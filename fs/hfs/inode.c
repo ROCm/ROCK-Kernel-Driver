@@ -190,7 +190,7 @@ static int __hfs_notify_change(struct dentry *dentry, struct iattr * attr, int k
 
 	/* Change the catalog entry if needed */
 	if (attr->ia_valid & ATTR_MTIME) {
-		entry->modify_date = hfs_u_to_mtime(inode->i_mtime);
+		entry->modify_date = hfs_u_to_mtime(inode->i_mtime.tv_sec);
 		hfs_cat_mark_dirty(entry);
 	}
 	if (attr->ia_valid & ATTR_MODE) {
@@ -323,8 +323,11 @@ struct inode *hfs_iget(struct hfs_cat_entry *entry, ino_t type,
 		struct hfs_sb_info *hsb = HFS_SB(sb);
 
 		inode->i_rdev = NODEV;
-		inode->i_ctime = inode->i_atime = inode->i_mtime =
+		inode->i_ctime.tv_sec = inode->i_atime.tv_sec = inode->i_mtime.tv_sec =
 					hfs_m_to_utime(entry->modify_date);
+		inode->i_ctime.tv_nsec = 0;
+		inode->i_mtime.tv_nsec = 0;
+		inode->i_atime.tv_nsec = 0;
 		inode->i_blksize = HFS_SECTOR_SIZE;
 		inode->i_uid = hsb->s_uid;
 		inode->i_gid = hsb->s_gid;

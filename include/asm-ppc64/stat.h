@@ -36,15 +36,17 @@ struct stat {
 	unsigned long  	st_blksize;
 	unsigned long  	st_blocks;
 	unsigned long  	st_atime;
-	unsigned long  	__unused1;
+	unsigned long	st_atime_nsec;
 	unsigned long  	st_mtime;
-	unsigned long  	__unused2;
+	unsigned long  	st_mtime_nsec;
 	unsigned long  	st_ctime;
-	unsigned long  	__unused3;
+	unsigned long  	st_ctime_nsec;
 	unsigned long  	__unused4;
 	unsigned long  	__unused5;
 	unsigned long  	__unused6;
 };
+
+#define STAT_HAVE_NSEC 1
 
 /* This matches struct stat64 in glibc2.1. */
 struct stat64 {
@@ -61,11 +63,11 @@ struct stat64 {
 
 	long st_blocks;			/* Number 512-byte blocks allocated. */
 	int   st_atime;			/* Time of last access.  */
-	unsigned int  __unused1;
+	int   st_atime_nsec;
 	int   st_mtime;			/* Time of last modification.  */
-	unsigned int  __unused2;
+	int   st_mtime_nsec;
 	int   st_ctime;			/* Time of last status change.  */
-	unsigned int   __unused3;
+	int   st_ctime_nsec;
 	unsigned int   __unused4;
 	unsigned int   __unused5;
 };

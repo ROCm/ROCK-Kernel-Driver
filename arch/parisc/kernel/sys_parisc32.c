@@ -660,7 +660,7 @@ get_timeval32(struct timeval32 *u, struct timeval *t)
 
 asmlinkage long sys32_time(time_t32 *tloc)
 {
-    time_t now = CURRENT_TIME;
+    time_t now = get_seconds();
     time_t32 now32 = now;
 
     if (tloc)

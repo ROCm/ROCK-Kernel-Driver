@@ -32,7 +32,7 @@
 
 void cache_init(struct cache_head *h)
 {
-	time_t now = CURRENT_TIME;
+	time_t now = get_seconds();
 	h->next = NULL;
 	h->flags = 0;
 	atomic_set(&h->refcnt, 0);
@@ -61,7 +61,7 @@ int cache_check(struct cache_detail *detail,
 
 	/* First decide return status as best we can */
 	if (!test_bit(CACHE_VALID, &h->flags) ||
-	    h->expiry_time < CURRENT_TIME)
+	    h->expiry_time < get_seconds())
 		rv = -EAGAIN;
 	else if (detail->flush_time > h->last_refresh)
 		rv = -EAGAIN;
@@ -74,7 +74,7 @@ int cache_check(struct cache_detail *detail,
 
 	/* now see if we want to start an upcall */
 	refresh_age = (h->expiry_time - h->last_refresh);
-	age = CURRENT_TIME - h->last_refresh;
+	age = get_seconds() - h->last_refresh;
 
 	if (rqstp == NULL) {
 		if (rv == -EAGAIN)
@@ -87,7 +87,7 @@ int cache_check(struct cache_detail *detail,
 				clear_bit(CACHE_PENDING, &h->flags);
 				if (rv == -EAGAIN) {
 					set_bit(CACHE_NEGATIVE, &h->flags);
-					cache_fresh(detail, h, CURRENT_TIME+CACHE_NEW_EXPIRY);
+					cache_fresh(detail, h, get_seconds()+CACHE_NEW_EXPIRY);
 					rv = -ENOENT;
 				}
 				break;
@@ -115,7 +115,7 @@ void cache_fresh(struct cache_detail *detail,
 {
 
 	head->expiry_time = expiry;
-	head->last_refresh = CURRENT_TIME;
+	head->last_refresh = get_seconds();
 	if (!test_and_set_bit(CACHE_VALID, &head->flags))
 		cache_revisit_request(head);
 	if (test_and_clear_bit(CACHE_PENDING, &head->flags))
@@ -182,7 +182,7 @@ void cache_register(struct cache_detail *cd)
 	cd->nextcheck = 0;
 	cd->entries = 0;
 	atomic_set(&cd->readers, 0);
-	cd->last_close = CURRENT_TIME;
+	cd->last_close = get_seconds();
 	list_add(&cd->others, &cache_list);
 	spin_unlock(&cache_list_lock);
 }
@@ -261,11 +261,11 @@ int cache_clean(void)
 			return -1;
 		}
 		current_detail = list_entry(next, struct cache_detail, others);
-		if (current_detail->nextcheck > CURRENT_TIME)
+		if (current_detail->nextcheck > get_seconds())
 			current_index = current_detail->hash_size;
 		else {
 			current_index = 0;
-			current_detail->nextcheck = CURRENT_TIME+30*60;
+			current_detail->nextcheck = get_seconds()+30*60;
 		}
 	}
 
@@ -289,7 +289,7 @@ int cache_clean(void)
 		for (; ch; cp= & ch->next, ch= *cp) {
 			if (atomic_read(&ch->refcnt))
 				continue;
-			if (ch->expiry_time < CURRENT_TIME
+			if (ch->expiry_time < get_seconds()
 			    || ch->last_refresh < current_detail->flush_time
 				)
 				break;
@@ -330,8 +330,8 @@ void cache_flush(void)
 
 void cache_purge(struct cache_detail *detail)
 {
-	detail->flush_time = CURRENT_TIME+1;
-	detail->nextcheck = CURRENT_TIME;
+	detail->flush_time = get_seconds()+1;
+	detail->nextcheck = get_seconds();
 	cache_flush();
 }
 
@@ -372,7 +372,7 @@ void cache_defer_req(struct cache_req *req, struct cache_head *item)
 		return;
 
 	dreq->item = item;
-	dreq->recv_time = CURRENT_TIME;
+	dreq->recv_time = get_seconds();
 
 	spin_lock(&cache_defer_lock);
 
@@ -702,7 +702,7 @@ cache_release(struct inode *inode, struct file *filp)
 	filp->private_data = NULL;
 	kfree(rp);
 
-	cd->last_close = CURRENT_TIME;
+	cd->last_close = get_seconds();
 	atomic_dec(&cd->readers);
 	return 0;
 }
@@ -831,7 +831,7 @@ static int cache_make_upcall(struct cache_detail *detail, struct cache_head *h)
 		return -EINVAL;
 
 	if (atomic_read(&detail->readers) == 0 &&
-	    detail->last_close < CURRENT_TIME - 60)
+	    detail->last_close < get_seconds() - 60)
 		/* nobody is listening */
 		return -EINVAL;
 

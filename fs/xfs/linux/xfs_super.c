@@ -426,9 +426,12 @@ xfs_revalidate_inode(
 	inode->i_size	= ip->i_d.di_size;
 	inode->i_blocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
-	inode->i_atime	= ip->i_d.di_atime.t_sec;
-	inode->i_mtime	= ip->i_d.di_mtime.t_sec;
-	inode->i_ctime	= ip->i_d.di_ctime.t_sec;
+	inode->i_atime.tv_sec	= ip->i_d.di_atime.t_sec;
+	inode->i_atime.tv_nsec	= ip->i_d.di_atime.t_nsec;
+	inode->i_mtime.tv_sec	= ip->i_d.di_mtime.t_sec;
+	inode->i_mtime.tv_nsec	= ip->i_d.di_mtime.t_nsec;
+	inode->i_ctime.tv_sec	= ip->i_d.di_ctime.t_sec;
+	inode->i_ctime.tv_nsec	= ip->i_d.di_ctime.t_nsec;
 
 	vp->v_flag &= ~VMODIFIED;
 }

@@ -479,7 +479,7 @@ int jffs2_do_unlink(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f,
 	rd->pino = dir_f->inocache->ino;
 	rd->version = ++dir_f->highest_version;
 	rd->ino = 0;
-	rd->mctime = CURRENT_TIME;
+	rd->mctime = get_seconds();
 	rd->nsize = namelen;
 	rd->type = DT_UNKNOWN;
 	rd->node_crc = crc32(0, rd, sizeof(*rd)-8);
@@ -561,7 +561,7 @@ int jffs2_do_link (struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, uint
 	rd->pino = dir_f->inocache->ino;
 	rd->version = ++dir_f->highest_version;
 	rd->ino = ino;
-	rd->mctime = CURRENT_TIME;
+	rd->mctime = get_seconds();
 	rd->nsize = namelen;
 
 	rd->type = type;

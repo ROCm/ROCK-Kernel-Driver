@@ -431,7 +431,7 @@ static int ext2_setup_super (struct super_block * sb,
 		printk ("EXT2-fs warning: maximal mount count reached, "
 			"running e2fsck is recommended\n");
 	else if (le32_to_cpu(es->s_checkinterval) &&
-		(le32_to_cpu(es->s_lastcheck) + le32_to_cpu(es->s_checkinterval) <= CURRENT_TIME))
+		(le32_to_cpu(es->s_lastcheck) + le32_to_cpu(es->s_checkinterval) <= get_seconds()))
 		printk ("EXT2-fs warning: checktime reached, "
 			"running e2fsck is recommended\n");
 	if (!(__s16) le16_to_cpu(es->s_max_mnt_count))
@@ -830,14 +830,14 @@ failed_sbi:
 static void ext2_commit_super (struct super_block * sb,
 			       struct ext2_super_block * es)
 {
-	es->s_wtime = cpu_to_le32(CURRENT_TIME);
+	es->s_wtime = cpu_to_le32(get_seconds());
 	mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
 	sb->s_dirt = 0;
 }
 
 static void ext2_sync_super(struct super_block *sb, struct ext2_super_block *es)
 {
-	es->s_wtime = cpu_to_le32(CURRENT_TIME);
+	es->s_wtime = cpu_to_le32(get_seconds());
 	mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
 	ll_rw_block(WRITE, 1, &EXT2_SB(sb)->s_sbh);
 	wait_on_buffer(EXT2_SB(sb)->s_sbh);
@@ -866,7 +866,7 @@ void ext2_write_super (struct super_block * sb)
 			ext2_debug ("setting valid to 0\n");
 			es->s_state = cpu_to_le16(le16_to_cpu(es->s_state) &
 						  ~EXT2_VALID_FS);
-			es->s_mtime = cpu_to_le32(CURRENT_TIME);
+			es->s_mtime = cpu_to_le32(get_seconds());
 			ext2_sync_super(sb, es);
 		} else
 			ext2_commit_super (sb, es);
@@ -901,7 +901,7 @@ static int ext2_remount (struct super_block * sb, int * flags, char * data)
 		 * the rdonly flag and then mark the partition as valid again.
 		 */
 		es->s_state = cpu_to_le16(sbi->s_mount_state);
-		es->s_mtime = cpu_to_le32(CURRENT_TIME);
+		es->s_mtime = cpu_to_le32(get_seconds());
 	} else {
 		int ret;
 		if ((ret = EXT2_HAS_RO_COMPAT_FEATURE(sb,

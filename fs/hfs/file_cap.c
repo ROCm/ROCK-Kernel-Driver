@@ -85,7 +85,7 @@ static void cap_build_meta(struct hfs_cap_info *meta,
 	meta->fi_datevalid = HFS_CAP_MDATE | HFS_CAP_CDATE;
 	hfs_put_nl(hfs_m_to_htime(entry->create_date), meta->fi_ctime);
 	hfs_put_nl(hfs_m_to_htime(entry->modify_date), meta->fi_mtime);
-	hfs_put_nl(CURRENT_TIME,                       meta->fi_utime);
+	hfs_put_nl(get_seconds(),                       meta->fi_utime);
 }
 
 static loff_t cap_info_llseek(struct file *file, loff_t offset, int origin)

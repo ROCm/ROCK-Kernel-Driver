@@ -608,9 +608,12 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 		de = map_dirent(s->s_root->d_inode, root_dno, "\001\001", 2, NULL, &qbh);
 	if (!root_dno || !de) hpfs_error(s, "unable to find root dir");
 	else {
-		s->s_root->d_inode->i_atime = local_to_gmt(s, de->read_date);
-		s->s_root->d_inode->i_mtime = local_to_gmt(s, de->write_date);
-		s->s_root->d_inode->i_ctime = local_to_gmt(s, de->creation_date);
+		s->s_root->d_inode->i_atime.tv_sec = local_to_gmt(s, de->read_date);
+		s->s_root->d_inode->i_atime.tv_nsec = 0;
+		s->s_root->d_inode->i_mtime.tv_sec = local_to_gmt(s, de->write_date);
+		s->s_root->d_inode->i_mtime.tv_nsec = 0;
+		s->s_root->d_inode->i_ctime.tv_sec = local_to_gmt(s, de->creation_date);
+		s->s_root->d_inode->i_ctime.tv_nsec = 0;
 		hpfs_i(s->s_root->d_inode)->i_ea_size = de->ea_size;
 		hpfs_i(s->s_root->d_inode)->i_parent_dir = s->s_root->d_inode->i_ino;
 		if (s->s_root->d_inode->i_size == -1) s->s_root->d_inode->i_size = 2048;

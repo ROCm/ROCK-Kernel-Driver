@@ -2117,7 +2117,7 @@ __u32 secure_ipv6_id(__u32 *daddr)
 {
 	struct keydata *keyptr;
 
-	keyptr = check_and_rekey(CURRENT_TIME);
+	keyptr = check_and_rekey(get_seconds());
 
 	return halfMD4Transform(daddr, keyptr->secret);
 }
@@ -2177,7 +2177,7 @@ __u32 secure_ip_id(__u32 daddr)
 	struct keydata *keyptr;
 	__u32 hash[4];
 
-	keyptr = check_and_rekey(CURRENT_TIME);
+	keyptr = check_and_rekey(get_seconds());
 
 	/*
 	 *  Pick a unique starting offset for each IP destination.

@@ -1008,7 +1008,7 @@ static void md_update_sb(mddev_t * mddev)
 
 	mddev->sb_dirty = 0;
 repeat:
-	mddev->utime = CURRENT_TIME;
+	mddev->utime = get_seconds();
 	mddev->events ++;
 
 	if (!mddev->events) {
@@ -2107,7 +2107,7 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 	mddev->major_version = MD_MAJOR_VERSION;
 	mddev->minor_version = MD_MINOR_VERSION;
 	mddev->patch_version = MD_PATCHLEVEL_VERSION;
-	mddev->ctime         = CURRENT_TIME;
+	mddev->ctime         = get_seconds();
 
 	mddev->level         = info->level;
 	mddev->size          = info->size;

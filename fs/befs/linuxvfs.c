@@ -360,8 +360,9 @@ befs_read_inode(struct inode *inode)
 	 * doesn't have creation time.
 	 */
 
-	inode->i_mtime =
-	    (time_t) (fs64_to_cpu(sb, raw_inode->last_modified_time) >> 16);
+	inode->i_mtime.tv_sec =
+	    fs64_to_cpu(sb, raw_inode->last_modified_time) >> 16;
+	inode->i_mtime.tv_nsec = 0;   /* use the lower bits ? */	
 	inode->i_ctime = inode->i_mtime;
 	inode->i_atime = inode->i_mtime;
 	inode->i_blksize = befs_sb->block_size;

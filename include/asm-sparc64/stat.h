@@ -69,13 +69,13 @@ struct stat64 {
 	unsigned int	st_blocks;
 
 	unsigned int	st_atime;
-	unsigned int	__unused1;
+	unsigned int	st_atime_nsec;
 
 	unsigned int	st_mtime;
-	unsigned int	__unused2;
+	unsigned int	st_mtime_nsec;
 
 	unsigned int	st_ctime;
-	unsigned int	__unused3;
+	unsigned int	st_ctime_nsec;
 
 	unsigned int	__unused4;
 	unsigned int	__unused5;

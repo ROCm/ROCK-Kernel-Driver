@@ -314,7 +314,7 @@ static int autofs_root_symlink(struct inode *dir, struct dentry *dentry, const c
 	}
 
 	memcpy(sl->data,symname,slsize);
-	sl->mtime = CURRENT_TIME;
+	sl->mtime = get_seconds();
 
 	ent->ino = AUTOFS_FIRST_SYMLINK + n;
 	ent->hash = dentry->d_name.hash;

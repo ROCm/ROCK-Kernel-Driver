@@ -1067,7 +1067,10 @@ sector_t bmap(struct inode * inode, sector_t block)
  
 void update_atime(struct inode *inode)
 {
-	if (inode->i_atime == CURRENT_TIME)
+	struct timespec now = CURRENT_TIME; 
+
+	/* Can later do this more lazily with a per superblock interval */
+	if (timespec_equal(&inode->i_atime, &now))
 		return;
 	if (IS_NOATIME(inode))
 		return;
@@ -1075,9 +1078,32 @@ void update_atime(struct inode *inode)
 		return;
 	if (IS_RDONLY(inode))
 		return;
-	inode->i_atime = CURRENT_TIME;
+	inode->i_atime = now;
 	mark_inode_dirty_sync(inode);
 }
+
+/**
+ *	inode_update_time	-	update mtime and ctime time
+ *	@inode: inode accessed
+ *	@ctime_too: update ctime too
+ *
+ *	Update the mtime time on an inode and mark it for writeback.
+ *	This function automatically handles read only file systems and media.
+ *	When ctime_too is specified update the ctime too.
+ */
+
+void inode_update_time(struct inode *inode, int ctime_too)
+{
+	struct timespec now = CURRENT_TIME; 
+	if (timespec_equal(&inode->i_mtime, &now) &&
+	    !(ctime_too && !timespec_equal(&inode->i_ctime, &now)))
+		return;
+	inode->i_mtime = now;
+	if (ctime_too) 
+		inode->i_ctime = now;
+	mark_inode_dirty_sync(inode);
+}
+EXPORT_SYMBOL(inode_update_time);
 
 int inode_needs_sync(struct inode *inode)
 {

@@ -24,6 +24,8 @@ struct timezone {
 
 #ifdef __KERNEL__
 
+#include <linux/spinlock.h>
+
 /*
  * Change timeval to jiffies, trying to avoid the
  * most obvious overflows..
@@ -79,6 +81,10 @@ jiffies_to_timeval(unsigned long jiffies, struct timeval *value)
 	value->tv_sec = jiffies / HZ;
 }
 
+static __inline__ int timespec_equal(struct timespec *a, struct timespec *b) 
+{ 
+	return (a->tv_sec == b->tv_sec) && (a->tv_nsec == b->tv_nsec);
+} 
 
 /* Converts Gregorian date to seconds since 1970-01-01 00:00:00.
  * Assumes input in normal date format, i.e. 1980-12-31 23:59:59
@@ -114,8 +120,16 @@ mktime (unsigned int year, unsigned int mon,
 }
 
 extern struct timespec xtime;
+extern rwlock_t xtime_lock;
 
-#define CURRENT_TIME (xtime.tv_sec)
+static inline unsigned long get_seconds(void)
+{ 
+	return xtime.tv_sec;
+}
+
+struct timespec current_kernel_time(void);
+
+#define CURRENT_TIME (current_kernel_time())
 
 #endif /* __KERNEL__ */
 

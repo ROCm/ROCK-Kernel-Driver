@@ -514,23 +514,25 @@ date_unix2dos(struct smb_sb_info *server,
  * Convert the NT UTC (based 1601-01-01, in hundred nanosecond units)
  * into Unix UTC (based 1970-01-01, in seconds).
  */
-static time_t
+static struct timespec
 smb_ntutc2unixutc(u64 ntutc)
 {
+	struct timespec ts;
 	/* FIXME: what about the timezone difference? */
 	/* Subtract the NTFS time offset, then convert to 1s intervals. */
 	u64 t = ntutc - NTFS_TIME_OFFSET;
-	do_div(t, 10000000);
-	return (time_t)t;
+	ts.tv_nsec = do_div(t, 10000000) * 100;
+	ts.tv_sec = t; 
+	return ts;
 }
 
 /* Convert the Unix UTC into NT time */
 static u64
-smb_unixutc2ntutc(time_t t)
+smb_unixutc2ntutc(struct timespec ts)
 {
 	/* Note: timezone conversion is probably wrong. */
 	/* return ((u64)utc2local(server, t)) * 10000000 + NTFS_TIME_OFFSET; */
-	return ((u64)t) * 10000000 + NTFS_TIME_OFFSET;
+	return ((u64)ts.tv_sec) * 10000000 + ts.tv_nsec/100 + NTFS_TIME_OFFSET;
 }
 
 #define MAX_FILE_MODE	6
@@ -1239,10 +1241,14 @@ smb_proc_close_inode(struct smb_sb_info *server, struct inode * ino)
 		 * two seconds ... round the times to avoid needless
 		 * cache invalidations!
 		 */
-		if (ino->i_mtime & 1)
-			ino->i_mtime--;
-		if (ino->i_atime & 1)
-			ino->i_atime--;
+		if (ino->i_mtime.tv_sec & 1) { 
+			ino->i_mtime.tv_sec--;
+			ino->i_mtime.tv_nsec = 0; 
+		}
+		if (ino->i_atime.tv_sec & 1) {
+			ino->i_atime.tv_sec--;
+			ino->i_atime.tv_nsec = 0;
+		}
 		/*
 		 * If the file is open with write permissions,
 		 * update the time stamps to sync mtime and atime.
@@ -1256,7 +1262,7 @@ smb_proc_close_inode(struct smb_sb_info *server, struct inode * ino)
 			smb_proc_setattr_ext(server, ino, &fattr);
 		}
 
-		result = smb_proc_close(server, ei->fileid, ino->i_mtime);
+		result = smb_proc_close(server, ei->fileid, ino->i_mtime.tv_sec);
 		/*
 		 * Force a revalidation after closing ... some servers
 		 * don't post the size until the file has been closed.
@@ -1290,7 +1296,7 @@ smb_close_fileid(struct dentry *dentry, __u16 fileid)
 	struct smb_sb_info *server = server_from_dentry(dentry);
 	int result;
 
-	result = smb_proc_close(server, fileid, CURRENT_TIME);
+	result = smb_proc_close(server, fileid, get_seconds());
 	return result;
 }
 
@@ -1875,7 +1881,8 @@ smb_decode_short_dirent(struct smb_sb_info *server, char *p,
 
 	p += SMB_STATUS_SIZE;	/* reserved (search_status) */
 	fattr->attr = *p;
-	fattr->f_mtime = date_dos2unix(server, WVAL(p, 3), WVAL(p, 1));
+	fattr->f_mtime.tv_sec = date_dos2unix(server, WVAL(p, 3), WVAL(p, 1));
+	fattr->f_mtime.tv_nsec = 0;
 	fattr->f_size = DVAL(p, 5);
 	fattr->f_ctime = fattr->f_mtime;
 	fattr->f_atime = fattr->f_mtime;
@@ -2136,15 +2143,18 @@ smb_decode_long_dirent(struct smb_sb_info *server, char *p, int level,
 
 		date = WVAL(p, 0);
 		time = WVAL(p, 2);
-		fattr->f_ctime = date_dos2unix(server, date, time);
+		fattr->f_ctime.tv_sec = date_dos2unix(server, date, time);
+		fattr->f_ctime.tv_nsec = 0;
 
 		date = WVAL(p, 4);
 		time = WVAL(p, 6);
-		fattr->f_atime = date_dos2unix(server, date, time);
+		fattr->f_atime.tv_sec = date_dos2unix(server, date, time);
+		fattr->f_atime.tv_nsec = 0;
 
 		date = WVAL(p, 8);
 		time = WVAL(p, 10);
-		fattr->f_mtime = date_dos2unix(server, date, time);
+		fattr->f_mtime.tv_sec = date_dos2unix(server, date, time);
+		fattr->f_mtime.tv_nsec = 0;
 		fattr->f_size = DVAL(p, 12);
 		/* ULONG allocation size */
 		fattr->attr = WVAL(p, 20);
@@ -2535,15 +2545,18 @@ smb_proc_getattr_ff(struct smb_sb_info *server, struct dentry *dentry,
 	 */
 	date = WVAL(req->rq_data, 0);
 	time = WVAL(req->rq_data, 2);
-	fattr->f_ctime = date_dos2unix(server, date, time);
+	fattr->f_ctime.tv_sec = date_dos2unix(server, date, time);
+	fattr->f_ctime.tv_nsec = 0;
 
 	date = WVAL(req->rq_data, 4);
 	time = WVAL(req->rq_data, 6);
-	fattr->f_atime = date_dos2unix(server, date, time);
+	fattr->f_atime.tv_sec = date_dos2unix(server, date, time);
+	fattr->f_atime.tv_nsec = 0;
 
 	date = WVAL(req->rq_data, 8);
 	time = WVAL(req->rq_data, 10);
-	fattr->f_mtime = date_dos2unix(server, date, time);
+	fattr->f_mtime.tv_sec = date_dos2unix(server, date, time);
+	fattr->f_mtime.tv_nsec = 0;
 	VERBOSE("name=%s, date=%x, time=%x, mtime=%ld\n",
 		mask, date, time, fattr->f_mtime);
 	fattr->f_size = DVAL(req->rq_data, 12);
@@ -2578,7 +2591,8 @@ smb_proc_getattr_core(struct smb_sb_info *server, struct dentry *dir,
 	if ((result = smb_request_ok(req, SMBgetatr, 10, 0)) < 0)
 		goto out_free;
 	fattr->attr    = WVAL(req->rq_header, smb_vwv0);
-	fattr->f_mtime = local2utc(server, DVAL(req->rq_header, smb_vwv1));
+	fattr->f_mtime.tv_sec = local2utc(server, DVAL(req->rq_header, smb_vwv1));
+	fattr->f_mtime.tv_nsec = 0;
 	fattr->f_size  = DVAL(req->rq_header, smb_vwv3);
 	fattr->f_ctime = fattr->f_mtime; 
 	fattr->f_atime = fattr->f_mtime; 
@@ -2667,15 +2681,18 @@ smb_proc_getattr_trans2_std(struct smb_sb_info *server, struct dentry *dir,
 	}
 	date = WVAL(req->rq_data, off_date);
 	time = WVAL(req->rq_data, off_time);
-	attr->f_ctime = date_dos2unix(server, date, time);
+	attr->f_ctime.tv_sec = date_dos2unix(server, date, time);
+	attr->f_ctime.tv_nsec = 0;
 
 	date = WVAL(req->rq_data, 4 + off_date);
 	time = WVAL(req->rq_data, 4 + off_time);
-	attr->f_atime = date_dos2unix(server, date, time);
+	attr->f_atime.tv_sec = date_dos2unix(server, date, time);
+	attr->f_atime.tv_nsec = 0;
 
 	date = WVAL(req->rq_data, 8 + off_date);
 	time = WVAL(req->rq_data, 8 + off_time);
-	attr->f_mtime = date_dos2unix(server, date, time);
+	attr->f_mtime.tv_sec = date_dos2unix(server, date, time);
+	attr->f_mtime.tv_nsec = 0;
 #ifdef SMBFS_DEBUG_TIMESTAMP
 	printk(KERN_DEBUG "getattr_trans2: %s/%s, date=%x, time=%x, mtime=%ld\n",
 	       DENTRY_PATH(dir), date, time, attr->f_mtime);
@@ -2877,10 +2894,10 @@ smb_proc_setattr_ext(struct smb_sb_info *server,
 	/* We don't change the creation time */
 	WSET(req->rq_header, smb_vwv1, 0);
 	WSET(req->rq_header, smb_vwv2, 0);
-	date_unix2dos(server, fattr->f_atime, &date, &time);
+	date_unix2dos(server, fattr->f_atime.tv_sec, &date, &time);
 	WSET(req->rq_header, smb_vwv3, date);
 	WSET(req->rq_header, smb_vwv4, time);
-	date_unix2dos(server, fattr->f_mtime, &date, &time);
+	date_unix2dos(server, fattr->f_mtime.tv_sec, &date, &time);
 	WSET(req->rq_header, smb_vwv5, date);
 	WSET(req->rq_header, smb_vwv6, time);
 #ifdef SMBFS_DEBUG_TIMESTAMP
@@ -2928,10 +2945,10 @@ smb_proc_setattr_trans2(struct smb_sb_info *server,
 
 	WSET(data, 0, 0); /* creation time */
 	WSET(data, 2, 0);
-	date_unix2dos(server, fattr->f_atime, &date, &time);
+	date_unix2dos(server, fattr->f_atime.tv_sec, &date, &time);
 	WSET(data, 4, date);
 	WSET(data, 6, time);
-	date_unix2dos(server, fattr->f_mtime, &date, &time);
+	date_unix2dos(server, fattr->f_mtime.tv_sec, &date, &time);
 	WSET(data, 8, date);
 	WSET(data, 10, time);
 #ifdef SMBFS_DEBUG_TIMESTAMP

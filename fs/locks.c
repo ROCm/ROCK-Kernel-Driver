@@ -1101,12 +1101,13 @@ out:
  * exclusive leases.  The justification is that if someone has an
  * exclusive lease, then they could be modifiying it.
  */
-time_t lease_get_mtime(struct inode *inode)
+void lease_get_mtime(struct inode *inode, struct timespec *time)
 {
 	struct file_lock *flock = inode->i_flock;
 	if (flock && IS_LEASE(flock) && (flock->fl_type & F_WRLCK))
-		return CURRENT_TIME;
-	return inode->i_mtime;
+		*time = CURRENT_TIME;
+	else
+		*time = inode->i_mtime;
 }
 
 /**

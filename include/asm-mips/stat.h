@@ -37,11 +37,11 @@ struct stat {
 	 * but we don't have it under Linux.
 	 */
 	time_t		st_atime;
-	long		reserved0;
+	long		st_atime_nsec;
 	time_t		st_mtime;
-	long		reserved1;
+	long		st_mtime_nsec;
 	time_t		st_ctime;
-	long		reserved2;
+	long		st_ctime_nsec;
 	long		st_blksize;
 	long		st_blocks;
 	long		st_pad4[14];

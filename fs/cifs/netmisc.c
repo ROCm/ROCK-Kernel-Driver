@@ -878,23 +878,25 @@ smbCalcSize(struct smb_hdr *ptr)
      * Convert the NT UTC (based 1601-01-01, in hundred nanosecond units)
      * into Unix UTC (based 1970-01-01, in seconds).
      */
-time_t
+struct timespec
 cifs_NTtimeToUnix(u64 ntutc)
 {
+	struct timespec ts; 
 	/* BB what about the timezone? BB */
 
 	/* Subtract the NTFS time offset, then convert to 1s intervals. */
 	u64 t;
 
 	t = ntutc - NTFS_TIME_OFFSET;
-	do_div(t, 10000000);
-	return (time_t) t;
+	ts.tv_nsec = do_div(t, 10000000) * 100;
+	ts.tv_sec = t; 
+	return ts;
 }
 
 /* Convert the Unix UTC into NT UTC. */
 u64
-cifs_UnixTimeToNT(time_t t)
+cifs_UnixTimeToNT(struct timespec t)
 {
 	/* Convert to 100ns intervals and then add the NTFS time offset. */
-	return (u64) t *10000000 + NTFS_TIME_OFFSET;
+	return (u64) t.tv_sec * 10000000 + t.tv_nsec/100 + NTFS_TIME_OFFSET;
 }

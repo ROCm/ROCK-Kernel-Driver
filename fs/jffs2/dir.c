@@ -211,7 +211,8 @@ static int jffs2_create(struct inode *dir_i, struct dentry *dentry, int mode)
 		return ret;
 	}
 
-	dir_i->i_mtime = dir_i->i_ctime = ri->ctime;
+	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = ri->ctime;
+	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
 
 	jffs2_free_raw_inode(ri);
 	d_instantiate(dentry, inode);
@@ -377,7 +378,7 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 	rd->pino = dir_i->i_ino;
 	rd->version = ++dir_f->highest_version;
 	rd->ino = inode->i_ino;
-	rd->mctime = CURRENT_TIME;
+	rd->mctime = get_seconds();
 	rd->nsize = namelen;
 	rd->type = DT_LNK;
 	rd->node_crc = crc32(0, rd, sizeof(*rd)-8);
@@ -395,7 +396,8 @@ static int jffs2_symlink (struct inode *dir_i, struct dentry *dentry, const char
 		return PTR_ERR(fd);
 	}
 
-	dir_i->i_mtime = dir_i->i_ctime = rd->mctime;
+	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = rd->mctime;
+	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
 
 	jffs2_free_raw_dirent(rd);
 
@@ -514,7 +516,7 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 	rd->pino = dir_i->i_ino;
 	rd->version = ++dir_f->highest_version;
 	rd->ino = inode->i_ino;
-	rd->mctime = CURRENT_TIME;
+	rd->mctime = get_seconds();
 	rd->nsize = namelen;
 	rd->type = DT_DIR;
 	rd->node_crc = crc32(0, rd, sizeof(*rd)-8);
@@ -532,7 +534,8 @@ static int jffs2_mkdir (struct inode *dir_i, struct dentry *dentry, int mode)
 		return PTR_ERR(fd);
 	}
 
-	dir_i->i_mtime = dir_i->i_ctime = rd->mctime;
+	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = rd->mctime;
+	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
 	dir_i->i_nlink++;
 
 	jffs2_free_raw_dirent(rd);
@@ -674,7 +677,7 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, in
 	rd->pino = dir_i->i_ino;
 	rd->version = ++dir_f->highest_version;
 	rd->ino = inode->i_ino;
-	rd->mctime = CURRENT_TIME;
+	rd->mctime = get_seconds();
 	rd->nsize = namelen;
 
 	/* XXX: This is ugly. */
@@ -695,7 +698,8 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, in
 		return PTR_ERR(fd);
 	}
 
-	dir_i->i_mtime = dir_i->i_ctime = rd->mctime;
+	dir_i->i_mtime.tv_sec = dir_i->i_ctime.tv_sec = rd->mctime;
+	dir_i->i_mtime.tv_nsec = dir_i->i_ctime.tv_nsec = 0;
 
 	jffs2_free_raw_dirent(rd);
 

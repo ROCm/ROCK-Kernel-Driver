@@ -211,7 +211,7 @@ void ext3_delete_inode (struct inode * inode)
 	 * (Well, we could do this if we need to, but heck - it works)
 	 */
 	ext3_orphan_del(handle, inode);
-	EXT3_I(inode)->i_dtime	= CURRENT_TIME;
+	EXT3_I(inode)->i_dtime	= get_seconds();
 
 	/* 
 	 * One subtle ordering requirement: if anything has gone wrong
@@ -2218,9 +2218,10 @@ void ext3_read_inode(struct inode * inode)
 	}
 	inode->i_nlink = le16_to_cpu(raw_inode->i_links_count);
 	inode->i_size = le32_to_cpu(raw_inode->i_size);
-	inode->i_atime = le32_to_cpu(raw_inode->i_atime);
-	inode->i_ctime = le32_to_cpu(raw_inode->i_ctime);
-	inode->i_mtime = le32_to_cpu(raw_inode->i_mtime);
+	inode->i_atime.tv_sec = le32_to_cpu(raw_inode->i_atime);
+	inode->i_ctime.tv_sec = le32_to_cpu(raw_inode->i_ctime);
+	inode->i_mtime.tv_sec = le32_to_cpu(raw_inode->i_mtime);
+	inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_mtime.tv_nsec = 0;
 
 	ei->i_state = 0;
 	ei->i_next_alloc_block = 0;
@@ -2371,9 +2372,9 @@ static int ext3_do_update_inode(handle_t *handle,
 	}
 	raw_inode->i_links_count = cpu_to_le16(inode->i_nlink);
 	raw_inode->i_size = cpu_to_le32(ei->i_disksize);
-	raw_inode->i_atime = cpu_to_le32(inode->i_atime);
-	raw_inode->i_ctime = cpu_to_le32(inode->i_ctime);
-	raw_inode->i_mtime = cpu_to_le32(inode->i_mtime);
+	raw_inode->i_atime = cpu_to_le32(inode->i_atime.tv_sec);
+	raw_inode->i_ctime = cpu_to_le32(inode->i_ctime.tv_sec);
+	raw_inode->i_mtime = cpu_to_le32(inode->i_mtime.tv_sec);
 	raw_inode->i_blocks = cpu_to_le32(inode->i_blocks);
 	raw_inode->i_dtime = cpu_to_le32(ei->i_dtime);
 	raw_inode->i_flags = cpu_to_le32(ei->i_flags);

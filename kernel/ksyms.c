@@ -601,3 +601,5 @@ EXPORT_SYMBOL(__per_cpu_offset);
 
 /* debug */
 EXPORT_SYMBOL(dump_stack);
+
+EXPORT_SYMBOL(current_kernel_time); 

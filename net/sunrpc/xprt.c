@@ -1284,7 +1284,7 @@ xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
 	static u32	xid = 0;
 
 	if (!xid)
-		xid = CURRENT_TIME << 12;
+		xid = get_seconds() << 12;
 
 	dprintk("RPC: %4d reserved req %p xid %08x\n", task->tk_pid, req, xid);
 	req->rq_timeout = xprt->timeout;

@@ -155,7 +155,7 @@ static int newary (key_t key, int nsems, int semflg)
 	sma->sem_pending_last = &sma->sem_pending;
 	/* sma->undo = NULL; */
 	sma->sem_nsems = nsems;
-	sma->sem_ctime = CURRENT_TIME;
+	sma->sem_ctime = get_seconds();
 	sem_unlock(sma);
 
 	return sem_buildid(id, sma->sem_perm.seq);
@@ -296,7 +296,7 @@ static int try_atomic_semop (struct sem_array * sma, struct sembuf * sops,
 		goto undo;
 	}
 
-	sma->sem_otime = CURRENT_TIME;
+	sma->sem_otime = get_seconds();
 	return 0;
 
 out_of_range:
@@ -605,7 +605,7 @@ static int semctl_main(int semid, int semnum, int cmd, int version, union semun 
 		for (un = sma->undo; un; un = un->id_next)
 			for (i = 0; i < nsems; i++)
 				un->semadj[i] = 0;
-		sma->sem_ctime = CURRENT_TIME;
+		sma->sem_ctime = get_seconds();
 		/* maybe some queued-up processes were waiting for this */
 		update_queue(sma);
 		err = 0;
@@ -657,7 +657,7 @@ static int semctl_main(int semid, int semnum, int cmd, int version, union semun 
 			un->semadj[semnum] = 0;
 		curr->semval = val;
 		curr->sempid = current->pid;
-		sma->sem_ctime = CURRENT_TIME;
+		sma->sem_ctime = get_seconds();
 		/* maybe some queued-up processes were waiting for this */
 		update_queue(sma);
 		err = 0;
@@ -749,7 +749,7 @@ static int semctl_down(int semid, int semnum, int cmd, int version, union semun 
 		ipcp->gid = setbuf.gid;
 		ipcp->mode = (ipcp->mode & ~S_IRWXUGO)
 				| (setbuf.mode & S_IRWXUGO);
-		sma->sem_ctime = CURRENT_TIME;
+		sma->sem_ctime = get_seconds();
 		sem_unlock(sma);
 		err = 0;
 		break;
@@ -1228,7 +1228,7 @@ found:
 				sem->semval = 0; /* shouldn't happen */
 			sem->sempid = current->pid;
 		}
-		sma->sem_otime = CURRENT_TIME;
+		sma->sem_otime = get_seconds();
 		/* maybe some queued-up processes were waiting for this */
 		update_queue(sma);
 next_entry:

@@ -33,7 +33,7 @@
 static void sysv_write_super(struct super_block *sb)
 {
 	struct sysv_sb_info *sbi = SYSV_SB(sb);
-	unsigned long time = CURRENT_TIME, old_time;
+	unsigned long time = get_seconds(), old_time;
 
 	lock_kernel();
 	if (sb->s_flags & MS_RDONLY)
@@ -184,9 +184,12 @@ static void sysv_read_inode(struct inode *inode)
 	inode->i_gid = (gid_t)fs16_to_cpu(sbi, raw_inode->i_gid);
 	inode->i_nlink = fs16_to_cpu(sbi, raw_inode->i_nlink);
 	inode->i_size = fs32_to_cpu(sbi, raw_inode->i_size);
-	inode->i_atime = fs32_to_cpu(sbi, raw_inode->i_atime);
-	inode->i_mtime = fs32_to_cpu(sbi, raw_inode->i_mtime);
-	inode->i_ctime = fs32_to_cpu(sbi, raw_inode->i_ctime);
+	inode->i_atime.tv_sec = fs32_to_cpu(sbi, raw_inode->i_atime);
+	inode->i_mtime.tv_sec = fs32_to_cpu(sbi, raw_inode->i_mtime);
+	inode->i_ctime.tv_sec = fs32_to_cpu(sbi, raw_inode->i_ctime);
+	inode->i_ctime.tv_nsec = 0;
+	inode->i_atime.tv_nsec = 0;
+	inode->i_mtime.tv_nsec = 0;
 	inode->i_blocks = inode->i_blksize = 0;
 
 	si = SYSV_I(inode);
@@ -231,9 +234,9 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 	raw_inode->i_gid = cpu_to_fs16(sbi, fs_high2lowgid(inode->i_gid));
 	raw_inode->i_nlink = cpu_to_fs16(sbi, inode->i_nlink);
 	raw_inode->i_size = cpu_to_fs32(sbi, inode->i_size);
-	raw_inode->i_atime = cpu_to_fs32(sbi, inode->i_atime);
-	raw_inode->i_mtime = cpu_to_fs32(sbi, inode->i_mtime);
-	raw_inode->i_ctime = cpu_to_fs32(sbi, inode->i_ctime);
+	raw_inode->i_atime = cpu_to_fs32(sbi, inode->i_atime.tv_sec);
+	raw_inode->i_mtime = cpu_to_fs32(sbi, inode->i_mtime.tv_sec);
+	raw_inode->i_ctime = cpu_to_fs32(sbi, inode->i_ctime.tv_sec);
 
 	si = SYSV_I(inode);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))

@@ -475,7 +475,7 @@ int lento_setattr(const char *name, struct iattr *iattr,
                name, iattr->ia_valid, iattr->ia_mode, iattr->ia_uid,
                iattr->ia_gid, iattr->ia_size);
         CDEBUG(D_PIOCTL, "atime %#lx, mtime %#lx, ctime %#lx, attr_flags %#x\n",
-               iattr->ia_atime, iattr->ia_mtime, iattr->ia_ctime,
+               iattr->ia_atime, iattr->ia_mtime.tv_sec, iattr->ia_ctime.tv_sec,
                iattr->ia_attr_flags);
         CDEBUG(D_PIOCTL, "offset %d, recno %d, flags %#x\n",
                info->slot_offset, info->recno, info->flags);

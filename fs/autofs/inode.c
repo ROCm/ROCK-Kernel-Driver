@@ -233,7 +233,8 @@ static void autofs_read_inode(struct inode *inode)
 		sl = &sbi->symlink[n];
 		inode->u.generic_ip = sl;
 		inode->i_mode = S_IFLNK | S_IRWXUGO;
-		inode->i_mtime = inode->i_ctime = sl->mtime;
+		inode->i_mtime.tv_sec = inode->i_ctime.tv_sec = sl->mtime;
+		inode->i_mtime.tv_nsec = inode->i_ctime.tv_nsec = 0;
 		inode->i_size = sl->len;
 		inode->i_nlink = 1;
 	}

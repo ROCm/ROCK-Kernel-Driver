@@ -87,7 +87,7 @@ static inline hfs_s32 hfs_to_utc(hfs_u32 time)
 }
 
 static inline hfs_u32 hfs_time(void) {
-	return htonl(hfs_from_utc(CURRENT_TIME)+2082844800U);
+	return htonl(hfs_from_utc(get_seconds())+2082844800U);
 }
 
 

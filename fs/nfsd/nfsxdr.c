@@ -122,12 +122,14 @@ decode_sattr(u32 *p, struct iattr *iap)
 	tmp  = ntohl(*p++); tmp1 = ntohl(*p++);
 	if (tmp != (u32)-1 && tmp1 != (u32)-1) {
 		iap->ia_valid |= ATTR_ATIME | ATTR_ATIME_SET;
-		iap->ia_atime = tmp;
+		iap->ia_atime.tv_sec = tmp;
+		iap->ia_atime.tv_nsec = tmp1; 
 	}
 	tmp  = ntohl(*p++); tmp1 = ntohl(*p++);
 	if (tmp != (u32)-1 && tmp1 != (u32)-1) {
 		iap->ia_valid |= ATTR_MTIME | ATTR_MTIME_SET;
-		iap->ia_mtime = tmp;
+		iap->ia_mtime.tv_sec = tmp;
+		iap->ia_mtime.tv_nsec = tmp1; 
 	}
 	return p;
 }
@@ -139,6 +141,7 @@ encode_fattr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	struct dentry	*dentry = fhp->fh_dentry;
 	struct kstat stat;
 	int type;
+	struct timespec time;
 
 	vfs_getattr(mnt, dentry, &stat);
 	type = (stat.mode & S_IFMT);
@@ -167,12 +170,13 @@ encode_fattr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	else
 		*p++ = htonl((u32) stat.dev);
 	*p++ = htonl((u32) stat.ino);
-	*p++ = htonl((u32) stat.atime);
-	*p++ = 0;
-	*p++ = htonl((u32) lease_get_mtime(dentry->d_inode));
-	*p++ = 0;
-	*p++ = htonl((u32) stat.ctime);
-	*p++ = 0;
+	*p++ = htonl((u32) stat.atime.tv_sec);
+	*p++ = htons(stat.atime.tv_nsec);
+	lease_get_mtime(dentry->d_inode, &time); 
+	*p++ = htonl((u32) time.tv_sec);
+	*p++ = htons(time.tv_nsec); 
+	*p++ = htonl((u32) stat.ctime.tv_sec);
+	*p++ = htons(stat.ctime.tv_nsec);
 
 	return p;
 }

@@ -216,9 +216,12 @@ vn_revalidate(struct vnode *vp)
 		inode->i_gid	    = va.va_gid;
 		inode->i_size	    = va.va_size;
 		inode->i_blocks	    = va.va_nblocks;
-		inode->i_mtime	    = va.va_mtime.tv_sec;
-		inode->i_ctime	    = va.va_ctime.tv_sec;
-		inode->i_atime	    = va.va_atime.tv_sec;
+		inode->i_mtime.tv_sec	    = va.va_mtime.tv_sec;
+		inode->i_mtime.tv_nsec	    = va.va_mtime.tv_nsec;
+		inode->i_ctime.tv_sec	    = va.va_ctime.tv_sec;
+		inode->i_ctime.tv_nsec	    = va.va_ctime.tv_nsec;
+		inode->i_atime.tv_sec	    = va.va_atime.tv_sec;
+		inode->i_atime.tv_nsec	    = va.va_atime.tv_nsec;
 		VUNMODIFY(vp);
 	}
 

@@ -514,7 +514,8 @@ static int fat_read_root(struct inode *inode)
 	MSDOS_I(inode)->mmu_private = inode->i_size;
 
 	MSDOS_I(inode)->i_attrs = 0;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = 0;
+	inode->i_mtime.tv_sec = inode->i_atime.tv_sec = inode->i_ctime.tv_sec = 0;
+	inode->i_mtime.tv_nsec = inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = 0;
 	MSDOS_I(inode)->i_ctime_ms = 0;
 	inode->i_nlink = fat_subdirs(inode)+2;
 
@@ -1090,7 +1091,7 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;
-	inode->i_generation = CURRENT_TIME;
+	inode->i_generation = get_seconds();
 	
 	if ((de->attr & ATTR_DIR) && !IS_FREE(de->name)) {
 		inode->i_generation &= ~1;
@@ -1138,12 +1139,14 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	inode->i_blksize = 1 << sbi->cluster_bits;
 	inode->i_blocks = ((inode->i_size + inode->i_blksize - 1)
 			   & ~((loff_t)inode->i_blksize - 1)) >> 9;
-	inode->i_mtime = inode->i_atime =
+	inode->i_mtime.tv_sec = inode->i_atime.tv_sec =
 		date_dos2unix(CF_LE_W(de->time),CF_LE_W(de->date));
-	inode->i_ctime =
+	inode->i_mtime.tv_nsec = inode->i_atime.tv_nsec = 0;
+	inode->i_ctime.tv_sec =
 		MSDOS_SB(sb)->options.isvfat
 		? date_dos2unix(CF_LE_W(de->ctime),CF_LE_W(de->cdate))
-		: inode->i_mtime;
+		: inode->i_mtime.tv_sec;
+	inode->i_ctime.tv_nsec = de->ctime_ms * 1000000;
 	MSDOS_I(inode)->i_ctime_ms = de->ctime_ms;
 
 	return 0;
@@ -1190,12 +1193,12 @@ retry:
 	    MSDOS_I(inode)->i_attrs;
 	raw_entry->start = CT_LE_W(MSDOS_I(inode)->i_logstart);
 	raw_entry->starthi = CT_LE_W(MSDOS_I(inode)->i_logstart >> 16);
-	fat_date_unix2dos(inode->i_mtime,&raw_entry->time,&raw_entry->date);
+	fat_date_unix2dos(inode->i_mtime.tv_sec,&raw_entry->time,&raw_entry->date);
 	raw_entry->time = CT_LE_W(raw_entry->time);
 	raw_entry->date = CT_LE_W(raw_entry->date);
 	if (MSDOS_SB(sb)->options.isvfat) {
-		fat_date_unix2dos(inode->i_ctime,&raw_entry->ctime,&raw_entry->cdate);
-		raw_entry->ctime_ms = MSDOS_I(inode)->i_ctime_ms;
+		fat_date_unix2dos(inode->i_ctime.tv_sec,&raw_entry->ctime,&raw_entry->cdate);
+		raw_entry->ctime_ms = MSDOS_I(inode)->i_ctime_ms; /* use i_ctime.tv_nsec? */
 		raw_entry->ctime = CT_LE_W(raw_entry->ctime);
 		raw_entry->cdate = CT_LE_W(raw_entry->cdate);
 	}

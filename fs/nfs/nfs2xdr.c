@@ -133,7 +133,7 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	SATTR(p, attr, ATTR_SIZE, ia_size);
 
 	if (attr->ia_valid & (ATTR_ATIME|ATTR_ATIME_SET)) {
-		*p++ = htonl(attr->ia_atime);
+		*p++ = htonl(attr->ia_atime.tv_sec);
 		*p++ = 0;
 	} else {
 		*p++ = ~(u32) 0;
@@ -141,7 +141,7 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	}
 
 	if (attr->ia_valid & (ATTR_MTIME|ATTR_MTIME_SET)) {
-		*p++ = htonl(attr->ia_mtime);
+		*p++ = htonl(attr->ia_mtime.tv_sec);
 		*p++ = 0;
 	} else {
 		*p++ = ~(u32) 0;	

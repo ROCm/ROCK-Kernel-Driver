@@ -276,7 +276,7 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname,
 		goto abort;
 
 	/* success */
-	entry->ctime = xtime.tv_sec;
+	entry->ctime = get_seconds();
 	ret = 0;
 
  out_unwait:
@@ -407,7 +407,7 @@ int afs_rxvl_get_entry_by_id(afs_server_t *server,
 #endif
 
 	/* success */
-	entry->ctime = xtime.tv_sec;
+	entry->ctime = get_seconds();
 	ret = 0;
 
  out_unwait:
@@ -584,7 +584,7 @@ int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
 #endif
 
 		/* success */
-		entry->ctime = xtime.tv_sec;
+		entry->ctime = CURRENT_TIME;
 		ret = 0;
 		goto done;
 	}

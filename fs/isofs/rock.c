@@ -308,14 +308,22 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
 	/* Some RRIP writers incorrectly place ctime in the TF_CREATE field.
 	   Try to handle this correctly for either case. */
 	cnt = 0; /* Rock ridge never appears on a High Sierra disk */
-	if(rr->u.TF.flags & TF_CREATE) 
-	  inode->i_ctime = iso_date(rr->u.TF.times[cnt++].time, 0);
-	if(rr->u.TF.flags & TF_MODIFY) 
-	  inode->i_mtime = iso_date(rr->u.TF.times[cnt++].time, 0);
-	if(rr->u.TF.flags & TF_ACCESS) 
-	  inode->i_atime = iso_date(rr->u.TF.times[cnt++].time, 0);
-	if(rr->u.TF.flags & TF_ATTRIBUTES) 
-	  inode->i_ctime = iso_date(rr->u.TF.times[cnt++].time, 0);
+	if(rr->u.TF.flags & TF_CREATE) { 
+	  inode->i_ctime.tv_sec = iso_date(rr->u.TF.times[cnt++].time, 0);
+	  inode->i_ctime.tv_nsec = 0;
+	}
+	if(rr->u.TF.flags & TF_MODIFY) {
+	  inode->i_mtime.tv_sec = iso_date(rr->u.TF.times[cnt++].time, 0);
+	  inode->i_mtime.tv_nsec = 0;
+	}
+	if(rr->u.TF.flags & TF_ACCESS) {
+	  inode->i_atime.tv_sec = iso_date(rr->u.TF.times[cnt++].time, 0);
+	  inode->i_atime.tv_nsec = 0;
+	}
+	if(rr->u.TF.flags & TF_ATTRIBUTES) { 
+	  inode->i_ctime.tv_sec = iso_date(rr->u.TF.times[cnt++].time, 0);
+	  inode->i_ctime.tv_nsec = 0;
+	} 
 	break;
       case SIG('S','L'):
 	{int slen;
