@@ -3,12 +3,11 @@ in the Linux kernel. This is not a technical description on
 the internals of module, but mostly a sample of how to compile
 and use modules.
 
-Note: You should ensure that the modutils-X.Y.Z.tar.gz you are using
-is the most up to date one for this kernel. The "X.Y.Z" will reflect
-the kernel version at the time of the release of the modules package.
-Some older modules packages aren't aware of some of the newer modular
-features that the kernel now supports.  The current required version
-is listed in the file linux/Documentation/Changes.
+Note: You should ensure that the module-init-tools-X.Y.Z.tar.gz you
+are using is the most up to date one for this kernel.  Some older
+modules packages aren't aware of some of the newer modular features
+that the kernel now supports.  The current required version is listed
+in the file linux/Documentation/Changes.
 
 * * * NOTE * * *
 The kernel has been changed to remove kerneld support and use
@@ -124,7 +123,8 @@ And, yes, there _are_ man-pages for all this...
 
 To use modprobe successfully, you generally place the following
 command in your /etc/rc.d/rc.S script.  (Read more about this in the
-"rc.hints" file in the module utilities package, "modutils-x.y.z.tar.gz".)
+"rc.hints" file in the module utilities package,
+"module-init-tools-x.y.z.tar.gz".)
 
 	/sbin/depmod -a
 
