@@ -240,6 +240,77 @@ static void handle_write_error(struct address_space *mapping,
 	unlock_page(page);
 }
 
+/* possible outcome of pageout() */
+typedef enum {
+	/* failed to write page out, page is locked */
+	PAGE_KEEP,
+	/* move page to the active list, page is locked */
+	PAGE_ACTIVATE,
+	/* page has been sent to the disk successfully, page is unlocked */
+	PAGE_SUCCESS,
+	/* page is clean and locked */
+	PAGE_CLEAN,
+} pageout_t;
+
+/*
+ * pageout is called by shrink_list() for each dirty page. Calls ->writepage().
+ */
+static pageout_t pageout(struct page *page, struct address_space *mapping)
+{
+	/*
+	 * If the page is dirty, only perform writeback if that write
+	 * will be non-blocking.  To prevent this allocation from being
+	 * stalled by pagecache activity.  But note that there may be
+	 * stalls if we need to run get_block().  We could test
+	 * PagePrivate for that.
+	 *
+	 * If this process is currently in generic_file_write() against
+	 * this page's queue, we can perform writeback even if that
+	 * will block.
+	 *
+	 * If the page is swapcache, write it back even if that would
+	 * block, for some throttling. This happens by accident, because
+	 * swap_backing_dev_info is bust: it doesn't reflect the
+	 * congestion state of the swapdevs.  Easy to fix, if needed.
+	 * See swapfile.c:page_queue_congested().
+	 */
+	if (!is_page_cache_freeable(page))
+		return PAGE_KEEP;
+	if (!mapping)
+		return PAGE_KEEP;
+	if (mapping->a_ops->writepage == NULL)
+		return PAGE_ACTIVATE;
+	if (!may_write_to_queue(mapping->backing_dev_info))
+		return PAGE_KEEP;
+
+	if (clear_page_dirty_for_io(page)) {
+		int res;
+		struct writeback_control wbc = {
+			.sync_mode = WB_SYNC_NONE,
+			.nr_to_write = SWAP_CLUSTER_MAX,
+			.nonblocking = 1,
+			.for_reclaim = 1,
+		};
+
+		SetPageReclaim(page);
+		res = mapping->a_ops->writepage(page, &wbc);
+		if (res < 0)
+			handle_write_error(mapping, page, res);
+		if (res == WRITEPAGE_ACTIVATE) {
+			ClearPageReclaim(page);
+			return PAGE_ACTIVATE;
+		}
+		if (!PageWriteback(page)) {
+			/* synchronous write or broken a_ops? */
+			ClearPageReclaim(page);
+		}
+
+		return PAGE_SUCCESS;
+	}
+
+	return PAGE_CLEAN;
+}
+
 /*
  * shrink_list returns the number of reclaimed pages
  */
@@ -321,59 +392,21 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		}
 		page_map_unlock(page);
 
-		/*
-		 * If the page is dirty, only perform writeback if that write
-		 * will be non-blocking.  To prevent this allocation from being
-		 * stalled by pagecache activity.  But note that there may be
-		 * stalls if we need to run get_block().  We could test
-		 * PagePrivate for that.
-		 *
-		 * If this process is currently in generic_file_write() against
-		 * this page's queue, we can perform writeback even if that
-		 * will block.
-		 *
-		 * If the page is swapcache, write it back even if that would
-		 * block, for some throttling. This happens by accident, because
-		 * swap_backing_dev_info is bust: it doesn't reflect the
-		 * congestion state of the swapdevs.  Easy to fix, if needed.
-		 * See swapfile.c:page_queue_congested().
-		 */
 		if (PageDirty(page)) {
 			if (referenced)
 				goto keep_locked;
-			if (!is_page_cache_freeable(page))
-				goto keep_locked;
-			if (!mapping)
-				goto keep_locked;
-			if (mapping->a_ops->writepage == NULL)
-				goto activate_locked;
 			if (!may_enter_fs)
-				goto keep_locked;
-			if (!may_write_to_queue(mapping->backing_dev_info))
 				goto keep_locked;
 			if (laptop_mode && !do_writepage)
 				goto keep_locked;
-			if (clear_page_dirty_for_io(page)) {
-				int res;
-				struct writeback_control wbc = {
-					.sync_mode = WB_SYNC_NONE,
-					.nr_to_write = SWAP_CLUSTER_MAX,
-					.nonblocking = 1,
-					.for_reclaim = 1,
-				};
 
-				SetPageReclaim(page);
-				res = mapping->a_ops->writepage(page, &wbc);
-				if (res < 0)
-					handle_write_error(mapping, page, res);
-				if (res == WRITEPAGE_ACTIVATE) {
-					ClearPageReclaim(page);
-					goto activate_locked;
-				}
-				if (!PageWriteback(page)) {
-					/* synchronous write or broken a_ops? */
-					ClearPageReclaim(page);
-				}
+			/* Page is dirty, try to write it out here */
+			switch(pageout(page, mapping)) {
+			case PAGE_KEEP:
+				goto keep_locked;
+			case PAGE_ACTIVATE:
+				goto activate_locked;
+			case PAGE_SUCCESS:
 				if (PageWriteback(page) || PageDirty(page))
 					goto keep;
 				/*
@@ -385,6 +418,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				if (PageDirty(page) || PageWriteback(page))
 					goto keep_locked;
 				mapping = page_mapping(page);
+			case PAGE_CLEAN:
+				; /* try to free the page below */
 			}
 		}
 
