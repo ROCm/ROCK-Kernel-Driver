@@ -107,7 +107,11 @@ MFG:HEWLETT-PACKARD;MDL:DESKJET 970C;CMD:MLC,PCL,PML;CLASS:PRINTER;DESCRIPTION:H
 #define USBLP_REQ_RESET				0x02
 #define USBLP_REQ_HP_CHANNEL_CHANGE_REQUEST	0x00	/* HP Vendor-specific */
 
+#ifdef CONFIG_USB_DYNAMIC_MINORS
+#define USBLP_MINORS		256
+#else
 #define USBLP_MINORS		16
+#endif
 #define USBLP_MINOR_BASE	0
 
 #define USBLP_WRITE_TIMEOUT	(5*HZ)			/* 5 seconds */
@@ -208,6 +212,8 @@ static int usblp_select_alts(struct usblp *usblp);
 static int usblp_set_protocol(struct usblp *usblp, int protocol);
 static int usblp_cache_device_id_string(struct usblp *usblp);
 
+/* forward reference to make our lives easier */
+extern struct usb_driver usblp_driver;
 
 /*
  * Functions for usblp control messages.
@@ -366,6 +372,7 @@ static void usblp_cleanup (struct usblp *usblp)
 {
 	devfs_unregister (usblp->devfs);
 	usblp_table [usblp->minor] = NULL;
+	usb_deregister_dev (&usblp_driver, 1, usblp->minor);
 	info("usblp%d: removed", usblp->minor);
 
 	kfree (usblp->writeurb->transfer_buffer);
@@ -801,12 +808,14 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	init_waitqueue_head(&usblp->wait);
 	usblp->ifnum = ifnum;
 
-	/* Look for a free usblp_table entry. */
-	while (usblp_table[usblp->minor]) {
-		usblp->minor++;
-		if (usblp->minor >= USBLP_MINORS) {
-			err("no more free usblp devices");
-			goto abort;
+	if (usb_register_dev(&usblp_driver, 1, &usblp->minor)) {
+		/* Look for a free usblp_table entry on our own. */
+		while (usblp_table[usblp->minor]) {
+			usblp->minor++;
+			if (usblp->minor >= USBLP_MINORS) {
+				err("no more free usblp devices");
+				goto abort;
+			}
 		}
 	}
 
