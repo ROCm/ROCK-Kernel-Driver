@@ -1312,7 +1312,8 @@ static int capinc_tty_init(void)
 
 	drv->owner = THIS_MODULE;
 	drv->driver_name = "capi_nc";
-	drv->name = "capi/";
+	drv->devfs_name = "capi/";
+	drv->name = "capi";
 	drv->major = capi_ttymajor;
 	drv->minor_start = 0;
 	drv->type = TTY_DRIVER_TYPE_SERIAL;
@@ -1488,7 +1489,7 @@ static int __init capi_init(void)
 		return PTR_ERR(capi_class);
 	}
 
-	class_simple_device_add(capi_class, MKDEV(capi_major, 0), NULL, "capi20");
+	class_simple_device_add(capi_class, MKDEV(capi_major, 0), NULL, "capi");
 	devfs_mk_cdev(MKDEV(capi_major, 0), S_IFCHR | S_IRUSR | S_IWUSR,
 			"isdn/capi20");
 
