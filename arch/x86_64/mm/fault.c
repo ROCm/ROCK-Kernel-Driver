@@ -73,6 +73,9 @@ static int is_prefetch(struct pt_regs *regs, unsigned long addr)
 	if (regs->cs & (1<<2))
 		return 0;
 
+	if ((regs->cs & 3) != 0 && regs->rip >= TASK_SIZE)
+		return 0;
+
 	while (scan_more && instr < max_instr) { 
 		unsigned char opcode;
 		unsigned char instr_hi;
