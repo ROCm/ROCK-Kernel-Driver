@@ -62,6 +62,7 @@ cpumask_t cpu_online_map;
 
 /* which logical CPU number maps to which CPU (physical APIC ID) */
 volatile char x86_cpu_to_apicid[NR_CPUS];
+EXPORT_SYMBOL(x86_cpu_to_apicid);
 
 static cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;

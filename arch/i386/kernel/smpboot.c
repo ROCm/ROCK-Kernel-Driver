@@ -73,6 +73,10 @@ static cpumask_t smp_commenced_mask;
 /* Per CPU bogomips and other parameters */
 struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 
+u8 x86_cpu_to_apicid[NR_CPUS] =
+			{ [0 ... NR_CPUS-1] = 0xff };
+EXPORT_SYMBOL(x86_cpu_to_apicid);
+
 /* Set when the idlers are all forked */
 int smp_threads_ready;
 
@@ -871,6 +875,7 @@ static int __init do_boot_cpu(int apicid)
 			inquire_remote_apic(apicid);
 		}
 	}
+	x86_cpu_to_apicid[cpu] = apicid;
 	if (boot_error) {
 		/* Try to put things back the way they were before ... */
 		unmap_cpu_to_logical_apicid(cpu);
@@ -953,6 +958,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
 	boot_cpu_logical_apicid = logical_smp_processor_id();
+	x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
 
 	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();

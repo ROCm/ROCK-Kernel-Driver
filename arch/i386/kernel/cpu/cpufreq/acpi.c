@@ -108,13 +108,27 @@ acpi_processor_set_performance (
 	u32			value = 0;
 	int			i = 0;
 	struct cpufreq_freqs    cpufreq_freqs;
+	cpumask_t		saved_mask;
+	int			retval;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_set_performance");
 
+	/*
+	 * TBD: Use something other than set_cpus_allowed.
+	 * As set_cpus_allowed is a bit racy, 
+	 * with any other set_cpus_allowed for this process.
+	 */
+	saved_mask = current->cpus_allowed;
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
+	if (smp_processor_id() != cpu) {
+		return_VALUE(-EAGAIN);
+	}
+	
 	if (state == data->acpi_data.state) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 			"Already at target state (P%d)\n", state));
-		return_VALUE(0);
+		retval = 0;
+		goto migrate_end;
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Transitioning from P%d to P%d\n",
@@ -144,7 +158,8 @@ acpi_processor_set_performance (
 	if (ret) {
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN,
 			"Invalid port width 0x%04x\n", bit_width));
-		return_VALUE(ret);
+		retval = ret;
+		goto migrate_end;
 	}
 
 	/*
@@ -166,7 +181,8 @@ acpi_processor_set_performance (
 		if (ret) {	
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN,
 				"Invalid port width 0x%04x\n", bit_width));
-			return_VALUE(ret);
+			retval = ret;
+			goto migrate_end;
 		}
 		if (value == (u32) data->acpi_data.states[state].status)
 			break;
@@ -183,7 +199,8 @@ acpi_processor_set_performance (
 		cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_PRECHANGE);
 		cpufreq_notify_transition(&cpufreq_freqs, CPUFREQ_POSTCHANGE);
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Transition failed\n"));
-		return_VALUE(-ENODEV);
+		retval = -ENODEV;
+		goto migrate_end;
 	}
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
@@ -192,7 +209,10 @@ acpi_processor_set_performance (
 
 	data->acpi_data.state = state;
 
-	return_VALUE(0);
+	retval = 0;
+migrate_end:
+	set_cpus_allowed(current, saved_mask);
+	return_VALUE(retval);
 }
 
 

@@ -65,6 +65,11 @@ void (*pm_power_off) (void);
 unsigned char acpi_kbd_controller_present = 1;
 unsigned char acpi_legacy_devices;
 
+#define MAX_SAPICS 256
+u16 ia64_acpiid_to_sapicid[MAX_SAPICS] =
+	{ [0 ... MAX_SAPICS - 1] = -1 };
+EXPORT_SYMBOL(ia64_acpiid_to_sapicid);
+
 const char *
 acpi_get_sysname (void)
 {
@@ -205,6 +210,7 @@ acpi_parse_lsapic (acpi_table_entry_header *header, const unsigned long end)
 		    == (unsigned int) smp_boot_data.cpu_phys_id[available_cpus])
 			printk(" (BSP)");
 #endif
+		ia64_acpiid_to_sapicid[lsapic->acpi_id] = (lsapic->id << 8) | lsapic->eid;
 		++available_cpus;
 	}
 

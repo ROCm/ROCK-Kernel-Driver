@@ -163,6 +163,8 @@ extern int acpi_pci_disabled;
 #define BROKEN_ACPI_Sx		0x0001
 #define BROKEN_INIT_AFTER_S1	0x0002
 
+extern u8 x86_acpiid_to_apicid[];
+
 #endif /*__KERNEL__*/
 
 #endif /*_ASM_ACPI_H*/
