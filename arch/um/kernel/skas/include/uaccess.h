@@ -26,10 +26,6 @@ static inline int verify_area_skas(int type, const void * addr,
 	return(access_ok_skas(type, addr, size) ? 0 : -EFAULT);
 }
 
-extern unsigned long handle_page_fault(unsigned long address, 
-				       unsigned long ip, int is_write, 
-				       int is_user, int *code_out);
-
 extern void *um_virt_to_phys(struct task_struct *task, unsigned long virt,
 			     pte_t *pte_out);
 
@@ -212,7 +208,7 @@ static inline int strnlen_chunk(unsigned long str, int len, void *arg)
 	return(0);
 }
 
-static inline int strnlen_user_skas(void *str, int len)
+static inline int strnlen_user_skas(const void *str, int len)
 {
 	int count = 0, n;
 

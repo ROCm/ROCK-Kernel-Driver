@@ -222,21 +222,25 @@ int page_mask(void)
 	return(PAGE_MASK);
 }
 
-unsigned long um_virt_to_phys(void *t, unsigned long addr)
+void *um_virt_to_phys(struct task_struct *task, unsigned long addr, 
+		      pte_t *pte_out)
 {
-	struct task_struct *task;
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
 
-	task = t;
-	if(task->mm == NULL) return(0xffffffff);
+	if(task->mm == NULL) 
+		return(ERR_PTR(-EINVAL));
 	pgd = pgd_offset(task->mm, addr);
 	pmd = pmd_offset(pgd, addr);
-	if(!pmd_present(*pmd)) return(0xffffffff);
+	if(!pmd_present(*pmd)) 
+		return(ERR_PTR(-EINVAL));
 	pte = pte_offset_kernel(pmd, addr);
-	if(!pte_present(*pte)) return(0xffffffff);
-	return((pte_val(*pte) & PAGE_MASK) + (addr & ~PAGE_MASK));
+	if(!pte_present(*pte)) 
+		return(ERR_PTR(-EINVAL));
+	if(pte_out != NULL)
+		*pte_out = *pte;
+	return((void *) (pte_val(*pte) & PAGE_MASK) + (addr & ~PAGE_MASK));
 }
 
 char *current_cmd(void)
@@ -244,8 +248,8 @@ char *current_cmd(void)
 #if defined(CONFIG_SMP) || defined(CONFIG_HIGHMEM)
 	return("(Unknown)");
 #else
-	unsigned long addr = um_virt_to_phys(current, current->mm->arg_start);
-	return addr == 0xffffffff? "(Unknown)": __va(addr);
+	void *addr = um_virt_to_phys(current, current->mm->arg_start, NULL);
+	return IS_ERR(addr) ? "(Unknown)": __va((unsigned long) addr);
 #endif
 }
 

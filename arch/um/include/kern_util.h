@@ -33,9 +33,8 @@ extern int do_signal(int error);
 extern int is_stack_fault(unsigned long sp);
 extern unsigned long segv(unsigned long address, unsigned long ip, 
 			  int is_write, int is_user, void *sc);
-extern unsigned long handle_page_fault(unsigned long address, unsigned long ip,
-				       int is_write, int is_user, 
-				       int *code_out);
+extern int handle_page_fault(unsigned long address, unsigned long ip,
+			     int is_write, int is_user, int *code_out);
 extern void syscall_ready(void);
 extern void set_tracing(void *t, int tracing);
 extern int is_tracing(void *task);

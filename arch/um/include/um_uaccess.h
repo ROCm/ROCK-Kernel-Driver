@@ -54,7 +54,7 @@ static inline int clear_user(void *mem, int len)
 	return(CHOOSE_MODE_PROC(clear_user_tt, clear_user_skas, mem, len));
 }
 
-static inline int strnlen_user(void *str, int len)
+static inline int strnlen_user(const void *str, int len)
 {
 	return(CHOOSE_MODE_PROC(strnlen_user_tt, strnlen_user_skas, str, len));
 }
