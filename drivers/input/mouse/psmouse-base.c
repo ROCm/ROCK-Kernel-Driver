@@ -308,7 +308,7 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	while (test_bit(PSMOUSE_FLAG_CMD, &psmouse->flags) && timeout--) {
 
 		if (!test_bit(PSMOUSE_FLAG_CMD1, &psmouse->flags)) {
-		    
+
 			if (command == PSMOUSE_CMD_RESET_BAT && timeout > 100000)
 				timeout = 100000;
 
@@ -626,6 +626,21 @@ static void psmouse_initialize(struct psmouse *psmouse)
 }
 
 /*
+ * psmouse_set_state() sets new psmouse state and resets all flags and
+ * counters while holding serio lock so fighting with interrupt handler
+ * is not a concern.
+ */
+
+static void psmouse_set_state(struct psmouse *psmouse, unsigned char new_state)
+{
+	serio_pause_rx(psmouse->serio);
+	psmouse->state = new_state;
+	psmouse->pktcnt = psmouse->cmdcnt = psmouse->out_of_sync = 0;
+	psmouse->flags = 0;
+	serio_continue_rx(psmouse->serio);
+}
+
+/*
  * psmouse_activate() enables the mouse so that we get motion reports from it.
  */
 
@@ -634,7 +649,7 @@ static void psmouse_activate(struct psmouse *psmouse)
 	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_ENABLE))
 		printk(KERN_WARNING "psmouse.c: Failed to enable mouse on %s\n", psmouse->serio->phys);
 
-	psmouse->state = PSMOUSE_ACTIVATED;
+	psmouse_set_state(psmouse, PSMOUSE_ACTIVATED);
 }
 
 /*
@@ -657,7 +672,7 @@ static void psmouse_disconnect(struct serio *serio)
 	struct psmouse *psmouse, *parent;
 
 	psmouse = serio->private;
-	psmouse->state = PSMOUSE_CMD_MODE;
+	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
 
 	if (serio->parent && (serio->type & SERIO_TYPE) == SERIO_PS_PSTHRU) {
 		parent = serio->parent->private;
@@ -668,7 +683,7 @@ static void psmouse_disconnect(struct serio *serio)
 	if (psmouse->disconnect)
 		psmouse->disconnect(psmouse);
 
-	psmouse->state = PSMOUSE_IGNORE;
+	psmouse_set_state(psmouse, PSMOUSE_IGNORE);
 
 	input_unregister_device(&psmouse->dev);
 	serio_close(serio);
@@ -699,9 +714,9 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 	psmouse->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REL);
 	psmouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
 	psmouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);
-	psmouse->state = PSMOUSE_CMD_MODE;
 	psmouse->serio = serio;
 	psmouse->dev.private = psmouse;
+	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
 
 	serio->private = psmouse;
 	if (serio_open(serio, drv)) {
@@ -780,12 +795,7 @@ static int psmouse_reconnect(struct serio *serio)
 		return -1;
 	}
 
-	psmouse->state = PSMOUSE_CMD_MODE;
-
-	clear_bit(PSMOUSE_FLAG_ACK, &psmouse->flags);
-	clear_bit(PSMOUSE_FLAG_CMD,  &psmouse->flags);
-
-	psmouse->pktcnt = psmouse->out_of_sync = 0;
+	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
 
 	if (psmouse->reconnect) {
 	       if (psmouse->reconnect(psmouse))
