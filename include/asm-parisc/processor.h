@@ -295,12 +295,6 @@ extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
 extern void map_hpux_gateway_page(struct task_struct *tsk, struct mm_struct *mm);
 
-#define copy_segments(tsk, mm)  do { \
-					if (tsk->personality == PER_HPUX)  \
-					    map_hpux_gateway_page(tsk,mm); \
-				} while (0)
-#define release_segments(mm)	do { } while (0)
-
 static inline unsigned long get_wchan(struct task_struct *p)
 {
 	return 0xdeadbeef; /* XXX */

@@ -80,11 +80,7 @@ static int kafstimod(void *arg)
 	/* only certain signals are of interest */
 	spin_lock_irq(&current->sig->siglock);
 	siginitsetinv(&current->blocked,0);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,3)
 	recalc_sigpending();
-#else
-	recalc_sigpending(current);
-#endif
 	spin_unlock_irq(&current->sig->siglock);
 
 	/* loop around looking for things to attend to */

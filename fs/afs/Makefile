@@ -23,14 +23,6 @@ kafs-objs := \
 	vnode.o \
 	volume.o
 
-#	cache.o
-
-obj-m  := kafs.o
-
-# superfluous for 2.5, but needed for 2.4..
-ifeq "$(VERSION).$(PATCHLEVEL)" "2.4"
-kafs.o: $(kafs-objs)
-	$(LD) -r -o kafs.o $(kafs-objs)
-endif
+obj-$(CONFIG_AFS_FS)  := kafs.o
 
 include $(TOPDIR)/Rules.make

@@ -5,7 +5,7 @@
  *            (C) 2002 Dominik Brodowski <linux@brodo.de>
  *            
  *
- * $Id: cpufreq.h,v 1.26 2002/09/21 09:05:29 db Exp $
+ * $Id: cpufreq.h,v 1.27 2002/10/08 14:54:23 db Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -148,10 +148,8 @@ static inline void cpufreq_verify_within_limits(struct cpufreq_policy *policy, u
 int cpufreq_set_policy(struct cpufreq_policy *policy);
 int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
 
-#ifdef CONFIG_CPU_FREQ_26_API
 #ifdef CONFIG_PM
 int cpufreq_restore(void);
-#endif
 #endif
 
 
@@ -160,9 +158,6 @@ int cpufreq_restore(void);
  *                        CPUFREQ 2.4. INTERFACE                     *
  *********************************************************************/
 int cpufreq_setmax(unsigned int cpu);
-#ifdef CONFIG_PM
-int cpufreq_restore(void);
-#endif
 int cpufreq_set(unsigned int kHz, unsigned int cpu);
 unsigned int cpufreq_get(unsigned int cpu);
 
