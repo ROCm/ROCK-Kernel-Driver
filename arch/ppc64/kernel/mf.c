@@ -9,17 +9,17 @@
   * all partitions in the iSeries.  It also provides miscellaneous low-level
   * machine facility type operations.
   *
-  * 
+  *
   * This program is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License as published by
   * the Free Software Foundation; either version 2 of the License, or
   * (at your option) any later version.
-  * 
+  *
   * This program is distributed in the hope that it will be useful,
   * but WITHOUT ANY WARRANTY; without even the implied warranty of
   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   * GNU General Public License for more details.
-  * 
+  *
   * You should have received a copy of the GNU General Public License
   * along with this program; if not, write to the Free Software
   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
@@ -497,7 +497,7 @@ static void ackReceived(struct IoMFLpEvent *event)
 		pending_event_head = pending_event_head->next;
 		two = pending_event_head;
 		free_pending_event(oldHead);
-	} 
+	}
 	spin_unlock_irqrestore(&pending_event_spinlock, flags);
 
 	/* send next waiting event */
@@ -695,7 +695,7 @@ void mf_setSide(char side)
 			break;
 	case 'B':	newSide = 1;
 			break;
-	case 'C':	newSide = 2; 
+	case 'C':	newSide = 2;
 			break;
 	default:	newSide = 3;
 			break;
@@ -959,7 +959,7 @@ int mf_getRtcTime(unsigned long *time)
 
 	*time = mktime(year, mon, day, hour, min, sec);
 	*time += (jiffies / HZ);
-    
+
 	/*
 	 * Now THIS is a nasty hack!
 	 * It ensures that the first two calls to mf_getRtcTime get different
@@ -1020,7 +1020,7 @@ int mf_getRtc(struct rtc_time *tm)
 
 				if (year <= 69)
 					year += 100;
-	    
+
 				tm->tm_sec = sec;
 				tm->tm_min = min;
 				tm->tm_hour = hour;
@@ -1051,17 +1051,17 @@ int mf_setRtc(struct rtc_time * tm)
 	char ceTime[12] = "\x00\x00\x00\x41\x00\x00\x00\x00\x00\x00\x00\x00";
 	u8 day, mon, hour, min, sec, y1, y2;
 	unsigned year;
-    
+
 	year = 1900 + tm->tm_year;
 	y1 = year / 100;
 	y2 = year % 100;
-    
+
 	sec = tm->tm_sec;
 	min = tm->tm_min;
 	hour = tm->tm_hour;
 	day = tm->tm_mday;
 	mon = tm->tm_mon + 1;
-	    
+
 	BIN_TO_BCD(sec);
 	BIN_TO_BCD(min);
 	BIN_TO_BCD(hour);
@@ -1077,7 +1077,7 @@ int mf_setRtc(struct rtc_time * tm)
 	ceTime[8] = hour;
 	ceTime[10] = day;
 	ceTime[11] = mon;
-   
+
 	return signal_ce_msg(ceTime, NULL);
 }
 
