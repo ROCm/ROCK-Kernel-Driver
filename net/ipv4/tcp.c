@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp.c,v 1.211 2001/09/20 00:35:35 davem Exp $
+ * Version:	$Id: tcp.c,v 1.212 2001/09/21 21:27:34 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -852,7 +852,7 @@ ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffset, size
 
 		page = pages[poffset/PAGE_SIZE];
 		offset = poffset % PAGE_SIZE;
-		size = min_t(unsigned int, psize, PAGE_SIZE-offset);
+		size = min(psize, PAGE_SIZE-offset);
 
 		if (tp->send_head==NULL || (copy = mss_now - skb->len) <= 0) {
 new_segment:

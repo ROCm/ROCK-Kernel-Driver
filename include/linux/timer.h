@@ -19,7 +19,6 @@ struct timer_list {
 	unsigned long data;
 	void (*function)(unsigned long);
 };
-typedef struct timer_list timer_t;
 
 extern void add_timer(struct timer_list * timer);
 extern int del_timer(struct timer_list * timer);

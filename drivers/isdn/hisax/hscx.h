@@ -1,10 +1,12 @@
-/* $Id: hscx.h,v 1.6.6.1 2001/02/16 16:43:27 kai Exp $
+/* $Id: hscx.h,v 1.6.6.2 2001/09/23 22:24:48 kai Exp $
  *
- * hscx.h   HSCX specific defines
+ * HSCX specific defines
  *
- * Author       Karsten Keil (keil@isdn4linux.de)
- *
- * This file is (c) under GNU General Public License
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 

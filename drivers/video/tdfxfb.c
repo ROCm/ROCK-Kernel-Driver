@@ -2069,6 +2069,8 @@ static void __exit tdfxfb_exit(void)
 
 MODULE_AUTHOR("Hannu Mallat <hmallat@cc.hut.fi>");
 MODULE_DESCRIPTION("3Dfx framebuffer device driver");
+MODULE_LICENSE("GPL");
+
 
 #ifdef MODULE
 module_init(tdfxfb_init);

@@ -1,4 +1,4 @@
-/* $Id: string.h,v 1.19 2001/06/05 20:56:33 davem Exp $
+/* $Id: string.h,v 1.20 2001/09/27 04:36:24 kanoj Exp $
  * string.h: External definitions for optimized assembly string
  *           routines for the Linux Kernel.
  *
@@ -17,10 +17,6 @@
 
 extern void __memmove(void *,const void *,__kernel_size_t);
 extern __kernel_size_t __memcpy(void *,const void *,__kernel_size_t);
-extern __kernel_size_t __memcpy_short(void *,const void *,__kernel_size_t,long,long);
-extern __kernel_size_t __memcpy_entry(void *,const void *,__kernel_size_t,long,long);
-extern __kernel_size_t __memcpy_16plus(void *,const void *,__kernel_size_t,long,long);
-extern __kernel_size_t __memcpy_384plus(void *,const void *,__kernel_size_t,long,long);
 extern void *__memset(void *,int,__kernel_size_t);
 extern void *__builtin_memcpy(void *,const void *,__kernel_size_t);
 extern void *__builtin_memset(void *,int,__kernel_size_t);

@@ -213,6 +213,8 @@ static int isapnp = 0;
 
 MODULE_AUTHOR("Takashi Iwai <iwai@ww.uni-erlangen.de>");
 MODULE_DESCRIPTION("SB AWE32/64 WaveTable driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "base i/o port of Emu8000");
 MODULE_PARM(memsize, "i");

@@ -1,14 +1,12 @@
 /*
+ * CAPI encode/decode prototypes and defines
+ *
  * Copyright (C) 1996 Universidade de Lisboa
  * 
  * Written by Pedro Roque Marques (roque@di.fc.ul.pt)
  *
  * This software may be used and distributed according to the terms of 
  * the GNU General Public License, incorporated herein by reference.
- */
-
-/*        
- *        CAPI encode/decode prototypes and defines
  */
 
 #ifndef CAPI_H

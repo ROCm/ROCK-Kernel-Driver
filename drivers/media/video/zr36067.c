@@ -4901,3 +4901,4 @@ static void unload_dc10_cards(void)
 
 module_init(init_dc10_cards);
 module_exit(unload_dc10_cards);
+MODULE_LICENSE("GPL");

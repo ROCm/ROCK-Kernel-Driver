@@ -1,22 +1,11 @@
-/* $Id: isdnloop.c,v 1.11.6.5 2001/08/17 12:34:27 kai Exp $
-
+/* $Id: isdnloop.c,v 1.11.6.6 2001/09/23 22:24:56 kai Exp $
+ *
  * ISDN low-level module implementing a dummy loop driver.
  *
  * Copyright 1997 by Fritz Elfert (fritz@isdn4linux.de)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -25,8 +14,14 @@
 #include <linux/init.h>
 #include "isdnloop.h"
 
-static char
-*revision = "$Revision: 1.11.6.5 $";
+static char *revision = "$Revision: 1.11.6.6 $";
+static char *isdnloop_id;
+
+MODULE_DESCRIPTION("ISDN4Linux: Pseudo Driver that simulates an ISDN card");
+MODULE_AUTHOR("Fritz Elfert");
+MODULE_LICENSE("GPL");
+MODULE_PARM(isdnloop_id, "s");
+MODULE_PARM_DESC(isdnloop_id, "ID-String of first card");
 
 static int isdnloop_addcard(char *);
 

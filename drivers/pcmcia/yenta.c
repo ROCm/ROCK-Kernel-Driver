@@ -895,3 +895,4 @@ struct pci_socket_ops yenta_operations = {
 	yenta_proc_setup
 };
 EXPORT_SYMBOL(yenta_operations);
+MODULE_LICENSE("GPL");

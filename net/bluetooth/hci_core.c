@@ -2028,3 +2028,5 @@ int hci_core_cleanup(void)
 {
 	return 0;
 }
+
+MODULE_LICENSE("GPL");

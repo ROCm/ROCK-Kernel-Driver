@@ -1,5 +1,9 @@
 /*
  * Hardware specific macros, defines and structures
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
  */
 
 #ifndef HARDWARE_H
@@ -12,15 +16,7 @@
  */
 
 #define MAX_CARDS	4		/* The maximum number of cards to
-					   control or probe for. If you change
-					   this, you must also change the number
-					   of elements in io, irq, and ram to
-					   match. Initialized in init.c */
-/*
-extern unsigned int io[];
-extern unsigned char irq[];
-extern unsigned long ram[];
-*/
+					   control or probe for. */
 
 #define SIGNATURE	0x87654321	/* Board reset signature */
 #define SIG_OFFSET	0x1004		/* Where to find signature in shared RAM */

@@ -299,6 +299,7 @@ static void __exit bonding_exit(void)
 
 module_init(bonding_init);
 module_exit(bonding_exit);
+MODULE_LICENSE("GPL");
 
 /*
  * Local variables:

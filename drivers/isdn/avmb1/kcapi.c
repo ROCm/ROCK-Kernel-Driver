@@ -1,11 +1,14 @@
-/*
- * $Id: kcapi.c,v 1.21.6.7 2001/06/09 15:14:15 kai Exp $
+/* $Id: kcapi.c,v 1.21.6.8 2001/09/23 22:24:33 kai Exp $
  * 
  * Kernel CAPI 2.0 Module
  * 
- * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
+ * Copyright 1999 by Carsten Paeth <calle@calle.de>
  * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
  */
+
 #define CONFIG_AVMB1_COMPAT
 
 #include <linux/config.h>
@@ -30,7 +33,7 @@
 #include <linux/b1lli.h>
 #endif
 
-static char *revision = "$Revision: 1.21.6.7 $";
+static char *revision = "$Revision: 1.21.6.8 $";
 
 /* ------------------------------------------------------------- */
 
@@ -41,10 +44,12 @@ static char *revision = "$Revision: 1.21.6.7 $";
 
 /* ------------------------------------------------------------- */
 
-int showcapimsgs = 0;
+static int showcapimsgs = 0;
 
-MODULE_AUTHOR("Carsten Paeth <calle@calle.in-berlin.de>");
-MODULE_PARM(showcapimsgs, "0-4i");
+MODULE_DESCRIPTION("CAPI4Linux: kernel CAPI layer");
+MODULE_AUTHOR("Carsten Paeth");
+MODULE_LICENSE("GPL");
+MODULE_PARM(showcapimsgs, "i");
 
 /* ------------------------------------------------------------- */
 

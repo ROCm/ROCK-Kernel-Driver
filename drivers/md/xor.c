@@ -137,5 +137,6 @@ calibrate_xor_block(void)
 }
 
 MD_EXPORT_SYMBOL(xor_block);
+MODULE_LICENSE("GPL");
 
 module_init(calibrate_xor_block);

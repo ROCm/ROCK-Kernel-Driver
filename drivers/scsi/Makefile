@@ -13,29 +13,21 @@
 # satisfy certain initialization assumptions in the SCSI layer.
 # *!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!
 
-O_TARGET := scsidrv.o
-
-SUB_DIRS	:=
-MOD_SUB_DIRS	:=
-MOD_IN_SUB_DIRS	:=
-ALL_SUB_DIRS	:= $(SUB_DIRS) pcmcia
-
-subdir-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx
-
-ifeq ($(CONFIG_PCMCIA),y)
-  SUB_DIRS += pcmcia
-  MOD_IN_SUB_DIRS += pcmcia
-else
-  ifeq ($(CONFIG_PCMCIA),m)
-    MOD_IN_SUB_DIRS += pcmcia
-  endif
-endif
-
-export-objs	:= scsi_syms.o 53c700.o 53c700-mem.o
 
 CFLAGS_aha152x.o =   -DAHA152X_STAT -DAUTOCONF
 CFLAGS_gdth.o    = # -DDEBUG_GDTH=2 -D__SERIAL__ -D__COM2__ -DGDTH_STATISTICS
 CFLAGS_seagate.o =   -DARBITRATE -DPARITY -DSEAGATE_USE_ASM
+
+
+O_TARGET := scsidrv.o
+
+export-objs	:= scsi_syms.o 53c700.o
+mod-subdirs	:= pcmcia ../acorn/scsi
+
+
+subdir-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx
+subdir-$(CONFIG_PCMCIA)		+= pcmcia
+
 
 obj-$(CONFIG_SCSI)		+= scsi_mod.o
 
@@ -125,13 +117,10 @@ obj-$(CONFIG_SUN3X_ESP)		+= NCR53C9x.o	sun3x_esp.o
 obj-$(CONFIG_SCSI_DEBUG)	+= scsi_debug.o
 obj-$(CONFIG_SCSI_FCAL)		+= fcal.o
 obj-$(CONFIG_SCSI_CPQFCTS)	+= cpqfc.o
-obj-$(CONFIG_SCSI_LASI700)	+= lasi700.o 53c700-mem.o
+obj-$(CONFIG_SCSI_LASI700)	+= lasi700.o 53c700.o
 
-ifeq ($(CONFIG_ARCH_ACORN),y)
-mod-subdirs	+= ../acorn/scsi
-subdir-y	+= ../acorn/scsi
-obj-y		+= ../acorn/scsi/acorn-scsi.o
-endif
+subdir-$(CONFIG_ARCH_ACORN)	+= ../acorn/scsi
+obj-$(CONFIG_ARCH_ACORN)	+= ../acorn/scsi/acorn-scsi.o
 
 obj-$(CONFIG_CHR_DEV_ST)	+= st.o
 obj-$(CONFIG_CHR_DEV_OSST)	+= osst.o
@@ -149,7 +138,8 @@ sd_mod-objs	:= sd.o
 sr_mod-objs	:= sr.o sr_ioctl.o sr_vendor.o
 initio-objs	:= ini9100u.o i91uscsi.o
 a100u2w-objs	:= inia100.o i60uscsi.o
-cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o cpqfcTSworker.o cpqfcTStrigger.o
+cpqfc-objs	:= cpqfcTSinit.o cpqfcTScontrol.o cpqfcTSi2c.o \
+		   cpqfcTSworker.o cpqfcTStrigger.o
 
 include $(TOPDIR)/Rules.make
 
@@ -209,10 +199,3 @@ sim710.o : sim710_d.h
 	mv script.h 53c700_d.h
 
 53c700.o: 53c700_d.h
-
-53c700-mem.o: 53c700_d.h
-
-53c700-mem.c: 53c700.c
-	echo "/* WARNING: GENERATED FILE (from $<), DO NOT MODIFY */" > $@
-	echo "#define MEM_MAPPED" >> $@
-	cat $< >> $@

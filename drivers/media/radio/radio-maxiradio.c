@@ -316,6 +316,8 @@ static void radio_close(struct video_device *dev)
 
 MODULE_AUTHOR("Dimitromanolakis Apostolos, apdim@grecian.net");
 MODULE_DESCRIPTION("Radio driver for the Guillemot Maxi Radio FM2000 radio.");
+MODULE_LICENSE("GPL");
+
 
 EXPORT_NO_SYMBOLS;
 

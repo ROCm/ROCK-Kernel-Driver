@@ -1,35 +1,20 @@
-/* $Id: isdn_net.c,v 1.140.6.8 2001/08/14 14:04:21 kai Exp $
-
+/* $Id: isdn_net.c,v 1.140.6.10 2001/09/28 08:05:29 kai Exp $
+ *
  * Linux ISDN subsystem, network interfaces and related functions (linklevel).
  *
  * Copyright 1994-1998  by Fritz Elfert (fritz@isdn4linux.de)
  * Copyright 1995,96    by Thinking Objects Software GmbH Wuerzburg
  * Copyright 1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- *
- */
-
-/* Jan 2001: fix CISCO HDLC      Bjoern A. Zeeb <i4l@zabbadoz.net>
+ * Jan 2001: fix CISCO HDLC      Bjoern A. Zeeb <i4l@zabbadoz.net>
  *           for info on the protocol, see 
  *           http://i4l.zabbadoz.net/i4l/cisco-hdlc.txt
  */
 
 #include <linux/config.h>
-#define __NO_VERSION__
-#include <linux/module.h>
 #include <linux/isdn.h>
 #include <net/arp.h>
 #include <net/dst.h>
@@ -190,7 +175,7 @@ static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
 static void isdn_net_ciscohdlck_connected(isdn_net_local *lp);
 static void isdn_net_ciscohdlck_disconnected(isdn_net_local *lp);
 
-char *isdn_net_revision = "$Revision: 1.140.6.8 $";
+char *isdn_net_revision = "$Revision: 1.140.6.10 $";
 
  /*
   * Code for raw-networking over ISDN
@@ -583,7 +568,7 @@ isdn_net_dial(void)
 	isdn_net_dev *p = dev->netdev;
 	int anymore = 0;
 	int i;
-	ulong flags;
+	unsigned long flags;
 	isdn_ctrl cmd;
 
 	while (p) {
@@ -1673,10 +1658,11 @@ isdn_net_ciscohdlck_slarp_in(isdn_net_local *lp, struct sk_buff *skb)
 {
 	unsigned char *p;
 	int period;
-	__u32 code;
-	__u32 my_seq, addr;
-	__u32 your_seq, mask;
-	__u16 unused;
+	u32 code;
+	u32 my_seq, addr;
+	u32 your_seq, mask;
+	u32 local;
+	u16 unused;
 
 	if (skb->len < 14)
 		return;
@@ -1690,14 +1676,27 @@ isdn_net_ciscohdlck_slarp_in(isdn_net_local *lp, struct sk_buff *skb)
 		isdn_net_ciscohdlck_slarp_send_reply(lp);
 		break;
 	case CISCO_SLARP_REPLY:
-		/* Ignore replies - at least for now */
-		if (lp->cisco_debserint) {
-			p += get_u32(p, &addr);
-			p += get_u32(p, &mask);
-			p += get_u16(p, &unused);
-			printk(KERN_DEBUG "%s: got slarp reply (%ul/%ul) - "
-				"ignored\n", lp->name, addr, mask);
-		}
+		addr = ntohl(*(u32 *)p);
+		mask = ntohl(*(u32 *)(p+4));
+		if (mask != 0xfffffffc)
+			goto slarp_reply_out;
+		if ((addr & 3) == 0 || (addr & 3) == 3)
+			goto slarp_reply_out;
+		local = addr ^ 3;
+		printk(KERN_INFO "%s: got slarp reply: "
+			"remote ip: %d.%d.%d.%d, "
+			"local ip: %d.%d.%d.%d "
+			"mask: %d.%d.%d.%d\n",
+		       lp->name,
+		       HIPQUAD(addr),
+		       HIPQUAD(local),
+		       HIPQUAD(mask));
+		break;
+  slarp_reply_out:
+		 printk(KERN_INFO "%s: got invalid slarp "
+				 "reply (%d.%d.%d.%d/%d.%d.%d.%d) "
+				 "- ignored\n", lp->name,
+				 HIPQUAD(addr), HIPQUAD(mask));
 		break;
 	case CISCO_SLARP_KEEPALIVE:
 		period = (int)((jiffies - lp->cisco_last_slarp_in
@@ -1723,9 +1722,9 @@ static void
 isdn_net_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 {
 	unsigned char *p;
-	__u8 addr;
-	__u8 ctrl;
-	__u16 type;
+ 	u8 addr;
+ 	u8 ctrl;
+ 	u16 type;
 	
 	if (skb->len < 4)
 		goto out_free;
@@ -2792,7 +2791,7 @@ isdn_net_setcfg(isdn_net_ioctl_cfg * cfg)
 			chidx = lp->pre_channel;
 		}
 		if (cfg->exclusive > 0) {
-			ulong flags;
+			unsigned long flags;
 
 			/* If binding is exclusive, try to grab the channel */
 			save_flags(flags);
@@ -3048,7 +3047,7 @@ isdn_net_delphone(isdn_net_ioctl_phone * phone)
 	int inout = phone->outgoing & 1;
 	isdn_net_phone *n;
 	isdn_net_phone *m;
-	ulong flags;
+	unsigned long flags;
 
 	if (p) {
 		save_flags(flags);
@@ -3084,7 +3083,7 @@ isdn_net_rmallphone(isdn_net_dev * p)
 {
 	isdn_net_phone *n;
 	isdn_net_phone *m;
-	ulong flags;
+	unsigned long flags;
 	int i;
 
 	save_flags(flags);
@@ -3133,7 +3132,7 @@ isdn_net_force_hangup(char *name)
 static int
 isdn_net_realrm(isdn_net_dev * p, isdn_net_dev * q)
 {
-	ulong flags;
+	unsigned long flags;
 
 	save_flags(flags);
 	cli();
@@ -3219,7 +3218,7 @@ isdn_net_rm(char *name)
 int
 isdn_net_rmall(void)
 {
-	ulong flags;
+	unsigned long flags;
 	int ret;
 
 	/* Walk through netdev-chain */

@@ -1,12 +1,14 @@
-/* $Id: netjet.c,v 1.24.6.5 2001/06/09 15:14:18 kai Exp $
+/* $Id: netjet.c,v 1.24.6.6 2001/09/23 22:24:50 kai Exp $
  *
- * netjet.c     low level stuff for Traverse Technologie NETJet ISDN cards
+ * low level stuff for Traverse Technologie NETJet ISDN cards
  *
- * Author     Karsten Keil (keil@isdn4linux.de)
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
- * Thanks to Traverse Technologie Australia for documents and informations
- *
- * This file is (c) under GNU General Public License
+ * Thanks to Traverse Technologie Australia for documents and information
  *
  */
 
@@ -22,7 +24,7 @@
 #include <asm/io.h>
 #include "netjet.h"
 
-const char *NETjet_revision = "$Revision: 1.24.6.5 $";
+const char *NETjet_revision = "$Revision: 1.24.6.6 $";
 
 /* Interface functions */
 

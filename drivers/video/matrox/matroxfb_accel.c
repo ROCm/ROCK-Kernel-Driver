@@ -1237,3 +1237,4 @@ void matrox_init_putc(WPMINFO struct display* p, void (*dac_createcursor)(WPMINF
 		ACCESS_FBINFO(curr.putcs) = matrox_cfbX_putcs;
 	}
 }
+MODULE_LICENSE("GPL");

@@ -1545,8 +1545,7 @@ static inline int wv_set_frequency(unsigned long ioaddr,	/* I/O port of the card
 	/* Setting by channel (same as wfreqsel) */
 	/* Warning: each channel is 22 MHz wide, so some of the channels
 	 * will interfere. */
-	if ((frequency->e == 0) &&
-	    (frequency->m >= 0) && (frequency->m < BAND_NUM)) {
+	if ((frequency->e == 0) && (frequency->m < BAND_NUM)) {
 		/* Get frequency offset. */
 		freq = channel_bands[frequency->m] >> 1;
 	}
@@ -4292,6 +4291,7 @@ void cleanup_module(void)
 #endif
 }
 #endif				/* MODULE */
+MODULE_LICENSE("GPL");
 
 /*
  * This software may only be used and distributed

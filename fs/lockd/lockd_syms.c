@@ -35,8 +35,4 @@ EXPORT_SYMBOL(nlmclnt_proc);
 EXPORT_SYMBOL(nlmsvc_invalidate_client);
 EXPORT_SYMBOL(nlmsvc_ops);
 
-/* Configuration at insmod time */
-EXPORT_SYMBOL(nlmsvc_grace_period);
-EXPORT_SYMBOL(nlmsvc_timeout);
-
 #endif /* CONFIG_MODULES */

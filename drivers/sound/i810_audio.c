@@ -2700,6 +2700,7 @@ static void __exit i810_remove(struct pci_dev *pci_dev)
 
 MODULE_AUTHOR("");
 MODULE_DESCRIPTION("Intel 810 audio support");
+MODULE_LICENSE("GPL");
 MODULE_PARM(ftsodell, "i");
 MODULE_PARM(clocking, "i");
 MODULE_PARM(strict_clocking, "i");

@@ -439,6 +439,8 @@ static void __exit gemtek_pci_cleanup_module( void )
 
 MODULE_AUTHOR( "Vladimir Shebordaev <vshebordaev@mail.ru>" );
 MODULE_DESCRIPTION( "The video4linux driver for the Gemtek PCI Radio Card" );
+MODULE_LICENSE("GPL");
+
 MODULE_PARM( mx, "b" );
 MODULE_PARM_DESC( mx, "single digit: 1 - turn off the turner upon module exit (default), 0 - do not" );
 MODULE_PARM( nr_radio, "i");

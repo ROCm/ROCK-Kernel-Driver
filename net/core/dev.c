@@ -552,9 +552,32 @@ int dev_alloc_name(struct net_device *dev, const char *name)
 {
 	int i;
 	char buf[32];
+	char *p, c;
 
 	/*
-	 *	If you need over 100 please also fix the algorithm...
+	 * Verify the string as this thing may have come from
+	 * the user.  There must be one "%d" and no other "%"
+	 * characters.
+	 */
+	p = name;
+	while ((c = *p++) != 0) {
+		if (c == '%') {
+			c = *p++;
+			if (c != 'd')
+				return -EINVAL;
+
+			while ((c = *p++) != 0) {
+				if (c == '%')
+					return -EINVAL;
+			}
+			goto name_ok;
+		}
+	}
+	return -EINVAL;
+
+ name_ok:
+	/*
+	 * If you need over 100 please also fix the algorithm...
 	 */
 	for (i = 0; i < 100; i++) {
 		sprintf(buf,name,i);

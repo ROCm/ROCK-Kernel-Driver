@@ -1545,6 +1545,8 @@ int eata_detect(Scsi_Host_Template * tpnt)
     return(registered_HBAs);
 }
 
+MODULE_LICENSE("GPL");
+
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = EATA_DMA;
 #include "scsi_module.c"

@@ -596,6 +596,7 @@ EXPORT_SYMBOL(i2c_pcf_del_bus);
 #ifdef MODULE
 MODULE_AUTHOR("Hans Berglund <hb@spacetec.no>");
 MODULE_DESCRIPTION("I2C-Bus PCF8584 algorithm");
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(pcf_test, "i");
 MODULE_PARM(pcf_scan, "i");

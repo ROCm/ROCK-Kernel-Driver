@@ -4,6 +4,7 @@
  * Copyright (C) 2000 Linus Torvalds.
  *               2000 Transmeta Corp.
  *
+ * Usage limits added by David Gibson, Linuxcare Australia.
  * This file is released under the GPL.
  */
 
@@ -348,3 +349,5 @@ static void __exit exit_ramfs_fs(void)
 
 module_init(init_ramfs_fs)
 module_exit(exit_ramfs_fs)
+MODULE_LICENSE("GPL");
+

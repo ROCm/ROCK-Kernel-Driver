@@ -1209,6 +1209,8 @@ static int sb1000_close(struct net_device *dev)
 #ifdef MODULE
 MODULE_AUTHOR("Franco Venturi <fventuri@mediaone.net>");
 MODULE_DESCRIPTION("General Instruments SB1000 driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "1-2i");
 MODULE_PARM(irq, "i");
 MODULE_PARM_DESC(io, "SB1000 I/O base addresses");

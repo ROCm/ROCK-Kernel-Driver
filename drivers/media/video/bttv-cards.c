@@ -83,6 +83,7 @@ MODULE_PARM_DESC(autoload,"automatically load i2c modules like tuner.o, default 
 MODULE_PARM(gpiomask,"i");
 MODULE_PARM(audioall,"i");
 MODULE_PARM(audiomux,"1-5i");
+MODULE_LICENSE("GPL");
 
 /* kernel args */
 #ifndef MODULE

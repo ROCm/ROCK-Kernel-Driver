@@ -58,6 +58,7 @@
 #include <linux/atalk.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
+#include <linux/module.h>
 
 int sysctl_aarp_expiry_time = AARP_EXPIRY_TIME;
 int sysctl_aarp_tick_time = AARP_TICK_TIME;
@@ -982,3 +983,4 @@ void aarp_unregister_proc_fs(void)
 }
 #endif
 #endif  /* CONFIG_ATALK || CONFIG_ATALK_MODULE */
+MODULE_LICENSE("GPL");

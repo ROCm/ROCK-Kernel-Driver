@@ -2468,6 +2468,8 @@ static int __init init_solo1(void)
 
 MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch, hb9jnx@hb9w.che.eu");
 MODULE_DESCRIPTION("ESS Solo1 Driver");
+MODULE_LICENSE("GPL");
+
 
 static void __exit cleanup_solo1(void)
 {

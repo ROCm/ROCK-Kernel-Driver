@@ -5,8 +5,6 @@
     This driver is for the Sedlbauer Speed Star and Speed Star II, 
     which are ISDN PCMCIA Cards.
     
-    sedlbauer_cs.c 1.1a 2001/01/28 15:04:04
-
     The contents of this file are subject to the Mozilla Public
     License Version 1.1 (the "License"); you may not use this file
     except in compliance with the License. You may obtain a copy of
@@ -56,6 +54,10 @@
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ds.h>
 #include <pcmcia/bus_ops.h>
+
+MODULE_DESCRIPTION("ISDN4Linux: PCMCIA client driver for Sedlbauer cards");
+MODULE_AUTHOR("Marcus Niemann");
+MODULE_LICENSE("Dual MPL/GPL");
 
 /*
    All the PCMCIA modules use PCMCIA_DEBUG to control debugging.  If

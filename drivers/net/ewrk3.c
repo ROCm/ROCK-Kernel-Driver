@@ -1876,6 +1876,8 @@ void cleanup_module(void)
 	release_region(thisEthwrk.base_addr, EWRK3_TOTAL_SIZE);
 }
 #endif				/* MODULE */
+MODULE_LICENSE("GPL");
+
 
 
 /*

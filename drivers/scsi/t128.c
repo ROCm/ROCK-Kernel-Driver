@@ -120,6 +120,7 @@
 #include "sd.h"
 #include <linux/stat.h>
 #include <linux/init.h>
+#include <linux/module.h>
 
 static struct override {
     unsigned long address;
@@ -393,6 +394,8 @@ static inline int NCR5380_pwrite (struct Scsi_Host *instance, unsigned char *src
     } else 
 	return 0;
 }
+
+MODULE_LICENSE("GPL");
 
 #include "NCR5380.c"
 

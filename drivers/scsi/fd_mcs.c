@@ -77,9 +77,7 @@
 
  **************************************************************************/
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #include <linux/sched.h>
 #include <linux/blk.h>

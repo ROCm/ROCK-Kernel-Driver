@@ -49,6 +49,12 @@ struct geom {
 	unsigned char sectors;
 };
 
+/* structure for the splitting of bufferheads */
+
+struct ataraid_bh_private {
+	struct buffer_head *parent;
+	atomic_t count;
+};
 
 extern struct gendisk ataraid_gendisk;
 
@@ -56,4 +62,11 @@ extern int ataraid_get_device(struct raid_device_operations *fops);
 extern void ataraid_release_device(int device);
 extern int get_blocksize(kdev_t dev);
 extern void ataraid_register_disk(int device,long size);
+extern struct buffer_head *ataraid_get_bhead(void);
+extern struct ataraid_bh_private *ataraid_get_private(void);
+extern void ataraid_end_request(struct buffer_head *bh, int uptodate);
+
+
+
+
 

@@ -1,4 +1,6 @@
 /*
+ * Callbacks for the FSM
+ *
  * Copyright (C) 1996 Universidade de Lisboa
  * 
  * Written by Pedro Roque Marques (roque@di.fc.ul.pt)
@@ -7,20 +9,11 @@
  * the GNU General Public License, incorporated herein by reference.
  */
 
-/*        
- *        callbacks for the FSM
- */
-
 /*
  * Fix: 19981230 - Carlos Morgado <chbm@techie.com>
  * Port of Nelson Escravana's <nelson.escravana@usa.net> fix to CalledPN 
  * NULL pointer dereference in cb_in_1 (originally fixed in 2.0)
  */
-
-
-#define __NO_VERSION__
-
-#include <linux/module.h>
 
 #include <linux/sched.h>
 #include <linux/string.h>

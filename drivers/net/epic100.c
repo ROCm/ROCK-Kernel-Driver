@@ -138,6 +138,8 @@ static char version3[] __devinitdata =
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("SMC 83c170 EPIC series Ethernet driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(debug, "i");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(rx_copybreak, "i");

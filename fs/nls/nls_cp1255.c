@@ -396,3 +396,4 @@ module_exit(exit_nls_cp1255)
  * c-continued-brace-offset: 0
  * End:
  */
+MODULE_LICENSE("BSD without advertising clause");

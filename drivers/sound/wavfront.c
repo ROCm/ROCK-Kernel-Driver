@@ -3486,6 +3486,7 @@ static int irq = -1;
 
 MODULE_AUTHOR      ("Paul Barton-Davis <pbd@op.net>");
 MODULE_DESCRIPTION ("Turtle Beach WaveFront Linux Driver");
+MODULE_LICENSE("GPL");
 MODULE_PARM        (io,"i");
 MODULE_PARM        (irq,"i");
 

@@ -48,6 +48,8 @@ static char version[] __devinitdata =
 
 MODULE_AUTHOR("David S. Miller (davem@redhat.com)");
 MODULE_DESCRIPTION("Sun GEM Gbit ethernet driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(gem_debug, "i");
 MODULE_PARM_DESC(gem_debug, "(ignored)");
 

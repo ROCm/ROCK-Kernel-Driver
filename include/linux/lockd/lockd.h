@@ -47,6 +47,7 @@ struct nlm_host {
 	unsigned short		h_authflavor;	/* RPC authentication type */
 	unsigned short		h_reclaiming : 1,
 				h_inuse      : 1,
+				h_killed     : 1,
 				h_monitored  : 1;
 	wait_queue_head_t	h_gracewait;	/* wait while reclaiming */
 	u32			h_state;	/* pseudo-state counter */
@@ -120,7 +121,7 @@ extern struct svc_procedure	nlmsvc_procedures[];
 #ifdef CONFIG_LOCKD_V4
 extern struct svc_procedure	nlmsvc_procedures4[];
 #endif
-extern unsigned long		nlmsvc_grace_period;
+extern int			nlmsvc_grace_period;
 extern unsigned long		nlmsvc_timeout;
 
 /*

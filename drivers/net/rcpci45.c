@@ -111,6 +111,7 @@ static struct pci_device_id rcpci45_pci_table[] __devinitdata = {
 	{}
 };
 MODULE_DEVICE_TABLE (pci, rcpci45_pci_table);
+MODULE_LICENSE("GPL");
 
 static void __exit
 rcpci45_remove_one (struct pci_dev *pdev)

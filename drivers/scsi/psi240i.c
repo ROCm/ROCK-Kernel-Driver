@@ -714,6 +714,7 @@ int Psi240i_BiosParam (Scsi_Disk *disk, kdev_t dev, int geom[])
 	return 0;
 	}
 
+MODULE_LICENSE("GPL");
 
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = PSI240I;

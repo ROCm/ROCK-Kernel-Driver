@@ -257,6 +257,8 @@ static int irq = IRQ;
 MODULE_PARM (base_address, "i");
 MODULE_PARM (controller_type, "b");
 MODULE_PARM (irq, "i");
+MODULE_LICENSE("GPL");
+
 
 #define retcode(result) (((result) << 16) | (message << 8) | status)
 #define STATUS ((u8) isa_readb(st0x_cr_sr))

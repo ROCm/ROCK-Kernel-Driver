@@ -1,22 +1,11 @@
-/* $Id: icn.h,v 1.30.6.4 2001/08/17 12:34:27 kai Exp $
-
+/* $Id: icn.h,v 1.30.6.5 2001/09/23 22:24:55 kai Exp $
+ *
  * ISDN lowlevel-module for the ICN active ISDN-Card.
  *
  * Copyright 1994 by Fritz Elfert (fritz@isdn4linux.de)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -46,7 +35,6 @@ typedef struct icn_cdef {
 #ifdef __KERNEL__
 /* Kernel includes */
 
-#include <linux/module.h>
 #include <linux/version.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -205,27 +193,6 @@ static u_char chan2bank[] =
 {0, 4, 8, 12};                  /* for icn_map_channel() */
 
 static icn_dev dev;
-
-/* With modutils >= 1.1.67 Integers can be changed while loading a
- * module. For this reason define the Port-Base an Shmem-Base as
- * integers.
- */
-static int portbase = ICN_BASEADDR;
-static unsigned long membase = ICN_MEMADDR;
-static char *icn_id = "\0";
-static char *icn_id2 = "\0";
-
-#ifdef MODULE
-MODULE_AUTHOR("Fritz Elfert");
-MODULE_PARM(portbase, "i");
-MODULE_PARM_DESC(portbase, "Port address of first card");
-MODULE_PARM(membase, "l");
-MODULE_PARM_DESC(membase, "Shared memory address of all cards");
-MODULE_PARM(icn_id, "s");
-MODULE_PARM_DESC(icn_id, "ID-String of first card");
-MODULE_PARM(icn_id2, "s");
-MODULE_PARM_DESC(icn_id2, "ID-String of first card, second S0 (4B only)");
-#endif
 
 #endif                          /* __KERNEL__ */
 

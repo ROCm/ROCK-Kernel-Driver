@@ -1047,6 +1047,8 @@ MODULE_PARM(args, "s");
 MODULE_PARM_DESC(de4x5_debug, "de4x5 debug mask");
 MODULE_PARM_DESC(dec_only, "de4x5 probe only for Digital boards (0-1)");
 MODULE_PARM_DESC(args, "de4x5 full duplex and media type settings; see de4x5.c for details");
+MODULE_LICENSE("GPL");
+
 # else
 static int loading_module;
 #endif /* MODULE */

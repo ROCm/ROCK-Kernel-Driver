@@ -478,3 +478,4 @@ static int __init setup_uart401(char *str)
 
 __setup("uart401=", setup_uart401);
 #endif
+MODULE_LICENSE("GPL");

@@ -420,6 +420,8 @@ nlm4svc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 					      void	        *resp)
 {
 	struct sockaddr_in	saddr = rqstp->rq_addr;
+	int			vers = rqstp->rq_vers;
+	int			prot = rqstp->rq_prot;
 	struct nlm_host		*host;
 
 	dprintk("lockd: SM_NOTIFY     called\n");
@@ -435,8 +437,8 @@ nlm4svc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 	/* Obtain the host pointer for this NFS server and try to
 	 * reclaim all locks we hold on this server.
 	 */
-	saddr.sin_addr.s_addr = argp->addr;	
-	if ((host = nlm_lookup_host(NULL, &saddr, IPPROTO_UDP, 1)) != NULL) {
+	saddr.sin_addr.s_addr = argp->addr;
+	if ((host = nlmclnt_lookup_host(&saddr, prot, vers)) != NULL) {
 		nlmclnt_recovery(host, argp->state);
 		nlm_release_host(host);
 	}
@@ -444,7 +446,7 @@ nlm4svc_proc_sm_notify(struct svc_rqst *rqstp, struct nlm_reboot *argp,
 	/* If we run on an NFS server, delete all locks held by the client */
 	if (nlmsvc_ops != NULL) {
 		struct svc_client	*clnt;
-		saddr.sin_addr.s_addr = argp->addr;	
+		saddr.sin_addr.s_addr = argp->addr;
 		if ((clnt = nlmsvc_ops->exp_getclient(&saddr)) != NULL 
 		 && (host = nlm_lookup_host(clnt, &saddr, 0, 0)) != NULL) {
 			nlmsvc_free_host_resources(host);
@@ -549,7 +551,8 @@ struct svc_procedure		nlmsvc_procedures4[] = {
   PROC(cancel_res,	cancelres,	norep,		res,	void),
   PROC(unlock_res,	unlockres,	norep,		res,	void),
   PROC(granted_res,	grantedres,	norep,		res,	void),
-  PROC(none,		void,		void,		void,	void),
+  /* statd callback */
+  PROC(sm_notify,	reboot,		void,		reboot,	void),
   PROC(none,		void,		void,		void,	void),
   PROC(none,		void,		void,		void,	void),
   PROC(none,		void,		void,		void,	void),
@@ -558,6 +561,4 @@ struct svc_procedure		nlmsvc_procedures4[] = {
   PROC(nm_lock,		lockargs,	res,		args,	res),
   PROC(free_all,	notify,		void,		args,	void),
 
-  /* statd callback */
-  PROC(sm_notify,	reboot,		void,		reboot,	void),
 };

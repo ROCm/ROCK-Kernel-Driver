@@ -474,3 +474,4 @@ static int __init setup_maui(char *str)
 
 __setup("maui=", setup_maui);
 #endif
+MODULE_LICENSE("GPL");

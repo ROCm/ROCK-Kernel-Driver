@@ -11963,6 +11963,9 @@ aic7xxx_print_scratch_ram(struct aic7xxx_host *p)
 
 #include "aic7xxx_old/aic7xxx_proc.c"
 
+MODULE_LICENSE("Dual BSD/GPL");
+
+
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = AIC7XXX;
 

@@ -343,3 +343,4 @@ EXPORT_SYMBOL(ip_nat_cheat_check);
 EXPORT_SYMBOL(ip_nat_mangle_tcp_packet);
 EXPORT_SYMBOL(ip_nat_seq_adjust);
 EXPORT_SYMBOL(ip_nat_delete_sack);
+MODULE_LICENSE("GPL");

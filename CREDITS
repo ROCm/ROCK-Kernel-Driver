@@ -603,6 +603,13 @@ S: Alexandra Terrace
 S: Guildford, GU1 3DA
 S: United Kingdom
 
+N: Cristian Mihail Craciunescu
+W: http://www.dnt.ro/~cristi/
+E: cristi@dnt.ro
+D: Support for Xircom PGSDB9 (firmware and host driver)
+S: Bucharest
+S: Romania
+
 N: Laurence Culhane
 E: loz@holmes.demon.co.uk
 D: Wrote the initial alpha SLIP code

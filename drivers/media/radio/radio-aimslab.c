@@ -370,6 +370,8 @@ static int __init rtrack_init(void)
 
 MODULE_AUTHOR("M.Kirkwood");
 MODULE_DESCRIPTION("A driver for the RadioTrack/RadioReveal radio card.");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the RadioTrack card (0x20f or 0x30f)");
 MODULE_PARM(radio_nr, "i");

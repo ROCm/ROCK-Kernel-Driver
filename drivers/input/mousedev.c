@@ -314,9 +314,9 @@ static ssize_t mousedev_write(struct file * file, const char * buffer, size_t co
 
 			case 0xf2: /* Get ID */
 				switch (list->mode) {
-					case 0: list->ps2[1] = 0;
-					case 1: list->ps2[1] = 3;
-					case 2: list->ps2[1] = 4;
+					case 0: list->ps2[1] = 0; break;
+					case 1: list->ps2[1] = 3; break;
+					case 2: list->ps2[1] = 4; break;
 				}
 				list->bufsiz = 2;
 				break;
@@ -497,6 +497,8 @@ module_exit(mousedev_exit);
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Input driver to PS/2 or ImPS/2 device driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(xres, "i");
 MODULE_PARM_DESC(xres, "Horizontal screen resolution");
 MODULE_PARM(yres, "i");

@@ -181,3 +181,4 @@ static void __exit fini(void)
 
 module_init(init);
 module_exit(fini);
+MODULE_LICENSE("GPL");

@@ -36,14 +36,32 @@
 static int pdcraid_open(struct inode * inode, struct file * filp);
 static int pdcraid_release(struct inode * inode, struct file * filp);
 static int pdcraid_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
-static int pdcraid_make_request (request_queue_t *q, int rw, struct buffer_head * bh);
+static int pdcraid0_make_request (request_queue_t *q, int rw, struct buffer_head * bh);
+static int pdcraid1_make_request (request_queue_t *q, int rw, struct buffer_head * bh);
 
+struct disk_dev {
+	int major;
+	int minor;
+	int device;
+};
+
+static struct disk_dev devlist[]= {
+	{IDE0_MAJOR,  0,  -1 },
+	{IDE0_MAJOR, 64,  -1 },
+	{IDE1_MAJOR,  0,  -1 },
+	{IDE1_MAJOR, 64,  -1 },
+	{IDE2_MAJOR,  0,  -1 },
+	{IDE2_MAJOR, 64,  -1 },
+	{IDE3_MAJOR,  0,  -1 },
+	{IDE3_MAJOR, 64,  -1 },
+};
 
 
 struct pdcdisk {
 	kdev_t	device;
 	unsigned long sectors;
 	struct block_device *bdev;
+	unsigned long last_pos;
 };
 
 struct pdcraid {
@@ -58,21 +76,31 @@ struct pdcraid {
 	unsigned int cutoff_disks[8];
 };
 
-static struct raid_device_operations pdcraid_ops = {
+static struct raid_device_operations pdcraid0_ops = {
         open:                   pdcraid_open,
 	release:                pdcraid_release,
 	ioctl:			pdcraid_ioctl,
-	make_request:		pdcraid_make_request
+	make_request:		pdcraid0_make_request
+};
+
+static struct raid_device_operations pdcraid1_ops = {
+        open:                   pdcraid_open,
+	release:                pdcraid_release,
+	ioctl:			pdcraid_ioctl,
+	make_request:		pdcraid1_make_request
 };
 
 static struct pdcraid raid[16];
 
+
 static int pdcraid_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	unsigned int minor;
-   	unsigned long sectors;
+   	unsigned long sectors,*larg;
 
-	if (!inode || !inode->i_rdev) 	
+	
+
+	if (!inode || !inode->i_rdev) 
 		return -EINVAL;
 
 	minor = MINOR(inode->i_rdev)>>SHIFT;
@@ -121,6 +149,7 @@ static int pdcraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 			return blk_ioctl(inode->i_rdev, cmd, arg);
 
 		default:
+			printk("Invalid ioctl \n");
 			return -EINVAL;
 	};
 
@@ -128,7 +157,49 @@ static int pdcraid_ioctl(struct inode *inode, struct file *file, unsigned int cm
 }
 
 
-static int pdcraid_make_request (request_queue_t *q, int rw, struct buffer_head * bh)
+unsigned long partition_map_normal(unsigned long block, unsigned long partition_off, unsigned long partition_size, int stride)
+{
+	return block + partition_off;
+}
+
+unsigned long partition_map_linux(unsigned long block, unsigned long partition_off, unsigned long partition_size, int stride)
+{
+	unsigned long newblock;
+	
+	newblock = stride - (partition_off%stride); if (newblock == stride) newblock = 0;
+	newblock += block;
+	newblock = newblock % partition_size;
+	newblock += partition_off;
+	
+	return newblock;
+}
+
+static int funky_remap[8] = { 0, 1,  2, 3, 4, 5, 6, 7 };
+
+unsigned long partition_map_linux_raid0_4disk(unsigned long block, unsigned long partition_off, unsigned long partition_size, int stride)
+{
+	unsigned long newblock,temp,temp2;
+	
+	newblock = stride - (partition_off%stride); if (newblock == stride) newblock = 0;
+
+	if (block < (partition_size / (8*stride))*8*stride ) {
+		temp = block % stride;
+		temp2 = block / stride;
+		temp2 = ((temp2>>3)<<3)|(funky_remap[temp2&7]);
+		block = temp2*stride+temp;
+	}
+
+	
+	newblock += block;
+	newblock = newblock % partition_size;
+	newblock += partition_off;
+	
+	return newblock;
+}
+
+
+
+static int pdcraid0_make_request (request_queue_t *q, int rw, struct buffer_head * bh)
 {
 	unsigned long rsect;
 	unsigned long rsect_left,rsect_accum = 0;
@@ -159,7 +230,7 @@ static int pdcraid_make_request (request_queue_t *q, int rw, struct buffer_head 
 
 	/* Partitions need adding of the start sector of the partition to the requested sector */
 	
-	rsect += ataraid_gendisk.part[MINOR(bh->b_rdev)].start_sect;
+	rsect = partition_map_normal(rsect, ataraid_gendisk.part[MINOR(bh->b_rdev)].start_sect, ataraid_gendisk.part[MINOR(bh->b_rdev)].nr_sects, thisraid->stride);
 
 	/* Woops we need to split the request to avoid crossing a stride barrier */
 	if ((rsect/thisraid->stride) != ((rsect+(bh->b_size/512)-1)/thisraid->stride)) {
@@ -208,8 +279,113 @@ static int pdcraid_make_request (request_queue_t *q, int rw, struct buffer_head 
 	 * Let the main block layer submit the IO and resolve recursion:
 	 */
 	return 1;
+
+ outerr:
+	buffer_IO_error(bh);
+	return 0;
 }
 
+static int pdcraid1_write_request(request_queue_t *q, int rw, struct buffer_head * bh)
+{
+	struct buffer_head *bh1;
+	struct ataraid_bh_private *private;
+	int device;
+	int i;
+
+	device = (bh->b_rdev >> SHIFT)&MAJOR_MASK;
+	private = ataraid_get_private();
+	if (private==NULL)
+		BUG();
+
+	private->parent = bh;
+	
+	atomic_set(&private->count,raid[device].disks);
+
+
+	for (i = 0; i< raid[device].disks; i++) { 
+		bh1=ataraid_get_bhead();
+		/* If this ever fails we're doomed */
+		if (!bh1)
+			BUG();
+	
+		/* dupe the bufferhead and update the parts that need to be different */
+		memcpy(bh1, bh, sizeof(*bh));
+		
+		bh1->b_end_io = ataraid_end_request;
+		bh1->b_private = private;
+		bh1->b_rsector += ataraid_gendisk.part[MINOR(bh->b_rdev)].start_sect; /* partition offset */
+		bh1->b_rdev = raid[device].disk[i].device;
+
+		/* update the last known head position for the drive */
+		raid[device].disk[i].last_pos = bh1->b_rsector+(bh1->b_size>>9);
+
+		generic_make_request(rw,bh1);
+	}
+	return 0;
+}
+
+static int pdcraid1_read_request (request_queue_t *q, int rw, struct buffer_head * bh)
+{
+	int device;
+	int dist;
+	int bestsofar,bestdist,i;
+	static int previous;
+
+	/* Reads are simple in principle. Pick a disk and go. 
+	   Initially I cheat by just picking the one which the last known
+	   head position is closest by.
+	   Later on, online/offline checking and performance needs adding */
+	
+	device = (bh->b_rdev >> SHIFT)&MAJOR_MASK;
+	bh->b_rsector += ataraid_gendisk.part[MINOR(bh->b_rdev)].start_sect;
+
+	bestsofar = 0; 
+	bestdist = raid[device].disk[0].last_pos - bh->b_rsector;
+	if (bestdist<0) 
+		bestdist=-bestdist;
+	if (bestdist>4095)
+		bestdist=4095;
+
+	for (i=1 ; i<raid[device].disks; i++) {
+		dist = raid[device].disk[i].last_pos - bh->b_rsector;
+		if (dist<0) 
+			dist = -dist;
+		if (dist>4095)
+			dist=4095;
+		
+		if (bestdist==dist) {  /* it's a tie; try to do some read balancing */
+			if ((previous>bestsofar)&&(previous<=i))  
+				bestsofar = i;
+			previous = (previous + 1) % raid[device].disks;
+		} else if (bestdist>dist) {
+			bestdist = dist;
+			bestsofar = i;
+		}
+	
+	}
+	
+	bh->b_rdev = raid[device].disk[bestsofar].device; 
+	raid[device].disk[bestsofar].last_pos = bh->b_rsector+(bh->b_size>>9);
+
+	/*
+	 * Let the main block layer submit the IO and resolve recursion:
+	 */
+                          	
+	return 1;
+}
+
+
+static int pdcraid1_make_request (request_queue_t *q, int rw, struct buffer_head * bh)
+{
+	/* Read and Write are totally different cases; split them totally here */
+	if (rw==READA)
+		rw = READ;
+	
+	if (rw==READ)
+		return pdcraid1_read_request(q,rw,bh);
+	else
+		return pdcraid1_write_request(q,rw,bh);
+}
 
 #include "pdcraid.h"
 
@@ -288,12 +464,22 @@ static unsigned int calc_sb_csum (unsigned int* ptr)
 	return sum;
 }
 
-static void __init probedisk(int major, int minor,int device)
+static int cookie = 0;
+
+static void __init probedisk(int devindex,int device, int raidlevel)
 {
 	int i;
+	int major, minor;
         struct promise_raid_conf *prom;
 	static unsigned char block[4096];
+	struct block_device *bdev;
+
+	if (devlist[devindex].device!=-1) /* already assigned to another array */
+		return;
 	
+	major = devlist[devindex].major;
+	minor = devlist[devindex].minor; 
+
         if (read_disk_sb(major,minor,(unsigned char*)&block,sizeof(block)))
         	return;
                                                                                                                  
@@ -302,26 +488,23 @@ static void __init probedisk(int major, int minor,int device)
         /* the checksums must match */
 	if (prom->checksum != calc_sb_csum((unsigned int*)prom))
 		return;
-	if (prom->raid.type!=0x00) /* Only raid 0 is supported right now */
+	if (prom->raid.type!=raidlevel) /* different raidlevel */
+		return;
+
+	if ((cookie!=0) && (cookie != prom->raid.magic_1)) /* different array */
 		return;
 	
+	cookie = prom->raid.magic_1;
 
 	/* This looks evil. But basically, we have to search for our adapternumber
 	   in the arraydefinition, both of which are in the superblock */	
         for (i=0;(i<prom->raid.total_disks)&&(i<8);i++) {
         	if ( (prom->raid.disk[i].channel== prom->raid.channel) &&
         	     (prom->raid.disk[i].device == prom->raid.device) ) {
-			struct block_device *bdev = bdget(MKDEV(major,minor));
-			if (bdev && blkdev_get(bdev,FMODE_READ|FMODE_WRITE,0,BDEV_RAW) == 0) {
-        	        	struct gendisk *gd;
-        	        	int j;
-        	        	/* This is supposed to prevent others from stealing our underlying disks */
+
+        	        bdev = bdget(MKDEV(major,minor));
+        	        if (bdev && blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_RAW) == 0) {
 				raid[device].disk[i].bdev = bdev;
-				gd=get_gendisk(major);
-				if (gd!=NULL) {
-					for (j=1+(minor<<gd->minor_shift);j<((minor+1)<<gd->minor_shift);j++) 
-						gd->part[j].nr_sects=0;					
-				}
 			}
 			raid[device].disk[i].device = MKDEV(major,minor);
 			raid[device].disk[i].sectors = prom->raid.disk_secs;
@@ -331,7 +514,7 @@ static void __init probedisk(int major, int minor,int device)
 			raid[device].geom.heads = prom->raid.heads+1;
 			raid[device].geom.sectors = prom->raid.sectors;
 			raid[device].geom.cylinders = prom->raid.cylinders+1;
-			
+			devlist[devindex].device=device;
         	     }
         }
 	               
@@ -362,62 +545,91 @@ static void __init fill_cutoff(int device)
 	}
 }
 			   
-static __init int pdcraid_init_one(int device)
+static __init int pdcraid_init_one(int device,int raidlevel)
 {
+	request_queue_t *q;
 	int i,count;
 
-	probedisk(IDE0_MAJOR,  0, device);
-	probedisk(IDE0_MAJOR, 64, device);
-	probedisk(IDE1_MAJOR,  0, device);
-	probedisk(IDE1_MAJOR, 64, device);
-	probedisk(IDE2_MAJOR,  0, device);
-	probedisk(IDE2_MAJOR, 64, device);
-	probedisk(IDE3_MAJOR,  0, device);
-	probedisk(IDE3_MAJOR, 64, device);
+	probedisk(0, device, raidlevel);
+	probedisk(1, device, raidlevel);
+	probedisk(2, device, raidlevel);
+	probedisk(3, device, raidlevel);
+	probedisk(4, device, raidlevel);
+	probedisk(5, device, raidlevel);
+	probedisk(6, device, raidlevel);
+	probedisk(7, device, raidlevel);
 	
-	fill_cutoff(device);
+	if (raidlevel==0)
+		fill_cutoff(device);
 	
 	/* Initialize the gendisk structure */
 	
 	ataraid_register_disk(device,raid[device].sectors);        
 		
 	count=0;
-	printk(KERN_INFO "Promise Fasttrak(tm) Softwareraid driver for linux version 0.02\n");
 	
 	for (i=0;i<8;i++) {
 		if (raid[device].disk[i].device!=0) {
-			printk(KERN_INFO "Drive %i is %li Mb \n",
-				i,raid[device].disk[i].sectors/2048);
+			printk(KERN_INFO "Drive %i is %li Mb (%i / %i) \n",
+				i,raid[device].disk[i].sectors/2048,MAJOR(raid[device].disk[i].device),MINOR(raid[device].disk[i].device));
 			count++;
 		}
 	}
 	if (count) {
-		printk(KERN_INFO "Raid array consists of %i drives. \n",count);
+		printk(KERN_INFO "Raid%i array consists of %i drives. \n",raidlevel,count);
 		return 0;
 	} else {
-		printk(KERN_INFO "No raid array found\n");
 		return -ENODEV;
 	}
 }
 
 static __init int pdcraid_init(void)
 {
-	int retval,device;
+	int i,retval,device,count=0;
+
+	do {
 	
-	device=ataraid_get_device(&pdcraid_ops);
-	if (device<0)
-		return -ENODEV;
-	retval = pdcraid_init_one(device);
-	if (retval)
-		ataraid_release_device(device);
-	return retval;
+		cookie = 0;
+		device=ataraid_get_device(&pdcraid0_ops);
+		if (device<0)
+			break;
+		retval = pdcraid_init_one(device,0);
+		if (retval) {
+			ataraid_release_device(device);
+			break;
+		} else {
+			count++;
+		}
+	} while (1);
+
+	do {
+	
+		cookie = 0;
+		device=ataraid_get_device(&pdcraid1_ops);
+		if (device<0)
+			break;
+		retval = pdcraid_init_one(device,1);
+		if (retval) {
+			ataraid_release_device(device);
+			break;
+		} else {
+			count++;
+		}
+	} while (1);
+
+	if (count) {
+		printk(KERN_INFO "Promise Fasttrak(tm) Softwareraid driver for linux version 0.03beta\n");
+		return 0;
+	}
+	printk(KERN_DEBUG "Promise Fasttrak(tm) Softwareraid driver 0.03beta: No raid array found\n");
+	return -ENODEV;
 }
 
 static void __exit pdcraid_exit (void)
 {
 	int i,device;
 	for (device = 0; device<16; device++) {
-		for (i=0;i<8;i++)  {
+		for (i=0;i<8;i++) {
 			struct block_device *bdev = raid[device].disk[i].bdev;
 			raid[device].disk[i].bdev = NULL;
 			if (bdev)
@@ -441,3 +653,4 @@ static int pdcraid_release(struct inode * inode, struct file * filp)
 
 module_init(pdcraid_init);
 module_exit(pdcraid_exit);
+MODULE_LICENSE("GPL");

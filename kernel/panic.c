@@ -99,3 +99,24 @@ NORET_TYPE void panic(const char * fmt, ...)
 		CHECK_EMERGENCY_SYNC
 	}
 }
+
+/**
+ *	print_tainted - return a string to represent the kernel taint state.
+ *
+ *	The string is overwritten by the next call to print_taint().
+ */
+ 
+const char *print_tainted()
+{
+	static char buf[20];
+	if (tainted) {
+		snprintf(buf, sizeof(buf), "Tainted: %c%c",
+			tainted & 1 ? 'P' : 'G',
+			tainted & 2 ? 'F' : ' ');
+	}
+	else
+		snprintf(buf, sizeof(buf), "Not tainted");
+	return(buf);
+}
+
+int tainted = 0;

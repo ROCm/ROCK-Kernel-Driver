@@ -2077,3 +2077,4 @@ static Scsi_Host_Template driver_template = EATA;
 #ifndef MODULE
 __setup("eata=", option_setup);
 #endif /* end MODULE */
+MODULE_LICENSE("BSD");

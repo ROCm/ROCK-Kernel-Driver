@@ -107,6 +107,7 @@ MODULE_PARM(mmiobase, "i");
 MODULE_PARM(srambase, "i");
 MODULE_PARM(sramsize, "i");
 MODULE_PARM(ringspeed, "i");
+MODULE_LICENSE("GPL");
 
 /*====================================================================*/
 

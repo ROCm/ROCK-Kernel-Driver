@@ -1,10 +1,12 @@
-/* $Id: l3_1tr6.h,v 2.2.6.1 2001/02/16 16:43:27 kai Exp $
+/* $Id: l3_1tr6.h,v 2.2.6.2 2001/09/23 22:24:49 kai Exp $
  *
- *  German 1TR6 D-channel protocol defines
+ * German 1TR6 D-channel protocol defines
  *
- * This file is (c) under GNU General Public License
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
+
 #ifndef l3_1tr6
 #define l3_1tr6
 

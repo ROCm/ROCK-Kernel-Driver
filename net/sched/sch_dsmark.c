@@ -490,3 +490,4 @@ void cleanup_module(void)
 	unregister_qdisc(&dsmark_qdisc_ops);
 }
 #endif
+MODULE_LICENSE("GPL");

@@ -2871,5 +2871,7 @@ module_exit(strip_exit_driver);
 
 MODULE_AUTHOR("Stuart Cheshire <cheshire@cs.stanford.edu>");
 MODULE_DESCRIPTION("Starmode Radio IP (STRIP) Device Driver");
+MODULE_LICENSE("BSD without advertisement clause");
+
 MODULE_SUPPORTED_DEVICE("Starmode Radio IP (STRIP) modem");
 

@@ -347,6 +347,8 @@ void cleanup_module(void)
 	}
 }
 #endif /* MODULE */
+MODULE_LICENSE("GPL");
+
 
 /* Starting in v2.1.*, the LANCE/PCnet probe is now similar to the other
    board probes now that kmalloc() can allocate ISA DMA-able regions.

@@ -331,6 +331,8 @@ static int __init trust_init(void)
 
 MODULE_AUTHOR("Eric Lammerts, Russell Kroll, Quay Lu, Donald Song, Jason Lewis, Scott McGrath, William McGrath");
 MODULE_DESCRIPTION("A driver for the Trust FM Radio card.");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the Trust FM Radio card (0x350 or 0x358)");
 MODULE_PARM(radio_nr, "i");

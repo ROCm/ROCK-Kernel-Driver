@@ -190,6 +190,8 @@ struct pci_device_id happymeal_pci_ids[] __initdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, happymeal_pci_ids);
+MODULE_LICENSE("GPL");
+
 #endif
 
 /* NOTE: In the descriptor writes one _must_ write the address

@@ -151,6 +151,8 @@ static int xcvr[NUM_UNITS]; 			/* The data transfer mode. */
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("RealTek RTL8002/8012 parallel port Ethernet driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(debug, "i");
 MODULE_PARM(io, "1-" __MODULE_STRING(NUM_UNITS) "i");

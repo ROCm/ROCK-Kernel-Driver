@@ -521,7 +521,7 @@ void sun3fb_palette(int enter)
     /*
      *  Initialisation
      */
-static void __init sun3fb_init_fb(int fbtype, unsigned long addr)
+static int __init sun3fb_init_fb(int fbtype, unsigned long addr)
 {
 	static struct linux_sbus_device sdb;
 	struct fb_fix_screeninfo *fix;
@@ -587,8 +587,8 @@ sizechange:
 	fb->cursor.hwsize.fby = 32;
 	
 	if (depth > 1 && !fb->color_map) {
-		fb->color_map = kmalloc(256 * 3, GFP_ATOMIC);
-		return -ENOMEM;
+		if((fb->color_map = kmalloc(256 * 3, GFP_ATOMIC))==NULL)
+			return -ENOMEM;
 	}
 			
 	switch(fbtype) {
@@ -605,7 +605,7 @@ sizechange:
 	
 	if (!p) {
 		kfree(fb);
-		-ENODEV;
+		return -ENODEV;
 	}
 	
 	if (p == SBUSFBINIT_SIZECHANGE)

@@ -357,6 +357,7 @@ static void __exit parport_serial_exit (void)
 
 MODULE_AUTHOR("Tim Waugh <twaugh@redhat.com>");
 MODULE_DESCRIPTION("Driver for common parallel+serial multi-I/O PCI cards");
+MODULE_LICENSE("GPL");
 
 module_init(parport_serial_init);
 module_exit(parport_serial_exit);

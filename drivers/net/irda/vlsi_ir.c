@@ -46,6 +46,8 @@
 
 MODULE_DESCRIPTION("IrDA SIR/MIR/FIR driver for VLSI 82C147");
 MODULE_AUTHOR("Martin Diehl <info@mdiehl.de>");
+MODULE_LICENSE("GPL");
+
 
 
 static /* const */ char drivername[] = "vlsi_ir";

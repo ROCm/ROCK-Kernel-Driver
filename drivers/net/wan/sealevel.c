@@ -1,5 +1,3 @@
-#define LINUX_21
-
 /*
  *	Sealevel Systems 4021 driver.
  *
@@ -8,8 +6,8 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  *
- *	(c) Copyright 1999 Building Number Three Ltd
- *	(c) Copyright 2001 Alan Cox.
+ *	(c) Copyright 1999, 2001 Alan Cox
+ *	(c) Copyright 2001 Red Hat Inc.
  *
  */
 
@@ -185,7 +183,6 @@ static int sealevel_queue_xmit(struct sk_buff *skb, struct net_device *d)
 	return z8530_queue_xmit(slvl->chan, skb);
 }
 
-#ifdef LINUX_21
 static int sealevel_neigh_setup(struct neighbour *n)
 {
 	if (n->nud_state == NUD_NONE) {
@@ -204,15 +201,6 @@ static int sealevel_neigh_setup_dev(struct net_device *dev, struct neigh_parms *
 	}
 	return 0;
 }
-
-#else
-
-static int return_0(struct net_device *d)
-{
-	return 0;
-}
-
-#endif
 
 /*
  *	Description block for a Comtrol Hostess SV11 card
@@ -374,11 +362,7 @@ static struct slvl_board *slvl_init(int iobase, int irq, int txdma, int rxdma, i
 			d->get_stats = sealevel_get_stats;
 			d->set_multicast_list = NULL;
 			d->do_ioctl = sealevel_ioctl;
-#ifdef LINUX_21			
 			d->neigh_setup = sealevel_neigh_setup_dev;
-#else
-			d->init = return_0;
-#endif
 			d->set_mac_address = NULL;
 		
 			if(register_netdev(d)==-1)
@@ -444,7 +428,6 @@ static int rxdma=3;
 static int irq=5;
 static int slow=0;
 
-#ifdef LINUX_21
 MODULE_PARM(io,"i");
 MODULE_PARM_DESC(io, "The I/O base of the Sealevel card");
 MODULE_PARM(txdma,"i");
@@ -459,7 +442,6 @@ MODULE_PARM_DESC(slow, "Set this for an older Sealevel card such as the 4012");
 MODULE_AUTHOR("Alan Cox");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Modular driver for the SeaLevel 4021");
-#endif
 
 static struct slvl_board *slvl_unit;
 

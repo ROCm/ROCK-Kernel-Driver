@@ -2541,6 +2541,8 @@ MODULE_PARM_DESC(micbias, "sets the +5V bias for an electret microphone");
 
 MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch, hb9jnx@hb9w.che.eu");
 MODULE_DESCRIPTION("ES1370 AudioPCI Driver");
+MODULE_LICENSE("GPL");
+
 
 /* --------------------------------------------------------------------- */
 

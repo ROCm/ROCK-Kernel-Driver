@@ -797,3 +797,4 @@ EXPORT_SYMBOL(slhc_uncompress);
 EXPORT_SYMBOL(slhc_toss);
 
 #endif /* CONFIG_INET */
+MODULE_LICENSE("BSD without advertising clause");

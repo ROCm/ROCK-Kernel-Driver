@@ -230,9 +230,7 @@
  *
  */
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #include <linux/config.h>
 

@@ -1,10 +1,12 @@
-/* $Id: hfcscard.c,v 1.8.6.1 2001/02/16 16:43:27 kai Exp $
+/* $Id: hfcscard.c,v 1.8.6.2 2001/09/23 22:24:48 kai Exp $
  *
- * hfcscard.c     low level stuff for hfcs based cards (Teles3c, ACER P10)
+ * low level stuff for hfcs based cards (Teles3c, ACER P10)
  *
- * Author     Karsten Keil (keil@isdn4linux.de)
- *
- * This file is (c) under GNU General Public License
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -16,7 +18,7 @@
 
 extern const char *CardType[];
 
-static const char *hfcs_revision = "$Revision: 1.8.6.1 $";
+static const char *hfcs_revision = "$Revision: 1.8.6.2 $";
 
 static void
 hfcs_interrupt(int intno, void *dev_id, struct pt_regs *regs)

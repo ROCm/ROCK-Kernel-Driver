@@ -1432,6 +1432,7 @@ static int __init plip_init (void)
 
 module_init(plip_init);
 module_exit(plip_cleanup_module);
+MODULE_LICENSE("GPL");
 
 /*
  * Local variables:

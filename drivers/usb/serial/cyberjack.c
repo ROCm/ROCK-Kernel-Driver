@@ -309,16 +309,16 @@ static void cyberjack_read_int_callback( struct urb *urb )
 	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
 
+	if (port_paranoia_check (port, __FUNCTION__)) return;
+
 	dbg(__FUNCTION__ " - port %d", port->number);
 
 	/* the urb might have been killed. */
 	if (urb->status)
 		return;
 
-	if (port_paranoia_check (port, "cyberjack_read_interrupt")) return;
-
 	serial = port->serial;
-	if (serial_paranoia_check (serial, "cyberjack_read_interrupt")) return;
+	if (serial_paranoia_check (serial, __FUNCTION__)) return;
 
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 

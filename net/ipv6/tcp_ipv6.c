@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: tcp_ipv6.c,v 1.138 2001/09/01 00:31:50 davem Exp $
+ *	$Id: tcp_ipv6.c,v 1.139 2001/09/26 23:38:47 davem Exp $
  *
  *	Based on: 
  *	linux/net/ipv4/tcp.c
@@ -1098,7 +1098,7 @@ static struct sock *tcp_v6_hnd_req(struct sock *sk,struct sk_buff *skb)
 			bh_lock_sock(nsk);
 			return nsk;
 		}
-		tcp_tw_put((struct tcp_tw_bucket*)sk);
+		tcp_tw_put((struct tcp_tw_bucket*)nsk);
 		return NULL;
 	}
 

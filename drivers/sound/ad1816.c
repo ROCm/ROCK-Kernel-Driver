@@ -1471,3 +1471,4 @@ static int __init setup_ad1816(char *str)
 
 __setup("ad1816=", setup_ad1816);
 #endif
+MODULE_LICENSE("GPL");

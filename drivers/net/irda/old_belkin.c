@@ -152,6 +152,8 @@ static int old_belkin_reset(struct irda_task *task)
 #ifdef MODULE
 MODULE_AUTHOR("Jean Tourrilhes <jt@hpl.hp.com>");
 MODULE_DESCRIPTION("Belkin (old) SmartBeam dongle driver");	
+MODULE_LICENSE("GPL");
+
 
 /*
  * Function init_module (void)

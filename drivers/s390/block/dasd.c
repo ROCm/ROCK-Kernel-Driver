@@ -135,7 +135,9 @@ static void dasd_disable_ranges (dasd_range_t *, dasd_discipline_t *, int, int);
 static void dasd_enable_single_device ( unsigned long);
 static inline int dasd_state_init_to_ready(dasd_device_t*);
 static inline void dasd_setup_partitions ( dasd_device_t *);
+static inline void dasd_destroy_partitions ( dasd_device_t *);
 static inline int dasd_setup_blkdev(dasd_device_t*);
+static void dasd_deactivate_queue (dasd_device_t *);
 static inline int dasd_disable_blkdev(dasd_device_t*);
 static void dasd_flush_chanq ( dasd_device_t * device, int destroy ); 
 static void dasd_flush_request_queues ( dasd_device_t * device, int destroy );
@@ -205,12 +207,20 @@ dasd_create_range (int from, int to, int features)
         int i;
 
 	if ( from > to ) {
-                printk (KERN_WARNING PRINTK_HEADER "Adding device range %04X-%04X: range invalid, ignoring.\n",from,to);
+                printk (KERN_WARNING PRINTK_HEADER 
+                        "Adding device range %04x-%04x: range invalid, ignoring.\n",
+                        from,
+                        to);
+
 		return NULL;
 	}
 	for (i=from;i<=to;i++) {
                 if (dasd_device_from_devno(i)) {
-                        printk (KERN_WARNING PRINTK_HEADER "device range %04X-%04X: device %04X is already in a range.\n",from,to,i);
+                        printk (KERN_WARNING PRINTK_HEADER 
+                                "device range %04x-%04x: device %04x is already in a range.\n",
+                                from,
+                                to,
+                                i);
                 }
         }
 	range = (dasd_range_t *) kmalloc (sizeof (dasd_range_t), GFP_KERNEL);
@@ -501,8 +511,15 @@ dasd_strtoul (char *str, char **stra, int* features)
         }
 
         /* copy device no to buffer and convert to decimal */
-        for (i=0;isxdigit(temp[i]);i++)
-                buffer[i]=temp[i];
+        for (i=0; temp[i]!='\0' && temp[i]!='(' && 
+                  temp[i]!='-'  && temp[i]!=' '; i++){
+                if (isxdigit(temp[i])) {
+                        buffer[i]=temp[i];
+                } else {
+                        return -EINVAL;
+                }
+        }
+
         buffer[i]='\0';
 
         val = simple_strtoul (buffer, &buffer, 16);
@@ -524,10 +541,12 @@ dasd_strtoul (char *str, char **stra, int* features)
                                         break;
                                 }
                                 printk (KERN_WARNING PRINTK_HEADER 
-                                        "unsupported feature: %s, ignoring setting",buffer);
+                                        "unsupported feature: %s, ignoring setting",
+                                        buffer);
                         }
                 }
         }
+
         *stra = temp+i;
         return val;
 }
@@ -537,12 +556,13 @@ dasd_strtoul (char *str, char **stra, int* features)
  * examines the strings given in the string array str and
  * creates and adds the ranges to the apropriate lists
  */
-static inline void
+static int
 dasd_parse (char **str)
 {
 	char *temp;
 	int from, to;
         int features = 0;
+        int rc = 0;
 
 	if (*str) {
 		/* turn off probeonly mode, if any dasd parameter is present */
@@ -570,10 +590,18 @@ dasd_parse (char **str)
 				temp++;
 				to = dasd_strtoul (temp, &temp, &features);
 			}
-			dasd_add_range (from, to ,features);
-		}
+                        if (from == -EINVAL ||
+                            to   == -EINVAL    ) {
+                                rc = -EINVAL;
+                                break;
+                        } else {
+                                dasd_add_range (from, to ,features);
+                        }
+                }
 		str++;
 	}
+
+        return rc;
 }
 
 /* SECTION: Dealing with devices registered to multiple major numbers */
@@ -648,7 +676,9 @@ dasd_register_major (major_info_t * major_info)
 	rc = devfs_register_blkdev (major, DASD_NAME, &dasd_device_operations);
 	if (rc < 0) {
 		printk (KERN_WARNING PRINTK_HEADER
-			"Cannot register to major no %d, rc = %d\n", major, rc);
+			"Cannot register to major no %d, rc = %d\n",
+                        major, 
+                        rc);
 		goto out_reg_blkdev; 
 	} else {
 		major_info->flags |= DASD_MAJOR_INFO_REGISTERED;
@@ -751,7 +781,8 @@ dasd_register_major (major_info_t * major_info)
 	rc = devfs_unregister_blkdev (major, DASD_NAME);
 	if (rc < 0) {
 		printk (KERN_WARNING PRINTK_HEADER
-			"Unable to unregister from major no %d, rc = %d\n", major,
+			"Unable to unregister from major no %d, rc = %d\n", 
+                        major,
 			rc);
 	} else {
 		major_info->flags &= ~DASD_MAJOR_INFO_REGISTERED;
@@ -800,7 +831,8 @@ dasd_unregister_major (major_info_t * major_info)
 	rc = devfs_unregister_blkdev (major, DASD_NAME);
 	if (rc < 0) {
 		printk (KERN_WARNING PRINTK_HEADER
-			"Cannot unregister from major no %d, rc = %d\n", major,
+			"Cannot unregister from major no %d, rc = %d\n",
+                        major,
 			rc);
 		return rc;
 	} else {
@@ -1051,8 +1083,6 @@ ccw_req_t *
 dasd_alloc_request (char *magic, int cplength, int datasize, dasd_device_t* device)
 {
 	ccw_req_t *rv = NULL;
-	int i;
-	unsigned long flags;
 
 	if ((rv = ccw_alloc_request (magic, cplength, datasize)) != NULL) {
 		return rv;
@@ -1062,7 +1092,9 @@ dasd_alloc_request (char *magic, int cplength, int datasize, dasd_device_t* devi
 		BUG ();
 		}
         if (device->lowmem_cqr==NULL) {
-                DASD_MESSAGE (KERN_WARNING, device, "Low memory! Using emergency request %p",device->lowmem_ccws);
+                DASD_MESSAGE (KERN_WARNING, device, 
+                              "Low memory! Using emergency request %p",
+                              device->lowmem_ccws);
                 device->lowmem_cqr=device->lowmem_ccws;
                 rv = device->lowmem_ccws;
 		memset (rv, 0, PAGE_SIZE);
@@ -1073,7 +1105,10 @@ dasd_alloc_request (char *magic, int cplength, int datasize, dasd_device_t* devi
 		rv->data = (void *) ((long) rv + PAGE_SIZE - datasize);
 		rv->cpaddr = (ccw1_t *) ((long) rv + sizeof (ccw_req_t));
         } else {
-                DASD_MESSAGE (KERN_WARNING, device,"Refusing emergency mem for request NULL, already in use at %p.",device->lowmem_ccws);
+                DASD_MESSAGE (KERN_WARNING, device,
+                              "Refusing emergency mem for request "
+                              "NULL, already in use at %p.",
+                              device->lowmem_ccws);
 	}
 	return rv;
 }
@@ -1086,47 +1121,61 @@ void
 dasd_free_request (ccw_req_t * request, dasd_device_t* device)
 {
 #ifdef CONFIG_ARCH_S390X
-    ccw1_t* ccw;
-    /* clear any idals used for chain */
-    ccw=request->cpaddr-1;
-    do {
-            ccw++;
-            if ((ccw->cda < (unsigned long) device->lowmem_idals) || (ccw->cda >= (unsigned long) device->lowmem_idals+PAGE_SIZE))
-                    clear_normalized_cda (ccw);
-            else {
-                    if (device->lowmem_idal_ptr != device->lowmem_idals)
-                            DASD_MESSAGE (KERN_WARNING, device, "Freeing emergency idals from request at %p.",request);
-                    device->lowmem_idal_ptr = device->lowmem_idals;
-                    device->lowmem_cqr=NULL;
-            }
-    } while ((ccw->flags & CCW_FLAG_CC) || (ccw->flags & CCW_FLAG_DC));
+        ccw1_t* ccw;
+        /* clear any idals used for chain */
+        ccw=request->cpaddr-1;
+        do {
+                ccw++;
+                if ((ccw->cda < (unsigned long) device->lowmem_idals           ) || 
+                    (ccw->cda >= (unsigned long) device->lowmem_idals+PAGE_SIZE)   )
+                        clear_normalized_cda (ccw);
+                else {
+                        if (device->lowmem_idal_ptr != device->lowmem_idals)
+                                DASD_MESSAGE (KERN_WARNING, device,
+                                              "Freeing emergency idals from request at %p.",
+                                              request);
+                        device->lowmem_idal_ptr = device->lowmem_idals;
+                        device->lowmem_cqr=NULL;
+                }
+        } while ((ccw->flags & CCW_FLAG_CC) || 
+                 (ccw->flags & CCW_FLAG_DC)   );
 #endif
-    if (request != device->lowmem_ccws) { /* compare to lowmem_ccws to protect usage of lowmem_cqr for IDAL only ! */
+        if (request != device->lowmem_ccws) { 
+                /* compare to lowmem_ccws to protect usage of lowmem_cqr for IDAL only ! */
 		ccw_free_request (request);
-    } else {
-            DASD_MESSAGE (KERN_WARNING, device,  "Freeing emergency request at %p",request);
-            device->lowmem_cqr=NULL;
+        } else {
+                DASD_MESSAGE (KERN_WARNING, device,
+                              "Freeing emergency request at %p",
+                              request);
+                device->lowmem_cqr=NULL;
 	}
 }
 
 int
-dasd_set_normalized_cda ( ccw1_t * cp, unsigned long address, ccw_req_t* request, dasd_device_t* device )
+dasd_set_normalized_cda (ccw1_t * cp, unsigned long address, 
+                         ccw_req_t* request, dasd_device_t* device )
 {
 #ifdef CONFIG_ARCH_S390X
 	int nridaws;
         int count = cp->count;
         
         if (set_normalized_cda (cp, address)!=-ENOMEM) {
-            return 0;
+                return 0;
         }
 
         if ((device->lowmem_cqr!=NULL) && (device->lowmem_cqr!=request)) {
-            DASD_MESSAGE (KERN_WARNING, device, "Refusing emergency idals for request %p, memory is already in use for request %p",request,device->lowmem_cqr);
-            return -ENOMEM;
+                DASD_MESSAGE (KERN_WARNING, device, 
+                              "Refusing emergency idals for request %p, memory"
+                              " is already in use for request %p",
+                              request,
+                              device->lowmem_cqr);
+                return -ENOMEM;
         }
         device->lowmem_cqr=request;
         if (device->lowmem_idal_ptr == device->lowmem_idals) {
-            DASD_MESSAGE (KERN_WARNING,device, "Low memory! Using emergency IDALs for request %p.\n",request);
+            DASD_MESSAGE (KERN_WARNING,device, 
+                          "Low memory! Using emergency IDALs for request %p.\n",
+                          request);
         }
         nridaws = ((address & (IDA_BLOCK_SIZE-1)) + count + 
 		   (IDA_BLOCK_SIZE-1)) >> IDA_SIZE_LOG;
@@ -1165,7 +1214,27 @@ dasd_chanq_enq (dasd_chanq_t * q, ccw_req_t * cqr)
 		q->head = cqr;
 	cqr->next = NULL;
 	q->tail = cqr;
-	check_then_set (&cqr->status, CQR_STATUS_FILLED, CQR_STATUS_QUEUED);
+	check_then_set (&cqr->status, 
+                        CQR_STATUS_FILLED, 
+                        CQR_STATUS_QUEUED);
+
+       
+        /* save profile information for non erp cqr */
+        if (cqr->refers == NULL) {
+                unsigned int  counter = 0;
+                ccw_req_t     *ptr;
+                dasd_device_t *device = cqr->device;
+
+                /* count the length of the chanq for statistics */
+                for (ptr = q->head; 
+                     ptr->next != NULL && counter <=31; 
+                     ptr = ptr->next) {
+                        counter++;
+                }                
+                
+                dasd_global_profile.dasd_io_nr_req[counter]++;
+                device->profile.dasd_io_nr_req[counter]++;
+        }
 }
 
 /*
@@ -1217,8 +1286,11 @@ dasd_chanq_deq (dasd_chanq_t * q, ccw_req_t * cqr)
 /* SECTION: Managing the device queues etc. */
 
 /*
- * function dasd_start_IO
- * attempts to start the IO and returns an appropriate return code
+ * DASD_TERM_IO
+ *
+ * attempts to terminate the the current IO and set it to failed if termination
+ * was successful.
+ * returns an appropriate return code
  */
 int
 dasd_term_IO (ccw_req_t * cqr)
@@ -1234,49 +1306,54 @@ dasd_term_IO (ccw_req_t * cqr)
 	irq = device->devinfo.irq;
 	if (strncmp ((char *) &cqr->magic, device->discipline->ebcname, 4)) {
 		DASD_MESSAGE (KERN_WARNING, device,
-			      " ccw_req_t 0x%08X magic doesn't match"
-			      " discipline 0x%08X\n",
+			      " ccw_req_t 0x%08x magic doesn't match"
+			      " discipline 0x%08x\n",
 			      cqr->magic,
 			      *(unsigned int *) device->discipline->name);
 		return -EINVAL;
 	}
+        
+        while ((retries < 5                    ) &&
+               (cqr->status == CQR_STATUS_IN_IO)   ) {
 
-        while ( retries < 5 ) {
-            if ( retries < 2 )
-                rc = halt_IO(irq, (long)cqr, 
-                             cqr->options | DOIO_WAIT_FOR_INTERRUPT);
-            else
-                rc = clear_IO(irq, (long)cqr, 
-                              cqr->options | DOIO_WAIT_FOR_INTERRUPT);
-            switch (rc) {
-            case 0:
-		break;
-            case -ENODEV:
-		DASD_MESSAGE (KERN_WARNING, device, "%s",
-			      "device gone, retry\n");
-		break;
-            case -EIO:
-		DASD_MESSAGE (KERN_WARNING, device, "%s",
-			      "I/O error, retry\n");
-		break;
-            case -EBUSY:
-		DASD_MESSAGE (KERN_WARNING, device, "%s",
-			      "device busy, retry later\n");
-		break;
-            default:
-		DASD_MESSAGE (KERN_ERR, device,
-			      "line %d unknown RC=%d, please report"
-			      " to linux390@de.ibm.com\n", __LINE__, rc);
-		BUG ();
-		break;
-            }
-            if (rc == 0) {
-		check_then_set (&cqr->status,
-				CQR_STATUS_IN_IO, CQR_STATUS_FAILED);
-                asm volatile ("STCK %0":"=m" (cqr->stopclk));
-                break;
-            }
-            retries ++;
+                if ( retries < 2 )
+                        rc = halt_IO(irq, (long)cqr, 
+                                     cqr->options | DOIO_WAIT_FOR_INTERRUPT);
+                else
+                        rc = clear_IO(irq, (long)cqr, 
+                                      cqr->options | DOIO_WAIT_FOR_INTERRUPT);
+
+                switch (rc) {
+                case 0:         /* termination successful */
+                        check_then_set (&cqr->status,
+                                        CQR_STATUS_IN_IO, 
+                                        CQR_STATUS_FAILED);
+                        
+                        asm volatile ("STCK %0":"=m" (cqr->stopclk));
+                        break;
+                case -ENODEV:
+                        DASD_MESSAGE (KERN_WARNING, device, "%s",
+                                      "device gone, retry\n");
+                        break;
+                case -EIO:
+                        DASD_MESSAGE (KERN_WARNING, device, "%s",
+                                      "I/O error, retry\n");
+                        break;
+                case -EBUSY:
+                        DASD_MESSAGE (KERN_WARNING, device, "%s",
+                                      "device busy, retry later\n");
+                        break;
+                default:
+                        DASD_MESSAGE (KERN_ERR, device,
+                                      "line %d unknown RC=%d, please report"
+                                      " to linux390@de.ibm.com\n", 
+                                      __LINE__, 
+                                      rc);
+                        BUG ();
+                        break;
+                }
+
+                retries ++;
         }
 	return rc;
 }
@@ -1299,29 +1376,53 @@ dasd_start_IO (ccw_req_t * cqr)
 	irq = device->devinfo.irq;
 	if (strncmp ((char *) &cqr->magic, device->discipline->ebcname, 4)) {
 		DASD_MESSAGE (KERN_WARNING, device,
-			      " ccw_req_t 0x%08X magic doesn't match"
-			      " discipline 0x%08X\n",
+			      " ccw_req_t 0x%08x magic doesn't match"
+			      " discipline 0x%08x\n",
 			      cqr->magic,
 			      *(unsigned int *) device->discipline->name);
 		return -EINVAL;
 	}
 
 	asm volatile ("STCK %0":"=m" (now));
+        cqr->startclk = now;
+
 	rc = do_IO (irq, cqr->cpaddr, (long) cqr, cqr->lpm, cqr->options);
+
 	switch (rc) {
 	case 0:
-		break;
-	case -ENODEV:
-		check_then_set (&cqr->status,
-				CQR_STATUS_QUEUED, CQR_STATUS_FAILED);
-		break;
-	case -EIO:
-		check_then_set (&cqr->status,
-				CQR_STATUS_QUEUED, CQR_STATUS_FAILED);
+                if (cqr->options & DOIO_WAIT_FOR_INTERRUPT) {
+                        /* request already finished (synchronous IO) */
+                        DASD_MESSAGE (KERN_ERR, device, "%s",
+                                      " do_IO finished request... "
+                                      "DOIO_WAIT_FOR_INTERRUPT was set");
+                        check_then_set (&cqr->status,
+                                        CQR_STATUS_QUEUED, 
+                                        CQR_STATUS_DONE);
+
+                        cqr->stopclk = now;
+                        dasd_schedule_bh (device);
+                        
+                } else {
+                        check_then_set (&cqr->status,
+                                        CQR_STATUS_QUEUED, 
+                                        CQR_STATUS_IN_IO);
+                }
 		break;
 	case -EBUSY:
 		DASD_MESSAGE (KERN_WARNING, device, "%s",
 			      "device busy, retry later\n");
+		break;
+	case -ETIMEDOUT: 
+		DASD_MESSAGE (KERN_WARNING, device, "%s",
+			      "request timeout - terminated\n");
+	case -ENODEV:
+	case -EIO:
+		check_then_set (&cqr->status,
+				CQR_STATUS_QUEUED, 
+                                CQR_STATUS_FAILED);
+
+                cqr->stopclk = now;
+                dasd_schedule_bh (device);
 		break;
 	default:
 		DASD_MESSAGE (KERN_ERR, device,
@@ -1330,11 +1431,7 @@ dasd_start_IO (ccw_req_t * cqr)
 		BUG ();
 		break;
 	}
-	if (rc == 0) {
-		check_then_set (&cqr->status,
-				CQR_STATUS_QUEUED, CQR_STATUS_IN_IO);
-		cqr->startclk = now;
-	}
+
 	return rc;
 }
 
@@ -1410,7 +1507,7 @@ dasd_get_queue (kdev_t kdev)
 /*
  * function dasd_check_expire_time
  * check the request given as argument for expiration
- * and returns 0 if not yet expired, nonzero else
+ * and returns 0 if not yet expired, EIO else
  */
 static inline int
 dasd_check_expire_time (ccw_req_t * cqr)
@@ -1425,6 +1522,7 @@ dasd_check_expire_time (ccw_req_t * cqr)
 			      (long) (cqr->expires >> 44),
 			      (long) (cqr->expires >> 12), cqr);
 		cqr->expires <<= 1;
+                rc = -EIO;
 	}
 	return rc;
 }
@@ -1501,6 +1599,8 @@ dasd_process_queues (dasd_device_t * device)
                                 check_then_set (&qp->head->status,
                                                 CQR_STATUS_ERROR,
                                                 CQR_STATUS_FAILED);
+
+                                asm volatile ("STCK %0":"=m" (qp->head->stopclk));
 
                         } else if ((device->discipline->erp_action == NULL                          ) ||
                                    ((erp_action = device->discipline->erp_action (qp->head)) == NULL)   ) {
@@ -1628,7 +1728,8 @@ dasd_process_queues (dasd_device_t * device)
 		}
 	}
 	s390irq_spin_unlock_irqrestore (irq, flags);
-}
+
+} /* end dasd_process_queues */
 
 /*
  * function dasd_run_bh
@@ -1703,28 +1804,30 @@ dasd_handle_state_change_pending (devstat_t * stat)
 
 		printk (KERN_DEBUG PRINTK_HEADER
 			"unable to find device for state change pending "
-			"interrupt: devno%04X\n", stat->devno);
-	} else {
-		/* re-activate first request in queue */
-		cqr = (*device_addr)->queue.head;
+			"interrupt: devno%04x\n", 
+                        stat->devno);
+                return;
+	} 
 
-		if (cqr->status == CQR_STATUS_PENDING) {
+        /* re-activate first request in queue */
+        cqr = (*device_addr)->queue.head;
+        
+        if (cqr->status == CQR_STATUS_PENDING) {
+                
+                DASD_MESSAGE (KERN_DEBUG, (*device_addr), "%s",
+                              "device request queue restarted by "
+                              "state change pending interrupt\n");
+                
+                del_timer (&(*device_addr)->timer);
+                
+                check_then_set (&cqr->status,
+                                CQR_STATUS_PENDING, CQR_STATUS_QUEUED);
+                
+                dasd_schedule_bh (*device_addr);
+                
+        }
 
-			DASD_MESSAGE (KERN_DEBUG, (*device_addr),
-				      "%s",
-				      "device request queue restarted by "
-				      "state change pending interrupt\n");
-
-			del_timer (&(*device_addr)->timer);
-
-			check_then_set (&cqr->status,
-					CQR_STATUS_PENDING, CQR_STATUS_QUEUED);
-
-			dasd_schedule_bh (*device_addr);
-
-		}
-	}
-}				/* end dasd_handle_state_change_pending */
+} /* end dasd_handle_state_change_pending */
 
 /*
  * function dasd_int_handler
@@ -1740,44 +1843,66 @@ dasd_int_handler (int irq, void *ds, struct pt_regs *regs)
 	dasd_era_t era = dasd_era_none; /* default is everything is okay */
 	devstat_t *stat = (devstat_t *)ds;
 
-        DASD_DRIVER_DEBUG_EVENT (4, dasd_int_handler,
-                                 "Interrupt: IRQ 0x%x",irq);
+        DASD_DRIVER_DEBUG_EVENT (6, dasd_int_handler,
+                                 "Interrupt: IRQ %02x, stat %02x, devno %04x",
+                                 irq,
+                                 stat->dstat,
+                                 stat->devno);
         asm volatile ("STCK %0":"=m" (now));
         if (stat == NULL) {
                 BUG();
 	}
 
         /* first of all check for state change pending interrupt */
-        if (stat->dstat & (DEV_STAT_ATTENTION | 
-                           DEV_STAT_DEV_END   |
-                           DEV_STAT_UNIT_EXCEP )) {
+        if ((stat->dstat & DEV_STAT_ATTENTION ) && 
+            (stat->dstat & DEV_STAT_DEV_END   ) &&
+            (stat->dstat & DEV_STAT_UNIT_EXCEP)   ) {
                 DASD_DRIVER_DEBUG_EVENT (2, dasd_int_handler,
-                                         "State change Interrupt: %04X",
+                                         "State change Interrupt: %04x",
                                          stat->devno);
                 dasd_handle_state_change_pending (stat);
-                //return; /* TBD */
+                return;
         }
 
 	ip = stat->intparm;
 	if (!ip) {		/* no intparm: unsolicited interrupt */
                 DASD_DRIVER_DEBUG_EVENT (2, dasd_int_handler,
-                                         "Unsolicited Interrupt: %04X",
+                                         "Unsolicited Interrupt: %04x",
                                          stat->devno);
 		printk (KERN_DEBUG PRINTK_HEADER
-                        "unsolicited interrupt: irq0x%x devno%04X\n",
-                        irq,stat->devno);
+                        "unsolicited interrupt: irq 0x%x devno %04x\n",
+                        irq,
+                        stat->devno);
 		return;
 	}
 	if (ip & 0x80000001) {
                 DASD_DRIVER_DEBUG_EVENT (2, dasd_int_handler,
-                                         "spurious Interrupt: %04X",
+                                         "spurious Interrupt: %04x",
                                          stat->devno);
 		printk (KERN_DEBUG PRINTK_HEADER
-                        "spurious interrupt: irq0x%x devno%04X, parm %08x\n",
-                        irq,stat->devno,ip);
+                        "spurious interrupt: irq 0x%x devno %04x, parm %08x\n",
+                        irq,
+                        stat->devno,ip);
 		return;
 	}
+
 	cqr = (ccw_req_t *)(long)ip;
+
+        /* check status - the request might have been killed because of dyn dettach */
+	if (cqr->status != CQR_STATUS_IN_IO) {
+                DASD_DRIVER_DEBUG_EVENT (2, dasd_int_handler,
+                                         "invalid status %02x on device %04x",
+                                         cqr->status,
+                                         stat->devno);
+
+		printk (KERN_DEBUG PRINTK_HEADER
+                        "invalid status: irq 0x%x devno %04x, status %02x\n",
+                        irq,
+                        stat->devno,
+                        cqr->status);
+		return;
+	}
+
 	device = (dasd_device_t *) cqr->device;
 	if (device == NULL || 
             device != ds-offsetof(dasd_device_t,dev_status)) {
@@ -1789,46 +1914,11 @@ dasd_int_handler (int irq, void *ds, struct pt_regs *regs)
 	if (strncmp (device->discipline->ebcname, (char *) &cqr->magic, 4)) {
                 BUG();
 	}
-#ifdef ERP_FAKE
-        {
-                static int counter    = 0;
-                static int fake_count = 0;
 
-                if ((++counter % 937 >=   0) &&
-                    (  counter % 937 <=  10) && 
-                    (  counter       < 5000) && 
-                    (  counter       > 2000)   ) {
-
-                        char *sense = stat->ii.sense.data;
-                        
-                        printk (KERN_INFO PRINTK_HEADER
-                                "***********************************************\n");
-                        printk (KERN_INFO PRINTK_HEADER
-                                "Faking I/O error to recover from; cntr=%i / %02X\n",
-                                counter, ++fake_count);
-                        printk (KERN_INFO PRINTK_HEADER
-                                "***********************************************\n");
-
-                        era = dasd_era_recover;
-                        stat->flag  |= DEVSTAT_FLAG_SENSE_AVAIL;
-                        stat->dstat |= 0x02;
-                        memset(sense,0,32);
-
-                        /* 32 byte sense (byte 27 bit 1 = 0)*/
-                        sense[25] = 0x1D;
-//                        sense [25] = (fake_count % 256); //0x1B;
-
-                        /* 24 byte sense (byte 27 bit 1 = 1)*/
-//                        sense [0] = (counter % 0xFF); //0x1B;
-//                        sense [1] = ((counter * 7) % 0xFF); //0x1B;
-//                        sense [2] = (fake_count % 0xFF); //0x1B;
-//                        sense [27] = 0x80;
-                }
-        }
-#endif /* ERP_FAKE */
         /* first of all lets try to find out the appropriate era_action */
-        DASD_DEVICE_DEBUG_EVENT (4, device," Int: CS/DS 0x%04X",
+        DASD_DEVICE_DEBUG_EVENT (4, device," Int: CS/DS 0x%04x",
                                  ((stat->cstat<<8)|stat->dstat));
+
 	/* first of all lets try to find out the appropriate era_action */
 	if (stat->flag & DEVSTAT_FLAG_SENSE_AVAIL ||
 	    stat->dstat & ~(DEV_STAT_CHN_END | DEV_STAT_DEV_END)) {
@@ -1844,7 +1934,9 @@ dasd_int_handler (int irq, void *ds, struct pt_regs *regs)
 	}
         if ( era == dasd_era_none ) {
                 check_then_set(&cqr->status, 
-                               CQR_STATUS_IN_IO, CQR_STATUS_DONE);
+                               CQR_STATUS_IN_IO, 
+                               CQR_STATUS_DONE);
+
                 cqr->stopclk=now;
 		/* start the next queued request if possible -> fast_io */
                 if (cqr->next &&
@@ -1875,11 +1967,15 @@ dasd_int_handler (int irq, void *ds, struct pt_regs *regs)
 
 		switch (era) {
 		case dasd_era_fatal:
-			check_then_set (&cqr->status, CQR_STATUS_IN_IO,
+			check_then_set (&cqr->status, 
+                                        CQR_STATUS_IN_IO,
 					CQR_STATUS_FAILED);
+
+                        cqr->stopclk = now;
 			break;
 		case dasd_era_recover:
-			check_then_set (&cqr->status, CQR_STATUS_IN_IO,
+			check_then_set (&cqr->status, 
+                                        CQR_STATUS_IN_IO,
 					CQR_STATUS_ERROR);
 			break;
 		default:
@@ -1894,7 +1990,8 @@ dasd_int_handler (int irq, void *ds, struct pt_regs *regs)
                         wake_up (&dasd_init_waitq);
         }
 	dasd_schedule_bh (device);
-}
+
+} /* end dasd_int_handler */
 
 /* SECTION: Some stuff related to error recovery */
 
@@ -1929,13 +2026,15 @@ dasd_default_erp_action (ccw_req_t * cqr)
                                 CQR_STATUS_ERROR,
                                 CQR_STATUS_FAILED);
 
+                asm volatile ("STCK %0":"=m" (cqr->stopclk));
+
                 return cqr;
 	}
 
 	erp->cpaddr->cmd_code = CCW_CMD_TIC;
 	erp->cpaddr->cda = (__u32) (void *) cqr->cpaddr;
 	erp->function = dasd_default_erp_action;
-	erp->refers = (unsigned int) (unsigned long) cqr;
+	erp->refers = cqr;
 	erp->device = cqr->device;
 	erp->magic = cqr->magic;
 	erp->retries = 16;
@@ -1946,7 +2045,8 @@ dasd_default_erp_action (ccw_req_t * cqr)
                              erp);
 
 	return erp;
-}
+
+} /* end dasd_default_erp_action */
 
 /*
  * DEFAULT_ERP_POSTACTION
@@ -2012,6 +2112,8 @@ dasd_default_erp_postaction (ccw_req_t *erp)
 		check_then_set (&cqr->status,
 				CQR_STATUS_ERROR, 
                                 CQR_STATUS_FAILED);
+
+                asm volatile ("STCK %0":"=m" (cqr->stopclk));
 	}
 
 	return cqr;
@@ -2040,8 +2142,10 @@ dasd_format (dasd_device_t * device, format_data_t * fdata)
 	}
 	DASD_MESSAGE (KERN_INFO, device,
 		      "formatting units %d to %d (%d B blocks) flags %d",
-		      fdata->start_unit, fdata->stop_unit,
-		      fdata->blksize, fdata->intensity);
+		      fdata->start_unit, 
+                      fdata->stop_unit,
+		      fdata->blksize, 
+                      fdata->intensity);
 	while ((!rc) && (fdata->start_unit <= fdata->stop_unit)) {
                 ccw_req_t *req;
                 dasd_format_fn_t ffn = device->discipline->format_device;
@@ -2060,8 +2164,10 @@ dasd_format (dasd_device_t * device, format_data_t * fdata)
 			break;
 		} 
 		dasd_free_request (req, device);	/* request is no longer used */
-	        if ( signal_pending(current) )
+	        if ( signal_pending(current) ) {
+			rc = -ERESTARTSYS;
 			break;		
+                }
 		fdata->start_unit++;
 	}
 	return rc;
@@ -2126,7 +2232,13 @@ dasd_revalidate (dasd_device_t * device)
 	}
 	for (i = (1 << DASD_PARTN_BITS) - 1; i >= 0; i--) {
                 int major = device->major_info->gendisk.major;
-		invalidate_device(MKDEV (major, start+i), 1);
+		int minor = start + i;
+		kdev_t devi = MKDEV (major, minor);
+		struct super_block *sb = get_super (devi);
+		//sync_dev (devi);
+		if (sb)
+			invalidate_inodes (sb);
+		invalidate_buffers (devi);
 	}
         dasd_destroy_partitions(device);
         dasd_setup_partitions(device);
@@ -2143,7 +2255,8 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 	if (!device) {
 		printk (KERN_WARNING PRINTK_HEADER
 			"No device registered as device (%d:%d)\n",
-			MAJOR (inp->i_rdev), MINOR (inp->i_rdev));
+			MAJOR (inp->i_rdev), 
+                        MINOR (inp->i_rdev));
 		return -EINVAL;
 	}
 	if ((_IOC_DIR (no) != _IOC_NONE) && (data == 0)) {
@@ -2154,15 +2267,21 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 #if 0
 	printk (KERN_DEBUG PRINTK_HEADER
 		"ioctl 0x%08x %s'0x%x'%d(%d) on /dev/%s (%d:%d,"
-		" devno 0x%04X on irq %d) with data %8lx\n",
+		" devno 0x%04x on irq %d) with data %8lx\n",
 		no,
 		_IOC_DIR (no) == _IOC_NONE ? "0" :
 		_IOC_DIR (no) == _IOC_READ ? "r" :
 		_IOC_DIR (no) == _IOC_WRITE ? "w" :
 		_IOC_DIR (no) == (_IOC_READ | _IOC_WRITE) ? "rw" : "u",
-		_IOC_TYPE (no), _IOC_NR (no), _IOC_SIZE (no),
-		device->name, MAJOR (inp->i_rdev), MINOR (inp->i_rdev),
-		device->devinfo.devno, device->devinfo.irq, data);
+		_IOC_TYPE (no),
+                _IOC_NR (no),
+                _IOC_SIZE (no),
+		device->name, 
+                MAJOR (inp->i_rdev), 
+                MINOR (inp->i_rdev),
+		device->devinfo.devno, 
+                device->devinfo.irq, 
+                data);
 #endif
 	switch (no) {
         case DASDAPIVER: {
@@ -2175,13 +2294,11 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 	case BLKGETSIZE:{	/* Return device size */
 			long blocks = major_info->gendisk.sizes 
                                       [MINOR (inp->i_rdev)] << 1;
-			rc = put_user(blocks, (long *)arg);
-			break;
-		}
-	case BLKGETSIZE64:{
-			u64 blocks = major_info->gendisk.sizes 
-                                      [MINOR (inp->i_rdev)];
-			rc = put_user(blocks << 10, (u64 *)arg);
+			rc =
+			    copy_to_user ((long *) data, &blocks,
+					  sizeof (long));
+			if (rc)
+				rc = -EFAULT;
 			break;
 		}
 	case BLKRRPART:{
@@ -2210,6 +2327,7 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 				break;
 			}
                         if ( device->level > DASD_STATE_ACCEPT) {
+                                dasd_deactivate_queue(device);
                                 if ( device->request_queue)
                                         dasd_flush_request_queues(device,0);
                                 dasd_flush_chanq(device,0);
@@ -2264,7 +2382,7 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 			rc = dasd_format (device, &fdata);
 			break;
 		}
-	case BIODASDPRRST:{
+	case BIODASDPRRST:{     /* reset device profile information */
 			if (!capable (CAP_SYS_ADMIN)) {
 				rc = -EACCES;
 				break;
@@ -2273,7 +2391,7 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 				sizeof (dasd_profile_info_t));
 			break;
 		}
-	case BIODASDPRRD:{
+	case BIODASDPRRD:{      /* retrun device profile information */
 			rc = copy_to_user((long *)data,
 					  (long *)&device->profile,
 					  sizeof(dasd_profile_info_t));
@@ -2281,7 +2399,7 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 				rc = -EFAULT;
 			break;
 		}
-	case BIODASDRSRV:{
+	case BIODASDRSRV:{      /* reserve */
 			ccw_req_t *req;
 			if (!capable (CAP_SYS_ADMIN)) {
 				rc = -EACCES;
@@ -2292,7 +2410,7 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 			dasd_free_request (req, device);
 			break;
 		}
-	case BIODASDRLSE:{
+	case BIODASDRLSE:{      /* release */
 			ccw_req_t *req;
 			if (!capable (CAP_SYS_ADMIN)) {
 				rc = -EACCES;
@@ -2303,9 +2421,15 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 			dasd_free_request (req, device);
 			break;
 		}
-	case BIODASDSLCK:{
-			printk (KERN_WARNING PRINTK_HEADER
-				"Unsupported ioctl BIODASDSLCK\n");
+	case BIODASDSLCK:{      /* steal lock - unconditional reserve */
+			ccw_req_t *req;
+			if (!capable (CAP_SYS_ADMIN)) {
+				rc = -EACCES;
+				break;
+			}
+			req = device->discipline->steal_lock (device);
+			rc = dasd_sleep_on_req (req);
+			dasd_free_request (req, device);
 			break;
 		}
 	case BIODASDINFO:{
@@ -2398,11 +2522,12 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 					      no,
 					      _IOC_DIR (no) == _IOC_NONE ? "0" :
 					      _IOC_DIR (no) == _IOC_READ ? "r" :
-					      _IOC_DIR (no) ==
-					      _IOC_WRITE ? "w" : _IOC_DIR (no)
-					      == (_IOC_READ | _IOC_WRITE) ? "rw"
-					      : "u", _IOC_TYPE (no),
-					      _IOC_NR (no), _IOC_SIZE (no),
+					      _IOC_DIR (no) == _IOC_WRITE ? "w" : 
+                                              _IOC_DIR (no) == 
+                                              (_IOC_READ | _IOC_WRITE) ? "rw" : "u",
+                                              _IOC_TYPE (no),
+					      _IOC_NR (no), 
+                                              _IOC_SIZE (no),
 					      data);
 				rc = -ENOTTY;
 			}
@@ -2441,7 +2566,8 @@ dasd_open (struct inode *inp, struct file *filp)
 	if (dasd_probeonly) {
 		printk ("\n" KERN_INFO PRINTK_HEADER
 			"No access to device (%d:%d) due to probeonly mode\n",
-			MAJOR (inp->i_rdev), MINOR (inp->i_rdev));
+			MAJOR (inp->i_rdev), 
+                        MINOR (inp->i_rdev));
 		rc = -EPERM;
                 goto fail;
 	}
@@ -2450,13 +2576,14 @@ dasd_open (struct inode *inp, struct file *filp)
 	if (device == NULL ) {
 		printk (KERN_WARNING PRINTK_HEADER
 			"No device registered as (%d:%d)\n",
-			MAJOR (inp->i_rdev), MINOR (inp->i_rdev));
+			MAJOR (inp->i_rdev), 
+                        MINOR (inp->i_rdev));
 		rc = -ENODEV;
                 goto unlock;
 	}
-	if (device->level < DASD_STATE_ACCEPT ) {
-		DASD_MESSAGE (KERN_WARNING, device,
-			      " %s", " Cannot open unrecognized device\n");
+	if (device->level <= DASD_STATE_ACCEPT ) {
+		DASD_MESSAGE (KERN_WARNING, device, " %s", 
+                              " Cannot open unrecognized device\n");
 		rc = -ENODEV;
                 goto unlock;
 	}
@@ -2473,6 +2600,11 @@ dasd_open (struct inode *inp, struct file *filp)
 	return rc;
 }
 
+/*
+ * DASD_RELEASE
+ *
+ * DESCRIPTION
+ */
 static int
 dasd_release (struct inode *inp, struct file *filp)
 {
@@ -2488,17 +2620,19 @@ dasd_release (struct inode *inp, struct file *filp)
 	if (device == NULL) {
 		printk (KERN_WARNING PRINTK_HEADER
 			"No device registered as %d:%d\n",
-			MAJOR (inp->i_rdev), MINOR (inp->i_rdev));
+			MAJOR (inp->i_rdev), 
+                        MINOR (inp->i_rdev));
 		rc = -EINVAL;
                 goto out;
 	}
 
 	if (device->level < DASD_STATE_ACCEPT ) {
-		DASD_MESSAGE (KERN_WARNING, device,
-			      " %s", " Cannot release unrecognized device\n");
+		DASD_MESSAGE (KERN_WARNING, device, " %s",
+                              " Cannot release unrecognized device\n");
 		rc = -ENODEV;
                 goto out;
 	}
+	// fsync_dev (inp->i_rdev);	/* sync the device */
         count = atomic_dec_return (&device->open_count);
         if ( count == 0) {
                 invalidate_buffers (inp->i_rdev);
@@ -2604,11 +2738,14 @@ dasd_flush_chanq ( dasd_device_t * device, int destroy )
                 s390irq_spin_lock_irqsave (device->devinfo.irq, flags);
                 cqr = device->queue.head;
                 while ( cqr != NULL ) {
-                        if ( cqr -> status == CQR_STATUS_IN_IO )
+                        if ( cqr->status == CQR_STATUS_IN_IO )
                                 device->discipline->term_IO (cqr);
                         if ( cqr->status != CQR_STATUS_DONE ||
                              cqr->status != CQR_STATUS_FAILED ) {
+
                                 cqr->status = CQR_STATUS_FAILED;
+                                asm volatile ("STCK %0":"=m" (cqr->stopclk));
+
                         }
                         dasd_schedule_bh(device);
                         cqr = cqr->next;
@@ -2638,29 +2775,26 @@ dasd_disable_volume ( dasd_device_t * device, int force )
         int rc = 0;
         int target  = DASD_STATE_KNOWN;
         int count = atomic_read (&device->open_count);
-        int part;
         
 	if ( count ) {
 		DASD_MESSAGE (KERN_EMERG, device, "%s",
 			      "device has vanished although it was open!");
         }
         if ( force ) {
+                dasd_deactivate_queue(device);
                 dasd_flush_chanq(device,force);
                 dasd_flush_request_queues(device,force);
                 dasd_disable_blkdev(device);
                 target = DASD_STATE_DEL;
         }
 
-#if 0
-        /* unregister devfs entries */
-        for (part = 0; part < (1 << DASD_PARTN_BITS); part++) {
-                devfs_unregister(device->major_info->gendisk.part[MINOR(device->kdev)+part].de);
-                device->major_info->gendisk.part[MINOR(device->kdev)+part].de = NULL;
-        }                        
-#endif
+        /* unregister partitions ('ungrok_partitions') */
+        devfs_register_partitions(&device->major_info->gendisk,
+                                  MINOR(device->kdev),1);
         
         DASD_MESSAGE (KERN_WARNING, device, 
-                      "disabling device, target state:%d",target);
+                      "disabling device, target state: %d",target);
+
         dasd_set_device_level (device->devinfo.devno, 
                                device->discipline, 
                                target);
@@ -2777,9 +2911,14 @@ dasd_enable_ranges (dasd_range_t *range, dasd_discipline_t *d, int all )
                              device->level >= DASD_STATE_READY &&
                              device->request_queue == NULL ) {
                                 if (dasd_features_from_devno(j)&DASD_FEATURE_READONLY) {
-                                    for (tempdev=device->kdev;tempdev<(device->kdev +(1 << DASD_PARTN_BITS));tempdev++)
-                                        set_device_ro (tempdev, 1);
-                                     printk (KERN_WARNING PRINTK_HEADER "setting read-only mode for device /dev/%s\n",device->name);
+                                        for (tempdev=device->kdev;
+                                             tempdev<(device->kdev +(1 << DASD_PARTN_BITS));
+                                             tempdev++)
+                                                set_device_ro (tempdev, 1);
+
+                                        printk (KERN_WARNING PRINTK_HEADER 
+                                                "setting read-only mode for device /dev/%s\n",
+                                                device->name);
                                 }
                                 dasd_setup_blkdev(device);
                                 dasd_setup_partitions(device);
@@ -2790,6 +2929,12 @@ dasd_enable_ranges (dasd_range_t *range, dasd_discipline_t *d, int all )
 }
 
 #ifdef CONFIG_DASD_DYNAMIC
+/*
+ * DASD_NOT_OPER_HANDLER
+ *
+ * DESCRIPTION
+ *   handles leaving devices
+ */
 static void
 dasd_not_oper_handler (int irq, int status)
 {
@@ -2811,14 +2956,26 @@ dasd_not_oper_handler (int irq, int status)
 		if (devno != -ENODEV)
 			break;
 	}
+
+	DASD_DRIVER_DEBUG_EVENT (5, dasd_not_oper_handler, 
+                                 "called for devno %04x", 
+                                 devno);
+
 	if (devno < 0) {
 		printk (KERN_WARNING PRINTK_HEADER
-			"not_oper_handler called on irq %d no devno!\n", irq);
+			"not_oper_handler called on irq 0x%04x no devno!\n", 
+                        irq);
 		return;
 	}
-        dasd_disable_volume(device, 0);
+        dasd_disable_volume(device, 1);
 }
 
+/*
+ * DASD_OPER_HANDLER
+ *
+ * DESCRIPTION
+ *   called by the machine check handler to make an device operational
+ */
 int
 dasd_oper_handler (int irq, devreg_t * devreg)
 {
@@ -2835,7 +2992,12 @@ dasd_oper_handler (int irq, devreg_t * devreg)
 		rc = -ENODEV;
                 goto out;
 	}
-	/* find out devno of leaving device: CIO has already deleted this information ! */
+
+	DASD_DRIVER_DEBUG_EVENT (5, dasd_oper_handler, 
+                                 "called for devno %04x", 
+                                 devno);
+
+	/* find out devno of device */
 	list_for_each (l, &dasd_major_info[0].list) {
 		major_info = list_entry (l, major_info_t, list);
 		for (i = 0; i < DASD_PER_MAJOR; i++) {
@@ -2881,10 +3043,11 @@ dasd_find_device_addr ( int devno )
         dasd_device_t **device_addr;
 
 	DASD_DRIVER_DEBUG_EVENT (1, dasd_find_device_addr, 
-                                 "devno %04X", devno);
+                                 "devno %04x", 
+                                 devno);
 	if ( dasd_devindex_from_devno (devno) < 0 ) {
                 DASD_DRIVER_DEBUG_EXCEPTION (1, dasd_find_device_addr, 
-                                             "no dasd: devno %04X",
+                                             "no dasd: devno %04x",
                                              devno);
 		return NULL;
 	}
@@ -2996,6 +3159,13 @@ dasd_state_new_to_known (dasd_device_t **dptr, int devno, dasd_discipline_t *dis
         if ( rc ) {
                 goto out;
         }
+
+	DASD_DRIVER_DEBUG_EVENT (5, dasd_state_new_to_known, 
+                                 "got devinfo CU-type %04x and dev-type %04x", 
+                                 device->devinfo.sid_data.cu_type,
+                                 device->devinfo.sid_data.dev_type);
+
+
         if ( devno != device->devinfo.devno )
                 BUG();
         device->discipline = dasd_find_disc (device, disc);
@@ -3003,7 +3173,8 @@ dasd_state_new_to_known (dasd_device_t **dptr, int devno, dasd_discipline_t *dis
                 rc = -ENODEV;
                 goto out;
         }
-        sprintf (buffer, "%04x", device->devinfo.devno);
+        sprintf (buffer, "%04x", 
+                 device->devinfo.devno);
         dir = devfs_mk_dir (dasd_devfs_handle, buffer, device);
         device->major_info->gendisk.de_arr[MINOR(device->kdev)
                                           >> DASD_PARTN_BITS] = dir;
@@ -3039,7 +3210,8 @@ dasd_state_known_to_accept (dasd_device_t *device)
                                              3 * sizeof (long));
         debug_register_view (device->debug_area, &debug_sprintf_view);
         debug_register_view (device->debug_area, &debug_hex_ascii_view);
-        DASD_DEVICE_DEBUG_EVENT (0, device,"%p debug area created",device);
+        DASD_DEVICE_DEBUG_EVENT (0, device,"%p debug area created",
+                                 device);
         
         if (device->discipline->int_handler) {
                 rc = s390_request_irq_special (device->devinfo.irq,
@@ -3065,7 +3237,8 @@ dasd_state_accept_to_known (dasd_device_t *device )
         if (device->discipline->int_handler) {
                 free_irq (device->devinfo.irq, &device->dev_status);
         }
-        DASD_DEVICE_DEBUG_EVENT (0, device,"%p debug area deleted",device);
+        DASD_DEVICE_DEBUG_EVENT (0, device,"%p debug area deleted",
+                                 device);
         if ( device->debug_area != NULL )
                 debug_unregister (device->debug_area);
         device->discipline = NULL;
@@ -3079,6 +3252,10 @@ dasd_state_accept_to_init (dasd_device_t *device)
 {
         int rc = 0;
         unsigned long flags;
+
+        printk (KERN_ERR PRINTK_HEADER
+                "called dasd_state_accept_to_init for device %02x\n",
+                device->devinfo.devno);
 
         if ( device->discipline->init_analysis ) {
                 device->init_cqr=device->discipline->init_analysis (device);
@@ -3197,6 +3374,18 @@ dasd_setup_blkdev (dasd_device_t *device )
         return rc;
 }
 
+static void
+dasd_deactivate_queue (dasd_device_t *device)
+{
+        int i;
+        int major = MAJOR(device->kdev);
+        int minor = MINOR(device->kdev);
+
+        for (i = 0; i < (1 << DASD_PARTN_BITS); i++) {
+                device->major_info->gendisk.sizes[minor + i] = 0;
+        }
+}
+
 static inline int
 dasd_disable_blkdev (dasd_device_t *device ) 
 {
@@ -3238,7 +3427,6 @@ static inline void
 dasd_destroy_partitions ( dasd_device_t * device ) 
 {
         int i;
-        int major = MAJOR(device->kdev);
         int minor = MINOR(device->kdev);
         
         for (i = 0; i < (1 << DASD_PARTN_BITS); i++) {
@@ -3284,6 +3472,12 @@ dasd_set_device_level (unsigned int devno,
         } else {
                 from_state = device->level;
         }
+
+        DASD_DRIVER_DEBUG_EVENT (3, dasd_set_device_level,
+                                 "devno %04x; from %i to %i",
+                                 devno,
+                                 from_state,
+                                 to_state);
 
         if ( from_state == to_state )
                 goto out;
@@ -3340,8 +3534,12 @@ dasd_set_device_level (unsigned int devno,
  bringup_fail:   /* revert changes */
 #if 0
         printk (KERN_DEBUG PRINTK_HEADER
-                "failed to set device from state %d to %d at level %d rc %d. Reverting...\n",
-                from_state,to_state,device->level,rc);
+                "failed to set device from state %d to %d at "
+                "level %d rc %d. Reverting...\n",
+                from_state,
+                to_state,
+                device->level,
+                rc);
 #endif
         to_state = from_state;
         from_state = device->level;
@@ -3352,18 +3550,22 @@ dasd_set_device_level (unsigned int devno,
              to_state <= DASD_STATE_READY ) 
                 if (dasd_state_online_to_ready(device))
                         BUG();
+
         if ( from_state >= DASD_STATE_READY &&
-                      to_state <= DASD_STATE_ACCEPT ) 
+             to_state <= DASD_STATE_ACCEPT ) 
                 if ( dasd_state_ready_to_accept(device))
                         BUG();
+
         if ( from_state >= DASD_STATE_ACCEPT &&
              to_state <= DASD_STATE_KNOWN ) 
                 if ( dasd_state_accept_to_known(device))
                         BUG();
+
         if ( from_state >= DASD_STATE_KNOWN &&
              to_state <= DASD_STATE_NEW ) 
                 if ( dasd_state_known_to_new(device))
                         BUG();
+
         if ( from_state >= DASD_STATE_NEW &&
              to_state <= DASD_STATE_DEL) 
                 if (dasd_state_new_to_del(device_addr))
@@ -3420,7 +3622,8 @@ dasd_devices_open (struct inode *inode, struct file *file)
 	}
 	info->data = (char *) vmalloc (size);	
 	DASD_DRIVER_DEBUG_EVENT (1, dasd_devices_open, "area: %p, size 0x%x",
-				 info->data, size);
+				 info->data, 
+                                 size);
 	if (size && info->data == NULL) {
 		printk (KERN_WARNING "No memory available for data\n");
 		vfree (info);
@@ -3437,7 +3640,7 @@ dasd_devices_open (struct inode *inode, struct file *file)
                         device = temp->dasd_device[i];
 			if (device) {
 				len += sprintf (info->data + len,
-						"%04X(%s) at (%3d:%3d) is %7s:",
+						"%04x(%s) at (%3d:%3d) is %7s:",
 						device->devinfo.devno,
 						device->discipline ?
 						device->
@@ -3506,7 +3709,7 @@ dasd_devices_open (struct inode *inode, struct file *file)
                                                         "none");
                                 } else {
                                         len += sprintf (info->data + len,
-                                                        "%04X",devno);
+                                                        "%04x",devno);
                                 }
                                 len += sprintf (info->data + len,
                                                 "(none) at (%3d:%3d) is %7s: unknown",
@@ -3591,22 +3794,31 @@ dasd_devices_write (struct file *file, const char *user_buf,
 		range.to = dasd_strtoul (temp, &temp, &features);
 	}
 
-	off = (long) temp - (long) buffer;
-	if (!strncmp (buffer, "add", strlen ("add"))) {
-		dasd_add_range (range.from, range.to, features);
-                dasd_enable_ranges (&range, NULL, 0);
-	} else { 
-		while (buffer[off] && !isalnum (buffer[off]))
-			off++;
-		if (!strncmp (buffer + off, "on", strlen ("on"))) {
-        	        dasd_enable_ranges (&range, NULL, 0);
-		} else if (!strncmp (buffer + off, "off", strlen ("off"))) {
-        	        dasd_disable_ranges (&range, NULL, 0, 1);
-		} else {
-			printk (KERN_WARNING PRINTK_HEADER
-			"/proc/dasd/devices: parse error in '%s'", buffer);
-		}
-	}
+        if (range.from == -EINVAL ||
+            range.to   == -EINVAL   ) {
+                
+                printk (KERN_WARNING PRINTK_HEADER
+                        "/proc/dasd/devices: parse error in '%s'", 
+                        buffer);
+        } else {
+                off = (long) temp - (long) buffer;
+                if (!strncmp (buffer, "add", strlen ("add"))) {
+                        dasd_add_range (range.from, range.to, features);
+                        dasd_enable_ranges (&range, NULL, 0);
+                } else { 
+                        while (buffer[off] && !isalnum (buffer[off]))
+                                off++;
+                        if (!strncmp (buffer + off, "on", strlen ("on"))) {
+                                dasd_enable_ranges (&range, NULL, 0);
+                        } else if (!strncmp (buffer + off, "off", strlen ("off"))) {
+                                dasd_disable_ranges (&range, NULL, 0, 1);
+                        } else {
+                                printk (KERN_WARNING PRINTK_HEADER
+                                        "/proc/dasd/devices: parse error in '%s'", buffer);
+                        }
+                }
+        }
+
 	vfree (buffer);
 	return user_len;
 }
@@ -3660,112 +3872,124 @@ dasd_statistics_open (struct inode *inode, struct file *file)
                 MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
+        
+        /* prevent couter 'ouverflow' on output */
 	for (shift = 0, help = dasd_global_profile.dasd_io_reqs;
-	     help > 8192; help = help >> 1, shift++) ;
-	len =
-	    sprintf (info->data, "%d dasd I/O requests\n",
-		     dasd_global_profile.dasd_io_reqs);
-	len +=
-	    sprintf (info->data + len, "with %d sectors(512B each)\n",
-		     dasd_global_profile.dasd_io_sects);
-	len +=
-	    sprintf (info->data + len,
-		     "__<4 ___8 __16 __32 __64 _128 _256 _512 __1k __2k __4k __8k _16k _32k _64k 128k\n");
-	len +=
-	    sprintf (info->data + len,
-		     "_256 _512 __1M __2M __4M __8M _16M _32M _64M 128M 256M 512M __1G __2G __4G _>4G\n");
+	     help > 9999999; help = help >> 1, shift++) ;
+
+	len = sprintf (info->data, "%d dasd I/O requests\n",
+                       dasd_global_profile.dasd_io_reqs);
+	len += sprintf (info->data + len, "with %d sectors(512B each)\n",
+                        dasd_global_profile.dasd_io_sects);
+
+	len += sprintf (info->data + len,
+                        "   __<4    ___8    __16    __32    __64 "
+                        "   _128    _256    _512    __1k    __2k "
+                        "   __4k    __8k    _16k    _32k    _64k "
+                        "   128k\n");
+
+	len += sprintf (info->data + len,
+                        "   _256    _512    __1M    __2M    __4M "
+                        "   __8M    _16M    _32M    _64M    128M "
+                        "   256M    512M    __1G    __2G    __4G "
+                        "   _>4G\n");
+
 	len += sprintf (info->data + len, "Histogram of sizes (512B secs)\n");
 	for (i = 0; i < 16; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_secs[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_secs[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
+
 	len += sprintf (info->data + len, "Histogram of I/O times\n");
 	for (i = 0; i < 16; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_times[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_times[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
 	for (; i < 32; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_times[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_times[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
-	len +=
-	    sprintf (info->data + len, "Histogram of I/O times per sector\n");
+
+	len += sprintf (info->data + len, "Histogram of I/O times per sector\n");
 	for (i = 0; i < 16; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_timps[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_timps[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
 	for (; i < 32; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_timps[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_timps[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
+
 	len += sprintf (info->data + len, "Histogram of I/O time till ssch\n");
 	for (i = 0; i < 16; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_time1[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_time1[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
 	for (; i < 32; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_time1[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_time1[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
-	len +=
-	    sprintf (info->data + len,
-		     "Histogram of I/O time between ssch and irq\n");
+
+	len += sprintf (info->data + len,
+                        "Histogram of I/O time between ssch and irq\n");
 	for (i = 0; i < 16; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_time2[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_time2[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
 	for (; i < 32; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_time2[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_time2[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
-	len +=
-	    sprintf (info->data + len,
-		     "Histogram of I/O time between ssch and irq per sector\n");
+
+	len += sprintf (info->data + len,
+                        "Histogram of I/O time between ssch and irq per sector\n");
 	for (i = 0; i < 16; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_time2ps[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_time2ps[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
 	for (; i < 32; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_time2ps[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_time2ps[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
-	len +=
-	    sprintf (info->data + len,
-		     "Histogram of I/O time between irq and end\n");
+
+	len += sprintf (info->data + len,
+                        "Histogram of I/O time between irq and end\n");
 	for (i = 0; i < 16; i++) {
 		len +=
-		    sprintf (info->data + len, "%4d ",
+		    sprintf (info->data + len, "%7d ",
 			     dasd_global_profile.dasd_io_time3[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
 	for (; i < 32; i++) {
-		len +=
-		    sprintf (info->data + len, "%4d ",
-			     dasd_global_profile.dasd_io_time3[i] >> shift);
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_time3[i] >> shift);
 	}
 	len += sprintf (info->data + len, "\n");
+
+	len += sprintf (info->data + len,
+                        "# of req in chanq at enqueuing (1..32) \n");
+	for (i = 0; i < 16; i++) {
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_nr_req[i] >> shift);
+	}
+	len += sprintf (info->data + len, "\n");
+	for (; i < 32; i++) {
+		len += sprintf (info->data + len, "%7d ",
+                                dasd_global_profile.dasd_io_nr_req[i] >> shift);
+	}
+	len += sprintf (info->data + len, "\n");
+
 	info->len = len;
 	return rc;
 }
@@ -3838,7 +4062,9 @@ dasd_request_module ( void *name ) {
 	} 
 	while ( (rc=request_module(name)) != 0 ) {
         	DECLARE_WAIT_QUEUE_HEAD(wait);
-		printk ( KERN_INFO "request_module returned %d for %s\n",rc,(char*)name);
+		printk ( KERN_INFO "request_module returned %d for %s\n",
+                         rc,
+                         (char*)name);
         	sleep_on_timeout(&wait,5* HZ); /* wait in steps of 5 seconds */
     	}
     	return rc;
@@ -3855,7 +4081,7 @@ dasd_init (void)
 	struct list_head *l;
 
 	printk (KERN_INFO PRINTK_HEADER "initializing...\n");
-	dasd_debug_area = debug_register (DASD_NAME, 0, 2, 4 * sizeof (long));
+	dasd_debug_area = debug_register (DASD_NAME, 0, 2, 5 * sizeof (long));
 	debug_register_view (dasd_debug_area, &debug_sprintf_view);
 	debug_register_view (dasd_debug_area, &debug_hex_ascii_view);
 
@@ -3864,10 +4090,12 @@ dasd_init (void)
 	if (dasd_debug_area == NULL) {
 		goto failed;
 	}
-	DASD_DRIVER_DEBUG_EVENT (0, dasd_init, "%s", "ENTRY");
+	DASD_DRIVER_DEBUG_EVENT (0, dasd_init, "%s", 
+                                 "ENTRY");
 	dasd_devfs_handle = devfs_mk_dir (NULL, DASD_NAME, NULL);
 	if (dasd_devfs_handle < 0) {
-		DASD_DRIVER_DEBUG_EVENT (1, dasd_init, "%s", "no devfs");
+		DASD_DRIVER_DEBUG_EVENT (1, dasd_init, "%s", 
+                                         "no devfs");
 		goto failed;
 	}
 	list_for_each (l, &dasd_major_info[0].list) {
@@ -3893,7 +4121,12 @@ dasd_init (void)
 #ifndef MODULE
 	dasd_split_parm_string (dasd_parm_string);
 #endif				/* ! MODULE */
-	dasd_parse (dasd);
+	rc = dasd_parse (dasd);
+	if (rc) {
+		DASD_DRIVER_DEBUG_EVENT (1, dasd_init, "%s",
+                                         "invalid range found");
+		goto failed;
+	}
 
 	rc = dasd_proc_init ();
 	if (rc) {
@@ -3909,7 +4142,7 @@ dasd_init (void)
 			int index = dasd_devindex_from_devno (devno);
 			if (index == -ENODEV) {	/* not included in ranges */
 				DASD_DRIVER_DEBUG_EVENT (2, dasd_init,
-							 "add %04X to range",
+							 "add %04x to range",
 							 devno);
 				dasd_add_range (devno, devno, DASD_DEFAULT_FEATURES);
 			}

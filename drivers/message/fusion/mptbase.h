@@ -12,7 +12,7 @@
  *  Originally By: Steven J. Ralston
  *  (mailto:Steve.Ralston@lsil.com)
  *
- *  $Id: mptbase.h,v 1.46.2.2.2.1 2001/08/24 20:07:05 sralston Exp $
+ *  $Id: mptbase.h,v 1.46.2.2.2.2 2001/09/18 03:22:29 sralston Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -77,8 +77,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2001 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"1.02.01"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-1.02.01"
+#define MPT_LINUX_VERSION_COMMON	"1.02.02"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-1.02.02"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 
 #define show_mptmod_ver(s,ver)  \

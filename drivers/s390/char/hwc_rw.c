@@ -238,17 +238,18 @@ static signed int do_hwc_write (int from_user, unsigned char *,
 				unsigned int,
 				unsigned char);
 
+unsigned char hwc_ip_buf[512];
+
 static asmlinkage int 
 internal_print (char write_time, char *fmt,...)
 {
 	va_list args;
 	int i;
-	unsigned char buf[512];
 
 	va_start (args, fmt);
-	i = vsprintf (buf, fmt, args);
+	i = vsprintf (hwc_ip_buf, fmt, args);
 	va_end (args);
-	return do_hwc_write (0, buf, i, write_time);
+	return do_hwc_write (0, hwc_ip_buf, i, write_time);
 }
 
 int 
@@ -256,15 +257,14 @@ hwc_printk (const char *fmt,...)
 {
 	va_list args;
 	int i;
-	unsigned char buf[512];
 	unsigned long flags;
 	int retval;
 
 	spin_lock_irqsave (&hwc_data.lock, flags);
 
-	i = vsprintf (buf, fmt, args);
+	i = vsprintf (hwc_ip_buf, fmt, args);
 	va_end (args);
-	retval = do_hwc_write (0, buf, i, IMMEDIATE_WRITE);
+	retval = do_hwc_write (0, hwc_ip_buf, i, IMMEDIATE_WRITE);
 
 	spin_unlock_irqrestore (&hwc_data.lock, flags);
 
@@ -2098,10 +2098,10 @@ hwc_send (hwc_request_t * req)
 		retval = -ENOTSUPP;
 		goto unlock;
 	}
-	hwc_data.request = req;
 	cc = service_call (req->word, req->block);
 	switch (cc) {
 	case 0:
+		hwc_data.request = req;
 		hwc_data.current_servc = req->word;
 		hwc_data.current_hwcb = req->block;
 		retval = 0;

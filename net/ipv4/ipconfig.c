@@ -1,5 +1,5 @@
 /*
- *  $Id: ipconfig.c,v 1.37 2001/04/30 18:54:12 davem Exp $
+ *  $Id: ipconfig.c,v 1.38 2001/09/25 23:23:07 davem Exp $
  *
  *  Automatic Configuration of IP -- use DHCP, BOOTP, RARP, or
  *  user-supplied information to configure own IP address and routes.
@@ -816,62 +816,67 @@ static int __init ic_bootp_recv(struct sk_buff *skb, struct net_device *dev, str
 		u8 *ext;
 
 #ifdef IPCONFIG_DHCP
+		if (ic_proto_enabled & IC_USE_DHCP) {
+			u32 server_id = INADDR_NONE;
+			int mt = 0;
 
-		u32 server_id = INADDR_NONE;
-		int mt = 0;
-
-		ext = &b->exten[4];
-		while (ext < end && *ext != 0xff) {
-			u8 *opt = ext++;
-			if (*opt == 0)	/* Padding */
-				continue;
-			ext += *ext + 1;
-			if (ext >= end)
-				break;
-			switch (*opt) {
-			case 53:	/* Message type */
-				if (opt[1])
-					mt = opt[2];
-				break;
-			case 54:	/* Server ID (IP address) */
-				if (opt[1] >= 4)
-					memcpy(&server_id, opt + 2, 4);
-				break;
+			ext = &b->exten[4];
+			while (ext < end && *ext != 0xff) {
+				u8 *opt = ext++;
+				if (*opt == 0)	/* Padding */
+					continue;
+				ext += *ext + 1;
+				if (ext >= end)
+					break;
+				switch (*opt) {
+				case 53:	/* Message type */
+					if (opt[1])
+						mt = opt[2];
+					break;
+				case 54:	/* Server ID (IP address) */
+					if (opt[1] >= 4)
+						memcpy(&server_id, opt + 2, 4);
+					break;
+				};
 			}
-		}
 
 #ifdef IPCONFIG_DEBUG
-		printk("DHCP: Got message type %d\n", mt);
+			printk("DHCP: Got message type %d\n", mt);
 #endif
 
-		switch (mt) {
-		    case DHCPOFFER:
-			/* While in the process of accepting one offer,
-			   ignore all others. */
-			if (ic_myaddr != INADDR_NONE)
+			switch (mt) {
+			case DHCPOFFER:
+				/* While in the process of accepting one offer,
+				 * ignore all others.
+				 */
+				if (ic_myaddr != INADDR_NONE)
+					goto drop;
+
+				/* Let's accept that offer. */
+				ic_myaddr = b->your_ip;
+				ic_servaddr = server_id;
+#ifdef IPCONFIG_DEBUG
+				printk("DHCP: Offered address %u.%u.%u.%u",
+				       NIPQUAD(ic_myaddr));
+				printk(" by server %u.%u.%u.%u\n",
+				       NIPQUAD(ic_servaddr));
+#endif
+				break;
+
+			case DHCPACK:
+				/* Yeah! */
+				break;
+
+			default:
+				/* Urque.  Forget it*/
+				ic_myaddr = INADDR_NONE;
+				ic_servaddr = INADDR_NONE;
 				goto drop;
-			/* Let's accept that offer. */
-			ic_myaddr = b->your_ip;
-			ic_servaddr = server_id;
-#ifdef IPCONFIG_DEBUG
-			printk("DHCP: Offered address %u.%u.%u.%u", NIPQUAD(ic_myaddr));
-			printk(" by server %u.%u.%u.%u\n", NIPQUAD(ic_servaddr));
-#endif
-			break;
+			};
 
-		    case DHCPACK:
-			/* Yeah! */
-			break;
+			ic_dhcp_msgtype = mt;
 
-		    default:
-			/* Urque.  Forget it*/
-			ic_myaddr = INADDR_NONE;
-			ic_servaddr = INADDR_NONE;
-			goto drop;
 		}
-
-		ic_dhcp_msgtype = mt;
-
 #endif /* IPCONFIG_DHCP */
 
 		ext = &b->exten[4];

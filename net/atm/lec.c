@@ -2193,3 +2193,4 @@ lec_arp_check_empties(struct lec_priv *priv,
         lec_arp_put(priv->lec_arp_tables,entry);
         lec_arp_unlock(priv);  
 }
+MODULE_LICENSE("GPL");

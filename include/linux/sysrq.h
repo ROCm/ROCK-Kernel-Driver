@@ -24,6 +24,8 @@ struct sysrq_key_op {
 	char *action_msg;
 };
 
+#ifdef CONFIG_MAGIC_SYSRQ
+
 /* Generic SysRq interface -- you may call it from any device driver, supplying
  * ASCII code of the key, pointer to registers and kbd/tty structs (if they
  * are available -- else NULL's).
@@ -42,7 +44,6 @@ void __handle_sysrq_nolock(int, struct pt_regs *,
                 struct kbd_struct *, struct tty_struct *);
 
 
-#ifdef CONFIG_MAGIC_SYSRQ
 
 /*
  * Sysrq registration manipulation functions
@@ -55,7 +56,8 @@ void __sysrq_put_key_op (int key, struct sysrq_key_op *op_p);
 
 extern __inline__ int
 __sysrq_swap_key_ops_nolock(int key, struct sysrq_key_op *insert_op_p,
-				struct sysrq_key_op *remove_op_p) {
+				struct sysrq_key_op *remove_op_p)
+{
 	int retval;
 	if (__sysrq_get_key_op(key) == remove_op_p) {
 		__sysrq_put_key_op(key, insert_op_p);
@@ -87,9 +89,17 @@ static inline int unregister_sysrq_key(int key, struct sysrq_key_op *op_p)
 }
 
 #else
-#define register_sysrq_key(a,b)		do {} while(0)
-#define unregister_sysrq_key(a,b)	do {} while(0)
+
+static inline int __reterr(void)
+{
+	return -EINVAL;
+}
+
+#define register_sysrq_key(ig,nore) __reterr()
+#define unregister_sysrq_key(ig,nore) __reterr()
+
 #endif
+
 
 /* Deferred actions */
 

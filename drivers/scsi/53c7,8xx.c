@@ -215,9 +215,7 @@
 
 #include <linux/version.h>
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #include <asm/dma.h>
 #include <asm/io.h>
@@ -6429,6 +6427,7 @@ NCR53c7x0_release(struct Scsi_Host *host) {
     return 1;
 }
 #endif /* def MODULE */
+MODULE_LICENSE("GPL");
 
 static Scsi_Host_Template driver_template = NCR53c7xx;
 #include "scsi_module.c"

@@ -604,3 +604,4 @@ module_init(aironet_proc_init);
 module_exit(aironet_proc_exit);
 
 #endif // whole proc system styff
+MODULE_LICENSE("GPL");

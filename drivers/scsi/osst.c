@@ -83,6 +83,8 @@ static int max_sg_segs = 0;
 #ifdef MODULE
 MODULE_AUTHOR("Willem Riede");
 MODULE_DESCRIPTION("OnStream SCSI Tape Driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(buffer_kbs, "i");
 MODULE_PARM(write_threshold_kbs, "i");
 MODULE_PARM(max_buffers, "i");

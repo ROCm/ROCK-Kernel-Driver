@@ -116,10 +116,7 @@
 
 #define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
-
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>
@@ -9270,6 +9267,7 @@ const char *ncr53c8xx_info (struct Scsi_Host *host)
 /*
 **	Module stuff
 */
+MODULE_LICENSE("GPL");
 
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
 static

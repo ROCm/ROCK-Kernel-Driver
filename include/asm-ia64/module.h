@@ -14,7 +14,13 @@
 #define module_map(x)		vmalloc(x)
 #define module_unmap(x)		ia64_module_unmap(x)
 #define module_arch_init(x)	ia64_module_init(x)
-#define arch_init_modules(x)	do { } while (0)
+#define arch_init_modules(x)	{ 	static struct archdata archdata; \
+					register char *kernel_gp asm ("gp");\
+					archdata.gp = kernel_gp; \
+					kernel_module.archdata_start = (const char *) &archdata; \
+					kernel_module.archdata_end   = (const char *) (&archdata + 1); \
+				}
+		
 
 /*
  * This must match in size and layout the data created by

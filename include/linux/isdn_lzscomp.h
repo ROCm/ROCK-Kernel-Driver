@@ -1,9 +1,11 @@
-/*
- * $Id: isdn_lzscomp.h,v 1.1 1998/07/08 16:52:33 hipp Exp $
+/* $Id: isdn_lzscomp.h,v 1.1.10.1 2001/09/23 22:25:05 kai Exp $
  *
  * Header for isdn_lzscomp.c
  * Concentrated here to not mess up half a dozen kernel headers with code
  * snippets
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 

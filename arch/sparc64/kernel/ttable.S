@@ -1,4 +1,4 @@
-/* $Id: ttable.S,v 1.34 2001/08/12 09:08:56 davem Exp $
+/* $Id: ttable.S,v 1.35 2001/09/21 02:14:39 kanoj Exp $
  * ttable.S: Sparc V9 Trap Table(s) with SpitFire/Cheetah extensions.
  *
  * Copyright (C) 1996, 2001 David S. Miller (davem@caip.rutgers.edu)
@@ -144,12 +144,7 @@ tl0_resv164:	BTRAP(0x164) BTRAP(0x165) BTRAP(0x166) BTRAP(0x167) BTRAP(0x168)
 tl0_resv169:	BTRAP(0x169) BTRAP(0x16a) BTRAP(0x16b) BTRAP(0x16c)
 tl0_linux64:	LINUX_64BIT_SYSCALL_TRAP
 tl0_gsctx:	TRAP(sparc64_get_context) TRAP(sparc64_set_context)
-tl0_resv170:	BTRAP(0x170) BTRAP(0x171) 
-#ifdef CONFIG_EC_FLUSH_TRAP
-					  TRAP(cache_flush_trap)
-#else
-					  BTRAP(0x172)
-#endif
+tl0_resv170:	BTRAP(0x170) BTRAP(0x171) BTRAP(0x172)
 tl0_resv173:	BTRAP(0x173) BTRAP(0x174) BTRAP(0x175) BTRAP(0x176) BTRAP(0x177)
 tl0_resv178:	BTRAP(0x178) BTRAP(0x179) BTRAP(0x17a) BTRAP(0x17b) BTRAP(0x17c)
 tl0_resv17d:	BTRAP(0x17d) BTRAP(0x17e) BTRAP(0x17f)

@@ -1480,6 +1480,8 @@ static void __exit meye_cleanup_module(void) {
 
 MODULE_AUTHOR("Stelian Pop <stelian.pop@fr.alcove.com>");
 MODULE_DESCRIPTION("video4linux driver for the MotionEye camera");
+MODULE_LICENSE("GPL");
+
 
 MODULE_PARM(gbuffers,"i");
 MODULE_PARM_DESC(gbuffers,"number of capture buffers, default is 2 (32 max)");

@@ -43,7 +43,8 @@ static int rxdmacount /* = 0 */;
 
 /* Set the copy breakpoint for the copy-only-tiny-buffer Rx method.
    Lower values use more memory, but are faster. */
-#if defined(__alpha__) || defined(__sparc__) || defined(__arm__)
+#if defined(__alpha__) || defined(__sparc__) || defined(__mips__) || \
+    defined(__arm__)
 static int rx_copybreak = 1518;
 #else
 static int rx_copybreak = 200;
@@ -103,6 +104,7 @@ static int debug = -1;			/* The debug level */
 #include <linux/spinlock.h>
 #include <linux/init.h>
 #include <linux/mii.h>
+#include <linux/delay.h>
 
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -114,6 +116,7 @@ static int debug = -1;			/* The debug level */
 
 MODULE_AUTHOR("Maintainer: Andrey V. Savochkin <saw@saw.sw.com.sg>");
 MODULE_DESCRIPTION("Intel i82557/i82558/i82559 PCI EtherExpressPro driver");
+MODULE_LICENSE("GPL");
 MODULE_PARM(debug, "i");
 MODULE_PARM(options, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(full_duplex, "1-" __MODULE_STRING(8) "i");
@@ -165,7 +168,7 @@ static inline int null_set_power_state(struct pci_dev *dev, int state)
 #endif
 
 
-int speedo_debug = 1;
+static int speedo_debug = 1;
 
 /*
 				Theory of Operation
@@ -319,7 +322,7 @@ static inline void io_outw(unsigned int val, unsigned long port)
 static inline void wait_for_cmd_done(long cmd_ioaddr)
 {
 	int wait = 1000;
-	do   ;
+	do  udelay(1) ;
 	while(inb(cmd_ioaddr) && --wait >= 0);
 #ifndef final_version
 	if (wait < 0)
@@ -1332,56 +1335,63 @@ speedo_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	long ioaddr = dev->base_addr;
 	int entry;
 
-	{	/* Prevent interrupts from changing the Tx ring from underneath us. */
-		unsigned long flags;
+	/* Prevent interrupts from changing the Tx ring from underneath us. */
+	unsigned long flags;
 
-		spin_lock_irqsave(&sp->lock, flags);
+	spin_lock_irqsave(&sp->lock, flags);
 
-		/* Check if there are enough space. */
-		if ((int)(sp->cur_tx - sp->dirty_tx) >= TX_QUEUE_LIMIT) {
-			printk(KERN_ERR "%s: incorrect tbusy state, fixed.\n", dev->name);
-			netif_stop_queue(dev);
-			sp->tx_full = 1;
-			spin_unlock_irqrestore(&sp->lock, flags);
-			return 1;
-		}
-
-		/* Calculate the Tx descriptor entry. */
-		entry = sp->cur_tx++ % TX_RING_SIZE;
-
-		sp->tx_skbuff[entry] = skb;
-		sp->tx_ring[entry].status =
-			cpu_to_le32(CmdSuspend | CmdTx | CmdTxFlex);
-		if (!(entry & ((TX_RING_SIZE>>2)-1)))
-			sp->tx_ring[entry].status |= cpu_to_le32(CmdIntr);
-		sp->tx_ring[entry].link =
-			cpu_to_le32(TX_RING_ELEM_DMA(sp, sp->cur_tx % TX_RING_SIZE));
-		sp->tx_ring[entry].tx_desc_addr =
-			cpu_to_le32(TX_RING_ELEM_DMA(sp, entry) + TX_DESCR_BUF_OFFSET);
-		/* The data region is always in one buffer descriptor. */
-		sp->tx_ring[entry].count = cpu_to_le32(sp->tx_threshold);
-		sp->tx_ring[entry].tx_buf_addr0 =
-			cpu_to_le32(pci_map_single(sp->pdev, skb->data,
-						   skb->len, PCI_DMA_TODEVICE));
-		sp->tx_ring[entry].tx_buf_size0 = cpu_to_le32(skb->len);
-		/* Trigger the command unit resume. */
-		wait_for_cmd_done(ioaddr + SCBCmd);
-		clear_suspend(sp->last_cmd);
-		/* We want the time window between clearing suspend flag on the previous
-		   command and resuming CU to be as small as possible.
-		   Interrupts in between are very undesired.  --SAW */
-		outb(CUResume, ioaddr + SCBCmd);
-		sp->last_cmd = (struct descriptor *)&sp->tx_ring[entry];
-
-		/* Leave room for set_rx_mode(). If there is no more space than reserved
-		   for multicast filter mark the ring as full. */
-		if ((int)(sp->cur_tx - sp->dirty_tx) >= TX_QUEUE_LIMIT) {
-			netif_stop_queue(dev);
-			sp->tx_full = 1;
-		}
-
+	/* Check if there are enough space. */
+	if ((int)(sp->cur_tx - sp->dirty_tx) >= TX_QUEUE_LIMIT) {
+		printk(KERN_ERR "%s: incorrect tbusy state, fixed.\n", dev->name);
+		netif_stop_queue(dev);
+		sp->tx_full = 1;
 		spin_unlock_irqrestore(&sp->lock, flags);
+		return 1;
 	}
+
+	/* Calculate the Tx descriptor entry. */
+	entry = sp->cur_tx++ % TX_RING_SIZE;
+
+	sp->tx_skbuff[entry] = skb;
+	sp->tx_ring[entry].status =
+		cpu_to_le32(CmdSuspend | CmdTx | CmdTxFlex);
+	if (!(entry & ((TX_RING_SIZE>>2)-1)))
+		sp->tx_ring[entry].status |= cpu_to_le32(CmdIntr);
+	sp->tx_ring[entry].link =
+		cpu_to_le32(TX_RING_ELEM_DMA(sp, sp->cur_tx % TX_RING_SIZE));
+	sp->tx_ring[entry].tx_desc_addr =
+		cpu_to_le32(TX_RING_ELEM_DMA(sp, entry) + TX_DESCR_BUF_OFFSET);
+	/* The data region is always in one buffer descriptor. */
+	sp->tx_ring[entry].count = cpu_to_le32(sp->tx_threshold);
+	sp->tx_ring[entry].tx_buf_addr0 =
+		cpu_to_le32(pci_map_single(sp->pdev, skb->data,
+					   skb->len, PCI_DMA_TODEVICE));
+	sp->tx_ring[entry].tx_buf_size0 = cpu_to_le32(skb->len);
+
+	/* workaround for hardware bug on 10 mbit half duplex */
+
+	if ((sp->partner==0) && (sp->chip_id==1)) {
+		wait_for_cmd_done(ioaddr + SCBCmd);
+		outb(0 , ioaddr + SCBCmd);
+	}
+
+	/* Trigger the command unit resume. */
+	wait_for_cmd_done(ioaddr + SCBCmd);
+	clear_suspend(sp->last_cmd);
+	/* We want the time window between clearing suspend flag on the previous
+	   command and resuming CU to be as small as possible.
+	   Interrupts in between are very undesired.  --SAW */
+	outb(CUResume, ioaddr + SCBCmd);
+	sp->last_cmd = (struct descriptor *)&sp->tx_ring[entry];
+
+	/* Leave room for set_rx_mode(). If there is no more space than reserved
+	   for multicast filter mark the ring as full. */
+	if ((int)(sp->cur_tx - sp->dirty_tx) >= TX_QUEUE_LIMIT) {
+		netif_stop_queue(dev);
+		sp->tx_full = 1;
+	}
+
+	spin_unlock_irqrestore(&sp->lock, flags);
 
 	dev->trans_start = jiffies;
 
@@ -2205,11 +2215,14 @@ static void __devexit eepro100_remove_one (struct pci_dev *pdev)
 	pci_free_consistent(pdev, TX_RING_SIZE * sizeof(struct TxFD)
 								+ sizeof(struct speedo_stats),
 						sp->tx_ring, sp->tx_ring_dma);
+	pci_disable_device(pdev);
 	kfree(dev);
 }
 
 static struct pci_device_id eepro100_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82557,
+		PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82562ET,
 		PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82559ER,
 		PCI_ANY_ID, PCI_ANY_ID, },

@@ -693,6 +693,8 @@ check_if_enabled:
 		 */
 		if ((IDE_PCI_DEVID_EQ(d->devid, DEVID_PDC20265)) && (secondpdc++==1) && (port==1)  ) 
 			goto controller_ok;
+		if ((IDE_PCI_DEVID_EQ(d->devid, DEVID_PDC20262)) && (secondpdc++==1) && (port==1)  ) 
+			goto controller_ok;
 			
 		if (e->reg && (pci_read_config_byte(dev, e->reg, &tmp) || (tmp & e->mask) != e->val))
 			continue;	/* port not enabled */

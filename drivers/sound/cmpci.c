@@ -3140,6 +3140,8 @@ static int __init init_cmpci(void)
 
 MODULE_AUTHOR("ChenLi Tien, cltien@cmedia.com.tw");
 MODULE_DESCRIPTION("CM8x38 Audio Driver");
+MODULE_LICENSE("GPL");
+
 
 static void __exit cleanup_cmpci(void)
 {

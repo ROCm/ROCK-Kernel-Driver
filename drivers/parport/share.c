@@ -18,6 +18,7 @@
 #undef PARPORT_DEBUG_SHARING		/* undef for production */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/string.h>
 #include <linux/threads.h>
 #include <linux/parport.h>
@@ -1140,3 +1141,4 @@ int parport_parse_dmas(int nports, const char *dmastr[], int dmaval[])
 	return parport_parse_params (nports, dmastr, dmaval, PARPORT_DMA_AUTO,
 				     PARPORT_DMA_NONE, PARPORT_DMA_NOFIFO);
 }
+MODULE_LICENSE("GPL");

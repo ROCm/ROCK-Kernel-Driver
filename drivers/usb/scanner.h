@@ -67,6 +67,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	/* Acer */
 	{ USB_DEVICE(0x04a5, 0x2060) },	/* Prisa Acerscan 620U & 640U (!)*/
 	{ USB_DEVICE(0x04a5, 0x2040) },	/* Prisa AcerScan 620U (!) */
+	{ USB_DEVICE(0x04a5, 0x20c0) },  /* Prisa AcerScan 1240UT */
 	{ USB_DEVICE(0x04a5, 0x2022) },	/* Vuego Scan Brisa 340U */
 	/* Agfa */
 	{ USB_DEVICE(0x06bd, 0x0001) },	/* SnapScan 1212U */

@@ -79,3 +79,4 @@ EXPORT_SYMBOL(hpsb_guid_get_entry);
 EXPORT_SYMBOL(hpsb_nodeid_get_entry);
 EXPORT_SYMBOL(hpsb_get_host_by_ne);
 EXPORT_SYMBOL(hpsb_guid_fill_packet);
+MODULE_LICENSE("GPL");

@@ -1,10 +1,12 @@
-/* $Id: hscx.c,v 1.21.6.2 2001/06/09 15:14:17 kai Exp $
+/* $Id: hscx.c,v 1.21.6.3 2001/09/23 22:24:48 kai Exp $
  *
- * hscx.c   HSCX specific routines
+ * HSCX specific routines
  *
- * Author       Karsten Keil (keil@isdn4linux.de)
- *
- * This file is (c) under GNU General Public License
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 

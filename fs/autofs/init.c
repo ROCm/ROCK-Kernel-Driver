@@ -38,3 +38,4 @@ void autofs_say(const char *name, int len)
 	printk(")\n");
 }
 #endif
+MODULE_LICENSE("GPL");

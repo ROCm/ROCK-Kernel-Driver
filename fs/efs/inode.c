@@ -9,6 +9,8 @@
 
 #include <linux/efs_fs.h>
 #include <linux/efs_fs_sb.h>
+#include <linux/module.h>
+
 
 extern int efs_get_block(struct inode *, long, struct buffer_head *, int);
 static int efs_readpage(struct file *file, struct page *page)
@@ -302,3 +304,4 @@ efs_block_t efs_map_block(struct inode *inode, efs_block_t block) {
 	return 0;
 }  
 
+MODULE_LICENSE("GPL");

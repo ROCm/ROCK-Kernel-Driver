@@ -44,6 +44,7 @@
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
 #include <linux/smp_lock.h>
+#include <linux/module.h>
 
 /*
  * This ought to be moved into include/asm/dma.h
@@ -645,6 +646,7 @@ static void __exit oss_cleanup(void)
 
 module_init(oss_init);
 module_exit(oss_cleanup);
+MODULE_LICENSE("GPL");
 
 
 int sound_alloc_dma(int chn, char *deviceID)

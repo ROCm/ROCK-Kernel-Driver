@@ -2637,3 +2637,4 @@ static void __exit ipx_proto_finito(void)
 }
 
 module_exit(ipx_proto_finito);
+MODULE_LICENSE("GPL");

@@ -105,6 +105,7 @@ MODULE_PARM(vbi_nr,"i");
 
 MODULE_DESCRIPTION("bttv - v4l driver module for bt848/878 based cards");
 MODULE_AUTHOR("Ralph  Metzler & Marcus Metzler & Gerd Knorr");
+MODULE_LICENSE("GPL");
 
 /* kernel args */
 #ifndef MODULE

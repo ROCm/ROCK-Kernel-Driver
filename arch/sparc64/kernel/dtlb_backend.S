@@ -1,4 +1,4 @@
-/* $Id: dtlb_backend.S,v 1.14 2001/09/07 18:26:17 kanoj Exp $
+/* $Id: dtlb_backend.S,v 1.15 2001/09/24 21:54:09 davem Exp $
  * dtlb_backend.S: Back end to DTLB miss replacement strategy.
  *                 This is included directly into the trap table.
  *
@@ -13,12 +13,14 @@
 	 sllx		%g2, 62, r1
 #define FILL_VALID_SZ_BITS2(r1)
 #define FILL_VALID_SZ_BITS_NOP nop
-#else /* PAGE_SHIFT */
+#elif PAGE_SHIFT == 16
 #define FILL_VALID_SZ_BITS1(r1) \
 	or		%g0, 5, r1
 #define FILL_VALID_SZ_BITS2(r1) \
 	sllx		r1, 61, r1
 #define FILL_VALID_SZ_BITS_NOP
+#else
+#error unsupported PAGE_SIZE
 #endif /* PAGE_SHIFT */
 
 #define VPTE_BITS		(_PAGE_CP | _PAGE_CV | _PAGE_P )

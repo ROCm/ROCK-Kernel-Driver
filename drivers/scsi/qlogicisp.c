@@ -1994,6 +1994,7 @@ void isp1020_print_scsi_cmd(Scsi_Cmnd *cmd)
 
 #endif /* DEBUG_ISP1020 */
 
+MODULE_LICENSE("GPL");
 
 static Scsi_Host_Template driver_template = QLOGICISP;
 

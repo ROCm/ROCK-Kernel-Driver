@@ -383,3 +383,4 @@ void cleanup_module(void)
 	unregister_tcf_proto_ops(&cls_fw_ops);
 }
 #endif
+MODULE_LICENSE("GPL");

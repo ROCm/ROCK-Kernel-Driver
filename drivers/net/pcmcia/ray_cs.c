@@ -221,6 +221,8 @@ static unsigned int ray_mem_speed = 500;
 
 MODULE_AUTHOR("Corey Thomas <corey@world.std.com>");
 MODULE_DESCRIPTION("Raylink/WebGear wireless LAN driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(irq_mask,"i");
 MODULE_PARM(net_type,"i");
 MODULE_PARM(hop_dwell,"i");

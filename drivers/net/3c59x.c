@@ -267,6 +267,8 @@ DRV_NAME ": Donald Becker and others. www.scyld.com/network/vortex.html\n";
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("3Com 3c59x/3c9xx ethernet driver "
 					DRV_VERSION " " DRV_RELDATE);
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(debug, "i");
 MODULE_PARM(options, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(full_duplex, "1-" __MODULE_STRING(8) "i");

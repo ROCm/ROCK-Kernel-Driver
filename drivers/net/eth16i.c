@@ -1405,6 +1405,8 @@ static int debug = -1;
 #if (LINUX_VERSION_CODE >= 0x20115) 
 MODULE_AUTHOR("Mika Kuoppala <miku@iki.fi>");
 MODULE_DESCRIPTION("ICL EtherTeam 16i/32 driver");
+MODULE_LICENSE("GPL");
+
 
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_ETH16I_CARDS) "i");
 MODULE_PARM_DESC(io, "eth16i I/O base address(es)");

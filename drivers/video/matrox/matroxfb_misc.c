@@ -4,7 +4,7 @@
  *
  * (c) 1998,1999,2000 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.50 2000/08/10
+ * Version: 1.54 2001/09/09
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -62,6 +62,9 @@
  *
  *               "Mark Vojkovich" <mvojkovi@ucsd.edu>
  *                     G400 support
+ *
+ *               "David C. Hansen" <haveblue@us.ibm.com>
+ *                     Fixes
  *
  * (following author is not in any relation with this code, but his code
  *  is included in this driver)
@@ -654,7 +657,3 @@ EXPORT_SYMBOL(matroxfb_fastfont_tryset);	/* accel */
 EXPORT_SYMBOL(matroxfb_fastfont_init);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_vgaHWinit);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_vgaHWrestore);		/* DAC1064, Ti3026 */
-#ifdef MATROXFB_USE_SPINLOCK
-spinlock_t matroxfb_spinlock = SPIN_LOCK_UNLOCKED;
-EXPORT_SYMBOL(matroxfb_spinlock);
-#endif

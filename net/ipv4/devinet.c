@@ -1,7 +1,7 @@
 /*
  *	NET3	IP device support routines.
  *
- *	Version: $Id: devinet.c,v 1.42 2001/05/16 16:45:35 davem Exp $
+ *	Version: $Id: devinet.c,v 1.43 2001/09/26 22:52:58 davem Exp $
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -20,6 +20,10 @@
  *	Changes:
  *	        Alexey Kuznetsov:	pa_* fields are replaced with ifaddr lists.
  *		Cyrus Durgin:		updated for kmod
+ *		Matthias Andree:	in devinet_ioctl, compare label and 
+ *					address (4.4BSD alias style support),
+ *					fall back to comparing just the label
+ *					if no match found.
  */
 
 #include <linux/config.h>
@@ -463,6 +467,7 @@ static __inline__ int inet_abc_len(u32 addr)
 int devinet_ioctl(unsigned int cmd, void *arg)
 {
 	struct ifreq ifr;
+	struct sockaddr_in sin_orig;
 	struct sockaddr_in *sin = (struct sockaddr_in *)&ifr.ifr_addr;
 	struct in_device *in_dev;
 	struct in_ifaddr **ifap = NULL;
@@ -470,6 +475,7 @@ int devinet_ioctl(unsigned int cmd, void *arg)
 	struct net_device *dev;
 	char *colon;
 	int ret = 0;
+	int tryaddrmatch = 0;
 
 	/*
 	 *	Fetch the caller's info block into kernel space
@@ -478,6 +484,9 @@ int devinet_ioctl(unsigned int cmd, void *arg)
 	if (copy_from_user(&ifr, arg, sizeof(struct ifreq)))
 		return -EFAULT;
 	ifr.ifr_name[IFNAMSIZ-1] = 0;
+
+	/* save original address for comparison */
+	memcpy(&sin_orig, sin, sizeof(*sin));
 
 	colon = strchr(ifr.ifr_name, ':');
 	if (colon)
@@ -492,10 +501,11 @@ int devinet_ioctl(unsigned int cmd, void *arg)
 	case SIOCGIFBRDADDR:	/* Get the broadcast address */
 	case SIOCGIFDSTADDR:	/* Get the destination address */
 	case SIOCGIFNETMASK:	/* Get the netmask for the interface */
-		/* Note that this ioctls will not sleep,
+		/* Note that these ioctls will not sleep,
 		   so that we do not impose a lock.
 		   One day we will be forced to put shlock here (I mean SMP)
 		 */
+		tryaddrmatch = (sin_orig.sin_family == AF_INET);
 		memset(sin, 0, sizeof(*sin));
 		sin->sin_family = AF_INET;
 		break;
@@ -529,9 +539,27 @@ int devinet_ioctl(unsigned int cmd, void *arg)
 		*colon = ':';
 
 	if ((in_dev=__in_dev_get(dev)) != NULL) {
-		for (ifap=&in_dev->ifa_list; (ifa=*ifap) != NULL; ifap=&ifa->ifa_next)
-			if (strcmp(ifr.ifr_name, ifa->ifa_label) == 0)
-				break;
+		if (tryaddrmatch) {
+			/* Matthias Andree */
+			/* compare label and address (4.4BSD style) */
+			/* note: we only do this for a limited set of ioctls
+			   and only if the original address family was AF_INET.
+			   This is checked above. */
+			for (ifap=&in_dev->ifa_list; (ifa=*ifap) != NULL; ifap=&ifa->ifa_next) {
+				if ((strcmp(ifr.ifr_name, ifa->ifa_label) == 0)
+				    && (sin_orig.sin_addr.s_addr == ifa->ifa_address)) {
+					break; /* found */
+				}
+			}
+		}
+		/* we didn't get a match, maybe the application is
+		   4.3BSD-style and passed in junk so we fall back to 
+		   comparing just the label */
+		if (ifa == NULL) {
+			for (ifap=&in_dev->ifa_list; (ifa=*ifap) != NULL; ifap=&ifa->ifa_next)
+				if (strcmp(ifr.ifr_name, ifa->ifa_label) == 0)
+					break;
+		}
 	}
 
 	if (ifa == NULL && cmd != SIOCSIFADDR && cmd != SIOCSIFFLAGS) {

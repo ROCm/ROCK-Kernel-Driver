@@ -1,31 +1,17 @@
-/* $Id: isdn_ppp.c,v 1.85.6.6 2001/07/27 09:08:27 kai Exp $
+/* $Id: isdn_ppp.c,v 1.85.6.7 2001/09/23 22:24:31 kai Exp $
  *
  * Linux ISDN subsystem, functions for synchronous PPP (linklevel).
  *
  * Copyright 1995,96 by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
 #include <linux/config.h>
-#define __NO_VERSION__
-#include <linux/module.h>
-#include <linux/version.h>
-#include <linux/poll.h>
 #include <linux/isdn.h>
+#include <linux/poll.h>
 #include <linux/ppp-comp.h>
 
 #include "isdn_common.h"
@@ -83,7 +69,7 @@ static void isdn_ppp_mp_cleanup( isdn_net_local * lp );
 static int isdn_ppp_bundle(struct ippp_struct *, int unit);
 #endif	/* CONFIG_ISDN_MPP */
   
-char *isdn_ppp_revision = "$Revision: 1.85.6.6 $";
+char *isdn_ppp_revision = "$Revision: 1.85.6.7 $";
 
 static struct ippp_struct *ippp_table[ISDN_MAX_CHANNELS];
 

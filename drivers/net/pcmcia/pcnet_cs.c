@@ -1522,3 +1522,4 @@ static void __exit exit_pcnet_cs(void)
 
 module_init(init_pcnet_cs);
 module_exit(exit_pcnet_cs);
+MODULE_LICENSE("GPL");

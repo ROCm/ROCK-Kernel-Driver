@@ -621,6 +621,7 @@ EXPORT_SYMBOL(i2c_bit_del_bus);
 #ifdef MODULE
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus bit-banging algorithm");
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(bit_test, "i");
 MODULE_PARM(bit_scan, "i");

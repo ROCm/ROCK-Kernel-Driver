@@ -1,4 +1,4 @@
-/* $Id: ide.h,v 1.19 2000/05/27 00:49:37 davem Exp $
+/* $Id: ide.h,v 1.21 2001/09/25 20:21:48 kanoj Exp $
  * ide.h: Ultra/PCI specific IDE glue.
  *
  * Copyright (C) 1997  David S. Miller (davem@caip.rutgers.edu)
@@ -14,6 +14,8 @@
 #include <asm/pgalloc.h>
 #include <asm/io.h>
 #include <asm/hdreg.h>
+#include <asm/page.h>
+#include <asm/spitfire.h>
 
 #undef  MAX_HWIFS
 #define MAX_HWIFS	2
@@ -151,7 +153,9 @@ static __inline__ void ide_insw(unsigned long port,
 				void *dst,
 				unsigned long count)
 {
+#if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
 	unsigned long end = (unsigned long)dst + (count << 1);
+#endif
 	u16 *ps = dst;
 	u32 *pi;
 
@@ -172,7 +176,9 @@ static __inline__ void ide_insw(unsigned long port,
 	if(count)
 		*ps++ = inw_be(port);
 
+#if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
 	__flush_dcache_range((unsigned long)dst, end);
+#endif
 }
 
 static __inline__ void outw_be(unsigned short w, unsigned long addr)
@@ -186,7 +192,9 @@ static __inline__ void ide_outsw(unsigned long port,
 				 const void *src,
 				 unsigned long count)
 {
+#if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
 	unsigned long end = (unsigned long)src + (count << 1);
+#endif
 	const u16 *ps = src;
 	const u32 *pi;
 
@@ -207,7 +215,9 @@ static __inline__ void ide_outsw(unsigned long port,
 	if(count)
 		outw_be(*ps, port);
 
+#if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
 	__flush_dcache_range((unsigned long)src, end);
+#endif
 }
 
 #define T_CHAR          (0x0000)        /* char:  don't touch  */

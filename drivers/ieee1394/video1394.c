@@ -1639,6 +1639,7 @@ static struct hpsb_highlevel_ops hl_ops = {
 MODULE_AUTHOR("Sebastien Rougeaux <sebastien.rougeaux@anu.edu.au>");
 MODULE_DESCRIPTION("driver for digital video on OHCI board");
 MODULE_SUPPORTED_DEVICE(VIDEO1394_DRIVER_NAME);
+MODULE_LICENSE("GPL");
 
 static void __exit video1394_exit_module (void)
 {

@@ -1660,5 +1660,5 @@ static void __exit exit_i82365(void)
 
 module_init(init_i82365);
 module_exit(exit_i82365);
-
+MODULE_LICENSE("Dual MPL/GPL");
 /*====================================================================*/

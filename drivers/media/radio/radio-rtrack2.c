@@ -256,6 +256,8 @@ static int __init rtrack2_init(void)
 
 MODULE_AUTHOR("Ben Pfaff");
 MODULE_DESCRIPTION("A driver for the RadioTrack II radio card.");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the RadioTrack card (0x20c or 0x30c)");
 MODULE_PARM(radio_nr, "i");

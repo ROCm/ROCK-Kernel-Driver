@@ -665,8 +665,10 @@ void show_regs(struct pt_regs * regs)
 	/*
 	 * Saved cp0 registers
 	 */
-	printk("epc  : %08lx\nStatus: %08x\nCause : %08x\n",
-	       (unsigned long) regs->cp0_epc, (unsigned int) regs->cp0_status,
+	printk("epc  : %08lx    %s\nStatus: %08x\nCause : %08x\n",
+	       (unsigned long) regs->cp0_epc,
+	       print_tainted(),
+	       (unsigned int) regs->cp0_status,
 	       (unsigned int) regs->cp0_cause);
 }
 

@@ -120,9 +120,7 @@
  * under normal conditions.
  */
 
-#if defined(MODULE)
 #include <linux/module.h>
-#endif
 
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
@@ -2869,6 +2867,8 @@ ahc_platform_dump_card_state(struct ahc_softc *ahc)
 		}
 	}
 }
+
+MODULE_LICENSE("Dual BSD/GPL");
 
 #if defined(MODULE) || LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static Scsi_Host_Template driver_template = AIC7XXX;

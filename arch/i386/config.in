@@ -170,10 +170,13 @@ bool 'Math emulation' CONFIG_MATH_EMULATION
 bool 'MTRR (Memory Type Range Register) support' CONFIG_MTRR
 bool 'Symmetric multi-processing support' CONFIG_SMP
 if [ "$CONFIG_SMP" != "y" ]; then
-   bool 'APIC and IO-APIC support on uniprocessors' CONFIG_X86_UP_IOAPIC
+   bool 'Local APIC support on uniprocessors' CONFIG_X86_UP_APIC
+   dep_bool 'IO-APIC support on uniprocessors' CONFIG_X86_UP_IOAPIC $CONFIG_X86_UP_APIC
+   if [ "$CONFIG_X86_UP_APIC" = "y" ]; then
+      define_bool CONFIG_X86_LOCAL_APIC y
+   fi
    if [ "$CONFIG_X86_UP_IOAPIC" = "y" ]; then
       define_bool CONFIG_X86_IO_APIC y
-      define_bool CONFIG_X86_LOCAL_APIC y
    fi
 fi
 

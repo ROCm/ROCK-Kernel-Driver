@@ -1528,3 +1528,4 @@ static int __init setup_sscape(char *str)
 
 __setup("sscape=", setup_sscape);
 #endif
+MODULE_LICENSE("GPL");

@@ -21,9 +21,7 @@
  * 4) Maybe change use of "esp" to something more "NCR"'ish.
  */
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #include <linux/config.h>
 #include <linux/kernel.h>

@@ -129,9 +129,10 @@ static int sprintf_regs(int line, char *buff, struct task_struct *task, struct p
 		break;
 	case sp_psw:
 		if(regs)
-			linelen=sprintf(buff, "%s PSW:    %08lx %08lx\n", mode,
+			linelen=sprintf(buff, "%s PSW:    %08lx %08lx    %s\n", mode,
 				(unsigned long) regs->psw.mask,
-				(unsigned long) regs->psw.addr);
+				(unsigned long) regs->psw.addr,
+				print_tainted());
 		else
 			linelen=sprintf(buff,"pt_regs=NULL some info unavailable\n");
 		break;

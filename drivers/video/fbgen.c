@@ -440,3 +440,4 @@ void fbgen_blank(int blank, struct fb_info *info)
     } else
 	fbgen_install_cmap(currcon, info2);
 }
+MODULE_LICENSE("GPL");

@@ -42,7 +42,7 @@
  *  Originally By: Steven J. Ralston
  *  (mailto:Steve.Ralston@lsil.com)
  *
- *  $Id: mptbase.c,v 1.53.4.1 2001/08/24 20:07:05 sralston Exp $
+ *  $Id: mptbase.c,v 1.53.4.3 2001/09/18 03:54:54 sralston Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -108,6 +108,8 @@
 
 MODULE_AUTHOR(MODULEAUTHOR);
 MODULE_DESCRIPTION(my_NAME);
+MODULE_LICENSE("GPL");
+
 
 /*
  *  cmd line parameters
@@ -1435,10 +1437,14 @@ mpt_adapter_disable(MPT_ADAPTER *this, int freeup)
 {
 	if (this != NULL) {
 		int sz;
+		u32 state;
 
 		/* Disable the FW */
-		if (SendIocReset(this, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET) != 0)
-			(void) KickStart(this, 1);
+		state = GetIocState(this, 1);
+		if (state == MPI_IOC_STATE_OPERATIONAL) {
+			if (SendIocReset(this, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET) != 0)
+				(void) KickStart(this, 1);
+		}
 
 		/* Disable adapter interrupts! */
 		CHIPREG_WRITE32(&this->chip->IntMask, 0xFFFFFFFF);

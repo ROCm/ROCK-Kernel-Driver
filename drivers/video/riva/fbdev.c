@@ -1111,6 +1111,7 @@ static int riva_get_cmap_len(const struct fb_var_screeninfo *var)
 #ifdef FBCON_HAS_CFB16
 	case 15:
 		rc = 15;	/* fix for 15 bpp depths on Riva 128 based cards */
+		break;
 	case 16:
 		rc = 16;	/* directcolor... 16 entries SW palette */
 		break;		/* Mystique: truecolor, 16 entries SW palette, HW palette hardwired into 1:1 mapping */
@@ -2131,3 +2132,4 @@ MODULE_PARM_DESC(nomtrr, "Disables MTRR support (0 or 1=disabled) (default=0)");
 
 MODULE_AUTHOR("Ani Joshi, maintainer");
 MODULE_DESCRIPTION("Framebuffer driver for nVidia Riva 128, TNT, TNT2");
+MODULE_LICENSE("GPL");

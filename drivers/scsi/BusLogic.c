@@ -4993,6 +4993,7 @@ __setup("BusLogic=", BusLogic_Setup);
 /*
   Get it all started
 */
+MODULE_LICENSE("GPL");
 
 static SCSI_Host_Template_T driver_template = BUSLOGIC;
 

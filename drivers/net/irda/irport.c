@@ -1035,6 +1035,8 @@ MODULE_PARM_DESC(irq, "IRQ lines");
 
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("Half duplex serial driver for IrDA SIR mode");
+MODULE_LICENSE("GPL");
+
 
 void cleanup_module(void)
 {

@@ -1508,6 +1508,8 @@ void __init mpt_lan_exit(void)
 MODULE_PARM(tx_max_out_p, "i");
 MODULE_PARM(max_buckets_out, "i"); // Debug stuff. FIXME!
 
+MODULE_LICENSE("GPL");
+
 module_init(mpt_lan_init);
 module_exit(mpt_lan_exit);
 

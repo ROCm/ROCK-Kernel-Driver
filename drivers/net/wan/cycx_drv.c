@@ -64,6 +64,8 @@
 
 MODULE_AUTHOR("Arnaldo Carvalho de Melo");
 MODULE_DESCRIPTION("Cyclom 2x Sync Card Driver");
+MODULE_LICENSE("GPL");
+
 
 /* Function Prototypes */
 /* Module entry points. These are called by the OS and must be public. */

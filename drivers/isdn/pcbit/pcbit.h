@@ -1,14 +1,12 @@
 /*
+ * PCBIT-D device driver definitions
+ *
  * Copyright (C) 1996 Universidade de Lisboa
  * 
  * Written by Pedro Roque Marques (roque@di.fc.ul.pt)
  *
  * This software may be used and distributed according to the terms of 
  * the GNU General Public License, incorporated herein by reference.
- */
-
-/*        
- *        PCBIT-D device driver definitions
  */
 
 #ifndef PCBIT_H

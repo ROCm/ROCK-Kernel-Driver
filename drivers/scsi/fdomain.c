@@ -2035,6 +2035,8 @@ int fdomain_16x0_biosparam( Scsi_Disk *disk, kdev_t dev, int *info_array )
    return 0;
 }
 
+MODULE_LICENSE("GPL");
+
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = FDOMAIN_16X0;
 

@@ -1,8 +1,8 @@
 /*
  *
- * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200 and G400
+ * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200, G400 and G450
  *
- * (c) 1998,1999,2000 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998,1999,2000,2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
  */
 #ifndef __MATROXFB_H__
@@ -533,6 +533,7 @@ struct matrox_fb_info {
 						/* 0 except for 6MB Millenium */
 		int		memtype;
 		int		g450dac;
+		int		dfp_type;
 			      } devflags;
 	struct display_switch	dispsw;
 	struct {

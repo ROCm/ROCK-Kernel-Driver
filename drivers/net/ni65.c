@@ -1214,6 +1214,7 @@ void cleanup_module(void)
 	dev_ni65.priv = NULL;
 }
 #endif /* MODULE */
+MODULE_LICENSE("GPL");
 
 /*
  * END of ni65.c

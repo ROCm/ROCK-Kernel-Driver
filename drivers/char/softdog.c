@@ -46,6 +46,7 @@
 static int soft_margin = TIMER_MARGIN;	/* in seconds */
 
 MODULE_PARM(soft_margin,"i");
+MODULE_LICENSE("GPL");
 
 /*
  *	Our timer

@@ -2397,6 +2397,7 @@ EXPORT_SYMBOL(usb_clear_halt);
 EXPORT_SYMBOL(usb_set_interface);
 EXPORT_SYMBOL(usb_get_configuration);
 EXPORT_SYMBOL(usb_set_configuration);
+EXPORT_SYMBOL(usb_get_status);
 
 EXPORT_SYMBOL(usb_get_current_frame_number);
 

@@ -287,3 +287,4 @@ static void __exit cleanup_vmidi(void)
 
 module_init(init_vmidi);
 module_exit(cleanup_vmidi);
+MODULE_LICENSE("GPL");

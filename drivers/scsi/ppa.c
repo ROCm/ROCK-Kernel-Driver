@@ -1145,3 +1145,4 @@ static int device_check(int host_no)
     printk("ppa: No devices found, aborting driver load.\n");
     return 1;
 }
+MODULE_LICENSE("GPL");

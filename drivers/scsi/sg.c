@@ -1373,6 +1373,8 @@ static void sg_detach(Scsi_Device * scsidp)
 
 MODULE_AUTHOR("Douglas Gilbert");
 MODULE_DESCRIPTION("SCSI generic (sg) driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(def_reserved_size, "i");
 MODULE_PARM_DESC(def_reserved_size, "size of buffer reserved for each fd");
 

@@ -1,4 +1,4 @@
-/* $Id: sys_sparc32.c,v 1.178 2001/08/13 14:40:07 davem Exp $
+/* $Id: sys_sparc32.c,v 1.179 2001/09/25 00:48:09 davem Exp $
  * sys_sparc32.c: Conversion between 32bit and 64bit native syscalls.
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -4015,7 +4015,7 @@ asmlinkage int sys32_sendfile(int out_fd, int in_fd, __kernel_off_t32 *offset, s
 	ret = sys_sendfile(out_fd, in_fd, offset ? &of : NULL, count);
 	set_fs(old_fs);
 	
-	if (!ret && offset && put_user(of, offset))
+	if (offset && put_user(of, offset))
 		return -EFAULT;
 		
 	return ret;

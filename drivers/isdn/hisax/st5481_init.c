@@ -25,6 +25,7 @@
  * clean up debug
  */
 
+#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -32,8 +33,9 @@
 #include <linux/slab.h>
 #include "st5481.h"
 
-MODULE_AUTHOR("Frode Isaksen <fisaksen@bewan.com>");
-MODULE_DESCRIPTION("ST5481 USB ISDN modem driver");
+MODULE_DESCRIPTION("ISDN4Linux: driver for ST5481 USB ISDN adapter");
+MODULE_AUTHOR("Frode Isaksen");
+MODULE_LICENSE("GPL");
 
 static int protocol = 2;       /* EURO-ISDN Default */
 MODULE_PARM(protocol, "i");

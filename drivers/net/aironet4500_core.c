@@ -2582,6 +2582,8 @@ MODULE_PARM_DESC(master,"Aironet is Adhoc master (creates network sync) (0-1)");
 MODULE_PARM_DESC(slave,"Aironet is Adhoc slave (0-1)");
 MODULE_PARM_DESC(max_mtu,"Aironet MTU limit (256-2312)");
 #endif
+MODULE_LICENSE("GPL");
+
 
 /*EXPORT_SYMBOL(tx_queue_len);
 EXPORT_SYMBOL(awc_debug);

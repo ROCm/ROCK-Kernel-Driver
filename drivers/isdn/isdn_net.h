@@ -1,24 +1,13 @@
-/* $Id: isdn_net.h,v 1.19.6.2 2001/08/14 14:04:21 kai Exp $
-
+/* $Id: isdn_net.h,v 1.19.6.4 2001/09/28 08:05:29 kai Exp $
+ *
  * header for Linux ISDN subsystem, network related functions (linklevel).
  *
  * Copyright 1994-1999  by Fritz Elfert (fritz@isdn4linux.de)
  * Copyright 1995,96    by Thinking Objects Software GmbH Wuerzburg
  * Copyright 1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -39,8 +28,8 @@
 #define CISCO_TYPE_CDP        0x2000
 #define CISCO_TYPE_INET       0x0800
 #define CISCO_TYPE_SLARP      0x8035
-#define CISCO_SLARP_REPLY     0
-#define CISCO_SLARP_REQUEST   1
+#define CISCO_SLARP_REQUEST   0
+#define CISCO_SLARP_REPLY     1
 #define CISCO_SLARP_KEEPALIVE 2
 
 extern char *isdn_net_new(char *, struct net_device *);
@@ -147,48 +136,44 @@ static __inline__ void isdn_net_rm_from_bundle(isdn_net_local *lp)
 }
 
 static inline int
-put_u8(unsigned char *p, __u8 x)
+put_u8(unsigned char *p, u8 x)
 {
-	p[0] = x;
+	*p = x;
 	return 1;
 }
 
 static inline int
-put_u16(unsigned char *p, __u16 x)
+put_u16(unsigned char *p, u16 x)
 {
-	p[0] = x >> 8;
-	p[1] = x;
+	*((u16 *)p) = htons(x);
 	return 2;
 }
 
 static inline int
-put_u32(unsigned char *p, __u32 x)
+put_u32(unsigned char *p, u32 x)
 {
-	p[0] = x >> 24;
-	p[1] = x >> 16;
-	p[2] = x >> 8;
-	p[3] = x;
+	*((u32 *)p) = htonl(x);
 	return 4;
 }
 
 static inline int
-get_u8(unsigned char *p, __u8 *x)
+get_u8(unsigned char *p, u8 *x)
 {
-	*x = p[0];
+	*x = *p;
 	return 1;
 }
 
 static inline int
-get_u16(unsigned char *p, __u16 *x)
+get_u16(unsigned char *p, u16 *x)
 {
-	*x = (p[0] << 8) + p[1];
+	*x = ntohs(*((u16 *)p));
 	return 2;
 }
 
 static inline int
-get_u32(unsigned char *p, __u32 *x)
+get_u32(unsigned char *p, u32 *x)
 {
-	*x = (p[0] << 24) + (p[1] << 16) + (p[2] << 8) + p[3];
+	*x = ntohl(*((u32 *)p));
 	return 4;
 }
 

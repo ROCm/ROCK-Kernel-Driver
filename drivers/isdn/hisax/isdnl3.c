@@ -1,11 +1,14 @@
-/* $Id: isdnl3.c,v 2.17.6.4 2001/06/09 15:14:17 kai Exp $
+/* $Id: isdnl3.c,v 2.17.6.5 2001/09/23 22:24:49 kai Exp $
  *
- * Author       Karsten Keil (keil@isdn4linux.de)
+ * Author       Karsten Keil
  *              based on the teles driver from Jan den Ouden
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
- *		This file is (c) under GNU General Public License
- *		For changes and modifications please read
- *		../../../Documentation/isdn/HiSax.cert
+ * For changes and modifications please read
+ * ../../../Documentation/isdn/HiSax.cert
  *
  * Thanks to    Jan den Ouden
  *              Fritz Elfert
@@ -18,7 +21,7 @@
 #include "isdnl3.h"
 #include <linux/config.h>
 
-const char *l3_revision = "$Revision: 2.17.6.4 $";
+const char *l3_revision = "$Revision: 2.17.6.5 $";
 
 static struct Fsm l3fsm;
 

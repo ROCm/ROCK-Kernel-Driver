@@ -1571,6 +1571,8 @@ static int __init msnd_pinnacle_cfg_devices(int cfg, int reset, msnd_pinnacle_cf
 #ifdef MODULE
 MODULE_AUTHOR				("Andrew Veliath <andrewtv@usa.net>");
 MODULE_DESCRIPTION			("Turtle Beach " LONGNAME " Linux Driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM				(io, "i");
 MODULE_PARM				(irq, "i");
 MODULE_PARM				(mem, "i");

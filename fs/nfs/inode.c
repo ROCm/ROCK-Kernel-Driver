@@ -312,6 +312,7 @@ nfs_read_super(struct super_block *sb, void *raw_data, int silent)
 	if (data->flags & NFS_MOUNT_NOAC) {
 		data->acregmin = data->acregmax = 0;
 		data->acdirmin = data->acdirmax = 0;
+		sb->s_flags |= MS_SYNCHRONOUS;
 	}
 	server->acregmin = data->acregmin*HZ;
 	server->acregmax = data->acregmax*HZ;

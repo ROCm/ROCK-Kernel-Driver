@@ -333,6 +333,8 @@ enum {
 #if defined(MODULE)
 MODULE_AUTHOR("Jürgen Fischer");
 MODULE_DESCRIPTION(AHA152X_REVID);
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "1-2i");
 MODULE_PARM_DESC(io,"base io address of controller");
 static int io[] = {0, 0};

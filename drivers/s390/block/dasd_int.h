@@ -254,6 +254,7 @@ typedef ccw_req_t *(*dasd_cp_builder_fn_t)(struct dasd_device_t *,struct request
 typedef char *(*dasd_dump_sense_fn_t)(struct dasd_device_t *,ccw_req_t *);
 typedef ccw_req_t *(*dasd_reserve_fn_t)(struct dasd_device_t *);
 typedef ccw_req_t *(*dasd_release_fn_t)(struct dasd_device_t *);
+typedef ccw_req_t *(*dasd_steal_lock_fn_t)(struct dasd_device_t *);
 typedef ccw_req_t *(*dasd_merge_cp_fn_t)(struct dasd_device_t *);
 typedef int (*dasd_info_fn_t) (struct dasd_device_t *, dasd_information_t *);
 typedef int (*dasd_use_count_fn_t) (int);
@@ -286,6 +287,7 @@ typedef struct dasd_discipline_t {
         dasd_int_handler_fn_t int_handler;
         dasd_reserve_fn_t reserve;
         dasd_release_fn_t release;
+        dasd_steal_lock_fn_t steal_lock;
         dasd_merge_cp_fn_t merge_cp;
         dasd_info_fn_t fill_info;
 	struct list_head list;	/* used for list of disciplines */

@@ -1,4 +1,4 @@
-/* $Id: ultra.S,v 1.57 2001/09/06 19:27:17 kanoj Exp $
+/* $Id: ultra.S,v 1.61 2001/09/25 18:04:51 kanoj Exp $
  * ultra.S: Don't expand these all over the place...
  *
  * Copyright (C) 1997, 2000 David S. Miller (davem@redhat.com)
@@ -237,6 +237,16 @@ __spitfire_flush_tlb_range_pbp_slow:
 	retl
 /*IC22*/ wrpr		%g1, 0x0, %pstate
 
+/*
+ * The following code flushes one page_size worth.
+ */
+#if (PAGE_SHIFT == 13)
+#define ITAG_MASK 0xfe
+#elif (PAGE_SHIFT == 16)
+#define ITAG_MASK 0x7fe
+#else
+#error unsupported PAGE_SIZE
+#endif
 	.align		32
 	.globl		__flush_icache_page
 __flush_icache_page:	/* %o0 = phys_page */
@@ -250,7 +260,7 @@ __flush_icache_page:	/* %o0 = phys_page */
 	or		%o0, %g1, %o0		! VALID+phys-addr comparitor
 
 	sllx		%g2, 1, %g2
-	andn		%g2, 0xfe, %g2		! IC_tag mask
+	andn		%g2, ITAG_MASK, %g2	! IC_tag mask
 	nop
 	nop
 	nop
@@ -313,6 +323,16 @@ flush_dcpage_cheetah:
 	retl
 	 nop
 
+#if (PAGE_SHIFT == 13)
+#define DTAG_MASK 0x3
+#elif (PAGE_SHIFT == 16)
+#define DTAG_MASK 0x1f
+#elif (PAGE_SHIFT == 19)
+#define DTAG_MASK 0xff
+#elif (PAGE_SHIFT == 22)
+#define DTAG_MASK 0x3ff
+#endif
+
 flush_dcpage_spitfire:
 	clr		%o4
 	srlx		%o0, 11, %o0
@@ -323,19 +343,19 @@ flush_dcpage_spitfire:
 	add		%o4, (1 << 5), %o4		! IEU0
 	ldxa		[%o4] ASI_DCACHE_TAG, %g2	! LSU	Group	o3 available
 	add		%o4, (1 << 5), %o4		! IEU0
-	andn		%o3, 0x3, %o3			! IEU1
+	andn		%o3, DTAG_MASK, %o3		! IEU1
 	ldxa		[%o4] ASI_DCACHE_TAG, %g3	! LSU	Group
 	add		%o4, (1 << 5), %o4		! IEU0
-	andn		%g1, 0x3, %g1			! IEU1
+	andn		%g1, DTAG_MASK, %g1		! IEU1
 	cmp		%o0, %o3			! IEU1	Group
 	be,a,pn		%xcc, dflush1			! CTI
 	 sub		%o4, (4 << 5), %o4		! IEU0	(Group)
 	cmp		%o0, %g1			! IEU1	Group
-	andn		%g2, 0x3, %g2			! IEU0
+	andn		%g2, DTAG_MASK, %g2		! IEU0
 	be,a,pn		%xcc, dflush2			! CTI
 	 sub		%o4, (3 << 5), %o4		! IEU0	(Group)
 	cmp		%o0, %g2			! IEU1	Group
-	andn		%g3, 0x3, %g3			! IEU0
+	andn		%g3, DTAG_MASK, %g3		! IEU0
 	be,a,pn		%xcc, dflush3			! CTI
 	 sub		%o4, (2 << 5), %o4		! IEU0	(Group)
 	cmp		%o0, %g3			! IEU1	Group

@@ -28,3 +28,4 @@ static void __exit exit_autofs4_fs(void)
 
 module_init(init_autofs4_fs) 
 module_exit(exit_autofs4_fs)
+MODULE_LICENSE("GPL");

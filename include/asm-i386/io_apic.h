@@ -28,7 +28,8 @@ struct IO_APIC_reg_00 {
 
 struct IO_APIC_reg_01 {
 	__u32	version		:  8,
-		__reserved_2	:  8,
+		__reserved_2	:  7,
+		PRQ		:  1,
 		entries		:  8,
 		__reserved_1	:  8;
 } __attribute__ ((packed));

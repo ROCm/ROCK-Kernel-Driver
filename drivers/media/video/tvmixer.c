@@ -355,3 +355,4 @@ module_exit(tvmixer_cleanup_module);
  * c-basic-offset: 8
  * End:
  */
+MODULE_LICENSE("GPL");

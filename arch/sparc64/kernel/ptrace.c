@@ -25,6 +25,7 @@
 #include <asm/uaccess.h>
 #include <asm/psrcompat.h>
 #include <asm/visasm.h>
+#include <asm/spitfire.h>
 
 #define MAGIC_CONSTANT 0x80000000
 
@@ -596,7 +597,7 @@ flush_and_out:
 				spitfire_put_dcache_tag(va, 0x0);
 			/* No need to mess with I-cache on Cheetah. */
 		} else {
-			for (va =  0; va < (PAGE_SIZE << 1); va += 32)
+			for (va =  0; va < L1DCACHE_SIZE; va += 32)
 				spitfire_put_dcache_tag(va, 0x0);
 			if (request == PTRACE_PEEKTEXT ||
 			    request == PTRACE_POKETEXT ||

@@ -2290,6 +2290,8 @@ static void FIR2SIR(int iobase)
 #ifdef MODULE
 MODULE_AUTHOR("Benjamin Kong <benjamin_kong@ali.com.tw>");
 MODULE_DESCRIPTION("ALi FIR Controller Driver");
+MODULE_LICENSE("GPL");
+
 
 MODULE_PARM(io,  "1-4i");
 MODULE_PARM_DESC(io, "Base I/O addresses");

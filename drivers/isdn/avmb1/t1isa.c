@@ -1,10 +1,12 @@
-/*
- * $Id: t1isa.c,v 1.16.6.6 2001/05/17 21:15:33 kai Exp $
+/* $Id: t1isa.c,v 1.16.6.7 2001/09/23 22:24:34 kai Exp $
  * 
  * Module for AVM T1 HEMA-card.
  * 
- * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
+ * Copyright 1999 by Carsten Paeth <calle@calle.de>
  * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
  */
 
 #include <linux/module.h>
@@ -23,11 +25,13 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.16.6.6 $";
+static char *revision = "$Revision: 1.16.6.7 $";
 
 /* ------------------------------------------------------------- */
 
-MODULE_AUTHOR("Carsten Paeth <calle@calle.in-berlin.de>");
+MODULE_DESCRIPTION("CAPI4Linux: Driver for AVM T1 HEMA ISA card");
+MODULE_AUTHOR("Carsten Paeth");
+MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 

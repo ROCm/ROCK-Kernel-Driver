@@ -1765,3 +1765,4 @@ int ipfw_init_or_cleanup(int init)
 #endif
 	return ret;
 }
+MODULE_LICENSE("BSD without advertisement clause");

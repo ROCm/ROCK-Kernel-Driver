@@ -726,3 +726,4 @@ void cleanup_module(void)
 	unregister_tcf_proto_ops(&cls_u32_ops);
 }
 #endif
+MODULE_LICENSE("GPL");

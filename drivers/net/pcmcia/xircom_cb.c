@@ -37,6 +37,7 @@
 
 MODULE_DESCRIPTION("Xircom Cardbus ethernet driver");
 MODULE_AUTHOR("Arjan van de Ven <arjanv@redhat.com>");
+MODULE_LICENSE("GPL");
 
 
 

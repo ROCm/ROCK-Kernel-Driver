@@ -1,9 +1,11 @@
-/*
- * $Id: c4.c,v 1.20.6.10 2001/06/09 15:14:15 kai Exp $
+/* $Id: c4.c,v 1.20.6.11 2001/09/23 22:24:33 kai Exp $
  * 
  * Module for AVM C4 & C2 card.
  * 
- * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
+ * Copyright 1999 by Carsten Paeth <calle@calle.de>
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -27,7 +29,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.20.6.10 $";
+static char *revision = "$Revision: 1.20.6.11 $";
 
 #undef CONFIG_C4_DEBUG
 #undef CONFIG_C4_POLLDEBUG
@@ -43,7 +45,9 @@ static struct pci_device_id c4_pci_tbl[] __initdata = {
 };
 
 MODULE_DEVICE_TABLE(pci, c4_pci_tbl);
-MODULE_AUTHOR("Carsten Paeth <calle@calle.in-berlin.de>");
+MODULE_DESCRIPTION("CAPI4Linux: Driver for AVM C2/C4 cards");
+MODULE_AUTHOR("Carsten Paeth");
+MODULE_LICENSE("GPL");
 MODULE_PARM(suppress_pollack, "0-1i");
 
 /* ------------------------------------------------------------- */

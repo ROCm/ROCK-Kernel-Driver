@@ -2312,3 +2312,5 @@ module_exit(l2cap_cleanup);
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("BlueZ L2CAP ver " VERSION);
+MODULE_LICENSE("GPL");
+

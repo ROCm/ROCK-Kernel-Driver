@@ -138,3 +138,4 @@ static void __exit miropcm20_rds_cleanup(void)
 
 module_init(miropcm20_rds_init);
 module_exit(miropcm20_rds_cleanup);
+MODULE_LICENSE("GPL");

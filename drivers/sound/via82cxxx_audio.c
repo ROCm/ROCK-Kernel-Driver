@@ -3254,6 +3254,8 @@ module_exit(cleanup_via82cxxx_audio);
 
 MODULE_AUTHOR("Jeff Garzik <jgarzik@mandrakesoft.com>");
 MODULE_DESCRIPTION("DSP audio and mixer driver for Via 82Cxxx audio devices");
+MODULE_LICENSE("GPL");
+
 EXPORT_NO_SYMBOLS;
 
 

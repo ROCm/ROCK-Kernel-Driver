@@ -94,9 +94,9 @@
 
 /* Size of the various buffers.
  */
-#define FRAME_SIZE              2048
-#define MFS_BUFFER_SIZE         FRAME_SIZE
-#define SFS_BUFFER_SIZE         (FRAME_SIZE + TACHYON_HEADER_LEN)
+#define TACH_FRAME_SIZE         2048
+#define MFS_BUFFER_SIZE         TACH_FRAME_SIZE
+#define SFS_BUFFER_SIZE         (TACH_FRAME_SIZE + TACHYON_HEADER_LEN)
 #define SEST_BUFFER_SIZE        512
 #define TACH_HEADER_SIZE        64
 #define NO_OF_TACH_HEADERS      ((MY_PAGE_SIZE)/TACH_HEADER_SIZE)

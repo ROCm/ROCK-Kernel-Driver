@@ -999,6 +999,7 @@ static void __devexit emu10k1_remove(struct pci_dev *pci_dev)
 
 MODULE_AUTHOR("Bertrand Lee, Cai Ying. (Email to: emu10k1-devel@opensource.creative.com)");
 MODULE_DESCRIPTION("Creative EMU10K1 PCI Audio Driver v" DRIVER_VERSION "\nCopyright (C) 1999 Creative Technology Ltd.");
+MODULE_LICENSE("GPL");
 
 static struct pci_driver emu10k1_pci_driver = {
 	name:		"emu10k1",

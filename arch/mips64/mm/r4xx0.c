@@ -2109,8 +2109,8 @@ static void r4k_show_regs(struct pt_regs *regs)
 	printk("Lo      : %016lx\n", regs->lo);
 
 	/* Saved cp0 registers. */
-	printk("epc     : %016lx\nbadvaddr: %016lx\n",
-	       regs->cp0_epc, regs->cp0_badvaddr);
+	printk("epc     : %016lx    %s\nbadvaddr: %016lx\n",
+	       regs->cp0_epc, print_tainted(), regs->cp0_badvaddr);
 	printk("Status  : %08x\nCause   : %08x\n",
 	       (unsigned int) regs->cp0_status, (unsigned int) regs->cp0_cause);
 }

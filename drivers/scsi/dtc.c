@@ -73,6 +73,7 @@
 
 
 #include <asm/system.h>
+#include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/blk.h>
@@ -432,6 +433,8 @@ static inline int NCR5380_pwrite (struct Scsi_Host *instance,
       dtc_wmaxi = i;
    return (0);
 }
+
+MODULE_LICENSE("GPL");
 
 #include "NCR5380.c"
 

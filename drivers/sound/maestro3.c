@@ -2905,6 +2905,8 @@ static int m3_resume(struct pci_dev *pci_dev)
 
 MODULE_AUTHOR("Zach Brown <zab@zabbo.net>");
 MODULE_DESCRIPTION("ESS Maestro3/Allegro Driver");
+MODULE_LICENSE("GPL");
+
 #ifdef M_DEBUG
 MODULE_PARM(debug,"i");
 #endif

@@ -312,6 +312,8 @@ static int __init aztech_init(void)
 
 MODULE_AUTHOR("Russell Kroll, Quay Lu, Donald Song, Jason Lewis, Scott McGrath, William McGrath");
 MODULE_DESCRIPTION("A driver for the Aztech radio card.");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "i");
 MODULE_PARM(radio_nr, "i");
 MODULE_PARM_DESC(io, "I/O address of the Aztech card (0x350 or 0x358)");

@@ -142,9 +142,7 @@
  *  WD7000 driver now work on kernels >= 2.1.x
  */
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #include <stdarg.h>
 #include <linux/kernel.h>
@@ -1779,6 +1777,8 @@ int wd7000_biosparam (Disk *disk, kdev_t dev, int *ip)
 
     return (0);
 }
+
+MODULE_LICENSE("GPL");
 
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = WD7000;

@@ -65,6 +65,7 @@ static char *version =
 
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
 MODULE_DESCRIPTION("CardBus stub enabler module");
+MODULE_LICENSE("Dual MPL/GPL");
 
 /*====================================================================*/
 

@@ -1,5 +1,3 @@
-#define LINUX_21
-
 /*
  *	Comtrol SV11 card driver
  *
@@ -186,7 +184,6 @@ static int hostess_queue_xmit(struct sk_buff *skb, struct net_device *d)
 	return z8530_queue_xmit(&sv11->sync.chanA, skb);
 }
 
-#ifdef LINUX_21
 static int hostess_neigh_setup(struct neighbour *n)
 {
 	if (n->nud_state == NUD_NONE) {
@@ -205,15 +202,6 @@ static int hostess_neigh_setup_dev(struct net_device *dev, struct neigh_parms *p
 	}
 	return 0;
 }
-
-#else
-
-static int return_0(struct net_device *d)
-{
-	return 0;
-}
-
-#endif
 
 /*
  *	Description block for a Comtrol Hostess SV11 card
@@ -345,11 +333,7 @@ static struct sv11_device *sv11_init(int iobase, int irq)
 		d->get_stats = hostess_get_stats;
 		d->set_multicast_list = NULL;
 		d->do_ioctl = hostess_ioctl;
-#ifdef LINUX_21			
 		d->neigh_setup = hostess_neigh_setup_dev;
-#else
-		d->init = return_0;
-#endif
 		d->set_mac_address = NULL;
 		
 		if(register_netdev(d)==-1)
@@ -416,7 +400,7 @@ static struct sv11_device *sv11_unit;
 int init_module(void)
 {
 	printk(KERN_INFO "SV-11 Z85230 Synchronous Driver v 0.02.\n");
-	printk(KERN_INFO "(c) Copyright 1998, Building Number Three Ltd.\n");	
+	printk(KERN_INFO "(c) Copyright 2001, Red Hat Inc.\n");	
 	if((sv11_unit=sv11_init(io,irq))==NULL)
 		return -ENODEV;
 	return 0;

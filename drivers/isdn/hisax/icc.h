@@ -1,19 +1,17 @@
-// $Id: icc.h,v 1.2.6.2 2001/03/13 16:17:08 kai Exp $
-//-----------------------------------------------------------------------------
-//
-// ICC specific routines
-//
-// Author       Matt Henderson & Guy Ellis - Traverse Tecnologies Pty Ltd
-//              www.traverse.com.au
-//
-// 1999.7.14 Initial implementation of routines for Siemens ISDN 
-// Communication Controller PEB 2070 based on the ISAC routines 
-// written by Karsten Keil.
-//
-// This file is (c) under GNU General Public License
-//
-//-----------------------------------------------------------------------------
-
+/* $Id: icc.h,v 1.2.6.3 2001/09/23 22:24:48 kai Exp $
+ *
+ * ICC specific routines
+ *
+ * Author       Matt Henderson & Guy Ellis
+ * Copyright    by Traverse Technologies Pty Ltd, www.travers.com.au
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
+ * 1999.7.14 Initial implementation of routines for Siemens ISDN 
+ * Communication Controller PEB 2070 based on the ISAC routines 
+ * written by Karsten Keil.
+ */
 
 /* All Registers original Siemens Spec  */
 

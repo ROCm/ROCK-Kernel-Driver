@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.78 2001/09/14 19:49:32 kanoj Exp $
+/* $Id: traps.c,v 1.79 2001/09/21 02:14:39 kanoj Exp $
  * arch/sparc64/kernel/traps.c
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -1636,44 +1636,6 @@ void do_tof_tl1(struct pt_regs *regs)
 {
 	die_if_kernel("TL1: Tag Overflow Exception", regs);
 }
-
-#ifdef CONFIG_EC_FLUSH_TRAP
-void cache_flush_trap(struct pt_regs *regs)
-{
-#ifndef CONFIG_SMP
-	unsigned node = linux_cpus[get_cpuid()].prom_node;
-#else
-#error cache_flush_trap not supported on sparc64/SMP yet
-#endif
-
-#if 0
-/* Broken */
-	int size = prom_getintdefault(node, "ecache-size", 512*1024);
-	int i, j;
-	unsigned long addr;
-	struct page *page, *end;
-
-	regs->tpc = regs->tnpc;
-	regs->tnpc = regs->tnpc + 4;
-	if (!capable(CAP_SYS_ADMIN)) return;
-	size >>= PAGE_SHIFT;
-	addr = PAGE_OFFSET - PAGE_SIZE;
-	page = mem_map - 1;
-	end = mem_map + max_mapnr;
-	for (i = 0; i < size; i++) {
-		do {
-			addr += PAGE_SIZE;
-			page++;
-			if (page >= end)
-				return;
-		} while (!PageReserved(page));
-		/* E-Cache line size is 64B. Let us pollute it :)) */
-		for (j = 0; j < PAGE_SIZE; j += 64)
-			__asm__ __volatile__ ("ldx [%0 + %1], %%g1" : : "r" (j), "r" (addr) : "g1");
-	}
-#endif
-}
-#endif
 
 void do_getpsr(struct pt_regs *regs)
 {

@@ -369,3 +369,4 @@ static int __init init(void)
 
 module_init(init);
 module_exit(fini);
+MODULE_LICENSE("GPL");

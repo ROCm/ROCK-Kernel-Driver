@@ -1,12 +1,12 @@
-/* $Id: mic.c,v 1.10.6.1 2001/02/16 16:43:28 kai Exp $
+/* $Id: mic.c,v 1.10.6.2 2001/09/23 22:24:50 kai Exp $
  *
- * mic.c  low level stuff for mic cards
+ * low level stuff for mic cards
  *
- * Copyright (C) 1997 
- *
- * Author  Stephan von Krawczynski <skraw@ithnet.com>
- *
- * This file is (c) under GNU General Public License
+ * Author       Stephan von Krawczynski
+ * Copyright    by Stephan von Krawczynski <skraw@ithnet.com>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -19,7 +19,7 @@
 
 extern const char *CardType[];
 
-const char *mic_revision = "$Revision: 1.10.6.1 $";
+const char *mic_revision = "$Revision: 1.10.6.2 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

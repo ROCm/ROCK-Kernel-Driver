@@ -1058,6 +1058,8 @@ static int __init init_pms_cards(void)
 MODULE_PARM(io_port,"i");
 MODULE_PARM(mem_base,"i");
 MODULE_PARM(video_nr,"i");
+MODULE_LICENSE("GPL");
+
 
 static void __exit shutdown_mediavision(void)
 {

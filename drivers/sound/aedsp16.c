@@ -1325,6 +1325,7 @@ MODULE_PARM(mpu_base, "i");
 MODULE_PARM_DESC(mpu_base,"MPU-401 I/O base address (0x300 0x310 0x320 0x330)");
 MODULE_AUTHOR("Riccardo Facchetti <fizban@tin.it>");
 MODULE_DESCRIPTION("Audio Excel DSP 16 Driver Version " VERSION);
+MODULE_LICENSE("GPL");
 
 static int __init do_init_aedsp16(void) {
 	printk("Audio Excel DSP 16 init driver Copyright (C) Riccardo Facchetti 1995-98\n");

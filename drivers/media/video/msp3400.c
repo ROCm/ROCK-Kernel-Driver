@@ -131,6 +131,8 @@ MODULE_PARM(debug,"i");
 MODULE_PARM(simple,"i");
 MODULE_PARM(amsound,"i");
 MODULE_PARM(dolby,"i");
+MODULE_LICENSE("GPL");
+
 
 /* ---------------------------------------------------------------------- */
 

@@ -1292,3 +1292,4 @@ EXPORT_SYMBOL(sb_be_quiet);
 EXPORT_SYMBOL(probe_sbmpu);
 EXPORT_SYMBOL(unload_sbmpu);
 EXPORT_SYMBOL(smw_free);
+MODULE_LICENSE("GPL");

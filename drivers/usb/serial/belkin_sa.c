@@ -108,6 +108,12 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(BELKIN_OLD_VID, BELKIN_OLD_PID) },
 	{ USB_DEVICE(PERACOM_VID, PERACOM_PID) },
 	{ USB_DEVICE(GOHUBS_VID, GOHUBS_PID) },
+	{ USB_DEVICE(BELKIN_DOCKSTATION_VID, BELKIN_DOCKSTATION_PID) },
+	{ }							/* Terminating entry */
+};
+
+static __devinitdata struct usb_device_id belkin_dockstation_table [] = {
+	{ USB_DEVICE(BELKIN_DOCKSTATION_VID, BELKIN_DOCKSTATION_PID) },
 	{ }							/* Terminating entry */
 };
 
@@ -132,6 +138,27 @@ static __devinitdata struct usb_device_id gocom232_table [] = {
 };
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
+
+/* All of the device info needed for the Belkin dockstation serial converter */
+struct usb_serial_device_type belkin_dockstation_device = {
+	name:			"Belkin F5U120-PC USB Serial Adapter",
+	id_table:		belkin_dockstation_table,		/* the Belkin F5U103 device */
+	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
+	needs_bulk_in:		MUST_HAVE,			/* this device must have a bulk in endpoint */
+	needs_bulk_out:		MUST_HAVE,			/* this device must have a bulk out endpoint */
+	num_interrupt_in:	1,
+	num_bulk_in:		1,
+	num_bulk_out:		1,
+	num_ports:		1,
+	open:			belkin_sa_open,
+	close:			belkin_sa_close,
+	read_int_callback:	belkin_sa_read_int_callback,	/* How we get the status info */
+	ioctl:			belkin_sa_ioctl,
+	set_termios:		belkin_sa_set_termios,
+	break_ctl:		belkin_sa_break_ctl,
+	startup:		belkin_sa_startup,
+	shutdown:		belkin_sa_shutdown,
+};
 
 /* All of the device info needed for the Belkin serial converter */
 struct usb_serial_device_type belkin_sa_device = {
@@ -345,7 +372,7 @@ static void belkin_sa_close (struct usb_serial_port *port, struct file *filp)
 static void belkin_sa_read_int_callback (struct urb *urb)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct belkin_sa_private *priv = (struct belkin_sa_private *)port->private;
+	struct belkin_sa_private *priv;
 	struct usb_serial *serial;
 	unsigned char *data = urb->transfer_buffer;
 
@@ -353,16 +380,17 @@ static void belkin_sa_read_int_callback (struct urb *urb)
 	if (urb->status)
 		return;
 	
-	if (port_paranoia_check (port, "belkin_sa_read_interrupt")) return;
+	if (port_paranoia_check (port, __FUNCTION__)) return;
 
 	serial = port->serial;
-	if (serial_paranoia_check (serial, "belkin_sa_read_interrupt")) return;
+	if (serial_paranoia_check (serial, __FUNCTION__)) return;
 	
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, data);
 
 	/* Handle known interrupt data */
 	/* ignore data[0] and data[1] */
 
+	priv = (struct belkin_sa_private *)port->private;
 	priv->last_msr = data[BELKIN_SA_MSR_INDEX];
 	
 	/* Record Control Line states */
@@ -603,6 +631,7 @@ static int belkin_sa_ioctl (struct usb_serial_port *port, struct file * file, un
 
 static int __init belkin_sa_init (void)
 {
+	usb_serial_register (&belkin_dockstation_device);
 	usb_serial_register (&belkin_sa_device);
 	usb_serial_register (&belkin_old_device);
 	usb_serial_register (&peracom_device);
@@ -614,6 +643,7 @@ static int __init belkin_sa_init (void)
 
 static void __exit belkin_sa_exit (void)
 {
+	usb_serial_deregister (&belkin_dockstation_device);
 	usb_serial_deregister (&belkin_sa_device);
 	usb_serial_deregister (&belkin_old_device);
 	usb_serial_deregister (&peracom_device);

@@ -34,6 +34,8 @@
 #include "id.h"
 
 MODULE_PARM(debug,"i");
+MODULE_LICENSE("GPL");
+
 
 static int debug = 0;	/* insmod parameter */
 

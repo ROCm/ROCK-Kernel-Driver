@@ -1181,7 +1181,7 @@ int usbvideo_RegisterVideoDevice(uvd_t *uvd)
 	assert(uvd->handle != NULL);
 	if (uvd->handle->uses_procfs) {
 		if (uvd->debug > 0) {
-			info("%s: Creating /proc/%s/ filesystem entries.",
+			info("%s: Creating /proc/video/%s/ filesystem entries.",
 			     proc, uvd->handle->drvName);
 		}
 		usbvideo_procfs_level2_create(uvd);
@@ -2472,3 +2472,4 @@ static int usbvideo_default_procfs_write_proc(
 }
 
 #endif /* USES_PROC_FS */
+MODULE_LICENSE("GPL");

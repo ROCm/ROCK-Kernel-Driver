@@ -1,5 +1,5 @@
 /*
- * USB Skeleton driver - 0.4
+ * USB Skeleton driver - 0.5
  *
  * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
  *
@@ -22,6 +22,7 @@
  *
  * History:
  *
+ * 2001_09_04 - 0.5 - fix devfs bug in skel_disconnect. Thanks to wim delvaux
  * 2001_08_21 - 0.4 - more small bug fixes.
  * 2001_05_29 - 0.3 - more bug fixes based on review from linux-usb-devel
  * 2001_05_24 - 0.2 - bug fixes based on review from linux-usb-devel people
@@ -598,6 +599,9 @@ static void skel_disconnect(struct usb_device *udev, void *ptr)
 		
 	minor = dev->minor;
 
+	/* remove our devfs node */
+	devfs_unregister(dev->devfs);
+
 	/* if the device is not opened, then we clean up right now */
 	if (!dev->open_count) {
 		skel_delete (dev);
@@ -605,9 +609,6 @@ static void skel_disconnect(struct usb_device *udev, void *ptr)
 		dev->udev = NULL;
 		up (&dev->sem);
 	}
-
-	/* remove our devfs node */
-	devfs_unregister(dev->devfs);
 
 	info("USB Skeleton #%d now disconnected", minor);
 	up (&minor_table_mutex);

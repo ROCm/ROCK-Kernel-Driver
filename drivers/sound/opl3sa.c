@@ -334,3 +334,4 @@ static int __init setup_opl3sa(char *str)
 
 __setup("opl3sa=", setup_opl3sa);
 #endif
+MODULE_LICENSE("GPL");

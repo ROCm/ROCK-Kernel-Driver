@@ -75,6 +75,8 @@ static int video_nr = -1;
 MODULE_PARM(def_norm, "i");
 MODULE_PARM_DESC(def_norm, "Default startup norm (0=PAL, 1=NTSC, 2=SECAM)");
 MODULE_PARM(video_nr,"i");
+MODULE_LICENSE("GPL");
+
 
 /* ------------------ PlanB Exported Functions ------------------ */
 static long planb_write(struct video_device *, const char *, unsigned long, int);

@@ -1069,3 +1069,4 @@ void cleanup_module(void)
 	unregister_qdisc(&csz_qdisc_ops);
 }
 #endif
+MODULE_LICENSE("GPL");

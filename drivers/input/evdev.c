@@ -398,3 +398,5 @@ module_exit(evdev_exit);
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Event character device driver");
+MODULE_LICENSE("GPL");
+

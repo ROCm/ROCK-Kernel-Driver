@@ -502,3 +502,4 @@ EXPORT_NO_SYMBOLS;
 
 module_init(init_sysv_fs)
 module_exit(exit_sysv_fs)
+MODULE_LICENSE("GPL");

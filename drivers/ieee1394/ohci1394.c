@@ -2402,6 +2402,7 @@ EXPORT_SYMBOL(ohci1394_unregister_video);
 
 MODULE_AUTHOR("Sebastien Rougeaux <sebastien.rougeaux@anu.edu.au>");
 MODULE_DESCRIPTION("Driver for PCI OHCI IEEE-1394 controllers");
+MODULE_LICENSE("GPL");
 
 static void __devexit ohci1394_remove_one(struct pci_dev *pdev)
 {

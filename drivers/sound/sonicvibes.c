@@ -2458,6 +2458,8 @@ MODULE_PARM_DESC(wavetable, "if 1 the wavetable synth is enabled");
 
 MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch, hb9jnx@hb9w.che.eu");
 MODULE_DESCRIPTION("S3 SonicVibes Driver");
+MODULE_LICENSE("GPL");
+
 
 /* --------------------------------------------------------------------- */
 

@@ -149,3 +149,4 @@ void cleanup_module(void)
   parport_unregister_driver(&parport_i2c_driver);
 }
 #endif
+MODULE_LICENSE("GPL");

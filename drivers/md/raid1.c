@@ -1826,4 +1826,4 @@ static void raid1_exit (void)
 
 module_init(raid1_init);
 module_exit(raid1_exit);
-
+MODULE_LICENSE("GPL");

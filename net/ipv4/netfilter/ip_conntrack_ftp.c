@@ -417,6 +417,7 @@ static int __init init(void)
 
 EXPORT_SYMBOL(ip_ftp_lock);
 EXPORT_SYMBOL(ip_conntrack_ftp);
+MODULE_LICENSE("GPL");
 
 module_init(init);
 module_exit(fini);

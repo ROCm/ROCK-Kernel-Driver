@@ -26,8 +26,11 @@
 #include <asm/kmap_types.h>
 #include <asm/pgtable.h>
 
-/* undef for production */
+#ifdef CONFIG_DEBUG_HIGHMEM
 #define HIGHMEM_DEBUG 1
+#else
+#define HIGHMEM_DEBUG 0
+#endif
 
 /* declarations for highmem.c */
 extern unsigned long highstart_pfn, highend_pfn;

@@ -1,11 +1,14 @@
-/*
- * $Id: capidrv.h,v 1.2.8.1 2001/05/17 20:41:51 kai Exp $
+/* $Id: capidrv.h,v 1.2.8.2 2001/09/23 22:24:33 kai Exp $
  *
  * ISDN4Linux Driver, using capi20 interface (kernelcapi)
  *
- * Copyright 1997 by Carsten Paeth (calle@calle.in-berlin.de)
+ * Copyright 1997 by Carsten Paeth <calle@calle.de>
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
+
 #ifndef __CAPIDRV_H__
 #define __CAPIDRV_H__
 

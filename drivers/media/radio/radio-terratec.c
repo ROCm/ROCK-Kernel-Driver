@@ -338,6 +338,7 @@ static int __init terratec_init(void)
 
 MODULE_AUTHOR("R.OFFERMANNS & others");
 MODULE_DESCRIPTION("A driver for the TerraTec ActiveRadio Standalone radio card.");
+MODULE_LICENSE("GPL");
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the TerraTec ActiveRadio card (0x590 or 0x591)");
 MODULE_PARM(radio_nr, "i");

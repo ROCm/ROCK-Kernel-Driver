@@ -765,8 +765,8 @@ void show_regs(struct pt_regs * regs)
 	       regs->regs[28], regs->regs[29], regs->regs[30], regs->regs[31]);
 
 	/* Saved cp0 registers. */
-	printk("epc   : %08lx\nStatus: %08lx\nCause : %08lx\n",
-	       regs->cp0_epc, regs->cp0_status, regs->cp0_cause);
+	printk("epc   : %08lx    %s\nStatus: %08lx\nCause : %08lx\n",
+	       regs->cp0_epc, print_tainted(), regs->cp0_status, regs->cp0_cause);
 }
 			
 void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,

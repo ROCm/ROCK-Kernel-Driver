@@ -1409,3 +1409,4 @@ static void __exit exit_sd(void)
 
 module_init(init_sd);
 module_exit(exit_sd);
+MODULE_LICENSE("GPL");

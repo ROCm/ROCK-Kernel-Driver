@@ -106,6 +106,8 @@
 
 MODULE_AUTHOR ("3ware Inc.");
 MODULE_DESCRIPTION ("3ware Storage Controller Linux Driver");
+MODULE_LICENSE("GPL");
+
 
 #include <linux/kernel.h>
 #include <linux/pci.h>

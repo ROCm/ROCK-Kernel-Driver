@@ -995,6 +995,7 @@ int eata_pio_detect(Scsi_Host_Template * tpnt)
 static Scsi_Host_Template driver_template = EATA_PIO;
 
 #include "scsi_module.c"
+MODULE_LICENSE("GPL");
 
 /*
  * Overrides for Emacs so that we almost follow Linus's tabbing style.

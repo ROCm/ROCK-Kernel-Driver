@@ -19,7 +19,7 @@
  *  Original author: Steven J. Ralston
  *  (mailto:Steve.Ralston@lsil.com)
  *
- *  $Id: mptscsih.c,v 1.29 2001/06/18 18:59:05 sralston Exp $
+ *  $Id: mptscsih.c,v 1.29.4.1 2001/09/18 03:22:30 sralston Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -81,6 +81,8 @@
 
 MODULE_AUTHOR(MODULEAUTHOR);
 MODULE_DESCRIPTION(my_NAME);
+MODULE_LICENSE("GPL");
+
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -324,14 +326,10 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *r)
 			dprintk((KERN_NOTICE MYNAM ": SET sc->resid=%02xh\n", sc->resid));
 #endif
 
-#if 0
-			if (sc->underflow && (le32_to_cpu(pScsiReply->TransferCount) < sc->underflow)) {
-				sc->result = DID_ERROR << 16;
-				sc->resid = sc->request_bufflen - le32_to_cpu(pScsiReply->TransferCount);
-			} else {
-				sc->result = 0;
+			if (pScsiReq->CDB[0] == INQUIRY) {
+				sc->result = (DID_OK << 16);
+				break;
 			}
-#endif
 
 			/* workaround attempts... */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)

@@ -199,8 +199,9 @@ EXPORT_NO_SYMBOLS;
 
 #ifdef MODULE
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
-MODULE_DESCRIPTION("I2C-Bus adapter routines for ELV parallel port adapter")
-;
+MODULE_DESCRIPTION("I2C-Bus adapter routines for ELV parallel port adapter");
+MODULE_LICENSE("GPL");
+
 
 MODULE_PARM(base, "i");
 

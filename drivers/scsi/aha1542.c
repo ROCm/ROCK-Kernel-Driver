@@ -1800,6 +1800,7 @@ static int aha1542_biosparam(Scsi_Disk * disk, kdev_t dev, int *ip)
 
 	return 0;
 }
+MODULE_LICENSE("GPL");
 
 
 /* Eventually this will go into an include file, but this will be later */

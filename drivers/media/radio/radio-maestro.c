@@ -298,6 +298,7 @@ inline static __u16 radio_install(struct pci_dev *pcidev);
 
 MODULE_AUTHOR("Adam Tlalka, atlka@pg.gda.pl");
 MODULE_DESCRIPTION("Radio driver for the Maestro PCI sound card radio.");
+MODULE_LICENSE("GPL");
 
 EXPORT_NO_SYMBOLS;
 

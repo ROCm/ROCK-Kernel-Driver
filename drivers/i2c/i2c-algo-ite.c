@@ -844,6 +844,7 @@ EXPORT_SYMBOL(i2c_iic_del_bus);
  */
 MODULE_AUTHOR("MontaVista Software <www.mvista.com>");
 MODULE_DESCRIPTION("ITE iic algorithm");
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(iic_test, "i");
 MODULE_PARM(iic_scan, "i");

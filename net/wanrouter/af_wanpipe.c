@@ -2763,3 +2763,4 @@ int init_module(void)
 	return 0;
 }
 #endif
+MODULE_LICENSE("GPL");

@@ -78,6 +78,8 @@ static int max_sg_segs;
 
 MODULE_AUTHOR("Kai Makisara");
 MODULE_DESCRIPTION("SCSI Tape Driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(buffer_kbs, "i");
 MODULE_PARM_DESC(buffer_kbs, "Default driver buffer size (KB; 32)");
 MODULE_PARM(write_threshold_kbs, "i");

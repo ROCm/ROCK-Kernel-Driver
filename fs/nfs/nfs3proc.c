@@ -362,8 +362,8 @@ nfs3_proc_mkdir(struct inode *dir, struct qstr *name, struct iattr *sattr,
 		struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
 	struct nfs_fattr	dir_attr;
-	struct nfs3_createargs	arg = { NFS_FH(dir), name->name, name->len,
-					sattr, 0, { 0, 0 } };
+	struct nfs3_mkdirargs	arg = { NFS_FH(dir), name->name, name->len,
+					sattr };
 	struct nfs3_diropres	res = { &dir_attr, fhandle, fattr };
 	int			status;
 

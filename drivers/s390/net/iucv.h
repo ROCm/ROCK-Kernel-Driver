@@ -8,8 +8,6 @@
  *		Xenia Tkatschow (xenia@us.ibm.com)
  *
  *
- * Linux Kernel IUCV will not support a machine with storage > 2 GB. 
- *
  * Functionality:
  * To explore any of the IUCV functions, one must first register
  * their program using iucv_register_program(). Once your program has
@@ -314,7 +312,7 @@ int
  *                 of this message.                                    
  * Return: Return code from CP IUCV call.                           
 */
-int iucv_purge (u16 pathid, u32 msgid, u32 srccls, uchar audit[3]);
+int iucv_purge (u16 pathid, u32 msgid, u32 srccls, __u32 *audit);
 /*
  * Name: iucv_query_maxconn
  * Purpose: This function determines the maximum number of communication paths you

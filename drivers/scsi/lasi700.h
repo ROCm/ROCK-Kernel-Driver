@@ -38,9 +38,19 @@ static int lasi700_release(struct Scsi_Host *host);
 	this_id:	7,			\
 }
 
+#define LASI_710_SVERSION	0x082
+#define LASI_700_SVERSION	0x071
+
 #define LASI700_ID_TABLE {			\
 	hw_type:	HPHW_FIO,		\
-	sversion:	0x071,			\
+	sversion:	LASI_700_SVERSION,	\
+	hversion:	HVERSION_ANY_ID,	\
+	hversion_rev:	HVERSION_REV_ANY_ID,	\
+}
+
+#define LASI710_ID_TABLE {			\
+	hw_type:	HPHW_FIO,		\
+	sversion:	LASI_710_SVERSION,	\
 	hversion:	HVERSION_ANY_ID,	\
 	hversion_rev:	HVERSION_REV_ANY_ID,	\
 }
@@ -52,6 +62,7 @@ static int lasi700_release(struct Scsi_Host *host);
 }
 
 #define LASI700_CLOCK	25
+#define LASI710_CLOCK	40
 #define LASI_SCSI_CORE_OFFSET 0x100
 
 #endif

@@ -384,6 +384,7 @@ MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_LNE_CARDS) "i");
 MODULE_PARM_DESC(io, "LNE390 I/O base address(es)");
 MODULE_PARM_DESC(irq, "LNE390 IRQ number(s)");
 MODULE_PARM_DESC(mem, "LNE390 memory base address(es)");
+MODULE_LICENSE("GPL");
 
 int init_module(void)
 {

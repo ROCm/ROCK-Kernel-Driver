@@ -1,17 +1,23 @@
-/* $Id: callc.c,v 2.51.6.5 2001/08/23 19:44:23 kai Exp $
+/* $Id: callc.c,v 2.51.6.6 2001/09/23 22:24:46 kai Exp $
  *
- * Author       Karsten Keil (keil@isdn4linux.de)
- *              based on the teles driver from Jan den Ouden
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
- *		This file is (c) under GNU General Public License
- *		For changes and modifications please read
- *		../../../Documentation/isdn/HiSax.cert
+ * For changes and modifications please read
+ * ../../../Documentation/isdn/HiSax.cert
+ *
+ * based on the teles driver from Jan den Ouden
  *
  * Thanks to    Jan den Ouden
  *              Fritz Elfert
  *
  */
+
 #define __NO_VERSION__
+#include <linux/module.h>
 #include <linux/init.h>
 #include "hisax.h"
 #include "../avmb1/capicmd.h"  /* this should be moved in a common place */
@@ -20,7 +26,7 @@
 #define MOD_USE_COUNT ( GET_USE_COUNT (&__this_module))
 #endif	/* MODULE */
 
-const char *lli_revision = "$Revision: 2.51.6.5 $";
+const char *lli_revision = "$Revision: 2.51.6.6 $";
 
 extern struct IsdnCard cards[];
 extern int nrcards;

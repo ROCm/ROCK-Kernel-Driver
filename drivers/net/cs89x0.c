@@ -1628,6 +1628,8 @@ MODULE_PARM_DESC(use_dma , "(ignored)");
 #endif
 
 MODULE_AUTHOR("Mike Cruse, Russwll Nelson <nelson@crynwr.com>, Andrew Morton <andrewm@uow.edu.au>");
+MODULE_LICENSE("GPL");
+
 
 EXPORT_NO_SYMBOLS;
 

@@ -1825,3 +1825,4 @@ static void __exit streamer_cleanup_module(void) {
 
 module_init(streamer_init_module);
 module_exit(streamer_cleanup_module);
+MODULE_LICENSE("GPL");

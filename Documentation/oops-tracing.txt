@@ -201,3 +201,26 @@ Roger Maris Cancer Center    INTERNET: greg@wind.rmcc.com
 820 4th St. N.
 Fargo, ND  58122
 Phone: 701-234-7556
+
+
+---------------------------------------------------------------------------
+Tainted kernels:
+
+Some oops reports contain the string 'Tainted: ' after the program
+counter, this indicates that the kernel has been tainted by some
+mechanism.  The string is followed by a series of position sensitive
+characters, each representing a particular tainted value.
+
+  1: 'G' if all modules loaded have a GPL or compatible license, 'P' if
+     any proprietary module has been loaded.  Modules without a
+     MODULE_LICENSE or with a MODULE_LICENSE that is not recognised by
+     insmod as GPL compatible are assumed to be proprietary.
+
+  2: 'F' if any module was force loaded by insmod -f, ' ' if all
+     modules were loaded normally.
+
+The primary reason for the 'Tainted: ' string is to tell kernel
+debuggers if this is a clean kernel or if anything unusual has
+occurred.  Tainting is permanent, even if an offending module is
+unloading the tainted value remains to indicate that the kernel is not
+trustworthy.

@@ -19,6 +19,7 @@
 
 MODULE_AUTHOR("Tigran A. Aivazian <tigran@veritas.com>");
 MODULE_DESCRIPTION("SCO UnixWare BFS filesystem for Linux");
+MODULE_LICENSE("GPL");
 EXPORT_NO_SYMBOLS;
 
 #undef DEBUG

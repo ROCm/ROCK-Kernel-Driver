@@ -291,6 +291,7 @@ EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for Philips parallel port adapter");
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(type, "i");
 

@@ -1184,6 +1184,7 @@ void irlan_mod_dec_use_count(void)
 
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("The Linux IrDA LAN protocol"); 
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(eth, "i");
 MODULE_PARM_DESC(eth, "Name devices ethX (0) or irlanX (1)");

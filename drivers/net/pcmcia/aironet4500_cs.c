@@ -644,4 +644,4 @@ static void __exit aironet_cs_exit(void)
 
 module_init(aironet_cs_init);
 module_exit(aironet_cs_exit);
-
+MODULE_LICENSE("GPL");

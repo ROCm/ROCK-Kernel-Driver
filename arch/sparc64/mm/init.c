@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.189 2001/09/02 23:27:18 kanoj Exp $
+/*  $Id: init.c,v 1.193 2001/09/25 22:47:35 davem Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -30,6 +30,7 @@
 #include <asm/dma.h>
 #include <asm/starfire.h>
 #include <asm/tlb.h>
+#include <asm/spitfire.h>
 
 mmu_gather_t mmu_gathers[NR_CPUS];
 
@@ -113,15 +114,16 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t p
 
 	if (VALID_PAGE(page) && page->mapping &&
 	    test_bit(PG_dcache_dirty, &page->flags)) {
-		__flush_dcache_page(page->virtual,
-				    (tlb_type == spitfire));
+#if (L1DCACHE_SIZE > PAGE_SIZE)			/* is there D$ aliasing problem */
+		__flush_dcache_page(page->virtual, (tlb_type == spitfire));
+#else
+		if (tlb_type == spitfire)	/* fix local I$ coherency */
+			__flush_icache_page(__get_phys((unsigned long)(page->virtual)));
+#endif
 		clear_bit(PG_dcache_dirty, &page->flags);
 	}
 	__update_mmu_cache(vma, address, pte);
 }
-
-/* In arch/sparc64/mm/ultra.S */
-extern void __flush_icache_page(unsigned long);
 
 void flush_icache_range(unsigned long start, unsigned long end)
 {
@@ -887,23 +889,28 @@ struct pgtable_cache_struct pgt_quicklists;
  * addresses. The idea is that if the vpte color and PAGE_OFFSET range 
  * color is the same, then when the kernel initializes the pagetable 
  * using the later address range, accesses with the first address
- * range will not see the newly initialized data rather than the
- * garbage.
+ * range will see the newly initialized data rather than the garbage.
  */
- 
+#if (L1DCACHE_SIZE > PAGE_SIZE)			/* is there D$ aliasing problem */
+#define DC_ALIAS_SHIFT	1
+#else
+#define DC_ALIAS_SHIFT	0
+#endif
 pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
-	struct page *page = alloc_pages(GFP_KERNEL, 1);
-	unsigned long color = ((address >> (PAGE_SHIFT + 10)) & 1UL);
+	struct page *page = alloc_pages(GFP_KERNEL, DC_ALIAS_SHIFT);
+	unsigned long color = VPTE_COLOR(address);
 
 	if (page) {
 		unsigned long *to_free;
 		unsigned long paddr;
 		pte_t *pte;
 
+#if (L1DCACHE_SIZE > PAGE_SIZE)			/* is there D$ aliasing problem */
 		set_page_count((page + 1), 1);
+#endif
 		paddr = (unsigned long) page_address(page);
-		memset((char *)paddr, 0, (PAGE_SIZE << 1));
+		memset((char *)paddr, 0, (PAGE_SIZE << DC_ALIAS_SHIFT));
 
 		if (!color) {
 			pte = (pte_t *) paddr;
@@ -913,10 +920,12 @@ pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 			to_free = (unsigned long *) paddr;
 		}
 
+#if (L1DCACHE_SIZE > PAGE_SIZE)			/* is there D$ aliasing problem */
 		/* Now free the other one up, adjust cache size. */
 		*to_free = (unsigned long) pte_quicklist[color ^ 0x1];
 		pte_quicklist[color ^ 0x1] = to_free;
 		pgtable_cache_size++;
+#endif
 
 		return pte;
 	}

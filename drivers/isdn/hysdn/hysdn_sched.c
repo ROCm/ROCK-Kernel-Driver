@@ -1,36 +1,23 @@
-/* $Id: hysdn_sched.c,v 1.5.6.2 2001/04/20 02:42:00 keil Exp $
-
- * Linux driver for HYSDN cards, scheduler routines for handling exchange card <-> pc.
+/* $Id: hysdn_sched.c,v 1.5.6.3 2001/09/23 22:24:54 kai Exp $
  *
- * written by Werner Cornelius (werner@titro.de) for Hypercope GmbH
+ * Linux driver for HYSDN cards
+ * scheduler routines for handling exchange card <-> pc.
  *
- * Copyright 1999  by Werner Cornelius (werner@titro.de)
+ * Author    Werner Cornelius (werner@titro.de) for Hypercope GmbH
+ * Copyright 1999 by Werner Cornelius (werner@titro.de)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
-#define __NO_VERSION__
 #include <linux/config.h>
-#include <linux/module.h>
-#include <linux/version.h>
-#include <asm/io.h>
+#include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
+#include <asm/io.h>
 
 #include "hysdn_defs.h"
 

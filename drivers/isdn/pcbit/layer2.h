@@ -1,4 +1,6 @@
 /*
+ * PCBIT-D low-layer interface definitions
+ *
  * Copyright (C) 1996 Universidade de Lisboa
  * 
  * Written by Pedro Roque Marques (roque@di.fc.ul.pt)
@@ -11,10 +13,6 @@
  * 19991203 - Fernando Carvalho - takion@superbofh.org
  * Hacked to compile with egcs and run with current version of isdn modules
 */
-
-/*        
- *        PCBIT-D low-layer interface definitions
- */
 
 #ifndef LAYER2_H
 #define LAYER2_H

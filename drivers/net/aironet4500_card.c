@@ -38,6 +38,7 @@ static const char *awc_version =
 #include <linux/if_arp.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 
 #include "aironet4500.h"
 
@@ -66,6 +67,8 @@ static struct pci_device_id aironet4500_card_pci_tbl[] __devinitdata = {
 	{ }			/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(pci, aironet4500_card_pci_tbl);
+MODULE_LICENSE("GPL");
+
 
 static int reverse_probe;
 

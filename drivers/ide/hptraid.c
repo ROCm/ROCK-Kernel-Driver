@@ -306,8 +306,8 @@ static void __init probedisk(int major, int minor,int device)
 	if (bdev && blkdev_get(bdev,FMODE_READ|FMODE_WRITE,0,BDEV_RAW) == 0) {
         	int j=0;
         	struct gendisk *gd;
-
 		raid[device].disk[i].bdev = bdev;
+        	/* This is supposed to prevent others from stealing our underlying disks */
 		/* now blank the /proc/partitions table for the wrong partition table,
 		   so that scripts don't accidentally mount it and crash the kernel */
 		 /* XXX: the 0 is an utter hack  --hch */
@@ -408,12 +408,12 @@ static void __exit hptraid_exit (void)
 {
 	int i,device;
 	for (device = 0; device<16; device++) {
-		for (i=0;i<8;i++) {
+		for (i=0;i<8;i++)  {
 			struct block_device *bdev = raid[device].disk[i].bdev;
 			raid[device].disk[i].bdev = NULL;
 			if (bdev)
 				blkdev_put(bdev, BDEV_RAW);
-		}
+		}       
 		if (raid[device].sectors)
 			ataraid_release_device(device);
 	}
@@ -432,3 +432,4 @@ static int hptraid_release(struct inode * inode, struct file * filp)
 
 module_init(hptraid_init);
 module_exit(hptraid_exit);
+MODULE_LICENSE("GPL");

@@ -1074,6 +1074,7 @@ void __init calc_port_addr(void)
     /* SIGNATURE	= (port_base+0x0E);*/
     /* CONFIG6		= (port_base+0x0F);*/
 }
+MODULE_LICENSE("GPL");
 
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = NCR53c406a;

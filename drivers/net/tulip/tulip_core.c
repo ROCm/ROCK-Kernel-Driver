@@ -101,6 +101,7 @@ static int csr0 = 0x00A00000 | 0x4800;
 
 MODULE_AUTHOR("The Linux Kernel Team");
 MODULE_DESCRIPTION("Digital 21*4* Tulip ethernet driver");
+MODULE_LICENSE("GPL");
 MODULE_PARM(tulip_debug, "i");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(rx_copybreak, "i");
@@ -1466,8 +1467,6 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		goto err_out_free_res;
 #endif
 
-	pci_set_master(pdev);
-
 	pci_read_config_byte (pdev, PCI_REVISION_ID, &chip_rev);
 
 	/*
@@ -1511,6 +1510,8 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 
 	/* Stop the chip's Tx and Rx processes. */
 	tulip_stop_rxtx(tp);
+
+	pci_set_master(pdev);
 
 	/* Clear the missed-packet counter. */
 	inl(ioaddr + CSR8);

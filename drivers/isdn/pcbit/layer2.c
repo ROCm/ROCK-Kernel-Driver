@@ -1,4 +1,6 @@
 /*
+ * PCBIT-D low-layer interface
+ *
  * Copyright (C) 1996 Universidade de Lisboa
  *
  * Written by Pedro Roque Marques (roque@di.fc.ul.pt)
@@ -13,10 +15,6 @@
 */
 
 /*
- *        PCBIT-D low-layer interface
- */
-
-/*
  *        Based on documentation provided by Inesc:
  *        - "Interface com bus do PC para o PCBIT e PCBIT-D", Inesc, Jan 93
  */
@@ -25,16 +23,6 @@
  *        TODO: better handling of errors
  *              re-write/remove debug printks
  */
-
-#define __NO_VERSION__
-
-
-#ifdef MODULE
-#define INCLUDE_INLINE_FUNCS
-#endif
-
-
-#include <linux/module.h>
 
 #include <linux/sched.h>
 #include <linux/string.h>

@@ -497,3 +497,4 @@ void cleanup_module(void)
 	unregister_qdisc(&red_qdisc_ops);
 }
 #endif
+MODULE_LICENSE("GPL");

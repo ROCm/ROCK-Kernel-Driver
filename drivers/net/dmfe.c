@@ -2000,6 +2000,7 @@ static struct pci_device_id dmfe_pci_tbl[] __devinitdata = {
 };
 MODULE_DEVICE_TABLE(pci, dmfe_pci_tbl);
 
+
 static struct pci_driver dmfe_driver = {
 	name:		"dmfe",
 	id_table:	dmfe_pci_tbl,
@@ -2009,6 +2010,8 @@ static struct pci_driver dmfe_driver = {
 
 MODULE_AUTHOR("Sten Wang, sten_wang@davicom.com.tw");
 MODULE_DESCRIPTION("Davicom DM910X fast ethernet driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(debug, "i");
 MODULE_PARM(mode, "i");
 MODULE_PARM(cr6set, "i");

@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 1996  SpellCaster Telecommunications Inc.
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
+ */
+
 #define __NO_VERSION__
 #include "includes.h"
 #include "hardware.h"

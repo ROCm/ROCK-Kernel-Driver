@@ -5259,6 +5259,8 @@ static struct cs_card_type cards[]={
 
 MODULE_AUTHOR("Alan Cox <alan@redhat.com>, Jaroslav Kysela, <pcaudio@crystal.cirrus.com>");
 MODULE_DESCRIPTION("Crystal SoundFusion Audio Support");
+MODULE_LICENSE("GPL");
+
 
 static const char cs46xx_banner[] = KERN_INFO "Crystal 4280/46xx + AC97 Audio, version " CS46XX_MAJOR_VERSION "." CS46XX_MINOR_VERSION "." CS46XX_ARCH ", " __TIME__ " " __DATE__ "\n";
 static const char fndmsg[] = KERN_INFO "cs46xx: Found %d audio device(s).\n";

@@ -1801,3 +1801,4 @@ EXPORT_SYMBOL(ip6t_unregister_target);
 
 module_init(init);
 module_exit(fini);
+MODULE_LICENSE("GPL");

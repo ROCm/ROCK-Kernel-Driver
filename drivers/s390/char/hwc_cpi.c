@@ -16,6 +16,9 @@
 #include "hwc_rw.h"
 #include "hwc.h"
 
+#define CPI_RETRIES		3
+#define CPI_SLEEP_TICKS		50
+
 #define CPI_LENGTH_SYSTEM_TYPE	8
 #define CPI_LENGTH_SYSTEM_NAME	8
 #define CPI_LENGTH_SYSPLEX_NAME	8
@@ -84,6 +87,7 @@ cpi_module_init (void)
 	int system_type_length;
 	int system_name_length;
 	int sysplex_name_length = 0;
+	int retries;
 
 	if (!MACHINE_HAS_HWC) {
 		printk ("cpi: bug: hardware console not present\n");
@@ -163,21 +167,29 @@ cpi_module_init (void)
 	cpi_request.word = HWC_CMDW_WRITEDATA;
 	cpi_request.callback = cpi_callback;
 
-	retval = hwc_send (&cpi_request);
-	if (retval) {
-		printk ("cpi: failed (%i)\n", retval);
-		goto free;
-	}
-	down (&sem);
+	for (retries = CPI_RETRIES; retries; retries--) {
+		retval = hwc_send (&cpi_request);
+		if (retval) {
 
-	switch (cpi_hwcb->response_code) {
-	case 0x0020:
-		printk ("cpi: succeeded\n");
-		break;
-	default:
-		printk ("cpi: failed with response code 0x%x\n",
-			cpi_hwcb->response_code);
+			set_current_state (TASK_INTERRUPTIBLE);
+			schedule_timeout (CPI_SLEEP_TICKS);
+		} else {
+
+			down (&sem);
+
+			switch (cpi_hwcb->response_code) {
+			case 0x0020:
+				printk ("cpi: succeeded\n");
+				break;
+			default:
+				printk ("cpi: failed with response code 0x%x\n",
+					cpi_hwcb->response_code);
+			}
+			goto free;
+		}
 	}
+
+	printk ("cpi: failed (%i)\n", retval);
 
       free:
 	kfree (cpi_hwcb);

@@ -747,6 +747,8 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 #ifdef MODULE
 MODULE_AUTHOR("Jes Sorensen <jes@trained-monkey.org>");
 MODULE_DESCRIPTION("AceNIC/3C985/GA620 Gigabit Ethernet driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(link, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(trace, "1-" __MODULE_STRING(8) "i");
 MODULE_PARM(tx_coal_tick, "1-" __MODULE_STRING(8) "i");

@@ -120,17 +120,30 @@ CONFIG_SMP
   
   If you don't know what to do here, say N.
   
-APIC and IO-APIC Support on Uniprocessors
+IO-APIC Support on Uniprocessors
 CONFIG_X86_UP_IOAPIC
-  APIC (Advanced Programmable Interrupt Controller) is a scheme for
-  delivering hardware interrupt requests to the CPU. It is commonly
-  used on systems with several CPU's. If you have a single-CPU system
-  which uses APIC, you can say Y here to use it. If you say Y here
-  even though your machine doesn't have APIC, then the kernel will
-  still run with no slowdown at all.
+  An IO-APIC (I/O Advanced Programmable Interrupt Controller) is an
+  SMP-capable replacement for PC-style interrupt controllers. Most
+  SMP systems and a small number of uniprocessor systems have one.
+  If you have a single-CPU system with an IO-APIC, you can say Y here
+  to use it. If you say Y here even though your machine doesn't have
+  an IO-APIC, then the kernel will still run with no slowdown at all.
 
-  If you have system with several CPU's, you do not need to say Y
-  here: APIC will be used automatically.
+  If you have a system with several CPUs, you do not need to say Y
+  here: the IO-APIC will be used automatically.
+
+Local APIC Support on Uniprocessors
+CONFIG_X86_UP_APIC
+  A local APIC (Advanced Programmable Interrupt Controller) is an
+  integrated interrupt controller in the CPU. If you have a single-CPU
+  system which has a processor with a local APIC, you can say Y here to
+  enable and use it. If you say Y here even though your machine doesn't
+  have a local APIC, then the kernel will still run with no slowdown at
+  all. The local APIC supports CPU-generated self-interrupts (timer,
+  performance counters), and the NMI watchdog which detects hard lockups.
+
+  If you have a system with several CPUs, you do not need to say Y
+  here: the local APIC will be used automatically.
 
 Kernel math emulation
 CONFIG_MATH_EMULATION

@@ -295,9 +295,7 @@
  * phase:                       Service/parameter/return code special command
  */
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #include <linux/version.h>
 #include <linux/kernel.h>
@@ -687,6 +685,7 @@ MODULE_PARM(rescan, "i");
 MODULE_PARM(virt_ctr, "i");
 MODULE_PARM(shared_access, "i");
 MODULE_AUTHOR("Achim Leubner");
+MODULE_LICENSE("GPL");
 #endif
 #endif
 

@@ -4,7 +4,7 @@
  *
  * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.53 2001/06/18
+ * Version: 1.54 2001/09/09
  *
  * See matroxfb_base.c for contributors.
  *
@@ -319,7 +319,7 @@ void DAC1064_global_restore(CPMINFO const struct matrox_hw_state* hw) {
 	outDAC1064(PMINFO M1064_XMISCCTRL, hw->DACreg[POS1064_XMISCCTRL]);
 	if (ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG400) {
 		outDAC1064(PMINFO 0x20, 0x04);
-		outDAC1064(PMINFO 0x1F, 0x00);
+		outDAC1064(PMINFO 0x1F, ACCESS_FBINFO(devflags.dfp_type));
 		if (ACCESS_FBINFO(devflags.g450dac)) {
 			outDAC1064(PMINFO M1064_X8B, 0xCC);	/* only matrox know... */
 			outDAC1064(PMINFO M1064_XOUTPUTCONN, hw->DACreg[POS1064_XOUTPUTCONN]);
@@ -851,6 +851,11 @@ static void MGAG100_reset(WPMINFO struct matrox_hw_state* hw){
 		}
 	}
 	DAC1064_setmclk(PMINFO hw, DAC1064_OPT_RESERVED | DAC1064_OPT_MDIV2 | DAC1064_OPT_GDIV1 | DAC1064_OPT_SCLK_PLL, 133333);
+	if (ACCESS_FBINFO(devflags.accelerator) == FB_ACCEL_MATROX_MGAG400) {
+		if (ACCESS_FBINFO(devflags.dfp_type) == -1) {
+			ACCESS_FBINFO(devflags.dfp_type) = inDAC1064(PMINFO 0x1F);
+		}
+	}
 	if (ACCESS_FBINFO(devflags.noinit))
 		return;
 	MGAG100_setPixClock(PMINFO 4, 25175);
@@ -929,3 +934,4 @@ EXPORT_SYMBOL(matrox_G100);
 EXPORT_SYMBOL(DAC1064_global_init);
 EXPORT_SYMBOL(DAC1064_global_restore);
 #endif
+MODULE_LICENSE("GPL");

@@ -14,6 +14,7 @@
  */
 
 #include "irnet_ppp.h"		/* Private header */
+#include <linux/module.h>
 
 /************************* CONTROL CHANNEL *************************/
 /*
@@ -1095,3 +1096,4 @@ cleanup_module(void)
   return ppp_irnet_cleanup();
 }
 #endif /* MODULE */
+MODULE_LICENSE("GPL");

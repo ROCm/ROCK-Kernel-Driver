@@ -592,6 +592,8 @@ EXPORT_SYMBOL(video_unregister_device);
 
 MODULE_AUTHOR("Alan Cox");
 MODULE_DESCRIPTION("Device registrar for Video4Linux drivers");
+MODULE_LICENSE("GPL");
+
 
 /*
  * Local variables:

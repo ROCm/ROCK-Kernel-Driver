@@ -1,12 +1,15 @@
-/* $Id: hfc_2bds0.c,v 1.15.6.2 2001/06/09 15:14:17 kai Exp $
+/* $Id: hfc_2bds0.c,v 1.15.6.3 2001/09/23 22:24:47 kai Exp $
  *
- *  specific routines for CCD's HFC 2BDS0
+ * specific routines for CCD's HFC 2BDS0
  *
- * Author       Karsten Keil (keil@isdn4linux.de)
- *
- * This file is (c) under GNU General Public License
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
+
 #define __NO_VERSION__
 #include <linux/init.h>
 #include "hisax.h"

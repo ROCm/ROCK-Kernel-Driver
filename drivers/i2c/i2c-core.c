@@ -1369,6 +1369,7 @@ MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus main module");
 MODULE_PARM(i2c_debug, "i");
 MODULE_PARM_DESC(i2c_debug,"debug level");
+MODULE_LICENSE("GPL");
 
 int init_module(void) 
 {

@@ -1479,3 +1479,4 @@ void cleanup_module(void)
 	return;
 }
 #endif /* MODULE */
+MODULE_LICENSE("GPL");

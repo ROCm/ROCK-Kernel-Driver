@@ -209,7 +209,7 @@ define_extent (ccw1_t * de_ccw,
 	memset (de_ccw, 0, sizeof (ccw1_t));
 	de_ccw->cmd_code = DASD_ECKD_CCW_DEFINE_EXTENT;
 	de_ccw->count = 16;
-	if (rc=dasd_set_normalized_cda (de_ccw, __pa (data), cqr, device)) 
+	if ((rc=dasd_set_normalized_cda (de_ccw, __pa (data), cqr, device))) 
                 return rc;
 
 	memset (data, 0, sizeof (DE_eckd_data_t));
@@ -283,7 +283,7 @@ locate_record (ccw1_t * lo_ccw,
 	memset (lo_ccw, 0, sizeof (ccw1_t));
 	lo_ccw->cmd_code = DASD_ECKD_CCW_LOCATE_RECORD;
 	lo_ccw->count = 16;
-	if (rc=dasd_set_normalized_cda (lo_ccw, __pa (data), cqr, device))
+	if ((rc=dasd_set_normalized_cda (lo_ccw, __pa (data), cqr, device)))
                 return rc;
 
 	memset (data, 0, sizeof (LO_eckd_data_t));
@@ -1157,6 +1157,16 @@ dasd_eckd_cleanup_request (ccw_req_t * cqr)
 	return ret;
 }
 #endif
+
+/*
+ * DASD_ECKD_RESERVE
+ *
+ * DESCRIPTION
+ *    Buils a channel programm to reserve a device.
+ *    Options are set to 'synchronous wait for interrupt' and
+ *    'timeout the request'. This leads to an terminate IO if 
+ *    the interrupt is outstanding for a certain time. 
+ */
 ccw_req_t *
 dasd_eckd_reserve (struct dasd_device_t * device)
 {
@@ -1168,12 +1178,21 @@ dasd_eckd_reserve (struct dasd_device_t * device)
 		return NULL;
 	}
 	cqr->cpaddr->cmd_code = DASD_ECKD_CCW_RESERVE;
-	cqr->device = device;
+	cqr->device  = device;
 	cqr->retries = 0;
-	cqr->status = CQR_STATUS_FILLED;
-	return cqr;
+	cqr->expires = 10 * TOD_SEC;
+        cqr->options = (DOIO_WAIT_FOR_INTERRUPT | DOIO_TIMEOUT); /* timeout reqest */
+	cqr->status  = CQR_STATUS_FILLED;
+	return cqr; 
 }
 
+/*
+ * DASD_ECKD_RELEASE
+ *
+ * DESCRIPTION
+ *    Buils a channel programm to releases a prior reserved 
+ *    (see dasd_eckd_reserve) device.
+ */
 ccw_req_t *
 dasd_eckd_release (struct dasd_device_t * device)
 {
@@ -1185,11 +1204,39 @@ dasd_eckd_release (struct dasd_device_t * device)
 		return NULL;
 	}
 	cqr->cpaddr->cmd_code = DASD_ECKD_CCW_RELEASE;
-	cqr->device = device;
+	cqr->device  = device;
 	cqr->retries = 0;
-	cqr->status = CQR_STATUS_FILLED;
+	cqr->expires = 10 * TOD_SEC;
+        cqr->options = (DOIO_WAIT_FOR_INTERRUPT | DOIO_TIMEOUT); /* timeout reqest */
+	cqr->status  = CQR_STATUS_FILLED;
 	return cqr;
 
+}
+
+/*
+ * DASD_ECKD_STEAL_LOCK
+ *
+ * DESCRIPTION
+ *    Buils a channel programm to break a device's reservation. 
+ *    (unconditional reserve)
+ */
+ccw_req_t *
+dasd_eckd_steal_lock (struct dasd_device_t * device)
+{
+	ccw_req_t *cqr =
+	    dasd_alloc_request (dasd_eckd_discipline.name, 1 + 1, 0, device);
+	if (cqr == NULL) {
+		printk (KERN_WARNING PRINTK_HEADER
+			"No memory to allocate initialization request\n");
+		return NULL;
+	}
+	cqr->cpaddr->cmd_code = DASD_ECKD_CCW_SLCK;
+	cqr->device  = device;
+	cqr->retries = 0;
+	cqr->expires = 10 * TOD_SEC;
+        cqr->options = (DOIO_WAIT_FOR_INTERRUPT | DOIO_TIMEOUT); /* timeout reqest */
+	cqr->status  = CQR_STATUS_FILLED;
+	return cqr;
 }
 
 static inline ccw1_t *
@@ -1335,6 +1382,7 @@ dasd_discipline_t dasd_eckd_discipline = {
 	int_handler:dasd_int_handler,
 	reserve:dasd_eckd_reserve,
 	release:dasd_eckd_release,
+        steal_lock:dasd_eckd_steal_lock,
 	merge_cp:dasd_eckd_merge_cp,
 	fill_info:dasd_eckd_fill_info,
 };

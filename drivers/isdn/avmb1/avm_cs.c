@@ -1,10 +1,13 @@
-/*======================================================================
-
-    A PCMCIA client driver for AVM B1/M1/M2
-
-    Written by Carsten Paeth, calle@calle.in-berlin.de
-    
-======================================================================*/
+/* $Id: avm_cs.c,v 1.4.6.3 2001/09/23 22:24:33 kai Exp $
+ *
+ * A PCMCIA client driver for AVM B1/M1/M2
+ *
+ * Copyright 1999 by Carsten Paeth <calle@calle.de>
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
+ */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -32,6 +35,12 @@
 #include <linux/capi.h>
 #include <linux/b1lli.h>
 #include <linux/b1pcmcia.h>
+
+/*====================================================================*/
+
+MODULE_DESCRIPTION("CAPI4Linux: PCMCIA client driver for AVM B1/M1/M2");
+MODULE_AUTHOR("Carsten Paeth");
+MODULE_LICENSE("GPL");
 
 /*====================================================================*/
 

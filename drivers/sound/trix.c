@@ -543,3 +543,4 @@ static int __init setup_trix (char *str)
 
 __setup("trix=", setup_trix);
 #endif
+MODULE_LICENSE("GPL");

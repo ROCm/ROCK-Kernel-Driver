@@ -220,6 +220,8 @@ tuner3036_exit(void)
 
 MODULE_DESCRIPTION("SAB3036 tuner driver");
 MODULE_AUTHOR("Philip Blundell <philb@gnu.org>");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(debug,"i");
 MODULE_PARM_DESC(debug,"Enable debugging output");
 

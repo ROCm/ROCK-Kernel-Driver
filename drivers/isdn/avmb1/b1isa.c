@@ -1,10 +1,12 @@
-/*
- * $Id: b1isa.c,v 1.10.6.5 2001/05/17 20:41:51 kai Exp $
+/* $Id: b1isa.c,v 1.10.6.6 2001/09/23 22:24:33 kai Exp $
  * 
  * Module for AVM B1 ISA-card.
  * 
- * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
+ * Copyright 1999 by Carsten Paeth <calle@calle.de>
  * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
  */
 
 #include <linux/module.h>
@@ -22,11 +24,13 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.10.6.5 $";
+static char *revision = "$Revision: 1.10.6.6 $";
 
 /* ------------------------------------------------------------- */
 
-MODULE_AUTHOR("Carsten Paeth <calle@calle.in-berlin.de>");
+MODULE_DESCRIPTION("CAPI4Linux: Driver for AVM B1 ISA card");
+MODULE_AUTHOR("Carsten Paeth");
+MODULE_LICENSE("GPL");
 
 /* ------------------------------------------------------------- */
 

@@ -1,13 +1,17 @@
-/* $Id: telespci.c,v 2.16.6.4 2001/02/16 16:43:29 kai Exp $
+/* $Id: telespci.c,v 2.16.6.5 2001/09/23 22:24:52 kai Exp $
  *
- * telespci.c     low level stuff for Teles PCI isdn cards
+ * low level stuff for Teles PCI isdn cards
  *
- * Author       Ton van Rosmalen 
- *              Karsten Keil (keil@isdn4linux.de)
- *
- * This file is (c) under GNU General Public License
+ * Author       Ton van Rosmalen
+ *              Karsten Keil
+ * Copyright    by Ton van Rosmalen
+ *              by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
+
 #define __NO_VERSION__
 #include <linux/init.h>
 #include <linux/config.h>
@@ -18,7 +22,7 @@
 #include <linux/pci.h>
 
 extern const char *CardType[];
-const char *telespci_revision = "$Revision: 2.16.6.4 $";
+const char *telespci_revision = "$Revision: 2.16.6.5 $";
 
 #define ZORAN_PO_RQ_PEN	0x02000000
 #define ZORAN_PO_WR	0x00800000

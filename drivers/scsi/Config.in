@@ -115,9 +115,18 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
    fi
 fi
 dep_tristate 'NCR53c406a SCSI support' CONFIG_SCSI_NCR53C406A $CONFIG_SCSI
-dep_tristate 'NCR Dual 700 MCA SCSI support' CONFIG_SCSI_NCR_D700 $CONFIG_SCSI $CONFIG_MCA
+if [ "$CONFIG_MCA" = "y" ]; then
+   dep_tristate 'NCR Dual 700 MCA SCSI support' CONFIG_SCSI_NCR_D700 $CONFIG_SCSI
+   if [ "$CONFIG_SCSI_NCR_D700" != "n" ]; then
+      define_bool CONFIG_53C700_IO_MAPPED y
+   fi
+fi
 if [ "$CONFIG_PARISC" = "y" ]; then
-   dep_tristate 'HP LASI SCSI support for 53c700' CONFIG_SCSI_LASI70 $CONFIG_SCSI
+   dep_tristate 'HP LASI SCSI support for 53c700' CONFIG_SCSI_LASI700 $CONFIG_SCSI
+   if [ "$CONFIG_SCSI_LASI700" != "n" ]; then
+      define_bool CONFIG_53C700_MEM_MAPPED y
+      define_bool CONFIG_53C700_LE_ON_BE y
+   fi
 fi
 dep_tristate 'NCR53c7,8xx SCSI support'  CONFIG_SCSI_NCR53C7xx $CONFIG_SCSI $CONFIG_PCI
 if [ "$CONFIG_SCSI_NCR53C7xx" != "n" ]; then

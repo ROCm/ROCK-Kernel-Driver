@@ -34,6 +34,8 @@ static int int_timeout;		/* Rx DMA wait time in 64ns increments */
 
 MODULE_AUTHOR ("Edward Peng");
 MODULE_DESCRIPTION ("D-Link DL2000-based Gigabit Ethernet Adapter");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM (mtu, "1-" __MODULE_STRING (MAX_UNITS) "i");
 MODULE_PARM (media, "1-" __MODULE_STRING (MAX_UNITS) "s");
 MODULE_PARM (vlan, "1-" __MODULE_STRING (MAX_UNITS) "i");

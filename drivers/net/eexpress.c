@@ -1634,6 +1634,8 @@ MODULE_PARM(io, "1-" __MODULE_STRING(EEXP_MAX_CARDS) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(EEXP_MAX_CARDS) "i");
 MODULE_PARM_DESC(io, "EtherExpress 16 I/O base address(es)");
 MODULE_PARM_DESC(irq, "EtherExpress 16 IRQ number(s)");
+MODULE_LICENSE("GPL");
+
 
 /* Ideally the user would give us io=, irq= for every card.  If any parameters
  * are specified, we verify and then use them.  If no parameters are given, we

@@ -2360,6 +2360,8 @@ static int stop = 0;
 
 }
 
+MODULE_LICENSE("GPL");
+
 
 static Scsi_Host_Template driver_template = IN2000;
 #include "scsi_module.c"

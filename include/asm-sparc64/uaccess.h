@@ -1,4 +1,4 @@
-/* $Id: uaccess.h,v 1.33 2000/08/29 07:01:58 davem Exp $ */
+/* $Id: uaccess.h,v 1.34 2001/09/27 04:36:24 kanoj Exp $ */
 #ifndef _ASM_UACCESS_H
 #define _ASM_UACCESS_H
 
@@ -248,22 +248,6 @@ __asm__ __volatile__(							\
        : "=r" (x) : "r" (__m(addr)), "i" (retval))
 
 extern int __get_user_bad(void);
-
-extern __kernel_size_t __memcpy_short(void *to, const void *from,
-				      __kernel_size_t size,
-				      long asi_src, long asi_dst);
-
-extern __kernel_size_t __memcpy_entry(void *to, const void *from,
-				      __kernel_size_t size,
-				      long asi_src, long asi_dst);
-
-extern __kernel_size_t __memcpy_16plus(void *to, const void *from,
-				       __kernel_size_t size,
-				       long asi_src, long asi_dst);
-
-extern __kernel_size_t __memcpy_386plus(void *to, const void *from,
-					__kernel_size_t size,
-					long asi_src, long asi_dst);
 
 extern __kernel_size_t __copy_from_user(void *to, const void *from,
 					__kernel_size_t size);

@@ -67,9 +67,7 @@
 #include <linux/version.h>
 #endif
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #include <stdarg.h>
 #include <asm/irq.h>
@@ -796,4 +794,5 @@ int inia100_release(struct Scsi_Host *hreg)
         return 0;
 } 
 
+MODULE_LICENSE("Dual BSD/GPL");
 /*#include "inia100scsi.c" */

@@ -4,8 +4,14 @@
  * Patched version for ISDN syncPPP written 1997/1998 by Michael Hipp
  * The whole module is now SKB based.
  *
- * Compile with:
- *  gcc -O2 -I/usr/src/linux/include -D__KERNEL__ -DMODULE -c isdn_bsdcomp.c
+ */
+
+/*
+ * Update: The Berkeley copyright was changed, and the change 
+ * is retroactive to all "true" BSD software (ie everything
+ * from UCB as opposed to other peoples code that just carried
+ * the same license). The new copyright doesn't clash with the
+ * GPL, so the module-only restriction has been removed..
  */
 
 /*
@@ -82,13 +88,15 @@
 
 #include <linux/isdn.h>
 #include <linux/isdn_ppp.h>
-/* #include <linux/netprotocol.h> */
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/if_arp.h>
 #include <linux/ppp-comp.h>
 
 #include "isdn_ppp.h"
+
+MODULE_DESCRIPTION("ISDN4Linux: BSD Compression for PPP over ISDN");
+MODULE_LICENSE("Dual BSD/GPL");
 
 #define BSD_VERSION(x)	((x) >> 5)
 #define BSD_NBITS(x)	((x) & 0x1F)

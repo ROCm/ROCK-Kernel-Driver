@@ -301,3 +301,4 @@ static void bt856_exit(void)
 
 module_init(bt856_init);
 module_exit(bt856_exit);
+MODULE_LICENSE("GPL");

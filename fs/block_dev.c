@@ -345,7 +345,6 @@ struct block_device *bdget(dev_t dev)
 			inode->i_rdev = kdev;
 			inode->i_dev = kdev;
 			inode->i_bdev = new_bdev;
-			inode->i_blkbits = blksize_bits(block_size(kdev));
 			inode->i_data.a_ops = &def_blk_aops;
 			inode->i_data.gfp_mask = GFP_USER;
 			spin_lock(&bdev_lock);

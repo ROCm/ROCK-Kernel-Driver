@@ -841,6 +841,9 @@ cleanup_module(void)
 	release_region(DE600_IO, 3);
 }
 #endif /* MODULE */
+
+MODULE_LICENSE("GPL");
+
 /*
  * Local variables:
  *  kernel-compile-command: "gcc -D__KERNEL__ -Ilinux/include -I../../net/inet -Wall -Wstrict-prototypes -O2 -m486 -c de600.c"

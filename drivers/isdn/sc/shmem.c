@@ -1,24 +1,13 @@
-/*
- *  $Id: shmem.c,v 1.2 1996/11/20 17:49:56 fritz Exp $
- *  Copyright (C) 1996  SpellCaster Telecommunications Inc.
+/* $Id: shmem.c,v 1.2.10.1 2001/09/23 22:24:59 kai Exp $
  *
- *  card.c - Card functions implementing ISDN4Linux functionality
+ * Copyright (C) 1996  SpellCaster Telecommunications Inc.
  *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
+ * Card functions implementing ISDN4Linux functionality
  *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- *
- *  For more information, please contact gpl-info@spellcast.com or write:
+ * For more information, please contact gpl-info@spellcast.com or write:
  *
  *     SpellCaster Telecommunications Inc.
  *     5621 Finch Avenue East, Unit #3

@@ -187,6 +187,8 @@ char *sim710;		/* command line passed by insmod */
 
 MODULE_AUTHOR("Richard Hirst");
 MODULE_DESCRIPTION("Simple NCR53C710 driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(sim710, "s");
 
 #endif

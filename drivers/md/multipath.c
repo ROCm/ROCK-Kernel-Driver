@@ -1258,4 +1258,4 @@ static void multipath_exit (void)
 
 module_init(multipath_init);
 module_exit(multipath_exit);
-
+MODULE_LICENSE("GPL");

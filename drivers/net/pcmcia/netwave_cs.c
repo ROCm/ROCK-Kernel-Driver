@@ -1590,3 +1590,4 @@ static void set_multicast_list(struct net_device *dev)
     writeb(rcvMode, ramBase + NETWAVE_EREG_CB + 1);
     writeb(NETWAVE_CMD_EOC, ramBase + NETWAVE_EREG_CB + 2);
 }
+MODULE_LICENSE("GPL");

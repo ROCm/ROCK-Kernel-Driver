@@ -1,24 +1,23 @@
-// $Id: l3ni1.c,v 2.5.6.2 2001/02/16 16:43:28 kai Exp $
-//
-//-----------------------------------------------------------------------------
-//
-// NI1 D-channel protocol
-//
-// Authors:
-// Matt Henderson & Guy Ellis - Traverse Tecnologies Pty Ltd
-// www.traverse.com.au
-//
-// 2000.6.6 Initial implementation of routines for US NI1 
-// Layer 3 protocol based on the EURO/DSS1 D-channel protocol 
-// driver written by Karsten Keil et al.  
-// NI-1 Hall of Fame - Thanks to.... 
-// Ragnar Paulson - for some handy code fragments
-// Will Scales - beta tester extraordinaire
-// Brett Whittacre - beta tester and remote devel system in Vegas
-//
-// This file is (c) under GNU General Public License
-//
-//-----------------------------------------------------------------------------
+/* $Id: l3ni1.c,v 2.5.6.3 2001/09/23 22:24:50 kai Exp $
+ *
+ * NI1 D-channel protocol
+ *
+ * Author       Matt Henderson & Guy Ellis
+ * Copyright    by Traverse Technologies Pty Ltd, www.travers.com.au
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
+ * 2000.6.6 Initial implementation of routines for US NI1 
+ * Layer 3 protocol based on the EURO/DSS1 D-channel protocol 
+ * driver written by Karsten Keil et al.  
+ * NI-1 Hall of Fame - Thanks to.... 
+ * Ragnar Paulson - for some handy code fragments
+ * Will Scales - beta tester extraordinaire
+ * Brett Whittacre - beta tester and remote devel system in Vegas
+ *
+ */
+
 #define __NO_VERSION__
 #include "hisax.h"
 #include "isdnl3.h"
@@ -26,7 +25,7 @@
 #include <linux/ctype.h>
 
 extern char *HiSax_getrev(const char *revision);
-const char *ni1_revision = "$Revision: 2.5.6.2 $";
+const char *ni1_revision = "$Revision: 2.5.6.3 $";
 
 #define EXT_BEARER_CAPS 1
 
@@ -48,7 +47,7 @@ const char *ni1_revision = "$Revision: 2.5.6.2 $";
 static unsigned char new_invoke_id(struct PStack *p)
 {
 	unsigned char retval;
-	long flags;
+	unsigned long flags;
 	int i;
   
 	i = 32; /* maximum search depth */
@@ -77,7 +76,7 @@ static unsigned char new_invoke_id(struct PStack *p)
 /* free a used invoke id */
 /*************************/
 static void free_invoke_id(struct PStack *p, unsigned char id)
-{ long flags;
+{ unsigned long flags;
 
   if (!id) return; /* 0 = invalid value */
 

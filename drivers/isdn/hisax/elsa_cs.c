@@ -4,6 +4,7 @@
 
     This driver is for the Elsa PCM ISDN Cards, i.e. the MicroLink
 
+
     The contents of this file are subject to the Mozilla Public
     License Version 1.1 (the "License"); you may not use this file
     except in compliance with the License. You may obtain a copy of
@@ -20,6 +21,17 @@
 
     Modifications from dummy_cs.c are Copyright (C) 1999-2001 Klaus
     Lichtenwalder <Lichtenwalder@ACM.org>. All Rights Reserved.
+
+    Alternatively, the contents of this file may be used under the
+    terms of the GNU General Public License version 2 (the "GPL"), in
+    which case the provisions of the GPL are applicable instead of the
+    above.  If you wish to allow the use of your version of this file
+    only under the terms of the GPL and not to allow others to use
+    your version of this file under the MPL, indicate your decision
+    by deleting the provisions above and replace them with the notice
+    and other provisions required by the GPL.  If you do not delete
+    the provisions above, a recipient may use your version of this
+    file under either the MPL or the GPL.
 
 ======================================================================*/
 
@@ -43,6 +55,10 @@
 #include <pcmcia/ds.h>
 #include <pcmcia/bus_ops.h>
 
+MODULE_DESCRIPTION("ISDN4Linux: PCMCIA client driver for Elsa PCM cards");
+MODULE_AUTHOR("Klaus Lichtenwalder");
+MODULE_LICENSE("Dual MPL/GPL");
+
 /*
    All the PCMCIA modules use PCMCIA_DEBUG to control debugging.  If
    you do not define PCMCIA_DEBUG at all, all the debug code will be
@@ -56,7 +72,7 @@ static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args);
 static char *version =
-"elsa_cs.c $Revision: 1.1.2.1 $ $Date: 2001/04/15 08:01:34 $ (K.Lichtenwalder)";
+"elsa_cs.c $Revision: 1.1.2.2 $ $Date: 2001/09/23 22:24:47 $ (K.Lichtenwalder)";
 #else
 #define DEBUG(n, args...)
 #endif

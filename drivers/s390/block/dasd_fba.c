@@ -71,7 +71,7 @@ define_extent (ccw1_t * ccw, DE_fba_data_t * DE_data, int rw,
 	memset (DE_data, 0, sizeof (DE_fba_data_t));
 	ccw->cmd_code = DASD_FBA_CCW_DEFINE_EXTENT;
 	ccw->count = 16;
-	if (rc=dasd_set_normalized_cda (ccw, __pa (DE_data), cqr, device))
+	if ((rc=dasd_set_normalized_cda (ccw, __pa (DE_data), cqr, device)))
                 return rc;
 	if (rw == WRITE)
 		(DE_data->mask).perm = 0x0;

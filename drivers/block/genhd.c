@@ -47,9 +47,27 @@ EXPORT_SYMBOL(gendisk_head);
 void
 add_gendisk(struct gendisk *gp)
 {
+	struct gendisk *sgp;
+
 	write_lock(&gendisk_lock);
+
+	/*
+ 	 *	In 2.5 this will go away. Fix the drivers who rely on
+ 	 *	old behaviour.
+ 	 */
+
+	for (sgp = gendisk_head; sgp; sgp = sgp->next)
+	{
+		if (sgp == gp)
+		{
+//			printk(KERN_ERR "add_gendisk: device major %d is buggy and added a live gendisk!\n",
+//				sgp->major)
+			goto out;
+		}
+	}
 	gp->next = gendisk_head;
 	gendisk_head = gp;
+out:
 	write_unlock(&gendisk_lock);
 }
 

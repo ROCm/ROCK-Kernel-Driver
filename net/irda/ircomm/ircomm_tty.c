@@ -1363,6 +1363,7 @@ done:
 #ifdef MODULE
 MODULE_AUTHOR("Dag Brattli <dagb@cs.uit.no>");
 MODULE_DESCRIPTION("IrCOMM serial TTY driver");
+MODULE_LICENSE("GPL");
 
 int init_module(void) 
 {

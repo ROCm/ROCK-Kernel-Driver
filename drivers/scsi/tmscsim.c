@@ -492,6 +492,8 @@ MODULE_PARM_DESC(tmscsim, "Host SCSI ID, Speed (0=10MHz), Device Flags, Adapter 
 #if defined(MODULE) && LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,30)
 MODULE_AUTHOR("C.L. Huang / Kurt Garloff");
 MODULE_DESCRIPTION("SCSI host adapter driver for Tekram DC390 and other AMD53C974A based PCI SCSI adapters");
+MODULE_LICENSE("GPL");
+
 MODULE_SUPPORTED_DEVICE("sd,sr,sg,st");
 #endif
 

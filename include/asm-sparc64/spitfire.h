@@ -1,4 +1,4 @@
-/* $Id: spitfire.h,v 1.15 2001/03/27 00:10:15 davem Exp $
+/* $Id: spitfire.h,v 1.16 2001/09/24 21:17:57 kanoj Exp $
  * spitfire.h: SpitFire/BlackBird/Cheetah inline MMU operations.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -45,6 +45,8 @@ extern enum ultra_tlb_layout tlb_type;
 
 #define SPITFIRE_HIGHEST_LOCKED_TLBENT	(64 - 1)
 #define CHEETAH_HIGHEST_LOCKED_TLBENT	(16 - 1)
+
+#define L1DCACHE_SIZE		0x4000
 
 #define sparc64_highest_locked_tlbent()	\
 	(tlb_type == spitfire ? \

@@ -1,30 +1,14 @@
-/* 
- * $Id: isdn_divert.c,v 1.6.6.2 2001/02/16 16:43:25 kai Exp $
+/* $Id: isdn_divert.c,v 1.6.6.3 2001/09/23 22:24:36 kai Exp $
  *
  * DSS1 main diversion supplementary handling for i4l.
  *
  * Copyright 1999       by Werner Cornelius (werner@isdn4linux.de)
  * 
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA. 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
-
-
-#define __NO_VERSION__
-#include <linux/module.h>
 #include <linux/version.h>
 #include <linux/proc_fs.h>
 #include "isdn_divert.h"
@@ -67,7 +51,7 @@ static unsigned char extern_wait_max = 4; /* maximum wait in s for external proc
 /* timer callback function */
 /***************************/
 static void deflect_timer_expire(ulong arg)
-{ long flags;
+{ unsigned long flags;
   struct call_struc *cs = (struct call_struc *) arg;
 
   save_flags(flags);
@@ -125,7 +109,7 @@ static void deflect_timer_expire(ulong arg)
 int cf_command(int drvid, int mode, 
                u_char proc, char *msn, 
                u_char service, char *fwd_nr, ulong *procid)
-{ long flags;
+{ unsigned long flags;
   int retval,msnlen;
   int fwd_len;
   char *p,*ielenp,tmp[60];
@@ -221,7 +205,7 @@ int cf_command(int drvid, int mode,
 int deflect_extern_action(u_char cmd, ulong callid, char *to_nr)
 { struct call_struc *cs;
   isdn_ctrl ic;
-  long flags;
+  unsigned long flags;
   int i;
 
   if ((cmd & 0x7F) > 2) return(-EINVAL); /* invalid command */
@@ -292,7 +276,7 @@ int deflect_extern_action(u_char cmd, ulong callid, char *to_nr)
 /********************************/
 int insertrule(int idx, divert_rule *newrule)
 { struct deflect_struc *ds,*ds1=NULL;
-  long flags;
+  unsigned long flags;
 
   if (!(ds = (struct deflect_struc *) kmalloc(sizeof(struct deflect_struc), 
                                               GFP_KERNEL))) 
@@ -338,7 +322,7 @@ int insertrule(int idx, divert_rule *newrule)
 /***********************************/
 int deleterule(int idx)
 { struct deflect_struc *ds,*ds1;
-  long flags;
+  unsigned long flags;
   
   if (idx < 0) 
    { save_flags(flags);
@@ -406,7 +390,7 @@ divert_rule *getruleptr(int idx)
 /*************************************************/
 int isdn_divert_icall(isdn_ctrl *ic)
 { int retval = 0;
-  long flags;
+  unsigned long flags;
   struct call_struc *cs = NULL; 
   struct deflect_struc *dv;
   char *p,*p1;
@@ -558,7 +542,7 @@ int isdn_divert_icall(isdn_ctrl *ic)
 
 void deleteprocs(void)
 { struct call_struc *cs, *cs1; 
-  long flags;
+  unsigned long flags;
 
   save_flags(flags);
   cli();
@@ -716,7 +700,7 @@ int interrogate_success(isdn_ctrl *ic, struct call_struc *cs)
 int prot_stat_callback(isdn_ctrl *ic)
 { struct call_struc *cs, *cs1;
   int i;
-  long flags;
+  unsigned long flags;
 
   cs = divert_head; /* start of list */
   cs1 = NULL;
@@ -807,7 +791,7 @@ int prot_stat_callback(isdn_ctrl *ic)
 /***************************/
 int isdn_divert_stat_callback(isdn_ctrl *ic)
 { struct call_struc *cs, *cs1;
-  long flags;
+  unsigned long flags;
   int retval;
 
   retval = -1;

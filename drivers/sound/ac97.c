@@ -445,6 +445,8 @@ EXPORT_SYMBOL(ac97_put_register);
 EXPORT_SYMBOL(ac97_get_mixer_scaled);
 EXPORT_SYMBOL(ac97_mixer_ioctl);
 EXPORT_SYMBOL(ac97_reset);
+MODULE_LICENSE("GPL");
+
 
 /*
  * Local variables:

@@ -202,6 +202,8 @@ static struct isapnp_device_id el3_isapnp_adapters[] __initdata = {
 };
 
 MODULE_DEVICE_TABLE(isapnp, el3_isapnp_adapters);
+MODULE_LICENSE("GPL");
+
 
 static u16 el3_isapnp_phys_addr[8][3];
 #endif /* CONFIG_ISAPNP || CONFIG_ISAPNP_MODULE */

@@ -1,24 +1,13 @@
-/* $Id: isdn_common.c,v 1.114.6.14 2001/08/17 12:34:25 kai Exp $
-
+/* $Id: isdn_common.c,v 1.114.6.15 2001/09/23 22:24:31 kai Exp $
+ *
  * Linux ISDN subsystem, common used functions (linklevel).
  *
  * Copyright 1994-1999  by Fritz Elfert (fritz@isdn4linux.de)
  * Copyright 1995,96    Thinking Objects Software GmbH Wuerzburg
  * Copyright 1995,96    by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -49,9 +38,13 @@
 /* Debugflags */
 #undef ISDN_DEBUG_STATCALLB
 
+MODULE_DESCRIPTION("ISDN4Linux: link layer");
+MODULE_AUTHOR("Fritz Elfert");
+MODULE_LICENSE("GPL");
+
 isdn_dev *dev;
 
-static char *isdn_revision = "$Revision: 1.114.6.14 $";
+static char *isdn_revision = "$Revision: 1.114.6.15 $";
 
 extern char *isdn_net_revision;
 extern char *isdn_tty_revision;
@@ -280,7 +273,7 @@ isdn_timer_funct(ulong dummy)
 	}
 	if (tf) 
 	{
-		long flags;
+		unsigned long flags;
 
 		save_flags(flags);
 		cli();
@@ -292,7 +285,7 @@ isdn_timer_funct(ulong dummy)
 void
 isdn_timer_ctrl(int tf, int onoff)
 {
-	long flags;
+	unsigned long flags;
 	int old_tflags;
 
 	save_flags(flags);
@@ -2397,7 +2390,7 @@ static int __init isdn_init(void)
  */
 static void __exit isdn_exit(void)
 {
-	long flags;
+	unsigned long flags;
 	int i;
 
 #ifdef CONFIG_ISDN_PPP

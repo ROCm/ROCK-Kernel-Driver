@@ -552,6 +552,8 @@ static void WROUTDOOR (mega_host_config * megaCfg, ulong value)
 
 MODULE_AUTHOR ("American Megatrends Inc.");
 MODULE_DESCRIPTION ("AMI MegaRAID driver");
+MODULE_LICENSE("GPL");
+
 
 #define DRIVER_LOCK_T
 #define DRIVER_LOCK_INIT(p)

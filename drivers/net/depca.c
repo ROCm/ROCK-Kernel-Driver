@@ -2076,6 +2076,7 @@ cleanup_module(void)
   release_region(thisDepca.base_addr, DEPCA_TOTAL_SIZE);
 }
 #endif /* MODULE */
+MODULE_LICENSE("GPL");
 
 
 /*

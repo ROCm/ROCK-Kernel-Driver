@@ -53,8 +53,8 @@ opDEC_check(void)
 void
 dik_show_regs(struct pt_regs *regs, unsigned long *r9_15)
 {
-	printk("pc = [<%016lx>]  ra = [<%016lx>]  ps = %04lx\n",
-	       regs->pc, regs->r26, regs->ps);
+	printk("pc = [<%016lx>]  ra = [<%016lx>]  ps = %04lx    %s\n",
+	       regs->pc, regs->r26, regs->ps, print_tainted());
 	printk("v0 = %016lx  t0 = %016lx  t1 = %016lx\n",
 	       regs->r0, regs->r1, regs->r2);
 	printk("t2 = %016lx  t3 = %016lx  t4 = %016lx\n",

@@ -2757,6 +2757,8 @@ MODULE_PARM_DESC(amplifier, "Set to 1 if the machine needs the amp control enabl
 
 MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch, hb9jnx@hb9w.che.eu");
 MODULE_DESCRIPTION("ES1371 AudioPCI97 Driver");
+MODULE_LICENSE("GPL");
+
 
 /* --------------------------------------------------------------------- */
 

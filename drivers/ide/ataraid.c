@@ -63,12 +63,6 @@ static DECLARE_MUTEX(ataraid_sem);
 /* Bitmap for the devices currently in use */
 static unsigned int ataraiduse;
 
-/* structure for the splitting of bufferheads */
-
-struct ataraid_bh_private {
-	struct buffer_head *parent;
-	atomic_t count;
-};
 
 /* stub fops functions */
 
@@ -121,7 +115,7 @@ static int ataraid_make_request (request_queue_t *q, int rw, struct buffer_head 
 	return -EINVAL;
 }
 
-static struct buffer_head *get_bhead(void)
+struct buffer_head *ataraid_get_bhead(void)
 {
 	void *ptr = NULL;
 	while (!ptr) {
@@ -135,7 +129,9 @@ static struct buffer_head *get_bhead(void)
 	return ptr;
 }
 
-static struct ataraid_bh_private *get_private(void)
+EXPORT_SYMBOL(ataraid_get_bhead);
+
+struct ataraid_bh_private *ataraid_get_private(void)
 {
 	void *ptr = NULL;
 	while (!ptr) {
@@ -149,7 +145,9 @@ static struct ataraid_bh_private *get_private(void)
 	return ptr;
 }
 
-static void ataraid_end_request(struct buffer_head *bh, int uptodate)
+EXPORT_SYMBOL(ataraid_get_private);
+
+void ataraid_end_request(struct buffer_head *bh, int uptodate)
 {
 	struct ataraid_bh_private *private = bh->b_private;
 
@@ -164,17 +162,19 @@ static void ataraid_end_request(struct buffer_head *bh, int uptodate)
 	kfree(bh);
 }
 
+EXPORT_SYMBOL(ataraid_end_request);
+
 static void ataraid_split_request(request_queue_t *q, int rw, struct buffer_head * bh)
 {
 	struct buffer_head *bh1,*bh2;
 	struct ataraid_bh_private *private;
-	bh1=get_bhead();
-	bh2=get_bhead();
+	bh1=ataraid_get_bhead();
+	bh2=ataraid_get_bhead();
 
 	/* If either of those ever fails we're doomed */
 	if ((!bh1)||(!bh2))
 		BUG();
-	private = get_private();
+	private = ataraid_get_private();
 	if (private==NULL)
 		BUG();
 	
@@ -249,7 +249,7 @@ static __init int ataraid_init(void)
 	{
         	ataraid_hardsect_size[i] = 512;
 		ataraid_blksize_size[i] = 1024;  
-		ataraid_readahead[i] = 32;
+		ataraid_readahead[i] = 1023;
 	}
 	
 	if (blksize_size[ATAMAJOR]==NULL)
@@ -317,4 +317,5 @@ EXPORT_SYMBOL(ataraid_get_device);
 EXPORT_SYMBOL(ataraid_release_device);
 EXPORT_SYMBOL(ataraid_gendisk);
 EXPORT_SYMBOL(ataraid_register_disk);
+MODULE_LICENSE("GPL");
 

@@ -403,6 +403,8 @@ MODULE_PARM(joystick,"i");
 MODULE_PARM(symphony,"i");
 MODULE_PARM(broken_bus_clock,"i");
 
+MODULE_LICENSE("GPL");
+
 static int __init init_pas2(void)
 {
 	printk(KERN_INFO "Pro Audio Spectrum driver Copyright (C) by Hannu Savolainen 1993-1996\n");

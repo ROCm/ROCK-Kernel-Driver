@@ -1,4 +1,4 @@
-/*  $Id: setup.c,v 1.66 2001/09/20 00:35:31 davem Exp $
+/*  $Id: setup.c,v 1.67 2001/09/21 03:17:06 kanoj Exp $
  *  linux/arch/sparc64/kernel/setup.c
  *
  *  Copyright (C) 1995,1996  David S. Miller (davem@caip.rutgers.edu)
@@ -38,6 +38,7 @@
 #include <asm/idprom.h>
 #include <asm/head.h>
 #include <asm/starfire.h>
+#include <asm/hardirq.h>
 
 #ifdef CONFIG_IP_PNP
 #include <net/ipconfig.h>
@@ -95,6 +96,14 @@ int prom_callback(long *args)
 	if (!(cmd = (char *)args[0]))
 		return -1;
 
+	/*
+	 * The callback can be invoked on the cpu that first dropped 
+	 * into prom_cmdline after taking the serial interrupt, or on 
+	 * a slave processor that was smp_captured() if the 
+	 * administrator has done a switch-cpu inside obp. In either 
+	 * case, the cpu is marked as in-interrupt. Drop IRQ locks.
+	 */
+	irq_exit(smp_processor_id(), 0);
 	save_and_cli(flags);
 	cons = console_drivers;
 	while (cons) {
@@ -271,6 +280,10 @@ int prom_callback(long *args)
 		register_console(cons);
 	}
 	restore_flags(flags);
+	/*
+	 * Restore in-interrupt status for a resume from obp.
+	 */
+	irq_enter(smp_processor_id(), 0);
 	return 0;
 }
 

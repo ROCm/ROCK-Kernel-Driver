@@ -1756,6 +1756,7 @@ int u14_34f_release(struct Scsi_Host *shpnt) {
    return FALSE;
 }
 
+MODULE_LICENSE("BSD without advertisement clause");
 static Scsi_Host_Template driver_template = ULTRASTOR_14_34F;
 
 #include "scsi_module.c"

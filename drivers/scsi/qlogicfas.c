@@ -685,6 +685,7 @@ const char	*qlogicfas_info(struct Scsi_Host * host)
 {
 	return qinfo;
 }
+MODULE_LICENSE("GPL");
 
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = QLOGICFAS;

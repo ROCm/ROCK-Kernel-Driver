@@ -49,10 +49,10 @@ enum {
 #define NLMPROC_CANCEL_RES	13
 #define NLMPROC_UNLOCK_RES	14
 #define NLMPROC_GRANTED_RES	15
+#define NLMPROC_NSM_NOTIFY	16		/* statd callback */
 #define NLMPROC_SHARE		20
 #define NLMPROC_UNSHARE		21
 #define NLMPROC_NM_LOCK		22
 #define NLMPROC_FREE_ALL	23
-#define NLMPROC_NSM_NOTIFY	24		/* statd callback */
 
 #endif /* LINUX_LOCKD_NLM_H */

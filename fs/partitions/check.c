@@ -177,6 +177,15 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
  			sprintf(buf, "%s/c%dd%dp%d", maj, ctlr, unit, part);
  		return buf;
  	}
+	if (hd->major == ATARAID_MAJOR) {
+		int disk = minor >> hd->minor_shift;
+		int part = minor & (( 1 << hd->minor_shift) - 1);
+		if (part == 0)
+			sprintf(buf, "%s/d%d", maj, disk);
+		else
+			sprintf(buf, "%s/d%dp%d", maj, disk, part);
+		return buf;
+	}
 	if (part)
 		sprintf(buf, "%s%c%d", maj, unit+'a', part);
 	else

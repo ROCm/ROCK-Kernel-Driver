@@ -29,6 +29,7 @@
 #include <linux/smp_lock.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <linux/module.h>
 
 extern struct inode_operations affs_symlink_inode_operations;
 extern struct timezone sys_tz;
@@ -413,3 +414,4 @@ err:
 	affs_unlock_link(inode);
 	goto done;
 }
+MODULE_LICENSE("GPL");

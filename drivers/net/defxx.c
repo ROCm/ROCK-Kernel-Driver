@@ -3413,6 +3413,7 @@ static void __exit dfx_cleanup(void)
 
 module_init(dfx_init);
 module_exit(dfx_cleanup);
+MODULE_LICENSE("GPL");
 
 
 /*

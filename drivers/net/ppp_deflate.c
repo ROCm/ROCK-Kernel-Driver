@@ -657,3 +657,4 @@ void __exit deflate_cleanup(void)
 
 module_init(deflate_init);
 module_exit(deflate_cleanup);
+MODULE_LICENSE("BSD without advertisement clause");

@@ -361,3 +361,4 @@ static int __init setup_uart6850(char *str)
 }
 __setup("uart6850=", setup_uart6850);
 #endif
+MODULE_LICENSE("GPL");

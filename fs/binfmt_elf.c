@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/highuid.h>
 #include <linux/smp_lock.h>
+#include <linux/compiler.h>
 
 #include <asm/uaccess.h>
 #include <asm/param.h>
@@ -408,7 +409,6 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	char * elf_interpreter = NULL;
 	unsigned int interpreter_type = INTERPRETER_NONE;
 	unsigned char ibcs2_interpreter = 0;
-	mm_segment_t old_fs;
 	unsigned long error;
 	struct elf_phdr * elf_ppnt, *elf_phdata;
 	unsigned long elf_bss, k, elf_brk;
@@ -609,14 +609,28 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	   the image should be loaded at fixed address, not at a variable
 	   address. */
 
-	old_fs = get_fs();
-	set_fs(get_ds());
 	for(i = 0, elf_ppnt = elf_phdata; i < elf_ex.e_phnum; i++, elf_ppnt++) {
 		int elf_prot = 0, elf_flags;
 		unsigned long vaddr;
 
 		if (elf_ppnt->p_type != PT_LOAD)
 			continue;
+
+		if (unlikely (elf_brk > elf_bss)) {
+			unsigned long nbyte;
+	            
+			/* There was a PT_LOAD segment with p_memsz > p_filesz
+			   before this one. Map anonymous pages, if needed,
+			   and clear the area.  */
+			set_brk (elf_bss + load_bias, elf_brk + load_bias);
+			nbyte = ELF_PAGEOFFSET(elf_bss);
+			if (nbyte) {
+				nbyte = ELF_MIN_ALIGN - nbyte;
+				if (nbyte > elf_brk - elf_bss)
+					nbyte = elf_brk - elf_bss;
+				clear_user((void *) elf_bss + load_bias, nbyte);
+			}
+		}
 
 		if (elf_ppnt->p_flags & PF_R) elf_prot |= PROT_READ;
 		if (elf_ppnt->p_flags & PF_W) elf_prot |= PROT_WRITE;
@@ -661,7 +675,6 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		if (k > elf_brk)
 			elf_brk = k;
 	}
-	set_fs(old_fs);
 
 	elf_entry += load_bias;
 	elf_bss += load_bias;

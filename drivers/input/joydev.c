@@ -84,6 +84,7 @@ static struct joydev *joydev_table[JOYDEV_MINORS];
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Joystick device driver");
+MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("input/js");
 
 static int joydev_correct(int value, struct js_corr *corr)

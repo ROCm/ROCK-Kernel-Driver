@@ -1,4 +1,4 @@
-/* $Id: pgalloc.h,v 1.21 2001/08/22 22:16:56 kanoj Exp $ */
+/* $Id: pgalloc.h,v 1.23 2001/09/25 20:21:48 kanoj Exp $ */
 #ifndef _SPARC64_PGALLOC_H
 #define _SPARC64_PGALLOC_H
 
@@ -7,6 +7,8 @@
 #include <linux/sched.h>
 
 #include <asm/page.h>
+#include <asm/spitfire.h>
+#include <asm/pgtable.h>
 
 /* Cache and TLB flush operations. */
 
@@ -29,6 +31,8 @@
 extern void flush_icache_range(unsigned long start, unsigned long end);
 
 extern void __flush_dcache_page(void *addr, int flush_icache);
+extern void __flush_icache_page(unsigned long);
+#if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
 #define flush_dcache_page(page) \
 do {	if ((page)->mapping && \
 	    !((page)->mapping->i_mmap) && \
@@ -39,6 +43,18 @@ do {	if ((page)->mapping && \
 				    ((tlb_type == spitfire) && \
 				     (page)->mapping != NULL)); \
 } while(0)
+#else /* L1DCACHE_SIZE > PAGE_SIZE */
+#define flush_dcache_page(page) \
+do {	if ((page)->mapping && \
+	    !((page)->mapping->i_mmap) && \
+	    !((page)->mapping->i_mmap_shared)) \
+		set_bit(PG_dcache_dirty, &(page)->flags); \
+	else \
+		if ((tlb_type == spitfire) && \
+		    (page)->mapping != NULL) \
+			__flush_icache_page(__get_phys((unsigned long)((page)->virtual))); \
+} while(0)
+#endif /* L1DCACHE_SIZE > PAGE_SIZE */
 
 extern void __flush_dcache_range(unsigned long start, unsigned long end);
 
@@ -227,6 +243,14 @@ extern __inline__ void free_pgd_slow(pgd_t *pgd)
 
 #endif /* CONFIG_SMP */
 
+#if (L1DCACHE_SIZE > PAGE_SIZE)			/* is there D$ aliasing problem */
+#define VPTE_COLOR(address)		(((address) >> (PAGE_SHIFT + 10)) & 1UL)
+#define DCACHE_COLOR(address)		(((address) >> PAGE_SHIFT) & 1UL)
+#else
+#define VPTE_COLOR(address)		0
+#define DCACHE_COLOR(address)		0
+#endif
+
 #define pgd_populate(MM, PGD, PMD)	pgd_set(PGD, PMD)
 
 extern __inline__ pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
@@ -254,9 +278,7 @@ extern __inline__ pmd_t *pmd_alloc_one_fast(struct mm_struct *mm, unsigned long 
 
 extern __inline__ void free_pmd_fast(pmd_t *pmd)
 {
-	unsigned long color;
-
-	color = (((unsigned long)pmd >> PAGE_SHIFT) & 0x1UL);
+	unsigned long color = DCACHE_COLOR((unsigned long)pmd);
 	*(unsigned long *)pmd = (unsigned long) pte_quicklist[color];
 	pte_quicklist[color] = (unsigned long *) pmd;
 	pgtable_cache_size++;
@@ -273,7 +295,7 @@ extern pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address);
 
 extern __inline__ pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
-	unsigned long color = (address >> (PAGE_SHIFT + 10)) & 0x1UL;
+	unsigned long color = VPTE_COLOR(address);
 	unsigned long *ret;
 
 	if((ret = (unsigned long *)pte_quicklist[color]) != NULL) {
@@ -286,7 +308,7 @@ extern __inline__ pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long 
 
 extern __inline__ void free_pte_fast(pte_t *pte)
 {
-	unsigned long color = (((unsigned long)pte >> PAGE_SHIFT) & 0x1);
+	unsigned long color = DCACHE_COLOR((unsigned long)pte);
 	*(unsigned long *)pte = (unsigned long) pte_quicklist[color];
 	pte_quicklist[color] = (unsigned long *) pte;
 	pgtable_cache_size++;

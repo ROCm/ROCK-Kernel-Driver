@@ -1,22 +1,11 @@
-/* $Id: isdn_v110.c,v 1.5.6.3 2001/02/16 16:43:23 kai Exp $
-
+/* $Id: isdn_v110.c,v 1.5.6.4 2001/09/23 22:24:32 kai Exp $
+ *
  * Linux ISDN subsystem, V.110 related functions (linklevel).
  *
  * Copyright by Thomas Pfeiffer (pfeiffer@pds.de)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -30,7 +19,7 @@
 
 #undef ISDN_V110_DEBUG
 
-char *isdn_v110_revision = "$Revision: 1.5.6.3 $";
+char *isdn_v110_revision = "$Revision: 1.5.6.4 $";
 
 #define V110_38400 255
 #define V110_19200  15

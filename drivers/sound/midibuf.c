@@ -253,13 +253,13 @@ void MIDIbuf_release(int dev, struct file *file)
 
 	midi_devs[dev]->close(dev);
 
+	open_devs--;
+	if (open_devs == 0)
+		del_timer_sync(&poll_timer);
 	vfree(midi_in_buf[dev]);
 	vfree(midi_out_buf[dev]);
 	midi_in_buf[dev] = NULL;
 	midi_out_buf[dev] = NULL;
-	if (open_devs < 2)
-		del_timer(&poll_timer);;
-	open_devs--;
 
 	if (midi_devs[dev]->owner)
 		__MOD_DEC_USE_COUNT (midi_devs[dev]->owner);

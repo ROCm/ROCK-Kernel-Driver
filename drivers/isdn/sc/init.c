@@ -1,8 +1,22 @@
+/*
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
+ */
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include "includes.h"
 #include "hardware.h"
 #include "card.h"
+
+MODULE_DESCRIPTION("ISDN4Linux: Driver for Spellcaster card");
+MODULE_AUTHOR("Spellcaster Telecommunications Inc.");
+MODULE_LICENSE("GPL");
+MODULE_PARM( io, "1-" __MODULE_STRING(MAX_CARDS) "i");
+MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_CARDS) "i");
+MODULE_PARM(ram, "1-" __MODULE_STRING(MAX_CARDS) "i");
+MODULE_PARM(do_reset, "i");
 
 board *adapter[MAX_CARDS];
 int cinst;
@@ -38,11 +52,6 @@ int irq_supported(int irq_x)
 	}
 	return 0;
 }
-
-MODULE_PARM(io, "1-4i");
-MODULE_PARM(irq, "1-4i");
-MODULE_PARM(ram, "1-4i");
-MODULE_PARM(do_reset, "i");
 
 static int __init sc_init(void)
 {

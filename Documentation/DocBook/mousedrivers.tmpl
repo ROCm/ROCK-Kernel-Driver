@@ -241,16 +241,12 @@ void cleanup_module(void)
 
   <programlisting>
 struct file_operations our_mouse_fops = {
-        NULL,                   /* Mice don't seek */
-        read_mouse,             /* You can read a mouse */
-        write_mouse,            /* This won't do a lot */
-        NULL,                   /* No readdir - not a directory */
-        poll_mouse,             /* Poll */
-        NULL,                   /* No ioctl calls */
-        NULL,                   /* No mmap */
-        open_mouse,             /* Called on open */
-        NULL,                   /* Flush - 2.2+ only */
-        close_mouse,            /* Called on close */
+        owner: THIS_MODULE,            /* Automatic usage management */
+        read:  read_mouse,             /* You can read a mouse */
+        write: write_mouse,            /* This won't do a lot */
+        poll:  poll_mouse,             /* Poll */
+        open:  open_mouse,             /* Called on open */
+        release: close_mouse,          /* Called on close */
 };
   </programlisting>
 
@@ -260,6 +256,18 @@ struct file_operations our_mouse_fops = {
     nothing stopping us providing an ioctl function for this mouse. Indeed 
     if you have a configurable mouse it may be very appropriate to provide 
     configuration interfaces via ioctl calls.
+  </para>
+  <para>
+    The syntax we use is not standard C as such. GCC provides the ability
+    to initialise fields by name, and this generally makes the method table
+    much easier to read than counting through NULL pointers and remembering
+    the order by hand.
+  </para>
+  <para>
+    The owner field is used to manage the locking of module load an
+    unloading. It is obviously important that a module is not unloaded while
+    in use. When your device is opened the module specified by "owner" is 
+    locked. When it is finally released the module is unlocked.
   </para>
   <para>
     The open and close routines need to manage enabling and disabling the 
@@ -278,12 +286,9 @@ static int open_mouse(struct inode *inode, struct file *file)
         if(mouse_users++)
                 return 0;
 
-	MOD_INC_USE_COUNT;
-
         if(request_irq(mouse_intr, OURMOUSE_IRQ, 0, "ourmouse", NULL))
         {
                 mouse_users--;
-	        MOD_DEC_USE_COUNT;
                 return -EBUSY;
         }
         mouse_dx = 0;
@@ -299,11 +304,6 @@ static int open_mouse(struct inode *inode, struct file *file)
     to request the interrupt multiple times. If the mouse has at least one 
     user then it is set up and we simply add to the user count and return
     <returnvalue>0</returnvalue> for success.
-  </para>
-  <para>
-    Firstly we use <function>MOD_INC_USE_COUNT</function> to ensure that 
-    while the mouse is open nobody will unload it and cause a nasty crash.
-    We must do this before we sleep - and grabbing the interrupt might sleep.
   </para>
   <para>
     We grab the interrupt and thus start mouse interrupts. If the interrupt 
@@ -328,7 +328,6 @@ static int close_mouse(struct inode *inode, struct file *file)
         if(--mouse_users)
                 return 0;
         free_irq(OURMOUSE_IRQ, NULL);
-        MOD_DEC_USE_COUNT;
         return 0;
 }
   </programlisting>
@@ -336,8 +335,7 @@ static int close_mouse(struct inode *inode, struct file *file)
     We count off a user and provided that there are still other users need 
     take no further action. The last person closing the mouse causes us to 
     free up the interrupt. This stops interrupts from the mouse from using 
-    our CPU time, and lets us use <function>MOD_DEC_USE_COUNT</function> so 
-    that the mouse can now be unloaded.
+    our CPU time, and ensures that the mouse can now be unloaded.
   </para>
   <para>
     We can fill in the write handler at this point as the write function for 
@@ -718,14 +716,14 @@ static void ourmouse_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         struct wait_queue wait = { current, NULL };
 
         add_wait_queue(&amp;mouse_wait, &amp;wait);
-        current-&gt;state = TASK_INTERRUPTIBLE;
+        set_current_state(TASK_INTERRUPTIBLE);
         
         while(!mouse_event)
         {
                 if(file-&gt;f_flags&amp;O_NDELAY)
                 {
                         remove_wait_queue(&amp;mouse_wait, &amp;wait);
-                        current-&gt;state = TASK_RUNNING;
+                        set_current_state(TASK_RUNNING);
                         return -EWOULDBLOCK;
                 }
                 if(signal_pending(current))
@@ -735,11 +733,11 @@ static void ourmouse_interrupt(int irq, void *dev_id, struct pt_regs *regs)
                         return -ERESTARTSYS;
                 }
                 schedule();
-                current-&gt;state = TASK_INTERRUPTIBLE;
+                set_current_state(TASK_INTERRUPTIBLE);
         }
         
         remove_wait_wait(&amp;mouse_wait, &amp;wait);
-        current-&gt;state = TASK_RUNNING;
+        set_current_state(TASK_RUNNING);
   </programlisting>
 
   <para>
@@ -889,18 +887,13 @@ static void ourmouse_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
   <programlisting>
 struct file_operations our_mouse_fops = {
-        NULL,                   /* Mice don't seek */
-        read_mouse,             /* You can read a mouse */
-        write_mouse,            /* This won't do a lot */
-        NULL,                   /* No readdir - not a directory */
-        poll_mouse,             /* Poll */
-        NULL,                   /* No ioctl calls */
-        NULL,                   /* No mmap */
-        open_mouse,             /* Called on open */
-        NULL,                   /* Flush */
-        close_mouse,            /* Called on close */
-        NULL,                   /* No fsync on a mouse */
-        fasync_mouse,           /* Asynchronous I/O */
+        owner: THIS_MODULE
+        read:  read_mouse,      /* You can read a mouse */
+        write: write_mouse,     /* This won't do a lot */
+        poll:  poll_mouse,      /* Poll */
+        open:  open_mouse,      /* Called on open */
+        release: close_mouse,   /* Called on close */
+        fasync: fasync_mouse,   /* Asynchronous I/O */
 };
   </programlisting>
 

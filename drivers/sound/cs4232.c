@@ -329,6 +329,8 @@ static int __initdata isapnp	= 1;
 
 MODULE_DESCRIPTION("CS4232 based soundcard driver"); 
 MODULE_AUTHOR("Hannu Savolainen, Paul Barton-Davis"); 
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io,"i");
 MODULE_PARM_DESC(io,"base I/O port for AD1848");
 MODULE_PARM(irq,"i");

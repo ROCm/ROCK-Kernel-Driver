@@ -47,6 +47,7 @@ MODULE_PARM(addr,"i");
 MODULE_PARM(tv_range,"2i");
 MODULE_PARM(radio_range,"2i");
 MODULE_PARM(pal,"s");
+MODULE_LICENSE("GPL");
 
 struct tuner
 {

@@ -514,6 +514,7 @@ int ircomm_proc_read(char *buf, char **start, off_t offset, int len)
 #ifdef MODULE
 MODULE_AUTHOR("Dag Brattli <dag@brattli.net>");
 MODULE_DESCRIPTION("IrCOMM protocol");
+MODULE_LICENSE("GPL");
 
 int init_module(void) 
 {

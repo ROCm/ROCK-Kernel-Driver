@@ -480,3 +480,4 @@ static void __exit exit_parport_cs(void)
 
 module_init(init_parport_cs);
 module_exit(exit_parport_cs);
+MODULE_LICENSE("Dual MPL/GPL");

@@ -63,8 +63,8 @@ show_regs (struct pt_regs *regs)
 {
 	unsigned long ip = regs->cr_iip + ia64_psr(regs)->ri;
 
-	printk("\npsr : %016lx ifs : %016lx ip  : [<%016lx>]\n",
-	       regs->cr_ipsr, regs->cr_ifs, ip);
+	printk("\npsr : %016lx ifs : %016lx ip  : [<%016lx>]    %s\n",
+	       regs->cr_ipsr, regs->cr_ifs, ip, print_tainted());
 	printk("unat: %016lx pfs : %016lx rsc : %016lx\n",
 	       regs->ar_unat, regs->ar_pfs, regs->ar_rsc);
 	printk("rnat: %016lx bsps: %016lx pr  : %016lx\n",

@@ -1,7 +1,7 @@
-/* $Id: eicon_idi.c,v 1.41.6.2 2001/04/07 21:41:44 armin Exp $
+/* $Id: eicon_idi.c,v 1.41.6.3 2001/09/23 22:24:37 kai Exp $
  *
  * ISDN lowlevel-module for Eicon active cards.
- *        IDI interface 
+ * IDI interface 
  *
  * Copyright 1998-2000  by Armin Schindler (mac@melware.de)
  * Copyright 1999,2000  Cytronics & Melware (info@melware.de)
@@ -11,19 +11,8 @@
  *		capabilities with Diva Server cards.
  *		(dor@deutschemailbox.de)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA. 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -36,7 +25,7 @@
 
 #undef EICON_FULL_SERVICE_OKTETT
 
-char *eicon_idi_revision = "$Revision: 1.41.6.2 $";
+char *eicon_idi_revision = "$Revision: 1.41.6.3 $";
 
 eicon_manifbuf *manbuf;
 

@@ -494,3 +494,4 @@ static void bt819_exit(void)
 
 module_init(bt819_setup);
 module_exit(bt819_exit);
+MODULE_LICENSE("GPL");

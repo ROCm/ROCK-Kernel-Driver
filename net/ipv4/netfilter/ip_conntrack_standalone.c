@@ -33,6 +33,8 @@
 #endif
 
 struct module *ip_conntrack_module = THIS_MODULE;
+MODULE_LICENSE("GPL");
+
 
 static unsigned int
 print_tuple(char *buffer, const struct ip_conntrack_tuple *tuple,

@@ -1,22 +1,21 @@
-/* $Id: sedlbauer.c,v 1.25.6.5 2001/07/13 09:20:12 kai Exp $
+/* $Id: sedlbauer.c,v 1.25.6.6 2001/09/23 22:24:51 kai Exp $
  *
- * sedlbauer.c  low level stuff for Sedlbauer cards
- *              includes support for the Sedlbauer speed star (speed star II),
- *              support for the Sedlbauer speed fax+,
- *              support for the Sedlbauer ISDN-Controller PC/104 and
- *              support for the Sedlbauer speed pci
- *              derived from the original file asuscom.c from Karsten Keil
+ * low level stuff for Sedlbauer cards
+ * includes support for the Sedlbauer speed star (speed star II),
+ * support for the Sedlbauer speed fax+,
+ * support for the Sedlbauer ISDN-Controller PC/104 and
+ * support for the Sedlbauer speed pci
+ * derived from the original file asuscom.c from Karsten Keil
  *
- * Copyright (C) 1997,1998 Marcus Niemann (for the modifications to
- *                                         the original file asuscom.c)
- *
- * Author     Marcus Niemann (niemann@www-bib.fh-bielefeld.de)
+ * Author       Marcus Niemann
+ * Copyright    by Marcus Niemann    <niemann@www-bib.fh-bielefeld.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  * Thanks to  Karsten Keil
  *            Sedlbauer AG for informations
  *            Edgar Toernig
- *
- * This file is (c) under GNU General Public License
  *
  */
 
@@ -52,7 +51,7 @@
 
 extern const char *CardType[];
 
-const char *Sedlbauer_revision = "$Revision: 1.25.6.5 $";
+const char *Sedlbauer_revision = "$Revision: 1.25.6.6 $";
 
 const char *Sedlbauer_Types[] =
 	{"None", "speed card/win", "speed star", "speed fax+",

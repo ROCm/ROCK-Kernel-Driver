@@ -99,7 +99,7 @@ static int  ircc_pmproc(struct pm_dev *dev, pm_request_t rqst, void *data);
 #define	SERx4	8	/* SuperIO Chip supports 115,2 KBaud * 4=460,8 KBaud */
 
 /* These are the currently known SMC SuperIO chipsets */
-static const smc_chip_t __init fdc_chips_flat[]=
+static smc_chip_t __initdata fdc_chips_flat[]=
 {
 	/* Base address 0x3f0 or 0x370 */
 	{ "37C44",	KEY55_1|NoIRDA,		0x00, 0x00 }, /* This chip can not detected */
@@ -113,7 +113,7 @@ static const smc_chip_t __init fdc_chips_flat[]=
 	{ NULL }
 };
 
-static const smc_chip_t __init fdc_chips_paged[]=
+static smc_chip_t __initdata fdc_chips_paged[]=
 {
 	/* Base address 0x3f0 or 0x370 */
 	{ "37B72X",	KEY55_1|SIR|SERx4,	0x4c, 0x00 },
@@ -132,7 +132,7 @@ static const smc_chip_t __init fdc_chips_paged[]=
 	{ NULL }
 };
 
-static const smc_chip_t __init lpc_chips_flat[]=
+static smc_chip_t __initdata lpc_chips_flat[]=
 {
 	/* Base address 0x2E or 0x4E */
 	{ "47N227",	KEY55_1|FIR|SERx4,	0x5a, 0x00 },
@@ -140,7 +140,7 @@ static const smc_chip_t __init lpc_chips_flat[]=
 	{ NULL }
 };
 
-static const smc_chip_t __init lpc_chips_paged[]=
+static smc_chip_t __initdata lpc_chips_paged[]=
 {
 	/* Base address 0x2E or 0x4E */
 	{ "47B27X",	KEY55_1|SIR|SERx4,	0x51, 0x00 },
@@ -1219,6 +1219,8 @@ module_exit(smc_cleanup);
  
 MODULE_AUTHOR("Thomas Davis <tadavis@jps.net>");
 MODULE_DESCRIPTION("SMC IrCC controller driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(ircc_dma, "1i");
 MODULE_PARM_DESC(ircc_dma, "DMA channel");
 MODULE_PARM(ircc_irq, "1i");

@@ -689,7 +689,6 @@ static void apm_power_off(void)
 		(void) apm_set_power_state(APM_STATE_OFF);
 }
 
-#ifdef CONFIG_MAGIC_SYSRQ
 /*
  * Magic sysrq key and handler for the power off function
  */
@@ -703,7 +702,6 @@ struct sysrq_key_op sysrq_poweroff_op = {
 	help_msg:       "Off",
 	action_msg:     "Power Off\n"
 };
-#endif
 
 
 #ifdef CONFIG_APM_DO_ENABLE
@@ -1672,7 +1670,7 @@ static int __init apm_init(void)
 		apm_info.realmode_power_off = 1;
 	/* User can override, but default is to trust DMI */
 	if (apm_disabled != -1)
-		apm_info.disabled = 1;
+		apm_info.disabled = apm_disabled;
 
 	/*
 	 * Fix for the Compaq Contura 3/25c which reports BIOS version 0.1
@@ -1699,8 +1697,7 @@ static int __init apm_init(void)
 	}
 
 	if (apm_info.disabled) {
-		if(apm_disabled == 1)
-			printk(KERN_NOTICE "apm: disabled on user request.\n");
+		printk(KERN_NOTICE "apm: disabled on user request.\n");
 		return -ENODEV;
 	}
 	if ((smp_num_cpus > 1) && !power_off) {

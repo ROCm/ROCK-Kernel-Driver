@@ -35,6 +35,9 @@
  *   0.6 F6FBB 25.08.98  Added 1200Bds format
  *   0.7 F6FBB 12.09.98  Added to the kernel configuration
  *   0.8 F6FBB 14.10.98  Fixed slottime/persistance timing bug
+ *       OK1ZIA 2.09.01  Fixed "kfree_skb on hard IRQ" 
+ *                       using dev_kfree_skb_any(). (important in 2.4 kernel)
+ *   
  */
 
 /*****************************************************************************/
@@ -649,16 +652,16 @@ static void yam_tx_byte(struct net_device *dev, struct yam_port *yp)
 			yp->tx_state = TX_DATA;
 			if (skb->data[0] != 0) {
 /*                              do_kiss_params(s, skb->data, skb->len); */
-				dev_kfree_skb(skb);
+				dev_kfree_skb_any(skb);
 				break;
 			}
 			yp->tx_len = skb->len - 1;	/* strip KISS byte */
 			if (yp->tx_len >= YAM_MAX_FRAME || yp->tx_len < 2) {
-				dev_kfree_skb(skb);
+        			dev_kfree_skb_any(skb);
 				break;
 			}
 			memcpy(yp->tx_buf, skb->data + 1, yp->tx_len);
-			dev_kfree_skb(skb);
+			dev_kfree_skb_any(skb);
 			yp->tx_count = 0;
 			yp->tx_crcl = 0x21;
 			yp->tx_crch = 0xf3;
@@ -858,7 +861,7 @@ static int yam_open(struct net_device *dev)
 		return -EIO;
 	}
 	outb(0, IER(dev->base_addr));
-	if (request_irq(dev->irq, yam_interrupt, SA_INTERRUPT | SA_SHIRQ, dev->name, NULL)) {
+	if (request_irq(dev->irq, yam_interrupt, SA_INTERRUPT | SA_SHIRQ, dev->name, dev)) {
 		printk(KERN_ERR "%s: irq %d busy\n", dev->name, dev->irq);
 		return -EBUSY;
 	}
@@ -896,7 +899,7 @@ static int yam_close(struct net_device *dev)
 	outb(0, IER(dev->base_addr));
 	outb(1, MCR(dev->base_addr));
 	/* Remove IRQ handler if last */
-	free_irq(dev->irq, NULL);
+	free_irq(dev->irq,dev);
 	release_region(dev->base_addr, YAM_EXTENT);
 	netif_stop_queue(dev);
 	while ((skb = skb_dequeue(&yp->send_queue)))

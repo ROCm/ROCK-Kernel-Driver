@@ -266,13 +266,13 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
  * Never offer a window over 32767 without using window scaling. Some
  * poor stacks do signed 16bit maths! 
  */
-#define MAX_TCP_WINDOW		32767
+#define MAX_TCP_WINDOW		32767U
 
 /* Minimal accepted MSS. It is (60+60+8) - (20+20). */
-#define TCP_MIN_MSS		88
+#define TCP_MIN_MSS		88U
 
 /* Minimal RCV_MSS. */
-#define TCP_MIN_RCVMSS		536
+#define TCP_MIN_RCVMSS		536U
 
 /* After receiving this amount of duplicate ACKs fast retransmit starts. */
 #define TCP_FASTRETRANS_THRESH 3
@@ -281,7 +281,7 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 #define TCP_MAX_REORDERING	127
 
 /* Maximal number of ACKs sent quickly to accelerate slow-start. */
-#define TCP_MAX_QUICKACKS	16
+#define TCP_MAX_QUICKACKS	16U
 
 /* urg_data states */
 #define TCP_URG_VALID	0x0100
@@ -323,21 +323,21 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 				  * TIME-WAIT timer.
 				  */
 
-#define TCP_DELACK_MAX	(HZ/5)	/* maximal time to delay before sending an ACK */
+#define TCP_DELACK_MAX	((unsigned)(HZ/5))	/* maximal time to delay before sending an ACK */
 #if HZ >= 100
-#define TCP_DELACK_MIN	(HZ/25)	/* minimal time to delay before sending an ACK */
-#define TCP_ATO_MIN	(HZ/25)
+#define TCP_DELACK_MIN	((unsigned)(HZ/25))	/* minimal time to delay before sending an ACK */
+#define TCP_ATO_MIN	((unsigned)(HZ/25))
 #else
-#define TCP_DELACK_MIN	4
-#define TCP_ATO_MIN	4
+#define TCP_DELACK_MIN	4U
+#define TCP_ATO_MIN	4U
 #endif
-#define TCP_RTO_MAX	(120*HZ)
-#define TCP_RTO_MIN	(HZ/5)
-#define TCP_TIMEOUT_INIT (3*HZ)	/* RFC 1122 initial RTO value	*/
+#define TCP_RTO_MAX	((unsigned)(120*HZ))
+#define TCP_RTO_MIN	((unsigned)(HZ/5))
+#define TCP_TIMEOUT_INIT ((unsigned)(3*HZ))	/* RFC 1122 initial RTO value	*/
 
-#define TCP_RESOURCE_PROBE_INTERVAL (HZ/2) /* Maximal interval between probes
-					    * for local resources.
-					    */
+#define TCP_RESOURCE_PROBE_INTERVAL ((unsigned)(HZ/2U)) /* Maximal interval between probes
+					                 * for local resources.
+					                 */
 
 #define TCP_KEEPALIVE_TIME	(120*60*HZ)	/* two hours */
 #define TCP_KEEPALIVE_PROBES	9		/* Max of 9 keepalive probes	*/
@@ -919,14 +919,13 @@ static __inline__ unsigned int tcp_current_mss(struct sock *sk)
 static inline void tcp_initialize_rcv_mss(struct sock *sk)
 {
 	struct tcp_opt *tp = &sk->tp_pinfo.af_tcp;
-	unsigned int hint = min_t(unsigned int, tp->advmss, tp->mss_cache);
+	unsigned int hint = min(tp->advmss, tp->mss_cache);
 
-	hint = min_t(unsigned int, hint, tp->rcv_wnd/2);
-		
-	tp->ack.rcv_mss = max_t(unsigned int,
-			      min_t(unsigned int,
-				  hint, TCP_MIN_RCVMSS),
-			      TCP_MIN_MSS);
+	hint = min(hint, tp->rcv_wnd/2);
+	hint = min(hint, TCP_MIN_RCVMSS);
+	hint = max(hint, TCP_MIN_MSS);
+
+	tp->ack.rcv_mss = hint;
 }
 
 static __inline__ void __tcp_fast_path_on(struct tcp_opt *tp, u32 snd_wnd)
@@ -1065,7 +1064,7 @@ static inline int tcp_wspace(struct sock *sk)
  *	"Packets left network, but not honestly ACKed yet" PLUS
  *	"Packets fast retransmitted"
  */
-static __inline__ int tcp_packets_in_flight(struct tcp_opt *tp)
+static __inline__ unsigned int tcp_packets_in_flight(struct tcp_opt *tp)
 {
 	return tp->packets_out - tp->left_out + tp->retrans_out;
 }
@@ -1077,7 +1076,7 @@ static __inline__ int tcp_packets_in_flight(struct tcp_opt *tp)
  */
 static inline __u32 tcp_recalc_ssthresh(struct tcp_opt *tp)
 {
-	return max_t(u32, tp->snd_cwnd >> 1, 2);
+	return max(tp->snd_cwnd >> 1U, 2U);
 }
 
 /* If cwnd > ssthresh, we may raise ssthresh to be half-way to cwnd.
@@ -1089,7 +1088,7 @@ static inline __u32 tcp_current_ssthresh(struct tcp_opt *tp)
 	if ((1<<tp->ca_state)&(TCPF_CA_CWR|TCPF_CA_Recovery))
 		return tp->snd_ssthresh;
 	else
-		return max_t(u32, tp->snd_ssthresh,
+		return max(tp->snd_ssthresh,
 			   ((tp->snd_cwnd >> 1) +
 			    (tp->snd_cwnd >> 2)));
 }
@@ -1126,8 +1125,8 @@ static inline void __tcp_enter_cwr(struct tcp_opt *tp)
 {
 	tp->undo_marker = 0;
 	tp->snd_ssthresh = tcp_recalc_ssthresh(tp);
-	tp->snd_cwnd = min_t(u32, tp->snd_cwnd,
-			   tcp_packets_in_flight(tp) + 1);
+	tp->snd_cwnd = min(tp->snd_cwnd,
+			   tcp_packets_in_flight(tp) + 1U);
 	tp->snd_cwnd_cnt = 0;
 	tp->high_seq = tp->snd_nxt;
 	tp->snd_cwnd_stamp = tcp_time_stamp;
@@ -1484,16 +1483,18 @@ static inline void tcp_syn_build_options(__u32 *ptr, int mss, int ts, int sack,
  * be a multiple of mss if possible. We assume here that mss >= 1.
  * This MUST be enforced by all callers.
  */
-static inline void tcp_select_initial_window(int space, __u32 mss,
+static inline void tcp_select_initial_window(int __space, __u32 mss,
 	__u32 *rcv_wnd,
 	__u32 *window_clamp,
 	int wscale_ok,
 	__u8 *rcv_wscale)
 {
+	unsigned int space = (__space < 0 ? 0 : __space);
+
 	/* If no clamp set the clamp to the max possible scaled window */
 	if (*window_clamp == 0)
 		(*window_clamp) = (65535 << 14);
-	space = min_t(u32, *window_clamp, space);
+	space = min(*window_clamp, space);
 
 	/* Quantize space offering to a multiple of mss if possible. */
 	if (space > mss)
@@ -1505,7 +1506,7 @@ static inline void tcp_select_initial_window(int space, __u32 mss,
 	 * our initial window offering to 32k. There should also
 	 * be a sysctl option to stop being nice.
 	 */
-	(*rcv_wnd) = min_t(int, space, MAX_TCP_WINDOW);
+	(*rcv_wnd) = min(space, MAX_TCP_WINDOW);
 	(*rcv_wscale) = 0;
 	if (wscale_ok) {
 		/* See RFC1323 for an explanation of the limit to 14 */
@@ -1514,7 +1515,7 @@ static inline void tcp_select_initial_window(int space, __u32 mss,
 			(*rcv_wscale)++;
 		}
 		if (*rcv_wscale && sysctl_tcp_app_win && space>=mss &&
-		    space - max_t(unsigned int, (space>>sysctl_tcp_app_win), mss>>*rcv_wscale) < 65536/2)
+		    space - max((space>>sysctl_tcp_app_win), mss>>*rcv_wscale) < 65536/2)
 			(*rcv_wscale)--;
 	}
 
@@ -1532,7 +1533,7 @@ static inline void tcp_select_initial_window(int space, __u32 mss,
 			*rcv_wnd = init_cwnd*mss;
 	}
 	/* Set the clamp no higher than max representable value */
-	(*window_clamp) = min_t(u32, 65535 << (*rcv_wscale), *window_clamp);
+	(*window_clamp) = min(65535U << (*rcv_wscale), *window_clamp);
 }
 
 static inline int tcp_win_from_space(int space)
@@ -1698,8 +1699,8 @@ static inline void tcp_enter_memory_pressure(void)
 static inline void tcp_moderate_sndbuf(struct sock *sk)
 {
 	if (!(sk->userlocks&SOCK_SNDBUF_LOCK)) {
-		sk->sndbuf = min_t(int, sk->sndbuf, sk->wmem_queued/2);
-		sk->sndbuf = max_t(int, sk->sndbuf, SOCK_MIN_SNDBUF);
+		sk->sndbuf = min(sk->sndbuf, sk->wmem_queued/2);
+		sk->sndbuf = max(sk->sndbuf, SOCK_MIN_SNDBUF);
 	}
 }
 

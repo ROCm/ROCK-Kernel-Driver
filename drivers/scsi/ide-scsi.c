@@ -849,3 +849,4 @@ static void __exit exit_idescsi_module(void)
 
 module_init(init_idescsi_module);
 module_exit(exit_idescsi_module);
+MODULE_LICENSE("GPL");

@@ -81,8 +81,8 @@ void machine_power_off(void)
 void show_regs(struct pt_regs * regs)
 {
 	printk("\n");
-	printk("PC  : %08lx SP  : %08lx SR  : %08lx TEA : %08x\n",
-	       regs->pc, regs->regs[15], regs->sr, ctrl_inl(MMU_TEA));
+	printk("PC  : %08lx SP  : %08lx SR  : %08lx TEA : %08x    %s\n",
+	       regs->pc, regs->regs[15], regs->sr, ctrl_inl(MMU_TEA), print_tainted());
 	printk("R0  : %08lx R1  : %08lx R2  : %08lx R3  : %08lx\n",
 	       regs->regs[0],regs->regs[1],
 	       regs->regs[2],regs->regs[3]);

@@ -530,6 +530,7 @@ EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl> and Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C /dev entries driver");
+MODULE_LICENSE("GPL");
 
 int init_module(void)
 {

@@ -1,12 +1,15 @@
-/* $Id: l3_1tr6.c,v 2.13.6.1 2001/02/16 16:43:27 kai Exp $
+/* $Id: l3_1tr6.c,v 2.13.6.2 2001/09/23 22:24:49 kai Exp $
  *
- *  German 1TR6 D-channel protocol
+ * German 1TR6 D-channel protocol
  *
- * Author       Karsten Keil (keil@isdn4linux.de)
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
- *		This file is (c) under GNU General Public License
- *		For changes and modifications please read
- *		../../../Documentation/isdn/HiSax.cert
+ * For changes and modifications please read
+ * ../../../Documentation/isdn/HiSax.cert
  *
  */
 
@@ -17,7 +20,7 @@
 #include <linux/ctype.h>
 
 extern char *HiSax_getrev(const char *revision);
-const char *l3_1tr6_revision = "$Revision: 2.13.6.1 $";
+const char *l3_1tr6_revision = "$Revision: 2.13.6.2 $";
 
 #define MsgHead(ptr, cref, mty, dis) \
 	*ptr++ = dis; \

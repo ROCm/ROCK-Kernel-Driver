@@ -1653,6 +1653,8 @@ static struct pci_device_id nm256_pci_tbl[] __devinitdata = {
 	{0,}
 };
 MODULE_DEVICE_TABLE(pci, nm256_pci_tbl);
+MODULE_LICENSE("GPL");
+
 
 struct pci_driver nm256_pci_driver = {
 	name:"nm256_audio",

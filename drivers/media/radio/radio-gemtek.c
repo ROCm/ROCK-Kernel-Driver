@@ -294,6 +294,8 @@ static int __init gemtek_init(void)
 
 MODULE_AUTHOR("Jonas Munsin");
 MODULE_DESCRIPTION("A driver for the GemTek Radio Card");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the GemTek card (0x20c, 0x30c, 0x24c or 0x34c (0x20c or 0x248 have been reported to work for the combined sound/radiocard)).");
 MODULE_PARM(radio_nr, "i");

@@ -95,7 +95,7 @@ xdr_decode_string_inplace(u32 *p, char **sp, int *lenp, int maxlen)
 	if ((len = ntohl(*p++)) > maxlen)
 		return NULL;
 	*lenp = len;
-	*sp = p;
+	*sp = (char *) p;
 	return p + XDR_QUADLEN(len);
 }
 

@@ -2525,6 +2525,7 @@ static void __devexit ymf_remove_one(struct pci_dev *pcidev)
 
 MODULE_AUTHOR("Jaroslav Kysela");
 MODULE_DESCRIPTION("Yamaha YMF7xx PCI Audio");
+MODULE_LICENSE("GPL");
 
 static struct pci_driver ymfpci_driver = {
 	name:		"ymfpci",

@@ -51,7 +51,8 @@ nlmclnt_lookup_host(struct sockaddr_in *sin, int proto, int version)
 struct nlm_host *
 nlmsvc_lookup_host(struct svc_rqst *rqstp)
 {
-	return nlm_lookup_host(rqstp->rq_client, &rqstp->rq_addr, 0, 0);
+	return nlm_lookup_host(rqstp->rq_client, &rqstp->rq_addr,
+			       rqstp->rq_prot, rqstp->rq_vers);
 }
 
 /*
@@ -97,7 +98,9 @@ nlm_lookup_host(struct svc_client *clnt, struct sockaddr_in *sin,
 		nlm_gc_hosts();
 
 	for (hp = &nlm_hosts[hash]; (host = *hp); hp = &host->h_next) {
-		if (host->h_version != version || host->h_proto != proto)
+		if (proto && host->h_proto != proto)
+			continue;
+		if (version && host->h_version != version)
 			continue;
 
 		if (nlm_match_host(host, clnt, sin)) {
@@ -325,7 +328,8 @@ nlm_gc_hosts(void)
 			}
 			dprintk("lockd: delete host %s\n", host->h_name);
 			*q = host->h_next;
-			if (host->h_monitored)
+			/* Don't unmonitor hosts that have been invalidated */
+			if (host->h_monitored && !host->h_killed)
 				nsm_unmonitor(host);
 			if ((clnt = host->h_rpcclnt) != NULL) {
 				if (atomic_read(&clnt->cl_users)) {

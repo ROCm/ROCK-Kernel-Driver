@@ -1,29 +1,21 @@
-/* $Id: module.c,v 1.14.6.3 2001/07/13 09:20:11 kai Exp $
+/* $Id: module.c,v 1.14.6.4 2001/09/23 22:24:32 kai Exp $
  *
  * ISDN lowlevel-module for the IBM ISDN-S0 Active 2000.
  *
- * Copyright 1998 by Fritz Elfert (fritz@isdn4linux.de)
+ * Author       Fritz Elfert
+ * Copyright    by Fritz Elfert      <fritz@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
  * Thanks to Friedemann Baitinger and IBM Germany
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA. 
  *
  */
 
 #include "act2000.h"
 #include "act2000_isa.h"
 #include "capi.h"
+#include <linux/module.h>
 #include <linux/init.h>
 
 static unsigned short act2000_isa_ports[] =
@@ -41,9 +33,9 @@ static int   act_port = -1;  /* -1 = Autoprobe  */
 static int   act_irq  = -1;
 static char *act_id   = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
-MODULE_DESCRIPTION(       "Driver for IBM Active 2000 ISDN card");
+MODULE_DESCRIPTION(       "ISDN4Linux: Driver for IBM Active 2000 ISDN card");
 MODULE_AUTHOR(            "Fritz Elfert");
-MODULE_SUPPORTED_DEVICE(  "ISDN subsystem");
+MODULE_LICENSE(           "GPL");
 MODULE_PARM_DESC(act_bus, "BusType of first card, 1=ISA, 2=MCA, 3=PCMCIA, currently only ISA");
 MODULE_PARM_DESC(membase, "Base port address of first card");
 MODULE_PARM_DESC(act_irq, "IRQ of first card");

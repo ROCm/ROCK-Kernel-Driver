@@ -4165,6 +4165,8 @@ static void __exit trident_remove(struct pci_dev *pci_dev)
 
 MODULE_AUTHOR("Alan Cox, Aaron Holtzman, Ollie Lho, Ching Ling Lee");
 MODULE_DESCRIPTION("Trident 4DWave/SiS 7018/ALi 5451 and Tvia/IGST CyberPro5050 PCI Audio Driver");
+MODULE_LICENSE("GPL");
+
 
 #define TRIDENT_MODULE_NAME "trident"
 

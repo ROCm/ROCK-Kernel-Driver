@@ -8,6 +8,7 @@
 
 #define __KERNEL_SYSCALLS__
 
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/nfs_fs.h>
@@ -17,7 +18,7 @@
 #include <linux/lockd/lockd.h>
 #include <linux/smp_lock.h>
 
-#define NLMDBG_FACILITY		NLMDBG_CIENT
+#define NLMDBG_FACILITY		NLMDBG_CLIENT
 
 /*
  * Local function prototypes
@@ -131,29 +132,63 @@ nlmclnt_grant(struct nlm_lock *lock)
  */
 
 /*
+ * Mark the locks for reclaiming.
+ * FIXME: In 2.5 we don't want to iterate through any global file_lock_list.
+ *        Maintain NLM lock reclaiming lists in the nlm_host instead.
+ */
+static
+void nlmclnt_mark_reclaim(struct nlm_host *host)
+{
+	struct file_lock *fl;
+	struct inode *inode;
+	struct list_head *tmp;
+
+	list_for_each(tmp, &file_lock_list) {
+		fl = list_entry(tmp, struct file_lock, fl_link);
+
+		inode = fl->fl_file->f_dentry->d_inode;
+		if (inode->i_sb->s_magic != NFS_SUPER_MAGIC)
+			continue;
+		if (fl->fl_u.nfs_fl.host != host)
+			continue;
+		if (!(fl->fl_u.nfs_fl.flags & NFS_LCK_GRANTED))
+			continue;
+		fl->fl_u.nfs_fl.flags |= NFS_LCK_RECLAIM;
+	}
+}
+
+/*
+ * Someone has sent us an SM_NOTIFY. Ensure we bind to the new port number,
+ * that we mark locks for reclaiming, and that we bump the pseudo NSM state.
+ */
+static inline
+void nlmclnt_prepare_reclaim(struct nlm_host *host, u32 newstate)
+{
+	host->h_monitored = 0;
+	host->h_nsmstate = newstate;
+	host->h_state++;
+	host->h_nextrebind = 0;
+	nlm_rebind_host(host);
+	nlmclnt_mark_reclaim(host);
+	dprintk("NLM: reclaiming locks for host %s", host->h_name);
+}
+
+/*
  * Reclaim all locks on server host. We do this by spawning a separate
  * reclaimer thread.
- * FIXME: should bump MOD_USE_COUNT while reclaiming
  */
 void
 nlmclnt_recovery(struct nlm_host *host, u32 newstate)
 {
-	if (!host->h_reclaiming++) {
+	if (host->h_reclaiming++) {
 		if (host->h_nsmstate == newstate)
 			return;
-		printk(KERN_WARNING
-			"lockd: Uh-oh! Interfering reclaims for host %s",
-			host->h_name);
-		host->h_monitored = 0;
-		host->h_nsmstate = newstate;
-		host->h_state++;
-		nlm_release_host(host);
+		nlmclnt_prepare_reclaim(host, newstate);
 	} else {
-		host->h_monitored = 0;
-		host->h_nsmstate = newstate;
-		host->h_state++;
+		nlmclnt_prepare_reclaim(host, newstate);
 		nlm_get_host(host);
-		kernel_thread(reclaimer, host, 0);
+		MOD_INC_USE_COUNT;
+		kernel_thread(reclaimer, host, CLONE_SIGNAL);
 	}
 }
 
@@ -163,32 +198,38 @@ reclaimer(void *ptr)
 	struct nlm_host	  *host = (struct nlm_host *) ptr;
 	struct nlm_wait	  *block;
 	struct list_head *tmp;
+	struct file_lock *fl;
+	struct inode *inode;
 
+	daemonize();
 	reparent_to_init();
 	snprintf(current->comm, sizeof(current->comm),
 		 "%s-reclaim",
 		 host->h_name);
-	
+
 	/* This one ensures that our parent doesn't terminate while the
 	 * reclaim is in progress */
 	lock_kernel();
 	lockd_up();
 
-	/* First, reclaim all locks that have been granted previously. */
+	/* First, reclaim all locks that have been marked. */
 restart:
-	tmp = file_lock_list.next;
-	while (tmp != &file_lock_list) {
-		struct file_lock *fl = list_entry(tmp, struct file_lock, fl_link);
-		struct inode *inode = fl->fl_file->f_dentry->d_inode;
-		if (inode->i_sb->s_magic == NFS_SUPER_MAGIC &&
-				nlm_cmp_addr(NFS_ADDR(inode), &host->h_addr) &&
-				fl->fl_u.nfs_fl.state != host->h_state &&
-				(fl->fl_u.nfs_fl.flags & NFS_LCK_GRANTED)) {
-			fl->fl_u.nfs_fl.flags &= ~ NFS_LCK_GRANTED;
-			nlmclnt_reclaim(host, fl);	/* This sleeps */
-			goto restart;
-		}
-		tmp = tmp->next;
+	list_for_each(tmp, &file_lock_list) {
+		fl = list_entry(tmp, struct file_lock, fl_link);
+
+		inode = fl->fl_file->f_dentry->d_inode;
+		if (inode->i_sb->s_magic != NFS_SUPER_MAGIC)
+			continue;
+		if (fl->fl_u.nfs_fl.host != host)
+			continue;
+		if (!(fl->fl_u.nfs_fl.flags & NFS_LCK_RECLAIM))
+			continue;
+
+		fl->fl_u.nfs_fl.flags &= ~NFS_LCK_RECLAIM;
+		nlmclnt_reclaim(host, fl);
+		if (signalled())
+			break;
+		goto restart;
 	}
 
 	host->h_reclaiming = 0;
@@ -206,6 +247,7 @@ restart:
 	nlm_release_host(host);
 	lockd_down();
 	unlock_kernel();
+	MOD_DEC_USE_COUNT;
 
 	return 0;
 }

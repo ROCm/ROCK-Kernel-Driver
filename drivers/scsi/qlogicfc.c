@@ -2259,6 +2259,7 @@ void isp2x00_print_scsi_cmd(Scsi_Cmnd * cmd)
 
 #endif				/* DEBUG_ISP2x00 */
 
+MODULE_LICENSE("GPL");
 
 static Scsi_Host_Template driver_template = QLOGICFC;
 

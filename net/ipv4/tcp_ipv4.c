@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_ipv4.c,v 1.230 2001/09/01 00:31:50 davem Exp $
+ * Version:	$Id: tcp_ipv4.c,v 1.231 2001/09/26 23:38:47 davem Exp $
  *
  *		IPv4 specific functions
  *
@@ -1486,7 +1486,7 @@ static struct sock *tcp_v4_hnd_req(struct sock *sk,struct sk_buff *skb)
 			bh_lock_sock(nsk);
 			return nsk;
 		}
-		tcp_tw_put((struct tcp_tw_bucket*)sk);
+		tcp_tw_put((struct tcp_tw_bucket*)nsk);
 		return NULL;
 	}
 

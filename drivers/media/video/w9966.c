@@ -119,6 +119,8 @@ struct w9966_dev {
 
 MODULE_AUTHOR("Jakob Kemi <jakob.kemi@post.utfors.se>");
 MODULE_DESCRIPTION("Winbond w9966cf WebCam driver (0.32)");
+MODULE_LICENSE("GPL");
+
 
 #ifdef MODULE
 static const char* pardev[] = {[0 ... W9966_MAXCAMS] = ""};

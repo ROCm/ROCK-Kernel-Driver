@@ -685,5 +685,7 @@ static void __exit fini(void)
 }
 
 MODULE_DESCRIPTION("IPv4 packet queue handler");
+MODULE_LICENSE("GPL");
+
 module_init(init);
 module_exit(fini);

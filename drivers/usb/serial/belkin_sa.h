@@ -33,6 +33,9 @@
 #ifndef __LINUX_USB_SERIAL_BSA_H
 #define __LINUX_USB_SERIAL_BSA_H
 
+#define BELKIN_DOCKSTATION_VID	0x050d	/* Vendor Id */
+#define BELKIN_DOCKSTATION_PID	0x1203	/* Product Id */
+
 #define BELKIN_SA_VID	0x050d	/* Vendor Id */
 #define BELKIN_SA_PID	0x0103	/* Product Id */
 

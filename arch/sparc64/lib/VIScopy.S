@@ -1,4 +1,4 @@
-/* $Id: VIScopy.S,v 1.25 2000/11/01 09:29:19 davem Exp $
+/* $Id: VIScopy.S,v 1.26 2001/09/27 04:36:24 kanoj Exp $
  * VIScopy.S: High speed copy operations utilizing the UltraSparc
  *            Visual Instruction Set.
  *
@@ -310,17 +310,6 @@ __memcpy_begin:
 		.globl			__memcpy
 		.type			__memcpy,@function
 
-		.globl			__memcpy_384plus
-		.type			__memcpy_384plus,@function
-
-		.globl			__memcpy_16plus
-		.type			__memcpy_16plus,@function
-
-		.globl			__memcpy_short
-		.type			__memcpy_short,@function
-
-		.globl			__memcpy_entry
-		.type			__memcpy_entry,@function
 memcpy_private:
 __memcpy:
 memcpy:		mov		ASI_P, asi_src			! IEU0	Group
@@ -395,7 +384,6 @@ cheetah_patch_copyops:
 
 	.align			32
 #ifdef __KERNEL__
-__memcpy_384plus:
 	andcc			%o0, 7, %g2			! IEU1	Group
 #endif
 VIS_enter:
@@ -735,9 +723,6 @@ __memcpy_entry:
 	bleu,pn		%xcc, __memcpy_short			! CTI
 	 cmp		%o2, (64 * 6)				! IEU1	Group
 	bgeu,pn		%xcc, VIS_enter				! CTI
-#ifdef __KERNEL__
-__memcpy_16plus:
-#endif
 	 andcc		%o0, 7, %g2				! IEU1	Group
 	sub		%o0, %o1, %g5				! IEU0
 	andcc		%g5, 3, %o5				! IEU1	Group

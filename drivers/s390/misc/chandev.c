@@ -599,9 +599,6 @@ static int chandev_exec_start_script(void *unused)
 	
 	chandev_unlock();
  Fail2:
-	/* We don't really need to report /sbin/hotplug not existing */
-	if(retval!=-ENOENT)
-	   printk("chandev_exec_start_script failed retval=%d\n",retval);
 	return(retval);
 }
 
@@ -1140,6 +1137,7 @@ void chandev_reset(void)
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(2,3,0)
 	chandev_use_devno_names=FALSE;
 #endif
+	chandev_persistent=0;
 	chandev_unlock();
 }
 
@@ -2225,7 +2223,7 @@ static char *argstrs[]=
 	"unregister_probe_by_chan_type",
 	"read_conf",
 	"dont_read_conf",
-	"persistent"
+	"persist"
 };
 
 typedef enum
@@ -2262,7 +2260,7 @@ typedef enum
 	unregister_probe_by_chan_type_stridx,
 	read_conf_stridx,
 	dont_read_conf_stridx,
-	persistent_stridx,
+	persist_stridx,
 	last_stridx,
 } chandev_str_enum;
 
@@ -2388,7 +2386,7 @@ static int chandev_get_string(char **instr,char **outstr)
 
 
 
-static int chandev_setup(char *instr,char *errstr,int lineno)
+static int chandev_setup(int in_read_conf,char *instr,char *errstr,int lineno)
 {
 	chandev_strval   val=isnull;
 	chandev_str_enum stridx;
@@ -2676,12 +2674,17 @@ static int chandev_setup(char *instr,char *errstr,int lineno)
 				chandev_unregister_probe_by_chan_type((chandev_type)ints[1]);
 				break;
 			case read_conf_stridx*stridx_mult:
+				if(in_read_conf)
+				{
+					printk("attempt to recursively call read_conf\n");
+					goto BadArgs;
+				}
 				chandev_read_conf();
 				break;
 			case dont_read_conf_stridx*stridx_mult:
 				atomic_set(&chandev_conf_read,TRUE);
 				break;
-			case (persistent_stridx*stridx_mult)|iscomma:
+			case (persist_stridx*stridx_mult)|iscomma:
 				if(ints[0]==1)
 					chandev_persistent=ints[1];
 				else
@@ -2729,7 +2732,7 @@ static int chandev_setup_bootargs(char *str,int paramno)
 	copystr=alloca(len+1);
 	strncpy(copystr,str,len);
 	copystr[len]=0;
-	if(chandev_setup(copystr,"at "CHANDEV_KEYWORD" bootparam no",paramno)==0)
+	if(chandev_setup(FALSE,copystr,"at "CHANDEV_KEYWORD" bootparam no",paramno)==0)
 		return(0);
 	return(len);
 
@@ -2758,7 +2761,7 @@ static void __init chandev_parse_args(void)
 	}
 }
 
-int chandev_do_setup(char *buff,int size)
+int chandev_do_setup(int in_read_conf,char *buff,int size)
 {
 	int curr,comment=FALSE,newline=FALSE,oldnewline=TRUE;
 	char *startline=NULL,*endbuff=&buff[size];
@@ -2787,7 +2790,7 @@ int chandev_do_setup(char *buff,int size)
 			startline=buff;
 		if(startline&&(buff>startline)&&(oldnewline==FALSE)&&(newline==TRUE))
 		{
-			if((chandev_setup(startline," on line no",lineno))==0)
+			if((chandev_setup(in_read_conf,startline," on line no",lineno))==0)
 				return(-EINVAL);
 			startline=NULL;
 		}
@@ -2835,7 +2838,7 @@ static void chandev_read_conf(void)
 				close(fd);
 			}
 			set_fs(USER_DS);
-			chandev_do_setup(buff,statbuf.st_size);
+			chandev_do_setup(TRUE,buff,statbuf.st_size);
 			vfree(buff);
 		}
 	}
@@ -2898,7 +2901,7 @@ static int chandev_read_proc(char *page, char **start, off_t offset,
 	chandev_printf(chan_exit,"\n%s\n"
 		       "*'s for cu/dev type/models indicate don't cares\n",chandev_keydescript);
 	chandev_printf(chan_exit,"\ncautious_auto_detect: %s\n",chandev_cautious_auto_detect ? "on":"off");
-	chandev_printf(chan_exit,"\nchandev_persistent = 0x%02x\n",chandev_persistent);
+	chandev_printf(chan_exit,"\npersist = 0x%02x\n",chandev_persistent);
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(2,3,0)
 	chandev_printf(chan_exit,"\nuse_devno_names: %s\n\n",chandev_use_devno_names ? "on":"off");
 #endif
@@ -3151,7 +3154,7 @@ static int chandev_write_proc(struct file *file, const char *buffer,
 		rc = copy_from_user(buff,buffer,count);
 		if (rc)
 			goto chandev_write_exit;
-		chandev_do_setup(buff,count);
+		chandev_do_setup(FALSE,buff,count);
 		rc=count;
 	chandev_write_exit:
 		vfree(buff);
@@ -3212,13 +3215,25 @@ int chandev_register_and_probe(chandev_probefunc probefunc,
 			       chandev_msck_notification_func msck_notfunc,
 			       chandev_type chan_type)
 {
-	chandev_probelist *new_probe;
+	chandev_probelist *new_probe,*curr_probe;
 	/* Avoid chicked & egg situations where we may be called before we */
 	/* are initialised. */
 
 	chandev_interrupt_check();
 	if(!atomic_compare_and_swap(FALSE,TRUE,&chandev_initialised))
 		chandev_init();
+	chandev_lock();
+	for_each(curr_probe,chandev_probelist_head)
+	{
+		if(curr_probe->probefunc==probefunc)
+		{
+			chandev_unlock();
+			printk("chandev_register_and_probe detected duplicate probefunc %p"
+			       " for chan_type  0x%02x \n",probefunc,chan_type);
+			return (-EPERM);
+		}
+	}
+	chandev_unlock();
 	if((new_probe=chandev_alloc(sizeof(chandev_probelist))))
 	{
 		new_probe->probefunc=probefunc;
@@ -3229,12 +3244,12 @@ int chandev_register_and_probe(chandev_probefunc probefunc,
 		chandev_add_to_list((list **)&chandev_probelist_head,new_probe);
 		chandev_probe();
 	}
-	return(new_probe ? new_probe->devices_found:0);
+	return(new_probe ? new_probe->devices_found:-ENOMEM);
 }
 
 void chandev_unregister(chandev_probefunc probefunc,int call_shutdown)
 {
-	chandev_probelist *curr_probe=NULL;
+	chandev_probelist *curr_probe;
 	chandev_activelist *curr_device,*next_device;
 	
 	chandev_interrupt_check();

@@ -2872,6 +2872,7 @@ int atp870u_release (struct Scsi_Host *pshost)
 	panic("atp870u: bad scsi host passed.\n");
 
 }
+MODULE_LICENSE("GPL");
 
 static Scsi_Host_Template driver_template = ATP870U;
 #include "scsi_module.c"

@@ -1312,6 +1312,7 @@ static void __exit exit_3c574_cs(void)
 
 module_init(init_3c574_cs);
 module_exit(exit_3c574_cs);
+MODULE_LICENSE("GPL");
 
 /*
  * Local variables:

@@ -288,7 +288,7 @@ nfs_writepage(struct page *page)
 		goto out;
 do_it:
 	lock_kernel();
-	if (NFS_SERVER(inode)->rsize >= PAGE_CACHE_SIZE) {
+	if (NFS_SERVER(inode)->wsize >= PAGE_CACHE_SIZE && !IS_SYNC(inode)) {
 		err = nfs_writepage_async(NULL, inode, page, 0, offset);
 		if (err >= 0)
 			err = 0;
@@ -1031,7 +1031,7 @@ nfs_updatepage(struct file *file, struct page *page, unsigned int offset, unsign
 	 * If wsize is smaller than page size, update and write
 	 * page synchronously.
 	 */
-	if (NFS_SERVER(inode)->wsize < PAGE_SIZE)
+	if (NFS_SERVER(inode)->wsize < PAGE_CACHE_SIZE || IS_SYNC(inode))
 		return nfs_writepage_sync(file, inode, page, offset, count);
 
 	/*

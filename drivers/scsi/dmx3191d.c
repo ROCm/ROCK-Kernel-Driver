@@ -119,6 +119,7 @@ int dmx3191d_release_resources(struct Scsi_Host *instance)
 	return 0;
 }
 
+MODULE_LICENSE("GPL");
 
 static Scsi_Host_Template driver_template = DMX3191D;
 #include "scsi_module.c"

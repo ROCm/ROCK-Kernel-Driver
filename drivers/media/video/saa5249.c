@@ -694,3 +694,4 @@ static struct video_device saa_template =
 	ioctl:		saa5249_ioctl,
 };
 
+MODULE_LICENSE("GPL");

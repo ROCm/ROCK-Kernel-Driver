@@ -1,7 +1,7 @@
-#define VERSION "0.11"
+#define VERSION "0.12"
 /* ns83820.c by Benjamin LaHaise <bcrl@redhat.com>
  *
- * $Revision: 1.34.2.2 $
+ * $Revision: 1.34.2.8 $
  *
  * Copyright 2001 Benjamin LaHaise.
  * Copyright 2001 Red Hat.
@@ -41,7 +41,9 @@
  *	20010827	0.10 - fix ia64 unaligned access.
  *	20010906	0.11 - accept all packets with checksum errors as
  *			       otherwise fragments get lost
-			     - fix >> 32 bugs
+ *			     - fix >> 32 bugs
+ *			0.12 - add statistics counters
+ *			     - add allmulti/promisc support
  *
  * Driver Overview
  * ===============
@@ -61,7 +63,9 @@
  *	Cameo		SOHO-GA2000T	SOHO-GA2500T
  *	D-Link		DGE-500T
  *	PureData	PDP8023Z-TG
- *	SMC		SMC9462TX
+ *	SMC		SMC9452TX	SMC9462TX
+ *
+ * Special thanks to SMC for providing hardware to test this driver on.
  *
  * Reports of success or failure would be greatly appreciated.
  */
@@ -366,6 +370,7 @@ struct rx_info {
 
 struct ns83820 {
 	struct net_device	net_dev;
+	struct net_device_stats	stats;
 	u8			*base;
 
 	struct pci_dev		*pci_dev;
@@ -732,39 +737,22 @@ static void rx_irq(struct ns83820 *dev)
 			kfree_skb(skb);
 			skb = tmp;
 #endif
+			if (cmdsts & CMDSTS_DEST_MULTI)
+				dev->stats.multicast ++;
+			dev->stats.rx_packets ++;
+			dev->stats.rx_bytes += len;
 			if ((extsts & 0x002a0000) && !(extsts & 0x00540000)) {
 				skb->ip_summed = CHECKSUM_UNNECESSARY;
 			} else {
 				skb->ip_summed = CHECKSUM_NONE;
 			}
 			skb->protocol = eth_type_trans(skb, &dev->net_dev);
-			switch (netif_rx(skb)) {
-			case NET_RX_SUCCESS:
-				dev->ihr = 3;
-				break;
-			case NET_RX_CN_LOW:
-				dev->ihr = 3;
-				break;
-			case NET_RX_CN_MOD:
-				dev->ihr = dev->ihr + 1;
-				break;
-			case NET_RX_CN_HIGH:
-				dev->ihr += dev->ihr/2 + 1;
-				break;
-			case NET_RX_DROP:
-				dev->ihr = 255;
-				break;
-			}
-			if (dev->ihr > 255)
-				dev->ihr = 255;
+			if (NET_RX_DROP == netif_rx(skb))
+				dev->stats.rx_dropped ++;
 #ifndef __i386__
 		done:;
 #endif
 		} else {
-			static int err;
-			if (err++ < 20) {
-				Dprintk("error packet: cmdsts: %08x extsts: %08x\n", cmdsts, extsts);
-			}
 			kfree_skb(skb);
 		}
 
@@ -806,6 +794,13 @@ static void do_tx_done(struct ns83820 *dev)
 	while ((tx_done_idx != dev->tx_free_idx) &&
 	       !(CMDSTS_OWN & (cmdsts = desc[CMDSTS])) ) {
 		struct sk_buff *skb;
+
+		if (cmdsts & CMDSTS_ERR)
+			dev->stats.tx_errors ++;
+		if (cmdsts & CMDSTS_OK)
+			dev->stats.tx_packets ++;
+		if (cmdsts & CMDSTS_OK)
+			dev->stats.tx_bytes += cmdsts & 0xffff;
 
 		dprintk("tx_done_idx=%d free_idx=%d cmdsts=%08x\n",
 			tx_done_idx, dev->tx_free_idx, desc[CMDSTS]);
@@ -985,6 +980,35 @@ again:
 	return 0;
 }
 
+static void ns83820_update_stats(struct ns83820 *dev)
+{
+	u8 *base = dev->base;
+
+	dev->stats.rx_errors		+= readl(base + 0x60) & 0xffff;
+	dev->stats.rx_crc_errors	+= readl(base + 0x64) & 0xffff;
+	dev->stats.rx_missed_errors	+= readl(base + 0x68) & 0xffff;
+	dev->stats.rx_frame_errors	+= readl(base + 0x6c) & 0xffff;
+	/*dev->stats.rx_symbol_errors +=*/ readl(base + 0x70);
+	dev->stats.rx_length_errors	+= readl(base + 0x74) & 0xffff;
+	dev->stats.rx_length_errors	+= readl(base + 0x78) & 0xffff;
+	/*dev->stats.rx_badopcode_errors += */ readl(base + 0x7c);
+	/*dev->stats.rx_pause_count += */  readl(base + 0x80);
+	/*dev->stats.tx_pause_count += */  readl(base + 0x84);
+	dev->stats.tx_carrier_errors	+= readl(base + 0x88) & 0xff;
+}
+
+static struct net_device_stats *ns83820_get_stats(struct net_device *_dev)
+{
+	struct ns83820 *dev = (void *)_dev;
+
+	/* somewhat overkill */
+	spin_lock_irq(&dev->misc_lock);
+	ns83820_update_stats(dev);
+	spin_unlock_irq(&dev->misc_lock);
+
+	return &dev->stats;
+}
+
 static void ns83820_irq(int foo, void *data, struct pt_regs *regs)
 {
 	struct ns83820 *dev = data;
@@ -1059,6 +1083,12 @@ static void ns83820_irq(int foo, void *data, struct pt_regs *regs)
 	 */
 	if ((ISR_TXDESC | ISR_TXIDLE) & isr)
 		do_tx_done(dev);
+
+	if (ISR_MIB & isr) {
+		spin_lock(&dev->misc_lock);
+		ns83820_update_stats(dev);
+		spin_unlock(&dev->misc_lock);
+	}
 
 	if (ISR_PHY & isr)
 		phy_intr(dev);
@@ -1178,6 +1208,28 @@ static int ns83820_change_mtu(struct net_device *_dev, int new_mtu)
 	return 0;
 }
 
+static void ns83820_set_multicast(struct net_device *_dev)
+{
+	struct ns83820 *dev = (void *)_dev;
+	u8 *rfcr = dev->base + RFCR;
+	u32 and_mask = 0xffffffff;
+	u32 or_mask = 0;
+
+	if (dev->net_dev.flags & IFF_PROMISC)
+		or_mask |= RFCR_AAU | RFCR_AAM;
+	else
+		and_mask &= ~(RFCR_AAU | RFCR_AAM);
+
+	if (dev->net_dev.flags & IFF_ALLMULTI)
+		or_mask |= RFCR_AAM;
+	else
+		and_mask &= ~RFCR_AAM;
+
+	spin_lock_irq(&dev->misc_lock);
+	writel((readl(rfcr) & and_mask) | or_mask, rfcr);
+	spin_unlock_irq(&dev->misc_lock);
+}
+
 static int ns83820_probe(struct pci_dev *pci_dev, const struct pci_device_id *id)
 {
 	struct ns83820 *dev;
@@ -1241,6 +1293,9 @@ static int ns83820_probe(struct pci_dev *pci_dev, const struct pci_device_id *id
 	dev->net_dev.stop = ns83820_stop;
 	dev->net_dev.hard_start_xmit = ns83820_hard_start_xmit;
 	dev->net_dev.change_mtu = ns83820_change_mtu;
+	dev->net_dev.get_stats = ns83820_get_stats;
+	dev->net_dev.change_mtu = ns83820_change_mtu;
+	dev->net_dev.set_multicast_list = ns83820_set_multicast;
 	//FIXME: dev->net_dev.tx_timeout = ns83820_tx_timeout;
 
 	lock_kernel();
@@ -1423,6 +1478,9 @@ static void ns83820_exit(void)
 
 MODULE_AUTHOR("Benjamin LaHaise <bcrl@redhat.com>");
 MODULE_DESCRIPTION("National Semiconductor DP83820 10/100/1000 driver");
+MODULE_LICENSE("GPL");
+
 MODULE_DEVICE_TABLE(pci, pci_device_id);
+
 module_init(ns83820_init);
 module_exit(ns83820_exit);

@@ -1362,6 +1362,7 @@ void ni52_dump(struct net_device *dev,void *ptr)
 	printk("\n");
 }
 #endif
+MODULE_LICENSE("GPL");
 
 /*
  * END: linux/drivers/net/ni52.c

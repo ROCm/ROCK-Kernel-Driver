@@ -592,6 +592,8 @@ struct rtl8139_private {
 
 MODULE_AUTHOR ("Jeff Garzik <jgarzik@mandrakesoft.com>");
 MODULE_DESCRIPTION ("RealTek RTL-8139 Fast Ethernet driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM (multicast_filter_limit, "i");
 MODULE_PARM (max_interrupt_work, "i");
 MODULE_PARM (media, "1-" __MODULE_STRING(MAX_UNITS) "i");
@@ -825,6 +827,7 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 #ifdef USE_IO_OPS
 	ioaddr = (void *) pio_start;
 	dev->base_addr = pio_start;
+	tp->mmio_addr = ioaddr;
 #else
 	/* ioremap MMIO region */
 	ioaddr = ioremap (mmio_start, mmio_len);

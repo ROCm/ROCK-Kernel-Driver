@@ -730,3 +730,4 @@ EXPORT_NO_SYMBOLS;
 
 module_init(init_ncp_fs)
 module_exit(exit_ncp_fs)
+MODULE_LICENSE("GPL");

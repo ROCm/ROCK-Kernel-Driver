@@ -1132,6 +1132,8 @@ MODULE_PARM(pss_mixer, "b");
 MODULE_PARM_DESC(pss_mixer, "Enable (1) or disable (0) PSS mixer (controlling of output volume, bass, treble, synth volume). The mixer is not available on all PSS cards.");
 MODULE_AUTHOR("Hannu Savolainen, Vladimir Michl");
 MODULE_DESCRIPTION("Module for PSS sound cards (based on AD1848, ADSP-2115 and ESC614). This module includes control of output amplifier and synth volume of the Beethoven ADSP-16 card (this may work with other PSS cards).\n");
+MODULE_LICENSE("GPL");
+
 
 static int fw_load = 0;
 static int pssmpu = 0, pssmss = 0;

@@ -82,7 +82,7 @@ void show_regs(struct pt_regs *regs)
 
 	printk("     YZrvWESTHLNXBCVMcbcbcbcbOGFRQPDI\nPSW: ");
 	printbinary(regs->gr[0], 32);
-	printk("\n");
+	printk("    %s\n", print_tainted());
 
 	for (i = 0; i < 32; i += 4) {
 		int j;

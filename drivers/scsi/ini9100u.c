@@ -112,9 +112,7 @@
 #include <linux/version.h>
 #endif
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #include <stdarg.h>
 #include <asm/irq.h>
@@ -828,3 +826,4 @@ int i91u_release(struct Scsi_Host *hreg)
 	release_region(hreg->io_port, 256);
 	return 0;
 }
+MODULE_LICENSE("Dual BSD/GPL");

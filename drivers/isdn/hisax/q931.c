@@ -1,17 +1,17 @@
-/* $Id: q931.c,v 1.10.6.2 2001/03/13 16:17:08 kai Exp $
+/* $Id: q931.c,v 1.10.6.3 2001/09/23 22:24:50 kai Exp $
  *
- * q931.c       code to decode ITU Q.931 call control messages
+ * code to decode ITU Q.931 call control messages
  *
  * Author       Jan den Ouden
+ * Copyright    by Jan den Ouden
  *
- * This file is (c) under GNU General Public License
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
- * Changelog
+ * Changelog:
  *
  * Pauline Middelink    general improvements
- *
  * Beat Doebeli         cause texts, display information element
- *
  * Karsten Keil         cause texts, display information element for 1TR6
  *
  */

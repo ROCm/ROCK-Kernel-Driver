@@ -448,3 +448,4 @@ void cleanup_module(void)
 {
 }
 #endif
+MODULE_LICENSE("GPL");

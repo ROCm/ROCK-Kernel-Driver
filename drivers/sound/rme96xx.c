@@ -52,6 +52,8 @@ MODULE_PARM_DESC(devices, "number of dsp devices allocated by the driver");
 
 MODULE_AUTHOR("Guenter Geiger, geiger@debian.org");
 MODULE_DESCRIPTION("RME9652/36 \"Hammerfall\" Driver");
+MODULE_LICENSE("GPL");
+
 
 #ifdef DEBUG
 #define DBG(x) printk("RME_DEBUG:");x

@@ -4,7 +4,7 @@
  *
  * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.53 2001/06/18
+ * Version: 1.54 2001/09/09
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -1326,6 +1326,7 @@ static unsigned int fv;			/* "matrox:fv:xxxxx" */
 static unsigned int fh;			/* "matrox:fh:xxxxxk" */
 static unsigned int maxclk;		/* "matrox:maxclk:xxxxM" */
 static int dfp;				/* "matrox:dfp */
+static int dfp_type = -1;		/* "matrox:dfp:xxx */
 static int memtype = -1;		/* "matrox:memtype:xxx" */
 static char fontname[64];		/* "matrox:font:xxxxx" */
 
@@ -1640,6 +1641,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 		if (dfp)
 			ACCESS_FBINFO(output.ph) |= MATROXFB_OUTPUT_CONN_DFP;
 	}
+	ACCESS_FBINFO(devflags.dfp_type) = dfp_type;
 	ACCESS_FBINFO(devflags.g450dac) = b->flags & DEVF_G450DAC;
 	ACCESS_FBINFO(devflags.textstep) = ACCESS_FBINFO(devflags.vgastep) * ACCESS_FBINFO(devflags.textmode);
 	ACCESS_FBINFO(devflags.textvram) = 65536 / ACCESS_FBINFO(devflags.textmode);
@@ -2155,6 +2157,7 @@ static struct pci_device_id matroxfb_devices[] __devinitdata = {
 
 MODULE_DEVICE_TABLE(pci, matroxfb_devices);
 
+
 static struct pci_driver matroxfb_driver = {
 	name:		"matroxfb",
 	id_table:	matroxfb_devices,
@@ -2405,6 +2408,10 @@ int __init matroxfb_setup(char *options) {
 			mem = simple_strtoul(this_opt+4, NULL, 0);
 		else if (!strncmp(this_opt, "mode:", 5))
 			strncpy(videomode, this_opt+5, sizeof(videomode)-1);
+		else if (!strncmp(this_opt, "dfp:", 4)) {
+			dfp_type = simple_strtoul(this_opt+4, NULL, 0);
+			dfp = 1;
+		}	
 #ifdef CONFIG_PPC
 		else if (!strncmp(this_opt, "vmode:", 6)) {
 			unsigned int vmode = simple_strtoul(this_opt+6, NULL, 0);
@@ -2510,6 +2517,8 @@ int __init matroxfb_init(void)
 
 MODULE_AUTHOR("(c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Accelerated FBDev driver for Matrox Millennium/Mystique/G100/G200/G400/G450");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(mem, "i");
 MODULE_PARM_DESC(mem, "Size of available memory in MB, KB or B (2,4,8,12,16MB, default=autodetect)");
 MODULE_PARM(disabled, "i");
@@ -2586,6 +2595,8 @@ MODULE_PARM(cross4MB, "i");
 MODULE_PARM_DESC(cross4MB, "Specifies that 4MB boundary can be in middle of line. (default=autodetected)");
 MODULE_PARM(dfp, "i");
 MODULE_PARM_DESC(dfp, "Specifies whether to use digital flat panel interface of G200/G400 (0 or 1) (default=0)");
+MODULE_PARM(dfp_type, "i");
+MODULE_PARM_DESC(dfp_type, "Specifies DFP interface type (0 to 255) (default=read from hardware)");
 #ifdef CONFIG_PPC
 MODULE_PARM(vmode, "i");
 MODULE_PARM_DESC(vmode, "Specify the vmode mode number that should be used (640x480 default)");

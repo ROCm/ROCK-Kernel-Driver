@@ -1627,6 +1627,7 @@ static struct pci_driver lynx_pcidriver = {
 
 MODULE_AUTHOR("Andreas E. Bombe <andreas.bombe@munich.netsurf.de>");
 MODULE_DESCRIPTION("driver for Texas Instruments PCI Lynx IEEE-1394 controller");
+MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("pcilynx");
 MODULE_DEVICE_TABLE(pci, pci_table);
 

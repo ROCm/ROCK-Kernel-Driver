@@ -23,6 +23,7 @@
 #include <linux/pci.h>
 #include <linux/wrapper.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <asm/io.h>
 #ifdef CONFIG_BIGPHYS_AREA
 #include <linux/bigphysarea.h>
@@ -75,3 +76,5 @@ void bfree(void* mem, unsigned long size)
 #endif
 	}
 }
+
+MODULE_LICENSE("GPL");

@@ -2515,6 +2515,7 @@ static char *scsihosts;
 
 MODULE_PARM(scsihosts, "s");
 MODULE_DESCRIPTION("SCSI core");
+MODULE_LICENSE("GPL");
 
 #ifndef MODULE
 int __init scsi_setup(char *str)

@@ -194,3 +194,4 @@ static int __init setup_sgalaxy(char *str)
 
 __setup("sgalaxy=", setup_sgalaxy);
 #endif
+MODULE_LICENSE("GPL");

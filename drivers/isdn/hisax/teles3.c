@@ -1,16 +1,16 @@
-/* $Id: teles3.c,v 2.17.6.1 2001/02/16 16:43:29 kai Exp $
+/* $Id: teles3.c,v 2.17.6.2 2001/09/23 22:24:52 kai Exp $
  *
- * teles3.c     low level stuff for Teles 16.3 & PNP isdn cards
+ * low level stuff for Teles 16.3 & PNP isdn cards
  *
- *              based on the teles driver from Jan den Ouden
- *
- * Author       Karsten Keil (keil@isdn4linux.de)
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  * Thanks to    Jan den Ouden
  *              Fritz Elfert
  *              Beat Doebeli
- *
- * This file is (c) under GNU General Public License
  *
  */
 #define __NO_VERSION__
@@ -21,7 +21,7 @@
 #include "isdnl1.h"
 
 extern const char *CardType[];
-const char *teles3_revision = "$Revision: 2.17.6.1 $";
+const char *teles3_revision = "$Revision: 2.17.6.2 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

@@ -250,3 +250,5 @@ static void __exit exit_devpts_fs(void)
 
 module_init(init_devpts_fs)
 module_exit(exit_devpts_fs)
+MODULE_LICENSE("GPL");
+

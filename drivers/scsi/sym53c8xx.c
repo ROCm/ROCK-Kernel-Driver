@@ -101,9 +101,7 @@
 
 #define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #include <asm/dma.h>
 #include <asm/io.h>
@@ -14701,6 +14699,8 @@ sym_read_Tekram_nvram (ncr_slot *np, u_short device_id, Tekram_nvram *nvram)
 /*
 **	Module stuff
 */
+
+MODULE_LICENSE("GPL");
 
 #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
 static

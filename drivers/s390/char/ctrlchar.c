@@ -38,7 +38,7 @@ void ctrlchar_init(void) {
 		return;
 	INIT_LIST_HEAD(&ctrlchar_tq.list);
 	ctrlchar_tq.sync = 0;
-	ctrlchar_tq.routine = ctrlchar_handle_sysrq;
+	ctrlchar_tq.routine = (void (*)(void *)) ctrlchar_handle_sysrq;
 #endif
 }
 

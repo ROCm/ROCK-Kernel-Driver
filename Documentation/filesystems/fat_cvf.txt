@@ -112,7 +112,7 @@ struct cvf_format
   int (*mount_cvf) (struct super_block*sb,char*options);
   int (*unmount_cvf) (struct super_block*sb);
   [...]
-  void (*cvf_zero_cluster) (struct inode*inode,int clusternr);
+  void (*zero_out_cluster) (struct inode*, int clusternr);
 }
 
 This structure defines the capabilities of a CVF module. It must be filled
@@ -161,8 +161,8 @@ It contains...
       functions. NULL means use the original FAT driver functions instead.
       If you really want "no action", write a function that does nothing and 
       hang it in instead.
-  - cvf_zero_cluster:
-      The cvf_zero_cluster function is called when the fat driver wants to
+  - zero_out_cluster:
+      The zero_out_cluster function is called when the fat driver wants to
       zero out a (new) cluster. This is important for directories (mkdir).
       If it is NULL, the FAT driver defaults to overwriting the whole
       cluster with zeros. Note that clusternr is absolute, not relative

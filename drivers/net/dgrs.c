@@ -126,6 +126,8 @@ static struct pci_device_id dgrs_pci_tbl[] __initdata = {
 	{ }			/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(pci, dgrs_pci_tbl);
+MODULE_LICENSE("GPL");
+
 
 /*
  *	Firmware.  Compiled separately for local compilation,

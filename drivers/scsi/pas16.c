@@ -110,9 +110,7 @@
  *   (IRQ_AUTO == 254, IRQ_NONE == 255 in NCR5380.h)
  */
  
-#ifdef MODULE
 #include <linux/module.h>
-#endif
 
 #include <asm/system.h>
 #include <linux/signal.h>
@@ -609,3 +607,4 @@ static Scsi_Host_Template driver_template = MV_PAS16;
 MODULE_PARM(pas16_addr, "h");
 MODULE_PARM(pas16_irq, "i");
 #endif
+MODULE_LICENSE("GPL");

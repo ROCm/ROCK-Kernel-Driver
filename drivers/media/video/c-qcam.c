@@ -876,6 +876,8 @@ static void __exit cqcam_cleanup (void)
 
 MODULE_AUTHOR("Philip Blundell <philb@gnu.org>");
 MODULE_DESCRIPTION(BANNER);
+MODULE_LICENSE("GPL");
+
 MODULE_PARM_DESC(parport ,"parport=<auto|n[,n]...> for port detection method\n\
 probe=<0|1|2> for camera detection method\n\
 force_rgb=<0|1> for RGB data format (default BGR)");

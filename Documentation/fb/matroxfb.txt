@@ -216,6 +216,13 @@ dfp      - enables digital flat panel interface. This option is incompatible wit
            secondary (TV) output - if DFP is active, TV output must be
 	   inactive and vice versa. DFP always uses same timing as primary
 	   (monitor) output.
+dfp:X    - use settings X for digital flat panel interface. X is number from
+           0 to 0xFF, and meaning of each individual bit is described in
+	   G400 manual, in description of DAC register 0x1F. For normal operation
+	   you should set all bits to zero, except lowest bit. This lowest bit
+	   selects who is source of display clocks, whether G400, or panel.
+	   Default value is now read back from hardware - so you should specify
+	   this value only if you are also using `init' parameter.
 vesa:X   - selects startup videomode. X is number from 0 to 0x1FF, see table
            above for detailed explanation. Default is 640x480x8bpp if driver
 	   has 8bpp support. Otherwise first available of 640x350x4bpp,
@@ -280,6 +287,8 @@ Currently there are following known bugs:
  + interlaced text mode is not supported; it looks like hardware limitation,
    but I'm not sure.
  + Gxx0 SGRAM/SDRAM is not autodetected.
+ + If you are using more than one framebuffer device, you must boot kernel
+   with 'video=scrollback:0'.
  + maybe more...
 And following misfeatures:
  + SVGALib does not restore screen on exit.

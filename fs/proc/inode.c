@@ -209,3 +209,4 @@ out_no_root:
 	iput(root_inode);
 	return NULL;
 }
+MODULE_LICENSE("GPL");

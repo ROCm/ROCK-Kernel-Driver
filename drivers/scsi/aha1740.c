@@ -22,10 +22,7 @@
  * if it doesn't work for your devices, take a look.
  */
 
-#ifdef MODULE
 #include <linux/module.h>
-#endif
-
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/string.h>
@@ -613,6 +610,8 @@ int aha1740_biosparam(Disk * disk, kdev_t dev, int* ip)
     }
     return 0;
 }
+
+MODULE_LICENSE("GPL");
 
 /* Eventually this will go into an include file, but this will be later */
 static Scsi_Host_Template driver_template = AHA1740;

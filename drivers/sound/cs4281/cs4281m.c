@@ -4512,6 +4512,7 @@ void __exit cs4281_cleanup_module(void)
 
 MODULE_AUTHOR("gw boynton, audio@crystal.cirrus.com");
 MODULE_DESCRIPTION("Cirrus Logic CS4281 Driver");
+MODULE_LICENSE("GPL");
 
 // --------------------------------------------------------------------- 
 

@@ -352,6 +352,8 @@ static int __init fmi_init(void)
 
 MODULE_AUTHOR("Petr Vandrovec, vandrove@vc.cvut.cz and M. Kirkwood");
 MODULE_DESCRIPTION("A driver for the SF16MI radio.");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the SF16MI card (0x284 or 0x384)");
 MODULE_PARM(radio_nr, "i");

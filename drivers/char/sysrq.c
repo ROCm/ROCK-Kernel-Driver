@@ -47,13 +47,13 @@ static void sysrq_handle_loglevel(int key, struct pt_regs *pt_regs,
 	int i;
 	i = key - '0';
 	console_loglevel = 7;
-	printk("%d\n", i);
+	printk("Loglevel set to %d\n", i);
 	console_loglevel = i;
 }	
 static struct sysrq_key_op sysrq_loglevel_op = {
 	handler:	sysrq_handle_loglevel,
 	help_msg:	"loglevel0-8",
-	action_msg:	"Loglevel set to ",
+	action_msg:	"Changing Loglevel",
 };
 
 
@@ -68,7 +68,7 @@ static void sysrq_handle_SAK(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_SAK_op = {
 	handler:	sysrq_handle_SAK,
 	help_msg:	"saK",
-	action_msg:	"SAK\n",
+	action_msg:	"SAK",
 };
 #endif
 
@@ -82,7 +82,7 @@ static void sysrq_handle_unraw(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_unraw_op = {
 	handler:	sysrq_handle_unraw,
 	help_msg:	"unRaw",
-	action_msg:	"Keyboard mode set to XLATE\n",
+	action_msg:	"Keyboard mode set to XLATE",
 };
 
 
@@ -94,7 +94,7 @@ static void sysrq_handle_reboot(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_reboot_op = {
 	handler:	sysrq_handle_reboot,
 	help_msg:	"reBoot",
-	action_msg:	"Resetting\n",
+	action_msg:	"Resetting",
 };
 
 
@@ -225,18 +225,18 @@ static void sysrq_handle_sync(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_sync_op = {
 	handler:	sysrq_handle_sync,
 	help_msg:	"Sync",
-	action_msg:	"Emergency Sync\n",
+	action_msg:	"Emergency Sync",
 };
 
 static void sysrq_handle_mountro(int key, struct pt_regs *pt_regs,
 		struct kbd_struct *kbd, struct tty_struct *tty) {
 	emergency_sync_scheduled = EMERG_REMOUNT;
-	wakeup_bdflush();
+	wakeup_bdflush(0);
 }
 static struct sysrq_key_op sysrq_mountro_op = {
 	handler:	sysrq_handle_mountro,
 	help_msg:	"Unmount",
-	action_msg:	"Emergency Remount R/0\n",
+	action_msg:	"Emergency Remount R/0",
 };
 
 /* END SYNC SYSRQ HANDLERS BLOCK */
@@ -252,7 +252,7 @@ static void sysrq_handle_showregs(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_showregs_op = {
 	handler:	sysrq_handle_showregs,
 	help_msg:	"showPc",
-	action_msg:	"Show Regs\n",
+	action_msg:	"Show Regs",
 };
 
 
@@ -263,7 +263,7 @@ static void sysrq_handle_showstate(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_showstate_op = {
 	handler:	sysrq_handle_showstate,
 	help_msg:	"showTasks",
-	action_msg:	"Show State\n",
+	action_msg:	"Show State",
 };
 
 
@@ -274,7 +274,7 @@ static void sysrq_handle_showmem(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_showmem_op = {
 	handler:	sysrq_handle_showmem,
 	help_msg:	"showMem",
-	action_msg:	"Show Memory\n",
+	action_msg:	"Show Memory",
 };
 
 /* SHOW SYSRQ HANDLERS BLOCK */
@@ -307,7 +307,7 @@ static void sysrq_handle_term(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_term_op = {
 	handler:	sysrq_handle_term,
 	help_msg:	"tErm",
-	action_msg:	"Terminate All Tasks\n",
+	action_msg:	"Terminate All Tasks",
 };
 
 static void sysrq_handle_kill(int key, struct pt_regs *pt_regs,
@@ -318,7 +318,7 @@ static void sysrq_handle_kill(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_kill_op = {
 	handler:	sysrq_handle_kill,
 	help_msg:	"kIll",
-	action_msg:	"Kill All Tasks\n",
+	action_msg:	"Kill All Tasks",
 };
 
 static void sysrq_handle_killall(int key, struct pt_regs *pt_regs,
@@ -329,7 +329,7 @@ static void sysrq_handle_killall(int key, struct pt_regs *pt_regs,
 static struct sysrq_key_op sysrq_killall_op = {
 	handler:	sysrq_handle_killall,
 	help_msg:	"killalL",
-	action_msg:	"Kill All Tasks (even init)\n",
+	action_msg:	"Kill All Tasks (even init)",
 };
 
 /* END SIGNAL SYSRQ HANDLERS BLOCK */
@@ -462,8 +462,9 @@ void __handle_sysrq_nolock(int key, struct pt_regs *pt_regs,
 
         op_p = __sysrq_get_key_op(key);
         if (op_p) {
-                printk ("%s", op_p->action_msg);
-                op_p->handler(key, pt_regs, kbd, tty);
+		printk ("%s\n", op_p->action_msg);
+		console_loglevel = orig_log_level;
+		op_p->handler(key, pt_regs, kbd, tty);
 	} else {
 		printk("HELP : ");
 		/* Only print the help msg once per handler */
@@ -474,8 +475,8 @@ void __handle_sysrq_nolock(int key, struct pt_regs *pt_regs,
 				printk ("%s ", sysrq_key_table[i]->help_msg);
 		}
 		printk ("\n");
+		console_loglevel = orig_log_level;
 	}
-	console_loglevel = orig_log_level;
 }
 
 EXPORT_SYMBOL(handle_sysrq);

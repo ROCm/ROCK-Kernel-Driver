@@ -96,6 +96,7 @@ static const char *options = "options: " OPTIONS;
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
 MODULE_DESCRIPTION("Linux Kernel Card Services " CS_RELEASE
 		   "\n  options:" OPTIONS);
+MODULE_LICENSE("Dual MPL/GPL");	  
 
 /*====================================================================*/
 

@@ -493,3 +493,4 @@ void cleanup_module(void)
 	rtnl_unlock();
 }
 #endif
+MODULE_LICENSE("GPL");

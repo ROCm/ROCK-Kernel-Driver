@@ -918,6 +918,8 @@ cleanup_module(void)
 	release_region(dev_at1700.base_addr, AT1700_IO_EXTENT);
 }
 #endif /* MODULE */
+MODULE_LICENSE("GPL");
+
 
 /*
  * Local variables:

@@ -36,8 +36,8 @@
 /* WARNING: Leave this in for now: the dependency preprocessor doesn't
  * pick up file specific flags, so must define here if they are not
  * set */
-#if !defined(IO_MAPPED) && !defined(MEM_MAPPED)
-#define IO_MAPPED
+#if !defined(CONFIG_53C700_IO_MAPPED) && !defined(CONFIG_53C700_MEM_MAPPED)
+#error "Config.in must define either CONFIG_53C700_IO_MAPPED or CONFIG_53C700_MEM_MAPPED to use this scsi core."
 #endif
 
 
@@ -90,43 +90,43 @@ struct NCR_700_SG_List {
 static inline void
 NCR_700_set_SXFER(Scsi_Device *SDp, __u8 sxfer)
 {
-	((__u32)SDp->hostdata) &= 0xffffff00;
-	((__u32)SDp->hostdata) |= sxfer & 0xff;
+	((unsigned long)SDp->hostdata) &= 0xffffff00;
+	((unsigned long)SDp->hostdata) |= sxfer & 0xff;
 }
 static inline __u8 NCR_700_get_SXFER(Scsi_Device *SDp)
 {
-	return (((__u32)SDp->hostdata) & 0xff);
+	return (((unsigned long)SDp->hostdata) & 0xff);
 }
 static inline void
 NCR_700_set_depth(Scsi_Device *SDp, __u8 depth)
 {
-	((__u32)SDp->hostdata) &= 0xffff00ff;
-	((__u32)SDp->hostdata) |= (0xff00 & (depth << 8));
+	((unsigned long)SDp->hostdata) &= 0xffff00ff;
+	((unsigned long)SDp->hostdata) |= (0xff00 & (depth << 8));
 }
 static inline __u8
 NCR_700_get_depth(Scsi_Device *SDp)
 {
-	return ((((__u32)SDp->hostdata) & 0xff00)>>8);
+	return ((((unsigned long)SDp->hostdata) & 0xff00)>>8);
 }
 static inline int
 NCR_700_is_flag_set(Scsi_Device *SDp, __u32 flag)
 {
-	return (((__u32)SDp->hostdata) & flag) == flag;
+	return (((unsigned long)SDp->hostdata) & flag) == flag;
 }
 static inline int
 NCR_700_is_flag_clear(Scsi_Device *SDp, __u32 flag)
 {
-	return (((__u32)SDp->hostdata) & flag) == 0;
+	return (((unsigned long)SDp->hostdata) & flag) == 0;
 }
 static inline void
 NCR_700_set_flag(Scsi_Device *SDp, __u32 flag)
 {
-	((__u32)SDp->hostdata) |= (flag & 0xffff0000);
+	((unsigned long)SDp->hostdata) |= (flag & 0xffff0000);
 }
 static inline void
 NCR_700_clear_flag(Scsi_Device *SDp, __u32 flag)
 {
-	((__u32)SDp->hostdata) &= ~(flag & 0xffff0000);
+	((unsigned long)SDp->hostdata) &= ~(flag & 0xffff0000);
 }
 
 /* These represent the Nexus hashing functions.  A Nexus in SCSI terms
@@ -162,6 +162,8 @@ hash_ITLQ(__u8 pun, __u8 lun, __u8 tag)
 }
 
 struct NCR_700_command_slot {
+	struct NCR_700_SG_List	SG[NCR_700_SG_SEGMENTS+1];
+	struct NCR_700_SG_List	*pSG;
 	#define NCR_700_SLOT_MASK 0xFC
 	#define NCR_700_SLOT_MAGIC 0xb8
 	#define	NCR_700_SLOT_FREE (0|NCR_700_SLOT_MAGIC) /* slot may be used */
@@ -170,10 +172,12 @@ struct NCR_700_command_slot {
 	__u8	state;
 	#define NCR_700_NO_TAG	0xdead
 	__u16	tag;
-	struct NCR_700_SG_List	SG[NCR_700_SG_SEGMENTS+1];
 	__u32	resume_offset;
 	Scsi_Cmnd	*cmnd;
 	__u32		temp;
+	/* if this command is a pci_single mapping, holds the dma address
+	 * for later unmapping in the done routine */
+	dma_addr_t	dma_handle;
 	/* Doubly linked ITL/ITLQ list kept in strict time order
 	 * (latest at the back) */
 	struct NCR_700_command_slot *ITL_forw;
@@ -186,12 +190,16 @@ struct NCR_700_Host_Parameters {
 	/* These must be filled in by the calling driver */
 	int	clock;			/* board clock speed in MHz */
 	__u32	base;			/* the base for the port (copied to host) */
+	struct pci_dev	*pci_dev;
+	__u8	dmode_extra;	/* adjustable bus settings */
 	__u8	differential:1;	/* if we are differential */
-#ifdef __hppa__
+#ifdef CONFIG_53C700_LE_ON_BE
 	/* This option is for HP only.  Set it if your chip is wired for
 	 * little endian on this platform (which is big endian) */
 	__u8	force_le_on_be:1;
 #endif
+	__u8	chip710:1;	/* set if really a 710 not 700 */
+	__u8	burst_disable:1;	/* set to 1 to disable 710 bursting */
 
 	/* NOTHING BELOW HERE NEEDS ALTERING */
 	__u8	fast:1;		/* if we can alter the SCSI bus clock
@@ -209,10 +217,11 @@ struct NCR_700_Host_Parameters {
 	enum NCR_700_Host_State state; /* protected by state lock */
 	Scsi_Cmnd *cmd;
 
-	__u8	msgout[8];
+	__u8	*msgout;
+#define	MSG_ARRAY_SIZE	16
 	__u8	tag_negotiated;
-	__u8	status;
-	__u8	msgin[8];
+	__u8	*status;
+	__u8	*msgin;
 	struct NCR_700_command_slot	*slots;
 	int	saved_slot_position;
 	int	command_slot_count; /* protected by state lock */
@@ -237,7 +246,7 @@ struct NCR_700_Host_Parameters {
 /*
  *	53C700 Register Interface - the offset from the Selected base
  *	I/O address */
-#ifdef __hppa__
+#ifdef CONFIG_53C700_LE_ON_BE
 #define bE	(hostdata->force_le_on_be ? 0 : 3)
 #define	bSWAP	(hostdata->force_le_on_be)
 #elif defined(__BIG_ENDIAN)
@@ -310,6 +319,7 @@ struct NCR_700_Host_Parameters {
 #define		SODL_REG_FULL		0x20
 #define SSTAT2_REG                      0x0F
 #define CTEST0_REG                      0x14
+#define		BTB_TIMER_DISABLE	0x40
 #define CTEST1_REG                      0x15
 #define CTEST2_REG                      0x16
 #define CTEST3_REG                      0x17
@@ -327,6 +337,8 @@ struct NCR_700_Host_Parameters {
 #define         MASTER_CONTROL          0x10
 #define         DMA_DIRECTION           0x08
 #define CTEST7_REG                      0x1B
+#define		BURST_DISABLE		0x80 /* 710 only */
+#define		SEL_TIMEOUT_DISABLE	0x10 /* 710 only */
 #define         DFP                     0x08
 #define         EVP                     0x04
 #define		DIFF			0x01
@@ -337,6 +349,7 @@ struct NCR_700_Host_Parameters {
 #define		CLR_FIFO		0x40
 #define	ISTAT_REG			0x21
 #define		ABORT_OPERATION		0x80
+#define		SOFTWARE_RESET_710	0x40
 #define		DMA_INT_PENDING		0x01
 #define		SCSI_INT_PENDING	0x02
 #define		CONNECTED		0x08
@@ -345,27 +358,34 @@ struct NCR_700_Host_Parameters {
 #define		SHORTEN_FILTERING	0x04
 #define		ENABLE_ACTIVE_NEGATION	0x10
 #define		GENERATE_RECEIVE_PARITY	0x20
+#define		CLR_FIFO_710		0x04
+#define		FLUSH_DMA_FIFO_710	0x08
 #define CTEST9_REG                      0x23
 #define	DBC_REG				0x24
 #define	DCMD_REG			0x27
 #define	DNAD_REG			0x28
 #define	DIEN_REG			0x39
+#define		BUS_FAULT		0x20
 #define 	ABORT_INT		0x10
 #define 	INT_INST_INT		0x04
 #define 	WD_INT			0x02
 #define 	ILGL_INST_INT		0x01
 #define	DCNTL_REG			0x3B
 #define		SOFTWARE_RESET		0x01
+#define		COMPAT_700_MODE		0x01
 #define 	SCRPTS_16BITS		0x20
 #define		ASYNC_DIV_2_0		0x00
-#define		ASYNC_DIV_1_5		0x01
-#define		ASYNC_DIV_1_0		0x02
-#define		ASYNC_DIV_3_0		0x03
-#define	DMODE_REG			0x34
+#define		ASYNC_DIV_1_5		0x40
+#define		ASYNC_DIV_1_0		0x80
+#define		ASYNC_DIV_3_0		0xc0
+#define DMODE_710_REG			0x38
+#define	DMODE_700_REG			0x34
 #define		BURST_LENGTH_1		0x00
 #define		BURST_LENGTH_2		0x40
 #define		BURST_LENGTH_4		0x80
 #define		BURST_LENGTH_8		0xC0
+#define		DMODE_FC1		0x10
+#define		DMODE_FC2		0x20
 #define 	BW16			32 
 #define 	MODE_286		16
 #define 	IO_XFER			8
@@ -377,7 +397,11 @@ struct NCR_700_Host_Parameters {
 /* Parameters to begin SDTR negotiations.  Empirically, I find that
  * the 53c700-66 cannot handle an offset >8, so don't change this  */
 #define NCR_700_MAX_OFFSET	8
+/* Was hoping the max offset would be greater for the 710, but
+ * empirically it seems to be 8 also */
+#define NCR_710_MAX_OFFSET	8
 #define NCR_700_MIN_XFERP	1
+#define NCR_710_MIN_XFERP	0
 #define NCR_700_MIN_PERIOD	25 /* for SDTR message, 100ns */
 
 #define script_patch_32(script, symbol, value) \
@@ -427,14 +451,14 @@ struct NCR_700_Host_Parameters {
 		val |= ((value) & 0xffff); \
 		(script)[A_##symbol##_used[i]] = bS_to_host(val); \
 		dma_cache_wback((unsigned long)&(script)[A_##symbol##_used[i]], 4); \
-		DEBUG((" script, patching ID field %s at %d to 0x%x\n", \
+		DEBUG((" script, patching short field %s at %d to 0x%x\n", \
 		       #symbol, A_##symbol##_used[i], val)); \
 	} \
 }
 
 #endif
 
-#ifdef MEM_MAPPED
+#ifdef CONFIG_53C700_MEM_MAPPED
 static inline __u8
 NCR_700_readb(struct Scsi_Host *host, __u32 reg)
 {
@@ -482,7 +506,7 @@ NCR_700_writel(__u32 value, struct Scsi_Host *host, __u32 reg)
 
 	writel(bS_to_host(value), host->base + reg);
 }
-#elif defined(IO_MAPPED)
+#elif defined(CONFIG_53C700_IO_MAPPED)
 static inline __u8
 NCR_700_readb(struct Scsi_Host *host, __u32 reg)
 {

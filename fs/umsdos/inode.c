@@ -475,3 +475,4 @@ EXPORT_NO_SYMBOLS;
 
 module_init(init_umsdos_fs)
 module_exit(exit_umsdos_fs)
+MODULE_LICENSE("GPL");

@@ -268,8 +268,8 @@ void show_stackframe(struct sparc_stackf *sf)
 
 void show_regs(struct pt_regs * regs)
 {
-        printk("PSR: %08lx PC: %08lx NPC: %08lx Y: %08lx\n", regs->psr,
-	       regs->pc, regs->npc, regs->y);
+        printk("PSR: %08lx PC: %08lx NPC: %08lx Y: %08lx    %s\n", regs->psr,
+	       regs->pc, regs->npc, regs->y, print_tainted());
 	printk("g0: %08lx g1: %08lx g2: %08lx g3: %08lx ",
 	       regs->u_regs[0], regs->u_regs[1], regs->u_regs[2],
 	       regs->u_regs[3]);

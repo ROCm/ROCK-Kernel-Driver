@@ -653,3 +653,4 @@ EXPORT_NO_SYMBOLS;
 
 module_init(init_smb_fs)
 module_exit(exit_smb_fs)
+MODULE_LICENSE("GPL");

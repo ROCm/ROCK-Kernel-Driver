@@ -1724,8 +1724,16 @@ dasd_3990_erp_env_data (ccw_req_t *erp,
         dasd_3990_handle_env_data (erp,
                                    sense);
 
-	erp = dasd_3990_erp_action_4 (erp,
-				      sense);
+        /* don't retry on disabled interface */
+        if (sense[7] != 0x0F) {
+
+                erp = dasd_3990_erp_action_4 (erp,
+                                              sense);
+        } else {
+
+                erp = dasd_3990_erp_cleanup (erp,
+                                             CQR_STATUS_IN_IO);
+        }
 
 	return erp;
 

@@ -643,6 +643,8 @@ out:
 
 MODULE_DESCRIPTION("Toshiba OBOE IrDA Device Driver");
 MODULE_AUTHOR("James McKenzie <james@fishsoup.dhs.org>");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM (max_baud, "i");
 MODULE_PARM_DESC(max_baus, "Maximum baud rate");
 

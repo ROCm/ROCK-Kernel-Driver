@@ -39,6 +39,7 @@ show up in /proc/sys/kernel:
 - rtsig-max
 - sg-big-buff                 [ generic SCSI device (sg) ]
 - shmmax                      [ sysv ipc ]
+- tainted
 - version
 - zero-paged                  [ PPC only ]
 
@@ -217,6 +218,19 @@ This value can be used to query and set the run time limit
 on the maximum shared memory segment size that can be created.
 Shared memory segments up to 1Gb are now supported in the 
 kernel.  This value defaults to SHMMAX.
+
+==============================================================
+
+tainted: 
+
+Non-zero if the kernel has been tainted.  Numeric values, which
+can be ORed together:
+
+  1 - A module with a non-GPL license has been loaded, this
+      includes modules with no license.
+      Set by modutils >= 2.4.9.
+  2 - A module was force loaded by insmod -f.
+      Set by modutils >= 2.4.9.
 
 ==============================================================
 

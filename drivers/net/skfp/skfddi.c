@@ -187,6 +187,7 @@ static struct pci_device_id skfddi_pci_tbl[] __initdata = {
 	{ }			/* Terminating entry */
 };
 MODULE_DEVICE_TABLE(pci, skfddi_pci_tbl);
+MODULE_LICENSE("GPL");
 
 // Define module-wide (static) variables
 

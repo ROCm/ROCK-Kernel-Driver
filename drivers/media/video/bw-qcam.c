@@ -1051,3 +1051,4 @@ int __init init_bw_qcams(struct video_init *unused)
 	return 0;
 }
 #endif
+MODULE_LICENSE("GPL");

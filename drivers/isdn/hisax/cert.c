@@ -1,10 +1,13 @@
-/* $Id: cert.c,v 2.3.6.2 2001/07/27 09:08:27 kai Exp $
+/* $Id: cert.c,v 2.3.6.3 2001/09/23 22:24:47 kai Exp $
  *
- * Author       Karsten Keil (keil@isdn4linux.de)
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
- *		This file is (c) under GNU General Public License
- *		For changes and modifications please read
- *		../../../Documentation/isdn/HiSax.cert
+ * For changes and modifications please read
+ * ../../../Documentation/isdn/HiSax.cert
  *
  */
  

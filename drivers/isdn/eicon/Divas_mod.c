@@ -1,22 +1,8 @@
-
 /*
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY OF ANY KIND WHATSOEVER INCLUDING ANY 
- * implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
- * See the GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
-
 
 #include <linux/config.h>
 #include <linux/init.h>
@@ -35,6 +21,10 @@
 #include "uxio.h"
 
 
+MODULE_DESCRIPTION("ISDN4Linux: Driver for Eicon Diva Server cards");
+MODULE_AUTHOR("Armin Schindler");
+MODULE_LICENSE("GPL");
+
 #ifdef MODULE
 #include "idi.h"
 void DIVA_DIDD_Write(DESCRIPTOR *, int);
@@ -51,7 +41,6 @@ divas_init(void)
 	printk(KERN_DEBUG "DIVA Server Driver - initialising\n");
 	
 	printk(KERN_DEBUG "DIVA Server Driver - Version 2.0.16\n");
-
 
 #if !defined(CONFIG_PCI)
 	printk(KERN_WARNING "CONFIG_PCI is not defined!\n");

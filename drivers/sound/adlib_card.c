@@ -70,3 +70,4 @@ static int __init setup_adlib(char *str)
 }
 __setup("adlib=", setup_adlib);
 #endif
+MODULE_LICENSE("GPL");

@@ -40,3 +40,4 @@
 #define RSVP_OPS	cls_rsvp6_ops
 
 #include "cls_rsvp.h"
+MODULE_LICENSE("GPL");

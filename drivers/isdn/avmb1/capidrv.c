@@ -1,9 +1,11 @@
-/*
- * $Id: capidrv.c,v 1.39.6.6 2001/05/17 20:41:51 kai Exp $
+/* $Id: capidrv.c,v 1.39.6.7 2001/09/23 22:24:33 kai Exp $
  *
  * ISDN4Linux Driver, using capi20 interface (kernelcapi)
  *
- * Copyright 1997 by Carsten Paeth (calle@calle.in-berlin.de)
+ * Copyright 1997 by Carsten Paeth <calle@calle.de>
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -33,10 +35,12 @@
 #include "capicmd.h"
 #include "capidrv.h"
 
-static char *revision = "$Revision: 1.39.6.6 $";
+static char *revision = "$Revision: 1.39.6.7 $";
 static int debugmode = 0;
 
-MODULE_AUTHOR("Carsten Paeth <calle@calle.in-berlin.de>");
+MODULE_DESCRIPTION("CAPI4Linux: Interface to ISDN4Linux");
+MODULE_AUTHOR("Carsten Paeth");
+MODULE_LICENSE("GPL");
 MODULE_PARM(debugmode, "i");
 
 /* -------- type definitions ----------------------------------------- */

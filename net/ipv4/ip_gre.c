@@ -284,7 +284,7 @@ static struct ip_tunnel * ipgre_tunnel_locate(struct ip_tunnel_parm *parms, int 
 		}
 		if (i==100)
 			goto failed;
-		memcpy(parms->name, dev->name, IFNAMSIZ);
+		memcpy(nt->parms.name, dev->name, IFNAMSIZ);
 	}
 	if (register_netdevice(dev) < 0)
 		goto failed;
@@ -1011,6 +1011,7 @@ ipgre_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 			err = -EPERM;
 			if (t == &ipgre_fb_tunnel)
 				goto done;
+			dev = t->dev;
 		}
 		err = unregister_netdevice(dev);
 		break;
@@ -1296,3 +1297,4 @@ void cleanup_module(void)
 }
 
 #endif
+MODULE_LICENSE("GPL");

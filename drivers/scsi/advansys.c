@@ -775,9 +775,7 @@
  */
 
 #include <linux/config.h>
-#ifdef MODULE
 #include <linux/module.h>
-#endif /* MODULE */
 
 #if defined(CONFIG_X86) && !defined(CONFIG_ISA)
 #define CONFIG_ISA
@@ -18682,3 +18680,4 @@ AdvInquiryHandling(
         }
     }
 }
+MODULE_LICENSE("BSD without advertising clause");

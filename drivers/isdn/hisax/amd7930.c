@@ -1,8 +1,12 @@
-/* $Id: amd7930.c,v 1.5.6.3 2001/06/11 22:08:37 kai Exp $
+/* $Id: amd7930.c,v 1.5.6.4 2001/09/23 22:24:46 kai Exp $
  *
  * HiSax ISDN driver - chip specific routines for AMD 7930
  *
- * Author       Brent Baccala (baccala@FreeSoft.org)
+ * Author       Brent Baccala
+ * Copyright    by Brent Baccala <baccala@FreeSoft.org>
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  *    - Existing ISDN HiSax driver provides all the smarts
  *    - it compiles, runs, talks to an isolated phone switch, connects
@@ -94,7 +98,7 @@
 #include "rawhdlc.h"
 #include <linux/interrupt.h>
 
-static const char *amd7930_revision = "$Revision: 1.5.6.3 $";
+static const char *amd7930_revision = "$Revision: 1.5.6.4 $";
 
 #define RCV_BUFSIZE	1024	/* Size of raw receive buffer in bytes */
 #define RCV_BUFBLKS	4	/* Number of blocks to divide buffer into

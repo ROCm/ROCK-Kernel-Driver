@@ -1,25 +1,13 @@
-/* $Id: hfc_sx.c,v 1.9.6.2 2001/07/18 16:25:12 kai Exp $
-
- * hfc_sx.c     low level driver for CCD´s hfc-s+/sp based cards
+/* $Id: hfc_sx.c,v 1.9.6.3 2001/09/23 22:24:48 kai Exp $
  *
- * Author     Werner Cornelius (werner@isdn4linux.de)
- *            based on existing driver for CCD HFC PCI cards
+ * level driver for CCD´s hfc-s+/sp based cards
  *
- * Copyright 1999  by Werner Cornelius (werner@isdn4linux.de)
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * Author       Werner Cornelius
+ *              based on existing driver for CCD HFC PCI cards
+ * Copyright    by Werner Cornelius  <werner@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -32,7 +20,7 @@
 
 extern const char *CardType[];
 
-static const char *hfcsx_revision = "$Revision: 1.9.6.2 $";
+static const char *hfcsx_revision = "$Revision: 1.9.6.3 $";
 
 /***************************************/
 /* IRQ-table for CCDs demo board       */
@@ -73,7 +61,7 @@ static u_char ccd_sp_irqtab[16] = {
 /******************************/
 static inline void
 Write_hfc(struct IsdnCardState *cs, u_char regnum, u_char val)
-{       long flags;
+{       unsigned long flags;
 
         save_flags(flags);
 	cli();
@@ -84,7 +72,7 @@ Write_hfc(struct IsdnCardState *cs, u_char regnum, u_char val)
 
 static inline u_char
 Read_hfc(struct IsdnCardState *cs, u_char regnum)
-{       long flags;
+{       unsigned long flags;
         u_char ret; 
 
         save_flags(flags);
@@ -101,7 +89,7 @@ Read_hfc(struct IsdnCardState *cs, u_char regnum)
 /**************************************************/
 static void
 fifo_select(struct IsdnCardState *cs, u_char fifo)
-{       long flags;
+{       unsigned long flags;
 
         if (fifo == cs->hw.hfcsx.last_fifo) 
 	  return; /* still valid */
@@ -123,7 +111,7 @@ fifo_select(struct IsdnCardState *cs, u_char fifo)
 /******************************************/
 static void
 reset_fifo(struct IsdnCardState *cs, u_char fifo)
-{       long flags;
+{       unsigned long flags;
 
         save_flags(flags); 
 	cli();
@@ -337,7 +325,7 @@ read_fifo(struct IsdnCardState *cs, u_char fifo, int trans_max)
 void
 release_io_hfcsx(struct IsdnCardState *cs)
 {
-	long flags;
+	unsigned long flags;
 
 	save_flags(flags);
 	cli();
@@ -599,7 +587,7 @@ static void
 hfcsx_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	long flags;
+	unsigned long flags;
 
 	if (!bcs->tx_skb)
 		return;
@@ -670,7 +658,7 @@ dch_nt_l2l1(struct PStack *st, int pr, void *arg)
 static int
 hfcsx_auxcmd(struct IsdnCardState *cs, isdn_ctrl * ic)
 {
-	long flags;
+	unsigned long flags;
 	int i = *(unsigned int *) ic->parm.num;
 
 	if ((ic->arg == 98) &&
@@ -729,7 +717,7 @@ hfcsx_auxcmd(struct IsdnCardState *cs, isdn_ctrl * ic)
 static void
 receive_emsg(struct IsdnCardState *cs)
 {
-	long flags;
+	unsigned long flags;
 	int count = 5;
 	u_char *ptr;
 	struct sk_buff *skb;
@@ -961,7 +949,7 @@ HFCSX_l1hw(struct PStack *st, int pr, void *arg)
 {
 	struct IsdnCardState *cs = (struct IsdnCardState *) st->l1.hardware;
 	struct sk_buff *skb = arg;
-	long flags;
+	unsigned long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
@@ -1115,7 +1103,7 @@ void
 mode_hfcsx(struct BCState *bcs, int mode, int bc)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	long flags;
+	unsigned long flags;
 	int fifo2;
 
 	if (cs->debug & L1_DEB_HSCX)
@@ -1339,7 +1327,7 @@ setstack_2b(struct PStack *st, struct BCState *bcs)
 static void
 hfcsx_bh(struct IsdnCardState *cs)
 {
-	long flags;
+	unsigned long flags;
 /*      struct PStack *stptr;
  */
 	if (!cs)
@@ -1479,7 +1467,7 @@ setup_hfcsx(struct IsdnCard *card)
 {
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	long flags;
+	unsigned long flags;
 
 	strcpy(tmp, hfcsx_revision);
 	printk(KERN_INFO "HiSax: HFC-SX driver Rev. %s\n", HiSax_getrev(tmp));

@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.46 2001/07/05 17:36:41 felfert Exp $
+ * $Id: ctcmain.c,v 1.49 2001/08/31 14:50:05 felfert Exp $
  *
  * CTC / ESCON network driver
  *
@@ -35,7 +35,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.46 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.49 $
  *
  */
 
@@ -43,7 +43,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/slab.h>
+#include <linux/malloc.h>
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
@@ -80,7 +80,7 @@
 #if LINUX_VERSION_CODE >= 0x020213
 #  include <asm/idals.h>
 #else
-#  define set_normalized_cda(ccw, addr) ((ccw)->cda = (addr))
+#  define set_normalized_cda(ccw, addr) ((ccw)->cda = (addr),0)
 #  define clear_normalized_cda(ccw)
 #endif
 #if LINUX_VERSION_CODE < 0x020400
@@ -382,7 +382,7 @@ static __inline__ int ctc_test_and_set_busy(net_device *dev)
  */
 static void print_banner(void) {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.46 $";
+	char vbuf[] = "$Revision: 1.49 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -925,6 +925,7 @@ static __inline__ int ctc_checkalloc_buffer(channel *ch, int warn) {
 	    (ch->flags & CHANNEL_FLAGS_BUFSIZE_CHANGED)) {
 		if (ch->trans_skb != NULL)
 			dev_kfree_skb(ch->trans_skb);
+		clear_normalized_cda(&ch->ccw[1]);
 		ch->trans_skb = dev_alloc_skb(ch->max_bufsize);
 		if (ch->trans_skb == NULL) {
 			if (warn)
@@ -935,9 +936,9 @@ static __inline__ int ctc_checkalloc_buffer(channel *ch, int warn) {
 				       "RX" : "TX");
 			return -ENOMEM;
 		}
-		set_normalized_cda(&ch->ccw[1],
-				   virt_to_phys(ch->trans_skb->data));
-		if (ch->ccw[1].cda == 0) {
+		ch->ccw[1].count = ch->max_bufsize;
+		if (set_normalized_cda(&ch->ccw[1],
+				       virt_to_phys(ch->trans_skb->data))) {
 			dev_kfree_skb(ch->trans_skb);
 			ch->trans_skb = NULL;
 			if (warn)
@@ -949,6 +950,7 @@ static __inline__ int ctc_checkalloc_buffer(channel *ch, int warn) {
 				       "RX" : "TX");
 			return -ENOMEM;
 		}
+		ch->ccw[1].count = 0;
 		ch->flags &= ~CHANNEL_FLAGS_BUFSIZE_CHANGED;
 	}
 	return 0;
@@ -1330,6 +1332,15 @@ static void ch_action_start(fsm_instance *fi, int event, void *arg)
 		dev_kfree_skb(ch->trans_skb);
 		ch->trans_skb = NULL;
 	}
+	if (CHANNEL_DIRECTION(ch->flags) == READ) {
+		ch->ccw[1].cmd_code = CCW_CMD_READ;
+		ch->ccw[1].flags    = CCW_FLAG_SLI;
+		ch->ccw[1].count    = 0;
+	} else {
+		ch->ccw[1].cmd_code = CCW_CMD_WRITE;
+		ch->ccw[1].flags    = CCW_FLAG_SLI | CCW_FLAG_CC;
+		ch->ccw[1].count    = 0;
+	}
 	if (ctc_checkalloc_buffer(ch, 0))
 		printk(KERN_NOTICE
 		       "%s: Could not allocate %s trans_skb, delaying "
@@ -1350,21 +1361,13 @@ static void ch_action_start(fsm_instance *fi, int event, void *arg)
 	ch->ccw[0].flags    = CCW_FLAG_SLI | CCW_FLAG_CC;
 	ch->ccw[0].count    = 0;
 	ch->ccw[0].cda	    = 0;
-	if (CHANNEL_DIRECTION(ch->flags) == READ) {
-		ch->ccw[1].cmd_code = CCW_CMD_READ;
-		ch->ccw[1].flags    = CCW_FLAG_SLI;
-		ch->ccw[1].count    = 0;
-	} else {
-		ch->ccw[1].cmd_code = CCW_CMD_WRITE;
-		ch->ccw[1].flags    = CCW_FLAG_SLI | CCW_FLAG_CC;
-		ch->ccw[1].count    = 0;
-	}
 	ch->ccw[2].cmd_code = CCW_CMD_NOOP;	 /* jointed CE + DE */
 	ch->ccw[2].flags    = CCW_FLAG_SLI;
 	ch->ccw[2].count    = 0;
 	ch->ccw[2].cda	    = 0;
 	memcpy(&ch->ccw[3], &ch->ccw[0], sizeof(ccw1_t) * 3);
 	ch->ccw[4].cda	    = 0;
+	ch->ccw[4].flags    &= ~CCW_FLAG_IDA;
 
 	fsm_newstate(fi, CH_STATE_STARTWAIT);
 	fsm_addtimer(&ch->timer, 1000, CH_EVENT_TIMER, ch);
@@ -1696,9 +1699,10 @@ static void ch_action_txretry(fsm_instance *fi, int event, void *arg)
 		if ((skb = skb_peek(&ch->io_queue))) {
 			int rc = 0;
 
-			set_normalized_cda(&ch->ccw[4],
-					   virt_to_phys(skb->data));
-			if (ch->ccw[4].cda == 0) {
+			clear_normalized_cda(&ch->ccw[4]);
+			ch->ccw[4].count = skb->len;
+			if (set_normalized_cda(&ch->ccw[4],
+					       virt_to_phys(skb->data))) {
 				printk(KERN_DEBUG "%s: IDAL alloc failed, "
 				       "restarting channel\n", dev->name);
 				fsm_event(((ctc_priv *)dev->priv)->fsm,
@@ -1709,7 +1713,6 @@ static void ch_action_txretry(fsm_instance *fi, int event, void *arg)
 			fsm_addtimer(&ch->timer, 1000, CH_EVENT_TIMER, ch);
 			if (event == CH_EVENT_TIMER)
 				s390irq_spin_lock_irqsave(ch->irq, saveflags);
-			ch->ccw[4].count = skb->len;
 #ifdef DEBUG
 	printk(KERN_DEBUG "ccw[4].cda = %08x\n", ch->ccw[4].cda);
 #endif
@@ -2488,8 +2491,8 @@ static int transmit_skb(channel *ch, struct sk_buff *skb) {
 		       LL_HEADER_LENGTH);
 		block_len = skb->len + 2;
 		*((__u16 *)skb_push(skb, 2)) = block_len;
-		set_normalized_cda(&ch->ccw[4], virt_to_phys(skb->data));
-		if (ch->ccw[4].cda == 0) {
+		ch->ccw[4].count = block_len;
+		if (set_normalized_cda(&ch->ccw[4], virt_to_phys(skb->data))) {
 			/**
 			 * idal allocation failed, try via copying to
 			 * trans_skb. trans_skb usually has a pre-allocated
@@ -2513,7 +2516,6 @@ static int transmit_skb(channel *ch, struct sk_buff *skb) {
 			dev_kfree_skb_irq(skb);
 			ccw_idx = 0;
 		} else {
-			ch->ccw[4].count = block_len;
 			skb_queue_tail(&ch->io_queue, skb);
 			ccw_idx = 3;
 		}

@@ -1,9 +1,12 @@
-/* $Id: bkm_ax.h,v 1.5.6.2 2001/02/16 16:43:25 kai Exp $
- * bkm_ax.h   low level decls for T-Berkom cards A4T and Scitel Quadro (4*S0, passive)
+/* $Id: bkm_ax.h,v 1.5.6.3 2001/09/23 22:24:46 kai Exp $
  *
- * Author     Roland Klabunde (R.Klabunde@Berkom.de)
+ * low level decls for T-Berkom cards A4T and Scitel Quadro (4*S0, passive)
  *
- * This file is (c) under GNU General Public License
+ * Author       Roland Klabunde
+ * Copyright    by Roland Klabunde   <R.Klabunde@Berkom.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 

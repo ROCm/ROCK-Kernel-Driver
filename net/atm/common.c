@@ -930,6 +930,8 @@ int atm_ioctl(struct socket *sock,unsigned int cmd,unsigned long arg)
 	if (size)
 		ret_val =  put_user(size,&((struct atmif_sioc *) arg)->length) ?
 			-EFAULT : 0;
+	else
+		ret_val = 0;
 
  done:
 	spin_unlock (&atm_dev_lock); 

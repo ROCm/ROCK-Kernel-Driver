@@ -940,3 +940,4 @@ static void __exit exit_sr(void)
 
 module_init(init_sr);
 module_exit(exit_sr);
+MODULE_LICENSE("GPL");

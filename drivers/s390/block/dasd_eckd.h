@@ -26,6 +26,7 @@
 #define DASD_ECKD_CCW_READ_CKD_MT 0x9e
 #define DASD_ECKD_CCW_WRITE_CKD_MT 0x9d
 #define DASD_ECKD_CCW_RESERVE 0xB4
+#define DASD_ECKD_CCW_SLCK 0x14	/* steal lock - unconditional reserve */
 
 typedef
     struct eckd_count_t {

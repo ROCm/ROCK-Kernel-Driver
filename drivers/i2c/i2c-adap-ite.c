@@ -299,6 +299,7 @@ EXPORT_NO_SYMBOLS;
  */
 MODULE_AUTHOR("MontaVista Software <www.mvista.com>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for ITE IIC bus adapter");
+MODULE_LICENSE("GPL");
 
 MODULE_PARM(base, "i");
 MODULE_PARM(irq, "i");

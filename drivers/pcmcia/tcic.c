@@ -69,6 +69,7 @@ static const char *version =
 
 MODULE_AUTHOR("David Hinds <dhinds@pcmcia.sourceforge.org>");
 MODULE_DESCRIPTION("Databook TCIC-2 PCMCIA socket driver");
+MODULE_LICENSE("Dual MPL/GPL");
 
 /*====================================================================*/
 

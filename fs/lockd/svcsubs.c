@@ -305,6 +305,7 @@ nlmsvc_invalidate_client(struct svc_client *clnt)
 		dprintk("lockd: invalidating client for %s\n", host->h_name);
 		nlmsvc_free_host_resources(host);
 		host->h_expires = 0;
+		host->h_killed = 1;
 		nlm_release_host(host);
 	}
 }

@@ -1,11 +1,19 @@
-/* $Id: config.c,v 2.57.6.18 2001/08/27 22:19:05 kai Exp $
+/* $Id: config.c,v 2.57.6.20 2001/09/23 22:24:47 kai Exp $
  *
- * Author       Karsten Keil (keil@isdn4linux.de)
- *              based on the teles driver from Jan den Ouden
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ *              by Kai Germaschewski <kai.germaschewski@gmx.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
- * This file is (c) under GNU General Public License
+ * For changes and modifications please read
+ * ../../../Documentation/isdn/HiSax.cert
+ *
+ * based on the teles driver from Jan den Ouden
  *
  */
+
 #include <linux/types.h>
 #include <linux/stddef.h>
 #include <linux/timer.h>
@@ -365,7 +373,9 @@ static int irq[8] __devinitdata = { 0, };
 static int mem[8] __devinitdata = { 0, };
 static char *id __devinitdata = HiSaxID;
 
+MODULE_DESCRIPTION("ISDN4Linux: Driver for passive ISDN cards");
 MODULE_AUTHOR("Karsten Keil");
+MODULE_LICENSE("GPL");
 MODULE_PARM(type, "1-8i");
 MODULE_PARM(protocol, "1-8i");
 MODULE_PARM(io, "1-8i");

@@ -307,7 +307,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.3"
+#define DRIVER_VERSION "v1.4"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com, http://www.kroah.com/linux-usb/"
 #define DRIVER_DESC "USB Serial Driver core"
 
@@ -343,6 +343,13 @@ static struct usb_serial_device_type generic_device = {
 	num_ports:		1,
 	shutdown:		generic_shutdown,
 };
+
+#define if_generic_do(x)					\
+	if ((serial->dev->descriptor.idVendor == vendor) &&	\
+	    (serial->dev->descriptor.idProduct == product))	\
+	                x
+#else
+#define if_generic_do(x)
 #endif
 
 
@@ -505,8 +512,6 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 		return -ENODEV;
 	}
 
-	MOD_INC_USE_COUNT;
-	
 	/* set up our port structure making the tty driver remember our port object, and us it */
 	portNumber = MINOR(tty->device) - serial->minor;
 	port = &serial->port[portNumber];
@@ -544,8 +549,6 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 	} else {
 		generic_close(port, filp);
 	}
-
-	MOD_DEC_USE_COUNT;
 }	
 
 
@@ -768,7 +771,8 @@ static int generic_open (struct usb_serial_port *port, struct file *filp)
 	if (port_paranoia_check (port, __FUNCTION__))
 		return -ENODEV;
 
-	MOD_INC_USE_COUNT;
+	/* only increment our usage count, if this device is _really_ a generic device */
+	if_generic_do(MOD_INC_USE_COUNT);
 
 	dbg(__FUNCTION__ " - port %d", port->number);
 
@@ -828,7 +832,9 @@ static void generic_close (struct usb_serial_port *port, struct file * filp)
 	}
 
 	up (&port->sem);
-	MOD_DEC_USE_COUNT;
+
+	/* only decrement our usage count, if this device is _really_ a generic device */
+	if_generic_do(MOD_DEC_USE_COUNT);
 }
 
 

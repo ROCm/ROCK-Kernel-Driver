@@ -1097,3 +1097,4 @@ static void __exit exit_3c589_cs(void)
 
 module_init(init_3c589_cs);
 module_exit(exit_3c589_cs);
+MODULE_LICENSE("GPL");

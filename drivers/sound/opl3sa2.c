@@ -164,6 +164,8 @@ static int __initdata multiple; /* = 0 */
 
 MODULE_DESCRIPTION("Module for OPL3-SA2 and SA3 sound cards (uses AD1848 MSS driver).");
 MODULE_AUTHOR("Scott Murray <scott@spiteful.org>");
+MODULE_LICENSE("GPL");
+
 
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "Set I/O base of OPL3-SA2 or SA3 card (usually 0x370.  Address must be even and must be from 0x100 to 0xFFE)");

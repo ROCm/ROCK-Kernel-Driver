@@ -1173,3 +1173,4 @@ void __exit bsdcomp_cleanup(void)
 
 module_init(bsdcomp_init);
 module_exit(bsdcomp_cleanup);
+MODULE_LICENSE("BSD without advertising clause");

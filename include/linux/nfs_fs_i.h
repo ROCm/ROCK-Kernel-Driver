@@ -99,5 +99,6 @@ struct nfs_lock_info {
  * Lock flag values
  */
 #define NFS_LCK_GRANTED		0x0001		/* lock has been granted */
+#define NFS_LCK_RECLAIM		0x0002		/* lock marked for reclaiming */
 
 #endif

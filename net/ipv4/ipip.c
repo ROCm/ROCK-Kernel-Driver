@@ -1,7 +1,7 @@
 /*
  *	Linux NET3:	IP/IP protocol decoder. 
  *
- *	Version: $Id: ipip.c,v 1.47 2001/09/18 00:36:07 davem Exp $
+ *	Version: $Id: ipip.c,v 1.49 2001/09/25 22:35:47 davem Exp $
  *
  *	Authors:
  *		Sam Lantinga (slouken@cs.ucdavis.edu)  02/01/95
@@ -255,7 +255,7 @@ struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 		}
 		if (i==100)
 			goto failed;
-		memcpy(parms->name, dev->name, IFNAMSIZ);
+		memcpy(nt->parms.name, dev->name, IFNAMSIZ);
 	}
 	if (register_netdevice(dev) < 0)
 		goto failed;
@@ -758,6 +758,7 @@ ipip_tunnel_ioctl (struct net_device *dev, struct ifreq *ifr, int cmd)
 			err = -EPERM;
 			if (t == &ipip_fb_tunnel)
 				goto done;
+			dev = t->dev;
 		}
 		err = unregister_netdevice(dev);
 		break;
@@ -903,3 +904,4 @@ static void __exit ipip_fini(void)
 module_init(ipip_init);
 #endif
 module_exit(ipip_fini);
+MODULE_LICENSE("GPL");

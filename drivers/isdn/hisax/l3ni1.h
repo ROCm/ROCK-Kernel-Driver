@@ -1,20 +1,19 @@
-// $Id: l3ni1.h,v 2.3.6.1 2001/02/16 16:43:28 kai Exp $
-//-----------------------------------------------------------------------------
-//
-// NI1 D-channel protocol
-//
-// Author       Matt Henderson & Guy Ellis - Traverse Tecnologies Pty Ltd
-//              www.traverse.com.au
-//
-// 2000.6.6 Initial implementation of routines for US NI1 
-// Layer 3 protocol based on the EURO/DSS1 D-channel protocol 
-// driver written by Karsten Keil et al.  Thanks also for the 
-// code provided by Ragnar Paulson.
-//
-//
-// This file is (c) under GNU General Public License
-//
-//-----------------------------------------------------------------------------
+/* $Id: l3ni1.h,v 2.3.6.2 2001/09/23 22:24:50 kai Exp $
+ *
+ * NI1 D-channel protocol
+ *
+ * Author       Matt Henderson & Guy Ellis
+ * Copyright    by Traverse Technologies Pty Ltd, www.travers.com.au
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
+ * 2000.6.6 Initial implementation of routines for US NI1 
+ * Layer 3 protocol based on the EURO/DSS1 D-channel protocol 
+ * driver written by Karsten Keil et al.  Thanks also for the 
+ * code provided by Ragnar Paulson.
+ *
+ */
 
 #ifndef l3ni1_process
 

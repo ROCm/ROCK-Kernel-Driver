@@ -158,9 +158,6 @@ dasd_start_diag (ccw_req_t * cqr)
 				CQR_STATUS_QUEUED, CQR_STATUS_DONE);
 		dasd_schedule_bh (device);
 	} else {
-		if (cqr->expires) {
-			cqr->expires += cqr->startclk;
-		}
 		check_then_set (&cqr->status,
 				CQR_STATUS_QUEUED, CQR_STATUS_IN_IO);
 		rc = 0;
@@ -178,6 +175,8 @@ dasd_ext_handler (struct pt_regs *regs, __u16 code)
 	dasd_device_t *device;
 	int done_fast_io = 0;
 	int devno;
+        unsigned long flags;
+
 
 	irq_enter(cpu, -1);
 
@@ -195,6 +194,7 @@ dasd_ext_handler (struct pt_regs *regs, __u16 code)
 	}
 	cqr = (ccw_req_t *) ip;
 	device = (dasd_device_t *) cqr->device;
+
 	devno = device->devinfo.devno;
 	if (device == NULL) {
 		printk (KERN_WARNING PRINTK_HEADER
@@ -214,7 +214,13 @@ dasd_ext_handler (struct pt_regs *regs, __u16 code)
 		irq_exit(cpu, -1);
 		return;
 	}
+
+        /* get irq lock to modify request queue */
+        s390irq_spin_lock_irqsave (device->devinfo.irq, 
+                                   flags);
+
 	asm volatile ("STCK %0":"=m" (cqr->stopclk));
+
 	switch (status) {
 	case 0x00:
 		check_then_set (&cqr->status,
@@ -233,9 +239,14 @@ dasd_ext_handler (struct pt_regs *regs, __u16 code)
 				CQR_STATUS_IN_IO, CQR_STATUS_FAILED);
 		break;
 	}
+
+        s390irq_spin_unlock_irqrestore (device->devinfo.irq, 
+                                        flags);
+
 	wake_up (&device->wait_q);
 	dasd_schedule_bh (device);
 	irq_exit(cpu, -1);
+
 }
 
 static int

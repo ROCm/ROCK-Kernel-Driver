@@ -1008,6 +1008,8 @@ void cleanup_module(void)
 	release_region(de620_dev.base_addr, 3);
 }
 #endif /* MODULE */
+MODULE_LICENSE("GPL");
+
 
 /*
  * (add '-DMODULE' when compiling as loadable module)

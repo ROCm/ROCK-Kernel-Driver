@@ -6812,6 +6812,7 @@ static char	*qla1280_get_token(char *cmdline, char *str )
         *cp = '\0';
         return( cp );
 }
+MODULE_LICENSE("GPL");
 
 /*
  * Overrides for Emacs so that we almost follow Linus's tabbing style.

@@ -426,3 +426,4 @@ static void saa7110_exit(void)
 
 module_init(saa7110_init);
 module_exit(saa7110_exit);
+MODULE_LICENSE("GPL");

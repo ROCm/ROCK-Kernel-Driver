@@ -406,3 +406,4 @@ static void saa7185_exit(void)
 
 module_init(saa7185_init);
 module_exit(saa7185_exit);
+MODULE_LICENSE("GPL");

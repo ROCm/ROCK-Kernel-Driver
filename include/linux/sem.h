@@ -68,11 +68,11 @@ struct  seminfo {
 #define SEMMNS  (SEMMNI*SEMMSL) /* <= INT_MAX max # of semaphores in system */
 #define SEMOPM  32	        /* <= 1 000 max num of ops per semop call */
 #define SEMVMX  32767           /* <= 32767 semaphore maximum value */
+#define SEMAEM  SEMVMX          /* adjust on exit max value */
 
 /* unused */
 #define SEMUME  SEMOPM          /* max num of undo entries per process */
 #define SEMMNU  SEMMNS          /* num of undo structures system wide */
-#define SEMAEM  (SEMVMX >> 1)   /* adjust on exit max value */
 #define SEMMAP  SEMMNS          /* # of entries in semaphore map */
 #define SEMUSZ  20		/* sizeof struct sem_undo */
 

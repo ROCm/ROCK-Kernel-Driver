@@ -476,3 +476,4 @@ static void adv7175_exit(void)
 
 module_init(adv7175_init);
 module_exit(adv7175_exit);
+MODULE_LICENSE("GPL");

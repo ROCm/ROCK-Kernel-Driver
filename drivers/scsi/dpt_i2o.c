@@ -3324,3 +3324,4 @@ static static void adpt_delay(int millisec)
 static Scsi_Host_Template driver_template = DPT_I2O;
 #include "scsi_module.c"
 EXPORT_NO_SYMBOLS;
+MODULE_LICENSE("BSD without advertising clause");

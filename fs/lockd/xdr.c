@@ -367,7 +367,8 @@ nlmsvc_decode_reboot(struct svc_rqst *rqstp, u32 *p, struct nlm_reboot *argp)
 	if (!(p = xdr_decode_string_inplace(p, &argp->mon, &argp->len, SM_MAXSTRLEN)))
 		return 0;
 	argp->state = ntohl(*p++);
-	argp->addr = ntohl(*p++);
+	/* Preserve the address in network byte order */
+	argp->addr = *p++;
 	return xdr_argsize_check(rqstp, p);
 }
 

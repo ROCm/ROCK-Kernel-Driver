@@ -863,3 +863,4 @@ struct matrox_switch matrox_millennium = {
 };
 EXPORT_SYMBOL(matrox_millennium);
 #endif
+MODULE_LICENSE("GPL");

@@ -208,3 +208,4 @@ int __init attach_aci_rds(void)
 void __exit unload_aci_rds(void)
 {
 }
+MODULE_LICENSE("GPL");

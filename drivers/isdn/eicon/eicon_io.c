@@ -1,4 +1,4 @@
-/* $Id: eicon_io.c,v 1.13.6.1 2001/02/16 09:09:50 armin Exp $
+/* $Id: eicon_io.c,v 1.13.6.2 2001/09/23 22:24:37 kai Exp $
  *
  * ISDN low-level module for Eicon active ISDN-Cards.
  * Code for communicating with hardware.
@@ -6,25 +6,13 @@
  * Copyright 1999,2000  by Armin Schindler (mac@melware.de)
  * Copyright 1999,2000  Cytronics & Melware (info@melware.de)
  *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
  * Thanks to	Eicon Networks for 
  *		documents, informations and hardware. 
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA. 
- *
  */
-
 
 #include <linux/config.h>
 #include "eicon.h"

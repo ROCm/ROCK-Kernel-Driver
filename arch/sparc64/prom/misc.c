@@ -1,4 +1,4 @@
-/* $Id: misc.c,v 1.19 2000/06/30 10:18:38 davem Exp $
+/* $Id: misc.c,v 1.20 2001/09/21 03:17:07 kanoj Exp $
  * misc.c:  Miscellaneous prom functions that don't belong
  *          anywhere else.
  *
@@ -59,25 +59,15 @@ prom_cmdline(void)
 		prom_palette (1);
 #endif
 
-	/* We always arrive here via a serial interrupt.
-	 * So in order for everything to work reliably, even
-	 * on SMP, we need to drop the IRQ locks we hold.
-	 */
 #ifdef CONFIG_SMP
-	irq_exit(smp_processor_id(), 0);
 	smp_capture();
-#else
-	local_irq_count(smp_processor_id())--;
 #endif
 
 	p1275_cmd ("enter", P1275_INOUT(0,0));
 
 #ifdef CONFIG_SMP
 	smp_release();
-	irq_enter(smp_processor_id(), 0);
 	spin_unlock_wait(&__br_write_locks[BR_GLOBALIRQ_LOCK].lock);
-#else
-	local_irq_count(smp_processor_id())++;
 #endif
 
 #ifdef CONFIG_SUN_CONSOLE

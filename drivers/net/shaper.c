@@ -743,4 +743,5 @@ static void __exit shaper_exit (void)
 
 module_init(shaper_init);
 module_exit(shaper_exit);
+MODULE_LICENSE("GPL");
 

@@ -1,4 +1,9 @@
-#include <linux/module.h>
+/*
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
+ */
+
 #include <linux/version.h>
 #include <linux/errno.h>
 #include <asm/segment.h>

@@ -1767,6 +1767,8 @@ static int n_eepro;
 
 MODULE_AUTHOR("Pascal Dupuis <dupuis@lei.ucl.ac.be> for the 2.1 stuff (locking,...)");
 MODULE_DESCRIPTION("Intel i82595 ISA EtherExpressPro10/10+ driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "1-" __MODULE_STRING(MAX_EEPRO) "i");
 MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_EEPRO) "i");
 MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_EEPRO) "i");

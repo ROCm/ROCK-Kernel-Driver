@@ -805,3 +805,4 @@ static Scsi_Host_Template driver_template = SCSI_DEBUG;
  * tab-width: 8
  * End:
  */
+MODULE_LICENSE("GPL");

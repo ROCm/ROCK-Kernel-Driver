@@ -706,3 +706,4 @@ static void __exit unload_aci(void)
 
 module_init(attach_aci);
 module_exit(unload_aci);
+MODULE_LICENSE("GPL");

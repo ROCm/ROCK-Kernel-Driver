@@ -190,6 +190,8 @@ static  int boards_found;
 
 MODULE_AUTHOR("Maintainer: Torben Mathiasen <torben.mathiasen@compaq.com>");
 MODULE_DESCRIPTION("Driver for TI ThunderLAN based ethernet PCI adapters");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(aui, "1-" __MODULE_STRING(MAX_TLAN_BOARDS) "i");
 MODULE_PARM(duplex, "1-" __MODULE_STRING(MAX_TLAN_BOARDS) "i");
 MODULE_PARM(speed, "1-" __MODULE_STRING(MAX_TLAN_BOARDS) "i");
@@ -452,7 +454,7 @@ static int __init tlan_probe(void)
 	
 	/* Use new style PCI probing. Now the kernel will
 	   do most of this for us */
-	pci_module_init(&tlan_driver);
+	pci_register_driver(&tlan_driver);
 
 	TLAN_DBG(TLAN_DEBUG_PROBE, "Starting EISA Probe....\n");
 	TLan_EisaProbe();
@@ -462,6 +464,7 @@ static int __init tlan_probe(void)
 		 tlan_have_pci, tlan_have_eisa);
 
 	if (TLanDevicesInstalled == 0) {
+		pci_unregister_driver(&tlan_driver);
 		kfree(TLanPadBuffer);
 		return -ENODEV;
 	}
@@ -643,8 +646,7 @@ static void TLan_Eisa_Cleanup(void)
 		
 static void __exit tlan_exit(void)
 {
-	if (tlan_have_pci)
-		pci_unregister_driver(&tlan_driver);
+	pci_unregister_driver(&tlan_driver);
 
 	if (tlan_have_eisa)
 		TLan_Eisa_Cleanup();

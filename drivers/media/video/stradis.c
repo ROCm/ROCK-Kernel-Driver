@@ -65,6 +65,8 @@ static int saa_num = 0;		/* number of SAA7146s in use */
 
 static int video_nr = -1;
 MODULE_PARM(video_nr,"i");
+MODULE_LICENSE("GPL");
+
 
 #define nDebNormal	0x00480000
 #define nDebNoInc	0x00480000

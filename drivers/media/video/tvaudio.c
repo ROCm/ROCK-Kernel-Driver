@@ -1168,6 +1168,7 @@ void audiochip_cleanup_module(void)
 
 module_init(audiochip_init_module);
 module_exit(audiochip_cleanup_module);
+MODULE_LICENSE("GPL");
 
 /*
  * Local variables:

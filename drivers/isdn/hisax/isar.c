@@ -1,4 +1,4 @@
-/* $Id: isar.c,v 1.17.6.4 2001/08/17 12:34:26 kai Exp $
+/* $Id: isar.c,v 1.17.6.5 2001/09/23 11:51:33 keil Exp $
  *
  * isar.c   ISAR (Siemens PSB 7110) specific routines
  *
@@ -270,9 +270,10 @@ isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
 			ret = 1;goto reterror;
 		}
 		while (left>0) {
-			noc = left;
-			if (noc > 126)
+			if (left > 126)
 				noc = 126;
+			else
+				noc = left;
 			nom = 2*noc;
 			mp  = msg;
 			*mp++ = sadr / 256;
@@ -288,8 +289,8 @@ isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
 			nom += 3;
 			sp = (u_short *)tmpmsg;
 #if DBG_LOADFIRM
-			printk(KERN_DEBUG"isar: load %3d words at %04x\n",
-				 noc, sadr);
+			printk(KERN_DEBUG"isar: load %3d words at %04x left %d\n",
+				 noc, sadr, left);
 #endif
 			sadr += noc;
 			while(noc) {

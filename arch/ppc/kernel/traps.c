@@ -191,8 +191,8 @@ SMIException(struct pt_regs *regs)
 void
 UnknownException(struct pt_regs *regs)
 {
-	printk("Bad trap at PC: %lx, SR: %lx, vector=%lx\n",
-	       regs->nip, regs->msr, regs->trap);
+	printk("Bad trap at PC: %lx, SR: %lx, vector=%lx    %s\n",
+	       regs->nip, regs->msr, regs->trap, print_tainted());
 	_exception(SIGTRAP, regs);	
 }
 
@@ -338,9 +338,9 @@ StackOverflow(struct pt_regs *regs)
 void
 trace_syscall(struct pt_regs *regs)
 {
-	printk("Task: %p(%d), PC: %08lX/%08lX, Syscall: %3ld, Result: %s%ld\n",
+	printk("Task: %p(%d), PC: %08lX/%08lX, Syscall: %3ld, Result: %s%ld    %s\n",
 	       current, current->pid, regs->nip, regs->link, regs->gpr[0],
-	       regs->ccr&0x10000000?"Error=":"", regs->gpr[3]);
+	       regs->ccr&0x10000000?"Error=":"", regs->gpr[3], print_tainted());
 }
 
 #ifdef CONFIG_8xx
@@ -376,8 +376,8 @@ SoftwareEmulation(struct pt_regs *regs)
 void
 TAUException(struct pt_regs *regs)
 {
-	printk("TAU trap at PC: %lx, SR: %lx, vector=%lx\n",
-	       regs->nip, regs->msr, regs->trap);
+	printk("TAU trap at PC: %lx, SR: %lx, vector=%lx    %s\n",
+	       regs->nip, regs->msr, regs->trap, print_tainted());
 }
 #endif /* CONFIG_INT_TAU */
 

@@ -1,46 +1,21 @@
-/* $Id: ix1_micro.c,v 2.10.6.1 2001/02/16 16:43:27 kai Exp $
+/* $Id: ix1_micro.c,v 2.10.6.2 2001/09/23 22:24:49 kai Exp $
  *
- * ix1_micro.c  low level stuff for ITK ix1-micro Rev.2 isdn cards
- *              derived from the original file teles3.c from Karsten Keil
+ * low level stuff for ITK ix1-micro Rev.2 isdn cards
+ * derived from the original file teles3.c from Karsten Keil
  *
- * Copyright (C) 1997 Klaus-Peter Nischke (ITK AG) (for the modifications to
- *                                                  the original file teles.c)
+ * Author       Klaus-Peter Nischke
+ * Copyright    by Klaus-Peter Nischke, ITK AG
+ *                                   <klaus@nischke.do.eunet.de>
+ *              by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
- * Thanks to    Jan den Ouden
- *              Fritz Elfert
- *              Beat Doebeli
- *
+ * Klaus-Peter Nischke
+ * Deusener Str. 287
+ * 44369 Dortmund
+ * Germany
  */
-
-/*
-   For the modification done by the author the following terms and conditions
-   apply (GNU General Public License)
-
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software
-   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-
-
-   You may contact Klaus-Peter Nischke by email: klaus@nischke.do.eunet.de
-   or by conventional mail:
-
-   Klaus-Peter Nischke
-   Deusener Str. 287
-   44369 Dortmund
-   Germany
- */
-
 
 #define __NO_VERSION__
 #include <linux/init.h>
@@ -50,7 +25,7 @@
 #include "isdnl1.h"
 
 extern const char *CardType[];
-const char *ix1_revision = "$Revision: 2.10.6.1 $";
+const char *ix1_revision = "$Revision: 2.10.6.2 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

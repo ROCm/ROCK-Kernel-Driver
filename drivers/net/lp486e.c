@@ -1324,6 +1324,8 @@ static void set_multicast_list(struct net_device *dev) {
 
 MODULE_AUTHOR("Ard van Breemen <ard@cstmel.nl.eu.org>");
 MODULE_DESCRIPTION("Intel Panther onboard i82596 driver");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(debug, "i");
 //MODULE_PARM(max_interrupt_work, "i");
 //MODULE_PARM(reverse_probe, "i");

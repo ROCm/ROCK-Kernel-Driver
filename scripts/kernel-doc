@@ -31,6 +31,12 @@ use strict;
 #		Return error code.
 # 		Keith Owens <kaos@ocs.com.au>
 
+# 23/09/2001 - Added support for typedefs, structs, enums and unions
+#              Support for Context section; can be terminated using empty line
+#              Small fixes (like spaces vs. \s in regex)
+# -- Tim Jansen <tim@tjansen.de>
+
+
 #
 # This will read a 'c' file and scan for embedded comments in the
 # style of gnome comments (+minor extensions - see below).
@@ -95,7 +101,48 @@ use strict;
 #  */
 # etc.
 #
-# All descriptions can be multiline, apart from the short function description.
+# Beside functions you can also write documentation for structs, unions, 
+# enums and typedefs. Instead of the function name you must write the name 
+# of the declaration;  the struct/union/enum/typedef must always precede 
+# the name. Nesting of declarations is not supported. 
+# Use the argument mechanism to document members or constants. In 
+# structs and unions you must declare one member per declaration 
+# (comma-separated members are not allowed -  the parser does not support 
+# this).
+# e.g.
+# /**
+#  * struct my_struct - short description
+#  * @a: first member
+#  * @b: second member
+#  * 
+#  * Longer description
+#  */
+# struct my_struct {
+#     int a;
+#     int b;
+# };
+#
+# All descriptions can be multiline, except the short function description.
+# 
+# You can also add additional sections. When documenting kernel functions you 
+# should document the "Context:" of the function, e.g. whether the functions 
+# can be called form interrupts. Unlike other sections you can end it with an
+# empty line. 
+# Example-sections should contain the string EXAMPLE so that they are marked 
+# appropriately in DocBook.
+#
+# Example:
+# /**
+#  * user_function - function that can only be called in user context
+#  * @a: some argument
+#  * Context: !in_interrupt()
+#  * 
+#  * Some description
+#  * Example:
+#  *    user_function(22);
+#  */
+# ...
+#
 #
 # All descriptive text is further processed, scanning for the following special
 # patterns, which are highlighted appropriately.
@@ -114,7 +161,6 @@ my $type_func = '(\w+)\(\)';
 my $type_param = '\@(\w+)';
 my $type_struct = '\&((struct\s*)?[_\w]+)';
 my $type_env = '(\$\w+)';
-
 
 # Output conversion substitutions.
 #  One for each output format
@@ -177,14 +223,18 @@ my %highlights = %highlights_man;
 my $blankline = $blankline_man;
 my $modulename = "Kernel API";
 my $function_only = 0;
+my $man_date = ('January', 'February', 'March', 'April', 'May', 'June', 
+		'July', 'August', 'September', 'October', 
+		'November', 'December')[(localtime)[4]] . 
+  " " . ((localtime)[5]+1900);
 
 # Essentially these are globals
 # They probably want to be tidied up made more localised or summat.
 # CAVEAT EMPTOR!  Some of the others I localised may not want to be which
 # could cause "use of undefined value" or other bugs.
-my ($function, %function_table,%parametertypes,$function_purpose);
-my ($type,$file,$function_name,$return_type);
-my ($newsection,$newcontents,$prototype,$filelist);
+my ($function, %function_table,%parametertypes,$declaration_purpose);
+my ($type,$file,$declaration_name,$return_type);
+my ($newsection,$newcontents,$prototype,$filelist, $brcount, %source_map);
 
 my $lineprefix="";
 
@@ -193,28 +243,38 @@ my $lineprefix="";
 # 1 - looking for function name
 # 2 - scanning field start.
 # 3 - scanning prototype.
-my $state = 0;
+# 4 - documentation block
+my $state;
+
+#declaration types: can be
+# 'function', 'struct', 'union', 'enum', 'typedef'
+my $decl_type;
+
 my $doc_special = "\@\%\$\&";
 
-my $doc_start = "^/\\*\\*\$";
-my $doc_end = "\\*/";
-my $doc_com = "\\s*\\*\\s*";
-my $doc_func = $doc_com."(\\w+):?";
-my $doc_sect = $doc_com."([".$doc_special."]?[\\w ]+):(.*)";
-my $doc_content = $doc_com."(.*)";
-my $doc_block = $doc_com."DOC:\\s*(.*)?";
+my $doc_start = '^/\*\*\s*$'; # Allow whitespace at end of comment start.
+my $doc_end = '\*/';
+my $doc_com = '\s*\*\s*';
+my $doc_decl = $doc_com.'(\w+)';
+my $doc_sect = $doc_com.'(['.$doc_special.']?[\w ]+):(.*)';
+my $doc_content = $doc_com.'(.*)';
+my $doc_block = $doc_com.'DOC:\s*(.*)?';
 
-my %constants = ();
-my %parameters = ();
-my @parameterlist = ();
-my %sections = ();
-my @sectionlist = ();
-my %source_map = ();
+my %constants;
+my %parameterdescs;
+my @parameterlist;
+my %sections;
+my @sectionlist;
 
 my $contents = "";
 my $section_default = "Description";	# default section
 my $section_intro = "Introduction";
 my $section = $section_default;
+my $section_context = "Context";
+
+my $undescribed = "-- undescribed --";
+
+reset_state();
 
 while ($ARGV[0] =~ m/^-(.*)/) {
     my $cmd = shift @ARGV;
@@ -280,7 +340,7 @@ sub dump_section {
     } elsif ($name =~ m/$type_param/) {
 #	print STDERR "parameter def '$1' = '$contents'\n";
 	$name = $1;
-	$parameters{$name} = $contents;
+	$parameterdescs{$name} = $contents;
     } else {
 #	print STDERR "other section '$name' = '$contents'\n";
 	$sections{$name} = $contents;
@@ -291,28 +351,28 @@ sub dump_section {
 ##
 # output function
 #
-# parameters, a hash.
+# parameterdescs, a hash.
 #  function => "function name"
 #  parameterlist => @list of parameters
-#  parameters => %parameter descriptions
+#  parameterdescs => %parameter descriptions
 #  sectionlist => @list of sections
 #  sections => %descriont descriptions
 #  
 
-sub output_highlight(@) {
+sub output_highlight {
     my $contents = join "\n",@_;
     my $line;
 
-#	DEBUG
-#	if (!defined $contents) {
-#	    use Carp;
-#	    confess "output_highlight got called with no args?\n";
-#    }
+#   DEBUG
+#   if (!defined $contents) {
+#	use Carp;
+#	confess "output_highlight got called with no args?\n";
+#   }
 
     eval $dohighlight;
     die $@ if $@;
     foreach $line (split "\n", $contents) {
-	if ($line eq ""){
+      if ($line eq ""){
 	    print $lineprefix, $blankline;
 	} else {
             $line =~ s/\\\\\\/\&/g;
@@ -322,9 +382,98 @@ sub output_highlight(@) {
     }
 }
 
+#output sections in html
+sub output_section_html(%) {
+    my %args = %{$_[0]};
+    my $section;
 
-# output in html
-sub output_html(%) {
+    foreach $section (@{$args{'sectionlist'}}) {
+	print "<h3>$section</h3>\n";
+	print "<blockquote>\n";
+	output_highlight($args{'sections'}{$section});
+	print "</blockquote>\n";
+    }  
+}
+
+# output enum in html
+sub output_enum_html(%) {
+    my %args = %{$_[0]};
+    my ($parameter);
+    my $count;
+    print "<h2>enum ".$args{'enum'}."</h2>\n";
+
+    print "<b>enum ".$args{'enum'}."</b> {<br>\n";
+    $count = 0;
+    foreach $parameter (@{$args{'parameterlist'}}) {
+        print " <b>".$parameter."</b>";
+	if ($count != $#{$args{'parameterlist'}}) {
+	    $count++;
+	    print ",\n";
+	}
+	print "<br>";
+    }
+    print "};<br>\n";
+
+    print "<h3>Constants</h3>\n";
+    print "<dl>\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+	print "<dt><b>".$parameter."</b>\n";
+	print "<dd>";
+	output_highlight($args{'parameterdescs'}{$parameter});
+    }
+    print "</dl>\n";
+    output_section_html(@_);
+    print "<hr>\n";
+}
+
+# output tyepdef in html
+sub output_typedef_html(%) {
+    my %args = %{$_[0]};
+    my ($parameter);
+    my $count;
+    print "<h2>typedef ".$args{'typedef'}."</h2>\n";
+
+    print "<b>typedef ".$args{'typedef'}."</b>\n";
+    output_section_html(@_);
+    print "<hr>\n";
+}
+
+# output struct in html
+sub output_struct_html(%) {
+    my %args = %{$_[0]};
+    my ($parameter);
+
+    print "<h2>".$args{'type'}." ".$args{'struct'}."</h2>\n";
+    print "<b>".$args{'type'}." ".$args{'struct'}."</b> {<br>\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+        ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
+	$type = $args{'parametertypes'}{$parameter};
+	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
+	    # pointer-to-function
+	    print " <i>$1</i><b>$parameter</b>) <i>($2)</i>;<br>\n";
+	} elsif ($type =~ m/^(.*?)\s*(:.*)/) {
+	    print " <i>$1</i> <b>$parameter</b>$2;<br>\n";
+	} else {
+	    print " <i>$type</i> <b>$parameter</b>;<br>\n";
+	}
+    }
+    print "};<br>\n";
+
+    print "<h3>Members</h3>\n";
+    print "<dl>\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+        ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
+	print "<dt><b>".$parameter."</b>\n";
+	print "<dd>";
+	output_highlight($args{'parameterdescs'}{$parameter});
+    }
+    print "</dl>\n";
+    output_section_html(@_);
+    print "<hr>\n";
+}
+
+# output function in html
+sub output_function_html(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -352,22 +501,17 @@ sub output_html(%) {
     print "<h3>Arguments</h3>\n";
     print "<dl>\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+        ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
 	print "<dt><b>".$parameter."</b>\n";
 	print "<dd>";
-	output_highlight($args{'parameters'}{$parameter});
+	output_highlight($args{'parameterdescs'}{$parameter});
     }
     print "</dl>\n";
-    foreach $section (@{$args{'sectionlist'}}) {
-	print "<h3>$section</h3>\n";
-	print "<blockquote>\n";
-	output_highlight($args{'sections'}{$section});
-	print "</blockquote>\n";
-    }
+    output_section_html(@_);
     print "<hr>\n";
 }
 
-
-# output in html
+# output intro in html
 sub output_intro_html(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
@@ -382,8 +526,26 @@ sub output_intro_html(%) {
     print "<hr>\n";
 }
 
-# output in sgml DocBook
-sub output_sgml(%) {
+sub output_section_sgml(%) {
+    my %args = %{$_[0]};
+    my $section;    
+    # print out each section
+    $lineprefix="   ";
+    foreach $section (@{$args{'sectionlist'}}) {
+	print "<refsect1>\n <title>$section</title>\n <para>\n";
+	if ($section =~ m/EXAMPLE/i) {
+	    print "<example><para>\n";
+	}
+	output_highlight($args{'sections'}{$section});
+	if ($section =~ m/EXAMPLE/i) {
+	    print "</para></example>\n";
+	}
+	print " </para>\n</refsect1>\n";
+    }
+}
+
+# output function in sgml DocBook
+sub output_function_sgml(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -406,10 +568,9 @@ sub output_sgml(%) {
 
     print "<refsynopsisdiv>\n";
     print " <title>Synopsis</title>\n";
-    print "  <funcsynopsis>\n";
+    print "  <funcsynopsis><funcprototype>\n";
     print "   <funcdef>".$args{'functiontype'}." ";
-    print "<function>".$args{'function'}." ";
-    print "</function></funcdef>\n";
+    print "<function>".$args{'function'}." </function></funcdef>\n";
 
     $count = 0;
     if ($#{$args{'parameterlist'}} >= 0) {
@@ -438,7 +599,7 @@ sub output_sgml(%) {
 	    print "  <varlistentry>\n   <term><parameter>$parameter</parameter></term>\n";
 	    print "   <listitem>\n    <para>\n";
 	    $lineprefix="     ";
-	    output_highlight($args{'parameters'}{$parameter});
+	    output_highlight($args{'parameterdescs'}{$parameter});
 	    print "    </para>\n   </listitem>\n  </varlistentry>\n";
 	}
 	print " </variablelist>\n";
@@ -447,19 +608,157 @@ sub output_sgml(%) {
     }
     print "</refsect1>\n";
 
-    # print out each section
-    $lineprefix="   ";
-    foreach $section (@{$args{'sectionlist'}}) {
-	print "<refsect1>\n <title>$section</title>\n <para>\n";
-	if ($section =~ m/EXAMPLE/i) {
-	    print "<example><para>\n";
+    output_section_sgml(@_);
+    print "</refentry>\n\n";
+}
+
+# output struct in sgml DocBook
+sub output_struct_sgml(%) {
+    my %args = %{$_[0]};
+    my ($parameter, $section);
+    my $id;
+
+    $id = "API-struct-".$args{'struct'};
+    $id =~ s/[^A-Za-z0-9]/-/g;
+
+    print "<refentry>\n";
+    print "<refmeta>\n";
+    print "<refentrytitle><phrase id=\"$id\">".$args{'type'}." ".$args{'struct'}."</phrase></refentrytitle>\n";
+    print "</refmeta>\n";
+    print "<refnamediv>\n";
+    print " <refname>".$args{'type'}." ".$args{'struct'}."</refname>\n";
+    print " <refpurpose>\n";
+    print "  ";
+    output_highlight ($args{'purpose'});
+    print " </refpurpose>\n";
+    print "</refnamediv>\n";
+
+    print "<refsynopsisdiv>\n";
+    print " <title>Synopsis</title>\n";
+    print "  <programlisting>\n";
+    print $args{'type'}." ".$args{'struct'}." {\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+        ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
+	$type = $args{'parametertypes'}{$parameter};
+	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
+	    # pointer-to-function
+	    print "  $1 $parameter ($2);\n";
+	} elsif ($type =~ m/^(.*?)\s*(:.*)/) {
+	    print "  $1 $parameter$2;\n";
+	} else {
+	    print "  ".$type." ".$parameter.";\n";
 	}
-	output_highlight($args{'sections'}{$section});
-	if ($section =~ m/EXAMPLE/i) {
-	    print "</para></example>\n";
-	}
-	print " </para>\n</refsect1>\n";
     }
+    print "};";
+    print "  </programlisting>\n";
+    print "</refsynopsisdiv>\n";
+
+    print " <refsect1>\n";
+    print "  <title>Members</title>\n";
+
+    print "  <variablelist>\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+      ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
+      print "    <varlistentry>";
+      print "      <term>$parameter</term>\n";
+      print "      <listitem><para>\n";
+      output_highlight($args{'parameterdescs'}{$parameter});
+      print "      </para></listitem>\n";
+      print "    </varlistentry>\n";
+    }
+    print "  </variablelist>\n";
+    print " </refsect1>\n";
+
+    output_section_sgml(@_);
+
+    print "</refentry>\n\n";
+}
+
+# output enum in sgml DocBook
+sub output_enum_sgml(%) {
+    my %args = %{$_[0]};
+    my ($parameter, $section);
+    my $count;
+    my $id;
+
+    $id = "API-enum-".$args{'enum'};
+    $id =~ s/[^A-Za-z0-9]/-/g;
+
+    print "<refentry>\n";
+    print "<refmeta>\n";
+    print "<refentrytitle><phrase id=\"$id\">enum ".$args{'enum'}."</phrase></refentrytitle>\n";
+    print "</refmeta>\n";
+    print "<refnamediv>\n";
+    print " <refname>enum ".$args{'enum'}."</refname>\n";
+    print " <refpurpose>\n";
+    print "  ";
+    output_highlight ($args{'purpose'});
+    print " </refpurpose>\n";
+    print "</refnamediv>\n";
+
+    print "<refsynopsisdiv>\n";
+    print " <title>Synopsis</title>\n";
+    print "  <programlisting>\n";
+    print "enum ".$args{'enum'}." {\n";
+    $count = 0;
+    foreach $parameter (@{$args{'parameterlist'}}) {
+        print "  $parameter";
+        if ($count != $#{$args{'parameterlist'}}) {
+	    $count++;
+	    print ",";
+        }
+	print "\n";
+    }
+    print "};";
+    print "  </programlisting>\n";
+    print "</refsynopsisdiv>\n";
+
+    print "<refsect1>\n";
+    print " <title>Constants</title>\n";    
+    print "  <variablelist>\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+      print "    <varlistentry>";
+      print "      <term>$parameter</term>\n";
+      print "      <listitem><para>\n";
+      output_highlight($args{'parameterdescs'}{$parameter});
+      print "      </para></listitem>\n";
+      print "    </varlistentry>\n";
+    }
+    print "  </variablelist>\n";
+    print "</refsect1>\n";
+
+    output_section_sgml(@_);
+
+    print "</refentry>\n\n";
+}
+
+# output typedef in sgml DocBook
+sub output_typedef_sgml(%) {
+    my %args = %{$_[0]};
+    my ($parameter, $section);
+    my $id;
+
+    $id = "API-typedef-".$args{'typedef'};
+    $id =~ s/[^A-Za-z0-9]/-/g;
+
+    print "<refentry>\n";
+    print "<refmeta>\n";
+    print "<refentrytitle><phrase id=\"$id\">typedef ".$args{'typedef'}."</phrase></refentrytitle>\n";
+    print "</refmeta>\n";
+    print "<refnamediv>\n";
+    print " <refname>typedef ".$args{'typedef'}."</refname>\n";
+    print " <refpurpose>\n";
+    print "  ";
+    output_highlight ($args{'purpose'});
+    print " </refpurpose>\n";
+    print "</refnamediv>\n";
+
+    print "<refsynopsisdiv>\n";
+    print " <title>Synopsis</title>\n";
+    print "  <synopsis>typedef ".$args{'typedef'}.";</synopsis>\n";
+    print "</refsynopsisdiv>\n";
+
+    output_section_sgml(@_);
 
     print "</refentry>\n\n";
 }
@@ -491,7 +790,7 @@ sub output_intro_sgml(%) {
 }
 
 # output in sgml DocBook
-sub output_gnome {
+sub output_function_gnome {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
@@ -535,7 +834,7 @@ sub output_gnome {
 	    print "  <row><entry align=\"right\"><parameter>$parameter</parameter></entry>\n";
 	    print "   <entry>\n";
 	    $lineprefix="     ";
-	    output_highlight($args{'parameters'}{$parameter});
+	    output_highlight($args{'parameterdescs'}{$parameter});
 	    print "    </entry></row>\n";
 	}
 	print " </tbody></tgroup></informaltable>\n";
@@ -565,13 +864,13 @@ sub output_gnome {
 }
 
 ##
-# output in man
-sub output_man(%) {
+# output function in man
+sub output_function_man(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
     my $count;
 
-    print ".TH \"$args{'module'}\" 9 \"$args{'function'}\" \"April 2001\" \"API Manual\" LINUX\n";
+    print ".TH \"$args{'module'}\" 9 \"$args{'function'}\" \"$man_date\" \"API Manual\" LINUX\n";
 
     print ".SH NAME\n";
     print $args{'function'}." \\- ".$args{'purpose'}."\n";
@@ -600,8 +899,106 @@ sub output_man(%) {
     print ".SH Arguments\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
 	print ".IP \"".$parameter."\" 12\n";
-	output_highlight($args{'parameters'}{$parameter});
+	output_highlight($args{'parameterdescs'}{$parameter});
     }
+    foreach $section (@{$args{'sectionlist'}}) {
+	print ".SH \"$section\"\n";
+	output_highlight($args{'sections'}{$section});
+    }
+}
+
+##
+# output enum in man
+sub output_enum_man(%) {
+    my %args = %{$_[0]};
+    my ($parameter, $section);
+    my $count;
+
+    print ".TH \"$args{'module'}\" 9 \"enum $args{'enum'}\" \"$man_date\" \"API Manual\" LINUX\n";
+
+    print ".SH NAME\n";
+    print "enum ".$args{'enum'}." \\- ".$args{'purpose'}."\n";
+
+    print ".SH SYNOPSIS\n";
+    print "enum ".$args{'enum'}." {\n";
+    $count = 0;
+    foreach my $parameter (@{$args{'parameterlist'}}) {
+        print ".br\n.BI \"    $parameter\"\n";
+	if ($count == $#{$args{'parameterlist'}}) {
+	    print "\n};\n";
+	    last;
+	}
+	else {
+	    print ", \n.br\n";
+	}
+	$count++;
+    }
+
+    print ".SH Constants\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+	print ".IP \"".$parameter."\" 12\n";
+	output_highlight($args{'parameterdescs'}{$parameter});
+    }
+    foreach $section (@{$args{'sectionlist'}}) {
+	print ".SH \"$section\"\n";
+	output_highlight($args{'sections'}{$section});
+    }
+}
+
+##
+# output struct in man
+sub output_struct_man(%) {
+    my %args = %{$_[0]};
+    my ($parameter, $section);
+
+    print ".TH \"$args{'module'}\" 9 \"".$args{'type'}." ".$args{'struct'}."\" \"$man_date\" \"API Manual\" LINUX\n";
+
+    print ".SH NAME\n";
+    print $args{'type'}." ".$args{'struct'}." \\- ".$args{'purpose'}."\n";
+
+    print ".SH SYNOPSIS\n";
+    print $args{'type'}." ".$args{'struct'}." {\n";
+
+    foreach my $parameter (@{$args{'parameterlist'}}) {
+        ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
+	print "\n.br\n";
+	$type = $args{'parametertypes'}{$parameter};
+	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
+	    # pointer-to-function
+	    print ".BI \"    ".$1."\" ".$parameter." \") (".$2.")"."\"\n;\n";
+	} elsif ($type =~ m/^(.*?)\s*(:.*)/) {
+	    print ".BI \"    ".$1."\" ".$parameter.$2." \""."\"\n;\n";
+	} else {
+	    $type =~ s/([^\*])$/$1 /;
+	    print ".BI \"    ".$type."\" ".$parameter." \""."\"\n;\n";
+	}
+	print "\n.br\n";
+    }
+    print "};\n.br\n";
+
+    print ".SH Arguments\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+        ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
+	print ".IP \"".$parameter."\" 12\n";
+	output_highlight($args{'parameterdescs'}{$parameter});
+    }
+    foreach $section (@{$args{'sectionlist'}}) {
+	print ".SH \"$section\"\n";
+	output_highlight($args{'sections'}{$section});
+    }
+}
+
+##
+# output typedef in man
+sub output_typedef_man(%) {
+    my %args = %{$_[0]};
+    my ($parameter, $section);
+
+    print ".TH \"$args{'module'}\" 9 \"$args{'typedef'}\" \"$man_date\" \"API Manual\" LINUX\n";
+
+    print ".SH NAME\n";
+    print "typedef ".$args{'typedef'}." \\- ".$args{'purpose'}."\n";
+
     foreach $section (@{$args{'sectionlist'}}) {
 	print ".SH \"$section\"\n";
 	output_highlight($args{'sections'}{$section});
@@ -613,7 +1010,7 @@ sub output_intro_man(%) {
     my ($parameter, $section);
     my $count;
 
-    print ".TH \"$args{'module'}\" 9 \"$args{'module'}\" \"April 2001\" \"API Manual\" LINUX\n";
+    print ".TH \"$args{'module'}\" 9 \"$args{'module'}\" \"$man_date\" \"API Manual\" LINUX\n";
 
     foreach $section (@{$args{'sectionlist'}}) {
 	print ".SH \"$section\"\n";
@@ -623,7 +1020,7 @@ sub output_intro_man(%) {
 
 ##
 # output in text
-sub output_text(%) {
+sub output_function_text(%) {
     my %args = %{$_[0]};
     my ($parameter, $section);
 
@@ -632,6 +1029,7 @@ sub output_text(%) {
     print $start;
     my $count = 0;
     foreach my $parameter (@{$args{'parameterlist'}}) {
+	$type = $args{'parametertypes'}{$parameter};
 	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
 	    # pointer-to-function
 	    print $1.$parameter.") (".$2;
@@ -649,13 +1047,92 @@ sub output_text(%) {
 
     print "Arguments:\n\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
-	print $parameter."\n\t".$args{'parameters'}{$parameter}."\n";
+	print $parameter."\n\t".$args{'parameterdescs'}{$parameter}."\n";
     }
+    output_section_text(@_);
+}
+
+#output sections in text
+sub output_section_text(%) {
+    my %args = %{$_[0]};
+    my $section;
+
+    print "\n";
     foreach $section (@{$args{'sectionlist'}}) {
 	print "$section:\n\n";
 	output_highlight($args{'sections'}{$section});
-    }
+    }  
     print "\n\n";
+}
+
+# output enum in text
+sub output_enum_text(%) {
+    my %args = %{$_[0]};
+    my ($parameter);
+    my $count;
+    print "Enum:\n\n";
+
+    print "enum ".$args{'enum'}." {\n";
+    $count = 0;
+    foreach $parameter (@{$args{'parameterlist'}}) {
+        print "\t$parameter";
+	if ($count != $#{$args{'parameterlist'}}) {
+	    $count++;
+	    print ",";
+	}
+	print "\n";
+    }
+    print "};\n\n";
+
+    print "Constants:\n\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+	print "$parameter\n\t";
+	print $args{'parameterdescs'}{$parameter}."\n";
+    }
+
+    output_section_text(@_);
+}
+
+# output typedef in text
+sub output_typedef_text(%) {
+    my %args = %{$_[0]};
+    my ($parameter);
+    my $count;
+    print "Typedef:\n\n";
+
+    print "typedef ".$args{'typedef'}."\n";
+    output_section_text(@_);
+}
+
+# output struct as text
+sub output_struct_text(%) {
+    my %args = %{$_[0]};
+    my ($parameter);
+
+    print $args{'type'}." ".$args{'struct'}.":\n\n";
+    print $args{'type'}." ".$args{'struct'}." {\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+        ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
+	$type = $args{'parametertypes'}{$parameter};
+	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
+	    # pointer-to-function
+	    print "\t$1 $parameter) ($2);\n";
+	} elsif ($type =~ m/^(.*?)\s*(:.*)/) {
+	    print "\t$1 $parameter$2;\n";
+	} else {
+	    print "\t".$type." ".$parameter.";\n";
+	}
+    }
+    print "};\n\n";
+
+    print "Members:\n\n";
+    foreach $parameter (@{$args{'parameterlist'}}) {
+        ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
+	print "$parameter\n\t";
+	print $args{'parameterdescs'}{$parameter}."\n";
+    }
+    print "\n";
+    output_section_text(@_);
 }
 
 sub output_intro_text(%) {
@@ -670,12 +1147,18 @@ sub output_intro_text(%) {
 }
 
 ##
-# generic output function - calls the right one based
-# on current output mode.
-sub output_function {
+# generic output function for typedefs
+sub output_declaration {
     no strict 'refs';
-    my $func = "output_".$output_mode;
-    &$func(@_);
+    my $name = shift;
+    my $functype = shift;
+    my $func = "output_${functype}_$output_mode";
+    if (($function_only==0) || 
+	( $function_only == 1 && defined($function_table{$name})) || 
+	( $function_only == 2 && !defined($function_table{$name})))
+    {
+        &$func(@_);
+    }
 }
 
 ##
@@ -687,6 +1170,179 @@ sub output_intro {
     &$func(@_);
 }
 
+##
+# takes a declaration (struct, union, enum, typedef) and 
+# invokes the right handler. NOT called for functions.
+sub dump_declaration($$) {
+    no strict 'refs';
+    my ($prototype, $file) = @_;
+    my $func = "dump_".$decl_type;
+    &$func(@_);
+}
+
+sub dump_union($$) {
+    dump_struct(@_);
+}
+
+sub dump_struct($$) {
+    my $x = shift;
+    my $file = shift;
+
+    if ($x =~/(struct|union)\s+(\w+)\s*{(.*)}/) {
+        $declaration_name = $2;
+        my $members = $3;
+
+	# ignore embedded structs or unions
+	$members =~ s/{.*}//g;
+
+	create_parameterlist($members, ';');
+
+	output_declaration($declaration_name,
+			   'struct',
+			   {'struct' => $declaration_name,
+			    'module' => $modulename,
+			    'parameterlist' => \@parameterlist,
+			    'parameterdescs' => \%parameterdescs,
+			    'parametertypes' => \%parametertypes,
+			    'sectionlist' => \@sectionlist,
+			    'sections' => \%sections,
+			    'purpose' => $declaration_purpose,
+			    'type' => $decl_type
+			   });
+    }
+    else {
+        print STDERR "Cannot parse struct or union!\n";
+    }
+}
+
+sub dump_enum($$) {
+    my $x = shift;
+    my $file = shift;
+
+    if ($x =~ /enum\s+(\w+)\s*{(.*)}/) {
+        $declaration_name = $1;
+        my $members = $2;
+
+	foreach my $arg (split ',', $members) {
+	    $arg =~ s/^\s*(\w+).*/$1/;
+	    push @parameterlist, $arg;
+	    if (!$parameterdescs{$arg}) {
+	        $parameterdescs{$arg} = $undescribed;
+	        print STDERR "Warning($file:$.): Enum value '$arg' ".
+		    "described in enum '$declaration_name'\n";
+	    }
+
+	}
+	
+	output_declaration($declaration_name,
+			   'enum',
+			   {'enum' => $declaration_name,
+			    'module' => $modulename,
+			    'parameterlist' => \@parameterlist,
+			    'parameterdescs' => \%parameterdescs,
+			    'sectionlist' => \@sectionlist,
+			    'sections' => \%sections,
+			    'purpose' => $declaration_purpose
+			   });
+    }
+    else {
+        print STDERR "Cannot parse enum!\n";
+    }
+}
+
+sub dump_typedef($$) {
+    my $x = shift;
+    my $file = shift;
+
+    while (($x =~ /\(*.\)\s*;$/) || ($x =~ /\[*.\]\s*;$/)) {
+        $x =~ s/\(*.\)\s*;$/;/;
+	$x =~ s/\[*.\]\s*;$/;/;
+    }
+
+    if ($x =~ /typedef.*\s+(\w+)\s*;/) {
+        $declaration_name = $1;
+
+	output_declaration($declaration_name,
+			   'typedef',
+			   {'typedef' => $declaration_name,
+			    'module' => $modulename,
+			    'sectionlist' => \@sectionlist,
+			    'sections' => \%sections,
+			    'purpose' => $declaration_purpose
+			   });
+    }
+    else {
+        print STDERR "Cannot parse typedef!\n";
+    }
+}
+
+sub create_parameterlist($$) {
+    my $args = shift;
+    my $splitter = shift;
+    my $type;
+    my $param;
+
+    while ($args =~ /(\([^\),]+),/) {
+        $args =~ s/(\([^\),]+),/$1#/g;
+    }
+    
+    foreach my $arg (split($splitter, $args)) {
+        # strip leading/trailing spaces
+        $arg =~ s/^\s*//;
+	$arg =~ s/\s*$//;
+	$arg =~ s/\s+/ /;
+
+	if ($arg =~ m/\(/) {
+	    # pointer-to-function
+	    $arg =~ tr/#/,/;
+	    $arg =~ m/[^\(]+\(\*([^\)]+)\)/;
+	    $param = $1;
+	    $type = $arg;
+	    $type =~ s/([^\(]+\(\*)$param/$1/;
+	} else {
+	    # evil magic to get fixed array parameters to work
+	    $arg =~ s/(.+\s+)(.+)\[.*/$1* $2/;
+	    my @args = split('\s', $arg);
+	
+	    $param = pop @args;
+	    if ($param =~ m/^(\*+)(.*)/) {
+	        $param = $2;
+		push @args, $1;
+	    } 
+	    elsif ($param =~ m/(.*?)\s*:\s*(\d+)/) {
+	        $param = $1;
+	        push @args, ":$2";
+	    }
+	    $type = join " ", @args;
+	}
+
+	if ($type eq "" && $param eq "...")
+	{
+	    $type="...";
+	    $param="...";
+	    $parameterdescs{"..."} = "variable arguments";
+	}
+	elsif ($type eq "" && ($param eq "" or $param eq "void"))
+	{
+	    $type="";
+	    $param="void";
+	    $parameterdescs{void} = "no arguments";
+	}
+	if (defined $type && $type && !defined $parameterdescs{$param}) {
+	    $parameterdescs{$param} = $undescribed;
+
+	    if (($type eq 'function') || ($type eq 'enum')) {
+	        print STDERR "Warning($file:$.): Function parameter ".
+		    "or member '$param' not " .
+		    "described in '$declaration_name'\n";
+	    }
+	    ++$errors;
+        }
+
+	push @parameterlist, $param;
+	$parametertypes{$param} = $type;
+    }
+}
 
 ##
 # takes a function prototype and the name of the current file being
@@ -733,121 +1389,29 @@ sub dump_function($$) {
 	$prototype =~ m/^(\w+\s+\w+\s+\w+)\s+([a-zA-Z0-9_~:]+)\s*\(([^\{]*)\)/ ||
 	$prototype =~ m/^(\w+\s+\w+\s+\w+\s*\*)\s*([a-zA-Z0-9_~:]+)\s*\(([^\{]*)\)/)  {
 	$return_type = $1;
-	$function_name = $2;
+	$declaration_name = $2;
 	my $args = $3;
-	my ($param);
 
-	# allow for up to six args to function pointers
-	$args =~ s/(\([^\),]+),/$1#/g;
-	$args =~ s/(\([^\),]+),/$1#/g;
-	$args =~ s/(\([^\),]+),/$1#/g;
-	$args =~ s/(\([^\),]+),/$1#/g;
-	$args =~ s/(\([^\),]+),/$1#/g;
-#	print STDERR "ARGS = '$args'\n";
-
-	foreach my $arg (split ',', $args) {
-	    # strip leading/trailing spaces
-	    $arg =~ s/^\s*//;
-	    $arg =~ s/\s*$//;
-
-	    if ($arg =~ m/\(/) {
-		# pointer-to-function
-		$arg =~ tr/#/,/;
-		$arg =~ m/[^\(]+\(\*([^\)]+)\)/;
-		$param = $1;
-		$type = $arg;
-		$type =~ s/([^\(]+\(\*)$param/$1/;
-	    } else {
-		# evil magic to get fixed array parameters to work
-		$arg =~ s/(.+\s+)(.+)\[.*/$1* $2/;
-#		print STDERR "SCAN ARG: '$arg'\n";
-		my @args = split('\s', $arg);
-
-#		print STDERR " -> @args\n";
-		$param = pop @args;
-#		print STDERR " -> @args\n";
-		if ($param =~ m/^(\*+)(.*)/) {
-		    $param = $2;
-		    push @args, $1;
-		}
-		$type = join " ", @args;
-	    }
-
-	    if ($type eq "" && $param eq "...")
-	    {
-		$type="...";
-		$param="...";
-		$parameters{"..."} = "variable arguments";
-	    }
-	    elsif ($type eq "" && ($param eq "" or $param eq "void"))
-	    {
-		$type="";
-		$param="void";
-		$parameters{void} = "no arguments";
-	    }
-            if (defined $type && $type && !defined $parameters{$param}) {
-	        $parameters{$param} = "-- undescribed --";
-	        print STDERR "Warning($file:$.): Function parameter '$param' not described in '$function_name'\n";
-		++$errors;
-	    }
-
-	    push @parameterlist, $param;
-	    $parametertypes{$param} = $type;
-#	    print STDERR "param = '$param', type = '$type'\n";
-	}
+	create_parameterlist($args, ',');
     } else {
 	print STDERR "Error($.): cannot understand prototype: '$prototype'\n";
 	++$errors;
 	return;
     }
 
-    if ($function_only==0 || 
-     ( $function_only == 1 && defined($function_table{$function_name})) || 
-     ( $function_only == 2 && !defined($function_table{$function_name})))
-    {
-	output_function({'function' => $function_name,
-			 'module' => $modulename,
-			 'functiontype' => $return_type,
-			 'parameterlist' => \@parameterlist,
-			 'parameters' => \%parameters,
-			 'parametertypes' => \%parametertypes,
-			 'sectionlist' => \@sectionlist,
-			 'sections' => \%sections,
-			 'purpose' => $function_purpose
-			 });
-    }
+    output_declaration($declaration_name, 
+		       'function',
+		       {'function' => $declaration_name,
+			'module' => $modulename,
+			'functiontype' => $return_type,
+			'parameterlist' => \@parameterlist,
+			'parameterdescs' => \%parameterdescs,
+			'parametertypes' => \%parametertypes,
+			'sectionlist' => \@sectionlist,
+			'sections' => \%sections,
+			'purpose' => $declaration_purpose
+		       });
 }
-
-######################################################################
-# main
-# states
-# 0 - normal code
-# 1 - looking for function name
-# 2 - scanning field start.
-# 3 - scanning prototype.
-$state = 0;
-$section = "";
-
-$doc_special = "\@\%\$\&";
-
-$doc_start = "^/\\*\\*\\s*\$"; # Allow whitespace at end of comment start.
-$doc_end = "\\*/";
-$doc_com = "\\s*\\*\\s*";
-$doc_func = $doc_com."(\\w+):?";
-$doc_sect = $doc_com."([".$doc_special."]?[\\w ]+):(.*)";
-$doc_content = $doc_com."(.*)";
-$doc_block = $doc_com."DOC:\\s*(.*)?";
-
-%constants = ();
-%parameters = ();
-@parameterlist = ();
-%sections = ();
-@sectionlist = ();
-
-$contents = "";
-$section_default = "Description";	# default section
-$section_intro = "Introduction";
-$section = $section_default;
 
 sub process_file($);
 
@@ -879,8 +1443,68 @@ foreach (@ARGV) {
 
 exit($errors);
 
+sub reset_state {
+    $function = "";
+    %constants = ();
+    %parameterdescs = ();
+    %parametertypes = ();
+    @parameterlist = ();
+    %sections = ();
+    @sectionlist = ();
+    $prototype = "";
+    
+    $state = 0;
+}
+
+sub process_state3_function($) { 
+    my $x = shift;
+
+    if ($x =~ m#\s*/\*\s+MACDOC\s*#io) {
+	# do nothing
+    }
+    elsif ($x =~ /([^\{]*)/) {
+        $prototype .= $1;
+    }
+    if (($x =~ /\{/) || ($x =~ /\#/) || ($x =~ /;/)) {
+        $prototype =~ s@/\*.*?\*/@@gos;	# strip comments.
+	$prototype =~ s@[\r\n]+@ @gos; # strip newlines/cr's.
+	$prototype =~ s@^\s+@@gos; # strip leading spaces
+	dump_function($prototype,$file);
+	reset_state();
+    }
+}
+
+sub process_state3_type($) { 
+    my $x = shift;
+
+    $x =~ s@/\*.*?\*/@@gos;	# strip comments.
+    $x =~ s@[\r\n]+@ @gos; # strip newlines/cr's.
+    $x =~ s@^\s+@@gos; # strip leading spaces
+    $x =~ s@\s+$@@gos; # strip trailing spaces
+
+    while (1) {
+        if ( $x =~ /([^{};]*)([{};])(.*)/ ) {
+	    $prototype .= $1 . $2;
+	    ($2 eq '{') && $brcount++;
+	    ($2 eq '}') && $brcount--;
+	    if (($2 eq ';') && ($brcount == 0)) {
+	        dump_declaration($prototype,$file);
+		reset_state();
+	        last;
+	    }
+	    $x = $3;
+        } else {
+	    $prototype .= $x;
+	    last;
+	}
+    }
+}
+
 sub process_file($) {
     my ($file) = @_;
+    my $identifier;
+    my $func;
+
     if (defined($source_map{$file})) {
 	$file = $source_map{$file};
     }
@@ -906,16 +1530,32 @@ sub process_file($) {
 			$section = $1;
 		}
             }
-	    elsif (/$doc_func/o) {
-		$function = $1;
+	    elsif (/$doc_decl/o) {
+		$identifier = $1;
+		if (/\s*([\w\s]+?)\s*-/) {
+		    $identifier = $1;
+		}
+
 		$state = 2;
 		if (/-(.*)/) {
-		    $function_purpose = $1;
+		    $declaration_purpose = $1;
 		} else {
-		    $function_purpose = "";
+		    $declaration_purpose = "";
 		}
+		if ($identifier =~ m/^struct/) {
+		    $decl_type = 'struct';
+		} elsif ($identifier =~ m/^union/) {
+		    $decl_type = 'union';
+		} elsif ($identifier =~ m/^enum/) {
+		    $decl_type = 'enum';
+		} elsif ($identifier =~ m/^typedef/) {
+		    $decl_type = 'typedef';
+		} else {
+		    $decl_type = 'function';
+		}
+
 		if ($verbose) {
-		    print STDERR "Info($.): Scanning doc for $function\n";
+		    print STDERR "Info($.): Scanning doc for $identifier\n";
 		}
 	    } else {
 		print STDERR "WARN($.): Cannot understand $_ on line $.",
@@ -952,13 +1592,15 @@ sub process_file($) {
 		    $contents = "";
 		}
 
-#	    print STDERR "end of doc comment, looking for prototype\n";
 		$prototype = "";
 		$state = 3;
+		$brcount = 0;
+#	    print STDERR "end of doc comment, looking for prototype\n";
 	    } elsif (/$doc_content/) {
 		# miguel-style comment kludge, look for blank lines after
 		# @parameter line to signify start of description
-		if ($1 eq "" && $section =~ m/^@/) {
+		if ($1 eq "" && 
+			($section =~ m/^@/ || $section eq $section_context)) {
 		    $contents =~ s/\&/\\\\\\amp;/g;
 		    $contents =~ s/\</\\\\\\lt;/g;
 		    $contents =~ s/\>/\\\\\\gt;/g;
@@ -974,28 +1616,10 @@ sub process_file($) {
 		++$errors;
 	    }
 	} elsif ($state == 3) {	# scanning for function { (end of prototype)
-	    if (m#\s*/\*\s+MACDOC\s*#io) {
-	      # do nothing
-	    }
-	    elsif (/([^\{]*)/) {
-		$prototype .= $1;
-	    }
-	    if (/\{/ || /\#/ || /;/) { # added for #define AK, ';' added for declarations.
-		$prototype =~ s@/\*.*?\*/@@gos;	# strip comments.
-		$prototype =~ s@[\r\n]+@ @gos; # strip newlines/cr's.
-		$prototype =~ s@^ +@@gos; # strip leading spaces
-		dump_function($prototype,$file);
-
-		$function = "";
-		%constants = ();
-		%parameters = ();
-		%parametertypes = ();
-		@parameterlist = ();
-		%sections = ();
-		@sectionlist = ();
-		$prototype = "";
-
-		$state = 0;
+	    if ($decl_type eq 'function') {
+	        process_state3_function($_);
+	    } else {
+	        process_state3_type($_);
 	    }
 	} elsif ($state == 4) {
 		# Documentation block
@@ -1006,7 +1630,7 @@ sub process_file($) {
 			$contents = "";
 			$function = "";
 			%constants = ();
-			%parameters = ();
+			%parameterdescs = ();
 			%parametertypes = ();
 			@parameterlist = ();
 			%sections = ();
@@ -1026,7 +1650,7 @@ sub process_file($) {
 			$contents = "";
 			$function = "";
 			%constants = ();
-			%parameters = ();
+			%parameterdescs = ();
 			%parametertypes = ();
 			@parameterlist = ();
 			%sections = ();

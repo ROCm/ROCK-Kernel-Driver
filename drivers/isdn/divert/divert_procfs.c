@@ -1,23 +1,11 @@
-/*
- * $Id: divert_procfs.c,v 1.11.6.1 2001/08/13 07:46:15 kai Exp $
+/* $Id: divert_procfs.c,v 1.11.6.2 2001/09/23 22:24:36 kai Exp $
  *
  * Filesystem handling for the diversion supplementary services.
  *
  * Copyright 1998       by Werner Cornelius (werner@isdn4linux.de)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
@@ -50,7 +38,7 @@ void
 put_info_buffer(char *cp)
 {
 	struct divert_info *ib;
-	long flags;
+	unsigned long flags;
 
 	if (if_used <= 0)
 		return;
@@ -145,7 +133,7 @@ isdn_divert_poll(struct file *file, poll_table * wait)
 static int
 isdn_divert_open(struct inode *ino, struct file *filep)
 {
-	long flags;
+	unsigned long flags;
 
 	lock_kernel();
 	save_flags(flags);
@@ -168,7 +156,7 @@ static int
 isdn_divert_close(struct inode *ino, struct file *filep)
 {
 	struct divert_info *inf;
-	long flags;
+	unsigned long flags;
 
 	lock_kernel();
 	save_flags(flags);
@@ -199,7 +187,7 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 {
 	divert_ioctl dioctl;
 	int i;
-	long flags;
+	unsigned long flags;
 	divert_rule *rulep;
 	char *cp;
 

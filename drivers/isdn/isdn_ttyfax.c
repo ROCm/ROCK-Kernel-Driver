@@ -1,39 +1,26 @@
-/* $Id: isdn_ttyfax.c,v 1.7.6.1 2001/08/14 14:12:18 kai Exp $
-
+/* $Id: isdn_ttyfax.c,v 1.7.6.2 2001/09/23 22:24:32 kai Exp $
+ *
  * Linux ISDN subsystem, tty_fax AT-command emulator (linklevel).
  *
  * Copyright 1999    by Armin Schindler (mac@melware.de)
  * Copyright 1999    by Ralf Spachmann (mel@melware.de)
  * Copyright 1999    by Cytronics & Melware
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  */
 
 #undef ISDN_TTY_FAX_STAT_DEBUG
 #undef ISDN_TTY_FAX_CMD_DEBUG
 
-#define __NO_VERSION__
-#include <linux/module.h>
 #include <linux/isdn.h>
 #include "isdn_common.h"
 #include "isdn_tty.h"
 #include "isdn_ttyfax.h"
 
 
-static char *isdn_tty_fax_revision = "$Revision: 1.7.6.1 $";
+static char *isdn_tty_fax_revision = "$Revision: 1.7.6.2 $";
 
 #define PARSE_ERROR1 { isdn_tty_fax_modem_result(1, info); return 1; }
 

@@ -511,3 +511,5 @@ EXPORT_NO_SYMBOLS;
 
 module_init(init_qnx4_fs)
 module_exit(exit_qnx4_fs)
+MODULE_LICENSE("GPL");
+

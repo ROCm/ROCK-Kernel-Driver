@@ -132,6 +132,14 @@ L:	linux-sound@vger.kernel.org
 W:	http://www.uni-karlsruhe.de/~Robert.Siemer/Private/
 S:	Maintained
 
+ACP/MWAVE MODEM
+P:	Paul B Schroeder
+M:	paulsch@us.ibm.com
+P:	Mike Sullivan
+M:	sullivam@us.ibm.com
+W:	http://www.ibm.com/linux/ltc/
+S:	Supported
+
 ACPI
 P:	Andy Grover
 M:	andrew.grover@intel.com

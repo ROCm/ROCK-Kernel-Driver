@@ -1,10 +1,12 @@
-/*
- * $Id: capifs.c,v 1.14.6.7 2001/05/24 08:29:08 kai Exp $
+/* $Id: capifs.c,v 1.14.6.8 2001/09/23 22:24:33 kai Exp $
  * 
- * (c) Copyright 2000 by Carsten Paeth (calle@calle.de)
+ * Copyright 2000 by Carsten Paeth <calle@calle.de>
  *
  * Heavily based on devpts filesystem from H. Peter Anvin
  * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ *
  */
 
 #include <linux/version.h>
@@ -26,9 +28,11 @@
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 
-MODULE_AUTHOR("Carsten Paeth <calle@calle.de>");
+MODULE_DESCRIPTION("CAPI4Linux: /dev/capi/ filesystem");
+MODULE_AUTHOR("Carsten Paeth");
+MODULE_LICENSE("GPL");
 
-static char *revision = "$Revision: 1.14.6.7 $";
+static char *revision = "$Revision: 1.14.6.8 $";
 
 struct capifs_ncci {
 	struct inode *inode;

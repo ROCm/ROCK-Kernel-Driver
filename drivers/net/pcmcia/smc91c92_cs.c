@@ -85,6 +85,7 @@ static int irq_list[4] = { -1 };
 MODULE_PARM(if_port, "i");
 MODULE_PARM(irq_mask, "i");
 MODULE_PARM(irq_list, "1-4i");
+MODULE_LICENSE("GPL");
 
 /* Operational parameter that usually are not changed. */
 

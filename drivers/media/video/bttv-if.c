@@ -351,6 +351,7 @@ int __devinit init_bttv_i2c(struct bttv *btv)
 	btv->i2c_rc = i2c_bit_add_bus(&btv->i2c_adap);
 	return btv->i2c_rc;
 }
+MODULE_LICENSE("GPL");
 
 /*
  * Local variables:

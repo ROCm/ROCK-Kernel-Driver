@@ -17,6 +17,8 @@
 #include <linux/locks.h>
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
+#include <linux/module.h>
+
 
 #include "adfs.h"
 
@@ -373,3 +375,4 @@ void adfs_write_inode(struct inode *inode, int unused)
 	adfs_dir_update(sb, &obj);
 	unlock_kernel();
 }
+MODULE_LICENSE("GPL");

@@ -43,7 +43,7 @@ nsm_mon_unmon(struct nlm_host *host, u32 proc, struct nsm_res *res)
 
 	args.addr = host->h_addr.sin_addr.s_addr;
 	args.prog = NLM_PROGRAM;
-	args.vers = 1;
+	args.vers = host->h_version;
 	args.proc = NLMPROC_NSM_NOTIFY;
 	memset(res, 0, sizeof(*res));
 

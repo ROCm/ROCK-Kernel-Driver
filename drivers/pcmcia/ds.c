@@ -68,6 +68,8 @@ static const char *version =
 
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
 MODULE_DESCRIPTION("PCMCIA Driver Services " CS_RELEASE);
+MODULE_LICENSE("Dual MPL/GPL");
+
 
 /*====================================================================*/
 
@@ -415,7 +417,10 @@ static int bind_request(int i, bind_info_t *bind_info)
     driver->use_count++;
     b = kmalloc(sizeof(socket_bind_t), GFP_KERNEL);
     if (!b) 
-      return -ENOMEM;
+    {
+    	driver->use_count--;
+	return -ENOMEM;    
+    }
     b->driver = driver;
     b->function = bind_info->function;
     b->instance = NULL;

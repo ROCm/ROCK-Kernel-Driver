@@ -1020,3 +1020,4 @@ unsigned int ac97_set_adc_rate(struct ac97_codec *codec, unsigned int rate)
 }
 
 EXPORT_SYMBOL(ac97_set_adc_rate);
+MODULE_LICENSE("GPL");

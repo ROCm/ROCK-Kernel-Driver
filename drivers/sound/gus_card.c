@@ -232,6 +232,7 @@ MODULE_PARM(no_wave_dma, "i");
 MODULE_PARM(db16, "i");
 MODULE_PARM(gus16, "i");
 #endif
+MODULE_LICENSE("GPL");
 
 static int __init init_gus(void)
 {

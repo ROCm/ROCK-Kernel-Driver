@@ -257,6 +257,8 @@ static int clocking=48000;
 
 MODULE_AUTHOR("Zach Brown <zab@zabbo.net>, Alan Cox <alan@redhat.com>");
 MODULE_DESCRIPTION("ESS Maestro Driver");
+MODULE_LICENSE("GPL");
+
 #ifdef M_DEBUG
 MODULE_PARM(debug,"i");
 #endif

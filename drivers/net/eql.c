@@ -1016,6 +1016,7 @@ static void __exit eql_cleanup_module(void)
 
 module_init(eql_init_module);
 module_exit(eql_cleanup_module);
+MODULE_LICENSE("GPL");
 
 /*
  * Local Variables: 

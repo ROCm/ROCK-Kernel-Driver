@@ -1,15 +1,16 @@
-/* $Id: saphir.c,v 1.8.6.1 2001/02/16 16:43:29 kai Exp $
+/* $Id: saphir.c,v 1.8.6.2 2001/09/23 22:24:51 kai Exp $
  *
- * saphir.c low level stuff for HST Saphir 1
+ * low level stuff for HST Saphir 1
  *
- * Author     Karsten Keil (keil@isdn4linux.de)
+ * Author       Karsten Keil
+ * Copyright    by Karsten Keil      <keil@isdn4linux.de>
+ * 
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
  *
  * Thanks to    HST High Soft Tech GmbH
  *
- * This file is (c) under GNU General Public License
- *
  */
-
 
 #define __NO_VERSION__
 #include <linux/init.h>
@@ -19,7 +20,7 @@
 #include "isdnl1.h"
 
 extern const char *CardType[];
-static char *saphir_rev = "$Revision: 1.8.6.1 $";
+static char *saphir_rev = "$Revision: 1.8.6.2 $";
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)

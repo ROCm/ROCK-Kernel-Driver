@@ -65,7 +65,7 @@ extern int irda_proto_init(void);
 extern int irda_device_init(void);
 #endif
 
-#ifdef CONFIG_X86_IO_APIC
+#ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
 #endif
 
@@ -479,7 +479,7 @@ extern void cpu_idle(void);
 
 #ifndef CONFIG_SMP
 
-#ifdef CONFIG_X86_IO_APIC
+#ifdef CONFIG_X86_LOCAL_APIC
 static void __init smp_init(void)
 {
 	APIC_init_uniprocessor();

@@ -847,6 +847,8 @@ static int sym53c416_bios_param(Disk *disk, kdev_t dev, int *ip)
 #ifdef MODULE
 
 MODULE_AUTHOR("Lieven Willems");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(sym53c416, "1-2i");
 MODULE_PARM(sym53c416_1, "1-2i");
 MODULE_PARM(sym53c416_2, "1-2i");

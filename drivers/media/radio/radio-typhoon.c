@@ -317,6 +317,8 @@ static int typhoon_get_info(char *buf, char **start, off_t offset, int len)
 
 MODULE_AUTHOR("Dr. Henrik Seidel");
 MODULE_DESCRIPTION("A driver for the Typhoon radio card (a.k.a. EcoRadio).");
+MODULE_LICENSE("GPL");
+
 MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the Typhoon card (0x316 or 0x336)");
 MODULE_PARM(mutefreq, "i");

@@ -349,3 +349,4 @@ MODULE_DESCRIPTION("Support module providing I2C buses present on Matrox videoca
 module_init(i2c_matroxfb_init);
 module_exit(i2c_matroxfb_exit);
 /* no __setup required */
+MODULE_LICENSE("GPL");

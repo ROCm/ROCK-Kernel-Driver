@@ -1071,3 +1071,4 @@ static int __init setup_mad16(char *str)
 
 __setup("mad16=", setup_mad16);
 #endif
+MODULE_LICENSE("GPL");
