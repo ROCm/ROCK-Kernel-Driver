@@ -764,8 +764,6 @@ void __init eeh_init(void)
 	struct device_node *phb, *np;
 	struct eeh_early_enable_info info;
 
-	init_pci_config_tokens();
-
 	np = of_find_node_by_path("/rtas");
 	if (np == NULL)
 		return;

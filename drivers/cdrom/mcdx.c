@@ -56,7 +56,6 @@ static const char *mcdx_c_version
     = "$Id: mcdx.c,v 1.21 1997/01/26 07:12:59 davem Exp $";
 #endif
 
-#include <linux/version.h>
 #include <linux/module.h>
 
 #include <linux/errno.h>
@@ -1265,11 +1264,7 @@ int __init mcdx_init_drive(int drive)
 int __init mcdx_init(void)
 {
 	int drive;
-#ifdef MODULE
-	xwarn("Version 2.14(hs) for " UTS_RELEASE "\n");
-#else
 	xwarn("Version 2.14(hs) \n");
-#endif
 
 	xwarn("$Id: mcdx.c,v 1.21 1997/01/26 07:12:59 davem Exp $\n");
 

@@ -566,7 +566,7 @@ static int hs_set_io_map(struct pcmcia_socket *s, struct pccard_io_map *io)
 	struct pccard_io_map *sio;
 	pgprot_t prot;
 
-    	DPRINTK("hs_set_io_map(sock=%d, map=%d, flags=0x%x, speed=%dns, start=0x%04x, stop=0x%04x)\n",
+    	DPRINTK("hs_set_io_map(sock=%d, map=%d, flags=0x%x, speed=%dns, start=%#lx, stop=%#lx)\n",
 	    sock, map, io->flags, io->speed, io->start, io->stop);
 	if (map >= MAX_IO_WIN)
 	    return -EINVAL;

@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/irq.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/iSeries/HvCallPci.h>
@@ -49,7 +50,7 @@
 int iSeries_Device_ToggleReset(struct pci_dev *PciDev, int AssertTime,
 		int DelayTime)
 {
-	unsigned long AssertDelay, WaitDelay;
+	unsigned int AssertDelay, WaitDelay;
 	struct iSeries_Device_Node *DeviceNode =
 		(struct iSeries_Device_Node *)PciDev->sysdata;
 
@@ -62,14 +63,14 @@ int iSeries_Device_ToggleReset(struct pci_dev *PciDev, int AssertTime,
 	 * Set defaults, Assert is .5 second, Wait is 3 seconds.
 	 */
 	if (AssertTime == 0)
-		AssertDelay = (5 * HZ) / 10;
+		AssertDelay = 500;
 	else
-		AssertDelay = (AssertTime * HZ) / 10;
+		AssertDelay = AssertTime * 100;
 
 	if (DelayTime == 0)
-		WaitDelay = (30 * HZ) / 10;
+		WaitDelay = 3000;
 	else
-		WaitDelay = (DelayTime * HZ) / 10;
+		WaitDelay = DelayTime * 100;
 
 	/*
 	 * Assert reset
@@ -77,8 +78,7 @@ int iSeries_Device_ToggleReset(struct pci_dev *PciDev, int AssertTime,
 	DeviceNode->ReturnCode = HvCallPci_setSlotReset(ISERIES_BUS(DeviceNode),
 			0x00, DeviceNode->AgentId, 1);
 	if (DeviceNode->ReturnCode == 0) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(AssertDelay);       /* Sleep for the time */
+		msleep(AssertDelay);			/* Sleep for the time */
 		DeviceNode->ReturnCode =
 			HvCallPci_setSlotReset(ISERIES_BUS(DeviceNode),
 					0x00, DeviceNode->AgentId, 0);
@@ -86,8 +86,7 @@ int iSeries_Device_ToggleReset(struct pci_dev *PciDev, int AssertTime,
 		/*
    		 * Wait for device to reset
 		 */
-		set_current_state(TASK_UNINTERRUPTIBLE);  
-		schedule_timeout(WaitDelay);
+		msleep(WaitDelay);
 	}
 	if (DeviceNode->ReturnCode == 0)
 		PCIFR("Slot 0x%04X.%02 Reset\n", ISERIES_BUS(DeviceNode),

@@ -105,12 +105,13 @@ static void pmu_stop(void)
 	up(&pmu_sem);
 }
 
-void __init pmu_init(struct oprofile_operations *ops, struct op_arm_model_spec *spec)
+int __init
+pmu_init(struct oprofile_operations *ops, struct op_arm_model_spec *spec)
 {
 	init_MUTEX(&pmu_sem);
 
 	if (spec->init() < 0)
-		return;
+		return -ENODEV;
 
 	pmu_model = spec;
 	init_driverfs();
@@ -121,6 +122,8 @@ void __init pmu_init(struct oprofile_operations *ops, struct op_arm_model_spec *
 	ops->stop = pmu_stop;
 	ops->cpu_type = pmu_model->name;
 	printk(KERN_INFO "oprofile: using %s PMU\n", spec->name);
+
+	return 0;
 }
 
 void pmu_exit(void)

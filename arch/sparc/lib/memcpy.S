@@ -1,5 +1,5 @@
-/* memcpy.S: Sparc optimized memcpy, bcopy and memmove code
- * Hand optimized from GNU libc's memcpy, bcopy and memmove
+/* memcpy.S: Sparc optimized memcpy and memmove code
+ * Hand optimized from GNU libc's memcpy and memmove
  * Copyright (C) 1991,1996 Free Software Foundation
  * Copyright (C) 1995 Linus Torvalds (Linus.Torvalds@helsinki.fi)
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -192,13 +192,6 @@ x:
 	retl
 	 nop		! Only bcopy returns here and it retuns void...
 
-FUNC(bcopy)
-	mov		%o0, %o3
-	mov		%o1, %o0
-	mov		%o3, %o1
-	tst		%o2
-	bcs		0b
-	 /* Do the cmp in the delay slot */
 #ifdef __KERNEL__
 FUNC(amemmove)
 FUNC(__memmove)

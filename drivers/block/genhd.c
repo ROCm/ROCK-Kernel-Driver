@@ -300,7 +300,7 @@ static struct kobject *base_probe(dev_t dev, int *part, void *data)
 	return NULL;
 }
 
-int __init device_init(void)
+static int __init genhd_device_init(void)
 {
 	bdev_map = kobj_map_init(base_probe, &block_subsys);
 	blk_dev_init();
@@ -308,7 +308,7 @@ int __init device_init(void)
 	return 0;
 }
 
-subsys_initcall(device_init);
+subsys_initcall(genhd_device_init);
 
 
 

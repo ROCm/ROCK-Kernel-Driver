@@ -234,6 +234,11 @@ config PREEMPT_BKL
 	  Say Y here if you are building a kernel for a desktop system.
 	  Say N if you are unsure.
 
+config EEH
+	bool "PCI Extended Error Handling (EEH)" if EMBEDDED
+	depends on PPC_PSERIES
+	default y if !EMBEDDED
+
 #
 # Use the generic interrupt handling code in kernel/irq/:
 #

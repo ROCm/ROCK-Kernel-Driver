@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-i2c.c,v 1.13 2004/11/07 13:17:15 kraxel Exp $
+    $Id: bttv-i2c.c,v 1.17 2004/12/14 15:33:30 kraxel Exp $
 
     bttv-i2c.c  --  all the i2c code is here
 
@@ -26,6 +26,7 @@
 */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <asm/io.h>
@@ -327,13 +328,6 @@ void bttv_call_i2c_clients(struct bttv *btv, unsigned int cmd, void *arg)
 	i2c_clients_command(&btv->c.i2c_adap, cmd, arg);
 }
 
-void bttv_i2c_call(unsigned int card, unsigned int cmd, void *arg)
-{
-	if (card >= bttv_num)
-		return;
-	bttv_call_i2c_clients(&bttvs[card], cmd, arg);
-}
-
 static struct i2c_client bttv_i2c_client_template = {
 	I2C_DEVNAME("bttv internal"),
         .id       = -1,
@@ -385,19 +379,8 @@ int bttv_I2CWrite(struct bttv *btv, unsigned char addr, unsigned char b1,
 /* read EEPROM content */
 void __devinit bttv_readee(struct bttv *btv, unsigned char *eedata, int addr)
 {
-	int i;
-
-	if (bttv_I2CWrite(btv, addr, 0, -1, 0)<0) {
-		printk(KERN_WARNING "bttv: readee error\n");
-		return;
-	}
 	btv->i2c_client.addr = addr >> 1;
-	for (i=0; i<256; i+=16) {
-		if (16 != i2c_master_recv(&btv->i2c_client,eedata+i,16)) {
-			printk(KERN_WARNING "bttv: readee error\n");
-			break;
-		}
-	}
+	tveeprom_read(&btv->i2c_client, eedata, 256);
 }
 
 static char *i2c_devs[128] = {

@@ -28,6 +28,7 @@
 
 #define RFCOMM_CONN_TIMEOUT (HZ * 30)
 #define RFCOMM_DISC_TIMEOUT (HZ * 20)
+#define RFCOMM_AUTH_TIMEOUT (HZ * 25)
 
 #define RFCOMM_DEFAULT_MTU	127
 #define RFCOMM_DEFAULT_CREDITS	7
@@ -198,14 +199,18 @@ struct rfcomm_dlc {
 /* DLC and session flags */
 #define RFCOMM_RX_THROTTLED 0
 #define RFCOMM_TX_THROTTLED 1
-#define RFCOMM_MSC_PENDING  2
-#define RFCOMM_TIMED_OUT    3
+#define RFCOMM_TIMED_OUT    2
+#define RFCOMM_MSC_PENDING  3 
+#define RFCOMM_AUTH_PENDING 4
+#define RFCOMM_AUTH_ACCEPT  5
+#define RFCOMM_AUTH_REJECT  6
 
 /* Scheduling flags and events */
 #define RFCOMM_SCHED_STATE  0
 #define RFCOMM_SCHED_RX     1
 #define RFCOMM_SCHED_TX     2
 #define RFCOMM_SCHED_TIMEO  3
+#define RFCOMM_SCHED_AUTH   4
 #define RFCOMM_SCHED_WAKEUP 31
 
 /* MSC exchange flags */

@@ -37,9 +37,9 @@
  *   | value 2          | |
  *   +------------------+
  *
- * The header is followed by multiple entry descriptors. Descriptors are
- * kept sorted. The attribute values are aligned to the end of the block
- * in no specific order.
+ * The header is followed by multiple entry descriptors. In disk blocks, the
+ * entry descriptors are kept sorted. In inodes, they are unsorted. The
+ * attribute values are aligned to the end of the block in no specific order.
  *
  * Locking strategy
  * ----------------
@@ -272,8 +272,7 @@ ext3_xattr_ibody_get(struct inode *inode, int name_index, const char *name,
 	void *end;
 	int error;
 
-	if (EXT3_SB(inode->i_sb)->s_inode_size <= EXT3_GOOD_OLD_INODE_SIZE ||
-	    !(EXT3_I(inode)->i_state & EXT3_STATE_XATTR))
+	if (!(EXT3_I(inode)->i_state & EXT3_STATE_XATTR))
 		return -ENODATA;
 	error = ext3_get_inode_loc(inode, &iloc);
 	if (error)
@@ -399,8 +398,7 @@ ext3_xattr_ibody_list(struct inode *inode, char *buffer, size_t buffer_size)
 	void *end;
 	int error;
 
-	if (EXT3_SB(inode->i_sb)->s_inode_size <= EXT3_GOOD_OLD_INODE_SIZE ||
-	    !(EXT3_I(inode)->i_state & EXT3_STATE_XATTR))
+	if (!(EXT3_I(inode)->i_state & EXT3_STATE_XATTR))
 		return 0;
 	error = ext3_get_inode_loc(inode, &iloc);
 	if (error)
@@ -773,7 +771,7 @@ inserted:
 				error = ext3_journal_get_write_access(handle,
 								      new_bh);
 				if (error)
-					goto cleanup;
+					goto cleanup_dquot;
 				lock_buffer(new_bh);
 				BHDR(new_bh)->h_refcount = cpu_to_le32(1 +
 					le32_to_cpu(BHDR(new_bh)->h_refcount));
@@ -783,7 +781,7 @@ inserted:
 				error = ext3_journal_dirty_metadata(handle,
 								    new_bh);
 				if (error)
-					goto cleanup;
+					goto cleanup_dquot;
 			}
 			mb_cache_entry_release(ce);
 			ce = NULL;
@@ -823,7 +821,6 @@ getblk_failed:
 			error = ext3_journal_dirty_metadata(handle, new_bh);
 			if (error)
 				goto cleanup;
-			ext3_xattr_update_super_block(handle, sb);
 		}
 	}
 
@@ -843,6 +840,10 @@ cleanup:
 		kfree(s->base);
 
 	return error;
+
+cleanup_dquot:
+	DQUOT_FREE_BLOCK(inode, 1);
+	goto cleanup;
 
 bad_block:
 	ext3_error(inode->i_sb, __FUNCTION__,
@@ -866,7 +867,7 @@ ext3_xattr_ibody_find(struct inode *inode, struct ext3_xattr_info *i,
 	struct ext3_inode *raw_inode;
 	int error;
 
-	if (EXT3_SB(inode->i_sb)->s_inode_size <= EXT3_GOOD_OLD_INODE_SIZE)
+	if (EXT3_I(inode)->i_extra_isize == 0)
 		return 0;
 	raw_inode = ext3_raw_inode(&is->iloc);
 	header = IHDR(inode, raw_inode);
@@ -897,7 +898,7 @@ ext3_xattr_ibody_set(handle_t *handle, struct inode *inode,
 	struct ext3_xattr_search *s = &is->s;
 	int error;
 
-	if (EXT3_SB(inode->i_sb)->s_inode_size <= EXT3_GOOD_OLD_INODE_SIZE)
+	if (EXT3_I(inode)->i_extra_isize == 0)
 		return -ENOSPC;
 	error = ext3_xattr_set_entry(i, s);
 	if (error)
@@ -957,6 +958,13 @@ ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 	error = ext3_get_inode_loc(inode, &is.iloc);
 	if (error)
 		goto cleanup;
+
+	if (EXT3_I(inode)->i_state & EXT3_STATE_NEW) {
+		struct ext3_inode *raw_inode = ext3_raw_inode(&is.iloc);
+		memset(raw_inode, 0, EXT3_SB(inode->i_sb)->s_inode_size);
+		EXT3_I(inode)->i_state &= ~EXT3_STATE_NEW;
+	}
+
 	error = ext3_xattr_ibody_find(inode, &i, &is);
 	if (error)
 		goto cleanup;
@@ -1001,6 +1009,7 @@ ext3_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 		}
 	}
 	if (!error) {
+		ext3_xattr_update_super_block(handle, inode->i_sb);
 		inode->i_ctime = CURRENT_TIME_SEC;
 		error = ext3_mark_iloc_dirty(handle, inode, &is.iloc);
 		/*
@@ -1066,7 +1075,6 @@ ext3_xattr_delete_inode(handle_t *handle, struct inode *inode)
 {
 	struct buffer_head *bh = NULL;
 
-	down_write(&EXT3_I(inode)->xattr_sem);
 	if (!EXT3_I(inode)->i_file_acl)
 		goto cleanup;
 	bh = sb_bread(inode->i_sb, EXT3_I(inode)->i_file_acl);
@@ -1088,7 +1096,6 @@ ext3_xattr_delete_inode(handle_t *handle, struct inode *inode)
 
 cleanup:
 	brelse(bh);
-	up_write(&EXT3_I(inode)->xattr_sem);
 }
 
 /*

@@ -143,7 +143,7 @@ static void dibusb_remote_query(void *data)
 	   if we're busy. */
 	dibusb_read_remote_control(dib);
 	schedule_delayed_work(&dib->rc_query_work,
-			      msecs_to_jiffies(rc_query_interval));
+			      msecs_to_jiffies(dib->rc_query_interval));
 }
 
 int dibusb_remote_init(struct usb_dibusb *dib)
@@ -171,11 +171,11 @@ int dibusb_remote_init(struct usb_dibusb *dib)
 	INIT_WORK(&dib->rc_query_work, dibusb_remote_query, dib);
 
 	/* Start the remote-control polling. */
-	if (rc_query_interval < 40)
-		rc_query_interval = 100; /* default */
+	if (dib->rc_query_interval < 40)
+		dib->rc_query_interval = 100; /* default */
 
-	info("schedule remote query interval to %d msecs.",rc_query_interval);
-	schedule_delayed_work(&dib->rc_query_work,msecs_to_jiffies(rc_query_interval));
+	info("schedule remote query interval to %d msecs.",dib->rc_query_interval);
+	schedule_delayed_work(&dib->rc_query_work,msecs_to_jiffies(dib->rc_query_interval));
 
 	dib->init_state |= DIBUSB_STATE_REMOTE;
 	

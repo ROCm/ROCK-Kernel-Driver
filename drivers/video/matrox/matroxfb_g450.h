@@ -3,7 +3,7 @@
 
 #include "matroxfb_base.h"
 
-#ifdef CONFIG_FB_MATROX_G450
+#ifdef CONFIG_FB_MATROX_G
 void matroxfb_g450_connect(WPMINFO2);
 void matroxfb_g450_shutdown(WPMINFO2);
 #else

@@ -2,9 +2,10 @@ USERSPACE MAD ACCESS
 
 Device files
 
-  Each port of each InfiniBand device has a "umad" device attached.
-  For example, a two-port HCA will have two devices, while a switch
-  will have one device (for switch port 0).
+  Each port of each InfiniBand device has a "umad" device and an
+  "issm" device attached.  For example, a two-port HCA will have two
+  umad devices and two issm devices, while a switch will have one
+  device of each type (for switch port 0).
 
 Creating MAD agents
 
@@ -63,19 +64,36 @@ Sending MADs
 	if (ret != sizeof mad)
 		perror("write");
 
+Setting IsSM Capability Bit
+
+  To set the IsSM capability bit for a port, simply open the
+  corresponding issm device file.  If the IsSM bit is already set,
+  then the open call will block until the bit is cleared (or return
+  immediately with errno set to EAGAIN if the O_NONBLOCK flag is
+  passed to open()).  The IsSM bit will be cleared when the issm file
+  is closed.  No read, write or other operations can be performed on
+  the issm file.
+
 /dev files
 
   To create the appropriate character device files automatically with
   udev, a rule like
 
     KERNEL="umad*", NAME="infiniband/%k"
+    KERNEL="issm*", NAME="infiniband/%k"
 
-  can be used.  This will create a device node named
+  can be used.  This will create device nodes named
 
     /dev/infiniband/umad0
+    /dev/infiniband/issm0
 
   for the first port, and so on.  The InfiniBand device and port
-  associated with this device can be determined from the files
+  associated with these devices can be determined from the files
 
     /sys/class/infiniband_mad/umad0/ibdev
     /sys/class/infiniband_mad/umad0/port
+
+  and
+
+    /sys/class/infiniband_mad/issm0/ibdev
+    /sys/class/infiniband_mad/issm0/port

@@ -75,8 +75,7 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
-#include <linux/uts.h>
-#include <linux/version.h>
+#include <linux/utsname.h>
 #include <linux/device.h>
 #include <linux/moduleparam.h>
 
@@ -1265,8 +1264,8 @@ autoconf_fail:
 	INFO (dev, "using %s, OUT %s IN %s\n", gadget->name,
 		EP_OUT_NAME, EP_IN_NAME);
 
-	snprintf (manufacturer, sizeof manufacturer,
-		UTS_SYSNAME " " UTS_RELEASE " with %s",
+	snprintf (manufacturer, sizeof manufacturer, "%s %s with %s",
+		system_utsname.sysname, system_utsname.release,
 		gadget->name);
 
 	return 0;

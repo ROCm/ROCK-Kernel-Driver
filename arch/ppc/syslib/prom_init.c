@@ -810,6 +810,9 @@ prom_init(int r3, int r4, prom_entry pp)
 	char *p, *d;
  	unsigned long phys;
 	void *result[3];
+	char model[32];
+	phandle node;
+	int rc;
 
  	/* Default */
  	phys = (unsigned long) &_stext;
@@ -866,11 +869,20 @@ prom_init(int r3, int r4, prom_entry pp)
 
 	klimit = (char *) (mem - offset);
 
-	/* If we are already running at 0xc0000000, we assume we were
-	 * loaded by an OF bootloader which did set a BAT for us.
-	 * This breaks OF translate so we force phys to be 0.
-	 */
-	if (offset == 0) {
+	node = call_prom("finddevice", 1, 1, "/");
+	rc = call_prom("getprop", 4, 1, node, "model", model, sizeof(model));
+	if (rc > 0 && !strncmp (model, "Pegasos", 7)
+		&& strncmp (model, "Pegasos2", 8)) {
+		/* Pegasos 1 has a broken translate method in the OF,
+		 * and furthermore the BATs are mapped 1:1 so the phys
+		 * address calculated above is correct, so let's use
+		 * it directly.
+		 */
+	} else if (offset == 0) {
+		/* If we are already running at 0xc0000000, we assume we were
+	 	 * loaded by an OF bootloader which did set a BAT for us.
+	 	 * This breaks OF translate so we force phys to be 0.
+	 	 */
 		prom_print("(already at 0xc0000000) phys=0\n");
 		phys = 0;
 	} else if ((int) call_prom("getprop", 4, 1, prom_chosen, "mmu",

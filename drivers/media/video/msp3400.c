@@ -36,6 +36,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/string.h>
@@ -379,7 +380,7 @@ static void msp3400c_setvolume(struct i2c_client *client,
 	int val = 0, bal = 0;
 
 	if (!muted) {
-		val = (volume * 0x73 / 65535) << 8;
+		val = (volume * 0x7F / 65535) << 8;
 	}
 	if (val) {
 		bal = (balance / 256) - 128;
@@ -1202,7 +1203,7 @@ static void msp34xxg_set_source(struct i2c_client *client, int source);
 static int msp34xxg_init(struct i2c_client *client)
 {
 	struct msp3400c *msp = i2c_get_clientdata(client);
-	int modus;
+	int modus,std;
 
 	if (msp3400c_reset(client))
 		return -1;
@@ -1216,12 +1217,18 @@ static int msp34xxg_init(struct i2c_client *client)
 
 	/* step-by-step initialisation, as described in the manual */
 	modus = msp34xx_modus(msp->norm);
+	std   = msp34xx_standard(msp->norm);
 	modus &= ~0x03; /* STATUS_CHANGE=0 */
 	modus |= 0x01;  /* AUTOMATIC_SOUND_DETECTION=1 */
 	if (msp3400c_write(client,
 			   I2C_MSP3400C_DEM,
 			   0x30/*MODUS*/,
 			   modus))
+		return -1;
+	if (msp3400c_write(client,
+			   I2C_MSP3400C_DEM,
+			   0x20/*stanard*/,
+			   std))
 		return -1;
 
 	/* write the dfps that may have an influence on

@@ -141,14 +141,14 @@ static int enter_state(suspend_state_t state)
 	if (down_trylock(&pm_sem))
 		return -EBUSY;
 
-	/* Suspend is hard to get right on SMP. */
-	if (num_online_cpus() != 1) {
-		error = -EPERM;
+	if (state == PM_SUSPEND_DISK) {
+		error = pm_suspend_disk();
 		goto Unlock;
 	}
 
-	if (state == PM_SUSPEND_DISK) {
-		error = pm_suspend_disk();
+	/* Suspend is hard to get right on SMP. */
+	if (num_online_cpus() != 1) {
+		error = -EPERM;
 		goto Unlock;
 	}
 

@@ -289,7 +289,7 @@ static void serial_detach(dev_link_t * link)
 
 /*====================================================================*/
 
-static int setup_serial(struct serial_info * info, ioaddr_t iobase, int irq)
+static int setup_serial(struct serial_info * info, kio_addr_t iobase, int irq)
 {
 	struct uart_port port;
 	int line;
@@ -351,7 +351,7 @@ next_tuple(client_handle_t handle, tuple_t * tuple, cisparse_t * parse)
 
 static int simple_config(dev_link_t *link)
 {
-	static ioaddr_t base[5] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8, 0x0 };
+	static kio_addr_t base[5] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8, 0x0 };
 	static int size_table[2] = { 8, 16 };
 	client_handle_t handle = link->handle;
 	struct serial_info *info = link->priv;
@@ -366,7 +366,7 @@ static int simple_config(dev_link_t *link)
 	/* If the card is already configured, look up the port and irq */
 	i = pcmcia_get_configuration_info(handle, &config);
 	if ((i == CS_SUCCESS) && (config.Attributes & CONF_VALID_CLIENT)) {
-		ioaddr_t port = 0;
+		kio_addr_t port = 0;
 		if ((config.BasePort2 != 0) && (config.NumPorts2 == 8)) {
 			port = config.BasePort2;
 			info->slave = 1;

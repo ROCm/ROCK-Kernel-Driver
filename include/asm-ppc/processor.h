@@ -34,6 +34,7 @@
 /* these are arbitrary */
 #define _CHRP_Motorola	0x04	/* motorola chrp, the cobra */
 #define _CHRP_IBM	0x05	/* IBM chrp, the longtrail and longtrail 2 */
+#define _CHRP_Pegasos	0x06	/* Genesi/bplan's Pegasos and Pegasos2 */
 
 #define _GLOBAL(n)\
 	.stabs __stringify(n:F-1),N_FUN,0,0,n;\
@@ -54,6 +55,7 @@ extern int _machine;
 
 /* what kind of prep workstation we are */
 extern int _prep_type;
+extern int _chrp_type;
 
 /*
  * This is used to identify the board type from a given PReP board

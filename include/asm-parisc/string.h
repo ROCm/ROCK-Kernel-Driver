@@ -7,7 +7,4 @@ extern void * memset(void *, int, size_t);
 #define __HAVE_ARCH_MEMCPY
 void * memcpy(void * dest,const void *src,size_t count);
 
-#define __HAVE_ARCH_BCOPY
-void bcopy(const void * srcp, void * destp, size_t count);
-
 #endif

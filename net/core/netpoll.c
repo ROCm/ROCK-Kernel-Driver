@@ -65,27 +65,25 @@ static int checksum_udp(struct sk_buff *skb, struct udphdr *uh,
 	return csum_fold(skb_checksum(skb, 0, skb->len, skb->csum));
 }
 
-void netpoll_poll(struct netpoll *np)
+/*
+ * Check whether delayed processing was scheduled for our current CPU,
+ * and then manually invoke NAPI polling to pump data off the card.
+ *
+ * In cases where there is bi-directional communications, reading only
+ * one message at a time can lead to packets being dropped by the
+ * network adapter, forcing superfluous retries and possibly timeouts.
+ * Thus, we set our budget to greater than 1.
+ */
+static void poll_napi(struct netpoll *np)
 {
-	/*
-	 * In cases where there is bi-directional communications, reading
-	 * only one message at a time can lead to packets being dropped by
-	 * the network adapter, forcing superfluous retries and possibly
-	 * timeouts.  Thus, we set our budget to a more reasonable value.
-	 */
 	int budget = 16;
 	unsigned long flags;
+	struct softnet_data *queue;
 
-	if(!np->dev || !netif_running(np->dev) || !np->dev->poll_controller)
-		return;
-
-	/* Process pending work on NIC */
-	np->dev->poll_controller(np->dev);
-
-	/* If scheduling is stopped, tickle NAPI bits */
 	spin_lock_irqsave(&netpoll_poll_lock, flags);
-	if (np->dev->poll &&
-	    test_bit(__LINK_STATE_RX_SCHED, &np->dev->state)) {
+	queue = &__get_cpu_var(softnet_data);
+	if (test_bit(__LINK_STATE_RX_SCHED, &np->dev->state) &&
+	    !list_empty(&queue->poll_list)) {
 		np->dev->netpoll_rx |= NETPOLL_RX_DROP;
 		atomic_inc(&trapped);
 
@@ -95,6 +93,17 @@ void netpoll_poll(struct netpoll *np)
 		np->dev->netpoll_rx &= ~NETPOLL_RX_DROP;
 	}
 	spin_unlock_irqrestore(&netpoll_poll_lock, flags);
+}
+
+void netpoll_poll(struct netpoll *np)
+{
+	if(!np->dev || !netif_running(np->dev) || !np->dev->poll_controller)
+		return;
+
+	/* Process pending work on NIC */
+	np->dev->poll_controller(np->dev);
+	if (np->dev->poll)
+		poll_napi(np);
 
 	zap_completion_queue();
 }

@@ -1207,6 +1207,22 @@ intelfbhw_program_mode(struct intelfb_info *dinfo,
 	OUTREG(ADPA, tmp);
 
 	/* setup display plane */
+	if (dinfo->pdev->device == PCI_DEVICE_ID_INTEL_830M) {
+		/*
+		 *      i830M errata: the display plane must be enabled
+		 *      to allow writes to the other bits in the plane
+		 *      control register.
+		 */
+		tmp = INREG(DSPACNTR);
+		if ((tmp & DISPPLANE_PLANE_ENABLE) != DISPPLANE_PLANE_ENABLE) {
+			tmp |= DISPPLANE_PLANE_ENABLE;
+			OUTREG(DSPACNTR, tmp);
+			OUTREG(DSPACNTR,
+			       hw->disp_a_ctrl|DISPPLANE_PLANE_ENABLE);
+			mdelay(1);
+              }
+	}
+
 	OUTREG(DSPACNTR, hw->disp_a_ctrl & ~DISPPLANE_PLANE_ENABLE);
 	OUTREG(DSPASTRIDE, hw->disp_a_stride);
 	OUTREG(DSPABASE, hw->disp_a_base);

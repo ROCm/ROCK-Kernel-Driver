@@ -36,8 +36,7 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
-#include <linux/uts.h>
-#include <linux/version.h>
+#include <linux/utsname.h>
 #include <linux/device.h>
 #include <linux/moduleparam.h>
 #include <linux/ctype.h>
@@ -2337,8 +2336,8 @@ eth_bind (struct usb_gadget *gadget)
 			gadget->name);
 		return -ENODEV;
 	}
-	snprintf (manufacturer, sizeof manufacturer,
-		UTS_SYSNAME " " UTS_RELEASE "/%s",
+	snprintf (manufacturer, sizeof manufacturer, "%s %s/%s",
+		system_utsname.sysname, system_utsname.release,
 		gadget->name);
 
 	/* If there's an RNDIS configuration, that's what Windows wants to

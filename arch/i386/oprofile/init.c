@@ -21,7 +21,7 @@ extern void nmi_exit(void);
 extern void x86_backtrace(struct pt_regs * const regs, unsigned int depth);
 
 
-void __init oprofile_arch_init(struct oprofile_operations * ops)
+int __init oprofile_arch_init(struct oprofile_operations * ops)
 {
 	int ret;
 
@@ -35,6 +35,8 @@ void __init oprofile_arch_init(struct oprofile_operations * ops)
 		ret = nmi_timer_init(ops);
 #endif
 	ops->backtrace = x86_backtrace;
+
+	return ret;
 }
 
 

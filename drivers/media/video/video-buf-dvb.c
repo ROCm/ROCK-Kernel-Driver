@@ -1,5 +1,5 @@
 /*
- * $Id: video-buf-dvb.c,v 1.5 2004/11/07 13:17:15 kraxel Exp $
+ * $Id: video-buf-dvb.c,v 1.7 2004/12/09 12:51:35 kraxel Exp $
  *
  * some helper function for simple DVB cards which simply DMA the
  * complete transport stream and let the computer sort everything else
@@ -35,7 +35,7 @@ module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug,"enable debug messages");
 
 #define dprintk(fmt, arg...)	if (debug)			\
-	printk(KERN_DEBUG "%s/dvb: " fmt, dvb->name, ## arg)
+	printk(KERN_DEBUG "%s/dvb: " fmt, dvb->name , ## arg)
 
 /* ------------------------------------------------------------------ */
 
@@ -134,19 +134,22 @@ static int videobuf_dvb_stop_feed(struct dvb_demux_feed *feed)
 
 /* ------------------------------------------------------------------ */
 
-int videobuf_dvb_register(struct videobuf_dvb *dvb)
+int videobuf_dvb_register(struct videobuf_dvb *dvb,
+			  struct module *module,
+			  void *adapter_priv)
 {
 	int result;
 
 	init_MUTEX(&dvb->lock);
 
 	/* register adapter */
-	result = dvb_register_adapter(&dvb->adapter, dvb->name, THIS_MODULE);
+	result = dvb_register_adapter(&dvb->adapter, dvb->name, module);
 	if (result < 0) {
 		printk(KERN_WARNING "%s: dvb_register_adapter failed (errno = %d)\n",
 		       dvb->name, result);
 		goto fail_adapter;
 	}
+	dvb->adapter->priv = adapter_priv;
 
 	/* register frontend */
 	result = dvb_register_frontend(dvb->adapter, dvb->frontend);

@@ -1748,6 +1748,7 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
         info->fix.type_aux = 0;
         info->fix.mmio_start = rinfo->mmio_base_phys;
         info->fix.mmio_len = RADEON_REGSIZE;
+	info->fix.accel = FB_ACCEL_ATI_RADEON;
 
 	fb_alloc_cmap(&info->cmap, 256, 0);
 

@@ -17,9 +17,6 @@ static DEFINE_SPINLOCK(_lock);
 
 int dm_register_dirty_log_type(struct dirty_log_type *type)
 {
-	if (!try_module_get(type->module))
-		return -EINVAL;
-
 	spin_lock(&_lock);
 	type->use_count = 0;
 	list_add(&type->list, &_log_types);
@@ -34,10 +31,8 @@ int dm_unregister_dirty_log_type(struct dirty_log_type *type)
 
 	if (type->use_count)
 		DMWARN("Attempt to unregister a log type that is still in use");
-	else {
+	else
 		list_del(&type->list);
-		module_put(type->module);
-	}
 
 	spin_unlock(&_lock);
 
@@ -51,6 +46,10 @@ static struct dirty_log_type *get_type(const char *type_name)
 	spin_lock(&_lock);
 	list_for_each_entry (type, &_log_types, list)
 		if (!strcmp(type_name, type->name)) {
+			if (!type->use_count && !try_module_get(type->module)){
+				spin_unlock(&_lock);
+				return NULL;
+			}
 			type->use_count++;
 			spin_unlock(&_lock);
 			return type;
@@ -63,7 +62,8 @@ static struct dirty_log_type *get_type(const char *type_name)
 static void put_type(struct dirty_log_type *type)
 {
 	spin_lock(&_lock);
-	type->use_count--;
+	if (!--type->use_count)
+		module_put(type->module);
 	spin_unlock(&_lock);
 }
 

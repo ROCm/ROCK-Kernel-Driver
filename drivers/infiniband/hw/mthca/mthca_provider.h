@@ -66,11 +66,11 @@ struct mthca_eq {
 	struct mthca_dev      *dev;
 	int                    eqn;
 	u32                    ecr_mask;
+	u32                    cons_index;
 	u16                    msi_x_vector;
 	u16                    msi_x_entry;
 	int                    have_irq;
 	int                    nent;
-	int                    cons_index;
 	struct mthca_buf_list *page_list;
 	struct mthca_mr        mr;
 };

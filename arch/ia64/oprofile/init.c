@@ -16,13 +16,17 @@ extern int perfmon_init(struct oprofile_operations * ops);
 extern void perfmon_exit(void);
 extern void ia64_backtrace(struct pt_regs * const regs, unsigned int depth);
 
-void __init oprofile_arch_init(struct oprofile_operations * ops)
+int __init oprofile_arch_init(struct oprofile_operations * ops)
 {
+	int ret = -ENODEV;
+
 #ifdef CONFIG_PERFMON
 	/* perfmon_init() can fail, but we have no way to report it */
-	perfmon_init(ops);
+	ret = perfmon_init(ops);
 #endif
 	ops->backtrace = ia64_backtrace;
+
+	return ret;
 }
 
 

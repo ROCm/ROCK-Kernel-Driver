@@ -138,7 +138,7 @@ op_axp_create_files(struct super_block * sb, struct dentry * root)
 	return 0;
 }
 
-void __init
+int __init
 oprofile_arch_init(struct oprofile_operations *ops)
 {
 	struct op_axp_model *lmodel = NULL;
@@ -166,7 +166,7 @@ oprofile_arch_init(struct oprofile_operations *ops)
 	}
 
 	if (!lmodel)
-		return;
+		return -ENODEV;
 	model = lmodel;
 
 	ops->create_files = op_axp_create_files;
@@ -178,6 +178,8 @@ oprofile_arch_init(struct oprofile_operations *ops)
 
 	printk(KERN_INFO "oprofile: using %s performance monitoring.\n",
 	       lmodel->cpu_type);
+
+	return 0;
 }
 
 

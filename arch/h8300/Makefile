@@ -7,9 +7,6 @@
 #
 # (C) Copyright 2002,2003 Yoshinori Sato <ysato@users.sourceforge.jp>
 #
-ifndef include-config
--include $(TOPDIR)/.config
-endif
 
 platform-$(CONFIG_CPU_H8300H)	:= h8300h
 platform-$(CONFIG_CPU_H8S)	:= h8s
@@ -47,9 +44,11 @@ LIBGCC := $(shell $(CROSS-COMPILE)$(CC) $(CFLAGS) -print-libgcc-file-name)
 head-y := arch/$(ARCH)/platform/$(platform-y)/$(board-y)/crt0_$(model-y).o
 
 core-y	+= arch/$(ARCH)/kernel/ \
-	   arch/$(ARCH)/mm/ \
-	   arch/$(ARCH)/platform/$(PLATFORM)/ \
+	   arch/$(ARCH)/mm/
+ifdef PLATFORM
+core-y	+= arch/$(ARCH)/platform/$(PLATFORM)/ \
 	   arch/$(ARCH)/platform/$(PLATFORM)/$(BOARD)/
+endif
 
 libs-y	+= arch/$(ARCH)/lib/ $(LIBGCC)
 

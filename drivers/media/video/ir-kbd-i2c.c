@@ -1,5 +1,5 @@
 /*
- * $Id: ir-kbd-i2c.c,v 1.8 2004/09/15 16:15:24 kraxel Exp $
+ * $Id: ir-kbd-i2c.c,v 1.10 2004/12/09 12:51:35 kraxel Exp $
  *
  * keyboard input driver for i2c IR remote controls
  *
@@ -433,7 +433,7 @@ static int ir_probe(struct i2c_adapter *adap)
 	*/
 
 	static const int probe_bttv[] = { 0x1a, 0x18, 0x4b, 0x64, 0x30, -1};
-	static const int probe_saa7134[] = { 0x7a, -1};
+	static const int probe_saa7134[] = { 0x7a, -1 };
 	const int *probe = NULL;
 	struct i2c_client c; char buf; int i,rc;
 

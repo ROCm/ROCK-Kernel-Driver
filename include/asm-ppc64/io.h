@@ -371,7 +371,7 @@ static inline unsigned long in_be64(const volatile unsigned long __iomem *addr)
 {
 	unsigned long ret;
 
-	__asm__ __volatile__("ld %0,0(%1); twi 0,%0,0; isync"
+	__asm__ __volatile__("ld%U1%X1 %0,%1; twi 0,%0,0; isync"
 			     : "=r" (ret) : "m" (*addr));
 	return ret;
 }

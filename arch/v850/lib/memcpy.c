@@ -60,11 +60,6 @@ void *memcpy (void *dst, const void *src, __kernel_size_t size)
 	return dst;
 }
 
-void bcopy (const char *src, char *dst, int size)
-{
-	memcpy (dst, src, size);
-}
-
 void *memmove (void *dst, const void *src, __kernel_size_t size)
 {
 	if ((unsigned long)dst < (unsigned long)src

@@ -186,14 +186,15 @@ static int sub_interval(struct resource_map *map, u_long base, u_long num)
 ======================================================================*/
 
 #ifdef CONFIG_PCMCIA_PROBE
-static void do_io_probe(struct pcmcia_socket *s, ioaddr_t base, ioaddr_t num)
+static void do_io_probe(struct pcmcia_socket *s, kio_addr_t base, kio_addr_t num)
 {
     struct resource *res;
     struct socket_data *s_data = s->resource_data;
-    ioaddr_t i, j, bad, any;
+    kio_addr_t i, j, bad;
+    int any;
     u_char *b, hole, most;
 
-    printk(KERN_INFO "cs: IO port probe 0x%04x-0x%04x:",
+    printk(KERN_INFO "cs: IO port probe %#lx-%#lx:",
 	   base, base+num-1);
 
     /* First, what does a floating port look like? */
@@ -233,7 +234,7 @@ static void do_io_probe(struct pcmcia_socket *s, ioaddr_t base, ioaddr_t num)
 	} else {
 	    if (bad) {
 		sub_interval(&s_data->io_db, bad, i-bad);
-		printk(" %#04x-%#04x", bad, i-1);
+		printk(" %#lx-%#lx", bad, i-1);
 		bad = 0;
 	    }
 	}
@@ -244,7 +245,7 @@ static void do_io_probe(struct pcmcia_socket *s, ioaddr_t base, ioaddr_t num)
 	    return;
 	} else {
 	    sub_interval(&s_data->io_db, bad, i-bad);
-	    printk(" %#04x-%#04x", bad, i-1);
+	    printk(" %#lx-%#lx", bad, i-1);
 	}
     }
 
@@ -725,7 +726,8 @@ static int adjust_memory(struct pcmcia_socket *s, adjust_t *adj)
 static int adjust_io(struct pcmcia_socket *s, adjust_t *adj)
 {
 	struct socket_data *data = s->resource_data;
-	int base, num, ret = CS_SUCCESS;
+	kio_addr_t base, num;
+	int ret = CS_SUCCESS;
 
 	base = adj->resource.io.BasePort;
 	num = adj->resource.io.NumPorts;

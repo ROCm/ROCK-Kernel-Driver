@@ -1,5 +1,5 @@
 /*
- * $Id: bttv.h,v 1.10 2004/10/13 10:39:00 kraxel Exp $
+ * $Id: bttv.h,v 1.14 2005/01/07 13:11:19 kraxel Exp $
  *
  *  bttv - Bt848 frame grabber driver
  *
@@ -133,6 +133,7 @@
 #define BTTV_MATRIX_VISIONSLC 0x7e
 #define BTTV_APAC_VIEWCOMP  0x7f
 #define BTTV_DVICO_DVBT_LITE  0x80
+#define BTTV_TIBET_CS16  0x83
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2
@@ -149,7 +150,7 @@
 #define I2C_VHX            0xc0
 #define I2C_MSP3400        0x80
 #define I2C_MSP3400_ALT    0x88
-#define I2C_TEA6300        0x80
+#define I2C_TEA6300        0x80 /* also used by 6320 */
 #define I2C_DPL3518	   0x84
 #define I2C_TDA9887	   0x86
 

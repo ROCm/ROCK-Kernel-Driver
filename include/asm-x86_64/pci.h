@@ -41,7 +41,6 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 #include <linux/slab.h>
 #include <asm/scatterlist.h>
 #include <linux/string.h>
-#include <asm/io.h>
 #include <asm/page.h>
 
 extern int iommu_setup(char *opt);

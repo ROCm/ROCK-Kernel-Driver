@@ -1158,10 +1158,11 @@ static int mirror_end_io(struct dm_target *ti, struct bio *bio,
 	return 0;
 }
 
-static void mirror_suspend(struct dm_target *ti)
+static void mirror_postsuspend(struct dm_target *ti)
 {
 	struct mirror_set *ms = (struct mirror_set *) ti->private;
 	struct dirty_log *log = ms->rh.log;
+
 	rh_stop_recovery(&ms->rh);
 	if (log->type->suspend && log->type->suspend(log))
 		/* FIXME: need better error handling */
@@ -1220,7 +1221,7 @@ static struct target_type mirror_target = {
 	.dtr	 = mirror_dtr,
 	.map	 = mirror_map,
 	.end_io	 = mirror_end_io,
-	.suspend = mirror_suspend,
+	.postsuspend = mirror_postsuspend,
 	.resume	 = mirror_resume,
 	.status	 = mirror_status,
 };

@@ -405,15 +405,6 @@ void die_nmi(char *str, struct pt_regs *regs)
 	do_exit(SIGSEGV);
 }
 
-static inline unsigned long get_cr2(void)
-{
-	unsigned long address;
-
-	/* get the address */
-	__asm__("movq %%cr2,%0":"=r" (address));
-	return address;
-}
-
 static void do_trap(int trapnr, int signr, char *str, 
 			   struct pt_regs * regs, long error_code, siginfo_t *info)
 {

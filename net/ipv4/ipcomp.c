@@ -472,7 +472,7 @@ static int ipcomp_init_state(struct xfrm_state *x, void *args)
 			goto error_tunnel;
 	}
 
-	calg_desc = xfrm_calg_get_byname(x->calg->alg_name);
+	calg_desc = xfrm_calg_get_byname(x->calg->alg_name, 0);
 	BUG_ON(!calg_desc);
 	ipcd->threshold = calg_desc->uinfo.comp.threshold;
 	x->data = ipcd;

@@ -51,20 +51,17 @@ extern void switch_slb(struct task_struct *tsk, struct mm_struct *mm);
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 			     struct task_struct *tsk)
 {
-#ifdef CONFIG_ALTIVEC
-	asm volatile (
- BEGIN_FTR_SECTION
-	"dssall;\n"
- END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
-	 : : );
-#endif /* CONFIG_ALTIVEC */
-
 	if (!cpu_isset(smp_processor_id(), next->cpu_vm_mask))
 		cpu_set(smp_processor_id(), next->cpu_vm_mask);
 
 	/* No need to flush userspace segments if the mm doesnt change */
 	if (prev == next)
 		return;
+
+#ifdef CONFIG_ALTIVEC
+	if (cur_cpu_spec->cpu_features & CPU_FTR_ALTIVEC)
+		asm volatile ("dssall");
+#endif /* CONFIG_ALTIVEC */
 
 	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB)
 		switch_slb(tsk, next);

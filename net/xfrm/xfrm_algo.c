@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/pfkeyv2.h>
+#include <linux/crypto.h>
 #include <net/xfrm.h>
 #if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
 #include <net/ah.h>
@@ -346,58 +347,48 @@ struct xfrm_algo_desc *xfrm_calg_get_byid(int alg_id)
 	return NULL;
 }
 
-struct xfrm_algo_desc *xfrm_aalg_get_byname(char *name)
+static struct xfrm_algo_desc *xfrm_get_byname(struct xfrm_algo_desc *list,
+					      int entries, char *name,
+					      int probe)
 {
-	int i;
+	int i, status;
 
 	if (!name)
 		return NULL;
 
-	for (i=0; i < aalg_entries(); i++) {
-		if (strcmp(name, aalg_list[i].name) == 0) {
-			if (aalg_list[i].available)
-				return &aalg_list[i];
-			else
-				break;
-		}
+	for (i = 0; i < entries; i++) {
+		if (!strcmp(name, list[i].name))
+			continue;
+
+		if (list[i].available)
+			return &list[i];
+
+		if (!probe)
+			break;
+
+		status = crypto_alg_available(name, 0);
+		if (!status)
+			break;
+
+		list[i].available = status;
+		return &list[i];
 	}
 	return NULL;
 }
 
-struct xfrm_algo_desc *xfrm_ealg_get_byname(char *name)
+struct xfrm_algo_desc *xfrm_aalg_get_byname(char *name, int probe)
 {
-	int i;
-
-	if (!name)
-		return NULL;
-
-	for (i=0; i < ealg_entries(); i++) {
-		if (strcmp(name, ealg_list[i].name) == 0) {
-			if (ealg_list[i].available)
-				return &ealg_list[i];
-			else
-				break;
-		}
-	}
-	return NULL;
+	return xfrm_get_byname(aalg_list, aalg_entries(), name, probe);
 }
 
-struct xfrm_algo_desc *xfrm_calg_get_byname(char *name)
+struct xfrm_algo_desc *xfrm_ealg_get_byname(char *name, int probe)
 {
-	int i;
+	return xfrm_get_byname(ealg_list, ealg_entries(), name, probe);
+}
 
-	if (!name)
-		return NULL;
-
-	for (i=0; i < calg_entries(); i++) {
-		if (strcmp(name, calg_list[i].name) == 0) {
-			if (calg_list[i].available)
-				return &calg_list[i];
-			else
-				break;
-		}
-	}
-	return NULL;
+struct xfrm_algo_desc *xfrm_calg_get_byname(char *name, int probe)
+{
+	return xfrm_get_byname(calg_list, calg_entries(), name, probe);
 }
 
 struct xfrm_algo_desc *xfrm_aalg_get_byidx(unsigned int idx)

@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-if.c,v 1.3 2004/10/13 10:39:00 kraxel Exp $
+    $Id: bttv-if.c,v 1.4 2004/11/17 18:47:47 kraxel Exp $
 
     bttv-if.c  --  old gpio interface to other kernel modules
                    don't use in new code, will go away in 2.7
@@ -50,6 +50,8 @@ EXPORT_SYMBOL(bttv_i2c_call);
 
 int bttv_get_cardinfo(unsigned int card, int *type, unsigned *cardid)
 {
+	printk("The bttv_* interface is obsolete and will go away,\n"
+	       "please use the new, sysfs based interface instead.\n");
 	if (card >= bttv_num) {
 		return -1;
 	}
@@ -67,7 +69,8 @@ struct pci_dev* bttv_get_pcidev(unsigned int card)
 
 int bttv_get_id(unsigned int card)
 {
-	printk("bttv_get_id is obsolete, use bttv_get_cardinfo instead\n");
+	printk("The bttv_* interface is obsolete and will go away,\n"
+	       "please use the new, sysfs based interface instead.\n");
 	if (card >= bttv_num) {
 		return -1;
 	}
@@ -141,6 +144,13 @@ wait_queue_head_t* bttv_get_gpio_queue(unsigned int card)
 		return NULL;
 	}
 	return &btv->gpioq;
+}
+
+void bttv_i2c_call(unsigned int card, unsigned int cmd, void *arg)
+{
+	if (card >= bttv_num)
+		return;
+	bttv_call_i2c_clients(&bttvs[card], cmd, arg);
 }
 
 /*

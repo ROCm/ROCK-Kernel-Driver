@@ -81,4 +81,5 @@ cond_syscall(compat_sys_socketcall)
 cond_syscall(sys_pciconfig_read)
 cond_syscall(sys_pciconfig_write)
 cond_syscall(sys_pciconfig_iobase)
-
+cond_syscall(sys32_ipc)
+cond_syscall(sys32_sysctl)

@@ -64,7 +64,8 @@ struct kparam_array
    param_set_XXX and param_check_XXX. */
 #define module_param_named(name, value, type, perm)			   \
 	param_check_##type(name, &(value));				   \
-	module_param_call(name, param_set_##type, param_get_##type, &value, perm)
+	module_param_call(name, param_set_##type, param_get_##type, &value, perm); \
+	__MODULE_INFO(parmtype, name##type, #name ":" #type)
 
 #define module_param(name, type, perm)				\
 	module_param_named(name, name, type, perm)
@@ -74,7 +75,8 @@ struct kparam_array
 	static struct kparam_string __param_string_##name		\
 		= { len, string };					\
 	module_param_call(name, param_set_copystring, param_get_string,	\
-		   &__param_string_##name, perm)
+		   &__param_string_##name, perm);			\
+	__MODULE_INFO(parmtype, name##type, #name ":string")
 
 /* Called on module insert or kernel boot */
 extern int parse_args(const char *name,
@@ -135,7 +137,8 @@ extern int param_get_invbool(char *buffer, struct kernel_param *kp);
 	= { ARRAY_SIZE(array), nump, param_set_##type, param_get_##type,\
 	    sizeof(array[0]), array };					\
 	module_param_call(name, param_array_set, param_array_get, 	\
-			  &__param_arr_##name, perm)
+			  &__param_arr_##name, perm);			\
+	__MODULE_INFO(parmtype, name##type, #name ":array of " #type)
 
 #define module_param_array(name, type, nump, perm)		\
 	module_param_array_named(name, name, type, nump, perm)

@@ -653,6 +653,7 @@ sys32_pause(void)
 }
 
 
+#ifdef CONFIG_SYSCTL
 struct sysctl_ia32 {
 	unsigned int	name;
 	int		nlen;
@@ -667,9 +668,6 @@ struct sysctl_ia32 {
 asmlinkage long
 sys32_sysctl(struct sysctl_ia32 __user *args32)
 {
-#ifndef CONFIG_SYSCTL
-	return -ENOSYS; 
-#else
 	struct sysctl_ia32 a32;
 	mm_segment_t old_fs = get_fs ();
 	void *oldvalp, *newvalp;
@@ -710,8 +708,8 @@ sys32_sysctl(struct sysctl_ia32 __user *args32)
 		return -EFAULT;
 
 	return ret;
-#endif
 }
+#endif
 
 /* warning: next two assume little endian */ 
 asmlinkage long
@@ -1081,8 +1079,6 @@ long sys32_lookup_dcookie(u32 addr_low, u32 addr_high,
 {
 	return sys_lookup_dcookie(((u64)addr_high << 32) | addr_low, buf, len);
 }
-
-cond_syscall(sys32_ipc)
 
 static int __init ia32_init (void)
 {

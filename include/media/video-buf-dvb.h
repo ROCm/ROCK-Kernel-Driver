@@ -24,7 +24,9 @@ struct videobuf_dvb {
 	struct dvb_net             net;
 };
 
-int videobuf_dvb_register(struct videobuf_dvb *dvb);
+int videobuf_dvb_register(struct videobuf_dvb *dvb,
+			  struct module *module,
+			  void *adapter_priv);
 void videobuf_dvb_unregister(struct videobuf_dvb *dvb);
 
 /*

@@ -1,5 +1,5 @@
 /*
-    $Id: bttv-vbi.c,v 1.7 2004/11/07 13:17:15 kraxel Exp $
+    $Id: bttv-vbi.c,v 1.9 2005/01/13 17:22:33 kraxel Exp $
 
     bttv - Bt848 frame grabber driver
     vbi interface
@@ -22,6 +22,7 @@
 */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -182,7 +183,7 @@ void bttv_vbi_try_fmt(struct bttv_fh *fh, struct v4l2_format *f)
 	case 2: /* SECAM */
 	default:
 		start0 = 7;
-		start1 = 319;
+		start1 = 320;
 	}
 
 	count0 = (f->fmt.vbi.start[0] + f->fmt.vbi.count[0]) - start0;

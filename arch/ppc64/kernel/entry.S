@@ -185,10 +185,10 @@ syscall_exit_trace_cont:
 	beq-	1f			/* only restore r13 if */
 	ld	r13,GPR13(r1)		/* returning to usermode */
 1:	ld	r2,GPR2(r1)
-	ld	r1,GPR1(r1)
 	li	r12,MSR_RI
 	andc	r10,r10,r12
 	mtmsrd	r10,1			/* clear MSR.RI */
+	ld	r1,GPR1(r1)
 	mtlr	r4
 	mtcr	r5
 	mtspr	SRR0,r7

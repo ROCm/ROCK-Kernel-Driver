@@ -283,8 +283,8 @@ M:	john@dnsworld.co.uk
 S:	Maintained
 
 ARM MFM AND FLOPPY DRIVERS
-P:	Dave Gilbert
-M:	linux@treblig.org
+P:	Ian Molton
+M:	spyro@f2s.com
 S:	Maintained
 
 ARM/CORGI MACHINE SUPPORT
@@ -1798,7 +1798,7 @@ S:	Maintained
 
 PPP OVER ETHERNET
 P:	Michal Ostrowski
-M:	mostrows@styx.uwaterloo.ca
+M:	mostrows@speakeasy.net
 S:	Maintained
 
 PREEMPTIBLE KERNEL

@@ -245,7 +245,7 @@ aoeblk_gdalloc(void *vp)
 		d->fw_ver, (long long)d->ssize);
 }
 
-void __exit
+void
 aoeblk_exit(void)
 {
 	kmem_cache_destroy(buf_pool_cache);
@@ -254,19 +254,12 @@ aoeblk_exit(void)
 int __init
 aoeblk_init(void)
 {
-	int n;
-
 	buf_pool_cache = kmem_cache_create("aoe_bufs", 
 					   sizeof(struct buf),
 					   0, 0, NULL, NULL);
 	if (buf_pool_cache == NULL)
 		return -ENOMEM;
 
-	n = register_blkdev(AOE_MAJOR, DEVICE_NAME);
-	if (n < 0) {
-		printk(KERN_ERR "aoe: aoeblk_init: can't register major\n");
-		return n;
-	}
 	return 0;
 }
 

@@ -64,30 +64,31 @@ ports_match_v1(const struct ipt_multiport_v1 *minfo,
 
 			if (minfo->flags == IPT_MULTIPORT_SOURCE
 			    && src >= s && src <= e)
-				return 1;
+				return 1 ^ minfo->invert;
 			if (minfo->flags == IPT_MULTIPORT_DESTINATION
 			    && dst >= s && dst <= e)
-				return 1;
+				return 1 ^ minfo->invert;
 			if (minfo->flags == IPT_MULTIPORT_EITHER
 			    && ((dst >= s && dst <= e)
 				|| (src >= s && src <= e)))
-				return 1;
+				return 1 ^ minfo->invert;
 		} else {
 			/* exact port matching */
 			duprintf("src or dst matches with %d?\n", s);
+
 			if (minfo->flags == IPT_MULTIPORT_SOURCE
 			    && src == s)
-				return 1;
+				return 1 ^ minfo->invert;
 			if (minfo->flags == IPT_MULTIPORT_DESTINATION
 			    && dst == s)
-				return 1;
+				return 1 ^ minfo->invert;
 			if (minfo->flags == IPT_MULTIPORT_EITHER
 			    && (src == s || dst == s))
-				return 1;
+				return 1 ^ minfo->invert;
 		}
 	}
  
- 	return 0;
+ 	return minfo->invert;
 }
 
 static int

@@ -338,7 +338,7 @@ void zoran_irq(int irq, void *dev_id, struct pt_regs * regs)
 {
 	u32 stat,estat;
 	int count = 0;
-	struct zoran *ztv = (struct zoran *)dev_id;
+	struct zoran *ztv = dev_id;
 
 	UNUSED(irq); UNUSED(regs);
 	for (;;) {
@@ -775,7 +775,7 @@ static int zoran_open(struct video_device *dev, int flags)
 	memset(ztv->fbuffer,0,ZORAN_MAX_FBUFSIZE);
 
 	if (!ztv->overinfo.overlay)
-		ztv->overinfo.overlay = (void*)kmalloc(1024*1024/8, GFP_KERNEL);
+		ztv->overinfo.overlay = kmalloc(1024*1024/8, GFP_KERNEL);
 	if (!ztv->overinfo.overlay) {
 		/* could not get an overlay buffer, bail out */
 		bfree(ztv->fbuffer, ZORAN_MAX_FBUFSIZE);
@@ -1500,7 +1500,7 @@ static struct video_device zr36120_template=
 static
 int vbi_open(struct video_device *dev, int flags)
 {
-	struct zoran *ztv = (struct zoran*)dev->priv;
+	struct zoran *ztv = dev->priv;
 	struct vidinfo* item;
 
 	DEBUG(printk(CARD_DEBUG "vbi_open(dev,%d)\n",CARD,flags));
@@ -1549,7 +1549,7 @@ int vbi_open(struct video_device *dev, int flags)
 static
 void vbi_close(struct video_device *dev)
 {
-	struct zoran *ztv = (struct zoran*)dev->priv;
+	struct zoran *ztv = dev->priv;
 	struct vidinfo* item;
 
 	DEBUG(printk(CARD_DEBUG "vbi_close(dev)\n",CARD));
@@ -1585,7 +1585,7 @@ void vbi_close(struct video_device *dev)
 static
 long vbi_read(struct video_device* dev, char* buf, unsigned long count, int nonblock)
 {
-	struct zoran *ztv = (struct zoran*)dev->priv;
+	struct zoran *ztv = dev->priv;
 	unsigned long max;
 	struct vidinfo* unused = 0;
 	struct vidinfo* done = 0;
@@ -1740,7 +1740,7 @@ out:
 static
 unsigned int vbi_poll(struct video_device *dev, struct file *file, poll_table *wait)
 {
-	struct zoran *ztv = (struct zoran*)dev->priv;
+	struct zoran *ztv = dev->priv;
 	struct vidinfo* item;
 	unsigned int mask = 0;
 
@@ -1761,7 +1761,7 @@ unsigned int vbi_poll(struct video_device *dev, struct file *file, poll_table *w
 static
 int vbi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 {
-	struct zoran* ztv = (struct zoran*)dev->priv;
+	struct zoran* ztv = dev->priv;
 
 	switch (cmd) {
 	 case VIDIOCGVBIFMT:
@@ -1861,7 +1861,7 @@ int __init find_zoran(void)
 		DEBUG(printk(KERN_DEBUG "zoran: mapped-memory at 0x%p\n",ztv->zoran_mem));
 
 		result = request_irq(dev->irq, zoran_irq,
-			SA_SHIRQ|SA_INTERRUPT,"zoran",(void *)ztv);
+			SA_SHIRQ|SA_INTERRUPT,"zoran", ztv);
 		if (result==-EINVAL)
 		{
 			iounmap(ztv->zoran_mem);

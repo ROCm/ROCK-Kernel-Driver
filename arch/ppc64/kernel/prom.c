@@ -717,6 +717,7 @@ static unsigned long __init unflatten_dt_node(unsigned long mem,
 				dad->next->sibling = np;
 			dad->next = np;
 		}
+		kref_init(&np->kref);
 	}
 	while(1) {
 		u32 sz, noff;
@@ -1475,24 +1476,31 @@ EXPORT_SYMBOL(of_get_next_child);
  *	@node:	Node to inc refcount, NULL is supported to
  *		simplify writing of callers
  *
- *	Returns the node itself or NULL if gone.
+ *	Returns node.
  */
 struct device_node *of_node_get(struct device_node *node)
 {
-	if (node && !OF_IS_STALE(node)) {
-		atomic_inc(&node->_users);
-		return node;
-	}
-	return NULL;
+	if (node)
+		kref_get(&node->kref);
+	return node;
 }
 EXPORT_SYMBOL(of_node_get);
 
-/**
- *	of_node_cleanup - release a dynamically allocated node
- *	@arg:  Node to be released
- */
-static void of_node_cleanup(struct device_node *node)
+static inline struct device_node * kref_to_device_node(struct kref *kref)
 {
+	return container_of(kref, struct device_node, kref);
+}
+
+/**
+ *	of_node_release - release a dynamically allocated node
+ *	@kref:  kref element of the node to be released
+ *
+ *	In of_node_put() this function is passed to kref_put()
+ *	as the destructor.
+ */
+static void of_node_release(struct kref *kref)
+{
+	struct device_node *node = kref_to_device_node(kref);
 	struct property *prop = node->properties;
 
 	if (!OF_IS_DYNAMIC(node))
@@ -1518,19 +1526,8 @@ static void of_node_cleanup(struct device_node *node)
  */
 void of_node_put(struct device_node *node)
 {
-	if (!node)
-		return;
-
-	WARN_ON(0 == atomic_read(&node->_users));
-
-	if (OF_IS_STALE(node)) {
-		if (atomic_dec_and_test(&node->_users)) {
-			of_node_cleanup(node);
-			return;
-		}
-	}
-	else
-		atomic_dec(&node->_users);
+	if (node)
+		kref_put(&node->kref, of_node_release);
 }
 EXPORT_SYMBOL(of_node_put);
 
@@ -1773,6 +1770,7 @@ int of_add_node(const char *path, struct property *proplist)
 
 	np->properties = proplist;
 	OF_MARK_DYNAMIC(np);
+	kref_init(&np->kref);
 	of_node_get(np);
 	np->parent = derive_parent(path);
 	if (!np->parent) {
@@ -1809,8 +1807,9 @@ static void of_cleanup_node(struct device_node *np)
 }
 
 /*
- * Remove an OF device node from the system.
- * Caller should have already "gotten" np.
+ * "Unplug" a node from the device tree.  The caller must hold
+ * a reference to the node.  The memory associated with the node
+ * is not freed until its refcount goes to zero.
  */
 int of_remove_node(struct device_node *np)
 {
@@ -1828,7 +1827,6 @@ int of_remove_node(struct device_node *np)
 	of_cleanup_node(np);
 
 	write_lock(&devtree_lock);
-	OF_MARK_STALE(np);
 	remove_node_proc_entries(np);
 	if (allnodes == np)
 		allnodes = np->allnext;
@@ -1853,6 +1851,7 @@ int of_remove_node(struct device_node *np)
 	}
 	write_unlock(&devtree_lock);
 	of_node_put(parent);
+	of_node_put(np); /* Must decrement the refcount */
 	return 0;
 }
 

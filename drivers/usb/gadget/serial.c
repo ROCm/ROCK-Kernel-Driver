@@ -30,8 +30,7 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
-#include <linux/uts.h>
-#include <linux/version.h>
+#include <linux/utsname.h>
 #include <linux/wait.h>
 #include <linux/proc_fs.h>
 #include <linux/device.h>
@@ -1596,8 +1595,9 @@ static int gs_bind(struct usb_gadget *gadget)
 	if (dev == NULL)
 		return -ENOMEM;
 
-	snprintf(manufacturer, sizeof(manufacturer),
-		UTS_SYSNAME " " UTS_RELEASE " with %s", gadget->name);
+	snprintf(manufacturer, sizeof(manufacturer), "%s %s with %s",
+		system_utsname.sysname, system_utsname.release,
+		gadget->name);
 
 	memset(dev, 0, sizeof(struct gs_dev));
 	dev->dev_gadget = gadget;

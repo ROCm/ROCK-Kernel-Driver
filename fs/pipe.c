@@ -630,13 +630,13 @@ void free_pipe_info(struct inode *inode)
 	struct pipe_inode_info *info = inode->i_pipe;
 
 	inode->i_pipe = NULL;
-	if (info->tmp_page)
-		__free_page(info->tmp_page);
 	for (i = 0; i < PIPE_BUFFERS; i++) {
 		struct pipe_buffer *buf = info->bufs + i;
 		if (buf->ops)
 			buf->ops->release(info, buf);
 	}
+	if (info->tmp_page)
+		__free_page(info->tmp_page);
 	kfree(info);
 }
 

@@ -464,7 +464,7 @@ static int ext3_find_goal(struct inode *inode, long block, Indirect chain[4],
 {
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	/* Writer: ->i_next_alloc* */
-	if (block == ei->i_next_alloc_block + 1) {
+	if ((block == ei->i_next_alloc_block + 1)&& ei->i_next_alloc_goal) {
 		ei->i_next_alloc_block++;
 		ei->i_next_alloc_goal++;
 	}
@@ -2493,15 +2493,30 @@ void ext3_read_inode(struct inode * inode)
 		ei->i_data[block] = raw_inode->i_block[block];
 	INIT_LIST_HEAD(&ei->i_orphan);
 
-	ei->i_extra_isize =
-		(EXT3_INODE_SIZE(inode->i_sb) > EXT3_GOOD_OLD_INODE_SIZE) ?
-		le16_to_cpu(raw_inode->i_extra_isize) : 0;
-	if (ei->i_extra_isize) {
-		__le32 *magic = (void *)raw_inode + EXT3_GOOD_OLD_INODE_SIZE +
-				ei->i_extra_isize;
-		if (le32_to_cpu(*magic))
-			 ei->i_state |= EXT3_STATE_XATTR;
-	}
+	if (inode->i_ino >= EXT3_FIRST_INO(inode->i_sb) + 1 &&
+	    EXT3_INODE_SIZE(inode->i_sb) > EXT3_GOOD_OLD_INODE_SIZE) {
+		/*
+		 * When mke2fs creates big inodes it does not zero out
+		 * the unused bytes above EXT3_GOOD_OLD_INODE_SIZE,
+		 * so ignore those first few inodes.
+		 */
+		ei->i_extra_isize = le16_to_cpu(raw_inode->i_extra_isize);
+		if (EXT3_GOOD_OLD_INODE_SIZE + ei->i_extra_isize >
+		    EXT3_INODE_SIZE(inode->i_sb))
+			goto bad_inode;
+		if (ei->i_extra_isize == 0) {
+			/* The extra space is currently unused. Use it. */
+			ei->i_extra_isize = sizeof(struct ext3_inode) -
+					    EXT3_GOOD_OLD_INODE_SIZE;
+		} else {
+			__le32 *magic = (void *)raw_inode +
+					EXT3_GOOD_OLD_INODE_SIZE +
+					ei->i_extra_isize;
+			if (*magic == cpu_to_le32(EXT3_XATTR_MAGIC))
+				 ei->i_state |= EXT3_STATE_XATTR;
+		}
+	} else
+		ei->i_extra_isize = 0;
 
 	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &ext3_file_inode_operations;
