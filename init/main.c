@@ -558,7 +558,9 @@ asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
  */
 static void __init do_basic_setup(void)
 {
+#ifdef CONFIG_HOTPLUG
 	extern char hotplug_path[];
+#endif
 	
 	driver_init();
 
@@ -571,10 +573,12 @@ static void __init do_basic_setup(void)
 
 	init_workqueues();
 
+#ifdef CONFIG_HOTPLUG
 	if (sys_access(hotplug_path, 0) == 0) {
 		printk(KERN_INFO "mounting sysfs on /sys");
 		sys_mount("sys", "/sys","sysfs",0,NULL);
 	}
+#endif
 
 	do_initcalls();
 }
