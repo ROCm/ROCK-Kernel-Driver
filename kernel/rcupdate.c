@@ -60,9 +60,9 @@ struct rcu_state {
 	                              /* for current batch to proceed.        */
 };
 
-struct rcu_state rcu_state ____cacheline_maxaligned_in_smp =
+static struct rcu_state rcu_state ____cacheline_maxaligned_in_smp =
 	  {.lock = SPIN_LOCK_UNLOCKED, .cpumask = CPU_MASK_NONE };
-struct rcu_state rcu_bh_state ____cacheline_maxaligned_in_smp =
+static struct rcu_state rcu_bh_state ____cacheline_maxaligned_in_smp =
 	  {.lock = SPIN_LOCK_UNLOCKED, .cpumask = CPU_MASK_NONE };
 
 DEFINE_PER_CPU(struct rcu_data, rcu_data) = { 0L };
