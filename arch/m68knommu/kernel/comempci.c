@@ -3,7 +3,7 @@
 /*
  *	comemlite.c -- PCI access code for embedded CO-MEM Lite PCI controller.
  *
- *	(C) Copyright 1999-2002, Greg Ungerer (gerg@snapgear.com).
+ *	(C) Copyright 1999-2003, Greg Ungerer (gerg@snapgear.com).
  *	(C) Copyright 2000, Lineo (www.lineo.com)
  */
 
@@ -60,8 +60,8 @@ unsigned long	pci_slotmask = 0;
  *	really assign any resources we like to devices, as long as
  *	they do not clash with other PCI devices.
  */
-unsigned int	pci_iobase = 0x100;		/* Arbitary start address */
-unsigned int	pci_membase = 0x00010000;	/* Arbitary start address */
+unsigned int	pci_iobase = PCIBIOS_MIN_IO;	/* Arbitary start address */
+unsigned int	pci_membase = PCIBIOS_MIN_MEM;	/* Arbitary start address */
 
 #define	PCI_MINIO	0x100			/* 256 byte minimum I/O */
 #define	PCI_MINMEM	0x00010000		/* 64k minimum chunk */
@@ -75,7 +75,7 @@ unsigned int	pci_shmemaddr;
 
 /*****************************************************************************/
 
-void 		pci_interrupt(int irq, void *id, struct pt_regs *fp);
+void	pci_interrupt(int irq, void *id, struct pt_regs *fp);
 
 /*****************************************************************************/
 
@@ -105,7 +105,7 @@ void pci_resetbus(void)
 
 /*****************************************************************************/
 
-int pcibios_assignres(int slot)
+int pcibios_assign_resource_slot(int slot)
 {
 	volatile unsigned long	*rp;
 	volatile unsigned char	*ip;
@@ -113,7 +113,7 @@ int pcibios_assignres(int slot)
 	int			bar;
 
 #ifdef DEBUGPCI
-	printk("pcibios_assignres(slot=%x)\n", slot);
+	printk("pcibios_assign_resource_slot(slot=%x)\n", slot);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -224,7 +224,7 @@ int pcibios_assignres(int slot)
 
 /*****************************************************************************/
 
-int pcibios_enable(int slot)
+int pcibios_enable_slot(int slot)
 {
 	volatile unsigned long	*rp;
 	volatile unsigned short	*wp;
@@ -232,7 +232,7 @@ int pcibios_enable(int slot)
 	unsigned short		cmd;
 
 #ifdef DEBUGPCI
-	printk("pcibios_enbale(slot=%x)\n", slot);
+	printk("pcibios_enbale_slot(slot=%x)\n", slot);
 #endif
 
 	rp = (volatile unsigned long *) COMEM_BASE;
@@ -256,7 +256,34 @@ int pcibios_enable(int slot)
 
 /*****************************************************************************/
 
-unsigned long pcibios_init(unsigned long mem_start, unsigned long mem_end)
+void pcibios_assign_resources(void)
+{
+	volatile unsigned long	*rp;
+	unsigned long		sel, id;
+	int			slot;
+
+	rp = (volatile unsigned long *) COMEM_BASE;
+
+	/*
+	 *	Do a quick scan of the PCI bus and see what is here.
+	 */
+	for (slot = COMEM_MINDEV; (slot <= COMEM_MAXDEV); slot++) {
+		sel = COMEM_DA_CFGRD | COMEM_DA_ADDR(0x1 << (slot + 16));
+		rp[LREG(COMEM_DAHBASE)] = sel;
+		rp[LREG(COMEM_PCIBUS)] = 0; /* Clear bus */
+		id = rp[LREG(COMEM_PCIBUS)];
+		if ((id != 0) && ((id & 0xffff0000) != (sel & 0xffff0000))) {
+			printk("PCI: slot=%d id=%08x\n", slot, (int) id);
+			pci_slotmask |= 0x1 << slot;
+			pcibios_assign_resource_slot(slot);
+			pcibios_enable_slot(slot);
+		}
+	}
+}
+
+/*****************************************************************************/
+
+int pcibios_init(void)
 {
 	volatile unsigned long	*rp;
 	unsigned long		sel, id;
@@ -276,7 +303,7 @@ unsigned long pcibios_init(unsigned long mem_start, unsigned long mem_end)
 	rp = (volatile unsigned long *) COMEM_BASE;
 	if ((rp[LREG(COMEM_LBUSCFG)] & 0xff) != 0x50) {
 		printk("PCI: no PCI bus present\n");
-		return(mem_start);
+		return(0);
 	}
 
 #ifdef COMEM_BRIDGEDEV
@@ -291,33 +318,17 @@ unsigned long pcibios_init(unsigned long mem_start, unsigned long mem_end)
 	id = rp[LREG(COMEM_PCIBUS)];
 	if ((id == 0) || ((id & 0xffff0000) == (sel & 0xffff0000))) {
 		printk("PCI: no PCI bus bridge present\n");
-		return(mem_start);
+		return(0);
 	}
 
 	printk("PCI: bridge device at slot=%d id=%08x\n", slot, (int) id);
 	pci_slotmask |= 0x1 << slot;
 	pci_shmemaddr = pci_membase;
-	pcibios_assignres(slot);
-	pcibios_enable(slot);
+	pcibios_assign_resource_slot(slot);
+	pcibios_enable_slot(slot);
 #endif
 
 	pci_bus_is_present = 1;
-
-	/*
-	 *	Do a quick scan of the PCI bus and see what is here.
-	 */
-	for (slot = COMEM_MINDEV; (slot <= COMEM_MAXDEV); slot++) {
-		sel = COMEM_DA_CFGRD | COMEM_DA_ADDR(0x1 << (slot + 16));
-		rp[LREG(COMEM_DAHBASE)] = sel;
-		rp[LREG(COMEM_PCIBUS)] = 0; /* Clear bus */
-		id = rp[LREG(COMEM_PCIBUS)];
-		if ((id != 0) && ((id & 0xffff0000) != (sel & 0xffff0000))) {
-			printk("PCI: slot=%d id=%08x\n", slot, (int) id);
-			pci_slotmask |= 0x1 << slot;
-			pcibios_assignres(slot);
-			pcibios_enable(slot);
-		}
-	}
 
 	/* Get PCI irq for local vectoring */
 	if (request_irq(COMEM_IRQ, pci_interrupt, 0, "PCI bridge", NULL)) {
@@ -326,15 +337,52 @@ unsigned long pcibios_init(unsigned long mem_start, unsigned long mem_end)
 		mcf_autovector(COMEM_IRQ);
 	}
 
-	return(mem_start);
+	pcibios_assign_resources();
+
+	return(0);
 }
 
 /*****************************************************************************/
 
-unsigned long pcibios_fixup(unsigned long mem_start, unsigned long mem_end)
+char *pcibios_setup(char *option)
 {
-	return(mem_start);
+	/* Nothing for us to handle. */
+	return(option);
 }
+/*****************************************************************************/
+
+struct pci_fixup pcibios_fixups[] = { { 0 } };
+
+void pcibios_fixup_bus(struct pci_bus *b)
+{
+}
+
+/*****************************************************************************/
+
+void pcibios_align_resource(void *data, struct resource *res, unsigned long size, unsigned long align)
+{
+}
+
+/*****************************************************************************/
+
+int pcibios_enable_device(struct pci_dev *dev, int mask)
+{
+	int slot;
+
+	slot = PCI_SLOT(dev->devfn);
+	if ((dev->bus == 0) && (pci_slotmask & (1 << slot)))
+		pcibios_enable_slot(slot);
+	return(0);
+}
+
+/*****************************************************************************/
+
+void pcibios_update_resource(struct pci_dev *dev, struct resource *root, struct resource *r, int resource)
+{
+	printk("%s(%d): no support for changing PCI resources...\n",
+		__FILE__, __LINE__);
+}
+
 
 /*****************************************************************************/
 
@@ -918,6 +966,26 @@ void pci_bmcpyfrom(void *dst, void *src, int len)
 	}
 	printk("\n");
 #endif
+}
+
+/*****************************************************************************/
+
+void *pci_alloc_consistent(struct pci_dev *dev, size_t size, dma_addr_t *dma_addr)
+{
+	void *mp;
+	if ((mp = pci_bmalloc(size)) != NULL) {
+		dma_addr = mp - (COMEM_BASE + COMEM_SHMEM);
+		return(mp);
+	}
+	*dma_addr = (dma_addr_t) NULL;
+	return(NULL);
+}
+
+/*****************************************************************************/
+
+void pci_free_consistent(struct pci_dev *dev, size_t size, void *cpu_addr, dma_addr_t dma_addr)
+{
+	pci_bmfree(cpu_addr, size);
 }
 
 /*****************************************************************************/
