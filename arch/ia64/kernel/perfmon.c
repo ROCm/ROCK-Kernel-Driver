@@ -115,6 +115,8 @@
 #define PMD_IS_COUNTING(i) ((pmu_conf.pmd_desc[i].type & PFM_REG_COUNTING) == PFM_REG_COUNTING)
 #define PMC_IS_COUNTING(i) ((pmu_conf.pmc_desc[i].type & PFM_REG_COUNTING) == PFM_REG_COUNTING)
 #define PMC_IS_MONITOR(i)  ((pmu_conf.pmc_desc[i].type & PFM_REG_MONITOR)  == PFM_REG_MONITOR)
+#define PMC_IS_CONTROL(i)  ((pmu_conf.pmc_desc[i].type & PFM_REG_CONTROL)  == PFM_REG_CONTROL)
+
 #define PMC_DFL_VAL(i)     pmu_conf.pmc_desc[i].default_value
 #define PMC_RSVD_MASK(i)   pmu_conf.pmc_desc[i].reserved_mask
 #define PMD_PMD_DEP(i)	   pmu_conf.pmd_desc[i].dep_pmd[0]
@@ -232,6 +234,8 @@
  */
 #define PMC0_HAS_OVFL(cmp0)  (cmp0 & ~0x1UL)
 
+#define PFMFS_MAGIC 0xa0b4d889
+
 /*
  * debugging
  */
@@ -328,7 +332,7 @@ typedef struct pfm_context {
 
 	pfm_counter_t		ctx_pmds[IA64_NUM_PMD_REGS]; /* software state for PMDS */
 
-	u64			ctx_saved_psr;		/* copy of psr used for ctxsw */
+	u64			ctx_saved_psr_up;	/* only contains psr.up value */
 
 	unsigned long		ctx_last_activation;	/* context last activation number for last_cpu */
 	unsigned int		ctx_last_cpu;		/* CPU id of current or last CPU used (SMP only) */
@@ -560,100 +564,6 @@ static struct vm_operations_struct pfm_vm_ops={
 	close: pfm_vm_close
 };
 
-/*
- * Linux 2.5 vs. 2.4 helper macros and definitions
- *
- * if not at least 2.5.69, then assume 2.4.x.
- */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,69)
-
-#define PFM_COMPILED_FOR_2_4 1
-
-#include <linux/wrapper.h>
-
-#define pfm_get_cpu_var(v)	local_cpu_data->v
-#define pfm_get_cpu_data(a,b)	cpu_data((b))->a
-typedef	void pfm_irq_handler_t;
-#define PFM_IRQ_HANDLER_RET(v)
-
-#define DEFINE_PER_CPU(a,b)
-
-static inline int
-pfm_wait_task_inactive(struct task_struct *task)
-{
-#ifdef CONFIG_SMP
-	/* Make sure the child gets off its CPU.. */
-	for (;;) {
-		task_lock(task);
-		if (!task_has_cpu(task)) break;
-		task_unlock(task);
-		do {
-			if (task->state != TASK_STOPPED)
-				return -ESRCH;
-			barrier();
-			cpu_relax();
-		} while (task_has_cpu(task));
-	}
-	task_unlock(task);
-#endif
-	return 0;
-}
-
-static inline void
-pfm_put_task(struct task_struct *task)
-{
-	if (task != current) free_task_struct(task);
-}
-
-static inline void
-pfm_set_task_notify(struct task_struct *task)
-{
-}
-
-static inline void
-pfm_clear_task_notify(void)
-{
-}
-
-static inline void
-pfm_reserve_page(unsigned long a)
-{
-	unsigned long page;
-
-	page = ia64_tpa(a);
-	mem_map_reserve(virt_to_page(__va(page)));
-}
-
-static inline void
-pfm_unreserve_page(unsigned long a)
-{
-	unsigned long page;
-
-	page = ia64_tpa(a);
-	mem_map_unreserve(virt_to_page(__va(page)));
-}
-
-static inline int
-pfm_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long phys_addr, unsigned long size, pgprot_t prot)
-{
-	return remap_page_range(from, phys_addr, size, prot);
-}
-
-static inline unsigned long
-pfm_protect_ctx_ctxsw(pfm_context_t *x)
-{
-	unsigned long f;
-	spin_lock(&(x)->ctx_lock);
-	return f;
-}
-
-static inline unsigned long
-pfm_unprotect_ctx_ctxsw(pfm_context_t *x, unsigned long f)
-{
-	spin_unlock(&(x)->ctx_lock);
-}
-
-#else /* 2.5.69 or higher */
 
 #define pfm_wait_task_inactive(t)	wait_task_inactive(t)
 #define pfm_get_cpu_var(v)		__get_cpu_var(v)
@@ -705,7 +615,7 @@ pfm_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned lo
 static inline unsigned long
 pfm_protect_ctx_ctxsw(pfm_context_t *x)
 {
-	spin_lock_irq(&(x)->ctx_lock);
+	spin_lock(&(x)->ctx_lock);
 	return 0UL;
 }
 
@@ -715,7 +625,30 @@ pfm_unprotect_ctx_ctxsw(pfm_context_t *x, unsigned long f)
 	spin_unlock(&(x)->ctx_lock);
 }
 
-#endif /* 2.5 vs. 2.4 */
+static inline unsigned int
+pfm_do_munmap(struct mm_struct *mm, unsigned long addr, size_t len, int acct)
+{
+	return do_munmap(mm, addr, len);
+}
+
+static inline unsigned long 
+pfm_get_unmapped_area(struct file *file, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags, unsigned long exec)
+{
+	return get_unmapped_area(file, addr, len, pgoff, flags);
+}
+
+
+static struct super_block *
+pfmfs_get_sb(struct file_system_type *fs_type, int flags, char *dev_name, void *data)
+{
+	return get_sb_pseudo(fs_type, "pfm:", NULL, PFMFS_MAGIC);
+}
+
+static struct file_system_type pfm_fs_type = {
+	.name     = "pfmfs",
+	.get_sb   = pfmfs_get_sb,
+	.kill_sb  = kill_anon_super,
+};
 
 DEFINE_PER_CPU(unsigned long, pfm_syst_info);
 DEFINE_PER_CPU(struct task_struct *, pmu_owner);
@@ -758,13 +691,13 @@ pfm_set_psr_pp(void)
 static inline void
 pfm_clear_psr_up(void)
 {
-	__asm__ __volatile__ ("rum psr.up;; srlz.i;;"::: "memory");
+	__asm__ __volatile__ ("rsm psr.up;; srlz.i;;"::: "memory");
 }
 
 static inline void
 pfm_set_psr_up(void)
 {
-	__asm__ __volatile__ ("sum psr.up;; srlz.i;;"::: "memory");
+	__asm__ __volatile__ ("ssm psr.up;; srlz.i;;"::: "memory");
 }
 
 static inline unsigned long
@@ -1502,7 +1435,7 @@ pfm_remove_smpl_mapping(struct task_struct *task, void *vaddr, unsigned long siz
 
 	DPRINT(("down_write done smpl_vaddr=%p size=%lu\n", vaddr, size));
 
-	r = do_munmap(task->mm, (unsigned long)vaddr, size);
+	r = pfm_do_munmap(task->mm, (unsigned long)vaddr, size, 0);
 
 	up_write(&task->mm->mmap_sem);
 	if (r !=0) {
@@ -1569,68 +1502,6 @@ pfm_exit_smpl_buffer(pfm_buffer_fmt_t *fmt)
  * d_name - pfm: will go nicely and kill the special-casing in procfs.
  */
 static struct vfsmount *pfmfs_mnt;
-#define PFMFS_MAGIC 0xa0b4d889
-
-#ifdef PFM_COMPILED_FOR_2_4
-
-static int
-pfmfs_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = PFMFS_MAGIC;
-	buf->f_bsize = 1024;
-	buf->f_namelen = 255;
-	return 0;
-}
-
-static struct super_operations pfmfs_ops = {
-	statfs:		pfmfs_statfs,
-};
-
-static struct super_block *
-pfmfs_read_super(struct super_block *sb, void *data, int silent)
-{
-	struct inode *root = new_inode(sb);
-	if (!root)
-		return NULL;
-	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
-	root->i_uid = root->i_gid = 0;
-	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
-	sb->s_blocksize = 1024;
-	sb->s_blocksize_bits = 10;
-	sb->s_magic = PFMFS_MAGIC;
-	sb->s_op	= &pfmfs_ops;
-	sb->s_root = d_alloc(NULL, &(const struct qstr) { "pfm:", 4, 0 });
-	if (!sb->s_root) {
-		iput(root);
-		return NULL;
-	}
-	sb->s_root->d_sb = sb;
-	sb->s_root->d_parent = sb->s_root;
-	d_instantiate(sb->s_root, root);
-	return sb;
-}
-
-//static DECLARE_FSTYPE(pfm_fs_type, "pfmfs", pfmfs_read_super, FS_NOMOUNT);
-static struct file_system_type pfm_fs_type = {
-	name:		"pfmfs",
-	read_super:	pfmfs_read_super,
-	fs_flags:	FS_NOMOUNT,
-};
-
-#else /* ! COMPILED_FOR_2_4 */
-
-static struct super_block *
-pfmfs_get_sb(struct file_system_type *fs_type, int flags, char *dev_name, void *data)
-{
-	return get_sb_pseudo(fs_type, "pfm:", NULL, PFMFS_MAGIC);
-}
-
-static struct file_system_type pfm_fs_type = {
-	.name     = "pfmfs",
-	.get_sb   = pfmfs_get_sb,
-	.kill_sb  = kill_anon_super,
-};
-#endif /* COMPILED_FOR_2_4 */
 
 static int __init
 init_pfm_fs(void)
@@ -2453,7 +2324,7 @@ pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned lon
 	down_write(&task->mm->mmap_sem);
 
 	/* find some free area in address space, must have mmap sem held */
-	vma->vm_start = get_unmapped_area(NULL, 0, size, 0, MAP_PRIVATE|MAP_ANONYMOUS);
+	vma->vm_start = pfm_get_unmapped_area(NULL, 0, size, 0, MAP_PRIVATE|MAP_ANONYMOUS, 0);
 	if (vma->vm_start == 0UL) {
 		DPRINT(("Cannot find unmapped area for size %ld\n", size));
 		up_write(&task->mm->mmap_sem);
@@ -3020,7 +2891,7 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		 * as attempts to modify PMC[0-3] which are used
 		 * as status registers by the PMU
 		 */
-		if (!PMC_IS_IMPL(cnum) || cnum < 4) {
+		if (PMC_IS_IMPL(cnum) == 0 || PMC_IS_CONTROL(cnum)) {
 			DPRINT(("pmc%u is unimplemented or invalid\n", cnum));
 			goto error;
 		}
@@ -4124,7 +3995,7 @@ pfm_stop(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		/*
 		 * monitoring disabled in kernel at next reschedule
 		 */
-		ctx->ctx_saved_psr &= ~IA64_PSR_UP;
+		ctx->ctx_saved_psr_up = 0;
 		printk("pfm_stop: current [%d] task=[%d]\n", current->pid, ctx->ctx_task->pid);
 	}
 	return 0;
@@ -4198,7 +4069,7 @@ pfm_start(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		 * start monitoring at the kernel level the next
 		 * time the task is scheduled
 		 */
-		ctx->ctx_saved_psr |= IA64_PSR_UP;
+		ctx->ctx_saved_psr_up = IA64_PSR_UP;
 
 		/*
 		 * activate monitoring at user level
@@ -4429,7 +4300,7 @@ pfm_context_load(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 		SET_LAST_CPU(ctx, -1);
 
 		/* initial saved psr (stopped) */
-		ctx->ctx_saved_psr = pfm_get_psr() & ~(IA64_PSR_PP|IA64_PSR_UP);
+		ctx->ctx_saved_psr_up = 0UL;
 		ia64_psr(regs)->up = ia64_psr(regs)->pp = 0;
 
 		if (ctx->ctx_fl_unsecure) {
@@ -5640,6 +5511,7 @@ pfm_save_regs(struct task_struct *task)
 	unsigned long flags;
 	u64 psr;
 
+
 	ctx = PFM_GET_CTX(task);
 	if (ctx == NULL) goto save_error;
 	t = &task->thread;
@@ -5672,9 +5544,9 @@ pfm_save_regs(struct task_struct *task)
 	 * sanity check
 	 */
 	if (ctx->ctx_last_activation != GET_ACTIVATION()) {
-		DPRINT(("ctx_activation=%lu activation=%lu state=%d: no save\n",
+		printk("ctx_activation=%lu activation=%lu state=%d: no save\n",
 				ctx->ctx_last_activation,
-				GET_ACTIVATION(), ctx->ctx_state));
+				GET_ACTIVATION(), ctx->ctx_state);
 
 		pfm_unprotect_ctx_ctxsw(ctx, flags);
 
@@ -5684,7 +5556,10 @@ pfm_save_regs(struct task_struct *task)
 	/*
 	 * save current PSR: needed because we modify it
 	 */
+	ia64_srlz_d();
 	psr = pfm_get_psr();
+
+	BUG_ON(psr & (IA64_PSR_I));
 
 	/*
 	 * stop monitoring:
@@ -5696,9 +5571,13 @@ pfm_save_regs(struct task_struct *task)
 	pfm_clear_psr_up();
 
 	/*
-	 * keep a copy of the saved psr (for reload)
+	 * keep a copy of psr.up (for reload)
 	 */
-	ctx->ctx_saved_psr = psr;
+	ctx->ctx_saved_psr_up = psr & IA64_PSR_UP;
+
+	{ u64 foo = pfm_get_psr();
+	  BUG_ON(foo & ((IA64_PSR_UP|IA64_PSR_PP)));
+	}
 
 	/*
 	 * release ownership of this PMU.
@@ -5772,18 +5651,16 @@ pfm_save_regs(struct task_struct *task)
 	pfm_clear_psr_up();
 
 	/*
-	 * keep a copy of the saved psr (for reload)
+	 * keep a copy of psr.up (for reload)
 	 */
-	ctx->ctx_saved_psr = psr;
+	ctx->ctx_saved_psr_up = psr & IA64_PSR_UP;
 
-	psr = pfm_get_psr();
-	if (psr & IA64_PSR_UP) {
-		printk(KERN_ERR " perfmon: pfm_save_regs: psr.up set current [%d] owner [%d] psr=0x%lx\n", current->pid, GET_PMU_OWNER()->pid, psr);
+#if 1
+	{ u64 foo = pfm_get_psr();
+	  BUG_ON(foo & (IA64_PSR_I));
+	  BUG_ON(foo & ((IA64_PSR_UP|IA64_PSR_PP)));
 	}
-	if (psr & IA64_PSR_I) {
-		printk(KERN_ERR " perfmon: pfm_save_regs: psr.i set current [%d] owner [%d] psr=0x%lx\n", current->pid, GET_PMU_OWNER()->pid, psr);
-	}
-
+#endif
 	return;
 save_error:
 	printk(KERN_ERR "perfmon: pfm_save_regs CPU%d [%d] NULL context PM_VALID=%ld\n",
@@ -5797,13 +5674,10 @@ pfm_lazy_save_regs (struct task_struct *task)
 	pfm_context_t *ctx;
 	struct thread_struct *t;
 	unsigned long flags;
-	unsigned long psr;
 
 #if 1
-	psr = pfm_get_psr();
-	if (psr & IA64_PSR_UP) {
-		printk(KERN_ERR " perfmon: pfm_lazy_save_regs: psr.up set current [%d] owner [%d] psr=0x%lx\n", current->pid, task->pid, psr);
-		pfm_clear_psr_up();
+	{ u64 foo  = pfm_get_psr();
+	  BUG_ON(foo & IA64_PSR_UP);
 	}
 #endif
 
@@ -5864,10 +5738,9 @@ pfm_load_regs (struct task_struct *task)
 {
 	pfm_context_t *ctx;
 	struct thread_struct *t;
-	struct task_struct *owner;
 	unsigned long pmc_mask = 0UL, pmd_mask = 0UL;
 	unsigned long flags;
-	u64 psr;
+	u64 psr, psr_up;
 
 	ctx = PFM_GET_CTX(task);
 	if (unlikely(ctx == NULL)) {
@@ -5875,22 +5748,21 @@ pfm_load_regs (struct task_struct *task)
 		return;
 	}
 
-	owner = GET_PMU_OWNER();
+	BUG_ON(GET_PMU_OWNER());
+
 	t     = &task->thread;
+	psr   = pfm_get_psr();
 
 #if 1
-	psr = pfm_get_psr();
-	BUG_ON(psr & IA64_PSR_UP);
-	psr = pfm_get_psr();
+	BUG_ON(psr & (IA64_PSR_UP|IA64_PSR_PP));
 	BUG_ON(psr & IA64_PSR_I);
 #endif
-
 
 	/*
 	 * possible on unload
 	 */
 	if (unlikely((t->flags & IA64_THREAD_PM_VALID) == 0)) {
-		DPRINT(("[%d] PM_VALID=0, nothing to do\n", task->pid));
+		printk("[%d] PM_VALID=0, nothing to do\n", task->pid);
 		return;
 	}
 
@@ -5923,19 +5795,15 @@ pfm_load_regs (struct task_struct *task)
 	/*
 	 * we restore ALL the debug registers to avoid picking up
 	 * stale state.
-	 *
-	 * This must be done even when the task is still the owner
-	 * as the registers may have been modified via ptrace()
-	 * (not perfmon) by the previous task.
 	 */
 	if (ctx->ctx_fl_using_dbreg) {
 		pfm_restore_ibrs(ctx->ctx_ibrs, pmu_conf.num_ibrs);
 		pfm_restore_dbrs(ctx->ctx_dbrs, pmu_conf.num_dbrs);
 	}
 	/*
-	 * retrieve saved psr
+	 * retrieve saved psr.up
 	 */
-	psr = ctx->ctx_saved_psr;
+	psr_up = ctx->ctx_saved_psr_up;
 
 	/*
 	 * if we were the last user of the PMU on that CPU,
@@ -5968,8 +5836,8 @@ pfm_load_regs (struct task_struct *task)
 	 	 */
 		pmc_mask = ctx->ctx_all_pmcs[0];
 
-		DPRINT(("full reload for [%d] owner=%d activation=%lu last_activation=%lu last_cpu=%d pmd_mask=0x%lx pmc_mask=0x%lx\n",
-			task->pid, owner ? owner->pid : -1,
+		DPRINT(("full reload for [%d] activation=%lu last_activation=%lu last_cpu=%d pmd_mask=0x%lx pmc_mask=0x%lx\n",
+			task->pid,
 			GET_ACTIVATION(), ctx->ctx_last_activation,
 			GET_LAST_CPU(ctx), pmd_mask, pmc_mask));
 
@@ -6026,9 +5894,9 @@ pfm_load_regs (struct task_struct *task)
 	SET_PMU_OWNER(task, ctx);
 
 	/*
-	 * restore the psr we changed
+	 * restore the psr.up bit 
 	 */
-	pfm_set_psr_l(psr);
+	if (likely(psr_up)) pfm_set_psr_up();
 
 	/*
 	 * allow concurrent access to context
@@ -6047,21 +5915,16 @@ pfm_load_regs (struct task_struct *task)
 	pfm_context_t *ctx;
 	struct task_struct *owner;
 	unsigned long pmd_mask, pmc_mask;
-	u64 psr;
+	u64 psr, psr_up;
 
-	owner      = GET_PMU_OWNER();
-	ctx        = PFM_GET_CTX(task);
-	t          = &task->thread;
+	owner = GET_PMU_OWNER();
+	ctx   = PFM_GET_CTX(task);
+	t     = &task->thread;
+	psr   = pfm_get_psr();
 
 #if 1
-	psr = pfm_get_psr();
-	if (psr & IA64_PSR_UP) {
-		printk(KERN_ERR " perfmon: pfm_load_regs: psr.up set current [%d] owner [%d] psr=0x%lx\n", current->pid, owner->pid, psr);
-	}
-	psr = pfm_get_psr();
-	if (psr & IA64_PSR_I) {
-		printk(KERN_ERR " perfmon: pfm_load_regs: psr.i set current [%d] owner [%d] psr=0x%lx\n", current->pid, owner->pid, psr);
-	}
+	BUG_ON(psr & (IA64_PSR_UP|IA64_PSR_PP));
+	BUG_ON(psr & IA64_PSR_I);
 #endif
 
 	/*
@@ -6078,9 +5941,9 @@ pfm_load_regs (struct task_struct *task)
 	}
 
 	/*
-	 * retrieved save psr
+	 * retrieved saved psr.up
 	 */
-	psr = ctx->ctx_saved_psr;
+	psr_up = ctx->ctx_saved_psr_up;
 
 	/*
 	 * short path, our state is still there, just
@@ -6091,7 +5954,7 @@ pfm_load_regs (struct task_struct *task)
 	 * concurrency even without interrupt masking.
 	 */
 	if (likely(owner == task)) {
-		pfm_set_psr_l(psr);
+		if (likely(psr_up)) pfm_set_psr_up();
 		return;
 	}
 
@@ -6163,8 +6026,7 @@ pfm_load_regs (struct task_struct *task)
 	 * restore the psr. This is the point at which
 	 * new overflow interrupts can be generated again.
 	 */
-	pfm_set_psr_l(psr);
-
+	if (likely(psr_up)) pfm_set_psr_up();
 }
 #endif /* CONFIG_SMP */
 
@@ -6469,13 +6331,13 @@ dump_pmu_state(void)
 		printk("pmd[%d]=0x%lx tpmd=0x%lx\n", i, ia64_get_pmd(i), t->pmds[i]);
 	}
 	if (ctx) {
-		printk("ctx_state=%d vaddr=%p addr=%p fd=%d ctx_task=[%d] saved_psr=0x%lx\n",
+		printk("ctx_state=%d vaddr=%p addr=%p fd=%d ctx_task=[%d] saved_psr_up=0x%lx\n",
 				ctx->ctx_state,
 				ctx->ctx_smpl_vaddr,
 				ctx->ctx_smpl_hdr,
 				ctx->ctx_msgq_head,
 				ctx->ctx_msgq_tail,
-				ctx->ctx_saved_psr);
+				ctx->ctx_saved_psr_up);
 	}
 }
 
