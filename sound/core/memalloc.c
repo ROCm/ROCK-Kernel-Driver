@@ -247,6 +247,7 @@ static void *snd_malloc_dev_pages(struct device *dev, size_t size, dma_addr_t *d
 	snd_assert(dma != NULL, return NULL);
 	pg = get_order(size);
 	gfp_flags = GFP_KERNEL;
+	gfp_flags |= __GFP_NORETRY; /* don't trigger OOM-killer */
 	if (pg > 0)
 		gfp_flags |= __GFP_NOWARN;
 	res = dma_alloc_coherent(dev, PAGE_SIZE << pg, dma, gfp_flags);
