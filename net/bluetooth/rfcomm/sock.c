@@ -822,10 +822,11 @@ int rfcomm_init_sockets(void)
 	int err;
 
 	if ((err = bt_sock_register(BTPROTO_RFCOMM, &rfcomm_sock_family_ops))) {
-		BT_ERR("Can't register RFCOMM socket layer");
+		BT_ERR("RFCOMM socket layer registration failed. %d", err);
 		return err;
 	}
 
+	BT_INFO("RFCOMM socket layer initialized");
 	return 0;
 }
 
@@ -835,5 +836,5 @@ void rfcomm_cleanup_sockets(void)
 
 	/* Unregister socket, protocol and notifier */
 	if ((err = bt_sock_unregister(BTPROTO_RFCOMM)))
-		BT_ERR("Can't unregister RFCOMM socket layer %d", err);
+		BT_ERR("RFCOMM socket layer unregistration failed. %d", err);
 }

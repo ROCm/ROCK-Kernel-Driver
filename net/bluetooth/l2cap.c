@@ -2079,19 +2079,20 @@ int __init l2cap_init(void)
 	int err;
 
 	if ((err = bt_sock_register(BTPROTO_L2CAP, &l2cap_sock_family_ops))) {
-		BT_ERR("Can't register L2CAP socket");
+		BT_ERR("L2CAP socket registration failed");
 		return err;
 	}
 
 	if ((err = hci_register_proto(&l2cap_hci_proto))) {
-		BT_ERR("Can't register L2CAP protocol");
+		BT_ERR("L2CAP protocol registration failed");
 		return err;
 	}
 
 	create_proc_read_entry("bluetooth/l2cap", 0, 0, l2cap_read_proc, NULL);
 
-	BT_INFO("Bluetooth L2CAP ver %s Copyright (C) 2000,2001 Qualcomm Inc", VERSION);
-	BT_INFO("Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>");
+	BT_INFO("L2CAP ver %s", VERSION);
+	BT_INFO("L2CAP socket layer initialized");
+
 	return 0;
 }
 
@@ -2101,10 +2102,10 @@ void l2cap_cleanup(void)
 
 	/* Unregister socket and protocol */
 	if (bt_sock_unregister(BTPROTO_L2CAP))
-		BT_ERR("Can't unregister L2CAP socket");
+		BT_ERR("L2CAP socket unregistration failed");
 
 	if (hci_unregister_proto(&l2cap_hci_proto))
-		BT_ERR("Can't unregister L2CAP protocol");
+		BT_ERR("L2CAP protocol unregistration failed");
 }
 
 module_init(l2cap_init);

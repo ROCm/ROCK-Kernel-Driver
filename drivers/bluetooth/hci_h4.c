@@ -269,7 +269,13 @@ static struct hci_uart_proto h4p = {
 	      
 int h4_init(void)
 {
-	return hci_uart_register_proto(&h4p);
+	int err = hci_uart_register_proto(&h4p);
+	if (!err)
+		BT_INFO("HCI H4 protocol initialized");
+	else
+		BT_ERR("HCI H4 protocol registration failed");
+	
+	return err;
 }
 
 int h4_deinit(void)
