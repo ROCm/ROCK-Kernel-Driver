@@ -1843,6 +1843,37 @@ void dump_stack(void)
 
 EXPORT_SYMBOL(dump_stack);
 
+static inline int is_kernel_stack(struct task_struct *task,
+				  struct reg_window *rw)
+{
+	unsigned long rw_addr = (unsigned long) rw;
+	unsigned long thread_base, thread_end;
+
+	if (rw_addr < PAGE_OFFSET) {
+		if (task != &init_task)
+			return 0;
+	}
+
+	thread_base = (unsigned long) task->thread_info;
+	thread_end = thread_base + sizeof(union thread_union);
+	if (rw_addr >= thread_base &&
+	    rw_addr < thread_end &&
+	    !(rw_addr & 0x7UL))
+		return 1;
+
+	return 0;
+}
+
+static inline struct reg_window *kernel_stack_up(struct reg_window *rw)
+{
+	unsigned long fp = rw->ins[6];
+
+	if (!fp)
+		return NULL;
+
+	return (struct reg_window *) (fp + STACK_BIAS);
+}
+
 void die_if_kernel(char *str, struct pt_regs *regs)
 {
 	static int die_counter;
@@ -1868,17 +1899,14 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 		/* Stop the back trace when we hit userland or we
 		 * find some badly aligned kernel stack.
 		 */
-		while (rw					&&
-		       count++ < 30				&&
-		       (((unsigned long) rw) >= PAGE_OFFSET)	&&
-		       (char *) rw < ((char *) current)
-		       + sizeof (union thread_union) 		&&
-		       !(((unsigned long) rw) & 0x7)) {
+		while (rw &&
+		       count++ < 30&&
+		       is_kernel_stack(current, rw)) {
 			printk("Caller[%016lx]", rw->ins[7]);
 			print_symbol(": %s", rw->ins[7]);
 			printk("\n");
-			rw = (struct reg_window *)
-				(rw->ins[6] + STACK_BIAS);
+
+			rw = kernel_stack_up(rw);
 		}
 		instruction_dump ((unsigned int *) regs->tpc);
 	} else {

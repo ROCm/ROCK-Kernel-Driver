@@ -1556,8 +1556,7 @@ static void __init sunzilog_register_serio(struct uart_sunzilog_port *up, int ch
 
 	up->serio = serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
-
-		memset(serio, 0, sizeof(serio));
+		memset(serio, 0, sizeof(*serio));
 
 		serio->port_data = up;
 
