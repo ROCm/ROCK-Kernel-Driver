@@ -1229,37 +1229,51 @@ isdn_net_init(struct net_device *ndev)
 	return 0;
 }
 
-static void
-isdn_net_swapbind(int drvidx)
+static int
+isdn_net_do_callback(isdn_net_local *lp)
 {
-	struct list_head *l;
-
-	dbg_net_icall("n_fi: swapping ch of %d\n", drvidx);
-	list_for_each(l, &isdn_net_devs) {
-		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
-		if (p->local.pre_device != drvidx)
-			continue;
-
-		switch (p->local.pre_channel) {
-		case 0:
-			p->local.pre_channel = 1;
-			break;
-		case 1:
-			p->local.pre_channel = 0;
-			break;
-		}
+	int chi;
+	/*
+	 * Is the state MANUAL?
+	 * If so, no callback can be made,
+	 * so reject actively.
+	 */
+	if (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF) {
+		printk(KERN_INFO "incoming call for callback, interface %s `off' -> rejected\n",
+		       lp->name);
+		return 3;
 	}
-}
-
-static void
-isdn_net_swap_usage(int i1, int i2)
-{
-	int u1 = isdn_slot_usage(i1);
-	int u2 = isdn_slot_usage(i2);
-
-	dbg_net_icall("n_fi: usage of %d and %d\n", i1, i2);
-	isdn_slot_set_usage(i1, (u1 & ~ISDN_USAGE_EXCLUSIVE) | (u2 & ISDN_USAGE_EXCLUSIVE));
-	isdn_slot_set_usage(i2, (u2 & ~ISDN_USAGE_EXCLUSIVE) | (u1 & ISDN_USAGE_EXCLUSIVE));
+	printk(KERN_DEBUG "%s: start callback\n", lp->name);
+	
+	/* Grab a free ISDN-Channel */
+	if ((chi = isdn_get_free_slot(
+		     ISDN_USAGE_NET,
+		     lp->l2_proto,
+		     lp->l3_proto,
+		     lp->pre_device,
+		     lp->pre_channel,
+		     lp->msn)
+		    ) < 0) {
+		
+		printk(KERN_WARNING "isdn_net_find_icall: No channel for %s\n", lp->name);
+		return 0;
+	}
+	/* Setup dialstate. */
+	lp->dial_timer.expires = jiffies + lp->cbdelay;
+	lp->dial_event = EV_NET_TIMER_CB;
+	add_timer(&lp->dial_timer);
+	
+	lp->dialstate = ST_WAIT_BEFORE_CB;
+	/* Connect interface with channel */
+	isdn_net_bind_channel(lp, chi);
+	if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
+		if (isdn_ppp_bind(lp) < 0) {
+			isdn_net_unbind_channel(lp);
+			return 0;
+		}
+	
+	/* Initiate dialing by returning 2 or 4 */
+	return (lp->flags & ISDN_NET_CBHUP) ? 2 : 4;
 }
 
 /*
@@ -1282,17 +1296,14 @@ int
 isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 {
 	char *eaz;
-	int si1;
-	int si2;
-	int ematch;
-	int wret;
-	int swapped;
-	int sidx = 0;
+	unsigned char si1, si2;
+	int match_more = 0;
 	struct list_head *l;
 	struct isdn_net_phone *n;
 	ulong flags;
 	char nr[32];
 	char *my_eaz;
+	int retval;
 	isdn_ctrl cmd;
 
 	int slot = isdn_dc2minor(di, ch);
@@ -1303,15 +1314,17 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		nr[0] = '0';
 		nr[1] = '\0';
 		printk(KERN_INFO "isdn_net: Incoming call without OAD, assuming '0'\n");
-	} else
+	} else {
 		strcpy(nr, setup->phone);
-	si1 = (int) setup->si1;
-	si2 = (int) setup->si2;
+	}
+	si1 = setup->si1;
+	si2 = setup->si2;
 	if (!setup->eazmsn[0]) {
 		printk(KERN_WARNING "isdn_net: Incoming call without CPN, assuming '0'\n");
 		eaz = "0";
-	} else
+	} else {
 		eaz = setup->eazmsn;
+	}
 	if (dev->net_verbose > 1)
 		printk(KERN_INFO "isdn_net: call from %s,%d,%d -> %s\n", nr, si1, si2, eaz);
         /* Accept DATA and VOICE calls at this stage
@@ -1324,269 +1337,154 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
         }
 
 	n = NULL;
-	ematch = wret = swapped = 0;
 	dbg_net_icall("n_fi: di=%d ch=%d idx=%d usg=%d\n", di, ch, idx,
 		      isdn_slot_usage(idx));
 
 	list_for_each(l, &isdn_net_devs) {
-		int matchret;
 		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 		isdn_net_local *lp = &p->local;
 
-		/* If last check has triggered as binding-swap, revert it */
-		switch (swapped) {
-			case 2:
-				isdn_net_swap_usage(idx, sidx);
-				/* fall through */
-			case 1:
-				isdn_net_swapbind(di);
-				break;
-		}
-		swapped = 0;
                 /* check acceptable call types for DOV */
+		dbg_net_icall("n_fi: if='%s', l.msn=%s, l.flags=%d, l.dstate=%d\n",
+			      lp->name, lp->msn, lp->flags, lp->dialstate);
+
                 my_eaz = isdn_slot_map_eaz2msn(slot, lp->msn);
                 if (si1 == 1) { /* it's a DOV call, check if we allow it */
                         if (*my_eaz == 'v' || *my_eaz == 'V' ||
 			    *my_eaz == 'b' || *my_eaz == 'B')
                                 my_eaz++; /* skip to allow a match */
                         else
-                                my_eaz = 0; /* force non match */
+                                continue; /* force non match */
                 } else { /* it's a DATA call, check if we allow it */
                         if (*my_eaz == 'b' || *my_eaz == 'B')
                                 my_eaz++; /* skip to allow a match */
                 }
-                if (my_eaz)
-                        matchret = isdn_msncmp(eaz, my_eaz);
-                else
-                        matchret = 1;
-                if (!matchret)
-                        ematch = 1;
 
-		/* Remember if more numbers eventually can match */
-		if (matchret > wret)
-			wret = matchret;
-		dbg_net_icall("n_fi: if='%s', l.msn=%s, l.flags=%d, l.dstate=%d\n",
-		       lp->name, lp->msn, lp->flags, lp->dialstate);
-		if ((!matchret) &&                                        /* EAZ is matching   */
-		    (((!isdn_net_bound(lp)) &&              /* but not connected */
-		      (USG_NONE(isdn_slot_usage(idx)))) ||                     /* and ch. unused or */
-		     ((((lp->dialstate == ST_OUT_WAIT_DCONN) || (lp->dialstate == ST_OUT_WAIT_DCONN)) && /* if dialing        */
-		       (!(lp->flags & ISDN_NET_CALLBACK)))                /* but no callback   */
-		     )))
-			 {
-			dbg_net_icall("n_fi: match1, pdev=%d pch=%d\n",
-			       lp->pre_device, lp->pre_channel);
-			if (isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE) {
-				if ((lp->pre_channel != ch) ||
-				    (lp->pre_device != di)) {
-					/* Here we got a problem:
-					 * If using an ICN-Card, an incoming call is always signaled on
-					 * on the first channel of the card, if both channels are
-					 * down. However this channel may be bound exclusive. If the
-					 * second channel is free, this call should be accepted.
-					 * The solution is horribly but it runs, so what:
-					 * We exchange the exclusive bindings of the two channels, the
-					 * corresponding variables in the interface-structs.
-					 */
-					if (ch == 0) {
-						sidx = isdn_dc2minor(di, 1);
-						dbg_net_icall("n_fi: ch is 0\n");
-						if (USG_NONE(isdn_slot_usage(sidx))) {
-							/* Second Channel is free, now see if it is bound
-							 * exclusive too. */
-							if (isdn_slot_usage(sidx) & ISDN_USAGE_EXCLUSIVE) {
-								dbg_net_icall("n_fi: 2nd channel is down and bound\n");
-								/* Yes, swap bindings only, if the original
-								 * binding is bound to channel 1 of this driver */
-								if ((lp->pre_device == di) &&
-								    (lp->pre_channel == 1)) {
-									isdn_net_swapbind(di);
-									swapped = 1;
-								} else {
-									/* ... else iterate next device */
-									continue;
-								}
-							} else {
-								dbg_net_icall("n_fi: 2nd channel is down and unbound\n");
-								/* No, swap always and swap excl-usage also */
-								isdn_net_swap_usage(idx, sidx);
-								isdn_net_swapbind(di);
-								swapped = 2;
-							}
-							/* Now check for exclusive binding again */
-							dbg_net_icall("n_fi: final check\n");
-							if ((isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE) &&
-							    ((lp->pre_channel != ch) ||
-							     (lp->pre_device != di))) {
-								dbg_net_icall("n_fi: final check failed\n");
-								continue;
-							}
-						}
-					} else {
-						/* We are already on the second channel, so nothing to do */
-						dbg_net_icall("n_fi: already on 2nd channel\n");
-					}
+		switch (isdn_msncmp(eaz, my_eaz)) {
+		case 1:
+			continue;
+		case 2:
+			match_more = 1;
+			continue;
+		}
+
+		if (isdn_net_bound(lp))
+			continue;
+		
+		if (!USG_NONE(isdn_slot_usage(idx)))
+			continue;
+
+		dbg_net_icall("n_fi: match1, pdev=%d pch=%d\n",
+			      lp->pre_device, lp->pre_channel);
+
+		if (isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE &&
+		    (lp->pre_channel != ch || lp->pre_device != di)) {
+			dbg_net_icall("n_fi: excl check failed\n");
+			continue;
+		}
+		dbg_net_icall("n_fi: match2\n");
+		if (lp->flags & ISDN_NET_SECURE) {
+			spin_lock_irqsave(&lp->lock, flags);
+			list_for_each_entry(n, &lp->phone[0], list) {
+				if (!isdn_msncmp(nr, n->num)) {
+					spin_unlock_irqrestore(&lp->lock, flags);
+					goto found;
 				}
 			}
-			dbg_net_icall("n_fi: match2\n");
-			if (lp->flags & ISDN_NET_SECURE) {
-				spin_lock_irqsave(&lp->lock, flags);
-				list_for_each_entry(n, &lp->phone[0], list) {
-					if (!isdn_msncmp(nr, n->num)) {
-						spin_unlock_irqrestore(&lp->lock, flags);
+			spin_unlock_irqrestore(&lp->lock, flags);
+			continue;
+		}
+	found:
+		dbg_net_icall("n_fi: match3\n");
+		/* matching interface found */
+		
+		/*
+		 * Is the state STOPPED?
+		 * If so, no dialin is allowed,
+		 * so reject actively.
+		 * */
+		if (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF) {
+			restore_flags(flags);
+			printk(KERN_INFO "incoming call, interface %s `stopped' -> rejected\n",
+			       lp->name);
+			return 3;
+		}
+		/*
+		 * Is the interface up?
+		 * If not, reject the call actively.
+		 */
+		if (!isdn_net_device_started(p)) {
+			restore_flags(flags);
+			printk(KERN_INFO "%s: incoming call, interface down -> rejected\n",
+			       lp->name);
+			return 3;
+		}
+		/* Interface is up, now see if it's a slave. If so, see if
+		 * it's master and parent slave is online. If not, reject the call.
+		 */
+		if (lp->master) {
+			isdn_net_local *mlp = (isdn_net_local *) lp->master->priv;
+			printk(KERN_DEBUG "ICALLslv: %s\n", lp->name);
+			printk(KERN_DEBUG "master=%s\n", mlp->name);
+			if (isdn_net_bound(mlp)) {
+				printk(KERN_DEBUG "master online\n");
+				/* Master is online, find parent-slave (master if first slave) */
+				while (mlp->slave) {
+					if ((isdn_net_local *) mlp->slave->priv == lp)
 						break;
-					}
+					mlp = (isdn_net_local *) mlp->slave->priv;
 				}
-				spin_unlock_irqrestore(&lp->lock, flags);
+			} else
+				printk(KERN_DEBUG "master offline\n");
+			/* Found parent, if it's offline iterate next device */
+			printk(KERN_DEBUG "mlpf: %d\n", isdn_net_bound(mlp));
+			if (!isdn_net_bound(mlp)) {
 				continue;
 			}
-			dbg_net_icall("n_fi: match3\n");
-			/* matching interface found */
+		} 
+		if (lp->flags & ISDN_NET_CALLBACK) {
+			retval = isdn_net_do_callback(lp);
+			restore_flags(flags);
+			return retval;
+		}
+		printk(KERN_DEBUG "%s: call from %s -> %s accepted\n", lp->name,
+		       nr, eaz);
 
-			/*
-			 * Is the state STOPPED?
-			 * If so, no dialin is allowed,
-			 * so reject actively.
-			 * */
-			if (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF) {
+		strcpy(isdn_slot_num(idx), nr);
+		isdn_slot_set_usage(idx, (isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE) | ISDN_USAGE_NET);
+		isdn_slot_set_st_netdev(idx, lp->netdev);
+		lp->isdn_slot = slot;
+		lp->ppp_slot = -1;
+		
+		lp->outgoing = 0;
+		lp->huptimer = 0;
+		lp->charge_state = ST_CHARGE_NULL;
+		/* Got incoming Call, setup L2 and L3 protocols,
+		 * then wait for D-Channel-connect
+		 */
+		cmd.arg = lp->l2_proto << 8;
+		isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
+		cmd.arg = lp->l3_proto << 8;
+		isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
+		
+		lp->dial_timer.expires = jiffies + 15 * HZ;
+		lp->dial_event = EV_NET_TIMER_IN_DCONN;
+		add_timer(&lp->dial_timer);
+		lp->dialstate = ST_IN_WAIT_DCONN;
+		
+		if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
+			if (isdn_ppp_bind(lp) < 0) {
+				isdn_net_unbind_channel(lp);
 				restore_flags(flags);
-				printk(KERN_INFO "incoming call, interface %s `stopped' -> rejected\n",
-				       lp->name);
-				return 3;
+				return 0;
 			}
-			/*
-			 * Is the interface up?
-			 * If not, reject the call actively.
-			 */
-			if (!isdn_net_device_started(p)) {
-				restore_flags(flags);
-				printk(KERN_INFO "%s: incoming call, interface down -> rejected\n",
-				       lp->name);
-				return 3;
-			}
-			/* Interface is up, now see if it's a slave. If so, see if
-			 * it's master and parent slave is online. If not, reject the call.
-			 */
-			if (lp->master) {
-				isdn_net_local *mlp = (isdn_net_local *) lp->master->priv;
-				printk(KERN_DEBUG "ICALLslv: %s\n", lp->name);
-				printk(KERN_DEBUG "master=%s\n", mlp->name);
-				if (isdn_net_bound(mlp)) {
-					printk(KERN_DEBUG "master online\n");
-					/* Master is online, find parent-slave (master if first slave) */
-					while (mlp->slave) {
-						if ((isdn_net_local *) mlp->slave->priv == lp)
-							break;
-						mlp = (isdn_net_local *) mlp->slave->priv;
-					}
-				} else
-					printk(KERN_DEBUG "master offline\n");
-				/* Found parent, if it's offline iterate next device */
-				printk(KERN_DEBUG "mlpf: %d\n", isdn_net_bound(mlp));
-				if (!isdn_net_bound(mlp)) {
-					continue;
-				}
-			} 
-			if (lp->flags & ISDN_NET_CALLBACK) {
-				int chi;
-				/*
-				 * Is the state MANUAL?
-				 * If so, no callback can be made,
-				 * so reject actively.
-				 * */
-				if (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF) {
-					restore_flags(flags);
-					printk(KERN_INFO "incoming call for callback, interface %s `off' -> rejected\n",
-					       lp->name);
-					return 3;
-				}
-				printk(KERN_DEBUG "%s: call from %s -> %s, start callback\n",
-				       lp->name, nr, eaz);
-
-				/* Grab a free ISDN-Channel */
-				if ((chi = 
-				     isdn_get_free_slot(
-					     ISDN_USAGE_NET,
-					     lp->l2_proto,
-					     lp->l3_proto,
-					     lp->pre_device,
-					     lp->pre_channel,
-					     lp->msn)
-					    ) < 0) {
-					
-					printk(KERN_WARNING "isdn_net_find_icall: No channel for %s\n", lp->name);
-					restore_flags(flags);
-					return 0;
-				}
-				/* Setup dialstate. */
-				lp->dial_timer.expires = jiffies + lp->cbdelay;
-				lp->dial_event = EV_NET_TIMER_CB;
-				add_timer(&lp->dial_timer);
-				
-				lp->dialstate = ST_WAIT_BEFORE_CB;
-				/* Connect interface with channel */
-				isdn_net_bind_channel(lp, chi);
-				if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-					if (isdn_ppp_bind(lp) < 0) {
-						isdn_net_unbind_channel(lp);
-						restore_flags(flags);
-						return 0;
-					}
-
-				/* Initiate dialing by returning 2 or 4 */
-				restore_flags(flags);
-				return (lp->flags & ISDN_NET_CBHUP) ? 2 : 4;
-			} else {
-				printk(KERN_DEBUG "%s: call from %s -> %s accepted\n", lp->name, nr,
-				       eaz);
-				/* if this interface is dialing, it does it probably on a different
-				   device, so free this device */
-				if (lp->dialstate == ST_OUT_WAIT_DCONN) {
-					if (lp->disconnected)
-						lp->disconnected(lp);
-
-					isdn_net_lp_disconnected(lp);
-					isdn_slot_free(lp->isdn_slot,
-						       ISDN_USAGE_NET);
-				}
-				strcpy(isdn_slot_num(idx), nr);
-				isdn_slot_set_usage(idx, (isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE) | ISDN_USAGE_NET);
-				isdn_slot_set_st_netdev(idx, lp->netdev);
-				lp->isdn_slot = slot;
-				lp->ppp_slot = -1;
-				
-				lp->outgoing = 0;
-				lp->huptimer = 0;
-				lp->charge_state = ST_CHARGE_NULL;
-				/* Got incoming Call, setup L2 and L3 protocols,
-				 * then wait for D-Channel-connect
-				 */
-				cmd.arg = lp->l2_proto << 8;
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL2, &cmd);
-				cmd.arg = lp->l3_proto << 8;
-				isdn_slot_command(lp->isdn_slot, ISDN_CMD_SETL3, &cmd);
-				
-				lp->dial_timer.expires = jiffies + 15 * HZ;
-				lp->dial_event = EV_NET_TIMER_IN_DCONN;
-				add_timer(&lp->dial_timer);
-				lp->dialstate = ST_IN_WAIT_DCONN;
-				
-				if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-					if (isdn_ppp_bind(lp) < 0) {
-						isdn_net_unbind_channel(lp);
-						restore_flags(flags);
-						return 0;
-					}
-				restore_flags(flags);
-				return 1;
-			}
-			 }
+		restore_flags(flags);
+		return 1;
 	}
-	/* If none of configured EAZ/MSN matched and not verbose, be silent */
-	if (!ematch || dev->net_verbose)
+	if (dev->net_verbose)
 		printk(KERN_INFO "isdn_net: call from %s -> %d %s ignored\n", nr, slot, eaz);
 	restore_flags(flags);
-	return (wret == 2)?5:0;
+	return (match_more == 2) ? 5:0;
 }
 
 /*
