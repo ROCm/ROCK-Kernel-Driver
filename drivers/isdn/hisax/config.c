@@ -1697,43 +1697,61 @@ static void hisax_bc_close(struct BCState *bcs);
 static void hisax_bh(void *data);
 static void EChannel_proc_rcv(struct hisax_d_if *d_if);
 
+static int
+hisax_l1_open(struct PStack *st, struct IsdnCardState *cs)
+{
+	st->l1.l2l1 = hisax_d_l2l1;
+	return 0;
+}
+
 static struct dc_l1_ops hisax_l1_ops = {
+	.open    = hisax_l1_open,
 	.bh_func = hisax_bh,
+};
+
+static struct bc_l1_ops hisax_bc_l1_ops = {
+	.open    = hisax_bc_setstack,
+	.close   = hisax_bc_close,
 };
 
 int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 		   char *name, int protocol)
 {
-	int i, retval;
-	char id[20];
+	int i;
 	struct IsdnCardState *cs;
-
+	
 	for (i = 0; i < HISAX_MAX_CARDS; i++) {
 		if (!cards[i].typ)
 			break;
 	}
-
+	
 	if (i >= HISAX_MAX_CARDS)
 		return -EBUSY;
-
-	cards[i].typ = ISDN_CTYPE_DYNAMIC;
-	cards[i].protocol = protocol;
-	sprintf(id, "%s%d", name, i);
+	
 	nrcards++;
-	retval = checkcard(i, id, 0);
-	if (retval == 0) { // yuck
-		cards[i].typ = 0;
-		nrcards--;
-		return retval;
-	}
-	cs = cards[i].cs;
+
+	cs = alloc_IsdnCardState();
+	if (!cs)
+		return -ENOMEM;
+
+#if TEI_PER_CARD
+	if (protocol == ISDN_PTYPE_NI1)
+		test_and_set_bit(FLG_TWO_DCHAN, &cs->HW_Flags);
+#else
+	test_and_set_bit(FLG_TWO_DCHAN, &cs->HW_Flags);
+#endif
+	cs->cardnr = i;
+	cs->protocol = protocol;
+	cs->typ = ISDN_CTYPE_DYNAMIC;
+
+	sprintf(cs->iif.id, "%s%d", name, i);
+	do_register_isdn(cs);
+
 	hisax_d_if->cs = cs;
 	cs->hw.hisax_d_if = hisax_d_if;
-	cs->iif.owner = hisax_d_if->owner; // FIXME should be done before registering
+	cs->iif.owner = hisax_d_if->owner;
 	dc_l1_init(cs, &hisax_l1_ops);
-	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
-	cs->bc_l1_ops->open = hisax_bc_setstack;
-	cs->bc_l1_ops->close = hisax_bc_close;
+	cs->bc_l1_ops = &hisax_bc_l1_ops;
 
 	for (i = 0; i < 2; i++) {
 		b_if[i]->ifc.l1l2 = hisax_b_l1l2;
@@ -1744,6 +1762,8 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	skb_queue_head_init(&hisax_d_if->erq);
 	clear_bit(0, &hisax_d_if->ph_state);
 	
+	do_init(cs);
+
 	return 0;
 }
 
