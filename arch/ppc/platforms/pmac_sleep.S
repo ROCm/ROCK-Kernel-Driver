@@ -54,6 +54,9 @@
  * vector that will be called by the ROM on wakeup
  */
 _GLOBAL(low_sleep_handler)
+#ifndef CONFIG_6xx
+	blr
+#else
 	mflr	r0
 	stw	r0,4(r1)
 	stwu	r1,-SL_SIZE(r1)
@@ -381,4 +384,6 @@ turn_on_mmu:
 sleep_storage:
 	.long 0
 	.balign	L1_CACHE_LINE_SIZE, 0
+
+#endif /* CONFIG_6xx */
 	.section .text
