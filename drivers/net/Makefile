@@ -42,7 +42,7 @@ subdir-$(CONFIG_TR) += tokenring
 subdir-$(CONFIG_WAN) += wan
 subdir-$(CONFIG_NET_FC) += fc
 subdir-$(CONFIG_ARCNET) += arcnet
-subdir-$(CONFIG_APPLETALK) += appletalk
+subdir-$(CONFIG_DEV_APPLETALK) += appletalk
 subdir-$(CONFIG_SK98LIN) += sk98lin
 subdir-$(CONFIG_SKFP) += skfp
 

@@ -52,7 +52,10 @@ tristate 'The IPX protocol' CONFIG_IPX
 if [ "$CONFIG_IPX" != "n" ]; then
    source net/ipx/Config.in
 fi
+
 tristate 'Appletalk protocol support' CONFIG_ATALK
+source drivers/net/appletalk/Config.in
+
 tristate 'DECnet Support' CONFIG_DECNET
 if [ "$CONFIG_DECNET" != "n" ]; then
    source net/decnet/Config.in

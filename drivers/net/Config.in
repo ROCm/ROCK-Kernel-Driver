@@ -3,7 +3,6 @@
 #
 
 source drivers/net/arcnet/Config.in
-source drivers/net/appletalk/Config.in
 
 tristate 'Dummy net driver support' CONFIG_DUMMY
 tristate 'Bonding driver support' CONFIG_BONDING

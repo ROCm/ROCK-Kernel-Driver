@@ -1,8 +1,9 @@
-CONFIG_APPLETALK
-  AppleTalk is the way Apple computers speak to each other on a
-  network. If your Linux box is connected to such a network and you
-  want to join the conversation, say Y.
-
+CONFIG_DEV_APPLETALK
+  AppleTalk is the protocol that Apple computers can use to communicate
+  on a network.  If your Linux box is connected to such a network, and wish
+  to do IP over it, or you have a LocalTalk card and wish to use it to
+  connect to the AppleTalk network, say Y.
+ 
 CONFIG_IPDDP
   This allows IP networking for users who only have AppleTalk
   networking available. This feature is experimental. With this
