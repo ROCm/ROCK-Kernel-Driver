@@ -326,7 +326,7 @@ int cap_vm_enough_memory(long pages)
 }
 
 #ifdef CONFIG_SECURITY
-static struct security_operations capability_security_ops = {
+struct security_operations capability_security_ops = {
 	.ptrace =			cap_ptrace,
 	.capget =			cap_capget,
 	.capset_check =			cap_capset_check,
