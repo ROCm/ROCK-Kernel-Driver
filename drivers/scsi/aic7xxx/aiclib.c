@@ -1335,7 +1335,7 @@ aic_error_action(struct scsi_cmnd *cmd, struct scsi_inquiry_data *inq_data,
 
 char *
 aic_parse_brace_option(char *opt_name, char *opt_arg, char *end, int depth,
-		       aic_option_callback_t *callback, void *callback_arg)
+		       aic_option_callback_t *callback, u_long callback_arg)
 {
 	char	*tok_end;
 	char	*tok_end2;

@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.h#74 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.h#75 $
  *
  * $FreeBSD$
  */
@@ -1081,6 +1081,14 @@ struct ahc_softc {
 
 	/* PCI cacheline size. */
 	u_int			  pci_cachesize;
+
+	/*
+	 * Count of parity errors we have seen as a target.
+	 * We auto-disable parity error checking after seeing
+	 * AHC_PCI_TARGET_PERR_THRESH number of errors.
+	 */
+	u_int			  pci_target_perr_count;
+#define		AHC_PCI_TARGET_PERR_THRESH	10
 
 	/* Maximum number of sequencer instructions supported. */
 	u_int			  instruction_ram_size;

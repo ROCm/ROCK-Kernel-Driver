@@ -15,15 +15,58 @@
  * Ported to run under 386BSD by Julian Elischer (julian@tfs.com) Sept 1992
  *
  * $FreeBSD: src/sys/cam/scsi/scsi_all.h,v 1.21 2002/10/08 17:12:44 ken Exp $
+ *
+ * Copyright (c) 2003 Adaptec Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions, and the following disclaimer,
+ *    without modification.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
+ *
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
+ *
  * $Id$
  */
 
-/*
- * SCSI general  interface description
- */
+#ifndef	_AICLIB_H
+#define _AICLIB_H
 
-#ifndef	_SCSI_SCSI_ALL_H
-#define _SCSI_SCSI_ALL_H 1
+/*
+ * Linux Interrupt Support.
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+#define	AIC_LINUX_IRQRETURN_T irqreturn_t
+#define	AIC_LINUX_IRQRETURN(ours) return (IRQ_RETVAL(ours))
+#else
+#define	AIC_LINUX_IRQRETURN_T void
+#define	AIC_LINUX_IRQRETURN(ours)  return
+#endif
 
 /*
  * SCSI command format
@@ -906,10 +949,10 @@ int		aic_inquiry_match(caddr_t /*inqbuffer*/,
 int		aic_static_inquiry_match(caddr_t /*inqbuffer*/,
 					 caddr_t /*table_entry*/);
 
-typedef void aic_option_callback_t(void *, int, int, int32_t);
+typedef void aic_option_callback_t(u_long, int, int, int32_t);
 char *		aic_parse_brace_option(char *opt_name, char *opt_arg,
 				       char *end, int depth,
-				       aic_option_callback_t *, void *);
+				       aic_option_callback_t *, u_long);
 
 static __inline void	 scsi_extract_sense(struct scsi_sense_data *sense,
 					    int *error_code, int *sense_key,
@@ -1003,4 +1046,4 @@ scsi_4btoul(uint8_t *bytes)
 	return (rv);
 }
 
-#endif /*_SCSI_SCSI_ALL_H*/
+#endif /*_AICLIB_H */
