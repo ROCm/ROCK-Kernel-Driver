@@ -38,7 +38,7 @@ MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("ATI IXP AC97 controller");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ATI,IXP150/200/250}}");
+MODULE_DEVICES("{{ATI,IXP150/200/250/300}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -273,6 +273,7 @@ struct snd_atiixp {
 
 	atiixp_dma_t dmas[3];		/* playback, capture, spdif */
 	struct ac97_pcm *pcms[3];	/* playback, capture, spdif */
+	snd_pcm_t *pcmdevs[2];		/* PCM devices: analog i/o, spdif */
 
 	int max_channels;		/* max. channels for PCM out */
 
@@ -280,6 +281,10 @@ struct snd_atiixp {
 
 	int spdif_over_aclink;		/* passed from the module option */
 	struct semaphore open_mutex;	/* playback open mutex */
+
+#ifdef CONFIG_PM
+	u32 pci_state[16];
+#endif
 };
 
 
@@ -535,12 +540,10 @@ static int snd_atiixp_aclink_reset(atiixp_t *chip)
 	return 0;
 }
 
-#if 0 /* for P/M */
+#ifdef CONFIG_PM
 static int snd_atiixp_aclink_down(atiixp_t *chip)
 {
-	unsigned long flags;
-
-	if (atiixp_read(chip, MODEM_MIRROR) & ATI_REG_MODEM_MIRROR_RUNNING)
+	if (atiixp_read(chip, MODEM_MIRROR) & 0x1) /* modem running, too? */
 		return -EBUSY;
 	atiixp_update(chip, CMD,
 		     ATI_REG_CMD_POWERDOWN | ATI_REG_CMD_AC_RESET,
@@ -1255,6 +1258,7 @@ static int __devinit snd_atiixp_pcm_new(atiixp_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_atiixp_capture_ops);
 	pcm->private_data = chip;
 	strcpy(pcm->name, "ATI IXP AC97");
+	chip->pcmdevs[0] = pcm;
 
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
 					      snd_dma_pci_data(chip->pci), 64*1024, 128*1024);
@@ -1274,6 +1278,7 @@ static int __devinit snd_atiixp_pcm_new(atiixp_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_atiixp_spdif_ops);
 	pcm->private_data = chip;
 	strcpy(pcm->name, "ATI IXP IEC958");
+	chip->pcmdevs[1] = pcm;
 
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
 					      snd_dma_pci_data(chip->pci), 64*1024, 128*1024);
@@ -1344,6 +1349,7 @@ static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
 	ac97_bus_t bus, *pbus;
 	ac97_t ac97;
 	int i, err;
+	int codec_count;
 	static unsigned int codec_skip[3] = {
 		ATI_REG_ISR_CODEC0_NOT_READY,
 		ATI_REG_ISR_CODEC1_NOT_READY,
@@ -1362,6 +1368,7 @@ static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
 		return err;
 	chip->ac97_bus = pbus;
 
+	codec_count = 0;
 	for (i = 0; i < 3; i++) {
 		if (chip->codec_not_ready_bits & codec_skip[i])
 			continue;
@@ -1369,14 +1376,78 @@ static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
 		ac97.private_data = chip;
 		ac97.pci = chip->pci;
 		ac97.num = i;
-		if ((err = snd_ac97_mixer(pbus, &ac97, &chip->ac97[i])) < 0)
-			return err;
+		if ((err = snd_ac97_mixer(pbus, &ac97, &chip->ac97[i])) < 0) {
+			if (chip->codec_not_ready_bits)
+				/* codec(s) was detected but not available.
+				 * return the error
+				 */
+				return err;
+			else {
+				/* codec(s) was NOT detected, so just ignore here */
+				chip->ac97[i] = NULL; /* to be sure */
+				snd_printd("atiixp: codec %d not found\n", i);
+				continue;
+			}
+		}
+		codec_count++;
+	}
+
+	if (! codec_count) {
+		snd_printk(KERN_ERR "atiixp: no codec available\n");
+		return -ENODEV;
 	}
 
 	/* snd_ac97_tune_hardware(chip->ac97, ac97_quirks); */
 
 	return 0;
 }
+
+
+#ifdef CONFIG_PM
+/*
+ * power management
+ */
+static int snd_atiixp_suspend(snd_card_t *card, unsigned int state)
+{
+	atiixp_t *chip = snd_magic_cast(atiixp_t, card->pm_private_data, return -EINVAL);
+	int i;
+
+	for (i = 0; i < 2; i++)
+		if (chip->pcmdevs[i])
+			snd_pcm_suspend_all(chip->pcmdevs[i]);
+	for (i = 0; i < 3; i++)
+		if (chip->ac97[i])
+			snd_ac97_suspend(chip->ac97[i]);
+	snd_atiixp_aclink_down(chip);
+	snd_atiixp_chip_stop(chip);
+
+	pci_save_state(chip->pci, chip->pci_state);
+	pci_set_power_state(chip->pci, 3);
+	pci_disable_device(chip->pci);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
+}
+
+static int snd_atiixp_resume(snd_card_t *card, unsigned int state)
+{
+	atiixp_t *chip = snd_magic_cast(atiixp_t, card->pm_private_data, return -EINVAL);
+	int i;
+
+	pci_enable_device(chip->pci);
+	pci_restore_state(chip->pci, chip->pci_state);
+	pci_set_power_state(chip->pci, 0);
+
+	snd_atiixp_aclink_reset(chip);
+	snd_atiixp_chip_start(chip);
+
+	for (i = 0; i < 3; i++)
+		if (chip->ac97[i])
+			snd_ac97_resume(chip->ac97[i]);
+
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
+	return 0;
+}
+#endif /* CONFIG_PM */
 
 
 /*
@@ -1536,6 +1607,8 @@ static int __devinit snd_atiixp_probe(struct pci_dev *pci,
 	sprintf(card->longname, "%s rev %x at 0x%lx, irq %i",
 		card->shortname, revision, chip->addr, chip->irq);
 
+	snd_card_set_pm_callback(card, snd_atiixp_suspend, snd_atiixp_resume, chip);
+
 	if ((err = snd_card_register(card)) < 0)
 		goto __error;
 
@@ -1559,6 +1632,7 @@ static struct pci_driver driver = {
 	.id_table = snd_atiixp_ids,
 	.probe = snd_atiixp_probe,
 	.remove = __devexit_p(snd_atiixp_remove),
+	SND_PCI_PM_CALLBACKS
 };
 
 

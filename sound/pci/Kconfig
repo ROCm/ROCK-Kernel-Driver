@@ -16,11 +16,11 @@ config SND_ALI5451
 	  Say 'Y' or 'M' to include support for ALI PCI Audio M5451 sound core.
 
 config SND_ATIIXP
-	tristate "ATI IXP 150/200/250"
+	tristate "ATI IXP 150/200/250/300"
 	depends on SND
 	select SND_AC97_CODEC
 	help
-	  Say 'Y' or 'M' to include support for ATI IXP 150/200/250 AC97 controller.
+	  Say 'Y' or 'M' to include support for ATI IXP 150/200/250/300 AC97 controller.
 
 config SND_AU8810
         tristate "Aureal Advantage"
