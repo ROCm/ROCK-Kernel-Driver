@@ -19,8 +19,10 @@ static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t
 {
 	if (type >= MAXQUOTAS)
 		return -EINVAL;
+	if (!sb && cmd != Q_SYNC)
+		return -ENODEV;
 	/* Is operation supported? */
-	if (!sb->s_qcop)
+	if (sb && !sb->s_qcop)
 		return -ENOSYS;
 
 	switch (cmd) {
@@ -51,7 +53,7 @@ static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t
 				return -ENOSYS;
 			break;
 		case Q_SYNC:
-			if (!sb->s_qcop->quota_sync)
+			if (sb && !sb->s_qcop->quota_sync)
 				return -ENOSYS;
 			break;
 		case Q_XQUOTAON:
@@ -100,6 +102,50 @@ static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t
 			return -EPERM;
 
 	return security_quotactl (cmd, type, id, sb);
+}
+
+static struct super_block *get_super_to_sync(int type)
+{
+	struct list_head *head;
+	int cnt, dirty;
+
+restart:
+	spin_lock(&sb_lock);
+	list_for_each(head, &super_blocks) {
+		struct super_block *sb = list_entry(head, struct super_block, s_list);
+
+		for (cnt = 0, dirty = 0; cnt < MAXQUOTAS; cnt++)
+			if ((type == cnt || type == -1) && sb_has_quota_enabled(sb, cnt)
+			    && info_any_dquot_dirty(&sb_dqopt(sb)->info[cnt]))
+				dirty = 1;
+		if (!dirty)
+			continue;
+		sb->s_count++;
+		spin_unlock(&sb_lock);
+		down_read(&sb->s_umount);
+		if (!sb->s_root) {
+			drop_super(sb);
+			goto restart;
+		}
+		return sb;
+	}
+	spin_unlock(&sb_lock);
+	return NULL;
+}
+
+void sync_dquots(struct super_block *sb, int type)
+{
+	if (sb) {
+		if (sb->s_qcop->quota_sync)
+			sb->s_qcop->quota_sync(sb, type);
+	}
+	else {
+		while ((sb = get_super_to_sync(type))) {
+			if (sb->s_qcop->quota_sync)
+				sb->s_qcop->quota_sync(sb, type);
+			drop_super(sb);
+		}
+	}
 }
 
 /* Copy parameters and call proper function */
@@ -167,7 +213,8 @@ static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, cadd
 			return sb->s_qcop->set_dqblk(sb, type, id, &idq);
 		}
 		case Q_SYNC:
-			return sb->s_qcop->quota_sync(sb, type);
+			sync_dquots(sb, type);
+			return 0;
 
 		case Q_XQUOTAON:
 		case Q_XQUOTAOFF:
@@ -222,27 +269,30 @@ asmlinkage long sys_quotactl(unsigned int cmd, const char *special, qid_t id, ca
 	struct super_block *sb = NULL;
 	struct block_device *bdev;
 	char *tmp;
-	int ret = -ENODEV;
+	int ret;
 
 	cmds = cmd >> SUBCMDSHIFT;
 	type = cmd & SUBCMDMASK;
 
-	tmp = getname(special);
-	if (IS_ERR(tmp))
-		return PTR_ERR(tmp);
-	bdev = lookup_bdev(tmp);
-	putname(tmp);
-	if (IS_ERR(bdev))
-		return PTR_ERR(bdev);
-	sb = get_super(bdev);
-	bdput(bdev);
-
-	if (sb) {
-		ret = check_quotactl_valid(sb, type, cmds, id);
-		if (ret >= 0)
-			ret = do_quotactl(sb, type, cmds, id, addr);
-		drop_super(sb);
+	if (cmds != Q_SYNC || special) {
+		tmp = getname(special);
+		if (IS_ERR(tmp))
+			return PTR_ERR(tmp);
+		bdev = lookup_bdev(tmp);
+		putname(tmp);
+		if (IS_ERR(bdev))
+			return PTR_ERR(bdev);
+		sb = get_super(bdev);
+		bdput(bdev);
+		if (!sb)
+			return -ENODEV;
 	}
+
+	ret = check_quotactl_valid(sb, type, cmds, id);
+	if (ret >= 0)
+		ret = do_quotactl(sb, type, cmds, id, addr);
+	if (sb)
+		drop_super(sb);
 
 	return ret;
 }

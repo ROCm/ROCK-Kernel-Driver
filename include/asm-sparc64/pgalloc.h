@@ -159,7 +159,7 @@ static __inline__ pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addre
 
 	pmd = pmd_alloc_one_fast(mm, address);
 	if (!pmd) {
-		pmd = (pmd_t *)__get_free_page(GFP_KERNEL);
+		pmd = (pmd_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 		if (pmd)
 			memset(pmd, 0, PAGE_SIZE);
 	}

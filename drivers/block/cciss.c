@@ -599,9 +599,12 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
  		luninfo.num_opens = drv->usage_count;
  		luninfo.num_parts = 0;
  		/* count partitions 1 to 15 with sizes > 0 */
- 		for(i=1; i <MAX_PART; i++)
- 			if (disk->part[i].nr_sects != 0)
- 				luninfo.num_parts++;
+ 		for(i=1; i <MAX_PART; i++) {
+			if (!disk->part[i])
+				continue;
+			if (disk->part[i]->nr_sects != 0)
+				luninfo.num_parts++;
+		}
  		if (copy_to_user((void *) arg, &luninfo,
  				sizeof(LogvolInfo_struct)))
  			return -EFAULT;

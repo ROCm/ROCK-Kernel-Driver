@@ -62,11 +62,6 @@
 
 /*
   Define the pci dma mask supported by DAC960 V1 and V2 Firmware Controlers
-
-  For now set the V2 mask to only 32 bits.  The controller IS capable
-  of doing 64 bit dma.  But I have yet to find out whether this needs to
-  be explicitely enabled in the controller, or of the controller adapts
-  automatically.
  */
 
 #define DAC690_V1_PciDmaMask	0xffffffff
@@ -2370,6 +2365,7 @@ typedef struct DAC960_Controller
   unsigned short ControllerScatterGatherLimit;
   unsigned short DriverScatterGatherLimit;
   unsigned int ControllerUsageCount;
+  u64		BounceBufferLimit;
   unsigned int CombinedStatusBufferLength;
   unsigned int InitialStatusLength;
   unsigned int CurrentStatusLength;

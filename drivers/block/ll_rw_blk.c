@@ -1841,7 +1841,7 @@ static inline void blk_partition_remap(struct bio *bio)
 	if (bdev == bdev->bd_contains)
 		return;
 
-	p = &disk->part[bdev->bd_dev-MKDEV(disk->major,disk->first_minor)-1];
+	p = disk->part[bdev->bd_dev-MKDEV(disk->major,disk->first_minor)-1];
 	switch (bio->bi_rw) {
 	case READ:
 		p->read_sectors += bio_sectors(bio);

@@ -75,7 +75,8 @@ pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
  * Add newly discovered PCI devices (which are on the bus->devices
  * list) to the global PCI device list, add the sysfs and procfs
  * entries.  Where a bridge is found, add the discovered bus to
- * the parents list of child buses, and recurse.
+ * the parents list of child buses, and recurse (breadth-first
+ * to be compatible with 2.4)
  *
  * Call hotplug for each new devices.
  */
@@ -97,6 +98,12 @@ void __devinit pci_bus_add_devices(struct pci_bus *bus)
 		pci_proc_attach_device(dev);
 #endif
 		pci_create_sysfs_dev_files(dev);
+
+	}
+
+	list_for_each_entry(dev, &bus->devices, bus_list) {
+
+		BUG_ON(list_empty(&dev->global_list));
 
 		/*
 		 * If there is an unattached subordinate bus, attach

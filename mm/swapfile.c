@@ -7,6 +7,7 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <linux/mman.h>
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
 #include <linux/swap.h>
@@ -15,7 +16,6 @@
 #include <linux/namei.h>
 #include <linux/shm.h>
 #include <linux/blkdev.h>
-#include <linux/buffer_head.h>
 #include <linux/writeback.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
@@ -300,7 +300,7 @@ int remove_exclusive_swap_page(struct page *page)
 	struct swap_info_struct * p;
 	swp_entry_t entry;
 
-	BUG_ON(page_has_buffers(page));
+	BUG_ON(PagePrivate(page));
 	BUG_ON(!PageLocked(page));
 
 	if (!PageSwapCache(page))
@@ -355,7 +355,7 @@ void free_swap_and_cache(swp_entry_t entry)
 	if (page) {
 		int one_user;
 
-		BUG_ON(page_has_buffers(page));
+		BUG_ON(PagePrivate(page));
 		page_cache_get(page);
 		one_user = (page_count(page) == 2);
 		/* Only cache user (+us), or swap space full? Free it! */
@@ -590,6 +590,11 @@ static int try_to_unuse(unsigned int type)
 	 * to swapoff for a while, then reappear - but that is rare.
 	 */
 	while ((i = find_next_to_unuse(si, i))) {
+		if (signal_pending(current)) {
+			retval = -EINTR;
+			break;
+		}
+
 		/* 
 		 * Get a page for the entry, using the existing swap
 		 * cache page if there is one.  Otherwise, get a clean
@@ -759,8 +764,7 @@ static int try_to_unuse(unsigned int type)
 
 		/*
 		 * Make sure that we aren't completely killing
-		 * interactive performance.  Interruptible check on
-		 * signal_pending() would be nice, but changes the spec?
+		 * interactive performance.
 		 */
 		cond_resched();
 	}
@@ -1029,12 +1033,18 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 		}
 		prev = type;
 	}
-	err = -EINVAL;
 	if (type < 0) {
+		err = -EINVAL;
 		swap_list_unlock();
 		goto out_dput;
 	}
-
+	if (vm_enough_memory(p->pages))
+		vm_unacct_memory(p->pages);
+	else {
+		err = -ENOMEM;
+		swap_list_unlock();
+		goto out_dput;
+	}
 	if (prev < 0) {
 		swap_list.head = p->next;
 	} else {
@@ -1048,7 +1058,9 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	total_swap_pages -= p->pages;
 	p->flags &= ~SWP_WRITEOK;
 	swap_list_unlock();
+	current->flags |= PF_SWAPOFF;
 	err = try_to_unuse(type);
+	current->flags &= ~PF_SWAPOFF;
 	if (err) {
 		/* re-insert swap space back into swap_list */
 		swap_list_lock();

@@ -668,12 +668,12 @@ static int dmfe_start_xmit(struct sk_buff *skb, struct DEVICE *dev)
 	if ( db->tx_queue_cnt < TX_FREE_DESC_CNT )
 		netif_wake_queue(dev);
 
-	/* free this SKB */
-	dev_kfree_skb(skb);
-
 	/* Restore CR7 to enable interrupt */
 	spin_unlock_irqrestore(&db->lock, flags);
 	outl(db->cr7_data, dev->base_addr + DCR7);
+
+	/* free this SKB */
+	dev_kfree_skb(skb);
 
 	return 0;
 }

@@ -129,37 +129,45 @@ nomem:
 int
 follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		    struct page **pages, struct vm_area_struct **vmas,
-		    unsigned long *st, int *length, int i)
+		    unsigned long *position, int *length, int i)
 {
-	pte_t *ptep, pte;
-	unsigned long start = *st;
-	unsigned long pstart;
-	int len = *length;
-	struct page *page;
+	unsigned long vpfn, vaddr = *position;
+	int remainder = *length;
 
-	do {
-		pstart = start;
-		ptep = huge_pte_offset(mm, start);
-		pte = *ptep;
+	WARN_ON(!is_vm_hugetlb_page(vma));
 
-back1:
-		page = pte_page(pte);
+	vpfn = vaddr/PAGE_SIZE;
+	while (vaddr < vma->vm_end && remainder) {
+
 		if (pages) {
-			page += ((start & ~HPAGE_MASK) >> PAGE_SHIFT);
+			pte_t *pte;
+			struct page *page;
+
+			pte = huge_pte_offset(mm, vaddr);
+
+			/* hugetlb should be locked, and hence, prefaulted */
+			WARN_ON(!pte || pte_none(*pte));
+
+			page = &pte_page(*pte)[vpfn % (HPAGE_SIZE/PAGE_SIZE)];
+
+			WARN_ON(!PageCompound(page));
+
 			get_page(page);
 			pages[i] = page;
 		}
+
 		if (vmas)
 			vmas[i] = vma;
-		i++;
-		len--;
-		start += PAGE_SIZE;
-		if (((start & HPAGE_MASK) == pstart) && len &&
-				(start < vma->vm_end))
-			goto back1;
-	} while (len && start < vma->vm_end);
-	*length = len;
-	*st = start;
+
+		vaddr += PAGE_SIZE;
+		++vpfn;
+		--remainder;
+		++i;
+	}
+
+	*length = remainder;
+	*position = vaddr;
+
 	return i;
 }
 
@@ -474,9 +482,7 @@ int hugetlb_report_meminfo(char *buf)
 
 int is_hugepage_mem_enough(size_t size)
 {
-	if (size > (htlbpagemem << HPAGE_SHIFT))
-		return 0;
-	return 1;
+	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= htlbpagemem;
 }
 
 /*

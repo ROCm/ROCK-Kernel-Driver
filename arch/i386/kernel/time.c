@@ -124,15 +124,28 @@ void do_settimeofday(struct timeval *tv)
 	 * made, and then undo it!
 	 */
 	tv->tv_usec -= timer->get_offset();
-	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
+	tv->tv_usec -= (jiffies - wall_jiffies) * (USEC_PER_SEC / HZ);
 
 	while (tv->tv_usec < 0) {
-		tv->tv_usec += 1000000;
+		tv->tv_usec += USEC_PER_SEC;
 		tv->tv_sec--;
+	}
+	tv->tv_usec *= NSEC_PER_USEC;
+
+	wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
+	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_usec;
+
+	if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
+		wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
+		wall_to_monotonic.tv_sec++;
+	}
+	if (wall_to_monotonic.tv_nsec < 0) {
+		wall_to_monotonic.tv_nsec += NSEC_PER_SEC;
+		wall_to_monotonic.tv_sec--;
 	}
 
 	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = (tv->tv_usec * 1000);
+	xtime.tv_nsec = tv->tv_usec;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
@@ -228,41 +241,6 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 }
 
 /*
- * Lost tick detection and compensation
- */
-static inline void detect_lost_tick(void)
-{
-	/* read time since last interrupt */
-	unsigned long delta = timer->get_offset();
-	static unsigned long dbg_print;
-	
-	/* check if delta is greater then two ticks */
-	if(delta >= 2*(1000000/HZ)){
-
-		/*
-		 * only print debug info first 5 times
-		 */
-		/*
-		 * AKPM: disable this for now; it's nice, but irritating.
-		 */
-		if (0 && dbg_print < 5) {
-			printk(KERN_WARNING "\nWarning! Detected %lu "
-				"micro-second gap between interrupts.\n",
-				delta);
-			printk(KERN_WARNING "  Compensating for %lu lost "
-				"ticks.\n",
-				delta/(1000000/HZ)-1);
-			dump_stack();
-			dbg_print++;
-		}
-		/* calculate number of missed ticks */
-		delta = delta/(1000000/HZ)-1;
-		jiffies += delta;
-	}
-		
-}
-
-/*
  * This is the same as the above, except we _also_ save the current
  * Time Stamp Counter value at the time of the timer interrupt, so that
  * we later on can estimate the time of day more exactly.
@@ -278,7 +256,6 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	write_seqlock(&xtime_lock);
 
-	detect_lost_tick();
 	timer->mark_offset();
  
 	do_timer_interrupt(irq, NULL, regs);
@@ -322,7 +299,9 @@ void __init time_init(void)
 {
 	
 	xtime.tv_sec = get_cmos_time();
-	xtime.tv_nsec = 0;
+	wall_to_monotonic.tv_sec = -xtime.tv_sec + INITIAL_JIFFIES / HZ;
+	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
+	wall_to_monotonic.tv_nsec = 0;
 
 
 	timer = select_timer();
