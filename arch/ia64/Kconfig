@@ -158,14 +158,6 @@ config IA64_BRL_EMU
 	depends on ITANIUM
 	default y
 
-config ITANIUM_BSTEP_SPECIFIC
-	bool "Itanium B-step specific code"
-	depends on ITANIUM
-	help
-	  Select this option to build a kernel for an Itanium prototype system
-	  with a B-step CPU.  You have a B-step CPU if the "revision" field in
-	  /proc/cpuinfo has a value in the range from 1 to 4.
-
 # align cache-sensitive data to 128 bytes
 config IA64_L1_CACHE_SHIFT
 	int
