@@ -834,7 +834,7 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 			 * reserved hugepage range.  For some archs like IA-64,
 			 * there is a separate region for hugepages.
 			 */
-			ret = check_valid_hugepage_range(addr, len);
+			ret = is_hugepage_only_range(addr, len);
 		}
 		if (ret)
 			return ret;
