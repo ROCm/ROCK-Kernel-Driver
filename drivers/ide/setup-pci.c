@@ -185,19 +185,16 @@ static unsigned long ide_get_or_set_dma_base (ide_hwif_t *hwif)
 second_chance_to_dma:
 #endif /* CONFIG_BLK_DEV_IDEDMA_FORCED */
 
-	if ((hwif->mmio) && (hwif->dma_base))
+	if (hwif->mmio)
 		return hwif->dma_base;
 
 	if (hwif->mate && hwif->mate->dma_base) {
 		dma_base = hwif->mate->dma_base - (hwif->channel ? 0 : 8);
 	} else {
-		dma_base = (hwif->mmio) ?
-			((unsigned long) hwif->hwif_data) :
-			(pci_resource_start(dev, 4));
+		dma_base = pci_resource_start(dev, 4);
 		if (!dma_base) {
-			printk(KERN_ERR "%s: dma_base is invalid (0x%04lx)\n",
-				hwif->cds->name, dma_base);
-			dma_base = 0;
+			printk(KERN_ERR "%s: dma_base is invalid\n",
+					hwif->cds->name);
 		}
 	}
 
@@ -251,7 +248,6 @@ second_chance_to_dma:
 				simplex_stat = hwif->INB(dma_base + 2);
 				if (simplex_stat & 0x80) {
 					/* simplex device? */
-#if 0					
 /*
  *	At this point we haven't probed the drives so we can't make the
  *	appropriate decision. Really we should defer this problem
@@ -259,18 +255,7 @@ second_chance_to_dma:
  *	to be the DMA end. This has to be become dynamic to handle hot
  *	plug.
  */
-					/* Don't enable DMA on a simplex channel with no drives */
-					if (!hwif->drives[0].present && !hwif->drives[1].present)
-					{
-						printk(KERN_INFO "%s: simplex device with no drives: DMA disabled\n",
-								hwif->cds->name);
-						dma_base = 0;
-					}
-					/* If our other channel has DMA then we cannot */
-					else 
-#endif					
-					if(hwif->mate && hwif->mate->dma_base) 
-					{
+					if (hwif->mate && hwif->mate->dma_base) {
 						printk(KERN_INFO "%s: simplex device: "
 							"DMA disabled\n",
 							hwif->cds->name);
