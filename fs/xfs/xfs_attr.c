@@ -197,10 +197,8 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	/*
 	 * Attach the dquots to the inode.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if ((error = xfs_qm_dqattach(dp, 0)))
-			return (error);
-	}
+	if ((error = XFS_QM_DQATTACH(mp, dp, 0)))
+		return (error);
 
 	/*
 	 * If the inode doesn't have an attribute fork, add one.
@@ -280,19 +278,13 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	}
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (rsvd) {
-			error = xfs_trans_reserve_blkquota_force(args.trans,
-					dp, nblks);
-		} else {
-			error = xfs_trans_reserve_blkquota(args.trans,
-					dp, nblks);
-		}
-		if (error) {
-			xfs_iunlock(dp, XFS_ILOCK_EXCL);
-			xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
-			return (error);
-		}
+	error = XFS_TRANS_RESERVE_QUOTA_NBLKS(mp, args.trans, dp, nblks, 0,
+			 rsvd ? XFS_QMOPT_RES_REGBLKS | XFS_QMOPT_FORCE_RES :
+				XFS_QMOPT_RES_REGBLKS);
+	if (error) {
+		xfs_iunlock(dp, XFS_ILOCK_EXCL);
+		xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+		return (error);
 	}
 
 	xfs_trans_ijoin(args.trans, dp, XFS_ILOCK_EXCL);
@@ -483,12 +475,9 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	/*
 	 * Attach the dquots to the inode.
 	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (XFS_NOT_DQATTACHED(mp, dp)) {
-			if ((error = xfs_qm_dqattach(dp, 0)))
-				return (error);
-		}
-	}
+	if ((error = XFS_QM_DQATTACH(mp, dp, 0)))
+		return (error);
+
 	/*
 	 * Start our first transaction of the day.
 	 *

@@ -29,20 +29,32 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_GLOBALS_H__
-#define __XFS_GLOBALS_H__
+#include <xfs.h>
 
-/*
- * This file declares globals needed by XFS that were normally defined
- * somewhere else in IRIX.
- */
+#ifndef CONFIG_XFS_QUOTA
+STATIC struct xfs_dquot *
+xfs_dqvopchown_default(
+	struct xfs_trans	*tp,
+	struct xfs_inode	*ip,
+	struct xfs_dquot	**dqp,
+	struct xfs_dquot	*dq)
+{
+	return NULL;
+}
 
-extern uint64_t xfs_panic_mask;		/* set to cause more panics */
-
-extern unsigned long xfs_physmem;
-
-extern spinlock_t xfs_atomic_spin;
-
-extern struct cred *sys_cred;
-
-#endif	/* __XFS_GLOBALS_H__ */
+xfs_qmops_t	xfs_qmcore_xfs = {
+	.xfs_qminit		= (xfs_qminit_t) fs_noerr,
+	.xfs_qmdone		= (xfs_qmdone_t) fs_noerr,
+	.xfs_qmmount		= (xfs_qmmount_t) fs_noerr,
+	.xfs_qmunmount		= (xfs_qmunmount_t) fs_noerr,
+	.xfs_dqrele		= (xfs_dqrele_t) fs_noerr,
+	.xfs_dqattach		= (xfs_dqattach_t) fs_noerr,
+	.xfs_dqdetach		= (xfs_dqdetach_t) fs_noerr,
+	.xfs_dqpurgeall		= (xfs_dqpurgeall_t) fs_noerr,
+	.xfs_dqvopalloc		= (xfs_dqvopalloc_t) fs_noerr,
+	.xfs_dqvopcreate	= (xfs_dqvopcreate_t) fs_noerr,
+	.xfs_dqvoprename	= (xfs_dqvoprename_t) fs_noerr,
+	.xfs_dqvopchown		= xfs_dqvopchown_default,
+	.xfs_dqvopchownresv	= (xfs_dqvopchownresv_t) fs_noerr,
+};
+#endif /* CONFIG_XFS_QUOTA */

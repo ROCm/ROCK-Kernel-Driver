@@ -45,11 +45,7 @@ static inline void delay(long ticks)
 
 static inline void nanotime(struct timespec *tvp)
 {
-	struct timeval tv;
-
-	do_gettimeofday(&tv);
-	tvp->tv_sec = tv.tv_sec;
-	tvp->tv_nsec = tv.tv_usec * 1000;
+	*tvp = CURRENT_TIME;
 }
 
 #endif /* __XFS_SUPPORT_TIME_H__ */

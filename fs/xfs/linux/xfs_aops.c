@@ -78,6 +78,7 @@ xfs_unwritten_conv(
 				  XFS_BUF_OFFSET(bp), XFS_BUF_SIZE(bp));
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
 	XFS_BUF_CLR_IODONE_FUNC(bp);
+	XFS_BUF_UNDATAIO(bp);
 	xfs_biodone(bp);
 }
 
@@ -431,6 +432,7 @@ map_unwritten(
 	size = nblocks;		/* NB: using 64bit number here */
 	size <<= block_bits;	/* convert fsb's to byte range */
 
+	XFS_BUF_DATAIO(pb);
 	XFS_BUF_SET_SIZE(pb, size);
 	XFS_BUF_SET_OFFSET(pb, offset);
 	XFS_BUF_SET_FSPRIVATE(pb, LINVFS_GET_VP(inode)->v_fbhv);

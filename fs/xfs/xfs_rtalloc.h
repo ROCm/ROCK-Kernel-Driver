@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -34,6 +34,8 @@
 
 struct xfs_mount;
 struct xfs_trans;
+
+#define XFS_IS_REALTIME_INODE(ip) ((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME)
 
 /* Min and max rt extent sizes, specified in bytes */
 #define XFS_MAX_RTEXTSIZE	(1024 * 1024 * 1024)	/* 1GB */

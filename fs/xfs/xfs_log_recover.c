@@ -136,16 +136,15 @@ xlog_bwrite(
 /*
  * check log record header for recovery
  */
-
 static void
 xlog_header_check_dump(xfs_mount_t *mp, xlog_rec_header_t *head)
 {
     int b;
 
-    printk("xlog_header_check_dump:\n	 SB : uuid = ");
+    printk("%s:  SB : uuid = ", __FUNCTION__);
     for (b=0;b<16;b++) printk("%02x",((unsigned char *)&mp->m_sb.sb_uuid)[b]);
     printk(", fmt = %d\n",XLOG_FMT);
-    printk("    log: uuid = ");
+    printk("    log : uuid = ");
     for (b=0;b<16;b++) printk("%02x",((unsigned char *)&head->h_fs_uuid)[b]);
     printk(", fmt = %d\n", INT_GET(head->h_fmt, ARCH_CONVERT));
 }
@@ -1813,7 +1812,6 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 		 */
 		error = 0;
 		if (buf_f->blf_flags & (XFS_BLI_UDQUOT_BUF|XFS_BLI_GDQUOT_BUF)) {
-			/* OK, if this returns ENOSYS */
 			error = xfs_qm_dqcheck((xfs_disk_dquot_t *)
 					       item->ri_buf[i].i_addr,
 					       -1, 0, XFS_QMOPT_DOWARN,
@@ -1821,9 +1819,9 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 		}
 		if (!error)
 			memcpy(xfs_buf_offset(bp,
-					(uint)bit << XFS_BLI_SHIFT),	/* dest */
-				item->ri_buf[i].i_addr,			/* source */
-				nbits<<XFS_BLI_SHIFT);			/* length */
+				(uint)bit << XFS_BLI_SHIFT),	/* dest */
+				item->ri_buf[i].i_addr,		/* source */
+				nbits<<XFS_BLI_SHIFT);		/* length */
 		i++;
 		bit += nbits;
 	}
@@ -1832,6 +1830,120 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 	ASSERT(i == item->ri_total);
 }	/* xlog_recover_do_reg_buffer */
 
+/*
+ * Do some primitive error checking on ondisk dquot data structures.
+ */
+int
+xfs_qm_dqcheck(
+	xfs_disk_dquot_t *ddq,
+	xfs_dqid_t	 id,
+	uint		 type,	  /* used only when IO_dorepair is true */
+	uint		 flags,
+	char		 *str)
+{
+	xfs_dqblk_t	 *d = (xfs_dqblk_t *)ddq;
+	int		errs = 0;
+
+	/*
+	 * We can encounter an uninitialized dquot buffer for 2 reasons:
+	 * 1. If we crash while deleting the quotainode(s), and those blks got
+	 *    used for user data. This is because we take the path of regular
+	 *    file deletion; however, the size field of quotainodes is never
+	 *    updated, so all the tricks that we play in itruncate_finish
+	 *    don't quite matter.
+	 *
+	 * 2. We don't play the quota buffers when there's a quotaoff logitem.
+	 *    But the allocation will be replayed so we'll end up with an
+	 *    uninitialized quota block.
+	 *
+	 * This is all fine; things are still consistent, and we haven't lost
+	 * any quota information. Just don't complain about bad dquot blks.
+	 */
+	if (INT_GET(ddq->d_magic, ARCH_CONVERT) != XFS_DQUOT_MAGIC) {
+		if (flags & XFS_QMOPT_DOWARN)
+			cmn_err(CE_ALERT,
+			"%s : XFS dquot ID 0x%x, magic 0x%x != 0x%x",
+			str, id,
+			INT_GET(ddq->d_magic, ARCH_CONVERT), XFS_DQUOT_MAGIC);
+		errs++;
+	}
+	if (INT_GET(ddq->d_version, ARCH_CONVERT) != XFS_DQUOT_VERSION) {
+		if (flags & XFS_QMOPT_DOWARN)
+			cmn_err(CE_ALERT,
+			"%s : XFS dquot ID 0x%x, version 0x%x != 0x%x",
+			str, id,
+			INT_GET(ddq->d_magic, ARCH_CONVERT), XFS_DQUOT_VERSION);
+		errs++;
+	}
+
+	if (INT_GET(ddq->d_flags, ARCH_CONVERT) != XFS_DQ_USER &&
+	    INT_GET(ddq->d_flags, ARCH_CONVERT) != XFS_DQ_GROUP) {
+		if (flags & XFS_QMOPT_DOWARN)
+			cmn_err(CE_ALERT,
+			"%s : XFS dquot ID 0x%x, unknown flags 0x%x",
+			str, id, INT_GET(ddq->d_flags, ARCH_CONVERT));
+		errs++;
+	}
+
+	if (id != -1 && id != INT_GET(ddq->d_id, ARCH_CONVERT)) {
+		if (flags & XFS_QMOPT_DOWARN)
+			cmn_err(CE_ALERT,
+			"%s : ondisk-dquot 0x%x, ID mismatch: "
+			"0x%x expected, found id 0x%x",
+			str, ddq, id, INT_GET(ddq->d_id, ARCH_CONVERT));
+		errs++;
+	}
+
+	if (! errs) {
+		if (INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT) &&
+		    INT_GET(ddq->d_bcount, ARCH_CONVERT) >=
+				INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT)) {
+			if (INT_ISZERO(ddq->d_btimer, ARCH_CONVERT) &&
+			    !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
+				if (flags & XFS_QMOPT_DOWARN)
+					cmn_err(CE_ALERT,
+					"%s : Dquot ID 0x%x (0x%x) "
+					"BLK TIMER NOT STARTED",
+					str, (int)
+					INT_GET(ddq->d_id, ARCH_CONVERT), ddq);
+				errs++;
+			}
+		}
+		if (INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT) &&
+		    INT_GET(ddq->d_icount, ARCH_CONVERT) >=
+				INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT)) {
+			if (INT_ISZERO(ddq->d_itimer, ARCH_CONVERT) &&
+			    !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
+				if (flags & XFS_QMOPT_DOWARN)
+					cmn_err(CE_ALERT,
+					"%s : Dquot ID 0x%x (0x%x) "
+					"INODE TIMER NOT STARTED",
+					str, (int)
+					INT_GET(ddq->d_id, ARCH_CONVERT), ddq);
+				errs++;
+			}
+		}
+	}
+
+	if (!errs || !(flags & XFS_QMOPT_DQREPAIR))
+		return errs;
+
+	if (flags & XFS_QMOPT_DOWARN)
+		cmn_err(CE_NOTE, "Re-initializing dquot ID 0x%x", id);
+
+	/*
+	 * Typically, a repair is only requested by quotacheck.
+	 */
+	ASSERT(id != -1);
+	ASSERT(flags & XFS_QMOPT_DQREPAIR);
+	memset(d, 0, sizeof(xfs_dqblk_t));
+	INT_SET(d->dd_diskdq.d_magic, ARCH_CONVERT, XFS_DQUOT_MAGIC);
+	INT_SET(d->dd_diskdq.d_version, ARCH_CONVERT, XFS_DQUOT_VERSION);
+	INT_SET(d->dd_diskdq.d_id, ARCH_CONVERT, id);
+	INT_SET(d->dd_diskdq.d_flags, ARCH_CONVERT, type);
+
+	return errs;
+}
 
 /*
  * Perform a dquot buffer recovery.
@@ -2335,8 +2447,6 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 			   dq_f->qlf_id,
 			   0, XFS_QMOPT_DOWARN,
 			   "xlog_recover_do_dquot_trans (log copy)"))) {
-		if (error == ENOSYS)
-			return (0);
 		return XFS_ERROR(EIO);
 	}
 	ASSERT(dq_f->qlf_len == 1);
@@ -2923,8 +3033,6 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 
 	/*
 	 * Prevent any DMAPI event from being sent while in this function.
-	 * Not a problem for xfs since the file system isn't mounted
-	 * yet.	 It is a problem for cxfs recovery.
 	 */
 	mp_dmevmask = mp->m_dmevmask;
 	mp->m_dmevmask = 0;
@@ -2982,11 +3090,8 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 					 * Prevent any DMAPI event from
 					 * being sent when the
 					 * reference on the inode is
-					 * dropped.  Not a problem for
-					 * xfs since the file system
-					 * isn't mounted yet.  It is a
-					 * problem for cxfs recovery.
-					 */
+					 * dropped.
+                                         */
 					ip->i_d.di_dmevmask = 0;
 
 					/*
