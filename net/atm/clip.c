@@ -984,19 +984,7 @@ static struct file_operations arp_seq_fops = {
 
 static int __init atm_clip_init(void)
 {
-	/* we should use neigh_table_init() */
-	clip_tbl.lock = RW_LOCK_UNLOCKED;
-	clip_tbl.kmem_cachep = kmem_cache_create(clip_tbl.id,
-	    clip_tbl.entry_size, 0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-
-	if (!clip_tbl.kmem_cachep)
-		return -ENOMEM;
-
-	/* so neigh_ifdown() doesn't complain */
-	clip_tbl.proxy_timer.data = 0;
-	clip_tbl.proxy_timer.function = NULL;
-	init_timer(&clip_tbl.proxy_timer);
-	skb_queue_head_init(&clip_tbl.proxy_queue);
+	neigh_table_init(&clip_tbl);
 
 	clip_tbl_hook = &clip_tbl;
 	register_atm_ioctl(&clip_ioctl_ops);
@@ -1022,7 +1010,18 @@ static void __exit atm_clip_exit(void)
 
 	deregister_atm_ioctl(&clip_ioctl_ops);
 
+	/* First, stop the idle timer, so it stops banging
+	 * on the table.
+	 */
+	if (start_timer == 0)
+		del_timer(&idle_timer);
+
+	/* Next, purge the table, so that the device
+	 * unregister loop below does not hang due to
+	 * device references remaining in the table.
+	 */
 	neigh_ifdown(&clip_tbl, NULL);
+
 	dev = clip_devs;
 	while (dev) {
 		next = PRIV(dev)->next;
@@ -1030,9 +1029,9 @@ static void __exit atm_clip_exit(void)
 		free_netdev(dev);
 		dev = next;
 	}
-	if (start_timer == 0) del_timer(&idle_timer);
 
-	kmem_cache_destroy(clip_tbl.kmem_cachep);
+	/* Now it is safe to fully shutdown whole table. */
+	neigh_table_clear(&clip_tbl);
 
 	clip_tbl_hook = NULL;
 }

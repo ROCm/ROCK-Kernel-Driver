@@ -23,7 +23,6 @@ ENTRY(v5tj_early_abort)
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
 	bic	r1, r1, #1 << 11 | 1 << 10	@ clear bits 11 and 10 of FSR
 	tst	r3, #PSR_J_BIT			@ Java?
-	orrne	r1, r1, #1 << 11		@ always assume write
 	movne	pc, lr
 	tst	r3, #PSR_T_BIT			@ Thumb?
 	ldrneh	r3, [r2]			@ read aborted thumb instruction

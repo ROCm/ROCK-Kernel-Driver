@@ -41,57 +41,6 @@
 #include <linux/ide.h>
 #include <linux/init.h>
 
-static struct pci_dev *triflex_dev;
-
-#ifdef CONFIG_PROC_FS
-static int triflex_get_info(char *buf, char **addr, off_t offset, int count)
-{
-	char *p = buf;
-	int len;
-
-	struct pci_dev *dev	= triflex_dev;
-	unsigned long bibma = pci_resource_start(dev, 4);
-	u8  c0 = 0, c1 = 0;
-	u32 pri_timing, sec_timing;
-
-	p += sprintf(p, "\n                                Compaq Triflex Chipset\n");
-	
-	pci_read_config_dword(dev, 0x70, &pri_timing);
-	pci_read_config_dword(dev, 0x74, &sec_timing);
-
-	/*
-	 * at that point bibma+0x2 et bibma+0xa are byte registers
-	 * to investigate:
-	 */
-	c0 = inb((unsigned short)bibma + 0x02);
-	c1 = inb((unsigned short)bibma + 0x0a);
-
-	p += sprintf(p, "--------------- Primary Channel "
-			"---------------- Secondary Channel "
-			"-------------\n");
-	p += sprintf(p, "                %sabled "
-			"                        %sabled\n",
-			(c0&0x80) ? "dis" : " en",
-			(c1&0x80) ? "dis" : " en");
-	p += sprintf(p, "--------------- drive0 --------- drive1 "
-			"-------- drive0 ---------- drive1 ------\n");
-	p += sprintf(p, "DMA enabled:    %s              %s "
-			"            %s               %s\n",
-			(c0&0x20) ? "yes" : "no ",
-			(c0&0x40) ? "yes" : "no ",
-			(c1&0x20) ? "yes" : "no ",
-			(c1&0x40) ? "yes" : "no " );
-
-	p += sprintf(p, "DMA\n");
-	p += sprintf(p, "PIO\n");
-
-	len = (p - buf) - offset;
-	*addr = buf + offset;
-	
-	return len > count ? count : len;
-}
-#endif
-
 static int triflex_tune_chipset(ide_drive_t *drive, u8 xferspeed)
 {
 	ide_hwif_t *hwif = HWIF(drive);
@@ -206,18 +155,8 @@ static void __init init_hwif_triflex(ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
-static unsigned int __init init_chipset_triflex(struct pci_dev *dev, 
-		const char *name) 
-{
-#ifdef CONFIG_PROC_FS
-	ide_pci_create_host_proc("triflex", triflex_get_info);
-#endif
-	return 0;	
-}
-
 static ide_pci_device_t triflex_device __devinitdata = {
 	.name		= "TRIFLEX",
-	.init_chipset	= init_chipset_triflex,
 	.init_hwif	= init_hwif_triflex,
 	.channels	= 2,
 	.autodma	= AUTODMA,
@@ -229,7 +168,6 @@ static int __devinit triflex_init_one(struct pci_dev *dev,
 		const struct pci_device_id *id)
 {
 	ide_setup_pci_device(dev, &triflex_device);
-	triflex_dev = dev;
 
 	return 0;
 }

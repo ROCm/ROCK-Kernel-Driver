@@ -50,6 +50,7 @@
 #include <linux/poll.h>
 #include <linux/pci.h>
 #include <linux/list.h>
+#include <linux/delay.h>
 #include <linux/workqueue.h>
 
 #include <asm/atomic.h>
@@ -1080,8 +1081,7 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	 * Ugly. But we want to wait for the socket threads to have started up.
 	 * We really should let the drivers themselves drive some of this..
 	 */
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(HZ/4);
+	msleep(250);
 
 	init_waitqueue_head(&s->queue);
 	init_waitqueue_head(&s->request);

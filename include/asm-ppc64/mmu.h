@@ -202,7 +202,7 @@ extern void htab_finish_init(void);
 #define SLB_VSID_KERNEL		(SLB_VSID_KP|SLB_VSID_C)
 #define SLB_VSID_USER		(SLB_VSID_KP|SLB_VSID_KS)
 
-#define VSID_MULTIPLIER	ASM_CONST(268435399)	/* largest 28-bit prime */
+#define VSID_MULTIPLIER	ASM_CONST(200730139)	/* 28-bit prime */
 #define VSID_BITS	36
 #define VSID_MODULUS	((1UL<<VSID_BITS)-1)
 
