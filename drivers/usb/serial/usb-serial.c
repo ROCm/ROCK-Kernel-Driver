@@ -1295,20 +1295,7 @@ void usb_serial_disconnect(struct usb_interface *interface)
 	dev_info(dev, "device disconnected\n");
 }
 
-
-struct tty_driver usb_serial_tty_driver = {
-	.magic =		TTY_DRIVER_MAGIC,
-	.owner =		THIS_MODULE,
-	.driver_name =		"usbserial",
-	.devfs_name =		"usb/tts/",
-	.name =			"ttyUSB",
-	.major =		SERIAL_TTY_MAJOR,
-	.minor_start =		0,
-	.num =			SERIAL_TTY_MINORS,
-	.type =			TTY_DRIVER_TYPE_SERIAL,
-	.subtype =		SERIAL_TYPE_NORMAL,
-	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
-
+static struct tty_operations serial_ops = {
 	.open =			serial_open,
 	.close =		serial_close,
 	.write =		serial_write,
@@ -1324,11 +1311,16 @@ struct tty_driver usb_serial_tty_driver = {
 	.tiocmset =		serial_tiocmset,
 };
 
+struct tty_driver *usb_serial_tty_driver;
 
 static int __init usb_serial_init(void)
 {
 	int i;
 	int result = 0;
+
+	usb_serial_tty_driver = alloc_tty_driver(SERIAL_TTY_MINORS);
+	if (!usb_serial_tty_driver)
+		return -ENOMEM;
 
 	/* Initialize our global data */
 	for (i = 0; i < SERIAL_TTY_MINORS; ++i) {
@@ -1344,10 +1336,19 @@ static int __init usb_serial_init(void)
 		goto exit;
 	}
 
-	/* register the tty driver */
-	usb_serial_tty_driver.init_termios = tty_std_termios;
-	usb_serial_tty_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	result = tty_register_driver (&usb_serial_tty_driver);
+	usb_serial_tty_driver->owner = THIS_MODULE;
+	usb_serial_tty_driver->driver_name = "usbserial";
+	usb_serial_tty_driver->devfs_name = "usb/tts/";
+	usb_serial_tty_driver->name = 	"ttyUSB";
+	usb_serial_tty_driver->major = SERIAL_TTY_MAJOR;
+	usb_serial_tty_driver->minor_start = 0;
+	usb_serial_tty_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	usb_serial_tty_driver->subtype = SERIAL_TYPE_NORMAL;
+	usb_serial_tty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	usb_serial_tty_driver->init_termios = tty_std_termios;
+	usb_serial_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	tty_set_operations(usb_serial_tty_driver, &serial_ops);
+	result = tty_register_driver(usb_serial_tty_driver);
 	if (result) {
 		err("%s - tty_register_driver failed", __FUNCTION__);
 		goto exit_generic;
@@ -1365,13 +1366,14 @@ static int __init usb_serial_init(void)
 	return result;
 
 exit_tty:
-	tty_unregister_driver(&usb_serial_tty_driver);
+	tty_unregister_driver(usb_serial_tty_driver);
 
 exit_generic:
 	usb_serial_generic_deregister();
 
 exit:
 	err ("%s - returning with error %d", __FUNCTION__, result);
+	put_tty_driver(usb_serial_tty_driver);
 	return result;
 }
 
@@ -1383,7 +1385,8 @@ static void __exit usb_serial_exit(void)
 	usb_serial_generic_deregister();
 
 	usb_deregister(&usb_serial_driver);
-	tty_unregister_driver(&usb_serial_tty_driver);
+	tty_unregister_driver(usb_serial_tty_driver);
+	put_tty_driver(usb_serial_tty_driver);
 	bus_unregister(&usb_serial_bus_type);
 }
 
