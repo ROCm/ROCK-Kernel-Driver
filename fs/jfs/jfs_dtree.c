@@ -2830,6 +2830,22 @@ void dtInitRoot(tid_t tid, struct inode *ip, u32 idotdot)
 	return;
 }
 
+struct jfs_dirent {
+	loff_t position;
+	int ino;
+	u16 name_len;
+	char name[0];
+};
+
+inline struct jfs_dirent *next_jfs_dirent(struct jfs_dirent *dirent)
+{
+	return (struct jfs_dirent *)
+		((char *)dirent +
+		 ((sizeof (struct jfs_dirent) + dirent->name_len + 1 +
+		   sizeof (loff_t) - 1) &
+		  ~(sizeof (loff_t) - 1)));
+}
+
 /*
  *	jfs_readdir()
  *
@@ -2846,11 +2862,12 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	struct inode *ip = filp->f_dentry->d_inode;
 	struct nls_table *codepage = JFS_SBI(ip->i_sb)->nls_tab;
 	int rc = 0;
+	loff_t dtpos;	/* legacy OS/2 style position */
 	struct dtoffset {
 		s16 pn;
 		s16 index;
 		s32 unused;
-	} *dtoffset = (struct dtoffset *) &filp->f_pos;
+	} *dtoffset = (struct dtoffset *) &dtpos;
 	s64 bn;
 	struct metapage *mp;
 	dtpage_t *p;
@@ -2860,12 +2877,16 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	int i, next;
 	struct ldtentry *d;
 	struct dtslot *t;
-	int d_namleft, d_namlen, len, outlen;
-	char *d_name, *name_ptr;
+	int d_namleft, len, outlen;
+	unsigned long dirent_buf;
+	char *name_ptr;
 	int dtlhdrdatalen;
 	u32 dir_index;
 	int do_index = 0;
 	uint loop_count = 0;
+	struct jfs_dirent *jfs_dirent;
+	int jfs_dirents;
+	int overflow;
 
 	if (filp->f_pos == DIREND)
 		return 0;
@@ -2885,7 +2906,9 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		if (dir_index > 1) {
 			struct dir_table_slot dirtab_slot;
 
-			if (dtEmpty(ip)) {
+			if (dtEmpty(ip) ||
+			    (dir_index >= JFS_IP(ip)->next_index)) {
+				/* Stale position.  Directory has shrunk */
 				filp->f_pos = DIREND;
 				return 0;
 			}
@@ -2963,13 +2986,15 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		 */
 		dtlhdrdatalen = DTLHDRDATALEN_LEGACY;
 
-		if (filp->f_pos == 0) {
+		dtpos = filp->f_pos;
+		if (dtpos == 0) {
 			/* build "." entry */
 
 			if (filldir(dirent, ".", 1, filp->f_pos, ip->i_ino,
 				    DT_DIR))
 				return 0;
 			dtoffset->index = 1;
+			filp->f_pos = dtpos;
 		}
 
 		if (dtoffset->pn == 0) {
@@ -2985,6 +3010,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			}
 			dtoffset->pn = 1;
 			dtoffset->index = 0;
+			filp->f_pos = dtpos;
 		}
 
 		if (dtEmpty(ip)) {
@@ -3009,32 +3035,48 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		}
 	}
 
-	d_name = kmalloc((JFS_NAME_MAX + 1) * sizeof(wchar_t), GFP_NOFS);
-	if (d_name == NULL) {
+	dirent_buf = __get_free_page(GFP_KERNEL);
+	if (dirent_buf == 0) {
 		DT_PUTPAGE(mp);
-		jERROR(1, ("jfs_readdir: kmalloc failed!\n"));
+		jERROR(1, ("jfs_readdir: __get_free_page failed!\n"));
 		filp->f_pos = DIREND;
-		return 0;
+		return -ENOMEM;
 	}
+
 	while (1) {
+		jfs_dirent = (struct jfs_dirent *) dirent_buf;
+		jfs_dirents = 0;
+		overflow = 0;
+
 		stbl = DT_GETSTBL(p);
 
 		for (i = index; i < p->header.nextindex; i++) {
 			d = (struct ldtentry *) & p->slot[stbl[i]];
 
+			if (((long) jfs_dirent + d->namlen + 1) >
+			    (dirent_buf + PSIZE)) {
+				/* DBCS codepages could overrun dirent_buf */
+				index = i;
+				overflow = 1;
+				break;
+			}
+
 			d_namleft = d->namlen;
-			name_ptr = d_name;
+			name_ptr = jfs_dirent->name;
+			jfs_dirent->ino = le32_to_cpu(d->inumber);
 
 			if (do_index) {
-				filp->f_pos = le32_to_cpu(d->index);
+				jfs_dirent->position = le32_to_cpu(d->index);
 				len = min(d_namleft, DTLHDRDATALEN);
-			} else
+			} else {
+				jfs_dirent->position = dtpos;
 				len = min(d_namleft, DTLHDRDATALEN_LEGACY);
+			}
 
 			/* copy the name of head/only segment */
 			outlen = jfs_strfromUCS_le(name_ptr, d->name, len,
 						   codepage);
-			d_namlen = outlen;
+			jfs_dirent->name_len = outlen;
 
 			/* copy name in the additional segment(s) */
 			next = d->next;
@@ -3053,56 +3095,60 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				len = min(d_namleft, DTSLOTDATALEN);
 				outlen = jfs_strfromUCS_le(name_ptr, t->name,
 							   len, codepage);
-				d_namlen+= outlen;
+				jfs_dirent->name_len += outlen;
 
 				next = t->next;
 			}
 
-			if (filldir(dirent, d_name, d_namlen, filp->f_pos,
-				    le32_to_cpu(d->inumber), DT_UNKNOWN))
-				goto out;
+			jfs_dirents++;
+			jfs_dirent = next_jfs_dirent(jfs_dirent);
 skip_one:
 			if (!do_index)
 				dtoffset->index++;
 		}
 
-		/*
-		 * get next leaf page
-		 */
-
-		if (p->header.flag & BT_ROOT) {
-			filp->f_pos = DIREND;
-			break;
-		}
-
-		bn = le64_to_cpu(p->header.next);
-		if (bn == 0) {
-			filp->f_pos = DIREND;
-			break;
+		if (!overflow) {
+			/* Point to next leaf page */
+			if (p->header.flag & BT_ROOT)
+				bn = 0;
+			else {
+				bn = le64_to_cpu(p->header.next);
+				index = 0;
+				/* update offset (pn:index) for new page */
+				if (!do_index) {
+					dtoffset->pn++;
+					dtoffset->index = 0;
+				}
+			}
 		}
 
 		/* unpin previous leaf page */
 		DT_PUTPAGE(mp);
 
-		/* get next leaf page */
+		jfs_dirent = (struct jfs_dirent *) dirent_buf;
+		while (jfs_dirents--) {
+			filp->f_pos = jfs_dirent->position;
+			if (filldir(dirent, jfs_dirent->name,
+				    jfs_dirent->name_len, filp->f_pos,
+				    jfs_dirent->ino, DT_UNKNOWN))
+				goto out;
+			jfs_dirent = next_jfs_dirent(jfs_dirent);
+		}
+
+		if (!overflow && (bn == 0)) {
+			filp->f_pos = DIREND;
+			break;
+		}
+
 		DT_GETPAGE(ip, bn, mp, PSIZE, p, rc);
 		if (rc) {
-			kfree(d_name);
+			free_page(dirent_buf);
 			return -rc;
 		}
-
-		/* update offset (pn:index) for new page */
-		index = 0;
-		if (!do_index) {
-			dtoffset->pn++;
-			dtoffset->index = 0;
-		}
-
 	}
 
       out:
-	kfree(d_name);
-	DT_PUTPAGE(mp);
+	free_page(dirent_buf);
 
 	return rc;
 }
