@@ -73,6 +73,7 @@ struct winsize {
 #define N_HCI		15  /* Bluetooth HCI UART */
 
 #ifdef __KERNEL__
+#include <linux/module.h>
 
 /*
  * c_cc characters in the termio structure.  Oh, how I love being
@@ -166,6 +167,9 @@ struct winsize {
 	} \
 	0; \
 })
+
+#define MODULE_ALIAS_LDISC(ldisc) \
+	MODULE_ALIAS("tty-ldisc-" __stringify(ldisc))
 
 #endif	/* __KERNEL__ */
 
