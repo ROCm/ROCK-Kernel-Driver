@@ -953,7 +953,7 @@ int fib6_del(struct rt6_info *rt, struct nlmsghdr *nlh)
 
 #if RT6_DEBUG >= 2
 	if (rt->u.dst.obsolete>0) {
-		BUG_TRAP(fn==NULL || rt->u.dst.obsolete<=0);
+		BUG_TRAP(fn==NULL);
 		return -ENOENT;
 	}
 #endif
