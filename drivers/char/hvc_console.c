@@ -22,6 +22,7 @@
 #include <linux/console.h>
 #include <linux/major.h>
 #include <linux/kernel.h>
+#include <linux/sysrq.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/sched.h>
@@ -46,6 +47,9 @@ static struct tty_struct *hvc_table[MAX_NR_HVC_CONSOLES];
 static struct termios *hvc_termios[MAX_NR_HVC_CONSOLES];
 static struct termios *hvc_termios_locked[MAX_NR_HVC_CONSOLES];
 static int hvc_offset;
+#ifdef CONFIG_MAGIC_SYSRQ
+static int sysrq_pressed;
+#endif
 
 #define N_OUTBUF	16
 
@@ -96,6 +100,14 @@ static void hvc_close(struct tty_struct *tty, struct file * filp)
 		printk(KERN_ERR "hvc_close %lu: oops, count is %d\n",
 		       hp - hvc_struct, hp->count);
 	spin_unlock_irqrestore(&hp->lock, flags);
+}
+
+static void hvc_hangup(struct tty_struct *tty)
+{
+	struct hvc_struct *hp = tty->driver_data;
+
+	hp->count = 0;
+	hp->tty = NULL;
 }
 
 /* called with hp->lock held */
@@ -186,8 +198,19 @@ static void hvc_poll(int index)
 			n = hvc_get_chars(index + hvc_offset, buf, sizeof(buf));
 			if (n <= 0)
 				break;
-			for (i = 0; i < n; ++i)
+			for (i = 0; i < n; ++i) {
+#ifdef CONFIG_MAGIC_SYSRQ		/* Handle the SysRq Hack */
+				if (buf[i] == '\x0f') {	/* ^O -- should support a sequence */
+					sysrq_pressed = 1;
+					continue;
+				} else if (sysrq_pressed) {
+					handle_sysrq(buf[i], NULL, NULL, tty);
+					sysrq_pressed = 0;
+					continue;
+				}
+#endif
 				tty_insert_flip_char(tty, buf[i], 0);
+			}
 		}
 		if (tty->flip.count)
 			tty_schedule_flip(tty);
@@ -246,6 +269,7 @@ int __init hvc_init(void)
 	hvc_driver.open = hvc_open;
 	hvc_driver.close = hvc_close;
 	hvc_driver.write = hvc_write;
+	hvc_driver.hangup = hvc_hangup;
 	hvc_driver.write_room = hvc_write_room;
 	hvc_driver.chars_in_buffer = hvc_chars_in_buffer;
 
