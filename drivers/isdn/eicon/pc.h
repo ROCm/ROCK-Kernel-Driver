@@ -11,11 +11,6 @@
 #ifndef PC_H_INCLUDED
 #define PC_H_INCLUDED
 
-
-#define byte unsigned char
-#define word unsigned short
-#define dword unsigned long
-
 /*------------------------------------------------------------------*/
 /* buffer definition                                                */
 /*------------------------------------------------------------------*/
