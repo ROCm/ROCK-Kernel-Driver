@@ -329,6 +329,8 @@ acpi_ex_opcode_2A_1T_1R (
 			break;
 
 		default:
+			ACPI_REPORT_ERROR (("Concat - invalid obj type: %X\n",
+					ACPI_GET_OBJECT_TYPE (operand[0])));
 			status = AE_AML_INTERNAL;
 		}
 
@@ -433,7 +435,7 @@ acpi_ex_opcode_2A_1T_1R (
 			}
 
 			return_desc->reference.target_type = ACPI_TYPE_PACKAGE;
-			return_desc->reference.object    = operand[0]->package.elements [index];
+			return_desc->reference.object    = operand[0];
 			return_desc->reference.where     = &operand[0]->package.elements [index];
 		}
 		else {

@@ -243,8 +243,8 @@ acpi_ds_get_buffer_arguments (
 
 	node = obj_desc->buffer.node;
 	if (!node) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"No pointer back to NS node in buffer %p\n", obj_desc));
+		ACPI_REPORT_ERROR ((
+				"No pointer back to NS node in buffer obj %p\n", obj_desc));
 		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
 
@@ -290,7 +290,7 @@ acpi_ds_get_package_arguments (
 
 	node = obj_desc->package.node;
 	if (!node) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+		ACPI_REPORT_ERROR ((
 				"No pointer back to NS node in package %p\n", obj_desc));
 		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}

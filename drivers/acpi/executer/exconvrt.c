@@ -55,8 +55,9 @@
  *
  * FUNCTION:    acpi_ex_convert_to_integer
  *
- * PARAMETERS:  *obj_desc       - Object to be converted.  Must be an
+ * PARAMETERS:  obj_desc        - Object to be converted.  Must be an
  *                                Integer, Buffer, or String
+ *              result_desc     - Where the new Integer object is returned
  *              walk_state      - Current method state
  *
  * RETURN:      Status
@@ -189,8 +190,9 @@ acpi_ex_convert_to_integer (
  *
  * FUNCTION:    acpi_ex_convert_to_buffer
  *
- * PARAMETERS:  *obj_desc       - Object to be converted.  Must be an
+ * PARAMETERS:  obj_desc        - Object to be converted.  Must be an
  *                                Integer, Buffer, or String
+ *              result_desc     - Where the new buffer object is returned
  *              walk_state      - Current method state
  *
  * RETURN:      Status
@@ -319,6 +321,7 @@ acpi_ex_convert_to_ascii (
 
 	ACPI_FUNCTION_ENTRY ();
 
+
 	if (data_width < sizeof (acpi_integer)) {
 		leading_zero = FALSE;
 		length = data_width;
@@ -328,22 +331,21 @@ acpi_ex_convert_to_ascii (
 		length = sizeof (acpi_integer);
 	}
 
-
 	switch (base) {
 	case 10:
 
 		remainder = 0;
-		for (i = ACPI_MAX_DECIMAL_DIGITS; i > 0 ; i--) {
+		for (i = ACPI_MAX_DECIMAL_DIGITS; i > 0; i--) {
 			/* Divide by nth factor of 10 */
 
 			digit = integer;
-			for (j = 1; j < i; j++) {
+			for (j = 0; j < i; j++) {
 				(void) acpi_ut_short_divide (&digit, 10, &digit, &remainder);
 			}
 
 			/* Create the decimal digit */
 
-			if (digit != 0) {
+			if (remainder != 0) {
 				leading_zero = FALSE;
 			}
 
@@ -353,6 +355,7 @@ acpi_ex_convert_to_ascii (
 			}
 		}
 		break;
+
 
 	case 16:
 
@@ -372,13 +375,14 @@ acpi_ex_convert_to_ascii (
 		}
 		break;
 
+
 	default:
 		break;
 	}
 
 	/*
 	 * Since leading zeros are supressed, we must check for the case where
-	 * the integer equals 0.
+	 * the integer equals 0
 	 *
 	 * Finally, null terminate the string and return the length
 	 */
@@ -396,8 +400,11 @@ acpi_ex_convert_to_ascii (
  *
  * FUNCTION:    acpi_ex_convert_to_string
  *
- * PARAMETERS:  *obj_desc       - Object to be converted.  Must be an
- *                                Integer, Buffer, or String
+ * PARAMETERS:  obj_desc        - Object to be converted.  Must be an
+ *                                  Integer, Buffer, or String
+ *              result_desc     - Where the string object is returned
+ *              Base            - 10 or 16
+ *              max_length      - Max length of the returned string
  *              walk_state      - Current method state
  *
  * RETURN:      Status
@@ -415,10 +422,10 @@ acpi_ex_convert_to_string (
 	struct acpi_walk_state          *walk_state)
 {
 	union acpi_operand_object       *ret_desc;
-	u32                             i;
-	u32                             string_length;
 	u8                              *new_buf;
 	u8                              *pointer;
+	u32                             string_length;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_convert_to_string", obj_desc);
@@ -539,7 +546,6 @@ acpi_ex_convert_to_string (
 		return_ACPI_STATUS (AE_TYPE);
 	}
 
-
 	/*
 	 * If we are about to overwrite the original object on the operand stack,
 	 * we must remove a reference on the original object because we are
@@ -562,6 +568,7 @@ acpi_ex_convert_to_string (
  *
  * PARAMETERS:  destination_type    - Current type of the destination
  *              source_desc         - Source object to be converted.
+ *              result_desc         - Where the converted object is returned
  *              walk_state          - Current method state
  *
  * RETURN:      Status
@@ -653,6 +660,8 @@ acpi_ex_convert_to_target_type (
 
 
 		default:
+			ACPI_REPORT_ERROR (("Bad destination type during conversion: %X\n",
+				destination_type));
 			status = AE_AML_INTERNAL;
 			break;
 		}
@@ -672,6 +681,8 @@ acpi_ex_convert_to_target_type (
 			GET_CURRENT_ARG_TYPE (walk_state->op_info->runtime_args),
 			walk_state->op_info->name, acpi_ut_get_type_name (destination_type)));
 
+		ACPI_REPORT_ERROR (("Bad Target Type (ARGI): %X\n",
+			GET_CURRENT_ARG_TYPE (walk_state->op_info->runtime_args)))
 		status = AE_AML_INTERNAL;
 	}
 
