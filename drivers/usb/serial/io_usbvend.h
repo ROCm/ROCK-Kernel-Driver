@@ -106,11 +106,23 @@
 #define ION_DEVICE_ID_BB_EDGEPORT_4_DIN		0x011	// Edgeport/4 RS232 with Apple DIN connector
 #define ION_DEVICE_ID_BB_EDGEPORT_16_DUAL_CPU	0x012	// Half of an Edgeport/16 (the kind with 2 EP/8s)
 #define ION_DEVICE_ID_BB_EDGEPORT_8I		0x014	// Edgeport/8 RS422 (single-CPU)
-// These IDs are used by the Edgeport.exe program for uninstalling.
-// 
-#define EDGEPORT_DEVICE_IDS	{0x001, 0x003, 0x004, 0x005, 0x006, 0x007, 0x00B, \
-				 0x00C, 0x00D, 0x00E, 0x00F, 0x010, 0x011, 0x012, \
-				 0x013, 0x014 }
+
+
+/* Edgeport TI based devices */
+#define ION_DEVICE_ID_TI_EDGEPORT_4		0x0201	/* Edgeport/4 RS232 */
+#define ION_DEVICE_ID_TI_EDGEPORT_2		0x0205	/* Edgeport/2 RS232 */
+#define ION_DEVICE_ID_TI_EDGEPORT_4I		0x0206	/* Edgeport/4i RS422 */
+#define ION_DEVICE_ID_TI_EDGEPORT_2I		0x0207	/* Edgeport/2i RS422/RS485 */
+#define ION_DEVICE_ID_TI_EDGEPORT_421		0x020C	/* Edgeport/421 4 hub 2 RS232 + Parallel (lucent on a different hub port) */
+#define ION_DEVICE_ID_TI_EDGEPORT_21		0x020D	/* Edgeport/21 2 RS232 + Parallel (lucent on a different hub port) */
+#define ION_DEVICE_ID_TI_EDGEPORT_1		0x0215	/* Edgeport/1 RS232 */
+#define ION_DEVICE_ID_TI_EDGEPORT_42		0x0217	/* Edgeport/42 4 hub 2 RS232 */
+#define ION_DEVICE_ID_TI_EDGEPORT_22		0x021A	/* Edgeport/22  Edgeport/22I is an Edgeport/4 with ports 1&2 RS422 and ports 3&4 RS232 */
+
+#define ION_DEVICE_ID_TI_EDGEPORT_421_BOOT	0x0240	/* Edgeport/421 in boot mode */
+#define ION_DEVICE_ID_TI_EDGEPORT_421_DOWN	0x0241	/* Edgeport/421 in download mode first interface is 2 RS232 (Note that the second interface of this multi interface device should be a standard USB class 7 printer port) */
+#define ION_DEVICE_ID_TI_EDGEPORT_21_BOOT	0x0242	/* Edgeport/21 in boot mode */
+#define ION_DEVICE_ID_TI_EDGEPORT_21_DOWN	0x0243	/*Edgeport/42 in download mode: first interface is 2 RS232 (Note that the second interface of this multi interface device should be a standard USB class 7 printer port) */
 
 
 #define	MAKE_USB_PRODUCT_ID( OemId, DeviceId )					\
@@ -217,7 +229,7 @@
 //		descriptor format, so that they may be separately retrieved,
 //		if necessary, with a minimum of work on the 930. This also
 //		requires them to be in UNICODE format, which, for English at
-//		least, simply means extending each UCHAR into a USHORT.
+//		least, simply means extending each __u8 into a __u16.
 //	3.	For all fields, 00 means 'uninitialized'.
 //	4.	All unused areas should be set to 00 for future expansion.
 //
@@ -384,5 +396,92 @@ struct edge_boot_descriptor {
 
 #define	BOOT_CAP_RESET_CMD	0x0001	// If set, boot correctly supports ION_RESET_DEVICE
 
-#endif	// if !defined()
 
+
+/************************************************************************
+                 T I   U M P   D E F I N I T I O N S
+ ***********************************************************************/
+
+//************************************************************************
+//	TI I2C Format Definitions
+//************************************************************************
+#define I2C_DESC_TYPE_INFO_BASIC	1
+#define I2C_DESC_TYPE_FIRMWARE_BASIC	2
+#define I2C_DESC_TYPE_DEVICE		3
+#define I2C_DESC_TYPE_CONFIG		4
+#define I2C_DESC_TYPE_STRING		5
+#define I2C_DESC_TYPE_FIRMWARE_BLANK 	0xf2
+
+#define I2C_DESC_TYPE_MAX		5
+// 3410 may define types 6, 7 for other firmware downloads
+
+// Special section defined by ION
+#define I2C_DESC_TYPE_ION		0	// Not defined by TI
+
+
+struct ti_i2c_desc
+{
+	__u8	Type;			// Type of descriptor
+	__u16	Size;			// Size of data only not including header
+	__u8	CheckSum;		// Checksum (8 bit sum of data only)
+	__u8	Data[0];		// Data starts here
+}__attribute__((packed));
+
+struct ti_i2c_firmware_rec 
+{
+	__u8	Ver_Major;		// Firmware Major version number
+	__u8	Ver_Minor;		// Firmware Minor version number
+	__u8	Data[0];		// Download starts here
+}__attribute__((packed));
+
+
+// Structure of header of download image in fw_down.h
+struct ti_i2c_image_header
+{
+	__u16	Length;
+	__u8	CheckSum;
+}__attribute__((packed));
+
+struct ti_basic_descriptor
+{
+	__u8	Power;		// Self powered
+				// bit 7: 1 - power switching supported
+				//        0 - power switching not supported
+				//
+				// bit 0: 1 - self powered
+				//        0 - bus powered
+				//
+				//
+	__u16	HubVid;		// VID HUB
+	__u16	HubPid;		// PID HUB
+	__u16	DevPid;		// PID Edgeport
+	__u8	HubTime;	// Time for power on to power good
+	__u8	HubCurrent;	// HUB Current = 100ma
+} __attribute__((packed));
+
+
+#define TI_GET_CPU_REVISION(x)		(__u8)((((x)>>4)&0x0f))
+#define TI_GET_BOARD_REVISION(x)	(__u8)(((x)&0x0f))
+
+#define TI_I2C_SIZE_MASK		0x1f  // 5 bits
+#define TI_GET_I2C_SIZE(x)		((((x) & TI_I2C_SIZE_MASK)+1)*256)
+
+#define TI_MAX_I2C_SIZE			( 16 * 1024 )
+
+/* TI USB 5052 definitions */
+struct edge_ti_manuf_descriptor
+{
+	__u8 IonConfig;		//  Config byte for ION manufacturing use
+	__u8 IonConfig2;	//  Expansion
+	__u8 Version;		//  Verqsion
+	__u8 CpuRev_BoardRev;	//  CPU revision level (0xF0) and Board Rev Level (0x0F)
+	__u8 NumPorts;		//  Number of ports	for this UMP
+	__u8 NumVirtualPorts;	//  Number of Virtual ports
+	__u8 HubConfig1;	//  Used to configure the Hub
+	__u8 HubConfig2;	//  Used to configure the Hub
+	__u8 TotalPorts;	//  Total Number of Com Ports for the entire device (All UMPs)
+	__u8 Reserved;
+}__attribute__((packed));
+
+
+#endif		// if !defined()

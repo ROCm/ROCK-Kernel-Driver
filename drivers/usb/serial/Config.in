@@ -19,6 +19,7 @@ dep_tristate '  USB Handspring Visor / Palm m50x / Sony Clie Driver' CONFIG_USB_
 dep_tristate '  USB Compaq iPAQ / HP Jornada / Casio EM500 Driver' CONFIG_USB_SERIAL_IPAQ $CONFIG_USB_SERIAL
 dep_tristate '  USB IR Dongle Serial Driver (EXPERIMENTAL)' CONFIG_USB_SERIAL_IR $CONFIG_USB_SERIAL $CONFIG_EXPERIMENTAL
 dep_tristate '  USB Inside Out Edgeport Serial Driver' CONFIG_USB_SERIAL_EDGEPORT $CONFIG_USB_SERIAL
+dep_tristate '  USB Inside Out Edgeport Serial Driver (TI devices)' CONFIG_USB_SERIAL_EDGEPORT_TI $CONFIG_USB_SERIAL
 dep_tristate '  USB Keyspan PDA Single Port Serial Driver' CONFIG_USB_SERIAL_KEYSPAN_PDA $CONFIG_USB_SERIAL
 dep_tristate '  USB Keyspan USA-xxx Serial Driver' CONFIG_USB_SERIAL_KEYSPAN $CONFIG_USB_SERIAL
    dep_mbool '    USB Keyspan USA-28 Firmware' CONFIG_USB_SERIAL_KEYSPAN_USA28 $CONFIG_USB_SERIAL_KEYSPAN
