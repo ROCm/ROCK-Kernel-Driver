@@ -2169,7 +2169,7 @@ static void l3dss1_redir_req_early(struct l3_process *pc, u8 pr, void *arg)
 
 /***********************************************/
 /* handle special commands for this protocol.  */
-/* Examples are call independant services like */
+/* Examples are call independent services like */
 /* remote operations with dummy  callref.      */
 /***********************************************/
 static int l3dss1_cmd_global(struct PStack *st, isdn_ctrl *ic)

@@ -1,7 +1,7 @@
 /*
  * linux/arch/ia64/kernel/time.c
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	Stephane Eranian <eranian@hpl.hp.com>
  *	David Mosberger <davidm@hpl.hp.com>
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
@@ -24,7 +24,6 @@
 #include <asm/sal.h>
 #include <asm/system.h>
 
-extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
 extern unsigned long last_time_offset;
 
@@ -76,10 +75,8 @@ gettimeoffset (void)
 
 	now = ia64_get_itc();
 	if ((long) (now - last_tick) < 0) {
-# if 1
-		printk("CPU %d: now < last_tick (now=0x%lx,last_tick=0x%lx)!\n",
+		printk(KERN_ERR "CPU %d: now < last_tick (now=0x%lx,last_tick=0x%lx)!\n",
 		       smp_processor_id(), now, last_tick);
-# endif
 		return last_time_offset;
 	}
 	elapsed_cycles = now - last_tick;
@@ -89,7 +86,7 @@ gettimeoffset (void)
 void
 do_settimeofday (struct timeval *tv)
 {
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	{
 		/*
 		 * This is revolting. We need to set "xtime" correctly. However, the value
@@ -112,21 +109,21 @@ do_settimeofday (struct timeval *tv)
 		time_maxerror = NTP_PHASE_LIMIT;
 		time_esterror = NTP_PHASE_LIMIT;
 	}
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 void
 do_gettimeofday (struct timeval *tv)
 {
-	unsigned long flags, usec, sec, old;
+	unsigned long seq, usec, sec, old;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	{
+	do {
+		seq = read_seqbegin(&xtime_lock);
 		usec = gettimeoffset();
 
 		/*
-		 * Ensure time never goes backwards, even when ITC on different CPUs are
-		 * not perfectly synchronized.
+		 * Ensure time never goes backwards, even when ITC on 
+		 * different CPUs are not perfectly synchronized.
 		 */
 		do {
 			old = last_time_offset;
@@ -138,8 +135,8 @@ do_gettimeofday (struct timeval *tv)
 
 		sec = xtime.tv_sec;
 		usec += xtime.tv_nsec / 1000;
-	}
-	read_unlock_irqrestore(&xtime_lock, flags);
+	} while (read_seqend(&xtime_lock, seq));
+
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
@@ -158,7 +155,7 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	new_itm = local_cpu_data->itm_next;
 
 	if (!time_after(ia64_get_itc(), new_itm))
-		printk("Oops: timer tick before it's due (itc=%lx,itm=%lx)\n",
+		printk(KERN_ERR "Oops: timer tick before it's due (itc=%lx,itm=%lx)\n",
 		       ia64_get_itc(), new_itm);
 
 	while (1) {
@@ -182,10 +179,10 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			 * another CPU. We need to avoid to SMP race by acquiring the
 			 * xtime_lock.
 			 */
-			write_lock(&xtime_lock);
+			write_seqlock(&xtime_lock);
 			do_timer(regs);
 			local_cpu_data->itm_next = new_itm;
-			write_unlock(&xtime_lock);
+			write_sequnlock(&xtime_lock);
 		} else
 			local_cpu_data->itm_next = new_itm;
 
@@ -247,21 +244,22 @@ ia64_init_itm (void)
 	 */
 	status = ia64_sal_freq_base(SAL_FREQ_BASE_PLATFORM, &platform_base_freq, &drift);
 	if (status != 0) {
-		printk("SAL_FREQ_BASE_PLATFORM failed: %s\n", ia64_sal_strerror(status));
+		printk(KERN_ERR "SAL_FREQ_BASE_PLATFORM failed: %s\n", ia64_sal_strerror(status));
 	} else {
 		status = ia64_pal_freq_ratios(&proc_ratio, 0, &itc_ratio);
 		if (status != 0)
-			printk("PAL_FREQ_RATIOS failed with status=%ld\n", status);
+			printk(KERN_ERR "PAL_FREQ_RATIOS failed with status=%ld\n", status);
 	}
 	if (status != 0) {
 		/* invent "random" values */
-		printk("SAL/PAL failed to obtain frequency info---inventing reasonably values\n");
+		printk(KERN_ERR
+		       "SAL/PAL failed to obtain frequency info---inventing reasonably values\n");
 		platform_base_freq = 100000000;
 		itc_ratio.num = 3;
 		itc_ratio.den = 1;
 	}
 	if (platform_base_freq < 40000000) {
-		printk("Platform base frequency %lu bogus---resetting to 75MHz!\n",
+		printk(KERN_ERR "Platform base frequency %lu bogus---resetting to 75MHz!\n",
 		       platform_base_freq);
 		platform_base_freq = 75000000;
 	}
@@ -272,8 +270,8 @@ ia64_init_itm (void)
 
 	itc_freq = (platform_base_freq*itc_ratio.num)/itc_ratio.den;
 	local_cpu_data->itm_delta = (itc_freq + HZ/2) / HZ;
-	printk("CPU %d: base freq=%lu.%03luMHz, ITC ratio=%lu/%lu, ITC freq=%lu.%03luMHz\n",
-	       smp_processor_id(),
+	printk(KERN_INFO "CPU %d: base freq=%lu.%03luMHz, ITC ratio=%lu/%lu, "
+	       "ITC freq=%lu.%03luMHz\n", smp_processor_id(),
 	       platform_base_freq / 1000000, (platform_base_freq / 1000) % 1000,
 	       itc_ratio.num, itc_ratio.den, itc_freq / 1000000, (itc_freq / 1000) % 1000);
 

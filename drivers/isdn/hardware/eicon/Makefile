@@ -1,9 +1,5 @@
 # Makefile for the Eicon DIVA ISDN drivers.
 
-# Objects that export symbols.
-
-export-objs     := diva_didd.o
-
 # Multipart objects. 
 
 divas-objs      := divasmain.o divasfunc.o di.o io.o istream.o diva.o dlist.o divasproc.o diva_dma.o

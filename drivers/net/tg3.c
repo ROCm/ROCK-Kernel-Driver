@@ -1,4 +1,4 @@
-/* $Id: tg3.c,v 1.43.2.80 2002/03/14 00:10:04 davem Exp $
+/*
  * tg3.c: Broadcom Tigon3 ethernet driver.
  *
  * Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com)
@@ -54,8 +54,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.2a"
-#define DRV_MODULE_RELDATE	"Dec 9, 2002"
+#define DRV_MODULE_VERSION	"1.4"
+#define DRV_MODULE_RELDATE	"Feb 1, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -141,6 +141,12 @@ static struct pci_device_id tg3_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5703X,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5704S,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5702A3,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5703A3,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_SYSKONNECT, 0x4400,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC1000,
@@ -163,6 +169,8 @@ static void tg3_write_indirect_reg32(struct tg3 *tp, u32 off, u32 val)
 		spin_unlock_irqrestore(&tp->indirect_lock, flags);
 	} else {
 		writel(val, tp->regs + off);
+		if ((tp->tg3_flags & TG3_FLAG_5701_REG_WRITE_BUG) != 0)
+			readl(tp->regs + off);
 	}
 }
 
@@ -213,28 +221,11 @@ static void tg3_enable_ints(struct tg3 *tp)
 	tw32(TG3PCI_MISC_HOST_CTRL,
 	     (tp->misc_host_ctrl & ~MISC_HOST_CTRL_MASK_PCI_INT));
 	tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW, 0x00000000);
-
-	if (tp->hw_status->status & SD_STATUS_UPDATED) {
-		tw32(GRC_LOCAL_CTRL,
-		     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
-	}
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
-}
 
-static inline void tg3_mask_ints(struct tg3 *tp)
-{
-	tw32(TG3PCI_MISC_HOST_CTRL,
-	     (tp->misc_host_ctrl | MISC_HOST_CTRL_MASK_PCI_INT));
-}
-
-static inline void tg3_unmask_ints(struct tg3 *tp)
-{
-	tw32(TG3PCI_MISC_HOST_CTRL,
-	     (tp->misc_host_ctrl & ~MISC_HOST_CTRL_MASK_PCI_INT));
-	if (tp->hw_status->status & SD_STATUS_UPDATED) {
+	if (tp->hw_status->status & SD_STATUS_UPDATED)
 		tw32(GRC_LOCAL_CTRL,
 		     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
-	}
 }
 
 static void tg3_switch_clocks(struct tg3 *tp)
@@ -899,6 +890,20 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 	udelay(40);
 
 	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x02);
+
+	/* Some third-party PHYs need to be reset on link going
+	 * down.
+	 *
+	 * XXX 5705 note: This workaround also applies to 5705_a0
+	 */
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) &&
+	    netif_carrier_ok(tp->dev)) {
+		tg3_readphy(tp, MII_BMSR, &bmsr);
+		tg3_readphy(tp, MII_BMSR, &bmsr);
+		if (!(bmsr & BMSR_LSTATUS))
+			tg3_phy_reset(tp, 1);
+	}
 
 	if ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401) {
 		tg3_readphy(tp, MII_BMSR, &bmsr);
@@ -1867,7 +1872,7 @@ static int tg3_vlan_rx(struct tg3 *tp, struct sk_buff *skb, u16 vlan_tag)
  * Each TG3_BDINFO specifies a MAXLEN field and the first TG3_BDINFO
  * which is within the range of the new packet's length is chosen.
  *
- * The "seperate ring for rx status" scheme may sound queer, but it makes
+ * The "separate ring for rx status" scheme may sound queer, but it makes
  * sense from a cache coherency perspective.  If only the host writes
  * to the buffer post rings, and only the chip writes to the rx status
  * rings, then cache lines never move beyond shared-modified state.
@@ -1958,13 +1963,12 @@ static int tg3_rx(struct tg3 *tp, int budget)
 		}
 
 		if ((tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) &&
-		    (desc->type_flags & RXD_FLAG_TCPUDP_CSUM)) {
-			skb->csum = htons((desc->ip_tcp_csum & RXD_TCPCSUM_MASK)
-					  >> RXD_TCPCSUM_SHIFT);
-			skb->ip_summed = CHECKSUM_HW;
-		} else {
+		    (desc->type_flags & RXD_FLAG_TCPUDP_CSUM) &&
+		    (((desc->ip_tcp_csum & RXD_TCPCSUM_MASK)
+		      >> RXD_TCPCSUM_SHIFT) == 0xffff))
+			skb->ip_summed = CHECKSUM_UNNECESSARY;
+		else
 			skb->ip_summed = CHECKSUM_NONE;
-		}
 
 		skb->protocol = eth_type_trans(skb, tp->dev);
 #if TG3_VLAN_TAG_USED
@@ -2017,10 +2021,12 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 {
 	struct tg3 *tp = netdev->priv;
 	struct tg3_hw_status *sblk = tp->hw_status;
+	unsigned long flags;
 	int done;
 
-	spin_lock_irq(&tp->lock);
+	spin_lock_irqsave(&tp->lock, flags);
 
+	/* handle link change and other phy events */
 	if (!(tp->tg3_flags &
 	      (TG3_FLAG_USE_LINKCHG_REG |
 	       TG3_FLAG_POLL_SERDES))) {
@@ -2031,12 +2037,14 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 		}
 	}
 
+	/* run TX completion thread */
 	if (sblk->idx[0].tx_consumer != tp->tx_cons) {
 		spin_lock(&tp->tx_lock);
 		tg3_tx(tp);
 		spin_unlock(&tp->tx_lock);
 	}
 
+	/* run RX thread, within the bounds set by NAPI */
 	done = 1;
 	if (sblk->idx[0].rx_producer != tp->rx_rcb_ptr) {
 		int orig_budget = *budget;
@@ -2054,44 +2062,35 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 			done = 0;
 	}
 
+	/* if no more work, tell net stack and NIC we're done */
 	if (done) {
 		netif_rx_complete(netdev);
-		tg3_unmask_ints(tp);
+		tg3_enable_ints(tp);
 	}
 
-	spin_unlock_irq(&tp->lock);
+	spin_unlock_irqrestore(&tp->lock, flags);
 
 	return (done ? 0 : 1);
 }
 
-static __inline__ void tg3_interrupt_main_work(struct net_device *dev, struct tg3 *tp)
+static inline unsigned int tg3_has_work(struct net_device *dev, struct tg3 *tp)
 {
 	struct tg3_hw_status *sblk = tp->hw_status;
-	int work_exists = 0;
+	unsigned int work_exists = 0;
 
+	/* check for phy events */
 	if (!(tp->tg3_flags &
 	      (TG3_FLAG_USE_LINKCHG_REG |
 	       TG3_FLAG_POLL_SERDES))) {
 		if (sblk->status & SD_STATUS_LINK_CHG)
 			work_exists = 1;
 	}
+	/* check for RX/TX work to do */
 	if (sblk->idx[0].tx_consumer != tp->tx_cons ||
 	    sblk->idx[0].rx_producer != tp->rx_rcb_ptr)
 		work_exists = 1;
 
-	if (!work_exists)
-		return;
-
-	if (netif_rx_schedule_prep(dev)) {
-		/* NOTE: These writes are posted by the readback of
-		 *       the mailbox register done by our caller.
-		 */
-		tg3_mask_ints(tp);
-		__netif_rx_schedule(dev);
-	} else {
-		printk(KERN_ERR PFX "%s: Error, poll already scheduled\n",
-		       dev->name);
-	}
+	return work_exists;
 }
 
 static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -2104,15 +2103,32 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock_irqsave(&tp->lock, flags);
 
 	if (sblk->status & SD_STATUS_UPDATED) {
+		/*
+		 * writing any value to intr-mbox-0 clears PCI INTA# and
+		 * chip-internal interrupt pending events.
+		 * writing non-zero to intr-mbox-0 additional tells the
+		 * NIC to stop sending us irqs, engaging "in-intr-handler"
+		 * event coalescing.
+		 */
 		tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
 			     0x00000001);
+		/*
+		 * Flush PCI write.  This also guarantees that our
+		 * status block has been flushed to host memory.
+		 */
+		tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 		sblk->status &= ~SD_STATUS_UPDATED;
 
-		tg3_interrupt_main_work(dev, tp);
-
-		tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
-			     0x00000000);
-		tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
+		if (likely(tg3_has_work(dev, tp)))
+			netif_rx_schedule(dev);		/* schedule NAPI poll */
+		else {
+			/* no work, shared interrupt perhaps?  re-enable
+			 * interrupts, and flush that PCI write
+			 */
+			tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
+			     	0x00000000);
+			tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
+		}
 	}
 
 	spin_unlock_irqrestore(&tp->lock, flags);
@@ -2212,11 +2228,6 @@ static int tigon3_4gb_hwbug_workaround(struct tg3 *tp, struct sk_buff *skb,
 		dev_kfree_skb(skb);
 		return -1;
 	}
-
-	/* NOTE: Broadcom's driver botches this case up really bad.
-	 *       This is especially true if any of the frag pages
-	 *       are in highmem.  It will instantly oops in that case.
-	 */
 
 	/* New SKB is guarenteed to be linear. */
 	entry = *start;
@@ -2649,6 +2660,17 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
+static inline void tg3_set_mtu(struct net_device *dev, struct tg3 *tp,
+			       int new_mtu)
+{
+	dev->mtu = new_mtu;
+
+	if (new_mtu > ETH_DATA_LEN)
+		tp->tg3_flags |= TG3_FLAG_JUMBO_ENABLE;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_JUMBO_ENABLE;
+}
+
 static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct tg3 *tp = dev->priv;
@@ -2660,7 +2682,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 		/* We'll just catch it later when the
 		 * device is up'd.
 		 */
-		dev->mtu = new_mtu;
+		tg3_set_mtu(dev, tp, new_mtu);
 		return 0;
 	}
 
@@ -2669,12 +2691,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 
 	tg3_halt(tp);
 
-	dev->mtu = new_mtu;
-
-	if (new_mtu > ETH_DATA_LEN)
-		tp->tg3_flags |= TG3_FLAG_JUMBO_ENABLE;
-	else
-		tp->tg3_flags &= ~TG3_FLAG_JUMBO_ENABLE;
+	tg3_set_mtu(dev, tp, new_mtu);
 
 	tg3_init_rings(tp);
 	tg3_init_hw(tp);
@@ -4285,6 +4302,12 @@ static int tg3_reset_hw(struct tg3 *tp)
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5703_A1)
 		tw32(MAC_SERDES_CFG, 0x616000);
 
+	/* Prevent chip from dropping frames when flow control
+	 * is enabled.
+	 */
+	tw32(MAC_LOW_WMARK_MAX_RX_FRAME, 2);
+	tr32(MAC_LOW_WMARK_MAX_RX_FRAME);
+
 	err = tg3_setup_phy(tp);
 	if (err)
 		return err;
@@ -4353,8 +4376,9 @@ out:
 static void tg3_timer(unsigned long __opaque)
 {
 	struct tg3 *tp = (struct tg3 *) __opaque;
+	unsigned long flags;
 
-	spin_lock_irq(&tp->lock);
+	spin_lock_irqsave(&tp->lock, flags);
 	spin_lock(&tp->tx_lock);
 
 	/* All of this garbage is because when using non-tagged
@@ -4436,7 +4460,7 @@ static void tg3_timer(unsigned long __opaque)
 	}
 
 	spin_unlock(&tp->tx_lock);
-	spin_unlock_irq(&tp->lock);
+	spin_unlock_irqrestore(&tp->lock, flags);
 
 	tp->timer.expires = jiffies + tp->timer_offset;
 	add_timer(&tp->timer);
@@ -5793,7 +5817,8 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x2aaa);
 	}
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) &&
+	    (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)) {
 		tg3_writephy(tp, 0x1c, 0x8d68);
 		tg3_writephy(tp, 0x1c, 0x8d68);
 	}
@@ -5999,6 +6024,14 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 			pci_write_config_word(tp->pdev, PCI_COMMAND, pci_cmd);
 		}
 	}
+
+	/* Back to back register writes can cause problems on this chip,
+	 * the workaround is to read back all reg writes except those to
+	 * mailbox regs.  See tg3_write_indirect_reg32().
+	 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701)
+		tp->tg3_flags |= TG3_FLAG_5701_REG_WRITE_BUG;
+
 	if ((pci_state_reg & PCISTATE_BUS_SPEED_HIGH) != 0)
 		tp->tg3_flags |= TG3_FLAG_PCI_HIGH_SPEED;
 	if ((pci_state_reg & PCISTATE_BUS_32BIT) != 0)
@@ -6013,8 +6046,11 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 
 	/* Force the chip into D0. */
 	err = tg3_set_power_state(tp, 0);
-	if (err)
+	if (err) {
+		printk(KERN_ERR PFX "(%s) transition to D0 failed\n",
+		       tp->pdev->slot_name);
 		return err;
+	}
 
 	/* 5700 B0 chips do not support checksumming correctly due
 	 * to hardware bugs.
@@ -6022,18 +6058,14 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5700_B0)
 		tp->tg3_flags |= TG3_FLAG_BROKEN_CHECKSUMS;
 
-	/* Regardless of whether checksums work or not, we configure
-	 * the StrongARM chips to not compute the pseudo header checksums
-	 * in either direction.  Because of the way Linux checksum support
-	 * works we do not need the chips to do this, and taking the load
-	 * off of the TX/RX onboard StrongARM cpus means that they will not be
-	 * the bottleneck.  Whoever wrote Broadcom's driver did not
-	 * understand the situation at all.  He could have bothered
-	 * to read Jes's Acenic driver because the logic (and this part of
-	 * the Tigon2 hardware/firmware) is pretty much identical.
+	/* Pseudo-header checksum is done by hardware logic and not
+	 * the offload processers, so make the chip do the pseudo-
+	 * header checksums on receive.  For transmit it is more
+	 * convenient to do the pseudo-header checksum in software
+	 * as Linux does that on transmit for us in all cases.
 	 */
 	tp->tg3_flags |= TG3_FLAG_NO_TX_PSEUDO_CSUM;
-	tp->tg3_flags |= TG3_FLAG_NO_RX_PSEUDO_CSUM;
+	tp->tg3_flags &= ~TG3_FLAG_NO_RX_PSEUDO_CSUM;
 
 	/* Derive initial jumbo mode from MTU assigned in
 	 * ether_setup() via the alloc_etherdev() call
@@ -6111,19 +6143,8 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	if (tp->tg3_flags & TG3_FLAG_PCIX_TARGET_HWBUG)
 		tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
 
-	/* Quick sanity check.  Make sure we see an expected
-	 * value here.
-	 */
 	grc_misc_cfg = tr32(GRC_MISC_CFG);
 	grc_misc_cfg &= GRC_MISC_CFG_BOARD_ID_MASK;
-	if (grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5700 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5701 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5702FE &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5703S &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_5704 &&
-	    grc_misc_cfg != GRC_MISC_CFG_BOARD_ID_AC91002A1)
-		return -ENODEV;
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 &&
 	    grc_misc_cfg == GRC_MISC_CFG_BOARD_ID_5704CIOBE) {
@@ -6131,14 +6152,16 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->split_mode_max_reqs = SPLIT_MODE_5704_MAX_REQ;
 	}
 
-	/* ROFL, you should see Broadcom's driver code implementing
-	 * this, stuff like "if (a || b)" where a and b are always
-	 * mutually exclusive.  DaveM finds like 6 bugs today, hello!
-	 */
+	/* this one is limited to 10/100 only */
 	if (grc_misc_cfg == GRC_MISC_CFG_BOARD_ID_5702FE)
 		tp->tg3_flags |= TG3_FLAG_10_100_ONLY;
 
 	err = tg3_phy_probe(tp);
+	if (err) {
+		printk(KERN_ERR PFX "(%s) phy probe failed, err %d\n",
+		       tp->pdev->slot_name, err);
+		/* ... but do not return immediately ... */
+	}
 
 	tg3_read_partno(tp);
 
@@ -6192,17 +6215,10 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	/* 5700 chips can get confused if TX buffers straddle the
 	 * 4GB address boundary in some cases.
 	 */
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700) {
-		/* ROFL!  Latest Broadcom driver disables NETIF_F_HIGHDMA
-		 * in this case instead of fixing their workaround code.
-		 *
-		 * Like, hey, there is this skb_copy() thing guys,
-		 * use it.  Oh I can't stop laughing...
-		 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700)
 		tp->dev->hard_start_xmit = tg3_start_xmit_4gbug;
-	} else {
+	else
 		tp->dev->hard_start_xmit = tg3_start_xmit;
-	}
 
 	tp->rx_offset = 2;
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 &&
@@ -6368,6 +6384,7 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 			(0x7 << DMA_RWCTRL_WRITE_WATER_SHIFT) |
 			(0x7 << DMA_RWCTRL_READ_WATER_SHIFT) |
 			(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
+		/* XXX 5705 note: set MIN_DMA to zero here */
 	} else {
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
 			tp->dma_rwctrl =
@@ -6385,12 +6402,19 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 				(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
 
 		/* Wheee, some more chip bugs... */
-		if (tp->pci_chip_rev_id == CHIPREV_ID_5703_A1 ||
-		    tp->pci_chip_rev_id == CHIPREV_ID_5703_A2 ||
-		    tp->pci_chip_rev_id == CHIPREV_ID_5703_A3 ||
-		    tp->pci_chip_rev_id == CHIPREV_ID_5704_A0)
-			tp->dma_rwctrl |= DMA_RWCTRL_ONE_DMA;
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+			u32 ccval = (tr32(TG3PCI_CLOCK_CTRL) & 0x1f);
+
+			if (ccval == 0x6 || ccval == 0x7)
+				tp->dma_rwctrl |= DMA_RWCTRL_ONE_DMA;
+		}
 	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
+		tp->dma_rwctrl &= ~(DMA_RWCTRL_MIN_DMA
+				    << DMA_RWCTRL_MIN_DMA_SHIFT);
 
 	/* We don't do this on x86 because it seems to hurt performace.
 	 * It does help things on other platforms though.

@@ -72,7 +72,8 @@
 
 #define PG_direct		16	/* ->pte_chain points directly at pte */
 #define PG_mappedtodisk		17	/* Has blocks allocated on-disk */
-#define PG_reclaim		18	/* To be recalimed asap */
+#define PG_reclaim		18	/* To be reclaimed asap */
+#define PG_compound		19	/* Part of a compound page */
 
 /*
  * Global page accounting.  One instance per CPU.  Only unsigned longs are
@@ -97,15 +98,20 @@ struct page_state {
 	unsigned long pswpin;		/* swap reads */
 	unsigned long pswpout;		/* swap writes */
 	unsigned long pgalloc;		/* page allocations */
+
 	unsigned long pgfree;		/* page freeings */
 	unsigned long pgactivate;	/* pages moved inactive->active */
 	unsigned long pgdeactivate;	/* pages moved active->inactive */
 	unsigned long pgfault;		/* faults (major+minor) */
 	unsigned long pgmajfault;	/* faults (major only) */
+
 	unsigned long pgscan;		/* pages scanned by page reclaim */
 	unsigned long pgrefill;		/* inspected in refill_inactive_zone */
 	unsigned long pgsteal;		/* total pages reclaimed */
+	unsigned long pginodesteal;	/* pages reclaimed via inode freeing */
 	unsigned long kswapd_steal;	/* pages reclaimed by kswapd */
+
+	unsigned long kswapd_inodesteal;/* reclaimed via kswapd inode freeing */
 	unsigned long pageoutrun;	/* kswapd's calls to page reclaim */
 	unsigned long allocstall;	/* direct reclaim calls */
 	unsigned long pgrotated;	/* pages rotated to tail of the LRU */
@@ -245,6 +251,10 @@ extern void get_full_page_state(struct page_state *ret);
 #define SetPageReclaim(page)	set_bit(PG_reclaim, &(page)->flags)
 #define ClearPageReclaim(page)	clear_bit(PG_reclaim, &(page)->flags)
 #define TestClearPageReclaim(page) test_and_clear_bit(PG_reclaim, &(page)->flags)
+
+#define PageCompound(page)	test_bit(PG_compound, &(page)->flags)
+#define SetPageCompound(page)	set_bit(PG_compound, &(page)->flags)
+#define ClearPageCompound(page)	clear_bit(PG_compound, &(page)->flags)
 
 /*
  * The PageSwapCache predicate doesn't use a PG_flag at this time,

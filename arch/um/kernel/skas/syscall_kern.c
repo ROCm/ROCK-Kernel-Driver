@@ -21,7 +21,7 @@ long execute_syscall_skas(void *r)
 
 	current->thread.nsyscalls++;
 	nsyscalls++;
-	syscall = regs->regs.syscall;
+	syscall = UPT_SYSCALL_NR(&regs->regs);
 
 	if((syscall >= NR_syscalls) || (syscall < 0))
 		res = -ENOSYS;

@@ -897,7 +897,7 @@ static __inline__ void run_main(void)
 static int AM53C974_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 {
 	unsigned long flags;
-	struct Scsi_Host *instance = cmd->host;
+	struct Scsi_Host *instance = cmd->device->host;
 	struct AM53C974_hostdata *hostdata = (struct AM53C974_hostdata *) instance->hostdata;
 	Scsi_Cmnd *tmp;
 
@@ -906,7 +906,7 @@ static int AM53C974_queue_command(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	DEB_QUEUE(printk(SEPARATOR_LINE));
 	DEB_QUEUE(printk("scsi%d: AM53C974_queue_command called\n", instance->host_no));
 	DEB_QUEUE(printk("cmd=%02x target=%02x lun=%02x bufflen=%d use_sg = %02x\n",
-			 cmd->cmnd[0], cmd->target, cmd->lun, cmd->request_bufflen, cmd->use_sg));
+			 cmd->cmnd[0], cmd->target, cmd->device->lun, cmd->request_bufflen, cmd->use_sg));
 
 /* We use the host_scribble field as a pointer to the next command in a queue */
 	cmd->host_scribble = NULL;
@@ -978,7 +978,7 @@ static void AM53C974_main(void)
 				for (tmp = (Scsi_Cmnd *) hostdata->issue_queue, prev = NULL; tmp;
 				     prev = tmp, tmp = (Scsi_Cmnd *) tmp->host_scribble) {
 					/*  When we find one, remove it from the issue queue. */
-					if (!(hostdata->busy[tmp->target] & (1 << tmp->lun))) {
+					if (!(hostdata->busy[tmp->device->id] & (1 << tmp->device->lun))) {
 						if (prev) {
 							REMOVE(prev, (Scsi_Cmnd *) (prev->host_scribble), tmp,
 							       (Scsi_Cmnd *) (tmp->host_scribble));
@@ -1127,7 +1127,7 @@ static void AM53C974_intr(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 		printk("scsi%d : PARITY error\n", instance->host_no);
 		if (hostdata->connected)
-			hostdata->sync_off[hostdata->connected->target] = 0;	/* setup asynchronous transfer */
+			hostdata->sync_off[hostdata->connected->device->id] = 0;	/* setup asynchronous transfer */
 		hostdata->aborted = 1;
 	}
 	if (statreg & STATREG_IOE) {
@@ -1209,7 +1209,7 @@ static void AM53C974_intr(int irq, void *dev_id, struct pt_regs *regs)
 			  (hostdata->sel_cmd->cmnd[0] == REQUEST_SENSE) ?
 					TAG_NONE : TAG_NEXT);
 			hostdata->selecting = 0;
-			AM53C974_set_sync(instance, hostdata->sel_cmd->target);
+			AM53C974_set_sync(instance, hostdata->sel_cmd->device->id);
 			restore_flags(flags);
 			return;
 		}
@@ -1243,7 +1243,7 @@ static void AM53C974_intr(int irq, void *dev_id, struct pt_regs *regs)
 #ifdef SCSI2
 				if (!hostdata->connected->device->tagged_queue)
 #endif
-					hostdata->busy[hostdata->connected->target] |= (1 << hostdata->connected->lun);
+					hostdata->busy[hostdata->connected->device->id] |= (1 << hostdata->connected->device->lun);
 				/* very strange -- use_sg is sometimes nonzero for request sense commands !! */
 				if ((hostdata->connected->cmnd[0] == REQUEST_SENSE) && hostdata->connected->use_sg) {
 					DEB(printk("scsi%d: REQUEST_SENSE command with nonzero use_sg\n", instance->host_no));
@@ -1318,9 +1318,9 @@ static void AM53C974_intr_disconnect(struct Scsi_Host *instance)
 	if (hostdata->disconnecting) {
 		/* target sent disconnect message, so we are prepared */
 		cmd = (Scsi_Cmnd *) hostdata->connected;
-		AM53C974_set_async(instance, cmd->target);
+		AM53C974_set_async(instance, cmd->device->id);
 		DEB_INTR(printk("scsi%d : disc. from cmnd %d for ta %d, lun %d\n",
-		instance->host_no, cmd->cmnd[0], cmd->target, cmd->lun));
+		instance->host_no, cmd->cmnd[0], cmd->target, cmd->device->lun));
 		if (cmd->device->disconnect) {
 			/* target wants to reselect later */
 			DEB_INTR(printk("ok, re-enabling selection\n"));
@@ -1329,7 +1329,7 @@ static void AM53C974_intr_disconnect(struct Scsi_Host *instance)
 			hostdata->disconnected_queue = cmd;
 			DEB_QUEUE(printk("scsi%d : command for target %d lun %d this %d was moved from connected to"
 					 "  the disconnected_queue\n", instance->host_no, cmd->target,
-					 cmd->lun, hostdata->disconnected_queue->SCp.this_residual));
+					 cmd->device->lun, hostdata->disconnected_queue->SCp.this_residual));
 			DEB_QUEUE(AM53C974_print_queues(instance));
 			goto EXIT_UNFINISHED;
 		} else {
@@ -1355,9 +1355,9 @@ static void AM53C974_intr_disconnect(struct Scsi_Host *instance)
 #ifdef AM53C974_DEBUG
 		deb_stop = 1;
 #endif
-		AM53C974_set_async(instance, cmd->target);
+		AM53C974_set_async(instance, cmd->device->id);
 		printk("scsi%d: Unexpected disconnect; phase: %d; target: %d; this_residual: %d; buffers_residual: %d; message: %d\n",
-		       instance->host_no, cmd->SCp.phase, cmd->target, cmd->SCp.this_residual, cmd->SCp.buffers_residual,
+		       instance->host_no, cmd->SCp.phase, cmd->device->id, cmd->SCp.this_residual, cmd->SCp.buffers_residual,
 		       cmd->SCp.Message);
 		printk("cmdreg: 0x%02x; statreg: 0x%02x; isreg: 0x%02x; cfifo: 0x%02x\n",
 		       AM53C974_read_8(CMDREG), AM53C974_read_8(STATREG), AM53C974_read_8(ISREG),
@@ -1366,7 +1366,7 @@ static void AM53C974_intr_disconnect(struct Scsi_Host *instance)
 		if ((hostdata->last_message[0] == EXTENDED_MESSAGE) &&
 		    (hostdata->last_message[2] == EXTENDED_SDTR)) {
 			/* sync. negotiation was aborted, setup asynchronous transfer with target */
-			hostdata->sync_off[cmd->target] = 0;
+			hostdata->sync_off[cmd->device->id] = 0;
 		}
 		if (hostdata->aborted || hostdata->msgout[0] == ABORT)
 			cmd->result = DID_ABORT << 16;
@@ -1382,14 +1382,14 @@ static void AM53C974_intr_disconnect(struct Scsi_Host *instance)
 	hostdata->selecting = 0;
 	hostdata->disconnecting = 0;
 	hostdata->dma_busy = 0;
-	hostdata->busy[cmd->target] &= ~(1 << cmd->lun);
+	hostdata->busy[cmd->device->id] &= ~(1 << cmd->device->lun);
 	AM53C974_write_8(CMDREG, CMDREG_CFIFO);
 	DEB(printk("disconnect; issue_queue: 0x%lx, disconnected_queue: 0x%lx\n",
 		   (long) hostdata->issue_queue, (long) hostdata->disconnected_queue));
 	cmd->scsi_done(cmd);
 
 	if (!hostdata->selecting) {
-		AM53C974_set_async(instance, cmd->target);
+		AM53C974_set_async(instance, cmd->device->id);
 		AM53C974_write_8(CMDREG, CMDREG_ESR);
 	}			/* allow reselect */
 	return;
@@ -1405,7 +1405,7 @@ static void AM53C974_intr_disconnect(struct Scsi_Host *instance)
 	DEB(printk("disconnect; issue_queue: 0x%lx, disconnected_queue: 0x%lx\n",
 		   (long) hostdata->issue_queue, (long) hostdata->disconnected_queue));
 	if (!hostdata->selecting) {
-		AM53C974_set_async(instance, cmd->target);
+		AM53C974_set_async(instance, cmd->device->id);
 		AM53C974_write_8(CMDREG, CMDREG_ESR);
 	}			/* allow reselect */
 	return;
@@ -1573,7 +1573,7 @@ static void AM53C974_information_transfer(struct Scsi_Host *instance,
 		case PHASE_MSGIN:
 		    DEB_INFO(printk("Message-In phase; cmd=0x%lx, sel_cmd=0x%lx\n",
 		  (long) hostdata->connected, (long) hostdata->sel_cmd));
-		AM53C974_set_async(instance, cmd->target);
+		AM53C974_set_async(instance, cmd->device->id);
 		if (cmd->SCp.phase == PHASE_DATAIN)
 			AM53C974_dma_blast(instance, dmastatus, statreg);
 		if ((cmd->SCp.phase == PHASE_DATAOUT) && (AM53C974_read_8(DMACMD) & DMACMD_START)) {
@@ -1603,13 +1603,13 @@ static void AM53C974_information_transfer(struct Scsi_Host *instance,
 			ret = AM53C974_message(instance, cmd, cmd->SCp.Message);
 		}
 		cmd->SCp.phase = PHASE_MSGIN;
-		AM53C974_set_sync(instance, cmd->target);
+		AM53C974_set_sync(instance, cmd->device->id);
 		break;
 		case PHASE_MSGOUT:
 		    DEB_INFO(printk("Message-Out phase; cfifo=%d; msgout[0]=0x%02x\n",
 				    AM53C974_read_8(CFIREG) & CFIREG_CF, hostdata->msgout[0]));
 		AM53C974_write_8(DMACMD, DMACMD_IDLE);
-		AM53C974_set_async(instance, cmd->target);
+		AM53C974_set_async(instance, cmd->device->id);
 		for (i = 0; i < sizeof(hostdata->last_message); i++)
 			hostdata->last_message[i] = hostdata->msgout[i];
 		if ((hostdata->msgout[0] == 0) || INSIDE(hostdata->msgout[0], 0x02, 0x1F) ||
@@ -1635,24 +1635,24 @@ static void AM53C974_information_transfer(struct Scsi_Host *instance,
 		AM53C974_write_8(CMDREG, CMDREG_IT);
 		cmd->SCp.phase = PHASE_MSGOUT;
 		hostdata->msgout[0] = NOP;
-		AM53C974_set_sync(instance, cmd->target);
+		AM53C974_set_sync(instance, cmd->device->id);
 		break;
 
 		case PHASE_CMDOUT:
 		    DEB_INFO(printk("Command-Out phase\n"));
-		AM53C974_set_async(instance, cmd->target);
+		AM53C974_set_async(instance, cmd->device->id);
 		for (i = 0; i < cmd->cmd_len; i++)
 			AM53C974_write_8(FFREG, cmd->cmnd[i]);
 		AM53C974_write_8(CMDREG, CMDREG_IT);
 		cmd->SCp.phase = PHASE_CMDOUT;
-		AM53C974_set_sync(instance, cmd->target);
+		AM53C974_set_sync(instance, cmd->device->id);
 		break;
 
 		case PHASE_STATIN:
 		    DEB_INFO(printk("Status phase\n"));
 		if (cmd->SCp.phase == PHASE_DATAIN)
 			AM53C974_dma_blast(instance, dmastatus, statreg);
-		AM53C974_set_async(instance, cmd->target);
+		AM53C974_set_async(instance, cmd->device->id);
 		if (cmd->SCp.phase == PHASE_DATAOUT) {
 			unsigned long residual;
 
@@ -1724,12 +1724,12 @@ static int AM53C974_message(struct Scsi_Host *instance, Scsi_Cmnd * cmd,
 		    case LINKED_FLG_CMD_COMPLETE:
 		/* Accept message by releasing ACK */
 		    DEB_LINKED(printk("scsi%d : target %d lun %d linked command complete.\n",
-			      instance->host_no, cmd->target, cmd->lun));
+			      instance->host_no, cmd->device->id, cmd->device->lun));
 		/* Sanity check : A linked command should only terminate with
 		 * one of these messages if there are more linked commands available. */
 		if (!cmd->next_link) {
 			printk("scsi%d : target %d lun %d linked command complete, no next_link\n"
-			       instance->host_no, cmd->target, cmd->lun);
+			       instance->host_no, cmd->device->id, cmd->device->lun);
 			hostdata->aborted = 1;
 			AM53C974_write_8(CMDREG, CMDREG_SATN);
 			AM53C974_write_8(CMDREG, CMDREG_MA);
@@ -1747,7 +1747,7 @@ static int AM53C974_message(struct Scsi_Host *instance, Scsi_Cmnd * cmd,
 		cmd->next_link->tag = cmd->tag;
 		cmd->result = cmd->SCp.Status | (cmd->SCp.Message << 8);
 		DEB_LINKED(printk("scsi%d : target %d lun %d linked request done, calling scsi_done().\n",
-			      instance->host_no, cmd->target, cmd->lun));
+			      instance->host_no, cmd->device->id, cmd->device->lun));
 		cmd->scsi_done(cmd);
 		cmd = hostdata->connected;
 		break;
@@ -1757,7 +1757,7 @@ static int AM53C974_message(struct Scsi_Host *instance, Scsi_Cmnd * cmd,
 		case ABORT:
 		    case COMMAND_COMPLETE:
 		    DEB_MSG(printk("scsi%d: command complete message received; cmd %d for target %d, lun %d\n",
-		instance->host_no, cmd->cmnd[0], cmd->target, cmd->lun));
+		instance->host_no, cmd->cmnd[0], cmd->device->id, cmd->device->lun));
 		hostdata->disconnecting = 1;
 		cmd->device->disconnect = 0;
 
@@ -1807,22 +1807,22 @@ static int AM53C974_message(struct Scsi_Host *instance, Scsi_Cmnd * cmd,
 
 		case MESSAGE_REJECT:
 		    DEB_MSG(printk("scsi%d: reject message received; cmd %d for target %d, lun %d\n",
-		instance->host_no, cmd->cmnd[0], cmd->target, cmd->lun));
+		instance->host_no, cmd->cmnd[0], cmd->device->id, cmd->device->lun));
 		switch (hostdata->last_message[0]) {
 			case EXTENDED_MESSAGE:
 			    if (hostdata->last_message[2] == EXTENDED_SDTR) {
 				/* sync. negotiation was rejected, setup asynchronous transfer with target */
 				printk("\ntarget %d: rate=%d Mhz, asynchronous (sync. negotiation rejected)\n",
-				       cmd->target, DEF_CLK / DEF_STP);
-				hostdata->sync_off[cmd->target] = 0;
-				hostdata->sync_per[cmd->target] = DEF_STP;
+				       cmd->device->id, DEF_CLK / DEF_STP);
+				hostdata->sync_off[cmd->device->id] = 0;
+				hostdata->sync_per[cmd->device->id] = DEF_STP;
 			}
 			break;
 			case HEAD_OF_QUEUE_TAG:
 			    case ORDERED_QUEUE_TAG:
 			    case SIMPLE_QUEUE_TAG:
 			    cmd->device->tagged_queue = 0;
-			hostdata->busy[cmd->target] |= (1 << cmd->lun);
+			hostdata->busy[cmd->device->id] |= (1 << cmd->device->lun);
 			break;
 			default:
 			    break;
@@ -1834,7 +1834,7 @@ static int AM53C974_message(struct Scsi_Host *instance, Scsi_Cmnd * cmd,
 
 		case DISCONNECT:
 		    DEB_MSG(printk("scsi%d: disconnect message received; cmd %d for target %d, lun %d\n",
-		instance->host_no, cmd->cmnd[0], cmd->target, cmd->lun));
+		instance->host_no, cmd->cmnd[0], cmd->device->id, cmd->device->lun));
 		cmd->device->disconnect = 1;
 		hostdata->disconnecting = 1;
 		AM53C974_write_8(CMDREG, CMDREG_MA);	/* Accept message by clearing ACK */
@@ -1843,7 +1843,7 @@ static int AM53C974_message(struct Scsi_Host *instance, Scsi_Cmnd * cmd,
 		case SAVE_POINTERS:
 		    case RESTORE_POINTERS:
 		    DEB_MSG(printk("scsi%d: save/restore pointers message received; cmd %d for target %d, lun %d\n",
-		instance->host_no, cmd->cmnd[0], cmd->target, cmd->lun));
+		instance->host_no, cmd->cmnd[0], cmd->device->id, cmd->device->lun));
 		/* The SCSI data pointer is *IMPLICITLY* saved on a disconnect
 		 * operation, in violation of the SCSI spec so we can safely 
 		 * ignore SAVE/RESTORE pointers calls.
@@ -1862,7 +1862,7 @@ static int AM53C974_message(struct Scsi_Host *instance, Scsi_Cmnd * cmd,
 
 		case EXTENDED_MESSAGE:
 		    DEB_MSG(printk("scsi%d: extended message received; cmd %d for target %d, lun %d\n",
-		instance->host_no, cmd->cmnd[0], cmd->target, cmd->lun));
+		instance->host_no, cmd->cmnd[0], cmd->device->id, cmd->device->lun));
 		/* Extended messages are sent in the following format :
 		 * Byte    
 		 * 0           EXTENDED_MESSAGE == 1
@@ -1907,7 +1907,7 @@ static int AM53C974_message(struct Scsi_Host *instance, Scsi_Cmnd * cmd,
 
 		/* check message */
 		if (extended_msg[2] == EXTENDED_SDTR)
-			ret = AM53C974_sync_neg(instance, cmd->target, extended_msg);
+			ret = AM53C974_sync_neg(instance, cmd->device->id, extended_msg);
 		if (ret || hostdata->aborted)
 			AM53C974_write_8(CMDREG, CMDREG_SATN);
 
@@ -1962,9 +1962,9 @@ static void AM53C974_select(struct Scsi_Host *instance, Scsi_Cmnd * cmd, int tag
 		AM53C974_write_8(CMDREG, CMDREG_CFIFO);		/* clear FIFO */
 	}
 #ifdef AM53C974_PROHIBIT_DISCONNECT
-	tmp[0] = IDENTIFY(0, cmd->lun);
+	tmp[0] = IDENTIFY(0, cmd->device->lun);
 #else
-	tmp[0] = IDENTIFY(1, cmd->lun);
+	tmp[0] = IDENTIFY(1, cmd->device->lun);
 #endif
 
 #ifdef SCSI2
@@ -1995,16 +1995,16 @@ static void AM53C974_select(struct Scsi_Host *instance, Scsi_Cmnd * cmd, int tag
 /* in case of an inquiry or req. sense command with no sync. neg performed yet, we start
    sync negotiation via start stops and transfer the command in cmdout phase */
 	if (((cmd->cmnd[0] == INQUIRY) || (cmd->cmnd[0] == REQUEST_SENSE)) &&
-	    !(hostdata->sync_neg[cmd->target]) && hostdata->sync_en[cmd->target]) {
-		hostdata->sync_neg[cmd->target] = 1;
+	    !(hostdata->sync_neg[cmd->device->id]) && hostdata->sync_en[cmd->device->id]) {
+		hostdata->sync_neg[cmd->device->id] = 1;
 		hostdata->msgout[0] = EXTENDED_MESSAGE;
 		hostdata->msgout[1] = 3;
 		hostdata->msgout[2] = EXTENDED_SDTR;
-		hostdata->msgout[3] = 250 / (int) hostdata->max_rate[cmd->target];
-		hostdata->msgout[4] = hostdata->max_offset[cmd->target];
+		hostdata->msgout[3] = 250 / (int) hostdata->max_rate[cmd->device->id];
+		hostdata->msgout[4] = hostdata->max_offset[cmd->device->id];
 		len += 5;
 	}
-	AM53C974_write_8(SDIDREG, SDIREG_MASK & cmd->target);	/* setup dest. id  */
+	AM53C974_write_8(SDIDREG, SDIREG_MASK & cmd->device->id);	/* setup dest. id  */
 	AM53C974_write_8(STIMREG, DEF_SCSI_TIMEOUT);	/* setup timeout reg */
 	switch (len) {
 	case 1:
@@ -2110,7 +2110,7 @@ static void AM53C974_intr_reselect(struct Scsi_Host *instance, unsigned char sta
  * just reestablished, and remove it from the disconnected queue. */
 	for (tmp = (Scsi_Cmnd *) hostdata->disconnected_queue, prev = NULL;
 	     tmp; prev = tmp, tmp = (Scsi_Cmnd *) tmp->host_scribble)
-		if ((target == tmp->target) && (lun == tmp->lun)
+		if ((target == tmp->device->id) && (lun == tmp->device->lun)
 #ifdef SCSI2
 		    && (tag == tmp->tag)
 #endif
@@ -2279,7 +2279,7 @@ static int AM53C974_abort(Scsi_Cmnd * cmd)
 {
 	AM53C974_local_declare();
 	unsigned long flags;
-	struct Scsi_Host *instance = cmd->host;
+	struct Scsi_Host *instance = cmd->device->host;
 	struct AM53C974_hostdata *hostdata = (struct AM53C974_hostdata *) instance->hostdata;
 	Scsi_Cmnd *tmp, **prev;
 
@@ -2388,7 +2388,7 @@ static int AM53C974_reset(Scsi_Cmnd * cmd, unsigned int reset_flags)
 	AM53C974_local_declare();
 	unsigned long flags;
 	int i;
-	struct Scsi_Host *instance = cmd->host;
+	struct Scsi_Host *instance = cmd->device->host;
 	struct AM53C974_hostdata *hostdata = (struct AM53C974_hostdata *) instance->hostdata;
 	AM53C974_setio(instance);
 

@@ -88,7 +88,7 @@ static int __init rpcmouse_init(void)
 
 	input_register_device(&rpcmouse_dev);
 
-	printk(KERN_INFO "input: Acorn RiscPC mouse irq %d", IRQ_VSYNCPULSE);
+	printk(KERN_INFO "input: Acorn RiscPC mouse\n");
 
 	return 0;
 }

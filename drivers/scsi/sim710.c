@@ -48,7 +48,7 @@
  * addr: parameter is specified first for each controller.  e.g.
  *      sim710="addr:0x9000 irq:15 addr:0x8000 irq:14"
  *
- * To seperate the different options, ' ', '+', and ',' can be used, except
+ * To separate the different options, ' ', '+', and ',' can be used, except
  * that ',' can not be used in module parameters.  ' ' can be a pain, because
  * it needs to be quoted, which causes problems with some installers.
  * The command line above is completely equivalent to
@@ -378,7 +378,7 @@ param_setup(char *str)
 	    return 1;
 	}
 
-	/* Allow ',', ' ', or '+' seperators.  Used to be ',' at boot and
+	/* Allow ',', ' ', or '+' separators.  Used to be ',' at boot and
 	 * ' ' for module load, some installers crap out on the space and
 	 * insmod doesn't like the comma.
 	 */

@@ -313,7 +313,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 }
 
 /*
- * fill in the user structure for a core dump..
+ * Fill in the user structure for an ECOFF core dump.
  */
 void
 dump_thread(struct pt_regs * pt, struct user * dump)
@@ -373,12 +373,81 @@ dump_thread(struct pt_regs * pt, struct user * dump)
 	memcpy((char *)dump->regs + EF_SIZE, sw->fp, 32 * 8);
 }
 
-int
-dump_fpu(struct pt_regs * regs, elf_fpregset_t *r)
+/*
+ * Fill in the user structure for a ELF core dump.
+ */
+void
+dump_elf_thread(elf_greg_t *dest, struct pt_regs *pt, struct thread_info *ti)
 {
 	/* switch stack follows right below pt_regs: */
-	struct switch_stack * sw = ((struct switch_stack *) regs) - 1;
-	memcpy(r, sw->fp, 32 * 8);
+	struct switch_stack * sw = ((struct switch_stack *) pt) - 1;
+
+	dest[ 0] = pt->r0;
+	dest[ 1] = pt->r1;
+	dest[ 2] = pt->r2;
+	dest[ 3] = pt->r3;
+	dest[ 4] = pt->r4;
+	dest[ 5] = pt->r5;
+	dest[ 6] = pt->r6;
+	dest[ 7] = pt->r7;
+	dest[ 8] = pt->r8;
+	dest[ 9] = sw->r9;
+	dest[10] = sw->r10;
+	dest[11] = sw->r11;
+	dest[12] = sw->r12;
+	dest[13] = sw->r13;
+	dest[14] = sw->r14;
+	dest[15] = sw->r15;
+	dest[16] = pt->r16;
+	dest[17] = pt->r17;
+	dest[18] = pt->r18;
+	dest[19] = pt->r19;
+	dest[20] = pt->r20;
+	dest[21] = pt->r21;
+	dest[22] = pt->r22;
+	dest[23] = pt->r23;
+	dest[24] = pt->r24;
+	dest[25] = pt->r25;
+	dest[26] = pt->r26;
+	dest[27] = pt->r27;
+	dest[28] = pt->r28;
+	dest[29] = pt->gp;
+	dest[30] = rdusp();
+	dest[31] = pt->pc;
+
+	/* Once upon a time this was the PS value.  Which is stupid
+	   since that is always 8 for usermode.  Usurped for the more
+	   useful value of the thread's UNIQUE field.  */
+	dest[32] = ti->pcb.unique;
+}
+
+int
+dump_elf_task(elf_greg_t *dest, struct task_struct *task)
+{
+	struct thread_info *ti;
+	struct pt_regs *pt;
+
+	ti = task->thread_info;
+	pt = (struct pt_regs *)((unsigned long)ti + 2*PAGE_SIZE) - 1;
+
+	dump_elf_thread(dest, pt, ti);
+
+	return 1;
+}
+
+int
+dump_elf_task_fp(elf_fpreg_t *dest, struct task_struct *task)
+{
+	struct thread_info *ti;
+	struct pt_regs *pt;
+	struct switch_stack *sw;
+
+	ti = task->thread_info;
+	pt = (struct pt_regs *)((unsigned long)ti + 2*PAGE_SIZE) - 1;
+	sw = (struct switch_stack *)pt - 1;
+
+	memcpy(dest, sw->fp, 32 * 8);
+
 	return 1;
 }
 

@@ -1771,7 +1771,7 @@ static int __init rivafb_probe(struct pci_dev *pd,
 	case NV_ARCH_03:
 		/* Riva128's PRAMIN is in the "framebuffer" space
 		 * Since these cards were never made with more than 8 megabytes
-		 * we can safely allocate this seperately.
+		 * we can safely allocate this separately.
 		 */
 		if (!request_mem_region(rivafb_fix.smem_start + 0x00C00000,
 					 0x00008000, "rivafb")) {

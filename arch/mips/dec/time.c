@@ -15,6 +15,7 @@
 #include <linux/param.h>
 #include <linux/string.h>
 #include <linux/mm.h>
+#include <linux/time.h>
 #include <linux/interrupt.h>
 #include <linux/bcd.h>
 
@@ -35,7 +36,6 @@
 extern void (*board_time_init)(struct irqaction *irq);
 
 extern volatile unsigned long wall_jiffies;
-extern rwlock_t xtime_lock;
 
 /*
  * Change this if you have some constant time drift
@@ -211,19 +211,22 @@ static unsigned long (*do_gettimeoffset) (void) = do_slow_gettimeoffset;
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
+	unsigned long seq;
 
-	read_lock_irqsave(&xtime_lock, flags);
-	*tv = xtime;
-	tv->tv_usec += do_gettimeoffset();
+	do {
+		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+		*tv = xtime;
+		tv->tv_usec += do_gettimeoffset();
 
-	/*
-	 * xtime is atomically updated in timer_bh. jiffies - wall_jiffies
-	 * is nonzero if the timer bottom half hasnt executed yet.
-	 */
-	if (jiffies - wall_jiffies)
-		tv->tv_usec += USECS_PER_JIFFY;
+		/*
+		 * xtime is atomically updated in timer_bh. jiffies - wall_jiffies
+		 * is nonzero if the timer bottom half hasnt executed yet.
+		 */
+		if (jiffies - wall_jiffies)
+			tv->tv_usec += USECS_PER_JIFFY;
 
-	read_unlock_irqrestore(&xtime_lock, flags);
+	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
+
 
 	if (tv->tv_usec >= 1000000) {
 		tv->tv_usec -= 1000000;
@@ -233,7 +236,7 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 
 	/* This is revolting. We need to set the xtime.tv_usec
 	 * correctly. However, the value in this location is
@@ -254,7 +257,7 @@ void do_settimeofday(struct timeval *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 }
 
 /*
@@ -330,6 +333,7 @@ static inline void
 timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	volatile unsigned char dummy;
+	unsigned long seq;
 
 	dummy = CMOS_READ(RTC_REG_C);	/* ACK RTC Interrupt */
 
@@ -357,23 +361,27 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 * CMOS clock accordingly every ~11 minutes. Set_rtc_mmss() has to be
 	 * called as close as possible to 500 ms before the new second starts.
 	 */
-	read_lock(&xtime_lock);
-	if ((time_status & STA_UNSYNC) == 0
-	    && xtime.tv_sec > last_rtc_update + 660
-	    && xtime.tv_usec >= 500000 - tick / 2
-	    && xtime.tv_usec <= 500000 + tick / 2) {
-		if (set_rtc_mmss(xtime.tv_sec) == 0)
-			last_rtc_update = xtime.tv_sec;
-		else
-			/* do it again in 60 s */
-			last_rtc_update = xtime.tv_sec - 600;
-	}
+	do {
+		seq = read_seqbegin(&xtime_lock);
+
+		if ((time_status & STA_UNSYNC) == 0
+		    && xtime.tv_sec > last_rtc_update + 660
+		    && xtime.tv_usec >= 500000 - tick / 2
+		    && xtime.tv_usec <= 500000 + tick / 2) {
+			if (set_rtc_mmss(xtime.tv_sec) == 0)
+				last_rtc_update = xtime.tv_sec;
+			else
+				/* do it again in 60 s */
+				last_rtc_update = xtime.tv_sec - 600;
+		}
+	} while (read_seqretry(&xtime_lock, seq));
+
 	/* As we return to user mode fire off the other CPU schedulers.. this is
 	   basically because we don't yet share IRQ's around. This message is
 	   rigged to be safe on the 386 - basically it's a hack, so don't look
 	   closely for now.. */
 	/*smp_message_pass(MSG_ALL_BUT_SELF, MSG_RESCHEDULE, 0L, 0); */
-	read_unlock(&xtime_lock);
+
 }
 
 static void r4k_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -470,10 +478,10 @@ void __init time_init(void)
 	real_year = CMOS_READ(RTC_DEC_YEAR);
 	year += real_year - 72 + 2000;
 
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
 	xtime.tv_usec = 0;
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 
 	if (mips_cpu.options & MIPS_CPU_COUNTER) {
 		write_32bit_cp0_register(CP0_COUNT, 0);

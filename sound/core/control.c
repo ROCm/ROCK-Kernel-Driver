@@ -48,9 +48,6 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 	snd_ctl_file_t *ctl;
 	int err;
 
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	card = snd_cards[cardnum];
 	if (!card) {
 		err = -ENODEV;
@@ -82,13 +79,10 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 	return 0;
 
       __error:
-      	module_put(card->module);
+	module_put(card->module);
       __error2:
 	snd_card_file_remove(card, file);
       __error1:
-#ifdef LINUX_2_2
-      	MOD_DEC_USE_COUNT;
-#endif
       	return err;
 }
 
@@ -131,9 +125,6 @@ static int snd_ctl_release(struct inode *inode, struct file *file)
 	snd_magic_kfree(ctl);
 	module_put(card->module);
 	snd_card_file_remove(card, file);
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 
@@ -178,6 +169,15 @@ void snd_ctl_notify(snd_card_t *card, unsigned int mask, snd_ctl_elem_id_t *id)
 	read_unlock(&card->ctl_files_rwlock);
 }
 
+/**
+ * snd_ctl_new - create a control instance from the template
+ * @control: the control template
+ *
+ * Allocates a new snd_kcontrol_t instance and copies the given template 
+ * to the new instance.
+ *
+ * Returns the pointer of the new instance, or NULL on failure.
+ */
 snd_kcontrol_t *snd_ctl_new(snd_kcontrol_t * control)
 {
 	snd_kcontrol_t *kctl;
@@ -190,6 +190,17 @@ snd_kcontrol_t *snd_ctl_new(snd_kcontrol_t * control)
 	return kctl;
 }
 
+/**
+ * snd_ctl_new1 - create a control instance from the template
+ * @ncontrol: the initialization record
+ * @private_data: the private data to set
+ *
+ * Allocates a new snd_kcontrol_t instance and initialize from the given 
+ * template.  When the access field of ncontrol is 0, it's assumed as
+ * READWRITE access.
+ *
+ * Returns the pointer of the newly generated instance, or NULL on failure.
+ */
 snd_kcontrol_t *snd_ctl_new1(snd_kcontrol_new_t * ncontrol, void *private_data)
 {
 	snd_kcontrol_t kctl;
@@ -200,7 +211,8 @@ snd_kcontrol_t *snd_ctl_new1(snd_kcontrol_new_t * ncontrol, void *private_data)
 	kctl.id.iface = ncontrol->iface;
 	kctl.id.device = ncontrol->device;
 	kctl.id.subdevice = ncontrol->subdevice;
-	strncpy(kctl.id.name, ncontrol->name, sizeof(kctl.id.name)-1);
+	if (ncontrol->name)
+		strncpy(kctl.id.name, ncontrol->name, sizeof(kctl.id.name)-1);
 	kctl.id.index = ncontrol->index;
 	kctl.access = ncontrol->access == 0 ? SNDRV_CTL_ELEM_ACCESS_READWRITE :
 		      (ncontrol->access & (SNDRV_CTL_ELEM_ACCESS_READWRITE|SNDRV_CTL_ELEM_ACCESS_INACTIVE|SNDRV_CTL_ELEM_ACCESS_INDIRECT));
@@ -212,6 +224,14 @@ snd_kcontrol_t *snd_ctl_new1(snd_kcontrol_new_t * ncontrol, void *private_data)
 	return snd_ctl_new(&kctl);
 }
 
+/**
+ * snd_ctl_free_one - release the control instance
+ * @kcontrol: the control instance
+ *
+ * Releases the control instance created via snd_ctl_new()
+ * or snd_ctl_new1().
+ * Don't call this after the control was added to the card.
+ */
 void snd_ctl_free_one(snd_kcontrol_t * kcontrol)
 {
 	if (kcontrol) {
@@ -221,6 +241,16 @@ void snd_ctl_free_one(snd_kcontrol_t * kcontrol)
 	}
 }
 
+/**
+ * snd_ctl_add - add the control instance to the card
+ * @card: the card instance
+ * @kcontrol: the control instance to add
+ *
+ * Adds the control instance created via snd_ctl_new() or
+ * snd_ctl_new1() to the given card.
+ *
+ * Returns zero if successful, or a negative error code on failure.
+ */
 int snd_ctl_add(snd_card_t * card, snd_kcontrol_t * kcontrol)
 {
 	snd_runtime_check(card != NULL && kcontrol != NULL, return -EINVAL);
@@ -236,6 +266,16 @@ int snd_ctl_add(snd_card_t * card, snd_kcontrol_t * kcontrol)
 	return 0;
 }
 
+/**
+ * snd_ctl_remove - remove the control from the card and release it
+ * @card: the card instance
+ * @kcontrol: the control instance to remove
+ *
+ * Removes the control from the card and then releases the instance.
+ * You don't need to call snd_ctl_free_one().
+ * 
+ * Returns 0 if successful, or a negative error code on failure.
+ */
 int snd_ctl_remove(snd_card_t * card, snd_kcontrol_t * kcontrol)
 {
 	snd_runtime_check(card != NULL && kcontrol != NULL, return -EINVAL);
@@ -248,6 +288,16 @@ int snd_ctl_remove(snd_card_t * card, snd_kcontrol_t * kcontrol)
 	return 0;
 }
 
+/**
+ * snd_ctl_remove_id - remove the control of the given id and release it
+ * @card: the card instance
+ * @id: the control id to remove
+ *
+ * Finds the control instance with the given id, removes it from the
+ * card list and releases it.
+ * 
+ * Returns 0 if successful, or a negative error code on failure.
+ */
 int snd_ctl_remove_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 {
 	snd_kcontrol_t *kctl;
@@ -260,6 +310,17 @@ int snd_ctl_remove_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 
 static snd_kcontrol_t *_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id); /* w/o lock */
 
+/**
+ * snd_ctl_rename_id - replace the id of a control on the card
+ * @card: the card instance
+ * @src_id: the old id
+ * @dst_id: the new id
+ *
+ * Finds the control with the old id from the card, and replaces the
+ * id with the new one.
+ *
+ * Returns zero if successful, or a negative error code on failure.
+ */
 int snd_ctl_rename_id(snd_card_t * card, snd_ctl_elem_id_t *src_id, snd_ctl_elem_id_t *dst_id)
 {
 	snd_kcontrol_t *kctl;
@@ -315,7 +376,15 @@ static snd_kcontrol_t *_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 	return NULL;
 }
 
-/* exported: with read lock */
+/**
+ * snd_ctl_find_id - find the control instance with the given id
+ * @card: the card instance
+ * @id: the id to search
+ *
+ * Finds the control instance with the given id from the card.
+ *
+ * Returns the pointer of the instance if found, or NULL if not.
+ */
 snd_kcontrol_t *snd_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 {
 	snd_kcontrol_t *kctl;
@@ -325,7 +394,15 @@ snd_kcontrol_t *snd_ctl_find_id(snd_card_t * card, snd_ctl_elem_id_t *id)
 	return kctl;
 }
 
-/* exported: with read lock */
+/**
+ * snd_ctl_find_numid - find the control instance with the given number-id
+ * @card: the card instance
+ * @numid: the number-id to search
+ *
+ * Finds the control instance with the given number-id from the card.
+ *
+ * Returns the pointer of the instance if found, or NULL if not.
+ */
 snd_kcontrol_t *snd_ctl_find_numid(snd_card_t * card, unsigned int numid)
 {
 	snd_kcontrol_t *kctl;
@@ -637,13 +714,15 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
+		err = -ENOPROTOOPT;
 #ifdef CONFIG_PM
-		if (card->set_power_state == NULL)
-			return -ENOPROTOOPT;
-		return card->set_power_state(card, err);
-#else
-		return -ENOPROTOOPT;
+		if (card->set_power_state) {
+		    snd_power_lock(card);
+		    err = card->set_power_state(card, err);
+		    snd_power_unlock(card);
+		}
 #endif
+		return err;
 	case SNDRV_CTL_IOCTL_POWER_STATE:
 #ifdef CONFIG_PM
 		return put_user(card->power_state, (int *)arg) ? -EFAULT : 0;
@@ -736,6 +815,10 @@ static unsigned int snd_ctl_poll(struct file *file, poll_table * wait)
 	return mask;
 }
 
+/*
+ * register the device-specific control-ioctls.
+ * called from each device manager like pcm.c, hwdep.c, etc.
+ */
 int snd_ctl_register_ioctl(snd_kctl_ioctl_func_t fcn)
 {
 	snd_kctl_ioctl_t *pn;
@@ -751,6 +834,9 @@ int snd_ctl_register_ioctl(snd_kctl_ioctl_func_t fcn)
 	return 0;
 }
 
+/*
+ * de-register the device-specific control-ioctls.
+ */
 int snd_ctl_unregister_ioctl(snd_kctl_ioctl_func_t fcn)
 {
 	struct list_head *list;
@@ -806,6 +892,10 @@ static snd_minor_t snd_ctl_reg =
 	.f_ops =	&snd_ctl_f_ops,
 };
 
+/*
+ * registration of the control device:
+ * called from init.c
+ */
 int snd_ctl_register(snd_card_t *card)
 {
 	int err, cardnum;
@@ -821,6 +911,10 @@ int snd_ctl_register(snd_card_t *card)
 	return 0;
 }
 
+/*
+ * disconnection of the control device:
+ * called from init.c
+ */
 int snd_ctl_disconnect(snd_card_t *card)
 {
 	struct list_head *flist;
@@ -836,6 +930,10 @@ int snd_ctl_disconnect(snd_card_t *card)
 	return 0;
 }
 
+/*
+ * de-registration of the control device:
+ * called from init.c
+ */
 int snd_ctl_unregister(snd_card_t *card)
 {
 	int err, cardnum;

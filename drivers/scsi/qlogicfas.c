@@ -348,7 +348,7 @@ static void ql_icmd(Scsi_Cmnd * cmd)
 	 /**/ outb(qlcfg5, qbase + 5);	/* select timer */
 	outb(qlcfg9 & 7, qbase + 9);	/* prescaler */
 /*	outb(0x99, qbase + 5);	*/
-	outb(cmd->target, qbase + 4);
+	outb(cmd->device->id, qbase + 4);
 
 	for (i = 0; i < cmd->cmd_len; i++)
 		outb(cmd->cmnd[i], qbase + 2);
@@ -573,7 +573,7 @@ static int qlogicfas_command(Scsi_Cmnd * cmd)
 	 *	Non-irq version
 	 */
 	 
-	if (cmd->target == qinitid)
+	if (cmd->device->id == qinitid)
 		return (DID_BAD_TARGET << 16);
 	ql_icmd(cmd);
 	if ((k = ql_wai()))
@@ -590,7 +590,7 @@ static int qlogicfas_command(Scsi_Cmnd * cmd)
 
 int qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 {
-	if (cmd->target == qinitid) {
+	if (cmd->device->id == qinitid) {
 		cmd->result = DID_BAD_TARGET << 16;
 		done(cmd);
 		return 0;

@@ -9,4 +9,3 @@ obj-y		:= core.o driver.o resource.o interface.o quirks.o names.o system.o $(pnp
 obj-$(CONFIG_PNPBIOS)		+= pnpbios/
 obj-$(CONFIG_ISAPNP)		+= isapnp/
 
-export-objs	:= core.o driver.o resource.o $(pnp-card-y)

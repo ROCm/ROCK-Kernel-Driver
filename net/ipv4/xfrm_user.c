@@ -276,9 +276,11 @@ static int dump_one_state(struct xfrm_state *x, int count, void *ptr)
 	copy_to_user_state(x, p);
 
 	if (x->aalg)
-		RTA_PUT(skb, XFRMA_ALG_AUTH, sizeof(*(x->aalg)), x->aalg);
+		RTA_PUT(skb, XFRMA_ALG_AUTH,
+			sizeof(*(x->aalg))+(x->aalg->alg_key_len+7)/8, x->aalg);
 	if (x->ealg)
-		RTA_PUT(skb, XFRMA_ALG_CRYPT, sizeof(*(x->ealg)), x->ealg);
+		RTA_PUT(skb, XFRMA_ALG_CRYPT,
+			sizeof(*(x->ealg))+(x->ealg->alg_key_len+7)/8, x->ealg);
 	if (x->calg)
 		RTA_PUT(skb, XFRMA_ALG_COMP, sizeof(*(x->calg)), x->calg);
 
@@ -655,6 +657,7 @@ static int xfrm_dump_policy(struct sk_buff *skb, struct netlink_callback *cb)
 	info.in_skb = cb->skb;
 	info.out_skb = skb;
 	info.nlmsg_seq = cb->nlh->nlmsg_seq;
+	info.this_idx = 0;
 	info.start_idx = cb->args[0];
 	(void) xfrm_policy_walk(dump_one_policy, &info);
 	cb->args[0] = info.this_idx;
@@ -752,7 +755,7 @@ static int xfrm_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *err
 {
 	struct rtattr *xfrma[XFRMA_MAX];
 	struct xfrm_link *link;
-	int type, min_len, kind;
+	int type, min_len;
 
 	if (!(nlh->nlmsg_flags & NLM_F_REQUEST))
 		return 0;
@@ -768,7 +771,6 @@ static int xfrm_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *err
 		goto err_einval;
 
 	type -= XFRM_MSG_BASE;
-	kind = (type & 3);
 	link = &xfrm_dispatch[type];
 
 	/* All operations require privileges, even GET */
@@ -777,7 +779,7 @@ static int xfrm_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *err
 		return -1;
 	}
 
-	if (kind == 2 && (nlh->nlmsg_flags & NLM_F_DUMP)) {
+	if ((type == 2 || type == 5) && (nlh->nlmsg_flags & NLM_F_DUMP)) {
 		u32 rlen;
 
 		if (link->dump == NULL)

@@ -19,7 +19,7 @@
  */
 #include <linux/config.h>
 #ifdef CONFIG_PROC_FS
-static char *sg_version_str = "Version: 3.5.27 (20020812)";
+static char *sg_version_str = "Version: 3.5.27 (20030130)";
 #endif
 static int sg_version_num = 30527;	/* 2 digits for each component */
 /*
@@ -842,7 +842,7 @@ sg_ioctl(struct inode *inode, struct file *filp,
 			__put_user((int) sdp->device->type, &sg_idp->scsi_type);
 			__put_user((short) sdp->device->host->cmd_per_lun,
 				   &sg_idp->h_cmd_per_lun);
-			__put_user((short) sdp->device->new_queue_depth,
+			__put_user((short) sdp->device->queue_depth,
 				   &sg_idp->d_queue_depth);
 			__put_user(0, &sg_idp->unused[0]);
 			__put_user(0, &sg_idp->unused[1]);
@@ -1455,9 +1455,9 @@ find_empty_slot:
 	sdp->sg_tablesize = scsidp->host ? scsidp->host->sg_tablesize : 0;
 
 	memset(&sdp->sg_driverfs_dev, 0, sizeof (struct device));
-	sprintf(sdp->sg_driverfs_dev.bus_id, "%s:gen",
+	snprintf(sdp->sg_driverfs_dev.bus_id, BUS_ID_SIZE, "%s:gen",
 		scsidp->sdev_driverfs_dev.bus_id);
-	sprintf(sdp->sg_driverfs_dev.name, "%sgeneric",
+	snprintf(sdp->sg_driverfs_dev.name, DEVICE_NAME_SIZE, "%sgeneric",
 		scsidp->sdev_driverfs_dev.name);
 	sdp->sg_driverfs_dev.parent = &scsidp->sdev_driverfs_dev;
 	sdp->sg_driverfs_dev.bus = scsidp->sdev_driverfs_dev.bus;
@@ -2982,7 +2982,7 @@ sg_proc_dev_info(char *buffer, int *len, off_t * begin, off_t offset, int size)
 				   scsidp->host->host_no, scsidp->channel,
 				   scsidp->id, scsidp->lun, (int) scsidp->type,
 				   (int) scsidp->access_count,
-				   (int) scsidp->new_queue_depth,
+				   (int) scsidp->queue_depth,
 				   (int) scsidp->device_busy,
 				   (int) scsidp->online);
 		else

@@ -926,7 +926,7 @@ struct tx_queue {
 #define	PL_PC1		(1<<7)		/* BREAK   - entry point in start PCM*/
 #define	PL_PC2		(2<<7)		/* TRACE   - to localize stuck Beacon*/
 #define	PL_PC3		(3<<7)		/* CONNECT - synchronize ends of conn*/
-#define	PL_PC4		(4<<7)		/* NEXT	   - to seperate the signalng*/
+#define	PL_PC4		(4<<7)		/* NEXT	   - to separate the signalng*/
 #define	PL_PC5		(5<<7)		/* SIGNAL  - PCM trans/rec. bit infos*/
 #define	PL_PC6		(6<<7)		/* JOIN	   - 1. state to activ conn. */
 #define	PL_PC7		(7<<7)		/* VERIFY  - 2. - " - (3. ACTIVE) */

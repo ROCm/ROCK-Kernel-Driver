@@ -2,7 +2,7 @@
  * (c) 1998 C. van Schaik <carl@leg.uct.ac.za>
  *
  * BUGS  
- *  Due to the inconsistancy in reading from the signal flags
+ *  Due to the inconsistency in reading from the signal flags
  *  it is difficult to get an accurate tuned signal.
  *
  *  It seems that the card is not linear to 0 volume. It cuts off

@@ -85,7 +85,7 @@ int jfs_commit_inode(struct inode *inode, int wait)
 	tid_t tid;
 	static int noisy = 5;
 
-	jFYI(1, ("In jfs_commit_inode, inode = 0x%p\n", inode));
+	jfs_info("In jfs_commit_inode, inode = 0x%p", inode);
 
 	/*
 	 * Don't commit if inode has been committed since last being
@@ -100,9 +100,9 @@ int jfs_commit_inode(struct inode *inode, int wait)
 		 * partitions and may think inode is dirty
 		 */
 		if (!special_file(inode->i_mode) && noisy) {
-			jERROR(1, ("jfs_commit_inode(0x%p) called on "
-				   "read-only volume\n", inode));
-			jERROR(1, ("Is remount racy?\n"));
+			jfs_err("jfs_commit_inode(0x%p) called on "
+				   "read-only volume", inode);
+			jfs_err("Is remount racy?");
 			noisy--;
 		}
 		return 0;
@@ -128,13 +128,13 @@ void jfs_write_inode(struct inode *inode, int wait)
 		return;
 
 	if (jfs_commit_inode(inode, wait)) {
-		jERROR(1, ("jfs_write_inode: jfs_commit_inode failed!\n"));
+		jfs_err("jfs_write_inode: jfs_commit_inode failed!");
 	}
 }
 
 void jfs_delete_inode(struct inode *inode)
 {
-	jFYI(1, ("In jfs_delete_inode, inode = 0x%p\n", inode));
+	jfs_info("In jfs_delete_inode, inode = 0x%p", inode);
 
 	if (test_cflag(COMMIT_Freewmap, inode))
 		freeZeroLink(inode);
@@ -153,9 +153,8 @@ void jfs_dirty_inode(struct inode *inode)
 			/* kernel allows writes to devices on read-only
 			 * partitions and may try to mark inode dirty
 			 */
-			jERROR(1, ("jfs_dirty_inode called on "
-				   "read-only volume\n"));
-			jERROR(1, ("Is remount racy?\n"));
+			jfs_err("jfs_dirty_inode called on read-only volume");
+			jfs_err("Is remount racy?");
 			noisy--;
 		}
 		return;
@@ -302,7 +301,7 @@ static int jfs_readpages(struct file *file, struct address_space *mapping,
 static int jfs_prepare_write(struct file *file,
 			     struct page *page, unsigned from, unsigned to)
 {
-	return block_prepare_write(page, from, to, jfs_get_block);
+	return nobh_prepare_write(page, from, to, jfs_get_block);
 }
 
 static sector_t jfs_bmap(struct address_space *mapping, sector_t block)
@@ -327,7 +326,7 @@ struct address_space_operations jfs_aops = {
 	.writepages	= jfs_writepages,
 	.sync_page	= block_sync_page,
 	.prepare_write	= jfs_prepare_write,
-	.commit_write	= generic_commit_write,
+	.commit_write	= nobh_commit_write,
 	.bmap		= jfs_bmap,
 	.direct_IO	= jfs_direct_IO,
 };
@@ -378,9 +377,9 @@ void jfs_truncate_nolock(struct inode *ip, loff_t length)
 
 void jfs_truncate(struct inode *ip)
 {
-	jFYI(1, ("jfs_truncate: size = 0x%lx\n", (ulong) ip->i_size));
+	jfs_info("jfs_truncate: size = 0x%lx", (ulong) ip->i_size);
 
-	block_truncate_page(ip->i_mapping, ip->i_size, jfs_get_block);
+	nobh_truncate_page(ip->i_mapping, ip->i_size);
 
 	IWRITE_LOCK(ip);
 	jfs_truncate_nolock(ip, ip->i_size);

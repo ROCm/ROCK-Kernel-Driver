@@ -81,21 +81,11 @@ init_buffer(struct buffer_head *bh, bh_end_io_t *handler, void *private)
  * Return the address of the waitqueue_head to be used for this
  * buffer_head
  */
-static wait_queue_head_t *bh_waitq_head(struct buffer_head *bh)
+wait_queue_head_t *bh_waitq_head(struct buffer_head *bh)
 {
 	return &bh_wait_queue_heads[hash_ptr(bh, BH_WAIT_TABLE_ORDER)].wqh;
 }
-
-/*
- * Wait on a buffer until someone does a wakeup on it.  Needs
- * lots of external locking.  ext3 uses this.  Fix it.
- */
-void sleep_on_buffer(struct buffer_head *bh)
-{
-	wait_queue_head_t *wq = bh_waitq_head(bh);
-	sleep_on(wq);
-}
-EXPORT_SYMBOL(sleep_on_buffer);
+EXPORT_SYMBOL(bh_waitq_head);
 
 void wake_up_buffer(struct buffer_head *bh)
 {
@@ -137,9 +127,10 @@ void __wait_on_buffer(struct buffer_head * bh)
 	get_bh(bh);
 	do {
 		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
-		blk_run_queues();
-		if (buffer_locked(bh))
-			schedule();
+		if (buffer_locked(bh)) {
+			blk_run_queues();
+			io_schedule();
+		}
 	} while (buffer_locked(bh));
 	put_bh(bh);
 	finish_wait(wqh, &wait);
@@ -969,8 +960,6 @@ no_grow:
 	 * the reserve list is empty, we're sure there are 
 	 * async buffer heads in use.
 	 */
-	blk_run_queues();
-
 	free_more_memory();
 	goto try_again;
 }

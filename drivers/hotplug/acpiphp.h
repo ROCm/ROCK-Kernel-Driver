@@ -34,9 +34,8 @@
 #ifndef _ACPIPHP_H
 #define _ACPIPHP_H
 
-#include "include/acpi.h"
+#include <linux/acpi.h>
 #include "pci_hotplug.h"
-#include "acpi_bus.h"
 
 #define dbg(format, arg...)					\
 	do {							\

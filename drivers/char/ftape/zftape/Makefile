@@ -27,8 +27,6 @@
 # ZFT_OBSOLETE - enable the MTIOC_ZFTAPE_GETBLKSZ ioctl. You should
 #                leave this enabled for compatibility with taper.
 
-export-objs := zftape_syms.o
-
 obj-$(CONFIG_ZFTAPE) += zftape.o
 
 zftape-objs := zftape-rw.o zftape-ctl.o zftape-read.o \

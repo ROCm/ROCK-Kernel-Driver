@@ -3,8 +3,6 @@
 #
 # $Id: Makefile,v 1.5 2001/09/19 22:39:59 dwmw2 Exp $
 
-export-objs	:= nand.o nand_ecc.o
-
 nandobjs-y			:= nand.o
 nandobjs-$(CONFIG_MTD_NAND_ECC) += nand_ecc.o
 

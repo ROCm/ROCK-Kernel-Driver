@@ -157,7 +157,7 @@ typedef struct X25Cmd
 #define X25RES_PROTO_VIOLATION	0x41	/* protocol violation occured */
 #define X25RES_PKT_TIMEOUT	0x42	/* X.25 packet time out */
 #define X25RES_PKT_RETRY_LIMIT	0x43	/* X.25 packet retry limit exceeded */
-/*----- Command-dependant results -----*/
+/*----- Command-dependent results -----*/
 #define X25RES_LINK_DISC	0x00	/* HDLC_LINK_STATUS */
 #define X25RES_LINK_IN_ABM	0x01	/* HDLC_LINK_STATUS */
 #define X25RES_NO_DATA		0x01	/* HDLC_READ/READ_TRACE_DATA*/

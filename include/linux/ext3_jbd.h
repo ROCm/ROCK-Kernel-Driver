@@ -28,7 +28,7 @@
  * indirection blocks, the group and superblock summaries, and the data
  * block to complete the transaction.  */
 
-#define EXT3_SINGLEDATA_TRANS_BLOCKS	8
+#define EXT3_SINGLEDATA_TRANS_BLOCKS	8U
 
 /* Extended attributes may touch two data buffers, two bitmap buffers,
  * and two group and summaries. */
@@ -58,7 +58,7 @@ extern int ext3_writepage_trans_blocks(struct inode *inode);
  * start off at the maximum transaction size and grow the transaction
  * optimistically as we go. */
 
-#define EXT3_MAX_TRANS_DATA		64
+#define EXT3_MAX_TRANS_DATA		64U
 
 /* We break up a large truncate or write transaction once the handle's
  * buffer credits gets this low, we need either to extend the
@@ -67,7 +67,7 @@ extern int ext3_writepage_trans_blocks(struct inode *inode);
  * one block, plus two quota updates.  Quota allocations are not
  * needed. */
 
-#define EXT3_RESERVE_TRANS_BLOCKS	12
+#define EXT3_RESERVE_TRANS_BLOCKS	12U
 
 #define EXT3_INDEX_EXTRA_TRANS_BLOCKS	8
 

@@ -463,13 +463,14 @@ static void start_urb_unlink (struct ohci_hcd *ohci, struct ed *ed)
 /* enqueue next TD for this URB (OHCI spec 5.2.8.2) */
 
 static void
-td_fill (unsigned int info,
+td_fill (struct ohci_hcd *ohci, u32 info,
 	dma_addr_t data, int len,
 	struct urb *urb, int index)
 {
 	struct td		*td, *td_pt;
 	struct urb_priv		*urb_priv = urb->hcpriv;
 	int			is_iso = info & TD_ISO;
+	int			hash;
 
 	// ASSERT (index < urb_priv->length);
 
@@ -516,11 +517,16 @@ td_fill (unsigned int info,
 		td->hwBE = 0;
 	td->hwNextTD = cpu_to_le32 (td_pt->td_dma);
 
-	/* HC might read the TD right after we link it ... */
-	wmb ();
-
 	/* append to queue */
 	list_add_tail (&td->td_list, &td->ed->td_list);
+
+	/* hash it for later reverse mapping */
+	hash = TD_HASH_FUNC (td->td_dma);
+	td->td_hash = ohci->td_hash [hash];
+	ohci->td_hash [hash] = td;
+
+	/* HC might read the TD (or cachelines) right away ... */
+	wmb ();
 	td->ed->hwTailP = td->hwNextTD;
 }
 
@@ -578,7 +584,7 @@ static void td_submit_urb (
 			: TD_T_TOGGLE | TD_CC | TD_DP_IN;
 		/* TDs _could_ transfer up to 8K each */
 		while (data_len > 4096) {
-			td_fill (info, data, 4096, urb, cnt);
+			td_fill (ohci, info, data, 4096, urb, cnt);
 			data += 4096;
 			data_len -= 4096;
 			cnt++;
@@ -586,11 +592,11 @@ static void td_submit_urb (
 		/* maybe avoid ED halt on final TD short read */
 		if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
 			info |= TD_R;
-		td_fill (info, data, data_len, urb, cnt);
+		td_fill (ohci, info, data, data_len, urb, cnt);
 		cnt++;
 		if ((urb->transfer_flags & URB_ZERO_PACKET)
 				&& cnt < urb_priv->length) {
-			td_fill (info, 0, 0, urb, cnt);
+			td_fill (ohci, info, 0, 0, urb, cnt);
 			cnt++;
 		}
 		/* maybe kickstart bulk list */
@@ -605,17 +611,17 @@ static void td_submit_urb (
 	 */
 	case PIPE_CONTROL:
 		info = TD_CC | TD_DP_SETUP | TD_T_DATA0;
-		td_fill (info, urb->setup_dma, 8, urb, cnt++);
+		td_fill (ohci, info, urb->setup_dma, 8, urb, cnt++);
 		if (data_len > 0) {
 			info = TD_CC | TD_R | TD_T_DATA1;
 			info |= is_out ? TD_DP_OUT : TD_DP_IN;
 			/* NOTE:  mishandles transfers >8K, some >4K */
-			td_fill (info, data, data_len, urb, cnt++);
+			td_fill (ohci, info, data, data_len, urb, cnt++);
 		}
 		info = is_out
 			? TD_CC | TD_DP_IN | TD_T_DATA1
 			: TD_CC | TD_DP_OUT | TD_T_DATA1;
-		td_fill (info, data, 0, urb, cnt++);
+		td_fill (ohci, info, data, 0, urb, cnt++);
 		/* maybe kickstart control list */
 		wmb ();
 		writel (OHCI_CLF, &ohci->regs->cmdstatus);
@@ -634,7 +640,7 @@ static void td_submit_urb (
 			// a 2^16 iso range, vs other HCs max of 2^10)
 			frame += cnt * urb->interval;
 			frame &= 0xffff;
-			td_fill (TD_CC | TD_ISO | frame,
+			td_fill (ohci, TD_CC | TD_ISO | frame,
 				data + urb->iso_frame_desc [cnt].offset,
 				urb->iso_frame_desc [cnt].length, urb, cnt);
 		}

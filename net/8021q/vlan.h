@@ -41,7 +41,7 @@ extern spinlock_t vlan_group_lock;
 /*  Find a VLAN device by the MAC address of it's Ethernet device, and
  *  it's VLAN ID.  The default configuration is to have VLAN's scope
  *  to be box-wide, so the MAC will be ignored.  The mac will only be
- *  looked at if we are configured to have a seperate set of VLANs per
+ *  looked at if we are configured to have a separate set of VLANs per
  *  each MAC addressable interface.  Note that this latter option does
  *  NOT follow the spec for VLANs, but may be useful for doing very
  *  large quantities of VLAN MUX/DEMUX onto FrameRelay or ATM PVCs.

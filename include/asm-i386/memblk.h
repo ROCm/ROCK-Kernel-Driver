@@ -14,7 +14,7 @@ struct i386_memblk {
 extern struct i386_memblk memblk_devices[MAX_NR_MEMBLKS];
 
 static inline int arch_register_memblk(int num){
-	int p_node = __memblk_to_node(num);
+	int p_node = memblk_to_node(num);
 
 	return register_memblk(&memblk_devices[num].memblk, num, 
 				&node_devices[p_node].node);

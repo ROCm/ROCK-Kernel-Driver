@@ -24,11 +24,8 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
-#include "amlcode.h"
 #include "acdispat.h"
 #include "acnamesp.h"
-#include "acinterp.h"
 
 #define _COMPONENT          ACPI_DISPATCHER
 	 ACPI_MODULE_NAME    ("dsinit")

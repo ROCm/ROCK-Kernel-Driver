@@ -221,6 +221,7 @@ static dev_link_t *com20020_attach(void)
     memset(link, 0, sizeof(struct dev_link_t));
     dev->priv = lp;
 
+    init_timer(&link->release);
     link->release.function = &com20020_release;
     link->release.data = (u_long)link;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;

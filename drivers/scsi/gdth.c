@@ -2313,8 +2313,8 @@ static void gdth_putq(int hanum,Scsi_Cmnd *scp,unchar priority)
     GDTH_LOCK_HA(ha, flags);
 
     scp->SCp.this_residual = (int)priority;
-    b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->channel;
-    t = scp->target;
+    b = virt_ctr ? NUMDATA(scp->device->host)->busnum : scp->device->channel;
+    t = scp->device->id;
 #if LINUX_VERSION_CODE >= 0x010300
     if (priority >= DEFAULT_PRI) {
         if ((b != ha->virt_bus && ha->raw[BUS_L2P(ha,b)].lock) ||
@@ -2375,8 +2375,8 @@ static void gdth_next(int hanum)
     for (nscp = pscp = ha->req_first; nscp; nscp = (Scsi_Cmnd *)nscp->SCp.ptr) {
         if (nscp != pscp && nscp != (Scsi_Cmnd *)pscp->SCp.ptr)
             pscp = (Scsi_Cmnd *)pscp->SCp.ptr;
-        b = virt_ctr ? NUMDATA(nscp->host)->busnum : nscp->channel;
-        t = nscp->target;
+        b = virt_ctr ? NUMDATA(nscp->device->host)->busnum : nscp->device->channel;
+        t = nscp->device->id;
         if (nscp->SCp.this_residual >= DEFAULT_PRI) {
             if ((b != ha->virt_bus && ha->raw[BUS_L2P(ha,b)].lock) ||
                 (b == ha->virt_bus && t < MAX_HDRIVES && ha->hdr[t].lock)) 
@@ -2407,13 +2407,13 @@ static void gdth_next(int hanum)
                         b, t, nscp->lun));
                 /* TEST_UNIT_READY -> set scan mode */
                 if ((ha->scan_mode & 0x0f) == 0) {
-                    if (b == 0 && t == 0 && nscp->lun == 0) {
+                    if (b == 0 && t == 0 && nscp->device->lun == 0) {
                         ha->scan_mode |= 1;
                         TRACE2(("Scan mode: 0x%x\n", ha->scan_mode));
                     }
                 } else if ((ha->scan_mode & 0x0f) == 1) {
-                    if (b == 0 && ((t == 0 && nscp->lun == 1) ||
-                         (t == 1 && nscp->lun == 0))) {
+                    if (b == 0 && ((t == 0 && nscp->device->lun == 1) ||
+                         (t == 1 && nscp->device->lun == 0))) {
                         nscp->SCp.sent_command = GDT_SCAN_START;
                         nscp->SCp.phase = ((ha->scan_mode & 0x10 ? 1:0) << 8) 
                             | SCSIRAWSERVICE;
@@ -2483,7 +2483,7 @@ static void gdth_next(int hanum)
                 this_cmd = FALSE;
             else 
                 ha->raw[BUS_L2P(ha,b)].io_cnt[t]++;
-        } else if (t >= MAX_HDRIVES || !ha->hdr[t].present || nscp->lun != 0) {
+        } else if (t >= MAX_HDRIVES || !ha->hdr[t].present || nscp->device->lun != 0) {
             TRACE2(("Command 0x%x to bus %d id %d lun %d -> IGNORE\n",
                     nscp->cmnd[0], b, t, nscp->lun));
             nscp->result = DID_BAD_TARGET << 16;
@@ -2682,7 +2682,7 @@ static int gdth_internal_cache_cmd(int hanum,Scsi_Cmnd *scp)
     gdth_modep_data mpd;
 
     ha = HADATA(gdth_ctr_tab[hanum]);
-    t  = scp->target;
+    t  = scp->device->id;
     TRACE(("gdth_internal_cache_cmd() cmd 0x%x hdrive %d\n",
            scp->cmnd[0],t));
 
@@ -2900,8 +2900,8 @@ static int gdth_fill_raw_cmd(int hanum,Scsi_Cmnd *scp,unchar b)
     unchar t,l;
 
     ha = HADATA(gdth_ctr_tab[hanum]);
-    t = scp->target;
-    l = scp->lun;
+    t = scp->device->id;
+    l = scp->device->lun;
     cmdp = ha->pccb;
     TRACE(("gdth_fill_raw_cmd() cmd 0x%x bus %d ID %d LUN %d\n",
            scp->cmnd[0],b,t,l));
@@ -3372,7 +3372,7 @@ static void gdth_interrupt(int irq,struct pt_regs *regs)
     if (rval == 2) {
         gdth_putq(hanum,scp,scp->SCp.this_residual);
     } else if (rval == 1) {
-        GDTH_LOCK_SCSI_DONE(scp->host, flags);
+        GDTH_LOCK_SCSI_DONE(scp->device->host, flags);
         scp->scsi_done(scp);
         GDTH_UNLOCK_SCSI_DONE(scp->host,flags);
     }
@@ -3461,9 +3461,9 @@ static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp)
         printk("\n");
 
     } else {
-        b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->channel;
+        b = virt_ctr ? NUMDATA(scp->device->host)->busnum : scp->device->channel;
         if (scp->SCp.sent_command == -1 && b != ha->virt_bus) {
-            ha->raw[BUS_L2P(ha,b)].io_cnt[scp->target]--;
+            ha->raw[BUS_L2P(ha,b)].io_cnt[scp->device->id]--;
         }
         /* cache or raw service */
         if (ha->status == S_OK) {
@@ -3474,12 +3474,12 @@ static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp)
                         scp->SCp.sent_command));
                 /* special commands GDT_CLUST_INFO/GDT_MOUNT ? */
                 if (scp->SCp.sent_command == GDT_CLUST_INFO) {
-                    ha->hdr[scp->target].cluster_type = (unchar)ha->info;
-                    if (!(ha->hdr[scp->target].cluster_type & 
+                    ha->hdr[scp->device->id].cluster_type = (unchar)ha->info;
+                    if (!(ha->hdr[scp->device->id].cluster_type & 
                         CLUSTER_MOUNTED)) {
                         /* NOT MOUNTED -> MOUNT */
                         scp->SCp.sent_command = GDT_MOUNT;
-                        if (ha->hdr[scp->target].cluster_type & 
+                        if (ha->hdr[scp->device->id].cluster_type & 
                             CLUSTER_RESERVED) {
                             /* cluster drive RESERVED (on the other node) */
                             scp->SCp.phase = -2;      /* reservation conflict */
@@ -3489,11 +3489,11 @@ static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp)
                     }
                 } else {
                     if (scp->SCp.sent_command == GDT_MOUNT) {
-                        ha->hdr[scp->target].cluster_type |= CLUSTER_MOUNTED;
-                        ha->hdr[scp->target].media_changed = TRUE;
+                        ha->hdr[scp->device->id].cluster_type |= CLUSTER_MOUNTED;
+                        ha->hdr[scp->device->id].media_changed = TRUE;
                     } else if (scp->SCp.sent_command == GDT_UNMOUNT) {
-                        ha->hdr[scp->target].cluster_type &= ~CLUSTER_MOUNTED;
-                        ha->hdr[scp->target].media_changed = TRUE;
+                        ha->hdr[scp->device->id].cluster_type &= ~CLUSTER_MOUNTED;
+                        ha->hdr[scp->device->id].media_changed = TRUE;
                     } 
                     scp->SCp.sent_command = -1;
                 }
@@ -3503,9 +3503,9 @@ static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp)
             } else {
                 /* RESERVE/RELEASE ? */
                 if (scp->cmnd[0] == RESERVE) {
-                    ha->hdr[scp->target].cluster_type |= CLUSTER_RESERVED;
+                    ha->hdr[scp->device->id].cluster_type |= CLUSTER_RESERVED;
                 } else if (scp->cmnd[0] == RELEASE) {
-                    ha->hdr[scp->target].cluster_type &= ~CLUSTER_RESERVED;
+                    ha->hdr[scp->device->id].cluster_type &= ~CLUSTER_RESERVED;
                 }           
                 scp->result = DID_OK << 16;
                 scp->sense_buffer[0] = 0;
@@ -3538,10 +3538,10 @@ static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp)
                 scp->result = (DID_OK << 16) | (CHECK_CONDITION << 1);
             } else if (service == CACHESERVICE) {
                 if (ha->status == S_CACHE_UNKNOWN &&
-                    (ha->hdr[scp->target].cluster_type & 
+                    (ha->hdr[scp->device->id].cluster_type & 
                      CLUSTER_RESERVE_STATE) == CLUSTER_RESERVE_STATE) {
                     /* bus reset -> force GDT_CLUST_INFO */
-                    ha->hdr[scp->target].cluster_type &= ~CLUSTER_RESERVED;
+                    ha->hdr[scp->device->id].cluster_type &= ~CLUSTER_RESERVED;
                 }
                 memset((char*)scp->sense_buffer,0,16);
                 if (ha->status == (ushort)S_CACHE_RESERV) {
@@ -3560,7 +3560,7 @@ static int gdth_sync_event(int hanum,int service,unchar index,Scsi_Cmnd *scp)
                     ha->dvr.eu.sync.service = service;
                     ha->dvr.eu.sync.status  = ha->status;
                     ha->dvr.eu.sync.info    = ha->info;
-                    ha->dvr.eu.sync.hostdrive = scp->target;
+                    ha->dvr.eu.sync.hostdrive = scp->device->id;
                     if (ha->status >= 0x8000)
                         gdth_store_event(ha, ES_SYNC, 0, &ha->dvr);
                     else
@@ -4507,15 +4507,15 @@ int gdth_eh_bus_reset(Scsi_Cmnd *scp)
     unchar b;
 
     TRACE2(("gdth_eh_bus_reset()\n"));
-    hanum = NUMDATA(scp->host)->hanum;
-    b = virt_ctr ? NUMDATA(scp->host)->busnum : scp->channel;
+    hanum = NUMDATA(scp->device->host)->hanum;
+    b = virt_ctr ? NUMDATA(scp->device->host)->busnum : scp->device->channel;
     ha    = HADATA(gdth_ctr_tab[hanum]);
 
     /* clear command tab */
     GDTH_LOCK_HA(ha, flags);
     for (i = 0; i < GDTH_MAXCMDS; ++i) {
         cmnd = ha->cmd_tab[i].cmnd;
-        if (!SPECIAL_SCP(cmnd) && cmnd->channel == b)
+        if (!SPECIAL_SCP(cmnd) && cmnd->device->channel == b)
             ha->cmd_tab[i].cmnd = UNUSED_CMND;
     }
     GDTH_UNLOCK_HA(ha, flags);
@@ -4593,13 +4593,13 @@ int gdth_queuecommand(Scsi_Cmnd *scp,void (*done)(Scsi_Cmnd *))
     int priority;
 
     TRACE(("gdth_queuecommand() cmd 0x%x id %d lun %d\n",
-           scp->cmnd[0],scp->target,scp->lun));
+           scp->cmnd[0],scp->device->id,scp->lun));
     
     scp->scsi_done = (void *)done;
     scp->SCp.have_data_in = 1;
     scp->SCp.phase = -1;
     scp->SCp.sent_command = -1;
-    hanum = NUMDATA(scp->host)->hanum;
+    hanum = NUMDATA(scp->device->host)->hanum;
 #ifdef GDTH_STATISTICS
     ++act_ios;
 #endif
@@ -4637,7 +4637,7 @@ static void gdth_flush(int hanum)
 
 #if LINUX_VERSION_CODE >= 0x020322
     sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-    scp  = scsi_allocate_device(sdev, 1);
+    scp  = scsi_get_command(sdev, GFP_KERNEL);
     scp->cmd_len = 12;
     scp->use_sg = 0;
 #else
@@ -4665,7 +4665,7 @@ static void gdth_flush(int hanum)
         }
     }
 #if LINUX_VERSION_CODE >= 0x020322
-    scsi_release_command(scp);
+    scsi_put_command(scp);
     scsi_free_host_dev(sdev);
 #endif
 }
@@ -4711,7 +4711,7 @@ void gdth_halt(void)
         memset(cmnd, 0xff, MAX_COMMAND_SIZE);
 #if LINUX_VERSION_CODE >= 0x020322
         sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-        scp  = scsi_allocate_device(sdev, 1);
+        scp  = scsi_get_command(sdev, GFP_KERNEL);
         scp->cmd_len = 12;
         scp->use_sg = 0;
 #else
@@ -4728,7 +4728,7 @@ void gdth_halt(void)
         TRACE2(("gdth_halt(): reset controller %d\n", hanum));
 #if LINUX_VERSION_CODE >= 0x020322
         gdth_do_cmd(scp, &gdtcmd, cmnd, 10);
-        scsi_release_command(scp);
+        scsi_put_command(scp);
         scsi_free_host_dev(sdev);
 #else
         gdth_do_cmd(&scp, &gdtcmd, cmnd, 10);

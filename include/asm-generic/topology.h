@@ -29,23 +29,23 @@
 
 /* Other architectures wishing to use this simple topology API should fill
    in the below functions as appropriate in their own <asm/topology.h> file. */
-#ifndef __cpu_to_node
-#define __cpu_to_node(cpu)		(0)
+#ifndef cpu_to_node
+#define cpu_to_node(cpu)	(0)
 #endif
-#ifndef __memblk_to_node
-#define __memblk_to_node(memblk)	(0)
+#ifndef memblk_to_node
+#define memblk_to_node(memblk)	(0)
 #endif
-#ifndef __parent_node
-#define __parent_node(node)		(0)
+#ifndef parent_node
+#define parent_node(node)	(0)
 #endif
-#ifndef __node_to_first_cpu
-#define __node_to_first_cpu(node)	(0)
+#ifndef node_to_cpumask
+#define node_to_cpumask(node)	(cpu_online_map)
 #endif
-#ifndef __node_to_cpu_mask
-#define __node_to_cpu_mask(node)	(cpu_online_map)
+#ifndef node_to_first_cpu
+#define node_to_first_cpu(node)	(0)
 #endif
-#ifndef __node_to_memblk
-#define __node_to_memblk(node)		(0)
+#ifndef node_to_memblk
+#define node_to_memblk(node)	(0)
 #endif
 
 /* Cross-node load balancing interval. */

@@ -375,7 +375,7 @@ struct pci_bus_info * __init init_hades_pci(void)
 	memset(bus, 0, sizeof(struct pci_bus_info));
 
 	/*
-	 * Claim resources. The m68k has no seperate I/O space, both
+	 * Claim resources. The m68k has no separate I/O space, both
 	 * PCI memory space and PCI I/O space are in memory space. Therefore
 	 * the I/O resources are requested in memory space as well.
 	 */

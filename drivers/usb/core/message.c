@@ -206,7 +206,8 @@ static void sg_clean (struct usb_sg_request *io)
 		kfree (io->urbs);
 		io->urbs = 0;
 	}
-	usb_buffer_unmap_sg (io->dev, io->pipe, io->sg, io->nents);
+	if (io->dev->dev.dma_mask != 0)
+		usb_buffer_unmap_sg (io->dev, io->pipe, io->sg, io->nents);
 	io->dev = 0;
 }
 
@@ -301,6 +302,7 @@ int usb_sg_init (
 {
 	int			i;
 	int			urb_flags;
+	int			dma;
 
 	if (!io || !dev || !sg
 			|| usb_pipecontrol (pipe)
@@ -314,8 +316,16 @@ int usb_sg_init (
 	io->sg = sg;
 	io->nents = nents;
 
+	/* not all host controllers use DMA (like the mainstream pci ones);
+	 * they can use PIO (sl811) or be software over another transport.
+	 */
+	dma = (dev->dev.dma_mask != 0);
+	if (dma)
+		io->entries = usb_buffer_map_sg (dev, pipe, sg, nents);
+	else
+		io->entries = nents;
+
 	/* initialize all the urbs we'll use */
-	io->entries = usb_buffer_map_sg (dev, pipe, sg, nents);
 	if (io->entries <= 0)
 		return io->entries;
 
@@ -347,8 +357,17 @@ int usb_sg_init (
 		io->urbs [i]->status = -EINPROGRESS;
 		io->urbs [i]->actual_length = 0;
 
-		io->urbs [i]->transfer_dma = sg_dma_address (sg + i);
-		len = sg_dma_len (sg + i);
+		if (dma) {
+			/* hc may use _only_ transfer_dma */
+			io->urbs [i]->transfer_dma = sg_dma_address (sg + i);
+			len = sg_dma_len (sg + i);
+		} else {
+			/* hc may use _only_ transfer_buffer */
+			io->urbs [i]->transfer_buffer =
+				page_address (sg [i].page) + sg [i].offset;
+			len = sg [i].length;
+		}
+
 		if (length) {
 			len = min_t (unsigned, len, length);
 			length -= len;
@@ -434,9 +453,7 @@ void usb_sg_wait (struct usb_sg_request *io)
 			retval = 0;
 			i--;
 			// FIXME:  should it usb_sg_cancel() on INTERRUPT?
-			// how about imposing a backoff?
-			set_current_state (TASK_UNINTERRUPTIBLE);
-			schedule ();
+			yield ();
 			break;
 
 			/* no error? continue immediately.

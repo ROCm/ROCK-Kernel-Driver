@@ -4,15 +4,13 @@
 
 export ACPI_CFLAGS
 
-ACPI_CFLAGS	:= -D_LINUX -Idrivers/acpi/include
+ACPI_CFLAGS	:= -D_LINUX -Os -Iinclude/acpi
 
 ifdef CONFIG_ACPI_DEBUG
   ACPI_CFLAGS	+= -DACPI_DEBUG_OUTPUT
 endif
 
 EXTRA_CFLAGS	+= $(ACPI_CFLAGS)
-
-export-objs 	:= acpi_ksyms.o processor.o
 
 obj-y		:= acpi_ksyms.o 
 

@@ -116,14 +116,6 @@ config ACPI_PROCESSOR
 	  ACPI C2 and C3 processor states to save power, on systems that
 	  support it.
 
-config ACPI_PROCESSOR_PERF
-	bool "Processor Performance States"
-	depends on X86 && ACPI && !ACPI_HT_ONLY && ACPI_PROCESSOR && CPU_FREQ
-	help
-	  This driver adds support for CPU frequency scaling, if this is supported
-	  by the hardware and the BIOS. If you are compiling for a mobile system,
-	  say Y.
-
 config ACPI_THERMAL
 	tristate "Thermal Zone"
 	depends on ACPI_PROCESSOR

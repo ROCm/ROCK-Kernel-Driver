@@ -3,8 +3,6 @@
 # Copyright (c) 2001 by Jaroslav Kysela <perex@suse.cz>
 #
 
-export-objs  := cs4231_lib.o cs4236_lib.o
-
 snd-cs4231-lib-objs := cs4231_lib.o
 snd-cs4236-lib-objs := cs4236_lib.o
 snd-cs4231-objs := cs4231.o

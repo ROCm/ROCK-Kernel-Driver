@@ -748,7 +748,8 @@ Module parameters
   Module snd-rme32
   ----------------
 
-    Module for RME Digi32, Digi32/8 and Digi32 PRO soundcards.
+    Module for RME Digi32, Digi32 Pro and Digi32/8 (Sek'd Prodif32, 
+    Prodif96 and Prodif Gold) soundcards.
 
     Module supports up to 8 cards.
 

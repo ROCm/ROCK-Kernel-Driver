@@ -773,7 +773,7 @@ iiWriteBuf16(i2eBordStrPtr pB, unsigned char *address, int count)
 //
 // Writes 'count' bytes from 'address' to the data fifo specified by the board
 // structure pointer pB. Should count happen to be odd, an extra pad byte is
-// sent (identity unknown...). This is to be consistant with the 16-bit version.
+// sent (identity unknown...). This is to be consistent with the 16-bit version.
 // Uses 8-bit (byte) operations. Is called indirectly through pB->i2eWriteBuf.
 //
 //******************************************************************************

@@ -11,7 +11,7 @@
  * "NVRAM" (NV stands for non-volatile).
  *
  * The data are supplied as a (seekable) character device, /dev/nvram. The
- * size of this file is dependant on the controller.  The usual size is 114,
+ * size of this file is dependent on the controller.  The usual size is 114,
  * the number of freely available bytes in the memory (i.e., not used by the
  * RTC itself).
  *

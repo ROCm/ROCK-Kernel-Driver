@@ -466,9 +466,9 @@ static void i91uBuildSCB(HCS * pHCB, SCB * pSCB, Scsi_Cmnd * SCpnt)
 	pSCB->SCB_Srb = SCpnt;
 	pSCB->SCB_Opcode = ExecSCSI;
 	pSCB->SCB_Flags = SCF_POST;	/* After SCSI done, call post routine */
-	pSCB->SCB_Target = SCpnt->target;
-	pSCB->SCB_Lun = SCpnt->lun;
-	pSCB->SCB_Ident = SCpnt->lun | DISC_ALLOW;
+	pSCB->SCB_Target = SCpnt->device->id;
+	pSCB->SCB_Lun = SCpnt->device->lun;
+	pSCB->SCB_Ident = SCpnt->device->lun | DISC_ALLOW;
 	pSCB->SCB_Flags |= SCF_SENSE;	/* Turn on auto request sense   */
 
 	pSCB->SCB_SensePtr = (U32) VIRT_TO_BUS(SCpnt->sense_buffer);
@@ -522,13 +522,13 @@ int i91u_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	register SCB *pSCB;
 	HCS *pHCB;		/* Point to Host adapter control block */
 
-	if (SCpnt->lun > 16) {	/* 07/22/98 */
+	if (SCpnt->device->lun > 16) {	/* 07/22/98 */
 
 		SCpnt->result = (DID_TIME_OUT << 16);
 		done(SCpnt);	/* Notify system DONE           */
 		return (0);
 	}
-	pHCB = (HCS *) SCpnt->host->base;
+	pHCB = (HCS *) SCpnt->device->host->base;
 
 	SCpnt->scsi_done = done;
 	/* Get free SCSI control block  */
@@ -558,7 +558,7 @@ int i91u_abort(Scsi_Cmnd * SCpnt)
 {
 	HCS *pHCB;
 
-	pHCB = (HCS *) SCpnt->host->base;
+	pHCB = (HCS *) SCpnt->device->host->base;
 	return tul_abort_srb(pHCB, SCpnt);
 }
 
@@ -570,12 +570,12 @@ int i91u_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 {				/* I need Host Control Block Information */
 	HCS *pHCB;
 
-	pHCB = (HCS *) SCpnt->host->base;
+	pHCB = (HCS *) SCpnt->device->host->base;
 
 	if (reset_flags & (SCSI_RESET_SUGGEST_BUS_RESET | SCSI_RESET_SUGGEST_HOST_RESET))
 		return tul_reset_scsi_bus(pHCB);
 	else
-		return tul_device_reset(pHCB, (ULONG) SCpnt, SCpnt->target, reset_flags);
+		return tul_device_reset(pHCB, (ULONG) SCpnt, SCpnt->device->id, reset_flags);
 }
 
 /*

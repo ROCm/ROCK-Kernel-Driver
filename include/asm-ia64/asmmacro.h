@@ -2,12 +2,19 @@
 #define _ASM_IA64_ASMMACRO_H
 
 /*
- * Copyright (C) 2000-2001 Hewlett-Packard Co
+ * Copyright (C) 2000-2001, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
+#include <linux/config.h>
+
 #define ENTRY(name)				\
 	.align 32;				\
+	.proc name;				\
+name:
+
+#define ENTRY_MIN_ALIGN(name)			\
+	.align 16;				\
 	.proc name;				\
 name:
 
@@ -37,19 +44,40 @@ name:
 	.previous
 
 #if __GNUC__ >= 3
-# define EX(y,x...)					\
-	.xdata4 "__ex_table", @gprel(99f), @gprel(y);	\
+# define EX(y,x...)				\
+	.xdata4 "__ex_table", 99f-., y-.;	\
   [99:]	x
-# define EXCLR(y,x...)					\
-	.xdata4 "__ex_table", @gprel(99f), @gprel(y)+4;	\
+# define EXCLR(y,x...)				\
+	.xdata4 "__ex_table", 99f-., y-.+4;	\
   [99:]	x
 #else
-# define EX(y,x...)					\
-	.xdata4 "__ex_table", @gprel(99f), @gprel(y);	\
+# define EX(y,x...)				\
+	.xdata4 "__ex_table", 99f-., y-.;	\
   99:	x
-# define EXCLR(y,x...)					\
-	.xdata4 "__ex_table", @gprel(99f), @gprel(y)+4;	\
+# define EXCLR(y,x...)				\
+	.xdata4 "__ex_table", 99f-., y-.+4;	\
   99:	x
+#endif
+
+/*
+ * For now, we always put in the McKinley E9 workaround.  On CPUs that don't need it,
+ * we'll patch out the work-around bundles with NOPs, so their impact is minimal.
+ */
+#define DO_MCKINLEY_E9_WORKAROUND
+#ifdef DO_MCKINLEY_E9_WORKAROUND
+	.section "__mckinley_e9_bundles", "a"
+	.previous
+/* workaround for Itanium 2 Errata 9: */
+# define MCKINLEY_E9_WORKAROUND			\
+	.xdata4 "__mckinley_e9_bundles", 1f-.;	\
+1:{ .mib;					\
+	nop.m 0;				\
+	nop.i 0;				\
+	br.call.sptk.many b7=1f;;		\
+  };						\
+1:
+#else
+# define MCKINLEY_E9_WORKAROUND
 #endif
 
 #endif /* _ASM_IA64_ASMMACRO_H */

@@ -460,7 +460,7 @@ ahc_queue_scb(struct ahc_softc *ahc, struct scb *scb)
 	ahc->qinfifo[ahc->qinfifonext++] = scb->hscb->tag;
 
 	/*
-	 * Make sure our data is consistant from the
+	 * Make sure our data is consistent from the
 	 * perspective of the adapter.
 	 */
 	ahc_sync_scb(ahc, scb, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);

@@ -743,8 +743,8 @@ nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 		goto out;
 	
 	/*
-	 * Now we do a seperate LOOKUP for each component of the mount path.
-	 * The LOOKUPs are done seperately so that we can conveniently
+	 * Now we do a separate LOOKUP for each component of the mount path.
+	 * The LOOKUPs are done separately so that we can conveniently
 	 * catch an ERR_WRONGSEC if it occurs along the way...
 	 */
 	p = server->mnt_path;

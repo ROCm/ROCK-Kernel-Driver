@@ -3,7 +3,7 @@
 /*
  * linux/include/asm-generic/rmap.h
  *
- * Architecture dependant parts of the reverse mapping code,
+ * Architecture dependent parts of the reverse mapping code,
  * this version should work for most architectures with a
  * 'normal' page table layout.
  *

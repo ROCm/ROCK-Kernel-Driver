@@ -86,7 +86,7 @@ static struct zoran zorans[ZORAN_MAX];
  * 0x28 and 0x2C. How you do that is left as an exercise
  * to the impatient reader :)
  */
-#define T 1	/* to seperate the bools from the ints */
+#define T 1	/* to separate the bools from the ints */
 #define F 0
 static struct tvcard tvcards[] = {
 	/* reported working by <middelin@polyware.nl> */

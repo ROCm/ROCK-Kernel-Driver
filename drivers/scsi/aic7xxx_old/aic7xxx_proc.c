@@ -313,7 +313,7 @@ aic7xxx_proc_info ( char *buffer, char **start, off_t offset, int length,
                     p->user[tindex].options);
     if(sdptr->simple_tags)
     {
-      size += sprintf(BLS, "  Tagged Command Queueing Enabled, Ordered Tags %s, Depth %d/%d\n", sdptr->ordered_tags ? "Enabled" : "Disabled", sdptr->new_queue_depth, aic_dev->max_q_depth);
+      size += sprintf(BLS, "  Tagged Command Queueing Enabled, Ordered Tags %s, Depth %d/%d\n", sdptr->ordered_tags ? "Enabled" : "Disabled", sdptr->queue_depth, aic_dev->max_q_depth);
     }
     if(aic_dev->barrier_total)
       size += sprintf(BLS, "  Total transfers %ld:\n    (%ld/%ld/%ld/%ld reads/writes/REQ_BARRIER/Ordered Tags)\n",

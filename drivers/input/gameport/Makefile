@@ -2,10 +2,6 @@
 # Makefile for the gameport drivers.
 #
 
-# Objects that export symbols.
-
-export-objs	:= gameport.o
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_GAMEPORT)		+= gameport.o

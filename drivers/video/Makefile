@@ -2,12 +2,6 @@
 # 5 Aug 1999, James Simmons, <mailto:jsimmons@users.sf.net>
 # Rewritten to use lists instead of if-statements.
 
-# All of the (potential) objects that export symbols.
-# This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
-
-export-objs    	:= fbmem.o fbcmap.o fbmon.o modedb.o softcursor.o cfbfillrect.o \
-		   cfbcopyarea.o cfbimgblt.o cyber2000fb.o vgastate.o
-
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_VT)		  += console/

@@ -305,7 +305,7 @@ typedef struct {
  * Per card driver data
  */
 typedef struct eicon_card {
-	eicon_hwif hwif;                 /* Hardware dependant interface     */
+	eicon_hwif hwif;                 /* Hardware dependent interface     */
 	DESCRIPTOR *d;			 /* IDI Descriptor		     */
         u_char ptype;                    /* Protocol type (1TR6 or Euro)     */
         u_char bus;                      /* Bustype (ISA, MCA, PCI)          */

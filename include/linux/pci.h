@@ -671,6 +671,37 @@ void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
 extern struct pci_dev *isa_bridge;
 #endif
 
+/* Some worker functions that PCI Hotplug drivers find useful */
+struct pci_dev_wrapped {
+	struct pci_dev	*dev;
+	void		*data;
+};
+
+struct pci_bus_wrapped {
+	struct pci_bus	*bus;
+	void		*data;
+};
+
+struct pci_visit {
+	int (* pre_visit_pci_bus)	(struct pci_bus_wrapped *,
+					 struct pci_dev_wrapped *);
+	int (* post_visit_pci_bus)	(struct pci_bus_wrapped *,
+					 struct pci_dev_wrapped *);
+
+	int (* pre_visit_pci_dev)	(struct pci_dev_wrapped *,
+					 struct pci_bus_wrapped *);
+	int (* visit_pci_dev)		(struct pci_dev_wrapped *,
+					 struct pci_bus_wrapped *);
+	int (* post_visit_pci_dev)	(struct pci_dev_wrapped *,
+					 struct pci_bus_wrapped *);
+};
+
+extern int pci_visit_dev(struct pci_visit *fn,
+			 struct pci_dev_wrapped *wrapped_dev,
+			 struct pci_bus_wrapped *wrapped_parent);
+extern int pci_is_dev_in_use(struct pci_dev *dev);
+extern int pci_remove_device_safe(struct pci_dev *dev);
+
 #endif /* CONFIG_PCI */
 
 /* Include architecture-dependent settings and functions */

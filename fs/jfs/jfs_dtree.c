@@ -130,7 +130,7 @@ struct dtsplit {
 		if (((P)->header.nextindex > (((BN)==0)?DTROOTMAXSLOT:(P)->header.maxslot)) ||\
 		    ((BN) && ((P)->header.maxslot > DTPAGEMAXSLOT)))\
 		{\
-			jERROR(1,("DT_GETPAGE: dtree page corrupt\n"));\
+			jfs_err("DT_GETPAGE: dtree page corrupt");\
 			BT_PUTPAGE(MP);\
 			updateSuper((IP)->i_sb, FM_DIRTY);\
 			MP = NULL;\
@@ -222,6 +222,25 @@ static struct metapage *read_index_page(struct inode *inode, s64 blkno)
 }
 
 /*
+ *	get_index_page()
+ *
+ *	Same as get_index_page(), but get's a new page without reading
+ */
+static struct metapage *get_index_page(struct inode *inode, s64 blkno)
+{
+	int rc;
+	s64 xaddr;
+	int xflag;
+	s32 xlen;
+
+	rc = xtLookup(inode, blkno, 1, &xflag, &xaddr, &xlen, 1);
+	if (rc || (xlen == 0))
+		return NULL;
+
+	return get_metapage(inode, xaddr, PSIZE, 1);
+}
+
+/*
  *	find_index()
  *
  *	Returns dtree page containing directory table entry for specified
@@ -241,15 +260,14 @@ static struct dir_table_slot *find_index(struct inode *ip, u32 index,
 
 	if (index < 2) {
 		if (maxWarnings) {
-			jERROR(1, ("find_entry called with index = %d\n",
-				   index));
+			jfs_warn("find_entry called with index = %d", index);
 			maxWarnings--;
 		}
 		return 0;
 	}
 
 	if (index >= jfs_ip->next_index) {
-		jFYI(1, ("find_entry called with index >= next_index\n"));
+		jfs_warn("find_entry called with index >= next_index");
 		return 0;
 	}
 
@@ -274,8 +292,7 @@ static struct dir_table_slot *find_index(struct inode *ip, u32 index,
 			*mp = read_index_page(ip, blkno);
 		}
 		if (*mp == 0) {
-			jERROR(1,
-			       ("free_index: error reading directory table\n"));
+			jfs_err("free_index: error reading directory table");
 			return 0;
 		}
 
@@ -336,8 +353,8 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 	ASSERT(DO_INDEX(ip));
 
 	if (jfs_ip->next_index < 2) {
-		jERROR(1, ("next_index = %d.  Please fix this!\n",
-			   jfs_ip->next_index));
+		jfs_warn("add_index: next_index = %d.  Resetting!",
+			   jfs_ip->next_index);
 		jfs_ip->next_index = 2;
 	}
 
@@ -386,14 +403,14 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		if ((rc =
 		     xtInsert(tid, ip, 0, 0, sbi->nbperpage,
 			      &xaddr, 0))) {
-			jFYI(1, ("add_index: xtInsert failed!\n"));
+			jfs_warn("add_index: xtInsert failed!");
 			return -1;
 		}
 		ip->i_size = PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
 
-		if ((mp = read_index_page(ip, 0)) == 0) {
-			jERROR(1, ("add_index: get_metapage failed!\n"));
+		if ((mp = get_index_page(ip, 0)) == 0) {
+			jfs_err("add_index: get_metapage failed!");
 			xtTruncate(tid, ip, 0, COMMIT_PWMAP);
 			return -1;
 		}
@@ -428,14 +445,14 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		if ((rc =
 		     xtInsert(tid, ip, 0, blkno, sbi->nbperpage,
 			      &xaddr, 0))) {
-			jFYI(1, ("add_index: xtInsert failed!\n"));
+			jfs_warn("add_index: xtInsert failed!");
 			jfs_ip->next_index--;
 			return -1;
 		}
 		ip->i_size += PSIZE;
 		ip->i_blocks += LBLK2PBLK(sb, sbi->nbperpage);
 
-		if ((mp = read_index_page(ip, blkno)))
+		if ((mp = get_index_page(ip, blkno)))
 			memset(mp->data, 0, PSIZE);	/* Just looks better */
 		else
 			xtTruncate(tid, ip, offset, COMMIT_PWMAP);
@@ -443,7 +460,7 @@ static u32 add_index(tid_t tid, struct inode *ip, s64 bn, int slot)
 		mp = read_index_page(ip, blkno);
 
 	if (mp == 0) {
-		jERROR(1, ("add_index: get/read_metapage failed!\n"));
+		jfs_err("add_index: get/read_metapage failed!");
 		return -1;
 	}
 
@@ -751,7 +768,7 @@ int dtSearch(struct inode *ip, struct component_name * key, ino_t * data,
 			/* Something's corrupted, mark filesytem dirty so
 			 * chkdsk will fix it.
 			 */
-			jERROR(1, ("stack overrun in dtSearch!\n"));
+			jfs_err("stack overrun in dtSearch!");
 			updateSuper(sb, FM_DIRTY);
 			rc = EIO;
 			goto out;
@@ -1162,7 +1179,7 @@ static int dtSplitUp(tid_t tid,
 			break;
 
 		default:
-			jERROR(2, ("dtSplitUp(): UFO!\n"));
+			jfs_err("dtSplitUp(): UFO!");
 			break;
 		}
 
@@ -1313,8 +1330,7 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 	if (rmp == NULL)
 		return EIO;
 
-	jEVENT(0,
-	       ("dtSplitPage: ip:0x%p smp:0x%p rmp:0x%p\n", ip, smp, rmp));
+	jfs_info("dtSplitPage: ip:0x%p smp:0x%p rmp:0x%p", ip, smp, rmp);
 
 	BT_MARK_DIRTY(rmp, ip);
 	/*
@@ -1420,9 +1436,8 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 		 * acquire a transaction lock on the next page
 		 */
 		tlck = txLock(tid, ip, mp, tlckDTREE | tlckRELINK);
-		jEVENT(0,
-		       ("dtSplitPage: tlck = 0x%p, ip = 0x%p, mp=0x%p\n",
-			tlck, ip, mp));
+		jfs_info("dtSplitPage: tlck = 0x%p, ip = 0x%p, mp=0x%p",
+			tlck, ip, mp);
 		dtlck = (struct dt_lock *) & tlck->lock;
 
 		/* linelock header of previous right sibling page */
@@ -1564,7 +1579,6 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 
 	ip->i_blocks += LBLK2PBLK(sb, lengthPXD(pxd));
 
-	jEVENT(0, ("dtSplitPage: ip:0x%p sp:0x%p rp:0x%p\n", ip, sp, rp));
 	return 0;
 }
 
@@ -1665,8 +1679,7 @@ static int dtExtendPage(tid_t tid,
 	 */
 	sp->header.self = *pxd;
 
-	jEVENT(0,
-	       ("dtExtendPage: ip:0x%p smp:0x%p sp:0x%p\n", ip, smp, sp));
+	jfs_info("dtExtendPage: ip:0x%p smp:0x%p sp:0x%p", ip, smp, sp);
 
 	BT_MARK_DIRTY(smp, ip);
 	/*
@@ -1803,10 +1816,6 @@ static int dtExtendPage(tid_t tid,
 				  lengthDXD(&JFS_IP(ip)->ea) : 0) +
 				 ((JFS_IP(ip)->acl.flag & DXD_EXTENT) ?
 				  lengthDXD(&JFS_IP(ip)->acl) : 0));
-
-	jEVENT(0,
-	       ("dtExtendPage: ip:0x%p smp:0x%p sp:0x%p\n", ip, smp, sp));
-
 
 	DT_PUTPAGE(pmp);
 	return 0;
@@ -2401,9 +2410,9 @@ int dtRelocate(tid_t tid, struct inode *ip, s64 lmxaddr, pxd_t * opxd,
 	oxaddr = addressPXD(opxd);
 	xlen = lengthPXD(opxd);
 
-	jEVENT(0, ("dtRelocate: lmxaddr:%Ld xaddr:%Ld:%Ld xlen:%d\n",
+	jfs_info("dtRelocate: lmxaddr:%Ld xaddr:%Ld:%Ld xlen:%d",
 		   (long long)lmxaddr, (long long)oxaddr, (long long)nxaddr,
-		   xlen));
+		   xlen);
 
 	/*
 	 *      1. get the internal parent dtpage covering
@@ -2415,7 +2424,7 @@ int dtRelocate(tid_t tid, struct inode *ip, s64 lmxaddr, pxd_t * opxd,
 
 	/* retrieve search result */
 	DT_GETSEARCH(ip, btstack.top, bn, pmp, pp, index);
-	jEVENT(0, ("dtRelocate: parent router entry validated.\n"));
+	jfs_info("dtRelocate: parent router entry validated.");
 
 	/*
 	 *      2. relocate the target dtpage
@@ -2521,7 +2530,7 @@ int dtRelocate(tid_t tid, struct inode *ip, s64 lmxaddr, pxd_t * opxd,
 #endif /* _STILL_TO_PORT */
 	/* unpin the relocated page */
 	DT_PUTPAGE(mp);
-	jEVENT(0, ("dtRelocate: target dtpage relocated.\n"));
+	jfs_info("dtRelocate: target dtpage relocated.");
 
 	/* the moved extent is dtpage, then a LOG_NOREDOPAGE log rec
 	 * needs to be written (in logredo(), the LOG_NOREDOPAGE log rec
@@ -2549,7 +2558,7 @@ int dtRelocate(tid_t tid, struct inode *ip, s64 lmxaddr, pxd_t * opxd,
 	 * acquire tlck for the parent entry covering the target dtpage;
 	 * write LOG_REDOPAGE to apply after image only;
 	 */
-	jEVENT(0, ("dtRelocate: update parent router entry.\n"));
+	jfs_info("dtRelocate: update parent router entry.");
 	tlck = txLock(tid, ip, pmp, tlckDTREE | tlckENTRY);
 	dtlck = (struct dt_lock *) & tlck->lock;
 	lv = & dtlck->lv[dtlck->index];
@@ -2708,9 +2717,8 @@ static int dtRelink(tid_t tid, struct inode *ip, dtpage_t * p)
 		 * action: update prev pointer;
 		 */
 		tlck = txLock(tid, ip, mp, tlckDTREE | tlckRELINK);
-		jEVENT(0,
-		       ("dtRelink nextbn: tlck = 0x%p, ip = 0x%p, mp=0x%p\n",
-			tlck, ip, mp));
+		jfs_info("dtRelink nextbn: tlck = 0x%p, ip = 0x%p, mp=0x%p",
+			tlck, ip, mp);
 		dtlck = (struct dt_lock *) & tlck->lock;
 
 		/* linelock header */
@@ -2738,9 +2746,8 @@ static int dtRelink(tid_t tid, struct inode *ip, dtpage_t * p)
 		 * action: update next pointer;
 		 */
 		tlck = txLock(tid, ip, mp, tlckDTREE | tlckRELINK);
-		jEVENT(0,
-		       ("dtRelink prevbn: tlck = 0x%p, ip = 0x%p, mp=0x%p\n",
-			tlck, ip, mp));
+		jfs_info("dtRelink prevbn: tlck = 0x%p, ip = 0x%p, mp=0x%p",
+			tlck, ip, mp);
 		dtlck = (struct dt_lock *) & tlck->lock;
 
 		/* linelock header */
@@ -3012,8 +3019,8 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			}
 			if (dirtab_slot.flag == DIR_INDEX_FREE) {
 				if (loop_count++ > JFS_IP(ip)->next_index) {
-					jERROR(1, ("jfs_readdir detected "
-						   "infinite loop!\n"));
+					jfs_err("jfs_readdir detected "
+						   "infinite loop!");
 					filp->f_pos = DIREND;
 					return 0;
 				}
@@ -3032,7 +3039,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				return 0;
 			}
 			if (p->header.flag & BT_INTERNAL) {
-				jERROR(1,("jfs_readdir: bad index table\n"));
+				jfs_err("jfs_readdir: bad index table");
 				DT_PUTPAGE(mp);
 				filp->f_pos = -1;
 				return 0;
@@ -3097,8 +3104,8 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 					    PARENT(ip), DT_DIR))
 					return 0;
 			} else {
-				jERROR(1,
-				       ("jfs_readdir called with invalid offset!\n"));
+				jfs_err("jfs_readdir called with "
+					"invalid offset!");
 			}
 			dtoffset->pn = 1;
 			dtoffset->index = 0;
@@ -3111,9 +3118,8 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		}
 
 		if ((rc = dtReadNext(ip, &filp->f_pos, &btstack))) {
-			jERROR(1,
-			       ("jfs_readdir: unexpected rc = %d from dtReadNext\n",
-				rc));
+			jfs_err("jfs_readdir: unexpected rc = %d "
+				"from dtReadNext", rc);
 			filp->f_pos = DIREND;
 			return 0;
 		}
@@ -3130,7 +3136,7 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	dirent_buf = __get_free_page(GFP_KERNEL);
 	if (dirent_buf == 0) {
 		DT_PUTPAGE(mp);
-		jERROR(1, ("jfs_readdir: __get_free_page failed!\n"));
+		jfs_warn("jfs_readdir: __get_free_page failed!");
 		filp->f_pos = DIREND;
 		return -ENOMEM;
 	}
@@ -3202,9 +3208,10 @@ int jfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 				d_namleft -= len;
 				/* Sanity Check */
 				if (d_namleft == 0) {
-					jERROR(1,("JFS:Dtree error: "
-					  "ino = %ld, bn=%Ld, index = %d\n",
-						  (long)ip->i_ino, (long long)bn, i));
+					jfs_err("JFS:Dtree error: ino = "
+						"%ld, bn=%Ld, index = %d",
+						(long)ip->i_ino,(long long)bn,
+						i);
 					updateSuper(ip->i_sb, FM_DIRTY);
 					goto skip_one;
 				}

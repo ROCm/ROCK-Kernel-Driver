@@ -2,8 +2,6 @@
 # Makefile for the kernel DVB device drivers.
 #
 
-export-objs     := dvb_ksyms.o
-
 dvb-core-objs = dvbdev.o dmxdev.o dvb_demux.o dvb_filter.o \
 		dvb_frontend.o dvb_i2c.o dvb_net.o dvb_ksyms.o
 

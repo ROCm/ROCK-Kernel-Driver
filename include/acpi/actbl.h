@@ -184,7 +184,7 @@ struct smart_battery_description_table
 #define ACPI_TABLE_ROOT         0x00
 #define ACPI_TABLE_PRIMARY      0x10
 #define ACPI_TABLE_SECONDARY    0x20
-#define ACPI_TABLE_OTHER        0x30
+#define ACPI_TABLE_ALL          0x30
 #define ACPI_TABLE_TYPE_MASK    0x30
 
 /* Data about each known table type */

@@ -82,7 +82,7 @@ static char *amd_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100" };
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
 
-static int amd_base;
+static long amd_base;
 static struct pci_dev *bmide_dev;
 extern int (*amd74xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
 

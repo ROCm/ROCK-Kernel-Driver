@@ -5,9 +5,6 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-export-objs :=	z85230.o syncppp.o comx.o sdladrv.o cycx_drv.o hdlc_generic.o \
-		dlci.o
-
 wanpipe-y			:= sdlamain.o sdla_ft1.o
 wanpipe-$(CONFIG_WANPIPE_X25)	+= sdla_x25.o
 wanpipe-$(CONFIG_WANPIPE_FR)	+= sdla_fr.o

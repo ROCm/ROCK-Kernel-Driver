@@ -176,6 +176,9 @@ menu "SCSI low-level drivers"
 config SGIWD93_SCSI
 	tristate "SGI WD93C93 SCSI Driver"
 	depends on SGI_IP22 && SCSI
+  	help
+	  If you have a Western Digital WD93 SCSI controller on
+	  an SGI MIPS system, say Y.  Otherwise, say N.
 
 config SCSI_DECNCR
 	tristate "DEC NCR53C94 Scsi Driver"
@@ -1342,6 +1345,10 @@ config SCSI_QLOGIC_FC
 config SCSI_QLOGIC_FC_FIRMWARE
 	bool "Include loadable firmware in driver"
 	depends on SCSI_QLOGIC_FC
+  	help
+	  Say Y to include ISP2100 Fabric Initiator/Target Firmware, with
+	  expanded LUN addressing and FcTape (FCP-2) support, in the
+	  Qlogic QLA 1280 driver. This is required on some platforms.
 
 config SCSI_QLOGIC_1280
 	tristate "Qlogic QLA 1280 SCSI support"

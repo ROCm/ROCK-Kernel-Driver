@@ -15,6 +15,7 @@
 #include <linux/string.h>
 #include <linux/mm.h>
 #include <linux/init.h>
+#include <linux/time.h>
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <linux/pmu.h>
@@ -28,8 +29,6 @@
 #include <asm/hardirq.h>
 #include <asm/time.h>
 #include <asm/nvram.h>
-
-extern rwlock_t xtime_lock;
 
 /* Apparently the RTC stores seconds since 1 Jan 1904 */
 #define RTC_OFFSET	2082844800
@@ -215,19 +214,21 @@ time_sleep_notify(struct pmu_sleep_notifier *self, int when)
 {
 	static unsigned long time_diff;
 	unsigned long flags;
+	unsigned long seq;
 
 	switch (when) {
 	case PBOOK_SLEEP_NOW:
-		read_lock_irqsave(&xtime_lock, flags);
-		time_diff = xtime.tv_sec - pmac_get_rtc_time();
-		read_unlock_irqrestore(&xtime_lock, flags);
+		do {
+			seq = read_seqbegin_irqsave(&xtime_lock, flags);
+			time_diff = xtime.tv_sec - pmac_get_rtc_time();
+		} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
 		break;
 	case PBOOK_WAKE:
-		write_lock_irqsave(&xtime_lock, flags);
+		write_seqlock_irqsave(&xtime_lock, flags);
 		xtime.tv_sec = pmac_get_rtc_time() + time_diff;
 		xtime.tv_nsec = 0;
 		last_rtc_update = xtime.tv_sec;
-		write_unlock_irqrestore(&xtime_lock, flags);
+		write_sequnlock_irqrestore(&xtime_lock, flags);
 		break;
 	}
 	return PBOOK_SLEEP_OK;

@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/swap.h>
 #include <linux/errno.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/times.h>
 #include <linux/elf.h>
@@ -615,19 +616,17 @@ asmlinkage int irix_getgid(struct pt_regs *regs)
 	return current->gid;
 }
 
-extern rwlock_t xtime_lock;
-
 asmlinkage int irix_stime(int value)
 {
 	if (!capable(CAP_SYS_TIME))
 		return -EPERM;
 
-	write_lock_irq(&xtime_lock);
+	write_seqlock_irq(&xtime_lock);
 	xtime.tv_sec = value;
 	xtime.tv_usec = 0;
 	time_maxerror = MAXPHASE;
 	time_esterror = MAXPHASE;
-	write_unlock_irq(&xtime_lock);
+	write_sequnlock_irq(&xtime_lock);
 
 	return 0;
 }

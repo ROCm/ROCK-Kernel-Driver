@@ -107,8 +107,8 @@
 	- Provide compat macros for pci_enable_device(), pci_find_subsys()
 	  and scsi_set_pci_device()
 	- Call scsi_set_pci_device() for all devices
-	- Reduce size of kernel version dependant device probe code
-	- Move duplicate probe/init code to seperate function
+	- Reduce size of kernel version dependent device probe code
+	- Move duplicate probe/init code to separate function
 	- Handle error if qla1280_mem_alloc() fails
 	- Kill OFFSET() macro and use Linux's PCI definitions instead
         - Kill private structure defining PCI config space (struct config_reg)
@@ -588,9 +588,9 @@ static int ql_debug_level = 0;
 #define ENTER_INTR(x)		dprintk(3, "qla1280 : Entering %s()\n", x);
 #define LEAVE_INTR(x)		dprintk(3, "qla1280 : Leaving %s()\n", x);
 
-#define SCSI_BUS_32(scp)	scp->channel
-#define SCSI_TCN_32(scp)	scp->target
-#define SCSI_LUN_32(scp)	scp->lun
+#define SCSI_BUS_32(scp)	scp->device->channel
+#define SCSI_TCN_32(scp)	scp->device->id
+#define SCSI_LUN_32(scp)	scp->device->lun
 
 /****************************************************************************/
 /*  LINUX -  Loadable Module Functions.                                     */
@@ -866,19 +866,17 @@ qla1280_do_device_init(struct pci_dev *pdev,
 			"qla1280", ha)) {
 		printk("qla1280 : Failed to reserve interrupt %d already "
 		       "in use\n", host->irq);
-		goto error_mem_alloced;
+		goto error_unmap;
 	}
 #if !MEMORY_MAPPED_IO
 	/* Register the I/O space with Linux */
-	if (check_region(host->io_port, 0xff)) {
+	if (!request_region(host->io_port, 0xff, "qla1280")) {
 		printk("qla1280 : Failed to reserve i/o region 0x%04lx-0x%04lx"
 		       " already in use\n",
 		       host->io_port, host->io_port + 0xff);
-		free_irq(host->irq, ha);
-		goto error_mem_alloced;
+		goto error_irq;
 	}
 
-	request_region(host->io_port, 0xff, "qla1280");
 #endif
 
 	reg = ha->iobase;
@@ -886,13 +884,28 @@ qla1280_do_device_init(struct pci_dev *pdev,
 	/* load the F/W, read paramaters, and init the H/W */
 	if (qla1280_initialize_adapter(ha)) {
 		printk(KERN_INFO "qla1x160:Failed to initialize adapter\n");
-		goto error_mem_alloced;
+		goto error_region;
 	}
 
 	/* set our host ID  (need to do something about our two IDs) */
 	host->this_id = ha->bus_settings[0].id;
 
 	return host;
+
+ error_region:
+#if !MEMORY_MAPPED_IO
+	release_region(host->io_port, 0xff);
+#endif
+
+ error_irq:
+	free_irq(host->irq, ha);
+
+ error_unmap:
+#if MEMORY_MAPPED_IO
+	if (ha->mmpbase)
+		iounmap((void *)(((unsigned long) ha->mmpbase) & PAGE_MASK));
+#endif
+
 
  error_mem_alloced:
 	qla1280_mem_free(ha);
@@ -1157,7 +1170,7 @@ qla1280_queuecommand(Scsi_Cmnd * cmd, void (*fn) (Scsi_Cmnd *))
 	/*ENTER("qla1280_queuecommand");
 	 */
 
-	host = cmd->host;
+	host = cmd->device->host;
 	ha = (struct scsi_qla_host *)host->hostdata;
 
 	/* send command to adapter */
@@ -1232,8 +1245,8 @@ qla1280_abort(Scsi_Cmnd * cmd)
 	u16 data;
 
 	ENTER("qla1280_abort");
-	ha = (struct scsi_qla_host *)cmd->host->hostdata;
-	host = cmd->host;
+	ha = (struct scsi_qla_host *)cmd->device->host->hostdata;
+	host = cmd->device->host;
 
 	/* Get the SCSI request ptr */
 	sp = (srb_t *)CMD_SP(cmd);
@@ -1365,7 +1378,7 @@ qla1280_new_abort(Scsi_Cmnd * cmd)
 	u16 data;
 
 	ENTER("qla1280_abort");
-	host = cmd->host;
+	host = cmd->device->host;
 	ha = (struct scsi_qla_host *)host->hostdata;
 
 	/* Get the SCSI request ptr */
@@ -1523,7 +1536,7 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
 		       "pointer, failing.\n");
 		return SCSI_RESET_SNOOZE;
 	}
-	ha = (struct scsi_qla_host *)cmd->host->hostdata;
+	ha = (struct scsi_qla_host *)cmd->device->host->hostdata;
 	sp = (srb_t *)CMD_SP(cmd);
 
 #if STOP_ON_RESET
@@ -1820,7 +1833,7 @@ qla1280_slave_configure(Scsi_Device * device)
 		/* device->queue_depth = 20; */
 		printk(KERN_INFO "scsi(%li:%d:%d:%d): Enabled tagged queuing, "
 		       "queue depth %d.\n", p->host_no, device->channel,
-		       device->id, device->lun, device->new_queue_depth);
+		       device->id, device->lun, device->queue_depth);
 	} else {
 		scsi_adjust_queue_depth(device, 0 /* TCQ off */, 3);
 	}

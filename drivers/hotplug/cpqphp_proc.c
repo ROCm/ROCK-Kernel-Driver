@@ -113,6 +113,8 @@ static int read_dev (char *buf, char **start, off_t offset, int len, int *eof, v
 
 	while (slot) {
 		new_slot = cpqhp_slot_find(slot->bus, slot->device, 0);
+		if (!new_slot)
+			break;
 		out += sprintf(out, "assigned resources: memory\n");
 		index = 11;
 		res = new_slot->mem_head;

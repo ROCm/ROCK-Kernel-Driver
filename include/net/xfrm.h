@@ -105,7 +105,6 @@ struct xfrm_state
 		u16		family;
 		xfrm_address_t	saddr;
 		int		header_len;
-		int		trailer_len;
 	} props;
 
 	struct xfrm_lifetime_cfg lft;

@@ -88,7 +88,7 @@
  *	Revision 1.9  1998/09/16 07:33:52  malthoff
  *	remove memcmp() by SK_MEMCMP and
  *	memcpy() by SK_MEMCPY() to be
- *	independant from the 'C' Standard Library.
+ *	independent from the 'C' Standard Library.
  *	
  *	Revision 1.8  1998/08/19 12:52:35  malthoff
  *	compiler fix: use SK_VPD_KEY instead of S_VPD.

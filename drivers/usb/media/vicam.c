@@ -988,7 +988,7 @@ read_frame(struct vicam_camera *cam, int framenum)
 	up(&cam->cam_lock);
 }
 
-static int
+static ssize_t
 vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
 {
 	struct vicam_camera *cam = file->private_data;

@@ -111,6 +111,13 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	 */
 };
 
+/* 2.4 does this a bit differently ... */
+static inline struct usb_bus *hcd_to_bus (struct usb_hcd *hcd)
+{
+	return &hcd->self;
+}
+
+
 struct hcd_dev {	/* usb_device.hcpriv points to this */
 	struct list_head	dev_list;	/* on this hcd */
 	struct list_head	urb_list;	/* pending on this dev */
@@ -342,6 +349,13 @@ extern void usb_deregister_bus (struct usb_bus *);
 
 extern int usb_register_root_hub (struct usb_device *usb_dev,
 		struct device *parent_dev);
+
+/* for portability to 2.4, hcds should call this */
+static inline int hcd_register_root (struct usb_hcd *hcd)
+{
+	return usb_register_root_hub (
+		hcd_to_bus (hcd)->root_hub, hcd->controller);
+}
 
 /*-------------------------------------------------------------------------*/
 

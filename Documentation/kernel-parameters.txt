@@ -1,4 +1,4 @@
-November 2002             Kernel Parameters                     v2.5.49
+February 2003             Kernel Parameters                     v2.5.59
                           ~~~~~~~~~~~~~~~~~
 
 The following is a consolidated list of the kernel parameters as implemented
@@ -60,6 +60,7 @@ restrictions referred to are that the relevant option is valid if:
 	V4L	Video For Linux support is enabled.
 	VGA	The VGA console has been enabled.
 	VT	Virtual terminal support is enabled.
+	WDT	Watchdog support is enabled.
 	XT	IBM PC/XT MFM hard disk support is enabled.
 
 In addition, the following text indicates that the option:
@@ -98,6 +99,9 @@ running once the system is up.
 	advansys=	[HW,SCSI]
 			See header of drivers/scsi/advansys.c.
 
+	advwdt=		[HW,WDT] Advantech WDT
+			Format: <iostart>,<iostop>
+
 	aedsp16=	[HW,OSS] Audio Excel DSP 16
 			Format: <io>,<irq>,<dma>,<mss_io>,<mpu_io>,<mpu_irq>
 			See also header of sound/oss/aedsp16.c.
@@ -110,6 +114,9 @@ running once the system is up.
 
 	aic7xxx=	[HW,SCSI]
 			See Documentation/scsi/aic7xxx.txt.
+
+	aic79xx=	[HW,SCSI]
+			See Documentation/scsi/aic79xx.txt.
 
 	allowdma0	[ISAPNP]
 
@@ -230,19 +237,11 @@ running once the system is up.
 
 	cs89x0_media=	[HW,NET]
 			Format: { rj45 | aui | bnc }
-
-	ctc=		[HW,NET]
-			See drivers/s390/net/ctcmain.c, comment before function
-			ctc_setup().
  
 	cyclades=	[HW,SERIAL] Cyclades multi-serial port adapter.
  
 	dasd=		[HW,NET]    
 			See header of drivers/s390/block/dasd_devmap.c.
-
-	dasd_discipline=
-			[HW,NET]
-			See header of drivers/s390/block/dasd.c.
 
 	db9=		[HW,JOY]
 	db9_2=
@@ -253,9 +252,6 @@ running once the system is up.
 	decnet=		[HW,NET]
 			Format: <area>[,<node>]
 			See also Documentation/networking/decnet.txt.
-
-	decr_overclock= [PPC]
-	decr_overclock_proc0=
 
 	devfs=		[DEVFS]
 			See Documentation/filesystems/devfs/boot-options.
@@ -305,6 +301,9 @@ running once the system is up.
 			This option is obsoleted by the "netdev=" option, which
 			has equivalent usage. See its documentation for details.
 
+	eurwdt=		[HW,WDT] Eurotech CPU-1220/1410 onboard watchdog.
+			Format: <io>[,<irq>]
+
 	fd_mcs=		[HW,SCSI]
 			See header of drivers/scsi/fd_mcs.c.
 
@@ -350,7 +349,9 @@ running once the system is up.
 	hisax=		[HW,ISDN]
 			See Documentation/isdn/README.HiSax.
 
-	hugepages=	[HW,IA-32] Maximal number of HugeTLB pages
+	hugepages=	[HW,IA-32,IA-64] Maximal number of HugeTLB pages.
+
+	noirqbalance	[IA-32,SMP,KNL] Disable kernel irq balancing
 
 	i8042_direct	[HW] Non-translated mode
 	i8042_dumbkbd
@@ -393,6 +394,10 @@ running once the system is up.
 			Format: <irq>
 
 	inttest=	[IA64]
+
+	io7=		[HW] IO7 for Marvel based alpha systems
+			See comment before marvel_specify_io7 in
+			arch/alpha/kernel/core_marvel.c.
 
 	ip=		[IP_PNP]
 			See Documentation/nfsroot.txt.
@@ -495,6 +500,7 @@ running once the system is up.
  
 	mdacon=		[MDA]
 			Format: <first>,<last>
+			Specifies range of consoles to be captured by the MDA.
  
 	mem=exactmap	[KNL,BOOT,IA-32] Enable setting of an exact
 			E820 memory map, as specified by the user.
@@ -576,6 +582,8 @@ running once the system is up.
  
 	nodisconnect	[HW,SCSI,M68K] Disables SCSI disconnects.
 
+	noexec		[IA-64]
+
 	nofxsr		[BUGS=IA-32]
 
 	nohighio	[BUGS=IA-32] Disable highmem block I/O.
@@ -599,7 +607,9 @@ running once the system is up.
 
 	noresume	[SWSUSP] Disables resume and restore original swap space.
  
-	no-scroll	[VGA]
+	no-scroll	[VGA] Disables scrollback.
+			This is required for the Braillex ib80-piezo Braille
+			reader made by F.H. Papenmeier (Germany).
 
 	nosbagart	[IA-64]
 
@@ -809,6 +819,9 @@ running once the system is up.
 			See a comment before function sbpcd_setup() in
 			drivers/cdrom/sbpcd.c.
 
+	sc1200wdt=	[HW,WDT] SC1200 WDT (watchdog) driver
+			Format: <io>[,<timeout>[,<isapnp>]]
+
 	scsi_debug_*=	[SCSI]
 			See drivers/scsi/scsi_debug.c.
 
@@ -997,9 +1010,6 @@ running once the system is up.
 	spia_pedr=
 	spia_peddr=
 
-	spread_lpevents=
-			[PPC]
-
 	sscape=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<mpu_io>,<mpu_irq>
  
@@ -1008,6 +1018,19 @@ running once the system is up.
 
 	st0x=		[HW,SCSI]
 			See header of drivers/scsi/seagate.c.
+
+	sti=		[HW]
+			Format: <num>
+			Set the STI (builtin display/keyboard on the HP-PARISC
+			machines) console (graphic card) which should be used
+			as the initial boot-console.
+			See also comment in drivers/video/console/sticore.c.
+
+	sti_font=	[HW]
+			See comment in drivers/video/console/sticore.c.
+
+	stifb=		[HW]
+			Format: bpp:<bpp1>[:<bpp2>[:<bpp3>...]]
 
 	stram_swap=	[HW,M68k]
 
@@ -1079,7 +1102,7 @@ running once the system is up.
 	wd7000=		[HW,SCSI]
 			See header of drivers/scsi/wd7000.c.
 
-	wdt=		[HW] Watchdog
+	wdt=		[WDT] Watchdog
 			See Documentation/watchdog.txt.
 
 	xd=		[HW,XT] Original XT pre-IDE (RLL encoded) disks.

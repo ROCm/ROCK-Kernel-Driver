@@ -264,19 +264,10 @@ int snd_gf1_mem_init(snd_gus_card_t * gus)
 	if (snd_gf1_mem_xalloc(alloc, &block) == NULL)
 		return -ENOMEM;
 #ifdef CONFIG_SND_DEBUG
-	alloc->info_entry = NULL;
-	entry = snd_info_create_card_entry(gus->card, "gusmem", gus->card->proc_root);
-	if (entry) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
+	if (! snd_card_proc_new(gus->card, "gusmem", &entry)) {
+		snd_info_set_text_ops(entry, gus, snd_gf1_mem_info_read);
 		entry->c.text.read_size = 256 * 1024;
-		entry->c.text.read = snd_gf1_mem_info_read;
-		entry->private_data = gus;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
 	}
-	alloc->info_entry = entry;
 #endif
 	return 0;
 }
@@ -293,10 +284,6 @@ int snd_gf1_mem_done(snd_gus_card_t * gus)
 		snd_gf1_mem_xfree(alloc, block);
 		block = nblock;
 	}
-#ifdef CONFIG_SND_DEBUG
-	if (alloc->info_entry)
-		snd_info_unregister(alloc->info_entry);
-#endif
 	return 0;
 }
 

@@ -1317,7 +1317,7 @@ asmlinkage long sys_umask(int mask)
 asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 			  unsigned long arg4, unsigned long arg5)
 {
-	int error = 0;
+	int error;
 	int sig;
 
 	error = security_task_prctl(option, arg2, arg3, arg4, arg5);

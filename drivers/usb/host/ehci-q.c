@@ -43,7 +43,8 @@
 /* fill a qtd, returning how much of the buffer we were able to queue up */
 
 static int
-qtd_fill (struct ehci_qtd *qtd, dma_addr_t buf, size_t len, int token)
+qtd_fill (struct ehci_qtd *qtd, dma_addr_t buf, size_t len,
+		int token, int maxpacket)
 {
 	int	i, count;
 	u64	addr = buf;
@@ -69,6 +70,10 @@ qtd_fill (struct ehci_qtd *qtd, dma_addr_t buf, size_t len, int token)
 			else
 				count = len;
 		}
+
+		/* short packets may only terminate transfers */
+		if (count != len)
+			count -= (count % maxpacket);
 	}
 	qtd->hw_token = cpu_to_le32 ((count << 16) | token);
 	qtd->length = count;
@@ -85,7 +90,7 @@ qh_update (struct ehci_hcd *ehci, struct ehci_qh *qh, struct ehci_qtd *qtd)
 {
 	qh->hw_current = 0;
 	qh->hw_qtd_next = QTD_NEXT (qtd->qtd_dma);
-	qh->hw_alt_next = ehci->async->hw_alt_next;
+	qh->hw_alt_next = EHCI_LIST_END;
 
 	/* HC must see latest qtd and qh data before we clear ACTIVE+HALT */
 	wmb ();
@@ -96,7 +101,7 @@ qh_update (struct ehci_hcd *ehci, struct ehci_qh *qh, struct ehci_qtd *qtd)
 
 #define IS_SHORT_READ(token) (QTD_LENGTH (token) != 0 && QTD_PID (token) == 1)
 
-static inline void qtd_copy_status (
+static void qtd_copy_status (
 	struct ehci_hcd *ehci,
 	struct urb *urb,
 	size_t length,
@@ -224,11 +229,23 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 {
 	struct ehci_qtd		*last = 0, *end = qh->dummy;
 	struct list_head	*entry, *tmp;
-	int			stopped = 0;
+	int			stopped;
 	unsigned		count = 0;
+	int			do_status = 0;
+	u8			state;
 
 	if (unlikely (list_empty (&qh->qtd_list)))
 		return count;
+
+	/* completions (or tasks on other cpus) must never clobber HALT
+	 * till we've gone through and cleaned everything up, even when
+	 * they add urbs to this qh's queue or mark them for unlinking.
+	 *
+	 * NOTE:  unlinking expects to be done in queue order.
+	 */
+	state = qh->qh_state;
+	qh->qh_state = QH_STATE_COMPLETING;
+	stopped = (state == QH_STATE_IDLE);
 
 	/* remove de-activated QTDs from front of queue.
 	 * after faults (including short reads), cleanup this urb
@@ -261,7 +278,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 		rmb ();
 		token = le32_to_cpu (qtd->hw_token);
 		stopped = stopped
-			|| (qh->qh_state == QH_STATE_IDLE)
 			|| (HALT_BIT & qh->hw_token) != 0
 			|| (ehci->hcd.state == USB_STATE_HALT);
 
@@ -271,36 +287,53 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 			/* magic dummy for short reads; won't advance */
 			if (IS_SHORT_READ (token)
 					&& !(token & QTD_STS_HALT)
-					&& ehci->async->hw_alt_next
-						== qh->hw_alt_next)
+					&& (qh->hw_alt_next & QTD_MASK)
+						== ehci->async->hw_alt_next) {
+				stopped = 1;
 				goto halt;
+			}
 
 		/* stop scanning when we reach qtds the hc is using */
 		} else if (likely (!stopped)) {
-			last = 0;
 			break;
 
 		} else {
-			/* ignore active qtds unless some previous qtd
+			/* ignore active urbs unless some previous qtd
 			 * for the urb faulted (including short read) or
 			 * its urb was canceled.  we may patch qh or qtds.
 			 */
-			if ((token & QTD_STS_ACTIVE)
-					&& urb->status == -EINPROGRESS) {
-				last = 0;
+			if (likely (urb->status == -EINPROGRESS))
+				continue;
+			
+			/* issue status after short control reads */
+			if (unlikely (do_status != 0)
+					&& QTD_PID (token) == 0 /* OUT */) {
+				do_status = 0;
 				continue;
 			}
+
+			/* token in overlay may be most current */
+			if (state == QH_STATE_IDLE
+					&& cpu_to_le32 (qtd->qtd_dma)
+						== qh->hw_current)
+				token = le32_to_cpu (qh->hw_token);
+
+			/* force halt for unlinked or blocked qh, so we'll
+			 * patch the qh later and so that completions can't
+			 * activate it while we "know" it's stopped.
+			 */
 			if ((HALT_BIT & qh->hw_token) == 0) {
 halt:
 				qh->hw_token |= HALT_BIT;
 				wmb ();
-				stopped = 1;
 			}
 		}
  
 		/* remove it from the queue */
 		spin_lock (&urb->lock);
 		qtd_copy_status (ehci, urb, qtd->length, token);
+		do_status = (urb->status == -EREMOTEIO)
+				&& usb_pipecontrol (urb->pipe);
 		spin_unlock (&urb->lock);
 
 		if (stopped && qtd->qtd_list.prev != &qh->qtd_list) {
@@ -318,6 +351,9 @@ halt:
 		count++;
 		ehci_qtd_free (ehci, last);
 	}
+
+	/* restore original state; caller must unlink or relink */
+	qh->qh_state = state;
 
 	/* update qh after fault cleanup */
 	if (unlikely ((HALT_BIT & qh->hw_token) != 0)) {
@@ -367,7 +403,7 @@ qh_urb_transaction (
 	struct ehci_qtd		*qtd, *qtd_prev;
 	dma_addr_t		buf;
 	int			len, maxpacket;
-	int			is_input, status_patch = 0;
+	int			is_input;
 	u32			token;
 
 	/*
@@ -388,7 +424,7 @@ qh_urb_transaction (
 	if (usb_pipecontrol (urb->pipe)) {
 		/* SETUP pid */
 		qtd_fill (qtd, urb->setup_dma, sizeof (struct usb_ctrlrequest),
-			token | (2 /* "setup" */ << 8));
+			token | (2 /* "setup" */ << 8), 8);
 
 		/* ... and always at least one more pid */
 		token ^= QTD_TOGGLE;
@@ -399,10 +435,6 @@ qh_urb_transaction (
 		qtd->urb = urb;
 		qtd_prev->hw_next = QTD_NEXT (qtd->qtd_dma);
 		list_add_tail (&qtd->qtd_list, head);
-
-		if (len > 0 && is_input
-				&& !(urb->transfer_flags & URB_SHORT_NOT_OK))
-			status_patch = 1;
 	} 
 
 	/*
@@ -413,6 +445,7 @@ qh_urb_transaction (
 	else
 		buf = 0;
 
+	// FIXME this 'buf' check break some zlps...
 	if (!buf || is_input)
 		token |= (1 /* "in" */ << 8);
 	/* else it's already initted to "out" pid (0 << 8) */
@@ -427,9 +460,11 @@ qh_urb_transaction (
 	for (;;) {
 		int this_qtd_len;
 
-		this_qtd_len = qtd_fill (qtd, buf, len, token);
+		this_qtd_len = qtd_fill (qtd, buf, len, token, maxpacket);
 		len -= this_qtd_len;
 		buf += this_qtd_len;
+		if (is_input)
+			qtd->hw_alt_next = ehci->async->hw_alt_next;
 
 		/* qh makes control packets use qtd toggle; maybe switch it */
 		if ((maxpacket & (this_qtd_len + (maxpacket - 1))) == 0)
@@ -446,6 +481,13 @@ qh_urb_transaction (
 		qtd_prev->hw_next = QTD_NEXT (qtd->qtd_dma);
 		list_add_tail (&qtd->qtd_list, head);
 	}
+
+	/* unless the bulk/interrupt caller wants a chance to clean
+	 * up after short reads, hc should advance qh past this urb
+	 */
+	if (likely ((urb->transfer_flags & URB_SHORT_NOT_OK) == 0
+				|| usb_pipecontrol (urb->pipe)))
+		qtd->hw_alt_next = EHCI_LIST_END;
 
 	/*
 	 * control requests may need a terminating data "status" ack;
@@ -473,21 +515,8 @@ qh_urb_transaction (
 			list_add_tail (&qtd->qtd_list, head);
 
 			/* never any data in such packets */
-			qtd_fill (qtd, 0, 0, token);
+			qtd_fill (qtd, 0, 0, token, 0);
 		}
-	}
-
-	/* if we're permitting a short control read, we want the hardware to
-	 * just continue after short data and send the status ack.  it can do
-	 * that on the last data packet (typically the only one).  for other
-	 * packets, software fixup is needed (in qh_completions).
-	 */
-	if (status_patch) {
-		struct ehci_qtd		*prev;
-
-		prev = list_entry (qtd->qtd_list.prev,
-				struct ehci_qtd, qtd_list);
-		prev->hw_alt_next = QTD_NEXT (qtd->qtd_dma);
 	}
 
 	/* by default, enable interrupt on urb completion */
@@ -611,7 +640,8 @@ qh_make (
 
 	case USB_SPEED_FULL:
 		/* EPS 0 means "full" */
-		info1 |= (EHCI_TUNE_RL_TT << 28);
+		if (type != PIPE_INTERRUPT)
+			info1 |= (EHCI_TUNE_RL_TT << 28);
 		if (type == PIPE_CONTROL) {
 			info1 |= (1 << 27);	/* for TT */
 			info1 |= 1 << 14;	/* toggle from qtd */
@@ -628,12 +658,13 @@ qh_make (
 
 	case USB_SPEED_HIGH:		/* no TT involved */
 		info1 |= (2 << 12);	/* EPS "high" */
-		info1 |= (EHCI_TUNE_RL_HS << 28);
 		if (type == PIPE_CONTROL) {
+			info1 |= (EHCI_TUNE_RL_HS << 28);
 			info1 |= 64 << 16;	/* usb2 fixed maxpacket */
 			info1 |= 1 << 14;	/* toggle from qtd */
 			info2 |= (EHCI_TUNE_MULT_HS << 30);
 		} else if (type == PIPE_BULK) {
+			info1 |= (EHCI_TUNE_RL_HS << 28);
 			info1 |= 512 << 16;	/* usb2 fixed maxpacket */
 			info2 |= (EHCI_TUNE_MULT_HS << 30);
 		} else {		/* PIPE_INTERRUPT */
@@ -769,8 +800,7 @@ static struct ehci_qh *qh_append_tds (
 				&& !usb_pipecontrol (urb->pipe)) {
 			/* "never happens": drivers do stall cleanup right */
 			if (qh->qh_state != QH_STATE_IDLE
-					&& (cpu_to_le32 (QTD_STS_HALT)
-						& qh->hw_token) == 0)
+					&& qh->qh_state != QH_STATE_COMPLETING)
 				ehci_warn (ehci, "clear toggle dev%d "
 						"ep%d%s: not idle\n",
 						usb_pipedevice (urb->pipe),
@@ -809,7 +839,6 @@ static struct ehci_qh *qh_append_tds (
 			__list_splice (qtd_list, qh->qtd_list.prev);
 
 			ehci_qtd_init (qtd, qtd->qtd_dma);
-			qtd->hw_alt_next = ehci->async->hw_alt_next;
 			qh->dummy = qtd;
 
 			/* hc must see the new dummy at list end */
@@ -877,9 +906,12 @@ submit_async (
 
 /* the async qh for the qtds being reclaimed are now unlinked from the HC */
 
+static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh);
+
 static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 {
 	struct ehci_qh		*qh = ehci->reclaim;
+	struct ehci_qh		*next;
 
 	del_timer (&ehci->watchdog);
 
@@ -889,6 +921,10 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 	qh_put (ehci, qh);			// refcount from reclaim 
 	ehci->reclaim = 0;
 	ehci->reclaim_ready = 0;
+
+	/* other unlink(s) may be pending (in QH_STATE_UNLINK_WAIT) */
+	next = qh->reclaim;
+	qh->reclaim = 0;
 
 	qh_completions (ehci, qh, regs);
 
@@ -909,6 +945,9 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 					jiffies + EHCI_ASYNC_JIFFIES);
 		}
 	}
+
+	if (next)
+		start_unlink_async (ehci, next);
 }
 
 /* makes sure the async qh will become idle */
@@ -921,7 +960,8 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 
 #ifdef DEBUG
 	if (ehci->reclaim
-			|| qh->qh_state != QH_STATE_LINKED
+			|| (qh->qh_state != QH_STATE_LINKED
+				&& qh->qh_state != QH_STATE_UNLINK_WAIT)
 #ifdef CONFIG_SMP
 // this macro lies except on SMP compiles
 			|| !spin_is_locked (&ehci->lock)
@@ -953,6 +993,9 @@ static void start_unlink_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	wmb ();
 
 	if (unlikely (ehci->hcd.state == USB_STATE_HALT)) {
+		/* if (unlikely (qh->reclaim != 0))
+		 * 	this will recurse, probably not much
+		 */
 		end_unlink_async (ehci, NULL);
 		return;
 	}

@@ -106,7 +106,7 @@ int os_map_memory(void *virt, int fd, unsigned long off, unsigned long len,
 
 	loc = mmap((void *) virt, len, prot, MAP_SHARED | MAP_FIXED, 
 		   fd, off);
-	if(loc < 0)
+	if(loc == MAP_FAILED)
 		return(-errno);
 	return(0);
 }

@@ -48,7 +48,7 @@ __u8 rbv_clear;
  * just hit the combined register (ie, vIER|rIER) but that seems to
  * break on AV Macs...probably because they actually decode more than
  * eight address bits. Why can't Apple engineers at least be
- * _consistantly_ lazy?                          - 1999-05-21 (jmt)
+ * _consistently_ lazy?                          - 1999-05-21 (jmt)
  */
 
 static int gIER,gIFR,gBufA,gBufB;

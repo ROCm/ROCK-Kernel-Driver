@@ -109,7 +109,8 @@ unsigned long segv(unsigned long address, unsigned long ip, int is_write,
                 flush_tlb_kernel_vm();
                 return(0);
         }
-        if(current->mm == NULL) panic("Segfault with no mm");
+        if(current->mm == NULL)
+		panic("Segfault with no mm");
 	err = handle_page_fault(address, ip, is_write, is_user, &si.si_code);
 
 	catcher = current->thread.fault_catcher;
@@ -164,14 +165,15 @@ void bad_segv(unsigned long address, unsigned long ip, int is_write)
 	force_sig_info(SIGSEGV, &si, current);
 }
 
-void relay_signal(int sig, struct uml_pt_regs *regs)
+void relay_signal(int sig, union uml_pt_regs *regs)
 {
 	if(arch_handle_signal(sig, regs)) return;
-	if(!regs->is_user) panic("Kernel mode signal %d", sig);
+	if(!UPT_IS_USER(regs))
+		panic("Kernel mode signal %d", sig);
 	force_sig(sig, current);
 }
 
-void bus_handler(int sig, struct uml_pt_regs *regs)
+void bus_handler(int sig, union uml_pt_regs *regs)
 {
 	if(current->thread.fault_catcher != NULL)
 		do_longjmp(current->thread.fault_catcher, 1);

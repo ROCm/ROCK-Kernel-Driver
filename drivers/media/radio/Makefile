@@ -2,11 +2,6 @@
 # Makefile for the kernel character device drivers.
 #
 
-# All of the (potential) objects that export symbols.
-# This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
-
-export-objs     := miropcm20-rds-core.o
-
 miropcm20-objs	:= miropcm20-rds-core.o miropcm20-radio.o
 
 obj-$(CONFIG_RADIO_AZTECH) += radio-aztech.o

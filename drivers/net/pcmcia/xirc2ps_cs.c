@@ -632,6 +632,7 @@ xirc2ps_attach(void)
     link = &local->link; dev = &local->dev;
     link->priv = dev->priv = local;
 
+    init_timer(&link->release);
     link->release.function = &xirc2ps_release;
     link->release.data = (u_long) link;
 

@@ -1808,6 +1808,15 @@ C_LABEL(fpload):
 	retl
 	 nop
 
+	.globl	C_LABEL(ndelay)
+C_LABEL(ndelay):
+	save	%sp, -REGWIN_SZ, %sp
+	mov	%i0, %o0
+	call	.umul
+	 mov	5, %o1
+	ba	delay_continue
+	 nop
+
 	.globl	C_LABEL(udelay)
 C_LABEL(udelay):
 	save	%sp, -REGWIN_SZ, %sp
@@ -1815,6 +1824,7 @@ C_LABEL(udelay):
 	sethi	%hi(0x10c6), %o1
 	call	.umul
 	 or	%o1, %lo(0x10c6), %o1
+delay_continue:
 #ifndef CONFIG_SMP
 	sethi	%hi(C_LABEL(loops_per_jiffy)), %o3
 	call	.umul
@@ -1879,7 +1889,7 @@ C_LABEL(kill_user_windows):
 	wr	%o4, 0x0, %psr			! the uwinmask state
 	WRITE_PAUSE				! burn them cycles
 1:
-	ld	[%g6 + TI_UWINMASK], %o0	! get consistant state
+	ld	[%g6 + TI_UWINMASK], %o0	! get consistent state
 	orcc	%g0, %o0, %g0			! did an interrupt come in?
 	be	4f				! yep, we are done
 	 rd	%wim, %o3			! get current wim

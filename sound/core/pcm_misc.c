@@ -30,6 +30,13 @@
 #define snd_enum_to_int(v) (v)
 #define snd_int_to_enum(v) (v)
 
+/**
+ * snd_pcm_format_signed - Check the PCM format is signed linear
+ * @format: the format to check
+ *
+ * Returns 1 if the given PCM format is signed linear, 0 if unsigned
+ * linear, and a negative error code for non-linear formats.
+ */
 int snd_pcm_format_signed(snd_pcm_format_t format)
 {
 	switch (snd_enum_to_int(format)) {
@@ -66,6 +73,13 @@ int snd_pcm_format_signed(snd_pcm_format_t format)
 	}
 }
 
+/**
+ * snd_pcm_format_unsigned - Check the PCM format is unsigned linear
+ * @format: the format to check
+ *
+ * Returns 1 if the given PCM format is unsigned linear, 0 if signed
+ * linear, and a negative error code for non-linear formats.
+ */
 int snd_pcm_format_unsigned(snd_pcm_format_t format)
 {
 	int val;
@@ -76,11 +90,24 @@ int snd_pcm_format_unsigned(snd_pcm_format_t format)
 	return !val;
 }
 
+/**
+ * snd_pcm_format_linear - Check the PCM format is linear
+ * @format: the format to check
+ *
+ * Returns 1 if the given PCM format is linear, 0 if not.
+ */
 int snd_pcm_format_linear(snd_pcm_format_t format)
 {
 	return snd_pcm_format_signed(format) >= 0;
 }
 
+/**
+ * snd_pcm_format_little_endian - Check the PCM format is little-endian
+ * @format: the format to check
+ *
+ * Returns 1 if the given PCM format is little-endian, 0 if
+ * big-endian, or a negative error code if endian not specified.
+ */
 int snd_pcm_format_little_endian(snd_pcm_format_t format)
 {
 	switch (snd_enum_to_int(format)) {
@@ -121,6 +148,13 @@ int snd_pcm_format_little_endian(snd_pcm_format_t format)
 	}
 }
 
+/**
+ * snd_pcm_format_big_endian - Check the PCM format is big-endian
+ * @format: the format to check
+ *
+ * Returns 1 if the given PCM format is big-endian, 0 if
+ * little-endian, or a negative error code if endian not specified.
+ */
 int snd_pcm_format_big_endian(snd_pcm_format_t format)
 {
 	int val;
@@ -131,6 +165,13 @@ int snd_pcm_format_big_endian(snd_pcm_format_t format)
 	return !val;
 }
 
+/**
+ * snd_pcm_format_cpu_endian - Check the PCM format is CPU-endian
+ * @format: the format to check
+ *
+ * Returns 1 if the given PCM format is CPU-endian, 0 if
+ * opposite, or a negative error code if endian not specified.
+ */
 int snd_pcm_format_cpu_endian(snd_pcm_format_t format)
 {
 #ifdef SNDRV_LITTLE_ENDIAN
@@ -140,6 +181,13 @@ int snd_pcm_format_cpu_endian(snd_pcm_format_t format)
 #endif
 }
 
+/**
+ * snd_pcm_format_width - return the bit-width of the format
+ * @format: the format to check
+ *
+ * Returns the bit-width of the format, or a negative error code
+ * if unknown format.
+ */
 int snd_pcm_format_width(snd_pcm_format_t format)
 {
 	switch (snd_enum_to_int(format)) {
@@ -193,6 +241,13 @@ int snd_pcm_format_width(snd_pcm_format_t format)
 	}
 }
 
+/**
+ * snd_pcm_format_physical_width - return the physical bit-width of the format
+ * @format: the format to check
+ *
+ * Returns the physical bit-width of the format, or a negative error code
+ * if unknown format.
+ */
 int snd_pcm_format_physical_width(snd_pcm_format_t format)
 {
 	switch (snd_enum_to_int(format)) {
@@ -243,6 +298,13 @@ int snd_pcm_format_physical_width(snd_pcm_format_t format)
 	}
 }
 
+/**
+ * snd_pcm_format_size - return the byte size of samples on the given format
+ * @format: the format to check
+ *
+ * Returns the byte size of the given samples for the format, or a
+ * negative error code if unknown format.
+ */
 ssize_t snd_pcm_format_size(snd_pcm_format_t format, size_t samples)
 {
 	switch (snd_enum_to_int(format)) {
@@ -296,6 +358,12 @@ ssize_t snd_pcm_format_size(snd_pcm_format_t format, size_t samples)
 	}
 }
 
+/**
+ * snd_pcm_format_silence_64 - return the silent data in 64bit integer
+ * @format: the format to check
+ *
+ * Returns the silent data in 64bit integer for the given format.
+ */
 u_int64_t snd_pcm_format_silence_64(snd_pcm_format_t format)
 {
 	switch (snd_enum_to_int(format)) {
@@ -451,6 +519,16 @@ u_int8_t snd_pcm_format_silence(snd_pcm_format_t format)
 	return (u_int8_t)snd_pcm_format_silence_64(format);
 }
 
+/**
+ * snd_pcm_format_set_silence - set the silence data on the buffer
+ * @format: the PCM format
+ * @data: the buffer pointer
+ * @samples: the number of samples to set silence
+ *
+ * Sets the silence data on the buffer for the given samples.
+ *
+ * Returns zero if sucessful, or a negative error code on failure.
+ */
 int snd_pcm_format_set_silence(snd_pcm_format_t format, void *data, unsigned int samples)
 {
 	if (samples == 0)
@@ -497,6 +575,7 @@ int snd_pcm_format_set_silence(snd_pcm_format_t format, void *data, unsigned int
 #endif
 			}
 		}
+		break;
 	}
 	case 32: {
 		u_int32_t silence = snd_pcm_format_silence_64(format);
@@ -543,6 +622,14 @@ static int linear_formats[4*2*2] = {
 	SNDRV_PCM_FORMAT_U32_BE
 };
 
+/**
+ * snd_pcm_build_linear_format - return the suitable linear format for the given condition
+ * @width: the bit-width
+ * @unsignd: 1 if unsigned, 0 if signed.
+ * @big_endian: 1 if big-endian, 0 if little-endian
+ *
+ * Returns the suitable linear format for the given condition.
+ */
 snd_pcm_format_t snd_pcm_build_linear_format(int width, int unsignd, int big_endian)
 {
 	switch (width) {

@@ -30,6 +30,9 @@ sysfs_remove_dir(struct kobject *);
 extern int
 sysfs_create_file(struct kobject *, struct attribute *);
 
+extern int
+sysfs_update_file(struct kobject *, struct attribute *);
+
 extern void
 sysfs_remove_file(struct kobject *, struct attribute *);
 

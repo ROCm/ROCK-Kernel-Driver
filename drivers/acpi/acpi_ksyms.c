@@ -25,7 +25,7 @@
 
 #include <linux/module.h>
 #include <linux/acpi.h>
-#include "include/acpi.h"
+#include <acpi/acpi.h>
 #include "acpi_bus.h"
 
 

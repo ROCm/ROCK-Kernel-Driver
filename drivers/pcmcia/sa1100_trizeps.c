@@ -13,7 +13,8 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 
-#include <asm/hardware.h>   // included trizeps.h
+#include <asm/hardware.h>
+#include <asm/arch/trizeps.h>
 #include <asm/mach-types.h>
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -54,7 +55,7 @@ static int trizeps_pcmcia_init(struct pcmcia_init *init)
 	return NUMBER_OF_TRIZEPS_PCMCIA_SLOTS;
 
  irq_err:
-	printk( KERN_ERR __FUNCTION__ ": PCMCIA Request for IRQ %u failed\n", TRIZEPS_IRQ_PCMCIA_CD0 );
+	printk( KERN_ERR "%s(): PCMCIA Request for IRQ %u failed\n", __FUNCTION__, TRIZEPS_IRQ_PCMCIA_CD0 );
 	return -1;
 }
 

@@ -35,9 +35,9 @@
 #include <linux/kmod.h>
 #include <linux/delay.h>
 #include <linux/workqueue.h>
+#include <acpi/acpi.h>
 #include <asm/io.h>
 #include "acpi_bus.h"
-#include "acpi.h"
 
 #ifdef CONFIG_ACPI_EFI
 #include <linux/efi.h>

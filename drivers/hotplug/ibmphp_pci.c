@@ -951,6 +951,7 @@ static int configure_bridge (struct pci_func **func_passed, u8 slotno)
 		if (rc) {
 			if (rc == -ENOMEM) {
 				ibmphp_remove_bus (bus, func->busno);
+				kfree (amount_needed);
 				return rc;
 			}
 			retval = rc;
@@ -1621,23 +1622,23 @@ int ibmphp_unconfigure_card (struct slot **slot_cur, int the_end)
 			}
 
 			for (i = 0; i < count; i++) {
-				if (cur_func->io[count]) {
-					debug ("io[%d] exists \n", count);
+				if (cur_func->io[i]) {
+					debug ("io[%d] exists \n", i);
 					if (the_end > 0)
-						ibmphp_remove_resource (cur_func->io[count]);
-					cur_func->io[count] = NULL;
+						ibmphp_remove_resource (cur_func->io[i]);
+					cur_func->io[i] = NULL;
 				}
-				if (cur_func->mem[count]) {
-					debug ("mem[%d] exists \n", count);
+				if (cur_func->mem[i]) {
+					debug ("mem[%d] exists \n", i);
 					if (the_end > 0)
-						ibmphp_remove_resource (cur_func->mem[count]);
-					cur_func->mem[count] = NULL;
+						ibmphp_remove_resource (cur_func->mem[i]);
+					cur_func->mem[i] = NULL;
 				}
-				if (cur_func->pfmem[count]) {
-					debug ("pfmem[%d] exists \n", count);
+				if (cur_func->pfmem[i]) {
+					debug ("pfmem[%d] exists \n", i);
 					if (the_end > 0)
-						ibmphp_remove_resource (cur_func->pfmem[count]);
-					cur_func->pfmem[count] = NULL;
+						ibmphp_remove_resource (cur_func->pfmem[i]);
+					cur_func->pfmem[i] = NULL;
 				}
 			}
 

@@ -8,8 +8,6 @@ obj-y		:= init.o extable.o fault-common.o
 obj-m		:=
 obj-n		:=
 obj-		:=
-export-objs	:= proc-syms.o discontig.o
-
 ifeq ($(CONFIG_CPU_32),y)
 obj-y		+= consistent.o fault-armv.o ioremap.o mm-armv.o
 obj-$(CONFIG_MODULES) += proc-syms.o

@@ -251,6 +251,43 @@ static int snd_pcm_oss_period_size(snd_pcm_substream_t *substream,
 	return 0;
 }
 
+static int choose_rate(snd_pcm_substream_t *substream,
+		       snd_pcm_hw_params_t *params, int best_rate)
+{
+	snd_interval_t *it;
+	snd_pcm_hw_params_t *save;
+	int rate;
+
+	save = kmalloc(sizeof(*save), GFP_KERNEL);
+	if (save == NULL)
+		return -ENOMEM;
+	*save = *params;
+	it = hw_param_interval(save, SNDRV_PCM_HW_PARAM_RATE);
+
+	/* try multiples of the best rate */
+	rate = best_rate;
+	for (;;) {
+		if (it->max < rate || (it->max == rate && it->openmax))
+			break;
+		if (it->min < rate || (it->min == rate && !it->openmin)) {
+			int ret;
+			ret = snd_pcm_hw_param_set(substream, params,
+						   SNDRV_PCM_HW_PARAM_RATE,
+						   rate, 0);
+			if (ret == rate) {
+				kfree(save);
+				return rate;
+			}
+			*params = *save;
+		}
+		rate += best_rate;
+	}
+
+	/* not found, use the nearest rate */
+	kfree(save);
+	return snd_pcm_hw_param_near(substream, params, SNDRV_PCM_HW_PARAM_RATE, best_rate, 0);
+}
+
 static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -287,7 +324,7 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 		snd_printd("No usable accesses\n");
 		return -EINVAL;
 	}
-	snd_pcm_hw_param_near(substream, &sparams, SNDRV_PCM_HW_PARAM_RATE, runtime->oss.rate, 0);
+	choose_rate(substream, &sparams, runtime->oss.rate);
 	snd_pcm_hw_param_near(substream, &sparams, SNDRV_PCM_HW_PARAM_CHANNELS, runtime->oss.channels, 0);
 
 	format = snd_pcm_oss_format_from(runtime->oss.format);
@@ -1540,9 +1577,6 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 	device = SNDRV_MINOR_OSS_DEVICE(minor) == SNDRV_MINOR_OSS_PCM1 ?
 		adsp_map[cardnum] : dsp_map[cardnum];
 
-#ifdef LINUX_2_2
-	MOD_INC_USE_COUNT;
-#endif
 	pcm = snd_pcm_devices[(cardnum * SNDRV_PCM_DEVICES) + device];
 	if (pcm == NULL) {
 		err = -ENODEV;
@@ -1611,13 +1645,10 @@ static int snd_pcm_oss_open(struct inode *inode, struct file *file)
 	return err;
 
       __error:
-      	module_put(pcm->card->module);
+     	module_put(pcm->card->module);
       __error2:
       	snd_card_file_remove(pcm->card, file);
       __error1:
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return err;
 }
 
@@ -1640,9 +1671,6 @@ static int snd_pcm_oss_release(struct inode *inode, struct file *file)
 	wake_up(&pcm->open_wait);
 	module_put(pcm->card->module);
 	snd_card_file_remove(pcm->card, file);
-#ifdef LINUX_2_2
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 

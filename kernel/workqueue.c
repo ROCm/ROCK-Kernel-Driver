@@ -177,12 +177,13 @@ static int worker_thread(void *__startup)
 	current->flags |= PF_IOTHREAD;
 	cwq->thread = current;
 
+	set_user_nice(current, -10);
 	set_cpus_allowed(current, 1UL << cpu);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	siginitsetinv(&current->blocked, sigmask(SIGCHLD));
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	complete(&startup->done);
 
@@ -212,10 +213,10 @@ static int worker_thread(void *__startup)
 				/* SIGCHLD - auto-reaping */ ;
 
 			/* zap all other signals */
-			spin_lock_irq(&current->sig->siglock);
+			spin_lock_irq(&current->sighand->siglock);
 			flush_signals(current);
 			recalc_sigpending();
-			spin_unlock_irq(&current->sig->siglock);
+			spin_unlock_irq(&current->sighand->siglock);
 		}
 	}
 	remove_wait_queue(&cwq->more_work, &wait);

@@ -57,7 +57,6 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	filp = fget(fd);
 	if (!filp)
 		goto out;
-	error = 0;
 
 	error = security_file_ioctl(filp, cmd, arg);
 	if (error) {

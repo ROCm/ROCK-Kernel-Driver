@@ -439,7 +439,6 @@ struct arraycache_init initarray_generic __initdata = { { 0, BOOT_CPUCACHE_ENTRI
 static kmem_cache_t cache_cache = {
 	.lists		= LIST3_INIT(cache_cache.lists),
 	/* Allow for boot cpu != 0 */
-	.array		= { [0 ... NR_CPUS-1] = &initarray_cache.cache },
 	.batchcount	= 1,
 	.limit		= BOOT_CPUCACHE_ENTRIES,
 	.objsize	= sizeof(kmem_cache_t),
@@ -611,6 +610,7 @@ void __init kmem_cache_init(void)
 	init_MUTEX(&cache_chain_sem);
 	INIT_LIST_HEAD(&cache_chain);
 	list_add(&cache_cache.next, &cache_chain);
+	cache_cache.array[smp_processor_id()] = &initarray_cache.cache;
 
 	cache_estimate(0, cache_cache.objsize, 0,
 			&left_over, &cache_cache.num);
@@ -769,7 +769,7 @@ static void poison_obj(kmem_cache_t *cachep, void *addr, unsigned char val)
 	*(unsigned char *)(addr+size-1) = POISON_END;
 }
 
-static int check_poison_obj (kmem_cache_t *cachep, void *addr)
+static void check_poison_obj(kmem_cache_t *cachep, void *addr)
 {
 	int size = cachep->objsize;
 	void *end;
@@ -779,8 +779,7 @@ static int check_poison_obj (kmem_cache_t *cachep, void *addr)
 	}
 	end = memchr(addr, POISON_END, size);
 	if (end != (addr+size-1))
-		return 1;
-	return 0;
+		slab_error(cachep, "object was modified after freeing");
 }
 #endif
 
@@ -1420,6 +1419,8 @@ static int cache_grow (kmem_cache_t * cachep, int flags)
 opps1:
 	kmem_freepages(cachep, objp);
 failed:
+	if (local_flags & __GFP_WAIT)
+		local_irq_disable();
 	return 0;
 }
 
@@ -1628,8 +1629,7 @@ cache_alloc_debugcheck_after(kmem_cache_t *cachep,
 	if (!objp)	
 		return objp;
 	if (cachep->flags & SLAB_POISON)
-		if (check_poison_obj(cachep, objp))
-			BUG();
+		check_poison_obj(cachep, objp);
 	if (cachep->flags & SLAB_RED_ZONE) {
 		/* Set alloc red-zone, and check old one. */
 		if (xchg((unsigned long *)objp, RED_ACTIVE) != RED_INACTIVE)
@@ -2048,6 +2048,14 @@ static void enable_cpucache (kmem_cache_t *cachep)
 	int err;
 	int limit;
 
+	/* The head array serves three purposes:
+	 * - create a LIFO ordering, i.e. return objects that are cache-warm
+	 * - reduce the number of spinlock operations.
+	 * - reduce the number of linked list operations on the slab and 
+	 *   bufctl chains: array operations are cheaper.
+	 * The numbers are guessed, we should auto-tune as described by
+	 * Bonwick.
+	 */
 	if (cachep->objsize > PAGE_SIZE)
 		limit = 8;
 	else if (cachep->objsize > 1024)
@@ -2057,6 +2065,14 @@ static void enable_cpucache (kmem_cache_t *cachep)
 	else
 		limit = 248;
 
+#ifndef DEBUG
+	/* With debugging enabled, large batchcount lead to excessively
+	 * long periods with disabled local interrupts. Limit the 
+	 * batchcount
+	 */
+	if (limit > 32)
+		limit = 32;
+#endif
 	err = do_tune_cpucache(cachep, limit, limit/2);
 	if (err)
 		printk(KERN_ERR "enable_cpucache failed for %s, error %d.\n",

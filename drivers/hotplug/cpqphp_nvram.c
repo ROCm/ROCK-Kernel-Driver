@@ -473,7 +473,7 @@ int compaq_nvram_load (void *rom_start, struct controller *ctrl)
 		p_byte += 3;
 
 		if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-			return(2);
+			return 2;
 
 		bus = p_ev_ctrl->bus;
 		device = p_ev_ctrl->device;
@@ -490,20 +490,20 @@ int compaq_nvram_load (void *rom_start, struct controller *ctrl)
 			p_byte += 4;
 
 			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+				return 2;
 
 			// Skip forward to the next entry
 			p_byte += (nummem + numpmem + numio + numbus) * 8;
 
 			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+				return 2;
 
 			p_ev_ctrl = (struct ev_hrt_ctrl *) p_byte;
 
 			p_byte += 3;
 
 			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+				return 2;
 
 			bus = p_ev_ctrl->bus;
 			device = p_ev_ctrl->device;
@@ -518,7 +518,7 @@ int compaq_nvram_load (void *rom_start, struct controller *ctrl)
 		p_byte += 4;
 
 		if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-			return(2);
+			return 2;
 
 		while (nummem--) {
 			mem_node = (struct pci_resource*) kmalloc(sizeof(struct pci_resource), GFP_KERNEL);
@@ -530,15 +530,19 @@ int compaq_nvram_load (void *rom_start, struct controller *ctrl)
 			dbg("mem base = %8.8x\n",mem_node->base);
 			p_byte += 4;
 
-			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+			if (p_byte > ((u8*)p_EV_header + evbuffer_length)) {
+				kfree(mem_node);
+				return 2;
+			}
 
 			mem_node->length = *(u32*)p_byte;
 			dbg("mem length = %8.8x\n",mem_node->length);
 			p_byte += 4;
 
-			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+			if (p_byte > ((u8*)p_EV_header + evbuffer_length)) {
+				kfree(mem_node);
+				return 2;
+			}
 
 			mem_node->next = ctrl->mem_head;
 			ctrl->mem_head = mem_node;
@@ -554,15 +558,19 @@ int compaq_nvram_load (void *rom_start, struct controller *ctrl)
 			dbg("pre-mem base = %8.8x\n",p_mem_node->base);
 			p_byte += 4;
 
-			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+			if (p_byte > ((u8*)p_EV_header + evbuffer_length)) {
+				kfree(p_mem_node);
+				return 2;
+			}
 
 			p_mem_node->length = *(u32*)p_byte;
 			dbg("pre-mem length = %8.8x\n",p_mem_node->length);
 			p_byte += 4;
 
-			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+			if (p_byte > ((u8*)p_EV_header + evbuffer_length)) {
+				kfree(p_mem_node);
+				return 2;
+			}
 
 			p_mem_node->next = ctrl->p_mem_head;
 			ctrl->p_mem_head = p_mem_node;
@@ -578,15 +586,19 @@ int compaq_nvram_load (void *rom_start, struct controller *ctrl)
 			dbg("io base = %8.8x\n",io_node->base);
 			p_byte += 4;
 
-			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+			if (p_byte > ((u8*)p_EV_header + evbuffer_length)) {
+				kfree(io_node);
+				return 2;
+			}
 
 			io_node->length = *(u32*)p_byte;
 			dbg("io length = %8.8x\n",io_node->length);
 			p_byte += 4;
 
-			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+			if (p_byte > ((u8*)p_EV_header + evbuffer_length)) {
+				kfree(io_node);
+				return 2;
+			}
 
 			io_node->next = ctrl->io_head;
 			ctrl->io_head = io_node;
@@ -601,15 +613,18 @@ int compaq_nvram_load (void *rom_start, struct controller *ctrl)
 			bus_node->base = *(u32*)p_byte;
 			p_byte += 4;
 
-			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+			if (p_byte > ((u8*)p_EV_header + evbuffer_length)) {
+				kfree(bus_node);
+				return 2;
+			}
 
 			bus_node->length = *(u32*)p_byte;
 			p_byte += 4;
 
-
-			if (p_byte > ((u8*)p_EV_header + evbuffer_length))
-				return(2);
+			if (p_byte > ((u8*)p_EV_header + evbuffer_length)) {
+				kfree(bus_node);
+				return 2;
+			}
 
 			bus_node->next = ctrl->bus_head;
 			ctrl->bus_head = bus_node;
@@ -623,13 +638,11 @@ int compaq_nvram_load (void *rom_start, struct controller *ctrl)
 		rc &= cpqhp_resource_sort_and_combine(&(ctrl->io_head));
 		rc &= cpqhp_resource_sort_and_combine(&(ctrl->bus_head));
 
-		if (rc) {
+		if (rc)
 			return(rc);
-		}
 	} else {
-		if ((evbuffer[0] != 0) && (!ctrl->push_flag)) {
-			return(1);
-		}
+		if ((evbuffer[0] != 0) && (!ctrl->push_flag)) 
+			return 1;
 	}
 
 	return 0;

@@ -22,15 +22,14 @@
 #define ERESTARTNOINTR	513
 #define ERESTARTNOHAND	514
 
-void syscall_handler_tt(int sig, struct uml_pt_regs *regs)
+void syscall_handler_tt(int sig, union uml_pt_regs *regs)
 {
 	void *sc;
 	long result;
 	int index, syscall;
 
-	syscall = regs->syscall;
-	sc = regs->mode.tt;
-	sc_to_regs(regs, sc, syscall);
+	syscall = UPT_SYSCALL_NR(regs);
+	sc = UPT_SC(regs);
 	SC_START_SYSCALL(sc);
 
 	index = record_syscall_start(syscall);
@@ -40,7 +39,7 @@ void syscall_handler_tt(int sig, struct uml_pt_regs *regs)
 	/* regs->sc may have changed while the system call ran (there may
 	 * have been an interrupt or segfault), so it needs to be refreshed.
 	 */
-	regs->mode.tt = sc;
+	UPT_SC(regs) = sc;
 
 	SC_SET_SYSCALL_RETURN(sc, result);
 	if((result == -ERESTARTNOHAND) || (result == -ERESTARTSYS) || 
@@ -54,7 +53,7 @@ void syscall_handler_tt(int sig, struct uml_pt_regs *regs)
 int do_syscall(void *task, int pid)
 {
 	unsigned long proc_regs[FRAME_SIZE];
-	struct uml_pt_regs *regs;
+	union uml_pt_regs *regs;
 	int syscall;
 
 	if(ptrace_getregs(pid, proc_regs) < 0)

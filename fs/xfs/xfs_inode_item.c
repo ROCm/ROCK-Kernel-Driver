@@ -534,9 +534,11 @@ xfs_inode_item_pin(
  * item which was previously pinned with a call to xfs_inode_item_pin().
  * Just call xfs_iunpin() on the inode to do this.
  */
+/* ARGSUSED */
 STATIC void
 xfs_inode_item_unpin(
-	xfs_inode_log_item_t	*iip)
+	xfs_inode_log_item_t	*iip,
+	int			stale)
 {
 	xfs_iunpin(iip->ili_inode);
 }
@@ -880,7 +882,7 @@ struct xfs_item_ops xfs_inode_item_ops = {
 	.iop_format	= (void(*)(xfs_log_item_t*, xfs_log_iovec_t*))
 					xfs_inode_item_format,
 	.iop_pin	= (void(*)(xfs_log_item_t*))xfs_inode_item_pin,
-	.iop_unpin	= (void(*)(xfs_log_item_t*))xfs_inode_item_unpin,
+	.iop_unpin	= (void(*)(xfs_log_item_t*, int))xfs_inode_item_unpin,
 	.iop_unpin_remove = (void(*)(xfs_log_item_t*, xfs_trans_t*))
 					xfs_inode_item_unpin_remove,
 	.iop_trylock	= (uint(*)(xfs_log_item_t*))xfs_inode_item_trylock,

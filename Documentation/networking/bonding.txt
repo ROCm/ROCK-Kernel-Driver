@@ -258,7 +258,7 @@ arp_ip_target
         Specifies the ip addresses to use when arp_interval is > 0. These are
         the targets of the ARP request sent to determine the health of the link
         to the targets. Specify these values in ddd.ddd.ddd.ddd format.
-        Multiple ip adresses must be seperated by a comma. At least one ip
+        Multiple ip adresses must be separated by a comma. At least one ip
         address needs to be given for ARP monitoring to work. The maximum number
         of targets that can be specified is set at 16.
 
@@ -309,7 +309,7 @@ in a High Availability setup to have several targets to monitor. In the
 case of just one target,  the target itself may go down or have a problem
 making it unresponsive to ARP requests. Having an additional target (or
 several) would increase the reliability of the ARP monitoring.
-Multiple ARP targets must be seperated by commas as follows:
+Multiple ARP targets must be separated by commas as follows:
 
 # example options for ARP monitoring with three targets
 alias bond0 bonding

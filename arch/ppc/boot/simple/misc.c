@@ -82,7 +82,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 
 #if defined(CONFIG_LOPEC) || defined(CONFIG_PAL4)
 	/*
-	 * Call get_mem_size(), which is memory controller dependant,
+	 * Call get_mem_size(), which is memory controller dependent,
 	 * and we must have the correct file linked in here.
 	 */
 	TotalMemory = get_mem_size();

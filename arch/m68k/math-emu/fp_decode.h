@@ -68,7 +68,7 @@ do_no_pc_mode=0
 do_fscc=0
 
 | first decoding of the instr type
-| this seperates the conditional instr
+| this separates the conditional instr
 .macro	fp_decode_cond_instr_type
 	bfextu	%d2{#8,#2},%d0
 	jmp	([0f:w,%pc,%d0*4])
@@ -80,7 +80,7 @@ do_fscc=0
 .endm
 
 | second decoding of the instr type
-| this seperates most move instr
+| this separates most move instr
 .macro	fp_decode_move_instr_type
 	bfextu	%d2{#16,#3},%d0
 	jmp	([0f:w,%pc,%d0*4])

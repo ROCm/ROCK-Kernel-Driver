@@ -20,6 +20,7 @@
 #include <linux/resource.h>
 #include <linux/times.h>
 #include <linux/utsname.h>
+#include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -312,74 +313,6 @@ asmlinkage long sys32_unimplemented(int r26, int r25, int r24, int r23,
     printk(KERN_ERR "%s(%d): Unimplemented 32 on 64 syscall #%d!\n", 
     	current->comm, current->pid, r20);
     return -ENOSYS;
-}
-
-/* 32-bit user apps use struct statfs which uses 'long's */
-struct statfs32 {
-	__s32 f_type;
-	__s32 f_bsize;
-	__s32 f_blocks;
-	__s32 f_bfree;
-	__s32 f_bavail;
-	__s32 f_files;
-	__s32 f_ffree;
-	__kernel_fsid_t f_fsid;
-	__s32 f_namelen;
-	__s32 f_spare[6];
-};
-
-/* convert statfs struct to statfs32 struct and copy result to user */
-static unsigned long statfs32_to_user(struct statfs32 *ust32, struct statfs *st)
-{
-    struct statfs32 st32;
-#undef CP
-#define CP(a) st32.a = st->a
-    CP(f_type);
-    CP(f_bsize);
-    CP(f_blocks);
-    CP(f_bfree);
-    CP(f_bavail);
-    CP(f_files);
-    CP(f_ffree);
-    CP(f_fsid);
-    CP(f_namelen);
-    return copy_to_user(ust32, &st32, sizeof st32);
-}
-
-/* The following statfs calls are copies of code from linux/fs/open.c and
- * should be checked against those from time to time */
-asmlinkage long sys32_statfs(const char * path, struct statfs32 * buf)
-{
-	struct nameidata nd;
-	int error;
-
-	error = user_path_walk(path, &nd);
-	if (!error) {
-		struct statfs tmp;
-		error = vfs_statfs(nd.dentry->d_inode->i_sb, &tmp);
-		if (!error && statfs32_to_user(buf, &tmp))
-			error = -EFAULT;
-		path_release(&nd);
-	}
-	return error;
-}
-
-asmlinkage long sys32_fstatfs(unsigned int fd, struct statfs32 * buf)
-{
-	struct file * file;
-	struct statfs tmp;
-	int error;
-
-	error = -EBADF;
-	file = fget(fd);
-	if (!file)
-		goto out;
-	error = vfs_statfs(file->f_dentry->d_inode->i_sb, &tmp);
-	if (!error && statfs32_to_user(buf, &tmp))
-		error = -EFAULT;
-	fput(file);
-out:
-	return error;
 }
 
 extern asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg);
@@ -2429,21 +2362,23 @@ asmlinkage int sys32_sysinfo(struct sysinfo32 *info)
 {
 	struct sysinfo val;
 	int err;
-	extern rwlock_t xtime_lock;
+	unsigned long seq;
 
 	/* We don't need a memset here because we copy the
 	 * struct to userspace once element at a time.
 	 */
 
-	read_lock_irq(&xtime_lock);
-	val.uptime = jiffies / HZ;
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		val.uptime = jiffies / HZ;
 
-	val.loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
-	val.loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);
-	val.loads[2] = avenrun[2] << (SI_LOAD_SHIFT - FSHIFT);
+		val.loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
+		val.loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);
+		val.loads[2] = avenrun[2] << (SI_LOAD_SHIFT - FSHIFT);
 
-	val.procs = nr_threads;
-	read_unlock_irq(&xtime_lock);
+		val.procs = nr_threads;
+	} while (read_seqretry(&xtime_lock, seq));
+
 
 	si_meminfo(&val);
 	si_swapinfo(&val);
