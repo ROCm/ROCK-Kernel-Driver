@@ -49,7 +49,6 @@ acpi_status acpi_extract_package (acpi_object *, acpi_buffer *, acpi_buffer *);
 acpi_status acpi_evaluate_integer (acpi_handle, acpi_string, acpi_object_list *, unsigned long *);
 acpi_status acpi_evaluate_reference (acpi_handle, acpi_string, acpi_object_list *, struct acpi_handle_list *);
 
-
 #ifdef CONFIG_ACPI_BUS
 
 #include <linux/proc_fs.h>
@@ -115,26 +114,6 @@ struct acpi_driver {
 	char			*ids;		/* Supported Hardware IDs */
 	struct acpi_device_ops	ops;
 };
-
-enum acpi_blacklist_predicates
-{
-	all_versions,
-	less_than_or_equal,
-	equal,
-	greater_than_or_equal,
-};
-
-struct acpi_blacklist_item
-{
-	char		oem_id[7];
-	char		oem_table_id[9];
-	u32		oem_revision;
-	acpi_table_type table;
-	enum acpi_blacklist_predicates oem_revision_predicate;
-	char		*reason;
-	u32		is_critical_error;
-};
-
 
 /*
  * ACPI Device

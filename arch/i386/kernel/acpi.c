@@ -47,6 +47,7 @@
 
 #define PREFIX			"ACPI: "
 
+extern int acpi_disabled;
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
@@ -317,6 +318,14 @@ acpi_boot_init (
 	result = acpi_table_init(cmdline);
 	if (result)
 		return result;
+
+	result = acpi_blacklisted();
+	if (result) {
+		acpi_disabled = 1;
+		return result;
+	}
+	else
+		printk(KERN_NOTICE PREFIX "BIOS passes blacklist\n");
 
 #ifdef CONFIG_X86_LOCAL_APIC
 

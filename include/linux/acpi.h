@@ -106,6 +106,15 @@ struct acpi_table_xsdt {
 	u64			entry[1];
 } __attribute__ ((packed));
 
+/* Fixed ACPI Description Table (FADT) */
+
+struct acpi_table_fadt {
+	struct acpi_table_header header;
+	u32 facs_addr;
+	u32 dsdt_addr;
+	/* ... */
+} __attribute__ ((packed));
+
 /* Multiple APIC Description Table (MADT) */
 
 struct acpi_table_madt {
@@ -314,7 +323,7 @@ enum acpi_table_id {
 	ACPI_DSDT,
 	ACPI_ECDT,
 	ACPI_ETDT,
-	ACPI_FACP,
+	ACPI_FADT,
 	ACPI_FACS,
 	ACPI_OEMX,
 	ACPI_PSDT,
@@ -340,6 +349,7 @@ int acpi_numa_init (void);
 
 int acpi_table_init (char *cmdline);
 int acpi_table_parse (enum acpi_table_id id, acpi_table_handler handler);
+int acpi_get_table_header_early (enum acpi_table_id id, struct acpi_table_header **header);
 int acpi_table_parse_madt (enum acpi_madt_entry_id id, acpi_madt_entry_handler handler);
 int acpi_table_parse_srat (enum acpi_srat_entry_id id, acpi_madt_entry_handler handler);
 void acpi_table_print (struct acpi_table_header *header, unsigned long phys_addr);
@@ -392,8 +402,8 @@ int acpi_pci_irq_init (void);
 #ifdef CONFIG_ACPI
 
 int acpi_init(void);
+int acpi_blacklisted(void);
 
 #endif /*CONFIG_ACPI*/
-
 
 #endif /*_LINUX_ACPI_H*/

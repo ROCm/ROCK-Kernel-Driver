@@ -19,7 +19,7 @@ obj-y		:= acpi_ksyms.o
 #
 # ACPI Boot-Time Table Parsing
 #
-obj-$(CONFIG_ACPI_BOOT)		+= tables.o
+obj-$(CONFIG_ACPI_BOOT)		+= tables.o blacklist.o
 
 #
 # ACPI Core Subsystem (Interpreter)

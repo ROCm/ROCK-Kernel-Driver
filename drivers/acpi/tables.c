@@ -46,7 +46,7 @@ static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_DSDT]		= "DSDT",
 	[ACPI_ECDT]		= "ECDT",
 	[ACPI_ETDT]		= "ETDT",
-	[ACPI_FACP]		= "FACP",
+	[ACPI_FADT]		= "FACP",
 	[ACPI_FACS]		= "FACS",
 	[ACPI_OEMX]		= "OEM",
 	[ACPI_PSDT]		= "PSDT",
@@ -71,9 +71,6 @@ struct acpi_table_sdt {
 
 static struct acpi_table_sdt	sdt;
 
-acpi_madt_entry_handler		madt_handlers[ACPI_MADT_ENTRY_COUNT];
-
-
 void
 acpi_table_print (
 	struct acpi_table_header *header,
@@ -92,7 +89,7 @@ acpi_table_print (
 		name = "MADT";
 	}
 	else if (!strncmp((char *) &header->signature,
-		acpi_table_signatures[ACPI_FACP],
+		acpi_table_signatures[ACPI_FADT],
 		sizeof(header->signature))) {
 		name = "FADT";
 	}
@@ -222,6 +219,56 @@ acpi_table_compute_checksum (
 	return (sum & 0xFF);
 }
 
+int __init
+acpi_get_table_header_early (
+	enum acpi_table_id	id,
+	struct acpi_table_header **header)
+{
+	int i;
+	enum acpi_table_id temp_id;
+
+	/* DSDT is different from the rest */
+	if (id == ACPI_DSDT)
+		temp_id = ACPI_FADT;
+	else
+		temp_id = id;
+
+	/* Locate the table. */
+
+	for (i = 0; i < sdt.count; i++) {
+		if (sdt.entry[i].id != temp_id)
+			continue;
+		*header = (void *)
+			__acpi_map_table(sdt.entry[i].pa, sdt.entry[i].size);
+		if (!*header) {
+			printk(KERN_WARNING PREFIX "Unable to map %s\n",
+			       acpi_table_signatures[temp_id]);
+			return -ENODEV;
+		}
+		break;
+	}
+
+	if (!*header) {
+		printk(KERN_WARNING PREFIX "%s not present\n",
+		       acpi_table_signatures[id]);
+		return -ENODEV;
+	}
+
+	/* Map the DSDT header via the pointer in the FADT */
+	if (id == ACPI_DSDT) {
+		struct acpi_table_fadt *fadt = (struct acpi_table_fadt *) *header;
+
+		*header = (void *) __acpi_map_table(fadt->dsdt_addr,
+				sizeof(struct acpi_table_header));
+		if (!*header) {
+			printk(KERN_WARNING PREFIX "Unable to map DSDT\n");
+			return -ENODEV;
+		}
+	}
+
+	return 0;
+}
+	 
 
 int __init
 acpi_table_parse_madt_family (
@@ -460,7 +507,6 @@ acpi_table_init (
 	int			result = 0;
 
 	memset(&sdt, 0, sizeof(struct acpi_table_sdt));
-	memset(&madt_handlers, 0, sizeof(madt_handlers));
 
 	/* Locate and map the Root System Description Table (RSDP) */
 
