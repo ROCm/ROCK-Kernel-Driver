@@ -679,6 +679,7 @@ retry:
 			}
 		}
 		pagevec_release(&pvec);
+		cond_resched();
 	}
 	if (!scanned && !done) {
 		/*
