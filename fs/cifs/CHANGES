@@ -1,3 +1,24 @@
+Version 0.58
+------------
+Changed read and write to go through pagecache. Added additional address space operations.
+Memory mapped operations now working.
+
+Version 0.57
+------------
+Added writepage code for additional memory mapping support.  Fixed leak in xids causing
+the simultaneous operations counter (/proc/fs/cifs/SimultaneousOps) to increase on 
+every stat call.  Additional formatting cleanup. 
+
+Version 0.56
+------------
+Fix bigendian bug in order of time conversion. Merge 2.5 to 2.4 version.  Formatting cleanup.   
+
+Version 0.55
+------------
+Fixes from Zwane Mwaikambo for adding missing return code checking in a few places.
+Also included a modified version of his fix to protect global list manipulation of
+the smb session and tree connection and mid related global variables.
+
 Version 0.54
 ------------
 Fix problem with captive thread hanging around at unmount time.  Adjust to 2.5.42-pre

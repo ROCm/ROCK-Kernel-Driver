@@ -745,7 +745,28 @@ const static struct {
 	ERRDOS, ERRnoaccess, 0xc0000290}, {
 ERRDOS, ERRbadfunc, 0xc000029c},};
 
-void
+/*****************************************************************************
+ Print an error message from the status code
+ *****************************************************************************/
+static void
+cifs_print_status(__u32 status_code)
+{
+	int idx = 0;
+
+	printk("\nStatus code returned: 0x%08x", status_code);
+
+	while (nt_errs[idx].nt_errstr != NULL) {
+		if (((nt_errs[idx].nt_errcode) & 0xFFFFFF) ==
+		    (status_code & 0xFFFFFF)) {
+			printk(nt_errs[idx].nt_errstr);
+		}
+		idx++;
+	}
+	return;
+}
+
+
+static void
 ntstatus_to_dos(__u32 ntstatus, __u8 * eclass, __u16 * ecode)
 {
 	int i;
@@ -781,9 +802,9 @@ map_smb_to_linux_error(struct smb_hdr *smb)
 
 	if (smb->Flags2 & SMBFLG2_ERR_STATUS) {
 		/* translate the newer STATUS codes to old style errors and then to POSIX errors */
-		cFYI(1,
-		     (" !!Mapping cifs error code %d ", smb->Status.CifsError));
 		smb->Status.CifsError = le32_to_cpu(smb->Status.CifsError);
+		if(cifsFYI)
+			cifs_print_status(smb->Status.CifsError);
 		ntstatus_to_dos(smb->Status.CifsError, &smberrclass,
 				&smberrcode);
 	} else {

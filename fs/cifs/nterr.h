@@ -22,8 +22,17 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+
+
 #ifndef _NTERR_H
 #define _NTERR_H
+
+struct nt_err_code_struct {
+	char *nt_errstr;
+	__u32 nt_errcode;
+};
+
+extern const struct nt_err_code_struct nt_errs[];
 
 /* Win32 Status codes. */
 

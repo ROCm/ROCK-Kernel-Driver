@@ -219,6 +219,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				}
 
                 task_to_wake = NULL;
+				read_lock(&GlobalMid_Lock);
 				list_for_each(tmp, &server->pending_mid_q) {
 					mid_entry = list_entry(tmp, struct
 							       mid_q_entry,
@@ -234,7 +235,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 						    MID_RESPONSE_RECEIVED;
 					}
 				}
-
+				read_unlock(&GlobalMid_Lock);
 				if (task_to_wake) {
 					smb_buffer = NULL;	/* will be freed by users thread after he is done */
 					wake_up_process(task_to_wake);
@@ -256,12 +257,14 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 	}
 	/* BB add code to lock SMB sessions while releasing */
 	if(server->ssocket) {
-        sock_release(csocket);
+		sock_release(csocket);
 	    server->ssocket = NULL;
-    }
+	}
 	set_fs(temp_fs);
 	if (smb_buffer) /* buffer usually freed in free_mid - need to free it on error or exit */
 		buf_release(smb_buffer);
+
+	read_lock(&GlobalSMBSeslock);
 	if (list_empty(&server->pending_mid_q)) {
 		/* loop through server session structures attached to this and mark them dead */
 		list_for_each(tmp, &GlobalSMBSessionList) {
@@ -275,10 +278,12 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		}
 		kfree(server);
 	} else	/* BB need to more gracefully handle the rare negative session 
-               response case because response will be still outstanding */
+			   response case because response will be still outstanding */
 		cERROR(1, ("\nThere are still active MIDs in queue and we are exiting but we can not delete mid_q_entries or TCP_Server_Info structure due to pending requests MEMORY LEAK!!\n "));	/* BB wake up waitors, and/or wait and/or free stale mids and try again? BB */
 /* BB Need to fix bug in error path above - perhaps wait until smb requests
    time out and then free the tcp per server struct BB */
+	read_unlock(&GlobalSMBSeslock);
+
 
 	cFYI(1, ("\nAbout to exit from demultiplex thread\n"));
 	return 0;
@@ -421,7 +426,7 @@ find_tcp_session(__u32 new_target_ip_addr,
 	struct cifsSesInfo *ses;
 
 	*psrvTcp = NULL;
-
+	read_lock(&GlobalSMBSeslock);
 	list_for_each(tmp, &GlobalSMBSessionList) {
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		if (ses->server) {
@@ -432,12 +437,15 @@ find_tcp_session(__u32 new_target_ip_addr,
 				/* BB check if reconnection needed */
 				if (strncmp
 				    (ses->userName, userName,
-				     MAX_USERNAME_SIZE) == 0)
+				     MAX_USERNAME_SIZE) == 0){
+					read_unlock(&GlobalSMBSeslock);
 					return ses;	/* found exact match on both tcp and SMB sessions */
+				}
 			}
 		}
 		/* else tcp and smb sessions need reconnection */
 	}
+	read_unlock(&GlobalSMBSeslock);
 	return NULL;
 }
 
@@ -447,6 +455,7 @@ find_unc(__u32 new_target_ip_addr, char *uncName, char *userName)
 	struct list_head *tmp;
 	struct cifsTconInfo *tcon;
 
+	read_lock(&GlobalSMBSeslock);
 	list_for_each(tmp, &GlobalTreeConnectionList) {
 		cFYI(1, ("\nNext tcon - "));
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
@@ -473,13 +482,16 @@ find_unc(__u32 new_target_ip_addr, char *uncName, char *userName)
 						if (strncmp
 						    (tcon->ses->userName,
 						     userName,
-						     MAX_USERNAME_SIZE) == 0)
+						     MAX_USERNAME_SIZE) == 0) {
+							read_unlock(&GlobalSMBSeslock);
 							return tcon;/* also matched user (smb session)*/
+						}
 					}
 				}
 			}
 		}
 	}
+	read_unlock(&GlobalSMBSeslock);
 	return NULL;
 }
 
@@ -599,7 +611,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 {
 	int rc = 0;
 	int xid;
-    int ntlmv2_flag = FALSE;
+	int ntlmv2_flag = FALSE;
 	struct socket *csocket;
 	struct sockaddr_in sin_server;
 /*	struct sockaddr_in6 sin_server6; */
@@ -616,7 +628,11 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	xid = GetXid();
 	cFYI(0, ("\nEntering cifs_mount. Xid: %d with: %s\n", xid, mount_data));
 
-	parse_mount_options(mount_data, devname, &volume_info);
+	if(parse_mount_options(mount_data, devname, &volume_info)) {
+		FreeXid(xid);
+		return -EINVAL;
+	}
+
 
 	if (volume_info.username) {
 		cFYI(1, ("\nUsername: %s ", volume_info.username));
@@ -634,7 +650,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		cERROR(1,
 		       ("\nCIFS mount error: No UNC path (e.g. -o unc=//192.168.1.100/public) specified  "));
 		FreeXid(xid);
-		return -ENODEV;
+		return -EINVAL;
 	}
 	/* BB add support to use the multiuser_mount flag BB */
 	existingCifsSes =
@@ -720,18 +736,18 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 				   && (pSesInfo->secType == RawNTLMSSP)) {
 				cFYI(1, ("\nNTLMSSP sesssetup "));
 				rc = CIFSNTLMSSPNegotiateSessSetup(xid,
-								   pSesInfo,
-								   cryptKey,
-								   volume_info.domainname,
-                                   &ntlmv2_flag,
-								   cifs_sb->local_nls);
+								pSesInfo,
+								cryptKey,
+								volume_info.domainname,
+								&ntlmv2_flag,
+								cifs_sb->local_nls);
 				if (!rc) {
-                    if(ntlmv2_flag) {
-                        cFYI(1,("\nAble to use the more secure NTLM version 2 password hash"));
-                        /* SMBNTv2encrypt( ...);  */ /* BB fix this up - 
-                        and note that Samba client equivalent looks wrong */
-                    } else
-					    SMBNTencrypt(password_with_pad,cryptKey,ntlm_session_key);
+					if(ntlmv2_flag) {
+						cFYI(1,("\nAble to use the more secure NTLM version 2 password hash"));
+				/* SMBNTv2encrypt( ...);  */ /* BB fix this up - 
+				   and note that Samba client equivalent looks wrong */
+					} else
+						SMBNTencrypt(password_with_pad,cryptKey,ntlm_session_key);
 
 					/* for better security the weaker lanman hash not sent 
                        in AuthSessSetup so why bother calculating it */
@@ -742,13 +758,13 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 						   cryptKey, session_key); */
 
 					rc = CIFSNTLMSSPAuthSessSetup(xid,
-								      pSesInfo,
-								      volume_info.
-								      username,
-								      volume_info.domainname,
-								      ntlm_session_key,
-								      session_key,
-                                      ntlmv2_flag,
+								pSesInfo,
+								volume_info.
+								username,
+								volume_info.domainname,
+								ntlm_session_key,
+								session_key,
+								ntlmv2_flag,
 								      cifs_sb->local_nls);
 				}
 			} else {	/* old style NTLM 0.12 session setup */
@@ -805,6 +821,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 								 "",
 								 cifs_sb->
 								 local_nls);
+					FreeXid(xid);
 					return -ENODEV;
 				} else {
 					rc = CIFSTCon(xid, pSesInfo,
@@ -893,8 +910,8 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 	pSMB->req_no_secext.MaxBufferSize = cpu_to_le16(ses->maxBuf);
 	pSMB->req_no_secext.MaxMpxCount = cpu_to_le16(ses->maxReq);
 
-    if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	pSMB->req_no_secext.Capabilities =
 	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS;
@@ -928,8 +945,8 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 			*bcc_ptr = 0;
 			bcc_ptr++;
 		}
-        if(user == NULL)
-            bytes_returned = 0; /* skill null user */
+		if(user == NULL)
+			bytes_returned = 0; /* skill null user */
         else
 		    bytes_returned =
 		        cifs_strtoUCS((wchar_t *) bcc_ptr, user, 100, nls_codepage);
@@ -960,10 +977,10 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 		bcc_ptr += 2 * bytes_returned;
 		bcc_ptr += 2;
 	} else {
-        if(user != NULL) {                
+		if(user != NULL) {                
 		    strncpy(bcc_ptr, user, 200);
 		    bcc_ptr += strnlen(user, 200);
-        }
+		}
 		*bcc_ptr = 0;
 		bcc_ptr++;
 		if (domain == NULL) {
@@ -1065,7 +1082,6 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses, char *user,
 						    kcalloc(2, GFP_KERNEL);
 					}
 				} else {	/* ASCII */
-
 					len = strnlen(bcc_ptr, 1024);
 					if (((long) bcc_ptr + len) - (long)
 					    pByteArea(smb_buffer_response)
@@ -1148,8 +1164,8 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	pSMB->req.MaxBufferSize = cpu_to_le16(ses->maxBuf);
 	pSMB->req.MaxMpxCount = cpu_to_le16(ses->maxReq);
 
-    if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	pSMB->req.Capabilities =
 	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
@@ -1394,7 +1410,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	PCHALLENGE_MESSAGE SecurityBlob2;
 
 	cFYI(1, ("\nIn NTLMSSP sesssetup (negotiate) "));
-    *pNTLMv2_flag = FALSE;
+	*pNTLMv2_flag = FALSE;
 	smb_buffer = buf_get();
 	if (smb_buffer == 0) {
 		return -ENOMEM;
@@ -1413,8 +1429,8 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	pSMB->req.MaxBufferSize = cpu_to_le16(ses->maxBuf);
 	pSMB->req.MaxMpxCount = cpu_to_le16(ses->maxReq);
 
-    if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	pSMB->req.Capabilities =
 	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
@@ -1441,8 +1457,8 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	    NTLMSSP_NEGOTIATE_UNICODE | NTLMSSP_NEGOTIATE_OEM |
 	    NTLMSSP_REQUEST_TARGET | NTLMSSP_NEGOTIATE_NTLM | 0x80000000 |
 	    NTLMSSP_NEGOTIATE_ALWAYS_SIGN | NTLMSSP_NEGOTIATE_128;
-    if(ntlmv2_support)
-        SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
+	if(ntlmv2_support)
+		SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
 	/* setup pointers to domain name and workstation name */
 	bcc_ptr += SecurityBlobLength;
 
@@ -1558,8 +1574,8 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 				memcpy(challenge_from_server,
 				       SecurityBlob2->Challenge,
 				       CIFS_CRYPTO_KEY_SIZE);
-                if(SecurityBlob2->NegotiateFlags & NTLMSSP_NEGOTIATE_NTLMV2)
-                    *pNTLMv2_flag = TRUE;
+				if(SecurityBlob2->NegotiateFlags & NTLMSSP_NEGOTIATE_NTLMV2)
+					*pNTLMv2_flag = TRUE;
 				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
@@ -1645,7 +1661,6 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 						    kcalloc(2, GFP_KERNEL);
 					}
 				} else {	/* ASCII */
-
 					len = strnlen(bcc_ptr, 1024);
 					if (((long) bcc_ptr + len) - (long)
 					    pByteArea(smb_buffer_response)
@@ -1742,8 +1757,8 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 
 	pSMB->req.hdr.Uid = ses->Suid;
 
-    if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	pSMB->req.Capabilities =
 	    CAP_LARGE_FILES | CAP_NT_SMBS | CAP_LEVEL_II_OPLOCKS |
@@ -1771,8 +1786,8 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	    NTLMSSP_NEGOTIATE_UNICODE | NTLMSSP_REQUEST_TARGET |
 	    NTLMSSP_NEGOTIATE_NTLM | NTLMSSP_NEGOTIATE_TARGET_INFO |
 	    0x80000000 | NTLMSSP_NEGOTIATE_ALWAYS_SIGN | NTLMSSP_NEGOTIATE_128;
-    if(ntlmv2_flag)
-        SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
+	if(ntlmv2_flag)
+		SecurityBlob->NegotiateFlags |= NTLMSSP_NEGOTIATE_NTLMV2;
 
 /* setup pointers to domain name and workstation name */
 
@@ -2032,7 +2047,6 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 						ses->serverNOS = kcalloc(2, GFP_KERNEL);
 					}
 				} else {	/* ASCII */
-
 					len = strnlen(bcc_ptr, 1024);
 					if (((long) bcc_ptr + len) - 
                         (long) pByteArea(smb_buffer_response) 
@@ -2116,8 +2130,8 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 	bcc_ptr = &(pSMB->Password[0]);
 	bcc_ptr++;		/* skip password */
 
-    if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-        smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	if(ses->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		smb_buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 
 	if (ses->capabilities & CAP_STATUS32) {
 		smb_buffer->Flags2 |= SMBFLG2_ERR_STATUS;
@@ -2202,6 +2216,7 @@ cifs_umount(struct super_block *sb, struct cifs_sb_info *cifs_sb)
 	struct cifsSesInfo *ses = NULL;
 
 	xid = GetXid();
+
 	if (cifs_sb->tcon) {
 		ses = cifs_sb->tcon->ses; /* save ptr to ses before delete tcon!*/
 		rc = CIFSSMBTDis(xid, cifs_sb->tcon);
@@ -2218,16 +2233,11 @@ cifs_umount(struct super_block *sb, struct cifs_sb_info *cifs_sb)
 				FreeXid(xid);
 				return 0;
 			}
-    	 /* wake_up_process(ses->server->tsk);*/ /* was worth a try */
 			schedule_timeout(HZ / 4);	/* give captive thread time to exit */
-            if((ses->server) && (ses->server->ssocket)) {            
-                cFYI(1,("\nWaking up socket by sending it signal "));
-                send_sig(SIGINT,ses->server->tsk,1);
-                /* No luck figuring out a better way to_close socket */
-         /*ses->server->ssocket->sk->prot->close(ses->server->ssocket->sk,0);*/
-              /*  ses->server->ssocket = NULL; */  /* serialize better */
-                /* sock_wake_async(ses->server->ssocket,3,POLL_HUP); */
-            }
+			if((ses->server) && (ses->server->ssocket)) {            
+				cFYI(1,("\nWaking up socket by sending it signal "));
+				send_sig(SIGINT,ses->server->tsk,1);
+			}
 		} else
 			cFYI(1, ("\nNo session or bad tcon"));
 	}

@@ -79,18 +79,20 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 	buf += length;
 
 	i = 0;
+	read_lock(&GlobalSMBSeslock);
 	list_for_each(tmp, &GlobalSMBSessionList) {
 		i++;
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		length =
 		    sprintf(buf,
-			    "\n%d) Name: %s  Domain: %s HowManyMounts: %d LocalUsersToSameServer: %d\n\t ServerOS: %s  ServerNOS: %s  Capabilities: 0x%x ",
-			    i, ses->serverName, ses->serverDomain,
-			    atomic_read(&ses->inUse),
-			    atomic_read(&ses->server->socketUseCount),
-			    ses->serverOS, ses->serverNOS, ses->capabilities);
+			    "\n%d) Name: %s  Domain: %s HowManyMounts: %d ServerOS: %s  ServerNOS: %s  Capabilities: 0x%x\n",
+				i, ses->serverName, ses->serverDomain, atomic_read(&ses->inUse),
+				ses->serverOS, ses->serverNOS, ses->capabilities);
 		buf += length;
+		if(ses->server)
+		buf += sprintf(buf, "\tLocal Users To Same Server: %d ",atomic_read(&ses->server->socketUseCount));
 	}
+	read_unlock(&GlobalSMBSeslock);
 	sprintf(buf, "\n");
 	buf++;
 	printk("\nTotal Buffer so far: %s\n", buf_start);
@@ -99,6 +101,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 	buf += length;
 
 	i = 0;
+	read_lock(&GlobalSMBSeslock);
 	list_for_each(tmp, &GlobalTreeConnectionList) {
 		i++;
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
@@ -122,6 +125,7 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 				    tcon->fsDevInfo.DeviceType);
 		buf += length;
 	}
+	read_unlock(&GlobalSMBSeslock);
 	length = sprintf(buf, "\n");
 	buf += length;
 	*eof = 1;
@@ -156,22 +160,22 @@ int
 cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 		  int length, int *eof, void *data)
 {
-   int item_length;
+	int item_length;
 	length =
 	    sprintf(buf,
 		    "Currently Allocated structures\nCIFS Sessions: %d\n",sesInfoAllocCount.counter);
-    buf += length;
-    item_length = 
-        sprintf(buf,"Shares (unique mount targets): %d\n",tconInfoAllocCount.counter);
-    length += item_length;
-    buf += item_length;      
-    item_length = 
-        sprintf(buf,"Allocated SMB Request and Response Buffers: %d\n",bufAllocCount.counter);
-    length += item_length;
-    buf += item_length;      
-    item_length = 
-        sprintf(buf,"Active Operations (MIDs in use): %d\n",midCount.counter);
-    length += item_length;
+	buf += length;
+	item_length = 
+		sprintf(buf,"Shares (unique mount targets): %d\n",tconInfoAllocCount.counter);
+	length += item_length;
+	buf += item_length;      
+	item_length = 
+			sprintf(buf,"Allocated SMB Request and Response Buffers: %d\n",bufAllocCount.counter);
+	length += item_length;
+	buf += item_length;      
+	item_length = 
+		sprintf(buf,"Active Operations (MIDs in use): %d\n",midCount.counter);
+	length += item_length;
 
 	return length;
 }
@@ -262,10 +266,13 @@ cifs_proc_clean(void)
 	remove_proc_entry("DebugData", proc_fs_cifs);
 	remove_proc_entry("cifsFYI", proc_fs_cifs);
 	remove_proc_entry("TraceSMB", proc_fs_cifs);
-	remove_proc_entry("MaxSimultaneousOps", proc_fs_cifs);
+	remove_proc_entry("SimultaneousOps", proc_fs_cifs);
 	remove_proc_entry("TotalOps", proc_fs_cifs);
 	remove_proc_entry("MultiuserMount", proc_fs_cifs);
 	remove_proc_entry("oplockEnabled", proc_fs_cifs);
+	remove_proc_entry("NTLMV2Enabled",proc_fs_cifs);
+	remove_proc_entry("ExtendedSecurity",proc_fs_cifs);
+	remove_proc_entry("PacketSigningEnabled",proc_fs_cifs);
 	remove_proc_entry("cifs", proc_root_fs);
 }
 
