@@ -38,7 +38,7 @@ typedef struct {
 } ppa_struct;
 
 #define PPA_EMPTY	\
-	.base		= -1,		\
+{	.base		= -1,		\
 	.mode		= PPA_AUTODETECT,	\
 	.host		= -1,		\
 	.ppa_tq		= { .func = ppa_interrupt },	\

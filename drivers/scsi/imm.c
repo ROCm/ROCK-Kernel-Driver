@@ -47,7 +47,7 @@ typedef struct {
 } imm_struct;
 
 #define IMM_EMPTY \
-	.base		= -1,		\
+{	.base		= -1,		\
 	.mode		= IMM_AUTODETECT,	\
 	.host		= -1,		\
 }
