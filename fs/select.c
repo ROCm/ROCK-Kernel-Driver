@@ -120,7 +120,7 @@ void __pollwait(struct file * filp, wait_queue_head_t * wait_address, poll_table
 int do_select(int n, fd_set_bits *fds, long *timeout)
 {
 	poll_table table, *wait;
-	int retval, off, max, maxoff;
+	int retval, off, maxoff;
 	long __timeout = *timeout;
 
 	poll_initwait(&table);
@@ -129,27 +129,25 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 		wait = NULL;
 	
 	retval = 0;
-	maxoff = n/BITS_PER_LONG; 
-	max = 0; 
+	maxoff = FDS_LONGS(n);
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
 		for (off = 0; off <= maxoff; off++) { 
 			unsigned long val = BITS(fds, off); 
 
-			if (!val) 
-				continue;
 			while (val) { 
-				int k = ffz(~val); 
+				int k = ffz(~val), index; 
 				unsigned long mask, bit;
 				struct file *file;
-
-				if (k > n%BITS_PER_LONG) 
-					break;
 
 				bit = (1UL << k); 
 				val &= ~bit; 
 
-				file = fget((off * BITS_PER_LONG) + k);
+				index = off*BITS_PER_LONG + k;
+				if (index >= n) 
+					break;
+
+				file = fget(index);
 				mask = POLLNVAL;
 				if (file) {
 					mask = DEFAULT_POLLMASK;
@@ -167,7 +165,7 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 					retval++;
 					wait = NULL;
 				}
-				if ((mask& POLLOUT_SET) && ISSET(bit,__OUT(fds,off))) {
+				if ((mask & POLLOUT_SET) && ISSET(bit,__OUT(fds,off))) {
 					SET(bit, __RES_OUT(fds,off));
 					retval++;
 					wait = NULL;
@@ -177,18 +175,13 @@ int do_select(int n, fd_set_bits *fds, long *timeout)
 					retval++;
 					wait = NULL;
 				}
-
-				if (!(val &= ~bit))
-					break;
 			}
 		}
 
-		
-		maxoff = max; 
 		wait = NULL;
 		if (retval || !__timeout || signal_pending(current))
 			break;
-		if(table.error) {
+		if (table.error) {
 			retval = table.error;
 			break;
 		}
@@ -214,19 +207,15 @@ out:
 
 static int get_fd_set(unsigned long nr, void *ufdset, unsigned long *fdset)
 {
-	unsigned long rounded = FDS_BYTES(nr), mask; 
+	unsigned long rounded = FDS_BYTES(nr);
 	if (ufdset) {
 		int error = verify_area(VERIFY_WRITE, ufdset, rounded);
 		if (!error && __copy_from_user(fdset, ufdset, rounded))
 			error = -EFAULT;
-		if (nr % __NFDBITS == 0) 
-			mask = 0;
-		else { 
-			/* This includes one bit too much according to SU;
-			   but without this some programs hang. */ 
-			mask = ~(~0UL << (nr%__NFDBITS)); 
+		if (nr % __NFDBITS) {
+			unsigned long mask = ~(~0UL << (nr % __NFDBITS)); 
+			fdset[nr/__NFDBITS] &= mask; 
 		} 
-		fdset[nr/__NFDBITS] &= mask; 
 		return error;
 	}
 	memset(fdset, 0, rounded);
@@ -248,10 +237,10 @@ asmlinkage long
 sys_select(int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp)
 {
 	fd_set_bits fds;
-	char *bits;
+	unsigned long *bits;
 	long timeout;
 	int ret, size, max_fdset;
-	char stack_bits[FDS_BYTES(FAST_SELECT_MAX) * 6]; 
+	unsigned long stack_bits[FDS_LONGS(FAST_SELECT_MAX) * 6]; 
 
 	timeout = MAX_SCHEDULE_TIMEOUT;
 	if (tvp) {
@@ -286,22 +275,21 @@ sys_select(int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp)
 	 * since we used fdset we need to allocate memory in units of
 	 * long-words. 
 	 */
-	size = FDS_BYTES(n);
-	if (n < FAST_SELECT_MAX) { 
-		bits = stack_bits;
-	} else { 
+	size = FDS_LONGS(n);
+	bits = stack_bits;
+	if (n >= FAST_SELECT_MAX) { 
 		ret = -ENOMEM;
-		bits = kmalloc(6*size, GFP_KERNEL);
+		bits = kmalloc(sizeof(unsigned long)*6*size, GFP_KERNEL);
 		if (!bits)
 			goto out_nofds;
 	} 
 
-	fds.in      = (unsigned long *)  bits;
-	fds.out     = (unsigned long *) (bits +   size);
-	fds.ex      = (unsigned long *) (bits + 2*size);
-	fds.res_in  = (unsigned long *) (bits + 3*size);
-	fds.res_out = (unsigned long *) (bits + 4*size);
-	fds.res_ex  = (unsigned long *) (bits + 5*size);
+	fds.in      = bits;
+	fds.out     = bits +   size;
+	fds.ex      = bits + 2*size;
+	fds.res_in  = bits + 3*size;
+	fds.res_out = bits + 4*size;
+	fds.res_ex  = bits + 5*size;
 
 	if ((ret = get_fd_set(n, inp, fds.in)) ||
 	    (ret = get_fd_set(n, outp, fds.out)) ||
