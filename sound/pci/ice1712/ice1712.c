@@ -2375,6 +2375,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 	ice->omni = omni ? 1 : 0;
 	spin_lock_init(&ice->reg_lock);
 	init_MUTEX(&ice->gpio_mutex);
+	init_MUTEX(&ice->open_mutex);
 	ice->gpio.set_mask = snd_ice1712_set_gpio_mask;
 	ice->gpio.set_dir = snd_ice1712_set_gpio_dir;
 	ice->gpio.set_data = snd_ice1712_set_gpio_data;

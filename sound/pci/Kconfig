@@ -55,6 +55,12 @@ config SND_KORG1212
 	help
 	  Say 'Y' or 'M' to include support for Korg 1212IO.
 
+config SND_MIXART
+	tristate "Digigram miXart"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include support for Digigram miXart soundcard.
+
 config SND_NM256
 	tristate "NeoMagic NM256AV/ZX"
 	depends on SND

@@ -692,6 +692,15 @@ Module parameters
 
     The power-management is supported.
 
+  Module snd-mixart
+  -----------------
+
+    Module for Digigram miXart8 soundcards.
+
+    Module supports multiple cards.
+    Note: One miXart8 board will be represented as 4 alsa cards.
+          See MIXART.txt for details.
+
   Module snd-mpu401
   -----------------
 

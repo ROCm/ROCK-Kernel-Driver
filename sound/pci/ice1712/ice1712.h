@@ -335,6 +335,9 @@ struct _snd_ice1712 {
 	unsigned short hoontech_boxconfig[4];
 	unsigned int cur_rate;		/* current rate */
 
+	struct semaphore open_mutex;
+	snd_pcm_substream_t *pcm_reserved[4];
+
 	unsigned int akm_codecs;
 	akm4xxx_t *akm;
 	struct snd_ice1712_spdif spdif;
