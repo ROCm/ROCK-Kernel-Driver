@@ -185,7 +185,6 @@ EXPORT_SYMBOL(invalidate_inodes);
 EXPORT_SYMBOL(invalidate_device);
 EXPORT_SYMBOL(invalidate_inode_pages);
 EXPORT_SYMBOL(truncate_inode_pages);
-EXPORT_SYMBOL(fsync_dev);
 EXPORT_SYMBOL(fsync_bdev);
 EXPORT_SYMBOL(permission);
 EXPORT_SYMBOL(vfs_permission);
@@ -329,7 +328,6 @@ EXPORT_SYMBOL(tty_std_termios);
 /* block device driver support */
 EXPORT_SYMBOL(blk_size);
 EXPORT_SYMBOL(blk_dev);
-EXPORT_SYMBOL(is_read_only);
 EXPORT_SYMBOL(bdev_read_only);
 EXPORT_SYMBOL(set_device_ro);
 EXPORT_SYMBOL(bmap);

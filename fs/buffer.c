@@ -244,22 +244,6 @@ int fsync_bdev(struct block_device *bdev)
 }
 
 /*
- * Write out and wait upon all dirty data associated with this
- * kdev_t.   Filesystem data as well as the underlying block
- * device.  Takes the superblock lock.
- */
-int fsync_dev(kdev_t dev)
-{
-	struct block_device *bdev = bdget(kdev_t_to_nr(dev));
-	if (bdev) {
-		int res = fsync_bdev(bdev);
-		bdput(bdev);
-		return res;
-	}
-	return 0;
-}
-
-/*
  * sync everything.
  */
 asmlinkage long sys_sync(void)
