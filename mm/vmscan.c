@@ -970,8 +970,6 @@ scan:
 			if (nr_pages == 0) {	/* Not software suspend */
 				if (zone->free_pages <= zone->pages_high)
 					all_zones_ok = 0;
-				if (all_zones_ok)
-					continue;
 			}
 			zone->temp_priority = priority;
 			max_scan = zone->nr_inactive >> priority;
