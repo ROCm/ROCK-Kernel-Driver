@@ -447,6 +447,13 @@ UNUSUAL_DEV(  0x05ab, 0x5701, 0x0100, 0x0110,
 		0 ),
 #endif
 
+/* Reported by Avi Kivity <avi@argo.co.il> */
+UNUSUAL_DEV( 0x05ac, 0x1203, 0x0001, 0x0001,
+		"Apple",
+		"iPod",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
+
 #ifdef CONFIG_USB_STORAGE_JUMPSHOT
 UNUSUAL_DEV(  0x05dc, 0x0001, 0x0000, 0x0001,
 		"Lexar",
