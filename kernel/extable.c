@@ -38,5 +38,5 @@ int kernel_text_address(unsigned long addr)
 	    addr <= (unsigned long)_etext)
 		return 1;
 
-	return module_text_address(addr);
+	return module_text_address(addr) != NULL;
 }

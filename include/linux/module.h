@@ -268,7 +268,7 @@ static inline int module_is_live(struct module *mod)
 }
 
 /* Is this address in a module? */
-int module_text_address(unsigned long addr);
+struct module *module_text_address(unsigned long addr);
 
 #ifdef CONFIG_MODULE_UNLOAD
 
@@ -361,9 +361,9 @@ search_module_extables(unsigned long addr)
 }
 
 /* Is this address in a module? */
-static inline int module_text_address(unsigned long addr)
+static inline struct module *module_text_address(unsigned long addr)
 {
-	return 0;
+	return NULL;
 }
 
 /* Get/put a kernel symbol (calls should be symmetric) */

@@ -552,23 +552,14 @@ EXPORT_SYMBOL(__symbol_put);
 
 void symbol_put_addr(void *addr)
 {
-	struct kernel_symbol_group *ks;
 	unsigned long flags;
 
 	spin_lock_irqsave(&modlist_lock, flags);
-	list_for_each_entry(ks, &symbols, list) {
- 		unsigned int i;
+	if (!kernel_text_address((unsigned long)addr))
+		BUG();
 
-		for (i = 0; i < ks->num_syms; i++) {
-			if (ks->syms[i].value == (unsigned long)addr) {
-				module_put(ks->owner);
-				spin_unlock_irqrestore(&modlist_lock, flags);
-				return;
-			}
-		}
-	}
+	module_put(module_text_address((unsigned long)addr));
 	spin_unlock_irqrestore(&modlist_lock, flags);
-	BUG();
 }
 EXPORT_SYMBOL_GPL(symbol_put_addr);
 
@@ -1545,15 +1536,15 @@ const struct exception_table_entry *search_module_extables(unsigned long addr)
 }
 
 /* Is this a valid kernel address?  We don't grab the lock: we are oopsing. */
-int module_text_address(unsigned long addr)
+struct module *module_text_address(unsigned long addr)
 {
 	struct module *mod;
 
 	list_for_each_entry(mod, &modules, list)
 		if (within(addr, mod->module_init, mod->init_size)
 		    || within(addr, mod->module_core, mod->core_size))
-			return 1;
-	return 0;
+			return mod;
+	return NULL;
 }
 
 /* Provided by the linker */
