@@ -3755,6 +3755,31 @@ __init static int cpu_to_node_group(int cpu)
 }
 #endif
 
+/* Groups for isolated scheduling domains */
+static struct sched_group sched_group_isolated[NR_CPUS];
+__init static int cpu_to_isolated_group(int cpu)
+{
+        return cpu;
+}
+
+cpumask_t __initdata cpu_isolated_map = CPU_MASK_NONE; /* cpus with isolated domains */
+
+/* Setup the mask of cpus configured for isolated domains */
+static int __init
+isolated_cpu_setup(char *str)
+{
+        int ints[NR_CPUS], i;
+
+        str = get_options(str, ARRAY_SIZE(ints), ints);
+        cpus_clear(cpu_isolated_map);
+        for (i=1; i<=ints[0]; i++) {
+                cpu_set(ints[i], cpu_isolated_map);
+        }
+        return 1;
+}
+
+__setup ("isolcpus=", isolated_cpu_setup);
+
 /*
  * init_sched_build_groups takes an array of groups, the cpumask we wish
  * to span, and a pointer to a function which identifies what group a CPU
@@ -3803,6 +3828,15 @@ __init static void init_sched_build_groups(struct sched_group groups[],
 __init static void arch_init_sched_domains(void)
 {
 	int i;
+	cpumask_t cpu_default_map;
+
+	/*
+	 * Setup mask for cpus without special case scheduling requirements.
+	 * For now this just excludes isolated cpus, but could be used to
+	 * exclude other special cases in the future.
+	 */
+	cpus_complement(cpu_default_map, cpu_isolated_map);
+	cpus_and(cpu_default_map, cpu_default_map, cpu_possible_map);
 
 	/* Set up domains */
 	for_each_cpu(i) {
@@ -3810,12 +3844,37 @@ __init static void arch_init_sched_domains(void)
 		struct sched_domain *sd = NULL, *p;
 		cpumask_t nodemask = node_to_cpumask(cpu_to_node(i));
 
+		cpus_and(nodemask, nodemask, cpu_default_map);
+
+		/*
+		 * Set up isolated domains.
+		 * Unlike those of other cpus, the domains and groups are
+		 * single level, and span a single cpu.
+		 */
+		if (cpu_isset(i, cpu_isolated_map)) {
+#ifdef CONFIG_SCHED_SMT
+			sd = &per_cpu(cpu_domains, i);
+#else
+			sd = &per_cpu(phys_domains, i);
+#endif
+			group = cpu_to_isolated_group(i);
+			*sd = SD_CPU_INIT;
+			cpu_set(i, sd->span);
+			sd->balance_interval = INT_MAX;	/* Don't balance */
+			sd->flags = 0;			/* Avoid WAKE_ */
+			sd->groups = &sched_group_isolated[group];
+			printk(KERN_INFO "Setting up cpu %d isolated.\n", i);
+			/* Single level, so continue with next cpu */
+			continue;
+		}
+
 #ifdef CONFIG_NUMA
 		sd = &per_cpu(node_domains, i);
 		group = cpu_to_node_group(i);
 		*sd = SD_NODE_INIT;
 		/* FIXME: should be multilevel, in arch code */
 		sd->span = sched_domain_node_span(i, SD_NODES_PER_DOMAIN);
+		cpus_and(sd->span, sd->span, cpu_default_map);
 		sd->groups = &sched_group_nodes[group];
 #endif
 
@@ -3833,6 +3892,7 @@ __init static void arch_init_sched_domains(void)
 		group = cpu_to_cpu_group(i);
 		*sd = SD_SIBLING_INIT;
 		sd->span = cpu_sibling_map[i];
+		cpus_and(sd->span, sd->span, cpu_default_map);
 		sd->parent = p;
 		sd->groups = &sched_group_cpus[group];
 #endif
@@ -3841,19 +3901,30 @@ __init static void arch_init_sched_domains(void)
 #ifdef CONFIG_SCHED_SMT
 	/* Set up CPU (sibling) groups */
 	for_each_cpu(i) {
-		if (i != first_cpu(cpu_sibling_map[i]))
+		cpumask_t this_sibling_map = cpu_sibling_map[i];
+		cpus_and(this_sibling_map, this_sibling_map, cpu_default_map);
+		if (i != first_cpu(this_sibling_map))
 			continue;
 
-		init_sched_build_groups(sched_group_cpus, cpu_sibling_map[i],
+		init_sched_build_groups(sched_group_cpus, this_sibling_map,
 						&cpu_to_cpu_group);
 	}
 #endif
+
+	/* Set up isolated groups */
+	for_each_cpu_mask(i, cpu_isolated_map) {
+		cpumask_t mask;
+		cpus_clear(mask);
+		cpu_set(i, mask);
+		init_sched_build_groups(sched_group_isolated, mask,
+						&cpu_to_isolated_group);
+	}
 
 	/* Set up physical groups */
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		cpumask_t nodemask = node_to_cpumask(i);
 
-		cpus_and(nodemask, nodemask, cpu_possible_map);
+		cpus_and(nodemask, nodemask, cpu_default_map);
 		if (cpus_empty(nodemask))
 			continue;
 
@@ -3863,12 +3934,12 @@ __init static void arch_init_sched_domains(void)
 
 #ifdef CONFIG_NUMA
 	/* Set up node groups */
-	init_sched_build_groups(sched_group_nodes, cpu_possible_map,
+	init_sched_build_groups(sched_group_nodes, cpu_default_map,
 					&cpu_to_node_group);
 #endif
 
 	/* Calculate CPU power for physical packages and nodes */
-	for_each_cpu(i) {
+	for_each_cpu_mask(i, cpu_default_map) {
 		int power;
 		struct sched_domain *sd;
 #ifdef CONFIG_SCHED_SMT
