@@ -123,7 +123,7 @@ static int longrun_verify_policy(struct cpufreq_policy *policy)
 		policy->cpuinfo.max_freq);
 
 	if (policy->policy == CPUFREQ_POLICY_GOVERNOR)
-		policy->policy = longrun_driver.policy[0].policy;
+		return -EINVAL;
 
 	return 0;
 }
