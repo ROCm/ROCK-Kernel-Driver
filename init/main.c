@@ -60,8 +60,10 @@ extern char *linux_banner;
 static int init(void *);
 
 extern void init_IRQ(void);
+extern void init_modules(void);
 extern void sock_init(void);
 extern void fork_init(unsigned long);
+extern void extable_init(void);
 extern void mca_init(void);
 extern void sbus_init(void);
 extern void sysctl_init(void);
@@ -72,10 +74,6 @@ extern void pte_chain_init(void);
 extern void radix_tree_init(void);
 extern void free_initmem(void);
 extern void populate_rootfs(void);
-
-#ifdef CONFIG_MODULES
-extern void extable_init(void);
-#endif
 
 #ifdef CONFIG_TC
 extern void tc_init(void);
@@ -397,9 +395,7 @@ asmlinkage void __init start_kernel(void)
 	printk("Kernel command line: %s\n", saved_command_line);
 	parse_options(command_line);
 	trap_init();
-#ifdef CONFIG_MODULES
 	extable_init();
-#endif
 	rcu_init();
 	init_IRQ();
 	sched_init();
