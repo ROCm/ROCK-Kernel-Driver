@@ -157,8 +157,8 @@ static struct uhci_td *uhci_alloc_td(struct uhci_hcd *uhci, struct usb_device *d
 	return td;
 }
 
-static inline void uhci_fill_td(struct uhci_td *td, __u32 status,
-		__u32 token, __u32 buffer)
+static inline void uhci_fill_td(struct uhci_td *td, u32 status,
+		u32 token, u32 buffer)
 {
 	td->status = cpu_to_le32(status);
 	td->token = cpu_to_le32(token);
@@ -184,11 +184,11 @@ static void uhci_insert_td_frame_list(struct uhci_hcd *uhci, struct uhci_td *td,
 		list_add_tail(&td->fl_list, &ftd->fl_list);
 
 		td->link = ltd->link;
-		mb();
+		wmb();
 		ltd->link = cpu_to_le32(td->dma_handle);
 	} else {
 		td->link = uhci->fl->frame[framenum];
-		mb();
+		wmb();
 		uhci->fl->frame[framenum] = cpu_to_le32(td->dma_handle);
 		uhci->fl->frame_cpu[framenum] = td;
 	}
@@ -218,7 +218,7 @@ static void uhci_remove_td(struct uhci_hcd *uhci, struct uhci_td *td)
 		ptd->link = td->link;
 	}
 
-	mb();
+	wmb();
 	td->link = UHCI_PTR_TERM;
 
 	list_del_init(&td->fl_list);
@@ -332,17 +332,7 @@ static void uhci_insert_qh(struct uhci_hcd *uhci, struct uhci_qh *skelqh, struct
 	/* Grab the last QH */
 	lqh = list_entry(skelqh->list.prev, struct uhci_qh, list);
 
-	/*
-	 * Patch this endpoint's URB's QHs to point to the next skelqh:
-	 *    skelqh --> ... lqh --> newqh --> next skelqh
-	 * Do this first, so the HC always sees the right QH after this one.
-	 */
-	list_for_each (tmp, &urbp->queue_list) {
-		struct urb_priv *turbp =
-			list_entry(tmp, struct urb_priv, queue_list);
-
-		turbp->qh->link = lqh->link;
-	}
+	/* Point to the next skelqh */
 	urbp->qh->link = lqh->link;
 	wmb();				/* Ordering is important */
 
@@ -362,15 +352,15 @@ static void uhci_insert_qh(struct uhci_hcd *uhci, struct uhci_qh *skelqh, struct
 	 *
 	 * The HC could see (and use!) any of these as we write them.
 	 */
+	lqh->link = cpu_to_le32(urbp->qh->dma_handle) | UHCI_PTR_QH;
 	if (lqh->urbp) {
 		list_for_each (tmp, &lqh->urbp->queue_list) {
 			struct urb_priv *turbp =
 				list_entry(tmp, struct urb_priv, queue_list);
 
-			turbp->qh->link = cpu_to_le32(urbp->qh->dma_handle) | UHCI_PTR_QH;
+			turbp->qh->link = lqh->link;
 		}
 	}
-	lqh->link = cpu_to_le32(urbp->qh->dma_handle) | UHCI_PTR_QH;
 
 	list_add_tail(&urbp->qh->list, &skelqh->list);
 }
@@ -382,7 +372,7 @@ static void uhci_insert_qh(struct uhci_hcd *uhci, struct uhci_qh *skelqh, struct
 static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 {
 	struct uhci_qh *pqh;
-	__u32 newlink;
+	u32 newlink;
 
 	if (!qh)
 		return;
@@ -423,7 +413,7 @@ static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 				turbp->qh->link = newlink;
 			}
 		}
-		mb();
+		wmb();
 
 		/* Leave qh->link in case the HC is on the QH now, it will */
 		/* continue the rest of the schedule */
@@ -510,7 +500,7 @@ static void uhci_append_queued_urb(struct uhci_hcd *uhci, struct urb *eurb, stru
 	/* All qh's in the queue need to link to the next queue */
 	urbp->qh->link = eurbp->qh->link;
 
-	mb();			/* Make sure we flush everything */
+	wmb();			/* Make sure we flush everything */
 
 	lltd->link = cpu_to_le32(urbp->qh->dma_handle) | UHCI_PTR_QH;
 
@@ -1044,9 +1034,13 @@ static int uhci_submit_common(struct uhci_hcd *uhci, struct urb *urb, struct urb
 			usb_pipeout(urb->pipe));
 	}
 
-	/* Set the flag on the last packet */
-	if (!(urb->transfer_flags & URB_NO_INTERRUPT))
-		td->status |= cpu_to_le32(TD_CTRL_IOC);
+	/* Set the interrupt-on-completion flag on the last packet.
+	 * A more-or-less typical 4 KB URB (= size of one memory page)
+	 * will require about 3 ms to transfer; that's a little on the
+	 * fast side but not enough to justify delaying an interrupt
+	 * more than 2 or 3 URBs, so we will ignore the URB_NO_INTERRUPT
+	 * flag setting. */
+	td->status |= cpu_to_le32(TD_CTRL_IOC);
 
 	qh = uhci_alloc_qh(uhci, urb->dev);
 	if (!qh)
@@ -1786,6 +1780,9 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 
 	spin_unlock(&uhci->schedule_lock);
 
+	/* Wake up anyone waiting for an URB to complete */
+	wake_up_all(&uhci->waitqh);
+
 	return IRQ_HANDLED;
 }
 
@@ -2086,6 +2083,8 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	INIT_LIST_HEAD(&uhci->complete_list);
 
+	init_waitqueue_head(&uhci->waitqh);
+
 	uhci->fl = dma_alloc_coherent(uhci_dev(uhci), sizeof(*uhci->fl),
 			&dma_handle, 0);
 	if (!uhci->fl) {
@@ -2296,6 +2295,9 @@ static void uhci_stop(struct usb_hcd *hcd)
 	uhci_free_pending_qhs(uhci);
 	uhci_free_pending_tds(uhci);
 	spin_unlock_irq(&uhci->schedule_lock);
+
+	/* Wake up anyone waiting for an URB to complete */
+	wake_up_all(&uhci->waitqh);
 	
 	release_uhci(uhci);
 }
@@ -2361,6 +2363,46 @@ static void uhci_hcd_free(struct usb_hcd *hcd)
 	kfree(hcd_to_uhci(hcd));
 }
 
+/* Are there any URBs for a particular device/endpoint on a given list? */
+static int urbs_for_ep_list(struct list_head *head,
+		struct hcd_dev *hdev, int ep)
+{
+	struct urb_priv *urbp;
+
+	list_for_each_entry(urbp, head, urb_list) {
+		struct urb *urb = urbp->urb;
+
+		if (hdev == urb->dev->hcpriv && ep ==
+				(usb_pipeendpoint(urb->pipe) |
+				 usb_pipein(urb->pipe)))
+			return 1;
+	}
+	return 0;
+}
+
+/* Are there any URBs for a particular device/endpoint? */
+static int urbs_for_ep(struct uhci_hcd *uhci, struct hcd_dev *hdev, int ep)
+{
+	int rc;
+
+	spin_lock_irq(&uhci->schedule_lock);
+	rc = (urbs_for_ep_list(&uhci->urb_list, hdev, ep) ||
+			urbs_for_ep_list(&uhci->complete_list, hdev, ep) ||
+			urbs_for_ep_list(&uhci->urb_remove_list, hdev, ep));
+	spin_unlock_irq(&uhci->schedule_lock);
+	return rc;
+}
+
+/* Wait until all the URBs for a particular device/endpoint are gone */
+static void uhci_hcd_endpoint_disable(struct usb_hcd *hcd,
+		struct hcd_dev *hdev, int endpoint)
+{
+	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
+
+	wait_event_interruptible(uhci->waitqh,
+			!urbs_for_ep(uhci, hdev, endpoint));
+}
+
 static int uhci_hcd_get_frame_number(struct usb_hcd *hcd)
 {
 	return uhci_get_current_frame_number(hcd_to_uhci(hcd));
@@ -2390,6 +2432,7 @@ static const struct hc_driver uhci_driver = {
 	.urb_enqueue =		uhci_urb_enqueue,
 	.urb_dequeue =		uhci_urb_dequeue,
 
+	.endpoint_disable =	uhci_hcd_endpoint_disable,
 	.get_frame_number =	uhci_hcd_get_frame_number,
 
 	.hub_status_data =	uhci_hub_status_data,

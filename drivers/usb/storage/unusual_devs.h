@@ -438,22 +438,6 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 		US_FL_SINGLE_LUN ),
 #endif
 
-/* Following three Minolta cameras reported by Martin Pool
- * <mbp@sourcefrog.net>.  Originally discovered by Kedar Petankar,
- * Matthew Geier, Mikael Lofj"ard, Marcel de Boer.
- */
-UNUSUAL_DEV( 0x0686, 0x4006, 0x0001, 0x0001,
-		"Minolta",
-		"DiMAGE 7",
-		US_SC_SCSI, US_PR_DEVICE, NULL,
-		0 ),
-
-UNUSUAL_DEV( 0x0686, 0x400f, 0x0001, 0x0001,
-		"Minolta",
-		"DiMAGE 7Hi",
-		US_SC_SCSI, US_PR_DEVICE, NULL,
-		0 ),
-
 /* Submitted by Benny Sjostrand <benny@hostmobility.com> */
 UNUSUAL_DEV( 0x0686, 0x4011, 0x0001, 0x0001,
 		"Minolta",
@@ -629,7 +613,7 @@ UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
 		"Casio",
 		"QV DigitalCamera",
 		US_SC_DEVICE, US_PR_CB, NULL,
-		US_FL_FIX_INQUIRY ),
+		US_FL_NEED_OVERRIDE | US_FL_FIX_INQUIRY ),
 
 /* Later Casio cameras apparently tell the truth */
 UNUSUAL_DEV( 0x07cf, 0x1001, 0x9010, 0x9999,
@@ -688,7 +672,7 @@ UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
 UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
 		"IBM",
 		"IBM USB Memory Key",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* This Pentax still camera is not conformant

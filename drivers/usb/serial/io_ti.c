@@ -995,7 +995,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 	if (status)
 		return status;
 
-	interface = &serial->serial->dev->config->interface[0]->altsetting->desc;
+	interface = &serial->serial->interface->cur_altsetting->desc;
 	if (!interface) {
 		dev_err (&serial->serial->dev->dev, "%s - no interface set, error!", __FUNCTION__);
 		return -ENODEV;

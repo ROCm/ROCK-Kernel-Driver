@@ -154,7 +154,6 @@ struct usbdevfs_hub_portinfo {
 
 struct dev_state {
 	struct list_head list;      /* state list */
-	struct rw_semaphore devsem; /* protects modifications to dev (dev == NULL indicating disconnect) */ 
 	struct usb_device *dev;
 	struct file *file;
 	spinlock_t lock;            /* protects the async urb lists */

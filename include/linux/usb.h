@@ -14,6 +14,7 @@
 #include <linux/delay.h>	/* for mdelay() */
 #include <linux/interrupt.h>	/* for in_interrupt() */
 #include <linux/list.h>		/* for struct list_head */
+#include <linux/kref.h>		/* for struct kref */
 #include <linux/device.h>	/* for struct device */
 #include <linux/fs.h>		/* for struct file_operations */
 #include <linux/completion.h>	/* for struct completion */
@@ -147,11 +148,42 @@ void usb_put_intf(struct usb_interface *intf);
 #define USB_MAXINTERFACES	32
 
 /**
+ * struct usb_interface_cache - long-term representation of a device interface
+ * @num_altsetting: number of altsettings defined.
+ * @ref: reference counter.
+ * @altsetting: variable-length array of interface structures, one for
+ *	each alternate setting that may be selected.  Each one includes a
+ *	set of endpoint configurations.  They will be in no particular order.
+ *
+ * These structures persist for the lifetime of a usb_device, unlike
+ * struct usb_interface (which persists only as long as its configuration
+ * is installed).  The altsetting arrays can be accessed through these
+ * structures at any time, permitting comparison of configurations and
+ * providing support for the /proc/bus/usb/devices pseudo-file.
+ */
+struct usb_interface_cache {
+	unsigned num_altsetting;	/* number of alternate settings */
+	struct kref ref;		/* reference counter */
+
+	/* variable-length array of alternate settings for this interface,
+	 * stored in no particular order */
+	struct usb_host_interface altsetting[0];
+};
+#define	ref_to_usb_interface_cache(r) \
+		container_of(r, struct usb_interface_cache, ref)
+#define	altsetting_to_usb_interface_cache(a) \
+		container_of(a, struct usb_interface_cache, altsetting[0])
+
+/**
  * struct usb_host_config - representation of a device's configuration
  * @desc: the device's configuration descriptor.
- * @interface: array of usb_interface structures, one for each interface
- *	in the configuration.  The number of interfaces is stored in
- *	desc.bNumInterfaces.
+ * @interface: array of pointers to usb_interface structures, one for each
+ *	interface in the configuration.  The number of interfaces is stored
+ *	in desc.bNumInterfaces.  These pointers are valid only while the
+ *	the configuration is active.
+ * @intf_cache: array of pointers to usb_interface_cache structures, one
+ *	for each interface in the configuration.  These structures exist
+ *	for the entire life of the device.
  * @extra: pointer to buffer containing all extra descriptors associated
  *	with this configuration (those preceding the first interface
  *	descriptor).
@@ -184,6 +216,10 @@ struct usb_host_config {
 	/* the interfaces associated with this configuration,
 	 * stored in no particular order */
 	struct usb_interface *interface[USB_MAXINTERFACES];
+
+	/* Interface information available even when this is not the
+	 * active configuration */
+	struct usb_interface_cache *intf_cache[USB_MAXINTERFACES];
 
 	unsigned char *extra;   /* Extra descriptors */
 	int extralen;
@@ -731,8 +767,8 @@ typedef void (*usb_complete_t)(struct urb *, struct pt_regs *);
 struct urb
 {
 	/* private, usb core and host controller only fields in the urb */
+	struct kref kref;		/* reference count of the URB */
 	spinlock_t lock;		/* lock for the URB */
-	atomic_t count;			/* reference count of the URB */
 	void *hcpriv;			/* private data for host controller */
 	struct list_head urb_list;	/* list pointer to all active urbs */
 	int bandwidth;			/* bandwidth for INT/ISO request */

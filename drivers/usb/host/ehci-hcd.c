@@ -965,7 +965,7 @@ idle_timeout:
 		goto rescan;
 	case QH_STATE_IDLE:		/* fully unlinked */
 		if (list_empty (&qh->qtd_list)) {
-			qh_put (ehci, qh);
+			qh_put (qh);
 			break;
 		}
 		/* else FALL THROUGH */

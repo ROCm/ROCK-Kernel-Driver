@@ -928,8 +928,8 @@ static struct usb_driver usbnet_driver;
  */
 static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 {
-	u8				*buf = intf->altsetting->extra;
-	int				len = intf->altsetting->extralen;
+	u8				*buf = intf->cur_altsetting->extra;
+	int				len = intf->cur_altsetting->extralen;
 	struct usb_interface_descriptor	*d;
 	struct cdc_state		*info = (void *) &dev->data;
 	int				status;
@@ -955,7 +955,7 @@ static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 	/* this assumes that if there's a non-RNDIS vendor variant
 	 * of cdc-acm, it'll fail RNDIS requests cleanly.
 	 */
-	rndis = (intf->altsetting->desc.bInterfaceProtocol == 0xff);
+	rndis = (intf->cur_altsetting->desc.bInterfaceProtocol == 0xff);
 
 	memset (info, 0, sizeof *info);
 	info->control = intf;
@@ -1025,7 +1025,7 @@ static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 			}
 
 			/* a data interface altsetting does the real i/o */
-			d = &info->data->altsetting->desc;
+			d = &info->data->cur_altsetting->desc;
 			if (d->bInterfaceClass != USB_CLASS_CDC_DATA) {
 				dev_dbg (&intf->dev, "slave class %u\n",
 					d->bInterfaceClass);

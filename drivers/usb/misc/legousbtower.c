@@ -704,7 +704,7 @@ static int tower_probe (struct usb_interface *interface, const struct usb_device
 	dev->interrupt_out_urb = NULL;
 
 
-	iface_desc = &interface->altsetting[0];
+	iface_desc = interface->cur_altsetting;
 
 	/* set up the endpoint information */
 	for (i = 0; i < iface_desc->desc.bNumEndpoints; ++i) {

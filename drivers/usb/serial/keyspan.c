@@ -133,9 +133,6 @@
 
 	/* Per device and per port private data */
 struct keyspan_serial_private {
-	/* number of active ports */
-	atomic_t	active_count;
-
 	const struct keyspan_device_details	*device_details;
 
 	struct urb	*instat_urb;

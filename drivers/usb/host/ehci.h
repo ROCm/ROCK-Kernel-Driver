@@ -366,7 +366,8 @@ struct ehci_qh {
 	struct ehci_qtd		*dummy;
 	struct ehci_qh		*reclaim;	/* next to reclaim */
 
-	atomic_t		refcount;
+	struct ehci_hcd		*ehci;
+	struct kref		kref;
 	unsigned		stamp;
 
 	u8			qh_state;

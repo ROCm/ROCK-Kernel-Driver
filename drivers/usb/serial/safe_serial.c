@@ -395,7 +395,7 @@ static int safe_write_room (struct usb_serial_port *port)
 
 static int safe_startup (struct usb_serial *serial)
 {
-	switch (serial->interface->altsetting->desc.bInterfaceProtocol) {
+	switch (serial->interface->cur_altsetting->desc.bInterfaceProtocol) {
 	case LINEO_SAFESERIAL_CRC:
 		break;
 	case LINEO_SAFESERIAL_CRC_PADDED:
