@@ -360,10 +360,8 @@ follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 	BUG_ON(! pmd_hugepage(*pmd));
 
 	page = hugepte_page(*(hugepte_t *)pmd);
-	if (page) {
+	if (page)
 		page += ((address & ~HPAGE_MASK) >> PAGE_SHIFT);
-		get_page(page);
-	}
 	return page;
 }
 
