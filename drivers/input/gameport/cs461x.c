@@ -118,7 +118,7 @@ MODULE_LICENSE("GPL");
 */
 
 static unsigned long ba0_addr;
-static unsigned int *ba0;
+static unsigned int __iomem *ba0;
 
 static char phys[32];
 static char name[] = "CS416x Gameport";
@@ -127,34 +127,34 @@ static char name[] = "CS416x Gameport";
 static unsigned long ba1_addr;
 static union ba1_t {
         struct {
-                unsigned int *data0;
-                unsigned int *data1;
-                unsigned int *pmem;
-                unsigned int *reg;
+                unsigned int __iomem *data0;
+                unsigned int __iomem *data1;
+                unsigned int __iomem *pmem;
+                unsigned int __iomem *reg;
         } name;
-        unsigned int *idx[4];
+        unsigned int __iomem *idx[4];
 } ba1;
 
 static void cs461x_poke(unsigned long reg, unsigned int val)
 {
-        ba1.idx[(reg >> 16) & 3][(reg >> 2) & 0x3fff] = val;
+        writel(val, &ba1.idx[(reg >> 16) & 3][(reg >> 2) & 0x3fff]);
 }
 
 static unsigned int cs461x_peek(unsigned long reg)
 {
-        return ba1.idx[(reg >> 16) & 3][(reg >> 2) & 0x3fff];
+        return readl(&ba1.idx[(reg >> 16) & 3][(reg >> 2) & 0x3fff]);
 }
 
 #endif
 
 static void cs461x_pokeBA0(unsigned long reg, unsigned int val)
 {
-        ba0[reg >> 2] = val;
+        writel(val, &ba0[reg >> 2]);
 }
 
 static unsigned int cs461x_peekBA0(unsigned long reg)
 {
-        return ba0[reg >> 2];
+        return readl(&ba0[reg >> 2]);
 }
 
 static int cs461x_free(struct pci_dev *pdev)

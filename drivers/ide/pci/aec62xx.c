@@ -16,7 +16,54 @@
 
 #include <asm/io.h>
 
-#include "aec62xx.h"
+struct chipset_bus_clock_list_entry {
+	u8 xfer_speed;
+	u8 chipset_settings;
+	u8 ultra_settings;
+};
+
+static struct chipset_bus_clock_list_entry aec6xxx_33_base [] = {
+	{	XFER_UDMA_6,	0x31,	0x07	},
+	{	XFER_UDMA_5,	0x31,	0x06	},
+	{	XFER_UDMA_4,	0x31,	0x05	},
+	{	XFER_UDMA_3,	0x31,	0x04	},
+	{	XFER_UDMA_2,	0x31,	0x03	},
+	{	XFER_UDMA_1,	0x31,	0x02	},
+	{	XFER_UDMA_0,	0x31,	0x01	},
+
+	{	XFER_MW_DMA_2,	0x31,	0x00	},
+	{	XFER_MW_DMA_1,	0x31,	0x00	},
+	{	XFER_MW_DMA_0,	0x0a,	0x00	},
+	{	XFER_PIO_4,	0x31,	0x00	},
+	{	XFER_PIO_3,	0x33,	0x00	},
+	{	XFER_PIO_2,	0x08,	0x00	},
+	{	XFER_PIO_1,	0x0a,	0x00	},
+	{	XFER_PIO_0,	0x00,	0x00	},
+	{	0,		0x00,	0x00	}
+};
+
+static struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
+	{	XFER_UDMA_6,	0x41,	0x06	},
+	{	XFER_UDMA_5,	0x41,	0x05	},
+	{	XFER_UDMA_4,	0x41,	0x04	},
+	{	XFER_UDMA_3,	0x41,	0x03	},
+	{	XFER_UDMA_2,	0x41,	0x02	},
+	{	XFER_UDMA_1,	0x41,	0x01	},
+	{	XFER_UDMA_0,	0x41,	0x01	},
+
+	{	XFER_MW_DMA_2,	0x41,	0x00	},
+	{	XFER_MW_DMA_1,	0x42,	0x00	},
+	{	XFER_MW_DMA_0,	0x7a,	0x00	},
+	{	XFER_PIO_4,	0x41,	0x00	},
+	{	XFER_PIO_3,	0x43,	0x00	},
+	{	XFER_PIO_2,	0x78,	0x00	},
+	{	XFER_PIO_1,	0x7a,	0x00	},
+	{	XFER_PIO_0,	0x70,	0x00	},
+	{	0,		0x00,	0x00	}
+};
+
+#define BUSCLOCK(D)	\
+	((struct chipset_bus_clock_list_entry *) pci_get_drvdata((D)))
 
 #if 0
 		if (dev->device == PCI_DEVICE_ID_ARTOP_ATP850UF) {
@@ -101,8 +148,7 @@ static int aec6210_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	/* 0x40|(2*drive->dn): Active, 0x41|(2*drive->dn): Recovery */
 	pci_read_config_word(dev, 0x40|(2*drive->dn), &d_conf);
 	tmp0 = pci_bus_clock_list(speed, BUSCLOCK(dev));
-	SPLIT_BYTE(tmp0,tmp1,tmp2);
-	MAKE_WORD(d_conf,tmp1,tmp2);
+	d_conf = ((tmp0 & 0xf0) << 4) | (tmp0 & 0xf);
 	pci_write_config_word(dev, 0x40|(2*drive->dn), d_conf);
 
 	tmp1 = 0x00;
@@ -342,6 +388,58 @@ static int __devinit init_setup_aec6x80(struct pci_dev *dev, ide_pci_device_t *d
 
 	return ide_setup_pci_device(dev, d);
 }
+
+static ide_pci_device_t aec62xx_chipsets[] __devinitdata = {
+	{	/* 0 */
+		.name		= "AEC6210",
+		.init_setup	= init_setup_aec62xx,
+		.init_chipset	= init_chipset_aec62xx,
+		.init_hwif	= init_hwif_aec62xx,
+		.init_dma	= init_dma_aec62xx,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
+		.bootable	= OFF_BOARD,
+	},{	/* 1 */
+		.name		= "AEC6260",
+		.init_setup	= init_setup_aec62xx,
+		.init_chipset	= init_chipset_aec62xx,
+		.init_hwif	= init_hwif_aec62xx,
+		.init_dma	= init_dma_aec62xx,
+		.channels	= 2,
+		.autodma	= NOAUTODMA,
+		.bootable	= OFF_BOARD,
+	},{	/* 2 */
+		.name		= "AEC6260R",
+		.init_setup	= init_setup_aec62xx,
+		.init_chipset	= init_chipset_aec62xx,
+		.init_hwif	= init_hwif_aec62xx,
+		.init_dma	= init_dma_aec62xx,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
+		.bootable	= NEVER_BOARD,
+	},{	/* 3 */
+		.name		= "AEC6X80",
+		.init_setup	= init_setup_aec6x80,
+		.init_chipset	= init_chipset_aec62xx,
+		.init_hwif	= init_hwif_aec62xx,
+		.init_dma	= init_dma_aec62xx,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.bootable	= OFF_BOARD,
+	},{	/* 4 */
+		.name		= "AEC6X80R",
+		.init_setup	= init_setup_aec6x80,
+		.init_chipset	= init_chipset_aec62xx,
+		.init_hwif	= init_hwif_aec62xx,
+		.init_dma	= init_dma_aec62xx,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
+		.bootable	= OFF_BOARD,
+	}
+};
 
 /**
  *	aec62xx_init_one	-	called when a AEC is found

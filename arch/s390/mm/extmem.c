@@ -117,7 +117,7 @@ segment_by_name (char *name)
 	struct list_head *l;
 	struct dcss_segment *tmp, *retval = NULL;
 
-	BUG_ON (!spin_is_locked(&dcss_lock));
+	assert_spin_locked(&dcss_lock);
 	dcss_mkname (name, dcss_name);
 	list_for_each (l, &dcss_list) {
 		tmp = list_entry (l, struct dcss_segment, list);
@@ -271,7 +271,7 @@ segment_overlaps_others (struct dcss_segment *seg)
 	struct list_head *l;
 	struct dcss_segment *tmp;
 
-	BUG_ON (!spin_is_locked(&dcss_lock));
+	assert_spin_locked(&dcss_lock);
 	list_for_each(l, &dcss_list) {
 		tmp = list_entry(l, struct dcss_segment, list);
 		if ((tmp->start_addr >> 20) > (seg->end >> 20))
@@ -576,8 +576,8 @@ segment_save(char *name)
 			segtype_string[seg->range[i].start & 0xff]);
 	}
 	sprintf(cmd2, "SAVESEG %s", name);
-	cpcmd(cmd1, NULL, 80);
-	cpcmd(cmd2, NULL, 80);
+	cpcmd(cmd1, NULL, 0);
+	cpcmd(cmd2, NULL, 0);
 	spin_unlock(&dcss_lock);
 }
 

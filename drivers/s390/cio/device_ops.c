@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device_ops.c
  *
- *   $Revision: 1.50 $
+ *   $Revision: 1.53 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -54,6 +54,7 @@ ccw_device_clear(struct ccw_device *cdev, unsigned long intparm)
 	if (cdev->private->state == DEV_STATE_NOT_OPER)
 		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE &&
+	    cdev->private->state != DEV_STATE_WAIT4IO &&
 	    cdev->private->state != DEV_STATE_W4SENSE)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
@@ -66,8 +67,9 @@ ccw_device_clear(struct ccw_device *cdev, unsigned long intparm)
 }
 
 int
-ccw_device_start(struct ccw_device *cdev, struct ccw1 *cpa,
-		 unsigned long intparm, __u8 lpm, unsigned long flags)
+ccw_device_start_key(struct ccw_device *cdev, struct ccw1 *cpa,
+		     unsigned long intparm, __u8 lpm, __u8 key,
+		     unsigned long flags)
 {
 	struct subchannel *sch;
 	int ret;
@@ -87,10 +89,35 @@ ccw_device_start(struct ccw_device *cdev, struct ccw1 *cpa,
 	ret = cio_set_options (sch, flags);
 	if (ret)
 		return ret;
-	ret = cio_start (sch, cpa, lpm);
+	ret = cio_start_key (sch, cpa, lpm, key);
 	if (ret == 0)
 		cdev->private->intparm = intparm;
 	return ret;
+}
+
+
+int
+ccw_device_start_timeout_key(struct ccw_device *cdev, struct ccw1 *cpa,
+			     unsigned long intparm, __u8 lpm, __u8 key,
+			     unsigned long flags, int expires)
+{
+	int ret;
+
+	if (!cdev)
+		return -ENODEV;
+	ccw_device_set_timeout(cdev, expires);
+	ret = ccw_device_start_key(cdev, cpa, intparm, lpm, key, flags);
+	if (ret != 0)
+		ccw_device_set_timeout(cdev, 0);
+	return ret;
+}
+
+int
+ccw_device_start(struct ccw_device *cdev, struct ccw1 *cpa,
+		 unsigned long intparm, __u8 lpm, unsigned long flags)
+{
+	return ccw_device_start_key(cdev, cpa, intparm, lpm,
+				    default_storage_key, flags);
 }
 
 int
@@ -98,16 +125,11 @@ ccw_device_start_timeout(struct ccw_device *cdev, struct ccw1 *cpa,
 			 unsigned long intparm, __u8 lpm, unsigned long flags,
 			 int expires)
 {
-	int ret;
-
-	if (!cdev)
-		return -ENODEV;
-	ccw_device_set_timeout(cdev, expires);
-	ret = ccw_device_start(cdev, cpa, intparm, lpm, flags);
-	if (ret != 0)
-		ccw_device_set_timeout(cdev, 0);
-	return ret;
+	return ccw_device_start_timeout_key(cdev, cpa, intparm, lpm,
+					    default_storage_key, flags,
+					    expires);
 }
+
 
 int
 ccw_device_halt(struct ccw_device *cdev, unsigned long intparm)
@@ -120,6 +142,7 @@ ccw_device_halt(struct ccw_device *cdev, unsigned long intparm)
 	if (cdev->private->state == DEV_STATE_NOT_OPER)
 		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE &&
+	    cdev->private->state != DEV_STATE_WAIT4IO &&
 	    cdev->private->state != DEV_STATE_W4SENSE)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
@@ -539,6 +562,8 @@ EXPORT_SYMBOL(ccw_device_halt);
 EXPORT_SYMBOL(ccw_device_resume);
 EXPORT_SYMBOL(ccw_device_start_timeout);
 EXPORT_SYMBOL(ccw_device_start);
+EXPORT_SYMBOL(ccw_device_start_timeout_key);
+EXPORT_SYMBOL(ccw_device_start_key);
 EXPORT_SYMBOL(ccw_device_get_ciw);
 EXPORT_SYMBOL(ccw_device_get_path_mask);
 EXPORT_SYMBOL(read_conf_data);

@@ -188,14 +188,14 @@ config LDM_DEBUG
 
 config SGI_PARTITION
 	bool "SGI partition support" if PARTITION_ADVANCED
-	default y if (SGI_IP22 || SGI_IP27)
+	default y if (SGI_IP22 || SGI_IP27 || ((MACH_JAZZ || SNI_RM200_PCI) && !CPU_LITTLE_ENDIAN))
 	help
 	  Say Y here if you would like to be able to read the hard disk
 	  partition table format used by SGI machines.
 
 config ULTRIX_PARTITION
 	bool "Ultrix partition table support" if PARTITION_ADVANCED
-	default y if DECSTATION
+	default y if MACH_DECSTATION
 	help
 	  Say Y here if you would like to be able to read the hard disk
 	  partition table format used by DEC (now Compaq) Ultrix machines.

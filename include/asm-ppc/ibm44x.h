@@ -3,9 +3,9 @@
  *
  * PPC44x definitions
  *
- * Matt Porter <mporter@mvista.com>
+ * Matt Porter <mporter@kernel.crashing.org>
  *
- * Copyright 2002-2003 MontaVista Software Inc.
+ * Copyright 2002-2005 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -34,23 +34,55 @@
 /* Lowest TLB slot consumed by the default pinned TLBs */
 #define PPC44x_LOW_SLOT		63
 
+/* LS 32-bits of UART0 physical address location for early serial text debug */
+#ifdef CONFIG_440SP
+#define UART0_PHYS_IO_BASE	0xf0000200
+#else
+#define UART0_PHYS_IO_BASE	0x40000200
+#endif
+
+/*
+ * XXX This 36-bit trap stuff will move somewhere in syslib/
+ * when we rework/abstract the PPC44x PCI-X handling -mdp
+ */
+
 /*
  * Standard 4GB "page" definitions
  */
+#ifdef CONFIG_440SP
+#define	PPC44x_IO_PAGE		0x0000000100000000ULL
+#define	PPC44x_PCICFG_PAGE	0x0000000900000000ULL
+#define	PPC44x_PCIIO_PAGE	PPC44x_PCICFG_PAGE
+#define	PPC44x_PCIMEM_PAGE	0x0000000a00000000ULL
+#else
 #define	PPC44x_IO_PAGE		0x0000000100000000ULL
 #define	PPC44x_PCICFG_PAGE	0x0000000200000000ULL
 #define	PPC44x_PCIIO_PAGE	PPC44x_PCICFG_PAGE
 #define	PPC44x_PCIMEM_PAGE	0x0000000300000000ULL
+#endif
 
 /*
  * 36-bit trap ranges
  */
-#define PPC44x_IO_LO		0x40000000
-#define PPC44x_IO_HI		0x40001000
-#define PPC44x_PCICFG_LO	0x0ec00000
-#define PPC44x_PCICFG_HI	0x0ec7ffff
-#define PPC44x_PCIMEM_LO	0x80002000
-#define PPC44x_PCIMEM_HI	0xffffffff
+#ifdef CONFIG_440SP
+#define PPC44x_IO_LO		0xf0000000UL
+#define PPC44x_IO_HI		0xf0000fffUL
+#define PPC44x_PCI0CFG_LO	0x0ec00000UL
+#define PPC44x_PCI0CFG_HI	0x0ec00007UL
+#define PPC44x_PCI1CFG_LO	0x1ec00000UL
+#define PPC44x_PCI1CFG_HI	0x1ec00007UL
+#define PPC44x_PCI2CFG_LO	0x2ec00000UL
+#define PPC44x_PCI2CFG_HI	0x2ec00007UL
+#define PPC44x_PCIMEM_LO	0x80000000UL
+#define PPC44x_PCIMEM_HI	0xdfffffffUL
+#else
+#define PPC44x_IO_LO		0x40000000UL
+#define PPC44x_IO_HI		0x40000fffUL
+#define PPC44x_PCI0CFG_LO	0x0ec00000UL
+#define PPC44x_PCI0CFG_HI	0x0ec00007UL
+#define PPC44x_PCIMEM_LO	0x80002000UL
+#define PPC44x_PCIMEM_HI	0xffffffffUL
+#endif
 
 /*
  * The "residual" board information structure the boot loader passes
@@ -62,8 +94,8 @@
  * DCRN definitions
  */
 
-#ifdef CONFIG_440GX
-/* CPRs */
+
+/* CPRs (440GX and 440SP) */
 #define DCRN_CPR_CONFIG_ADDR	0xc
 #define DCRN_CPR_CONFIG_DATA	0xd
 
@@ -84,7 +116,7 @@
 	mtdcr(DCRN_CPR_CONFIG_ADDR, offset); \
 	mtdcr(DCRN_CPR_CONFIG_DATA, data);})
 
-/* SDRs */
+/* SDRs (440GX and 440SP) */
 #define DCRN_SDR_CONFIG_ADDR 	0xe
 #define DCRN_SDR_CONFIG_DATA	0xf
 #define DCRN_SDR_PFC0		0x4100
@@ -127,9 +159,8 @@
 #define SDR_WRITE(offset, data) ({\
 	mtdcr(DCRN_SDR_CONFIG_ADDR, offset); \
 	mtdcr(DCRN_SDR_CONFIG_DATA,data);})
-#endif /* CONFIG_440GX */
 
-/* Base DCRNs */
+/* DMA (excluding 440SP) */
 #define DCRN_DMA0_BASE		0x100
 #define DCRN_DMA1_BASE		0x108
 #define DCRN_DMA2_BASE		0x110
@@ -163,7 +194,7 @@
 #define UICB_UIC1NC		0x10000000
 #define UICB_UIC2NC		0x04000000
 
-/* 440GP MAL DCRs */
+/* 440 MAL DCRs */
 #define DCRN_MALCR(base)		(base + 0x0)	/* Configuration */
 #define DCRN_MALESR(base)		(base + 0x1)	/* Error Status */
 #define DCRN_MALIER(base)		(base + 0x2)	/* Interrupt Enable */
@@ -193,7 +224,6 @@
 #define DCRN_MALTXCTP7R(base)	((base) + 0x27)	/* Channel Tx 7 Channel Table Pointer */
 #define DCRN_MALRCBS2(base)	((base) + 0x62)	/* Channel Rx 2 Channel Buffer Size */
 #define DCRN_MALRCBS3(base)	((base) + 0x63)	/* Channel Rx 3 Channel Buffer Size */
-
 
 #define MALCR_MMSR		0x80000000	/* MAL Software reset */
 #define MALCR_PLBP_1		0x00400000	/* MAL reqest priority: */
@@ -239,13 +269,24 @@
 #define MALOBISR_CH0		0x80000000	/* EOB channel 1 bit */
 #define MALOBISR_CH2		0x40000000	/* EOB channel 2 bit */
 
-/* 440GP PLB Arbiter DCRs */
+/* 440GP/GX PLB Arbiter DCRs */
 #define DCRN_PLB0_REVID		0x082		/* PLB Arbiter Revision ID */
 #define DCRN_PLB0_ACR		0x083		/* PLB Arbiter Control */
 #define DCRN_PLB0_BESR		0x084		/* PLB Error Status */
 #define DCRN_PLB0_BEARL		0x086		/* PLB Error Address Low */
 #define DCRN_PLB0_BEAR		DCRN_PLB0_BEARL	/* 40x compatibility */
 #define DCRN_PLB0_BEARH		0x087		/* PLB Error Address High */
+
+/* 440GP/GX PLB to OPB bridge DCRs */
+#define DCRN_POB0_BESR0		0x090
+#define DCRN_POB0_BESR1		0x094
+#define DCRN_POB0_BEARL		0x092
+#define DCRN_POB0_BEARH		0x093
+
+/* 440GP/GX OPB to PLB bridge DCRs */
+#define DCRN_OPB0_BSTAT		0x0a9
+#define DCRN_OPB0_BEARL		0x0aa
+#define DCRN_OPB0_BEARH		0x0ab
 
 /* 440GP Clock, PM, chip control */
 #define DCRN_CPC0_SR		0x0b0
@@ -309,7 +350,7 @@
 #define DCRN_SLP	(DCRN_DMASR_BASE + 0x5)	/* DMA Sleep Register */
 #define DCRN_POL	(DCRN_DMASR_BASE + 0x6)	/* DMA Polarity Register */
 
-/* 440GP DRAM controller DCRs */
+/* 440GP/440GX SDRAM controller DCRs */
 #define DCRN_SDRAM0_CFGADDR		0x010
 #define DCRN_SDRAM0_CFGDATA		0x011
 
@@ -335,13 +376,35 @@
 #define PPC44x_MEM_SIZE_128M		0x08000000
 #define PPC44x_MEM_SIZE_256M		0x10000000
 #define PPC44x_MEM_SIZE_512M		0x20000000
+#define PPC44x_MEM_SIZE_1G		0x40000000
+#define PPC44x_MEM_SIZE_2G		0x80000000
 
-#ifdef CONFIG_440GX
-/* Internal SRAM Controller */
-#define DCRN_SRAM0_SB0CR	0x020
-#define DCRN_SRAM0_SB1CR	0x021
-#define DCRN_SRAM0_SB2CR	0x022
-#define DCRN_SRAM0_SB3CR	0x023
+/* 440SP memory controller DCRs */
+#define DCRN_MQ0_BS0BAS			0x40
+#define DCRN_MQ0_BS1BAS			0x41
+
+#define MQ0_CONFIG_SIZE_MASK		0x0000fff0
+#define MQ0_CONFIG_SIZE_8M		0x0000ffc0
+#define MQ0_CONFIG_SIZE_16M		0x0000ff80
+#define MQ0_CONFIG_SIZE_32M		0x0000ff00
+#define MQ0_CONFIG_SIZE_64M		0x0000fe00
+#define MQ0_CONFIG_SIZE_128M		0x0000fc00
+#define MQ0_CONFIG_SIZE_256M		0x0000f800
+#define MQ0_CONFIG_SIZE_512M		0x0000f000
+#define MQ0_CONFIG_SIZE_1G		0x0000e000
+#define MQ0_CONFIG_SIZE_2G		0x0000c000
+
+/* Internal SRAM Controller 440GX/440SP */
+#ifdef CONFIG_440SP
+#define DCRN_SRAM0_BASE		0x100
+#else /* 440GX */
+#define DCRN_SRAM0_BASE		0x000
+#endif
+
+#define DCRN_SRAM0_SB0CR	(DCRN_SRAM0_BASE + 0x020)
+#define DCRN_SRAM0_SB1CR	(DCRN_SRAM0_BASE + 0x021)
+#define DCRN_SRAM0_SB2CR	(DCRN_SRAM0_BASE + 0x022)
+#define DCRN_SRAM0_SB3CR	(DCRN_SRAM0_BASE + 0x023)
 #define  SRAM_SBCR_BAS0		0x80000000
 #define  SRAM_SBCR_BAS1		0x80010000
 #define  SRAM_SBCR_BAS2		0x80020000
@@ -350,16 +413,16 @@
 #define  SRAM_SBCR_BS_64KB	0x00000800
 #define  SRAM_SBCR_BU_RO	0x00000080
 #define  SRAM_SBCR_BU_RW	0x00000180
-#define DCRN_SRAM0_BEAR		0x024
-#define DCRN_SRAM0_BESR0	0x025
-#define DCRN_SRAM0_BESR1	0x026
-#define DCRN_SRAM0_PMEG		0x027
-#define DCRN_SRAM0_CID		0x028
-#define DCRN_SRAM0_REVID	0x029
-#define DCRN_SRAM0_DPC		0x02a
+#define DCRN_SRAM0_BEAR		(DCRN_SRAM0_BASE + 0x024)
+#define DCRN_SRAM0_BESR0	(DCRN_SRAM0_BASE + 0x025)
+#define DCRN_SRAM0_BESR1	(DCRN_SRAM0_BASE + 0x026)
+#define DCRN_SRAM0_PMEG		(DCRN_SRAM0_BASE + 0x027)
+#define DCRN_SRAM0_CID		(DCRN_SRAM0_BASE + 0x028)
+#define DCRN_SRAM0_REVID	(DCRN_SRAM0_BASE + 0x029)
+#define DCRN_SRAM0_DPC		(DCRN_SRAM0_BASE + 0x02a)
 #define  SRAM_DPC_ENABLE	0x80000000
 
-/* L2 Cache Controller */
+/* L2 Cache Controller 440GX/440SP */
 #define DCRN_L2C0_CFG		0x030
 #define  L2C_CFG_L2M		0x80000000
 #define  L2C_CFG_ICU		0x40000000
@@ -409,13 +472,29 @@
 #define  L2C_SNP_SSR_MASK	0x0000f000
 #define  L2C_SNP_SSR_32G	0x0000f000
 #define  L2C_SNP_ESR		0x00000800
-#endif /* CONFIG_440GX */
 
 /*
  * PCI-X definitions
  */
-#define PCIX0_REG_BASE		0x20ec80000ULL
-#define PCIX0_REG_SIZE		0x200
+#define PCIX0_CFGA		0x0ec00000UL
+#define PCIX1_CFGA		0x1ec00000UL
+#define PCIX2_CFGA		0x2ec00000UL
+#define PCIX0_CFGD		0x0ec00004UL
+#define PCIX1_CFGD		0x1ec00004UL
+#define PCIX2_CFGD		0x2ec00004UL
+
+#define PCIX0_IO_BASE		0x0000000908000000ULL
+#define PCIX1_IO_BASE		0x0000000908000000ULL
+#define PCIX2_IO_BASE		0x0000000908000000ULL
+#define PCIX_IO_SIZE		0x00010000
+
+#ifdef CONFIG_440SP
+#define PCIX0_REG_BASE		0x000000090ec80000ULL
+#else
+#define PCIX0_REG_BASE		0x000000020ec80000ULL
+#endif
+#define PCIX_REG_OFFSET		0x10000000
+#define PCIX_REG_SIZE		0x200
 
 #define PCIX0_VENDID		0x000
 #define PCIX0_DEVID		0x002
@@ -512,8 +591,6 @@
 #else
 #define NR_UICS 2
 #endif
-
-#define BD_EMAC_ADDR(e,i) bi_enetaddr[e][i]
 
 #include <asm/ibm4xx.h>
 

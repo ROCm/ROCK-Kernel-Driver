@@ -117,7 +117,7 @@ static void inline flush_mace_bus(void)
  * IRQ spinlock - Ralf says not to disable CPU interrupts,
  * and I think he knows better.
  */
-static spinlock_t ip32_irq_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ip32_irq_lock);
 
 /* Some initial interrupts to set up */
 extern irqreturn_t crime_memerr_intr (int irq, void *dev_id,

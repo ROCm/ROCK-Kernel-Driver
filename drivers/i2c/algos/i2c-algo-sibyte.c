@@ -181,9 +181,6 @@ int i2c_sibyte_add_bus(struct i2c_adapter *i2c_adap, int speed)
 		printk("\n");
 	}
 
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
 	i2c_add_adapter(i2c_adap);
 
 	return 0;
@@ -197,9 +194,6 @@ int i2c_sibyte_del_bus(struct i2c_adapter *adap)
 	if ((res = i2c_del_adapter(adap)) < 0)
 		return res;
 
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
 	return 0;
 }
 

@@ -27,7 +27,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/mv64x60_defs.h>
 
-extern u8      mv64x60_pci_exclude_bridge;
+extern u8	mv64x60_pci_exclude_bridge;
 
 extern spinlock_t mv64x60_lock;
 
@@ -210,7 +210,7 @@ struct mv64x60_chip_info {
 	void	(*enable_window_64bit)(mv64x60_handle_t *bh, u32 window);
 	void	(*disable_window_64bit)(mv64x60_handle_t *bh, u32 window);
 	void	(*disable_all_windows)(mv64x60_handle_t *bh,
-		       struct mv64x60_setup_info *si);
+			struct mv64x60_setup_info *si);
 	void	(*config_io2mem_windows)(mv64x60_handle_t *bh,
 			struct mv64x60_setup_info *si,
 			u32 mem_windows[MV64x60_CPU2MEM_WINDOWS][2]);
@@ -223,16 +223,16 @@ struct mv64x60_chip_info {
 };
 
 struct mv64x60_handle {
-	u32	type;		/* type of bridge */
-	u32	rev;		/* revision of bridge */
-	u32	v_base;		/* virtual base addr of bridge regs */
-	u32	p_base;		/* physical base addr of bridge regs */
+	u32		type;		/* type of bridge */
+	u32		rev;		/* revision of bridge */
+	void		*v_base;	/* virtual base addr of bridge regs */
+	phys_addr_t	p_base;		/* physical base addr of bridge regs */
 
-	u32	pci_mode_a;	/* pci bus 0 mode: conventional pci, pci-x */
-	u32	pci_mode_b;	/* pci bus 1 mode: conventional pci, pci-x */
+	u32		pci_mode_a;	/* pci 0 mode: conventional pci, pci-x*/
+	u32		pci_mode_b;	/* pci 1 mode: conventional pci, pci-x*/
 
-	u32	io_base_a;	/* vaddr of pci 0's I/O space */
-	u32	io_base_b;	/* vaddr of pci 1's I/O space */
+	u32		io_base_a;	/* vaddr of pci 0's I/O space */
+	u32		io_base_b;	/* vaddr of pci 1's I/O space */
 
 	struct pci_controller	*hose_a;
 	struct pci_controller	*hose_b;
@@ -247,17 +247,19 @@ mv64x60_write(struct mv64x60_handle *bh, u32 offset, u32 val) {
 	ulong	flags;
 
 	spin_lock_irqsave(&mv64x60_lock, flags);
-	out_le32((volatile u32 *)(bh->v_base + offset), val);
+	out_le32(bh->v_base + offset, val);
 	spin_unlock_irqrestore(&mv64x60_lock, flags);
 }
 
 extern inline u32
 mv64x60_read(struct mv64x60_handle *bh, u32 offset) {
 	ulong	flags;
+	u32     reg;
 
 	spin_lock_irqsave(&mv64x60_lock, flags);
-	return in_le32((volatile u32 *)(bh->v_base + offset));
+	reg = in_le32(bh->v_base + offset);
 	spin_unlock_irqrestore(&mv64x60_lock, flags);
+	return reg;
 }
 
 extern inline void
@@ -267,9 +269,9 @@ mv64x60_modify(struct mv64x60_handle *bh, u32 offs, u32 data, u32 mask)
 	ulong	flags;
 
 	spin_lock_irqsave(&mv64x60_lock, flags);
-	reg = mv64x60_read(bh, offs) & (~mask); /* zero bits we care about */
-	reg |= data & mask; /* set bits from the data */
-	mv64x60_write(bh, offs, reg);
+	reg = in_le32(bh->v_base + offs) & (~mask);
+	reg |= data & mask;
+	out_le32(bh->v_base + offs, reg);
 	spin_unlock_irqrestore(&mv64x60_lock, flags);
 }
 
@@ -282,11 +284,11 @@ int mv64x60_init(struct mv64x60_handle *bh, struct mv64x60_setup_info *si);
 u32 mv64x60_get_mem_size(u32 bridge_base, u32 chip_type);
 void mv64x60_early_init(struct mv64x60_handle *bh,
 	struct mv64x60_setup_info *si);
-void mv64x60_alloc_hose(struct mv64x60_handle *bh, u32 cfg_addr, u32 cfg_data,
-	struct pci_controller **hose);
+void mv64x60_alloc_hose(struct mv64x60_handle *bh, u32 cfg_addr,
+	u32 cfg_data, struct pci_controller **hose);
 int mv64x60_get_type(struct mv64x60_handle *bh);
 int mv64x60_setup_for_chip(struct mv64x60_handle *bh);
-u32 mv64x60_get_bridge_vbase(void);
+void *mv64x60_get_bridge_vbase(void);
 u32 mv64x60_get_bridge_type(void);
 u32 mv64x60_get_bridge_rev(void);
 void mv64x60_get_mem_windows(struct mv64x60_handle *bh,

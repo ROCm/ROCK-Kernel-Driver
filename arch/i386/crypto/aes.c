@@ -93,12 +93,12 @@ static u32 rcon_tab[RC_LENGTH];
 
 u32 ft_tab[4][256];
 u32 fl_tab[4][256];
-u32 ls_tab[4][256];
-u32 im_tab[4][256];
+static u32 ls_tab[4][256];
+static u32 im_tab[4][256];
 u32 il_tab[4][256];
 u32 it_tab[4][256];
 
-void gen_tabs(void)
+static void gen_tabs(void)
 {
 	u32 i, w;
 	u8 pow[512], log[256];

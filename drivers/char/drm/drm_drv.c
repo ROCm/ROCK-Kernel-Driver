@@ -403,7 +403,7 @@ static int __init drm_core_init(void)
 	if (register_chrdev(DRM_MAJOR, "drm", &drm_stub_fops))
 		goto err_p1;
 	
-	drm_class = class_simple_create(THIS_MODULE, "drm");
+	drm_class = drm_sysfs_create(THIS_MODULE, "drm");
 	if (IS_ERR(drm_class)) {
 		printk (KERN_ERR "DRM: Error creating drm class.\n");
 		ret = PTR_ERR(drm_class);
@@ -426,7 +426,7 @@ static int __init drm_core_init(void)
 		);
 	return 0;
 err_p3:
-	class_simple_destroy(drm_class);
+	drm_sysfs_destroy(drm_class);
 err_p2:
 	unregister_chrdev(DRM_MAJOR, "drm");
 	drm_free(drm_minors, sizeof(*drm_minors) * drm_cards_limit, DRM_MEM_STUB);
@@ -437,7 +437,7 @@ err_p1:
 static void __exit drm_core_exit (void)
 {
 	remove_proc_entry("dri", NULL);
-	class_simple_destroy(drm_class);
+	drm_sysfs_destroy(drm_class);
 
 	unregister_chrdev(DRM_MAJOR, "drm");
 
@@ -516,7 +516,7 @@ int drm_ioctl( struct inode *inode, struct file *filp,
 	
 	if (nr < DRIVER_IOCTL_COUNT)
 		ioctl = &drm_ioctls[nr];
-	else if ((nr >= DRM_COMMAND_BASE) || (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls))
+	else if ((nr >= DRM_COMMAND_BASE) && (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls))
 		ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
 	else
 		goto err_i1;

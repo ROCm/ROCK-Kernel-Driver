@@ -29,6 +29,10 @@ menu "Machine selection"
 
 config MACH_JAZZ
 	bool "Support for the Jazz family of machines"
+	select ARC
+	select ARC32
+	select GENERIC_ISA_DMA
+	select I8259
 	select ISA
 	help
 	 This a family of machines based on the MIPS R4030 chipset which was
@@ -69,6 +73,21 @@ config OLIVETTI_M700
 config MACH_VR41XX
 	bool "Support for NEC VR41XX-based machines"
 
+config NEC_CMBVR4133
+	bool "Support for NEC CMB-VR4133"
+	depends on MACH_VR41XX
+	select CPU_VR41XX
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select HW_HAS_PCI
+	select PCI_VR41XX
+
+config ROCKHOPPER
+	bool "Support for Rockhopper baseboard"
+	depends on NEC_CMBVR4133
+	select I8259
+	select HAVE_STD_PC_SERIAL_PORT
+
 config CASIO_E55
 	bool "Support for CASIO CASSIOPEIA E-10/15/55/65"
 	depends on MACH_VR41XX
@@ -102,6 +121,10 @@ config TANBAC_TB0229
 	help
 	  The TANBAC TB0229 (VR4131DIMM) is a MIPS-based platform manufactured by TANBAC.
 	  Please refer to <http://www.tanbac.co.jp/> about VR4131DIMM.
+
+config TANBAC_TB0219
+	bool "Added TANBAC TB0219 Base board support"
+	depends on TANBAC_TB0229
 
 config VICTOR_MPC30X
 	bool "Support for Victor MP-C303/304"
@@ -145,10 +168,12 @@ config MIPS_COBALT
 	depends on EXPERIMENTAL
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select I8259
 	select IRQ_CPU
 
 config MACH_DECSTATION
 	bool "Support for DECstations"
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
 	select IRQ_CPU
 	depends on MIPS32 || EXPERIMENTAL
@@ -172,6 +197,7 @@ config MIPS_EV64120
 	depends on EXPERIMENTAL
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select MIPS_GT64120
 	help
 	  This is an evaluation board based on the Galileo GT-64120
 	  single-chip system controller that contains a MIPS R5000 compatible
@@ -213,6 +239,7 @@ config LASAT
 	bool "Support for LASAT Networks platforms"
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select MIPS_GT64120
 	select R5000_CPU_SCACHE
 
 config PICVUE
@@ -253,8 +280,10 @@ config IT8172_REVC
 
 config MIPS_ATLAS
 	bool "Support for MIPS Atlas board"
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select MIPS_GT64120
 	select SWAP_IO_SPACE
 	help
 	  This enables support for the QED R5231-based MIPS Atlas evaluation
@@ -262,9 +291,13 @@ config MIPS_ATLAS
 
 config MIPS_MALTA
 	bool "Support for MIPS Malta board"
+	select BOOT_ELF32
 	select HAVE_STD_PC_SERIAL_PORT
 	select DMA_NONCOHERENT
+	select GENERIC_ISA_DMA
 	select HW_HAS_PCI
+	select I8259
+	select MIPS_GT64120
 	select SWAP_IO_SPACE
 	help
 	  This enables support for the VR5000-based MIPS Malta evaluation
@@ -282,6 +315,7 @@ config MOMENCO_OCELOT
 	select HW_HAS_PCI
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
+	select MIPS_GT64120
 	select RM7000_CPU_SCACHE
 	select SWAP_IO_SPACE
 	help
@@ -316,6 +350,7 @@ config MOMENCO_OCELOT_C
 
 config MOMENCO_OCELOT_3
 	bool "Support for Momentum Ocelot-3 board"
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
 	select IRQ_CPU
@@ -330,6 +365,7 @@ config MOMENCO_OCELOT_3
 
 config MOMENCO_JAGUAR_ATX
 	bool "Support for Momentum Jaguar board"
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
 	select IRQ_CPU
@@ -356,6 +392,7 @@ config PMC_YOSEMITE
 	select HW_HAS_PCI
 	select IRQ_CPU
 	select IRQ_CPU_RM7K
+	select IRQ_CPU_RM9K
 	select SWAP_IO_SPACE
 	help
 	  Yosemite is an evaluation board for the RM9000x2 processor
@@ -372,6 +409,7 @@ config DDB5074
 	select HAVE_STD_PC_SERIAL_PORT
 	select HW_HAS_PCI
 	select IRQ_CPU
+	select I8259
 	select ISA
 	help
 	  This enables support for the VR5000-based NEC DDB Vrc-5074
@@ -383,6 +421,7 @@ config DDB5476
 	select HAVE_STD_PC_SERIAL_PORT
 	select HW_HAS_PCI
 	select IRQ_CPU
+	select I8259
 	select ISA
 	help
 	  This enables support for the R5432-based NEC DDB Vrc-5476
@@ -396,6 +435,7 @@ config DDB5477
 	bool "Support for NEC DDB Vrc-5477"
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
+	select I8259
 	select IRQ_CPU
 	help
 	  This enables support for the R5432-based NEC DDB Vrc-5477,
@@ -416,6 +456,9 @@ config NEC_OSPREY
 
 config SGI_IP22
 	bool "Support for SGI IP22 (Indy/Indigo2)"
+	select ARC
+	select ARC32
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
 	select IP22_CPU_SCACHE
 	select IRQ_CPU
@@ -428,6 +471,8 @@ config SGI_IP22
 config SGI_IP27
 	bool "Support for SGI IP27 (Origin200/2000)"
 	depends on MIPS64
+	select ARC
+	select ARC64
 	select DMA_IP27
 	select HW_HAS_PCI
 	select PCI_DOMAINS
@@ -494,6 +539,11 @@ config REPLICATE_EXHANDLERS
 config SGI_IP32
 	bool "Support for SGI IP32 (O2) (EXPERIMENTAL)"
 	depends on MIPS64 && EXPERIMENTAL
+	select ARC
+	select ARC32
+	select BOOT_ELF32
+	select OWN_DMA
+	select DMA_IP32
 	select DMA_NONCOHERENT
 	select HW_HAS_PCI
 	select R5000_CPU_SCACHE
@@ -508,31 +558,31 @@ config SOC_AU1X00
 choice
 	prompt "Au1X00 SOC Type"
 	depends on SOC_AU1X00
-        help
-           Say Y here to enable support for one of three AMD/Alchemy
-           SOCs. For additional documentation see www.amd.com.
+	help
+	  Say Y here to enable support for one of three AMD/Alchemy
+	  SOCs. For additional documentation see www.amd.com.
 
 config SOC_AU1000
-        bool "SOC_AU1000"
+	bool "SOC_AU1000"
 config SOC_AU1100
-        bool "SOC_AU1100"
+	bool "SOC_AU1100"
 config SOC_AU1500
-        bool "SOC_AU1500"
+	bool "SOC_AU1500"
 config SOC_AU1550
-        bool "SOC_AU1550"
+	bool "SOC_AU1550"
 
 endchoice
 
 choice
-        prompt "AMD/Alchemy Au1x00 board support"
-        depends on SOC_AU1X00
+	prompt "AMD/Alchemy Au1x00 board support"
+	depends on SOC_AU1X00
 	help
 	  These are evaluation boards built by AMD/Alchemy to
 	  showcase their Au1X00 Internet Edge Processors. The SOC design
 	  is based on the MIPS32 architecture running at 266/400/500MHz
-          with many integrated peripherals. Further information can be
-          found at their website, <http://www.amd.com/>. Say Y here if you
-          wish to build a kernel for this platform.
+	  with many integrated peripherals. Further information can be
+	  found at their website, <http://www.amd.com/>. Say Y here if you
+	  wish to build a kernel for this platform.
 
 config MIPS_PB1000
 	bool "PB1000 board"
@@ -604,6 +654,7 @@ config MIPS_XXS1500
 config MIPS_MTX1
 	bool "4G Systems MTX-1 board"
 	depends on SOC_AU1500
+	select HW_HAS_PCI
 	select DMA_NONCOHERENT
 
 endchoice
@@ -611,6 +662,7 @@ endchoice
 config SIBYTE_SB1xxx_SOC
 	bool "Support for Broadcom BCM1xxx SOCs (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
+	select BOOT_ELF32
 	select DMA_COHERENT
 	select SWAP_IO_SPACE
 
@@ -721,6 +773,7 @@ choice
 config CPU_SB1_PASS_1
 	bool "1250 Pass1"
 	depends on SIBYTE_SB1250
+	select CPU_HAS_PREFETCH
 
 config CPU_SB1_PASS_2_1250
 	bool "1250 An"
@@ -732,12 +785,14 @@ config CPU_SB1_PASS_2_1250
 config CPU_SB1_PASS_2_2
 	bool "1250 Bn"
 	depends on SIBYTE_SB1250
+	select CPU_HAS_PREFETCH
 	help
 	  Also called BCM1250 Pass 2.2
 
 config CPU_SB1_PASS_4
 	bool "1250 Cn"
 	depends on SIBYTE_SB1250
+	select CPU_HAS_PREFETCH
 	help
 	  Also called BCM1250 Pass 3
 
@@ -749,6 +804,7 @@ config CPU_SB1_PASS_2_112x
 config CPU_SB1_PASS_3
 	bool "112x An"
 	depends on SIBYTE_BCM112X
+	select CPU_HAS_PREFETCH
 
 endchoice
 
@@ -819,9 +875,14 @@ config SIBYTE_TBPROF
 
 config SNI_RM200_PCI
 	bool "Support for SNI RM200 PCI"
+	select ARC
+	select ARC32
+	select BOOT_ELF32
 	select DMA_NONCOHERENT
+	select GENERIC_ISA_DMA
 	select HAVE_STD_PC_SERIAL_PORT
 	select HW_HAS_PCI
+	select I8259
 	select ISA
 	help
 	  The SNI RM200 PCI was a MIPS-based platform manufactured by Siemens
@@ -833,6 +894,7 @@ config TOSHIBA_RBTX4927
 	bool "Support for Toshiba TBTX49[23]7 board"
 	depends on MIPS32
 	select DMA_NONCOHERENT
+	select HAS_TXX9_SERIAL
 	select HW_HAS_PCI
 	select I8259
 	select ISA
@@ -955,6 +1017,7 @@ config MIPS_GT64120
 config MIPS_TX3927
 	bool
 	depends on TOSHIBA_JMR3927
+	select HAS_TXX9_SERIAL
 	default y
 
 config PCI_MARVELL

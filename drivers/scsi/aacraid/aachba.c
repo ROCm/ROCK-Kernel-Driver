@@ -1047,7 +1047,7 @@ static void synchronize_callback(void *context, struct fib *fibptr)
 			COMMAND_COMPLETE << 8 | SAM_STAT_GOOD;
 	else {
 		struct scsi_device *sdev = cmd->device;
-		struct aac_dev *dev = (struct aav_dev *)sdev->host->hostdata;
+		struct aac_dev *dev = (struct aac_dev *)sdev->host->hostdata;
 		u32 cid = ID_LUN_TO_CONTAINER(sdev->id, sdev->lun);
 		printk(KERN_WARNING 
 		     "synchronize_callback: synchronize failed, status = %d\n",

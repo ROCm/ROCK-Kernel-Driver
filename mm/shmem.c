@@ -1162,6 +1162,8 @@ struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int
 	idx = (address - vma->vm_start) >> PAGE_SHIFT;
 	idx += vma->vm_pgoff;
 	idx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
+	if (((loff_t) idx << PAGE_CACHE_SHIFT) >= i_size_read(inode))
+		return NOPAGE_SIGBUS;
 
 	error = shmem_getpage(inode, idx, &page, SGP_CACHE, type);
 	if (error)

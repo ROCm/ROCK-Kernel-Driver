@@ -37,7 +37,7 @@ typedef union sigval32 {
 	s32 sival_ptr;
 } sigval_t32;
 
-typedef struct compat_siginfo{
+typedef struct compat_siginfo {
 	int si_signo;
 	int si_code;
 	int si_errno;
@@ -106,7 +106,7 @@ typedef struct compat_siginfo{
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-extern asmlinkage int do_signal32(sigset_t *oldset, struct pt_regs *regs);
+extern int do_signal32(sigset_t *oldset, struct pt_regs *regs);
 
 /* 32-bit compatibility types */
 
@@ -192,6 +192,7 @@ static inline int get_sigset(sigset_t *kbuf, const compat_sigset_t *ubuf)
 /*
  * Atomically swap in the new signal mask, and wait for a signal.
  */
+
 save_static_function(sys32_sigsuspend);
 __attribute_used__ noinline static int
 _sys32_sigsuspend(nabi_no_regargs struct pt_regs regs)
@@ -333,10 +334,10 @@ asmlinkage int sys32_sigaltstack(nabi_no_regargs struct pt_regs regs)
 	return ret;
 }
 
-static asmlinkage int restore_sigcontext32(struct pt_regs *regs,
-					   struct sigcontext32 *sc)
+static int restore_sigcontext32(struct pt_regs *regs, struct sigcontext32 *sc)
 {
 	int err = 0;
+	__u32 used_math;
 
 	/* Always make any pending restarted system calls return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
@@ -361,11 +362,12 @@ static asmlinkage int restore_sigcontext32(struct pt_regs *regs,
 	restore_gp_reg(31);
 #undef restore_gp_reg
 
-	err |= __get_user(current->used_math, &sc->sc_used_math);
+	err |= __get_user(used_math, &sc->sc_used_math);
+	conditional_used_math(used_math);
 
 	preempt_disable();
 
-	if (current->used_math) {
+	if (used_math()) {
 		/* restore fpu context if we have used it before */
 		own_fpu();
 		err |= restore_fp_context32(sc);
@@ -389,7 +391,7 @@ struct sigframe {
 struct rt_sigframe32 {
 	u32 rs_ass[4];			/* argument save space for o32 */
 	u32 rs_code[2];			/* signal trampoline */
-	struct compat_siginfo_t rs_info;
+	compat_siginfo_t rs_info;
 	struct ucontext32 rs_uc;
 };
 
@@ -440,7 +442,9 @@ int copy_siginfo_to_user32(compat_siginfo_t *to, siginfo_t *from)
 	return err;
 }
 
-asmlinkage void sys32_sigreturn(nabi_no_regargs struct pt_regs regs)
+save_static_function(sys32_sigreturn);
+__attribute_used__ noinline static void
+_sys32_sigreturn(nabi_no_regargs struct pt_regs regs)
 {
 	struct sigframe *frame;
 	sigset_t blocked;
@@ -476,7 +480,9 @@ badframe:
 	force_sig(SIGSEGV, current);
 }
 
-asmlinkage void sys32_rt_sigreturn(nabi_no_regargs struct pt_regs regs)
+save_static_function(sys32_rt_sigreturn);
+__attribute_used__ noinline static void
+_sys32_rt_sigreturn(nabi_no_regargs struct pt_regs regs)
 {
 	struct rt_sigframe32 *frame;
 	sigset_t set;
@@ -552,9 +558,9 @@ static inline int setup_sigcontext32(struct pt_regs *regs,
 	err |= __put_user(regs->cp0_cause, &sc->sc_cause);
 	err |= __put_user(regs->cp0_badvaddr, &sc->sc_badvaddr);
 
-	err |= __put_user(current->used_math, &sc->sc_used_math);
+	err |= __put_user(!!used_math(), &sc->sc_used_math);
 
-	if (!current->used_math)
+	if (!used_math())
 		goto out;
 
 	/* 
@@ -759,7 +765,7 @@ static inline void handle_signal(unsigned long sig, siginfo_t *info,
 	}
 }
 
-asmlinkage int do_signal32(sigset_t *oldset, struct pt_regs *regs)
+int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 {
 	struct k_sigaction ka;
 	siginfo_t info;

@@ -162,8 +162,10 @@ void avc_dump_av(struct audit_buffer *ab, u16 tclass, u32 av)
 	i = 0;
 	perm = 1;
 	while (perm < common_base) {
-		if (perm & av)
+		if (perm & av) {
 			audit_log_format(ab, " %s", common_pts[i]);
+			av &= ~perm;
+		}
 		i++;
 		perm <<= 1;
 	}
@@ -175,13 +177,18 @@ void avc_dump_av(struct audit_buffer *ab, u16 tclass, u32 av)
 				    (av_perm_to_string[i2].value == perm))
 					break;
 			}
-			if (i2 < ARRAY_SIZE(av_perm_to_string))
+			if (i2 < ARRAY_SIZE(av_perm_to_string)) {
 				audit_log_format(ab, " %s",
 						 av_perm_to_string[i2].name);
+				av &= ~perm;
+			}
 		}
 		i++;
 		perm <<= 1;
 	}
+
+	if (av)
+		audit_log_format(ab, " 0x%x", av);
 
 	audit_log_format(ab, " }");
 }

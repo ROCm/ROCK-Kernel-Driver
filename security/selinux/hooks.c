@@ -2140,6 +2140,9 @@ static int selinux_inode_setattr(struct dentry *dentry, struct iattr *iattr)
 	if (rc)
 		return rc;
 
+	if (iattr->ia_valid & ATTR_FORCE)
+		return 0;
+
 	if (iattr->ia_valid & (ATTR_MODE | ATTR_UID | ATTR_GID |
 			       ATTR_ATIME_SET | ATTR_MTIME_SET))
 		return dentry_has_perm(current, NULL, dentry, FILE__SETATTR);

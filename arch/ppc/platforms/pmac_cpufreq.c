@@ -154,6 +154,14 @@ static int __pmac dfs_set_cpu_speed(int low_speed)
 	return 0;
 }
 
+static unsigned int __pmac dfs_get_cpu_speed(unsigned int cpu)
+{
+	if (mfspr(HID1) & HID1_DFS)
+		return low_freq;
+	else
+		return hi_freq;
+}
+
 
 /* Switch CPU speed using slewing GPIOs
  */
@@ -229,10 +237,6 @@ static int __pmac pmu_set_cpu_speed(int low_speed)
 	/* Save & disable L2 and L3 caches */
 	save_l3cr = _get_L3CR();	/* (returns -1 if not available) */
 	save_l2cr = _get_L2CR();	/* (returns -1 if not available) */
-	if (save_l3cr != 0xffffffff && (save_l3cr & L3CR_L3E) != 0)
-		_set_L3CR(save_l3cr & 0x7fffffff);
-	if (save_l2cr != 0xffffffff && (save_l2cr & L2CR_L2E) != 0)
-		_set_L2CR(save_l2cr & 0x7fffffff);
 
 	/* Send the new speed command. My assumption is that this command
 	 * will cause PLL_CFG[0..3] to be changed next time CPU goes to sleep
@@ -458,14 +462,13 @@ static int __pmac pmac_cpufreq_init_7447A(struct device_node *cpunode)
 {
 	struct device_node *volt_gpio_np;
 	u32 *reg;
+	struct cpufreq_driver *driver = &pmac_cpufreq_driver;
 
 	/* OF only reports the high frequency */
 	hi_freq = cur_freq;
 	low_freq = cur_freq/2;
-	if (mfspr(HID1) & HID1_DFS)
-		cur_freq = low_freq;
-	else
-		cur_freq = hi_freq;
+	driver->get = dfs_get_cpu_speed;
+	cur_freq = driver->get(0);
 
 	volt_gpio_np = of_find_node_by_name(NULL, "cpu-vcore-select");
 	if (!volt_gpio_np){

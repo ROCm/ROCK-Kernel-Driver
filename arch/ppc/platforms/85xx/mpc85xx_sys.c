@@ -24,12 +24,12 @@ struct ppc_sys_spec ppc_sys_specs[] = {
 		.ppc_sys_name	= "MPC8540",
 		.mask 		= 0xFFFF0000,
 		.value 		= 0x80300000,
-		.num_devices	= 9,
+		.num_devices	= 10,
 		.device_list	= (enum ppc_sys_devices[])
 		{
 			MPC85xx_TSEC1, MPC85xx_TSEC2, MPC85xx_FEC, MPC85xx_IIC1,
 			MPC85xx_DMA0, MPC85xx_DMA1, MPC85xx_DMA2, MPC85xx_DMA3,
-			MPC85xx_PERFMON,
+			MPC85xx_PERFMON, MPC85xx_DUART,
 		},
 	},
 	{
@@ -52,12 +52,12 @@ struct ppc_sys_spec ppc_sys_specs[] = {
 		.ppc_sys_name	= "MPC8541",
 		.mask 		= 0xFFFF0000,
 		.value 		= 0x80720000,
-		.num_devices	= 12,
+		.num_devices	= 13,
 		.device_list	= (enum ppc_sys_devices[])
 		{
 			MPC85xx_TSEC1, MPC85xx_TSEC2, MPC85xx_IIC1,
 			MPC85xx_DMA0, MPC85xx_DMA1, MPC85xx_DMA2, MPC85xx_DMA3,
-			MPC85xx_PERFMON,
+			MPC85xx_PERFMON, MPC85xx_DUART,
 			MPC85xx_CPM_SPI, MPC85xx_CPM_I2C,
 			MPC85xx_CPM_FCC1, MPC85xx_CPM_FCC2,
 		},
@@ -66,12 +66,12 @@ struct ppc_sys_spec ppc_sys_specs[] = {
 		.ppc_sys_name	= "MPC8541E",
 		.mask 		= 0xFFFF0000,
 		.value 		= 0x807A0000,
-		.num_devices	= 13,
+		.num_devices	= 14,
 		.device_list	= (enum ppc_sys_devices[])
 		{
 			MPC85xx_TSEC1, MPC85xx_TSEC2, MPC85xx_IIC1,
 			MPC85xx_DMA0, MPC85xx_DMA1, MPC85xx_DMA2, MPC85xx_DMA3,
-			MPC85xx_PERFMON, MPC85xx_SEC2,
+			MPC85xx_PERFMON, MPC85xx_DUART, MPC85xx_SEC2,
 			MPC85xx_CPM_SPI, MPC85xx_CPM_I2C,
 			MPC85xx_CPM_FCC1, MPC85xx_CPM_FCC2,
 		},
@@ -80,12 +80,12 @@ struct ppc_sys_spec ppc_sys_specs[] = {
 		.ppc_sys_name	= "MPC8555",
 		.mask 		= 0xFFFF0000,
 		.value 		= 0x80710000,
-		.num_devices	= 19,
+		.num_devices	= 20,
 		.device_list	= (enum ppc_sys_devices[])
 		{
 			MPC85xx_TSEC1, MPC85xx_TSEC2, MPC85xx_IIC1,
 			MPC85xx_DMA0, MPC85xx_DMA1, MPC85xx_DMA2, MPC85xx_DMA3,
-			MPC85xx_PERFMON,
+			MPC85xx_PERFMON, MPC85xx_DUART,
 			MPC85xx_CPM_SPI, MPC85xx_CPM_I2C, MPC85xx_CPM_SCC1,
 			MPC85xx_CPM_SCC2, MPC85xx_CPM_SCC3,
 			MPC85xx_CPM_FCC1, MPC85xx_CPM_FCC2, MPC85xx_CPM_FCC3,
@@ -97,12 +97,12 @@ struct ppc_sys_spec ppc_sys_specs[] = {
 		.ppc_sys_name	= "MPC8555E",
 		.mask 		= 0xFFFF0000,
 		.value 		= 0x80790000,
-		.num_devices	= 20,
+		.num_devices	= 21,
 		.device_list	= (enum ppc_sys_devices[])
 		{
 			MPC85xx_TSEC1, MPC85xx_TSEC2, MPC85xx_IIC1,
 			MPC85xx_DMA0, MPC85xx_DMA1, MPC85xx_DMA2, MPC85xx_DMA3,
-			MPC85xx_PERFMON, MPC85xx_SEC2,
+			MPC85xx_PERFMON, MPC85xx_DUART, MPC85xx_SEC2,
 			MPC85xx_CPM_SPI, MPC85xx_CPM_I2C, MPC85xx_CPM_SCC1,
 			MPC85xx_CPM_SCC2, MPC85xx_CPM_SCC3,
 			MPC85xx_CPM_FCC1, MPC85xx_CPM_FCC2, MPC85xx_CPM_FCC3,

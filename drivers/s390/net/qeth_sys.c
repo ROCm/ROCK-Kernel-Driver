@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.48 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.49 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -20,7 +20,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_SYS_C = "$Revision: 1.48 $";
+const char *VERSION_QETH_SYS_C = "$Revision: 1.49 $";
 
 /*****************************************************************************/
 /*                                                                           */
@@ -514,19 +514,11 @@ qeth_dev_fake_ll_store(struct device *dev, const char *buf, size_t count)
 		return -EPERM;
 
 	i = simple_strtoul(buf, &tmp, 16);
-	if ((i == 0) || (i == 1)) {
-		card->options.fake_ll = i;
-		if (card->dev) {
-			if (i)
-  				card->dev->hard_header = qeth_fake_header;
-			else
-				card->dev->hard_header = NULL;
-		}
-	}
-	else {
+	if ((i != 0) && (i != 1)) {
 		PRINT_WARN("fake_ll: write 0 or 1 to this file!\n");
 		return -EINVAL;
 	}
+	card->options.fake_ll = i;
 	return count;
 }
 

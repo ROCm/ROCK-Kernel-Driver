@@ -16,7 +16,6 @@
 #include <linux/dcache.h>
 #include <linux/stat.h>
 #include <linux/cache.h>
-#include <linux/prio_tree.h>
 #include <linux/kobject.h>
 #include <asm/atomic.h>
 
@@ -219,6 +218,7 @@ extern int dir_notify_enable;
 
 #include <linux/list.h>
 #include <linux/radix-tree.h>
+#include <linux/prio_tree.h>
 #include <linux/audit.h>
 #include <linux/init.h>
 #include <asm/semaphore.h>
@@ -1151,6 +1151,10 @@ struct export_operations {
 
 };
 
+extern struct dentry *
+find_exported_dentry(struct super_block *sb, void *obj, void *parent,
+		     int (*acceptable)(void *context, struct dentry *de),
+		     void *context);
 
 struct file_system_type {
 	const char *name;

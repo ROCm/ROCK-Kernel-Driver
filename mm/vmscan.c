@@ -575,6 +575,7 @@ static void shrink_cache(struct zone *zone, struct scan_control *sc)
 			nr_taken++;
 		}
 		zone->nr_inactive -= nr_taken;
+		zone->pages_scanned += nr_scan;
 		spin_unlock_irq(&zone->lru_lock);
 
 		if (nr_taken == 0)
@@ -937,8 +938,6 @@ int try_to_free_pages(struct zone **zones,
 		if (sc.nr_scanned && priority < DEF_PRIORITY - 2)
 			blk_congestion_wait(WRITE, HZ/10);
 	}
-	if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY))
-		out_of_memory(gfp_mask);
 out:
 	for (i = 0; zones[i] != 0; i++)
 		zones[i]->prev_priority = zones[i]->temp_priority;

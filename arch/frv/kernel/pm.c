@@ -36,7 +36,7 @@ extern void frv_change_cmode(int);
 
 int pm_do_suspend(void)
 {
-	cli();
+	local_irq_disable();
 
 	__set_LEDS(0xb1);
 
@@ -45,7 +45,7 @@ int pm_do_suspend(void)
 
 	__set_LEDS(0xb2);
 
-	sti();
+	local_irq_enable();
 
 	return 0;
 }
@@ -84,7 +84,7 @@ void (*__power_switch_wake_cleanup)(void) = __default_power_switch_cleanup;
 
 int pm_do_bus_sleep(void)
 {
-	cli();
+	local_irq_disable();
 
 	/*
          * Here is where we need some platform-dependent setup
@@ -113,7 +113,7 @@ int pm_do_bus_sleep(void)
 	 */
 	__power_switch_wake_cleanup();
 
-	sti();
+	local_irq_enable();
 
 	return 0;
 }
@@ -134,7 +134,7 @@ unsigned long sleep_phys_sp(void *sp)
 #define CTL_PM_P0 4
 #define CTL_PM_CM 5
 
-static int user_atoi(char *ubuf, int len)
+static int user_atoi(char *ubuf, size_t len)
 {
 	char buf[16];
 	unsigned long ret;
@@ -191,7 +191,7 @@ static int try_set_cmode(int new_cmode)
 	pm_send_all(PM_SUSPEND, (void *)3);
 
 	/* now change cmode */
-	cli();
+	local_irq_disable();
 	frv_dma_pause_all();
 
 	frv_change_cmode(new_cmode);
@@ -203,7 +203,7 @@ static int try_set_cmode(int new_cmode)
 	determine_clocks(1);
 #endif
 	frv_dma_resume_all();
-	sti();
+	local_irq_enable();
 
 	/* tell all the drivers we're resuming */
 	pm_send_all(PM_RESUME, (void *)0);

@@ -422,7 +422,7 @@ static int block2mtd_setup(const char *val, struct kernel_param *kp)
 	char buf[80+12], *str=buf; /* 80 for device, 12 for erase size */
 	char *token[2];
 	char *name;
-	size_t erase_size = PAGE_SIZE;
+	u32 erase_size = PAGE_SIZE;
 	int i, ret;
 
 	if (strnlen(val, sizeof(buf)) >= sizeof(buf))

@@ -129,7 +129,7 @@ struct log_header {
 struct log_c {
 	struct dm_target *ti;
 	int touched;
-	sector_t region_size;
+	uint32_t region_size;
 	unsigned int region_count;
 	region_t sync_count;
 
@@ -292,7 +292,7 @@ static int core_ctr(struct dirty_log *log, struct dm_target *ti,
 	enum sync sync = DEFAULTSYNC;
 
 	struct log_c *lc;
-	sector_t region_size;
+	uint32_t region_size;
 	unsigned int region_count;
 	size_t bitset_size;
 
@@ -313,12 +313,12 @@ static int core_ctr(struct dirty_log *log, struct dm_target *ti,
 		}
 	}
 
-	if (sscanf(argv[0], SECTOR_FORMAT, &region_size) != 1) {
+	if (sscanf(argv[0], "%u", &region_size) != 1) {
 		DMWARN("invalid region size string");
 		return -EINVAL;
 	}
 
-	region_count = dm_div_up(ti->len, region_size);
+	region_count = dm_sector_div_up(ti->len, region_size);
 
 	lc = kmalloc(sizeof(*lc), GFP_KERNEL);
 	if (!lc) {
@@ -508,7 +508,7 @@ static int disk_resume(struct dirty_log *log)
 	return write_header(lc);
 }
 
-static sector_t core_get_region_size(struct dirty_log *log)
+static uint32_t core_get_region_size(struct dirty_log *log)
 {
 	struct log_c *lc = (struct log_c *) log->context;
 	return lc->region_size;
@@ -616,7 +616,7 @@ static int core_status(struct dirty_log *log, status_type_t status,
 		break;
 
 	case STATUSTYPE_TABLE:
-		DMEMIT("%s %u " SECTOR_FORMAT " ", log->type->name,
+		DMEMIT("%s %u %u ", log->type->name,
 		       lc->sync == DEFAULTSYNC ? 1 : 2, lc->region_size);
 		DMEMIT_SYNC;
 	}
@@ -637,7 +637,7 @@ static int disk_status(struct dirty_log *log, status_type_t status,
 
 	case STATUSTYPE_TABLE:
 		format_dev_t(buffer, lc->log_dev->bdev->bd_dev);
-		DMEMIT("%s %u %s " SECTOR_FORMAT " ", log->type->name,
+		DMEMIT("%s %u %s %u ", log->type->name,
 		       lc->sync == DEFAULTSYNC ? 2 : 3, buffer,
 		       lc->region_size);
 		DMEMIT_SYNC;

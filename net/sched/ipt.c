@@ -207,6 +207,11 @@ tcf_ipt(struct sk_buff **pskb, struct tc_action *a)
 	struct tcf_ipt *p = PRIV(a, ipt);
 	struct sk_buff *skb = *pskb;
 
+	if (skb_cloned(skb)) {
+		if (pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
+			return TC_ACT_UNSPEC;
+	}
+
 	spin_lock(&p->lock);
 
 	p->tm.lastuse = jiffies;

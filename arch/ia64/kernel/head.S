@@ -5,7 +5,7 @@
  * to set up the kernel's global pointer and jump to the kernel
  * entry point.
  *
- * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
+ * Copyright (C) 1998-2001, 2003, 2005 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
@@ -232,21 +232,6 @@ start_ap:
 	;;
 (isBP)	st8 [r2]=r28		// save the address of the boot param area passed by the bootloader
 
-#ifdef CONFIG_IA64_EARLY_PRINTK
-	.rodata
-alive_msg:
-	stringz "I'm alive and well\n"
-alive_msg_end:
-	.previous
-
-	alloc r2=ar.pfs,0,0,2,0
-	movl out0=alive_msg
-	movl out1=alive_msg_end-alive_msg-1
-	;;
-	br.call.sptk.many rp=early_printk
-1:	// force new bundle
-#endif /* CONFIG_IA64_EARLY_PRINTK */
-
 #ifdef CONFIG_SMP
 (isAP)	br.call.sptk.many rp=start_secondary
 .ret0:
@@ -267,7 +252,9 @@ alive_msg_end:
 	;;
 	ld8 out0=[r3]
 	br.call.sptk.many b0=console_print
-self:	br.sptk.many self		// endless loop
+
+self:	hint @pause
+	br.sptk.many self		// endless loop
 END(_start)
 
 GLOBAL_ENTRY(ia64_save_debug_regs)

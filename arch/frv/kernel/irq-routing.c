@@ -82,7 +82,7 @@ void distribute_irqs(struct irq_group *group, unsigned long irqmask)
 			int status = 0;
 
 //			if (!(action->flags & SA_INTERRUPT))
-//				sti();
+//				local_irq_enable();
 
 			do {
 				status |= action->flags;
@@ -92,7 +92,7 @@ void distribute_irqs(struct irq_group *group, unsigned long irqmask)
 
 			if (status & SA_SAMPLE_RANDOM)
 				add_interrupt_randomness(irq);
-			cli();
+			local_irq_disable();
 		}
 	}
 }

@@ -765,8 +765,6 @@ static int __init viocd_init(void)
 	vio_setHandler(viomajorsubtype_cdio, vio_handle_cd_event);
 
 	get_viocd_info();
-	if (viocd_numdev == 0)
-		goto out_undo_vio;
 
 	spin_lock_init(&viocd_reqlock);
 
@@ -786,7 +784,6 @@ out_free_info:
 	dma_free_coherent(iSeries_vio_dev,
 			sizeof(*viocd_unitinfo) * VIOCD_MAX_CD,
 			viocd_unitinfo, unitinfo_dmaaddr);
-out_undo_vio:
 	vio_clearHandler(viomajorsubtype_cdio);
 	viopath_close(viopath_hostLp, viomajorsubtype_cdio, MAX_CD_REQ + 2);
 out_unregister:

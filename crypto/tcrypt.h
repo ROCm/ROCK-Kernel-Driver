@@ -1986,7 +1986,7 @@ static struct cipher_testvec arc4_dec_tv_template[] =
 #define TEA_ENC_TEST_VECTORS	4
 #define TEA_DEC_TEST_VECTORS	4
 
-static struct cipher_testvec xtea_enc_tv_template[] =
+static struct cipher_testvec tea_enc_tv_template[] =
 {
 	{
 		.key    = { [0 ... 15] = 0x00 },
@@ -2080,7 +2080,7 @@ static struct cipher_testvec tea_dec_tv_template[] =
 #define XTEA_ENC_TEST_VECTORS	4
 #define XTEA_DEC_TEST_VECTORS	4
 
-static struct cipher_testvec tea_enc_tv_template[] =
+static struct cipher_testvec xtea_enc_tv_template[] =
 {
 	{
 		.key    = { [0 ... 15] = 0x00 },

@@ -109,13 +109,6 @@ extern struct hotplug_slot_ops rpaphp_hotplug_slot_ops;
 extern struct list_head rpaphp_slot_head;
 extern int num_slots;
 
-static inline int is_hotplug_capable(struct device_node *dn)
-{
-	unsigned char *ptr = get_property(dn, "ibm,fw-pci-hot-plug-ctrl", NULL);
-
-	return (int) (ptr != NULL);
-}
-
 /* function prototypes */
 
 /* rpaphp_pci.c */

@@ -17,7 +17,7 @@
 #include <asm/io.h>
 #include <asm/sni.h>
 
-spinlock_t pciasic_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(pciasic_lock);
 
 extern asmlinkage void sni_rm200_pci_handle_int(void);
 

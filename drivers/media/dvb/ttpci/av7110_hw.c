@@ -1051,7 +1051,7 @@ int av7110_osd_cmd(struct av7110 *av7110, osd_cmd_t *dc)
 			goto out;
 		} else {
 			int i, len = dc->x0-dc->color+1;
-			u8 __user *colors = (u8 *)dc->data;
+			u8 __user *colors = (u8 __user *)dc->data;
 			u8 r, g, b, blend;
 
 			for (i = 0; i<len; i++) {

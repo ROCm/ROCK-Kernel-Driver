@@ -144,6 +144,19 @@ extern int ccw_device_start(struct ccw_device *, struct ccw1 *,
  */
 extern int ccw_device_start_timeout(struct ccw_device *, struct ccw1 *,
 				    unsigned long, __u8, unsigned long, int);
+/*
+ * ccw_device_start_key()
+ * ccw_device_start_key_timeout()
+ *
+ * Same as ccw_device_start() and ccw_device_start_timeout(), except a
+ * storage key != default key can be provided for the I/O.
+ */
+extern int ccw_device_start_key(struct ccw_device *, struct ccw1 *,
+				unsigned long, __u8, __u8, unsigned long);
+extern int ccw_device_start_timeout_key(struct ccw_device *, struct ccw1 *,
+					unsigned long, __u8, __u8,
+					unsigned long, int);
+
 
 extern int ccw_device_resume(struct ccw_device *);
 extern int ccw_device_halt(struct ccw_device *, unsigned long);

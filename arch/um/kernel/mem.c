@@ -79,7 +79,7 @@ void mem_init(void)
 	uml_reserved = brk_end;
 
 	/* Fill in any hole at the start of the binary */
-	start = (unsigned long) &__binary_start;
+	start = (unsigned long) &__binary_start & PAGE_MASK;
 	if(uml_physmem != start){
 		map_memory(uml_physmem, __pa(uml_physmem), start - uml_physmem,
 			   1, 1, 0);
@@ -152,6 +152,7 @@ void __init kmap_init(void)
 static void init_highmem(void)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 	unsigned long vaddr;
@@ -163,7 +164,8 @@ static void init_highmem(void)
 	fixrange_init(vaddr, vaddr + PAGE_SIZE*LAST_PKMAP, swapper_pg_dir);
 
 	pgd = swapper_pg_dir + pgd_index(vaddr);
-	pmd = pmd_offset(pgd, vaddr);
+	pud = pud_offset(pgd, vaddr);
+	pmd = pmd_offset(pud, vaddr);
 	pte = pte_offset_kernel(pmd, vaddr);
 	pkmap_page_table = pte;
 
@@ -173,9 +175,10 @@ static void init_highmem(void)
 
 static void __init fixaddr_user_init( void)
 {
-#if FIXADDR_USER_START != 0
+#if CONFIG_ARCH_REUSE_HOST_VSYSCALL_AREA
 	long size = FIXADDR_USER_END - FIXADDR_USER_START;
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 	unsigned long paddr, vaddr = FIXADDR_USER_START;
@@ -187,9 +190,10 @@ static void __init fixaddr_user_init( void)
 	paddr = (unsigned long)alloc_bootmem_low_pages( size);
 	memcpy( (void *)paddr, (void *)FIXADDR_USER_START, size);
 	paddr = __pa(paddr);
-	for ( ; size > 0; size-=PAGE_SIZE, vaddr+=PAGE_SIZE, paddr+=PAGE_SIZE) {
+	for ( ; size > 0; size-=PAGE_SIZE, vaddr+=PAGE_SIZE, paddr+=PAGE_SIZE){
 		pgd = swapper_pg_dir + pgd_index(vaddr);
-		pmd = pmd_offset(pgd, vaddr);
+		pud = pud_offset(pgd, vaddr);
+		pmd = pmd_offset(pud, vaddr);
 		pte = pte_offset_kernel(pmd, vaddr);
 		pte_set_val( (*pte), paddr, PAGE_READONLY);
 	}

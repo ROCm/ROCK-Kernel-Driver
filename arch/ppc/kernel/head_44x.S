@@ -21,7 +21,7 @@
  * 	Author: MontaVista Software, Inc.
  *         	frank_rowand@mvista.com or source@mvista.com
  * 	   	debbie_chu@mvista.com
- *    Copyright 2002-2004 MontaVista Software, Inc.
+ *    Copyright 2002-2005 MontaVista Software, Inc.
  *      PowerPC 44x support, Matt Porter <mporter@kernel.crashing.org>
  *
  * This program is free software; you can redistribute  it and/or modify it
@@ -185,11 +185,11 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	 * are used for polled operation.
 	 */
  	/* pageid fields */
-	lis	r3,0xe000	
+	lis	r3,UART0_IO_BASE@h
 	ori	r3,r3,PPC44x_TLB_VALID | PPC44x_TLB_256M
 
 	/* xlat fields */
-	lis	r4,0x4000		/* RPN is 0x40000000 */
+	lis	r4,UART0_PHYS_IO_BASE@h		/* RPN depends on SoC */
 	ori	r4,r4,0x0001		/* ERPN is 1 for second 4GB page */
 
 	/* attrib fields */

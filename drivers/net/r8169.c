@@ -60,6 +60,7 @@ VERSION 1.6LK	<2004/04/14>
 #include <linux/dma-mapping.h>
 
 #include <asm/io.h>
+#include <asm/irq.h>
 
 #define RTL8169_VERSION "1.6LK"
 #define MODULENAME "r8169"

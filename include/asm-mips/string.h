@@ -18,6 +18,8 @@
  */
 #ifdef CONFIG_MIPS32
 
+#ifndef IN_STRING_C
+
 #define __HAVE_ARCH_STRCPY
 static __inline__ char *strcpy(char *__dest, __const__ char *__src)
 {
@@ -95,6 +97,8 @@ static __inline__ int strcmp(__const__ char *__cs, __const__ char *__ct)
 
   return __res;
 }
+
+#endif /* !defined(IN_STRING_C) */
 
 #define __HAVE_ARCH_STRNCMP
 static __inline__ int

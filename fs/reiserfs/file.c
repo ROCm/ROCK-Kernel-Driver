@@ -588,7 +588,7 @@ error_exit:
 
 /* Unlock pages prepared by reiserfs_prepare_file_region_for_write */
 static void reiserfs_unprepare_pages(struct page **prepared_pages, /* list of locked pages */
-			      int num_pages /* amount of pages */) {
+			      size_t num_pages /* amount of pages */) {
     int i; // loop counter
 
     for (i=0; i < num_pages ; i++) {
@@ -619,7 +619,7 @@ static int reiserfs_copy_from_user_to_file_region(
     int offset; // offset in page
 
     for ( i = 0, offset = (pos & (PAGE_CACHE_SIZE-1)); i < num_pages ; i++,offset=0) {
-	int count = min_t(int,PAGE_CACHE_SIZE-offset,write_bytes); // How much of bytes to write to this page
+	size_t count = min_t(size_t,PAGE_CACHE_SIZE-offset,write_bytes); // How much of bytes to write to this page
 	struct page *page=prepared_pages[i]; // Current page we process.
 
 	fault_in_pages_readable( buf, count);
@@ -718,8 +718,8 @@ static int reiserfs_submit_file_region_for_write(
 				struct reiserfs_transaction_handle *th,
 				struct inode *inode,
 				loff_t pos, /* Writing position offset */
-				int num_pages, /* Number of pages to write */
-				int write_bytes, /* number of bytes to write */
+				size_t num_pages, /* Number of pages to write */
+				size_t write_bytes, /* number of bytes to write */
 				struct page **prepared_pages /* list of pages */
 				)
 {
@@ -854,9 +854,9 @@ static int reiserfs_check_for_tail_and_convert( struct inode *inode, /* inode to
 static int reiserfs_prepare_file_region_for_write(
 				struct inode *inode /* Inode of the file */,
 				loff_t pos, /* position in the file */
-				int num_pages, /* number of pages to
+				size_t num_pages, /* number of pages to
 					          prepare */
-				int write_bytes, /* Amount of bytes to be
+				size_t write_bytes, /* Amount of bytes to be
 						    overwritten from
 						    @pos */
 				struct page **prepared_pages /* pointer to array
@@ -1252,10 +1252,9 @@ static ssize_t reiserfs_file_write( struct file *file, /* the file we are going 
     while ( count > 0) {
 	/* This is the main loop in which we running until some error occures
 	   or until we write all of the data. */
-	int num_pages;/* amount of pages we are going to write this iteration */
-	int write_bytes; /* amount of bytes to write during this iteration */
-	int blocks_to_allocate; /* how much blocks we need to allocate for
-				   this iteration */
+	size_t num_pages;/* amount of pages we are going to write this iteration */
+	size_t write_bytes; /* amount of bytes to write during this iteration */
+	size_t blocks_to_allocate; /* how much blocks we need to allocate for this iteration */
         
         /*  (pos & (PAGE_CACHE_SIZE-1)) is an idiom for offset into a page of pos*/
 	num_pages = !!((pos+count) & (PAGE_CACHE_SIZE - 1)) + /* round up partial
@@ -1269,7 +1268,7 @@ static ssize_t reiserfs_file_write( struct file *file, /* the file we are going 
 	    /* If we were asked to write more data than we want to or if there
 	       is not that much space, then we shorten amount of data to write
 	       for this iteration. */
-	    num_pages = min_t(int, REISERFS_WRITE_PAGES_AT_A_TIME, reiserfs_can_fit_pages(inode->i_sb));
+	    num_pages = min_t(size_t, REISERFS_WRITE_PAGES_AT_A_TIME, reiserfs_can_fit_pages(inode->i_sb));
 	    /* Also we should not forget to set size in bytes accordingly */
 	    write_bytes = (num_pages << PAGE_CACHE_SHIFT) - 
 			    (pos & (PAGE_CACHE_SIZE-1));
@@ -1295,7 +1294,7 @@ static ssize_t reiserfs_file_write( struct file *file, /* the file we are going 
 	    // But overwriting files on absolutelly full volumes would not
 	    // be very efficient. Well, people are not supposed to fill
 	    // 100% of disk space anyway.
-	    write_bytes = min_t(int, count, inode->i_sb->s_blocksize - (pos & (inode->i_sb->s_blocksize - 1)));
+	    write_bytes = min_t(size_t, count, inode->i_sb->s_blocksize - (pos & (inode->i_sb->s_blocksize - 1)));
 	    num_pages = 1;
 	    // No blocks were claimed before, so do it now.
 	    reiserfs_claim_blocks_to_be_allocated(inode->i_sb, 1 << (PAGE_CACHE_SHIFT - inode->i_blkbits));

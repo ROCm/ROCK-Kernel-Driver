@@ -416,11 +416,11 @@ struct file_operations proc_schedstat_operations = {
 	.release = single_release,
 };
 
-# define schedstat_inc(rq, field)	rq->field++;
-# define schedstat_add(rq, field, amt)	rq->field += amt;
+# define schedstat_inc(rq, field)	do { (rq)->field++; } while (0)
+# define schedstat_add(rq, field, amt)	do { (rq)->field += (amt); } while (0)
 #else /* !CONFIG_SCHEDSTATS */
-# define schedstat_inc(rq, field)	do { } while (0);
-# define schedstat_add(rq, field, amt)	do { } while (0);
+# define schedstat_inc(rq, field)	do { } while (0)
+# define schedstat_add(rq, field, amt)	do { } while (0)
 #endif
 
 /*
@@ -778,7 +778,7 @@ static void resched_task(task_t *p)
 {
 	int need_resched, nrpolling;
 
-	BUG_ON(!spin_is_locked(&task_rq(p)->lock));
+	assert_spin_locked(&task_rq(p)->lock);
 
 	/* minimise the chance of sending an interrupt to poll_idle() */
 	nrpolling = test_tsk_thread_flag(p,TIF_POLLING_NRFLAG);
@@ -867,7 +867,7 @@ void wait_task_inactive(task_t * p)
 repeat:
 	rq = task_rq_lock(p, &flags);
 	/* Must be off runqueue entirely, not preempted. */
-	if (unlikely(p->array)) {
+	if (unlikely(p->array || task_running(rq, p))) {
 		/* If it's preempted, we yield.  It could be a while. */
 		preempted = !task_running(rq, p);
 		task_rq_unlock(rq, &flags);
@@ -885,6 +885,12 @@ repeat:
  *
  * Cause a process which is running on another CPU to enter
  * kernel-mode, without any delay. (to get signals handled.)
+ *
+ * NOTE: this function doesnt have to take the runqueue lock,
+ * because all it wants to ensure is that the remote task enters
+ * the kernel. If the IPI races and the task has been migrated
+ * to another CPU then no harm is done and the purpose has been
+ * achieved as well.
  */
 void kick_process(task_t *p)
 {
@@ -2867,6 +2873,48 @@ need_resched:
 }
 
 EXPORT_SYMBOL(preempt_schedule);
+
+/*
+ * this is is the entry point to schedule() from kernel preemption
+ * off of irq context.
+ * Note, that this is called and return with irqs disabled. This will
+ * protect us against recursive calling from irq.
+ */
+asmlinkage void __sched preempt_schedule_irq(void)
+{
+	struct thread_info *ti = current_thread_info();
+#ifdef CONFIG_PREEMPT_BKL
+	struct task_struct *task = current;
+	int saved_lock_depth;
+#endif
+	/* Catch callers which need to be fixed*/
+	BUG_ON(ti->preempt_count || !irqs_disabled());
+
+need_resched:
+	add_preempt_count(PREEMPT_ACTIVE);
+	/*
+	 * We keep the big kernel semaphore locked, but we
+	 * clear ->lock_depth so that schedule() doesnt
+	 * auto-release the semaphore:
+	 */
+#ifdef CONFIG_PREEMPT_BKL
+	saved_lock_depth = task->lock_depth;
+	task->lock_depth = -1;
+#endif
+	local_irq_enable();
+	schedule();
+	local_irq_disable();
+#ifdef CONFIG_PREEMPT_BKL
+	task->lock_depth = saved_lock_depth;
+#endif
+	sub_preempt_count(PREEMPT_ACTIVE);
+
+	/* we could miss a preemption opportunity between schedule and now */
+	barrier();
+	if (unlikely(test_thread_flag(TIF_NEED_RESCHED)))
+		goto need_resched;
+}
+
 #endif /* CONFIG_PREEMPT */
 
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync, void *key)
@@ -3020,15 +3068,17 @@ wait_for_completion_timeout(struct completion *x, unsigned long timeout)
 			__set_current_state(TASK_UNINTERRUPTIBLE);
 			spin_unlock_irq(&x->wait.lock);
 			timeout = schedule_timeout(timeout);
-			if (!timeout)
-				goto out;
 			spin_lock_irq(&x->wait.lock);
+			if (!timeout) {
+				__remove_wait_queue(&x->wait, &wait);
+				goto out;
+			}
 		} while (!x->done);
 		__remove_wait_queue(&x->wait, &wait);
 	}
 	x->done--;
-	spin_unlock_irq(&x->wait.lock);
 out:
+	spin_unlock_irq(&x->wait.lock);
 	return timeout;
 }
 EXPORT_SYMBOL(wait_for_completion_timeout);
@@ -3048,6 +3098,7 @@ int fastcall __sched wait_for_completion_interruptible(struct completion *x)
 		do {
 			if (signal_pending(current)) {
 				ret = -ERESTARTSYS;
+				__remove_wait_queue(&x->wait, &wait);
 				goto out;
 			}
 			__set_current_state(TASK_INTERRUPTIBLE);
@@ -3080,21 +3131,23 @@ wait_for_completion_interruptible_timeout(struct completion *x,
 		do {
 			if (signal_pending(current)) {
 				timeout = -ERESTARTSYS;
-				goto out_unlock;
+				__remove_wait_queue(&x->wait, &wait);
+				goto out;
 			}
 			__set_current_state(TASK_INTERRUPTIBLE);
 			spin_unlock_irq(&x->wait.lock);
 			timeout = schedule_timeout(timeout);
-			if (!timeout)
-				goto out;
 			spin_lock_irq(&x->wait.lock);
+			if (!timeout) {
+				__remove_wait_queue(&x->wait, &wait);
+				goto out;
+			}
 		} while (!x->done);
 		__remove_wait_queue(&x->wait, &wait);
 	}
 	x->done--;
-out_unlock:
-	spin_unlock_irq(&x->wait.lock);
 out:
+	spin_unlock_irq(&x->wait.lock);
 	return timeout;
 }
 EXPORT_SYMBOL(wait_for_completion_interruptible_timeout);

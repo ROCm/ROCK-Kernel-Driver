@@ -987,8 +987,11 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 		/* The following is not allowed by the tty layer and
 		   unsafe. It should be fixed ASAP */
 		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
-			if(tty->low_latency)
+			if (tty->low_latency) {
+				spin_unlock(&up->port.lock);
 				tty_flip_buffer_push(tty);
+				spin_lock(&up->port.lock);
+			}
 			/* If this failed then we will throw away the
 			   bytes but must do so to clear interrupts */
 		}
@@ -1059,7 +1062,9 @@ receive_chars(struct uart_8250_port *up, int *status, struct pt_regs *regs)
 	ignore_char:
 		lsr = serial_inp(up, UART_LSR);
 	} while ((lsr & UART_LSR_DR) && (max_count-- > 0));
+	spin_unlock(&up->port.lock);
 	tty_flip_buffer_push(tty);
+	spin_lock(&up->port.lock);
 	*status = lsr;
 }
 

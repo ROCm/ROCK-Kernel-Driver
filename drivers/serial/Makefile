@@ -48,3 +48,4 @@ obj-$(CONFIG_SERIAL_ICOM) += icom.o
 obj-$(CONFIG_SERIAL_M32R_SIO) += m32r_sio.o
 obj-$(CONFIG_SERIAL_MPSC) += mpsc.o
 obj-$(CONFIG_ETRAX_SERIAL) += crisv10.o
+obj-$(CONFIG_SERIAL_TXX9) += serial_txx9.o

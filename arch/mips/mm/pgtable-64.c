@@ -55,5 +55,4 @@ void __init pagetable_init(void)
 	/* Initialize the entire pgd.  */
 	pgd_init((unsigned long)swapper_pg_dir);
 	pmd_init((unsigned long)invalid_pmd_table, (unsigned long)invalid_pte_table);
-	memset((void *)invalid_pte_table, 0, sizeof(pte_t) * PTRS_PER_PTE);
 }

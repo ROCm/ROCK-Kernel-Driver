@@ -4,7 +4,7 @@
  * BRIEF MODULE DESCRIPTION
  * Momentum Computer Ocelot-3 board dependent boot routines
  *
- * Copyright (C) 1996, 1997, 2001  Ralf Baechle
+ * Copyright (C) 1996, 1997, 01, 05  Ralf Baechle
  * Copyright (C) 2000 RidgeRun, Inc.
  * Copyright (C) 2001 Red Hat, Inc.
  * Copyright (C) 2002 Momentum Computer
@@ -47,7 +47,6 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/types.h>

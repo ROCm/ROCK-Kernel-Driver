@@ -231,7 +231,7 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	cs->irq = card->para[0];
 
 
-	outb(cs->hw.avm.cfg_reg+ASL1_OFFSET, ASL1_W_ENABLE_S0);
+	byteout(cs->hw.avm.cfg_reg+ASL1_OFFSET, ASL1_W_ENABLE_S0);
 	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,0x00);
 	HZDELAY(HZ / 5 + 1);
 	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,ASL0_W_RESET);

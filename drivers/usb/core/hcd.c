@@ -676,6 +676,7 @@ void usb_bus_init (struct usb_bus *bus)
 	INIT_LIST_HEAD (&bus->bus_list);
 
 	class_device_initialize(&bus->class_dev);
+	bus->class_dev.class = &usb_host_class;
 }
 EXPORT_SYMBOL (usb_bus_init);
 
@@ -732,7 +733,6 @@ int usb_register_bus(struct usb_bus *bus)
 	}
 
 	snprintf(bus->class_dev.class_id, BUS_ID_SIZE, "usb%d", busnum);
-	bus->class_dev.class = &usb_host_class;
 	bus->class_dev.dev = bus->controller;
 	retval = class_device_add(&bus->class_dev);
 	if (retval) {

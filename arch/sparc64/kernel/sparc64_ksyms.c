@@ -86,7 +86,7 @@ extern int svr4_getcontext(svr4_ucontext_t *uc, struct pt_regs *regs);
 extern int svr4_setcontext(svr4_ucontext_t *uc, struct pt_regs *regs);
 extern int compat_sys_ioctl(unsigned int fd, unsigned int cmd, u32 arg);
 extern int (*handle_mathemu)(struct pt_regs *, struct fpustate *);
-extern long sparc32_open(const char * filename, int flags, int mode);
+extern long sparc32_open(const char __user * filename, int flags, int mode);
 extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset, unsigned long size, pgprot_t prot, int space);
 extern void (*prom_palette)(int);
 
@@ -172,18 +172,25 @@ EXPORT_SYMBOL(down_interruptible);
 EXPORT_SYMBOL(up);
 
 /* Atomic counter implementation. */
-EXPORT_SYMBOL(__atomic_add);
-EXPORT_SYMBOL(__atomic_sub);
-EXPORT_SYMBOL(__atomic64_add);
-EXPORT_SYMBOL(__atomic64_sub);
+EXPORT_SYMBOL(atomic_add);
+EXPORT_SYMBOL(atomic_add_ret);
+EXPORT_SYMBOL(atomic_sub);
+EXPORT_SYMBOL(atomic_sub_ret);
+EXPORT_SYMBOL(atomic64_add);
+EXPORT_SYMBOL(atomic64_add_ret);
+EXPORT_SYMBOL(atomic64_sub);
+EXPORT_SYMBOL(atomic64_sub_ret);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(_atomic_dec_and_lock);
 #endif
 
 /* Atomic bit operations. */
-EXPORT_SYMBOL(___test_and_set_bit);
-EXPORT_SYMBOL(___test_and_clear_bit);
-EXPORT_SYMBOL(___test_and_change_bit);
+EXPORT_SYMBOL(test_and_set_bit);
+EXPORT_SYMBOL(test_and_clear_bit);
+EXPORT_SYMBOL(test_and_change_bit);
+EXPORT_SYMBOL(set_bit);
+EXPORT_SYMBOL(clear_bit);
+EXPORT_SYMBOL(change_bit);
 
 /* Bit searching */
 EXPORT_SYMBOL(find_next_bit);

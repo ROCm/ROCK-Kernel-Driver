@@ -4,7 +4,7 @@
  * Ebony board specific routines
  *
  * Matt Porter <mporter@kernel.crashing.org>
- * Copyright 2002-2004 MontaVista Software Inc.
+ * Copyright 2002-2005 MontaVista Software Inc.
  *
  * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
  * Copyright (c) 2003, 2004 Zultys Technologies
@@ -140,7 +140,7 @@ ebony_setup_pcix(void)
 {
 	void *pcix_reg_base;
 
-	pcix_reg_base = ioremap64(PCIX0_REG_BASE, PCIX0_REG_SIZE);
+	pcix_reg_base = ioremap64(PCIX0_REG_BASE, PCIX_REG_SIZE);
 
 	/* Disable all windows */
 	PCIX_WRITEL(0, PCIX0_POM0SA);

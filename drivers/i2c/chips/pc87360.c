@@ -795,8 +795,10 @@ int pc87360_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Fan clock dividers may be needed before any data is read */
 	for (i = 0; i < data->fannr; i++) {
-		data->fan_status[i] = pc87360_read_value(data, LD_FAN,
-				      NO_BANK, PC87360_REG_FAN_STATUS(i));
+		if (FAN_CONFIG_MONITOR(data->fan_conf, i))
+			data->fan_status[i] = pc87360_read_value(data,
+					      LD_FAN, NO_BANK,
+					      PC87360_REG_FAN_STATUS(i));
 	}
 
 	if (init > 0) {
@@ -898,14 +900,27 @@ int pc87360_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	if (data->fannr) {
-		device_create_file(&new_client->dev, &dev_attr_fan1_input);
-		device_create_file(&new_client->dev, &dev_attr_fan2_input);
-		device_create_file(&new_client->dev, &dev_attr_fan1_min);
-		device_create_file(&new_client->dev, &dev_attr_fan2_min);
-		device_create_file(&new_client->dev, &dev_attr_fan1_div);
-		device_create_file(&new_client->dev, &dev_attr_fan2_div);
-		device_create_file(&new_client->dev, &dev_attr_fan1_status);
-		device_create_file(&new_client->dev, &dev_attr_fan2_status);
+		if (FAN_CONFIG_MONITOR(data->fan_conf, 0)) {
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan1_input);
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan1_min);
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan1_div);
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan1_status);
+		}
+
+		if (FAN_CONFIG_MONITOR(data->fan_conf, 1)) {
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan2_input);
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan2_min);
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan2_div);
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan2_status);
+		}
 
 		if (FAN_CONFIG_CONTROL(data->fan_conf, 0))
 			device_create_file(&new_client->dev, &dev_attr_pwm1);
@@ -913,10 +928,16 @@ int pc87360_detect(struct i2c_adapter *adapter, int address, int kind)
 			device_create_file(&new_client->dev, &dev_attr_pwm2);
 	}
 	if (data->fannr == 3) {
-		device_create_file(&new_client->dev, &dev_attr_fan3_input);
-		device_create_file(&new_client->dev, &dev_attr_fan3_min);
-		device_create_file(&new_client->dev, &dev_attr_fan3_div);
-		device_create_file(&new_client->dev, &dev_attr_fan3_status);
+		if (FAN_CONFIG_MONITOR(data->fan_conf, 2)) {
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan3_input);
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan3_min);
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan3_div);
+			device_create_file(&new_client->dev,
+					   &dev_attr_fan3_status);
+		}
 
 		if (FAN_CONFIG_CONTROL(data->fan_conf, 2))
 			device_create_file(&new_client->dev, &dev_attr_pwm3);

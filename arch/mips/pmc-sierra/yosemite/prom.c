@@ -43,7 +43,7 @@ const char *get_system_type(void)
 
 static void prom_cpu0_exit(void *arg)
 {
-	void *nvram = (void *) YOSEMITE_NVRAM_BASE_ADDR;
+	void *nvram = (void *) YOSEMITE_RTC_BASE;
 
 	/* Ask the NVRAM/RTC/watchdog chip to assert reset in 1/16 second */
 	writeb(0x84, nvram + 0xff7);
@@ -94,8 +94,6 @@ void __init prom_init(void)
 	_machine_halt = prom_halt;
 	_machine_power_off = prom_halt;
 
-#ifdef CONFIG_MIPS32
-
 	debug_vectors = cv;
 	arcs_cmdline[0] = '\0';
 
@@ -108,6 +106,11 @@ void __init prom_init(void)
 		strcat(arcs_cmdline, arg[i]);
 		strcat(arcs_cmdline, " ");
 	}
+
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+	if ((strstr(arcs_cmdline, "console=ttyS")) == NULL)
+		strcat(arcs_cmdline, "console=ttyS0,115200");
+#endif
 
 	while (*env) {
 		if (strncmp("ocd_base", *env, strlen("ocd_base")) == 0)
@@ -122,7 +125,6 @@ void __init prom_init(void)
 
 		env++;
 	}
-#endif /* CONFIG_MIPS32 */
 
 	mips_machgroup = MACH_GROUP_TITAN;
 	mips_machtype = MACH_TITAN_YOSEMITE;

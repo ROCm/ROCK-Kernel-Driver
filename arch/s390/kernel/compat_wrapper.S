@@ -391,7 +391,7 @@ old32_readdir_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# void *
 	llgfr	%r4,%r4			# unsigned int
-	jg	old32_readdir		# branch to system call
+	jg	compat_sys_old_readdir	# branch to system call
 
 	.globl  old32_mmap_wrapper 
 old32_mmap_wrapper:
@@ -639,7 +639,7 @@ sys32_getdents_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# void *
 	llgfr	%r4,%r4			# unsigned int
-	jg	sys32_getdents		# branch to system call
+	jg	compat_sys_getdents	# branch to system call
 
 	.globl  compat_sys_select_wrapper
 compat_sys_select_wrapper:

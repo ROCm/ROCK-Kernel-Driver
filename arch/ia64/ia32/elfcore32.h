@@ -106,7 +106,7 @@ elf_core_copy_task_fpregs(struct task_struct *tsk, struct pt_regs *regs, elf_fpr
 	struct ia32_user_i387_struct *fpstate = (void*)fpu;
 	mm_segment_t old_fs;
 
-	if (!tsk->used_math)
+	if (!tsk_used_math(tsk))
 		return 0;
 	
 	old_fs = get_fs();
@@ -124,7 +124,7 @@ elf_core_copy_task_xfpregs(struct task_struct *tsk, elf_fpxregset_t *xfpu)
 	struct ia32_user_fxsr_struct *fpxstate = (void*) xfpu;
 	mm_segment_t old_fs;
 
-	if (!tsk->used_math)
+	if (!tsk_used_math(tsk))
 		return 0;
 
 	old_fs = get_fs();

@@ -17,6 +17,9 @@ struct arch_thread {
 #define current_text_addr() \
 	({ void *pc; __asm__("movq $1f,%0\n1:":"=g" (pc)); pc; })
 
+#define ARCH_IS_STACKGROW(address) \
+        (address + 128 >= UPT_SP(&current->thread.regs.regs))
+
 #include "asm/processor-generic.h"
 
 #endif

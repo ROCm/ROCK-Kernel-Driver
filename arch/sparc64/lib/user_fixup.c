@@ -20,11 +20,12 @@ unsigned long copy_from_user_fixup(void *to, const void __user *from, unsigned l
 	char *dst = to;
 	const char __user *src = from;
 
-	while (size--) {
+	while (size) {
 		if (__get_user(*dst, src))
 			break;
 		dst++;
 		src++;
+		size--;
 	}
 
 	if (size)
@@ -38,11 +39,12 @@ unsigned long copy_to_user_fixup(void __user *to, const void *from, unsigned lon
 	char __user *dst = to;
 	const char *src = from;
 
-	while (size--) {
+	while (size) {
 		if (__put_user(*src, dst))
 			break;
 		dst++;
 		src++;
+		size--;
 	}
 
 	return size;
@@ -53,7 +55,7 @@ unsigned long copy_in_user_fixup(void __user *to, void __user *from, unsigned lo
 	char __user *dst = to;
 	char __user *src = from;
 
-	while (size--) {
+	while (size) {
 		char tmp;
 
 		if (__get_user(tmp, src))
@@ -62,6 +64,7 @@ unsigned long copy_in_user_fixup(void __user *to, void __user *from, unsigned lo
 			break;
 		dst++;
 		src++;
+		size--;
 	}
 
 	return size;

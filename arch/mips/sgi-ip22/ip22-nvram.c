@@ -26,7 +26,7 @@
 #define EEPROM_DATO	0x08	/* Data out */
 #define EEPROM_DATI	0x10	/* Data in */
 
-/* We need to use this functions early... */
+/* We need to use these functions early... */
 #define delay()	({						\
 	int x;							\
 	for (x=0; x<100000; x++) __asm__ __volatile__(""); })

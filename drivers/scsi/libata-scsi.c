@@ -202,7 +202,7 @@ void ata_to_sense_error(struct ata_queued_cmd *qc, u8 drv_stat)
 		{0x40, 		MEDIUM_ERROR, 0x11, 0x04}, 	// Uncorrectable ECC error      Unrecovered read error
 		/* BBD - block marked bad */
 		{0x80, 		MEDIUM_ERROR, 0x11, 0x04}, 	// Block marked bad		  Medium error, unrecovered read error
-		{0xFF, 0xFF, 0xFF, 0xFF}, // END mark 
+		{0xFF, 0xFF, 0xFF, 0xFF}, // END mark
 	};
 	static unsigned char stat_table[][4] = {
 		/* Must be first because BUSY means no other bits valid */
@@ -210,22 +210,22 @@ void ata_to_sense_error(struct ata_queued_cmd *qc, u8 drv_stat)
 		{0x20, 		HARDWARE_ERROR,  0x00, 0x00}, 	// Device fault
 		{0x08, 		ABORTED_COMMAND, 0x47, 0x00},	// Timed out in xfer, fake parity for now
 		{0x04, 		RECOVERED_ERROR, 0x11, 0x00},	// Recovered ECC error	  Medium error, recovered
-		{0xFF, 0xFF, 0xFF, 0xFF}, // END mark 
+		{0xFF, 0xFF, 0xFF, 0xFF}, // END mark
 	};
 	int i = 0;
 
 	cmd->result = SAM_STAT_CHECK_CONDITION;
-	
+
 	/*
 	 *	Is this an error we can process/parse
 	 */
-	 
+
 	if(drv_stat & ATA_ERR)
 		/* Read the err bits */
 		err = ata_chk_err(qc->ap);
 
 	/* Display the ATA level error info */
-	
+
 	printk(KERN_WARNING "ata%u: status=0x%02x { ", qc->ap->id, drv_stat);
 	if(drv_stat & 0x80)
 	{
@@ -242,7 +242,7 @@ void ata_to_sense_error(struct ata_queued_cmd *qc, u8 drv_stat)
 		if(drv_stat & 0x01)	printk("Error ");
 	}
 	printk("}\n");
-	
+
 	if(err)
 	{
 		printk(KERN_WARNING "ata%u: error=0x%02x { ", qc->ap->id, err);
@@ -259,11 +259,11 @@ void ata_to_sense_error(struct ata_queued_cmd *qc, u8 drv_stat)
 		if(err & 0x02)		printk("TrackZeroNotFound ");
 		if(err & 0x01)		printk("AddrMarkNotFound ");
 		printk("}\n");
-		
+
 		/* Should we dump sector info here too ?? */
 	}
-		
-	
+
+
 	/* Look for err */
 	while(sense_table[i][0] != 0xFF)
 	{
@@ -301,7 +301,7 @@ void ata_to_sense_error(struct ata_queued_cmd *qc, u8 drv_stat)
 	/* No error ?? */
 	printk(KERN_ERR "ata%u: called with no error (%02X)!\n", qc->ap->id, drv_stat);
 	/* additional-sense-code[-qualifier] */
-	
+
 	sb[0] = 0x70;
 	sb[2] = MEDIUM_ERROR;
 	sb[7] = 0x0A;
@@ -488,19 +488,24 @@ static unsigned int ata_scsi_verify_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 	}
 
 	if (lba48) {
+		tf->command = ATA_CMD_VERIFY_EXT;
+
 		tf->hob_nsect = (n_sect >> 8) & 0xff;
 
 		tf->hob_lbah = (sect >> 40) & 0xff;
 		tf->hob_lbam = (sect >> 32) & 0xff;
 		tf->hob_lbal = (sect >> 24) & 0xff;
-	} else
+	} else {
+		tf->command = ATA_CMD_VERIFY;
+
 		tf->device |= (sect >> 24) & 0xf;
+	}
 
 	tf->nsect = n_sect & 0xff;
 
-	tf->hob_lbah = (sect >> 16) & 0xff;
-	tf->hob_lbam = (sect >> 8) & 0xff;
-	tf->hob_lbal = sect & 0xff;
+	tf->lbah = (sect >> 16) & 0xff;
+	tf->lbam = (sect >> 8) & 0xff;
+	tf->lbal = sect & 0xff;
 
 	return 0;
 }
@@ -600,7 +605,7 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 				return 1;
 
 			/* stores LBA27:24 in lower 4 bits of device reg */
-			tf->device |= scsicmd[2];
+			tf->device |= scsicmd[6];
 
 			qc->nsect = scsicmd[13];
 		}

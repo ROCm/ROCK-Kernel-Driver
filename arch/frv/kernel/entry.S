@@ -782,13 +782,12 @@ __entry_do_NMI:
 ###############################################################################
 #
 # the return path for a newly forked child process
-# - __switch_to() saved the old current pointer in GR27 for us
+# - __switch_to() saved the old current pointer in GR8 for us
 #
 ###############################################################################
 	.globl		ret_from_fork
 ret_from_fork:
 	LEDS		0x6100
-	ori.p		gr27,0,gr8
 	call		schedule_tail
 
 	# fork & co. return 0 to child

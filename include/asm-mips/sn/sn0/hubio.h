@@ -486,6 +486,7 @@ typedef union h1_icrba_u {
 #define ICRBN_A_CERR_SHFT	54
 #define ICRBN_A_ERR_MASK	0x3ff
 
+#if 0	/* Disabled, this causes namespace polution and break allmodconfig */
 /*
  * Easy access macros.
  */
@@ -499,6 +500,7 @@ typedef union h1_icrba_u {
 #define	a_addr		icrba_fields_s.addr
 #define	a_valid		icrba_fields_s.valid
 #define	a_iow		icrba_fields_s.iow
+#endif
 
 #endif /* !__ASSEMBLY__ */
 

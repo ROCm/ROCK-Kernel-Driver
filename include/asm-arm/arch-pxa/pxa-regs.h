@@ -444,7 +444,8 @@
  */
 
 /* FIXME: This clash with SA1111 defines */
-#ifndef CONFIG_SA1111
+#ifndef _ASM_ARCH_SA1111
+
 #define SACR0		__REG(0x40400000)  /* Global Control Register */
 #define SACR1		__REG(0x40400004)  /* Serial Audio I 2 S/MSB-Justified Control Register */
 #define SASR0		__REG(0x4040000C)  /* Serial Audio I 2 S/MSB-Justified Interface and FIFO Status Register */
@@ -452,45 +453,37 @@
 #define SAICR		__REG(0x40400018)  /* Serial Audio Interrupt Clear Register */
 #define SADIV		__REG(0x40400060)  /* Audio Clock Divider Register. */
 #define SADR		__REG(0x40400080)  /* Serial Audio Data Register (TX and RX FIFO access Register). */
+
+#define SACR0_RFTH(x)	(x << 12)	/* Rx FIFO Interrupt or DMA Trigger Threshold */
+#define SACR0_TFTH(x)	(x << 8)	/* Tx FIFO Interrupt or DMA Trigger Threshold */
+#define SACR0_STRF	(1 << 5)	/* FIFO Select for EFWR Special Function */
+#define SACR0_EFWR	(1 << 4)	/* Enable EFWR Function  */
+#define SACR0_RST	(1 << 3)	/* FIFO, i2s Register Reset */
+#define SACR0_BCKD	(1 << 2) 	/* Bit Clock Direction */
+#define SACR0_ENB	(1 << 0)	/* Enable I2S Link */
+#define SACR1_ENLBF	(1 << 5)	/* Enable Loopback */
+#define SACR1_DRPL	(1 << 4) 	/* Disable Replaying Function */
+#define SACR1_DREC	(1 << 3)	/* Disable Recording Function */
+#define SACR1_AMSL	(1 << 1)	/* Specify Alternate Mode */
+
+#define SASR0_I2SOFF	(1 << 7)	/* Controller Status */
+#define SASR0_ROR	(1 << 6)	/* Rx FIFO Overrun */
+#define SASR0_TUR	(1 << 5)	/* Tx FIFO Underrun */
+#define SASR0_RFS	(1 << 4)	/* Rx FIFO Service Request */
+#define SASR0_TFS	(1 << 3)	/* Tx FIFO Service Request */
+#define SASR0_BSY	(1 << 2)	/* I2S Busy */
+#define SASR0_RNE	(1 << 1)	/* Rx FIFO Not Empty */
+#define SASR0_TNF	(1 << 0) 	/* Tx FIFO Not Empty */
+
+#define SAICR_ROR	(1 << 6)	/* Clear Rx FIFO Overrun Interrupt */
+#define SAICR_TUR	(1 << 5)	/* Clear Tx FIFO Underrun Interrupt */
+
+#define SAIMR_ROR	(1 << 6)	/* Enable Rx FIFO Overrun Condition Interrupt */
+#define SAIMR_TUR	(1 << 5)	/* Enable Tx FIFO Underrun Condition Interrupt */
+#define SAIMR_RFS	(1 << 4)	/* Enable Rx FIFO Service Interrupt */
+#define SAIMR_TFS	(1 << 3)	/* Enable Tx FIFO Service Interrupt */
+
 #endif
-
-#define SACR0_RFTH(x)	(x << 12)		/* Rx FIFO Interrupt or DMA Trigger Threshold */
-#define SACR0_TFTH(x)	(x << 8)		/* Tx FIFO Interrupt or DMA Trigger Threshold */
-#define SACR0_STRF		(1 << 5)		/* FIFO Select for EFWR Special Function */
-#define SACR0_EFWR		(1 << 4)		/* Enable EFWR Function  */
-#define SACR0_RST		(1 << 3)		/* FIFO, i2s Register Reset */
-#define SACR0_BCKD		(1 << 2) 		/* Bit Clock Direction */
-#define SACR0_ENB		(1 << 0)		/* Enable I2S Link */
-
-#define SACR1_ENLBF		(1 << 5)		/* Enable Loopback */
-#define SACR1_DRPL		(1 << 4) 		/* Disable Replaying Function */
-#define SACR1_DREC		(1 << 3)		/* Disable Recording Function */
-#define SACR1_AMSL		(1 << 1)		/* Specify Alternate Mode */
-
-#define SASR0_I2SOFF	(1 << 7)		/* Controller Status */
-#define SASR0_ROR		(1 << 6)		/* Rx FIFO Overrun */
-#define SASR0_TUR		(1 << 5)		/* Tx FIFO Underrun */
-#define SASR0_RFS		(1 << 4)		/* Rx FIFO Service Request */
-#define SASR0_TFS		(1 << 3)		/* Tx FIFO Service Request */
-#define SASR0_BSY		(1 << 2)		/* I2S Busy */
-#define SASR0_RNE		(1 << 1)		/* Rx FIFO Not Empty */
-#define SASR0_TNF		(1 << 0) 		/* Tx FIFO Not Empty */
-
-#define SADIV_3_058M	0x0c			/* Serial Clock Divider 3.058MHz */
-#define SADIV_2_836M	0x0d			/* 2.836 MHz */
-#define SADIV_1_405M	0x1a			/* 1.405 MHz */
-#define SADIV_1_026M	0x24			/* 1.026 MHz */
-#define SADIV_702K		0x34			/* 702 kHz */
-#define SADIV_513K		0x48			/* 513 kHz */
-
-#define SAICR_ROR		(1 << 6)		/* Clear Rx FIFO Overrun Interrupt */
-#define SAICR_TUR		(1 << 5)		/* Clear Tx FIFO Underrun Interrupt */
-
-#define SAIMR_ROR		(1 << 6)		/* Enable Rx FIFO Overrun Condition Interrupt */
-#define SAIMR_TUR		(1 << 5)		/* Enable Tx FIFO Underrun Condition Interrupt */
-#define SAIMR_RFS		(1 << 4)		/* Enable Rx FIFO Service Interrupt */
-#define SAIMR_TFS		(1 << 3)		/* Enable Tx FIFO Service Interrupt */
-
 
 /*
  * AC97 Controller registers
@@ -1337,7 +1330,7 @@
 #define GPIO18_RDY_MD		(18 | GPIO_ALT_FN_1_IN)
 #define GPIO19_DREQ1_MD		(19 | GPIO_ALT_FN_1_IN)
 #define GPIO20_DREQ0_MD		(20 | GPIO_ALT_FN_1_IN)
-#define GPIO23_SCLK_md		(23 | GPIO_ALT_FN_2_OUT)
+#define GPIO23_SCLK_MD		(23 | GPIO_ALT_FN_2_OUT)
 #define GPIO24_SFRM_MD		(24 | GPIO_ALT_FN_2_OUT)
 #define GPIO25_STXD_MD		(25 | GPIO_ALT_FN_2_OUT)
 #define GPIO26_SRXD_MD		(26 | GPIO_ALT_FN_1_IN)

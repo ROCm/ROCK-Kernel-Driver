@@ -60,7 +60,7 @@ proc_file_read(struct file *file, char __user *buf, size_t nbytes,
 		return -ENOMEM;
 
 	while ((nbytes > 0) && !eof) {
-		count = min_t(ssize_t, PROC_BLOCK_SIZE, nbytes);
+		count = min_t(size_t, PROC_BLOCK_SIZE, nbytes);
 
 		start = NULL;
 		if (dp->get_info) {

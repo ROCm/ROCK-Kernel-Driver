@@ -257,6 +257,7 @@ void pcc_iowrite(int sock, unsigned long port, void *buf, size_t size, size_t nm
 
 /*====================================================================*/
 
+#define IS_REGISTERED		0x2000
 #define IS_ALIVE		0x8000
 
 typedef struct pcc_t {
@@ -772,11 +773,9 @@ static int __init init_m32r_pcc(void)
 		socket[i].socket.owner = THIS_MODULE;
 		socket[i].number = i;
 		ret = pcmcia_register_socket(&socket[i].socket);
-		if (ret && i--) {
-			for (; i>= 0; i--)
-				pcmcia_unregister_socket(&socket[i].socket);
-			break;
-		}
+		if (!ret)
+			socket[i].flags |= IS_REGISTERED;
+
 #if 0	/* driver model ordering issue */
 		class_device_create_file(&socket[i].socket.dev,
 					 &class_device_attr_info);
@@ -802,7 +801,8 @@ static void __exit exit_m32r_pcc(void)
 	int i;
 
 	for (i = 0; i < pcc_sockets; i++)
-		pcmcia_unregister_socket(&socket[i].socket);
+		if (socket[i].flags & IS_REGISTERED)
+			pcmcia_unregister_socket(&socket[i].socket);
 
 	platform_device_unregister(&pcc_device);
 	if (poll_interval != 0)

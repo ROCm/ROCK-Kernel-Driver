@@ -71,7 +71,7 @@ pci_sal_read (int seg, int bus, int devfn, int reg, int len, u32 *value)
 	u64 addr, mode, data = 0;
 	int result = 0;
 
-	if ((seg > 255) || (bus > 255) || (devfn > 255) || (reg > 4095))
+	if ((seg > 65535) || (bus > 255) || (devfn > 255) || (reg > 4095))
 		return -EINVAL;
 
 	if ((seg | reg) <= 255) {

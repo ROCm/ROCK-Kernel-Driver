@@ -95,9 +95,13 @@ int copy_siginfo_to_user32(compat_siginfo_t __user *to, siginfo_t *from)
 					  &to->si_addr);
 			break;
 		case __SI_POLL >> 16:
-		case __SI_TIMER >> 16:
 			err |= __put_user(from->si_band, &to->si_band);
 			err |= __put_user(from->si_fd, &to->si_fd);
+			break;
+		case __SI_TIMER >> 16:
+			err |= __put_user(from->si_tid, &to->si_tid);
+			err |= __put_user(from->si_overrun, &to->si_overrun);
+			err |= __put_user(from->si_int, &to->si_int);
 			break;
 		default:
 			break;
@@ -142,9 +146,13 @@ int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
 			to->si_addr = (void *)(u64) (tmp & PSW32_ADDR_INSN);
 			break;
 		case __SI_POLL >> 16:
-		case __SI_TIMER >> 16:
 			err |= __get_user(to->si_band, &from->si_band);
 			err |= __get_user(to->si_fd, &from->si_fd);
+			break;
+		case __SI_TIMER >> 16:
+			err |= __get_user(to->si_tid, &from->si_tid);
+			err |= __get_user(to->si_overrun, &from->si_overrun);
+			err |= __get_user(to->si_int, &from->si_int);
 			break;
 		default:
 			break;

@@ -387,7 +387,7 @@ static ssize_t show_physical_id(struct sys_device *dev, char *buf)
 {
 	struct cpu *cpu = container_of(dev, struct cpu, sysdev);
 
-	return sprintf(buf, "%u\n", get_hard_smp_processor_id(cpu->sysdev.id));
+	return sprintf(buf, "%d\n", get_hard_smp_processor_id(cpu->sysdev.id));
 }
 static SYSDEV_ATTR(physical_id, 0444, show_physical_id, NULL);
 

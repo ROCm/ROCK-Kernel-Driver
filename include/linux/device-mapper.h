@@ -108,6 +108,7 @@ struct dm_target {
 	sector_t len;
 
 	/* FIXME: turn this into a mask, and merge with io_restrictions */
+	/* Always a power of 2 */
 	sector_t split_io;
 
 	/*

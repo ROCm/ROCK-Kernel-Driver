@@ -336,8 +336,6 @@ static int sync_page_io(struct block_device *bdev, sector_t sector, int size,
 	struct completion event;
 	int ret;
 
-	bio_get(bio);
-
 	rw |= (1 << BIO_RW_SYNC);
 
 	bio->bi_bdev = bdev;
@@ -937,8 +935,8 @@ static void super_1_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 
 	max_dev = 0;
 	ITERATE_RDEV(mddev,rdev2,tmp)
-		if (rdev2->desc_nr > max_dev)
-			max_dev = rdev2->desc_nr;
+		if (rdev2->desc_nr+1 > max_dev)
+			max_dev = rdev2->desc_nr+1;
 	
 	sb->max_dev = cpu_to_le32(max_dev);
 	for (i=0; i<max_dev;i++)
@@ -955,6 +953,7 @@ static void super_1_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 	}
 
 	sb->recovery_offset = cpu_to_le64(0); /* not supported yet */
+	sb->sb_csum = calc_sb_1_csum(sb);
 }
 
 
@@ -1474,10 +1473,13 @@ static struct kobject *md_probe(dev_t dev, int *part, void *data)
 	}
 	disk->major = MAJOR(dev);
 	disk->first_minor = unit << shift;
-	if (partitioned)
+	if (partitioned) {
 		sprintf(disk->disk_name, "md_d%d", unit);
-	else
+		sprintf(disk->devfs_name, "md/d%d", unit);
+	} else {
 		sprintf(disk->disk_name, "md%d", unit);
+		sprintf(disk->devfs_name, "md/%d", unit);
+	}
 	disk->fops = &md_fops;
 	disk->private_data = mddev;
 	disk->queue = mddev->queue;
@@ -2442,6 +2444,9 @@ static int set_disk_faulty(mddev_t *mddev, dev_t dev)
 {
 	mdk_rdev_t *rdev;
 
+	if (mddev->pers == NULL)
+		return -ENODEV;
+
 	rdev = find_rdev(mddev, dev);
 	if (!rdev)
 		return -ENODEV;
@@ -3364,10 +3369,12 @@ static void md_do_sync(mddev_t *mddev)
 	init_waitqueue_head(&mddev->recovery_wait);
 	last_check = 0;
 
-	if (j)
+	if (j>2) {
 		printk(KERN_INFO 
 			"md: resuming recovery of %s from checkpoint.\n",
 			mdname(mddev));
+		mddev->curr_resync = j;
+	}
 
 	while (j < max_sectors) {
 		int sectors;
@@ -3449,7 +3456,7 @@ static void md_do_sync(mddev_t *mddev)
 
 	if (!test_bit(MD_RECOVERY_ERR, &mddev->recovery) &&
 	    mddev->curr_resync > 2 &&
-	    mddev->curr_resync > mddev->recovery_cp) {
+	    mddev->curr_resync >= mddev->recovery_cp) {
 		if (test_bit(MD_RECOVERY_INTR, &mddev->recovery)) {
 			printk(KERN_INFO 
 				"md: checkpointing recovery of %s.\n",
@@ -3657,7 +3664,7 @@ int __init md_init(void)
 	for (minor=0; minor < MAX_MD_DEVS; ++minor)
 		devfs_mk_bdev(MKDEV(mdp_major, minor<<MdpMinorShift),
 			      S_IFBLK|S_IRUSR|S_IWUSR,
-			      "md/d%d", minor);
+			      "md/mdp%d", minor);
 
 
 	register_reboot_notifier(&md_notifier);

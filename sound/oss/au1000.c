@@ -59,6 +59,7 @@
 #include <linux/slab.h>
 #include <linux/soundcard.h>
 #include <linux/init.h>
+#include <linux/page-flags.h>
 #include <linux/poll.h>
 #include <linux/pci.h>
 #include <linux/bitops.h>
@@ -66,20 +67,17 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
-#include <linux/wrapper.h>
 #include <linux/interrupt.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/au1000.h>
-#include <asm/au1000_dma.h>
+#include <asm/mach-au1x00/au1000.h>
+#include <asm/mach-au1x00/au1000_dma.h>
 
 /* --------------------------------------------------------------------- */
 
 #undef OSS_DOCUMENTED_MIXER_SEMANTICS
-#define AU1000_DEBUG
+#undef AU1000_DEBUG
 #undef AU1000_VERBOSE_DEBUG
-
-#define USE_COHERENT_DMA
 
 #define AU1000_MODULE_NAME "Au1000 audio"
 #define PFX AU1000_MODULE_NAME
@@ -116,7 +114,7 @@ struct au1000_state {
 	struct proc_dir_entry *ac97_ps;
 #endif				/* AU1000_DEBUG */
 
-	struct ac97_codec *codec;
+	struct ac97_codec codec;
 	unsigned        codec_base_caps;// AC'97 reg 00h, "Reset Register"
 	unsigned        codec_ext_caps;	// AC'97 reg 28h, "Extended Audio ID"
 	int             no_vra;	// do not use VRA
@@ -190,35 +188,6 @@ static inline unsigned ld2(unsigned int x)
 		r++;
 	return r;
 }
-
-
-#ifdef USE_COHERENT_DMA
-static inline void * dma_alloc(size_t size, dma_addr_t * dma_handle)
-{
-	void* ret = (void *)__get_free_pages(GFP_ATOMIC | GFP_DMA,
-					     get_order(size));
-	if (ret != NULL) {
-		memset(ret, 0, size);
-		*dma_handle = virt_to_phys(ret);
-	}
-	return ret;
-}
-
-static inline void dma_free(size_t size, void* va, dma_addr_t dma_handle)
-{
-	free_pages((unsigned long)va, get_order(size));
-}
-#else
-static inline void * dma_alloc(size_t size, dma_addr_t * dma_handle)
-{
-	return pci_alloc_consistent(NULL, size, dma_handle);
-}
-
-static inline void dma_free(size_t size, void* va, dma_addr_t dma_handle)
-{
-	pci_free_consistent(NULL, size, va, dma_handle);
-}
-#endif
 
 /* --------------------------------------------------------------------- */
 
@@ -356,17 +325,17 @@ static void set_adc_rate(struct au1000_state *s, unsigned rate)
 
 	adc->src_factor = 1;
 
-	ac97_extstat = rdcodec(s->codec, AC97_EXTENDED_STATUS);
+	ac97_extstat = rdcodec(&s->codec, AC97_EXTENDED_STATUS);
 
 	rate = rate > 48000 ? 48000 : rate;
 
 	// enable VRA
-	wrcodec(s->codec, AC97_EXTENDED_STATUS,
+	wrcodec(&s->codec, AC97_EXTENDED_STATUS,
 		ac97_extstat | AC97_EXTSTAT_VRA);
 	// now write the sample rate
-	wrcodec(s->codec, AC97_PCM_LR_ADC_RATE, (u16) rate);
+	wrcodec(&s->codec, AC97_PCM_LR_ADC_RATE, (u16) rate);
 	// read it back for actual supported rate
-	adc_rate = rdcodec(s->codec, AC97_PCM_LR_ADC_RATE);
+	adc_rate = rdcodec(&s->codec, AC97_PCM_LR_ADC_RATE);
 
 #ifdef AU1000_VERBOSE_DEBUG
 	dbg("%s: set to %d Hz", __FUNCTION__, adc_rate);
@@ -374,11 +343,11 @@ static void set_adc_rate(struct au1000_state *s, unsigned rate)
 
 	// some codec's don't allow unequal DAC and ADC rates, in which case
 	// writing one rate reg actually changes both.
-	dac_rate = rdcodec(s->codec, AC97_PCM_FRONT_DAC_RATE);
+	dac_rate = rdcodec(&s->codec, AC97_PCM_FRONT_DAC_RATE);
 	if (dac->num_channels > 2)
-		wrcodec(s->codec, AC97_PCM_SURR_DAC_RATE, dac_rate);
+		wrcodec(&s->codec, AC97_PCM_SURR_DAC_RATE, dac_rate);
 	if (dac->num_channels > 4)
-		wrcodec(s->codec, AC97_PCM_LFE_DAC_RATE, dac_rate);
+		wrcodec(&s->codec, AC97_PCM_LFE_DAC_RATE, dac_rate);
 
 	adc->sample_rate = adc_rate;
 	dac->sample_rate = dac_rate;
@@ -401,23 +370,23 @@ static void set_dac_rate(struct au1000_state *s, unsigned rate)
 
 	dac->src_factor = 1;
 
-	ac97_extstat = rdcodec(s->codec, AC97_EXTENDED_STATUS);
+	ac97_extstat = rdcodec(&s->codec, AC97_EXTENDED_STATUS);
 
 	rate = rate > 48000 ? 48000 : rate;
 
 	// enable VRA
-	wrcodec(s->codec, AC97_EXTENDED_STATUS,
+	wrcodec(&s->codec, AC97_EXTENDED_STATUS,
 		ac97_extstat | AC97_EXTSTAT_VRA);
 	// now write the sample rate
-	wrcodec(s->codec, AC97_PCM_FRONT_DAC_RATE, (u16) rate);
+	wrcodec(&s->codec, AC97_PCM_FRONT_DAC_RATE, (u16) rate);
 	// I don't support different sample rates for multichannel,
 	// so make these channels the same.
 	if (dac->num_channels > 2)
-		wrcodec(s->codec, AC97_PCM_SURR_DAC_RATE, (u16) rate);
+		wrcodec(&s->codec, AC97_PCM_SURR_DAC_RATE, (u16) rate);
 	if (dac->num_channels > 4)
-		wrcodec(s->codec, AC97_PCM_LFE_DAC_RATE, (u16) rate);
+		wrcodec(&s->codec, AC97_PCM_LFE_DAC_RATE, (u16) rate);
 	// read it back for actual supported rate
-	dac_rate = rdcodec(s->codec, AC97_PCM_FRONT_DAC_RATE);
+	dac_rate = rdcodec(&s->codec, AC97_PCM_FRONT_DAC_RATE);
 
 #ifdef AU1000_VERBOSE_DEBUG
 	dbg("%s: set to %d Hz", __FUNCTION__, dac_rate);
@@ -425,7 +394,7 @@ static void set_dac_rate(struct au1000_state *s, unsigned rate)
 
 	// some codec's don't allow unequal DAC and ADC rates, in which case
 	// writing one rate reg actually changes both.
-	adc_rate = rdcodec(s->codec, AC97_PCM_LR_ADC_RATE);
+	adc_rate = rdcodec(&s->codec, AC97_PCM_LR_ADC_RATE);
 
 	dac->sample_rate = dac_rate;
 	adc->sample_rate = adc_rate;
@@ -603,8 +572,11 @@ extern inline void dealloc_dmabuf(struct au1000_state *s, struct dmabuf *db)
 		pend = virt_to_page(db->rawbuf +
 				    (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-			mem_map_unreserve(page);
-		dma_free(PAGE_SIZE << db->buforder, db->rawbuf, db->dmaaddr);
+			ClearPageReserved(page);
+		dma_free_noncoherent(NULL,
+				PAGE_SIZE << db->buforder,
+				db->rawbuf,
+				db->dmaaddr);
 	}
 	db->rawbuf = db->nextIn = db->nextOut = NULL;
 	db->mapped = db->ready = 0;
@@ -622,8 +594,10 @@ static int prog_dmabuf(struct au1000_state *s, struct dmabuf *db)
 		db->ready = db->mapped = 0;
 		for (order = DMABUF_DEFAULTORDER;
 		     order >= DMABUF_MINORDER; order--)
-			if ((db->rawbuf = dma_alloc(PAGE_SIZE << order,
-						  &db->dmaaddr)))
+			if ((db->rawbuf = dma_alloc_noncoherent(NULL,
+						PAGE_SIZE << order,
+						&db->dmaaddr,
+						0)))
 				break;
 		if (!db->rawbuf)
 			return -ENOMEM;
@@ -633,7 +607,7 @@ static int prog_dmabuf(struct au1000_state *s, struct dmabuf *db)
 		pend = virt_to_page(db->rawbuf +
 				    (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-			mem_map_reserve(page);
+			SetPageReserved(page);
 	}
 
 	db->cnt_factor = 1;
@@ -708,7 +682,7 @@ extern inline int prog_dmabuf_dac(struct au1000_state *s)
 
 
 /* hold spinlock for the following */
-static void dac_dma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t dac_dma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct au1000_state *s = (struct au1000_state *) dev_id;
 	struct dmabuf  *dac = &s->dma_dac;
@@ -723,7 +697,7 @@ static void dac_dma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if ((buff_done = get_dma_buffer_done(dac->dmanr)) == 0) {
 		/* fastpath out, to ease interrupt sharing */
-		return;
+		return IRQ_HANDLED;
 	}
 
 	spin_lock(&s->lock);
@@ -786,10 +760,12 @@ static void dac_dma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		wake_up(&dac->wait);
 
 	spin_unlock(&s->lock);
+
+	return IRQ_HANDLED;
 }
 
 
-static void adc_dma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t adc_dma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct au1000_state *s = (struct au1000_state *) dev_id;
 	struct dmabuf  *adc = &s->dma_adc;
@@ -804,7 +780,7 @@ static void adc_dma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if ((buff_done = get_dma_buffer_done(adc->dmanr)) == 0) {
 		/* fastpath out, to ease interrupt sharing */
-		return;
+		return IRQ_HANDLED;
 	}
 
 	spin_lock(&s->lock);
@@ -816,7 +792,7 @@ static void adc_dma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			stop_adc(s);
 			adc->error++;
 			err("adc overrun");
-			return;
+			return IRQ_NONE;
 		}
 
 		adc->nextIn += adc->dma_fragsize;
@@ -853,7 +829,7 @@ static void adc_dma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			adc->error++;
 			err("adc overrun");
 			spin_unlock(&s->lock);
-			return;
+			return IRQ_NONE;
 		}
 
 		adc->nextIn += 2*adc->dma_fragsize;
@@ -873,6 +849,8 @@ static void adc_dma_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		wake_up(&adc->wait);
 
 	spin_unlock(&s->lock);
+
+	return IRQ_HANDLED;
 }
 
 /* --------------------------------------------------------------------- */
@@ -904,7 +882,7 @@ static int au1000_ioctl_mixdev(struct inode *inode, struct file *file,
 			       unsigned int cmd, unsigned long arg)
 {
 	struct au1000_state *s = (struct au1000_state *)file->private_data;
-	struct ac97_codec *codec = s->codec;
+	struct ac97_codec *codec = &s->codec;
 
 	return mixdev_ioctl(codec, cmd, arg);
 }
@@ -1338,8 +1316,7 @@ static int au1000_mmap(struct file *file, struct vm_area_struct *vma)
 		ret = -EINVAL;
 		goto out;
 	}
-	if (remap_pfn_range(vma->vm_start,
-			     virt_to_phys(db->rawbuf) >> PAGE_SHIFT,
+	if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(db->rawbuf),
 			     size, vma->vm_page_prot)) {
 		ret = -EAGAIN;
 		goto out;
@@ -1500,9 +1477,9 @@ static int au1000_ioctl(struct inode *inode, struct file *file,
 			s->dma_dac.num_channels = val ? 2 : 1;
 			if (s->codec_ext_caps & AC97_EXT_DACS) {
 				// disable surround and center/lfe in AC'97
-				u16 ext_stat = rdcodec(s->codec,
+				u16 ext_stat = rdcodec(&s->codec,
 						       AC97_EXTENDED_STATUS);
-				wrcodec(s->codec, AC97_EXTENDED_STATUS,
+				wrcodec(&s->codec, AC97_EXTENDED_STATUS,
 					ext_stat | (AC97_EXTSTAT_PRI |
 						    AC97_EXTSTAT_PRJ |
 						    AC97_EXTSTAT_PRK));
@@ -1552,9 +1529,9 @@ static int au1000_ioctl(struct inode *inode, struct file *file,
 					// disable surround and center/lfe
 					// channels in AC'97
 					u16             ext_stat =
-						rdcodec(s->codec,
+						rdcodec(&s->codec,
 							AC97_EXTENDED_STATUS);
-					wrcodec(s->codec,
+					wrcodec(&s->codec,
 						AC97_EXTENDED_STATUS,
 						ext_stat | (AC97_EXTSTAT_PRI |
 							    AC97_EXTSTAT_PRJ |
@@ -1563,14 +1540,14 @@ static int au1000_ioctl(struct inode *inode, struct file *file,
 					// enable surround, center/lfe
 					// channels in AC'97
 					u16             ext_stat =
-						rdcodec(s->codec,
+						rdcodec(&s->codec,
 							AC97_EXTENDED_STATUS);
 					ext_stat &= ~AC97_EXTSTAT_PRJ;
 					if (val == 6)
 						ext_stat &=
 							~(AC97_EXTSTAT_PRI |
 							  AC97_EXTSTAT_PRK);
-					wrcodec(s->codec,
+					wrcodec(&s->codec,
 						AC97_EXTENDED_STATUS,
 						ext_stat);
 				}
@@ -1832,7 +1809,7 @@ static int au1000_ioctl(struct inode *inode, struct file *file,
 		return -EINVAL;
 	}
 
-	return mixdev_ioctl(s->codec, cmd, arg);
+	return mixdev_ioctl(&s->codec, cmd, arg);
 }
 
 
@@ -1983,7 +1960,7 @@ static int proc_au1000_dump(char *buf, char **start, off_t fpos,
 	len += sprintf(buf + len, "----------------------\n");
 	for (cnt = 0; cnt <= 0x7e; cnt += 2)
 		len += sprintf(buf + len, "reg %02x = %04x\n",
-			       cnt, rdcodec(s->codec, cnt));
+			       cnt, rdcodec(&s->codec, cnt));
 
 	if (fpos >= len) {
 		*start = buf;
@@ -2010,7 +1987,9 @@ static int __devinit au1000_probe(void)
 {
 	struct au1000_state *s = &au1000_state;
 	int             val;
+#ifdef AU1000_DEBUG
 	char            proc_str[80];
+#endif
 
 	memset(s, 0, sizeof(struct au1000_state));
 
@@ -2019,23 +1998,16 @@ static int __devinit au1000_probe(void)
 	init_waitqueue_head(&s->open_wait);
 	init_MUTEX(&s->open_sem);
 	spin_lock_init(&s->lock);
-	
-	s->codec = ac97_alloc_codec();
-	if(s->codec == NULL)
-	{
-		error("Out of memory");
-		return -1;
-	}
-	s->codec->private_data = s;
-	s->codec->id = 0;
-	s->codec->codec_read = rdcodec;
-	s->codec->codec_write = wrcodec;
-	s->codec->codec_wait = waitcodec;
+	s->codec.private_data = s;
+	s->codec.id = 0;
+	s->codec.codec_read = rdcodec;
+	s->codec.codec_write = wrcodec;
+	s->codec.codec_wait = waitcodec;
 
-	if (!request_region(virt_to_phys((void *) AC97C_CONFIG),
+	if (!request_mem_region(CPHYSADDR(AC97C_CONFIG),
 			    0x14, AU1000_MODULE_NAME)) {
 		err("AC'97 ports in use");
-		goto err_codec;
+		return -1;
 	}
 	// Allocate the DMA Channels
 	if ((s->dma_dac.dmanr = request_au1000_dma(DMA_ID_AC97C_TX,
@@ -2057,25 +2029,17 @@ static int __devinit au1000_probe(void)
 	     s->dma_dac.dmanr, get_dma_done_irq(s->dma_dac.dmanr),
 	     s->dma_adc.dmanr, get_dma_done_irq(s->dma_adc.dmanr));
 
-#ifdef USE_COHERENT_DMA
 	// enable DMA coherency in read/write DMA channels
 	set_dma_mode(s->dma_dac.dmanr,
 		     get_dma_mode(s->dma_dac.dmanr) & ~DMA_NC);
 	set_dma_mode(s->dma_adc.dmanr,
 		     get_dma_mode(s->dma_adc.dmanr) & ~DMA_NC);
-#else
-	// disable DMA coherency in read/write DMA channels
-	set_dma_mode(s->dma_dac.dmanr,
-		     get_dma_mode(s->dma_dac.dmanr) | DMA_NC);
-	set_dma_mode(s->dma_adc.dmanr,
-		     get_dma_mode(s->dma_adc.dmanr) | DMA_NC);
-#endif
 
 	/* register devices */
 
 	if ((s->dev_audio = register_sound_dsp(&au1000_audio_fops, -1)) < 0)
 		goto err_dev1;
-	if ((s->codec->dev_mixer =
+	if ((s->codec.dev_mixer =
 	     register_sound_mixer(&au1000_mixer_fops, -1)) < 0)
 		goto err_dev2;
 
@@ -2108,11 +2072,11 @@ static int __devinit au1000_probe(void)
 	au_writel(0, AC97C_CONFIG);
 
 	/* codec init */
-	if (!ac97_probe_codec(s->codec))
+	if (!ac97_probe_codec(&s->codec))
 		goto err_dev3;
 
-	s->codec_base_caps = rdcodec(s->codec, AC97_RESET);
-	s->codec_ext_caps = rdcodec(s->codec, AC97_EXTENDED_ID);
+	s->codec_base_caps = rdcodec(&s->codec, AC97_RESET);
+	s->codec_ext_caps = rdcodec(&s->codec, AC97_EXTENDED_ID);
 	info("AC'97 Base/Extended ID = %04x/%04x",
 	     s->codec_base_caps, s->codec_ext_caps);
 
@@ -2124,12 +2088,12 @@ static int __devinit au1000_probe(void)
 	 * ALTPCM). ac97_codec.c does not handle detection
 	 * of this channel correctly.
 	 */
-	s->codec->supported_mixers |= SOUND_MASK_ALTPCM;
+	s->codec.supported_mixers |= SOUND_MASK_ALTPCM;
 	/*
 	 * Now set AUX_OUT's default volume.
 	 */
 	val = 0x4343;
-	mixdev_ioctl(s->codec, SOUND_MIXER_WRITE_ALTPCM,
+	mixdev_ioctl(&s->codec, SOUND_MIXER_WRITE_ALTPCM,
 		     (unsigned long) &val);
 	
 	if (!(s->codec_ext_caps & AC97_EXTID_VRA)) {
@@ -2137,8 +2101,8 @@ static int __devinit au1000_probe(void)
 		s->no_vra = 1;
 	} else if (!vra) {
 		// Boot option says disable VRA
-		u16 ac97_extstat = rdcodec(s->codec, AC97_EXTENDED_STATUS);
-		wrcodec(s->codec, AC97_EXTENDED_STATUS,
+		u16 ac97_extstat = rdcodec(&s->codec, AC97_EXTENDED_STATUS);
+		wrcodec(&s->codec, AC97_EXTENDED_STATUS,
 			ac97_extstat & ~AC97_EXTSTAT_VRA);
 		s->no_vra = 1;
 	}
@@ -2147,20 +2111,38 @@ static int __devinit au1000_probe(void)
 
 	/* set mic to be the recording source */
 	val = SOUND_MASK_MIC;
-	mixdev_ioctl(s->codec, SOUND_MIXER_WRITE_RECSRC,
+	mixdev_ioctl(&s->codec, SOUND_MIXER_WRITE_RECSRC,
 		     (unsigned long) &val);
 
 #ifdef AU1000_DEBUG
 	sprintf(proc_str, "driver/%s/%d/ac97", AU1000_MODULE_NAME,
-		s->codec->id);
+		s->codec.id);
 	s->ac97_ps = create_proc_read_entry (proc_str, 0, NULL,
-					     ac97_read_proc, s->codec);
+					     ac97_read_proc, &s->codec);
+#endif
+
+#ifdef CONFIG_MIPS_XXS1500
+	/* deassert eapd */
+	wrcodec(&s->codec, AC97_POWER_CONTROL,
+			rdcodec(&s->codec, AC97_POWER_CONTROL) & ~0x8000);
+	/* mute a number of signals which seem to be causing problems
+	 * if not muted.
+	 */
+	wrcodec(&s->codec, AC97_PCBEEP_VOL, 0x8000);
+	wrcodec(&s->codec, AC97_PHONE_VOL, 0x8008);
+	wrcodec(&s->codec, AC97_MIC_VOL, 0x8008);
+	wrcodec(&s->codec, AC97_LINEIN_VOL, 0x8808);
+	wrcodec(&s->codec, AC97_CD_VOL, 0x8808);
+	wrcodec(&s->codec, AC97_VIDEO_VOL, 0x8808);
+	wrcodec(&s->codec, AC97_AUX_VOL, 0x8808);
+	wrcodec(&s->codec, AC97_PCMOUT_VOL, 0x0808);
+	wrcodec(&s->codec, AC97_GENERAL_PURPOSE, 0x2000);
 #endif
 
 	return 0;
 
  err_dev3:
-	unregister_sound_mixer(s->codec->dev_mixer);
+	unregister_sound_mixer(s->codec.dev_mixer);
  err_dev2:
 	unregister_sound_dsp(s->dev_audio);
  err_dev1:
@@ -2168,9 +2150,7 @@ static int __devinit au1000_probe(void)
  err_dma2:
 	free_au1000_dma(s->dma_dac.dmanr);
  err_dma1:
-	release_region(virt_to_phys((void *) AC97C_CONFIG), 0x14);
- err_codec:
- 	ac97_release_codec(s->codec);
+	release_mem_region(CPHYSADDR(AC97C_CONFIG), 0x14);
 	return -1;
 }
 
@@ -2187,10 +2167,9 @@ static void au1000_remove(void)
 	synchronize_irq();
 	free_au1000_dma(s->dma_adc.dmanr);
 	free_au1000_dma(s->dma_dac.dmanr);
-	release_region(virt_to_phys((void *) AC97C_CONFIG), 0x14);
+	release_mem_region(CPHYSADDR(AC97C_CONFIG), 0x14);
 	unregister_sound_dsp(s->dev_audio);
-	unregister_sound_mixer(s->codec->dev_mixer);
-	ac97_release_codec(s->codec);
+	unregister_sound_mixer(s->codec.dev_mixer);
 }
 
 static int __init init_au1000(void)
@@ -2219,7 +2198,7 @@ static int __init au1000_setup(char *options)
 	if (!options || !*options)
 		return 0;
 
-	while (this_opt = strsep(&options, ",")) {
+	while ((this_opt = strsep(&options, ","))) {
 		if (!*this_opt)
 			continue;
 		if (!strncmp(this_opt, "vra", 3)) {

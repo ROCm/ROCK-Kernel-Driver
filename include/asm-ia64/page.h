@@ -75,6 +75,17 @@ do {						\
 	flush_dcache_page(page);		\
 } while (0)
 
+
+#define alloc_zeroed_user_highpage(vma, vaddr) \
+({						\
+	struct page *page = alloc_page_vma(GFP_HIGHUSER | __GFP_ZERO, vma, vaddr); \
+	if (page)				\
+ 		flush_dcache_page(page);	\
+	page;					\
+})
+
+#define __HAVE_ARCH_ALLOC_ZEROED_USER_HIGHPAGE
+
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP

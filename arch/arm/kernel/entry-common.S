@@ -11,6 +11,7 @@
 
 #include <asm/thread_info.h>
 #include <asm/ptrace.h>
+#include <asm/unistd.h>
 
 #include "entry-header.S"
 
@@ -137,7 +138,7 @@ ENTRY(vector_swi)
 	tst	ip, #_TIF_SYSCALL_TRACE		@ are we tracing syscalls?
 	bne	__sys_trace
 
-	adrsvc	al, lr, ret_fast_syscall	@ return address
+	adr	lr, ret_fast_syscall		@ return address
 	cmp	scno, #NR_syscalls		@ check upper syscall limit
 	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
 
@@ -157,7 +158,7 @@ __sys_trace:
 	mov	r0, #0				@ trace entry [IP = 0]
 	bl	syscall_trace
 
-	adrsvc	al, lr, __sys_trace_return	@ return address
+	adr	lr, __sys_trace_return		@ return address
 	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
 	cmp	scno, #NR_syscalls		@ check upper syscall limit
 	ldmccia	r1, {r0 - r3}			@ have to reload r0 - r3
@@ -190,13 +191,14 @@ ENTRY(sys_call_table)
 		.type	sys_syscall, #function
 sys_syscall:
 		eor	scno, r0, #OS_NUMBER << 20
-		cmp	scno, #NR_syscalls	@ check range
-		stmleia	sp, {r5, r6}		@ shuffle args
-		movle	r0, r1
-		movle	r1, r2
-		movle	r2, r3
-		movle	r3, r4
-		ldrle	pc, [tbl, scno, lsl #2]
+		cmp	scno, #__NR_syscall - __NR_SYSCALL_BASE
+		cmpne	scno, #NR_syscalls	@ check range
+		stmloia	sp, {r5, r6}		@ shuffle args
+		movlo	r0, r1
+		movlo	r1, r2
+		movlo	r2, r3
+		movlo	r3, r4
+		ldrlo	pc, [tbl, scno, lsl #2]
 		b	sys_ni_syscall
 
 sys_fork_wrapper:
@@ -211,8 +213,9 @@ sys_execve_wrapper:
 		add	r3, sp, #S_OFF
 		b	sys_execve
 
-sys_clone_wapper:
-		add	r2, sp, #S_OFF
+sys_clone_wrapper:
+		add	ip, sp, #S_OFF
+		str	ip, [sp, #4]
 		b	sys_clone
 
 sys_sigsuspend_wrapper:
@@ -234,6 +237,10 @@ sys_rt_sigreturn_wrapper:
 sys_sigaltstack_wrapper:
 		ldr	r2, [sp, #S_OFF + S_SP]
 		b	do_sigaltstack
+
+sys_futex_wrapper:
+		str	r5, [sp, #4]		@ push sixth arg
+		b	sys_futex
 
 /*
  * Note: off_4k (r5) is always units of 4K.  If we can't do the requested

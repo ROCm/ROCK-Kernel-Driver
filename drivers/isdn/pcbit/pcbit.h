@@ -45,7 +45,7 @@ struct msn_entry {
 struct pcbit_dev {
 	/* board */
 
-	volatile unsigned char* sh_mem;		/* RDP address	*/
+	volatile unsigned char __iomem *sh_mem;		/* RDP address	*/
 	unsigned long ph_mem;
 	unsigned int irq;
 	unsigned int id;
@@ -79,8 +79,8 @@ struct pcbit_dev {
 	u_char w_busy;
 	u_char r_busy;
 
-	volatile unsigned char *readptr;
-	volatile unsigned char *writeptr;
+	volatile unsigned char __iomem *readptr;
+	volatile unsigned char __iomem *writeptr;
 
 	ushort loadptr;
 

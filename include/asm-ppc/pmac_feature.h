@@ -125,6 +125,7 @@
 #define PMAC_MB_HAS_FW_POWER		0x00000002
 #define PMAC_MB_OLD_CORE99		0x00000004
 #define PMAC_MB_MOBILE			0x00000008
+#define PMAC_MB_MAY_SLEEP		0x00000010
 
 /*
  * Feature calls supported on pmac
@@ -238,7 +239,10 @@ static inline long pmac_call_feature(int selector, struct device_node* node,
 
 /* PMAC_FTR_SLEEP_STATE		(struct device_node* node, 0, int value)
  * set the sleep state of the motherboard.
+ *
  * Pass -1 as value to query for sleep capability
+ * Pass 1 to set IOs to sleep
+ * Pass 0 to set IOs to wake
  */
 #define PMAC_FTR_SLEEP_STATE		PMAC_FTR_DEF(15)
 
@@ -279,10 +283,21 @@ static inline long pmac_call_feature(int selector, struct device_node* node,
  */
 #define PMAC_FTR_AACK_DELAY_ENABLE     	PMAC_FTR_DEF(20)
 
+/* PMAC_FTR_DEVICE_CAN_WAKE
+ *
+ * Used by video drivers to inform system that they can actually perform
+ * wakeup from sleep
+ */
+#define PMAC_FTR_DEVICE_CAN_WAKE	PMAC_FTR_DEF(22)
+
 
 /* Don't use those directly, they are for the sake of pmac_setup.c */
 extern long pmac_do_feature_call(unsigned int selector, ...);
 extern void pmac_feature_init(void);
+
+/* Video suspend tweak */
+extern void pmac_set_early_video_resume(void (*proc)(void *data), void *data);
+extern void pmac_call_early_video_resume(void);
 
 #define PMAC_FTR_DEF(x) ((_MACH_Pmac << 16) | (x))
 

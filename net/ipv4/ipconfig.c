@@ -53,6 +53,7 @@
 #include <linux/seq_file.h>
 #include <linux/major.h>
 #include <linux/root_dev.h>
+#include <linux/delay.h>
 #include <net/arp.h>
 #include <net/ip.h>
 #include <net/ipconfig.h>
@@ -84,8 +85,8 @@
 #endif
 
 /* Define the friendly delay before and after opening net devices */
-#define CONF_PRE_OPEN		(HZ/2)	/* Before opening: 1/2 second */
-#define CONF_POST_OPEN		(1*HZ)	/* After opening: 1 second */
+#define CONF_PRE_OPEN		500	/* Before opening: 1/2 second */
+#define CONF_POST_OPEN		1	/* After opening: 1 second */
 
 /* Define the timeout for waiting for a DHCP/BOOTP/RARP reply */
 #define CONF_OPEN_RETRIES 	2	/* (Re)open devices twice */
@@ -1232,7 +1233,7 @@ u32 __init root_nfs_parse_addr(char *name)
 		if (*cp == ':')
 			*cp++ = '\0';
 		addr = in_aton(name);
-		strcpy(name, cp);
+		memmove(name, cp, strlen(cp) + 1);
 	} else
 		addr = INADDR_NONE;
 
@@ -1259,16 +1260,14 @@ static int __init ip_auto_config(void)
  try_try_again:
 #endif
 	/* Give hardware a chance to settle */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(CONF_PRE_OPEN);
+	msleep(CONF_PRE_OPEN);
 
 	/* Setup all network devices */
 	if (ic_open_devs() < 0)
 		return -1;
 
 	/* Give drivers a chance to settle */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(CONF_POST_OPEN);
+	ssleep(CONF_POST_OPEN);
 
 	/*
 	 * If the config information is insufficient (e.g., our IP address or

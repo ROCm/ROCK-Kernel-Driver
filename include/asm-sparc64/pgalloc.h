@@ -133,7 +133,7 @@ static __inline__ void free_pgd_slow(pgd_t *pgd)
 #define DCACHE_COLOR(address)		0
 #endif
 
-#define pgd_populate(MM, PGD, PMD)	pgd_set(PGD, PMD)
+#define pud_populate(MM, PUD, PMD)	pud_set(PUD, PMD)
 
 static __inline__ pmd_t *pmd_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {

@@ -76,8 +76,15 @@ extern int _text,_etext, _edata, _end;
 
 static char command_line[COMMAND_LINE_SIZE] = { 0, };
 
-static struct resource code_resource = { "Kernel code", 0x100000, 0 };
-static struct resource data_resource = { "Kernel data", 0, 0 };
+static struct resource code_resource = {
+	.name  = "Kernel code",
+	.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
+};
+
+static struct resource data_resource = {
+	.name = "Kernel data",
+	.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
+};
 
 /*
  * cpu_init() initializes state that is per-CPU.
@@ -96,7 +103,7 @@ void __devinit cpu_init (void)
          * Force FPU initialization:
          */
         clear_thread_flag(TIF_USEDFPU);
-        current->used_math = 0;
+        clear_used_math();
 
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
@@ -184,11 +191,11 @@ static void __init conmode_default(void)
 	char *ptr;
 
         if (MACHINE_IS_VM) {
-		cpcmd("QUERY CONSOLE", query_buffer, 1024);
+		__cpcmd("QUERY CONSOLE", query_buffer, 1024);
 		console_devno = simple_strtoul(query_buffer + 5, NULL, 16);
 		ptr = strstr(query_buffer, "SUBCHANNEL =");
 		console_irq = simple_strtoul(ptr + 13, NULL, 16);
-		cpcmd("QUERY TERM", query_buffer, 1024);
+		__cpcmd("QUERY TERM", query_buffer, 1024);
 		ptr = strstr(query_buffer, "CONMODE");
 		/*
 		 * Set the conmode to 3215 so that the device recognition 
@@ -197,7 +204,7 @@ static void __init conmode_default(void)
 		 * 3215 and the 3270 driver will try to access the console
 		 * device (3215 as console and 3270 as normal tty).
 		 */
-		cpcmd("TERM CONMODE 3215", NULL, 0);
+		__cpcmd("TERM CONMODE 3215", NULL, 0);
 		if (ptr == NULL) {
 #if defined(CONFIG_SCLP_CONSOLE)
 			SET_CONSOLE_SCLP;
@@ -314,7 +321,6 @@ void __init setup_arch(char **cmdline_p)
         unsigned long bootmap_size;
         unsigned long memory_start, memory_end;
         char c = ' ', cn, *to = command_line, *from = COMMAND_LINE;
-	struct resource *res;
 	unsigned long start_pfn, end_pfn;
         static unsigned int smptrap=0;
         unsigned long delay = 0;
@@ -472,6 +478,30 @@ void __init setup_arch(char **cmdline_p)
         }
 #endif
 
+	for (i = 0; i < 16 && memory_chunk[i].size > 0; i++) {
+		struct resource *res;
+
+		res = alloc_bootmem_low(sizeof(struct resource));
+		res->flags = IORESOURCE_BUSY | IORESOURCE_MEM;
+
+		switch (memory_chunk[i].type) {
+		case CHUNK_READ_WRITE:
+			res->name = "System RAM";
+			break;
+		case CHUNK_READ_ONLY:
+			res->name = "System ROM";
+			res->flags |= IORESOURCE_READONLY;
+			break;
+		default:
+			res->name = "reserved";
+		}
+		res->start = memory_chunk[i].addr;
+		res->end = memory_chunk[i].addr +  memory_chunk[i].size - 1;
+		request_resource(&iomem_resource, res);
+		request_resource(res, &code_resource);
+		request_resource(res, &data_resource);
+	}
+
         /*
          * Setup lowcore for boot cpu
          */
@@ -523,14 +553,6 @@ void __init setup_arch(char **cmdline_p)
 	 * Create kernel page tables and switch to virtual addressing.
 	 */
         paging_init();
-
-	res = alloc_bootmem_low(sizeof(struct resource));
-	res->start = 0;
-	res->end = memory_end;
-	res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-	request_resource(&iomem_resource, res);
-	request_resource(res, &code_resource);
-	request_resource(res, &data_resource);
 
         /* Setup default console */
 	conmode_default();

@@ -68,31 +68,8 @@ static struct pci_device_id pciidlist[] = {
 	r128_PCI_IDS
 };
 
-/* Interface history:
- *
- * ??  - ??
- * 2.4 - Add support for ycbcr textures (no new ioctls)
- * 2.5 - Add FLIP ioctl, disable FULLSCREEN.
- */
-static drm_ioctl_desc_t ioctls[] = {
-   [DRM_IOCTL_NR(DRM_R128_INIT)]       = { r128_cce_init,     1, 1 },
-   [DRM_IOCTL_NR(DRM_R128_CCE_START)]  = { r128_cce_start,    1, 1 },
-   [DRM_IOCTL_NR(DRM_R128_CCE_STOP)]   = { r128_cce_stop,     1, 1 },
-   [DRM_IOCTL_NR(DRM_R128_CCE_RESET)]  = { r128_cce_reset,    1, 1 },
-   [DRM_IOCTL_NR(DRM_R128_CCE_IDLE)]   = { r128_cce_idle,     1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_RESET)]      = { r128_engine_reset, 1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_FULLSCREEN)] = { r128_fullscreen,   1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_SWAP)]       = { r128_cce_swap,     1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_FLIP)]       = { r128_cce_flip,     1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_CLEAR)]      = { r128_cce_clear,    1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_VERTEX)]     = { r128_cce_vertex,   1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_INDICES)]    = { r128_cce_indices,  1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_BLIT)]       = { r128_cce_blit,     1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_DEPTH)]      = { r128_cce_depth,    1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_STIPPLE)]    = { r128_cce_stipple,  1, 0 },
-   [DRM_IOCTL_NR(DRM_R128_INDIRECT)]   = { r128_cce_indirect, 1, 1 },
-   [DRM_IOCTL_NR(DRM_R128_GETPARAM)]   = { r128_getparam, 1, 0 },
-};
+extern drm_ioctl_desc_t r128_ioctls[];
+extern int r128_max_ioctl;
 
 static struct drm_driver driver = {
 	.driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_PCI_DMA | DRIVER_SG | DRIVER_HAVE_DMA | DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL,
@@ -109,8 +86,7 @@ static struct drm_driver driver = {
 	.get_reg_ofs = drm_core_get_reg_ofs,
 	.postinit = postinit,
 	.version = version,
-	.ioctls = ioctls,
-	.num_ioctls = DRM_ARRAY_SIZE(ioctls),
+	.ioctls = r128_ioctls,
 	.dma_ioctl = r128_cce_buffers,
 	.fops = {
 		.owner = THIS_MODULE,
@@ -129,6 +105,7 @@ static struct drm_driver driver = {
 
 static int __init r128_init(void)
 {
+	driver.num_ioctls = r128_max_ioctl;
 	return drm_init(&driver);
 }
 

@@ -4,7 +4,7 @@
  * PPC44x system library
  *
  * Matt Porter <mporter@kernel.crashing.org>
- * Copyright 2002-2004 MontaVista Software Inc.
+ * Copyright 2002-2005 MontaVista Software Inc.
  *
  * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
  * Copyright (c) 2003, 2004 Zultys Technologies
@@ -39,11 +39,17 @@ phys_addr_t fixup_bigphys_addr(phys_addr_t addr, phys_addr_t size)
 	 * address in the 440's 36-bit address space.  Fix
 	 * them up with the appropriate ERPN
 	 */
-	if ((addr >= PPC44x_IO_LO) && (addr < PPC44x_IO_HI))
+	if ((addr >= PPC44x_IO_LO) && (addr <= PPC44x_IO_HI))
 		page_4gb = PPC44x_IO_PAGE;
-	else if ((addr >= PPC44x_PCICFG_LO) && (addr < PPC44x_PCICFG_HI))
+	else if ((addr >= PPC44x_PCI0CFG_LO) && (addr <= PPC44x_PCI0CFG_HI))
 		page_4gb = PPC44x_PCICFG_PAGE;
-	else if ((addr >= PPC44x_PCIMEM_LO) && (addr < PPC44x_PCIMEM_HI))
+#ifdef CONFIG_440SP
+	else if ((addr >= PPC44x_PCI1CFG_LO) && (addr <= PPC44x_PCI1CFG_HI))
+		page_4gb = PPC44x_PCICFG_PAGE;
+	else if ((addr >= PPC44x_PCI2CFG_LO) && (addr <= PPC44x_PCI2CFG_HI))
+		page_4gb = PPC44x_PCICFG_PAGE;
+#endif
+	else if ((addr >= PPC44x_PCIMEM_LO) && (addr <= PPC44x_PCIMEM_HI))
 		page_4gb = PPC44x_PCIMEM_PAGE;
 
 	return (page_4gb | addr);
@@ -172,3 +178,16 @@ void __init ibm44x_platform_init(void)
 #endif
 }
 
+/* Called from MachineCheckException */
+void platform_machine_check(struct pt_regs *regs)
+{
+    	printk("PLB0: BEAR=0x%08x%08x ACR=  0x%08x BESR= 0x%08x\n",
+		mfdcr(DCRN_PLB0_BEARH), mfdcr(DCRN_PLB0_BEARL),
+		mfdcr(DCRN_PLB0_ACR),  mfdcr(DCRN_PLB0_BESR));
+	printk("POB0: BEAR=0x%08x%08x BESR0=0x%08x BESR1=0x%08x\n",
+		mfdcr(DCRN_POB0_BEARH), mfdcr(DCRN_POB0_BEARL),
+		mfdcr(DCRN_POB0_BESR0), mfdcr(DCRN_POB0_BESR1));
+	printk("OPB0: BEAR=0x%08x%08x BSTAT=0x%08x\n",
+		mfdcr(DCRN_OPB0_BEARH), mfdcr(DCRN_OPB0_BEARL),
+		mfdcr(DCRN_OPB0_BSTAT));
+}

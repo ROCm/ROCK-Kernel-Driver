@@ -18,29 +18,30 @@
  * Corgi (Non Standard) GPIO Definitions
  */
 #define CORGI_GPIO_KEY_INT			(0)	/* Keyboard Interrupt */
-#define CORGI_GPIO_AC_IN			(1)
-#define CORGI_GPIO_WAKEUP			(3)
-#define CORGI_GPIO_AK_INT			(4)	/* IR Controller Interrupt */
+#define CORGI_GPIO_AC_IN			(1) /* Charger Detection */
+#define CORGI_GPIO_WAKEUP			(3) /* System wakeup notification? */
+#define CORGI_GPIO_AK_INT			(4)	/* Headphone Jack Control Interrupt */
 #define CORGI_GPIO_TP_INT			(5)	/* Touch Panel Interrupt */
-#define CORGI_GPIO_nSD_WP			(7)
+#define CORGI_GPIO_nSD_WP			(7) /* SD Write Protect? */
 #define CORGI_GPIO_nSD_DETECT		(9) /* MMC/SD Card Detect */
-#define CORGI_GPIO_nSD_INT			(10)
-#define CORGI_GPIO_MAIN_BAT_LOW		(11)
-#define CORGI_GPIO_BAT_COVER		(11)
-#define CORGI_GPIO_LED_ORANGE		(13)
+#define CORGI_GPIO_nSD_INT			(10) /* SD Interrupt for SDIO? */
+#define CORGI_GPIO_MAIN_BAT_LOW		(11) /* Main Battery Low Notification */
+#define CORGI_GPIO_BAT_COVER		(11) /* Battery Cover Detect */
+#define CORGI_GPIO_LED_ORANGE		(13) /* Orange LED Control */
 #define CORGI_GPIO_CF_CD			(14) /* Compact Flash Card Detect */
-#define CORGI_GPIO_CHRG_FULL		(16)
+#define CORGI_GPIO_CHRG_FULL		(16) /* Charging Complete Notification */
 #define CORGI_GPIO_CF_IRQ			(17) /* Compact Flash Interrupt */
 #define CORGI_GPIO_LCDCON_CS		(19) /* LCD Control Chip Select */
-#define CORGI_GPIO_MAX1111_CS		(20) /* MAX111 Chip Select */
-#define CORGI_GPIO_ADC_TEMP_ON		(21)
-#define CORGI_GPIO_IR_ON			(22)
+#define CORGI_GPIO_MAX1111_CS		(20) /* MAX1111 Chip Select */
+#define CORGI_GPIO_ADC_TEMP_ON		(21) /* Select battery voltage or temperature */
+#define CORGI_GPIO_IR_ON			(22) /* Enable IR Transciever */
 #define CORGI_GPIO_ADS7846_CS		(24) /* ADS7846 Chip Select */
 #define CORGI_GPIO_SD_PWR			(33) /* MMC/SD Power */
-#define CORGI_GPIO_CHRG_ON			(38)
-#define CORGI_GPIO_DISCHARGE_ON		(42)
+#define CORGI_GPIO_CHRG_ON			(38) /* Enable battery Charging */
+#define CORGI_GPIO_DISCHARGE_ON		(42) /* Enable battery Discharge */
+#define CORGI_GPIO_CHRG_UKN			(43) /* Unknown Charging (Bypass Control?) */
 #define CORGI_GPIO_HSYNC			(44) /* LCD HSync Pulse */
-#define CORGI_GPIO_USB_PULLUP		(45)
+#define CORGI_GPIO_USB_PULLUP		(45) /* USB show presence to host */
 
 
 /*
@@ -97,6 +98,7 @@
 			CORGI_SCP_MIC_BIAS )
 #define CORGI_SCOOP_IO_OUT	( CORGI_SCP_MUTE_L | CORGI_SCP_MUTE_R )
 
+
 /*
  * Corgi Parameter Area Definitions
  */
@@ -130,6 +132,19 @@ struct sharpsl_flash_param_info {
   unsigned int phad_keyword;
   unsigned int phadadj;
 };
+
+
+/*
+ * External Functions
+ */
+extern unsigned long corgi_ssp_ads7846_putget(unsigned long);
+extern unsigned long corgi_ssp_ads7846_get(void);
+extern void corgi_ssp_ads7846_put(ulong data);
+extern void corgi_ssp_ads7846_lock(void);
+extern void corgi_ssp_ads7846_unlock(void);
+extern void corgi_ssp_lcdtg_send (u8 adrs, u8 data);
+extern void corgi_ssp_blduty_set(int duty);
+extern int corgi_ssp_max1111_get(ulong data);
 
 #endif /* __ASM_ARCH_CORGI_H  */
 

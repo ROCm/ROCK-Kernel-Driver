@@ -8,6 +8,7 @@
  */
 
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 
@@ -20,6 +21,7 @@ void __secpath_destroy(struct sec_path *sp)
 		xfrm_state_put(sp->x[i].xvec);
 	kmem_cache_free(secpath_cachep, sp);
 }
+EXPORT_SYMBOL(__secpath_destroy);
 
 struct sec_path *secpath_dup(struct sec_path *src)
 {
@@ -40,6 +42,7 @@ struct sec_path *secpath_dup(struct sec_path *src)
 	atomic_set(&sp->refcnt, 1);
 	return sp;
 }
+EXPORT_SYMBOL(secpath_dup);
 
 /* Fetch spi and seq from ipsec header */
 
@@ -73,6 +76,7 @@ int xfrm_parse_spi(struct sk_buff *skb, u8 nexthdr, u32 *spi, u32 *seq)
 	*seq = *(u32*)(skb->h.raw + offset_seq);
 	return 0;
 }
+EXPORT_SYMBOL(xfrm_parse_spi);
 
 void __init xfrm_input_init(void)
 {

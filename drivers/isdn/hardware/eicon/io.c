@@ -227,10 +227,6 @@ void request(PISDN_ADAPTER IoAdapter, ENTITY * e)
         if (pI->descriptor_number >= 0) {
           dword dma_magic;
           void* local_addr;
-#if 0
-          DBG_TRC(("A(%d) dma_alloc(%d)",
-                   IoAdapter->ANum, pI->descriptor_number))
-#endif
           diva_get_dma_map_entry (\
                                (struct _diva_dma_map_entry*)IoAdapter->dma_map,
                                pI->descriptor_number,
@@ -243,9 +239,6 @@ void request(PISDN_ADAPTER IoAdapter, ENTITY * e)
         }
       } else if ((pI->operation == IDI_SYNC_REQ_DMA_DESCRIPTOR_FREE) &&
                  (pI->descriptor_number >= 0)) {
-#if 0
-        DBG_TRC(("A(%d) dma_free(%d)", IoAdapter->ANum, pI->descriptor_number))
-#endif
         diva_free_dma_map_entry((struct _diva_dma_map_entry*)IoAdapter->dma_map,
                                 pI->descriptor_number);
         pI->descriptor_number = -1;
@@ -369,9 +362,6 @@ void request(PISDN_ADAPTER IoAdapter, ENTITY * e)
   }
   if ( IoAdapter )
   {
-#if 0
-   DBG_FTL(("xdi: unknown Req 0 / Rc %d !", e->Rc))
-#endif
    return ;
   }
  }

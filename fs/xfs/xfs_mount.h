@@ -296,7 +296,7 @@ typedef struct xfs_mount {
 	xfs_agnumber_t		m_agirotor;	/* last ag dir inode alloced */
 	lock_t			m_agirotor_lock;/* .. and lock protecting it */
 	xfs_agnumber_t		m_maxagi;	/* highest inode alloc group */
-	int			m_ihsize;	/* size of next field */
+	uint			m_ihsize;	/* size of next field */
 	struct xfs_ihash	*m_ihash;	/* fs private inode hash table*/
 	struct xfs_inode	*m_inodes;	/* active inode list */
 	struct list_head	m_del_inodes;	/* inodes to reclaim */
@@ -376,7 +376,7 @@ typedef struct xfs_mount {
 	xfs_dablk_t		m_dirdatablk;	/* blockno of dir data v2 */
 	xfs_dablk_t		m_dirleafblk;	/* blockno of dir non-data v2 */
 	xfs_dablk_t		m_dirfreeblk;	/* blockno of dirfreeindex v2 */
-	int			m_chsize;	/* size of next field */
+	uint			m_chsize;	/* size of next field */
 	struct xfs_chash	*m_chash;	/* fs private inode per-cluster
 						 * hash table */
 	struct xfs_dmops	m_dm_ops;	/* vector of DMI ops */

@@ -28,14 +28,13 @@
 #define get_descriptor_id(type, service) (((type - 4) << 4) | service)
 
 extern struct bus_type pcie_port_bus_type;
-extern struct device_driver pcieport_generic_driver;
 extern int pcie_port_device_probe(struct pci_dev *dev);
 extern int pcie_port_device_register(struct pci_dev *dev);
 #ifdef CONFIG_PM
-extern int pcie_port_device_suspend(struct pcie_device *dev, u32 state);
-extern int pcie_port_device_resume(struct pcie_device *dev);
+extern int pcie_port_device_suspend(struct pci_dev *dev, u32 state);
+extern int pcie_port_device_resume(struct pci_dev *dev);
 #endif
-extern void pcie_port_device_remove(struct pcie_device *dev);
+extern void pcie_port_device_remove(struct pci_dev *dev);
 extern void pcie_port_bus_register(void);
 extern void pcie_port_bus_unregister(void);
 

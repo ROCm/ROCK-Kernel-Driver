@@ -719,6 +719,11 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 			ret = ptrace_setfpregs(child, (void __user *)data);
 			break;
 
+		case PTRACE_GET_THREAD_AREA:
+			ret = put_user(child->thread_info->tp_value,
+				       (unsigned long __user *) data);
+			break;
+
 		default:
 			ret = ptrace_request(child, request, addr, data);
 			break;

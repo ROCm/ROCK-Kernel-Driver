@@ -56,7 +56,10 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 enum {
 	IB_UMAD_MAX_PORTS  = 64,
-	IB_UMAD_MAX_AGENTS = 32
+	IB_UMAD_MAX_AGENTS = 32,
+
+	IB_UMAD_MAJOR      = 231,
+	IB_UMAD_MINOR_BASE = 0
 };
 
 struct ib_umad_port {
@@ -97,7 +100,7 @@ struct ib_umad_packet {
 	DECLARE_PCI_UNMAP_ADDR(mapping)
 };
 
-static dev_t base_dev;
+static const dev_t base_dev = MKDEV(IB_UMAD_MAJOR, IB_UMAD_MINOR_BASE);
 static spinlock_t map_lock;
 static DECLARE_BITMAP(dev_map, IB_UMAD_MAX_PORTS * 2);
 
@@ -789,10 +792,10 @@ static int __init ib_umad_init(void)
 
 	spin_lock_init(&map_lock);
 
-	ret = alloc_chrdev_region(&base_dev, 0, IB_UMAD_MAX_PORTS * 2,
-				  "infiniband_mad");
+	ret = register_chrdev_region(base_dev, IB_UMAD_MAX_PORTS * 2,
+				     "infiniband_mad");
 	if (ret) {
-		printk(KERN_ERR "user_mad: couldn't get device number\n");
+		printk(KERN_ERR "user_mad: couldn't register device number\n");
 		goto out;
 	}
 

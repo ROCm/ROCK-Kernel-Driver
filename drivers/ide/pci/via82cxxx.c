@@ -36,6 +36,10 @@
 #include <linux/ide.h>
 #include <asm/io.h>
 
+#ifdef CONFIG_PPC_MULTIPLATFORM
+#include <asm/processor.h>
+#endif
+
 #include "ide-timing.h"
 
 #define DISPLAY_VIA_TIMINGS
@@ -583,6 +587,13 @@ static void __init init_hwif_via82cxxx(ide_hwif_t *hwif)
 
 	hwif->tuneproc = &via82cxxx_tune_drive;
 	hwif->speedproc = &via_set_drive;
+
+
+#if defined(CONFIG_PPC_MULTIPLATFORM) && defined(CONFIG_PPC32)
+	if(_machine == _MACH_chrp && _chrp_type == _CHRP_Pegasos) {
+		hwif->irq = hwif->channel ? 15 : 14;
+	}
+#endif
 
 	for (i = 0; i < 2; i++) {
 		hwif->drives[i].io_32bit = 1;

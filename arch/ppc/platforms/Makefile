@@ -11,7 +11,7 @@ obj-$(CONFIG_PCI)		+= apus_pci.o
 endif
 obj-$(CONFIG_PPC_PMAC)		+= pmac_pic.o pmac_setup.o pmac_time.o \
 					pmac_feature.o pmac_pci.o pmac_sleep.o \
-					pmac_low_i2c.o
+					pmac_low_i2c.o pmac_cache.o
 obj-$(CONFIG_PPC_CHRP)		+= chrp_setup.o chrp_time.o chrp_pci.o
 obj-$(CONFIG_PPC_PREP)		+= prep_pci.o prep_setup.o
 ifeq ($(CONFIG_PPC_PMAC),y)

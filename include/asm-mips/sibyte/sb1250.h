@@ -58,6 +58,6 @@ extern void prom_printf(char *fmt, ...);
 
 #endif
 
-#define IOADDR(a) (UNCAC_BASE + (a))
+#define IOADDR(a) (IO_BASE + (a))
 
 #endif

@@ -333,9 +333,8 @@ beyond_if:
 	current->mm->start_stack =
 		(unsigned long) create_aout32_tables((char __user *)bprm->p, bprm);
 	if (!(orig_thr_flags & _TIF_32BIT)) {
-		unsigned long pgd_cache;
+		unsigned long pgd_cache = get_pgd_cache(current->mm->pgd);
 
-		pgd_cache = ((unsigned long)current->mm->pgd[0])<<11UL;
 		__asm__ __volatile__("stxa\t%0, [%1] %2\n\t"
 				     "membar #Sync"
 				     : /* no outputs */

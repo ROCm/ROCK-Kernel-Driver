@@ -48,6 +48,8 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 		goto good_area;
 	else if(!(vma->vm_flags & VM_GROWSDOWN)) 
 		goto out;
+	else if(!ARCH_IS_STACKGROW(address))
+		goto out;
 	else if(expand_stack(vma, address)) 
 		goto out;
 

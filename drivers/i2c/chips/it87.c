@@ -2,8 +2,8 @@
     it87.c - Part of lm_sensors, Linux kernel modules for hardware
              monitoring.
 
-    Supports: IT8705F  Super I/O chip w/LPC interface
-              IT8712F  Super I/O chip w/LPC interface & SMbus
+    Supports: IT8705F  Super I/O chip w/LPC interface & SMBus
+              IT8712F  Super I/O chip w/LPC interface & SMBus
               Sis950   A clone of the IT8705F
 
     Copyright (C) 2001 Chris Gauthron <chrisg@0-in.com> 
@@ -42,10 +42,8 @@
 
 
 /* Addresses to scan */
-static unsigned short normal_i2c[] = { 0x20, 0x21, 0x22, 0x23, 0x24,
-					0x25, 0x26, 0x27, 0x28, 0x29,
-					0x2a, 0x2b, 0x2c, 0x2d, 0x2e,
-					0x2f, I2C_CLIENT_END };
+static unsigned short normal_i2c[] = { 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d,
+					0x2e, 0x2f, I2C_CLIENT_END };
 static unsigned int normal_isa[] = { 0x0290, I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */

@@ -4,7 +4,7 @@
  */
 /*
  * MIPS floating point support
- * Copyright (C) 1994-2000 Algorithmics Ltd.  All rights reserved.
+ * Copyright (C) 1994-2000 Algorithmics Ltd.
  * http://www.algor.co.uk
  *
  * ########################################################################

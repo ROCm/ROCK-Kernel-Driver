@@ -2,9 +2,13 @@
  *
  * Alchemy Semi Au1000 pcmcia driver
  *
- * Copyright 2001 MontaVista Software Inc.
+ * Copyright 2001-2003 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
- *         	ppopov@mvista.com or source@mvista.com
+ *         	ppopov@embeddedalley.com or source@mvista.com
+ *
+ * Copyright 2004 Pete Popov, Embedded Alley Solutions, Inc.
+ * Updated the driver to 2.6. Followed the sa11xx API and largely
+ * copied many of the hardware independent functions.
  *
  * ########################################################################
  *
@@ -25,450 +29,255 @@
  *
  * 
  */
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/config.h>
-#include <linux/delay.h>
+#include <linux/cpufreq.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
-#include <linux/tqueue.h>
 #include <linux/timer.h>
 #include <linux/mm.h>
-#include <linux/proc_fs.h>
-#include <linux/types.h>
-#include <linux/vmalloc.h>
-
-#include <pcmcia/version.h>
-#include <pcmcia/cs_types.h>
-#include <pcmcia/cs.h>
-#include <pcmcia/ss.h>
-#include <pcmcia/bulkmem.h>
-#include <pcmcia/cistpl.h>
-#include <pcmcia/bus_ops.h>
-#include "cs_internal.h"
+#include <linux/notifier.h>
+#include <linux/interrupt.h>
+#include <linux/spinlock.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>
 
-#include <asm/au1000.h>
-#include <asm/au1000_pcmcia.h>
-
-#ifdef DEBUG
-static int pc_debug;
-
-module_param(pc_debug, int, 0644);
-
-#define debug(lvl,fmt) do {			\
-	if (pc_debug > (lvl))			\
-		printk(KERN_DEBUG fmt);		\
-} while (0)
-#else
-#define debug(lvl,fmt) do { } while (0)
-#endif
+#include <asm/mach-au1x00/au1000.h>
+#include "au1000_generic.h"
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Pete Popov, MontaVista Software <ppopov@mvista.com>");
+MODULE_AUTHOR("Pete Popov <ppopov@embeddedalley.com>");
 MODULE_DESCRIPTION("Linux PCMCIA Card Services: Au1x00 Socket Controller");
 
-#define MAP_SIZE 0x1000000
-
-/* This structure maintains housekeeping state for each socket, such
- * as the last known values of the card detect pins, or the Card Services
- * callback value associated with the socket:
- */
-static struct au1000_pcmcia_socket *pcmcia_socket;
-static int socket_count;
-
-
-/* Returned by the low-level PCMCIA interface: */
-static struct pcmcia_low_level *pcmcia_low_level;
-
-/* Event poll timer structure */
-static struct timer_list poll_timer;
-
-
-/* Prototypes for routines which are used internally: */
-
-static int  au1000_pcmcia_driver_init(void);
-static void au1000_pcmcia_driver_shutdown(void);
-static void au1000_pcmcia_task_handler(void *data);
-static void au1000_pcmcia_poll_event(unsigned long data);
-static void au1000_pcmcia_interrupt(int irq, void *dev, struct pt_regs *regs);
-static struct tq_struct au1000_pcmcia_task;
-
-#ifdef CONFIG_PROC_FS
-static int au1000_pcmcia_proc_status(char *buf, char **start, 
-		off_t pos, int count, int *eof, void *data);
-#endif
-
-
-/* Prototypes for operations which are exported to the
- * new-and-impr^H^H^H^H^H^H^H^H^H^H in-kernel PCMCIA core:
- */
-
-static int au1000_pcmcia_init(u32 sock);
-static int au1000_pcmcia_suspend(u32 sock);
-static int au1000_pcmcia_register_callback(u32 sock, 
-		void (*handler)(void *, u32), void *info);
-static int au1000_pcmcia_inquire_socket(u32 sock, socket_cap_t *cap);
-static int au1000_pcmcia_get_status(u32 sock, u_int *value);
-static int au1000_pcmcia_get_socket(u32 sock, socket_state_t *state);
-static int au1000_pcmcia_set_socket(u32 sock, socket_state_t *state);
-static int au1000_pcmcia_get_io_map(u32 sock, struct pccard_io_map *io);
-static int au1000_pcmcia_set_io_map(u32 sock, struct pccard_io_map *io);
-static int au1000_pcmcia_get_mem_map(u32 sock, struct pccard_mem_map *mem);
-static int au1000_pcmcia_set_mem_map(u32 sock, struct pccard_mem_map *mem);
-#ifdef CONFIG_PROC_FS
-static void au1000_pcmcia_proc_setup(u32 sock, struct proc_dir_entry *base);
-#endif
-
-static struct pccard_operations au1000_pcmcia_operations = {
-	au1000_pcmcia_init,
-	au1000_pcmcia_suspend,
-	au1000_pcmcia_register_callback,
-	au1000_pcmcia_inquire_socket,
-	au1000_pcmcia_get_status,
-	au1000_pcmcia_get_socket,
-	au1000_pcmcia_set_socket,
-	au1000_pcmcia_get_io_map,
-	au1000_pcmcia_set_io_map,
-	au1000_pcmcia_get_mem_map,
-	au1000_pcmcia_set_mem_map,
-#ifdef CONFIG_PROC_FS
-	au1000_pcmcia_proc_setup
-#endif
-};
-
-static DEFINE_SPINLOCK(pcmcia_lock);
-
-static int __init au1000_pcmcia_driver_init(void)
-{
-	struct pcmcia_init pcmcia_init;
-	struct pcmcia_state state;
-	unsigned int i;
-
-	printk("\nAu1x00 PCMCIA\n");
-
-#ifndef CONFIG_64BIT_PHYS_ADDR
-	printk(KERN_ERR "Au1x00 PCMCIA 36 bit IO support not enabled\n");
-	return -1;
-#endif
-
-#if defined(CONFIG_MIPS_PB1000) || defined(CONFIG_MIPS_PB1100) || defined(CONFIG_MIPS_PB1500)
-	pcmcia_low_level=&pb1x00_pcmcia_ops;
+#if 0
+#define debug(x,args...) printk(KERN_DEBUG "%s: " x, __func__ , ##args)
 #else
-#error Unsupported AU1000 board.
+#define debug(x,args...)
 #endif
 
-	pcmcia_init.handler=au1000_pcmcia_interrupt;
-	if((socket_count=pcmcia_low_level->init(&pcmcia_init))<0) {
-		printk(KERN_ERR "Unable to initialize PCMCIA service.\n");
-		return -EIO;
-	}
+#define MAP_SIZE 0x100000
+extern struct au1000_pcmcia_socket au1000_pcmcia_socket[];
+#define PCMCIA_SOCKET(x)	(au1000_pcmcia_socket + (x))
+#define to_au1000_socket(x)	container_of(x, struct au1000_pcmcia_socket, socket)
 
-	/* NOTE: the chip select must already be setup */
-
-	pcmcia_socket = 
-		kmalloc(sizeof(struct au1000_pcmcia_socket) * socket_count, 
-				GFP_KERNEL);
-	if (!pcmcia_socket) {
-		printk(KERN_ERR "Card Services can't get memory \n");
-		return -1;
-	}
-	memset(pcmcia_socket, 0,
-			sizeof(struct au1000_pcmcia_socket) * socket_count);
-			
-	/* 
-	 * Assuming max of 2 sockets, which the Au1000 supports.
-	 * WARNING: the Pb1000 has two sockets, and both work, but you
-	 * can't use them both at the same time due to glue logic conflicts.
-	 */
-	for(i=0; i < socket_count; i++) {
-
-		if(pcmcia_low_level->socket_state(i, &state)<0){
-			printk(KERN_ERR "Unable to get PCMCIA status\n");
-			return -EIO;
-		}
-		pcmcia_socket[i].k_state=state;
-		pcmcia_socket[i].cs_state.csc_mask=SS_DETECT;
-		
-		if (i == 0) {
-			pcmcia_socket[i].virt_io = 
-				(u32)ioremap((kio_addr_t)0xF00000000, 0x1000);
-			pcmcia_socket[i].phys_attr = (memaddr_t)0xF40000000;
-			pcmcia_socket[i].phys_mem = (memaddr_t)0xF80000000;
-		}
-		else  {
-			pcmcia_socket[i].virt_io = 
-				(u32)ioremap((kio_addr_t)0xF08000000, 0x1000);
-			pcmcia_socket[i].phys_attr = (memaddr_t)0xF48000000;
-			pcmcia_socket[i].phys_mem = (memaddr_t)0xF88000000;
-		}
-	}
-
-	/* Only advertise as many sockets as we can detect: */
-	if(register_ss_entry(socket_count, &au1000_pcmcia_operations)<0){
-		printk(KERN_ERR "Unable to register socket service routine\n");
-		return -ENXIO;
-	}
-
-	/* Start the event poll timer.  
-	 * It will reschedule by itself afterwards. 
-	 */
-	au1000_pcmcia_poll_event(0);
-
-	debug(1, "au1000: initialization complete\n");
-	return 0;
-
-}  /* au1000_pcmcia_driver_init() */
-
-module_init(au1000_pcmcia_driver_init);
-
-static void __exit au1000_pcmcia_driver_shutdown(void)
-{
-	int i;
-
-	del_timer_sync(&poll_timer);
-	unregister_ss_entry(&au1000_pcmcia_operations);
-	pcmcia_low_level->shutdown();
-	flush_scheduled_tasks();
-	for(i=0; i < socket_count; i++) {
-		if (pcmcia_socket[i].virt_io) 
-			iounmap((void *)pcmcia_socket[i].virt_io);
-	}
-	debug(1, "au1000: shutdown complete\n");
-}
-
-module_exit(au1000_pcmcia_driver_shutdown);
-
-static int au1000_pcmcia_init(unsigned int sock) { return 0; }
-
-static int au1000_pcmcia_suspend(unsigned int sock)
-{
-	return 0;
-}
-
-
-static inline unsigned 
-au1000_pcmcia_events(struct pcmcia_state *state, 
-		struct pcmcia_state *prev_state, 
-		unsigned int mask, unsigned int flags)
-{
-	unsigned int events=0;
-
-	if(state->detect!=prev_state->detect){
-		debug(2, "%s(): card detect value %u\n", 
-				__FUNCTION__, state->detect);
-		events |= mask&SS_DETECT;
-	}
-
-
-	if(state->ready!=prev_state->ready){
-		debug(2, "%s(): card ready value %u\n", 
-				__FUNCTION__, state->ready);
-		events |= mask&((flags&SS_IOCARD)?0:SS_READY);
-	}
-
-	*prev_state=*state;
-	return events;
-
-}  /* au1000_pcmcia_events() */
-
-
-/* 
- * Au1000_pcmcia_task_handler()
- * Processes socket events.
+/* Some boards like to support CF cards as IDE root devices, so they
+ * grab pcmcia sockets directly.
  */
-static void au1000_pcmcia_task_handler(void *data) 
-{
-	struct pcmcia_state state;
-	int i, events, irq_status;
+u32 *pcmcia_base_vaddrs[2];
+extern const unsigned long mips_io_port_base;
 
-	for(i=0; i<socket_count; i++)  {
-		if((irq_status = pcmcia_low_level->socket_state(i, &state))<0)
-			printk(KERN_ERR "low-level PCMCIA error\n");
+DECLARE_MUTEX(pcmcia_sockets_lock);
 
-		events = au1000_pcmcia_events(&state, 
-				&pcmcia_socket[i].k_state, 
-				pcmcia_socket[i].cs_state.csc_mask, 
-				pcmcia_socket[i].cs_state.flags);
-		if(pcmcia_socket[i].handler!=NULL) {
-			pcmcia_socket[i].handler(pcmcia_socket[i].handler_info,
-					events);
-		}
-	}
-
-}  /* au1000_pcmcia_task_handler() */
-
-static struct tq_struct au1000_pcmcia_task = {
-	routine: au1000_pcmcia_task_handler
+static int (*au1x00_pcmcia_hw_init[])(struct device *dev) = {
+	au1x_board_init,
 };
 
-
-static void au1000_pcmcia_poll_event(unsigned long dummy)
-{
-	poll_timer.function = au1000_pcmcia_poll_event;
-	poll_timer.expires = jiffies + AU1000_PCMCIA_POLL_PERIOD;
-	add_timer(&poll_timer);
-	schedule_task(&au1000_pcmcia_task);
-}
-
-
-/* 
- * au1000_pcmcia_interrupt()
- * The actual interrupt work is performed by au1000_pcmcia_task(), 
- * because the Card Services event handling code performs scheduling 
- * operations which cannot be executed from within an interrupt context.
- */
-static void 
-au1000_pcmcia_interrupt(int irq, void *dev, struct pt_regs *regs)
-{
-	schedule_task(&au1000_pcmcia_task);
-}
-
-
-static int 
-au1000_pcmcia_register_callback(unsigned int sock, 
-		void (*handler)(void *, unsigned int), void *info)
-{
-	if(handler==NULL){
-		pcmcia_socket[sock].handler=NULL;
-		MOD_DEC_USE_COUNT;
-	} else {
-		MOD_INC_USE_COUNT;
-		pcmcia_socket[sock].handler=handler;
-		pcmcia_socket[sock].handler_info=info;
-	}
-	return 0;
-}
-
-
-/* au1000_pcmcia_inquire_socket()
- *
- * From the sa1100 socket driver : 
- *
- * Implements the inquire_socket() operation for the in-kernel PCMCIA
- * service (formerly SS_InquireSocket in Card Services).  We set 
- * SS_CAP_STATIC_MAP, which disables the memory resource database check. 
- * (Mapped memory is set up within the socket driver itself.)
- *
- * In conjunction with the STATIC_MAP capability is a new field,
- * `io_offset', recommended by David Hinds. Rather than go through
- * the SetIOMap interface (which is not quite suited for communicating
- * window locations up from the socket driver), we just pass up 
- * an offset which is applied to client-requested base I/O addresses
- * in alloc_io_space().
- *
- * Returns: 0 on success, -1 if no pin has been configured for `sock'
- */
-static int au1000_pcmcia_inquire_socket(unsigned int sock, socket_cap_t *cap)
-{
-	struct pcmcia_irq_info irq_info;
-
-	if(sock > socket_count){
-		printk(KERN_ERR "au1000: socket %u not configured\n", sock);
-		return -1;
-	}
-
-	/* from the sa1100_generic driver: */
-
-	/* SS_CAP_PAGE_REGS: used by setup_cis_mem() in cistpl.c to set the
-	*   force_low argument to validate_mem() in rsrc_mgr.c -- since in
-	*   general, the mapped * addresses of the PCMCIA memory regions
-	*   will not be within 0xffff, setting force_low would be
-	*   undesirable.
-	*
-	* SS_CAP_STATIC_MAP: don't bother with the (user-configured) memory
-	*   resource database; we instead pass up physical address ranges
-	*   and allow other parts of Card Services to deal with remapping.
-	*
-	* SS_CAP_PCCARD: we can deal with 16-bit PCMCIA & CF cards, but
-	*   not 32-bit CardBus devices.
-	*/
-	cap->features=(SS_CAP_PAGE_REGS  | SS_CAP_STATIC_MAP | SS_CAP_PCCARD);
-
-	irq_info.sock=sock;
-	irq_info.irq=-1;
-
-	if(pcmcia_low_level->get_irq_info(&irq_info)<0){
-		printk(KERN_ERR "Error obtaining IRQ info socket %u\n", sock);
-		return -1;
-	}
-
-	cap->irq_mask=0;
-	cap->map_size=MAP_SIZE;
-	cap->pci_irq=irq_info.irq;
-	cap->io_offset=pcmcia_socket[sock].virt_io;
-
-	return 0;
-
-}  /* au1000_pcmcia_inquire_socket() */
-
-
-static int 
-au1000_pcmcia_get_status(unsigned int sock, unsigned int *status)
+static int
+au1x00_pcmcia_skt_state(struct au1000_pcmcia_socket *skt)
 {
 	struct pcmcia_state state;
+	unsigned int stat;
 
+	memset(&state, 0, sizeof(struct pcmcia_state));
 
-	if((pcmcia_low_level->socket_state(sock, &state))<0){
-		printk(KERN_ERR "Unable to get PCMCIA status from kernel.\n");
-		return -1;
-	}
+	skt->ops->socket_state(skt, &state);
 
-	pcmcia_socket[sock].k_state = state;
+	stat = state.detect  ? SS_DETECT : 0;
+	stat |= state.ready  ? SS_READY  : 0;
+	stat |= state.wrprot ? SS_WRPROT : 0;
+	stat |= state.vs_3v  ? SS_3VCARD : 0;
+	stat |= state.vs_Xv  ? SS_XVCARD : 0;
+	stat |= skt->cs_state.Vcc ? SS_POWERON : 0;
 
-	*status = state.detect?SS_DETECT:0;
-
-	*status |= state.ready?SS_READY:0;
-
-	*status |= pcmcia_socket[sock].cs_state.Vcc?SS_POWERON:0;
-
-	if(pcmcia_socket[sock].cs_state.flags&SS_IOCARD)
-		*status |= state.bvd1?SS_STSCHG:0;
+	if (skt->cs_state.flags & SS_IOCARD)
+		stat |= state.bvd1 ? SS_STSCHG : 0;
 	else {
-		if(state.bvd1==0)
-			*status |= SS_BATDEAD;
-		else if(state.bvd2 == 0)
-			*status |= SS_BATWARN;
+		if (state.bvd1 == 0)
+			stat |= SS_BATDEAD;
+		else if (state.bvd2 == 0)
+			stat |= SS_BATWARN;
+	}
+	return stat;
+}
+
+/*
+ * au100_pcmcia_config_skt
+ *
+ * Convert PCMCIA socket state to our socket configure structure.
+ */
+static int
+au1x00_pcmcia_config_skt(struct au1000_pcmcia_socket *skt, socket_state_t *state)
+{
+	int ret;
+
+	ret = skt->ops->configure_socket(skt, state);
+	if (ret == 0) {
+		skt->cs_state = *state;
 	}
 
-	*status|=state.vs_3v?SS_3VCARD:0;
+	if (ret < 0)
+		debug("unable to configure socket %d\n", skt->nr);
 
-	*status|=state.vs_Xv?SS_XVCARD:0;
+	return ret;
+}
 
-	debug(2, "\tstatus: %s%s%s%s%s%s%s%s\n",
-	(*status&SS_DETECT)?"DETECT ":"",
-	(*status&SS_READY)?"READY ":"", 
-	(*status&SS_BATDEAD)?"BATDEAD ":"",
-	(*status&SS_BATWARN)?"BATWARN ":"",
-	(*status&SS_POWERON)?"POWERON ":"",
-	(*status&SS_STSCHG)?"STSCHG ":"",
-	(*status&SS_3VCARD)?"3VCARD ":"",
-	(*status&SS_XVCARD)?"XVCARD ":"");
-
-	return 0;
-
-}  /* au1000_pcmcia_get_status() */
-
-
-static int 
-au1000_pcmcia_get_socket(unsigned int sock, socket_state_t *state)
+/* au1x00_pcmcia_sock_init()
+ *
+ * (Re-)Initialise the socket, turning on status interrupts
+ * and PCMCIA bus.  This must wait for power to stabilise
+ * so that the card status signals report correctly.
+ *
+ * Returns: 0
+ */
+static int au1x00_pcmcia_sock_init(struct pcmcia_socket *sock)
 {
-	*state = pcmcia_socket[sock].cs_state;
+	struct au1000_pcmcia_socket *skt = to_au1000_socket(sock);
+
+	debug("initializing socket %u\n", skt->nr);
+
+	skt->ops->socket_init(skt);
 	return 0;
 }
 
-
-static int 
-au1000_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
+/*
+ * au1x00_pcmcia_suspend()
+ *
+ * Remove power on the socket, disable IRQs from the card.
+ * Turn off status interrupts, and disable the PCMCIA bus.
+ *
+ * Returns: 0
+ */
+static int au1x00_pcmcia_suspend(struct pcmcia_socket *sock)
 {
-	struct pcmcia_configure configure;
+	struct au1000_pcmcia_socket *skt = to_au1000_socket(sock);
+	int ret;
 
-	debug(2, "\tmask:  %s%s%s%s%s%s\n\tflags: %s%s%s%s%s%s\n"
-	"\tVcc %d  Vpp %d  irq %d\n",
+	debug("suspending socket %u\n", skt->nr);
+
+	ret = au1x00_pcmcia_config_skt(skt, &dead_socket);
+	if (ret == 0)
+		skt->ops->socket_suspend(skt);
+
+	return ret;
+}
+
+static DEFINE_SPINLOCK(status_lock);
+
+/*
+ * au1x00_check_status()
+ */
+static void au1x00_check_status(struct au1000_pcmcia_socket *skt)
+{
+	unsigned int events;
+
+	debug("entering PCMCIA monitoring thread\n");
+
+	do {
+		unsigned int status;
+		unsigned long flags;
+
+		status = au1x00_pcmcia_skt_state(skt);
+
+		spin_lock_irqsave(&status_lock, flags);
+		events = (status ^ skt->status) & skt->cs_state.csc_mask;
+		skt->status = status;
+		spin_unlock_irqrestore(&status_lock, flags);
+
+		debug("events: %s%s%s%s%s%s\n",
+			events == 0         ? "<NONE>"   : "",
+			events & SS_DETECT  ? "DETECT "  : "",
+			events & SS_READY   ? "READY "   : "",
+			events & SS_BATDEAD ? "BATDEAD " : "",
+			events & SS_BATWARN ? "BATWARN " : "",
+			events & SS_STSCHG  ? "STSCHG "  : "");
+
+		if (events)
+			pcmcia_parse_events(&skt->socket, events);
+	} while (events);
+}
+
+/* 
+ * au1x00_pcmcia_poll_event()
+ * Let's poll for events in addition to IRQs since IRQ only is unreliable...
+ */
+static void au1x00_pcmcia_poll_event(unsigned long dummy)
+{
+	struct au1000_pcmcia_socket *skt = (struct au1000_pcmcia_socket *)dummy;
+	debug("polling for events\n");
+
+	mod_timer(&skt->poll_timer, jiffies + AU1000_PCMCIA_POLL_PERIOD);
+
+	au1x00_check_status(skt);
+}
+
+/* au1x00_pcmcia_get_status()
+ *
+ * From the sa11xx_core.c:
+ * Implements the get_status() operation for the in-kernel PCMCIA
+ * service (formerly SS_GetStatus in Card Services). Essentially just
+ * fills in bits in `status' according to internal driver state or
+ * the value of the voltage detect chipselect register.
+ *
+ * As a debugging note, during card startup, the PCMCIA core issues
+ * three set_socket() commands in a row the first with RESET deasserted,
+ * the second with RESET asserted, and the last with RESET deasserted
+ * again. Following the third set_socket(), a get_status() command will
+ * be issued. The kernel is looking for the SS_READY flag (see
+ * setup_socket(), reset_socket(), and unreset_socket() in cs.c).
+ *
+ * Returns: 0
+ */
+static int
+au1x00_pcmcia_get_status(struct pcmcia_socket *sock, unsigned int *status)
+{
+	struct au1000_pcmcia_socket *skt = to_au1000_socket(sock);
+
+	skt->status = au1x00_pcmcia_skt_state(skt);
+	*status = skt->status;
+
+	return 0;
+}
+
+/* au1x00_pcmcia_get_socket()
+ * Implements the get_socket() operation for the in-kernel PCMCIA
+ * service (formerly SS_GetSocket in Card Services). Not a very
+ * exciting routine.
+ *
+ * Returns: 0
+ */
+static int
+au1x00_pcmcia_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
+{
+  struct au1000_pcmcia_socket *skt = to_au1000_socket(sock);
+
+  debug("for sock %u\n", skt->nr);
+  *state = skt->cs_state;
+  return 0;
+}
+
+/* au1x00_pcmcia_set_socket()
+ * Implements the set_socket() operation for the in-kernel PCMCIA
+ * service (formerly SS_SetSocket in Card Services). We more or
+ * less punt all of this work and let the kernel handle the details
+ * of power configuration, reset, &c. We also record the value of
+ * `state' in order to regurgitate it to the PCMCIA core later.
+ *
+ * Returns: 0
+ */
+static int
+au1x00_pcmcia_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
+{
+  struct au1000_pcmcia_socket *skt = to_au1000_socket(sock);
+
+  debug("for sock %u\n", skt->nr);
+
+  debug("\tmask:  %s%s%s%s%s%s\n\tflags: %s%s%s%s%s%s\n",
 	(state->csc_mask==0)?"<NONE>":"",
 	(state->csc_mask&SS_DETECT)?"DETECT ":"",
 	(state->csc_mask&SS_READY)?"READY ":"",
@@ -480,217 +289,294 @@ au1000_pcmcia_set_socket(unsigned int sock, socket_state_t *state)
 	(state->flags&SS_IOCARD)?"IOCARD ":"",
 	(state->flags&SS_RESET)?"RESET ":"",
 	(state->flags&SS_SPKR_ENA)?"SPKR_ENA ":"",
-	(state->flags&SS_OUTPUT_ENA)?"OUTPUT_ENA ":"",
+	(state->flags&SS_OUTPUT_ENA)?"OUTPUT_ENA ":"");
+  debug("\tVcc %d  Vpp %d  irq %d\n",
 	state->Vcc, state->Vpp, state->io_irq);
 
-	configure.sock=sock;
-	configure.vcc=state->Vcc;
-	configure.vpp=state->Vpp;
-	configure.output=(state->flags&SS_OUTPUT_ENA)?1:0;
-	configure.speaker=(state->flags&SS_SPKR_ENA)?1:0;
-	configure.reset=(state->flags&SS_RESET)?1:0;
-
-	if(pcmcia_low_level->configure_socket(&configure)<0){
-		printk(KERN_ERR "Unable to configure socket %u\n", sock);
-		return -1;
-	}
-
-	pcmcia_socket[sock].cs_state = *state;
-	return 0;
-
-}  /* au1000_pcmcia_set_socket() */
-
-
-static int 
-au1000_pcmcia_get_io_map(unsigned int sock, struct pccard_io_map *map)
-{
-	debug(1, "au1000_pcmcia_get_io_map: sock %d\n", sock);
-	if(map->map>=MAX_IO_WIN){
-		printk(KERN_ERR "%s(): map (%d) out of range\n", 
-				__FUNCTION__, map->map);
-		return -1;
-	}
-	*map=pcmcia_socket[sock].io_map[map->map];
-	return 0;
+  return au1x00_pcmcia_config_skt(skt, state);
 }
 
-
 int 
-au1000_pcmcia_set_io_map(unsigned int sock, struct pccard_io_map *map)
+au1x00_pcmcia_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *map)
 {
+	struct au1000_pcmcia_socket *skt = to_au1000_socket(sock);
 	unsigned int speed;
-	unsigned long start;
 
 	if(map->map>=MAX_IO_WIN){
-		printk(KERN_ERR "%s(): map (%d) out of range\n", 
-				__FUNCTION__, map->map);
+		debug("map (%d) out of range\n", map->map);
 		return -1;
 	}
 
 	if(map->flags&MAP_ACTIVE){
 		speed=(map->speed>0)?map->speed:AU1000_PCMCIA_IO_SPEED;
-		pcmcia_socket[sock].speed_io=speed;
+		skt->spd_io[map->map] = speed;
 	}
 
-	start=map->start;
-
-	if(map->stop==1) {
-		map->stop=PAGE_SIZE-1;
-	}
-
-	map->start=pcmcia_socket[sock].virt_io;
-	map->stop=map->start+(map->stop-start);
-	pcmcia_socket[sock].io_map[map->map]=*map;
-	debug(3, "set_io_map %d start %x stop %x\n", 
-			map->map, map->start, map->stop);
+	map->start=(ioaddr_t)(u32)skt->virt_io;
+	map->stop=map->start+MAP_SIZE;
 	return 0;
 
-}  /* au1000_pcmcia_set_io_map() */
+}  /* au1x00_pcmcia_set_io_map() */
 
 
 static int 
-au1000_pcmcia_get_mem_map(unsigned int sock, struct pccard_mem_map *map)
+au1x00_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *map)
 {
-
-	if(map->map>=MAX_WIN) {
-		printk(KERN_ERR "%s(): map (%d) out of range\n", 
-				__FUNCTION__, map->map);
-		return -1;
-	}
-	*map=pcmcia_socket[sock].mem_map[map->map];
-	return 0;
-}
-
-
-static int 
-au1000_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
-{
-	unsigned int speed;
-	u_long flags;
+	struct au1000_pcmcia_socket *skt = to_au1000_socket(sock);
+	unsigned short speed = map->speed;
 
 	if(map->map>=MAX_WIN){
-		printk(KERN_ERR "%s(): map (%d) out of range\n", 
-				__FUNCTION__, map->map);
+		debug("map (%d) out of range\n", map->map);
 		return -1;
 	}
 
-	if(map->flags&MAP_ACTIVE){
-		speed=(map->speed>0)?map->speed:AU1000_PCMCIA_MEM_SPEED;
-
-		/* TBD */
-		if(map->flags&MAP_ATTRIB){
-			pcmcia_socket[sock].speed_attr=speed;
-		} 
-		else {
-			pcmcia_socket[sock].speed_mem=speed;
-		}
+	if (map->flags & MAP_ATTRIB) {
+		skt->spd_attr[map->map] = speed;
+		skt->spd_mem[map->map] = 0;
+	} else {
+		skt->spd_attr[map->map] = 0;
+		skt->spd_mem[map->map] = speed;
 	}
 
-	spin_lock_irqsave(&pcmcia_lock, flags);
 	if (map->flags & MAP_ATTRIB) {
-		map->static_start = pcmcia_socket[sock].phys_attr + 
-			map->card_start;
+		map->static_start = skt->phys_attr + map->card_start;
 	}
 	else {
-		map->static_start = pcmcia_socket[sock].phys_mem + 
-			map->card_start;
+		map->static_start = skt->phys_mem + map->card_start;
 	}
 
-	pcmcia_socket[sock].mem_map[map->map]=*map;
-	spin_unlock_irqrestore(&pcmcia_lock, flags);
-	debug(3, "set_mem_map %d start %x card_start %x\n", 
-			map->map, map->static_start,
-			map->card_start);
+	debug("set_mem_map %d start %08lx card_start %08x\n",
+			map->map, map->static_start, map->card_start);
 	return 0;
 
-}  /* au1000_pcmcia_set_mem_map() */
+}  /* au1x00_pcmcia_set_mem_map() */
 
+static struct pccard_operations au1x00_pcmcia_operations = {
+	.init			= au1x00_pcmcia_sock_init,
+	.suspend		= au1x00_pcmcia_suspend,
+	.get_status		= au1x00_pcmcia_get_status,
+	.get_socket		= au1x00_pcmcia_get_socket,
+	.set_socket		= au1x00_pcmcia_set_socket,
+	.set_io_map		= au1x00_pcmcia_set_io_map,
+	.set_mem_map		= au1x00_pcmcia_set_mem_map,
+};
 
-#if defined(CONFIG_PROC_FS)
+static const char *skt_names[] = {
+	"PCMCIA socket 0",
+	"PCMCIA socket 1",
+};
 
-static void 
-au1000_pcmcia_proc_setup(unsigned int sock, struct proc_dir_entry *base)
+struct skt_dev_info {
+	int nskt;
+};
+
+int au1x00_pcmcia_socket_probe(struct device *dev, struct pcmcia_low_level *ops, int first, int nr)
 {
-	struct proc_dir_entry *entry;
+	struct skt_dev_info *sinfo;
+	int ret, i;
 
-	if((entry=create_proc_entry("status", 0, base))==NULL){
-		printk(KERN_ERR "Unable to install \"status\" procfs entry\n");
-		return;
+	sinfo = kmalloc(sizeof(struct skt_dev_info), GFP_KERNEL);
+	if (!sinfo) {
+		ret = -ENOMEM;
+		goto out;
 	}
 
-	entry->read_proc=au1000_pcmcia_proc_status;
-	entry->data=(void *)sock;
+	memset(sinfo, 0, sizeof(struct skt_dev_info));
+	sinfo->nskt = nr;
+
+	/*
+	 * Initialise the per-socket structure.
+	 */
+	for (i = 0; i < nr; i++) {
+		struct au1000_pcmcia_socket *skt = PCMCIA_SOCKET(i);
+		memset(skt, 0, sizeof(*skt));
+
+		skt->socket.ops = &au1x00_pcmcia_operations;
+		skt->socket.owner = ops->owner;
+		skt->socket.dev.dev = dev;
+
+		init_timer(&skt->poll_timer);
+		skt->poll_timer.function = au1x00_pcmcia_poll_event;
+		skt->poll_timer.data = (unsigned long)skt;
+		skt->poll_timer.expires = jiffies + AU1000_PCMCIA_POLL_PERIOD;
+
+		skt->nr		= first + i;
+		skt->irq	= 255;
+		skt->dev	= dev;
+		skt->ops	= ops;
+
+		skt->res_skt.name	= skt_names[skt->nr];
+		skt->res_io.name	= "io";
+		skt->res_io.flags	= IORESOURCE_MEM | IORESOURCE_BUSY;
+		skt->res_mem.name	= "memory";
+		skt->res_mem.flags	= IORESOURCE_MEM;
+		skt->res_attr.name	= "attribute";
+		skt->res_attr.flags	= IORESOURCE_MEM;
+
+		/*
+		 * PCMCIA client drivers use the inb/outb macros to access the
+		 * IO registers. Since mips_io_port_base is added to the
+		 * access address of the mips implementation of inb/outb,
+		 * we need to subtract it here because we want to access the
+		 * I/O or MEM address directly, without going through this
+		 * "mips_io_port_base" mechanism.
+		 */
+		if (i == 0) {
+			skt->virt_io = (void *)
+				(ioremap((phys_t)AU1X_SOCK0_IO, 0x1000) -
+				(u32)mips_io_port_base);
+			skt->phys_attr = AU1X_SOCK0_PSEUDO_PHYS_ATTR;
+			skt->phys_mem = AU1X_SOCK0_PSEUDO_PHYS_MEM;
+		}
+#ifndef CONFIG_MIPS_XXS1500
+		else  {
+			skt->virt_io = (void *)
+				(ioremap((phys_t)AU1X_SOCK1_IO, 0x1000) -
+				(u32)mips_io_port_base);
+			skt->phys_attr = AU1X_SOCK1_PSEUDO_PHYS_ATTR;
+			skt->phys_mem = AU1X_SOCK1_PSEUDO_PHYS_MEM;
+		}
+#endif
+		pcmcia_base_vaddrs[i] = (u32 *)skt->virt_io;
+		ret = ops->hw_init(skt);
+
+		skt->socket.features = SS_CAP_STATIC_MAP|SS_CAP_PCCARD;
+		skt->socket.irq_mask = 0;
+		skt->socket.map_size = MAP_SIZE;
+		skt->socket.pci_irq = skt->irq;
+		skt->socket.io_offset = (unsigned long)skt->virt_io;
+
+		skt->status = au1x00_pcmcia_skt_state(skt);
+
+		ret = pcmcia_register_socket(&skt->socket);
+		if (ret)
+			goto out_err;
+
+		WARN_ON(skt->socket.sock != i);
+
+		add_timer(&skt->poll_timer);
+	}
+
+	dev_set_drvdata(dev, sinfo);
+	return 0;
+
+	do {
+		struct au1000_pcmcia_socket *skt = PCMCIA_SOCKET(i);
+
+		del_timer_sync(&skt->poll_timer);
+		pcmcia_unregister_socket(&skt->socket);
+out_err:
+		flush_scheduled_work();
+		ops->hw_shutdown(skt);
+
+		i--;
+	} while (i > 0);
+	kfree(sinfo);
+out:
+	return ret;
 }
 
-
-/* au1000_pcmcia_proc_status()
- * Implements the /proc/bus/pccard/??/status file.
- *
- * Returns: the number of characters added to the buffer
- */
-static int 
-au1000_pcmcia_proc_status(char *buf, char **start, off_t pos, 
-		int count, int *eof, void *data)
+int au1x00_drv_pcmcia_remove(struct device *dev)
 {
-	char *p=buf;
-	unsigned int sock=(unsigned int)data;
+	struct skt_dev_info *sinfo = dev_get_drvdata(dev);
+	int i;
 
-	p+=sprintf(p, "k_flags  : %s%s%s%s%s%s%s\n", 
-	     pcmcia_socket[sock].k_state.detect?"detect ":"",
-	     pcmcia_socket[sock].k_state.ready?"ready ":"",
-	     pcmcia_socket[sock].k_state.bvd1?"bvd1 ":"",
-	     pcmcia_socket[sock].k_state.bvd2?"bvd2 ":"",
-	     pcmcia_socket[sock].k_state.wrprot?"wrprot ":"",
-	     pcmcia_socket[sock].k_state.vs_3v?"vs_3v ":"",
-	     pcmcia_socket[sock].k_state.vs_Xv?"vs_Xv ":"");
+	down(&pcmcia_sockets_lock);
+	dev_set_drvdata(dev, NULL);
 
-	p+=sprintf(p, "status   : %s%s%s%s%s%s%s%s%s\n",
-	     pcmcia_socket[sock].k_state.detect?"SS_DETECT ":"",
-	     pcmcia_socket[sock].k_state.ready?"SS_READY ":"",
-	     pcmcia_socket[sock].cs_state.Vcc?"SS_POWERON ":"",
-	     pcmcia_socket[sock].cs_state.flags&SS_IOCARD?\
-	     "SS_IOCARD ":"",
-	     (pcmcia_socket[sock].cs_state.flags&SS_IOCARD &&
-	      pcmcia_socket[sock].k_state.bvd1)?"SS_STSCHG ":"",
-	     ((pcmcia_socket[sock].cs_state.flags&SS_IOCARD)==0 &&
-	      (pcmcia_socket[sock].k_state.bvd1==0))?"SS_BATDEAD ":"",
-	     ((pcmcia_socket[sock].cs_state.flags&SS_IOCARD)==0 &&
-	      (pcmcia_socket[sock].k_state.bvd2==0))?"SS_BATWARN ":"",
-	     pcmcia_socket[sock].k_state.vs_3v?"SS_3VCARD ":"",
-	     pcmcia_socket[sock].k_state.vs_Xv?"SS_XVCARD ":"");
+	for (i = 0; i < sinfo->nskt; i++) {
+		struct au1000_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 
-	p+=sprintf(p, "mask     : %s%s%s%s%s\n",
-	     pcmcia_socket[sock].cs_state.csc_mask&SS_DETECT?\
-	     "SS_DETECT ":"",
-	     pcmcia_socket[sock].cs_state.csc_mask&SS_READY?\
-	     "SS_READY ":"",
-	     pcmcia_socket[sock].cs_state.csc_mask&SS_BATDEAD?\
-	     "SS_BATDEAD ":"",
-	     pcmcia_socket[sock].cs_state.csc_mask&SS_BATWARN?\
-	     "SS_BATWARN ":"",
-	     pcmcia_socket[sock].cs_state.csc_mask&SS_STSCHG?\
-	     "SS_STSCHG ":"");
+		del_timer_sync(&skt->poll_timer);
+		pcmcia_unregister_socket(&skt->socket);
+		flush_scheduled_work();
+		skt->ops->hw_shutdown(skt);
+		au1x00_pcmcia_config_skt(skt, &dead_socket);
+		iounmap(skt->virt_io);
+		skt->virt_io = NULL;
+	}
 
-	p+=sprintf(p, "cs_flags : %s%s%s%s%s\n",
-	     pcmcia_socket[sock].cs_state.flags&SS_PWR_AUTO?\
-	     "SS_PWR_AUTO ":"",
-	     pcmcia_socket[sock].cs_state.flags&SS_IOCARD?\
-	     "SS_IOCARD ":"",
-	     pcmcia_socket[sock].cs_state.flags&SS_RESET?\
-	     "SS_RESET ":"",
-	     pcmcia_socket[sock].cs_state.flags&SS_SPKR_ENA?\
-	     "SS_SPKR_ENA ":"",
-	     pcmcia_socket[sock].cs_state.flags&SS_OUTPUT_ENA?\
-	     "SS_OUTPUT_ENA ":"");
-
-	p+=sprintf(p, "Vcc      : %d\n", pcmcia_socket[sock].cs_state.Vcc);
-	p+=sprintf(p, "Vpp      : %d\n", pcmcia_socket[sock].cs_state.Vpp);
-	p+=sprintf(p, "irq      : %d\n", pcmcia_socket[sock].cs_state.io_irq);
-	p+=sprintf(p, "I/O      : %u\n", pcmcia_socket[sock].speed_io);
-	p+=sprintf(p, "attribute: %u\n", pcmcia_socket[sock].speed_attr);
-	p+=sprintf(p, "common   : %u\n", pcmcia_socket[sock].speed_mem);
-	return p-buf;
+	kfree(sinfo);
+	up(&pcmcia_sockets_lock);
+	return 0;
 }
 
 
-#endif  /* defined(CONFIG_PROC_FS) */
+/*
+ * PCMCIA "Driver" API
+ */
+
+static int au1x00_drv_pcmcia_probe(struct device *dev)
+{
+	int i, ret = -ENODEV;
+
+	down(&pcmcia_sockets_lock);
+	for (i=0; i < ARRAY_SIZE(au1x00_pcmcia_hw_init); i++) {
+		ret = au1x00_pcmcia_hw_init[i](dev);
+		if (ret == 0)
+			break;
+	}
+	up(&pcmcia_sockets_lock);
+	return ret;
+}
+
+
+static int au1x00_drv_pcmcia_suspend(struct device *dev, u32 state, u32 level)
+{
+	int ret = 0;
+	if (level == SUSPEND_SAVE_STATE)
+		ret = pcmcia_socket_dev_suspend(dev, state);
+	return ret;
+}
+
+static int au1x00_drv_pcmcia_resume(struct device *dev, u32 level)
+{
+	int ret = 0;
+	if (level == RESUME_RESTORE_STATE)
+		ret = pcmcia_socket_dev_resume(dev);
+	return ret;
+}
+
+
+static struct device_driver au1x00_pcmcia_driver = {
+	.probe		= au1x00_drv_pcmcia_probe,
+	.remove		= au1x00_drv_pcmcia_remove,
+	.name		= "au1x00-pcmcia",
+	.bus		= &platform_bus_type,
+	.suspend	= au1x00_drv_pcmcia_suspend,
+	.resume		= au1x00_drv_pcmcia_resume
+};
+
+static struct platform_device au1x00_device = {
+	.name = "au1x00-pcmcia",
+	.id = 0,
+};
+
+/* au1x00_pcmcia_init()
+ *
+ * This routine performs low-level PCMCIA initialization and then
+ * registers this socket driver with Card Services.
+ *
+ * Returns: 0 on success, -ve error code on failure
+ */
+static int __init au1x00_pcmcia_init(void)
+{
+	int error = 0;
+	if ((error = driver_register(&au1x00_pcmcia_driver)))
+		return error;
+	platform_device_register(&au1x00_device);
+	return error;
+}
+
+/* au1x00_pcmcia_exit()
+ * Invokes the low-level kernel service to free IRQs associated with this
+ * socket controller and reset GPIO edge detection.
+ */
+static void __exit au1x00_pcmcia_exit(void)
+{
+	driver_unregister(&au1x00_pcmcia_driver);
+	platform_device_unregister(&au1x00_device);
+}
+
+module_init(au1x00_pcmcia_init);
+module_exit(au1x00_pcmcia_exit);

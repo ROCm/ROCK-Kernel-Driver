@@ -1612,8 +1612,8 @@ static void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
 	unsigned long last = end + PGDIR_SIZE - 1;
 	struct mm_struct *mm = tlb->mm;
 
-	if (last > TASK_SIZE || last < end)
-		last = TASK_SIZE;
+	if (last > MM_VM_SIZE(mm) || last < end)
+		last = MM_VM_SIZE(mm);
 
 	if (!prev) {
 		prev = mm->mmap;
@@ -1808,13 +1808,6 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 		return 0;
 	/* we have  start < mpnt->vm_end  */
 
-	if (is_vm_hugetlb_page(mpnt)) {
-		int ret = is_aligned_hugepage_range(start, len);
-
-		if (ret)
-			return ret;
-	}
-
 	/* if it doesn't overlap, we have nothing.. */
 	end = start + len;
 	if (mpnt->vm_start >= end)
@@ -1828,6 +1821,8 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	 * places tmp vma above, and higher split_vma places tmp vma below.
 	 */
 	if (start > mpnt->vm_start) {
+		if (is_vm_hugetlb_page(mpnt) && (start & ~HPAGE_MASK))
+			return -EINVAL;
 		if (split_vma(mm, mpnt, start, 0))
 			return -ENOMEM;
 		prev = mpnt;
@@ -1836,6 +1831,8 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 	/* Does it split the last one? */
 	last = find_vma(mm, end);
 	if (last && end > last->vm_start) {
+		if (is_vm_hugetlb_page(last) && (end & ~HPAGE_MASK))
+			return -EINVAL;
 		if (split_vma(mm, last, end, 1))
 			return -ENOMEM;
 	}
@@ -1995,8 +1992,7 @@ void exit_mmap(struct mm_struct *mm)
 					~0UL, &nr_accounted, NULL);
 	vm_unacct_memory(nr_accounted);
 	BUG_ON(mm->map_count);	/* This is just debugging */
-	clear_page_range(tlb, FIRST_USER_PGD_NR * PGDIR_SIZE,
-			(TASK_SIZE + PGDIR_SIZE - 1) & PGDIR_MASK);
+	clear_page_range(tlb, FIRST_USER_PGD_NR * PGDIR_SIZE, MM_VM_SIZE(mm));
 	
 	tlb_finish_mmu(tlb, 0, MM_VM_SIZE(mm));
 

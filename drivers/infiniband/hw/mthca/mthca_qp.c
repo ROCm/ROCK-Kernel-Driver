@@ -1323,6 +1323,8 @@ int mthca_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 				break;
 			}
 
+			break;
+
 		case UD:
 			((struct mthca_ud_seg *) wqe)->lkey =
 				cpu_to_be32(to_mah(wr->wr.ud.ah)->key);

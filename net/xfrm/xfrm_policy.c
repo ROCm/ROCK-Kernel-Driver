@@ -21,14 +21,17 @@
 #include <linux/workqueue.h>
 #include <linux/notifier.h>
 #include <linux/netdevice.h>
+#include <linux/module.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
 
 DECLARE_MUTEX(xfrm_cfg_sem);
+EXPORT_SYMBOL(xfrm_cfg_sem);
 
 static DEFINE_RWLOCK(xfrm_policy_lock);
 
 struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
+EXPORT_SYMBOL(xfrm_policy_list);
 
 static DEFINE_RWLOCK(xfrm_policy_afinfo_lock);
 static struct xfrm_policy_afinfo *xfrm_policy_afinfo[NPROTO];
@@ -62,6 +65,7 @@ int xfrm_register_type(struct xfrm_type *type, unsigned short family)
 	xfrm_policy_put_afinfo(afinfo);
 	return err;
 }
+EXPORT_SYMBOL(xfrm_register_type);
 
 int xfrm_unregister_type(struct xfrm_type *type, unsigned short family)
 {
@@ -82,6 +86,7 @@ int xfrm_unregister_type(struct xfrm_type *type, unsigned short family)
 	xfrm_policy_put_afinfo(afinfo);
 	return err;
 }
+EXPORT_SYMBOL(xfrm_unregister_type);
 
 struct xfrm_type *xfrm_get_type(u8 proto, unsigned short family)
 {
@@ -112,6 +117,7 @@ retry:
 	xfrm_policy_put_afinfo(afinfo);
 	return type;
 }
+EXPORT_SYMBOL(xfrm_get_type);
 
 int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl, 
 		    unsigned short family)
@@ -129,6 +135,7 @@ int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl,
 	xfrm_policy_put_afinfo(afinfo);
 	return err;
 }
+EXPORT_SYMBOL(xfrm_dst_lookup);
 
 void xfrm_put_type(struct xfrm_type *type)
 {
@@ -234,6 +241,7 @@ struct xfrm_policy *xfrm_policy_alloc(int gfp)
 	}
 	return policy;
 }
+EXPORT_SYMBOL(xfrm_policy_alloc);
 
 /* Destroy xfrm_policy: descendant resources must be released to this moment. */
 
@@ -250,6 +258,7 @@ void __xfrm_policy_destroy(struct xfrm_policy *policy)
 
 	kfree(policy);
 }
+EXPORT_SYMBOL(__xfrm_policy_destroy);
 
 static void xfrm_policy_gc_kill(struct xfrm_policy *policy)
 {
@@ -373,6 +382,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(xfrm_policy_insert);
 
 struct xfrm_policy *xfrm_policy_bysel(int dir, struct xfrm_selector *sel,
 				      int delete)
@@ -396,6 +406,7 @@ struct xfrm_policy *xfrm_policy_bysel(int dir, struct xfrm_selector *sel,
 	}
 	return pol;
 }
+EXPORT_SYMBOL(xfrm_policy_bysel);
 
 struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete)
 {
@@ -418,6 +429,7 @@ struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete)
 	}
 	return pol;
 }
+EXPORT_SYMBOL(xfrm_policy_byid);
 
 void xfrm_policy_flush(void)
 {
@@ -438,6 +450,7 @@ void xfrm_policy_flush(void)
 	atomic_inc(&flow_cache_genid);
 	write_unlock_bh(&xfrm_policy_lock);
 }
+EXPORT_SYMBOL(xfrm_policy_flush);
 
 int xfrm_policy_walk(int (*func)(struct xfrm_policy *, int, int, void*),
 		     void *data)
@@ -470,7 +483,7 @@ out:
 	read_unlock_bh(&xfrm_policy_lock);
 	return error;
 }
-
+EXPORT_SYMBOL(xfrm_policy_walk);
 
 /* Find policy to apply to this flow. */
 
@@ -845,6 +858,7 @@ error:
 	*dst_p = NULL;
 	return err;
 }
+EXPORT_SYMBOL(xfrm_lookup);
 
 /* When skb is transformed back to its "native" form, we have to
  * check policy restrictions. At the moment we make this in maximally
@@ -981,6 +995,7 @@ reject:
 	xfrm_pol_put(pol);
 	return 0;
 }
+EXPORT_SYMBOL(__xfrm_policy_check);
 
 int __xfrm_route_forward(struct sk_buff *skb, unsigned short family)
 {
@@ -991,6 +1006,7 @@ int __xfrm_route_forward(struct sk_buff *skb, unsigned short family)
 
 	return xfrm_lookup(&skb->dst, &fl, NULL, 0) == 0;
 }
+EXPORT_SYMBOL(__xfrm_route_forward);
 
 /* Optimize later using cookies and generation ids. */
 
@@ -1163,6 +1179,7 @@ int xfrm_policy_register_afinfo(struct xfrm_policy_afinfo *afinfo)
 	write_unlock(&xfrm_policy_afinfo_lock);
 	return err;
 }
+EXPORT_SYMBOL(xfrm_policy_register_afinfo);
 
 int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo)
 {
@@ -1190,6 +1207,7 @@ int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo)
 	write_unlock(&xfrm_policy_afinfo_lock);
 	return err;
 }
+EXPORT_SYMBOL(xfrm_policy_unregister_afinfo);
 
 static struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family)
 {

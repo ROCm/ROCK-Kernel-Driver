@@ -36,16 +36,14 @@
  *
  * 1) Some chips have an erratum where several regs cannot be
  * read.  To work around that, we keep a local copy of those regs in
- * 'mpsc_port_info' and use the *_M or *_S macros when accessing those regs.
+ * 'mpsc_port_info'.
  *
  * 2) Some chips have an erratum where the ctlr will hang when the SDMA ctlr
- * accesses system mem in a cache coherent region.  This *should* be a
- * show-stopper when coherency is turned on but it seems to work okay as
- * long as there are no snoop hits.  Therefore, the ring buffer entries and
- * the buffers themselves are allocated via 'dma_alloc_noncoherent()' and
- * 'dma_cache_sync()' is used.  Also, since most PPC platforms are coherent
- * which makes 'dma_cache_sync()' a no-op, explicit cache management macros
- * have been added ensuring there are no snoop hits when coherency is on.
+ * accesses system mem with coherency enabled.  For that reason, the driver
+ * assumes that coherency for that ctlr has been disabled.  This means
+ * that when in a cache coherent system, the driver has to manually manage
+ * the data cache on the areas that it touches because the dma_* macro are
+ * basically no-ops.
  *
  * 3) There is an erratum (on PPC) where you can't use the instruction to do
  * a DMA_TO_DEVICE/cache clean so DMA_BIDIRECTIONAL/flushes are used in places
@@ -54,7 +52,6 @@
  * 4) AFAICT, hardware flow control isn't supported by the controller --MAG.
  */
 
-#include <linux/mv64xxx.h>
 #include "mpsc.h"
 
 /*
@@ -81,25 +78,48 @@ static struct mpsc_shared_regs mpsc_shared_regs;
 static void
 mpsc_brg_init(struct mpsc_port_info *pi, u32 clk_src)
 {
-	if (pi->brg_can_tune)
-		MPSC_MOD_FIELD_M(pi, brg, BRG_BCR, 1, 25, 0);
+	u32	v;
 
-	MPSC_MOD_FIELD_M(pi, brg, BRG_BCR, 4, 18, clk_src);
-	MPSC_MOD_FIELD(pi, brg, BRG_BTR, 16, 0, 0);
+	v = (pi->mirror_regs) ? pi->BRG_BCR_m : readl(pi->brg_base + BRG_BCR);
+	v = (v & ~(0xf << 18)) | ((clk_src & 0xf) << 18);
+
+	if (pi->brg_can_tune)
+		v &= ~(1 << 25);
+
+	if (pi->mirror_regs)
+		pi->BRG_BCR_m = v;
+	writel(v, pi->brg_base + BRG_BCR);
+
+	writel(readl(pi->brg_base + BRG_BTR) & 0xffff0000,
+		pi->brg_base + BRG_BTR);
 	return;
 }
 
 static void
 mpsc_brg_enable(struct mpsc_port_info *pi)
 {
-	MPSC_MOD_FIELD_M(pi, brg, BRG_BCR, 1, 16, 1);
+	u32	v;
+
+	v = (pi->mirror_regs) ? pi->BRG_BCR_m : readl(pi->brg_base + BRG_BCR);
+	v |= (1 << 16);
+
+	if (pi->mirror_regs)
+		pi->BRG_BCR_m = v;
+	writel(v, pi->brg_base + BRG_BCR);
 	return;
 }
 
 static void
 mpsc_brg_disable(struct mpsc_port_info *pi)
 {
-	MPSC_MOD_FIELD_M(pi, brg, BRG_BCR, 1, 16, 0);
+	u32	v;
+
+	v = (pi->mirror_regs) ? pi->BRG_BCR_m : readl(pi->brg_base + BRG_BCR);
+	v &= ~(1 << 16);
+
+	if (pi->mirror_regs)
+		pi->BRG_BCR_m = v;
+	writel(v, pi->brg_base + BRG_BCR);
 	return;
 }
 
@@ -115,10 +135,16 @@ mpsc_set_baudrate(struct mpsc_port_info *pi, u32 baud)
 	 * that accounts for the way the mpsc is set up is:
 	 * CDV = (clk / (baud*2*16)) - 1 ==> CDV = (clk / (baud << 5)) - 1.
 	 */
-	u32 cdv = (pi->port.uartclk / (baud << 5)) - 1;
+	u32	cdv = (pi->port.uartclk / (baud << 5)) - 1;
+	u32	v;
 
 	mpsc_brg_disable(pi);
-	MPSC_MOD_FIELD_M(pi, brg, BRG_BCR, 16, 0, cdv);
+	v = (pi->mirror_regs) ? pi->BRG_BCR_m : readl(pi->brg_base + BRG_BCR);
+	v = (v & 0xffff0000) | (cdv & 0xffff);
+
+	if (pi->mirror_regs)
+		pi->BRG_BCR_m = v;
+	writel(v, pi->brg_base + BRG_BCR);
 	mpsc_brg_enable(pi);
 
 	return;
@@ -135,7 +161,7 @@ mpsc_set_baudrate(struct mpsc_port_info *pi, u32 baud)
 static void
 mpsc_sdma_burstsize(struct mpsc_port_info *pi, u32 burst_size)
 {
-	u32 v;
+	u32	v;
 
 	pr_debug("mpsc_sdma_burstsize[%d]: burst_size: %d\n",
 	    pi->port.line, burst_size);
@@ -151,7 +177,8 @@ mpsc_sdma_burstsize(struct mpsc_port_info *pi, u32 burst_size)
 	else
 		v = 0x3;	/* 8 64-bit words */
 
-	MPSC_MOD_FIELD(pi, sdma, SDMA_SDC, 2, 12, v);
+	writel((readl(pi->sdma_base + SDMA_SDC) & (0x3 << 12)) | (v << 12),
+		pi->sdma_base + SDMA_SDC);
 	return;
 }
 
@@ -161,7 +188,8 @@ mpsc_sdma_init(struct mpsc_port_info *pi, u32 burst_size)
 	pr_debug("mpsc_sdma_init[%d]: burst_size: %d\n", pi->port.line,
 		burst_size);
 
-	MPSC_MOD_FIELD(pi, sdma, SDMA_SDC, 10, 0, 0x03f);
+	writel((readl(pi->sdma_base + SDMA_SDC) & 0x3ff) | 0x03f,
+		pi->sdma_base + SDMA_SDC);
 	mpsc_sdma_burstsize(pi, burst_size);
 	return;
 }
@@ -169,16 +197,21 @@ mpsc_sdma_init(struct mpsc_port_info *pi, u32 burst_size)
 static inline u32
 mpsc_sdma_intr_mask(struct mpsc_port_info *pi, u32 mask)
 {
-	u32 old, v;
+	u32	old, v;
 
 	pr_debug("mpsc_sdma_intr_mask[%d]: mask: 0x%x\n", pi->port.line, mask);
 
-	old = v = MPSC_READ_S(pi, sdma_intr, SDMA_INTR_MASK);
+	old = v = (pi->mirror_regs) ? pi->shared_regs->SDMA_INTR_MASK_m :
+		readl(pi->shared_regs->sdma_intr_base + SDMA_INTR_MASK);
+
 	mask &= 0xf;
 	if (pi->port.line)
 		mask <<= 8;
 	v &= ~mask;
-	MPSC_WRITE_S(pi, sdma_intr, SDMA_INTR_MASK, v);
+
+	if (pi->mirror_regs)
+		pi->shared_regs->SDMA_INTR_MASK_m = v;
+	writel(v, pi->shared_regs->sdma_intr_base + SDMA_INTR_MASK);
 
 	if (pi->port.line)
 		old >>= 8;
@@ -188,16 +221,21 @@ mpsc_sdma_intr_mask(struct mpsc_port_info *pi, u32 mask)
 static inline void
 mpsc_sdma_intr_unmask(struct mpsc_port_info *pi, u32 mask)
 {
-	u32 v;
+	u32	v;
 
 	pr_debug("mpsc_sdma_intr_unmask[%d]: mask: 0x%x\n", pi->port.line,mask);
 
-	v = MPSC_READ_S(pi, sdma_intr, SDMA_INTR_MASK);
+	v = (pi->mirror_regs) ? pi->shared_regs->SDMA_INTR_MASK_m :
+		readl(pi->shared_regs->sdma_intr_base + SDMA_INTR_MASK);
+
 	mask &= 0xf;
 	if (pi->port.line)
 		mask <<= 8;
 	v |= mask;
-	MPSC_WRITE_S(pi, sdma_intr, SDMA_INTR_MASK, v);
+
+	if (pi->mirror_regs)
+		pi->shared_regs->SDMA_INTR_MASK_m = v;
+	writel(v, pi->shared_regs->sdma_intr_base + SDMA_INTR_MASK);
 	return;
 }
 
@@ -205,7 +243,10 @@ static inline void
 mpsc_sdma_intr_ack(struct mpsc_port_info *pi)
 {
 	pr_debug("mpsc_sdma_intr_ack[%d]: Acknowledging IRQ\n", pi->port.line);
-	MPSC_WRITE_S(pi, sdma_intr, SDMA_INTR_CAUSE, 0);
+
+	if (pi->mirror_regs)
+		pi->shared_regs->SDMA_INTR_CAUSE_m = 0;
+	writel(0, pi->shared_regs->sdma_intr_base + SDMA_INTR_CAUSE);
 	return;
 }
 
@@ -215,30 +256,30 @@ mpsc_sdma_set_rx_ring(struct mpsc_port_info *pi, struct mpsc_rx_desc *rxre_p)
 	pr_debug("mpsc_sdma_set_rx_ring[%d]: rxre_p: 0x%x\n",
 		pi->port.line, (u32) rxre_p);
 
-	MPSC_WRITE(pi, sdma, SDMA_SCRDP, (u32) rxre_p);
+	writel((u32)rxre_p, pi->sdma_base + SDMA_SCRDP);
 	return;
 }
 
 static inline void
 mpsc_sdma_set_tx_ring(struct mpsc_port_info *pi, struct mpsc_tx_desc *txre_p)
 {
-	MPSC_WRITE(pi, sdma, SDMA_SFTDP, (u32) txre_p);
-	MPSC_WRITE(pi, sdma, SDMA_SCTDP, (u32) txre_p);
+	writel((u32)txre_p, pi->sdma_base + SDMA_SFTDP);
+	writel((u32)txre_p, pi->sdma_base + SDMA_SCTDP);
 	return;
 }
 
 static inline void
 mpsc_sdma_cmd(struct mpsc_port_info *pi, u32 val)
 {
-	u32 v;
+	u32	v;
 
-	v = MPSC_READ(pi, sdma, SDMA_SDCM);
+	v = readl(pi->sdma_base + SDMA_SDCM);
 	if (val)
 		v |= val;
 	else
 		v = 0;
 	wmb();
-	MPSC_WRITE(pi, sdma, SDMA_SDCM, v);
+	writel(v, pi->sdma_base + SDMA_SDCM);
 	wmb();
 	return;
 }
@@ -246,7 +287,7 @@ mpsc_sdma_cmd(struct mpsc_port_info *pi, u32 val)
 static inline uint
 mpsc_sdma_tx_active(struct mpsc_port_info *pi)
 {
-	return MPSC_READ(pi, sdma, SDMA_SDCM) & SDMA_SDCM_TXD;
+	return readl(pi->sdma_base + SDMA_SDCM) & SDMA_SDCM_TXD;
 }
 
 static inline void
@@ -259,7 +300,11 @@ mpsc_sdma_start_tx(struct mpsc_port_info *pi)
 		txre = (struct mpsc_tx_desc *)(pi->txr +
 			(pi->txr_tail * MPSC_TXRE_SIZE));
 		dma_cache_sync((void *) txre, MPSC_TXRE_SIZE, DMA_FROM_DEVICE);
-		MPSC_CACHE_INVALIDATE(pi, (u32)txre, (u32)txre+MPSC_TXRE_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+		if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+			invalidate_dcache_range((ulong)txre,
+				(ulong)txre + MPSC_TXRE_SIZE);
+#endif
 
 		if (be32_to_cpu(txre->cmdstat) & SDMA_DESC_CMDSTAT_O) {
 			txre_p = (struct mpsc_tx_desc *)(pi->txr_p +
@@ -305,32 +350,61 @@ mpsc_sdma_stop(struct mpsc_port_info *pi)
 static void
 mpsc_hw_init(struct mpsc_port_info *pi)
 {
+	u32	v;
+
 	pr_debug("mpsc_hw_init[%d]: Initializing hardware\n", pi->port.line);
 
 	/* Set up clock routing */
-	MPSC_MOD_FIELD_S(pi, mpsc_routing, MPSC_MRR, 3, 0, 0);
-	MPSC_MOD_FIELD_S(pi, mpsc_routing, MPSC_MRR, 3, 6, 0);
-	MPSC_MOD_FIELD_S(pi, mpsc_routing, MPSC_RCRR, 4, 0, 0);
-	MPSC_MOD_FIELD_S(pi, mpsc_routing, MPSC_RCRR, 4, 8, 1);
-	MPSC_MOD_FIELD_S(pi, mpsc_routing, MPSC_TCRR, 4, 0, 0);
-	MPSC_MOD_FIELD_S(pi, mpsc_routing, MPSC_TCRR, 4, 8, 1);
+	if (pi->mirror_regs) {
+		v = pi->shared_regs->MPSC_MRR_m;
+		v &= ~0x1c7;
+		pi->shared_regs->MPSC_MRR_m = v;
+		writel(v, pi->shared_regs->mpsc_routing_base + MPSC_MRR);
+
+		v = pi->shared_regs->MPSC_RCRR_m;
+		v = (v & ~0xf0f) | 0x100;
+		pi->shared_regs->MPSC_RCRR_m = v;
+		writel(v, pi->shared_regs->mpsc_routing_base + MPSC_RCRR);
+
+		v = pi->shared_regs->MPSC_TCRR_m;
+		v = (v & ~0xf0f) | 0x100;
+		pi->shared_regs->MPSC_TCRR_m = v;
+		writel(v, pi->shared_regs->mpsc_routing_base + MPSC_TCRR);
+	}
+	else {
+		v = readl(pi->shared_regs->mpsc_routing_base + MPSC_MRR);
+		v &= ~0x1c7;
+		writel(v, pi->shared_regs->mpsc_routing_base + MPSC_MRR);
+
+		v = readl(pi->shared_regs->mpsc_routing_base + MPSC_RCRR);
+		v = (v & ~0xf0f) | 0x100;
+		writel(v, pi->shared_regs->mpsc_routing_base + MPSC_RCRR);
+
+		v = readl(pi->shared_regs->mpsc_routing_base + MPSC_TCRR);
+		v = (v & ~0xf0f) | 0x100;
+		writel(v, pi->shared_regs->mpsc_routing_base + MPSC_TCRR);
+	}
 
 	/* Put MPSC in UART mode & enabel Tx/Rx egines */
-	MPSC_WRITE(pi, mpsc, MPSC_MMCRL, 0x000004c4);
+	writel(0x000004c4, pi->mpsc_base + MPSC_MMCRL);
 
 	/* No preamble, 16x divider, low-latency,  */
-	MPSC_WRITE(pi, mpsc, MPSC_MMCRH, 0x04400400);
+	writel(0x04400400, pi->mpsc_base + MPSC_MMCRH);
 
-	MPSC_WRITE_M(pi, mpsc, MPSC_CHR_1, 0);
-	MPSC_WRITE_M(pi, mpsc, MPSC_CHR_2, 0);
-	MPSC_WRITE(pi, mpsc, MPSC_CHR_3, pi->mpsc_max_idle);
-	MPSC_WRITE(pi, mpsc, MPSC_CHR_4, 0);
-	MPSC_WRITE(pi, mpsc, MPSC_CHR_5, 0);
-	MPSC_WRITE(pi, mpsc, MPSC_CHR_6, 0);
-	MPSC_WRITE(pi, mpsc, MPSC_CHR_7, 0);
-	MPSC_WRITE(pi, mpsc, MPSC_CHR_8, 0);
-	MPSC_WRITE(pi, mpsc, MPSC_CHR_9, 0);
-	MPSC_WRITE(pi, mpsc, MPSC_CHR_10, 0);
+	if (pi->mirror_regs) {
+		pi->MPSC_CHR_1_m = 0;
+		pi->MPSC_CHR_2_m = 0;
+	}
+	writel(0, pi->mpsc_base + MPSC_CHR_1);
+	writel(0, pi->mpsc_base + MPSC_CHR_2);
+	writel(pi->mpsc_max_idle, pi->mpsc_base + MPSC_CHR_3);
+	writel(0, pi->mpsc_base + MPSC_CHR_4);
+	writel(0, pi->mpsc_base + MPSC_CHR_5);
+	writel(0, pi->mpsc_base + MPSC_CHR_6);
+	writel(0, pi->mpsc_base + MPSC_CHR_7);
+	writel(0, pi->mpsc_base + MPSC_CHR_8);
+	writel(0, pi->mpsc_base + MPSC_CHR_9);
+	writel(0, pi->mpsc_base + MPSC_CHR_10);
 
 	return;
 }
@@ -338,19 +412,21 @@ mpsc_hw_init(struct mpsc_port_info *pi)
 static inline void
 mpsc_enter_hunt(struct mpsc_port_info *pi)
 {
-	u32 v;
-
 	pr_debug("mpsc_enter_hunt[%d]: Hunting...\n", pi->port.line);
 
-	MPSC_MOD_FIELD_M(pi, mpsc, MPSC_CHR_2, 1, 31, 1);
-
-	/* If erratum prevents reading CHR_2, just delay for a while */
-	if (pi->mirror_regs)
+	if (pi->mirror_regs) {
+		writel(pi->MPSC_CHR_2_m | MPSC_CHR_2_EH,
+			pi->mpsc_base + MPSC_CHR_2);
+		/* Erratum prevents reading CHR_2 so just delay for a while */
 		udelay(100);
-	else
-		do {
-			v = MPSC_READ_M(pi, mpsc, MPSC_CHR_2);
-		} while (v & MPSC_CHR_2_EH);
+	}
+	else {
+		writel(readl(pi->mpsc_base + MPSC_CHR_2) | MPSC_CHR_2_EH,
+			pi->mpsc_base + MPSC_CHR_2);
+
+		while (readl(pi->mpsc_base + MPSC_CHR_2) & MPSC_CHR_2_EH)
+			udelay(10);
+	}
 
 	return;
 }
@@ -358,16 +434,32 @@ mpsc_enter_hunt(struct mpsc_port_info *pi)
 static inline void
 mpsc_freeze(struct mpsc_port_info *pi)
 {
+	u32	v;
+
 	pr_debug("mpsc_freeze[%d]: Freezing\n", pi->port.line);
 
-	MPSC_MOD_FIELD_M(pi, mpsc, MPSC_MPCR, 1, 9, 1);
+	v = (pi->mirror_regs) ? pi->MPSC_MPCR_m :
+		readl(pi->mpsc_base + MPSC_MPCR);
+	v |= MPSC_MPCR_FRZ;
+
+	if (pi->mirror_regs)
+		pi->MPSC_MPCR_m = v;
+	writel(v, pi->mpsc_base + MPSC_MPCR);
 	return;
 }
 
 static inline void
 mpsc_unfreeze(struct mpsc_port_info *pi)
 {
-	MPSC_MOD_FIELD_M(pi, mpsc, MPSC_MPCR, 1, 9, 0);
+	u32	v;
+
+	v = (pi->mirror_regs) ? pi->MPSC_MPCR_m :
+		readl(pi->mpsc_base + MPSC_MPCR);
+	v &= ~MPSC_MPCR_FRZ;
+
+	if (pi->mirror_regs)
+		pi->MPSC_MPCR_m = v;
+	writel(v, pi->mpsc_base + MPSC_MPCR);
 
 	pr_debug("mpsc_unfreeze[%d]: Unfrozen\n", pi->port.line);
 	return;
@@ -376,29 +468,55 @@ mpsc_unfreeze(struct mpsc_port_info *pi)
 static inline void
 mpsc_set_char_length(struct mpsc_port_info *pi, u32 len)
 {
+	u32	v;
+
 	pr_debug("mpsc_set_char_length[%d]: char len: %d\n", pi->port.line,len);
 
-	MPSC_MOD_FIELD_M(pi, mpsc, MPSC_MPCR, 2, 12, len);
+	v = (pi->mirror_regs) ? pi->MPSC_MPCR_m :
+		readl(pi->mpsc_base + MPSC_MPCR);
+	v = (v & ~(0x3 << 12)) | ((len & 0x3) << 12);
+
+	if (pi->mirror_regs)
+		pi->MPSC_MPCR_m = v;
+	writel(v, pi->mpsc_base + MPSC_MPCR);
 	return;
 }
 
 static inline void
 mpsc_set_stop_bit_length(struct mpsc_port_info *pi, u32 len)
 {
+	u32	v;
+
 	pr_debug("mpsc_set_stop_bit_length[%d]: stop bits: %d\n",
 		pi->port.line, len);
 
-	MPSC_MOD_FIELD_M(pi, mpsc, MPSC_MPCR, 1, 14, len);
+	v = (pi->mirror_regs) ? pi->MPSC_MPCR_m :
+		readl(pi->mpsc_base + MPSC_MPCR);
+
+	v = (v & ~(1 << 14)) | ((len & 0x1) << 14);
+
+	if (pi->mirror_regs)
+		pi->MPSC_MPCR_m = v;
+	writel(v, pi->mpsc_base + MPSC_MPCR);
 	return;
 }
 
 static inline void
 mpsc_set_parity(struct mpsc_port_info *pi, u32 p)
 {
+	u32	v;
+
 	pr_debug("mpsc_set_parity[%d]: parity bits: 0x%x\n", pi->port.line, p);
 
-	MPSC_MOD_FIELD_M(pi, mpsc, MPSC_CHR_2, 2, 2, p);	/* TPM */
-	MPSC_MOD_FIELD_M(pi, mpsc, MPSC_CHR_2, 2, 18, p);	/* RPM */
+	v = (pi->mirror_regs) ? pi->MPSC_CHR_2_m :
+		readl(pi->mpsc_base + MPSC_CHR_2);
+
+	p &= 0x3;
+	v = (v & ~0xc000c) | (p << 18) | (p << 2);
+
+	if (pi->mirror_regs)
+		pi->MPSC_CHR_2_m = v;
+	writel(v, pi->mpsc_base + MPSC_CHR_2);
 	return;
 }
 
@@ -560,8 +678,11 @@ mpsc_init_rings(struct mpsc_port_info *pi)
 
 	dma_cache_sync((void *) pi->dma_region, MPSC_DMA_ALLOC_SIZE,
 		DMA_BIDIRECTIONAL);
-	MPSC_CACHE_FLUSH(pi, pi->dma_region,
-		pi->dma_region + MPSC_DMA_ALLOC_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+		if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+			flush_dcache_range((ulong)pi->dma_region,
+				(ulong)pi->dma_region + MPSC_DMA_ALLOC_SIZE);
+#endif
 
 	return;
 }
@@ -631,7 +752,11 @@ mpsc_rx_intr(struct mpsc_port_info *pi, struct pt_regs *regs)
 	rxre = (struct mpsc_rx_desc *)(pi->rxr + (pi->rxr_posn*MPSC_RXRE_SIZE));
 
 	dma_cache_sync((void *)rxre, MPSC_RXRE_SIZE, DMA_FROM_DEVICE);
-	MPSC_CACHE_INVALIDATE(pi, (u32) rxre, (u32) rxre + MPSC_RXRE_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+	if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+		invalidate_dcache_range((ulong)rxre,
+			(ulong)rxre + MPSC_RXRE_SIZE);
+#endif
 
 	/*
 	 * Loop through Rx descriptors handling ones that have been completed.
@@ -651,7 +776,11 @@ mpsc_rx_intr(struct mpsc_port_info *pi, struct pt_regs *regs)
 
 		bp = pi->rxb + (pi->rxr_posn * MPSC_RXBE_SIZE);
 		dma_cache_sync((void *) bp, MPSC_RXBE_SIZE, DMA_FROM_DEVICE);
-		MPSC_CACHE_INVALIDATE(pi, bp, bp + MPSC_RXBE_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+		if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+			invalidate_dcache_range((ulong)bp,
+				(ulong)bp + MPSC_RXBE_SIZE);
+#endif
 
 		/*
 		 * Other than for parity error, the manual provides little
@@ -716,20 +845,28 @@ next_frame:
 					    SDMA_DESC_CMDSTAT_L);
 		wmb();
 		dma_cache_sync((void *)rxre, MPSC_RXRE_SIZE, DMA_BIDIRECTIONAL);
-		MPSC_CACHE_FLUSH(pi, (u32) rxre, (u32) rxre + MPSC_RXRE_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+		if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+			flush_dcache_range((ulong)rxre,
+				(ulong)rxre + MPSC_RXRE_SIZE);
+#endif
 
 		/* Advance to next descriptor */
 		pi->rxr_posn = (pi->rxr_posn + 1) & (MPSC_RXR_ENTRIES - 1);
 		rxre = (struct mpsc_rx_desc *)(pi->rxr +
 			(pi->rxr_posn * MPSC_RXRE_SIZE));
 		dma_cache_sync((void *)rxre, MPSC_RXRE_SIZE, DMA_FROM_DEVICE);
-		MPSC_CACHE_INVALIDATE(pi, (u32)rxre, (u32)rxre+MPSC_RXRE_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+		if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+			invalidate_dcache_range((ulong)rxre,
+				(ulong)rxre + MPSC_RXRE_SIZE);
+#endif
 
 		rc = 1;
 	}
 
 	/* Restart rx engine, if its stopped */
-	if ((MPSC_READ(pi, sdma, SDMA_SDCM) & SDMA_SDCM_ERD) == 0)
+	if ((readl(pi->sdma_base + SDMA_SDCM) & SDMA_SDCM_ERD) == 0)
 		mpsc_start_rx(pi);
 
 	tty_flip_buffer_push(tty);
@@ -753,7 +890,11 @@ mpsc_setup_tx_desc(struct mpsc_port_info *pi, u32 count, u32 intr)
 							   : 0));
 	wmb();
 	dma_cache_sync((void *) txre, MPSC_TXRE_SIZE, DMA_BIDIRECTIONAL);
-	MPSC_CACHE_FLUSH(pi, (u32) txre, (u32) txre + MPSC_TXRE_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+	if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+		flush_dcache_range((ulong)txre,
+			(ulong)txre + MPSC_TXRE_SIZE);
+#endif
 
 	return;
 }
@@ -798,7 +939,11 @@ mpsc_copy_tx_data(struct mpsc_port_info *pi)
 			return;
 
 		dma_cache_sync((void *) bp, MPSC_TXBE_SIZE, DMA_BIDIRECTIONAL);
-		MPSC_CACHE_FLUSH(pi, bp, bp + MPSC_TXBE_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+		if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+			flush_dcache_range((ulong)bp,
+				(ulong)bp + MPSC_TXBE_SIZE);
+#endif
 		mpsc_setup_tx_desc(pi, i, 1);
 
 		/* Advance to next descriptor */
@@ -819,7 +964,11 @@ mpsc_tx_intr(struct mpsc_port_info *pi)
 			(pi->txr_tail * MPSC_TXRE_SIZE));
 
 		dma_cache_sync((void *) txre, MPSC_TXRE_SIZE, DMA_FROM_DEVICE);
-		MPSC_CACHE_INVALIDATE(pi, (u32) txre, (u32)txre+MPSC_TXRE_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+		if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+			invalidate_dcache_range((ulong)txre,
+				(ulong)txre + MPSC_TXRE_SIZE);
+#endif
 
 		while (!(be32_to_cpu(txre->cmdstat) & SDMA_DESC_CMDSTAT_O)) {
 			rc = 1;
@@ -834,8 +983,11 @@ mpsc_tx_intr(struct mpsc_port_info *pi)
 				(pi->txr_tail * MPSC_TXRE_SIZE));
 			dma_cache_sync((void *) txre, MPSC_TXRE_SIZE,
 				DMA_FROM_DEVICE);
-			MPSC_CACHE_INVALIDATE(pi, (u32) txre,
-			      (u32) txre + MPSC_TXRE_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+			if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+				invalidate_dcache_range((ulong)txre,
+					(ulong)txre + MPSC_TXRE_SIZE);
+#endif
 		}
 
 		mpsc_copy_tx_data(pi);
@@ -907,7 +1059,8 @@ mpsc_get_mctrl(struct uart_port *port)
 	ulong iflags;
 
 	spin_lock_irqsave(&pi->port.lock, iflags);
-	status = MPSC_READ_M(pi, mpsc, MPSC_CHR_10);
+	status = (pi->mirror_regs) ? pi->MPSC_CHR_10_m :
+		readl(pi->mpsc_base + MPSC_CHR_10);
 	spin_unlock_irqrestore(&pi->port.lock, iflags);
 
 	mflags = 0;
@@ -976,13 +1129,15 @@ static void
 mpsc_break_ctl(struct uart_port *port, int ctl)
 {
 	struct mpsc_port_info *pi = (struct mpsc_port_info *)port;
-	ulong flags;
+	ulong	flags;
+	u32	v;
+
+	v = ctl ? 0x00ff0000 : 0;
 
 	spin_lock_irqsave(&pi->port.lock, flags);
-	if (ctl) /* Send as many BRK chars as we can */
-		MPSC_WRITE_M(pi, mpsc, MPSC_CHR_1, 0x00ff0000);
-	else /* Stop sending BRK chars */
-		MPSC_WRITE_M(pi, mpsc, MPSC_CHR_1, 0);
+	if (pi->mirror_regs)
+		pi->MPSC_CHR_1_m = v;
+	writel(v, pi->mpsc_base + MPSC_CHR_1);
 	spin_unlock_irqrestore(&pi->port.lock, flags);
 
 	return;
@@ -1246,7 +1401,11 @@ mpsc_console_write(struct console *co, const char *s, uint count)
 		}
 
 		dma_cache_sync((void *) bp, MPSC_TXBE_SIZE, DMA_BIDIRECTIONAL);
-		MPSC_CACHE_FLUSH(pi, bp, bp + MPSC_TXBE_SIZE);
+#if defined(CONFIG_PPC32) && !defined(CONFIG_NOT_COHERENT_CACHE)
+		if (pi->cache_mgmt) /* GT642[46]0 Res #COMM-2 */
+			flush_dcache_range((ulong)bp,
+				(ulong)bp + MPSC_TXBE_SIZE);
+#endif
 		mpsc_setup_tx_desc(pi, i, 0);
 		pi->txr_head = (pi->txr_head + 1) & (MPSC_TXR_ENTRIES - 1);
 		mpsc_sdma_start_tx(pi);
@@ -1339,7 +1498,7 @@ mpsc_shared_map_regs(struct platform_device *pd)
 		MPSC_ROUTING_BASE_ORDER)) && request_mem_region(r->start,
 		MPSC_ROUTING_REG_BLOCK_SIZE, "mpsc_routing_regs")) {
 
-		mpsc_shared_regs.mpsc_routing_base = (u32) ioremap(r->start,
+		mpsc_shared_regs.mpsc_routing_base = ioremap(r->start,
 			MPSC_ROUTING_REG_BLOCK_SIZE);
 		mpsc_shared_regs.mpsc_routing_base_p = r->start;
 	}
@@ -1352,12 +1511,12 @@ mpsc_shared_map_regs(struct platform_device *pd)
 		MPSC_SDMA_INTR_BASE_ORDER)) && request_mem_region(r->start,
 		MPSC_SDMA_INTR_REG_BLOCK_SIZE, "sdma_intr_regs")) {
 
-		mpsc_shared_regs.sdma_intr_base = (u32) ioremap(r->start,
+		mpsc_shared_regs.sdma_intr_base = ioremap(r->start,
 			MPSC_SDMA_INTR_REG_BLOCK_SIZE);
 		mpsc_shared_regs.sdma_intr_base_p = r->start;
 	}
 	else {
-		iounmap((void *)mpsc_shared_regs.mpsc_routing_base);
+		iounmap(mpsc_shared_regs.mpsc_routing_base);
 		release_mem_region(mpsc_shared_regs.mpsc_routing_base_p,
 			MPSC_ROUTING_REG_BLOCK_SIZE);
 		mpsc_resource_err("SDMA intr base");
@@ -1371,12 +1530,12 @@ static void
 mpsc_shared_unmap_regs(void)
 {
 	if (!mpsc_shared_regs.mpsc_routing_base) {
-		iounmap((void *)mpsc_shared_regs.mpsc_routing_base);
+		iounmap(mpsc_shared_regs.mpsc_routing_base);
 		release_mem_region(mpsc_shared_regs.mpsc_routing_base_p,
 			MPSC_ROUTING_REG_BLOCK_SIZE);
 	}
 	if (!mpsc_shared_regs.sdma_intr_base) {
-		iounmap((void *)mpsc_shared_regs.sdma_intr_base);
+		iounmap(mpsc_shared_regs.sdma_intr_base);
 		release_mem_region(mpsc_shared_regs.sdma_intr_base_p,
 			MPSC_SDMA_INTR_REG_BLOCK_SIZE);
 	}
@@ -1394,21 +1553,20 @@ static int
 mpsc_shared_drv_probe(struct device *dev)
 {
 	struct platform_device		*pd = to_platform_device(dev);
-	struct mpsc_shared_pd_dd	*dd;
+	struct mpsc_shared_pdata	*pdata;
 	int				 rc = -ENODEV;
 
 	if (pd->id == 0) {
 		if (!(rc = mpsc_shared_map_regs(pd)))  {
-			dd = (struct mpsc_shared_pd_dd *)
-				dev_get_drvdata(dev);
+			pdata = (struct mpsc_shared_pdata *)dev->platform_data;
 
-			mpsc_shared_regs.MPSC_MRR_m = dd->mrr_val;
-			mpsc_shared_regs.MPSC_RCRR_m= dd->rcrr_val;
-			mpsc_shared_regs.MPSC_TCRR_m= dd->tcrr_val;
+			mpsc_shared_regs.MPSC_MRR_m = pdata->mrr_val;
+			mpsc_shared_regs.MPSC_RCRR_m= pdata->rcrr_val;
+			mpsc_shared_regs.MPSC_TCRR_m= pdata->tcrr_val;
 			mpsc_shared_regs.SDMA_INTR_CAUSE_m =
-				dd->intr_cause_val;
+				pdata->intr_cause_val;
 			mpsc_shared_regs.SDMA_INTR_MASK_m =
-				dd->intr_mask_val;
+				pdata->intr_mask_val;
 
 			rc = 0;
 		}
@@ -1469,7 +1627,7 @@ mpsc_drv_map_regs(struct mpsc_port_info *pi, struct platform_device *pd)
 	if ((r = platform_get_resource(pd, IORESOURCE_MEM, MPSC_BASE_ORDER)) &&
 		request_mem_region(r->start, MPSC_REG_BLOCK_SIZE, "mpsc_regs")){
 
-		pi->mpsc_base = (u32) ioremap(r->start, MPSC_REG_BLOCK_SIZE);
+		pi->mpsc_base = ioremap(r->start, MPSC_REG_BLOCK_SIZE);
 		pi->mpsc_base_p = r->start;
 	}
 	else {
@@ -1481,7 +1639,7 @@ mpsc_drv_map_regs(struct mpsc_port_info *pi, struct platform_device *pd)
 		MPSC_SDMA_BASE_ORDER)) && request_mem_region(r->start,
 		MPSC_SDMA_REG_BLOCK_SIZE, "sdma_regs")) {
 
-		pi->sdma_base = (u32)ioremap(r->start,MPSC_SDMA_REG_BLOCK_SIZE);
+		pi->sdma_base = ioremap(r->start,MPSC_SDMA_REG_BLOCK_SIZE);
 		pi->sdma_base_p = r->start;
 	}
 	else {
@@ -1493,7 +1651,7 @@ mpsc_drv_map_regs(struct mpsc_port_info *pi, struct platform_device *pd)
 		&& request_mem_region(r->start, MPSC_BRG_REG_BLOCK_SIZE,
 		"brg_regs")) {
 
-		pi->brg_base = (u32) ioremap(r->start, MPSC_BRG_REG_BLOCK_SIZE);
+		pi->brg_base = ioremap(r->start, MPSC_BRG_REG_BLOCK_SIZE);
 		pi->brg_base_p = r->start;
 	}
 	else {
@@ -1508,15 +1666,15 @@ static void
 mpsc_drv_unmap_regs(struct mpsc_port_info *pi)
 {
 	if (!pi->mpsc_base) {
-		iounmap((void *)pi->mpsc_base);
+		iounmap(pi->mpsc_base);
 		release_mem_region(pi->mpsc_base_p, MPSC_REG_BLOCK_SIZE);
 	}
 	if (!pi->sdma_base) {
-		iounmap((void *)pi->sdma_base);
+		iounmap(pi->sdma_base);
 		release_mem_region(pi->sdma_base_p, MPSC_SDMA_REG_BLOCK_SIZE);
 	}
 	if (!pi->brg_base) {
-		iounmap((void *)pi->brg_base);
+		iounmap(pi->brg_base);
 		release_mem_region(pi->brg_base_p, MPSC_BRG_REG_BLOCK_SIZE);
 	}
 
@@ -1535,35 +1693,35 @@ static void
 mpsc_drv_get_platform_data(struct mpsc_port_info *pi,
 	struct platform_device *pd, int num)
 {
-	struct mpsc_pd_dd	*dd;
+	struct mpsc_pdata	*pdata;
 
-	dd = (struct mpsc_pd_dd *)dev_get_drvdata(&pd->dev);
+	pdata = (struct mpsc_pdata *)pd->dev.platform_data;
 
-	pi->port.uartclk = dd->brg_clk_freq;
+	pi->port.uartclk = pdata->brg_clk_freq;
 	pi->port.iotype = UPIO_MEM;
 	pi->port.line = num;
 	pi->port.type = PORT_MPSC;
 	pi->port.fifosize = MPSC_TXBE_SIZE;
-	pi->port.membase = (char *)pi->mpsc_base;
-	pi->port.mapbase = (ulong) pi->mpsc_base;
+	pi->port.membase = pi->mpsc_base;
+	pi->port.mapbase = (ulong)pi->mpsc_base;
 	pi->port.ops = &mpsc_pops;
 
-	pi->mirror_regs = dd->mirror_regs;
-	pi->cache_mgmt = dd->cache_mgmt;
-	pi->brg_can_tune = dd->brg_can_tune;
-	pi->brg_clk_src = dd->brg_clk_src;
-	pi->mpsc_max_idle = dd->max_idle;
-	pi->default_baud = dd->default_baud;
-	pi->default_bits = dd->default_bits;
-	pi->default_parity = dd->default_parity;
-	pi->default_flow = dd->default_flow;
+	pi->mirror_regs = pdata->mirror_regs;
+	pi->cache_mgmt = pdata->cache_mgmt;
+	pi->brg_can_tune = pdata->brg_can_tune;
+	pi->brg_clk_src = pdata->brg_clk_src;
+	pi->mpsc_max_idle = pdata->max_idle;
+	pi->default_baud = pdata->default_baud;
+	pi->default_bits = pdata->default_bits;
+	pi->default_parity = pdata->default_parity;
+	pi->default_flow = pdata->default_flow;
 
 	/* Initial values of mirrored regs */
-	pi->MPSC_CHR_1_m = dd->chr_1_val;
-	pi->MPSC_CHR_2_m = dd->chr_2_val;
-	pi->MPSC_CHR_10_m = dd->chr_10_val;
-	pi->MPSC_MPCR_m = dd->mpcr_val;
-	pi->BRG_BCR_m = dd->bcr_val;
+	pi->MPSC_CHR_1_m = pdata->chr_1_val;
+	pi->MPSC_CHR_2_m = pdata->chr_2_val;
+	pi->MPSC_CHR_10_m = pdata->chr_10_val;
+	pi->MPSC_MPCR_m = pdata->mpcr_val;
+	pi->BRG_BCR_m = pdata->bcr_val;
 
 	pi->shared_regs = &mpsc_shared_regs;
 

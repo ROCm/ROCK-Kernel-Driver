@@ -58,7 +58,7 @@ struct dm_table {
 /*
  * Similar to ceiling(log_size(n))
  */
-static unsigned int int_log(unsigned long n, unsigned long base)
+static unsigned int int_log(unsigned int n, unsigned int base)
 {
 	int result = 0;
 

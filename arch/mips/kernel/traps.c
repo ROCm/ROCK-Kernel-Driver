@@ -38,12 +38,9 @@
 #include <asm/watch.h>
 #include <asm/types.h>
 
-extern asmlinkage void handle_mod(void);
+extern asmlinkage void handle_tlbm(void);
 extern asmlinkage void handle_tlbl(void);
 extern asmlinkage void handle_tlbs(void);
-extern asmlinkage void __xtlb_mod(void);
-extern asmlinkage void __xtlb_tlbl(void);
-extern asmlinkage void __xtlb_tlbs(void);
 extern asmlinkage void handle_adel(void);
 extern asmlinkage void handle_ades(void);
 extern asmlinkage void handle_ibe(void);
@@ -82,7 +79,12 @@ void show_stack(struct task_struct *task, unsigned long *sp)
 	long stackdata;
 	int i;
 
-	sp = sp ? sp : (unsigned long *) &sp;
+	if (!sp) {
+		if (task && task != current)
+			sp = (unsigned long *) task->thread.reg29;
+		else
+			sp = (unsigned long *) &sp;
+	}
 
 	printk("Stack :");
 	i = 0;
@@ -110,8 +112,12 @@ void show_trace(struct task_struct *task, unsigned long *stack)
 	const int field = 2 * sizeof(unsigned long);
 	unsigned long addr;
 
-	if (!stack)
-		stack = (unsigned long*)&stack;
+	if (!stack) {
+		if (task && task != current)
+			stack = (unsigned long *) task->thread.reg29;
+		else
+			stack = (unsigned long *) &stack;
+	}
 
 	printk("Call Trace:");
 #ifdef CONFIG_KALLSYMS
@@ -244,7 +250,7 @@ void show_registers(struct pt_regs *regs)
 	printk("\n");
 }
 
-static spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(die_lock);
 
 NORET_TYPE void __die(const char * str, struct pt_regs * regs,
 	const char * file, const char * func, unsigned long line)
@@ -655,11 +661,11 @@ asmlinkage void do_cpu(struct pt_regs *regs)
 		preempt_disable();
 
 		own_fpu();
-		if (current->used_math) {	/* Using the FPU again.  */
+		if (used_math()) {	/* Using the FPU again.  */
 			restore_fp(current);
 		} else {			/* First time FPU user.  */
 			init_fpu();
-			current->used_math = 1;
+			set_used_math();
 		}
 
 		if (!cpu_has_fpu) {
@@ -1001,16 +1007,10 @@ void __init trap_init(void)
 	if (board_be_init)
 		board_be_init();
 
-#ifdef CONFIG_MIPS32
-	set_except_vector(1, handle_mod);
+	set_except_vector(1, handle_tlbm);
 	set_except_vector(2, handle_tlbl);
 	set_except_vector(3, handle_tlbs);
-#endif
-#ifdef CONFIG_MIPS64
-	set_except_vector(1, __xtlb_mod);
-	set_except_vector(2, __xtlb_tlbl);
-	set_except_vector(3, __xtlb_tlbs);
-#endif
+
 	set_except_vector(4, handle_adel);
 	set_except_vector(5, handle_ades);
 
@@ -1047,7 +1047,7 @@ void __init trap_init(void)
 		 * unaligned ldc1/sdc1 exception.  The handlers have not been
 		 * written yet.  Well, anyway there is no R6000 machine on the
 		 * current list of targets for Linux/MIPS.
-		 * (Duh, crap, there is someone with a tripple R6k machine)
+		 * (Duh, crap, there is someone with a triple R6k machine)
 		 */
 		//set_except_vector(14, handle_mc);
 		//set_except_vector(15, handle_ndc);

@@ -111,7 +111,7 @@ __get_user_check((x),__gu_addr,sizeof(*(ptr)),__typeof__(*(ptr))); })
 #define __get_user(x,ptr) __get_user_nocheck((x),(ptr),sizeof(*(ptr)),__typeof__(*(ptr)))
 
 struct __large_struct { unsigned long buf[100]; };
-#define __m(x) ((struct __large_struct *)(x))
+#define __m(x) ((struct __large_struct __user *)(x))
 
 #define __put_user_check(x,addr,size) ({ \
 register int __pu_ret; \
@@ -299,27 +299,27 @@ extern unsigned long __copy_user(void __user *to, const void __user *from, unsig
 static inline unsigned long copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	if (n && __access_ok((unsigned long) to, n))
-		return __copy_user(to, (void __user *) from, n);
+		return __copy_user(to, (__force void __user *) from, n);
 	else
 		return n;
 }
 
 static inline unsigned long __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-	return __copy_user(to, (void __user *) from, n);
+	return __copy_user(to, (__force void __user *) from, n);
 }
 
 static inline unsigned long copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	if (n && __access_ok((unsigned long) from, n))
-		return __copy_user((void __user *) to, from, n);
+		return __copy_user((__force void __user *) to, from, n);
 	else
 		return n;
 }
 
 static inline unsigned long __copy_from_user(void *to, const void __user *from, unsigned long n)
 {
-	return __copy_user((void __user *) to, from, n);
+	return __copy_user((__force void __user *) to, from, n);
 }
 
 #define __copy_to_user_inatomic __copy_to_user

@@ -53,6 +53,7 @@ MODULE_SUPPORTED_DEVICE("{{Intel,82801AA-ICH},"
 		"{Intel,82801DB-ICH4},"
 		"{Intel,ICH5},"
 		"{Intel,ICH6},"
+		"{Intel,ICH7},"
 		"{Intel,6300ESB},"
 		"{Intel,MX440},"
 		"{SiS,SI7012},"
@@ -119,6 +120,9 @@ MODULE_PARM_DESC(xbox, "Set to 1 for Xbox, if you have problems with the AC'97 c
 #endif
 #ifndef PCI_DEVICE_ID_INTEL_ICH6_3
 #define PCI_DEVICE_ID_INTEL_ICH6_3	0x266e
+#endif
+#ifndef PCI_DEVICE_ID_INTEL_ICH7_20
+#define PCI_DEVICE_ID_INTEL_ICH7_20	0x27de
 #endif
 #ifndef PCI_DEVICE_ID_SI_7012
 #define PCI_DEVICE_ID_SI_7012		0x7012
@@ -438,6 +442,7 @@ static struct pci_device_id snd_intel8x0_ids[] = {
 	{ 0x8086, 0x24d5, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL_ICH4 }, /* ICH5 */
 	{ 0x8086, 0x25a6, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL_ICH4 }, /* ESB */
 	{ 0x8086, 0x266e, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL_ICH4 }, /* ICH6 */
+	{ 0x8086, 0x27de, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL_ICH4 }, /* ICH7 */
 	{ 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 440MX */
 	{ 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7012 */
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_NFORCE },	/* NFORCE */
@@ -1780,15 +1785,21 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	},
 	{
 		.vendor = 0x103c,
-		.device = 0x129d,
-		.name = "HP xw8000",
-		.type = AC97_TUNE_HP_ONLY
+		.device = 0x088c,
+		.name = "HP nc8000",
+		.type = AC97_TUNE_MUTE_LED
 	},
 	{
 		.vendor = 0x103c,
 		.device = 0x0890,
-		.name = "HP NC6000",
+		.name = "HP nc6000",
 		.type = AC97_TUNE_MUTE_LED
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x129d,
+		.name = "HP xw8000",
+		.type = AC97_TUNE_HP_ONLY
 	},
 	{
 		.vendor = 0x103c,
@@ -2703,6 +2714,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_INTEL_ICH5, "Intel ICH5" },
 	{ PCI_DEVICE_ID_INTEL_ESB_5, "Intel 6300ESB" },
 	{ PCI_DEVICE_ID_INTEL_ICH6_3, "Intel ICH6" },
+	{ PCI_DEVICE_ID_INTEL_ICH7_20, "Intel ICH7" },
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia nForce" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP2_AUDIO, "NVidia nForce2" },

@@ -92,7 +92,7 @@ static inline void set_bit(unsigned long nr, volatile unsigned long *addr)
 		__bi_flags;
 
 		a += nr >> SZLONG_LOG;
-		mask = 1 << (nr & SZLONG_MASK);
+		mask = 1UL << (nr & SZLONG_MASK);
 		__bi_local_irq_save(flags);
 		*a |= mask;
 		__bi_local_irq_restore(flags);
@@ -152,7 +152,7 @@ static inline void clear_bit(unsigned long nr, volatile unsigned long *addr)
 		__bi_flags;
 
 		a += nr >> SZLONG_LOG;
-		mask = 1 << (nr & SZLONG_MASK);
+		mask = 1UL << (nr & SZLONG_MASK);
 		__bi_local_irq_save(flags);
 		*a &= ~mask;
 		__bi_local_irq_restore(flags);
@@ -214,7 +214,7 @@ static inline void change_bit(unsigned long nr, volatile unsigned long *addr)
 		__bi_flags;
 
 		a += nr >> SZLONG_LOG;
-		mask = 1 << (nr & SZLONG_MASK);
+		mask = 1UL << (nr & SZLONG_MASK);
 		__bi_local_irq_save(flags);
 		*a ^= mask;
 		__bi_local_irq_restore(flags);
@@ -293,7 +293,7 @@ static inline int test_and_set_bit(unsigned long nr,
 		__bi_flags;
 
 		a += nr >> SZLONG_LOG;
-		mask = 1 << (nr & SZLONG_MASK);
+		mask = 1UL << (nr & SZLONG_MASK);
 		__bi_local_irq_save(flags);
 		retval = (mask & *a) != 0;
 		*a |= mask;
@@ -320,7 +320,7 @@ static inline int __test_and_set_bit(unsigned long nr,
 	int retval;
 
 	a += nr >> SZLONG_LOG;
-	mask = 1 << (nr & SZLONG_MASK);
+	mask = 1UL << (nr & SZLONG_MASK);
 	retval = (mask & *a) != 0;
 	*a |= mask;
 
@@ -385,7 +385,7 @@ static inline int test_and_clear_bit(unsigned long nr,
 		__bi_flags;
 
 		a += nr >> SZLONG_LOG;
-		mask = 1 << (nr & SZLONG_MASK);
+		mask = 1UL << (nr & SZLONG_MASK);
 		__bi_local_irq_save(flags);
 		retval = (mask & *a) != 0;
 		*a &= ~mask;
@@ -474,7 +474,7 @@ static inline int test_and_change_bit(unsigned long nr,
 		__bi_flags;
 
 		a += nr >> SZLONG_LOG;
-		mask = 1 << (nr & SZLONG_MASK);
+		mask = 1UL << (nr & SZLONG_MASK);
 		__bi_local_irq_save(flags);
 		retval = (mask & *a) != 0;
 		*a ^= mask;

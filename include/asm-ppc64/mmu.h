@@ -122,10 +122,13 @@ static inline void __tlbie(unsigned long va, int large)
 	/* clear top 16 bits, non SLS segment */
 	va &= ~(0xffffULL << 48);
 
-	if (large)
+	if (large) {
+		va &= HPAGE_MASK;
 		asm volatile("tlbie %0,1" : : "r"(va) : "memory");
-	else
+	} else {
+		va &= PAGE_MASK;
 		asm volatile("tlbie %0,0" : : "r"(va) : "memory");
+	}
 }
 
 static inline void tlbie(unsigned long va, int large)
@@ -139,6 +142,7 @@ static inline void __tlbiel(unsigned long va)
 {
 	/* clear top 16 bits, non SLS segment */
 	va &= ~(0xffffULL << 48);
+	va &= PAGE_MASK;
 
 	/* 
 	 * Thanks to Alan Modra we are now able to use machine specific 

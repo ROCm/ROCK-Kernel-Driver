@@ -38,7 +38,7 @@ extern int sysctl_legacy_va_layout;
 #include <asm/atomic.h>
 
 #ifndef MM_VM_SIZE
-#define MM_VM_SIZE(mm)	TASK_SIZE
+#define MM_VM_SIZE(mm)	((TASK_SIZE + PGDIR_SIZE - 1) & PGDIR_MASK)
 #endif
 
 #define nth_page(page,n) pfn_to_page(page_to_pfn((page)) + (n))
@@ -756,7 +756,9 @@ extern unsigned long page_unuse(struct page *);
 extern void truncate_inode_pages(struct address_space *, loff_t);
 
 /* generic vm_area_ops exported for stackable file systems */
-struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int *);
+extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int *);
+extern int filemap_populate(struct vm_area_struct *, unsigned long,
+		unsigned long, pgprot_t, unsigned long, int);
 
 /* mm/page-writeback.c */
 int write_one_page(struct page *page, int wait);

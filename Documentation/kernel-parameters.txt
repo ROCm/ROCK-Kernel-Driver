@@ -1363,9 +1363,6 @@ running once the system is up.
 	tipar.delay=	[HW,PPT]
 			Set inter-bit delay in microseconds (default 10).
 
-	tiusb=		[HW,USB] Texas Instruments' USB GraphLink (aka SilverLink)
-			Format: <timeout>
- 
 	tmc8xx=		[HW,SCSI]
 			See header of drivers/scsi/seagate.c.
 

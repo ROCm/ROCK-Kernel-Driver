@@ -436,6 +436,7 @@ int pci_create_sysfs_dev_files (struct pci_dev *pdev)
 		
 		rom_attr = kmalloc(sizeof(*rom_attr), GFP_ATOMIC);
 		if (rom_attr) {
+			memset(rom_attr, 0x00, sizeof(*rom_attr));
 			pdev->rom_attr = rom_attr;
 			rom_attr->size = pci_resource_len(pdev, PCI_ROM_RESOURCE);
 			rom_attr->attr.name = "rom";

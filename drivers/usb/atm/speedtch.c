@@ -494,7 +494,7 @@ static void speedtch_upload_firmware(struct speedtch_instance_data *instance,
 			dbg("speedtch_upload_firmware: write BLOCK1 to modem failed (%d)!", ret);
 			goto fail_release;
 		}
-		dbg("speedtch_upload_firmware: BLOCK1 uploaded (%d bytes)", fw1->size);
+		dbg("speedtch_upload_firmware: BLOCK1 uploaded (%zu bytes)", fw1->size);
 	}
 
 	/* USB led blinking green, ADSL led off */
@@ -522,7 +522,7 @@ static void speedtch_upload_firmware(struct speedtch_instance_data *instance,
 			goto fail_release;
 		}
 	}
-	dbg("speedtch_upload_firmware: BLOCK3 uploaded (%d bytes)", fw2->size);
+	dbg("speedtch_upload_firmware: BLOCK3 uploaded (%zu bytes)", fw2->size);
 
 	/* USB led static green, ADSL led static red */
 

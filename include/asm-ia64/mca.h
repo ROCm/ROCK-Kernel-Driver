@@ -11,6 +11,8 @@
 #ifndef _ASM_IA64_MCA_H
 #define _ASM_IA64_MCA_H
 
+#define IA64_MCA_STACK_SIZE	8192
+
 #if !defined(__ASSEMBLY__)
 
 #include <linux/interrupt.h>
@@ -102,21 +104,21 @@ typedef struct ia64_mca_os_to_sal_state_s {
 						 */
 } ia64_mca_os_to_sal_state_t;
 
-#define IA64_MCA_STACK_SIZE 	1024
-#define IA64_MCA_STACK_SIZE_BYTES 	(1024 * 8)
-#define IA64_MCA_BSPSTORE_SIZE 	1024
+/* Per-CPU MCA state that is too big for normal per-CPU variables.  */
 
-typedef struct ia64_mca_cpu_s {
-	u64	ia64_mca_stack[IA64_MCA_STACK_SIZE] 		__attribute__((aligned(16)));
-	u64	ia64_mca_proc_state_dump[512]			__attribute__((aligned(16)));
-	u64	ia64_mca_stackframe[32]				__attribute__((aligned(16)));
-	u64	ia64_mca_bspstore[IA64_MCA_BSPSTORE_SIZE]	__attribute__((aligned(16)));
-	u64	ia64_init_stack[KERNEL_STACK_SIZE/8] 		__attribute__((aligned(16)));
-} ia64_mca_cpu_t;
+struct ia64_mca_cpu {
+	u64 stack[IA64_MCA_STACK_SIZE/8];	/* MCA memory-stack */
+	u64 proc_state_dump[512];
+	u64 stackframe[32];
+	u64 rbstore[IA64_MCA_STACK_SIZE/8];	/* MCA reg.-backing store */
+	u64 init_stack[KERNEL_STACK_SIZE/8];
+} __attribute__ ((aligned(16)));
 
-#define PERCPU_MCA_SIZE sizeof(ia64_mca_cpu_t)
+/* Array of physical addresses of each CPU's MCA area.  */
+extern unsigned long __per_cpu_mca[NR_CPUS];
 
 extern void ia64_mca_init(void);
+extern void ia64_mca_cpu_init(void *);
 extern void ia64_os_mca_dispatch(void);
 extern void ia64_os_mca_dispatch_end(void);
 extern void ia64_mca_ucmc_handler(void);

@@ -228,6 +228,7 @@ register struct thread_info *current_thread_info_reg asm("g6");
  *       an immediate value in instructions such as andcc.
  */
 #define TIF_ABI_PENDING		12
+#define TIF_MEMDIE		13
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1<<TIF_NOTIFY_RESUME)

@@ -50,7 +50,7 @@ module_param_named(cards_limit, drm_cards_limit, int, 0444);
 module_param_named(debug, drm_debug, int, 0666);
 
 drm_minor_t *drm_minors;
-struct class_simple *drm_class;
+struct drm_sysfs_class *drm_class;
 struct proc_dir_entry *drm_proc_root;
 
 static int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_driver *driver)
@@ -87,7 +87,7 @@ static int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct
 	dev->driver = driver;
 	
 	if (dev->driver->preinit)
-		if ((retcode = dev->driver->preinit(dev)))
+		if ((retcode = dev->driver->preinit(dev, ent->driver_data)))
 			goto error_out_unreg;
 
 	if (drm_core_has_AGP(dev)) {
@@ -205,10 +205,13 @@ int drm_probe(struct pci_dev *pdev, const struct pci_device_id *ent, struct drm_
 			}
 
 			
-			dev_class = class_simple_device_add(drm_class, 
-							    MKDEV(DRM_MAJOR, minor), &pdev->dev, "card%d", minor);
+			dev_class = drm_sysfs_device_add(drm_class,
+							 MKDEV(DRM_MAJOR,
+							       minor),
+							 &pdev->dev,
+							 "card%d", minor);
 			if (IS_ERR(dev_class)) {
-				printk(KERN_ERR "DRM: Error class_simple_device_add.\n");
+				printk(KERN_ERR "DRM: Error sysfs_device_add.\n");
 				ret = PTR_ERR(dev_class);
 				goto err_g2;
 			}
@@ -246,7 +249,7 @@ int drm_put_minor(drm_device_t *dev)
 	DRM_DEBUG("release minor %d\n", dev->minor);
 	
 	drm_proc_cleanup(dev->minor, drm_proc_root, minors->dev_root);
-	class_simple_device_remove(MKDEV(DRM_MAJOR, dev->minor));
+	drm_sysfs_device_remove(MKDEV(DRM_MAJOR, dev->minor));
 	
 	*minors = (drm_minor_t){.dev = NULL, .type = DRM_MINOR_FREE};
 	drm_free(dev, sizeof(*dev), DRM_MEM_STUB);

@@ -792,4 +792,22 @@ config SERIAL_M32R_PLDSIO
 	  If you use an M3T-M32700UT or an OPSPUT platform,
 	  please say Y.
 
+config SERIAL_TXX9
+	bool "TMPTX39XX/49XX SIO support"
+	depends HAS_TXX9_SERIAL
+	select SERIAL_CORE
+	default y
+
+config HAS_TXX9_SERIAL
+	bool
+
+config SERIAL_TXX9_CONSOLE
+	bool "TMPTX39XX/49XX SIO Console support"
+	depends on SERIAL_TXX9=y
+	select SERIAL_CORE_CONSOLE
+
+config SERIAL_TXX9_STDSERIAL
+	bool "TX39XX/49XX SIO act as standard serial"
+	depends on !SERIAL_8250 && SERIAL_TXX9
+
 endmenu

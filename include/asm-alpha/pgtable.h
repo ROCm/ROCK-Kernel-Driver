@@ -194,7 +194,7 @@ extern unsigned long __zero_page(void);
  * and a page entry and page directory to the page they refer to.
  */
 #ifndef CONFIG_DISCONTIGMEM
-#define page_to_pa(page)	((page - mem_map) << PAGE_SHIFT)
+#define page_to_pa(page)	(((page) - mem_map) << PAGE_SHIFT)
 
 #define pte_pfn(pte)	(pte_val(pte) >> 32)
 #define pte_page(pte)	pfn_to_page(pte_pfn(pte))
@@ -272,10 +272,10 @@ extern inline pte_t pte_mkyoung(pte_t pte)	{ pte_val(pte) |= __ACCESS_BITS; retu
 #define PAGE_DIR_OFFSET(tsk,address) pgd_offset((tsk),(address))
 
 /* to find an entry in a kernel page-table-directory */
-#define pgd_offset_k(address) pgd_offset(&init_mm, address)
+#define pgd_offset_k(address) pgd_offset(&init_mm, (address))
 
 /* to find an entry in a page-table-directory. */
-#define pgd_index(address)	((address >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+#define pgd_index(address)	(((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
 #define pgd_offset(mm, address)	((mm)->pgd+pgd_index(address))
 
 /* Find an entry in the second-level page table.. */

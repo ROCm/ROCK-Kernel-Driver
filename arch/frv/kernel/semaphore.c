@@ -43,17 +43,18 @@ void __down(struct semaphore *sem, unsigned long flags)
 	struct task_struct *tsk = current;
 	struct sem_waiter waiter;
 
-	semtrace(sem,"Entering __down");
+	semtrace(sem, "Entering __down");
 
 	/* set up my own style of waitqueue */
-	waiter.task	= tsk;
+	waiter.task = tsk;
+	get_task_struct(tsk);
 
 	list_add_tail(&waiter.list, &sem->wait_list);
 
 	/* we don't need to touch the semaphore struct anymore */
 	spin_unlock_irqrestore(&sem->wait_lock, flags);
 
-	/* wait to be given the lock */
+	/* wait to be given the semaphore */
 	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 
 	for (;;) {
@@ -64,7 +65,7 @@ void __down(struct semaphore *sem, unsigned long flags)
 	}
 
 	tsk->state = TASK_RUNNING;
-	semtrace(sem,"Leaving __down");
+	semtrace(sem, "Leaving __down");
 }
 
 EXPORT_SYMBOL(__down);
@@ -83,6 +84,7 @@ int __down_interruptible(struct semaphore *sem, unsigned long flags)
 
 	/* set up my own style of waitqueue */
 	waiter.task = tsk;
+	get_task_struct(tsk);
 
 	list_add_tail(&waiter.list, &sem->wait_list);
 
@@ -91,7 +93,7 @@ int __down_interruptible(struct semaphore *sem, unsigned long flags)
 
 	spin_unlock_irqrestore(&sem->wait_lock, flags);
 
-	/* wait to be given the lock */
+	/* wait to be given the semaphore */
 	ret = 0;
 	for (;;) {
 		if (list_empty(&waiter.list))
@@ -116,6 +118,8 @@ int __down_interruptible(struct semaphore *sem, unsigned long flags)
 	}
 
 	spin_unlock_irqrestore(&sem->wait_lock, flags);
+	if (ret == -EINTR)
+		put_task_struct(current);
 	goto out;
 }
 
@@ -127,14 +131,24 @@ EXPORT_SYMBOL(__down_interruptible);
  */
 void __up(struct semaphore *sem)
 {
+	struct task_struct *tsk;
 	struct sem_waiter *waiter;
 
 	semtrace(sem,"Entering __up");
 
 	/* grant the token to the process at the front of the queue */
 	waiter = list_entry(sem->wait_list.next, struct sem_waiter, list);
+
+	/* We must be careful not to touch 'waiter' after we set ->task = NULL.
+	 * It is an allocated on the waiter's stack and may become invalid at
+	 * any time after that point (due to a wakeup from another source).
+	 */
 	list_del_init(&waiter->list);
-	wake_up_process(waiter->task);
+	tsk = waiter->task;
+	mb();
+	waiter->task = NULL;
+	wake_up_process(tsk);
+	put_task_struct(tsk);
 
 	semtrace(sem,"Leaving __up");
 }

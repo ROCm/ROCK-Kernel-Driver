@@ -547,8 +547,8 @@ int audit_alloc(struct task_struct *tsk)
 
 				/* Preserve login uid */
 	context->loginuid = -1;
-	if (tsk->audit_context)
-		context->loginuid = tsk->audit_context->loginuid;
+	if (current->audit_context)
+		context->loginuid = current->audit_context->loginuid;
 
 	tsk->audit_context  = context;
 	set_tsk_thread_flag(tsk, TIF_SYSCALL_AUDIT);
@@ -903,12 +903,27 @@ void audit_get_stamp(struct audit_context *ctx,
 	}
 }
 
+extern int audit_set_type(struct audit_buffer *ab, int type);
+
 int audit_set_loginuid(struct audit_context *ctx, uid_t loginuid)
 {
 	if (ctx) {
-		if (loginuid < 0)
-			return -EINVAL;
+		struct audit_buffer *ab;
+
+		ab = audit_log_start(NULL);
+		if (ab) {
+			audit_log_format(ab, "login pid=%d uid=%u "
+				"old loginuid=%u new loginuid=%u",
+				ctx->pid, ctx->uid, ctx->loginuid, loginuid);
+			audit_set_type(ab, AUDIT_LOGIN);
+			audit_log_end(ab);
+		}
 		ctx->loginuid = loginuid;
 	}
 	return 0;
+}
+
+uid_t audit_get_loginuid(struct audit_context *ctx)
+{
+	return ctx ? ctx->loginuid : -1;
 }

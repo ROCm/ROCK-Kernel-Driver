@@ -1709,12 +1709,13 @@ flush
 
 Writing to this file results in a flush of the routing cache.
 
-gc_elasticity, gc_interval, gc_min_interval, gc_tresh, gc_timeout,
-gc_thresh, gc_thresh1, gc_thresh2, gc_thresh3
---------------------------------------------------------------
+gc_elasticity, gc_interval, gc_min_interval_ms, gc_timeout, gc_thresh
+---------------------------------------------------------------------
 
 Values to  control  the  frequency  and  behavior  of  the  garbage collection
-algorithm for the routing cache.
+algorithm for the routing cache. gc_min_interval is deprecated and replaced
+by gc_min_interval_ms.
+
 
 max_size
 --------

@@ -422,8 +422,6 @@ static inline int mthca_poll_one(struct mthca_dev *dev,
 				*freed = 0;
 			}
 			spin_unlock(&(*cur_qp)->lock);
-			if (atomic_dec_and_test(&(*cur_qp)->refcount))
-				wake_up(&(*cur_qp)->wait);
 		}
 
 		spin_lock(&dev->qp_table.lock);

@@ -152,7 +152,7 @@ static void idescsi_input_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsigne
 		}
 		count = min(pc->sg->length - pc->b_count, bcount);
 		buf = page_address(pc->sg->page) + pc->sg->offset;
-		atapi_input_bytes (drive, buf + pc->b_count, count);
+		drive->hwif->atapi_input_bytes(drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
 		if (pc->b_count == pc->sg->length) {
 			pc->sg++;
@@ -174,7 +174,7 @@ static void idescsi_output_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsign
 		}
 		count = min(pc->sg->length - pc->b_count, bcount);
 		buf = page_address(pc->sg->page) + pc->sg->offset;
-		atapi_output_bytes (drive, buf + pc->b_count, count);
+		drive->hwif->atapi_output_bytes(drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
 		if (pc->b_count == pc->sg->length) {
 			pc->sg++;
@@ -481,7 +481,7 @@ static ide_startstop_t idescsi_pc_intr (ide_drive_t *drive)
 					if (pc->sg)
 						idescsi_input_buffers(drive, pc, temp);
 					else
-						atapi_input_bytes(drive, pc->current_position, temp);
+						drive->hwif->atapi_input_bytes(drive, pc->current_position, temp);
 					printk(KERN_ERR "ide-scsi: transferred %d of %d bytes\n", temp, bcount.all);
 				}
 				pc->actually_transferred += temp;
@@ -541,7 +541,7 @@ static ide_startstop_t idescsi_transfer_pc(ide_drive_t *drive)
 	/* Set the interrupt routine */
 	ide_set_handler(drive, &idescsi_pc_intr, get_timeout(pc), idescsi_expiry);
 	/* Send the actual packet */
-	atapi_output_bytes(drive, scsi->pc->c, 12);
+	drive->hwif->atapi_output_bytes(drive, scsi->pc->c, 12);
 	if (test_bit (PC_DMA_OK, &pc->flags)) {
 		set_bit (PC_DMA_IN_PROGRESS, &pc->flags);
 		hwif->dma_start(drive);

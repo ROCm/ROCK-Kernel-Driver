@@ -150,7 +150,7 @@ static inline int verify_area(int type, const void * addr, unsigned long size)
  * Returns zero on success, or -EFAULT on error.
  */
 #define put_user(x,ptr)	\
-	__put_user_check((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+	__put_user_check((x),(ptr),sizeof(*(ptr)))
 
 /*
  * get_user: - Get a simple variable from user space.
@@ -170,7 +170,7 @@ static inline int verify_area(int type, const void * addr, unsigned long size)
  * On error, the variable @x is set to zero.
  */
 #define get_user(x,ptr) \
-	__get_user_check((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+	__get_user_check((x),(ptr),sizeof(*(ptr)))
 
 /*
  * __put_user: - Write a simple value into user space, with less checking.
@@ -192,7 +192,7 @@ static inline int verify_area(int type, const void * addr, unsigned long size)
  * Returns zero on success, or -EFAULT on error.
  */
 #define __put_user(x,ptr) \
-	__put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+	__put_user_nocheck((x),(ptr),sizeof(*(ptr)))
 
 /*
  * __get_user: - Get a simple variable from user space, with less checking.
@@ -215,7 +215,7 @@ static inline int verify_area(int type, const void * addr, unsigned long size)
  * On error, the variable @x is set to zero.
  */
 #define __get_user(x,ptr) \
-	__get_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+	__get_user_nocheck((x),(ptr),sizeof(*(ptr)))
 
 struct __large_struct { unsigned long buf[100]; };
 #define __m(x) (*(struct __large_struct *)(x))
@@ -232,9 +232,10 @@ struct __large_struct { unsigned long buf[100]; };
 
 #define __get_user_nocheck(x,ptr,size)					\
 ({									\
-	long __gu_err = 0;						\
 	__typeof(*(ptr)) __gu_val = 0;					\
 	long __gu_addr;							\
+	long __gu_err = 0;						\
+									\
 	might_sleep();							\
 	__gu_addr = (long) (ptr);					\
 	switch (size) {							\
@@ -244,17 +245,18 @@ struct __large_struct { unsigned long buf[100]; };
 	case 8: __GET_USER_DW(__gu_err); break;				\
 	default: __get_user_unknown(); break;				\
 	}								\
-	 x = (__typeof__(*(ptr))) __gu_val;				\
+	x = (__typeof__(*(ptr))) __gu_val;				\
 	__gu_err;							\
 })
 
 #define __get_user_check(x,ptr,size)					\
 ({									\
 	__typeof__(*(ptr)) __gu_val = 0;				\
-	long __gu_addr = (long) (ptr);					\
+	long __gu_addr;							\
 	long __gu_err;							\
 									\
 	might_sleep();							\
+	__gu_addr = (long) (ptr);					\
 	__gu_err = verify_area(VERIFY_READ, (void *) __gu_addr, size);	\
 									\
 	if (likely(!__gu_err)) {					\
@@ -267,7 +269,7 @@ struct __large_struct { unsigned long buf[100]; };
 		}							\
 	}								\
 	x = (__typeof__(*(ptr))) __gu_val;				\
-	 __gu_err;							\
+	__gu_err;							\
 })
 
 #define __get_user_asm(insn,__gu_err)					\
@@ -324,9 +326,10 @@ extern void __get_user_unknown(void);
 
 #define __put_user_nocheck(x,ptr,size)					\
 ({									\
-	long __pu_err = 0;						\
 	__typeof__(*(ptr)) __pu_val;					\
 	long __pu_addr;							\
+	long __pu_err = 0;						\
+									\
 	might_sleep();							\
 	__pu_val = (x);							\
 	__pu_addr = (long) (ptr);					\
@@ -342,11 +345,13 @@ extern void __get_user_unknown(void);
 
 #define __put_user_check(x,ptr,size)					\
 ({									\
-	__typeof__(*(ptr)) __pu_val = (x);				\
-	long __pu_addr = (long) (ptr);					\
+	__typeof__(*(ptr)) __pu_val;					\
+	long __pu_addr;							\
 	long __pu_err;							\
 									\
 	might_sleep();							\
+	__pu_val = (x);							\
+	__pu_addr = (long) (ptr);					\
 	__pu_err = verify_area(VERIFY_WRITE, (void *) __pu_addr, size);	\
 									\
 	if (likely(!__pu_err)) {					\

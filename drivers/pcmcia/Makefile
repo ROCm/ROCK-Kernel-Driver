@@ -30,9 +30,22 @@ obj-$(CONFIG_PCMCIA_SA1111)			+= sa11xx_core.o sa1111_cs.o
 obj-$(CONFIG_PCMCIA_PXA2XX)                     += pxa2xx_core.o pxa2xx_cs.o
 obj-$(CONFIG_M32R_PCC)				+= m32r_pcc.o
 obj-$(CONFIG_M32R_CFC)				+= m32r_cfc.o
+obj-$(CONFIG_PCMCIA_AU1X00)			+= au1x00_ss.o
+obj-$(CONFIG_PCMCIA_VRC4171)			+= vrc4171_card.o
+obj-$(CONFIG_PCMCIA_VRC4173)			+= vrc4173_cardu.o
 
 sa11xx_core-y					+= soc_common.o sa11xx_base.o
 pxa2xx_core-y					+= soc_common.o pxa2xx_base.o
+
+au1x00_ss-y					+= au1000_generic.o
+au1x00_ss-$(CONFIG_MIPS_PB1000)			+= au1000_pb1x00.o
+au1x00_ss-$(CONFIG_MIPS_PB1100)			+= au1000_pb1x00.o
+au1x00_ss-$(CONFIG_MIPS_PB1500)			+= au1000_pb1x00.o
+au1x00_ss-$(CONFIG_MIPS_DB1000)			+= au1000_db1x00.o
+au1x00_ss-$(CONFIG_MIPS_DB1100)			+= au1000_db1x00.o
+au1x00_ss-$(CONFIG_MIPS_DB1500)			+= au1000_db1x00.o
+au1x00_ss-$(CONFIG_MIPS_DB1550)			+= au1000_db1x00.o
+au1x00_ss-$(CONFIG_MIPS_XXS1500)               += au1000_xxs1500.o
 
 sa1111_cs-y					+= sa1111_generic.o
 sa1111_cs-$(CONFIG_ASSABET_NEPONSET)		+= sa1100_neponset.o

@@ -78,9 +78,9 @@ enum sparc_cpu {
 
 #define nop() 		__asm__ __volatile__ ("nop")
 
-#define membar(type)	__asm__ __volatile__ ("membar " type : : : "memory");
+#define membar(type)	__asm__ __volatile__ ("membar " type : : : "memory")
 #define mb()		\
-	membar("#LoadLoad | #LoadStore | #StoreStore | #StoreLoad");
+	membar("#LoadLoad | #LoadStore | #StoreStore | #StoreLoad")
 #define rmb()		membar("#LoadLoad")
 #define wmb()		membar("#StoreStore")
 #define read_barrier_depends()		do { } while(0)
@@ -95,9 +95,9 @@ enum sparc_cpu {
 #define smp_wmb()	wmb()
 #define smp_read_barrier_depends()	read_barrier_depends()
 #else
-#define smp_mb()	__asm__ __volatile__("":::"memory");
-#define smp_rmb()	__asm__ __volatile__("":::"memory");
-#define smp_wmb()	__asm__ __volatile__("":::"memory");
+#define smp_mb()	__asm__ __volatile__("":::"memory")
+#define smp_rmb()	__asm__ __volatile__("":::"memory")
+#define smp_wmb()	__asm__ __volatile__("":::"memory")
 #define smp_read_barrier_depends()	do { } while(0)
 #endif
 
@@ -107,7 +107,7 @@ enum sparc_cpu {
 
 /* Performance counter register access. */
 #define read_pcr(__p)  __asm__ __volatile__("rd	%%pcr, %0" : "=r" (__p))
-#define write_pcr(__p) __asm__ __volatile__("wr	%0, 0x0, %%pcr" : : "r" (__p));
+#define write_pcr(__p) __asm__ __volatile__("wr	%0, 0x0, %%pcr" : : "r" (__p))
 #define read_pic(__p)  __asm__ __volatile__("rd %%pic, %0" : "=r" (__p))
 
 /* Blackbird errata workaround.  See commentary in
@@ -229,6 +229,7 @@ do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 static __inline__ unsigned long xchg32(__volatile__ unsigned int *m, unsigned int val)
 {
 	__asm__ __volatile__(
+"	membar		#StoreLoad | #LoadLoad\n"
 "	mov		%0, %%g5\n"
 "1:	lduw		[%2], %%g7\n"
 "	cas		[%2], %%g7, %0\n"
@@ -245,6 +246,7 @@ static __inline__ unsigned long xchg32(__volatile__ unsigned int *m, unsigned in
 static __inline__ unsigned long xchg64(__volatile__ unsigned long *m, unsigned long val)
 {
 	__asm__ __volatile__(
+"	membar		#StoreLoad | #LoadLoad\n"
 "	mov		%0, %%g5\n"
 "1:	ldx		[%2], %%g7\n"
 "	casx		[%2], %%g7, %0\n"
@@ -289,7 +291,8 @@ extern void die_if_kernel(char *str, struct pt_regs *regs) __attribute__ ((noret
 static __inline__ unsigned long
 __cmpxchg_u32(volatile int *m, int old, int new)
 {
-	__asm__ __volatile__("cas [%2], %3, %0\n\t"
+	__asm__ __volatile__("membar #StoreLoad | #LoadLoad\n"
+			     "cas [%2], %3, %0\n\t"
 			     "membar #StoreLoad | #StoreStore"
 			     : "=&r" (new)
 			     : "0" (new), "r" (m), "r" (old)
@@ -301,7 +304,8 @@ __cmpxchg_u32(volatile int *m, int old, int new)
 static __inline__ unsigned long
 __cmpxchg_u64(volatile long *m, unsigned long old, unsigned long new)
 {
-	__asm__ __volatile__("casx [%2], %3, %0\n\t"
+	__asm__ __volatile__("membar #StoreLoad | #LoadLoad\n"
+			     "casx [%2], %3, %0\n\t"
 			     "membar #StoreLoad | #StoreStore"
 			     : "=&r" (new)
 			     : "0" (new), "r" (m), "r" (old)

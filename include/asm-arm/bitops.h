@@ -356,7 +356,7 @@ static __inline__ int generic_fls(int x);
  * Find first bit set in a 168-bit bitmap, where the first
  * 128 bits are unlikely to be set.
  */
-static inline int sched_find_first_bit(unsigned long *b)
+static inline int sched_find_first_bit(const unsigned long *b)
 {
 	unsigned long v;
 	unsigned int off;

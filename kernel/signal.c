@@ -847,10 +847,7 @@ specific_send_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 
 	if (!irqs_disabled())
 		BUG();
-#ifdef CONFIG_SMP
-	if (!spin_is_locked(&t->sighand->siglock))
-		BUG();
-#endif
+	assert_spin_locked(&t->sighand->siglock);
 
 	if (((unsigned long)info > 2) && (info->si_code == SI_TIMER))
 		/*
@@ -1044,10 +1041,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	int ret = 0;
 
-#ifdef CONFIG_SMP
-	if (!spin_is_locked(&p->sighand->siglock))
-		BUG();
-#endif
+	assert_spin_locked(&p->sighand->siglock);
 	handle_stop_signal(sig, p);
 
 	if (((unsigned long)info > 2) && (info->si_code == SI_TIMER))

@@ -1462,7 +1462,8 @@ void __init paging_init(void)
 	memset(swapper_pmd_dir, 0, sizeof(swapper_pmd_dir));
 
 	/* Now can init the kernel/bad page tables. */
-	pgd_set(&swapper_pg_dir[0], swapper_pmd_dir + (shift / sizeof(pgd_t)));
+	pud_set(pud_offset(&swapper_pg_dir[0], 0),
+		swapper_pmd_dir + (shift / sizeof(pgd_t)));
 	
 	sparc64_vpte_patchme1[0] |=
 		(((unsigned long)pgd_val(init_mm.pgd[0])) >> 10);

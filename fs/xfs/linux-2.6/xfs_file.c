@@ -82,23 +82,23 @@ __linvfs_read(
 
 
 STATIC ssize_t
-linvfs_read(
+linvfs_aio_read(
 	struct kiocb		*iocb,
 	char			__user *buf,
 	size_t			count,
 	loff_t			pos)
 {
-	return __linvfs_read(iocb, buf, 0, count, pos);
+	return __linvfs_read(iocb, buf, IO_ISAIO, count, pos);
 }
 
 STATIC ssize_t
-linvfs_read_invis(
+linvfs_aio_read_invis(
 	struct kiocb		*iocb,
 	char			__user *buf,
 	size_t			count,
 	loff_t			pos)
 {
-	return __linvfs_read(iocb, buf, IO_INVIS, count, pos);
+	return __linvfs_read(iocb, buf, IO_ISAIO|IO_INVIS, count, pos);
 }
 
 
@@ -126,23 +126,23 @@ __linvfs_write(
 
 
 STATIC ssize_t
-linvfs_write(
+linvfs_aio_write(
 	struct kiocb		*iocb,
 	const char		__user *buf,
 	size_t			count,
 	loff_t			pos)
 {
-	return __linvfs_write(iocb, buf, 0, count, pos);
+	return __linvfs_write(iocb, buf, IO_ISAIO, count, pos);
 }
 
 STATIC ssize_t
-linvfs_write_invis(
+linvfs_aio_write_invis(
 	struct kiocb		*iocb,
 	const char		__user *buf,
 	size_t			count,
 	loff_t			pos)
 {
-	return __linvfs_write(iocb, buf, IO_INVIS, count, pos);
+	return __linvfs_write(iocb, buf, IO_ISAIO|IO_INVIS, count, pos);
 }
 
 
@@ -489,8 +489,8 @@ struct file_operations linvfs_file_operations = {
 	.write		= do_sync_write,
 	.readv		= linvfs_readv,
 	.writev		= linvfs_writev,
-	.aio_read	= linvfs_read,
-	.aio_write	= linvfs_write,
+	.aio_read	= linvfs_aio_read,
+	.aio_write	= linvfs_aio_write,
 	.sendfile	= linvfs_sendfile,
 	.unlocked_ioctl	= linvfs_ioctl,
 #ifdef CONFIG_COMPAT
@@ -508,8 +508,8 @@ struct file_operations linvfs_invis_file_operations = {
 	.write		= do_sync_write,
 	.readv		= linvfs_readv_invis,
 	.writev		= linvfs_writev_invis,
-	.aio_read	= linvfs_read_invis,
-	.aio_write	= linvfs_write_invis,
+	.aio_read	= linvfs_aio_read_invis,
+	.aio_write	= linvfs_aio_write_invis,
 	.sendfile	= linvfs_sendfile,
 	.unlocked_ioctl	= linvfs_ioctl_invis,
 #ifdef CONFIG_COMPAT
@@ -531,6 +531,7 @@ struct file_operations linvfs_dir_operations = {
 
 static struct vm_operations_struct linvfs_file_vm_ops = {
 	.nopage		= filemap_nopage,
+	.populate	= filemap_populate,
 #ifdef HAVE_VMOP_MPROTECT
 	.mprotect	= linvfs_mprotect,
 #endif

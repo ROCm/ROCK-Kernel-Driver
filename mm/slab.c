@@ -894,16 +894,13 @@ static void *kmem_getpages(kmem_cache_t *cachep, int flags, int nodeid)
 
 	flags |= cachep->gfpflags;
 	if (likely(nodeid == -1)) {
-		addr = (void*)__get_free_pages(flags, cachep->gfporder);
-		if (!addr)
-			return NULL;
-		page = virt_to_page(addr);
+		page = alloc_pages(flags, cachep->gfporder);
 	} else {
 		page = alloc_pages_node(nodeid, flags, cachep->gfporder);
-		if (!page)
-			return NULL;
-		addr = page_address(page);
 	}
+	if (!page)
+		return NULL;
+	addr = page_address(page);
 
 	i = (1 << cachep->gfporder);
 	if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
@@ -2863,7 +2860,7 @@ static void *s_start(struct seq_file *m, loff_t *pos)
 		seq_puts(m, "slabinfo - version: 2.1\n");
 #endif
 		seq_puts(m, "# name            <active_objs> <num_objs> <objsize> <objperslab> <pagesperslab>");
-		seq_puts(m, " : tunables <batchcount> <limit> <sharedfactor>");
+		seq_puts(m, " : tunables <limit> <batchcount> <sharedfactor>");
 		seq_puts(m, " : slabdata <active_slabs> <num_slabs> <sharedavail>");
 #if STATS
 		seq_puts(m, " : globalstat <listallocs> <maxobjs> <grown> <reaped>"

@@ -73,6 +73,11 @@ config EBONY
 	help
 	  This option enables support for the IBM PPC440GP evaluation board.
 
+config LUAN
+	bool "Luan"
+	help
+	  This option enables support for the IBM PPC440SP evaluation board.
+
 config OCOTEA
 	bool "Ocotea"
 	help
@@ -103,9 +108,14 @@ config 440GX
 	depends on OCOTEA
 	default y
 
+config 440SP
+	bool
+	depends on LUAN
+	default y
+
 config 440
 	bool
-	depends on 440GP
+	depends on 440GP || 440SP
 	default y
 
 config 440A
@@ -132,7 +142,7 @@ config BOOKE
 
 config IBM_OCP
 	bool
-	depends on ASH || BUBINGA || CPCI405 || EBONY || EP405 || OCOTEA || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
+	depends on ASH || BUBINGA || CPCI405 || EBONY || EP405 || LUAN || OCOTEA || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
 	default y
 
 config XILINX_OCP
@@ -142,7 +152,7 @@ config XILINX_OCP
 
 config IBM_EMAC4
 	bool
-	depends on 440GX
+	depends on 440GX || 440SP
 	default y
 
 config BIOS_FIXUP

@@ -305,9 +305,9 @@ static void dump_write_message(unsigned char *buf)
 	printk("  B5   force mute audio: %s\n",
 	       (buf[1] & 0x20) ? "yes" : "no");
 	printk("  B6   output port 1   : %s\n",
-	       (buf[1] & 0x40) ? "high" : "low");
+	       (buf[1] & 0x40) ? "high (inactive)" : "low (active)");
 	printk("  B7   output port 2   : %s\n",
-	       (buf[1] & 0x80) ? "high" : "low");
+	       (buf[1] & 0x80) ? "high (inactive)" : "low (active)");
 
 	printk(PREFIX "write: byte C 0x%02x\n",buf[2]);
 	printk("  C0-4 top adjustment  : %s dB\n", adjust[buf[2] & 0x1f]);
@@ -545,19 +545,24 @@ static int tda9887_configure(struct tda9887 *t)
 	int rc;
 
 	memset(buf,0,sizeof(buf));
+	tda9887_set_tvnorm(t,buf);
 	buf[1] |= cOutputPort1Inactive;
 	buf[1] |= cOutputPort2Inactive;
-	tda9887_set_tvnorm(t,buf);
 	if (UNSET != t->pinnacle_id) {
 		tda9887_set_pinnacle(t,buf);
 	}
 	tda9887_set_config(t,buf);
 	tda9887_set_insmod(t,buf);
 
+#if 0
+	/* This as-is breaks some cards, must be fixed in a
+	 * card-specific way, probably using TDA9887_SET_CONFIG to
+	  * turn on/off port2 */
 	if (t->std & V4L2_STD_SECAM_L) {
 		/* secam fixup (FIXME: move this to tvnorms array?) */
 		buf[1] &= ~cOutputPort2Inactive;
 	}
+#endif
 
 	dprintk(PREFIX "writing: b=0x%02x c=0x%02x e=0x%02x\n",
 		buf[1],buf[2],buf[3]);

@@ -331,8 +331,8 @@ static sector_t max_io_len(struct mapped_device *md,
 	 */
 	if (ti->split_io) {
 		sector_t boundary;
-		boundary = dm_round_up(offset + 1, ti->split_io) - offset;
-
+		boundary = ((offset + ti->split_io) & ~(ti->split_io - 1))
+			   - offset;
 		if (len > boundary)
 			len = boundary;
 	}

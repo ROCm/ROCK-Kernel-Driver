@@ -61,7 +61,6 @@ extern int core_uses_pid;
 extern char core_pattern[];
 extern int cad_pid;
 extern int pid_max;
-extern int sysctl_lower_zone_protection;
 extern int min_free_kbytes;
 extern int printk_ratelimit_jiffies;
 extern int printk_ratelimit_burst;
@@ -745,14 +744,13 @@ static ctl_table vm_table[] = {
 	 },
 #endif
 	{
-		.ctl_name	= VM_LOWER_ZONE_PROTECTION,
-		.procname	= "lower_zone_protection",
-		.data		= &sysctl_lower_zone_protection,
-		.maxlen		= sizeof(sysctl_lower_zone_protection),
+		.ctl_name	= VM_LOWMEM_RESERVE_RATIO,
+		.procname	= "lowmem_reserve_ratio",
+		.data		= &sysctl_lowmem_reserve_ratio,
+		.maxlen		= sizeof(sysctl_lowmem_reserve_ratio),
 		.mode		= 0644,
-		.proc_handler	= &lower_zone_protection_sysctl_handler,
+		.proc_handler	= &lowmem_reserve_ratio_sysctl_handler,
 		.strategy	= &sysctl_intvec,
-		.extra1		= &zero,
 	},
 	{
 		.ctl_name	= VM_MIN_FREE_KBYTES,

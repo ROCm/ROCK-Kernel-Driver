@@ -175,9 +175,10 @@ cio_start_handle_notoper(struct subchannel *sch, __u8 lpm)
 }
 
 int
-cio_start (struct subchannel *sch,	/* subchannel structure */
-	   struct ccw1 * cpa,		/* logical channel prog addr */
-	   __u8 lpm)			/* logical path mask */
+cio_start_key (struct subchannel *sch,	/* subchannel structure */
+	       struct ccw1 * cpa,	/* logical channel prog addr */
+	       __u8 lpm,		/* logical path mask */
+	       __u8 key)                /* storage key */
 {
 	char dbf_txt[15];
 	int ccode;
@@ -200,12 +201,12 @@ cio_start (struct subchannel *sch,	/* subchannel structure */
 	sch->orb.c64 = 1;
 	sch->orb.i2k = 0;
 #endif
+	sch->orb.key = key >> 4;
+	/* issue "Start Subchannel" */
 	sch->orb.cpa = (__u32) __pa (cpa);
-
-	/*
-	 * Issue "Start subchannel" and process condition code
-	 */
 	ccode = ssch (sch->irq, &sch->orb);
+
+	/* process condition code */
 	sprintf (dbf_txt, "ccode:%d", ccode);
 	CIO_TRACE_EVENT (4, dbf_txt);
 
@@ -222,6 +223,12 @@ cio_start (struct subchannel *sch,	/* subchannel structure */
 	default:		/* device/path not operational */
 		return cio_start_handle_notoper(sch, lpm);
 	}
+}
+
+int
+cio_start (struct subchannel *sch, struct ccw1 *cpa, __u8 lpm)
+{
+	return cio_start_key(sch, cpa, lpm, default_storage_key);
 }
 
 /*

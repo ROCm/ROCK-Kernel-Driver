@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.154 $
+ * $Revision: 1.156 $
  */
 
 #include <linux/config.h>
@@ -179,7 +179,7 @@ dasd_state_known_to_basic(struct dasd_device * device)
 	device->debug_area = debug_register(device->cdev->dev.bus_id, 0, 2,
 					    8 * sizeof (long));
 	debug_register_view(device->debug_area, &debug_sprintf_view);
-	debug_set_level(device->debug_area, DBF_DEBUG);
+	debug_set_level(device->debug_area, DBF_EMERG);
 	DBF_DEV_EVENT(DBF_EMERG, device, "%s", "debug area created");
 
 	device->state = DASD_STATE_BASIC;
@@ -745,8 +745,9 @@ dasd_start_IO(struct dasd_ccw_req * cqr)
 	switch (rc) {
 	case 0:
 		cqr->status = DASD_CQR_IN_IO;
-		DBF_DEV_EVENT(DBF_DEBUG, device, "%s",
-			      "start_IO: request %p started successful");
+		DBF_DEV_EVENT(DBF_DEBUG, device,
+			      "start_IO: request %p started successful",
+			      cqr);
 		break;
 	case -EBUSY:
 		DBF_DEV_EVENT(DBF_ERR, device, "%s",
@@ -1579,25 +1580,26 @@ do_dasd_request(request_queue_t * queue)
 }
 
 /*
- * Allocate and initialize request queue.
+ * Allocate and initialize request queue and default I/O scheduler.
  */
 static int
 dasd_alloc_queue(struct dasd_device * device)
 {
+	int rc;
+
 	device->request_queue = blk_init_queue(do_dasd_request,
 					       &device->request_queue_lock);
 	if (device->request_queue == NULL)
 		return -ENOMEM;
 
 	device->request_queue->queuedata = device;
-#if 0
+
 	elevator_exit(device->request_queue->elevator);
-	rc = elevator_init(device->request_queue, "noop");
+	rc = elevator_init(device->request_queue, "deadline");
 	if (rc) {
 		blk_cleanup_queue(device->request_queue);
 		return rc;
 	}
-#endif
 	return 0;
 }
 
@@ -1963,7 +1965,7 @@ dasd_init(void)
 		goto failed;
 	}
 	debug_register_view(dasd_debug_area, &debug_sprintf_view);
-	debug_set_level(dasd_debug_area, DBF_DEBUG);
+	debug_set_level(dasd_debug_area, DBF_EMERG);
 
 	DBF_EVENT(DBF_EMERG, "%s", "debug area created");
 

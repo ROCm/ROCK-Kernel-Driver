@@ -320,32 +320,44 @@ static int ptrace_setoptions(struct task_struct *child, long data)
 static int ptrace_getsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
 	siginfo_t lastinfo;
+	int error = -ESRCH;
 
-	spin_lock_irq(&child->sighand->siglock);
-	if (likely(child->last_siginfo != NULL)) {
-		memcpy(&lastinfo, child->last_siginfo, sizeof (siginfo_t));
+	read_lock(&tasklist_lock);
+	if (likely(child->sighand != NULL)) {
+		error = -EINVAL;
+		spin_lock_irq(&child->sighand->siglock);
+		if (likely(child->last_siginfo != NULL)) {
+			lastinfo = *child->last_siginfo;
+			error = 0;
+		}
 		spin_unlock_irq(&child->sighand->siglock);
-		return copy_siginfo_to_user(data, &lastinfo);
 	}
-	spin_unlock_irq(&child->sighand->siglock);
-	return -EINVAL;
+	read_unlock(&tasklist_lock);
+	if (!error)
+		return copy_siginfo_to_user(data, &lastinfo);
+	return error;
 }
 
 static int ptrace_setsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
 	siginfo_t newinfo;
+	int error = -ESRCH;
 
-	if (copy_from_user(&newinfo, data, sizeof (siginfo_t)) != 0)
+	if (copy_from_user(&newinfo, data, sizeof (siginfo_t)))
 		return -EFAULT;
 
-	spin_lock_irq(&child->sighand->siglock);
-	if (likely(child->last_siginfo != NULL)) {
-		memcpy(child->last_siginfo, &newinfo, sizeof (siginfo_t));
+	read_lock(&tasklist_lock);
+	if (likely(child->sighand != NULL)) {
+		error = -EINVAL;
+		spin_lock_irq(&child->sighand->siglock);
+		if (likely(child->last_siginfo != NULL)) {
+			*child->last_siginfo = newinfo;
+			error = 0;
+		}
 		spin_unlock_irq(&child->sighand->siglock);
-		return 0;
 	}
-	spin_unlock_irq(&child->sighand->siglock);
-	return -EINVAL;
+	read_unlock(&tasklist_lock);
+	return error;
 }
 
 int ptrace_request(struct task_struct *child, long request,

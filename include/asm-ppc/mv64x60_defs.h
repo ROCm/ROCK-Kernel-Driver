@@ -216,9 +216,9 @@
 #define MV64360_CPU1_SYNC_BARRIER_VIRT		0x00d8
 
 /* CPU Deadlock and Ordering registers (Rev B part only) */
-#define GT64260_CPU_DEADLOCK_ORDERING                   0x02d0
-#define GT64260_CPU_WB_PRIORITY_BUFFER_DEPTH            0x02d8
-#define GT64260_CPU_COUNTERS_SYNC_BARRIER_ATTRIBUTE     0x02e0
+#define GT64260_CPU_DEADLOCK_ORDERING			0x02d0
+#define GT64260_CPU_WB_PRIORITY_BUFFER_DEPTH		0x02d8
+#define GT64260_CPU_COUNTERS_SYNC_BARRIER_ATTRIBUTE	0x02e0
 
 /* CPU Access Protection Registers (gt64260 realy has 8 but don't need) */
 #define	MV64x260_CPU_PROT_WINDOWS		4

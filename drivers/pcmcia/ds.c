@@ -660,7 +660,7 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 			p_dev = pcmcia_get_dev(p_dev);
 			if (!p_dev)
 				continue;
-			if ((!p_dev->client.state & CLIENT_UNBOUND) ||
+			if (!(p_dev->client.state & CLIENT_UNBOUND) ||
 			    (!p_dev->dev.driver)) {
 				pcmcia_put_dev(p_dev);
 				continue;

@@ -50,9 +50,10 @@ typedef struct compat_siginfo {
 
 		/* POSIX.1b timers */
 		struct {
-			unsigned int	_timer1;
-			unsigned int	_timer2;
-                
+			timer_t _tid;		/* timer id */
+			int _overrun;		/* overrun count */
+			sigval_t _sigval;	/* same as below */
+			int _sys_private;       /* not to be passed to user */
 		} _timer;
 
 		/* POSIX.1b signals */
@@ -98,6 +99,8 @@ typedef struct compat_siginfo {
 #define si_addr		_sifields._sigfault._addr
 #define si_band		_sifields._sigpoll._band
 #define si_fd		_sifields._sigpoll._fd    
+#define si_tid		_sifields._timer._tid
+#define si_overrun	_sifields._timer._overrun
 
 /* asm/sigcontext.h */
 typedef union

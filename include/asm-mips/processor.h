@@ -66,11 +66,6 @@ extern unsigned int vced_count, vcei_count;
 	PAGE_ALIGN(TASK_SIZE32 / 3) : PAGE_ALIGN(TASK_SIZE / 3))
 #endif
 
-/*
- * Size of io_bitmap in longwords.
- */
-#define IO_BITMAP_SIZE	2048
-
 #define NUM_FPU_REGS	32
 
 typedef __u64 fpureg_t;

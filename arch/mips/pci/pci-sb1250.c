@@ -182,8 +182,8 @@ static int sb1250_pcibios_write(struct pci_bus *bus, unsigned int devfn,
 }
 
 struct pci_ops sb1250_pci_ops = {
-	.read = sb1250_pcibios_read,
-	.write = sb1250_pcibios_write
+	.read	= sb1250_pcibios_read,
+	.write	= sb1250_pcibios_write,
 };
 
 static struct resource sb1250_mem_resource = {
@@ -192,7 +192,7 @@ static struct resource sb1250_mem_resource = {
 	.end	= 0x5fffffffUL,
 	.flags	= IORESOURCE_MEM,
 };
-                                                                                
+
 static struct resource sb1250_io_resource = {
 	.name	= "SB1250 PCI I/O",
 	.start	= 0x00000000UL,
@@ -215,9 +215,13 @@ static int __init sb1250_pcibios_init(void)
 	/* CFE will assign PCI resources */
 	pci_probe_only = 1;
 
+	/* Avoid ISA compat ranges.  */
+	PCIBIOS_MIN_IO = 0x00008000UL;
+	PCIBIOS_MIN_MEM = 0x01000000UL;
+
 	/* Set I/O resource limits.  */
-	ioport_resource.end = 0x01ffffff;	/* 32MB accessible by sb1250 */
-	iomem_resource.end = 0xffffffff;	/* no HT support yet */
+	ioport_resource.end = 0x01ffffffUL;	/* 32MB accessible by sb1250 */
+	iomem_resource.end = 0xffffffffUL;	/* no HT support yet */
 
 	cfg_space =
 	    ioremap(A_PHYS_LDTPCI_CFG_MATCH_BITS, 16 * 1024 * 1024);
