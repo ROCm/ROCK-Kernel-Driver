@@ -84,7 +84,8 @@ decl_subsys(system,&ktype_sysdev,NULL);
 
 int sysdev_class_register(struct sysdev_class * cls)
 {
-	pr_debug("Registering sysdev class '%s'\n",cls->kset.kobj.name);
+	pr_debug("Registering sysdev class '%s'\n",
+		 kobject_name(&cls->kset.kobj));
 	INIT_LIST_HEAD(&cls->drivers);
 	cls->kset.subsys = &system_subsys;
 	kset_set_kset_s(cls,system_subsys);
@@ -93,7 +94,8 @@ int sysdev_class_register(struct sysdev_class * cls)
 
 void sysdev_class_unregister(struct sysdev_class * cls)
 {
-	pr_debug("Unregistering sysdev class '%s'\n",cls->kset.kobj.name);
+	pr_debug("Unregistering sysdev class '%s'\n",
+		 kobject_name(&cls->kset.kobj));
 	kset_unregister(&cls->kset);
 }
 
@@ -175,12 +177,9 @@ int sys_device_register(struct sys_device * sysdev)
 
 	/* But make sure we point to the right type for sysfs translation */
 	sysdev->kobj.ktype = &ktype_sysdev;
-
-	/* set the kobject name */
-	snprintf(sysdev->kobj.name,KOBJ_NAME_LEN,"%s%d",
-		 cls->kset.kobj.name,sysdev->id);
-
-	pr_debug("Registering sys device '%s'\n",sysdev->kobj.name);
+	kobject_set_name(&sysdev->kobj,"%s%d",
+			 kobject_name(&cls->kset.kobj),sysdev->id);
+	pr_debug("Registering sys device '%s'\n",kobject_name(&sysdev->kobj));
 
 	/* Register the object */
 	error = kobject_register(&sysdev->kobj);
@@ -255,11 +254,12 @@ void sysdev_shutdown(void)
 				    kset.kobj.entry) {
 		struct sys_device * sysdev;
 
-		pr_debug("Shutting down type '%s':\n",cls->kset.kobj.name);
+		pr_debug("Shutting down type '%s':\n",
+			 kobject_name(&cls->kset.kobj));
 
 		list_for_each_entry(sysdev,&cls->kset.list,kobj.entry) {
 			struct sysdev_driver * drv;
-			pr_debug(" %s\n",sysdev->kobj.name);
+			pr_debug(" %s\n",kobject_name(&sysdev->kobj));
 
 			/* Call global drivers first. */
 			list_for_each_entry(drv,&global_drivers,entry) {
@@ -305,11 +305,12 @@ int sysdev_suspend(u32 state)
 				    kset.kobj.entry) {
 		struct sys_device * sysdev;
 
-		pr_debug("Suspending type '%s':\n",cls->kset.kobj.name);
+		pr_debug("Suspending type '%s':\n",
+			 kobject_name(&cls->kset.kobj));
 
 		list_for_each_entry(sysdev,&cls->kset.list,kobj.entry) {
 			struct sysdev_driver * drv;
-			pr_debug(" %s\n",sysdev->kobj.name);
+			pr_debug(" %s\n",kobject_name(&sysdev->kobj));
 
 			/* Call global drivers first. */
 			list_for_each_entry(drv,&global_drivers,entry) {
@@ -350,11 +351,12 @@ int sysdev_resume(void)
 	list_for_each_entry(cls,&system_subsys.kset.list,kset.kobj.entry) {
 		struct sys_device * sysdev;
 
-		pr_debug("Resuming type '%s':\n",cls->kset.kobj.name);
+		pr_debug("Resuming type '%s':\n",
+			 kobject_name(&cls->kset.kobj));
 
 		list_for_each_entry(sysdev,&cls->kset.list,kobj.entry) {
 			struct sysdev_driver * drv;
-			pr_debug(" %s\n",sysdev->kobj.name);
+			pr_debug(" %s\n",kobject_name(&sysdev->kobj));
 
 			/* First, call the class-specific one */
 			if (cls->resume)

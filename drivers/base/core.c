@@ -220,7 +220,7 @@ int device_add(struct device *dev)
 	pr_debug("DEV: registering device: ID = '%s'\n", dev->bus_id);
 
 	/* first, register with generic layer. */
-	strlcpy(dev->kobj.name,dev->bus_id,KOBJ_NAME_LEN);
+	kobject_set_name(&dev->kobj,dev->bus_id);
 	if (parent)
 		dev->kobj.parent = &parent->kobj;
 
