@@ -357,8 +357,8 @@ static unsigned char snd_sonicvibes_in(sonicvibes_t * sonic, unsigned char reg)
 	return value;
 }
 
-#ifdef CONFIG_SND_DEBUG
-void snd_sonicvibes_debug(sonicvibes_t * sonic)
+#if 0
+static void snd_sonicvibes_debug(sonicvibes_t * sonic)
 {
 	printk("SV REGS:          INDEX = 0x%02x  ", inb(SV_REG(sonic, INDEX)));
 	printk("                 STATUS = 0x%02x\n", inb(SV_REG(sonic, STATUS)));

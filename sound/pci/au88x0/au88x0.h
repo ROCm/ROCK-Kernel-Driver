@@ -80,7 +80,8 @@
 #define VORTEX_RESOURCE_LAST	0x00000005
 
 /* Check for SDAC bit in "Extended audio ID" AC97 register */
-#define VORTEX_IS_QUAD(x) ((x->codec == NULL) ?  0 : (x->codec->ext_id&0x80))
+//#define VORTEX_IS_QUAD(x) (((x)->codec == NULL) ?  0 : ((x)->codec->ext_id&0x80))
+#define VORTEX_IS_QUAD(x) ((x)->isquad)
 /* Check if chip has bug. */
 #define IS_BAD_CHIP(x) (\
 	(x->rev == 0xfe && x->device == PCI_DEVICE_ID_AUREAL_VORTEX_2) || \
@@ -164,6 +165,8 @@ struct snd_vortex {
 	int xt_mode;		/* 1: speakers, 0:headphones. */
 #endif
 
+	int isquad;		/* cache of extended ID codec flag. */
+
 	/* Gameport stuff. */
 	struct gameport *gameport;
 
@@ -208,6 +211,7 @@ static void vortex_adbdma_startfifo(vortex_t * vortex, int adbdma);
 static void vortex_adbdma_pausefifo(vortex_t * vortex, int adbdma);
 static void vortex_adbdma_resumefifo(vortex_t * vortex, int adbdma);
 static int inline vortex_adbdma_getlinearpos(vortex_t * vortex, int adbdma);
+static void vortex_adbdma_resetup(vortex_t *vortex, int adbdma);
 
 #ifndef CHIP_AU8810
 static void vortex_wtdma_startfifo(vortex_t * vortex, int wtdma);

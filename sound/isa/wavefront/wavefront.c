@@ -279,7 +279,7 @@ static irqreturn_t snd_wavefront_ics2115_interrupt(int irq,
 	return IRQ_HANDLED;
 }
 
-snd_hwdep_t * __devinit
+static snd_hwdep_t * __devinit
 snd_wavefront_new_synth (snd_card_t *card,
 			 int hw_dev,
 			 snd_wavefront_card_t *acard)
@@ -305,7 +305,7 @@ snd_wavefront_new_synth (snd_card_t *card,
 	return wavefront_synth;
 }
 
-snd_hwdep_t * __devinit
+static snd_hwdep_t * __devinit
 snd_wavefront_new_fx (snd_card_t *card,
 		      int hw_dev,
 		      snd_wavefront_card_t *acard,
@@ -332,7 +332,7 @@ snd_wavefront_new_fx (snd_card_t *card,
 static snd_wavefront_mpu_id internal_id = internal_mpu;
 static snd_wavefront_mpu_id external_id = external_mpu;
 
-snd_rawmidi_t * __devinit
+static snd_rawmidi_t * __devinit
 snd_wavefront_new_midi (snd_card_t *card,
 			int midi_dev,
 			snd_wavefront_card_t *acard,

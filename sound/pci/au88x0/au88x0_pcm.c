@@ -313,8 +313,10 @@ static int snd_vortex_pcm_trigger(snd_pcm_substream_t * substream, int cmd)
 		// do something to start the PCM engine
 		//printk(KERN_INFO "vortex: start %d\n", dma);
 		stream->fifo_enabled = 1;
-		if (VORTEX_PCM_TYPE(substream->pcm) != VORTEX_PCM_WT)
+		if (VORTEX_PCM_TYPE(substream->pcm) != VORTEX_PCM_WT) {
+			vortex_adbdma_resetup(chip, dma);
 			vortex_adbdma_startfifo(chip, dma);
+		}
 #ifndef CHIP_AU8810
 		else {
 			printk(KERN_INFO "vortex: wt start %d\n", dma);

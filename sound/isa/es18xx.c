@@ -268,7 +268,7 @@ static int snd_es18xx_bits(es18xx_t *chip, unsigned char reg,
 	return ret;
 }
 
-inline void snd_es18xx_mixer_write(es18xx_t *chip,
+static inline void snd_es18xx_mixer_write(es18xx_t *chip,
 			    unsigned char reg, unsigned char data)
 {
 	unsigned long flags;
@@ -281,7 +281,7 @@ inline void snd_es18xx_mixer_write(es18xx_t *chip,
 #endif
 }
 
-inline int snd_es18xx_mixer_read(es18xx_t *chip, unsigned char reg)
+static inline int snd_es18xx_mixer_read(es18xx_t *chip, unsigned char reg)
 {
 	unsigned long flags;
 	int data;
@@ -1569,7 +1569,7 @@ static void snd_es18xx_pcm_free(snd_pcm_t *pcm)
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
-int __devinit snd_es18xx_pcm(es18xx_t *chip, int device, snd_pcm_t ** rpcm)
+static int __devinit snd_es18xx_pcm(es18xx_t *chip, int device, snd_pcm_t ** rpcm)
 {
         snd_pcm_t *pcm;
 	char str[16];

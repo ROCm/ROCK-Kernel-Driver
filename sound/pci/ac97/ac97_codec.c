@@ -633,7 +633,7 @@ static int snd_ac97_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *
 				    (val1 << shift_left) | (val2 << shift_right));
 }
 
-int snd_ac97_getput_page(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol,
+static int snd_ac97_getput_page(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol,
 			 int (*func)(snd_kcontrol_t *, snd_ctl_elem_value_t *))
 {
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
@@ -2213,6 +2213,46 @@ void snd_ac97_suspend(ac97_t *ac97)
 	snd_ac97_powerdown(ac97);
 }
 
+/*
+ * restore ac97 status
+ */
+void snd_ac97_restore_status(ac97_t *ac97)
+{
+	int i;
+
+	for (i = 2; i < 0x7c ; i += 2) {
+		if (i == AC97_POWERDOWN || i == AC97_EXTENDED_ID)
+			continue;
+		/* restore only accessible registers
+		 * some chip (e.g. nm256) may hang up when unsupported registers
+		 * are accessed..!
+		 */
+		if (test_bit(i, ac97->reg_accessed)) {
+			snd_ac97_write(ac97, i, ac97->regs[i]);
+			snd_ac97_read(ac97, i);
+		}
+	}
+}
+
+/*
+ * restore IEC958 status
+ */
+void snd_ac97_restore_iec958(ac97_t *ac97)
+{
+	if (ac97->ext_id & AC97_EI_SPDIF) {
+		if (ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_SPDIF) {
+			/* reset spdif status */
+			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
+			snd_ac97_write(ac97, AC97_EXTENDED_STATUS, ac97->regs[AC97_EXTENDED_STATUS]);
+			if (ac97->flags & AC97_CS_SPDIF)
+				snd_ac97_write(ac97, AC97_CSR_SPDIF, ac97->regs[AC97_CSR_SPDIF]);
+			else
+				snd_ac97_write(ac97, AC97_SPDIF, ac97->regs[AC97_SPDIF]);
+			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF); /* turn on again */
+		}
+	}
+}
+
 /**
  * snd_ac97_resume - General resume function for AC97 codec
  * @ac97: the ac97 instance
@@ -2222,7 +2262,7 @@ void snd_ac97_suspend(ac97_t *ac97)
  */
 void snd_ac97_resume(ac97_t *ac97)
 {
-	int i, is_ad18xx, codec;
+	int i;
 
 	if (ac97->bus->ops->reset) {
 		ac97->bus->ops->reset(ac97);
@@ -2264,66 +2304,11 @@ __reset_ready:
 	if (ac97->bus->ops->init)
 		ac97->bus->ops->init(ac97);
 
-	is_ad18xx = (ac97->flags & AC97_AD_MULTI);
-	if (is_ad18xx) {
-		/* restore the AD18xx codec configurations */
-		for (codec = 0; codec < 3; codec++) {
-			if (! ac97->spec.ad18xx.id[codec])
-				continue;
-			/* select single codec */
-			snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
-					     ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
-			ac97->bus->ops->write(ac97, AC97_AD_CODEC_CFG, ac97->spec.ad18xx.codec_cfg[codec]);
-		}
-		/* select all codecs */
-		snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
-	}
-
-	/* restore ac97 status */
-	for (i = 2; i < 0x7c ; i += 2) {
-		if (i == AC97_POWERDOWN || i == AC97_EXTENDED_ID)
-			continue;
-		/* restore only accessible registers
-		 * some chip (e.g. nm256) may hang up when unsupported registers
-		 * are accessed..!
-		 */
-		if (test_bit(i, ac97->reg_accessed)) {
-			if (is_ad18xx) {
-				/* handle multi codecs for AD18xx */
-				if (i == AC97_PCM) {
-					for (codec = 0; codec < 3; codec++) {
-						if (! ac97->spec.ad18xx.id[codec])
-							continue;
-						/* select single codec */
-						snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
-								     ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
-						/* update PCM bits */
-						ac97->bus->ops->write(ac97, AC97_PCM, ac97->spec.ad18xx.pcmreg[codec]);
-					}
-					/* select all codecs */
-					snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
-					continue;
-				} else if (i == AC97_AD_TEST ||
-					   i == AC97_AD_CODEC_CFG ||
-					   i == AC97_AD_SERIAL_CFG)
-					continue; /* ignore */
-			}
-			snd_ac97_write(ac97, i, ac97->regs[i]);
-			snd_ac97_read(ac97, i);
-		}
-	}
-
-	if (ac97->ext_id & AC97_EI_SPDIF) {
-		if (ac97->regs[AC97_EXTENDED_STATUS] & AC97_EA_SPDIF) {
-			/* reset spdif status */
-			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0);
-			snd_ac97_write(ac97, AC97_EXTENDED_STATUS, ac97->regs[AC97_EXTENDED_STATUS]);
-			if (ac97->flags & AC97_CS_SPDIF)
-				snd_ac97_write(ac97, AC97_CSR_SPDIF, ac97->regs[AC97_CSR_SPDIF]);
-			else
-				snd_ac97_write(ac97, AC97_SPDIF, ac97->regs[AC97_SPDIF]);
-			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF); /* turn on again */
-		}
+	if (ac97->build_ops->resume)
+		ac97->build_ops->resume(ac97);
+	else {
+		snd_ac97_restore_status(ac97);
+		snd_ac97_restore_iec958(ac97);
 	}
 }
 #endif

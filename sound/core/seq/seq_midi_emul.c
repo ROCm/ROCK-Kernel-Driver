@@ -549,12 +549,12 @@ sysex(snd_midi_op_t *ops, void *private, unsigned char *buf, int len, snd_midi_c
 
 		} else if (buf[5] == 0x01 && buf[6] == 0x30) {
 			/* reverb mode */
-			parsed = SNDRV_MIDI_SYSEX_GS_CHORUS_MODE;
+			parsed = SNDRV_MIDI_SYSEX_GS_REVERB_MODE;
 			chset->gs_reverb_mode = buf[7];
 
 		} else if (buf[5] == 0x01 && buf[6] == 0x38) {
 			/* chorus mode */
-			parsed = SNDRV_MIDI_SYSEX_GS_REVERB_MODE;
+			parsed = SNDRV_MIDI_SYSEX_GS_CHORUS_MODE;
 			chset->gs_chorus_mode = buf[7];
 
 		} else if (buf[5] == 0x00 && buf[6] == 0x04) {

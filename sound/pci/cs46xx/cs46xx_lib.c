@@ -68,6 +68,20 @@
 
 static void amp_voyetra(cs46xx_t *chip, int change);
 
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+static snd_pcm_ops_t snd_cs46xx_playback_rear_ops;
+static snd_pcm_ops_t snd_cs46xx_playback_indirect_rear_ops;
+static snd_pcm_ops_t snd_cs46xx_playback_clfe_ops;
+static snd_pcm_ops_t snd_cs46xx_playback_indirect_clfe_ops;
+static snd_pcm_ops_t snd_cs46xx_playback_iec958_ops;
+static snd_pcm_ops_t snd_cs46xx_playback_indirect_iec958_ops;
+#endif
+
+static snd_pcm_ops_t snd_cs46xx_playback_ops;
+static snd_pcm_ops_t snd_cs46xx_playback_indirect_ops;
+static snd_pcm_ops_t snd_cs46xx_capture_ops;
+static snd_pcm_ops_t snd_cs46xx_capture_indirect_ops;
+
 static unsigned short snd_cs46xx_codec_read(cs46xx_t *chip,
 					    unsigned short reg,
 					    int codec_index)
@@ -1446,7 +1460,7 @@ static int snd_cs46xx_capture_close(snd_pcm_substream_t * substream)
 }
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-snd_pcm_ops_t snd_cs46xx_playback_rear_ops = {
+static snd_pcm_ops_t snd_cs46xx_playback_rear_ops = {
 	.open =			snd_cs46xx_playback_open_rear,
 	.close =		snd_cs46xx_playback_close,
 	.ioctl =		snd_pcm_lib_ioctl,
@@ -1457,7 +1471,7 @@ snd_pcm_ops_t snd_cs46xx_playback_rear_ops = {
 	.pointer =		snd_cs46xx_playback_direct_pointer,
 };
 
-snd_pcm_ops_t snd_cs46xx_playback_indirect_rear_ops = {
+static snd_pcm_ops_t snd_cs46xx_playback_indirect_rear_ops = {
 	.open =			snd_cs46xx_playback_open_rear,
 	.close =		snd_cs46xx_playback_close,
 	.ioctl =		snd_pcm_lib_ioctl,
@@ -1469,7 +1483,7 @@ snd_pcm_ops_t snd_cs46xx_playback_indirect_rear_ops = {
 	.ack =			snd_cs46xx_playback_transfer,
 };
 
-snd_pcm_ops_t snd_cs46xx_playback_clfe_ops = {
+static snd_pcm_ops_t snd_cs46xx_playback_clfe_ops = {
 	.open =			snd_cs46xx_playback_open_clfe,
 	.close =		snd_cs46xx_playback_close,
 	.ioctl =		snd_pcm_lib_ioctl,
@@ -1480,7 +1494,7 @@ snd_pcm_ops_t snd_cs46xx_playback_clfe_ops = {
 	.pointer =		snd_cs46xx_playback_direct_pointer,
 };
 
-snd_pcm_ops_t snd_cs46xx_playback_indirect_clfe_ops = {
+static snd_pcm_ops_t snd_cs46xx_playback_indirect_clfe_ops = {
 	.open =			snd_cs46xx_playback_open_clfe,
 	.close =		snd_cs46xx_playback_close,
 	.ioctl =		snd_pcm_lib_ioctl,
@@ -1492,7 +1506,7 @@ snd_pcm_ops_t snd_cs46xx_playback_indirect_clfe_ops = {
 	.ack =			snd_cs46xx_playback_transfer,
 };
 
-snd_pcm_ops_t snd_cs46xx_playback_iec958_ops = {
+static snd_pcm_ops_t snd_cs46xx_playback_iec958_ops = {
 	.open =			snd_cs46xx_playback_open_iec958,
 	.close =		snd_cs46xx_playback_close_iec958,
 	.ioctl =		snd_pcm_lib_ioctl,
@@ -1503,7 +1517,7 @@ snd_pcm_ops_t snd_cs46xx_playback_iec958_ops = {
 	.pointer =		snd_cs46xx_playback_direct_pointer,
 };
 
-snd_pcm_ops_t snd_cs46xx_playback_indirect_iec958_ops = {
+static snd_pcm_ops_t snd_cs46xx_playback_indirect_iec958_ops = {
 	.open =			snd_cs46xx_playback_open_iec958,
 	.close =		snd_cs46xx_playback_close_iec958,
 	.ioctl =		snd_pcm_lib_ioctl,
@@ -1517,7 +1531,7 @@ snd_pcm_ops_t snd_cs46xx_playback_indirect_iec958_ops = {
 
 #endif
 
-snd_pcm_ops_t snd_cs46xx_playback_ops = {
+static snd_pcm_ops_t snd_cs46xx_playback_ops = {
 	.open =			snd_cs46xx_playback_open,
 	.close =		snd_cs46xx_playback_close,
 	.ioctl =		snd_pcm_lib_ioctl,
@@ -1528,7 +1542,7 @@ snd_pcm_ops_t snd_cs46xx_playback_ops = {
 	.pointer =		snd_cs46xx_playback_direct_pointer,
 };
 
-snd_pcm_ops_t snd_cs46xx_playback_indirect_ops = {
+static snd_pcm_ops_t snd_cs46xx_playback_indirect_ops = {
 	.open =			snd_cs46xx_playback_open,
 	.close =		snd_cs46xx_playback_close,
 	.ioctl =		snd_pcm_lib_ioctl,
@@ -1540,7 +1554,7 @@ snd_pcm_ops_t snd_cs46xx_playback_indirect_ops = {
 	.ack =			snd_cs46xx_playback_transfer,
 };
 
-snd_pcm_ops_t snd_cs46xx_capture_ops = {
+static snd_pcm_ops_t snd_cs46xx_capture_ops = {
 	.open =			snd_cs46xx_capture_open,
 	.close =		snd_cs46xx_capture_close,
 	.ioctl =		snd_pcm_lib_ioctl,
@@ -1551,7 +1565,7 @@ snd_pcm_ops_t snd_cs46xx_capture_ops = {
 	.pointer =		snd_cs46xx_capture_direct_pointer,
 };
 
-snd_pcm_ops_t snd_cs46xx_capture_indirect_ops = {
+static snd_pcm_ops_t snd_cs46xx_capture_indirect_ops = {
 	.open =			snd_cs46xx_capture_open,
 	.close =		snd_cs46xx_capture_close,
 	.ioctl =		snd_pcm_lib_ioctl,

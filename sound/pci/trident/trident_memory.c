@@ -450,29 +450,6 @@ static int synth_free_pages(trident_t *trident, snd_util_memblk_t *blk)
 }
 
 /*
- * bzero(blk + offset, size)
- */
-int snd_trident_synth_bzero(trident_t *trident, snd_util_memblk_t *blk, int offset, int size)
-{
-	int page, nextofs, end_offset, temp, temp1;
-
-	offset += blk->offset;
-	end_offset = offset + size;
-	page = get_aligned_page(offset) + 1;
-	do {
-		nextofs = aligned_page_offset(page);
-		temp = nextofs - offset;
-		temp1 = end_offset - offset;
-		if (temp1 < temp)
-			temp = temp1;
-		memset(offset_ptr(trident, offset), 0, temp);
-		offset = nextofs;
-		page++;
-	} while (offset < end_offset);
-	return 0;
-}
-
-/*
  * copy_from_user(blk + offset, data, size)
  */
 int snd_trident_synth_copy_from_user(trident_t *trident, snd_util_memblk_t *blk, int offset, const char __user *data, int size)

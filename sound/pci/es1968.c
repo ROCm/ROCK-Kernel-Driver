@@ -837,23 +837,19 @@ static u16 wave_get_register(es1968_t *chip, u16 reg)
 static void snd_es1968_bob_stop(es1968_t *chip)
 {
 	u16 reg;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
 	reg = __maestro_read(chip, 0x11);
 	reg &= ~ESM_BOB_ENABLE;
 	__maestro_write(chip, 0x11, reg);
 	reg = __maestro_read(chip, 0x17);
 	reg &= ~ESM_BOB_START;
 	__maestro_write(chip, 0x17, reg);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
 }
 
 static void snd_es1968_bob_start(es1968_t *chip)
 {
 	int prescale;
 	int divide;
-	unsigned long flags;
 
 	/* compute ideal interrupt frequency for buffer size & play rate */
 	/* first, find best prescaler value to match freq */
@@ -882,13 +878,11 @@ static void snd_es1968_bob_start(es1968_t *chip)
 	} else if (divide > 1)
 		divide--;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
 	__maestro_write(chip, 6, 0x9000 | (prescale << 5) | divide);	/* set reg */
 
 	/* Now set IDR 11/17 */
 	__maestro_write(chip, 0x11, __maestro_read(chip, 0x11) | 1);
 	__maestro_write(chip, 0x17, __maestro_read(chip, 0x17) | 1);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
 }
 
 /* call with substream spinlock */

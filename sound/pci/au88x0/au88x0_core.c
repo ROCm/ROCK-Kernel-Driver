@@ -21,7 +21,7 @@
  These functions are mainly the result of translations made
  from the original disassembly of the au88x0 binary drivers,
  written by Aureal before they went down.
- Many thanks to the Jeff Muizelar, Kester Maddock, and whoever
+ Many thanks to the Jeff Muizelaar, Kester Maddock, and whoever
  contributed to the OpenVortex project.
  The author of this file, put the few available pieces together
  and translated the rest of the riddle (Mix, Src and connection stuff).
@@ -1221,6 +1221,33 @@ static int vortex_adbdma_bufshift(vortex_t * vortex, int adbdma)
 		       adbdma, dma->period_virt, dma->period_real, delta);
 
 	return delta;
+}
+
+
+static void vortex_adbdma_resetup(vortex_t *vortex, int adbdma) {
+	stream_t *dma = &vortex->dma_adb[adbdma];
+	int p, pp, i;
+
+	/* refresh hw page table */
+	for (i=0 ; i < 4 && i < dma->nr_periods; i++) {
+		/* p: audio buffer page index */
+		p = dma->period_virt + i;
+		if (p >= dma->nr_periods)
+			p -= dma->nr_periods;
+		/* pp: hardware DMA page index. */
+		pp = dma->period_real + i;
+		if (dma->nr_periods < 4) {
+			if (pp >= dma->nr_periods)
+				pp -= dma->nr_periods;
+		}
+		else {
+			if (pp >= 4)
+				pp -= 4;
+		}
+		hwwrite(vortex->mmio, VORTEX_ADBDMA_BUFBASE+(((adbdma << 2)+pp) << 2), snd_sgbuf_get_addr(dma->sgbuf, dma->period_bytes * p));
+		/* Force write thru cache. */
+		hwread(vortex->mmio, VORTEX_ADBDMA_BUFBASE + (((adbdma << 2)+pp) << 2));
+	}
 }
 
 static int inline vortex_adbdma_getlinearpos(vortex_t * vortex, int adbdma)

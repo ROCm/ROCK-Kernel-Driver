@@ -411,7 +411,6 @@ EXPORT_SYMBOL(snd_kmalloc_strdup);
 EXPORT_SYMBOL(copy_to_user_fromio);
 EXPORT_SYMBOL(copy_from_user_toio);
   /* init.c */
-EXPORT_SYMBOL(snd_cards_count);
 EXPORT_SYMBOL(snd_cards);
 #if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 EXPORT_SYMBOL(snd_mixer_oss_notify_callback);

@@ -775,6 +775,69 @@ int patch_conexant(ac97_t * ac97)
 /*
  * Analog Device AD18xx, AD19xx codecs
  */
+static void ad18xx_resume(ac97_t *ac97)
+{
+	static unsigned short setup_regs[] = {
+		AC97_AD_MISC, AC97_AD_SERIAL_CFG, AC97_AD_JACK_SPDIF,
+	};
+	int i, codec;
+
+	for (i = 0; i < (int)ARRAY_SIZE(setup_regs); i++) {
+		unsigned short reg = setup_regs[i];
+		if (test_bit(reg, ac97->reg_accessed)) {
+			snd_ac97_write(ac97, reg, ac97->regs[reg]);
+			snd_ac97_read(ac97, reg);
+		}
+	}
+
+	if (! (ac97->flags & AC97_AD_MULTI))
+		/* normal restore */
+		snd_ac97_restore_status(ac97);
+	else {
+		/* restore the AD18xx codec configurations */
+		for (codec = 0; codec < 3; codec++) {
+			if (! ac97->spec.ad18xx.id[codec])
+				continue;
+			/* select single codec */
+			snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
+					     ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
+			ac97->bus->ops->write(ac97, AC97_AD_CODEC_CFG, ac97->spec.ad18xx.codec_cfg[codec]);
+		}
+		/* select all codecs */
+		snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
+
+		/* restore status */
+		for (i = 2; i < 0x7c ; i += 2) {
+			if (i == AC97_POWERDOWN || i == AC97_EXTENDED_ID)
+				continue;
+			if (test_bit(i, ac97->reg_accessed)) {
+				/* handle multi codecs for AD18xx */
+				if (i == AC97_PCM) {
+					for (codec = 0; codec < 3; codec++) {
+						if (! ac97->spec.ad18xx.id[codec])
+							continue;
+						/* select single codec */
+						snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000,
+								     ac97->spec.ad18xx.unchained[codec] | ac97->spec.ad18xx.chained[codec]);
+						/* update PCM bits */
+						ac97->bus->ops->write(ac97, AC97_PCM, ac97->spec.ad18xx.pcmreg[codec]);
+					}
+					/* select all codecs */
+					snd_ac97_update_bits(ac97, AC97_AD_SERIAL_CFG, 0x7000, 0x7000);
+					continue;
+				} else if (i == AC97_AD_TEST ||
+					   i == AC97_AD_CODEC_CFG ||
+					   i == AC97_AD_SERIAL_CFG)
+					continue; /* ignore */
+			}
+			snd_ac97_write(ac97, i, ac97->regs[i]);
+			snd_ac97_read(ac97, i);
+		}
+	}
+
+	snd_ac97_restore_iec958(ac97);
+}
+
 int patch_ad1819(ac97_t * ac97)
 {
 	unsigned short scfg;
@@ -843,6 +906,10 @@ static void patch_ad1881_chained(ac97_t * ac97, int unchained_idx, int cidx1, in
 	}
 }
 
+static struct snd_ac97_build_ops patch_ad1881_build_ops = {
+	.resume = &ad18xx_resume
+};
+
 int patch_ad1881(ac97_t * ac97)
 {
 	static const char cfg_idxs[3][2] = {
@@ -897,6 +964,7 @@ int patch_ad1881(ac97_t * ac97)
 		ac97->id &= 0xffff0000;
 		ac97->id |= ac97->spec.ad18xx.id[0];
 	}
+	ac97->build_ops = &patch_ad1881_build_ops;
 	return 0;
 }
 
@@ -919,7 +987,8 @@ static int patch_ad1885_specific(ac97_t * ac97)
 }
 
 static struct snd_ac97_build_ops patch_ad1885_build_ops = {
-	.build_specific = &patch_ad1885_specific
+	.build_specific = &patch_ad1885_specific,
+	.resume = &ad18xx_resume
 };
 
 int patch_ad1885(ac97_t * ac97)
@@ -1013,8 +1082,21 @@ static int patch_ad198x_post_spdif(ac97_t * ac97)
  	return patch_build_controls(ac97, &snd_ac97_ad198x_spdif_source, 1);
 }
 
+static const snd_kcontrol_new_t snd_ac97_ad1981x_jack_sense[] = {
+	AC97_SINGLE("Headphone Jack Sense", AC97_AD_JACK_SPDIF, 11, 1, 0),
+	AC97_SINGLE("Line Jack Sense", AC97_AD_JACK_SPDIF, 12, 1, 0),
+};
+
+static int patch_ad1981a_specific(ac97_t * ac97)
+{
+	return patch_build_controls(ac97, snd_ac97_ad1981x_jack_sense,
+				    ARRAY_SIZE(snd_ac97_ad1981x_jack_sense));
+}
+
 static struct snd_ac97_build_ops patch_ad1981a_build_ops = {
-	.build_post_spdif = patch_ad198x_post_spdif
+	.build_post_spdif = patch_ad198x_post_spdif,
+	.build_specific = patch_ad1981a_specific,
+	.resume = ad18xx_resume
 };
 
 int patch_ad1981a(ac97_t *ac97)
@@ -1023,6 +1105,7 @@ int patch_ad1981a(ac97_t *ac97)
 	ac97->build_ops = &patch_ad1981a_build_ops;
 	snd_ac97_update_bits(ac97, AC97_AD_MISC, AC97_AD198X_MSPLT, AC97_AD198X_MSPLT);
 	ac97->flags |= AC97_STEREO_MUTES;
+	snd_ac97_update_bits(ac97, AC97_AD_JACK_SPDIF, 1<<11, 1<<11); /* HP jack sense */
 	return 0;
 }
 
@@ -1031,12 +1114,18 @@ AC97_SINGLE("Stereo Mic", AC97_AD_MISC, 6, 1, 0);
 
 static int patch_ad1981b_specific(ac97_t *ac97)
 {
-	return patch_build_controls(ac97, &snd_ac97_ad198x_2cmic, 1);
+	int err;
+
+	if ((err = patch_build_controls(ac97, &snd_ac97_ad198x_2cmic, 1)) < 0)
+		return err;
+	return patch_build_controls(ac97, snd_ac97_ad1981x_jack_sense,
+				    ARRAY_SIZE(snd_ac97_ad1981x_jack_sense));
 }
 
 static struct snd_ac97_build_ops patch_ad1981b_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
-	.build_specific = patch_ad1981b_specific
+	.build_specific = patch_ad1981b_specific,
+	.resume = ad18xx_resume
 };
 
 int patch_ad1981b(ac97_t *ac97)
@@ -1045,6 +1134,7 @@ int patch_ad1981b(ac97_t *ac97)
 	ac97->build_ops = &patch_ad1981b_build_ops;
 	snd_ac97_update_bits(ac97, AC97_AD_MISC, AC97_AD198X_MSPLT, AC97_AD198X_MSPLT);
 	ac97->flags |= AC97_STEREO_MUTES;
+	snd_ac97_update_bits(ac97, AC97_AD_JACK_SPDIF, 1<<11, 1<<11); /* HP jack sense */
 	return 0;
 }
 
@@ -1150,7 +1240,8 @@ static int patch_ad1888_specific(ac97_t *ac97)
 
 static struct snd_ac97_build_ops patch_ad1888_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
-	.build_specific = patch_ad1888_specific
+	.build_specific = patch_ad1888_specific,
+	.resume = ad18xx_resume
 };
 
 int patch_ad1888(ac97_t * ac97)
@@ -1184,7 +1275,8 @@ static int patch_ad1980_specific(ac97_t *ac97)
 
 static struct snd_ac97_build_ops patch_ad1980_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
-	.build_specific = patch_ad1980_specific
+	.build_specific = patch_ad1980_specific,
+	.resume = ad18xx_resume
 };
 
 int patch_ad1980(ac97_t * ac97)
@@ -1210,7 +1302,8 @@ static int patch_ad1985_specific(ac97_t *ac97)
 
 static struct snd_ac97_build_ops patch_ad1985_build_ops = {
 	.build_post_spdif = patch_ad198x_post_spdif,
-	.build_specific = patch_ad1985_specific
+	.build_specific = patch_ad1985_specific,
+	.resume = ad18xx_resume
 };
 
 int patch_ad1985(ac97_t * ac97)
@@ -1304,7 +1397,8 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 static const snd_kcontrol_new_t snd_ac97_spdif_controls_alc650[] = {
         AC97_SINGLE("IEC958 Capture Switch", AC97_ALC650_MULTICH, 11, 1, 0),
         AC97_SINGLE("Analog to IEC958 Output", AC97_ALC650_MULTICH, 12, 1, 0),
-        AC97_SINGLE("IEC958 Input Monitor", AC97_ALC650_MULTICH, 13, 1, 0),
+	/* disable this controls since it doesn't work as expected */
+	/* AC97_SINGLE("IEC958 Input Monitor", AC97_ALC650_MULTICH, 13, 1, 0), */
 };
 
 static int patch_alc650_specific(ac97_t * ac97)
@@ -1454,7 +1548,8 @@ static int alc655_iec958_route_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 
 static const snd_kcontrol_new_t snd_ac97_spdif_controls_alc655[] = {
         AC97_PAGE_SINGLE("IEC958 Capture Switch", AC97_ALC650_MULTICH, 11, 1, 0, 0),
-        AC97_PAGE_SINGLE("IEC958 Input Monitor", AC97_ALC650_MULTICH, 14, 1, 0, 0),
+	/* disable this controls since it doesn't work as expected */
+        /* AC97_PAGE_SINGLE("IEC958 Input Monitor", AC97_ALC650_MULTICH, 14, 1, 0, 0), */
 	{
 		.iface  = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name   = "IEC958 Playback Route",

@@ -49,6 +49,8 @@ int snd_ac97_remove_ctl(ac97_t *ac97, const char *name, const char *suffix);
 int snd_ac97_rename_ctl(ac97_t *ac97, const char *src, const char *dst, const char *suffix);
 int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2, const char *suffix);
 void snd_ac97_rename_vol_ctl(ac97_t *ac97, const char *src, const char *dst);
+void snd_ac97_restore_status(ac97_t *ac97);
+void snd_ac97_restore_iec958(ac97_t *ac97);
 
 /* ac97_proc.c */
 #ifdef CONFIG_PROC_FS

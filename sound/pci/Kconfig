@@ -106,8 +106,9 @@ config SND_BT87X
         depends on SND
 	select SND_PCM
         help
-	  Say Y here to include support for recording audio from TV
-	  cards based on Brooktree Bt878/Bt879 chips.
+	  If you want to record audio from TV cards based on
+	  Brooktree Bt878/Bt879 chips, say Y here and read
+	  <file:Documentation/sound/alsa/Bt87x.txt>.
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-bt87x.

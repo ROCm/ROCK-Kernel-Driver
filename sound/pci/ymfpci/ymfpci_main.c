@@ -258,7 +258,7 @@ static int voice_alloc(ymfpci_t *chip, ymfpci_voice_type_t type, int pair, ymfpc
 	return -ENOMEM;
 }
 
-int snd_ymfpci_voice_alloc(ymfpci_t *chip, ymfpci_voice_type_t type, int pair, ymfpci_voice_t **rvoice)
+static int snd_ymfpci_voice_alloc(ymfpci_t *chip, ymfpci_voice_type_t type, int pair, ymfpci_voice_t **rvoice)
 {
 	unsigned long flags;
 	int result;
@@ -278,7 +278,7 @@ int snd_ymfpci_voice_alloc(ymfpci_t *chip, ymfpci_voice_type_t type, int pair, y
 	return result;		
 }
 
-int snd_ymfpci_voice_free(ymfpci_t *chip, ymfpci_voice_t *pvoice)
+static int snd_ymfpci_voice_free(ymfpci_t *chip, ymfpci_voice_t *pvoice)
 {
 	unsigned long flags;
 	

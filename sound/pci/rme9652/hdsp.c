@@ -934,6 +934,7 @@ static snd_pcm_uframes_t hdsp_hw_pointer(hdsp_t *hdsp)
 	}
 
 	position &= HDSP_BufferPositionMask;
+	position /= 4;
 	position &= (hdsp->period_bytes/2) - 1;
 	return position;
 }
@@ -1443,14 +1444,14 @@ static int snd_hdsp_midi_output_close(snd_rawmidi_substream_t * substream)
 	return 0;
 }
 
-snd_rawmidi_ops_t snd_hdsp_midi_output =
+static snd_rawmidi_ops_t snd_hdsp_midi_output =
 {
 	.open =		snd_hdsp_midi_output_open,
 	.close =	snd_hdsp_midi_output_close,
 	.trigger =	snd_hdsp_midi_output_trigger,
 };
 
-snd_rawmidi_ops_t snd_hdsp_midi_input =
+static snd_rawmidi_ops_t snd_hdsp_midi_input =
 {
 	.open =		snd_hdsp_midi_input_open,
 	.close =	snd_hdsp_midi_input_close,
@@ -3137,7 +3138,7 @@ HDSP_LINE_OUT("Line Out", 0),
 static snd_kcontrol_new_t snd_hdsp_96xx_aeb = HDSP_AEB("Analog Extension Board", 0);
 static snd_kcontrol_new_t snd_hdsp_adat_sync_check = HDSP_ADAT_SYNC_CHECK;
 
-int snd_hdsp_create_controls(snd_card_t *card, hdsp_t *hdsp)
+static int snd_hdsp_create_controls(snd_card_t *card, hdsp_t *hdsp)
 {
 	unsigned int idx;
 	int err;
@@ -3651,7 +3652,7 @@ static int snd_hdsp_set_defaults(hdsp_t *hdsp)
 	return 0;
 }
 
-void hdsp_midi_tasklet(unsigned long arg)
+static void hdsp_midi_tasklet(unsigned long arg)
 {
 	hdsp_t *hdsp = (hdsp_t *)arg;
 	

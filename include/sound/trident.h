@@ -457,27 +457,23 @@ int snd_trident_create(snd_card_t * card,
 		       int pcm_spdif_device,
 		       int max_wavetable_size,
 		       trident_t ** rtrident);
-int snd_trident_free(trident_t *trident);
 void snd_trident_gameport(trident_t *trident);
 
 int snd_trident_pcm(trident_t * trident, int device, snd_pcm_t **rpcm);
 int snd_trident_foldback_pcm(trident_t * trident, int device, snd_pcm_t **rpcm);
 int snd_trident_spdif_pcm(trident_t * trident, int device, snd_pcm_t **rpcm);
 int snd_trident_attach_synthesizer(trident_t * trident);
-int snd_trident_detach_synthesizer(trident_t * trident);
 snd_trident_voice_t *snd_trident_alloc_voice(trident_t * trident, int type, int client, int port);
 void snd_trident_free_voice(trident_t * trident, snd_trident_voice_t *voice);
 void snd_trident_start_voice(trident_t * trident, unsigned int voice);
 void snd_trident_stop_voice(trident_t * trident, unsigned int voice);
 void snd_trident_write_voice_regs(trident_t * trident, snd_trident_voice_t *voice);
-void snd_trident_clear_voices(trident_t * trident, unsigned short v_min, unsigned short v_max);
 
 /* TLB memory allocation */
 snd_util_memblk_t *snd_trident_alloc_pages(trident_t *trident, snd_pcm_substream_t *substream);
 int snd_trident_free_pages(trident_t *trident, snd_util_memblk_t *blk);
 snd_util_memblk_t *snd_trident_synth_alloc(trident_t *trident, unsigned int size);
 int snd_trident_synth_free(trident_t *trident, snd_util_memblk_t *blk);
-int snd_trident_synth_bzero(trident_t *trident, snd_util_memblk_t *blk, int offset, int size);
 int snd_trident_synth_copy_from_user(trident_t *trident, snd_util_memblk_t *blk, int offset, const char __user *data, int size);
 
 #endif /* __SOUND_TRIDENT_H */

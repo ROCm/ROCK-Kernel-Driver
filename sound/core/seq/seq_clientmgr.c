@@ -904,7 +904,7 @@ static int snd_seq_client_enqueue_event(client_t *client,
 		return -ENXIO; /* queue is not allocated */
 
 	/* allocate an event cell */
-	err = snd_seq_event_dup(client->pool, event, &cell, !blocking && !atomic, file);
+	err = snd_seq_event_dup(client->pool, event, &cell, !blocking || atomic, file);
 	if (err < 0)
 		return err;
 
