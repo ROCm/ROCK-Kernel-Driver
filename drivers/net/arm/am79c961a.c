@@ -196,7 +196,7 @@ am79c961_ramtest(struct net_device *dev, unsigned int val)
 static void
 am79c961_init_for_open(struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	unsigned long flags;
 	unsigned char *p;
 	u_int hdr_addr, first_free_addr;
@@ -271,7 +271,7 @@ am79c961_init_for_open(struct net_device *dev)
 static void am79c961_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	unsigned int lnkstat, carrier;
 
 	lnkstat = read_ireg(dev->base_addr, ISALED0) & ISALED0_LNKST;
@@ -291,7 +291,7 @@ static void am79c961_timer(unsigned long data)
 static int
 am79c961_open(struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	int ret;
 
 	memset (&priv->stats, 0, sizeof (priv->stats));
@@ -318,7 +318,7 @@ am79c961_open(struct net_device *dev)
 static int
 am79c961_close(struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	unsigned long flags;
 
 	del_timer_sync(&priv->timer);
@@ -341,7 +341,7 @@ am79c961_close(struct net_device *dev)
  */
 static struct net_device_stats *am79c961_getstats (struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	return &priv->stats;
 }
 
@@ -365,7 +365,7 @@ static void am79c961_mc_hash(struct dev_mc_list *dmi, unsigned short *hash)
  */
 static void am79c961_setmulticastlist (struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	unsigned long flags;
 	unsigned short multi_hash[4], mode;
 	int i, stopped;
@@ -444,7 +444,7 @@ static void am79c961_timeout(struct net_device *dev)
 static int
 am79c961_sendpacket(struct sk_buff *skb, struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	unsigned int hdraddr, bufaddr;
 	unsigned int head;
 	unsigned long flags;
@@ -593,7 +593,7 @@ static irqreturn_t
 am79c961_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 	u_int status, n = 100;
 	int handled = 0;
 
@@ -630,7 +630,7 @@ am79c961_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static int
 am79c961_hw_init(struct net_device *dev)
 {
-	struct dev_priv *priv = (struct dev_priv *)dev->priv;
+	struct dev_priv *priv = netdev_priv(dev);
 
 	spin_lock_irq(&priv->chip_lock);
 	write_rreg (dev->base_addr, CSR0, CSR0_STOP);
@@ -662,7 +662,7 @@ static int __init am79c961_init(void)
 	if (!dev)
 		goto out;
 
-	priv = dev->priv;
+	priv = netdev_priv(dev);
 
 	/*
 	 * Fixed address and IRQ lines here.

@@ -746,7 +746,7 @@ sb1000_rx(struct net_device *dev)
 	int ioaddr, ns;
 	unsigned int skbsize;
 	struct sk_buff *skb;
-	struct sb1000_private *lp = (struct sb1000_private *)dev->priv;
+	struct sb1000_private *lp = netdev_priv(dev);
 	struct net_device_stats *stats = &lp->stats;
 
 	/* SB1000 frame constants */
@@ -905,7 +905,7 @@ sb1000_error_dpc(struct net_device *dev)
 	char *name;
 	unsigned char st[5];
 	int ioaddr[2];
-	struct sb1000_private *lp = (struct sb1000_private *)dev->priv;
+	struct sb1000_private *lp = netdev_priv(dev);
 	const unsigned char Command0[6] = {0x80, 0x26, 0x00, 0x00, 0x00, 0x00};
 	const int ErrorDpcCounterInitialize = 200;
 
@@ -932,7 +932,7 @@ sb1000_open(struct net_device *dev)
 {
 	char *name;
 	int ioaddr[2], status;
-	struct sb1000_private *lp = (struct sb1000_private *)dev->priv;
+	struct sb1000_private *lp = netdev_priv(dev);
 	const unsigned short FirmwareVersion[] = {0x01, 0x01};
 
 	ioaddr[0] = dev->base_addr;
@@ -998,7 +998,7 @@ static int sb1000_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	short PID[4];
 	int ioaddr[2], status, frequency;
 	unsigned int stats[5];
-	struct sb1000_private *lp = (struct sb1000_private *)dev->priv;
+	struct sb1000_private *lp = netdev_priv(dev);
 
 	if (!(dev && dev->flags & IFF_UP))
 		return -ENODEV;
@@ -1092,7 +1092,7 @@ static irqreturn_t sb1000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned char st;
 	int ioaddr[2];
 	struct net_device *dev = (struct net_device *) dev_id;
-	struct sb1000_private *lp = (struct sb1000_private *)dev->priv;
+	struct sb1000_private *lp = netdev_priv(dev);
 
 	const unsigned char Command0[6] = {0x80, 0x2c, 0x00, 0x00, 0x00, 0x00};
 	const unsigned char Command1[6] = {0x80, 0x2e, 0x00, 0x00, 0x00, 0x00};
@@ -1148,7 +1148,7 @@ static irqreturn_t sb1000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static struct net_device_stats *sb1000_stats(struct net_device *dev)
 {
-	struct sb1000_private *lp = (struct sb1000_private *)dev->priv;
+	struct sb1000_private *lp = netdev_priv(dev);
 	return &lp->stats;
 }
 
@@ -1156,7 +1156,7 @@ static int sb1000_close(struct net_device *dev)
 {
 	int i;
 	int ioaddr[2];
-	struct sb1000_private *lp = (struct sb1000_private *)dev->priv;
+	struct sb1000_private *lp = netdev_priv(dev);
 
 	if (sb1000_debug > 2)
 		printk(KERN_DEBUG "%s: Shutting down sb1000.\n", dev->name);

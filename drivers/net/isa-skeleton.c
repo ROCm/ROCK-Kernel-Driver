@@ -303,7 +303,7 @@ static int __init netcard_probe1(struct net_device *dev, int ioaddr)
 	}
 #endif	/* jumpered DMA */
 
-	np = (struct net_local *)dev->priv;
+	np = netdev_priv(dev);
 	spin_lock_init(&np->lock);
 
 	dev->open		= net_open;
@@ -326,7 +326,7 @@ out:
 
 static void net_tx_timeout(struct net_device *dev)
 {
-	struct net_local *np = (struct net_local *)dev->priv;
+	struct net_local *np = netdev_priv(dev);
 
 	printk(KERN_WARNING "%s: transmit timed out, %s?\n", dev->name,
 	       tx_done(dev) ? "IRQ conflict" : "network cable problem");
@@ -361,7 +361,7 @@ static void net_tx_timeout(struct net_device *dev)
 static int
 net_open(struct net_device *dev)
 {
-	struct net_local *np = (struct net_local *)dev->priv;
+	struct net_local *np = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	/*
 	 * This is used if the interrupt line can turned off (shared).
@@ -399,7 +399,7 @@ net_open(struct net_device *dev)
  */
 static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_local *np = (struct net_local *)dev->priv;
+	struct net_local *np = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	short length = ETH_ZLEN < skb->len ? skb->len : ETH_ZLEN;
 	unsigned char *buf = skb->data;
@@ -465,7 +465,7 @@ static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
  */
 void net_tx(struct net_device *dev)
 {
-	struct net_local *np = (struct net_local *)dev->priv;
+	struct net_local *np = netdev_priv(dev);
 	int entry;
 
 	/* This protects us from concurrent execution of
@@ -508,7 +508,7 @@ static irqreturn_t net_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	ioaddr = dev->base_addr;
 
-	np = (struct net_local *)dev->priv;
+	np = netdev_priv(dev);
 	status = inw(ioaddr + 0);
 
 	if (status == 0)
@@ -539,7 +539,7 @@ out:
 static void
 net_rx(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	int boguscount = 10;
 
@@ -591,7 +591,7 @@ net_rx(struct net_device *dev)
 static int
 net_close(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	lp->open_time = 0;
@@ -620,7 +620,7 @@ net_close(struct net_device *dev)
  */
 static struct net_device_stats *net_get_stats(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	short ioaddr = dev->base_addr;
 
 	/* Update the statistics from the device registers. */

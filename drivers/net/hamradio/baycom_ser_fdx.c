@@ -281,7 +281,7 @@ static __inline__ void ser12_rx(struct net_device *dev, struct baycom_state *bc,
 static irqreturn_t ser12_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
-	struct baycom_state *bc = (struct baycom_state *)dev->priv;
+	struct baycom_state *bc = netdev_priv(dev);
 	struct timeval tv;
 	unsigned char iir, msr;
 	unsigned int txcount = 0;
@@ -407,7 +407,7 @@ static enum uart ser12_check_uart(unsigned int iobase)
 
 static int ser12_open(struct net_device *dev)
 {
-	struct baycom_state *bc = (struct baycom_state *)dev->priv;
+	struct baycom_state *bc = netdev_priv(dev);
 	enum uart u;
 
 	if (!dev || !bc)
@@ -466,7 +466,7 @@ static int ser12_open(struct net_device *dev)
 
 static int ser12_close(struct net_device *dev)
 {
-	struct baycom_state *bc = (struct baycom_state *)dev->priv;
+	struct baycom_state *bc = netdev_priv(dev);
 
 	if (!dev || !bc)
 		return -EINVAL;
@@ -536,7 +536,7 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr,
 		printk(KERN_ERR "bc_ioctl: invalid device struct\n");
 		return -EINVAL;
 	}
-	bc = (struct baycom_state *)dev->priv;
+	bc = netdev_priv(dev);
 
 	if (cmd != SIOCDEVPRIVATE)
 		return -ENOIOCTLCMD;
@@ -644,7 +644,7 @@ static int __init init_baycomserfdx(void)
 		if (IS_ERR(dev)) 
 			break;
 
-		bc = (struct baycom_state *)dev->priv;
+		bc = netdev_priv(dev);
 		if (set_hw && baycom_setmode(bc, mode[i]))
 			set_hw = 0;
 		bc->baud = baud[i];

@@ -272,7 +272,7 @@ static __inline__ void par96_rx(struct net_device *dev, struct baycom_state *bc)
 static void par96_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
-	struct baycom_state *bc = (struct baycom_state *)dev->priv;
+	struct baycom_state *bc = netdev_priv(dev);
 
 	if (!dev || !bc || bc->hdrv.magic != HDLCDRV_MAGIC)
 		return;
@@ -302,7 +302,7 @@ static void par96_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void par96_wakeup(void *handle)
 {
         struct net_device *dev = (struct net_device *)handle;
-	struct baycom_state *bc = (struct baycom_state *)dev->priv;
+	struct baycom_state *bc = netdev_priv(dev);
 
 	printk(KERN_DEBUG "baycom_par: %s: why am I being woken up?\n", dev->name);
 	if (!parport_claim(bc->pdev))
@@ -313,7 +313,7 @@ static void par96_wakeup(void *handle)
 
 static int par96_open(struct net_device *dev)
 {
-	struct baycom_state *bc = (struct baycom_state *)dev->priv;
+	struct baycom_state *bc = netdev_priv(dev);
 	struct parport *pp;
 
 	if (!dev || !bc)
@@ -362,7 +362,7 @@ static int par96_open(struct net_device *dev)
 
 static int par96_close(struct net_device *dev)
 {
-	struct baycom_state *bc = (struct baycom_state *)dev->priv;
+	struct baycom_state *bc = netdev_priv(dev);
 	struct parport *pp;
 
 	if (!dev || !bc)
@@ -424,7 +424,7 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr,
 		printk(KERN_ERR "bc_ioctl: invalid device struct\n");
 		return -EINVAL;
 	}
-	bc = (struct baycom_state *)dev->priv;
+	bc = netdev_priv(dev);
 
 	if (cmd != SIOCDEVPRIVATE)
 		return -ENOIOCTLCMD;
@@ -524,7 +524,7 @@ static int __init init_baycompar(void)
 		if (IS_ERR(dev)) 
 			break;
 
-		bc = (struct baycom_state *)dev->priv;
+		bc = netdev_priv(dev);
 		if (set_hw && baycom_setmode(bc, mode[i]))
 			set_hw = 0;
 		found++;

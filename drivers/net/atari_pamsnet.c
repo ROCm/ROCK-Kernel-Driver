@@ -667,7 +667,7 @@ struct net_device * __init pamsnet_probe (int unit)
  */
 static int
 pamsnet_open(struct net_device *dev) {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if (pamsnet_debug > 0)
 		printk("pamsnet_open\n");
@@ -696,7 +696,7 @@ pamsnet_open(struct net_device *dev) {
 
 static int
 pamsnet_send_packet(struct sk_buff *skb, struct net_device *dev) {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	unsigned long flags;
 
 	/* Block a timer-based transmit from overlapping.  This could better be
@@ -742,7 +742,7 @@ pamsnet_send_packet(struct sk_buff *skb, struct net_device *dev) {
  */
 static void
 pamsnet_poll_rx(struct net_device *dev) {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int boguscount;
 	int pkt_len;
 	struct sk_buff *skb;
@@ -817,7 +817,7 @@ pamsnet_poll_rx(struct net_device *dev) {
 static void
 pamsnet_tick(unsigned long data) {
 	struct net_device	 *dev = (struct net_device *)data;
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if( pamsnet_debug > 0 && (lp->open_time++ & 7) == 8 )
 		printk("pamsnet_tick: %ld\n", lp->open_time);
@@ -832,7 +832,7 @@ pamsnet_tick(unsigned long data) {
  */
 static int
 pamsnet_close(struct net_device *dev) {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 
 	if (pamsnet_debug > 0)
 		printk("pamsnet_close, open_time=%ld\n", lp->open_time);
@@ -859,7 +859,7 @@ pamsnet_close(struct net_device *dev) {
  */
 static struct net_device_stats *net_get_stats(struct net_device *dev) 
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	return &lp->stats;
 }
 

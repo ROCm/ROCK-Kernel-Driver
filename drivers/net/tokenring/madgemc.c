@@ -365,7 +365,7 @@ static int __init madgemc_probe(void)
 				return 0;
 			return -1;
 		}
-		tp = (struct net_local *)dev->priv;
+		tp = netdev_priv(dev);
 
 		/* 
 		 * The MC16 is physically a 32bit card.  However, Madge
@@ -504,7 +504,7 @@ static irqreturn_t madgemc_interrupt(int irq, void *dev_id, struct pt_regs *regs
 unsigned short madgemc_setnselout_pins(struct net_device *dev)
 {
 	unsigned char reg1;
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	
 	reg1 = inb(dev->base_addr + MC_CONTROL_REG1);
 
@@ -731,7 +731,7 @@ static int madgemc_mcaproc(char *buf, int slot, void *d)
 	}
 	len += sprintf(buf+len, "-------\n");
 	if (curcard) {
-		struct net_local *tp = (struct net_local *)dev->priv;
+		struct net_local *tp = netdev_priv(dev);
 		int i;
 		
 		len += sprintf(buf+len, "Card Revision: %d\n", curcard->cardrev);
