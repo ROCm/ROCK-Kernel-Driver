@@ -11,6 +11,8 @@ enum km_type {
 	KM_BIO_DST_IRQ,
 	KM_IRQ0,
 	KM_IRQ1,
+	KM_CRYPTO_USER,
+	KM_CRYPTO_SOFTIRQ,
 	KM_TYPE_NR
 };
 

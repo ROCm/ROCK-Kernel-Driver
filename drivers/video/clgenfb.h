@@ -1,7 +1,7 @@
 /*
  * drivers/video/clgenfb.h - Cirrus Logic chipset constants
  *
- * Copyright 1999 Jeff Garzik <jgarzik@mandrakesoft.com>
+ * Copyright 1999 Jeff Garzik <jgarzik@pobox.com>
  *
  * Original clgenfb author:  Frank Neumann
  *

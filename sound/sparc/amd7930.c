@@ -47,19 +47,19 @@
 #include <asm/irq.h>
 #include <asm/sbus.h>
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for Sun AMD7930 soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for Sun AMD7930 soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable Sun AMD7930 soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for Sun AMD7930 soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for Sun AMD7930 soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable Sun AMD7930 soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 MODULE_AUTHOR("Thomas K. Dyas and David S. Miller");
 MODULE_DESCRIPTION("Sun AMD7930");
 MODULE_LICENSE("GPL");
@@ -1042,7 +1042,7 @@ static int __init amd7930_attach(int prom_node, struct sbus_dev *sdev)
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
@@ -1070,7 +1070,7 @@ static int __init amd7930_attach(int prom_node, struct sbus_dev *sdev)
 		rp->flags = IORESOURCE_IO | (reg_prop.which_io & 0xff);
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
@@ -1151,7 +1151,7 @@ module_exit(amd7930_exit);
 
 #ifndef MODULE
 
-/* format is: snd-sun-amd7930=snd_index,snd_id,snd_enable */
+/* format is: snd-sun-amd7930=index,id,enable */
 
 static int __init alsa_card_sun_amd7930_setup(char *str)
 {
@@ -1159,9 +1159,9 @@ static int __init alsa_card_sun_amd7930_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_option(&str,&snd_id[nr_dev]) == 2 &&
-	       get_id(&str,&snd_enable[nr_dev]) == 2);
+	(void)(get_option(&str,&index[nr_dev]) == 2 &&
+	       get_option(&str,&id[nr_dev]) == 2 &&
+	       get_id(&str,&enable[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

@@ -59,66 +59,66 @@ MODULE_DESCRIPTION("AMD InterWave STB with TEA6330T");
 MODULE_DEVICES("{{AMD,InterWave STB with TEA6330T}}");
 #endif
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_ISAPNP; /* Enable this card */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_ISAPNP; /* Enable this card */
 #ifdef __ISAPNP__
-static int snd_isapnp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
+static int isapnp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 #endif
-static long snd_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x210,0x220,0x230,0x240,0x250,0x260 */
+static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x210,0x220,0x230,0x240,0x250,0x260 */
 #ifdef SNDRV_STB
-static long snd_port_tc[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x350,0x360,0x370,0x380 */
+static long port_tc[SNDRV_CARDS] = SNDRV_DEFAULT_PORT;	/* 0x350,0x360,0x370,0x380 */
 #endif
-static int snd_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 2,3,5,9,11,12,15 */
-static int snd_dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
-static int snd_dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
-static int snd_joystick_dac[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 29};
+static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ;	/* 2,3,5,9,11,12,15 */
+static int dma1[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
+static int dma2[SNDRV_CARDS] = SNDRV_DEFAULT_DMA;	/* 0,1,3,5,6,7 */
+static int joystick_dac[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 29};
 				/* 0 to 31, (0.59V-4.52V or 0.389V-2.98V) */
-static int snd_midi[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int snd_pcm_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
-static int snd_effect[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int midi[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int pcm_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
+static int effect[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for InterWave soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for InterWave soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable InterWave soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_isapnp, "ISA PnP detection for specified soundcard.");
-MODULE_PARM_SYNTAX(snd_isapnp, SNDRV_ISAPNP_DESC);
-MODULE_PARM(snd_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_port, "Port # for InterWave driver.");
-MODULE_PARM_SYNTAX(snd_port, SNDRV_ENABLED ",allows:{{0x210,0x260,0x10}},dialog:list");
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for InterWave soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for InterWave soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable InterWave soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(isapnp, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(isapnp, "ISA PnP detection for specified soundcard.");
+MODULE_PARM_SYNTAX(isapnp, SNDRV_ISAPNP_DESC);
+MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(port, "Port # for InterWave driver.");
+MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0x210,0x260,0x10}},dialog:list");
 #ifdef SNDRV_STB
-MODULE_PARM(snd_port_tc, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_port_tc, "Tone control (TEA6330T - i2c bus) port # for InterWave driver.");
-MODULE_PARM_SYNTAX(snd_port_tc, SNDRV_ENABLED ",allows:{{0x350,0x380,0x10}},dialog:list");
+MODULE_PARM(port_tc, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(port_tc, "Tone control (TEA6330T - i2c bus) port # for InterWave driver.");
+MODULE_PARM_SYNTAX(port_tc, SNDRV_ENABLED ",allows:{{0x350,0x380,0x10}},dialog:list");
 #endif
-MODULE_PARM(snd_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_irq, "IRQ # for InterWave driver.");
-MODULE_PARM_SYNTAX(snd_irq, SNDRV_ENABLED ",allows:{{3},{5},{9},{11},{12},{15}},dialog:list");
-MODULE_PARM(snd_dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma1, "DMA1 # for InterWave driver.");
-MODULE_PARM_SYNTAX(snd_dma1, SNDRV_DMA_DESC);
-MODULE_PARM(snd_dma2, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_dma2, "DMA2 # for InterWave driver.");
-MODULE_PARM_SYNTAX(snd_dma2, SNDRV_DMA_DESC);
-MODULE_PARM(snd_joystick_dac, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_joystick_dac, "Joystick DAC level 0.59V-4.52V or 0.389V-2.98V for InterWave driver.");
+MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(irq, "IRQ # for InterWave driver.");
+MODULE_PARM_SYNTAX(irq, SNDRV_ENABLED ",allows:{{3},{5},{9},{11},{12},{15}},dialog:list");
+MODULE_PARM(dma1, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma1, "DMA1 # for InterWave driver.");
+MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
+MODULE_PARM(dma2, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(dma2, "DMA2 # for InterWave driver.");
+MODULE_PARM_SYNTAX(dma2, SNDRV_DMA_DESC);
+MODULE_PARM(joystick_dac, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(joystick_dac, "Joystick DAC level 0.59V-4.52V or 0.389V-2.98V for InterWave driver.");
 MODULE_PARM_SYNTAX(snd_joystic_dac, SNDRV_ENABLED ",allows:{{0,31}}");
-MODULE_PARM(snd_midi, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_midi, "MIDI UART enable for InterWave driver.");
-MODULE_PARM_SYNTAX(snd_midi, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_pcm_channels, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_pcm_channels, "Reserved PCM channels for InterWave driver.");
-MODULE_PARM_SYNTAX(snd_pcm_channels, SNDRV_ENABLED ",allows:{{2,16}}");
-MODULE_PARM(snd_effect, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_effect, "Effects enable for InterWave driver.");
-MODULE_PARM_SYNTAX(snd_effect, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
+MODULE_PARM(midi, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(midi, "MIDI UART enable for InterWave driver.");
+MODULE_PARM_SYNTAX(midi, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
+MODULE_PARM(pcm_channels, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(pcm_channels, "Reserved PCM channels for InterWave driver.");
+MODULE_PARM_SYNTAX(pcm_channels, SNDRV_ENABLED ",allows:{{2,16}}");
+MODULE_PARM(effect, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(effect, "Effects enable for InterWave driver.");
+MODULE_PARM_SYNTAX(effect, SNDRV_ENABLED "," SNDRV_ENABLE_DESC);
 
 struct snd_interwave {
 	int irq;
@@ -237,7 +237,7 @@ static int __init snd_interwave_detect_stb(struct snd_interwave *iwcard,
 	int err;
 
 	*rbus = NULL;
-	port = snd_port_tc[dev];
+	port = port_tc[dev];
 	if (port == SNDRV_AUTO_PORT) {
 		port = 0x350;
 		if (gus->gf1.port == 0x250) {
@@ -527,7 +527,7 @@ static void __init snd_interwave_init(int dev, snd_gus_card_t * gus)
 	gus->codec_flag = 1;
 	gus->interwave = 1;
 	gus->max_flag = 1;
-	gus->joystick_dac = snd_joystick_dac[dev];
+	gus->joystick_dac = joystick_dac[dev];
 
 }
 
@@ -611,19 +611,19 @@ static int __init snd_interwave_isapnp(int dev, struct snd_interwave *iwcard)
 	pdev = iwcard->dev;
 	if (pdev->prepare(pdev)<0)
 		return -EAGAIN;
-	if (snd_port[dev] != SNDRV_AUTO_PORT) {
-		isapnp_resource_change(&pdev->resource[0], snd_port[dev], 16);
-		isapnp_resource_change(&pdev->resource[1], snd_port[dev] + 0x100, 12);
-		isapnp_resource_change(&pdev->resource[2], snd_port[dev] + 0x10c, 4);
+	if (port[dev] != SNDRV_AUTO_PORT) {
+		isapnp_resource_change(&pdev->resource[0], port[dev], 16);
+		isapnp_resource_change(&pdev->resource[1], port[dev] + 0x100, 12);
+		isapnp_resource_change(&pdev->resource[2], port[dev] + 0x10c, 4);
 	}
-	if (snd_dma1[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[0], snd_dma1[dev], 1);
-	if (snd_dma2[dev] != SNDRV_AUTO_DMA)
-		isapnp_resource_change(&pdev->dma_resource[1], snd_dma2[dev], 1);
-	if (snd_dma2[dev] < 0)
+	if (dma1[dev] != SNDRV_AUTO_DMA)
+		isapnp_resource_change(&pdev->dma_resource[0], dma1[dev], 1);
+	if (dma2[dev] != SNDRV_AUTO_DMA)
+		isapnp_resource_change(&pdev->dma_resource[1], dma2[dev], 1);
+	if (dma2[dev] < 0)
 		isapnp_resource_change(&pdev->dma_resource[1], 4, 1);
-	if (snd_irq[dev] != SNDRV_AUTO_IRQ)
-		isapnp_resource_change(&pdev->irq_resource[0], snd_irq[dev], 1);
+	if (irq[dev] != SNDRV_AUTO_IRQ)
+		isapnp_resource_change(&pdev->irq_resource[0], irq[dev], 1);
 	if (pdev->activate(pdev)<0) {
 		snd_printk("isapnp configure failure (out of resources?)\n");
 		return -EBUSY;
@@ -634,16 +634,16 @@ static int __init snd_interwave_isapnp(int dev, struct snd_interwave *iwcard)
 		pdev->deactivate(pdev);
 		return -ENOENT;
 	}
-	snd_port[dev] = pdev->resource[0].start;
-	snd_dma1[dev] = pdev->dma_resource[0].start;
-	if (snd_dma2[dev] >= 0)
-		snd_dma2[dev] = pdev->dma_resource[1].start;
-	snd_irq[dev] = pdev->irq_resource[0].start;
+	port[dev] = pdev->resource[0].start;
+	dma1[dev] = pdev->dma_resource[0].start;
+	if (dma2[dev] >= 0)
+		dma2[dev] = pdev->dma_resource[1].start;
+	irq[dev] = pdev->irq_resource[0].start;
 	snd_printdd("isapnp IW: sb port=0x%lx, gf1 port=0x%lx, codec port=0x%lx\n",
 				pdev->resource[0].start,
 				pdev->resource[1].start,
 				pdev->resource[2].start);
-	snd_printdd("isapnp IW: dma1=%i, dma2=%i, irq=%i\n", snd_dma1[dev], snd_dma2[dev], snd_irq[dev]);
+	snd_printdd("isapnp IW: dma1=%i, dma2=%i, irq=%i\n", dma1[dev], dma2[dev], irq[dev]);
 #ifdef SNDRV_STB
 	/* Tone Control initialization */
 	pdev = iwcard->devtc;
@@ -651,15 +651,15 @@ static int __init snd_interwave_isapnp(int dev, struct snd_interwave *iwcard)
 		iwcard->dev->deactivate(iwcard->dev);
 		return -EAGAIN;
 	}
-	if (snd_port_tc[dev] != SNDRV_AUTO_PORT)
-		isapnp_resource_change(&pdev->resource[0], snd_port_tc[dev], 1);
+	if (port_tc[dev] != SNDRV_AUTO_PORT)
+		isapnp_resource_change(&pdev->resource[0], port_tc[dev], 1);
 	if (pdev->activate(pdev)<0) {
 		snd_printk("Tone Control isapnp configure failure (out of resources?)\n");
 		iwcard->dev->deactivate(iwcard->dev);
 		return -EBUSY;
 	}
-	snd_port_tc[dev] = pdev->resource[0].start;
-	snd_printdd("isapnp IW: tone control port=0x%lx\n", snd_port_tc[dev]);
+	port_tc[dev] = pdev->resource[0].start;
+	snd_printdd("isapnp IW: tone control port=0x%lx\n", port_tc[dev]);
 #endif
 	return 0;
 }
@@ -703,7 +703,7 @@ static int __init snd_interwave_probe(int dev)
 {
 	static int possible_irqs[] = {5, 11, 12, 9, 7, 15, 3, -1};
 	static int possible_dmas[] = {0, 1, 3, 5, 6, 7, -1};
-	int irq, dma1, dma2;
+	int xirq, xdma1, xdma2;
 	snd_card_t *card;
 	struct snd_interwave *iwcard;
 	cs4231_t *cs4231;
@@ -715,7 +715,7 @@ static int __init snd_interwave_probe(int dev)
 	char *str;
 	int err;
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE,
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE,
 			    sizeof(struct snd_interwave));
 	if (card == NULL)
 		return -ENOMEM;
@@ -724,30 +724,30 @@ static int __init snd_interwave_probe(int dev)
 	iwcard->irq = -1;
 	card->private_free = snd_interwave_free;
 #ifdef __ISAPNP__
-	if (snd_isapnp[dev] && snd_interwave_isapnp(dev, iwcard)) {
+	if (isapnp[dev] && snd_interwave_isapnp(dev, iwcard)) {
 		snd_card_free(card);
 		return -ENODEV;
 	}
 #endif
-	irq = snd_irq[dev];
-	if (irq == SNDRV_AUTO_IRQ) {
-		if ((irq = snd_legacy_find_free_irq(possible_irqs)) < 0) {
+	xirq = irq[dev];
+	if (xirq == SNDRV_AUTO_IRQ) {
+		if ((xirq = snd_legacy_find_free_irq(possible_irqs)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free IRQ\n");
 			return -EBUSY;
 		}
 	}
-	dma1 = snd_dma1[dev];
-	if (dma1 == SNDRV_AUTO_DMA) {
-		if ((dma1 = snd_legacy_find_free_dma(possible_dmas)) < 0) {
+	xdma1 = dma1[dev];
+	if (xdma1 == SNDRV_AUTO_DMA) {
+		if ((xdma1 = snd_legacy_find_free_dma(possible_dmas)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free DMA1\n");
 			return -EBUSY;
 		}
 	}
-	dma2 = snd_dma2[dev];
-	if (dma2 == SNDRV_AUTO_DMA) {
-		if ((dma2 = snd_legacy_find_free_dma(possible_dmas)) < 0) {
+	xdma2 = dma2[dev];
+	if (xdma2 == SNDRV_AUTO_DMA) {
+		if ((xdma2 = snd_legacy_find_free_dma(possible_dmas)) < 0) {
 			snd_card_free(card);
 			snd_printk("unable to find a free DMA2\n");
 			return -EBUSY;
@@ -755,10 +755,10 @@ static int __init snd_interwave_probe(int dev)
 	}
 
 	if ((err = snd_gus_create(card,
-				  snd_port[dev],
-				  -irq, dma1, dma2,
+				  port[dev],
+				  -xirq, xdma1, xdma2,
 				  0, 32,
-				  snd_pcm_channels[dev], snd_effect[dev], &gus)) < 0) {
+				  pcm_channels[dev], effect[dev], &gus)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -780,16 +780,16 @@ static int __init snd_interwave_probe(int dev)
 		return err;
 	}
 
-	if (request_irq(irq, snd_interwave_interrupt, SA_INTERRUPT, "InterWave", (void *)iwcard)) {
+	if (request_irq(xirq, snd_interwave_interrupt, SA_INTERRUPT, "InterWave", (void *)iwcard)) {
 		snd_card_free(card);
 		snd_printk("unable to grab IRQ %d\n", irq);
 		return -EBUSY;
 	}
-	iwcard->irq = irq;
+	iwcard->irq = xirq;
 
 	if ((err = snd_cs4231_create(card,
-				     gus->gf1.port + 0x10c, -1, irq,
-				     dma2 < 0 ? dma1 : dma2, dma1,
+				     gus->gf1.port + 0x10c, -1, xirq,
+				     xdma2 < 0 ? xdma1 : xdma2, xdma1,
 				     CS4231_HW_INTERWAVE,
 				     CS4231_HWSHARE_IRQ |
 				     CS4231_HWSHARE_DMA1 |
@@ -812,7 +812,7 @@ static int __init snd_interwave_probe(int dev)
 		snd_card_free(card);
 		return err;
 	}
-	if (snd_pcm_channels[dev] > 0) {
+	if (pcm_channels[dev] > 0) {
 		if ((err = snd_gf1_pcm_new(gus, 1, 1, NULL)) < 0) {
 			snd_card_free(card);
 			return err;
@@ -848,7 +848,7 @@ static int __init snd_interwave_probe(int dev)
 	}
 #endif
 
-	gus->uart_enable = snd_midi[dev];
+	gus->uart_enable = midi[dev];
 	if ((err = snd_gf1_rawmidi_new(gus, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -866,10 +866,10 @@ static int __init snd_interwave_probe(int dev)
 	sprintf(card->longname, "%s at 0x%lx, irq %i, dma %d",
 		str,
 		gus->gf1.port,
-		irq,
-		dma1);
-	if (dma2 >= 0)
-		sprintf(card->longname + strlen(card->longname), "&%d", dma2);
+		xirq,
+		xdma1);
+	if (xdma2 >= 0)
+		sprintf(card->longname + strlen(card->longname), "&%d", xdma2);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
@@ -882,22 +882,22 @@ static int __init snd_interwave_probe(int dev)
 	return 0;
 }
 
-static int __init snd_interwave_probe_legacy_port(unsigned long port)
+static int __init snd_interwave_probe_legacy_port(unsigned long xport)
 {
 	static int dev;
 	int res;
 
 	for ( ; dev < SNDRV_CARDS; dev++) {
-		if (!snd_enable[dev] || snd_port[dev] != SNDRV_AUTO_PORT)
+		if (!enable[dev] || port[dev] != SNDRV_AUTO_PORT)
                         continue;
 #ifdef __ISAPNP__
-		if (snd_isapnp[dev])
+		if (isapnp[dev])
 			continue;
 #endif
-		snd_port[dev] = port;
+		port[dev] = xport;
 		res = snd_interwave_probe(dev);
 		if (res < 0)
-			snd_port[dev] = SNDRV_AUTO_PORT;
+			port[dev] = SNDRV_AUTO_PORT;
 		return res;
 	}
 	return -ENODEV;
@@ -912,7 +912,7 @@ static int __init snd_interwave_isapnp_detect(struct isapnp_card *card,
 	int res;
 
 	for ( ; dev < SNDRV_CARDS; dev++) {
-		if (!snd_enable[dev] || !snd_isapnp[dev])
+		if (!enable[dev] || !isapnp[dev])
 			continue;
 		snd_interwave_isapnp_cards[dev] = card;
 		snd_interwave_isapnp_id[dev] = id;
@@ -935,10 +935,10 @@ static int __init alsa_card_interwave_init(void)
 	int dev;
 
 	for (dev = 0; dev < SNDRV_CARDS; dev++) {
-		if (!snd_enable[dev] || snd_port[dev] == SNDRV_AUTO_PORT)
+		if (!enable[dev] || port[dev] == SNDRV_AUTO_PORT)
 			continue;
 #ifdef __ISAPNP__
-		if (snd_isapnp[dev])
+		if (isapnp[dev])
 			continue;
 #endif
 		if (!snd_interwave_probe(dev)) {
@@ -946,7 +946,7 @@ static int __init alsa_card_interwave_init(void)
 			continue;
 		}
 #ifdef MODULE
-		printk(KERN_ERR "InterWave soundcard #%i not found at 0x%lx or device busy\n", dev, snd_port[dev]);
+		printk(KERN_ERR "InterWave soundcard #%i not found at 0x%lx or device busy\n", dev, port[dev]);
 #endif
 	}
 	/* legacy auto configured cards */
@@ -978,11 +978,11 @@ module_exit(alsa_card_interwave_exit)
 
 #ifndef MODULE
 
-/* format is: snd-interwave=snd_enable,snd_index,snd_id,snd_isapnp,
-			    snd_port[,snd_port_tc],snd_irq,
-			    snd_dma1,snd_dma2,
-			    snd_joystick_dac,snd_midi,
-			    snd_pcm_channels,snd_effect */
+/* format is: snd-interwave=enable,index,id,isapnp,
+			    port[,port_tc],irq,
+			    dma1,dma2,
+			    joystick_dac,midi,
+			    pcm_channels,effect */
 
 static int __init alsa_card_interwave_setup(char *str)
 {
@@ -991,24 +991,24 @@ static int __init alsa_card_interwave_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option(&str,&pnp) == 2 &&
-	       get_option(&str,(int *)&snd_port[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
 #ifdef SNDRV_STB
-	       get_option(&str,(int *)&snd_port_tc[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&port_tc[nr_dev]) == 2 &&
 #endif
-	       get_option(&str,&snd_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_dma1[nr_dev]) == 2 &&
-	       get_option(&str,&snd_dma2[nr_dev]) == 2 &&
-	       get_option(&str,&snd_joystick_dac[nr_dev]) == 2 &&
-	       get_option(&str,&snd_midi[nr_dev]) == 2 &&
-	       get_option(&str,&snd_pcm_channels[nr_dev]) == 2 &&
-	       get_option(&str,&snd_effect[nr_dev]) == 2);
+	       get_option(&str,&irq[nr_dev]) == 2 &&
+	       get_option(&str,&dma1[nr_dev]) == 2 &&
+	       get_option(&str,&dma2[nr_dev]) == 2 &&
+	       get_option(&str,&joystick_dac[nr_dev]) == 2 &&
+	       get_option(&str,&midi[nr_dev]) == 2 &&
+	       get_option(&str,&pcm_channels[nr_dev]) == 2 &&
+	       get_option(&str,&effect[nr_dev]) == 2);
 #ifdef __ISAPNP__
 	if (pnp != INT_MAX)
-		snd_isapnp[nr_dev] = pnp;
+		isapnp[nr_dev] = pnp;
 #endif
 	nr_dev++;
 	return 1;

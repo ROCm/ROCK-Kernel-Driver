@@ -50,27 +50,27 @@ MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{Generic,USB Audio}}");
 
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int snd_vid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Vendor ID for this card */
-static int snd_pid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Product ID for this card */
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int vid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Vendor ID for this card */
+static int pid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Product ID for this card */
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for the USB audio adapter.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for the USB audio adapter.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable USB audio adapter.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_vid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_vid, "Vendor ID for the USB audio device.");
-MODULE_PARM_SYNTAX(snd_vid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
-MODULE_PARM(snd_pid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_pid, "Product ID for the USB audio device.");
-MODULE_PARM_SYNTAX(snd_pid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for the USB audio adapter.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for the USB audio adapter.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable USB audio adapter.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(vid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(vid, "Vendor ID for the USB audio device.");
+MODULE_PARM_SYNTAX(vid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
+MODULE_PARM(pid, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(pid, "Product ID for the USB audio device.");
+MODULE_PARM_SYNTAX(pid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
 
 
 /*
@@ -1833,11 +1833,6 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, unsigned char *buffer, i
 /*
  * parse audio control descriptor and create pcm/midi streams
  */
-
-static int snd_usb_create_midi_interface(snd_usb_audio_t *chip,
-					 struct usb_interface *iface,
-					 const snd_usb_audio_quirk_t *quirk);
-
 static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif,
 				  unsigned char *buffer, int buflen)
 {
@@ -1896,38 +1891,95 @@ static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif,
 	return 0;
 }
 
-static int snd_usb_create_midi_interface(snd_usb_audio_t *chip,
-					 struct usb_interface *iface,
-					 const snd_usb_audio_quirk_t *quirk)
+static int snd_usb_roland_ua100_hack_intf(snd_usb_audio_t *chip, int ifnum)
 {
-#if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
-	snd_seq_device_t *seq_device;
-	snd_usb_midi_t *umidi;
+	struct audioformat *fp;
 	int err;
 
-	err = snd_seq_device_new(chip->card, chip->next_seq_device,
-				 SNDRV_SEQ_DEV_ID_USBMIDI,
-				 sizeof(snd_usb_midi_t), &seq_device);
-	if (err < 0)
+	fp = kmalloc(sizeof(*fp), GFP_KERNEL);
+	if (! fp) {
+		snd_printk(KERN_ERR "cannot malloc\n");
+		return -ENOMEM;
+	}
+	memset(fp, 0, sizeof(*fp));
+	fp->format = SNDRV_PCM_FORMAT_S16_LE;
+	fp->channels = ifnum == 0 ? 4 : 2;
+	fp->iface = ifnum;
+	fp->altsetting = 1;
+	fp->altset_idx = 1;
+	fp->attributes = ifnum == 0 ? 0 : EP_CS_ATTR_FILL_MAX;
+	fp->endpoint = ifnum == 0 ? 0x01 : 0x81;
+	fp->ep_attr = ifnum == 0 ? 0x09 : 0x05;
+	fp->rates = SNDRV_PCM_RATE_CONTINUOUS;
+	fp->rate_min = fp->rate_max = 44100;
+
+	err = add_audio_endpoint(chip, ifnum == 0 ? SNDRV_PCM_STREAM_PLAYBACK
+				 : SNDRV_PCM_STREAM_CAPTURE, fp);
+	if (err < 0) {
+		kfree(fp);
 		return err;
-	chip->next_seq_device++;
-	strcpy(seq_device->name, chip->card->shortname);
-	umidi = (snd_usb_midi_t *)SNDRV_SEQ_DEVICE_ARGPTR(seq_device);
-	umidi->chip = chip;
-	umidi->iface = iface;
-	umidi->ifnum = iface->altsetting->bInterfaceNumber;
-	umidi->quirk = quirk;
-	umidi->seq_client = -1;
-#endif
+	}
+	usb_set_interface(chip->dev, ifnum, 0);
 	return 0;
 }
 
-static inline int snd_usb_create_quirk(snd_usb_audio_t *chip,
-				       struct usb_interface *iface,
-	       			       const snd_usb_audio_quirk_t *quirk)
+static int snd_usb_roland_ua100_hack(snd_usb_audio_t *chip)
 {
-	/* in the future, there may be quirks for PCM devices */
-	return snd_usb_create_midi_interface(chip, iface, quirk);
+	static const snd_usb_midi_endpoint_info_t ep_quirk = {
+		.epnum = -1,
+		.out_cables = 0x0007,
+		.in_cables  = 0x0007
+	};
+	static const snd_usb_audio_quirk_t midi_quirk = {
+		.vendor_name = "Roland",
+		.product_name = "UA-100",
+		.ifnum = 2,
+		.type = QUIRK_MIDI_FIXED_ENDPOINT,
+		.data = &ep_quirk
+	};
+	struct usb_config_descriptor *cfg = chip->dev->actconfig;
+	struct usb_interface *iface;
+	int err;
+
+	if (cfg->bNumInterfaces != 3) {
+		snd_printdd(KERN_ERR "invalid UA-100 descriptor\n");
+		return -ENXIO;
+	}
+	/* if 0: output */
+	if ((err = snd_usb_roland_ua100_hack_intf(chip, 0)) < 0)
+		return err;
+	/* if 1: input */
+	iface = &cfg->interface[1];
+	if (! usb_interface_claimed(iface)) {
+		if ((err = snd_usb_roland_ua100_hack_intf(chip, 1)) < 0)
+			return err;
+		usb_driver_claim_interface(&usb_audio_driver, iface, (void*)-1);
+	}
+	/* if 2: MIDI */
+	iface = &cfg->interface[2];
+	if (! usb_interface_claimed(iface)) {
+		if ((err = snd_usb_create_midi_interface(chip, iface, &midi_quirk)) < 0)
+			return err;
+		usb_driver_claim_interface(&usb_audio_driver, iface, (void*)-1);
+	}
+	return 0;
+}
+
+static int snd_usb_create_quirk(snd_usb_audio_t *chip,
+				struct usb_interface *iface,
+				const snd_usb_audio_quirk_t *quirk)
+{
+	switch (quirk->type) {
+	case QUIRK_MIDI_FIXED_ENDPOINT:
+	case QUIRK_MIDI_YAMAHA:
+	case QUIRK_MIDI_MIDIMAN:
+		return snd_usb_create_midi_interface(chip, iface, quirk);
+	case QUIRK_ROLAND_UA100:
+		return snd_usb_roland_ua100_hack(chip);
+	default:
+		snd_printd(KERN_ERR "invalid quirk type %d\n", quirk->type);
+		return -ENXIO;
+	}
 }
 
 
@@ -2080,10 +2132,10 @@ static int alloc_desc_buffer(struct usb_device *dev, int index, unsigned char **
  */
 static void *snd_usb_audio_probe(struct usb_device *dev,
 				 struct usb_interface *intf,
-				 const struct usb_device_id *id)
+				 const struct usb_device_id *usb_id)
 {
 	struct usb_config_descriptor *config = dev->actconfig;	
-	const snd_usb_audio_quirk_t *quirk = (const snd_usb_audio_quirk_t *)id->driver_info;
+	const snd_usb_audio_quirk_t *quirk = (const snd_usb_audio_quirk_t *)usb_id->driver_info;
 	int i;
 	snd_card_t *card;
 	snd_usb_audio_t *chip;
@@ -2115,10 +2167,10 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 		 * now look for an empty slot and create a new card instance
 		 */
 		for (i = 0; i < SNDRV_CARDS; i++)
-			if (snd_enable[i] && ! usb_chip[i] &&
-			    (snd_vid[i] == -1 || snd_vid[i] == dev->descriptor.idVendor) &&
-			    (snd_pid[i] == -1 || snd_pid[i] == dev->descriptor.idProduct)) {
-				card = snd_card_new(snd_index[i], snd_id[i], THIS_MODULE, 0);
+			if (enable[i] && ! usb_chip[i] &&
+			    (vid[i] == -1 || vid[i] == dev->descriptor.idVendor) &&
+			    (pid[i] == -1 || pid[i] == dev->descriptor.idProduct)) {
+				card = snd_card_new(index[i], id[i], THIS_MODULE, 0);
 				if (card == NULL) {
 					snd_printk(KERN_ERR "cannot create a card instance %d\n", i);
 					goto __error;
@@ -2253,7 +2305,7 @@ module_exit(snd_usb_audio_cleanup);
 
 #ifndef MODULE
 /*
- * format is snd-usb-audio=snd_enable,snd_index,snd_id
+ * format is snd-usb-audio=enable,index,id
  */
 static int __init snd_usb_audio_module_setup(char* str)
 {
@@ -2261,9 +2313,9 @@ static int __init snd_usb_audio_module_setup(char* str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str, &snd_enable[nr_dev]) == 2 &&
-	       get_option(&str, &snd_index[nr_dev]) == 2 &&
-	       get_id(&str, &snd_id[nr_dev]) == 2);
+	(void)(get_option(&str, &enable[nr_dev]) == 2 &&
+	       get_option(&str, &index[nr_dev]) == 2 &&
+	       get_id(&str, &id[nr_dev]) == 2);
 	++nr_dev;
 	return 1;
 }

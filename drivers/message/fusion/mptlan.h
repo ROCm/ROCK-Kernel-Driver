@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/miscdevice.h>
 #include <linux/spinlock.h>
+#include <linux/version.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)
 #include <linux/tqueue.h>
 #else

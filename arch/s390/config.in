@@ -76,4 +76,5 @@ bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
 endmenu
 
 source security/Config.in
+source crypto/Config.in
 source lib/Config.in

@@ -118,7 +118,6 @@ deadline_find_hash(struct deadline_data *dd, sector_t offset)
 
 	while ((entry = next) != hash_list) {
 		next = entry->next;
-		prefetch(next);
 		
 		drq = list_entry_hash(entry);
 
@@ -192,8 +191,6 @@ deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 	entry = sort_list = &dd->sort_list[data_dir];
 	while ((entry = entry->prev) != sort_list) {
 		__rq = list_entry_rq(entry);
-
-		prefetch(entry->prev);
 
 		BUG_ON(__rq->flags & REQ_STARTED);
 
@@ -301,8 +298,6 @@ static void deadline_move_requests(struct deadline_data *dd, struct request *rq)
 	do {
 		struct list_head *nxt = rq->queuelist.next;
 		int this_rq_cost;
-
-		prefetch(nxt);
 
 		/*
 		 * take it off the sort and fifo list, move

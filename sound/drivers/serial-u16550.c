@@ -61,48 +61,48 @@ static char *adaptor_names[] = {
 	"Generic"
 };
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE; /* Enable this card */
-static long snd_port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT; /* 0x3f8,0x2f8,0x3e8,0x2e8 */
-static int snd_irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ; 	/* 3,4,5,7,9,10,11,14,15 */
-static int snd_speed[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 38400}; /* 9600,19200,38400,57600,115200 */
-static int snd_base[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 115200}; /* baud base */
-static int snd_outs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};	 /* 1 to 16 */
-static int snd_ins[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};	/* 1 to 16 */
-static int snd_adaptor[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = SNDRV_SERIAL_SOUNDCANVAS};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE; /* Enable this card */
+static long port[SNDRV_CARDS] = SNDRV_DEFAULT_PORT; /* 0x3f8,0x2f8,0x3e8,0x2e8 */
+static int irq[SNDRV_CARDS] = SNDRV_DEFAULT_IRQ; 	/* 3,4,5,7,9,10,11,14,15 */
+static int speed[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 38400}; /* 9600,19200,38400,57600,115200 */
+static int base[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 115200}; /* baud base */
+static int outs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};	 /* 1 to 16 */
+static int ins[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};	/* 1 to 16 */
+static int adaptor[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = SNDRV_SERIAL_SOUNDCANVAS};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for Serial MIDI.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for Serial MIDI.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_enable, "Enable UART16550A chip.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_port, "Port # for UART16550A chip.");
-MODULE_PARM_SYNTAX(snd_port, SNDRV_PORT12_DESC);
-MODULE_PARM(snd_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_irq, "IRQ # for UART16550A chip.");
-MODULE_PARM_SYNTAX(snd_irq, SNDRV_IRQ_DESC);
-MODULE_PARM(snd_speed, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_speed, "Speed in bauds.");
-MODULE_PARM_SYNTAX(snd_speed, SNDRV_ENABLED ",allows:{9600,19200,38400,57600,115200},dialog:list");
-MODULE_PARM(snd_base, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_base, "Base for divisor in bauds.");
-MODULE_PARM_SYNTAX(snd_base, SNDRV_ENABLED ",allows:{57600,115200,230400,460800},dialog:list");
-MODULE_PARM(snd_outs, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_outs, "Number of MIDI outputs.");
-MODULE_PARM(snd_ins, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_ins, "Number of MIDI inputs.");
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for Serial MIDI.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for Serial MIDI.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(enable, "Enable UART16550A chip.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
+MODULE_PARM_DESC(port, "Port # for UART16550A chip.");
+MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
+MODULE_PARM(irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(irq, "IRQ # for UART16550A chip.");
+MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
+MODULE_PARM(speed, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(speed, "Speed in bauds.");
+MODULE_PARM_SYNTAX(speed, SNDRV_ENABLED ",allows:{9600,19200,38400,57600,115200},dialog:list");
+MODULE_PARM(base, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(base, "Base for divisor in bauds.");
+MODULE_PARM_SYNTAX(base, SNDRV_ENABLED ",allows:{57600,115200,230400,460800},dialog:list");
+MODULE_PARM(outs, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(outs, "Number of MIDI outputs.");
+MODULE_PARM(ins, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(ins, "Number of MIDI inputs.");
 
-MODULE_PARM_SYNTAX(snd_outs, SNDRV_ENABLED ",allows:{{1,16}},dialog:list");
-MODULE_PARM_SYNTAX(snd_ins, SNDRV_ENABLED ",allows:{{1,16}},dialog:list");
-MODULE_PARM(snd_adaptor, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_adaptor, "Type of adaptor.");
-MODULE_PARM_SYNTAX(snd_adaptor, SNDRV_ENABLED ",allows:{{0=Soundcanvas,1=MS-124T,2=MS-124W S/A,3=MS-124W M/B,4=Generic}},dialog:list");
+MODULE_PARM_SYNTAX(outs, SNDRV_ENABLED ",allows:{{1,16}},dialog:list");
+MODULE_PARM_SYNTAX(ins, SNDRV_ENABLED ",allows:{{1,16}},dialog:list");
+MODULE_PARM(adaptor, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(adaptor, "Type of adaptor.");
+MODULE_PARM_SYNTAX(adaptor, SNDRV_ENABLED ",allows:{{0=Soundcanvas,1=MS-124T,2=MS-124W S/A,3=MS-124W M/B,4=Generic}},dialog:list");
 
 /*#define SNDRV_SERIAL_MS124W_MB_NOCOMBO 1*/  /* Address outs as 0-3 instead of bitmap */
 
@@ -842,67 +842,67 @@ static int __init snd_serial_probe(int dev)
 	snd_uart16550_t *uart;
 	int err;
 
-	if (!snd_enable[dev])
+	if (!enable[dev])
 		return -ENOENT;
 
-	switch (snd_adaptor[dev]) {
+	switch (adaptor[dev]) {
 	case SNDRV_SERIAL_SOUNDCANVAS:
-		snd_ins[dev] = 1;
+		ins[dev] = 1;
 		break;
 	case SNDRV_SERIAL_MS124T:
 	case SNDRV_SERIAL_MS124W_SA:
-		snd_outs[dev] = 1;
-		snd_ins[dev] = 1;
+		outs[dev] = 1;
+		ins[dev] = 1;
 		break;
 	case SNDRV_SERIAL_MS124W_MB:
-		snd_outs[dev] = 16;
-		snd_ins[dev] = 1;
+		outs[dev] = 16;
+		ins[dev] = 1;
 		break;
 	case SNDRV_SERIAL_GENERIC:
 		break;
 	default:
 		snd_printk("Adaptor type is out of range 0-%d (%d)\n",
-			   SNDRV_SERIAL_MAX_ADAPTOR, snd_adaptor[dev]);
+			   SNDRV_SERIAL_MAX_ADAPTOR, adaptor[dev]);
 		return -ENODEV;
 	}
 
-	if (snd_outs[dev] < 1 || snd_outs[dev] > SNDRV_SERIAL_MAX_OUTS) {
+	if (outs[dev] < 1 || outs[dev] > SNDRV_SERIAL_MAX_OUTS) {
 		snd_printk("Count of outputs is out of range 1-%d (%d)\n",
-			   SNDRV_SERIAL_MAX_OUTS, snd_outs[dev]);
+			   SNDRV_SERIAL_MAX_OUTS, outs[dev]);
 		return -ENODEV;
 	}
 
-	if (snd_ins[dev] < 1 || snd_ins[dev] > SNDRV_SERIAL_MAX_INS) {
+	if (ins[dev] < 1 || ins[dev] > SNDRV_SERIAL_MAX_INS) {
 		snd_printk("Count of inputs is out of range 1-%d (%d)\n",
-			   SNDRV_SERIAL_MAX_INS, snd_ins[dev]);
+			   SNDRV_SERIAL_MAX_INS, ins[dev]);
 		return -ENODEV;
 	}
 
-	card  = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card  = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
 	strcpy(card->driver, "Serial");
 	strcpy(card->shortname, "Serial midi (uart16550A)");
 
-	if ((err = snd_uart16550_detect(snd_port[dev])) <= 0) {
+	if ((err = snd_uart16550_detect(port[dev])) <= 0) {
 		snd_card_free(card);
-		printk(KERN_ERR "no UART detected at 0x%lx\n", (long)snd_port[dev]);
+		printk(KERN_ERR "no UART detected at 0x%lx\n", (long)port[dev]);
 		return err;
 	}
 
 	if ((err = snd_uart16550_create(card,
-					snd_port[dev],
-					snd_irq[dev],
-					snd_speed[dev],
-					snd_base[dev],
-					snd_adaptor[dev],
+					port[dev],
+					irq[dev],
+					speed[dev],
+					base[dev],
+					adaptor[dev],
 					&uart)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
 
-	if ((err = snd_uart16550_rmidi(uart, 0, snd_outs[dev], snd_ins[dev], &uart->rmidi)) < 0) {
+	if ((err = snd_uart16550_rmidi(uart, 0, outs[dev], ins[dev], &uart->rmidi)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
@@ -913,8 +913,8 @@ static int __init snd_serial_probe(int dev)
 		uart->irq,
 		uart->speed,
 		(int)uart->divisor,
-		snd_outs[dev],
-		snd_ins[dev],
+		outs[dev],
+		ins[dev],
 		adaptor_names[uart->adaptor]);
 
 	if ((err = snd_card_register(card)) < 0) {
@@ -959,9 +959,9 @@ module_exit(alsa_card_serial_exit)
 
 #ifndef MODULE
 
-/* format is: snd-serial=snd_enable,snd_index,snd_id,
-			 snd_port,snd_irq,snd_speed,snd_base,snd_outs,
- 			 snd_ins,snd_adaptor */
+/* format is: snd-serial=enable,index,id,
+			 port,irq,speed,base,outs,
+ 			 ins,adaptor */
 
 static int __init alsa_card_serial_setup(char *str)
 {
@@ -969,16 +969,16 @@ static int __init alsa_card_serial_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,(int *)&snd_port[nr_dev]) == 2 &&
-	       get_option(&str,&snd_irq[nr_dev]) == 2 &&
-	       get_option(&str,&snd_speed[nr_dev]) == 2 &&
-	       get_option(&str,&snd_base[nr_dev]) == 2 &&
-	       get_option(&str,&snd_outs[nr_dev]) == 2 &&
-	       get_option(&str,&snd_ins[nr_dev]) == 2 &&
-	       get_option(&str,&snd_adaptor[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,(int *)&port[nr_dev]) == 2 &&
+	       get_option(&str,&irq[nr_dev]) == 2 &&
+	       get_option(&str,&speed[nr_dev]) == 2 &&
+	       get_option(&str,&base[nr_dev]) == 2 &&
+	       get_option(&str,&outs[nr_dev]) == 2 &&
+	       get_option(&str,&ins[nr_dev]) == 2 &&
+	       get_option(&str,&adaptor[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

@@ -2,7 +2,7 @@
  * tg3.c: Broadcom Tigon3 ethernet driver.
  *
  * Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com)
- * Copyright (C) 2001, 2002 Jeff Garzik (jgarzik@mandrakesoft.com)
+ * Copyright (C) 2001, 2002 Jeff Garzik (jgarzik@pobox.com)
  */
 
 #include <linux/config.h>
@@ -136,7 +136,7 @@
 static char version[] __devinitdata =
 	DRV_MODULE_NAME ".c:v" DRV_MODULE_VERSION " (" DRV_MODULE_RELDATE ")\n";
 
-MODULE_AUTHOR("David S. Miller (davem@redhat.com) and Jeff Garzik (jgarzik@mandrakesoft.com)");
+MODULE_AUTHOR("David S. Miller (davem@redhat.com) and Jeff Garzik (jgarzik@pobox.com)");
 MODULE_DESCRIPTION("Broadcom Tigon3 ethernet driver");
 MODULE_LICENSE("GPL");
 MODULE_PARM(tg3_debug, "i");

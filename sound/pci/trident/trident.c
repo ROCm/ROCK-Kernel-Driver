@@ -47,27 +47,27 @@ MODULE_DEVICES("{{Trident,4DWave DX},"
 		"{Jaton,SonicWave 4D},"
 		"{Hoontech,SoundTrack Digital 4DWave NX}}");
 
-static int snd_index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
-static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
-static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int snd_pcm_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 32};
-static int snd_wavetable_size[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 8192};
+static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
+static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
+static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
+static int pcm_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 32};
+static int wavetable_size[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 8192};
 
-MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_index, "Index value for Trident 4DWave PCI soundcard.");
-MODULE_PARM_SYNTAX(snd_index, SNDRV_INDEX_DESC);
-MODULE_PARM(snd_id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
-MODULE_PARM_DESC(snd_id, "ID string for Trident 4DWave PCI soundcard.");
-MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
-MODULE_PARM(snd_enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_enable, "Enable Trident 4DWave PCI soundcard.");
-MODULE_PARM_SYNTAX(snd_enable, SNDRV_ENABLE_DESC);
-MODULE_PARM(snd_pcm_channels, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_pcm_channels, "Number of hardware channels assigned for PCM.");
-MODULE_PARM_SYNTAX(snd_pcm_channels, SNDRV_ENABLED ",default:32,allows:{{1,32}}");
-MODULE_PARM(snd_wavetable_size, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(snd_wavetable_size, "Maximum memory size in kB for wavetable synth.");
-MODULE_PARM_SYNTAX(snd_wavetable_size, SNDRV_ENABLED ",default:8192,skill:advanced");
+MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(index, "Index value for Trident 4DWave PCI soundcard.");
+MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
+MODULE_PARM(id, "1-" __MODULE_STRING(SNDRV_CARDS) "s");
+MODULE_PARM_DESC(id, "ID string for Trident 4DWave PCI soundcard.");
+MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
+MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(enable, "Enable Trident 4DWave PCI soundcard.");
+MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
+MODULE_PARM(pcm_channels, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(pcm_channels, "Number of hardware channels assigned for PCM.");
+MODULE_PARM_SYNTAX(pcm_channels, SNDRV_ENABLED ",default:32,allows:{{1,32}}");
+MODULE_PARM(wavetable_size, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(wavetable_size, "Maximum memory size in kB for wavetable synth.");
+MODULE_PARM_SYNTAX(wavetable_size, SNDRV_ENABLED ",default:8192,skill:advanced");
 
 static struct pci_device_id snd_trident_ids[] __devinitdata = {
 	{ 0x1023, 0x2000, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },	/* Trident 4DWave DX PCI Audio */
@@ -79,7 +79,7 @@ static struct pci_device_id snd_trident_ids[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, snd_trident_ids);
 
 static int __devinit snd_trident_probe(struct pci_dev *pci,
-				       const struct pci_device_id *id)
+				       const struct pci_device_id *pci_id)
 {
 	static int dev;
 	snd_card_t *card;
@@ -89,19 +89,19 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
-	if (!snd_enable[dev]) {
+	if (!enable[dev]) {
 		dev++;
 		return -ENOENT;
 	}
 
-	card = snd_card_new(snd_index[dev], snd_id[dev], THIS_MODULE, 0);
+	card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
 	if (card == NULL)
 		return -ENOMEM;
 
 	if ((err = snd_trident_create(card, pci,
-				      snd_pcm_channels[dev],
+				      pcm_channels[dev],
 				      2,
-				      snd_wavetable_size[dev],
+				      wavetable_size[dev],
 				      &trident)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -243,8 +243,8 @@ module_exit(alsa_card_trident_exit)
 
 #ifndef MODULE
 
-/* format is: snd-trident=snd_enable,snd_index,snd_id,
-			  snd_pcm_channels,snd_wavetable_size */
+/* format is: snd-trident=enable,index,id,
+			  pcm_channels,wavetable_size */
 
 static int __init alsa_card_trident_setup(char *str)
 {
@@ -252,11 +252,11 @@ static int __init alsa_card_trident_setup(char *str)
 
 	if (nr_dev >= SNDRV_CARDS)
 		return 0;
-	(void)(get_option(&str,&snd_enable[nr_dev]) == 2 &&
-	       get_option(&str,&snd_index[nr_dev]) == 2 &&
-	       get_id(&str,&snd_id[nr_dev]) == 2 &&
-	       get_option(&str,&snd_pcm_channels[nr_dev]) == 2 &&
-	       get_option(&str,&snd_wavetable_size[nr_dev]) == 2);
+	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
+	       get_option(&str,&index[nr_dev]) == 2 &&
+	       get_id(&str,&id[nr_dev]) == 2 &&
+	       get_option(&str,&pcm_channels[nr_dev]) == 2 &&
+	       get_option(&str,&wavetable_size[nr_dev]) == 2);
 	nr_dev++;
 	return 1;
 }

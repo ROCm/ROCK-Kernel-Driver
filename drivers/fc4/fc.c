@@ -885,12 +885,6 @@ void fcp_queue_empty(fc_channel *fc)
 	}
 }
 
-int fcp_old_abort(Scsi_Cmnd *SCpnt)
-{
-	printk("FC: Abort not implemented\n");
-	return 1;
-}
-
 int fcp_scsi_abort(Scsi_Cmnd *SCpnt)
 {
 	/* Internal bookkeeping only. Lose 1 cmd_slots slot. */

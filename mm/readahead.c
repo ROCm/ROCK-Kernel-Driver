@@ -20,6 +20,16 @@ struct backing_dev_info default_backing_dev_info = {
 };
 
 /*
+ * Initialise a struct file's readahead state
+ */
+void
+file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping)
+{
+	memset(ra, 0, sizeof(*ra));
+	ra->ra_pages = mapping->backing_dev_info->ra_pages;
+}
+
+/*
  * Return max readahead size for this inode in number-of-pages.
  */
 static inline unsigned long get_max_readahead(struct file_ra_state *ra)

@@ -116,8 +116,10 @@ EXPORT_SYMBOL(strncpy_from_user);
 EXPORT_SYMBOL(__strncpy_from_user);
 EXPORT_SYMBOL(clear_user);
 EXPORT_SYMBOL(__clear_user);
-EXPORT_SYMBOL(__generic_copy_from_user);
-EXPORT_SYMBOL(__generic_copy_to_user);
+EXPORT_SYMBOL(copy_from_user);
+EXPORT_SYMBOL(__copy_from_user);
+EXPORT_SYMBOL(copy_to_user);
+EXPORT_SYMBOL(__copy_to_user);
 EXPORT_SYMBOL(strnlen_user);
 
 EXPORT_SYMBOL(pci_alloc_consistent);

@@ -1,6 +1,6 @@
 /* 8139cp.c: A Linux PCI Ethernet driver for the RealTek 8139C+ chips. */
 /*
-	Copyright 2001,2002 Jeff Garzik <jgarzik@mandrakesoft.com>
+	Copyright 2001,2002 Jeff Garzik <jgarzik@pobox.com>
 
 	Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com) [tg3.c]
 	Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com) [sungem.c]
@@ -89,7 +89,7 @@
 static char version[] __devinitdata =
 KERN_INFO DRV_NAME ": 10/100 PCI Ethernet driver v" DRV_VERSION " (" DRV_RELDATE ")\n";
 
-MODULE_AUTHOR("Jeff Garzik <jgarzik@mandrakesoft.com>");
+MODULE_AUTHOR("Jeff Garzik <jgarzik@pobox.com>");
 MODULE_DESCRIPTION("RealTek RTL-8139C+ series 10/100 PCI Ethernet driver");
 MODULE_LICENSE("GPL");
 

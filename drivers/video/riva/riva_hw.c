@@ -41,7 +41,7 @@
  * GPL licensing note -- nVidia is allowing a liberal interpretation of
  * the documentation restriction above, to merely say that this nVidia's
  * copyright and disclaimer should be included with all code derived
- * from this source.  -- Jeff Garzik <jgarzik@mandrakesoft.com>, 01/Nov/99 
+ * from this source.  -- Jeff Garzik <jgarzik@pobox.com>, 01/Nov/99 
  */
 
 /* $XFree86: xc/programs/Xserver/hw/xfree86/drivers/nv/riva_hw.c,v 1.8 2000/02/08 17:19:11 dawes Exp $ */

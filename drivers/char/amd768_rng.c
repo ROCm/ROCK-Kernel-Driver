@@ -5,7 +5,7 @@
  	derived from
  
 	Hardware driver for Intel i810 Random Number Generator (RNG)
-	Copyright 2000,2001 Jeff Garzik <jgarzik@mandrakesoft.com>
+	Copyright 2000,2001 Jeff Garzik <jgarzik@pobox.com>
 	Copyright 2000,2001 Philipp Rumpf <prumpf@mandrakesoft.com>
 
 	Please read Documentation/i810_rng.txt for details on use.

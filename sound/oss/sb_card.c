@@ -17,7 +17,7 @@
  *  CMI 8330 support - Alessandro Zummo <azummo@ita.flashnet.it>
  *
  * 18-01-2000 Separated sb_card and sb_common
- *  Jeff Garzik <jgarzik@mandrakesoft.com>
+ *  Jeff Garzik <jgarzik@pobox.com>
  *
  * 04-02-2000 Added Soundblaster AWE 64 PnP support, isapnpjump
  *  Alessandro Zummo <azummo@ita.flashnet.it>

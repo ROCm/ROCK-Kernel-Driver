@@ -1,6 +1,6 @@
 
 		Framebuffer driver for Cirrus Logic chipsets
-		Copyright 1999 Jeff Garzik <jgarzik@mandrakesoft.com>
+		Copyright 1999 Jeff Garzik <jgarzik@pobox.com>
 
 
 

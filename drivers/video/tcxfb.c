@@ -253,14 +253,14 @@ static void tcx_reset (struct fb_info_sbusfb *fb)
 
 static void tcx_margins (struct fb_info_sbusfb *fb, struct display *p, int x_margin, int y_margin)
 {
-	fb->info.screen_base += (y_margin - fb->y_margin) * p->line_length + (x_margin - fb->x_margin);
+	fb->info.screen_base += (y_margin - fb->y_margin) * p->fb_info->fix.line_length + (x_margin - fb->x_margin);
 }
 
 static char idstring[60] __initdata = { 0 };
 
 char __init *tcxfb_init(struct fb_info_sbusfb *fb)
 {
-	struct fb_fix_screeninfo *fix = &fb->fix;
+	struct fb_fix_screeninfo *fix = &fb->info.fix;
 	struct display *disp = &fb->disp;
 	struct fbtype *type = &fb->type;
 	struct sbus_dev *sdev = fb->sbdp;
@@ -280,7 +280,7 @@ char __init *tcxfb_init(struct fb_info_sbusfb *fb)
 		strcpy(fb->info.modename, "TCX24");
 		strcpy(fix->id, "TCX24");
 	}
-	fix->line_length = fb->var.xres_virtual;
+	fix->line_length = fb->info.var.xres_virtual;
 	fix->accel = FB_ACCEL_SUN_TCX;
 
 	disp->scrollmode = SCROLL_YREDRAW;

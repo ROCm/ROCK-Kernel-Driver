@@ -477,6 +477,7 @@ fi
 endmenu
 
 source security/Config.in
+source crypto/Config.in
 source lib/Config.in
 
 if [ "$CONFIG_SMP" = "y" ]; then

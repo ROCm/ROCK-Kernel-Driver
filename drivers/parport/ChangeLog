@@ -269,7 +269,7 @@
 	* parport_pc.c (parport_pc_probe_port): Remove __devinit
 	attribute.  Export unconditionally.
 
-2001-04-14  Jeff Garzik  <jgarzik@mandrakesoft.com>
+2001-04-14  Jeff Garzik  <jgarzik@pobox.com>
 
 	Merged:  2001-03-30  Tim Waugh  <twaugh@redhat.com>
 

@@ -2,7 +2,7 @@
 
 	8139too.c: A RealTek RTL-8139 Fast Ethernet driver for Linux.
 
-	Maintained by Jeff Garzik <jgarzik@mandrakesoft.com>
+	Maintained by Jeff Garzik <jgarzik@pobox.com>
 	Copyright 2000-2002 Jeff Garzik
 
 	Much code comes from Donald Becker's rtl8139.c driver,
@@ -590,7 +590,7 @@ struct rtl8139_private {
 	unsigned int regs_len;
 };
 
-MODULE_AUTHOR ("Jeff Garzik <jgarzik@mandrakesoft.com>");
+MODULE_AUTHOR ("Jeff Garzik <jgarzik@pobox.com>");
 MODULE_DESCRIPTION ("RealTek RTL-8139 Fast Ethernet driver");
 MODULE_LICENSE("GPL");
 
