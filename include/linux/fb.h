@@ -368,7 +368,7 @@ struct fb_ops {
     /* perform polling on fb device */
     int (*fb_poll)(struct fb_info *info, poll_table *wait);
     /* wait for blit idle, optional */
-    void (*fb_sync)(struct fb_info *info);		
+    int (*fb_sync)(struct fb_info *info);		
     /* perform fb specific ioctl (optional) */
     int (*fb_ioctl)(struct inode *inode, struct file *file, unsigned int cmd,
 		    unsigned long arg, struct fb_info *info);

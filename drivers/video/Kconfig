@@ -233,33 +233,6 @@ config FB_ATARI
 	  This is the frame buffer device driver for the builtin graphics
 	  chipset found in Ataris.
 
-config FB_ATY
-	tristate "ATI Mach64 display support" if PCI
-	depends on FB
-	help
-	  This driver supports graphics boards with the ATI Mach64 chips.
-	  Say Y if you have such a graphics board.
-
-	  The driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want). The
-	  module will be called atyfb.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
-
-config FB_ATY
-	prompt "ATI Mach64 display support"
-	depends on FB && (SPARC64 && PCI && FB_PCI || ATARI)
-
-config FB_ATY_GX
-	bool "Mach64 GX support" if PCI
-	depends on FB_ATY
-	default y if ATARI
-	help
-	  Say Y here to support use of the ATI Mach64 Graphics Expression
-	  board (or other boards based on the Mach64 GX chipset) as a
-	  framebuffer device.  The ATI product support page for these boards
-	  is at
-	  <http://support.ati.com/products/pc/mach64/graphics_xpression.html>.
-
 config FB_OF
 	bool "Open Firmware frame buffer device support"
 	depends on FB && PPC && ALL_PPC
@@ -649,16 +622,6 @@ config FB_MATROX_MULTIHEAD
 	  There is no need for enabling 'Matrox multihead support' if you have
 	  only one Matrox card in the box.
 
-config FB_ATY_CT
-	bool "Mach64 CT/VT/GT/LT (incl. 3D RAGE) support"
-	depends on PCI && FB_ATY
-	default y if SPARC64 && FB_PCI
-	help
-	  Say Y here to support use of ATI's 64-bit Rage boards (or other
-	  boards based on the Mach64 CT, VT, GT, and LT chipsets) as a
-	  framebuffer device.  The ATI product support page for these boards
-	  is at <http://support.ati.com/products/pc/mach64/>.
-
 config FB_RADEON
 	tristate "ATI Radeon display support"
 	depends on FB && PCI
@@ -681,6 +644,39 @@ config FB_ATY128
 	  inserted and removed from the running kernel whenever you want). The
 	  module will be called aty128fb.o. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
+
+config FB_ATY
+	tristate "ATI Mach64 display support" if PCI || ATARI
+	depends on FB
+	help
+	  This driver supports graphics boards with the ATI Mach64 chips.
+	  Say Y if you have such a graphics board.
+
+	  The driver is also available as a module ( = code which can be
+	  inserted and removed from the running kernel whenever you want). The
+	  module will be called atyfb.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
+config FB_ATY_CT
+	bool "Mach64 CT/VT/GT/LT (incl. 3D RAGE) support"
+	depends on PCI && FB_ATY
+	default y if SPARC64 && FB_PCI
+	help
+	  Say Y here to support use of ATI's 64-bit Rage boards (or other
+	  boards based on the Mach64 CT, VT, GT, and LT chipsets) as a
+	  framebuffer device.  The ATI product support page for these boards
+	  is at <http://support.ati.com/products/pc/mach64/>.
+
+config FB_ATY_GX
+	bool "Mach64 GX support" if PCI
+	depends on FB_ATY
+	default y if ATARI
+	help
+	  Say Y here to support use of the ATI Mach64 Graphics Expression
+	  board (or other boards based on the Mach64 GX chipset) as a
+	  framebuffer device.  The ATI product support page for these boards
+	  is at
+	  <http://support.ati.com/products/pc/mach64/graphics_xpression.html>.
 
 config FB_SIS
 	tristate "SIS acceleration"

@@ -464,13 +464,14 @@ static void vgaHWRestore(const struct fb_info *info,
 /*
  * Hardware Acceleration for Neo2200+
  */
-static inline void neo2200_sync(struct fb_info *info)
+static inline int neo2200_sync(struct fb_info *info)
 {
 	struct neofb_par *par = (struct neofb_par *) info->par;
 	int waitcycles;
 
 	while (par->neo2200->bltStat & 1)
 		waitcycles++;
+	return 0;
 }
 
 static inline void neo2200_wait_fifo(struct fb_info *info,

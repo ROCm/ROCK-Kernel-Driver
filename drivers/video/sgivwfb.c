@@ -23,15 +23,16 @@
 #include <asm/uaccess.h>
 #include <linux/fb.h>
 #include <linux/init.h>
+#include <linux/ioport.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
 
 #define INCLUDE_TIMING_TABLE_DATA
-#define DBE_REG_BASE regs
-#include <video/sgivw.h>
+#define DBE_REG_BASE default_par.regs
+#include <asm/sgi-vwdbe.h>
 
 struct sgivw_par {
-	asregs *regs;
+	struct asregs *regs;
 	u32 cmap_fifo;
 	u_long timing_num;
 };
@@ -44,11 +45,12 @@ struct sgivw_par {
  */
 
 /* set by arch/i386/kernel/setup.c */
-u_long sgivwfb_mem_phys;
-u_long sgivwfb_mem_size;
+extern unsigned long sgivwfb_mem_phys;
+extern unsigned long sgivwfb_mem_size;
 
-static struct fb_info fb_info;
 static struct sgivw_par default_par;
+static u32 pseudo_palette[17];
+static struct fb_info fb_info;
 static int ypan = 0;
 static int ywrap = 0;
 
@@ -58,7 +60,7 @@ static struct fb_fix_screeninfo sgivwfb_fix __initdata = {
         .visual		= FB_VISUAL_PSEUDOCOLOR,
 	.mmio_start	= DBE_REG_PHYS,
 	.mmio_len	= DBE_REG_SIZE,
-        .accel_flags	= FB_ACCEL_NONE
+        .accel		= FB_ACCEL_NONE
 };
 
 static struct fb_var_screeninfo sgivwfb_var __initdata = {
@@ -152,8 +154,8 @@ static unsigned long bytes_per_pixel(int bpp)
 
 static void dbe_TurnOffDma(void)
 {
-	int i;
 	unsigned int readVal;
+	int i;
 
 	// Check to see if things are already turned off:
 	// 1) Check to see if dbe is not using the internal dotclock.
@@ -219,7 +221,7 @@ static void dbe_TurnOffDma(void)
 static int sgivwfb_check_var(struct fb_var_screeninfo *var, 
 			     struct fb_info *info)
 {
-	int err, activate = var->activate;
+	struct sgivw_par *par = (struct sgivw_par *)info->par;
 	struct dbe_timing_info *timing;
 	u_long line_length;
 	u_long min_mode;
@@ -362,7 +364,7 @@ static int sgivwfb_set_par(struct fb_info *info)
 	u32 readVal, outputVal;
 	int wholeTilesX, maxPixelsPerTileX;
 	int frmWrite1, frmWrite2, frmWrite3b;
-	dbe_timing_info_t *currentTiming;	/* Current Video Timing */
+	struct dbe_timing_info_t *currentTiming; /* Current Video Timing */
 	int xpmax, ypmax;	// Monitor resolution
 	int bytesPerPixel;	// Bytes per pixel
 
@@ -698,11 +700,16 @@ int __init sgivwfb_init(void)
 	printk(KERN_INFO "sgivwfb: framebuffer at 0x%lx, size %ldk\n",
 	       sgivwfb_mem_phys, sgivwfb_mem_size / 1024);
 
-	default_par.regs = (asregs *) ioremap_nocache(DBE_REG_PHYS, DBE_REG_SIZE);
+	if (!request_mem_region(DBE_REG_PHYS, DBE_REG_SIZE, "sgivwfb")) {
+		printk(KERN_ERR "sgivwfb: couldn't reserve mmio region\n");
+		goto fail_request_mem_region;
+	}
+	default_par.regs = (struct asregs *) ioremap_nocache(DBE_REG_PHYS, DBE_REG_SIZE);
 	if (!default_par.regs) {
 		printk(KERN_ERR "sgivwfb: couldn't ioremap registers\n");
 		goto fail_ioremap_regs;
 	}
+
 #ifdef CONFIG_MTRR
 	mtrr_add((unsigned long) sgivwfb_mem_phys, sgivwfb_mem_size,
 		 MTRR_TYPE_WRCOMB, 1);
@@ -722,8 +729,7 @@ int __init sgivwfb_init(void)
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	fb_info.screen_base =
-	    ioremap_nocache((unsigned long) sgivwfb_mem_phys,
-			    sgivwfb_mem_size);
+	fb_info.screen_base = ioremap_nocache((unsigned long) sgivwfb_mem_phys, sgivwfb_mem_size);
 	if (!fb_info.screen_base) {
 		printk(KERN_ERR "sgivwfb: couldn't ioremap screen_base\n");
 		goto fail_ioremap_fbmem;
@@ -732,15 +738,11 @@ int __init sgivwfb_init(void)
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 
 	if (register_framebuffer(&fb_info) < 0) {
-		printk(KERN_ERR
-		       "sgivwfb: couldn't register framebuffer\n");
+		printk(KERN_ERR "sgivwfb: couldn't register framebuffer\n");
 		goto fail_register_framebuffer;
 	}
 
-	printk(KERN_INFO
-	       "fb%d: Virtual frame buffer device, using %ldK of video memory\n",
-	       minor(fb_info.node), sgivwfb_mem_size >> 10);
-
+	printk(KERN_INFO "fb%d: SGI BDE frame buffer device, using %ldK of video memory\n", minor(fb_info.node, sgivwfb_mem_size >> 10);
 	return 0;
 
       fail_register_framebuffer:

@@ -138,13 +138,6 @@ static struct fb_videomode defaultmode __initdata = {
 	.vmode =	FB_VMODE_NONINTERLACED
 };
 
-/* struct to hold chip description information */
-struct aty128_chip_info {
-	const char *name;
-	unsigned short device;
-	int chip_gen;
-};
-
 /* Chip generations */
 enum {
 	rage_128,
@@ -152,21 +145,46 @@ enum {
 	rage_M3
 };
 
+/*
+ * PCI driver prototypes
+ */
+static int aty128_probe(struct pci_dev *pdev,
+                               const struct pci_device_id *ent);
+static void aty128_remove(struct pci_dev *pdev);
+
 /* supported Rage128 chipsets */
-static struct aty128_chip_info aty128_pci_probe_list[] __initdata =
-{
-	{"Rage128 RE (PCI)", PCI_DEVICE_ID_ATI_RAGE128_RE, rage_128},
-	{"Rage128 RF (AGP)", PCI_DEVICE_ID_ATI_RAGE128_RF, rage_128},
-	{"Rage128 RK (PCI)", PCI_DEVICE_ID_ATI_RAGE128_RK, rage_128},
-	{"Rage128 RL (AGP)", PCI_DEVICE_ID_ATI_RAGE128_RL, rage_128},
-	{"Rage128 Pro PF (AGP)", PCI_DEVICE_ID_ATI_RAGE128_PF, rage_128_pro},
-	{"Rage128 Pro PR (PCI)", PCI_DEVICE_ID_ATI_RAGE128_PR, rage_128_pro},
-	{"Rage128 Pro TR (AGP)", PCI_DEVICE_ID_ATI_RAGE128_U3, rage_128_pro},
-	{"Rage128 Pro TF (AGP)", PCI_DEVICE_ID_ATI_RAGE128_U1, rage_128_pro},
-	{"Rage Mobility M3 (PCI)", PCI_DEVICE_ID_ATI_RAGE128_LE, rage_M3},
-	{"Rage Mobility M3 (AGP)", PCI_DEVICE_ID_ATI_RAGE128_LF, rage_M3},
-	{NULL, 0, rage_128}
- };
+static struct pci_device_id aty128_pci_tbl[] __devinitdata = {
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_RE,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128 },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_RF,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128 },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_RK,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128 },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_RL,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128 },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_PF,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128_pro },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_PR,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128_pro },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_U3,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128_pro },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_U1,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_128_pro },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_LE,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_M3 },
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RAGE128_LF,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, rage_M3 },
+	{ 0, }
+};
+
+MODULE_DEVICE_TABLE(pci, aty128_pci_tbl);
+
+static struct pci_driver aty128fb_driver = {
+	name:		"aty128fb",
+	id_table:	aty128_pci_tbl,
+	probe:		aty128_probe,
+	remove:		__devexit_p(aty128_remove),
+};
 
 /* packed BIOS settings */
 #ifndef CONFIG_PPC
@@ -231,11 +249,7 @@ static struct fb_fix_screeninfo aty128fb_fix __initdata = {
 	.accel		= FB_ACCEL_ATI_RAGE128,
 };
 
-static char fontname[40] __initdata = { 0 };
-
-static int  noaccel __initdata = 0;
 #ifdef MODULE
-static char *font __initdata = NULL;
 static char *mode __initdata = NULL;
 #ifdef CONFIG_MTRR
 static int  nomtrr __initdata = 0;
@@ -303,9 +317,6 @@ struct aty128fb_par {
 	u32 vram_size;                      /* onboard video ram   */
 	int chip_gen;
 	const struct aty128_meminfo *mem;   /* onboard mem info    */
-#ifdef CONFIG_PCI
-	struct pci_dev *pdev;
-#endif
 #ifdef CONFIG_MTRR
 	struct { int vram; int vram_valid; } mtrr;
 #endif
@@ -321,15 +332,6 @@ struct aty128fb_par {
 	unsigned char blue[64];
 };
 
-struct fb_info_aty128 {
-	struct fb_info fb_info;
-	struct aty128fb_par par;
-	u32 pseudo_palette[17];
-	struct fb_info_aty128 *next;
-};
-
-static struct fb_info_aty128 *board_list = NULL;
-
 #ifdef CONFIG_PMAC_PBOOK
 int aty128_sleep_notify(struct pmu_sleep_notifier *self, int when);
 static struct pmu_sleep_notifier aty128_sleep_notifier = {
@@ -342,7 +344,7 @@ static struct pmu_sleep_notifier aty128_sleep_notifier = {
     /*
      *  Interface used by the world
      */
-
+int aty128fb_init(void);
 int aty128fb_setup(char *options);
 
 static int aty128fb_check_var(struct fb_var_screeninfo *var,
@@ -358,12 +360,6 @@ static int aty128fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 static int aty128fb_sync(struct fb_info *info);
 
     /*
-     *  Interface to the low level console driver
-     */
-
-int aty128fb_init(void);
-
-    /*
      *  Internal routines
      */
 
@@ -371,8 +367,6 @@ static int aty128_encode_var(struct fb_var_screeninfo *var,
                              const struct aty128fb_par *par);
 static int aty128_decode_var(struct fb_var_screeninfo *var,
                              struct aty128fb_par *par);
-static int aty128_pci_register(struct pci_dev *pdev,
-                               const struct aty128_chip_info *aci);
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
 static void __init aty128_get_pllinfo(struct aty128fb_par *par,
 				      char *bios_seg);
@@ -1408,33 +1402,21 @@ aty128fb_setup(char *options)
 		return 0;
 
 	while ((this_opt = strsep(&options, ",")) != NULL) {
-		if (!strncmp(this_opt, "font:", 5)) {
-			char *p;
-			int i;
-	    
-			p = this_opt +5;
-			for (i = 0; i < sizeof(fontname) - 1; i++)
-				if (!*p || *p == ' ' || *p == ',')
-					break;
-			memcpy(fontname, this_opt + 5, i);
-			fontname[i] = 0;
-		} else if (!strncmp(this_opt, "noaccel", 7)) {
-			noaccel = 1;
 #ifdef CONFIG_PMAC_PBOOK
-		} else if (!strncmp(this_opt, "lcd:", 4)) {
+		if (!strncmp(this_opt, "lcd:", 4)) {
 			default_lcd_on = simple_strtoul(this_opt+4, NULL, 0);
 		} else if (!strncmp(this_opt, "crt:", 4)) {
 			default_crt_on = simple_strtoul(this_opt+4, NULL, 0);
-#endif
 		}
+#endif
 #ifdef CONFIG_MTRR
-		else if(!strncmp(this_opt, "nomtrr", 6)) {
+		if(!strncmp(this_opt, "nomtrr", 6)) {
 			mtrr = 0;
 		}
 #endif
 #ifdef CONFIG_ALL_PPC
 		/* vmode and cmode depreciated */
-		else if (!strncmp(this_opt, "vmode:", 6)) {
+		if (!strncmp(this_opt, "vmode:", 6)) {
 			unsigned int vmode = simple_strtoul(this_opt+6, NULL, 0);
 			if (vmode > 0 && vmode <= VMODE_MAX)
 				default_vmode = vmode;
@@ -1468,14 +1450,14 @@ aty128fb_setup(char *options)
  */
 
 static int __init
-aty128_init(struct fb_info *info, const char *name)
+aty128_init(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
+	struct fb_info *info = pci_get_drvdata(pdev);
 	struct aty128fb_par *par = info->par;
 	struct fb_var_screeninfo var;
-	u32 dac;
+	char video_card[25];
 	u8 chip_rev;
-	const struct aty128_chip_info *aci = &aty128_pci_probe_list[0];
-	const char *video_card;
+	u32 dac;
 
 	if (!par->vram_size)	/* may have already been probed */
 		par->vram_size = aty_ld_le32(CONFIG_MEMSIZE) & 0x03FFFFFF;
@@ -1483,11 +1465,40 @@ aty128_init(struct fb_info *info, const char *name)
 	/* Get the chip revision */
 	chip_rev = (aty_ld_le32(CONFIG_CNTL) >> 16) & 0x1F;
 
-	/* put a name with the face */
-	while (aci->name && par->pdev->device != aci->device)
-		aci++;
-	video_card = aci->name? aci->name: "Rage128";
-	par->chip_gen = aci->chip_gen;
+	switch (pdev->device) {
+		case PCI_DEVICE_ID_ATI_RAGE128_RE:
+			strcpy(video_card, "Rage128 RE (PCI)");
+			break;
+		case PCI_DEVICE_ID_ATI_RAGE128_RF:
+			strcpy(video_card, "Rage128 RF (AGP)");
+			break;
+		case PCI_DEVICE_ID_ATI_RAGE128_RK:
+			strcpy(video_card, "Rage128 RK (PCI)");
+			break;
+		case PCI_DEVICE_ID_ATI_RAGE128_RL:
+			strcpy(video_card, "Rage128 RL (AGP)");
+			break;
+		case PCI_DEVICE_ID_ATI_RAGE128_PF:
+			strcpy(video_card, "Rage128 Pro PF (AGP)");
+			break;
+		case PCI_DEVICE_ID_ATI_RAGE128_PR:
+			strcpy(video_card, "Rage128 Pro PR (PCI)");
+			break;
+		case PCI_DEVICE_ID_ATI_RAGE128_U3:
+			strcpy(video_card, "Rage128 Pro TR (AGP)");
+			break;
+		case PCI_DEVICE_ID_ATI_RAGE128_U1:
+			strcpy(video_card, "Rage128 Pro TF (AGP)");
+			break;
+		case PCI_DEVICE_ID_ATI_RAGE128_LE:
+			strcpy(video_card, "Rage Mobility M3 (PCI)");
+			break;
+		case PCI_DEVICE_ID_ATI_RAGE128_LF:
+			strcpy(video_card, "Rage Mobility M3 (AGP)");
+			break;
+		default:
+			return -ENODEV;
+	}
 
 	printk(KERN_INFO "aty128fb: %s [chip rev 0x%x] ", video_card, chip_rev);
 
@@ -1495,6 +1506,8 @@ aty128_init(struct fb_info *info, const char *name)
 		printk("%dM %s\n", par->vram_size / (1024*1024), par->mem->name);
 	else
 		printk("%dk %s\n", par->vram_size / 1024, par->mem->name);
+
+	par->chip_gen = ent->driver_data;
 
 	/* fill in info */
 	info->node  = NODEV;
@@ -1553,10 +1566,8 @@ aty128_init(struct fb_info *info, const char *name)
 			var = default_var;
 	}
 
-	if (noaccel)
-		var.accel_flags &= ~FB_ACCELF_TEXT;
-	else
-		var.accel_flags |= FB_ACCELF_TEXT;
+	var.accel_flags &= ~FB_ACCELF_TEXT;
+//	var.accel_flags |= FB_ACCELF_TEXT;/* FIXME Will add accel later */
 
 	if (aty128fb_check_var(&var, info)) {
 		printk(KERN_ERR "aty128fb: Cannot set default mode.\n");
@@ -1590,54 +1601,25 @@ aty128_init(struct fb_info *info, const char *name)
 		register_backlight_controller(&aty128_backlight_controller, par, "ati");
 #endif /* CONFIG_PMAC_BACKLIGHT */
 #ifdef CONFIG_PMAC_PBOOK
-	if (!par->pdev)
-		printk(KERN_WARNING "aty128fb: Not a PCI card, can't enable power management\n");
-	else {
-		par->pm_reg = pci_find_capability(par->pdev, PCI_CAP_ID_PM);
-		pmu_register_sleep_notifier(&aty128_sleep_notifier);
-	}
+	par->pm_reg = pci_find_capability(pdev, PCI_CAP_ID_PM);
+	pmu_register_sleep_notifier(&aty128_sleep_notifier);
 #endif
 
 	printk(KERN_INFO "fb%d: %s frame buffer device on %s\n",
-	       minor(info->node), info->fix.id, name);
+	       minor(info->node), info->fix.id, video_card);
 
 	return 1;	/* success! */
 }
 
-
-int __init
-aty128fb_init(void)
-{
-#ifdef CONFIG_PCI
-	struct pci_dev *pdev = NULL;
-	const struct aty128_chip_info *aci = &aty128_pci_probe_list[0];
-
-	while (aci->name != NULL) {
-		pdev = pci_find_device(PCI_VENDOR_ID_ATI, aci->device, pdev);
-		while (pdev != NULL) {
-			if (aty128_pci_register(pdev, aci) == 0)
-				return 0;
-			pdev = pci_find_device(PCI_VENDOR_ID_ATI, aci->device, pdev);
-		}
-		aci++;
-	}
-#endif
-
-	return 0;
-}
-
-
 #ifdef CONFIG_PCI
 /* register a card    ++ajoshi */
 static int __init
-aty128_pci_register(struct pci_dev *pdev,
-                               const struct aty128_chip_info *aci)
+aty128_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
-	struct fb_info_aty128 *lump = NULL;
-	struct fb_info *info;
-	struct aty128fb_par *par;
 	unsigned long fb_addr, reg_addr;
-	int err;
+	struct aty128fb_par *par;
+	struct fb_info *info;
+	int err, size;
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
 	char *bios_seg = NULL;
 #endif
@@ -1665,19 +1647,21 @@ aty128_pci_register(struct pci_dev *pdev,
 	}
 
 	/* We have the resources. Now virtualize them */
-	if (!(lump = kmalloc(sizeof(struct fb_info_aty128), GFP_ATOMIC))) {
+	size = sizeof(struct fb_info) + sizeof(struct aty128fb_par) +
+			 sizeof(u32)*16;
+	if (!(info = kmalloc(size, GFP_ATOMIC))) {
 		printk(KERN_ERR "aty128fb: can't alloc fb_info_aty128\n");
 		goto err_unmap_out;
 	}
-	memset(lump, 0, sizeof(struct fb_info_aty128));
-	info = &lump->fb_info;
-	par = &lump->par;
+	memset(info, 0, size);
+
+	par = (struct aty128fb_par *)(info + 1);
+	info->pseudo_palette = (void *) (par + 1);
+
+	memset(info, 0, sizeof(struct fb_info));
 
 	info->par = par;
 	info->fix = aty128fb_fix;
-	info->pseudo_palette = lump->pseudo_palette;
-
-	par->pdev = pdev;
 
 	/* Virtualize mmio region */
 	info->fix.mmio_start = reg_addr;
@@ -1718,12 +1702,10 @@ aty128_pci_register(struct pci_dev *pdev,
 	}
 #endif
 	aty128_timings(par);
+	pci_set_drvdata(pdev, info);
 
-	if (!aty128_init(info, "PCI"))
+	if (!aty128_init(pdev, ent))
 		goto err_out;
-
-	lump->next = board_list;
-	board_list = lump;
 
 #ifdef CONFIG_MTRR
 	if (mtrr) {
@@ -1740,7 +1722,7 @@ err_out:
 	iounmap(info->screen_base);
 	iounmap(par->regbase);
 err_free_info:
-	kfree(lump);
+	kfree(info);
 err_unmap_out:
 	release_mem_region(pci_resource_start(pdev, 2),
 			pci_resource_len(pdev, 2));
@@ -1752,8 +1734,33 @@ err_free_fb:
 			pci_resource_len(pdev, 1));
 	return -ENODEV;
 }
-#endif /* CONFIG_PCI */
 
+static void __devexit aty128_remove(struct pci_dev *pdev)
+{
+	struct fb_info *info = pci_get_drvdata(pdev);
+	struct aty128fb_par *par = info->par;
+
+	if (!info)
+		return;
+
+	unregister_framebuffer(info);
+#ifdef CONFIG_MTRR
+	if (par->mtrr.vram_valid)
+		mtrr_del(par->mtrr.vram, info->fix.smem_start,
+			 par->vram_size);
+#endif /* CONFIG_MTRR */
+	iounmap(par->regbase);
+	iounmap(info->screen_base);
+
+	release_mem_region(pci_resource_start(pdev, 0),
+			   pci_resource_len(pdev, 0));
+	release_mem_region(pci_resource_start(pdev, 1),
+			   pci_resource_len(pdev, 1));
+	release_mem_region(pci_resource_start(pdev, 2),
+			   pci_resource_len(pdev, 2));
+	kfree(info);
+}
+#endif /* CONFIG_PCI */
 
 /* PPC and Sparc cannot read video ROM */
 #if !defined(CONFIG_PPC) && !defined(__sparc__)
@@ -2238,8 +2245,6 @@ aty128_set_suspend(struct aty128fb_par *par, int suspend)
 	}
 }
 
-extern struct display_switch fbcon_dummy;
-
 /*
  * Save the contents of the frame buffer when we go to sleep,
  * and restore it when we wake up again.
@@ -2247,81 +2252,75 @@ extern struct display_switch fbcon_dummy;
 int
 aty128_sleep_notify(struct pmu_sleep_notifier *self, int when)
 {
-	struct fb_info_aty128 *board;
- 	int result;
+ 	int result = PBOOK_SLEEP_OK, nb;
+	struct fb_info *info = info;	/* FIXME!!! How do find which framebuffer  */
+	struct aty128fb_par *par = info->par;
 
-	result = PBOOK_SLEEP_OK;
+	nb = info->var.yres * info->fix.line_length;
 
-	for (board = board_list; board != NULL; board = board->next) {
-		struct fb_info *info = &board->fb_info;
-		struct aty128fb_par *par = info->par;
-		int nb;
-
-		nb = info->var.yres * info->fix.line_length;
-
-		switch (when) {
-		case PBOOK_SLEEP_REQUEST:
-			par->save_framebuffer = vmalloc(nb);
-			if (par->save_framebuffer == NULL)
-				return PBOOK_SLEEP_REFUSE;
-			break;
-		case PBOOK_SLEEP_REJECT:
-			if (par->save_framebuffer) {
-				vfree(par->save_framebuffer);
-				par->save_framebuffer = 0;
-			}
-			break;
-		case PBOOK_SLEEP_NOW:
-			if (info->currcon >= 0)
-				fb_display[info->currcon].dispsw = &fbcon_dummy;
-			
-			wait_for_idle(par);
-			aty128_reset_engine(par);
-			wait_for_idle(par);
-
-			/* Backup fb content */	
-			if (par->save_framebuffer)
-				memcpy_fromio(par->save_framebuffer,
-				       info->screen_base, nb);
-
-			/* Blank display and LCD */
-			aty128fb_blank(VESA_POWERDOWN, info);
-			
-			/* Sleep the chip */
-			aty128_set_suspend(par, 1);
-
-			break;
-		case PBOOK_WAKE:
-			/* Wake the chip */
-			aty128_set_suspend(par, 0);
-			
-			aty128_reset_engine(par);
-			wait_for_idle(par);
-
-			/* Restore fb content */			
-			if (par->save_framebuffer) {
-				memcpy_toio(info->screen_base,
-				       par->save_framebuffer, nb);
-				vfree(par->save_framebuffer);
-				par->save_framebuffer = 0;
-			}
-			gen_set_disp(-1, info);
-			aty128fb_blank(0, info);
-			break;
+	switch (when) {
+	case PBOOK_SLEEP_REQUEST:
+		par->save_framebuffer = vmalloc(nb);
+		if (par->save_framebuffer == NULL)
+			return PBOOK_SLEEP_REFUSE;
+		break;
+	case PBOOK_SLEEP_REJECT:
+		if (par->save_framebuffer) {
+			vfree(par->save_framebuffer);
+			par->save_framebuffer = 0;
 		}
+		break;
+	case PBOOK_SLEEP_NOW:
+		wait_for_idle(par);
+		aty128_reset_engine(par);
+		wait_for_idle(par);
+
+		/* Backup fb content */	
+		if (par->save_framebuffer)
+			memcpy_fromio(par->save_framebuffer,
+			       info->screen_base, nb);
+
+		/* Blank display and LCD */
+		aty128fb_blank(VESA_POWERDOWN, info);
+			
+		/* Sleep the chip */
+		aty128_set_suspend(par, 1);
+
+		break;
+	case PBOOK_WAKE:
+		/* Wake the chip */
+		aty128_set_suspend(par, 0);
+		
+		aty128_reset_engine(par);
+		wait_for_idle(par);
+
+		/* Restore fb content */			
+		if (par->save_framebuffer) {
+			memcpy_toio(info->screen_base,
+			       par->save_framebuffer, nb);
+			vfree(par->save_framebuffer);
+			par->save_framebuffer = 0;
+		}
+		aty128fb_blank(0, info);
+		break;
 	}
 	return result;
 }
 #endif /* CONFIG_PMAC_PBOOK */
 
-#ifdef MODULE
+int __init aty128fb_init(void)
+{
+	return pci_module_init(&aty128fb_driver);
+}
+
+static void __exit aty128fb_exit(void)
+{
+	pci_unregister_driver(&aty128fb_driver);
+}
+
 MODULE_AUTHOR("(c)1999-2000 Brad Douglas <brad@neruo.com>");
 MODULE_DESCRIPTION("FBDev driver for ATI Rage128 / Pro cards");
 MODULE_LICENSE("GPL");
-MODULE_PARM(noaccel, "i");
-MODULE_PARM_DESC(noaccel, "Disable hardware acceleration (0 or 1=disabled) (default=0)");
-MODULE_PARM(font, "s");
-MODULE_PARM_DESC(font, "Specify one of the compiled-in fonts (default=none)");
 MODULE_PARM(mode, "s");
 MODULE_PARM_DESC(mode, "Specify resolution as \"<xres>x<yres>[-<bpp>][@<refresh>]\" ");
 #ifdef CONFIG_MTRR
@@ -2329,58 +2328,3 @@ MODULE_PARM(nomtrr, "i");
 MODULE_PARM_DESC(nomtrr, "Disable MTRR support (0 or 1=disabled) (default=0)");
 #endif
 
-int __init
-init_module(void)
-{
-	if (noaccel) {
-		noaccel = 1;
-		printk(KERN_INFO "aty128fb: Parameter NOACCEL set\n");
-	}
-	if (font) {
-		strncpy(fontname, font, sizeof(fontname)-1);
-		printk(KERN_INFO "aty128fb: Parameter FONT set to %s\n", font);
-	}
-	if (mode) {
-		mode_option = mode;
-		printk(KERN_INFO "aty128fb: Parameter MODE set to %s\n", mode);
-	}
-#ifdef CONFIG_MTRR
-	if (nomtrr) {
-		mtrr = 0;
-		printk(KERN_INFO "aty128fb: Parameter NOMTRR set\n");
-	}
-#endif
-
-	aty128fb_init();
-	return 0;
-}
-
-void __exit
-cleanup_module(void)
-{
-	struct fb_info_aty128 *info = board_list;
-
-	while (board_list) {
-		info = board_list;
-		board_list = board_list->next;
-
-		unregister_framebuffer(&info->fb_info);
-#ifdef CONFIG_MTRR
-		if (info->mtrr.vram_valid)
-			mtrr_del(info->mtrr.vram, info->fix.smem_start,
-				 info->vram_size);
-#endif /* CONFIG_MTRR */
-		iounmap(info->par.regbase);
-		iounmap(info->fb_info.screen_base);
-
-		release_mem_region(pci_resource_start(info->par.pdev, 0),
-				   pci_resource_len(info->par.pdev, 0));
-		release_mem_region(pci_resource_start(info->par.pdev, 1),
-				   pci_resource_len(info->par.pdev, 1));
-		release_mem_region(pci_resource_start(info->par.pdev, 2),
-				   pci_resource_len(info->par.pdev, 2));
-
-		kfree(info);
-	}
-}
-#endif /* MODULE */
