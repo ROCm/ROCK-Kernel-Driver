@@ -156,7 +156,6 @@ typedef struct idefloppy_packet_command_s {
 	int request_transfer;			/* Bytes to transfer */
 	int actually_transferred;		/* Bytes actually transferred */
 	int buffer_size;			/* Size of our data buffer */
-	char *b_data;				/* Pointer which runs on the buffers */
 	int b_count;				/* Missing/Available data on the current buffer */
 	struct request *rq;			/* The corresponding request */
 	u8 *buffer;				/* Data buffer */
@@ -515,9 +514,6 @@ typedef struct {
 	u8		reserved[4];
 } idefloppy_mode_parameter_header_t;
 
-#define IDEFLOPPY_MIN(a,b)	((a)<(b) ? (a):(b))
-#define	IDEFLOPPY_MAX(a,b)	((a)>(b) ? (a):(b))
-
 /*
  *	Too bad. The drive wants to send us data which we are not ready to accept.
  *	Just throw it away.
@@ -575,59 +571,68 @@ static int idefloppy_do_end_request(ide_drive_t *drive, int uptodate, int nsecs)
 static void idefloppy_input_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, unsigned int bcount)
 {
 	struct request *rq = pc->rq;
-	struct bio *bio = rq->bio;
-	int count;
+	struct bio_vec *bvec;
+	struct bio *bio;
+	unsigned long flags;
+	char *data;
+	int count, i, done = 0;
 
-	while (bcount) {
-		if (pc->b_count == bio->bi_size) {
-			rq->sector += rq->current_nr_sectors;
-			rq->nr_sectors -= rq->current_nr_sectors;
-			idefloppy_do_end_request(drive, 1, 0);
-			if ((bio = rq->bio) != NULL)
-				pc->b_count = 0;
+	rq_for_each_bio(bio, rq) {
+		bio_for_each_segment(bvec, bio, i) {
+			if (!bcount)
+				break;
+
+			count = min(bvec->bv_len, bcount);
+
+			data = bvec_kmap_irq(bvec, &flags);
+			atapi_input_bytes(drive, data, count);
+			bvec_kunmap_irq(data, &flags);
+
+			bcount -= count;
+			pc->b_count += count;
+			done += count;
 		}
-		if (bio == NULL) {
-			printk(KERN_ERR "%s: bio == NULL in "
-				"idefloppy_input_buffers, bcount == %d\n",
-				drive->name, bcount);
-			idefloppy_discard_data(drive, bcount);
-			return;
-		}
-		count = IDEFLOPPY_MIN(bio->bi_size - pc->b_count, bcount);
-		atapi_input_bytes(drive, bio_data(bio) + pc->b_count, count);
-		bcount -= count;
-		pc->b_count += count;
+	}
+
+	idefloppy_do_end_request(drive, 1, done >> 9);
+
+	if (bcount) {
+		printk(KERN_ERR "%s: leftover data in idefloppy_input_buffers, bcount == %d\n", drive->name, bcount);
+		idefloppy_discard_data(drive, bcount);
 	}
 }
 
 static void idefloppy_output_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, unsigned int bcount)
 {
 	struct request *rq = pc->rq;
-	struct bio *bio = rq->bio;
-	int count;
-	
-	while (bcount) {
-		if (!pc->b_count) {
-			rq->sector += rq->current_nr_sectors;
-			rq->nr_sectors -= rq->current_nr_sectors;
-			idefloppy_do_end_request(drive, 1, 0);
-			if ((bio = rq->bio) != NULL) {
-				pc->b_data = bio_data(bio);
-				pc->b_count = bio->bi_size;
-			}
+	struct bio *bio;
+	struct bio_vec *bvec;
+	unsigned long flags;
+	int count, i, done = 0;
+	char *data;
+
+	rq_for_each_bio(bio, rq) {
+		bio_for_each_segment(bvec, bio, i) {
+			if (!bcount)
+				break;
+
+			count = min(bvec->bv_len, bcount);
+
+			data = bvec_kmap_irq(bvec, &flags);
+			atapi_output_bytes(drive, data, count);
+			bvec_kunmap_irq(data, &flags);
+
+			bcount -= count;
+			pc->b_count += count;
+			done += count;
 		}
-		if (bio == NULL) {
-			printk(KERN_ERR "%s: bio == NULL in "
-				"idefloppy_output_buffers, bcount == %d\n",
-				drive->name, bcount);
-			idefloppy_write_zeros(drive, bcount);
-			return;
-		}
-		count = IDEFLOPPY_MIN(pc->b_count, bcount);
-		atapi_output_bytes(drive, pc->b_data, count);
-		bcount -= count;
-		pc->b_data += count;
-		pc->b_count -= count;
+	}
+
+	idefloppy_do_end_request(drive, 1, done >> 9);
+
+	if (bcount) {
+		printk(KERN_ERR "%s: leftover data in idefloppy_output_buffers, bcount == %d\n", drive->name, bcount);
+		idefloppy_write_zeros(drive, bcount);
 	}
 }
 
@@ -732,8 +737,6 @@ static void idefloppy_init_pc (idefloppy_pc_t *pc)
 	pc->request_transfer = 0;
 	pc->buffer = pc->pc_buffer;
 	pc->buffer_size = IDEFLOPPY_PC_BUFFER_SIZE;
-	pc->b_data = NULL;
-//	pc->bio = NULL;
 	pc->callback = &idefloppy_pc_callback;
 }
 
@@ -1199,7 +1202,6 @@ static void idefloppy_create_rw_cmd (idefloppy_floppy_t *floppy, idefloppy_pc_t 
 	put_unaligned(htonl(block), (unsigned int *) &pc->c[2]);
 	pc->callback = &idefloppy_rw_callback;
 	pc->rq = rq;
-	pc->b_data = rq->buffer;
 	pc->b_count = cmd == READ ? 0 : rq->bio->bi_size;
 	if (rq->flags & REQ_RW)
 		set_bit(PC_WRITING, &pc->flags);
