@@ -4850,7 +4850,6 @@ static void do_sbpcd_request(request_queue_t * q)
 			xnr, current->pid, jiffies);
 		printk( "do_sbpcd_request[%do](NULL) end 0 (null), Time:%li\n",
 			xnr, jiffies);
-		CLEAR_INTR;
 		return;
 	}
 
@@ -4858,10 +4857,8 @@ static void do_sbpcd_request(request_queue_t * q)
 		xnr, CURRENT, CURRENT->sector, CURRENT->nr_sectors, current->pid, jiffies);
 #endif
 
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
 	req = CURRENT;		/* take out our request so no other */
 	blkdev_dequeue_request(req);	/* task can fuck it up         GTL  */

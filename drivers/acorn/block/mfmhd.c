@@ -114,7 +114,6 @@
 #include <linux/delay.h>
 
 #define MAJOR_NR	MFM_ACORN_MAJOR
-#define DEVICE_INTR do_mfm
 #define DEVICE_NR(device) (minor(device) >> 6)
 #include <linux/blk.h>
 #include <linux/blkpg.h>
@@ -128,6 +127,7 @@
 #include <asm/ecard.h>
 #include <asm/hardware/ioc.h>
 
+static void (*do_mfm)(void) = NULL;
 /*
  * This sort of stuff should be in a header file shared with ide.c, hd.c, xd.c etc
  */
@@ -572,7 +572,7 @@ static void mfm_rw_intr(void)
 		DBG("mfm_rw_intr: returned from cont->done\n");
 	} else {
 		/* Its going to generate another interrupt */
-		DEVICE_INTR = mfm_rw_intr;
+		do_mfm = mfm_rw_intr;
 	};
 }
 
@@ -580,7 +580,7 @@ static void mfm_setup_rw(void)
 {
 	DBG("setting up for rw...\n");
 
-	DEVICE_INTR = mfm_rw_intr;
+	do_mfm = mfm_rw_intr;
 	issue_command(raw_cmd.cmdcode, raw_cmd.cmddata, raw_cmd.cmdlen);
 }
 
@@ -610,7 +610,7 @@ static void mfm_recal_intr(void)
 	/* Command end without seek end (see data sheet p.20) for parallel seek
 	   - we have to send a POL command to wait for the seek */
 	if (mfm_status & STAT_CED) {
-		DEVICE_INTR = mfm_recal_intr;
+		do_mfm = mfm_recal_intr;
 		issue_command(CMD_POL, NULL, 0);
 		return;
 	}
@@ -640,7 +640,7 @@ static void mfm_seek_intr(void)
 		return;
 	}
 	if (mfm_status & STAT_CED) {
-		DEVICE_INTR = mfm_seek_intr;
+		do_mfm = mfm_seek_intr;
 		issue_command(CMD_POL, NULL, 0);
 		return;
 	}
@@ -698,7 +698,7 @@ static void mfm_seek(void)
 
 	DBG("seeking...\n");
 	if (MFM_DRV_INFO.cylinder < 0) {
-		DEVICE_INTR = mfm_recal_intr;
+		do_mfm = mfm_recal_intr;
 		DBG("mfm_seek: about to call specify\n");
 		mfm_specify ();	/* DAG added this */
 
@@ -714,7 +714,7 @@ static void mfm_seek(void)
 		cmdb[2] = raw_cmd.cylinder >> 8;
 		cmdb[3] = raw_cmd.cylinder;
 
-		DEVICE_INTR = mfm_seek_intr;
+		do_mfm = mfm_seek_intr;
 		issue_command(CMD_SEK, cmdb, 4);
 	} else
 		mfm_setup_rw();
@@ -909,7 +909,7 @@ static void mfm_request(void)
 
 		if (blk_queue_empty(QUEUE)) {
 			printk("mfm_request: Exiting due to empty queue (pre)\n");
-			DEVICE_INTR = NULL;
+			do_mfm = NULL;
 			Busy = 0;
 			return;
 		}
@@ -971,9 +971,9 @@ static void do_mfm_request(request_queue_t *q)
 
 static void mfm_interrupt_handler(int unused, void *dev_id, struct pt_regs *regs)
 {
-	void (*handler) (void) = DEVICE_INTR;
+	void (*handler) (void) = do_mfm;
 
-	DEVICE_INTR = NULL;
+	do_mfm = NULL;
 
 	DBG("mfm_interrupt_handler (handler=0x%p)\n", handler);
 

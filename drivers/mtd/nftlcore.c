@@ -837,10 +837,8 @@ void nftl_request(RQFUNC_ARG)
 	int res;
 
 	while (1) {
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		req = CURRENT;
 		

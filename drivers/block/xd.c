@@ -284,10 +284,8 @@ static void do_xd_request (request_queue_t * q)
 	while (1) {
 		code = 0;
 		/* do some checking on the request structure */
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		if (DEVICE_NR(CURRENT->rq_dev) < xd_drives
 		    && (CURRENT->flags & REQ_CMD)

@@ -206,10 +206,8 @@ static void jsfd_do_request(request_queue_t *q)
 	size_t len;
 
 	for (;;) {
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		req = CURRENT;
 

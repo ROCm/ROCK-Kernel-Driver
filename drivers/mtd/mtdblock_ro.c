@@ -114,10 +114,8 @@ static void mtdblock_request(RQFUNC_ARG)
    {
       /* Grab the Request and unlink it from the request list, we
 	 will execute a return if we are done. */
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
       current_request = CURRENT;
 

@@ -983,10 +983,8 @@ static void do_stram_request(request_queue_t *q)
 	unsigned long len;
 
 	while (1) {
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		start = swap_start + (CURRENT->sector << 9);
 		len   = CURRENT->current_nr_sectors << 9;

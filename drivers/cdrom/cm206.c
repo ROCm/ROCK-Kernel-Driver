@@ -858,10 +858,8 @@ static void do_cm206_request(request_queue_t * q)
 	uch *source, *dest;
 
 	while (1) {		/* repeat until all requests have been satisfied */
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		if (CURRENT->cmd != READ) {
 			debug(("Non-read command %d on cdrom\n",

@@ -280,10 +280,8 @@ static void __do_gscd_request(unsigned long dummy)
 	unsigned int nsect;
 
       repeat:
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
 	dev = minor(CURRENT->rq_dev);
 	block = CURRENT->sector;

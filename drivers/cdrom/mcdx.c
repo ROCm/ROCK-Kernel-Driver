@@ -563,10 +563,8 @@ void do_mcdx_request(request_queue_t * q)
 
       again:
 
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
 	dev = minor(CURRENT->rq_dev);
 	stuffp = mcdx_stuffp[dev];

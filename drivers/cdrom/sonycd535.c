@@ -135,7 +135,6 @@
 #include <linux/cdrom.h>
 
 #define MAJOR_NR CDU535_CDROM_MAJOR
-#define DEVICE_INTR do_cdu535
 #define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 

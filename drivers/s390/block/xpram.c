@@ -84,7 +84,6 @@ int xpram_major;   /* must be declared before including blk.h */
 devfs_handle_t xpram_devfs_handle;
 
 #define DEVICE_NR(device) MINOR(device)   /* xpram has no partition bits */
-#define DEVICE_INTR xpram_intrptr         /* pointer to the bottom half */
 #define DEVICE_NO_RANDOM                  /* no entropy to contribute */
 #define DEVICE_OFF(d)                     /* do-nothing */
 
@@ -683,10 +682,8 @@ void xpram_request(request_queue_t * queue)
         struct request * current_req;      /* working request */
 
 	while(1) {
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		fault=0;
 		current_req = CURRENT;

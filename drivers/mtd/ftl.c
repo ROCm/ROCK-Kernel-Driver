@@ -1191,10 +1191,8 @@ static void do_ftl_request(request_arg_t)
 
     do {
 	//	    sti();
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
 	minor = minor(CURRENT->rq_dev);
 

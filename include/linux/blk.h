@@ -108,13 +108,6 @@ extern inline struct request *elv_next_request(request_queue_t *q)
 # define CURRENT elv_next_request(QUEUE)
 #endif
 
-#ifdef DEVICE_INTR
-static void (*DEVICE_INTR)(void) = NULL;
-#  define CLEAR_INTR DEVICE_INTR = NULL
-# else
-#  define CLEAR_INTR
-# endif
-
 #endif /* !defined(IDE_DRIVER) */
 
 /*

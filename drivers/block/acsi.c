@@ -45,7 +45,6 @@
 
 #define MAJOR_NR ACSI_MAJOR
 #define DEVICE_NAME "ACSI"
-#define DEVICE_INTR do_acsi
 #define DEVICE_NR(device) (minor(device) >> 4)
 
 #include <linux/config.h>
@@ -80,6 +79,7 @@ typedef void Scsi_Device; /* hack to avoid including scsi.h */
 #include <asm/atari_stdma.h>
 #include <asm/atari_stram.h>
 
+static void (*do_acsi)(void) = NULL;
 
 #define DEBUG
 #undef DEBUG_DETECT
@@ -738,9 +738,9 @@ static void acsi_print_error( const unsigned char *errblk, int dev  )
 
 static void acsi_interrupt(int irq, void *data, struct pt_regs *fp )
 
-{	void (*acsi_irq_handler)(void) = DEVICE_INTR;
+{	void (*acsi_irq_handler)(void) = do_acsi;
 
-	DEVICE_INTR = NULL;
+	do_acsi = NULL;
 	CLEAR_TIMER();
 
 	if (!acsi_irq_handler)
@@ -841,9 +841,9 @@ static void acsi_times_out( unsigned long dummy )
 
 {
 	DISABLE_IRQ();
-	if (!DEVICE_INTR) return;
+	if (!do_acsi) return;
 
-	DEVICE_INTR = NULL;
+	do_acsi = NULL;
 	printk( KERN_ERR "ACSI timeout\n" );
 	if (blk_queue_empty(QUEUE))
 	    return;
@@ -959,11 +959,11 @@ static void redo_acsi_request( void )
   repeat:
 	CLEAR_TIMER();
 
-	if (DEVICE_INTR)
+	if (do_acsi)
 		return;
 
 	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+		do_acsi = NULL;
 		ENABLE_IRQ();
 		stdma_release();
 		return;
@@ -1052,9 +1052,9 @@ static void redo_acsi_request( void )
 		if (buffer == acsi_buffer)
 			copy_to_acsibuffer();
 		dma_cache_maintenance( pbuffer, nsect*512, 1 );
-		DEVICE_INTR = write_intr;
+		do_acsi = write_intr;
 		if (!acsicmd_dma( write_cmd, buffer, nsect, 1, 1)) {
-			CLEAR_INTR;
+			do_acsi = NULL;
 			printk( KERN_ERR "ACSI (write): Timeout in command block\n" );
 			bad_rw_intr();
 			goto repeat;
@@ -1066,9 +1066,9 @@ static void redo_acsi_request( void )
 		CMDSET_TARG_LUN( read_cmd, target, lun );
 		CMDSET_BLOCK( read_cmd, block );
 		CMDSET_LEN( read_cmd, nsect );
-		DEVICE_INTR = read_intr;
+		do_acsi = read_intr;
 		if (!acsicmd_dma( read_cmd, buffer, nsect, 0, 1)) {
-			CLEAR_INTR;
+			do_acsi = NULL;
 			printk( KERN_ERR "ACSI (read): Timeout in command block\n" );
 			bad_rw_intr();
 			goto repeat;

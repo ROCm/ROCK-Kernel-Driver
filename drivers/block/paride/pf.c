@@ -840,10 +840,8 @@ static void do_pf_request (request_queue_t * q)
 
         if (pf_busy) return;
 repeat:
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
         pf_unit = unit = DEVICE_NR(CURRENT->rq_dev);
         pf_block = CURRENT->sector;

@@ -397,10 +397,8 @@ static void handle_mtdblock_request(void)
 	unsigned int res;
 
 	for (;;) {
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		req = CURRENT;
 		spin_unlock_irq(QUEUE->queue_lock);

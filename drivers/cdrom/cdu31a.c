@@ -1594,10 +1594,8 @@ static void do_cdu31a_request(request_queue_t * q)
 		 * The beginning here is stolen from the hard disk driver.  I hope
 		 * it's right.
 		 */
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			goto end_do_cdu31a_request;
-		}
 
 		if (!sony_spun_up) {
 			scd_spinup();

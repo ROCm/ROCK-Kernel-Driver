@@ -834,10 +834,8 @@ static void do_pd_request (request_queue_t * q)
 
         if (pd_busy) return;
 repeat:
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
         pd_dev = minor(CURRENT->rq_dev);
 	pd_unit = unit = DEVICE_NR(CURRENT->rq_dev);

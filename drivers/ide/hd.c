@@ -52,7 +52,6 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR HD_MAJOR
-#define DEVICE_INTR do_hd
 #define DEVICE_NR(device) (minor(device)>>6)
 #include <linux/blk.h>
 
@@ -113,13 +112,16 @@ static int hd_sizes[MAX_HD<<6];
 
 static struct timer_list device_timer;
 
+#define TIMEOUT_VALUE (6*HZ)
+
 #define SET_TIMER							\
 	do {								\
 		mod_timer(&device_timer, jiffies + TIMEOUT_VALUE);	\
 	} while (0)
 
+static void (*do_hd)(void) = NULL;
 #define SET_HANDLER(x) \
-if ((DEVICE_INTR = (x)) != NULL) \
+if ((do_hd = (x)) != NULL) \
 	SET_TIMER; \
 else \
 	del_timer(&device_timer);
@@ -495,7 +497,7 @@ static void hd_times_out(unsigned long dummy)
 {
 	unsigned int dev;
 
-	DEVICE_INTR = NULL;
+	do_hd = NULL;
 
 	if (blk_queue_empty(QUEUE))
 		return;
@@ -545,14 +547,14 @@ static void hd_request(void)
 {
 	unsigned int dev, block, nsect, sec, track, head, cyl;
 
-	if (DEVICE_INTR)
+	if (do_hd)
 		return;
 repeat:
 	del_timer(&device_timer);
 	sti();
 
 	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+		do_hd = NULL;
 		return;
 	}
 
@@ -701,9 +703,9 @@ static struct gendisk hd_gendisk = {
 	
 static void hd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	void (*handler)(void) = DEVICE_INTR;
+	void (*handler)(void) = do_hd;
 
-	DEVICE_INTR = NULL;
+	do_hd = NULL;
 	del_timer(&device_timer);
 	if (!handler)
 		handler = unexpected_hd_interrupt;
