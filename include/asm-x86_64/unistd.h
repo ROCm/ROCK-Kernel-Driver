@@ -98,7 +98,7 @@ __SYSCALL(__NR_setitimer, sys_setitimer)
 __SYSCALL(__NR_getpid, sys_getpid)
 
 #define __NR_sendfile                           40
-__SYSCALL(__NR_sendfile, sys_sendfile)
+__SYSCALL(__NR_sendfile, sys_sendfile64)
 #define __NR_socket                             41
 __SYSCALL(__NR_socket, sys_socket)
 #define __NR_connect                            42
