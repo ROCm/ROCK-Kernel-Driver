@@ -940,12 +940,19 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 	}
 
 #if FORCED_DEBUG
-	if ((size < (PAGE_SIZE>>3)) && !(flags & SLAB_MUST_HWCACHE_ALIGN))
-		/*
-		 * do not red zone large object, causes severe
-		 * fragmentation.
-		 */
+	/*
+	 * Enable redzoning and last user accounting, except
+	 * - for caches with forced alignment: redzoning would violate the
+	 *   alignment
+	 * - for caches with large objects, if the increased size would
+	 *   increase the object size above the next power of two: caches
+	 *   with object sizes just above a power of two have a significant
+	 *   amount of internal fragmentation
+	 */
+	if ((size < (PAGE_SIZE>>3) || fls(size-1) == fls(size-1+3*BYTES_PER_WORD))
+			&& !(flags & SLAB_MUST_HWCACHE_ALIGN)) {
 		flags |= SLAB_RED_ZONE|SLAB_STORE_USER;
+	}
 	flags |= SLAB_POISON;
 #endif
 #endif
@@ -1782,10 +1789,12 @@ __free_block(kmem_cache_t *cachep, void **objpp, int nr_objects)
 		slabp = GET_PAGE_SLAB(virt_to_page(objp));
 		list_del(&slabp->list);
 		objnr = (objp - slabp->s_mem) / cachep->objsize;
+		check_slabp(cachep, slabp);
 		slab_bufctl(slabp)[objnr] = slabp->free;
 		slabp->free = objnr;
 		STATS_DEC_ACTIVE(cachep);
 		slabp->inuse--;
+		check_slabp(cachep, slabp);
 
 		/* fixup slab chains */
 		if (slabp->inuse == 0) {
