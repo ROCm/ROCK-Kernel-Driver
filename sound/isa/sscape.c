@@ -616,10 +616,10 @@ static int sscape_upload_microcode(struct soundscape *sscape,
 	 */
 	if (get_user(code, &mc->code))
 		return -EFAULT;
-	if ((err = verify_area(VERIFY_READ, code, 65536)) != 0)
+	if ((err = verify_area(VERIFY_READ, code, SSCAPE_MICROCODE_SIZE)) != 0)
 		return err;
 
-	if ((ret = upload_dma_data(sscape, code, 65536)) == 0) {
+	if ((ret = upload_dma_data(sscape, code, SSCAPE_MICROCODE_SIZE)) == 0) {
 		snd_printk(KERN_INFO "sscape: MIDI firmware loaded\n");
 	}
 
