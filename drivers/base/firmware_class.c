@@ -56,13 +56,13 @@ firmware_timeout_store(struct class *class, const char *buf, size_t count)
 	return count;
 }
 
-CLASS_ATTR(timeout, 0644, firmware_timeout_show, firmware_timeout_store);
+static CLASS_ATTR(timeout, 0644, firmware_timeout_show, firmware_timeout_store);
 
 static void  fw_class_dev_release(struct class_device *class_dev);
 int firmware_class_hotplug(struct class_device *dev, char **envp,
 			   int num_envp, char *buffer, int buffer_size);
 
-struct class firmware_class = {
+static struct class firmware_class = {
 	.name		= "firmware",
 	.hotplug	= firmware_class_hotplug,
 	.release	= fw_class_dev_release,
@@ -132,8 +132,8 @@ firmware_loading_store(struct class_device *class_dev,
 	return count;
 }
 
-CLASS_DEVICE_ATTR(loading, 0644,
-		  firmware_loading_show, firmware_loading_store);
+static CLASS_DEVICE_ATTR(loading, 0644,
+			firmware_loading_show, firmware_loading_store);
 
 static ssize_t
 firmware_data_read(struct kobject *kobj,
@@ -224,10 +224,11 @@ firmware_class_timeout(u_long data)
 	wmb();
 	complete(&fw_priv->completion);
 }
+
 static inline void
 fw_setup_class_device_id(struct class_device *class_dev, struct device *dev)
 {
-#warning we should watch out for name collisions
+	/* XXX warning we should watch out for name collisions */
 	strncpy(class_dev->class_id, dev->bus_id, BUS_ID_SIZE);
 	class_dev->class_id[BUS_ID_SIZE - 1] = '\0';
 }
@@ -252,7 +253,7 @@ fw_setup_class_device(struct class_device **class_dev_p,
 	memcpy(&fw_priv->attr_data, &firmware_attr_data_tmpl,
 	       sizeof (firmware_attr_data_tmpl));
 
-	strncpy(fw_priv->fw_id, fw_name, FIRMWARE_NAME_MAX);
+	strncpy(&fw_priv->fw_id[0], fw_name, FIRMWARE_NAME_MAX);
 	fw_priv->fw_id[FIRMWARE_NAME_MAX - 1] = '\0';
 
 	fw_setup_class_device_id(class_dev, device);

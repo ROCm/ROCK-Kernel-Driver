@@ -13,7 +13,6 @@ int request_firmware_nowait(
 	struct module *module,
 	const char *name, struct device *device, void *context,
 	void (*cont)(const struct firmware *fw, void *context));
-/* Maybe 'device' should be 'struct device *' */
 
 void release_firmware(const struct firmware *fw);
 void register_firmware(const char *name, const u8 *data, size_t size);
