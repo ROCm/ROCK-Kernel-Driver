@@ -73,9 +73,8 @@ static void d_callback(void *arg)
 {
 	struct dentry * dentry = (struct dentry *)arg;
 
-	if (dname_external(dentry)) {
-		kfree(dentry->d_qstr);
-	}
+	if (dname_external(dentry))
+		kfree(dentry->d_name.name);
 	kmem_cache_free(dentry_cache, dentry); 
 }
 
@@ -682,34 +681,30 @@ static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
  * copied and the copy passed in may be reused after this call.
  */
  
-struct dentry * d_alloc(struct dentry * parent, const struct qstr *name)
+struct dentry *d_alloc(struct dentry * parent, const struct qstr *name)
 {
-	char * str;
 	struct dentry *dentry;
-	struct qstr * qstr;
+	char *dname;
 
 	dentry = kmem_cache_alloc(dentry_cache, GFP_KERNEL); 
 	if (!dentry)
 		return NULL;
 
 	if (name->len > DNAME_INLINE_LEN-1) {
-		qstr = kmalloc(sizeof(*qstr) + name->len + 1, GFP_KERNEL);
-		if (!qstr) {
+		dname = kmalloc(name->len + 1, GFP_KERNEL);
+		if (!dname) {
 			kmem_cache_free(dentry_cache, dentry); 
 			return NULL;
 		}
-		qstr->name = qstr->name_str;
-		qstr->len = name->len;
-		qstr->hash = name->hash;
-		dentry->d_qstr = qstr;
-		str = qstr->name_str;
 	} else  {
-		dentry->d_qstr = &dentry->d_name;
-		str = dentry->d_iname;
+		dname = dentry->d_iname;
 	}	
+	dentry->d_name.name = dname;
 
-	memcpy(str, name->name, name->len);
-	str[name->len] = 0;
+	dentry->d_name.len = name->len;
+	dentry->d_name.hash = name->hash;
+	memcpy(dname, name->name, name->len);
+	dname[name->len] = 0;
 
 	atomic_set(&dentry->d_count, 1);
 	dentry->d_vfs_flags = DCACHE_UNHASHED;
@@ -717,11 +712,7 @@ struct dentry * d_alloc(struct dentry * parent, const struct qstr *name)
 	dentry->d_flags = 0;
 	dentry->d_inode = NULL;
 	dentry->d_parent = NULL;
-	dentry->d_move_count = 0;
 	dentry->d_sb = NULL;
-	dentry->d_name.name = str;
-	dentry->d_name.len = name->len;
-	dentry->d_name.hash = name->hash;
 	dentry->d_op = NULL;
 	dentry->d_fsdata = NULL;
 	dentry->d_mounted = 0;
@@ -788,7 +779,8 @@ struct dentry * d_alloc_root(struct inode * root_inode)
 	struct dentry *res = NULL;
 
 	if (root_inode) {
-		static const struct qstr name = { .name = "/", .len = 1, .hash = 0 };
+		static const struct qstr name = { .name = "/", .len = 1 };
+
 		res = d_alloc(NULL, &name);
 		if (res) {
 			res->d_sb = root_inode->i_sb;
@@ -829,7 +821,7 @@ static inline struct hlist_head *d_hash(struct dentry *parent,
 
 struct dentry * d_alloc_anon(struct inode *inode)
 {
-	static const struct qstr anonstring = { "", 0, 0};
+	static const struct qstr anonstring = { .name = "" };
 	struct dentry *tmp;
 	struct dentry *res;
 
@@ -935,8 +927,7 @@ struct dentry *d_splice_alias(struct inode *inode, struct dentry *dentry)
  *
  * __d_lookup is dcache_lock free. The hash list is protected using RCU.
  * Memory barriers are used while updating and doing lockless traversal. 
- * To avoid races with d_move while rename is happening, d_move_count is 
- * used. 
+ * To avoid races with d_move while rename is happening, d_lock is used.
  *
  * Overflows in memcmp(), while d_move, are avoided by keeping the length
  * and name pointer in one structure pointed by d_qstr.
@@ -979,8 +970,7 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 	
 	hlist_for_each (node, head) { 
 		struct dentry *dentry; 
-		unsigned long move_count;
-		struct qstr * qstr;
+		struct qstr *qstr;
 
 		smp_read_barrier_depends();
 		dentry = hlist_entry(node, struct dentry, d_hash);
@@ -991,11 +981,6 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		if (unlikely(dentry->d_bucket != head))
 			break;
 
-		/*
-		 * We must take a snapshot of d_move_count followed by
-		 * read memory barrier before any search key comparison 
-		 */
-		move_count = dentry->d_move_count;
 		smp_rmb();
 
 		if (dentry->d_name.hash != hash)
@@ -1003,29 +988,36 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 		if (dentry->d_parent != parent)
 			continue;
 
-		qstr = dentry->d_qstr;
+		spin_lock(&dentry->d_lock);
+
+		/*
+		 * Recheck the dentry after taking the lock - d_move may have
+		 * changed things.  Don't bother checking the hash because we're
+		 * about to compare the whole name anyway.
+		 */
+		if (dentry->d_parent != parent)
+			goto next;
+
+		qstr = &dentry->d_name;
 		smp_read_barrier_depends();
 		if (parent->d_op && parent->d_op->d_compare) {
 			if (parent->d_op->d_compare(parent, qstr, name))
-				continue;
+				goto next;
 		} else {
 			if (qstr->len != len)
-				continue;
+				goto next;
 			if (memcmp(qstr->name, str, len))
-				continue;
+				goto next;
 		}
-		spin_lock(&dentry->d_lock);
-		/*
-		 * If dentry is moved, fail the lookup
-		 */ 
-		if (likely(move_count == dentry->d_move_count)) {
-			if (!d_unhashed(dentry)) {
-				atomic_inc(&dentry->d_count);
-				found = dentry;
-			}
+
+		if (!d_unhashed(dentry)) {
+			atomic_inc(&dentry->d_count);
+			found = dentry;
 		}
 		spin_unlock(&dentry->d_lock);
 		break;
+next:
+		spin_unlock(&dentry->d_lock);
  	}
  	rcu_read_unlock();
 
@@ -1147,28 +1139,40 @@ void d_rehash(struct dentry * entry)
  * then no longer matches the actual (corrupted) string of the target.
  * The hash value has to match the hash queue that the dentry is on..
  */
-static inline void switch_names(struct dentry * dentry, struct dentry * target)
+static void switch_names(struct dentry *dentry, struct dentry *target)
 {
-	const unsigned char *old_name, *new_name;
-	struct qstr *old_qstr, *new_qstr;
-
-	memcpy(dentry->d_iname, target->d_iname, DNAME_INLINE_LEN); 
-	old_qstr = target->d_qstr;
-	old_name = target->d_name.name;
-	new_qstr = dentry->d_qstr;
-	new_name = dentry->d_name.name;
-	if (old_name == target->d_iname) {
-		old_name = dentry->d_iname;
-		old_qstr = &dentry->d_name;
+	if (dname_external(target)) {
+		if (dname_external(dentry)) {
+			/*
+			 * Both external: swap the pointers
+			 */
+			do_switch(target->d_name.name, dentry->d_name.name);
+		} else {
+			/*
+			 * dentry:internal, target:external.  Steal target's
+			 * storage and make target internal.
+			 */
+			dentry->d_name.name = target->d_name.name;
+			target->d_name.name = target->d_iname;
+		}
+	} else {
+		if (dname_external(dentry)) {
+			/*
+			 * dentry:external, target:internal.  Give dentry's
+			 * storage to target and make dentry internal
+			 */
+			memcpy(dentry->d_iname, target->d_name.name,
+					target->d_name.len + 1);
+			target->d_name.name = dentry->d_name.name;
+			dentry->d_name.name = dentry->d_iname;
+		} else {
+			/*
+			 * Both are internal.  Just copy target to dentry
+			 */
+			memcpy(dentry->d_iname, target->d_name.name,
+					target->d_name.len + 1);
+		}
 	}
-	if (new_name == dentry->d_iname) {
-		new_name = target->d_iname;
-		new_qstr = &target->d_name;
-	}
-	target->d_name.name = new_name;
-	dentry->d_name.name = old_name;
-	target->d_qstr = new_qstr;
-	dentry->d_qstr = old_qstr;
 }
 
 /*
@@ -1246,7 +1250,6 @@ already_unhashed:
 	}
 
 	list_add(&dentry->d_child, &dentry->d_parent->d_subdirs);
-	dentry->d_move_count++;
 	spin_unlock(&target->d_lock);
 	spin_unlock(&dentry->d_lock);
 	write_sequnlock(&rename_lock);
@@ -1344,6 +1347,7 @@ char * d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 	char *res;
 	struct vfsmount *rootmnt;
 	struct dentry *root;
+
 	read_lock(&current->fs->lock);
 	rootmnt = mntget(current->fs->rootmnt);
 	root = dget(current->fs->root);

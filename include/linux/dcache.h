@@ -29,10 +29,9 @@ struct vfsmount;
  * saves "metadata" about the string (ie length and the hash).
  */
 struct qstr {
-	const unsigned char * name;
+	const unsigned char *name;
 	unsigned int len;
 	unsigned int hash;
-	char name_str[0];
 };
 
 struct dentry_stat_t {
@@ -93,8 +92,6 @@ struct dentry {
 	void * d_fsdata;		/* fs-specific data */
  	struct rcu_head d_rcu;
 	struct dcookie_struct * d_cookie; /* cookie, if any */
-	unsigned long d_move_count;	/* to indicated moved dentry while lockless lookup */
-	struct qstr * d_qstr;		/* quick str ptr used in lockless lookup and concurrent d_move */
 	struct dentry * d_parent;	/* parent directory */
 	struct qstr d_name;
 	struct hlist_node d_hash;	/* lookup hash list */	
@@ -120,13 +117,13 @@ struct dentry_operations {
 
 /*
 locking rules:
-		big lock	dcache_lock	may block
-d_revalidate:	no		no		yes
-d_hash		no		no		yes
-d_compare:	no		yes		no
-d_delete:	no		yes		no
-d_release:	no		no		yes
-d_iput:		no		no		yes
+		big lock	dcache_lock	d_lock   may block
+d_revalidate:	no		no		no       yes
+d_hash		no		no		no       yes
+d_compare:	no		yes		yes      no
+d_delete:	no		yes		no       no
+d_release:	no		no		no       yes
+d_iput:		no		no		no       yes
  */
 
 /* d_flags entries */
@@ -184,9 +181,9 @@ static inline void d_drop(struct dentry *dentry)
 	spin_unlock(&dcache_lock);
 }
 
-static inline int dname_external(struct dentry *d)
+static inline int dname_external(struct dentry *dentry)
 {
-	return d->d_name.name != d->d_iname; 
+	return dentry->d_name.name != dentry->d_iname;
 }
 
 /*
