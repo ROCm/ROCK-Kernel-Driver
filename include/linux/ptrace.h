@@ -87,6 +87,7 @@ extern void ptrace_notify(int exit_code);
 extern void __ptrace_link(struct task_struct *child,
 			  struct task_struct *new_parent);
 extern void __ptrace_unlink(struct task_struct *child);
+extern void ptrace_untrace(struct task_struct *child);
 
 static inline void ptrace_link(struct task_struct *child,
 			       struct task_struct *new_parent)
