@@ -2652,7 +2652,7 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
-		(void) drive->channel->udma(ide_dma_verbose, drive, NULL);
+		udma_print(drive);
 #endif
 	printk("\n");
 

@@ -74,12 +74,12 @@ extern struct ata_timing ata_timing[];
  * It's a bit elaborate due to the legacy we have to bear.
  */
 
-extern short ata_timing_mode(ide_drive_t *drive, int map);
+extern short ata_timing_mode(struct ata_device *drive, int map);
 extern void ata_timing_quantize(struct ata_timing *t, struct ata_timing *q,
 		int T, int UT);
 extern void ata_timing_merge(struct ata_timing *a, struct ata_timing *b,
 		struct ata_timing *m, unsigned int what);
 extern struct ata_timing* ata_timing_data(short speed);
-extern int ata_timing_compute(ide_drive_t *drive,
+extern int ata_timing_compute(struct ata_device *drive,
 		short speed, struct ata_timing *t, int T, int UT);
 #endif

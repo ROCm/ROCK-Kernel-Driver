@@ -93,7 +93,7 @@ static int ns87415_dmaproc(ide_dma_action_t func, struct ata_device *drive, stru
 			dma_stat = inb(hwif->dma_base+2);
 			outb(inb(hwif->dma_base)&~1, hwif->dma_base);	/* stop DMA */
 			outb(inb(hwif->dma_base)|6, hwif->dma_base);	/* from ERRATA: clear the INTR & ERROR bits */
-			ide_destroy_dmatable(drive);			/* and free any DMA resources */
+			udma_destroy_table(hwif);			/* and free any DMA resources */
 			return (dma_stat & 7) != 4;		/* verify good DMA status */
 		case ide_dma_write:
 		case ide_dma_read:

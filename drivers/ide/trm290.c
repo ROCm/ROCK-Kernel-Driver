@@ -175,7 +175,7 @@ static void trm290_selectproc (ide_drive_t *drive)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 static int trm290_dmaproc (ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
-	struct ata_channel *hwif = drive->channel;
+	struct ata_channel *ch = drive->channel;
 	unsigned int count, reading = 2, writing = 0;
 
 	switch (func) {
@@ -186,12 +186,12 @@ static int trm290_dmaproc (ide_dma_action_t func, struct ata_device *drive, stru
 			break;	/* always use PIO for writes */
 #endif
 		case ide_dma_read:
-			if (!(count = ide_build_dmatable(drive, func)))
+			if (!(count = udma_new_table(ch, rq)))
 				break;		/* try PIO instead of DMA */
 			trm290_prepare_drive(drive, 1);	/* select DMA xfer */
-			outl(hwif->dmatable_dma|reading|writing, hwif->dma_base);
+			outl(ch->dmatable_dma|reading|writing, ch->dma_base);
 			drive->waiting_for_dma = 1;
-			outw((count * 2) - 1, hwif->dma_base+2); /* start DMA */
+			outw((count * 2) - 1, ch->dma_base+2); /* start DMA */
 			if (drive->type != ATA_DISK)
 				return 0;
 			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
@@ -201,10 +201,10 @@ static int trm290_dmaproc (ide_dma_action_t func, struct ata_device *drive, stru
 			return 0;
 		case ide_dma_end:
 			drive->waiting_for_dma = 0;
-			ide_destroy_dmatable(drive);		/* purge DMA mappings */
-			return (inw(hwif->dma_base+2) != 0x00ff);
+			udma_destroy_table(ch);	/* purge DMA mappings */
+			return (inw(ch->dma_base + 2) != 0x00ff);
 		case ide_dma_test_irq:
-			return (inw(hwif->dma_base+2) == 0x00ff);
+			return (inw(ch->dma_base + 2) == 0x00ff);
 		default:
 			return ide_dmaproc(func, drive, rq);
 	}

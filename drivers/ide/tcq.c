@@ -215,6 +215,8 @@ static int wait_altstat(struct ata_device *drive, u8 *stat, u8 busy_mask)
 	return 0;
 }
 
+static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *rq);
+
 /*
  * issue SERVICE command to drive -- drive must have been selected first,
  * and it must have reported a need for service (status has SERVICE_STAT set)
@@ -296,7 +298,7 @@ static ide_startstop_t service(struct ata_device *drive)
 	 * interrupt to indicate end of transfer, release is not allowed
 	 */
 	TCQ_PRINTK("%s: starting command %x\n", __FUNCTION__, stat);
-	return drive->channel->udma(ide_dma_queued_start, drive, rq);
+	return udma_tcq_start(drive, rq);
 }
 
 static ide_startstop_t check_service(struct ata_device *drive)
@@ -483,11 +485,119 @@ static int configure_tcq(struct ata_device *drive)
 	return 0;
 }
 
-/*
- * for now assume that command list is always as big as we need and don't
- * attempt to shrink it on tcq disable
+static int tcq_wait_dataphase(struct ata_device *drive)
+{
+	u8 stat;
+	int i;
+
+	while ((stat = GET_STAT()) & BUSY_STAT)
+		udelay(10);
+
+	if (OK_STAT(stat, READY_STAT | DRQ_STAT, drive->bad_wstat))
+		return 0;
+
+	i = 0;
+	udelay(1);
+	while (!OK_STAT(GET_STAT(), READY_STAT | DRQ_STAT, drive->bad_wstat)) {
+		if (unlikely(i++ > IDE_TCQ_WAIT))
+			return 1;
+
+		udelay(10);
+	}
+
+	return 0;
+}
+
+/****************************************************************************
+ * UDMA transfer handling functions.
  */
-static int enable_queued(struct ata_device *drive, int on)
+
+/*
+ * Invoked from a SERVICE interrupt, command etc already known.  Just need to
+ * start the dma engine for this tag.
+ */
+static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *rq)
+{
+	struct ata_channel *ch = drive->channel;
+
+	TCQ_PRINTK("%s: setting up queued %d\n", __FUNCTION__, rq->tag);
+	if (!test_bit(IDE_BUSY, &ch->hwgroup->flags))
+		printk("queued_rw: IDE_BUSY not set\n");
+
+	if (tcq_wait_dataphase(drive))
+		return ide_stopped;
+
+	if (ata_start_dma(drive, rq))
+		return ide_stopped;
+
+	set_irq(drive, ide_dmaq_intr);
+	if (!ch->udma(ide_dma_begin, drive, rq))
+		return ide_started;
+
+	return ide_stopped;
+}
+
+/*
+ * Start a queued command from scratch.
+ */
+ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
+{
+	u8 stat;
+	u8 feat;
+
+	struct ata_taskfile *args = rq->special;
+
+	TCQ_PRINTK("%s: start tag %d\n", drive->name, rq->tag);
+
+	/*
+	 * set nIEN, tag start operation will enable again when
+	 * it is safe
+	 */
+	drive_ctl_nien(drive, 1);
+
+	OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
+
+	if (wait_altstat(drive, &stat, BUSY_STAT)) {
+		ide_dump_status(drive, "queued start", stat);
+		tcq_invalidate_queue(drive);
+		return ide_stopped;
+	}
+
+	drive_ctl_nien(drive, 0);
+
+	if (stat & ERR_STAT) {
+		ide_dump_status(drive, "tcq_start", stat);
+		return ide_stopped;
+	}
+
+	/*
+	 * drive released the bus, clear active tag and
+	 * check for service
+	 */
+	if ((feat = GET_FEAT()) & NSEC_REL) {
+		drive->immed_rel++;
+		HWGROUP(drive)->rq = NULL;
+		set_irq(drive, ide_dmaq_intr);
+
+		TCQ_PRINTK("REL in queued_start\n");
+
+		if ((stat = GET_STAT()) & SERVICE_STAT)
+			return service(drive);
+
+		return ide_released;
+	}
+
+	TCQ_PRINTK("IMMED in queued_start\n");
+	drive->immed_comp++;
+
+	return udma_tcq_start(drive, rq);
+}
+
+/*
+ * For now assume that command list is always as big as we need and don't
+ * attempt to shrink it on tcq disable.
+ */
+int udma_tcq_enable(struct ata_device *drive, int on)
 {
 	int depth = drive->using_tcq ? drive->queue_depth : 0;
 
@@ -522,121 +632,4 @@ static int enable_queued(struct ata_device *drive, int on)
 
 	drive->using_tcq = 1;
 	return 0;
-}
-
-static int tcq_wait_dataphase(struct ata_device *drive)
-{
-	u8 stat;
-	int i;
-
-	while ((stat = GET_STAT()) & BUSY_STAT)
-		udelay(10);
-
-	if (OK_STAT(stat, READY_STAT | DRQ_STAT, drive->bad_wstat))
-		return 0;
-
-	i = 0;
-	udelay(1);
-	while (!OK_STAT(GET_STAT(), READY_STAT | DRQ_STAT, drive->bad_wstat)) {
-		if (unlikely(i++ > IDE_TCQ_WAIT))
-			return 1;
-
-		udelay(10);
-	}
-
-	return 0;
-}
-
-ide_startstop_t ide_tcq_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
-{
-	struct ata_channel *hwif = drive->channel;
-	unsigned int enable_tcq = 1;
-	u8 stat;
-	u8 feat;
-
-	switch (func) {
-		/*
-		 * invoked from a SERVICE interrupt, command etc already known.
-		 * just need to start the dma engine for this tag
-		 */
-		case ide_dma_queued_start:
-			TCQ_PRINTK("ide_dma: setting up queued %d\n", rq->tag);
-			if (!test_bit(IDE_BUSY, &HWGROUP(drive)->flags))
-				printk("queued_rw: IDE_BUSY not set\n");
-
-			if (tcq_wait_dataphase(drive))
-				return ide_stopped;
-
-			if (ide_start_dma(func, drive))
-				return ide_stopped;
-
-			set_irq(drive, ide_dmaq_intr);
-			if (!hwif->udma(ide_dma_begin, drive, rq))
-				return ide_started;
-
-			return ide_stopped;
-
-			/*
-			 * start a queued command from scratch
-			 */
-		case ide_dma_read_queued:
-		case ide_dma_write_queued: {
-			struct ata_taskfile *args = rq->special;
-
-			TCQ_PRINTK("%s: start tag %d\n", drive->name, rq->tag);
-
-			/*
-			 * set nIEN, tag start operation will enable again when
-			 * it is safe
-			 */
-			drive_ctl_nien(drive, 1);
-
-			OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
-
-			if (wait_altstat(drive, &stat, BUSY_STAT)) {
-				ide_dump_status(drive, "queued start", stat);
-				tcq_invalidate_queue(drive);
-				return ide_stopped;
-			}
-
-			drive_ctl_nien(drive, 0);
-
-			if (stat & ERR_STAT) {
-				ide_dump_status(drive, "tcq_start", stat);
-				return ide_stopped;
-			}
-
-			/*
-			 * drive released the bus, clear active tag and
-			 * check for service
-			 */
-			if ((feat = GET_FEAT()) & NSEC_REL) {
-				drive->immed_rel++;
-				HWGROUP(drive)->rq = NULL;
-				set_irq(drive, ide_dmaq_intr);
-
-				TCQ_PRINTK("REL in queued_start\n");
-
-				if ((stat = GET_STAT()) & SERVICE_STAT)
-					return service(drive);
-
-				return ide_released;
-			}
-
-			TCQ_PRINTK("IMMED in queued_start\n");
-			drive->immed_comp++;
-			return hwif->udma(ide_dma_queued_start, drive, rq);
-			}
-
-		case ide_dma_queued_off:
-			enable_tcq = 0;
-		case ide_dma_queued_on:
-			if (enable_tcq && !drive->using_dma)
-				return 1;
-			return enable_queued(drive, enable_tcq);
-		default:
-			break;
-	}
-
-	return 1;
 }

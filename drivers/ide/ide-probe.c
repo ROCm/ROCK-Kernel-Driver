@@ -448,7 +448,7 @@ static inline void probe_for_drive(struct ata_device *drive)
  */
 static void channel_probe(struct ata_channel *ch)
 {
-	unsigned int unit;
+	unsigned int i;
 	unsigned long flags;
 	int error;
 
@@ -463,8 +463,8 @@ static void channel_probe(struct ata_channel *ch)
 	/*
 	 * Check for the presence of a channel by probing for drives on it.
 	 */
-	for (unit = 0; unit < MAX_DRIVES; ++unit) {
-		struct ata_device *drive = &ch->drives[unit];
+	for (i = 0; i < MAX_DRIVES; ++i) {
+		struct ata_device *drive = &ch->drives[i];
 
 		probe_for_drive(drive);
 
@@ -483,23 +483,8 @@ static void channel_probe(struct ata_channel *ch)
 		error += !request_region(ch->io_ports[IDE_DATA_OFFSET], 8, ch->name);
 		ch->straight8 = 1;
 	} else {
-		if (ch->io_ports[IDE_DATA_OFFSET])
-			error += !request_region(ch->io_ports[IDE_DATA_OFFSET], 1, ch->name);
-		if (ch->io_ports[IDE_ERROR_OFFSET])
-			error += !request_region(ch->io_ports[IDE_ERROR_OFFSET], 1, ch->name);
-		if (ch->io_ports[IDE_NSECTOR_OFFSET])
-			error += !request_region(ch->io_ports[IDE_NSECTOR_OFFSET], 1, ch->name);
-		if (ch->io_ports[IDE_SECTOR_OFFSET])
-			error += !request_region(ch->io_ports[IDE_SECTOR_OFFSET], 1, ch->name);
-		if (ch->io_ports[IDE_LCYL_OFFSET])
-			error += !request_region(ch->io_ports[IDE_LCYL_OFFSET], 1, ch->name);
-		if (ch->io_ports[IDE_HCYL_OFFSET])
-			error += !request_region(ch->io_ports[IDE_HCYL_OFFSET], 1, ch->name);
-		if (ch->io_ports[IDE_SELECT_OFFSET])
-			error += !request_region(ch->io_ports[IDE_SELECT_OFFSET], 1, ch->name);
-		if (ch->io_ports[IDE_STATUS_OFFSET])
-			error += !request_region(ch->io_ports[IDE_STATUS_OFFSET], 1, ch->name);
-
+		for (i = 0; i < 8; i++)
+			error += !request_region(ch->io_ports[i], 1, ch->name);
 	}
 	if (ch->io_ports[IDE_CONTROL_OFFSET])
 		error += !request_region(ch->io_ports[IDE_CONTROL_OFFSET], 1, ch->name);
@@ -561,8 +546,8 @@ static void channel_probe(struct ata_channel *ch)
 	/*
 	 * Now setup the PIO transfer modes of the drives on this channel.
 	 */
-	for (unit = 0; unit < MAX_DRIVES; ++unit) {
-		struct ata_device *drive = &ch->drives[unit];
+	for (i = 0; i < MAX_DRIVES; ++i) {
+		struct ata_device *drive = &ch->drives[i];
 
 		if (drive->present && (drive->autotune == 1)) {
 			if (drive->channel->tuneproc)
@@ -818,6 +803,16 @@ static void channel_init(struct ata_channel *ch)
 	if (!gd->part)
 		goto err_kmalloc_gd_part;
 	memset(gd->part, 0, ATA_MINORS * sizeof(struct hd_struct));
+
+	gd->de_arr = kmalloc (sizeof(*gd->de_arr) * MAX_DRIVES, GFP_KERNEL);
+	if (!gd->de_arr)
+		goto err_kmalloc_gd_de_arr;
+	memset(gd->de_arr, 0, sizeof(*gd->de_arr) * MAX_DRIVES);
+
+	gd->flags = kmalloc (sizeof(*gd->flags) * MAX_DRIVES, GFP_KERNEL);
+	if (!gd->flags)
+		goto err_kmalloc_gd_flags;
+	memset(gd->flags, 0, sizeof(*gd->flags) * MAX_DRIVES);
 
 	for (unit = 0; unit < MAX_DRIVES; ++unit)
 		ch->drives[unit].part = &gd->part[unit << PARTN_BITS];

@@ -44,29 +44,38 @@
  */
 char *ide_xfer_verbose (byte xfer_rate)
 {
-	switch(xfer_rate) {
-		case XFER_UDMA_7:	return("UDMA 7");
-		case XFER_UDMA_6:	return("UDMA 6");
-		case XFER_UDMA_5:	return("UDMA 5");
-		case XFER_UDMA_4:	return("UDMA 4");
-		case XFER_UDMA_3:	return("UDMA 3");
-		case XFER_UDMA_2:	return("UDMA 2");
-		case XFER_UDMA_1:	return("UDMA 1");
-		case XFER_UDMA_0:	return("UDMA 0");
-		case XFER_MW_DMA_2:	return("MW DMA 2");
-		case XFER_MW_DMA_1:	return("MW DMA 1");
-		case XFER_MW_DMA_0:	return("MW DMA 0");
-		case XFER_SW_DMA_2:	return("SW DMA 2");
-		case XFER_SW_DMA_1:	return("SW DMA 1");
-		case XFER_SW_DMA_0:	return("SW DMA 0");
-		case XFER_PIO_4:	return("PIO 4");
-		case XFER_PIO_3:	return("PIO 3");
-		case XFER_PIO_2:	return("PIO 2");
-		case XFER_PIO_1:	return("PIO 1");
-		case XFER_PIO_0:	return("PIO 0");
-		case XFER_PIO_SLOW:	return("PIO SLOW");
-		default:		return("XFER ERROR");
-	}
+	static struct ide_xfer_par {
+		byte rate;
+		char *name;
+	} xfer_verbose[] = {
+		{ XFER_UDMA_7,		"UDMA 7" },
+		{ XFER_UDMA_6,		"UDMA 6" },
+		{ XFER_UDMA_5,		"UDMA 5" },
+		{ XFER_UDMA_4,		"UDMA 4" },
+		{ XFER_UDMA_3,		"UDMA 3" },
+		{ XFER_UDMA_2,		"UDMA 2" },
+		{ XFER_UDMA_1,		"UDMA 1" },
+		{ XFER_UDMA_0,		"UDMA 0" },
+		{ XFER_MW_DMA_2,	"MW DMA 2" },
+		{ XFER_MW_DMA_1,	"MW DMA 1" },
+		{ XFER_MW_DMA_0,	"MW DMA 0" },
+		{ XFER_SW_DMA_2,	"SW DMA 2" },
+		{ XFER_SW_DMA_1,	"SW DMA 1" },
+		{ XFER_SW_DMA_0,	"SW DMA 0" },
+		{ XFER_PIO_4,		"PIO 4" },
+		{ XFER_PIO_3,		"PIO 3" },
+		{ XFER_PIO_2,		"PIO 2" },
+		{ XFER_PIO_1,		"PIO 1" },
+		{ XFER_PIO_0,		"PIO 0" },
+		{ XFER_PIO_SLOW,	"PIO SLOW" },
+	};
+
+	int i = 0;
+
+	for (; i < ARRAY_SIZE(xfer_verbose); i++)
+		if (xfer_verbose[i].rate == xfer_rate)
+			return xfer_verbose[i].name;
+	return "XFER ERROR";
 }
 
 byte ide_auto_reduce_xfer (ide_drive_t *drive)

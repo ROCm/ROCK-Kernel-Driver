@@ -312,10 +312,10 @@ no_dma_set:
  * by HighPoint|Triones Technologies, Inc.
  */
 
-int hpt34x_dmaproc (ide_dma_action_t func, struct ata_device *drive, struct request *rq)
+int hpt34x_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct request *rq)
 {
-	struct ata_channel *hwif = drive->channel;
-	unsigned long dma_base = hwif->dma_base;
+	struct ata_channel *ch = drive->channel;
+	unsigned long dma_base = ch->dma_base;
 	unsigned int count, reading = 0;
 	byte dma_stat;
 
@@ -325,9 +325,9 @@ int hpt34x_dmaproc (ide_dma_action_t func, struct ata_device *drive, struct requ
 		case ide_dma_read:
 			reading = 1 << 3;
 		case ide_dma_write:
-			if (!(count = ide_build_dmatable(drive, func)))
+			if (!(count = udma_new_table(ch, rq)))
 				return 1;	/* try PIO instead of DMA */
-			outl(hwif->dmatable_dma, dma_base + 4); /* PRD table */
+			outl(ch->dmatable_dma, dma_base + 4); /* PRD table */
 			reading |= 0x01;
 			outb(reading, dma_base);		/* specify r/w */
 			outb(inb(dma_base+2)|6, dma_base+2);	/* clear INTR & ERROR flags */
@@ -342,7 +342,7 @@ int hpt34x_dmaproc (ide_dma_action_t func, struct ata_device *drive, struct requ
 			outb(inb(dma_base)&~1, dma_base);	/* stop DMA */
 			dma_stat = inb(dma_base+2);		/* get DMA status */
 			outb(dma_stat|6, dma_base+2);		/* clear the INTR & ERROR bits */
-			ide_destroy_dmatable(drive);		/* purge DMA mappings */
+			udma_destroy_table(ch);			/* purge DMA mappings */
 			return (dma_stat & 7) != 4;		/* verify good DMA status */
 		default:
 			break;

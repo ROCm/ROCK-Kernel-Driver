@@ -89,7 +89,7 @@ static int lba_capacity_is_ok(struct hd_driveid *id)
 	return 0;	/* lba_capacity value may be bad */
 }
 
-static u8 get_command(ide_drive_t *drive, int cmd)
+static u8 get_command(struct ata_device *drive, int cmd)
 {
 	int lba48bit = (drive->id->cfs_enable_2 & 0x0400) ? 1 : 0;
 
@@ -345,7 +345,7 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 	return chs_do_request(drive, rq, block);
 }
 
-static int idedisk_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
+static int idedisk_open (struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	MOD_INC_USE_COUNT;
 	if (drive->removable && drive->usage == 1) {
@@ -370,7 +370,7 @@ static int idedisk_open (struct inode *inode, struct file *filp, ide_drive_t *dr
 	return 0;
 }
 
-static int idedisk_flushcache(ide_drive_t *drive)
+static int idedisk_flushcache(struct ata_device *drive)
 {
 	struct ata_taskfile args;
 
@@ -386,7 +386,7 @@ static int idedisk_flushcache(ide_drive_t *drive)
 	return ide_raw_taskfile(drive, &args, NULL);
 }
 
-static void idedisk_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
+static void idedisk_release (struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	if (drive->removable && !drive->usage) {
 		struct ata_taskfile args;
@@ -408,7 +408,7 @@ static void idedisk_release (struct inode *inode, struct file *filp, ide_drive_t
 	MOD_DEC_USE_COUNT;
 }
 
-static int idedisk_check_media_change (ide_drive_t *drive)
+static int idedisk_check_media_change(struct ata_device *drive)
 {
 	/* if removable, always assume it was changed */
 	return drive->removable;
@@ -474,7 +474,7 @@ static ide_startstop_t idedisk_special(struct ata_device *drive)
 	return IS_PDC4030_DRIVE ? ide_stopped : ide_started;
 }
 
-static void idedisk_pre_reset (ide_drive_t *drive)
+static void idedisk_pre_reset(struct ata_device *drive)
 {
 	int legacy = (drive->id->cfs_enable_2 & 0x0400) ? 0 : 1;
 
@@ -490,7 +490,7 @@ static void idedisk_pre_reset (ide_drive_t *drive)
 
 #ifdef CONFIG_PROC_FS
 
-static int smart_enable(ide_drive_t *drive)
+static int smart_enable(struct ata_device *drive)
 {
 	struct ata_taskfile args;
 
@@ -504,7 +504,7 @@ static int smart_enable(ide_drive_t *drive)
 	return ide_raw_taskfile(drive, &args, NULL);
 }
 
-static int get_smart_values(ide_drive_t *drive, u8 *buf)
+static int get_smart_values(struct ata_device *drive, u8 *buf)
 {
 	struct ata_taskfile args;
 
@@ -521,7 +521,7 @@ static int get_smart_values(ide_drive_t *drive, u8 *buf)
 	return ide_raw_taskfile(drive, &args, buf);
 }
 
-static int get_smart_thresholds(ide_drive_t *drive, u8 *buf)
+static int get_smart_thresholds(struct ata_device *drive, u8 *buf)
 {
 	struct ata_taskfile args;
 
@@ -541,7 +541,7 @@ static int get_smart_thresholds(ide_drive_t *drive, u8 *buf)
 static int proc_idedisk_read_cache
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *) data;
+	struct ata_device *drive = (struct ata_device *) data;
 	char		*out = page;
 	int		len;
 
@@ -555,7 +555,7 @@ static int proc_idedisk_read_cache
 static int proc_idedisk_read_smart_thresholds
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *)data;
+	struct ata_device *drive = (struct ata_device *)data;
 	int		len = 0, i = 0;
 
 	if (!get_smart_thresholds(drive, page)) {
@@ -574,8 +574,8 @@ static int proc_idedisk_read_smart_thresholds
 static int proc_idedisk_read_smart_values
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *)data;
-	int		len = 0, i = 0;
+	struct ata_device *drive = (struct ata_device *)data;
+	int len = 0, i = 0;
 
 	if (!get_smart_values(drive, page)) {
 		unsigned short *val = (unsigned short *) page;
@@ -594,7 +594,7 @@ static int proc_idedisk_read_smart_values
 static int proc_idedisk_read_tcq
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = (ide_drive_t *) data;
+	struct ata_device *drive = (struct ata_device *) data;
 	char		*out = page;
 	int		len, cmds, i;
 	unsigned long	flags;
@@ -658,7 +658,7 @@ static ide_proc_entry_t idedisk_proc[] = {
  * This is tightly woven into the driver->special can not touch.
  * DON'T do it again until a total personality rewrite is committed.
  */
-static int set_multcount(ide_drive_t *drive, int arg)
+static int set_multcount(struct ata_device *drive, int arg)
 {
 	struct request rq;
 
@@ -670,12 +670,12 @@ static int set_multcount(ide_drive_t *drive, int arg)
 	drive->mult_req = arg;
 	drive->special_cmd |= ATA_SPECIAL_MMODE;
 
-	ide_do_drive_cmd (drive, &rq, ide_wait);
+	ide_do_drive_cmd(drive, &rq, ide_wait);
 
 	return (drive->mult_count == arg) ? 0 : -EIO;
 }
 
-static int set_nowerr(ide_drive_t *drive, int arg)
+static int set_nowerr(struct ata_device *drive, int arg)
 {
 	if (ide_spin_wait_hwgroup(drive))
 		return -EBUSY;
@@ -686,7 +686,7 @@ static int set_nowerr(ide_drive_t *drive, int arg)
 	return 0;
 }
 
-static int write_cache(ide_drive_t *drive, int arg)
+static int write_cache(struct ata_device *drive, int arg)
 {
 	struct ata_taskfile args;
 
@@ -704,7 +704,7 @@ static int write_cache(ide_drive_t *drive, int arg)
 	return 0;
 }
 
-static int idedisk_standby(ide_drive_t *drive)
+static int idedisk_standby(struct ata_device *drive)
 {
 	struct ata_taskfile args;
 
@@ -715,7 +715,7 @@ static int idedisk_standby(ide_drive_t *drive)
 	return ide_raw_taskfile(drive, &args, NULL);
 }
 
-static int set_acoustic(ide_drive_t *drive, int arg)
+static int set_acoustic(struct ata_device *drive, int arg)
 {
 	struct ata_taskfile args;
 
@@ -732,7 +732,7 @@ static int set_acoustic(ide_drive_t *drive, int arg)
 }
 
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
-static int set_using_tcq(ide_drive_t *drive, int arg)
+static int set_using_tcq(struct ata_device *drive, int arg)
 {
 	if (!drive->driver)
 		return -EPERM;
@@ -750,14 +750,14 @@ static int set_using_tcq(ide_drive_t *drive, int arg)
 			drive->queue_depth = drive->id->queue_depth + 1;
 	}
 
-	if (drive->channel->udma(arg ? ide_dma_queued_on : ide_dma_queued_off, drive, NULL))
+	if (udma_tcq_enable(drive, arg))
 		return -EIO;
 
 	return 0;
 }
 #endif
 
-static int probe_lba_addressing (ide_drive_t *drive, int arg)
+static int probe_lba_addressing(struct ata_device *drive, int arg)
 {
 	drive->addressing =  0;
 
@@ -768,12 +768,12 @@ static int probe_lba_addressing (ide_drive_t *drive, int arg)
 	return 0;
 }
 
-static int set_lba_addressing (ide_drive_t *drive, int arg)
+static int set_lba_addressing(struct ata_device *drive, int arg)
 {
 	return (probe_lba_addressing(drive, arg));
 }
 
-static void idedisk_add_settings(ide_drive_t *drive)
+static void idedisk_add_settings(struct ata_device *drive)
 {
 	struct hd_driveid *id = drive->id;
 
@@ -795,7 +795,7 @@ static void idedisk_add_settings(ide_drive_t *drive)
 
 static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 {
-	ide_drive_t *drive = dev->driver_data;
+	struct ata_device *drive = dev->driver_data;
 
 	/* I hope that every freeze operations from the upper levels have
 	 * already been done...
@@ -822,7 +822,7 @@ static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 
 static int idedisk_resume(struct device *dev, u32 level)
 {
-	ide_drive_t *drive = dev->driver_data;
+	struct ata_device *drive = dev->driver_data;
 
 	if (level != RESUME_RESTORE_STATE)
 		return 0;
@@ -916,7 +916,7 @@ static u64 native_max_address_ext(struct ata_device *drive)
  * Sets maximum virtual LBA address of the drive.
  * Returns new maximum virtual LBA address (> 0) or 0 on failure.
  */
-static sector_t set_max_address(ide_drive_t *drive, sector_t addr_req)
+static sector_t set_max_address(struct ata_device *drive, sector_t addr_req)
 {
 	struct ata_taskfile args;
 	sector_t addr_set = 0;
@@ -945,7 +945,7 @@ static sector_t set_max_address(ide_drive_t *drive, sector_t addr_req)
 	return addr_set;
 }
 
-static u64 set_max_address_ext(ide_drive_t *drive, u64 addr_req)
+static u64 set_max_address_ext(struct ata_device *drive, u64 addr_req)
 {
 	struct ata_taskfile args;
 	u64 addr_set = 0;
@@ -1177,7 +1177,7 @@ static void idedisk_setup(struct ata_device *drive)
 	       drive->bios_cyl, drive->bios_head, drive->bios_sect);
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
-		(void) drive->channel->udma(ide_dma_verbose, drive, NULL);
+		udma_print(drive);
 #endif
 	printk("\n");
 
@@ -1213,7 +1213,7 @@ static void idedisk_setup(struct ata_device *drive)
 	probe_lba_addressing(drive, 1);
 }
 
-static int idedisk_cleanup(ide_drive_t *drive)
+static int idedisk_cleanup(struct ata_device *drive)
 {
 	if (!drive)
 	    return 0;
@@ -1250,7 +1250,7 @@ MODULE_DESCRIPTION("ATA DISK Driver");
 
 static void __exit idedisk_exit (void)
 {
-	ide_drive_t *drive;
+	struct ata_device *drive;
 	int failed = 0;
 
 	while ((drive = ide_scan_devices(ATA_DISK, "ide-disk", &idedisk_driver, failed)) != NULL) {
@@ -1267,9 +1267,9 @@ static void __exit idedisk_exit (void)
 	}
 }
 
-int idedisk_init (void)
+int idedisk_init(void)
 {
-	ide_drive_t *drive;
+	struct ata_device *drive;
 	int failed = 0;
 
 	MOD_INC_USE_COUNT;

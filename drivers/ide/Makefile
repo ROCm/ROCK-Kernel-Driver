@@ -10,7 +10,7 @@
 
 O_TARGET := idedriver.o
 
-export-objs		:= ide-taskfile.o ide.o ide-features.o ide-probe.o ataraid.o
+export-objs	:= ide-taskfile.o ide.o ide-features.o ide-probe.o ide-dma.o ataraid.o
 
 obj-y		:=
 obj-m		:=
