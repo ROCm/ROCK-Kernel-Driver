@@ -209,6 +209,7 @@ EXPORT_SYMBOL(bd_claim);
 EXPORT_SYMBOL(bd_release);
 EXPORT_SYMBOL(open_bdev_excl);
 EXPORT_SYMBOL(close_bdev_excl);
+EXPORT_SYMBOL(open_by_devnum);
 EXPORT_SYMBOL(__brelse);
 EXPORT_SYMBOL(__bforget);
 EXPORT_SYMBOL(ll_rw_block);

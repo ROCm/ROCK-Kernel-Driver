@@ -1128,9 +1128,8 @@ static int __init init_blkmtd(void)
     return 1;
   }
   /* get the block device */
-  bdev = bdget(rdev);
-  err = blkdev_get(bdev, mode, 0, BDEV_RAW);
-  if (err)
+  bdev = open_by_devnum(rdev, FMODE_READ, BDEV_RAW);
+  if (IS_ERR(bdev))
     return 1;
 
   DEBUG(1, "blkmtd: devname = %s\n", bdevname(bdev, b));

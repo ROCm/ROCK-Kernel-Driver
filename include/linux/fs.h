@@ -1041,6 +1041,7 @@ extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
 extern int blkdev_open(struct inode *, struct file *);
 extern int blkdev_close(struct inode *, struct file *);
+extern struct block_device *open_by_devnum(dev_t, unsigned, int);
 extern struct file_operations def_blk_fops;
 extern struct address_space_operations def_blk_aops;
 extern struct file_operations def_chr_fops;
