@@ -1,6 +1,8 @@
 Version 10 of schedstats includes support for sched_domains, which
 hit the mainline kernel in 2.6.7.  Some counters make more sense to be
-per-runqueue; other to be per-domain.
+per-runqueue; other to be per-domain.  Note that domains (and their associated
+information) will only be pertinent and available on machines utilizing
+CONFIG_SMP.
 
 In version 10 of schedstat, there is at least one level of domain
 statistics for each cpu listed, and there may well be more than one
@@ -83,7 +85,9 @@ The last six are statistics dealing with pull_task():
 
 Domain statistics
 -----------------
-One of these is produced per domain for each cpu described.
+One of these is produced per domain for each cpu described. (Note that if
+CONFIG_SMP is not defined, *no* domains are utilized and these lines
+will not appear in the output.)
 
 domain<N> 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
 

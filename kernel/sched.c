@@ -483,8 +483,10 @@ static int show_schedstat(struct seq_file *seq, void *v)
 	seq_printf(seq, "timestamp %lu\n", jiffies);
 	for_each_online_cpu(cpu) {
 		runqueue_t *rq = cpu_rq(cpu);
+#ifdef CONFIG_SMP
 		struct sched_domain *sd;
 		int dcnt = 0;
+#endif
 
 		/* runqueue-specific stats */
 		seq_printf(seq,
@@ -506,6 +508,7 @@ static int show_schedstat(struct seq_file *seq, void *v)
 						    rq->pt_lost[itype]);
 		seq_printf(seq, "\n");
 
+#ifdef CONFIG_SMP
 		/* domain-specific stats */
 		for_each_domain(cpu, sd) {
 			char mask_str[NR_CPUS];
@@ -524,6 +527,7 @@ static int show_schedstat(struct seq_file *seq, void *v)
 			    sd->sbe_pushed, sd->sbe_attempts,
 			    sd->ttwu_wake_affine, sd->ttwu_wake_balance);
 		}
+#endif
 	}
 	return 0;
 }
