@@ -22,8 +22,6 @@
  */
 #define DEBUG_QLA2100		0	/* For Debug of qla2x00 */
 
-#define MEMORY_MAPPED_IO	1
-#define STOP_ON_ERROR		0	/* Stop on aborts and resets  */
 #define STOP_ON_RESET		0
 #define USE_ABORT_TGT		1	/* Use Abort Target mbx cmd */
 

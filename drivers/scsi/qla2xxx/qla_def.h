@@ -33,6 +33,14 @@
 #define PCI_DEVICE_ID_QLOGIC_ISP2322	0x2322
 #endif
 
+#ifndef PCI_DEVICE_ID_QLOGIC_ISP6312
+#define PCI_DEVICE_ID_QLOGIC_ISP6312	0x6312
+#endif
+
+#ifndef PCI_DEVICE_ID_QLOGIC_ISP6322
+#define PCI_DEVICE_ID_QLOGIC_ISP6322	0x6322
+#endif
+
 #if defined(CONFIG_SCSI_QLA21XX) || defined(CONFIG_SCSI_QLA21XX_MODULE)
 #define IS_QLA2100(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2100)
 #else
@@ -49,18 +57,23 @@
 #define IS_QLA2300(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2300)
 #define IS_QLA2312(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2312)
 #define IS_QLA2322(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP2322)
-#define IS_QLA23XX(ha)	(IS_QLA2300(ha) || IS_QLA2312(ha) || IS_QLA2322(ha))
+#define IS_QLA6312(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP6312)
+#define IS_QLA6322(ha)	((ha)->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP6322)
+#define IS_QLA23XX(ha)	(IS_QLA2300(ha) || IS_QLA2312(ha) || IS_QLA2322(ha) || \
+    			 IS_QLA6312(ha) || IS_QLA6322(ha))
 #else
 #define IS_QLA2300(ha)	0
 #define IS_QLA2312(ha)	0
 #define IS_QLA2322(ha)	0
+#define IS_QLA6312(ha)	0
+#define IS_QLA6322(ha)	0
 #define IS_QLA23XX(ha)	0
 #endif
 
 /*
- * Only ISP23XX has extended addressing support in the firmware.
+ * Only non-ISP2[12]00 have extended addressing support in the firmware.
  */
-#define HAS_EXTENDED_IDS(ha)	IS_QLA23XX(ha)
+#define HAS_EXTENDED_IDS(ha)	(!IS_QLA2100(ha) && !IS_QLA2200(ha))
 
 /*
  * We have MAILBOX_REGISTER_COUNT sized arrays in a few places,
@@ -126,21 +139,12 @@
  * I/O register
 */
 
-#if MEMORY_MAPPED_IO
 #define RD_REG_BYTE(addr)		readb(addr)
 #define RD_REG_WORD(addr)		readw(addr)
 #define RD_REG_DWORD(addr)		readl(addr)
 #define WRT_REG_BYTE(addr, data)	writeb(data,addr)
 #define WRT_REG_WORD(addr, data)	writew(data,addr)
 #define WRT_REG_DWORD(addr, data)	writel(data,addr)
-#else   /* MEMORY_MAPPED_IO */
-#define RD_REG_BYTE(addr)		(inb((unsigned long)addr))
-#define RD_REG_WORD(addr)		(inw((unsigned long)addr))
-#define RD_REG_DWORD(addr)		(inl((unsigned long)addr))
-#define WRT_REG_BYTE(addr, data)	(outb(data,(unsigned long)addr))
-#define WRT_REG_WORD(addr, data)	(outw(data,(unsigned long)addr))
-#define WRT_REG_DWORD(addr, data)	(outl(data,(unsigned long)addr))
-#endif  /* MEMORY_MAPPED_IO */
 
 /*
  * Fibre Channel device definitions.
@@ -433,41 +437,42 @@ typedef volatile struct {
 	} u_end;
 } device_reg_t;
 
-#define	ISP_REQ_Q_IN(ha, reg) \
-	(IS_QLA23XX(ha) ? \
-	 &(reg)->u.isp2300.req_q_in : \
-	 &(reg)->u.isp2100.mailbox4)
-#define	ISP_REQ_Q_OUT(ha, reg) \
-	(IS_QLA23XX(ha) ? \
-	 &(reg)->u.isp2300.req_q_out : \
-	 &(reg)->u.isp2100.mailbox4)
-#define	ISP_RSP_Q_IN(ha, reg) \
-	(IS_QLA23XX(ha) ? \
-	 &(reg)->u.isp2300.rsp_q_in : \
-	 &(reg)->u.isp2100.mailbox5)
-#define	ISP_RSP_Q_OUT(ha, reg) \
-	(IS_QLA23XX(ha) ? \
-	 &(reg)->u.isp2300.rsp_q_out : \
-	 &(reg)->u.isp2100.mailbox5)
+#define ISP_REQ_Q_IN(ha, reg) \
+	(IS_QLA2100(ha) || IS_QLA2200(ha) ? \
+	 &(reg)->u.isp2100.mailbox4 : \
+	 &(reg)->u.isp2300.req_q_in)
+#define ISP_REQ_Q_OUT(ha, reg) \
+	(IS_QLA2100(ha) || IS_QLA2200(ha) ? \
+	 &(reg)->u.isp2100.mailbox4 : \
+	 &(reg)->u.isp2300.req_q_out)
+#define ISP_RSP_Q_IN(ha, reg) \
+	(IS_QLA2100(ha) || IS_QLA2200(ha) ? \
+	 &(reg)->u.isp2100.mailbox5 : \
+	 &(reg)->u.isp2300.rsp_q_in)
+#define ISP_RSP_Q_OUT(ha, reg) \
+	(IS_QLA2100(ha) || IS_QLA2200(ha) ? \
+	 &(reg)->u.isp2100.mailbox5 : \
+	 &(reg)->u.isp2300.rsp_q_out)
 
 #define MAILBOX_REG(ha, reg, num) \
-	(IS_QLA23XX(ha) ? \
-	 &(reg)->u.isp2300.mailbox0 + (num) : \
-	 ((num < 8) ? \
+	(IS_QLA2100(ha) || IS_QLA2200(ha) ? \
+	 (num < 8 ? \
 	  &(reg)->u.isp2100.mailbox0 + (num) : \
-	  &(reg)->u_end.isp2200.mailbox8 + (num) - 8))	/* only for isp2200 */
+	  &(reg)->u_end.isp2200.mailbox8 + (num) - 8) : \
+	 &(reg)->u.isp2300.mailbox0 + (num))
 #define RD_MAILBOX_REG(ha, reg, num) \
 	RD_REG_WORD(MAILBOX_REG(ha, reg, num))
 #define WRT_MAILBOX_REG(ha, reg, num, data) \
 	WRT_REG_WORD(MAILBOX_REG(ha, reg, num), data)
 
 #define FB_CMD_REG(ha, reg) \
-	(IS_QLA23XX(ha) ? &(reg)->u.isp2300.fb_cmd : &(reg)->fb_cmd_2100)
+	(IS_QLA2100(ha) || IS_QLA2200(ha) ? \
+	 &(reg)->fb_cmd_2100 : \
+	 &(reg)->u.isp2300.fb_cmd)
 #define RD_FB_CMD_REG(ha, reg) \
 	RD_REG_WORD(FB_CMD_REG(ha, reg))
 #define WRT_FB_CMD_REG(ha, reg, data) \
 	WRT_REG_WORD(FB_CMD_REG(ha, reg), data)
-
 
 typedef struct {
 	uint32_t	out_mb;		/* outbound from driver */
@@ -716,8 +721,8 @@ typedef struct {
 	uint8_t hard_address;
 	uint8_t reserved_1;
 	uint8_t port_id[4];
-	uint8_t node_name[WWN_SIZE];		/* Big endian. */
-	uint8_t port_name[WWN_SIZE];		/* Big endian. */
+	uint8_t node_name[WWN_SIZE];
+	uint8_t port_name[WWN_SIZE];
 	uint16_t execution_throttle;
 	uint16_t execution_count;
 	uint8_t reset_count;
@@ -1919,12 +1924,6 @@ struct io_descriptor {
 	uint32_t signature;
 };
 
-/* Mailbox command semaphore queue for command serialization */
-typedef struct _mbx_cmdq_t {
-	struct semaphore	cmd_sem;
-	struct _mbx_cmdq_t	*pnext;
-} mbx_cmdq_t;
-
 struct qla_fw_info {
 	unsigned short addressing;	/* addressing method used to load fw */
 #define FW_INFO_ADDR_NORMAL	0
@@ -2102,6 +2101,8 @@ typedef struct scsi_qla_host {
 	uint16_t	max_public_loop_ids;
 	uint16_t	min_external_loopid;	/* First external loop Id */
 
+	uint16_t	link_data_rate;		/* F/W operating speed */
+
 	uint8_t		current_topology;
 	uint8_t		prev_topology;
 #define ISP_CFG_NL	1
@@ -2115,9 +2116,6 @@ typedef struct scsi_qla_host {
 #define LOOP_P2P  2
 #define P2P_LOOP  3
 
-	uint8_t		active_fc4_types;	/* Active fc4 types */
-
-	uint8_t		current_speed;		/* F/W operating speed */
         uint8_t		marker_needed; 
 	uint8_t		sns_retry_cnt;
 	uint8_t		mem_err;
@@ -2194,26 +2192,13 @@ typedef struct scsi_qla_host {
 
 	mbx_cmd_t	*mcp;
 	unsigned long	mbx_cmd_flags;
-#define MBX_CMD_ACTIVE	1
-#define MBX_CMD_WANT	2
-#define MBX_INTERRUPT	3
-#define MBX_INTR_WAIT   4
+#define MBX_INTERRUPT	1
+#define MBX_INTR_WAIT   2
 
 	spinlock_t	mbx_reg_lock;   /* Mbx Cmd Register Lock */
-	spinlock_t	mbx_q_lock;     /* Mbx Active Cmd Queue Lock */
-	spinlock_t	mbx_bits_lock;  /* Mailbox access bits Lock */
 
-	struct semaphore  mbx_intr_sem;  /* Used for completion notification */
-
-	mbx_cmdq_t	*mbx_sem_pool_head;  /* Head Pointer to a list of
-			                      * recyclable mbx semaphore pool
-			                      * to be used during run time.
-			                      */
-	mbx_cmdq_t	*mbx_sem_pool_tail;  /* Tail Pointer to semaphore pool*/
-#define MBQ_INIT_LEN	16 /* initial mbx sem pool q len. actual len may vary */
-
-	mbx_cmdq_t	*mbx_q_head; /* Head Pointer to sem q for active cmds */
-	mbx_cmdq_t	*mbx_q_tail; /* Tail Pointer to sem q for active cmds */
+	struct semaphore mbx_cmd_sem;	/* Serialialize mbx access */
+	struct semaphore mbx_intr_sem;  /* Used for completion notification */
 
 	uint32_t	mbx_flags;
 #define  MBX_IN_PROGRESS	BIT_0
@@ -2257,21 +2242,14 @@ typedef struct scsi_qla_host {
 
 	uint8_t		host_str[16];
 	uint16_t	pci_attr;
-	uint16_t	xchg_buf_cnt;
-	uint16_t	iocb_buf_cnt;
 
-	uint8_t model_number[16+1];
+	uint16_t	product_id[4];
+
+	uint8_t		model_number[16+1];
 #define BINZERO		"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-	char *model_desc;
+	char		*model_desc;
 
 /* following are new and needed for IOCTL support */
-#ifdef CONFIG_SCSI_QLA2XXX_IOCTL
-	struct hba_ioctl *ioctl;
-
-	void        *ioctl_mem;
-	dma_addr_t  ioctl_mem_phys;
-	uint32_t    ioctl_mem_size;
-#endif
 	uint8_t     node_name[WWN_SIZE];
 	uint8_t     nvram_version; 
 	uint8_t     optrom_major; 

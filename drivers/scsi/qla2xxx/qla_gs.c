@@ -20,11 +20,6 @@
 
 #include "qla_def.h"
 
-/* XXX(hch): this is ugly, but we don't want to pull in exioctl.h */
-#ifndef EXT_DEF_FC4_TYPE_SCSI
-#define EXT_DEF_FC4_TYPE_SCSI		0x1
-#endif
-
 static inline ms_iocb_entry_t *
 qla2x00_prep_ms_iocb(scsi_qla_host_t *, uint32_t, uint32_t);
 
@@ -235,7 +230,7 @@ qla2x00_gid_pt(scsi_qla_host_t *ha, sw_info_t *list)
 
 		/*
 		 * If we've used all available slots, then the switch is
-		 * reporting back more devices that we can handle with this
+		 * reporting back more devices than we can handle with this
 		 * single call.  Return a failed status, and let GA_NXT handle
 		 * the overload.
 		 */
@@ -477,7 +472,6 @@ qla2x00_rft_id(scsi_qla_host_t *ha)
 	ct_req->req.rft_id.port_id[2] = ha->d_id.b.al_pa;
 
 	ct_req->req.rft_id.fc4_types[2] = 0x01;		/* FCP-3 */
-	ha->active_fc4_types = EXT_DEF_FC4_TYPE_SCSI;
 
 	/* Execute MS IOCB */
 	rval = qla2x00_issue_iocb(ha, ha->ms_iocb, ha->ms_iocb_dma,

@@ -21,12 +21,6 @@
 
 #include "qla_def.h"
 
-/* XXX(hch): this is ugly, but we don't want to pull in exioctl.h */
-#ifndef EXT_DEF_PORTSPEED_1GBIT
-#define EXT_DEF_PORTSPEED_1GBIT		1
-#define EXT_DEF_PORTSPEED_2GBIT		2
-#endif
-
 static void qla2x00_mbx_completion(scsi_qla_host_t *, uint16_t);
 static void qla2x00_async_event(scsi_qla_host_t *, uint32_t);
 static void qla2x00_process_completed_request(struct scsi_qla_host *, uint32_t);
@@ -424,15 +418,14 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 	case MBA_LOOP_UP:		/* Loop Up Event */
 		mb[1] = RD_MAILBOX_REG(ha, reg, 1);
 
-		ha->current_speed = EXT_DEF_PORTSPEED_1GBIT;
+		ha->link_data_rate = 0;
 		if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 			link_speed = link_speeds[0];
 		} else {
 			link_speed = link_speeds[3];
 			if (mb[1] < 5)
 				link_speed = link_speeds[mb[1]];
-			if (mb[1] == 1)
-				ha->current_speed = EXT_DEF_PORTSPEED_2GBIT;
+			ha->link_data_rate = mb[1];
 		}
 
 		DEBUG2(printk("scsi(%ld): Asynchronous LOOP UP (%s Gbps).\n",
@@ -458,7 +451,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		}
 
 		ha->flags.management_server_logged_in = 0;
-		ha->current_speed = 0; /* reset value */
+		ha->link_data_rate = 0;
 
 		/* Update AEN queue. */
 		qla2x00_enqueue_aen(ha, MBA_LOOP_DOWN, NULL);
@@ -547,7 +540,8 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		 * us, create a new entry in our rscn fcports list and handle
 		 * the event like an RSCN.
 		 */
-		if (IS_QLA23XX(ha) && ha->flags.init_done && mb[1] != 0xffff &&
+		if (!IS_QLA2100(ha) && !IS_QLA2200(ha) &&
+		    ha->flags.init_done && mb[1] != 0xffff &&
 		    ((ha->operating_mode == P2P && mb[1] != 0) ||
 		    (ha->operating_mode != P2P && mb[1] !=
 			SNS_FIRST_LOOP_ID)) && (mb[2] == 6 || mb[2] == 7)) {
@@ -775,7 +769,7 @@ qla2x00_process_response_queue(struct scsi_qla_host *ha)
 			qla2x00_ms_entry(ha, (ms_iocb_entry_t *)pkt);
 			break;
 		case MBX_IOCB_TYPE:
-			if (IS_QLA23XX(ha)) {
+			if (!IS_QLA2100(ha) && !IS_QLA2200(ha)) {
 				if (pkt->sys_define == SOURCE_ASYNC_IOCB) {
 					qla2x00_process_iodesc(ha,
 					    (struct mbx_entry *)pkt);
