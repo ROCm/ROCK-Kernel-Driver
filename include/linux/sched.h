@@ -626,7 +626,7 @@ struct sched_domain {
 	.imbalance_pct		= 110,			\
 	.cache_hot_time		= 0,			\
 	.cache_nice_tries	= 0,			\
-	.per_cpu_gain		= 15,			\
+	.per_cpu_gain		= 25,			\
 	.flags			= SD_BALANCE_NEWIDLE	\
 				| SD_BALANCE_EXEC	\
 				| SD_WAKE_AFFINE	\
