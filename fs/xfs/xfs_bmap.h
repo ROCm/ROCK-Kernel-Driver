@@ -90,26 +90,6 @@ int xfs_bmapi_aflag(int w);
 #define	DELAYSTARTBLOCK		((xfs_fsblock_t)-1LL)
 #define	HOLESTARTBLOCK		((xfs_fsblock_t)-2LL)
 
-/*
- * Trace operations for bmap extent tracing
- */
-#define	XFS_BMAP_KTRACE_DELETE	1
-#define	XFS_BMAP_KTRACE_INSERT	2
-#define	XFS_BMAP_KTRACE_PRE_UP	3
-#define	XFS_BMAP_KTRACE_POST_UP	4
-
-#define	XFS_BMAP_TRACE_SIZE	4096	/* size of global trace buffer */
-#define	XFS_BMAP_KTRACE_SIZE	32	/* size of per-inode trace buffer */
-
-#if defined(XFS_ALL_TRACE)
-#define	XFS_BMAP_TRACE
-#endif
-
-#if !defined(DEBUG)
-#undef	XFS_BMAP_TRACE
-#endif
-
-
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_INIT)
 void xfs_bmap_init(xfs_bmap_free_t *flp, xfs_fsblock_t *fbp);
 #define	XFS_BMAP_INIT(flp,fbp)	xfs_bmap_init(flp,fbp)
@@ -142,6 +122,33 @@ typedef struct xfs_bmalloca {
 } xfs_bmalloca_t;
 
 #ifdef __KERNEL__
+
+#if defined(XFS_BMAP_TRACE)
+/*
+ * Trace operations for bmap extent tracing
+ */
+#define	XFS_BMAP_KTRACE_DELETE	1
+#define	XFS_BMAP_KTRACE_INSERT	2
+#define	XFS_BMAP_KTRACE_PRE_UP	3
+#define	XFS_BMAP_KTRACE_POST_UP	4
+
+#define	XFS_BMAP_TRACE_SIZE	4096	/* size of global trace buffer */
+#define	XFS_BMAP_KTRACE_SIZE	32	/* size of per-inode trace buffer */
+extern ktrace_t	*xfs_bmap_trace_buf;
+
+/*
+ * Add bmap trace insert entries for all the contents of the extent list.
+ */
+void
+xfs_bmap_trace_exlist(
+	char			*fname,		/* function name */
+	struct xfs_inode	*ip,		/* incore inode pointer */
+	xfs_extnum_t		cnt,		/* count of entries in list */
+	int			whichfork);	/* data or attr fork */
+#else
+#define	xfs_bmap_trace_exlist(f,ip,c,w)
+#endif
+
 /*
  * Convert inode from non-attributed to attributed.
  * Must not be in a transaction, ip must not be locked.
@@ -260,20 +267,6 @@ xfs_bmap_read_extents(
 	struct xfs_inode	*ip,		/* incore inode */
 	int			whichfork);	/* data or attr fork */
 
-#if defined(XFS_BMAP_TRACE)
-/*
- * Add bmap trace insert entries for all the contents of the extent list.
- */
-void
-xfs_bmap_trace_exlist(
-	char			*fname,		/* function name */
-	struct xfs_inode	*ip,		/* incore inode pointer */
-	xfs_extnum_t		cnt,		/* count of entries in list */
-	int			whichfork);	/* data or attr fork */
-#else
-#define	xfs_bmap_trace_exlist(f,ip,c,w)
-#endif
-
 /*
  * Map file blocks to filesystem blocks.
  * File range is given by the bno/len pair.
@@ -375,7 +368,7 @@ xfs_bmap_eof(
 int
 xfs_bmap_count_blocks(
 	xfs_trans_t		*tp,
-	xfs_inode_t		*ip,
+	struct xfs_inode	*ip,
 	int			whichfork,
 	int			*count);
 

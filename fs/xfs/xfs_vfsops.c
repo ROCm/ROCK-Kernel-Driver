@@ -60,6 +60,7 @@
 #include "xfs_bmap.h"
 #include "xfs_da_btree.h"
 #include "xfs_rw.h"
+#include "xfs_refcache.h"
 #include "xfs_buf_item.h"
 #include "xfs_extfree_item.h"
 #include "xfs_quota.h"
@@ -74,24 +75,11 @@ STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
 int
 xfs_init(void)
 {
-	extern kmem_zone_t	*xfs_da_state_zone;
 	extern kmem_zone_t	*xfs_bmap_free_item_zone;
 	extern kmem_zone_t	*xfs_btree_cur_zone;
-	extern kmem_zone_t	*xfs_inode_zone;
-	extern kmem_zone_t	*xfs_chashlist_zone;
 	extern kmem_zone_t	*xfs_trans_zone;
 	extern kmem_zone_t	*xfs_buf_item_zone;
-	extern kmem_zone_t	*xfs_efd_zone;
-	extern kmem_zone_t	*xfs_efi_zone;
 	extern kmem_zone_t	*xfs_dabuf_zone;
-#ifdef DEBUG_NOT
-	extern ktrace_t	        *xfs_alloc_trace_buf;
-	extern ktrace_t	        *xfs_bmap_trace_buf;
-	extern ktrace_t	        *xfs_bmbt_trace_buf;
-	extern ktrace_t	        *xfs_dir_trace_buf;
-	extern ktrace_t	        *xfs_attr_trace_buf;
-	extern ktrace_t	        *xfs_dir2_trace_buf;
-#endif	/* DEBUG */
 #ifdef XFS_DABUF_DEBUG
 	extern lock_t	        xfs_dabuf_global_lock;
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
@@ -131,14 +119,6 @@ xfs_init(void)
 	xfs_chashlist_zone = kmem_zone_init(sizeof(xfs_chashlist_t),
 					    "xfs_chashlist");
 	_ACL_ZONE_INIT(xfs_acl_zone, "xfs_acl");
-
-#ifdef CONFIG_XFS_VNODE_TRACING
-	ktrace_init(VNODE_TRACE_SIZE);
-#else
-#ifdef DEBUG
-	ktrace_init(64);
-#endif
-#endif
 
 	/*
 	 * Allocate global trace buffers.
@@ -189,6 +169,7 @@ xfs_cleanup(void)
 
 	xfs_cleanup_procfs();
 	xfs_sysctl_unregister();
+	xfs_refcache_destroy();
 
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
 	kmem_cache_destroy(xfs_btree_cur_zone);
@@ -203,9 +184,6 @@ xfs_cleanup(void)
 	kmem_cache_destroy(xfs_ili_zone);
 	kmem_cache_destroy(xfs_chashlist_zone);
 	_ACL_ZONE_DESTROY(xfs_acl_zone);
-#if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
-	ktrace_uninit();
-#endif
 }
 
 /*
@@ -547,6 +525,12 @@ xfs_unmount(
 					0 : DM_FLAGS_UNWANTED;
 	}
 
+	/*
+	 * First blow any referenced inode from this file system
+	 * out of the reference cache, and delete the timer.
+	 */
+	xfs_refcache_purge_mp(mp);
+
 	XFS_bflush(mp->m_ddev_targp);
 	error = xfs_unmount_flush(mp, 0);
 	if (error)
@@ -617,6 +601,7 @@ xfs_mntupdate(
 	}
 
 	if (*flags & MS_RDONLY) {
+		xfs_refcache_purge_mp(mp);
 		pagebuf_delwri_flush(mp->m_ddev_targp, 0, NULL);
 		xfs_finish_reclaim_all(mp, 0);
 
@@ -758,7 +743,7 @@ xfs_root(
 STATIC int
 xfs_statvfs(
 	bhv_desc_t	*bdp,
-	struct kstatfs	*statp,
+	xfs_statfs_t	*statp,
 	vnode_t		*vp)
 {
 	__uint64_t	fakeinos;
@@ -1489,8 +1474,18 @@ xfs_syncsub(
 	}
 
 	/*
+	 * If this is the periodic sync, then kick some entries out of
+	 * the reference cache.  This ensures that idle entries are
+	 * eventually kicked out of the cache.
+	 */
+	if (flags & SYNC_REFCACHE) {
+		xfs_refcache_purge_some(mp);
+	}
+
+	/*
 	 * Now check to see if the log needs a "dummy" transaction.
 	 */
+
 	if (!(flags & SYNC_REMOUNT) && xfs_log_need_covered(mp)) {
 		xfs_trans_t *tp;
 		xfs_inode_t *ip;
@@ -1789,10 +1784,14 @@ xfs_showargs(
 		char	*str;
 	} xfs_info[] = {
 		/* the few simple ones we can get from the mount struct */
+		{ XFS_MOUNT_WSYNC,		"," MNTOPT_WSYNC },
+		{ XFS_MOUNT_INO64,		"," MNTOPT_INO64 },
 		{ XFS_MOUNT_NOALIGN,		"," MNTOPT_NOALIGN },
+		{ XFS_MOUNT_NOUUID,		"," MNTOPT_NOUUID },
 		{ XFS_MOUNT_NORECOVERY,		"," MNTOPT_NORECOVERY },
 		{ XFS_MOUNT_OSYNCISOSYNC,	"," MNTOPT_OSYNCISOSYNC },
-		{ XFS_MOUNT_NOUUID,		"," MNTOPT_NOUUID },
+		{ XFS_MOUNT_NOLOGFLUSH,		"," MNTOPT_NOLOGFLUSH },
+		{ XFS_MOUNT_IDELETE,		"," MNTOPT_NOIKEEP },
 		{ 0, NULL }
 	};
 	struct proc_xfs_info	*xfs_infop;
@@ -1828,6 +1827,9 @@ xfs_showargs(
 		seq_printf(m, "," MNTOPT_SWIDTH "=%d",
 				(int)XFS_FSB_TO_BB(mp, mp->m_swidth));
 
+	if (!(mp->m_flags & XFS_MOUNT_32BITINOOPT))
+		seq_printf(m, "," MNTOPT_64BITINODE);
+	
 	return 0;
 }
 

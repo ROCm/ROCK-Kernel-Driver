@@ -134,7 +134,7 @@ vfs_root(
 int
 vfs_statvfs(
 	struct bhv_desc		*bdp,
-	struct kstatfs		*sp,
+	xfs_statfs_t		*sp,
 	struct vnode		*vp)
 {
 	struct bhv_desc		*next = bdp;

@@ -159,11 +159,15 @@ xfs_buftarg_t *xlog_target;
 #endif
 
 #if defined(XFS_LOG_TRACE)
+
 void
 xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, xfs_caddr_t string)
 {
-	if (! log->l_grant_trace)
-		log->l_grant_trace = ktrace_alloc(1024, KM_SLEEP);
+	if (! log->l_grant_trace) {
+		log->l_grant_trace = ktrace_alloc(1024, KM_NOSLEEP);
+		if (! log->l_grant_trace)
+			return;
+	}
 
 	ktrace_enter(log->l_grant_trace,
 		     (void *)tic,
@@ -178,31 +182,6 @@ xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, xfs_caddr_t string)
 		     (void *)((unsigned long)CYCLE_LSN(log->l_tail_lsn, ARCH_NOCONVERT)),
 		     (void *)((unsigned long)BLOCK_LSN(log->l_tail_lsn, ARCH_NOCONVERT)),
 		     (void *)string,
-		     (void *)((unsigned long)13),
-		     (void *)((unsigned long)14),
-		     (void *)((unsigned long)15),
-		     (void *)((unsigned long)16));
-}
-
-void
-xlog_trace_tic(xlog_t *log, xlog_ticket_t *tic)
-{
-	if (! log->l_trace)
-		log->l_trace = ktrace_alloc(256, KM_SLEEP);
-
-	ktrace_enter(log->l_trace,
-		     (void *)tic,
-		     (void *)((unsigned long)tic->t_curr_res),
-		     (void *)((unsigned long)tic->t_unit_res),
-		     (void *)((unsigned long)tic->t_ocnt),
-		     (void *)((unsigned long)tic->t_cnt),
-		     (void *)((unsigned long)tic->t_flags),
-		     (void *)((unsigned long)7),
-		     (void *)((unsigned long)8),
-		     (void *)((unsigned long)9),
-		     (void *)((unsigned long)10),
-		     (void *)((unsigned long)11),
-		     (void *)((unsigned long)12),
 		     (void *)((unsigned long)13),
 		     (void *)((unsigned long)14),
 		     (void *)((unsigned long)15),
@@ -1044,7 +1023,6 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
  *
  * If the filesystem blocksize is too large, we may need to choose a
  * larger size since the directory code currently logs entire blocks.
- * XXXmiken XXXcurtis
  */
 
 STATIC void
@@ -1059,7 +1037,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	 * When logbufs == 0, someone has disabled the log from the FSTAB
 	 * file.  This is not a documented feature.  We need to set xlog_debug
 	 * to zero (this deactivates the log) and set xlog_target to the
-	 * appropriate dev_t.  Only one filesystem may be affected as such
+	 * appropriate device.  Only one filesystem may be affected as such
 	 * since this is just a performance hack to test what we might be able
 	 * to get if the log were not present.
 	 */
@@ -1078,7 +1056,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 			if (xfs_physmem <= btoc(128*1024*1024)) { 
 				log->l_iclog_bufs = XLOG_MIN_ICLOGS; 
 			} else if (xfs_physmem <= btoc(400*1024*1024)) { 
-				log->l_iclog_bufs = XLOG_MED_ICLOGS;; 
+				log->l_iclog_bufs = XLOG_MED_ICLOGS; 
 			} else {
 				/* 256K with 32K bufs */
 				log->l_iclog_bufs = XLOG_MAX_ICLOGS;
@@ -1087,9 +1065,9 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 			log->l_iclog_bufs = mp->m_logbufs;
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
-		/* We are reactivating a filesystem after it was active */
+		/* We are reactivating a filesystem after it was inactive */
 		if (log->l_targ == xlog_target) {
-			xlog_target = 1; /* XXX(hch): WTF? */
+			xlog_target = NULL;
 			xlog_debug = 1;
 		}
 #endif
@@ -1578,7 +1556,7 @@ xlog_unalloc_log(xlog_t *log)
 		sv_destroy(&iclog->ic_forcesema);
 		sv_destroy(&iclog->ic_writesema);
 		xfs_buf_free(iclog->ic_bp);
-#ifdef DEBUG
+#ifdef XFS_LOG_TRACE
 		if (iclog->ic_trace != NULL) {
 			ktrace_free(iclog->ic_trace);
 		}
@@ -1609,7 +1587,7 @@ xlog_unalloc_log(xlog_t *log)
 		}
 	}
 	xfs_buf_free(log->l_xbuf);
-#ifdef DEBUG
+#ifdef XFS_LOG_TRACE
 	if (log->l_trace != NULL) {
 		ktrace_free(log->l_trace);
 	}

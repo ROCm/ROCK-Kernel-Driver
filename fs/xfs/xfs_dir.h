@@ -43,14 +43,6 @@
  * as possible so as to fit into the literal area of the inode.
  */
 
-#ifdef XFS_ALL_TRACE
-#define	XFS_DIR_TRACE
-#endif
-
-#if !defined(DEBUG)
-#undef XFS_DIR_TRACE
-#endif
-
 /*========================================================================
  * Function prototypes for the kernel.
  *========================================================================*/

@@ -943,7 +943,7 @@ xfs_ioc_bulkstat(
 					bulkreq.ubuffer, &done);
 		} else {
 			error = xfs_bulkstat(mp, NULL, &inlast, &count,
-				(bulkstat_one_pf)xfs_bulkstat_one,
+				(bulkstat_one_pf)xfs_bulkstat_one, NULL,
 				sizeof(xfs_bstat_t), bulkreq.ubuffer,
 				BULKSTAT_FG_QUICK, &done);
 		}

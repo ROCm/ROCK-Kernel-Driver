@@ -32,14 +32,6 @@
 #ifndef	__XFS_LOG_PRIV_H__
 #define __XFS_LOG_PRIV_H__
 
-#if defined(XFS_ALL_TRACE)
-#define	XFS_LOG_TRACE
-#endif
-
-#if !defined(DEBUG)
-#undef XFS_LOG_TRACE
-#endif
-
 struct xfs_buf;
 struct ktrace;
 struct log;
@@ -109,6 +101,7 @@ int xlog_btolrbb(int b);
 
 
 #ifdef __KERNEL__
+
 /*
  * get client id from packed copy.
  *
@@ -434,7 +427,7 @@ typedef struct xlog_iclog_fields {
 	struct log		*ic_log;
 	xfs_log_callback_t	*ic_callback;
 	xfs_log_callback_t	**ic_callback_tail;
-#ifdef DEBUG
+#ifdef XFS_LOG_TRACE
 	struct ktrace		*ic_trace;
 #endif
 	int			ic_size;
@@ -531,7 +524,7 @@ typedef struct log {
 	int			l_grant_write_bytes;
 
 	/* The following fields don't need locking */
-#ifdef DEBUG
+#ifdef XFS_LOG_TRACE
 	struct ktrace		*l_trace;
 	struct ktrace		*l_grant_trace;
 #endif

@@ -124,7 +124,7 @@ xfs_qm_dqinit(
 		initnsema(&dqp->q_flock, 1, "fdq");
 		sv_init(&dqp->q_pinwait, SV_DEFAULT, "pdq");
 
-#ifdef DQUOT_TRACING
+#ifdef XFS_DQUOT_TRACE
 		dqp->q_trace = ktrace_alloc(DQUOT_TRACE_SIZE, KM_SLEEP);
 		xfs_dqtrace_entry(dqp, "DQINIT");
 #endif
@@ -148,7 +148,7 @@ xfs_qm_dqinit(
 		 dqp->q_hash = 0;
 		 ASSERT(dqp->dq_flnext == dqp->dq_flprev);
 
-#ifdef DQUOT_TRACING
+#ifdef XFS_DQUOT_TRACE
 		 ASSERT(dqp->q_trace);
 		 xfs_dqtrace_entry(dqp, "DQRECLAIMED_INIT");
 #endif
@@ -173,7 +173,7 @@ xfs_qm_dqdestroy(
 	freesema(&dqp->q_flock);
 	sv_destroy(&dqp->q_pinwait);
 
-#ifdef DQUOT_TRACING
+#ifdef XFS_DQUOT_TRACE
 	if (dqp->q_trace)
 	     ktrace_free(dqp->q_trace);
 	dqp->q_trace = NULL;
@@ -201,20 +201,20 @@ xfs_qm_dqinit_core(
 }
 
 
-#ifdef DQUOT_TRACING
+#ifdef XFS_DQUOT_TRACE
 /*
  * Dquot tracing for debugging.
  */
 /* ARGSUSED */
 void
-xfs_dqtrace_entry__(
-	xfs_dquot_t *dqp,
-	char *func,
-	void *retaddr,
-	xfs_inode_t *ip)
+__xfs_dqtrace_entry(
+	xfs_dquot_t	*dqp,
+	char		*func,
+	void		*retaddr,
+	xfs_inode_t	*ip)
 {
-	xfs_dquot_t *udqp = NULL;
-	int ino;
+	xfs_dquot_t	*udqp = NULL;
+	xfs_ino_t	ino = 0;
 
 	ASSERT(dqp->q_trace);
 	if (ip) {
@@ -227,13 +227,19 @@ xfs_dqtrace_entry__(
 		     (void *)(__psint_t)dqp->q_nrefs,
 		     (void *)(__psint_t)dqp->dq_flags,
 		     (void *)(__psint_t)dqp->q_res_bcount,
-		     (void *)(__psint_t)INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT),
-		     (void *)(__psint_t)INT_GET(dqp->q_core.d_icount, ARCH_CONVERT),
-		     (void *)(__psint_t)INT_GET(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT),
-		     (void *)(__psint_t)INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT),
-		     (void *)(__psint_t)INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT),
-		     (void *)(__psint_t)INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT),
-		     (void *)(__psint_t)INT_GET(dqp->q_core.d_id, ARCH_CONVERT), /* 11 */
+		     (void *)(__psint_t)INT_GET(dqp->q_core.d_bcount,
+						ARCH_CONVERT),
+		     (void *)(__psint_t)INT_GET(dqp->q_core.d_icount,
+						ARCH_CONVERT),
+		     (void *)(__psint_t)INT_GET(dqp->q_core.d_blk_hardlimit,
+						ARCH_CONVERT),
+		     (void *)(__psint_t)INT_GET(dqp->q_core.d_blk_softlimit,
+						ARCH_CONVERT),
+		     (void *)(__psint_t)INT_GET(dqp->q_core.d_ino_hardlimit,
+						ARCH_CONVERT),
+		     (void *)(__psint_t)INT_GET(dqp->q_core.d_ino_softlimit,
+						ARCH_CONVERT),
+		     (void *)(__psint_t)INT_GET(dqp->q_core.d_id, ARCH_CONVERT),
 		     (void *)(__psint_t)current_pid(),
 		     (void *)(__psint_t)ino,
 		     (void *)(__psint_t)retaddr,
@@ -751,7 +757,6 @@ xfs_qm_idtodq(
 	}
 
 	*O_dqpp = dqp;
-	ASSERT(! XFS_DQ_IS_LOCKED(dqp));
 	return (0);
 
  error0:
@@ -1000,7 +1005,6 @@ xfs_qm_dqget(
 	/*
 	 * Dquot lock comes after hashlock in the lock ordering
 	 */
-	ASSERT(! XFS_DQ_IS_LOCKED(dqp));
 	if (ip) {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		if (! XFS_IS_DQTYPE_ON(mp, type)) {
@@ -1504,7 +1508,7 @@ xfs_qm_dqpurge(
 	 */
 	ASSERT(XFS_DQ_IS_ON_FREELIST(dqp));
 
-	dqp->q_mount = NULL;;
+	dqp->q_mount = NULL;
 	dqp->q_hash = NULL;
 	dqp->dq_flags = XFS_DQ_INACTIVE;
 	memset(&dqp->q_core, 0, sizeof(dqp->q_core));

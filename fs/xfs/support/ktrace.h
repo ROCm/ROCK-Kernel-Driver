@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -32,6 +32,7 @@
 #ifndef __XFS_SUPPORT_KTRACE_H__
 #define __XFS_SUPPORT_KTRACE_H__
 
+#include <support/spin.h>
 
 /*
  * Trace buffer entry structure.
@@ -59,16 +60,13 @@ typedef struct ktrace_snap {
 	int		ks_index;	/* current index */
 } ktrace_snap_t;
 
-/*
- * Exported interfaces.
- */
-extern ktrace_t *ktrace_alloc(int, int);
 
-#if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
+#ifdef CONFIG_XFS_TRACE
 
 extern void ktrace_init(int zentries);
 extern void ktrace_uninit(void);
 
+extern ktrace_t *ktrace_alloc(int, int);
 extern void ktrace_free(ktrace_t *);
 
 extern void ktrace_enter(
@@ -96,10 +94,8 @@ extern ktrace_entry_t   *ktrace_next(ktrace_t *, ktrace_snap_t *);
 extern ktrace_entry_t   *ktrace_skip(ktrace_t *, int, ktrace_snap_t *);
 
 #else
+#define ktrace_init(x)	do { } while (0)
+#define ktrace_uninit()	do { } while (0)
+#endif	/* CONFIG_XFS_TRACE */
 
-#define	ktrace_free(ktp)
-#define	ktrace_enter(ktp,v0,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11,v12,v13,v14,v15)
-
-#endif
-
-#endif /* __XFS_SUPPORT_KTRACE_H__ */
+#endif	/* __XFS_SUPPORT_KTRACE_H__ */
