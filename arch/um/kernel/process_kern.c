@@ -404,7 +404,9 @@ int sysemu_supported;
 
 void set_using_sysemu(int value)
 {
-	atomic_set(&using_sysemu, sysemu_supported && value);
+	if (value > sysemu_supported)
+		return;
+	atomic_set(&using_sysemu, value);
 }
 
 int get_using_sysemu(void)
@@ -427,7 +429,7 @@ static int proc_write_sysemu(struct file *file,const char *buf, unsigned long co
 	if (copy_from_user(tmp, buf, 1))
 		return -EFAULT;
 
-	if (tmp[0] == '0' || tmp[0] == '1')
+	if (tmp[0] >= '0' && tmp[0] <= '2')
 		set_using_sysemu(tmp[0] - '0');
 	return count; /*We use the first char, but pretend to write everything*/
 }

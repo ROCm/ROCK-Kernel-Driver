@@ -21,6 +21,9 @@ extern void ptrace_pokeuser(unsigned long addr, unsigned long data);
 #ifndef PTRACE_SYSEMU
 #define PTRACE_SYSEMU 31
 #endif
+#ifndef PTRACE_SYSEMU_SINGLESTEP
+#define PTRACE_SYSEMU_SINGLESTEP 32
+#endif
 
 void set_using_sysemu(int value);
 int get_using_sysemu(void);
