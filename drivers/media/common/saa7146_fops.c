@@ -83,7 +83,7 @@ int saa7146_buffer_queue(struct saa7146_dev *dev,
 			 struct saa7146_dmaqueue *q,
 			 struct saa7146_buf *buf)
 {
-#if DEBUG_SPINLOCKS
+#ifdef DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 	DEB_EE(("dev:%p, dmaq:%p, buf:%p\n", dev, q, buf));
@@ -109,7 +109,7 @@ void saa7146_buffer_finish(struct saa7146_dev *dev,
 			   struct saa7146_dmaqueue *q,
 			   int state)
 {
-#if DEBUG_SPINLOCKS
+#ifdef DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 	if( NULL == q->curr ) {
@@ -145,7 +145,7 @@ void saa7146_buffer_next(struct saa7146_dev *dev,
 
 	DEB_INT(("dev:%p, dmaq:%p, vbi:%d\n", dev, q, vbi));
 
-#if DEBUG_SPINLOCKS
+#ifdef DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
 #endif
 	if (!list_empty(&q->queue)) {
