@@ -34,12 +34,12 @@ struct sha512_ctx {
 
 static inline u64 Ch(u64 x, u64 y, u64 z)
 {
-        return ((x & y) ^ (~x & z));
+        return z ^ (x & (y ^ z));
 }
 
 static inline u64 Maj(u64 x, u64 y, u64 z)
 {
-        return ((x & y) ^ (x & z) ^ (y & z));
+        return (x & y) | (z & (x | y));
 }
 
 static inline u64 RORu64(u64 x, u64 y)
