@@ -1624,8 +1624,9 @@ static int __init gt96100_setup(char *options)
 	if (!options || !*options)
 		return 0;
 
-        for(this_opt=strtok(options, ",");
-	    this_opt; this_opt=strtok(NULL, ",")) {
+	while ((this_opt = strsep (&options, ",")) != NULL) {
+		if (!*this_opt)
+			continue;
 		if (!strncmp(this_opt, "mac0:", 5)) {
 			memcpy(mac0, this_opt+5, 17);
 			mac0[17]= '\0';
