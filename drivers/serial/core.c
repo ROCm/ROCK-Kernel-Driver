@@ -104,13 +104,10 @@ static void __uart_start(struct tty_struct *tty)
 {
 	struct uart_info *info = tty->driver_data;
 	struct uart_port *port = info->port;
-	unsigned long flags;
 
-	spin_lock_irqsave(&port->lock, flags);
 	if (!uart_circ_empty(&info->xmit) && info->xmit.buf &&
 	    !tty->stopped && !tty->hw_stopped)
 		port->ops->start_tx(port, 1);
-	spin_unlock_irqrestore(&port->flags, flags);
 }
 
 static void uart_start(struct tty_struct *tty)
