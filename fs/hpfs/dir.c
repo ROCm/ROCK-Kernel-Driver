@@ -7,11 +7,8 @@
  */
 
 #include "hpfs_fn.h"
-#include <linux/buffer_head.h>
-#include <linux/time.h>
-#include <linux/smp_lock.h>
 
-int hpfs_dir_release(struct inode *inode, struct file *filp)
+static int hpfs_dir_release(struct inode *inode, struct file *filp)
 {
 	lock_kernel();
 	hpfs_del_pos(inode, &filp->f_pos);
@@ -22,7 +19,7 @@ int hpfs_dir_release(struct inode *inode, struct file *filp)
 
 /* This is slow, but it's not used often */
 
-loff_t hpfs_dir_lseek(struct file *filp, loff_t off, int whence)
+static loff_t hpfs_dir_lseek(struct file *filp, loff_t off, int whence)
 {
 	loff_t new_off = off + (whence == 1 ? filp->f_pos : 0);
 	loff_t pos;
@@ -53,7 +50,7 @@ fail:
 	return -ESPIPE;
 }
 
-int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
+static int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct hpfs_inode_info *hpfs_inode = hpfs_i(inode);
@@ -140,32 +137,28 @@ int hpfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 			hpfs_add_pos(inode, &filp->f_pos);
 			filp->f_version = inode->i_version;
 		}
-			/*if (filp->f_version != inode->i_version) {
-				ret = -ENOENT;
-				goto out;
-			}*/	
-			old_pos = filp->f_pos;
-			if (!(de = map_pos_dirent(inode, &filp->f_pos, &qbh))) {
-				ret = -EIOERROR;
-				goto out;
+		old_pos = filp->f_pos;
+		if (!(de = map_pos_dirent(inode, &filp->f_pos, &qbh))) {
+			ret = -EIOERROR;
+			goto out;
+		}
+		if (de->first || de->last) {
+			if (hpfs_sb(inode->i_sb)->sb_chk) {
+				if (de->first && !de->last && (de->namelen != 2 || de ->name[0] != 1 || de->name[1] != 1)) hpfs_error(inode->i_sb, "hpfs_readdir: bad ^A^A entry; pos = %08x", old_pos);
+				if (de->last && (de->namelen != 1 || de ->name[0] != 255)) hpfs_error(inode->i_sb, "hpfs_readdir: bad \\377 entry; pos = %08x", old_pos);
 			}
-			if (de->first || de->last) {
-				if (hpfs_sb(inode->i_sb)->sb_chk) {
-					if (de->first && !de->last && (de->namelen != 2 || de ->name[0] != 1 || de->name[1] != 1)) hpfs_error(inode->i_sb, "hpfs_readdir: bad ^A^A entry; pos = %08x", old_pos);
-					if (de->last && (de->namelen != 1 || de ->name[0] != 255)) hpfs_error(inode->i_sb, "hpfs_readdir: bad \\377 entry; pos = %08x", old_pos);
-				}
-				hpfs_brelse4(&qbh);
-				goto again;
-			}
-			tempname = hpfs_translate_name(inode->i_sb, de->name, de->namelen, lc, de->not_8x3);
-			if (filldir(dirent, tempname, de->namelen, old_pos, de->fnode, DT_UNKNOWN) < 0) {
-				filp->f_pos = old_pos;
-				if (tempname != (char *)de->name) kfree(tempname);
-				hpfs_brelse4(&qbh);
-				goto out;
-			}
+			hpfs_brelse4(&qbh);
+			goto again;
+		}
+		tempname = hpfs_translate_name(inode->i_sb, de->name, de->namelen, lc, de->not_8x3);
+		if (filldir(dirent, tempname, de->namelen, old_pos, de->fnode, DT_UNKNOWN) < 0) {
+			filp->f_pos = old_pos;
 			if (tempname != (char *)de->name) kfree(tempname);
 			hpfs_brelse4(&qbh);
+			goto out;
+		}
+		if (tempname != (char *)de->name) kfree(tempname);
+		hpfs_brelse4(&qbh);
 	}
 out:
 	unlock_kernel();
@@ -316,3 +309,12 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry, struct name
 	unlock_kernel();
 	return ERR_PTR(-ENOENT);
 }
+
+struct file_operations hpfs_dir_ops =
+{
+	.llseek		= hpfs_dir_lseek,
+	.read		= generic_read_dir,
+	.readdir	= hpfs_readdir,
+	.release	= hpfs_dir_release,
+	.fsync		= hpfs_file_fsync,
+};

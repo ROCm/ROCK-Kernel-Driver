@@ -6,12 +6,9 @@
  *  adding & removing files & directories
  */
 
-#include <linux/pagemap.h>
-#include <linux/string.h>
-#include <linux/buffer_head.h>
 #include "hpfs_fn.h"
 
-int hpfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+static int hpfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
 	const char *name = dentry->d_name.name;
 	unsigned len = dentry->d_name.len;
@@ -121,7 +118,7 @@ bail:
 	return err;
 }
 
-int hpfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
+static int hpfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	const char *name = dentry->d_name.name;
 	unsigned len = dentry->d_name.len;
@@ -211,7 +208,7 @@ bail:
 	return err;
 }
 
-int hpfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
+static int hpfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 {
 	const char *name = dentry->d_name.name;
 	unsigned len = dentry->d_name.len;
@@ -289,9 +286,7 @@ bail:
 	return err;
 }
 
-extern struct address_space_operations hpfs_symlink_aops;
-
-int hpfs_symlink(struct inode *dir, struct dentry *dentry, const char *symlink)
+static int hpfs_symlink(struct inode *dir, struct dentry *dentry, const char *symlink)
 {
 	const char *name = dentry->d_name.name;
 	unsigned len = dentry->d_name.len;
@@ -371,7 +366,7 @@ bail:
 	return err;
 }
 
-int hpfs_unlink(struct inode *dir, struct dentry *dentry)
+static int hpfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	const char *name = dentry->d_name.name;
 	unsigned len = dentry->d_name.len;
@@ -453,7 +448,7 @@ out:
 	return err;
 }
 
-int hpfs_rmdir(struct inode *dir, struct dentry *dentry)
+static int hpfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	const char *name = dentry->d_name.name;
 	unsigned len = dentry->d_name.len;
@@ -513,7 +508,7 @@ out:
 	return err;
 }
 
-int hpfs_symlink_readpage(struct file *file, struct page *page)
+static int hpfs_symlink_readpage(struct file *file, struct page *page)
 {
 	char *link = kmap(page);
 	struct inode *i = page->mapping->host;
@@ -542,8 +537,12 @@ fail:
 	unlock_page(page);
 	return err;
 }
+
+struct address_space_operations hpfs_symlink_aops = {
+	.readpage	= hpfs_symlink_readpage
+};
 	
-int hpfs_rename(struct inode *old_dir, struct dentry *old_dentry,
+static int hpfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		struct inode *new_dir, struct dentry *new_dentry)
 {
 	char *old_name = (char *)old_dentry->d_name.name;
@@ -659,3 +658,16 @@ end1:
 	unlock_kernel();
 	return err;
 }
+
+struct inode_operations hpfs_dir_iops =
+{
+	.create		= hpfs_create,
+	.lookup		= hpfs_lookup,
+	.unlink		= hpfs_unlink,
+	.symlink	= hpfs_symlink,
+	.mkdir		= hpfs_mkdir,
+	.rmdir		= hpfs_rmdir,
+	.mknod		= hpfs_mknod,
+	.rename		= hpfs_rename,
+	.setattr	= hpfs_notify_change,
+};

@@ -6,7 +6,6 @@
  *  handling directory dnode tree - adding, deleteing & searching for dirents
  */
 
-#include <linux/buffer_head.h>
 #include "hpfs_fn.h"
 
 static loff_t get_pos(struct dnode *d, struct hpfs_dirent *fde)

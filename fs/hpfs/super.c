@@ -6,13 +6,11 @@
  *  mounting, unmounting, error handling
  */
 
-#include <linux/buffer_head.h>
-#include <linux/string.h>
 #include "hpfs_fn.h"
 #include <linux/module.h>
 #include <linux/parser.h>
 #include <linux/init.h>
-#include <linux/vfs.h>
+#include <linux/statfs.h>
 
 /* Mark the filesystem dirty, so that chkdsk checks it when os/2 booted */
 
@@ -101,7 +99,7 @@ int hpfs_stop_cycles(struct super_block *s, int key, int *c1, int *c2,
 	return 0;
 }
 
-void hpfs_put_super(struct super_block *s)
+static void hpfs_put_super(struct super_block *s)
 {
 	struct hpfs_sb_info *sbi = hpfs_sb(s);
 	if (sbi->sb_cp_table) kfree(sbi->sb_cp_table);
@@ -137,7 +135,7 @@ static unsigned count_bitmaps(struct super_block *s)
 	return count;
 }
 
-int hpfs_statfs(struct super_block *s, struct kstatfs *buf)
+static int hpfs_statfs(struct super_block *s, struct kstatfs *buf)
 {
 	struct hpfs_sb_info *sbi = hpfs_sb(s);
 	lock_kernel();
@@ -205,18 +203,6 @@ static void destroy_inodecache(void)
 	if (kmem_cache_destroy(hpfs_inode_cachep))
 		printk(KERN_INFO "hpfs_inode_cache: not all structures were freed\n");
 }
-
-/* Super operations */
-
-static struct super_operations hpfs_sops =
-{
-	.alloc_inode	= hpfs_alloc_inode,
-	.destroy_inode	= hpfs_destroy_inode,
-	.delete_inode	= hpfs_delete_inode,
-	.put_super	= hpfs_put_super,
-	.statfs		= hpfs_statfs,
-	.remount_fs	= hpfs_remount_fs,
-};
 
 /*
  * A tiny parser for option strings, stolen from dosfs.
@@ -397,7 +383,7 @@ HPFS filesystem options:\n\
 \n");
 }
 
-int hpfs_remount_fs(struct super_block *s, int *flags, char *data)
+static int hpfs_remount_fs(struct super_block *s, int *flags, char *data)
 {
 	uid_t uid;
 	gid_t gid;
@@ -440,6 +426,18 @@ int hpfs_remount_fs(struct super_block *s, int *flags, char *data)
 
 	return 0;
 }
+
+/* Super operations */
+
+static struct super_operations hpfs_sops =
+{
+	.alloc_inode	= hpfs_alloc_inode,
+	.destroy_inode	= hpfs_destroy_inode,
+	.delete_inode	= hpfs_delete_inode,
+	.put_super	= hpfs_put_super,
+	.statfs		= hpfs_statfs,
+	.remount_fs	= hpfs_remount_fs,
+};
 
 static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 {

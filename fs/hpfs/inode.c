@@ -6,56 +6,7 @@
  *  inode VFS functions
  */
 
-#include <linux/fs.h>
-#include <linux/time.h>
-#include <linux/smp_lock.h>
-#include <linux/buffer_head.h>
 #include "hpfs_fn.h"
-
-static struct file_operations hpfs_file_ops =
-{
-	.llseek		= generic_file_llseek,
-	.read		= generic_file_read,
-	.write		= hpfs_file_write,
-	.mmap		= generic_file_mmap,
-	.open		= hpfs_open,
-	.release	= hpfs_file_release,
-	.fsync		= hpfs_file_fsync,
-	.sendfile	= generic_file_sendfile,
-};
-
-static struct inode_operations hpfs_file_iops =
-{
-	.truncate	= hpfs_truncate,
-	.setattr	= hpfs_notify_change,
-};
-
-static struct file_operations hpfs_dir_ops =
-{
-	.llseek		= hpfs_dir_lseek,
-	.read		= generic_read_dir,
-	.readdir	= hpfs_readdir,
-	.open		= hpfs_open,
-	.release	= hpfs_dir_release,
-	.fsync		= hpfs_file_fsync,
-};
-
-static struct inode_operations hpfs_dir_iops =
-{
-	.create		= hpfs_create,
-	.lookup		= hpfs_lookup,
-	.unlink		= hpfs_unlink,
-	.symlink	= hpfs_symlink,
-	.mkdir		= hpfs_mkdir,
-	.rmdir		= hpfs_rmdir,
-	.mknod		= hpfs_mknod,
-	.rename		= hpfs_rename,
-	.setattr	= hpfs_notify_change,
-};
-
-struct address_space_operations hpfs_symlink_aops = {
-	.readpage	= hpfs_symlink_readpage
-};
 
 void hpfs_init_inode(struct inode *i)
 {
