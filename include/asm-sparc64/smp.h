@@ -24,7 +24,8 @@ struct prom_cpuinfo {
 };
 
 extern int linux_num_cpus;	/* number of CPUs probed  */
-extern struct prom_cpuinfo linux_cpus[64];
+extern struct prom_cpuinfo linux_cpus[NR_CPUS];
+extern unsigned int prom_cpu_nodes[NR_CPUS];
 
 #endif /* !(__ASSEMBLY__) */
 
@@ -60,9 +61,21 @@ extern cpuinfo_sparc cpu_data[NR_CPUS];
  *	Private routines/data
  */
  
+#include <asm/bitops.h>
+#include <asm/atomic.h>
+
 extern unsigned char boot_cpu_id;
-extern unsigned long cpu_present_map;
-#define cpu_online_map cpu_present_map
+extern unsigned long cpu_online_map;
+#define cpu_online(cpu)		(cpu_online_map & (1UL << (cpu)))
+extern atomic_t sparc64_num_cpus_online;
+#define num_online_cpus()	(atomic_read(&sparc64_num_cpus_online))
+
+static inline int any_online_cpu(unsigned long mask)
+{
+	if ((mask &= cpu_online_map) != 0UL)
+		return __ffs(mask);
+	return -1;
+}
 
 /*
  *	General functions that each host system must provide.
@@ -71,18 +84,6 @@ extern unsigned long cpu_present_map;
 extern void smp_callin(void);
 extern void smp_boot_cpus(void);
 extern void smp_store_cpu_info(int id);
-
-extern __volatile__ int __cpu_number_map[NR_CPUS];
-extern __volatile__ int __cpu_logical_map[NR_CPUS];
-
-extern __inline__ int cpu_logical_map(int cpu)
-{
-	return __cpu_logical_map[cpu];
-}
-extern __inline__ int cpu_number_map(int cpu)
-{
-	return __cpu_number_map[cpu];
-}
 
 extern __inline__ int hard_smp_processor_id(void)
 {
