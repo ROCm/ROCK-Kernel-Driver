@@ -195,15 +195,16 @@ static int pirq_piix_set(struct pci_dev *router, struct pci_dev *dev, int pirq, 
 /*
  * The VIA pirq rules are nibble-based, like ALI,
  * but without the ugly irq number munging.
+ * However, PIRQD is in the upper instead of lower 4 bits.
  */
 static int pirq_via_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
-	return read_config_nybble(router, 0x55, pirq);
+	return read_config_nybble(router, 0x55, pirq == 4 ? 5 : pirq);
 }
 
 static int pirq_via_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
-	write_config_nybble(router, 0x55, pirq, irq);
+	write_config_nybble(router, 0x55, pirq == 4 ? 5 : pirq, irq);
 	return 1;
 }
 
