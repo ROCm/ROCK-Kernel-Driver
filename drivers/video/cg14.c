@@ -188,9 +188,9 @@ struct cg14_clut {
 
 struct cg14_par {
 	spinlock_t		lock;
-	struct cg14_regs	*regs;
-	struct cg14_clut	*clut;
-	struct cg14_cursor	*cursor;
+	struct cg14_regs	__iomem *regs;
+	struct cg14_clut	__iomem *clut;
+	struct cg14_cursor	__iomem *cursor;
 
 	u32			flags;
 #define CG14_FLAG_BLANKED	0x00000001
@@ -209,7 +209,7 @@ struct cg14_par {
 
 static void __cg14_reset(struct cg14_par *par)
 {
-	struct cg14_regs *regs = par->regs;
+	struct cg14_regs __iomem *regs = par->regs;
 	u8 val;
 
 	val = sbus_readb(&regs->mcr);
@@ -248,13 +248,16 @@ static int cg14_setcolreg(unsigned regno,
 			  unsigned transp, struct fb_info *info)
 {
 	struct cg14_par *par = (struct cg14_par *) info->par;
-	struct cg14_clut *clut = par->clut;
+	struct cg14_clut __iomem *clut = par->clut;
 	unsigned long flags;
 	u32 val;
 
 	if (regno >= 256)
 		return 1;
 
+	red >>= 8;
+	green >>= 8;
+	blue >>= 8;
 	val = (red | (green << 8) | (blue << 16));
 
 	spin_lock_irqsave(&par->lock, flags);
@@ -277,7 +280,7 @@ static int cg14_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		      unsigned long arg, struct fb_info *info)
 {
 	struct cg14_par *par = (struct cg14_par *) info->par;
-	struct cg14_regs *regs = par->regs;
+	struct cg14_regs __iomem *regs = par->regs;
 	struct mdi_cfginfo kmdi, __user *mdii;
 	unsigned long flags;
 	int cur_mode, mode, ret = 0;
@@ -322,7 +325,8 @@ static int cg14_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			break;
 
 		case MDI_16_PIX:
-			cur_mode |= 0x20;
+			cur_mode |= (CG14_MCR_PIXMODE_16 <<
+				     CG14_MCR_PIXMODE_SHIFT);
 			break;
 
 		case MDI_8_PIX:
@@ -341,7 +345,7 @@ static int cg14_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	default:
 		ret = sbusfb_ioctl_helper(cmd, arg, info,
-					  FBTYPE_MDICOLOR, 24, par->fbsize);
+					  FBTYPE_MDICOLOR, 8, par->fbsize);
 		break;
 	};
 
@@ -355,11 +359,16 @@ static int cg14_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static void cg14_init_fix(struct fb_info *info, int linebytes)
 {
 	struct cg14_par *par = (struct cg14_par *)info->par;
+	const char *name;
 
-	strlcpy(info->fix.id, par->sdev->prom_name, sizeof(info->fix.id));
+	name = "cgfourteen";
+	if (par->sdev)
+		name = par->sdev->prom_name;
+
+	strlcpy(info->fix.id, name, sizeof(info->fix.id));
 
 	info->fix.type = FB_TYPE_PACKED_PIXELS;
-	info->fix.visual = FB_VISUAL_TRUECOLOR;
+	info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
 
 	info->fix.line_length = linebytes;
 
@@ -484,8 +493,11 @@ static void cg14_init_one(struct sbus_dev *sdev, int node, int parent_node)
 	spin_lock_init(&all->par.lock);
 
 	sbusfb_fill_var(&all->info.var, node, 8);
+	all->info.var.red.length = 8;
+	all->info.var.green.length = 8;
+	all->info.var.blue.length = 8;
 
-	linebytes = prom_getintdefault(sdev->prom_node, "linebytes",
+	linebytes = prom_getintdefault(node, "linebytes",
 				       all->info.var.xres);
 	all->par.fbsize = PAGE_ALIGN(linebytes * all->info.var.yres);
 
@@ -495,33 +507,29 @@ static void cg14_init_one(struct sbus_dev *sdev, int node, int parent_node)
 		all->par.physbase = phys = sdev->reg_addrs[1].phys_addr;
 		all->par.iospace = sdev->reg_addrs[0].which_io;
 
-		all->par.regs = (struct cg14_regs *)
-			sbus_ioremap(&sdev->resource[0], 0,
+		all->par.regs = sbus_ioremap(&sdev->resource[0], 0,
 				     sizeof(struct cg14_regs),
 				     "cg14 regs");
-		all->par.clut = (struct cg14_clut *)
-			sbus_ioremap(&sdev->resource[0], CG14_CLUT1,
+		all->par.clut = sbus_ioremap(&sdev->resource[0], CG14_CLUT1,
 				     sizeof(struct cg14_clut),
 				     "cg14 clut");
-		all->par.cursor = (struct cg14_cursor *)
-			sbus_ioremap(&sdev->resource[0], CG14_CURSORREGS,
+		all->par.cursor = sbus_ioremap(&sdev->resource[0], CG14_CURSORREGS,
 				     sizeof(struct cg14_cursor),
 				     "cg14 cursor");
-		all->info.screen_base = (char *)
-			sbus_ioremap(&sdev->resource[1], 0,
+		all->info.screen_base = sbus_ioremap(&sdev->resource[1], 0,
 				     all->par.fbsize, "cg14 ram");
 	} else {
 		rphys = __get_phys(bases[0]);
 		all->par.physbase = phys = __get_phys(bases[1]);
 		all->par.iospace = __get_iospace(bases[0]);
-		all->par.regs = (struct cg14_regs *)(unsigned long)bases[0];
-		all->par.clut = (struct cg14_clut *)((unsigned long)bases[0] +
+		all->par.regs = (struct cg14_regs __iomem *)(unsigned long)bases[0];
+		all->par.clut = (struct cg14_clut __iomem *)((unsigned long)bases[0] +
 						     CG14_CLUT1);
 		all->par.cursor =
-			(struct cg14_cursor *)((unsigned long)bases[0] +
+			(struct cg14_cursor __iomem *)((unsigned long)bases[0] +
 					       CG14_CURSORREGS);
 
-		all->info.screen_base = (char *)(unsigned long)bases[1];
+		all->info.screen_base = (char __iomem *)(unsigned long)bases[1];
 	}
 
 	prom_getproperty(node, "reg", (char *) &bases[0], sizeof(bases));
@@ -561,6 +569,7 @@ static void cg14_init_one(struct sbus_dev *sdev, int node, int parent_node)
 		kfree(all);
 		return;
 	}
+	fb_set_cmap(&all->info.cmap, &all->info);
 
 	cg14_init_fix(&all->info, linebytes);
 
@@ -573,8 +582,8 @@ static void cg14_init_one(struct sbus_dev *sdev, int node, int parent_node)
 
 	list_add(&all->list, &cg14_list);
 
-	printk("cg14: cgfourteen at %lx:%lx\n",
-	       all->par.physbase, all->par.iospace);
+	printk("cg14: cgfourteen at %lx:%lx, %dMB\n",
+	       all->par.iospace, all->par.physbase, all->par.ramsize >> 20);
 
 }
 

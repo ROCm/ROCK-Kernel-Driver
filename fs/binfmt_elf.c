@@ -576,7 +576,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			 */
 
 			retval = -ENOMEM;
-			if (elf_ppnt->p_filesz > PATH_MAX)
+			if (elf_ppnt->p_filesz > PATH_MAX || 
+			    elf_ppnt->p_filesz == 0)
 				goto out_free_file;
 			elf_interpreter = (char *) kmalloc(elf_ppnt->p_filesz,
 							   GFP_KERNEL);
@@ -592,7 +593,9 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 				goto out_free_interp;
 			}
 			/* make sure path is NULL terminated */
-			elf_interpreter[elf_ppnt->p_filesz - 1] = '\0';
+			retval = -EINVAL;
+			if (elf_interpreter[elf_ppnt->p_filesz - 1] != '\0')
+				goto out_free_interp;
 
 			/* If the program interpreter is one of these two,
 			 * then assume an iBCS2 image. Otherwise assume

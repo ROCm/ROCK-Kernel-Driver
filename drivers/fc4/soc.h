@@ -260,7 +260,7 @@ typedef struct {
 } soc_port; 
 
 typedef struct {
-	soc_hw_cq		*hw_cq;	/* Related XRAM cq */
+	soc_hw_cq		__iomem *hw_cq;	/* Related XRAM cq */
 	soc_req			*pool;
 	u8			in;
 	u8			out;

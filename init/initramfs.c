@@ -372,11 +372,12 @@ static long bytes_out;
 #define Tracecv(c,x)
 
 #define STATIC static
+#define INIT __init
 
-static void flush_window(void);
-static void error(char *m);
-static void gzip_mark(void **);
-static void gzip_release(void **);
+static void __init flush_window(void);
+static void __init error(char *m);
+static void __init gzip_mark(void **);
+static void __init gzip_release(void **);
 
 #include "../lib/inflate.c"
 

@@ -407,7 +407,7 @@ struct zoran {
 	struct pci_dev *pci_dev;	/* PCI device */
 	unsigned char revision;	/* revision of zr36057 */
 	unsigned int zr36057_adr;	/* bus address of IO mem returned by PCI BIOS */
-	unsigned char *zr36057_mem;	/* pointer to mapped IO memory */
+	unsigned char __iomem *zr36057_mem;/* pointer to mapped IO memory */
 
 	spinlock_t spinlock;	/* Spinlock */
 
@@ -499,10 +499,10 @@ struct zoran {
   of _ALPHA_BUZ in the Makefile.*/
 
 #ifdef _ALPHA_BUZ
-#define btwrite(dat,adr)    writel((dat),(char *) (zr->zr36057_adr+(adr)))
+#define btwrite(dat,adr)    writel((dat), zr->zr36057_adr+(adr))
 #define btread(adr)         readl(zr->zr36057_adr+(adr))
 #else
-#define btwrite(dat,adr)    writel((dat), (char *) (zr->zr36057_mem+(adr)))
+#define btwrite(dat,adr)    writel((dat), zr->zr36057_mem+(adr))
 #define btread(adr)         readl(zr->zr36057_mem+(adr))
 #endif
 

@@ -11,6 +11,7 @@
  *      Martin Peschke <mpeschke@de.ibm.com>
  *	Heiko Carstens <heiko.carstens@de.ibm.com>
  *      Andreas Herrmann <aherrman@de.ibm.com>
+ *      Volker Sameske <sameske@de.ibm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,7 +28,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.29 $"
+#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.30 $"
 
 #include "zfcp_ext.h"
 
@@ -67,6 +68,12 @@ ZFCP_DEFINE_UNIT_ATTR(status, "0x%08x\n", atomic_read(&unit->status));
 ZFCP_DEFINE_UNIT_ATTR(scsi_lun, "0x%x\n", unit->scsi_lun);
 ZFCP_DEFINE_UNIT_ATTR(in_recovery, "%d\n", atomic_test_mask
 		      (ZFCP_STATUS_COMMON_ERP_INUSE, &unit->status));
+ZFCP_DEFINE_UNIT_ATTR(access_denied, "%d\n", atomic_test_mask
+		      (ZFCP_STATUS_COMMON_ACCESS_DENIED, &unit->status));
+ZFCP_DEFINE_UNIT_ATTR(access_shared, "%d\n", atomic_test_mask
+		      (ZFCP_STATUS_UNIT_SHARED, &unit->status));
+ZFCP_DEFINE_UNIT_ATTR(access_readonly, "%d\n", atomic_test_mask
+		      (ZFCP_STATUS_UNIT_READONLY, &unit->status));
 
 /**
  * zfcp_sysfs_unit_failed_store - failed state of unit
@@ -135,6 +142,9 @@ static struct attribute *zfcp_unit_attrs[] = {
 	&dev_attr_failed.attr,
 	&dev_attr_in_recovery.attr,
 	&dev_attr_status.attr,
+	&dev_attr_access_denied.attr,
+	&dev_attr_access_shared.attr,
+	&dev_attr_access_readonly.attr,
 	NULL
 };
 

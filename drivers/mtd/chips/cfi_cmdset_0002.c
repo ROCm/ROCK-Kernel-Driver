@@ -13,7 +13,7 @@
  *
  * This code is GPL
  *
- * $Id: cfi_cmdset_0002.c,v 1.110 2004/09/24 04:26:04 eric Exp $
+ * $Id: cfi_cmdset_0002.c,v 1.111 2004/11/16 18:29:00 dwmw2 Exp $
  *
  */
 
@@ -1506,7 +1506,7 @@ static void cfi_amdstd_destroy(struct mtd_info *mtd)
 static char im_name[]="cfi_cmdset_0002";
 
 
-int __init cfi_amdstd_init(void)
+static int __init cfi_amdstd_init(void)
 {
 	inter_module_register(im_name, THIS_MODULE, &cfi_cmdset_0002);
 	return 0;

@@ -68,7 +68,6 @@
  */
 #if 1
 #define	SYM_LINUX_PROC_INFO_SUPPORT
-#define SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT
 #define SYM_LINUX_USER_COMMAND_SUPPORT
 #define SYM_LINUX_USER_INFO_SUPPORT
 #define SYM_LINUX_DEBUG_CONTROL_SUPPORT
@@ -129,9 +128,7 @@ struct sym_driver_setup {
 	u_char	scsi_bus_check;
 	u_char	host_id;
 
-	u_char	reverse_probe;
 	u_char	verbose;
-	u_short	debug;
 	u_char	settle_delay;
 	u_char	use_nvram;
 	u_long	excludes[8];
@@ -145,6 +142,7 @@ struct sym_driver_setup {
 #define SYM_SETUP_IRQ_MODE		sym_driver_setup.irq_mode
 #define SYM_SETUP_SCSI_BUS_CHECK	sym_driver_setup.scsi_bus_check
 #define SYM_SETUP_HOST_ID		sym_driver_setup.host_id
+#define boot_verbose			sym_driver_setup.verbose
 
 /* Always enable parity. */
 #define SYM_SETUP_PCI_PARITY		1
@@ -163,54 +161,13 @@ struct sym_driver_setup {
 	.irq_mode	= 0,					\
 	.scsi_bus_check	= 1,					\
 	.host_id	= 7,					\
-	.reverse_probe	= 0,					\
 	.verbose	= 0,					\
-	.debug		= 0,					\
 	.settle_delay	= 3,					\
 	.use_nvram	= 1,					\
 }
 
-/*
- *  Boot fail safe setup.
- *
- *  Override initial setup from boot command line:
- *    sym53c8xx=safe:y
- */
-#define SYM_LINUX_DRIVER_SAFE_SETUP {				\
-	.max_tag	= 0,					\
-	.burst_order	= 0,					\
-	.scsi_led	= 0,					\
-	.scsi_diff	= 1,					\
-	.irq_mode	= 0,					\
-	.scsi_bus_check	= 2,					\
-	.host_id	= 7,					\
-	.reverse_probe	= 0,					\
-	.verbose	= 2,					\
-	.debug		= 0,					\
-	.settle_delay	= 10,					\
-	.use_nvram	= 1,					\
-}
-
-/*
- *  This structure is initialized from linux config options.
- *  It can be overridden at boot-up by the boot command line.
- */
-#ifdef SYM_GLUE_C
-struct sym_driver_setup
-	sym_driver_setup = SYM_LINUX_DRIVER_SETUP;
-#ifdef SYM_LINUX_DEBUG_CONTROL_SUPPORT
-u_int	sym_debug_flags = 0;
-#endif
-#else
 extern struct sym_driver_setup sym_driver_setup;
-#ifdef SYM_LINUX_DEBUG_CONTROL_SUPPORT
-extern u_int sym_debug_flags;
-#endif
-#endif /* SYM_GLUE_C */
-
-#ifdef SYM_LINUX_DEBUG_CONTROL_SUPPORT
+extern unsigned int sym_debug_flags;
 #define DEBUG_FLAGS	sym_debug_flags
-#endif
-#define boot_verbose	sym_driver_setup.verbose
 
 #endif /* SYM53C8XX_H */

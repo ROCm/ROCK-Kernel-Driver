@@ -88,20 +88,12 @@ extern s32 i2c_smbus_write_byte_data(struct i2c_client * client,
 extern s32 i2c_smbus_read_word_data(struct i2c_client * client, u8 command);
 extern s32 i2c_smbus_write_word_data(struct i2c_client * client,
                                      u8 command, u16 value);
-extern s32 i2c_smbus_process_call(struct i2c_client * client,
-                                  u8 command, u16 value);
-/* Returns the number of read bytes */
-extern s32 i2c_smbus_read_block_data(struct i2c_client * client,
-                                     u8 command, u8 *values);
+/* Returns the number of bytes transferred */
 extern s32 i2c_smbus_write_block_data(struct i2c_client * client,
-                                      u8 command, u8 length,
-                                      u8 *values);
+				      u8 command, u8 length,
+				      u8 *values);
 extern s32 i2c_smbus_read_i2c_block_data(struct i2c_client * client,
-                                         u8 command, u8 *values);
-extern s32 i2c_smbus_write_i2c_block_data(struct i2c_client * client,
-                                          u8 command, u8 length,
-                                          u8 *values);
-
+					 u8 command, u8 *values);
 
 /*
  * A driver is capable of handling one or more physical devices present on

@@ -679,7 +679,7 @@ int init_tulip(HCS * pCurHcb, SCB * scbp, int tul_num_scb, BYTE * pbBiosAdr, int
 
 	pCurHcb->HCS_NumScbs = tul_num_scb;
 	pCurHcb->HCS_Semaph = 1;
-	pCurHcb->HCS_SemaphLock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&pCurHcb->HCS_SemaphLock);
 	pCurHcb->HCS_JSStatus0 = 0;
 	pCurHcb->HCS_Scb = scbp;
 	pCurHcb->HCS_NxtPend = scbp;
@@ -694,7 +694,7 @@ int init_tulip(HCS * pCurHcb, SCB * scbp, int tul_num_scb, BYTE * pbBiosAdr, int
 	pCurHcb->HCS_ScbEnd = pTmpScb;
 	pCurHcb->HCS_FirstAvail = scbp;
 	pCurHcb->HCS_LastAvail = pPrevScb;
-	pCurHcb->HCS_AvailLock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&pCurHcb->HCS_AvailLock);
 	pCurHcb->HCS_FirstPend = NULL;
 	pCurHcb->HCS_LastPend = NULL;
 	pCurHcb->HCS_FirstBusy = NULL;

@@ -236,7 +236,7 @@ static int mct_u232_calculate_baud_rate(struct usb_serial *serial, int value) {
 
 static int mct_u232_set_baud_rate(struct usb_serial *serial, int value)
 {
-	unsigned int divisor;
+	__le32 divisor;
         int rc;
         unsigned char zero_byte = 0;
 

@@ -170,13 +170,11 @@ ioctl_rio(struct inode *inode, struct file *file, unsigned int cmd,
 			if (result == -ETIMEDOUT)
 				retries--;
 			else if (result < 0) {
-				err("Error executing ioctrl. code = %d",
-				     le32_to_cpu(result));
+				err("Error executing ioctrl. code = %d", result);
 				retries = 0;
 			} else {
-				dbg("Executed ioctl. Result = %d (data=%04x)",
-				     le32_to_cpu(result),
-				     le32_to_cpu(*((long *) buffer)));
+				dbg("Executed ioctl. Result = %d (data=%02x)",
+				     result, buffer[0]);
 				if (copy_to_user(rio_cmd.buffer, buffer,
 						 rio_cmd.length)) {
 					free_page((unsigned long) buffer);
@@ -239,12 +237,10 @@ ioctl_rio(struct inode *inode, struct file *file, unsigned int cmd,
 			if (result == -ETIMEDOUT)
 				retries--;
 			else if (result < 0) {
-				err("Error executing ioctrl. code = %d",
-				     le32_to_cpu(result));
+				err("Error executing ioctrl. code = %d", result);
 				retries = 0;
 			} else {
-				dbg("Executed ioctl. Result = %d",
-				       le32_to_cpu(result));
+				dbg("Executed ioctl. Result = %d", result);
 				retries = 0;
 
 			}

@@ -124,6 +124,18 @@ static int proc_ide_read_identify
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
+static void proc_ide_settings_warn(void)
+{
+	static int warned = 0;
+
+	if (warned)
+		return;
+
+	printk(KERN_WARNING "Warning: /proc/ide/hd?/settings interface is "
+			    "obsolete, and will be removed soon!\n");
+	warned = 1;
+}
+
 static int proc_ide_read_settings
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
@@ -132,8 +144,7 @@ static int proc_ide_read_settings
 	char		*out = page;
 	int		len, rc, mul_factor, div_factor;
 
-	printk(KERN_WARNING "Warning: /proc/ide/hd?/settings interface is "
-			    "obsolete, and will be removed soon!\n");
+	proc_ide_settings_warn();
 
 	down(&ide_setting_sem);
 	out += sprintf(out, "name\t\t\tvalue\t\tmin\t\tmax\t\tmode\n");
@@ -171,11 +182,10 @@ static int proc_ide_write_settings(struct file *file, const char __user *buffer,
 	ide_settings_t	*setting;
 	char *buf, *s;
 
-	printk(KERN_WARNING "Warning: /proc/ide/hd?/settings interface is "
-			    "obsolete, and will be removed soon!\n");
-
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
+
+	proc_ide_settings_warn();
 
 	if (count >= PAGE_SIZE)
 		return -EINVAL;

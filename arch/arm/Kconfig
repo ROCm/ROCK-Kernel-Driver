@@ -389,22 +389,11 @@ config XIP_PHYS_ADDR
 
 if (ARCH_SA1100 || ARCH_INTEGRATOR)
 
-config CPU_FREQ
-	bool "Support CPU clock change"
-	help
-	  CPU clock scaling allows you to change the clock speed of the
-	  running CPU on the fly. This is a nice method to save battery power,
-	  because the lower the clock speed, the less power the CPU
-	  consumes. Note that this driver doesn't automatically change the CPU
-	  clock speed, you need some userland tools (which still have to be
-	  written) to implement the policy. If you don't understand what this
-	  is all about, it's safe to say 'N'.
-
 source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_SA1100
 	bool
-	depends on CPU_FREQ && SA1100_LART
+	depends on CPU_FREQ && (SA1100_LART || SA1100_PLEB)
 	default y
 
 config CPU_FREQ_SA1110

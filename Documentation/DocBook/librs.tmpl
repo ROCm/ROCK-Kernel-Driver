@@ -83,13 +83,13 @@
 		<title>Initializing</title>
 		<para>
 			The init function init_rs returns a pointer to a
-			rs decoder structure, which holds the neccecary
+			rs decoder structure, which holds the necessary
 			information for encoding, decoding and error correction
 			with the given polynomial. It either uses an existing
 			matching decoder or creates a new one. On creation all
 			the lookup tables for fast en/decoding are created.
 			The function may take a while, so make sure not to 
-			call it in critical code pathes.
+			call it in critical code paths.
 		</para>
 		<programlisting>
 /* the Reed Solomon control structure */
@@ -123,10 +123,10 @@ rs_decoder = init_rs (10, 0x409, 0, 1, 6);
 			results in ECC errors.
 		</para>
 		<para>
-			The databytes are expanded to the given symbolsize
-			on the fly. There is no support for encoding continuos
-			bitstreams with a symbolsize != 8 at the moment. If
-			it is neccecary it should be not a big deal to implement
+			The databytes are expanded to the given symbol size
+			on the fly. There is no support for encoding continuous
+			bitstreams with a symbol size != 8 at the moment. If
+			it is necessary it should be not a big deal to implement
 			such functionality.
 		</para>
 		<programlisting>
@@ -155,13 +155,13 @@ encode_rs8 (rs_decoder, data8, 512, par, 0);
 			location buffer to the decoder. The decoder stores the
 			calculated error location and the correction bitmask
 			in the given buffers. This is useful for hardware
-			decoders which use a weird bitordering scheme.
+			decoders which use a weird bit ordering scheme.
 		</para>
 		<para>
-			The databytes are expanded to the given symbolsize
-			on the fly. There is no support for decoding continuos
+			The databytes are expanded to the given symbol size
+			on the fly. There is no support for decoding continuous
 			bitstreams with a symbolsize != 8 at the moment. If
-			it is neccecary it should be not a big deal to implement
+			it is necessary it should be not a big deal to implement
 			such functionality.
 		</para>
 		
@@ -208,7 +208,7 @@ numerr = decode_rs8 (rs_decoder, data8, par, 512, syn, 0, NULL, 0, NULL);
 			Decoding with syndrome given by hardware decoder, no direct data correction.
 		</title>
 		<para>
-			Note: It's not neccecary to give data and recieved parity to the decoder.
+			Note: It's not necessary to give data and received parity to the decoder.
 		</para>
 		<programlisting>
 /* Parity buffer. Size = number of roots */

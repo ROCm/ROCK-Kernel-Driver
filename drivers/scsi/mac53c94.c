@@ -41,9 +41,9 @@ enum fsc_phase {
 };
 
 struct fsc_state {
-	struct	mac53c94_regs *regs;
+	struct	mac53c94_regs __iomem *regs;
 	int	intr;
-	struct	dbdma_regs *dma;
+	struct	dbdma_regs __iomem *dma;
 	int	dmaintr;
 	int	clk_freq;
 	struct	Scsi_Host *host;
@@ -106,10 +106,10 @@ static int mac53c94_abort(struct scsi_cmnd *cmd)
 static int mac53c94_host_reset(struct scsi_cmnd *cmd)
 {
 	struct fsc_state *state = (struct fsc_state *) cmd->device->host->hostdata;
-	struct mac53c94_regs *regs = state->regs;
-	struct dbdma_regs *dma = state->dma;
+	struct mac53c94_regs __iomem *regs = state->regs;
+	struct dbdma_regs __iomem *dma = state->dma;
 
-	st_le32(&dma->control, (RUN|PAUSE|FLUSH|WAKE) << 16);
+	writel((RUN|PAUSE|FLUSH|WAKE) << 16, &dma->control);
 	writeb(CMD_SCSI_RESET, &regs->command);	/* assert RST */
 	udelay(100);			/* leave it on for a while (>= 25us) */
 	writeb(CMD_RESET, &regs->command);
@@ -121,8 +121,8 @@ static int mac53c94_host_reset(struct scsi_cmnd *cmd)
 
 static void mac53c94_init(struct fsc_state *state)
 {
-	struct mac53c94_regs *regs = state->regs;
-	struct dbdma_regs *dma = state->dma;
+	struct mac53c94_regs __iomem *regs = state->regs;
+	struct dbdma_regs __iomem *dma = state->dma;
 	int x;
 
 	writeb(state->host->this_id | CF1_PAR_ENABLE, &regs->config1);
@@ -143,7 +143,7 @@ static void mac53c94_init(struct fsc_state *state)
 static void mac53c94_start(struct fsc_state *state)
 {
 	struct scsi_cmnd *cmd;
-	struct mac53c94_regs *regs = state->regs;
+	struct mac53c94_regs __iomem *regs = state->regs;
 	int i;
 
 	if (state->phase != idle || state->current_req != NULL)
@@ -191,8 +191,8 @@ static irqreturn_t do_mac53c94_interrupt(int irq, void *dev_id, struct pt_regs *
 static void mac53c94_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	struct fsc_state *state = (struct fsc_state *) dev_id;
-	struct mac53c94_regs *regs = state->regs;
-	struct dbdma_regs *dma = state->dma;
+	struct mac53c94_regs __iomem *regs = state->regs;
+	struct dbdma_regs __iomem *dma = state->dma;
 	struct scsi_cmnd *cmd = state->current_req;
 	int nb, stat, seq, intr;
 	static int mac53c94_errors;
@@ -458,10 +458,10 @@ static int mac53c94_probe(struct macio_dev *mdev, const struct of_match *match)
 	state->pdev = pdev;
 	state->mdev = mdev;
 
-	state->regs = (struct mac53c94_regs *)
+	state->regs = (struct mac53c94_regs __iomem *)
 		ioremap(macio_resource_start(mdev, 0), 0x1000);
 	state->intr = macio_irq(mdev, 0);
-	state->dma = (struct dbdma_regs *)
+	state->dma = (struct dbdma_regs __iomem *)
 		ioremap(macio_resource_start(mdev, 1), 0x1000);
 	state->dmaintr = macio_irq(mdev, 1);
 	if (state->regs == NULL || state->dma == NULL) {

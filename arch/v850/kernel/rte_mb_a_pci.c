@@ -254,7 +254,7 @@ static void __devinit pcibios_assign_resources (void)
 	struct pci_dev *dev = NULL;
 	struct resource *r;
 
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	for_each_pci_dev(dev) {
 		unsigned di_num;
 		unsigned class = dev->class >> 8;
 

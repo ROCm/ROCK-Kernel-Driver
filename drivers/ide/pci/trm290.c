@@ -249,7 +249,7 @@ static int trm290_ide_dma_test_irq (ide_drive_t *drive)
 /*
  * Invoked from ide-dma.c at boot time.
  */
-void __devinit init_hwif_trm290(ide_hwif_t *hwif)
+static void __devinit init_hwif_trm290(ide_hwif_t *hwif)
 {
 	unsigned int cfgbase = 0;
 	unsigned long flags;

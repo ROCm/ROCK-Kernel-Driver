@@ -290,11 +290,11 @@ smp_call_function_single (int cpuid, void (*func) (void *info), void *info, int 
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
-		barrier();
+		cpu_relax();
 
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
-			barrier();
+			cpu_relax();
 	call_data = NULL;
 
 	spin_unlock_bh(&call_lock);
@@ -349,11 +349,11 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
-		barrier();
+		cpu_relax();
 
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
-			barrier();
+			cpu_relax();
 	call_data = NULL;
 
 	spin_unlock(&call_lock);

@@ -18,7 +18,7 @@ struct ip_nat_protocol
 	/* Do a packet translation according to the ip_nat_proto_manip
 	 * and manip type.  Return true if succeeded. */
 	int (*manip_pkt)(struct sk_buff **pskb,
-			 unsigned int hdroff,
+			 unsigned int iphdroff,
 			 const struct ip_conntrack_manip *manip,
 			 enum ip_nat_manip_type maniptype);
 

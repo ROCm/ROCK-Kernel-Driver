@@ -4,7 +4,7 @@
 /* (C) 1999 Machine Vision Holdings, Inc.			*/
 /* (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>		*/
 
-/* $Id: docprobe.c,v 1.41 2003/12/03 10:19:57 dwmw2 Exp $	*/
+/* $Id: docprobe.c,v 1.43 2004/11/16 18:29:01 dwmw2 Exp $	*/
 
 
 
@@ -270,7 +270,7 @@ static void __init DoC_Probe(unsigned long physadr)
 		memset((char *)this, 0, sizeof(struct DiskOnChip));
 
 		mtd->priv = this;
-		this->virtadr = docptr;
+		this->virtadr = (void __iomem *)docptr;
 		this->physadr = physadr;
 		this->ChipID = ChipID;
 		sprintf(namebuf, "with ChipID %2.2X", ChipID);
@@ -328,7 +328,7 @@ static void __init DoC_Probe(unsigned long physadr)
  *
  ****************************************************************************/
 
-int __init init_doc(void)
+static int __init init_doc(void)
 {
 	int i;
 	

@@ -303,6 +303,12 @@ static int class_hotplug(struct kset *kset, struct kobject *kobj, char **envp,
 					    buffer, buffer_size, &length,
 					    "PHYSDEVBUS=%s", dev->bus->name);
 
+		/* add driver name of physical device */
+		if (dev->driver)
+			add_hotplug_env_var(envp, num_envp, &i,
+					    buffer, buffer_size, &length,
+					    "PHYSDEVDRIVER=%s", dev->driver->name);
+
 		/* terminate, set to next free slot, shrink available space */
 		envp[i] = NULL;
 		envp = &envp[i];

@@ -56,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.88 $"
+#define VERSION_QDIO_C "$Revision: 1.89 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -1401,7 +1401,7 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr,
 	int result=-ENOMEM;
 
 	for (i=0;i<no_input_qs;i++) {
-		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL|GFP_DMA);
+		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL);
 
 		if (!q) {
 			QDIO_PRINT_ERR("kmalloc of q failed!\n");
@@ -1410,7 +1410,7 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr,
 
 		memset(q,0,sizeof(struct qdio_q));
 
-		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL|GFP_DMA);
+		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL);
 		if (!q->slib) {
 			QDIO_PRINT_ERR("kmalloc of slib failed!\n");
 			goto out;
@@ -1420,7 +1420,7 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr,
 	}
 
 	for (i=0;i<no_output_qs;i++) {
-		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL|GFP_DMA);
+		q=kmalloc(sizeof(struct qdio_q),GFP_KERNEL);
 
 		if (!q) {
 			goto out;
@@ -1428,7 +1428,7 @@ qdio_alloc_qs(struct qdio_irq *irq_ptr,
 
 		memset(q,0,sizeof(struct qdio_q));
 
-		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL|GFP_DMA);
+		q->slib=kmalloc(PAGE_SIZE,GFP_KERNEL);
 		if (!q->slib) {
 			QDIO_PRINT_ERR("kmalloc of slib failed!\n");
 			goto out;

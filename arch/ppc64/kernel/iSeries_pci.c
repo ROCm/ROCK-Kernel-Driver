@@ -256,9 +256,12 @@ unsigned long __init find_and_init_phbs(void)
 		int ret = HvCallXm_testBus(bus);
 		if (ret == 0) {
 			printk("bus %d appears to exist\n", bus);
-			phb = pci_alloc_pci_controller(phb_type_hypervisor);
+
+			phb = (struct pci_controller *)kmalloc(sizeof(struct pci_controller), GFP_KERNEL);
 			if (phb == NULL)
-				return -1;
+				return -ENOMEM;
+       			pci_setup_pci_controller(phb);
+
 			phb->pci_mem_offset = phb->local_number = bus;
 			phb->first_busno = bus;
 			phb->last_busno = bus;
@@ -292,7 +295,6 @@ void iSeries_pcibios_init(void)
 	iomm_table_initialize();
 	find_and_init_phbs();
 	io_page_mask = -1;
-	/* pci_assign_all_busses = 0;		SFRXXX*/
 	PPCDBG(PPCDBG_BUSWALK, "iSeries_pcibios_init Exit.\n"); 
 }
 

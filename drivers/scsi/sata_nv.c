@@ -44,7 +44,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME			"sata_nv"
-#define DRV_VERSION			"0.03"
+#define DRV_VERSION			"0.5"
 
 #define NV_PORTS			2
 #define NV_PIO_MASK			0x1f
@@ -234,6 +234,7 @@ MODULE_AUTHOR("NVIDIA");
 MODULE_DESCRIPTION("low-level driver for NVIDIA nForce SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, nv_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 irqreturn_t nv_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 {
@@ -454,12 +455,13 @@ static void nv_check_hotplug(struct ata_host_set *host_set)
 
 static void nv_enable_hotplug_ck804(struct ata_probe_ent *probe_ent)
 {
+	struct pci_dev *pdev = to_pci_dev(probe_ent->dev);
 	u8 intr_mask;
 	u8 regval;
 
-	pci_read_config_byte(probe_ent->pdev, NV_MCP_SATA_CFG_20, &regval);
+	pci_read_config_byte(pdev, NV_MCP_SATA_CFG_20, &regval);
 	regval |= NV_MCP_SATA_CFG_20_SATA_SPACE_EN;
-	pci_write_config_byte(probe_ent->pdev, NV_MCP_SATA_CFG_20, regval);
+	pci_write_config_byte(pdev, NV_MCP_SATA_CFG_20, regval);
 
 	writeb(NV_INT_STATUS_HOTPLUG, probe_ent->mmio_base + NV_INT_STATUS_CK804);
 
@@ -471,6 +473,7 @@ static void nv_enable_hotplug_ck804(struct ata_probe_ent *probe_ent)
 
 static void nv_disable_hotplug_ck804(struct ata_host_set *host_set)
 {
+	struct pci_dev *pdev = to_pci_dev(host_set->dev);
 	u8 intr_mask;
 	u8 regval;
 
@@ -480,9 +483,9 @@ static void nv_disable_hotplug_ck804(struct ata_host_set *host_set)
 
 	writeb(intr_mask, host_set->mmio_base + NV_INT_ENABLE_CK804);
 
-	pci_read_config_byte(host_set->pdev, NV_MCP_SATA_CFG_20, &regval);
+	pci_read_config_byte(pdev, NV_MCP_SATA_CFG_20, &regval);
 	regval &= ~NV_MCP_SATA_CFG_20_SATA_SPACE_EN;
-	pci_write_config_byte(host_set->pdev, NV_MCP_SATA_CFG_20, regval);
+	pci_write_config_byte(pdev, NV_MCP_SATA_CFG_20, regval);
 }
 
 static void nv_check_hotplug_ck804(struct ata_host_set *host_set)

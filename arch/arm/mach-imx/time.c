@@ -28,8 +28,7 @@
  * Returns number of us since last clock interrupt.  Note that interrupts
  * will have been disabled by do_gettimeoffset()
  */
-static unsigned long
-imx_gettimeoffset(void)
+static unsigned long imx_gettimeoffset(void)
 {
 	unsigned long ticks;
 
@@ -80,8 +79,7 @@ static struct irqaction imx_timer_irq = {
 /*
  * Set up timer interrupt, and return the current time in seconds.
  */
-static void __init
-imx_timer_init(void)
+static void __init imx_timer_init(void)
 {
 	/*
 	 * Initialise to a known state (all timers off, and timing reset)
@@ -97,7 +95,7 @@ imx_timer_init(void)
 	setup_irq(TIM1_INT, &imx_timer_irq);
 }
 
-struct imx_timer = {
+struct sys_timer imx_timer = {
 	.init		= imx_timer_init,
 	.offset		= imx_gettimeoffset,
 };

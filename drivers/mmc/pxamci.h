@@ -70,6 +70,16 @@
 #define BUF_PART_FULL		(1 << 0)
 
 #define MMC_I_MASK	0x0028
+
+/*PXA27x MMC interrupts*/
+#define SDIO_SUSPEND_ACK  	(1 << 12)
+#define SDIO_INT          	(1 << 11)
+#define RD_STALLED        	(1 << 10)
+#define RES_ERR           	(1 << 9)
+#define DAT_ERR           	(1 << 8)
+#define TINT              	(1 << 7)
+
+/*PXA2xx MMC interrupts*/
 #define TXFIFO_WR_REQ		(1 << 6)
 #define RXFIFO_RD_REQ		(1 << 5)
 #define CLK_IS_OFF		(1 << 4)
@@ -77,6 +87,12 @@
 #define END_CMD_RES		(1 << 2)
 #define PRG_DONE		(1 << 1)
 #define DATA_TRAN_DONE		(1 << 0)
+
+#ifdef CONFIG_PXA27x
+#define MMC_I_MASK_ALL          0x00001fff
+#else
+#define MMC_I_MASK_ALL          0x0000007f
+#endif
 
 #define MMC_I_REG	0x002c
 /* same as MMC_I_MASK */
@@ -92,3 +108,17 @@
 #define MMC_RXFIFO	0x0040	/* 8 bit */
 
 #define MMC_TXFIFO	0x0044	/* 8 bit */
+
+/*
+ * The base MMC clock rate
+ */
+#ifdef CONFIG_PXA27x
+#define CLOCKRATE_MIN	304688
+#define CLOCKRATE_MAX	19500000
+#else
+#define CLOCKRATE_MIN	312500
+#define CLOCKRATE_MAX	20000000
+#endif
+
+#define CLOCKRATE	CLOCKRATE_MAX
+

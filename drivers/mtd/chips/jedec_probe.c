@@ -1,7 +1,7 @@
 /* 
    Common Flash Interface probe code.
    (C) 2000 Red Hat. GPL'd.
-   $Id: jedec_probe.c,v 1.57 2004/09/17 11:45:05 eric Exp $
+   $Id: jedec_probe.c,v 1.58 2004/11/16 18:29:00 dwmw2 Exp $
    See JEDEC (http://www.jedec.org/) standard JESD21C (section 3.5)
    for the standard this probe goes back to.
 
@@ -1661,7 +1661,7 @@ static int cfi_jedec_setup(struct cfi_private *p_cfi, int index);
 static int jedec_probe_chip(struct map_info *map, __u32 base,
 			    unsigned long *chip_map, struct cfi_private *cfi);
 
-struct mtd_info *jedec_probe(struct map_info *map);
+static struct mtd_info *jedec_probe(struct map_info *map);
 
 static inline u32 jedec_read_mfr(struct map_info *map, __u32 base, 
 	struct cfi_private *cfi)
@@ -2055,7 +2055,7 @@ static struct chip_probe jedec_chip_probe = {
 	.probe_chip = jedec_probe_chip
 };
 
-struct mtd_info *jedec_probe(struct map_info *map)
+static struct mtd_info *jedec_probe(struct map_info *map)
 {
 	/*
 	 * Just use the generic probe stuff to call our CFI-specific
@@ -2070,7 +2070,7 @@ static struct mtd_chip_driver jedec_chipdrv = {
 	.module	= THIS_MODULE
 };
 
-int __init jedec_probe_init(void)
+static int __init jedec_probe_init(void)
 {
 	register_mtd_chip_driver(&jedec_chipdrv);
 	return 0;

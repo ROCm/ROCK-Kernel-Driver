@@ -16,7 +16,7 @@
  *  
  * Interface to generic NAND code for M-Systems DiskOnChip devices
  *
- * $Id: diskonchip.c,v 1.38 2004/10/05 22:11:46 gleixner Exp $
+ * $Id: diskonchip.c,v 1.42 2004/11/16 18:29:03 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -102,17 +102,17 @@ static void doc200x_hwcontrol(struct mtd_info *mtd, int cmd);
 static void doc200x_select_chip(struct mtd_info *mtd, int chip);
 
 static int debug=0;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 
 static int try_dword=1;
-MODULE_PARM(try_dword, "i");
+module_param(try_dword, int, 0);
 
 static int no_ecc_failures=0;
-MODULE_PARM(no_ecc_failures, "i");
+module_param(no_ecc_failures, int, 0);
 
 #ifdef CONFIG_MTD_PARTITIONS
 static int no_autopart=0;
-MODULE_PARM(no_autopart, "i");
+module_param(no_autopart, int, 0);
 #endif
 
 #ifdef MTD_NAND_DISKONCHIP_BBTWRITE
@@ -120,10 +120,10 @@ static int inftl_bbt_write=1;
 #else
 static int inftl_bbt_write=0;
 #endif
-MODULE_PARM(inftl_bbt_write, "i");
+module_param(inftl_bbt_write, int, 0);
 
 static unsigned long doc_config_location = CONFIG_MTD_DISKONCHIP_PROBE_ADDRESS;
-MODULE_PARM(doc_config_location, "l");
+module_param(doc_config_location, ulong, 0);
 MODULE_PARM_DESC(doc_config_location, "Physical memory address at which to probe for DiskOnChip");
 
 
@@ -1505,7 +1505,7 @@ static inline int __init doc_probe(unsigned long physadr)
 	int reg, len, numchips;
 	int ret = 0;
 
-	virtadr = (void __iomem *)ioremap(physadr, DOC_IOREMAP_LEN);
+	virtadr = ioremap(physadr, DOC_IOREMAP_LEN);
 	if (!virtadr) {
 		printk(KERN_ERR "Diskonchip ioremap failed: 0x%x bytes at 0x%lx\n", DOC_IOREMAP_LEN, physadr);
 		return -EIO;
@@ -1720,24 +1720,9 @@ static void release_nanddoc(void)
 	}
 }
 
-int __init init_nanddoc(void)
+static int __init init_nanddoc(void)
 {
-	int i;
-
-	if (doc_config_location) {
-		printk(KERN_INFO "Using configured DiskOnChip probe address 0x%lx\n", doc_config_location);
-		return doc_probe(doc_config_location);
-	} else {
-		for (i=0; (doc_locations[i] != 0xffffffff); i++) {
-			doc_probe(doc_locations[i]);
-		}
-	}
-	/* No banner message any more. Print a message if no DiskOnChip
-	   found, so the user knows we at least tried. */
-	if (!doclist) {
-		printk(KERN_INFO "No valid DiskOnChip devices found\n");
-		return -ENODEV;
-	}
+	int i, ret = 0;
 
 	/* We could create the decoder on demand, if memory is a concern.
 	 * This way we have it handy, if an error happens 
@@ -1751,14 +1736,33 @@ int __init init_nanddoc(void)
 	rs_decoder = init_rs(10, 0x409, FCR, 1, NROOTS);
  	if (!rs_decoder) {
 		printk (KERN_ERR "DiskOnChip: Could not create a RS decoder\n");
-		release_nanddoc();
 		return -ENOMEM;
 	}
 
+	if (doc_config_location) {
+		printk(KERN_INFO "Using configured DiskOnChip probe address 0x%lx\n", doc_config_location);
+		ret = doc_probe(doc_config_location);
+		if (ret < 0)
+			goto outerr;
+	} else {
+		for (i=0; (doc_locations[i] != 0xffffffff); i++) {
+			doc_probe(doc_locations[i]);
+		}
+	}
+	/* No banner message any more. Print a message if no DiskOnChip
+	   found, so the user knows we at least tried. */
+	if (!doclist) {
+		printk(KERN_INFO "No valid DiskOnChip devices found\n");
+		ret = -ENODEV;
+		goto outerr;
+	}
 	return 0;
+outerr:
+	free_rs(rs_decoder);
+	return ret;
 }
 
-void __exit cleanup_nanddoc(void)
+static void __exit cleanup_nanddoc(void)
 {
 	/* Cleanup the nand/DoC resources */
 	release_nanddoc();

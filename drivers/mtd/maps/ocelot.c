@@ -1,5 +1,5 @@
 /*
- * $Id: ocelot.c,v 1.14 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: ocelot.c,v 1.15 2004/11/04 13:24:15 gleixner Exp $
  *
  * Flash on Momenco Ocelot
  */
@@ -81,7 +81,7 @@ static int __init init_ocelot_maps(void)
 	iounmap(pld);
 
 	/* Now ioremap the NVRAM space */
-	ocelot_nvram_map.virt = (void __iomem *)ioremap_nocache(NVRAM_WINDOW_ADDR, NVRAM_WINDOW_SIZE);
+	ocelot_nvram_map.virt = ioremap_nocache(NVRAM_WINDOW_ADDR, NVRAM_WINDOW_SIZE);
 	if (!ocelot_nvram_map.virt) {
 		printk(KERN_NOTICE "Failed to ioremap Ocelot NVRAM space\n");
 		return -EIO;
@@ -101,7 +101,7 @@ static int __init init_ocelot_maps(void)
 	nvram_mtd->write = ocelot_ram_write;
 
 	/* Now map the flash space */
-	ocelot_flash_map.virt = (void __iomem *)ioremap_nocache(FLASH_WINDOW_ADDR, FLASH_WINDOW_SIZE);
+	ocelot_flash_map.virt = ioremap_nocache(FLASH_WINDOW_ADDR, FLASH_WINDOW_SIZE);
 	if (!ocelot_flash_map.virt) {
 		printk(KERN_NOTICE "Failed to ioremap Ocelot flash space\n");
 		goto fail_2;

@@ -1526,11 +1526,11 @@ sys_call_table:
 	data8 sys_mq_notify
 	data8 sys_mq_getsetattr
 	data8 sys_ni_syscall			// reserved for kexec_load
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall			// 1270
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
-	data8 sys_ni_syscall
+	data8 sys_ni_syscall			// reserved for vserver
+	data8 sys_waitid			// 1270
+	data8 sys_add_key
+	data8 sys_request_key
+	data8 sys_keyctl
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall			// 1275
 	data8 sys_ni_syscall

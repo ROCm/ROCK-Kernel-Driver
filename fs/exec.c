@@ -342,7 +342,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
 	struct mm_struct *mm = current->mm;
-	int i;
+	int i, ret;
 	long arg_size;
 
 #ifdef CONFIG_STACK_GROWSUP
@@ -433,7 +433,11 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 			mpnt->vm_flags = VM_STACK_FLAGS;
 		mpnt->vm_flags |= mm->def_flags;
 		mpnt->vm_page_prot = protection_map[mpnt->vm_flags & 0x7];
-		insert_vm_struct(mm, mpnt);
+		if ((ret = insert_vm_struct(mm, mpnt))) {
+			up_write(&mm->mmap_sem);
+			kmem_cache_free(vm_area_cachep, mpnt);
+			return ret;
+		}
 		mm->stack_vm = mm->total_vm = vma_pages(mpnt);
 	}
 

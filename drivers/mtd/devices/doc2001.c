@@ -4,7 +4,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2001.c,v 1.44 2004/08/09 14:04:24 dwmw2 Exp $
+ * $Id: doc2001.c,v 1.46 2004/11/16 18:29:01 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -52,7 +52,7 @@ static int doc_erase (struct mtd_info *mtd, struct erase_info *instr);
 static struct mtd_info *docmillist = NULL;
 
 /* Perform the required delay cycles by reading from the NOP register */
-static void DoC_Delay(unsigned long docptr, unsigned short cycles)
+static void DoC_Delay(void __iomem * docptr, unsigned short cycles)
 {
 	volatile char dummy;
 	int i;
@@ -62,7 +62,7 @@ static void DoC_Delay(unsigned long docptr, unsigned short cycles)
 }
 
 /* DOC_WaitReady: Wait for RDY line to be asserted by the flash chip */
-static int _DoC_WaitReady(unsigned long docptr)
+static int _DoC_WaitReady(void __iomem * docptr)
 {
 	unsigned short c = 0xffff;
 
@@ -79,7 +79,7 @@ static int _DoC_WaitReady(unsigned long docptr)
 	return (c == 0);
 }
 
-static inline int DoC_WaitReady(unsigned long docptr)
+static inline int DoC_WaitReady(void __iomem * docptr)
 {
 	/* This is inline, to optimise the common case, where it's ready instantly */
 	int ret = 0;
@@ -103,7 +103,7 @@ static inline int DoC_WaitReady(unsigned long docptr)
    with the internal pipeline. Each of 4 delay cycles (read from the NOP register) is
    required after writing to CDSN Control register, see Software Requirement 11.4 item 3. */
 
-static inline void DoC_Command(unsigned long docptr, unsigned char command,
+static inline void DoC_Command(void __iomem * docptr, unsigned char command,
 			       unsigned char xtraflags)
 {
 	/* Assert the CLE (Command Latch Enable) line to the flash chip */
@@ -123,7 +123,7 @@ static inline void DoC_Command(unsigned long docptr, unsigned char command,
    with the internal pipeline. Each of 4 delay cycles (read from the NOP register) is
    required after writing to CDSN Control register, see Software Requirement 11.4 item 3. */
 
-static inline void DoC_Address(unsigned long docptr, int numbytes, unsigned long ofs,
+static inline void DoC_Address(void __iomem * docptr, int numbytes, unsigned long ofs,
 			       unsigned char xtraflags1, unsigned char xtraflags2)
 {
 	/* Assert the ALE (Address Latch Enable) line to the flash chip */
@@ -161,7 +161,7 @@ static inline void DoC_Address(unsigned long docptr, int numbytes, unsigned long
 }
 
 /* DoC_SelectChip: Select a given flash chip within the current floor */
-static int DoC_SelectChip(unsigned long docptr, int chip)
+static int DoC_SelectChip(void __iomem * docptr, int chip)
 {
 	/* Select the individual flash chip requested */
 	WriteDOC(chip, docptr, CDSNDeviceSelect);
@@ -172,7 +172,7 @@ static int DoC_SelectChip(unsigned long docptr, int chip)
 }
 
 /* DoC_SelectFloor: Select a given floor (bank of flash chips) */
-static int DoC_SelectFloor(unsigned long docptr, int floor)
+static int DoC_SelectFloor(void __iomem * docptr, int floor)
 {
 	/* Select the floor (bank) of chips required */
 	WriteDOC(floor, docptr, FloorSelect);
@@ -417,7 +417,7 @@ static int doc_read_ecc (struct mtd_info *mtd, loff_t from, size_t len,
 	volatile char dummy;
 	unsigned char syndrome[6];
 	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
-	unsigned long docptr = this->virtadr;
+	void __iomem *docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[from >> (this->chipshift)];
 
 	/* Don't allow read past end of device */
@@ -543,7 +543,7 @@ static int doc_write_ecc (struct mtd_info *mtd, loff_t to, size_t len,
 	int i,ret = 0;
 	volatile char dummy;
 	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
-	unsigned long docptr = this->virtadr;
+	void __iomem *docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[to >> (this->chipshift)];
 
 	/* Don't allow write past end of device */
@@ -678,7 +678,7 @@ static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 #endif
 	volatile char dummy;
 	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
-	unsigned long docptr = this->virtadr;
+	void __iomem *docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[ofs >> this->chipshift];
 
 	/* Find the chip which is to be used and select it */
@@ -730,7 +730,7 @@ static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 	volatile char dummy;
 	int ret = 0;
 	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
-	unsigned long docptr = this->virtadr;
+	void __iomem *docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[ofs >> this->chipshift];
 
 	/* Find the chip which is to be used and select it */
@@ -799,7 +799,7 @@ int doc_erase (struct mtd_info *mtd, struct erase_info *instr)
 	struct DiskOnChip *this = (struct DiskOnChip *)mtd->priv;
 	__u32 ofs = instr->addr;
 	__u32 len = instr->len;
-	unsigned long docptr = this->virtadr;
+	void __iomem *docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[ofs >> this->chipshift];
 
 	if (len != mtd->erasesize) 
@@ -856,7 +856,7 @@ int doc_erase (struct mtd_info *mtd, struct erase_info *instr)
  *
  ****************************************************************************/
 
-int __init init_doc2001(void)
+static int __init init_doc2001(void)
 {
 	inter_module_register(im_name, THIS_MODULE, &DoCMil_init);
 	return 0;

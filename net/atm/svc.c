@@ -479,7 +479,7 @@ static int svc_setsockopt(struct socket *sock, int level, int optname,
 				error = -EINVAL;
 				goto out;
 			}
- 			if (get_user(value, (int *) optval)) {
+ 			if (get_user(value, (int __user *) optval)) {
  				error = -EFAULT;
 				goto out;
 			}
@@ -597,14 +597,14 @@ static int svc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
  		case ATM_ADDPARTY:
  			if (!test_bit(ATM_VF_SESSION, &vcc->flags))
  				return -EINVAL;
- 			if (copy_from_user(&sa, (void *) arg, sizeof(sa)))
+ 			if (copy_from_user(&sa, (void __user *) arg, sizeof(sa)))
 				return -EFAULT;
  			error = svc_addparty(sock, (struct sockaddr *) &sa, sizeof(sa), 0);
  			break;
  		case ATM_DROPPARTY:
  			if (!test_bit(ATM_VF_SESSION, &vcc->flags))
  				return -EINVAL;
- 			if (copy_from_user(&ep_ref, (void *) arg, sizeof(int)))
+ 			if (copy_from_user(&ep_ref, (void __user *) arg, sizeof(int)))
 				return -EFAULT;
  			error = svc_dropparty(sock, ep_ref);
  			break;

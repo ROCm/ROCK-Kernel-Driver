@@ -84,8 +84,7 @@ int __init init_ocotea(void)
 	}
 
 	ocotea_small_map.phys = small_flash_base;
-	ocotea_small_map.virt =
-		(void __iomem *)ioremap64(small_flash_base,
+	ocotea_small_map.virt = ioremap64(small_flash_base,
 					 ocotea_small_map.size);
 
 	if (!ocotea_small_map.virt) {
@@ -106,8 +105,7 @@ int __init init_ocotea(void)
 	}
 
 	ocotea_large_map.phys = large_flash_base;
-	ocotea_large_map.virt =
-		(void __iomem *)ioremap64(large_flash_base,
+	ocotea_large_map.virt = ioremap64(large_flash_base,
 					 ocotea_large_map.size);
 
 	if (!ocotea_large_map.virt) {

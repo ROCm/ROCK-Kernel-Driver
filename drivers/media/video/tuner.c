@@ -1,5 +1,5 @@
 /*
- * $Id: tuner.c,v 1.29 2004/11/07 13:17:15 kraxel Exp $
+ * $Id: tuner.c,v 1.31 2004/11/10 11:07:24 kraxel Exp $
  */
 
 #include <linux/module.h>
@@ -30,24 +30,24 @@ I2C_CLIENT_INSMOD;
 /* insmod options used at init time => read/only */
 static unsigned int type  =  UNSET;
 static unsigned int addr  =  0;
-module_param(type, int, 444);
-module_param(addr, int, 444);
+module_param(type, int, 0444);
+module_param(addr, int, 0444);
 
 /* insmod options used at runtime => read/write */
 static unsigned int debug         = 0;
 static unsigned int tv_antenna    = 1;
 static unsigned int radio_antenna = 0;
 static unsigned int optimize_vco  = 1;
-module_param(debug,             int, 644);
-module_param(tv_antenna,        int, 644);
-module_param(radio_antenna,     int, 644);
-module_param(optimize_vco,      int, 644);
+module_param(debug,             int, 0644);
+module_param(tv_antenna,        int, 0644);
+module_param(radio_antenna,     int, 0644);
+module_param(optimize_vco,      int, 0644);
 
 static unsigned int tv_range[2]    = { 44, 958 };
 static unsigned int radio_range[2] = { 65, 108 };
 
-module_param_array(tv_range,    int, NULL, 644);
-module_param_array(radio_range, int, NULL, 644);
+module_param_array(tv_range,    int, NULL, 0644);
+module_param_array(radio_range, int, NULL, 0644);
 
 MODULE_DESCRIPTION("device driver for various TV and TV+FM radio tuners");
 MODULE_AUTHOR("Ralph Metzler, Gerd Knorr, Gunther Mayer");
@@ -262,6 +262,8 @@ static struct tunertype tuners[] = {
 	  16*162.00,16*457.00,0xa2,0x94,0x31,0x8e,732},
         { "TCL 2002N", TCL, NTSC,
           16*172.00,16*448.00,0x01,0x02,0x08,0x8e,732},
+	{ "Philips PAL/SECAM_D (FM 1256 I-H3)", Philips, PAL,
+	  16*160.00,16*442.00,0x01,0x02,0x04,0x8e,623 },
 
 };
 #define TUNERS ARRAY_SIZE(tuners)
@@ -986,12 +988,16 @@ static void default_set_radio_freq(struct i2c_client *c, unsigned int freq)
 
 	tun=&tuners[t->type];
 	div = freq + (int)(16*10.7);
-        buffer[0] = (div>>8) & 0x7f;
-        buffer[1] = div      & 0xff;
 	buffer[2] = tun->config;
+
 	switch (t->type) {
 	case TUNER_PHILIPS_FM1216ME_MK3:
 	case TUNER_PHILIPS_FM1236_MK3:
+		buffer[3] = 0x19;
+		break;
+	case TUNER_PHILIPS_FM1256_IH3:
+		div = (20 * freq)/16 + 333 * 2;
+	        buffer[2] = 0x80;
 		buffer[3] = 0x19;
 		break;
 	case TUNER_LG_PAL_FM:
@@ -1001,6 +1007,8 @@ static void default_set_radio_freq(struct i2c_client *c, unsigned int freq)
 		buffer[3] = 0xa4;
 		break;
 	}
+        buffer[0] = (div>>8) & 0x7f;
+        buffer[1] = div      & 0xff;
 
 	dprintk("tuner: radio 0x%02x 0x%02x 0x%02x 0x%02x\n",
 		buffer[0],buffer[1],buffer[2],buffer[3]);
@@ -1077,7 +1085,7 @@ static void set_type(struct i2c_client *c, unsigned int type, char *source)
 {
 	struct tuner *t = i2c_get_clientdata(c);
 
-	if (t->type != UNSET) {
+	if (t->type != UNSET && t->type != TUNER_ABSENT) {
 		if (t->type != type)
 			printk("tuner: type already set to %d, "
 			       "ignoring request for %d\n", t->type, type);

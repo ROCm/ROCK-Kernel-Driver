@@ -94,6 +94,9 @@
 /*IBM icom*/
 #define PORT_ICOM      60
 
+/* Samsung S3C2440 SoC */
+#define PORT_S3C2440	61
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>
@@ -171,7 +174,7 @@ struct uart_icount {
 struct uart_port {
 	spinlock_t		lock;			/* port lock */
 	unsigned int		iobase;			/* in/out[bwl] */
-	char			*membase;		/* read/write[bwl] */
+	unsigned char __iomem	*membase;		/* read/write[bwl] */
 	unsigned int		irq;			/* irq number */
 	unsigned int		uartclk;		/* base uart clock */
 	unsigned char		fifosize;		/* tx fifo size */

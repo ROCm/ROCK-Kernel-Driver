@@ -10,7 +10,6 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/smp.h>
@@ -26,7 +25,6 @@
 #include <linux/kmod.h>
 #include <linux/workqueue.h>
 #include <linux/jiffies.h>
-#include <linux/config.h>
 #include <linux/kernel_stat.h>
 #include <linux/percpu.h>
 
@@ -83,7 +81,7 @@ struct dbs_tuners {
 	unsigned int		down_threshold;
 };
 
-struct dbs_tuners dbs_tuners_ins = {
+static struct dbs_tuners dbs_tuners_ins = {
 	.up_threshold 		= DEF_FREQUENCY_UP_THRESHOLD,
 	.down_threshold 	= DEF_FREQUENCY_DOWN_THRESHOLD,
 	.sampling_down_factor 	= DEF_SAMPLING_DOWN_FACTOR,
@@ -101,10 +99,8 @@ static ssize_t show_sampling_rate_min(struct cpufreq_policy *policy, char *buf)
 }
 
 #define define_one_ro(_name) 					\
-static struct freq_attr _name = { 				\
-	.attr = { .name = __stringify(_name), .mode = 0444 }, 	\
-	.show = show_##_name, 					\
-}
+static struct freq_attr _name =  				\
+__ATTR(_name, 0444, show_##_name, NULL)
 
 define_one_ro(sampling_rate_max);
 define_one_ro(sampling_rate_min);
@@ -127,13 +123,13 @@ static ssize_t store_sampling_down_factor(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
-	down(&dbs_sem);
 	if (ret != 1 )
-		goto out;
+		return -EINVAL;
 
+	down(&dbs_sem);
 	dbs_tuners_ins.sampling_down_factor = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
@@ -143,13 +139,16 @@ static ssize_t store_sampling_rate(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
+
 	down(&dbs_sem);
-	if (ret != 1 || input > MAX_SAMPLING_RATE || input < MIN_SAMPLING_RATE)
-		goto out;
+	if (ret != 1 || input > MAX_SAMPLING_RATE || input < MIN_SAMPLING_RATE) {
+		up(&dbs_sem);
+		return -EINVAL;
+	}
 
 	dbs_tuners_ins.sampling_rate = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
@@ -159,15 +158,18 @@ static ssize_t store_up_threshold(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
+
 	down(&dbs_sem);
 	if (ret != 1 || input > MAX_FREQUENCY_UP_THRESHOLD || 
 			input < MIN_FREQUENCY_UP_THRESHOLD ||
-			input <= dbs_tuners_ins.down_threshold)
-		goto out;
+			input <= dbs_tuners_ins.down_threshold) {
+		up(&dbs_sem);
+		return -EINVAL;
+	}
 
 	dbs_tuners_ins.up_threshold = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
@@ -177,24 +179,24 @@ static ssize_t store_down_threshold(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
+
 	down(&dbs_sem);
 	if (ret != 1 || input > MAX_FREQUENCY_DOWN_THRESHOLD || 
 			input < MIN_FREQUENCY_DOWN_THRESHOLD ||
-			input >= dbs_tuners_ins.up_threshold)
-		goto out;
+			input >= dbs_tuners_ins.up_threshold) {
+		up(&dbs_sem);
+		return -EINVAL;
+	}
 
 	dbs_tuners_ins.down_threshold = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
-#define define_one_rw(_name) 					\
-static struct freq_attr _name = { 				\
-	.attr = { .name = __stringify(_name), .mode = 0644 }, 	\
-	.show = show_##_name, 					\
-	.store = store_##_name, 				\
-}
+#define define_one_rw(_name) \
+static struct freq_attr _name = \
+__ATTR(_name, 0644, show_##_name, store_##_name)
 
 define_one_rw(sampling_rate);
 define_one_rw(sampling_down_factor);

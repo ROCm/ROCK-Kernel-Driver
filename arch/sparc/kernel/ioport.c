@@ -47,8 +47,8 @@
 
 struct resource *_sparc_find_resource(struct resource *r, unsigned long);
 
-static void *_sparc_ioremap(struct resource *res, u32 bus, u32 pa, int sz);
-static void *_sparc_alloc_io(unsigned int busno, unsigned long phys,
+static void __iomem *_sparc_ioremap(struct resource *res, u32 bus, u32 pa, int sz);
+static void __iomem *_sparc_alloc_io(unsigned int busno, unsigned long phys,
     unsigned long size, char *name);
 static void _sparc_free_io(struct resource *res);
 
@@ -103,7 +103,7 @@ static void xres_free(struct xresource *xrp) {
  *
  * Bus type is always zero on IIep.
  */
-void *ioremap(unsigned long offset, unsigned long size)
+void __iomem *ioremap(unsigned long offset, unsigned long size)
 {
 	char name[14];
 
@@ -114,7 +114,7 @@ void *ioremap(unsigned long offset, unsigned long size)
 /*
  * Comlimentary to ioremap().
  */
-void iounmap(void *virtual)
+void iounmap(volatile void __iomem *virtual)
 {
 	unsigned long vaddr = (unsigned long) virtual & PAGE_MASK;
 	struct resource *res;
@@ -134,24 +134,24 @@ void iounmap(void *virtual)
 
 /*
  */
-unsigned long sbus_ioremap(struct resource *phyres, unsigned long offset,
+void __iomem *sbus_ioremap(struct resource *phyres, unsigned long offset,
     unsigned long size, char *name)
 {
-	return (unsigned long) _sparc_alloc_io(phyres->flags & 0xF,
+	return _sparc_alloc_io(phyres->flags & 0xF,
 	    phyres->start + offset, size, name);
 }
 
 /*
  */
-void sbus_iounmap(unsigned long addr, unsigned long size)
+void sbus_iounmap(volatile void __iomem *addr, unsigned long size)
 {
-	iounmap((void *)addr);
+	iounmap(addr);
 }
 
 /*
  * Meat of mapping
  */
-static void *_sparc_alloc_io(unsigned int busno, unsigned long phys,
+static void __iomem *_sparc_alloc_io(unsigned int busno, unsigned long phys,
     unsigned long size, char *name)
 {
 	static int printed_full;
@@ -159,7 +159,7 @@ static void *_sparc_alloc_io(unsigned int busno, unsigned long phys,
 	struct resource *res;
 	char *tack;
 	int tlen;
-	void *va;	/* P3 diag */
+	void __iomem *va;	/* P3 diag */
 
 	if (name == NULL) name = "???";
 
@@ -189,7 +189,7 @@ static void *_sparc_alloc_io(unsigned int busno, unsigned long phys,
 
 /*
  */
-static void *
+static void __iomem *
 _sparc_ioremap(struct resource *res, u32 bus, u32 pa, int sz)
 {
 	unsigned long offset = ((unsigned long) pa) & (~PAGE_MASK);
@@ -206,7 +206,7 @@ _sparc_ioremap(struct resource *res, u32 bus, u32 pa, int sz)
 	pa &= PAGE_MASK;
 	sparc_mapiorange(bus, pa, res->start, res->end - res->start + 1);
 
-	return (void *) (res->start + offset);
+	return (void __iomem *) (res->start + offset);
 }
 
 /*

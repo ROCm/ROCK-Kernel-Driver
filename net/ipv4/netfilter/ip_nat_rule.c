@@ -59,8 +59,8 @@ static struct
 	struct ipt_replace repl;
 	struct ipt_standard entries[3];
 	struct ipt_error term;
-} nat_initial_table __initdata
-= { { "nat", NAT_VALID_HOOKS, 4,
+} nat_initial_table = {
+    { "nat", NAT_VALID_HOOKS, 4,
       sizeof(struct ipt_standard) * 3 + sizeof(struct ipt_error),
       { [NF_IP_PRE_ROUTING] = 0,
 	[NF_IP_POST_ROUTING] = sizeof(struct ipt_standard),

@@ -51,7 +51,7 @@
 
 struct uart_sunsab_port {
 	struct uart_port		port;		/* Generic UART port	*/
-	union sab82532_async_regs	*regs;		/* Chip registers	*/
+	union sab82532_async_regs	__iomem *regs;	/* Chip registers	*/
 	unsigned long			irqflags;	/* IRQ state flags	*/
 	int				dsr;		/* Current DSR state	*/
 	unsigned int			cec_timeout;	/* Chip poll timeout... */
@@ -1125,13 +1125,13 @@ static int __init sunsab_init(void)
 
 	sunserial_current_minor += num_channels;
 	
+	sunsab_console_init();
+
 	for (i = 0; i < num_channels; i++) {
 		struct uart_sunsab_port *up = &sunsab_ports[i];
 
 		uart_add_one_port(&sunsab_reg, &up->port);
 	}
-
-	sunsab_console_init();
 
 	return 0;
 }

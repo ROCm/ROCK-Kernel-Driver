@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/head-armv.S
+ *  linux/arch/arm/kernel/head.S
  *
  *  Copyright (C) 1994-2002 Russell King
  *

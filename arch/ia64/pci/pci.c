@@ -46,6 +46,8 @@
 #define DBG(x...)
 #endif
 
+static int pci_routeirq;
+
 /*
  * Low-level SAL-based PCI configuration access functions. Note that SAL
  * calls are already serialized (via sal_lock), so we don't need another
@@ -141,13 +143,28 @@ extern acpi_status acpi_map_iosapic (acpi_handle, u32, void*, void**);
 
 	acpi_get_devices(NULL, acpi_map_iosapic, NULL, NULL);
 #endif
-	/*
-	 * PCI IRQ routing is set up by pci_enable_device(), but we
-	 * also do it here in case there are still broken drivers that
-	 * don't use pci_enable_device().
-	 */
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
-		acpi_pci_irq_enable(dev);
+
+	if (pci_routeirq) {
+		/*
+		 * PCI IRQ routing is set up by pci_enable_device(), but we
+		 * also do it here in case there are still broken drivers that
+		 * don't use pci_enable_device().
+		 */
+		printk(KERN_INFO "** Routing PCI interrupts for all devices because \"pci=routeirq\"\n");
+		printk(KERN_INFO "** was specified.  If this was required to make a driver work,\n");
+		printk(KERN_INFO "** please email the output of \"lspci\" to bjorn.helgaas@hp.com\n");
+		printk(KERN_INFO "** so I can fix the driver.\n");
+		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
+			acpi_pci_irq_enable(dev);
+	} else {
+		printk(KERN_INFO "** PCI interrupts are no longer routed automatically.  If this\n");
+		printk(KERN_INFO "** causes a device to stop working, it is probably because the\n");
+		printk(KERN_INFO "** driver failed to call pci_enable_device().  As a temporary\n");
+		printk(KERN_INFO "** workaround, the \"pci=routeirq\" argument restores the old\n");
+		printk(KERN_INFO "** behavior.  If this argument makes the device work again,\n");
+		printk(KERN_INFO "** please email the output of \"lspci\" to bjorn.helgaas@hp.com\n");
+		printk(KERN_INFO "** so I can fix the driver.\n");
+	}
 
 	return 0;
 }
@@ -475,6 +492,8 @@ pcibios_align_resource (void *data, struct resource *res,
 char * __init
 pcibios_setup (char *str)
 {
+	if (!strcmp(str, "routeirq"))
+		pci_routeirq = 1;
 	return NULL;
 }
 

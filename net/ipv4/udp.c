@@ -1306,6 +1306,7 @@ static int udp_getsockopt(struct sock *sk, int level, int optname,
 
 struct proto udp_prot = {
  	.name =		"UDP",
+	.owner =	THIS_MODULE,
 	.close =	udp_close,
 	.connect =	ip4_datagram_connect,
 	.disconnect =	udp_disconnect,

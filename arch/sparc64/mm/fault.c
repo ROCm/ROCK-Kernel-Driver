@@ -352,7 +352,7 @@ asmlinkage void do_sparc64_fault(struct pt_regs *regs)
 	 * If we're in an interrupt or have no user
 	 * context, we must not take the fault..
 	 */
-	if (in_interrupt() || !mm)
+	if (in_atomic() || !mm)
 		goto intr_or_no_mm;
 
 	if (test_thread_flag(TIF_32BIT)) {
@@ -361,7 +361,15 @@ asmlinkage void do_sparc64_fault(struct pt_regs *regs)
 		address &= 0xffffffff;
 	}
 
-	down_read(&mm->mmap_sem);
+	if (!down_read_trylock(&mm->mmap_sem)) {
+		if ((regs->tstate & TSTATE_PRIV) &&
+		    !search_exception_tables(regs->tpc)) {
+			insn = get_fault_insn(regs, insn);
+			goto handle_kernel_fault;
+		}
+		down_read(&mm->mmap_sem);
+	}
+
 	vma = find_vma(mm, address);
 	if (!vma)
 		goto bad_area;
@@ -446,16 +454,18 @@ good_area:
 	}
 
 	switch (handle_mm_fault(mm, vma, address, (fault_code & FAULT_CODE_WRITE))) {
-	case 1:
+	case VM_FAULT_MINOR:
 		current->min_flt++;
 		break;
-	case 2:
+	case VM_FAULT_MAJOR:
 		current->maj_flt++;
 		break;
-	case 0:
+	case VM_FAULT_SIGBUS:
 		goto do_sigbus;
-	default:
+	case VM_FAULT_OOM:
 		goto out_of_memory;
+	default:
+		BUG();
 	}
 
 	up_read(&mm->mmap_sem);

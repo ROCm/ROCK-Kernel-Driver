@@ -6,7 +6,7 @@
  *  Derived from drivers/mtd/nand/autcpu12.c
  *       Copyright (c) 2001 Thomas Gleixner (gleixner@autronix.de)
  *
- * $Id: edb7312.c,v 1.10 2004/10/05 13:50:20 gleixner Exp $
+ * $Id: edb7312.c,v 1.11 2004/11/04 12:53:10 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -56,16 +56,6 @@ static struct mtd_info *ep7312_mtd = NULL;
 static unsigned long ep7312_fio_pbase = EP7312_FIO_PBASE;
 static void __iomem * ep7312_pxdr = (void __iomem *) EP7312_PXDR;
 static void __iomem * ep7312_pxddr = (void __iomem *) EP7312_PXDDR;
-
-#ifdef MODULE
-MODULE_PARM(ep7312_fio_pbase, "i");
-MODULE_PARM(ep7312_pxdr, "i");
-MODULE_PARM(ep7312_pxddr, "i");
-
-__setup("ep7312_fio_pbase=",ep7312_fio_pbase);
-__setup("ep7312_pxdr=",ep7312_pxdr);
-__setup("ep7312_pxddr=",ep7312_pxddr);
-#endif
 
 #ifdef CONFIG_MTD_PARTITIONS
 /*
@@ -143,7 +133,7 @@ static int __init ep7312_init (void)
 	}
 	
 	/* map physical adress */
-	ep7312_fio_base = (void __iomem *)ioremap(ep7312_fio_pbase, SZ_1K);
+	ep7312_fio_base = ioremap(ep7312_fio_pbase, SZ_1K);
 	if(!ep7312_fio_base) {
 		printk("ioremap EDB7312 NAND flash failed\n");
 		kfree(ep7312_mtd);

@@ -55,7 +55,7 @@ __xfrm6_state_lookup(xfrm_address_t *daddr, u32 spi, u8 proto)
 	list_for_each_entry(x, xfrm6_state_afinfo.state_byspi+h, byspi) {
 		if (x->props.family == AF_INET6 &&
 		    spi == x->id.spi &&
-		    !ipv6_addr_cmp((struct in6_addr *)daddr, (struct in6_addr *)x->id.daddr.a6) &&
+		    ipv6_addr_equal((struct in6_addr *)daddr, (struct in6_addr *)x->id.daddr.a6) &&
 		    proto == x->id.proto) {
 			xfrm_state_hold(x);
 			return x;
@@ -76,10 +76,10 @@ __xfrm6_find_acq(u8 mode, u32 reqid, u8 proto,
 
 	list_for_each_entry(x, xfrm6_state_afinfo.state_bydst+h, bydst) {
 		if (x->props.family == AF_INET6 &&
-		    !ipv6_addr_cmp((struct in6_addr *)daddr, (struct in6_addr *)x->id.daddr.a6) &&
+		    ipv6_addr_equal((struct in6_addr *)daddr, (struct in6_addr *)x->id.daddr.a6) &&
 		    mode == x->props.mode &&
 		    proto == x->id.proto &&
-		    !ipv6_addr_cmp((struct in6_addr *)saddr, (struct in6_addr *)x->props.saddr.a6) &&
+		    ipv6_addr_equal((struct in6_addr *)saddr, (struct in6_addr *)x->props.saddr.a6) &&
 		    reqid == x->props.reqid &&
 		    x->km.state == XFRM_STATE_ACQ &&
 		    !x->id.spi) {

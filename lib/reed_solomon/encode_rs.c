@@ -9,11 +9,11 @@
  *
  * Adaption to the kernel by Thomas Gleixner (tglx@linutronix.de)
  *
- * $Id: encode_rs.c,v 1.3 2004/10/05 22:07:53 gleixner Exp $
+ * $Id: encode_rs.c,v 1.4 2004/10/22 15:41:47 gleixner Exp $
  *
  */
 
-/* Generic data witdh independend code which is included by the 
+/* Generic data width independent code which is included by the 
  * wrappers.
  * int encode_rsX (struct rs_control *rs, uintX_t *data, int len, uintY_t *par)
  */

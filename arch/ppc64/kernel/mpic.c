@@ -476,7 +476,7 @@ struct mpic * __init mpic_alloc(unsigned long phys_addr,
 	const char	*vers;
 	int		i;
 
-	mpic = (struct mpic *)alloc_bootmem(sizeof(struct mpic));
+	mpic = alloc_bootmem(sizeof(struct mpic));
 	if (mpic == NULL)
 		return NULL;
 	

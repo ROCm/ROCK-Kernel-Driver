@@ -1,5 +1,5 @@
 /***************************************************************************
- * Driver for TAS5110C1B image sensor connected to the SN9C10x PC Camera   *
+ * Plug-in for TAS5110C1B image sensor connected to the SN9C10x PC Camera  *
  * Controllers                                                             *
  *                                                                         *
  * Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>       *
@@ -150,7 +150,7 @@ int sn9c102_probe_tas5110c1b(struct sn9c102_device* cam)
 	/* This sensor has no identifiers, so let's attach it anyway */
 	sn9c102_attach_sensor(cam, &tas5110c1b);
 
-	/* At the moment, sensor detection is based on USB pid/vid */
+	/* Sensor detection is based on USB pid/vid */
 	if (tas5110c1b.usbdev->descriptor.idProduct != 0x6001 &&
 	    tas5110c1b.usbdev->descriptor.idProduct != 0x6005 &&
 	    tas5110c1b.usbdev->descriptor.idProduct != 0x60ab)

@@ -19,7 +19,7 @@
  * PPP driver, written by Michael Callahan and Al Longyear, and
  * subsequently hacked by Paul Mackerras.
  *
- * ==FILEVERSION 20020217==
+ * ==FILEVERSION 20041108==
  */
 
 #include <linux/config.h>
@@ -412,6 +412,17 @@ static ssize_t ppp_read(struct file *file, char __user *buf,
 		ret = 0;
 		if (pf->dead)
 			break;
+		if (pf->kind == INTERFACE) {
+			/*
+			 * Return 0 (EOF) on an interface that has no
+			 * channels connected, unless it is looping
+			 * network traffic (demand mode).
+			 */
+			struct ppp *ppp = PF_TO_PPP(pf);
+			if (ppp->n_channels == 0
+			    && (ppp->flags & SC_LOOP_TRAFFIC) == 0)
+				break;
+		}
 		ret = -EAGAIN;
 		if (file->f_flags & O_NONBLOCK)
 			break;
@@ -491,6 +502,14 @@ static unsigned int ppp_poll(struct file *file, poll_table *wait)
 		mask |= POLLIN | POLLRDNORM;
 	if (pf->dead)
 		mask |= POLLHUP;
+	else if (pf->kind == INTERFACE) {
+		/* see comment in ppp_read */
+		struct ppp *ppp = PF_TO_PPP(pf);
+		if (ppp->n_channels == 0
+		    && (ppp->flags & SC_LOOP_TRAFFIC) == 0)
+			mask |= POLLIN | POLLRDNORM;
+	}
+
 	return mask;
 }
 
@@ -2559,7 +2578,8 @@ ppp_disconnect_channel(struct channel *pch)
 		/* remove it from the ppp unit's list */
 		ppp_lock(ppp);
 		list_del(&pch->clist);
-		--ppp->n_channels;
+		if (--ppp->n_channels == 0)
+			wake_up_interruptible(&ppp->file.rwait);
 		ppp_unlock(ppp);
 		if (atomic_dec_and_test(&ppp->file.refcnt))
 			ppp_destroy_interface(ppp);

@@ -537,7 +537,7 @@ void usb_stor_invoke_transport(struct scsi_cmnd *srb, struct us_data *us)
 	/* if the command gets aborted by the higher layers, we need to
 	 * short-circuit all other processing
 	 */
-	if (us->sm_state == US_STATE_ABORTING) {
+	if (test_bit(US_FLIDX_TIMED_OUT, &us->flags)) {
 		US_DEBUGP("-- command was aborted\n");
 		goto Handle_Abort;
 	}
@@ -665,7 +665,7 @@ void usb_stor_invoke_transport(struct scsi_cmnd *srb, struct us_data *us)
 		srb->cmd_len = old_cmd_len;
 		memcpy(srb->cmnd, old_cmnd, MAX_COMMAND_SIZE);
 
-		if (us->sm_state == US_STATE_ABORTING) {
+		if (test_bit(US_FLIDX_TIMED_OUT, &us->flags)) {
 			US_DEBUGP("-- auto-sense aborted\n");
 			goto Handle_Abort;
 		}

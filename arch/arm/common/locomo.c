@@ -627,9 +627,6 @@ static int locomo_remove(struct device *dev)
 	if (lchip) {
 		__locomo_remove(lchip);
 		dev_set_drvdata(dev, NULL);
-
-		kfree(dev->saved_state);
-		dev->saved_state = NULL;
 	}
 
 	return 0;

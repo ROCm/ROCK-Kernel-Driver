@@ -325,7 +325,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	set_fs(USER_DS);
 	if (regs->eflags & TF_MASK) {
-		if (current->ptrace & PT_PTRACED) {
+		if ((current->ptrace & (PT_PTRACED | PT_DTRACE)) == (PT_PTRACED | PT_DTRACE)) {
 			ptrace_notify(SIGTRAP);
 		} else {
 			regs->eflags &= ~TF_MASK;
