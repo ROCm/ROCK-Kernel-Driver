@@ -1,36 +1,20 @@
 /* Postprocess module symbol versions
  *
  * Copyright 2003       Kai Germaschewski
- *           2002       Rusty Russell IBM Corporation
+ *           2002-2003  Rusty Russell, IBM Corporation
  *
- * Based in part on module-init-tools/depmod.c
+ * Based in part on module-init-tools/depmod.c,file2alias
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
  *
- * Usage: modpost $(NM) vmlinux module1.o module2.o ...
+ * Usage: modpost vmlinux module1.o module2.o ...
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-/* nm command */
-const char *nm;
+#include "modpost.h"
 
 /* Are we using CONFIG_MODVERSIONS? */
 int modversions = 0;
-
-void
-usage(void)
-{
-	fprintf(stderr, "Usage: modpost $(NM) vmlinux module1.o module2.o\n");
-	exit(1);
-}
 
 void
 fatal(const char *fmt, ...)
@@ -71,14 +55,29 @@ void *do_nofail(void *ptr, const char *file, int line, const char *expr)
 
 /* A list of all modules we processed */
 
-struct module {
-	struct module *next;
-	const char *name;
-	struct symbol *unres;
-	int seen;
-};
-
 static struct module *modules;
+
+struct module *
+new_module(char *modname)
+{
+	struct module *mod;
+	char *p;
+	
+	/* strip trailing .o */
+	p = strstr(modname, ".o");
+	if (p)
+		*p = 0;
+
+	mod = NOFAIL(malloc(sizeof(*mod)));
+	memset(mod, 0, sizeof(*mod));
+	mod->name = modname;
+
+	/* add to list */
+	mod->next = modules;
+	modules = mod;
+
+	return mod;
+}
 
 /* A hash of all exported symbols,
  * struct symbol is also used for lists of unresolved symbols */
@@ -159,7 +158,7 @@ find_symbol(const char *name)
 /* Add an exported symbol - it may have already been added without a
  * CRC, in this case just update the CRC */
 void
-add_symbol(const char *name, struct module *module, unsigned int *crc)
+add_exported_symbol(const char *name, struct module *module, unsigned int *crc)
 {
 	struct symbol *s = find_symbol(name);
 
@@ -173,74 +172,162 @@ add_symbol(const char *name, struct module *module, unsigned int *crc)
 	}
 }
 
-#define SZ 500
+void *
+grab_file(const char *filename, unsigned long *size)
+{
+	struct stat st;
+	void *map;
+	int fd;
+
+	fd = open(filename, O_RDONLY);
+	if (fd < 0) {
+		perror(filename);
+		abort();
+	}
+	if (fstat(fd, &st) != 0) {
+		perror(filename);
+		abort();
+	}
+
+	*size = st.st_size;
+	map = mmap(NULL, *size, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
+	if (mmap == MAP_FAILED) {
+		perror(filename);
+		abort();
+	}
+	close(fd);
+	return map;
+}
+
+void
+parse_elf(struct elf_info *info, const char *filename)
+{
+	unsigned int i;
+	Elf_Ehdr *hdr = info->hdr;
+	Elf_Shdr *sechdrs;
+	Elf_Sym  *sym;
+
+	hdr = grab_file(filename, &info->size);
+	info->hdr = hdr;
+	if (info->size < sizeof(*hdr))
+		goto truncated;
+
+	/* Fix endianness in ELF header */
+	hdr->e_shoff    = TO_NATIVE(hdr->e_shoff);
+	hdr->e_shstrndx = TO_NATIVE(hdr->e_shstrndx);
+	hdr->e_shnum    = TO_NATIVE(hdr->e_shnum);
+	sechdrs = (void *)hdr + hdr->e_shoff;
+	info->sechdrs = sechdrs;
+
+	/* Fix endianness in section headers */
+	for (i = 0; i < hdr->e_shnum; i++) {
+		sechdrs[i].sh_type   = TO_NATIVE(sechdrs[i].sh_type);
+		sechdrs[i].sh_offset = TO_NATIVE(sechdrs[i].sh_offset);
+		sechdrs[i].sh_size   = TO_NATIVE(sechdrs[i].sh_size);
+		sechdrs[i].sh_link   = TO_NATIVE(sechdrs[i].sh_link);
+	}
+	/* Find symbol table. */
+	for (i = 1; i < hdr->e_shnum; i++) {
+		if (sechdrs[i].sh_offset > info->size)
+			goto truncated;
+		if (sechdrs[i].sh_type != SHT_SYMTAB)
+			continue;
+
+		info->symtab_start = (void *)hdr + sechdrs[i].sh_offset;
+		info->symtab_stop  = (void *)hdr + sechdrs[i].sh_offset 
+			                         + sechdrs[i].sh_size;
+		info->strtab       = (void *)hdr + 
+			             sechdrs[sechdrs[i].sh_link].sh_offset;
+	}
+	if (!info->symtab_start) {
+		fprintf(stderr, "modpost: %s no symtab?\n", filename);
+		abort();
+	}
+	/* Fix endianness in symbols */
+	for (sym = info->symtab_start; sym < info->symtab_stop; sym++) {
+		sym->st_shndx = TO_NATIVE(sym->st_shndx);
+		sym->st_name  = TO_NATIVE(sym->st_name);
+		sym->st_value = TO_NATIVE(sym->st_value);
+		sym->st_size  = TO_NATIVE(sym->st_size);
+	}
+	return;
+
+ truncated:
+	fprintf(stderr, "modpost: %s is truncated.\n", filename);
+	abort();
+}
+
+void
+parse_elf_finish(struct elf_info *info)
+{
+	munmap(info->hdr, info->size);
+}
+
+void
+handle_modversions(struct module *mod, struct elf_info *info,
+		   Elf_Sym *sym, const char *symname)
+{
+	struct symbol *s;
+
+	switch (sym->st_shndx) {
+	case SHN_COMMON:
+		fprintf(stderr, "*** Warning: \"%s\" [%s] is COMMON symbol\n",
+			symname, mod->name);
+		break;
+	case SHN_ABS:
+		/* CRC'd symbol */
+		if (memcmp(symname, "__crc_", 6) == 0) {
+			add_exported_symbol(symname+6, mod, &sym->st_value);
+			modversions = 1;
+		}
+		break;
+	case SHN_UNDEF:
+		/* undefined symbol */
+		if (ELF_ST_BIND(sym->st_info) != STB_GLOBAL)
+			break;
+		
+		s = alloc_symbol(symname);
+		/* add to list */
+		s->next = mod->unres;
+		mod->unres = s;
+		break;
+	default:
+		/* All exported symbols */
+		if (memcmp(symname, "__ksymtab_", 10) == 0) {
+			add_exported_symbol(symname+10, mod, NULL);
+		}
+		break;
+	}
+}
 
 void
 read_symbols(char *modname)
 {
+	const char *symname;
 	struct module *mod;
-	struct symbol *s;
-	char buf[SZ], sym[SZ], *p;
-	FILE *pipe;
-	unsigned int crc;
-	int rc;
+	struct elf_info info = { };
+	Elf_Sym *sym;
 
-	/* read nm output */
-	snprintf(buf, SZ, "%s --no-sort %s", nm, modname);
-	pipe = NOFAIL(popen(buf, "r"));
+	parse_elf(&info, modname);
 
-	/* strip trailing .o */
-	p = strstr(modname, ".o");
-	if (p)
-		*p = 0;
+	mod = new_module(modname);
 
-	mod = NOFAIL(malloc(sizeof(*mod)));
-	mod->name = modname;
-	/* add to list */
-	mod->next = modules;
-	modules = mod;
-	
-	while (fgets(buf, SZ, pipe)) {
-		/* actual CRCs */
-		rc = sscanf(buf, "%x A __crc_%s\n", &crc, sym);
-		if (rc == 2) {
-			add_symbol(sym, mod, &crc);
-			modversions = 1;
-			continue;
-		}
+	for (sym = info.symtab_start; sym < info.symtab_stop; sym++) {
+		symname = info.strtab + sym->st_name;
 
-		/* all exported symbols */
-		rc = sscanf(buf, "%x r __ksymtab_%s", &crc, sym);
-		if (rc == 2) {
-			add_symbol(sym, mod, NULL);
-			continue;
-		}
-
-		/* all unresolved symbols */
-		rc = sscanf(buf, " U %s\n", sym);
-		if (rc == 1) {
-			s = alloc_symbol(sym);
-			/* add to list */
-			s->next = mod->unres;
-			mod->unres = s;
-			continue;
-		}
-	};
-	pclose(pipe);
+		handle_modversions(mod, &info, sym, symname);
+		handle_moddevtable(mod, &info, sym, symname);
+	}
+	parse_elf_finish(&info);
 }
+
+#define SZ 500
 
 /* We first write the generated file into memory using the
  * following helper, then compare to the file on disk and
  * only update the later if anything changed */
 
-struct buffer {
-	char *p;
-	int pos;
-	int size;
-};
-
-void
-__attribute__((format(printf, 2, 3)))
+void __attribute__((format(printf, 2, 3)))
 buf_printf(struct buffer *buf, const char *fmt, ...)
 {
 	char tmp[SZ];
@@ -250,16 +337,23 @@ buf_printf(struct buffer *buf, const char *fmt, ...)
 	va_start(ap, fmt);
 	len = vsnprintf(tmp, SZ, fmt, ap);
 	if (buf->size - buf->pos < len + 1) {
-		if (buf->size == 0)
-			buf->size = 1024;
-		else
-			buf->size *= 2;
-
+		buf->size += 128;
 		buf->p = realloc(buf->p, buf->size);
 	}
 	strncpy(buf->p + buf->pos, tmp, len + 1);
 	buf->pos += len;
 	va_end(ap);
+}
+
+void
+buf_write(struct buffer *buf, const char *s, int len)
+{
+	if (buf->size - buf->pos < len) {
+		buf->size += len;
+		buf->p = realloc(buf->p, buf->size);
+	}
+	strncpy(buf->p + buf->pos, s, len);
+	buf->pos += len;
 }
 
 /* Header for the generated file */
@@ -399,18 +493,12 @@ write_if_changed(struct buffer *b, const char *fname)
 int
 main(int argc, char **argv)
 {
-	int i;
 	struct module *mod;
 	struct buffer buf = { };
 	char fname[SZ];
 
-	if (argc < 3)
-		usage();
-
-	nm = argv[1];
-
-	for (i = 2; i < argc; i++) {
-		read_symbols(argv[i]);
+	for (; argv[1]; argv++) {
+		read_symbols(argv[1]);
 	}
 
 	for (mod = modules; mod; mod = mod->next) {
@@ -422,6 +510,7 @@ main(int argc, char **argv)
 		add_header(&buf);
 		add_versions(&buf, mod);
 		add_depends(&buf, mod, modules);
+		add_moddevtable(&buf, mod);
 
 		sprintf(fname, "%s.ver.c", mod->name);
 		write_if_changed(&buf, fname);

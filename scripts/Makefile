@@ -9,8 +9,10 @@
 # conmakehash:	 Create arrays for initializing the kernel console tables
 
 host-progs    := fixdep split-include conmakehash docproc kallsyms modpost \
-		 file2alias mk_elfconfig
+		 mk_elfconfig
 build-targets := $(host-progs) empty.o
+
+modpost-objs  := modpost.o file2alias.o
 
 # Let clean descend into subdirs
 subdir-	:= lxdialog kconfig
@@ -20,12 +22,12 @@ $(addprefix $(obj)/,$(filter-out fixdep,$(host-progs))): $(obj)/fixdep
 
 # dependencies on generated files need to be listed explicitly
 
-$(obj)/file2alias: $(obj)/elfconfig.h
+$(obj)/modpost.o $(obj)/file2alias.o: $(obj)/elfconfig.h
 
-quiet_cmd_elfconfig = MKTARGET $@
+quiet_cmd_elfconfig = MKELF   $@
       cmd_elfconfig = $(obj)/mk_elfconfig < $< > $@
 
 $(obj)/elfconfig.h: $(obj)/empty.o $(obj)/mk_elfconfig FORCE
 	$(call if_changed,elfconfig)
 
-targets += $(obj)/target.h
+targets += $(obj)/elfconfig.h

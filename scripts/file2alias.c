@@ -1,23 +1,16 @@
 /* Simple code to turn various tables in an ELF file into alias definitions.
-   This deals with kernel datastructures where they should be
-   dealt with: in the kernel source.
-   (C) 2002 Rusty Russell IBM Corporation.
-*/
-#include <stdio.h>
-#include <fcntl.h>
-#include <string.h>
-#include <errno.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <elf.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <stdint.h>
-#include <endian.h>
+ * This deals with kernel datastructures where they should be
+ * dealt with: in the kernel source.
+ *
+ * Copyright 2002-2003  Rusty Russell, IBM Corporation
+ *           2003       Kai Germaschewski
+ *           
+ *
+ * This software may be used and distributed according to the terms
+ * of the GNU General Public License, incorporated herein by reference.
+ */
 
-#include "elfconfig.h"
+#include "modpost.h"
 
 /* We use the ELF typedefs, since we can't rely on stdint.h being present. */
 
@@ -35,45 +28,6 @@ typedef unsigned char  __u8;
  * even potentially has different endianness and word sizes, since 
  * we handle those differences explicitly below */
 #include "../include/linux/mod_devicetable.h"
-
-#if KERNEL_ELFCLASS == ELFCLASS32
-
-#define Elf_Ehdr Elf32_Ehdr 
-#define Elf_Shdr Elf32_Shdr 
-#define Elf_Sym  Elf32_Sym
-
-#else
-
-#define Elf_Ehdr Elf64_Ehdr 
-#define Elf_Shdr Elf64_Shdr 
-#define Elf_Sym  Elf64_Sym
-
-#endif
-
-#if KERNEL_ELFDATA != HOST_ELFDATA
-
-static void __endian(const void *src, void *dest, unsigned int size)
-{
-	unsigned int i;
-	for (i = 0; i < size; i++)
-		((unsigned char*)dest)[i] = ((unsigned char*)src)[size - i-1];
-}
-
-
-
-#define TO_NATIVE(x)						\
-({								\
-	typeof(x) __x;						\
-	__endian(&(x), &(__x), sizeof(__x));			\
-	__x;							\
-})
-
-#else /* endianness matches */
-
-#define TO_NATIVE(x) (x)
-
-#endif
-
 
 #define ADD(str, sep, cond, field)                              \
 do {                                                            \
@@ -145,7 +99,7 @@ static int do_pci_entry(const char *filename,
 	ADD(alias, "sd", id->subdevice != PCI_ANY_ID, id->subdevice);
 	if (id->class_mask != 0 && id->class_mask != ~0) {
 		fprintf(stderr,
-			"file2alias: Can't handle class_mask in %s:%04X\n",
+			"*** Warning: Can't handle class_mask in %s:%04X\n",
 			filename, id->class_mask);
 		return 0;
 	}
@@ -164,155 +118,61 @@ static inline int sym_is(const char *symbol, const char *name)
 	return match[strlen(symbol)] == '\0';
 }
 
-/* Returns 1 if we output anything. */
-static int do_table(void *symval, unsigned long size,
-		    unsigned long id_size,
-		    void *function,
-		    const char *filename, int *first)
+static void do_table(void *symval, unsigned long size,
+		     unsigned long id_size,
+		     void *function,
+		     struct module *mod)
 {
 	unsigned int i;
 	char alias[500];
 	int (*do_entry)(const char *, void *entry, char *alias) = function;
-	int wrote = 0;
 
 	if (size % id_size || size < id_size) {
-		fprintf(stderr, "WARNING: %s ids %lu bad size (each on %lu)\n",
-			filename, size, id_size);
-		return 0;
+		fprintf(stderr, "*** Warning: %s ids %lu bad size "
+			"(each on %lu)\n", mod->name, size, id_size);
 	}
 	/* Leave last one: it's the terminator. */
 	size -= id_size;
 
 	for (i = 0; i < size; i += id_size) {
-		if (do_entry(filename, symval+i, alias)) {
+		if (do_entry(mod->name, symval+i, alias)) {
 			/* Always end in a wildcard, for future extension */
 			if (alias[strlen(alias)-1] != '*')
 				strcat(alias, "*");
-			if (*first) {
-				printf("#include <linux/module.h>\n\n");
-				*first = 0;
-			}
-			printf("MODULE_ALIAS(\"%s\");\n", alias);
-			wrote = 1;
+			buf_printf(&mod->dev_table_buf,
+				   "MODULE_ALIAS(\"%s\");\n", alias);
 		}
 	}
-	return wrote;
 }
 
-/* This contains the cookie-cutter code for ELF handling (32 v 64). */
-static void analyze_file(Elf_Ehdr *hdr,
-			unsigned int size,
-			const char *filename)
+/* Create MODULE_ALIAS() statements.
+ * At this time, we cannot write the actual output C source yet,
+ * so we write into the mod->dev_table_buf buffer. */
+void handle_moddevtable(struct module *mod, struct elf_info *info,
+			Elf_Sym *sym, const char *symname)
 {
-	unsigned int i, num_syms = 0;
-	Elf_Shdr *sechdrs;
-	Elf_Sym *syms = NULL;
-	char *secstrings, *strtab = NULL;
-	int first = 1;
+	void *symval;
 
-	if (size < sizeof(*hdr))
-		goto truncated;
+	/* We're looking for a section relative symbol */
+	if (!sym->st_shndx || sym->st_shndx >= info->hdr->e_shnum)
+		return;
 
-	sechdrs = (void *)hdr + TO_NATIVE(hdr->e_shoff);
-	hdr->e_shoff = TO_NATIVE(hdr->e_shoff);
-	hdr->e_shstrndx = TO_NATIVE(hdr->e_shstrndx);
-	hdr->e_shnum = TO_NATIVE(hdr->e_shnum);
-	for (i = 0; i < hdr->e_shnum; i++) {
-		sechdrs[i].sh_type = TO_NATIVE(sechdrs[i].sh_type);
-		sechdrs[i].sh_offset = TO_NATIVE(sechdrs[i].sh_offset);
-		sechdrs[i].sh_size = TO_NATIVE(sechdrs[i].sh_size);
-		sechdrs[i].sh_link = TO_NATIVE(sechdrs[i].sh_link);
-	}
+	symval = (void *)info->hdr
+		+ info->sechdrs[sym->st_shndx].sh_offset
+		+ sym->st_value;
 
-	/* Find symbol table. */
-	secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
-
-	for (i = 1; i < hdr->e_shnum; i++) {
-		if (sechdrs[i].sh_offset > size)
-			goto truncated;
-		if (sechdrs[i].sh_type == SHT_SYMTAB) {
-			syms = (void *)hdr + sechdrs[i].sh_offset;
-			num_syms = sechdrs[i].sh_size / sizeof(syms[0]);
-		} else if (sechdrs[i].sh_type == SHT_STRTAB)
-			strtab = (void *)hdr + sechdrs[i].sh_offset;
-	}
-
-	if (!strtab || !syms) {
-		fprintf(stderr, "table2alias: %s no symtab?\n", filename);
-		abort();
-	}
-
-	for (i = 0; i < num_syms; i++) {
-		const char *symname;
-		void *symval;
-
-		syms[i].st_shndx = TO_NATIVE(syms[i].st_shndx);
-		syms[i].st_name = TO_NATIVE(syms[i].st_name);
-		syms[i].st_value = TO_NATIVE(syms[i].st_value);
-		syms[i].st_size = TO_NATIVE(syms[i].st_size);
-
-		if (!syms[i].st_shndx || syms[i].st_shndx >= hdr->e_shnum)
-			continue;
-
-		symname = strtab + syms[i].st_name;
-		symval = (void *)hdr
-			+ sechdrs[syms[i].st_shndx].sh_offset
-			+ syms[i].st_value;
-		if (sym_is(symname, "__mod_pci_device_table"))
-			do_table(symval, syms[i].st_size,
-				 sizeof(struct pci_device_id),
-				 do_pci_entry, filename, &first);
-		else if (sym_is(symname, "__mod_usb_device_table"))
-			do_table(symval, syms[i].st_size,
-				 sizeof(struct usb_device_id),
-				 do_usb_entry, filename, &first);
-	}
-	return;
-
- truncated:
-	fprintf(stderr, "table2alias: %s is truncated.\n", filename);
-	abort();
+	if (sym_is(symname, "__mod_pci_device_table"))
+		do_table(symval, sym->st_size, sizeof(struct pci_device_id),
+			 do_pci_entry, mod);
+	else if (sym_is(symname, "__mod_usb_device_table"))
+		do_table(symval, sym->st_size, sizeof(struct usb_device_id),
+			 do_usb_entry, mod);
 }
 
-static void *grab_file(const char *filename, unsigned long *size)
+/* Now add out buffered information to the generated C source */
+void add_moddevtable(struct buffer *buf, struct module *mod)
 {
-	struct stat st;
-	void *map;
-	int fd;
-
-	fd = open(filename, O_RDONLY);
-	if (fd < 0)
-		return NULL;
-	if (fstat(fd, &st) != 0) {
-		close(fd);
-		return NULL;
-	}
-	*size = st.st_size;
-	map = mmap(NULL, *size, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
-	if (mmap == MAP_FAILED) {
-		close(fd);
-		return NULL;
-	}
-	close(fd);
-	return map;
-}
-
-/* Look through files for __mod_*_device_table: emit alias definitions
-   for compiling in. */
-int main(int argc, char *argv[])
-{
-	void *file;
-	unsigned long size;
-
-	for (; argv[1]; argv++) {
-		file = grab_file(argv[1], &size);
-		if (!file) {
-			fprintf(stderr, "file2alias: opening %s: %s\n",
-				argv[1], strerror(errno));
-			abort();
-		}
-		analyze_file(file, size, argv[1]);
-		munmap(file, size);
-	}
-	return 0;
+	buf_printf(buf, "\n");
+	buf_write(buf, mod->dev_table_buf.p, mod->dev_table_buf.pos);
+	free(mod->dev_table_buf.p);
 }

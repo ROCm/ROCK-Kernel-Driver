@@ -27,7 +27,7 @@ quiet_cmd_ld_ko_o = LD [M]  $@
       cmd_ld_ko_o = $(LD) $(LDFLAGS) $(LDFLAGS_MODULE) -o $@ 		\
 			  $(filter-out FORCE,$^)
 
-$(modules): %.ko :%.o %.ver.o $(if CONFIG_HOTPLUG,%.aliases.o) FORCE
+$(modules): %.ko :%.o %.ver.o FORCE
 	$(call if_changed,ld_ko_o)
 
 targets += $(modules)
@@ -45,21 +45,6 @@ $(modules:.ko=.ver.o): %.ver.o: %.ver.c include/linux/compile.h FORCE
 
 targets += $(modules:.ko=.ver.o)
 
-$(modules:.ko=.aliases.o): %.aliases.o: %.aliases.c FORCE
-	$(call if_changed,cc_o_c)
-
-targets += $(modules:.ko=.aliases.o)
-
-# Generate aliases
-
-quiet_cmd_file2alias = ALIAS   $@
-      cmd_file2alias = scripts/file2alias $< > $@
-
-$(modules:.ko=.aliases.c): %.aliases.c: %.o FORCE
-	$(call if_changed,file2alias)
-
-targets += $(modules:.ko=.aliases.c)
-
 # All the .ver.c files are generated using the helper "modpost"
 
 .PHONY: __modpost
@@ -69,7 +54,7 @@ $(modules:.ko=.ver.c): __modpost ;
 # Extract all checksums for all exported symbols
 
 quiet_cmd_modpost = MODPOST
-      cmd_modpost = scripts/modpost $(NM) $^
+      cmd_modpost = scripts/modpost $^
 
 __modpost: $(wildcard vmlinux) $(modules:.ko=.o)
 	$(call if_changed,modpost)
