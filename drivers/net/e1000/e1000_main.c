@@ -2213,6 +2213,7 @@ e1000_clean(struct net_device *netdev, int *budget)
 	if(work_done < work_to_do || !netif_running(netdev)) {
 		netif_rx_complete(netdev);
 		e1000_irq_enable(adapter);
+		return 0;
 	}
 
 	return (work_done >= work_to_do);
