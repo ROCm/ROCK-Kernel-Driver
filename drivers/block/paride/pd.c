@@ -276,7 +276,7 @@ struct pd_unit {
 	int alt_geom;
 	int present;
 	char name[PD_NAMELEN];	/* pda, pdb, etc ... */
-	struct gendisk gd;
+	struct gendisk *gd;
 };
 
 struct pd_unit pd[PD_UNITS];
@@ -435,9 +435,9 @@ static int pd_revalidate(kdev_t dev)
 	if (unit >= PD_UNITS || !disk->present)
 		return -ENODEV;
 	if (pd_identify(disk))
-		set_capacity(&disk->gd, disk->capacity);
+		set_capacity(disk->gd, disk->capacity);
 	else
-		set_capacity(&disk->gd, 0);
+		set_capacity(disk->gd, 0);
 	return 0;
 }
 
@@ -717,13 +717,20 @@ static int pd_detect(void)
 	}
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
 		if (disk->present) {
-			strcpy(disk->gd.disk_name, disk->name);
-			disk->gd.minor_shift = PD_BITS;
-			disk->gd.fops = &pd_fops;
-			disk->gd.major = major;
-			disk->gd.first_minor = unit << PD_BITS;
-			set_capacity(&disk->gd, disk->capacity);
-			add_disk(&disk->gd);
+			struct gendisk *p = alloc_disk();
+			if (!p) {
+				disk->present = 0;
+				k--;
+				continue;
+			}
+			strcpy(p->disk_name, disk->name);
+			p->minor_shift = PD_BITS;
+			p->fops = &pd_fops;
+			p->major = major;
+			p->first_minor = unit << PD_BITS;
+			set_capacity(p, disk->capacity);
+			disk->gd = p;
+			add_disk(p);
 		}
 	}
 	if (k)
@@ -760,7 +767,7 @@ repeat:
 	pd_run = pd_req->nr_sectors;
 	pd_count = pd_req->current_nr_sectors;
 	pd_current = pd + unit;
-	if (pd_block + pd_count > get_capacity(&pd_current->gd)) {
+	if (pd_block + pd_count > get_capacity(pd_current->gd)) {
 		end_request(pd_req, 0);
 		goto repeat;
 	}
@@ -942,7 +949,10 @@ static void __exit pd_exit(void)
 	unregister_blkdev(MAJOR_NR, name);
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
 		if (disk->present) {
-			del_gendisk(&disk->gd);
+			struct gendisk *p = disk->gd;
+			disk->gd = NULL;
+			del_gendisk(p);
+			put_disk(p);
 			pi_release(disk->pi);
 		}
 	}
