@@ -613,29 +613,6 @@ static void scsi_release_buffers(struct scsi_cmnd *cmd)
 }
 
 /*
- * Function:    scsi_get_request_dev()
- *
- * Purpose:     Find the upper-level driver that is responsible for this
- *              request
- *
- * Arguments:   request   - I/O request we are preparing to queue.
- *
- * Lock status: No locks assumed to be held, but as it happens the
- *              q->queue_lock is held when this is called.
- *
- * Returns:     Nothing
- *
- * Notes:       The requests in the request queue may have originated
- *              from any block device driver.  We need to find out which
- *              one so that we can later form the appropriate command.
- */
-static struct Scsi_Device_Template *scsi_get_request_dev(struct request *req)
-{
-	struct gendisk *p = req->rq_disk;
-	return p ? *(struct Scsi_Device_Template **)p->private_data : NULL;
-}
-
-/*
  * Function:    scsi_io_completion()
  *
  * Purpose:     Completion processing for block device I/O requests.
@@ -849,11 +826,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, int good_sectors,
 		return;
 	}
 	if (result) {
-		struct Scsi_Device_Template *sdt;
-
-		sdt = scsi_get_request_dev(cmd->request);
-		printk("SCSI %s error : <%d %d %d %d> return code = 0x%x\n",
-		       (sdt ? sdt->name : "device"),
+		printk("SCSI error : <%d %d %d %d> return code = 0x%x\n",
 		       cmd->device->host->host_no,
 		       cmd->device->channel,
 		       cmd->device->id,
@@ -947,7 +920,6 @@ static int scsi_init_io(struct scsi_cmnd *cmd)
 
 static int scsi_prep_fn(struct request_queue *q, struct request *req)
 {
-	struct Scsi_Device_Template *sdt;
 	struct scsi_device *sdev = q->queuedata;
 	struct scsi_cmnd *cmd;
 
@@ -1003,6 +975,7 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 	 * happening now.
 	 */
 	if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
+		struct scsi_driver *drv;
 		int ret;
 
 		/*
@@ -1017,8 +990,6 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 		 * some kinds of consistency checking may cause the	
 		 * request to be rejected immediately.
 		 */
-		sdt = scsi_get_request_dev(req);
-		BUG_ON(!sdt);
 
 		/* 
 		 * This sets up the scatter-gather table (allocating if
@@ -1031,7 +1002,8 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 		/*
 		 * Initialize the actual SCSI command for this request.
 		 */
-		if (unlikely(!sdt->init_command(cmd))) {
+		drv = *(struct scsi_driver **)req->rq_disk->private_data;
+		if (unlikely(!drv->init_command(cmd))) {
 			scsi_release_buffers(cmd);
 			scsi_put_command(cmd);
 			return BLKPREP_KILL;

@@ -67,25 +67,19 @@ MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
 	 CDC_PLAY_AUDIO|CDC_RESET|CDC_IOCTLS|CDC_DRIVE_STATUS| \
 	 CDC_CD_R|CDC_CD_RW|CDC_DVD|CDC_DVD_R|CDC_GENERIC_PACKET)
 
-static int sr_attach(struct scsi_device *);
-static void sr_detach(struct scsi_device *);
+static int sr_probe(struct device *);
+static int sr_remove(struct device *);
 static int sr_init_command(struct scsi_cmnd *);
 
-static struct Scsi_Device_Template sr_template = {
-	.module		= THIS_MODULE,
-	.list		= LIST_HEAD_INIT(sr_template.list),
-	.name		= "cdrom",
-	.scsi_type	= TYPE_ROM,
-	.attach		= sr_attach,
-	.detach		= sr_detach,
-	.init_command	= sr_init_command,
-	.scsi_driverfs_driver = {
-		.name   = "sr",
+static struct scsi_driver sr_template = {
+	.owner			= THIS_MODULE,
+	.gendrv = {
+		.name   	= "sr",
+		.probe		= sr_probe,
+		.remove		= sr_remove,
 	},
+	.init_command		= sr_init_command,
 };
-
-static LIST_HEAD(sr_devlist);
-static spinlock_t sr_devlist_lock = SPIN_LOCK_UNLOCKED;
 
 static unsigned long sr_index_bits[SR_DISKS / BITS_PER_LONG];
 static spinlock_t sr_index_lock = SPIN_LOCK_UNLOCKED;
@@ -98,37 +92,6 @@ static void get_capabilities(struct scsi_cd *);
 
 static int sr_media_change(struct cdrom_device_info *, int);
 static int sr_packet(struct cdrom_device_info *, struct cdrom_generic_command *);
-
-static Scsi_CD *sr_find_by_sdev(Scsi_Device *sd)
-{
-	struct list_head *p;
-	Scsi_CD *cd;
-
-	spin_lock(&sr_devlist_lock);
-	list_for_each(p, &sr_devlist) {
-		cd = list_entry(p, Scsi_CD, list);
-		if (cd->device == sd) {
-			spin_unlock(&sr_devlist_lock);
-			return cd;
-		}
-	}
-	spin_unlock(&sr_devlist_lock);
-	return NULL;
-}
-
-static inline void sr_devlist_insert(Scsi_CD *cd)
-{
-	spin_lock(&sr_devlist_lock);
-	list_add(&cd->list, &sr_devlist);
-	spin_unlock(&sr_devlist_lock);
-}
-
-static inline void sr_devlist_remove(Scsi_CD *cd)
-{
-	spin_lock(&sr_devlist_lock);
-	list_del(&cd->list);
-	spin_unlock(&sr_devlist_lock);
-}
 
 static struct cdrom_device_ops sr_dops = {
 	.open			= sr_open,
@@ -506,14 +469,16 @@ static void sr_release(struct cdrom_device_info *cdi)
 	scsi_device_put(cd->device);
 }
 
-static int sr_attach(struct scsi_device *sdev)
+static int sr_probe(struct device *dev)
 {
+	struct scsi_device *sdev = to_scsi_device(dev);
 	struct gendisk *disk;
 	struct scsi_cd *cd;
 	int minor, error;
 
+	error = -ENODEV;
 	if (sdev->type != TYPE_ROM && sdev->type != TYPE_WORM)
-		return 1;
+		goto fail;
 
 	error = -ENOMEM;
 	cd = kmalloc(sizeof(*cd), GFP_KERNEL);
@@ -575,8 +540,8 @@ static int sr_attach(struct scsi_device *sdev)
 	disk->private_data = &cd->driver;
 	disk->queue = sdev->request_queue;
 
+	dev_set_drvdata(dev, cd);
 	add_disk(disk);
-	sr_devlist_insert(cd);
 
 	printk(KERN_DEBUG
 	    "Attached scsi CD-ROM %s at scsi%d, channel %d, id %d, lun %d\n",
@@ -807,15 +772,10 @@ static int sr_packet(struct cdrom_device_info *cdi,
 	return cgc->stat;
 }
 
-static void sr_detach(struct scsi_device * SDp)
+static int sr_remove(struct device *dev)
 {
-	struct scsi_cd *cd;
+	struct scsi_cd *cd = dev_get_drvdata(dev);
 
-	cd = sr_find_by_sdev(SDp);
-	if (!cd)
-		return;
-
-	sr_devlist_remove(cd);
 	del_gendisk(cd->disk);
 
 	spin_lock(&sr_index_lock);
@@ -825,6 +785,8 @@ static void sr_detach(struct scsi_device * SDp)
 	put_disk(cd->disk);
 	unregister_cdrom(&cd->cdi);
 	kfree(cd);
+
+	return 0;
 }
 
 static int __init init_sr(void)
@@ -834,12 +796,12 @@ static int __init init_sr(void)
 	rc = register_blkdev(SCSI_CDROM_MAJOR, "sr");
 	if (rc)
 		return rc;
-	return scsi_register_device(&sr_template);
+	return scsi_register_driver(&sr_template.gendrv);
 }
 
 static void __exit exit_sr(void)
 {
-	scsi_unregister_device(&sr_template);
+	scsi_unregister_driver(&sr_template.gendrv);
 	unregister_blkdev(SCSI_CDROM_MAJOR, "sr");
 }
 

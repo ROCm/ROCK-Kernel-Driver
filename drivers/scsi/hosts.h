@@ -542,25 +542,23 @@ static inline struct device *scsi_get_device(struct Scsi_Host *shost)
         return shost->host_gendev.parent;
 }
 
-struct Scsi_Device_Template
-{
-    struct list_head list;
-    const char * name;
-    struct module * module;	  /* Used for loadable modules */
-    unsigned char scsi_type;
-    int (*attach)(Scsi_Device *); /* Attach devices to arrays */
-    void (*detach)(Scsi_Device *);
-    int (*init_command)(Scsi_Cmnd *);     /* Used by new queueing code. 
-                                           Selects command for blkdevs */
-    void (*rescan)(Scsi_Device *);
-    struct device_driver scsi_driverfs_driver;
-};
+struct scsi_driver {
+	struct module		*owner;
+	struct device_driver	gendrv;
 
-/*
- * Highlevel driver registration/unregistration.
- */
-extern int scsi_register_device(struct Scsi_Device_Template *);
-extern int scsi_unregister_device(struct Scsi_Device_Template *);
+	int (*init_command)(struct scsi_cmnd *);
+	void (*rescan)(struct device *);
+};
+#define to_scsi_driver(drv) \
+	container_of((drv), struct scsi_driver, gendrv)
+
+extern int scsi_register_driver(struct device_driver *);
+#define scsi_unregister_driver(drv) \
+	driver_unregister(drv);
+
+extern int scsi_register_interface(struct class_interface *);
+#define scsi_unregister_interface(intf) \
+	class_interface_unregister(intf)
 
 /*
  * HBA allocation/freeing.
