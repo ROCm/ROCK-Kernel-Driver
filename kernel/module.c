@@ -576,6 +576,8 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 
 	/* Stop the machine so refcounts can't move and disable module. */
 	ret = try_stop_module(mod, flags, &forced);
+	if (ret != 0)
+		goto out;
 
 	/* Never wait if forced. */
 	if (!forced && module_refcount(mod) != 0)
