@@ -14,8 +14,19 @@
 #define clear_page(page)	memzero((void *)(page), PAGE_SIZE)
 extern void copy_page(void *to, void *from);
 
-#define clear_user_page(page, vaddr)	cpu_clear_user_page(page,vaddr)
-#define copy_user_page(to, from, vaddr)	cpu_copy_user_page(to,from,vaddr)
+#define clear_user_page(addr,vaddr)			\
+	do {						\
+		preempt_disable();			\
+		cpu_clear_user_page(addr, vaddr);	\
+		preempt_enable();			\
+	} while (0)
+
+#define copy_user_page(to,from,vaddr)			\
+	do {						\
+		preempt_disable();			\
+		cpu_copy_user_page(to, from, vaddr);	\
+		preempt_enable();			\
+	} while (0)
 
 #ifdef STRICT_MM_TYPECHECKS
 /*

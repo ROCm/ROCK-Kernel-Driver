@@ -127,7 +127,7 @@ __entry:
 		mov	r1, #MACH_TYPE_L7200
 #endif
 
-		mov	r0, #F_BIT | I_BIT | MODE_SVC	@ make sure svc mode
+		mov	r0, #PSR_F_BIT | PSR_I_BIT | MODE_SVC	@ make sure svc mode
 		msr	cpsr_c, r0			@ and all irqs disabled
 		bl	__lookup_processor_type
 		teq	r10, #0				@ invalid processor?

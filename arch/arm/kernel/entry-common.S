@@ -55,7 +55,7 @@ work_resched:
  */
 ENTRY(ret_to_user)
 ret_slow_syscall:
-	set_cpsr_c r1, #PSR_I_BIT | MODE_SVC
+	set_cpsr_c r1, #PSR_I_BIT | MODE_SVC	@ disable interrupts
 	ldr	r1, [tsk, #TI_FLAGS]
 	tst	r1, #_TIF_WORK_MASK
 	beq	no_work_pending
@@ -73,12 +73,9 @@ __do_notify_resume:
 	b	SYMBOL_NAME(do_notify_resume)	@ note the bl above sets lr
 
 /*
- * This is how we return from a fork.  __switch_to will be calling us
- * with r0 pointing at the previous task that was running (ready for
- * calling schedule_tail).
+ * This is how we return from a fork.
  */
 ENTRY(ret_from_fork)
-	bl	SYMBOL_NAME(schedule_tail)
 	get_thread_info tsk
 	ldr	ip, [tsk, #TI_FLAGS]		@ check for syscall tracing
 	mov	why, #1

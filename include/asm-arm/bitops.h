@@ -327,6 +327,23 @@ static inline unsigned long __ffs(unsigned long word)
 #define ffs(x) generic_ffs(x)
 
 /*
+ * Find first bit set in a 168-bit bitmap, where the first
+ * 128 bits are unlikely to be set.
+ */
+static inline int sched_find_first_bit(unsigned long *b)
+{
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 32;
+	if (unlikely(b[2]))
+		return __ffs(b[2]) + 64;
+	if (b[3])
+		return __ffs(b[3]) + 96;
+	return __ffs(b[4]) + 128;
+}
+
+/*
  * hweightN: returns the hamming weight (i.e. the number
  * of bits set) of a N-bit word
  */
