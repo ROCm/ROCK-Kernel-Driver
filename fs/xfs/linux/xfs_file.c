@@ -309,7 +309,6 @@ linvfs_file_mmap(
 	vma->vm_ops = &linvfs_file_vm_ops;
 
 	VOP_SETATTR(vp, &va, XFS_AT_UPDATIME, NULL, error);
-	UPDATE_ATIME(ip);
 	return 0;
 }
 
