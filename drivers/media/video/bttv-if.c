@@ -54,7 +54,7 @@ EXPORT_SYMBOL(bttv_i2c_call);
 /*                      gpio ports (IR for example)                        */
 /*                      see bttv.h for comments                            */
 
-int bttv_get_cardinfo(unsigned int card, int *type, int *cardid)
+int bttv_get_cardinfo(unsigned int card, int *type, unsigned *cardid)
 {
 	if (card >= bttv_num) {
 		return -1;
@@ -194,6 +194,7 @@ static int bttv_bit_getsda(void *data)
 	return state;
 }
 
+
 static int attach_inform(struct i2c_client *client)
 {
         struct bttv *btv = (struct bttv*)client->adapter->data;
@@ -262,7 +263,7 @@ static struct i2c_algo_bit_data bttv_i2c_algo_template = {
 };
 
 static struct i2c_adapter bttv_i2c_adap_template = {
-	.owner		   = THIS_MODULE,
+	.owner          = THIS_MODULE,
 	.name              = "bt848",
 	.id                = I2C_HW_B_BT848,
 	.client_register   = attach_inform,

@@ -31,12 +31,7 @@
 #include <linux/mm.h>
 
 #include <linux/ftape.h>
-#if LINUX_VERSION_CODE >= KERNEL_VER(2,1,16)
 #include <linux/init.h>
-#else
-#define __initdata
-#define __initfunc(__arg) __arg
-#endif
 #include "../lowlevel/ftape-tracing.h"
 #include "../lowlevel/fdc-io.h"
 

@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/smp_lock.h>
 #include <asm/div64.h>
 
@@ -119,6 +120,10 @@ static void tvaudio_init(struct saa7134_dev *dev)
 
 	/* init all audio registers */
 	saa_writeb(SAA7134_AUDIO_PLL_CTRL,   0x00);
+	if (need_resched())
+		schedule();
+	else
+		udelay(10);
 		
 	saa_writeb(SAA7134_AUDIO_CLOCK0,      clock        & 0xff);
 	saa_writeb(SAA7134_AUDIO_CLOCK1,     (clock >>  8) & 0xff);
@@ -357,6 +362,7 @@ static int tvaudio_checkcarrier(struct saa7134_dev *dev, int carrier)
 	return value;
 }
 
+#if 0
 static void sifdebug_dump_regs(struct saa7134_dev *dev)
 {
 	print_regb(AUDIO_STATUS);
@@ -372,6 +378,7 @@ static void sifdebug_dump_regs(struct saa7134_dev *dev)
 	print_regb(SIF_SAMPLE_FREQ);
 	print_regb(ANALOG_IO_SELECT);
 }
+#endif
 
 static int tvaudio_thread(void *data)
 {
@@ -440,9 +447,8 @@ static int tvaudio_thread(void *data)
 		}
 		if (0 == carrier) {
 			/* Oops: autoscan didn't work for some reason :-/ */
-			printk("%s/audio: oops: audio carrier scan failed\n",
-			       dev->name);
-			sifdebug_dump_regs(dev);
+			printk(KERN_WARNING "%s/audio: oops: audio carrier "
+			       "scan failed\n", dev->name);
 		} else {
 			dprintk("found %s main sound carrier @ %d.%03d MHz\n",
 				dev->tvnorm->name,

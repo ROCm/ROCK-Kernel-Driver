@@ -90,6 +90,7 @@
 #define BTTV_SENSORAY311    0x49
 #define BTTV_RV605          0x4a
 #define BTTV_WINDVR         0x4c
+#define BTTV_KWORLD         0x4e
 #define BTTV_HAUPPAUGEPVR   0x50
 #define BTTV_GVBCTV5PCI     0x51
 #define BTTV_OSPREY1x0      0x52
@@ -104,6 +105,9 @@
 #define BTTV_OSPREY540      0x5b
 #define BTTV_OSPREY2000     0x5c
 #define BTTV_IDS_EAGLE      0x5d
+#define BTTV_PINNACLESAT    0x5e
+#define BTTV_FORMAC_PROTV   0x5f
+#define BTTV_EURESYS_PICOLO 0x61
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2
@@ -132,6 +136,10 @@
 #define WINVIEW_PT2254_DATA 0x20
 #define WINVIEW_PT2254_STROBE 0x80
 
+/* digital_mode */
+#define DIGITAL_MODE_VIDEO 1
+#define DIGITAL_MODE_CAMERA 2
+
 struct bttv;
 
 struct tvcard
@@ -141,6 +149,7 @@ struct tvcard
         int audio_inputs;
         int tuner;
         int svhs;
+	int digital_mode; // DIGITAL_MODE_CAMERA or DIGITAL_MODE_VIDEO
         u32 gpiomask;
         u32 muxsel[16];
         u32 audiomux[6]; /* Tuner, Radio, external, internal, mute, stereo */
@@ -191,7 +200,8 @@ extern int bttv_handle_chipset(struct bttv *btv);
    for possible values see lines below beginning with #define BTTV_UNKNOWN
    returns negative value if error occurred 
 */
-extern int bttv_get_cardinfo(unsigned int card, int *type, int *cardid);
+extern int bttv_get_cardinfo(unsigned int card, int *type,
+			     unsigned int *cardid);
 extern struct pci_dev* bttv_get_pcidev(unsigned int card);
 
 /* obsolete, use bttv_get_cardinfo instead */

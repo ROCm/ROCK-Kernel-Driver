@@ -215,7 +215,7 @@ EXPORT_SYMBOL(ll_rw_block);
 EXPORT_SYMBOL(submit_bh);
 EXPORT_SYMBOL(unlock_buffer);
 EXPORT_SYMBOL(__wait_on_buffer);
-EXPORT_SYMBOL(generic_direct_IO);
+EXPORT_SYMBOL(blockdev_direct_IO);
 EXPORT_SYMBOL(block_write_full_page);
 EXPORT_SYMBOL(block_read_full_page);
 EXPORT_SYMBOL(block_prepare_write);
@@ -329,6 +329,7 @@ EXPORT_SYMBOL(generic_shutdown_super);
 EXPORT_SYMBOL(deactivate_super);
 EXPORT_SYMBOL(sget);
 EXPORT_SYMBOL(set_anon_super);
+EXPORT_SYMBOL(do_select);
 
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
 EXPORT_SYMBOL(default_llseek);

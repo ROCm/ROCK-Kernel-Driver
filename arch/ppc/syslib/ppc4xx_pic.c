@@ -38,6 +38,13 @@
 
 /* Global Variables */
 struct hw_interrupt_type *ppc4xx_pic;
+/*
+ * We define 4xxIRQ_InitSenses table thusly:
+ * bit 0x1: sense, 1 for edge and 0 for level.
+ * bit 0x2: polarity, 0 for negative, 1 for positive.
+ */
+unsigned int ibm4xxPIC_NumInitSenses __initdata = 0;
+unsigned char *ibm4xxPIC_InitSenses __initdata = NULL;
 
 /* Six of one, half dozen of the other....#ifdefs, separate files,
  * other tricks.....
@@ -140,21 +147,42 @@ static void
 ppc405_uic_enable(unsigned int irq)
 {
 	int bit, word;
+	irq_desc_t *desc = irq_desc + irq;
 
 	bit = irq & 0x1f;
 	word = irq >> 5;
-#ifdef UIC_DEBUG	
-	printk("ppc405_uic_enable - irq %d word %d bit 0x%x\n",irq, word , bit);
+
+#ifdef UIC_DEBUG
+	printk("ppc405_uic_enable - irq %d word %d bit 0x%x\n", irq, word, bit);
 #endif
 	ppc_cached_irq_mask[word] |= 1 << (31 - bit);
-	switch (word){
-		case 0:
-			mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
+	switch (word) {
+	case 0:
+		mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
+		if ((mfdcr(DCRN_UIC_TR(UIC0)) & (1 << (31 - bit))) == 0)
+			desc->status |= IRQ_LEVEL;
+		else
+		/* lets hope this works since in linux/irq.h
+		 * there is no define for EDGE and it's assumed
+		 * once you set status to LEVEL you would not 
+		 * want to change it - Armin
+		 */
+		desc->status = desc->status & ~IRQ_LEVEL;
 		break;
-		case 1:
-			mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
-		break;
+	case 1:
+		mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
+		if ((mfdcr(DCRN_UIC_TR(UIC1)) & (1 << (31 - bit))) == 0)
+			desc->status |= IRQ_LEVEL;
+		else
+		/* lets hope this works since in linux/irq.h
+		 * there is no define for EDGE and it's assumed
+		 * once you set status to LEVEL you would not 
+		 * want to change it - Armin
+		 */
+		desc->status = desc->status & ~IRQ_LEVEL;
+	break;
 	}
+
 }
 
 static void
@@ -164,16 +192,17 @@ ppc405_uic_disable(unsigned int irq)
 
 	bit = irq & 0x1f;
 	word = irq >> 5;
-#ifdef UIC_DEBUG	
-	printk("ppc405_uic_disable - irq %d word %d bit 0x%x\n",irq, word , bit);
+#ifdef UIC_DEBUG
+	printk("ppc405_uic_disable - irq %d word %d bit 0x%x\n", irq, word,
+	       bit);
 #endif
 	ppc_cached_irq_mask[word] &= ~(1 << (31 - bit));
-	switch (word){
-		case 0:
-			mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
+	switch (word) {
+	case 0:
+		mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
 		break;
-		case 1:
-			mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
+	case 1:
+		mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
 		break;
 	}
 }
@@ -186,18 +215,19 @@ ppc405_uic_disable_and_ack(unsigned int irq)
 	bit = irq & 0x1f;
 	word = irq >> 5;
 
-#ifdef UIC_DEBUG	
-printk("ppc405_uic_disable_and_ack - irq %d word %d bit 0x%x\n",irq, word , bit);
+#ifdef UIC_DEBUG
+	printk("ppc405_uic_disable_and_ack - irq %d word %d bit 0x%x\n", irq,
+	       word, bit);
 #endif
 	ppc_cached_irq_mask[word] &= ~(1 << (31 - bit));
-	switch (word){
-		case 0:
-			mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
-			mtdcr(DCRN_UIC_SR(UIC0), (1 << (31 - bit)));
+	switch (word) {
+	case 0:
+		mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
+		mtdcr(DCRN_UIC_SR(UIC0), (1 << (31 - bit)));
 		break;
-		case 1:	
-			mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
-			mtdcr(DCRN_UIC_SR(UIC1), (1 << (31 - bit)));
+	case 1:
+		mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
+		mtdcr(DCRN_UIC_SR(UIC1), (1 << (31 - bit)));
 		break;
 	}
 }
@@ -211,40 +241,39 @@ ppc405_uic_end(unsigned int irq)
 	bit = irq & 0x1f;
 	word = irq >> 5;
 
-#ifdef UIC_DEBUG	
-	printk("ppc405_uic_end - irq %d word %d bit 0x%x\n",irq, word , bit);
+#ifdef UIC_DEBUG
+	printk("ppc405_uic_end - irq %d word %d bit 0x%x\n", irq, word, bit);
 #endif
 
-	switch (word){
-		case 0:
-			tr_bits = mfdcr(DCRN_UIC_TR(UIC0));
+	switch (word) {
+	case 0:
+		tr_bits = mfdcr(DCRN_UIC_TR(UIC0));
 		break;
-		case 1:
-			tr_bits = mfdcr(DCRN_UIC_TR(UIC1));
+	case 1:
+		tr_bits = mfdcr(DCRN_UIC_TR(UIC1));
 		break;
 	}
 
 	if ((tr_bits & (1 << (31 - bit))) == 0) {
 		/* level trigger */
-		switch (word){
-			case 0:
-				mtdcr(DCRN_UIC_SR(UIC0), 1 << (31 - bit));
+		switch (word) {
+		case 0:
+			mtdcr(DCRN_UIC_SR(UIC0), 1 << (31 - bit));
 			break;
-			case 1:
-				mtdcr(DCRN_UIC_SR(UIC1), 1 << (31 - bit));
+		case 1:
+			mtdcr(DCRN_UIC_SR(UIC1), 1 << (31 - bit));
 			break;
 		}
 	}
 
-	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS))
-	    && irq_desc[irq].action) {
+	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
 		ppc_cached_irq_mask[word] |= 1 << (31 - bit);
-		switch (word){
-			case 0:
-				mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
+		switch (word) {
+		case 0:
+			mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[word]);
 			break;
-			case 1:
-				mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
+		case 1:
+			mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[word]);
 			break;
 		}
 	}
@@ -278,15 +307,15 @@ ppc405_pic_get_irq(struct pt_regs *regs)
 
 	bits = mfdcr(DCRN_UIC_MSR(UIC0));
 
-#if (NR_UICS > 1) 
-	if (bits & UIC_CASCADE_MASK){
+#if (NR_UICS > 1)
+	if (bits & UIC_CASCADE_MASK) {
 		bits = mfdcr(DCRN_UIC_MSR(UIC1));
 		cas_irq = 32 - ffs(bits);
 		irq = 32 + cas_irq;
 	} else {
 		irq = 32 - ffs(bits);
 		if (irq == 32)
-			irq= -1;
+			irq = -1;
 	}
 #else
 	/*
@@ -301,7 +330,7 @@ ppc405_pic_get_irq(struct pt_regs *regs)
 		irq = -1;
 
 #ifdef UIC_DEBUG
-printk("ppc405_pic_get_irq - irq %d bit 0x%x\n",irq, bits);
+	printk("ppc405_pic_get_irq - irq %d bit 0x%x\n", irq, bits);
 #endif
 
 	return (irq);
@@ -309,8 +338,74 @@ printk("ppc405_pic_get_irq - irq %d bit 0x%x\n",irq, bits);
 #endif
 
 void __init
+ppc4xx_extpic_init(void)
+{
+	/* set polarity 
+	 * 1 = default/pos/rising  , 0= neg/falling internal
+	 * 1 = neg/falling , 0= pos/rising external
+	 * Sense
+	 * 0 = default level internal
+	 * 0 = level, 1 = edge external
+	 */
+
+	unsigned int sense, irq;
+	int bit, word;
+	unsigned long ppc_cached_sense_mask[NR_MASK_WORDS];
+	unsigned long ppc_cached_pol_mask[NR_MASK_WORDS];
+	ppc_cached_sense_mask[0] = 0;
+	ppc_cached_sense_mask[1] = 0;
+	ppc_cached_pol_mask[0] = 0;
+	ppc_cached_pol_mask[1] = 0;
+
+	for (irq = 0; irq < NR_IRQS; irq++) {
+
+		bit = irq & 0x1f;
+		word = irq >> 5;
+
+		sense =
+		    (irq <
+		     ibm4xxPIC_NumInitSenses) ? ibm4xxPIC_InitSenses[irq] : 3;
+#ifdef PPC4xx_PIC_DEBUG
+		printk("PPC4xx_picext %d word:%x bit:%x sense:%x", irq, word,
+		       bit, sense);
+#endif
+		ppc_cached_sense_mask[word] |=
+		    (sense & IRQ_SENSE_MASK) << (31 - bit);
+		ppc_cached_pol_mask[word] |=
+		    ((sense & IRQ_POLARITY_MASK) >> 1) << (31 - bit);
+		switch (word) {
+		case 0:
+#ifdef PPC4xx_PIC_DEBUG
+			printk("Pol %x ", mfdcr(DCRN_UIC_PR(UIC0)));
+			printk("Level %x\n", mfdcr(DCRN_UIC_TR(UIC0)));
+#endif
+			/* polarity  setting */
+			mtdcr(DCRN_UIC_PR(UIC0), ppc_cached_pol_mask[word]);
+
+			/* Level setting */
+			mtdcr(DCRN_UIC_TR(UIC0), ppc_cached_sense_mask[word]);
+
+			break;
+		case 1:
+#ifdef PPC4xx_PIC_DEBUG
+			printk("Pol %x ", mfdcr(DCRN_UIC_PR(UIC1)));
+			printk("Level %x\n", mfdcr(DCRN_UIC_TR(UIC1)));
+#endif
+			/* polarity  setting */
+			mtdcr(DCRN_UIC_PR(UIC1), ppc_cached_pol_mask[word]);
+
+			/* Level setting */
+			mtdcr(DCRN_UIC_TR(UIC1), ppc_cached_sense_mask[word]);
+
+			break;
+		}
+	}
+
+}
+void __init
 ppc4xx_pic_init(void)
 {
+
 	/*
 	 * Disable all external interrupts until they are
 	 * explicity requested.
@@ -324,25 +419,26 @@ ppc4xx_pic_init(void)
 	ppc4xx_pic = &ppc403_aic;
 	ppc_md.get_irq = ppc403_pic_get_irq;
 #else
-#if  (NR_UICS > 1) 
-	ppc_cached_irq_mask[0] |= 1 << (31 - UIC0_UIC1NC ); /* enable cascading interrupt */
-	mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[0]);
+#if  (NR_UICS > 1)
+	ppc_cached_irq_mask[0] |= 1 << (31 - UIC0_UIC1NC);	/* enable cascading interrupt */
 	mtdcr(DCRN_UIC_ER(UIC1), ppc_cached_irq_mask[1]);
-
-	/* Set all interrupts to non-critical.
-	 */
-	mtdcr(DCRN_UIC_CR(UIC0), 0);
 	mtdcr(DCRN_UIC_CR(UIC1), 0);
 
-#else	
-	mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[0]);
-
-	/* Set all interrupts to non-critical.
-	 */
-	mtdcr(DCRN_UIC_CR(UIC0), 0);
 #endif
+	mtdcr(DCRN_UIC_ER(UIC0), ppc_cached_irq_mask[0]);
+	mtdcr(DCRN_UIC_CR(UIC0), 0);
+	
+	if (ibm4xxPIC_InitSenses != NULL)
+		ppc4xx_extpic_init();
+
+	/* Clear any pending interrupts */
+#if (NR_UICS > 1)
+	mtdcr(DCRN_UIC_SR(UIC1), 0xffffffff);
+#endif
+	mtdcr(DCRN_UIC_SR(UIC0), 0xffffffff);
 
 	ppc4xx_pic = &ppc405_uic;
 	ppc_md.get_irq = ppc405_pic_get_irq;
 #endif
+
 }

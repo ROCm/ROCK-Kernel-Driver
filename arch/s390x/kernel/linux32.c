@@ -1671,8 +1671,7 @@ asmlinkage int sys32_sched_rr_get_interval(compat_pid_t pid,
 	set_fs (KERNEL_DS);
 	ret = sys_sched_rr_get_interval(pid, &t);
 	set_fs (old_fs);
-	if (put_user (t.tv_sec, &interval->tv_sec) ||
-	    __put_user (t.tv_nsec, &interval->tv_nsec))
+	if (put_compat_timespec(&t, interval))
 		return -EFAULT;
 	return ret;
 }
@@ -1806,8 +1805,7 @@ sys32_rt_sigtimedwait(sigset_t32 *uthese, siginfo_t32 *uinfo,
 	signotset(&these);
 
 	if (uts) {
-		if (get_user (ts.tv_sec, &uts->tv_sec) ||
-		    get_user (ts.tv_nsec, &uts->tv_nsec))
+		if (get_compat_timespec(&ts, uts))
 			return -EINVAL;
 		if (ts.tv_nsec >= 1000000000L || ts.tv_nsec < 0
 		    || ts.tv_sec < 0)
@@ -4149,13 +4147,12 @@ sys32_futex(void *uaddr, int op, int val,
 	mm_segment_t old_fs;
 	int ret;
 
-	if (get_user (tmp.tv_sec,  &timeout32->tv_sec)  ||
-	    get_user (tmp.tv_nsec, &timeout32->tv_nsec))
+	if (timeout32 && get_compat_timespec(&tmp, timeout32))
 		return -EINVAL;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	ret = sys_futex(uaddr, op, val, &tmp);
+	ret = sys_futex(uaddr, op, val, timeout32 ? &tmp : NULL);
 	set_fs(old_fs);
 
 	return ret;

@@ -310,12 +310,13 @@ static sector_t jfs_bmap(struct address_space *mapping, sector_t block)
 	return generic_block_bmap(mapping, block, jfs_get_block);
 }
 
-static int jfs_direct_IO(int rw, struct file *file, const struct iovec *iov,
+static int jfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 			loff_t offset, unsigned long nr_segs)
 {
+	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 
-	return generic_direct_IO(rw, inode, inode->i_sb->s_bdev, iov,
+	return blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov,
 				offset, nr_segs, jfs_get_blocks);
 }
 

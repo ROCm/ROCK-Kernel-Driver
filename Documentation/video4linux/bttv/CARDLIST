@@ -69,7 +69,7 @@ bttv.o
   card=67 - IODATA GV-BCTV4/PCI
   card=68 - 3Dfx VoodooTV FM (Euro), VoodooTV 200 (USA)
   card=69 - Active Imaging AIMMS
-  card=70 - Prolink Pixelview PV-BT878P+ (Rev.4C)
+  card=70 - Prolink Pixelview PV-BT878P+ (Rev.4C,8E)
   card=71 - Lifeview FlyVideo 98EZ (capture only) LR51
   card=72 - Prolink Pixelview PV-BT878P+9B (PlayTV Pro rev.9B FM+NICAM)
   card=73 - Sensoray 311

@@ -267,7 +267,7 @@ nfs_readpage_result(struct rpc_task *task)
 		if (task->tk_status >= 0) {
 			if (count < PAGE_CACHE_SIZE) {
 				memclear_highpage_flush(page,
-							req->wb_offset + count,
+							req->wb_pgbase + count,
 							req->wb_bytes - count);
 
 				if (data->res.eof ||

@@ -23,7 +23,7 @@
  * Client user credentials
  */
 struct rpc_cred {
-	struct rpc_cred *	cr_next;	/* linked list */
+	struct list_head	cr_hash;	/* hash chain */
 	struct rpc_auth *	cr_auth;
 	struct rpc_credops *	cr_ops;
 	unsigned long		cr_expire;	/* when to gc */
@@ -49,7 +49,7 @@ struct rpc_cred {
 #define RPC_CREDCACHE_NR	8
 #define RPC_CREDCACHE_MASK	(RPC_CREDCACHE_NR - 1)
 struct rpc_auth {
-	struct rpc_cred *	au_credcache[RPC_CREDCACHE_NR];
+	struct list_head	au_credcache[RPC_CREDCACHE_NR];
 	unsigned long		au_expire;	/* cache expiry interval */
 	unsigned long		au_nextgc;	/* next garbage collection */
 	unsigned int		au_cslack;	/* call cred size estimate */
@@ -101,8 +101,6 @@ struct rpc_cred *	rpcauth_bindcred(struct rpc_task *);
 void			rpcauth_holdcred(struct rpc_task *);
 void			put_rpccred(struct rpc_cred *);
 void			rpcauth_unbindcred(struct rpc_task *);
-int			rpcauth_matchcred(struct rpc_auth *,
-					  struct rpc_cred *, int);
 u32 *			rpcauth_marshcred(struct rpc_task *, u32 *);
 u32 *			rpcauth_checkverf(struct rpc_task *, u32 *);
 int			rpcauth_refreshcred(struct rpc_task *);
@@ -110,8 +108,6 @@ void			rpcauth_invalcred(struct rpc_task *);
 int			rpcauth_uptodatecred(struct rpc_task *);
 void			rpcauth_init_credcache(struct rpc_auth *);
 void			rpcauth_free_credcache(struct rpc_auth *);
-void			rpcauth_insert_credcache(struct rpc_auth *,
-						struct rpc_cred *);
 
 static inline
 struct rpc_cred *	get_rpccred(struct rpc_cred *cred)

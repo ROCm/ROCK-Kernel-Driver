@@ -276,6 +276,7 @@ struct iattr {
 struct page;
 struct address_space;
 struct writeback_control;
+struct kiocb;
 
 struct address_space_operations {
 	int (*writepage)(struct page *page, struct writeback_control *wbc);
@@ -301,7 +302,7 @@ struct address_space_operations {
 	sector_t (*bmap)(struct address_space *, sector_t);
 	int (*invalidatepage) (struct page *, unsigned long);
 	int (*releasepage) (struct page *, int);
-	int (*direct_IO)(int, struct file *, const struct iovec *iov,
+	int (*direct_IO)(int, struct kiocb *, const struct iovec *iov,
 			loff_t offset, unsigned long nr_segs);
 };
 
@@ -736,7 +737,6 @@ typedef int (*read_actor_t)(read_descriptor_t *, struct page *, unsigned long, u
  * read, write, poll, fsync, readv, writev can be called
  *   without the big kernel lock held in all filesystems.
  */
-struct kiocb;
 struct file_operations {
 	struct module *owner;
 	loff_t (*llseek) (struct file *, loff_t, int);
@@ -1234,6 +1234,8 @@ extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);
 extern ssize_t generic_file_write(struct file *, const char *, size_t, loff_t *);
 extern ssize_t generic_file_aio_read(struct kiocb *, char *, size_t, loff_t);
 extern ssize_t generic_file_aio_write(struct kiocb *, const char *, size_t, loff_t);
+extern ssize_t generic_file_aio_write_nolock(struct kiocb *, const struct iovec *,
+				unsigned long, loff_t *);
 extern ssize_t do_sync_read(struct file *filp, char *buf, size_t len, loff_t *ppos);
 extern ssize_t do_sync_write(struct file *filp, const char *buf, size_t len, loff_t *ppos);
 ssize_t generic_file_write_nolock(struct file *file, const struct iovec *iov,
@@ -1243,10 +1245,11 @@ extern void do_generic_mapping_read(struct address_space *, struct file_ra_state
 				    loff_t *, read_descriptor_t *, read_actor_t);
 extern void
 file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping);
-extern ssize_t generic_file_direct_IO(int rw, struct file *file,
+extern ssize_t generic_file_direct_IO(int rw, struct kiocb *iocb,
 	const struct iovec *iov, loff_t offset, unsigned long nr_segs);
-extern int generic_direct_IO(int rw, struct inode *inode, struct block_device *bdev,
-	const struct iovec *iov, loff_t offset, unsigned long nr_segs, get_blocks_t *get_blocks);
+extern int blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode, 
+	struct block_device *bdev, const struct iovec *iov, loff_t offset, 
+	unsigned long nr_segs, get_blocks_t *get_blocks);
 extern ssize_t generic_file_readv(struct file *filp, const struct iovec *iov, 
 	unsigned long nr_segs, loff_t *ppos);
 ssize_t generic_file_writev(struct file *filp, const struct iovec *iov, 

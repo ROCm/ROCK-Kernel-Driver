@@ -36,6 +36,8 @@ struct compat_tms {
 extern int cp_compat_stat(struct kstat *, struct compat_stat *);
 extern int get_compat_flock(struct flock *, struct compat_flock *);
 extern int put_compat_flock(struct flock *, struct compat_flock *);
+extern int get_compat_timespec(struct timespec *, struct compat_timespec *);
+extern int put_compat_timespec(struct timespec *, struct compat_timespec *);
 
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */

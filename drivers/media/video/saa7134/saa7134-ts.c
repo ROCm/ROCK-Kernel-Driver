@@ -52,21 +52,24 @@ static int buffer_activate(struct saa7134_dev *dev,
 			   struct saa7134_buf *buf,
 			   struct saa7134_buf *next)
 {
-	unsigned long control,status;
-
+	u32 control;
+	
 	dprintk("buffer_activate [%p]\n",buf);
 	buf->vb.state = STATE_ACTIVE;
 	
-	/* dma: setup channel 5 (= TS) */
-	control = SAA7134_RS_CONTROL_BURST_16 |
-		SAA7134_RS_CONTROL_ME |
-		(buf->pt->dma >> 12);
+        /* dma: setup channel 5 (= TS) */
+        control = SAA7134_RS_CONTROL_BURST_16 |
+                SAA7134_RS_CONTROL_ME |
+                (buf->pt->dma >> 12);
 
-	status = saa_readl(SAA7134_IRQ_STATUS);
-	if (0 == (status & 0x100000)) {
+	if (NULL == next)
+		next = buf;
+	if (V4L2_FIELD_TOP == buf->vb.field) {
+		dprintk("[top]     buf=%p next=%p",buf,next);
 		saa_writel(SAA7134_RS_BA1(5),saa7134_buffer_base(buf));
 		saa_writel(SAA7134_RS_BA2(5),saa7134_buffer_base(next));
 	} else {
+		dprintk("[bottom]  buf=%p next=%p",buf,next);
 		saa_writel(SAA7134_RS_BA1(5),saa7134_buffer_base(next));
 		saa_writel(SAA7134_RS_BA2(5),saa7134_buffer_base(buf));
 	}
@@ -80,7 +83,8 @@ static int buffer_activate(struct saa7134_dev *dev,
 	return 0;
 }
 
-static int buffer_prepare(struct file *file, struct videobuf_buffer *vb)
+static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
+			  enum v4l2_field field)
 {
 	struct saa7134_dev *dev = file->private_data;
 	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
@@ -116,7 +120,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb)
 	buf->vb.state = STATE_PREPARED;
 	buf->top_seen = 0;
 	buf->activate = buffer_activate;
-	buf->vb.field = V4L2_FIELD_SEQ_TB;
+	buf->vb.field = field;
 	return 0;
 
  oops:
@@ -408,11 +412,13 @@ int saa7134_ts_init(struct saa7134_dev *dev)
 		tsbufs = VIDEO_MAX_FRAME;
 
 	INIT_LIST_HEAD(&dev->ts_q.queue);
+	init_timer(&dev->ts_q.timeout);
 	dev->ts_q.timeout.function = saa7134_buffer_timeout;
 	dev->ts_q.timeout.data     = (unsigned long)(&dev->ts_q);
 	dev->ts_q.dev              = dev;
 	videobuf_queue_init(&dev->ts.ts, &ts_qops, dev->pci, &dev->slock,
 			    V4L2_BUF_TYPE_VIDEO_CAPTURE,
+			    V4L2_FIELD_ALTERNATE,
 			    sizeof(struct saa7134_buf));
 	saa7134_pgtable_alloc(dev->pci,&dev->ts.pt_ts);
 
@@ -437,11 +443,23 @@ int saa7134_ts_fini(struct saa7134_dev *dev)
 
 void saa7134_irq_ts_done(struct saa7134_dev *dev, unsigned long status)
 {
+	enum v4l2_field field;
+
 	spin_lock(&dev->slock);
 	if (dev->ts_q.curr) {
+		field = dev->video_q.curr->vb.field;
+		if (field == V4L2_FIELD_TOP) {
+			if ((status & 0x100000) != 0x100000)
+				goto done;
+		} else {
+			if ((status & 0x100000) != 0x000000)
+				goto done;
+		}
 		saa7134_buffer_finish(dev,&dev->ts_q,STATE_DONE);
 	}
 	saa7134_buffer_next(dev,&dev->ts_q);
+
+ done:
 	spin_unlock(&dev->slock);
 }
 

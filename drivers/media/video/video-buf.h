@@ -154,7 +154,8 @@ struct videobuf_buffer {
 
 struct videobuf_queue_ops {
 	int (*buf_setup)(struct file *file, int *count, int *size);
-	int (*buf_prepare)(struct file *file,struct videobuf_buffer *vb);
+	int (*buf_prepare)(struct file *file,struct videobuf_buffer *vb,
+			   enum v4l2_field field);
 	void (*buf_queue)(struct file *file,struct videobuf_buffer *vb);
 	void (*buf_release)(struct file *file,struct videobuf_buffer *vb);
 };
@@ -166,6 +167,8 @@ struct videobuf_queue {
 
 	enum v4l2_buf_type         type;
 	int                        msize;
+	enum v4l2_field            field;
+	enum v4l2_field            last; /* for field=V4L2_FIELD_ALTERNATE */
 	struct videobuf_buffer     *bufs[VIDEO_MAX_FRAME];
 	struct videobuf_queue_ops  *ops;
 
@@ -186,7 +189,8 @@ int videobuf_iolock(struct pci_dev *pci, struct videobuf_buffer *vb);
 void videobuf_queue_init(struct videobuf_queue *q,
 			 struct videobuf_queue_ops *ops,
 			 struct pci_dev *pci, spinlock_t *irqlock,
-			 enum v4l2_buf_type type, int msize);
+			 enum v4l2_buf_type type,
+			 enum v4l2_field field, int msize);
 int  videobuf_queue_is_busy(struct videobuf_queue *q);
 void videobuf_queue_cancel(struct file *file, struct videobuf_queue *q);
 

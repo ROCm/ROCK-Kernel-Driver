@@ -7,22 +7,9 @@
  *      Author: MontaVista Software, Inc.  <source@mvista.com>
  *              Frank Rowand <frank_rowand@mvista.com>
  *              Debbie Chu   <debbie_chu@mvista.com>
+ *	Further modifications by Armin Kuster
  *
  *    Module name: ppc4xx_setup.c
- *
- *    Description:
- *      Architecture- / platform-specific boot-time initialization code for
- *      IBM PowerPC 4xx based boards. Adapted from original
- *      code by Gary Thomas, Cort Dougan <cort@fsmlabs.com>, and Dan Malek
- *      <dan@net4x.com>.
- *
- * 	History: 11/09/2001 - armin
- *	rename board_setup_nvram_access to board_init. board_init is
- *	used for all other board specific instructions needed during
- *	platform_init.
- *	moved RTC to board.c files
- *	moved VT/FB to board.c files
- *	moved r/w4 ide to redwood.c
  *
  */
 
@@ -63,19 +50,12 @@ extern void ppc4xx_wdt_heartbeat(void);
 extern int wdt_enable;
 extern unsigned long wdt_period;
 
-/* Board specific functions */
-extern void board_setup_arch(void);
-extern void board_io_mapping(void);
-extern void board_setup_irq(void);
-extern void board_init(void);
-
 /* Global Variables */
-unsigned char __res[sizeof (bd_t)];
+bd_t __res;
 
-static void __init
+void __init
 ppc4xx_setup_arch(void)
 {
-
 	/* Setup PCI host bridges */
 
 #ifdef CONFIG_PCI
@@ -85,8 +65,6 @@ ppc4xx_setup_arch(void)
 #if defined(CONFIG_FB)
 	conswitchp = &dummy_con;
 #endif
-
-	board_setup_arch();
 }
 
 /*
@@ -97,9 +75,7 @@ ppc4xx_setup_arch(void)
 static int
 ppc4xx_show_percpuinfo(struct seq_file *m, int i)
 {
-	bd_t *bip = (bd_t *) __res;
-
-	seq_printf(m, "clock\t\t: %ldMHz\n", (long) bip->bi_intfreq / 1000000);
+	seq_printf(m, "clock\t\t: %ldMHz\n", (long)__res.bi_intfreq / 1000000);
 
 	return 0;
 }
@@ -111,7 +87,7 @@ ppc4xx_show_percpuinfo(struct seq_file *m, int i)
 static int
 ppc4xx_show_cpuinfo(struct seq_file *m)
 {
-	bd_t *bip = (bd_t *) __res;
+	bd_t *bip = &__res;
 
 	seq_printf(m, "machine\t\t: %s\n", PPC4xx_MACHINE_NAME);
 	seq_printf(m, "plb bus clock\t: %ldMHz\n",
@@ -130,13 +106,11 @@ ppc4xx_show_cpuinfo(struct seq_file *m)
 static unsigned long __init
 ppc4xx_find_end_of_memory(void)
 {
-	bd_t *bip = (bd_t *) __res;
-
-	return ((unsigned long) bip->bi_memsize);
+	return ((unsigned long) __res.bi_memsize);
 }
 
-static void __init
-m4xx_map_io(void)
+void __init
+ppc4xx_map_io(void)
 {
 	io_block_mapping(PPC4xx_ONB_IO_VADDR,
 			 PPC4xx_ONB_IO_PADDR, PPC4xx_ONB_IO_SIZE, _PAGE_IO);
@@ -148,10 +122,9 @@ m4xx_map_io(void)
 	io_block_mapping(PPC4xx_PCI_LCFG_VADDR,
 			 PPC4xx_PCI_LCFG_PADDR, PPC4xx_PCI_LCFG_SIZE, _PAGE_IO);
 #endif
-	board_io_mapping();
 }
 
-static void __init
+void __init
 ppc4xx_init_IRQ(void)
 {
 	int i;
@@ -160,10 +133,6 @@ ppc4xx_init_IRQ(void)
 
 	for (i = 0; i < NR_IRQS; i++)
 		irq_desc[i].handler = ppc4xx_pic;
-
-	/* give board specific code a chance to setup things */
-	board_setup_irq();
-	return;
 }
 
 static void
@@ -199,19 +168,13 @@ static void __init
 ppc4xx_calibrate_decr(void)
 {
 	unsigned int freq;
-	bd_t *bip = (bd_t *) __res;
+	bd_t *bip = &__res;
 
-#if defined(CONFIG_WALNUT) || defined(CONFIG_CEDER)
+#if defined(CONFIG_WALNUT) || defined(CONFIG_CEDER)|| defined(CONFIG_ASH) || defined(CONFIG_SYCAMORE)
 	/* Walnut boot rom sets DCR CHCR1 (aka CPC0_CR1) bit CETE to 1 */
 	mtdcr(DCRN_CHCR1, mfdcr(DCRN_CHCR1) & ~CHR1_CETE);
 #endif
-#ifdef CONFIG_REDWOOD_5
 	freq = bip->bi_tbfreq;
-#else
-	freq = bip->bi_intfreq;
-
-#endif
-
 	tb_ticks_per_jiffy = freq / HZ;
 	tb_to_us = mulhwu_scale_factor(freq, 1000000);
 
@@ -230,20 +193,40 @@ ppc4xx_calibrate_decr(void)
 	/* Set the PIT reload value and just let it run. */
 	mtspr(SPRN_PIT, tb_ticks_per_jiffy);
 }
+#ifdef CONFIG_SERIAL_TEXT_DEBUG
 
-#ifdef CONFIG_DEBUG_TEXT
+/* We assume that the UART has already been initialized by the
+   firmware or the boot loader */
+static void
+serial_putc(u8 * com_port, unsigned char c)
+{
+	while ((readb(com_port + (UART_LSR)) & UART_LSR_THRE) == 0) ;
+	writeb(c, com_port);
+}
+
 static void
 ppc4xx_progress(char *s, unsigned short hex)
 {
-	printk("%s\n\r", s);
-}
+	char c;
+#ifdef SERIAL_DEBUG_IO_BASE
+	u8 *com_port = (u8 *) SERIAL_DEBUG_IO_BASE;
+
+	while ((c = *s++) != '\0') {
+		serial_putc(com_port, c);
+	}
+	serial_putc(com_port, '\r');
+	serial_putc(com_port, '\n');
+#else
+	printk("%s\r\n");
 #endif
+}
+#endif				/* CONFIG_SERIAL_TEXT_DEBUG */
 
 /*
  * IDE stuff.
  * should be generic for every IDE PCI chipset
  */
-#ifdef  CONFIG_PCI
+#if defined(CONFIG_PCI) && defined(CONFIG_IDE)
 static void
 ppc4xx_ide_init_hwif_ports(hw_regs_t * hw, ide_ioreg_t data_port,
 			   ide_ioreg_t ctrl_port, int *irq)
@@ -255,7 +238,7 @@ ppc4xx_ide_init_hwif_ports(hw_regs_t * hw, ide_ioreg_t data_port,
 
 	hw->io_ports[IDE_CONTROL_OFFSET] = ctrl_port;
 }
-#endif
+#endif /* defined(CONFIG_PCI) && defined(CONFIG_IDE) */
 
 TODC_ALLOC();
 
@@ -272,8 +255,8 @@ TODC_ALLOC();
  *        command-line parameters.
  */
 void __init
-platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
-	      unsigned long r6, unsigned long r7)
+ppc4xx_init(unsigned long r3, unsigned long r4, unsigned long r5,
+	    unsigned long r6, unsigned long r7)
 {
 	parse_bootinfo(find_bootinfo());
 
@@ -281,11 +264,9 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	 * If we were passed in a board information, copy it into the
 	 * residual data area.
 	 */
-	if (r3) {
-		memcpy((void *) __res, (void *) (r3 + KERNELBASE),
-		       sizeof (bd_t));
+	if (r3)
+		__res = *(bd_t *)(r3 + KERNELBASE);
 
-	}
 #if defined(CONFIG_BLK_DEV_INITRD)
 	/*
 	 * If the init RAM disk has been configured in, and there's a valid
@@ -320,7 +301,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 #endif
 
-	/* Initialize machine-dependency vectors */
+	/* Initialize machine-dependent vectors */
 
 	ppc_md.setup_arch = ppc4xx_setup_arch;
 	ppc_md.show_percpuinfo = ppc4xx_show_percpuinfo;
@@ -339,9 +320,9 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.heartbeat_count = 0;
 
 	ppc_md.find_end_of_memory = ppc4xx_find_end_of_memory;
-	ppc_md.setup_io_mappings = m4xx_map_io;
+	ppc_md.setup_io_mappings = ppc4xx_map_io;
 
-#ifdef CONFIG_DEBUG_TEXT
+#ifdef CONFIG_SERIAL_TEXT_DEBUG
 	ppc_md.progress = ppc4xx_progress;
 #endif
 
@@ -349,12 +330,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 **   m8xx_setup.c, prep_setup.c use
 **     defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 */
-#ifdef CONFIG_IDE
-# ifdef CONFIG_PCI
+#if defined(CONFIG_PCI) && defined(CONFIG_IDE)
 	ppc_ide_md.ide_init_hwif = ppc4xx_ide_init_hwif_ports;
-# endif
-#endif
-	board_init();
-
-	return;
+#endif /* defined(CONFIG_PCI) && defined(CONFIG_IDE) */
 }

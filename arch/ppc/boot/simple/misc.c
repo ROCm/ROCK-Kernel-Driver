@@ -76,8 +76,8 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 {
 	int timer = 0;
 	char *cp, ch;
-	struct bi_record *rec, *birecs;
-	unsigned long TotalMemory = 0;
+	struct bi_record *rec;
+	unsigned long TotalMemory = 0, rec_loc, initrd_loc;
 
 	serial_fixups();
 	com_port = serial_init(0, NULL);
@@ -197,10 +197,29 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	/*
 	 * Create bi_recs for cmd_line and initrds
 	 */
-	rec = (struct bi_record *)_ALIGN((unsigned long)(zimage_size) +
+	rec_loc = _ALIGN((unsigned long)(zimage_size) +
 			(1 << 20) - 1, (1 << 20));
-	birecs = rec;
+	rec = (struct bi_record *)rec_loc;
 
+	/* We need to make sure that the initrd and bi_recs do not
+	 * overlap. */
+	if ( initrd_size ) {
+		initrd_loc = (unsigned long)(&__ramdisk_begin);
+		/* If the bi_recs are in the middle of the current
+		 * initrd, move the initrd to the next MB
+		 * boundary. */
+		if ((rec_loc > initrd_loc) &&
+				((initrd_loc + initrd_size) > rec_loc)) {
+			initrd_loc = _ALIGN((unsigned long)(zimage_size)
+					+ (2 << 20) - 1, (2 << 20));
+		 	memmove((void *)initrd_loc, &__ramdisk_begin,
+				 initrd_size);
+	         	puts("initrd moved:  "); puthex(initrd_loc);
+		 	puts(" "); puthex(initrd_loc + initrd_size);
+		 	puts("\n");
+		}
+	}
+ 
 	rec->tag = BI_FIRST;
 	rec->size = sizeof(struct bi_record);
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);
@@ -219,7 +238,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 
 	if ( initrd_size ) {
 		rec->tag = BI_INITRD;
-		rec->data[0] = (unsigned long)(&__ramdisk_begin);
+		rec->data[0] = initrd_loc;
 		rec->data[1] = initrd_size;
 		rec->size = sizeof(struct bi_record) + 2 *
 			sizeof(unsigned long);
@@ -233,5 +252,5 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	puts("Now booting the kernel\n");
 	serial_close(com_port);
 
-	return birecs;
+	return (struct bi_record *)rec_loc;
 }
