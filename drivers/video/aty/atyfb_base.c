@@ -1037,7 +1037,7 @@ static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		fbtyp.fb_cmsize = info->cmap.len;
 		fbtyp.fb_size = info->fix.smem_len;
 		if (copy_to_user
-		    ((struct fbtype *) arg, &fbtyp, sizeof(fbtyp)))
+		    ((struct fbtype __user *) arg, &fbtyp, sizeof(fbtyp)))
 			return -EFAULT;
 		break;
 #endif				/* __sparc__ */
