@@ -20,6 +20,7 @@
 #include <linux/fs.h>
 #include <linux/jbd.h>
 #include <linux/ext3_fs.h>
+#include "xattr.h"
 
 static int ext3_readlink(struct dentry *dentry, char *buffer, int buflen)
 {
@@ -33,7 +34,20 @@ static int ext3_follow_link(struct dentry *dentry, struct nameidata *nd)
 	return vfs_follow_link(nd, (char*)ei->i_data);
 }
 
+struct inode_operations ext3_symlink_inode_operations = {
+	.readlink	= page_readlink,
+	.follow_link	= page_follow_link,
+	.setxattr	= ext3_setxattr,
+	.getxattr	= ext3_getxattr,
+	.listxattr	= ext3_listxattr,
+	.removexattr	= ext3_removexattr,
+};
+
 struct inode_operations ext3_fast_symlink_inode_operations = {
-	.readlink	= ext3_readlink,		/* BKL not held.  Don't need */
+	.readlink	= ext3_readlink,	/* BKL not held.  Don't need */
 	.follow_link	= ext3_follow_link,	/* BKL not held.  Don't need */
+	.setxattr	= ext3_setxattr,
+	.getxattr	= ext3_getxattr,
+	.listxattr	= ext3_listxattr,
+	.removexattr	= ext3_removexattr,
 };

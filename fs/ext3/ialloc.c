@@ -25,6 +25,9 @@
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 
+#include "xattr.h"
+#include "acl.h"
+
 /*
  * ialloc.c contains the inodes allocation and deallocation routines
  */
@@ -118,6 +121,7 @@ void ext3_free_inode (handle_t *handle, struct inode * inode)
 	 * as writing the quota to disk may need the lock as well.
 	 */
 	DQUOT_INIT(inode);
+	ext3_xattr_delete_inode(handle, inode);
 	DQUOT_FREE_INODE(inode);
 	DQUOT_DROP(inode);
 
@@ -420,20 +424,27 @@ repeat:
 	inode->i_generation = EXT3_SB(sb)->s_next_generation++;
 
 	ei->i_state = EXT3_STATE_NEW;
-	err = ext3_mark_inode_dirty(handle, inode);
-	if (err) goto fail;
-	
+
 	unlock_super(sb);
 	ret = inode;
 	if(DQUOT_ALLOC_INODE(inode)) {
 		DQUOT_DROP(inode);
-		inode->i_flags |= S_NOQUOTA;
-		inode->i_nlink = 0;
-		iput(inode);
-		ret = ERR_PTR(-EDQUOT);
-	} else {
-		ext3_debug("allocating inode %lu\n", inode->i_ino);
+		err = -EDQUOT;
+		goto fail2;
 	}
+	err = ext3_init_acl(handle, inode, dir);
+	if (err) {
+		DQUOT_FREE_INODE(inode);
+		goto fail2;
+  	}
+	err = ext3_mark_inode_dirty(handle, inode);
+	if (err) {
+		ext3_std_error(sb, err);
+		DQUOT_FREE_INODE(inode);
+		goto fail2;
+	}
+
+	ext3_debug("allocating inode %lu\n", inode->i_ino);
 	goto really_out;
 fail:
 	ext3_std_error(sb, err);
@@ -444,6 +455,12 @@ out:
 really_out:
 	brelse(bitmap_bh);
 	return ret;
+
+fail2:
+	inode->i_flags |= S_NOQUOTA;
+	inode->i_nlink = 0;
+	iput(inode);
+	return ERR_PTR(err);
 }
 
 /* Verify that we are loading a valid orphan from disk */

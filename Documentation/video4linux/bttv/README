@@ -76,6 +76,12 @@ correct card type in case the autodetection does'nt work. If you get
 video but no sound you've very likely specified the wrong (or no)
 card type.  A list of supported cards is in CARDLIST.
 
+For the WinTV/PVR you need one firmware file from the driver CD:
+hcwamc.rbf.  The file is in the pvr45xxx.exe archive (self-extracting
+zip file, unzip can unpack it).  Put it into the /etc/pvr directory or
+use the firm_altera=<path> insmod option to point the driver to the
+location of the file.
+
 If your card isn't listed in CARDLIST or if you have trouble making
 audio work, you should read the Sound-FAQ.
 

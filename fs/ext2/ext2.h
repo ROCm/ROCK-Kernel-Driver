@@ -10,6 +10,7 @@ struct ext2_inode_info {
 	__u32	i_faddr;
 	__u8	i_frag_no;
 	__u8	i_frag_size;
+	__u16	i_state;
 	__u32	i_file_acl;
 	__u32	i_dir_acl;
 	__u32	i_dtime;
@@ -19,9 +20,19 @@ struct ext2_inode_info {
 	__u32	i_prealloc_block;
 	__u32	i_prealloc_count;
 	__u32	i_dir_start_lookup;
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
+	struct posix_acl	*i_acl;
+	struct posix_acl	*i_default_acl;
+#endif
 	rwlock_t i_meta_lock;
 	struct inode	vfs_inode;
 };
+
+/*
+ * Inode dynamic state flags
+ */
+#define EXT2_STATE_NEW			0x00000001 /* inode is newly created */
+
 
 /*
  * Function prototypes
@@ -78,6 +89,7 @@ extern void ext2_delete_inode (struct inode *);
 extern int ext2_sync_inode (struct inode *);
 extern void ext2_discard_prealloc (struct inode *);
 extern void ext2_truncate (struct inode *);
+extern int ext2_setattr (struct dentry *, struct iattr *);
 
 /* ioctl.c */
 extern int ext2_ioctl (struct inode *, struct file *, unsigned int,
@@ -110,6 +122,8 @@ extern struct address_space_operations ext2_aops;
 
 /* namei.c */
 extern struct inode_operations ext2_dir_inode_operations;
+extern struct inode_operations ext2_special_inode_operations;
 
 /* symlink.c */
 extern struct inode_operations ext2_fast_symlink_inode_operations;
+extern struct inode_operations ext2_symlink_inode_operations;
