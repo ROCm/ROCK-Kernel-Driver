@@ -1355,7 +1355,7 @@ MODULE_LICENSE("GPL");
 
 /* --------------------------------------------------------------------- */
 
-static void __init baycom_epp_setup(struct net_device *dev)
+static void __init baycom_epp_dev_setup(struct net_device *dev)
 {
 	struct baycom_state *bc = dev->priv;
 
@@ -1384,7 +1384,7 @@ static int __init init_baycomepp(void)
 		struct net_device *dev;
 		
 		dev = alloc_netdev(sizeof(struct baycom_state), "bce%d",
-				   baycom_epp_setup);
+				   baycom_epp_dev_setup);
 
 		if (!dev) {
 			printk(KERN_WARNING "bce%d : out of memory\n", i);

@@ -225,7 +225,7 @@ void sym_announce_transfer_rate(hcb_p np, int target)
  */
 void sym_update_trans_settings(hcb_p np, tcb_p tp)
 {
-	bcopy(&tp->tinfo.user, &tp->tinfo.goal, sizeof(tp->tinfo.goal));
+	memcpy(&tp->tinfo.goal, &tp->tinfo.user, sizeof(tp->tinfo.goal));
 
 	if (tp->inq_version >= 4) {
 		switch(tp->inq_byte56 & INQ56_CLOCKING) {

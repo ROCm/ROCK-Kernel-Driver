@@ -9,9 +9,6 @@
 #define _ASM_THREAD_INFO_H
 
 #ifdef __KERNEL__
-
-#include <asm/processor.h>
-
 #ifndef __ASSEMBLY__
 /*
  * low level task data.

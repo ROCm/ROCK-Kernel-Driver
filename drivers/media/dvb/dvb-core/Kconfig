@@ -1,6 +1,7 @@
 config DVB_CORE
 	tristate "DVB Core Support"
 	depends on DVB
+	select CRC32
 	help
 	  DVB core utility functions for device handling, software fallbacks etc.
 

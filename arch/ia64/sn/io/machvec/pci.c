@@ -35,8 +35,6 @@
  * can probably be removed with a little more cleanup now that the SAL routines
  * work on sn2.
  */
-#ifdef CONFIG_PCI
-
 extern vertex_hdl_t devfn_to_vertex(unsigned char bus, unsigned char devfn);
 
 int sn_read_config(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val)
@@ -71,9 +69,3 @@ struct pci_ops sn_pci_ops = {
 	.read = sn_read_config,
 	.write = sn_write_config,
 };
-
-#else
-struct list_head pci_root_buses;
-struct list_head pci_root_buses;
-struct list_head pci_devices;
-#endif /* CONFIG_PCI */

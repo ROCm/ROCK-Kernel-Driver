@@ -28,7 +28,7 @@
 
 #include <linux/module.h>
 #include <linux/device.h>
-#include <linux/mca.h>
+#include <linux/mca-legacy.h>
 #include <asm/io.h>
 
 /* NOTE: This structure is stack allocated */

@@ -143,6 +143,8 @@ config CRYPTO_CAST6
 config CRYPTO_DEFLATE
 	tristate "Deflate compression algorithm"
 	depends on CRYPTO
+	select ZLIB_INFLATE
+	select ZLIB_DEFLATE
 	help
 	  This is the Deflate algorithm (RFC1951), specified for use in
 	  IPSec with the IPCOMP protocol (RFC3173, RFC2394).

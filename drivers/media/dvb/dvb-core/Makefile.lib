@@ -1,1 +1,0 @@
-obj-$(CONFIG_DVB_CORE)		+= crc32.o

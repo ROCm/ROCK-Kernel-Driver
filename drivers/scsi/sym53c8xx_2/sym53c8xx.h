@@ -53,36 +53,7 @@
 #ifndef SYM53C8XX_H
 #define SYM53C8XX_H
 
-#if !defined(LINUX_VERSION_CODE)
-#include <linux/version.h>
-#endif
 #include <linux/config.h>
-
-/*
- *  Compatibility with ncr53c8xx and sym53c8xx configuration options.
- */
-#ifndef	CONFIG_SCSI_SYM53C8XX_IOMAPPED
-#ifdef	CONFIG_SCSI_NCR53C8XX_IOMAPPED
-#define	CONFIG_SCSI_SYM53C8XX_IOMAPPED		CONFIG_SCSI_NCR53C8XX_IOMAPPED
-#endif
-#endif
-
-#ifndef	CONFIG_SCSI_SYM53C8XX_DEFAULT_TAGS
-#ifdef	CONFIG_SCSI_NCR53C8XX_DEFAULT_TAGS
-#define	CONFIG_SCSI_SYM53C8XX_DEFAULT_TAGS	CONFIG_SCSI_NCR53C8XX_DEFAULT_TAGS
-#endif
-#endif
-
-#ifndef	CONFIG_SCSI_SYM53C8XX_MAX_TAGS
-#ifdef	CONFIG_SCSI_NCR53C8XX_MAX_TAGS
-#define	CONFIG_SCSI_SYM53C8XX_MAX_TAGS		CONFIG_SCSI_NCR53C8XX_MAX_TAGS
-#endif
-#endif
-
-/*
- *  Translate kernel configuration parameters
- *  into corresponding driver parameters.
- */
 
 /*
  *  Use normal IO if configured.
@@ -108,9 +79,7 @@
  *  2 : 64 bit addressing when supported by chip,
  *      limited to 16 segments of 4 GB -> 64 GB max.
  */
-#ifdef	CONFIG_SCSI_SYM53C8XX_DMA_ADDRESSING_MODE
 #define	SYM_CONF_DMA_ADDRESSING_MODE CONFIG_SCSI_SYM53C8XX_DMA_ADDRESSING_MODE
-#endif
 
 /*
  *  NCR PQS/PDS special device support.
@@ -175,25 +144,9 @@
 #endif
 
 /*
- *  Sync transfer frequency at startup.
- *  Allow up to ULTRA-160. The driver will scale the value 
- *  according to controller capabilities.
- */
-#define	CONFIG_SCSI_SYM53C8XX_DEFAULT_SYNC (9)
-
-/*
  *  Max number of SG entries.
  */
 #define SYM_CONF_MAX_SG		(96)
-
-/*
- *  Max number of LUNs per target.
- */
-#if 1 /* defined CONFIG_SCSI_MULTI_LUN */
-#define	CONFIG_SCSI_SYM53C8XX_MAX_LUN	(16)
-#else
-#define	CONFIG_SCSI_SYM53C8XX_MAX_LUN	(1)
-#endif
 
 /*
  *  Driver setup structure.
@@ -202,20 +155,13 @@
  *  It can be overridden at boot-up by the boot command line.
  */
 struct sym_driver_setup {
-	u_char	pci_parity;
-	u_char	scsi_parity;
 	u_short	max_tag;
-	u_char	min_sync;
 	u_char	burst_order;
 	u_char	scsi_led;
-	u_char	max_wide;
 	u_char	scsi_diff;
 	u_char	irq_mode;
 	u_char	scsi_bus_check;
 	u_char	host_id;
-	u_char	max_offs;
-	u_char	max_lun;
-	u_char	pci_fix_up;
 
 	u_char	reverse_probe;
 	u_char	verbose;
@@ -226,47 +172,36 @@ struct sym_driver_setup {
 	char	tag_ctrl[100];
 };
 
-#define SYM_SETUP_PCI_PARITY		sym_driver_setup.pci_parity
-#define SYM_SETUP_SCSI_PARITY		sym_driver_setup.scsi_parity
 #define SYM_SETUP_MAX_TAG		sym_driver_setup.max_tag
-#define SYM_SETUP_MIN_SYNC		sym_driver_setup.min_sync
 #define SYM_SETUP_BURST_ORDER		sym_driver_setup.burst_order
 #define SYM_SETUP_SCSI_LED		sym_driver_setup.scsi_led
-#define SYM_SETUP_MAX_WIDE		sym_driver_setup.max_wide
 #define SYM_SETUP_SCSI_DIFF		sym_driver_setup.scsi_diff
 #define SYM_SETUP_IRQ_MODE		sym_driver_setup.irq_mode
 #define SYM_SETUP_SCSI_BUS_CHECK	sym_driver_setup.scsi_bus_check
 #define SYM_SETUP_HOST_ID		sym_driver_setup.host_id
-#define SYM_SETUP_MAX_OFFS		sym_driver_setup.max_offs
-#define SYM_SETUP_MAX_LUN		sym_driver_setup.max_lun
-#define SYM_SETUP_PCI_FIX_UP		sym_driver_setup.pci_fix_up
+
+/* Always enable parity. */
+#define SYM_SETUP_PCI_PARITY		1
+#define SYM_SETUP_SCSI_PARITY		1
 
 /*
  *  Initial setup.
  *
  *  Can be overriden at startup by a command line.
  */
-#define SYM_LINUX_DRIVER_SETUP			\
-{						\
-	1,	/* pci_parity */		\
-	1,	/* scsi_parity */		\
-	CONFIG_SCSI_SYM53C8XX_DEFAULT_TAGS,	\
-	CONFIG_SCSI_SYM53C8XX_DEFAULT_SYNC,	\
-	7,	/* burst_order */		\
-	1,	/* scsi_led */			\
-	1,	/* max_wide */			\
-	1,	/* scsi_diff */			\
-	0,	/* irq_mode */			\
-	1,	/* scsi_bus_check */		\
-	7,	/* host_id */			\
-	62,	/* max_offs */			\
-	CONFIG_SCSI_SYM53C8XX_MAX_LUN,		\
-	3,	/* pci_fix_up */		\
-	0,	/* reverse_probe */		\
-	0,	/* verbose */			\
-	0,	/* debug */			\
-	3,	/* settle_delay */		\
-	1,	/* use_nvram */			\
+#define SYM_LINUX_DRIVER_SETUP	{				\
+	.max_tag	= CONFIG_SCSI_SYM53C8XX_DEFAULT_TAGS,	\
+	.burst_order	= 7,					\
+	.scsi_led	= 1,					\
+	.scsi_diff	= 1,					\
+	.irq_mode	= 0,					\
+	.scsi_bus_check	= 1,					\
+	.host_id	= 7,					\
+	.reverse_probe	= 0,					\
+	.verbose	= 0,					\
+	.debug		= 0,					\
+	.settle_delay	= 3,					\
+	.use_nvram	= 1,					\
 }
 
 /*
@@ -275,27 +210,19 @@ struct sym_driver_setup {
  *  Override initial setup from boot command line:
  *    sym53c8xx=safe:y
  */
-#define SYM_LINUX_DRIVER_SAFE_SETUP		\
-{						\
-	0,	/* pci_parity */		\
-	0,	/* scsi_parity */		\
-	0,	/* max_tag */			\
-	50,	/* min_sync */			\
-	0,	/* burst_order */		\
-	0,	/* scsi_led */			\
-	1,	/* max_wide */			\
-	1,	/* scsi_diff */			\
-	0,	/* irq_mode */			\
-	2,	/* scsi_bus_check */		\
-	7,	/* host_id */			\
-	15,	/* max_offs */			\
-	1,	/* max_lun */			\
-	0,	/* pci_fix_up */		\
-	0,	/* reverse_probe */		\
-	2,	/* verbose */			\
-	0,	/* debug */			\
-	10,	/* settle_delay */		\
-	1,	/* use_nvram */			\
+#define SYM_LINUX_DRIVER_SAFE_SETUP {				\
+	.max_tag	= 0,					\
+	.burst_order	= 0,					\
+	.scsi_led	= 0,					\
+	.scsi_diff	= 1,					\
+	.irq_mode	= 0,					\
+	.scsi_bus_check	= 2,					\
+	.host_id	= 7,					\
+	.reverse_probe	= 0,					\
+	.verbose	= 2,					\
+	.debug		= 0,					\
+	.settle_delay	= 10,					\
+	.use_nvram	= 1,					\
 }
 
 /*

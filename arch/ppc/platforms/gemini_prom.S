@@ -9,12 +9,10 @@
  */
 
 #include <linux/config.h>
-#include <asm/processor.h>
+#include <asm/reg.h>
 #include <asm/page.h>
 #include <platforms/gemini.h>
 #include <asm/ppc_asm.h>
-
-#define HID0_ABE (1<<3)
 
 /*
  *  On 750's the MMU is on when Linux is booted, so we need to clear out the

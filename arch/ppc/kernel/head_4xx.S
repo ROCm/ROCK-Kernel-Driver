@@ -983,7 +983,7 @@ initial_mmu:
 
 _GLOBAL(abort)
         mfspr   r13,SPRN_DBCR0
-        oris    r13,r13,DBCR_RST(DBCR_RST_SYSTEM)@h
+        oris    r13,r13,DBCR0_RST_SYSTEM@h
         mtspr   SPRN_DBCR0,r13
 
 _GLOBAL(set_context)

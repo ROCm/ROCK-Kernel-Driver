@@ -17,7 +17,7 @@
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
-#include <asm/processor.h>
+#include <asm/reg.h>
 
 #define NO_SCROLL
 

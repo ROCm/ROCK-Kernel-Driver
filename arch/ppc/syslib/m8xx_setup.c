@@ -35,7 +35,7 @@
 #include <linux/root_dev.h>
 
 #include <asm/mmu.h>
-#include <asm/processor.h>
+#include <asm/reg.h>
 #include <asm/residual.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -221,9 +221,7 @@ m8xx_restart(char *cmd)
 
 	/* Clear the ME bit in MSR to cause checkstop on machine check
 	*/
-	__asm__("mfmsr %0" : "=r" (msr) );
-	msr &= ~0x1000;
-	__asm__("mtmsr %0" : : "r" (msr) );
+	mtmsr(mfmsr(msr) & ~0x1000);
 
 	dummy = ((immap_t *)IMAP_ADDR)->im_clkrst.res[0];
 	printk("Restart failed\n");

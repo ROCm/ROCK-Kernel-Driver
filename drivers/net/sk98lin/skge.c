@@ -577,13 +577,7 @@ static int	XmitFrameSG(SK_AC*, TX_PORT*, struct sk_buff*);
 #ifdef CONFIG_PROC_FS
 static const char 	SK_Root_Dir_entry[] = "sk98lin";
 static struct		proc_dir_entry *pSkRootDir;
-
-extern int 		sk_proc_read(	char   *buffer,
-					char	**buffer_location,
-					off_t	offset,
-					int	buffer_length,
-					int	*eof,
-					void	*data);
+extern struct		file_operations sk_proc_fops;
 #endif
 
 extern void SkDimEnableModerationIfNeeded(SK_AC *pAC);	
@@ -605,12 +599,6 @@ static int probed __initdata = 0;
 /* local variables **********************************************************/
 static uintptr_t TxQueueAddr[SK_MAX_MACS][2] = {{0x680, 0x600},{0x780, 0x700}};
 static uintptr_t RxQueueAddr[SK_MAX_MACS] = {0x400, 0x480};
-
-
-#ifdef CONFIG_PROC_FS
-static struct proc_dir_entry	*pSkRootDir;
-#endif
-
 
 
 /*****************************************************************************
@@ -638,7 +626,6 @@ static int __init skge_probe (void)
 	SK_BOOL BootStringCount = SK_FALSE;
 	int			retval;
 #ifdef CONFIG_PROC_FS
-	int			proc_root_initialized = 0;
 	struct proc_dir_entry	*pProcFile;
 #endif
 
@@ -758,26 +745,23 @@ static int __init skge_probe (void)
 				sizeof(SK_Root_Dir_entry) - 1);
 
 			/*Create proc (directory)*/
-			if(!proc_root_initialized) {
-				pSkRootDir = create_proc_entry(SK_Root_Dir_entry,
-					S_IFDIR | S_IWUSR | S_IRUGO | S_IXUGO, proc_net);
-				pSkRootDir->owner = THIS_MODULE;
-				proc_root_initialized = 1;
+			if(!pSkRootDir) {
+				pSkRootDir = proc_mkdir(SK_Root_Dir_entry, proc_net);
+				if (!pSkRootDir) 
+					printk(KERN_WARNING "%s: Unable to create /proc/net/%s",
+					       dev->name, SK_Root_Dir_entry);
+				else
+					pSkRootDir->owner = THIS_MODULE;
 			}
 		}
-
-		/* Create proc file */
-		pProcFile = create_proc_entry(dev->name,
-			S_IFREG | S_IXUSR | S_IWGRP | S_IROTH,
-			pSkRootDir);
-
 		
-		pProcFile->read_proc = sk_proc_read;
-		pProcFile->write_proc = NULL;
-		pProcFile->nlink = 1;
-		pProcFile->size = sizeof(dev->name + 1);
-		pProcFile->data = (void *)pProcFile;
-		pProcFile->owner = THIS_MODULE;
+		/* Create proc file */
+		if (pSkRootDir 
+		    && (pProcFile = create_proc_entry(dev->name, S_IRUGO,
+						      pSkRootDir))) {
+			pProcFile->proc_fops = &sk_proc_fops;
+			pProcFile->data = dev;
+		}
 #endif
 
 		pNet->PortNr = 0;
@@ -831,17 +815,13 @@ static int __init skge_probe (void)
 #endif
 
 #ifdef CONFIG_PROC_FS
-			pProcFile = create_proc_entry(dev->name,
-				S_IFREG | S_IXUSR | S_IWGRP | S_IROTH,
-				pSkRootDir);
-
-		
-			pProcFile->read_proc = sk_proc_read;
-			pProcFile->write_proc = NULL;
-			pProcFile->nlink = 1;
-			pProcFile->size = sizeof(dev->name + 1);
-			pProcFile->data = (void *)pProcFile;
-			pProcFile->owner = THIS_MODULE;
+			if (pSkRootDir 
+			    && (pProcFile = create_proc_entry(dev->name, 
+							      S_IRUGO,
+							      pSkRootDir))) {
+				pProcFile->proc_fops = &sk_proc_fops;
+				pProcFile->data = dev;
+			}
 #endif
 
 			memcpy((caddr_t) &dev->dev_addr,
@@ -1188,7 +1168,8 @@ SK_EVPARA EvPara;
 
 #ifdef CONFIG_PROC_FS
 	/* clear proc-dir */
-	remove_proc_entry(pSkRootDir->name, proc_net);
+	if (pSkRootDir) 
+		remove_proc_entry(pSkRootDir->name, proc_net);
 #endif
 
 } /* skge_cleanup_module */

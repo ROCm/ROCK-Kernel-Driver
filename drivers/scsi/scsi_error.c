@@ -211,8 +211,7 @@ static inline void scsi_eh_prt_fail_stats(struct Scsi_Host *shost,
 	int cmd_cancel = 0;
 	int devices_failed = 0;
 
-
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+	shost_for_each_device(sdev, shost) {
 		list_for_each_entry(scmd, work_q, eh_entry) {
 			if (scmd->device == sdev) {
 				++total_failures;
@@ -323,17 +322,6 @@ static int scsi_eh_completed_normally(struct scsi_cmnd *scmd)
 	 * that would indicate what we need to do.
 	 */
 	if (host_byte(scmd->result) == DID_RESET) {
-		if (scmd->flags & IS_RESETTING) {
-			/*
-			 * ok, this is normal.  we don't know whether in fact
-			 * the command in question really needs to be rerun
-			 * or not - if this was the original data command then
-			 * the answer is yes, otherwise we just flag it as
-			 * SUCCESS.
-			 */
-			scmd->flags &= ~IS_RESETTING;
-			return NEEDS_RETRY;
-		}
 		/*
 		 * rats.  we are already in the error handler, so we now
 		 * get to try and figure out what to do next.  if the sense
@@ -861,7 +849,7 @@ static int scsi_eh_bus_device_reset(struct Scsi_Host *shost,
 	struct scsi_device *sdev;
 	int rtn;
 
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+	shost_for_each_device(sdev, shost) {
 		bdr_scmd = NULL;
 		list_for_each_entry(scmd, work_q, eh_entry)
 			if (scmd->device == sdev) {
@@ -1217,14 +1205,6 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 			return FAILED;
 		}
 	case DID_RESET:
-		/*
-		 * in the normal case where we haven't initiated a reset,
-		 * this is a failure.
-		 */
-		if (scmd->flags & IS_RESETTING) {
-			scmd->flags &= ~IS_RESETTING;
-			goto maybe_retry;
-		}
 		return SUCCESS;
 	default:
 		return FAILED;
@@ -1382,9 +1362,10 @@ static void scsi_restart_operations(struct Scsi_Host *shost)
 	 * onto the head of the SCSI request queue for the device.  There
 	 * is no point trying to lock the door of an off-line device.
 	 */
-	list_for_each_entry(sdev, &shost->my_devices, siblings)
+	shost_for_each_device(sdev, shost) {
 		if (sdev->online && sdev->locked)
 			scsi_eh_lock_door(sdev);
+	}
 
 	/*
 	 * next free up anything directly waiting upon the host.  this
@@ -1509,7 +1490,7 @@ static void scsi_unjam_host(struct Scsi_Host *shost)
  *    event (i.e. failure).  When this takes place, we have the job of
  *    trying to unjam the bus and restarting things.
  **/
-void scsi_error_handler(void *data)
+int scsi_error_handler(void *data)
 {
 	struct Scsi_Host *shost = (struct Scsi_Host *) data;
 	int rtn;
@@ -1613,6 +1594,7 @@ void scsi_error_handler(void *data)
 	 * the way out the door.
 	 */
 	complete_and_exit(shost->eh_notify, 0);
+	return 0;
 }
 
 /*
@@ -1640,7 +1622,7 @@ void scsi_report_bus_reset(struct Scsi_Host *shost, int channel)
 {
 	struct scsi_device *sdev;
 
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+	shost_for_each_device(sdev, shost) {
 		if (channel == sdev->channel) {
 			sdev->was_reset = 1;
 			sdev->expecting_cc_ua = 1;
@@ -1674,7 +1656,7 @@ void scsi_report_device_reset(struct Scsi_Host *shost, int channel, int target)
 {
 	struct scsi_device *sdev;
 
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
+	shost_for_each_device(sdev, shost) {
 		if (channel == sdev->channel &&
 		    target == sdev->id) {
 			sdev->was_reset = 1;

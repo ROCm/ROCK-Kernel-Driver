@@ -750,6 +750,7 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 
 	if (stat->size > MAX_NON_LFS || !new_valid_dev(stat->dev) ||
 	    !new_valid_dev(stat->rdev))
+		return -EOVERFLOW;
 
 	err  = put_user(new_encode_dev(stat->dev), &statbuf->st_dev);
 	err |= put_user(stat->ino, &statbuf->st_ino);

@@ -3833,10 +3833,6 @@ orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				{ SIOCIWLASTPRIV, 0, 0, "dump_recs" },
 			};
 
-			err = verify_area(VERIFY_WRITE, wrq->u.data.pointer, sizeof(privtab));
-			if (err)
-				break;
-			
 			wrq->u.data.length = sizeof(privtab) / sizeof(privtab[0]);
 			if (copy_to_user(wrq->u.data.pointer, privtab, sizeof(privtab)))
 				err = -EFAULT;

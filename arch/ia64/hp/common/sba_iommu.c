@@ -1849,18 +1849,19 @@ static struct file_operations ioc_map_fops = {
 static void __init
 ioc_proc_init(void)
 {
-	if (ioc_list) {
-		struct proc_dir_entry *dir, *entry;
+	struct proc_dir_entry *dir, *entry;
 
-		dir = proc_mkdir("bus/mckinley", 0);
-		entry = create_proc_entry(ioc_list->name, 0, dir);
-		if (entry)
-			entry->proc_fops = &ioc_fops;
+	dir = proc_mkdir("bus/mckinley", 0);
+	if (!dir)
+		return;
 
-		entry = create_proc_entry("bitmap", 0, dir);
-		if (entry)
-			entry->proc_fops = &ioc_map_fops;
-	}
+	entry = create_proc_entry(ioc_list->name, 0, dir);
+	if (entry)
+		entry->proc_fops = &ioc_fops;
+
+	entry = create_proc_entry("bitmap", 0, dir);
+	if (entry)
+		entry->proc_fops = &ioc_map_fops;
 }
 #endif
 
@@ -1946,6 +1947,8 @@ static int __init
 sba_init(void)
 {
 	acpi_bus_register_driver(&acpi_sba_ioc_driver);
+	if (!ioc_list)
+		return 0;
 
 #ifdef CONFIG_PCI
 	{

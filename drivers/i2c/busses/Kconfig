@@ -285,7 +285,7 @@ config I2C_VELLEMAN
 	  will be called i2c-velleman.
 
 config I2C_VIA
-	tristate "VIA 82C58B"
+	tristate "VIA 82C586B"
 	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
 	help
 

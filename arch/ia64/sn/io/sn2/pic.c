@@ -29,8 +29,6 @@
 #include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
 
-extern char *bcopy(const char * src, char * dest, int count);
-
 
 #define PCI_BUS_NO_1 1
 
@@ -51,7 +49,7 @@ pic_bus1_inventory_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v)
 				(arbitrary_info_t *)&pinv) == GRAPH_SUCCESS)
  {
 		NEW(peer_pinv);
-		bcopy((const char *)pinv, (char *)peer_pinv, sizeof(inventory_t));
+		memcpy(peer_pinv, pinv, sizeof(inventory_t));
 		if (hwgraph_info_add_LBL(peer_conn_v, INFO_LBL_INVENT,
 			    (arbitrary_info_t)peer_pinv) != GRAPH_SUCCESS) {
 			DEL(peer_pinv);

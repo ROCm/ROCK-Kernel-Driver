@@ -912,7 +912,7 @@ sg_ioctl(struct inode *inode, struct file *filp,
 	case SG_GET_VERSION_NUM:
 		return put_user(sg_version_num, (int *) arg);
 	case SG_GET_ACCESS_COUNT:
-		val = (sdp->device ? sdp->device->access_count : 0);
+		val = (sdp->device ? atomic_read(&sdp->device->access_count) : 0);
 		return put_user(val, (int *) arg);
 	case SG_GET_REQUEST_TABLE:
 		result = verify_area(VERIFY_WRITE, (void *) arg,
@@ -1514,8 +1514,10 @@ init_sg(void)
 	if (rc)
 		return rc;
 	rc = scsi_register_interface(&sg_interface);
-	if (rc)
+	if (rc) {
+		unregister_chrdev(SCSI_GENERIC_MAJOR, "sg");
 		return rc;
+	}
 #ifdef CONFIG_SCSI_PROC_FS
 	sg_proc_init();
 #endif				/* CONFIG_SCSI_PROC_FS */
@@ -2899,7 +2901,7 @@ sg_proc_dev_info(char *buffer, int *len, off_t * begin, off_t offset, int size)
 			PRINT_PROC("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",
 				   scsidp->host->host_no, scsidp->channel,
 				   scsidp->id, scsidp->lun, (int) scsidp->type,
-				   (int) scsidp->access_count,
+				   (int) atomic_read(&scsidp->access_count),
 				   (int) scsidp->queue_depth,
 				   (int) scsidp->device_busy,
 				   (int) scsidp->online);

@@ -10,7 +10,6 @@
 #define _ASM_SN_XTALK_XTALK_PRIVATE_H
 
 #include <asm/sn/ioerror.h>        /* for error function and arg types */
-#include <linux/devfs_fs_kernel.h>
 #include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/xtalk/xtalk.h>
 

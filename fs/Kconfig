@@ -496,6 +496,7 @@ config JOLIET
 config ZISOFS
 	bool "Transparent decompression extension"
 	depends on ISO9660_FS
+	select ZLIB_INFLATE
 	help
 	  This is a Linux-specific extension to RockRidge which lets you store
 	  data in compressed form on a CD-ROM and have it transparently
@@ -1046,6 +1047,9 @@ config JFFS_PROC_FS
 config JFFS2_FS
 	tristate "Journalling Flash File System v2 (JFFS2) support"
 	depends on MTD
+	select CRC32
+	select ZLIB_INFLATE
+	select ZLIB_DEFLATE
 	help
 	  JFFS2 is the second generation of the Journalling Flash File System
 	  for use on diskless embedded devices. It provides improved wear
@@ -1091,6 +1095,7 @@ config JFFS2_FS_NAND
 
 config CRAMFS
 	tristate "Compressed ROM file system support"
+	select ZLIB_INFLATE
 	help
 	  Saying Y here includes support for CramFs (Compressed ROM File
 	  System).  CramFs is designed to be a simple, small, and compressed
@@ -1249,6 +1254,8 @@ menu "Network File Systems"
 config NFS_FS
 	tristate "NFS file system support"
 	depends on INET
+	select LOCKD
+	select SUNRPC
 	help
 	  If you are connected to some other (usually local) Unix computer
 	  (using SLIP, PLIP, PPP or Ethernet) and want to mount files residing
@@ -1304,6 +1311,8 @@ config NFS_V4
 config NFSD
 	tristate "NFS server support"
 	depends on INET
+	select LOCKD
+	select SUNRPC
 	help
 	  If you want your Linux box to act as an NFS *server*, so that other
 	  computers on your local network which support NFS can access certain
@@ -1366,8 +1375,6 @@ config ROOT_NFS
 
 config LOCKD
 	tristate
-	default m if NFS_FS!=y && NFSD!=y && (NFS_FS=m || NFSD=m)
-	default y if NFS_FS=y || NFSD=y
 
 config LOCKD_V4
 	bool
@@ -1380,8 +1387,6 @@ config EXPORTFS
 
 config SUNRPC
 	tristate
-	default m if NFS_FS!=y && NFSD!=y && (NFS_FS=m || NFSD=m)
-	default y if NFS_FS=y || NFSD=y
 
 config SUNRPC_GSS
 	tristate "Provide RPCSEC_GSS authentication (EXPERIMENTAL)"
@@ -1560,6 +1565,7 @@ config AFS_FS
 # for fs/nls/Config.in
 	tristate "Andrew File System support (AFS) (Experimental)"
 	depends on INET && EXPERIMENTAL
+	select RXRPC
 	help
 	  If you say Y here, you will get an experimental Andrew File System
 	  driver. It currently only supports unsecured read-only AFS access.
@@ -1570,8 +1576,6 @@ config AFS_FS
 
 config RXRPC
 	tristate
-	default m if AFS_FS=m
-	default y if AFS_FS=y
 
 endmenu
 

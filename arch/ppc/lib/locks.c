@@ -4,14 +4,11 @@
  * Written by Cort Dougan (cort@cs.nmt.edu)
  */
 
-
-#include <linux/kernel.h>
+#include <linux/config.h>
 #include <linux/sched.h>
-#include <linux/delay.h>
 #include <linux/spinlock.h>
-#include <asm/processor.h>
-#include <asm/system.h>
-#include <asm/io.h>
+#include <asm/ppc_asm.h>
+#include <asm/smp.h>
 
 #ifdef CONFIG_DEBUG_SPINLOCK
 

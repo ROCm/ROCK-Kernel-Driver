@@ -844,7 +844,7 @@ _GLOBAL(enter_rtas)
 	LOAD_MSR_KERNEL(r0,MSR_KERNEL)
 	SYNC			/* disable interrupts so SRR0/1 */
 	MTMSRD(r0)		/* don't get trashed */
-	li	r9,MSR_
+	li	r9,MSR_KERNEL & ~(MSR_IR|MSR_DR)
 	mtlr	r6
 	CLR_TOP32(r7)
 	mtspr	SPRG2,r7

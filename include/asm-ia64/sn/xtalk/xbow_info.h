@@ -10,7 +10,6 @@
 #define _ASM_SN_XTALK_XBOW_INFO_H
 
 #include <linux/types.h>
-#include <linux/devfs_fs_kernel.h>
 
 #define XBOW_PERF_MODES	       0x03
 #define XBOW_PERF_COUNTERS     0x02

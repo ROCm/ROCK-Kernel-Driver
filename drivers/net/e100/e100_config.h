@@ -151,6 +151,7 @@
 
 /* function prototypes */
 extern void e100_config_init(struct e100_private *bdp);
+extern void e100_config_init_82557(struct e100_private *bdp);
 extern unsigned char e100_force_config(struct e100_private *bdp);
 extern unsigned char e100_config(struct e100_private *bdp);
 extern void e100_config_fc(struct e100_private *bdp);

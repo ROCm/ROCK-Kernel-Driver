@@ -22,12 +22,12 @@
 #include <linux/string.h>
 
 #include <asm/page.h>
-#include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/bootinfo.h>
 #ifdef CONFIG_44x
 #include <asm/ibm4xx.h>
 #endif
+#include <asm/reg.h>
 
 #include "nonstdio.h"
 #include "zlib.h"

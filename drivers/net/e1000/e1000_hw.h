@@ -995,7 +995,6 @@ struct e1000_hw {
     uint32_t ledctl_mode1;
     uint32_t ledctl_mode2;
     uint16_t phy_spd_default;
-    uint16_t dsp_reset_counter;
     uint16_t autoneg_advertised;
     uint16_t pci_cmd_word;
     uint16_t fc_high_water;
@@ -2108,6 +2107,5 @@ struct e1000_hw {
 #define AUTONEG_ADVERTISE_SPEED_DEFAULT 0x002F  /* Everything but 1000-Half */
 #define AUTONEG_ADVERTISE_10_100_ALL    0x000F /* All 10/100 speeds*/
 #define AUTONEG_ADVERTISE_10_ALL        0x0003 /* 10Mbps Full & Half speeds*/
-
 
 #endif /* _E1000_HW_H_ */

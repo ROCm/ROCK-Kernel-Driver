@@ -24,7 +24,6 @@
 
 #include <asm/segment.h>
 #include <asm/io.h>
-#include <asm/processor.h>
 #include <asm/nvram.h>
 #include <asm/prom.h>
 #include <asm/sections.h>

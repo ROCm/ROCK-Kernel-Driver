@@ -20,7 +20,6 @@
 #include <linux/pci.h>
 
 #include <asm/page.h>
-#include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/bootinfo.h>
 

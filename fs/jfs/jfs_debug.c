@@ -81,7 +81,7 @@ static int loglevel_read(char *page, char **start, off_t off,
 	return len;
 }
 
-static int loglevel_write(struct file *file, const char *buffer,
+static int loglevel_write(struct file *file, const char __user *buffer,
 			unsigned long count, void *data)
 {
 	char c;

@@ -1844,7 +1844,7 @@ static void __init in2000_setup(char *str, int *ints)
 /* check_setup_args() returns index if key found, 0 if not
  */
 
-static int __init check_setup_args(char *key, int *flags, int *val, char *buf)
+static int __init check_setup_args(char *key, int *val, char *buf)
 {
 	int x;
 	char *cp;
@@ -1929,7 +1929,7 @@ static int __init in2000_detect(Scsi_Host_Template * tpnt)
 
 	detect_count = 0;
 	for (bios = 0; bios_tab[bios]; bios++) {
-		if (check_setup_args("ioport", &flags, &val, buf)) {
+		if (check_setup_args("ioport", &val, buf)) {
 			base = val;
 			switches = ~inb(base + IO_SWITCHES) & 0xff;
 			printk("Forcing IN2000 detection at IOport 0x%x ", base);
@@ -2048,30 +2048,30 @@ static int __init in2000_detect(Scsi_Host_Template * tpnt)
 #endif
 #endif
 
-		if (check_setup_args("nosync", &flags, &val, buf))
+		if (check_setup_args("nosync", &val, buf))
 			hostdata->sync_off = val;
 
-		if (check_setup_args("period", &flags, &val, buf))
+		if (check_setup_args("period", &val, buf))
 			hostdata->default_sx_per = sx_table[round_period((unsigned int) val)].period_ns;
 
-		if (check_setup_args("disconnect", &flags, &val, buf)) {
+		if (check_setup_args("disconnect", &val, buf)) {
 			if ((val >= DIS_NEVER) && (val <= DIS_ALWAYS))
 				hostdata->disconnect = val;
 			else
 				hostdata->disconnect = DIS_ADAPTIVE;
 		}
 
-		if (check_setup_args("noreset", &flags, &val, buf))
+		if (check_setup_args("noreset", &val, buf))
 			hostdata->args ^= A_NO_SCSI_RESET;
 
-		if (check_setup_args("level2", &flags, &val, buf))
+		if (check_setup_args("level2", &val, buf))
 			hostdata->level2 = val;
 
-		if (check_setup_args("debug", &flags, &val, buf))
+		if (check_setup_args("debug", &val, buf))
 			hostdata->args = (val & DB_MASK);
 
 #ifdef PROC_INTERFACE
-		if (check_setup_args("proc", &flags, &val, buf))
+		if (check_setup_args("proc", &val, buf))
 			hostdata->proc = val;
 #endif
 

@@ -16,12 +16,11 @@ struct ucontext {
 	struct ucontext *uc_link;
 	stack_t		 uc_stack;
 	int		 uc_pad[7];
-	struct mcontext	*uc_regs;	/* backward compat */
-	sigset_t	 uc_oldsigmask;	/* backward compat */
-	int		 uc_pad2;
+	struct mcontext	*uc_regs;	/* points to uc_mcontext field */
 	sigset_t	 uc_sigmask;
 	/* glibc has 1024-bit signal masks, ours are 64-bit */
 	int		 uc_maskext[30];
+	int		 uc_pad2[3];
 	struct mcontext	 uc_mcontext;
 };
 

@@ -2216,6 +2216,8 @@ static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
     struct smc_private *smc = dev->priv;
     struct mii_ioctl_data *mii;
     int rc = 0;
+    u_short saved_bank;
+    ioaddr_t ioaddr = dev->base_addr;
 
     mii = (struct mii_ioctl_data *) &rq->ifr_data;
     if (!netif_running(dev))
@@ -2223,12 +2225,18 @@ static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
     switch (cmd) {
     case SIOCETHTOOL:
+	saved_bank = inw(ioaddr + BANK_SELECT);
+	SMC_SELECT_BANK(3);
 	rc = smc_ethtool_ioctl(dev, (void *) rq->ifr_data);
+	SMC_SELECT_BANK(saved_bank);
 	break;
 
     default:
 	spin_lock_irq(&smc->lock);
+	saved_bank = inw(ioaddr + BANK_SELECT);
+	SMC_SELECT_BANK(3);
 	rc = generic_mii_ioctl(&smc->mii_if, mii, cmd, NULL);
+	SMC_SELECT_BANK(saved_bank);
 	spin_unlock_irq(&smc->lock);
 	break;
     }
