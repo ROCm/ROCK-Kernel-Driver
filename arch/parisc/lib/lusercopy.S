@@ -201,16 +201,18 @@ $lsfu_exit:
 	nop
 	.exit
 
-3:      b           $lsfu_exit
+	.section .fixup,"ax"
+3:      fixup_branch $lsfu_exit
 	ldi         -EFAULT,%r28
+	.previous
 
-	.section __ex_table,"a"
+	.section __ex_table,"aw"
 #ifdef __LP64__
-	.dword      1b,(3b-1b)
-	.dword      2b,(3b-2b)
+	.dword      1b,3b
+	.dword      2b,3b
 #else
-	.word       1b,(3b-1b)
-	.word       2b,(3b-2b)
+	.word       1b,3b
+	.word       2b,3b
 #endif
 	.previous
 
@@ -239,14 +241,16 @@ $lclu_done:
 	copy        %r25,%r28
 	.exit
 
-2:      b $lclu_done
+	.section .fixup,"ax"
+2:      fixup_branch $lclu_done
 	ldo        1(%r25),%r25
+	.previous
 
-	.section __ex_table,"a"
+	.section __ex_table,"aw"
 #ifdef __LP64__
-	.dword      1b,(2b-1b)
+	.dword      1b,2b
 #else
-	.word       1b,(2b-1b)
+	.word       1b,2b
 #endif
 	.previous
 
@@ -282,16 +286,18 @@ $lslen_nzero:
 	b           $lslen_done
 	ldo         1(%r26),%r26 /* special case for N == 0 */
 
-3:      b           $lslen_done
+	.section .fixup,"ax"
+3:      fixup_branch $lslen_done
 	copy        %r24,%r26    /* reset r26 so 0 is returned on fault */
+	.previous
 
-	.section __ex_table,"a"
+	.section __ex_table,"aw"
 #ifdef __LP64__
-	.dword      1b,(3b-1b)
-	.dword      2b,(3b-2b)
+	.dword      1b,3b
+	.dword      2b,3b
 #else
-	.word       1b,(3b-1b)
-	.word       2b,(3b-2b)
+	.word       1b,3b
+	.word       2b,3b
 #endif
 	.previous
 
