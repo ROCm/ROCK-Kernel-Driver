@@ -2574,7 +2574,6 @@ go_idle:
 		}
 	} else {
 		if (dependent_sleeper(cpu, rq)) {
-			schedstat_inc(rq, sched_goidle);
 			next = rq->idle;
 			goto switch_tasks;
 		}
@@ -2618,6 +2617,8 @@ go_idle:
 	}
 	next->activated = 0;
 switch_tasks:
+	if (next == rq->idle)
+		schedstat_inc(rq, sched_goidle);
 	prefetch(next);
 	clear_tsk_need_resched(prev);
 	rcu_qsctr_inc(task_cpu(prev));
