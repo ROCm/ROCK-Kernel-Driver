@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -45,7 +45,7 @@
  * system call), and the ABI issues that this implies.
  *
  * In Linux, we are passed a comma separated set of options;
- * ie. a NULL terminated string of characters.	Userspace mount
+ * ie. a NULL terminated string of characters.  Userspace mount
  * code does not have any knowledge of mount options expected by
  * each filesystem type and so each filesystem parses its mount
  * options in kernel space.
@@ -69,10 +69,10 @@ struct xfs_mount_args {
 /*
  * XFS mount option flags
  */
-#define XFSMNT_CHKLOG		0x00000001	/* check log */
-#define XFSMNT_WSYNC		0x00000002	/* safe mode nfs mount
+#define	XFSMNT_CHKLOG		0x00000001	/* check log */
+#define	XFSMNT_WSYNC		0x00000002	/* safe mode nfs mount
 						 * compatible */
-#define XFSMNT_INO64		0x00000004	/* move inode numbers up
+#define	XFSMNT_INO64		0x00000004	/* move inode numbers up
 						 * past 2^32 */
 #define XFSMNT_UQUOTA		0x00000008	/* user quota accounting */
 #define XFSMNT_PQUOTA		0x00000010	/* IRIX prj quota accounting */

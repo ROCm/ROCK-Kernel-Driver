@@ -969,6 +969,7 @@ static void __exit sco_proc_cleanup(void)
 
 static struct proto_ops sco_sock_ops = {
 	.family  =      PF_BLUETOOTH,
+	.owner   =	THIS_MODULE,
 	.release =      sco_sock_release,
 	.bind    =     	sco_sock_bind,
 	.connect =      sco_sock_connect,
@@ -989,6 +990,7 @@ static struct proto_ops sco_sock_ops = {
 static struct net_proto_family sco_sock_family_ops = {
 	.family =       PF_BLUETOOTH,
 	.create =       sco_sock_create,
+	.owner	=	THIS_MODULE,
 };
 
 static struct hci_proto sco_hci_proto = {

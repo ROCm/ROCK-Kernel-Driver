@@ -9,14 +9,14 @@
 
 #include <linux/kernel.h>
 #include <linux/oprofile.h>
+#include <linux/errno.h>
 #include <linux/init.h>
  
 extern void timer_init(struct oprofile_operations ** ops);
 
 int __init oprofile_arch_init(struct oprofile_operations ** ops)
 {
-	timer_init(ops);
-	return 0;
+	return -ENODEV;
 }
 
 

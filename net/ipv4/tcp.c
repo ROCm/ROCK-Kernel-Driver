@@ -254,6 +254,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/fs.h>
+#include <linux/random.h>
 
 #include <net/icmp.h>
 #include <net/tcp.h>
@@ -551,6 +552,7 @@ int tcp_listen_start(struct sock *sk)
 	for (lopt->max_qlen_log = 6; ; lopt->max_qlen_log++)
 		if ((1 << lopt->max_qlen_log) >= sysctl_max_syn_backlog)
 			break;
+	get_random_bytes(&lopt->hash_rnd, 4);
 
 	write_lock_bh(&tp->syn_wait_lock);
 	tp->listen_opt = lopt;

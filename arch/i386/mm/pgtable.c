@@ -151,47 +151,30 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	return pte;
 }
 
-extern kmem_cache_t *pmd_cache;
-extern kmem_cache_t *pgd_cache;
-
-void pmd_ctor(void *__pmd, kmem_cache_t *pmd_cache, unsigned long flags)
-{
-	clear_page(__pmd);
-}
-
-void pgd_ctor(void *__pgd, kmem_cache_t *pgd_cache, unsigned long flags)
-{
-	pgd_t *pgd = __pgd;
-
-	if (PTRS_PER_PMD == 1)
-		memset(pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
-	memcpy(pgd + USER_PTRS_PER_PGD,
-		swapper_pg_dir + USER_PTRS_PER_PGD,
-		(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-}
+#if CONFIG_X86_PAE
 
 pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	int i;
-	pgd_t *pgd = kmem_cache_alloc(pgd_cache, SLAB_KERNEL);
+	pgd_t *pgd = kmem_cache_alloc(pae_pgd_cachep, GFP_KERNEL);
 
-	if (PTRS_PER_PMD == 1)
-		return pgd;
-	else if (!pgd)
-		return NULL;
-
-	for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
-		pmd_t *pmd = kmem_cache_alloc(pmd_cache, SLAB_KERNEL);
-		if (!pmd)
-			goto out_oom;
-		set_pgd(pgd + i, __pgd(1 + __pa((unsigned long long)((unsigned long)pmd))));
+	if (pgd) {
+		for (i = 0; i < USER_PTRS_PER_PGD; i++) {
+			unsigned long pmd = __get_free_page(GFP_KERNEL);
+			if (!pmd)
+				goto out_oom;
+			clear_page(pmd);
+			set_pgd(pgd + i, __pgd(1 + __pa(pmd)));
+		}
+		memcpy(pgd + USER_PTRS_PER_PGD,
+			swapper_pg_dir + USER_PTRS_PER_PGD,
+			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
 	}
 	return pgd;
-
 out_oom:
-	for (i--; i >= 0; --i)
-		kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
-	kmem_cache_free(pgd_cache, (void *)pgd);
+	for (i--; i >= 0; i--)
+		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
+	kmem_cache_free(pae_pgd_cachep, pgd);
 	return NULL;
 }
 
@@ -199,12 +182,30 @@ void pgd_free(pgd_t *pgd)
 {
 	int i;
 
-	if (PTRS_PER_PMD > 1) {
-		for (i = 0; i < USER_PTRS_PER_PGD; ++i) {
-			kmem_cache_free(pmd_cache, (void *)__va(pgd_val(pgd[i])-1));
-			set_pgd(pgd + i, __pgd(0));
-		}
-	}
-
-	kmem_cache_free(pgd_cache, (void *)pgd);
+	for (i = 0; i < USER_PTRS_PER_PGD; i++)
+		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
+	kmem_cache_free(pae_pgd_cachep, pgd);
 }
+
+#else
+
+pgd_t *pgd_alloc(struct mm_struct *mm)
+{
+	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
+
+	if (pgd) {
+		memset(pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
+		memcpy(pgd + USER_PTRS_PER_PGD,
+			swapper_pg_dir + USER_PTRS_PER_PGD,
+			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+	}
+	return pgd;
+}
+
+void pgd_free(pgd_t *pgd)
+{
+	free_page((unsigned long)pgd);
+}
+
+#endif /* CONFIG_X86_PAE */
+

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -90,15 +90,15 @@ extern void ktrace_enter(
 	void		*,
 	void		*);
 
-extern ktrace_entry_t	*ktrace_first(ktrace_t *, ktrace_snap_t *);
-extern int		ktrace_nentries(ktrace_t *);
-extern ktrace_entry_t	*ktrace_next(ktrace_t *, ktrace_snap_t *);
-extern ktrace_entry_t	*ktrace_skip(ktrace_t *, int, ktrace_snap_t *);
+extern ktrace_entry_t   *ktrace_first(ktrace_t *, ktrace_snap_t *);
+extern int              ktrace_nentries(ktrace_t *);
+extern ktrace_entry_t   *ktrace_next(ktrace_t *, ktrace_snap_t *);
+extern ktrace_entry_t   *ktrace_skip(ktrace_t *, int, ktrace_snap_t *);
 
 #else
 
-#define ktrace_free(ktp)
-#define ktrace_enter(ktp,v0,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11,v12,v13,v14,v15)
+#define	ktrace_free(ktp)
+#define	ktrace_enter(ktp,v0,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11,v12,v13,v14,v15)
 
 #endif
 

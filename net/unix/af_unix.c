@@ -494,6 +494,7 @@ static struct sock * unix_create1(struct socket *sock)
 	atomic_inc(&unix_nr_socks);
 
 	sock_init_data(sock,sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	sk->write_space		=	unix_write_space;
 
@@ -1884,7 +1885,7 @@ done:
 
 struct proto_ops unix_stream_ops = {
 	.family =	PF_UNIX,
-	
+	.owner =	THIS_MODULE,
 	.release =	unix_release,
 	.bind =		unix_bind,
 	.connect =	unix_stream_connect,
@@ -1905,7 +1906,7 @@ struct proto_ops unix_stream_ops = {
 
 struct proto_ops unix_dgram_ops = {
 	.family =	PF_UNIX,
-
+	.owner =	THIS_MODULE,
 	.release =	unix_release,
 	.bind =		unix_bind,
 	.connect =	unix_dgram_connect,

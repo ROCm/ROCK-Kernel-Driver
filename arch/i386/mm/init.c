@@ -505,36 +505,20 @@ void __init mem_init(void)
 #endif
 }
 
-#include <linux/slab.h>
-
-kmem_cache_t *pmd_cache;
-kmem_cache_t *pgd_cache;
-
-void pmd_ctor(void *, kmem_cache_t *, unsigned long);
-void pgd_ctor(void *, kmem_cache_t *, unsigned long);
+#if CONFIG_X86_PAE
+struct kmem_cache_s *pae_pgd_cachep;
 
 void __init pgtable_cache_init(void)
 {
-	if (PTRS_PER_PMD > 1) {
-		pmd_cache = kmem_cache_create("pae_pmd",
-						PTRS_PER_PMD*sizeof(pmd_t),
-						0,
-						SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN,
-						pmd_ctor,
-						NULL);
-
-		if (!pmd_cache)
-			panic("pgtable_cache_init(): cannot create pmd cache");
-	}
-
         /*
          * PAE pgds must be 16-byte aligned:
          */
-        pgd_cache = kmem_cache_create("pgd", PTRS_PER_PGD*sizeof(pgd_t), 0,
-                SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, pgd_ctor, NULL);
-        if (!pgd_cache)
-                panic("pgtable_cache_init(): Cannot create pgd cache");
+        pae_pgd_cachep = kmem_cache_create("pae_pgd", 32, 0,
+                SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, NULL, NULL);
+        if (!pae_pgd_cachep)
+                panic("init_pae(): Cannot alloc pae_pgd SLAB cache");
 }
+#endif
 
 /*
  * This function cannot be __init, since exceptions don't work in that

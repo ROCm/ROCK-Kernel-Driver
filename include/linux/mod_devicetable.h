@@ -21,6 +21,22 @@ struct pci_device_id {
 	kernel_ulong_t driver_data;	/* Data private to the driver */
 };
 
+
+#define IEEE1394_MATCH_VENDOR_ID	0x0001
+#define IEEE1394_MATCH_MODEL_ID		0x0002
+#define IEEE1394_MATCH_SPECIFIER_ID	0x0004
+#define IEEE1394_MATCH_VERSION		0x0008
+
+struct ieee1394_device_id {
+	__u32 match_flags;
+	__u32 vendor_id;
+	__u32 model_id;
+	__u32 specifier_id;
+	__u32 version;
+	kernel_ulong_t driver_data;
+};
+
+
 /*
  * Device table entry for "new style" table-driven USB drivers.
  * User mode code can read these tables to choose which modules to load.

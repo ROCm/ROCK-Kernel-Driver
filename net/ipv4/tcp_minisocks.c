@@ -967,6 +967,7 @@ struct sock *tcp_check_req(struct sock *sk,struct sk_buff *skb,
 	if (child == NULL)
 		goto listen_overflow;
 
+	sk_set_owner(child, sk->owner);
 	tcp_synq_unlink(tp, req, prev);
 	tcp_synq_removed(sk, req);
 

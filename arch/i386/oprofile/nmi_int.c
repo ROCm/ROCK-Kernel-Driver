@@ -314,13 +314,13 @@ int __init nmi_init(struct oprofile_operations ** ops)
 	__u8 family = current_cpu_data.x86;
  
 	if (!cpu_has_apic)
-		return 0;
+		return -ENODEV;
  
 	switch (vendor) {
 		case X86_VENDOR_AMD:
 			/* Needs to be at least an Athlon (or hammer in 32bit mode) */
 			if (family < 6)
-				return 0;
+				return -ENODEV;
 			model = &op_athlon_spec;
 			nmi_ops.cpu_type = "i386/athlon";
 			break;
@@ -331,30 +331,30 @@ int __init nmi_init(struct oprofile_operations ** ops)
 				/* Pentium IV */
 				case 0xf:
 					if (!p4_init())
-						return 0;
+						return -ENODEV;
 					break;
 
 				/* A P6-class processor */
 				case 6:
 					if (!ppro_init())
-						return 0;
+						return -ENODEV;
 					break;
 
 				default:
-					return 0;
+					return -ENODEV;
 			}
 			break;
 #endif /* !CONFIG_X86_64 */
 
 		default:
-			return 0;
+			return -ENODEV;
 	}
 
 	init_driverfs();
 	using_nmi = 1;
 	*ops = &nmi_ops;
 	printk(KERN_INFO "oprofile: using NMI interrupt.\n");
-	return 1;
+	return 0;
 }
 
 

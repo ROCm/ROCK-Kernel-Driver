@@ -47,11 +47,12 @@
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
-#include "ieee1394_hotplug.h"
+#include "nodemgr.h"
 #include "hosts.h"
 #include "ieee1394_core.h"
 #include "highlevel.h"
 #include "video1394.h"
+#include "nodemgr.h"
 #include "dma.h"
 
 #include "ohci1394.h"
@@ -991,6 +992,8 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		struct video1394_queue_variable qv;
 		struct dma_iso_ctx *d;
 
+		qv.packet_sizes = NULL;
+
 		if(copy_from_user(&v, (void *)arg, sizeof(v)))
 			return -EFAULT;
 
@@ -1003,12 +1006,22 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 		}
 		
 		if (d->flags & VIDEO1394_VARIABLE_PACKET_SIZE) {
+			unsigned int *psizes;
+			int buf_size = d->nb_cmd * sizeof(unsigned int);
+
 			if (copy_from_user(&qv, (void *)arg, sizeof(qv))) 
 				return -EFAULT;
-			if (!access_ok(VERIFY_READ, qv.packet_sizes, 
-				       d->nb_cmd * sizeof(unsigned int))) {
+
+			psizes = kmalloc(buf_size, GFP_KERNEL);
+			if (!psizes)
+				return -ENOMEM;
+
+			if (copy_from_user(psizes, qv.packet_sizes, buf_size)) {
+				kfree(psizes);
 				return -EFAULT;
 			}
+
+			qv.packet_sizes = psizes;
 		}
 
 		spin_lock_irqsave(&d->lock,flags);
@@ -1017,6 +1030,8 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			PRINT(KERN_ERR, ohci->id, 
 			      "Buffer %d is already used",v.buffer);
 			spin_unlock_irqrestore(&d->lock,flags);
+			if (qv.packet_sizes)
+				kfree(qv.packet_sizes);
 			return -EFAULT;
 		}
 		
@@ -1070,6 +1085,10 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 				reg_write(ohci, d->ctrlSet, 0x1000);
 			}
 		}
+
+		if (qv.packet_sizes)
+			kfree(qv.packet_sizes);
+
 		return 0;
 		
 	}

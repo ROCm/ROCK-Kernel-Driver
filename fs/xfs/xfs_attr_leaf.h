@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_ATTR_LEAF_H__
-#define __XFS_ATTR_LEAF_H__
+#define	__XFS_ATTR_LEAF_H__
 
 /*
  * Attribute storage layout, internal structure, access macros, etc.
@@ -38,7 +38,7 @@
  * Attribute lists are structured around Btrees where all the data
  * elements are in the leaf nodes.  Attribute names are hashed into an int,
  * then that int is used as the index into the Btree.  Since the hashval
- * of an attribute name may not be unique, we may have duplicate keys.	The
+ * of an attribute name may not be unique, we may have duplicate keys.  The
  * internal links in the Btree are logical block offsets into the file.
  */
 
@@ -58,7 +58,7 @@ struct xfs_trans;
 /*
  * This is the structure of the leaf nodes in the Btree.
  *
- * Struct leaf_entry's are packed from the top.	 Name/values grow from the
+ * Struct leaf_entry's are packed from the top.  Name/values grow from the
  * bottom but are not packed.  The freemap contains run-length-encoded entries
  * for the free bytes after the leaf_entry's, but only the N largest such,
  * smaller runs are dropped.  When the freemap doesn't show enough space
@@ -76,10 +76,10 @@ struct xfs_trans;
  * the leaf_entry.  The namespaces are independent only because we also look
  * at the root/user bit when we are looking for a matching attribute name.
  *
- * We also store a "incomplete" bit in the leaf_entry.	It shows that an
+ * We also store a "incomplete" bit in the leaf_entry.  It shows that an
  * attribute is in the middle of being created and should not be shown to
  * the user if we crash during the time that the bit is set.  We clear the
- * bit when we have finished setting up the attribute.	We do this because
+ * bit when we have finished setting up the attribute.  We do this because
  * we cannot create some large attributes inside a single transaction, and we
  * need some indication that we weren't finished if we crash in the middle.
  */
@@ -127,9 +127,9 @@ typedef struct xfs_attr_leaf_name_remote xfs_attr_leaf_name_remote_t;
  * NOTE: the INCOMPLETE bit must not collide with the flags bits specified
  * on the system call, they are "or"ed together for various operations.
  */
-#define XFS_ATTR_LOCAL_BIT	0	/* attr is stored locally */
-#define XFS_ATTR_ROOT_BIT	1	/* limit access to attr to userid 0 */
-#define XFS_ATTR_INCOMPLETE_BIT 7	/* attr in middle of create/delete */
+#define	XFS_ATTR_LOCAL_BIT	0	/* attr is stored locally */
+#define	XFS_ATTR_ROOT_BIT	1	/* limit access to attr to userid 0 */
+#define	XFS_ATTR_INCOMPLETE_BIT	7	/* attr in middle of create/delete */
 #define XFS_ATTR_LOCAL		(1 << XFS_ATTR_LOCAL_BIT)
 #define XFS_ATTR_ROOT		(1 << XFS_ATTR_ROOT_BIT)
 #define XFS_ATTR_INCOMPLETE	(1 << XFS_ATTR_INCOMPLETE_BIT)
@@ -138,7 +138,7 @@ typedef struct xfs_attr_leaf_name_remote xfs_attr_leaf_name_remote_t;
  * Alignment for namelist and valuelist entries (since they are mixed
  * there can be only one alignment value)
  */
-#define XFS_ATTR_LEAF_NAME_ALIGN	((uint)sizeof(xfs_dablk_t))
+#define	XFS_ATTR_LEAF_NAME_ALIGN	((uint)sizeof(xfs_dablk_t))
 
 /*
  * Cast typed pointers for "local" and "remote" name/value structs.
@@ -211,11 +211,11 @@ int xfs_attr_leaf_entsize_local_max(int bsize);
 typedef struct xfs_attr_list_context {
 	struct xfs_inode		*dp;	/* inode */
 	struct attrlist_cursor_kern	*cursor;/* position in list */
-	struct attrlist			*alist; /* output buffer */
+	struct attrlist			*alist;	/* output buffer */
 	int				count;	/* num used entries */
-	int				dupcnt; /* count dup hashvals seen */
+	int				dupcnt;	/* count dup hashvals seen */
 	int				bufsize;/* total buffer size */
-	int				firstu; /* first used byte in buffer */
+	int				firstu;	/* first used byte in buffer */
 	int				flags;	/* from VOP call */
 	int				resynch;/* T/F: resynch with cursor */
 } xfs_attr_list_context_t;

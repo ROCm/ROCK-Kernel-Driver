@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,25 +30,52 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
-#include <xfs_dfrag.h>
+#include "xfs.h"
+#include "xfs_macros.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_ag.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_btree.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
+#include "xfs_bmap.h"
+#include "xfs_ialloc.h"
+#include "xfs_itable.h"
+#include "xfs_dfrag.h"
+#include "xfs_error.h"
+#include "xfs_mac.h"
+#include "xfs_rw.h"
 
 /*
  * Syssgi interface for swapext
  */
 int
 xfs_swapext(
-	xfs_swapext_t	*sxp)
+	xfs_swapext_t   *sxp)
 {
 	xfs_swapext_t	sx;
-	xfs_inode_t	*ip=NULL, *tip=NULL, *ips[2];
-	xfs_trans_t	*tp;
-	xfs_mount_t	*mp;
+	xfs_inode_t     *ip=NULL, *tip=NULL, *ips[2];
+	xfs_trans_t     *tp;
+	xfs_mount_t     *mp;
 	xfs_bstat_t	*sbp;
 	struct file	*fp = NULL, *tfp = NULL;
 	vnode_t		*vp, *tvp;
-	bhv_desc_t	*bdp, *tbdp;
-	vn_bhv_head_t	*bhp, *tbhp;
+	bhv_desc_t      *bdp, *tbdp;
+	vn_bhv_head_t   *bhp, *tbhp;
 	uint		lock_flags=0;
 	int		ilf_fields, tilf_fields;
 	int		error = 0;
@@ -93,7 +120,7 @@ xfs_swapext(
 	}
 
 	if (ip->i_ino == tip->i_ino) {
-		error =	 XFS_ERROR(EINVAL);
+		error =  XFS_ERROR(EINVAL);
 		goto error0;
 	}
 
@@ -102,7 +129,7 @@ xfs_swapext(
 	sbp = &sx.sx_stat;
 
 	if (XFS_FORCED_SHUTDOWN(mp)) {
-		error =	 XFS_ERROR(EIO);
+		error =  XFS_ERROR(EIO);
 		goto error0;
 	}
 
@@ -222,7 +249,7 @@ xfs_swapext(
 	if ((error = xfs_trans_reserve(tp, 0,
 				     XFS_ICHANGE_LOG_RES(mp), 0,
 				     0, 0))) {
-		xfs_iunlock(ip,	 XFS_IOLOCK_EXCL);
+		xfs_iunlock(ip,  XFS_IOLOCK_EXCL);
 		xfs_iunlock(tip, XFS_IOLOCK_EXCL);
 		xfs_trans_cancel(tp, 0);
 		return error;
@@ -236,7 +263,7 @@ xfs_swapext(
 	     (ip->i_d.di_aformat != XFS_DINODE_FMT_LOCAL)) {
 		error = xfs_bmap_count_blocks(tp, ip, XFS_ATTR_FORK, &aforkblks);
 		if (error) {
-			xfs_iunlock(ip,	 lock_flags);
+			xfs_iunlock(ip,  lock_flags);
 			xfs_iunlock(tip, lock_flags);
 			xfs_trans_cancel(tp, 0);
 			return error;
@@ -247,7 +274,7 @@ xfs_swapext(
 		error = xfs_bmap_count_blocks(tp, tip, XFS_ATTR_FORK,
 			&taforkblks);
 		if (error) {
-			xfs_iunlock(ip,	 lock_flags);
+			xfs_iunlock(ip,  lock_flags);
 			xfs_iunlock(tip, lock_flags);
 			xfs_trans_cancel(tp, 0);
 			return error;
@@ -261,7 +288,7 @@ xfs_swapext(
 	tifp = &tip->i_df;
 	tempif = *ifp;	/* struct copy */
 	*ifp = *tifp;	/* struct copy */
-	*tifp = tempif; /* struct copy */
+	*tifp = tempif;	/* struct copy */
 
 	/*
 	 * Fix the on-disk inode values
@@ -347,7 +374,7 @@ xfs_swapext(
 
  error0:
 	if (locked) {
-		xfs_iunlock(ip,	 lock_flags);
+		xfs_iunlock(ip,  lock_flags);
 		xfs_iunlock(tip, lock_flags);
 	}
 

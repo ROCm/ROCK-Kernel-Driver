@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_DA_BTREE_H__
-#define __XFS_DA_BTREE_H__
+#define	__XFS_DA_BTREE_H__
 
 struct xfs_buf;
 struct xfs_bmap_free;
@@ -52,10 +52,10 @@ struct zone;
 #define XFS_DA_NODE_MAGIC	0xfebe	/* magic number: non-leaf blocks */
 #define XFS_DIR_LEAF_MAGIC	0xfeeb	/* magic number: directory leaf blks */
 #define XFS_ATTR_LEAF_MAGIC	0xfbee	/* magic number: attribute leaf blks */
-#define XFS_DIR2_LEAF1_MAGIC	0xd2f1	/* magic number: v2 dirlf single blks */
-#define XFS_DIR2_LEAFN_MAGIC	0xd2ff	/* magic number: v2 dirlf multi blks */
+#define	XFS_DIR2_LEAF1_MAGIC	0xd2f1	/* magic number: v2 dirlf single blks */
+#define	XFS_DIR2_LEAFN_MAGIC	0xd2ff	/* magic number: v2 dirlf multi blks */
 
-#define XFS_DIRX_LEAF_MAGIC(mp) \
+#define	XFS_DIRX_LEAF_MAGIC(mp)	\
 	(XFS_DIR_IS_V1(mp) ? XFS_DIR_LEAF_MAGIC : XFS_DIR2_LEAFN_MAGIC)
 
 typedef struct xfs_da_blkinfo {
@@ -74,7 +74,7 @@ typedef struct xfs_da_blkinfo {
  * Since we have duplicate keys, use a binary search but always follow
  * all match in the block, not just the first match found.
  */
-#define XFS_DA_NODE_MAXDEPTH	5	/* max depth of Btree */
+#define	XFS_DA_NODE_MAXDEPTH	5	/* max depth of Btree */
 
 typedef struct xfs_da_intnode {
 	struct xfs_da_node_hdr {	/* constant-structure header block */
@@ -97,15 +97,15 @@ typedef struct xfs_da_node_entry xfs_da_node_entry_t;
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LBSIZE)
 int xfs_lbsize(struct xfs_mount *mp);
-#define XFS_LBSIZE(mp)			xfs_lbsize(mp)
+#define	XFS_LBSIZE(mp)			xfs_lbsize(mp)
 #else
-#define XFS_LBSIZE(mp)	((mp)->m_sb.sb_blocksize)
+#define	XFS_LBSIZE(mp)	((mp)->m_sb.sb_blocksize)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_LBLOG)
 int xfs_lblog(struct xfs_mount *mp);
-#define XFS_LBLOG(mp)			xfs_lblog(mp)
+#define	XFS_LBLOG(mp)			xfs_lblog(mp)
 #else
-#define XFS_LBLOG(mp)	((mp)->m_sb.sb_blocklog)
+#define	XFS_LBLOG(mp)	((mp)->m_sb.sb_blocklog)
 #endif
 
 /*
@@ -118,41 +118,41 @@ int xfs_lblog(struct xfs_mount *mp);
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_MAKE_BNOENTRY)
 __uint32_t xfs_da_make_bnoentry(struct xfs_mount *mp, xfs_dablk_t bno,
 				int entry);
-#define XFS_DA_MAKE_BNOENTRY(mp,bno,entry)	\
+#define	XFS_DA_MAKE_BNOENTRY(mp,bno,entry)	\
 	xfs_da_make_bnoentry(mp,bno,entry)
 #else
-#define XFS_DA_MAKE_BNOENTRY(mp,bno,entry) \
+#define	XFS_DA_MAKE_BNOENTRY(mp,bno,entry) \
 	(((bno) << (mp)->m_dircook_elog) | (entry))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_MAKE_COOKIE)
 xfs_off_t xfs_da_make_cookie(struct xfs_mount *mp, xfs_dablk_t bno, int entry,
 				xfs_dahash_t hash);
-#define XFS_DA_MAKE_COOKIE(mp,bno,entry,hash)	\
+#define	XFS_DA_MAKE_COOKIE(mp,bno,entry,hash)	\
 	xfs_da_make_cookie(mp,bno,entry,hash)
 #else
-#define XFS_DA_MAKE_COOKIE(mp,bno,entry,hash) \
+#define	XFS_DA_MAKE_COOKIE(mp,bno,entry,hash) \
 	(((xfs_off_t)XFS_DA_MAKE_BNOENTRY(mp, bno, entry) << 32) | (hash))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_HASH)
 xfs_dahash_t xfs_da_cookie_hash(struct xfs_mount *mp, xfs_off_t cookie);
-#define XFS_DA_COOKIE_HASH(mp,cookie)		xfs_da_cookie_hash(mp,cookie)
+#define	XFS_DA_COOKIE_HASH(mp,cookie)		xfs_da_cookie_hash(mp,cookie)
 #else
-#define XFS_DA_COOKIE_HASH(mp,cookie)	((xfs_dahash_t)(cookie))
+#define	XFS_DA_COOKIE_HASH(mp,cookie)	((xfs_dahash_t)(cookie))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_BNO)
 xfs_dablk_t xfs_da_cookie_bno(struct xfs_mount *mp, xfs_off_t cookie);
-#define XFS_DA_COOKIE_BNO(mp,cookie)		xfs_da_cookie_bno(mp,cookie)
+#define	XFS_DA_COOKIE_BNO(mp,cookie)		xfs_da_cookie_bno(mp,cookie)
 #else
-#define XFS_DA_COOKIE_BNO(mp,cookie) \
+#define	XFS_DA_COOKIE_BNO(mp,cookie) \
 	(((xfs_off_t)(cookie) >> 31) == -1LL ? \
 		(xfs_dablk_t)0 : \
 		(xfs_dablk_t)((xfs_off_t)(cookie) >> ((mp)->m_dircook_elog + 32)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_ENTRY)
 int xfs_da_cookie_entry(struct xfs_mount *mp, xfs_off_t cookie);
-#define XFS_DA_COOKIE_ENTRY(mp,cookie)		xfs_da_cookie_entry(mp,cookie)
+#define	XFS_DA_COOKIE_ENTRY(mp,cookie)		xfs_da_cookie_entry(mp,cookie)
 #else
-#define XFS_DA_COOKIE_ENTRY(mp,cookie) \
+#define	XFS_DA_COOKIE_ENTRY(mp,cookie) \
 	(((xfs_off_t)(cookie) >> 31) == -1LL ? \
 		(xfs_dablk_t)0 : \
 		(xfs_dablk_t)(((xfs_off_t)(cookie) >> 32) & \
@@ -217,7 +217,7 @@ typedef struct xfs_dabuf {
 #endif
 	struct xfs_buf	*bps[1];	/* actually nbuf of these */
 } xfs_dabuf_t;
-#define XFS_DA_BUF_SIZE(n)	\
+#define	XFS_DA_BUF_SIZE(n)	\
 	(sizeof(xfs_dabuf_t) + sizeof(struct xfs_buf *) * ((n) - 1))
 
 #ifdef XFS_DABUF_DEBUG

@@ -135,10 +135,6 @@ static void aty_set_cursor(struct fb_info *info)
 			yoff = 0;
 		}
 
-		/* In doublescan mode, the cursor location also needs to be
-		   doubled. */
-                if (par->crtc.gen_cntl & CRTC_DBL_SCAN_EN)
-			y<<=1;
 		wait_for_fifo(4, par);
 		aty_st_le32(CUR_OFFSET, (info->fix.smem_len >> 3) + (yoff << 1),
 			    par);
@@ -168,7 +164,7 @@ int atyfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 
 #ifdef __sparc__
 	if (par->mmaped)
-		return;
+		return 0;
 #endif
 
 	aty_set_cursor(info);
@@ -192,7 +188,7 @@ struct aty_cursor *__init aty_init_cursor(struct fb_info *info)
 	info->fix.smem_len -= PAGE_SIZE;
 
 #ifdef __sparc__
-	addr = info->screen_base - 0x800000 + info->fix.smem_len;
+	addr = (unsigned long) info->screen_base - 0x800000 + info->fix.smem_len;
 	cursor->ram = (u8 *) addr;
 #else
 #ifdef __BIG_ENDIAN

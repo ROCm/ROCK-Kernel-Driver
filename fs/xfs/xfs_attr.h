@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_ATTR_H__
-#define __XFS_ATTR_H__
+#define	__XFS_ATTR_H__
 
 /*
  * xfs_attr.h
@@ -46,7 +46,7 @@
  */
 
 #ifdef XFS_ALL_TRACE
-#define XFS_ATTR_TRACE
+#define	XFS_ATTR_TRACE
 #endif
 
 #if !defined(DEBUG)
@@ -68,15 +68,15 @@
 
 /*
  * The maximum size (into the kernel or returned from the kernel) of an
- * attribute value or the buffer used for an attr_list() call.	Larger
+ * attribute value or the buffer used for an attr_list() call.  Larger
  * sizes will result in an ERANGE return code.
  */
-#define ATTR_MAX_VALUELEN	(64*1024)	/* max length of a value */
+#define	ATTR_MAX_VALUELEN	(64*1024)	/* max length of a value */
 
 /*
  * Define how lists of attribute names are returned to the user from
  * the attr_list() call.  A large, 32bit aligned, buffer is passed in
- * along with its size.	 We put an array of offsets at the top that each
+ * along with its size.  We put an array of offsets at the top that each
  * reference an attrlist_ent_t and pack the attrlist_ent_t's at the bottom.
  */
 typedef struct attrlist {
@@ -98,7 +98,7 @@ typedef struct attrlist_ent {	/* data from attr_list() */
  * Given a pointer to the (char*) buffer containing the attr_list() result,
  * and an index, return a pointer to the indicated attribute in the buffer.
  */
-#define ATTR_ENTRY(buffer, index)		\
+#define	ATTR_ENTRY(buffer, index)		\
 	((attrlist_ent_t *)			\
 	 &((char *)buffer)[ ((attrlist_t *)(buffer))->al_offset[index] ])
 

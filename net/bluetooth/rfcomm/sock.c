@@ -856,6 +856,7 @@ static void __exit rfcomm_sock_proc_cleanup(void)
 
 static struct proto_ops rfcomm_sock_ops = {
 	.family		= PF_BLUETOOTH,
+	.owner		= THIS_MODULE,
 	.release	= rfcomm_sock_release,
 	.bind		= rfcomm_sock_bind,
 	.connect	= rfcomm_sock_connect,

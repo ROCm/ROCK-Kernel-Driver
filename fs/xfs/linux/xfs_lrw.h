@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -45,7 +45,7 @@ struct page_buf_bmap_s;
 /*
  * Maximum count of bmaps used by read and write paths.
  */
-#define XFS_MAX_RW_NBMAPS	4
+#define	XFS_MAX_RW_NBMAPS	4
 
 extern int xfs_bmap(struct bhv_desc *, xfs_off_t, ssize_t, int,
 			struct page_buf_bmap_s *, int *);
@@ -75,8 +75,6 @@ extern int xfs_iomap_write_allocate(struct xfs_inode *,
 extern int xfs_iomap_write_unwritten(struct xfs_inode *, loff_t, size_t);
 
 extern int xfs_dev_is_read_only(struct xfs_mount *, char *);
-
-extern void XFS_log_write_unmount_ro(struct bhv_desc *);
 
 #define XFS_FSB_TO_DB_IO(io,fsb) \
 		(((io)->io_flags & XFS_IOCORE_RT) ? \

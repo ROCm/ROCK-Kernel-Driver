@@ -190,6 +190,14 @@ extern void add_disk(struct gendisk *disk);
 extern void del_gendisk(struct gendisk *gp);
 extern void unlink_gendisk(struct gendisk *gp);
 extern struct gendisk *get_gendisk(dev_t dev, int *part);
+
+extern void set_device_ro(struct block_device *bdev, int flag);
+extern void set_disk_ro(struct gendisk *disk, int flag);
+
+/* drivers/char/random.c */
+extern void add_disk_randomness(struct gendisk *disk);
+extern void rand_initialize_disk(struct gendisk *disk);
+
 static inline sector_t get_start_sect(struct block_device *bdev)
 {
 	return bdev->bd_offset;

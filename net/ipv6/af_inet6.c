@@ -193,6 +193,7 @@ static int inet6_create(struct socket *sock, int protocol)
 
 	sock->ops = answer->ops;
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	sk->prot = answer->prot;
 	sk->no_check = answer->no_check;
@@ -498,7 +499,7 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 struct proto_ops inet6_stream_ops = {
 	.family =	PF_INET6,
-
+	.owner =	THIS_MODULE,
 	.release =	inet6_release,
 	.bind =		inet6_bind,
 	.connect =	inet_stream_connect,		/* ok		*/
@@ -519,7 +520,7 @@ struct proto_ops inet6_stream_ops = {
 
 struct proto_ops inet6_dgram_ops = {
 	.family =	PF_INET6,
-
+	.owner =	THIS_MODULE,
 	.release =	inet6_release,
 	.bind =		inet6_bind,
 	.connect =	inet_dgram_connect,		/* ok		*/

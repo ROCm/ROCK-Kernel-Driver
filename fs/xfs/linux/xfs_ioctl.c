@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,9 +30,43 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
-#include <xfs_fsops.h>
-#include <xfs_dfrag.h>
+#include "xfs.h"
+
+#include "xfs_fs.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_alloc.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_btree.h"
+#include "xfs_ialloc.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode.h"
+#include "xfs_bmap.h"
+#include "xfs_bit.h"
+#include "xfs_rtalloc.h"
+#include "xfs_error.h"
+#include "xfs_itable.h"
+#include "xfs_rw.h"
+#include "xfs_acl.h"
+#include "xfs_cap.h"
+#include "xfs_mac.h"
+#include "xfs_attr.h"
+#include "xfs_buf_item.h"
+#include "xfs_utils.h"
+#include "xfs_dfrag.h"
+#include "xfs_fsops.h"
+
 #include <linux/dcache.h>
 #include <linux/mount.h>
 #include <linux/namei.h>
@@ -168,7 +202,7 @@ xfs_find_handle(
 STATIC int
 xfs_vget_fsop_handlereq(
 	xfs_mount_t		*mp,
-	struct inode		*parinode,	/* parent inode pointer	   */
+	struct inode		*parinode,	/* parent inode pointer    */
 	int			cap,		/* capability level for op */
 	unsigned long		arg,		/* userspace data pointer  */
 	unsigned long		size,		/* size of expected struct */
@@ -362,10 +396,10 @@ xfs_readlink_by_handle(
 	aiov.iov_base	= hreq.ohandle;
 
 	auio.uio_iov	= &aiov;
-	auio.uio_iovcnt = 1;
+	auio.uio_iovcnt	= 1;
 	auio.uio_fmode	= FINVIS;
-	auio.uio_offset = 0;
-	auio.uio_segflg = UIO_USERSPACE;
+	auio.uio_offset	= 0;
+	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= olen;
 
 	VOP_READLINK(vp, &auio, NULL, error);
@@ -578,7 +612,7 @@ xfs_ioctl(
 	case XFS_IOC_FREESP64:
 	case XFS_IOC_RESVSP64:
 	case XFS_IOC_UNRESVSP64:
-		/* 
+		/*
 		 * Only allow the sys admin to reserve space unless
 		 * unwritten extents are enabled.
 		 */
@@ -986,7 +1020,7 @@ xfs_ioc_xattr(
 			return -XFS_ERROR(EFAULT);
 		return 0;
 	}
-	
+
 	default:
 		return -ENOTTY;
 

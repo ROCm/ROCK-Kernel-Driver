@@ -235,6 +235,7 @@ static int netlink_create(struct socket *sock, int protocol)
 		return -ENOMEM;
 
 	sock_init_data(sock,sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	nlk = nlk_sk(sk) = kmalloc(sizeof(*nlk), GFP_KERNEL);
 	if (!nlk) {
@@ -1030,7 +1031,7 @@ int netlink_unregister_notifier(struct notifier_block *nb)
                 
 struct proto_ops netlink_ops = {
 	.family =	PF_NETLINK,
-
+	.owner =	THIS_MODULE,
 	.release =	netlink_release,
 	.bind =		netlink_bind,
 	.connect =	netlink_connect,

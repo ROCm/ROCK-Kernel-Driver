@@ -1424,7 +1424,7 @@ static struct net_proto_family rose_family_ops = {
 
 static struct proto_ops rose_proto_ops = {
 	.family		=	PF_ROSE,
-
+	.owner		=	THIS_MODULE,
 	.release	=	rose_release,
 	.bind		=	rose_bind,
 	.connect	=	rose_connect,

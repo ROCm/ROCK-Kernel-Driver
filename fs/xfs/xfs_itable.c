@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,30 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
+#include "xfs_macros.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_ag.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_btree.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode.h"
+#include "xfs_ialloc.h"
+#include "xfs_itable.h"
+#include "xfs_error.h"
 
 /*
  * Return stat information for one inode.
@@ -51,8 +74,8 @@ xfs_bulkstat_one(
 	xfs_dinode_t	*dip;		/* dinode inode pointer */
 	xfs_dinode_core_t *dic;		/* dinode core info pointer */
 	xfs_inode_t	*ip = NULL;	/* incore inode pointer */
-	xfs_arch_t	arch;		/* these are set according to	   */
-	__uint16_t	di_flags;	/* temp */
+	xfs_arch_t      arch;           /* these are set according to      */
+	__uint16_t      di_flags;       /* temp */
 
 	buf = (xfs_bstat_t *)buffer;
 	dip = (xfs_dinode_t *)dibuff;
@@ -100,10 +123,10 @@ xfs_bulkstat_one(
 		/*
 		 * The inode format changed when we moved the link count and
 		 * made it 32 bits long.  If this is an old format inode,
-		 * convert it in memory to look like a new one.	 If it gets
+		 * convert it in memory to look like a new one.  If it gets
 		 * flushed to disk we will convert back before flushing or
-		 * logging it.	We zero out the new projid field and the old link
-		 * count field.	 We'll handle clearing the pad field (the remains
+		 * logging it.  We zero out the new projid field and the old link
+		 * count field.  We'll handle clearing the pad field (the remains
 		 * of the old uuid field) when we actually convert the inode to
 		 * the new format. We don't change the version number so that we
 		 * can distinguish this from a real new format inode.
@@ -214,25 +237,25 @@ xfs_bulkstat(
 	xfs_btree_cur_t		*cur;	/* btree cursor for ialloc btree */
 	int			end_of_ag; /* set if we've seen the ag end */
 	int			error;	/* error code */
-	int			fmterror;/* bulkstat formatter result */
+	int                     fmterror;/* bulkstat formatter result */
 	__int32_t		gcnt;	/* current btree rec's count */
 	xfs_inofree_t		gfree;	/* current btree rec's free mask */
 	xfs_agino_t		gino;	/* current btree rec's start inode */
 	int			i;	/* loop index */
-	int			icount; /* count of inodes good in irbuf */
+	int			icount;	/* count of inodes good in irbuf */
 	xfs_ino_t		ino;	/* inode number (filesystem) */
 	xfs_inobt_rec_t		*irbp;	/* current irec buffer pointer */
-	xfs_inobt_rec_t		*irbuf; /* start of irec buffer */
+	xfs_inobt_rec_t		*irbuf;	/* start of irec buffer */
 	xfs_inobt_rec_t		*irbufend; /* end of good irec buffer entries */
 	xfs_ino_t		lastino=0; /* last inode number returned */
 	int			nbcluster; /* # of blocks in a cluster */
 	int			nicluster; /* # of inodes in a cluster */
-	int			nimask; /* mask for inode clusters */
-	int			nirbuf; /* size of irbuf */
+	int			nimask;	/* mask for inode clusters */
+	int			nirbuf;	/* size of irbuf */
 	int			rval;	/* return value error code */
 	int			tmp;	/* result value from btree calls */
 	int			ubcount; /* size of user's buffer */
-	int			ubleft; /* spaces left in user's buffer */
+	int			ubleft;	/* spaces left in user's buffer */
 	xfs_caddr_t		ubufp;	/* current pointer into user's buffer */
 	xfs_buf_t		*bp;	/* ptr to on-disk inode cluster buf */
 	xfs_dinode_t		*dip;	/* ptr into bp for specific inode */
@@ -360,7 +383,7 @@ xfs_bulkstat(
 				error = xfs_inobt_increment(cur, 0, &tmp);
 		} else {
 			/*
-			 * Start of ag.	 Lookup the first inode chunk.
+			 * Start of ag.  Lookup the first inode chunk.
 			 */
 			error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &tmp);
 			icount = 0;
@@ -595,7 +618,7 @@ int					/* error status */
 xfs_bulkstat_single(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
 	xfs_ino_t		*lastinop, /* inode to return */
-	xfs_caddr_t		buffer, /* buffer with inode stats */
+	xfs_caddr_t		buffer,	/* buffer with inode stats */
 	int			*done)	/* 1 if there're more stats to get */
 {
 	xfs_bstat_t		bstat;	/* one bulkstat result structure */
@@ -654,7 +677,7 @@ xfs_inumbers(
 	int		bcount;
 	xfs_inogrp_t	*buffer;
 	int		bufidx;
-	xfs_btree_cur_t *cur;
+	xfs_btree_cur_t	*cur;
 	int		error;
 	__int32_t	gcnt;
 	xfs_inofree_t	gfree;

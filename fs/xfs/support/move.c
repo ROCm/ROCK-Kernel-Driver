@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -41,7 +41,7 @@
 /*
  * Move "n" bytes at byte address "cp"; "rw" indicates the direction
  * of the move, and the I/O parameters are provided in "uio", which is
- * update to reflect the data which was moved.	Returns 0 on success or
+ * update to reflect the data which was moved.  Returns 0 on success or
  * a non-zero errno on failure.
  */
 int
