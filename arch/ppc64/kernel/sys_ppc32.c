@@ -208,40 +208,42 @@ out:
 asmlinkage long sys32_readv(int fd, struct iovec32 *vector, u32 count)
 {
 	struct file *file;
-	int ret;
+	int ret = -EBADF;
 
 	file = fget(fd);
-	if(!file)
-		return -EBADF;
+	if (!file || !(file->f_mode & FMODE_READ))
+		goto out; 
 
-	if (!(file->f_mode & FMODE_READ))
-		return -EBADF;
+	ret = -EINVAL;
 	if (!file->f_op || (!file->f_op->readv && !file->f_op->read))
-		return -EINVAL;
+		goto out;
 
 	ret = do_readv_writev32(READ, file, vector, count);
 
-	fput(file);
+out:
+	if (file)
+		fput(file);
 	return ret;
 }
 
 asmlinkage long sys32_writev(int fd, struct iovec32 *vector, u32 count)
 {
 	struct file *file;
-	int ret;
+	int ret = -EBADF;
 
 	file = fget(fd);
-	if(!file)
-		return -EBADF;
+	if (!file || !(file->f_mode & FMODE_WRITE))
+		goto out;
 
-	if (!(file->f_mode & FMODE_WRITE))
-		return -EBADF;
+	ret = -EINVAL;
 	if (!file->f_op || (!file->f_op->writev && !file->f_op->write))
-		return -EINVAL;
+		goto out;
 
 	ret = do_readv_writev32(WRITE, file, vector, count);
 
-	fput(file);
+out:
+	if (file)
+		fput(file);
 	return ret;
 }
 
