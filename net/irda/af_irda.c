@@ -802,9 +802,6 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		if (err < 0)
 			return err;
 
-		self->max_data_size = ULTRA_MAX_DATA - LMP_PID_HEADER;
-		self->max_header_size = IRDA_MAX_HEADER + LMP_PID_HEADER;
-
 		/* Pretend we are connected */
 		sock->state = SS_CONNECTED;
 		sk->sk_state   = TCP_ESTABLISHED;
@@ -1122,6 +1119,10 @@ static int irda_create(struct socket *sock, int protocol)
 #ifdef CONFIG_IRDA_ULTRA
 		case IRDAPROTO_ULTRA:
 			sock->ops = &irda_ultra_ops;
+			/* Initialise now, because we may send on unbound
+			 * sockets. Jean II */
+			self->max_data_size = ULTRA_MAX_DATA - LMP_PID_HEADER;
+			self->max_header_size = IRDA_MAX_HEADER + LMP_PID_HEADER;
 			break;
 #endif /* CONFIG_IRDA_ULTRA */
 		case IRDAPROTO_UNITDATA:
@@ -1584,6 +1585,8 @@ static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
 {
 	struct sock *sk = sock->sk;
 	struct irda_sock *self;
+	__u8 pid = 0;
+	int bound = 0;
 	struct sk_buff *skb;
 	unsigned char *asmptr;
 	int err;
@@ -1600,6 +1603,33 @@ static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
 
 	self = irda_sk(sk);
 	ASSERT(self != NULL, return -1;);
+
+	/* Check if an address was specified with sendto. Jean II */
+	if (msg->msg_name) {
+		struct sockaddr_irda *addr = (struct sockaddr_irda *) msg->msg_name;
+		/* Check address, extract pid. Jean II */
+		if (msg->msg_namelen < sizeof(*addr))
+			return -EINVAL;
+		if (addr->sir_family != AF_IRDA)
+			return -EINVAL;
+
+		pid = addr->sir_lsap_sel;
+		if (pid & 0x80) {
+			IRDA_DEBUG(0, "%s(), extension in PID not supp!\n", __FUNCTION__);
+			return -EOPNOTSUPP;
+		}
+	} else {
+		/* Check that the socket is properly bound to an Ultra
+		 * port. Jean II */
+		if ((self->lsap == NULL) ||
+		    (sk->sk_state != TCP_ESTABLISHED)) {
+			IRDA_DEBUG(0, "%s(), socket not bound to Ultra PID.\n",
+				   __FUNCTION__);
+			return -ENOTCONN;
+		}
+		/* Use PID from socket */
+		bound = 1;
+	}
 
 	/*
 	 * Check that we don't send out to big frames. This is an unreliable
@@ -1627,7 +1657,8 @@ static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
 		return err;
 	}
 
-	err = irlmp_connless_data_request(self->lsap, skb);
+	err = irlmp_connless_data_request((bound ? self->lsap : NULL),
+					  skb, pid);
 	if (err) {
 		IRDA_DEBUG(0, "%s(), err=%d\n", __FUNCTION__, err);
 		return err;

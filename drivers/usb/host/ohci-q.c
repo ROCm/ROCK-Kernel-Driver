@@ -30,7 +30,7 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 /*
  * URB goes back to driver, and isn't reissued.
  * It's completely gone from HC data structures.
- * PRECONDITION:  no locks held, irqs blocked  (Giveback can call into HCD.)
+ * PRECONDITION:  ohci lock held, irqs blocked.
  */
 static void
 finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *regs)
@@ -55,7 +55,6 @@ finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *regs)
 	}
 	spin_unlock (&urb->lock);
 
-	// what lock protects these?
 	switch (usb_pipetype (urb->pipe)) {
 	case PIPE_ISOCHRONOUS:
 		hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs--;
@@ -68,7 +67,18 @@ finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *regs)
 #ifdef OHCI_VERBOSE_DEBUG
 	urb_print (urb, "RET", usb_pipeout (urb->pipe));
 #endif
+
+	/* urb->complete() can reenter this HCD */
+	spin_unlock (&ohci->lock);
 	usb_hcd_giveback_urb (&ohci->hcd, urb, regs);
+	spin_lock (&ohci->lock);
+
+	/* stop periodic dma if it's not needed */
+	if (hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs == 0
+			&& hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs == 0) {
+		ohci->hc_control &= ~(OHCI_CTRL_PLE|OHCI_CTRL_IE);
+		writel (ohci->hc_control, &ohci->regs->control);
+	}
 }
 
 
@@ -549,6 +559,7 @@ static void td_submit_urb (
 	int		cnt = 0;
 	u32		info = 0;
 	int		is_out = usb_pipeout (urb->pipe);
+	int		periodic = 0;
 
 	/* OHCI handles the bulk/interrupt data toggles itself.  We just
 	 * use the device toggle bits for resetting, and rely on the fact
@@ -578,7 +589,8 @@ static void td_submit_urb (
 	 */
 	case PIPE_INTERRUPT:
 		/* ... and periodic urbs have extra accounting */
-		hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs++;
+		periodic = hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs++ == 0
+			&& hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs == 0;
 		/* FALLTHROUGH */
 	case PIPE_BULK:
 		info = is_out
@@ -646,9 +658,17 @@ static void td_submit_urb (
 				data + urb->iso_frame_desc [cnt].offset,
 				urb->iso_frame_desc [cnt].length, urb, cnt);
 		}
-		hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs++;
+		periodic = hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs++ == 0
+			&& hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs == 0;
 		break;
 	}
+
+	/* start periodic dma if needed */
+	if (periodic) {
+		ohci->hc_control |= OHCI_CTRL_PLE|OHCI_CTRL_IE;
+		writel (ohci->hc_control, &ohci->regs->control);
+	}
+
 	// ASSERT (urb_priv->length == cnt);
 }
 
@@ -949,9 +969,7 @@ rescan_this:
 			/* if URB is done, clean up */
 			if (urb_priv->td_cnt == urb_priv->length) {
 				modified = completed = 1;
-				spin_unlock (&ohci->lock);
 				finish_urb (ohci, urb, regs);
-				spin_lock (&ohci->lock);
 			}
 		}
 		if (completed && !list_empty (&ed->td_list))
@@ -1030,11 +1048,8 @@ dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
   		urb_priv->td_cnt++;
 
 		/* If all this urb's TDs are done, call complete() */
-  		if (urb_priv->td_cnt == urb_priv->length) {
-     			spin_unlock (&ohci->lock);
+  		if (urb_priv->td_cnt == urb_priv->length)
   			finish_urb (ohci, urb, regs);
-  			spin_lock (&ohci->lock);
-  		}
 
 		/* clean schedule:  unlink EDs that are no longer busy */
 		if (list_empty (&ed->td_list))

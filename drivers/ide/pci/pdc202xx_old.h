@@ -207,7 +207,7 @@ static u8 pdc202xx_proc;
 
 static int pdc202xx_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t pdc202xx_procs[] __initdata = {
+static ide_pci_host_proc_t pdc202xx_procs[] = {
 	{
 		.name		= "pdc202xx",
 		.set		= 1,

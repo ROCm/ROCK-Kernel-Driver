@@ -178,7 +178,7 @@ vn_get(
 	if (inode->i_state & I_FREEING)
 		return NULL;
 
-	inode = VFS_GET_INODE(vmap->v_vfsp, vmap->v_ino, IGET_NOALLOC);
+	inode = ilookup(vmap->v_vfsp->vfs_super, vmap->v_ino);
 	if (!inode)	/* Inode not present */
 		return NULL;
 

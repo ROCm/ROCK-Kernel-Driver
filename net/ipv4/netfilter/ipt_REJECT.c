@@ -117,7 +117,7 @@ static void send_reset(struct sk_buff *oldskb, int hook)
 	if ((rt = route_reverse(oldskb, hook)) == NULL)
 		return;
 
-	hh_len = (rt->u.dst.dev->hard_header_len + 15)&~15;
+	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	/* We need a linear, writeable skb.  We also need to expand
 	   headroom in case hh_len of incoming interface < hh_len of
@@ -305,9 +305,9 @@ static void send_unreach(struct sk_buff *skb_in, int code)
 	if (length > 576)
 		length = 576;
 
-	hh_len = (rt->u.dst.dev->hard_header_len + 15)&~15;
+	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
-	nskb = alloc_skb(hh_len+15+length, GFP_ATOMIC);
+	nskb = alloc_skb(hh_len + length, GFP_ATOMIC);
 	if (!nskb) {
 		ip_rt_put(rt);
 		return;

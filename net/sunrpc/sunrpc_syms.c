@@ -21,6 +21,7 @@
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/svcsock.h>
 #include <linux/sunrpc/auth.h>
+#include <linux/workqueue.h>
 #include <linux/sunrpc/rpc_pipe_fs.h>
 
 
@@ -40,6 +41,7 @@ EXPORT_SYMBOL(rpc_release_task);
 
 /* RPC client functions */
 EXPORT_SYMBOL(rpc_create_client);
+EXPORT_SYMBOL(rpc_clone_client);
 EXPORT_SYMBOL(rpc_destroy_client);
 EXPORT_SYMBOL(rpc_shutdown_client);
 EXPORT_SYMBOL(rpc_release_client);
@@ -67,6 +69,7 @@ EXPORT_SYMBOL(xprt_tcp_slot_table_entries);
 /* Client credential cache */
 EXPORT_SYMBOL(rpcauth_register);
 EXPORT_SYMBOL(rpcauth_unregister);
+EXPORT_SYMBOL(rpcauth_create);
 EXPORT_SYMBOL(rpcauth_lookupcred);
 EXPORT_SYMBOL(rpcauth_lookup_credcache);
 EXPORT_SYMBOL(rpcauth_free_credcache);
@@ -131,6 +134,9 @@ EXPORT_SYMBOL(xdr_encode_word);
 EXPORT_SYMBOL(xdr_decode_word);
 EXPORT_SYMBOL(xdr_encode_array2);
 EXPORT_SYMBOL(xdr_decode_array2);
+EXPORT_SYMBOL(xdr_buf_from_iov);
+EXPORT_SYMBOL(xdr_buf_subsegment);
+EXPORT_SYMBOL(xdr_buf_read_netobj);
 
 /* Debugging symbols */
 #ifdef RPC_DEBUG

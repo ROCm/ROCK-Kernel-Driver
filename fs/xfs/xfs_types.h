@@ -75,24 +75,6 @@ typedef __uint64_t __psunsigned_t;
 #error BITS_PER_LONG must be 32 or 64
 #endif
 
-/*
- * Some types are conditional depending on the target system.
- * XFS_BIG_BLKNOS needs block layer disk addresses to be 64 bits.
- * XFS_BIG_INUMS needs the VFS inode number to be 64 bits, as well
- * as requiring XFS_BIG_BLKNOS to be set.
- */
-#if defined(CONFIG_LBD) || (defined(HAVE_SECTOR_T) && (BITS_PER_LONG == 64))
-# define XFS_BIG_BLKNOS	1
-# if BITS_PER_LONG == 64
-#  define XFS_BIG_INUMS	1
-# else
-#  define XFS_BIG_INUMS	0
-# endif
-#else
-# define XFS_BIG_BLKNOS	0
-# define XFS_BIG_INUMS	0
-#endif
-
 #endif	/* __KERNEL__ */
 
 typedef __uint32_t	xfs_agblock_t;	/* blockno in alloc. group */
@@ -196,21 +178,5 @@ typedef enum {
 	XFS_BTNUM_BNOi, XFS_BTNUM_CNTi, XFS_BTNUM_BMAPi, XFS_BTNUM_INOi,
 	XFS_BTNUM_MAX
 } xfs_btnum_t;
-
-
-/*
- * Juggle IRIX device numbers - still used in ondisk structures
- */
-#define XFS_DEV_BITSMAJOR	14
-#define XFS_DEV_BITSMINOR	18
-#define XFS_DEV_MAXMAJ		0x1ff
-#define XFS_DEV_MAXMIN		0x3ffff
-#define XFS_DEV_MAJOR(dev)	((int)(((unsigned)(dev)>>XFS_DEV_BITSMINOR) \
-				    & XFS_DEV_MAXMAJ))
-#define XFS_DEV_MINOR(dev)	((int)((dev)&XFS_DEV_MAXMIN))
-#define XFS_MKDEV(major,minor) ((xfs_dev_t)(((major)<<XFS_DEV_BITSMINOR) \
-				    | (minor&XFS_DEV_MAXMIN)))
-
-#define XFS_DEV_TO_KDEVT(dev)	mk_kdev(XFS_DEV_MAJOR(dev),XFS_DEV_MINOR(dev))
 
 #endif	/* __XFS_TYPES_H__ */

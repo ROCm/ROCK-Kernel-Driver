@@ -250,10 +250,9 @@ struct svc_deferred_req {
 };
 
 /*
- * List of RPC programs on the same transport endpoint
+ * RPC program
  */
 struct svc_program {
-	struct svc_program *	pg_next;	/* other programs (same xprt) */
 	u32			pg_prog;	/* program number */
 	unsigned int		pg_lovers;	/* lowest version */
 	unsigned int		pg_hivers;	/* lowest version */

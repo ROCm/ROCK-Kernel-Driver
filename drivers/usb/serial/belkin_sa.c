@@ -232,8 +232,10 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 
 	port->interrupt_in_urb->dev = port->serial->dev;
 	retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
-	if (retval)
+	if (retval) {
+		usb_unlink_urb(port->read_urb);
 		err(" usb_submit_urb(read int) failed");
+	}
 
 exit:
 	return retval;

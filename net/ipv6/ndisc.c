@@ -459,7 +459,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 			inc_opt = 0;
 	}
 
-	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + dev->hard_header_len + 15,
+	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev),
 				  1, &err);
 
 	if (skb == NULL) {
@@ -468,7 +468,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 		return;
 	}
 
-	skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	ip6_nd_hdr(sk, skb, dev, src_addr, daddr, IPPROTO_ICMPV6, len);
 
 	msg = (struct nd_msg *)skb_put(skb, len);
@@ -545,7 +545,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	if (send_llinfo)
 		len += NDISC_OPT_SPACE(dev->addr_len);
 
-	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + dev->hard_header_len + 15,
+	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev),
 				  1, &err);
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
@@ -553,7 +553,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 		return;
 	}
 
-	skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	ip6_nd_hdr(sk, skb, dev, saddr, daddr, IPPROTO_ICMPV6, len);
 
 	msg = (struct nd_msg *)skb_put(skb, len);
@@ -617,7 +617,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 	if (dev->addr_len)
 		len += NDISC_OPT_SPACE(dev->addr_len);
 
-        skb = sock_alloc_send_skb(sk, MAX_HEADER + len + dev->hard_header_len + 15,
+        skb = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev),
 				  1, &err);
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
@@ -625,7 +625,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 		return;
 	}
 
-	skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	ip6_nd_hdr(sk, skb, dev, saddr, daddr, IPPROTO_ICMPV6, len);
 
         hdr = (struct icmp6hdr *)skb_put(skb, len);
@@ -1305,7 +1305,7 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 	rd_len &= ~0x7;
 	len += rd_len;
 
-	buff = sock_alloc_send_skb(sk, MAX_HEADER + len + dev->hard_header_len + 15,
+	buff = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev),
 				   1, &err);
 	if (buff == NULL) {
 		ND_PRINTK1("ndisc_send_redirect: alloc_skb failed\n");
@@ -1315,7 +1315,7 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 
 	hlen = 0;
 
-	skb_reserve(buff, (dev->hard_header_len + 15) & ~15);
+	skb_reserve(buff, LL_RESERVED_SPACE(dev));
 	ip6_nd_hdr(sk, buff, dev, &saddr_buf, &skb->nh.ipv6h->saddr,
 		   IPPROTO_ICMPV6, len);
 

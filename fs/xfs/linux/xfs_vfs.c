@@ -201,19 +201,6 @@ vfs_quotactl(
 	return ((*bhvtovfsops(next)->vfs_quotactl)(next, cmd, id, addr));
 }
 
-struct inode *
-vfs_get_inode(
-	struct bhv_desc		*bdp,
-	xfs_ino_t		ino,
-	int			fl)
-{
-	struct bhv_desc		*next = bdp;
-
-	while (! (bhvtovfsops(next))->vfs_get_inode)
-		next = BHV_NEXTNULL(next);
-	return ((*bhvtovfsops(next)->vfs_get_inode)(next, ino, fl));
-}
-
 void
 vfs_init_vnode(
 	struct bhv_desc		*bdp,
@@ -321,14 +308,9 @@ bhv_insert_all_vfsops(
 	struct vfs		*vfsp)
 {
 	struct xfs_mount	*mp;
-	struct bhv_vfsops	*op;
 
 	mp = xfs_mount_init();
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
-	op = (struct bhv_vfsops *) bhv_lookup_module(XFS_DMOPS, XFS_DM_MODULE);
-	if (op)
-		vfs_insertops(vfsp, op);
-	op = (struct bhv_vfsops *) bhv_lookup_module(XFS_QMOPS, XFS_QM_MODULE);
-	if (op)
-		vfs_insertops(vfsp, op);
+	vfs_insertdmapi(vfsp);
+	vfs_insertquota(vfsp);
 }

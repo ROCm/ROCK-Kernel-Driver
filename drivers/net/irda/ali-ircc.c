@@ -103,7 +103,7 @@ static struct net_device_stats *ali_ircc_net_get_stats(struct net_device *dev);
 
 /* SIR function */
 static int  ali_ircc_sir_hard_xmit(struct sk_buff *skb, struct net_device *dev);
-static void ali_ircc_sir_interrupt(int irq, struct ali_ircc_cb *self, struct pt_regs *regs);
+static irqreturn_t ali_ircc_sir_interrupt(struct ali_ircc_cb *self);
 static void ali_ircc_sir_receive(struct ali_ircc_cb *self);
 static void ali_ircc_sir_write_wakeup(struct ali_ircc_cb *self);
 static int  ali_ircc_sir_write(int iobase, int fifo_size, __u8 *buf, int len);
@@ -112,7 +112,7 @@ static void ali_ircc_sir_change_speed(struct ali_ircc_cb *priv, __u32 speed);
 /* FIR function */
 static int  ali_ircc_fir_hard_xmit(struct sk_buff *skb, struct net_device *dev);
 static void ali_ircc_fir_change_speed(struct ali_ircc_cb *priv, __u32 speed);
-static void ali_ircc_fir_interrupt(int irq, struct ali_ircc_cb *self, struct pt_regs *regs);
+static irqreturn_t ali_ircc_fir_interrupt(struct ali_ircc_cb *self);
 static int  ali_ircc_dma_receive(struct ali_ircc_cb *self); 
 static int  ali_ircc_dma_receive_complete(struct ali_ircc_cb *self);
 static int  ali_ircc_dma_xmit_complete(struct ali_ircc_cb *self);
@@ -635,6 +635,7 @@ static irqreturn_t ali_ircc_interrupt(int irq, void *dev_id,
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct ali_ircc_cb *self;
+	int ret;
 		
 	IRDA_DEBUG(2, "%s(), ---------------- Start ----------------\n", __FUNCTION__);
 		
@@ -649,22 +650,22 @@ static irqreturn_t ali_ircc_interrupt(int irq, void *dev_id,
 	
 	/* Dispatch interrupt handler for the current speed */
 	if (self->io.speed > 115200)
-		ali_ircc_fir_interrupt(irq, self, regs);
+		ret = ali_ircc_fir_interrupt(self);
 	else
-		ali_ircc_sir_interrupt(irq, self, regs);	
+		ret = ali_ircc_sir_interrupt(self);
 		
 	spin_unlock(&self->lock);
 	
 	IRDA_DEBUG(2, "%s(), ----------------- End ------------------\n", __FUNCTION__);
-	return IRQ_HANDLED;
+	return ret;
 }
 /*
- * Function ali_ircc_fir_interrupt(irq, struct ali_ircc_cb *self, regs)
+ * Function ali_ircc_fir_interrupt(irq, struct ali_ircc_cb *self)
  *
  *    Handle MIR/FIR interrupt
  *
  */
-static void ali_ircc_fir_interrupt(int irq, struct ali_ircc_cb *self, struct pt_regs *regs)
+static irqreturn_t ali_ircc_fir_interrupt(struct ali_ircc_cb *self)
 {
 	__u8 eir, OldMessageCount;
 	int iobase, tmp;
@@ -777,6 +778,7 @@ static void ali_ircc_fir_interrupt(int irq, struct ali_ircc_cb *self, struct pt_
 	SetCOMInterrupts(self, TRUE);	
 		
 	IRDA_DEBUG(1, "%s(), ----------------- End ---------------\n", __FUNCTION__);
+	return IRQ_RETVAL(eir);
 }
 
 /*
@@ -785,7 +787,7 @@ static void ali_ircc_fir_interrupt(int irq, struct ali_ircc_cb *self, struct pt_
  *    Handle SIR interrupt
  *
  */
-static void ali_ircc_sir_interrupt(int irq, struct ali_ircc_cb *self, struct pt_regs *regs)
+static irqreturn_t ali_ircc_sir_interrupt(struct ali_ircc_cb *self)
 {
 	int iobase;
 	int iir, lsr;
@@ -827,6 +829,8 @@ static void ali_ircc_sir_interrupt(int irq, struct ali_ircc_cb *self, struct pt_
 	
 	
 	IRDA_DEBUG(2, "%s(), ----------------- End ------------------\n", __FUNCTION__);	
+
+	return IRQ_RETVAL(iir);
 }
 
 

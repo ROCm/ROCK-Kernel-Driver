@@ -1949,7 +1949,7 @@ static irqreturn_t nsc_ircc_interrupt(int irq, void *dev_id,
 	outb(bsr, iobase+BSR);       /* Restore bank register */
 
 	spin_unlock(&self->lock);
-	return IRQ_HANDLED;
+	return IRQ_RETVAL(eir);
 }
 
 /*

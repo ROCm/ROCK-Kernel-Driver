@@ -40,11 +40,9 @@
 
 
 #if USE_RW_WAIT_QUEUE_SPINLOCK
-# define wq_write_lock		write_lock
-# define wq_write_unlock	write_unlock
+# define wq_write_lock	write_lock
 #else
-# define wq_write_lock		spin_lock
-# define wq_write_unlock	spin_unlock
+# define wq_write_lock	spin_lock
 #endif
 
 /*
@@ -91,21 +89,21 @@ lock_wait(wait_queue_head_t *q, spinlock_t *lock, int rw)
 
 	__set_current_state(TASK_UNINTERRUPTIBLE);
 
-	wq_write_lock(&q->lock);
+	spin_lock(&q->lock);
 	if (rw) {
 		__add_wait_queue_tail(q, &wait);
 	} else {
 		__add_wait_queue(q, &wait);
 	}
 
-	wq_write_unlock(&q->lock);
+	spin_unlock(&q->lock);
 	spin_unlock(lock);
 
 	schedule();
 
-	wq_write_lock(&q->lock);
+	spin_lock(&q->lock);
 	__remove_wait_queue(q, &wait);
-	wq_write_unlock(&q->lock);
+	spin_unlock(&q->lock);
 
 	spin_lock(lock);
 

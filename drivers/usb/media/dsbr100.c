@@ -15,7 +15,7 @@
  You might find some interesting stuff about this module at
  http://unimut.fsk.uni-heidelberg.de/unimut/demi/dsbr
 
- Copyright (c) 2000 Markus Demleitner <msdemlei@tucana.harvard.edu>
+ Copyright (c) 2000 Markus Demleitner <msdemlei@cl.uni-heidelberg.de>
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@
  History:
 
  Version 0.30:
- 	Markus: Updates for 2.5.x kernel and more ISO compiant source
+ 	Markus: Updates for 2.5.x kernel and more ISO compliant source
 
  Version 0.25:
         PSL and Markus: Cleanup, radio now doesn't stop on device close
@@ -75,7 +75,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.25"
+#define DRIVER_VERSION "v0.30"
 #define DRIVER_AUTHOR "Markus Demleitner <msdemlei@tucana.harvard.edu>"
 #define DRIVER_DESC "D-Link DSB-R100 USB FM radio driver"
 

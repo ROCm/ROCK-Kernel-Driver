@@ -330,8 +330,7 @@ xfs_read(
 	 * does not really happen here, but is scheduled 
 	 * later?
 	 */
-	if (!(ioflags & IO_ISLOCKED))
-		xfs_ilock(ip, XFS_IOLOCK_SHARED);
+	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(ioflags & IO_INVIS)) {
@@ -341,15 +340,13 @@ xfs_read(
 		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp), *offset, size,
 				      FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
-			if (!(ioflags & IO_ISLOCKED))
-				xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 			return -error;
 		}
 	}
 
 	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
-	if (!(ioflags & IO_ISLOCKED))
-		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	if (ret > 0)
 		XFS_STATS_ADD(xs_read_bytes, ret);
@@ -394,8 +391,7 @@ xfs_sendfile(
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return -EIO;
 
-	if (!(ioflags & IO_ISLOCKED))
-		xfs_ilock(ip, XFS_IOLOCK_SHARED);
+	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 	    (!(ioflags & IO_INVIS))) {
@@ -405,14 +401,12 @@ xfs_sendfile(
 		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp), *offset, count,
 				      FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
-			if (!(ioflags & IO_ISLOCKED))
-				xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 			return -error;
 		}
 	}
 	ret = generic_file_sendfile(filp, offset, count, actor, target);
-	if (!(ioflags & IO_ISLOCKED))
-		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	XFS_STATS_ADD(xs_read_bytes, ret);
 	xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
@@ -709,9 +703,6 @@ xfs_write(
 		locktype = VRWLOCK_WRITE;
 	}
 
-	if (ioflags & IO_ISLOCKED)
-		iolock = 0;
-
 	xfs_ilock(xip, XFS_ILOCK_EXCL|iolock);
 
 	isize = xip->i_d.di_size;
@@ -744,7 +735,7 @@ start:
 				      *offset, size,
 				      FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
-			if (iolock) xfs_iunlock(xip, iolock);
+			xfs_iunlock(xip, iolock);
 			return -error;
 		}
 		xfs_ilock(xip, XFS_ILOCK_EXCL);
@@ -937,9 +928,7 @@ retry:
 		}
 	} /* (ioflags & O_SYNC) */
 
-	if (iolock)
-		xfs_rwunlock(bdp, locktype);
-
+	xfs_rwunlock(bdp, locktype);
 	return(ret);
 }
 

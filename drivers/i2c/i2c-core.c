@@ -598,7 +598,7 @@ int i2c_master_recv(struct i2c_client *client, char *buf ,int count)
 		ret = adap->algo->master_xfer(adap,&msg,1);
 		up(&adap->bus_lock);
 	
-		dev_dbg(&client->dev, "master_recv: return:%d (count:%d, addr:0x%02x)\n",
+		dev_dbg(&client->adapter->dev, "master_recv: return:%d (count:%d, addr:0x%02x)\n",
 			ret, count, client->addr);
 	
 		/* if everything went ok (i.e. 1 msg transmitted), return #bytes

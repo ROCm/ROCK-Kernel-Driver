@@ -572,7 +572,6 @@ xfs_acl_access(
 
 	return xfs_acl_capability_check(md, cr, fap);
 }
-EXPORT_SYMBOL(xfs_acl_access);
 
 /*
  * ACL validity checker.

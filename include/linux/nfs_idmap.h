@@ -52,18 +52,25 @@
 #define IDMAP_STATUS_SUCCESS    0x08
 
 struct idmap_msg {
-	u_int8_t  im_type;
-	u_int8_t  im_conv;
-	char      im_name[IDMAP_NAMESZ];
-	u_int32_t im_id;
-	u_int8_t  im_status;
+	__u8  im_type;
+	__u8  im_conv;
+	char  im_name[IDMAP_NAMESZ];
+	__u32 im_id;
+	__u8  im_status;
 };
 
 #ifdef __KERNEL__
-void      *nfs_idmap_new(struct nfs_server *);
-void       nfs_idmap_delete(struct nfs_server *);
-int        nfs_idmap_id(struct nfs_server *, u_int8_t, char *, u_int,  uid_t *);
-int        nfs_idmap_name(struct nfs_server *, u_int8_t, uid_t, char *, u_int *);
+
+/* Forward declaration to make this header independent of others */
+struct nfs4_client;
+
+void nfs_idmap_new(struct nfs4_client *);
+void nfs_idmap_delete(struct nfs4_client *);
+
+int nfs_map_name_to_uid(struct nfs4_client *, const char *, size_t, __u32 *);
+int nfs_map_group_to_gid(struct nfs4_client *, const char *, size_t, __u32 *);
+int nfs_map_uid_to_name(struct nfs4_client *, __u32, char *);
+int nfs_map_gid_to_group(struct nfs4_client *, __u32, char *);
 #endif /* __KERNEL__ */
 
 #endif /* NFS_IDMAP_H */

@@ -78,7 +78,7 @@ static u8 aec62xx_proc;
 
 static int aec62xx_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t aec62xx_procs[] __initdata = {
+static ide_pci_host_proc_t aec62xx_procs[] = {
 	{
 		.name		= "aec62xx",
 		.set		= 1,
