@@ -24,7 +24,7 @@ ToDo:
 
 	- Fix buggy free cluster and free inode determination logic.
 
-2.1.1 - Important bug fix aleviating the random hangs.
+2.1.1 - Minor updates.
 
 	- Add handling for initialized_size != data_size in compressed files.
 	- Reduce function local stack usage from 0x3d4 bytes to just noise in
