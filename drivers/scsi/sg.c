@@ -680,7 +680,7 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 		sg_finish_rem_req(srp);
 		return -ENODEV;
 	}
-	SRpnt = scsi_allocate_request(sdp->device);
+	SRpnt = scsi_allocate_request(sdp->device, GFP_ATOMIC);
 	if (SRpnt == NULL) {
 		SCSI_LOG_TIMEOUT(1, printk("sg_write: no mem\n"));
 		sg_finish_rem_req(srp);

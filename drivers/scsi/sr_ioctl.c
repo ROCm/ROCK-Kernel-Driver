@@ -82,7 +82,7 @@ int sr_do_ioctl(Scsi_CD *cd, struct cdrom_generic_command *cgc)
 	int result, err = 0, retries = 0;
 
 	SDev = cd->device;
-	SRpnt = scsi_allocate_request(SDev);
+	SRpnt = scsi_allocate_request(SDev, GFP_KERNEL);
         if (!SRpnt) {
                 printk(KERN_ERR "Unable to allocate SCSI request in sr_do_ioctl");
 		err = -ENOMEM;

@@ -693,7 +693,7 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 	sdev = scsi_alloc_sdev(host, channel, id, lun);
 	if (!sdev)
 		goto out;
-	sreq = scsi_allocate_request(sdev);
+	sreq = scsi_allocate_request(sdev, GFP_ATOMIC);
 	if (!sreq)
 		goto out_free_sdev;
 	result = kmalloc(256, GFP_ATOMIC |
@@ -906,7 +906,7 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 	if (bflags & BLIST_NOLUN)
 		return 0;
 
-	sreq = scsi_allocate_request(sdev);
+	sreq = scsi_allocate_request(sdev, GFP_ATOMIC);
 	if (!sreq)
 		goto out;
 

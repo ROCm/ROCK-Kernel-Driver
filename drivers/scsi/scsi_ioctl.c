@@ -98,7 +98,7 @@ static int ioctl_internal_command(struct scsi_device *sdev, char *cmd,
 
 	SCSI_LOG_IOCTL(1, printk("Trying ioctl with scsi command %d\n", *cmd));
 
-	sreq = scsi_allocate_request(sdev);
+	sreq = scsi_allocate_request(sdev, GFP_KERNEL);
 	if (!sreq) {
 		printk("SCSI internal ioctl failed, no memory\n");
 		return -ENOMEM;
@@ -321,7 +321,7 @@ int scsi_ioctl_send_command(struct scsi_device *sdev,
 		break;
 	}
 
-	sreq = scsi_allocate_request(sdev);
+	sreq = scsi_allocate_request(sdev, GFP_KERNEL);
         if (!sreq) {
                 result = -EINTR;
                 goto error;

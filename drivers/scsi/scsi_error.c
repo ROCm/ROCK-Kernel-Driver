@@ -1339,7 +1339,7 @@ static void scsi_eh_lock_done(struct scsi_cmnd *scmd)
  **/
 static void scsi_eh_lock_door(struct scsi_device *sdev)
 {
-	struct scsi_request *sreq = scsi_allocate_request(sdev);
+	struct scsi_request *sreq = scsi_allocate_request(sdev, GFP_KERNEL);
 
 	if (unlikely(!sreq)) {
 		printk(KERN_ERR "%s: request allocate failed,"

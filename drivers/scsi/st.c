@@ -374,7 +374,7 @@ static Scsi_Request *
 	unsigned char *bp;
 
 	if (SRpnt == NULL) {
-		SRpnt = scsi_allocate_request(STp->device);
+		SRpnt = scsi_allocate_request(STp->device, GFP_ATOMIC);
 		if (SRpnt == NULL) {
 			DEBC( printk(KERN_ERR "%s: Can't get SCSI request.\n",
 				     tape_name(STp)); );

@@ -4990,7 +4990,7 @@ static int ioc_resetdrv(unsigned long arg, char *cmnd)
         cmd.u.cache.DeviceNo = res.number;
 #if LINUX_VERSION_CODE >= 0x020503
         sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-        srp  = scsi_allocate_request(sdev);
+        srp  = scsi_allocate_request(sdev, GFP_KERNEL);
         if (!srp)
             return -ENOMEM;
         srp->sr_cmd_len = 12;
@@ -5091,7 +5091,7 @@ static int ioc_general(unsigned long arg, char *cmnd)
 
 #if LINUX_VERSION_CODE >= 0x020503
         sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-        srp  = scsi_allocate_request(sdev);
+        srp  = scsi_allocate_request(sdev, GFP_KERNEL);
         if (!srp)
             return -ENOMEM;
         srp->sr_cmd_len = 12;
@@ -5164,7 +5164,7 @@ static int ioc_hdrlist(unsigned long arg, char *cmnd)
    
 #if LINUX_VERSION_CODE >= 0x020503
         sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-        srp  = scsi_allocate_request(sdev);
+        srp  = scsi_allocate_request(sdev, GFP_KERNEL);
         if (!srp)
             return -ENOMEM;
         srp->sr_cmd_len = 12;
@@ -5253,7 +5253,7 @@ static int ioc_rescan(unsigned long arg, char *cmnd)
 
 #if LINUX_VERSION_CODE >= 0x020503
         sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-        srp  = scsi_allocate_request(sdev);
+        srp  = scsi_allocate_request(sdev, GFP_KERNEL);
         if (!srp)
             return -ENOMEM;
         srp->sr_cmd_len = 12;
@@ -5631,7 +5631,7 @@ static void gdth_flush(int hanum)
 
 #if LINUX_VERSION_CODE >= 0x020503
     sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-    srp  = scsi_allocate_request(sdev);
+    srp  = scsi_allocate_request(sdev, GFP_KERNEL);
     if (!srp)
         return;
     srp->sr_cmd_len = 12;
@@ -5727,7 +5727,7 @@ void gdth_halt(void)
         TRACE2(("gdth_halt(): reset controller %d\n", hanum));
 #if LINUX_VERSION_CODE >= 0x020503
         sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-        srp  = scsi_allocate_request(sdev);
+        srp  = scsi_allocate_request(sdev, GFP_KERNEL);
         if (!srp) {
 #if LINUX_VERSION_CODE >= 0x020100
             unregister_reboot_notifier(&gdth_notifier);

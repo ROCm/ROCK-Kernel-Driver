@@ -44,7 +44,7 @@ static int gdth_set_info(char *buffer,int length,int hanum,int busnum)
 
 #if LINUX_VERSION_CODE >= 0x020503
     sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-    scp  = scsi_allocate_request(sdev);
+    scp  = scsi_allocate_request(sdev, GFP_KERNEL);
     if (!scp)
         return -ENOMEM;
     scp->sr_cmd_len = 12;
@@ -797,7 +797,7 @@ static int gdth_get_info(char *buffer,char **start,off_t offset,
 
 #if LINUX_VERSION_CODE >= 0x020503
     sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
-    scp  = scsi_allocate_request(sdev);
+    scp  = scsi_allocate_request(sdev, GFP_KERNEL);
     if (!scp)
         return -ENOMEM;
     scp->sr_cmd_len = 12;

@@ -603,7 +603,7 @@ int cpqfcTS_ioctl( struct scsi_device *ScsiDev, int Cmnd, void *arg)
 	    return -ENOMEM;
 	}
         // Now build a Scsi_Request to pass down...
-        ScsiPassThruReq = scsi_allocate_request(ScsiDev);
+        ScsiPassThruReq = scsi_allocate_request(ScsiDev, GFP_KERNEL);
 	if (ScsiPassThruReq == NULL) {
 		kfree(buf);
 		return -ENOMEM;

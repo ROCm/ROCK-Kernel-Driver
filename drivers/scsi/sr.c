@@ -599,7 +599,7 @@ static void get_sectorsize(struct scsi_cd *cd)
 	buffer = kmalloc(512, GFP_KERNEL | GFP_DMA);
 	if (!buffer)
 		goto Enomem;
-	SRpnt = scsi_allocate_request(cd->device);
+	SRpnt = scsi_allocate_request(cd->device, GFP_KERNEL);
 	if (!SRpnt)
 		goto Enomem;
 

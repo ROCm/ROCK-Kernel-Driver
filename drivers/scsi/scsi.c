@@ -113,26 +113,21 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] = {
  *
  * Purpose:     Allocate a request descriptor.
  *
- * Arguments:   device    - device for which we want a request
+ * Arguments:   device		- device for which we want a request
+ *		gfp_mask	- allocation flags passed to kmalloc
  *
  * Lock status: No locks assumed to be held.  This function is SMP-safe.
  *
  * Returns:     Pointer to request block.
- *
- * Notes:       With the new queueing code, it becomes important
- *              to track the difference between a command and a
- *              request.  A request is a pending item in the queue that
- *              has not yet reached the top of the queue.
- *
- * XXX(hch):	Need to add a gfp_mask argument.
  */
-struct scsi_request *scsi_allocate_request(struct scsi_device *sdev)
+struct scsi_request *scsi_allocate_request(struct scsi_device *sdev,
+					   int gfp_mask)
 {
 	const int offset = ALIGN(sizeof(struct scsi_request), 4);
 	const int size = offset + sizeof(struct request);
 	struct scsi_request *sreq;
   
-	sreq = kmalloc(size, GFP_ATOMIC);
+	sreq = kmalloc(size, gfp_mask);
 	if (likely(sreq != NULL)) {
 		memset(sreq, 0, size);
 		sreq->sr_request = (struct request *)(((char *)sreq) + offset);

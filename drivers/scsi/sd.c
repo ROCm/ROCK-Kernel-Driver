@@ -1174,7 +1174,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	if (!sdp->online)
 		goto out;
 
-	sreq = scsi_allocate_request(sdp);
+	sreq = scsi_allocate_request(sdp, GFP_KERNEL);
 	if (!sreq) {
 		printk(KERN_WARNING "(sd_revalidate_disk:) Request allocation "
 		       "failure.\n");
@@ -1355,12 +1355,12 @@ static int sd_remove(struct device *dev)
 static void sd_shutdown(struct device *dev)
 {
 	struct scsi_device *sdp = to_scsi_device(dev);
-       struct scsi_disk *sdkp;
+	struct scsi_disk *sdkp;
 	struct scsi_request *sreq;
 	int retries, res;
 
-       sdkp = dev_get_drvdata(dev);
-       if (!sdkp)
+	sdkp = dev_get_drvdata(dev);
+	if (!sdkp)
                return;         /* this can happen */
 
 	if (!sdp->online || !sdkp->WCE)
@@ -1369,7 +1369,7 @@ static void sd_shutdown(struct device *dev)
 	printk(KERN_NOTICE "Synchronizing SCSI cache for disk %s: ",
 			sdkp->disk->disk_name);
 
-	sreq = scsi_allocate_request(sdp);
+	sreq = scsi_allocate_request(sdp, GFP_KERNEL);
 	if (!sreq) {
 		printk("FAILED\n  No memory for request\n");
 		return;
