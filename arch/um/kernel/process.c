@@ -212,6 +212,49 @@ __uml_setup("nosysemu", nosysemu_cmd_param,
 		"    To make it working, you need a kernel patch for your host, too.\n"
 		"    See http://perso.wanadoo.fr/laurent.vivier/UML/ for further information.\n");
 
+static void __init check_sysemu(void)
+{
+	void *stack;
+	int pid, n, status;
+
+	if (mode_tt)
+		return;
+
+	printk("Checking syscall emulation patch for ptrace...");
+	sysemu_supported = 0;
+	pid = start_ptraced_child(&stack);
+	if(ptrace(PTRACE_SYSEMU, pid, 0, 0) >= 0) {
+		struct user_regs_struct regs;
+
+		if (waitpid(pid, &status, WUNTRACED) < 0)
+			panic("check_ptrace : wait failed, errno = %d", errno);
+		if(!WIFSTOPPED(status) || (WSTOPSIG(status) != SIGTRAP))
+			panic("check_ptrace : expected SIGTRAP, "
+			      "got status = %d", status);
+
+		if (ptrace(PTRACE_GETREGS, pid, 0, &regs) < 0)
+			panic("check_ptrace : failed to read child "
+			      "registers, errno = %d", errno);
+		regs.orig_eax = pid;
+		if (ptrace(PTRACE_SETREGS, pid, 0, &regs) < 0)
+			panic("check_ptrace : failed to modify child "
+			      "registers, errno = %d", errno);
+
+		stop_ptraced_child(pid, stack, 0);
+
+		sysemu_supported = 1;
+		printk("found\n");
+	}
+	else
+	{
+		stop_ptraced_child(pid, stack, 1);
+		sysemu_supported = 0;
+		printk("missing\n");
+	}
+
+	set_using_sysemu(!force_sysemu_disabled);
+}
+
 void __init check_ptrace(void)
 {
 	void *stack;
@@ -244,42 +287,7 @@ void __init check_ptrace(void)
 	}
 	stop_ptraced_child(pid, stack, 0);
 	printk("OK\n");
-
-	printk("Checking syscall emulation patch for ptrace...");
-	set_using_sysemu(0);
-	pid = start_ptraced_child(&stack);
-	if(ptrace(PTRACE_SYSEMU, pid, 0, 0) >= 0) {
-		struct user_regs_struct regs;
-
-		if (waitpid(pid, &status, WUNTRACED) < 0)
-			panic("check_ptrace : wait failed, errno = %d", errno);
-		if(!WIFSTOPPED(status) || (WSTOPSIG(status) != SIGTRAP))
-			panic("check_ptrace : expected SIGTRAP, "
-			      "got status = %d", status);
-
-		if (ptrace(PTRACE_GETREGS, pid, 0, &regs) < 0)
-			panic("check_ptrace : failed to read child "
-			      "registers, errno = %d", errno);
-		regs.orig_eax = pid;
-		if (ptrace(PTRACE_SETREGS, pid, 0, &regs) < 0)
-			panic("check_ptrace : failed to modify child "
-			      "registers, errno = %d", errno);
-
-		stop_ptraced_child(pid, stack, 0);
-
-		if (!force_sysemu_disabled) {
-			printk("found\n");
-			set_using_sysemu(1);
-		} else {
-			printk("found but disabled\n");
-		}
-	}
-	else
-	{
-		printk("missing\n");
-		stop_ptraced_child(pid, stack, 1);
-	}
-
+	check_sysemu();
 }
 
 int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr)

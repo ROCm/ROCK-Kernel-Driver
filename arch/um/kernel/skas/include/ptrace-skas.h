@@ -18,6 +18,7 @@
 
 void set_using_sysemu(int value);
 int get_using_sysemu(void);
+extern int sysemu_supported;
 
 #include "skas_ptregs.h"
 

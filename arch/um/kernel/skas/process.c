@@ -151,8 +151,8 @@ void userspace(union uml_pt_regs *regs)
 	else
 		err = ptrace(PTRACE_SYSCALL, pid, 0, 0);
 	if(err)
-		panic("userspace - PTRACE_SYSCALL failed, errno = %d\n", 
-		       errno);
+		panic("userspace - PTRACE_%s failed, errno = %d\n",
+		       local_using_sysemu ? "SYSEMU" : "SYSCALL", errno);
 	while(1){
 		err = waitpid(pid, &status, WUNTRACED);
 		if(err < 0)
@@ -199,8 +199,9 @@ void userspace(union uml_pt_regs *regs)
 
 		err = ptrace(op, pid, 0, 0);
 		if(err)
-			panic("userspace - PTRACE_SYSCALL failed, "
-			      "errno = %d\n", errno);
+			panic("userspace - PTRACE_%s failed, "
+			      "errno = %d\n",
+			      local_using_sysemu ? "SYSEMU" : "SYSCALL", errno);
 	}
 }
 

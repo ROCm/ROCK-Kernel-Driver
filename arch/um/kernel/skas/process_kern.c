@@ -23,13 +23,12 @@
 #include "kern.h"
 #include "mode.h"
 
-#ifdef PTRACE_SYSEMU
 static atomic_t using_sysemu;
-#endif
+int sysemu_supported;
 
 void set_using_sysemu(int value)
 {
-	atomic_set(&using_sysemu, value);
+	atomic_set(&using_sysemu, sysemu_supported && value);
 }
 
 int get_using_sysemu(void)
@@ -60,16 +59,19 @@ int proc_write_sysemu(struct file *file,const char *buf, unsigned long count,voi
 int __init make_proc_sysemu(void)
 {
 	struct proc_dir_entry *ent;
+	if (mode_tt || !sysemu_supported)
+		return 0;
 
-	ent = create_proc_entry("sysemu", 00600, &proc_root);
-	ent->read_proc  = proc_read_sysemu;
-	ent->write_proc = proc_write_sysemu;
+	ent = create_proc_entry("sysemu", 0600, &proc_root);
 
 	if (ent == NULL)
 	{
 		printk("Failed to register /proc/sysemu\n");
 		return(0);
 	}
+
+	ent->read_proc  = proc_read_sysemu;
+	ent->write_proc = proc_write_sysemu;
 
 	return 0;
 }
