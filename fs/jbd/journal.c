@@ -84,39 +84,6 @@ EXPORT_SYMBOL(journal_force_commit);
 static int journal_convert_superblock_v1(journal_t *, journal_superblock_t *);
 
 /*
- * journal_datalist_lock is used to protect data buffers:
- *
- *	bh->b_transaction
- *	bh->b_tprev
- *	bh->b_tnext
- *
- * journal_free_buffer() is called from journal_try_to_free_buffer(), and is
- * async wrt everything else.
- *
- * It is also used for checkpoint data, also to protect against
- * journal_try_to_free_buffer():
- *
- *	bh->b_cp_transaction
- *	bh->b_cpnext
- *	bh->b_cpprev
- *	transaction->t_checkpoint_list
- *	transaction->t_cpnext
- *	transaction->t_cpprev
- *	journal->j_checkpoint_transactions
- *
- * It is global at this time rather than per-journal because it's
- * impossible for __journal_free_buffer to go from a buffer_head
- * back to a journal_t unracily (well, not true.  Fix later)
- *
- *
- * The `datalist' and `checkpoint list' functions are quite
- * separate and we could use two spinlocks here.
- *
- * lru_list_lock nests inside journal_datalist_lock.
- */
-spinlock_t journal_datalist_lock = SPIN_LOCK_UNLOCKED;
-
-/*
  * List of all journals in the system.  Protected by the BKL.
  */
 static LIST_HEAD(all_journals);
@@ -1516,26 +1483,6 @@ int journal_blocks_per_page(struct inode *inode)
 }
 
 /*
- * shrink_journal_memory().
- * Called when we're under memory pressure.  Free up all the written-back
- * checkpointed metadata buffers.
- */
-void shrink_journal_memory(void)
-{
-	struct list_head *list;
-
-	lock_kernel();
-	list_for_each(list, &all_journals) {
-		journal_t *journal =
-			list_entry(list, journal_t, j_all_journals);
-		spin_lock(&journal_datalist_lock);
-		__journal_clean_checkpoint_list(journal);
-		spin_unlock(&journal_datalist_lock);
-	}
-	unlock_kernel();
-}
-
-/*
  * Simple support for retying memory allocations.  Introduced to help to
  * debug different VM deadlock avoidance strategies. 
  */
@@ -1660,7 +1607,6 @@ static void journal_free_journal_head(struct journal_head *jh)
  *
  * Doesn't need the journal lock.
  * May sleep.
- * Cannot be called with journal_datalist_lock held.
  */
 struct journal_head *journal_add_journal_head(struct buffer_head *bh)
 {

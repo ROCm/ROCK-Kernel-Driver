@@ -20,8 +20,6 @@
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 
-extern spinlock_t journal_datalist_lock;
-
 /*
  * Default IO end handler for temporary BJ_IO buffer_heads.
  */
@@ -67,9 +65,9 @@ void journal_commit_transaction(journal_t *journal)
 	lock_journal(journal); /* Protect journal->j_running_transaction */
 
 #ifdef COMMIT_STATS
-	spin_lock(&journal_datalist_lock);
+	spin_lock(&journal->j_list_lock);
 	summarise_journal_usage(journal);
-	spin_unlock(&journal_datalist_lock);
+	spin_unlock(&journal->j_list_lock);
 #endif
 
 	lock_kernel();
@@ -121,7 +119,7 @@ void journal_commit_transaction(journal_t *journal)
 	while (commit_transaction->t_reserved_list) {
 		jh = commit_transaction->t_reserved_list;
 		JBUFFER_TRACE(jh, "reserved, unused: refile");
-		journal_refile_buffer(jh);
+		journal_refile_buffer(journal, jh);
 	}
 
 	/*
@@ -129,9 +127,9 @@ void journal_commit_transaction(journal_t *journal)
 	 * checkpoint lists.  We do this *before* commit because it potentially
 	 * frees some memory
 	 */
-	spin_lock(&journal_datalist_lock);
+	spin_lock(&journal->j_list_lock);
 	__journal_clean_checkpoint_list(journal);
-	spin_unlock(&journal_datalist_lock);
+	spin_unlock(&journal->j_list_lock);
 
 	/* First part of the commit: force the revoke list out to disk.
 	 * The revoke code generates its own metadata blocks on disk for this.
@@ -185,10 +183,10 @@ write_out_data:
 	 * Cleanup any flushed data buffers from the data list.  Even in
 	 * abort mode, we want to flush this out as soon as possible.
 	 *
-	 * We take journal_datalist_lock to protect the lists from
+	 * We take j_list_lock to protect the lists from
 	 * journal_try_to_free_buffers().
 	 */
-	spin_lock(&journal_datalist_lock);
+	spin_lock(&journal->j_list_lock);
 
 write_out_data_locked:
 	bufs = 0;
@@ -214,9 +212,9 @@ write_out_data_locked:
 				 * We have a lock ranking problem..
 				 */
 				if (!jbd_trylock_bh_state(bh)) {
-					spin_unlock(&journal_datalist_lock);
+					spin_unlock(&journal->j_list_lock);
 					schedule();
-					spin_lock(&journal_datalist_lock);
+					spin_lock(&journal->j_list_lock);
 					break;
 				}
 				__journal_unfile_buffer(jh);
@@ -238,14 +236,14 @@ write_out_data_locked:
 
 	if (bufs || need_resched()) {
 		jbd_debug(2, "submit %d writes\n", bufs);
-		spin_unlock(&journal_datalist_lock);
+		spin_unlock(&journal->j_list_lock);
 		unlock_journal(journal);
 		if (bufs)
 			ll_rw_block(WRITE, bufs, wbuf);
 		cond_resched();
 		journal_brelse_array(wbuf, bufs);
 		lock_journal(journal);
-		spin_lock(&journal_datalist_lock);
+		spin_lock(&journal->j_list_lock);
 		if (bufs)
 			goto write_out_data_locked;
 	}
@@ -263,7 +261,7 @@ write_out_data_locked:
 		bh = jh2bh(jh);
 		if (buffer_locked(bh)) {
 			get_bh(bh);
-			spin_unlock(&journal_datalist_lock);
+			spin_unlock(&journal->j_list_lock);
 			unlock_journal(journal);
 			wait_on_buffer(bh);
 			if (unlikely(!buffer_uptodate(bh)))
@@ -279,7 +277,7 @@ write_out_data_locked:
 	goto write_out_data_locked;
 
 sync_datalist_empty:
-	spin_unlock(&journal_datalist_lock);
+	spin_unlock(&journal->j_list_lock);
 
 	/*
 	 * If we found any dirty or locked buffers, then we should have
@@ -311,7 +309,7 @@ sync_datalist_empty:
 
 		if (is_journal_aborted(journal)) {
 			JBUFFER_TRACE(jh, "journal is aborting: refile");
-			journal_refile_buffer(jh);
+			journal_refile_buffer(journal, jh);
 			/* If that was the last one, we need to clean up
 			 * any descriptor buffers which may have been
 			 * already allocated, even if we are now
@@ -355,7 +353,7 @@ sync_datalist_empty:
                            completion later */
 			BUFFER_TRACE(bh, "ph3: file as descriptor");
 			journal_file_buffer(descriptor, commit_transaction,
-						BJ_LogCtl);
+					BJ_LogCtl);
 		}
 
 		/* Where is the buffer to be written? */
@@ -462,7 +460,7 @@ start_journal_io:
 	jbd_debug(3, "JBD: commit phase 4\n");
 
 	/*
-	 * akpm: these are BJ_IO, and journal_datalist_lock is not needed.
+	 * akpm: these are BJ_IO, and j_list_lock is not needed.
 	 * See __journal_try_to_free_buffer.
 	 */
 wait_for_iobuf:
@@ -483,7 +481,7 @@ wait_for_iobuf:
 		clear_buffer_jwrite(bh);
 
 		JBUFFER_TRACE(jh, "ph4: unfile after journal write");
-		journal_unfile_buffer(jh);
+		journal_unfile_buffer(journal, jh);
 
 		/*
 		 * akpm: don't put back a buffer_head with stale pointers
@@ -543,8 +541,8 @@ wait_for_iobuf:
 		}
 
 		BUFFER_TRACE(bh, "ph5: control buffer writeout done: unfile");
-		clear_bit(BH_JWrite, &bh->b_state);
-		journal_unfile_buffer(jh);
+		clear_buffer_jwrite(bh);
+		journal_unfile_buffer(journal, jh);
 		jh->b_transaction = NULL;
 		journal_put_journal_head(jh);
 		__brelse(bh);		/* One for getblk */
@@ -664,7 +662,7 @@ skip_commit: /* The journal should be unlocked by now. */
 			jh->b_frozen_data = NULL;
 		}
 
-		spin_lock(&journal_datalist_lock);
+		spin_lock(&journal->j_list_lock);
 		cp_transaction = jh->b_cp_transaction;
 		if (cp_transaction) {
 			JBUFFER_TRACE(jh, "remove from old cp transaction");
@@ -706,7 +704,7 @@ skip_commit: /* The journal should be unlocked by now. */
 			journal_remove_journal_head(bh);
 			__brelse(bh);
 		}
-		spin_unlock(&journal_datalist_lock);
+		spin_unlock(&journal->j_list_lock);
 	}
 
 	/* Done with this transaction! */
@@ -720,7 +718,7 @@ skip_commit: /* The journal should be unlocked by now. */
 	journal->j_commit_sequence = commit_transaction->t_tid;
 	journal->j_committing_transaction = NULL;
 
-	spin_lock(&journal_datalist_lock);
+	spin_lock(&journal->j_list_lock);
 	if (commit_transaction->t_checkpoint_list == NULL) {
 		__journal_drop_transaction(journal, commit_transaction);
 	} else {
@@ -739,7 +737,7 @@ skip_commit: /* The journal should be unlocked by now. */
 				commit_transaction;
 		}
 	}
-	spin_unlock(&journal_datalist_lock);
+	spin_unlock(&journal->j_list_lock);
 
 	jbd_debug(1, "JBD: commit %d complete, head %d\n",
 		  journal->j_commit_sequence, journal->j_tail_sequence);

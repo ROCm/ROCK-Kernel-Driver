@@ -836,10 +836,10 @@ struct journal_s
  */
 
 /* Filing buffers */
+extern void journal_unfile_buffer(journal_t *, struct journal_head *);
 extern void __journal_unfile_buffer(struct journal_head *);
-extern void journal_unfile_buffer(struct journal_head *);
 extern void __journal_refile_buffer(struct journal_head *);
-extern void journal_refile_buffer(struct journal_head *);
+extern void journal_refile_buffer(journal_t *, struct journal_head *);
 extern void __journal_file_buffer(struct journal_head *, transaction_t *, int);
 extern void __journal_free_buffer(struct journal_head *bh);
 extern void journal_file_buffer(struct journal_head *, transaction_t *, int);
@@ -854,10 +854,8 @@ extern void journal_commit_transaction(journal_t *);
 
 /* Checkpoint list management */
 int __journal_clean_checkpoint_list(journal_t *journal);
-extern void journal_remove_checkpoint(struct journal_head *);
-extern void __journal_remove_checkpoint(struct journal_head *);
-extern void journal_insert_checkpoint(struct journal_head *, transaction_t *);
-extern void __journal_insert_checkpoint(struct journal_head *,transaction_t *);
+void __journal_remove_checkpoint(struct journal_head *);
+void __journal_insert_checkpoint(struct journal_head *, transaction_t *);
 
 /* Buffer IO */
 extern int 
@@ -1016,9 +1014,6 @@ extern int	log_do_checkpoint (journal_t *, int);
 extern void	log_wait_for_space(journal_t *, int nblocks);
 extern void	__journal_drop_transaction(journal_t *, transaction_t *);
 extern int	cleanup_journal_tail(journal_t *);
-
-/* Reduce journal memory usage by flushing */
-extern void shrink_journal_memory(void);
 
 /* Debugging code only: */
 

@@ -23,12 +23,10 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 
-extern spinlock_t journal_datalist_lock;
-
 /*
  * Unlink a buffer from a transaction. 
  *
- * Called with journal_datalist_lock held.
+ * Called with j_list_lock held.
  */
 
 static inline void __buffer_unlink(struct journal_head *jh)
@@ -49,7 +47,7 @@ static inline void __buffer_unlink(struct journal_head *jh)
 /*
  * Try to release a checkpointed buffer from its transaction.
  * Returns 1 if we released it.
- * Requires journal_datalist_lock
+ * Requires j_list_lock
  * Called under jbd_lock_bh_state(jh2bh(jh)), and drops it
  */
 static int __try_to_free_cp_buf(struct journal_head *jh)
@@ -97,14 +95,14 @@ void log_wait_for_space(journal_t *journal, int nblocks)
 }
 
 /*
- * We were unable to perform jbd_trylock_bh_state() inside
- * journal_datalist_lock.  The caller must restart a list walk.  Wait for
- * someone else to run jbd_unlock_bh_state().
+ * We were unable to perform jbd_trylock_bh_state() inside j_list_lock.
+ * The caller must restart a list walk.  Wait for someone else to run
+ * jbd_unlock_bh_state().
  */
 static void jbd_sync_bh(journal_t *journal, struct buffer_head *bh)
 {
 	get_bh(bh);
-	spin_unlock(&journal_datalist_lock);
+	spin_unlock(&journal->j_list_lock);
 	jbd_lock_bh_state(bh);
 	jbd_unlock_bh_state(bh);
 	put_bh(bh);
@@ -121,7 +119,7 @@ static void jbd_sync_bh(journal_t *journal, struct buffer_head *bh)
  * the last checkpoint buffer is cleansed)
  *
  * Called with the journal locked.
- * Called with journal_datalist_lock held.
+ * Called with j_list_lock held.
  */
 static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 {
@@ -129,7 +127,7 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 	struct buffer_head *bh;
 	int ret = 0;
 
-	assert_spin_locked(&journal_datalist_lock);
+	assert_spin_locked(&journal->j_list_lock);
 	jh = transaction->t_checkpoint_list;
 	if (!jh)
 		return 0;
@@ -141,7 +139,7 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 		bh = jh2bh(jh);
 		if (buffer_locked(bh)) {
 			atomic_inc(&bh->b_count);
-			spin_unlock(&journal_datalist_lock);
+			spin_unlock(&journal->j_list_lock);
 			unlock_journal(journal);
 			wait_on_buffer(bh);
 			/* the journal_head may have gone by now */
@@ -162,7 +160,7 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 			transaction_t *transaction = jh->b_transaction;
 			tid_t tid = transaction->t_tid;
 
-			spin_unlock(&journal_datalist_lock);
+			spin_unlock(&journal->j_list_lock);
 			jbd_unlock_bh_state(bh);
 			log_start_commit(journal, transaction);
 			unlock_journal(journal);
@@ -196,20 +194,20 @@ static int __cleanup_transaction(journal_t *journal, transaction_t *transaction)
 	return ret;
 out_return_1:
 	lock_journal(journal);
-	spin_lock(&journal_datalist_lock);
+	spin_lock(&journal->j_list_lock);
 	return 1;
 }
 
 #define NR_BATCH	64
 
-static void __flush_batch(struct buffer_head **bhs, int *batch_count)
+static void
+__flush_batch(journal_t *journal, struct buffer_head **bhs, int *batch_count)
 {
 	int i;
 
-	spin_unlock(&journal_datalist_lock);
+	spin_unlock(&journal->j_list_lock);
 	ll_rw_block(WRITE, *batch_count, bhs);
-	blk_run_queues();
-	spin_lock(&journal_datalist_lock);
+	spin_lock(&journal->j_list_lock);
 	for (i = 0; i < *batch_count; i++) {
 		struct buffer_head *bh = bhs[i];
 		clear_bit(BH_JWrite, &bh->b_state);
@@ -225,7 +223,7 @@ static void __flush_batch(struct buffer_head **bhs, int *batch_count)
  * Return 1 if something happened which requires us to abort the current
  * scan of the checkpoint list.  
  *
- * Called with journal_datalist_lock held.
+ * Called with j_list_lock held.
  * Called under jbd_lock_bh_state(jh2bh(jh)), and drops it
  */
 static int __flush_buffer(journal_t *journal, struct journal_head *jh,
@@ -253,7 +251,7 @@ static int __flush_buffer(journal_t *journal, struct journal_head *jh,
 		jbd_unlock_bh_state(bh);
 		(*batch_count)++;
 		if (*batch_count == NR_BATCH) {
-			__flush_batch(bhs, batch_count);
+			__flush_batch(journal, bhs, batch_count);
 			ret = 1;
 		}
 	} else {
@@ -287,7 +285,7 @@ static int __flush_buffer(journal_t *journal, struct journal_head *jh,
  */
 
 /* @@@ `nblocks' is unused.  Should it be used? */
-int log_do_checkpoint (journal_t *journal, int nblocks)
+int log_do_checkpoint(journal_t *journal, int nblocks)
 {
 	transaction_t *transaction, *last_transaction, *next_transaction;
 	int result;
@@ -314,7 +312,7 @@ int log_do_checkpoint (journal_t *journal, int nblocks)
 	 * AKPM: check this code.  I had a feeling a while back that it
 	 * degenerates into a busy loop at unmount time.
 	 */
-	spin_lock(&journal_datalist_lock);
+	spin_lock(&journal->j_list_lock);
 repeat:
 	transaction = journal->j_checkpoint_transactions;
 	if (transaction == NULL)
@@ -340,14 +338,14 @@ repeat:
 			bh = jh2bh(jh);
 			if (!jbd_trylock_bh_state(bh)) {
 				jbd_sync_bh(journal, bh);
-				spin_lock(&journal_datalist_lock);
+				spin_lock(&journal->j_list_lock);
 				break;
 			}
 			retry = __flush_buffer(journal, jh, bhs, &batch_count,
 						&drop_count);
 		} while (jh != last_jh && !retry);
 		if (batch_count) {
-			__flush_batch(bhs, &batch_count);
+			__flush_batch(journal, bhs, &batch_count);
 			goto repeat;
 		}
 		if (retry)
@@ -363,7 +361,7 @@ repeat:
 	} while (transaction != last_transaction);
 
 done:
-	spin_unlock(&journal_datalist_lock);
+	spin_unlock(&journal->j_list_lock);
 	result = cleanup_journal_tail(journal);
 	if (result < 0)
 		return result;
@@ -402,7 +400,7 @@ int cleanup_journal_tail(journal_t *journal)
 	 * start. */
 
 	/* j_checkpoint_transactions needs locking */
-	spin_lock(&journal_datalist_lock);
+	spin_lock(&journal->j_list_lock);
 	transaction = journal->j_checkpoint_transactions;
 	if (transaction) {
 		first_tid = transaction->t_tid;
@@ -417,7 +415,7 @@ int cleanup_journal_tail(journal_t *journal)
 		first_tid = journal->j_transaction_sequence;
 		blocknr = journal->j_head;
 	}
-	spin_unlock(&journal_datalist_lock);
+	spin_unlock(&journal->j_list_lock);
 	J_ASSERT (blocknr != 0);
 
 	/* If the oldest pinned transaction is at the tail of the log
@@ -454,7 +452,7 @@ int cleanup_journal_tail(journal_t *journal)
  * Find all the written-back checkpoint buffers in the journal and release them.
  *
  * Called with the journal locked.
- * Called with journal_datalist_lock held.
+ * Called with j_list_lock held.
  * Returns number of bufers reaped (for debug)
  */
 
@@ -506,7 +504,7 @@ out:
  * checkpoint list.  
  *
  * This function is called with the journal locked.
- * This function is called with journal_datalist_lock held.
+ * This function is called with j_list_lock held.
  */
 
 void __journal_remove_checkpoint(struct journal_head *jh)
@@ -551,20 +549,13 @@ out:
 	JBUFFER_TRACE(jh, "exit");
 }
 
-void journal_remove_checkpoint(struct journal_head *jh)
-{
-	spin_lock(&journal_datalist_lock);
-	__journal_remove_checkpoint(jh);
-	spin_unlock(&journal_datalist_lock);
-}
-
 /*
  * journal_insert_checkpoint: put a committed buffer onto a checkpoint
  * list so that we know when it is safe to clean the transaction out of
  * the log.
  *
  * Called with the journal locked.
- * Called with journal_datalist_lock held.
+ * Called with j_list_lock held.
  */
 void __journal_insert_checkpoint(struct journal_head *jh, 
 			       transaction_t *transaction)
@@ -573,7 +564,6 @@ void __journal_insert_checkpoint(struct journal_head *jh,
 	J_ASSERT_JH(jh, buffer_dirty(jh2bh(jh)) || buffer_jbddirty(jh2bh(jh)));
 	J_ASSERT_JH(jh, jh->b_cp_transaction == NULL);
 
-	assert_spin_locked(&journal_datalist_lock);
 	jh->b_cp_transaction = transaction;
 
 	if (!transaction->t_checkpoint_list) {
@@ -587,14 +577,6 @@ void __journal_insert_checkpoint(struct journal_head *jh,
 	transaction->t_checkpoint_list = jh;
 }
 
-void journal_insert_checkpoint(struct journal_head *jh, 
-			       transaction_t *transaction)
-{
-	spin_lock(&journal_datalist_lock);
-	__journal_insert_checkpoint(jh, transaction);
-	spin_unlock(&journal_datalist_lock);
-}
-
 /*
  * We've finished with this transaction structure: adios...
  * 
@@ -602,12 +584,12 @@ void journal_insert_checkpoint(struct journal_head *jh,
  * point.
  *
  * Called with the journal locked.
- * Called with journal_datalist_lock held.
+ * Called with j_list_lock held.
  */
 
 void __journal_drop_transaction(journal_t *journal, transaction_t *transaction)
 {
-	assert_spin_locked(&journal_datalist_lock);
+	assert_spin_locked(&journal->j_list_lock);
 	if (transaction->t_cpnext) {
 		transaction->t_cpnext->t_cpprev = transaction->t_cpprev;
 		transaction->t_cpprev->t_cpnext = transaction->t_cpnext;
