@@ -92,13 +92,13 @@ __dump_save_regs(struct pt_regs *dest_regs, const struct pt_regs *regs)
 
 
 #ifdef CONFIG_SMP
-extern unsigned long irq_affinity[];
+extern cpumask_t irq_affinity[];
 extern irq_desc_t irq_desc[];
 extern void dump_send_ipi(void);
 
 static int dump_expect_ipi[NR_CPUS];
 static atomic_t waiting_for_dump_ipi;
-static unsigned long saved_affinity[NR_IRQS];
+static cpumask_t saved_affinity[NR_IRQS];
 
 extern void stop_this_cpu(void *); /* exported by i386 kernel */
 
@@ -178,13 +178,14 @@ static void
 set_irq_affinity(void)
 {
 	int i;
-	int cpu = smp_processor_id();
+	cpumask_t cpu = CPU_MASK_NONE;
 
+	cpu_set(smp_processor_id(), cpu);
 	memcpy(saved_affinity, irq_affinity, NR_IRQS * sizeof(unsigned long));
 	for (i = 0; i < NR_IRQS; i++) {
 		if (irq_desc[i].handler == NULL)
 			continue;
-		irq_affinity[i] = 1UL << cpu;
+		irq_affinity[i] = cpu;
 		if (irq_desc[i].handler->set_affinity != NULL)
 			irq_desc[i].handler->set_affinity(i, irq_affinity[i]);
 	}

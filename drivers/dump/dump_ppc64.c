@@ -36,9 +36,9 @@
 #include <linux/kdb.h>
 #endif
 
-extern unsigned long irq_affinity[];
+extern cpumask_t irq_affinity[];
 
-static unsigned long saved_affinity[NR_IRQS];
+static cpumask_t saved_affinity[NR_IRQS];
 
 static __s32         saved_irq_count;   /* saved preempt_count() flags */
 
@@ -170,8 +170,10 @@ static void
 __dump_set_irq_affinity(void)
 {
 	int i;
-	int cpu = smp_processor_id();
+	cpumask_t cpu = CPU_MASK_NONE;
 	irq_desc_t *irq_d;
+
+	cpu_set(smp_processor_id(), cpu);
 
 	memcpy(saved_affinity, irq_affinity, NR_IRQS * sizeof(unsigned long));
 
@@ -180,7 +182,7 @@ __dump_set_irq_affinity(void)
 		if (irq_d->handler == NULL) {
 			continue;
 		}
-		irq_affinity[i] = 1UL << cpu;
+		irq_affinity[i] = cpu;
 		if (irq_d->handler->set_affinity != NULL) {
 			irq_d->handler->set_affinity(i, irq_affinity[i]);
 		}
