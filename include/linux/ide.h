@@ -1115,12 +1115,13 @@ typedef struct ide_settings_s {
 	struct ide_settings_s	*next;
 } ide_settings_t;
 
-void ide_add_setting(ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set);
-void ide_remove_setting(ide_drive_t *drive, char *name);
-ide_settings_t *ide_find_setting_by_name(ide_drive_t *drive, char *name);
-int ide_read_setting(ide_drive_t *t, ide_settings_t *setting);
-int ide_write_setting(ide_drive_t *drive, ide_settings_t *setting, int val);
-void ide_add_generic_settings(ide_drive_t *drive);
+extern struct semaphore ide_setting_sem;
+extern int ide_add_setting(ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set);
+extern void ide_remove_setting(ide_drive_t *drive, char *name);
+extern ide_settings_t *ide_find_setting_by_name(ide_drive_t *drive, char *name);
+extern int ide_read_setting(ide_drive_t *t, ide_settings_t *setting);
+extern int ide_write_setting(ide_drive_t *drive, ide_settings_t *setting, int val);
+extern void ide_add_generic_settings(ide_drive_t *drive);
 
 /*
  * /proc/ide interface
@@ -1254,10 +1255,17 @@ extern int noautodma;
 extern int ide_end_request (ide_drive_t *drive, int uptodate, int nrsecs);
 
 /*
- * This is used on exit from the driver, to designate the next irq handler
+ * This is used on exit from the driver to designate the next irq handler
  * and also to start the safety timer.
  */
 extern void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler, unsigned int timeout, ide_expiry_t *expiry);
+
+/*
+ * This is used on exit from the driver to designate the next irq handler
+ * and start the safety time safely and atomically from the IRQ handler
+ * with respect to the command issue (which it also does)
+ */
+extern void ide_execute_command(ide_drive_t *, task_ioreg_t cmd, ide_handler_t *, unsigned int, ide_expiry_t *);
 
 /*
  * Error reporting, in human readable form (luxurious, but a memory hog).
@@ -1560,14 +1568,6 @@ extern int ide_system_bus_speed(void);
  * to the hwgroup by sleeping for timeout jiffies.
  */
 extern void ide_stall_queue(ide_drive_t *drive, unsigned long timeout);
-
-/*
- * CompactFlash cards and their brethern pretend to be removable hard disks,
- * but they never have a slave unit, and they don't have doorlock mechanisms.
- * This test catches them, and is invoked elsewhere when setting appropriate
- * config bits.
- */
-extern int drive_is_flashcard (ide_drive_t *drive);
 
 extern int ide_spin_wait_hwgroup(ide_drive_t *);
 extern void ide_timer_expiry(unsigned long);
