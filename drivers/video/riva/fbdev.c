@@ -44,6 +44,10 @@
 #ifdef CONFIG_MTRR
 #include <asm/mtrr.h>
 #endif
+#ifdef CONFIG_PPC_OF
+#include <asm/prom.h>
+#include <asm/pci-bridge.h>
+#endif
 
 #include "rivafb.h"
 #include "nvreg.h"
