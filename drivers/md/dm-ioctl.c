@@ -828,7 +828,7 @@ static void retrieve_status(struct dm_table *table,
 		outptr += strlen(outptr) + 1;
 		used = param->data_start + (outptr - outbuf);
 
-		align_ptr(outptr);
+		outptr = align_ptr(outptr);
 		spec->next = outptr - outbuf;
 	}
 
