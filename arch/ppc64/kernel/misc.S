@@ -293,11 +293,16 @@ _GLOBAL(flush_dcache_phys_range)
 	blr
 
 _GLOBAL(flush_inval_dcache_phys_range)
+#if 0
 	LOADADDR(r10,naca)		/* Get Naca address */
 	ld	r10,0(r10)
 	LOADADDR(r11,systemcfg)		/* Get systemcfg address */
 	ld	r11,0(r11)
 	lwz	r7,DCACHEL1LINESIZE(r11)	/* Get dcache line size */
+#else
+	ld      r10,PPC64_CACHES@toc(r2)
+	lwz     r7,DCACHEL1LINESIZE(r10)/* Get cache line size */
+#endif
 	addi	r5,r7,-1
 	andc	r6,r3,r5		/* round low to line bdy */
 	subf	r8,r6,r4		/* compute length */
