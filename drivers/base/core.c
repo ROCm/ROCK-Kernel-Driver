@@ -23,13 +23,12 @@ int (*platform_notify_remove)(struct device * dev) = NULL;
 
 DECLARE_MUTEX(device_sem);
 
-#define to_dev(obj) container_of(obj,struct device,kobj)
-
 
 /*
  * sysfs bindings for devices.
  */
 
+#define to_dev(obj) container_of(obj,struct device,kobj)
 #define to_dev_attr(_attr) container_of(_attr,struct device_attribute,attr)
 
 extern struct attribute * dev_default_attrs[];
@@ -86,11 +85,55 @@ static struct kobj_type ktype_device = {
 	.default_attrs	= dev_default_attrs,
 };
 
+
+static int dev_hotplug_filter(struct kset *kset, struct kobject *kobj)
+{
+	struct kobj_type *ktype = get_ktype(kobj);
+
+	if (ktype == &ktype_device) {
+		struct device *dev = to_dev(kobj);
+		if (dev->bus)
+			return 1;
+	}
+	return 0;
+}
+
+static char *dev_hotplug_name(struct kset *kset, struct kobject *kobj)
+{
+	struct device *dev = to_dev(kobj);
+
+	return dev->bus->name;
+}
+
+static int dev_hotplug(struct kset *kset, struct kobject *kobj, char **envp,
+			int num_envp, char *buffer, int buffer_size)
+{
+	struct device *dev = to_dev(kobj);
+	int retval = 0;
+
+	if (dev->bus->hotplug) {
+		/* have the bus specific function add its stuff */
+		retval = dev->bus->hotplug (dev, envp, num_envp, buffer, buffer_size);
+			if (retval) {
+			pr_debug ("%s - hotplug() returned %d\n",
+				  __FUNCTION__, retval);
+		}
+	}
+
+	return retval;
+}
+
+static struct kset_hotplug_ops device_hotplug_ops = {
+	.filter =	dev_hotplug_filter,
+	.name =		dev_hotplug_name,
+	.hotplug =	dev_hotplug,
+};
+
 /**
  *	device_subsys - structure to be registered with kobject core.
  */
 
-decl_subsys(devices,&ktype_device);
+decl_subsys(devices, &ktype_device, &device_hotplug_ops);
 
 
 /**
@@ -192,9 +235,6 @@ int device_add(struct device *dev)
 	if (platform_notify)
 		platform_notify(dev);
 
-	/* notify userspace of device entry */
-	dev_hotplug(dev, "add");
-
 	devclass_add_device(dev);
  register_done:
 	if (error && parent)
@@ -277,9 +317,6 @@ void device_del(struct device * dev)
 	 */
 	if (platform_notify_remove)
 		platform_notify_remove(dev);
-
-	/* notify userspace that this device is about to disappear */
-	dev_hotplug (dev, "remove");
 
 	bus_remove_device(dev);
 
