@@ -580,7 +580,15 @@ sys_call_table:
 	.long  sys_futex
 	.long  sys_sched_setaffinity
 	.long  sys_sched_getaffinity	 /* 240 */
-	.rept  255-240
+	.long  sys_security
+	.long  sys_ni_syscall		 /* reserved for TUX */
+	.long  sys_io_setup
+	.long  sys_io_destroy
+	.long  sys_io_getevents		 /* 245 */
+	.long  sys_io_submit
+	.long  sys_io_cancel
+	.long  sys_exit_group
+	.rept  255-248
 	.long  sys_ni_syscall
 	.endr
 

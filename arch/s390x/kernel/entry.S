@@ -605,13 +605,21 @@ sys_call_table:
 	.long  SYSCALL(sys_flistxattr,sys32_flistxattr_wrapper)
 	.long  SYSCALL(sys_removexattr,sys32_removexattr_wrapper)
 	.long  SYSCALL(sys_lremovexattr,sys32_lremovexattr_wrapper)
-	.long  SYSCALL(sys_fremovexattr,sys32_fremovexattr_wrapper)
+	.long  SYSCALL(sys_fremovexattr,sys32_fremovexattr_wrapper) /* 235 */
 	.long  SYSCALL(sys_gettid,sys_gettid)
 	.long  SYSCALL(sys_tkill,sys_tkill)
 	.long  SYSCALL(sys_futex,sys32_futex_wrapper)
 	.long  SYSCALL(sys_sched_setaffinity,sys32_sched_setaffinity_wrapper)
-	.long  SYSCALL(sys_sched_getaffinity,sys32_sched_getaffinity_wrapper)
-        .rept  255-240
+	.long  SYSCALL(sys_sched_getaffinity,sys32_sched_getaffinity_wrapper) /* 240 */
+	.long  SYSCALL(sys_security,sys_ni_syscall)
+	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* reserved for TUX */
+	.long  SYSCALL(sys_io_setup,sys_ni_syscall)
+	.long  SYSCALL(sys_io_destroy,sys_ni_syscall)
+	.long  SYSCALL(sys_io_getevents,sys_ni_syscall)       /* 245 */
+	.long  SYSCALL(sys_io_submit,sys_ni_syscall)
+	.long  SYSCALL(sys_io_cancel,sys_ni_syscall)
+	.long  SYSCALL(sys_exit_group,sys32_exit_group_wrapper)
+        .rept  255-248
 	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
 	.endr
 

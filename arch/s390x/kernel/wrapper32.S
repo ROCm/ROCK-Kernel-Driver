@@ -1114,7 +1114,7 @@ sys32_futex_wrapper:
 	lgfr	%r3,%r3			# int
 	lgfr	%r4,%r4			# int
 	llgtr	%r5,%r5			# struct timespec *
-	jg	sys_futex		# branch to system call
+	jg	sys32_futex		# branch to system call
 
 	.globl	sys32_setxattr_wrapper
 sys32_setxattr_wrapper:
@@ -1220,3 +1220,7 @@ sys32_sched_getaffinity_wrapper:
 	llgtr	%r4,%r4			# unsigned long *
 	jg	sys32_sched_getaffinity
 
+	.globl  sys32_exit_group_wrapper
+sys32_exit_group_wrapper:
+	lgfr	%r2,%r2			# int
+	jg	sys_exit_group		# branch to system call

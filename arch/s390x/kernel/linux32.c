@@ -4527,3 +4527,34 @@ asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
 
 	return ret;
 }
+
+asmlinkage int 
+sys_futex(void *uaddr, int op, int val, struct timespec *utime);
+
+asmlinkage int
+sys32_futex(void *uaddr, int op, int val, 
+		 struct timespec32 *timeout32)
+{
+	long ret;
+	struct timespec tmp, *timeout;
+
+	ret = -ENOMEM;
+	timeout = kmalloc(sizeof(*timeout), GFP_USER);
+	if (!timeout)
+		goto out;
+
+	ret = -EINVAL;
+	if (get_user (tmp.tv_sec,  &timeout32->tv_sec)  ||
+	    get_user (tmp.tv_nsec, &timeout32->tv_nsec) ||
+	    put_user (tmp.tv_sec,  &timeout->tv_sec)    ||
+	    put_user (tmp.tv_nsec, &timeout->tv_nsec))
+		goto out_free;
+
+	ret = sys_futex(uaddr, op, val, timeout);
+
+out_free:
+	kfree(timeout);
+out:
+	return ret;
+}
+
