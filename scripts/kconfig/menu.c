@@ -283,8 +283,7 @@ struct menu *menu_get_parent_menu(struct menu *menu)
 {
 	enum prop_type type;
 
-	while (menu != &rootmenu) {
-		menu = menu->parent;
+	for (; menu != &rootmenu; menu = menu->parent) {
 		type = menu->prompt ? menu->prompt->type : 0;
 		if (type == P_MENU || type == P_ROOTMENU)
 			break;
