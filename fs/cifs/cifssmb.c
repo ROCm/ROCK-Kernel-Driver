@@ -174,7 +174,15 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 #endif
 	return rc;
 }
+static int validate_t2(struct smb_t2_rsp * pSMB) 
+{
+	int rc = 0;
 
+	/* check for plausible wct, bcc and possible t2 data and parm sizes */
+	/* check for parm and data offset going beyond end of smb */
+
+	return rc;
+}
 int
 CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 {
@@ -1880,20 +1888,25 @@ findFirstRetry:
 
 	if (rc) {		/* BB add logic to retry regular search if Unix search rejected unexpectedly by server */
 		cFYI(1, ("Error in FindFirst = %d", rc));
-	} else {		/* decode response */
+	} else {
+		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
+		if(!rc) {
+		/* decode response */
 		/* BB add safety checks for these memcpys */
-		if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE)
-			*pUnicodeFlag = TRUE;
-		else
-			*pUnicodeFlag = FALSE;
-		memcpy(findParms,
-		       (char *) &pSMBr->hdr.Protocol +
-		       le16_to_cpu(pSMBr->ParameterOffset),
-		       sizeof (T2_FFIRST_RSP_PARMS));
-		response_data =
-		    (char *) &pSMBr->hdr.Protocol +
-		    le16_to_cpu(pSMBr->DataOffset);
-		memcpy(findData, response_data, le16_to_cpu(pSMBr->DataCount));
+			if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE)
+				*pUnicodeFlag = TRUE;
+			else
+				*pUnicodeFlag = FALSE;
+			memcpy(findParms,
+			       (char *) &pSMBr->hdr.Protocol +
+			       le16_to_cpu(pSMBr->t2.ParameterOffset),
+			       sizeof (T2_FFIRST_RSP_PARMS));
+			response_data =
+			    (char *) &pSMBr->hdr.Protocol +
+			    le16_to_cpu(pSMBr->t2.DataOffset);
+			memcpy(findData, response_data, 
+				le16_to_cpu(pSMBr->t2.DataCount));
+		}
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);
@@ -2017,10 +2030,10 @@ findFirst2Retry:
 
 		if(ppfindData)
 			*ppfindData = (char *) &pSMBr->hdr.Protocol + 
-				le16_to_cpu(pSMBr->DataOffset);
+				le16_to_cpu(pSMBr->t2.DataOffset);
 
 		parms = (T2_FFIRST_RSP_PARMS *)((char *) &pSMBr->hdr.Protocol +
-		       le16_to_cpu(pSMBr->ParameterOffset));
+		       le16_to_cpu(pSMBr->t2.ParameterOffset));
 
 		*pEndOfSearchFlag = parms->EndofSearch;
 		*searchCount  = parms->SearchCount;
@@ -2169,6 +2182,39 @@ CIFSFindClose(const int xid, struct cifsTconInfo *tcon, const __u16 searchHandle
 
 	return rc;
 }
+
+#ifdef CIFS_EXPERIMENTAL
+int
+CIFSGetSrvInodeNumber(const int xid, struct cifsTconInfo *tcon,
+                const unsigned char *searchName,
+                __u64 * inode_number,
+                const struct nls_table *nls_codepage)
+{
+	int rc = 0;
+	TRANSACTION2_QPI_REQ *pSMB = NULL;
+	TRANSACTION2_QPI_RSP *pSMBr = NULL;
+
+	cFYI(1,("In GetSrvInodeNumber for %s",searchName));
+	if(tcon == NULL)
+		return -ENODEV; 
+
+        cFYI(1, ("In QPathInfo path %s", searchName));
+GetInodeNumberRetry:
+	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
+                      (void **) &pSMBr);
+	if (rc)
+		return rc;
+
+/* BB add missing code here */
+
+	if (pSMB)
+		cifs_buf_release(pSMB);
+                                                                                                                         
+	if (rc == -EAGAIN)
+		goto GetInodeNumberRetry;
+	return rc;
+}
+#endif /* CIFS_EXPERIMENTAL */
 
 int
 CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
