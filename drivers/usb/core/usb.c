@@ -770,16 +770,9 @@ usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
  */
 struct usb_device *usb_get_dev (struct usb_device *dev)
 {
-	struct device *tmp;
-
-	if (!dev)
-		return NULL;
-
-	tmp = get_device(&dev->dev);
-	if (tmp)        
-		return to_usb_device(tmp);
-	else
-		return NULL;
+	if (dev)
+		get_device(&dev->dev);
+	return dev;
 }
 
 /**
