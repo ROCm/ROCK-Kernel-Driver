@@ -192,6 +192,8 @@ static struct list_head dquot_hash[NR_DQHASH];
 
 struct dqstats dqstats;
 
+static void dqput(struct dquot *dquot);
+
 static inline int const hashfn(struct super_block *sb, unsigned int id, int type)
 {
 	return((((unsigned long)sb>>L1_CACHE_SHIFT) ^ id) * (MAXQUOTAS - type)) % NR_DQHASH;
@@ -339,8 +341,11 @@ restart:
 			continue;
 		if (!dquot_dirty(dquot))
 			continue;
+		atomic_inc(&dquot->dq_count);
+		dqstats.lookups++;
 		spin_unlock(&dq_list_lock);
 		sb->dq_op->sync_dquot(dquot);
+		dqput(dquot);
 		goto restart;
 	}
 	spin_unlock(&dq_list_lock);
