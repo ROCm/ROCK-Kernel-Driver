@@ -156,9 +156,6 @@ static void kset_hotplug(const char *action, struct kset *kset,
 	envp [i++] = scratch;
 	scratch += sprintf(scratch, "ACTION=%s", action) + 1;
 
-	if(!sequence_num)
-		printk(" ... the first call_usermodehelper: %s\n", name);
-
 	spin_lock(&sequence_lock);
 	seq = sequence_num++;
 	spin_unlock(&sequence_lock);

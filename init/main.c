@@ -565,7 +565,6 @@ static void __init do_initcalls(void)
 	initcall_t *call;
 	int count = preempt_count();
 
-	printk("%s\n",__FUNCTION__);
 	for (call = &__initcall_start; call < &__initcall_end; call++) {
 		char *msg;
 
