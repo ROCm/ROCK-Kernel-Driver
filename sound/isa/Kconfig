@@ -6,6 +6,7 @@ menu "ISA devices"
 config SND_AD1816A
 	tristate "Analog Devices SoundPort AD1816A"
 	depends on SND && ISAPNP
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -33,6 +34,7 @@ config SND_CS4231
 config SND_CS4232
 	tristate "Generic Cirrus Logic CS4232 driver"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -42,6 +44,7 @@ config SND_CS4232
 config SND_CS4236
 	tristate "Generic Cirrus Logic CS4236+ driver"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -51,6 +54,7 @@ config SND_CS4236
 config SND_PC98_CS4232
 	tristate "NEC PC9800 CS4232 driver"
 	depends on SND && X86_PC9800
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -68,6 +72,7 @@ config SND_ES968
 config SND_ES1688
 	tristate "Generic ESS ES688/ES1688 driver"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -76,6 +81,7 @@ config SND_ES1688
 config SND_ES18XX
 	tristate "Generic ESS ES18xx driver"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -92,6 +98,7 @@ config SND_GUSCLASSIC
 config SND_GUSEXTREME
 	tristate "Gravis UltraSound Extreme"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -127,6 +134,7 @@ config SND_INTERWAVE_STB
 config SND_OPTI92X_AD1848
 	tristate "OPTi 82C92x - AD1848"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -136,6 +144,7 @@ config SND_OPTI92X_AD1848
 config SND_OPTI92X_CS4231
 	tristate "OPTi 82C92x - CS4231"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -145,6 +154,7 @@ config SND_OPTI92X_CS4231
 config SND_OPTI93X
 	tristate "OPTi 82C93x"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -153,6 +163,7 @@ config SND_OPTI93X
 config SND_SB8
 	tristate "Sound Blaster 1.0/2.0/Pro (8-bit)"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -162,6 +173,7 @@ config SND_SB8
 config SND_SB16
 	tristate "Sound Blaster 16 (PnP)"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -171,6 +183,7 @@ config SND_SB16
 config SND_SBAWE
 	tristate "Sound Blaster AWE (32,64) (PnP)"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -188,6 +201,7 @@ config SND_SB16_CSP
 config SND_WAVEFRONT
 	tristate "Turtle Beach Maui,Tropez,Tropez+ (Wavefront)"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -197,6 +211,7 @@ config SND_WAVEFRONT
 config SND_ALS100
 	tristate "Avance Logic ALS100/ALS120"
 	depends on SND && ISAPNP
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -206,6 +221,7 @@ config SND_ALS100
 config SND_AZT2320
 	tristate "Aztech Systems AZT2320"
 	depends on SND && ISAPNP
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -221,6 +237,7 @@ config SND_CMI8330
 config SND_DT019X
 	tristate "Diamond Technologies DT-019X, Avance Logic ALS-007"
 	depends on SND && ISAPNP
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -230,6 +247,7 @@ config SND_DT019X
 config SND_OPL3SA2
 	tristate "Yamaha OPL3-SA2/SA3"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -245,6 +263,7 @@ config SND_SGALAXY
 config SND_SSCAPE
 	tristate "Ensoniq SoundScape PnP driver"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help

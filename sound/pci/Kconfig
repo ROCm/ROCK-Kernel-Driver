@@ -14,6 +14,7 @@ config SND_ALI5451
 config SND_AZT3328
 	tristate "Aztech AZF3328 / PCI168 (EXPERIMENTAL)"
 	depends on SND && EXPERIMENTAL
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -46,6 +47,7 @@ config SND_CS46XX_NEW_DSP
 config SND_CS4281
 	tristate "Cirrus Logic (Sound Fusion) CS4281"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -54,6 +56,7 @@ config SND_CS4281
 config SND_EMU10K1
 	tristate "EMU10K1 (SB Live! & Audigy, E-mu APS)"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -108,6 +111,7 @@ config SND_RME9652
 config SND_HDSP
 	tristate "RME Hammerfall DSP Audio"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -126,6 +130,7 @@ config SND_TRIDENT
 config SND_YMFPCI
 	tristate "Yamaha YMF724/740/744/754"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -135,6 +140,7 @@ config SND_YMFPCI
 config SND_ALS4000
 	tristate "Avance Logic ALS4000"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -143,6 +149,7 @@ config SND_ALS4000
 config SND_CMIPCI
 	tristate "C-Media 8738, 8338"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -169,6 +176,7 @@ config SND_ENS1371
 config SND_ES1938
 	tristate "ESS ES1938/1946/1969 (Solo-1)"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -193,6 +201,7 @@ config SND_MAESTRO3
 config SND_FM801
 	tristate "ForteMedia FM801"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -240,6 +249,7 @@ config SND_INTEL8X0
 config SND_SONICVIBES
 	tristate "S3 SonicVibes"
 	depends on SND
+	select SND_HWDEP
 	select SND_RAWMIDI
 	select SND_PCM
 	help
@@ -256,6 +266,7 @@ config SND_VIA82XX
 config SND_VX222
 	tristate "Digigram VX222"
 	depends on SND
+	select SND_HWDEP
 	select SND_PCM
 	help
 	  Say 'Y' or 'M' to include support for Digigram VX222 soundcards.
