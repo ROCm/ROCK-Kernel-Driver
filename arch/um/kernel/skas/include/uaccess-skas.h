@@ -7,11 +7,16 @@
 #define __SKAS_UACCESS_H
 
 #include "asm/errno.h"
+#include "asm/fixmap.h"
 
 #define access_ok_skas(type, addr, size) \
 	((segment_eq(get_fs(), KERNEL_DS)) || \
 	 (((unsigned long) (addr) < TASK_SIZE) && \
-	  ((unsigned long) (addr) + (size) <= TASK_SIZE)))
+	  ((unsigned long) (addr) + (size) <= TASK_SIZE)) || \
+	 ((type == VERIFY_READ ) && \
+	  (size <= (FIXADDR_USER_END - FIXADDR_USER_START)) && \
+	  ((unsigned long) (addr) >= FIXADDR_USER_START) && \
+	  ((unsigned long) (addr) + (size) <= FIXADDR_USER_END)))
 
 static inline int verify_area_skas(int type, const void * addr,
 				   unsigned long size)
