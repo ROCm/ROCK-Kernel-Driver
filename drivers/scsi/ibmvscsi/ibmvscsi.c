@@ -87,7 +87,7 @@ static int max_channel = 3;
 static int init_timeout = 5;
 static int max_requests = 50;
 
-#define IBMVSCSI_VERSION "1.5.1"
+#define IBMVSCSI_VERSION "1.5.2"
 
 MODULE_DESCRIPTION("IBM Virtual SCSI");
 MODULE_AUTHOR("Dave Boutcher");
@@ -641,11 +641,16 @@ static void adapter_info_rsp(struct srp_event_struct *evt_struct)
 		       evt_struct->xfer_iu->mad.adapter_info.common.status);
 	} else {
 		printk("ibmvscsi: host srp version: %s, "
-		       "host partition %s (%d), OS %d\n",
+		       "host partition %s (%d), OS %d, max io %u\n",
 		       hostdata->madapter_info.srp_version,
 		       hostdata->madapter_info.partition_name,
 		       hostdata->madapter_info.partition_number,
-		       hostdata->madapter_info.os_type);
+		       hostdata->madapter_info.os_type,
+		       hostdata->madapter_info.port_max_txu[0]);
+		
+		if (hostdata->madapter_info.port_max_txu[0]) 
+			hostdata->host->max_sectors = 
+				hostdata->madapter_info.port_max_txu[0] >> 9;
 	}
 }
 
@@ -1295,6 +1300,7 @@ static int ibmvscsi_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 	hostdata->host = host;
 	hostdata->dev = dev;
 	atomic_set(&hostdata->request_limit, -1);
+	hostdata->host->max_sectors = 32 * 8; /* default max I/O 32 pages */
 
 	if (ibmvscsi_init_crq_queue(&hostdata->queue, hostdata,
 				    max_requests) != 0) {
