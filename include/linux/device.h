@@ -306,6 +306,18 @@ g_list_to_dev(struct list_head *g_list)
 	return list_entry(g_list, struct device, g_list);
 }
 
+static inline void *
+dev_get_drvdata (struct device *dev)
+{
+	return dev->driver_data;
+}
+
+static inline void
+dev_set_drvdata (struct device *dev, void *data)
+{
+	dev->driver_data = data;
+}
+
 /*
  * High level routines for use by the bus drivers
  */
