@@ -63,6 +63,8 @@ static inline void wait_on_inode(struct inode *inode)
 /*
  * mm/page-writeback.c
  */
+int wakeup_bdflush(long nr_pages);
+
 /* These 5 are exported to sysctl. */
 extern int dirty_background_ratio;
 extern int dirty_async_ratio;

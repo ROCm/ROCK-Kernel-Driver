@@ -201,14 +201,19 @@ static void background_writeout(unsigned long _min_pages)
 }
 
 /*
- * Start heavy writeback of everything.
+ * Start writeback of `nr_pages' pages.  If `nr_pages' is zero, write back
+ * the whole world.  Returns 0 if a pdflush thread was dispatched.  Returns
+ * -1 if all pdflush threads were busy.
  */
-void wakeup_bdflush(void)
+int wakeup_bdflush(long nr_pages)
 {
-	struct page_state ps;
+	if (nr_pages == 0) {
+		struct page_state ps;
 
-	get_page_state(&ps);
-	pdflush_operation(background_writeout, ps.nr_dirty);
+		get_page_state(&ps);
+		nr_pages = ps.nr_dirty;
+	}
+	return pdflush_operation(background_writeout, nr_pages);
 }
 
 static struct timer_list wb_timer;

@@ -1755,6 +1755,9 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	if (unlikely(pos < 0))
 		return -EINVAL;
 
+	/* We can write back this queue in page reclaim */
+	current->backing_dev_info = mapping->backing_dev_info;
+
 	pagevec_init(&lru_pvec);
 
 	if (unlikely(file->f_error)) {
@@ -1959,6 +1962,7 @@ out_status:
 	err = written ? written : status;
 out:
 	pagevec_lru_add(&lru_pvec);
+	current->backing_dev_info = 0;
 	return err;
 }
 
