@@ -1346,12 +1346,6 @@ void ata_bus_reset(struct ata_port *ap)
 
 	DPRINTK("ENTER, host %u, port %u\n", ap->id, ap->port_no);
 
-	/* set up device control */
-	if (ap->flags & ATA_FLAG_MMIO)
-		writeb(ap->ctl, ioaddr->ctl_addr);
-	else
-		outb(ap->ctl, ioaddr->ctl_addr);
-
 	/* determine if device 0/1 are present */
 	if (ap->flags & ATA_FLAG_SATA_RESET)
 		dev0 = 1;
@@ -1372,8 +1366,14 @@ void ata_bus_reset(struct ata_port *ap)
 	/* issue bus reset */
 	if (ap->flags & ATA_FLAG_SRST)
 		rc = ata_bus_softreset(ap, devmask);
-	else if ((ap->flags & ATA_FLAG_SATA_RESET) == 0)
+	else if ((ap->flags & ATA_FLAG_SATA_RESET) == 0) {
+		/* set up device control */
+		if (ap->flags & ATA_FLAG_MMIO)
+			writeb(ap->ctl, ioaddr->ctl_addr);
+		else
+			outb(ap->ctl, ioaddr->ctl_addr);
 		rc = ata_bus_edd(ap);
+	}
 
 	if (rc)
 		goto err_out;
@@ -1398,6 +1398,14 @@ void ata_bus_reset(struct ata_port *ap)
 	if ((ap->device[0].class == ATA_DEV_NONE) &&
 	    (ap->device[1].class == ATA_DEV_NONE))
 		goto err_out;
+
+	if (ap->flags & (ATA_FLAG_SATA_RESET | ATA_FLAG_SRST)) {
+		/* set up device control for ATA_FLAG_SATA_RESET */
+		if (ap->flags & ATA_FLAG_MMIO)
+			writeb(ap->ctl, ioaddr->ctl_addr);
+		else
+			outb(ap->ctl, ioaddr->ctl_addr);
+	}
 
 	DPRINTK("EXIT\n");
 	return;
@@ -2369,8 +2377,8 @@ static void ata_dma_complete(struct ata_port *ap, u8 host_stat,
  *	One if interrupt was handled, zero if not (shared irq).
  */
 
-static inline unsigned int ata_host_intr (struct ata_port *ap,
-					  struct ata_queued_cmd *qc)
+inline unsigned int ata_host_intr (struct ata_port *ap,
+				   struct ata_queued_cmd *qc)
 {
 	u8 status, host_stat;
 	unsigned int handled = 0;
@@ -2728,7 +2736,7 @@ int ata_port_start (struct ata_port *ap)
 	if (!ap->prd)
 		return -ENOMEM;
 	
-	DPRINTK("prd alloc, virt %p, dma %x\n", ap->prd, ap->prd_dma);
+	DPRINTK("prd alloc, virt %p, dma %llx\n", ap->prd, (unsigned long long) ap->prd_dma);
 
 	return 0;
 }
@@ -3373,4 +3381,4 @@ EXPORT_SYMBOL_GPL(ata_scsi_queuecmd);
 EXPORT_SYMBOL_GPL(ata_scsi_error);
 EXPORT_SYMBOL_GPL(ata_scsi_slave_config);
 EXPORT_SYMBOL_GPL(ata_scsi_release);
-
+EXPORT_SYMBOL_GPL(ata_host_intr);
