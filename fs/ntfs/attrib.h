@@ -78,6 +78,9 @@ extern int ntfs_map_runlist(ntfs_inode *ni, VCN vcn);
 
 extern LCN ntfs_vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 
+extern runlist_element *ntfs_find_vcn(ntfs_inode *ni, const VCN vcn,
+		const BOOL need_write);
+
 extern BOOL find_attr(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic, const u8 *val,
 		const u32 val_len, attr_search_context *ctx);

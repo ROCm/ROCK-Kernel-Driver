@@ -1051,6 +1051,107 @@ LCN ntfs_vcn_to_lcn(const runlist_element *rl, const VCN vcn)
 }
 
 /**
+ * ntfs_find_vcn - find a vcn in the runlist described by an ntfs inode
+ * @ni:		ntfs inode describing the runlist to search
+ * @vcn:	vcn to find
+ * @need_write:	if false, lock for reading and if true, lock for writing
+ *
+ * Find the virtual cluster number @vcn in the runlist described by the ntfs
+ * inode @ni and return the address of the runlist element containing the @vcn.
+ * The runlist is left locked and the caller has to unlock it.  If @need_write
+ * is true, the runlist is locked for writing and if @need_write is false, the
+ * runlist is locked for reading.  In the error case, the runlist is not left
+ * locked.
+ *
+ * Note you need to distinguish between the lcn of the returned runlist element
+ * being >= 0 and LCN_HOLE.  In the later case you have to return zeroes on
+ * read and allocate clusters on write.
+ *
+ * Return the runlist element containing the @vcn on success and
+ * ERR_PTR(-errno) on error.  You need to test the return value with IS_ERR()
+ * to decide if the return is success or failure and PTR_ERR() to get to the
+ * error code if IS_ERR() is true.
+ *
+ * The possible error return codes are:
+ *	-ENOENT - No such vcn in the runlist, i.e. @vcn is out of bounds.
+ *	-ENOMEM - Not enough memory to map runlist.
+ *	-EIO	- Critical error (runlist/file is corrupt, i/o error, etc).
+ *
+ * Locking: - The runlist must be unlocked on entry.
+ *	    - On failing return, the runlist is unlocked.
+ *	    - On successful return, the runlist is locked.  If @need_write us
+ *	      true, it is locked for writing.  Otherwise is is locked for
+ *	      reading.
+ */
+runlist_element *ntfs_find_vcn(ntfs_inode *ni, const VCN vcn,
+		const BOOL need_write)
+{
+	runlist_element *rl;
+	int err = 0;
+	BOOL is_retry = FALSE;
+
+	ntfs_debug("Entering for i_ino 0x%lx, vcn 0x%llx, lock for %sing.",
+			ni->mft_no, (unsigned long long)vcn,
+			!need_write ? "read" : "writ");
+	BUG_ON(!ni);
+	BUG_ON(!NInoNonResident(ni));
+	BUG_ON(vcn < 0);
+lock_retry_remap:
+	if (!need_write)
+		down_read(&ni->runlist.lock);
+	else
+		down_write(&ni->runlist.lock);
+	rl = ni->runlist.rl;
+	if (likely(rl && vcn >= rl[0].vcn)) {
+		while (likely(rl->length)) {
+			if (likely(vcn < rl[1].vcn)) {
+				if (likely(rl->lcn >= (LCN)LCN_HOLE)) {
+					ntfs_debug("Done.");
+					return rl;
+				}
+				break;
+			}
+			rl++;
+		}
+		switch (rl->lcn) {
+		case (LCN)LCN_RL_NOT_MAPPED:
+			break;
+		case (LCN)LCN_ENOENT:
+			err = -ENOENT;
+			break;
+		default:
+			err = -EIO;
+			break;
+		}
+	}
+	if (!need_write)
+		up_read(&ni->runlist.lock);
+	else
+		up_write(&ni->runlist.lock);
+	if (!err && !is_retry) {
+		/*
+		 * The @vcn is in an unmapped region, map the runlist and
+		 * retry.
+		 */
+		err = ntfs_map_runlist(ni, vcn);
+		if (likely(!err)) {
+			is_retry = TRUE;
+			goto lock_retry_remap;
+		}
+		/*
+		 * -EINVAL and -ENOENT coming from a failed mapping attempt are
+		 * equivalent to i/o errors for us as they should not happen in
+		 * our code paths.
+		 */
+		if (err == -EINVAL || err == -ENOENT)
+			err = -EIO;
+	} else if (!err)
+		err = -EIO;
+	ntfs_error(ni->vol->sb, "Failed with error code %i.", err);
+	return ERR_PTR(err);
+}
+
+/**
  * find_attr - find (next) attribute in mft record
  * @type:	attribute type to find
  * @name:	attribute name to find (optional, i.e. NULL means don't care)

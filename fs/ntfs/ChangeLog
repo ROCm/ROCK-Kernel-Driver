@@ -25,6 +25,9 @@ ToDo/Notes:
 
 	- Implement bitmap modification code (fs/ntfs/bitmap.[hc]).  This
 	  includes functions to set/clear a single bit or a run of bits.
+	- Add fs/ntfs/attrib.[hc]::ntfs_find_vcn() which returns the locked
+	  runlist element containing a particular vcn.  It also takes care of
+	  mapping any needed runlist fragments.
 
 2.1.16 - Implement access time updates, file sync, async io, and read/writev.
 
@@ -448,7 +451,7 @@ ToDo/Notes:
 	  cannot set any write related options when the driver is compiled
 	  read-only.
 	- Optimize block resolution in fs/ntfs/aops.c::ntfs_read_block() to
-	  cache the current run list element. This should improve performance
+	  cache the current runlist element. This should improve performance
 	  when reading very large and/or very fragmented data.
 
 2.0.16 - Convert access to $MFT/$BITMAP to attribute inode API.
@@ -496,9 +499,9 @@ ToDo/Notes:
 	- Change fs/ntfs/super.c::ntfs_statfs() to not rely on BKL by moving
 	  the locking out of super.c::get_nr_free_mft_records() and taking and
 	  dropping the mftbmp_lock rw_semaphore in ntfs_statfs() itself.
-	- Bring attribute run list merging code (fs/ntfs/attrib.c) in sync with
+	- Bring attribute runlist merging code (fs/ntfs/attrib.c) in sync with
 	  current userspace ntfs library code. This means that if a merge
-	  fails the original run lists are always left unmodified instead of
+	  fails the original runlists are always left unmodified instead of
 	  being silently corrupted.
 	- Misc typo fixes.
 
@@ -690,7 +693,7 @@ ToDo/Notes:
 	  appropriately.
 	- Update to 2.5.9 kernel (preserving backwards compatibility) by
 	  replacing all occurences of page->buffers with page_buffers(page).
-	- Fix minor bugs in run list merging, also minor cleanup.
+	- Fix minor bugs in runlist merging, also minor cleanup.
 	- Updates to bootsector layout and mft mirror contents descriptions.
 	- Small bug fix in error detection in unistr.c and some cleanups.
 	- Grow name buffer allocations in unistr.c in aligned mutlipled of 64
@@ -713,12 +716,12 @@ ToDo/Notes:
 	  initialized_size vs data_size (i.e. i_size). Done are
 	  mft.c::ntfs_mft_readpage(), aops.c::end_buffer_read_index_async(),
 	  and attrib.c::load_attribute_list().
-	- Lock the run list in attrib.c::load_attribute_list() while using it.
+	- Lock the runlist in attrib.c::load_attribute_list() while using it.
 	- Fix memory leak in ntfs_file_read_compressed_block() and generally
 	  clean up compress.c a little, removing some uncommented/unused debug
 	  code.
 	- Tidy up dir.c a little bit.
-	- Don't bother getting the run list in inode.c::ntfs_read_inode().
+	- Don't bother getting the runlist in inode.c::ntfs_read_inode().
 	- Merge mft.c::ntfs_mft_readpage() and aops.c::ntfs_index_readpage()
 	  creating aops.c::ntfs_mst_readpage(), improving the handling of
 	  holes and overflow in the process and implementing the correct
@@ -748,7 +751,7 @@ tng-0.0.8 - 08/03/2002 - Now using BitKeeper, http://linux-ntfs.bkbits.net/
 	- Apply kludge in ntfs_read_inode(), setting i_nlink to 1 for
 	  directories. Without this the "find" utility gets very upset which is
 	  fair enough as Linux/Unix do not support directory hard links.
-	- Further run list merging work. (Richard Russon)
+	- Further runlist merging work. (Richard Russon)
 	- Backwards compatibility for gcc-2.95. (Richard Russon)
 	- Update to kernel 2.5.5-pre1 and rediff the now tiny patch.
 	- Convert to new file system declaration using ->ntfs_get_sb() and
@@ -803,7 +806,7 @@ tng-0.0.8 - 08/03/2002 - Now using BitKeeper, http://linux-ntfs.bkbits.net/
 	  which is then referenced but not copied.
 	- Rename run_list structure to run_list_element and create a new
 	  run_list structure containing a pointer to a run_list_element
-	  structure and a read/write semaphore. Adapt all users of run lists
+	  structure and a read/write semaphore. Adapt all users of runlists
 	  to new scheme and take and release the lock as needed. This fixes a
 	  nasty race as the run_list changes even when inodes are locked for
 	  reading and even when the inode isn't locked at all, so we really
@@ -834,7 +837,7 @@ tng-0.0.7 - 13/02/2002 - The driver is now feature complete for read-only!
 	- Cleanup mft.c and it's debug/error output in particular. Fix a minor
 	  bug in mapping of extent inodes. Update all the comments to fit all
 	  the recent code changes.
-	- Modify vcn_to_lcn() to cope with entirely unmapped run lists.
+	- Modify vcn_to_lcn() to cope with entirely unmapped runlists.
 	- Cleanups in compress.c, mostly comments and folding help.
 	- Implement attrib.c::map_run_list() as a generic helper.
 	- Make compress.c::ntfs_file_read_compressed_block() use map_run_list()
@@ -860,11 +863,11 @@ tng-0.0.7 - 13/02/2002 - The driver is now feature complete for read-only!
 	  pass in the upcase table and its length. These can be gotten from
 	  ctx->ntfs_ino->vol->upcase{_len}. Update all callers.
 	- Cleanups in attrib.c.
-	- Implement merging of run lists, attrib.c::merge_run_lists() and its
+	- Implement merging of runlists, attrib.c::merge_run_lists() and its
 	  helpers. (Richard Russon)
-	- Attribute lists part 2, attribute extents and multi part run lists:
+	- Attribute lists part 2, attribute extents and multi part runlists:
 	  enable proper support for LCN_RL_NOT_MAPPED and automatic mapping of
-	  further run list parts via attrib.c::map_run_list().
+	  further runlist parts via attrib.c::map_run_list().
 	- Tiny endianness bug fix in decompress_mapping_pairs().
 
 tng-0.0.6 - Encrypted directories, bug fixes, cleanups, debugging enhancements.
@@ -896,7 +899,7 @@ tng-0.0.6 - Encrypted directories, bug fixes, cleanups, debugging enhancements.
 	  support dollar signs in the names of variables/constants. Attribute
 	  types now start with AT_ instead of $ and $I30 is now just I30.
 	- Cleanup ntfs_lookup() and add consistency check of sequence numbers.
-	- Load complete run list for $MFT/$BITMAP during mount and cleanup
+	- Load complete runlist for $MFT/$BITMAP during mount and cleanup
 	  access functions. This means we now cope with $MFT/$BITMAP being
 	  spread accross several mft records.
 	- Disable modification of mft_zone_multiplier on remount. We can always
@@ -929,11 +932,11 @@ tng-0.0.4 - Big changes, getting in line with Al Viro's comments.
 	  parameter list. Pass either READ or WRITE to this, each has the
 	  obvious meaning.
 	- General cleanups to allow for easier folding in vi.
-	- attrib.c::decompress_mapping_pairs() now accepts the old run list
+	- attrib.c::decompress_mapping_pairs() now accepts the old runlist
 	  argument, and invokes attrib.c::merge_run_lists() to merge the old
-	  and the new run lists.
+	  and the new runlists.
 	- Removed attrib.c::find_first_attr().
-	- Implemented loading of attribute list and complete run list for $MFT.
+	- Implemented loading of attribute list and complete runlist for $MFT.
 	  This means we now cope with $MFT being spread across several mft
 	  records.
 	- Adapt to 2.5.2-pre9 and the changed create_empty_buffers() syntax.
@@ -971,7 +974,7 @@ tng-0.0.4 - Big changes, getting in line with Al Viro's comments.
 tng-0.0.3 - Cleanups, enhancements, bug fixes.
 
 	- Work on attrib.c::decompress_mapping_pairs() to detect base extents
-	  and setup the run list appropriately using knowledge provided by the
+	  and setup the runlist appropriately using knowledge provided by the
 	  sizes in the base attribute record.
 	- Balance the get_/put_attr_search_ctx() calls so we don't leak memory
 	  any more.
