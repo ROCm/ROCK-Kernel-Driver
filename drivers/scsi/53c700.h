@@ -8,6 +8,8 @@
 #ifndef _53C700_H
 #define _53C700_H
 
+#include <asm/io.h>
+
 /* Turn on for general debugging---too verbose for normal use */
 #undef	NCR_700_DEBUG
 /* Debug the tag queues, checking hash queue allocation and deallocation

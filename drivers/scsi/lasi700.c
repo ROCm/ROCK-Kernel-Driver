@@ -50,8 +50,8 @@
 #include <asm/pgtable.h>
 #include <asm/irq.h>
 #include <asm/hardware.h>
+#include <asm/parisc-device.h>
 #include <asm/delay.h>
-#include <asm/gsc.h>
 
 #include <linux/module.h>
 
