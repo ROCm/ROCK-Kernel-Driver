@@ -315,25 +315,51 @@ static inline struct vm_area_struct *find_nommu_vma(unsigned long start)
 static void add_nommu_vma(struct vm_area_struct *vma)
 {
 	struct vm_area_struct *pvma;
+	struct address_space *mapping;
 	struct rb_node **p = &nommu_vma_tree.rb_node;
 	struct rb_node *parent = NULL;
 
+	/* add the VMA to the master list */
 	while (*p) {
 		parent = *p;
 		pvma = rb_entry(parent, struct vm_area_struct, vm_rb);
 
-		if (vma->vm_start < pvma->vm_start)
+		if (vma->vm_start < pvma->vm_start) {
 			p = &(*p)->rb_left;
-		else if (vma->vm_start > pvma->vm_start)
+		}
+		else if (vma->vm_start > pvma->vm_start) {
 			p = &(*p)->rb_right;
-		else
-			BUG(); /* shouldn't happen by this point */
+		}
+		else {
+			/* mappings are at the same address - this can only
+			 * happen for shared-mem chardevs and shared file
+			 * mappings backed by ramfs/tmpfs */
+			BUG_ON(!(pvma->vm_flags & VM_SHARED));
+
+			if (vma < pvma)
+				p = &(*p)->rb_left;
+			else if (vma > pvma)
+				p = &(*p)->rb_right;
+			else
+				BUG();
+		}
 	}
 
 	rb_link_node(&vma->vm_rb, parent, p);
 	rb_insert_color(&vma->vm_rb, &nommu_vma_tree);
 }
 
+static void delete_nommu_vma(struct vm_area_struct *vma)
+{
+	struct address_space *mapping;
+
+	/* remove from the master list */
+	rb_erase(&vma->vm_rb, &nommu_vma_tree);
+}
+
+/*
+ * handle mapping creation for uClinux
+ */
 unsigned long do_mmap_pgoff(struct file *file,
 			    unsigned long addr,
 			    unsigned long len,
@@ -633,27 +659,33 @@ unsigned long do_mmap_pgoff(struct file *file,
 	return -ENOMEM;
 }
 
+/*
+ * handle mapping disposal for uClinux
+ */
 static void put_vma(struct vm_area_struct *vma)
 {
 	if (vma) {
 		down_write(&nommu_vma_sem);
 
 		if (atomic_dec_and_test(&vma->vm_usage)) {
-			rb_erase(&vma->vm_rb, &nommu_vma_tree);
+			delete_nommu_vma(vma);
 
 			if (vma->vm_ops && vma->vm_ops->close)
 				vma->vm_ops->close(vma);
 
-			if (!(vma->vm_flags & VM_IO) && vma->vm_start) {
+			/* IO memory and memory shared directly out of the pagecache from
+			 * ramfs/tmpfs mustn't be released here */
+			if (!(vma->vm_flags & (VM_IO | VM_SHARED)) && vma->vm_start) {
 				realalloc -= kobjsize((void *) vma->vm_start);
 				askedalloc -= vma->vm_end - vma->vm_start;
-				if (vma->vm_file)
-					fput(vma->vm_file);
 				kfree((void *) vma->vm_start);
 			}
 
 			realalloc -= kobjsize(vma);
 			askedalloc -= sizeof(*vma);
+
+			if (vma->vm_file)
+				fput(vma->vm_file);
 			kfree(vma);
 		}
 
@@ -664,6 +696,7 @@ static void put_vma(struct vm_area_struct *vma)
 int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
 {
 	struct vm_list_struct *vml, **parent;
+	unsigned long end = addr + len;
 
 #ifdef MAGIC_ROM_PTR
 	/* For efficiency's sake, if the pointer is obviously in ROM,
@@ -677,15 +710,16 @@ int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
 #endif
 
 	for (parent = &mm->context.vmlist; *parent; parent = &(*parent)->next)
-		if ((*parent)->vma->vm_start == addr)
-			break;
-	vml = *parent;
+		if ((*parent)->vma->vm_start == addr &&
+		    (*parent)->vma->vm_end == end)
+			goto found;
 
-	if (!vml) {
-		printk("munmap of non-mmaped memory by process %d (%s): %p\n",
-		       current->pid, current->comm, (void *) addr);
-		return -EINVAL;
-	}
+	printk("munmap of non-mmaped memory by process %d (%s): %p\n",
+	       current->pid, current->comm, (void *) addr);
+	return -EINVAL;
+
+ found:
+	vml = *parent;
 
 	put_vma(vml->vma);
 
