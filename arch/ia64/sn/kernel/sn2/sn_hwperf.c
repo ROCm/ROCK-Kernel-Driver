@@ -128,45 +128,34 @@ static int sn_hwperf_generic_ordinal(struct sn_hwperf_object_info *obj,
 	return ordinal;
 }
 
-#ifndef MODULE_IOBRICK 
-/* this will be available when ioif TIO support is added */
-#define MODULE_IOBRICK (MODULE_OPUSBRICK+1)
-#endif
+static struct {
+        char	*brick_chars;
+        char	*brick_name;
+} brick_names[] = {
+        {"c^jbf",   	"node"		},
+        {"r",   	"router"	},	
+	{NULL,		"?-brick"	}
+};
 
-static const char *sn_hwperf_get_brickname(struct sn_hwperf_object_info *obj,
-				struct sn_hwperf_object_info *objs, int *ordinal)
+static char *sn_hwperf_get_brickname(struct sn_hwperf_object_info *obj,
+			struct sn_hwperf_object_info *objs, int *ordinal)
 {
 	int i;
-	const char *objtype = NULL;
 
-	for (i=0; i < MAX_BRICK_TYPES; i++) {
-		if (brick_types[i] != obj->location[3])
-			continue;
-		switch (i) {
-		case MODULE_CBRICK:
-		    objtype = "node";
-		    *ordinal = sn_hwperf_obj_to_cnode(obj); /* cnodeid */
-		    break;
-
-		case MODULE_RBRICK:
-		    objtype = "router";
-		    *ordinal = sn_hwperf_generic_ordinal(obj, objs);
-		    break;
-
-		case MODULE_IOBRICK:
-		    objtype = "ionode";
-		    *ordinal = sn_hwperf_generic_ordinal(obj, objs);
-		    break;
-		}
-		break;
+	for (i=0; brick_names[i].brick_chars; i++) {
+		if (strchr(brick_names[i].brick_chars, obj->location[3]))
+			break;
 	}
 
-	if (i == MAX_BRICK_TYPES) {
-		objtype = "other";
+	if (strcmp(brick_names[i].brick_name, "node") == 0)
+		*ordinal = sn_hwperf_obj_to_cnode(obj);
+	else {
 		*ordinal = sn_hwperf_generic_ordinal(obj, objs);
+		if (!brick_names[i].brick_chars)
+			brick_names[i].brick_name[0] = obj->location[3];
 	}
 
-	return objtype;
+	return brick_names[i].brick_name;
 }
 
 static int sn_topology_show(struct seq_file *s, void *d)
@@ -206,7 +195,7 @@ static int sn_topology_show(struct seq_file *s, void *d)
 	seq_printf(s, "%s %d %s %s asic %s", brickname, ordinal, obj->location,
 		obj->sn_hwp_this_part ? "local" : "shared", obj->name);
 
-	if (obj->location[3] != 'c')
+	if (strcmp(brickname, "node") != 0)
 		seq_putc(s, '\n');
 	else {
 		seq_printf(s, ", nasid 0x%x", cnodeid_to_nasid(ordinal));
@@ -261,10 +250,15 @@ static int sn_topology_show(struct seq_file *s, void *d)
 					break;
 				}
 			}
-			if (i >= sn_hwperf_obj_cnt)
-				continue;
 			seq_printf(s, "numalink %d %s-%d",
 			    ordinal+pt, obj->location, ptdata[pt].port);
+
+			if (i >= sn_hwperf_obj_cnt) {
+				/* no connection */
+				seq_puts(s, " local endpoint disconnected"
+					    ", protocol unknown\n");
+				continue;
+			}
 
 			if (obj->sn_hwp_this_part && p->sn_hwp_this_part)
 				/* both ends local to this partition */
