@@ -1484,7 +1484,7 @@ nfsd4_open_confirm(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfs
 	struct nfs4_stateid *stp;
 
 	dprintk("NFSD: nfsd4_open_confirm on file %.*s\n",
-			current_fh->fh_dentry->d_name.len,
+			(int)current_fh->fh_dentry->d_name.len,
 			current_fh->fh_dentry->d_name.name);
 	oc->oc_stateowner = NULL;
 	down(&client_sema); /* XXX need finer grained locking */
@@ -1518,7 +1518,7 @@ nfsd4_open_downgrade(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct n
 	struct nfs4_stateid *stp;
 
 	dprintk("NFSD: nfsd4_open_downgrade on file %.*s\n", 
-			current_fh->fh_dentry->d_name.len, 
+			(int)current_fh->fh_dentry->d_name.len,
 			current_fh->fh_dentry->d_name.name);
 
 	down(&client_sema); /* XXX need finer grained locking */
@@ -1557,7 +1557,7 @@ nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_clos
 	struct nfs4_stateid *stp;
 
 	dprintk("NFSD: nfsd4_close on file %.*s\n", 
-			current_fh->fh_dentry->d_name.len, 
+			(int)current_fh->fh_dentry->d_name.len,
 			current_fh->fh_dentry->d_name.name);
 
 	down(&client_sema); /* XXX need finer grained locking */
