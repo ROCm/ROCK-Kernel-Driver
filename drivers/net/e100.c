@@ -825,6 +825,8 @@ static inline int e100_exec_cb(struct nic *nic, struct sk_buff *skb,
 	mb();
 	cb->prev->command &= cpu_to_le16(~cb_s);
 
+	mb();
+
 	while(nic->cb_to_send != nic->cb_to_use) {
 		if(unlikely((err = e100_exec_cmd(nic, nic->cuc_cmd,
 			nic->cb_to_send->dma_addr)))) {
