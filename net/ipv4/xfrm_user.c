@@ -46,8 +46,14 @@ static int verify_one_alg(struct rtattr **xfrma, enum xfrm_attr_type_t type)
 	algp = RTA_DATA(rt);
 	switch (type) {
 	case XFRMA_ALG_AUTH:
+		if (!algp->alg_key_len &&
+		    strcmp(algp->alg_name, "digest_null") != 0)
+			return -EINVAL;
+		break;
+
 	case XFRMA_ALG_CRYPT:
-		if (!algp->alg_key_len)
+		if (!algp->alg_key_len &&
+		    strcmp(algp->alg_name, "cipher_null") != 0)
 			return -EINVAL;
 		break;
 

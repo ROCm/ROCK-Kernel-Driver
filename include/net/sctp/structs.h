@@ -86,10 +86,8 @@ struct sctp_opt;
 struct sctp_endpoint_common;
 struct sctp_ssnmap;
 
-typedef struct sctp_protocol sctp_protocol_t;
 typedef struct sctp_endpoint sctp_endpoint_t;
 typedef struct sctp_association sctp_association_t;
-typedef struct sctp_packet sctp_packet_t;
 typedef struct sctp_chunk sctp_chunk_t;
 typedef struct sctp_bind_addr sctp_bind_addr_t;
 typedef struct sctp_endpoint_common sctp_endpoint_common_t;
@@ -222,7 +220,7 @@ struct sctp_af {
 	void 		(*get_saddr)	(struct sctp_association *asoc,
 					 struct dst_entry *dst,
 					 union sctp_addr *daddr,
-				 	 union sctp_addr *saddr);	 
+				 	 union sctp_addr *saddr);
 	void            (*copy_addrlist) (struct list_head *,
 					  struct net_device *);
 	void            (*dst_saddr)    (union sctp_addr *saddr,
@@ -262,6 +260,9 @@ struct sctp_pf {
 			  const union sctp_addr *,
 			  struct sctp_opt *);
 	int  (*bind_verify) (struct sctp_opt *, union sctp_addr *);
+	int  (*supported_addrs)(const struct sctp_opt *, __u16 *);
+	struct sock *(*create_accept_sk) (struct sock *sk,
+					  struct sctp_association *asoc);
 	struct sctp_af *af;
 };
 
@@ -365,8 +366,6 @@ typedef struct sctp_signed_cookie {
 	__u8 signature[SCTP_SECRET_SIZE];
 	sctp_cookie_t c;
 } sctp_signed_cookie_t;
-
-
 
 /* This is another convenience type to allocate memory for address
  * params for the maximum size and pass such structures around
@@ -604,26 +603,26 @@ struct sctp_packet {
 
 typedef int (sctp_outq_thandler_t)(struct sctp_outq *, void *);
 typedef int (sctp_outq_ehandler_t)(struct sctp_outq *);
-typedef sctp_packet_t *(sctp_outq_ohandler_init_t)
-	(sctp_packet_t *,
+typedef struct sctp_packet *(sctp_outq_ohandler_init_t)
+	(struct sctp_packet *,
          struct sctp_transport *,
          __u16 sport,
          __u16 dport);
-typedef sctp_packet_t *(sctp_outq_ohandler_config_t)
-        (sctp_packet_t *,
+typedef struct sctp_packet *(sctp_outq_ohandler_config_t)
+        (struct sctp_packet *,
 	 __u32 vtag,
 	 int ecn_capable,
 	 sctp_packet_phandler_t *get_prepend_chunk);
-typedef sctp_xmit_t (sctp_outq_ohandler_t)(sctp_packet_t *,
+typedef sctp_xmit_t (sctp_outq_ohandler_t)(struct sctp_packet *,
                                                sctp_chunk_t *);
-typedef int (sctp_outq_ohandler_force_t)(sctp_packet_t *);
+typedef int (sctp_outq_ohandler_force_t)(struct sctp_packet *);
 
 sctp_outq_ohandler_init_t    sctp_packet_init;
 sctp_outq_ohandler_config_t  sctp_packet_config;
 sctp_outq_ohandler_t         sctp_packet_append_chunk;
 sctp_outq_ohandler_t         sctp_packet_transmit_chunk;
 sctp_outq_ohandler_force_t   sctp_packet_transmit;
-void sctp_packet_free(sctp_packet_t *);
+void sctp_packet_free(struct sctp_packet *);
 
 
 /* This represents a remote transport address.
@@ -789,7 +788,7 @@ struct sctp_transport {
 	struct list_head transmitted;
 
 	/* We build bundle-able packets for this transport here.  */
-	sctp_packet_t packet;
+	struct sctp_packet packet;
 
 	/* This is the list of transports that have chunks to send.  */
 	struct list_head send_ready;
@@ -865,11 +864,10 @@ void sctp_inq_set_th_handler(struct sctp_inq *, void (*)(void *), void *);
 struct sctp_outq {
 	sctp_association_t *asoc;
 
-	/* BUG: This really should be an array of streams.
-	 * This really holds a list of chunks (one stream).
-	 * FIXME: If true, why so?
-	 */
+	/* Data pending that has never been transmitted.  */
 	struct sk_buff_head out;
+
+	unsigned out_qlen;	/* Total length of queued data chunks. */
 
 	/* These are control chunks we want to send.  */
 	struct sk_buff_head control;
@@ -885,7 +883,7 @@ struct sctp_outq {
 	struct list_head retransmit;
 
 	/* Call these functions to send chunks down to the next lower
-	 * layer.  This is always SCTP_packet, but we separate the two
+	 * layer.  This is always sctp_packet, but we separate the two
 	 * structures to make testing simpler.
 	 */
 	sctp_outq_ohandler_init_t	*init_output;
@@ -1098,8 +1096,9 @@ static inline sctp_endpoint_t *sctp_ep(sctp_endpoint_common_t *base)
 }
 
 /* These are function signatures for manipulating endpoints.  */
-sctp_endpoint_t *sctp_endpoint_new(sctp_protocol_t *, struct sock *, int);
-sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *, sctp_protocol_t *,
+sctp_endpoint_t *sctp_endpoint_new(struct sctp_protocol *, struct sock *, int);
+sctp_endpoint_t *sctp_endpoint_init(struct sctp_endpoint *,
+				    struct sctp_protocol *,
 				    struct sock *, int priority);
 void sctp_endpoint_free(sctp_endpoint_t *);
 void sctp_endpoint_put(sctp_endpoint_t *);
@@ -1111,7 +1110,6 @@ sctp_association_t *sctp_endpoint_lookup_assoc(const sctp_endpoint_t *ep,
 int sctp_endpoint_is_peeled_off(sctp_endpoint_t *, const union sctp_addr *);
 sctp_endpoint_t *sctp_endpoint_is_match(sctp_endpoint_t *,
 					const union sctp_addr *);
-
 int sctp_has_association(const union sctp_addr *laddr,
 			 const union sctp_addr *paddr);
 
@@ -1587,7 +1585,7 @@ struct sctp_transport *sctp_assoc_lookup_paddr(const sctp_association_t *,
 struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *,
 				     const union sctp_addr *address,
 				     const int priority);
-void sctp_assoc_control_transport(sctp_association_t *,
+void sctp_assoc_control_transport(struct sctp_association *,
 				  struct sctp_transport *,
 				  sctp_transport_cmd_t, sctp_sn_error_t);
 struct sctp_transport *sctp_assoc_lookup_tsn(sctp_association_t *, __u32);
@@ -1597,14 +1595,14 @@ struct sctp_transport *sctp_assoc_is_match(sctp_association_t *,
 void sctp_assoc_migrate(sctp_association_t *, struct sock *);
 void sctp_assoc_update(sctp_association_t *dst, sctp_association_t *src);
 
-__u32 __sctp_association_get_next_tsn(sctp_association_t *);
-__u32 __sctp_association_get_tsn_block(sctp_association_t *, int);
-__u16 __sctp_association_get_next_ssn(sctp_association_t *, __u16 sid);
+__u32 sctp_association_get_next_tsn(struct sctp_association *);
+__u32 sctp_association_get_tsn_block(struct sctp_association *, int);
 
-void sctp_assoc_sync_pmtu(sctp_association_t *);
-void sctp_assoc_rwnd_increase(sctp_association_t *, int);
-void sctp_assoc_rwnd_decrease(sctp_association_t *, int);
-
+void sctp_assoc_sync_pmtu(struct sctp_association *);
+void sctp_assoc_rwnd_increase(struct sctp_association *, int);
+void sctp_assoc_rwnd_decrease(struct sctp_association *, int);
+void sctp_assoc_set_primary(struct sctp_association *,
+			    struct sctp_transport *);
 int sctp_assoc_set_bind_addr_from_ep(sctp_association_t *, int);
 int sctp_assoc_set_bind_addr_from_cookie(sctp_association_t *,
 					 sctp_cookie_t *, int);

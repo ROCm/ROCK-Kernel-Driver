@@ -67,7 +67,7 @@ static const char __module_generic_string_##name [] \
 #define SNDRV_BOOLEAN_TRUE_DESC	"allows:{{0,Disabled},{1,Enabled}},default:1,dialog:check"
 #define SNDRV_BOOLEAN_FALSE_DESC "allows:{{0,Disabled},{1,Enabled}},default:0,dialog:check"
 
-#define SNDRV_ENABLED		"enable:(snd_enable)"
+#define SNDRV_ENABLED		"enable:(enable)"
 
 #define SNDRV_INDEX_DESC	SNDRV_ENABLED ",allows:{{0,7}},unique,skill:required,dialog:list"
 #define SNDRV_ID_DESC		SNDRV_ENABLED ",unique"

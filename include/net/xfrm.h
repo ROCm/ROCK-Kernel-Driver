@@ -107,6 +107,7 @@ struct xfrm_state
 		u16		family;
 		xfrm_address_t	saddr;
 		int		header_len;
+		int		trailer_len;
 	} props;
 
 	struct xfrm_lifetime_cfg lft;
@@ -255,6 +256,11 @@ static inline void xfrm_state_put(struct xfrm_state *x)
 		__xfrm_state_destroy(x);
 }
 
+static inline void xfrm_state_hold(struct xfrm_state *x)
+{
+	atomic_inc(&x->refcnt);
+}
+
 static inline int
 xfrm4_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 {
@@ -353,7 +359,7 @@ extern int __xfrm_sk_clone_policy(struct sock *sk);
 static inline int xfrm_sk_clone_policy(struct sock *sk)
 {
 	if (unlikely(sk->policy[0] || sk->policy[1]))
-		return xfrm_sk_clone_policy(sk);
+		return __xfrm_sk_clone_policy(sk);
 	return 0;
 }
 

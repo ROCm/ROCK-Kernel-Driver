@@ -785,6 +785,7 @@ void vlan_dev_destruct(struct net_device *dev)
 			kfree(dev->priv);
 			dev->priv = NULL;
 		}
+		kfree(dev);
 	}
 }
 

@@ -79,6 +79,8 @@
 #include "sun3_scsi.h"
 #include "NCR5380.h"
 
+static void NCR5380_print(struct Scsi_Host *instance);
+
 /* #define OLDDMA */
 
 #define USE_WRAPPER
@@ -312,7 +314,7 @@ int sun3scsi_release (struct Scsi_Host *shpnt)
 	if (shpnt->irq != IRQ_NONE)
 		free_irq (shpnt->irq, NULL);
 
-	iounmap(sun3_scsi_regp);
+	iounmap((void *)sun3_scsi_regp);
 
 	return 0;
 }
@@ -621,8 +623,8 @@ static Scsi_Host_Template driver_template = {
 	.release		= sun3scsi_release,
 	.info			= sun3scsi_info,
 	.queuecommand		= sun3scsi_queue_command,
-	.abort			= sun3scsi_abort,
-	.reset			= sun3scsi_reset,
+	.eh_abort_handler      	= sun3scsi_abort,
+	.eh_bus_reset_handler  	= sun3scsi_bus_reset,
 	.can_queue		= CAN_QUEUE,
 	.this_id		= 7,
 	.sg_tablesize		= SG_TABLESIZE,

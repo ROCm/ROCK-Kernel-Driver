@@ -128,18 +128,11 @@ EXPORT_SYMBOL(__write_unlock);
 #endif
 
 /* Hard IRQ locking */
-#ifdef CONFIG_SMP
 EXPORT_SYMBOL(synchronize_irq);
-#endif
 
 #if defined(CONFIG_MCOUNT)
 extern void mcount(void);
 EXPORT_SYMBOL_NOVERS(mcount);
-#endif
-
-/* Uniprocessor clock frequency */
-#ifndef CONFIG_SMP
-EXPORT_SYMBOL(up_clock_tick);
 #endif
 
 /* Per-CPU information table */
@@ -162,10 +155,13 @@ EXPORT_SYMBOL(_do_write_lock);
 EXPORT_SYMBOL(_do_write_unlock);
 #endif
 
-#ifdef CONFIG_SMP
 EXPORT_SYMBOL(smp_call_function);
-#endif
+#endif /* CONFIG_SMP */
 
+/* Uniprocessor clock frequency */
+#ifndef CONFIG_SMP
+extern unsigned long up_clock_tick;
+EXPORT_SYMBOL(up_clock_tick);
 #endif
 
 /* semaphores */

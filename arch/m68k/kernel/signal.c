@@ -16,7 +16,7 @@
  * 1997-12-01  Modified for POSIX.1b signals by Andreas Schwab
  *
  * mathemu support by Roman Zippel
- *  (Note: fpstate in the signal context is completly ignored for the emulator
+ *  (Note: fpstate in the signal context is completely ignored for the emulator
  *         and the internal floating point format is put on stack)
  */
 
@@ -1019,7 +1019,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 				/* Restart the system call the same way as
 				   if the process were not traced.  */
 				struct k_sigaction *ka =
-					&current->sig->action[signr-1];
+					&current->sighand->action[signr-1];
 				int has_handler =
 					(ka->sa.sa_handler != SIG_IGN &&
 					 ka->sa.sa_handler != SIG_DFL);
@@ -1060,7 +1060,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 			}
 		}
 
-		ka = &current->sig->action[signr-1];
+		ka = &current->sighand->action[signr-1];
 		if (ka->sa.sa_handler == SIG_IGN) {
 			if (signr != SIGCHLD)
 				continue;
@@ -1087,11 +1087,11 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 				/* FALLTHRU */
 
 			case SIGSTOP: {
-				struct signal_struct *sig;
+				struct sighand_struct *sighand;
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
-				sig = current->parent->sig;
-				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags 
+				sighand = current->parent->sighand;
+				if (sighand && !(sighand->action[SIGCHLD-1].sa.sa_flags 
 					     & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
@@ -1106,7 +1106,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 				/* FALLTHRU */
 
 			default:
-				sig_exit(signr, exit_code, &info);
+				do_group_exit(signr);
 				/* NOTREACHED */
 			}
 		}

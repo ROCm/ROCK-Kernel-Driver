@@ -386,8 +386,12 @@ static int check(const char *tablename,
 	return 1;
 }
 
-static struct ipt_target ipt_reject_reg
-= { { NULL, NULL }, "REJECT", reject, check, NULL, THIS_MODULE };
+static struct ipt_target ipt_reject_reg = {
+	.name		= "REJECT",
+	.target		= reject,
+	.checkentry	= check,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

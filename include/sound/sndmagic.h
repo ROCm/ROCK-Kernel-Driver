@@ -108,7 +108,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define snd_pcm_proc_private_t_magic		0xa15a0104
 #define snd_pcm_oss_file_t_magic		0xa15a0105
 #define snd_mixer_oss_t_magic			0xa15a0106
-#define snd_pcm_sgbuf_t_magic			0xa15a0107
+// #define snd_pcm_sgbuf_t_magic			0xa15a0107
 
 #define snd_info_private_data_t_magic		0xa15a0201
 #define snd_info_entry_t_magic			0xa15a0202
@@ -174,6 +174,7 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define m3_dma_t_magic				0xa15a3202
 #define nm256_t_magic				0xa15a3301
 #define nm256_dma_t_magic			0xa15a3302
+#define sam9407_t_magic				0xa15a3401
 #define pmac_t_magic				0xa15a3501
 #define ali_t_magic				0xa15a3601
 #define mtpav_t_magic				0xa15a3701
@@ -190,6 +191,8 @@ static inline int _snd_magic_bad(void *obj, unsigned long magic)
 #define snd_usb_midi_t_magic			0xa15a3f01
 #define snd_usb_midi_out_endpoint_t_magic	0xa15a3f02
 #define snd_usb_midi_in_endpoint_t_magic	0xa15a3f03
+#define ak4117_t_magic				0xa15a4000
+#define psic_t_magic				0xa15a4100
 
 
 #else

@@ -353,10 +353,8 @@ static int fd_motor_on(int nr)
 		unit[nr].motor = 1;
 		fd_select(nr);
 
-		del_timer(&motor_on_timer);
 		motor_on_timer.data = nr;
-		motor_on_timer.expires = jiffies + HZ/2;
-		add_timer(&motor_on_timer);
+		mod_timer(&motor_on_timer, jiffies + HZ/2);
 
 		on_attempts = 10;
 		sleep_on (&motor_wait);
@@ -414,11 +412,9 @@ static void floppy_off (unsigned int nr)
 	int drive;
 
 	drive = nr & 3;
-	del_timer(motor_off_timer + drive);
-	motor_off_timer[drive].expires = jiffies + 3*HZ;
 	/* called this way it is always from interrupt */
 	motor_off_timer[drive].data = nr | 0x80000000;
-	add_timer(motor_off_timer + nr);
+	mod_timer(motor_off_timer + drive, jiffies + 3*HZ);
 }
 
 static int fd_calibrate(int drive)
@@ -1429,10 +1425,7 @@ static void redo_fd_request(void)
 
 			floppy->dirty = 1;
 		        /* reset the timer */
-		        del_timer (flush_track_timer + drive);
-			    
-			flush_track_timer[drive].expires = jiffies + 1;
-			add_timer (flush_track_timer + drive);
+			mod_timer (flush_track_timer + drive, jiffies + 1);
 			local_irq_restore(flags);
 			break;
 		}

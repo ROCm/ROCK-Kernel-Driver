@@ -663,7 +663,7 @@ config EL16
 	  as <file:Documentation/networking/net-modules.txt>.
 
 config EL3
-	tristate "3c509/3c529 (MCA)/3c579 \"EtherLink III\" support"
+	tristate "3c509/3c529 (MCA)/3c569B (98)/3c579 \"EtherLink III\" support"
 	depends on NET_VENDOR_3COM && (ISA || EISA || MCA)
 	---help---
 	  If you have a network (Ethernet) card belonging to the 3Com
@@ -932,7 +932,7 @@ config NI65
 source "drivers/net/tulip/Kconfig"
 
 config AT1700
-	tristate "AT1700/1720 support (EXPERIMENTAL)"
+	tristate "AT1700/1720/RE1000Plus(C-Bus) support (EXPERIMENTAL)"
 	depends on NET_ETHERNET && (ISA || MCA) && EXPERIMENTAL
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read
@@ -978,7 +978,7 @@ config HP100
 
 config NET_ISA
 	bool "Other ISA cards"
-	depends on NET_ETHERNET && ISA
+	depends on NET_ETHERNET && ISA && !X86_PC9800
 	---help---
 	  If your network (Ethernet) card hasn't been mentioned yet and its
 	  bus system (that's the way the cards talks to the other components
@@ -1175,6 +1175,55 @@ config SK_G16
 	  If you have a network (Ethernet) card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
 	  <http://www.linuxdoc.org/docs.html#howto>.
+
+config NET_CBUS
+	bool "NEC PC-9800 C-bus cards"
+	depends on NET_ETHERNET && ISA && X86_PC9800
+	---help---
+	  If your network (Ethernet) card hasn't been mentioned yet and its
+	  bus system (that's the way the cards talks to the other components
+	  of your computer) is NEC PC-9800 C-Bus, say Y.
+
+config NE2K_CBUS
+	tristate "Most NE2000-based Ethernet support"
+	depends on NET_CBUS
+
+config NE2K_CBUS_EGY98
+	bool "Melco EGY-98 support"
+	depends on NE2K_CBUS
+
+config NE2K_CBUS_LGY98
+	bool "Melco LGY-98 support"
+	depends on NE2K_CBUS
+
+config NE2K_CBUS_ICM
+	bool "ICM IF-27xxET support"
+	depends on NE2K_CBUS
+
+config NE2K_CBUS_IOLA98
+	bool "I-O DATA LA-98 support"
+	depends on NE2K_CBUS
+
+config NE2K_CBUS_CNET98EL
+	bool "Contec C-NET(98)E/L support"
+	depends on NE2K_CBUS
+
+config NE2K_CBUS_CNET98EL_IO_BASE
+	hex "C-NET(98)E/L I/O base address (0xaaed or 0x55ed)"
+	depends on NE2K_CBUS_CNET98EL
+	default "0xaaed"
+
+config NE2K_CBUS_ATLA98
+	bool "Allied Telesis LA-98 Support"
+	depends on NE2K_CBUS
+
+config NE2K_CBUS_BDN
+	bool "ELECOM Laneed LD-BDN[123]A Support"
+	depends on NE2K_CBUS
+
+config NE2K_CBUS_NEC108
+	bool "NEC PC-9801-108 Support"
+	depends on NE2K_CBUS
 
 config SKMC
 	tristate "SKnet MCA support"
@@ -1904,6 +1953,7 @@ config E1000
 	  82544       PRO/1000 XF Server Adapter           A50484-xxx
 	  82544       PRO/1000 T Desktop Adapter           A62947-xxx
 	  82540       PRO/1000 MT Desktop Adapter          A78408-xxx
+	  82541       PRO/1000 MT Desktop Adapter          C91016-xxx
 	  82545       PRO/1000 MT Server Adapter           A92165-xxx
 	  82546       PRO/1000 MT Dual Port Server Adapter A92111-xxx
 	  82545       PRO/1000 MF Server Adapter           A91622-xxx

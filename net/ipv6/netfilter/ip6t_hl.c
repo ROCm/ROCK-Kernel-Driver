@@ -56,8 +56,12 @@ static int checkentry(const char *tablename, const struct ip6t_ip6 *ip,
 	return 1;
 }
 
-static struct ip6t_match hl_match = { { NULL, NULL }, "hl", &match,
-		&checkentry, NULL, THIS_MODULE };
+static struct ip6t_match hl_match = {
+	.name		= "hl",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

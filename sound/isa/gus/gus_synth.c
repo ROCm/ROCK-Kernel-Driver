@@ -197,7 +197,7 @@ static int snd_gus_synth_create_port(snd_gus_card_t * gus, int idx)
 						   SNDRV_SEQ_PORT_TYPE_MIDI_GS |
 						   SNDRV_SEQ_PORT_TYPE_DIRECT_SAMPLE |
 						   SNDRV_SEQ_PORT_TYPE_SYNTH,
-						   16,
+						   16, 0,
 						   name);
 	if (p->chset->port < 0) {
 		result = p->chset->port;

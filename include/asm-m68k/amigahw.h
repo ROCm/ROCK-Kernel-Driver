@@ -324,7 +324,7 @@ struct tod3000 {
 };
 #define TOD3000_CNTRL1_HOLD	0
 #define TOD3000_CNTRL1_FREE	9
-#define TOD_3000 ((struct tod3000 *)(zTwoBase+0xDC0000))
+#define tod_3000 ((*(volatile struct tod3000 *)(zTwoBase+0xDC0000)))
 
 struct tod2000 {
   unsigned int  :28, second2:4;	/* lower digit */
@@ -349,6 +349,6 @@ struct tod2000 {
 #define TOD2000_CNTRL1_BUSY	(1<<1)
 #define TOD2000_CNTRL3_24HMODE	(1<<2)
 #define TOD2000_HOUR1_PM	(1<<2)
-#define TOD_2000 ((struct tod2000 *)(zTwoBase+0xDC0000))
+#define tod_2000 ((*(volatile struct tod2000 *)(zTwoBase+0xDC0000)))
 
 #endif /* _M68K_AMIGAHW_H */

@@ -75,6 +75,25 @@ struct ifmcaddr6
 	spinlock_t		mca_lock;
 };
 
+/* Anycast stuff */
+
+struct ipv6_ac_socklist
+{
+	struct in6_addr		acl_addr;
+	int			acl_ifindex;
+	struct ipv6_ac_socklist *acl_next;
+};
+
+struct ifacaddr6
+{
+	struct in6_addr		aca_addr;
+	struct inet6_dev	*aca_idev;
+	struct ifacaddr6	*aca_next;
+	int			aca_users;
+	atomic_t		aca_refcnt;
+	spinlock_t		aca_lock;
+};
+
 #define	IFA_HOST	IPV6_ADDR_LOOPBACK
 #define	IFA_LINK	IPV6_ADDR_LINKLOCAL
 #define	IFA_SITE	IPV6_ADDR_SITELOCAL
@@ -108,6 +127,7 @@ struct inet6_dev
 
 	struct inet6_ifaddr	*addr_list;
 	struct ifmcaddr6	*mc_list;
+	struct ifacaddr6	*ac_list;
 	rwlock_t		lock;
 	atomic_t		refcnt;
 	__u32			if_flags;

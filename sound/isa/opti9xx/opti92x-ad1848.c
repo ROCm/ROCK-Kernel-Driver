@@ -987,9 +987,11 @@ static int snd_opti93x_trigger(snd_pcm_substream_t *substream,
 			s = s->link_next;
 		} while (s != substream);
 		spin_lock(&chip->lock);
-		if (cmd == SNDRV_PCM_TRIGGER_START)
+		if (cmd == SNDRV_PCM_TRIGGER_START) {
 			snd_opti93x_out_mask(chip, OPTi93X_IFACE_CONF, what, what);
-		else
+			if (what & OPTi93X_CAPTURE_ENABLE)
+				udelay(50);
+		} else
 			snd_opti93x_out_mask(chip, OPTi93X_IFACE_CONF, what, 0x00);
 		spin_unlock(&chip->lock);
 		break;
@@ -1207,6 +1209,7 @@ static int snd_opti93x_capture_open(snd_pcm_substream_t *substream)
 		return error;
 	runtime->hw = snd_opti93x_capture;
 	snd_pcm_set_sync(substream);
+	chip->capture_substream = substream;
 	snd_pcm_limit_isa_dma_size(chip->dma2, &runtime->hw.buffer_bytes_max);
 	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates);
 	return error;

@@ -2175,7 +2175,9 @@ static void enable_cpucache (kmem_cache_t *cachep)
 	 * The numbers are guessed, we should auto-tune as described by
 	 * Bonwick.
 	 */
-	if (cachep->objsize > PAGE_SIZE)
+	if (cachep->objsize > 131072)
+		limit = 1;
+	else if (cachep->objsize > PAGE_SIZE)
 		limit = 8;
 	else if (cachep->objsize > 1024)
 		limit = 54;
@@ -2192,7 +2194,7 @@ static void enable_cpucache (kmem_cache_t *cachep)
 	if (limit > 32)
 		limit = 32;
 #endif
-	err = do_tune_cpucache(cachep, limit, limit/2);
+	err = do_tune_cpucache(cachep, limit, (limit+1)/2);
 	if (err)
 		printk(KERN_ERR "enable_cpucache failed for %s, error %d.\n",
 					cachep->name, -err);

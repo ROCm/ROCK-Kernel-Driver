@@ -179,8 +179,10 @@ static int snd_opl3_synth_create_port(opl3_t * opl3)
 {
 	snd_seq_port_callback_t callbacks;
 	char name[32];
-	int opl_ver;
+	int voices, opl_ver;
 
+	voices = (opl3->hardware < OPL3_HW_OPL3) ?
+		MAX_OPL2_VOICES : MAX_OPL3_VOICES;
 	opl3->chset = snd_midi_channel_alloc_set(16);
 	if (opl3->chset == NULL)
 		return -ENOMEM;
@@ -204,7 +206,7 @@ static int snd_opl3_synth_create_port(opl3_t * opl3)
 						      SNDRV_SEQ_PORT_TYPE_MIDI_GENERIC |
 						      SNDRV_SEQ_PORT_TYPE_MIDI_GM |
 						      SNDRV_SEQ_PORT_TYPE_SYNTH,
-						      16,
+						      16, voices,
 						      name);
 	if (opl3->chset->port < 0) {
 		snd_midi_channel_free_set(opl3->chset);

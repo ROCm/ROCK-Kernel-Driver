@@ -26,9 +26,6 @@
 #include <sound/pcm.h>
 #include <sound/info.h>
 #include <sound/initval.h>
-#ifdef CONFIG_PCI
-#include <sound/pcm_sgbuf.h>
-#endif
 
 static int preallocate_dma = 1;
 MODULE_PARM(preallocate_dma, "i");
@@ -44,59 +41,33 @@ const static size_t snd_minimum_buffer = 16384;
 
 
 /*
- * allocate pages on the specified bus
- */
-static int alloc_pcm_pages(snd_pcm_substream_t *substream, size_t size,
-			   struct snd_pcm_dma_buffer *dmab)
-{
-	switch (substream->dma_type) {
-	case SNDRV_PCM_DMA_TYPE_CONTINUOUS:
-		dmab->area = snd_malloc_pages(size, (unsigned int)((unsigned long)substream->dma_private & 0xffffffff));
-		dmab->addr = 0UL;		/* not valid */
-		break;
-#ifdef CONFIG_ISA
-	case SNDRV_PCM_DMA_TYPE_ISA:
-		dmab->area = snd_malloc_isa_pages(size, &dmab->addr);
-		break;
-#endif
-#ifdef CONFIG_PCI
-	case SNDRV_PCM_DMA_TYPE_PCI:
-		dmab->area = snd_malloc_pci_pages((struct pci_dev *)substream->dma_private, size, &dmab->addr);
-		break;
-	case SNDRV_PCM_DMA_TYPE_PCI_SG:
-		snd_pcm_sgbuf_alloc_pages((struct pci_dev *)substream->dma_private, size, dmab);
-		break;
-#endif
-#ifdef CONFIG_SBUS
-	case SNDRV_PCM_DMA_TYPE_SBUS:
-		dmab->area = snd_malloc_sbus_pages((struct sbus_dev *)substream->dma_private, size, &dmab->addr);
-		break;
-#endif
-	default:
-		dmab->area = NULL;
-		dmab->addr = 0;
-		return -ENXIO;
-	}
-	return 0;
-}
-
-/*
  * try to allocate as the large pages as possible.
  * stores the resultant memory size in *res_size.
  *
  * the minimum size is snd_minimum_buffer.  it should be power of 2.
  */
-static int alloc_pcm_pages_fallback(snd_pcm_substream_t *substream,
-				    size_t size,
-				    struct snd_pcm_dma_buffer *dmab)
+static int preallocate_pcm_pages(snd_pcm_substream_t *substream, size_t size)
 {
+	struct snd_dma_buffer *dmab = &substream->dma_buffer;
 	int err;
+
 	snd_assert(size > 0, return -EINVAL);
+
+	/* already reserved? */
+	if (snd_dma_get_reserved(&substream->dma_device, dmab) > 0) {
+		if (dmab->bytes >= size)
+			return 0; /* yes */
+		/* no, reset the reserved block */
+		snd_dma_free_reserved(&substream->dma_device);
+		dmab->bytes = 0;
+	}
+
 	do {
-		if ((err = alloc_pcm_pages(substream, size, dmab)) < 0)
+		if ((err = snd_dma_alloc_pages(&substream->dma_device, size, dmab)) < 0)
 			return err;
 		if (dmab->area) {
-			dmab->bytes = size;
+			/* remember this one */
+			snd_dma_set_reserved(&substream->dma_device, dmab);
 			return 0;
 		}
 		size >>= 1;
@@ -106,46 +77,13 @@ static int alloc_pcm_pages_fallback(snd_pcm_substream_t *substream,
 }
 
 /*
- * release the pages on the specified bus
- */
-static void free_pcm_pages(snd_pcm_substream_t *substream,
-			   struct snd_pcm_dma_buffer *dmab)
-{
-	switch (substream->dma_type) {
-	case SNDRV_PCM_DMA_TYPE_CONTINUOUS:
-		snd_free_pages(dmab->area, dmab->bytes);
-		break;
-#ifdef CONFIG_ISA
-	case SNDRV_PCM_DMA_TYPE_ISA:
-		snd_free_isa_pages(dmab->bytes, dmab->area, dmab->addr);
-		break;
-#endif
-#ifdef CONFIG_PCI
-	case SNDRV_PCM_DMA_TYPE_PCI:
-		snd_free_pci_pages((struct pci_dev *)substream->dma_private,
-				   dmab->bytes, dmab->area, dmab->addr);
-		break;
-	case SNDRV_PCM_DMA_TYPE_PCI_SG:
-		snd_pcm_sgbuf_free_pages(dmab);
-		break;
-#endif
-#ifdef CONFIG_SBUS
-	case SNDRV_PCM_DMA_TYPE_SBUS:
-		snd_free_sbus_pages((struct sbus_dev *)substream->dma_private,
-				    dmab->bytes, dmab->area, dmab->addr);
-		break;
-#endif
-	}
-}
-
-/*
  * release the preallocated buffer if not yet done.
  */
 static void snd_pcm_lib_preallocate_dma_free(snd_pcm_substream_t *substream)
 {
 	if (substream->dma_buffer.area == NULL)
 		return;
-	free_pcm_pages(substream, &substream->dma_buffer);
+	snd_dma_free_reserved(&substream->dma_device);
 	substream->dma_buffer.area = NULL;
 }
 
@@ -164,7 +102,7 @@ int snd_pcm_lib_preallocate_free(snd_pcm_substream_t *substream)
 		snd_info_unregister(substream->proc_prealloc_entry);
 		substream->proc_prealloc_entry = NULL;
 	}
-	substream->dma_type = SNDRV_PCM_DMA_TYPE_UNKNOWN;
+	substream->dma_device.type = SNDRV_DMA_TYPE_UNKNOWN;
 	return 0;
 }
 
@@ -210,7 +148,7 @@ static void snd_pcm_lib_preallocate_proc_write(snd_info_entry_t *entry,
 	snd_pcm_substream_t *substream = (snd_pcm_substream_t *)entry->private_data;
 	char line[64], str[64];
 	size_t size;
-	struct snd_pcm_dma_buffer new_dmab;
+	struct snd_dma_buffer new_dmab;
 
 	if (substream->runtime) {
 		buffer->error = -EBUSY;
@@ -228,7 +166,7 @@ static void snd_pcm_lib_preallocate_proc_write(snd_info_entry_t *entry,
 		memset(&new_dmab, 0, sizeof(new_dmab));
 		if (size > 0) {
 
-			if (alloc_pcm_pages(substream, size, &new_dmab) < 0 ||
+			if (snd_dma_alloc_pages(&substream->dma_device, size, &new_dmab) < 0 ||
 			    new_dmab.area == NULL) {
 				buffer->error = -ENOMEM;
 				return;
@@ -237,7 +175,7 @@ static void snd_pcm_lib_preallocate_proc_write(snd_info_entry_t *entry,
 		} else {
 			substream->buffer_bytes_max = UINT_MAX;
 		}
-		snd_pcm_lib_preallocate_dma_free(substream);
+		snd_dma_set_reserved(&substream->dma_device, &new_dmab);
 		substream->dma_buffer = new_dmab;
 	} else {
 		buffer->error = -EINVAL;
@@ -254,7 +192,7 @@ static int snd_pcm_lib_preallocate_pages1(snd_pcm_substream_t *substream,
 
 	memset(&substream->dma_buffer, 0, sizeof(substream->dma_buffer));
 	if (size > 0 && preallocate_dma && substream->number < maximum_substreams)
-		alloc_pcm_pages_fallback(substream, size, &substream->dma_buffer);
+		preallocate_pcm_pages(substream, size);
 
 	if (substream->dma_buffer.bytes > 0)
 		substream->buffer_bytes_max = substream->dma_buffer.bytes;
@@ -274,6 +212,16 @@ static int snd_pcm_lib_preallocate_pages1(snd_pcm_substream_t *substream,
 	return 0;
 }
 
+
+/*
+ * set up the unique pcm id
+ */
+static inline void setup_pcm_id(snd_pcm_substream_t *subs)
+{
+	subs->dma_device.id = subs->pcm->device << 16 |
+		subs->stream << 8 | subs->number;
+}
+
 /**
  * snd_pcm_lib_preallocate_pages - pre-allocation for the continuous memory type
  * @substream: the pcm substream instance
@@ -289,8 +237,9 @@ int snd_pcm_lib_preallocate_pages(snd_pcm_substream_t *substream,
 				      size_t size, size_t max,
 				      unsigned int flags)
 {
-	substream->dma_type = SNDRV_PCM_DMA_TYPE_CONTINUOUS;
-	substream->dma_private = (void *)(unsigned long)flags;
+	substream->dma_device.type = SNDRV_DMA_TYPE_CONTINUOUS;
+	substream->dma_device.dev.flags = flags;
+	setup_pcm_id(substream);
 	return snd_pcm_lib_preallocate_pages1(substream, size, max);
 }
 
@@ -334,8 +283,9 @@ int snd_pcm_lib_preallocate_pages_for_all(snd_pcm_t *pcm,
 int snd_pcm_lib_preallocate_isa_pages(snd_pcm_substream_t *substream,
 				      size_t size, size_t max)
 {
-	substream->dma_type = SNDRV_PCM_DMA_TYPE_ISA;
-	substream->dma_private = NULL;
+	substream->dma_device.type = SNDRV_DMA_TYPE_ISA;
+	substream->dma_device.dev.flags = 0; /* FIXME: any good identifier? */
+	setup_pcm_id(substream);
 	return snd_pcm_lib_preallocate_pages1(substream, size, max);
 }
 
@@ -379,9 +329,9 @@ int snd_pcm_lib_preallocate_isa_pages_for_all(snd_pcm_t *pcm,
 int snd_pcm_lib_malloc_pages(snd_pcm_substream_t *substream, size_t size)
 {
 	snd_pcm_runtime_t *runtime;
-	struct snd_pcm_dma_buffer dmab;
+	struct snd_dma_buffer dmab;
 
-	snd_assert(substream->dma_type != SNDRV_PCM_DMA_TYPE_UNKNOWN, return -EINVAL);
+	snd_assert(substream->dma_device.type != SNDRV_DMA_TYPE_UNKNOWN, return -EINVAL);
 	snd_assert(substream != NULL, return -EINVAL);
 	runtime = substream->runtime;
 	snd_assert(runtime != NULL, return -EINVAL);	
@@ -398,7 +348,7 @@ int snd_pcm_lib_malloc_pages(snd_pcm_substream_t *substream, size_t size)
 		dmab = substream->dma_buffer;
 	} else {
 		memset(&dmab, 0, sizeof(dmab));
-		alloc_pcm_pages(substream, size, &dmab);
+		snd_dma_alloc_pages(&substream->dma_device, size, &dmab);
 	}
 	if (! dmab.area)
 		return -ENOMEM;
@@ -427,13 +377,13 @@ int snd_pcm_lib_free_pages(snd_pcm_substream_t *substream)
 	if (runtime->dma_area == NULL)
 		return 0;
 	if (runtime->dma_area != substream->dma_buffer.area) {
-		struct snd_pcm_dma_buffer dmab;
+		struct snd_dma_buffer dmab;
 		memset(&dmab, 0, sizeof(dmab));
 		dmab.area = runtime->dma_area;
 		dmab.addr = runtime->dma_addr;
 		dmab.bytes = runtime->dma_bytes;
 		dmab.private_data = runtime->dma_private;
-		free_pcm_pages(substream, &dmab);
+		snd_dma_free_pages(&substream->dma_device, &dmab);
 	}
 	runtime->dma_area = NULL;
 	runtime->dma_addr = 0UL;
@@ -459,8 +409,9 @@ int snd_pcm_lib_preallocate_pci_pages(struct pci_dev *pci,
 				      snd_pcm_substream_t *substream,
 				      size_t size, size_t max)
 {
-	substream->dma_type = SNDRV_PCM_DMA_TYPE_PCI;
-	substream->dma_private = pci;
+	substream->dma_device.type = SNDRV_DMA_TYPE_PCI;
+	substream->dma_device.dev.pci = pci;
+	setup_pcm_id(substream);
 	return snd_pcm_lib_preallocate_pages1(substream, size, max);
 }
 
@@ -510,8 +461,9 @@ int snd_pcm_lib_preallocate_sbus_pages(struct sbus_dev *sdev,
 				       snd_pcm_substream_t *substream,
 				       size_t size, size_t max)
 {
-	substream->dma_type = SNDRV_PCM_DMA_TYPE_SBUS;
-	substream->dma_private = sdev;
+	substream->dma_device.type = SNDRV_DMA_TYPE_SBUS;
+	substream->dma_device.dev.sbus = sdev;
+	setup_pcm_id(substream);
 	return snd_pcm_lib_preallocate_pages1(substream, size, max);
 }
 
@@ -563,8 +515,9 @@ int snd_pcm_lib_preallocate_sg_pages(struct pci_dev *pci,
 				     snd_pcm_substream_t *substream,
 				     size_t size, size_t max)
 {
-	substream->dma_type = SNDRV_PCM_DMA_TYPE_PCI_SG;
-	substream->dma_private = pci;
+	substream->dma_device.type = SNDRV_DMA_TYPE_PCI_SG;
+	substream->dma_device.dev.pci = pci;
+	setup_pcm_id(substream);
 	return snd_pcm_lib_preallocate_pages1(substream, size, max);
 }
 
@@ -594,6 +547,24 @@ int snd_pcm_lib_preallocate_sg_pages_for_all(struct pci_dev *pci,
 			if ((err = snd_pcm_lib_preallocate_sg_pages(pci, substream, size, max)) < 0)
 				return err;
 	return 0;
+}
+
+/**
+ * snd_pcm_sgbuf_ops_page - get the page struct at the given offset
+ * @substream: the pcm substream instance
+ * @offset: the buffer offset
+ *
+ * Returns the page struct at the given buffer offset.
+ * Used as the page callback of PCM ops.
+ */
+struct page *snd_pcm_sgbuf_ops_page(snd_pcm_substream_t *substream, unsigned long offset)
+{
+	struct snd_sg_buf *sgbuf = snd_pcm_substream_sgbuf(substream);
+
+	unsigned int idx = offset >> PAGE_SHIFT;
+	if (idx >= (unsigned int)sgbuf->pages)
+		return NULL;
+	return sgbuf->page_table[idx];
 }
 
 #endif /* CONFIG_PCI */

@@ -156,7 +156,8 @@ dsp_scb_descriptor_t *  cs46xx_dsp_create_src_task_scb(cs46xx_t * chip,char * sc
                                                        u16 src_buffer_addr,
                                                        u16 src_delay_buffer_addr,u32 dest,
                                                        dsp_scb_descriptor_t * parent_scb,
-                                                       int scb_child_type);
+                                                       int scb_child_type,
+						       int pass_through);
 dsp_scb_descriptor_t *  cs46xx_dsp_create_mix_only_scb(cs46xx_t * chip,char * scb_name,
                                                        u16 mix_buffer_addr,u32 dest,
                                                        dsp_scb_descriptor_t * parent_scb,

@@ -83,7 +83,7 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 					   const union sctp_addr *addr,
 					   int priority)
 {
-	sctp_protocol_t *proto = sctp_get_protocol();
+	struct sctp_protocol *proto = sctp_get_protocol();
 
 	/* Copy in the address.  */
 	peer->ipaddr = *addr;
@@ -262,7 +262,7 @@ void sctp_transport_put(struct sctp_transport *transport)
 /* Update transport's RTO based on the newly calculated RTT. */
 void sctp_transport_update_rto(struct sctp_transport *tp, __u32 rtt)
 {
-	sctp_protocol_t *proto = sctp_get_protocol();
+	struct sctp_protocol *proto = sctp_get_protocol();
 
 	/* Check for valid transport.  */
 	SCTP_ASSERT(tp, "NULL transport", return);

@@ -2326,16 +2326,16 @@ static int snd_rme9652_hw_rule_channels_rate(snd_pcm_hw_params_t *params,
 	snd_interval_t *r = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	if (r->min > 48000) {
 		snd_interval_t t = {
-			min: rme9652->ds_channels,
-			max: rme9652->ds_channels,
-			integer: 1,
+			.min = rme9652->ds_channels,
+			.max = rme9652->ds_channels,
+			.integer = 1,
 		};
 		return snd_interval_refine(c, &t);
 	} else if (r->max < 88200) {
 		snd_interval_t t = {
-			min: rme9652->ss_channels,
-			max: rme9652->ss_channels,
-			integer: 1,
+			.min = rme9652->ss_channels,
+			.max = rme9652->ss_channels,
+			.integer = 1,
 		};
 		return snd_interval_refine(c, &t);
 	}
@@ -2350,16 +2350,16 @@ static int snd_rme9652_hw_rule_rate_channels(snd_pcm_hw_params_t *params,
 	snd_interval_t *r = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	if (c->min >= rme9652->ss_channels) {
 		snd_interval_t t = {
-			min: 44100,
-			max: 48000,
-			integer: 1,
+			.min = 44100,
+			.max = 48000,
+			.integer = 1,
 		};
 		return snd_interval_refine(r, &t);
 	} else if (c->max <= rme9652->ds_channels) {
 		snd_interval_t t = {
-			min: 88200,
-			max: 96000,
-			integer: 1,
+			.min = 88200,
+			.max = 96000,
+			.integer = 1,
 		};
 		return snd_interval_refine(r, &t);
 	}

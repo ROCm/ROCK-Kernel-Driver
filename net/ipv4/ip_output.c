@@ -162,13 +162,13 @@ static inline int ip_finish_output2(struct sk_buff *skb)
 	struct dst_entry *dst = skb->dst;
 	struct hh_cache *hh = dst->hh;
 	struct net_device *dev = dst->dev;
+	int hh_len = LL_RESERVED_SPACE(dev);
 
 	/* Be paranoid, rather than too clever. */
-	if (unlikely(skb_headroom(skb) < dev->hard_header_len
-		     && dev->hard_header)) {
+	if (unlikely(skb_headroom(skb) < hh_len && dev->hard_header)) {
 		struct sk_buff *skb2;
 
-		skb2 = skb_realloc_headroom(skb, (dev->hard_header_len&~15) + 16);
+		skb2 = skb_realloc_headroom(skb, LL_RESERVED_SPACE(dev));
 		if (skb2 == NULL) {
 			kfree_skb(skb);
 			return -ENOMEM;
@@ -440,7 +440,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 
 	iph = skb->nh.iph;
 
-	if (unlikely(iph->frag_off & htons(IP_DF))) {
+	if (unlikely((iph->frag_off & htons(IP_DF)) && !skb->local_df)) {
 		icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED,
 			  htonl(dst_pmtu(&rt->u.dst)));
 		kfree_skb(skb);
@@ -572,7 +572,7 @@ slow_path:
 		 *	Allocate buffer.
 		 */
 
-		if ((skb2 = alloc_skb(len+hlen+rt->u.dst.dev->hard_header_len+16,GFP_ATOMIC)) == NULL) {
+		if ((skb2 = alloc_skb(len+hlen+LL_RESERVED_SPACE(rt->u.dst.dev), GFP_ATOMIC)) == NULL) {
 			NETDEBUG(printk(KERN_INFO "IP: frag: no memory for new fragment!\n"));
 			err = -ENOMEM;
 			goto fail;
@@ -583,7 +583,7 @@ slow_path:
 		 */
 
 		ip_copy_metadata(skb2, skb);
-		skb_reserve(skb2, (rt->u.dst.dev->hard_header_len&~15)+16);
+		skb_reserve(skb2, LL_RESERVED_SPACE(rt->u.dst.dev));
 		skb_put(skb2, len + hlen);
 		skb2->nh.raw = skb2->data;
 		skb2->h.raw = skb2->data + hlen;
@@ -771,7 +771,7 @@ int ip_append_data(struct sock *sk,
 		exthdrlen = 0;
 		mtu = inet->cork.fragsize;
 	}
-	hh_len = (rt->u.dst.dev->hard_header_len&~15) + 16;
+	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	fragheaderlen = sizeof(struct iphdr) + (opt ? opt->optlen : 0);
 	maxfraglen = ((mtu-fragheaderlen) & ~7) + fragheaderlen;
@@ -792,6 +792,19 @@ int ip_append_data(struct sock *sk,
 		csummode = CHECKSUM_HW;
 
 	inet->cork.length += length;
+
+	/* So, what's going on in the loop below?
+	 *
+	 * We use calculated fragment length to generate chained skb,
+	 * each of segments is IP fragment ready for sending to network after
+	 * adding appropriate IP header.
+	 *
+	 * Mistake is:
+	 *
+	 *    If mtu-fragheaderlen is not 0 modulo 8, we generate additional
+	 *    small fragment of length (mtu-fragheaderlen)%8, even though
+	 *    it is not necessary. Not a big bug, but needs a fix.
+	 */
 
 	if ((skb = skb_peek_tail(&sk->write_queue)) == NULL)
 		goto alloc_new_skb;
@@ -815,6 +828,15 @@ alloc_new_skb:
 				alloclen = maxfraglen;
 			else
 				alloclen = datalen + fragheaderlen;
+
+			/* The last fragment gets additional space at tail.
+			 * Note, with MSG_MORE we overallocate on fragments,
+			 * because we have no idea what fragment will be
+			 * the last.
+			 */
+			if (datalen == length)
+				alloclen += rt->u.dst.trailer_len;
+
 			if (transhdrlen) {
 				skb = sock_alloc_send_skb(sk, 
 						alloclen + hh_len + 15,
@@ -967,7 +989,7 @@ ssize_t	ip_append_page(struct sock *sk, struct page *page,
 	if (!(rt->u.dst.dev->features&NETIF_F_SG))
 		return -EOPNOTSUPP;
 
-	hh_len = (rt->u.dst.dev->hard_header_len&~15)+16;
+	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 	mtu = inet->cork.fragsize;
 
 	fragheaderlen = sizeof(struct iphdr) + (opt ? opt->optlen : 0);
@@ -1088,6 +1110,16 @@ int ip_push_pending_frames(struct sock *sk)
 #endif
 	}
 
+	/* Unless user demanded real pmtu discovery (IP_PMTUDISC_DO), we allow
+	 * to fragment the frame generated here. No matter, what transforms
+	 * how transforms change size of the packet, it will come out.
+	 */
+	if (inet->pmtudisc != IP_PMTUDISC_DO)
+		skb->local_df = 1;
+
+	/* DF bit is set when we want to see DF on outgoing frames.
+	 * If local_df is set too, we still allow to fragment this frame
+	 * locally. */
 	if (inet->pmtudisc == IP_PMTUDISC_DO ||
 	    (!skb_shinfo(skb)->frag_list && ip_dont_fragment(sk, &rt->u.dst)))
 		df = htons(IP_DF);

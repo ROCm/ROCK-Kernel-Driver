@@ -280,7 +280,7 @@ static int raw_send_hdrinc(struct sock *sk, void *from, int length,
 	if (flags&MSG_PROBE)
 		goto out;
 
-	hh_len = (rt->u.dst.dev->hard_header_len&~15) + 16;
+	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	skb = sock_alloc_send_skb(sk, length+hh_len+15,
 				  flags&MSG_DONTWAIT, &err);

@@ -802,7 +802,7 @@ module_exit(alsa_card_mtpav_exit)
 
 #ifndef MODULE
 
-/* format is: snd-mtpav=snd_enable,index,id,
+/* format is: snd-mtpav=enable,index,id,
 			port,irq,hwports */
 
 static int __init alsa_card_mtpav_setup(char *str)

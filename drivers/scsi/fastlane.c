@@ -191,8 +191,8 @@ int __init fastlane_esp_detect(Scsi_Host_Template *tpnt)
 		esp->edev = (void *) address;
 		
 		/* Set the command buffer */
-		esp->esp_command = (volatile unsigned char*) cmd_buffer;
-		esp->esp_command_dvma = virt_to_bus(cmd_buffer);
+		esp->esp_command = cmd_buffer;
+		esp->esp_command_dvma = virt_to_bus((void *)cmd_buffer);
 
 		esp->irq = IRQ_AMIGA_PORTS;
 		esp->slot = board+FASTLANE_ESP_ADDR;

@@ -208,6 +208,7 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 	skb->len	  = 0;
 	skb->data_len	  = 0;
 	skb->csum	  = 0;
+	skb->local_df	  = 0;
 	skb->cloned	  = 0;
 	skb->pkt_type	  = PACKET_HOST;	/* Default type */
 	skb->ip_summed	  = 0;
@@ -375,6 +376,7 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(len);
 	C(data_len);
 	C(csum);
+	C(local_df);
 	n->cloned = 1;
 	C(pkt_type);
 	C(ip_summed);
@@ -438,6 +440,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->mac.raw	= old->mac.raw + offset;
 	memcpy(new->cb, old->cb, sizeof(old->cb));
 	atomic_set(&new->users, 1);
+	new->local_df	= old->local_df;
 	new->pkt_type	= old->pkt_type;
 	new->stamp	= old->stamp;
 	new->destructor = NULL;

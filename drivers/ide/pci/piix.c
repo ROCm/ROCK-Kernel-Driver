@@ -106,6 +106,7 @@
 #include "ide_modes.h"
 #include "piix.h"
 
+static int no_piix_dma;
 #if defined(DISPLAY_PIIX_TIMINGS) && defined(CONFIG_PROC_FS)
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
@@ -114,7 +115,6 @@ static u8 piix_proc = 0;
 #define PIIX_MAX_DEVS		5
 static struct pci_dev *piix_devs[PIIX_MAX_DEVS];
 static int n_piix_devs;
-static int no_piix_dma = 0;
 
 /**
  *	piix_get_info		-	fill in /proc for PIIX ide

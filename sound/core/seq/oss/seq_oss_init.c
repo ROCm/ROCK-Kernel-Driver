@@ -51,7 +51,7 @@ static int translate_mode(struct file *file);
 static int create_port(seq_oss_devinfo_t *dp);
 static int delete_port(seq_oss_devinfo_t *dp);
 static int alloc_seq_queue(seq_oss_devinfo_t *dp);
-static int delete_seq_queue(seq_oss_devinfo_t *dp);
+static int delete_seq_queue(int queue);
 static void free_devinfo(void *private);
 
 #define call_ctl(type,rec) snd_seq_kernel_client_ctl(system_client, type, rec)
@@ -186,6 +186,7 @@ snd_seq_oss_open(struct file *file, int level)
 		snd_printk(KERN_ERR "can't malloc device info\n");
 		return -ENOMEM;
 	}
+	debug_printk(("oss_open: dp = %p\n", dp));
 
 	for (i = 0; i < SNDRV_SEQ_OSS_MAX_CLIENTS; i++) {
 		if (client_table[i] == NULL)
@@ -193,6 +194,7 @@ snd_seq_oss_open(struct file *file, int level)
 	}
 	if (i >= SNDRV_SEQ_OSS_MAX_CLIENTS) {
 		snd_printk(KERN_ERR "too many applications\n");
+		kfree(dp);
 		return -ENOMEM;
 	}
 
@@ -209,22 +211,21 @@ snd_seq_oss_open(struct file *file, int level)
 
 	if (dp->synth_opened == 0 && dp->max_mididev == 0) {
 		snd_printk(KERN_ERR "no device found\n");
-		kfree(dp);
-		return -ENODEV;
+		rc = -ENODEV;
+		goto _error;
 	}
 
 	/* create port */
+	debug_printk(("create new port\n"));
 	if ((rc = create_port(dp)) < 0) {
 		snd_printk(KERN_ERR "can't create port\n");
-		free_devinfo(dp);
-		return rc;
+		goto _error;
 	}
 
 	/* allocate queue */
-	if ((rc = alloc_seq_queue(dp)) < 0) {
-		delete_port(dp);
-		return rc;
-	}
+	debug_printk(("allocate queue\n"));
+	if ((rc = alloc_seq_queue(dp)) < 0)
+		goto _error;
 
 	/* set address */
 	dp->addr.client = dp->cseq;
@@ -238,31 +239,32 @@ snd_seq_oss_open(struct file *file, int level)
 	dp->file_mode = translate_mode(file);
 
 	/* initialize read queue */
+	debug_printk(("initialize read queue\n"));
 	if (is_read_mode(dp->file_mode)) {
 		if ((dp->readq = snd_seq_oss_readq_new(dp, maxqlen)) == NULL) {
-			delete_seq_queue(dp);
-			delete_port(dp);
-			return -ENOMEM;
+			rc = -ENOMEM;
+			goto _error;
 		}
 	}
 
 	/* initialize write queue */
+	debug_printk(("initialize write queue\n"));
 	if (is_write_mode(dp->file_mode)) {
 		dp->writeq = snd_seq_oss_writeq_new(dp, maxqlen);
 		if (dp->writeq == NULL) {
-			delete_seq_queue(dp);
-			delete_port(dp);
-			return -ENOMEM;
+			rc = -ENOMEM;
+			goto _error;
 		}
 	}
 
 	/* initialize timer */
+	debug_printk(("initialize timer\n"));
 	if ((dp->timer = snd_seq_oss_timer_new(dp)) == NULL) {
 		snd_printk(KERN_ERR "can't alloc timer\n");
-		delete_seq_queue(dp);
-		delete_port(dp);
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto _error;
 	}
+	debug_printk(("timer initialized\n"));
 
 	/* set private data pointer */
 	file->private_data = dp;
@@ -277,8 +279,16 @@ snd_seq_oss_open(struct file *file, int level)
 	num_clients++;
 
 	debug_printk(("open done\n"));
-
 	return 0;
+
+ _error:
+	snd_seq_oss_synth_cleanup(dp);
+	snd_seq_oss_midi_cleanup(dp);
+	i = dp->queue;
+	delete_port(dp);
+	delete_seq_queue(i);
+
+	return rc;
 }
 
 /*
@@ -344,6 +354,7 @@ delete_port(seq_oss_devinfo_t *dp)
 	if (dp->port < 0)
 		return 0;
 
+	debug_printk(("delete_port %i\n", dp->port));
 	memset(&port_info, 0, sizeof(port_info));
 	port_info.addr.client = dp->cseq;
 	port_info.addr.port = dp->port;
@@ -375,15 +386,19 @@ alloc_seq_queue(seq_oss_devinfo_t *dp)
  * release queue
  */
 static int
-delete_seq_queue(seq_oss_devinfo_t *dp)
+delete_seq_queue(int queue)
 {
 	snd_seq_queue_info_t qinfo;
+	int rc;
 
-	if (dp->queue < 0)
+	if (queue < 0)
 		return 0;
 	memset(&qinfo, 0, sizeof(qinfo));
-	qinfo.queue = dp->queue;
-	return call_ctl(SNDRV_SEQ_IOCTL_DELETE_QUEUE, &qinfo);
+	qinfo.queue = queue;
+	rc = call_ctl(SNDRV_SEQ_IOCTL_DELETE_QUEUE, &qinfo);
+	if (rc < 0)
+		printk(KERN_ERR "seq-oss: unable to delete queue %d (%d)\n", queue, rc);
+	return rc;
 }
 
 
@@ -414,6 +429,8 @@ free_devinfo(void *private)
 void
 snd_seq_oss_release(seq_oss_devinfo_t *dp)
 {
+	int queue;
+
 	client_table[dp->index] = NULL;
 	num_clients--;
 
@@ -426,10 +443,10 @@ snd_seq_oss_release(seq_oss_devinfo_t *dp)
 
 	/* clear slot */
 	debug_printk(("releasing resource..\n"));
+	queue = dp->queue;
 	if (dp->port >= 0)
 		delete_port(dp);
-	if (dp->queue >= 0)
-		delete_seq_queue(dp);
+	delete_seq_queue(queue);
 
 	debug_printk(("release done\n"));
 }

@@ -24,17 +24,6 @@ MODULE_AUTHOR("Andras Kis-Szabo <kisza@sch.bme.hu>");
 #define DEBUGP(format, args...)
 #endif
 
-int ipv6_ext_hdr(u8 nexthdr)
-{
-        return ( (nexthdr == NEXTHDR_HOP)       ||
-                 (nexthdr == NEXTHDR_ROUTING)   ||
-                 (nexthdr == NEXTHDR_FRAGMENT)  ||
-                 (nexthdr == NEXTHDR_AUTH)      ||
-                 (nexthdr == NEXTHDR_ESP)       ||
-                 (nexthdr == NEXTHDR_NONE)      ||
-                 (nexthdr == NEXTHDR_DEST) );
-}
-
 static int
 ipv6header_match(const struct sk_buff *skb,
 		 const struct net_device *in,
@@ -95,7 +84,7 @@ ipv6header_match(const struct sk_buff *skb,
 
 	temp = 0;
 
-        while (ipv6_ext_hdr(nexthdr)) {
+        while (ip6t_ext_hdr(nexthdr)) {
         	struct ipv6_opt_hdr *hdr;
         	int hdrlen;
 
@@ -196,14 +185,12 @@ ipv6header_destroy(void *matchinfo,
 	return;
 }
 
-static struct ip6t_match
-ip6t_ipv6header_match = {
-	{ NULL, NULL },
-	"ipv6header",
-	&ipv6header_match,
-	&ipv6header_checkentry,
-	&ipv6header_destroy,
-	THIS_MODULE
+static struct ip6t_match ip6t_ipv6header_match = {
+	.name		= "ipv6header",
+	.match		= &ipv6header_match,
+	.checkentry	= &ipv6header_checkentry,
+	.destroy	= &ipv6header_destroy,
+	.me		= THIS_MODULE,
 };
 
 static int  __init ipv6header_init(void)

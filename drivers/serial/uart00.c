@@ -235,8 +235,8 @@ static void uart00_modem_status(struct uart_port *port)
 
 	status = UART_GET_MSR(port);
 
-	if (!status & (UART_MSR_DCTS_MSK | UART_MSR_DDSR_MSK | 
-		       UART_MSR_TERI_MSK | UART_MSR_DDCD_MSK))
+	if (!(status & (UART_MSR_DCTS_MSK | UART_MSR_DDSR_MSK | 
+			UART_MSR_TERI_MSK | UART_MSR_DDCD_MSK)))
 		return;
 
 	if (status & UART_MSR_DDCD_MSK)

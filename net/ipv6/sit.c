@@ -181,7 +181,6 @@ static struct ip_tunnel * ipip6_tunnel_locate(struct ip_tunnel_parm *parms, int 
 	nt = (struct ip_tunnel*)dev->priv;
 	nt->dev = dev;
 	dev->init = ipip6_tunnel_init;
-	dev->features |= NETIF_F_DYNALLOC;
 	memcpy(&nt->parms, parms, sizeof(*parms));
 	nt->parms.name[IFNAMSIZ-1] = '\0';
 	strcpy(dev->name, nt->parms.name);
@@ -213,6 +212,7 @@ failed:
 static void ipip6_tunnel_destructor(struct net_device *dev)
 {
 	if (dev != &ipip6_fb_tunnel_dev) {
+		kfree(dev);
 		MOD_DEC_USE_COUNT;
 	}
 }
@@ -552,7 +552,7 @@ static int ipip6_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	/*
 	 * Okay, now see if we can stuff it in the buffer as-is.
 	 */
-	max_headroom = (((tdev->hard_header_len+15)&~15)+sizeof(struct iphdr));
+	max_headroom = LL_RESERVED_SPACE(tdev)+sizeof(struct iphdr);
 
 	if (skb_headroom(skb) < max_headroom || skb_cloned(skb) || skb_shared(skb)) {
 		struct sk_buff *new_skb = skb_realloc_headroom(skb, max_headroom);

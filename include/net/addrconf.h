@@ -63,7 +63,15 @@ extern struct inet6_ifaddr *	ipv6_get_ifaddr(struct in6_addr *addr,
 extern int			ipv6_get_saddr(struct dst_entry *dst, 
 					       struct in6_addr *daddr,
 					       struct in6_addr *saddr);
+extern int			ipv6_dev_get_saddr(struct net_device *dev, 
+					       struct in6_addr *daddr,
+					       struct in6_addr *saddr,
+					       int onlink);
 extern int			ipv6_get_lladdr(struct net_device *dev, struct in6_addr *);
+extern void			addrconf_join_solict(struct net_device *dev,
+					struct in6_addr *addr);
+extern void			addrconf_leave_solict(struct net_device *dev,
+					struct in6_addr *addr);
 
 /*
  *	multicast prototypes (mcast.c)
@@ -92,6 +100,26 @@ extern int			ipv6_chk_mcast_addr(struct net_device *dev,
 
 extern void			addrconf_prefix_rcv(struct net_device *dev,
 						    u8 *opt, int len);
+
+/*
+ *	anycast prototypes (anycast.c)
+ */
+extern int			ipv6_sock_ac_join(struct sock *sk, 
+						  int ifindex, 
+						  struct in6_addr *addr);
+extern int			ipv6_sock_ac_drop(struct sock *sk,
+						  int ifindex, 
+						  struct in6_addr *addr);
+extern void			ipv6_sock_ac_close(struct sock *sk);
+extern int			inet6_ac_check(struct sock *sk, struct in6_addr *addr, int ifindex);
+
+extern int			ipv6_dev_ac_inc(struct net_device *dev,
+						struct in6_addr *addr);
+extern int			ipv6_dev_ac_dec(struct net_device *dev,
+						struct in6_addr *addr);
+extern int			ipv6_chk_acast_addr(struct net_device *dev,
+						struct in6_addr *addr);
+
 
 /* Device notifier */
 extern int register_inet6addr_notifier(struct notifier_block *nb);

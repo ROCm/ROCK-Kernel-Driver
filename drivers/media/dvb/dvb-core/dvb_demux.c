@@ -221,7 +221,7 @@ dvb_dmx_swfilter_sectionfilter(struct dvb_demux_feed *dvbdmxfeed,
 			return 0;
 		neq|=f->maskandnotmode[i]&xor;
 	}
-	if (f->doneq & !neq)
+	if (f->doneq && !neq)
 		return 0;
 
         return dvbdmxfeed->cb.sec(dvbdmxfeed->secbuf, dvbdmxfeed->seclen, 

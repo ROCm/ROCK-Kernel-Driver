@@ -113,7 +113,7 @@ fp_fadd(struct fp_ext *dest, struct fp_ext *src)
 	return dest;
 }
 
-/* fp_fsub: Implementes the kernel of the FSUB, FSSUB, and FDSUB
+/* fp_fsub: Implements the kernel of the FSUB, FSSUB, and FDSUB
    instructions.
 
    Remember that the arguments are in assembler-syntax order! */

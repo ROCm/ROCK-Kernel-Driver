@@ -273,29 +273,29 @@ asmlinkage void atari_prio_irq_handler( void );
 /* Dummy function to allow asm with operands.  */
 void atari_fast_prio_irq_dummy (void) {
 __asm__ (__ALIGN_STR "\n"
-"atari_fast_irq_handler:
-	orw 	#0x700,%%sr		/* disable all interrupts */
-atari_prio_irq_handler:\t
-	addl	%3,%2\n"		/* preempt_count() += HARDIRQ_OFFSET */
-	SAVE_ALL_INT "\n"
-	GET_CURRENT(%%d0) "
+"atari_fast_irq_handler:\n\t"
+	"orw 	#0x700,%%sr\n"		/* disable all interrupts */
+"atari_prio_irq_handler:\n\t"
+	"addl	%3,%2\n\t"		/* preempt_count() += HARDIRQ_OFFSET */
+	SAVE_ALL_INT "\n\t"
+	GET_CURRENT(%%d0) "\n\t"
 	/* get vector number from stack frame and convert to source */
-	bfextu	%%sp@(%c1){#4,#10},%%d0
-	subw	#(0x40-8),%%d0
-	jpl 	1f
-	addw	#(0x40-8-0x18),%%d0
-1:	lea	%a0,%%a0
-	addql	#1,%%a0@(%%d0:l:4)
-	lea	irq_handler,%%a0
-	lea	%%a0@(%%d0:l:8),%%a0
-	pea 	%%sp@			/* push frame address */
-	movel	%%a0@(4),%%sp@-		/* push handler data */
-	movel	%%d0,%%sp@-		/* push int number */
-	movel	%%a0@,%%a0
-	jsr	%%a0@			/* and call the handler */
-	addql	#8,%%sp
-	addql	#4,%%sp
-	jbra	ret_from_interrupt"
+	"bfextu	%%sp@(%c1){#4,#10},%%d0\n\t"
+	"subw	#(0x40-8),%%d0\n\t"
+	"jpl 	1f\n\t"
+	"addw	#(0x40-8-0x18),%%d0\n"
+    "1:\tlea	%a0,%%a0\n\t"
+	"addql	#1,%%a0@(%%d0:l:4)\n\t"
+	"lea	irq_handler,%%a0\n\t"
+	"lea	%%a0@(%%d0:l:8),%%a0\n\t"
+	"pea 	%%sp@\n\t"		/* push frame address */
+	"movel	%%a0@(4),%%sp@-\n\t"	/* push handler data */
+	"movel	%%d0,%%sp@-\n\t"	/* push int number */
+	"movel	%%a0@,%%a0\n\t"
+	"jsr	%%a0@\n\t"		/* and call the handler */
+	"addql	#8,%%sp\n\t"
+	"addql	#4,%%sp\n\t"
+	"jbra	ret_from_interrupt"
 	 : : "i" (&kstat_cpu(0).irqs), "n" (PT_OFF_FORMATVEC),
 	     "m" (preempt_count()), "di" (HARDIRQ_OFFSET)
 );
@@ -308,10 +308,10 @@ atari_prio_irq_handler:\t
  */
 asmlinkage void falcon_hblhandler(void);
 asm(".text\n"
-__ALIGN_STR "\n"
-"falcon_hblhandler:
-	orw	#0x200,%sp@	/* set saved ipl to 2 */
-	rte");
+__ALIGN_STR "\n\t"
+"falcon_hblhandler:\n\t"
+	"orw	#0x200,%sp@\n\t"	/* set saved ipl to 2 */
+	"rte");
 
 /* Defined in entry.S; only increments 'num_spurious' */
 asmlinkage void bad_interrupt(void);

@@ -7,7 +7,7 @@
  * License.  See the file COPYING in the main directory of this archive
  * for more details.
  *
- * .. used to be losely based on bvme6000ints.c
+ * .. used to be loosely based on bvme6000ints.c
  *
  */
 
@@ -127,6 +127,7 @@ int q40_request_irq(unsigned int irq,
 	    printk("warning IRQ 10 and 11 not distinguishable\n");
 	    irq=10;
 	  default:
+	    ;
 	  }
 
 	if (irq<Q40_IRQ_SAMPLE)
@@ -174,6 +175,7 @@ void q40_free_irq(unsigned int irq, void *dev_id)
 	    return;
 	  case 11: irq=10;
 	  default:
+	    ;
 	  }
 	
 	if (irq<Q40_IRQ_SAMPLE)
@@ -315,7 +317,7 @@ void q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
   unsigned mir, mer;
   int irq,i;
 
- repeat:
+//repeat:
   mir=master_inb(IIRQ_REG);
   if (mir&Q40_IRQ_FRAME_MASK) {
 	  irq_tab[Q40_IRQ_FRAME].count++;
@@ -342,7 +344,7 @@ void q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
 				  continue; /* ignore uninited INTs :-( */
 			  }
 			  if ( irq_tab[irq].state & IRQ_INPROGRESS ) {
-				  /* some handlers do sti() for irq latency reasons, */
+				  /* some handlers do local_irq_enable() for irq latency reasons, */
 				  /* however reentering an active irq handler is not permitted */
 #ifdef IP_USE_DISABLE
 				  /* in theory this is the better way to do it because it still */
@@ -439,7 +441,7 @@ void q40_disable_irq (unsigned int irq)
 {
   /* disable ISA iqs : only do something if the driver has been
    * verified to be Q40 "compatible" - right now IDE, NE2K
-   * Any driver should not attempt to sleep accross disable_irq !!
+   * Any driver should not attempt to sleep across disable_irq !!
    */
 
   if ( irq>=5 && irq<=15 ) {

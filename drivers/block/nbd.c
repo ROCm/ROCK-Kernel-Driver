@@ -76,22 +76,15 @@ static void nbd_end_request(struct request *req)
 {
 	int uptodate = (req->errors == 0) ? 1 : 0;
 	request_queue_t *q = req->q;
-	struct bio *bio;
-	unsigned nsect;
 	unsigned long flags;
 
 #ifdef PARANOIA
 	requests_out++;
 #endif
 	spin_lock_irqsave(q->queue_lock, flags);
-	while((bio = req->bio) != NULL) {
-		nsect = bio_sectors(bio);
-		blk_finished_io(nsect);
-		req->bio = bio->bi_next;
-		bio->bi_next = NULL;
-		bio_endio(bio, nsect << 9, uptodate ? 0 : -EIO);
+	if (!end_that_request_first(req, uptodate, req->nr_sectors)) {
+		end_that_request_last(req);
 	}
-	blk_put_request(req);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
@@ -243,7 +236,7 @@ static struct request *nbd_find_request(struct nbd_device *lo, char *handle)
 		req = list_entry(tmp, struct request, queuelist);
 		if (req != xreq)
 			continue;
-		list_del(&req->queuelist);
+		list_del_init(&req->queuelist);
 		spin_unlock(&lo->queue_lock);
 		return req;
 	}
@@ -322,7 +315,7 @@ void nbd_clear_que(struct nbd_device *lo)
 		spin_lock(&lo->queue_lock);
 		if (!list_empty(&lo->queue_head)) {
 			req = list_entry(lo->queue_head.next, struct request, queuelist);
-			list_del(&req->queuelist);
+			list_del_init(&req->queuelist);
 		}
 		spin_unlock(&lo->queue_lock);
 		if (req) {
@@ -387,7 +380,7 @@ static void do_nbd_request(request_queue_t * q)
 		if (req->errors) {
 			printk(KERN_ERR "nbd: nbd_send_req failed\n");
 			spin_lock(&lo->queue_lock);
-			list_del(&req->queuelist);
+			list_del_init(&req->queuelist);
 			spin_unlock(&lo->queue_lock);
 			nbd_end_request(req);
 			spin_lock_irq(q->queue_lock);
@@ -590,6 +583,7 @@ static int __init nbd_init(void)
 		disk->first_minor = i;
 		disk->fops = &nbd_fops;
 		disk->private_data = &nbd_dev[i];
+		disk->queue = &nbd_queue;
 		sprintf(disk->disk_name, "nbd%d", i);
 		set_capacity(disk, 0x3ffffe);
 		add_disk(disk);

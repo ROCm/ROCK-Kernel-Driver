@@ -32,8 +32,10 @@ int esp_output(struct sk_buff *skb)
 	} tmp_iph;
 
 	/* First, if the skb is not checksummed, complete checksum. */
-	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL)
-		return -EINVAL;
+	if (skb->ip_summed == CHECKSUM_HW && skb_checksum_help(skb) == NULL) {
+		err = -EINVAL;
+		goto error_nolock;
+	}
 
 	spin_lock_bh(&x->lock);
 	if ((err = xfrm_state_check_expire(x)) != 0)
@@ -143,8 +145,10 @@ int esp_output(struct sk_buff *skb)
 	x->curlft.bytes += skb->len;
 	x->curlft.packets++;
 	spin_unlock_bh(&x->lock);
-	if ((skb->dst = dst_pop(dst)) == NULL)
+	if ((skb->dst = dst_pop(dst)) == NULL) {
+		err = -EHOSTUNREACH;
 		goto error_nolock;
+	}
 	return NET_XMIT_BYPASS;
 
 error:
@@ -259,7 +263,7 @@ static u32 esp4_get_max_size(struct xfrm_state *x, int mtu)
 	if (esp->conf.padlen)
 		mtu = (mtu + esp->conf.padlen-1)&~(esp->conf.padlen-1);
 
-	return mtu + x->props.header_len + esp->auth.icv_full_len;
+	return mtu + x->props.header_len + esp->auth.icv_trunc_len;
 }
 
 void esp4_err(struct sk_buff *skb, u32 info)
@@ -365,6 +369,7 @@ int esp_init_state(struct xfrm_state *x, void *args)
 	if (x->props.mode)
 		x->props.header_len += 20;
 	x->data = esp;
+	x->props.trailer_len = esp4_get_max_size(x, 0) - x->props.header_len;
 	return 0;
 
 error:

@@ -162,7 +162,9 @@ static inline unsigned long isa_mtb(long addr)
 #ifdef CONFIG_GG2
     case GG2_ISA: return GG2_ISA_MEM_B(addr);
 #endif
-      /* FIXME: any ISA mem mapping for PCMCIA? */
+#ifdef CONFIG_AMIGA_PCMCIA
+    case AG_ISA: return addr;
+#endif
     default: return 0; /* avoid warnings, just in case */
     }
 }
@@ -176,6 +178,9 @@ static inline unsigned long isa_mtw(long addr)
 #ifdef CONFIG_GG2
     case GG2_ISA: return GG2_ISA_MEM_W(addr);
 #endif
+#ifdef CONFIG_AMIGA_PCMCIA
+    case AG_ISA: return addr;
+#endif
     default: return 0; /* avoid warnings, just in case */
     }
 }
@@ -187,9 +192,9 @@ static inline unsigned long isa_mtw(long addr)
 #define isa_outw(val,port) (ISA_SEX ? out_be16(isa_itw(port),(val)) : out_le16(isa_itw(port),(val)))
 
 #define isa_readb(p)       in_8(isa_mtb(p))
-#define isa_readw(p)       in_le16(isa_mtw(p))
+#define isa_readw(p)       (ISA_SEX ? in_be16(isa_mtw(p)) : in_le16(isa_mtw(p)))
 #define isa_writeb(val,p)  out_8(isa_mtb(p),(val))
-#define isa_writew(val,p)  out_le16(isa_mtw(p),(val))
+#define isa_writew(val,p)  (ISA_SEX ? out_be16(isa_mtw(p),(val)) : out_le16(isa_mtw(p),(val)))
 
 static inline void isa_delay(void)
 {

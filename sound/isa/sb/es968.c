@@ -277,7 +277,7 @@ module_exit(alsa_card_es968_exit)
 #ifndef MODULE
 
 /* format is: snd-es968=enable,index,id,
-			port,irq,snd_dma1 */
+			port,irq,dma1 */
 
 static int __init alsa_card_es968_setup(char *str)
 {

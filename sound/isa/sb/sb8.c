@@ -123,10 +123,10 @@ static int __init snd_sb8_probe(int dev)
 	if (chip->hardware >= SB_HW_16) {
 		snd_card_free(card);
 		if (chip->hardware == SB_HW_ALS100)
-			snd_printdd("ALS100 chip detected at 0x%lx, try snd-card-als100 module\n",
+			snd_printdd("ALS100 chip detected at 0x%lx, try snd-als100 module\n",
 				    port[dev]);
 		else
-			snd_printdd("SB 16 chip detected at 0x%lx, try snd-card-sb16 module\n",
+			snd_printdd("SB 16 chip detected at 0x%lx, try snd-sb16 module\n",
 				    port[dev]);
 		return -ENODEV;
 	}

@@ -143,7 +143,10 @@ struct i2c_driver {
 	 * with the device.
 	 */
 	int (*command)(struct i2c_client *client,unsigned int cmd, void *arg);
+
+	struct device_driver driver;
 };
+#define to_i2c_driver(d) container_of(d, struct i2c_driver, driver)
 
 extern struct bus_type i2c_bus_type;
 

@@ -101,8 +101,12 @@ static int checkentry(const char *tablename, const struct ipt_ip *ip,
 	return 1;
 }
 
-static struct ipt_match ecn_match = { { NULL, NULL }, "ecn", &match,
-		&checkentry, NULL, THIS_MODULE };
+static struct ipt_match ecn_match = {
+	.name		= "ecn",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

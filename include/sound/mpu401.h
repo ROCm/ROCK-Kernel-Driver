@@ -42,6 +42,7 @@
 #define MPU401_HW_ALS4000		16	/* Avance Logic ALS4000 */
 #define MPU401_HW_INTEL8X0		17	/* Intel8x0 driver */
 #define MPU401_HW_PC98II		18	/* Roland PC98II */
+#define MPU401_HW_AUREAL		19	/* Aureal Vortex */
 
 #define MPU401_MODE_BIT_INPUT		0
 #define MPU401_MODE_BIT_OUTPUT		1
@@ -87,6 +88,9 @@ struct _snd_mpu401 {
 	spinlock_t timer_lock;
 
 	struct timer_list timer;
+
+	void (*write) (mpu401_t * mpu, unsigned char data, unsigned long addr);
+	unsigned char (*read) (mpu401_t * mpu, unsigned long addr);
 };
 
 /* I/O ports */

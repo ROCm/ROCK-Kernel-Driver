@@ -732,6 +732,9 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	struct irqaction *old, **p;
 	irq_desc_t *desc = irq_desc + irq;
 
+	if (desc->handler == &no_irq_type)
+		return -ENOSYS;
+
 	/*
 	 * Some drivers like serial.c use request_irq() heavily,
 	 * so we have to be careful not to interfere with a

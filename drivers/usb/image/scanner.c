@@ -347,8 +347,9 @@
  *    - Don't print errors when the device is busy.
  *      
  * 0.4.11  2003-02-25
- *    - Added vendor/product ids for Artec, Avision, Brother, Medion, Primax,
- *      Prolink, Fujitsu, Plustek, and SYSCAN scanners.
+ *    - Added vendor/product ids for Artec, Avision, Brother, Canon, Compaq,
+ *      Fujitsu, Hewlett-Packard, Lexmark, LG Electronics, Medion, Microtek,
+ *      Primax, Prolink,  Plustek, SYSCAN, Trust and UMAX scanners.
  *    - Fixed generation of devfs names if dynamic minors are disabled.
  *    - Used kobject reference counting to free the scn struct when the device
  *      is closed and disconnected. Avoids crashes when writing to a 

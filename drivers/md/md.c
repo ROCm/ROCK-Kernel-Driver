@@ -1735,7 +1735,6 @@ static int do_md_run(mddev_t * mddev)
 	mddev->safemode_delay = (20 * HZ)/1000 +1; /* 20 msec delay */
 	mddev->in_sync = 1;
 	
-	md_update_sb(mddev);
 	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 	md_wakeup_thread(mddev->thread);
 	set_capacity(disk, md_size[mdidx(mddev)]<<1);
@@ -1763,7 +1762,6 @@ static int restart_array(mddev_t *mddev)
 			goto out;
 
 		mddev->safemode = 0;
-		md_update_sb(mddev);
 		mddev->ro = 0;
 		set_disk_ro(disk, 0);
 
@@ -3247,7 +3245,7 @@ static void md_do_sync(mddev_t *mddev)
 {
 	mddev_t *mddev2;
 	unsigned int max_sectors, currspeed = 0,
-		j, window, err;
+		j, window;
 	unsigned long mark[SYNC_MARKS];
 	unsigned long mark_cnt[SYNC_MARKS];
 	int last_mark,m;
@@ -3283,7 +3281,6 @@ static void md_do_sync(mddev_t *mddev)
 				if (wait_event_interruptible(resync_wait,
 							     mddev2->curr_resync < mddev->curr_resync)) {
 					flush_signals(current);
-					err = -EINTR;
 					mddev_put(mddev2);
 					goto skip;
 				}
@@ -3335,7 +3332,7 @@ static void md_do_sync(mddev_t *mddev)
 
 		sectors = mddev->pers->sync_request(mddev, j, currspeed < sysctl_speed_limit_min);
 		if (sectors < 0) {
-			err = sectors;
+			set_bit(MD_RECOVERY_ERR, &mddev->recovery);
 			goto out;
 		}
 		atomic_add(sectors, &mddev->recovery_active);
@@ -3372,7 +3369,7 @@ static void md_do_sync(mddev_t *mddev)
 			 */
 			printk(KERN_INFO "md: md_do_sync() got signal ... exiting\n");
 			flush_signals(current);
-			err = -EINTR;
+			set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 			goto out;
 		}
 
@@ -3398,7 +3395,6 @@ static void md_do_sync(mddev_t *mddev)
 		}
 	}
 	printk(KERN_INFO "md: md%d: sync done.\n",mdidx(mddev));
-	err = 0;
 	/*
 	 * this also signals 'finished resyncing' to md_stop
 	 */
@@ -3408,8 +3404,6 @@ static void md_do_sync(mddev_t *mddev)
 	/* tell personality that we are finished */
 	mddev->pers->sync_request(mddev, max_sectors, 1);
 
-	if (err)
-		set_bit(MD_RECOVERY_ERR, &mddev->recovery);
 	if (!test_bit(MD_RECOVERY_ERR, &mddev->recovery) &&
 	    mddev->curr_resync > 2 &&
 	    mddev->curr_resync > mddev->recovery_cp) {

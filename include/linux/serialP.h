@@ -22,6 +22,7 @@
 #include <linux/config.h>
 #include <linux/termios.h>
 #include <linux/workqueue.h>
+#include <linux/interrupt.h>
 #include <linux/circ_buf.h>
 #include <linux/wait.h>
 #if (LINUX_VERSION_CODE < 0x020300)
@@ -87,6 +88,7 @@ struct async_struct {
 	u16			iomem_reg_shift;
 	int			io_type;
 	struct work_struct			work;
+	struct tasklet_struct	tlet;
 #ifdef DECLARE_WAITQUEUE
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;

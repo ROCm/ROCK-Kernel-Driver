@@ -371,6 +371,10 @@ struct tss_struct {
 	 * pads the TSS to be cacheline-aligned (size is 0x100)
 	 */
 	unsigned long __cacheline_filler[5];
+	/*
+	 * .. and then another 0x100 bytes for emergency kernel stack
+	 */
+	unsigned long stack[64];
 };
 
 struct thread_struct {

@@ -525,9 +525,6 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 
-	if ((c->x86_vendor != X86_VENDOR_CENTAUR) || (c->x86 !=6) )
-		return -ENODEV;
-
 	switch (c->x86_model) {
 	case 6:		/* VIA C3 Samuel C5A */
 		longhaul=1;

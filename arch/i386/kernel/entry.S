@@ -73,10 +73,10 @@ NT_MASK		= 0x00004000
 VM_MASK		= 0x00020000
 
 /*
- * ESP0 is at offset 4. 0x100 is the size of the TSS, and
+ * ESP0 is at offset 4. 0x200 is the size of the TSS, and
  * also thus the top-of-stack pointer offset of SYSENTER_ESP
  */
-TSS_ESP0_OFFSET = (4 - 0x100)
+TSS_ESP0_OFFSET = (4 - 0x200)
 
 #ifdef CONFIG_PREEMPT
 #define preempt_stop		cli
@@ -479,23 +479,32 @@ device_not_available_emulate:
  * by hand onto the new stack - while updating the return eip past
  * the instruction that would have done it for sysenter.
  */
-#define CHECK_SYSENTER_EIP			\
-	cmpl $sysenter_entry,(%esp);		\
-	jne 1f;					\
-	movl TSS_ESP0_OFFSET+12(%esp),%esp;	\
+#define FIX_STACK(offset, ok, label)		\
+	cmpw $__KERNEL_CS,4(%esp);		\
+	jne ok;					\
+label:						\
+	movl TSS_ESP0_OFFSET+offset(%esp),%esp;	\
 	pushfl;					\
 	pushl $__KERNEL_CS;			\
-	pushl $sysenter_past_esp;		\
-1:
+	pushl $sysenter_past_esp
 
 ENTRY(debug)
-	CHECK_SYSENTER_EIP
+	cmpl $sysenter_entry,(%esp)
+	jne debug_stack_correct
+	FIX_STACK(12, debug_stack_correct, debug_esp_fix_insn)
+debug_stack_correct:
 	pushl $0
 	pushl $do_debug
 	jmp error_code
 
 ENTRY(nmi)
-	CHECK_SYSENTER_EIP
+	cmpl $sysenter_entry,(%esp)
+	je nmi_stack_fixup
+	cmpl $debug - 1,(%esp)
+	jle nmi_stack_correct
+	cmpl $debug_esp_fix_insn,(%esp)
+	jle nmi_debug_stack_fixup
+nmi_stack_correct:
 	pushl %eax
 	SAVE_ALL
 	movl %esp, %edx
@@ -504,6 +513,13 @@ ENTRY(nmi)
 	call do_nmi
 	addl $8, %esp
 	RESTORE_ALL
+
+nmi_stack_fixup:
+	FIX_STACK(12,nmi_stack_correct, 1)
+	jmp nmi_stack_correct
+nmi_debug_stack_fixup:
+	FIX_STACK(24,nmi_stack_correct, 1)
+	jmp nmi_stack_correct
 
 ENTRY(int3)
 	pushl $0

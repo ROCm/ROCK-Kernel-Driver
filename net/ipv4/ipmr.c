@@ -182,6 +182,11 @@ static struct net_device_stats *reg_vif_get_stats(struct net_device *dev)
 	return (struct net_device_stats*)dev->priv;
 }
 
+static void vif_dev_destructor(struct net_device *dev)
+{
+	kfree(dev);
+}
+
 static
 struct net_device *ipmr_reg_vif(struct vifctl *v)
 {
@@ -205,7 +210,7 @@ struct net_device *ipmr_reg_vif(struct vifctl *v)
 	dev->flags		= IFF_NOARP;
 	dev->hard_start_xmit	= reg_vif_xmit;
 	dev->get_stats		= reg_vif_get_stats;
-	dev->features		|= NETIF_F_DYNALLOC;
+	dev->destructor		= vif_dev_destructor;
 
 	if (register_netdevice(dev)) {
 		kfree(dev);
@@ -1178,7 +1183,7 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c,
 		return;
 	}
 
-	encap += dev->hard_header_len;
+	encap += LL_RESERVED_SPACE(dev);
 
 	if (skb_headroom(skb) < encap || skb_cloned(skb) || !last)
 		skb2 = skb_realloc_headroom(skb, (encap + 15)&~15);

@@ -302,7 +302,6 @@ _060_fpsp_effadd:
 
 | The size of this section MUST be 128 bytes!!!
 
-	.global	_FP_CALL_TOP
 _FP_CALL_TOP:
 	.long	_060_real_bsun		- _FP_CALL_TOP
 	.long	_060_real_snan		- _FP_CALL_TOP

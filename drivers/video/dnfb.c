@@ -103,11 +103,6 @@
 
 #define SWAP(A) ((A>>8) | ((A&0xff) <<8))
 
-#if 0
-#define outb(a,d) *(char *)(a)=(d)
-#define outw(a,d) *(unsigned short *)a=d
-#endif
-
 static struct fb_info fb_info;
 
 /* frame buffer operations */
@@ -147,9 +142,9 @@ static struct fb_fix_screeninfo dnfb_fix __initdata = {
 static int dnfb_blank(int blank, struct fb_info *info)
 {
 	if (blank)
-		outb(0x0, AP_CONTROL_3A);
+		out_8(AP_CONTROL_3A, 0x0);
 	else
-		outb(0x1, AP_CONTROL_3A);
+		out_8(AP_CONTROL_3A, 0x1);
 	return 0;
 }
 
@@ -174,8 +169,8 @@ void dnfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 		x_word_count = (x_end >> 4) - (area->dx >> 4) + 1;
 		start_mask = 0xffff0000 >> (area->dx & 0xf);
 		end_mask = 0x7ffff >> (x_end & 0xf);
-		outb((((area->dx & 0xf) - (area->sx & 0xf)) % 16) | (0x4 << 5),
-		     AP_CONTROL_0);
+		out_8(AP_CONTROL_0,
+		     (((area->dx & 0xf) - (area->sx & 0xf)) % 16) | (0x4 << 5));
 		if ((area->dx & 0xf) < (area->sx & 0xf))
 			pre_read = 1;
 	} else {
@@ -184,15 +179,16 @@ void dnfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 		x_word_count = (area->dx >> 4) - (x_end >> 4) + 1;
 		start_mask = 0x7ffff >> (area->dx & 0xf);
 		end_mask = 0xffff0000 >> (x_end & 0xf);
-		outb(((-((area->sx & 0xf) - (area->dx & 0xf))) %
-		      16) | (0x4 << 5), AP_CONTROL_0);
+		out_8(AP_CONTROL_0,
+		     ((-((area->sx & 0xf) - (area->dx & 0xf))) % 16) |
+		     (0x4 << 5));
 		if ((area->dx & 0xf) > (area->sx & 0xf))
 			pre_read = 1;
 	}
 
 	for (i = 0; i < area->height; i++) {
 
-		outb(0xc | (dest >> 16), AP_CONTROL_3A);
+		out_8(AP_CONTROL_3A, 0xc | (dest >> 16));
 
 		if (pre_read) {
 			dummy = *src;
@@ -200,11 +196,11 @@ void dnfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 		}
 
 		if (x_word_count) {
-			outb(start_mask, AP_WRITE_ENABLE);
+			out_8(AP_WRITE_ENABLE, start_mask);
 			*src = dest;
 			src += incr;
 			dest += incr;
-			outb(0, AP_WRITE_ENABLE);
+			out_8(AP_WRITE_ENABLE, 0);
 
 			for (j = 1; j < (x_word_count - 1); j++) {
 				*src = dest;
@@ -212,12 +208,12 @@ void dnfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 				dest += incr;
 			}
 
-			outb(start_mask, AP_WRITE_ENABLE);
+			out_8(AP_WRITE_ENABLE, start_mask);
 			*src = dest;
 			dest += incr;
 			src += incr;
 		} else {
-			outb(start_mask | end_mask, AP_WRITE_ENABLE);
+			out_8(AP_WRITE_ENABLE, start_mask | end_mask);
 			*src = dest;
 			dest += incr;
 			src += incr;
@@ -225,7 +221,7 @@ void dnfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 		src += (y_delta / 16);
 		dest += (y_delta / 16);
 	}
-	outb(NORMAL_MODE, AP_CONTROL_0);
+	out_8(AP_CONTROL_0, NORMAL_MODE);
 }
 
 
@@ -246,12 +242,12 @@ unsigned long __init dnfb_init(unsigned long mem_start)
 		panic("unable to register apollo frame buffer\n");
 
 	/* now we have registered we can safely setup the hardware */
-	outb(RESET_CREG, AP_CONTROL_3A);
-	outw(0x0, AP_WRITE_ENABLE);
-	outb(NORMAL_MODE, AP_CONTROL_0);
-	outb((AD_BLT | DST_EQ_SRC | NORM_CREG1), AP_CONTROL_1);
-	outb(S_DATA_PLN, AP_CONTROL_2);
-	outw(SWAP(0x3), AP_ROP_1);
+	out_8(AP_CONTROL_3A, RESET_CREG);
+	out_be16(AP_WRITE_ENABLE, 0x0);
+	out_8(AP_CONTROL_0, NORMAL_MODE);
+	out_8(AP_CONTROL_1, (AD_BLT | DST_EQ_SRC | NORM_CREG1));
+	out_8(AP_CONTROL_2, S_DATA_PLN);
+	out_be16(AP_ROP_1, SWAP(0x3));
 
 	printk("apollo frame buffer alive and kicking !\n");
 	return mem_start;

@@ -1663,21 +1663,42 @@ icmp_checkentry(const char *tablename,
 }
 
 /* The built-in targets: standard (NULL) and error. */
-static struct ipt_target ipt_standard_target
-= { { NULL, NULL }, IPT_STANDARD_TARGET, NULL, NULL, NULL };
-static struct ipt_target ipt_error_target
-= { { NULL, NULL }, IPT_ERROR_TARGET, ipt_error, NULL, NULL };
+static struct ipt_target ipt_standard_target = {
+	.name		= IPT_STANDARD_TARGET,
+};
 
-static struct nf_sockopt_ops ipt_sockopts
-= { { NULL, NULL }, PF_INET, IPT_BASE_CTL, IPT_SO_SET_MAX+1, do_ipt_set_ctl,
-    IPT_BASE_CTL, IPT_SO_GET_MAX+1, do_ipt_get_ctl, 0, NULL  };
+static struct ipt_target ipt_error_target = {
+	.name		= IPT_ERROR_TARGET,
+	.target		= ipt_error,
+};
 
-static struct ipt_match tcp_matchstruct
-= { { NULL, NULL }, "tcp", &tcp_match, &tcp_checkentry, NULL };
-static struct ipt_match udp_matchstruct
-= { { NULL, NULL }, "udp", &udp_match, &udp_checkentry, NULL };
-static struct ipt_match icmp_matchstruct
-= { { NULL, NULL }, "icmp", &icmp_match, &icmp_checkentry, NULL };
+static struct nf_sockopt_ops ipt_sockopts = {
+	.pf		= PF_INET,
+	.set_optmin	= IPT_BASE_CTL,
+	.set_optmax	= IPT_SO_SET_MAX+1,
+	.set		= do_ipt_set_ctl,
+	.get_optmin	= IPT_BASE_CTL,
+	.get_optmax	= IPT_SO_GET_MAX+1,
+	.get		= do_ipt_get_ctl,
+};
+
+static struct ipt_match tcp_matchstruct = {
+	.name		= "tcp",
+	.match		= &tcp_match,
+	.checkentry	= &tcp_checkentry,
+};
+
+static struct ipt_match udp_matchstruct = {
+	.name		= "udp",
+	.match		= &udp_match,
+	.checkentry	= &udp_checkentry,
+};
+
+static struct ipt_match icmp_matchstruct = {
+	.name		= "icmp",
+	.match		= &icmp_match,
+	.checkentry	= &icmp_checkentry,
+};
 
 #ifdef CONFIG_PROC_FS
 static inline int print_name(const struct ipt_table *t,

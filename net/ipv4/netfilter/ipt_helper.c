@@ -89,8 +89,12 @@ static int check(const char *tablename,
 	return 1;
 }
 
-static struct ipt_match helper_match
-= { { NULL, NULL }, "helper", &match, &check, NULL, THIS_MODULE };
+static struct ipt_match helper_match = {
+	.name		= "helper",
+	.match		= &match,
+	.checkentry	= &check,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

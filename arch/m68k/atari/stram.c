@@ -146,7 +146,7 @@
 
 /* The following two numbers define the maximum fraction of ST-RAM in total
  * memory, below that the kernel would automatically use ST-RAM as swap
- * space. This decision can be overriden with stram_swap= */
+ * space. This decision can be overridden with stram_swap= */
 #define MAX_STRAM_FRACTION_NOM		1
 #define MAX_STRAM_FRACTION_DENOM	3
 
@@ -347,7 +347,7 @@ void __init atari_stram_reserve_pages(void *start_mem)
 		/*
 		 * If the whole ST-RAM is used for swapping, there are no allocatable
 		 * dma pages left. But unfortunately, some shared parts of the kernel
-		 * (particularily the SCSI mid-level) call __get_dma_pages()
+		 * (particularly the SCSI mid-level) call __get_dma_pages()
 		 * unconditionally :-( These calls then fail, and scsi.c even doesn't
 		 * check for NULL return values and just crashes. The quick fix for
 		 * this (instead of doing much clean up work in the SCSI code) is to

@@ -24,7 +24,7 @@
  *
  */      
 
-#define  AMP_AUDIO2000_DEVICE_DESC 	       "{AMP Ltd AUDIO2000},"
+#define  AMP_AUDIO2000_DEVICE_DESC 	       "{AMP Ltd,AUDIO2000},"
 
 #define VT1724_SUBDEVICE_AUDIO2000	0x12142417	/* Advanced Micro Peripherals Ltd AUDIO2000 */
 

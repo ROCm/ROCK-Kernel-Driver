@@ -584,7 +584,8 @@ cs46xx_dsp_create_src_task_scb(cs46xx_t * chip,char * scb_name,
                                u16 src_buffer_addr,
                                u16 src_delay_buffer_addr,u32 dest,
                                dsp_scb_descriptor_t * parent_scb,
-                               int scb_child_type)
+                               int scb_child_type,
+	                       int pass_through)
 {
 
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
@@ -659,10 +660,22 @@ cs46xx_dsp_create_src_task_scb(cs46xx_t * chip,char * scb_name,
 		/* clear buffers */
 		_dsp_clear_sample_buffer (chip,src_buffer_addr,8);
 		_dsp_clear_sample_buffer (chip,src_delay_buffer_addr,32);
-		
-		scb = _dsp_create_generic_scb(chip,scb_name,(u32 *)&src_task_scb,
-					      dest,ins->s16_up,parent_scb,
-					      scb_child_type);
+				
+		if (pass_through) {
+			/* wont work with any other rate than
+			   the native DSP rate */
+			snd_assert (rate = 48000);
+
+			scb = cs46xx_dsp_create_generic_scb(chip,scb_name,(u32 *)&src_task_scb,
+							    dest,"DMAREADER",parent_scb,
+							    scb_child_type);
+		} else {
+			scb = _dsp_create_generic_scb(chip,scb_name,(u32 *)&src_task_scb,
+						      dest,ins->s16_up,parent_scb,
+						      scb_child_type);
+		}
+
+
 	}
 
 	return scb;
@@ -835,10 +848,10 @@ cs46xx_dsp_create_pcm_serial_input_scb(cs46xx_t * chip,char * scb_name,u32 dest,
 
 		RSCONFIG_SAMPLE_16STEREO + RSCONFIG_MODULO_16,
 		0,
-		0,input_scb->address,
+      /* 0xD */ 0,input_scb->address,
 		{
-			0x8000,0x8000,
-			0x8000,0x8000
+      /* 0xE */   0x8000,0x8000,
+      /* 0xF */	  0x8000,0x8000
 		}
 	};
 
@@ -1134,9 +1147,9 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 	dsp_scb_descriptor_t * src_scb = NULL,* pcm_scb, * mixer_scb = NULL;
 	dsp_scb_descriptor_t * src_parent_scb = NULL;
 
-	/*dsp_scb_descriptor_t * pcm_parent_scb;*/
+	/* dsp_scb_descriptor_t * pcm_parent_scb; */
 	char scb_name[DSP_MAX_SCB_NAME];
-	int i,pcm_index = -1, insert_point, src_index = -1;
+	int i,pcm_index = -1, insert_point, src_index = -1,pass_through = 0;
 	unsigned long flags;
 
 	switch (pcm_channel_id) {
@@ -1163,7 +1176,8 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 		   alter the raw data stream ...) */
 		if (sample_rate == 48000) {
 			snd_printdd ("IEC958 pass through\n");
-			src_parent_scb = ins->asynch_tx_scb;
+			/* Hack to bypass creating a new SRC */
+			pass_through = 1;
 		}
 		break;
 	default:
@@ -1216,18 +1230,16 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 		snd_assert (src_index != -1,return NULL);
 
 		/* we need to create a new SRC SCB */
-		if (src_parent_scb == NULL) {
-			if (mixer_scb->sub_list_ptr == ins->the_null_scb) {
-				src_parent_scb = mixer_scb;
-				insert_point = SCB_ON_PARENT_SUBLIST_SCB;
-			} else {
-				src_parent_scb = find_next_free_scb(chip,mixer_scb->sub_list_ptr);
-				insert_point = SCB_ON_PARENT_NEXT_SCB;
-			}
-		} else insert_point = SCB_ON_PARENT_NEXT_SCB;
+		if (mixer_scb->sub_list_ptr == ins->the_null_scb) {
+			src_parent_scb = mixer_scb;
+			insert_point = SCB_ON_PARENT_SUBLIST_SCB;
+		} else {
+			src_parent_scb = find_next_free_scb(chip,mixer_scb->sub_list_ptr);
+			insert_point = SCB_ON_PARENT_NEXT_SCB;
+		}
 
 		snprintf (scb_name,DSP_MAX_SCB_NAME,"SrcTask_SCB%d",src_index);
-
+		
 		snd_printdd( "dsp_spos: creating SRC \"%s\"\n",scb_name);
 		src_scb = cs46xx_dsp_create_src_task_scb(chip,scb_name,
 							 sample_rate,
@@ -1236,7 +1248,8 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 							 /* 0x400 - 0x600 source SCBs */
 							 0x400 + (src_index * 0x10) ,
 							 src_parent_scb,
-							 insert_point);
+							 insert_point,
+							 pass_through);
 
 		if (!src_scb) {
 			snd_printk (KERN_ERR "dsp_spos: failed to create SRCtaskSCB\n");
@@ -1267,19 +1280,6 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 	if (!pcm_scb) {
 		snd_printk (KERN_ERR "dsp_spos: failed to create PCMreaderSCB\n");
 		return NULL;
-	}
-
-	if (pcm_channel_id == DSP_IEC958_CHANNEL && sample_rate == 48000) {
-		snd_assert (ins->spdif_pcm_input_scb == NULL);
-		
-		/* a hack to make the skip the SRC and pass the stream 
-		   directly to the SPDIF task */
-		ins->spdif_pcm_input_scb = 
-			cs46xx_dsp_create_pcm_serial_input_scb(chip,"PCMSerialInput_PCM",
-							       PCMSERIALINII_SCB_ADDR,
-							       pcm_scb,
-							       ins->asynch_tx_scb,
-							       SCB_ON_PARENT_SUBLIST_SCB);		
 	}
 	
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -1540,7 +1540,7 @@ int cs46xx_dsp_enable_spdif_out (cs46xx_t *chip)
 		cs46xx_dsp_enable_spdif_hw (chip);
 	}
 
-	/* don't touch anything if SPDIF is open */
+	/* dont touch anything if SPDIF is open */
 	if ( ins->spdif_status_out & DSP_SPDIF_STATUS_PLAYBACK_OPEN) {
 		/* when cs46xx_iec958_post_close(...) is called it
 		   will call this function if necessary depending on
@@ -1584,7 +1584,7 @@ int  cs46xx_dsp_disable_spdif_out (cs46xx_t *chip)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
-	/* don't touch anything if SPDIF is open */
+	/* dont touch anything if SPDIF is open */
 	if ( ins->spdif_status_out & DSP_SPDIF_STATUS_PLAYBACK_OPEN) {
 		ins->spdif_status_out &= ~DSP_SPDIF_STATUS_OUTPUT_ENABLED;
 		return -EBUSY;
@@ -1625,7 +1625,7 @@ int cs46xx_iec958_pre_open (cs46xx_t *chip)
 	}
 	
 	/* if not enabled already */
-	if (ins->spdif_status_out & DSP_SPDIF_STATUS_HW_ENABLED) {
+	if ( !(ins->spdif_status_out & DSP_SPDIF_STATUS_HW_ENABLED) ) {
 		cs46xx_dsp_enable_spdif_hw (chip);
 	}
 
@@ -1669,7 +1669,6 @@ int cs46xx_iec958_post_close (cs46xx_t *chip)
 	_dsp_clear_sample_buffer(chip,SPDIFO_IP_OUTPUT_BUFFER1,256);
 
 	/* restore state */
-
 	if ( ins->spdif_status_out & DSP_SPDIF_STATUS_OUTPUT_ENABLED ) {
 		cs46xx_dsp_enable_spdif_out (chip);
 	}

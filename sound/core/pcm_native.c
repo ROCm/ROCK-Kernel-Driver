@@ -30,6 +30,7 @@
 #include <sound/info.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
+#include <sound/timer.h>
 #include <sound/minors.h>
 
 /*
@@ -514,9 +515,9 @@ int snd_pcm_status(snd_pcm_substream_t *substream,
 		if (runtime->tstamp_mode & SNDRV_PCM_TSTAMP_MMAP)
 			status->tstamp = runtime->status->tstamp;
 		else
-			snd_timestamp_now(&status->tstamp);
+			snd_timestamp_now(&status->tstamp, runtime->tstamp_timespec);
 	} else
-		snd_timestamp_now(&status->tstamp);
+		snd_timestamp_now(&status->tstamp, runtime->tstamp_timespec);
 	status->appl_ptr = runtime->control->appl_ptr;
 	status->hw_ptr = runtime->status->hw_ptr;
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -585,15 +586,15 @@ static int snd_pcm_channel_info(snd_pcm_substream_t * substream, snd_pcm_channel
 	return 0;
 }
 
-static void snd_pcm_trigger_time(snd_pcm_substream_t *substream)
+static void snd_pcm_trigger_tstamp(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	if (runtime->trigger_master == NULL)
 		return;
 	if (runtime->trigger_master == substream) {
-		snd_timestamp_now(&runtime->trigger_tstamp);
+		snd_timestamp_now(&runtime->trigger_tstamp, runtime->tstamp_timespec);
 	} else {
-		snd_pcm_trigger_time(runtime->trigger_master);
+		snd_pcm_trigger_tstamp(runtime->trigger_master);
 		runtime->trigger_tstamp = runtime->trigger_master->runtime->trigger_tstamp;
 	}
 	runtime->trigger_master = NULL;
@@ -668,13 +669,15 @@ static inline int snd_pcm_do_start(snd_pcm_substream_t *substream, int state)
 static inline void snd_pcm_post_start(snd_pcm_substream_t *substream, int state)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_pcm_trigger_time(substream);
+	snd_pcm_trigger_tstamp(substream);
 	runtime->status->state = SNDRV_PCM_STATE_RUNNING;
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
 	    runtime->silence_size > 0)
 		snd_pcm_playback_silence(substream, ULONG_MAX);
 	if (runtime->sleep_min)
 		snd_pcm_tick_prepare(substream);
+	if (substream->timer)
+		snd_timer_notify(substream->timer, SNDRV_TIMER_EVENT_MSTART, &runtime->trigger_tstamp);
 }
 
 /**
@@ -703,7 +706,9 @@ static inline int snd_pcm_do_stop(snd_pcm_substream_t *substream, int state)
 static inline void snd_pcm_post_stop(snd_pcm_substream_t *substream, int state)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_pcm_trigger_time(substream);
+	snd_pcm_trigger_tstamp(substream);
+	if (substream->timer)
+		snd_timer_notify(substream->timer, SNDRV_TIMER_EVENT_MSTOP, &runtime->trigger_tstamp);
 	runtime->status->state = state;
 	snd_pcm_tick_set(substream, 0);
 	wake_up(&runtime->sleep);
@@ -741,15 +746,19 @@ static inline int snd_pcm_do_pause(snd_pcm_substream_t *substream, int push)
 static inline void snd_pcm_post_pause(snd_pcm_substream_t *substream, int push)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_pcm_trigger_time(substream);
+	snd_pcm_trigger_tstamp(substream);
 	if (push) {
 		runtime->status->state = SNDRV_PCM_STATE_PAUSED;
+		if (substream->timer)
+			snd_timer_notify(substream->timer, SNDRV_TIMER_EVENT_MPAUSE, &runtime->trigger_tstamp);
 		snd_pcm_tick_set(substream, 0);
 		wake_up(&runtime->sleep);
 	} else {
 		runtime->status->state = SNDRV_PCM_STATE_RUNNING;
 		if (runtime->sleep_min)
 			snd_pcm_tick_prepare(substream);
+		if (substream->timer)
+			snd_timer_notify(substream->timer, SNDRV_TIMER_EVENT_MCONTINUE, &runtime->trigger_tstamp);
 	}
 }
 
@@ -782,7 +791,9 @@ static inline int snd_pcm_do_suspend(snd_pcm_substream_t *substream, int state)
 static inline void snd_pcm_post_suspend(snd_pcm_substream_t *substream, int state)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_pcm_trigger_time(substream);
+	snd_pcm_trigger_tstamp(substream);
+	if (substream->timer)
+		snd_timer_notify(substream->timer, SNDRV_TIMER_EVENT_MPAUSE, &runtime->trigger_tstamp);
 	runtime->status->state = SNDRV_PCM_STATE_SUSPENDED;
 	snd_pcm_tick_set(substream, 0);
 	wake_up(&runtime->sleep);
@@ -847,7 +858,9 @@ static inline int snd_pcm_do_resume(snd_pcm_substream_t *substream, int state)
 static inline void snd_pcm_post_resume(snd_pcm_substream_t *substream, int state)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_pcm_trigger_time(substream);
+	snd_pcm_trigger_tstamp(substream);
+	if (substream->timer)
+		snd_timer_notify(substream->timer, SNDRV_TIMER_EVENT_MCONTINUE, &runtime->trigger_tstamp);
 	runtime->status->state = runtime->status->suspended_state;
 	if (runtime->sleep_min)
 		snd_pcm_tick_prepare(substream);
@@ -1733,9 +1746,12 @@ static int snd_pcm_release_file(snd_pcm_file_t * pcm_file)
 	runtime = substream->runtime;
 	str = substream->pstr;
 	snd_pcm_unlink(substream);
-	if (substream->ops->hw_free != NULL)
-		substream->ops->hw_free(substream);
-	substream->ops->close(substream);
+	if (substream->open_flag) {
+		if (substream->ops->hw_free != NULL)
+			substream->ops->hw_free(substream);
+		substream->ops->close(substream);
+		substream->open_flag = 0;
+	}
 	substream->ffile = NULL;
 	snd_pcm_remove_file(str, pcm_file);
 	snd_pcm_release_substream(substream);
@@ -1784,6 +1800,7 @@ static int snd_pcm_open_file(struct file *file,
 		snd_pcm_release_file(pcm_file);
 		return err;
 	}
+	substream->open_flag = 1;
 
 	err = snd_pcm_hw_constraints_complete(substream);
 	if (err < 0) {
@@ -1982,6 +1999,106 @@ snd_pcm_sframes_t snd_pcm_capture_rewind(snd_pcm_substream_t *substream, snd_pcm
 	return ret;
 }
 
+snd_pcm_sframes_t snd_pcm_playback_forward(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_sframes_t appl_ptr;
+	snd_pcm_sframes_t ret;
+	snd_pcm_sframes_t avail;
+
+	if (frames == 0)
+		return 0;
+
+	spin_lock_irq(&runtime->lock);
+	switch (runtime->status->state) {
+	case SNDRV_PCM_STATE_PREPARED:
+	case SNDRV_PCM_STATE_PAUSED:
+		break;
+	case SNDRV_PCM_STATE_DRAINING:
+	case SNDRV_PCM_STATE_RUNNING:
+		if (snd_pcm_update_hw_ptr(substream) >= 0)
+			break;
+		/* Fall through */
+	case SNDRV_PCM_STATE_XRUN:
+		ret = -EPIPE;
+		goto __end;
+	default:
+		ret = -EBADFD;
+		goto __end;
+	}
+
+	avail = snd_pcm_playback_avail(runtime);
+	if (avail <= 0) {
+		ret = 0;
+		goto __end;
+	}
+	if (frames > (snd_pcm_uframes_t)avail)
+		frames = avail;
+	else
+		frames -= frames % runtime->xfer_align;
+	appl_ptr = runtime->control->appl_ptr + frames;
+	if (appl_ptr >= (snd_pcm_sframes_t)runtime->boundary)
+		appl_ptr -= runtime->boundary;
+	runtime->control->appl_ptr = appl_ptr;
+	if (runtime->status->state == SNDRV_PCM_STATE_RUNNING &&
+	    runtime->sleep_min)
+		snd_pcm_tick_prepare(substream);
+	ret = frames;
+ __end:
+	spin_unlock_irq(&runtime->lock);
+	return ret;
+}
+
+snd_pcm_sframes_t snd_pcm_capture_forward(snd_pcm_substream_t *substream, snd_pcm_uframes_t frames)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_sframes_t appl_ptr;
+	snd_pcm_sframes_t ret;
+	snd_pcm_sframes_t avail;
+
+	if (frames == 0)
+		return 0;
+
+	spin_lock_irq(&runtime->lock);
+	switch (runtime->status->state) {
+	case SNDRV_PCM_STATE_PREPARED:
+	case SNDRV_PCM_STATE_DRAINING:
+	case SNDRV_PCM_STATE_PAUSED:
+		break;
+	case SNDRV_PCM_STATE_RUNNING:
+		if (snd_pcm_update_hw_ptr(substream) >= 0)
+			break;
+		/* Fall through */
+	case SNDRV_PCM_STATE_XRUN:
+		ret = -EPIPE;
+		goto __end;
+	default:
+		ret = -EBADFD;
+		goto __end;
+	}
+
+	avail = snd_pcm_capture_avail(runtime);
+	if (avail <= 0) {
+		ret = 0;
+		goto __end;
+	}
+	if (frames > (snd_pcm_uframes_t)avail)
+		frames = avail;
+	else
+		frames -= frames % runtime->xfer_align;
+	appl_ptr = runtime->control->appl_ptr + frames;
+	if (appl_ptr >= (snd_pcm_sframes_t)runtime->boundary)
+		appl_ptr -= runtime->boundary;
+	runtime->control->appl_ptr = appl_ptr;
+	if (runtime->status->state == SNDRV_PCM_STATE_RUNNING &&
+	    runtime->sleep_min)
+		snd_pcm_tick_prepare(substream);
+	ret = frames;
+ __end:
+	spin_unlock_irq(&runtime->lock);
+	return ret;
+}
+
 static int snd_pcm_hwsync(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -2065,6 +2182,14 @@ static int snd_pcm_common_ioctl1(snd_pcm_substream_t *substream,
 		return put_user(SNDRV_PCM_VERSION, (int *)arg) ? -EFAULT : 0;
 	case SNDRV_PCM_IOCTL_INFO:
 		return snd_pcm_info_user(substream, (snd_pcm_info_t *) arg);
+	case SNDRV_PCM_IOCTL_TSTAMP:
+	{
+		int xarg;
+		if (get_user(xarg, (int *) arg))
+			return -EFAULT;
+		substream->runtime->tstamp_timespec = xarg ? 1 : 0;
+		return 0;
+	}
 	case SNDRV_PCM_IOCTL_HW_REFINE:
 		return snd_pcm_hw_refine_user(substream, (snd_pcm_hw_params_t *) arg);
 	case SNDRV_PCM_IOCTL_HW_PARAMS:
@@ -2169,6 +2294,18 @@ static int snd_pcm_playback_ioctl1(snd_pcm_substream_t *substream,
 		__put_user(result, _frames);
 		return result < 0 ? result : 0;
 	}
+	case SNDRV_PCM_IOCTL_FORWARD:
+	{
+		snd_pcm_uframes_t frames, *_frames = arg;
+		snd_pcm_sframes_t result;
+		if (get_user(frames, _frames))
+			return -EFAULT;
+		if (put_user(0, _frames))
+			return -EFAULT;
+		result = snd_pcm_playback_forward(substream, frames);
+		__put_user(result, _frames);
+		return result < 0 ? result : 0;
+	}
 	case SNDRV_PCM_IOCTL_PAUSE:
 	{
 		int res;
@@ -2241,6 +2378,18 @@ static int snd_pcm_capture_ioctl1(snd_pcm_substream_t *substream,
 		if (put_user(0, _frames))
 			return -EFAULT;
 		result = snd_pcm_capture_rewind(substream, frames);
+		__put_user(result, _frames);
+		return result < 0 ? result : 0;
+	}
+	case SNDRV_PCM_IOCTL_FORWARD:
+	{
+		snd_pcm_uframes_t frames, *_frames = arg;
+		snd_pcm_sframes_t result;
+		if (get_user(frames, _frames))
+			return -EFAULT;
+		if (put_user(0, _frames))
+			return -EFAULT;
+		result = snd_pcm_capture_forward(substream, frames);
 		__put_user(result, _frames);
 		return result < 0 ? result : 0;
 	}

@@ -1471,7 +1471,7 @@ reset_wd33c93(struct Scsi_Host *instance)
 		int busycount = 0;
 		extern void sgiwd93_reset(unsigned long);
 		/* wait 'til the chip gets some time for us */
-		while ((READ_AUX_STAT() & ASR_BSY) && busycount++ < 100)
+		while ((read_aux_stat(regs) & ASR_BSY) && busycount++ < 100)
 			udelay (10);
 	/*
  	 * there are scsi devices out there, which manage to lock up
@@ -1481,7 +1481,7 @@ reset_wd33c93(struct Scsi_Host *instance)
 	 * does this for the SGI Indy, where this is possible
 	 */
 	/* still busy ? */
-	if (READ_AUX_STAT() & ASR_BSY)
+	if (read_aux_stat(regs) & ASR_BSY)
 		sgiwd93_reset(instance->base); /* yeah, give it the hard one */
 	}
 #endif
@@ -2086,3 +2086,4 @@ EXPORT_SYMBOL(wd33c93_release);
 EXPORT_SYMBOL(wd33c93_abort);
 EXPORT_SYMBOL(wd33c93_queuecommand);
 EXPORT_SYMBOL(wd33c93_intr);
+EXPORT_SYMBOL(wd33c93_proc_info);

@@ -714,14 +714,14 @@ static int snd_ctl_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
-		err = -ENOPROTOOPT;
 #ifdef CONFIG_PM
 		if (card->set_power_state) {
 		    snd_power_lock(card);
 		    err = card->set_power_state(card, err);
 		    snd_power_unlock(card);
-		}
+		} else
 #endif
+			err = -ENOPROTOOPT;
 		return err;
 	case SNDRV_CTL_IOCTL_POWER_STATE:
 #ifdef CONFIG_PM

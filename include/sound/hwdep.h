@@ -27,6 +27,8 @@
 
 typedef enum sndrv_hwdep_iface snd_hwdep_iface_t;
 typedef struct sndrv_hwdep_info snd_hwdep_info_t;
+typedef struct sndrv_hwdep_dsp_status snd_hwdep_dsp_status_t;
+typedef struct sndrv_hwdep_dsp_image snd_hwdep_dsp_image_t;
 
 typedef struct _snd_hwdep_ops {
 	long long (*llseek) (snd_hwdep_t *hw, struct file * file, long long offset, int orig);
@@ -37,6 +39,8 @@ typedef struct _snd_hwdep_ops {
 	unsigned int (*poll) (snd_hwdep_t * hw, struct file * file, poll_table * wait);
 	int (*ioctl) (snd_hwdep_t * hw, struct file * file, unsigned int cmd, unsigned long arg);
 	int (*mmap) (snd_hwdep_t * hw, struct file * file, struct vm_area_struct * vma);
+	int (*dsp_status) (snd_hwdep_t * hw, snd_hwdep_dsp_status_t * status);
+	int (*dsp_load) (snd_hwdep_t * hw, snd_hwdep_dsp_image_t * image);
 } snd_hwdep_ops_t;
 
 struct _snd_hwdep {
@@ -56,6 +60,11 @@ struct _snd_hwdep {
 	wait_queue_head_t open_wait;
 	void *private_data;
 	void (*private_free) (snd_hwdep_t *hwdep);
+
+	struct semaphore open_mutex;
+	int used;
+	unsigned int dsp_loaded;
+	unsigned int exclusive: 1;
 };
 
 extern int snd_hwdep_new(snd_card_t * card, char *id, int device, snd_hwdep_t ** rhwdep);

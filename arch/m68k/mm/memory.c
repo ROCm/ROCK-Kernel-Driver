@@ -33,7 +33,7 @@
 typedef struct list_head ptable_desc;
 static LIST_HEAD(ptable_list);
 
-#define PD_PTABLE(page) ((ptable_desc *)virt_to_page(page))
+#define PD_PTABLE(page) ((ptable_desc *)&(virt_to_page(page)->list))
 #define PD_PAGE(ptable) (list_entry(ptable, struct page, list))
 #define PD_MARKBITS(dp) (*(unsigned char *)&PD_PAGE(dp)->index)
 

@@ -555,9 +555,7 @@ ipq_rcv_dev_event(struct notifier_block *this,
 }
 
 static struct notifier_block ipq_dev_notifier = {
-	ipq_rcv_dev_event,
-	NULL,
-	0
+	.notifier_call	= ipq_rcv_dev_event,
 };
 
 static int
@@ -577,9 +575,7 @@ ipq_rcv_nl_event(struct notifier_block *this,
 }
 
 static struct notifier_block ipq_nl_notifier = {
-	ipq_rcv_nl_event,
-	NULL,
-	0
+	.notifier_call	= ipq_rcv_nl_event,
 };
 
 static int sysctl_maxlen = IPQ_QMAX_DEFAULT;
@@ -601,7 +597,6 @@ static ctl_table ipq_dir_table[] = {
 	{
 		.ctl_name	= NET_IPV4,
 		.procname	= "ipv4",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= ipq_table
 	},
@@ -612,7 +607,6 @@ static ctl_table ipq_root_table[] = {
 	{
 		.ctl_name	= CTL_NET,
 		.procname	= "net",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= ipq_dir_table
 	},

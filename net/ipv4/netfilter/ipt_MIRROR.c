@@ -157,9 +157,12 @@ static int ipt_mirror_checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ipt_target ipt_mirror_reg
-= { { NULL, NULL }, "MIRROR", ipt_mirror_target, ipt_mirror_checkentry, NULL,
-    THIS_MODULE };
+static struct ipt_target ipt_mirror_reg = {
+	.name		= "MIRROR",
+	.target		= ipt_mirror_target,
+	.checkentry	= ipt_mirror_checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

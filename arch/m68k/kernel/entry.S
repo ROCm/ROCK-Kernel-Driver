@@ -33,7 +33,6 @@
  *		 for 68040
  */
 
-#include <linux/sys.h>
 #include <linux/config.h>
 #include <linux/linkage.h>
 #include <asm/entry.h>
@@ -41,6 +40,7 @@
 #include <asm/setup.h>
 #include <asm/segment.h>
 #include <asm/traps.h>
+#include <asm/unistd.h>
 
 #include "m68k_defs.h"
 
@@ -661,7 +661,3 @@ sys_call_table:
 	.long sys_lremovexattr
 	.long sys_fremovexattr
 	.long sys_futex		/* 235 */
-
-	.rept NR_syscalls-(.-sys_call_table)/4
-		.long sys_ni_syscall
-	.endr

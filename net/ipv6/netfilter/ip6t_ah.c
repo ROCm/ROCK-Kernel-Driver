@@ -26,17 +26,6 @@ struct ahhdr {
        __u32   spi;
 };
 
-int ipv6_ext_hdr(u8 nexthdr)
-{
-        return ( (nexthdr == NEXTHDR_HOP)       ||
-                 (nexthdr == NEXTHDR_ROUTING)   ||
-                 (nexthdr == NEXTHDR_FRAGMENT)  ||
-                 (nexthdr == NEXTHDR_AUTH)      ||
-                 (nexthdr == NEXTHDR_ESP)       ||
-                 (nexthdr == NEXTHDR_NONE)      ||
-                 (nexthdr == NEXTHDR_DEST) );
-}
-
 /* Returns 1 if the spi is matched by the range, 0 otherwise */
 static inline int
 spi_match(u_int32_t min, u_int32_t max, u_int32_t spi, int invert)
@@ -79,7 +68,7 @@ match(const struct sk_buff *skb,
        len = skb->len - ptr;
        temp = 0;
 
-        while (ipv6_ext_hdr(nexthdr)) {
+        while (ip6t_ext_hdr(nexthdr)) {
                struct ipv6_opt_hdr *hdr;
 
               DEBUGP("ipv6_ah header iteration \n");
@@ -200,8 +189,12 @@ checkentry(const char *tablename,
        return 1;
 }
 
-static struct ip6t_match ah_match
-= { { NULL, NULL }, "ah", &match, &checkentry, NULL, THIS_MODULE };
+static struct ip6t_match ah_match = {
+	.name		= "ah",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

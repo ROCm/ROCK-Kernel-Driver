@@ -322,7 +322,7 @@ static int __pnp_bios_get_dev_node(u8 *nodenum, char boot, struct pnp_bios_node 
 	u16 status;
 	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
-	if ( !boot & pnpbios_dont_use_current_config )
+	if ( !boot && pnpbios_dont_use_current_config )
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_GET_SYS_DEV_NODE, 0, PNP_TS1, 0, PNP_TS2, boot ? 2 : 1, PNP_DS, 0,
 			       nodenum, sizeof(char), data, 65536);
@@ -350,7 +350,7 @@ static int __pnp_bios_set_dev_node(u8 nodenum, char boot, struct pnp_bios_node *
 	u16 status;
 	if (!pnp_bios_present())
 		return PNP_FUNCTION_NOT_SUPPORTED;
-	if ( !boot & pnpbios_dont_use_current_config )
+	if ( !boot && pnpbios_dont_use_current_config )
 		return PNP_FUNCTION_NOT_SUPPORTED;
 	status = call_pnp_bios(PNP_SET_SYS_DEV_NODE, nodenum, 0, PNP_TS1, boot ? 2 : 1, PNP_DS, 0, 0,
 			       data, 65536, 0, 0);
