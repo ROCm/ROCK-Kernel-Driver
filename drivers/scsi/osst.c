@@ -181,7 +181,7 @@ static int osst_write_error_recovery(OS_Scsi_Tape * STp, Scsi_Request ** aSRpnt,
 
 static inline char *tape_name(OS_Scsi_Tape *tape)
 {
-	return tape->name;
+	return tape->disk->disk_name;
 }
 
 
@@ -275,33 +275,27 @@ static int osst_chk_result(OS_Scsi_Tape * STp, Scsi_Request * SRpnt)
 /* Wakeup from interrupt */
 static void osst_sleep_done (Scsi_Cmnd * SCpnt)
 {
-	unsigned int dev = TAPE_NR(SCpnt->request->rq_dev);
-	OS_Scsi_Tape * STp;
+	OS_Scsi_Tape * STp = container_of(SCpnt->request->rq_disk->private_data,
+					OS_Scsi_Tape, driver);
 
-	if (os_scsi_tapes && (STp = os_scsi_tapes[dev])) {
-		if ((STp->buffer)->writing &&
-		    (SCpnt->sense_buffer[0] & 0x70) == 0x70 &&
-		    (SCpnt->sense_buffer[2] & 0x40)) {
-			/* EOM at write-behind, has all been written? */
-			if ((SCpnt->sense_buffer[2] & 0x0f) == VOLUME_OVERFLOW)
-				(STp->buffer)->midlevel_result = SCpnt->result; /* Error */
-			else
-				(STp->buffer)->midlevel_result = INT_MAX;       /* OK */
-		}
+	if ((STp->buffer)->writing &&
+	    (SCpnt->sense_buffer[0] & 0x70) == 0x70 &&
+	    (SCpnt->sense_buffer[2] & 0x40)) {
+		/* EOM at write-behind, has all been written? */
+		if ((SCpnt->sense_buffer[2] & 0x0f) == VOLUME_OVERFLOW)
+			(STp->buffer)->midlevel_result = SCpnt->result; /* Error */
 		else
-			(STp->buffer)->midlevel_result = SCpnt->result;
-		SCpnt->request->rq_status = RQ_SCSI_DONE;
-		(STp->buffer)->last_SRpnt = SCpnt->sc_request;
+			(STp->buffer)->midlevel_result = INT_MAX;       /* OK */
+	}
+	else
+		(STp->buffer)->midlevel_result = SCpnt->result;
+	SCpnt->request->rq_status = RQ_SCSI_DONE;
+	(STp->buffer)->last_SRpnt = SCpnt->sc_request;
 
 #if DEBUG
-		STp->write_pending = 0;
+	STp->write_pending = 0;
 #endif
-		complete(SCpnt->request->waiting);
-	}
-#if DEBUG
-	else if (debugging)
-		printk(OSST_DEB_MSG "osst?:D: Illegal interrupt device %x\n", dev);
-#endif
+	complete(SCpnt->request->waiting);
 }
 
 
@@ -341,7 +335,9 @@ static	Scsi_Request * osst_do_scsi(Scsi_Request *SRpnt, OS_Scsi_Tape *STp,
 	SRpnt->sr_cmd_len = 0;
 	SRpnt->sr_request->waiting = &(STp->wait);
 	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
-	SRpnt->sr_request->rq_dev = STp->devt;
+	SRpnt->sr_request->rq_disk = STp->disk;
+	SRpnt->sr_request->rq_dev = mk_kdev(STp->disk->major,
+					    STp->disk->first_minor);
 
 	scsi_do_req(SRpnt, (void *)cmd, bp, bytes, osst_sleep_done, timeout, retries);
 
@@ -5410,6 +5406,7 @@ static int osst_attach(Scsi_Device * SDp)
 	ST_mode * STm;
 	ST_partstat * STps;
 	int i, dev;
+	struct gendisk *disk;
 #ifdef CONFIG_DEVFS_FS
 	int mode;
 #endif
@@ -5417,8 +5414,13 @@ static int osst_attach(Scsi_Device * SDp)
 	if (SDp->type != TYPE_TAPE || !osst_supports(SDp))
 		 return 1;
 
+	disk = alloc_disk(1);
+	if (!disk)
+		return 1;
+
 	if (osst_template.nr_dev >= osst_template.dev_max) {
 		 SDp->attached--;
+		 put_disk(disk);
 		 return 1;
 	}
 	
@@ -5431,6 +5433,7 @@ static int osst_attach(Scsi_Device * SDp)
 	if (tpnt == NULL) {
 		 SDp->attached--;
 		 printk(KERN_WARNING "osst :W: Can't allocate device descriptor.\n");
+		 put_disk(disk);
 		 return 1;
 	}
 	memset(tpnt, 0, sizeof(OS_Scsi_Tape));
@@ -5482,8 +5485,12 @@ static int osst_attach(Scsi_Device * SDp)
 #endif
 
 	tpnt->device = SDp;
-	sprintf(tpnt->name, "osst%d", i);
-	tpnt->devt = mk_kdev(MAJOR_NR, i);
+	disk->private_data = &tpnt->driver;
+	sprintf(disk->disk_name, "osst%d", i);
+	disk->major = MAJOR_NR;
+	disk->first_minor = i;
+	tpnt->driver = &osst_template;
+	tpnt->disk = disk;
 	tpnt->dirty = 0;
 	tpnt->in_use = 0;
 	tpnt->drv_buffer = 1;  /* Try buffering if no mode sense */
@@ -5638,6 +5645,7 @@ static void osst_detach(Scsi_Device * SDp)
 			tpnt->de_n[mode] = NULL;
 		}
 #endif
+		put_disk(tpnt->disk);
 		kfree(tpnt);
 		os_scsi_tapes[i] = NULL;
 		SDp->attached--;
@@ -5670,6 +5678,7 @@ static void __exit exit_osst (void)
 				continue;
 			if (STp->header_cache)
 				vfree(STp->header_cache);
+			put_disk(STp->disk);
 			kfree(STp);
 		}
 		kfree(os_scsi_tapes);

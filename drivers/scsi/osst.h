@@ -532,8 +532,7 @@ typedef struct {
 
 /* The tape drive descriptor */
 typedef struct {
-  char name[8];
-  kdev_t devt;
+  struct Scsi_Device_Template *driver;
   unsigned capacity;
   Scsi_Device* device;
   struct semaphore lock;       /* for serialization */
@@ -629,6 +628,7 @@ typedef struct {
   unsigned char last_cmnd[6];
   unsigned char last_sense[16];
 #endif
+  struct gendisk *disk;
 } OS_Scsi_Tape;
 
 /* Values of write_type */
