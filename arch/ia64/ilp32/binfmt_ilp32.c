@@ -13,8 +13,6 @@
 #define	init_elf_binfmt			init_ilp32_elf_binfmt
 #define	exit_elf_binfmt			exit_ilp32_elf_binfmt
 
-extern void put_dirty_page(struct task_struct *tsk, struct page *page, unsigned long address, pgprot_t prot);
-
 struct linux_binprm; struct elf32_hdr;
 static int ilp32_elf_setup_arg_pages (struct linux_binprm *);
 static void ilp32_elf_set_personality (struct elf32_hdr *, unsigned char);
@@ -70,7 +68,7 @@ static int ilp32_elf_setup_arg_pages (struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current, page, stack_base, PAGE_COPY);
+			put_dirty_page(current, page, stack_base, PAGE_COPY, mpnt);
 		}
 		stack_base += PAGE_SIZE;
 	}
