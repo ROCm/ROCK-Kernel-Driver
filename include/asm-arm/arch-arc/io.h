@@ -246,7 +246,7 @@ DECLARE_IO(int,l,"")
 #define outw(v,p)	(__builtin_constant_p((p)) ? __outwc(v,p) : __outw(v,p))
 #define outl(v,p)	(__builtin_constant_p((p)) ? __outlc(v,p) : __outl(v,p))
 #define __ioaddr(p)	(__builtin_constant_p((p)) ? __ioaddr(p)  : __ioaddrc(p))
-/* the following macro is depreciated */
+/* the following macro is deprecated */
 #define ioaddr(port)			__ioaddr((port))
 
 /*

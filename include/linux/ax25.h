@@ -85,7 +85,7 @@ struct ax25_ctl_struct {
 };
 
 /* this will go away. Please do not export to user land */
-struct ax25_info_struct_depreciated {
+struct ax25_info_struct_deprecated {
 	unsigned int	n2, n2count;
 	unsigned int	t1, t1timer;
 	unsigned int	t2, t2timer;
