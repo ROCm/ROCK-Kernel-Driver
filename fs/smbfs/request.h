@@ -1,6 +1,7 @@
-#include <linux/types.h>
-#include <linux/wait.h>
 #include <linux/list.h>
+#include <linux/types.h>
+#include <linux/uio.h>
+#include <linux/wait.h>
 
 struct smb_request {
 	struct list_head rq_queue;	/* recvq or xmitq for the server */

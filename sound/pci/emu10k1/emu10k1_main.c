@@ -28,9 +28,11 @@
 #include <sound/driver.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 

@@ -32,23 +32,27 @@
 #include <linux/slab.h>
 #include <linux/version.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
-#include <asm/irq.h>
-#include <asm/io.h>
+#include <linux/wait.h>
 
 #include <linux/i2c.h>
 #include <linux/i2c-algo-pcf.h>
 #include <linux/i2c-elektor.h>
+
+#include <asm/io.h>
+#include <asm/irq.h>
+
 #include "i2c-pcf8584.h"
 
 #define DEFAULT_BASE 0x330
 
-static int base   = 0;
-static int irq    = 0;
+static int base;
+static int irq;
 static int clock  = 0x1c;
 static int own    = 0x55;
-static int mmapped = 0;
-static int i2c_debug = 0;
+static int mmapped;
+static int i2c_debug;
 
 /* vdovikin: removed static struct i2c_pcf_isa gpi; code - 
   this module in real supports only one device, due to missing arguments
@@ -199,24 +203,24 @@ static void pcf_isa_dec_use(struct i2c_adapter *adap)
  * This is only done when more than one hardware adapter is supported.
  */
 static struct i2c_algo_pcf_data pcf_isa_data = {
-	NULL,
-	pcf_isa_setbyte,
-	pcf_isa_getbyte,
-	pcf_isa_getown,
-	pcf_isa_getclock,
-	pcf_isa_waitforpin,
-	10, 10, 100,		/*	waits, timeout */
+	.setpcf	    = pcf_isa_setbyte,
+	.getpcf	    = pcf_isa_getbyte,
+	.getown	    = pcf_isa_getown,
+	.getclock   = pcf_isa_getclock,
+	.waitforpin = pcf_isa_waitforpin,
+	.udelay	    = 10,
+	.mdelay	    = 10,
+	.timeout    = 100,
 };
 
 static struct i2c_adapter pcf_isa_ops = {
-	"PCF8584 ISA adapter",
-	I2C_HW_P_ELEK,
-	NULL,
-	&pcf_isa_data,
-	pcf_isa_inc_use,
-	pcf_isa_dec_use,
-	pcf_isa_reg,
-	pcf_isa_unreg,
+	.name		   = "PCF8584 ISA adapter",
+	.id		   = I2C_HW_P_ELEK,
+	.algo_data	   = &pcf_isa_data,
+	.inc_use	   = pcf_isa_inc_use,
+	.dec_use	   = pcf_isa_dec_use,
+	.client_register   = pcf_isa_reg,
+	.client_unregister = pcf_isa_unreg,
 };
 
 int __init i2c_pcfisa_init(void) 

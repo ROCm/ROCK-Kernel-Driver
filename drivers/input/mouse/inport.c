@@ -34,14 +34,15 @@
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
-#include <asm/io.h>
-#include <asm/irq.h>
-
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/input.h>
+
+#include <asm/io.h>
+#include <asm/irq.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Inport (ATI XL and Microsoft) busmouse driver");

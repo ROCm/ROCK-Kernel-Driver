@@ -38,8 +38,8 @@ int cs4281_resume(struct cs4281_state *s);
 #define CS4281_SUSPEND_TBL cs4281_suspend_tbl
 #define CS4281_RESUME_TBL cs4281_resume_tbl
 */
-#define CS4281_SUSPEND_TBL cs4281_null
-#define CS4281_RESUME_TBL cs4281_null
+#define CS4281_SUSPEND_TBL cs4281_suspend_null
+#define CS4281_RESUME_TBL cs4281_resume_null
 
 int cs4281_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 {
@@ -78,7 +78,7 @@ int cs4281_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 }
 
 #else /* CS4281_PM */
-#define CS4281_SUSPEND_TBL cs4281_null
-#define CS4281_RESUME_TBL cs4281_null
+#define CS4281_SUSPEND_TBL cs4281_suspend_null
+#define CS4281_RESUME_TBL cs4281_resume_null
 #endif /* CS4281_PM */
 

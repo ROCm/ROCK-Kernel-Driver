@@ -28,16 +28,16 @@
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
-#include <asm/io.h>
-
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/ioport.h>
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/serio.h>
 #include <linux/errno.h>
-#include <linux/sched.h>
+
+#include <asm/io.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("82C710 C&T mouse port chip driver");
@@ -61,8 +61,8 @@ static char ct82c710_phys[16];
 
 #define CT82C710_IRQ          12
 
-static int ct82c710_data = 0;
-static int ct82c710_status = 0;
+static int ct82c710_data;
+static int ct82c710_status;
 
 static void ct82c710_interrupt(int cpl, void *dev_id, struct pt_regs * regs);
 

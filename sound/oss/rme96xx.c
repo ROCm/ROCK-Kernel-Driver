@@ -41,10 +41,14 @@ TODO:
 #include <linux/smp_lock.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <asm/dma.h>
-#include <asm/hardirq.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/poll.h>
+#include <linux/wait.h>
+
+#include <asm/dma.h>
+#include <asm/page.h>
+
 #include "rme96xx.h"
 
 #define NR_DEVICE 2
@@ -808,17 +812,22 @@ static void __devinit rme96xx_remove(struct pci_dev *dev)
 #endif
 
 static struct pci_device_id id_table[] __devinitdata = {
-	{ PCI_VENDOR_ID_RME, PCI_DEVICE_ID_RME9652, PCI_ANY_ID, PCI_ANY_ID, 0, 0 },
-	{ 0, }
+	{
+		.vendor	   = PCI_VENDOR_ID_RME,
+		.device	   = PCI_DEVICE_ID_RME9652,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+	},
+	{ 0, },
 };
 
 MODULE_DEVICE_TABLE(pci, id_table);
 
 static struct pci_driver rme96xx_driver = {
-	name: "rme96xx",
-	id_table: id_table,
-	probe: rme96xx_probe,
-	remove: rme96xx_remove
+	.name	  =  "rme96xx",
+	.id_table = id_table,
+	.probe	  = rme96xx_probe,
+	.remove	  = rme96xx_remove,
 };
 
 static int __init init_rme96xx(void)
@@ -1223,7 +1232,7 @@ static int rme96xx_open(struct inode *in, struct file *f)
 static int rme96xx_release(struct inode *in, struct file *file)
 {
 	struct dmabuf * dma = (struct dmabuf*) file->private_data;
-	int hwp;
+	/* int hwp; */
 	DBG(printk(__FUNCTION__"\n"));
 
 	COMM          ("draining")
@@ -1483,15 +1492,15 @@ static unsigned int rme96xx_poll(struct file *file, struct poll_table_struct *wa
 
 static struct file_operations rme96xx_audio_fops = {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-	owner: THIS_MODULE,
+	.owner	 = THIS_MODULE,
 #endif
-	read: rme96xx_read,
-	write: rme96xx_write,
-	poll: rme96xx_poll,
-	ioctl: rme96xx_ioctl,  
-	mmap: rm96xx_mmap,
-	open: rme96xx_open,  
-	release: rme96xx_release 
+	.read	 = rme96xx_read,
+	.write	 = rme96xx_write,
+	.poll	 = rme96xx_poll,
+	.ioctl	 = rme96xx_ioctl,  
+	.mmap	 = rm96xx_mmap,
+	.open	 = rme96xx_open,  
+	.release = rme96xx_release 
 };
 
 static int rme96xx_mixer_open(struct inode *inode, struct file *file)
@@ -1565,9 +1574,9 @@ static int rme96xx_mixer_release(struct inode *inode, struct file *file)
 
 static /*const*/ struct file_operations rme96xx_mixer_fops = {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-	owner: THIS_MODULE,
+	.owner	 = THIS_MODULE,
 #endif
-	ioctl:		rme96xx_mixer_ioctl,
-	open:		rme96xx_mixer_open,
-	release:	rme96xx_mixer_release,
+	.ioctl	 = rme96xx_mixer_ioctl,
+	.open	 = rme96xx_mixer_open,
+	.release = rme96xx_mixer_release,
 };
