@@ -580,7 +580,8 @@ static inline void ptep_mkdirty(pte_t *ptep)
 
 static inline void
 ptep_establish(struct vm_area_struct *vma, 
-	       unsigned long address, pte_t *ptep, pte_t entry)
+	       unsigned long address, pte_t *ptep,
+	       pte_t entry, int dirty)
 {
 	ptep_clear_flush(vma, address, ptep);
 	set_pte(ptep, entry);

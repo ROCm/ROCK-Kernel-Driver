@@ -10,7 +10,7 @@
  *
  * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock
  */
-#define ptep_establish(__vma, __address, __ptep, __entry)		\
+#define ptep_establish(__vma, __address, __ptep, __entry, __dirty)	\
 do {									\
 	set_pte(__ptep, __entry);					\
 	flush_tlb_page(__vma, __address);				\
