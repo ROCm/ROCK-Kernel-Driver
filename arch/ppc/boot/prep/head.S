@@ -1,7 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
 #include <asm/ppc_asm.h>
 #include <asm/processor.h>
 #include <asm/cache.h>
@@ -38,10 +34,6 @@ start_:
 	isync
 
 	mr	r11,r3		/* Save pointer to residual/board data */
-	mr      r25,r5		/* Save OFW pointer */
-
-	/* Save the original MSR value */
-	mfmsr	r26
 
 	/* Establish default MSR value */
 	li	r3,MSR_IP|MSR_FP
@@ -114,17 +106,11 @@ start_ldr:
 	li	r2,0x000F		/* Mask pointer to 16-byte boundary */
 	andc	r1,r1,r2
 
-	/* Store the original MSR into 'orig_MSR' */
-	lis	r3,orig_MSR@h
-	ori	r3,r3,orig_MSR@l
-	stw	r26,0(r3)
-
 /* Run loader */
 	mr	r3,r8			/* Load point */
 	mr	r4,r7			/* Program length */
 	mr	r5,r6			/* Checksum */
 	mr	r6,r11			/* Residual data */
-	mr      r7,r25                  /* OFW interfaces */
 	bl	decompress_kernel
 
 	/*

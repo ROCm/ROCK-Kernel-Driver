@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *  arch/ppc/platforms/pmac_nvram.c
  *
  *  Copyright (C) 2002 Benjamin Herrenschmidt (benh@kernel.crashing.org)

@@ -37,7 +37,7 @@
 	.globl	start
 start:
 	bl	start_
-#ifdef CONFIG_TREEBOOT
+#ifdef CONFIG_IBM_OPENBIOS
 	/* The IBM "Tree" bootrom knows that the address of the bootrom
 	 * read only structure is 4 bytes after _start.
 	 */
@@ -73,7 +73,8 @@ start_:
 #ifdef CONFIG_6xx
 	bl	disable_6xx_mmu
 	bl	disable_6xx_l1cache
-#if defined(CONFIG_FORCE) || defined(CONFIG_K2) || defined(CONFIG_EV64260)
+#if defined(CONFIG_FORCE) || defined(CONFIG_K2)		\
+		|| defined(CONFIG_EV64260) || defined(CONFIG_PAL4)
 	bl	_setup_L2CR
 #endif
 #endif

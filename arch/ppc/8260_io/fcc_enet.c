@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Fast Ethernet Controller (FCC) driver for Motorola MPC8260.
  * Copyright (c) 2000 MontaVista Software, Inc.   Dan Malek (dmalek@jlc.net)
  *

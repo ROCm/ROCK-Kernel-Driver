@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *  UART driver for MPC860 CPM SCC or SMC
  *  Copyright (c) 1997 Dan Malek (dmalek@jlc.net)
  *

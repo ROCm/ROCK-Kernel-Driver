@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.ucontext.h 1.5 05/17/01 18:14:26 cort
- */
 #ifndef _ASMPPC_UCONTEXT_H
 #define _ASMPPC_UCONTEXT_H
 

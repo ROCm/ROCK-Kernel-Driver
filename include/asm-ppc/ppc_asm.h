@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * include/asm-ppc/ppc_asm.h
  *
  * Definitions used by various bits of low-level assembly code on PowerPC.

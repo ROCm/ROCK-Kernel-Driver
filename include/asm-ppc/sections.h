@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.sections.h 1.11 09/08/01 15:47:43 paulus
- */
 #ifdef __KERNEL__
 #ifndef _PPC_SECTIONS_H
 #define _PPC_SECTIONS_H

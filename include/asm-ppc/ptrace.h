@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifndef _PPC_PTRACE_H
 #define _PPC_PTRACE_H
 

@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.mman.h 1.7 05/17/01 18:14:25 cort
- */
 #ifndef __PPC_MMAN_H__
 #define __PPC_MMAN_H__
 

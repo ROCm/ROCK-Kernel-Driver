@@ -1,8 +1,4 @@
 /*
- * BK Id: SCCS/s.immap_8260.h 1.8 07/18/01 15:46:50 trini
- */
-
-/*
  * MPC8260 Internal Memory Map
  * Copyright (c) 1999 Dan Malek (dmalek@jlc.net)
  *

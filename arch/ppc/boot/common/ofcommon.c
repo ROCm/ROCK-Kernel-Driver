@@ -1,6 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- *
  * Copyright (C) Paul Mackerras 1997.
  *
  * This program is free software; you can redistribute it and/or

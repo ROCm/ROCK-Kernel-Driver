@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Routines providing a simple monitor for use on the PowerMac.
  *
  * Copyright (C) 1996 Paul Mackerras.

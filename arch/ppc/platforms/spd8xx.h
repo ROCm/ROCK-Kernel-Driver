@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.spd8xx.h 1.8 10/27/01 13:39:41 trini
- */
-/*
  * Speech Design SPD8xxTS board specific definitions
  * 
  * Copyright (c) 2000,2001 Wolfgang Denk (wd@denx.de)

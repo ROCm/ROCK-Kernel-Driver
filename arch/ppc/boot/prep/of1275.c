@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.of1275.c 1.6 05/18/01 15:16:42 cort
- */
 /* Open Firmware Client Interface */
 
 

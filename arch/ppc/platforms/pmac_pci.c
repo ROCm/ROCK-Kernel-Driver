@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Support for PCI bridges found on Power Macintoshes.
  * 
  * This includes support for bandit, chaos, grackle (motorola

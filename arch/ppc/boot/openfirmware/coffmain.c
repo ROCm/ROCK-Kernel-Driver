@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Copyright (C) Paul Mackerras 1997.
  *
  * This program is free software; you can redistribute it and/or
@@ -13,6 +10,7 @@
 #include <asm/page.h>
 
 #include "nonstdio.h"
+#include "of1275.h"
 #include "zlib.h"
 
 /* Passed from the linker */
@@ -20,17 +18,13 @@ extern char __image_begin, __image_end;
 extern char __ramdisk_begin[], __ramdisk_end;
 extern char _start, _end;
 
-extern char *claim(unsigned, unsigned, unsigned);
 extern char image_data[], initrd_data[];
 extern int initrd_len, image_len;
-extern int getprop(void *, const char *, void *, int);
 extern unsigned int heap_max;
-extern void *finddevice(const char *);
 extern void flush_cache(void *start, unsigned int len);
 extern void gunzip(void *, int, unsigned char *, int *);
 extern void make_bi_recs(unsigned long addr, char *name, unsigned int mach,
 		unsigned int progend);
-extern void pause(void);
 extern void setup_bats(unsigned long start);
 
 char *avail_ram;

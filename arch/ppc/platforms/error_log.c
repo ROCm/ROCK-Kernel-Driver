@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.error_log.c 1.6 05/17/01 18:14:21 cort
- */
-/*
  *  arch/ppc/kernel/error_log.c
  *  
  *  Copyright (c) 2000 Tilmann Bitterberg

@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Definitions for using the procedures in btext.c.
  *
  * Benjamin Herrenschmidt <benh@kernel.crashing.org>

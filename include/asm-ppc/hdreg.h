@@ -1,8 +1,5 @@
 /*
- * BK Id: SCCS/s.hdreg.h 1.5 05/17/01 18:14:24 cort
- */
-/*
- *  linux/include/asm-ppc/hdreg.h
+ *  include/asm-ppc/hdreg.h
  *
  *  Copyright (C) 1994-1996  Linus Torvalds & authors
  */

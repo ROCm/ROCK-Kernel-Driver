@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.amigahw.h 1.5 05/17/01 18:14:24 cort
- */
 #ifdef __KERNEL__
 #ifndef __ASMPPC_AMIGAHW_H
 #define __ASMPPC_AMIGAHW_H

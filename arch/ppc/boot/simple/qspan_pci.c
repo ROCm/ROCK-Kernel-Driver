@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * LinuxPPC arch/ppc/kernel/qspan_pci.c   Dan Malek (dmalek@jlc.net)
  *
  * QSpan Motorola bus to PCI bridge.  The config address register

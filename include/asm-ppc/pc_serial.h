@@ -1,6 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- *
  * include/asm-ppc/pc_serial.h
  *
  * This is basically a copy of include/asm-i386/serial.h.

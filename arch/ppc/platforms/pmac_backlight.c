@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Miscellaneous procedures for dealing with the PowerMac hardware.
  * Contains support for the backlight.
  * 

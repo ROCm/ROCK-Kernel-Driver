@@ -1,7 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
 /* Board specific functions for those embedded 8xx boards that do
  * not have boot monitor support for board information.
  *
@@ -14,13 +10,15 @@
 #include <linux/types.h>
 #include <linux/config.h>
 #include <linux/string.h>
-#include <asm/io.h>
 #ifdef CONFIG_8xx
 #include <asm/mpc8xx.h>
 #endif
 #ifdef CONFIG_8260
 #include <asm/mpc8260.h>
 #include <asm/immap_8260.h>
+#endif
+#ifdef CONFIG_40x
+#include <asm/io.h>
 #endif
 
 /* For those boards that don't provide one.
@@ -657,15 +655,65 @@ embed_config(bd_t **bdp)
 }
 #endif /* WILLOW */
 
-#ifdef CONFIG_TREEBOOT
+void
+embed_config(bd_t ** bdp)
+{
+	static const unsigned long line_size = 32;
+	static const unsigned long congruence_classes = 256;
+	unsigned long addr;
+	u_char *cp;
+	int i;
+	bd_t *bd;
+
+	/*
+	 * At one point, we were getting machine checks.  Linux was not
+	 * invalidating the data cache before it was enabled.  The
+	 * following code was added to do that.  Soon after we had done
+	 * that, we found the real reasons for the machine checks.  I've
+	 * run the kernel a few times with the following code
+	 * temporarily removed without any apparent problems.  However,
+	 * I objdump'ed the kernel and boot code and found out that
+	 * there were no other dccci's anywhere, so I put the code back
+	 * in and have been reluctant to remove it.  It seems safer to
+	 * just leave it here.
+	 */
+	for (addr = 0;
+	     addr < (congruence_classes * line_size); addr += line_size) {
+	      __asm__("dccci 0,%0": :"b"(addr));
+	}
+
+	bd = &bdinfo;
+	*bdp = bd;
+	bd->bi_memsize = XPAR_DDR_0_SIZE;
+	bd->bi_intfreq = XPAR_CORE_CLOCK_FREQ_HZ;
+	bd->bi_busfreq = XPAR_PLB_CLOCK_FREQ_HZ;
+}
+
+#ifdef CONFIG_IBM_OPENBIOS
 /* This could possibly work for all treeboot roms.
 */
-#if defined(CONFIG_ASH)
+#if defined(CONFIG_ASH) || defined(CONFIG_BEECH)
 #define BOARD_INFO_VECTOR       0xFFF80B50 /* openbios 1.19 moved this vector down  - armin */
 #else
-#define	BOARD_INFO_VECTOR	0xFFFE0B50
+#define BOARD_INFO_VECTOR	0xFFFE0B50
 #endif
 
+#ifdef CONFIG_BEECH
+static void
+get_board_info(bd_t **bdp)
+{
+	typedef void (*PFV)(bd_t *bd);
+	((PFV)(*(unsigned long *)BOARD_INFO_VECTOR))(*bdp);
+	return;
+}
+
+void
+embed_config(bd_t **bdp)
+{
+        *bdp = &bdinfo;
+	get_board_info(bdp);
+}
+#else /* !CONFIG_BEECH */
 void
 embed_config(bd_t **bdp)
 {
@@ -675,16 +723,13 @@ embed_config(bd_t **bdp)
 	bd_t *(*get_board_info)(void) =
 	    (bd_t *(*)(void))(*(unsigned long *)BOARD_INFO_VECTOR);
 #if !defined(CONFIG_STB03xxx)
-	volatile emac_t *emacp;
-	emacp = (emac_t *)EMAC0_BASE;  /* assume 1st emac - armin */
 
 	/* shut down the Ethernet controller that the boot rom
 	 * sometimes leaves running.
 	 */
 	mtdcr(DCRN_MALCR(DCRN_MAL_BASE), MALCR_MMSR);     /* 1st reset MAL */
 	while (mfdcr(DCRN_MALCR(DCRN_MAL_BASE)) & MALCR_MMSR) {}; /* wait for the reset */	
-	emacp->em0mr0 = 0x20000000;        /* then reset EMAC */
-	eieio();
+	out_be32(EMAC0_BASE,0x20000000);        /* then reset EMAC */
 #endif
 
 	bd = &bdinfo;
@@ -715,14 +760,15 @@ embed_config(bd_t **bdp)
 #endif
 	}
 	/* Yeah, this look weird, but on Redwood 4 they are
-	 * different object in the structure.  When RW5 uses
-	 * OpenBIOS, it requires a special value.
+	 * different object in the structure.  Sincr Redwwood 5
+	 * and Redwood 6 use OpenBIOS, it requires a special value.
 	 */
-#ifdef CONFIG_REDWOOD_5
+#if defined(CONFIG_REDWOOD_5) || defined (CONFIG_REDWOOD_6)
 	bd->bi_tbfreq = 27 * 1000 * 1000;
 #endif
 }
-#endif
+#endif /* CONFIG_BEECH */
+#endif /* CONFIG_IBM_OPENBIOS */
 
 #ifdef CONFIG_EP405
 #include <linux/serial_reg.h>
@@ -748,6 +794,14 @@ embed_config(bd_t **bdp)
 		/* The following tricks serial_init() into resetting the baud rate */
 		writeb(0, UART0_IO_BASE + UART_LCR);
 	}
+
+	/* We haven't seen actual problems with the EP405 leaving the
+	 * EMAC running (as we have on Walnut).  But the registers
+	 * suggest it may not be left completely quiescent.  Reset it
+	 * just to be sure. */
+	mtdcr(DCRN_MALCR(DCRN_MAL_BASE), MALCR_MMSR);     /* 1st reset MAL */
+	while (mfdcr(DCRN_MALCR(DCRN_MAL_BASE)) & MALCR_MMSR) {}; /* wait for the reset */	
+	out_be32(EMAC0_BASE,0x20000000);        /* then reset EMAC */
 
 	bd = &bdinfo;
 	*bdp = bd;
@@ -808,6 +862,16 @@ embed_config(bd_t **bdp)
 	
 	bd = &bdinfo;
 	*bdp = bd;
+	
+	for(i=0;i<8192;i+=32) {
+		__asm__("dccci 0,%0" :: "r" (i));
+	}
+	__asm__("iccci 0,0");
+	__asm__("sync;isync");
+
+	/* init ram for parity */
+	memset(0, 0,0x400000);  /* Lo memory */
+
 
 	bd->bi_memsize   = (32 * 1024 * 1024) ;
 	bd->bi_intfreq = 133000000; //the internal clock is 133 MHz

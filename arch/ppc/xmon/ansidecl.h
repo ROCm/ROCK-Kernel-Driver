@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.ansidecl.h 1.5 05/17/01 18:14:23 cort
- */
 /* ANSI and traditional C compatability macros
    Copyright 1991, 1992 Free Software Foundation, Inc.
    This file is part of the GNU C Library.

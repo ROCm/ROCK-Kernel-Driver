@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * QSpan pci routines.
  * Most 8xx boards use the QSpan PCI bridge.  The config address register
  * is located 0x500 from the base of the bridge control/status registers.

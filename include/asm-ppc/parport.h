@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.parport.h 1.5 05/17/01 18:14:25 cort
- */
-/*
  * parport.h: platform-specific PC-style parport initialisation
  *
  * Copyright (C) 1999, 2000  Tim Waugh <tim@cyberelk.demon.co.uk>

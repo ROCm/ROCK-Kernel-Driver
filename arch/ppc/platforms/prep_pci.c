@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * PReP pci functions.
  * Originally by Gary Thomas
  * rewritten and updated by Cort Dougan (cort@cs.nmt.edu)

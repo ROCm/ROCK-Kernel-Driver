@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * bitops.h: Bit string operations on the ppc
  */
 

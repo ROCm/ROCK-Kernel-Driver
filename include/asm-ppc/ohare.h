@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * ohare.h: definitions for using the "O'Hare" I/O controller chip.
  *
  * Copyright (C) 1997 Paul Mackerras.
