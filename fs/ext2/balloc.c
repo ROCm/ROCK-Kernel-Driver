@@ -518,7 +518,7 @@ got_block:
 		dq_alloc -= n;
 		group_alloc -= n;
 	}
-	write_unlock(&EXT2_I(inode->i_meta_lock);
+	write_unlock(&EXT2_I(inode)->i_meta_lock);
 
 	mark_buffer_dirty(bh);
 	if (sb->s_flags & MS_SYNCHRONOUS) {
