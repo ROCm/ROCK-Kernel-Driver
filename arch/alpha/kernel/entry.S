@@ -925,6 +925,24 @@ sys_ptrace:
 .end sys_ptrace
 
 	.align	4
+	.globl	sys_execve
+	.ent	sys_execve
+sys_execve:
+	.prologue 0
+	mov	$sp, $19
+	jmp	$31, do_sys_execve
+.end sys_execve
+
+	.align	4
+	.globl	osf_sigprocmask
+	.ent	osf_sigprocmask
+osf_sigprocmask:
+	.prologue 0
+	mov	$sp, $18
+	jmp	$31, do_osf_sigprocmask
+.end osf_sigprocmask
+
+	.align	4
 	.globl	alpha_ni_syscall
 	.ent	alpha_ni_syscall
 alpha_ni_syscall:

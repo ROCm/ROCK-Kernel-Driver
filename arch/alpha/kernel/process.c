@@ -456,19 +456,10 @@ dump_elf_task_fp(elf_fpreg_t *dest, struct task_struct *task)
 
 /*
  * sys_execve() executes a new program.
- *
- * This works due to the alpha calling sequence: the first 6 args
- * are gotten from registers, while the rest is on the stack, so
- * we get a0-a5 for free, and then magically find "struct pt_regs"
- * on the stack for us..
- *
- * Don't do this at home.
  */
 asmlinkage int
-sys_execve(char __user *ufilename, char __user * __user *argv,
-	   char __user * __user *envp,
-	   unsigned long a3, unsigned long a4, unsigned long a5,
-	   struct pt_regs regs)
+do_sys_execve(char __user *ufilename, char __user * __user *argv,
+	      char __user * __user *envp, struct pt_regs *regs)
 {
 	int error;
 	char *filename;
@@ -477,7 +468,7 @@ sys_execve(char __user *ufilename, char __user * __user *argv,
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
-	error = do_execve(filename, argv, envp, &regs);
+	error = do_execve(filename, argv, envp, regs);
 	putname(filename);
 out:
 	return error;
