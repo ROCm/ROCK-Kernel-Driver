@@ -76,7 +76,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	int rc = 0;
 	struct list_head *tmp;
 	struct cifsSesInfo *ses;
-    struct cifsTconInfo *tcon;
+	struct cifsTconInfo *tcon;
 
 	server->tcpStatus = CifsNeedReconnect;
 	server->maxBuf = 0;
@@ -889,7 +889,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 					if (pSesInfo->Suid)
 						CIFSSMBLogoff(xid, pSesInfo);
 					if(pSesInfo->server->tsk)
-						send_sig(SIGINT,pSesInfo->server->tsk,1);
+						send_sig(SIGKILL,pSesInfo->server->tsk,1);
 					else
 						cFYI(1,("Can not wake captive thread on cleanup of failed mount"));
 					set_current_state(TASK_INTERRUPTIBLE);
@@ -2278,7 +2278,7 @@ cifs_umount(struct super_block *sb, struct cifs_sb_info *cifs_sb)
 			schedule_timeout(HZ / 4);	/* give captive thread time to exit */
 			if((ses->server) && (ses->server->ssocket)) {            
 				cFYI(1,("Waking up socket by sending it signal "));
-				send_sig(SIGINT,ses->server->tsk,1);
+				send_sig(SIGKILL,ses->server->tsk,1);
 			}
 		} else
 			cFYI(1, ("No session or bad tcon"));

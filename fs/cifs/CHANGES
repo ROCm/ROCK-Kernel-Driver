@@ -1,3 +1,10 @@
+Version 0.67
+------------
+Fix signal sending so that captive thread (cifsd) exits on umount 
+(which was causing the warning in kmem_cache_free of the request buffers
+at rmmod time).  This had broken as a sideeffect of the recent global
+kernel change to daemonize
+
 Version 0.66
 ------------
 Reconnect tids and fids after session reconnection (still do not
