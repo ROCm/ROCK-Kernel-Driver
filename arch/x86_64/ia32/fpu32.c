@@ -72,15 +72,15 @@ static inline unsigned long twd_fxsr_to_i387(struct i387_fxsave_struct *fxsave)
 
 
 static inline int convert_fxsr_from_user(struct i387_fxsave_struct *fxsave,
-					 struct _fpstate_ia32 *buf)
+					 struct _fpstate_ia32 __user *buf)
 {
 	struct _fpxreg *to;
-	struct _fpreg *from;
+	struct _fpreg __user *from;
 	int i;
 	u32 v;
 	int err = 0;
 
-#define G(num,val) err |= __get_user(val, num + (u32 *)buf)
+#define G(num,val) err |= __get_user(val, num + (u32 __user *)buf)
 	G(0, fxsave->cwd);
 	G(1, fxsave->swd);
 	G(2, fxsave->twd);
@@ -104,12 +104,12 @@ static inline int convert_fxsr_from_user(struct i387_fxsave_struct *fxsave,
 }
 
 
-static inline int convert_fxsr_to_user(struct _fpstate_ia32 *buf,
+static inline int convert_fxsr_to_user(struct _fpstate_ia32 __user *buf,
 				       struct i387_fxsave_struct *fxsave,
 				       struct pt_regs *regs,
 				       struct task_struct *tsk)
 {
-	struct _fpreg *to;
+	struct _fpreg __user *to;
 	struct _fpxreg *from;
 	int i;
 	u16 cs,ds; 
@@ -125,7 +125,7 @@ static inline int convert_fxsr_to_user(struct _fpstate_ia32 *buf,
 		cs = regs->cs;
 	} 
 
-#define P(num,val) err |= __put_user(val, num + (u32 *)buf)
+#define P(num,val) err |= __put_user(val, num + (u32 __user *)buf)
 	P(0, (u32)fxsave->cwd | 0xffff0000);
 	P(1, (u32)fxsave->swd | 0xffff0000);
 	P(2, twd_fxsr_to_i387(fxsave));
@@ -147,7 +147,7 @@ static inline int convert_fxsr_to_user(struct _fpstate_ia32 *buf,
 	return 0;
 }
 
-int restore_i387_ia32(struct task_struct *tsk, struct _fpstate_ia32 *buf, int fsave) 
+int restore_i387_ia32(struct task_struct *tsk, struct _fpstate_ia32 __user *buf, int fsave) 
 { 
 	clear_fpu(tsk);
 	if (!fsave) { 
@@ -162,7 +162,7 @@ int restore_i387_ia32(struct task_struct *tsk, struct _fpstate_ia32 *buf, int fs
 }  
 
 int save_i387_ia32(struct task_struct *tsk, 
-		   struct _fpstate_ia32 *buf, 
+		   struct _fpstate_ia32 __user *buf, 
 		   struct pt_regs *regs,
 		   int fsave)
 {

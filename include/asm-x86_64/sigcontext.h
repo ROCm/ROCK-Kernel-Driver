@@ -2,6 +2,7 @@
 #define _ASM_X86_64_SIGCONTEXT_H
 
 #include <asm/types.h>
+#include <linux/compiler.h>
 
 /* FXSAVE frame */
 /* Note: reserved1/2 may someday contain valuable data. Always save/restore
@@ -47,7 +48,7 @@ struct sigcontext {
 	unsigned long trapno;
 	unsigned long oldmask;
 	unsigned long cr2;
-	struct _fpstate *fpstate;	/* zero when no FPU context */
+	struct _fpstate __user *fpstate;	/* zero when no FPU context */
 	unsigned long reserved1[8];
 };
 

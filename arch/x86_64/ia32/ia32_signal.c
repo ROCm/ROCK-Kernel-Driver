@@ -42,7 +42,7 @@
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
 asmlinkage int do_signal(struct pt_regs *regs, sigset_t *oldset);
-void signal_fault(struct pt_regs *regs, void *frame, char *where);
+void signal_fault(struct pt_regs *regs, void __user *frame, char *where);
 
 int ia32_copy_siginfo_to_user(siginfo_t32 __user *to, siginfo_t *from)
 {
@@ -136,8 +136,9 @@ sys32_sigsuspend(int history0, int history1, old_sigset_t mask, struct pt_regs r
 }
 
 asmlinkage long
-sys32_sigaltstack(const stack_ia32_t *uss_ptr, stack_ia32_t *uoss_ptr, 
-				  struct pt_regs regs)
+sys32_sigaltstack(const stack_ia32_t __user *uss_ptr,
+		  stack_ia32_t __user *uoss_ptr, 
+		  struct pt_regs regs)
 {
 	stack_t uss,uoss; 
 	int ret;
@@ -193,7 +194,7 @@ struct rt_sigframe
 };
 
 static int
-ia32_restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsigned int *peax)
+ia32_restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 __user *sc, unsigned int *peax)
 {
 	unsigned int err = 0;
 	
@@ -252,9 +253,9 @@ ia32_restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsign
 
 	{
 		u32 tmp;
-		struct _fpstate_ia32 * buf;
+		struct _fpstate_ia32 __user * buf;
 		err |= __get_user(tmp, &sc->fpstate);
-		buf = (struct _fpstate_ia32 *) (u64)tmp;
+		buf = compat_ptr(tmp);
 		if (buf) {
 			if (verify_area(VERIFY_READ, buf, sizeof(*buf)))
 				goto badframe;
@@ -275,7 +276,7 @@ badframe:
 
 asmlinkage long sys32_sigreturn(struct pt_regs regs)
 {
-	struct sigframe *frame = (struct sigframe *)(regs.rsp - 8);
+	struct sigframe __user *frame = (struct sigframe __user *)(regs.rsp-8);
 	sigset_t set;
 	unsigned int eax;
 
@@ -304,7 +305,7 @@ badframe:
 
 asmlinkage long sys32_rt_sigreturn(struct pt_regs regs)
 {
-	struct rt_sigframe *frame = (struct rt_sigframe *)(regs.rsp - 4);
+	struct rt_sigframe __user *frame = (struct rt_sigframe __user *)(regs.rsp - 4);
 	sigset_t set;
 	unsigned int eax;
 
@@ -322,8 +323,8 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs regs)
 	if (ia32_restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;
 
- 	if (sys32_sigaltstack(&frame->uc.uc_stack, NULL, regs) == -EFAULT)
-  		goto badframe;
+	if (sys32_sigaltstack(&frame->uc.uc_stack, NULL, regs) == -EFAULT)
+		goto badframe;
 
 	return eax;
 
@@ -337,20 +338,20 @@ badframe:
  */
 
 static int
-ia32_setup_sigcontext(struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate,
+ia32_setup_sigcontext(struct sigcontext_ia32 __user *sc, struct _fpstate_ia32 __user *fpstate,
 		 struct pt_regs *regs, unsigned int mask)
 {
 	int tmp, err = 0;
 
 	tmp = 0;
 	__asm__("movl %%gs,%0" : "=r"(tmp): "0"(tmp));
-	err |= __put_user(tmp, (unsigned int *)&sc->gs);
+	err |= __put_user(tmp, (unsigned int __user *)&sc->gs);
 	__asm__("movl %%fs,%0" : "=r"(tmp): "0"(tmp));
-	err |= __put_user(tmp, (unsigned int *)&sc->fs);
+	err |= __put_user(tmp, (unsigned int __user *)&sc->fs);
 	__asm__("movl %%ds,%0" : "=r"(tmp): "0"(tmp));
-	err |= __put_user(tmp, (unsigned int *)&sc->ds);
+	err |= __put_user(tmp, (unsigned int __user *)&sc->ds);
 	__asm__("movl %%es,%0" : "=r"(tmp): "0"(tmp));
-	err |= __put_user(tmp, (unsigned int *)&sc->es);
+	err |= __put_user(tmp, (unsigned int __user *)&sc->es);
 
 	err |= __put_user((u32)regs->rdi, &sc->edi);
 	err |= __put_user((u32)regs->rsi, &sc->esi);
@@ -387,7 +388,7 @@ ia32_setup_sigcontext(struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate,
 /*
  * Determine which stack to use..
  */
-static void *
+static void __user *
 get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 {
 	unsigned long rsp;
@@ -408,13 +409,13 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 		rsp = (unsigned long) ka->sa.sa_restorer;
 	}
 
-	return (void *)((rsp - frame_size) & -8UL);
+	return (void __user *)((rsp - frame_size) & -8UL);
 }
 
 void ia32_setup_frame(int sig, struct k_sigaction *ka,
 			compat_sigset_t *set, struct pt_regs * regs)
 {
-	struct sigframe *frame;
+	struct sigframe __user *frame;
 	int err = 0;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
@@ -501,7 +502,7 @@ give_sigsegv:
 void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 			   compat_sigset_t *set, struct pt_regs * regs)
 {
-	struct rt_sigframe *frame;
+	struct rt_sigframe __user *frame;
 	int err = 0;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
