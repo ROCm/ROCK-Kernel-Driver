@@ -1977,7 +1977,6 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1019, .device = 0x0996, .action = VIA_DXS_48K },
 		{ .vendor = 0x1043, .device = 0x80a1, .action = VIA_DXS_NO_VRA }, /* ASUS A7V8-X */
 		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
-		{ .vendor = 0x1458, .device = 0x5002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAX */
 		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
 		{ .vendor = 0x1462, .device = 0x7120, .action = VIA_DXS_ENABLE }, /* MSI KT4V */
 		{ } /* terminator */
