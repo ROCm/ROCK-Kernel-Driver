@@ -151,7 +151,7 @@ int x25_create_facilities(unsigned char *buffer,
 		*p++ = facilities->pacsize_out ? : facilities->pacsize_in;
 	}
 
-	if (facilities->winsize_in || facilities->winsize_out &&
+	if ((facilities->winsize_in || facilities->winsize_out) &&
 	    (facil_mask & X25_MASK_WINDOW_SIZE)) {
 		*p++ = X25_FAC_WINDOW_SIZE;
 		*p++ = facilities->winsize_in ? : facilities->winsize_out;
