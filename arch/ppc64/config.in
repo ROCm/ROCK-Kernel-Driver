@@ -67,6 +67,11 @@ source drivers/parport/Config.in
 
 if [ "$CONFIG_PPC_ISERIES" != "y" ]; then
    bool 'Support for Open Firmware device tree in /proc' CONFIG_PROC_DEVICETREE
+
+   bool 'Default bootloader kernel arguments' CONFIG_CMDLINE_BOOL
+   if [ "$CONFIG_CMDLINE_BOOL" = "y" ] ; then
+     string 'Initial kernel command string' CONFIG_CMDLINE "console=ttyS0,9600 console=tty0 root=/dev/sda2"
+   fi
 fi
 
 endmenu

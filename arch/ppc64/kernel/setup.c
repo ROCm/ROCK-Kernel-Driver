@@ -379,10 +379,15 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 
 	cmd_line[0] = 0;
+
+#ifdef CONFIG_CMDLINE
+	strcpy(cmd_line, CONFIG_CMDLINE);
+#endif /* CONFIG_CMDLINE */
+
 	chosen = find_devices("chosen");
 	if (chosen != NULL) {
 		p = get_property(chosen, "bootargs", NULL);
-		if (p != NULL)
+		if (p != NULL && p[0] != 0)
 			strncpy(cmd_line, p, sizeof(cmd_line));
 	}
 	cmd_line[sizeof(cmd_line) - 1] = 0;
