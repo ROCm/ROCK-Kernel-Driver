@@ -297,7 +297,7 @@ struct compound_hdr {
 	*p++ = htonl((uint32_t)(n));					\
 } while (0)
 #define WRITEMEM(ptr,nbytes)     do {				\
-	p = xdr_writemem(p, ptr, nbytes);			\
+	p = xdr_encode_opaque_fixed(p, ptr, nbytes);		\
 } while (0)
 
 #define RESERVE_SPACE(nbytes)	do {				\
@@ -305,17 +305,6 @@ struct compound_hdr {
 	if (!p) printk("RESERVE_SPACE(%d) failed in function %s\n", (int) (nbytes), __FUNCTION__); \
 	BUG_ON(!p);						\
 } while (0)
-
-static inline
-uint32_t *xdr_writemem(uint32_t *p, const void *ptr, int nbytes)
-{
-	int tmp = XDR_QUADLEN(nbytes);
-	if (!tmp)
-		return p;
-	p[tmp-1] = 0;
-	memcpy(p, ptr, nbytes);
-	return p + tmp;
-}
 
 static int
 encode_compound_hdr(struct xdr_stream *xdr, struct compound_hdr *hdr)
