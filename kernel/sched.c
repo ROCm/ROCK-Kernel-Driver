@@ -438,12 +438,6 @@ static runqueue_t *this_rq_lock(void)
 	return rq;
 }
 
-static inline void rq_unlock(runqueue_t *rq)
-	__releases(rq->lock)
-{
-	spin_unlock_irq(&rq->lock);
-}
-
 #ifdef CONFIG_SCHED_SMT
 static int cpu_and_siblings_are_idle(int cpu)
 {
