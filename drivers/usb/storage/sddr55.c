@@ -737,16 +737,15 @@ static void sddr55_card_info_destructor(void *extra) {
 int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us)
 {
 	int result;
-	int i;
-	unsigned char inquiry_response[36] = {
+	static unsigned char inquiry_response[8] = {
 		0x00, 0x80, 0x00, 0x02, 0x1F, 0x00, 0x00, 0x00
 	};
-	unsigned char mode_page_01[16] = { // write-protected for now
+	static unsigned char mode_page_01[16] = { // write-protected for now
 		0x03, 0x00, 0x80, 0x00,
 		0x01, 0x0A,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	};
-	unsigned char *ptr;
+	unsigned char *ptr = us->iobuf;
 	unsigned long capacity;
 	unsigned int lba;
 	unsigned int pba;
@@ -765,21 +764,13 @@ int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	info = (struct sddr55_card_info *)(us->extra);
 
-	ptr = (unsigned char *)srb->request_buffer;
-
 	if (srb->cmnd[0] == REQUEST_SENSE) {
-		i = srb->cmnd[4];
-
-		if (i > sizeof info->sense_data)
-			i = sizeof info->sense_data;
-
-
 		US_DEBUGP("SDDR55: request sense %02x/%02x/%02x\n", info->sense_data[2], info->sense_data[12], info->sense_data[13]);
 
-		info->sense_data[0] = 0x70;
-		info->sense_data[7] = 10;
-
-		memcpy (ptr, info->sense_data, i);
+		memcpy (ptr, info->sense_data, sizeof info->sense_data);
+		ptr[0] = 0x70;
+		ptr[7] = 11;
+		usb_stor_set_xfer_buf (ptr, sizeof info->sense_data, srb);
 		memset (info->sense_data, 0, sizeof info->sense_data);
 
 		return USB_STOR_TRANSPORT_GOOD;
@@ -791,8 +782,8 @@ int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us)
 	   respond to INQUIRY commands */
 
 	if (srb->cmnd[0] == INQUIRY) {
-		memset(inquiry_response+8, 0, 28);
-		fill_inquiry_response(us, inquiry_response, 36);
+		memcpy(ptr, inquiry_response, 8);
+		fill_inquiry_response(us, ptr, 36);
 		return USB_STOR_TRANSPORT_GOOD;
 	}
 
@@ -841,17 +832,9 @@ int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us)
 		capacity /= PAGESIZE;
 		capacity--;
 
-		ptr[0] = MSB_of(capacity>>16);
-		ptr[1] = LSB_of(capacity>>16);
-		ptr[2] = MSB_of(capacity&0xFFFF);
-		ptr[3] = LSB_of(capacity&0xFFFF);
-
-		// The page size
-
-		ptr[4] = MSB_of(PAGESIZE>>16);
-		ptr[5] = LSB_of(PAGESIZE>>16);
-		ptr[6] = MSB_of(PAGESIZE&0xFFFF);
-		ptr[7] = LSB_of(PAGESIZE&0xFFFF);
+		((u32 *) ptr)[0] = cpu_to_be32(capacity);
+		((u32 *) ptr)[1] = cpu_to_be32(PAGESIZE);
+		usb_stor_set_xfer_buf(ptr, 8, srb);
 
 		sddr55_read_map(us);
 
@@ -860,20 +843,14 @@ int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	if (srb->cmnd[0] == MODE_SENSE) {
 
-		mode_page_01[2] = (info->read_only || info->force_read_only) ? 0x80 : 0;
+		memcpy(ptr, mode_page_01, sizeof mode_page_01);
+		ptr[2] = (info->read_only || info->force_read_only) ? 0x80 : 0;
 
 		if ( (srb->cmnd[2] & 0x3F) == 0x01 ) {
 
 			US_DEBUGP(
 			  "SDDR55: Dummy up request for mode page 1\n");
 
-			if (ptr==NULL || 
-			  srb->request_bufflen<sizeof(mode_page_01)) {
-				set_sense_info (5, 0x24, 0);	/* invalid field in command */
-				return USB_STOR_TRANSPORT_FAILED;
-			}
-
-			memcpy(ptr, mode_page_01, sizeof(mode_page_01));
 			return USB_STOR_TRANSPORT_GOOD;
 
 		} else if ( (srb->cmnd[2] & 0x3F) == 0x3F ) {
@@ -881,13 +858,6 @@ int sddr55_transport(Scsi_Cmnd *srb, struct us_data *us)
 			US_DEBUGP(
 			  "SDDR55: Dummy up request for all mode pages\n");
 
-			if (ptr==NULL || 
-			  srb->request_bufflen<sizeof(mode_page_01)) {
-				set_sense_info (5, 0x24, 0);	/* invalid field in command */
-				return USB_STOR_TRANSPORT_FAILED;
-			}
-
-			memcpy(ptr, mode_page_01, sizeof(mode_page_01));
 			return USB_STOR_TRANSPORT_GOOD;
 		}
 
