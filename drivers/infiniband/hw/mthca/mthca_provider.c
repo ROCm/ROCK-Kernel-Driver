@@ -634,6 +634,8 @@ int mthca_register_device(struct mthca_dev *dev)
 	dev->ib_dev.detach_mcast         = mthca_multicast_detach;
 	dev->ib_dev.process_mad          = mthca_process_mad;
 
+	init_MUTEX(&dev->cap_mask_mutex);
+
 	ret = ib_register_device(&dev->ib_dev);
 	if (ret)
 		return ret;
@@ -646,8 +648,6 @@ int mthca_register_device(struct mthca_dev *dev)
 			return ret;
 		}
 	}
-
-	init_MUTEX(&dev->cap_mask_mutex);
 
 	return 0;
 }
