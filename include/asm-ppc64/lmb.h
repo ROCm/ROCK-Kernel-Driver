@@ -21,8 +21,9 @@ extern unsigned long reloc_offset(void);
 #define MAX_LMB_REGIONS 64
 
 union lmb_reg_property { 
-	struct reg_property32 addr32[MAX_LMB_REGIONS];
-	struct reg_property64 addr64[MAX_LMB_REGIONS];
+	struct reg_property32	 addr32[MAX_LMB_REGIONS];
+	struct reg_property64	 addr64[MAX_LMB_REGIONS];
+	struct reg_property_pmac addrPM[MAX_LMB_REGIONS];
 };
 
 #define LMB_MEMORY_AREA	1

@@ -30,6 +30,7 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
+#include <linux/delay.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/lmb.h>
@@ -48,6 +49,7 @@
 #include <asm/pci_dma.h>
 #include <asm/bootinfo.h>
 #include <asm/ppcdebug.h>
+#include <asm/btext.h>
 #include <asm/sections.h>
 #include "open_pic.h"
 
@@ -115,24 +117,15 @@ typedef unsigned long interpret_func(struct device_node *, unsigned long,
 static interpret_func interpret_pci_props;
 static interpret_func interpret_isa_props;
 static interpret_func interpret_root_props;
+static interpret_func interpret_dbdma_props;
+static interpret_func interpret_macio_props;
 
 #ifndef FB_MAX			/* avoid pulling in all of the fb stuff */
 #define FB_MAX	8
 #endif
 
-
-struct prom_t prom = {
-	0,			/* entry */
-	0,			/* chosen */
-	0,			/* cpu */
-	0,			/* stdout */
-	0,			/* disp_node */
-	{0,0,0,{0},NULL},	/* args */
-	0,			/* version */
-	32,			/* encode_phys_size */
-	0			/* bi_rec pointer */
-};
-
+/* prom structure */
+struct prom_t prom;
 
 char *prom_display_paths[FB_MAX] __initdata = { 0, };
 unsigned int prom_num_displays = 0;
@@ -140,7 +133,6 @@ char *of_stdout_device = 0;
 
 extern struct rtas_t rtas;
 extern unsigned long klimit;
-extern unsigned long embedded_sysmap_end;
 extern struct lmb lmb;
 
 #define MAX_PHB 16 * 3  // 16 Towers * 3 PHBs/tower
@@ -343,9 +335,14 @@ prom_initialize_naca(unsigned long mem)
 					  RELOC("d-cache-size"),
 					  &size, sizeof(size));
 
-				call_prom(RELOC("getprop"), 4, 1, node,
-					  RELOC("d-cache-line-size"),
-					  &lsize, sizeof(lsize));
+				if (_systemcfg->platform == PLATFORM_POWERMAC)
+					call_prom(RELOC("getprop"), 4, 1, node,
+						  RELOC("d-cache-block-size"),
+						  &lsize, sizeof(lsize));
+				else
+					call_prom(RELOC("getprop"), 4, 1, node,
+						  RELOC("d-cache-line-size"),
+						  &lsize, sizeof(lsize));
 
 				_systemcfg->dCacheL1Size = size;
 				_systemcfg->dCacheL1LineSize = lsize;
@@ -356,9 +353,14 @@ prom_initialize_naca(unsigned long mem)
 					  RELOC("i-cache-size"),
 					  &size, sizeof(size));
 
-				call_prom(RELOC("getprop"), 4, 1, node,
-					  RELOC("i-cache-line-size"),
-					  &lsize, sizeof(lsize));
+				if (_systemcfg->platform == PLATFORM_POWERMAC)
+					call_prom(RELOC("getprop"), 4, 1, node,
+						  RELOC("i-cache-block-size"),
+						  &lsize, sizeof(lsize));
+				else
+					call_prom(RELOC("getprop"), 4, 1, node,
+						  RELOC("i-cache-line-size"),
+						  &lsize, sizeof(lsize));
 
 				_systemcfg->iCacheL1Size = size;
 				_systemcfg->iCacheL1LineSize = lsize;
@@ -379,6 +381,8 @@ prom_initialize_naca(unsigned long mem)
 			struct isa_reg_property reg;
 			union pci_range ranges;
 
+			if (_systemcfg->platform == PLATFORM_POWERMAC)
+				continue;
 			type[0] = 0;
 			call_prom(RELOC("getprop"), 4, 1, node,
 				  RELOC("ibm,aix-loc"), type, sizeof(type));
@@ -409,24 +413,27 @@ prom_initialize_naca(unsigned long mem)
                 }
 	}
 
-	_naca->interrupt_controller = IC_INVALID;
-        for (node = 0; prom_next_node(&node); ) {
-                type[0] = 0;
-                call_prom(RELOC("getprop"), 4, 1, node, RELOC("name"),
-                          type, sizeof(type));
-                if (strcmp(type, RELOC("interrupt-controller"))) {
-			continue;
+	if (_systemcfg->platform == PLATFORM_POWERMAC)
+		_naca->interrupt_controller = IC_OPEN_PIC;
+	else {
+		_naca->interrupt_controller = IC_INVALID;
+		for (node = 0; prom_next_node(&node); ) {
+			type[0] = 0;
+			call_prom(RELOC("getprop"), 4, 1, node, RELOC("name"),
+				  type, sizeof(type));
+			if (strcmp(type, RELOC("interrupt-controller")))
+				continue;
+			call_prom(RELOC("getprop"), 4, 1, node, RELOC("compatible"),
+				  type, sizeof(type));
+			if (strstr(type, RELOC("open-pic")))
+				_naca->interrupt_controller = IC_OPEN_PIC;
+			else if (strstr(type, RELOC("ppc-xicp")))
+				_naca->interrupt_controller = IC_PPC_XIC;
+			else
+				prom_print(RELOC("prom: failed to recognize"
+						 " interrupt-controller\n"));
+			break;
 		}
-                call_prom(RELOC("getprop"), 4, 1, node, RELOC("compatible"),
-                          type, sizeof(type));
-                if (strstr(type, RELOC("open-pic"))) {
-			_naca->interrupt_controller = IC_OPEN_PIC;
-		} else if (strstr(type, RELOC("ppc-xicp"))) {
-			_naca->interrupt_controller = IC_PPC_XIC;
-		} else {
-			prom_print(RELOC("prom: failed to recognize interrupt-controller\n"));
-		}
-		break;
 	}
 
 	if (_naca->interrupt_controller == IC_INVALID) {
@@ -440,7 +447,8 @@ prom_initialize_naca(unsigned long mem)
 
 	_systemcfg->physicalMemorySize = lmb_phys_mem_size();
 
-	if (_systemcfg->platform == PLATFORM_PSERIES) {
+	if (_systemcfg->platform == PLATFORM_PSERIES ||
+	    _systemcfg->platform == PLATFORM_POWERMAC) {
 		unsigned long rnd_mem_size, pteg_count;
 
 		/* round mem_size up to next power of 2 */
@@ -519,11 +527,18 @@ prom_initialize_lmb(unsigned long mem)
 	char type[64];
         unsigned long i, offset = reloc_offset();
 	struct prom_t *_prom = PTRRELOC(&prom);
+        struct systemcfg *_systemcfg = RELOC(systemcfg);
 	union lmb_reg_property reg;
 	unsigned long lmb_base, lmb_size;
 	unsigned long num_regs, bytes_per_reg = (_prom->encode_phys_size*2)/8;
 
 	lmb_init();
+
+	/* XXX Quick HACK. Proper fix is to drop those structures and properly use
+	 * #address-cells. PowerMac has #size-cell set to 1 and #address-cells to 2
+	 */
+	if (_systemcfg->platform == PLATFORM_POWERMAC)
+		bytes_per_reg = 12;
 
         for (node = 0; prom_next_node(&node); ) {
                 type[0] = 0;
@@ -537,7 +552,15 @@ prom_initialize_lmb(unsigned long mem)
 			&reg, sizeof(reg)) / bytes_per_reg;
 
 		for (i=0; i < num_regs ;i++) {
-			if (_prom->encode_phys_size == 32) {
+			if (_systemcfg->platform == PLATFORM_POWERMAC) {
+				lmb_base = ((unsigned long)reg.addrPM[i].address_hi) << 32;
+				lmb_base |= (unsigned long)reg.addrPM[i].address_lo;
+				lmb_size = reg.addrPM[i].size;
+				if (lmb_base > 0x80000000ull) {
+					prom_print(RELOC("Skipping memory above 2Gb for now, not yet supported\n"));
+					continue;
+				}
+			} else if (_prom->encode_phys_size == 32) {
 				lmb_base = reg.addr32[i].address;
 				lmb_size = reg.addr32[i].size;
 			} else {
@@ -922,19 +945,47 @@ prom_hold_cpus(unsigned long mem)
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
 
+	/* On pmac, we just fill out the various global bitmasks and
+	 * arrays indicating our CPUs are here, they are actually started
+	 * later on from pmac_smp
+	 */
+	if (_systemcfg->platform == PLATFORM_POWERMAC) {
+		for (node = 0; prom_next_node(&node); ) {
+			type[0] = 0;
+			call_prom(RELOC("getprop"), 4, 1, node, RELOC("device_type"),
+				  type, sizeof(type));
+			if (strcmp(type, RELOC("cpu")) != 0)
+				continue;
+			reg = -1;
+			call_prom(RELOC("getprop"), 4, 1, node, RELOC("reg"),
+				  &reg, sizeof(reg));
+			_xPaca[cpuid].xHwProcNum = reg;
+
+#ifdef CONFIG_SMP
+			cpu_set(cpuid, RELOC(cpu_available_map));
+			cpu_set(cpuid, RELOC(cpu_possible_map));
+			cpu_set(cpuid, RELOC(cpu_present_at_boot));
+			if (reg == 0)
+				cpu_set(cpuid, RELOC(cpu_online_map));
+#endif /* CONFIG_SMP */
+			cpuid++;
+		}
+		return;
+	}
+
 	/* Initially, we must have one active CPU. */
 	_systemcfg->processorCount = 1;
 
 #ifdef DEBUG_PROM
 	prom_print(RELOC("prom_hold_cpus: start...\n"));
 	prom_print(RELOC("    1) spinloop       = 0x"));
-	prom_print_hex(spinloop);
+	prom_print_hex((unsigned long)spinloop);
 	prom_print_nl();
 	prom_print(RELOC("    1) *spinloop      = 0x"));
 	prom_print_hex(*spinloop);
 	prom_print_nl();
 	prom_print(RELOC("    1) acknowledge    = 0x"));
-	prom_print_hex(acknowledge);
+	prom_print_hex((unsigned long)acknowledge);
 	prom_print_nl();
 	prom_print(RELOC("    1) *acknowledge   = 0x"));
 	prom_print_hex(*acknowledge);
@@ -1212,6 +1263,144 @@ smt_setup(void)
 	_naca->smt_state = my_smt_enabled;
 }
 
+
+#ifdef CONFIG_BOOTX_TEXT
+
+/* This function will enable the early boot text when doing OF booting. This
+ * way, xmon output should work too
+ */
+static void __init setup_disp_fake_bi(ihandle dp)
+{
+	int width = 640, height = 480, depth = 8, pitch;
+	unsigned address;
+	struct pci_reg_property addrs[8];
+	int i, naddrs;
+	char name[64];
+	unsigned long offset = reloc_offset();
+	char *getprop = RELOC("getprop");
+
+	prom_print(RELOC("Initializing fake screen: "));
+
+	memset(name, 0, sizeof(name));
+	call_prom(getprop, 4, 1, dp, RELOC("name"), name, sizeof(name));
+	name[sizeof(name)-1] = 0;
+	prom_print(name);
+	prom_print(RELOC("\n"));
+	call_prom(getprop, 4, 1, dp, RELOC("width"), &width, sizeof(width));
+	call_prom(getprop, 4, 1, dp, RELOC("height"), &height, sizeof(height));
+	call_prom(getprop, 4, 1, dp, RELOC("depth"), &depth, sizeof(depth));
+	pitch = width * ((depth + 7) / 8);
+	call_prom(getprop, 4, 1, dp, RELOC("linebytes"),
+		  &pitch, sizeof(pitch));
+	if (pitch == 1)
+		pitch = 0x1000;		/* for strange IBM display */
+	address = 0;
+
+	prom_print(RELOC("width "));
+	prom_print_hex(width);
+	prom_print(RELOC(" height "));
+	prom_print_hex(height);
+	prom_print(RELOC(" depth "));
+	prom_print_hex(depth);
+	prom_print(RELOC(" linebytes "));
+	prom_print_hex(pitch);
+	prom_print(RELOC("\n"));
+
+
+	call_prom(getprop, 4, 1, dp, RELOC("address"),
+		  &address, sizeof(address));
+	if (address == 0) {
+		/* look for an assigned address with a size of >= 1MB */
+		naddrs = (int) call_prom(getprop, 4, 1, dp,
+				RELOC("assigned-addresses"),
+				addrs, sizeof(addrs));
+		naddrs /= sizeof(struct pci_reg_property);
+		for (i = 0; i < naddrs; ++i) {
+			if (addrs[i].size_lo >= (1 << 20)) {
+				address = addrs[i].addr.a_lo;
+				/* use the BE aperture if possible */
+				if (addrs[i].size_lo >= (16 << 20))
+					address += (8 << 20);
+				break;
+			}
+		}
+		if (address == 0) {
+			prom_print(RELOC("Failed to get address of frame buffer\n"));
+			return;
+		}
+	}
+	btext_setup_display(width, height, depth, pitch, address);
+	prom_print(RELOC("Addr of fb: "));
+	prom_print_hex(address);
+	prom_print_nl();
+	RELOC(boot_text_mapped) = 0;
+}
+#endif /* CONFIG_BOOTX_TEXT */
+
+static void __init prom_init_client_services(unsigned long pp)
+{
+	unsigned long offset = reloc_offset();
+	struct prom_t *_prom = PTRRELOC(&prom);
+
+	/* Get a handle to the prom entry point before anything else */
+	_prom->entry = pp;
+
+	/* Init default value for phys size */
+	_prom->encode_phys_size = 32;
+
+	/* get a handle for the stdout device */
+	_prom->chosen = (ihandle)call_prom(RELOC("finddevice"), 1, 1,
+				       RELOC("/chosen"));
+	if ((long)_prom->chosen <= 0)
+		prom_panic(RELOC("cannot find chosen")); /* msg won't be printed :( */
+
+	/* get device tree root */
+	_prom->root = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/"));
+	if ((long)_prom->root <= 0)
+		prom_panic(RELOC("cannot find device tree root")); /* msg won't be printed :( */
+}
+
+static void __init prom_init_stdout(void)
+{
+	unsigned long offset = reloc_offset();
+	struct prom_t *_prom = PTRRELOC(&prom);
+	u32 val;
+
+        if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
+			    RELOC("stdout"), &val,
+			    sizeof(val)) <= 0)
+                prom_panic(RELOC("cannot find stdout"));
+
+        _prom->stdout = (ihandle)(unsigned long)val;
+}
+
+static int __init prom_find_machine_type(void)
+{
+	unsigned long offset = reloc_offset();
+	struct prom_t *_prom = PTRRELOC(&prom);
+	char compat[256];
+	int len, i = 0;
+
+	len = (int)(long)call_prom(RELOC("getprop"), 4, 1, _prom->root,
+				   RELOC("compatible"),
+				   compat, sizeof(compat)-1);
+	if (len > 0) {
+		compat[len] = 0;
+		while (i < len) {
+			char *p = &compat[i];
+			int sl = strlen(p);
+			if (sl == 0)
+				break;
+			if (strstr(p, RELOC("Power Macintosh")) ||
+			    strstr(p, RELOC("MacRISC4")))
+				return PLATFORM_POWERMAC;
+			i += sl + 1;
+		}
+	}
+	/* Default to pSeries */
+	return PLATFORM_PSERIES;
+}
+
 /*
  * We enter here early on, when the Open Firmware prom is still
  * handling exceptions and the MMU hash table for us.
@@ -1222,7 +1411,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	  unsigned long r6, unsigned long r7)
 {
 	unsigned long mem;
-	ihandle prom_root, prom_cpu;
+	ihandle prom_cpu;
 	phandle cpu_pkg;
 	unsigned long offset = reloc_offset();
 	long l;
@@ -1241,39 +1430,27 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	RELOC(systemcfg) = _systemcfg = (struct systemcfg *)(SYSTEMCFG_VIRT_ADDR - offset);
 	RELOC(naca) = (struct naca_struct *)(NACA_VIRT_ADDR - offset);
 
-	/* Default machine type. */
-	_systemcfg->platform = PLATFORM_PSERIES;
+	/* Init interface to Open Firmware and pickup bi-recs */
+	prom_init_client_services(pp);
 
-#if 0
-	/* Reset klimit to take into account the embedded system map */
-	if (RELOC(embedded_sysmap_end))
-		RELOC(klimit) = __va(PAGE_ALIGN(RELOC(embedded_sysmap_end)));
-#endif
+	/* Init prom stdout device */
+	prom_init_stdout();
 
-	/* Get a handle to the prom entry point before anything else */
-	_prom->entry = pp;
+	/* check out if we have bi_recs */
 	_prom->bi_recs = prom_bi_rec_verify((struct bi_record *)r6);
-	if ( _prom->bi_recs != NULL ) {
-		RELOC(klimit) = PTRUNRELOC((unsigned long)_prom->bi_recs + _prom->bi_recs->data[1]);
-	}
+	if ( _prom->bi_recs != NULL )
+		RELOC(klimit) = PTRUNRELOC((unsigned long)_prom->bi_recs +
+					   _prom->bi_recs->data[1]);
 
-	/* First get a handle for the stdout device */
-	_prom->chosen = (ihandle)call_prom(RELOC("finddevice"), 1, 1,
-				       RELOC("/chosen"));
+	/* Default machine type. */
+	_systemcfg->platform = prom_find_machine_type();
 
-	if ((long)_prom->chosen <= 0)
-		prom_panic(RELOC("cannot find chosen")); /* msg won't be printed :( */
 
 	/* On pSeries, copy the CPU hold code */
 	if (_systemcfg->platform == PLATFORM_PSERIES)
 		copy_and_flush(0, KERNELBASE - offset, 0x100, 0);
-        if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
-			    RELOC("stdout"), &getprop_rval,
-			    sizeof(getprop_rval)) <= 0)
-                prom_panic(RELOC("cannot find stdout"));
 
-        _prom->stdout = (ihandle)(unsigned long)getprop_rval;
-
+	/* Start storing things at klimit */
 	mem = RELOC(klimit) - offset; 
 
 	/* Get the full OF pathname of the stdout device */
@@ -1284,13 +1461,10 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	mem += strlen(p) + 1;
 
 	getprop_rval = 1;
-	prom_root = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/"));
-	if (prom_root != (ihandle)-1) {
-                call_prom(RELOC("getprop"), 4, 1,
-                    prom_root, RELOC("#size-cells"),
-		    &getprop_rval, sizeof(getprop_rval));
-	}
-	_prom->encode_phys_size = (getprop_rval==1) ? 32 : 64;
+	call_prom(RELOC("getprop"), 4, 1,
+		  _prom->root, RELOC("#size-cells"),
+		  &getprop_rval, sizeof(getprop_rval));
+	_prom->encode_phys_size = (getprop_rval == 1) ? 32 : 64;
 
 	/* Determine which cpu is actually running right _now_ */
         if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
@@ -1329,13 +1503,24 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		mem = DOUBLEWORD_ALIGN(mem + strlen(d) + 1);
 	}
 
+	RELOC(cmd_line[0]) = 0;
+	if ((long)_prom->chosen > 0) {
+		call_prom(RELOC("getprop"), 4, 1, _prom->chosen, 
+			  RELOC("bootargs"), p, sizeof(cmd_line));
+		if (p != NULL && p[0] != 0)
+			strncpy(RELOC(cmd_line), p, sizeof(cmd_line));
+	}
+	RELOC(cmd_line[sizeof(cmd_line) - 1]) = 0;
+
+
 	mem = prom_initialize_lmb(mem);
 
 	mem = prom_bi_rec_reserve(mem);
 
 	mem = check_display(mem);
 
-	prom_instantiate_rtas();
+	if (_systemcfg->platform != PLATFORM_POWERMAC)
+		prom_instantiate_rtas();
         
         /* Initialize some system info into the Naca early... */
         mem = prom_initialize_naca(mem);
@@ -1346,7 +1531,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
          * following, regardless of whether we have an SMP
          * kernel or not.
          */
-	        prom_hold_cpus(mem);
+	prom_hold_cpus(mem);
 
 #ifdef DEBUG_PROM
 	prom_print(RELOC("copying OF device tree...\n"));
@@ -1359,6 +1544,13 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
 	if (_systemcfg->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
+
+#ifdef CONFIG_BOOTX_TEXT
+	if(_prom->disp_node) {
+		prom_print(RELOC("Setting up bi display...\n"));
+		setup_disp_fake_bi(_prom->disp_node);
+	}
+#endif /* CONFIG_BOOTX_TEXT */
 
 	prom_print(RELOC("Calling quiesce ...\n"));
 	call_prom(RELOC("quiesce"), 0, 0);
@@ -1476,6 +1668,10 @@ check_display(unsigned long mem)
 		RELOC(prom_display_paths[i]) = PTRUNRELOC(path);
 		if (RELOC(prom_num_displays) >= FB_MAX)
 			break;
+		/* XXX Temporary workaround: only open the first display so we don't
+		 * lose debug output
+		 */
+		break;
 	}
 	return DOUBLEWORD_ALIGN(mem);
 }
@@ -1689,9 +1885,9 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	np->type = get_property(np, "device_type", 0);
 
 	/* get the device addresses and interrupts */
-	if (ifunc != NULL) {
-	  mem_start = ifunc(np, mem_start, naddrc, nsizec);
-	}
+	if (ifunc != NULL)
+		mem_start = ifunc(np, mem_start, naddrc, nsizec);
+
 	mem_start = finish_node_interrupts(np, mem_start);
 
 	/* Look for #address-cells and #size-cells properties. */
@@ -1705,7 +1901,6 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	/* the f50 sets the name to 'display' and 'compatible' to what we
 	 * expect for the name -- Cort
 	 */
-	ifunc = NULL;
 	if (!strcmp(np->name, "display"))
 		np->name = get_property(np, "compatible", 0);
 
@@ -1715,8 +1910,19 @@ finish_node(struct device_node *np, unsigned long mem_start,
 		ifunc = NULL;
 	else if (!strcmp(np->type, "pci") || !strcmp(np->type, "vci"))
 		ifunc = interpret_pci_props;
+	else if (!strcmp(np->type, "dbdma"))
+		ifunc = interpret_dbdma_props;
+	else if (!strcmp(np->type, "mac-io") || ifunc == interpret_macio_props)
+		ifunc = interpret_macio_props;
 	else if (!strcmp(np->type, "isa"))
 		ifunc = interpret_isa_props;
+	else if (!strcmp(np->name, "uni-n") || !strcmp(np->name, "u3"))
+		ifunc = interpret_root_props;
+	else if (!((ifunc == interpret_dbdma_props
+		    || ifunc == interpret_macio_props)
+		   && (!strcmp(np->type, "escc")
+		       || !strcmp(np->type, "media-bay"))))
+		ifunc = NULL;
 
 	for (child = np->child; child != NULL; child = child->sibling)
 		mem_start = finish_node(child, mem_start, ifunc,
@@ -1893,6 +2099,12 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 		if (n <= 0)
 			continue;
 		np->intrs[i].line = openpic_to_irq(virt_irq_create_mapping(irq[0]));
+		/* We offset irq numbers for the u3 MPIC by 128 in PowerMac */
+		if (systemcfg->platform == PLATFORM_POWERMAC && ic && ic->parent) {
+			char *name = get_property(ic->parent, "name", NULL);
+			if (name && !strcmp(name, "u3"))
+				np->intrs[i].line += 128;
+		}
 		if (n > 1)
 			np->intrs[i].sense = irq[1];
 		if (n > 2) {
@@ -1961,6 +2173,78 @@ interpret_pci_props(struct device_node *np, unsigned long mem_start,
 		np->n_addrs = i;
 		mem_start += i * sizeof(struct address_range);
 	}
+	return mem_start;
+}
+
+static unsigned long __init
+interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
+		      int naddrc, int nsizec)
+{
+	struct reg_property32 *rp;
+	struct address_range *adr;
+	unsigned long base_address;
+	int i, l;
+	struct device_node *db;
+
+	base_address = 0;
+	for (db = np->parent; db != NULL; db = db->parent) {
+		if (!strcmp(db->type, "dbdma") && db->n_addrs != 0) {
+			base_address = db->addrs[0].address;
+			break;
+		}
+	}
+
+	rp = (struct reg_property32 *) get_property(np, "reg", &l);
+	if (rp != 0 && l >= sizeof(struct reg_property32)) {
+		i = 0;
+		adr = (struct address_range *) mem_start;
+		while ((l -= sizeof(struct reg_property32)) >= 0) {
+			adr[i].space = 2;
+			adr[i].address = rp[i].address + base_address;
+			adr[i].size = rp[i].size;
+			++i;
+		}
+		np->addrs = adr;
+		np->n_addrs = i;
+		mem_start += i * sizeof(struct address_range);
+	}
+
+	return mem_start;
+}
+
+static unsigned long __init
+interpret_macio_props(struct device_node *np, unsigned long mem_start,
+		      int naddrc, int nsizec)
+{
+	struct reg_property32 *rp;
+	struct address_range *adr;
+	unsigned long base_address;
+	int i, l;
+	struct device_node *db;
+
+	base_address = 0;
+	for (db = np->parent; db != NULL; db = db->parent) {
+		if (!strcmp(db->type, "mac-io") && db->n_addrs != 0) {
+			base_address = db->addrs[0].address;
+			break;
+		}
+	}
+
+	rp = (struct reg_property32 *) get_property(np, "reg", &l);
+	if (rp != 0 && l >= sizeof(struct reg_property32)) {
+		i = 0;
+		adr = (struct address_range *) mem_start;
+		while ((l -= sizeof(struct reg_property32)) >= 0) {
+			adr[i].space = 2;
+			adr[i].address = rp[i].address + base_address;
+			adr[i].size = rp[i].size;
+			++i;
+		}
+		np->addrs = adr;
+		np->n_addrs = i;
+		mem_start += i * sizeof(struct address_range);
+	}
+
 	return mem_start;
 }
 
@@ -2212,6 +2496,7 @@ struct device_node *of_find_node_by_name(struct device_node *from,
 	read_unlock(&devtree_lock);
 	return np;
 }
+EXPORT_SYMBOL(of_find_node_by_name);
 
 /**
  *	of_find_node_by_type - Find a node by its "device_type" property
@@ -2275,6 +2560,7 @@ struct device_node *of_find_compatible_node(struct device_node *from,
 	read_unlock(&devtree_lock);
 	return np;
 }
+EXPORT_SYMBOL(of_find_compatible_node);
 
 /**
  *	of_find_node_by_path - Find a node matching a full OF path
@@ -2295,6 +2581,7 @@ struct device_node *of_find_node_by_path(const char *path)
 	read_unlock(&devtree_lock);
 	return np;
 }
+EXPORT_SYMBOL(of_find_node_by_path);
 
 /**
  *	of_find_all_nodes - Get next node in global list
@@ -2318,6 +2605,7 @@ struct device_node *of_find_all_nodes(struct device_node *prev)
 	read_unlock(&devtree_lock);
 	return np;
 }
+EXPORT_SYMBOL(of_find_all_nodes);
 
 /**
  *	of_get_parent - Get a node's parent if any
@@ -2338,6 +2626,7 @@ struct device_node *of_get_parent(const struct device_node *node)
 	read_unlock(&devtree_lock);
 	return np;
 }
+EXPORT_SYMBOL(of_get_parent);
 
 /**
  *	of_get_next_child - Iterate a node childs
@@ -2362,6 +2651,7 @@ struct device_node *of_get_next_child(const struct device_node *node,
 	read_unlock(&devtree_lock);
 	return next;
 }
+EXPORT_SYMBOL(of_get_next_child);
 
 /**
  *	of_node_get - Increment refcount of a node
@@ -2378,6 +2668,7 @@ struct device_node *of_node_get(struct device_node *node)
 	}
 	return NULL;
 }
+EXPORT_SYMBOL(of_node_get);
 
 /**
  *	of_node_put - Decrement refcount of a node
@@ -2401,6 +2692,7 @@ void of_node_put(struct device_node *node)
 	else
 		atomic_dec(&node->_users);
 }
+EXPORT_SYMBOL(of_node_put);
 
 /**
  *	of_node_cleanup - release a dynamically allocated node
@@ -2657,6 +2949,12 @@ static int of_finish_dynamic_node(struct device_node *node)
 		err = -ENODEV;
 		goto out;
 	}
+
+	/* We don't support that function on PowerMac, at least
+	 * not yet
+	 */
+	if (systemcfg->platform == PLATFORM_POWERMAC)
+		return -ENODEV;
 
 	/* do the work of interpret_pci_props */
 	if (parent->type && !strcmp(parent->type, "pci")) {
