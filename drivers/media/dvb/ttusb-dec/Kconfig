@@ -1,24 +1,26 @@
 config DVB_TTUSB_DEC
-	tristate "Technotrend/Hauppauge USB DEC2000-T devices"
-	depends on DVB_CORE && USB && !STANDALONE
+	tristate "Technotrend/Hauppauge USB DEC devices"
+	depends on DVB_CORE && USB && FW_LOADER
 	help
 	  Support for external USB adapters designed by Technotrend and
-	  produced by Hauppauge, shipped under the brand name 'DEC2000-T'.
+	  produced by Hauppauge, shipped under the brand name 'DEC2000-t'
+	  and 'DEC3000-s'.
 
           Even if these devices have a MPEG decoder built in, they transmit
 	  only compressed MPEG data over the USB bus, so you need
 	  an external software decoder to watch TV on your computer.	  
 
-	  Say Y if you own such a device and want to use it.
+	  The DEC devices require firmware in order to boot into a mode in
+	  which they are slaves to the PC.  See
+	  linux/Documentation/dvb/FIRMWARE for details.
 
-config DVB_TTUSB_DEC_FIRMWARE_FILE
-	string "Full pathname of dec2000t.bin firmware file"
-	depends on DVB_TTUSB_DEC
-	default "/etc/dvb/dec2000t.bin"
-	help
-	  The DEC2000-T requires a firmware in order to boot into a mode in
-	  which it is a slave to the PC.  The firmware file can obtained as
-	  follows:
+	  The firmware can be obtained and put into the default
+	  locations as follows:
+
 	    wget http://hauppauge.lightpath.net/de/dec215a.exe
 	    unzip -j dec215a.exe Software/Oem/STB/App/Boot/STB_PC_T.bin
-	    mv STB_PC_T.bin /etc/dvb/dec2000t.bin
+	    mv STB_PC_T.bin /usr/lib/hotplug/firmware/dec2000t.bin
+	    unzip -j dec215a.exe Software/Oem/STB/App/Boot/STB_PC_S.bin
+	    mv STB_PC_S.bin /usr/lib/hotplug/firmware/dec3000s.bin
+
+	  Say Y if you own such a device and want to use it.
