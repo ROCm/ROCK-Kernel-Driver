@@ -1,7 +1,7 @@
 /* Driver for USB Mass Storage compliant devices
  * Main Header File
  *
- * $Id: usb.h,v 1.18 2001/07/30 00:27:59 mdharm Exp $
+ * $Id: usb.h,v 1.21 2002/04/21 02:57:59 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -102,6 +102,12 @@ struct us_unusual_dev {
 #define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets */
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs fixing */
 
+#define US_STATE_DETACHED	1	/* State machine states */
+#define US_STATE_IDLE		2
+#define US_STATE_RUNNING	3
+#define US_STATE_RESETTING	4
+#define US_STATE_ABORTING	5
+
 #define USB_STOR_STRING_LEN 32
 
 typedef int (*trans_cmnd)(Scsi_Cmnd*, struct us_data*);
@@ -152,10 +158,12 @@ struct us_data {
 	Scsi_Cmnd		*queue_srb;	 /* the single queue slot */
 	int			action;		 /* what to do		  */
 	int			pid;		 /* control thread	  */
+	atomic_t		sm_state;
 
 	/* interrupt info for CBI devices -- only good if attached */
 	struct semaphore	ip_waitq;	 /* for CBI interrupts	 */
-	atomic_t		ip_wanted[1];	 /* is an IRQ expected?	 */
+	unsigned long		bitflags;	 /* single-bit flags:	 */
+#define IP_WANTED	1			 /* is an IRQ expected?	 */
 
 	/* interrupt communications data */
 	struct semaphore	irq_urb_sem;	 /* to protect irq_urb	 */
@@ -188,4 +196,5 @@ extern struct usb_driver usb_storage_driver;
 /* Function to fill an inquiry response. See usb.c for details */
 extern void fill_inquiry_response(struct us_data *us,
 	unsigned char *data, unsigned int data_len);
+
 #endif

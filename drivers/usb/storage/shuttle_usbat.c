@@ -1,9 +1,12 @@
 /* Driver for SCM Microsystems USB-ATAPI cable
  *
- * $Id: shuttle_usbat.c,v 1.15 2001/12/08 23:32:48 mdharm Exp $
+ * $Id: shuttle_usbat.c,v 1.17 2002/04/22 03:39:43 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 2000, 2001 Robert Baruch (autophile@starband.net)
+ *
+ * Developed with the assistance of:
+ *   (c) 2002 Alan Stern <stern@rowland.org>
  *
  * Many originally ATAPI devices were slightly modified to meet the USB
  * market by using some kind of translation from ATAPI to USB on the host,
@@ -107,8 +110,8 @@ static int usbat_send_control(struct us_data *us,
 		/* a stall is a fatal condition from the device */
 		if (result == -EPIPE) {
 			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_clear_halt(us->pusb_dev, pipe);
-			US_DEBUGP("-- usb_clear_halt() returns %d\n", result);
+			result = usb_stor_clear_halt(us, pipe);
+			US_DEBUGP("-- usb_stor_clear_halt() returns %d\n", result);
 			return USB_STOR_TRANSPORT_FAILED;
 		}
 
@@ -140,7 +143,7 @@ static int usbat_raw_bulk(struct us_data *us,
        	        US_DEBUGP("EPIPE: clearing endpoint halt for"
 			" pipe 0x%x, stalled at %d bytes\n",
 			pipe, act_len);
-               	usb_clear_halt(us->pusb_dev, pipe);
+               	usb_stor_clear_halt(us, pipe);
         }
 
 	if (result) {
@@ -214,7 +217,7 @@ static int usbat_bulk_transport(struct us_data *us,
 		sg = (struct scatterlist *)data;
 		for (i=0; i<use_sg && transferred<len; i++) {
 			result = usbat_raw_bulk(us, direction,
-				page_address(sg[i].page) + sg[i].offset,
+				page_address(sg[i].page) + sg[i].offset, 
 				len-transferred > sg[i].length ?
 					sg[i].length : len-transferred);
 			if (result!=US_BULK_TRANSFER_GOOD)
@@ -515,7 +518,7 @@ int usbat_rw_block_test(struct us_data *us,
 			 */
 
 			if (direction==SCSI_DATA_READ && i==0)
-				usb_clear_halt(us->pusb_dev,
+				usb_stor_clear_halt(us,
 					usb_sndbulkpipe(us->pusb_dev,
 					  us->ep_out));
 			/*
@@ -675,9 +678,15 @@ int usbat_handle_read10(struct us_data *us,
 		len = short_pack(data[7+9], data[7+8]);
 		len <<= 16;
 		len |= data[7+7];
+		US_DEBUGP("handle_read10: GPCMD_READ_CD: len %d\n", len);
 		srb->transfersize = srb->request_bufflen/len;
 	}
 
+	if (!srb->transfersize)  {
+		srb->transfersize = 2048; /* A guess */
+		US_DEBUGP("handle_read10: transfersize 0, forcing %d\n",
+			srb->transfersize);
+	}
 
 	len = (65535/srb->transfersize) * srb->transfersize;
 	US_DEBUGP("Max read is %d bytes\n", len);
@@ -734,7 +743,7 @@ int usbat_handle_read10(struct us_data *us,
 				if (len - amount >= 
 					  sg[sg_segment].length-sg_offset) {
 				  memcpy(page_address(sg[sg_segment].page) +
-					 sg[sg_segment].offset + sg_offset,
+					 sg[sg_sgement].offset + sg_offset,
 					 buffer + amount,
 					 sg[sg_segment].length - sg_offset);
 				  amount += 

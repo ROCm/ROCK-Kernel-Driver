@@ -1,9 +1,9 @@
 /* Driver for USB Mass Storage compliant devices
  *
- * $Id: usb.c,v 1.70 2002/01/06 07:14:12 mdharm Exp $
+ * $Id: usb.c,v 1.75 2002/04/22 03:39:43 mdharm Exp $
  *
  * Current development and maintenance by:
- *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
+ *   (c) 1999-2002 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
  *
  * Developed with the assistance of:
  *   (c) 2000 David L. Brown, Jr. (usb-storage@davidb.org)
@@ -315,6 +315,7 @@ static int usb_stor_control_thread(void * __us)
 	 * so get rid of all our resources..
 	 */
 	daemonize();
+	reparent_to_init();
 
 	/* avoid getting signals */
 	spin_lock_irq(&current->sigmask_lock);
@@ -409,7 +410,7 @@ static int usb_stor_control_thread(void * __us)
 			down(&(us->dev_semaphore));
 
 			/* our device has gone - pretend not ready */
-			if (!us->pusb_dev) {
+			if (atomic_read(&us->sm_state) == US_STATE_DETACHED) {
 				US_DEBUGP("Request is for removed device\n");
 				/* For REQUEST_SENSE, it's the data.  But
 				 * for anything else, it should look like
@@ -433,7 +434,7 @@ static int usb_stor_control_thread(void * __us)
 					       sizeof(usb_stor_sense_notready));
 					us->srb->result = CHECK_CONDITION << 1;
 				}
-			} else { /* !us->pusb_dev */
+			} else { /* atomic_read(&us->sm_state) == STATE_DETACHED */
 
 				/* Handle those devices which need us to fake 
 				 * their inquiry data */
@@ -449,7 +450,9 @@ static int usb_stor_control_thread(void * __us)
 				} else {
 					/* we've got a command, let's do it! */
 					US_DEBUG(usb_stor_show_command(us->srb));
+					atomic_set(&us->sm_state, US_STATE_RUNNING);
 					us->proto_handler(us->srb, us);
+					atomic_set(&us->sm_state, US_STATE_IDLE);
 				}
 			}
 
@@ -713,6 +716,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 		/* establish the connection to the new device upon reconnect */
 		ss->ifnum = ifnum;
 		ss->pusb_dev = dev;
+		atomic_set(&ss->sm_state, US_STATE_IDLE);
 
 		/* copy over the endpoint data */
 		if (ep_in)
@@ -955,6 +959,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 			ss->protocol_name = "Unknown";
 			kfree(ss->current_urb);
 			kfree(ss);
+			usb_dec_dev_use(dev);
 			return NULL;
 			break;
 		}
@@ -962,6 +967,8 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		/* allocate an IRQ callback if one is needed */
 		if ((ss->protocol == US_PR_CBI) && usb_stor_allocate_irq(ss)) {
+			kfree(ss->current_urb);
+			kfree(ss);
 			usb_dec_dev_use(dev);
 			return NULL;
 		}
@@ -990,6 +997,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 			unusual_dev->initFunction(ss);
 
 		/* start up our control thread */
+		atomic_set(&ss->sm_state, US_STATE_IDLE);
 		ss->pid = kernel_thread(usb_stor_control_thread, ss,
 					CLONE_VM);
 		if (ss->pid < 0) {
@@ -1006,7 +1014,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		/* now register	 - our detect function will be called */
 		ss->htmplt.module = THIS_MODULE;
-		scsi_register_host(&ss->htmplt);
+		scsi_register_host(&(ss->htmplt));
 
 		/* lock access to the data structures */
 		down(&us_list_semaphore);
@@ -1066,6 +1074,7 @@ static void storage_disconnect(struct usb_device *dev, void *ptr)
 	/* mark the device as gone */
 	usb_dec_dev_use(ss->pusb_dev);
 	ss->pusb_dev = NULL;
+	atomic_set(&ss->sm_state, US_STATE_DETACHED);
 
 	/* unlock access to the device data structure */
 	up(&(ss->dev_semaphore));
@@ -1112,7 +1121,7 @@ void __exit usb_stor_exit(void)
 	 */
 	for (next = us_list; next; next = next->next) {
 		US_DEBUGP("-- calling scsi_unregister_host()\n");
-		scsi_unregister_host(&next->htmplt);
+		scsi_unregister_host(&(next->htmplt));
 	}
 
 	/* While there are still structures, free them.  Note that we are

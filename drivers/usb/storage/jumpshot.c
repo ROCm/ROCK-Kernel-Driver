@@ -1,15 +1,25 @@
 /* Driver for Lexar "Jumpshot" Compact Flash reader
  *
+ * $Id: jumpshot.c,v 1.7 2002/02/25 00:40:13 mdharm Exp $
+ *
  * jumpshot driver v0.1:
  *
  * First release
  *
  * Current development and maintenance by:
  *   (c) 2000 Jimmie Mayfield (mayfield+usb@sackheads.org)
- *   many thanks to Robert Baruch for the SanDisk SmartMedia reader driver
+ *
+ *   Many thanks to Robert Baruch for the SanDisk SmartMedia reader driver
  *   which I used as a template for this driver.
+ *
  *   Some bugfixes and scatter-gather code by Gregory P. Smith 
  *   (greg-usb@electricrain.com)
+ *
+ *   Fix for media change by Joerg Schneider (js@joergschneider.com)
+ *
+ * Developed with the assistance of:
+ *
+ *   (C) 2002 Alan Stern <stern@rowland.org>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -128,8 +138,8 @@ static int jumpshot_send_control(struct us_data  *us,
 		/* a stall is a fatal condition from the device */
 		if (result == -EPIPE) {
 			US_DEBUGP("jumpshot_send_control:  -- Stall on control pipe. Clearing\n");
-			result = usb_clear_halt(us->pusb_dev, pipe);
-			US_DEBUGP("jumpshot_send_control:  -- usb_clear_halt() returns %d\n", result);
+			result = usb_stor_clear_halt(us, pipe);
+			US_DEBUGP("jumpshot_send_control:  -- usb_stor_clear_halt() returns %d\n", result);
 			return USB_STOR_TRANSPORT_FAILED;
 		}
 
@@ -161,7 +171,7 @@ static int jumpshot_raw_bulk(int direction,
 	if (result == -EPIPE) {
 		US_DEBUGP("jumpshot_raw_bulk:  EPIPE. clearing endpoint halt for"
 			  " pipe 0x%x, stalled at %d bytes\n", pipe, act_len);
-		usb_clear_halt(us->pusb_dev, pipe);
+		usb_stor_clear_halt(us, pipe);
 	}
 
 	if (result) {
@@ -798,6 +808,23 @@ int jumpshot_transport(Scsi_Cmnd * srb, struct us_data *us)
 		//
 		return USB_STOR_TRANSPORT_GOOD;
 	}
+	
+	if (srb->cmnd[0] == START_STOP) {
+		/* this is used by sd.c'check_scsidisk_media_change to detect
+		   media change */
+		US_DEBUGP("jumpshot_transport:  START_STOP.\n");
+		/* the first jumpshot_id_device after a media change returns
+		   an error (determined experimentally) */
+		rc = jumpshot_id_device(us, info);
+		if (rc == USB_STOR_TRANSPORT_GOOD) {
+			info->sense_key = NO_SENSE;
+			srb->result = SUCCESS;
+		} else {
+			info->sense_key = UNIT_ATTENTION;
+			srb->result = CHECK_CONDITION;
+		}
+		return rc;
+        }
 
 	US_DEBUGP("jumpshot_transport:  Gah! Unknown command: %d (0x%x)\n", srb->cmnd[0], srb->cmnd[0]);
 	return USB_STOR_TRANSPORT_ERROR;
