@@ -127,7 +127,7 @@ void scc1_lineif(struct uart_cpm_port *pinfo)
 	io->iop_pdird |= 0x00000002;	/* Tx */
 
 	/* Wire BRG1 to SCC1 */
-	cpm2_immr->im_cpmux.cmx_scr &= ~0x00ffffff;
+	cpm2_immr->im_cpmux.cmx_scr &= 0x00ffffff;
 	cpm2_immr->im_cpmux.cmx_scr |= 0x00000000;
 	pinfo->brg = 1;
 }
@@ -140,7 +140,7 @@ void scc2_lineif(struct uart_cpm_port *pinfo)
 	io->iop_psorb |= 0x00880000;
 	io->iop_pdirb &= ~0x00030000;
 	io->iop_psorb &= ~0x00030000;
-	cpm2_immr->im_cpmux.cmx_scr &= ~0xff00ffff;
+	cpm2_immr->im_cpmux.cmx_scr &= 0xff00ffff;
 	cpm2_immr->im_cpmux.cmx_scr |= 0x00090000;
 	pinfo->brg = 2;
 }
@@ -153,7 +153,7 @@ void scc3_lineif(struct uart_cpm_port *pinfo)
 	io->iop_psorb |= 0x00880000;
 	io->iop_pdirb &= ~0x00030000;
 	io->iop_psorb &= ~0x00030000;
-	cpm2_immr->im_cpmux.cmx_scr &= ~0xffff00ff;
+	cpm2_immr->im_cpmux.cmx_scr &= 0xffff00ff;
 	cpm2_immr->im_cpmux.cmx_scr |= 0x00001200;
 	pinfo->brg = 3;
 }
@@ -167,7 +167,7 @@ void scc4_lineif(struct uart_cpm_port *pinfo)
 	io->iop_pdird &= ~0x00000200;	/* Rx */
 	io->iop_pdird |= 0x00000400;	/* Tx */
 
-	cpm2_immr->im_cpmux.cmx_scr &= ~0xffffff00;
+	cpm2_immr->im_cpmux.cmx_scr &= 0xffffff00;
 	cpm2_immr->im_cpmux.cmx_scr |= 0x0000001b;
 	pinfo->brg = 4;
 }
