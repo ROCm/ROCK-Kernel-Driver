@@ -15,7 +15,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "siimage.h"
 
 #if defined(DISPLAY_SIIMAGE_TIMINGS) && defined(CONFIG_PROC_FS)

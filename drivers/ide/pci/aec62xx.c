@@ -16,7 +16,6 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
 #include "aec62xx.h"
 
 #if defined(DISPLAY_AEC62XX_TIMINGS) && defined(CONFIG_PROC_FS)

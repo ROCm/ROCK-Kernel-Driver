@@ -85,6 +85,7 @@ static force_inline void do_vgettimeofday(struct timeval * tv)
 		if (__vxtime.mode == VXTIME_TSC) {
 			sync_core();
 			rdtscll(t);
+			if (t < __vxtime.last_tsc) t = __vxtime.last_tsc;
 			usec += ((t - __vxtime.last_tsc) *
 				 __vxtime.tsc_quot) >> 32;
 		} else {

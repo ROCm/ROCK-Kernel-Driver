@@ -299,7 +299,7 @@ void __init setup_local_APIC (void)
 	 * This is meaningless in clustered apic mode, so we skip it.
 	 */
 	if (!clustered_apic_mode &&
-		!cpu_isset(GET_APIC_ID(apic_read(APIC_ID)), phys_cpu_present_map))
+		!physid_isset(GET_APIC_ID(apic_read(APIC_ID)), phys_cpu_present_map))
 		BUG();
 
 	/*
@@ -993,7 +993,7 @@ int __init APIC_init_uniprocessor (void)
 
 	connect_bsp_APIC();
 
-	phys_cpu_present_map = cpumask_of_cpu(0);
+	phys_cpu_present_map = physid_mask_of_physid(0);
 	apic_write_around(APIC_ID, boot_cpu_id);
 
 	setup_local_APIC();

@@ -31,6 +31,9 @@ do {								\
 			memcpy((pcpudst)+__per_cpu_offset(__i),	\
 			       (src), (size));			\
 } while (0)
+
+extern void setup_per_cpu_areas(void);
+
 #else /* ! SMP */
 
 #define DEFINE_PER_CPU(type, name) \
@@ -45,7 +48,5 @@ do {								\
 
 #define EXPORT_PER_CPU_SYMBOL(var) EXPORT_SYMBOL(per_cpu__##var)
 #define EXPORT_PER_CPU_SYMBOL_GPL(var) EXPORT_SYMBOL_GPL(per_cpu__##var)
-
-extern void setup_per_cpu_areas(void);
 
 #endif /* _ASM_X8664_PERCPU_H_ */
