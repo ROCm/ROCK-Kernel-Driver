@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/bitops.h -- Bit operations
  *
- *  Copyright (C) 2001,02,03  NEC Electronics Corporation
- *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03,04  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03,04  Miles Bader <miles@gnu.org>
  *  Copyright (C) 1992  Linus Torvalds.
  *
  * This file is subject to the terms and conditions of the GNU General
@@ -84,24 +84,26 @@ extern __inline__ unsigned long ffz (unsigned long word)
 #define change_bit __change_bit
 
 
-#define __const_tns_bit_op(op, nr, addr)				\
-  ({ int __tns_res;							\
-     __asm__ ("tst1 (%1 - 0x123), %2; setf nz, %0; " op " (%1 - 0x123), %2" \
-	      : "=&r" (__tns_res)					\
-	      : "g" (((nr) & 0x7) + 0x123),				\
-		"m" (*((char *)(addr) + ((nr) >> 3)))			\
-	      : "memory");						\
-     __tns_res;							\
+#define __const_tns_bit_op(op, nr, addr)				      \
+  ({ int __tns_res;							      \
+     __asm__ __volatile__ (						      \
+	     "tst1 (%1 - 0x123), %2; setf nz, %0; " op " (%1 - 0x123), %2"    \
+	     : "=&r" (__tns_res)					      \
+	     : "g" (((nr) & 0x7) + 0x123),				      \
+	       "m" (*((char *)(addr) + ((nr) >> 3)))			      \
+	     : "memory");						      \
+     __tns_res;								      \
   })
-#define __var_tns_bit_op(op, nr, addr)					\
-  ({ int __nr = (nr);							\
-     int __tns_res;							\
-     __asm__ ("tst1 %1, [%2]; setf nz, %0; " op " %1, [%2]"		\
-	      : "=&r" (__tns_res)					\
-	      : "r" (__nr & 0x7),					\
-		"r" ((char *)(addr) + (__nr >> 3))			\
-	      : "memory");						\
-     __tns_res;							\
+#define __var_tns_bit_op(op, nr, addr)					      \
+  ({ int __nr = (nr);							      \
+     int __tns_res;							      \
+     __asm__ __volatile__ (						      \
+	     "tst1 %1, [%2]; setf nz, %0; " op " %1, [%2]"		      \
+	      : "=&r" (__tns_res)					      \
+	      : "r" (__nr & 0x7),					      \
+		"r" ((char *)(addr) + (__nr >> 3))			      \
+	      : "memory");						      \
+     __tns_res;								      \
   })
 #define __tns_bit_op(op, nr, addr)					\
   ((__builtin_constant_p (nr) && (unsigned)(nr) <= 0x7FFFF)		\
