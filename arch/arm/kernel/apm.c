@@ -87,7 +87,7 @@ static DECLARE_WAIT_QUEUE_HEAD(apm_suspend_waitqueue);
 /*
  * This is a list of everyone who has opened /dev/apm_bios
  */
-static spinlock_t user_list_lock = SPIN_LOCK_UNLOCKED;
+static DECLARE_RWSEM(user_list_lock);
 static LIST_HEAD(apm_user_list);
 
 /*
@@ -168,12 +168,12 @@ static void queue_event(apm_event_t event, struct apm_user *sender)
 {
 	struct apm_user *as;
 
-	spin_lock(&user_list_lock);
+	down_read(&user_list_lock);
 	list_for_each_entry(as, &apm_user_list, list) {
 		if (as != sender && as->reader)
 			queue_event_one_user(as, event);
 	}
-	spin_unlock(&user_list_lock);
+	up_read(&user_list_lock);
 	wake_up_interruptible(&apm_waitqueue);
 }
 
@@ -191,12 +191,12 @@ static int apm_suspend(void)
 	/*
 	 * Finally, wake up anyone who is sleeping on the suspend.
 	 */
-	spin_lock(&user_list_lock);
+	down_read(&user_list_lock);
 	list_for_each_entry(as, &apm_user_list, list) {
 		as->suspend_result = err;
 		as->suspend_wait = 0;
 	}
-	spin_unlock(&user_list_lock);
+	up_read(&user_list_lock);
 
 	wake_up_interruptible(&apm_suspend_waitqueue);
 	return err;
@@ -315,9 +315,9 @@ static int apm_release(struct inode * inode, struct file * filp)
 	struct apm_user *as = filp->private_data;
 	filp->private_data = NULL;
 
-	spin_lock(&user_list_lock);
+	down_write(&user_list_lock);
 	list_del(&as->list);
-	spin_unlock(&user_list_lock);
+	up_write(&user_list_lock);
 
 	/*
 	 * We are now unhooked from the chain.  As far as new
@@ -359,9 +359,9 @@ static int apm_open(struct inode * inode, struct file * filp)
 		as->writer = (filp->f_mode & FMODE_WRITE) == FMODE_WRITE;
 		as->reader = (filp->f_mode & FMODE_READ) == FMODE_READ;
 
-		spin_lock(&user_list_lock);
+		down_write(&user_list_lock);
 		list_add(&as->list, &apm_user_list);
-		spin_unlock(&user_list_lock);
+		up_write(&user_list_lock);
 
 		filp->private_data = as;
 	}
