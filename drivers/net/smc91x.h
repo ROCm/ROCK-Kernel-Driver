@@ -207,8 +207,9 @@ SMC_outw(u16 val, unsigned long ioaddr, int reg)
  * different and probably not worth it for that reason, and not as critical
  * as RX which can overrun memory and lose packets.
  */
-#include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <asm/dma.h>
+#include <asm/arch/pxa-regs.h>
 
 #ifdef SMC_insl
 #undef SMC_insl
@@ -234,7 +235,7 @@ smc_pxa_dma_insl(u_long ioaddr, u_long physaddr, int reg, int dma,
 	}
 
 	len *= 4;
-	dmabuf = dma_map_single(NULL, buf, len, PCI_DMA_FROMDEVICE);
+	dmabuf = dma_map_single(NULL, buf, len, DMA_FROM_DEVICE);
 	DCSR(dma) = DCSR_NODESC;
 	DTADR(dma) = dmabuf;
 	DSADR(dma) = physaddr + reg;
@@ -282,7 +283,7 @@ smc_pxa_dma_insw(u_long ioaddr, u_long physaddr, int reg, int dma,
 	while (!(DCSR(dma) & DCSR_STOPSTATE))
 		cpu_relax();
 	DCSR(dma) = 0;
-	dma_unmap_single(NULL, dmabuf, len, PCI_DMA_FROMDEVICE);
+	dma_unmap_single(NULL, dmabuf, len, DMA_FROM_DEVICE);
 }
 #endif
 
