@@ -119,6 +119,9 @@
 		  initialized
 		* enable only the WoL and PHY interrupts in wol mode
 
+	version 1.0.17: (Tim Hockin)
+		* Only do cable_magic on 83815 and early 83816
+
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
 	* support for an external PHY
@@ -157,8 +160,8 @@
 #include <asm/uaccess.h>
 
 #define DRV_NAME	"natsemi"
-#define DRV_VERSION	"1.07+LK1.0.16"
-#define DRV_RELDATE	"Aug 28, 2002"
+#define DRV_VERSION	"1.07+LK1.0.17"
+#define DRV_RELDATE	"Sep 23, 2002"
 
 /* Updated to recommendations in pci-skeleton v2.03. */
 
@@ -378,6 +381,7 @@ enum register_offsets {
 	IntrStatus		= 0x10,
 	IntrMask		= 0x14,
 	IntrEnable		= 0x18,
+	IntrHoldoff		= 0x16, /* DP83816 only */
 	TxRingPtr		= 0x20,
 	TxConfig		= 0x24,
 	RxRingPtr		= 0x30,
@@ -587,8 +591,11 @@ enum PhyCtrl_bits {
 	PhyAddrMask		= 0xf,
 };
 
-#define SRR_REV_C	0x0302
-#define SRR_REV_D	0x0403
+/* values we might find in the silicon revision register */
+#define SRR_DP83815_C	0x0302
+#define SRR_DP83815_D	0x0403
+#define SRR_DP83816_A4	0x0504
+#define SRR_DP83816_A5	0x0505
 
 /* The Rx and Tx buffer descriptors. */
 /* Note that using only 32 bit fields simplifies conversion to big-endian
@@ -1096,6 +1103,9 @@ static int netdev_open(struct net_device *dev)
 
 static void do_cable_magic(struct net_device *dev)
 {
+	if (np->srr >= SRR_DP83816_A5)
+		return;
+
 	/*
 	 * 100 MBit links with short cables can trip an issue with the chip.
 	 * The problem manifests as lots of CRC errors and/or flickering
@@ -1133,6 +1143,9 @@ static void undo_cable_magic(struct net_device *dev)
 {
 	u16 data;
 	struct netdev_private *np = dev->priv;
+
+	if (np->srr >= SRR_DP83816_A5)
+		return;
 
 	writew(1, dev->base_addr + PGSEL);
 	/* make sure the lock bit is clear */
@@ -2082,7 +2095,7 @@ static int netdev_set_wol(struct net_device *dev, u32 newval)
 		data |= WakeArp;
 	if (newval & WAKE_MAGIC)
 		data |= WakeMagic;
-	if (np->srr >= SRR_REV_D) {
+	if (np->srr >= SRR_DP83815_D) {
 		if (newval & WAKE_MAGICSECURE) {
 			data |= WakeMagicSecure;
 		}
@@ -2101,7 +2114,7 @@ static int netdev_get_wol(struct net_device *dev, u32 *supported, u32 *cur)
 	*supported = (WAKE_PHY | WAKE_UCAST | WAKE_MCAST | WAKE_BCAST 
 			| WAKE_ARP | WAKE_MAGIC);
 	
-	if (np->srr >= SRR_REV_D) {
+	if (np->srr >= SRR_DP83815_D) {
 		/* SOPASS works on revD and higher */
 		*supported |= WAKE_MAGICSECURE;
 	}
@@ -2134,7 +2147,7 @@ static int netdev_set_sopass(struct net_device *dev, u8 *newval)
 	u16 *sval = (u16 *)newval;
 	u32 addr;
 	
-	if (np->srr < SRR_REV_D) {
+	if (np->srr < SRR_DP83815_D) {
 		return 0;
 	}
 
@@ -2165,7 +2178,7 @@ static int netdev_get_sopass(struct net_device *dev, u8 *data)
 	u16 *sval = (u16 *)data;
 	u32 addr;
 
-	if (np->srr < SRR_REV_D) {
+	if (np->srr < SRR_DP83815_D) {
 		sval[0] = sval[1] = sval[2] = 0;
 		return 0;
 	}
