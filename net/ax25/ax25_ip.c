@@ -154,9 +154,15 @@ int ax25_rebuild_header(struct sk_buff *skb)
 				skb_set_owner_w(ourskb, skb->sk);
 
 			kfree_skb(skb);
-
-			src_c = *src;
-			dst_c = *dst;
+			/* dl9sau: bugfix
+			 * after kfree_skb(), dst and src which were pointer
+			 * to bp which is part of skb->data would not be valid
+			 * anymore hope that after skb_pull(ourskb, ..) our
+			 * dsc_c and src_c will not become invalid
+			 */
+			bp  = ourskb->data;
+			dst_c = *(ax25_address *)(bp + 1);
+			src_c = *(ax25_address *)(bp + 8);
 
 			skb_pull(ourskb, AX25_HEADER_LEN - 1);	/* Keep PID */
 			ourskb->nh.raw = ourskb->data;

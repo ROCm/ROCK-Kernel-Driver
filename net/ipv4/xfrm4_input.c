@@ -9,6 +9,7 @@
  * 	
  */
 
+#include <linux/slab.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
 
