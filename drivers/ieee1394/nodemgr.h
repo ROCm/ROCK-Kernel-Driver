@@ -219,7 +219,16 @@ int hpsb_node_lock(struct node_entry *ne, u64 addr,
 		   int extcode, quadlet_t *data, quadlet_t arg);
 
 
+/* Iterate the hosts, calling a given function with supplied data for each
+ * host. */
+int nodemgr_for_each_host(void *__data, int (*cb)(struct hpsb_host *, void *));
+
+
 void init_ieee1394_nodemgr(void);
 void cleanup_ieee1394_nodemgr(void);
+
+
+/* The template for a host device */
+extern struct device nodemgr_dev_template_host;
 
 #endif /* _IEEE1394_NODEMGR_H */

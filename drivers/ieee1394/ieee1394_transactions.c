@@ -263,7 +263,7 @@ struct hpsb_packet *hpsb_make_readpacket(struct hpsb_host *host, nodeid_t node,
 	if (length == 0)
 		return NULL;
 
-	packet = alloc_hpsb_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+	packet = hpsb_alloc_packet(length + (length % 4 ? 4 - (length % 4) : 0));
 	if (!packet)
 		return NULL;
 
@@ -271,7 +271,7 @@ struct hpsb_packet *hpsb_make_readpacket(struct hpsb_host *host, nodeid_t node,
 	packet->node_id = node;
 
 	if (hpsb_get_tlabel(packet)) {
-		free_hpsb_packet(packet);
+		hpsb_free_packet(packet);
 		return NULL;
 	}
 
@@ -291,7 +291,7 @@ struct hpsb_packet *hpsb_make_writepacket (struct hpsb_host *host, nodeid_t node
 	if (length == 0)
 		return NULL;
 
-	packet = alloc_hpsb_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+	packet = hpsb_alloc_packet(length + (length % 4 ? 4 - (length % 4) : 0));
 	if (!packet)
 		return NULL;
 
@@ -302,7 +302,7 @@ struct hpsb_packet *hpsb_make_writepacket (struct hpsb_host *host, nodeid_t node
 	packet->node_id = node;
 
 	if (hpsb_get_tlabel(packet)) {
-		free_hpsb_packet(packet);
+		hpsb_free_packet(packet);
 		return NULL;
 	}
 
@@ -325,7 +325,7 @@ struct hpsb_packet *hpsb_make_streampacket(struct hpsb_host *host, u8 *buffer, i
 	if (length == 0)
 		return NULL;
 
-	packet = alloc_hpsb_packet(length + (length % 4 ? 4 - (length % 4) : 0));
+	packet = hpsb_alloc_packet(length + (length % 4 ? 4 - (length % 4) : 0));
 	if (!packet)
 		return NULL;
 
@@ -335,7 +335,7 @@ struct hpsb_packet *hpsb_make_streampacket(struct hpsb_host *host, u8 *buffer, i
 	packet->host = host;
     
 	if (hpsb_get_tlabel(packet)) {
-		free_hpsb_packet(packet);
+		hpsb_free_packet(packet);
 		return NULL;
 	}
 
@@ -353,13 +353,13 @@ struct hpsb_packet *hpsb_make_lockpacket(struct hpsb_host *host, nodeid_t node,
 	struct hpsb_packet *p;
 	u32 length;
 
-	p = alloc_hpsb_packet(8);
+	p = hpsb_alloc_packet(8);
 	if (!p) return NULL;
 
 	p->host = host;
 	p->node_id = node;
 	if (hpsb_get_tlabel(p)) {
-		free_hpsb_packet(p);
+		hpsb_free_packet(p);
 		return NULL;
 	}
 
@@ -390,13 +390,13 @@ struct hpsb_packet *hpsb_make_lock64packet(struct hpsb_host *host, nodeid_t node
 	struct hpsb_packet *p;
 	u32 length;
 
-	p = alloc_hpsb_packet(16);
+	p = hpsb_alloc_packet(16);
 	if (!p) return NULL;
 
 	p->host = host;
 	p->node_id = node;
 	if (hpsb_get_tlabel(p)) {
-		free_hpsb_packet(p);
+		hpsb_free_packet(p);
 		return NULL;
 	}
 
@@ -429,7 +429,7 @@ struct hpsb_packet *hpsb_make_phypacket(struct hpsb_host *host,
 {
         struct hpsb_packet *p; 
 
-        p = alloc_hpsb_packet(0); 
+        p = hpsb_alloc_packet(0); 
         if (!p) return NULL; 
 
         p->host = host; 
@@ -444,7 +444,7 @@ struct hpsb_packet *hpsb_make_isopacket(struct hpsb_host *host,
 {
 	struct hpsb_packet *p;
 
-	p = alloc_hpsb_packet(length);
+	p = hpsb_alloc_packet(length);
 	if (!p) return NULL;
 
 	p->host = host;
@@ -478,13 +478,10 @@ int hpsb_read(struct hpsb_host *host, nodeid_t node, unsigned int generation,
         }
 
 	packet->generation = generation;
-        if (!hpsb_send_packet(packet)) {
-		retval = -EINVAL;
+        retval = hpsb_send_packet_and_wait(packet);
+	if (retval < 0)
 		goto hpsb_read_fail;
-	}
 
-        down(&packet->state_change);
-        down(&packet->state_change);
         retval = hpsb_packet_success(packet);
 
         if (retval == 0) {
@@ -497,7 +494,7 @@ int hpsb_read(struct hpsb_host *host, nodeid_t node, unsigned int generation,
 
 hpsb_read_fail:
         hpsb_free_tlabel(packet);
-        free_hpsb_packet(packet);
+        hpsb_free_packet(packet);
 
         return retval;
 }
@@ -520,18 +517,15 @@ int hpsb_write(struct hpsb_host *host, nodeid_t node, unsigned int generation,
 		return -ENOMEM;
 
 	packet->generation = generation;
-        if (!hpsb_send_packet(packet)) {
-		retval = -EINVAL;
+        retval = hpsb_send_packet_and_wait(packet);
+	if (retval < 0)
 		goto hpsb_write_fail;
-	}
 
-        down(&packet->state_change);
-        down(&packet->state_change);
         retval = hpsb_packet_success(packet);
 
 hpsb_write_fail:
         hpsb_free_tlabel(packet);
-        free_hpsb_packet(packet);
+        hpsb_free_packet(packet);
 
         return retval;
 }
@@ -550,12 +544,10 @@ int hpsb_lock(struct hpsb_host *host, nodeid_t node, unsigned int generation,
                 return -ENOMEM;
 
 	packet->generation = generation;
-        if (!hpsb_send_packet(packet)) {
-		retval = -EINVAL;
+        retval = hpsb_send_packet_and_wait(packet);
+	if (retval < 0)
 		goto hpsb_lock_fail;
-	}
-        down(&packet->state_change);
-        down(&packet->state_change);
+
         retval = hpsb_packet_success(packet);
 
         if (retval == 0) {
@@ -564,7 +556,7 @@ int hpsb_lock(struct hpsb_host *host, nodeid_t node, unsigned int generation,
 
 hpsb_lock_fail:
         hpsb_free_tlabel(packet);
-        free_hpsb_packet(packet);
+        hpsb_free_packet(packet);
 
         return retval;
 }
@@ -582,12 +574,10 @@ int hpsb_lock64(struct hpsb_host *host, nodeid_t node, unsigned int generation,
 		return -ENOMEM;
 
 	packet->generation = generation;
-	if (!hpsb_send_packet(packet)) {
-		retval = -EINVAL;
+	retval = hpsb_send_packet_and_wait(packet);
+	if (retval < 0)
 		goto hpsb_lock64_fail;
-	}
-	down(&packet->state_change);
-	down(&packet->state_change);
+
 	retval = hpsb_packet_success(packet);
 
 	if (retval == 0)
@@ -595,7 +585,7 @@ int hpsb_lock64(struct hpsb_host *host, nodeid_t node, unsigned int generation,
 
 hpsb_lock64_fail:
 	hpsb_free_tlabel(packet);
-	free_hpsb_packet(packet);
+	hpsb_free_packet(packet);
 
         return retval;
 }
@@ -626,10 +616,9 @@ int hpsb_send_gasp(struct hpsb_host *host, int channel, unsigned int generation,
 
 	packet->no_waiter = 1;
 
-	if (!hpsb_send_packet(packet)) {
-		free_hpsb_packet(packet);
-		retval = -EINVAL;
-	}
+	retval = hpsb_send_packet(packet);
+	if (retval < 0)
+		hpsb_free_packet(packet);
 
 	return retval;
 }
