@@ -36,9 +36,23 @@
 #include <asm/psrcompat.h>
 #include <asm/processor.h>
 #include <asm/timer.h>
+#include <asm/kdebug.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
 #endif
+
+struct notifier_block *sparc64die_chain;
+static spinlock_t die_notifier_lock = SPIN_LOCK_UNLOCKED;
+
+int register_die_notifier(struct notifier_block *nb)
+{
+	int err = 0;
+	unsigned long flags;
+	spin_lock_irqsave(&die_notifier_lock, flags);
+	err = notifier_chain_register(&sparc64die_chain, nb);
+	spin_unlock_irqrestore(&die_notifier_lock, flags);
+	return err;
+}
 
 /* When an irrecoverable trap occurs at tl > 0, the trap entry
  * code logs the trap state registers at every level in the trap
