@@ -221,7 +221,7 @@ static int usblp_set_protocol(struct usblp *usblp, int protocol);
 static int usblp_cache_device_id_string(struct usblp *usblp);
 
 /* forward reference to make our lives easier */
-extern struct usb_driver usblp_driver;
+static struct usb_driver usblp_driver;
 
 /*
  * Functions for usblp control messages.
