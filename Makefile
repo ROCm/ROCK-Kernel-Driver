@@ -389,7 +389,7 @@ scripts_basic:
 # using a seperate output directory. This allows convinient use
 # of make in output directory
 outputmakefile:
-	$(Q)if /usr/bin/env test ! $(srctree) -ef $(objtree); then \
+	$(Q)if test ! $(srctree) -ef $(objtree); then \
 	$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile              \
 	    $(srctree) $(objtree) $(VERSION) $(PATCHLEVEL)         \
 	    > $(objtree)/Makefile;                                 \
