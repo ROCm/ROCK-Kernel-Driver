@@ -1456,8 +1456,8 @@ static ssize_t i810_read(struct file *file, char *buffer, size_t count, loff_t *
                         }
                         continue;
                 }
-		swptr = dmabuf->swptr;
 		cnt = i810_get_available_read_data(state);
+		swptr = dmabuf->swptr;
 		// this is to make the copy_to_user simpler below
 		if(cnt > (dmabuf->dmasize - swptr))
 			cnt = dmabuf->dmasize - swptr;
@@ -1600,8 +1600,8 @@ static ssize_t i810_write(struct file *file, const char *buffer, size_t count, l
                         continue;
                 }
 
-		swptr = dmabuf->swptr;
 		cnt = i810_get_free_write_space(state);
+		swptr = dmabuf->swptr;
 		/* Bound the maximum size to how much we can copy to the
 		 * dma buffer before we hit the end.  If we have more to
 		 * copy then it will get done in a second pass of this
