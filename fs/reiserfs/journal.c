@@ -1667,7 +1667,7 @@ static int journal_read(struct super_block *p_s_sb) {
 
   cur_dblock = SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) ;
   printk("reiserfs: checking transaction log (%s) for (%s)\n",
-	 __bdevname(SB_JOURNAL_DEV(p_s_sb)), p_s_sb->s_id) ;
+	 bdevname(SB_JOURNAL(p_s_sb)->j_dev_bd), p_s_sb->s_id) ;
   start = CURRENT_TIME ;
 
   /* step 1, read in the journal header block.  Check the transaction it says 
@@ -1944,18 +1944,17 @@ static int journal_init_dev( struct super_block *super,
 			     const char *jdev_name )
 {
 	int result;
-	kdev_t jdev;
+	dev_t jdev;
 
 	result = 0;
 
 	journal -> j_dev_bd = NULL;
 	journal -> j_dev_file = NULL;
-	jdev = SB_JOURNAL_DEV( super ) = 
-      		SB_ONDISK_JOURNAL_DEVICE( super ) ?
-		to_kdev_t(SB_ONDISK_JOURNAL_DEVICE( super )) : super -> s_dev;	
+	jdev = SB_ONDISK_JOURNAL_DEVICE( super ) ?
+		SB_ONDISK_JOURNAL_DEVICE( super ) : kdev_t_to_nr(super->s_dev);	
 	/* there is no "jdev" option and journal is on separate device */
 	if( ( !jdev_name || !jdev_name[ 0 ] ) ) {
-		journal -> j_dev_bd = bdget( kdev_t_to_nr( jdev ) );
+		journal -> j_dev_bd = bdget(jdev);
 		if( journal -> j_dev_bd )
 			result = blkdev_get( journal -> j_dev_bd, 
 					     FMODE_READ | FMODE_WRITE, 0, 
@@ -1964,7 +1963,7 @@ static int journal_init_dev( struct super_block *super,
 			result = -ENOMEM;
 		if( result != 0 )
 			printk( "sh-458: journal_init_dev: cannot init journal device\n '%s': %i", 
-				kdevname( jdev ), result );
+				kdevname( to_kdev_t(jdev) ), result );
 
 		return result;
 	}
@@ -1988,8 +1987,7 @@ static int journal_init_dev( struct super_block *super,
 			     result );
 		} else
 			/* ok */
-			SB_JOURNAL_DEV( super ) = 
-				to_kdev_t( jdev_inode -> i_bdev -> bd_dev );
+			jdev = jdev_inode -> i_bdev -> bd_dev;
 	} else {
 		result = PTR_ERR( journal -> j_dev_file );
 		journal -> j_dev_file = NULL;
@@ -1998,7 +1996,7 @@ static int journal_init_dev( struct super_block *super,
 	if( result != 0 ) {
 		release_journal_dev( super, journal );
 	}
-	printk( "journal_init_dev: journal device: %s", kdevname( SB_JOURNAL_DEV( super ) ) );
+	printk( "journal_init_dev: journal device: %s", kdevname(to_kdev_t(jdev)) );
 	return result;
 }
 
@@ -2055,7 +2053,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
 	 char jname[ 32 ];
 	 char fname[ 32 ];
 	 
-	 strcpy( jname, kdevname( SB_JOURNAL_DEV(p_s_sb) ) );
+	 strcpy( jname, bdevname(SB_JOURNAL(p_s_sb)->j_dev_bd) );
 	 strcpy( fname, p_s_sb->s_id);
 	 printk("sh-460: journal header magic %x (device %s) does not match "
 		"to magic found in super block %x (device %s)\n",
@@ -2111,7 +2109,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
   printk ("Reiserfs journal params: device %s, size %u, "
 	  "journal first block %u, max trans len %u, max batch %u, "
 	  "max commit age %u, max trans age %u\n",
-	  kdevname( SB_JOURNAL_DEV(p_s_sb) ),
+	  bdevname( SB_JOURNAL(p_s_sb)->j_dev_bd ),
 	  SB_ONDISK_JOURNAL_SIZE(p_s_sb),
 	  SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb),
 	  SB_JOURNAL_TRANS_MAX(p_s_sb),
