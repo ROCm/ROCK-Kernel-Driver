@@ -179,7 +179,8 @@ static inline int
 nfsd4_putrootfh(struct svc_rqst *rqstp, struct svc_fh *current_fh)
 {
 	fh_put(current_fh);
-	return exp_pseudoroot(rqstp->rq_client, current_fh);
+	return exp_pseudoroot(rqstp->rq_client, current_fh,
+			      &rqstp->rq_chandle);
 }
 
 static inline int
