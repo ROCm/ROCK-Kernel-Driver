@@ -200,7 +200,7 @@ static int wait_on_page_writeback_range(struct address_space *mapping,
 	index = start;
 	while ((nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
 			PAGECACHE_TAG_WRITEBACK,
-			min(end - index, (pgoff_t)PAGEVEC_SIZE-1) + 1))) {
+			min(end - index, (pgoff_t)PAGEVEC_SIZE-1) + 1)) != 0) {
 		unsigned i;
 
 		for (i = 0; i < nr_pages; i++) {

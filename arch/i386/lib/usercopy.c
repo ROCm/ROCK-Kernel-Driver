@@ -219,7 +219,7 @@ long strnlen_user(const char __user *s, long n)
 
 #ifdef CONFIG_X86_INTEL_USERCOPY
 static unsigned long
-__copy_user_intel(void *to, const void *from,unsigned long size)
+__copy_user_intel(void __user *to, const void *from, unsigned long size)
 {
 	int d0, d1;
 	__asm__ __volatile__(
@@ -326,7 +326,7 @@ __copy_user_intel(void *to, const void *from,unsigned long size)
 }
 
 static unsigned long
-__copy_user_zeroing_intel(void *to, const void *from, unsigned long size)
+__copy_user_zeroing_intel(void *to, const void __user *from, unsigned long size)
 {
 	int d0, d1;
 	__asm__ __volatile__(
@@ -425,9 +425,9 @@ __copy_user_zeroing_intel(void *to, const void *from, unsigned long size)
  * them
  */
 unsigned long
-__copy_user_zeroing_intel(void *to, const void *from, unsigned long size);
+__copy_user_zeroing_intel(void *to, const void __user *from, unsigned long size);
 unsigned long
-__copy_user_intel(void *to, const void *from,unsigned long size);
+__copy_user_intel(void __user *to, const void *from, unsigned long size);
 #endif /* CONFIG_X86_INTEL_USERCOPY */
 
 /* Generic arbitrary sized copy.  */
@@ -562,9 +562,9 @@ survive:
 	}
 #endif
 	if (movsl_is_ok(to, from, n))
-		__copy_user((void *)to, from, n);
+		__copy_user(to, from, n);
 	else
-		n = __copy_user_intel((void *)to, from, n);
+		n = __copy_user_intel(to, from, n);
 	return n;
 }
 
@@ -572,9 +572,9 @@ unsigned long
 __copy_from_user_ll(void *to, const void __user *from, unsigned long n)
 {
 	if (movsl_is_ok(to, from, n))
-		__copy_user_zeroing(to, (const void *) from, n);
+		__copy_user_zeroing(to, from, n);
 	else
-		n = __copy_user_zeroing_intel(to, (const void *) from, n);
+		n = __copy_user_zeroing_intel(to, from, n);
 	return n;
 }
 

@@ -211,7 +211,7 @@ struct request *elv_next_request(request_queue_t *q)
 	struct request *rq;
 	int ret;
 
-	while ((rq = __elv_next_request(q))) {
+	while ((rq = __elv_next_request(q)) != NULL) {
 		/*
 		 * just mark as started even if we don't start it, a request
 		 * that has been delayed should not be passed by new incoming
