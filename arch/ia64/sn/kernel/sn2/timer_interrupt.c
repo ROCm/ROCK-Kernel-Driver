@@ -48,7 +48,6 @@ sn_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (!pda->hb_count--) {
 		pda->hb_count = HZ/2;
 		set_led_bits(pda->hb_state ^= LED_CPU_HEARTBEAT, LED_CPU_HEARTBEAT);
-		printk("Blink\n");
 	}
 
 	if (enable_shub_wars_1_1()) {
