@@ -238,7 +238,7 @@ struct module_sect_attrs
 	struct module_sect_attr attrs[0];
 };
 
-struct param_kobject;
+struct module_param_attrs;
 
 struct module
 {
@@ -252,7 +252,7 @@ struct module
 
 	/* Sysfs stuff. */
 	struct module_kobject mkobj;
-	struct param_kobject *params_kobject;
+	struct module_param_attrs *param_attrs;
 
 	/* Exported symbols */
 	const struct kernel_symbol *syms;
