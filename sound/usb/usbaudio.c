@@ -725,7 +725,7 @@ static int deactivate_urbs(snd_usb_substream_t *subs, int force, int can_sleep)
 	subs->running = 0;
 
 	if (!force && subs->stream->chip->shutdown) /* to be sure... */
-		return 0;
+		return -EBADFD;
 
 	async = !can_sleep && async_unlink;
 
@@ -769,6 +769,9 @@ static int start_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 {
 	unsigned int i;
 	int err;
+
+	if (subs->stream->chip->shutdown)
+		return -EBADFD;
 
 	for (i = 0; i < subs->nurbs; i++) {
 		snd_assert(subs->dataurb[i].urb, return -EINVAL);
