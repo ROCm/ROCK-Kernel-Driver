@@ -1,5 +1,5 @@
 /*
- * llc_sock.c - LLC User Interface SAPs
+ * af_llc.c - LLC User Interface SAPs
  * Description:
  *   Functions in this module are implementation of socket based llc
  *   communications for the Linux operating system. Support of llc class
