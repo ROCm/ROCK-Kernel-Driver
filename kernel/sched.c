@@ -3909,8 +3909,7 @@ static int migration_thread(void * data)
 
 		if (req->type == REQ_MOVE_TASK) {
 			spin_unlock(&rq->lock);
-			__migrate_task(req->task, smp_processor_id(),
-					req->dest_cpu);
+			__migrate_task(req->task, cpu, req->dest_cpu);
 			local_irq_enable();
 		} else if (req->type == REQ_SET_DOMAIN) {
 			rq->sd = req->sd;
@@ -4180,6 +4179,94 @@ int __init migration_init(void)
 #endif
 
 #ifdef CONFIG_SMP
+#define SCHED_DOMAIN_DEBUG
+#ifdef SCHED_DOMAIN_DEBUG
+static void sched_domain_debug(struct sched_domain *sd, int cpu)
+{
+	int level = 0;
+
+	printk(KERN_DEBUG "CPU%d attaching sched-domain:\n", cpu);
+
+	do {
+		int i;
+		char str[NR_CPUS];
+		struct sched_group *group = sd->groups;
+		cpumask_t groupmask;
+
+		cpumask_scnprintf(str, NR_CPUS, sd->span);
+		cpus_clear(groupmask);
+
+		printk(KERN_DEBUG);
+		for (i = 0; i < level + 1; i++)
+			printk(" ");
+		printk("domain %d: ", level);
+
+		if (!(sd->flags & SD_LOAD_BALANCE)) {
+			printk("does not load-balance\n");
+			if (sd->parent)
+				printk(KERN_ERR "ERROR: !SD_LOAD_BALANCE domain has parent");
+			break;
+		}
+
+		printk("span %s\n", str);
+
+		if (!cpu_isset(cpu, sd->span))
+			printk(KERN_ERR "ERROR: domain->span does not contain CPU%d\n", cpu);
+		if (!cpu_isset(cpu, group->cpumask))
+			printk(KERN_ERR "ERROR: domain->groups does not contain CPU%d\n", cpu);
+
+		printk(KERN_DEBUG);
+		for (i = 0; i < level + 2; i++)
+			printk(" ");
+		printk("groups:");
+		do {
+			if (!group) {
+				printk("\n");
+				printk(KERN_ERR "ERROR: group is NULL\n");
+				break;
+			}
+
+			if (!group->cpu_power) {
+				printk("\n");
+				printk(KERN_ERR "ERROR: domain->cpu_power not set\n");
+			}
+
+			if (!cpus_weight(group->cpumask)) {
+				printk("\n");
+				printk(KERN_ERR "ERROR: empty group\n");
+			}
+
+			if (cpus_intersects(groupmask, group->cpumask)) {
+				printk("\n");
+				printk(KERN_ERR "ERROR: repeated CPUs\n");
+			}
+
+			cpus_or(groupmask, groupmask, group->cpumask);
+
+			cpumask_scnprintf(str, NR_CPUS, group->cpumask);
+			printk(" %s", str);
+
+			group = group->next;
+		} while (group != sd->groups);
+		printk("\n");
+
+		if (!cpus_equal(sd->span, groupmask))
+			printk(KERN_ERR "ERROR: groups don't span domain->span\n");
+
+		level++;
+		sd = sd->parent;
+
+		if (sd) {
+			if (!cpus_subset(groupmask, sd->span))
+				printk(KERN_ERR "ERROR: parent span is not a superset of domain->span\n");
+		}
+
+	} while (sd);
+}
+#else
+#define sched_domain_debug(sd, cpu) {}
+#endif
+
 /*
  * Attach the domain 'sd' to 'cpu' as its base domain.  Callers must
  * hold the hotplug lock.
@@ -4190,6 +4277,8 @@ void __devinit cpu_attach_domain(struct sched_domain *sd, int cpu)
 	unsigned long flags;
 	runqueue_t *rq = cpu_rq(cpu);
 	int local = 1;
+
+	sched_domain_debug(sd, cpu);
 
 	spin_lock_irqsave(&rq->lock, flags);
 
@@ -4466,96 +4555,6 @@ static void __devinit arch_destroy_sched_domains(void)
 
 #endif /* ARCH_HAS_SCHED_DOMAIN */
 
-#define SCHED_DOMAIN_DEBUG
-#ifdef SCHED_DOMAIN_DEBUG
-static void sched_domain_debug(void)
-{
-	int i;
-
-	for_each_online_cpu(i) {
-		runqueue_t *rq = cpu_rq(i);
-		struct sched_domain *sd;
-		int level = 0;
-
-		sd = rq->sd;
-
-		printk(KERN_DEBUG "CPU%d:\n", i);
-
-		do {
-			int j;
-			char str[NR_CPUS];
-			struct sched_group *group = sd->groups;
-			cpumask_t groupmask;
-
-			cpumask_scnprintf(str, NR_CPUS, sd->span);
-			cpus_clear(groupmask);
-
-			printk(KERN_DEBUG);
-			for (j = 0; j < level + 1; j++)
-				printk(" ");
-			printk("domain %d: ", level);
-
-			if (!(sd->flags & SD_LOAD_BALANCE)) {
-				printk("does not load-balance");
-				if (sd->parent)
-					printk(" ERROR !SD_LOAD_BALANCE domain has parent");
-				printk("\n");
-				break;
-			}
-
-			printk("span %s\n", str);
-
-			if (!cpu_isset(i, sd->span))
-				printk(KERN_DEBUG "ERROR domain->span does not contain CPU%d\n", i);
-			if (!cpu_isset(i, group->cpumask))
-				printk(KERN_DEBUG "ERROR domain->groups does not contain CPU%d\n", i);
-
-			printk(KERN_DEBUG);
-			for (j = 0; j < level + 2; j++)
-				printk(" ");
-			printk("groups:");
-			do {
-				if (!group) {
-					printk(" ERROR: NULL");
-					break;
-				}
-				
-				if (!group->cpu_power)
-					printk(KERN_DEBUG "ERROR group->cpu_power not set\n");
-
-				if (!cpus_weight(group->cpumask))
-					printk(" ERROR empty group:");
-
-				if (cpus_intersects(groupmask, group->cpumask))
-					printk(" ERROR repeated CPUs:");
-
-				cpus_or(groupmask, groupmask, group->cpumask);
-
-				cpumask_scnprintf(str, NR_CPUS, group->cpumask);
-				printk(" %s", str);
-
-				group = group->next;
-			} while (group != sd->groups);
-			printk("\n");
-
-			if (!cpus_equal(sd->span, groupmask))
-				printk(KERN_DEBUG "ERROR groups don't span domain->span\n");
-
-			level++;
-			sd = sd->parent;
-
-			if (sd) {
-				if (!cpus_subset(groupmask, sd->span))
-					printk(KERN_DEBUG "ERROR parent span is not a superset of domain->span\n");
-			}
-
-		} while (sd);
-	}
-}
-#else
-#define sched_domain_debug() {}
-#endif
-
 /*
  * Initial dummy domain for early boot and for hotplug cpu. Being static,
  * it is initialized to zero, so all balancing flags are cleared which is
@@ -4598,8 +4597,6 @@ static int update_sched_domains(struct notifier_block *nfb,
 	/* The hotplug lock is already held by cpu_up/cpu_down */
 	arch_init_sched_domains();
 
-	sched_domain_debug();
-
 	return NOTIFY_OK;
 }
 #endif
@@ -4608,7 +4605,6 @@ void __init sched_init_smp(void)
 {
 	lock_cpu_hotplug();
 	arch_init_sched_domains();
-	sched_domain_debug();
 	unlock_cpu_hotplug();
 	/* XXX: Theoretical race here - CPU may be hotplugged now */
 	hotcpu_notifier(update_sched_domains, 0);
