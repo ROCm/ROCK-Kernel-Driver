@@ -341,74 +341,9 @@ static void pndisc_destructor(struct pneigh_entry *n)
 	ipv6_dev_mc_dec(dev, &maddr);
 }
 
-
-
-#if 0
-static int
-ndisc_build_ll_hdr(struct sk_buff *skb, struct net_device *dev,
-		   struct in6_addr *daddr, struct neighbour *neigh, int len)
-{
-	unsigned char ha[MAX_ADDR_LEN];
-	unsigned char *h_dest = NULL;
-
-	if (!dev) {
-		printk(KERN_DEBUG "%s:device=%p, neigh=%p\n",
-			__FUNCTION__, dev, neigh);
-		BUG();
-	}
-
-	if (dev->hard_header) {
-		if (ipv6_addr_is_multicast(daddr)) {
-			ndisc_mc_map(daddr, ha, dev, 1);
-			h_dest = ha;
-		} else if (neigh) {
-			read_lock_bh(&neigh->lock);
-			if (neigh->nud_state&NUD_VALID) {
-				memcpy(ha, neigh->ha, dev->addr_len);
-				h_dest = ha;
-			}
-			read_unlock_bh(&neigh->lock);
-		} else {
-			neigh = neigh_lookup(&nd_tbl, daddr, dev);
-			if (neigh) {
-				read_lock_bh(&neigh->lock);
-				if (neigh->nud_state&NUD_VALID) {
-					memcpy(ha, neigh->ha, dev->addr_len);
-					h_dest = ha;
-				}
-				read_unlock_bh(&neigh->lock);
-				neigh_release(neigh);
-			}
-		}
-
-		if (dev->hard_header(skb, dev, ETH_P_IPV6, h_dest, NULL, len) < 0)
-			return 0;
-	}
-
-	return 1;
-}
-#endif
-
-
 /*
  *	Send a Neighbour Advertisement
  */
-
-#if 0
-static int ndisc_output(struct sk_buff *skb)
-{
-	if (skb) {
-		struct neighbour *neigh = (skb->dst ? skb->dst->neighbour : NULL);
-		if (ndisc_build_ll_hdr(skb, skb->dev, &skb->nh.ipv6h->daddr, neigh, skb->len) == 0) {
-			kfree_skb(skb);
-			return -EINVAL;
-		}
-		dev_queue_xmit(skb);
-		return 0;
-	}
-	return -EINVAL;
-}
-#endif
 
 static inline void ndisc_flow_init(struct flowi *fl, u8 type,
 			    struct in6_addr *saddr, struct in6_addr *daddr)
@@ -484,8 +419,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 			inc_opt = 0;
 	}
 
-	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev)
-				  + dst->header_len + 64,
+	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev) + dst->header_len + 64, 
 				  1, &err);
 
 	if (skb == NULL) {
@@ -571,8 +505,7 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	if (send_llinfo)
 		len += NDISC_OPT_SPACE(dev->addr_len);
 
-	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev)
-				  + dst->header_len + 64,
+	skb = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev) + dst->header_len + 64,
 				  1, &err);
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
@@ -644,8 +577,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 	if (dev->addr_len)
 		len += NDISC_OPT_SPACE(dev->addr_len);
 
-        skb = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev)
-				  + dst->header_len + 64,
+        skb = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev) + dst->header_len + 64,
 				  1, &err);
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
@@ -775,7 +707,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 			return;
 		}
 
-		/* XXX: RFC2461 7.1.1:
+		/* RFC2461 7.1.1:
 	 	 *	If the IP source address is the unspecified address, 
 		 *	there MUST NOT be source link-layer address option 
 		 *	in the message.
@@ -834,7 +766,6 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 				 * sender should delay its response 
 				 * by a random time between 0 and 
 				 * MAX_ANYCAST_DELAY_TIME seconds.
-				 * (RFC2461) -- yoshfuji
 				 */
 				struct sk_buff *n = skb_clone(skb, GFP_ATOMIC);
 				if (n)
@@ -849,8 +780,13 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		struct in6_addr maddr;
 
 		ipv6_addr_all_nodes(&maddr);
+#ifdef CONFIG_IPV6_NDISC_NEW
 		ndisc_send_na(dev, NULL, &maddr, &msg->target,
-			      idev->cnf.forwarding, 0, (ifp != NULL), 1);
+			      idev->cnf.forwarding, 0, ifp && inc, inc);
+#else
+		ndisc_send_na(dev, NULL, &maddr, &msg->target,
+			      idev->cnf.forwarding, 0, ifp != NULL, inc);
+#endif
 		goto out;
 	}
 
@@ -867,8 +803,8 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 	neigh = __neigh_lookup(&nd_tbl, saddr, skb->dev, !inc || lladdr || !skb->dev->addr_len);
 	if (neigh) {
 		ndisc_update(neigh, lladdr, NEIGH_UPDATE_F_IP6NS);
-		ndisc_send_na(dev, neigh, saddr, &ifp->addr,
-			      ifp->idev->cnf.forwarding, 1, inc, inc);
+		ndisc_send_na(dev, neigh, saddr, &msg->target,
+			      idev->cnf.forwarding, 1, (ifp && inc) , inc);
 		neigh_release(neigh);
 	}
 #else
@@ -876,8 +812,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 
 	if (neigh || !dev->hard_header) {
 		ndisc_send_na(dev, neigh, saddr, &msg->target,
-			      idev->cnf.forwarding, 
-			      1, (ifp != NULL && inc), inc);
+			      idev->cnf.forwarding, 1, ifp != NULL, 1);
 		if (neigh)
 			neigh_release(neigh);
 	}
@@ -977,12 +912,8 @@ static void ndisc_recv_na(struct sk_buff *skb)
 			 */
 			struct rt6_info *rt;
 			rt = rt6_get_dflt_router(saddr, dev);
-			if (rt) {
-				/* It is safe only because 
-				 * we're in BH */
-				dst_release(&rt->u.dst);
+			if (rt)
 				ip6_del_rt(rt, NULL, NULL);
-			}
 		}
 #else
 		if (neigh->flags & NTF_ROUTER) {
@@ -1003,9 +934,7 @@ static void ndisc_recv_na(struct sk_buff *skb)
 		neigh_update(neigh, lladdr,
 			     msg->icmph.icmp6_solicited ? NUD_REACHABLE : NUD_STALE,
 			     msg->icmph.icmp6_override, 1);
-		neigh_release(neigh);
 #endif
-	}
 #ifdef CONFIG_IPV6_NDISC_NEW
 ignore:
 #ifdef CONFIG_ARPD
@@ -1014,8 +943,10 @@ ignore:
 			neigh_app_notify(neigh);
 		} else
 #endif
-		write_unlock_bh(&neigh->lock);
+			write_unlock_bh(&neigh->lock);
 #endif
+		neigh_release(neigh);
+	}
 }
 
 static void ndisc_recv_rs(struct sk_buff *skb)
@@ -1454,8 +1385,7 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 	rd_len &= ~0x7;
 	len += rd_len;
 
-	buff = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev)
-				  + dst->header_len + 64,
+	buff = sock_alloc_send_skb(sk, MAX_HEADER + len + LL_RESERVED_SPACE(dev) + dst->header_len + 64,
 				   1, &err);
 	if (buff == NULL) {
 		ND_PRINTK1("ndisc_send_redirect: alloc_skb failed\n");
