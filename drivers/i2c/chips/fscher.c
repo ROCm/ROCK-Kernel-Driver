@@ -512,7 +512,7 @@ static ssize_t set_fan_div(struct i2c_client *client, struct fscher_data *data,
 	default:
 		dev_err(&client->dev, "fan_div value %ld not "
 			 "supported. Choose one of 2, 4 or 8!\n", v);
-		return -1;
+		return -EINVAL;
 	}
 
 	/* bits 2..7 reserved => mask with 0x03 */

@@ -367,7 +367,7 @@ static ssize_t set_sensor(struct device *dev, const char *buf,
 	else if (val == 2)
 	    data->sensor |= 8 << nr;
 	else if (val != 0)
-		return -1;
+		return -EINVAL;
 	it87_write_value(client, IT87_REG_TEMP_ENABLE, data->sensor);
 	return count;
 }

@@ -129,8 +129,9 @@ static ssize_t set_out0_output(struct device *dev, const char *buf, size_t count
 	if ((value = (simple_strtoul(buf, NULL, 10) + 5) / 10) <= 255) {
 		data->aout = value;
 		i2c_smbus_write_byte_data(client, data->control, data->aout);
+		return count;
 	}
-	return count;
+	return -EINVAL;
 }
 
 static DEVICE_ATTR(out0_output, S_IWUSR | S_IRUGO, 
