@@ -1,4 +1,4 @@
-/* $Id: jffs2_fs_sb.h,v 1.15 2001/04/18 13:05:28 dwmw2 Exp $ */
+/* $Id: jffs2_fs_sb.h,v 1.16 2001/09/18 20:15:18 dwmw2 Exp $ */
 
 #ifndef _JFFS2_FS_SB
 #define _JFFS2_FS_SB
@@ -26,9 +26,8 @@ struct jffs2_sb_info {
 
 	//	pid_t thread_pid;		/* GC thread's PID */
 	struct task_struct *gc_task;	/* GC task struct */
-	struct semaphore gc_thread_sem; /* GC thread startup mutex */
-	struct completion gc_thread_exit; /* GC thread exit completion */
-
+	struct semaphore gc_thread_start; /* GC thread start mutex */
+	struct completion gc_thread_exit; /* GC thread exit completion port */
 	//	__u32 gc_minfree_threshold;	/* GC trigger thresholds */
 	//	__u32 gc_maxdirty_threshold;
 

@@ -370,7 +370,8 @@ irnet_discover_daddr_and_lsap_sel(irnet_socket *	self)
   DENTER(IRDA_SR_TRACE, "(self=0x%X)\n", (unsigned int) self);
 
   /* Ask lmp for the current discovery log */
-  self->discoveries = irlmp_get_discoveries(&self->disco_number, self->mask);
+  self->discoveries = irlmp_get_discoveries(&self->disco_number, self->mask,
+					    DISCOVERY_DEFAULT_SLOTS);
 
   /* Check if the we got some results */
   if(self->discoveries == NULL)
@@ -426,7 +427,8 @@ irnet_dname_to_daddr(irnet_socket *	self)
   DENTER(IRDA_SR_TRACE, "(self=0x%X)\n", (unsigned int) self);
 
   /* Ask lmp for the current discovery log */
-  discoveries = irlmp_get_discoveries(&number, 0xffff);
+  discoveries = irlmp_get_discoveries(&number, 0xffff,
+				      DISCOVERY_DEFAULT_SLOTS);
   /* Check if the we got some results */
   if(discoveries == NULL)
     DRETURN(-ENETUNREACH, IRDA_SR_INFO, "Cachelog empty...\n");
@@ -664,7 +666,8 @@ irnet_daddr_to_dname(irnet_socket *	self)
   DENTER(IRDA_SERV_TRACE, "(self=0x%X)\n", (unsigned int) self);
 
   /* Ask lmp for the current discovery log */
-  discoveries = irlmp_get_discoveries(&number, 0xffff);
+  discoveries = irlmp_get_discoveries(&number, 0xffff,
+				      DISCOVERY_DEFAULT_SLOTS);
   /* Check if the we got some results */
   if (discoveries == NULL)
     DRETURN(-ENETUNREACH, IRDA_SERV_INFO, "Cachelog empty...\n");

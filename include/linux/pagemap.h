@@ -87,6 +87,7 @@ extern void __add_page_to_hash_queue(struct page * page, struct page **p);
 
 extern void add_to_page_cache(struct page * page, struct address_space *mapping, unsigned long index);
 extern void add_to_page_cache_locked(struct page * page, struct address_space *mapping, unsigned long index);
+extern int add_to_page_cache_unique(struct page * page, struct address_space *mapping, unsigned long index, struct page **hash);
 
 extern void ___wait_on_page(struct page *);
 

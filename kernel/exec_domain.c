@@ -219,13 +219,15 @@ get_exec_domain_list(char *page)
 asmlinkage long
 sys_personality(u_long personality)
 {
-	if (personality == 0xffffffff)
-		goto ret;
-	set_personality(personality);
-	if (current->personality != personality)
-		return -EINVAL;
-ret:
-	return (current->personality);
+	u_long old = current->personality;;
+
+	if (personality != 0xffffffff) {
+		set_personality(personality);
+		if (current->personality != personality)
+			return -EINVAL;
+	}
+
+	return (long)old;
 }
 
 

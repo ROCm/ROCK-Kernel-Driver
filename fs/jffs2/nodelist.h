@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: nodelist.h,v 1.45 2001/03/20 17:43:57 dwmw2 Exp $
+ * $Id: nodelist.h,v 1.46 2001/09/18 23:43:05 dwmw2 Exp $
  *
  */
 
@@ -232,10 +232,6 @@ struct jffs2_eraseblock
 
 
 #define PAD(x) (((x)+3)&~3)
-
-/* These probably ought to be somewhere central. */
-//#define min(x,y) ({ typeof((x)) _x = (x); typeof((y)) _y = (y); (_x>_y)?_y:_x; })
-//#define max(x,y) ({ typeof((x)) _x = (x); typeof((y)) _y = (y); (_x>_y)?_x:_y; })
 
 static inline int jffs2_raw_ref_to_inum(struct jffs2_raw_node_ref *raw)
 {

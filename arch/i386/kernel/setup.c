@@ -2416,7 +2416,12 @@ int get_cpuinfo(char * buffer)
 	struct cpuinfo_x86 *c = cpu_data;
 	int i, n;
 
-	for (n = 0; n < NR_CPUS; n++, c++) {
+	/* 
+	 * WARNING - nasty evil hack ... if we print > 8, it overflows the
+	 * page buffer and corrupts memory - this needs fixing properly
+	 */
+	for (n = 0; n < 8; n++, c++) {
+	/* for (n = 0; n < NR_CPUS; n++, c++) { */
 		int fpu_exception;
 #ifdef CONFIG_SMP
 		if (!(cpu_online_map & (1<<n)))
@@ -2479,7 +2484,7 @@ int get_cpuinfo(char * buffer)
 	return p - buffer;
 }
 
-static unsigned long cpu_initialized __initdata = 0;
+unsigned long cpu_initialized __initdata = 0;
 
 /*
  * cpu_init() initializes state that is per-CPU. Some data is already

@@ -1,7 +1,7 @@
 #
 # linux/drivers/devices/Makefile
 #
-# $Id: Makefile,v 1.2 2001/04/19 22:12:36 dwmw2 Exp $
+# $Id: Makefile,v 1.4 2001/06/26 21:10:05 spse Exp $
 
 O_TARGET	:= devlink.o
 
@@ -19,5 +19,7 @@ obj-$(CONFIG_MTD_DOCPROBE)	+= docprobe.o docecc.o
 obj-$(CONFIG_MTD_SLRAM)		+= slram.o
 obj-$(CONFIG_MTD_PMC551)	+= pmc551.o
 obj-$(CONFIG_MTD_MTDRAM)	+= mtdram.o
+obj-$(CONFIG_MTD_LART)		+= lart.o
+obj-$(CONFIG_MTD_BLKMTD)	+= blkmtd.o
 
 include $(TOPDIR)/Rules.make

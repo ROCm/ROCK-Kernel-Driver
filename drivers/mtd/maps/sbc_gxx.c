@@ -17,7 +17,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
 
-   $Id: sbc_gxx.c,v 1.17 2001/06/02 14:52:23 dwmw2 Exp $
+   $Id: sbc_gxx.c,v 1.19 2001/10/02 15:05:14 dwmw2 Exp $
 
 The SBC-MediaGX / SBC-GXx has up to 16 MiB of 
 Intel StrataFlash (28F320/28F640) in x8 mode.  
@@ -221,12 +221,7 @@ static struct map_info sbc_gxx_map = {
 /* MTD device for all of the flash. */
 static struct mtd_info *all_mtd;
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_sbc_gxx init_module
-#define cleanup_sbc_gxx cleanup_module
-#endif
-
-mod_exit_t cleanup_sbc_gxx(void)
+static void __exit cleanup_sbc_gxx(void)
 {
 	if( all_mtd ) {
 		del_mtd_partitions( all_mtd );
@@ -237,7 +232,7 @@ mod_exit_t cleanup_sbc_gxx(void)
 	release_region(PAGE_IO,PAGE_IO_SIZE);
 }
 
-mod_init_t init_sbc_gxx(void)
+int __init init_sbc_gxx(void)
 {
 	if (check_region(PAGE_IO,PAGE_IO_SIZE) != 0) {
 		printk( KERN_ERR"%s: IO ports 0x%x-0x%x in use\n",
@@ -260,7 +255,7 @@ mod_init_t init_sbc_gxx(void)
 		WINDOW_START, WINDOW_START+WINDOW_LENGTH-1 );
 
 	/* Probe for chip. */
-	all_mtd = do_map_probe( "cfi", &sbc_gxx_map );
+	all_mtd = do_map_probe( "cfi_probe", &sbc_gxx_map );
 	if( !all_mtd ) {
 		cleanup_sbc_gxx();
 		return -ENXIO;
@@ -276,3 +271,7 @@ mod_init_t init_sbc_gxx(void)
 
 module_init(init_sbc_gxx);
 module_exit(cleanup_sbc_gxx);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Arcom Control Systems Ltd.");
+MODULE_DESCRIPTION("MTD map driver for SBC-GXm and SBC-GX1 series boards");

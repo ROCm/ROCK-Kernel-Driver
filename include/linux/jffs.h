@@ -10,7 +10,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * $Id: jffs.h,v 1.11 2000/08/04 12:46:34 dwmw2 Exp $
+ * $Id: jffs.h,v 1.20 2001/09/18 21:33:37 dwmw2 Exp $
  *
  * Ported to Linux 2.3.x and MTD:
  * Copyright (C) 2000  Alexander Larsson (alex@cendio.se), Cendio Systems AB
@@ -20,9 +20,10 @@
 #ifndef __LINUX_JFFS_H__
 #define __LINUX_JFFS_H__
 
-#define JFFS_VERSION_STRING "1.0"
-
+#include <linux/types.h>
 #include <linux/completion.h>
+
+#define JFFS_VERSION_STRING "1.0"
 
 /* This is a magic number that is used as an identification number for
    this file system.  It is written to the super_block structure.  */
@@ -206,9 +207,9 @@ struct jffs_flash_status
 /* This stuff could be used for finding memory leaks.  */
 #define JFFS_MEMORY_DEBUG 0
 
-#if defined(JFFS_MEMORY_DEBUG) && JFFS_MEMORY_DEBUG
-extern long no_jffs_file;
 extern long no_jffs_node;
+extern long no_jffs_file;
+#if defined(JFFS_MEMORY_DEBUG) && JFFS_MEMORY_DEBUG
 extern long no_jffs_control;
 extern long no_jffs_raw_inode;
 extern long no_jffs_node_ref;

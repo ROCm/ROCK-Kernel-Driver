@@ -26,9 +26,14 @@ dep_tristate '  MSDOS fs support' CONFIG_MSDOS_FS $CONFIG_FAT_FS
 dep_tristate '    UMSDOS: Unix-like file system on top of standard MSDOS fs' CONFIG_UMSDOS_FS $CONFIG_MSDOS_FS
 dep_tristate '  VFAT (Windows-95) fs support' CONFIG_VFAT_FS $CONFIG_FAT_FS
 dep_tristate 'EFS file system support (read only) (EXPERIMENTAL)' CONFIG_EFS_FS $CONFIG_EXPERIMENTAL
-dep_tristate 'Journalling Flash File System (JFFS) support (EXPERIMENTAL)' CONFIG_JFFS_FS $CONFIG_EXPERIMENTAL $CONFIG_MTD
+dep_tristate 'Journalling Flash File System (JFFS) support' CONFIG_JFFS_FS $CONFIG_MTD
 if [ "$CONFIG_JFFS_FS" = "y" -o "$CONFIG_JFFS_FS" = "m" ] ; then
    int 'JFFS debugging verbosity (0 = quiet, 3 = noisy)' CONFIG_JFFS_FS_VERBOSE 0
+   bool 'JFFS stats available in /proc filesystem' CONFIG_JFFS_PROC_FS
+fi
+dep_tristate 'Journalling Flash File System v2 (JFFS2) support (EXPERIMENTAL)' CONFIG_JFFS2_FS $CONFIG_EXPERIMENTAL $CONFIG_MTD
+if [ "$CONFIG_JFFS2_FS" != "n" ] ; then
+        int 'JFFS2 debugging verbosity (0 = quiet, 3 = noisy)' CONFIG_JFFS2_FS_DEBUG 0
 fi
 tristate 'Compressed ROM file system support' CONFIG_CRAMFS
 bool 'Virtual memory file system support (former shm fs)' CONFIG_TMPFS

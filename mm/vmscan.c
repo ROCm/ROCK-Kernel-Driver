@@ -125,14 +125,17 @@ drop_pte:
 	 * we have the swap cache set up to associate the
 	 * page with that swap entry.
 	 */
-	swap_list_lock();
-	entry = get_swap_page();
-	if (entry.val) {
+	for (;;) {
+		entry = get_swap_page();
+		if (!entry.val)
+			break;
 		/* Add it to the swap cache and mark it dirty */
-		add_to_swap_cache(page, entry);
-		swap_list_unlock();
-		set_page_dirty(page);
-		goto set_swap_pte;
+		if (add_to_swap_cache(page, entry) == 0) {
+			set_page_dirty(page);
+			goto set_swap_pte;
+		}
+		/* Raced with "speculative" read_swap_cache_async */
+		swap_free(entry);
 	}
 
 	/* No swap space left */
@@ -332,7 +335,6 @@ static int shrink_cache(int nr_pages, int max_scan, zone_t * classzone, unsigned
 	spin_lock(&pagemap_lru_lock);
 	while (max_scan && (entry = inactive_list.prev) != &inactive_list) {
 		struct page * page;
-		swp_entry_t swap;
 
 		if (unlikely(current->need_resched)) {
 			spin_unlock(&pagemap_lru_lock);
@@ -466,23 +468,17 @@ static int shrink_cache(int nr_pages, int max_scan, zone_t * classzone, unsigned
 
 		/* point of no return */
 		if (likely(!PageSwapCache(page))) {
-			swap.val = 0;
 			__remove_inode_page(page);
+			spin_unlock(&pagecache_lock);
 		} else {
+			swp_entry_t swap;
 			swap.val = page->index;
 			__delete_from_swap_cache(page);
+			spin_unlock(&pagecache_lock);
+			swap_free(swap);
 		}
-		spin_unlock(&pagecache_lock);
 
 		__lru_cache_del(page);
-
-		if (unlikely(swap.val != 0)) {
-			/* must drop lru lock if getting swap_list lock */
-			spin_unlock(&pagemap_lru_lock);
-			swap_free(swap);
-			spin_lock(&pagemap_lru_lock);
-		}
-
 		UnlockPage(page);
 
 		/* effectively free the page here */
@@ -557,27 +553,14 @@ static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask
 int try_to_free_pages(zone_t * classzone, unsigned int gfp_mask, unsigned int order)
 {
 	int ret = 0;
+	int nr_pages = SWAP_CLUSTER_MAX;
 
-	for (;;) {
-		int priority = DEF_PRIORITY;
-		int nr_pages = SWAP_CLUSTER_MAX;
+	nr_pages = shrink_caches(DEF_PRIORITY, classzone, gfp_mask, nr_pages);
 
-		do {
-			nr_pages = shrink_caches(priority, classzone, gfp_mask, nr_pages);
-			if (nr_pages <= 0)
-				return 1;
+	if (nr_pages < SWAP_CLUSTER_MAX)
+		ret |= 1;
 
-			ret |= swap_out(priority, classzone, gfp_mask, SWAP_CLUSTER_MAX << 2);
-		} while (--priority);
-
-		if (likely(ret))
-			break;
-		if (likely(current->pid != 1))
-			break;
-		current->policy |= SCHED_YIELD;
-		__set_current_state(TASK_RUNNING);
-		schedule();
-	}
+	ret |= swap_out(DEF_PRIORITY, classzone, gfp_mask, SWAP_CLUSTER_MAX << 2);
 
 	return ret;
 }
@@ -611,7 +594,7 @@ static int kswapd_balance_pgdat(pg_data_t * pgdat)
 		if (!try_to_free_pages(zone, GFP_KSWAPD, 0)) {
 			zone->need_balance = 0;
 			__set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ*5);
+			schedule_timeout(HZ);
 			continue;
 		}
 		if (check_classzone_need_balance(zone))
@@ -634,6 +617,9 @@ static void kswapd_balance(void)
 		do
 			need_more_balance |= kswapd_balance_pgdat(pgdat);
 		while ((pgdat = pgdat->node_next));
+		if (need_more_balance && out_of_memory()) {
+			oom_kill();	
+		}
 	} while (need_more_balance);
 }
 

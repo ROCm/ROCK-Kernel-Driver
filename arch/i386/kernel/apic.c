@@ -48,7 +48,7 @@ int get_maxlvt(void)
 	return maxlvt;
 }
 
-static void clear_local_APIC(void)
+void clear_local_APIC(void)
 {
 	int maxlvt;
 	unsigned long v;
@@ -254,6 +254,14 @@ void __init setup_local_APIC (void)
 {
 	unsigned long value, ver, maxlvt;
 
+	/* Pound the ESR really hard over the head with a big hammer - mbligh */
+	if (esr_disable) {
+		apic_write(APIC_ESR, 0);
+		apic_write(APIC_ESR, 0);
+		apic_write(APIC_ESR, 0);
+		apic_write(APIC_ESR, 0);
+	}
+
 	value = apic_read(APIC_LVR);
 	ver = GET_APIC_VERSION(value);
 
@@ -262,8 +270,10 @@ void __init setup_local_APIC (void)
 
 	/*
 	 * Double-check wether this APIC is really registered.
+	 * This is meaningless in clustered apic mode, so we skip it.
 	 */
-	if (!test_bit(GET_APIC_ID(apic_read(APIC_ID)), &phys_cpu_present_map))
+	if (!clustered_apic_mode && 
+	    !test_bit(GET_APIC_ID(apic_read(APIC_ID)), &phys_cpu_present_map))
 		BUG();
 
 	/*
@@ -272,19 +282,22 @@ void __init setup_local_APIC (void)
 	 * document number 292116).  So here it goes...
 	 */
 
-	/*
-	 * Put the APIC into flat delivery mode.
-	 * Must be "all ones" explicitly for 82489DX.
-	 */
-	apic_write_around(APIC_DFR, 0xffffffff);
+	if (!clustered_apic_mode) {
+		/*
+		 * In clustered apic mode, the firmware does this for us 
+		 * Put the APIC into flat delivery mode.
+		 * Must be "all ones" explicitly for 82489DX.
+		 */
+		apic_write_around(APIC_DFR, 0xffffffff);
 
-	/*
-	 * Set up the logical destination ID.
-	 */
-	value = apic_read(APIC_LDR);
-	value &= ~APIC_LDR_MASK;
-	value |= (1<<(smp_processor_id()+24));
-	apic_write_around(APIC_LDR, value);
+		/*
+		 * Set up the logical destination ID.
+		 */
+		value = apic_read(APIC_LDR);
+		value &= ~APIC_LDR_MASK;
+		value |= (1<<(smp_processor_id()+24));
+		apic_write_around(APIC_LDR, value);
+	}
 
 	/*
 	 * Set Task Priority to 'accept all'. We never change this
@@ -367,7 +380,7 @@ void __init setup_local_APIC (void)
 		value |= APIC_LVT_LEVEL_TRIGGER;
 	apic_write_around(APIC_LVT1, value);
 
-	if (APIC_INTEGRATED(ver)) {		/* !82489DX */
+	if (APIC_INTEGRATED(ver) && !esr_disable) {		/* !82489DX */
 		maxlvt = get_maxlvt();
 		if (maxlvt > 3)		/* Due to the Pentium erratum 3AP. */
 			apic_write(APIC_ESR, 0);
@@ -383,8 +396,18 @@ void __init setup_local_APIC (void)
 			apic_write(APIC_ESR, 0);
 		value = apic_read(APIC_ESR);
 		printk("ESR value after enabling vector: %08lx\n", value);
-	} else
-		printk("No ESR for 82489DX.\n");
+	} else {
+		if (esr_disable)	
+			/* 
+			 * Something untraceble is creating bad interrupts on 
+			 * secondary quads ... for the moment, just leave the
+			 * ESR disabled - we can't do anything useful with the
+			 * errors anyway - mbligh
+			 */
+			printk("Leaving ESR disabled.\n");
+		else 
+			printk("No ESR for 82489DX.\n");
+	}
 
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		setup_apic_nmi_watchdog();
@@ -598,7 +621,7 @@ static int __init detect_init_APIC (void)
 	}
 	set_bit(X86_FEATURE_APIC, &boot_cpu_data.x86_capability);
 	mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
-	boot_cpu_id = 0;
+	boot_cpu_physical_apicid = 0;
 	if (nmi_watchdog != NMI_NONE)
 		nmi_watchdog = NMI_LOCAL_APIC;
 
@@ -636,8 +659,8 @@ void __init init_apic_mappings(void)
 	 * Fetch the APIC ID of the BSP in case we have a
 	 * default configuration (or the MP table is broken).
 	 */
-	if (boot_cpu_id == -1U)
-		boot_cpu_id = GET_APIC_ID(apic_read(APIC_ID));
+	if (boot_cpu_physical_apicid == -1U)
+		boot_cpu_physical_apicid = GET_APIC_ID(apic_read(APIC_ID));
 
 #ifdef CONFIG_X86_IO_APIC
 	{
@@ -1077,9 +1100,9 @@ int __init APIC_init_uniprocessor (void)
 	/*
 	 * Complain if the BIOS pretends there is one.
 	 */
-	if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_id])) {
+	if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
 		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
-			boot_cpu_id);
+			boot_cpu_physical_apicid);
 		return -1;
 	}
 
@@ -1088,7 +1111,7 @@ int __init APIC_init_uniprocessor (void)
 	connect_bsp_APIC();
 
 	phys_cpu_present_map = 1;
-	apic_write_around(APIC_ID, boot_cpu_id);
+	apic_write_around(APIC_ID, boot_cpu_physical_apicid);
 
 	apic_pm_init2();
 

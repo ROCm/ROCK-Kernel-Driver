@@ -1,5 +1,5 @@
 /*
- * $Id: dbox2-flash.c,v 1.2 2001/04/26 15:42:43 dwmw2 Exp $
+ * $Id: dbox2-flash.c,v 1.4 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * Nokia / Sagem D-Box 2 flash driver
  */
@@ -97,12 +97,7 @@ struct map_info dbox2_flash_map = {
 	copy_to: dbox2_flash_copy_to
 };
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_dbox2_flash init_module
-#define cleanup_dbox2_flash cleanup_module
-#endif
-
-mod_init_t init_dbox2_flash(void)
+int __init init_dbox2_flash(void)
 {
        	printk(KERN_NOTICE "D-Box 2 flash driver (size->0x%X mem->0x%X)\n", WINDOW_SIZE, WINDOW_ADDR);
 	dbox2_flash_map.map_priv_1 = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE);
@@ -113,12 +108,12 @@ mod_init_t init_dbox2_flash(void)
 	}
 
 	// Probe for dual Intel 28F320 or dual AMD
-	mymtd = do_map_probe("cfi", &dbox2_flash_map);
+	mymtd = do_map_probe("cfi_probe", &dbox2_flash_map);
 	if (!mymtd) {
 	    // Probe for single Intel 28F640
 	    dbox2_flash_map.buswidth = 2;
 	
-	    mymtd = do_map_probe("cfi", &dbox2_flash_map);
+	    mymtd = do_map_probe("cfi_probe", &dbox2_flash_map);
 	}
 	    
 	if (mymtd) {
@@ -134,7 +129,7 @@ mod_init_t init_dbox2_flash(void)
 	return -ENXIO;
 }
 
-mod_exit_t cleanup_dbox2_flash(void)
+static void __exit cleanup_dbox2_flash(void)
 {
 	if (mymtd) {
 		del_mtd_partitions(mymtd);
@@ -149,3 +144,7 @@ mod_exit_t cleanup_dbox2_flash(void)
 module_init(init_dbox2_flash);
 module_exit(cleanup_dbox2_flash);
 
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Kári Davíðsson <kd@flaga.is>");
+MODULE_DESCRIPTION("MTD map driver for Nokia/Sagem D-Box 2 board");

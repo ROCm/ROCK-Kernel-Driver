@@ -156,7 +156,7 @@ struct mpc_config_lintsrc
  *	7	2 CPU MCA+PCI
  */
 
-#define MAX_IRQ_SOURCES 128
+#define MAX_IRQ_SOURCES 256
 #define MAX_MP_BUSSES 32
 enum mp_bustype {
 	MP_BUS_ISA = 1,
@@ -167,7 +167,7 @@ enum mp_bustype {
 extern int mp_bus_id_to_type [MAX_MP_BUSSES];
 extern int mp_bus_id_to_pci_bus [MAX_MP_BUSSES];
 
-extern unsigned int boot_cpu_id;
+extern unsigned int boot_cpu_physical_apicid;
 extern unsigned long phys_cpu_present_map;
 extern int smp_found_config;
 extern void find_smp_config (void);

@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: pushpull.c,v 1.6 2001/03/15 15:38:24 dwmw2 Exp $
+ * $Id: pushpull.c,v 1.7 2001/09/23 10:04:15 rmk Exp $
  *
  */
 
@@ -69,20 +69,3 @@ int pushedbits(struct pushpull *pp)
 {
 	return pp->ofs;
 }
-	
-
-int pullbit(struct pushpull *pp)
-{
-	int bit;
-
-	bit = (pp->buf[pp->ofs >> 3] >> (7-(pp->ofs & 7))) & 1;
-
-	pp->ofs++;
-	return bit;
-}
-
-int pulledbits (struct pushpull *pp)
-{
-	return pp->ofs;
-}
-     

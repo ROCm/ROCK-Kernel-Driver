@@ -4,7 +4,7 @@
  * Copyright 2000,2001 David A. Schleef <ds@schleef.org>
  *           2000,2001 Lineo, Inc.
  *
- * $Id: sharp.c,v 1.4 2001/04/29 16:21:17 dwmw2 Exp $
+ * $Id: sharp.c,v 1.6 2001/10/02 15:05:12 dwmw2 Exp $
  *
  * Devices supported:
  *   LH28F016SCT Symmetrical block flash memory, 2Mx8
@@ -26,6 +26,7 @@
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
+#include <linux/interrupt.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/cfi.h>
 #include <linux/delay.h>
@@ -569,11 +570,6 @@ static void sharp_destroy(struct mtd_info *mtd)
 
 }
 
-#if LINUX_VERSION_CODE < 0x020212 && defined(MODULE)
-#define sharp_probe_init init_module
-#define sharp_probe_exit cleanup_module
-#endif
-
 int __init sharp_probe_init(void)
 {
 	printk("MTD Sharp chip driver <ds@lineo.com>\n");
@@ -591,3 +587,7 @@ static void __exit sharp_probe_exit(void)
 module_init(sharp_probe_init);
 module_exit(sharp_probe_exit);
 
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Schleef <ds@schleef.org>");
+MODULE_DESCRIPTION("Old MTD chip driver for pre-CFI Sharp flash chips");

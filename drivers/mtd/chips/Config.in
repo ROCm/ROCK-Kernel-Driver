@@ -1,21 +1,31 @@
 # drivers/mtd/chips/Config.in
 
-# $Id: Config.in,v 1.4 2001/05/14 09:48:12 dwmw2 Exp $
+# $Id: Config.in,v 1.12 2001/09/23 15:35:21 dwmw2 Exp $
 
 mainmenu_option next_comment
 
 comment 'RAM/ROM/Flash chip drivers'
 
-dep_tristate '  Common Flash Interface (CFI) support' CONFIG_MTD_CFI $CONFIG_MTD
-if [ "$CONFIG_MTD_CFI" = "y" -o "$CONFIG_MTD_CFI" = "m" ]; then
-   bool '  CFI Virtual erase regions (EXPERIMENTAL)' CONFIG_MTD_CFI_VIRTUAL_ER 
-   bool '  CFI Advanced configuration options' CONFIG_MTD_CFI_ADV_OPTIONS
+dep_tristate '  Detect flash chips by Common Flash Interface (CFI) probe' CONFIG_MTD_CFI $CONFIG_MTD
+#dep_tristate '  Detect non-CFI Intel-compatible flash chips' CONFIG_MTD_INTELPROBE $CONFIG_MTD
+dep_tristate '  Detect non-CFI AMD/JEDEC-compatible flash chips' CONFIG_MTD_JEDECPROBE $CONFIG_MTD
+
+if [ "$CONFIG_MTD_CFI" = "y" -o "$CONFIG_MTD_INTELPROBE" = "y" -o "$CONFIG_MTD_JEDECPROBE" = "y" ]; then
+   define_bool CONFIG_MTD_GEN_PROBE y
+else
+   if [ "$CONFIG_MTD_CFI" = "m" -o "$CONFIG_MTD_INTELPROBE" = "m" -o "$CONFIG_MTD_JEDECPROBE" = "m" ]; then
+      define_bool CONFIG_MTD_GEN_PROBE m
+   else
+      define_bool CONFIG_MTD_GEN_PROBE n
+   fi
+fi
+if [ "$CONFIG_MTD_GEN_PROBE" = "y" -o "$CONFIG_MTD_GEN_PROBE" = "m" ]; then
+   bool '  Flash chip driver advanced configuration options' CONFIG_MTD_CFI_ADV_OPTIONS
    if [ "$CONFIG_MTD_CFI_ADV_OPTIONS" = "y" ]; then
      choice 'Flash cmd/query data swapping'			\
 	"NO			CONFIG_MTD_CFI_NOSWAP		\
 	 BIG_ENDIAN_BYTE	CONFIG_MTD_CFI_BE_BYTE_SWAP	\
-	 LITTLE_ENDIAN_BYTE	CONFIG_MTD_CFI_LE_BYTE_SWAP	\
-	 LART_ENDIAN_BYTE	CONFIG_MTD_CFI_LART_BIT_SWAP"	NO
+	 LITTLE_ENDIAN_BYTE	CONFIG_MTD_CFI_LE_BYTE_SWAP"	NO
      bool '  Specific CFI Flash geometry selection' CONFIG_MTD_CFI_GEOMETRY
      if [ "$CONFIG_MTD_CFI_GEOMETRY" = "y" ]; then
        bool '    Support  8-bit buswidth' CONFIG_MTD_CFI_B1
@@ -31,12 +41,17 @@ if [ "$CONFIG_MTD_CFI" = "y" -o "$CONFIG_MTD_CFI" = "m" ]; then
      fi
   fi
 fi
-dep_tristate '    CFI support for Intel/Sharp Basic/Extended Commands' CONFIG_MTD_CFI_INTELEXT $CONFIG_MTD_CFI
-dep_tristate '    CFI support for AMD/Fujitsu Standard Commands' CONFIG_MTD_CFI_AMDSTD $CONFIG_MTD_CFI
-dep_tristate '  AMD compatible flash chip support (non-CFI)' CONFIG_MTD_AMDSTD $CONFIG_MTD
-dep_tristate '  pre-CFI Sharp chip support' CONFIG_MTD_SHARP $CONFIG_MTD
+dep_tristate '  Support for Intel/Sharp flash chips' CONFIG_MTD_CFI_INTELEXT $CONFIG_MTD_GEN_PROBE
+dep_tristate '  Support for AMD/Fujitsu flash chips' CONFIG_MTD_CFI_AMDSTD $CONFIG_MTD_GEN_PROBE
+
 dep_tristate '  Support for RAM chips in bus mapping' CONFIG_MTD_RAM $CONFIG_MTD
 dep_tristate '  Support for ROM chips in bus mapping' CONFIG_MTD_ROM $CONFIG_MTD
-dep_tristate '  JEDEC device support' CONFIG_MTD_JEDEC $CONFIG_MTD
+dep_tristate '  Support for absent chips in bus mapping' CONFIG_MTD_ABSENT $CONFIG_MTD
+
+bool '  Older (theoretically obsoleted now) drivers for non-CFI chips' CONFIG_MTD_OBSOLETE_CHIPS
+dep_tristate '  AMD compatible flash chip support (non-CFI)' CONFIG_MTD_AMDSTD $CONFIG_MTD $CONFIG_MTD_OBSOLETE_CHIPS
+dep_tristate '  pre-CFI Sharp chip support' CONFIG_MTD_SHARP $CONFIG_MTD $CONFIG_MTD_OBSOLETE_CHIPS
+dep_tristate '  JEDEC device support' CONFIG_MTD_JEDEC $CONFIG_MTD $CONFIG_MTD_OBSOLETE_CHIPS
+
 
 endmenu

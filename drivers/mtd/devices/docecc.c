@@ -7,7 +7,7 @@
  * Author: Fabrice Bellard (fabrice.bellard@netgem.com) 
  * Copyright (C) 2000 Netgem S.A.
  *
- * $Id: docecc.c,v 1.1 2000/11/03 12:43:43 dwmw2 Exp $
+ * $Id: docecc.c,v 1.4 2001/10/02 15:05:13 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@
 #include <linux/init.h>
 #include <linux/types.h>
 
+#include <linux/mtd/compatmac.h> /* for min() in older kernels */
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/doc2000.h>
 
@@ -402,7 +403,7 @@ eras_dec_rs(dtype Alpha_to[NN + 1], dtype Index_of[NN + 1],
     den = 0;
     
     /* lambda[i+1] for i even is the formal derivative lambda_pr of lambda[i] */
-    for (i = min_t(int, deg_lambda,NN-KK-1) & ~1; i >= 0; i -=2) {
+    for (i = min(deg_lambda,NN-KK-1) & ~1; i >= 0; i -=2) {
       if(lambda[i+1] != A0)
 	den ^= Alpha_to[modnn(lambda[i+1] + i * root[j])];
     }
@@ -518,3 +519,6 @@ int doc_decode_ecc(unsigned char sector[SECTOR_SIZE], unsigned char ecc1[6])
     return nb_errors;
 }
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Fabrice Bellard <fabrice.bellard@netgem.com>");
+MODULE_DESCRIPTION("ECC code for correcting errors detected by DiskOnChip 2000 and Millennium ECC hardware");

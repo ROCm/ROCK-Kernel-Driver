@@ -126,7 +126,7 @@ solutions for on-flash filesystems as mentioned below.
 Using JFFS2
 -----------
 
-Using JFFS2 (the Second Journaling Flash File System) is probably the most
+Using JFFS2 (the Second Journalling Flash File System) is probably the most
 convenient way to store a writable filesystem into flash.  JFFS2 is used in
 conjunction with the MTD layer which is responsible for low-level flash
 management.  More information on the Linux MTD can be found on-line at:

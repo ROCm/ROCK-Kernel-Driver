@@ -4,7 +4,7 @@
  * Author: Fabrice Bellard (fabrice.bellard@netgem.com) 
  * Copyright (C) 2000 Netgem S.A.
  *
- * $Id: nftlmount.c,v 1.17 2001/06/02 20:33:20 dwmw2 Exp $
+ * $Id: nftlmount.c,v 1.23 2001/09/19 21:42:32 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,6 +39,8 @@
 
 #define SECTORSIZE 512
 
+char nftlmountrev[]="$Revision: 1.23 $";
+
 /* find_boot_record: Find the NFTL Media Header and its Spare copy which contains the
  *	various device information of the NFTL partition and Bad Unit Table. Update
  *	the ReplUnitTable[] table accroding to the Bad Unit Table. ReplUnitTable[]
@@ -48,94 +50,152 @@ static int find_boot_record(struct NFTLrecord *nftl)
 {
 	struct nftl_uci1 h1;
 	struct nftl_oob oob;
-	unsigned int block, boot_record_count;
+	unsigned int block, boot_record_count = 0;
 	int retlen;
 	u8 buf[SECTORSIZE];
 	struct NFTLMediaHeader *mh = &nftl->MediaHdr;
+	unsigned int i;
 
 	nftl->MediaUnit = BLOCK_NIL;
 	nftl->SpareMediaUnit = BLOCK_NIL;
-	boot_record_count = 0;
 
 	/* search for a valid boot record */
 	for (block = 0; block < nftl->nb_blocks; block++) {
-		unsigned int erase_mark;
+		int ret;
 
-		/* read ANAND header. To be safer with BIOS, also use erase mark as discriminant */
-		if (MTD_READOOB(nftl->mtd, block * nftl->EraseSize + SECTORSIZE + 8,
-				8, &retlen, (char *)&h1) < 0)
-			continue;
+		/* Check for ANAND header first. Then can whinge if it's found but later
+		   checks fail */
+		if ((ret = MTD_READ(nftl->mtd, block * nftl->EraseSize, SECTORSIZE, &retlen, buf))) {
+			static int warncount = 5;
 
-		erase_mark = le16_to_cpu ((h1.EraseMark | h1.EraseMark1));
-		if (erase_mark != ERASE_MARK) 
-			continue;
-
-		if (MTD_READECC(nftl->mtd, block * nftl->EraseSize, SECTORSIZE,
-				&retlen, buf, (char *)&oob) < 0)
-			continue;
-
-		memcpy(mh, buf, sizeof(struct NFTLMediaHeader));
-		if (memcmp(mh->DataOrgID, "ANAND", 6) == 0) {
-			/* first boot record */
-			if (boot_record_count == 0) {
-				unsigned int i;
-				/* header found : read the bad block table data */
-				if (mh->UnitSizeFactor != 0xff) {
-					printk("Sorry, we don't support UnitSizeFactor "
-					       "of != 1 yet\n");
-					goto ReplUnitTable;
-				}
-
-				nftl->nb_boot_blocks = le16_to_cpu(mh->FirstPhysicalEUN);
-				if ((nftl->nb_boot_blocks + 2) >= nftl->nb_blocks) {
-					printk(KERN_NOTICE "Potential NFTL Media Header found, but sanity check failed:\n");
-					printk(KERN_NOTICE "nb_boot_blocks (%d) + 2 > nb_blocks (%d)\n", 
-					       nftl->nb_boot_blocks, nftl->nb_blocks);
-					goto ReplUnitTable; /* small consistency check */
-				}
-
-				nftl->numvunits = le32_to_cpu(mh->FormattedSize) / nftl->EraseSize;
-				if (nftl->numvunits > (nftl->nb_blocks - nftl->nb_boot_blocks - 2)) {
-					printk(KERN_NOTICE "Potential NFTL Media Header found, but sanity check failed:\n");
-					printk(KERN_NOTICE "numvunits (%d) > nb_blocks (%d) - nb_boot_blocks(%d) - 2\n",
-					       nftl->numvunits, nftl->nb_blocks, nftl->nb_boot_blocks);
-					goto ReplUnitTable; /* small consistency check */
-				}
-				/* FixMe: with bad blocks, the total size available is not FormattedSize any
-				   more !!! */
-				nftl->nr_sects  = nftl->numvunits * (nftl->EraseSize / SECTORSIZE);
-				nftl->MediaUnit = block;
-
-				/* read the Bad Erase Unit Table and modify ReplUnitTable[] accordingly */
-				for (i = 0; i < nftl->nb_blocks; i++) {
-					if ((i & (SECTORSIZE - 1)) == 0) {
-						/* read one sector for every SECTORSIZE of blocks */
-						if (MTD_READECC(nftl->mtd, block * nftl->EraseSize +
-								i + SECTORSIZE, SECTORSIZE,
-								&retlen, buf, (char *)&oob) < 0)
-							goto ReplUnitTable;
-					}
-					/* mark the Bad Erase Unit as RESERVED in ReplUnitTable */
-					if (buf[i & (SECTORSIZE - 1)] != 0xff)
-						nftl->ReplUnitTable[i] = BLOCK_RESERVED;
-				}
-
-				boot_record_count++;
-			} else if (boot_record_count == 1) {
-				nftl->SpareMediaUnit = block;
-				boot_record_count++;
-				break;
+			if (warncount) {
+				printk(KERN_WARNING "Block read at 0x%x of mtd%d failed: %d\n",
+				       block * nftl->EraseSize, nftl->mtd->index, ret);
+				if (!--warncount)
+					printk(KERN_WARNING "Further failures for this block will not be printed\n");
 			}
+			continue;
 		}
-	ReplUnitTable:;
-	}
 
-	if (boot_record_count == 0) {
-		/* no boot record found */
-		return -1;
-	} else {
-		return 0;
-	}
+		if (retlen < 6 || memcmp(buf, "ANAND", 6)) {
+			/* ANAND\0 not found. Continue */
+#if 0
+			printk(KERN_DEBUG "ANAND header not found at 0x%x in mtd%d\n", 
+			       block * nftl->EraseSize, nftl->mtd->index);
+#endif			
+			continue;
+		}
+
+		/* To be safer with BIOS, also use erase mark as discriminant */
+		if ((ret = MTD_READOOB(nftl->mtd, block * nftl->EraseSize + SECTORSIZE + 8,
+				8, &retlen, (char *)&h1) < 0)) {
+			printk(KERN_WARNING "ANAND header found at 0x%x in mtd%d, but OOB data read failed (err %d)\n",
+			       block * nftl->EraseSize, nftl->mtd->index, ret);
+			continue;
+		}
+
+#if 1 /* Some people seem to have devices without ECC or erase marks
+	 on the Media Header blocks. There are enough other sanity
+	 checks in here that we can probably do without it.
+      */
+		if (le16_to_cpu ((h1.EraseMark | h1.EraseMark1) != ERASE_MARK)) {
+			printk(KERN_NOTICE "ANAND header found at 0x%x in mtd%d, but erase mark not present (0x%04x,0x%04x instead)\n",
+			       block * nftl->EraseSize, nftl->mtd->index, 
+			       le16_to_cpu(h1.EraseMark), le16_to_cpu(h1.EraseMark1));
+			continue;
+		}
+
+		/* Finally reread to check ECC */
+		if ((ret = MTD_READECC(nftl->mtd, block * nftl->EraseSize, SECTORSIZE,
+				&retlen, buf, (char *)&oob) < 0)) {
+			printk(KERN_NOTICE "ANAND header found at 0x%x in mtd%d, but ECC read failed (err %d)\n",
+			       block * nftl->EraseSize, nftl->mtd->index, ret);
+			continue;
+		}
+
+		/* Paranoia. Check the ANAND header is still there after the ECC read */
+		if (memcmp(buf, "ANAND", 6)) {
+			printk(KERN_NOTICE "ANAND header found at 0x%x in mtd%d, but went away on reread!\n",
+			       block * nftl->EraseSize, nftl->mtd->index);
+			printk(KERN_NOTICE "New data are: %02x %02x %02x %02x %02x %02x\n",
+			       buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+			continue;
+		}
+#endif
+			       
+		/* OK, we like it. */
+
+		if (boot_record_count) {
+			/* We've already processed one. So we just check if
+			   this one is the same as the first one we found */
+			if (memcmp(mh, buf, sizeof(struct NFTLMediaHeader))) {
+				printk(KERN_NOTICE "NFTL Media Headers at 0x%x and 0x%x disagree.\n",
+				       nftl->MediaUnit * nftl->EraseSize, block * nftl->EraseSize);
+				/* if (debug) Print both side by side */
+				return -1;
+			}
+			if (boot_record_count == 1)
+				nftl->SpareMediaUnit = block;
+
+			boot_record_count++;
+			continue;
+		}
+
+		/* This is the first we've seen. Copy the media header structure into place */
+		memcpy(mh, buf, sizeof(struct NFTLMediaHeader));
+
+		/* Do some sanity checks on it */
+		if (mh->UnitSizeFactor != 0xff) {
+			printk(KERN_NOTICE "Sorry, we don't support UnitSizeFactor "
+			       "of != 1 yet.\n");
+			return -1;
+		}
+
+		nftl->nb_boot_blocks = le16_to_cpu(mh->FirstPhysicalEUN);
+		if ((nftl->nb_boot_blocks + 2) >= nftl->nb_blocks) {
+			printk(KERN_NOTICE "NFTL Media Header sanity check failed:\n");
+			printk(KERN_NOTICE "nb_boot_blocks (%d) + 2 > nb_blocks (%d)\n", 
+			       nftl->nb_boot_blocks, nftl->nb_blocks);
+			return -1;
+		}
+
+		nftl->numvunits = le32_to_cpu(mh->FormattedSize) / nftl->EraseSize;
+		if (nftl->numvunits > (nftl->nb_blocks - nftl->nb_boot_blocks - 2)) {
+			printk(KERN_NOTICE "NFTL Media Header sanity check failed:\n");
+			printk(KERN_NOTICE "numvunits (%d) > nb_blocks (%d) - nb_boot_blocks(%d) - 2\n",
+			       nftl->numvunits, nftl->nb_blocks, nftl->nb_boot_blocks);
+			return -1;
+		}
+		
+		nftl->nr_sects  = nftl->numvunits * (nftl->EraseSize / SECTORSIZE);
+		
+		/* If we're not using the last sectors in the device for some reason,
+		   reduce nb_blocks accordingly so we forget they're there */
+		nftl->nb_blocks = le16_to_cpu(mh->NumEraseUnits) + le16_to_cpu(mh->FirstPhysicalEUN);
+
+		/* read the Bad Erase Unit Table and modify ReplUnitTable[] accordingly */
+		for (i = 0; i < nftl->nb_blocks; i++) {
+			if ((i & (SECTORSIZE - 1)) == 0) {
+				/* read one sector for every SECTORSIZE of blocks */
+				if ((ret = MTD_READECC(nftl->mtd, block * nftl->EraseSize +
+						       i + SECTORSIZE, SECTORSIZE,
+						       &retlen, buf, (char *)&oob)) < 0) {
+					printk(KERN_NOTICE "Read of bad sector table failed (err %d)\n",
+					       ret);
+					return -1;
+				}
+			}
+			/* mark the Bad Erase Unit as RESERVED in ReplUnitTable */
+			if (buf[i & (SECTORSIZE - 1)] != 0xff)
+				nftl->ReplUnitTable[i] = BLOCK_RESERVED;
+		}
+		
+		nftl->MediaUnit = block;
+		boot_record_count++;
+		
+	} /* foreach (block) */
+		
+	return boot_record_count?0:-1;
 }
 
 static int memcmpb(void *a, int c, int n)

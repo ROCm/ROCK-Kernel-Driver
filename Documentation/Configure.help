@@ -119,6 +119,14 @@ CONFIG_SMP
   SMP-FAQ on the WWW at http://www.irisa.fr/prive/mentre/smp-faq/ .
   
   If you don't know what to do here, say N.
+
+Multiquad support for NUMA systems
+CONFIG_MULTIQUAD
+  This option is used for getting Linux to run on a (IBM/Sequent) NUMA 
+  multiquad box. This changes the way that processors are bootstrapped,
+  and uses Clustered Logical APIC addressing mode instead of Flat Logical.
+  You will need a new lynxer.elf file to flash your firmware with - send
+  email to Martin.Bligh@us.ibm.com
   
 IO-APIC Support on Uniprocessors
 CONFIG_X86_UP_IOAPIC
@@ -18494,6 +18502,16 @@ CONFIG_SMC_IRCC_FIR
   and Sony PCG-505TX. If you want to compile it as a module, say M
   here and read Documentation/modules.txt. The module will be called
   smc-ircc.o.
+
+VLSI 82C147 PCI-IrDA Controller Driver
+CONFIG_VLSI_FIR
+  Say Y here if you want to build support for the VLSI 82C147
+  PCI-IrDA Controller. This controller is used by the HP OmniBook 800
+  and 5500 notebooks. The driver provides support for SIR, MIR and
+  FIR (4Mbps) speeds.
+
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>. The module will be called vlsi_ir.o.
 
 Serial dongle support
 CONFIG_DONGLE

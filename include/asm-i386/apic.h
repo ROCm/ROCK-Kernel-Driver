@@ -64,6 +64,7 @@ static inline void ack_APIC_irq(void)
 }
 
 extern int get_maxlvt(void);
+extern void clear_local_APIC(void);
 extern void connect_bsp_APIC (void);
 extern void disconnect_bsp_APIC (void);
 extern void disable_local_APIC (void);

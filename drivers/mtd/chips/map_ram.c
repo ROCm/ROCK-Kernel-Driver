@@ -1,7 +1,7 @@
 /*
  * Common code to handle map devices which are simple RAM
  * (C) 2000 Red Hat. GPL'd.
- * $Id: map_ram.c,v 1.11 2001/06/08 15:34:04 dwmw2 Exp $
+ * $Id: map_ram.c,v 1.14 2001/10/02 15:05:12 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -24,7 +24,7 @@ static struct mtd_info *map_ram_probe(struct map_info *map);
 
 static struct mtd_chip_driver mapram_chipdrv = {
 	probe: map_ram_probe,
-	name: "ram",
+	name: "map_ram",
 	module: THIS_MODULE
 };
 
@@ -63,14 +63,16 @@ static struct mtd_info *map_ram_probe(struct map_info *map)
 	mtd->priv = map;
 	mtd->name = map->name;
 	mtd->type = MTD_RAM;
-	mtd->erasesize = 0x10000;
 	mtd->size = map->size;
 	mtd->erase = mapram_erase;
 	mtd->read = mapram_read;
 	mtd->write = mapram_write;
 	mtd->sync = mapram_nop;
 	mtd->flags = MTD_CAP_RAM | MTD_VOLATILE;
+
 	mtd->erasesize = PAGE_SIZE;
+ 	while(mtd->size & (mtd->erasesize - 1))
+		mtd->erasesize >>= 1;
 
 	MOD_INC_USE_COUNT;
 	return mtd;
@@ -116,12 +118,7 @@ static void mapram_nop(struct mtd_info *mtd)
 	/* Nothing to see here */
 }
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define map_ram_init init_module
-#define map_ram_exit cleanup_module
-#endif
-
-static int __init map_ram_init(void)
+int __init map_ram_init(void)
 {
 	register_mtd_chip_driver(&mapram_chipdrv);
 	return 0;
@@ -134,3 +131,7 @@ static void __exit map_ram_exit(void)
 
 module_init(map_ram_init);
 module_exit(map_ram_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
+MODULE_DESCRIPTION("MTD chip driver for RAM chips");

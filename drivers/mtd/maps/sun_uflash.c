@@ -1,4 +1,4 @@
-/* $Id: sun_uflash.c,v 1.2 2001/04/26 15:40:23 dwmw2 Exp $
+/* $Id: sun_uflash.c,v 1.4 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * sun_uflash - Driver implementation for user-programmable flash
  * present on many Sun Microsystems SME boardsets.
@@ -37,6 +37,8 @@ MODULE_DESCRIPTION
 	("User-programmable flash device on Sun Microsystems boardsets");
 MODULE_SUPPORTED_DEVICE
 	("userflash");
+MODULE_LICENSE
+	("GPL");
 
 static LIST_HEAD(device_list);
 struct uflash_dev {
@@ -154,7 +156,7 @@ int uflash_devinit(struct linux_ebus_device* edev)
 	}
 
 	/* MTD registration */
-	pdev->mtd = do_map_probe("cfi", &pdev->map);
+	pdev->mtd = do_map_probe("cfi_probe", &pdev->map);
 	if(0 == pdev->mtd) {
 		iounmap((void *)pdev->map.map_priv_1);
 		kfree(pdev->name);

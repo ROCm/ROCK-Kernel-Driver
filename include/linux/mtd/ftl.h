@@ -1,4 +1,7 @@
 /*
+ * $Id: ftl.h,v 1.5 2001/06/02 20:35:51 dwmw2 Exp $
+ * 
+ * Derived from (and probably identical to):
  * ftl.h 1.7 1999/10/25 20:23:17
  *
  * The contents of this file are subject to the Mozilla Public License
@@ -16,8 +19,8 @@
  * are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
  *
  * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License version 2 (the "GPL"), in which
- * case the provisions of the GPL are applicable instead of the
+ * terms of the GNU General Public License version 2 (the "GPL"), in
+ * which case the provisions of the GPL are applicable instead of the
  * above.  If you wish to allow the use of your version of this file
  * only under the terms of the GPL and not to allow others to use
  * your version of this file under the MPL, indicate your decision by

@@ -376,7 +376,7 @@ void machine_restart(char * __unused)
 		if ((reboot_cpu == -1) ||  
 		      (reboot_cpu > (NR_CPUS -1))  || 
 		      !(phys_cpu_present_map & (1<<cpuid))) 
-			reboot_cpu = boot_cpu_id;
+			reboot_cpu = boot_cpu_physical_apicid;
 
 		reboot_smp = 0;  /* use this as a flag to only go through this once*/
 		/* re-run this function on the other CPUs

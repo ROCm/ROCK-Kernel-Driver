@@ -106,12 +106,12 @@ cabriolet_device_interrupt(unsigned long v, struct pt_regs *r)
 }
 
 static void __init
-cabriolet_init_irq(void)
+common_init_irq(void (*srm_dev_int)(unsigned long v, struct pt_regs *r))
 {
 	init_i8259a_irqs();
 
 	if (alpha_using_srm) {
-		alpha_mv.device_interrupt = srm_device_interrupt;
+		alpha_mv.device_interrupt = srm_dev_int;
 		init_srm_irqs(35, 0);
 	}
 	else {
@@ -131,28 +131,46 @@ cabriolet_init_irq(void)
 	setup_irq(16+4, &isa_cascade_irqaction);
 }
 
+static void __init
+cabriolet_init_irq(void)
+{
+	common_init_irq(srm_device_interrupt);
+}
+
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_PC164)
+/* In theory, the PC164 has the same interrupt hardware as the other
+   Cabriolet based systems.  However, something got screwed up late
+   in the development cycle which broke the interrupt masking hardware.
+   Repeat, it is not possible to mask and ack interrupts.  At all.
+
+   In an attempt to work around this, while processing interrupts,
+   we do not allow the IPL to drop below what it is currently.  This
+   prevents the possibility of recursion.  
+
+   ??? Another option might be to force all PCI devices to use edge
+   triggered rather than level triggered interrupts.  That might be
+   too invasive though.  */
+
+static void
+pc164_srm_device_interrupt(unsigned long v, struct pt_regs *r)
+{
+	__min_ipl = getipl();
+	srm_device_interrupt(v, r);
+	__min_ipl = 0;
+}
+
 static void
 pc164_device_interrupt(unsigned long v, struct pt_regs *r)
 {
-	/* In theory, the PC164 has the same interrupt hardware as
-	   the other Cabriolet based systems.  However, something 
-	   got screwed up late in the development cycle which broke
-	   the interrupt masking hardware.  Repeat, it is not 
-	   possible to mask and ack interrupts.  At all.
-
-	   In an attempt to work around this, while processing 
-	   interrupts, we do not allow the IPL to drop below what
-	   it is currently.  This prevents the possibility of
-	   recursion.  
-
-	   ??? Another option might be to force all PCI devices
-	   to use edge triggered rather than level triggered
-	   interrupts.  That might be too invasive though.  */
-
 	__min_ipl = getipl();
 	cabriolet_device_interrupt(v, r);
 	__min_ipl = 0;
+}
+
+static void __init
+pc164_init_irq(void)
+{
+	common_init_irq(pc164_srm_device_interrupt);
 }
 #endif
 
@@ -419,7 +437,7 @@ struct alpha_machine_vector pc164_mv __initmv = {
 	device_interrupt:	pc164_device_interrupt,
 
 	init_arch:		cia_init_arch,
-	init_irq:		cabriolet_init_irq,
+	init_irq:		pc164_init_irq,
 	init_rtc:		common_init_rtc,
 	init_pci:		alphapc164_init_pci,
 	pci_map_irq:		alphapc164_map_irq,

@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: pushpull.h,v 1.4 2001/03/15 15:38:24 dwmw2 Exp $
+ * $Id: pushpull.h,v 1.5 2001/09/23 10:04:15 rmk Exp $
  *
  */
 
@@ -47,7 +47,20 @@ struct pushpull {
 void init_pushpull(struct pushpull *, char *, unsigned, unsigned, unsigned);
 int pushbit(struct pushpull *pp, int bit, int use_reserved);
 int pushedbits(struct pushpull *pp);
-int pullbit(struct pushpull *pp);
-int pulledbits(struct pushpull *);
+
+static inline int pullbit(struct pushpull *pp)
+{
+	int bit;
+
+	bit = (pp->buf[pp->ofs >> 3] >> (7-(pp->ofs & 7))) & 1;
+
+	pp->ofs++;
+	return bit;
+}
+
+static inline int pulledbits(struct pushpull *pp)
+{
+	return pp->ofs;
+}
 
 #endif /* __PUSHPULL_H__ */

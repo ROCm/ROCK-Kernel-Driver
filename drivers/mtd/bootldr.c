@@ -3,7 +3,7 @@
  *
  * Copyright 2001 Compaq Computer Corporation.
  *
- * $Id: bootldr.c,v 1.4 2001/06/02 18:24:27 nico Exp $
+ * $Id: bootldr.c,v 1.6 2001/10/02 15:05:11 dwmw2 Exp $
  *
  * Use consistent with the GNU GPL is permitted,
  * provided that this copyright notice is
@@ -24,6 +24,8 @@
 
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
+#include <asm/setup.h>
+#include <linux/bootmem.h>
 
 #define FLASH_PARTITION_NAMELEN 32
 enum LFR_FLAGS {
@@ -33,6 +35,9 @@ enum LFR_FLAGS {
    LFR_EXPAND = 8               /* expand partition size to fit rest of flash */
 };
 
+// the tags are parsed too early to malloc or alloc_bootmem so we'll fix it
+// for now
+#define MAX_NUM_PARTITIONS 8
 typedef struct FlashRegion {
    char name[FLASH_PARTITION_NAMELEN];
    unsigned long base;
@@ -43,7 +48,7 @@ typedef struct FlashRegion {
 typedef struct BootldrFlashPartitionTable {
   int magic; /* should be filled with 0x646c7470 (btlp) BOOTLDR_PARTITION_MAGIC */
   int npartitions;
-  struct FlashRegion partition[0];
+  struct FlashRegion partition[8];
 } BootldrFlashPartitionTable;
 
 #define BOOTLDR_MAGIC      0x646c7462        /* btld: marks a valid bootldr image */
@@ -56,6 +61,10 @@ typedef struct BootldrFlashPartitionTable {
 #define BOOTCAP_PARTITIONS (1<<1) /* partition table stored in params sector */
 #define BOOTCAP_PARAMS_AFTER_BOOTLDR (1<<2) /* params sector right after bootldr sector(s), else in last sector */
 
+static struct BootldrFlashPartitionTable Table;
+static struct BootldrFlashPartitionTable *partition_table = NULL;
+
+
 int parse_bootldr_partitions(struct mtd_info *master, struct mtd_partition **pparts)
 {
 	struct mtd_partition *parts;
@@ -65,9 +74,10 @@ int parse_bootldr_partitions(struct mtd_info *master, struct mtd_partition **ppa
 	long bootmagic = 0;
 	long bootcap = 0;
 	int namelen = 0;
-	struct BootldrFlashPartitionTable *partition_table = NULL; 
+
 	char *names; 
 
+#if 0
 	/* verify bootldr magic */
 	ret = master->read(master, BOOTLDR_MAGIC_OFFSET, sizeof(long), &retlen, (void *)&bootmagic);
 	if (ret) 
@@ -87,22 +97,33 @@ int parse_bootldr_partitions(struct mtd_info *master, struct mtd_partition **ppa
 		partition_table_offset = master->size - master->erasesize;
 
 	printk(__FUNCTION__ ": partition_table_offset=%#lx\n", partition_table_offset);
+	printk(__FUNCTION__ ": ptable_addr=%#lx\n", ptable_addr);
+
 
 	/* Read the partition table */
 	partition_table = (struct BootldrFlashPartitionTable *)kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!partition_table)
 		return -ENOMEM;
+
 	ret = master->read(master, partition_table_offset,
 			   PAGE_SIZE, &retlen, (void *)partition_table);
 	if (ret)
-		goto out;
+	    goto out;
 
+#endif
+	if (!partition_table)
+	    return -ENOMEM;
+
+	
 	printk(__FUNCTION__ ": magic=%#x\n", partition_table->magic);
+	printk(__FUNCTION__ ": numPartitions=%#x\n", partition_table->npartitions);
+
 
 	/* check for partition table magic number */
 	if (partition_table->magic != BOOTLDR_PARTITION_MAGIC) 
 		goto out;
-	npartitions = partition_table->npartitions;
+	npartitions = (partition_table->npartitions > MAX_NUM_PARTITIONS)?
+	    MAX_NUM_PARTITIONS:partition_table->npartitions;	
 
 	printk(__FUNCTION__ ": npartitions=%#x\n", npartitions);
 
@@ -118,6 +139,9 @@ int parse_bootldr_partitions(struct mtd_info *master, struct mtd_partition **ppa
 	names = (char *)&parts[npartitions];
 	memset(parts, 0, sizeof(*parts)*npartitions + namelen);
 
+
+
+	// from here we use the partition table
 	for (i = 0; i < npartitions; i++) {
                 struct FlashRegion *partition = &partition_table->partition[i];
 		const char *name = partition->name;
@@ -141,9 +165,50 @@ int parse_bootldr_partitions(struct mtd_info *master, struct mtd_partition **ppa
 	*pparts = parts;
 
  out:
+#if 0
 	if (partition_table)
 		kfree(partition_table);
+#endif
+	
 	return ret;
 }
 
+
+static int __init parse_tag_ptable(const struct tag *tag)
+{
+    char buf[128];
+    int i;
+    int j;
+    
+    partition_table = &Table;
+
+#ifdef CONFIG_DEBUG_LL    
+    sprintf(buf,"ptable: magic = = 0x%lx  npartitions= %d \n",
+	    tag->u.ptable.magic,tag->u.ptable.npartitions);
+    printascii(buf);
+    
+    for (i=0; i<tag->u.ptable.npartitions; i++){
+	sprintf(buf,"ptable: partition name = %s base= 0x%lx  size= 0x%lx flags= 0x%lx\n",
+	    (char *) (&tag->u.ptable.partition[i].name[0]),
+		tag->u.ptable.partition[i].base,
+		tag->u.ptable.partition[i].size,
+		tag->u.ptable.partition[i].flags);
+	printascii(buf);
+    }
+#endif
+
+    memcpy((void *)partition_table,(void *) (&(tag->u.ptable)),sizeof(partition_table) +
+	sizeof(struct FlashRegion)*tag->u.ptable.npartitions);
+
+    
+    return 0;
+}
+
+__tagtable(ATAG_PTABLE, parse_tag_ptable);
+
 EXPORT_SYMBOL(parse_bootldr_partitions);
+
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Compaq Computer Corporation");
+MODULE_DESCRIPTION("Parsing code for Compaq bootldr partitions");

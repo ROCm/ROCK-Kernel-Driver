@@ -59,7 +59,7 @@ ksize.h: vmlinux.nh dummy
 	echo "#define KERNEL_SIZE `ls -l vmlinux.nh | awk '{print $$5}'`" > $@T
 ifdef INITRD
 	[ -f $(INITRD) ] || exit 1
-	echo "#define INITRD_SIZE `ls -l $(INITRD) | awk '{print $$5}'`" >> $@T
+	echo "#define INITRD_IMAGE_SIZE `ls -l $(INITRD) | awk '{print $$5}'`" >> $@T
 endif
 	cmp -s $@T $@ || mv -f $@T $@
 	rm -f $@T

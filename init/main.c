@@ -257,9 +257,15 @@ static struct dev_name_struct {
 	{ "cciss/c0d14p",0x68E0 },
 	{ "cciss/c0d15p",0x68F0 },
 #endif
-#ifdef CONFIG_NFTL
 	{ "nftla", 0x5d00 },
-#endif
+	{ "nftlb", 0x5d10 },
+	{ "nftlc", 0x5d20 },
+	{ "nftld", 0x5d30 },
+	{ "ftla", 0x2c00 },
+	{ "ftlb", 0x2c08 },
+	{ "ftlc", 0x2c10 },
+	{ "ftld", 0x2c18 },
+	{ "mtdblock", 0x1f00 },
 	{ NULL, 0 }
 };
 
@@ -476,6 +482,8 @@ static void __init parse_options(char *line)
 extern void setup_arch(char **);
 extern void cpu_idle(void);
 
+volatile unsigned long wait_init_idle = 0UL;
+
 #ifndef CONFIG_SMP
 
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -489,13 +497,25 @@ static void __init smp_init(void)
 
 #else
 
+
 /* Called by boot processor to activate the rest. */
 static void __init smp_init(void)
 {
 	/* Get other processors into their bootup holding patterns. */
 	smp_boot_cpus();
+	wait_init_idle = cpu_online_map;
+	clear_bit(current->processor, &wait_init_idle); /* Don't wait on me! */
+	printk("Waiting on wait_init_idle (map = 0x%lx)\n", wait_init_idle);
 	smp_threads_ready=1;
 	smp_commence();
+
+	/* Wait for the other cpus to set up their idle processes */
+        while (1) {
+                if (!wait_init_idle)
+                        break;
+                rep_nop();
+        }
+	printk("All processors have done init_idle\n");
 }		
 
 #endif
@@ -518,7 +538,7 @@ static void rest_init(void)
 /*
  *	Activate the first processor.
  */
- 
+
 asmlinkage void __init start_kernel(void)
 {
 	char * command_line;

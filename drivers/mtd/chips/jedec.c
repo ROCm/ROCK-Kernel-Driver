@@ -11,17 +11,17 @@
  * not going to guess how to send commands to them, plus I expect they will
  * all speak CFI..
  *
- * $Id: jedec.c,v 1.8 2001/06/09 23:56:57 dwmw2 Exp $
+ * $Id: jedec.c,v 1.11 2001/10/02 15:05:12 dwmw2 Exp $
  */
 
 #include <linux/mtd/jedec.h>
 
-struct mtd_info *jedec_probe(struct map_info *);
-int jedec_probe8(struct map_info *map,unsigned long base,
+static struct mtd_info *jedec_probe(struct map_info *);
+static int jedec_probe8(struct map_info *map,unsigned long base,
 		  struct jedec_private *priv);
-int jedec_probe16(struct map_info *map,unsigned long base,
+static int jedec_probe16(struct map_info *map,unsigned long base,
 		  struct jedec_private *priv);
-int jedec_probe32(struct map_info *map,unsigned long base,
+static int jedec_probe32(struct map_info *map,unsigned long base,
 		  struct jedec_private *priv);
 static void jedec_flash_chip_scan(struct jedec_private *priv,unsigned long start,
 			    unsigned long len);
@@ -48,7 +48,7 @@ static int jedec_read(struct mtd_info *mtd, loff_t from, size_t len,
 static int jedec_read_banked(struct mtd_info *mtd, loff_t from, size_t len, 
 			     size_t *retlen, u_char *buf);
 
-struct mtd_info *jedec_probe(struct map_info *map);
+static struct mtd_info *jedec_probe(struct map_info *map);
 
 
 
@@ -59,23 +59,31 @@ static struct mtd_chip_driver jedec_chipdrv = {
 };
 
 /* Probe entry point */
-struct jedec_private priv;
-struct mtd_info __MTD;
-struct mtd_info *jedec_probe(struct map_info *map)
+
+static struct mtd_info *jedec_probe(struct map_info *map)
 {
-   struct mtd_info *MTD = &__MTD;
+   struct mtd_info *MTD;
+   struct jedec_private *priv;
    unsigned long Base;
    unsigned long SectorSize;
    unsigned count;
    unsigned I,Uniq;
    char Part[200];
    memset(&priv,0,sizeof(priv));
+
+   MTD = kmalloc(sizeof(struct mtd_info) + sizeof(struct jedec_private), GFP_KERNEL);
+   if (!MTD)
+	   return NULL;
+
+   memset(MTD, 0, sizeof(struct mtd_info) + sizeof(struct jedec_private));
+   priv = (struct jedec_private *)&MTD[1];
    
    my_bank_size = map->size;
 
    if (map->size/my_bank_size > MAX_JEDEC_CHIPS)
    {
       printk("mtd: Increase MAX_JEDEC_CHIPS, too many banks.\n");
+      kfree(MTD);
       return 0;
    }
    
@@ -86,33 +94,35 @@ struct mtd_info *jedec_probe(struct map_info *map)
 	 map->buswidth = 1;
       
       if (map->buswidth == 1){
-	 if (jedec_probe8(map,Base,&priv) == 0) {
+	 if (jedec_probe8(map,Base,priv) == 0) {
 		 printk("did recognize jedec chip\n");
+		 kfree(MTD);
 	         return 0;
 	 }
       }
       if (map->buswidth == 2)
-	 jedec_probe16(map,Base,&priv);
+	 jedec_probe16(map,Base,priv);
       if (map->buswidth == 4)
-	 jedec_probe32(map,Base,&priv);
+	 jedec_probe32(map,Base,priv);
    }
    
    // Get the biggest sector size
    SectorSize = 0;
-   for (I = 0; priv.chips[I].jedec != 0 && I < MAX_JEDEC_CHIPS; I++)
+   for (I = 0; priv->chips[I].jedec != 0 && I < MAX_JEDEC_CHIPS; I++)
    {
-	   //	   printk("priv.chips[%d].jedec is %x\n",I,priv.chips[I].jedec);
-	   //	   printk("priv.chips[%d].sectorsize is %lx\n",I,priv.chips[I].sectorsize);
-      if (priv.chips[I].sectorsize > SectorSize)
-	 SectorSize = priv.chips[I].sectorsize;
+	   //	   printk("priv->chips[%d].jedec is %x\n",I,priv->chips[I].jedec);
+	   //	   printk("priv->chips[%d].sectorsize is %lx\n",I,priv->chips[I].sectorsize);
+      if (priv->chips[I].sectorsize > SectorSize)
+	 SectorSize = priv->chips[I].sectorsize;
    }
    
    // Quickly ensure that the other sector sizes are factors of the largest
-   for (I = 0; priv.chips[I].jedec != 0 && I < MAX_JEDEC_CHIPS; I++)
+   for (I = 0; priv->chips[I].jedec != 0 && I < MAX_JEDEC_CHIPS; I++)
    {
-      if ((SectorSize/priv.chips[I].sectorsize)*priv.chips[I].sectorsize != SectorSize)
+      if ((SectorSize/priv->chips[I].sectorsize)*priv->chips[I].sectorsize != SectorSize)
       {
 	 printk("mtd: Failed. Device has incompatible mixed sector sizes\n");
+	 kfree(MTD);
 	 return 0;
       }      
    }
@@ -124,21 +134,22 @@ struct mtd_info *jedec_probe(struct map_info *map)
    Part[sizeof(Part)-11] = 0;
    strcat(Part," ");
    Uniq = 0;
-   for (I = 0; priv.chips[I].jedec != 0 && I < MAX_JEDEC_CHIPS; I++)
+   for (I = 0; priv->chips[I].jedec != 0 && I < MAX_JEDEC_CHIPS; I++)
    {
       const struct JEDECTable *JEDEC;
       
-      if (priv.chips[I+1].jedec == priv.chips[I].jedec)
+      if (priv->chips[I+1].jedec == priv->chips[I].jedec)
       {
 	 count++;
 	 continue;
       }
       
       // Locate the chip in the jedec table
-      JEDEC = jedec_idtoinf(priv.chips[I].jedec >> 8,priv.chips[I].jedec);
+      JEDEC = jedec_idtoinf(priv->chips[I].jedec >> 8,priv->chips[I].jedec);
       if (JEDEC == 0)
       {
 	 printk("mtd: Internal Error, JEDEC not set\n");
+	 kfree(MTD);
 	 return 0;
       }
       
@@ -159,37 +170,39 @@ struct mtd_info *jedec_probe(struct map_info *map)
       are empty banks. Note, the last bank does not count here, only the
       first banks are important. Holes on non-bank boundaries can not exist
       due to the way the detection algorithm works. */
-   if (priv.size < my_bank_size)
-      my_bank_size = priv.size;
-   priv.is_banked = 0;
-   //printk("priv.size is %x, my_bank_size is %x\n",priv.size,my_bank_size);
-   //printk("priv.bank_fill[0] is %x\n",priv.bank_fill[0]);
-   if (!priv.size) {
-	   printk("priv.size is zero\n");
+   if (priv->size < my_bank_size)
+      my_bank_size = priv->size;
+   priv->is_banked = 0;
+   //printk("priv->size is %x, my_bank_size is %x\n",priv->size,my_bank_size);
+   //printk("priv->bank_fill[0] is %x\n",priv->bank_fill[0]);
+   if (!priv->size) {
+	   printk("priv->size is zero\n");
+	   kfree(MTD);
 	   return 0;
    }
-   if (priv.size/my_bank_size) {
-	   if (priv.size/my_bank_size == 1) {
-		   priv.size = my_bank_size;
+   if (priv->size/my_bank_size) {
+	   if (priv->size/my_bank_size == 1) {
+		   priv->size = my_bank_size;
 	   }
 	   else {
-		   for (I = 0; I != priv.size/my_bank_size - 1; I++)
+		   for (I = 0; I != priv->size/my_bank_size - 1; I++)
 		   {
-		      if (priv.bank_fill[I] != my_bank_size)
-			 priv.is_banked = 1;
+		      if (priv->bank_fill[I] != my_bank_size)
+			 priv->is_banked = 1;
 		      
 		      /* This even could be eliminated, but new de-optimized read/write
 			 functions have to be written */
-		      printk("priv.bank_fill[%d] is %lx, priv.bank_fill[0] is %lx\n",I,priv.bank_fill[I],priv.bank_fill[0]);
-		      if (priv.bank_fill[I] != priv.bank_fill[0])
+		      printk("priv->bank_fill[%d] is %lx, priv->bank_fill[0] is %lx\n",I,priv->bank_fill[I],priv->bank_fill[0]);
+		      if (priv->bank_fill[I] != priv->bank_fill[0])
 		      {
-			 printk("mtd: Failed. Cannot handle unsymetric banking\n");
+			 printk("mtd: Failed. Cannot handle unsymmetric banking\n");
+			 kfree(MTD);
 			 return 0;
 		      }      
 		   }
 	   }
    }
-   if (priv.is_banked == 1)
+   if (priv->is_banked == 1)
       strcat(Part,", banked");
 
    //   printk("Part: '%s'\n",Part);
@@ -202,18 +215,18 @@ struct mtd_info *jedec_probe(struct map_info *map)
    MTD->flags = MTD_CAP_NORFLASH;
    MTD->erasesize = SectorSize*(map->buswidth);
    //   printk("MTD->erasesize is %x\n",(unsigned int)MTD->erasesize);
-   MTD->size = priv.size;
+   MTD->size = priv->size;
    //   printk("MTD->size is %x\n",(unsigned int)MTD->size);
    //MTD->module = THIS_MODULE; // ? Maybe this should be the low level module?
    MTD->erase = flash_erase;
-   if (priv.is_banked == 1)
+   if (priv->is_banked == 1)
       MTD->read = jedec_read_banked;
    else
       MTD->read = jedec_read;
    MTD->write = flash_write;
    MTD->sync = jedec_sync;
    MTD->priv = map;
-   map->fldrv_priv = &priv;
+   map->fldrv_priv = priv;
    map->fldrv = &jedec_chipdrv;
    MOD_INC_USE_COUNT;
    return MTD;
@@ -334,7 +347,7 @@ const struct JEDECTable *jedec_idtoinf(__u8 mfr,__u8 id)
 }
 
 // Look for flash using an 8 bit bus interface
-int jedec_probe8(struct map_info *map,unsigned long base,
+static int jedec_probe8(struct map_info *map,unsigned long base,
 		  struct jedec_private *priv)
 { 
    #define flread(x) map->read8(map,base+x)
@@ -387,14 +400,14 @@ int jedec_probe8(struct map_info *map,unsigned long base,
 }
 
 // Look for flash using a 16 bit bus interface (ie 2 8-bit chips)
-int jedec_probe16(struct map_info *map,unsigned long base,
+static int jedec_probe16(struct map_info *map,unsigned long base,
 		  struct jedec_private *priv)
 {
    return 0;
 }
 
 // Look for flash using a 32 bit bus interface (ie 4 8-bit chips)
-int jedec_probe32(struct map_info *map,unsigned long base,
+static int jedec_probe32(struct map_info *map,unsigned long base,
 		  struct jedec_private *priv)
 {
    #define flread(x) map->read32(map,base+((x)<<2))
@@ -859,11 +872,6 @@ static void jedec_flash_chip_scan(struct jedec_private *priv,unsigned long start
 	 chip->length = (start + len - ByteStart + (1 << chip->addrshift)-1) >> chip->addrshift;
    }
 }
-									/*}}}*/
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define jedec_probe_init init_module
-#define jedec_probe_exit cleanup_module
-#endif
 
 int __init jedec_probe_init(void)
 {
@@ -878,3 +886,7 @@ static void __exit jedec_probe_exit(void)
 
 module_init(jedec_probe_init);
 module_exit(jedec_probe_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Jason Gunthorpe <jgg@deltatee.com> et al.");
+MODULE_DESCRIPTION("Old MTD chip driver for JEDEC-compliant flash chips");

@@ -119,8 +119,11 @@ extern void rw_swap_page_nolock(int, swp_entry_t, char *);
 /* linux/mm/page_alloc.c */
 
 /* linux/mm/swap_state.c */
+#define SWAP_CACHE_INFO
+#ifdef SWAP_CACHE_INFO
 extern void show_swap_cache_info(void);
-extern void add_to_swap_cache(struct page *, swp_entry_t);
+#endif
+extern int add_to_swap_cache(struct page *, swp_entry_t);
 extern void __delete_from_swap_cache(struct page *page);
 extern void delete_from_swap_cache(struct page *page);
 extern void free_page_and_swap_cache(struct page *page);
@@ -128,6 +131,7 @@ extern struct page * lookup_swap_cache(swp_entry_t);
 extern struct page * read_swap_cache_async(swp_entry_t);
 
 /* linux/mm/oom_kill.c */
+extern int out_of_memory(void);
 extern void oom_kill(void);
 
 /* linux/mm/swapfile.c */
@@ -150,15 +154,6 @@ struct swap_list_t {
 extern struct swap_list_t swap_list;
 asmlinkage long sys_swapoff(const char *);
 asmlinkage long sys_swapon(const char *, int);
-
-#define SWAP_CACHE_INFO
-
-#ifdef SWAP_CACHE_INFO
-extern unsigned long swap_cache_add_total;
-extern unsigned long swap_cache_del_total;
-extern unsigned long swap_cache_find_total;
-extern unsigned long swap_cache_find_success;
-#endif
 
 extern spinlock_t pagemap_lru_lock;
 

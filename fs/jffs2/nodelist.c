@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: nodelist.c,v 1.28 2001/03/27 06:20:04 dwmw2 Exp $
+ * $Id: nodelist.c,v 1.29 2001/09/19 00:06:35 dwmw2 Exp $
  *
  */
 
@@ -177,7 +177,7 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 				   dirent we've already read from the flash
 				*/
 			if (retlen > sizeof(struct jffs2_raw_dirent))
-				memcpy(&fd->name[0], &node.d.name[0], min(node.d.nsize, retlen-sizeof(struct jffs2_raw_dirent)));
+				memcpy(&fd->name[0], &node.d.name[0], min((__u32)node.d.nsize, (retlen-sizeof(struct jffs2_raw_dirent))));
 				
 				/* Do we need to copy any more of the name directly
 				   from the flash?

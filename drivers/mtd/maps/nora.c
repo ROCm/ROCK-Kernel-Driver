@@ -1,5 +1,5 @@
 /*
- * $Id: nora.c,v 1.19 2001/04/26 15:40:23 dwmw2 Exp $
+ * $Id: nora.c,v 1.21 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * This is so simple I love it.
  */
@@ -167,17 +167,11 @@ static struct mtd_info nora_mtds[4] = {  /* boot, kernel, ramdisk, fs */
 	}
 };
 
-
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_nora init_module
-#define cleanup_nora cleanup_module
-#endif
-
 int __init init_nora(void)
 {
        	printk(KERN_NOTICE "nora flash device: %x at %x\n", WINDOW_SIZE, WINDOW_ADDR);
 
-	mymtd = do_map_probe("cfi", &nora_map);
+	mymtd = do_map_probe("cfi_probe", &nora_map);
 	if (mymtd) {
 		mymtd->module = THIS_MODULE;
 		
@@ -204,3 +198,7 @@ static void __exit cleanup_nora(void)
 
 module_init(init_nora);
 module_exit(cleanup_nora);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Red Hat, Inc. - David Woodhouse <dwmw2@cambridge.redhat.com>");
+MODULE_DESCRIPTION("MTD map driver for Nora board");

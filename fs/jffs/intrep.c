@@ -10,7 +10,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * $Id: intrep.c,v 1.71.2.4 2001/01/08 23:27:02 dwmw2 Exp $
+ * $Id: intrep.c,v 1.102 2001/09/23 23:28:36 dwmw2 Exp $
  *
  * Ported to Linux 2.3.x and MTD:
  * Copyright (C) 2000  Alexander Larsson (alex@cendio.se), Cendio Systems AB
@@ -56,6 +56,7 @@
  */
 
 #define __NO_VERSION__
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/jffs.h>
@@ -73,9 +74,9 @@
 #include "intrep.h"
 #include "jffs_fm.h"
 
-#if defined(JFFS_MEMORY_DEBUG) && JFFS_MEMORY_DEBUG
-long no_jffs_file = 0;
 long no_jffs_node = 0;
+long no_jffs_file = 0;
+#if defined(JFFS_MEMORY_DEBUG) && JFFS_MEMORY_DEBUG
 long no_jffs_control = 0;
 long no_jffs_raw_inode = 0;
 long no_jffs_node_ref = 0;
@@ -87,9 +88,24 @@ long no_name = 0;
 
 static int jffs_scan_flash(struct jffs_control *c);
 static int jffs_update_file(struct jffs_file *f, struct jffs_node *node);
-static __u8 flash_read_u8(struct mtd_info *mtd, loff_t from);
 
-#if 1
+#if CONFIG_JFFS_FS_VERBOSE > 0
+static __u8
+flash_read_u8(struct mtd_info *mtd, loff_t from)
+{
+	size_t retlen;
+	__u8 ret;
+	int res;
+
+	res = MTD_READ(mtd, from, 1, &retlen, &ret);
+	if (retlen != 1) {
+		printk("Didn't read a byte in flash_read_u8(). Returned %d\n", res);
+		return 0;
+	}
+
+	return ret;
+}
+
 static void
 jffs_hexdump(struct mtd_info *mtd, loff_t pos, int size)
 {
@@ -135,6 +151,7 @@ jffs_hexdump(struct mtd_info *mtd, loff_t pos, int size)
 		size -= 16;
 	}
 }
+
 #endif
 
 #define flash_safe_acquire(arg)
@@ -149,7 +166,7 @@ flash_safe_read(struct mtd_info *mtd, loff_t from,
 	int res;
 
 	D3(printk(KERN_NOTICE "flash_safe_read(%p, %08x, %p, %08x)\n",
-		  mtd, from, buf, count));
+		  mtd, (unsigned int) from, buf, count));
 
 	res = MTD_READ(mtd, from, count, &retlen, buf);
 	if (retlen != count) {
@@ -176,29 +193,15 @@ flash_read_u32(struct mtd_info *mtd, loff_t from)
 }
 
 
-static __u8
-flash_read_u8(struct mtd_info *mtd, loff_t from)
-{
-	size_t retlen;
-	__u8 ret;
-	int res;
-
-	res = MTD_READ(mtd, from, 1, &retlen, &ret);
-	if (retlen != 1) {
-		printk("Didn't read a byte in flash_read_u8(). Returned %d\n", res);
-		return 0;
-	}
-
-	return ret;
-}
-
-
 static int
 flash_safe_write(struct mtd_info *mtd, loff_t to,
 		 const u_char *buf, size_t count)
 {
 	size_t retlen;
 	int res;
+
+	D3(printk(KERN_NOTICE "flash_safe_write(%p, %08x, %p, %08x)\n",
+		  mtd, (unsigned int) to, buf, count));
 
 	res = MTD_WRITE(mtd, to, count, &retlen, buf);
 	if (retlen != count) {
@@ -209,23 +212,62 @@ flash_safe_write(struct mtd_info *mtd, loff_t to,
 
 
 static int
+flash_safe_writev(struct mtd_info *mtd, const struct iovec *vecs,
+			unsigned long iovec_cnt, loff_t to)
+{
+	size_t retlen, retlen_a;
+	int i;
+	int res;
+
+	D3(printk(KERN_NOTICE "flash_safe_writev(%p, %08x, %p)\n",
+		  mtd, (unsigned int) to, vecs));
+	
+	if (mtd->writev) {
+		res = MTD_WRITEV(mtd, vecs, iovec_cnt, to, &retlen);
+		return res ? res : retlen;
+	}
+	/* Not implemented writev. Repeatedly use write - on the not so
+	   unreasonable assumption that the mtd driver doesn't care how
+	   many write cycles we use. */
+	res=0;
+	retlen=0;
+
+	for (i=0; !res && i<iovec_cnt; i++) {
+		res = MTD_WRITE(mtd, to, vecs[i].iov_len, &retlen_a, vecs[i].iov_base);
+		if (retlen_a != vecs[i].iov_len) {
+			printk("Didn't write all bytes in flash_safe_writev(). Returned %d\n", res);
+			if (i != iovec_cnt-1)
+				return -EIO;
+		}
+		/* If res is non-zero, retlen_a is undefined, but we don't
+		   care because in that case it's not going to be 
+		   returned anyway.
+		*/
+		to += retlen_a;
+		retlen += retlen_a;
+	}
+	return res?res:retlen;
+}
+
+
+static int
 flash_memset(struct mtd_info *mtd, loff_t to,
 	     const u_char c, size_t size)
 {
-	static unsigned char pattern[16];
+	static unsigned char pattern[64];
 	int i;
 
 	/* fill up pattern */
 
-	for(i = 0; i < 16; i++)
+	for(i = 0; i < 64; i++)
 		pattern[i] = c;
 
-	/* write as many 16-byte chunks as we can */
+	/* write as many 64-byte chunks as we can */
 
-	while (size >= 16) {
-		flash_safe_write(mtd, to, pattern, 16);
-		size -= 16;
-		to += 16;
+	while (size >= 64) {
+		flash_safe_write(mtd, to, pattern, 64);
+		size -= 64;
+		to += 64;
 	}
 
 	/* and the rest */
@@ -305,8 +347,8 @@ jffs_checksum(const void *data, int size)
 }
 
 
-__u32
-jffs_checksum_flash(struct mtd_info *mtd, loff_t start, int size)
+int
+jffs_checksum_flash(struct mtd_info *mtd, loff_t start, int size, __u32 *result)
 {
 	__u32 sum = 0;
 	loff_t ptr = start;
@@ -315,7 +357,10 @@ jffs_checksum_flash(struct mtd_info *mtd, loff_t start, int size)
 
 	/* Allocate read buffer */
 	read_buf = (__u8 *) kmalloc (sizeof(__u8) * 4096, GFP_KERNEL);
-
+	if (!read_buf) {
+		printk(KERN_NOTICE "kmalloc failed in jffs_checksum_flash()\n");
+		return -ENOMEM;
+	}
 	/* Loop until checksum done */
 	while (size) {
 		/* Get amount of data to read */
@@ -342,8 +387,10 @@ jffs_checksum_flash(struct mtd_info *mtd, loff_t start, int size)
 
 	/* Return result */
 	D3(printk("checksum result: 0x%08x\n", sum));
-	return sum;
+	*result = sum;
+	return 0;
 }
+
 static __inline__ void jffs_fm_write_lock(struct jffs_fmcontrol *fmc)
 {
   //	down(&fmc->wlock);
@@ -367,7 +414,7 @@ jffs_create_file(struct jffs_control *c,
 		D(printk("jffs_create_file(): Failed!\n"));
 		return 0;
 	}
-	DJM(no_jffs_file++);
+	no_jffs_file++;
 	memset(f, 0, sizeof(struct jffs_file));
 	f->ino = raw_inode->ino;
 	f->pino = raw_inode->pino;
@@ -471,11 +518,10 @@ jffs_add_virtual_root(struct jffs_control *c)
 						 GFP_KERNEL))) {
 		return -ENOMEM;
 	}
-	DJM(no_jffs_file++);
-	if (!(node = (struct jffs_node *)kmalloc(sizeof(struct jffs_node),
-						 GFP_KERNEL))) {
+	no_jffs_file++;
+	if (!(node = jffs_alloc_node())) {
 		kfree(root);
-		DJM(no_jffs_file--);
+		no_jffs_file--;
 		return -ENOMEM;
 	}
 	DJM(no_jffs_node++);
@@ -509,7 +555,26 @@ jffs_build_fs(struct super_block *sb)
 	c->building_fs = 1;
 	c->sb = sb;
 	if ((err = jffs_scan_flash(c)) < 0) {
-		goto jffs_build_fs_fail;
+		if(err == -EAGAIN){
+			/* scan_flash() wants us to try once more. A flipping 
+			   bits sector was detect in the middle of the scan flash.
+			   Clean up old allocated memory before going in.
+			*/
+			D1(printk("jffs_build_fs: Cleaning up all control structures,"
+				  " reallocating them and trying mount again.\n"));
+			jffs_cleanup_control(c);
+			if (!(c = jffs_create_control(sb->s_dev))) {
+				return -ENOMEM;
+			}
+			c->building_fs = 1;
+			c->sb = sb;
+
+			if ((err = jffs_scan_flash(c)) < 0) {
+				goto jffs_build_fs_fail;
+			}			
+		}else{
+			goto jffs_build_fs_fail;
+		}
 	}
 
 	/* Add a virtual root node if no one exists.  */
@@ -564,6 +629,125 @@ jffs_build_fs_fail:
 } /* jffs_build_fs()  */
 
 
+/*
+  This checks for sectors that were being erased in their previous 
+  lifetimes and for some reason or the other (power fail etc.), 
+  the erase cycles never completed.
+  As the flash array would have reverted back to read status, 
+  these sectors are detected by the symptom of the "flipping bits",
+  i.e. bits being read back differently from the same location in
+  flash if read multiple times.
+  The only solution to this is to re-erase the entire
+  sector.
+  Unfortunately detecting "flipping bits" is not a simple exercise
+  as a bit may be read back at 1 or 0 depending on the alignment 
+  of the stars in the universe.
+  The level of confidence is in direct proportion to the number of 
+  scans done. By power fail testing I (Vipin) have been able to 
+  proove that reading twice is not enough.
+  Maybe 4 times? Change NUM_REREADS to a higher number if you want
+  a (even) higher degree of confidence in your mount process. 
+  A higher number would of course slow down your mount.
+*/
+int check_partly_erased_sectors(struct jffs_fmcontrol *fmc){
+
+#define NUM_REREADS             4 /* see note above */
+#define READ_AHEAD_BYTES        4096 /* must be a multiple of 4, 
+					usually set to kernel page size */
+
+	__u8 *read_buf1;
+	__u8 *read_buf2;
+
+	int err = 0;
+	int retlen;
+	int i;
+	int cnt;
+	__u32 offset;
+	loff_t pos = 0;
+	loff_t end = fmc->flash_size;
+
+
+	/* Allocate read buffers */
+	read_buf1 = (__u8 *) kmalloc (sizeof(__u8) * READ_AHEAD_BYTES, GFP_KERNEL);
+	if (!read_buf1)
+		return -ENOMEM;
+
+	read_buf2 = (__u8 *) kmalloc (sizeof(__u8) * READ_AHEAD_BYTES, GFP_KERNEL);
+	if (!read_buf2) {
+		kfree(read_buf1);
+		return -ENOMEM;
+	}
+
+ CHECK_NEXT:
+	while(pos < end){
+		
+		D1(printk("check_partly_erased_sector():checking sector which contains"
+			  " offset 0x%x for flipping bits..\n", (__u32)pos));
+		
+		retlen = flash_safe_read(fmc->mtd, pos,
+					 &read_buf1[0], READ_AHEAD_BYTES);
+		retlen &= ~3;
+		
+		for(cnt = 0; cnt < NUM_REREADS; cnt++){
+			(void)flash_safe_read(fmc->mtd, pos,
+					      &read_buf2[0], READ_AHEAD_BYTES);
+			
+			for (i=0 ; i < retlen ; i+=4) {
+				/* buffers MUST match, double word for word! */
+				if(*((__u32 *) &read_buf1[i]) !=
+				   *((__u32 *) &read_buf2[i])
+				   ){
+				        /* flipping bits detected, time to erase sector */
+					/* This will help us log some statistics etc. */
+					D1(printk("Flipping bits detected in re-read round:%i of %i\n",
+					       cnt, NUM_REREADS));
+					D1(printk("check_partly_erased_sectors:flipping bits detected"
+						  " @offset:0x%x(0x%x!=0x%x)\n",
+						  (__u32)pos+i, *((__u32 *) &read_buf1[i]), 
+						  *((__u32 *) &read_buf2[i])));
+					
+				        /* calculate start of present sector */
+					offset = (((__u32)pos+i)/(__u32)fmc->sector_size) * (__u32)fmc->sector_size;
+					
+					D1(printk("check_partly_erased_sector():erasing sector starting 0x%x.\n",
+						  offset));
+					
+					if (flash_erase_region(fmc->mtd,
+							       offset, fmc->sector_size) < 0) {
+						printk(KERN_ERR "JFFS: Erase of flash failed. "
+						       "offset = %u, erase_size = %d\n",
+						       offset , fmc->sector_size);
+						
+						err = -EIO;
+						goto returnBack;
+
+					}else{
+						D1(printk("JFFS: Erase of flash sector @0x%x successful.\n",
+						       offset));
+						/* skip ahead to the next sector */
+						pos = (((__u32)pos+i)/(__u32)fmc->sector_size) * (__u32)fmc->sector_size;
+						pos += fmc->sector_size;
+						goto CHECK_NEXT;
+					}
+				}
+			}
+		}
+		pos += READ_AHEAD_BYTES;
+	}
+
+ returnBack:
+	kfree(read_buf1);
+	kfree(read_buf2);
+
+	D2(printk("check_partly_erased_sector():Done checking all sectors till offset 0x%x for flipping bits.\n",
+		  (__u32)pos));
+
+	return err;
+
+}/* end check_partly_erased_sectors() */
+
+
+
 /* Scan the whole flash memory in order to find all nodes in the
    file systems.  */
 static int
@@ -577,20 +761,51 @@ jffs_scan_flash(struct jffs_control *c)
 	__u8 tmp_accurate;
 	__u16 tmp_chksum;
 	__u32 deleted_file;
-	loff_t pos = fmc->flash_start;
+	loff_t pos = 0;
 	loff_t start;
-	loff_t end = fmc->flash_start + fmc->flash_size;
+	loff_t test_start;
+	loff_t end = fmc->flash_size;
 	__u8 *read_buf;
 	int i, len, retlen;
+	__u32 offset;
+
+	__u32 free_chunk_size1;
+	__u32 free_chunk_size2;
+
+	
+#define NUMFREEALLOWED     2        /* 2 chunks of at least erase size space allowed */
+	int num_free_space = 0;       /* Flag err if more than TWO
+				       free blocks found. This is NOT allowed
+				       by the current jffs design.
+				    */
+	int num_free_spc_not_accp = 0; /* For debugging purposed keep count 
+					of how much free space was rejected and
+					marked dirty
+				     */
 
 	D1(printk("jffs_scan_flash(): start pos = 0x%lx, end = 0x%lx\n",
 		  (long)pos, (long)end));
 
 	flash_safe_acquire(fmc->mtd);
 
+	/*
+	  check and make sure that any sector does not suffer
+	  from the "partly erased, bit flipping syndrome" (TM Vipin :)
+	  If so, offending sectors will be erased.
+	*/
+	if(check_partly_erased_sectors(fmc) < 0){
+
+		flash_safe_release(fmc->mtd);
+		return -EIO; /* bad, bad, bad error. Cannot continue.*/
+	}
+
 	/* Allocate read buffer */
 	read_buf = (__u8 *) kmalloc (sizeof(__u8) * 4096, GFP_KERNEL);
-
+	if (!read_buf) {
+		flash_safe_release(fmc->mtd);
+		return -ENOMEM;
+	}
+			      
 	/* Start the scan.  */
 	while (pos < end) {
 		deleted_file = 0;
@@ -600,32 +815,40 @@ jffs_scan_flash(struct jffs_control *c)
 
 		switch (flash_read_u32(fmc->mtd, pos)) {
 		case JFFS_EMPTY_BITMASK:
-			/* We have found 0xff at this position.  We have to
+			/* We have found 0xffffffff at this position.  We have to
 			   scan the rest of the flash till the end or till
-			   something else than 0xff is found.  */
-			D1(printk("jffs_scan_flash(): 0xff at pos 0x%lx.\n",
+			   something else than 0xffffffff is found.
+		           Keep going till we do not find JFFS_EMPTY_BITMASK 
+			   anymore */
+
+			D1(printk("jffs_scan_flash(): 0xffffffff at pos 0x%lx.\n",
 				  (long)pos));
 
-			len = end - pos < 4096 ? end - pos : 4096;
+		        while(pos < end){
 
-			retlen = flash_safe_read(fmc->mtd, pos,
+			      len = end - pos < 4096 ? end - pos : 4096;
+			      
+			      retlen = flash_safe_read(fmc->mtd, pos,
 						 &read_buf[0], len);
 
-			retlen &= ~3;
-
-			for (i=0 ; i < retlen ; i+=4, pos += 4) {
-				if(*((__u32 *) &read_buf[i]) !=
-						JFFS_EMPTY_BITMASK)
+			      retlen &= ~3;
+			      
+			      for (i=0 ; i < retlen ; i+=4, pos += 4) {
+				      if(*((__u32 *) &read_buf[i]) !=
+					 JFFS_EMPTY_BITMASK)
 					break;
+			      }
+			      if (i == retlen)
+				    continue;
+			      else
+				    break;
 			}
-			if (i == retlen)
-				continue;
 
-			D1(printk("jffs_scan_flash(): 0xff ended at "
-				  "pos 0x%lx.\n", (long)pos));
-
+			D1(printk("jffs_scan_flash():0xffffffff ended at pos 0x%lx.\n",
+				  (long)pos));
+			
 			/* If some free space ends in the middle of a sector,
-				treat it as dirty rather than clean.
+			   treat it as dirty rather than clean.
 			   This is to handle the case where one thread 
 			   allocated space for a node, but didn't get to
 			   actually _write_ it before power was lost, leaving
@@ -638,20 +861,127 @@ jffs_scan_flash(struct jffs_control *c)
 				   only from the beginning of this sector
 				   (or from start) 
 				*/
-				if (start < (pos & ~(fmc->sector_size-1))) {
-					D1(printk("Reducing start to 0x%lx from 0x%lx\n", (unsigned long)pos & ~(fmc->sector_size-1), (unsigned long)start));
-					start = pos & ~(fmc->sector_size-1);
+
+			        test_start = pos & ~(fmc->sector_size-1); /* end of last sector */
+
+				if (start < test_start) {
+
+				        /* free space started in the previous sector! */
+
+					if((num_free_space < NUMFREEALLOWED) && 
+					   ((unsigned int)(test_start - start) >= fmc->sector_size)){
+
+				                /*
+						  Count it in if we are still under NUMFREEALLOWED *and* it is 
+						  at least 1 erase sector in length. This will keep us from 
+						  picking any little ole' space as "free".
+						*/
+					  
+					        D1(printk("Reducing end of free space to 0x%x from 0x%x\n",
+							  (unsigned int)test_start, (unsigned int)pos));
+
+						D1(printk("Free space accepted: Starting 0x%x for 0x%x bytes\n",
+							  (unsigned int) start,
+							  (unsigned int)(test_start - start)));
+
+						/* below, space from "start" to "pos" will be marked dirty. */
+						start = test_start; 
+						
+						/* Being in here means that we have found at least an entire 
+						   erase sector size of free space ending on a sector boundary.
+						   Keep track of free spaces accepted.
+						*/
+						num_free_space++;
+					}else{
+					        num_free_spc_not_accp++;
+					        D1(printk("Free space (#%i) found but *Not* accepted: Starting"
+							  " 0x%x for 0x%x bytes\n",
+							  num_free_spc_not_accp, (unsigned int)start, 
+							  (unsigned int)((unsigned int)(pos & ~(fmc->sector_size-1)) - (unsigned int)start)));
+					        
+					}
+					
 				}
-				D1(printk("Dirty space: 0x%lx for 0x%lx bytes\n", (unsigned long)start, (unsigned long)(pos - start)));
-				jffs_fmalloced(fmc, (__u32) start,
-					       (__u32) (pos - start), 0);
+				if((((__u32)(pos - start)) != 0)){
+
+				        D1(printk("Dirty space: Starting 0x%x for 0x%x bytes\n",
+						  (unsigned int) start, (unsigned int) (pos - start)));
+					jffs_fmalloced(fmc, (__u32) start,
+						       (__u32) (pos - start), 0);
+				}else{
+					/* "Flipping bits" detected. This means that our scan for them
+					   did not catch this offset. See check_partly_erased_sectors() for
+					   more info.
+					*/
+				        
+					D1(printk("jffs_scan_flash():wants to allocate dirty flash "
+						  "space for 0 bytes.\n"));
+					D1(printk("jffs_scan_flash(): Flipping bits! We will free "
+						  "all allocated memory, erase this sector and remount\n"));
+
+					/* calculate start of present sector */
+					offset = (((__u32)pos)/(__u32)fmc->sector_size) * (__u32)fmc->sector_size;
+					
+					D1(printk("jffs_scan_flash():erasing sector starting 0x%x.\n",
+						  offset));
+					
+					if (flash_erase_region(fmc->mtd,
+							       offset, fmc->sector_size) < 0) {
+						printk(KERN_ERR "JFFS: Erase of flash failed. "
+						       "offset = %u, erase_size = %d\n",
+						       offset , fmc->sector_size);
+
+						flash_safe_release(fmc->mtd);
+						kfree (read_buf);
+						return -1; /* bad, bad, bad! */
+
+					}
+					flash_safe_release(fmc->mtd);
+					kfree (read_buf);
+
+					return -EAGAIN; /* erased offending sector. Try mount one more time please. */
+				}
+			}else{
+			        /* Being in here means that we have found free space that ends on an erase sector
+				   boundary.
+				   Count it in if we are still under NUMFREEALLOWED *and* it is at least 1 erase 
+				   sector in length. This will keep us from picking any little ole' space as "free".
+				 */
+			         if((num_free_space < NUMFREEALLOWED) && 
+				    ((unsigned int)(pos - start) >= fmc->sector_size)){
+				           /* We really don't do anything to mark space as free, except *not* 
+					      mark it dirty and just advance the "pos" location pointer. 
+					      It will automatically be picked up as free space.
+					    */ 
+				           num_free_space++;
+				           D1(printk("Free space accepted: Starting 0x%x for 0x%x bytes\n",
+						     (unsigned int) start, (unsigned int) (pos - start)));
+				 }else{
+				         num_free_spc_not_accp++;
+					 D1(printk("Free space (#%i) found but *Not* accepted: Starting "
+						   "0x%x for 0x%x bytes\n", num_free_spc_not_accp, 
+						   (unsigned int) start, 
+						   (unsigned int) (pos - start)));
+					 
+					 /* Mark this space as dirty. We already have our free space. */
+					 D1(printk("Dirty space: Starting 0x%x for 0x%x bytes\n",
+						   (unsigned int) start, (unsigned int) (pos - start)));
+					 jffs_fmalloced(fmc, (__u32) start,
+							(__u32) (pos - start), 0);				           
+				 }
+				 
+			}
+			if(num_free_space > NUMFREEALLOWED){
+			         printk(KERN_WARNING "jffs_scan_flash(): Found free space "
+					"number %i. Only %i free space is allowed.\n",
+					num_free_space, NUMFREEALLOWED);			      
 			}
 			continue;
 
 		case JFFS_DIRTY_BITMASK:
-			/* We have found 0x00 at this position.  Scan as far
+			/* We have found 0x00000000 at this position.  Scan as far
 			   as possible to find out how much is dirty.  */
-			D1(printk("jffs_scan_flash(): 0x00 at pos 0x%lx.\n",
+			D1(printk("jffs_scan_flash(): 0x00000000 at pos 0x%lx.\n",
 				  (long)pos));
 			for (; pos < end
 			       && JFFS_DIRTY_BITMASK == flash_read_u32(fmc->mtd, pos);
@@ -675,68 +1005,33 @@ jffs_scan_flash(struct jffs_control *c)
 				  "hexdump(pos = 0x%lx, len = 128):\n",
 				  (long)pos));
 			D1(jffs_hexdump(fmc->mtd, pos, 128));
-		cont_dirty:
+
 			for (pos += 4; pos < end; pos += 4) {
 				switch (flash_read_u32(fmc->mtd, pos)) {
 				case JFFS_MAGIC_BITMASK:
-					jffs_fmalloced(fmc, (__u32) start,
-						       (__u32) (pos - start),
-						       0);
-					goto cont_scan;
 				case JFFS_EMPTY_BITMASK:
-					/* First, mark as dirty the region
-					   which really does contain crap. */
-					jffs_fmalloced(fmc, (__u32) start,
-						       (__u32) (pos - start),
-						       0);
+					/* handle these in the main switch() loop */
+					goto cont_scan;
 
-					/* Then, scan the region which looks free.
-					   Depending on how large it is, we may
-					   mark it dirty too.
-					*/
-					start = pos;
-					for (; pos < end ; pos += 4) {
-						switch (flash_read_u32(fmc->mtd, pos)) {
-						case JFFS_MAGIC_BITMASK:
-							if (pos - start < fmc->max_chunk_size) {
-								/* Not much free space. Mark it dirty. */
-								jffs_fmalloced(fmc, (__u32)start,
-									       (__u32)pos-start, 0);
-							}
-							goto cont_scan;
-
-						case JFFS_EMPTY_BITMASK:
-							/* More empty space */
-							continue;
-				
-						default: 
-							/* i.e. more dirt */
-							if (pos - start < fmc->max_chunk_size) {
-								/* There wasn't much before the dirt
-								   started again. Just mark it all dirty
-								*/
-								goto cont_dirty;
-							}
-							/* There was quite a lot of free space. Leave it
-							   free.
-							*/
-							goto cont_scan;
-						}
-					}
 				default:
 					break;
 				}
 			}
+
 			cont_scan:
+			/* First, mark as dirty the region
+			   which really does contain crap. */
+			jffs_fmalloced(fmc, (__u32) start,
+				       (__u32) (pos - start),
+				       0);
+			
 			continue;
-		}
+		}/* switch */
 
 		/* We have found the beginning of an inode.  Create a
 		   node for it unless there already is one available.  */
 		if (!node) {
-			if (!(node = (struct jffs_node *)
-				     kmalloc(sizeof(struct jffs_node),
-					     GFP_KERNEL))) {
+			if (!(node = jffs_alloc_node())) {
 				/* Free read buffer */
 				kfree (read_buf);
 
@@ -844,7 +1139,13 @@ jffs_scan_flash(struct jffs_control *c)
 			if (raw_inode.rename) {
 				deleted_file = flash_read_u32(fmc->mtd, pos);
 			}
-			checksum = jffs_checksum_flash(fmc->mtd, pos, raw_inode.dsize);
+			if (jffs_checksum_flash(fmc->mtd, pos, raw_inode.dsize, &checksum)) {
+				printk("jffs_checksum_flash() failed to calculate a checksum\n");
+				jffs_fmalloced(fmc, (__u32) start,
+					       (__u32) (pos - start), 0);
+				/* Reuse this unused struct jffs_node.  */
+				continue;
+			}				
 			pos += raw_inode.dsize
 			       + JFFS_GET_PAD_BYTES(raw_inode.dsize);
 
@@ -885,7 +1186,7 @@ jffs_scan_flash(struct jffs_control *c)
 						  node);
 			if (!node->fm) {
 				D(printk("jffs_scan_flash(): !node->fm\n"));
-				kfree(node);
+				jffs_free_node(node);
 				DJM(no_jffs_node--);
 
 				/* Free read buffer */
@@ -909,7 +1210,7 @@ jffs_scan_flash(struct jffs_control *c)
 					  GFP_KERNEL);
 				if (!dl) {
 					D(printk("jffs_scan_flash: !dl\n"));
-					kfree(node);
+					jffs_free_node(node);
 					DJM(no_jffs_node--);
 
 					/* Release the flash device */
@@ -938,7 +1239,7 @@ jffs_scan_flash(struct jffs_control *c)
 	}
 
 	if (node) {
-		kfree(node);
+		jffs_free_node(node);
 		DJM(no_jffs_node--);
 	}
 	jffs_build_end(fmc);
@@ -946,10 +1247,32 @@ jffs_scan_flash(struct jffs_control *c)
 	/* Free read buffer */
 	kfree (read_buf);
 
+	if(!num_free_space){
+	        printk(KERN_WARNING "jffs_scan_flash(): Did not find even a single "
+		       "chunk of free space. This is BAD!\n");
+	}
+
 	/* Return happy */
 	D3(printk("jffs_scan_flash(): Leaving...\n"));
 	flash_safe_release(fmc->mtd);
-	return 0;
+
+	/* This is to trap the "free size accounting screwed error. */
+	free_chunk_size1 = jffs_free_size1(fmc);
+	free_chunk_size2 = jffs_free_size2(fmc);
+
+	if (free_chunk_size1 + free_chunk_size2 != fmc->free_size) {
+
+		printk(KERN_WARNING "jffs_scan_falsh():Free size accounting screwed\n");
+		printk(KERN_WARNING "jfffs_scan_flash():free_chunk_size1 == 0x%x, "
+		       "free_chunk_size2 == 0x%x, fmc->free_size == 0x%x\n", 
+		       free_chunk_size1, free_chunk_size2, fmc->free_size);
+
+		return -1; /* Do NOT mount f/s so that we can inspect what happened.
+			      Mounting this  screwed up f/s will screw us up anyway.
+			    */
+	}	
+
+	return 0; /* as far as we are concerned, we are happy! */
 } /* jffs_scan_flash()  */
 
 
@@ -1199,7 +1522,7 @@ jffs_remove_redundant_nodes(struct jffs_file *f)
 				  mod_type));
 			jffs_unlink_node_from_version_list(f, cur);
 			jffs_fmfree(f->c->fmc, cur->fm, cur);
-			kfree(cur);
+			jffs_free_node(cur);
 			DJM(no_jffs_node--);
 		}
 		else {
@@ -1419,7 +1742,10 @@ jffs_write_node(struct jffs_control *c, struct jffs_node *node,
 		struct jffs_file *f)
 {
 	struct jffs_fmcontrol *fmc = c->fmc;
-	struct jffs_fm *fm = NULL;
+	struct jffs_fm *fm;
+	struct iovec node_iovec[4];
+	unsigned long iovec_cnt;
+
 	__u32 pos;
 	int err;
 	__u32 slack = 0;
@@ -1458,6 +1784,9 @@ jffs_write_node(struct jffs_control *c, struct jffs_node *node,
 
 	jffs_fm_write_lock(fmc);
 
+retry:
+	fm = NULL;
+	err = 0;
 	while (!fm) {
 
 		/* Deadlocks suck. */
@@ -1527,6 +1856,10 @@ jffs_write_node(struct jffs_control *c, struct jffs_node *node,
 	if (f) {
 		raw_inode->version = f->highest_version + 1;
 		D1(printk (KERN_NOTICE "jffs_write_node(): setting version of %s to %d\n", f->name, raw_inode->version));
+
+		/* if the file was deleted, set the deleted bit in the raw inode */
+		if (f->deleted)
+			raw_inode->deleted = 1;
 	}
 
 	/* Compute the checksum for the data and name chunks.  */
@@ -1545,46 +1878,48 @@ jffs_write_node(struct jffs_control *c, struct jffs_node *node,
 		  "flash at pos 0x%lx:\n", (long)pos));
 	D3(jffs_print_raw_inode(raw_inode));
 
-	/* Step 1: Write the raw jffs inode to the flash.  */
-	if ((err = flash_safe_write(fmc->mtd, pos,
-				    (u_char *)raw_inode,
-				    sizeof(struct jffs_raw_inode))) < 0) {
-		jffs_fmfree_partly(fmc, fm,
-				   total_name_size + total_data_size);
-		jffs_fm_write_unlock(fmc);
-		printk(KERN_ERR "JFFS: jffs_write_node: Failed to write "
-		       "raw_inode.\n");
-		return err;
-	}
-	pos += sizeof(struct jffs_raw_inode);
+	/* The actual raw JFFS node */
+	node_iovec[0].iov_base = (void *) raw_inode;
+	node_iovec[0].iov_len = (size_t) sizeof(struct jffs_raw_inode);
+	iovec_cnt = 1;
 
-	/* Step 2: Write the name, if there is any.  */
+	/* Get name and size if there is one */
 	if (raw_inode->nsize) {
-		if ((err = flash_safe_write(fmc->mtd, pos,
-					    (u_char *)name,
-					    raw_inode->nsize)) < 0) {
-			jffs_fmfree_partly(fmc, fm, total_data_size);
-			jffs_fm_write_unlock(fmc);
-			printk(KERN_ERR "JFFS: jffs_write_node: Failed to "
-                              "write the name.\n");
-			return err;
+		node_iovec[iovec_cnt].iov_base = (void *) name;
+		node_iovec[iovec_cnt].iov_len = (size_t) raw_inode->nsize;
+		iovec_cnt++;
+
+		if (JFFS_GET_PAD_BYTES(raw_inode->nsize)) {
+			static char allff[3]={255,255,255};
+			/* Add some extra padding if necessary */
+			node_iovec[iovec_cnt].iov_base = allff;
+			node_iovec[iovec_cnt].iov_len =
+				JFFS_GET_PAD_BYTES(raw_inode->nsize);
+			iovec_cnt++;
 		}
-		pos += total_name_size;
+	}
+
+	/* Get data and size if there is any */
+	if (raw_inode->dsize) {
+		node_iovec[iovec_cnt].iov_base = (void *) data;
+		node_iovec[iovec_cnt].iov_len = (size_t) raw_inode->dsize;
+		iovec_cnt++;
+		/* No need to pad this because we're not actually putting
+		   anything after it.
+		*/
+	}
+
+	if ((err = flash_safe_writev(fmc->mtd, node_iovec, iovec_cnt,
+				    pos) < 0)) {
+		jffs_fmfree_partly(fmc, fm, 0);
+		jffs_fm_write_unlock(fmc);
+		printk(KERN_ERR "JFFS: jffs_write_node: Failed to write, "
+		       "requested %i, wrote %i\n", total_size, err);
+		goto retry;
 	}
 	if (raw_inode->deleted)
 		f->deleted = 1;
 
-	/* Step 3: Append the actual data, if any.  */
-	if (raw_inode->dsize) {
-		if ((err = flash_safe_write(fmc->mtd, pos, data,
-					    raw_inode->dsize)) < 0) {
-			jffs_fmfree_partly(fmc, fm, 0);
-			jffs_fm_write_unlock(fmc);
-			printk(KERN_ERR "JFFS: jffs_write_node: Failed to "
-			       "write the data.\n");
-			return err;
-		}
-	}
 	jffs_fm_write_unlock(fmc);
 	D3(printk("jffs_write_node(): Leaving...\n"));
 	return raw_inode->dsize;
@@ -1609,7 +1944,7 @@ jffs_get_node_data(struct jffs_file *f, struct jffs_node *node,
 		  "version: %u, node_offset: %u\n",
 		  f->name, node->ino, node->version, node_offset));
 
-	r = min_t(u32, avail, max_size);
+	r = min(avail, max_size);
 	D3(printk(KERN_NOTICE "jffs_get_node_data\n"));
 	flash_safe_read(fmc->mtd, pos, buf, r);
 
@@ -1662,8 +1997,8 @@ jffs_read_data(struct jffs_file *f, unsigned char *buf, __u32 read_offset,
 		int r;
 		if (!node->fm) {
 			/* This node does not refer to real data.  */
-			r = min_t(u32, size - read_data,
-				node->data_size - node_offset);
+			r = min(size - read_data,
+				     node->data_size - node_offset);
 			memset(&buf[read_data], 0, r);
 		}
 		else if ((r = jffs_get_node_data(f, node, &buf[read_data],
@@ -1720,7 +2055,7 @@ jffs_free_node_list(struct jffs_file *f)
 	while (node) {
 		p = node;
 		node = node->version_next;
-		kfree(p);
+		jffs_free_node(p);
 		DJM(no_jffs_node--);
 	}
 	return 0;
@@ -1739,10 +2074,15 @@ jffs_free_file(struct jffs_file *f)
 		DJM(no_name--);
 	}
 	kfree(f);
-	DJM(no_jffs_file--);
+	no_jffs_file--;
 	return 0;
 }
 
+long
+jffs_get_file_count(void)
+{
+	return no_jffs_file;
+}
 
 /* See if a file is deleted. If so, mark that file's nodes as obsolete.  */
 int
@@ -1856,9 +2196,7 @@ jffs_delete_data(struct jffs_file *f, struct jffs_node *node)
 			D3(printk("jffs_delete_data(): Split node with "
 				  "version number %u.\n", n->version));
 
-			if (!(new_node = (struct jffs_node *)
-					 kmalloc(sizeof(struct jffs_node),
-						 GFP_KERNEL))) {
+			if (!(new_node = jffs_alloc_node())) {
 				D(printk("jffs_delete_data(): -ENOMEM\n"));
 				return -ENOMEM;
 			}
@@ -1904,8 +2242,8 @@ jffs_delete_data(struct jffs_file *f, struct jffs_node *node)
 		else {
 			/* No.  No need to split the node.  Just remove
 			   the end of the node.  */
-			int r = min_t(u32, n->data_offset + n->data_size
-				    - offset, remove_size);
+			int r = min(n->data_offset + n->data_size
+					 - offset, remove_size);
 			n->data_size -= r;
 			remove_size -= r;
 			n = n->range_next;
@@ -1927,7 +2265,7 @@ jffs_delete_data(struct jffs_file *f, struct jffs_node *node)
 			}
 			jffs_unlink_node_from_range_list(f, p);
 			jffs_unlink_node_from_version_list(f, p);
-			kfree(p);
+			jffs_free_node(p);
 			DJM(no_jffs_node--);
 		}
 		else {
@@ -2043,9 +2381,7 @@ jffs_insert_data(struct jffs_file *f, struct jffs_node *node)
 		   front of this insertion.  This "virtual node" will not
 		   be associated with any space on the flash device.  */
 		struct jffs_node *virtual_node;
-		if (!(virtual_node = (struct jffs_node *)
-				     kmalloc(sizeof(struct jffs_node),
-					     GFP_KERNEL))) {
+		if (!(virtual_node = jffs_alloc_node())) {
 			return -ENOMEM;
 		}
 
@@ -2325,7 +2661,7 @@ jffs_print_memory_allocation_statistics(void)
 
 /* Rewrite `size' bytes, and begin at `node'.  */
 int
-jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, int size)
+jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, __u32 size)
 {
 	struct jffs_control *c = f->c;
 	struct jffs_fmcontrol *fmc = c->fmc;
@@ -2343,8 +2679,7 @@ jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, int size)
 		  f->ino, (f->name ? f->name : "(null)"), size));
 
 	/* Create and initialize the new node.  */
-	if (!(new_node = (struct jffs_node *)
-			 kmalloc(sizeof(struct jffs_node), GFP_KERNEL))) {
+	if (!(new_node = jffs_alloc_node())) {
 		D(printk("jffs_rewrite_data(): "
 			 "Failed to allocate node.\n"));
 		return -ENOMEM;
@@ -2359,13 +2694,15 @@ jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, int size)
 	new_node->fm_offset = sizeof(struct jffs_raw_inode)
 			      + total_name_size;
 
+retry:
 	jffs_fm_write_lock(fmc);
+	err = 0;
 
 	if ((err = jffs_fmalloc(fmc, total_size, new_node, &fm)) < 0) {
 		DJM(no_jffs_node--);
 		jffs_fm_write_unlock(fmc);
 		D(printk("jffs_rewrite_data(): Failed to allocate fm.\n"));
-		kfree(new_node);
+		jffs_free_node(new_node);
 		return err;
 	}
 	else if (!fm->nodes) {
@@ -2405,7 +2742,7 @@ jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, int size)
 	raw_inode.nlink = f->nlink;
 	raw_inode.spare = 0;
 	raw_inode.rename = 0;
-	raw_inode.deleted = 0;
+	raw_inode.deleted = f->deleted;
 	raw_inode.accurate = 0xff;
 	raw_inode.dchksum = 0;
 	raw_inode.nchksum = 0;
@@ -2426,23 +2763,27 @@ jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, int size)
 				   total_name_size + total_data_size);
 		jffs_fm_write_unlock(fmc);
 		printk(KERN_ERR "JFFS: jffs_rewrite_data: Write error during "
-		       "rewrite. (raw inode)\n");
-		return err;
+			"rewrite. (raw inode)\n");
+		printk(KERN_ERR "JFFS: jffs_rewrite_data: Now retrying "
+			"rewrite. (raw inode)\n");
+		goto retry;
 	}
 	pos += sizeof(struct jffs_raw_inode);
 
 	/* Write the name to the flash memory.  */
 	if (f->nsize) {
 		D3(printk("jffs_rewrite_data(): Writing name \"%s\" to "
-			  "pos 0x%ul.\n", f->name, (long)pos));
+			  "pos 0x%ul.\n", f->name, (unsigned int) pos));
 		if ((err = flash_safe_write(fmc->mtd, pos,
 					    (u_char *)f->name,
 					    f->nsize)) < 0) {
 			jffs_fmfree_partly(fmc, fm, total_data_size);
 			jffs_fm_write_unlock(fmc);
 			printk(KERN_ERR "JFFS: jffs_rewrite_data: Write "
-			       "error during rewrite. (name)\n");
-			return err;
+				"error during rewrite. (name)\n");
+			printk(KERN_ERR "JFFS: jffs_rewrite_data: Now retrying "
+				"rewrite. (name)\n");
+			goto retry;
 		}
 		pos += total_name_size;
 		raw_inode.nchksum = jffs_checksum(f->name, f->nsize);
@@ -2460,7 +2801,7 @@ jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, int size)
 		}
 
 		while (size) {
-			__u32 s = min_t(int, size, PAGE_SIZE);
+			__u32 s = min(size, (__u32)PAGE_SIZE);
 			if ((r = jffs_read_data(f, (char *)page,
 						offset, s)) < s) {
 				free_page((unsigned long)page);
@@ -2479,7 +2820,7 @@ jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, int size)
 				printk(KERN_ERR "JFFS: jffs_rewrite_data: "
 				       "Write error during rewrite. "
 				       "(data)\n");
-				return err;
+				goto retry;
 			}
 			pos += r;
 			size -= r;
@@ -2506,7 +2847,7 @@ jffs_rewrite_data(struct jffs_file *f, struct jffs_node *node, int size)
 		jffs_fm_write_unlock(fmc);
 		printk(KERN_ERR "JFFS: jffs_rewrite_data: Write error during "
 		       "rewrite. (checksum)\n");
-		return err;
+		goto retry;
 	}
 
 	/* Now make the file system aware of the newly written node.  */
@@ -2528,9 +2869,10 @@ jffs_garbage_collect_next(struct jffs_control *c)
 	struct jffs_fmcontrol *fmc = c->fmc;
 	struct jffs_node *node;
 	struct jffs_file *f;
-	int size, err = 0;
-	int data_size;
-	int total_name_size;
+	int err = 0;
+	__u32 size;
+	__u32 data_size;
+	__u32 total_name_size;
 	__u32 extra_available;
 	__u32 space_needed;
 	__u32 free_chunk_size1 = jffs_free_size1(fmc);
@@ -2654,10 +2996,10 @@ jffs_garbage_collect_next(struct jffs_control *c)
 	   what's available */
 	if (size > JFFS_PAD(node->data_size) + total_name_size + 
 	    sizeof(struct jffs_raw_inode) + extra_available) {
-		D1(printk("Reducing size of new node from %d to %d to avoid "
-			  "catching our tail\n", size,
-			  JFFS_PAD(node->data_size) + JFFS_PAD(node->name_size) + 
-			  sizeof(struct jffs_raw_inode) + extra_available));
+		D1(printk("Reducing size of new node from %d to %ld to avoid "
+		       "catching our tail\n", size, 
+			  (long) (JFFS_PAD(node->data_size) + JFFS_PAD(node->name_size) + 
+			  sizeof(struct jffs_raw_inode) + extra_available)));
 		D1(printk("space_needed = %d, extra_available = %d\n", 
 			  space_needed, extra_available));
 
@@ -2789,7 +3131,7 @@ jffs_try_to_erase(struct jffs_control *c)
 		return err;
 	}
 
-	offset = fmc->head->offset - fmc->flash_start;
+	offset = fmc->head->offset;
 
 	/* Now, let's try to do the erase.  */
 	if ((err = flash_erase_region(fmc->mtd,
@@ -2821,7 +3163,7 @@ jffs_try_to_erase(struct jffs_control *c)
 				printk("JFFS: Erase failed! pos = 0x%lx\n",
 				       (long)pos);
 				jffs_hexdump(fmc->mtd, pos,
-					     min_t(u32, 256, end - pos));
+					     jffs_min(256, end - pos));
 				err = -1;
 				break;
 			}
@@ -2947,17 +3289,31 @@ static inline int thread_should_wake (struct jffs_control *c)
 		   c->fmc->free_size, c->fmc->dirty_size, c->fmc->sector_size));
 
 	/* If there's not enough dirty space to free a block, there's no point. */
-	if (c->fmc->dirty_size < c->fmc->sector_size)
+	if (c->fmc->dirty_size < c->fmc->sector_size) {
+		D2(printk(KERN_NOTICE "thread_should_wake(): Not waking. Insufficient dirty space\n"));
 		return 0;
-
+	}
+#if 1
+	/* If there is too much RAM used by the various structures, GC */
+	if (jffs_get_node_inuse() > (c->fmc->used_size/c->fmc->max_chunk_size * 5 + jffs_get_file_count() * 2 + 50)) {
+		/* FIXME: Provide proof that this test can be satisfied. We
+		   don't want a filesystem doing endless GC just because this
+		   condition cannot ever be false.
+		*/
+		D2(printk(KERN_NOTICE "thread_should_wake(): Waking due to number of nodes\n"));
+		return 1;
+	}
+#endif
 	/* If there are fewer free bytes than the threshold, GC */
-	if (c->fmc->dirty_size < c->gc_minfree_threshold)
+	if (c->fmc->free_size < c->gc_minfree_threshold) {
+		D2(printk(KERN_NOTICE "thread_should_wake(): Waking due to insufficent free space\n"));
 		return 1;
-
+	}
 	/* If there are more dirty bytes than the threshold, GC */
-	if (c->fmc->dirty_size > c->gc_maxdirty_threshold)
+	if (c->fmc->dirty_size > c->gc_maxdirty_threshold) {
+		D2(printk(KERN_NOTICE "thread_should_wake(): Waking due to excessive dirty space\n"));
 		return 1;
-	
+	}	
 	/* FIXME: What about the "There are many versions of a node" condition? */
 
 	return 0;
@@ -3039,18 +3395,12 @@ jffs_garbage_collect_thread(void *ptr)
 			case SIGKILL:
 				D1(printk("jffs_garbage_collect_thread(): SIGKILL received.\n"));
 				c->gc_task = NULL;
-				unlock_kernel();
 				complete_and_exit(&c->gc_thread_comp, 0);
 			}
 		}
 
 
 		D1(printk (KERN_NOTICE "jffs_garbage_collect_thread(): collecting.\n"));
-
-		if (fmc->dirty_size < fmc->sector_size) {
-			D1(printk(KERN_WARNING "jffs_garbage_collect_thread with insufficient dirty space (0x%x)\n", fmc->dirty_size));
-			continue;
-		}
 
 		D3(printk (KERN_NOTICE "g_c_thread(): down biglock\n"));
 		down(&fmc->biglock);

@@ -192,3 +192,68 @@ void oom_kill(void)
 	schedule();
 	return;
 }
+
+static inline int node_zones_low(pg_data_t *pgdat)
+{
+	zone_t * zone;
+	int i;
+
+	for (i = pgdat->nr_zones-1; i >= 0; i--) {
+		zone = pgdat->node_zones + i;
+
+		if (zone->free_pages > (zone->pages_low))
+			return 0;
+
+	}
+	return 1;
+}
+
+static int all_zones_low(void)
+{
+	pg_data_t * pgdat = pgdat_list;
+
+	pgdat = pgdat_list;
+	do {
+		if (node_zones_low(pgdat))
+			continue;
+		return 0;
+	} while ((pgdat = pgdat->node_next));
+
+	return 1;
+}
+
+/**
+ * out_of_memory - is the system out of memory?
+ *
+ * Returns 0 if there is still enough memory left,
+ * 1 when we are out of memory (otherwise).
+ */
+int out_of_memory(void)
+{
+	long cache_mem, limit;
+
+	/* Enough free memory?  Not OOM. */
+	if (!all_zones_low())
+		return 0;
+
+	/* Enough swap space left?  Not OOM. */
+	if (nr_swap_pages > 0)
+		return 0;
+
+	/*
+	 * If the buffer and page cache (excluding swap cache) are over
+	 * their (/proc tunable) minimum, we're still not OOM.  We test
+	 * this to make sure we don't return OOM when the system simply
+	 * has a hard time with the cache.
+	 */
+	cache_mem = atomic_read(&page_cache_size);
+	cache_mem -= swapper_space.nrpages;
+	limit = 2;
+	limit *= num_physpages / 100;
+
+	if (cache_mem > limit)
+		return 0;
+
+	/* Else... */
+	return 1;
+}

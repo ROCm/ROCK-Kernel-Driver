@@ -1,5 +1,5 @@
 /*
- * $Id: pmc551.c,v 1.17 2001/05/22 13:56:46 dwmw2 Exp $
+ * $Id: pmc551.c,v 1.19 2001/10/02 15:05:13 dwmw2 Exp $
  *
  * PMC551 PCI Mezzanine Ram Device
  *
@@ -75,7 +75,11 @@
  *       waiting for it to set .. this does not safely handle busted
  *       devices that never reset the register correctly which will
  *       cause the system to hang w/ a reboot being the only chance at
- *       recover.
+ *       recover. [sort of fixed, could be better]
+ *       * Add I2C handling of the SROM so we can read the SROM's information
+ *       about the aperture size.  This should always accurately reflect the
+ *       onboard memory size.
+ *       * Comb the init routine.  It's still a bit cludgy on a few things.
  */
 
 #include <linux/config.h>
@@ -116,161 +120,168 @@ static struct mtd_info *pmc551list;
 
 static int pmc551_erase (struct mtd_info *mtd, struct erase_info *instr)
 {
-        struct mypriv *priv = mtd->priv;
-        u32 start_addr_highbits;
-        u32 end_addr_highbits;
-        u32 start_addr_lowbits;
-        u32 end_addr_lowbits;
+        struct mypriv *priv = (struct mypriv *)mtd->priv;
+        u32 soff_hi, soff_lo; /* start address offset hi/lo */
+        u32 eoff_hi, eoff_lo; /* end address offset hi/lo */
         unsigned long end;
+	u_char *ptr;
+	size_t retlen;
 
-        end = instr->addr + instr->len;
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_erase(pos:%ld, len:%ld)\n", (long)instr->addr, (long)instr->len);
+#endif
 
-        /* Is it too much memory?  The second check find if we wrap around
-           past the end of a u32. */
-        if ((end > mtd->size) || (end < instr->addr)) {
+        end = instr->addr + instr->len - 1;
+
+        /* Is it past the end? */
+        if ( end > mtd->size ) {
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_erase() out of bounds (%ld > %ld)\n", (long)end, (long)mtd->size);
+#endif
                 return -EINVAL;
         }
 
-        start_addr_highbits = instr->addr & PMC551_ADDR_HIGH_MASK;
-        end_addr_highbits = end & PMC551_ADDR_HIGH_MASK;
-        start_addr_lowbits = instr->addr & PMC551_ADDR_LOW_MASK;
-        end_addr_lowbits = end & PMC551_ADDR_LOW_MASK;
+        eoff_hi = end & ~(priv->asize - 1);
+        soff_hi = instr->addr & ~(priv->asize - 1);
+        eoff_lo = end & (priv->asize - 1);
+        soff_lo = instr->addr & (priv->asize - 1);
 
-        pci_write_config_dword ( priv->dev,
-                                 PMC551_PCI_MEM_MAP0,
-                                 (priv->mem_map0_base_val
-                                  | start_addr_highbits));
-        if (start_addr_highbits == end_addr_highbits) {
+	pmc551_point (mtd, instr->addr, instr->len, &retlen, &ptr);
+
+        if ( soff_hi == eoff_hi || mtd->size == priv->asize) {
                 /* The whole thing fits within one access, so just one shot
                    will do it. */
-                memset(priv->start + start_addr_lowbits,
-                       0xff,
-                       instr->len);
+                memset(ptr, 0xff, instr->len);
         } else {
                 /* We have to do multiple writes to get all the data
                    written. */
-                memset(priv->start + start_addr_lowbits,
-                       0xff,
-                       priv->aperture_size - start_addr_lowbits);
-                start_addr_highbits += priv->aperture_size;
-                while (start_addr_highbits != end_addr_highbits) {
-                        pci_write_config_dword ( priv->dev,
-                                                 PMC551_PCI_MEM_MAP0,
-                                                 (priv->mem_map0_base_val
-                                                  | start_addr_highbits));
-                        memset(priv->start,
-                               0xff,
-                               priv->aperture_size);
-                        start_addr_highbits += priv->aperture_size;
+                while (soff_hi != eoff_hi) {
+#ifdef CONFIG_MTD_PMC551_DEBUG
+			printk( KERN_DEBUG "pmc551_erase() soff_hi: %ld, eoff_hi: %ld\n", (long)soff_hi, (long)eoff_hi);
+#endif
+                        memset(ptr, 0xff, priv->asize);
+                        if (soff_hi + priv->asize >= mtd->size) {
+                                goto out;
+                        }
+                        soff_hi += priv->asize;
+			pmc551_point (mtd,(priv->base_map0|soff_hi),
+				      priv->asize, &retlen, &ptr);
                 }
-                priv->curr_mem_map0_val = (priv->mem_map0_base_val
-                                           | start_addr_highbits);
-                pci_write_config_dword ( priv->dev,
-                                         PMC551_PCI_MEM_MAP0,
-                                         priv->curr_mem_map0_val);
-                memset(priv->start,
-                       0xff,
-                       end_addr_lowbits);
+                memset (ptr, 0xff, eoff_lo);
         }
 
+out:
 	instr->state = MTD_ERASE_DONE;
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_erase() done\n");
+#endif
 
         if (instr->callback) {
                 (*(instr->callback))(instr);
 	}
-
         return 0;
 }
 
 
-static void pmc551_unpoint (struct mtd_info *mtd, u_char *addr)
-{}
-
-
-static int pmc551_read (struct mtd_info *mtd,
-                        loff_t from,
-                        size_t len,
-                        size_t *retlen,
-                        u_char *buf)
+static int pmc551_point (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char **mtdbuf)
 {
         struct mypriv *priv = (struct mypriv *)mtd->priv;
-        u32 start_addr_highbits;
-        u32 end_addr_highbits;
-        u32 start_addr_lowbits;
-        u32 end_addr_lowbits;
+        u32 soff_hi;
+        u32 soff_lo;
+
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_point(%ld, %ld)\n", (long)from, (long)len);
+#endif
+
+	if (from + len > mtd->size) {
+#ifdef CONFIG_MTD_PMC551_DEBUG
+		printk(KERN_DEBUG "pmc551_point() out of bounds (%ld > %ld)\n", (long)from+len, (long)mtd->size);
+#endif
+		return -EINVAL;
+	}
+
+        soff_hi = from & ~(priv->asize - 1);
+        soff_lo = from & (priv->asize - 1);
+
+	/* Cheap hack optimization */
+	if( priv->curr_map0 != from ) {
+        	pci_write_config_dword ( priv->dev, PMC551_PCI_MEM_MAP0,
+                                 	(priv->base_map0 | soff_hi) );
+		priv->curr_map0 = soff_hi;
+	}
+
+	*mtdbuf = priv->start + soff_lo;
+	*retlen = len;
+	return 0;
+}
+
+
+static void pmc551_unpoint (struct mtd_info *mtd, u_char *addr)
+{
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_unpoint()\n");
+#endif
+}
+
+
+static int pmc551_read (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf)
+{
+        struct mypriv *priv = (struct mypriv *)mtd->priv;
+        u32 soff_hi, soff_lo; /* start address offset hi/lo */
+        u32 eoff_hi, eoff_lo; /* end address offset hi/lo */
         unsigned long end;
+	u_char *ptr;
         u_char *copyto = buf;
 
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_read(pos:%ld, len:%ld) asize: %ld\n", (long)from, (long)len, (long)priv->asize);
+#endif
+
+        end = from + len - 1;
 
         /* Is it past the end? */
-        if (from > mtd->size) {
+        if (end > mtd->size) {
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_read() out of bounds (%ld > %ld)\n", (long) end, (long)mtd->size);
+#endif
                 return -EINVAL;
         }
 
-        end = from + len;
-        start_addr_highbits = from & PMC551_ADDR_HIGH_MASK;
-        end_addr_highbits = end & PMC551_ADDR_HIGH_MASK;
-        start_addr_lowbits = from & PMC551_ADDR_LOW_MASK;
-        end_addr_lowbits = end & PMC551_ADDR_LOW_MASK;
+        soff_hi = from & ~(priv->asize - 1);
+        eoff_hi = end & ~(priv->asize - 1);
+        soff_lo = from & (priv->asize - 1);
+        eoff_lo = end & (priv->asize - 1);
 
+	pmc551_point (mtd, from, len, retlen, &ptr);
 
-        /* Only rewrite the first value if it doesn't match our current
-           values.  Most operations are on the same page as the previous
-           value, so this is a pretty good optimization. */
-        if (priv->curr_mem_map0_val !=
-                        (priv->mem_map0_base_val | start_addr_highbits)) {
-                priv->curr_mem_map0_val = (priv->mem_map0_base_val
-                                           | start_addr_highbits);
-                pci_write_config_dword ( priv->dev,
-                                         PMC551_PCI_MEM_MAP0,
-                                         priv->curr_mem_map0_val);
-        }
-
-        if (start_addr_highbits == end_addr_highbits) {
+        if (soff_hi == eoff_hi) {
                 /* The whole thing fits within one access, so just one shot
                    will do it. */
-                memcpy(copyto,
-                       priv->start + start_addr_lowbits,
-                       len);
+                memcpy(copyto, ptr, len);
                 copyto += len;
         } else {
                 /* We have to do multiple writes to get all the data
                    written. */
-                memcpy(copyto,
-                       priv->start + start_addr_lowbits,
-                       priv->aperture_size - start_addr_lowbits);
-                copyto += priv->aperture_size - start_addr_lowbits;
-                start_addr_highbits += priv->aperture_size;
-                while (start_addr_highbits != end_addr_highbits) {
-                        pci_write_config_dword ( priv->dev,
-                                                 PMC551_PCI_MEM_MAP0,
-                                                 (priv->mem_map0_base_val
-                                                  | start_addr_highbits));
-                        memcpy(copyto,
-                               priv->start,
-                               priv->aperture_size);
-                        copyto += priv->aperture_size;
-                        start_addr_highbits += priv->aperture_size;
-                        if (start_addr_highbits >= mtd->size) {
-                                /* Make sure we have the right value here. */
-                                priv->curr_mem_map0_val
-                                = (priv->mem_map0_base_val
-                                   | start_addr_highbits);
+                while (soff_hi != eoff_hi) {
+#ifdef CONFIG_MTD_PMC551_DEBUG
+			printk( KERN_DEBUG "pmc551_read() soff_hi: %ld, eoff_hi: %ld\n", (long)soff_hi, (long)eoff_hi);
+#endif
+                        memcpy(copyto, ptr, priv->asize);
+                        copyto += priv->asize;
+                        if (soff_hi + priv->asize >= mtd->size) {
                                 goto out;
                         }
+                        soff_hi += priv->asize;
+			pmc551_point (mtd, soff_hi, priv->asize, retlen, &ptr);
                 }
-                priv->curr_mem_map0_val = (priv->mem_map0_base_val
-                                           | start_addr_highbits);
-                pci_write_config_dword ( priv->dev,
-                                         PMC551_PCI_MEM_MAP0,
-                                         priv->curr_mem_map0_val);
-                memcpy(copyto,
-                       priv->start,
-                       end_addr_lowbits);
-                copyto += end_addr_lowbits;
+                memcpy(copyto, ptr, eoff_lo);
+                copyto += eoff_lo;
         }
 
 out:
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_read() done\n");
+#endif
         *retlen = copyto - buf;
         return 0;
 }
@@ -278,83 +289,61 @@ out:
 static int pmc551_write (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf)
 {
         struct mypriv *priv = (struct mypriv *)mtd->priv;
-        u32 start_addr_highbits;
-        u32 end_addr_highbits;
-        u32 start_addr_lowbits;
-        u32 end_addr_lowbits;
+        u32 soff_hi, soff_lo; /* start address offset hi/lo */
+        u32 eoff_hi, eoff_lo; /* end address offset hi/lo */
         unsigned long end;
+	u_char *ptr;
         const u_char *copyfrom = buf;
 
 
-        /* Is it past the end? */
-        if (to > mtd->size) {
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_write(pos:%ld, len:%ld) asize:%ld\n", (long)to, (long)len, (long)priv->asize);
+#endif
+
+        end = to + len - 1;
+        /* Is it past the end?  or did the u32 wrap? */
+        if (end > mtd->size ) {
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_write() out of bounds (end: %ld, size: %ld, to: %ld)\n", (long) end, (long)mtd->size, (long)to);
+#endif
                 return -EINVAL;
         }
 
-        end = to + len;
-        start_addr_highbits = to & PMC551_ADDR_HIGH_MASK;
-        end_addr_highbits = end & PMC551_ADDR_HIGH_MASK;
-        start_addr_lowbits = to & PMC551_ADDR_LOW_MASK;
-        end_addr_lowbits = end & PMC551_ADDR_LOW_MASK;
+        soff_hi = to & ~(priv->asize - 1);
+        eoff_hi = end & ~(priv->asize - 1);
+        soff_lo = to & (priv->asize - 1);
+        eoff_lo = end & (priv->asize - 1);
 
+	pmc551_point (mtd, to, len, retlen, &ptr);
 
-        /* Only rewrite the first value if it doesn't match our current
-           values.  Most operations are on the same page as the previous
-           value, so this is a pretty good optimization. */
-        if (priv->curr_mem_map0_val !=
-                        (priv->mem_map0_base_val | start_addr_highbits)) {
-                priv->curr_mem_map0_val = (priv->mem_map0_base_val
-                                           | start_addr_highbits);
-                pci_write_config_dword ( priv->dev,
-                                         PMC551_PCI_MEM_MAP0,
-                                         priv->curr_mem_map0_val);
-        }
-
-        if (start_addr_highbits == end_addr_highbits) {
+        if (soff_hi == eoff_hi) {
                 /* The whole thing fits within one access, so just one shot
                    will do it. */
-                memcpy(priv->start + start_addr_lowbits,
-                       copyfrom,
-                       len);
+                memcpy(ptr, copyfrom, len);
                 copyfrom += len;
         } else {
                 /* We have to do multiple writes to get all the data
                    written. */
-                memcpy(priv->start + start_addr_lowbits,
-                       copyfrom,
-                       priv->aperture_size - start_addr_lowbits);
-                copyfrom += priv->aperture_size - start_addr_lowbits;
-                start_addr_highbits += priv->aperture_size;
-                while (start_addr_highbits != end_addr_highbits) {
-                        pci_write_config_dword ( priv->dev,
-                                                 PMC551_PCI_MEM_MAP0,
-                                                 (priv->mem_map0_base_val
-                                                  | start_addr_highbits));
-                        memcpy(priv->start,
-                               copyfrom,
-                               priv->aperture_size);
-                        copyfrom += priv->aperture_size;
-                        start_addr_highbits += priv->aperture_size;
-                        if (start_addr_highbits >= mtd->size) {
-                                /* Make sure we have the right value here. */
-                                priv->curr_mem_map0_val
-                                = (priv->mem_map0_base_val
-                                   | start_addr_highbits);
+                while (soff_hi != eoff_hi) {
+#ifdef CONFIG_MTD_PMC551_DEBUG
+			printk( KERN_DEBUG "pmc551_write() soff_hi: %ld, eoff_hi: %ld\n", (long)soff_hi, (long)eoff_hi);
+#endif
+                	memcpy(ptr, copyfrom, priv->asize);
+                	copyfrom += priv->asize;
+                        if (soff_hi >= mtd->size) {
                                 goto out;
                         }
+                        soff_hi += priv->asize;
+			pmc551_point (mtd, soff_hi, priv->asize, retlen, &ptr);
                 }
-                priv->curr_mem_map0_val = (priv->mem_map0_base_val
-                                           | start_addr_highbits);
-                pci_write_config_dword ( priv->dev,
-                                         PMC551_PCI_MEM_MAP0,
-                                         priv->curr_mem_map0_val);
-                memcpy(priv->start,
-                       copyfrom,
-                       end_addr_lowbits);
-                copyfrom += end_addr_lowbits;
+                memcpy(ptr, copyfrom, eoff_lo);
+                copyfrom += eoff_lo;
         }
 
 out:
+#ifdef CONFIG_MTD_PMC551_DEBUG
+	printk(KERN_DEBUG "pmc551_write() done\n");
+#endif
         *retlen = copyfrom - buf;
         return 0;
 }
@@ -437,8 +426,9 @@ static u32 fixup_pmc551 (struct pci_dev *dev)
 #ifndef CONFIG_MTD_PMC551_BUGFIX
 	pci_write_config_dword( dev, PCI_BASE_ADDRESS_0, ~0 );
 	pci_read_config_dword( dev, PCI_BASE_ADDRESS_0, &size );
+	size = (size&PCI_BASE_ADDRESS_MEM_MASK);
+	size &= ~(size-1);
 	pci_write_config_dword( dev, PCI_BASE_ADDRESS_0, cfg );
-	size=~(size&PCI_BASE_ADDRESS_MEM_MASK)+1;
 #else
         /*
          * Get the size of the memory by reading all the DRAM size values
@@ -503,7 +493,6 @@ static u32 fixup_pmc551 (struct pci_dev *dev)
 	 * The loop is taken directly from Ramix's example code.  I assume that
 	 * this must be held high for some duration of time, but I can find no
 	 * documentation refrencing the reasons why.
-	 * 
          */
         for ( i = 1; i<=8 ; i++) {
                 pci_write_config_word (dev, PMC551_SDRAM_CMD, 0x0df);
@@ -558,8 +547,10 @@ static u32 fixup_pmc551 (struct pci_dev *dev)
 	 * it's possible that the reset of the V370PDC nuked the original
 	 * setup
          */
+	/*
         cfg |= PCI_BASE_ADDRESS_MEM_PREFETCH;
 	pci_write_config_dword( dev, PCI_BASE_ADDRESS_0, cfg );
+	*/
 
         /*
          * Turn PCI memory and I/O bus access back on
@@ -571,7 +562,7 @@ static u32 fixup_pmc551 (struct pci_dev *dev)
          * Some screen fun
          */
         printk(KERN_DEBUG "pmc551: %d%c (0x%x) of %sprefetchable memory at 0x%lx\n",
-	       (size<1024)?size:(size<1048576)?size/1024:size/1024/1024,
+	       (size<1024)?size:(size<1048576)?size>>10:size>>20,
                (size<1024)?'B':(size<1048576)?'K':'M',
 	       size, ((dcmd&(0x1<<3)) == 0)?"non-":"",
                PCI_BASE_ADDRESS(dev)&PCI_BASE_ADDRESS_MEM_MASK );
@@ -644,19 +635,15 @@ static u32 fixup_pmc551 (struct pci_dev *dev)
  * Kernel version specific module stuffages
  */
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_pmc551 init_module
-#define cleanup_pmc551 cleanup_module
-#endif
 
-#if defined(MODULE)
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mark Ferrell <mferrell@mvista.com>");
 MODULE_DESCRIPTION(PMC551_VERSION);
 MODULE_PARM(msize, "i");
-MODULE_PARM_DESC(msize, "memory size, 6=32M, 7=64M, 8=128M, etc.. [32M-1024M]");
+MODULE_PARM_DESC(msize, "memory size in Megabytes [1 - 1024]");
 MODULE_PARM(asize, "i");
-MODULE_PARM_DESC(asize, "aperture size, must be <= memsize [1M-1024M]");
-#endif
+MODULE_PARM_DESC(asize, "aperture size, must be <= memsize [1-1024]");
+
 /*
  * Stuff these outside the ifdef so as to not bust compiled in driver support
  */
@@ -679,19 +666,19 @@ int __init init_pmc551(void)
         u32 length = 0;
 
 	if(msize) {
-		if (msize < 6 || msize > 11 ) {
-			printk(KERN_NOTICE "pmc551: Invalid memory size\n");
-			return -ENODEV;
+		msize = (1 << (ffs(msize) - 1))<<20;
+		if (msize > (1<<30)) {
+			printk(KERN_NOTICE "pmc551: Invalid memory size [%d]\n", msize);
+			return -EINVAL;
 		}
-		msize = (512*1024)<<msize;
 	}
 
 	if(asize) {
-		if (asize < 1 || asize > 11 ) {
-			printk(KERN_NOTICE "pmc551: Invalid aperture size\n");
-			return -ENODEV;
+		asize = (1 << (ffs(asize) - 1))<<20;
+		if (asize > (1<<30) ) {
+			printk(KERN_NOTICE "pmc551: Invalid aperture size [%d]\n", asize);
+			return -EINVAL;
 		}
-		asize = (512*1024)<<asize;
 	}
 
         printk(KERN_INFO PMC551_VERSION);
@@ -706,13 +693,14 @@ int __init init_pmc551(void)
          */
         for( count = 0; count < MAX_MTD_DEVICES; count++ ) {
 
-                if ( (PCI_Device = pci_find_device( PCI_VENDOR_ID_V3_SEMI,
-                                                    PCI_DEVICE_ID_V3_SEMI_V370PDC, PCI_Device ) ) == NULL) {
+                if ((PCI_Device = pci_find_device(PCI_VENDOR_ID_V3_SEMI,
+                                                  PCI_DEVICE_ID_V3_SEMI_V370PDC,
+						  PCI_Device ) ) == NULL) {
                         break;
                 }
 
-                printk(KERN_NOTICE "pmc551: Found PCI V370PDC IRQ:%d\n",
-                       PCI_Device->irq);
+                printk(KERN_NOTICE "pmc551: Found PCI V370PDC at 0x%lX\n",
+				    PCI_BASE_ADDRESS(PCI_Device));
 
                 /*
                  * The PMC551 device acts VERY weird if you don't init it
@@ -726,9 +714,16 @@ int __init init_pmc551(void)
                         printk(KERN_NOTICE "pmc551: Cannot init SDRAM\n");
                         break;
                 }
+
+		/*
+		 * This is needed untill the driver is capable of reading the
+		 * onboard I2C SROM to discover the "real" memory size.
+		 */
 		if(msize) {
 			length = msize;
 			printk(KERN_NOTICE "pmc551: Using specified memory size 0x%x\n", length);
+		} else {
+			msize = length;
 		}
 
                 mtd = kmalloc(sizeof(struct mtd_info), GFP_KERNEL);
@@ -747,71 +742,57 @@ int __init init_pmc551(void)
                 }
                 memset(priv, 0, sizeof(*priv));
                 mtd->priv = priv;
-
                 priv->dev = PCI_Device;
-		if(asize) {
-			if(asize > length) {
-				asize=length;
-				printk(KERN_NOTICE "pmc551: reducing aperture size to fit memory [0x%x]\n",asize);
-			} else {
-				printk(KERN_NOTICE "pmc551: Using specified aperture size 0x%x\n", asize);
-			}
-			priv->aperture_size = asize;
+
+		if(asize > length) {
+			printk(KERN_NOTICE "pmc551: reducing aperture size to fit %dM\n",length>>20);
+			priv->asize = asize = length;
+		} else if (asize == 0 || asize == length) {
+			printk(KERN_NOTICE "pmc551: Using existing aperture size %dM\n", length>>20);
+			priv->asize = asize = length;
 		} else {
-                	priv->aperture_size = length;
+			printk(KERN_NOTICE "pmc551: Using specified aperture size %dM\n", asize>>20);
+			priv->asize = asize;
 		}
                 priv->start = ioremap((PCI_BASE_ADDRESS(PCI_Device)
                                        & PCI_BASE_ADDRESS_MEM_MASK),
-                                      priv->aperture_size);
+                                      priv->asize);
 		
 		if (!priv->start) {
+			printk(KERN_NOTICE "pmc551: Unable to map IO space\n");
                         kfree(mtd->priv);
                         kfree(mtd);
 			break;
 		}
-		/*
-		 * Due to the dynamic nature of the code, we need to figure
-		 * this out in order to stuff the register to set the proper
-		 * aperture size.  If you know of an easier way to do this then
-		 * PLEASE help yourself.
-		 *
-		 * Not with bloody floating point, you don't. Consider yourself
-		 * duly LARTed. dwmw2.
-		 */
-		{
-			u32 size;
-			u16 bits;
-			size = priv->aperture_size>>20;
-			for(bits=0;!(size&0x01)&&size>0;bits++,size=size>>1);
-			//size=((u32)((log10(priv->aperture_size)/.30103)-19)<<4);
-                	priv->mem_map0_base_val = (PMC551_PCI_MEM_MAP_REG_EN
-						| PMC551_PCI_MEM_MAP_ENABLE
-						| size);
+
 #ifdef CONFIG_MTD_PMC551_DEBUG
-			printk(KERN_NOTICE "pmc551: aperture set to %d[%d]\n", 
-					size, size>>4);
+		printk( KERN_DEBUG "pmc551: setting aperture to %d\n",
+			ffs(priv->asize>>20)-1);
 #endif
-		}
-                priv->curr_mem_map0_val = priv->mem_map0_base_val;
 
-                pci_write_config_dword ( priv->dev,
-                                         PMC551_PCI_MEM_MAP0,
-                                         priv->curr_mem_map0_val);
+                priv->base_map0 = ( PMC551_PCI_MEM_MAP_REG_EN
+				  | PMC551_PCI_MEM_MAP_ENABLE
+				  | (ffs(priv->asize>>20)-1)<<4 );
+                priv->curr_map0 = priv->base_map0;
+                pci_write_config_dword ( priv->dev, PMC551_PCI_MEM_MAP0,
+                                         priv->curr_map0 );
 
-                mtd->size 		= length;
-                mtd->flags 		= (MTD_CLEAR_BITS
-                                | MTD_SET_BITS
-                                | MTD_WRITEB_WRITEABLE
-                                | MTD_VOLATILE);
-                mtd->erase 		= pmc551_erase;
-                mtd->point 		= NULL;
-                mtd->unpoint 		= pmc551_unpoint;
-                mtd->read 		= pmc551_read;
-                mtd->write 		= pmc551_write;
-                mtd->module 		= THIS_MODULE;
-                mtd->type 		= MTD_RAM;
-                mtd->name 		= "PMC551 RAM board";
-                mtd->erasesize 		= 0x10000;
+#ifdef CONFIG_MTD_PMC551_DEBUG
+		printk( KERN_DEBUG "pmc551: aperture set to %d\n", 
+			(priv->base_map0 & 0xF0)>>4 );
+#endif
+
+                mtd->size 	= msize;
+                mtd->flags 	= MTD_CAP_RAM;
+                mtd->erase 	= pmc551_erase;
+                mtd->read 	= pmc551_read;
+                mtd->write 	= pmc551_write;
+                mtd->point 	= pmc551_point;
+                mtd->unpoint 	= pmc551_unpoint;
+                mtd->module 	= THIS_MODULE;
+                mtd->type 	= MTD_RAM;
+                mtd->name 	= "PMC551 RAM board";
+                mtd->erasesize 	= 0x10000;
 
                 if (add_mtd_device(mtd)) {
                         printk(KERN_NOTICE "pmc551: Failed to register new device\n");
@@ -822,12 +803,12 @@ int __init init_pmc551(void)
                 }
                 printk(KERN_NOTICE "Registered pmc551 memory device.\n");
                 printk(KERN_NOTICE "Mapped %dM of memory from 0x%p to 0x%p\n",
-                       priv->aperture_size/1024/1024,
+                       priv->asize>>20,
                        priv->start,
-                       priv->start + priv->aperture_size);
+                       priv->start + priv->asize);
                 printk(KERN_NOTICE "Total memory is %d%c\n",
 	       		(length<1024)?length:
-				(length<1048576)?length/1024:length/1024/1024,
+				(length<1048576)?length>>10:length>>20,
                		(length<1024)?'B':(length<1048576)?'K':'M');
 		priv->nextpmc551 = pmc551list;
 		pmc551list = mtd;
@@ -835,7 +816,7 @@ int __init init_pmc551(void)
         }
 
         if( !pmc551list ) {
-                printk(KERN_NOTICE "pmc551: not detected,\n");
+                printk(KERN_NOTICE "pmc551: not detected\n");
                 return -ENODEV;
         } else {
 		printk(KERN_NOTICE "pmc551: %d pmc551 devices loaded\n", found);
@@ -856,12 +837,15 @@ static void __exit cleanup_pmc551(void)
 		priv = (struct mypriv *)mtd->priv;
 		pmc551list = priv->nextpmc551;
 		
-		if(priv->start)
-			iounmap(priv->start);
+		if(priv->start) {
+			printk (KERN_DEBUG "pmc551: unmapping %dM starting at 0x%p\n",
+				priv->asize>>20, priv->start);
+			iounmap (priv->start);
+		}
 		
 		kfree (mtd->priv);
-		del_mtd_device(mtd);
-		kfree(mtd);
+		del_mtd_device (mtd);
+		kfree (mtd);
 		found++;
 	}
 

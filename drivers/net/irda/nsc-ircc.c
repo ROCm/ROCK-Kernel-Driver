@@ -112,7 +112,7 @@ static char *dongle_types[] = {
 	"Reserved",
 	"Reserved",
 	"HP HSDL-1100/HSDL-2100",
-	"HP HSDL-1100/HSDL-2100"
+	"HP HSDL-1100/HSDL-2100",
 	"Supports SIR Mode only",
 	"No dongle connected",
 };

@@ -16,7 +16,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
 
-   $Id: elan-104nc.c,v 1.10 2001/06/02 14:30:44 dwmw2 Exp $
+   $Id: elan-104nc.c,v 1.12 2001/10/02 15:05:14 dwmw2 Exp $
 
 The ELAN-104NC has up to 8 Mibyte of Intel StrataFlash (28F320/28F640) in x16
 mode.  This drivers uses the CFI probe and Intel Extended Command Set drivers.
@@ -213,12 +213,7 @@ static struct map_info elan_104nc_map = {
 /* MTD device for all of the flash. */
 static struct mtd_info *all_mtd;
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_elan_104nc init_module
-#define cleanup_elan_104nc cleanup_module
-#endif
-
-mod_exit_t cleanup_elan_104nc(void)
+static void __exit cleanup_elan_104nc(void)
 {
 	if( all_mtd ) {
 		del_mtd_partitions( all_mtd );
@@ -229,7 +224,7 @@ mod_exit_t cleanup_elan_104nc(void)
 	release_region(PAGE_IO,PAGE_IO_SIZE);
 }
 
-mod_init_t init_elan_104nc(void)
+int __init init_elan_104nc(void)
 {
 	/* Urg! We use I/O port 0x22 without request_region()ing it */
 	/*
@@ -259,7 +254,7 @@ mod_init_t init_elan_104nc(void)
 	elan_104nc_setup();
 
 	/* Probe for chip. */
-	all_mtd = do_map_probe("cfi",  &elan_104nc_map );
+	all_mtd = do_map_probe("cfi_probe",  &elan_104nc_map );
 	if( !all_mtd ) {
 		cleanup_elan_104nc();
 		return -ENXIO;
@@ -275,3 +270,8 @@ mod_init_t init_elan_104nc(void)
 
 module_init(init_elan_104nc);
 module_exit(cleanup_elan_104nc);
+
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Arcom Control Systems Ltd.");
+MODULE_DESCRIPTION("MTD map driver for Arcom Control Systems ELAN-104NC");

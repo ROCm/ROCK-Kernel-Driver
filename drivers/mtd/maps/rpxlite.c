@@ -1,5 +1,5 @@
 /*
- * $Id: rpxlite.c,v 1.12 2001/04/26 15:40:23 dwmw2 Exp $
+ * $Id: rpxlite.c,v 1.15 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * Handle mapping of the flash on the RPX Lite and CLLF boards
  */
@@ -19,17 +19,17 @@ static struct mtd_info *mymtd;
 
 __u8 rpxlite_read8(struct map_info *map, unsigned long ofs)
 {
-	return readb(map->map_priv_1 + ofs);
+	return __raw_readb(map->map_priv_1 + ofs);
 }
 
 __u16 rpxlite_read16(struct map_info *map, unsigned long ofs)
 {
-	return readw(map->map_priv_1 + ofs);
+	return __raw_readw(map->map_priv_1 + ofs);
 }
 
 __u32 rpxlite_read32(struct map_info *map, unsigned long ofs)
 {
-	return readl(map->map_priv_1 + ofs);
+	return __raw_readl(map->map_priv_1 + ofs);
 }
 
 void rpxlite_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
@@ -39,17 +39,20 @@ void rpxlite_copy_from(struct map_info *map, void *to, unsigned long from, ssize
 
 void rpxlite_write8(struct map_info *map, __u8 d, unsigned long adr)
 {
-	writeb(d, map->map_priv_1 + adr);
+	__raw_writeb(d, map->map_priv_1 + adr);
+	mb();
 }
 
 void rpxlite_write16(struct map_info *map, __u16 d, unsigned long adr)
 {
-	writew(d, map->map_priv_1 + adr);
+	__raw_writew(d, map->map_priv_1 + adr);
+	mb();
 }
 
 void rpxlite_write32(struct map_info *map, __u32 d, unsigned long adr)
 {
-	writel(d, map->map_priv_1 + adr);
+	__raw_writel(d, map->map_priv_1 + adr);
+	mb();
 }
 
 void rpxlite_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
@@ -71,11 +74,6 @@ struct map_info rpxlite_map = {
 	copy_to: rpxlite_copy_to
 };
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_rpxlite init_module
-#define cleanup_rpxlite cleanup_module
-#endif
-
 int __init init_rpxlite(void)
 {
 	printk(KERN_NOTICE "RPX Lite or CLLF flash device: %x at %x\n", WINDOW_SIZE*4, WINDOW_ADDR);
@@ -85,7 +83,7 @@ int __init init_rpxlite(void)
 		printk("Failed to ioremap\n");
 		return -EIO;
 	}
-	mymtd = do_map_probe("cfi", &rpxlite_map);
+	mymtd = do_map_probe("cfi_probe", &rpxlite_map);
 	if (mymtd) {
 		mymtd->module = THIS_MODULE;
 		add_mtd_device(mymtd);
@@ -110,3 +108,7 @@ static void __exit cleanup_rpxlite(void)
 
 module_init(init_rpxlite);
 module_exit(cleanup_rpxlite);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Arnold Christensen <AKC@pel.dk>");
+MODULE_DESCRIPTION("MTD map driver for RPX Lite and CLLF boards");

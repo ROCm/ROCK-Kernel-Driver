@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: write.c,v 1.27 2001/04/11 15:29:34 dwmw2 Exp $
+ * $Id: write.c,v 1.28 2001/05/01 16:25:25 dwmw2 Exp $
  *
  */
 
@@ -255,7 +255,7 @@ struct jffs2_full_dirent *jffs2_write_dirent(struct inode *inode, struct jffs2_r
 	struct iovec vecs[2];
 	int ret;
 
-	D1(printk(KERN_DEBUG "jffs2_write_dirent(ino #%u, name \"%s\"->ino #%u\n", rd->pino, name, rd->ino));
+	D1(printk(KERN_DEBUG "jffs2_write_dirent(ino #%u, name at *0x%p \"%s\"->ino #%u, name_crc 0x%08x)\n", rd->pino, name, name, rd->ino, rd->name_crc));
 	writecheck(c->mtd, flash_ofs);
 
 	D1(if(rd->hdr_crc != crc32(0, rd, sizeof(struct jffs2_unknown_node)-4)) {

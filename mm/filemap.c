@@ -624,9 +624,6 @@ static inline void __add_to_page_cache(struct page * page,
 {
 	unsigned long flags;
 
-	if (PageLocked(page))
-		BUG();
-
 	flags = page->flags & ~(1 << PG_uptodate | 1 << PG_error | 1 << PG_dirty | 1 << PG_referenced | 1 << PG_arch_1 | 1 << PG_checked);
 	page->flags = flags | (1 << PG_locked);
 	page_cache_get(page);
@@ -643,7 +640,7 @@ void add_to_page_cache(struct page * page, struct address_space * mapping, unsig
 	spin_unlock(&pagecache_lock);
 }
 
-static int add_to_page_cache_unique(struct page * page,
+int add_to_page_cache_unique(struct page * page,
 	struct address_space *mapping, unsigned long offset,
 	struct page **hash)
 {

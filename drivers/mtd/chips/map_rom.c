@@ -1,9 +1,10 @@
 /*
  * Common code to handle map devices which are simple ROM
  * (C) 2000 Red Hat. GPL'd.
- * $Id: map_rom.c,v 1.14 2001/06/02 14:30:43 dwmw2 Exp $
+ * $Id: map_rom.c,v 1.17 2001/10/02 15:05:12 dwmw2 Exp $
  */
 
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -21,7 +22,7 @@ struct mtd_info *map_rom_probe(struct map_info *map);
 
 static struct mtd_chip_driver maprom_chipdrv = {
 	probe: map_rom_probe,
-	name: "rom",
+	name: "map_rom",
 	module: THIS_MODULE
 };
 
@@ -45,6 +46,8 @@ struct mtd_info *map_rom_probe(struct map_info *map)
 	mtd->sync = maprom_nop;
 	mtd->flags = MTD_CAP_ROM;
 	mtd->erasesize = 131072;
+ 	while(mtd->size & (mtd->erasesize - 1))
+		mtd->erasesize >>= 1;
 
 	MOD_INC_USE_COUNT;
 	return mtd;
@@ -71,21 +74,20 @@ static int maprom_write (struct mtd_info *mtd, loff_t to, size_t len, size_t *re
 	return -EIO;
 }
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define map_rom_init init_module
-#define map_rom_exit cleanup_module
-#endif
-
-mod_init_t map_rom_init(void)
+int __init map_rom_init(void)
 {
 	register_mtd_chip_driver(&maprom_chipdrv);
 	return 0;
 }
 
-mod_exit_t map_rom_exit(void)
+static void __exit map_rom_exit(void)
 {
 	unregister_mtd_chip_driver(&maprom_chipdrv);
 }
 
 module_init(map_rom_init);
 module_exit(map_rom_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
+MODULE_DESCRIPTION("MTD chip driver for ROM chips");

@@ -31,12 +31,13 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: compr_rubin.c,v 1.11 2001/03/21 16:20:48 dwmw2 Exp $
+ * $Id: compr_rubin.c,v 1.13 2001/09/23 10:06:05 rmk Exp $
  *
  */
 
  
 #include <linux/string.h>
+#include <linux/types.h>
 #include "compr_rubin.h"
 #include "histo_mips.h"
 
@@ -114,26 +115,51 @@ void init_decode(struct rubin_state *rs, int div, int *bits)
 		;
 }
 
+static void __do_decode(struct rubin_state *rs, unsigned long p, unsigned long q)
+{
+	register unsigned long lower_bits_rubin = LOWER_BITS_RUBIN;
+	unsigned long rec_q;
+	int c, bits = 0;
 
+	/*
+	 * First, work out how many bits we need from the input stream.
+	 * Note that we have already done the initial check on this
+	 * loop prior to calling this function.
+	 */
+	do {
+		bits++;
+		q &= lower_bits_rubin;
+		q <<= 1;
+		p <<= 1;
+	} while ((q >= UPPER_BIT_RUBIN) || ((p + q) <= UPPER_BIT_RUBIN));
+
+	rs->p = p;
+	rs->q = q;
+
+	rs->bit_number += bits;
+
+	/*
+	 * Now get the bits.  We really want this to be "get n bits".
+	 */
+	rec_q = rs->rec_q;
+	do {
+		c = pullbit(&rs->pp);
+		rec_q &= lower_bits_rubin;
+		rec_q <<= 1;
+		rec_q += c;
+	} while (--bits);
+	rs->rec_q = rec_q;
+}
 
 int decode(struct rubin_state *rs, long A, long B)
 {
-
-	char c;
-	long i0, i1, threshold;
+	unsigned long p = rs->p, q = rs->q;
+	long i0, threshold;
 	int symbol;
-	
 
-	while ((rs->q >= UPPER_BIT_RUBIN) || ((rs->p + rs->q) <= UPPER_BIT_RUBIN)) {
-		c = pullbit(&rs->pp);
-		rs->bit_number++;
-		rs->q &= LOWER_BITS_RUBIN;
-		rs->q <<= 1;
-		rs->p <<= 1;
-		rs->rec_q &= LOWER_BITS_RUBIN;
-		rs->rec_q <<= 1;
-		rs->rec_q += c;
-	};
+	if (q >= UPPER_BIT_RUBIN || ((p + q) <= UPPER_BIT_RUBIN))
+		__do_decode(rs, p, q);
+
 	i0 = A * rs->p / (A + B);
 	if (i0 <= 0) {
 		i0 = 1;
@@ -141,19 +167,16 @@ int decode(struct rubin_state *rs, long A, long B)
 	if (i0 >= rs->p) {
 		i0 = rs->p - 1;
 	}
-	i1 = rs->p - i0;
-
 
 	threshold = rs->q + i0;
-	if (rs->rec_q < threshold) {
-		symbol = 0;
-		rs->p = i0;
-	} else {
-		symbol = 1;
-		rs->p = i1;
+	symbol = rs->rec_q >= threshold;
+	if (rs->rec_q >= threshold) {
 		rs->q += i0;
+		i0 = rs->p - i0;
 	}
-	
+
+	rs->p = i0;
+
 	return symbol;
 }
 
@@ -179,11 +202,11 @@ static int out_byte(struct rubin_state *rs, unsigned char byte)
 
 static int in_byte(struct rubin_state *rs)
 {
-	int i;
-	int result=0;
-	for (i=0;i<8;i++) {
-		result |=  decode(rs, rs->bit_divider-rs->bits[i],rs->bits[i])<<i;
-	}
+	int i, result = 0, bit_divider = rs->bit_divider;
+
+	for (i = 0; i < 8; i++)
+		result |= decode(rs, bit_divider - rs->bits[i], rs->bits[i]) << i;
+
 	return result;
 }
 

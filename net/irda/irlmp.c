@@ -781,10 +781,6 @@ void irlmp_do_discovery(int nslots)
  */
 void irlmp_discovery_request(int nslots)
 {
-	/* Check if user wants to override the default */
-	if (nslots == DISCOVERY_DEFAULT_SLOTS)
-		nslots = sysctl_discovery_slots;
-
 	/* Return current cached discovery log */
 	irlmp_discovery_confirm(irlmp->cachelog);
 
@@ -792,21 +788,43 @@ void irlmp_discovery_request(int nslots)
 	 * Start a single discovery operation if discovery is not already
          * running 
 	 */
-	if (!sysctl_discovery)
+	if (!sysctl_discovery) {
+		/* Check if user wants to override the default */
+		if (nslots == DISCOVERY_DEFAULT_SLOTS)
+			nslots = sysctl_discovery_slots;
+
 		irlmp_do_discovery(nslots);
-	/* Note : we never do expiry here. Expiry will run on the
-	 * discovery timer regardless of the state of sysctl_discovery
-	 * Jean II */
+		/* Note : we never do expiry here. Expiry will run on the
+		 * discovery timer regardless of the state of sysctl_discovery
+		 * Jean II */
+	}
 }
 
 /*
- * Function irlmp_get_discoveries (pn, mask)
+ * Function irlmp_get_discoveries (pn, mask, slots)
  *
  *    Return the current discovery log
  *
  */
-struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask)
+struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask, int nslots)
 {
+	/* If discovery is not enabled, it's likely that the discovery log
+	 * will be empty. So, we trigger a single discovery, so that next
+	 * time the user call us there might be some results in the log.
+	 * Jean II
+	 */
+	if (!sysctl_discovery) {
+		/* Check if user wants to override the default */
+		if (nslots == DISCOVERY_DEFAULT_SLOTS)
+			nslots = sysctl_discovery_slots;
+
+		/* Start discovery - will complete sometime later */
+		irlmp_do_discovery(nslots);
+		/* Note : we never do expiry here. Expiry will run on the
+		 * discovery timer regardless of the state of sysctl_discovery
+		 * Jean II */
+	}
+
 	/* Return current cached discovery log */
 	return(irlmp_copy_discoveries(irlmp->cachelog, pn, mask));
 }

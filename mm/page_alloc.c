@@ -400,12 +400,14 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 			if (!z)
 				break;
 
-			if (zone_free_pages(z, order) > z->pages_high) {
+			if (zone_free_pages(z, order) > z->pages_min) {
 				page = rmqueue(z, order);
 				if (page)
 					return page;
 			}
 		}
+		
+		goto rebalance;
 	}
 
 	printk(KERN_NOTICE "__alloc_pages: %u-order allocation failed (gfp=0x%x/%i) from %p\n",
@@ -515,6 +517,30 @@ void show_free_areas_core(pg_data_t *pgdat)
 {
  	unsigned int order;
 	unsigned type;
+	pg_data_t *tmpdat = pgdat;
+
+	printk("Free pages:      %6dkB (%6dkB HighMem)\n",
+		nr_free_pages() << (PAGE_SHIFT-10),
+		nr_free_highpages() << (PAGE_SHIFT-10));
+
+	while (tmpdat) {
+		zone_t *zone;
+		for (zone = tmpdat->node_zones;
+			       	zone < tmpdat->node_zones + MAX_NR_ZONES; zone++)
+			printk("Zone:%s freepages:%6lukB min:%6luKB low:%6lukB " 
+				       "high:%6lukB\n", 
+					zone->name,
+					(zone->free_pages)
+					<< ((PAGE_SHIFT-10)),
+					zone->pages_min
+					<< ((PAGE_SHIFT-10)),
+					zone->pages_low
+					<< ((PAGE_SHIFT-10)),
+					zone->pages_high
+					<< ((PAGE_SHIFT-10)));
+			
+		tmpdat = tmpdat->node_next;
+	}
 
 	printk("Free pages:      %6dkB (%6dkB HighMem)\n",
 		nr_free_pages() << (PAGE_SHIFT-10),

@@ -3,7 +3,7 @@
  *
  *	vlsi_ir.h:	VLSI82C147 PCI IrDA controller driver for Linux
  *
- *	Version:	0.1, Aug 6, 2001
+ *	Version:	0.3, Sep 30, 2001
  *
  *	Copyright (c) 2001 Martin Diehl
  *
@@ -49,7 +49,7 @@ enum vlsi_pci_regs {
  *
  * On my HP OB-800 the BIOS sets external 40MHz clock as source
  * when IrDA enabled and I've never detected any PLL lock success.
- * Apparently the 14.31818MHz OSC input required for the PLL to work
+ * Apparently the 14.3...MHz OSC input required for the PLL to work
  * is not connected and the 40MHz EXTCLK is provided externally.
  * At least this is what makes the driver working for me.
  */
@@ -59,7 +59,7 @@ enum vlsi_pci_clkctl {
 	/* PLL control */
 
 	CLKCTL_NO_PD		= 0x04,		/* PD# (inverted power down) signal,
-						 * i.e. PLL is powered, if PD_INV is set */
+						 * i.e. PLL is powered, if NO_PD set */
 	CLKCTL_LOCK		= 0x40,		/* (ro) set, if PLL is locked */
 
 	/* clock source selection */
@@ -71,7 +71,7 @@ enum vlsi_pci_clkctl {
 
 	CLKCTL_CLKSTP		= 0x80,		/* set to disconnect from selected clock source */
 	CLKCTL_WAKE		= 0x08		/* set to enable wakeup feature: whenever IR activity
-						 * is detected, PD_INV gets set and CLKSTP cleared */
+						 * is detected, NO_PD gets set and CLKSTP cleared */
 };
 
 /* ------------------------------------------ */
@@ -105,8 +105,8 @@ enum vlsi_pci_clkctl {
 	 * restriction to the first 16MB of physical address range.
 	 * Hence the approach here is to enable PCI busmaster support using
 	 * the correct 32bit dma-mask used by the chip. Afterwards the device's
-	 * dma-mask gets restricted to 24bit, which must be honoured by all
-	 * allocations for memory areas to be exposed to the chip.
+	 * dma-mask gets restricted to 24bit, which must be honoured somehow by
+	 * all allocations for memory areas to be exposed to the chip ...
 	 *
 	 * Note:
 	 * Don't be surprised to get "Setting latency timer..." messages every
@@ -119,7 +119,7 @@ enum vlsi_pci_clkctl {
 
 /* VLSI_PCIIRMISC: IR Miscellaneous Register (u8, rw) */
 
-/* leagcy UART emulation - not used by this driver - would require:
+/* legacy UART emulation - not used by this driver - would require:
  * (see below for some register-value definitions)
  *
  *	- IRMISC_UARTEN must be set to enable UART address decoding
@@ -135,7 +135,7 @@ enum vlsi_pci_irmisc {
 
 	IRMISC_IRRAIL		= 0x40,		/* (ro?) IR rail power indication (and control?)
 						 * 0=3.3V / 1=5V. Probably set during power-on?
-						 * Not touched by driver */
+						 * unclear - not touched by driver */
 	IRMISC_IRPD		= 0x08,		/* transceiver power down, if set */
 
 	/* legacy UART control */
@@ -168,7 +168,7 @@ enum vlsi_pio_regs {
 	VLSI_PIO_RINGBASE	= 0x04,		/* [23:10] of ring address (u16, rw) */
 	VLSI_PIO_RINGSIZE	= 0x06,		/* rx/tx ring size (u16, rw) */
 	VLSI_PIO_PROMPT		= 0x08, 	/* triggers ring processing (u16, wo) */
-						/* 0x0a-0x0f: reserved, duplicated UART regs */
+	/* 0x0a-0x0f: reserved / duplicated UART regs */
 	VLSI_PIO_IRCFG		= 0x10,		/* configuration select (u16, rw) */
 	VLSI_PIO_SIRFLAG	= 0x12,		/* BOF/EOF for filtered SIR (u16, ro) */
 	VLSI_PIO_IRENABLE	= 0x14,		/* enable and status register (u16, rw/ro) */
@@ -176,7 +176,7 @@ enum vlsi_pio_regs {
 	VLSI_PIO_NPHYCTL	= 0x18,		/* next physical layer select (u16, rw) */
 	VLSI_PIO_MAXPKT		= 0x1a,		/* [11:0] max len for packet receive (u16, rw) */
 	VLSI_PIO_RCVBCNT	= 0x1c		/* current receive-FIFO byte count (u16, ro) */
-						/* 0x1e-0x1f: reserved, duplicated UART regs */
+	/* 0x1e-0x1f: reserved / duplicated UART regs */
 };
 
 /* ------------------------------------------ */
@@ -188,7 +188,7 @@ enum vlsi_pio_regs {
  * interrupt condition bits:
  * 		set according to corresponding interrupt source
  *		(regardless of the state of the enable bits)
- *		enable bit status indicated whether interrupt gets raised
+ *		enable bit status indicates whether interrupt gets raised
  *		write-to-clear
  * note: RPKTINT and TPKTINT behave different in legacy UART mode (which we don't use :-)
  */
@@ -212,16 +212,16 @@ enum vlsi_pio_irintr {
 
 /* VLSI_PIO_RINGPTR: Ring Pointer Read-Back Register (u16, ro) */
 
-#define MAX_RING_DESCR		64	/* tx, rx rings may contain up to 64 descr each */
-
 /* _both_ ring pointers are indices relative to the _entire_ rx,tx-ring!
  * i.e. the referenced descriptor is located
  * at RINGBASE + PTR * sizeof(descr) for rx and tx
- * therefore, the tx-pointer has offset by MAX_RING_DESCR
+ * therefore, the tx-pointer has offset MAX_RING_DESCR
  */
 
+#define MAX_RING_DESCR		64	/* tx, rx rings may contain up to 64 descr each */
+
 #define RINGPTR_RX_MASK		(MAX_RING_DESCR-1)
-#define RINGPTR_TX_MASK		((MAX_RING_DESCR|(MAX_RING_DESCR-1))<<8)
+#define RINGPTR_TX_MASK		((MAX_RING_DESCR-1)<<8)
 
 #define RINGPTR_GET_RX(p)	((p)&RINGPTR_RX_MASK)
 #define RINGPTR_GET_TX(p)	(((p)&RINGPTR_TX_MASK)>>8)
@@ -233,14 +233,14 @@ enum vlsi_pio_irintr {
 /* Contains [23:10] part of the ring base (bus-) address
  * which must be 1k-alinged. [31:24] is taken from
  * VLSI_PCI_MSTRPAGE above.
- * The controler initiates non-burst PCI BM cycles to
+ * The controller initiates non-burst PCI BM cycles to
  * fetch and update the descriptors in the ring.
  * Once fetched, the descriptor remains cached onchip
  * until it gets closed and updated due to the ring
  * processing state machine.
  * The entire ring area is split in rx and tx areas with each
  * area consisting of 64 descriptors of 8 bytes each.
- * The rx(tx) ring is located at ringbase+0 (ringbase+8*64).
+ * The rx(tx) ring is located at ringbase+0 (ringbase+64*8).
  */
 
 #define BUS_TO_RINGBASE(p)	(((p)>>10)&0x3fff)
@@ -273,9 +273,7 @@ enum vlsi_pio_irintr {
 /* VLSI_PIO_PROMPT: Ring Prompting Register (u16, write-to-start) */
 
 /* writing any value kicks the ring processing state machines
- * for both tx, rx rings.
- * currently enabled rings (according to IRENABLE_ENTXST, IRENABLE_ENRXST
- * status reporting - see below) are considered as follows:
+ * for both tx, rx rings as follows:
  * 	- active rings (currently owning an active descriptor)
  *	  ignore the prompt and continue
  *	- idle rings fetch the next descr from the ring and start
@@ -289,7 +287,7 @@ enum vlsi_pio_irintr {
 /* notes:
  *	- not more than one SIR/MIR/FIR bit must be set at any time
  *	- SIR, MIR, FIR and CRC16 select the configuration which will
- *	  be applied now/next time if/when IRENABLE_IREN is _cleared_ (see below)
+ *	  be applied on next 0->1 transition of IRENABLE_IREN (see below).
  *	- besides allowing the PCI interface to execute busmaster cycles
  *	  and therefore the ring SM to operate, the MSTR bit has side-effects:
  *	  when MSTR is cleared, the RINGPTR's get reset and the legacy UART mode
@@ -340,7 +338,7 @@ enum vlsi_pio_ircfg {
  */
 
 enum vlsi_pio_irenable {
-	IRENABLE_IREN		= 0x8000,  /* enable IR phy and gate mode config (rw) */
+	IRENABLE_IREN		= 0x8000,  /* enable IR phy and gate the mode config (rw) */
 	IRENABLE_CFGER		= 0x4000,  /* mode configuration error (ro) */
 	IRENABLE_FIR_ON		= 0x2000,  /* FIR on status (ro) */
 	IRENABLE_MIR_ON		= 0x1000,  /* MIR on status (ro) */
@@ -389,7 +387,7 @@ enum vlsi_pio_irenable {
  *		specification, which provides 1.5 usec pulse width for all speeds (except
  *		for 2.4kbaud getting 6usec). This is well inside IrPHY v1.3 specs and
  *		reduces the transceiver power which drains the battery. At 9.6kbaud for
- *		example this makes more than 90% battery power saving!
+ *		example this amounts to more than 90% battery power saving!
  *
  * MIR-mode:	BAUD = 0
  *		PLSWID = 9(10) for 40(48) MHz input clock
@@ -402,7 +400,7 @@ enum vlsi_pio_irenable {
  */
 
 #define BWP_TO_PHYCTL(B,W,P)	((((B)&0x3f)<<10) | (((W)&0x1f)<<5) | (((P)&0x1f)<<0))
-#define BAUD_BITS(br)		((115200/br)-1)
+#define BAUD_BITS(br)		((115200/(br))-1)
 
 static inline unsigned
 calc_width_bits(unsigned baudrate, unsigned widthselect, unsigned clockselect)
@@ -447,15 +445,25 @@ calc_width_bits(unsigned baudrate, unsigned widthselect, unsigned clockselect)
 
 /* VLSI_PIO_MAXPKT: Maximum Packet Length register (u16, rw) */
 
-/* specifies the maximum legth (up to 4096 bytes), which a
+/* specifies the maximum legth (up to 4k - or (4k-1)? - bytes), which a
  * received frame may have - i.e. the size of the corresponding
  * receive buffers. For simplicity we use the same length for
- * receive and submit buffers. Therefore we use 3k to have
- * enough space for a lot of XBOF's and escapes we may need at
- * some point when wrapping MTU=2048 sized packets for transmission.
+ * receive and submit buffers and increase transfer buffer size
+ * byond IrDA-MTU = 2048 so we have sufficient space left when
+ * packet size increases during wrapping due to XBOFs and CE's.
+ * Even for receiving unwrapped frames we need >MAX_PACKET_LEN
+ * space since the controller appends FCS/CRC (2 or 4 bytes)
+ * so we use 2*IrDA-MTU for both directions and cover even the
+ * worst case, where all data bytes have to be escaped when wrapping.
+ * well, this wastes some memory - anyway, later we will
+ * either map skb's directly or use pci_pool allocator...
  */
+ 
+#define IRDA_MTU	2048		/* seems to be undefined elsewhere */
+ 
+#define XFER_BUF_SIZE		(2*IRDA_MTU)
 
-#define MAX_PACKET_LENGTH	3172
+#define MAX_PACKET_LENGTH	(XFER_BUF_SIZE-1) /* register uses only [11:0] */
 
 
 /* ------------------------------------------ */
@@ -466,7 +474,7 @@ calc_width_bits(unsigned baudrate, unsigned widthselect, unsigned clockselect)
 /* recive packet counter gets incremented on every non-filtered
  * byte which was put in the receive fifo and reset for each
  * new packet. Used to decide whether we are just in the middle
- * of receiving receiving
+ * of receiving
  */
 
 #define RCVBCNT_MASK	0x0fff
@@ -538,12 +546,21 @@ struct ring_descr {
 
 struct ring_entry {
 	struct sk_buff	*skb;
-	void		*head;
+	void		*data;
+};
+
+
+struct vlsi_ring {
+	unsigned		size;
+	unsigned		mask;
+	unsigned		head, tail;
+	struct ring_descr	*hw;
+	struct ring_entry	buf[MAX_RING_DESCR];
 };
 
 /* ------------------------------------------ */
 
-/* our compound VLSI-PCI-IRDA device information */
+/* our private compound VLSI-PCI-IRDA device information */
 
 typedef struct vlsi_irda_dev {
 	struct pci_dev		*pdev;
@@ -557,14 +574,10 @@ typedef struct vlsi_irda_dev {
 	int			baud, new_baud;
 
 	dma_addr_t		busaddr;
+	void			*virtaddr;
+	struct vlsi_ring	tx_ring, rx_ring;
 
-	struct ring_descr	*ring_hw;
-
-	struct ring_entry	*ring_buf;
-
-	unsigned		tx_mask, rx_mask;
-
-	unsigned		tx_put, tx_get, rx_put, rx_get;
+	struct timeval		last_rx;
 
 	spinlock_t		lock;
 	

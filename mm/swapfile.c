@@ -87,8 +87,7 @@ static inline int scan_swap_map(struct swap_info_struct *si)
 			si->lowest_bit = si->max;
 			si->highest_bit = 0;
 		}
-		/* Initial count 1 for user reference + 1 for swap cache */
-		si->swap_map[offset] = 2;
+		si->swap_map[offset] = 1;
 		nr_swap_pages--;
 		si->cluster_next = offset+1;
 		return offset;
@@ -98,11 +97,6 @@ static inline int scan_swap_map(struct swap_info_struct *si)
 	return 0;
 }
 
-/*
- * Callers of get_swap_page must hold swap_list_lock across the call,
- * and across the following add_to_swap_cache, to guard against races
- * with read_swap_cache_async.
- */
 swp_entry_t get_swap_page(void)
 {
 	struct swap_info_struct * p;
@@ -111,6 +105,7 @@ swp_entry_t get_swap_page(void)
 	int type, wrapped = 0;
 
 	entry.val = 0;	/* Out of memory */
+	swap_list_lock();
 	type = swap_list.next;
 	if (type < 0)
 		goto out;
@@ -146,6 +141,7 @@ swp_entry_t get_swap_page(void)
 				goto out;	/* out of swap space */
 	}
 out:
+	swap_list_unlock();
 	return entry;
 }
 

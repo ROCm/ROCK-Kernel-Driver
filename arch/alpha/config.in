@@ -142,15 +142,18 @@ if [ "$CONFIG_ALPHA_DP264" = "y" -o "$CONFIG_ALPHA_EIGER" = "y" ]
 then
 	define_bool CONFIG_ALPHA_EV6 y
 	define_bool CONFIG_ALPHA_TSUNAMI y
+	bool 'EV67 (or later) CPU (speed > 600MHz)?' CONFIG_ALPHA_EV67
 fi
 if [ "$CONFIG_ALPHA_SHARK" = "y" ]
 then
+	define_bool CONFIG_ALPHA_EV6 y
 	define_bool CONFIG_ALPHA_EV67 y
 	define_bool CONFIG_ALPHA_TSUNAMI y
 fi
 if [ "$CONFIG_ALPHA_WILDFIRE" = "y" -o "$CONFIG_ALPHA_TITAN" = "y" ]
 then
-        define_bool CONFIG_ALPHA_EV6 y
+	define_bool CONFIG_ALPHA_EV6 y
+	define_bool CONFIG_ALPHA_EV67 y
 fi
 if [ "$CONFIG_ALPHA_RAWHIDE" = "y" ]
 then
@@ -170,6 +173,7 @@ if [ "$CONFIG_ALPHA_NAUTILUS" = "y" ]
 then
 	define_bool CONFIG_ALPHA_IRONGATE y
 	define_bool CONFIG_ALPHA_EV6 y
+	define_bool CONFIG_ALPHA_EV67 y
 fi
 
 if [ "$CONFIG_ALPHA_JENSEN" = "y" -o "$CONFIG_ALPHA_MIKASA" = "y" \

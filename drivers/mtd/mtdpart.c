@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: mtdpart.c,v 1.21 2001/06/09 16:33:32 dwmw2 Exp $
+ * $Id: mtdpart.c,v 1.23 2001/10/02 15:05:11 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -203,7 +203,8 @@ int add_mtd_partitions(struct mtd_info *master,
 
 		slave->mtd.read = part_read;
 		slave->mtd.write = part_write;
-		slave->mtd.sync = part_sync;
+		if (master->sync)
+			slave->mtd.sync = part_sync;
 		if (!i && master->suspend && master->resume) {
 				slave->mtd.suspend = part_suspend;
 				slave->mtd.resume = part_resume;
@@ -287,3 +288,9 @@ int add_mtd_partitions(struct mtd_info *master,
 
 EXPORT_SYMBOL(add_mtd_partitions);
 EXPORT_SYMBOL(del_mtd_partitions);
+
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Nicolas Pitre <nico@cam.org>");
+MODULE_DESCRIPTION("Generic support for partitioning of MTD devices");
+

@@ -3,7 +3,7 @@
  * Copyright (C) 2001 Mark Langsdorf (mark.langsdorf@amd.com)
  *	based on sc520cdp.c by Sysgo Real-Time Solutions GmbH
  *
- * $Id: netsc520.c,v 1.3 2001/06/02 14:52:23 dwmw2 Exp $
+ * $Id: netsc520.c,v 1.5 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -145,12 +145,6 @@ static struct map_info netsc520_map = {
 
 static struct mtd_info *mymtd;
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_netsc520 init_module
-#define cleanup_netsc520 cleanup_module
-#endif
-
-
 static int __init init_netsc520(void)
 {
 	printk(KERN_NOTICE "NetSc520 flash device: %lx at %lx\n", netsc520_map.size, netsc520_map.map_priv_2);
@@ -160,11 +154,11 @@ static int __init init_netsc520(void)
 		printk("Failed to ioremap_nocache\n");
 		return -EIO;
 	}
-	mymtd = do_map_probe("cfi", &netsc520_map);
+	mymtd = do_map_probe("cfi_probe", &netsc520_map);
 	if(!mymtd)
-		mymtd = do_map_probe("ram", &netsc520_map);
+		mymtd = do_map_probe("map_ram", &netsc520_map);
 	if(!mymtd)
-		mymtd = do_map_probe("rom", &netsc520_map);
+		mymtd = do_map_probe("map_rom", &netsc520_map);
 
 	if (!mymtd) {
 		iounmap((void *)netsc520_map.map_priv_1);
@@ -190,3 +184,7 @@ static void __exit cleanup_netsc520(void)
 
 module_init(init_netsc520);
 module_exit(cleanup_netsc520);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Mark Langsdorf <mark.langsdorf@amd.com>");
+MODULE_DESCRIPTION("MTD map driver for AMD NetSc520 Demonstration Board");

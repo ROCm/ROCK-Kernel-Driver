@@ -216,7 +216,7 @@ int  irlmp_disconnect_request(struct lsap_cb *, struct sk_buff *userdata);
 
 void irlmp_discovery_confirm(hashbin_t *discovery_log);
 void irlmp_discovery_request(int nslots);
-struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask);
+struct irda_device_info *irlmp_get_discoveries(int *pn, __u16 mask, int nslots);
 void irlmp_do_expiry(void);
 void irlmp_do_discovery(int nslots);
 discovery_t *irlmp_get_discovery_response(void);

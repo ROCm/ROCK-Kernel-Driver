@@ -1,5 +1,5 @@
 /*
- * $Id: mtdcore.c,v 1.30 2001/06/02 14:30:42 dwmw2 Exp $
+ * $Id: mtdcore.c,v 1.31 2001/10/02 15:05:11 dwmw2 Exp $
  *
  * Core registration and callback routines for MTD
  * drivers and users.
@@ -317,12 +317,7 @@ struct proc_dir_entry mtd_proc_entry = {
 /*====================================================================*/
 /* Init code */
 
-#if  LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_mtd init_module
-#define cleanup_mtd cleanup_module
-#endif
-
-mod_init_t init_mtd(void)
+int __init init_mtd(void)
 {
 #ifdef CONFIG_PROC_FS
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
@@ -343,7 +338,7 @@ mod_init_t init_mtd(void)
 	return 0;
 }
 
-mod_exit_t cleanup_mtd(void)
+static void __exit cleanup_mtd(void)
 {
 #ifdef CONFIG_PM
 	if (mtd_pm_dev) {
@@ -366,3 +361,6 @@ module_init(init_mtd);
 module_exit(cleanup_mtd);
 
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
+MODULE_DESCRIPTION("Core MTD registration and access routines");

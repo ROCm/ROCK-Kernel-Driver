@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: compr_zlib.c,v 1.6 2001/04/18 15:04:00 dwmw2 Exp $
+ * $Id: compr_zlib.c,v 1.8 2001/09/20 15:28:31 dwmw2 Exp $
  *
  */
 
@@ -39,6 +39,7 @@
 
 #ifdef __KERNEL__
 #include <linux/kernel.h>
+#include <linux/mtd/compatmac.h> /* for min() */
 #include <linux/slab.h>
 #include <linux/jffs2.h>
 #include "nodelist.h"
@@ -104,7 +105,7 @@ int zlib_compress(unsigned char *data_in, unsigned char *cpage_out,
 
 	while (strm.total_out < *dstlen - STREAM_END_SPACE && strm.total_in < *sourcelen) {
 		strm.avail_out = *dstlen - (strm.total_out + STREAM_END_SPACE);
-		strm.avail_in = min(*sourcelen-strm.total_in, strm.avail_out);
+		strm.avail_in = min((unsigned)(*sourcelen-strm.total_in), strm.avail_out);
 		D1(printk(KERN_DEBUG "calling deflate with avail_in %d, avail_out %d\n",
 			  strm.avail_in, strm.avail_out));
 		ret = deflate(&strm, Z_PARTIAL_FLUSH);

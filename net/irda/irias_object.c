@@ -435,8 +435,6 @@ struct ias_value *irias_new_integer_value(int integer)
 struct ias_value *irias_new_string_value(char *string)
 {
 	struct ias_value *value;
-	int len;
-	char *new_str;
 
 	value = kmalloc(sizeof(struct ias_value), GFP_ATOMIC);
 	if (value == NULL) {

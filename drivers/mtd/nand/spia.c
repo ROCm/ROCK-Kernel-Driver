@@ -1,9 +1,9 @@
 /*
- *  drivers/mtd/spia.c
+ *  drivers/mtd/nand/spia.c
  *
  *  Copyright (C) 2000 Steven J. Hill (sjhill@cotw.com)
  *
- * $Id: spia.c,v 1.11 2001/07/03 17:50:56 sjhill Exp $
+ * $Id: spia.c,v 1.12 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -46,10 +46,6 @@ static struct mtd_info *spia_mtd = NULL;
 /*
  * Module stuff
  */
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-  #define spia_init init_module
-  #define spia_cleanup cleanup_module
-#endif
 
 static int spia_io_base = SPIA_IO_BASE;
 static int spia_fio_base = SPIA_FIO_BASE;
@@ -158,3 +154,7 @@ static void __exit spia_cleanup (void)
 }
 module_exit(spia_cleanup);
 #endif
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Steven J. Hill <sjhill@cotw.com");
+MODULE_DESCRIPTION("Board-specific glue layer for NAND flash on SPIA board");

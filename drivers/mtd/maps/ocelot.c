@@ -1,5 +1,5 @@
 /*
- * $Id: ocelot.c,v 1.4 2001/06/08 15:36:27 dwmw2 Exp $
+ * $Id: ocelot.c,v 1.6 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * Flash on Momenco Ocelot
  */
@@ -115,7 +115,7 @@ static int __init init_ocelot_maps(void)
 	//	ocelot_nvram_map.map_priv_2 = ocelot_nvram_map.map_priv_1;
 
 	/* And do the RAM probe on it to get an MTD device */
-	nvram_mtd = do_map_probe("ram", &ocelot_nvram_map);
+	nvram_mtd = do_map_probe("map_ram", &ocelot_nvram_map);
 	if (!nvram_mtd) {
 		printk("NVRAM probe failed\n");
 		goto fail_1;
@@ -145,7 +145,7 @@ static int __init init_ocelot_maps(void)
 	}
 	/* If that failed or the jumper's absent, pretend it's ROM */
 	if (!flash_mtd) {
-		flash_mtd = do_map_probe("rom", &ocelot_flash_map);
+		flash_mtd = do_map_probe("map_rom", &ocelot_flash_map);
 		/* If we're treating it as ROM, set the erase size */
 		if (flash_mtd)
 			flash_mtd->erasesize = 0x10000;
@@ -197,3 +197,6 @@ static void __exit cleanup_ocelot_maps(void)
 module_init(init_ocelot_maps);
 module_exit(cleanup_ocelot_maps);
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Red Hat, Inc. - David Woodhouse <dwmw2@cambridge.redhat.com>");
+MODULE_DESCRIPTION("MTD map driver for Momenco Ocelot board");

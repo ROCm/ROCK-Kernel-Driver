@@ -44,11 +44,6 @@ static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
  */
 int nr_ioapic_registers[MAX_IO_APICS];
 
-#if CONFIG_SMP
-# define TARGET_CPUS cpu_online_map
-#else
-# define TARGET_CPUS 0x01
-#endif
 /*
  * Rough estimation of how many shared IRQs there are, can
  * be changed anytime.
@@ -603,7 +598,7 @@ void __init setup_IO_APIC_irqs(void)
 		memset(&entry,0,sizeof(entry));
 
 		entry.delivery_mode = dest_LowestPrio;
-		entry.dest_mode = 1;			/* logical delivery */
+		entry.dest_mode = INT_DELIVERY_MODE;
 		entry.mask = 0;				/* enable IRQ */
 		entry.dest.logical.logical_dest = TARGET_CPUS;
 
@@ -677,7 +672,7 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 	 * We use logical delivery to get the timer IRQ
 	 * to the first CPU.
 	 */
-	entry.dest_mode = 1;				/* logical delivery */
+	entry.dest_mode = INT_DELIVERY_MODE;
 	entry.mask = 0;					/* unmask IRQ now */
 	entry.dest.logical.logical_dest = TARGET_CPUS;
 	entry.delivery_mode = dest_LowestPrio;
@@ -1016,6 +1011,9 @@ static void __init setup_ioapic_ids_from_mpc (void)
 	unsigned char old_id;
 	unsigned long flags;
 
+	if (clustered_apic_mode)
+		/* We don't have a good way to do this yet - hack */
+		phys_id_present_map = (u_long) 0xf;
 	/*
 	 * Set the IOAPIC ID to the value stored in the MPC table.
 	 */
@@ -1053,7 +1051,11 @@ static void __init setup_ioapic_ids_from_mpc (void)
 				i);
 			phys_id_present_map |= 1 << i;
 			mp_ioapics[apic].mpc_apicid = i;
+		} else {
+			printk("Setting %d in the phys_id_present_map\n", mp_ioapics[apic].mpc_apicid);
+			phys_id_present_map |= 1 << mp_ioapics[apic].mpc_apicid;
 		}
+
 
 		/*
 		 * We need to adjust the IRQ routing table

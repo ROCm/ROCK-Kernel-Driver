@@ -1,12 +1,11 @@
 /*
- * $Id: mtdchar.c,v 1.38.2.1 2001/06/09 17:31:16 dwmw2 Exp $
+ * $Id: mtdchar.c,v 1.44 2001/10/02 15:05:11 dwmw2 Exp $
  *
  * Character-device access to raw MTD devices.
+ * Pure 2.4 version - compatibility cruft removed to mtdchar-compat.c
  *
  */
 
-
-#include <linux/mtd/compatmac.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -75,10 +74,15 @@ static int mtd_open(struct inode *inode, struct file *file)
 		return -EACCES;
 
 	mtd = get_mtd_device(NULL, devnum);
-		
+	
 	if (!mtd)
 		return -ENODEV;
 	
+	if (MTD_ABSENT == mtd->type) {
+		put_mtd_device(mtd);
+		return -ENODEV;
+	}
+
 	file->private_data = mtd;
 		
 	/* You can't open it RW if it's not a writeable device */
@@ -92,8 +96,7 @@ static int mtd_open(struct inode *inode, struct file *file)
 
 /*====================================================================*/
 
-static release_t mtd_close(struct inode *inode,
-				 struct file *file)
+static int mtd_close(struct inode *inode, struct file *file)
 {
 	struct mtd_info *mtd;
 
@@ -106,14 +109,8 @@ static release_t mtd_close(struct inode *inode,
 	
 	put_mtd_device(mtd);
 
-	release_return(0);
+	return 0;
 } /* mtd_close */
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-#define FILE_POS *ppos
-#else
-#define FILE_POS file->f_pos
-#endif
 
 /* FIXME: This _really_ needs to die. In 2.5, we should lock the
    userspace buffer down and use it directly with readv/writev.
@@ -131,8 +128,8 @@ static ssize_t mtd_read(struct file *file, char *buf, size_t count,loff_t *ppos)
 	
 	DEBUG(MTD_DEBUG_LEVEL0,"MTD_read\n");
 
-	if (FILE_POS + count > mtd->size)
-		count = mtd->size - FILE_POS;
+	if (*ppos + count > mtd->size)
+		count = mtd->size - *ppos;
 
 	if (!count)
 		return 0;
@@ -149,9 +146,9 @@ static ssize_t mtd_read(struct file *file, char *buf, size_t count,loff_t *ppos)
 		if (!kbuf)
 			return -ENOMEM;
 		
-		ret = MTD_READ(mtd, FILE_POS, len, &retlen, kbuf);
+		ret = MTD_READ(mtd, *ppos, len, &retlen, kbuf);
 		if (!ret) {
-			FILE_POS += retlen;
+			*ppos += retlen;
 			if (copy_to_user(buf, kbuf, retlen)) {
 			        kfree(kbuf);
 				return -EFAULT;
@@ -184,11 +181,11 @@ static ssize_t mtd_write(struct file *file, const char *buf, size_t count,loff_t
 
 	DEBUG(MTD_DEBUG_LEVEL0,"MTD_write\n");
 	
-	if (FILE_POS == mtd->size)
+	if (*ppos == mtd->size)
 		return -ENOSPC;
 	
-	if (FILE_POS + count > mtd->size)
-		count = mtd->size - FILE_POS;
+	if (*ppos + count > mtd->size)
+		count = mtd->size - *ppos;
 
 	if (!count)
 		return 0;
@@ -210,9 +207,9 @@ static ssize_t mtd_write(struct file *file, const char *buf, size_t count,loff_t
 			return -EFAULT;
 		}
 		
-	        ret = (*(mtd->write))(mtd, FILE_POS, len, &retlen, kbuf);
+	        ret = (*(mtd->write))(mtd, *ppos, len, &retlen, kbuf);
 		if (!ret) {
-			FILE_POS += retlen;
+			*ppos += retlen;
 			total_retlen += retlen;
 			count -= retlen;
 			buf += retlen;
@@ -318,15 +315,18 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 			  wq_head is no longer there when the
 			  callback routine tries to wake us up.
 			*/
-			current->state = TASK_UNINTERRUPTIBLE;
-			add_wait_queue(&waitq, &wait);
 			ret = mtd->erase(mtd, erase);
-			if (!ret)
-				schedule();
-			remove_wait_queue(&waitq, &wait);
-			current->state = TASK_RUNNING;
-			if (!ret)
-				ret = (erase->state == MTD_ERASE_FAILED);
+			if (!ret) {
+				set_current_state(TASK_UNINTERRUPTIBLE);
+				add_wait_queue(&waitq, &wait);
+				if (erase->state != MTD_ERASE_DONE &&
+				    erase->state != MTD_ERASE_FAILED)
+					schedule();
+				remove_wait_queue(&waitq, &wait);
+				set_current_state(TASK_RUNNING);
+
+				ret = (erase->state == MTD_ERASE_FAILED)?-EIO:0;
+			}
 			kfree(erase);
 		}
 		break;
@@ -488,12 +488,7 @@ static void mtd_notify_remove(struct mtd_info* mtd)
 }
 #endif
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_mtdchar init_module
-#define cleanup_mtdchar cleanup_module
-#endif
-
-mod_init_t init_mtdchar(void)
+static int __init init_mtdchar(void)
 {
 #ifdef CONFIG_DEVFS_FS
 	if (devfs_register_chrdev(MTD_CHAR_MAJOR, "mtd", &mtd_fops))
@@ -518,7 +513,7 @@ mod_init_t init_mtdchar(void)
 	return 0;
 }
 
-mod_exit_t cleanup_mtdchar(void)
+static void __exit cleanup_mtdchar(void)
 {
 #ifdef CONFIG_DEVFS_FS
 	unregister_mtd_user(&notifier);
@@ -531,3 +526,8 @@ mod_exit_t cleanup_mtdchar(void)
 
 module_init(init_mtdchar);
 module_exit(cleanup_mtdchar);
+
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
+MODULE_DESCRIPTION("Direct character-device access to MTD devices");

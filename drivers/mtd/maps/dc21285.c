@@ -5,7 +5,7 @@
  *
  * This code is GPL
  * 
- * $Id: dc21285.c,v 1.4 2001/04/26 15:40:23 dwmw2 Exp $
+ * $Id: dc21285.c,v 1.6 2001/10/02 15:05:14 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -137,7 +137,7 @@ int __init init_dc21285(void)
 		return -EIO;
 	}
 
-	mymtd = do_map_probe("cfi", &dc21285_map);
+	mymtd = do_map_probe("cfi_probe", &dc21285_map);
 	if (mymtd) {
 		int nrparts;
 
@@ -191,3 +191,8 @@ static void __exit cleanup_dc21285(void)
 
 module_init(init_dc21285);
 module_exit(cleanup_dc21285);
+
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Nicolas Pitre <nico@cam.org>");
+MODULE_DESCRIPTION("MTD map driver for DC21285 boards");

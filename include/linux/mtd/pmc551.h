@@ -1,5 +1,5 @@
 /*
- * $Id: pmc551.h,v 1.3 2000/10/30 20:03:23 major Exp $
+ * $Id: pmc551.h,v 1.4 2001/06/12 16:19:38 major Exp $
  *
  * PMC551 PCI Mezzanine Ram Device
  *
@@ -17,7 +17,7 @@
 
 #include <linux/mtd/mtd.h>
 
-#define PMC551_VERSION "$Id: pmc551.h,v 1.3 2000/10/30 20:03:23 major Exp $\n"\
+#define PMC551_VERSION "$Id: pmc551.h,v 1.4 2001/06/12 16:19:38 major Exp $\n"\
        "Ramix PMC551 PCI Mezzanine Ram Driver. (C) 1999,2000 Nortel Networks.\n"
 
 /*
@@ -26,9 +26,9 @@
 struct mypriv {
         struct pci_dev *dev;
         u_char *start;
-        u32    mem_map0_base_val;
-        u32    curr_mem_map0_val;
-        u32    aperture_size;
+        u32    base_map0;
+        u32    curr_map0;
+        u32    asize;
 	struct mtd_info *nextpmc551;
 };                       
 
@@ -37,9 +37,10 @@ struct mypriv {
  */
 static int pmc551_erase(struct mtd_info *, struct erase_info *);
 static void pmc551_unpoint(struct mtd_info *, u_char *);
+static int pmc551_point (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char **mtdbuf);
 static int pmc551_read(struct mtd_info *, loff_t, size_t, size_t *, u_char *);
-static int pmc551_write(struct mtd_info *, loff_t, size_t, size_t *, const u_char
-*);        
+static int pmc551_write(struct mtd_info *, loff_t, size_t, size_t *, const u_char *);        
+
 
 /*
  * Define the PCI ID's if the kernel doesn't define them for us
@@ -73,9 +74,6 @@ static int pmc551_write(struct mtd_info *, loff_t, size_t, size_t *, const u_cha
 #define PMC551_DRAM_BLK_SET_COL_MUX(x,v) (((x) & ~0x00007000) | (((v) & 0x7) << 12))
 #define PMC551_DRAM_BLK_SET_ROW_MUX(x,v) (((x) & ~0x00000f00) | (((v) & 0xf) << 8))
 
-
-#define PMC551_ADDR_HIGH_MASK	0x3ff00000
-#define PMC551_ADDR_LOW_MASK	0x000fffff
 
 #endif /* __MTD_PMC551_H__ */
 

@@ -1,5 +1,5 @@
 /*
- * $Id: cstm_mips_ixx.c,v 1.3 2001/06/02 14:52:23 dwmw2 Exp $
+ * $Id: cstm_mips_ixx.c,v 1.5 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * Mapping of a custom board with both AMD CFI and JEDEC flash in partitions.
  * Config with both CFI and JEDEC device support.
@@ -207,11 +207,6 @@ static struct mtd_partition cstm_mips_ixx_partitions[PHYSMAP_NUMBER][MAX_PHYSMAP
 
 struct map_info cstm_mips_ixx_map[PHYSMAP_NUMBER];
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_cstm_mips_ixx init_module
-#define cleanup_cstm_mips_ixx cleanup_module
-#endif
-
 int __init init_cstm_mips_ixx(void)
 {
 	int i;
@@ -241,7 +236,7 @@ int __init init_cstm_mips_ixx(void)
 	for (i=0;i<PHYSMAP_NUMBER;i++) {
                 parts = &cstm_mips_ixx_partitions[i][0];
 		jedec = 0;
-		mymtd = (struct mtd_info *)do_map_probe("cfi", &cstm_mips_ixx_map[i]);
+		mymtd = (struct mtd_info *)do_map_probe("cfi_probe", &cstm_mips_ixx_map[i]);
 		//printk(KERN_NOTICE "phymap %d cfi_probe: mymtd is %x\n",i,(unsigned int)mymtd);
 		if (!mymtd) {
 			jedec = 1;
@@ -312,3 +307,8 @@ void setup_ITE_IVR_flash()
 
 module_init(init_cstm_mips_ixx);
 module_exit(cleanup_cstm_mips_ixx);
+
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Alice Hennessy <ahennessy@mvista.com>");
+MODULE_DESCRIPTION("MTD map driver for ITE 8172G and Globespan IVR boards");

@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: super.c,v 1.43 2001/05/29 08:59:47 dwmw2 Exp $
+ * $Id: super.c,v 1.48 2001/10/02 09:16:23 dwmw2 Exp $
  *
  */
 
@@ -47,7 +47,6 @@
 #include <linux/pagemap.h>
 #include <linux/mtd/mtd.h>
 #include <linux/interrupt.h>
-
 #include "nodelist.h"
 
 #ifndef MTD_BLOCK_MAJOR
@@ -68,7 +67,7 @@ static struct super_operations jffs2_super_operations =
 	put_super:	jffs2_put_super,
 	write_super:	jffs2_write_super,
 	statfs:		jffs2_statfs,
-//	remount_fs:	jffs2_remount_fs,
+	remount_fs:	jffs2_remount_fs,
 	clear_inode:	jffs2_clear_inode
 };
 
@@ -270,7 +269,8 @@ static struct super_block *jffs2_read_super(struct super_block *sb, void *data, 
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = JFFS2_SUPER_MAGIC;
-	jffs2_start_garbage_collect_thread(c);
+	if (!(sb->s_flags & MS_RDONLY))
+		jffs2_start_garbage_collect_thread(c);
 	return sb;
 
  out_root_i:
@@ -290,19 +290,47 @@ void jffs2_put_super (struct super_block *sb)
 
 	D2(printk(KERN_DEBUG "jffs2: jffs2_put_super()\n"));
 
-	jffs2_stop_garbage_collect_thread(c);
+	if (!(sb->s_flags & MS_RDONLY))
+		jffs2_stop_garbage_collect_thread(c);
 	jffs2_free_ino_caches(c);
 	jffs2_free_raw_node_refs(c);
 	kfree(c->blocks);
+	if (c->mtd->sync)
+		c->mtd->sync(c->mtd);
 	put_mtd_device(c->mtd);
 	
 	D1(printk(KERN_DEBUG "jffs2_put_super returning\n"));
+}
+
+int jffs2_remount_fs (struct super_block *sb, int *flags, char *data)
+{
+	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
+
+	if (c->flags & JFFS2_SB_FLAG_RO && !(sb->s_flags & MS_RDONLY))
+		return -EROFS;
+
+	/* We stop if it was running, then restart if it needs to.
+	   This also catches the case where it was stopped and this
+	   is just a remount to restart it */
+	if (!(sb->s_flags & MS_RDONLY))
+		jffs2_stop_garbage_collect_thread(c);
+
+	if (!(*flags & MS_RDONLY))
+		jffs2_start_garbage_collect_thread(c);
+	
+	sb->s_flags = (sb->s_flags & ~MS_RDONLY)|(*flags & MS_RDONLY);
+
+	return 0;
 }
 
 void jffs2_write_super (struct super_block *sb)
 {
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(sb);
 	sb->s_dirt = 0;
+
+	if (sb->s_flags & MS_RDONLY)
+		return;
+
 	jffs2_garbage_collect_trigger(c);
 	jffs2_erase_pending_blocks(c);
 	jffs2_mark_erased_blocks(c);
@@ -353,3 +381,8 @@ static void __exit exit_jffs2_fs(void)
 
 module_init(init_jffs2_fs);
 module_exit(exit_jffs2_fs);
+
+MODULE_DESCRIPTION("The Journalling Flash File System, v2");
+MODULE_AUTHOR("Red Hat, Inc.");
+MODULE_LICENSE("GPL"); // Actually dual-licensed, but it doesn't matter for 
+		       // the sake of this tag. It's Free Software.

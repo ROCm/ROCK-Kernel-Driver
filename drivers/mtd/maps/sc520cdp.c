@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- * $Id: sc520cdp.c,v 1.7 2001/06/02 14:52:23 dwmw2 Exp $
+ * $Id: sc520cdp.c,v 1.9 2001/10/02 15:05:14 dwmw2 Exp $
  *
  *
  * The SC520CDP is an evaluation board for the Elan SC520 processor available
@@ -172,11 +172,6 @@ static struct map_info sc520cdp_map[] = {
 
 static struct mtd_info *mymtd[NUM_FLASH_BANKS];
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_sc520cdp init_module
-#define cleanup_sc520cdp cleanup_module
-#endif
-
 #ifdef REPROGRAM_PAR
 
 /*
@@ -310,11 +305,11 @@ static int __init init_sc520cdp(void)
 			printk("Failed to ioremap_nocache\n");
 			return -EIO;
 		}
-		mymtd[i] = do_map_probe("cfi", &sc520cdp_map[i]);
+		mymtd[i] = do_map_probe("cfi_probe", &sc520cdp_map[i]);
 		if(!mymtd[i])
 			mymtd[i] = do_map_probe("jedec", &sc520cdp_map[i]);
 		if(!mymtd[i])
-			mymtd[i] = do_map_probe("rom", &sc520cdp_map[i]);
+			mymtd[i] = do_map_probe("map_rom", &sc520cdp_map[i]);
 
 		if (mymtd[i]) {
 			mymtd[i]->module = THIS_MODULE;
@@ -346,3 +341,7 @@ static void __exit cleanup_sc520cdp(void)
 
 module_init(init_sc520cdp);
 module_exit(cleanup_sc520cdp);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Sysgo Real-Time Solutions GmbH");
+MODULE_DESCRIPTION("MTD map driver for AMD SC520 Customer Development Platform");

@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: nodemgmt.c,v 1.39 2001/04/11 22:20:26 dwmw2 Exp $
+ * $Id: nodemgmt.c,v 1.45 2001/09/20 08:05:05 dwmw2 Exp $
  *
  */
 
@@ -100,12 +100,13 @@ int jffs2_reserve_space(struct jffs2_sb_info *c, __u32 minsize, __u32 *ofs, __u3
 			ret = jffs2_garbage_collect_pass(c);
 			if (ret)
 				return ret;
-			if (signal_pending(current)) {
-				return -EINTR;
-			}
-			if(current->need_resched) {
+
+			if (current->need_resched)
 				schedule();
-			}
+
+			if (signal_pending(current))
+				return -EINTR;
+
 			down(&c->alloc_sem);
 			spin_lock_bh(&c->erase_completion_lock);
 		}
@@ -347,6 +348,8 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 	spin_unlock_bh(&c->erase_completion_lock);
 
 	if (c->mtd->type != MTD_NORFLASH && c->mtd->type != MTD_RAM)
+		return;
+	if (OFNI_BS_2SFFJ(c)->s_flags & MS_RDONLY)
 		return;
 
 	D1(printk(KERN_DEBUG "obliterating obsoleted node at 0x%08x\n", ref->flash_offset &~3));

@@ -1,7 +1,7 @@
 /*
  *  Copyright © 2001 Flaga hf. Medical Devices, Kári Davíðsson <kd@flaga.is>
  *
- *  $Id: cfi_flagadm.c,v 1.5 2001/05/29 15:47:49 kd Exp $
+ *  $Id: cfi_flagadm.c,v 1.7 2001/10/02 15:05:13 dwmw2 Exp $
  *  
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -137,11 +137,6 @@ struct mtd_partition flagadm_parts[] = {
 
 #define PARTITION_COUNT (sizeof(flagadm_parts)/sizeof(struct mtd_partition))
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_flagadm init_module
-#define cleanup_flagadm cleanup_module
-#endif
-
 static struct mtd_info *mymtd;
 
 int __init init_flagadm(void)
@@ -156,7 +151,7 @@ int __init init_flagadm(void)
 		printk("Failed to ioremap\n");
 		return -EIO;
 	}
-	mymtd = do_map_probe("cfi", &flagadm_map);
+	mymtd = do_map_probe("cfi_probe", &flagadm_map);
 	if (mymtd) {
 		mymtd->module = THIS_MODULE;
 		add_mtd_partitions(mymtd, flagadm_parts, PARTITION_COUNT);
@@ -182,3 +177,8 @@ static void __exit cleanup_flagadm(void)
 
 module_init(init_flagadm);
 module_exit(cleanup_flagadm);
+
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Kári Davíðsson <kd@flaga.is>");
+MODULE_DESCRIPTION("MTD map driver for Flaga digital module");

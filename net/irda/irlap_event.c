@@ -701,7 +701,21 @@ static int irlap_state_conn(struct irlap_cb *self, IRLAP_EVENT event,
 		 * We are allowed to send two frames, but this may increase
 		 * the connect latency, so lets not do it for now.
 		 */
-		/* What the hell is this ? - Jean II */
+		/* This is full of good intentions, but doesn't work in
+		 * practice.
+		 * After sending the first UA response, we switch the
+		 * dongle to the negociated speed, which is usually
+		 * different than 9600 kb/s.
+		 * From there, there is two solutions :
+		 * 1) The other end has received the first UA response :
+		 * it will set up the connection, move to state LAP_NRM_P,
+		 * and will ignore and drop the second UA response.
+		 * Actually, it's even worse : the other side will almost
+		 * immediately send a RR that will likely collide with the
+		 * UA response (depending on negociated turnaround).
+		 * 2) The other end has not received the first UA response,
+		 * will stay at 9600 and will never see the second UA response.
+		 * Jean II */
 		irlap_send_ua_response_frame(self, &self->qos_rx);
 #endif
 

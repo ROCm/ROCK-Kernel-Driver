@@ -3,7 +3,7 @@
  * 
  * (C) 2000 Nicolas Pitre <nico@cam.org>
  * 
- * $Id: sa1100-flash.c,v 1.15 2001/06/02 18:29:22 nico Exp $
+ * $Id: sa1100-flash.c,v 1.22 2001/10/02 10:04:52 rmk Exp $
  */
 
 #include <linux/config.h>
@@ -16,6 +16,7 @@
 #include <linux/mtd/partitions.h>
 
 #include <asm/hardware.h>
+#include <asm/io.h>
 
 
 #ifndef CONFIG_ARCH_SA1100
@@ -27,53 +28,53 @@
 
 static __u8 sa1100_read8(struct map_info *map, unsigned long ofs)
 {
-	return *(__u8 *)(WINDOW_ADDR + ofs);
+	return readb(map->map_priv_1 + ofs);
 }
 
 static __u16 sa1100_read16(struct map_info *map, unsigned long ofs)
 {
-	return *(__u16 *)(WINDOW_ADDR + ofs);
+	return readw(map->map_priv_1 + ofs);
 }
 
 static __u32 sa1100_read32(struct map_info *map, unsigned long ofs)
 {
-	return *(__u32 *)(WINDOW_ADDR + ofs);
+	return readl(map->map_priv_1 + ofs);
 }
 
 static void sa1100_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
 {
-	memcpy(to, (void *)(WINDOW_ADDR + from), len);
+	memcpy(to, (void *)(map->map_priv_1 + from), len);
 }
 
 static void sa1100_write8(struct map_info *map, __u8 d, unsigned long adr)
 {
-	*(__u8 *)(WINDOW_ADDR + adr) = d;
+	writeb(d, map->map_priv_1 + adr);
 }
 
 static void sa1100_write16(struct map_info *map, __u16 d, unsigned long adr)
 {
-	*(__u16 *)(WINDOW_ADDR + adr) = d;
+	writew(d, map->map_priv_1 + adr);
 }
 
 static void sa1100_write32(struct map_info *map, __u32 d, unsigned long adr)
 {
-	*(__u32 *)(WINDOW_ADDR + adr) = d;
+	writel(d, map->map_priv_1 + adr);
 }
 
 static void sa1100_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
 {
-	memcpy((void *)(WINDOW_ADDR + to), from, len);
+	memcpy((void *)(map->map_priv_1 + to), from, len);
 }
 
 
-#ifdef CONFIG_SA1100_BITSY
+#ifdef CONFIG_SA1100_H3600
 
-static void bitsy_set_vpp(struct map_info *map, int vpp)
+static void h3600_set_vpp(struct map_info *map, int vpp)
 {
 	if (vpp)
-		set_bitsy_egpio(EGPIO_BITSY_VPP_ON);
+		set_h3600_egpio(EGPIO_H3600_VPP_ON);
 	else
-		clr_bitsy_egpio(EGPIO_BITSY_VPP_ON);
+		clr_h3600_egpio(EGPIO_H3600_VPP_ON);
 }
 
 #endif
@@ -100,7 +101,9 @@ static struct map_info sa1100_map = {
 	write8:		sa1100_write8,
 	write16:	sa1100_write16,
 	write32:	sa1100_write32,
-	copy_to:	sa1100_copy_to
+	copy_to:	sa1100_copy_to,
+
+	map_priv_1:	WINDOW_ADDR,
 };
 
 
@@ -231,42 +234,42 @@ static struct mtd_partition huw_webpanel_partitions[] = {
 #endif /* CONFIG_SA1100_HUW_WEBPANEL */
 
 
-#ifdef CONFIG_SA1100_BITSY
+#ifdef CONFIG_SA1100_H3600
 
-static unsigned long bitsy_max_flash_size = 0x02000000;
-static struct mtd_partition bitsy_partitions[] = {
+static unsigned long h3600_max_flash_size = 0x02000000;
+static struct mtd_partition h3600_partitions[] = {
 	{
-		name: "BITSY boot firmware",
+		name: "H3600 boot firmware",
 		size: 0x00040000,
 		offset: 0,
 		mask_flags: MTD_WRITEABLE  /* force read-only */
 	},{
-		name: "BITSY kernel",
+		name: "H3600 kernel",
 		size: 0x00080000,
 		offset: 0x40000
 	},{
-		name: "BITSY params",
+		name: "H3600 params",
 		size: 0x00040000,
 		offset: 0xC0000
 	},{
 #ifdef CONFIG_JFFS2_FS
-		name: "BITSY root jffs2",
+		name: "H3600 root jffs2",
 		offset: 0x00100000,
 		size: MTDPART_SIZ_FULL
 #else
-		name: "BITSY initrd",
+		name: "H3600 initrd",
 		size: 0x00100000,
 		offset: 0x00100000
 	},{
-		name: "BITSY root cramfs",
+		name: "H3600 root cramfs",
 		size: 0x00300000,
 		offset: 0x00200000
 	},{
-		name: "BITSY usr cramfs",
+		name: "H3600 usr cramfs",
 		size: 0x00800000,
 		offset: 0x00500000
 	},{
-		name: "BITSY usr local",
+		name: "H3600 usr local",
 		offset: 0x00d00000,
 		size: MTDPART_SIZ_FULL
 #endif
@@ -333,7 +336,7 @@ static struct mtd_partition cerf_partitions[] = {
 static unsigned long graphicsclient_max_flash_size = 0x01000000;
 static struct mtd_partition graphicsclient_partitions[] = {
 	{ 
-	 name: "Bootloader + zImage",
+	 name: "zImage",
 	 offset: 0,
 	 size: 0x100000
 	},
@@ -351,13 +354,25 @@ static struct mtd_partition graphicsclient_partitions[] = {
 
 #endif
 
-#ifdef CONFIG_SA1100_LART
+#ifdef CONFIG_SA1100_GRAPHICSMASTER
 
-static unsigned long lart_max_flash_size = 0x00400000;
-static struct mtd_partition lart_partitions[] = {
-	{ offset: 0,			size: 0x020000 		},
-	{ offset: MTDPART_OFS_APPEND,	size: 0x0e0000 		},
-	{ offset: MTDPART_OFS_APPEND,	size: MTDPART_SIZ_FULL 	}
+static unsigned long graphicsmaster_max_flash_size = 0x01000000;
+static struct mtd_partition graphicsmaster_partitions[] = {
+	{ 
+	 name: "zImage",
+	 offset: 0,
+	 size: 0x100000
+	},
+	{ 
+         name: "ramdisk.gz",
+         offset: MTDPART_OFS_APPEND,
+         size: 0x300000 		
+	},
+	{ 
+	  name: "User FS",
+          offset: MTDPART_OFS_APPEND,	
+          size: MTDPART_SIZ_FULL
+	}
 };
 
 #endif
@@ -380,7 +395,7 @@ static struct mtd_partition pangolin_partitions[] = {
 	{
 	  name: "initrd",
 	  offset: 0x00180000,
-	  size: 0x00200000,
+	  size: 0x00280000,
 	},
 	{
 	  name: "initrd-test",
@@ -469,6 +484,50 @@ static struct mtd_partition sherman_partitions[] = {
 
 #endif
 
+#ifdef CONFIG_SA1100_STORK
+
+static unsigned long stork_max_flash_size = 0x02000000;
+static struct mtd_partition stork_partitions[] = {
+	{
+		name: "STORK boot firmware",
+		size: 0x00040000,
+		offset: 0,
+		mask_flags: MTD_WRITEABLE  /* force read-only */
+	},{
+		name: "STORK params",
+		size: 0x00040000,
+		offset: 0x40000
+	},{
+		name: "STORK kernel",
+		size: 0x00100000,
+		offset: 0x80000
+	},{
+#ifdef CONFIG_JFFS2_FS
+		name: "STORK root jffs2",
+		offset: 0x00180000,
+		size: MTDPART_SIZ_FULL
+#else
+		name: "STORK initrd",
+		size: 0x00100000,
+		offset: 0x00180000
+	},{
+		name: "STORK root cramfs",
+		size: 0x00300000,
+		offset: 0x00280000
+	},{
+		name: "STORK usr cramfs",
+		size: 0x00800000,
+		offset: 0x00580000
+	},{
+		name: "STORK usr local",
+		offset: 0x00d80000,
+		size: MTDPART_SIZ_FULL
+#endif
+	}
+};
+
+#endif
+
 #define NB_OF(x)  (sizeof(x)/sizeof(x[0]))
 
 
@@ -485,12 +544,8 @@ int __init sa1100_mtd_init(void)
 	int parsed_nr_parts = 0;
 	char *part_type;
 	
+	/* Default flash buswidth */
 	sa1100_map.buswidth = (MSC0 & MSC_RBW) ? 2 : 4;
-	printk(KERN_NOTICE "SA1100 flash: probing %d-bit flash bus\n", sa1100_map.buswidth*8);
-	mymtd = do_map_probe("cfi", &sa1100_map);
-	if (!mymtd)
-		return -ENXIO;
-	mymtd->module = THIS_MODULE;
 
 	/*
 	 * Static partition definition selection
@@ -512,12 +567,12 @@ int __init sa1100_mtd_init(void)
 	}
 #endif
 
-#ifdef CONFIG_SA1100_BITSY
-	if (machine_is_bitsy()) {
-		parts = bitsy_partitions;
-		nb_parts = NB_OF(bitsy_partitions);
-		sa1100_map.size = bitsy_max_flash_size;
-		sa1100_map.set_vpp = bitsy_set_vpp;
+#ifdef CONFIG_SA1100_H3600
+	if (machine_is_h3600()) {
+		parts = h3600_partitions;
+		nb_parts = NB_OF(h3600_partitions);
+		sa1100_map.size = h3600_max_flash_size;
+		sa1100_map.set_vpp = h3600_set_vpp;
 	}
 #endif
 #ifdef CONFIG_SA1100_FREEBIRD
@@ -539,13 +594,15 @@ int __init sa1100_mtd_init(void)
 		parts = graphicsclient_partitions;
 		nb_parts = NB_OF(graphicsclient_partitions);
 		sa1100_map.size = graphicsclient_max_flash_size;
+		sa1100_map.buswidth = (MSC1 & MSC_RBW) ? 2:4;
 	}
 #endif
-#ifdef CONFIG_SA1100_LART
-	if (machine_is_lart()) {
-		parts = lart_partitions;
-		nb_parts = NB_OF(lart_partitions);
-		sa1100_map.size = lart_max_flash_size;
+#ifdef CONFIG_SA1100_GRAPHICSMASTER
+	if (machine_is_graphicsmaster()) {
+		parts = graphicsmaster_partitions;
+		nb_parts = NB_OF(graphicsmaster_partitions);
+		sa1100_map.size = graphicsmaster_max_flash_size;
+		sa1100_map.buswidth = (MSC1 & MSC_RBW) ? 2:4;
 	}
 #endif
 #ifdef CONFIG_SA1100_PANGOLIN
@@ -584,18 +641,28 @@ int __init sa1100_mtd_init(void)
 		sa1100_map.size = flexanet_max_flash_size;
 	}
 #endif
-
-
-	if (!nb_parts) {
-		printk(KERN_WARNING "MTD: no known flash definition for this SA1100 machine\n");
-		return -ENXIO;
+#ifdef CONFIG_SA1100_STORK
+	if (machine_is_stork()) {
+		parts = stork_partitions;
+		nb_parts = NB_OF(stork_partitions);
+		sa1100_map.size = stork_max_flash_size;
 	}
+#endif
 
+	/*
+	 * Now let's probe for the actual flash.  Do it here since
+	 * specific machine settings might have been set above.
+	 */
+	printk(KERN_NOTICE "SA1100 flash: probing %d-bit flash bus\n", sa1100_map.buswidth*8);
+	mymtd = do_map_probe("cfi_probe", &sa1100_map);
+	if (!mymtd)
+		return -ENXIO;
+	mymtd->module = THIS_MODULE;
 
 	/*
 	 * Dynamic partition selection stuff (might override the static ones)
 	 */
-#ifdef CONFIG_MTD_SA1100_REDBOOT_PARTITIONS
+#ifdef CONFIG_MTD_REDBOOT_PARTS
 	if (parsed_nr_parts == 0) {
 		int ret = parse_redboot_partitions(mymtd, &parsed_parts);
 		
@@ -605,7 +672,7 @@ int __init sa1100_mtd_init(void)
 		}
 	}
 #endif
-#ifdef CONFIG_MTD_SA1100_BOOTLDR_PARTITIONS
+#ifdef CONFIG_MTD_BOOTLDR_PARTS
 	if (parsed_nr_parts == 0) {
 		int ret = parse_bootldr_partitions(mymtd, &parsed_parts);
 		if (ret > 0) {
@@ -642,3 +709,7 @@ static void __exit sa1100_mtd_cleanup(void)
 
 module_init(sa1100_mtd_init);
 module_exit(sa1100_mtd_cleanup);
+
+MODULE_AUTHOR("Nicolas Pitre");
+MODULE_DESCRIPTION("SA1100 CFI map driver");
+MODULE_LICENSE("GPL");

@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: gc.c,v 1.51 2001/05/24 22:24:39 dwmw2 Exp $
+ * $Id: gc.c,v 1.52 2001/09/19 21:53:47 dwmw2 Exp $
  *
  */
 
@@ -562,7 +562,7 @@ static int jffs2_garbage_collect_dnode(struct jffs2_sb_info *c, struct jffs2_era
 		/* Shitloads of space */
 		/* FIXME: Integrate this properly with GC calculations */
 		start &= ~(PAGE_CACHE_SIZE-1);
-		end = min(start + PAGE_CACHE_SIZE, inode->i_size);
+		end = min_t(__u32, start + PAGE_CACHE_SIZE, inode->i_size);
 		D1(printk(KERN_DEBUG "Plenty of free space, so expanding to write from offset 0x%x to 0x%x\n",
 			  start, end));
 		if (end < orig_end) {

@@ -1,5 +1,5 @@
 /* This version ported to the Linux-MTD system by dwmw2@infradead.org
- * $Id: ftl.c,v 1.35 2001/06/09 00:40:17 dwmw2 Exp $
+ * $Id: ftl.c,v 1.39 2001/10/02 15:05:11 dwmw2 Exp $
  *
  * Fixes: Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  * - fixes some leaks on failure in build_maps and ftl_notify_add, cleanups
@@ -258,7 +258,7 @@ static int scan_header(partition_t *part)
     max_offset = (0x100000<part->mtd->size)?0x100000:part->mtd->size;
     /* Search first megabyte for a valid FTL header */
     for (offset = 0;
-	 offset < max_offset;
+	 (offset + sizeof(header)) < max_offset;
 	 offset += part->mtd->erasesize ? : 0x2000) {
 
 	ret = part->mtd->read(part->mtd, offset, sizeof(header), &ret, 
@@ -1400,18 +1400,13 @@ static void ftl_notify_remove(struct mtd_info *mtd)
 		}
 }
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_ftl init_module
-#define cleanup_ftl cleanup_module
-#endif
-
-mod_init_t init_ftl(void)
+int init_ftl(void)
 {
     int i;
 
     memset(myparts, 0, sizeof(myparts));
     
-    DEBUG(0, "$Id: ftl.c,v 1.35 2001/06/09 00:40:17 dwmw2 Exp $\n");
+    DEBUG(0, "$Id: ftl.c,v 1.39 2001/10/02 15:05:11 dwmw2 Exp $\n");
     
     if (register_blkdev(FTL_MAJOR, "ftl", &ftl_blk_fops)) {
 	printk(KERN_NOTICE "ftl_cs: unable to grab major "
@@ -1435,7 +1430,7 @@ mod_init_t init_ftl(void)
     return 0;
 }
 
-mod_exit_t cleanup_ftl(void)
+static void __exit cleanup_ftl(void)
 {
     unregister_mtd_user(&ftl_notifier);
 
@@ -1448,3 +1443,8 @@ mod_exit_t cleanup_ftl(void)
 
 module_init(init_ftl);
 module_exit(cleanup_ftl);
+
+
+MODULE_LICENSE("Dual MPL/GPL");
+MODULE_AUTHOR("David Hinds <dhinds@sonic.net>");
+MODULE_DESCRIPTION("Support code for Flash Translation Layer, used on PCMCIA devices and M-Systems DiskOnChip 1000");

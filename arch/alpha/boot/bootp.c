@@ -147,7 +147,7 @@ start_kernel(void)
 	 */
 	static long nbytes;
 	static char envval[256] __attribute__((aligned(8)));
-#ifdef INITRD_SIZE
+#ifdef INITRD_IMAGE_SIZE
 	static unsigned long initrd_start;
 #endif
 
@@ -164,7 +164,7 @@ start_kernel(void)
 	}
 	pal_init();
 
-#ifdef INITRD_SIZE
+#ifdef INITRD_IMAGE_SIZE
 	/* The initrd must be page-aligned.  See below for the 
 	   cause of the magic number 5.  */
 	initrd_start = ((START_ADDR + 5*KERNEL_SIZE) | (PAGE_SIZE-1)) + 1;
@@ -192,17 +192,17 @@ start_kernel(void)
 	 *
 	 * Sigh...  */
 
-#ifdef INITRD_SIZE
-	load(initrd_start, KERNEL_ORIGIN+KERNEL_SIZE, INITRD_SIZE);
+#ifdef INITRD_IMAGE_SIZE
+	load(initrd_start, KERNEL_ORIGIN+KERNEL_SIZE, INITRD_IMAGE_SIZE);
 #endif
         load(START_ADDR+(4*KERNEL_SIZE), KERNEL_ORIGIN, KERNEL_SIZE);
         load(START_ADDR, START_ADDR+(4*KERNEL_SIZE), KERNEL_SIZE);
 
 	memset((char*)ZERO_PGE, 0, PAGE_SIZE);
 	strcpy((char*)ZERO_PGE, envval);
-#ifdef INITRD_SIZE
+#ifdef INITRD_IMAGE_SIZE
 	((long *)(ZERO_PGE+256))[0] = initrd_start;
-	((long *)(ZERO_PGE+256))[1] = INITRD_SIZE;
+	((long *)(ZERO_PGE+256))[1] = INITRD_IMAGE_SIZE;
 #endif
 
 	runkernel();

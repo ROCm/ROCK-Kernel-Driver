@@ -4,7 +4,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2001.c,v 1.34 2001/06/02 14:30:43 dwmw2 Exp $
+ * $Id: doc2001.c,v 1.35 2001/10/02 15:05:13 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -848,11 +848,6 @@ int doc_erase (struct mtd_info *mtd, struct erase_info *instr)
  *
  ****************************************************************************/
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define cleanup_doc2001 cleanup_module
-#define init_doc2001 init_module
-#endif
-
 int __init init_doc2001(void)
 {
 	inter_module_register(im_name, THIS_MODULE, &DoCMil_init);
@@ -880,4 +875,6 @@ static void __exit cleanup_doc2001(void)
 module_exit(cleanup_doc2001);
 module_init(init_doc2001);
 
-
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org> et al.");
+MODULE_DESCRIPTION("Alternative driver for DiskOnChip Millennium");

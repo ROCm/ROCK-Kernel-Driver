@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: erase.c,v 1.19 2001/03/25 22:36:12 dwmw2 Exp $
+ * $Id: erase.c,v 1.23 2001/09/19 21:51:11 dwmw2 Exp $
  *
  */
 #include <linux/kernel.h>
@@ -93,7 +93,10 @@ void jffs2_erase_block(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb)
 		return;
 	}
 
-	printk(KERN_WARNING "Erase at 0x%08x failed immediately: %d\n", jeb->offset, ret);
+	if (ret == -EROFS) 
+		printk(KERN_WARNING "Erase at 0x%08x failed immediately: -EROFS. Is the sector locked?\n", jeb->offset);
+	else
+		printk(KERN_WARNING "Erase at 0x%08x failed immediately: errno %d\n", jeb->offset, ret);
 	spin_lock_bh(&c->erase_completion_lock);
 	list_del(&jeb->list);
 	list_add(&jeb->list, &c->bad_list);
@@ -152,7 +155,7 @@ static void jffs2_erase_callback(struct erase_info *instr)
 		spin_unlock(&priv->c->erase_completion_lock);
 		wake_up(&priv->c->erase_wait);
 	} else {
-		D1(printk(KERN_DEBUG "Erase completed successfully at 0x%08lx\n", instr->addr));
+		D1(printk(KERN_DEBUG "Erase completed successfully at 0x%08x\n", instr->addr));
 		spin_lock(&priv->c->erase_completion_lock);
 		list_del(&priv->jeb->list);
 		list_add_tail(&priv->jeb->list, &priv->c->erase_complete_list);
@@ -165,48 +168,72 @@ static void jffs2_erase_callback(struct erase_info *instr)
 
 /* Hmmm. Maybe we should accept the extra space it takes and make
    this a standard doubly-linked list? */
-static inline void jffs2_remove_node_ref_from_ino_list(struct jffs2_sb_info *sbinfo, struct jffs2_raw_node_ref *ref)
+static inline void jffs2_remove_node_refs_from_ino_list(struct jffs2_sb_info *c,
+			struct jffs2_raw_node_ref *ref, struct jffs2_eraseblock *jeb)
 {
-	struct jffs2_inode_cache *ic;
-	struct jffs2_raw_node_ref **prev, *this;
-	D2(int c=0);
+	struct jffs2_inode_cache *ic = NULL;
+	struct jffs2_raw_node_ref **prev;
 
-	this = ref;
-	while(this->next_in_ino)
-		 this = this->next_in_ino;
+	prev = &ref->next_in_ino;
 
-	ic = (struct jffs2_inode_cache *)this;
+	/* Walk the inode's list once, removing any nodes from this eraseblock */
+	while (1) {
+		if (!(*prev)->next_in_ino) {
+			/* We're looking at the jffs2_inode_cache, which is 
+			   at the end of the linked list. Stash it and continue
+			   from the beginning of the list */
+			ic = (struct jffs2_inode_cache *)(*prev);
+			prev = &ic->nodes;
+			continue;
+		} 
 
-	D1(printk(KERN_DEBUG "Removing node at phys 0x%08x from ino #%u\n", ref->flash_offset &~3, ic->ino));
+		if (((*prev)->flash_offset & ~(c->sector_size -1)) == jeb->offset) {
+			/* It's in the block we're erasing */
+			struct jffs2_raw_node_ref *this;
 
-	prev = &ic->nodes;
-	if (!*prev) {
-		printk(KERN_WARNING "Eep. ic->nodes == NULL.\n");
+			this = *prev;
+			*prev = this->next_in_ino;
+			this->next_in_ino = NULL;
+
+			if (this == ref)
+				break;
+
+			continue;
+		}
+		/* Not to be deleted. Skip */
+		prev = &((*prev)->next_in_ino);
+	}
+
+	/* PARANOIA */
+	if (!ic) {
+		printk(KERN_WARNING "inode_cache not found in remove_node_refs()!!\n");
 		return;
 	}
-	while (*prev != ref) {
-		if (!(*prev)->next_in_ino) {
-		        printk(KERN_WARNING "Eep. node at phys 0x%08x, mem %p. next_in_ino is NULL.\n", (*prev)->flash_offset &~3, 
-			       *prev);
-			return;
+
+	D1(printk(KERN_DEBUG "Removed nodes in range 0x%08x-0x%08x from ino #%u\n",
+		  jeb->offset, jeb->offset + c->sector_size, ic->ino));
+
+	D2({
+		int i=0;
+        struct jffs2_raw_node_ref *this;		
+        printk(KERN_DEBUG "After remove_node_refs_from_ino_list: \n" KERN_DEBUG);
+
+		this = ic->nodes;
+	   
+		while(this) {
+			printk( "0x%08x(%d)->", this->flash_offset & ~3, this->flash_offset &3);
+			if (++i == 5) {
+				printk("\n" KERN_DEBUG);
+				i=0;
+			}
+			this = this->next_in_ino;
 		}
-		prev = &(*prev)->next_in_ino;
-	}
-	*prev = ref->next_in_ino;
-	this = ic->nodes;
-	D2(printk(KERN_DEBUG "After remove_node_ref_from_ino_list: \n" KERN_DEBUG);
-	while(this) {
-		printk( "0x%08x(%d)->", this->flash_offset & ~3, this->flash_offset &3);
-		if (++c == 5) {
-			printk("\n" KERN_DEBUG);
-			c=0;
-		}
-		this = this->next_in_ino;
-	}
-	printk("\n"););
+		printk("\n");
+	});
+
 	if (ic->nodes == (void *)ic) {
 		D1(printk(KERN_DEBUG "inocache for ino #%u is all gone now. Freeing\n", ic->ino));
-		jffs2_del_ino_cache(sbinfo, ic);
+		jffs2_del_ino_cache(c, ic);
 		jffs2_free_inode_cache(ic);
 	}
 }
@@ -221,8 +248,8 @@ static void jffs2_free_all_node_refs(struct jffs2_sb_info *c, struct jffs2_erase
 		
 		/* Remove from the inode-list */
 		if (ref->next_in_ino)
-			jffs2_remove_node_ref_from_ino_list(c, ref);
-		/* else it was a non-inode node so don't bother */
+			jffs2_remove_node_refs_from_ino_list(c, ref, jeb);
+		/* else it was a non-inode node or already removed, so don't bother */
 
 		jffs2_free_raw_node_ref(ref);
 	}
@@ -267,7 +294,7 @@ void jffs2_mark_erased_blocks(struct jffs2_sb_info *c)
 
 			D1(printk(KERN_DEBUG "Verifying erase at 0x%08x\n", jeb->offset));
 			while(ofs < jeb->offset + c->sector_size) {
-				__u32 readlen = min(PAGE_SIZE, jeb->offset + c->sector_size - ofs);
+				__u32 readlen = min((__u32)PAGE_SIZE, jeb->offset + c->sector_size - ofs);
 				int i;
 
 				ret = c->mtd->read(c->mtd, ofs, readlen, &retlen, ebuf);

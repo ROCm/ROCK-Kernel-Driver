@@ -31,11 +31,12 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: file.c,v 1.55 2001/05/29 09:19:24 dwmw2 Exp $
+ * $Id: file.c,v 1.58 2001/09/20 15:28:31 dwmw2 Exp $
  *
  */
 
 #include <linux/kernel.h>
+#include <linux/mtd/compatmac.h> /* for min() */
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/pagemap.h>
@@ -44,6 +45,7 @@
 #include "crc32.h"
 
 extern int generic_file_open(struct inode *, struct file *) __attribute__((weak));
+extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin) __attribute__((weak));
 
 
 int jffs2_null_fsync(struct file *filp, struct dentry *dentry, int datasync)
@@ -360,7 +362,7 @@ int jffs2_prepare_write (struct file *filp, struct page *pg, unsigned start, uns
 		ri.mode = inode->i_mode;
 		ri.uid = inode->i_uid;
 		ri.gid = inode->i_gid;
-		ri.isize = max(inode->i_size, pageofs);
+		ri.isize = max((__u32)inode->i_size, pageofs);
 		ri.atime = ri.ctime = ri.mtime = CURRENT_TIME;
 		ri.offset = inode->i_size;
 		ri.dsize = pageofs - inode->i_size;
@@ -409,9 +411,9 @@ int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsi
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct jffs2_inode_info *f = JFFS2_INODE_INFO(inode);
 	struct jffs2_sb_info *c = JFFS2_SB_INFO(inode->i_sb);
-	ssize_t newsize = max(filp->f_dentry->d_inode->i_size, (pg->index << PAGE_CACHE_SHIFT) + end);
+	__u32 newsize = max_t(__u32, filp->f_dentry->d_inode->i_size, (pg->index << PAGE_CACHE_SHIFT) + end);
 	__u32 file_ofs = (pg->index << PAGE_CACHE_SHIFT);
-	unsigned writelen = min(PAGE_CACHE_SIZE, newsize - file_ofs);
+	__u32 writelen = min((__u32)PAGE_CACHE_SIZE, newsize - file_ofs);
 	struct jffs2_raw_inode *ri;
 	int ret = 0;
 	ssize_t writtenlen = 0;
@@ -467,7 +469,7 @@ int jffs2_commit_write (struct file *filp, struct page *pg, unsigned start, unsi
 		ri->mode = inode->i_mode;
 		ri->uid = inode->i_uid;
 		ri->gid = inode->i_gid;
-		ri->isize = max(inode->i_size, file_ofs + datalen);
+		ri->isize = max((__u32)inode->i_size, file_ofs + datalen);
 		ri->atime = ri->ctime = ri->mtime = CURRENT_TIME;
 		ri->offset = file_ofs;
 		ri->csize = cdatalen;

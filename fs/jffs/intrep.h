@@ -10,13 +10,18 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * $Id: intrep.h,v 1.11 2000/08/17 22:46:46 bmatthews Exp $
+ * $Id: intrep.h,v 1.14 2001/09/23 23:28:37 dwmw2 Exp $
  *
  */
 
 #ifndef __LINUX_JFFS_INTREP_H__
 #define __LINUX_JFFS_INTREP_H__
 #include "jffs_fm.h"
+struct jffs_node *jffs_alloc_node(void);
+void jffs_free_node(struct jffs_node *n);
+int jffs_get_node_inuse(void);
+long jffs_get_file_count(void);
+
 __u32 jffs_checksum(const void *data, int size);
 
 void jffs_cleanup_control(struct jffs_control *c);

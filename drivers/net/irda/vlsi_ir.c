@@ -2,7 +2,7 @@
  *
  *	vlsi_ir.c:	VLSI82C147 PCI IrDA controller driver for Linux
  *
- *	Version:	0.1, Aug 6, 2001
+ *	Version:	0.3, Sep 30, 2001
  *
  *	Copyright (c) 2001 Martin Diehl
  *
@@ -32,6 +32,7 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <linux/delay.h>
+#include <linux/time.h>
 
 #include <net/irda/irda.h>
 #include <net/irda/irda_device.h>
@@ -49,15 +50,14 @@ MODULE_AUTHOR("Martin Diehl <info@mdiehl.de>");
 MODULE_LICENSE("GPL");
 
 
-
 static /* const */ char drivername[] = "vlsi_ir";
 
 
-#define PCI_CLASS_IRDA_GENERIC 0x0d00
+#define PCI_CLASS_WIRELESS_IRDA 0x0d00
 
 static struct pci_device_id vlsi_irda_table [] __devinitdata = { {
 
-	class:          PCI_CLASS_IRDA_GENERIC << 8,
+	class:          PCI_CLASS_WIRELESS_IRDA << 8,
 	vendor:         PCI_VENDOR_ID_VLSI,
 	device:         PCI_DEVICE_ID_VLSI_82C147,
 	}, { /* all zeroes */ }
@@ -83,37 +83,45 @@ static int clksrc = 0;			/* default is 0(auto) */
 
 
 MODULE_PARM(ringsize, "1-2i");
-MODULE_PARM_DESC(ringsize, "tx, rx ring descriptor size");
+MODULE_PARM_DESC(ringsize, "TX, RX ring descriptor size");
 
 /*	ringsize: size of the tx and rx descriptor rings
  *		independent for tx and rx
  *		specify as ringsize=tx[,rx]
  *		allowed values: 4, 8, 16, 32, 64
+ *		Due to the IrDA 1.x max. allowed window size=7,
+ *		there should be no gain when using rings larger than 8
  */
 
-static int ringsize[] = {16,16};	/* default is tx=rx=16 */
+static int ringsize[] = {8,8};		/* default is tx=rx=8 */
 
 
 MODULE_PARM(sirpulse, "i");
-MODULE_PARM_DESC(sirpulse, "sir pulse width tuning");
+MODULE_PARM_DESC(sirpulse, "SIR pulse width tuning");
 
-/*	sirpulse: tuning of the sir pulse width within IrPHY 1.3 limits
- *		0: real short, 1.5us (exception 6us at 2.4kb/s)
+/*	sirpulse: tuning of the SIR pulse width within IrPHY 1.3 limits
+ *		0: very short, 1.5us (exception: 6us at 2.4 kbaud)
  *		1: nominal 3/16 bittime width
+ *	note: IrDA compliant peer devices should be happy regardless
+ *		which one is used. Primary goal is to save some power
+ *		on the sender's side - at 9.6kbaud for example the short
+ *		pulse width saves more than 90% of the transmitted IR power.
  */
 
 static int sirpulse = 1;		/* default is 3/16 bittime */
 
 
-MODULE_PARM(mtt_bits, "i");
-MODULE_PARM_DESC(mtt_bits, "IrLAP bitfield representing min-turn-time");
+MODULE_PARM(qos_mtt_bits, "i");
+MODULE_PARM_DESC(qos_mtt_bits, "IrLAP bitfield representing min-turn-time");
 
-/*	mtt_bit: encoded min-turn-time values we accept for connections
- *		 according to IrLAP definition (section 6.6.8)
- *		 the widespreadly used HP HDLS-1100 requires 1 msec
+/*	qos_mtt_bits: encoded min-turn-time value we require the peer device
+ *		 to use before transmitting to us. "Type 1" (per-station)
+ *		 bitfield according to IrLAP definition (section 6.6.8)
+ *		 The HP HDLS-1100 requires 1 msec - don't even know
+ *		 if this is the one which is used by my OB800
  */
 
-static int mtt_bits = 0x07;		/* default is 1 ms or more */
+static int qos_mtt_bits = 0x04;		/* default is 1 ms */
 
 
 /********************************************************/
@@ -122,68 +130,81 @@ static int mtt_bits = 0x07;		/* default is 1 ms or more */
 /* some helpers for operations on ring descriptors */
 
 
-static inline int rd_is_active(struct ring_descr *rd)
+static inline int rd_is_active(struct vlsi_ring *r, unsigned i)
 {
-	return ((rd->rd_status & RD_STAT_ACTIVE) != 0);
+	return ((r->hw[i].rd_status & RD_STAT_ACTIVE) != 0);
 }
 
-static inline void rd_set_addr_status(struct ring_descr *rd, dma_addr_t a, u8 s)
+static inline void rd_activate(struct vlsi_ring *r, unsigned i)
 {
-	/* overlayed - order is important! */
+	r->hw[i].rd_status |= RD_STAT_ACTIVE;
+}
 
+static inline void rd_set_addr_status(struct vlsi_ring *r, unsigned i, dma_addr_t a, u8 s)
+{
+	struct ring_descr *rd = r->hw +i;
+
+	/* ordering is important for two reasons:
+	 *  - overlayed: writing addr overwrites status
+	 *  - we want to write status last so we have valid address in
+	 *    case status has RD_STAT_ACTIVE set
+	 */
+
+	if ((a & ~DMA_MASK_MSTRPAGE) != MSTRPAGE_VALUE)
+		BUG();
+
+	a &= DMA_MASK_MSTRPAGE;  /* clear highbyte to make sure we won't write
+				  * to status - just in case MSTRPAGE_VALUE!=0
+				  */
 	rd->rd_addr = a;
-	rd->rd_status = s;
+	wmb();
+	rd->rd_status = s;	 /* potentially passes ownership to the hardware */
 }
 
-static inline void rd_set_status(struct ring_descr *rd, u8 s)
+static inline void rd_set_status(struct vlsi_ring *r, unsigned i, u8 s)
 {
-	rd->rd_status = s;
+	r->hw[i].rd_status = s;
 }
 
-static inline void rd_set_count(struct ring_descr *rd, u16 c)
+static inline void rd_set_count(struct vlsi_ring *r, unsigned i, u16 c)
 {
-	rd->rd_count = c;
+	r->hw[i].rd_count = c;
 }
 
-static inline u8 rd_get_status(struct ring_descr *rd)
+static inline u8 rd_get_status(struct vlsi_ring *r, unsigned i)
 {
-	return rd->rd_status;
+	return r->hw[i].rd_status;
 }
 
-static inline dma_addr_t rd_get_addr(struct ring_descr *rd)
+static inline dma_addr_t rd_get_addr(struct vlsi_ring *r, unsigned i)
 {
 	dma_addr_t	a;
 
-	a = (rd->rd_addr & DMA_MASK_MSTRPAGE) | (MSTRPAGE_VALUE << 24);
+	a = (r->hw[i].rd_addr & DMA_MASK_MSTRPAGE) | (MSTRPAGE_VALUE << 24);
 	return a;
 }
 
-static inline u16 rd_get_count(struct ring_descr *rd)
+static inline u16 rd_get_count(struct vlsi_ring *r, unsigned i)
 {
-	return rd->rd_count;
+	return r->hw[i].rd_count;
 }
 
+/* producer advances r->head when descriptor was added for processing by hw */
 
-/* advancing indices pointing into descriptor rings */
-
-static inline void ring_ptr_inc(unsigned *ptr, unsigned mask)
+static inline void ring_put(struct vlsi_ring *r)
 {
-	*ptr = (*ptr + 1) & mask;
+	r->head = (r->head + 1) & r->mask;
+}
+
+/* consumer advances r->tail when descriptor was removed after getting processed by hw */
+
+static inline void ring_get(struct vlsi_ring *r)
+{
+	r->tail = (r->tail + 1) & r->mask;
 }
 
 
 /********************************************************/
-
-
-#define MAX_PACKET_LEN		2048	/* IrDA MTU */
-
-/* increase transfer buffer size somewhat so we have enough space left
- * when packet size increases during wrapping due to XBOFs and escapes.
- * well, this wastes some memory - anyway, later we will
- * either map skb's directly or use pci_pool allocator...
- */
-
-#define XFER_BUF_SIZE		(MAX_PACKET_LEN+512)
 
 /* the memory required to hold the 2 descriptor rings */
 
@@ -193,12 +214,11 @@ static inline void ring_ptr_inc(unsigned *ptr, unsigned mask)
 
 #define RING_ENTRY_SIZE		(2 * MAX_RING_DESCR * sizeof(struct ring_entry))
 
-
 /********************************************************/
 
 /* just dump all registers */
 
-static void vlsi_reg_debug(int iobase, const char *s)
+static void vlsi_reg_debug(unsigned iobase, const char *s)
 {
 	int	i;
 
@@ -217,15 +237,14 @@ static int vlsi_set_clock(struct pci_dev *pdev)
 	u8	clkctl, lock;
 	int	i, count;
 
-	if (clksrc < 0  ||  clksrc > 3) {
-		printk(KERN_ERR "%s: invalid clksrc=%d\n", __FUNCTION__, clksrc);
-		return -1;
-	}
 	if (clksrc < 2) { /* auto or PLL: try PLL */
 		clkctl = CLKCTL_NO_PD | CLKCTL_CLKSTP;
 		pci_write_config_byte(pdev, VLSI_PCI_CLKCTL, clkctl);
 
-		/* protocol to detect PLL lock synchronisation */
+		/* procedure to detect PLL lock synchronisation:
+		 * after 0.5 msec initial delay we expect to find 3 PLL lock
+		 * indications within 10 msec for successful PLL detection.
+		 */
 		udelay(500);
 		count = 0;
 		for (i = 500; i <= 10000; i += 50) { /* max 10 msec */
@@ -244,20 +263,20 @@ static int vlsi_set_clock(struct pci_dev *pdev)
 				pci_write_config_byte(pdev, VLSI_PCI_CLKCTL, clkctl);
 				return -1;
 			}
-			else /* was: clksrc=0(auto) */
-				clksrc = 3; /* fallback to 40MHz XCLK (OB800) */
+			else			/* was: clksrc=0(auto) */
+				clksrc = 3;	/* fallback to 40MHz XCLK (OB800) */
 
 			printk(KERN_INFO "%s: PLL not locked, fallback to clksrc=%d\n",
 				__FUNCTION__, clksrc);
 		}
-		else { /* got succesful PLL lock */
+		else { /* got successful PLL lock */
 			clksrc = 1;
 			return 0;
 		}
 	}
 
 	/* we get here if either no PLL detected in auto-mode or
-	   the external clock source explicitly specified */
+	   the external clock source was explicitly specified */
 
 	clkctl = CLKCTL_EXTCLK | CLKCTL_CLKSTP;
 	if (clksrc == 3)
@@ -310,80 +329,93 @@ static void vlsi_unset_clock(struct pci_dev *pdev)
 
 /* ### FIXME: don't use old virt_to_bus() anymore! */
 
-static int vlsi_alloc_buffers_init(vlsi_irda_dev_t *idev)
+
+static void vlsi_arm_rx(struct vlsi_ring *r)
 {
-	void *buf;
-	int i, j;
+	unsigned	i;
+	dma_addr_t	ba;
 
-	idev->ring_buf = kmalloc(RING_ENTRY_SIZE,GFP_KERNEL);
-	if (!idev->ring_buf)
-		return -ENOMEM;
-	memset(idev->ring_buf, 0, RING_ENTRY_SIZE);
+	for (i = 0; i < r->size; i++) {
+		if (r->buf[i].data == NULL)
+			BUG();
+		ba = virt_to_bus(r->buf[i].data);
+		rd_set_addr_status(r, i, ba, RD_STAT_ACTIVE);
+	}
+}
 
-	for (i = MAX_RING_DESCR; i < MAX_RING_DESCR+ringsize[0]; i++) {
-		buf = kmalloc(XFER_BUF_SIZE, GFP_KERNEL|GFP_DMA);
-		if (!buf) {
-			for (j = MAX_RING_DESCR; j < i; j++)
-				kfree(idev->ring_buf[j].head);
-			kfree(idev->ring_buf);
-			idev->ring_buf = NULL;
+static int vlsi_alloc_ringbuf(struct vlsi_ring *r)
+{
+	unsigned	i, j;
+
+	r->head = r->tail = 0;
+	r->mask = r->size - 1;
+	for (i = 0; i < r->size; i++) {
+		r->buf[i].skb = NULL;
+		r->buf[i].data = kmalloc(XFER_BUF_SIZE, GFP_KERNEL|GFP_DMA);
+		if (r->buf[i].data == NULL) {
+			for (j = 0; j < i; j++) {
+				kfree(r->buf[j].data);
+				r->buf[j].data = NULL;
+			}
 			return -ENOMEM;
 		}
-		idev->ring_buf[i].head = buf;
-		idev->ring_buf[i].skb = NULL;
-		rd_set_addr_status(idev->ring_hw+i,virt_to_bus(buf), 0);
 	}
-
-	for (i = 0; i < ringsize[1]; i++) {
-		buf = kmalloc(XFER_BUF_SIZE, GFP_KERNEL|GFP_DMA);
-		if (!buf) {
-			for (j = 0; j < i; j++)
-				kfree(idev->ring_buf[j].head);
-			for (j = MAX_RING_DESCR; j < MAX_RING_DESCR+ringsize[0]; j++)
-				kfree(idev->ring_buf[j].head);
-			kfree(idev->ring_buf);
-			idev->ring_buf = NULL;
-			return -ENOMEM;
-		}
-		idev->ring_buf[i].head = buf;
-		idev->ring_buf[i].skb = NULL;
-		rd_set_addr_status(idev->ring_hw+i,virt_to_bus(buf), RD_STAT_ACTIVE);
-	}
-
 	return 0;
+}
+
+static void vlsi_free_ringbuf(struct vlsi_ring *r)
+{
+	unsigned	i;
+
+	for (i = 0; i < r->size; i++) {
+		if (r->buf[i].data == NULL)
+			continue;
+		if (r->buf[i].skb) {
+			dev_kfree_skb(r->buf[i].skb);
+			r->buf[i].skb = NULL;
+		}
+		else
+			kfree(r->buf[i].data);
+		r->buf[i].data = NULL;
+	}
 }
 
 
 static int vlsi_init_ring(vlsi_irda_dev_t *idev)
 {
+	char 		 *ringarea;
 
-	idev->tx_mask = MAX_RING_DESCR | (ringsize[0] - 1);
-	idev->rx_mask = ringsize[1] - 1;
-
-	idev->ring_hw = pci_alloc_consistent(idev->pdev,
-		RING_AREA_SIZE, &idev->busaddr);
-	if (!idev->ring_hw) {
+	ringarea = pci_alloc_consistent(idev->pdev, RING_AREA_SIZE, &idev->busaddr);
+	if (!ringarea) {
 		printk(KERN_ERR "%s: insufficient memory for descriptor rings\n",
 			__FUNCTION__);
 		return -ENOMEM;
 	}
+	memset(ringarea, 0, RING_AREA_SIZE);
+
 #if 0
 	printk(KERN_DEBUG "%s: (%d,%d)-ring %p / %p\n", __FUNCTION__,
-		ringsize[0], ringsize[1], idev->ring_hw, 
+		ringsize[0], ringsize[1], ringarea, 
 		(void *)(unsigned)idev->busaddr);
 #endif
-	memset(idev->ring_hw, 0, RING_AREA_SIZE);
 
-	if (vlsi_alloc_buffers_init(idev)) {
-		
-		pci_free_consistent(idev->pdev, RING_AREA_SIZE,
-			idev->ring_hw, idev->busaddr);
-		printk(KERN_ERR "%s: insufficient memory for ring buffers\n",
-			__FUNCTION__);
-		return -1;
+	idev->rx_ring.size = ringsize[1];
+	idev->rx_ring.hw = (struct ring_descr *)ringarea;
+	if (!vlsi_alloc_ringbuf(&idev->rx_ring)) {
+		idev->tx_ring.size = ringsize[0];
+		idev->tx_ring.hw = idev->rx_ring.hw + MAX_RING_DESCR;
+		if (!vlsi_alloc_ringbuf(&idev->tx_ring)) {
+			idev->virtaddr = ringarea;
+			return 0;
+		}
+		vlsi_free_ringbuf(&idev->rx_ring);
 	}
 
-	return 0;
+	pci_free_consistent(idev->pdev, RING_AREA_SIZE,
+		ringarea, idev->busaddr);
+	printk(KERN_ERR "%s: insufficient memory for ring buffers\n",
+		__FUNCTION__);
+	return -1;
 }
 
 
@@ -397,7 +429,7 @@ static int vlsi_set_baud(struct net_device *ndev)
 	vlsi_irda_dev_t *idev = ndev->priv;
 	unsigned long flags;
 	u16 nphyctl;
-	int iobase; 
+	unsigned iobase; 
 	u16 config;
 	unsigned mode;
 	int	ret;
@@ -420,7 +452,7 @@ static int vlsi_set_baud(struct net_device *ndev)
 	else if (baudrate == 1152000) {
 		mode = IFF_MIR;
 		config = IRCFG_MIR | IRCFG_CRC16;
-		nphyctl = PHYCTL_MIR(baudrate);
+		nphyctl = PHYCTL_MIR(clksrc==3);
 	}
 	else {
 		mode = IFF_SIR;
@@ -449,7 +481,8 @@ static int vlsi_set_baud(struct net_device *ndev)
 	outw(nphyctl, iobase+VLSI_PIO_NPHYCTL);
 	wmb();
 	outw(IRENABLE_IREN, iobase+VLSI_PIO_IRENABLE);
-		/* chip fetches IRCFG on next rising edge of its 8MHz clock */
+
+	/* chip fetches IRCFG on next rising edge of its 8MHz clock */
 
 	mb();
 	config = inw(iobase+VLSI_PIO_IRENABLE) & IRENABLE_MASK;
@@ -493,15 +526,14 @@ static int vlsi_set_baud(struct net_device *ndev)
 static int vlsi_init_chip(struct net_device *ndev)
 {
 	vlsi_irda_dev_t *idev = ndev->priv;
+	unsigned	iobase;
 	u16 ptr;
-	unsigned  iobase;
-
 
 	iobase = ndev->base_addr;
 
-	outw(0, iobase+VLSI_PIO_IRENABLE);
-
 	outb(IRINTR_INT_MASK, iobase+VLSI_PIO_IRINTR); /* w/c pending IRQ, disable all INT */
+
+	outw(0, iobase+VLSI_PIO_IRENABLE);	/* disable IrPHY-interface */
 
 	/* disable everything, particularly IRCFG_MSTR - which resets the RING_PTR */
 
@@ -513,16 +545,16 @@ static int vlsi_init_chip(struct net_device *ndev)
 
 	outw(0, iobase+VLSI_PIO_IRENABLE);
 
-	outw(MAX_PACKET_LEN, iobase+VLSI_PIO_MAXPKT);
+	outw(MAX_PACKET_LENGTH, iobase+VLSI_PIO_MAXPKT);  /* max possible value=0x0fff */
 
 	outw(BUS_TO_RINGBASE(idev->busaddr), iobase+VLSI_PIO_RINGBASE);
 
-	outw(TX_RX_TO_RINGSIZE(ringsize[0], ringsize[1]), iobase+VLSI_PIO_RINGSIZE);	
-
+	outw(TX_RX_TO_RINGSIZE(idev->tx_ring.size, idev->rx_ring.size),
+		iobase+VLSI_PIO_RINGSIZE);	
 
 	ptr = inw(iobase+VLSI_PIO_RINGPTR);
-	idev->rx_put = idev->rx_get = RINGPTR_GET_RX(ptr);
-	idev->tx_put = idev->tx_get = RINGPTR_GET_TX(ptr);
+	idev->rx_ring.head = idev->rx_ring.tail = RINGPTR_GET_RX(ptr);
+	idev->tx_ring.head = idev->tx_ring.tail = RINGPTR_GET_TX(ptr);
 
 	outw(IRCFG_MSTR, iobase+VLSI_PIO_IRCFG);		/* ready for memory access */
 	wmb();
@@ -533,12 +565,12 @@ static int vlsi_init_chip(struct net_device *ndev)
 	idev->new_baud = 9600;		/* start with IrPHY using 9600(SIR) mode */
 	vlsi_set_baud(ndev);
 
-	outb(IRINTR_INT_MASK, iobase+VLSI_PIO_IRINTR);
+	outb(IRINTR_INT_MASK, iobase+VLSI_PIO_IRINTR);	/* just in case - w/c pending IRQ's */
 	wmb();
 
 	/* DO NOT BLINDLY ENABLE IRINTR_ACTEN!
 	 * basically every received pulse fires an ACTIVITY-INT
-	 * leading to >1000 INT's per second instead of few 10
+	 * leading to >>1000 INT's per second instead of few 10
 	 */
 
 	outb(IRINTR_RPKTEN|IRINTR_TPKTEN, iobase+VLSI_PIO_IRINTR);
@@ -551,97 +583,82 @@ static int vlsi_init_chip(struct net_device *ndev)
 /**************************************************************/
 
 
+static void vlsi_refill_rx(struct vlsi_ring *r)
+{
+	do {
+		if (rd_is_active(r, r->head))
+			BUG();
+		rd_activate(r, r->head);
+		ring_put(r);
+	} while (r->head != r->tail);
+}
+
+
 static int vlsi_rx_interrupt(struct net_device *ndev)
 {
 	vlsi_irda_dev_t *idev = ndev->priv;
-	int	iobase;
-	int	entry;
+	struct vlsi_ring *r;
 	int	len;
 	u8	status;
-	u16	word;
 	struct sk_buff	*skb;
 	int	crclen;
 
-	iobase = ndev->base_addr;
+	r = &idev->rx_ring;
+	while (!rd_is_active(r, r->tail)) {
 
-	entry = idev->rx_get;
+		status = rd_get_status(r, r->tail);
+		if (status & RX_STAT_ERROR) {
+			idev->stats.rx_errors++;
+			if (status & RX_STAT_OVER)  
+				idev->stats.rx_over_errors++;
+			if (status & RX_STAT_LENGTH)  
+				idev->stats.rx_length_errors++;
+			if (status & RX_STAT_PHYERR)  
+				idev->stats.rx_frame_errors++;
+			if (status & RX_STAT_CRCERR)  
+				idev->stats.rx_crc_errors++;
+		}
+		else {
+			len = rd_get_count(r, r->tail);
+			crclen = (idev->mode==IFF_FIR) ? sizeof(u32) : sizeof(u16);
+			if (len < crclen)
+				printk(KERN_ERR "%s: strange frame (len=%d)\n",
+					__FUNCTION__, len);
+			else
+				len -= crclen;		/* remove trailing CRC */
 
-	while ( !rd_is_active(idev->ring_hw+idev->rx_get) ) {
-
-		ring_ptr_inc(&idev->rx_get, idev->rx_mask);
-
-		while (entry != idev->rx_get) {
-
-			status = rd_get_status(idev->ring_hw+entry);
-
-			if (status & RD_STAT_ACTIVE) {
-				printk(KERN_CRIT "%s: rx still active!!!\n",
-					__FUNCTION__);
-				break;
-			}
-			if (status & RX_STAT_ERROR) {
-				idev->stats.rx_errors++;
-				if (status & RX_STAT_OVER)  
-					idev->stats.rx_over_errors++;
-				if (status & RX_STAT_LENGTH)  
-					idev->stats.rx_length_errors++;
-				if (status & RX_STAT_PHYERR)  
-					idev->stats.rx_frame_errors++;
-				if (status & RX_STAT_CRCERR)  
-					idev->stats.rx_crc_errors++;
+			skb = dev_alloc_skb(len+1);
+			if (skb) {
+				skb->dev = ndev;
+				skb_reserve(skb,1);
+				memcpy(skb_put(skb,len), r->buf[r->tail].data, len);
+				idev->stats.rx_packets++;
+				idev->stats.rx_bytes += len;
+				skb->mac.raw = skb->data;
+				skb->protocol = htons(ETH_P_IRDA);
+				netif_rx(skb);				
 			}
 			else {
-				len = rd_get_count(idev->ring_hw+entry);
-				crclen = (idev->mode==IFF_FIR) ? 4 : 2;
-				if (len < crclen)
-					printk(KERN_ERR "%s: strange frame (len=%d)\n",
-						__FUNCTION__, len);
-				else
-					len -= crclen;		/* remove trailing CRC */
-
-				skb = dev_alloc_skb(len+1);
-				if (skb) {
-					skb->dev = ndev;
-					skb_reserve(skb,1);
-					memcpy(skb_put(skb,len), idev->ring_buf[entry].head, len);
-					idev->stats.rx_packets++;
-					idev->stats.rx_bytes += len;
-					skb->mac.raw = skb->data;
-					skb->protocol = htons(ETH_P_IRDA);
-					netif_rx(skb);				
-				}
-				else {
-					idev->stats.rx_dropped++;
-					printk(KERN_ERR "%s: rx packet dropped\n", __FUNCTION__);
-				}
+				idev->stats.rx_dropped++;
+				printk(KERN_ERR "%s: rx packet dropped\n", __FUNCTION__);
 			}
-			rd_set_count(idev->ring_hw+entry, 0);
-			rd_set_status(idev->ring_hw+entry, RD_STAT_ACTIVE);
-			ring_ptr_inc(&entry, idev->rx_mask);
+		}
+		rd_set_count(r, r->tail, 0);
+		rd_set_status(r, r->tail, 0);
+		ring_get(r);
+		if (r->tail == r->head) {
+			printk(KERN_WARNING "%s: rx ring exhausted\n", __FUNCTION__);
+			break;
 		}
 	}
-	idev->rx_put = idev->rx_get;
-	idev->rx_get = entry;
 
-	word = inw(iobase+VLSI_PIO_IRENABLE);
-	if (!(word & IRENABLE_ENTXST)) {
+	do_gettimeofday(&idev->last_rx); /* remember "now" for later mtt delay */
 
-		/* only rewrite ENRX, if tx not running!
-		 * rewriting ENRX during tx in progress wouldn't hurt
-		 * but would be racy since we would also have to rewrite
-		 * ENTX then (same register) - which might get disabled meanwhile.
-		 */
+	vlsi_refill_rx(r);
 
-		outw(0, iobase+VLSI_PIO_IRENABLE);
-
-		word = inw(iobase+VLSI_PIO_IRCFG);
-		mb();
-		outw(word | IRCFG_ENRX, iobase+VLSI_PIO_IRCFG);
-		wmb();
-		outw(IRENABLE_IREN, iobase+VLSI_PIO_IRENABLE);
-	}
 	mb();
-	outw(0, iobase+VLSI_PIO_PROMPT);
+	outw(0, ndev->base_addr+VLSI_PIO_PROMPT);
+
 	return 0;
 }
 
@@ -649,64 +666,55 @@ static int vlsi_rx_interrupt(struct net_device *ndev)
 static int vlsi_tx_interrupt(struct net_device *ndev)
 {
 	vlsi_irda_dev_t *idev = ndev->priv;
-	int	iobase;
-	int	entry;
+	struct vlsi_ring	*r;
+	unsigned	iobase;
 	int	ret;
 	u16	config;
 	u16	status;
 
+	r = &idev->tx_ring;
+	while (!rd_is_active(r, r->tail)) {
+		if (r->tail == r->head)
+			break;	/* tx ring empty - nothing to send anymore */
+
+		status = rd_get_status(r, r->tail);
+		if (status & TX_STAT_UNDRN) {
+			idev->stats.tx_errors++;
+			idev->stats.tx_fifo_errors++;
+		}
+		else {
+			idev->stats.tx_packets++;
+			idev->stats.tx_bytes += rd_get_count(r, r->tail); /* not correct for SIR */
+		}
+		rd_set_count(r, r->tail, 0);
+		rd_set_status(r, r->tail, 0);
+		if (r->buf[r->tail].skb) {
+			rd_set_addr_status(r, r->tail, 0, 0);
+			dev_kfree_skb(r->buf[r->tail].skb);
+			r->buf[r->tail].skb = NULL;
+			r->buf[r->tail].data = NULL;
+		}
+		ring_get(r);
+	}
+
 	ret = 0;
 	iobase = ndev->base_addr;
 
-	entry = idev->tx_get;
+	if (r->head == r->tail) {	/* tx ring empty: re-enable rx */
 
-	while ( !rd_is_active(idev->ring_hw+idev->tx_get) ) {
-
-		if (idev->tx_get == idev->tx_put) { /* tx ring empty */
-			/* sth more to do here? */
-			break;
-		}
-		ring_ptr_inc(&idev->tx_get, idev->tx_mask);
-		while (entry != idev->tx_get) {
-			status = rd_get_status(idev->ring_hw+entry);
-			if (status & RD_STAT_ACTIVE) {
-				printk(KERN_CRIT "%s: tx still active!!!\n",
-					__FUNCTION__);
-				break;
-			}
-			if (status & TX_STAT_UNDRN) {
-				idev->stats.tx_errors++;
-				idev->stats.tx_fifo_errors++;
-			}
-			else {
-				idev->stats.tx_packets++;
-				idev->stats.tx_bytes += rd_get_count(idev->ring_hw+entry);
-			}
-			rd_set_count(idev->ring_hw+entry, 0);
-			rd_set_status(idev->ring_hw+entry, 0);
-			ring_ptr_inc(&entry, idev->tx_mask);
-		}
-	}
-
-	outw(0, iobase+VLSI_PIO_IRENABLE);
-	config = inw(iobase+VLSI_PIO_IRCFG);
-	mb();
-
-	if (idev->tx_get != idev->tx_put) {	/* tx ring not empty */
-		outw(config | IRCFG_ENTX, iobase+VLSI_PIO_IRCFG);
-		ret = 1;			/* no speed-change-check */
+		outw(0, iobase+VLSI_PIO_IRENABLE);
+		config = inw(iobase+VLSI_PIO_IRCFG);
+		mb();
+		outw((config & ~IRCFG_ENTX) | IRCFG_ENRX, iobase+VLSI_PIO_IRCFG);
+		wmb();
+		outw(IRENABLE_IREN, iobase+VLSI_PIO_IRENABLE);
 	}
 	else
-		outw((config & ~IRCFG_ENTX) | IRCFG_ENRX, iobase+VLSI_PIO_IRCFG);
-	wmb();
-	outw(IRENABLE_IREN, iobase+VLSI_PIO_IRENABLE);
+		ret = 1;			/* no speed-change-check */
 
 	mb();
-
 	outw(0, iobase+VLSI_PIO_PROMPT);
-	wmb();
 
-	idev->tx_get = entry;
 	if (netif_queue_stopped(ndev)) {
 		netif_wake_queue(ndev);
 		printk(KERN_DEBUG "%s: queue awoken\n", __FUNCTION__);
@@ -715,24 +723,27 @@ static int vlsi_tx_interrupt(struct net_device *ndev)
 }
 
 
+#if 0	/* disable ACTIVITY handling for now */
+
 static int vlsi_act_interrupt(struct net_device *ndev)
 {
 	printk(KERN_DEBUG "%s\n", __FUNCTION__);
 	return 0;
 }
-
+#endif
 
 static void vlsi_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *ndev = dev_instance;
 	vlsi_irda_dev_t *idev = ndev->priv;
-	int		iobase;
+	unsigned	iobase;
 	u8		irintr;
-	int 		boguscount = 20;
+	int 		boguscount = 32;
 	int		no_speed_check = 0;
+	unsigned	got_act;
 	unsigned long	flags;
 
-
+	got_act = 0;
 	iobase = ndev->base_addr;
 	spin_lock_irqsave(&idev->lock,flags);
 	do {
@@ -752,9 +763,16 @@ static void vlsi_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		if (irintr&IRINTR_TPKTINT)
 			no_speed_check |= vlsi_tx_interrupt(ndev);
 
-		if ((irintr&IRINTR_ACTIVITY) && !(irintr^IRINTR_ACTIVITY) )
-			no_speed_check |= vlsi_act_interrupt(ndev);
+#if 0	/* disable ACTIVITY handling for now */
 
+		if (got_act  &&  irintr==IRINTR_ACTIVITY) /* nothing new */
+			break;
+
+		if ((irintr&IRINTR_ACTIVITY) && !(irintr^IRINTR_ACTIVITY) ) {
+			no_speed_check |= vlsi_act_interrupt(ndev);
+			got_act = 1;
+		}
+#endif
 		if (irintr & ~(IRINTR_RPKTINT|IRINTR_TPKTINT|IRINTR_ACTIVITY))
 			printk(KERN_DEBUG "%s: IRINTR = %02x\n",
 				__FUNCTION__, (unsigned)irintr);
@@ -774,27 +792,51 @@ static void vlsi_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 /**************************************************************/
 
+
+/* writing all-zero to the VLSI PCI IO register area seems to prevent
+ * some occasional situations where the hardware fails (symptoms are 
+ * what appears as stalled tx/rx state machines, i.e. everything ok for
+ * receive or transmit but hw makes no progress or is unable to access
+ * the bus memory locations).
+ * Best place to call this is immediately after/before the internal clock
+ * gets started/stopped.
+ */
+
+static inline void vlsi_clear_regs(unsigned iobase)
+{
+	unsigned	i;
+	const unsigned	chip_io_extent = 32;
+
+	for (i = 0; i < chip_io_extent; i += sizeof(u16))
+		outw(0, iobase + i);
+}
+
+
 static int vlsi_open(struct net_device *ndev)
 {
 	vlsi_irda_dev_t *idev = ndev->priv;
 	struct pci_dev *pdev = idev->pdev;
-	char	hwname[32];
 	int	err;
-
-	MOD_INC_USE_COUNT;		/* still needed? - we have SET_MODULE_OWNER! */
+	char	hwname[32];
 
 	if (pci_request_regions(pdev,drivername)) {
 		printk(KERN_ERR "%s: io resource busy\n", __FUNCTION__);
-		MOD_DEC_USE_COUNT;
 		return -EAGAIN;
 	}
 
-	if (request_irq(ndev->irq, vlsi_interrupt, SA_SHIRQ|SA_INTERRUPT,
+	/* under some rare occasions the chip apparently comes up
+	 * with IRQ's pending. So we get interrupts invoked much too early
+	 * which will immediately kill us again :-(
+	 * so we better w/c pending IRQ and disable them all
+	 */
+
+	outb(IRINTR_INT_MASK, ndev->base_addr+VLSI_PIO_IRINTR);
+
+	if (request_irq(ndev->irq, vlsi_interrupt, SA_SHIRQ,
 			drivername, ndev)) {
 		printk(KERN_ERR "%s: couldn't get IRQ: %d\n",
 			__FUNCTION__, ndev->irq);
 		pci_release_regions(pdev);
-		MOD_DEC_USE_COUNT;
 		return -EAGAIN;
 	}
 	printk(KERN_INFO "%s: got resources for %s - irq=%d / io=%04lx\n",
@@ -805,18 +847,18 @@ static int vlsi_open(struct net_device *ndev)
 			__FUNCTION__);
 		free_irq(ndev->irq,ndev);
 		pci_release_regions(pdev);
-		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 
 	vlsi_start_clock(pdev);
+
+	vlsi_clear_regs(ndev->base_addr);
 
 	err = vlsi_init_ring(idev);
 	if (err) {
 		vlsi_unset_clock(pdev);
 		free_irq(ndev->irq,ndev);
 		pci_release_regions(pdev);
-		MOD_DEC_USE_COUNT;
 		return err;
 	}
 
@@ -827,7 +869,11 @@ static int vlsi_open(struct net_device *ndev)
 		(idev->mode==IFF_SIR)?"SIR":((idev->mode==IFF_MIR)?"MIR":"FIR"),
 		(sirpulse)?"3/16 bittime":"short");
 
-	sprintf(hwname, "VLSI-FIR");
+	vlsi_arm_rx(&idev->rx_ring);
+
+	do_gettimeofday(&idev->last_rx);  /* first mtt may start from now on */
+
+	sprintf(hwname, "VLSI-FIR @ 0x%04x", (unsigned)ndev->base_addr);
 	idev->irlap = irlap_open(ndev,&idev->qos,hwname);
 
 	netif_start_queue(ndev);
@@ -843,7 +889,6 @@ static int vlsi_close(struct net_device *ndev)
 {
 	vlsi_irda_dev_t *idev = ndev->priv;
 	struct pci_dev *pdev = idev->pdev;
-	int	i;
 	u8	cmd;
 	unsigned iobase;
 
@@ -861,10 +906,12 @@ static int vlsi_close(struct net_device *ndev)
 	outw(0, iobase+VLSI_PIO_IRCFG);			/* disable everything */
 	wmb();
 	outw(IRENABLE_IREN, iobase+VLSI_PIO_IRENABLE);
-	mb();				/* from now on */
+	mb();						/* ... from now on */
 
 	outw(0, iobase+VLSI_PIO_IRENABLE);
 	wmb();
+
+	vlsi_clear_regs(ndev->base_addr);
 
 	vlsi_stop_clock(pdev);
 
@@ -872,19 +919,13 @@ static int vlsi_close(struct net_device *ndev)
 
 	free_irq(ndev->irq,ndev);
 
-	if (idev->ring_buf) {
-		for (i = 0; i < 2*MAX_RING_DESCR; i++) {
-			if (idev->ring_buf[i].head)
-				kfree(idev->ring_buf[i].head);
-		}
-		kfree(idev->ring_buf);
-	}
+	vlsi_free_ringbuf(&idev->rx_ring);
+	vlsi_free_ringbuf(&idev->tx_ring);
 
 	if (idev->busaddr)
-		pci_free_consistent(idev->pdev,RING_AREA_SIZE,idev->ring_hw,idev->busaddr);
+		pci_free_consistent(idev->pdev,RING_AREA_SIZE,idev->virtaddr,idev->busaddr);
 
-	idev->ring_buf = NULL;
-	idev->ring_hw = NULL;
+	idev->virtaddr = NULL;
 	idev->busaddr = 0;
 
 	pci_read_config_byte(pdev, PCI_COMMAND, &cmd);
@@ -895,7 +936,6 @@ static int vlsi_close(struct net_device *ndev)
 
 	printk(KERN_INFO "%s: device %s stopped\n", __FUNCTION__, ndev->name);
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -909,16 +949,17 @@ static struct net_device_stats * vlsi_get_stats(struct net_device *ndev)
 static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 {
 	vlsi_irda_dev_t *idev = ndev->priv;
+	struct vlsi_ring	*r;
 	unsigned long flags;
-	int iobase;
+	unsigned iobase;
 	u8 status;
 	u16 config;
 	int mtt;
-	int entry;
 	int len, speed;
+	struct timeval  now, ready;
 
 
-	iobase = ndev->base_addr;
+	status = 0;
 
 	speed = irda_get_next_speed(skb);
 
@@ -931,71 +972,88 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		}
 		status = TX_STAT_CLRENTX;  /* stop tx-ring after this frame */
 	}
-	else
-		status = 0;
 
+	if (skb->len == 0) {
+		printk(KERN_ERR "%s: blocking 0-size packet???\n",
+			__FUNCTION__);
+		dev_kfree_skb(skb);
+		return 0;
+	}
 
-	spin_lock_irqsave(&idev->lock,flags);
+	r = &idev->tx_ring;
 
-	entry = idev->tx_put;
+	if (rd_is_active(r, r->head))
+		BUG();
 
 	if (idev->mode == IFF_SIR) {
 		status |= TX_STAT_DISCRC;
-		len = async_wrap_skb(skb, idev->ring_buf[entry].head,
-			XFER_BUF_SIZE);
+		len = async_wrap_skb(skb, r->buf[r->head].data, XFER_BUF_SIZE);
 	}
 	else {				/* hw deals with MIR/FIR mode */
 		len = skb->len;
-		memcpy(idev->ring_buf[entry].head, skb->data, len);
+		memcpy(r->buf[r->head].data, skb->data, len);
 	}
 
-	if (len == 0)
-		printk(KERN_ERR "%s: sending 0-size packet???\n",
-			__FUNCTION__);
+	rd_set_count(r, r->head, len);
+	rd_set_addr_status(r, r->head, virt_to_bus(r->buf[r->head].data), status);
 
-	status |= RD_STAT_ACTIVE;
-
-	rd_set_count(idev->ring_hw+entry, len);
-	rd_set_status(idev->ring_hw+entry, status);
-	ring_ptr_inc(&idev->tx_put, idev->tx_mask);
-
-	dev_kfree_skb(skb);	
+	/* new entry not yet activated! */
 
 #if 0
 	printk(KERN_DEBUG "%s: dump entry %d: %u %02x %08x\n",
-		__FUNCTION__, entry,
-		idev->ring_hw[entry].rd_count,
-		(unsigned)idev->ring_hw[entry].rd_status,
-		idev->ring_hw[entry].rd_addr & 0xffffffff);
+		__FUNCTION__, r->head,
+		idev->ring_hw[r->head].rd_count,
+		(unsigned)idev->ring_hw[r->head].rd_status,
+		idev->ring_hw[r->head].rd_addr & 0xffffffff);
 	vlsi_reg_debug(iobase,__FUNCTION__);
 #endif
 
+
+	/* let mtt delay pass before we need to acquire the spinlock! */
+
+	if ((mtt = irda_get_mtt(skb)) > 0) {
+	
+		ready.tv_usec = idev->last_rx.tv_usec + mtt;
+		ready.tv_sec = idev->last_rx.tv_sec;
+		if (ready.tv_usec >= 1000000) {
+			ready.tv_usec -= 1000000;
+			ready.tv_sec++;		/* IrLAP 1.1: mtt always < 1 sec */
+		}
+		for(;;) {
+			do_gettimeofday(&now);
+			if (now.tv_sec > ready.tv_sec
+			    ||  (now.tv_sec==ready.tv_sec && now.tv_usec>=ready.tv_usec))
+			    	break;
+			udelay(100);
+		}
+	}
+
 /*
- *	race window due to concurrent controller processing!
+ *	race window ahead, due to concurrent controller processing!
  *
- *	we may loose ENTX at any time when the controller
- *	fetches an inactive descr or one with CLR_ENTX set.
- *	therefore we only rely on the controller telling us
- *	tx is already stopped because (cannot restart without PROMPT).
- *	instead we depend on the tx-complete-isr to detect the
- *	false negatives and retrigger the tx ring.
- *	that's why we need interrupts disabled till tx has been
- *	kicked, so the tx-complete-isr was either already finished
- *	before we've put the new active descriptor on the ring - or
- *	the isr will be called after the new active descr is on the
- *	ring _and_ the ring was prompted. Making these two steps
- *	atomic allows to resolve the race.
+ *	We need to disable IR output in order to switch to TX mode.
+ *	Better not do this blindly anytime we want to transmit something
+ *	because TX may already run. However the controller may stop TX
+ *	at any time when fetching an inactive descriptor or one with
+ *	CLR_ENTX set. So we switch on TX only, if TX was not running
+ *	_after_ the new descriptor was activated on the ring. This ensures
+ *	we will either find TX already stopped or we can be sure, there
+ *	will be a TX-complete interrupt even if the chip stopped doing
+ *	TX just after we found it still running. The ISR will then find
+ *	the non-empty ring and restart TX processing. The enclosing
+ *	spinlock is required to get serialization with the ISR right.
  */
+
 
 	iobase = ndev->base_addr;
 
+	spin_lock_irqsave(&idev->lock,flags);
+
+	rd_activate(r, r->head);
+	ring_put(r);
+
 	if (!(inw(iobase+VLSI_PIO_IRENABLE) & IRENABLE_ENTXST)) {
-
-		mtt = irda_get_mtt(skb);
-		if (mtt) {
-			udelay(mtt);		/* ### FIXME ... */
-		}
-
+	
 		outw(0, iobase+VLSI_PIO_IRENABLE);
 
 		config = inw(iobase+VLSI_PIO_IRCFG);
@@ -1003,29 +1061,28 @@ static int vlsi_hard_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		outw(config | IRCFG_ENTX, iobase+VLSI_PIO_IRCFG);
 		wmb();
 		outw(IRENABLE_IREN, iobase+VLSI_PIO_IRENABLE);
-
 		mb();
-
 		outw(0, iobase+VLSI_PIO_PROMPT);
 		wmb();
 	}
 
-	spin_unlock_irqrestore(&idev->lock, flags);
-
-	if (idev->tx_put == idev->tx_get) {
+	if (r->head == r->tail) {
 		netif_stop_queue(ndev);
 		printk(KERN_DEBUG "%s: tx ring full - queue stopped: %d/%d\n",
-			__FUNCTION__, idev->tx_put, idev->tx_get);
-		entry = idev->tx_get;
+			__FUNCTION__, r->head, r->tail);
+#if 0
 		printk(KERN_INFO "%s: dump stalled entry %d: %u %02x %08x\n",
-			__FUNCTION__, entry,
-			idev->ring_hw[entry].rd_count,
-			(unsigned)idev->ring_hw[entry].rd_status,
-			idev->ring_hw[entry].rd_addr & 0xffffffff);
+			__FUNCTION__, r->tail,
+			r->hw[r->tail].rd_count,
+			(unsigned)r->hw[r->tail].rd_status,
+			r->hw[r->tail].rd_addr & 0xffffffff);
+#endif
 		vlsi_reg_debug(iobase,__FUNCTION__);
 	}
 
-//	vlsi_reg_debug(iobase, __FUNCTION__);
+	spin_unlock_irqrestore(&idev->lock, flags);
+
+	dev_kfree_skb(skb);	
 
 	return 0;
 }
@@ -1056,6 +1113,10 @@ static int vlsi_ioctl(struct net_device *ndev, struct ifreq *rq, int cmd)
 			irda_device_set_media_busy(ndev, TRUE);
 			break;
 		case SIOCGRECEIVING:
+			/* the best we can do: check whether there are any bytes in rx fifo.
+			 * The trustable window (in case some data arrives just afterwards)
+			 * may be as short as 1usec or so at 4Mbps - no way for future-telling.
+			 */
 			fifocnt = inw(ndev->base_addr+VLSI_PIO_RCVBCNT) & RCVBCNT_MASK;
 			irq->ifr_receiving = (fifocnt!=0) ? 1 : 0;
 			break;
@@ -1091,7 +1152,6 @@ int vlsi_irda_init(struct net_device *ndev)
 		return -1;
 	}
 	pci_set_master(pdev);
-
 	pdev->dma_mask = DMA_MASK_MSTRPAGE;
 	pci_write_config_byte(pdev, VLSI_PCI_MSTRPAGE, MSTRPAGE_VALUE);
 
@@ -1110,13 +1170,13 @@ int vlsi_irda_init(struct net_device *ndev)
 		| IR_19200 | IR_38400 | IR_57600 | IR_115200
 		| IR_1152000 | (IR_4000000 << 8);
 
-	idev->qos.min_turn_time.bits = mtt_bits;
+	idev->qos.min_turn_time.bits = qos_mtt_bits;
 
 	irda_qos_bits_to_value(&idev->qos);
 
 	irda_device_setup(ndev);
 
-	/* currently no media definitions for SIR/MIR/FIR */
+	/* currently no public media definitions for IrDA */
 
 	ndev->flags |= IFF_PORTSEL | IFF_AUTOMEDIA;
 	ndev->if_port = IF_PORT_UNKNOWN;
@@ -1139,15 +1199,18 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	vlsi_irda_dev_t		*idev;
 	int			alloc_size;
 
-	printk(KERN_INFO "%s: found IrDA PCI controler %s\n", drivername, pdev->name);
 
+	vlsi_reg_debug(0x3000, "vlsi initial state");
 	if (pci_enable_device(pdev))
 		goto out;
+
+	printk(KERN_INFO "%s: IrDA PCI controller %s detected\n",
+		drivername, pdev->name);
 
 	if ( !pci_resource_start(pdev,0)
 	     || !(pci_resource_flags(pdev,0) & IORESOURCE_IO) ) {
 		printk(KERN_ERR "%s: bar 0 invalid", __FUNCTION__);
-		goto out;
+		goto out_disable;
 	}
 
 	alloc_size = sizeof(*ndev) + sizeof(*idev);
@@ -1156,7 +1219,7 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ndev==NULL) {
 		printk(KERN_ERR "%s: Unable to allocate device memory.\n",
 			__FUNCTION__);
-		goto out;
+		goto out_disable;
 	}
 
 	memset(ndev, 0, alloc_size);
@@ -1181,6 +1244,8 @@ vlsi_irda_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 out_freedev:
 	kfree(ndev);
+out_disable:
+	pci_disable_device(pdev);
 out:
 	pdev->driver_data = NULL;
 	return -ENODEV;
@@ -1233,23 +1298,32 @@ static struct pci_driver vlsi_irda_driver = {
 
 static int __init vlsi_mod_init(void)
 {
+	int	i;
+
 	if (clksrc < 0  ||  clksrc > 3) {
-		printk(KERN_ERR "%s: invalid clksrc=%d\n", __FUNCTION__, clksrc);
+		printk(KERN_ERR "%s: invalid clksrc=%d\n", drivername, clksrc);
 		return -1;
 	}
-	if ( ringsize[0]==0  ||  (ringsize[0] & ~(64|32|16|8|4))
-	     ||  ((ringsize[0]-1)&ringsize[0])) {
-		printk(KERN_INFO "%s: invalid tx ringsize %d - using default=16\n",
-			__FUNCTION__, ringsize[0]);
-		ringsize[0] = 16;
+
+	for (i = 0; i < 2; i++) {
+		switch(ringsize[i]) {
+			case 4:
+			case 8:
+			case 16:
+			case 32:
+			case 64:
+				break;
+			default:
+				printk(KERN_WARNING "%s: invalid %s ringsize %d",
+					drivername, (i)?"rx":"tx", ringsize[i]);
+				printk(", using default=8\n");
+				ringsize[i] = 8;
+				break;
+		}
 	} 
-	if ( ringsize[1]==0  ||  (ringsize[1] & ~(64|32|16|8|4))
-	     ||  ((ringsize[1]-1)&ringsize[1])) {
-		printk(KERN_INFO "%s: invalid rx ringsize %d - using default=16\n",
-			__FUNCTION__, ringsize[1]);
-		ringsize[1] = 16;
-	}
+
 	sirpulse = !!sirpulse;
+
 	return pci_module_init(&vlsi_irda_driver);
 }
 

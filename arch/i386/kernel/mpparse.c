@@ -54,7 +54,7 @@ int pic_mode;
 unsigned long mp_lapic_addr;
 
 /* Processor that is doing the boot up */
-unsigned int boot_cpu_id = -1U;
+unsigned int boot_cpu_physical_apicid = -1U;
 /* Internal processor count */
 static unsigned int num_processors;
 
@@ -180,8 +180,9 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 
 	if (m->mpc_cpuflag & CPU_BOOTPROCESSOR) {
 		Dprintk("    Bootup CPU\n");
-		boot_cpu_id = m->mpc_apicid;
+		boot_cpu_physical_apicid = m->mpc_apicid;
 	}
+
 	num_processors++;
 
 	if (m->mpc_apicid > MAX_APICS) {
@@ -191,7 +192,12 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 	}
 	ver = m->mpc_apicver;
 
-	phys_cpu_present_map |= 1 << m->mpc_apicid;
+	if (clustered_apic_mode)
+		/* Crude temporary hack. Assumes processors are sequential */
+		phys_cpu_present_map |= 1 << (num_processors-1);
+	else
+		phys_cpu_present_map |= 1 << m->mpc_apicid;
+
 	/*
 	 * Validate version
 	 */
@@ -376,6 +382,10 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 				break;
 			}
 		}
+	}
+	if (clustered_apic_mode && nr_ioapics > 2) {
+		/* don't initialise IO apics on secondary quads */
+		nr_ioapics = 2;
 	}
 	if (!num_processors)
 		printk(KERN_ERR "SMP mptable: no processors registered!\n");

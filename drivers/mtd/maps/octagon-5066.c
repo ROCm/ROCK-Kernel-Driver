@@ -1,4 +1,4 @@
-// $Id: octagon-5066.c,v 1.17 2001/06/02 14:30:44 dwmw2 Exp $
+// $Id: octagon-5066.c,v 1.19 2001/10/02 15:05:14 dwmw2 Exp $
 /* ######################################################################
 
    Octagon 5066 MTD Driver. 
@@ -213,11 +213,6 @@ static int __init OctProbe(void)
    return 0;
 }
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_oct5066 init_module
-#define cleanup_oct5066 cleanup_module
-#endif
-
 void cleanup_oct5066(void)
 {
 	int i;
@@ -260,13 +255,13 @@ int __init init_oct5066(void)
 	       WINDOW_START+WINDOW_LENGTH);
 	
 	for (i=0; i<2; i++) {
-		oct5066_mtd[i] = do_map_probe("cfi", &oct5066_map[i]);
+		oct5066_mtd[i] = do_map_probe("cfi_probe", &oct5066_map[i]);
 		if (!oct5066_mtd[i])
 			oct5066_mtd[i] = do_map_probe("jedec", &oct5066_map[i]);
 		if (!oct5066_mtd[i])
-			oct5066_mtd[i] = do_map_probe("ram", &oct5066_map[i]);
+			oct5066_mtd[i] = do_map_probe("map_ram", &oct5066_map[i]);
 		if (!oct5066_mtd[i])
-			oct5066_mtd[i] = do_map_probe("rom", &oct5066_map[i]);
+			oct5066_mtd[i] = do_map_probe("map_rom", &oct5066_map[i]);
 		if (oct5066_mtd[i]) {
 			oct5066_mtd[i]->module = THIS_MODULE;
 			add_mtd_device(oct5066_mtd[i]);
@@ -283,3 +278,7 @@ int __init init_oct5066(void)
 
 module_init(init_oct5066);
 module_exit(cleanup_oct5066);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Jason Gunthorpe <jgg@deltatee.com>, David Woodhouse <dwmw2@infradead.org>");
+MODULE_DESCRIPTION("MTD map driver for Octagon 5066 Single Board Computer");

@@ -1,7 +1,7 @@
 /*****************************************************************************
  *
  * Filename:      irda-usb.h
- * Version:       0.9a
+ * Version:       0.9b
  * Description:   IrDA-USB Driver
  * Status:        Experimental 
  * Author:        Dag Brattli <dag@brattli.net>
@@ -63,17 +63,19 @@
 #define IU_MAX_RX_URBS	(IU_MAX_ACTIVE_RX_URBS + 1)
 
 /* Various ugly stuff to try to workaround generic problems */
-/* The USB layer should send empty frames at the end of packets multiple
- * of the frame size. As it doesn't do it by default, we need to do it
- * ourselves... See also following option. */
-#undef IU_BUG_KICK_TX
-/* Use the USB_ZERO_PACKET flag instead of sending empty frame (above)
- * Work only with usb-uhci.o so far. Please fix uhic.c and usb-ohci.c */
-#define IU_USE_USB_ZERO_FLAG
 /* Send speed command in case of timeout, just for trying to get things sane */
 #define IU_BUG_KICK_TIMEOUT
 /* Show the USB class descriptor */
 #undef IU_DUMP_CLASS_DESC 
+/* Assume a minimum round trip latency for USB transfer (in us)...
+ * USB transfer are done in the next USB slot if there is no traffic
+ * (1/19 msec) and is done at 12 Mb/s :
+ * Waiting for slot + tx = (53us + 16us) * 2 = 137us minimum.
+ * Rx notification will only be done at the end of the USB frame period :
+ * OHCI : frame period = 1ms
+ * UHCI : frame period = 1ms, but notification can take 2 or 3 ms :-(
+ * EHCI : frame period = 125us */
+#define IU_USB_MIN_RTT		500	/* This should be safe in most cases */
 
 /* Inbound header */
 #define MEDIA_BUSY    0x80
@@ -136,9 +138,6 @@ struct irda_usb_cb {
 	struct urb *idle_rx_urb;	/* Pointer to idle URB in Rx path */
 	struct urb tx_urb;		/* URB used to send data frames */
 	struct urb speed_urb;		/* URB used to send speed commands */
-#ifdef IU_BUG_KICK_TX
-	struct urb empty_urb;		/* URB used to send empty commands */
-#endif IU_BUG_KICK_TX
 	
 	struct net_device *netdev;	/* Yes! we are some kind of netdev. */
 	struct net_device_stats stats;

@@ -245,6 +245,14 @@ static int shmem_writepage(struct page * page)
 	index = page->index;
 	inode = mapping->host;
 	info = &inode->u.shmem_i;
+getswap:
+	swap = get_swap_page();
+	if (!swap.val) {
+		activate_page(page);
+		SetPageDirty(page);
+		error = -ENOMEM;
+		goto out;
+	}
 
 	spin_lock(&info->lock);
 	entry = shmem_swp_entry(info, index);
@@ -257,32 +265,27 @@ static int shmem_writepage(struct page * page)
 	/* Remove it from the page cache */
 	lru_cache_del(page);
 	remove_inode_page(page);
-
-	swap_list_lock();
-	swap = get_swap_page();
-
-	if (!swap.val) {
-		swap_list_unlock();
-		/* Add it back to the page cache */
-		add_to_page_cache_locked(page, mapping, index);
-		activate_page(page);
-		SetPageDirty(page);
-		error = -ENOMEM;
-		goto out;
-	}
+	page_cache_release(page);
 
 	/* Add it to the swap cache */
-	add_to_swap_cache(page, swap);
-	swap_list_unlock();
+	if (add_to_swap_cache(page, swap) != 0) {
+		/*
+		 * Raced with "speculative" read_swap_cache_async.
+		 * Add page back to page cache, unref swap, try again.
+		 */
+		add_to_page_cache_locked(page, mapping, index);
+		spin_unlock(&info->lock);
+		swap_free(swap);
+		goto getswap;
+	}
 
-	set_page_dirty(page);
-	info->swapped++;
 	*entry = swap;
+	info->swapped++;
+	spin_unlock(&info->lock);
+	set_page_dirty(page);
 	error = 0;
 out:
-	spin_unlock(&info->lock);
 	UnlockPage(page);
-	page_cache_release(page);
 	return error;
 }
 

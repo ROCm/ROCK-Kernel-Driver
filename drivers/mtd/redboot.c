@@ -1,5 +1,5 @@
 /*
- * $Id: redboot.c,v 1.4 2001/05/31 20:43:18 dwmw2 Exp $
+ * $Id: redboot.c,v 1.5 2001/10/02 15:05:11 dwmw2 Exp $
  *
  * Parse RedBoot-style Flash Image System (FIS) tables and
  * produce a Linux partition array to match.
@@ -148,3 +148,7 @@ int parse_redboot_partitions(struct mtd_info *master, struct mtd_partition **ppa
 }
 
 EXPORT_SYMBOL(parse_redboot_partitions);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Red Hat, Inc. - David Woodhouse <dwmw2@cambridge.redhat.com>");
+MODULE_DESCRIPTION("Parsing code for RedBoot Flash Image System (FIS) tables");

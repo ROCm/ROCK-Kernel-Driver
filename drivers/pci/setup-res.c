@@ -25,7 +25,7 @@
 #include <linux/slab.h>
 
 
-#define DEBUG_CONFIG 1
+#define DEBUG_CONFIG 0
 #if DEBUG_CONFIG
 # define DBGC(args)     printk args
 #else

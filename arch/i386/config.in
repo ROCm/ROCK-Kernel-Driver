@@ -178,6 +178,8 @@ if [ "$CONFIG_SMP" != "y" ]; then
    if [ "$CONFIG_X86_UP_IOAPIC" = "y" ]; then
       define_bool CONFIG_X86_IO_APIC y
    fi
+else
+   bool 'Multiquad NUMA system' CONFIG_MULTIQUAD
 fi
 
 if [ "$CONFIG_SMP" = "y" -a "$CONFIG_X86_CMPXCHG" = "y" ]; then

@@ -1,6 +1,6 @@
 
 /* Overhauled routines for dealing with different mmap regions of flash */
-/* $Id: map.h,v 1.24 2001/06/09 19:53:16 dwmw2 Exp $ */
+/* $Id: map.h,v 1.25 2001/09/09 15:04:17 dwmw2 Exp $ */
 
 #ifndef __LINUX_MTD_MAP_H__
 #define __LINUX_MTD_MAP_H__
@@ -79,7 +79,8 @@ static inline void map_destroy(struct mtd_info *mtd)
 {
 	struct map_info *map = mtd->priv;
 
-	map->fldrv->destroy(mtd);
+	if (map->fldrv->destroy)
+		map->fldrv->destroy(mtd);
 #ifdef CONFIG_MODULES
 	if (map->fldrv->module)
 		__MOD_DEC_USE_COUNT(map->fldrv->module);

@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: compr.c,v 1.16 2001/03/15 15:38:23 dwmw2 Exp $
+ * $Id: compr.c,v 1.17 2001/09/23 09:56:46 dwmw2 Exp $
  *
  */
 
@@ -77,18 +77,19 @@ unsigned char jffs2_compress(unsigned char *data_in, unsigned char *cpage_out,
 	if (!ret) {
 		return JFFS2_COMPR_ZLIB;
 	}
-
+#if 0 /* Disabled 23/9/1. With zlib it hardly ever gets a look in */
 	ret = dynrubin_compress(data_in, cpage_out, datalen, cdatalen);
 	if (!ret) {
 		return JFFS2_COMPR_DYNRUBIN;
 	}
-
-#if 0 /* Phase this one out */
+#endif
+#if 0 /* Disabled 26/2/1. Obsoleted by dynrubin */
 	ret = rubinmips_compress(data_in, cpage_out, datalen, cdatalen);
 	if (!ret) {
 		return JFFS2_COMPR_RUBINMIPS;
 	}
 #endif
+	/* rtime does manage to recompress already-compressed data */
 	ret = rtime_compress(data_in, cpage_out, datalen, cdatalen);
 	if (!ret) {
 		return JFFS2_COMPR_RTIME;
@@ -126,13 +127,20 @@ int jffs2_decompress(unsigned char comprtype, unsigned char *cdata_in,
 	case JFFS2_COMPR_RTIME:
 		rtime_decompress(cdata_in, data_out, cdatalen, datalen);
 		break;
-#if 1 /* Phase this one out */
+
 	case JFFS2_COMPR_RUBINMIPS:
+#if 0 /* Disabled 23/9/1 */
 		rubinmips_decompress(cdata_in, data_out, cdatalen, datalen);
-		break;
+#else
+		printk(KERN_WARNING "JFFS2: Rubinmips compression encountered but support not compiled in!\n");
 #endif
+		break;
 	case JFFS2_COMPR_DYNRUBIN:
+#if 1 /* Phase this one out */
 		dynrubin_decompress(cdata_in, data_out, cdatalen, datalen);
+#else
+		printk(KERN_WARNING "JFFS2: Dynrubin compression encountered but support not compiled in!\n");
+#endif
 		break;
 
 	default:

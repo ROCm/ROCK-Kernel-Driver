@@ -1,4 +1,4 @@
-// $Id: vmax301.c,v 1.22 2001/06/02 14:30:44 dwmw2 Exp $
+// $Id: vmax301.c,v 1.24 2001/10/02 15:05:14 dwmw2 Exp $
 /* ######################################################################
 
    Tempustech VMAX SBC301 MTD Driver.
@@ -175,11 +175,6 @@ static struct map_info vmax_map[2] = {
 
 static struct mtd_info *vmax_mtd[2] = {NULL, NULL};
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_vmax301 init_module
-#define cleanup_vmax301 cleanup_module
-#endif
-
 static void __exit cleanup_vmax301(void)
 {
 	int i;
@@ -215,13 +210,13 @@ int __init init_vmax301(void)
 	vmax_map[1].map_priv_1 = iomapadr + (3*WINDOW_START);
 	
 	for (i=0; i<2; i++) {
-		vmax_mtd[i] = do_map_probe("cfi", &vmax_map[i]);
+		vmax_mtd[i] = do_map_probe("cfi_probe", &vmax_map[i]);
 		if (!vmax_mtd[i])
 			vmax_mtd[i] = do_map_probe("jedec", &vmax_map[i]);
 		if (!vmax_mtd[i])
-			vmax_mtd[i] = do_map_probe("ram", &vmax_map[i]);
+			vmax_mtd[i] = do_map_probe("map_ram", &vmax_map[i]);
 		if (!vmax_mtd[i])
-			vmax_mtd[i] = do_map_probe("rom", &vmax_map[i]);
+			vmax_mtd[i] = do_map_probe("map_rom", &vmax_map[i]);
 		if (vmax_mtd[i]) {
 			vmax_mtd[i]->module = THIS_MODULE;
 			add_mtd_device(vmax_mtd[i]);
@@ -238,3 +233,7 @@ int __init init_vmax301(void)
 
 module_init(init_vmax301);
 module_exit(cleanup_vmax301);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
+MODULE_DESCRIPTION("MTD map driver for Tempustech VMAX SBC301 board");

@@ -1,5 +1,5 @@
 /*
- * $Id: iq80310.c,v 1.3 2001/04/26 15:40:23 dwmw2 Exp $
+ * $Id: iq80310.c,v 1.8 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * Mapping for the Intel XScale IQ80310 evaluation board
  *
@@ -80,40 +80,75 @@ static struct map_info iq80310_map = {
 	copy_to:	iq80310_copy_to
 };
 
-static struct mtd_partition iq80310_partitions[3] = {
+static struct mtd_partition iq80310_partitions[4] = {
 	{
-		name:		"firmware",
+		name:		"Firmware",
 		size:		0x00080000,
 		offset:		0,
 		mask_flags:	MTD_WRITEABLE  /* force read-only */
 	},{
-		name:		"kernel",
-		size:		0x00080000,
+		name:		"Kernel",
+		size:		0x000a0000,
 		offset:		0x00080000,
 	},{
-		name:		"filesystem",
-		size:		0x00700000,
-		offset:		0x00100000
+		name:		"Filesystem",
+		size:		0x00600000,
+		offset:		0x00120000
+	},{
+		name:		"RedBoot",
+		size:		0x000e0000,
+		offset:		0x00720000,
+		mask_flags:	MTD_WRITEABLE
 	}
 };
 
+#define NB_OF(x)  (sizeof(x)/sizeof(x[0]))
+
+static struct mtd_info *mymtd;
+static struct mtd_partition *parsed_parts;
+
+extern int parse_redboot_partitions(struct mtd_info *master, struct mtd_partition **pparts);
+
 static int __init init_iq80310(void)
 {
-	iq80310_map.map_priv_1 = (unsigned long)__ioremap(WINDOW_ADDR, WINDOW_SIZE, 0);
+	struct mtd_partition *parts;
+	int nb_parts = 0;
+	int parsed_nr_parts = 0;
+	char *part_type = "static";
 
+	iq80310_map.map_priv_1 = (unsigned long)__ioremap(WINDOW_ADDR, WINDOW_SIZE, 0);
 	if (!iq80310_map.map_priv_1) {
 		printk("Failed to ioremap\n");
 		return -EIO;
 	}
-	mymtd = do_map_probe("cfi", &iq80310_map);
-	if (mymtd) {
-		mymtd->module = THIS_MODULE;
-		add_mtd_partitions(mymtd, iq80310_partitions, 3);
-		return 0;
+	mymtd = do_map_probe("cfi_probe", &iq80310_map);
+	if (!mymtd) {
+		iounmap((void *)iq80310_map.map_priv_1);
+		return -ENXIO;
 	}
+	mymtd->module = THIS_MODULE;
 
-	iounmap((void *)iq80310_map.map_priv_1);
-	return -ENXIO;
+#ifdef CONFIG_MTD_REDBOOT_PARTS
+	if (parsed_nr_parts == 0) {
+		int ret = parse_redboot_partitions(mymtd, &parsed_parts);
+
+		if (ret > 0) {
+			part_type = "RedBoot";
+			parsed_nr_parts = ret;
+		}
+	}
+#endif
+
+	if (parsed_nr_parts > 0) {
+		parts = parsed_parts;
+		nb_parts = parsed_nr_parts;
+	} else {
+		parts = iq80310_partitions;
+		nb_parts = NB_OF(iq80310_partitions);
+	}
+	printk(KERN_NOTICE "Using %s partition definition\n", part_type);
+	add_mtd_partitions(mymtd, parts, nb_parts);
+	return 0;
 }
 
 static void __exit cleanup_iq80310(void)
@@ -121,13 +156,18 @@ static void __exit cleanup_iq80310(void)
 	if (mymtd) {
 		del_mtd_partitions(mymtd);
 		map_destroy(mymtd);
+		if (parsed_parts)
+			kfree(parsed_parts);
 	}
-	if (iq80310_map.map_priv_1) {
+	if (iq80310_map.map_priv_1)
 		iounmap((void *)iq80310_map.map_priv_1);
-		iq80310_map.map_priv_1 = 0;
-	}
+	return 0;
 }
 
 module_init(init_iq80310);
 module_exit(cleanup_iq80310);
 
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Nicolas Pitre <nico@cam.org>");
+MODULE_DESCRIPTION("MTD map driver for Intel XScale IQ80310 evaluation board");

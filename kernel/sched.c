@@ -1309,6 +1309,8 @@ void daemonize(void)
 	atomic_inc(&current->files->count);
 }
 
+extern volatile unsigned long wait_init_idle;
+
 void __init init_idle(void)
 {
 	struct schedule_data * sched_data;
@@ -1321,6 +1323,7 @@ void __init init_idle(void)
 	}
 	sched_data->curr = current;
 	sched_data->last_schedule = get_cycles();
+	clear_bit(current->processor, &wait_init_idle);
 }
 
 extern void init_timervecs (void);

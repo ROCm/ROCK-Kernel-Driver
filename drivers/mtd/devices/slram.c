@@ -1,6 +1,6 @@
 /*======================================================================
 
-  $Id: slram.c,v 1.19 2001/06/02 20:33:20 dwmw2 Exp $
+  $Id: slram.c,v 1.25 2001/10/02 15:05:13 dwmw2 Exp $
 
 ======================================================================*/
 
@@ -46,15 +46,8 @@ static char *map[SLRAM_MAX_DEVICES_PARAMS];
 static char *map;
 #endif
 
-#ifdef MODULE
-#if LINUX_VERSION_CODE < 0x20212
-#define init_slram init_module
-#define cleanup_slram cleanup_module
-#endif
-
 MODULE_PARM(map, "3-" __MODULE_STRING(SLRAM_MAX_DEVICES_PARAMS) "s");
 MODULE_PARM_DESC(map, "List of memory regions to map. \"map=<name>, <start>, <length / end>\"");
-#endif
 
 static slram_mtd_list_t *slram_mtdlist = NULL;
 
@@ -129,7 +122,7 @@ int slram_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 /*====================================================================*/
 
-int register_device(char *name, long start, long length)
+int register_device(char *name, unsigned long start, unsigned long length)
 {
 	slram_mtd_list_t **curmtd;
 
@@ -139,7 +132,7 @@ int register_device(char *name, long start, long length)
 	}
 
 	*curmtd = kmalloc(sizeof(slram_mtd_list_t), GFP_KERNEL);
-	if (!curmtd) {
+	if (!(*curmtd)) {
 		E("slram: Cannot allocate new MTD device.\n");
 		return(-ENOMEM);
 	}
@@ -193,8 +186,8 @@ int register_device(char *name, long start, long length)
 		kfree((*curmtd)->mtdinfo);
 		return(-EAGAIN);
 	}
-	T("slram: Registered device %s from %dKiB to %dKiB\n", name,
-			(int)(start / 1024), (int)((start + length) / 1024));
+	T("slram: Registered device %s from %luKiB to %luKiB\n", name,
+			(start / 1024), ((start + length) / 1024));
 	T("slram: Mapped from 0x%p to 0x%p\n",
 			((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start,
 			((slram_priv_t *)(*curmtd)->mtdinfo->priv)->end);
@@ -216,7 +209,7 @@ void unregister_devices(void)
 	}
 }
 
-int handle_unit(long value, char *unit)
+unsigned long handle_unit(unsigned long value, char *unit)
 {
 	if ((*unit == 'M') || (*unit == 'm')) {
 		return(value * 1024 * 1024);
@@ -229,8 +222,8 @@ int handle_unit(long value, char *unit)
 int parse_cmdline(char *devname, char *szstart, char *szlength)
 {
 	char *buffer;
-	long devstart;
-	long devlength;
+	unsigned long devstart;
+	unsigned long devlength;
 	
 	if ((!devname) || (!szstart) || (!szlength)) {
 		unregister_devices();
@@ -247,7 +240,7 @@ int parse_cmdline(char *devname, char *szstart, char *szlength)
 		devlength = simple_strtoul(szlength + 1, &buffer, 0);
 		devlength = handle_unit(devlength, buffer);
 	}
-	T("slram: devname=%s, devstart=%li, devlength=%li\n",
+	T("slram: devname=%s, devstart=0x%lx, devlength=0x%lx\n",
 			devname, devstart, devlength);
 	if ((devstart < 0) || (devlength < 0)) {
 		E("slram: Illegal start / length parameter.\n");
@@ -339,3 +332,7 @@ static void __exit cleanup_slram(void)
 
 module_init(init_slram);
 module_exit(cleanup_slram);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Jochen Schaeuble <psionic@psionic.de>");
+MODULE_DESCRIPTION("MTD driver for uncached system RAM");

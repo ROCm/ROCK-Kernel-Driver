@@ -1,6 +1,6 @@
 /*
  * mtdram - a test mtd device
- * $Id: mtdram.c,v 1.24 2001/06/09 23:09:23 dwmw2 Exp $
+ * $Id: mtdram.c,v 1.25 2001/10/02 15:05:13 dwmw2 Exp $
  * Author: Alexander Larsson <alex@cendio.se>
  *
  * Copyright (c) 1999 Alexander Larsson <alex@cendio.se>
@@ -104,13 +104,7 @@ static int ram_write(struct mtd_info *mtd, loff_t to, size_t len,
   return 0;
 }
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_mtdram init_module
-#define cleanup_mtdram cleanup_module
-#endif
-
-//static void __exit cleanup_mtdram(void)
-mod_exit_t cleanup_mtdram(void)
+static void __exit cleanup_mtdram(void)
 {
   if (mtd_info) {
     del_mtd_device(mtd_info);
@@ -124,7 +118,7 @@ mod_exit_t cleanup_mtdram(void)
   }
 }
 
-mod_init_t init_mtdram(void)
+int __init init_mtdram(void)
 {
    // Allocate some memory
    mtd_info = (struct mtd_info *)kmalloc(sizeof(struct mtd_info), GFP_KERNEL);
@@ -176,3 +170,8 @@ mod_init_t init_mtdram(void)
 
 module_init(init_mtdram);
 module_exit(cleanup_mtdram);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Alexander Larsson <alexl@redhat.com>");
+MODULE_DESCRIPTION("Simulated MTD driver for testing");
+

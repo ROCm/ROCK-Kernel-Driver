@@ -22,6 +22,18 @@
 #endif
 #endif
 
+#if CONFIG_SMP
+# ifdef CONFIG_MULTIQUAD
+#  define TARGET_CPUS 0xf     /* all CPUs in *THIS* quad */
+#  define INT_DELIVERY_MODE 0     /* physical delivery on LOCAL quad */
+# else
+#  define TARGET_CPUS cpu_online_map
+#  define INT_DELIVERY_MODE 1     /* logical delivery broadcast to all procs */
+# endif
+#else
+# define TARGET_CPUS 0x01
+#endif
+
 #ifdef CONFIG_SMP
 #ifndef ASSEMBLY
 
@@ -59,8 +71,21 @@ static inline int cpu_number_map(int cpu)
  * Some lowlevel functions might want to know about
  * the real APIC ID <-> CPU # mapping.
  */
-extern volatile int x86_apicid_to_cpu[NR_CPUS];
-extern volatile int x86_cpu_to_apicid[NR_CPUS];
+#define MAX_APICID 256
+extern volatile int cpu_to_physical_apicid[NR_CPUS];
+extern volatile int physical_apicid_to_cpu[MAX_APICID];
+extern volatile int cpu_to_logical_apicid[NR_CPUS];
+extern volatile int logical_apicid_to_cpu[MAX_APICID];
+
+#ifndef clustered_apic_mode
+ #ifdef CONFIG_MULTIQUAD
+  #define clustered_apic_mode (1)
+  #define esr_disable (1)
+ #else /* !CONFIG_MULTIQUAD */
+  #define clustered_apic_mode (0)
+  #define esr_disable (0)
+ #endif /* CONFIG_MULTIQUAD */
+#endif 
 
 /*
  * General functions that each host system must provide.
@@ -81,6 +106,12 @@ static __inline int hard_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
 	return GET_APIC_ID(*(unsigned long *)(APIC_BASE+APIC_ID));
+}
+
+extern __inline int logical_smp_processor_id(void)
+{
+	/* we don't want to mark this access volatile - bad code generation */
+	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
 }
 
 #endif /* !ASSEMBLY */

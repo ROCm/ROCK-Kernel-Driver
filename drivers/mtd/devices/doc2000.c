@@ -4,7 +4,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2000.c,v 1.43 2001/06/02 14:30:43 dwmw2 Exp $
+ * $Id: doc2000.c,v 1.46 2001/10/02 15:05:13 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -61,6 +61,8 @@ static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 			size_t *retlen, u_char *buf);
 static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 			 size_t *retlen, const u_char *buf);
+static int doc_write_oob_nolock(struct mtd_info *mtd, loff_t ofs, size_t len,
+			 size_t *retlen, const u_char *buf);
 static int doc_erase (struct mtd_info *mtd, struct erase_info *instr);
 
 static struct mtd_info *doc2klist = NULL;
@@ -84,19 +86,26 @@ static void DoC_Delay(struct DiskOnChip *doc, unsigned short cycles)
 static int _DoC_WaitReady(struct DiskOnChip *doc)
 {
 	unsigned long docptr = doc->virtadr;
-	unsigned short c = 0xffff;
+	unsigned long timeo = jiffies + (HZ * 10);
 
 	DEBUG(MTD_DEBUG_LEVEL3,
 	      "_DoC_WaitReady called for out-of-line wait\n");
 
 	/* Out-of-line routine to wait for chip response */
-	while (!(ReadDOC(docptr, CDSNControl) & CDSN_CTRL_FR_B) && --c)
-		;
+	while (!(ReadDOC(docptr, CDSNControl) & CDSN_CTRL_FR_B)) {
+		if (time_after(jiffies, timeo)) {
+			DEBUG(MTD_DEBUG_LEVEL2, "_DoC_WaitReady timed out.\n");
+			return -EIO;
+		}
+		if (current->need_resched) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(1);
+		}
+		else
+			udelay(1);
+	}
 
-	if (c == 0)
-		DEBUG(MTD_DEBUG_LEVEL2, "_DoC_WaitReady timed out.\n");
-
-	return (c == 0);
+	return 0;
 }
 
 static inline int DoC_WaitReady(struct DiskOnChip *doc)
@@ -220,7 +229,7 @@ static int DoC_Address(struct DiskOnChip *doc, int numbytes, unsigned long ofs,
 /* Read a buffer from DoC, taking care of Millennium odditys */
 static void DoC_ReadBuf(struct DiskOnChip *doc, u_char * buf, int len)
 {
-	int dummy;
+	volatile int dummy;
 	int modulus = 0xffff;
 	unsigned long docptr;
 	int i;
@@ -432,14 +441,14 @@ static void DoC_ScanChips(struct DiskOnChip *this)
 
 	/* If there are none at all that we recognise, bail */
 	if (!this->numchips) {
-		printk("No flash chips recognised.\n");
+		printk(KERN_NOTICE "No flash chips recognised.\n");
 		return;
 	}
 
 	/* Allocate an array to hold the information for each chip */
 	this->chips = kmalloc(sizeof(struct Nand) * this->numchips, GFP_KERNEL);
 	if (!this->chips) {
-		printk("No memory for allocating chip info structures\n");
+		printk(KERN_NOTICE "No memory for allocating chip info structures\n");
 		return;
 	}
 
@@ -566,6 +575,7 @@ static void DoC2k_init(struct mtd_info *mtd)
 
 	this->curfloor = -1;
 	this->curchip = -1;
+	init_MUTEX(&this->lock);
 
 	/* Ident all the chips present. */
 	DoC_ScanChips(this);
@@ -605,6 +615,8 @@ static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
 	/* Don't allow read past end of device */
 	if (from >= this->totlen)
 		return -EINVAL;
+
+	down(&this->lock);
 
 	/* Don't allow a single read to cross a 512-byte block boundary */
 	if (from + len > ((from | 0x1ff) + 1))
@@ -686,7 +698,7 @@ static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
 			int nb_errors;
 			/* There was an ECC error */
 #ifdef ECC_DEBUG
-			printk("DiskOnChip ECC Error: Read at %lx\n", (long)from);
+			printk(KERN_ERR "DiskOnChip ECC Error: Read at %lx\n", (long)from);
 #endif
 			/* Read the ECC syndrom through the DiskOnChip ECC logic.
 			   These syndrome will be all ZERO when there is no error */
@@ -697,7 +709,7 @@ static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
                         nb_errors = doc_decode_ecc(buf, syndrome);
 
 #ifdef ECC_DEBUG
-			printk("Errors corrected: %x\n", nb_errors);
+			printk(KERN_ERR "Errors corrected: %x\n", nb_errors);
 #endif
                         if (nb_errors < 0) {
 				/* We return error, but have actually done the read. Not that
@@ -708,7 +720,7 @@ static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
 		}
 
 #ifdef PSYCHO_DEBUG
-		printk("ECC DATA at %lxB: %2.2X %2.2X %2.2X %2.2X %2.2X %2.2X\n",
+		printk(KERN_DEBUG "ECC DATA at %lxB: %2.2X %2.2X %2.2X %2.2X %2.2X %2.2X\n",
 			     (long)from, eccbuf[0], eccbuf[1], eccbuf[2],
 			     eccbuf[3], eccbuf[4], eccbuf[5]);
 #endif
@@ -723,6 +735,8 @@ static int doc_read_ecc(struct mtd_info *mtd, loff_t from, size_t len,
 	{
 	    DoC_WaitReady(this);
 	}
+
+	up(&this->lock);
 
 	return ret;
 }
@@ -750,6 +764,8 @@ static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
 	/* Don't allow write past end of device */
 	if (to >= this->totlen)
 		return -EINVAL;
+
+	down(&this->lock);
 
 	/* Don't allow a single write to cross a 512-byte block boundary */
 	if (to + len > ((to | 0x1ff) + 1))
@@ -810,9 +826,10 @@ static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
 		DoC_Delay(this, 2);
 
 		if (ReadDOC_(docptr, this->ioreg) & 1) {
-			printk("Error programming flash\n");
+			printk(KERN_ERR "Error programming flash\n");
 			/* Error in programming */
 			*retlen = 0;
+			up(&this->lock);
 			return -EIO;
 		}
 
@@ -862,9 +879,10 @@ static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
 	DoC_Delay(this, 2);
 
 	if (ReadDOC_(docptr, this->ioreg) & 1) {
-		printk("Error programming flash\n");
+		printk(KERN_ERR "Error programming flash\n");
 		/* Error in programming */
 		*retlen = 0;
+		up(&this->lock);
 		return -EIO;
 	}
 
@@ -874,6 +892,7 @@ static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
 	if (eccbuf) {
 		unsigned char x[8];
 		size_t dummy;
+		int ret;
 
 		/* Write the ECC data to flash */
 		for (di=0; di<6; di++)
@@ -882,9 +901,11 @@ static int doc_write_ecc(struct mtd_info *mtd, loff_t to, size_t len,
 		x[6]=0x55;
 		x[7]=0x55;
 		
-		return doc_write_oob(mtd, to, 8, &dummy, x);
+		ret = doc_write_oob_nolock(mtd, to, 8, &dummy, x);
+		up(&this->lock);
+		return ret;
 	}
-
+	up(&this->lock);
 	return 0;
 }
 
@@ -892,9 +913,11 @@ static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 			size_t * retlen, u_char * buf)
 {
 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
-	int len256 = 0;
+	int len256 = 0, ret;
 	unsigned long docptr;
 	struct Nand *mychip;
+
+	down(&this->lock);
 
 	docptr = this->virtadr;
 
@@ -939,18 +962,22 @@ static int doc_read_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 	/* Reading the full OOB data drops us off of the end of the page,
          * causing the flash device to go into busy mode, so we need
          * to wait until ready 11.4.1 and Toshiba TC58256FT docs */
-	return DoC_WaitReady(this);
+	
+	ret = DoC_WaitReady(this);
+
+	up(&this->lock);
+	return ret;
 
 }
 
-static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
-			 size_t * retlen, const u_char * buf)
+static int doc_write_oob_nolock(struct mtd_info *mtd, loff_t ofs, size_t len,
+				size_t * retlen, const u_char * buf)
 {
 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
 	int len256 = 0;
 	unsigned long docptr = this->virtadr;
 	struct Nand *mychip = &this->chips[ofs >> this->chipshift];
-	int dummy;
+	volatile int dummy;
 
 	//      printk("doc_write_oob(%lx, %d): %2.2X %2.2X %2.2X %2.2X ... %2.2X %2.2X .. %2.2X %2.2X\n",(long)ofs, len,
 	//   buf[0], buf[1], buf[2], buf[3], buf[8], buf[9], buf[14],buf[15]);
@@ -1003,7 +1030,7 @@ static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 		DoC_Delay(this, 2);
 
 		if (ReadDOC_(docptr, this->ioreg) & 1) {
-			printk("Error programming oob data\n");
+			printk(KERN_ERR "Error programming oob data\n");
 			/* There was an error */
 			*retlen = 0;
 			return -EIO;
@@ -1022,7 +1049,7 @@ static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 	DoC_Delay(this, 2);
 
 	if (ReadDOC_(docptr, this->ioreg) & 1) {
-		printk("Error programming oob data\n");
+		printk(KERN_ERR "Error programming oob data\n");
 		/* There was an error */
 		*retlen = 0;
 		return -EIO;
@@ -1032,52 +1059,78 @@ static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
 	return 0;
 
 }
+ 
+static int doc_write_oob(struct mtd_info *mtd, loff_t ofs, size_t len,
+ 			 size_t * retlen, const u_char * buf)
+{
+ 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
+ 	int ret;
 
-int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
+ 	down(&this->lock);
+ 	ret = doc_write_oob_nolock(mtd, ofs, len, retlen, buf);
+
+ 	up(&this->lock);
+ 	return ret;
+}
+
+static int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
 	struct DiskOnChip *this = (struct DiskOnChip *) mtd->priv;
 	__u32 ofs = instr->addr;
 	__u32 len = instr->len;
+	volatile int dummy;
 	unsigned long docptr;
 	struct Nand *mychip;
 
-	if (len != mtd->erasesize)
-		printk(KERN_WARNING "Erase not right size (%x != %x)n",
-		       len, mtd->erasesize);
+ 	down(&this->lock);
 
-	docptr = this->virtadr;
-
-	mychip = &this->chips[ofs >> this->chipshift];
-
-	if (this->curfloor != mychip->floor) {
-		DoC_SelectFloor(this, mychip->floor);
-		DoC_SelectChip(this, mychip->chip);
-	} else if (this->curchip != mychip->chip) {
-		DoC_SelectChip(this, mychip->chip);
+	if (ofs & (mtd->erasesize-1) || len & (mtd->erasesize-1)) {
+		up(&this->lock);
+		return -EINVAL;
 	}
-	this->curfloor = mychip->floor;
-	this->curchip = mychip->chip;
-
-	instr->state = MTD_ERASE_PENDING;
-
-	DoC_Command(this, NAND_CMD_ERASE1, 0);
-	DoC_Address(this, ADDR_PAGE, ofs, 0, 0);
-	DoC_Command(this, NAND_CMD_ERASE2, 0);
 
 	instr->state = MTD_ERASING;
+		
+	docptr = this->virtadr;
 
-	DoC_Command(this, NAND_CMD_STATUS, CDSN_CTRL_WP);
+	/* FIXME: Do this in the background. Use timers or schedule_task() */
+	while(len) {
+		mychip = &this->chips[ofs >> this->chipshift];
 
-	if (ReadDOC_(docptr, this->ioreg) & 1) {
-		printk("Error writing\n");
-		/* There was an error */
-		instr->state = MTD_ERASE_FAILED;
-	} else
-		instr->state = MTD_ERASE_DONE;
+		if (this->curfloor != mychip->floor) {
+			DoC_SelectFloor(this, mychip->floor);
+			DoC_SelectChip(this, mychip->chip);
+		} else if (this->curchip != mychip->chip) {
+			DoC_SelectChip(this, mychip->chip);
+		}
+		this->curfloor = mychip->floor;
+		this->curchip = mychip->chip;
 
+		DoC_Command(this, NAND_CMD_ERASE1, 0);
+		DoC_Address(this, ADDR_PAGE, ofs, 0, 0);
+		DoC_Command(this, NAND_CMD_ERASE2, 0);
+
+		DoC_Command(this, NAND_CMD_STATUS, CDSN_CTRL_WP);
+
+		dummy = ReadDOC(docptr, CDSNSlowIO);
+		DoC_Delay(this, 2);
+		
+		if (ReadDOC_(docptr, this->ioreg) & 1) {
+			printk(KERN_ERR "Error erasing at 0x%x\n", ofs);
+			/* There was an error */
+			instr->state = MTD_ERASE_FAILED;
+			goto callback;
+		}
+		ofs += mtd->erasesize;
+		len -= mtd->erasesize;
+	}
+	instr->state = MTD_ERASE_DONE;
+
+ callback:
 	if (instr->callback)
 		instr->callback(instr);
 
+	up(&this->lock);
 	return 0;
 }
 
@@ -1087,11 +1140,6 @@ int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
  * Module stuff
  *
  ****************************************************************************/
-
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define cleanup_doc2000 cleanup_module
-#define init_doc2000 init_module
-#endif
 
 int __init init_doc2000(void)
 {
@@ -1119,3 +1167,8 @@ static void __exit cleanup_doc2000(void)
 
 module_exit(cleanup_doc2000);
 module_init(init_doc2000);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org> et al.");
+MODULE_DESCRIPTION("MTD driver for DiskOnChip 2000 and Millennium");
+

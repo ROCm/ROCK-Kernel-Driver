@@ -502,7 +502,7 @@ __EXTERN_INLINE unsigned long apecs_ioremap(unsigned long addr,
 	return addr + APECS_DENSE_MEM;
 }
 
-__EXTERN_INLINE void apecs_iounmap(unsigned addr)
+__EXTERN_INLINE void apecs_iounmap(unsigned long addr)
 {
 	return;
 }

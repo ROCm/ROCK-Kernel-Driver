@@ -24,6 +24,4 @@ outb_p((addr),RTC_PORT(0)); \
 outb_p((val),RTC_PORT(1)); \
 })
 
-#define RTC_IRQ 0		/* Don't support interrupt features.  */
-
 #endif /* __ASM_ALPHA_MC146818RTC_H */

@@ -637,7 +637,7 @@ static int irda_discover_daddr_and_lsap_sel(struct irda_sock *self, char *name)
 	 * Note : we have to use irlmp_get_discoveries(), as opposed
 	 * to play with the cachelog directly, because while we are
 	 * making our ias query, le log might change... */
-	discoveries = irlmp_get_discoveries(&number, self->mask);
+	discoveries = irlmp_get_discoveries(&number, self->mask, self->nslots);
 	/* Check if the we got some results */
 	if (discoveries == NULL)
 		return -ENETUNREACH;	/* No nodes discovered */
@@ -2091,7 +2091,8 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 	switch (optname) {
 	case IRLMP_ENUMDEVICES:
 		/* Ask lmp for the current discovery log */
-		discoveries = irlmp_get_discoveries(&list.len, self->mask);
+		discoveries = irlmp_get_discoveries(&list.len, self->mask,
+						    self->nslots);
 		/* Check if the we got some results */
 		if (discoveries == NULL)
 			return -EAGAIN;		/* Didn't find any devices */

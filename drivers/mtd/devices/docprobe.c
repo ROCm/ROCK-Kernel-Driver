@@ -3,7 +3,7 @@
 /* Probe routines common to all DoC devices			*/
 /* (c) 1999 Machine Vision Holdings, Inc.			*/
 /* Author: David Woodhouse <dwmw2@infradead.org>		*/
-/* $Id: docprobe.c,v 1.27 2001/06/03 19:06:09 dwmw2 Exp $	*/
+/* $Id: docprobe.c,v 1.30 2001/10/02 15:05:13 dwmw2 Exp $	*/
 
 
 
@@ -176,6 +176,7 @@ static inline int __init doccheck(unsigned long potential, unsigned long physadr
 	return 0;
 }   
 
+static int docfound;
 
 static void __init DoC_Probe(unsigned long physadr)
 {
@@ -195,11 +196,11 @@ static void __init DoC_Probe(unsigned long physadr)
 		return;
 	
 	if ((ChipID = doccheck(docptr, physadr))) {
-		
+		docfound = 1;
 		mtd = kmalloc(sizeof(struct DiskOnChip) + sizeof(struct mtd_info), GFP_KERNEL);
 
 		if (!mtd) {
-			printk("Cannot allocate memory for data structures. Dropping.\n");
+			printk(KERN_WARNING "Cannot allocate memory for data structures. Dropping.\n");
 			iounmap((void *)docptr);
 			return;
 		}
@@ -242,7 +243,7 @@ static void __init DoC_Probe(unsigned long physadr)
 			inter_module_put(im_funcname);
 			return;
 		}
-		printk("Cannot find driver for DiskOnChip %s at 0x%lX\n", name, physadr);
+		printk(KERN_NOTICE "Cannot find driver for DiskOnChip %s at 0x%lX\n", name, physadr);
 	}
 	iounmap((void *)docptr);
 }
@@ -254,26 +255,22 @@ static void __init DoC_Probe(unsigned long physadr)
  *
  ****************************************************************************/
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_doc init_module
-#endif
-
 int __init init_doc(void)
 {
 	int i;
 	
-	printk(KERN_NOTICE "M-Systems DiskOnChip driver. (C) 1999 Machine Vision Holdings, Inc.\n");
-#ifdef PRERELEASE
-	printk(KERN_INFO "$Id: docprobe.c,v 1.27 2001/06/03 19:06:09 dwmw2 Exp $\n");
-#endif
 	if (doc_config_location) {
-		printk("Using configured probe address 0x%lx\n", doc_config_location);
+		printk(KERN_INFO "Using configured DiskOnChip probe address 0x%lx\n", doc_config_location);
 		DoC_Probe(doc_config_location);
 	} else {
 		for (i=0; doc_locations[i]; i++) {
 			DoC_Probe(doc_locations[i]);
 		}
 	}
+	/* No banner message any more. Print a message if no DiskOnChip
+	   found, so the user knows we at least tried. */
+	if (!docfound)
+		printk(KERN_INFO "No recognised DiskOnChip devices found\n");
 	/* So it looks like we've been used and we get unloaded */
 	MOD_INC_USE_COUNT;
 	MOD_DEC_USE_COUNT;
@@ -282,4 +279,8 @@ int __init init_doc(void)
 }
 
 module_init(init_doc);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
+MODULE_DESCRIPTION("Probe code for DiskOnChip 2000 and Millennium devices");
 

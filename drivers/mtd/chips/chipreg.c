@@ -1,5 +1,5 @@
 /*
- * $Id: chipreg.c,v 1.8 2001/06/09 19:58:19 dwmw2 Exp $
+ * $Id: chipreg.c,v 1.12 2001/10/02 15:29:53 dwmw2 Exp $
  *
  * Registration for chip drivers
  *
@@ -90,3 +90,7 @@ struct mtd_info *do_map_probe(char *name, struct map_info *map)
 EXPORT_SYMBOL(register_mtd_chip_driver);
 EXPORT_SYMBOL(unregister_mtd_chip_driver);
 EXPORT_SYMBOL(do_map_probe);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
+MODULE_DESCRIPTION("Core routines for registering and invoking MTD chip drivers");

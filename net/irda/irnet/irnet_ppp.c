@@ -14,7 +14,7 @@
  */
 
 #include "irnet_ppp.h"		/* Private header */
-#include <linux/module.h>
+/* Please put other headers in irnet.h - Thanks */
 
 /************************* CONTROL CHANNEL *************************/
 /*
@@ -200,7 +200,8 @@ irnet_read_discovery_log(irnet_socket *	ap,
       __u16		mask = irlmp_service_to_hint(S_LAN);
 
       /* Ask IrLMP for the current discovery log */
-      ap->discoveries = irlmp_get_discoveries(&ap->disco_number, mask);
+      ap->discoveries = irlmp_get_discoveries(&ap->disco_number, mask,
+					      DISCOVERY_DEFAULT_SLOTS);
       /* Check if the we got some results */
       if(ap->discoveries == NULL)
 	ap->disco_number = -1;

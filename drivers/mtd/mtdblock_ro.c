@@ -1,5 +1,5 @@
 /*
- * $Id: mtdblock_ro.c,v 1.5 2001/06/10 01:41:53 dwmw2 Exp $
+ * $Id: mtdblock_ro.c,v 1.9 2001/10/02 15:05:11 dwmw2 Exp $
  *
  * Read-only version of the mtdblock device, without the 
  * read/erase/modify/writeback stuff
@@ -14,6 +14,7 @@
 #include <linux/types.h>
 
 #include <linux/mtd/mtd.h>
+#include <linux/mtd/compatmac.h>
 
 #define MAJOR_NR MTD_BLOCK_MAJOR
 #define DEVICE_NAME "mtdblock"
@@ -53,14 +54,15 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	
 	dev = MINOR(inode->i_rdev);
 	
-	MOD_INC_USE_COUNT;
-
 	mtd = get_mtd_device(NULL, dev);
-
-	if (!mtd) {
-		MOD_DEC_USE_COUNT;
-		return -ENODEV;
+	if (!mtd)
+		return -EINVAL;
+	if (MTD_ABSENT == mtd->type) {
+		put_mtd_device(mtd);
+		return -EINVAL;
 	}
+
+	MOD_INC_USE_COUNT;
 
 	mtd_sizes[dev] = mtd->size>>9;
 
@@ -248,11 +250,6 @@ static struct block_device_operations mtd_fops =
 };
 #endif
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_mtdblock init_module
-#define cleanup_mtdblock cleanup_module
-#endif
-
 int __init init_mtdblock(void)
 {
 	int i;
@@ -272,18 +269,21 @@ int __init init_mtdblock(void)
 	blksize_size[MAJOR_NR] = NULL;
 	blk_size[MAJOR_NR] = mtd_sizes;
 	
-#if LINUX_VERSION_CODE < 0x20320
-	blk_dev[MAJOR_NR].request_fn = mtdblock_request;
-#else
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &mtdblock_request);
-#endif
 	return 0;
 }
 
 static void __exit cleanup_mtdblock(void)
 {
 	unregister_blkdev(MAJOR_NR,DEVICE_NAME);
+	blksize_size[MAJOR_NR] = NULL;
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 }
 
 module_init(init_mtdblock);
 module_exit(cleanup_mtdblock);
+
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Erwin Authried <eauth@softsys.co.at> et al.");
+MODULE_DESCRIPTION("Simple read-only block device emulation access to MTD devices");

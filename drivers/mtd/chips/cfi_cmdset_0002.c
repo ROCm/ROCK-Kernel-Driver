@@ -8,7 +8,7 @@
  *
  * This code is GPL
  *
- * $Id: cfi_cmdset_0002.c,v 1.48 2001/06/03 01:32:57 nico Exp $
+ * $Id: cfi_cmdset_0002.c,v 1.51 2001/10/02 15:05:12 dwmw2 Exp $
  *
  */
 
@@ -22,6 +22,7 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/cfi.h>
 
@@ -37,93 +38,107 @@ static void cfi_amdstd_resume (struct mtd_info *);
 
 static void cfi_amdstd_destroy(struct mtd_info *);
 
-void cfi_cmdset_0002(struct map_info *, int, unsigned long);
+struct mtd_info *cfi_cmdset_0002(struct map_info *, int);
 static struct mtd_info *cfi_amdstd_setup (struct map_info *);
 
 
 static struct mtd_chip_driver cfi_amdstd_chipdrv = {
-	probe: cfi_amdstd_setup,
+	probe: NULL, /* Not usable directly */
 	destroy: cfi_amdstd_destroy,
 	name: "cfi_cmdset_0002",
 	module: THIS_MODULE
 };
 
-void cfi_cmdset_0002(struct map_info *map, int primary, unsigned long base)
+struct mtd_info *cfi_cmdset_0002(struct map_info *map, int primary)
 {
 	struct cfi_private *cfi = map->fldrv_priv;
 	unsigned char bootloc;
 	int ofs_factor = cfi->interleave * cfi->device_type;
 	int i;
 	__u8 major, minor;
-//	struct cfi_pri_intelext *extp;
+	__u32 base = cfi->chips[0].start;
 
-    if (cfi->cfi_mode==0){
-	__u16 adr = primary?cfi->cfiq->P_ADR:cfi->cfiq->A_ADR;
+	if (cfi->cfi_mode==1){
+		__u16 adr = primary?cfi->cfiq->P_ADR:cfi->cfiq->A_ADR;
 
-	cfi_send_gen_cmd(0x98, 0x55, 0, map, cfi, cfi->device_type, NULL);
+		cfi_send_gen_cmd(0x98, 0x55, base, map, cfi, cfi->device_type, NULL);
+		
+		major = cfi_read_query(map, base + (adr+3)*ofs_factor);
+		minor = cfi_read_query(map, base + (adr+4)*ofs_factor);
+		
+		printk(" Amd/Fujitsu Extended Query Table v%c.%c at 0x%4.4X\n",
+		       major, minor, adr);
+				cfi_send_gen_cmd(0xf0, 0x55, base, map, cfi, cfi->device_type, NULL);
+		
+		cfi_send_gen_cmd(0xaa, 0x555, base, map, cfi, cfi->device_type, NULL);
+		cfi_send_gen_cmd(0x55, 0x2aa, base, map, cfi, cfi->device_type, NULL);
+		cfi_send_gen_cmd(0x90, 0x555, base, map, cfi, cfi->device_type, NULL);
+		cfi->mfr = cfi_read_query(map, base);
+		cfi->id = cfi_read_query(map, base + ofs_factor);
 
-	major = cfi_read_query(map, (adr+3)*ofs_factor);
-	minor = cfi_read_query(map, (adr+4)*ofs_factor);
-
-	printk(" Amd/Fujitsu Extended Query Table v%c.%c at 0x%4.4X\n",
-	       major, minor, adr);
-
-	cfi_send_gen_cmd(0xf0, 0x55, 0, map, cfi, cfi->device_type, NULL);
-
-	cfi_send_gen_cmd(0xaa, 0x555, base, map, cfi, cfi->device_type, NULL);
-	cfi_send_gen_cmd(0x55, 0x2aa, base, map, cfi, cfi->device_type, NULL);
-	cfi_send_gen_cmd(0x90, 0x555, base, map, cfi, cfi->device_type, NULL);
-	cfi->mfr = cfi_read_query(map, base);
-	cfi->id = cfi_read_query(map, base + ofs_factor);
-
-	/* Wheee. Bring me the head of someone at AMD. */
+		/* Wheee. Bring me the head of someone at AMD. */
 #ifdef AMD_BOOTLOC_BUG
-	if (((major << 8) | minor) < 0x3131) {
-		/* CFI version 1.0 => don't trust bootloc */
-		if (cfi->id & 0x80) {
-			printk(KERN_WARNING "%s: JEDEC Device ID is 0x%02X. Assuming broken CFI table.\n", map->name, cfi->id);
-			bootloc = 3;	/* top boot */
-		} else {
-			bootloc = 2;	/* bottom boot */
-		}
-	} else
+		if (((major << 8) | minor) < 0x3131) {
+			/* CFI version 1.0 => don't trust bootloc */
+			if (cfi->id & 0x80) {
+				printk(KERN_WARNING "%s: JEDEC Device ID is 0x%02X. Assuming broken CFI table.\n", map->name, cfi->id);
+				bootloc = 3;	/* top boot */
+			} else {
+				bootloc = 2;	/* bottom boot */
+			}
+		} else
 #endif
-	{
-		cfi_send_gen_cmd(0x98, 0x55, 0, map, cfi, cfi->device_type, NULL);
-		bootloc = cfi_read_query(map, (adr+15)*ofs_factor);
-	}
-	if (bootloc == 3 && cfi->cfiq->NumEraseRegions > 1) {
-		printk(KERN_WARNING "%s: Swapping erase regions for broken CFI table.\n", map->name);
-
-		for (i=0; i<cfi->cfiq->NumEraseRegions / 2; i++) {
-			int j = (cfi->cfiq->NumEraseRegions-1)-i;
-			__u32 swap;
-
-			swap = cfi->cfiq->EraseRegionInfo[i];
-			cfi->cfiq->EraseRegionInfo[i] = cfi->cfiq->EraseRegionInfo[j];
-			cfi->cfiq->EraseRegionInfo[j] = swap;
+			{
+				cfi_send_gen_cmd(0x98, 0x55, base, map, cfi, cfi->device_type, NULL);
+				bootloc = cfi_read_query(map, base + (adr+15)*ofs_factor);
+			}
+		if (bootloc == 3 && cfi->cfiq->NumEraseRegions > 1) {
+			printk(KERN_WARNING "%s: Swapping erase regions for broken CFI table.\n", map->name);
+			
+			for (i=0; i<cfi->cfiq->NumEraseRegions / 2; i++) {
+				int j = (cfi->cfiq->NumEraseRegions-1)-i;
+				__u32 swap;
+				
+				swap = cfi->cfiq->EraseRegionInfo[i];
+				cfi->cfiq->EraseRegionInfo[i] = cfi->cfiq->EraseRegionInfo[j];
+				cfi->cfiq->EraseRegionInfo[j] = swap;
+			}
 		}
-	}
-    }
+		switch (cfi->device_type) {
+		case CFI_DEVICETYPE_X8:
+			cfi->addr_unlock1 = 0x555; 
+			cfi->addr_unlock2 = 0x2aa; 
+			break;
+		case CFI_DEVICETYPE_X16:
+			cfi->addr_unlock1 = 0xaaa;
+			if (map->buswidth == cfi->interleave) {
+				/* X16 chip(s) in X8 mode */
+				cfi->addr_unlock2 = 0x555;
+			} else {
+				cfi->addr_unlock2 = 0x554;
+			}
+			break;
+		case CFI_DEVICETYPE_X32:
+			cfi->addr_unlock1 = 0x1555; 
+			cfi->addr_unlock2 = 0xaaa; 
+			break;
+		default:
+			printk(KERN_NOTICE "Eep. Unknown cfi_cmdset_0002 device type %d\n", cfi->device_type);
+			return NULL;
+		}
+	} /* CFI mode */
 
-    /* If there was an old setup function, decrease its use count */
-    if (map->fldrv)
-      if(map->fldrv->module)
-	__MOD_DEC_USE_COUNT(map->fldrv->module);
-    
-    if (cfi->cmdset_priv)
-		kfree(cfi->cmdset_priv);
-
-    for (i=0; i< cfi->numchips; i++) {
+	for (i=0; i< cfi->numchips; i++) {
 		cfi->chips[i].word_write_time = 1<<cfi->cfiq->WordWriteTimeoutTyp;
 		cfi->chips[i].buffer_write_time = 1<<cfi->cfiq->BufWriteTimeoutTyp;
 		cfi->chips[i].erase_time = 1<<cfi->cfiq->BlockEraseTimeoutTyp;
-    }		
+	}		
+	
+	map->fldrv = &cfi_amdstd_chipdrv;
+	MOD_INC_USE_COUNT;
 
-    map->fldrv = &cfi_amdstd_chipdrv;
-    MOD_INC_USE_COUNT;
-    cfi_send_gen_cmd(0xf0, 0x55, 0, map, cfi, cfi->device_type, NULL);
-    return;
+	cfi_send_gen_cmd(0xf0, 0x55, base, map, cfi, cfi->device_type, NULL);
+	return cfi_amdstd_setup(map);
 }
 
 static struct mtd_info *cfi_amdstd_setup(struct map_info *map)
@@ -913,20 +928,15 @@ static void cfi_amdstd_destroy(struct mtd_info *mtd)
 	kfree(cfi);
 }
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define cfi_amdstd_init init_module
-#define cfi_amdstd_exit cleanup_module
-#endif
-
 static char im_name[]="cfi_cmdset_0002";
 
-mod_init_t cfi_amdstd_init(void)
+int __init cfi_amdstd_init(void)
 {
 	inter_module_register(im_name, THIS_MODULE, &cfi_cmdset_0002);
 	return 0;
 }
 
-mod_exit_t cfi_amdstd_exit(void)
+static void __exit cfi_amdstd_exit(void)
 {
 	inter_module_unregister(im_name);
 }
@@ -934,3 +944,6 @@ mod_exit_t cfi_amdstd_exit(void)
 module_init(cfi_amdstd_init);
 module_exit(cfi_amdstd_exit);
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Crossnet Co. <info@crossnet.co.jp> et al.");
+MODULE_DESCRIPTION("MTD chip driver for AMD/Fujitsu flash chips");

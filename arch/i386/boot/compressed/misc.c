@@ -123,6 +123,10 @@ static char *vidmem = (char *)0xb8000;
 static int vidport;
 static int lines, cols;
 
+#ifdef CONFIG_MULTIQUAD
+static void *xquad_portio = NULL;
+#endif
+
 #include "../../../../lib/inflate.c"
 
 static void *malloc(int size)

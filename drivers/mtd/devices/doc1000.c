@@ -1,6 +1,6 @@
 /*======================================================================
 
-  $Id: doc1000.c,v 1.11 2000/11/24 13:43:16 dwmw2 Exp $
+  $Id: doc1000.c,v 1.15 2001/10/02 15:05:13 dwmw2 Exp $
 
 ======================================================================*/
 
@@ -286,9 +286,9 @@ int flashcard_write (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen
 static inline int byte_write (volatile u_char *addr, u_char byte)
 {
 	register u_char status;
- 	register u_short i = 0;
-  	
- 	do {
+	register u_short i = 0;
+
+	do {
 		status = readb(addr);
 		if (status & CSR_WR_READY)
 		{
@@ -510,11 +510,6 @@ static void flashcard_periodic(unsigned long data)
 
 }
 
-#if defined (MODULE) && LINUX_VERSION_CODE < 0x20211
-#define init_doc1000 init_module
-#define cleanup_doc1000 cleanup_module
-#endif
-
 int __init init_doc1000(void)
 {
 	struct mypriv *priv;
@@ -591,7 +586,10 @@ static void __init cleanup_doc1000(void)
 	kfree(mymtd);
 }
 
-#if LINUX_VERSION_CODE >= 0x20211
 module_init(init_doc1000);
 module_exit(cleanup_doc1000);
-#endif
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
+MODULE_DESCRIPTION("MTD driver for DiskOnChip 1000");
+

@@ -192,7 +192,7 @@ enum implver_enum {
 #ifdef CONFIG_ALPHA_EV5
 #define implver() IMPLVER_EV5
 #endif
-#if defined(CONFIG_ALPHA_EV6) || defined(CONFIG_ALPHA_EV67)
+#if defined(CONFIG_ALPHA_EV6)
 #define implver() IMPLVER_EV6
 #endif
 #endif

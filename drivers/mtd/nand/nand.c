@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2000 Steven J. Hill (sjhill@cotw.com)
  *
- * $Id: nand.c,v 1.10 2001/03/20 07:26:01 dwmw2 Exp $
+ * $Id: nand.c,v 1.12 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,6 +21,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/nand_ids.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 
 #ifdef CONFIG_MTD_NAND_ECC
@@ -1367,3 +1368,7 @@ int nand_scan (struct mtd_info *mtd)
 }
 
 EXPORT_SYMBOL(nand_scan);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Steven J. Hill <sjhill@cotw.com");
+MODULE_DESCRIPTION("Generic NAND flash driver code");

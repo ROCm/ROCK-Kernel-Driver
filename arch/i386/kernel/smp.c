@@ -20,6 +20,7 @@
 
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
+#include <asm/smpboot.h>
 
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
@@ -148,28 +149,12 @@ static inline void __send_IPI_shortcut(unsigned int shortcut, int vector)
 	apic_write_around(APIC_ICR, cfg);
 }
 
-static inline void send_IPI_allbutself(int vector)
-{
-	/*
-	 * if there are no other CPUs in the system then
-	 * we get an APIC send error if we try to broadcast.
-	 * thus we have to avoid sending IPIs in this case.
-	 */
-	if (smp_num_cpus > 1)
-		__send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
-}
-
-static inline void send_IPI_all(int vector)
-{
-	__send_IPI_shortcut(APIC_DEST_ALLINC, vector);
-}
-
 void send_IPI_self(int vector)
 {
 	__send_IPI_shortcut(APIC_DEST_SELF, vector);
 }
 
-static inline void send_IPI_mask(int mask, int vector)
+static inline void send_IPI_mask_bitmask(int mask, int vector)
 {
 	unsigned long cfg;
 	unsigned long flags;
@@ -177,27 +162,120 @@ static inline void send_IPI_mask(int mask, int vector)
 	__save_flags(flags);
 	__cli();
 
+		
 	/*
 	 * Wait for idle.
 	 */
 	apic_wait_icr_idle();
-
+		
 	/*
 	 * prepare target chip field
 	 */
 	cfg = __prepare_ICR2(mask);
 	apic_write_around(APIC_ICR2, cfg);
-
+		
 	/*
 	 * program the ICR 
 	 */
 	cfg = __prepare_ICR(0, vector);
-	
+			
 	/*
 	 * Send the IPI. The write to APIC_ICR fires this off.
 	 */
 	apic_write_around(APIC_ICR, cfg);
+
 	__restore_flags(flags);
+}
+
+static inline void send_IPI_mask_sequence(int mask, int vector)
+{
+	unsigned long cfg, flags;
+	unsigned int query_cpu, query_mask;
+
+	/*
+	 * Hack. The clustered APIC addressing mode doesn't allow us to send 
+	 * to an arbitrary mask, so I do a unicasts to each CPU instead. This 
+	 * should be modified to do 1 message per cluster ID - mbligh
+	 */ 
+
+	__save_flags(flags);
+	__cli();
+
+	for (query_cpu = 0; query_cpu < NR_CPUS; ++query_cpu) {
+		query_mask = 1 << query_cpu;
+		if (query_mask & mask) {
+		
+			/*
+			 * Wait for idle.
+			 */
+			apic_wait_icr_idle();
+		
+			/*
+			 * prepare target chip field
+			 */
+			cfg = __prepare_ICR2(cpu_to_logical_apicid(query_cpu));
+			apic_write_around(APIC_ICR2, cfg);
+		
+			/*
+			 * program the ICR 
+			 */
+			cfg = __prepare_ICR(0, vector);
+			
+			/*
+			 * Send the IPI. The write to APIC_ICR fires this off.
+			 */
+			apic_write_around(APIC_ICR, cfg);
+		}
+	}
+	__restore_flags(flags);
+}
+
+static inline void send_IPI_mask(int mask, int vector)
+{
+	if (clustered_apic_mode) 
+		send_IPI_mask_sequence(mask, vector);
+	else
+		send_IPI_mask_bitmask(mask, vector);
+}
+
+static inline void send_IPI_allbutself(int vector)
+{
+	/*
+	 * if there are no other CPUs in the system then
+	 * we get an APIC send error if we try to broadcast.
+	 * thus we have to avoid sending IPIs in this case.
+	 */
+	if (!(smp_num_cpus > 1))
+		return;
+
+	if (clustered_apic_mode) {
+		// Pointless. Use send_IPI_mask to do this instead
+		int cpu;
+
+		if (smp_num_cpus > 1) {
+			for (cpu = 0; cpu < smp_num_cpus; ++cpu) {
+				if (cpu != smp_processor_id())
+					send_IPI_mask(1 << cpu, vector);
+			}
+		}
+	} else {
+		__send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
+		return;
+	}
+}
+
+static inline void send_IPI_all(int vector)
+{
+	if (clustered_apic_mode) {
+		// Pointless. Use send_IPI_mask to do this instead
+		int cpu;
+
+		for (cpu = 0; cpu < smp_num_cpus; ++cpu) {
+			send_IPI_mask(1 << cpu, vector);
+		}
+	} else {
+		__send_IPI_shortcut(APIC_DEST_ALLINC, vector);
+	}
 }
 
 /*

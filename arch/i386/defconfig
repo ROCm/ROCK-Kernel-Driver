@@ -59,6 +59,7 @@ CONFIG_NOHIGHMEM=y
 # CONFIG_MATH_EMULATION is not set
 # CONFIG_MTRR is not set
 CONFIG_SMP=y
+# CONFIG_MULTIQUAD is not set
 CONFIG_HAVE_DEC_LOCK=y
 
 #
@@ -603,6 +604,7 @@ CONFIG_AUTOFS4_FS=y
 # CONFIG_VFAT_FS is not set
 # CONFIG_EFS_FS is not set
 # CONFIG_JFFS_FS is not set
+# CONFIG_JFFS2_FS is not set
 # CONFIG_CRAMFS is not set
 CONFIG_TMPFS=y
 # CONFIG_RAMFS is not set

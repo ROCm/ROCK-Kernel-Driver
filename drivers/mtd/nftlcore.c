@@ -1,7 +1,7 @@
 /* Linux driver for NAND Flash Translation Layer      */
 /* (c) 1999 Machine Vision Holdings, Inc.             */
 /* Author: David Woodhouse <dwmw2@infradead.org>      */
-/* $Id: nftlcore.c,v 1.73 2001/06/09 01:09:43 dwmw2 Exp $ */
+/* $Id: nftlcore.c,v 1.82 2001/10/02 15:05:11 dwmw2 Exp $ */
 
 /*
   The contents of this file are distributed under the GNU General
@@ -229,7 +229,7 @@ static u16 NFTL_findfreeblock(struct NFTLrecord *nftl, int desperate )
 	/* We're passed the number of the last EUN in the chain, to save us from
 	   having to look it up again */
 	u16 pot = nftl->LastFreeEUN;
-	int silly = -1;
+	int silly = nftl->nb_blocks;
 
 	/* Normally, we force a fold to happen before we run out of free blocks completely */
 	if (!desperate && nftl->numfreeEUNs < 2) {
@@ -330,8 +330,17 @@ static u16 NFTL_foldchain (struct NFTLrecord *nftl, unsigned thisVUC, unsigned p
 					       "in Virtual Unit Chain %d for block %d\n",
 					       thisVUC, block);
 				break;
-			case SECTOR_IGNORE:
 			case SECTOR_DELETED:
+				if (!BlockFreeFound[block])
+					BlockMap[block] = BLOCK_NIL;
+				else
+					printk(KERN_WARNING 
+					       "SECTOR_DELETED found after SECTOR_FREE "
+					       "in Virtual Unit Chain %d for block %d\n",
+					       thisVUC, block);
+				break;
+
+			case SECTOR_IGNORE:
 				break;
 			default:
 				printk("Unknown status for block %d in EUN %d: %x\n",
@@ -350,12 +359,15 @@ static u16 NFTL_foldchain (struct NFTLrecord *nftl, unsigned thisVUC, unsigned p
 
 	if (inplace) {
 		/* We're being asked to be a fold-in-place. Check
-		   that all blocks are either present or SECTOR_FREE
-		   in the target block. If not, we're going to have
-		   to fold out-of-place anyway.
+		   that all blocks which actually have data associated
+		   with them (i.e. BlockMap[block] != BLOCK_NIL) are 
+		   either already present or SECTOR_FREE in the target
+		   block. If not, we're going to have to fold out-of-place
+		   anyway.
 		*/
 		for (block = 0; block < nftl->EraseSize / 512 ; block++) {
 			if (BlockLastState[block] != SECTOR_FREE &&
+			    BlockMap[block] != BLOCK_NIL &&
 			    BlockMap[block] != targetEUN) {
 				DEBUG(MTD_DEBUG_LEVEL1, "Setting inplace to 0. VUC %d, "
 				      "block %d was %x lastEUN, "
@@ -497,7 +509,7 @@ u16 NFTL_makefreeblock( struct NFTLrecord *nftl , unsigned pendingblock)
 	u16 ChainLength = 0, thislen;
 	u16 chain, EUN;
 
-	for (chain = 0; chain < nftl->MediaHdr.FormattedSize / nftl->EraseSize; chain++) {
+	for (chain = 0; chain < le32_to_cpu(nftl->MediaHdr.FormattedSize) / nftl->EraseSize; chain++) {
 		EUN = nftl->EUNtable[chain];
 		thislen = 0;
 
@@ -796,7 +808,7 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 	case BLKGETSIZE64:
 		return put_user((u64)part_table[MINOR(inode->i_rdev)].nr_sects << 9,
                                 (u64 *)arg);
-		
+
 	case BLKFLSBUF:
 		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
 		fsync_dev(inode->i_rdev);
@@ -1031,19 +1043,18 @@ static struct mtd_notifier nftl_notifier = {
 	remove:	NFTL_notify_remove
 };
 
-static int __init init_nftl(void)
+extern char nftlmountrev[];
+
+int __init init_nftl(void)
 {
 	int i;
 
-	printk(KERN_NOTICE
-	       "M-Systems NAND Flash Translation Layer driver. (C) 1999 MVHI\n");
 #ifdef PRERELEASE 
-	printk(KERN_INFO"$Id: nftlcore.c,v 1.73 2001/06/09 01:09:43 dwmw2 Exp $\n");
+	printk(KERN_INFO "NFTL driver: nftlcore.c $Revision: 1.82 $, nftlmount.c %s\n", nftlmountrev);
 #endif
 
 	if (register_blkdev(MAJOR_NR, "nftl", &nftl_fops)){
-		printk("unable to register NFTL block device on major %d\n",
-		       MAJOR_NR);
+		printk("unable to register NFTL block device on major %d\n", MAJOR_NR);
 		return -EBUSY;
 	} else {
 		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &nftl_request);
@@ -1074,3 +1085,7 @@ static void __exit cleanup_nftl(void)
 
 module_init(init_nftl);
 module_exit(cleanup_nftl);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>, Fabrice Bellard <fabrice.bellard@netgem.com> et al.");
+MODULE_DESCRIPTION("Support code for NAND Flash Translation Layer, used on M-Systems DiskOnChip 2000 and Millennium");

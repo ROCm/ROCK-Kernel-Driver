@@ -46,36 +46,49 @@ struct address_space swapper_space = {
 };
 
 #ifdef SWAP_CACHE_INFO
-unsigned long swap_cache_add_total;
-unsigned long swap_cache_del_total;
-unsigned long swap_cache_find_total;
-unsigned long swap_cache_find_success;
+#define INC_CACHE_INFO(x)	(swap_cache_info.x++)
+
+static struct {
+	unsigned long add_total;
+	unsigned long del_total;
+	unsigned long find_success;
+	unsigned long find_total;
+	unsigned long noent_race;
+	unsigned long exist_race;
+} swap_cache_info;
 
 void show_swap_cache_info(void)
 {
-	printk("Swap cache: add %ld, delete %ld, find %ld/%ld\n",
-		swap_cache_add_total, 
-		swap_cache_del_total,
-		swap_cache_find_success, swap_cache_find_total);
+	printk("Swap cache: add %lu, delete %lu, find %lu/%lu, race %lu+%lu\n",
+		swap_cache_info.add_total, swap_cache_info.del_total,
+		swap_cache_info.find_success, swap_cache_info.find_total,
+		swap_cache_info.noent_race, swap_cache_info.exist_race);
 }
+#else
+#define INC_CACHE_INFO(x)	do { } while (0)
 #endif
 
-void add_to_swap_cache(struct page *page, swp_entry_t entry)
+int add_to_swap_cache(struct page *page, swp_entry_t entry)
 {
-	unsigned long flags;
-
-#ifdef SWAP_CACHE_INFO
-	swap_cache_add_total++;
-#endif
-	if (!PageLocked(page))
-		BUG();
 	if (page->mapping)
 		BUG();
-
-	/* clear PG_dirty so a subsequent set_page_dirty takes effect */
-	flags = page->flags & ~(1 << PG_error | 1 << PG_dirty | 1 << PG_arch_1 | 1 << PG_referenced);
-	page->flags = flags | (1 << PG_uptodate);
-	add_to_page_cache_locked(page, &swapper_space, entry.val);
+	if (!swap_duplicate(entry)) {
+		INC_CACHE_INFO(noent_race);
+		return -ENOENT;
+	}
+	if (add_to_page_cache_unique(page, &swapper_space, entry.val,
+			page_hash(&swapper_space, entry.val)) != 0) {
+		swap_free(entry);
+		INC_CACHE_INFO(exist_race);
+		return -EEXIST;
+	}
+	page->flags |= (1 << PG_uptodate);
+	if (!PageLocked(page))
+		BUG();
+	if (!PageSwapCache(page))
+		BUG();
+	INC_CACHE_INFO(add_total);
+	return 0;
 }
 
 /*
@@ -84,16 +97,13 @@ void add_to_swap_cache(struct page *page, swp_entry_t entry)
  */
 void __delete_from_swap_cache(struct page *page)
 {
-#ifdef SWAP_CACHE_INFO
-	swap_cache_del_total++;
-#endif
 	if (!PageLocked(page))
 		BUG();
 	if (!PageSwapCache(page))
 		BUG();
-
 	ClearPageDirty(page);
 	__remove_inode_page(page);
+	INC_CACHE_INFO(del_total);
 }
 
 /*
@@ -155,9 +165,6 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 {
 	struct page *found;
 
-#ifdef SWAP_CACHE_INFO
-	swap_cache_find_total++;
-#endif
 	found = find_get_page(&swapper_space, entry.val);
 	/*
 	 * Unsafe to assert PageSwapCache and mapping on page found:
@@ -165,10 +172,9 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 	 * the swap cache at this moment.  find_lock_page would prevent
 	 * that, but no need to change: we _have_ got the right page.
 	 */
-#ifdef SWAP_CACHE_INFO
+	INC_CACHE_INFO(find_total);
 	if (found)
-		swap_cache_find_success++;
-#endif
+		INC_CACHE_INFO(find_success);
 	return found;
 }
 
@@ -180,58 +186,49 @@ struct page * lookup_swap_cache(swp_entry_t entry)
  */
 struct page * read_swap_cache_async(swp_entry_t entry)
 {
-	struct page *found_page, *new_page;
-	struct page **hash;
-	
-	/*
-	 * Look for the page in the swap cache.  Since we normally call
-	 * this only after lookup_swap_cache() failed, re-calling that
-	 * would confuse the statistics: use __find_get_page() directly.
-	 */
-	hash = page_hash(&swapper_space, entry.val);
-	found_page = __find_get_page(&swapper_space, entry.val, hash);
-	if (found_page)
-		goto out;
+	struct page *found_page, *new_page = NULL;
+	int err;
 
-	new_page = alloc_page(GFP_HIGHUSER);
-	if (!new_page)
-		goto out;		/* Out of memory */
-	if (TryLockPage(new_page))
-		BUG();
+	do {
+		/*
+		 * First check the swap cache.  Since this is normally
+		 * called after lookup_swap_cache() failed, re-calling
+		 * that would confuse statistics: use find_get_page()
+		 * directly.
+		 */
+		found_page = find_get_page(&swapper_space, entry.val);
+		if (found_page)
+			break;
 
-	/*
-	 * Check the swap cache again, in case we stalled above.
-	 * swap_list_lock is guarding against races between this check
-	 * and where the new page is added to the swap cache below.
-	 * It is also guarding against race where try_to_swap_out
-	 * allocates entry with get_swap_page then adds to cache.
-	 */
-	swap_list_lock();
-	found_page = __find_get_page(&swapper_space, entry.val, hash);
-	if (found_page)
-		goto out_free_page;
+		/*
+		 * Get a new page to read into from swap.
+		 */
+		if (!new_page) {
+			new_page = alloc_page(GFP_HIGHUSER);
+			if (!new_page)
+				break;		/* Out of memory */
+		}
 
-	/*
-	 * Make sure the swap entry is still in use.  It could have gone
-	 * since caller dropped page_table_lock, while allocating page above,
-	 * or while allocating page in prior call via swapin_readahead.
-	 */
-	if (!swap_duplicate(entry))	/* Account for the swap cache */
-		goto out_free_page;
+		/*
+		 * Associate the page with swap entry in the swap cache.
+		 * May fail (-ENOENT) if swap entry has been freed since
+		 * our caller observed it.  May fail (-EEXIST) if there
+		 * is already a page associated with this entry in the
+		 * swap cache: added by a racing read_swap_cache_async,
+		 * or by try_to_swap_out (or shmem_writepage) re-using
+		 * the just freed swap entry for an existing page.
+		 */
+		err = add_to_swap_cache(new_page, entry);
+		if (!err) {
+			/*
+			 * Initiate read into locked page and return.
+			 */
+			rw_swap_page(READ, new_page);
+			return new_page;
+		}
+	} while (err != -ENOENT);
 
-	/* 
-	 * Add it to the swap cache and read its contents.
-	 */
-	add_to_swap_cache(new_page, entry);
-	swap_list_unlock();
-
-	rw_swap_page(READ, new_page);
-	return new_page;
-
-out_free_page:
-	swap_list_unlock();
-	UnlockPage(new_page);
-	page_cache_release(new_page);
-out:
+	if (new_page)
+		page_cache_release(new_page);
 	return found_page;
 }

@@ -29,6 +29,7 @@
  *		Ingo Molnar	:	various cleanups and rewrites
  *		Tigran Aivazian	:	fixed "0.00 in /proc/uptime on SMP" bug.
  *	Maciej W. Rozycki	:	Bits for genuine 82489DX APICs
+ *		Martin J. Bligh	: 	Added support for multi-quad systems
  */
 
 #include <linux/config.h>
@@ -44,6 +45,7 @@
 #include <linux/mc146818rtc.h>
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
+#include <asm/smpboot.h>
 
 /* Set if we find a B stepping CPU			*/
 static int smp_b_stepping;
@@ -56,11 +58,6 @@ int smp_num_cpus = 1;
 
 /* Bitmask of currently online CPUs */
 unsigned long cpu_online_map;
-
-/* which CPU (physical APIC ID) maps to which logical CPU number */
-volatile int x86_apicid_to_cpu[NR_CPUS];
-/* which logical CPU number maps to which CPU (physical APIC ID) */
-volatile int x86_cpu_to_apicid[NR_CPUS];
 
 static volatile unsigned long cpu_callin_map;
 static volatile unsigned long cpu_callout_map;
@@ -357,7 +354,8 @@ void __init smp_callin(void)
 	 * our local APIC.  We have to wait for the IPI or we'll
 	 * lock up on an APIC access.
 	 */
-	while (!atomic_read(&init_deasserted));
+	if (!clustered_apic_mode) 
+		while (!atomic_read(&init_deasserted));
 
 	/*
 	 * (This works even if the APIC is not enabled.)
@@ -406,9 +404,15 @@ void __init smp_callin(void)
 	 */
 
 	Dprintk("CALLIN, before setup_local_APIC().\n");
+	/*
+	 * Because we use NMIs rather than the INIT-STARTUP sequence to
+	 * bootstrap the CPUs, the APIC may be in a wierd state. Kick it.
+	 */
+	if (clustered_apic_mode)
+		clear_local_APIC();
 	setup_local_APIC();
 
-	sti();
+	__sti();
 
 #ifdef CONFIG_MTRR
 	/*
@@ -501,6 +505,61 @@ static int __init fork_by_hand(void)
 	return do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0);
 }
 
+/* which physical APIC ID maps to which logical CPU number */
+volatile int physical_apicid_2_cpu[MAX_APICID];
+/* which logical CPU number maps to which physical APIC ID */
+volatile int cpu_2_physical_apicid[NR_CPUS];
+
+/* which logical APIC ID maps to which logical CPU number */
+volatile int logical_apicid_2_cpu[MAX_APICID];
+/* which logical CPU number maps to which logical APIC ID */
+volatile int cpu_2_logical_apicid[NR_CPUS];
+
+static inline void init_cpu_to_apicid(void)
+/* Initialize all maps between cpu number and apicids */
+{
+	int apicid, cpu;
+
+	for (apicid = 0; apicid < MAX_APICID; apicid++) {
+		physical_apicid_2_cpu[apicid] = -1;
+		logical_apicid_2_cpu[apicid] = -1;
+	}
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		cpu_2_physical_apicid[cpu] = -1;
+		cpu_2_logical_apicid[cpu] = -1;
+	}
+}
+
+static inline void map_cpu_to_boot_apicid(int cpu, int apicid)
+/* 
+ * set up a mapping between cpu and apicid. Uses logical apicids for multiquad,
+ * else physical apic ids
+ */
+{
+	if (clustered_apic_mode) {
+		logical_apicid_2_cpu[apicid] = cpu;	
+		cpu_2_logical_apicid[cpu] = apicid;
+	} else {
+		physical_apicid_2_cpu[apicid] = cpu;	
+		cpu_2_physical_apicid[cpu] = apicid;
+	}
+}
+
+static inline void unmap_cpu_to_boot_apicid(int cpu, int apicid)
+/* 
+ * undo a mapping between cpu and apicid. Uses logical apicids for multiquad,
+ * else physical apic ids
+ */
+{
+	if (clustered_apic_mode) {
+		logical_apicid_2_cpu[apicid] = -1;	
+		cpu_2_logical_apicid[cpu] = -1;
+	} else {
+		physical_apicid_2_cpu[apicid] = -1;	
+		cpu_2_physical_apicid[cpu] = -1;
+	}
+}
+
 #if APIC_DEBUG
 static inline void inquire_remote_apic(int apicid)
 {
@@ -539,89 +598,65 @@ static inline void inquire_remote_apic(int apicid)
 }
 #endif
 
-static void __init do_boot_cpu (int apicid)
+static int wakeup_secondary_via_NMI(int logical_apicid)
+/* 
+ * Poke the other CPU in the eye to wake it up. Remember that the normal
+ * INIT, INIT, STARTUP sequence will reset the chip hard for us, and this
+ * won't ... remember to clear down the APIC, etc later.
+ */
 {
-	struct task_struct *idle;
-	unsigned long send_status, accept_status, boot_status, maxlvt;
-	int timeout, num_starts, j, cpu;
-	unsigned long start_eip;
+	unsigned long send_status = 0, accept_status = 0;
+	int timeout, maxlvt;
 
-	cpu = ++cpucount;
-	/*
-	 * We can't use kernel_thread since we must avoid to
-	 * reschedule the child.
-	 */
-	if (fork_by_hand() < 0)
-		panic("failed fork for CPU %d", cpu);
+	/* Target chip */
+	apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(logical_apicid));
 
-	/*
-	 * We remove it from the pidhash and the runqueue
-	 * once we got the process:
-	 */
-	idle = init_task.prev_task;
-	if (!idle)
-		panic("No idle process for CPU %d", cpu);
+	/* Boot on the stack */
+	/* Kick the second */
+	apic_write_around(APIC_ICR, APIC_DM_NMI | APIC_DEST_LOGICAL);
 
-	idle->processor = cpu;
-	x86_cpu_to_apicid[cpu] = apicid;
-	x86_apicid_to_cpu[apicid] = cpu;
-	idle->has_cpu = 1; /* we schedule the first task manually */
-	idle->thread.eip = (unsigned long) start_secondary;
-
-	del_from_runqueue(idle);
-	unhash_process(idle);
-	init_tasks[cpu] = idle;
-
-	/* start_eip had better be page-aligned! */
-	start_eip = setup_trampoline();
-
-	/* So we see what's up   */
-	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
-	stack_start.esp = (void *) (1024 + PAGE_SIZE + (char *)idle);
+	Dprintk("Waiting for send to finish...\n");
+	timeout = 0;
+	do {
+		Dprintk("+");
+		udelay(100);
+		send_status = apic_read(APIC_ICR) & APIC_ICR_BUSY;
+	} while (send_status && (timeout++ < 1000));
 
 	/*
-	 * This grunge runs the startup process for
-	 * the targeted processor.
+	 * Give the other CPU some time to accept the IPI.
 	 */
-
-	atomic_set(&init_deasserted, 0);
-
-	Dprintk("Setting warm reset code and vector.\n");
-
-	CMOS_WRITE(0xa, 0xf);
-	local_flush_tlb();
-	Dprintk("1.\n");
-	*((volatile unsigned short *) phys_to_virt(0x469)) = start_eip >> 4;
-	Dprintk("2.\n");
-	*((volatile unsigned short *) phys_to_virt(0x467)) = start_eip & 0xf;
-	Dprintk("3.\n");
-
+	udelay(200);
 	/*
-	 * Be paranoid about clearing APIC errors.
+	 * Due to the Pentium erratum 3AP.
 	 */
-	if (APIC_INTEGRATED(apic_version[apicid])) {
+	maxlvt = get_maxlvt();
+	if (maxlvt > 3) {
 		apic_read_around(APIC_SPIV);
 		apic_write(APIC_ESR, 0);
-		apic_read(APIC_ESR);
 	}
+	accept_status = (apic_read(APIC_ESR) & 0xEF);
+	Dprintk("NMI sent.\n");
 
-	/*
-	 * Status is now clean
-	 */
-	send_status = 0;
-	accept_status = 0;
-	boot_status = 0;
+	if (send_status)
+		printk("APIC never delivered???\n");
+	if (accept_status)
+		printk("APIC delivery error (%lx).\n", accept_status);
 
-	/*
-	 * Starting actual IPI sequence...
-	 */
+	return (send_status | accept_status);
+}
+
+static int wakeup_secondary_via_INIT(int phys_apicid, unsigned long start_eip)
+{
+	unsigned long send_status = 0, accept_status = 0;
+	int maxlvt, timeout, num_starts, j;
 
 	Dprintk("Asserting INIT.\n");
 
 	/*
 	 * Turn INIT on target chip
 	 */
-	apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(apicid));
+	apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(phys_apicid));
 
 	/*
 	 * Send IPI
@@ -642,7 +677,7 @@ static void __init do_boot_cpu (int apicid)
 	Dprintk("Deasserting INIT.\n");
 
 	/* Target chip */
-	apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(apicid));
+	apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(phys_apicid));
 
 	/* Send IPI */
 	apic_write_around(APIC_ICR, APIC_INT_LEVELTRIG | APIC_DM_INIT);
@@ -661,10 +696,9 @@ static void __init do_boot_cpu (int apicid)
 	 * Should we send STARTUP IPIs ?
 	 *
 	 * Determine this based on the APIC version.
-	 * If we don't have an integrated APIC, don't
-	 * send the STARTUP IPIs.
+	 * If we don't have an integrated APIC, don't send the STARTUP IPIs.
 	 */
-	if (APIC_INTEGRATED(apic_version[apicid]))
+	if (APIC_INTEGRATED(apic_version[phys_apicid]))
 		num_starts = 2;
 	else
 		num_starts = 0;
@@ -688,7 +722,7 @@ static void __init do_boot_cpu (int apicid)
 		 */
 
 		/* Target chip */
-		apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(apicid));
+		apic_write_around(APIC_ICR2, SET_APIC_DEST_FIELD(phys_apicid));
 
 		/* Boot on the stack */
 		/* Kick the second */
@@ -732,7 +766,104 @@ static void __init do_boot_cpu (int apicid)
 	if (accept_status)
 		printk("APIC delivery error (%lx).\n", accept_status);
 
-	if (!send_status && !accept_status) {
+	return (send_status | accept_status);
+}
+
+extern unsigned long cpu_initialized;
+
+static void __init do_boot_cpu (int apicid) 
+/*
+ * NOTE - on most systems this is a PHYSICAL apic ID, but on multiquad
+ * (ie clustered apic addressing mode), this is a LOGICAL apic ID.
+ */
+{
+	struct task_struct *idle;
+	unsigned long boot_error = 0;
+	int timeout, cpu;
+	unsigned long start_eip;
+	unsigned short nmi_high, nmi_low;
+
+	cpu = ++cpucount;
+	/*
+	 * We can't use kernel_thread since we must avoid to
+	 * reschedule the child.
+	 */
+	if (fork_by_hand() < 0)
+		panic("failed fork for CPU %d", cpu);
+
+	/*
+	 * We remove it from the pidhash and the runqueue
+	 * once we got the process:
+	 */
+	idle = init_task.prev_task;
+	if (!idle)
+		panic("No idle process for CPU %d", cpu);
+
+	idle->processor = cpu;
+
+	map_cpu_to_boot_apicid(cpu, apicid);
+
+	idle->has_cpu = 1; /* we schedule the first task manually */
+	idle->thread.eip = (unsigned long) start_secondary;
+
+	del_from_runqueue(idle);
+	unhash_process(idle);
+	init_tasks[cpu] = idle;
+
+	/* start_eip had better be page-aligned! */
+	start_eip = setup_trampoline();
+
+	/* So we see what's up   */
+	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
+	stack_start.esp = (void *) (1024 + PAGE_SIZE + (char *)idle);
+
+	/*
+	 * This grunge runs the startup process for
+	 * the targeted processor.
+	 */
+
+	atomic_set(&init_deasserted, 0);
+
+	Dprintk("Setting warm reset code and vector.\n");
+
+	if (clustered_apic_mode) {
+		/* stash the current NMI vector, so we can put things back */
+		nmi_high = *((volatile unsigned short *) TRAMPOLINE_HIGH);
+		nmi_low = *((volatile unsigned short *) TRAMPOLINE_LOW);
+	} 
+
+	CMOS_WRITE(0xa, 0xf);
+	local_flush_tlb();
+	Dprintk("1.\n");
+	*((volatile unsigned short *) TRAMPOLINE_HIGH) = start_eip >> 4;
+	Dprintk("2.\n");
+	*((volatile unsigned short *) TRAMPOLINE_LOW) = start_eip & 0xf;
+	Dprintk("3.\n");
+
+	/*
+	 * Be paranoid about clearing APIC errors.
+	 */
+	if (!clustered_apic_mode && APIC_INTEGRATED(apic_version[apicid])) {
+		apic_read_around(APIC_SPIV);
+		apic_write(APIC_ESR, 0);
+		apic_read(APIC_ESR);
+	}
+
+	/*
+	 * Status is now clean
+	 */
+	boot_error = 0;
+
+	/*
+	 * Starting actual IPI sequence...
+	 */
+
+	if (clustered_apic_mode)
+		boot_error = wakeup_secondary_via_NMI(apicid);
+	else 
+		boot_error = wakeup_secondary_via_INIT(apicid, start_eip);
+
+	if (!boot_error) {
 		/*
 		 * allow APs to start initializing.
 		 */
@@ -756,7 +887,7 @@ static void __init do_boot_cpu (int apicid)
 			print_cpu_info(&cpu_data[cpu]);
 			Dprintk("CPU has booted.\n");
 		} else {
-			boot_status = 1;
+			boot_error= 1;
 			if (*((volatile unsigned char *)phys_to_virt(8192))
 					== 0xA5)
 				/* trampoline started but...? */
@@ -765,18 +896,28 @@ static void __init do_boot_cpu (int apicid)
 				/* trampoline code not run */
 				printk("Not responding.\n");
 #if APIC_DEBUG
-			inquire_remote_apic(apicid);
+			if (!clustered_apic_mode)
+				inquire_remote_apic(apicid);
 #endif
 		}
 	}
-	if (send_status || accept_status || boot_status) {
-		x86_cpu_to_apicid[cpu] = -1;
-		x86_apicid_to_cpu[apicid] = -1;
+	if (boot_error) {
+		/* Try to put things back the way they were before ... */
+		unmap_cpu_to_boot_apicid(cpu, apicid);
+		clear_bit(cpu, &cpu_callout_map); /* was set here (do_boot_cpu()) */
+		clear_bit(cpu, &cpu_initialized); /* was set by cpu_init() */
+		clear_bit(cpu, &cpu_online_map);  /* was set in smp_callin() */
 		cpucount--;
 	}
 
 	/* mark "stuck" area as not stuck */
 	*((volatile unsigned long *)phys_to_virt(8192)) = 0;
+
+	if(clustered_apic_mode) {
+		printk("Restoring NMI vector\n");
+		*((volatile unsigned short *) TRAMPOLINE_HIGH) = nmi_high;
+		*((volatile unsigned short *) TRAMPOLINE_LOW) = nmi_low;
+	}
 }
 
 cycles_t cacheflush_time;
@@ -826,9 +967,20 @@ extern int prof_multiplier[NR_CPUS];
 extern int prof_old_multiplier[NR_CPUS];
 extern int prof_counter[NR_CPUS];
 
+static int boot_cpu_logical_apicid;
+/* Where the IO area was mapped on multiquad, always 0 otherwise */
+void *xquad_portio = NULL;
+
 void __init smp_boot_cpus(void)
 {
-	int apicid, cpu;
+	int apicid, cpu, bit;
+
+        if (clustered_apic_mode) {
+                /* remap the 1st quad's 256k range for cross-quad I/O */
+                xquad_portio = ioremap (XQUAD_PORTIO_BASE, XQUAD_PORTIO_LEN);
+                printk("Cross quad port I/O vaddr 0x%08lx, len %08lx\n",
+                        (u_long) xquad_portio, (u_long) XQUAD_PORTIO_LEN);
+        }
 
 #ifdef CONFIG_MTRR
 	/*  Must be done before other processors booted  */
@@ -839,12 +991,13 @@ void __init smp_boot_cpus(void)
 	 * and the per-CPU profiling counter/multiplier
 	 */
 
-	for (apicid = 0; apicid < NR_CPUS; apicid++) {
-		x86_apicid_to_cpu[apicid] = -1;
-		prof_counter[apicid] = 1;
-		prof_old_multiplier[apicid] = 1;
-		prof_multiplier[apicid] = 1;
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		prof_counter[cpu] = 1;
+		prof_old_multiplier[cpu] = 1;
+		prof_multiplier[cpu] = 1;
 	}
+
+	init_cpu_to_apicid();
 
 	/*
 	 * Setup boot CPU information
@@ -857,8 +1010,9 @@ void __init smp_boot_cpus(void)
 	 * We have the boot CPU online for sure.
 	 */
 	set_bit(0, &cpu_online_map);
-	x86_apicid_to_cpu[boot_cpu_id] = 0;
-	x86_cpu_to_apicid[0] = boot_cpu_id;
+	boot_cpu_logical_apicid = logical_smp_processor_id();
+	map_cpu_to_boot_apicid(0, boot_cpu_apicid);
+
 	global_irq_holder = 0;
 	current->processor = 0;
 	init_idle();
@@ -884,20 +1038,22 @@ void __init smp_boot_cpus(void)
 	/*
 	 * Should not be necessary because the MP table should list the boot
 	 * CPU too, but we do it for the sake of robustness anyway.
+	 * Makes no sense to do this check in clustered apic mode, so skip it
 	 */
-	if (!test_bit(boot_cpu_id, &phys_cpu_present_map)) {
+	if (!clustered_apic_mode && 
+	    !test_bit(boot_cpu_physical_apicid, &phys_cpu_present_map)) {
 		printk("weird, boot CPU (#%d) not listed by the BIOS.\n",
-								 boot_cpu_id);
+							boot_cpu_physical_apicid);
 		phys_cpu_present_map |= (1 << hard_smp_processor_id());
 	}
 
 	/*
 	 * If we couldn't find a local APIC, then get out of here now!
 	 */
-	if (APIC_INTEGRATED(apic_version[boot_cpu_id]) &&
+	if (APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid]) &&
 	    !test_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability)) {
 		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
-			boot_cpu_id);
+			boot_cpu_physical_apicid);
 		printk(KERN_ERR "... forcing use of dummy APIC emulation. (tell your hw vendor)\n");
 #ifndef CONFIG_VISWS
 		io_apic_irqs = 0;
@@ -926,22 +1082,27 @@ void __init smp_boot_cpus(void)
 	connect_bsp_APIC();
 	setup_local_APIC();
 
-	if (GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_id)
+	if (GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid)
 		BUG();
 
 	/*
-	 * Now scan the CPU present map and fire up the other CPUs.
+	 * Scan the CPU present map and fire up the other CPUs via do_boot_cpu
+	 *
+	 * In clustered apic mode, phys_cpu_present_map is a constructed thus:
+	 * bits 0-3 are quad0, 4-7 are quad1, etc. A perverse twist on the 
+	 * clustered apic ID.
 	 */
 	Dprintk("CPU present map: %lx\n", phys_cpu_present_map);
 
-	for (apicid = 0; apicid < NR_CPUS; apicid++) {
+	for (bit = 0; bit < NR_CPUS; bit++) {
+		apicid = cpu_present_to_apicid(bit);
 		/*
 		 * Don't even attempt to start the boot CPU!
 		 */
-		if (apicid == boot_cpu_id)
+		if (apicid == boot_cpu_apicid)
 			continue;
 
-		if (!(phys_cpu_present_map & (1 << apicid)))
+		if (!(phys_cpu_present_map & (1 << bit)))
 			continue;
 		if ((max_cpus >= 0) && (max_cpus <= cpucount+1))
 			continue;
@@ -951,9 +1112,10 @@ void __init smp_boot_cpus(void)
 		/*
 		 * Make sure we unmap all failed CPUs
 		 */
-		if ((x86_apicid_to_cpu[apicid] == -1) &&
-				(phys_cpu_present_map & (1 << apicid)))
-			printk("phys CPU #%d not responding - cannot use it.\n",apicid);
+		if ((boot_apicid_to_cpu(apicid) == -1) &&
+				(phys_cpu_present_map & (1 << bit)))
+			printk("CPU #%d not responding - cannot use it.\n",
+								apicid);
 	}
 
 	/*

@@ -31,7 +31,7 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: background.c,v 1.10 2001/03/15 15:38:23 dwmw2 Exp $
+ * $Id: background.c,v 1.15 2001/09/20 08:05:04 dwmw2 Exp $
  *
  */
 
@@ -43,7 +43,7 @@
 #include <linux/jffs2.h>
 #include <linux/mtd/mtd.h>
 #include <linux/interrupt.h>
-#include <linux/smp_lock.h>
+#include <linux/completion.h>
 #include "nodelist.h"
 
 
@@ -58,23 +58,28 @@ void jffs2_garbage_collect_trigger(struct jffs2_sb_info *c)
 	spin_unlock_bh(&c->erase_completion_lock);
 }
 
+/* This must only ever be called when no GC thread is currently running */
 int jffs2_start_garbage_collect_thread(struct jffs2_sb_info *c)
 {
 	pid_t pid;
 	int ret = 0;
-	init_MUTEX_LOCKED(&c->gc_thread_sem);
+
+	if (c->gc_task)
+		BUG();
+
+	init_MUTEX_LOCKED(&c->gc_thread_start);
 	init_completion(&c->gc_thread_exit);
-	
+
 	pid = kernel_thread(jffs2_garbage_collect_thread, c, CLONE_FS|CLONE_FILES);
 	if (pid < 0) {
 		printk(KERN_WARNING "fork failed for JFFS2 garbage collect thread: %d\n", -pid);
+		complete(&c->gc_thread_exit);
 		ret = pid;
 	} else {
 		/* Wait for it... */
 		D1(printk(KERN_DEBUG "JFFS2: Garbage collect thread is pid %d\n", pid));
-		down(&c->gc_thread_sem);
+		down(&c->gc_thread_start);
 	}
-	up(&c->gc_thread_sem);
  
 	return ret;
 }
@@ -87,7 +92,6 @@ void jffs2_stop_garbage_collect_thread(struct jffs2_sb_info *c)
 		send_sig(SIGKILL, c->gc_task, 1);
 	}
 	spin_unlock_bh(&c->erase_completion_lock);
-	down(&c->gc_thread_sem);
 	wait_for_completion(&c->gc_thread_exit);
 }
 
@@ -98,7 +102,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 	daemonize();
 	current->tty = NULL;
 	c->gc_task = current;
-	up(&c->gc_thread_sem);
+	up(&c->gc_thread_start);
 
         sprintf(current->comm, "jffs2_gcd_mtd%d", c->mtd->index);
 
@@ -116,9 +120,8 @@ static int jffs2_garbage_collect_thread(void *_c)
 			D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread sleeping...\n"));
 		}
                 
-                schedule(); /* Yes, we do this even if we want to go
-			       on immediately - we're a low priority 
-			       background task. */
+		if (current->need_resched)
+			schedule();
 
                 /* Put_super will send a SIGKILL and then wait on the sem. 
                  */
@@ -142,8 +145,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 				spin_lock_bh(&c->erase_completion_lock);
                                 c->gc_task = NULL;
 				spin_unlock_bh(&c->erase_completion_lock);
-				up(&c->gc_thread_sem);
-				complete_and_exit(&c->gc_thread_exit,0 );
+				complete_and_exit(&c->gc_thread_exit, 0);
 
 			case SIGHUP:
 				D1(printk(KERN_DEBUG "jffs2_garbage_collect_thread(): SIGHUP received.\n"));

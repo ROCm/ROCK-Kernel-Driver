@@ -1,5 +1,5 @@
 /*
- * $Id: physmap.c,v 1.13 2001/06/10 00:14:55 dwmw2 Exp $
+ * $Id: physmap.c,v 1.15 2001/10/02 15:05:14 dwmw2 Exp $
  *
  * Normal mappings of chips in physical memory
  */
@@ -76,11 +76,6 @@ struct map_info physmap_map = {
 	copy_to: physmap_copy_to
 };
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_physmap init_module
-#define cleanup_physmap cleanup_module
-#endif
-
 int __init init_physmap(void)
 {
        	printk(KERN_NOTICE "physmap flash device: %x at %x\n", WINDOW_SIZE, WINDOW_ADDR);
@@ -90,7 +85,7 @@ int __init init_physmap(void)
 		printk("Failed to ioremap\n");
 		return -EIO;
 	}
-	mymtd = do_map_probe("cfi", &physmap_map);
+	mymtd = do_map_probe("cfi_probe", &physmap_map);
 	if (mymtd) {
 		mymtd->module = THIS_MODULE;
 
@@ -117,3 +112,7 @@ static void __exit cleanup_physmap(void)
 module_init(init_physmap);
 module_exit(cleanup_physmap);
 
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("David Woodhouse <dwmw2@infradead.org>");
+MODULE_DESCRIPTION("Generic configurable MTD map driver");

@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: pnc2000.c,v 1.8 2001/06/10 00:09:45 dwmw2 Exp $
+ * $Id: pnc2000.c,v 1.10 2001/10/02 15:05:14 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -106,16 +106,11 @@ static struct mtd_partition pnc_partitions[3] = {
  */
 static struct mtd_info *mymtd;
 
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define init_pnc2000 init_module
-#define cleanup_pnc2000 cleanup_module
-#endif
-
 int __init init_pnc2000(void)
 {
 	printk(KERN_NOTICE "Photron PNC-2000 flash mapping: %x at %x\n", WINDOW_SIZE, WINDOW_ADDR);
 
-	mymtd = do_map_probe("cfi", &pnc_map);
+	mymtd = do_map_probe("cfi_probe", &pnc_map);
 	if (mymtd) {
 		mymtd->module = THIS_MODULE;
 		return add_mtd_partitions(mymtd, pnc_partitions, 3);
@@ -134,3 +129,7 @@ static void __exit cleanup_pnc2000(void)
 
 module_init(init_pnc2000);
 module_exit(cleanup_pnc2000);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Crossnet Co. <info@crossnet.co.jp>");
+MODULE_DESCRIPTION("MTD map driver for Photron PNC-2000 board");

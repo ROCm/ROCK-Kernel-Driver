@@ -36,7 +36,9 @@
 
 ENTRY(trampoline_data)
 r_base = .
-
+#ifdef CONFIG_MULTIQUAD
+	wbinvd
+#endif /* CONFIG_MULTIQUAD */
 	mov	%cs, %ax	# Code and data in the same place
 	mov	%ax, %ds
 

@@ -14,7 +14,7 @@ obj-y :=	open.o read_write.o devices.o file_table.o buffer.o \
 		super.o block_dev.o char_dev.o stat.o exec.o pipe.o namei.o \
 		fcntl.o ioctl.o readdir.o select.o fifo.o locks.o \
 		dcache.o inode.o attr.o bad_inode.o file.o iobuf.o dnotify.o \
-		filesystems.o
+		filesystems.o namespace.o
 
 ifeq ($(CONFIG_QUOTA),y)
 obj-y += dquot.o
@@ -52,6 +52,7 @@ subdir-$(CONFIG_NTFS_FS)	+= ntfs
 subdir-$(CONFIG_UFS_FS)		+= ufs
 subdir-$(CONFIG_EFS_FS)		+= efs
 subdir-$(CONFIG_JFFS_FS)	+= jffs
+subdir-$(CONFIG_JFFS2_FS)	+= jffs2
 subdir-$(CONFIG_AFFS_FS)	+= affs
 subdir-$(CONFIG_ROMFS_FS)	+= romfs
 subdir-$(CONFIG_QNX4FS_FS)	+= qnx4
