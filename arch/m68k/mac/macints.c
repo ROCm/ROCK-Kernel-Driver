@@ -749,7 +749,7 @@ void mac_scc_dispatch(int irq, void *dev_id, struct pt_regs *regs)
 	/*                                              */
 	/* Note that we're ignoring scc_mask for now.   */
 	/* If we actually mask the ints then we tend to */
-	/* get hammered by very persistant SCC irqs,    */
+	/* get hammered by very persistent SCC irqs,    */
 	/* and since they're autovector interrupts they */
 	/* pretty much kill the system.                 */
 

@@ -100,8 +100,7 @@ int exec_usermodehelper(char *program_path, char *argv[], char *envp[])
 	int i;
 	struct task_struct *curtask = current;
 
-	curtask->session = 1;
-	curtask->pgrp = 1;
+	set_special_pids(1, 1);
 
 	use_init_fs_context();
 
@@ -111,26 +110,18 @@ int exec_usermodehelper(char *program_path, char *argv[], char *envp[])
 	   as the super user right after the execve fails if you time
 	   the signal just right.
 	*/
-	spin_lock_irq(&curtask->sig->siglock);
+	spin_lock_irq(&curtask->sighand->siglock);
 	sigemptyset(&curtask->blocked);
 	flush_signals(curtask);
 	flush_signal_handlers(curtask);
 	recalc_sigpending();
-	spin_unlock_irq(&curtask->sig->siglock);
+	spin_unlock_irq(&curtask->sighand->siglock);
 
 	for (i = 0; i < curtask->files->max_fds; i++ ) {
 		if (curtask->files->fd[i]) close(i);
 	}
 
-	/* Drop the "current user" thing */
-	{
-		struct user_struct *user = curtask->user;
-		curtask->user = INIT_USER;
-		atomic_inc(&INIT_USER->__count);
-		atomic_inc(&INIT_USER->processes);
-		atomic_dec(&user->processes);
-		free_uid(user);
-	}
+	switch_uid(INIT_USER);
 
 	/* Give kmod all effective privileges.. */
 	curtask->euid = curtask->fsuid = 0;
@@ -239,20 +230,20 @@ int request_module(const char * module_name)
 	}
 
 	/* Block everything but SIGKILL/SIGSTOP */
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	tmpsig = current->blocked;
 	siginitsetinv(&current->blocked, sigmask(SIGKILL) | sigmask(SIGSTOP));
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	waitpid_result = waitpid(pid, NULL, __WCLONE);
 	atomic_dec(&kmod_concurrent);
 
 	/* Allow signals again.. */
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = tmpsig;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	if (waitpid_result != pid) {
 		printk(KERN_ERR "request_module[%s]: waitpid(%d,...) failed, errno %d\n",

@@ -25,8 +25,8 @@ config PCMCIA
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  When compiled this way, there will be modules called pcmcia_core.o
-	  and ds.o.  If you want to compile it as a module, say M here and
+	  When compiled this way, there will be modules called pcmcia_core
+	  and ds.  If you want to compile it as a module, say M here and
 	  read <file:Documentation/modules.txt>.
 
 config CARDBUS

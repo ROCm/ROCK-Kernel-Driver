@@ -69,7 +69,7 @@ void snd_magic_kfree(void *ptr);
 
 static inline unsigned long _snd_magic_value(void *obj)
 {
-	return obj == NULL ? -1 : *(((unsigned long *)obj) - 1);
+	return obj == NULL ? (unsigned long)-1 : *(((unsigned long *)obj) - 1);
 }
 
 static inline int _snd_magic_bad(void *obj, unsigned long magic)

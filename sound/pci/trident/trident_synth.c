@@ -392,7 +392,7 @@ static void sample_volume(trident_t * trident, snd_trident_voice_t * voice, snd_
 					break;
 		} else {			/* attenuate right (pan left) */
 			for (voice->Pan = 0; voice->Pan < 63; voice->Pan++ ) 
-				if (volume->lr >= pan_table[voice->Pan] )
+				if ((unsigned int)volume->lr >= pan_table[voice->Pan] )
 					break;
 			voice->Pan |= 0x40;
 		}
@@ -746,7 +746,7 @@ static int snd_trident_synth_use(void *private_data, snd_seq_port_subscribe_t * 
 	snd_trident_port_t *port = (snd_trident_port_t *) private_data;
 	trident_t *trident = port->trident;
 	snd_trident_voice_t *voice;
-	int idx;
+	unsigned int idx;
 	unsigned long flags;
 
 	if (info->voices > 32)
@@ -909,6 +909,7 @@ static int snd_trident_synth_create_port(trident_t * trident, int idx)
 						   SNDRV_SEQ_PORT_TYPE_MIDI_GS |
 						   SNDRV_SEQ_PORT_TYPE_DIRECT_SAMPLE |
 						   SNDRV_SEQ_PORT_TYPE_SYNTH,
+						   16,
 						   name);
 	if (p->chset->port < 0) {
 		result = p->chset->port;

@@ -1341,6 +1341,8 @@ ES1938_SINGLE("Mic Boost (+26dB)", 0, 0x7d, 3, 1, 0)
 
 static int snd_es1938_free(es1938_t *chip)
 {
+	/*if (chip->rmidi)
+	  snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0);*/
 #if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	if (chip->gameport.io)
 		gameport_unregister_port(&chip->gameport);
@@ -1540,9 +1542,7 @@ static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* MPU401 */
 	if (status & 0x80) {
-		/* ack */
-		snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0);
-		printk("midi interrupt..\n");
+		// snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0); /* ack? */
 		if (chip->rmidi)
 			snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
 	}
@@ -1554,7 +1554,8 @@ static int __devinit snd_es1938_mixer(snd_pcm_t *pcm)
 {
 	snd_card_t *card;
 	es1938_t *chip;
-	int err, idx;
+	unsigned int idx;
+	int err;
 
 	snd_assert(pcm != NULL && pcm->card != NULL, return -EINVAL);
 
@@ -1563,8 +1564,7 @@ static int __devinit snd_es1938_mixer(snd_pcm_t *pcm)
 
 	strcpy(card->mixername, pcm->name);
 
-	for (idx = 0; idx < sizeof(snd_es1938_controls) / 
-		     sizeof(snd_es1938_controls[0]); idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_es1938_controls); idx++) {
 		snd_kcontrol_t *kctl;
 		kctl = snd_ctl_new1(&snd_es1938_controls[idx], chip);
 		switch (idx) {
@@ -1650,7 +1650,9 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 	if (snd_mpu401_uart_new(card, 0, MPU401_HW_MPU401,
 				chip->mpu_port, 1, chip->irq, 0, &chip->rmidi) < 0) {
 		printk(KERN_ERR "es1938: unable to initialize MPU-401\n");
-	}
+	} /*else
+	    snd_es1938_mixer_bits(chip, ESSSB_IREG_MPU401CONTROL, 0x40, 0x40);*/
+
 #if defined(CONFIG_GAMEPORT) || defined(CONFIG_GAMEPORT_MODULE)
 	chip->gameport.io = chip->game_port;
 	gameport_register_port(&chip->gameport);

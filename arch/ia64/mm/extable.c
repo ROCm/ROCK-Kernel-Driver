@@ -10,20 +10,19 @@
 #include <asm/uaccess.h>
 #include <asm/module.h>
 
-extern const struct exception_table_entry __start___ex_table[];
-extern const struct exception_table_entry __stop___ex_table[];
-
-static inline const struct exception_table_entry *
-search_one_table (const struct exception_table_entry *first,
-		  const struct exception_table_entry *last,
-		  unsigned long ip, unsigned long gp)
+const struct exception_table_entry *
+search_extable (const struct exception_table_entry *first,
+		const struct exception_table_entry *last,
+		unsigned long ip)
 {
-        while (first <= last) {
-		const struct exception_table_entry *mid;
-		long diff;
+	const struct exception_table_entry *mid;
+	unsigned long mid_ip;
+	long diff;
 
+        while (first <= last) {
 		mid = &first[(last - first)/2];
-		diff = (mid->addr + gp) - ip;
+		mid_ip = (u64) &mid->addr + mid->addr;
+		diff = mid_ip - ip;
                 if (diff == 0)
                         return mid;
                 else if (diff < 0)
@@ -34,50 +33,14 @@ search_one_table (const struct exception_table_entry *first,
         return 0;
 }
 
-#ifndef CONFIG_MODULES
-register unsigned long main_gp __asm__("gp");
-#endif
-
-struct exception_fixup
-search_exception_table (unsigned long addr)
-{
-	const struct exception_table_entry *entry;
-	struct exception_fixup fix = { 0 };
-
-#ifndef CONFIG_MODULES
-	/* There is only the kernel to search.  */
-	entry = search_one_table(__start___ex_table, __stop___ex_table - 1, addr, main_gp);
-	if (entry)
-		fix.cont = entry->cont + main_gp;
-	return fix;
-#else
-	struct archdata *archdata;
-	struct module *mp;
-
-	/* The kernel is the last "module" -- no need to treat it special. */
-	for (mp = module_list; mp; mp = mp->next) {
-		if (!mp->ex_table_start)
-			continue;
-		archdata = (struct archdata *) mp->archdata_start;
-		if (!archdata)
-			continue;
-		entry = search_one_table(mp->ex_table_start, mp->ex_table_end - 1,
-					 addr, (unsigned long) archdata->gp);
-		if (entry) {
-			fix.cont = entry->cont + (unsigned long) archdata->gp;
-			return fix;
-		}
-	}
-#endif
-	return fix;
-}
-
 void
-handle_exception (struct pt_regs *regs, struct exception_fixup fix)
+handle_exception (struct pt_regs *regs, const struct exception_table_entry *e)
 {
+	long fix = (u64) &e->cont + e->cont;
+
 	regs->r8 = -EFAULT;
-	if (fix.cont & 4)
+	if (fix & 4)
 		regs->r9 = 0;
-	regs->cr_iip = (long) fix.cont & ~0xf;
-	ia64_psr(regs)->ri = fix.cont & 0x3;		/* set continuation slot number */
+	regs->cr_iip = fix & ~0xf;
+	ia64_psr(regs)->ri = fix & 0x3;		/* set continuation slot number */
 }

@@ -26,7 +26,12 @@ CONFIG_LOG_BUF_SHIFT=15
 #
 # Loadable module support
 #
-# CONFIG_MODULES is not set
+CONFIG_MODULES=y
+CONFIG_MODULE_UNLOAD=y
+# CONFIG_MODULE_FORCE_UNLOAD is not set
+CONFIG_OBSOLETE_MODPARM=y
+# CONFIG_MODVERSIONS is not set
+# CONFIG_KMOD is not set
 
 #
 # Platform support
@@ -256,6 +261,7 @@ CONFIG_NETDEVICES=y
 # Ethernet (10 or 100Mbit)
 #
 CONFIG_NET_ETHERNET=y
+CONFIG_MII=y
 # CONFIG_OAKNET is not set
 # CONFIG_HAPPYMEAL is not set
 # CONFIG_SUNGEM is not set
@@ -452,6 +458,7 @@ CONFIG_HVC_CONSOLE=y
 # CONFIG_AGP is not set
 # CONFIG_DRM is not set
 CONFIG_RAW_DRIVER=y
+# CONFIG_HANGCHECK_TIMER is not set
 
 #
 # Multimedia devices

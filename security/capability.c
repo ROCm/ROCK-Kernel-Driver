@@ -133,7 +133,7 @@ void cap_bprm_compute_creds (struct linux_binprm *bprm)
 		if (must_not_trace_exec (current)
 		    || atomic_read (&current->fs->count) > 1
 		    || atomic_read (&current->files->count) > 1
-		    || atomic_read (&current->sig->count) > 1) {
+		    || atomic_read (&current->sighand->count) > 1) {
 			if (!capable (CAP_SETPCAP)) {
 				new_permitted = cap_intersect (new_permitted,
 							       current->
@@ -282,6 +282,8 @@ static struct security_operations capability_ops = {
 	.capset_check =			cap_capset_check,
 	.capset_set =			cap_capset_set,
 	.capable =			cap_capable,
+	.netlink_send =			cap_netlink_send,
+	.netlink_recv =			cap_netlink_recv,
 
 	.bprm_compute_creds =		cap_bprm_compute_creds,
 	.bprm_set_security =		cap_bprm_set_security,

@@ -234,7 +234,7 @@ put_gate_page (struct page *page, unsigned long address)
 	pte_t *pte;
 
 	if (!PageReserved(page))
-		printk("put_gate_page: gate page at 0x%p not in reserved memory\n",
+		printk(KERN_ERR "put_gate_page: gate page at 0x%p not in reserved memory\n",
 		       page_address(page));
 
 	pgd = pgd_offset_k(address);		/* note: this is NOT pgd_offset()! */
@@ -342,13 +342,6 @@ ia64_mmu_init (void *my_cpu_data)
  * Set up the page tables.
  */
 
-#ifdef CONFIG_HUGETLB_PAGE
-long htlbpagemem;
-int htlbpage_max;
-extern long htlbzone_pages;
-extern struct list_head htlbpage_freelist;
-#endif
-
 #ifdef CONFIG_DISCONTIGMEM
 void
 paging_init (void)
@@ -438,10 +431,10 @@ mem_init (void)
 	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;
 	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
 
-	printk("Memory: %luk/%luk available (%luk code, %luk reserved, %luk data, %luk init)\n",
-	       (unsigned long) nr_free_pages() << (PAGE_SHIFT - 10),
-	       num_physpages << (PAGE_SHIFT - 10), codesize >> 10, reserved_pages << (PAGE_SHIFT - 10),
-	       datasize >> 10, initsize >> 10);
+	printk(KERN_INFO "Memory: %luk/%luk available (%luk code, %luk reserved, "
+	       "%luk data, %luk init)\n", (unsigned long) nr_free_pages() << (PAGE_SHIFT - 10),
+	       num_physpages << (PAGE_SHIFT - 10), codesize >> 10,
+	       reserved_pages << (PAGE_SHIFT - 10), datasize >> 10, initsize >> 10);
 
 	/*
 	 * Allow for enough (cached) page table pages so that we can map the entire memory
@@ -461,30 +454,5 @@ mem_init (void)
 
 #ifdef CONFIG_IA32_SUPPORT
 	ia32_gdt_init();
-#endif
-#ifdef CONFIG_HUGETLB_PAGE
-	{
-		long i;
-		int j;
-		struct page *page, *map;
-
-		if ((htlbzone_pages << (HPAGE_SHIFT - PAGE_SHIFT)) >= max_low_pfn)
-			htlbzone_pages = (max_low_pfn >> ((HPAGE_SHIFT - PAGE_SHIFT) + 1));
-		INIT_LIST_HEAD(&htlbpage_freelist);
-		for (i = 0; i < htlbzone_pages; i++) {
-			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
-			if (!page)
-				break;
-			map = page;
-			for (j = 0; j < (HPAGE_SIZE/PAGE_SIZE); j++) {
-				SetPageReserved(map);
-				map++;
-			}
-			list_add(&page->list, &htlbpage_freelist);
-		}
-		printk("Total Huge_TLB_Page memory pages allocated %ld \n", i);
-		htlbzone_pages = htlbpagemem = i;
-		htlbpage_max = (int)i;
-	}
 #endif
 }

@@ -231,7 +231,7 @@ ia64_mca_register_cpev (int cpev)
 {
 	/* Register the CPE interrupt vector with SAL */
 	if (ia64_sal_mc_set_params(SAL_MC_PARAM_CPE_INT, SAL_MC_PARAM_MECHANISM_INT, cpev, 0, 0)) {
-		printk("ia64_mca_platform_init: failed to register Corrected "
+		printk(KERN_ERR "ia64_mca_platform_init: failed to register Corrected "
 		       "Platform Error interrupt vector with SAL.\n");
 		return;
 	}
@@ -398,7 +398,7 @@ ia64_mca_init(void)
 					 IA64_MCA_RENDEZ_TIMEOUT,
 					 0)))
 	{
-		printk("ia64_mca_init: Failed to register rendezvous interrupt "
+		printk(KERN_ERR "ia64_mca_init: Failed to register rendezvous interrupt "
 		       "with SAL.  rc = %ld\n", rc);
 		return;
 	}
@@ -409,8 +409,8 @@ ia64_mca_init(void)
 					 IA64_MCA_WAKEUP_VECTOR,
 					 0, 0)))
 	{
-		printk("ia64_mca_init: Failed to register wakeup interrupt with SAL.  rc = %ld\n",
-		       rc);
+		printk(KERN_ERR "ia64_mca_init: Failed to register wakeup interrupt with SAL.  "
+		       "rc = %ld\n", rc);
 		return;
 	}
 
@@ -430,8 +430,8 @@ ia64_mca_init(void)
 				       ia64_mc_info.imi_mca_handler_size,
 				       0, 0, 0)))
 	{
-		printk("ia64_mca_init: Failed to register os mca handler with SAL.  rc = %ld\n",
-		       rc);
+		printk(KERN_ERR "ia64_mca_init: Failed to register os mca handler with SAL.  "
+		       "rc = %ld\n", rc);
 		return;
 	}
 
@@ -459,8 +459,8 @@ ia64_mca_init(void)
 				       __pa(ia64_get_gp()),
 				       ia64_mc_info.imi_slave_init_handler_size)))
 	{
-		printk("ia64_mca_init: Failed to register m/s init handlers with SAL. rc = %ld\n",
-		       rc);
+		printk(KERN_ERR "ia64_mca_init: Failed to register m/s init handlers with SAL. "
+		       "rc = %ld\n", rc);
 		return;
 	}
 
@@ -495,7 +495,8 @@ ia64_mca_init(void)
 				}
 			ia64_mca_register_cpev(cpev);
 		} else
-			printk("ia64_mca_init: Failed to get routed CPEI vector from ACPI.\n");
+			printk(KERN_ERR
+			       "ia64_mca_init: Failed to get routed CPEI vector from ACPI.\n");
 	}
 
 	/* Initialize the areas set aside by the OS to buffer the
@@ -511,7 +512,7 @@ ia64_mca_init(void)
 	mca_test();
 #endif /* #if defined(MCA_TEST) */
 
-	printk("Mca related initialization done\n");
+	printk(KERN_INFO "Mca related initialization done\n");
 
 	/* commented out because this is done elsewhere */
 #if 0
@@ -807,7 +808,7 @@ ia64_init_handler (struct pt_regs *regs)
 	sal_log_processor_info_t *proc_ptr;
 	ia64_err_rec_t *plog_ptr;
 
-	printk("Entered OS INIT handler\n");
+	printk(KERN_INFO "Entered OS INIT handler\n");
 
 	/* Get the INIT processor log */
 	if (!ia64_log_get(SAL_INFO_TYPE_INIT, (prfunc_t)printk))
@@ -1736,8 +1737,7 @@ ia64_log_processor_info_print(sal_log_record_header_t *lh, prfunc_t prfunc)
 		/*
 		 *  Now process processor device error record section
 		 */
-		ia64_log_proc_dev_err_info_print((sal_log_processor_info_t *)slsh,
-						 printk);
+		ia64_log_proc_dev_err_info_print((sal_log_processor_info_t *)slsh, printk);
 	}
 
 	IA64_MCA_DEBUG("ia64_mca_log_print: "

@@ -410,6 +410,7 @@ struct arlan_private {
       int	out_time10;
       int	in_bytes10;
       int	out_bytes10;
+      int	init_etherdev_alloc;
 };
 
 

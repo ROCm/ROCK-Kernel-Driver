@@ -219,7 +219,7 @@ snd_emux_load_patch_seq_oss(snd_seq_oss_arg_t *arg, int format,
 						 SF_CLIENT_NO(p->chset.port));
 	else if (format == SNDRV_OSS_SOUNDFONT_PATCH) {
 		soundfont_patch_info_t patch;
-		if (count < sizeof(patch))
+		if (count < (int)sizeof(patch))
 			rc = -EINVAL;
 		if (copy_from_user(&patch, buf, sizeof(patch)))
 			rc = -EFAULT;

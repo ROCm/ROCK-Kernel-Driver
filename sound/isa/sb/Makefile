@@ -19,7 +19,7 @@ snd-es968-objs := es968.o
 #   <empty string> - CONFIG_SND_SEQUENCER is undefined
 #   otherwise parameter #1 value
 #
-sequencer := $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),m,$(if $(CONFIG_SND_SEQUENCER),$(1)))
+sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_SND_SEQUENCER),$(1)))
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ALS100) += snd-sb16-dsp.o snd-sb-common.o

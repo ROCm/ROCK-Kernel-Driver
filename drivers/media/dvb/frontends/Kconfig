@@ -31,7 +31,7 @@ config DVB_ALPS_TDLB7
 
 	  This tuner module needs some microcode located in a file called 
 	  "Sc_main.mc" in the windows driver. Please pass the module parameter
-	  mcfile="/PATH/FILENAME" when loading alps_tdlb7.o.
+	  mcfile="/PATH/FILENAME" when loading alps_tdlb7.
 
 	  If you don't know what tuner module is soldered on your 
 	  DVB adapter simply enable all supported frontends, the 

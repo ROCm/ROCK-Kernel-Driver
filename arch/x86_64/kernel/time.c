@@ -30,6 +30,10 @@ u64 jiffies_64;
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
+extern int using_apic_timer;
+extern void smp_local_timer_interrupt(struct pt_regs * regs);
+
+
 unsigned int cpu_khz;					/* TSC clocks / usec, not used here */
 unsigned long hpet_period;				/* fsecs / HPET clock */
 unsigned long hpet_tick;				/* HPET clocks / interrupt */

@@ -181,10 +181,10 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	 */
 	set.sig[0] = sigctx.oldmask + ((long)(sigctx._unused[3]) << 32);
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	if (regs->msr & MSR_FP )
 		giveup_fpu(current);
 	/* Last stacked signal - restore registers */
@@ -400,10 +400,10 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	 */
 	sigdelsetmask(&set, ~_BLOCKABLE); 
 	/* update the current based on the sigmask found in the rt_stackframe */
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	/* If currently owning the floating point - give them up */
 	if (regs->msr & MSR_FP)
@@ -750,6 +750,8 @@ long sys32_rt_sigqueueinfo(u32 pid, u32 sig, siginfo_t32 *uinfo)
 	return ret;
 }
 
+extern int do_signal(sigset_t *oldset, struct pt_regs *regs);
+
 int sys32_rt_sigsuspend(compat_sigset_t* unewset, size_t sigsetsize, int p3,
 		int p4, int p6, int p7, struct pt_regs *regs)
 {
@@ -776,11 +778,11 @@ int sys32_rt_sigsuspend(compat_sigset_t* unewset, size_t sigsetsize, int p3,
 
 	sigdelsetmask(&newset, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	current->blocked = newset;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->result = -EINTR;
 	regs->gpr[3] = EINTR;
@@ -904,7 +906,7 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 {
 	struct sigcontext32 *sc;
 	struct rt_sigframe_32 *rt_sf;
-	struct k_sigaction *ka = &current->sig->action[sig-1];
+	struct k_sigaction *ka = &current->sighand->action[sig-1];
 
 	if (regs->trap == 0x0C00 /* System Call! */
 	    && ((int)regs->result == -ERESTARTNOHAND ||
@@ -968,11 +970,11 @@ static void handle_signal32(unsigned long sig, siginfo_t *info,
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current->sighand->siglock);
 	}
 	return;
 
@@ -1065,7 +1067,7 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 
 	signr = get_signal_to_deliver(&info, regs);
 	if (signr > 0) {
-		ka = &current->sig->action[signr-1];
+		ka = &current->sighand->action[signr-1];
 		if ((ka->sa.sa_flags & SA_ONSTACK)
 		     && (!on_sig_stack(regs->gpr[1])))
 			newsp = (current->sas_ss_sp + current->sas_ss_size);

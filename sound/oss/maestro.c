@@ -793,7 +793,7 @@ static unsigned int ac97_oss_rm[] = {
 	
 /* read or write the recmask 
 	the ac97 can really have left and right recording
-	inputs independantly set, but OSS doesn't seem to 
+	inputs independently set, but OSS doesn't seem to 
 	want us to express that to the user. 
 	the caller guarantees that we have a supported bit set,
 	and they must be holding the card's spinlock */

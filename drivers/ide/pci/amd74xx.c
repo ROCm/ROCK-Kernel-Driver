@@ -60,7 +60,7 @@ static struct amd_ide_chip {
 	{ PCI_DEVICE_ID_AMD_OPUS_7441, 0x00, 0x40, AMD_UDMA_100 },			/* AMD-768 Opus */
 	{ PCI_DEVICE_ID_AMD_8111_IDE,  0x00, 0x40, AMD_UDMA_100 },			/* AMD-8111 */
         { PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, 0x00, 0x50, AMD_UDMA_100 },                  /* nVidia nForce */
-
+	{ PCI_DEVICE_ID_NVIDIA_NFORCE2_IDE, 0x00, 0x50, AMD_UDMA_100 },			/* nVidia nForce 2 */
 	{ 0 }
 };
 
@@ -82,7 +82,7 @@ static char *amd_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100" };
 #include <linux/stat.h>
 #include <linux/proc_fs.h>
 
-static int amd_base;
+static long amd_base;
 static struct pci_dev *bmide_dev;
 extern int (*amd74xx_display_info)(char *, char **, off_t, int); /* ide-proc.c */
 
@@ -446,6 +446,7 @@ static struct pci_device_id amd74xx_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_OPUS_7441,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3},
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8111_IDE, 	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 5},
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE2_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 6},
 	{ 0, },
 };
 

@@ -126,8 +126,8 @@ static const char *task_state_array[] = {
 	"R (running)",		/*  0 */
 	"S (sleeping)",		/*  1 */
 	"D (disk sleep)",	/*  2 */
-	"T (stopped)",		/*  8 */
-	"Z (zombie)",		/*  4 */
+	"T (stopped)",		/*  4 */
+	"Z (zombie)",		/*  8 */
 	"X (dead)"		/* 16 */
 };
 
@@ -190,16 +190,16 @@ static void collect_sigign_sigcatch(struct task_struct *p, sigset_t *ign,
 	sigemptyset(catch);
 
 	read_lock(&tasklist_lock);
-	if (p->sig) {
-		spin_lock_irq(&p->sig->siglock);
-		k = p->sig->action;
+	if (p->sighand) {
+		spin_lock_irq(&p->sighand->siglock);
+		k = p->sighand->action;
 		for (i = 1; i <= _NSIG; ++i, ++k) {
 			if (k->sa.sa_handler == SIG_IGN)
 				sigaddset(ign, i);
 			else if (k->sa.sa_handler != SIG_DFL)
 				sigaddset(catch, i);
 		}
-		spin_unlock_irq(&p->sig->siglock);
+		spin_unlock_irq(&p->sighand->siglock);
 	}
 	read_unlock(&tasklist_lock);
 }

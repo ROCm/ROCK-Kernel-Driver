@@ -131,23 +131,22 @@ int scsi_delete_timer(Scsi_Cmnd *scmd)
  **/
 void scsi_times_out(Scsi_Cmnd *scmd)
 {
+	struct Scsi_Host *shost = scmd->device->host;
+
 	/* Set the serial_number_at_timeout to the current serial_number */
 	scmd->serial_number_at_timeout = scmd->serial_number;
 
 	scsi_eh_eflags_set(scmd, SCSI_EH_CMD_TIMEOUT | SCSI_EH_CMD_ERR);
 
-	if( scmd->device->host->eh_wait == NULL ) {
+	if (unlikely(shost->eh_wait == NULL)) {
 		panic("Error handler thread not present at %p %p %s %d",
-		      scmd, scmd->device->host, __FILE__, __LINE__);
+		      scmd, shost, __FILE__, __LINE__);
 	}
 
-	scsi_host_failed_inc_and_test(scmd->device->host);
+	scsi_host_failed_inc_and_test(shost);
 
-	SCSI_LOG_TIMEOUT(3, printk("Command timed out active=%d busy=%d "
-				   " failed=%d\n",
-				   atomic_read(&scmd->device->host->host_active),
-				   scmd->device->host->host_busy,
-				   scmd->device->host->host_failed));
+	SCSI_LOG_TIMEOUT(3, printk("Command timed out busy=%d failed=%d\n",
+				   shost->host_busy, shost->host_failed));
 }
 
 /**
@@ -234,7 +233,10 @@ static void scsi_eh_get_failed(Scsi_Cmnd **sc_list, struct Scsi_Host *shost)
 
 	found = 0;
 	list_for_each_entry(sdev, &shost->my_devices, siblings) {
-		for (scmd = sdev->device_queue; scmd; scmd = scmd->next) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&sdev->list_lock, flags);
+		list_for_each_entry(scmd, &sdev->cmd_list, list) {
 			if (scsi_eh_eflags_chk(scmd, SCSI_EH_CMD_ERR)) {
 				scmd->bh_next = *sc_list;
 				*sc_list = scmd;
@@ -267,6 +269,7 @@ static void scsi_eh_get_failed(Scsi_Cmnd **sc_list, struct Scsi_Host *shost)
 				}
 			}
 		}
+		spin_unlock_irqrestore(&sdev->list_lock, flags);
 	}
 
 	SCSI_LOG_ERROR_RECOVERY(1, scsi_eh_prt_fail_stats(*sc_list, shost));
@@ -1576,10 +1579,10 @@ void scsi_error_handler(void *data)
 	int rtn;
 	DECLARE_MUTEX_LOCKED(sem);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	lock_kernel();
 
@@ -1740,25 +1743,13 @@ scsi_reset_provider_done_command(Scsi_Cmnd *SCpnt)
 int
 scsi_reset_provider(Scsi_Device *dev, int flag)
 {
-	struct scsi_cmnd SC, *SCpnt = &SC;
+	struct scsi_cmnd *SCpnt = scsi_get_command(dev, GFP_KERNEL);
 	struct request req;
 	int rtn;
 
 	SCpnt->request = &req;
 	memset(&SCpnt->eh_timeout, 0, sizeof(SCpnt->eh_timeout));
-	SCpnt->device                  	= dev;
 	SCpnt->request->rq_status      	= RQ_SCSI_BUSY;
-	SCpnt->request->waiting        	= NULL;
-	SCpnt->use_sg                  	= 0;
-	SCpnt->old_use_sg              	= 0;
-	SCpnt->old_cmd_len             	= 0;
-	SCpnt->underflow               	= 0;
-	SCpnt->transfersize            	= 0;
-	SCpnt->resid			= 0;
-	SCpnt->serial_number           	= 0;
-	SCpnt->serial_number_at_timeout	= 0;
-	SCpnt->host_scribble           	= NULL;
-	SCpnt->next                    	= NULL;
 	SCpnt->state                   	= SCSI_STATE_INITIALIZING;
 	SCpnt->owner	     		= SCSI_OWNER_MIDLEVEL;
     
@@ -1791,5 +1782,6 @@ scsi_reset_provider(Scsi_Device *dev, int flag)
 	rtn = scsi_new_reset(SCpnt, flag);
 
 	scsi_delete_timer(SCpnt);
+	scsi_put_command(SCpnt);
 	return rtn;
 }

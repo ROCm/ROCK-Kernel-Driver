@@ -23,7 +23,7 @@ config SERIAL_8250
 
 	  If you want to compile this driver as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
-	  serial.o.
+	  serial.
 	  [WARNING: Do not compile this driver as a module if you are using
 	  non-standard serial ports, since the configuration information will
 	  be lost when the driver is unloaded.  This limitation may be lifted
@@ -73,7 +73,7 @@ config SERIAL_8250_CS
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called serial_cs.o.  If you want to compile it as
+	  The module will be called serial_cs.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 	  If unsure, say N.
 

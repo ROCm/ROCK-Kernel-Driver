@@ -142,4 +142,8 @@ EXPORT_SYMBOL(efi_dir);
 EXPORT_SYMBOL(ia64_mv);
 #endif
 EXPORT_SYMBOL(machvec_noop);
-
+#ifdef CONFIG_PERFMON
+#include <asm/perfmon.h>
+EXPORT_SYMBOL(pfm_install_alternate_syswide_subsystem);
+EXPORT_SYMBOL(pfm_remove_alternate_syswide_subsystem);
+#endif

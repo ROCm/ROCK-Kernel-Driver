@@ -30,7 +30,7 @@ config BT
 	  Bluetooth kernel modules are provided in the BlueZ packages.
 	  For more information, see <http://bluez.sourceforge.net/>.
 
-	  If you want to compile Bluetooth Core as module (bluetooth.o) say M here.
+	  If you want to compile Bluetooth Core as module (bluetooth) say M here.
 
 config BT_L2CAP
 	tristate "L2CAP protocol support"
@@ -41,7 +41,7 @@ config BT_L2CAP
 	  support is required for most Bluetooth applications.
 
 	  Say Y here to compile L2CAP support into the kernel or say M to
-	  compile it as module (l2cap.o).
+	  compile it as module (l2cap).
 
 config BT_SCO
 	tristate "SCO links support"
@@ -51,7 +51,7 @@ config BT_SCO
 	  required for voice applications like Headset and Audio.
 
 	  Say Y here to compile SCO support into the kernel or say M to
-	  compile it as module (sco.o).
+	  compile it as module (sco).
 
 source "net/bluetooth/rfcomm/Kconfig"
 

@@ -205,13 +205,15 @@ static int scsi_check_device_busy(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_cmnd *scmd;
+	unsigned long flags;
 
 	/*
 	 * Loop over all of the commands associated with the
 	 * device.  If any of them are busy, then set the state
 	 * back to inactive and bail.
 	 */
-	for (scmd = sdev->device_queue; scmd; scmd = scmd->next) {
+	spin_lock_irqsave(&sdev->list_lock, flags);
+	list_for_each_entry(scmd, &sdev->cmd_list, list) {
 		if (scmd->request && scmd->request->rq_status != RQ_INACTIVE)
 			goto active;
 
@@ -223,6 +225,7 @@ static int scsi_check_device_busy(struct scsi_device *sdev)
 		if (scmd->request)
 			scmd->request->rq_status = RQ_SCSI_DISCONNECTING;
 	}
+	spin_unlock_irqrestore(&sdev->list_lock, flags);
 
 	return 0;
 
@@ -233,12 +236,13 @@ active:
 			scmd->pid, scmd->state, scmd->owner);
 
 	list_for_each_entry(sdev, &shost->my_devices, siblings) {
-		for (scmd = sdev->device_queue; scmd; scmd = scmd->next) {
+		list_for_each_entry(scmd, &sdev->cmd_list, list) {
 			if (scmd->request->rq_status == RQ_SCSI_DISCONNECTING)
 				scmd->request->rq_status = RQ_INACTIVE;
 		}
 	}
 
+	spin_unlock_irqrestore(&sdev->list_lock, flags);
 	printk(KERN_ERR "Device busy???\n");
 	return 1;
 }
@@ -285,26 +289,6 @@ int scsi_remove_host(struct Scsi_Host *shost)
 	return 0;
 }
 
-int __scsi_add_host(struct Scsi_Host *shost)
-{
-	Scsi_Host_Template *sht = shost->hostt;
-	struct scsi_device *sdev;
-	int error = 0, saved_error = 0;
-
-	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
-			sht->info ? sht->info(shost) : sht->name);
-
-	scsi_scan_host(shost);
-			
-	list_for_each_entry (sdev, &shost->my_devices, siblings) {
-		error = scsi_attach_device(sdev);
-		if (error)
-			saved_error = error;
-	}
-
-	return saved_error;
-}
-
 /**
  * scsi_add_host - add a scsi host
  * @shost:	scsi host pointer to add
@@ -315,11 +299,27 @@ int __scsi_add_host(struct Scsi_Host *shost)
  **/
 int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 {
+	Scsi_Host_Template *sht = shost->hostt;
+	struct scsi_device *sdev;
+	int error = 0, saved_error = 0;
+
+	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
+			sht->info ? sht->info(shost) : sht->name);
+
 	if (dev) {
 		dev->class_data = shost;
 		shost->host_gendev = dev;
 	}
-	return __scsi_add_host(shost);
+
+	scsi_scan_host(shost);
+			
+	list_for_each_entry (sdev, &shost->my_devices, siblings) {
+		error = scsi_attach_device(sdev);
+		if (error)
+			saved_error = error;
+	}
+
+	return saved_error;
 }
 
 /**
@@ -346,17 +346,8 @@ void scsi_unregister(struct Scsi_Host *shost)
 	}
 
 	shost->hostt->present--;
-
-	/* Cleanup proc */
 	scsi_proc_host_rm(shost);
-
-	while (!list_empty(&shost->free_list)) {
-		struct scsi_cmnd *cmd;
-		cmd = list_entry(shost->free_list.next,struct scsi_cmnd,list);
-		list_del_init(&cmd->list);
-		kmem_cache_free(scsi_core->scsi_cmd_cache, cmd);
-	}
-
+	scsi_destroy_command_freelist(shost);
 	kfree(shost);
 }
 
@@ -377,8 +368,7 @@ extern int blk_nohighio;
 struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 {
 	struct Scsi_Host *shost, *shost_scr;
-	struct scsi_cmnd *cmd = NULL;
-	int gfp_mask;
+	int gfp_mask, rval;
 	DECLARE_COMPLETION(sem);
 
         /* Check to see if this host has any error handling facilities */
@@ -406,7 +396,6 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 
 	spin_lock_init(&shost->default_lock);
 	scsi_assign_lock(shost, &shost->default_lock);
-	atomic_set(&shost->host_active,0);
 	INIT_LIST_HEAD(&shost->my_devices);
 
 	init_waitqueue_head(&shost->host_wait);
@@ -445,7 +434,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	shost->unchecked_isa_dma = shost_tp->unchecked_isa_dma;
 	shost->use_clustering = shost_tp->use_clustering;
 	if (!blk_nohighio)
-	shost->highmem_io = shost_tp->highmem_io;
+		shost->highmem_io = shost_tp->highmem_io;
 
 	shost->max_sectors = shost_tp->max_sectors;
 	shost->use_blk_tcq = shost_tp->use_blk_tcq;
@@ -467,16 +456,9 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 found:
 	spin_unlock(&scsi_host_list_lock);
 
-	spin_lock_init(&shost->free_list_lock);
-	INIT_LIST_HEAD(&shost->free_list);
-
-	/* Get one backup command for this host. */
-	cmd = scsi_get_command(shost, GFP_KERNEL);
-	if (cmd)
-		list_add(&cmd->list, &shost->free_list);		
-	else
-		printk(KERN_NOTICE "The system is running low in memory.\n");
-
+	rval = scsi_setup_command_freelist(shost);
+	if (rval)
+		goto fail;
 	scsi_proc_host_add(shost);
 
 	shost->eh_notify = &sem;
@@ -487,10 +469,15 @@ found:
 	 */
 	wait_for_completion(&sem);
 	shost->eh_notify = NULL;
-
 	shost->hostt->present++;
-
 	return shost;
+
+fail:
+	spin_lock(&scsi_host_list_lock);
+	list_del(&shost->sh_list);
+	spin_unlock(&scsi_host_list_lock);
+	kfree(shost);
+	return NULL;
 }
 
 /**
@@ -523,7 +510,7 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 	 */
 	list_for_each_entry(shost, &scsi_host_list, sh_list)
 		if (shost->hostt == shost_tp)
-			if (__scsi_add_host(shost))
+			if (scsi_add_host(shost, NULL))
 				goto out_of_space;
 
 	return 0;

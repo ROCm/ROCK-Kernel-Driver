@@ -215,7 +215,7 @@ static void emu8k_pcm_timer_func(unsigned long data)
 	add_timer(&rec->timer);
 
 	/* update period */
-	if (rec->period_pos >= rec->period_size) {
+	if (rec->period_pos >= (int)rec->period_size) {
 		rec->period_pos %= rec->period_size;
 		spin_unlock(&rec->timer_lock);
 		snd_pcm_period_elapsed(rec->substream);

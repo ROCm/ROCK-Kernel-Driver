@@ -67,7 +67,7 @@ static int snd_seq_simple_put(void *private_data, snd_seq_kinstr_t *instr,
 		return -EINVAL;
 	gfp_mask = atomic ? GFP_ATOMIC : GFP_KERNEL;
 	/* copy instrument data */
-	if (len < sizeof(ix))
+	if (len < (long)sizeof(ix))
 		return -EINVAL;
 	if (copy_from_user(&ix, instr_data, sizeof(ix)))
 		return -EFAULT;
@@ -91,7 +91,7 @@ static int snd_seq_simple_put(void *private_data, snd_seq_kinstr_t *instr,
 	ip->effect2 = ix.effect2;
 	ip->effect2_depth = ix.effect2_depth;
 	real_size = snd_seq_simple_size(ip->size, ip->format);
-	if (len < real_size)
+	if (len < (long)real_size)
 		return -EINVAL;
 	if (ops->put_sample) {
 		err = ops->put_sample(ops->private_data, ip,
@@ -113,7 +113,7 @@ static int snd_seq_simple_get(void *private_data, snd_seq_kinstr_t *instr,
 	
 	if (cmd != SNDRV_SEQ_INSTR_GET_CMD_FULL)
 		return -EINVAL;
-	if (len < sizeof(ix))
+	if (len < (long)sizeof(ix))
 		return -ENOMEM;
 	memset(&ix, 0, sizeof(ix));
 	ip = (simple_instrument_t *)KINSTR_DATA(instr);
@@ -137,7 +137,7 @@ static int snd_seq_simple_get(void *private_data, snd_seq_kinstr_t *instr,
 	instr_data += sizeof(ix);
 	len -= sizeof(ix);
 	real_size = snd_seq_simple_size(ip->size, ip->format);
-	if (len < real_size)
+	if (len < (long)real_size)
 		return -ENOMEM;
 	if (ops->get_sample) {
 		err = ops->get_sample(ops->private_data, ip,

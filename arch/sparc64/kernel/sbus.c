@@ -767,7 +767,7 @@ unsigned int sbus_build_irq(void *buscookie, unsigned int ino)
 	}
 	imap += reg_base;
 
-	/* SYSIO inconsistancy.  For external SLOTS, we have to select
+	/* SYSIO inconsistency.  For external SLOTS, we have to select
 	 * the right ICLR register based upon the lower SBUS irq level
 	 * bits.
 	 */

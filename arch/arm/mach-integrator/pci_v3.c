@@ -120,7 +120,7 @@
  *              function = which function
  *		offset = configuration space register we are interested in
  *
- * description:	this routine will generate a platform dependant config
+ * description:	this routine will generate a platform dependent config
  *		address.
  *
  * calls:	none

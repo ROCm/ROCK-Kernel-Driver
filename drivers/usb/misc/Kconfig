@@ -16,7 +16,7 @@ config USB_EMI26
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called audio.o. If you want to compile it as a
+	  The module will be called audio. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_TIGL
@@ -32,7 +32,7 @@ config USB_TIGL
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tiglusb.o. If you want to compile it as a
+	  The module will be called tiglusb. If you want to compile it as a
 	  module, say M here and read Documentation/modules.txt.
 
 	  If you don't know what the SilverLink cable is or what a Texas
@@ -50,7 +50,7 @@ config USB_AUERSWALD
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called auerswald.o. If you want to compile it as
+	  The module will be called auerswald. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_RIO500
@@ -63,7 +63,7 @@ config USB_RIO500
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rio500.o. If you want to compile it as
+	  The module will be called rio500. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_BRLVGER
@@ -76,7 +76,7 @@ config USB_BRLVGER
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called brlvger.o. If you want to compile it as
+	  The module will be called brlvger. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_LCD
@@ -90,7 +90,7 @@ config USB_LCD
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usblcd.o. If you want to compile it as
+	  The module will be called usblcd. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SPEEDTOUCH

@@ -51,7 +51,7 @@ static int snd_gus_synth_use(void *private_data, snd_seq_port_subscribe_t *info)
 	snd_gus_port_t * port = (snd_gus_port_t *)private_data;
 	snd_gus_card_t * gus = port->gus;
 	snd_gus_voice_t * voice;
-	int idx;
+	unsigned int idx;
 
 	if (info->voices > 32)
 		return -EINVAL;
@@ -133,7 +133,7 @@ static void snd_gus_synth_instr_notify(void *private_data,
 				       snd_seq_kinstr_t *instr,
 				       int what)
 {
-	int idx;
+	unsigned int idx;
 	snd_gus_card_t *gus = snd_magic_cast(snd_gus_card_t, private_data, return);
 	snd_gus_voice_t *pvoice;
 	unsigned long flags;
@@ -197,6 +197,7 @@ static int snd_gus_synth_create_port(snd_gus_card_t * gus, int idx)
 						   SNDRV_SEQ_PORT_TYPE_MIDI_GS |
 						   SNDRV_SEQ_PORT_TYPE_DIRECT_SAMPLE |
 						   SNDRV_SEQ_PORT_TYPE_SYNTH,
+						   16,
 						   name);
 	if (p->chset->port < 0) {
 		result = p->chset->port;

@@ -1718,10 +1718,10 @@ NCR_700_proc_directory_info(char *proc_buf, char **startp,
 	hostdata = (struct NCR_700_Host_Parameters *)host->hostdata[0];
 	len += sprintf(&buf[len], "Total commands outstanding: %d\n", hostdata->command_slot_count);
 	len += sprintf(&buf[len],"\
-Target	Depth  Active  Next Tag\n\
-======	=====  ======  ========\n");
+Target	Active  Next Tag\n\
+======	======  ========\n");
 	list_for_each_entry(SDp, &host->my_devices, siblings) {
-		len += sprintf(&buf[len]," %2d:%2d   %4d    %4d      %4d\n", SDp->id, SDp->lun, SDp->current_queue_depth, NCR_700_get_depth(SDp), SDp->current_tag);
+		len += sprintf(&buf[len]," %2d:%2d   %4d      %4d\n", SDp->id, SDp->lun, NCR_700_get_depth(SDp), SDp->current_tag);
 	}
 	if((len -= offset) <= 0)
 		return 0;

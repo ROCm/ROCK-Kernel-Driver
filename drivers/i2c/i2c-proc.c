@@ -39,7 +39,7 @@ static int i2c_create_name(char **name, const char *prefix,
 			       struct i2c_adapter *adapter, int addr);
 static int i2c_parse_reals(int *nrels, void *buffer, int bufsize,
 			       long *results, int magnitude);
-static int i2c_write_reals(int nrels, void *buffer, int *bufsize,
+static int i2c_write_reals(int nrels, void *buffer, size_t *bufsize,
 			       long *results, int magnitude);
 static int i2c_proc_chips(ctl_table * ctl, int write,
 			      struct file *filp, void *buffer,
@@ -514,7 +514,7 @@ int i2c_parse_reals(int *nrels, void *buffer, int bufsize,
 	return 0;
 }
 
-int i2c_write_reals(int nrels, void *buffer, int *bufsize,
+int i2c_write_reals(int nrels, void *buffer, size_t *bufsize,
 			 long *results, int magnitude)
 {
 #define BUFLEN 20

@@ -121,7 +121,7 @@ static int useresources[] = {
 	1, /* dayna-lc */
 };
 
-static const char __initdata * version =
+static char version[] __initdata =
 	"mac8390.c: v0.4 2001-05-15 David Huggins-Daines <dhd@debian.org> and others\n";
 		
 extern int mac8390_probe(struct net_device * dev);

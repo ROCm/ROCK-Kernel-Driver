@@ -13,7 +13,7 @@ snd-emux-synth-objs := emux.o emux_synth.o emux_seq.o emux_nrpn.o \
 #   <empty string> - CONFIG_SND_SEQUENCER is undefined
 #   otherwise parameter #1 value
 #
-sequencer := $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),m,$(if $(CONFIG_SND_SEQUENCER),$(1)))
+sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_SND_SEQUENCER),$(1)))
 
 # Toplevel Module Dependencies
 obj-$(call sequencer,$(CONFIG_SND_SBAWE)) += snd-emux-synth.o

@@ -26,6 +26,7 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 #include <sound/core.h>
 #include "pmac.h"
 #include <sound/pcm_params.h>
@@ -695,6 +696,7 @@ int __init snd_pmac_pcm_new(pmac_t *chip)
 }
 
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 
 /*
  * beep stuff
@@ -930,6 +932,8 @@ int __init snd_pmac_attach_beep(pmac_t *chip)
 
 	return 0;
 }
+
+#endif /* beep stuff */
 
 static void snd_pmac_dbdma_reset(pmac_t *chip)
 {

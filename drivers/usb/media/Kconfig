@@ -16,7 +16,7 @@ config USB_DABUSB
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called dabusb.o.  If you want to compile it as a
+	  The module will be called dabusb.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 comment "Video4Linux support is needed for USB Multimedia device support"
@@ -35,7 +35,7 @@ config USB_VICAM
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called vicam.o. If you want to compile it as a
+	  The module will be called vicam. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_DSBR
@@ -55,7 +55,7 @@ config USB_DSBR
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called dsbr100.o. If you want to compile it as a
+	  The module will be called dsbr100. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_IBMCAM
@@ -74,7 +74,7 @@ config USB_IBMCAM
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ibmcam.o.  If you want to compile it as a
+	  The module will be called ibmcam.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>. This
 	  camera has several configuration options which can be specified when
 	  you load the module.  Read <file:Documentation/usb/ibmcam.txt> to
@@ -95,7 +95,7 @@ config USB_KONICAWC
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called konicawc.o. If you want to compile it as
+	  The module will be called konicawc. If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_OV511
@@ -113,7 +113,7 @@ config USB_OV511
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ov511.o. If you want to compile it as a
+	  The module will be called ov511. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_PWC
@@ -154,7 +154,7 @@ config USB_PWC
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pwc.o.  If you want to compile it as a
+	  The module will be called pwc.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_SE401
@@ -172,7 +172,7 @@ config USB_SE401
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called se401.o. If you want to compile it as a
+	  The module will be called se401. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_STV680
@@ -191,6 +191,6 @@ config USB_STV680
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called stv680.o. If you want to compile it as a
+	  The module will be called stv680. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 

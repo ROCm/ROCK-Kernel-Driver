@@ -1119,7 +1119,8 @@ static int __devinit snd_sonicvibes_mixer(sonicvibes_t * sonic)
 {
 	snd_card_t *card;
 	snd_kcontrol_t *kctl;
-	int idx, err;
+	unsigned int idx;
+	int err;
 
 	snd_assert(sonic != NULL && sonic->card != NULL, return -EINVAL);
 	card = sonic->card;
@@ -1418,7 +1419,8 @@ static int __devinit snd_sonicvibes_midi(sonicvibes_t * sonic, snd_rawmidi_t * r
 	mpu401_t * mpu = snd_magic_cast(mpu401_t, rmidi->private_data, return -ENXIO);
 	snd_card_t *card = sonic->card;
 	snd_rawmidi_str_t *dir;
-	int idx, err;
+	unsigned int idx;
+	int err;
 
 	mpu->private_data = sonic;
 	mpu->open_input = snd_sonicvibes_midi_input_open;

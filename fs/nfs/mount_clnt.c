@@ -93,12 +93,6 @@ mnt_create(char *hostname, struct sockaddr_in *srvaddr, int version,
  * XDR encode/decode functions for MOUNT
  */
 static int
-xdr_error(struct rpc_rqst *req, u32 *p, void *dummy)
-{
-	return -EIO;
-}
-
-static int
 xdr_encode_dirpath(struct rpc_rqst *req, u32 *p, const char *path)
 {
 	p = xdr_encode_string(p, path);

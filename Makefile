@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 59
+SUBLEVEL = 60
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -408,6 +408,7 @@ ifdef CONFIG_MODVERSIONS
 ifdef KBUILD_MODULES
 ifeq ($(origin SUBDIRS),file)
 	$(Q)rm -rf $(MODVERDIR)
+	$(Q)mkdir $(MODVERDIR)
 else
 	@echo '*** Warning: Overriding SUBDIRS on the command line can cause'
 	@echo '***          inconsistencies with module symbol versions'

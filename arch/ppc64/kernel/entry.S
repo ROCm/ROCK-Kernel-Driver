@@ -102,7 +102,6 @@ _GLOBAL(DoSyscall)
  * Need to vector to 32 Bit or default sys_call_table here,
  * based on caller's run-mode / personality.
  */
-#ifdef CONFIG_BINFMT_ELF32
 	andi.	r11,r10,_TIF_32BIT
 	beq-	15f
 	ld	r10,.SYS_CALL_TABLE32@toc(2)
@@ -118,7 +117,6 @@ _GLOBAL(DoSyscall)
 	clrldi	r8,r8,32
 	b	17f
 15:
-#endif
 	ld	r10,.SYS_CALL_TABLE@toc(2)
 17:	slwi	r0,r0,3
 	ldx	r10,r10,r0	/* Fetch system call handler [ptr] */
@@ -171,7 +169,6 @@ _GLOBAL(ret_from_syscall_1)
  * Need to vector to 32 Bit or default sys_call_table here,
  * based on caller's run-mode / personality.
  */
-#ifdef CONFIG_BINFMT_ELF32
 	clrrdi	r10,r1,THREAD_SHIFT
 	ld	r10,TI_FLAGS(r10)
 	andi.	r11,r10,_TIF_32BIT
@@ -189,7 +186,6 @@ _GLOBAL(ret_from_syscall_1)
 	clrldi	r8,r8,32
 	b	57f
 55:
-#endif
 	ld	r10,.SYS_CALL_TABLE@toc(2)
 57:
 	slwi	r0,r0,3

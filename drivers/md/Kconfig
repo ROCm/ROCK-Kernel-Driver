@@ -41,7 +41,7 @@ config MD_LINEAR
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called linear.o.
+	  will be called linear.
 
 	  If unsure, say Y.
 
@@ -63,7 +63,7 @@ config MD_RAID0
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called raid0.o.
+	  will be called raid0.
 
 	  If unsure, say Y.
 
@@ -85,7 +85,7 @@ config MD_RAID1
 	  learn where to get the supporting user space utilities raidtools.
 
 	  If you want to use such a RAID-1 set, say Y. This code is also
-	  available as a module called raid1.o ( = code which can be inserted
+	  available as a module called raid1 ( = code which can be inserted
 	  in and removed from the running kernel whenever you want).  If you
 	  want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
@@ -110,7 +110,7 @@ config MD_RAID5
 	  learn where to get the supporting user space utilities raidtools.
 
 	  If you want to use such a RAID-4/RAID-5 set, say Y. This code is
-	  also available as a module called raid5.o ( = code which can be
+	  also available as a module called raid5 ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.
@@ -141,7 +141,7 @@ config BLK_DEV_DM
 	  Higher level volume managers such as LVM2 use this driver.
 
 	  If you want to compile this as a module, say M here and read 
-	  <file:Documentation/modules.txt>.  The module will be called dm-mod.o.
+	  <file:Documentation/modules.txt>.  The module will be called dm-mod.
 
 	  If unsure, say N.
 

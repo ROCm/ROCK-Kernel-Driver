@@ -8,7 +8,7 @@
 *   PACKAGE:     Linux tty Device Driver for IntelliPort II family of multiport
 *                serial I/O controllers.
 *
-*   DESCRIPTION: Defines, definitions and includes which are heavily dependant
+*   DESCRIPTION: Defines, definitions and includes which are heavily dependent
 *                on O/S, host, compiler, etc. This file is tailored for:
 *                 Linux v2.0.0 and later
 *                 Gnu gcc c2.7.2

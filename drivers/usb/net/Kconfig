@@ -25,7 +25,7 @@ config USB_CATC
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called catc.o. If you want to compile it as a
+	  The module will be called catc. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_CDCETHER
@@ -49,7 +49,7 @@ config USB_CDCETHER
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cdc-ether.o.  If you want to compile it 
+	  The module will be called cdc-ether.  If you want to compile it 
 	  as a module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_KAWETH
@@ -91,7 +91,7 @@ config USB_KAWETH
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called kaweth.o. If you want to compile it as a
+	  The module will be called kaweth. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_PEGASUS
@@ -107,7 +107,7 @@ config USB_PEGASUS
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pegasus.o. If you want to compile it as a
+	  The module will be called pegasus. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_RTL8150
@@ -120,7 +120,7 @@ config USB_RTL8150
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rtl8150.o. If you want to compile it as a
+	  The module will be called rtl8150. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
 config USB_USBNET
@@ -144,6 +144,6 @@ config USB_USBNET
 
 	  This code is also available as a kernel module (code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usbnet.o. If you want to compile it as a
+	  The module will be called usbnet. If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 

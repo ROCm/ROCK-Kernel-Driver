@@ -36,7 +36,7 @@ extern void
 pci_unmap_single (struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
 		  int dir);
 
-/* Make physical memory consistant for a single streaming mode DMA
+/* Make physical memory consistent for a single streaming mode DMA
    translation after a transfer.
 
    If you perform a pci_map_single() but wish to interrogate the

@@ -23,7 +23,7 @@ config AGP
 
 	  This driver is available as a module.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.  The
-	  module will be called agpgart.o.
+	  module will be called agpgart.
 
 config AGP_GART
 	bool "/dev/agpgart (AGP Support)"
@@ -57,16 +57,6 @@ config AGP_VIA
 	help
 	  This option gives you AGP support for the GLX component of the
 	  XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
-
-	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
-	  use GLX or DRI.  If unsure, say N.
-
-config AGP_VIA_KT400
-	tristate "VIA KT400 chipset support"
-	depends on AGP3
-	help
-	  This option gives you AGP support for the GLX component of the
-	  XFree86 4.x on VIA KT400 AGP 3.0 chipsets.
 
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI.  If unsure, say N.
@@ -140,6 +130,11 @@ config AGP_HP_ZX1
 	help
 	  This option gives you AGP GART support for the HP ZX1 chipset
 	  for IA64 processors.
+
+config AGP_ALPHA_CORE
+	tristate
+	depends on AGP && (ALPHA_GENERIC || ALPHA_TITAN || ALPHA_MARVEL)
+	default AGP
 
 # Put AGP 3.0 entries below here.
 

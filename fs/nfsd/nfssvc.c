@@ -168,6 +168,7 @@ nfsd(struct svc_rqst *rqstp)
 	struct svc_serv	*serv = rqstp->rq_server;
 	int		err;
 	struct nfsd_list me;
+	sigset_t shutdown_mask, allowed_mask;
 
 	/* Lock module and set up kernel thread */
 	MOD_INC_USE_COUNT;
@@ -175,6 +176,9 @@ nfsd(struct svc_rqst *rqstp)
 	daemonize();
 	sprintf(current->comm, "nfsd");
 	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
+
+	siginitsetinv(&shutdown_mask, SHUTDOWN_SIGS);
+	siginitsetinv(&allowed_mask, ALLOWED_SIGS);
 
 	nfsdstats.th_cnt++;
 
@@ -189,10 +193,7 @@ nfsd(struct svc_rqst *rqstp)
 	 */
 	for (;;) {
 		/* Block all but the shutdown signals */
-		spin_lock_irq(&current->sig->siglock);
-		siginitsetinv(&current->blocked, SHUTDOWN_SIGS);
-		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		sigprocmask(SIG_SETMASK, &shutdown_mask, NULL);
 
 		/*
 		 * Find a socket with data available and call its
@@ -210,10 +211,7 @@ nfsd(struct svc_rqst *rqstp)
 		exp_readlock();
 
 		/* Process request with signals blocked.  */
-		spin_lock_irq(&current->sig->siglock);
-		siginitsetinv(&current->blocked, ALLOWED_SIGS);
-		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		sigprocmask(SIG_SETMASK, &allowed_mask, NULL);
 
 		svc_process(serv, rqstp);
 

@@ -573,7 +573,7 @@ config MICROCODE
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called microcode.o.  If you want to compile it as
+	  The module will be called microcode.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt>.  If
 	  you use modprobe or kmod you may also want to add the line
 	  'alias char-major-10-184 microcode' to your /etc/modules.conf file.
@@ -859,7 +859,7 @@ config APM
 	  To compile this driver as a module ( = code which can be inserted in
 	  and removed from the running kernel whenever you want), say M here
 	  and read <file:Documentation/modules.txt>. The module will be called
-	  apm.o.
+	  apm.
 
 config APM_IGNORE_USER_SUSPEND
 	bool "Ignore USER SUSPEND"
@@ -1162,7 +1162,7 @@ config SCx200
 	  If you don't know what to do here, say N.
 
 	  This support is also available as a module.  If compiled as a
-	  module, it will be called scx200.o.
+	  module, it will be called scx200.
 
 source "drivers/pci/Kconfig"
 
@@ -1288,7 +1288,7 @@ config BINFMT_AOUT
 	  QMAGIC support" then you'll have to say Y here. You may answer M to
 	  compile a.out support as a module and later load the module when you
 	  want to use a program or library in a.out format. The module will be
-	  called binfmt_aout.o. Saying M or N here is dangerous though,
+	  called binfmt_aout. Saying M or N here is dangerous though,
 	  because some crucial programs on your system might still be in A.OUT
 	  format.
 
@@ -1318,7 +1318,7 @@ config BINFMT_ELF
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  will be called binfmt_elf. Saying M or N here is dangerous because
 	  some crucial programs on your system might be in ELF format.
 
 config BINFMT_MISC
@@ -1343,7 +1343,7 @@ config BINFMT_MISC
 	  use this part of the kernel.
 
 	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc.o. If you
+	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
 
 endmenu
@@ -1399,7 +1399,7 @@ config IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called ide.o.
+	  will be called ide.
 
 	  For further information, please read <file:Documentation/ide.txt>.
 
@@ -1426,7 +1426,7 @@ config SCSI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.o.  If you want to compile it as
+	  The module will be called scsi_mod.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
@@ -1530,7 +1530,7 @@ config SOUND
 	  and load that module after the PnP configuration is finished.  To do
 	  this, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/sound/README.modules>; the module will be
-	  called soundcore.o.
+	  called soundcore.
 
 	  I'm told that even without a sound card, you can make your computer
 	  say more than an occasional beep, by programming the PC speaker.

@@ -171,7 +171,7 @@ static const unsigned char days_in_mo[] =
  *	A very tiny interrupt handler. It runs with SA_INTERRUPT set,
  *	but there is possibility of conflicting with the set_rtc_mmss()
  *	call (the rtc irq and the timer irq can easily run at the same
- *	time in two different CPUs). So we need to serializes
+ *	time in two different CPUs). So we need to serialize
  *	accesses to the chip with the rtc_lock spinlock that each
  *	architecture should implement in the timer code.
  *	(See ./arch/XXXX/kernel/time.c for the set_rtc_mmss() function.)
@@ -401,22 +401,18 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 		min = alm_tm.tm_min;
 		sec = alm_tm.tm_sec;
 
-		if (hrs >= 24)
-			hrs = 0xff;
-
-		if (min >= 60)
-			min = 0xff;
-
-		if (sec >= 60)
-			sec = 0xff;
-
 		spin_lock_irq(&rtc_lock);
 		if (!(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) ||
 		    RTC_ALWAYS_BCD)
 		{
-			BIN_TO_BCD(sec);
-			BIN_TO_BCD(min);
-			BIN_TO_BCD(hrs);
+			if (sec < 60) BIN_TO_BCD(sec);
+			else sec = 0xff;
+
+			if (min < 60) BIN_TO_BCD(min);
+			else min = 0xff;
+
+			if (hrs < 24) BIN_TO_BCD(hrs);
+			else hrs = 0xff;
 		}
 		CMOS_WRITE(hrs, RTC_HOURS_ALARM);
 		CMOS_WRITE(min, RTC_MINUTES_ALARM);
@@ -486,7 +482,7 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 			yrs = 73;
 		}
 #endif
-		/* These limits and adjustments are independant of
+		/* These limits and adjustments are independent of
 		 * whether the chip is in binary mode or not.
 		 */
 		if (yrs > 169) {

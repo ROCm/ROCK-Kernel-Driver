@@ -482,7 +482,7 @@ static inline void tasklet_init(struct tasklet_struct *tasklet,
  *
  * One advantagous side effect of this allocation approach is that the
  * entire rx processing can be done without holding any spin lock
- * since the rx rings and registers are totally independant of the tx
+ * since the rx rings and registers are totally independent of the tx
  * ring and its registers.  This of course includes the kmalloc's of
  * new skb's. Thus start_xmit can run in parallel with rx processing
  * and the memory allocation on SMP systems.

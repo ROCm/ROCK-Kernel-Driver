@@ -90,10 +90,10 @@ static int __pdflush(struct pdflush_work *my_work)
 	strcpy(current->comm, "pdflush");
 
 	/* interruptible sleep, so block all signals */
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	siginitsetinv(&current->blocked, 0);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	current->flags |= PF_FLUSHER;
 	my_work->fn = NULL;

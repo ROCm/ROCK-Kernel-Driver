@@ -536,7 +536,7 @@ static int aac_slave_configure(Scsi_Device * dev )
 
 	dprintk((KERN_DEBUG "(scsi%d:%d:%d:%d) Tagged Queue depth %2d, "
 				"%s\n", dev->host->host_no, dev->channel,
-				dev->id, dev->lun, dev->new_queue_depth,
+				dev->id, dev->lun, dev->queue_depth,
 				dev->online ? "OnLine" : "OffLine"));
 	return 0;
 }

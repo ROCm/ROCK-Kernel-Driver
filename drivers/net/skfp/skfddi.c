@@ -33,7 +33,7 @@
  *   The driver architecture is based on the DEC FDDI driver by
  *   Lawrence V. Stefani and several ethernet drivers.
  *   I also used an existing Windows NT miniport driver.
- *   All hardware dependant fuctions are handled by the SysKonnect
+ *   All hardware dependent fuctions are handled by the SysKonnect
  *   Hardware Module.
  *   The only headerfiles that are directly related to this source
  *   are skfddi.c, h/types.h, h/osdef1st.h, h/targetos.h.
@@ -1729,7 +1729,7 @@ u_long dma_master(struct s_smc * smc, void *virt, int len, int flag)
  *	dma_complete
  *
  *	The hardware module calls this routine when it has completed a DMA
- *	transfer. If the operating system dependant module has set up the DMA
+ *	transfer. If the operating system dependent module has set up the DMA
  *	channel via dma_master() (e.g. Windows NT or AIX) it should clean up
  *	the DMA channel.
  * Args

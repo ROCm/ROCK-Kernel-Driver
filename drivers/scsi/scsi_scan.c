@@ -449,6 +449,8 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 		sdev->online = TRUE;
 		INIT_LIST_HEAD(&sdev->siblings);
 		INIT_LIST_HEAD(&sdev->same_target_siblings);
+		INIT_LIST_HEAD(&sdev->cmd_list);
+		spin_lock_init(&sdev->list_lock);
 		/*
 		 * Some low level driver could use device->type
 		 */
@@ -471,9 +473,6 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 
 		sdev->request_queue->queuedata = sdev;
 		scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
-		if (sdev->current_queue_depth == 0) {
-			goto out_bail;
-		}
 		init_waitqueue_head(&sdev->scpnt_wait);
 
 		if (shost->hostt->slave_alloc)

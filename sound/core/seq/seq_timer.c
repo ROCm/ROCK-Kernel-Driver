@@ -88,7 +88,7 @@ void snd_seq_timer_delete(seq_timer_t **tmr)
 	t->running = 0;
 
 	/* reset time */
-	snd_seq_timer_stop(t, 0);
+	snd_seq_timer_stop(t);
 	snd_seq_timer_reset(t);
 
 	kfree(t);
@@ -133,10 +133,10 @@ void snd_seq_timer_reset(seq_timer_t * tmr)
 /* called by timer interrupt routine. the period time since previous invocation is passed */
 static void snd_seq_timer_interrupt(snd_timer_instance_t *timeri,
 				    unsigned long resolution,
-				    unsigned long ticks, void *data)
+				    unsigned long ticks)
 {
 	unsigned long flags;
-	queue_t *q = (queue_t *)data;
+	queue_t *q = (queue_t *)timeri->callback_data;
 	seq_timer_t *tmr;
 
 	if (q == NULL)
@@ -180,7 +180,7 @@ int snd_seq_timer_set_tempo(seq_timer_t * tmr, int tempo)
 	if (tempo <= 0)
 		return -EINVAL;
 	spin_lock_irqsave(&tmr->lock, flags);
-	if (tempo != tmr->tempo) {
+	if ((unsigned int)tempo != tmr->tempo) {
 		tmr->tempo = tempo;
 		snd_seq_timer_set_tick_resolution(&tmr->tick, tmr->tempo, tmr->ppq, 1);
 	}
@@ -312,17 +312,14 @@ int snd_seq_timer_close(queue_t *q)
 	return 0;
 }
 
-int snd_seq_timer_stop(seq_timer_t * tmr, int in_callback)
+int snd_seq_timer_stop(seq_timer_t * tmr)
 {
 	if (! tmr->timeri)
 		return -EINVAL;
 	if (!tmr->running)
 		return 0;
 	tmr->running = 0;
-	if (in_callback)
-		snd_timer_del(tmr->timeri);
-	else
-		snd_timer_stop(tmr->timeri);
+	snd_timer_stop(tmr->timeri);
 	return 0;
 }
 
@@ -348,12 +345,12 @@ static int initialize_timer(seq_timer_t *tmr)
 	return 0;
 }
 
-int snd_seq_timer_start(seq_timer_t * tmr, int in_callback)
+int snd_seq_timer_start(seq_timer_t * tmr)
 {
 	if (! tmr->timeri)
 		return -EINVAL;
 	if (tmr->running)
-		snd_seq_timer_stop(tmr, in_callback);
+		snd_seq_timer_stop(tmr);
 	snd_seq_timer_reset(tmr);
 	if (initialize_timer(tmr) < 0)
 		return -EINVAL;
@@ -363,7 +360,7 @@ int snd_seq_timer_start(seq_timer_t * tmr, int in_callback)
 	return 0;
 }
 
-int snd_seq_timer_continue(seq_timer_t * tmr, int in_callback)
+int snd_seq_timer_continue(seq_timer_t * tmr)
 {
 	if (! tmr->timeri)
 		return -EINVAL;

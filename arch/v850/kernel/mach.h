@@ -45,7 +45,7 @@ void mach_reserve_bootmem (void) __attribute__ ((__weak__));
 extern void (*mach_tick) (void);
 
 /* The following establishes aliases for various mach_ functions to the
-   name by which the rest of the kernal calls them.  These statements
+   name by which the rest of the kernel calls them.  These statements
    should only have an effect in the file that defines the actual functions. */
 #define MACH_ALIAS(to, from)						      \
    asm (".global " macrology_stringify (C_SYMBOL_NAME (to)) ";"		      \

@@ -514,7 +514,7 @@ unsigned short madgemc_setnselout_pins(struct net_device *dev)
  *
  * Register selection is normally done via three contiguous
  * bits.  However, some boards (such as the MC16/32) use only
- * two bits, plus a seperate bit in the glue chip.  This
+ * two bits, plus a separate bit in the glue chip.  This
  * sets the SRSX bit (the top bit).  See page 4-17 in the
  * Yellow Book for which registers are affected.
  *
@@ -629,7 +629,7 @@ void madgemc_chipset_close(struct net_device *dev)
 /*
  * Read the card type (MC16 or MC32) from the card.
  *
- * The configuration registers are stored in two seperate
+ * The configuration registers are stored in two separate
  * pages.  Pages are flipped by clearing bit 3 of CONTROL_REG0 (PAGE)
  * for page zero, or setting bit 3 for page one.
  *

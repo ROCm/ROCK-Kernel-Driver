@@ -63,7 +63,6 @@ extern unsigned char stab_array[];
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
 void smp_message_pass(int target, int msg, unsigned long data, int wait);
-static unsigned long iSeries_smp_message[NR_CPUS];
 
 void xics_setup_cpu(void);
 void xics_cause_IPI(int cpu);
@@ -87,6 +86,8 @@ static inline void set_tb(unsigned int upper, unsigned int lower)
 }
 
 #ifdef CONFIG_PPC_ISERIES
+static unsigned long iSeries_smp_message[NR_CPUS];
+
 void iSeries_smp_message_recv( struct pt_regs * regs )
 {
 	int cpu = smp_processor_id();
@@ -563,8 +564,6 @@ static void __devinit smp_store_cpu_info(int id)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int i;
-
 	/* Fixup boot cpu */
 	smp_store_cpu_info(smp_processor_id());
 	cpu_callin_map[smp_processor_id()] = 1;

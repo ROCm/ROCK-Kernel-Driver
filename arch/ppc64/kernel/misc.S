@@ -499,7 +499,6 @@ SYSCALL(dup)
 SYSCALL(execve)
 SYSCALL(waitpid)
 
-#ifdef CONFIG_BINFMT_ELF32
 /* Why isn't this a) automatic, b) written in 'C'? */	
 	.balign 8
 _GLOBAL(sys_call_table32)
@@ -631,8 +630,8 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_mprotect		/* 125 */
 	.llong .compat_sys_sigprocmask
 	.llong .sys_ni_syscall		/* old create_module syscall */
-	.llong .sys32_init_module
-	.llong .sys32_delete_module
+	.llong .sys_init_module
+	.llong .sys_delete_module
 	.llong .sys_ni_syscall		/* 130 old get_kernel_syms syscall */
 	.llong .sys_quotactl
 	.llong .sys32_getpgid
@@ -666,7 +665,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_sched_get_priority_min  /* 160 */
 	.llong .sys32_sched_rr_get_interval
 	.llong .compat_sys_nanosleep
-	.llong .sys32_mremap
+	.llong .sys_mremap
 	.llong .sys_setresuid
 	.llong .sys_getresuid	        /* 165 */
 	.llong .sys_ni_syscall		/* old query_module syscall */
@@ -738,7 +737,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall		/* reserved for alloc_hugepages */
 	.llong .sys_ni_syscall		/* reserved for free_hugepages */
 	.llong .sys_exit_group
-	.llong .sys32_lookup_dcookie	/* 245 */
+	.llong .ppc32_lookup_dcookie	/* 245 */
 	.llong .sys_epoll_create
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait
@@ -747,7 +746,6 @@ _GLOBAL(sys_call_table32)
 	.rept NR_syscalls-239
 		.llong .sys_ni_syscall
 	.endr
-#endif
 
 	.balign 8
 _GLOBAL(sys_call_table)

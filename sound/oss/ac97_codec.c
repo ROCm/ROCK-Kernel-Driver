@@ -446,7 +446,7 @@ static void ac97_set_mixer(struct ac97_codec *codec, unsigned int oss_mixer, uns
 }
 
 /* read or write the recmask, the ac97 can really have left and right recording
-   inputs independantly set, but OSS doesn't seem to want us to express that to
+   inputs independently set, but OSS doesn't seem to want us to express that to
    the user. the caller guarantees that we have a supported bit set, and they
    must be holding the card's spinlock */
 static int ac97_recmask_io(struct ac97_codec *codec, int rw, int mask) 

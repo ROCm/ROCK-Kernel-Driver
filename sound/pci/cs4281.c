@@ -2054,7 +2054,7 @@ static void cs4281_suspend(cs4281_t *chip)
 {
 	snd_card_t *card = chip->card;
 	u32 ulCLK;
-	int i;
+	unsigned int i;
 
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		return;
@@ -2095,7 +2095,7 @@ static void cs4281_suspend(cs4281_t *chip)
 static void cs4281_resume(cs4281_t *chip)
 {
 	snd_card_t *card = chip->card;
-	int i;
+	unsigned int i;
 	u32 ulCLK;
 
 	if (card->power_state == SNDRV_CTL_POWER_D0)

@@ -577,7 +577,7 @@ config FPE_NWFPE
 	  your machine has an FPA or floating point co-processor podule.
 
 	  It is also possible to say M to build the emulator as a module
-	  (nwfpe.o) or indeed to leave it out altogether. However, unless you
+	  (nwfpe) or indeed to leave it out altogether. However, unless you
 	  know what you are doing this can easily render your machine
 	  unbootable. Saying Y is the safe option.
 
@@ -599,7 +599,7 @@ config FPE_FASTFPE
 	  choose NWFPE.
 
 	  It is also possible to say M to build the emulator as a module
-	  (fastfpe.o).  But keep in mind that you should only load the FP
+	  (fastfpe).  But keep in mind that you should only load the FP
 	  emulator early in the bootup.  You should never change from NWFPE to
 	  FASTFPE or vice versa in an active system!
 
@@ -654,7 +654,7 @@ config BINFMT_AOUT
 	  QMAGIC support" then you'll have to say Y here. You may answer M to
 	  compile a.out support as a module and later load the module when you
 	  want to use a program or library in a.out format. The module will be
-	  called binfmt_aout.o. Saying M or N here is dangerous though,
+	  called binfmt_aout. Saying M or N here is dangerous though,
 	  because some crucial programs on your system might still be in A.OUT
 	  format.
 
@@ -684,7 +684,7 @@ config BINFMT_ELF
 	  If you want to compile this as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf.o. Saying M or N here is dangerous because
+	  will be called binfmt_elf. Saying M or N here is dangerous because
 	  some crucial programs on your system might be in ELF format.
 
 config BINFMT_MISC
@@ -709,7 +709,7 @@ config BINFMT_MISC
 	  use this part of the kernel.
 
 	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc.o. If you
+	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
 
 config PM
@@ -804,7 +804,7 @@ config APM
 	  To compile this driver as a module ( = code which can be inserted in
 	  and removed from the running kernel whenever you want), say M here
 	  and read <file:Documentation/modules.txt>. The module will be called
-	  apm.o.
+	  apm.
 
 config ARTHUR
 	tristate "RISC OS personality"
@@ -814,7 +814,7 @@ config ARTHUR
 	  Acorn RISC OS/Arthur binaries under Linux. This code is still very
 	  experimental; if this sounds frightening, say N and sleep in peace.
 	  You can also say M here to compile this support as a module (which
-	  will be called arthur.o).
+	  will be called arthur).
 
 config CMDLINE
 	string "Default kernel command string"
@@ -946,7 +946,7 @@ config IDE
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
 	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called ide.o.
+	  will be called ide.
 
 	  For further information, please read <file:Documentation/ide.txt>.
 
@@ -973,7 +973,7 @@ config SCSI
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.o.  If you want to compile it as
+	  The module will be called scsi_mod.  If you want to compile it as
 	  a module, say M here and read <file:Documentation/modules.txt> and
 	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
 	  module if your root file system (the one containing the directory /)
@@ -1036,7 +1036,7 @@ config SOUND
 	  and load that module after the PnP configuration is finished.  To do
 	  this, say M here and read <file:Documentation/modules.txt> as well
 	  as <file:Documentation/sound/README.modules>; the module will be
-	  called soundcore.o.
+	  called soundcore.
 
 	  I'm told that even without a sound card, you can make your computer
 	  say more than an occasional beep, by programming the PC speaker.

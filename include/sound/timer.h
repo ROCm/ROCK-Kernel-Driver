@@ -23,6 +23,7 @@
  */
 
 #include <sound/asound.h>
+#include <linux/interrupt.h>
 
 typedef enum sndrv_timer_class snd_timer_class_t;
 typedef enum sndrv_timer_slave_class snd_timer_slave_class_t;
@@ -45,17 +46,19 @@ typedef struct sndrv_timer_read snd_timer_read_t;
 #define SNDRV_TIMER_HW_STOP	0x00000002	/* call stop before start */
 #define SNDRV_TIMER_HW_SLAVE	0x00000004	/* only slave timer (variable resolution) */
 #define SNDRV_TIMER_HW_FIRST	0x00000008	/* first tick can be incomplete */
+#define SNDRV_TIMER_HW_TASKLET	0x00000010	/* timer is called from tasklet */
 
-#define SNDRV_TIMER_IFLG_SLAVE	0x00000001
-#define SNDRV_TIMER_IFLG_RUNNING	0x00000002
-#define SNDRV_TIMER_IFLG_START	0x00000004
-#define SNDRV_TIMER_IFLG_AUTO	0x00000008	/* auto restart */
+#define SNDRV_TIMER_IFLG_SLAVE	  0x00000001
+#define SNDRV_TIMER_IFLG_RUNNING  0x00000002
+#define SNDRV_TIMER_IFLG_START	  0x00000004
+#define SNDRV_TIMER_IFLG_AUTO	  0x00000008	/* auto restart */
+#define SNDRV_TIMER_IFLG_FAST	  0x00000010	/* fast callback (do not use tasklet) */
+#define SNDRV_TIMER_IFLG_CALLBACK 0x00000020	/* timer callback is active */
 
-#define SNDRV_TIMER_FLG_SYSTEM	0x00000001	/* system timer */
-#define SNDRV_TIMER_FLG_CHANGE	0x00000002
-#define SNDRV_TIMER_FLG_RESCHED	0x00000004	/* need reschedule */
+#define SNDRV_TIMER_FLG_CHANGE	0x00000001
+#define SNDRV_TIMER_FLG_RESCHED	0x00000002	/* need reschedule */
 
-typedef void (*snd_timer_callback_t) (snd_timer_instance_t * timeri, unsigned long ticks, unsigned long resolution, void *data);
+typedef void (*snd_timer_callback_t) (snd_timer_instance_t * timeri, unsigned long ticks, unsigned long resolution);
 
 struct _snd_timer_hardware {
 	/* -- must be filled with low-level driver */
@@ -87,6 +90,9 @@ struct _snd_timer {
 	struct list_head device_list;
 	struct list_head open_list_head;
 	struct list_head active_list_head;
+	struct list_head ack_list_head;
+	struct list_head sack_list_head; /* slow ack list head */
+	struct tasklet_struct task_queue;
 };
 
 struct _snd_timer_instance {
@@ -97,17 +103,19 @@ struct _snd_timer_instance {
 	void (*private_free) (snd_timer_instance_t *ti);
 	snd_timer_callback_t callback;
 	void *callback_data;
-	unsigned long ticks;
-	unsigned long cticks;
+	unsigned long ticks;		/* auto-load ticks when expired */
+	unsigned long cticks;		/* current ticks */
+	unsigned long pticks;		/* accumulated ticks for callback */
+	unsigned long resolution;	/* current resolution for tasklet */
 	unsigned long lost;		/* lost ticks */
 	snd_timer_slave_class_t slave_class;
 	unsigned int slave_id;
 	struct list_head open_list;
 	struct list_head active_list;
+	struct list_head ack_list;
 	struct list_head slave_list_head;
 	struct list_head slave_active_head;
 	snd_timer_instance_t *master;
-	atomic_t in_use;		/* don't free */
 };
 
 /*
@@ -128,7 +136,6 @@ extern int snd_timer_set_resolution(snd_timer_instance_t * timeri, unsigned long
 extern unsigned long snd_timer_resolution(snd_timer_instance_t * timeri);
 extern int snd_timer_start(snd_timer_instance_t * timeri, unsigned int ticks);
 extern int snd_timer_stop(snd_timer_instance_t * timeri);
-extern int snd_timer_del(snd_timer_instance_t * timeri);
 extern int snd_timer_continue(snd_timer_instance_t * timeri);
 
 extern void snd_timer_interrupt(snd_timer_t * timer, unsigned long ticks_left);

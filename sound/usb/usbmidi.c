@@ -821,7 +821,7 @@ static int snd_usbmidi_get_ms_info(snd_usb_midi_t* umidi,
 		    ms_ep->bDescriptorType != USB_DT_CS_ENDPOINT ||
 		    ms_ep->bDescriptorSubtype != MS_GENERAL)
 			continue;
-		if ((ep->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK) == USB_DIR_OUT) {
+		if ((ep->bEndpointAddress & USB_ENDPOINT_DIR_MASK) == USB_DIR_OUT) {
 			if (endpoints[epidx].out_ep) {
 				if (++epidx >= MIDI_MAX_ENDPOINTS) {
 					printk(KERN_WARNING "snd-usb-midi: too many endpoints\n");

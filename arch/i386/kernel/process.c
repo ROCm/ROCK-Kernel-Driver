@@ -86,7 +86,7 @@ void enable_hlt(void)
  */
 void default_idle(void)
 {
-	if (current_cpu_data.hlt_works_ok && !hlt_counter) {
+	if (!hlt_counter && current_cpu_data.hlt_works_ok) {
 		local_irq_disable();
 		if (!need_resched())
 			safe_halt();

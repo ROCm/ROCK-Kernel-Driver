@@ -84,7 +84,6 @@ ip_nat_resize_packet(struct sk_buff **skb,
 	iph = (*skb)->nh.iph;
 	if (iph->protocol == IPPROTO_TCP) {
 		struct tcphdr *tcph = (void *)iph + iph->ihl*4;
-		void *data = (void *)tcph + tcph->doff*4;
 
 		DEBUGP("ip_nat_resize_packet: Seq_offset before: ");
 		DUMP_OFFSET(this_way);

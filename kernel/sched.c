@@ -438,6 +438,7 @@ void kick_if_running(task_t * p)
 /***
  * try_to_wake_up - wake up a thread
  * @p: the to-be-woken-up thread
+ * @state: the mask of task states that can be woken
  * @sync: do a synchronous wakeup?
  *
  * Put it on the run-queue if it's not already there. The "current"
@@ -448,7 +449,7 @@ void kick_if_running(task_t * p)
  *
  * returns failure only if the task is already active.
  */
-static int try_to_wake_up(task_t * p, int sync)
+static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 {
 	unsigned long flags;
 	int success = 0;
@@ -458,28 +459,30 @@ static int try_to_wake_up(task_t * p, int sync)
 repeat_lock_task:
 	rq = task_rq_lock(p, &flags);
 	old_state = p->state;
-	if (!p->array) {
-		/*
-		 * Fast-migrate the task if it's not running or runnable
-		 * currently. Do not violate hard affinity.
-		 */
-		if (unlikely(sync && !task_running(rq, p) &&
-			(task_cpu(p) != smp_processor_id()) &&
-			(p->cpus_allowed & (1UL << smp_processor_id())))) {
+	if (old_state & state) {
+		if (!p->array) {
+			/*
+			 * Fast-migrate the task if it's not running or runnable
+			 * currently. Do not violate hard affinity.
+			 */
+			if (unlikely(sync && !task_running(rq, p) &&
+				(task_cpu(p) != smp_processor_id()) &&
+				(p->cpus_allowed & (1UL << smp_processor_id())))) {
 
-			set_task_cpu(p, smp_processor_id());
-			task_rq_unlock(rq, &flags);
-			goto repeat_lock_task;
+				set_task_cpu(p, smp_processor_id());
+				task_rq_unlock(rq, &flags);
+				goto repeat_lock_task;
+			}
+			if (old_state == TASK_UNINTERRUPTIBLE)
+				rq->nr_uninterruptible--;
+			activate_task(p, rq);
+	
+			if (p->prio < rq->curr->prio)
+				resched_task(rq->curr);
+			success = 1;
 		}
-		if (old_state == TASK_UNINTERRUPTIBLE)
-			rq->nr_uninterruptible--;
-		activate_task(p, rq);
-
-		if (p->prio < rq->curr->prio)
-			resched_task(rq->curr);
-		success = 1;
+		p->state = TASK_RUNNING;
 	}
-	p->state = TASK_RUNNING;
 	task_rq_unlock(rq, &flags);
 
 	return success;
@@ -487,7 +490,12 @@ repeat_lock_task:
 
 int wake_up_process(task_t * p)
 {
-	return try_to_wake_up(p, 0);
+	return try_to_wake_up(p, TASK_STOPPED | TASK_INTERRUPTIBLE | TASK_UNINTERRUPTIBLE, 0);
+}
+
+int wake_up_state(task_t *p, unsigned int state)
+{
+	return try_to_wake_up(p, state, 0);
 }
 
 /*
@@ -1263,7 +1271,7 @@ need_resched:
 int default_wake_function(wait_queue_t *curr, unsigned mode, int sync)
 {
 	task_t *p = curr->task;
-	return ((p->state & mode) && try_to_wake_up(p, sync));
+	return try_to_wake_up(p, mode, sync);
 }
 
 /*
@@ -2037,7 +2045,7 @@ static void show_task(task_t * p)
 	unsigned long free = 0;
 	task_t *relative;
 	int state;
-	static const char * stat_nam[] = { "R", "S", "D", "Z", "T", "W" };
+	static const char * stat_nam[] = { "R", "S", "D", "T", "Z", "W" };
 
 	printk("%-13.13s ", p->comm);
 	state = p->state ? __ffs(p->state) + 1 : 0;
@@ -2418,7 +2426,7 @@ void __init sched_init(void)
 	rq->curr = current;
 	rq->idle = current;
 	set_task_cpu(current, smp_processor_id());
-	wake_up_process(current);
+	wake_up_forked_process(current);
 
 	init_timers();
 

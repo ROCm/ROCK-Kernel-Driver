@@ -842,7 +842,7 @@ sg_ioctl(struct inode *inode, struct file *filp,
 			__put_user((int) sdp->device->type, &sg_idp->scsi_type);
 			__put_user((short) sdp->device->host->cmd_per_lun,
 				   &sg_idp->h_cmd_per_lun);
-			__put_user((short) sdp->device->new_queue_depth,
+			__put_user((short) sdp->device->queue_depth,
 				   &sg_idp->d_queue_depth);
 			__put_user(0, &sg_idp->unused[0]);
 			__put_user(0, &sg_idp->unused[1]);
@@ -2982,7 +2982,7 @@ sg_proc_dev_info(char *buffer, int *len, off_t * begin, off_t offset, int size)
 				   scsidp->host->host_no, scsidp->channel,
 				   scsidp->id, scsidp->lun, (int) scsidp->type,
 				   (int) scsidp->access_count,
-				   (int) scsidp->new_queue_depth,
+				   (int) scsidp->queue_depth,
 				   (int) scsidp->device_busy,
 				   (int) scsidp->online);
 		else

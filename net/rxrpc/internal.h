@@ -54,9 +54,9 @@ static inline void rxrpc_discard_my_signals(void)
 	while (signal_pending(current)) {
 		siginfo_t sinfo;
 
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current->sighand->siglock);
 		dequeue_signal(&current->blocked,&sinfo);
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current->sighand->siglock);
 	}
 }
 

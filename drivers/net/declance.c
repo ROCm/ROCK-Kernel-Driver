@@ -279,7 +279,7 @@ struct lance_private {
 			lp->tx_old - lp->tx_new-1)
 
 /* The lance control ports are at an absolute address, machine and tc-slot
- * dependant.
+ * dependent.
  * DECstations do only 32-bit access and the LANCE uses 16 bit addresses,
  * so we have to give the structure an extra member making rap pointing
  * at the right address

@@ -2987,7 +2987,7 @@ static struct pnp_driver parport_pc_pnp_driver = {
 	.id_table	= pnp_dev_table,
 };
 #else
-static const struct pnp_driver parport_pc_pnp_driver;
+static struct pnp_driver parport_pc_pnp_driver;
 #endif
 
 /* This is called by parport_pc_find_nonpci_ports (in asm/parport.h) */

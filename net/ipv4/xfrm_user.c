@@ -16,6 +16,7 @@
 #include <linux/pfkeyv2.h>
 #include <linux/ipsec.h>
 #include <linux/init.h>
+#include <linux/security.h>
 #include <net/sock.h>
 #include <net/xfrm.h>
 
@@ -774,7 +775,7 @@ static int xfrm_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh, int *err
 	link = &xfrm_dispatch[type];
 
 	/* All operations require privileges, even GET */
-	if (!cap_raised(NETLINK_CB(skb).eff_cap, CAP_NET_ADMIN)) {
+	if (security_netlink_recv(skb)) {
 		*errp = -EPERM;
 		return -1;
 	}

@@ -7,7 +7,7 @@ config BT_RFCOMM
 	  applications.
 
 	  Say Y here to compile RFCOMM support into the kernel or say M to
-	  compile it as module (rfcomm.o).
+	  compile it as module (rfcomm).
 
 config BT_RFCOMM_TTY
 	bool "RFCOMM TTY support"

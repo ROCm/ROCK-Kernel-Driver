@@ -110,7 +110,7 @@ typedef struct snd_urb_ctx snd_urb_ctx_t;
 struct audioformat {
 	struct list_head list;
 	snd_pcm_format_t format;	/* format type */
-	int channels;			/* # channels */
+	unsigned int channels;		/* # channels */
 	int iface;			/* interface number */
 	unsigned char altsetting;	/* corresponding alternate setting */
 	unsigned char altset_idx;	/* array index of altenate setting */
@@ -118,9 +118,9 @@ struct audioformat {
 	unsigned char endpoint;		/* endpoint */
 	unsigned char ep_attr;		/* endpoint attributes */
 	unsigned int rates;		/* rate bitmasks */
-	int rate_min, rate_max;		/* min/max rates */
-	int nr_rates;			/* number of rate table entries */
-	int *rate_table;		/* rate table */
+	unsigned int rate_min, rate_max;	/* min/max rates */
+	unsigned int nr_rates;		/* number of rate table entries */
+	unsigned int *rate_table;	/* rate table */
 };
 
 struct snd_urb_ctx {
@@ -162,21 +162,21 @@ struct snd_usb_substream {
 
 	unsigned int running: 1;	/* running status */
 
-	int hwptr;			/* free frame position in the buffer (only for playback) */
-	int hwptr_done;			/* processed frame position in the buffer */
-	int transfer_sched;		/* scheduled frames since last period (for playback) */
-	int transfer_done;		/* processed frames since last period update */
+	unsigned int hwptr;			/* free frame position in the buffer (only for playback) */
+	unsigned int hwptr_done;			/* processed frame position in the buffer */
+	unsigned int transfer_sched;		/* scheduled frames since last period (for playback) */
+	unsigned int transfer_done;		/* processed frames since last period update */
 	unsigned long active_mask;	/* bitmask of active urbs */
 	unsigned long unlink_mask;	/* bitmask of unlinked urbs */
 
-	int nurbs;			/* # urbs */
+	unsigned int nurbs;			/* # urbs */
 	snd_urb_ctx_t dataurb[MAX_URBS];	/* data urb table */
 	snd_urb_ctx_t syncurb[SYNC_URBS];	/* sync urb table */
 	char syncbuf[SYNC_URBS * NRPACKS * 3]; /* sync buffer; it's so small - let's get static */
 	char *tmpbuf;			/* temporary buffer for playback */
 
 	u64 formats;			/* format bitmasks (all or'ed) */
-	int num_formats;		/* number of supported audio formats (list) */
+	unsigned int num_formats;		/* number of supported audio formats (list) */
 	struct list_head fmt_list;	/* format list */
 	spinlock_t lock;
 
@@ -314,7 +314,8 @@ static int retire_capture_urb(snd_usb_substream_t *subs,
 {
 	unsigned long flags;
 	unsigned char *cp;
-	int stride, i, len, oldptr;
+	int i;
+	unsigned int stride, len, oldptr;
 
 	stride = runtime->frame_bits >> 3;
 
@@ -337,8 +338,8 @@ static int retire_capture_urb(snd_usb_substream_t *subs,
 		spin_unlock_irqrestore(&subs->lock, flags);
 		/* copy a data chunk */
 		if (oldptr + len > runtime->buffer_size) {
-			int cnt = runtime->buffer_size - oldptr;
-			int blen = cnt * stride;
+			unsigned int cnt = runtime->buffer_size - oldptr;
+			unsigned int blen = cnt * stride;
 			memcpy(runtime->dma_area + oldptr * stride, cp, blen);
 			memcpy(runtime->dma_area, cp + blen, len * stride - blen);
 		} else {
@@ -389,7 +390,8 @@ static int retire_playback_sync_urb(snd_usb_substream_t *subs,
 				    snd_pcm_runtime_t *runtime,
 				    struct urb *urb)
 {
-	unsigned int f, i, found;
+	int i;
+	unsigned int f, found;
 	unsigned char *cp = urb->transfer_buffer;
 	unsigned long flags;
 
@@ -429,7 +431,7 @@ static int prepare_playback_urb(snd_usb_substream_t *subs,
 				struct urb *urb)
 {
 	int i, stride, offs;
-	int counts;
+	unsigned int counts;
 	unsigned long flags;
 	snd_urb_ctx_t *ctx = (snd_urb_ctx_t *)urb->context;
 
@@ -543,7 +545,7 @@ static void snd_complete_urb(struct urb *urb, struct pt_regs *regs)
 		return;
 	if (! subs->running) /* can be stopped during retire callback */
 		return;
-	if ((err = subs->ops.prepare(subs, substream->runtime, urb) < 0) ||
+	if ((err = subs->ops.prepare(subs, substream->runtime, urb)) < 0 ||
 	    (err = usb_submit_urb(urb, GFP_ATOMIC)) < 0) {
 		snd_printd(KERN_ERR "cannot submit urb (err = %d)\n", err);
 		snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
@@ -584,7 +586,8 @@ static void snd_complete_sync_urb(struct urb *urb, struct pt_regs *regs)
  */
 static int deactivate_urbs(snd_usb_substream_t *subs)
 {
-	int i, alive;
+	unsigned int i;
+	int alive;
 
 	subs->running = 0;
 
@@ -625,7 +628,8 @@ static int deactivate_urbs(snd_usb_substream_t *subs)
  */
 static int start_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 {
-	int i, err;
+	unsigned int i;
+	int err;
 
 	for (i = 0; i < subs->nurbs; i++) {
 		snd_assert(subs->dataurb[i].urb, return -EINVAL);
@@ -676,7 +680,8 @@ static int start_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 static int wait_clear_urbs(snd_usb_substream_t *subs)
 {
 	int timeout = HZ;
-	int i, alive;
+	unsigned int i;
+	int alive;
 
 	do {
 		alive = 0;
@@ -777,9 +782,9 @@ static void release_substream_urbs(snd_usb_substream_t *subs)
  */
 static int init_substream_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 {
-	int maxsize, n, i;
+	unsigned int maxsize, n, i;
 	int is_playback = subs->direction == SNDRV_PCM_STREAM_PLAYBACK;
-	int npacks[MAX_URBS], total_packs;
+	unsigned int npacks[MAX_URBS], total_packs;
 
 	/* calculate the frequency in 10.14 format */
 	subs->freqn = subs->freqm = get_usb_rate(runtime->rate);
@@ -925,7 +930,7 @@ static struct audioformat *find_format(snd_usb_substream_t *subs, snd_pcm_runtim
 		if (fp->rates & SNDRV_PCM_RATE_CONTINUOUS)
 			return fp;
 		else {
-			int i;
+			unsigned int i;
 			for (i = 0; i < fp->nr_rates; i++)
 				if (fp->rate_table[i] == runtime->rate)
 					return fp;
@@ -1069,8 +1074,8 @@ static int set_format(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 			return -EINVAL;
 		}
 		ep = get_endpoint(alts, 1)->bEndpointAddress;
-		if ((is_playback && ep != (get_endpoint(alts, 0)->bSynchAddress | USB_DIR_IN)) ||
-		    (! is_playback && ep != (get_endpoint(alts, 0)->bSynchAddress & ~USB_DIR_IN))) {
+		if ((is_playback && ep != (unsigned int)(get_endpoint(alts, 0)->bSynchAddress | USB_DIR_IN)) ||
+		    (! is_playback && ep != (unsigned int)(get_endpoint(alts, 0)->bSynchAddress & ~USB_DIR_IN))) {
 			snd_printk(KERN_ERR "%d:%d:%d : invalid synch pipe\n",
 				   dev->devnum, fmt->iface, fmt->altsetting);
 			return -EINVAL;
@@ -1210,7 +1215,8 @@ static int hw_rule_rate(snd_pcm_hw_params_t *params,
 	snd_usb_substream_t *subs = rule->private;
 	struct list_head *p;
 	snd_interval_t *it = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
-	int rmin, rmax, changed;
+	unsigned int rmin, rmax;
+	int changed;
 	
 	hwc_debug("hw_rule_rate: (%d,%d)\n", it->min, it->max);
 	changed = 0;
@@ -1263,7 +1269,8 @@ static int hw_rule_channels(snd_pcm_hw_params_t *params,
 	snd_usb_substream_t *subs = rule->private;
 	struct list_head *p;
 	snd_interval_t *it = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
-	int rmin, rmax, changed;
+	unsigned int rmin, rmax;
+	int changed;
 	
 	hwc_debug("hw_rule_channels: (%d,%d)\n", it->min, it->max);
 	changed = 0;
@@ -1647,7 +1654,7 @@ static void proc_dump_substream_formats(snd_usb_substream_t *subs, snd_info_buff
 			snd_iprintf(buffer, "    Rates: %d - %d (continous)\n",
 				    fp->rate_min, fp->rate_max);
 		} else {
-			int i;
+			unsigned int i;
 			snd_iprintf(buffer, "    Rates: ");
 			for (i = 0; i < fp->nr_rates; i++) {
 				if (i > 0)
@@ -1662,7 +1669,7 @@ static void proc_dump_substream_formats(snd_usb_substream_t *subs, snd_info_buff
 static void proc_dump_substream_status(snd_usb_substream_t *subs, snd_info_buffer_t *buffer)
 {
 	if (subs->running) {
-		int i;
+		unsigned int i;
 		snd_iprintf(buffer, "  Status: Running\n");
 		snd_iprintf(buffer, "    Interface = %d\n", subs->interface);
 		snd_iprintf(buffer, "    Altset = %d\n", subs->format);
@@ -2045,7 +2052,7 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, unsigned char *buffer, i
 			 */
 			int r, idx, c;
 			/* this table corresponds to the SNDRV_PCM_RATE_XXX bit */
-			static int conv_rates[] = {
+			static unsigned int conv_rates[] = {
 				5512, 8000, 11025, 16000, 22050, 32000, 44100, 48000,
 				64000, 88200, 96000, 176400, 192000
 			};
@@ -2059,7 +2066,7 @@ static int parse_audio_endpoints(snd_usb_audio_t *chip, unsigned char *buffer, i
 			fp->nr_rates = nr_rates;
 			fp->rate_min = fp->rate_max = combine_triple(&fmt[8]);
 			for (r = 0, idx = 8; r < nr_rates; r++, idx += 3) {
-				int rate = fp->rate_table[r] = combine_triple(&fmt[idx]);
+				unsigned int rate = fp->rate_table[r] = combine_triple(&fmt[idx]);
 				if (rate < fp->rate_min)
 					fp->rate_min = rate;
 				else if (rate > fp->rate_max)
@@ -2149,7 +2156,7 @@ static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif,
 				snd_printk(KERN_ERR "%d:%u:%d: cannot create sequencer device\n", dev->devnum, ctrlif, j);
 				continue;
 			}
-			usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1);
+			usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1L);
 			continue;
 		}
 		if (altsd->bInterfaceClass != USB_CLASS_AUDIO ||
@@ -2160,7 +2167,7 @@ static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif,
 		}
 		if (! parse_audio_endpoints(chip, buffer, buflen, j)) {
 			usb_set_interface(dev, j, 0); /* reset the current interface */
-			usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1);
+			usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1L);
 		}
 	}
 
@@ -2209,12 +2216,12 @@ static int create_composite_quirk(snd_usb_audio_t *chip,
 				  struct usb_interface *iface,
 				  const snd_usb_audio_quirk_t *quirk)
 {
-	struct usb_config_descriptor *config = chip->dev->actconfig;
+	struct usb_host_config *config = chip->dev->actconfig;
 	int probed_ifnum = get_iface_desc(iface->altsetting)->bInterfaceNumber;
 	int err;
 
 	for (quirk = quirk->data; quirk->ifnum >= 0; ++quirk) {
-		if (quirk->ifnum >= config->bNumInterfaces)
+		if (quirk->ifnum >= get_cfg_desc(config)->bNumInterfaces)
 			continue;
 		iface = &config->interface[quirk->ifnum];
 		if (quirk->ifnum != probed_ifnum &&
@@ -2224,7 +2231,7 @@ static int create_composite_quirk(snd_usb_audio_t *chip,
 		if (err < 0)
 			return err;
 		if (quirk->ifnum != probed_ifnum)
-			usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1);
+			usb_driver_claim_interface(&usb_audio_driver, iface, (void *)-1L);
 	}
 	return 0;
 }
@@ -2520,7 +2527,7 @@ static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 	snd_card_t *card;
 	struct list_head *p;
 
-	if (ptr == (void *)-1)
+	if (ptr == (void *)-1L)
 		return;
 
 	chip = snd_magic_cast(snd_usb_audio_t, ptr, return);
