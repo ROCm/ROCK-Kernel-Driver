@@ -32,6 +32,25 @@ extern void fastcall iowrite8(u8, void __iomem *);
 extern void fastcall iowrite16(u16, void __iomem *);
 extern void fastcall iowrite32(u32, void __iomem *);
 
+/*
+ * "string" versions of the above. Note that they
+ * use native byte ordering for the accesses (on
+ * the assumption that IO and memory agree on a
+ * byte order, and CPU byteorder is irrelevant).
+ *
+ * They do _not_ update the port address. If you
+ * want MMIO that copies stuff laid out in MMIO
+ * memory across multiple ports, use "memcpy_toio()"
+ * and friends.
+ */
+extern void fastcall ioread8_rep(void __iomem *port, void *buf, unsigned long count);
+extern void fastcall ioread16_rep(void __iomem *port, void *buf, unsigned long count);
+extern void fastcall ioread32_rep(void __iomem *port, void *buf, unsigned long count);
+
+extern void fastcall iowrite8_rep(void __iomem *port, const void *buf, unsigned long count);
+extern void fastcall iowrite16_rep(void __iomem *port, const void *buf, unsigned long count);
+extern void fastcall iowrite32_rep(void __iomem *port, const void *buf, unsigned long count);
+
 /* Create a virtual mapping cookie for an IO port range */
 extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
 extern void ioport_unmap(void __iomem *);
