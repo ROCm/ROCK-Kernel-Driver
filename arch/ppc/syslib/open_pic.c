@@ -55,7 +55,7 @@ static void openpic_set_spurious(u_int vector);
 #ifdef CONFIG_SMP
 /* Interprocessor Interrupts */
 static void openpic_initipi(u_int ipi, u_int pri, u_int vector);
-static void openpic_ipi_action(int cpl, void *dev_id, struct pt_regs *regs);
+static irqreturn_t openpic_ipi_action(int cpl, void *dev_id, struct pt_regs *);
 #endif
 
 /* Timer Interrupts */
