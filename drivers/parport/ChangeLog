@@ -1,3 +1,8 @@
+2002-01-04  Tim Waugh  <twaugh@redhat.com>
+
+	* share.c (parport_claim_or_block): Sleep interruptibly to prevent
+	a possible deadlock.
+
 2002-01-13  Niels Kristian Bech Jensen  <nkbj@image.dk>
 
 	* parport_pc.c: Change some occurrences of frob_set_mode to
