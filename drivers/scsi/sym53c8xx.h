@@ -74,7 +74,7 @@ int sym53c8xx_detect(Scsi_Host_Template *tpnt);
 const char *sym53c8xx_info(struct Scsi_Host *host);
 int sym53c8xx_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int sym53c8xx_reset(Scsi_Cmnd *, unsigned int);
-int sym53c8xx_slave_attach(Scsi_Device *);
+int sym53c8xx_slave_configure(Scsi_Device *);
 
 #ifdef MODULE
 int sym53c8xx_release(struct Scsi_Host *);
@@ -90,7 +90,7 @@ int sym53c8xx_release(struct Scsi_Host *);
 			release:        sym53c8xx_release,	\
 			info:           sym53c8xx_info, 	\
 			queuecommand:   sym53c8xx_queue_command,\
-			slave_attach:   sym53c8xx_slave_attach, \
+			slave_configure:sym53c8xx_slave_configure,\
 			abort:          sym53c8xx_abort,	\
 			reset:          sym53c8xx_reset,	\
 			can_queue:      SCSI_NCR_CAN_QUEUE,	\

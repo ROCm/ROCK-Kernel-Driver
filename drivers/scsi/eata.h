@@ -9,7 +9,7 @@ static int eata2x_eh_abort(Scsi_Cmnd *);
 static int eata2x_eh_host_reset(Scsi_Cmnd *);
 static int eata2x_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int *);
-static int eata2x_slave_attach(Scsi_Device *);
+static int eata2x_slave_configure(Scsi_Device *);
 
 #define EATA_VERSION "8.00.00"
 
@@ -23,7 +23,7 @@ static int eata2x_slave_attach(Scsi_Device *);
                 eh_bus_reset_handler:    NULL,                               \
                 eh_host_reset_handler:   eata2x_eh_host_reset,               \
                 bios_param:              eata2x_bios_param,                  \
-		slave_attach:		 eata2x_slave_attach,		     \
+		slave_configure:	 eata2x_slave_configure,	     \
                 this_id:                 7,                                  \
                 unchecked_isa_dma:       1,                                  \
                 use_clustering:          ENABLE_CLUSTERING                   \

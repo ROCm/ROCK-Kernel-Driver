@@ -44,7 +44,7 @@ static int adpt_queue(Scsi_Cmnd * cmd, void (*cmdcomplete) (Scsi_Cmnd *));
 static int adpt_abort(Scsi_Cmnd * cmd);
 static int adpt_reset(Scsi_Cmnd* cmd);
 static int adpt_release(struct Scsi_Host *host);
-static int adpt_slave_attach(Scsi_Device *);
+static int adpt_slave_configure(Scsi_Device *);
 
 static const char *adpt_info(struct Scsi_Host *pSHost);
 static int adpt_bios_param(struct scsi_device * sdev, struct block_device *dev,
@@ -93,7 +93,7 @@ static int adpt_device_reset(Scsi_Cmnd* cmd);
 	eh_bus_reset_handler: adpt_bus_reset,				\
 	eh_host_reset_handler: adpt_reset,				\
 	bios_param: adpt_bios_param,					\
-	slave_attach: adpt_slave_attach,				\
+	slave_configure: adpt_slave_configure,				\
 	can_queue: MAX_TO_IOP_MESSAGES,	/* max simultaneous cmds      */\
 	this_id: 7,			/* scsi id of host adapter    */\
 	sg_tablesize: 0,		/* max scatter-gather cmds    */\

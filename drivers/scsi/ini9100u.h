@@ -105,7 +105,6 @@ extern int i91u_biosparam(struct scsi_device *, struct block_device *,
  	eh_host_reset_handler: NULL, \
 	abort:		i91u_abort, \
 	reset:		i91u_reset, \
-	slave_attach:	NULL, \
 	bios_param:	i91u_biosparam, \
 	can_queue:	1, \
 	this_id:	1, \

@@ -674,7 +674,7 @@
 	 1. hacks for lk 2.5 series (D. Gilbert)
 
      3.3GJD (10/14/02):
-         1. change select_queue_depths to slave_attach
+         1. change select_queue_depths to slave_configure
 	 2. make cmd_per_lun be sane again
 
   I. Known Problems/Fix List (XXX)
@@ -4209,7 +4209,7 @@ STATIC PortAddr     _asc_def_iop_base[];
  */
 
 STATIC void       advansys_interrupt(int, void *, struct pt_regs *);
-STATIC int	  advansys_slave_attach(Scsi_Device *);
+STATIC int	  advansys_slave_configure(Scsi_Device *);
 STATIC void       asc_scsi_done_list(Scsi_Cmnd *, int from_isr);
 STATIC int        asc_execute_scsi_cmnd(Scsi_Cmnd *);
 STATIC int        asc_build_req(asc_board_t *, Scsi_Cmnd *);
@@ -6346,7 +6346,7 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * specified host adapter.
  */
 STATIC int
-advansys_slave_attach(Scsi_Device *device)
+advansys_slave_configure(Scsi_Device *device)
 {
     asc_board_t        *boardp;
 
@@ -6369,7 +6369,7 @@ advansys_slave_attach(Scsi_Device *device)
     } else {
 	scsi_adjust_queue_depth(device, 0, device->host->cmd_per_lun);
     }
-    ASC_DBG3(1, "advansys_slave_attach: shp 0x%lx, id %d, depth %d\n",
+    ASC_DBG3(1, "advansys_slave_configure: shp 0x%lx, id %d, depth %d\n",
             (ulong) shp, device->id, device->queue_depth);
     return 0;
 }

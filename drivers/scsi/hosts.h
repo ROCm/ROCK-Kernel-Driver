@@ -187,59 +187,73 @@ typedef struct	SHT
     int (*reset)(int,int);
 
     /*
-     * Once the device has responded to an INQUIRY and we know the device
-     * is online, call into the low level driver with the Scsi_Device *
-     * (so that the low level driver may save it off in a safe location
-     * for later use in calling scsi_adjust_queue_depth() or possibly
-     * other scsi_* functions) and char * to the INQUIRY return data buffer.
-     * This way, low level drivers will no longer have to snoop INQUIRY data
-     * to see if a drive supports PPR message protocol for Ultra160 speed
-     * negotiations or other similar items.  Instead it can simply wait until
-     * the scsi mid layer calls them with the data in hand and then it can
-     * do it's checking of INQUIRY data.  This will happen once for each new
-     * device added on this controller (including once for each lun on
-     * multi-lun devices, so low level drivers should take care to make
-     * sure that if they do tagged queueing on a per physical unit basis
-     * instead of a per logical unit basis that they have the mid layer
-     * allocate tags accordingly).
+     * slave_alloc()  -  Optional
+     * 
+     * Before the mid layer attempts to scan for a new device where none
+     * currently exists, it will call this entry in your driver.  Should
+     * your driver need to allocate any structs or perform any other init
+     * items in order to send commands to a currently unused target/lun
+     * combo, then this is where you can perform those allocations.  This
+     * is specifically so that drivers won't have to perform any kind of
+     * "is this a new device" checks in their queuecommand routine,
+     * thereby making the hot path a bit quicker.
      *
-     * Things currently recommended to be handled at this time include:
+     * Return values: 0 on success, non-0 on failure
      *
-     * 1.  Checking for tagged queueing capability and if able then calling
-     *     scsi_adjust_queue_depth() with the device pointer and the
-     *     suggested new queue depth.
-     * 2.  Checking for things such as SCSI level or DT bit in order to
-     *     determine if PPR message protocols are appropriate on this
-     *     device (or any other scsi INQUIRY data specific things the
-     *     driver wants to know in order to properly handle this device).
-     * 3.  Allocating command structs that the device will need.
-     * 4.  Setting the default timeout on this device (if needed).
-     * 5.  Saving the Scsi_Device pointer so that the low level driver
-     *     will be able to easily call back into scsi_adjust_queue_depth
-     *     again should it be determined that the queue depth for this
-     *     device should be lower or higher than it is initially set to.
-     * 6.  Allocate device data structures as needed that can be attached
-     *     to the Scsi_Device * via SDpnt->host_device_ptr
-     * 7.  Anything else the low level driver might want to do on a device
-     *     specific setup basis...
-     * 8.  Return 0 on success, non-0 on error.  The device will be marked
-     *     as offline on error so that no access will occur.
+     * Deallocation:  If we didn't find any devices at this ID, you will
+     * get an immediate call to slave_destroy().  If we find something here
+     * then you will get a call to slave_configure(), then the device will be
+     * used for however long it is kept around, then when the device is
+     * removed from the system (or * possibly at reboot time), you will
+     * then get a call to slave_detach().  This is assuming you implement
+     * slave_configure and slave_destroy.  However, if you allocate memory
+     * and hang it off the device struct, then you must implement the
+     * slave_destroy() routine at a minimum in order to avoid leaking memory
+     * each time a device is tore down.
      */
-    int (* slave_attach)(Scsi_Device *);
+    int (* slave_alloc)(Scsi_Device *);
 
     /*
-     * If we are getting ready to remove a device from the scsi chain then
-     * we call into the low level driver to let them know.  Once a low
-     * level driver has been informed that a drive is going away, the low
-     * level driver *must* remove it's pointer to the Scsi_Device because
-     * it is going to be kfree()'ed shortly.  It is no longer safe to call
-     * any mid layer functions with this Scsi_Device *.  Additionally, the
-     * mid layer will not make any more calls into the low level driver's
-     * queue routine with this device, so it is safe for the device driver
-     * to deallocate all structs/commands/etc that is has allocated
-     * specifically for this device at the time of this call.
+     * slave_configure()  -  Optional
+     * 
+     * Once the device has responded to an INQUIRY and we know the device
+     * is online, we call into the low level driver with the Scsi_Device *
+     * If the low level device driver implements this function, it *must*
+     * perform the task of setting the queue depth on the device.  All other
+     * tasks are optional and depend on what the driver supports and various
+     * implementation details.
+     * 
+     * Things currently recommended to be handled at this time include:
+     *
+     * 1.  Setting the device queue depth.  Proper setting of this is
+     *     described in the comments for scsi_adjust_queue_depth.
+     * 2.  Determining if the device supports the various synchronous
+     *     negotiation protocols.  The device struct will already have
+     *     responded to INQUIRY and the results of the standard items
+     *     will have been shoved into the various device flag bits, eg.
+     *     device->sdtr will be true if the device supports SDTR messages.
+     * 3.  Allocating command structs that the device will need.
+     * 4.  Setting the default timeout on this device (if needed).
+     * 5.  Anything else the low level driver might want to do on a device
+     *     specific setup basis...
+     * 6.  Return 0 on success, non-0 on error.  The device will be marked
+     *     as offline on error so that no access will occur.  If you return
+     *     non-0, your slave_detach routine will never get called for this
+     *     device, so don't leave any loose memory hanging around, clean
+     *     up after yourself before returning non-0
      */
-    void (* slave_detach)(Scsi_Device *);
+    int (* slave_configure)(Scsi_Device *);
+
+    /*
+     * slave_destroy()  -  Optional
+     *
+     * Immediately prior to deallocating the device and after all activity
+     * has ceased the mid layer calls this point so that the low level driver
+     * may completely detach itself from the scsi device and vice versa.
+     * The low level driver is responsible for freeing any memory it allocated
+     * in the slave_alloc or slave_configure calls. 
+     */
+    void (* slave_destroy)(Scsi_Device *);
 
     /*
      * This function determines the bios parameters for a given

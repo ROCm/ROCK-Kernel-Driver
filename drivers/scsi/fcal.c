@@ -70,7 +70,7 @@ static unsigned char target2alpa[] = {
 
 static int fcal_encode_addr(Scsi_Cmnd *SCpnt, u16 *addr, fc_channel *fc, fcp_cmnd *fcmd);
 
-int fcal_slave_attach(Scsi_Device *device)
+int fcal_slave_configure(Scsi_Device *device)
 {
 	int depth_to_use;
 	

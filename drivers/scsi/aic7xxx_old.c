@@ -3137,36 +3137,18 @@ aic7xxx_reset_device(struct aic7xxx_host *p, int target, int channel,
   struct scsi_device *sd;
   unsigned char active_scb, tcl, scb_tag;
   int i = 0, init_lists = FALSE;
-  struct aic_dev_data *aic_dev, *remove_aic_dev = NULL;
+  struct aic_dev_data *aic_dev;
 
   /*
    * Restore this when we're done
    */
   active_scb = aic_inb(p, SCBPTR);
-  /*
-   * If we are still scanning devices, this device may not be linked into
-   * our host controller yet.  So, we grab the temporary aic_dev that we
-   * allocate during the device scan (by getting device->hostdata for the
-   * active device) and if the list struct in the aic_dev is empty, we
-   * add it to p->aic_devs.  Then at the end of the function, if we added
-   * the aic_dev to our host struct so our loop would work, then we just
-   * remove it.
-   */
   scb_tag = aic_inb(p, SCB_TAG);
-  if(scb_tag < p->scb_data->numscbs)
-  {
-    scbp = p->scb_data->scb_array[scb_tag];
-    remove_aic_dev = (struct aic_dev_data *)scbp->cmd->device->hostdata;
-    if(list_empty(&remove_aic_dev->list))
-      list_add_tail(&remove_aic_dev->list, &p->aic_devs);
-    else
-      remove_aic_dev = NULL;
-  }
 
   if (aic7xxx_verbose & (VERBOSE_RESET_PROCESS | VERBOSE_ABORT_PROCESS))
   {
-    printk(INFO_LEAD "Reset device, hardware_scb %d, aic_dev %p,\n",
-         p->host_no, channel, target, lun, active_scb, remove_aic_dev);
+    printk(INFO_LEAD "Reset device, hardware_scb %d,\n",
+         p->host_no, channel, target, lun, active_scb);
     printk(INFO_LEAD "Current scb %d, SEQADDR 0x%x, LASTPHASE "
            "0x%x\n",
          p->host_no, channel, target, lun, scb_tag,
@@ -3230,8 +3212,6 @@ aic7xxx_reset_device(struct aic7xxx_host *p, int target, int channel,
       }
     }
   }
-  if (remove_aic_dev)
-    list_del(&remove_aic_dev->list);
 
   if (aic7xxx_verbose & (VERBOSE_ABORT_PROCESS | VERBOSE_RESET_PROCESS))
     printk(INFO_LEAD "Cleaning QINFIFO.\n", p->host_no, channel, target, lun );
@@ -6597,19 +6577,42 @@ aic7xxx_init_transinfo(struct aic7xxx_host *p, struct aic_dev_data *aic_dev)
 
 /*+F*************************************************************************
  * Function:
- *   aic7xxx_alloc_aic_dev
+ *   aic7xxx_slave_alloc
  *
  * Description:
  *   Set up the initial aic_dev struct pointers
  *-F*************************************************************************/
-static struct aic_dev_data *
-aic7xxx_alloc_aic_dev(struct aic7xxx_host *p, Scsi_Device *SDptr)
+static int
+aic7xxx_slave_alloc(Scsi_Device *SDptr)
 {
+  struct aic7xxx_host *p = (struct aic7xxx_host *)SDptr->host->hostdata;
   struct aic_dev_data *aic_dev;
 
   aic_dev = kmalloc(sizeof(struct aic_dev_data), GFP_ATOMIC | GFP_KERNEL);
   if(!aic_dev)
-    return aic_dev;
+    return 1;
+  /*
+   * Check to see if channel was scanned.
+   */
+  
+  if (!(p->flags & AHC_A_SCANNED) && (SDptr->channel == 0))
+  {
+    if (aic7xxx_verbose & VERBOSE_PROBE2)
+      printk(INFO_LEAD "Scanning channel for devices.\n",
+        p->host_no, 0, -1, -1);
+    p->flags |= AHC_A_SCANNED;
+  }
+  else
+  {
+    if (!(p->flags & AHC_B_SCANNED) && (SDptr->channel == 1))
+    {
+      if (aic7xxx_verbose & VERBOSE_PROBE2)
+        printk(INFO_LEAD "Scanning channel for devices.\n",
+          p->host_no, 1, -1, -1);
+      p->flags |= AHC_B_SCANNED;
+    }
+  }
+
   memset(aic_dev, 0, sizeof(struct aic_dev_data));
   SDptr->hostdata = aic_dev;
   aic_dev->SDptr = SDptr;
@@ -6617,7 +6620,8 @@ aic7xxx_alloc_aic_dev(struct aic7xxx_host *p, Scsi_Device *SDptr)
   aic_dev->temp_q_depth = 1;
   scbq_init(&aic_dev->delayed_scbs);
   INIT_LIST_HEAD(&aic_dev->list);
-  return aic_dev;
+  list_add_tail(&aic_dev->list, &p->aic_devs);
+  return 0;
 }
 
 /*+F*************************************************************************
@@ -6726,13 +6730,13 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
 
 /*+F*************************************************************************
  * Function:
- *   aic7xxx_slave_detach
+ *   aic7xxx_slave_destroy
  *
  * Description:
  *   prepare for this device to go away
  *-F*************************************************************************/
-void
-aic7xxx_slave_detach(Scsi_Device *sdpnt)
+static void
+aic7xxx_slave_destroy(Scsi_Device *sdpnt)
 {
   struct aic_dev_data *aic_dev = sdpnt->hostdata;
 
@@ -6744,15 +6748,15 @@ aic7xxx_slave_detach(Scsi_Device *sdpnt)
 
 /*+F*************************************************************************
  * Function:
- *   aic7xxx_slave_attach
+ *   aic7xxx_slave_configure
  *
  * Description:
  *   Configure the device we are attaching to the controller.  This is
  *   where we get to do things like scan the INQUIRY data, set queue
  *   depths, allocate command structs, etc.
  *-F*************************************************************************/
-int
-aic7xxx_slave_attach(Scsi_Device *sdpnt)
+static int
+aic7xxx_slave_configure(Scsi_Device *sdpnt)
 {
   struct aic7xxx_host *p = (struct aic7xxx_host *) sdpnt->host->hostdata;
   struct aic_dev_data *aic_dev;
@@ -6760,12 +6764,6 @@ aic7xxx_slave_attach(Scsi_Device *sdpnt)
 
   aic_dev = (struct aic_dev_data *)sdpnt->hostdata;
 
-  if(!aic_dev) {
-    aic_dev = aic7xxx_alloc_aic_dev(p, sdpnt);
-  }
-  if(!aic_dev)
-    return 1;
-  
   aic7xxx_init_transinfo(p, aic_dev);
   aic7xxx_device_queue_depth(p, sdpnt);
   if(list_empty(&aic_dev->list))
@@ -10311,39 +10309,7 @@ aic7xxx_queue(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
   p = (struct aic7xxx_host *) cmd->host->hostdata;
 
   aic_dev = cmd->device->hostdata;  
-  if(!aic_dev) {
-    aic_dev = aic7xxx_alloc_aic_dev(p, cmd->device);
-    if(!aic_dev)
-      return 1;
-  }
-  else
-  {
-    aic_dev = AIC_DEV(cmd);
-  }
-
 #ifdef AIC7XXX_VERBOSE_DEBUGGING
-  /*
-   * Check to see if channel was scanned.
-   */
-  
-  if (!(p->flags & AHC_A_SCANNED) && (cmd->channel == 0))
-  {
-    if (aic7xxx_verbose & VERBOSE_PROBE2)
-      printk(INFO_LEAD "Scanning channel for devices.\n",
-        p->host_no, 0, -1, -1);
-    p->flags |= AHC_A_SCANNED;
-  }
-  else
-  {
-    if (!(p->flags & AHC_B_SCANNED) && (cmd->channel == 1))
-    {
-      if (aic7xxx_verbose & VERBOSE_PROBE2)
-        printk(INFO_LEAD "Scanning channel for devices.\n",
-          p->host_no, 1, -1, -1);
-      p->flags |= AHC_B_SCANNED;
-    }
-  }
-
   if (aic_dev->active_cmds > aic_dev->max_q_depth)
   {
     printk(WARN_LEAD "Commands queued exceeds queue "

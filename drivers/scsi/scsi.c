@@ -1963,8 +1963,8 @@ int scsi_slave_attach(struct scsi_device *sdev)
 			       " configured\n");
 			return 1;
 		}
-		if (sdev->host->hostt->slave_attach != NULL) {
-			if (sdev->host->hostt->slave_attach(sdev) != 0) {
+		if (sdev->host->hostt->slave_configure != NULL) {
+			if (sdev->host->hostt->slave_configure(sdev) != 0) {
 				printk(KERN_INFO "scsi: failed low level driver"
 				       " attach, some SCSI device might not be"
 				       " configured\n");
@@ -1991,8 +1991,6 @@ int scsi_slave_attach(struct scsi_device *sdev)
 void scsi_slave_detach(struct scsi_device *sdev)
 {
 	if (--sdev->attached == 0) {
-		if (sdev->host->hostt->slave_detach != NULL)
-			sdev->host->hostt->slave_detach(sdev);
 		scsi_release_commandblocks(sdev);
 	}
 }

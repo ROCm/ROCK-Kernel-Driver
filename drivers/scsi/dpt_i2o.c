@@ -355,7 +355,7 @@ static void adpt_inquiry(adpt_hba* pHba)
 }
 
 
-static int adpt_slave_attach(Scsi_Device * device)
+static int adpt_slave_configure(Scsi_Device * device)
 {
 	struct Scsi_Host *host = device->host;
 	adpt_hba* pHba;

@@ -468,7 +468,7 @@ static void scsi_initialize_merge_fn(struct scsi_device *sd)
 struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 				    uint id, uint lun)
 {
-	struct scsi_device *sdev;
+	struct scsi_device *sdev, *device;
 
 	sdev = kmalloc(sizeof(*sdev), GFP_ATOMIC);
 	if (sdev == NULL)
@@ -483,6 +483,8 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 		sdev->lun = lun;
 		sdev->channel = channel;
 		sdev->online = TRUE;
+		INIT_LIST_HEAD(&sdev->siblings);
+		INIT_LIST_HEAD(&sdev->same_target_siblings);
 		/*
 		 * Some low level driver could use device->type
 		 */
@@ -493,6 +495,12 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 		 * doesn't
 		 */
 		sdev->borken = 1;
+		if (shost->hostt->slave_alloc)
+			if (shost->hostt->slave_alloc(sdev)) {
+				kfree(sdev);
+				return NULL;
+			}
+
 		scsi_initialize_queue(sdev, shost);
 		sdev->request_queue.queuedata = (void *) sdev;
 
@@ -509,7 +517,15 @@ struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
 			sdev->prev->next = sdev;
 		} else
 			shost->host_queue = sdev;
-
+		list_for_each_entry(device, &shost->my_devices, siblings) {
+			if(device->id == sdev->id &&
+			   device->channel == sdev->channel) {
+				list_add_tail(&sdev->same_target_siblings,
+					      &device->same_target_siblings);
+				break;
+			}
+		}
+		list_add_tail(&sdev->siblings, &shost->my_devices);
 	}
 	return (sdev);
 }
@@ -530,8 +546,12 @@ void scsi_free_sdev(struct scsi_device *sdev)
 		sdev->host->host_queue = sdev->next;
 	if (sdev->next != NULL)
 		sdev->next->prev = sdev->prev;
+	list_del(&sdev->siblings);
+	list_del(&sdev->same_target_siblings);
 
 	blk_cleanup_queue(&sdev->request_queue);
+	if (sdev->host->hostt->slave_destroy)
+		sdev->host->hostt->slave_destroy(sdev);
 	if (sdev->inquiry != NULL)
 		kfree(sdev->inquiry);
 	kfree(sdev);
@@ -1469,6 +1489,17 @@ static int scsi_probe_and_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 	if (sdevscan->current_queue_depth == 0)
 		goto alloc_failed;
 
+	/*
+	 * Since we reuse the same sdevscan over and over with different
+	 * target and lun values, we have to destroy and then recreate
+	 * any possible low level attachments since they very will might
+	 * also store the id and lun numbers in some form and need updating
+	 * with each scan.
+	 */
+	if (sdevscan->host->hostt->slave_destroy)
+		sdevscan->host->hostt->slave_destroy(sdevscan);
+	if (sdevscan->host->hostt->slave_alloc)
+		sdevscan->host->hostt->slave_alloc(sdevscan);
 	sreq = scsi_allocate_request(sdevscan);
 	if (sreq == NULL)
 		goto alloc_failed;
@@ -1703,6 +1734,22 @@ static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 		 */
 		return 0;
 	}
+	/*
+	 * Since we reuse the same sdevscan over and over with different
+	 * target and lun values, we have to destroy and then recreate
+	 * any possible low level attachments since they very will might
+	 * also store the id and lun numbers in some form and need updating
+	 * with each scan.
+	 *
+	 * This is normally handled in probe_and_add_lun, but since this
+	 * one particular function wants to scan lun 0 on each device
+	 * itself and will possibly pick up a resed sdevscan when doing
+	 * so, it also needs this hack.
+	 */
+	if (sdevscan->host->hostt->slave_destroy)
+		sdevscan->host->hostt->slave_destroy(sdevscan);
+	if (sdevscan->host->hostt->slave_alloc)
+		sdevscan->host->hostt->slave_alloc(sdevscan);
 	sreq = scsi_allocate_request(sdevscan);
 
 	sprintf(devname, "host %d channel %d id %d", sdevscan->host->host_no,
@@ -1884,7 +1931,6 @@ int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
 	error = scsi_probe_and_add_lun(sdevscan, &sdev, NULL);
 	scsi_free_sdev(sdevscan);
 
-	error = -ENODEV;
 	if (error != SCSI_SCAN_LUN_PRESENT) 
 		goto out;
 

@@ -8,7 +8,7 @@ static int u14_34f_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int u14_34f_eh_abort(Scsi_Cmnd *);
 static int u14_34f_eh_host_reset(Scsi_Cmnd *);
 static int u14_34f_bios_param(struct scsi_device *, struct block_device *, sector_t, int *);
-static int u14_34f_slave_attach(Scsi_Device *);
+static int u14_34f_slave_configure(Scsi_Device *);
 
 #define U14_34F_VERSION "8.00.00"
 
@@ -22,7 +22,7 @@ static int u14_34f_slave_attach(Scsi_Device *);
                 eh_bus_reset_handler:    NULL,                               \
                 eh_host_reset_handler:   u14_34f_eh_host_reset,              \
                 bios_param:              u14_34f_bios_param,                 \
-                slave_attach:            u14_34f_slave_attach,               \
+                slave_configure:         u14_34f_slave_configure,            \
                 this_id:                 7,                                  \
                 unchecked_isa_dma:       1,                                  \
                 use_clustering:          ENABLE_CLUSTERING                   \

@@ -170,8 +170,8 @@ STATIC int NCR_700_host_reset(Scsi_Cmnd * SCpnt);
 STATIC int NCR_700_proc_directory_info(char *, char **, off_t, int, int, int);
 STATIC void NCR_700_chip_setup(struct Scsi_Host *host);
 STATIC void NCR_700_chip_reset(struct Scsi_Host *host);
-STATIC int NCR_700_slave_attach(Scsi_Device *SDpnt);
-STATIC void NCR_700_slave_detach(Scsi_Device *SDpnt);
+STATIC int NCR_700_slave_configure(Scsi_Device *SDpnt);
+STATIC void NCR_700_slave_destroy(Scsi_Device *SDpnt);
 
 static char *NCR_700_phase[] = {
 	"",
@@ -285,8 +285,8 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 	tpnt->cmd_per_lun = NCR_700_CMD_PER_LUN;
 	tpnt->use_clustering = DISABLE_CLUSTERING;
 	tpnt->proc_info = NCR_700_proc_directory_info;
-	tpnt->slave_attach = NCR_700_slave_attach;
-	tpnt->slave_detach = NCR_700_slave_detach;
+	tpnt->slave_configure = NCR_700_slave_configure;
+	tpnt->slave_destroy = NCR_700_slave_destroy;
 	tpnt->use_blk_tcq = 1;
 	tpnt->highmem_io = 1;
 	
@@ -1999,7 +1999,7 @@ NCR_700_host_reset(Scsi_Cmnd * SCp)
 }
 
 STATIC int
-NCR_700_slave_attach(Scsi_Device *SDp)
+NCR_700_slave_configure(Scsi_Device *SDp)
 {
 	/* to do here: allocate memory; build a queue_full list */
 	if(SDp->tagged_supported) {
@@ -2012,7 +2012,7 @@ NCR_700_slave_attach(Scsi_Device *SDp)
 }
 
 STATIC void
-NCR_700_slave_detach(Scsi_Device *SDp)
+NCR_700_slave_destroy(Scsi_Device *SDp)
 {
 	/* to do here: deallocate memory */
 }

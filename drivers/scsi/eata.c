@@ -802,7 +802,7 @@ static int pci_probe = TRUE;
 static int pci_probe = FALSE;
 #endif
 
-static int eata2x_slave_attach(Scsi_Device *dev) {
+static int eata2x_slave_configure(Scsi_Device *dev) {
    int j, tqd, utqd;
    char *tag_suffix, *link_suffix;
    struct Scsi_Host *host = dev->host;

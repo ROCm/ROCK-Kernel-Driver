@@ -3667,7 +3667,7 @@ mptscsih_bios_param(Disk * disk, kdev_t dev, int *ip)
  *	member to 1 if a device does not support Q tags.
  */
 int
-mptscsih_slave_attach(Scsi_Device *device)
+mptscsih_slave_configure(Scsi_Device *device)
 {
 	VirtDevice		*pTarget;
 	pTarget = device->hostdata;

@@ -57,7 +57,7 @@ extern int BusLogic_QueueCommand(SCSI_Command_T *,
 extern int BusLogic_BIOSDiskParameters(struct scsi_device *,
 		struct block_device *, sector_t, int *);
 extern int BusLogic_ProcDirectoryInfo(char *, char **, off_t, int, int, int);
-extern int BusLogic_SlaveAttach(SCSI_Device_T *);
+extern int BusLogic_SlaveConfigure(SCSI_Device_T *);
 
 
 /*
@@ -72,7 +72,7 @@ extern int BusLogic_SlaveAttach(SCSI_Device_T *);
     release:        BusLogic_ReleaseHostAdapter,  /* Release Host Adapter   */ \
     info:           BusLogic_DriverInfo,	  /* Driver Info Function   */ \
     queuecommand:   BusLogic_QueueCommand,	  /* Queue Command Function */ \
-    slave_attach:   BusLogic_SlaveAttach,	  /* Configure a SCSI_Device*/ \
+    slave_configure:BusLogic_SlaveConfigure,	  /* Configure a SCSI_Device*/ \
     bios_param:     BusLogic_BIOSDiskParameters,  /* BIOS Disk Parameters   */ \
     unchecked_isa_dma: 1,			  /* Default Initial Value  */ \
     max_sectors:    128,			  /* I/O queue len limit    */ \

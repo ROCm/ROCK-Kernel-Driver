@@ -377,7 +377,6 @@ extern int blk_nohighio;
 struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 {
 	struct Scsi_Host *shost, *shost_scr;
-	struct list_head *lh;
 	int gfp_mask;
 	DECLARE_MUTEX_LOCKED(sem);
 
@@ -408,6 +407,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	spin_lock_init(&shost->default_lock);
 	scsi_assign_lock(shost, &shost->default_lock);
 	atomic_set(&shost->host_active,0);
+	INIT_LIST_HEAD(&shost->my_devices);
 
 	init_waitqueue_head(&shost->host_wait);
 	shost->dma_channel = 0xff;
@@ -456,8 +456,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	 * orders the scsi_host_list by host number and just do a
 	 * list_add_tail.
 	 */
-	list_for_each(lh, &scsi_host_list) {
-		shost_scr = list_entry(lh, struct Scsi_Host, sh_list);
+	list_for_each_entry(shost_scr, &scsi_host_list, sh_list) {
 		if (shost->host_no < shost_scr->host_no) {
 			__list_add(&shost->sh_list, shost_scr->sh_list.prev,
 				   &shost_scr->sh_list);

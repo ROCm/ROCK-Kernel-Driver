@@ -71,7 +71,7 @@ static void __init pluto_detect_scsi_done(Scsi_Cmnd *SCpnt)
 		up(&fc_sem);
 }
 
-int pluto_slave_attach(Scsi_Device *device)
+int pluto_slave_configure(Scsi_Device *device)
 {
 	int depth_to_use;
 
