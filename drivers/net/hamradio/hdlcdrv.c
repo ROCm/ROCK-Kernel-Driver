@@ -549,6 +549,8 @@ static int hdlcdrv_close(struct net_device *dev)
 
 	netif_stop_queue(dev);
 
+	netif_stop_queue(dev);
+
 	if (s->ops && s->ops->close)
 		i = s->ops->close(dev);
 	if (s->skb)
