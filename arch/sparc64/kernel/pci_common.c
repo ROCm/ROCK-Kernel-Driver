@@ -54,6 +54,7 @@ static int __init find_device_prom_node(struct pci_pbm_info *pbm,
 	    (pdev->vendor == PCI_VENDOR_ID_SUN) &&
 	    (pdev->device == PCI_DEVICE_ID_SUN_PBM ||
 	     pdev->device == PCI_DEVICE_ID_SUN_SCHIZO ||
+	     pdev->device == PCI_DEVICE_ID_SUN_TOMATILLO ||
 	     pdev->device == PCI_DEVICE_ID_SUN_SABRE ||
 	     pdev->device == PCI_DEVICE_ID_SUN_HUMMINGBIRD)) {
 		*nregs = 0;
