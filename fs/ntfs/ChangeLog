@@ -34,6 +34,8 @@ ToDo:
 	  allows mounted NTFS volumes to be exported via NFS.
 	- Add missing return -EOPNOTSUPP; in
 	  fs/ntfs/aops.c::ntfs_commit_nonresident_write().
+	- Enforce no atime and no dir atime updates at mount/remount time as
+	  they are not implemented yet anyway.
 
 2.1.6 - Fix minor bug in handling of compressed directories.
 

@@ -323,6 +323,9 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 			return -EROFS;
 		}
 	}
+	// TODO:  For now we enforce no atime and dir atime updates as they are
+	// not implemented.
+	*flags |= MS_NOATIME | MS_NODIRATIME;
 #endif
 
 	// FIXME/TODO: If left like this we will have problems with rw->ro and
@@ -1400,6 +1403,10 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	ntfs_debug("Entering.");
 #ifndef NTFS_RW
 	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+#else
+	// TODO:  For now we enforce no atime and dir atime updates as they are
+	// not implemented.
+	sb->s_flags |= MS_NOATIME | MS_NODIRATIME;
 #endif
 	/* Allocate a new ntfs_volume and place it in sb->s_fs_info. */
 	sb->s_fs_info = kmalloc(sizeof(ntfs_volume), GFP_NOFS);
