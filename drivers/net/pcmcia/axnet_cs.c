@@ -92,7 +92,7 @@ static char *version =
 /*====================================================================*/
 
 static void axnet_config(dev_link_t *link);
-static void axnet_release(u_long arg);
+static void axnet_release(dev_link_t *link);
 static int axnet_event(event_t event, int priority,
 		       event_callback_args_t *args);
 static int axnet_open(struct net_device *dev);
@@ -194,10 +194,6 @@ static dev_link_t *axnet_attach(void)
     memset(info, 0, sizeof(*info));
     link = &info->link; dev = &info->dev;
     link->priv = info;
-    
-    init_timer(&link->release);
-    link->release.function = &axnet_release;
-    link->release.data = (u_long)link;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
     link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
     if (irq_list[0] == -1)
@@ -258,9 +254,8 @@ static void axnet_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
-	axnet_release((u_long)link);
+	axnet_release(link);
 	if (link->state & DEV_STALE_CONFIG) {
 	    link->state |= DEV_STALE_LINK;
 	    return;
@@ -518,7 +513,7 @@ static void axnet_config(dev_link_t *link)
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
-    axnet_release((u_long)link);
+    axnet_release(link);
     link->state &= ~DEV_CONFIG_PENDING;
     return;
 } /* axnet_config */
@@ -531,10 +526,8 @@ failed:
 
 ======================================================================*/
 
-static void axnet_release(u_long arg)
+static void axnet_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
-
     DEBUG(0, "axnet_release(0x%p)\n", link);
 
     if (link->open) {
@@ -574,7 +567,7 @@ static int axnet_event(event_t event, int priority,
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG) {
 	    netif_device_detach(&info->dev);
-	    mod_timer(&link->release, jiffies + HZ/20);
+	    axnet_release(link);
 	}
 	break;
     case CS_EVENT_CARD_INSERTION:
@@ -708,7 +701,7 @@ static int axnet_close(struct net_device *dev)
     netif_stop_queue(dev);
     del_timer_sync(&info->watchdog);
     if (link->state & DEV_STALE_CONFIG)
-	mod_timer(&link->release, jiffies + HZ/20);
+	axnet_release(link);
 
     return 0;
 } /* axnet_close */

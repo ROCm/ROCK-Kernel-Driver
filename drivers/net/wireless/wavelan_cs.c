@@ -4128,7 +4128,7 @@ wv_pcmcia_config(dev_link_t *	link)
   /* If any step failed, release any partially configured state */
   if(i != 0)
     {
-      wv_pcmcia_release((u_long) link);
+      wv_pcmcia_release(link);
       return FALSE;
     }
 
@@ -4148,9 +4148,8 @@ wv_pcmcia_config(dev_link_t *	link)
  * still open, this will be postponed until it is closed.
  */
 static void
-wv_pcmcia_release(u_long	arg)	/* Address of the interface struct */
+wv_pcmcia_release(dev_link_t *link)
 {
-  dev_link_t *	link = (dev_link_t *) arg;
   device *	dev = (device *) link->priv;
 
 #ifdef DEBUG_CONFIG_TRACE
@@ -4675,7 +4674,7 @@ wavelan_close(device *	dev)
   else
     /* The card is no more there (flag is activated in wv_pcmcia_release) */
     if(link->state & DEV_STALE_CONFIG)
-      wv_pcmcia_release((u_long)link);
+      wv_pcmcia_release(link);
 
 #ifdef DEBUG_CALLBACK_TRACE
   printk(KERN_DEBUG "%s: <-wavelan_close()\n", dev->name);
@@ -4713,10 +4712,6 @@ wavelan_attach(void)
   link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
   if (!link) return NULL;
   memset(link, 0, sizeof(struct dev_link_t));
-
-  /* Unused for the Wavelan */
-  link->release.function = &wv_pcmcia_release;
-  link->release.data = (u_long) link;
 
   /* The io structure describes IO port mapping */
   link->io.NumPorts1 = 8;
@@ -4857,7 +4852,7 @@ wavelan_detach(dev_link_t *	link)
   if(link->state & DEV_CONFIG)
     {
       /* Some others haven't done their job : give them another chance */
-      wv_pcmcia_release((u_long) link);
+      wv_pcmcia_release(link);
       if(link->state & DEV_STALE_CONFIG)
 	{
 #ifdef DEBUG_CONFIG_INFO
@@ -4965,7 +4960,7 @@ wavelan_event(event_t		event,		/* The event received */
 	    netif_device_detach(dev);
 
 	    /* Release the card */
-	    wv_pcmcia_release((u_long) link);
+	    wv_pcmcia_release(link);
 	  }
 	break;
 

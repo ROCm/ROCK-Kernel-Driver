@@ -204,7 +204,7 @@ MODULE_PARM(irq_list, "1-4i");
 /*====================================================================*/
 
 /* PCMCIA (Card Services) related functions */
-static void netwave_release(u_long arg);     /* Card removal */
+static void netwave_release(dev_link_t *link);     /* Card removal */
 static int  netwave_event(event_t event, int priority, 
 					      event_callback_args_t *args);
 static void netwave_pcmcia_config(dev_link_t *arg); /* Runs after card 
@@ -455,10 +455,6 @@ static dev_link_t *netwave_attach(void)
     link = &priv->link;
     link->priv = dev;
 
-    init_timer(&link->release);
-    link->release.function = &netwave_release;
-    link->release.data = (u_long)link;
-	
     /* The io structure describes IO port mapping */
     link->io.NumPorts1 = 16;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_16;
@@ -552,9 +548,8 @@ static void netwave_detach(dev_link_t *link)
 	  the release() function is called, that will trigger a proper
 	  detach().
 	*/
-    del_timer(&link->release);
     if (link->state & DEV_CONFIG) {
-	netwave_release((u_long) link);
+	netwave_release(link);
 	if (link->state & DEV_STALE_CONFIG) {
 	    DEBUG(1, "netwave_cs: detach postponed, '%s' still "
 		  "locked\n", link->dev->dev_name);
@@ -1149,7 +1144,7 @@ static void netwave_pcmcia_config(dev_link_t *link) {
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
-    netwave_release((u_long)link);
+    netwave_release(link);
 } /* netwave_pcmcia_config */
 
 /*
@@ -1159,8 +1154,8 @@ failed:
  *    device, and release the PCMCIA configuration.  If the device is
  *    still open, this will be postponed until it is closed.
  */
-static void netwave_release(u_long arg) {
-    dev_link_t *link = (dev_link_t *)arg;
+static void netwave_release(dev_link_t *link)
+{
     struct net_device *dev = link->priv;
     netwave_private *priv = dev->priv;
 
@@ -1220,7 +1215,7 @@ static int netwave_event(event_t event, int priority,
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG) {
 	    netif_device_detach(dev);
-	    mod_timer(&link->release, jiffies + HZ/20);
+	    netwave_release(link);
 	}
 	break;
     case CS_EVENT_CARD_INSERTION:
@@ -1738,8 +1733,7 @@ static int netwave_close(struct net_device *dev) {
     link->open--;
     netif_stop_queue(dev);
     if (link->state & DEV_STALE_CONFIG)
-	mod_timer(&link->release, jiffies + HZ/20);
-	
+	    netwave_release(link);
     return 0;
 }
 

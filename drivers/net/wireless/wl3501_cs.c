@@ -45,7 +45,6 @@
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/timer.h>
 #include <linux/wireless.h>
 
 #include <net/iw_handler.h>
@@ -112,7 +111,7 @@ static int wl3501_irq_list[4] = { -1 };
  * are invoked from the wl24 event handler.
  */
 static void wl3501_config(dev_link_t *link);
-static void wl3501_release(unsigned long arg);
+static void wl3501_release(dev_link_t *link);
 static int wl3501_event(event_t event, int pri, event_callback_args_t *args);
 
 /*
@@ -1298,9 +1297,8 @@ static int wl3501_close(struct net_device *dev)
 	wl3501_block_interrupt(this);
 
 	if (link->state & DEV_STALE_CONFIG) {
-		link->release.expires = jiffies + WL3501_RELEASE_TIMEOUT;
 		link->state |= DEV_RELEASE_PENDING;
-		add_timer(&link->release);
+		wl3501_release(link);
 	}
 	rc = 0;
 	printk(KERN_INFO "%s: WL3501 closed\n", dev->name);
@@ -2042,9 +2040,6 @@ static dev_link_t *wl3501_attach(void)
 	if (!link)
 		goto out;
 	memset(link, 0, sizeof(struct dev_link_t));
-	init_timer(&link->release);
-	link->release.function	= wl3501_release;
-	link->release.data	= (unsigned long)link;
 
 	/* The io structure describes IO port mapping */
 	link->io.NumPorts1	= 16;
@@ -2230,7 +2225,7 @@ static void wl3501_config(dev_link_t *link)
 cs_failed:
 	cs_error(link->handle, last_fn, last_ret);
 failed:
-	wl3501_release((unsigned long)link);
+	wl3501_release(link);
 out:
 	return;
 }
@@ -2243,9 +2238,8 @@ out:
  * and release the PCMCIA configuration.  If the device is still open, this
  * will be postponed until it is closed.
  */
-static void wl3501_release(unsigned long arg)
+static void wl3501_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *)arg;
 	struct net_device *dev = link->priv;
 
 	/* If the device is currently in use, we won't release until it is
@@ -2301,9 +2295,7 @@ static int wl3501_event(event_t event, int pri, event_callback_args_t *args)
 			while (link->open > 0)
 				wl3501_close(dev);
 			netif_device_detach(dev);
-			link->release.expires = jiffies +
-						WL3501_RELEASE_TIMEOUT;
-			add_timer(&link->release);
+			wl3501_release(link);
 		}
 		break;
 	case CS_EVENT_CARD_INSERTION:
@@ -2370,11 +2362,10 @@ static void __exit wl3501_exit_module(void)
 	dprintk(0, ": unloading");
 	pcmcia_unregister_driver(&wl3501_driver);
 	while (wl3501_dev_list) {
-		del_timer(&wl3501_dev_list->release);
 		/* Mark the device as non-existing to minimize calls to card */
 		wl3501_dev_list->state &= ~DEV_PRESENT;
 		if (wl3501_dev_list->state & DEV_CONFIG)
-			wl3501_release((unsigned long)wl3501_dev_list);
+			wl3501_release(wl3501_dev_list);
 		wl3501_detach(wl3501_dev_list);
 	}
 }
