@@ -57,6 +57,12 @@ config SA1100_CERF_FLASH_32MB
 
 endchoice
 
+config SA1100_COLLIE
+	bool "Sharp Zaurus SL5500"
+	depends on ARCH_SA1100
+	help
+	  Say Y here to support the Sharp Zaurus SL5500 PDAs.
+
 config SA1100_H3100
 	bool "Compaq iPAQ H3100"
 	help
