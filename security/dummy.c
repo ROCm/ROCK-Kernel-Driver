@@ -90,6 +90,13 @@ static int dummy_quota_on (struct file *f)
 	return 0;
 }
 
+static int dummy_syslog (int type)
+{
+	if ((type != 3) && current->euid)
+		return -EPERM;
+	return 0;
+}
+
 static int dummy_bprm_alloc_security (struct linux_binprm *bprm)
 {
 	return 0;
@@ -640,6 +647,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, quotactl);
 	set_to_dummy_if_null(ops, quota_on);
 	set_to_dummy_if_null(ops, sysctl);
+	set_to_dummy_if_null(ops, syslog);
 	set_to_dummy_if_null(ops, bprm_alloc_security);
 	set_to_dummy_if_null(ops, bprm_free_security);
 	set_to_dummy_if_null(ops, bprm_compute_creds);

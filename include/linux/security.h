@@ -47,6 +47,7 @@ extern void cap_bprm_compute_creds (struct linux_binprm *bprm);
 extern int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid, int flags);
 extern void cap_task_kmod_set_label (void);
 extern void cap_task_reparent_to_init (struct task_struct *p);
+extern int cap_syslog (int type);
 
 /*
  * Values used in the task_security_ops calls
@@ -778,6 +779,12 @@ struct swap_info_struct;
  *	@tsk contains the task_struct for the process.
  *	@cap contains the capability <include/linux/capability.h>.
  *	Return 0 if the capability is granted for @tsk.
+ * @syslog:
+ *	Check permission before accessing the kernel message ring or changing
+ *	logging to the console.
+ *	See the syslog(2) manual page for an explanation of the @type values.  
+ *	@type contains the type of action.
+ *	Return 0 if permission is granted.
  *
  * @register_security:
  * 	allow module stacking.
@@ -808,6 +815,7 @@ struct security_operations {
 	int (*capable) (struct task_struct * tsk, int cap);
 	int (*quotactl) (int cmds, int type, int id, struct super_block * sb);
 	int (*quota_on) (struct file * f);
+	int (*syslog) (int type);
 
 	int (*bprm_alloc_security) (struct linux_binprm * bprm);
 	void (*bprm_free_security) (struct linux_binprm * bprm);
@@ -1011,6 +1019,11 @@ static inline int security_quotactl (int cmds, int type, int id,
 static inline int security_quota_on (struct file * file)
 {
 	return security_ops->quota_on (file);
+}
+
+static inline int security_syslog(int type)
+{
+	return security_ops->syslog(type);
 }
 
 static inline int security_bprm_alloc (struct linux_binprm *bprm)
@@ -1625,6 +1638,11 @@ static inline int security_quotactl (int cmds, int type, int id,
 static inline int security_quota_on (struct file * file)
 {
 	return 0;
+}
+
+static inline int security_syslog(int type)
+{
+	return cap_syslog(type);
 }
 
 static inline int security_bprm_alloc (struct linux_binprm *bprm)

@@ -262,6 +262,13 @@ void cap_task_reparent_to_init (struct task_struct *p)
 	return;
 }
 
+int cap_syslog (int type)
+{
+	if ((type != 3) && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+	return 0;
+}
+
 EXPORT_SYMBOL(cap_capable);
 EXPORT_SYMBOL(cap_ptrace);
 EXPORT_SYMBOL(cap_capget);
@@ -272,6 +279,7 @@ EXPORT_SYMBOL(cap_bprm_compute_creds);
 EXPORT_SYMBOL(cap_task_post_setuid);
 EXPORT_SYMBOL(cap_task_kmod_set_label);
 EXPORT_SYMBOL(cap_task_reparent_to_init);
+EXPORT_SYMBOL(cap_syslog);
 
 #ifdef CONFIG_SECURITY
 
@@ -289,6 +297,8 @@ static struct security_operations capability_ops = {
 	.task_post_setuid =		cap_task_post_setuid,
 	.task_kmod_set_label =		cap_task_kmod_set_label,
 	.task_reparent_to_init =	cap_task_reparent_to_init,
+
+	.syslog =                       cap_syslog,
 };
 
 #if defined(CONFIG_SECURITY_CAPABILITIES_MODULE)
