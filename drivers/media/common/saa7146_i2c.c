@@ -1,7 +1,7 @@
 #include <linux/version.h>
 #include <media/saa7146_vv.h>
 
-u32 saa7146_i2c_func(struct i2c_adapter *adapter)
+static u32 saa7146_i2c_func(struct i2c_adapter *adapter)
 {
 //fm	DEB_I2C(("'%s'.\n", adapter->name));
 
@@ -190,7 +190,7 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword, int short_d
 		saa7146_write(dev, I2C_TRANSFER, *dword);
 
 		dev->i2c_op = 1;
-		IER_ENABLE(dev, MASK_16|MASK_17);
+		SAA7146_IER_ENABLE(dev, MASK_16|MASK_17);
 		saa7146_write(dev, MC2, (MASK_00 | MASK_16));
 
 		wait_event_interruptible(dev->i2c_wq, dev->i2c_op == 0);

@@ -11,6 +11,7 @@
 
 #include <linux/config.h>
 #include <asm/idprom.h>
+#include <asm/io.h>
 
 /*       M48T02 Register Map (adapted from Sun NVRAM/Hostid FAQ)
  *

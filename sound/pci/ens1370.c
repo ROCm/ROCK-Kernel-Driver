@@ -1839,6 +1839,7 @@ static int snd_ensoniq_free(ensoniq_t *ensoniq)
 	if (ensoniq->irq >= 0)
 		free_irq(ensoniq->irq, (void *)ensoniq);
 	pci_release_regions(ensoniq->pci);
+	pci_disable_device(ensoniq->pci);
 	kfree(ensoniq);
 	return 0;
 }
@@ -1893,8 +1894,10 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 	ensoniq = kcalloc(1, sizeof(*ensoniq), GFP_KERNEL);
-	if (ensoniq == NULL)
+	if (ensoniq == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&ensoniq->reg_lock);
 	init_MUTEX(&ensoniq->src_mutex);
 	ensoniq->card = card;
@@ -1902,6 +1905,7 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 	ensoniq->irq = -1;
 	if ((err = pci_request_regions(pci, "Ensoniq AudioPCI")) < 0) {
 		kfree(ensoniq);
+		pci_disable_device(pci);
 		return err;
 	}
 	ensoniq->port = pci_resource_start(pci, 0);

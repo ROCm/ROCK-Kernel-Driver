@@ -127,9 +127,7 @@ int __scm_send(struct socket *sock, struct msghdr *msg, struct scm_cookie *p)
 		   for too short ancillary data object at all! Oops.
 		   OK, let's add it...
 		 */
-		if (cmsg->cmsg_len < sizeof(struct cmsghdr) ||
-		    (unsigned long)(((char*)cmsg - (char*)msg->msg_control)
-				    + cmsg->cmsg_len) > msg->msg_controllen)
+		if (!CMSG_OK(msg, cmsg))
 			goto error;
 
 		if (cmsg->cmsg_level != SOL_SOCKET)

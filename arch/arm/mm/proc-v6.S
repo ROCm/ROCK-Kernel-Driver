@@ -250,8 +250,8 @@ cpu_elf_name:
 	 */
 	.type	__v6_proc_info, #object
 __v6_proc_info:
-	.long	0x00070000
-	.long	0x00ff0000
+	.long	0x0007b000
+	.long	0x0007f000
 	.long	0x00000c0e
 	b	__v6_setup
 	.long	cpu_arch_name

@@ -63,8 +63,7 @@ init_targ(struct tcf_ipt *p)
 	target = __ipt_find_target_lock(t->u.user.name, &ret);
 
 	if (!target) {
-		printk("init_targ: Failed to find %s\n",
-		       t->u.kernel.target->name);
+		printk("init_targ: Failed to find %s\n", t->u.user.name);
 		return -1;
 	}
 

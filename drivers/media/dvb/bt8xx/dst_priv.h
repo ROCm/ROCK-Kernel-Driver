@@ -30,7 +30,7 @@ union dst_gpio_packet {
 #define DST_IG_READ	2
 #define DST_IG_TS       3
 
-struct bt878 ;
+struct bt878;
 
 int bt878_device_control(struct bt878 *bt, unsigned int cmd, union dst_gpio_packet *mp);
 

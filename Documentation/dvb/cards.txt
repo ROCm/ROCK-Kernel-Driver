@@ -38,7 +38,7 @@ o Frontends drivers:
                		  Comtech DVBT-6k07 (SP5730 PLL)
                		  (NxtWave Communications NXT6000 demodulator)
    - sp887x		: Microtune 7202D
-   - dib3000mb	: DiBcom 3000-MB Frontend
+   - dib3000mb	: DiBcom 3000-MB demodulator
   DVB-S/C/T:
    - dst		: TwinHan DST Frontend
 
@@ -69,7 +69,17 @@ o Technotrend / Hauppauge DVB USB devices:
 
 o DiBcom DVB-T USB based devices:
   - Twinhan VisionPlus VisionDTV USB-Ter DVB-T Device
-  - KWorld V-Stream XPERT DTV - DVB-T USB
   - HAMA DVB-T USB device
+  - CTS Portable (Chinese Television System)
+  - KWorld V-Stream XPERT DTV DVB-T USB
+  - JetWay DTV DVB-T USB
+  - ADSTech Instant TV DVB-T USB
+  - Ultima Electronic/Artec T1 USB TVBOX (AN2135 and AN2235)
+  - Compro Videomate DVB-U2000 - DVB-T USB
+  - Grandtec USB DVB-T
+  - Avermedia AverTV DVBT USB
+  - DiBcom USB DVB-T reference device (non-public)
+  - Yakumo DVB-T mobile USB2.0
+  - DiBcom USB2.0 DVB-T reference device (non-public)
 
 o Experimental support for the analog module of the Siemens DVB-C PCI card

@@ -69,10 +69,12 @@ const struct smb_to_posix_error mapping_table_ERRDOS[] = {
 	{ERRinvparm, -EINVAL},
 	{ERRdiskfull, -ENOSPC},
 	{ERRinvname, -ENOENT},
+	{ERRinvlevel,-EOPNOTSUPP},
 	{ERRdirnotempty, -ENOTEMPTY},
 	{ERRnotlocked, -ENOLCK},
 	{ERRalreadyexists, -EEXIST},
 	{ERRmoredata, -EOVERFLOW},
+	{ERReasnotsupported,-EOPNOTSUPP},
 	{ErrQuota, -EDQUOT},
 	{ErrNotALink, -ENOLINK},
 	{ERRnetlogonNotStarted,-ENOPROTOOPT},
@@ -287,7 +289,7 @@ static const struct {
 	ERRDOS, 87, NT_STATUS_BAD_WORKING_SET_LIMIT}, {
 	ERRDOS, 87, NT_STATUS_INCOMPATIBLE_FILE_MAP}, {
 	ERRDOS, 87, NT_STATUS_SECTION_PROTECTION}, {
-	ERRDOS, 282, NT_STATUS_EAS_NOT_SUPPORTED}, {
+	ERRDOS, ERReasnotsupported, NT_STATUS_EAS_NOT_SUPPORTED}, {
 	ERRDOS, 255, NT_STATUS_EA_TOO_LARGE}, {
 	ERRHRD, ERRgeneral, NT_STATUS_NONEXISTENT_EA_ENTRY}, {
 	ERRHRD, ERRgeneral, NT_STATUS_NO_EAS_ON_FILE}, {
@@ -752,7 +754,8 @@ static const struct {
 	ERRDOS, ERRnoaccess, 0xc000028e}, {
 	ERRDOS, ERRnoaccess, 0xc000028f}, {
 	ERRDOS, ERRnoaccess, 0xc0000290}, {
-ERRDOS, ERRbadfunc, 0xc000029c},};
+	ERRDOS, ERRbadfunc, 0xc000029c}, {
+	ERRDOS, ERRinvlevel, 0x007c0001}, };
 
 /*****************************************************************************
  Print an error message from the status code

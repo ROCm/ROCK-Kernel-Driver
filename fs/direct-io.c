@@ -1161,6 +1161,9 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	struct dio *dio;
 	int reader_with_isem = (rw == READ && dio_lock_type == DIO_OWN_LOCKING);
 
+	if (rw & WRITE)
+		current->flags |= PF_SYNCWRITE;
+
 	if (bdev)
 		bdev_blkbits = blksize_bits(bdev_hardsect_size(bdev));
 
@@ -1244,6 +1247,8 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 out:
 	if (reader_with_isem)
 		up(&inode->i_sem);
+	if (rw & WRITE)
+		current->flags &= ~PF_SYNCWRITE;
 	return retval;
 }
 EXPORT_SYMBOL(__blockdev_direct_IO);

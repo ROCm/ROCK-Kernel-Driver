@@ -21,6 +21,8 @@ systems.
 All of these problems can be addressed with the "mem=XXXM" boot option
 (where XXX is the size of RAM to use in megabytes).  
 It can also tell Linux to use less memory than is actually installed.
+If you use "mem=" on a machine with PCI, consider using "memmap=" to avoid
+physical address space collisions.
 
 See the documentation of your boot loader (LILO, loadlin, etc.) about
 how to pass options to the kernel.
@@ -44,7 +46,9 @@ Try:
 	* Disabling the cache from the BIOS.
 
 	* Try passing the "mem=4M" option to the kernel to limit
-	  Linux to using a very small amount of memory.
+	  Linux to using a very small amount of memory. Use "memmap="-option
+	  together with "mem=" on systems with PCI to avoid physical address
+	  space collisions.
 
 
 Other tricks:

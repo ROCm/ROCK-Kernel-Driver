@@ -306,6 +306,7 @@ config NR_CPUS
 
 config GART_IOMMU
 	bool "IOMMU support"
+	depends on PCI
 	help
 	  Support the K8 IOMMU. Needed to run systems with more than 4GB of memory
 	  properly with 32-bit PCI devices that do not support DAC (Double Address

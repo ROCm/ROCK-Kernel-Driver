@@ -79,7 +79,7 @@ typedef struct {
 
 #define elf_check_arch(x)	(((x)->e_machine == EM_SPARC) || ((x)->e_machine == EM_SPARC32PLUS))
 
-#define ELF_ET_DYN_BASE         0x08000000
+#define ELF_ET_DYN_BASE         0x70000000
 
 
 #include <asm/processor.h>

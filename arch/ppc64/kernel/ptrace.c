@@ -318,7 +318,8 @@ void do_syscall_trace_leave(void)
 	if (unlikely(current->audit_context))
 		audit_syscall_exit(current, 0);	/* FIXME: pass pt_regs */
 
-	if (test_thread_flag(TIF_SYSCALL_TRACE)
+	if ((test_thread_flag(TIF_SYSCALL_TRACE)
+	     || test_thread_flag(TIF_SINGLESTEP))
 	    && (current->ptrace & PT_PTRACED))
 		do_syscall_trace();
 }

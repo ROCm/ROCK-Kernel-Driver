@@ -67,7 +67,7 @@
 #endif
 
 #ifdef CONFIG_BT_HCIUSB_SCO
-static int isoc = 1;
+static int isoc = 2;
 #endif
 
 #define VERSION "2.7"
@@ -898,7 +898,7 @@ static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 				switch (ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
 				case USB_ENDPOINT_XFER_ISOC:
 					if (ep->desc.wMaxPacketSize < size ||
-							uif->desc.bAlternateSetting > 2)
+							uif->desc.bAlternateSetting != isoc)
 						break;
 					size = ep->desc.wMaxPacketSize;
 
@@ -1037,7 +1037,7 @@ module_init(hci_usb_init);
 module_exit(hci_usb_exit);
 
 #ifdef CONFIG_BT_HCIUSB_SCO
-module_param(isoc, bool, 0);
+module_param(isoc, int, 0644);
 MODULE_PARM_DESC(isoc, "Set isochronous transfers for SCO over HCI support");
 #endif
 

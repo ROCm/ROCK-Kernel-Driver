@@ -1,34 +1,9 @@
-
-
 Documentation for dib3000mb frontend driver and dibusb device driver
-
-The drivers should work with
-
-- Twinhan VisionPlus VisionDTV USB-Ter DVB-T Device (VP7041)
-	http://www.twinhan.com/
-
-- CTS Portable (Chinese Television System)
-	http://www.2cts.tv/ctsportable/
-
-- KWorld V-Stream XPERT DTV - DVB-T USB
-	http://www.kworld.com.tw/asp/pindex.asp?id=4&pid=13
-
-- HAMA DVB-T USB device
-	http://www.hama.de/portal/articleId*110620/action*2598
-
-- DiBcom USB DVB-T reference device
-
-- Ultima Electronic/Artec T1 USB TVBOX
-	http://www.arteceuro.com/products-tvbox.html
-
-- Compro Videomate DVB-U2000 - DVB-T USB
-	http://www.comprousa.com/products/vmu2000.htm
-
-- Unknown USB DVB-T device with vendor ID Hyper-Paltek
+====================================================================
 
 Copyright (C) 2004 Patrick Boettcher (patrick.boettcher@desy.de),
 
-both drivers based on GPL code, which has
+dibusb and dib3000mb/mc drivers based on GPL code, which has
 
 Copyright (C) 2004 Amaury Demol for DiBcom (ademol@dibcom.fr)
 
@@ -37,7 +12,80 @@ modify it under the terms of the GNU General Public License as
 published by the Free Software Foundation, version 2.
 
 
-NEWS:
+Supported devices USB1.1
+========================
+
+Produced and reselled by Twinhan:
+---------------------------------
+- TwinhanDTV USB-Ter DVB-T Device (VP7041)
+	http://www.twinhan.com/product_terrestrial_3.asp
+
+- TwinhanDTV Magic Box (VP7041e)
+	http://www.twinhan.com/product_terrestrial_4.asp
+
+- HAMA DVB-T USB device
+	http://www.hama.de/portal/articleId*110620/action*2598
+
+- CTS Portable (Chinese Television System)
+	http://www.2cts.tv/ctsportable/
+
+- Unknown USB DVB-T device with vendor ID Hyper-Paltek
+
+
+Produced and reselled by KWorld:
+--------------------------------
+- KWorld V-Stream XPERT DTV DVB-T USB
+	http://www.kworld.com.tw/en/product/DVBT-USB/DVBT-USB.html
+
+- JetWay DTV DVB-T USB
+	http://www.jetway.com.tw/evisn/product/lcd-tv/DVT-USB/dtv-usb.htm
+
+- ADSTech Instant TV DVB-T USB
+	http://www.adstech.com/products/PTV-333/intro/PTV-333_intro.asp?pid=PTV-333
+
+
+Others:
+-------
+- Ultima Electronic/Artec T1 USB TVBOX (AN2135 and AN2235)
+	http://82.161.246.249/products-tvbox.html
+
+- Compro Videomate DVB-U2000 - DVB-T USB
+	http://www.comprousa.com/products/vmu2000.htm
+
+- Grandtec USB DVB-T
+	http://www.grand.com.tw/
+
+- Avermedia AverTV DVBT USB
+	http://www.avermedia.com/
+
+- DiBcom USB DVB-T reference device (non-public)
+
+
+Supported devices USB2.0
+========================
+- Twinhan MagicBox II
+	http://www.twinhan.com/product_terrestrial_7.asp
+
+- Yakumo DVB-T mobile
+	http://www.yakumo.de/produkte/index.php?pid=1&ag=DVB-T
+
+- DiBcom USB2.0 DVB-T reference device (non-public)
+
+
+0. NEWS:
+  2004-12-06 - possibility for demod i2c-address probing
+             - new usb IDs (Compro,Artec)
+  2004-11-23 - merged changes from DiB3000MC_ver2.1
+             - revised the debugging
+             - possibility to deliver the complete TS for USB2.0
+  2004-11-21 - first working version of the dib3000mc/p frontend driver.
+  2004-11-12 - added additional remote control keys. Thanks to Uwe Hanke.
+  2004-11-07 - added remote control support. Thanks to David Matthews.
+  2004-11-05 - added support for a new devices (Grandtec/Avermedia/Artec)
+             - merged my changes (for dib3000mb/dibusb) to the FE_REFACTORING, because it became HEAD
+             - moved transfer control (pid filter, fifo control) from usb driver to frontend, it seems
+               better settled there (added xfer_ops-struct)
+             - created a common files for frontends (mc/p/mb)
   2004-09-28 - added support for a new device (Unkown, vendor ID is Hyper-Paltek)
   2004-09-20 - added support for a new device (Compro DVB-U2000), thanks
                to Amaury Demol for reporting
@@ -49,7 +97,7 @@ NEWS:
 
   (old news for vp7041.c)
   2004-07-15 - found out, by accident, that the device has a TUA6010XS for
-               frequency generator
+               PLL
   2004-07-12 - figured out, that the driver should also work with the
                CTS Portable (Chinese Television System)
   2004-07-08 - firmware-extraction-2.422-problem solved, driver is now working
@@ -67,7 +115,7 @@ NEWS:
 
 1. How to use?
 NOTE: This driver was developed using Linux 2.6.6.,
-it is working with 2.6.7, 2.6.8.1.
+it is working with 2.6.7, 2.6.8.1, 2.6.9 .
 
 Linux 2.4.x support is not planned, but patches are very welcome.
 
@@ -81,7 +129,14 @@ The USB driver needs to download a firmware to start working.
 You can either use "get_dvb_firmware dibusb" to download the firmware or you
 can get it directly via
 
+for USB1.1 (AN2135)
 http://linuxtv.org/cgi-bin/cvsweb.cgi/dvb-kernel/firmware/dvb-dibusb-5.0.0.11.fw?rev=1.1&content-type=text/plain
+
+for USB1.1 (AN2235) (a few Artec T1 devices)
+http://linuxtv.org/cgi-bin/cvsweb.cgi/dvb-kernel/firmware/dvb-dibusb-an2235-1.fw?rev=1.1&content-type=text/plain
+
+for USB2.0 (FX2)
+http://linuxtv.org/cgi-bin/cvsweb.cgi/dvb-kernel/firmware/dvb-dibusb-6.0.0.5.fw?rev=1.1&content-type=text/plain
 
 1.2. Compiling
 
@@ -94,15 +149,16 @@ to compile the driver as module. Hotplug does the rest.
 Hotplug is able to load the driver, when it is needed (because you plugged
 in the device).
 
-If you want to enable debug output, you have to load the driver manually.
+If you want to enable debug output, you have to load the driver manually and
+from withing the dvb-kernel cvs repository.
 
 first have a look, which debug level are available:
 
-modinfo dvb-dibusb
 modinfo dib3000mb
+modinfo dvb-dibusb
 
-modprobe dvb-dibusb debug=<level> 
 modprobe dib3000mb debug=<level>
+modprobe dvb-dibusb debug=<level>
 
 should do the trick.
 
@@ -118,21 +174,17 @@ as a slave device in vdr, was not working for me. Some work has to be done
 2. Known problems and bugs
 
 TODO:
-- remote control tasklet
 - signal-quality and strength calculations
-- debug messages restructure
-- i2c address probing
-- 
 
 2.1. Adding support for devices 
 
 It is not possible to determine the range of devices based on the DiBcom
-reference design. This is because the reference design of DiBcom can be sold
-to third persons, without telling DiBcom (so done with the Twinhan VP7041 and
+reference designs. This is because the reference design of DiBcom can be sold
+to thirds, without telling DiBcom (so done with the Twinhan VP7041 and
 the HAMA device).
 
 When you think you have a device like this and the driver does not recognizes it,
-please send the ****load.inf and the ****cap.inf of the Windows driver to me.
+please send the ****load*.inf and the ****cap*.inf of the Windows driver to me.
 
 Sometimes the Vendor or Product ID is identical to the ones of Twinhan, even
 though it is not a Twinhan device (e.g. HAMA), then please send me the name
@@ -144,7 +196,29 @@ the dvb-dibusb.h-file and create a patch and send it over to me or to
 the linux-dvb mailing list, _after_ you have tried compiling and modprobing
 it.
 
-2.2. Comments
+2.2. USB1.1 Bandwidth limitation
+
+Most of the current supported devices are USB1.1 and thus they have a
+maximum bandwidth of about 5-6 MBit/s when connected to a USB2.0 hub.
+This is not enough for receiving the complete transport stream of a
+DVB-T channel (which can be about 16 MBit/s). Normally this is not a
+problem, if you only want to watch TV, but watching a channel while
+recording another channel on the same frequency simply does not work.
+This applies to all USB1.1 DVB-T devices.
+
+A special problem of the dibusb for the USB1.1 is, that the USB control
+IC has a problem with write accesses while having MPEG2-streaming
+enabled. When you set another pid while receiving MPEG2-TS it happens, that
+the stream is disturbed and probably data is lost (results in distortions of
+the video or strange beeps within the audio stream). DiBcom is preparing a
+firmware especially for Linux which perhaps solves the problem.
+
+Especially VDR users are victoms of this bug. VDR frequently requests new PIDs
+due the automatic scanning (introduced in 1.3.x, afaik) and epg-scan. Disabling
+these features is maybe a solution. Additionally this behaviour of VDR exceeds
+the USB1.1 bandwidth.
+
+2.3. Comments
 
 Patches, comments and suggestions are very very welcome
 
@@ -152,6 +226,9 @@ Patches, comments and suggestions are very very welcome
 	Amaury Demol (ademol@dibcom.fr) and Francois Kanounnikoff from DiBcom for
 	providing specs, code and help, on which the dvb-dibusb and dib3000mb are
 	based.
+
+   David Matthews for identifying a new device type (Artec T1 with AN2235)
+    and for extending dibusb with remote control event handling. Thank you.
 
    Alex Woods for frequently answering question about usb and dvb
     stuff, a big thank you

@@ -124,6 +124,12 @@ int verify_compat_iovec(struct msghdr *kern_msg, struct iovec *kern_iov,
 	 (struct compat_cmsghdr __user *)((msg)->msg_control) :		\
 	 (struct compat_cmsghdr __user *)NULL)
 
+#define CMSG_COMPAT_OK(ucmlen, ucmsg, mhdr) \
+	((ucmlen) >= sizeof(struct cmsghdr) && \
+	 (ucmlen) <= (unsigned long) \
+	 ((mhdr)->msg_controllen - \
+	  ((char *)(ucmsg) - (char *)(mhdr)->msg_control)))
+
 static inline struct compat_cmsghdr __user *cmsg_compat_nxthdr(struct msghdr *msg,
 		struct compat_cmsghdr __user *cmsg, int cmsg_len)
 {
@@ -154,11 +160,7 @@ int cmsghdr_from_user_compat_to_kern(struct msghdr *kmsg,
 			return -EFAULT;
 
 		/* Catch bogons. */
-		if(CMSG_COMPAT_ALIGN(ucmlen) <
-		   CMSG_COMPAT_ALIGN(sizeof(struct compat_cmsghdr)))
-			return -EINVAL;
-		if((unsigned long)(((char __user *)ucmsg - (char __user *)kmsg->msg_control)
-				   + ucmlen) > kmsg->msg_controllen)
+		if (!CMSG_COMPAT_OK(ucmlen, ucmsg, kmsg))
 			return -EINVAL;
 
 		tmp = ((ucmlen - CMSG_COMPAT_ALIGN(sizeof(*ucmsg))) +

@@ -695,7 +695,7 @@ void usbfs_add_device(struct usb_device *dev)
 	for (i = 0; i < dev->descriptor.bNumConfigurations; ++i) {
 		struct usb_config_descriptor *config =
 			(struct usb_config_descriptor *)dev->rawdescriptors[i];
-		i_size += le16_to_cpu (config->wTotalLength);
+		i_size += le16_to_cpu ((__force __le16)config->wTotalLength);
 	}
 	if (dev->usbfs_dentry->d_inode)
 		dev->usbfs_dentry->d_inode->i_size = i_size;
@@ -715,6 +715,7 @@ void usbfs_remove_device(struct usb_device *dev)
 	}
 	while (!list_empty(&dev->filelist)) {
 		ds = list_entry(dev->filelist.next, struct dev_state, list);
+		wake_up_all(&ds->wait);
 		list_del_init(&ds->list);
 		if (ds->discsignr) {
 			sinfo.si_signo = SIGPIPE;

@@ -52,7 +52,7 @@
 /*------------------------------------------------------------------*/
 
 #include <linux/module.h>
-
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/init.h>
@@ -88,10 +88,10 @@ static struct usb_device_id dongles[] = {
 
 /*
  * Important note :
- * Devices based on the SigmaTel chipset (0x66f, 0x4200) are not compliant
- * with the USB-IrDA specification (and actually very very different), and
- * there is no way this driver can support those devices, apart from
- * a complete rewrite...
+ * Devices based on the SigmaTel chipset (0x66f, 0x4200) are not designed
+ * using the "USB-IrDA specification" (yes, there exist such a thing), and
+ * therefore not supported by this driver (don't add them above).
+ * There is a Linux driver, stir4200, that support those USB devices.
  * Jean II
  */
 
@@ -1007,9 +1007,9 @@ static int irda_usb_net_close(struct net_device *netdev)
 	}
 	/* Cancel Tx and speed URB - need to be synchronous to avoid races */
 	self->tx_urb->transfer_flags &= ~URB_ASYNC_UNLINK;
-	usb_unlink_urb(self->tx_urb);
+	usb_kill_urb(self->tx_urb);
 	self->speed_urb->transfer_flags &= ~URB_ASYNC_UNLINK;
-	usb_unlink_urb(self->speed_urb);
+	usb_kill_urb(self->speed_urb);
 
 	/* Stop and remove instance of IrLAP */
 	if (self->irlap)
@@ -1520,9 +1520,9 @@ static void irda_usb_disconnect(struct usb_interface *intf)
 		/* Cancel Tx and speed URB.
 		 * Toggle flags to make sure it's synchronous. */
 		self->tx_urb->transfer_flags &= ~URB_ASYNC_UNLINK;
-		usb_unlink_urb(self->tx_urb);
+		usb_kill_urb(self->tx_urb);
 		self->speed_urb->transfer_flags &= ~URB_ASYNC_UNLINK;
-		usb_unlink_urb(self->speed_urb);
+		usb_kill_urb(self->speed_urb);
 	}
 
 	/* Cleanup the device stuff */
@@ -1593,7 +1593,7 @@ module_exit(usb_irda_cleanup);
 /*
  * Module parameters
  */
-MODULE_PARM(qos_mtt_bits, "i");
+module_param(qos_mtt_bits, int, 0);
 MODULE_PARM_DESC(qos_mtt_bits, "Minimum Turn Time");
 MODULE_AUTHOR("Roman Weissgaerber <weissg@vienna.at>, Dag Brattli <dag@brattli.net> and Jean Tourrilhes <jt@hpl.hp.com>");
 MODULE_DESCRIPTION("IrDA-USB Dongle Driver"); 

@@ -1980,6 +1980,7 @@ static int snd_via82xx_free(via82xx_t *chip)
 		pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE, chip->old_legacy);
 		pci_write_config_byte(chip->pci, VIA_PNP_CONTROL, chip->old_legacy_cfg);
 	}
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -2006,8 +2007,10 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	if ((chip = kcalloc(1, sizeof(*chip), GFP_KERNEL)) == NULL)
+	if ((chip = kcalloc(1, sizeof(*chip), GFP_KERNEL)) == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	chip->chip_type = chip_type;
 	chip->revision = revision;
@@ -2025,6 +2028,7 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, card->driver)) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 	chip->port = pci_resource_start(pci, 0);

@@ -418,7 +418,7 @@ static int call_filldir(struct file * filp, void * dirent,
 				get_dtype(sb, fname->file_type));
 		if (error) {
 			filp->f_pos = curr_pos;
-			info->extra_fname = fname;
+			info->extra_fname = fname->next;
 			return error;
 		}
 		fname = fname->next;
@@ -457,12 +457,9 @@ static int ext3_dx_readdir(struct file * filp,
 	 * If there are any leftover names on the hash collision
 	 * chain, return them first.
 	 */
-	if (info->extra_fname) {
-		if(call_filldir(filp, dirent, filldir, info->extra_fname))
-			goto finished;
-		else
-			goto next_entry;
-	}
+	if (info->extra_fname &&
+	    call_filldir(filp, dirent, filldir, info->extra_fname))
+		goto finished;
 
 	if (!info->curr_node)
 		info->curr_node = rb_first(&info->root);
@@ -495,7 +492,7 @@ static int ext3_dx_readdir(struct file * filp,
 		info->curr_minor_hash = fname->minor_hash;
 		if (call_filldir(filp, dirent, filldir, fname))
 			break;
-next_entry:
+
 		info->curr_node = rb_next(info->curr_node);
 		if (!info->curr_node) {
 			if (info->next_hash == ~0) {

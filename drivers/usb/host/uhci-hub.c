@@ -69,7 +69,7 @@ static int uhci_hub_status_data(struct usb_hcd *hcd, char *buf)
  * FIXME:  Synchronize access to these fields by a spinlock.
  */
 static void uhci_finish_suspend(struct uhci_hcd *uhci, int port,
-		unsigned int port_addr)
+		unsigned long port_addr)
 {
 	int status;
 
@@ -78,13 +78,19 @@ static void uhci_finish_suspend(struct uhci_hcd *uhci, int port,
 		clear_bit(port, &uhci->suspended_ports);
 		clear_bit(port, &uhci->resuming_ports);
 		set_bit(port, &uhci->port_c_suspend);
+
+		/* The controller won't actually turn off the RD bit until
+		 * it has had a chance to send a low-speed EOP sequence,
+		 * which takes 3 bit times (= 2 microseconds).  We'll delay
+		 * slightly longer for good luck. */
+		udelay(4);
 	}
 }
 
 static void uhci_check_resume(struct uhci_hcd *uhci)
 {
 	unsigned int port;
-	unsigned int port_addr;
+	unsigned long port_addr;
 
 	for (port = 0; port < uhci->rh_numports; ++port) {
 		port_addr = uhci->io_addr + USBPORTSC1 + 2 * port;
