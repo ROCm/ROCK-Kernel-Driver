@@ -4468,7 +4468,11 @@ __init static void arch_init_sched_domains(void)
 		sd = &per_cpu(phys_domains, i);
 		group = cpu_to_phys_group(i);
 		*sd = SD_CPU_INIT;
+#ifdef CONFIG_NUMA
 		sd->span = nodemask;
+#else
+		sd->span = cpu_possible_map;
+#endif
 		sd->parent = p;
 		sd->groups = &sched_group_phys[group];
 
@@ -4506,6 +4510,7 @@ __init static void arch_init_sched_domains(void)
 						&cpu_to_isolated_group);
 	}
 
+#ifdef CONFIG_NUMA
 	/* Set up physical groups */
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		cpumask_t nodemask = node_to_cpumask(i);
@@ -4517,6 +4522,10 @@ __init static void arch_init_sched_domains(void)
 		init_sched_build_groups(sched_group_phys, nodemask,
 						&cpu_to_phys_group);
 	}
+#else
+	init_sched_build_groups(sched_group_phys, cpu_possible_map,
+							&cpu_to_phys_group);
+#endif
 
 #ifdef CONFIG_NUMA
 	/* Set up node groups */
