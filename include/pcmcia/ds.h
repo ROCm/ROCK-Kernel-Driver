@@ -152,7 +152,6 @@ struct pcmcia_driver {
 	void			(*detach)(dev_link_t *);
 	struct module		*owner;
 	struct device_driver	drv;
-	struct pcmcia_driver	*next;
 };
 
 int pcmcia_register_driver(struct pcmcia_driver *driver);
