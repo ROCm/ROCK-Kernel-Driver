@@ -644,6 +644,9 @@ nfs_fhget(struct dentry *dentry, struct nfs_fh *fhandle,
 	return __nfs_fhget(sb, fhandle, fattr);
 }
 
+/* Don't use READDIRPLUS on directories that we believe are too large */
+#define NFS_LIMIT_READDIRPLUS (8*PAGE_SIZE)
+
 /*
  * Look up the inode by super block and fattr->fileid.
  */
@@ -692,6 +695,9 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		} else if (S_ISDIR(inode->i_mode)) {
 			inode->i_op = &nfs_dir_inode_operations;
 			inode->i_fop = &nfs_dir_operations;
+			if (nfs_server_capable(inode, NFS_CAP_READDIRPLUS)
+			    && fattr->size <= NFS_LIMIT_READDIRPLUS)
+				NFS_FLAGS(inode) |= NFS_INO_ADVISE_RDPLUS;
 		} else if (S_ISLNK(inode->i_mode))
 			inode->i_op = &nfs_symlink_inode_operations;
 		else
