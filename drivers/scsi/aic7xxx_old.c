@@ -252,7 +252,7 @@
 
 #include <linux/config.h>        /* for CONFIG_PCI */
 
-#define AIC7XXX_C_VERSION  "5.2.5"
+#define AIC7XXX_C_VERSION  "5.2.6"
 
 #define NUMBER(arr)     (sizeof(arr) / sizeof(arr[0]))
 #define MIN(a,b)        (((a) < (b)) ? (a) : (b))
@@ -274,21 +274,11 @@
 #endif
 
 /*
- * You can try raising me if tagged queueing is enabled, or lowering
- * me if you only have 4 SCBs.
+ * You can try raising me for better performance or lowering me if you have
+ * flaky devices that go off the scsi bus when hit with too many tagged
+ * commands (like some IBM SCSI-3 LVD drives).
  */
 #define AIC7XXX_CMDS_PER_DEVICE 32
-
-/*
- * *** Determining commands per LUN ***
- * 
- * When AIC7XXX_CMDS_PER_DEVICE is not defined, the driver will use its
- * own algorithm to determine the commands/LUN.  If SCB paging is
- * enabled, which is always now, the default is 8 commands per lun
- * that indicates it supports tagged queueing.  All non-tagged devices
- * use an internal queue depth of 3, with no more than one of those
- * three commands active at one time.
- */
 
 typedef struct
 {
@@ -296,8 +286,8 @@ typedef struct
 } adapter_tag_info_t;
 
 /*
- * Make a define that will tell the driver not to use tagged queueing
- * by default.
+ * Make a define that will tell the driver not to the default tag depth
+ * everywhere.
  */
 #define DEFAULT_TAG_COMMANDS {0, 0, 0, 0, 0, 0, 0, 0,\
                               0, 0, 0, 0, 0, 0, 0, 0}
@@ -878,7 +868,6 @@ struct aic_dev_data {
   volatile unsigned short  temp_q_depth;
   unsigned short           max_q_depth;
   volatile unsigned char   active_cmds;
-  unsigned char            cmds_sent;
   /*
    * Statistics Kept:
    *
@@ -891,6 +880,9 @@ struct aic_dev_data {
    */
   long w_total;                          /* total writes */
   long r_total;                          /* total reads */
+  long barrier_total;			 /* total num of REQ_BARRIER commands */
+  long ordered_total;			 /* How many REQ_BARRIER commands we
+					    used ordered tags to satisfy */
   long w_bins[6];                       /* binned write */
   long r_bins[6];                       /* binned reads */
   transinfo_type	cur;
@@ -998,7 +990,7 @@ struct aic7xxx_host {
   unsigned short           sc_size;
   struct aic7xxx_host     *next;             /* allow for multiple IRQs */
   struct Scsi_Host        *host;             /* pointer to scsi host */
-  struct list_head	   aic_devs;	     /* all aic devs on host */
+  struct list_head	   aic_devs;	     /* all aic_dev structs on host */
   int                      host_no;          /* SCSI host number */
   unsigned long            mbase;            /* I/O memory address */
   ahc_chip                 chip;             /* chip type */
@@ -1066,6 +1058,10 @@ static struct aic7xxx_syncrate {
  *       rule are noted in the comments.
  */
 
+/*
+ * Use this as the default queue depth when setting tagged queueing on.
+ */
+static unsigned int aic7xxx_default_queue_depth = AIC7XXX_CMDS_PER_DEVICE;
 
 /*
  * Skip the scsi bus reset.  Non 0 make us skip the reset at startup.  This
@@ -1369,6 +1365,7 @@ aic7xxx_setup(char *s)
     { "pci_parity", &aic7xxx_pci_parity },
     { "dump_card", &aic7xxx_dump_card },
     { "dump_sequencer", &aic7xxx_dump_sequencer },
+    { "default_queue_depth", &aic7xxx_default_queue_depth },
     { "scbram", &aic7xxx_scbram },
     { "seltime", &aic7xxx_seltime },
     { "tag_info",    NULL }
@@ -2636,6 +2633,7 @@ aic7xxx_allocate_scb(struct aic7xxx_host *p)
 static void
 aic7xxx_queue_cmd_complete(struct aic7xxx_host *p, Scsi_Cmnd *cmd)
 {
+  aic7xxx_position(cmd) = SCB_LIST_NULL;
   cmd->host_scribble = (char *)p->completeq.head;
   p->completeq.head = cmd;
 }
@@ -2868,6 +2866,12 @@ aic7xxx_done(struct aic7xxx_host *p, struct aic7xxx_scb *scb)
     {
       aic_dev->r_total++;
       ptr = aic_dev->r_bins;
+    }
+    if(cmd->device->simple_tags && cmd->request->flags & REQ_BARRIER)
+    {
+      aic_dev->barrier_total++;
+      if(scb->tag_action == MSG_ORDERED_Q_TAG)
+        aic_dev->ordered_total++;
     }
     x = scb->sg_length;
     x >>= 10;
@@ -3130,23 +3134,41 @@ aic7xxx_reset_device(struct aic7xxx_host *p, int target, int channel,
 {
   struct aic7xxx_scb *scbp, *prev_scbp;
   struct scsi_device *sd;
-  unsigned char active_scb, tcl;
+  unsigned char active_scb, tcl, scb_tag;
   int i = 0, init_lists = FALSE;
-  struct list_head *list_item, *list_head;
-  struct aic_dev_data *aic_dev;
+  struct aic_dev_data *aic_dev, *remove_aic_dev = NULL;
 
   /*
    * Restore this when we're done
    */
   active_scb = aic_inb(p, SCBPTR);
+  /*
+   * If we are still scanning devices, this device may not be linked into
+   * our host controller yet.  So, we grab the temporary aic_dev that we
+   * allocate during the device scan (by getting device->hostdata for the
+   * active device) and if the list struct in the aic_dev is empty, we
+   * add it to p->aic_devs.  Then at the end of the function, if we added
+   * the aic_dev to our host struct so our loop would work, then we just
+   * remove it.
+   */
+  scb_tag = aic_inb(p, SCB_TAG);
+  if(scb_tag < p->scb_data->numscbs)
+  {
+    scbp = p->scb_data->scb_array[scb_tag];
+    remove_aic_dev = (struct aic_dev_data *)scbp->cmd->device->hostdata;
+    if(list_empty(&remove_aic_dev->list))
+      list_add_tail(&remove_aic_dev->list, &p->aic_devs);
+    else
+      remove_aic_dev = NULL;
+  }
 
   if (aic7xxx_verbose & (VERBOSE_RESET_PROCESS | VERBOSE_ABORT_PROCESS))
   {
-    printk(INFO_LEAD "Reset device, active_scb %d\n",
-         p->host_no, channel, target, lun, active_scb);
-    printk(INFO_LEAD "Current scb_tag %d, SEQADDR 0x%x, LASTPHASE "
+    printk(INFO_LEAD "Reset device, hardware_scb %d, aic_dev %p,\n",
+         p->host_no, channel, target, lun, active_scb, remove_aic_dev);
+    printk(INFO_LEAD "Current scb %d, SEQADDR 0x%x, LASTPHASE "
            "0x%x\n",
-         p->host_no, channel, target, lun, aic_inb(p, SCB_TAG),
+         p->host_no, channel, target, lun, scb_tag,
          aic_inb(p, SEQADDR0) | (aic_inb(p, SEQADDR1) << 8),
          aic_inb(p, LASTPHASE));
     printk(INFO_LEAD "SG_CACHEPTR 0x%x, SG_COUNT %d, SCSISIGI 0x%x\n",
@@ -3157,13 +3179,15 @@ aic7xxx_reset_device(struct aic7xxx_host *p, int target, int channel,
          p->host_no, channel, target, lun, aic_inb(p, SSTAT0),
          aic_inb(p, SSTAT1), aic_inb(p, SSTAT2));
   }
+
   /*
    * Deal with the busy target and linked next issues.
    */
-  list_head = &p->aic_devs;
-  list_for_each(list_item, list_head)
+  list_for_each_entry(aic_dev, &p->aic_devs, list)
   {
-    aic_dev = list_entry(list_item, struct aic_dev_data, list);
+    if (aic7xxx_verbose & (VERBOSE_RESET_PROCESS | VERBOSE_ABORT_PROCESS))
+      printk(INFO_LEAD "processing aic_dev %p\n", p->host_no, channel, target,
+		    lun, aic_dev);
     sd = aic_dev->SDptr;
 
     if((target != ALL_TARGETS && target != sd->id) ||
@@ -3205,6 +3229,8 @@ aic7xxx_reset_device(struct aic7xxx_host *p, int target, int channel,
       }
     }
   }
+  if (remove_aic_dev)
+    list_del(&remove_aic_dev->list);
 
   if (aic7xxx_verbose & (VERBOSE_ABORT_PROCESS | VERBOSE_RESET_PROCESS))
     printk(INFO_LEAD "Cleaning QINFIFO.\n", p->host_no, channel, target, lun );
@@ -6526,22 +6552,19 @@ do_aic7xxx_isr(int irq, void *dev_id, struct pt_regs *regs)
 
 /*+F*************************************************************************
  * Function:
- *   aic7xxx_init_aic_dev
+ *   aic7xxx_init_transinfo
  *
  * Description:
- *   Set up the initial aic_dev values from the BIOS settings and data
- *   we got back from INQUIRY commands.
+ *   Set up the initial aic_dev values from the BIOS settings and from
+ *   INQUIRY results
  *-F*************************************************************************/
 static void
-aic7xxx_init_aic_dev(struct aic7xxx_host *p, struct aic_dev_data *aic_dev)
+aic7xxx_init_transinfo(struct aic7xxx_host *p, struct aic_dev_data *aic_dev)
 {
-  struct scsi_device *sdpnt = aic_dev->SDptr;
+  Scsi_Device *sdpnt = aic_dev->SDptr;
   unsigned char tindex;
 
   tindex = sdpnt->id | (sdpnt->channel << 3);
-
-  scbq_init(&aic_dev->delayed_scbs);
-
   if (!(aic_dev->flags & DEVICE_DTR_SCANNED))
   {
     aic_dev->flags |= DEVICE_DTR_SCANNED;
@@ -6599,13 +6622,42 @@ aic7xxx_init_aic_dev(struct aic7xxx_host *p, struct aic_dev_data *aic_dev)
 
 /*+F*************************************************************************
  * Function:
+ *   aic7xxx_alloc_aic_dev
+ *
+ * Description:
+ *   Set up the initial aic_dev struct pointers
+ *-F*************************************************************************/
+static struct aic_dev_data *
+aic7xxx_alloc_aic_dev(struct aic7xxx_host *p, Scsi_Device *SDptr)
+{
+  struct aic_dev_data *aic_dev;
+
+  aic_dev = kmalloc(sizeof(struct aic_dev_data), GFP_ATOMIC | GFP_KERNEL);
+  if(!aic_dev)
+    return aic_dev;
+  memset(aic_dev, 0, sizeof(struct aic_dev_data));
+  SDptr->hostdata = aic_dev;
+  aic_dev->SDptr = SDptr;
+  aic_dev->max_q_depth = 1;
+  aic_dev->temp_q_depth = 1;
+  scbq_init(&aic_dev->delayed_scbs);
+  INIT_LIST_HEAD(&aic_dev->list);
+  return aic_dev;
+}
+
+/*+F*************************************************************************
+ * Function:
  *   aic7xxx_device_queue_depth
  *
  * Description:
  *   Determines the queue depth for a given device.  There are two ways
  *   a queue depth can be obtained for a tagged queueing device.  One
  *   way is the default queue depth which is determined by whether
- *   AIC7XXX_CMDS_PER_DEVICE is defined.  If it is defined, then it is used
+ *   aic7xxx_default_queue_depth.  The other is by the aic7xxx_tag_info
+ *   array.
+ *
+ *   If tagged queueing isn't supported on the device, then we set the
+ *   depth to p->host->hostt->cmd_per_lun for internal driver queueing.
  *   as the default queue depth.  Otherwise, we use either 4 or 8 as the
  *   default queue depth (dependent on the number of hardware SCBs).
  *   The other way we determine queue depth is through the use of the
@@ -6617,7 +6669,7 @@ aic7xxx_init_aic_dev(struct aic7xxx_host *p, struct aic_dev_data *aic_dev)
 static void
 aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
 {
-  int default_depth = p->host->hostt->cmd_per_lun;
+  int tag_enabled = FALSE;
   struct aic_dev_data *aic_dev = device->hostdata;
   unsigned char tindex;
 
@@ -6626,14 +6678,9 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
   if (device->simple_tags)
     return; // We've already enabled this device
 
-  aic_dev->temp_q_depth = 1;
-  aic_dev->max_q_depth = 1;
-
   if (device->tagged_supported)
   {
-    int tag_enabled = TRUE;
-
-    default_depth = AIC7XXX_CMDS_PER_DEVICE;
+    tag_enabled = TRUE;
 
     if (!(p->discenable & (1 << tindex)))
     {
@@ -6641,6 +6688,7 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
         printk(INFO_LEAD "Disconnection disabled, unable to "
              "enable tagged queueing.\n",
              p->host_no, device->channel, device->id, device->lun);
+      tag_enabled = FALSE;
     }
     else
     {
@@ -6655,7 +6703,8 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
                            " the aic7xxx.c source file.\n");
           print_warning = FALSE;
         }
-        aic_dev->max_q_depth = aic_dev->temp_q_depth = default_depth;
+        aic_dev->max_q_depth = aic_dev->temp_q_depth =
+		aic7xxx_default_queue_depth;
       }
       else
       {
@@ -6666,7 +6715,8 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
         }
         else if (aic7xxx_tag_info[p->instance].tag_commands[tindex] == 0)
         {
-          aic_dev->max_q_depth = aic_dev->temp_q_depth = default_depth;
+          aic_dev->max_q_depth = aic_dev->temp_q_depth =
+		  aic7xxx_default_queue_depth;
         }
         else
         {
@@ -6674,17 +6724,27 @@ aic7xxx_device_queue_depth(struct aic7xxx_host *p, Scsi_Device *device)
             aic7xxx_tag_info[p->instance].tag_commands[tindex];
         }
       }
-      if (tag_enabled)
-      {
-        if (aic7xxx_verbose & VERBOSE_NEGOTIATION2)
-        {
-              printk(INFO_LEAD "Enabled tagged queuing, queue depth %d.\n",
-                p->host_no, device->channel, device->id,
-                device->lun, aic_dev->max_q_depth);
-        }
-	scsi_adjust_queue_depth(device, MSG_ORDERED_TAG, aic_dev->max_q_depth);
-      }
     }
+  }
+  if (tag_enabled)
+  {
+    if (aic7xxx_verbose & VERBOSE_NEGOTIATION2)
+    {
+          printk(INFO_LEAD "Tagged queuing enabled, queue depth %d.\n",
+            p->host_no, device->channel, device->id,
+            device->lun, aic_dev->max_q_depth);
+    }
+    scsi_adjust_queue_depth(device, MSG_ORDERED_TAG, aic_dev->max_q_depth);
+  }
+  else
+  {
+    if (aic7xxx_verbose & VERBOSE_NEGOTIATION2)
+    {
+          printk(INFO_LEAD "Tagged queuing disabled, queue depth %d.\n",
+            p->host_no, device->channel, device->id,
+            device->lun, device->host->cmd_per_lun);
+    }
+    scsi_adjust_queue_depth(device, 0, device->host->cmd_per_lun);
   }
   return;
 }
@@ -6722,28 +6782,22 @@ aic7xxx_slave_attach(Scsi_Device *sdpnt)
   struct aic7xxx_host *p = (struct aic7xxx_host *) sdpnt->host->hostdata;
   struct aic_dev_data *aic_dev;
   int scbnum;
-  struct list_head *list_ptr, *list_head;
 
-  if(!sdpnt->hostdata) {
-    sdpnt->hostdata = kmalloc(sizeof(struct aic_dev_data), GFP_ATOMIC);
-    if(!sdpnt->hostdata)
-      return 1;
-    memset(sdpnt->hostdata, 0, sizeof(struct aic_dev_data));
+  aic_dev = (struct aic_dev_data *)sdpnt->hostdata;
+
+  if(!aic_dev) {
+    aic_dev = aic7xxx_alloc_aic_dev(p, sdpnt);
   }
-
-  aic_dev = sdpnt->hostdata;
-  aic_dev->SDptr = sdpnt;
-
-  aic7xxx_init_aic_dev(p, aic_dev);
+  if(!aic_dev)
+    return 1;
   
-  list_add(&aic_dev->list, &p->aic_devs);
-
+  aic7xxx_init_transinfo(p, aic_dev);
   aic7xxx_device_queue_depth(p, sdpnt);
+  if(list_empty(&aic_dev->list))
+    list_add_tail(&aic_dev->list, &p->aic_devs);
 
   scbnum = 0;
-  list_head = &p->aic_devs;
-  list_for_each(list_ptr, list_head) {
-    aic_dev = list_entry(list_ptr, struct aic_dev_data, list);
+  list_for_each_entry(aic_dev, &p->aic_devs, list) {
     scbnum += aic_dev->max_q_depth;
   }
   while (scbnum > p->scb_data->numscbs)
@@ -7878,6 +7932,7 @@ aic7xxx_register(Scsi_Host_Template *template, struct aic7xxx_host *p,
   p->completeq.tail = NULL;
   scbq_init(&p->scb_data->free_scbs);
   scbq_init(&p->waiting_scbs);
+  INIT_LIST_HEAD(&p->aic_devs);
 
   /*
    * We currently have no commands of any type
@@ -10117,30 +10172,6 @@ aic7xxx_detect(Scsi_Host_Template *template)
   return (found);
 }
 
-#ifdef AIC7XXX_VERBOSE_DEBUGGING
-/*+F*************************************************************************
- * Function:
- *   aic7xxx_print_scb
- *
- * Description:
- *   Dump the byte codes for an about to be sent SCB.
- *-F*************************************************************************/
-static void
-aic7xxx_print_scb(struct aic7xxx_host *p, struct aic7xxx_scb *scb)
-{
-  int i;
-  unsigned char *x;  
-
-  x = (unsigned char *)&scb->hscb->control;
-
-  for(i=0; i<32; i++)
-  {
-    printk("%02x ", x[i]);
-  }
-  printk("\n");
-}
-#endif
-
 /*+F*************************************************************************
  * Function:
  *   aic7xxx_buildscb
@@ -10157,6 +10188,7 @@ aic7xxx_buildscb(struct aic7xxx_host *p, Scsi_Cmnd *cmd,
   struct aic_dev_data *aic_dev = cmd->device->hostdata;
   struct scsi_device *sdptr = cmd->device;
   unsigned char tindex = TARGET_INDEX(cmd);
+  struct request *req = cmd->request;
 
   mask = (0x01 << tindex);
   hscb = scb->hscb;
@@ -10171,15 +10203,16 @@ aic7xxx_buildscb(struct aic7xxx_host *p, Scsi_Cmnd *cmd,
   if (p->discenable & mask)
   {
     hscb->control |= DISCENB;
-    if ( (sdptr->simple_tags) &&
-         (cmd->cmnd[0] != TEST_UNIT_READY) )
+    /* We always force TEST_UNIT_READY to untagged */
+    if (cmd->cmnd[0] != TEST_UNIT_READY && sdptr->simple_tags)
     {
-      aic_dev->cmds_sent++;
-      if (aic_dev->cmds_sent >= 254 && sdptr->ordered_tags)
+      if (req->flags & REQ_BARRIER)
       {
-        aic_dev->cmds_sent = 0;
-        hscb->control |= MSG_ORDERED_Q_TAG;
-        scb->tag_action = MSG_ORDERED_Q_TAG;
+	if(sdptr->ordered_tags)
+	{
+          hscb->control |= MSG_ORDERED_Q_TAG;
+          scb->tag_action = MSG_ORDERED_Q_TAG;
+	}
       }
       else
       {
@@ -10306,19 +10339,25 @@ aic7xxx_queue(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
   struct aic7xxx_host *p;
   struct aic7xxx_scb *scb;
   struct aic_dev_data *aic_dev;
-#ifdef AIC7XXX_VERBOSE_DEBUGGING
-  int tindex = TARGET_INDEX(cmd);
-#endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,95)
-  unsigned long cpu_flags = 0;
-#endif
 
   p = (struct aic7xxx_host *) cmd->host->hostdata;
+
+  aic_dev = cmd->device->hostdata;  
+  if(!aic_dev) {
+    aic_dev = aic7xxx_alloc_aic_dev(p, cmd->device);
+    if(!aic_dev)
+      return 1;
+  }
+  else
+  {
+    aic_dev = AIC_DEV(cmd);
+  }
+
+#ifdef AIC7XXX_VERBOSE_DEBUGGING
   /*
    * Check to see if channel was scanned.
    */
   
-#ifdef AIC7XXX_VERBOSE_DEBUGGING
   if (!(p->flags & AHC_A_SCANNED) && (cmd->channel == 0))
   {
     if (aic7xxx_verbose & VERBOSE_PROBE2)
@@ -10337,24 +10376,14 @@ aic7xxx_queue(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
     }
   }
 
-  if (p->dev_active_cmds[tindex] > (cmd->device->queue_depth + 1))
+  if (aic_dev->active_cmds > aic_dev->max_q_depth)
   {
     printk(WARN_LEAD "Commands queued exceeds queue "
            "depth, active=%d\n",
            p->host_no, CTL_OF_CMD(cmd), 
-           p->dev_active_cmds[tindex]);
-    if ( p->dev_active_cmds[tindex] > 220 )
-      p->dev_active_cmds[tindex] = 0;
+           aic_dev->active_cmds);
   }
 #endif
-
-  if(!cmd->device->hostdata) {
-    aic_dev = kmalloc(sizeof(struct aic_dev_data), GFP_ATOMIC);
-    if(!aic_dev)
-      return 1;
-    memset(aic_dev, 0, sizeof(struct aic_dev_data));
-    cmd->device->hostdata = aic_dev;
-  }
 
   scb = scbq_remove_head(&p->scb_data->free_scbs);
   if (scb == NULL)
@@ -10369,13 +10398,13 @@ aic7xxx_queue(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
     }
   }
   scb->cmd = cmd;
-  aic7xxx_position(cmd) = scb->hscb->tag;
 
   /*
    * Make sure the Scsi_Cmnd pointer is saved, the struct it points to
    * is set up properly, and the parity error flag is reset, then send
    * the SCB to the sequencer and watch the fun begin.
    */
+  aic7xxx_position(cmd) = scb->hscb->tag;
   cmd->scsi_done = fn;
   cmd->result = DID_OK;
   memset(cmd->sense_buffer, 0, sizeof(cmd->sense_buffer));
@@ -10392,10 +10421,7 @@ aic7xxx_queue(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
   scb->flags |= SCB_ACTIVE | SCB_WAITINGQ;
 
   scbq_insert_tail(&p->waiting_scbs, scb);
-  if ( (p->flags & (AHC_IN_ISR | AHC_IN_ABORT | AHC_IN_RESET)) == 0)
-  {
-    aic7xxx_run_waiting_queues(p);
-  }
+  aic7xxx_run_waiting_queues(p);
   return (0);
 }
 
@@ -10410,21 +10436,40 @@ aic7xxx_queue(Scsi_Cmnd *cmd, void (*fn)(Scsi_Cmnd *))
  *   aborted, then we will reset the channel and have all devices renegotiate.
  *   Returns an enumerated type that indicates the status of the operation.
  *-F*************************************************************************/
-static int
-aic7xxx_bus_device_reset(struct aic7xxx_host *p, Scsi_Cmnd *cmd)
+int
+aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
 {
+  struct aic7xxx_host  *p;
   struct aic7xxx_scb   *scb;
   struct aic7xxx_hwscb *hscb;
-  int result = -1;
   int channel;
   unsigned char saved_scbptr, lastphase;
   unsigned char hscb_index;
   int disconnected;
-  struct aic_dev_data *aic_dev = AIC_DEV(cmd);
+  struct aic_dev_data *aic_dev;
 
-  scb = (p->scb_data->scb_array[aic7xxx_position(cmd)]);
+  if(cmd == NULL)
+  {
+    printk(KERN_ERR "aic7xxx_bus_device_reset: called with NULL cmd!\n");
+    return FAILED;
+  }
+  p = (struct aic7xxx_host *)cmd->host->hostdata;
+  aic_dev = AIC_DEV(cmd);
+  if(aic7xxx_position(cmd) < p->scb_data->numscbs)
+    scb = (p->scb_data->scb_array[aic7xxx_position(cmd)]);
+  else
+    return FAILED;
+
   hscb = scb->hscb;
 
+  aic7xxx_isr(p->irq, (void *)p, NULL);
+  aic7xxx_done_cmds_complete(p);
+  /* If the command was already complete or just completed, then we didn't
+   * do a reset, return FAILED */
+  if(!scb->flags & SCB_ACTIVE)
+    return FAILED;
+
+  pause_sequencer(p);
   lastphase = aic_inb(p, LASTPHASE);
   if (aic7xxx_verbose & VERBOSE_RESET_PROCESS)
   {
@@ -10494,101 +10539,95 @@ aic7xxx_bus_device_reset(struct aic7xxx_host *p, Scsi_Cmnd *cmd)
       printk(WARN_LEAD "Invalid SCB ID %d is active, "
              "SCB flags = 0x%x.\n", p->host_no,
             CTL_OF_CMD(cmd), scb->hscb->tag, scb->flags);
-      return(SCSI_RESET_ERROR);
+      unpause_sequencer(p, FALSE);
+      return FAILED;
     }
     if (scb->hscb->tag == aic_inb(p, SCB_TAG))
     { 
-      if ( (lastphase != P_MESGOUT) && (lastphase != P_MESGIN) )
+      if ( (lastphase == P_MESGOUT) || (lastphase == P_MESGIN) )
       {
-        if (aic7xxx_verbose & VERBOSE_RESET_PROCESS)
-          printk(INFO_LEAD "Device reset message in "
-                "message buffer\n", p->host_no, CTL_OF_SCB(scb));
-        scb->flags |= SCB_RESET | SCB_DEVICE_RESET;
-        aic7xxx_error(cmd) = DID_RESET;
-        aic_dev->flags |= BUS_DEVICE_RESET_PENDING;
-        /* Send the abort message to the active SCB. */
-        aic_outb(p, HOST_MSG, MSG_OUT);
-        aic_outb(p, lastphase | ATNO, SCSISIGO);
-        return(SCSI_RESET_PENDING);
-      }
-      else
-      {
-        /* We want to send out the message, but it could screw an already */
-        /* in place and being used message.  Instead, we return an error  */
-        /* to try and start the bus reset phase since this command is     */
-        /* probably hung (aborts failed, and now reset is failing).  We   */
-        /* also make sure to set BUS_DEVICE_RESET_PENDING so we won't try */
-        /* any more on this device, but instead will escalate to a bus or */
-        /* host reset (additionally, we won't try to abort any more).     */
         printk(WARN_LEAD "Device reset, Message buffer "
                 "in use\n", p->host_no, CTL_OF_SCB(scb));
-        scb->flags |= SCB_RESET | SCB_DEVICE_RESET;
-        aic7xxx_error(cmd) = DID_RESET;
-        aic_dev->flags |= BUS_DEVICE_RESET_PENDING;
-        return(SCSI_RESET_ERROR);
+        unpause_sequencer(p, FALSE);
+	return FAILED;
       }
+	
+      if (aic7xxx_verbose & VERBOSE_RESET_PROCESS)
+        printk(INFO_LEAD "Device reset message in "
+              "message buffer\n", p->host_no, CTL_OF_SCB(scb));
+      scb->flags |= SCB_RESET | SCB_DEVICE_RESET;
+      aic7xxx_error(cmd) = DID_RESET;
+      aic_dev->flags |= BUS_DEVICE_RESET_PENDING;
+      /* Send the abort message to the active SCB. */
+      aic_outb(p, HOST_MSG, MSG_OUT);
+      aic_outb(p, lastphase | ATNO, SCSISIGO);
+      unpause_sequencer(p, FALSE);
+      spin_unlock_irq(p->host->host_lock);
+      scsi_sleep(HZ);
+      spin_lock_irq(p->host->host_lock);
+      if(aic_dev->flags & BUS_DEVICE_RESET_PENDING)
+        return FAILED;
+      else
+        return SUCCESS;
     }
   } /* if (last_phase != P_BUSFREE).....indicates we are idle and can work */
-  hscb_index = aic7xxx_find_scb(p, scb);
-  if (hscb_index == SCB_LIST_NULL)
+  /*
+   * Simply set the MK_MESSAGE flag and the SEQINT handler will do
+   * the rest on a reconnect/connect.
+   */
+  scb->hscb->control |= MK_MESSAGE;
+  scb->flags |= SCB_RESET | SCB_DEVICE_RESET;
+  aic_dev->flags |= BUS_DEVICE_RESET_PENDING;
+  /*
+   * Check to see if the command is on the qinfifo.  If it is, then we will
+   * not need to queue the command again since the card should start it soon
+   */
+  if (aic7xxx_search_qinfifo(p, cmd->channel, cmd->target, cmd->lun, hscb->tag,
+			  0, TRUE, NULL) == 0)
   {
-    disconnected = (aic7xxx_scb_on_qoutfifo(p, scb)) ? FALSE : TRUE;
-  }
-  else
-  {
-    aic_outb(p, hscb_index, SCBPTR);
-    if (aic_inb(p, SCB_CONTROL) & DISCONNECTED)
-    {
-      disconnected = TRUE;
-    }
-  }
-  if (disconnected)
-  {
-        /*
-         * Simply set the MK_MESSAGE flag and the SEQINT handler will do
-         * the rest on a reconnect.
-         */
-    scb->hscb->control |= MK_MESSAGE;
-    scb->flags |= SCB_RESET | SCB_DEVICE_RESET;
-    aic_dev->flags |= BUS_DEVICE_RESET_PENDING;
-    if (hscb_index != SCB_LIST_NULL)
+    disconnected = TRUE;
+    if ((hscb_index = aic7xxx_find_scb(p, scb)) != SCB_LIST_NULL)
     {
       unsigned char scb_control;
 
       aic_outb(p, hscb_index, SCBPTR);
       scb_control = aic_inb(p, SCB_CONTROL);
+      /*
+       * If the DISCONNECTED bit is not set in SCB_CONTROL, then we are
+       * actually on the waiting list, not disconnected, and we don't
+       * need to requeue the command.
+       */
+      disconnected = (scb_control & DISCONNECTED);
       aic_outb(p, scb_control | MK_MESSAGE, SCB_CONTROL);
     }
-        /*
-         * Actually requeue this SCB in case we can select the
-         * device before it reconnects.  If the transaction we
-         * want to abort is not tagged, then this will be the only
-         * outstanding command and we can simply shove it on the
-         * qoutfifo and be done.  If it is tagged, then it goes right
-         * in with all the others, no problem :)  We need to add it
-         * to the qinfifo and let the sequencer know it is there.
-         * Now, the only problem left to deal with is, *IF* this
-         * command completes, in spite of the MK_MESSAGE bit in the
-         * control byte, then we need to pick that up in the interrupt
-         * routine and clean things up.  This *shouldn't* ever happen.
-         */
-    if (aic7xxx_verbose & VERBOSE_RESET_PROCESS)
-      printk(INFO_LEAD "Queueing device reset "
-           "command.\n", p->host_no, CTL_OF_SCB(scb));
-    p->qinfifo[p->qinfifonext++] = scb->hscb->tag;
-    if (p->features & AHC_QUEUE_REGS)
-      aic_outb(p, p->qinfifonext, HNSCB_QOFF);
-    else
-      aic_outb(p, p->qinfifonext, KERNEL_QINPOS);
-    scb->flags |= SCB_QUEUED_ABORT;
-    result = SCSI_RESET_PENDING;
-  }
-  else if (result == -1)
-  {
-    result = SCSI_RESET_ERROR;
+    if (disconnected)
+    {
+      /*
+       * Actually requeue this SCB in case we can select the
+       * device before it reconnects.  This can result in the command
+       * being on the qinfifo twice, but we don't care because it will
+       * all get cleaned up if/when the reset takes place.
+       */
+      if (aic7xxx_verbose & VERBOSE_RESET_PROCESS)
+        printk(INFO_LEAD "Queueing device reset command.\n", p->host_no,
+		      CTL_OF_SCB(scb));
+      p->qinfifo[p->qinfifonext++] = scb->hscb->tag;
+      if (p->features & AHC_QUEUE_REGS)
+        aic_outb(p, p->qinfifonext, HNSCB_QOFF);
+      else
+        aic_outb(p, p->qinfifonext, KERNEL_QINPOS);
+      scb->flags |= SCB_QUEUED_ABORT;
+    }
   }
   aic_outb(p, saved_scbptr, SCBPTR);
-  return (result);
+  unpause_sequencer(p, FALSE);
+  spin_unlock_irq(p->host->host_lock);
+  scsi_sleep(HZ/4);
+  spin_lock_irq(p->host->host_lock);
+  if(aic_dev->flags & BUS_DEVICE_RESET_PENDING)
+    return FAILED;
+  else
+    return SUCCESS;
 }
 
 
@@ -10630,12 +10669,30 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
 {
   struct aic7xxx_scb  *scb = NULL;
   struct aic7xxx_host *p;
-  struct aic_dev_data *aic_dev = AIC_DEV(cmd);
-  int    result, found=0;
-  unsigned char tmp_char, saved_hscbptr, next_hscbptr, prev_hscbptr;
+  int    found=0, disconnected;
+  unsigned char saved_hscbptr, hscbptr, scb_control;
+  struct aic_dev_data *aic_dev;
 
-  p = (struct aic7xxx_host *) cmd->host->hostdata;
-  scb = (p->scb_data->scb_array[aic7xxx_position(cmd)]);
+  if(cmd == NULL)
+  {
+    printk(KERN_ERR "aic7xxx_abort: called with NULL cmd!\n");
+    return FAILED;
+  }
+  p = (struct aic7xxx_host *)cmd->host->hostdata;
+  aic_dev = AIC_DEV(cmd);
+  if(aic7xxx_position(cmd) < p->scb_data->numscbs)
+    scb = (p->scb_data->scb_array[aic7xxx_position(cmd)]);
+  else
+    return FAILED;
+
+  aic7xxx_isr(p->irq, (void *)p, NULL);
+  aic7xxx_done_cmds_complete(p);
+  /* If the command was already complete or just completed, then we didn't
+   * do a reset, return FAILED */
+  if(!scb->flags & SCB_ACTIVE)
+    return FAILED;
+
+  pause_sequencer(p);
 
   /*
    * I added a new config option to the driver: "panic_on_abort" that will
@@ -10648,92 +10705,6 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
   if (aic7xxx_panic_on_abort)
     aic7xxx_panic_abort(p, cmd);
 
-/*
- *  Run the isr to grab any command in the QOUTFIFO and any other misc.
- *  assundry tasks.  This should also set up the bh handler if there is
- *  anything to be done, but it won't run until we are done here since
- *  we are following a straight code path without entering the scheduler
- *  code.
- */
-  pause_sequencer(p);
-  while ( (aic_inb(p, INTSTAT) & INT_PEND) && !(p->flags & AHC_IN_ISR))
-  {
-    aic7xxx_isr(p->irq, p, (void *)NULL);
-    pause_sequencer(p);
-  }
-  aic7xxx_done_cmds_complete(p);
-
-  if (scb == NULL)
-  {
-    if (aic7xxx_verbose & VERBOSE_ABORT_MID)
-      printk(INFO_LEAD "Abort called with bogus Scsi_Cmnd "
-        "pointer.\n", p->host_no, CTL_OF_CMD(cmd));
-    unpause_sequencer(p, FALSE);
-    return(SCSI_ABORT_NOT_RUNNING);
-  }
-  if (scb->cmd != cmd)  /*  Hmmm...either this SCB is currently free with a */
-  {                     /*  NULL cmd pointer (NULLed out when freed) or it  */
-                        /*  has already been recycled for another command   */
-                        /*  Either way, this SCB has nothing to do with this*/
-                        /*  command and we need to deal with cmd without    */
-                        /*  touching the SCB.                               */
-                        /*  The theory here is to return a value that will  */
-                        /*  make the queued for complete command actually   */
-                        /*  finish successfully, or to indicate that we     */
-                        /*  don't have this cmd any more and the mid level  */
-                        /*  code needs to find it.                          */
-    if (aic7xxx_verbose & VERBOSE_ABORT_MID)
-      printk(INFO_LEAD "Abort called for already completed"
-        " command.\n", p->host_no, CTL_OF_CMD(cmd));
-    unpause_sequencer(p, FALSE);
-    return(SCSI_ABORT_NOT_RUNNING);
-  }
-    
-/*   At this point we know the following:
- *     the SCB pointer is valid
- *     the command pointer passed in to us and the scb->cmd pointer match
- *     this then means that the command we need to abort is the same as the
- *     command held by the scb pointer and is a valid abort request.
- *   Now, we just have to figure out what to do from here.  Current plan is:
- *     if we have already been here on this command, escalate to a reset
- *     if scb is on waiting list or QINFIFO, send it back as aborted, but
- *       we also need to be aware of the possibility that we could be using
- *       a faked negotiation command that is holding this command up,  if
- *       so we need to take care of that command instead, which means we
- *       would then treat this one like it was sitting around disconnected
- *       instead.
- *     if scb is on WAITING_SCB list in sequencer, free scb and send back
- *     if scb is disconnected and not completed, abort with abort message
- *     if scb is currently running, then it may be causing the bus to hang
- *       so we want a return value that indicates a reset would be appropriate
- *       if the command does not finish shortly
- *     if scb is already complete but not on completeq, we're screwed because
- *       this can't happen (except if the command is in the QOUTFIFO, in which
- *       case we would like it to complete successfully instead of having to
- *       to be re-done)
- *   All other scenarios already dealt with by previous code.
- */
-
-  if ( scb->flags & (SCB_ABORT | SCB_RESET | SCB_QUEUED_ABORT) )
-  {
-    if (aic7xxx_verbose & VERBOSE_ABORT_PROCESS)
-      printk(INFO_LEAD "SCB aborted once already, "
-        "escalating.\n", p->host_no, CTL_OF_SCB(scb));
-    unpause_sequencer(p, FALSE);
-    return(SCSI_ABORT_SNOOZE);
-  }
-  if ( (p->flags & (AHC_RESET_PENDING | AHC_ABORT_PENDING)) || 
-          (aic_dev->flags & BUS_DEVICE_RESET_PENDING) )
-  {
-    if (aic7xxx_verbose & VERBOSE_ABORT_PROCESS)
-      printk(INFO_LEAD "Reset/Abort pending for this "
-        "device, not wasting our time.\n", p->host_no, CTL_OF_SCB(scb));
-    unpause_sequencer(p, FALSE);
-    return(SCSI_ABORT_PENDING);
-  }
-
-  found = 0;
-  p->flags |= AHC_IN_ABORT;
   if (aic7xxx_verbose & VERBOSE_ABORT)
   {
     printk(INFO_LEAD "Aborting scb %d, flags 0x%x, SEQADDR 0x%x, LASTPHASE "
@@ -10750,56 +10721,8 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
          aic_inb(p, SSTAT1), aic_inb(p, SSTAT2));
   }
 
-/*
- *   First, let's check to see if the currently running command is our target
- *    since if it is, the return is fairly easy and quick since we don't want
- *    to touch the command in case it might complete, but we do want a timeout
- *    in case it's actually hung, so we really do nothing, but tell the mid
- *    level code to reset the timeout.
- */
-
-  if ( scb->hscb->tag == aic_inb(p, SCB_TAG) )
+  if (scb->flags & SCB_WAITINGQ)
   {
-   /*
-    *  Check to see if the sequencer is just sitting on this command, or
-    *   if it's actively being run.
-    */
-    result = aic_inb(p, LASTPHASE);
-    switch (result)
-    {
-      case P_DATAOUT:    /*    For any of these cases, we can assume we are */
-      case P_DATAIN:     /*    an active command and act according.  For    */
-      case P_COMMAND:    /*    anything else we are going to fall on through*/
-      case P_STATUS:     /*    The SCSI_ABORT_SNOOZE will give us two abort */
-      case P_MESGOUT:    /*    chances to finish and then escalate to a     */
-      case P_MESGIN:     /*    reset call                                   */
-        if (aic7xxx_verbose & VERBOSE_ABORT_PROCESS)
-          printk(INFO_LEAD "SCB is currently active.  "
-                "Waiting on completion.\n", p->host_no, CTL_OF_SCB(scb));
-        printk(INFO_LEAD "SCSISIGI 0x%x, SEQADDR 0x%x, SSTAT0 0x%x, SSTAT1 "
-           "0x%x\n", p->host_no, CTL_OF_SCB(scb),
-           aic_inb(p, SCSISIGI),
-           aic_inb(p, SEQADDR0) | (aic_inb(p, SEQADDR1) << 8),
-           aic_inb(p, SSTAT0), aic_inb(p, SSTAT1));
-        printk(INFO_LEAD "SG_CACHEPTR 0x%x, SSTAT2 0x%x, STCNT 0x%x\n",
-           p->host_no, CTL_OF_SCB(scb),
-           (p->features & AHC_ULTRA2) ? aic_inb(p, SG_CACHEPTR) : 0,
-           aic_inb(p, SSTAT2), aic_inb(p, STCNT + 2) << 16 |
-           aic_inb(p, STCNT + 1) << 8 | aic_inb(p, STCNT));
-        unpause_sequencer(p, FALSE);
-        p->flags &= ~AHC_IN_ABORT;
-        scb->flags |= SCB_RECOVERY_SCB; /*  Note the fact that we've been  */
-        p->flags |= AHC_ABORT_PENDING;  /*  here so we will know not to    */
-        return(SCSI_ABORT_PENDING);     /*  one doesn't complete and clear */
-        break;                          /*  out.                           */
-      default:
-        break;
-    }
-  }
-
-  if ((found == 0) && (scb->flags & SCB_WAITINGQ))
-  {
-
     if (aic7xxx_verbose & VERBOSE_ABORT_PROCESS) 
       printk(INFO_LEAD "SCB found on waiting list and "
           "aborted.\n", p->host_no, CTL_OF_SCB(scb));
@@ -10809,95 +10732,123 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
     p->activescbs++;
     scb->flags &= ~(SCB_WAITINGQ | SCB_ACTIVE);
     scb->flags |= SCB_ABORT | SCB_QUEUED_FOR_DONE;
-    found = 1;
+    goto success;
   }
 
 /*
  *  We just checked the waiting_q, now for the QINFIFO
  */
-  if ( found == 0 )
-  {
-    if ( ((found = aic7xxx_search_qinfifo(p, cmd->target, 
-                     cmd->channel,
+  if ( ((found = aic7xxx_search_qinfifo(p, cmd->target, cmd->channel,
                      cmd->lun, scb->hscb->tag, SCB_ABORT | SCB_QUEUED_FOR_DONE,
                      FALSE, NULL)) != 0) &&
                     (aic7xxx_verbose & VERBOSE_ABORT_PROCESS))
-      printk(INFO_LEAD "SCB found in QINFIFO and "
-        "aborted.\n", p->host_no, CTL_OF_SCB(scb));
+  {
+    printk(INFO_LEAD "SCB found in QINFIFO and aborted.\n", p->host_no,
+		    CTL_OF_SCB(scb));
+    goto success;
   }
 
 /*
  *  QINFIFO, waitingq, completeq done.  Next, check WAITING_SCB list in card
  */
 
-  if ( found == 0 )
+  saved_hscbptr = aic_inb(p, SCBPTR);
+  if ((hscbptr = aic7xxx_find_scb(p, scb)) != SCB_LIST_NULL)
   {
-    unsigned char scb_next_ptr;
-    prev_hscbptr = SCB_LIST_NULL;
-    saved_hscbptr = aic_inb(p, SCBPTR);
-    next_hscbptr = aic_inb(p, WAITING_SCBH);
-    while ( next_hscbptr != SCB_LIST_NULL )
-    {
-      aic_outb(p,  next_hscbptr, SCBPTR );
-      if ( scb->hscb->tag == aic_inb(p, SCB_TAG) )
+    aic_outb(p, hscbptr, SCBPTR);
+    scb_control = aic_inb(p, SCB_CONTROL);
+    disconnected = scb_control & DISCONNECTED;
+    /*
+     * If the DISCONNECTED bit is not set in SCB_CONTROL, then we are
+     * either currently active or on the waiting list.
+     */
+    if(!disconnected && aic_inb(p, LASTPHASE) == P_BUSFREE) {
+      if (aic7xxx_verbose & VERBOSE_ABORT_PROCESS)
+        printk(INFO_LEAD "SCB found on hardware waiting"
+          " list and aborted.\n", p->host_no, CTL_OF_SCB(scb));
+      /* If we are the only waiting command, stop the selection engine */
+      if (aic_inb(p, WAITING_SCBH) == hscbptr && aic_inb(p, SCB_NEXT) ==
+			SCB_LIST_NULL)
       {
-        found = 1;
-        if (aic7xxx_verbose & VERBOSE_ABORT_PROCESS)
-          printk(INFO_LEAD "SCB found on hardware waiting"
-            " list and aborted.\n", p->host_no, CTL_OF_SCB(scb));
-        if ( prev_hscbptr == SCB_LIST_NULL )
-        {
-            aic_outb(p, aic_inb(p, SCB_NEXT), WAITING_SCBH);
-            /* stop the selection since we just
-             * grabbed the scb out from under the
-             * card
-             */
-            aic_outb(p, aic_inb(p, SCSISEQ) & ~ENSELO, SCSISEQ);
-            aic_outb(p, CLRSELTIMEO, CLRSINT1);
-        }
-        else
-        {
-            scb_next_ptr = aic_inb(p, SCB_NEXT);
-            aic_outb(p, prev_hscbptr, SCBPTR);
-            aic_outb(p, scb_next_ptr, SCB_NEXT);
-            aic_outb(p, next_hscbptr, SCBPTR);
-        }
-        aic_outb(p, SCB_LIST_NULL, SCB_TAG);
-        aic_outb(p, 0, SCB_CONTROL);
-        aic7xxx_add_curscb_to_free_list(p);
-        scb->flags = SCB_ABORT | SCB_QUEUED_FOR_DONE;
-        break;
+        aic_outb(p, aic_inb(p, SCSISEQ) & ~ENSELO, SCSISEQ);
+        aic_outb(p, CLRSELTIMEO, CLRSINT1);
+	aic_outb(p, SCB_LIST_NULL, WAITING_SCBH);
       }
-      prev_hscbptr = next_hscbptr;
-      next_hscbptr = aic_inb(p, SCB_NEXT);
+      else
+      {
+	unsigned char prev, next;
+	prev = SCB_LIST_NULL;
+	next = aic_inb(p, WAITING_SCBH);
+	while(next != SCB_LIST_NULL)
+	{
+	  aic_outb(p, next, SCBPTR);
+	  if (next == hscbptr)
+	  {
+	    next = aic_inb(p, SCB_NEXT);
+	    if (prev != SCB_LIST_NULL)
+	    {
+	      aic_outb(p, prev, SCBPTR);
+	      aic_outb(p, next, SCB_NEXT);
+	    }
+	    else
+	      aic_outb(p, next, WAITING_SCBH);
+	    aic_outb(p, hscbptr, SCBPTR);
+	    next = SCB_LIST_NULL;
+	  }
+	  else
+	  {
+	    prev = next;
+	    next = aic_inb(p, SCB_NEXT);
+	  }
+	}
+      }
+      aic_outb(p, SCB_LIST_NULL, SCB_TAG);
+      aic_outb(p, 0, SCB_CONTROL);
+      aic7xxx_add_curscb_to_free_list(p);
+      scb->flags = SCB_ABORT | SCB_QUEUED_FOR_DONE;
+      goto success;
     }
-    aic_outb(p,  saved_hscbptr, SCBPTR );
+    else if (!disconnected)
+    {
+      /*
+       * We are the currently active command
+       */
+      if((aic_inb(p, LASTPHASE) == P_MESGIN) ||
+	 (aic_inb(p, LASTPHASE) == P_MESGOUT))
+      {
+	/*
+	 * Message buffer busy, unable to abort
+	 */
+	printk(INFO_LEAD "message buffer busy, unable to abort.\n",
+			  p->host_no, CTL_OF_SCB(scb));
+	unpause_sequencer(p, FALSE);
+	return FAILED;
+      }
+      /* Fallthrough to below, set ATNO after we set SCB_CONTROL */
+    } 
+    aic_outb(p,  scb_control | MK_MESSAGE, SCB_CONTROL);
+    if(!disconnected)
+    {
+      aic_outb(p, HOST_MSG, MSG_OUT);
+      aic_outb(p, aic_inb(p, SCSISIGI) | ATNO, SCSISIGO);
+    }
+    aic_outb(p, saved_hscbptr, SCBPTR);
+  } 
+  else
+  {
+    /*
+     * The scb isn't in the card at all and it is active and it isn't in
+     * any of the queues, so it must be disconnected and paged out.  Fall
+     * through to the code below.
+     */
+    disconnected = 1;
   }
         
-/*
- *  Hmmm...completeq, QOUTFIFO, QINFIFO, WAITING_SCBH, waitingq all checked.
- *  OK...the sequencer's paused, interrupts are off, and we haven't found the
- *  command anyplace where it could be easily aborted.  Time for the hard
- *  work.  We also know the command is valid.  This essentially means the
- *  command is disconnected, or connected but not into any phases yet, which
- *  we know due to the tests we ran earlier on the current active scb phase.
- *  At this point we can queue the abort tag and go on with life.
- */
-
-  if ( found == 0 )
+  p->flags |= AHC_ABORT_PENDING;
+  scb->flags |= SCB_QUEUED_ABORT | SCB_ABORT | SCB_RECOVERY_SCB;
+  scb->hscb->control |= MK_MESSAGE;
+  if(disconnected)
   {
-    p->flags |= AHC_ABORT_PENDING;
-    scb->flags |= SCB_QUEUED_ABORT | SCB_ABORT | SCB_RECOVERY_SCB;
-    scb->hscb->control |= MK_MESSAGE;
-    result=aic7xxx_find_scb(p, scb);
-    if ( result != SCB_LIST_NULL ) 
-    {
-      saved_hscbptr = aic_inb(p, SCBPTR);
-      aic_outb(p, result, SCBPTR);
-      tmp_char = aic_inb(p, SCB_CONTROL);
-      aic_outb(p,  tmp_char | MK_MESSAGE, SCB_CONTROL);
-      aic_outb(p, saved_hscbptr, SCBPTR);
-    }
     if (aic7xxx_verbose & VERBOSE_ABORT_PROCESS)
       printk(INFO_LEAD "SCB disconnected.  Queueing Abort"
         " SCB.\n", p->host_no, CTL_OF_SCB(scb));
@@ -10907,30 +10858,29 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
     else
       aic_outb(p, p->qinfifonext, KERNEL_QINPOS);
   }
-  if (found)
-  {
-    aic7xxx_run_done_queue(p, TRUE);
-    aic7xxx_run_waiting_queues(p);
-  }
-  p->flags &= ~AHC_IN_ABORT;
   unpause_sequencer(p, FALSE);
+  spin_unlock_irq(p->host->host_lock);
+  scsi_sleep(HZ/4);
+  spin_lock_irq(p->host->host_lock);
+  if (p->flags & AHC_ABORT_PENDING)
+  {
+    if (aic7xxx_verbose & VERBOSE_ABORT_RETURN)
+      printk(INFO_LEAD "Abort never delivered, returning FAILED\n", p->host_no,
+		    CTL_OF_CMD(cmd));
+    p->flags &= ~AHC_ABORT_PENDING;
+    return FAILED;
+  }
+  if (aic7xxx_verbose & VERBOSE_ABORT_RETURN)
+    printk(INFO_LEAD "Abort successful.\n", p->host_no, CTL_OF_CMD(cmd));
+  return SUCCESS;
 
-/*
- *  On the return value.  If we found the command and aborted it, then we know
- *  it's already sent back and there is no reason for a further timeout, so
- *  we use SCSI_ABORT_SUCCESS.  On the queued abort side, we aren't so certain
- *  there hasn't been a bus hang or something that might keep the abort from
- *  from completing.  Therefore, we use SCSI_ABORT_PENDING.  The first time this
- *  is passed back, the timeout on the command gets extended, the second time
- *  we pass this back, the mid level SCSI code calls our reset function, which
- *  would shake loose a hung bus.
- */
-  if ( found != 0 )
-    return(SCSI_ABORT_SUCCESS);
-  else
-    return(SCSI_ABORT_PENDING); 
+success:
+  if (aic7xxx_verbose & VERBOSE_ABORT_RETURN)
+    printk(INFO_LEAD "Abort successful.\n", p->host_no, CTL_OF_CMD(cmd));
+  aic7xxx_run_done_queue(p, TRUE);
+  unpause_sequencer(p, FALSE);
+  return SUCCESS;
 }
-
 
 /*+F*************************************************************************
  * Function:
@@ -10943,38 +10893,24 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
  *   the SCSI bus reset line.
  *-F*************************************************************************/
 int
-aic7xxx_reset(Scsi_Cmnd *cmd, unsigned int flags)
+aic7xxx_reset(Scsi_Cmnd *cmd)
 {
-  struct aic7xxx_scb *scb = NULL;
+  struct aic7xxx_scb *scb;
   struct aic7xxx_host *p;
   struct aic_dev_data *aic_dev;
-  int    tindex;
-  int    result = -1;
-#define DEVICE_RESET 0x01
-#define BUS_RESET    0x02
-#define HOST_RESET   0x04
-#define RESET_DELAY  0x08
-  int        action;
-
-
-  if ( cmd == NULL )
-  {
-    printk(KERN_WARNING "(scsi?:?:?:?) Reset called with NULL Scsi_Cmnd "
-      "pointer, failing.\n");
-    return(SCSI_RESET_SNOOZE);
-  }
 
   p = (struct aic7xxx_host *) cmd->host->hostdata;
   aic_dev = AIC_DEV(cmd);
-  if(aic_dev)
+  if(aic7xxx_position(cmd) < p->scb_data->numscbs)
   {
     scb = (p->scb_data->scb_array[aic7xxx_position(cmd)]);
+    if (scb->cmd != cmd)
+      scb = NULL;
   }
   else
   {
     scb = NULL;
   }
-  tindex = TARGET_INDEX(cmd);
 
   /*
    * I added a new config option to the driver: "panic_on_abort" that will
@@ -10989,44 +10925,6 @@ aic7xxx_reset(Scsi_Cmnd *cmd, unsigned int flags)
 
   pause_sequencer(p);
 
-  if(flags & SCSI_RESET_SYNCHRONOUS)
-  {
-    if (aic7xxx_verbose & VERBOSE_RESET_MID)
-      printk(INFO_LEAD "Reset called for a SYNCHRONOUS reset, flags 0x%x, "
-           "cmd->result 0x%x.\n", p->host_no, CTL_OF_CMD(cmd), flags,
-           cmd->result);
-    scb = NULL;
-    action = HOST_RESET;
-  }
-  else if ((scb == NULL) || (scb->cmd != cmd))
-  {
-    if (aic7xxx_verbose & VERBOSE_RESET_MID)
-      printk(INFO_LEAD "Reset called with bogus Scsi_Cmnd"
-           "->SCB mapping, failing.\n", p->host_no, CTL_OF_CMD(cmd));
-    aic7xxx_done_cmds_complete(p);
-    aic7xxx_run_waiting_queues(p);
-    unpause_sequencer(p, FALSE);
-    return(SCSI_RESET_NOT_RUNNING);
-  }
-  else
-  {
-    if (aic7xxx_verbose & VERBOSE_RESET_MID)
-      printk(INFO_LEAD "Reset called, scb %d, flags "
-        "0x%x\n", p->host_no, CTL_OF_SCB(scb), scb->hscb->tag, scb->flags);
-    if ( flags & SCSI_RESET_SUGGEST_HOST_RESET )
-    {
-      action = HOST_RESET;
-    }
-    else if ( flags & SCSI_RESET_SUGGEST_BUS_RESET )
-    {
-      action = BUS_RESET;
-    }
-    else 
-    {
-      action = DEVICE_RESET;
-    }
-  }
-
   while((aic_inb(p, INTSTAT) & INT_PEND) && !(p->flags & AHC_IN_ISR))
   {
     aic7xxx_isr(p->irq, p, (void *)NULL );
@@ -11040,134 +10938,32 @@ aic7xxx_reset(Scsi_Cmnd *cmd, unsigned int flags)
      * We just completed the command when we ran the isr stuff, so we no
      * longer have it.
      */
-    aic7xxx_run_waiting_queues(p);
     unpause_sequencer(p, FALSE);
-    return(SCSI_RESET_SUCCESS);
+    return SUCCESS;
   }
     
-  if ( (action & DEVICE_RESET) && 
-        (aic_dev->flags & BUS_DEVICE_RESET_PENDING) )
-  {
-    if (aic7xxx_verbose & VERBOSE_RESET_PROCESS)
-      printk(INFO_LEAD "Bus device reset already sent to "
-        "device, escalating.\n", p->host_no, CTL_OF_CMD(cmd));
-    action = BUS_RESET;
-  }
-  if ( (action & DEVICE_RESET) &&
-       (scb->flags & SCB_QUEUED_ABORT) )
-  {
-    if (aic7xxx_verbose & VERBOSE_RESET_PROCESS)
-    {
-      printk(INFO_LEAD "Have already attempted to reach "
-        "device with queued\n", p->host_no, CTL_OF_CMD(cmd));
-      printk(INFO_LEAD "message, will escalate to bus "
-        "reset.\n", p->host_no, CTL_OF_CMD(cmd));
-    }
-    action = BUS_RESET;
-  }
-  if ( (action & DEVICE_RESET) && 
-       (p->flags & (AHC_RESET_PENDING | AHC_ABORT_PENDING)) )
-  {
-    if (aic7xxx_verbose & VERBOSE_RESET_PROCESS)
-     printk(INFO_LEAD "Bus device reset stupid when "
-        "other action has failed.\n", p->host_no, CTL_OF_CMD(cmd));
-    action = BUS_RESET;
-  }
-  if ( (action & BUS_RESET) && !(p->features & AHC_TWIN) )
-  {
-    action = HOST_RESET;
-  }
-  if ( (aic_dev->flags & DEVICE_RESET_DELAY) &&
-       !(action & (HOST_RESET | BUS_RESET)))
-  {
-    if (aic7xxx_verbose & VERBOSE_RESET_PROCESS)
-    {
-      printk(INFO_LEAD "Reset called too soon after last "
-        "reset without requesting\n", p->host_no, CTL_OF_CMD(cmd));
-      printk(INFO_LEAD "bus or host reset, escalating.\n", p->host_no,
-        CTL_OF_CMD(cmd));
-    }
-    action = BUS_RESET;
-  }
-  if ( (p->flags & AHC_RESET_DELAY) &&
-       (action & (HOST_RESET | BUS_RESET)) )
-  {
-    if (aic7xxx_verbose & VERBOSE_RESET_PROCESS)
-      printk(INFO_LEAD "Reset called too soon after "
-        "last bus reset, delaying.\n", p->host_no, CTL_OF_CMD(cmd));
-    action = RESET_DELAY;
-  }
 /*
  *  By this point, we want to already know what we are going to do and
  *  only have the following code implement our course of action.
  */
-  switch (action)
+  aic7xxx_reset_channel(p, cmd->channel, TRUE);
+  if (p->features & AHC_TWIN)
   {
-    case RESET_DELAY:
-      aic7xxx_run_waiting_queues(p);
-      unpause_sequencer(p, FALSE);
-      if(scb == NULL)
-        return(SCSI_RESET_PUNT);
-      else
-        return(SCSI_RESET_PENDING);
-      break;
-    case DEVICE_RESET:
-      p->flags |= AHC_IN_RESET;
-      result = aic7xxx_bus_device_reset(p, cmd);
-      aic7xxx_run_done_queue(p, TRUE);
-      /*  We can't rely on run_waiting_queues to unpause the sequencer for
-       *  PCI based controllers since we use AAP */
-      aic7xxx_run_waiting_queues(p);
-      unpause_sequencer(p, FALSE);
-      p->flags &= ~AHC_IN_RESET;
-      return(result);
-      break;
-    case BUS_RESET:
-    case HOST_RESET:
-    default:
-      p->flags |= AHC_IN_RESET | AHC_RESET_DELAY;
-      aic7xxx_reset_channel(p, cmd->channel, TRUE);
-      if ( (p->features & AHC_TWIN) && (action & HOST_RESET) )
-      {
-        aic7xxx_reset_channel(p, cmd->channel ^ 0x01, TRUE);
-        restart_sequencer(p);
-      }
-      if (action != HOST_RESET)
-        result = SCSI_RESET_SUCCESS | SCSI_RESET_BUS_RESET;
-      else
-      {
-        result = SCSI_RESET_SUCCESS | SCSI_RESET_HOST_RESET;
-        aic_outb(p,  aic_inb(p, SIMODE1) & ~(ENREQINIT|ENBUSFREE),
-          SIMODE1);
-        aic7xxx_clear_intstat(p);
-        p->flags &= ~AHC_HANDLING_REQINITS;
-        p->msg_type = MSG_TYPE_NONE;
-        p->msg_index = 0;
-        p->msg_len = 0;
-      }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,1,95)
-      if(flags & SCSI_RESET_SYNCHRONOUS)
-      {
-        cmd->result = DID_RESET << 16;
-        cmd->done(cmd);
-      }
-#endif
-      aic7xxx_run_done_queue(p, TRUE);
-      p->flags &= ~AHC_IN_RESET;
-      /*
-       * We can't rely on run_waiting_queues to unpause the sequencer for
-       * PCI based controllers since we use AAP.  NOTE: this also sets
-       * the timer for the one command we might have queued in the case
-       * of a synch reset.
-       */
-      aic7xxx_run_waiting_queues(p);
-      unpause_sequencer(p, FALSE);
-      if(scb == NULL)
-        return(SCSI_RESET_SUCCESS|SCSI_RESET_HOST_RESET);
-      else
-        return(result);
-      break;
+    aic7xxx_reset_channel(p, cmd->channel ^ 0x01, TRUE);
+    restart_sequencer(p);
   }
+  aic_outb(p,  aic_inb(p, SIMODE1) & ~(ENREQINIT|ENBUSFREE), SIMODE1);
+  aic7xxx_clear_intstat(p);
+  p->flags &= ~AHC_HANDLING_REQINITS;
+  p->msg_type = MSG_TYPE_NONE;
+  p->msg_index = 0;
+  p->msg_len = 0;
+  aic7xxx_run_done_queue(p, TRUE);
+  unpause_sequencer(p, FALSE);
+  spin_unlock_irq(p->host->host_lock);
+  scsi_sleep(2 * HZ);
+  spin_lock_irq(p->host->host_lock);
+  return SUCCESS;
 }
 
 /*+F*************************************************************************
