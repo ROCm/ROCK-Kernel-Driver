@@ -1065,7 +1065,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 		DEBUG(("scsi%d: (%d:%d) RESELECTED!\n",
 		       host->host_no, reselection_id, lun));
 		/* clear the reselection indicator */
-		SDp = scsi_find_device(host, 0, reselection_id, lun);
+		SDp = __scsi_device_lookup(host, 0, reselection_id, lun);
 		if(unlikely(SDp == NULL)) {
 			printk(KERN_ERR "scsi%d: (%d:%d) HAS NO device\n",
 			       host->host_no, reselection_id, lun);
@@ -1498,7 +1498,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 			       host->host_no, SCp, SCp == NULL ? NULL : SCp->host_scribble, dsp, dsp - hostdata->pScript);
 
 			/* clear all the negotiated parameters */
-	    		list_for_each_entry(SDp, &host->my_devices, siblings)
+			__shost_for_each_device(SDp, host)
 				SDp->hostdata = 0;
 			
 			/* clear all the slots and their pending commands */

@@ -4,6 +4,7 @@
 #include <linux/device.h>
 
 struct module;
+struct scsi_cmnd;
 
 
 struct scsi_driver {

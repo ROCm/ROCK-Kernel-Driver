@@ -2930,7 +2930,7 @@ int acornscsi_proc_info(struct Scsi_Host *instance, char *buffer, char **start, 
 
     p += sprintf(p, "\nAttached devices:\n");
 
-    list_for_each_entry(scd, &instance->my_devices, siblings) {
+    shost_for_each_device(scd, instance) {
 	p += sprintf(p, "Device/Lun TaggedQ      Sync\n");
 	p += sprintf(p, "     %d/%d   ", scd->id, scd->lun);
 	if (scd->tagged_supported)
@@ -2953,8 +2953,10 @@ int acornscsi_proc_info(struct Scsi_Host *instance, char *buffer, char **start, 
 	    p = buffer;
 	}
 	pos = p - buffer;
-	if (pos + begin > offset + length)
+	if (pos + begin > offset + length) {
+	    scsi_device_put(scd);
 	    break;
+	}
     }
 
     pos = p - buffer;

@@ -363,19 +363,30 @@ enum {
 };
 
 struct Scsi_Host {
-	struct list_head	my_devices;
+	/*
+	 * __devices is protected by the host_lock, but you should
+	 * usually use scsi_device_lookup / shost_for_each_device
+	 * to access it and don't care about locking yourself.
+	 * In the rare case of beeing in irq context you can use
+	 * their __ prefixed variants with the lock held. NEVER
+	 * access this list directly from a driver.
+	 */
+	struct list_head	__devices;
+	
 	struct scsi_host_cmd_pool *cmd_pool;
 	spinlock_t		free_list_lock;
-	struct list_head	free_list;   /* backup store of cmd structs */
+	struct list_head	free_list; /* backup store of cmd structs */
 	struct list_head	starved_list;
 
 	spinlock_t		default_lock;
 	spinlock_t		*host_lock;
 
+	struct semaphore	scan_mutex;/* serialize scanning activity */
+
 	struct list_head	eh_cmd_q;
 	struct task_struct    * ehandler;  /* Error recovery thread. */
-	struct semaphore      * eh_wait;   /* The error recovery thread waits on
-                                          this. */
+	struct semaphore      * eh_wait;   /* The error recovery thread waits
+					      on this. */
 	struct completion     * eh_notify; /* wait for eh to begin or end */
 	struct semaphore      * eh_action; /* Wait for specific actions on the
                                           host. */
@@ -477,12 +488,6 @@ struct Scsi_Host {
 	 * module_init/module_exit.
 	 */
 	struct list_head sht_legacy_list;
-
-	/*
-	 * This mutex serializes all scsi scanning activity from kernel- and
-	 * userspace.
-	 */
-	struct semaphore scan_mutex;
 
 	/*
 	 * We should ensure that this is aligned, both for better performance
