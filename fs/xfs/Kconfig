@@ -19,6 +19,10 @@ config XFS_FS
 	  system of your root partition is compiled as a module, you'll need
 	  to use an initial ramdisk (initrd) to boot.
 
+config XFS_EXPORT
+	bool
+	default y if XFS_FS && EXPORTFS
+
 config XFS_RT
 	bool "Realtime support (EXPERIMENTAL)"
 	depends on XFS_FS && EXPERIMENTAL

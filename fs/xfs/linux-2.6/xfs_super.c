@@ -750,7 +750,7 @@ linvfs_fill_super(
 	}
 
 	sb_min_blocksize(sb, BBSIZE);
-#ifdef CONFIG_EXPORTFS
+#ifdef CONFIG_XFS_EXPORT
 	sb->s_export_op = &linvfs_export_ops;
 #endif
 	sb->s_qcop = &linvfs_qops;
