@@ -474,23 +474,16 @@ static ssize_t show_affected_cpus (struct cpufreq_policy * policy, char *buf)
 
 
 #define define_one_ro(_name) \
-static struct freq_attr _name = { \
-	.attr = { .name = __stringify(_name), .mode = 0444 }, \
-	.show = show_##_name, \
-}
+static struct freq_attr _name = \
+__ATTR(_name, 0444, show_##_name, NULL)
 
 #define define_one_ro0400(_name) \
-static struct freq_attr _name = { \
-	.attr = { .name = __stringify(_name), .mode = 0400 }, \
-	.show = show_##_name, \
-}
+static struct freq_attr _name = \
+__ATTR(_name, 0400, show_##_name, NULL)
 
 #define define_one_rw(_name) \
-static struct freq_attr _name = { \
-	.attr = { .name = __stringify(_name), .mode = 0644 }, \
-	.show = show_##_name, \
-	.store = store_##_name, \
-}
+static struct freq_attr _name = \
+__ATTR(_name, 0644, show_##_name, store_##_name)
 
 define_one_ro0400(cpuinfo_cur_freq);
 define_one_ro(cpuinfo_min_freq);
