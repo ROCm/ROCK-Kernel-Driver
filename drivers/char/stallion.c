@@ -1553,7 +1553,8 @@ static int stl_setserial(stlport_t *portp, struct serial_struct *sp)
 	printk("stl_setserial(portp=%x,sp=%x)\n", (int) portp, (int) sp);
 #endif
 
-	copy_from_user(&sio, sp, sizeof(struct serial_struct));
+	if (copy_from_user(&sio, sp, sizeof(struct serial_struct)))
+		return -EFAULT;
 	if (!capable(CAP_SYS_ADMIN)) {
 		if ((sio.baud_base != portp->baud_base) ||
 		    (sio.close_delay != portp->close_delay) ||
@@ -2949,7 +2950,8 @@ static int stl_getbrdstats(combrd_t *bp)
 	stlpanel_t	*panelp;
 	int		i;
 
-	copy_from_user(&stl_brdstats, bp, sizeof(combrd_t));
+	if (copy_from_user(&stl_brdstats, bp, sizeof(combrd_t)))
+		return -EFAULT;
 	if (stl_brdstats.brd >= STL_MAXBRDS)
 		return(-ENODEV);
 	brdp = stl_brds[stl_brdstats.brd];
@@ -2973,8 +2975,7 @@ static int stl_getbrdstats(combrd_t *bp)
 		stl_brdstats.panels[i].nrports = panelp->nrports;
 	}
 
-	copy_to_user(bp, &stl_brdstats, sizeof(combrd_t));
-	return(0);
+	return copy_to_user(bp, &stl_brdstats, sizeof(combrd_t)) ? -EFAULT : 0;
 }
 
 /*****************************************************************************/
@@ -3017,7 +3018,8 @@ static int stl_getportstats(stlport_t *portp, comstats_t *cp)
 	unsigned long	flags;
 
 	if (portp == (stlport_t *) NULL) {
-		copy_from_user(&stl_comstats, cp, sizeof(comstats_t));
+		if (copy_from_user(&stl_comstats, cp, sizeof(comstats_t)))
+			return -EFAULT;
 		portp = stl_getport(stl_comstats.brd, stl_comstats.panel,
 			stl_comstats.port);
 		if (portp == (stlport_t *) NULL)
@@ -3058,8 +3060,8 @@ static int stl_getportstats(stlport_t *portp, comstats_t *cp)
 
 	portp->stats.signals = (unsigned long) stl_getsignals(portp);
 
-	copy_to_user(cp, &portp->stats, sizeof(comstats_t));
-	return(0);
+	return copy_to_user(cp, &portp->stats,
+			    sizeof(comstats_t)) ? -EFAULT : 0;
 }
 
 /*****************************************************************************/
@@ -3071,7 +3073,8 @@ static int stl_getportstats(stlport_t *portp, comstats_t *cp)
 static int stl_clrportstats(stlport_t *portp, comstats_t *cp)
 {
 	if (portp == (stlport_t *) NULL) {
-		copy_from_user(&stl_comstats, cp, sizeof(comstats_t));
+		if (copy_from_user(&stl_comstats, cp, sizeof(comstats_t)))
+			return -EFAULT;
 		portp = stl_getport(stl_comstats.brd, stl_comstats.panel,
 			stl_comstats.port);
 		if (portp == (stlport_t *) NULL)
@@ -3082,8 +3085,8 @@ static int stl_clrportstats(stlport_t *portp, comstats_t *cp)
 	portp->stats.brd = portp->brdnr;
 	portp->stats.panel = portp->panelnr;
 	portp->stats.port = portp->portnr;
-	copy_to_user(cp, &portp->stats, sizeof(comstats_t));
-	return(0);
+	return copy_to_user(cp, &portp->stats,
+			    sizeof(comstats_t)) ? -EFAULT : 0;
 }
 
 /*****************************************************************************/
@@ -3096,13 +3099,14 @@ static int stl_getportstruct(unsigned long arg)
 {
 	stlport_t	*portp;
 
-	copy_from_user(&stl_dummyport, (void *) arg, sizeof(stlport_t));
+	if (copy_from_user(&stl_dummyport, (void *) arg, sizeof(stlport_t)))
+		return -EFAULT;
 	portp = stl_getport(stl_dummyport.brdnr, stl_dummyport.panelnr,
 		 stl_dummyport.portnr);
 	if (portp == (stlport_t *) NULL)
 		return(-ENODEV);
-	copy_to_user((void *) arg, portp, sizeof(stlport_t));
-	return(0);
+	return copy_to_user((void *)arg, portp,
+			    sizeof(stlport_t)) ? -EFAULT : 0;
 }
 
 /*****************************************************************************/
@@ -3115,14 +3119,14 @@ static int stl_getbrdstruct(unsigned long arg)
 {
 	stlbrd_t	*brdp;
 
-	copy_from_user(&stl_dummybrd, (void *) arg, sizeof(stlbrd_t));
+	if (copy_from_user(&stl_dummybrd, (void *) arg, sizeof(stlbrd_t)))
+		return -EFAULT;
 	if ((stl_dummybrd.brdnr < 0) || (stl_dummybrd.brdnr >= STL_MAXBRDS))
 		return(-ENODEV);
 	brdp = stl_brds[stl_dummybrd.brdnr];
 	if (brdp == (stlbrd_t *) NULL)
 		return(-ENODEV);
-	copy_to_user((void *) arg, brdp, sizeof(stlbrd_t));
-	return(0);
+	return copy_to_user((void *)arg, brdp, sizeof(stlbrd_t)) ? -EFAULT : 0;
 }
 
 /*****************************************************************************/

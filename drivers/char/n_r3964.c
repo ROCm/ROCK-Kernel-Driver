@@ -1364,7 +1364,7 @@ static ssize_t r3964_write(struct tty_struct * tty, struct file * file,
       pHeader->owner = pClient;
    }
 
-   copy_from_user (pHeader->data, data, count); /* We already verified this */
+   __copy_from_user(pHeader->data, data, count); /* We already verified this */
 
    if(pInfo->flags & R3964_DEBUG)
    {
