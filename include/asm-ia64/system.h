@@ -276,6 +276,8 @@ do {						\
 #define finish_arch_switch(rq, prev)	spin_unlock_irq(&(prev)->switch_lock)
 #define task_running(rq, p) 		((rq)->curr == (p) || spin_is_locked(&(p)->switch_lock))
 
+#define ia64_platform_is(x) (strcmp(x, platform_name) == 0)
+
 #endif /* __KERNEL__ */
 
 #endif /* __ASSEMBLY__ */
