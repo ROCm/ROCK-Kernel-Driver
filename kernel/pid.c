@@ -36,7 +36,10 @@ int last_pid;
 
 #define RESERVED_PIDS		300
 
-#define PIDMAP_ENTRIES		(PID_MAX_LIMIT/PAGE_SIZE/8)
+int pid_max_min = RESERVED_PIDS + 1;
+int pid_max_max = PID_MAX_LIMIT;
+
+#define PIDMAP_ENTRIES		((PID_MAX_LIMIT + 8*PAGE_SIZE - 1)/PAGE_SIZE/8)
 #define BITS_PER_PAGE		(PAGE_SIZE*8)
 #define BITS_PER_PAGE_MASK	(BITS_PER_PAGE-1)
 #define mk_pid(map, off)	(((map) - pidmap_array)*BITS_PER_PAGE + (off))
