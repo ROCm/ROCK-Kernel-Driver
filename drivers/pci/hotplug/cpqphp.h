@@ -257,9 +257,7 @@ struct pci_func {
 	struct pci_dev* pci_dev;
 };
 
-#define SLOT_MAGIC	0x67267321
 struct slot {
-	u32 magic;
 	struct slot *next;
 	u8 bus;
 	u8 device;
@@ -451,40 +449,6 @@ extern u8 cpqhp_disk_irq;
 
 
 /* inline functions */
-
-
-/* Inline functions to check the sanity of a pointer that is passed to us */
-static inline int slot_paranoia_check (struct slot *slot, const char *function)
-{
-	if (!slot) {
-		dbg("%s - slot == NULL", function);
-		return -1;
-	}
-	if (slot->magic != SLOT_MAGIC) {
-		dbg("%s - bad magic number for slot", function);
-		return -1;
-	}
-	if (!slot->hotplug_slot) {
-		dbg("%s - slot->hotplug_slot == NULL!", function);
-		return -1;
-	}
-	return 0;
-}
-
-static inline struct slot *get_slot (struct hotplug_slot *hotplug_slot, const char *function)
-{ 
-	struct slot *slot;
-
-	if (!hotplug_slot) {
-		dbg("%s - hotplug_slot == NULL\n", function);
-		return NULL;
-	}
-
-	slot = (struct slot *)hotplug_slot->private;
-	if (slot_paranoia_check (slot, function))
-                return NULL;
-	return slot;
-}               
 
 /*
  * return_resource
@@ -688,9 +652,6 @@ static inline int cpq_get_attention_status(struct controller *ctrl, struct slot 
 {
 	u8 hp_slot;
 
-	if (slot == NULL)
-		return 1;
-
 	hp_slot = slot->device - ctrl->slot_device_offset;
 
 	return read_amber_LED(ctrl, hp_slot);
@@ -700,9 +661,6 @@ static inline int cpq_get_attention_status(struct controller *ctrl, struct slot 
 static inline int get_slot_enabled(struct controller *ctrl, struct slot *slot)
 {
 	u8 hp_slot;
-
-	if (slot == NULL)
-		return 1;
 
 	hp_slot = slot->device - ctrl->slot_device_offset;
 
@@ -714,9 +672,6 @@ static inline int cpq_get_latch_status(struct controller *ctrl, struct slot *slo
 {
 	u32 status;
 	u8 hp_slot;
-
-	if (slot == NULL)
-		return 1;
 
 	hp_slot = slot->device - ctrl->slot_device_offset;
 	dbg("%s: slot->device = %d, ctrl->slot_device_offset = %d \n",
@@ -733,9 +688,6 @@ static inline int get_presence_status(struct controller *ctrl, struct slot *slot
 	int presence_save = 0;
 	u8 hp_slot;
 	u32 tempdword;
-
-	if (slot == NULL)
-		return 0;
 
 	hp_slot = slot->device - ctrl->slot_device_offset;
 

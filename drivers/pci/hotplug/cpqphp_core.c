@@ -314,7 +314,7 @@ static void *get_SMBIOS_entry (void *smbios_start, void *smbios_table, u8 type, 
 
 static void release_slot(struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	
 	if (slot == NULL)
 		return;
@@ -374,7 +374,6 @@ static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start, void *
 			return -ENOMEM;
 		}
 
-		new_slot->magic = SLOT_MAGIC;
 		new_slot->ctrl = ctrl;
 		new_slot->bus = ctrl->bus;
 		new_slot->device = slot_device;
@@ -600,7 +599,7 @@ static int cpqhp_set_attention_status (struct controller *ctrl, struct pci_func 
 static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
 {
 	struct pci_func *slot_func;
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	struct controller *ctrl;
 	u8 bus;
 	u8 devfn;
@@ -632,25 +631,18 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
 }
 
 
-static int process_SI (struct hotplug_slot *hotplug_slot)
+static int process_SI(struct hotplug_slot *hotplug_slot)
 {
 	struct pci_func *slot_func;
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	struct controller *ctrl;
+	struct slot *slot = hotplug_slot->private;
+	struct controller *ctrl = slot->ctrl;
 	u8 bus;
 	u8 devfn;
 	u8 device;
 	u8 function;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
-	ctrl = slot->ctrl;
-	if (ctrl == NULL)
-		return -ENODEV;
-	
 	if (cpqhp_get_bus_dev(ctrl, &bus, &devfn, slot->number) == -1)
 		return -ENODEV;
 
@@ -672,25 +664,18 @@ static int process_SI (struct hotplug_slot *hotplug_slot)
 }
 
 
-static int process_SS (struct hotplug_slot *hotplug_slot)
+static int process_SS(struct hotplug_slot *hotplug_slot)
 {
 	struct pci_func *slot_func;
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	struct controller *ctrl;
+	struct slot *slot = hotplug_slot->private;
+	struct controller *ctrl = slot->ctrl;
 	u8 bus;
 	u8 devfn;
 	u8 device;
 	u8 function;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
-	ctrl = slot->ctrl;
-	if (ctrl == NULL)
-		return -ENODEV;
-	
 	if (cpqhp_get_bus_dev(ctrl, &bus, &devfn, slot->number) == -1)
 		return -ENODEV;
 
@@ -708,112 +693,70 @@ static int process_SS (struct hotplug_slot *hotplug_slot)
 }
 
 
-static int hardware_test (struct hotplug_slot *hotplug_slot, u32 value)
+static int hardware_test(struct hotplug_slot *hotplug_slot, u32 value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	struct controller *ctrl;
+	struct slot *slot = hotplug_slot->private;
+	struct controller *ctrl = slot->ctrl;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
-
-	if (slot == NULL)
-		return -ENODEV;
-
-	ctrl = slot->ctrl;
-	if (ctrl == NULL)
-		return -ENODEV;
 
 	return cpqhp_hardware_test (ctrl, value);	
 }
 
 
-static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
+static int get_power_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	struct controller *ctrl;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+	struct slot *slot = hotplug_slot->private;
+	struct controller *ctrl = slot->ctrl;
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
-	ctrl = slot->ctrl;
-	if (ctrl == NULL)
-		return -ENODEV;
-	
 	*value = get_slot_enabled(ctrl, slot);
 	return 0;
 }
 
-static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 *value)
+static int get_attention_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	struct controller *ctrl;
-	
-	if (slot == NULL)
-		return -ENODEV;
+	struct slot *slot = hotplug_slot->private;
+	struct controller *ctrl = slot->ctrl;
 	
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
-	ctrl = slot->ctrl;
-	if (ctrl == NULL)
-		return -ENODEV;
-	
 	*value = cpq_get_attention_status(ctrl, slot);
 	return 0;
 }
 
-static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
+static int get_latch_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	struct controller *ctrl;
-	
-	if (slot == NULL)
-		return -ENODEV;
-	
+	struct slot *slot = hotplug_slot->private;
+	struct controller *ctrl = slot->ctrl;
+
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
-	ctrl = slot->ctrl;
-	if (ctrl == NULL)
-		return -ENODEV;
-	
-	*value = cpq_get_latch_status (ctrl, slot);
+	*value = cpq_get_latch_status(ctrl, slot);
 
 	return 0;
 }
 
-static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
+static int get_adapter_status(struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	struct controller *ctrl;
-	
-	if (slot == NULL)
-		return -ENODEV;
+	struct slot *slot = hotplug_slot->private;
+	struct controller *ctrl = slot->ctrl;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
-	ctrl = slot->ctrl;
-	if (ctrl == NULL)
-		return -ENODEV;
-	
-	*value = get_presence_status (ctrl, slot);
+	*value = get_presence_status(ctrl, slot);
 
 	return 0;
 }
 
 static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	struct controller *ctrl;
-	
-	if (slot == NULL)
-		return -ENODEV;
+	struct slot *slot = hotplug_slot->private;
+	struct controller *ctrl = slot->ctrl;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
-	ctrl = slot->ctrl;
-	if (ctrl == NULL)
-		return -ENODEV;
-	
 	*value = ctrl->speed_capability;
 
 	return 0;
@@ -821,18 +764,11 @@ static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_sp
 
 static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
 {
-	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
-	struct controller *ctrl;
-	
-	if (slot == NULL)
-		return -ENODEV;
+	struct slot *slot = hotplug_slot->private;
+	struct controller *ctrl = slot->ctrl;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
-	ctrl = slot->ctrl;
-	if (ctrl == NULL)
-		return -ENODEV;
-	
 	*value = ctrl->speed;
 
 	return 0;

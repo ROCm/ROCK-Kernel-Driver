@@ -143,12 +143,7 @@ static u8 handle_switch_change(u8 change, struct controller * ctrl)
  */
 struct slot *cpqhp_find_slot(struct controller *ctrl, u8 device)
 {
-	struct slot *slot;
-
-	if (!ctrl)
-		return NULL;
-
-	slot = ctrl->slot;
+	struct slot *slot = ctrl->slot;
 
 	while (slot && (slot->device != device)) {
 		slot = slot->next;
