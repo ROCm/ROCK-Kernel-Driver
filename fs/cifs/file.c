@@ -1348,12 +1348,11 @@ fill_in_inode(struct inode *tmp_inode,
 {
 	struct cifsInodeInfo *cifsInfo = CIFS_I(tmp_inode);
 	struct cifs_sb_info *cifs_sb = CIFS_SB(tmp_inode->i_sb);
+	__u32 attr = le32_to_cpu(pfindData->ExtFileAttributes);
+	__u64 allocation_size = le64_to_cpu(pfindData->AllocationSize);
+	__u64 end_of_file = le64_to_cpu(pfindData->EndOfFile);
 
-	pfindData->ExtFileAttributes =
-	    le32_to_cpu(pfindData->ExtFileAttributes);
-	pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
-	pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
-	cifsInfo->cifsAttrs = pfindData->ExtFileAttributes;
+	cifsInfo->cifsAttrs = attr;
 	cifsInfo->time = jiffies;
 
 	/* Linux can not store file creation time unfortunately so ignore it */
@@ -1376,12 +1375,12 @@ fill_in_inode(struct inode *tmp_inode,
 
 	cFYI(0,
 	     ("CIFS FFIRST: Attributes came in as 0x%x",
-	      pfindData->ExtFileAttributes));
-	if (pfindData->ExtFileAttributes & ATTR_REPARSE) {
+	      attr));
+	if (attr & ATTR_REPARSE) {
 		*pobject_type = DT_LNK;
 		/* BB can this and S_IFREG or S_IFDIR be set as in Windows? */
 		tmp_inode->i_mode |= S_IFLNK;
-	} else if (pfindData->ExtFileAttributes & ATTR_DIRECTORY) {
+	} else if (attr & ATTR_DIRECTORY) {
 		*pobject_type = DT_DIR;
 		/* override default perms since we do not lock dirs */
 		if(atomic_read(&cifsInfo->inUse) == 0) {
@@ -1391,7 +1390,7 @@ fill_in_inode(struct inode *tmp_inode,
 	} else {
 		*pobject_type = DT_REG;
 		tmp_inode->i_mode |= S_IFREG;
-		if(pfindData->ExtFileAttributes & ATTR_READONLY)
+		if(attr & ATTR_READONLY)
 			tmp_inode->i_mode &= ~(S_IWUGO);
 
 	}/* could add code here - to validate if device or weird share type? */
@@ -1404,14 +1403,14 @@ fill_in_inode(struct inode *tmp_inode,
 	if(is_size_safe_to_change(cifsInfo)) {
 		/* can not safely change the file size here if the 
 		client is writing to it due to potential races */
-		i_size_write(tmp_inode,pfindData->EndOfFile);
+		i_size_write(tmp_inode,end_of_file);
 
 	/* 512 bytes (2**9) is the fake blocksize that must be used */
 	/* for this calculation, even though the reported blocksize is larger */
-		tmp_inode->i_blocks = (512 - 1 + pfindData->AllocationSize) >> 9;
+		tmp_inode->i_blocks = (512 - 1 + allocation_size) >> 9;
 	}
 
-	if (pfindData->AllocationSize < pfindData->EndOfFile)
+	if (allocation_size < end_of_file)
 		cFYI(1, ("Possible sparse file: allocation size less than end of file "));
 	cFYI(1,
 	     ("File Size %ld and blocks %ld and blocksize %ld",
@@ -1608,7 +1607,7 @@ cifs_filldir(struct qstr *pqstring, FILE_DIRECTORY_INFO * pfindData,
 	int object_type,rc;
 
 	pqstring->name = pfindData->FileName;
-	pqstring->len = pfindData->FileNameLength;
+	/* pqstring->len is already set by caller */
 
 	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
 	if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
@@ -1835,21 +1834,19 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			}
 			for (i = 2; i < (unsigned int)findParms.SearchCount + 2; i++) {
 				if (UnixSearch == FALSE) {
-					pfindData->FileNameLength =
-					  le32_to_cpu(pfindData->FileNameLength);
+					__u32 len = le32_to_cpu(pfindData->FileNameLength);
 					if (Unicode == TRUE)
-						pfindData->FileNameLength =
+						len =
 						    cifs_strfromUCS_le
 						    (pfindData->FileName,
 						     (wchar_t *)
 						     pfindData->FileName,
-						     (pfindData->
-						      FileNameLength) / 2,
+						     len / 2,
 						     cifs_sb->local_nls);
-					qstring.len = pfindData->FileNameLength;
-					if (((qstring.len != 1)
+					qstring.len = len;
+					if (((len != 1)
 					     || (pfindData->FileName[0] != '.'))
-					    && ((qstring.len != 2)
+					    && ((len != 2)
 						|| (pfindData->
 						    FileName[0] != '.')
 						|| (pfindData->
@@ -2032,23 +2029,21 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				}
 
 				for (i = 0; i < findNextParms.SearchCount; i++) {
-					pfindData->FileNameLength =
-					    le32_to_cpu(pfindData->
+					__u32 len = le32_to_cpu(pfindData->
 							FileNameLength);
 					if (UnixSearch == FALSE) {
 						if (Unicode == TRUE)
-							pfindData->FileNameLength =
+							len =
 							  cifs_strfromUCS_le
 							  (pfindData->FileName,
 							  (wchar_t *)
 							  pfindData->FileName,
-							  (pfindData->FileNameLength)/ 2,
+							  len / 2,
 							  cifs_sb->local_nls);
-						qstring.len = 
-							pfindData->FileNameLength;
-						if (((qstring.len != 1)
+						qstring.len = len;
+						if (((len != 1)
 						    || (pfindData->FileName[0] != '.'))
-						    && ((qstring.len != 2)
+						    && ((len != 2)
 							|| (pfindData->FileName[0] != '.')
 							|| (pfindData->FileName[1] !=
 							    '.'))) {

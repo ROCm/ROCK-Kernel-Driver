@@ -1681,16 +1681,16 @@ struct file_end_of_file_info {
 };	/* size info, level 0x104 */
 
 typedef struct {
-	__u32 NextEntryOffset;
+	__le32 NextEntryOffset;
 	__u32 FileIndex;
-	__u64 CreationTime;
-	__u64 LastAccessTime;
-	__u64 LastWriteTime;
-	__u64 ChangeTime;
-	__u64 EndOfFile;
-	__u64 AllocationSize;
-	__u32 ExtFileAttributes;
-	__u32 FileNameLength;
+	__le64 CreationTime;
+	__le64 LastAccessTime;
+	__le64 LastWriteTime;
+	__le64 ChangeTime;
+	__le64 EndOfFile;
+	__le64 AllocationSize;
+	__le32 ExtFileAttributes;
+	__le32 FileNameLength;
 	char FileName[1];
 } FILE_DIRECTORY_INFO;   /* level 257 FF response data area */
 
