@@ -1522,6 +1522,8 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 			printk(KERN_ERR "scsi%d: Bus Reset detected, executing command %p, slot %p, dsp %08x[%04x]\n",
 			       host->host_no, SCp, SCp == NULL ? NULL : SCp->host_scribble, dsp, dsp - hostdata->pScript);
 
+			scsi_report_bus_reset(host, 0);
+
 			/* clear all the negotiated parameters */
 			__shost_for_each_device(SDp, host)
 				SDp->hostdata = 0;
@@ -1967,6 +1969,9 @@ NCR_700_bus_reset(Scsi_Cmnd * SCp)
 	wait_for_completion(&complete);
 	spin_lock_irq(SCp->device->host->host_lock);
 	hostdata->eh_complete = NULL;
+	/* Revalidate the transport parameters of the failing device */
+	if(hostdata->fast)
+		spi_schedule_dv_device(SCp->device);
 	return SUCCESS;
 }
 
@@ -2051,9 +2056,11 @@ NCR_700_slave_configure(Scsi_Device *SDp)
 		scsi_adjust_queue_depth(SDp, 0, SDp->host->cmd_per_lun);
 	}
 	if(hostdata->fast) {
-		NCR_700_set_period(SDp, hostdata->min_period);
-		NCR_700_set_offset(SDp, hostdata->chip710
-				   ? NCR_710_MAX_OFFSET : NCR_700_MAX_OFFSET);
+		/* Find the correct offset and period via domain validation */
+		spi_dv_device(SDp);
+	} else {
+		spi_offset(SDp) = 0;
+		spi_period(SDp) = 0;
 	}
 	return 0;
 }
