@@ -527,6 +527,8 @@ toshiba_acpi_init(void)
 	acpi_status status = AE_OK;
 	u32 hci_result;
 
+	if (acpi_disabled)
+		return -ENODEV;
 	/* simple device detection: look for HCI method */
 	if (is_valid_acpi_path(METHOD_HCI_1))
 		method_hci = METHOD_HCI_1;
