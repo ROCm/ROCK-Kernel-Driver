@@ -99,7 +99,9 @@ static void rfcomm_dev_destruct(struct rfcomm_dev *dev)
 	rfcomm_dlc_put(dlc);
 	kfree(dev);
 
-	MOD_DEC_USE_COUNT;
+	/* It's safe to call module_put() here because socket still 
+	 holds refference to this module. */
+	module_put(THIS_MODULE);
 }
 
 static inline void rfcomm_dev_hold(struct rfcomm_dev *dev)
@@ -211,8 +213,9 @@ static int rfcomm_dev_add(struct rfcomm_dev_req *req, struct rfcomm_dlc *dlc)
 	dev->dlc   = dlc;
 	rfcomm_dlc_unlock(dlc);
 
-	MOD_INC_USE_COUNT;
-	
+	/* It's safe to call __module_get() here because socket already 
+	 holds refference to this module. */
+	__module_get(THIS_MODULE);
 out:
 	write_unlock_bh(&rfcomm_dev_lock);
 
