@@ -252,7 +252,6 @@ struct pd_unit {
 	int removable;		/* removable media device  ?  */
 	int standby;
 	int alt_geom;
-	int present;
 	char name[PD_NAMELEN];	/* pda, pdb, etc ... */
 	struct gendisk *gd;
 };
@@ -279,7 +278,6 @@ static void pd_init_units(void)
 		disk->changed = 1;
 		disk->capacity = 0;
 		disk->drive = parm[D_SLV];
-		disk->present = 0;
 		snprintf(disk->name, PD_NAMELEN, "%s%c", name, 'a'+unit);
 		disk->alt_geom = parm[D_GEO];
 		disk->standby = parm[D_SBY];
@@ -864,11 +862,11 @@ static struct block_device_operations pd_fops = {
 	.revalidate_disk= pd_revalidate
 };
 
-static int pd_probe_drive(struct pd_unit *disk)
+static void pd_probe_drive(struct pd_unit *disk)
 {
 	struct gendisk *p = alloc_disk(1 << PD_BITS);
 	if (!p)
-		return 0;
+		return;
 	strcpy(p->disk_name, disk->name);
 	p->fops = &pd_fops;
 	p->major = major;
@@ -880,28 +878,24 @@ static int pd_probe_drive(struct pd_unit *disk)
 	if (disk->drive == -1) {
 		for (disk->drive = 0; disk->drive <= 1; disk->drive++)
 			if (pd_identify(disk))
-				return 1;
+				return;
 	} else if (pd_identify(disk))
-		return 1;
+		return;
 	disk->gd = NULL;
 	put_disk(p);
-	return 0;
 }
 
 static int pd_detect(void)
 {
-	int k, unit;
+	int found = 0, unit;
 	struct pd_unit *disk;
 
-	k = 0;
 	if (pd_drive_count == 0) { /* nothing spec'd - so autoprobe for 1 */
 		disk = pd;
 		if (pi_init(disk->pi, 1, -1, -1, -1, -1, -1, pd_scratch,
 			    PI_PD, verbose, disk->name)) {
-			if (pd_probe_drive(disk)) {
-				disk->present = 1;
-				k = 1;
-			} else
+			pd_probe_drive(disk);
+			if (!disk->gd)
 				pi_release(disk->pi);
 		}
 
@@ -913,24 +907,22 @@ static int pd_detect(void)
 			if (pi_init(disk->pi, 0, parm[D_PRT], parm[D_MOD],
 				     parm[D_UNI], parm[D_PRO], parm[D_DLY],
 				     pd_scratch, PI_PD, verbose, disk->name)) {
-				if (pd_probe_drive(disk)) {
-					disk->present = 1;
-					k = unit + 1;
-				} else
+				pd_probe_drive(disk);
+				if (!disk->gd)
 					pi_release(disk->pi);
 			}
 		}
 	}
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
-		if (disk->present) {
+		if (disk->gd) {
 			set_capacity(disk->gd, disk->capacity);
 			add_disk(disk->gd);
+			found = 1;
 		}
 	}
-	if (k)
-		return 1;
-	printk("%s: no valid drive found\n", name);
-	return 0;
+	if (!found)
+		printk("%s: no valid drive found\n", name);
+	return found;
 }
 
 static int __init pd_init(void)
@@ -969,8 +961,8 @@ static void __exit pd_exit(void)
 	int unit;
 	unregister_blkdev(major, name);
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
-		if (disk->present) {
-			struct gendisk *p = disk->gd;
+		struct gendisk *p = disk->gd;
+		if (p) {
 			disk->gd = NULL;
 			del_gendisk(p);
 			put_disk(p);
