@@ -78,7 +78,7 @@ static void printk_log_rtas(char *buf, int len)
 	char buffer[64];
 	char * str = "RTAS event";
 
-	printk(RTAS_ERR "%d -------- %s begin --------\n", error_log_cnt, str);
+	printk(RTAS_DEBUG "%d -------- %s begin --------\n", error_log_cnt, str);
 
 	/*
 	 * Print perline bytes on each line, each line will start
@@ -99,12 +99,12 @@ static void printk_log_rtas(char *buf, int len)
 		n += sprintf(buffer+n, "%02x", (unsigned char)buf[i]);
 
 		if (j == (perline-1))
-			printk(KERN_ERR "%s\n", buffer);
+			printk(KERN_DEBUG "%s\n", buffer);
 	}
 	if ((i % perline) != 0)
-		printk(KERN_ERR "%s\n", buffer);
+		printk(KERN_DEBUG "%s\n", buffer);
 
-	printk(RTAS_ERR "%d -------- %s end ----------\n", error_log_cnt, str);
+	printk(RTAS_DEBUG "%d -------- %s end ----------\n", error_log_cnt, str);
 }
 
 static int log_rtas_len(char * buf)
