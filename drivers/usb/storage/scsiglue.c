@@ -228,8 +228,8 @@ static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 
 	/* we use the usb_reset_device() function to handle this for us */
 	US_DEBUGP("bus_reset() called\n");
-
-       	us = (struct us_data *)srb->device->host->hostdata[0];
+	scsi_unlock(srb->device->host);
+	us = (struct us_data *)srb->device->host->hostdata[0];
 
 	/* attempt to reset the port */
 	result = usb_reset_device(us->pusb_dev);
