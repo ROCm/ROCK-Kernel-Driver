@@ -163,9 +163,9 @@ pipe_readv(struct file *filp, const struct iovec *_iov,
 				curbuf = (curbuf + 1) & (PIPE_BUFFERS-1);
 				info->curbuf = curbuf;
 				info->nrbufs = --bufs;
-				do_wakeup = 1;
 			}
 			total_len -= chars;
+			do_wakeup = 1;
 			if (!total_len)
 				break;	/* common path: read succeeded */
 		}
