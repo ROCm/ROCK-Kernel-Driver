@@ -74,12 +74,15 @@ static int ah_output(struct sk_buff **pskb)
 	}
 
 	spin_lock_bh(&x->lock);
-	err = xfrm_check_output(x, *pskb, AF_INET);
+	err = xfrm_state_check(x, *pskb);
 	if (err)
 		goto error;
 
 	iph = (*pskb)->nh.iph;
 	if (x->props.mode) {
+		err = xfrm4_tunnel_check_size(*pskb);
+		if (err)
+			goto error;
 		top_iph = (struct iphdr*)skb_push(*pskb, x->props.header_len);
 		top_iph->ihl = 5;
 		top_iph->version = 4;
