@@ -203,10 +203,7 @@ static void __iomem * __ioremap_com(unsigned long addr, unsigned long pa,
 void __iomem *
 ioremap(unsigned long addr, unsigned long size)
 {
-	void __iomem *ret = __ioremap(addr, size, _PAGE_NO_CACHE);
-	if(mem_init_done)
-		return eeh_ioremap(addr, ret);	/* may remap the addr */
-	return ret;
+	return __ioremap(addr, size, _PAGE_NO_CACHE);
 }
 
 void __iomem *
@@ -363,9 +360,7 @@ void iounmap(volatile void __iomem *token)
 		return;
 	}
 	
-	/* addr could be in EEH or IO region, map it to IO region regardless.
-	 */
-	addr = (void *) (IO_TOKEN_TO_ADDR(token) & PAGE_MASK);
+	addr = (void *) ((unsigned long __force) token & PAGE_MASK);
 	
 	if ((size = im_free(addr)) == 0) {
 		return;
@@ -415,9 +410,7 @@ int iounmap_explicit(volatile void __iomem *start, unsigned long size)
 	unsigned long addr;
 	int rc;
 	
-	/* addr could be in EEH or IO region, map it to IO region regardless.
-	 */
-	addr = (IO_TOKEN_TO_ADDR(start) & PAGE_MASK);
+	addr = (unsigned long __force) start & PAGE_MASK;
 
 	/* Verify that the region either exists or is a subset of an existing
 	 * region.  In the latter case, split the parent region to create 

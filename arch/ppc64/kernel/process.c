@@ -397,9 +397,20 @@ void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp)
 	/* Check whether the e_entry function descriptor entries
 	 * need to be relocated before we can use them.
 	 */
-	if ( load_addr != 0 ) {
+	if (load_addr != 0) {
 		entry += load_addr;
 		toc   += load_addr;
+	}
+
+	/*
+	 * If we exec out of a kernel thread then thread.regs will not be
+	 * set. Do it now.
+	 */
+	if (!current->thread.regs) {
+		unsigned long childregs = (unsigned long)current->thread_info +
+						THREAD_SIZE;
+		childregs -= sizeof(struct pt_regs);
+		current->thread.regs = childregs;
 	}
 
 	regs->nip = entry;

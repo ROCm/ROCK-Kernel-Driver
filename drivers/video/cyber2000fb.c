@@ -1720,7 +1720,11 @@ int __init cyber2000fb_init(void)
 	int ret = -1, err;
 
 #ifndef MODULE
-	cyber2000fb_setup(fb_get_options("cyber200fb"));
+	char *option = NULL;
+
+	if (fb_get_options("cyber2000fb", NULL))
+		return -ENODEV;
+	cyber2000fb_setup(option);
 #endif
 
 #ifdef CONFIG_ARCH_SHARK

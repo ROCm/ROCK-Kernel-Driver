@@ -5720,7 +5720,11 @@ int __init sisfb_init(void)
 {
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,8)
 #ifndef MODULE
-	sisfb_setup(fb_get_options("sisfb"));
+	char *option = NULL;
+
+	if (fb_get_options("sisfb", &option))
+		return -ENODEV;
+	sisfb_setup(option);
 #endif
 #endif
 	return(pci_module_init(&sisfb_driver));

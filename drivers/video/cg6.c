@@ -760,6 +760,9 @@ int __init cg6_init(void)
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev;
 
+	if (fb_get_options("cg6fb", NULL))
+		return -ENODEV;
+
 	for_all_sbusdev(sdev, sbus) {
 		if (!strcmp(sdev->prom_name, "cgsix") ||
 		    !strcmp(sdev->prom_name, "cgthree+"))

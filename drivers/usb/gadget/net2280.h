@@ -446,7 +446,7 @@ struct net2280_ep_regs {	/* [11.9] */
  */
 
 static inline u32
-get_idx_reg (struct net2280_regs *regs, u32 index)
+get_idx_reg (struct net2280_regs __iomem *regs, u32 index)
 {
 	writel (index, &regs->idxaddr);
 	/* NOTE:  synchs device/cpu memory views */
@@ -454,7 +454,7 @@ get_idx_reg (struct net2280_regs *regs, u32 index)
 }
 
 static inline void
-set_idx_reg (struct net2280_regs *regs, u32 index, u32 value)
+set_idx_reg (struct net2280_regs __iomem *regs, u32 index, u32 value)
 {
 	writel (index, &regs->idxaddr);
 	writel (value, &regs->idxdata);
@@ -507,8 +507,8 @@ struct net2280_dma {
 
 struct net2280_ep {
 	struct usb_ep				ep;
-	struct net2280_ep_regs			*regs;
-	struct net2280_dma_regs			*dma;
+	struct net2280_ep_regs			__iomem *regs;
+	struct net2280_dma_regs			__iomem *dma;
 	struct net2280_dma			*dummy;
 	dma_addr_t				td_dma;	/* of dummy */
 	struct net2280				*dev;
@@ -539,7 +539,7 @@ static inline void allow_status (struct net2280_ep *ep)
 /* count (<= 4) bytes in the next fifo write will be valid */
 static inline void set_fifo_bytecount (struct net2280_ep *ep, unsigned count)
 {
-	writeb (count, 2 + (u8 *) &ep->regs->ep_cfg);
+	writeb (count, 2 + (u8 __iomem *) &ep->regs->ep_cfg);
 }
 
 struct net2280_request {
@@ -566,12 +566,12 @@ struct net2280 {
 
 	/* pci state used to access those endpoints */
 	struct pci_dev			*pdev;
-	struct net2280_regs		*regs;
-	struct net2280_usb_regs		*usb;
-	struct net2280_pci_regs		*pci;
-	struct net2280_dma_regs		*dma;
-	struct net2280_dep_regs		*dep;
-	struct net2280_ep_regs		*epregs;
+	struct net2280_regs		__iomem *regs;
+	struct net2280_usb_regs		__iomem *usb;
+	struct net2280_pci_regs		__iomem *pci;
+	struct net2280_dma_regs		__iomem *dma;
+	struct net2280_dep_regs		__iomem *dep;
+	struct net2280_ep_regs		__iomem *epregs;
 
 	struct pci_pool			*requests;
 	// statistics...

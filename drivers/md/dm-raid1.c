@@ -1009,8 +1009,8 @@ static struct dirty_log *create_dirty_log(struct dm_target *ti,
  * log_type #log_params <log_params>
  * #mirrors [mirror_path offset]{2,}
  *
- * For now, #log_params = 1, log_type = "core"
- *
+ * log_type is "core" or "disk"
+ * #log_params is between 1 and 3
  */
 #define DM_IO_PAGES 64
 static int mirror_ctr(struct dm_target *ti, unsigned int argc, char **argv)
@@ -1182,35 +1182,30 @@ static int mirror_status(struct dm_target *ti, status_type_t type,
 			 char *result, unsigned int maxlen)
 {
 	char buffer[32];
-	unsigned int m, sz = 0;
+	unsigned int m, sz;
 	struct mirror_set *ms = (struct mirror_set *) ti->private;
 
-#define EMIT(x...) sz += ((sz >= maxlen) ? \
-			  0 : scnprintf(result + sz, maxlen - sz, x))
+	sz = ms->rh.log->type->status(ms->rh.log, type, result, maxlen);
 
 	switch (type) {
 	case STATUSTYPE_INFO:
-		EMIT("%d ", ms->nr_mirrors);
-
+		DMEMIT("%d ", ms->nr_mirrors);
 		for (m = 0; m < ms->nr_mirrors; m++) {
 			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
-			EMIT("%s ", buffer);
+			DMEMIT("%s ", buffer);
 		}
 
-		EMIT(SECTOR_FORMAT "/" SECTOR_FORMAT,
-		     ms->rh.log->type->get_sync_count(ms->rh.log),
-		     ms->nr_regions);
+		DMEMIT(SECTOR_FORMAT "/" SECTOR_FORMAT,
+		       ms->rh.log->type->get_sync_count(ms->rh.log),
+		       ms->nr_regions);
 		break;
 
 	case STATUSTYPE_TABLE:
-		EMIT("%s 1 " SECTOR_FORMAT " %d ",
-		     ms->rh.log->type->name, ms->rh.region_size,
-		     ms->nr_mirrors);
-
+		DMEMIT("%d ", ms->nr_mirrors);
 		for (m = 0; m < ms->nr_mirrors; m++) {
 			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
-			EMIT("%s " SECTOR_FORMAT " ",
-			     buffer, ms->mirror[m].offset);
+			DMEMIT("%s " SECTOR_FORMAT " ",
+			       buffer, ms->mirror[m].offset);
 		}
 	}
 

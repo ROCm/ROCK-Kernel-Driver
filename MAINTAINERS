@@ -1757,6 +1757,12 @@ M:	promise@pnd-pc.demon.co.uk
 W:	http://www.pnd-pc.demon.co.uk/promise/
 S:	Maintained
 
+PXA2xx SUPPORT
+P:	Nicolas Pitre
+M:	nico@cam.org
+L:	linux-arm-kernel@lists.arm.linux.org.uk
+S:	Maintained
+
 QNX4 FILESYSTEM
 P:	Anders Larsen
 M:	al@alarsen.net
@@ -1831,12 +1837,6 @@ SAA7146 VIDEO4LINUX-2 DRIVER
 P:	Michael Hunold
 M:	michael@mihu.de
 W:	http://www.mihu.de/linux/saa7146
-S:	Maintained
-
-SA1100 SUPPORT
-P:	Nicolas Pitre
-M:	nico@cam.org
-L:	linux-arm@lists.arm.linux.org.uk
 S:	Maintained
 
 SBPCD CDROM DRIVER
@@ -1955,6 +1955,11 @@ P:	Urban Widmark
 M:	urban@teststation.com
 W:	http://samba.org/
 L:	samba@samba.org
+S:	Maintained
+
+SMC91x ETHERNET DRIVER
+P:	Nicolas Pitre
+M:	nico@cam.org
 S:	Maintained
 
 SNA NETWORK LAYER

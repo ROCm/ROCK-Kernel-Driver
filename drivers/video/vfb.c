@@ -497,7 +497,11 @@ int __init vfb_init(void)
 	int ret = 0;
 
 #ifndef MODULE
-	vfb_setup(fb_get_options("vfb"));
+	char *option = NULL;
+
+	if (fb_get_options("vfb", &option))
+		return -ENODEV;
+	vfb_setup(option);
 #endif
 
 	if (!vfb_enable)

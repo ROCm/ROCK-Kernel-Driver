@@ -721,6 +721,9 @@ static struct matroxfb_driver crtc2 = {
 		.remove =	matroxfb_crtc2_remove };
 
 static int matroxfb_crtc2_init(void) {
+	if (fb_get_options("matrox_crtc2fb", NULL))
+		return -ENODEV;
+
 	matroxfb_register_driver(&crtc2);
 	return 0;
 }

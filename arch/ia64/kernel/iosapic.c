@@ -117,6 +117,9 @@ static struct iosapic {
 	char		*addr;		/* base address of IOSAPIC */
 	unsigned int 	gsi_base;	/* first GSI assigned to this IOSAPIC */
 	unsigned short 	num_rte;	/* number of RTE in this IOSAPIC */
+#ifdef CONFIG_NUMA
+	unsigned short	node;		/* numa node association via pxm */
+#endif
 } iosapic_lists[NR_IOSAPICS];
 
 static int num_iosapic;
@@ -488,7 +491,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 }
 
 static unsigned int
-get_target_cpu (void)
+get_target_cpu (unsigned int gsi, int vector)
 {
 #ifdef CONFIG_SMP
 	static int cpu = -1;
@@ -507,6 +510,34 @@ get_target_cpu (void)
 	if (!cpu_online(smp_processor_id()))
 		return hard_smp_processor_id();
 
+#ifdef CONFIG_NUMA
+	{
+		int num_cpus, cpu_index, iosapic_index, numa_cpu, i = 0;
+		cpumask_t cpu_mask;
+
+		iosapic_index = find_iosapic(gsi);
+		if (iosapic_index < 0 ||
+		    iosapic_lists[iosapic_index].node == MAX_NUMNODES)
+			goto skip_numa_setup;
+
+		cpu_mask = node_to_cpumask(iosapic_lists[iosapic_index].node);
+		
+		num_cpus = cpus_weight(cpu_mask);
+
+		if (!num_cpus)
+			goto skip_numa_setup;
+
+		/* Use vector assigment to distribute across cpus in node */
+		cpu_index = vector % num_cpus;
+
+		for (numa_cpu = first_cpu(cpu_mask) ; i < cpu_index ; i++)
+			numa_cpu = next_cpu(numa_cpu, cpu_mask);
+
+		if (numa_cpu != NR_CPUS)
+			return cpu_physical_id(numa_cpu);
+	}
+skip_numa_setup:
+#endif
 	/*
 	 * Otherwise, round-robin interrupt vectors across all the
 	 * processors.  (It'd be nice if we could be smarter in the
@@ -550,7 +581,7 @@ iosapic_register_intr (unsigned int gsi,
 		}
 
 		vector = assign_irq_vector(AUTO_ASSIGN);
-		dest = get_target_cpu();
+		dest = get_target_cpu(gsi, vector);
 		register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY,
 			polarity, trigger);
 	}
@@ -680,6 +711,9 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 	iosapic_lists[num_iosapic].addr = addr;
 	iosapic_lists[num_iosapic].gsi_base = gsi_base;
 	iosapic_lists[num_iosapic].num_rte = num_rte;
+#ifdef CONFIG_NUMA
+	iosapic_lists[num_iosapic].node = MAX_NUMNODES;
+#endif
 	num_iosapic++;
 
 	if ((gsi_base == 0) && pcat_compat) {
@@ -692,3 +726,20 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 			iosapic_override_isa_irq(isa_irq, isa_irq, IOSAPIC_POL_HIGH, IOSAPIC_EDGE);
 	}
 }
+
+#ifdef CONFIG_NUMA
+void __init
+map_iosapic_to_node(unsigned int gsi_base, int node)
+{
+	int index;
+
+	index = find_iosapic(gsi_base);
+	if (index < 0) {
+		printk(KERN_WARNING "%s: No IOSAPIC for GSI %u\n",
+		       __FUNCTION__, gsi_base);
+		return;
+	}
+	iosapic_lists[index].node = node;
+	return;
+}
+#endif

@@ -28,8 +28,8 @@ typedef union extent_u {
 } efs_extent;
 
 typedef struct edevs {
-	short		odev;
-	unsigned int	ndev;
+	__be16		odev;
+	__be32		ndev;
 } efs_devs;
 
 /*
@@ -37,16 +37,16 @@ typedef struct edevs {
  * is exactly 128 bytes long.
  */
 struct	efs_dinode {
-	u_short		di_mode;	/* mode and type of file */
-	short		di_nlink;	/* number of links to file */
-	u_short		di_uid;		/* owner's user id */
-	u_short		di_gid;		/* owner's group id */
-	int32_t		di_size;	/* number of bytes in file */
-	int32_t		di_atime;	/* time last accessed */
-	int32_t		di_mtime;	/* time last modified */
-	int32_t		di_ctime;	/* time created */
-	uint32_t	di_gen;		/* generation number */
-	short		di_numextents;	/* # of extents */
+	__be16		di_mode;	/* mode and type of file */
+	__be16		di_nlink;	/* number of links to file */
+	__be16		di_uid;		/* owner's user id */
+	__be16		di_gid;		/* owner's group id */
+	__be32		di_size;	/* number of bytes in file */
+	__be32		di_atime;	/* time last accessed */
+	__be32		di_mtime;	/* time last modified */
+	__be32		di_ctime;	/* time created */
+	__be32		di_gen;		/* generation number */
+	__be16		di_numextents;	/* # of extents */
 	u_char		di_version;	/* version of inode */
 	u_char		di_spare;	/* spare - used by AFS */
 	union di_addr {

@@ -296,7 +296,11 @@ int __init fm2fb_setup(char *options);
 
 int __init fm2fb_init(void)
 {
-	fm2fb_setup(fb_get_options("fb2fb"));
+	char *option = NULL;
+
+	if (fb_get_options("fm2fb", &option))
+		return -ENODEV;
+	fm2fb_setup(option);
 	return zorro_register_driver(&fm2fb_driver);
 }
 

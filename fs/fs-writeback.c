@@ -403,7 +403,6 @@ writeback_inodes(struct writeback_control *wbc)
 	struct super_block *sb;
 
 	might_sleep();
-	spin_lock(&inode_lock);
 	spin_lock(&sb_lock);
 restart:
 	sb = sb_entry(super_blocks.prev);
@@ -418,19 +417,21 @@ restart:
 			 * be unmounted by the time it is released.
 			 */
 			if (down_read_trylock(&sb->s_umount)) {
-				if (sb->s_root)
+				if (sb->s_root) {
+					spin_lock(&inode_lock);
 					sync_sb_inodes(sb, wbc);
+					spin_unlock(&inode_lock);
+				}
 				up_read(&sb->s_umount);
 			}
 			spin_lock(&sb_lock);
-			if (__put_super(sb))
+			if (__put_super_and_need_restart(sb))
 				goto restart;
 		}
 		if (wbc->nr_to_write <= 0)
 			break;
 	}
 	spin_unlock(&sb_lock);
-	spin_unlock(&inode_lock);
 }
 
 /*

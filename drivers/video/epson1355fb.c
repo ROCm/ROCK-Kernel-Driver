@@ -740,6 +740,9 @@ int __init epson1355fb_init(void)
 {
 	int ret = 0;
 
+	if (fb_get_options("epson1355fb", NULL))
+		return -ENODEV;
+
 	ret = driver_register(&epson1355fb_driver);
 	if (!ret) {
 		ret = platform_device_register(&epson1355fb_device);

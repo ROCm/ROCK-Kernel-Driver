@@ -589,8 +589,14 @@ open_file:
             break;
     }
 
-    inode->i_ctime = CURRENT_TIME;
-    mark_inode_dirty (inode);
+    /* We can't mark the inode dirty if it's not hashed. This is the case
+     * when we're inheriting the default ACL. If we dirty it, the inode
+     * gets marked dirty, but won't (ever) make it onto the dirty list until
+     * it's synced explicitly to clear I_DIRTY. This is bad. */
+    if (!hlist_unhashed(&inode->i_hash)) {
+        inode->i_ctime = CURRENT_TIME;
+        mark_inode_dirty (inode);
+    }
 
 out_filp:
     up (&xinode->i_sem);

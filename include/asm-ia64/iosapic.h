@@ -90,6 +90,9 @@ extern int __init iosapic_register_platform_intr (u32 int_type,
 extern unsigned int iosapic_version (char *addr);
 
 extern void iosapic_pci_fixup (int);
+#ifdef CONFIG_NUMA
+extern void __init map_iosapic_to_node (unsigned int, int);
+#endif
 #else
 #define iosapic_system_init(pcat_compat)			do { } while (0)
 #define iosapic_init(address,gsi_base)				do { } while (0)

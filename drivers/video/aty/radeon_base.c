@@ -2373,7 +2373,11 @@ int __init radeonfb_setup (char *options);
 int __init radeonfb_init (void)
 {
 #ifndef MODULE
-	radeonfb_setup(fb_get_options("radeonfb"));
+	char *option = NULL;
+
+	if (fb_get_options("radeonfb", &option))
+		return -ENODEV;
+	radeonfb_setup(option);
 #endif
 	return pci_module_init (&radeonfb_driver);
 }

@@ -434,7 +434,10 @@ act2000_isa_download(act2000_card * card, act2000_ddef __user * cb)
                 l = (length > 1024) ? 1024 : length;
                 c = 0;
                 b = buf;
-                copy_from_user(buf, p, l);
+                if (copy_from_user(buf, p, l)) {
+                        kfree(buf);
+                        return -EFAULT;
+                }
                 while (c < l) {
                         if (act2000_isa_writeb(card, *b++)) {
                                 printk(KERN_WARNING

@@ -405,9 +405,9 @@ write_out_data:
 			jbd_debug(4, "JBD: got buffer %llu (%p)\n",
 				(unsigned long long)bh->b_blocknr, bh->b_data);
 			header = (journal_header_t *)&bh->b_data[0];
-			header->h_magic     = htonl(JFS_MAGIC_NUMBER);
-			header->h_blocktype = htonl(JFS_DESCRIPTOR_BLOCK);
-			header->h_sequence  = htonl(commit_transaction->t_tid);
+			header->h_magic     = cpu_to_be32(JFS_MAGIC_NUMBER);
+			header->h_blocktype = cpu_to_be32(JFS_DESCRIPTOR_BLOCK);
+			header->h_sequence  = cpu_to_be32(commit_transaction->t_tid);
 
 			tagp = &bh->b_data[sizeof(journal_header_t)];
 			space_left = bh->b_size - sizeof(journal_header_t);
@@ -473,8 +473,8 @@ write_out_data:
 			tag_flag |= JFS_FLAG_SAME_UUID;
 
 		tag = (journal_block_tag_t *) tagp;
-		tag->t_blocknr = htonl(jh2bh(jh)->b_blocknr);
-		tag->t_flags = htonl(tag_flag);
+		tag->t_blocknr = cpu_to_be32(jh2bh(jh)->b_blocknr);
+		tag->t_flags = cpu_to_be32(tag_flag);
 		tagp += sizeof(journal_block_tag_t);
 		space_left -= sizeof(journal_block_tag_t);
 
@@ -498,7 +498,7 @@ write_out_data:
                            submitting the IOs.  "tag" still points to
                            the last tag we set up. */
 
-			tag->t_flags |= htonl(JFS_FLAG_LAST_TAG);
+			tag->t_flags |= cpu_to_be32(JFS_FLAG_LAST_TAG);
 
 start_journal_io:
 			for (i = 0; i < bufs; i++) {
@@ -631,9 +631,9 @@ wait_for_iobuf:
 	for (i = 0; i < jh2bh(descriptor)->b_size; i += 512) {
 		journal_header_t *tmp =
 			(journal_header_t*)jh2bh(descriptor)->b_data;
-		tmp->h_magic = htonl(JFS_MAGIC_NUMBER);
-		tmp->h_blocktype = htonl(JFS_COMMIT_BLOCK);
-		tmp->h_sequence = htonl(commit_transaction->t_tid);
+		tmp->h_magic = cpu_to_be32(JFS_MAGIC_NUMBER);
+		tmp->h_blocktype = cpu_to_be32(JFS_COMMIT_BLOCK);
+		tmp->h_sequence = cpu_to_be32(commit_transaction->t_tid);
 	}
 
 	JBUFFER_TRACE(descriptor, "write commit block");

@@ -1902,7 +1902,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	return 1;
 }
 
-int __init atyfb_init(void)
+int __init atyfb_do_init(void)
 {
 #if defined(CONFIG_PCI)
 	unsigned long addr, res_start, res_size;
@@ -1920,13 +1920,6 @@ int __init atyfb_init(void)
 #else
 	u16 tmp;
 #endif
-#endif
-
-#ifndef MODULE
-	atyfb_setup(fb_get_options("atyfb"));
-#endif
-
-#if defined(CONFIG_PCI)
 
 #ifdef __sparc__
 	/* Do not attach when we have a serial console. */
@@ -2385,6 +2378,19 @@ int __init atyfb_init(void)
 #endif				/* CONFIG_ATARI */
 	return 0;
 }
+
+int __init atyfb_init(void)
+{
+#ifndef MODULE
+	char *option = NULL;
+
+	if (fb_get_options("atyfb", &option))
+		return -ENODEV;
+	atyfb_setup(option);
+#endif
+	return atyfb_do_init();
+}
+
 
 #ifndef MODULE
 int __init atyfb_setup(char *options)

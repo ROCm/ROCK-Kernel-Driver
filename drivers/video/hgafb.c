@@ -547,6 +547,9 @@ static struct fb_ops hgafb_ops = {
 
 int __init hgafb_init(void)
 {
+	if (fb_get_options("hgafb", NULL))
+		return -ENODEV;
+
 	if (! hga_card_detect()) {
 		printk(KERN_INFO "hgafb: HGA card not detected.\n");
 		return -EINVAL;

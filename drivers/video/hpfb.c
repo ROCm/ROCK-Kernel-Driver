@@ -115,6 +115,9 @@ int __init hpfb_init_one(unsigned long base)
 {
 	unsigned long fboff;
 
+	if (fb_get_options("hpfb", NULL))
+		return -ENODEV;
+
 	fboff = (in_8(base + TOPCAT_FBOMSB) << 8) | in_8(base + TOPCAT_FBOLSB);
 
 	hpfb_fix.smem_start = 0xf0000000 | (in_8(base + fboff) << 16);

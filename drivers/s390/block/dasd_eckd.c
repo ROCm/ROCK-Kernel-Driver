@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.57 $
+ * $Revision: 1.59 $
  */
 
 #include <linux/config.h>
@@ -68,6 +68,10 @@ static struct ccw_device_id dasd_eckd_ids[] = {
 	{ CCW_DEVICE_DEVTYPE (0x3990, 0, 0x3380, 0), driver_info: 0x4},
 	{ CCW_DEVICE_DEVTYPE (0x2105, 0, 0x3380, 0), driver_info: 0x5},
 	{ CCW_DEVICE_DEVTYPE (0x9343, 0, 0x9345, 0), driver_info: 0x6},
+	{ CCW_DEVICE_DEVTYPE (0x2107, 0, 0x3390, 0), driver_info: 0x7},
+	{ CCW_DEVICE_DEVTYPE (0x2107, 0, 0x3380, 0), driver_info: 0x8},
+	{ CCW_DEVICE_DEVTYPE (0x1750, 0, 0x3390, 0), driver_info: 0x9},
+	{ CCW_DEVICE_DEVTYPE (0x1750, 0, 0x3380, 0), driver_info: 0xa},
 	{ /* end of list */ },
 };
 
@@ -274,9 +278,11 @@ define_extent(struct ccw1 * ccw, struct DE_eckd_data * data, int trk,
 
 	data->attributes.mode = 0x3;	/* ECKD */
 
-	if (private->rdc_data.cu_type == 0x2105
+	if ((private->rdc_data.cu_type == 0x2105 ||
+	     private->rdc_data.cu_type == 0x2107 ||
+	     private->rdc_data.cu_type == 0x1750)
 	    && !(private->uses_cdl && trk < 2))
-		data->ga_extended |= 0x40;
+		data->ga_extended |= 0x40; /* Regular Data Format Mode */
 
 	geo.cyl = private->rdc_data.no_cyl;
 	geo.head = private->rdc_data.trk_per_cyl;
@@ -903,6 +909,8 @@ dasd_eckd_examine_error(struct dasd_ccw_req * cqr, struct irb * irb)
 	switch (cdev->id.cu_type) {
 	case 0x3990:
 	case 0x2105:
+	case 0x2107:
+	case 0x1750:
 		return dasd_3990_erp_examine(cqr, irb);
 	case 0x9343:
 		return dasd_9343_erp_examine(cqr, irb);
@@ -923,6 +931,8 @@ dasd_eckd_erp_action(struct dasd_ccw_req * cqr)
 	switch (cdev->id.cu_type) {
 	case 0x3990:
 	case 0x2105:
+	case 0x2107:
+	case 0x1750:
 		return dasd_3990_erp_action;
 	case 0x9343:
 		/* Return dasd_9343_erp_action; */

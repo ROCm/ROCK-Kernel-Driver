@@ -2439,6 +2439,14 @@ static int aty128_pci_resume(struct pci_dev *pdev)
 
 int __init aty128fb_init(void)
 {
+#ifndef MODULE
+	char *option = NULL;
+
+	if (fb_get_options("aty128fb", &option))
+		return -ENODEV;
+	aty128fb_setup(option);
+#endif
+
 	return pci_module_init(&aty128fb_driver);
 }
 
@@ -2447,8 +2455,9 @@ static void __exit aty128fb_exit(void)
 	pci_unregister_driver(&aty128fb_driver);
 }
 
-#ifdef MODULE
 module_init(aty128fb_init);
+
+#ifdef MODULE
 module_exit(aty128fb_exit);
 
 MODULE_AUTHOR("(c)1999-2003 Brad Douglas <brad@neruo.com>");

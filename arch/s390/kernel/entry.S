@@ -150,30 +150,6 @@ __switch_to_noper:
 	st	%r3,__LC_KERNEL_STACK	# __LC_KERNEL_STACK = new kernel stack
 	br	%r14
 
-/*
- * do_softirq calling function. We want to run the softirq functions on the
- * asynchronous interrupt stack.
- */
-	.global do_call_softirq
-do_call_softirq:
-	stnsm	__SF_EMPTY(%r15),0xfc
-	stm	%r12,%r15,__SF_GPRS(%r15)
-	lr	%r12,%r15
-        basr    %r13,0
-do_call_base:
-	l	%r0,__LC_ASYNC_STACK
-	slr     %r0,%r15
-	sra	%r0,STACK_SHIFT
-	be	0f-do_call_base(%r13)
-	l	%r15,__LC_ASYNC_STACK
-0:	sl	%r15,.Lc_overhead-do_call_base(%r13)
-        st	%r12,__SF_BACKCHAIN(%r15)	# store backchain
-	l	%r1,.Ldo_softirq-do_call_base(%r13)
-	basr	%r14,%r1
-	lm	%r12,%r15,__SF_GPRS(%r12)
-	ssm	__SF_EMPTY(%r15)
-	br	%r14
-
 __critical_start:
 /*
  * SVC interrupt handler routine. System calls are synchronous events and
@@ -733,7 +709,6 @@ cleanup_sysc_leave_lpsw:
 .Ldo_IRQ:      .long  do_IRQ
 .Ldo_extint:   .long  do_extint
 .Ldo_signal:   .long  do_signal
-.Ldo_softirq:  .long  do_softirq
 .Lhandle_per:  .long  do_single_step
 .Ljump_table:  .long  pgm_check_table
 .Lschedule:    .long  schedule

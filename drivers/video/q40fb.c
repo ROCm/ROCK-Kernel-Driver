@@ -143,6 +143,9 @@ int __init q40fb_init(void)
 {
 	int ret = 0;
 
+	if (fb_get_options("q40fb", NULL))
+		return -ENODEV;
+
 	ret = driver_register(&q40fb_driver);
 
 	if (!ret) {

@@ -462,6 +462,9 @@ static struct pci_driver chipsfb_driver = {
 
 int __init chips_init(void)
 {
+	if (fb_get_options("chipsfb", NULL))
+		return -ENODEV;
+
 	return pci_module_init(&chipsfb_driver);
 }
 

@@ -586,7 +586,11 @@ static void __exit xxxfb_cleanup(void)
      *  For kernel boot options (in 'video=xxxfb:<options>' format)
      */
 #ifndef MODULE
-    xxxfb_setup(fb_get_options("xxxfb"));
+    char *option = NULL;
+
+    if (fb_get_options("xxxfb", &option))
+	    return -ENODEV;
+    xxxfb_setup(option);
 #endif
 
     /*

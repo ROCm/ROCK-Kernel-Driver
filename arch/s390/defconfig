@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.9-rc1
-# Mon Aug 30 19:03:48 2004
+# Linux kernel version: 2.6.9-rc2
+# Mon Sep 20 17:16:38 2004
 #
 CONFIG_MMU=y
 CONFIG_RWSEM_XCHGADD_ALGORITHM=y
@@ -17,6 +17,7 @@ CONFIG_CLEAN_COMPILE=y
 #
 # General setup
 #
+CONFIG_LOCALVERSION=""
 CONFIG_SWAP=y
 CONFIG_SYSVIPC=y
 # CONFIG_POSIX_MQUEUE is not set
@@ -38,6 +39,8 @@ CONFIG_IOSCHED_AS=y
 CONFIG_IOSCHED_DEADLINE=y
 CONFIG_IOSCHED_CFQ=y
 # CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
+CONFIG_SHMEM=y
+# CONFIG_TINY_SHMEM is not set
 
 #
 # Loadable module support
@@ -162,7 +165,7 @@ CONFIG_BLK_DEV_INITRD=y
 CONFIG_BLK_DEV_XPRAM=m
 # CONFIG_DCSSBLK is not set
 CONFIG_DASD=y
-# CONFIG_DASD_PROFILE is not set
+CONFIG_DASD_PROFILE=y
 CONFIG_DASD_ECKD=y
 CONFIG_DASD_FBA=y
 CONFIG_DASD_DIAG=y

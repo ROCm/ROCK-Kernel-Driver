@@ -417,11 +417,6 @@ attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno)
  * choice but implement a bunch of them...
  *
  */
-#define BUILD_SHOW_FUNC_DEG(name, data)				\
-static ssize_t show_##name(struct device *dev, char *buf)	\
-{								\
-	return sprintf(buf, "%d°C\n", data);			\
-}
 #define BUILD_SHOW_FUNC_INT(name, data)				\
 static ssize_t show_##name(struct device *dev, char *buf)	\
 {								\
@@ -453,10 +448,10 @@ static ssize_t store_##name(struct device *dev, const char *buf, size_t n) \
 	return n;						\
 }
 
-BUILD_SHOW_FUNC_DEG(cpu_temperature,	 (read_reg(thermostat, TEMP_REG[1])))
-BUILD_SHOW_FUNC_DEG(gpu_temperature,	 (read_reg(thermostat, TEMP_REG[2])))
-BUILD_SHOW_FUNC_DEG(cpu_limit,		 thermostat->limits[1])
-BUILD_SHOW_FUNC_DEG(gpu_limit,		 thermostat->limits[2])
+BUILD_SHOW_FUNC_INT(cpu_temperature,	 (read_reg(thermostat, TEMP_REG[1])))
+BUILD_SHOW_FUNC_INT(gpu_temperature,	 (read_reg(thermostat, TEMP_REG[2])))
+BUILD_SHOW_FUNC_INT(cpu_limit,		 thermostat->limits[1])
+BUILD_SHOW_FUNC_INT(gpu_limit,		 thermostat->limits[2])
 
 BUILD_SHOW_FUNC_INT(specified_fan_speed, fan_speed)
 BUILD_SHOW_FUNC_INT(cpu_fan_speed,	 (read_fan_speed(thermostat, FAN_SPEED[0])))

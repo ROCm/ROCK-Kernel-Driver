@@ -496,6 +496,8 @@ static struct amba_driver clcd_driver = {
 
 int __init amba_clcdfb_init(void)
 {
+	if (fb_get_options("ambafb", NULL))
+		return -ENODEV;
 
 	return amba_driver_register(&clcd_driver);
 }

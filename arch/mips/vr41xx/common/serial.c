@@ -115,7 +115,7 @@ void __init vr41xx_siu_init(void)
 	port.line = vr41xx_serial_ports;
 	port.uartclk = SIU_BASE_BAUD * 16;
 	port.irq = SIU_IRQ;
-	port.flags = UPF_RESOURCES | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST;
+	port.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST;
 	switch (current_cpu_data.cputype) {
 	case CPU_VR4111:
 	case CPU_VR4121:
@@ -160,7 +160,7 @@ void __init vr41xx_dsiu_init(void)
 	port.line = vr41xx_serial_ports;
 	port.uartclk = DSIU_BASE_BAUD * 16;
 	port.irq = DSIU_IRQ;
-	port.flags = UPF_RESOURCES | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST;
+	port.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST;
 	port.mapbase = DSIU_BASE;
 	port.regshift = 0;
 	port.iotype = UPIO_MEM;

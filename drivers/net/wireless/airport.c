@@ -28,6 +28,7 @@
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -94,8 +95,7 @@ airport_resume(struct macio_dev *mdev)
 	printk(KERN_DEBUG "%s: Airport waking up\n", dev->name);
 
 	pmac_call_feature(PMAC_FTR_AIRPORT_ENABLE, macio_get_of_node(mdev), 0, 1);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ/5);
+	msleep(200);
 
 	enable_irq(dev->irq);
 
@@ -147,8 +147,7 @@ airport_detach(struct macio_dev *mdev)
 	macio_release_resource(mdev, 0);
 
 	pmac_call_feature(PMAC_FTR_AIRPORT_ENABLE, macio_get_of_node(mdev), 0, 0);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ);
+	ssleep(1);
 
 	macio_set_drvdata(mdev, NULL);
 	free_netdev(dev);
@@ -174,14 +173,12 @@ static int airport_hard_reset(struct orinoco_private *priv)
 	disable_irq(dev->irq);
 
 	pmac_call_feature(PMAC_FTR_AIRPORT_ENABLE, macio_get_of_node(card->mdev), 0, 0);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ);
+	ssleep(1);
 	pmac_call_feature(PMAC_FTR_AIRPORT_ENABLE, macio_get_of_node(card->mdev), 0, 1);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ);
+	ssleep(1);
 
 	enable_irq(dev->irq);
-	schedule_timeout(HZ);
+	ssleep(1);
 #endif
 
 	return 0;
@@ -240,8 +237,7 @@ airport_attach(struct macio_dev *mdev, const struct of_match *match)
 		
 	/* Power up card */
 	pmac_call_feature(PMAC_FTR_AIRPORT_ENABLE, macio_get_of_node(mdev), 0, 1);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ);
+	ssleep(1);
 
 	/* Reset it before we get the interrupt */
 	hermes_init(hw);

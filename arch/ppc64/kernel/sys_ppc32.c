@@ -633,8 +633,24 @@ out:
 void start_thread32(struct pt_regs* regs, unsigned long nip, unsigned long sp)
 {
 	set_fs(USER_DS);
-	memset(regs->gpr, 0, sizeof(regs->gpr));
-	memset(&regs->ctr, 0, 4 * sizeof(regs->ctr));
+
+	/*
+	 * If we exec out of a kernel thread then thread.regs will not be
+	 * set. Do it now.
+	 */
+	if (!current->thread.regs) {
+		unsigned long childregs = (unsigned long)current->thread_info +
+						THREAD_SIZE;
+		childregs -= sizeof(struct pt_regs);
+		current->thread.regs = childregs;
+	}
+
+	/*
+	 * ELF_PLAT_INIT already clears all registers but it also sets r2.
+	 * So just clear r2 here.
+	 */
+	regs->gpr[2] = 0;
+
 	regs->nip = nip;
 	regs->gpr[1] = sp;
 	regs->msr = MSR_USER32;

@@ -101,6 +101,12 @@ struct dirty_log_type {
 	 * Returns the number of regions that are in sync.
          */
         region_t (*get_sync_count)(struct dirty_log *log);
+
+	/*
+	 * Support function for mirror status requests.
+	 */
+	int (*status)(struct dirty_log *log, status_type_t status_type,
+		      char *result, unsigned int maxlen);
 };
 
 int dm_register_dirty_log_type(struct dirty_log_type *type);

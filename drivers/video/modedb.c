@@ -670,7 +670,7 @@ int fb_mode_is_equal(struct fb_videomode *mode1,
  *
  * IMPORTANT:
  * This function assumes that all modelist entries in
- * info->monspecs.modelist are valid.
+ * info->modelist are valid.
  *
  * NOTES:
  * Finds best matching videomode which has an equal or greater dimension than

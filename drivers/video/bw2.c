@@ -386,6 +386,9 @@ int __init bw2_init(void)
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev;
 
+	if (fb_get_options("bw2fb", &option))
+		return -ENODEV;
+
 #ifdef CONFIG_SUN4
 	bw2_init_one(NULL);
 #endif

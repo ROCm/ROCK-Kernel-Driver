@@ -1049,6 +1049,9 @@ int __init ffb_init(void)
 {
 	int root;
 
+	if (fb_get_options("ffb", NULL))
+		return -ENODEV;
+
 	ffb_scan_siblings(prom_root_node);
 
 	root = prom_getchild(prom_root_node);
