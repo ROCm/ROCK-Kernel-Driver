@@ -837,10 +837,8 @@ direct_io_worker(int rw, struct inode *inode, const struct iovec *iov,
 		ret = ret2;
 	if (ret == 0)
 		ret = dio.page_errors;
-	if (ret == 0)
-		ret = tot_bytes; 
 
-	return ret;
+	return tot_bytes ? tot_bytes : ret;
 }
 
 /*
