@@ -1,7 +1,7 @@
 #ifndef _ASM_M68K_ZORRO_H
 #define _ASM_M68K_ZORRO_H
 
-#include <asm/io.h>
+#include <asm/raw_io.h>
 
 #define z_readb raw_inb
 #define z_readw raw_inw
