@@ -931,9 +931,9 @@ loop_get_status(struct loop_device *lo, struct loop_info64 *info)
 		return error;
 	memset(info, 0, sizeof(*info));
 	info->lo_number = lo->lo_number;
-	info->lo_device = stat.dev;
+	info->lo_device = old_encode_dev(stat.dev);
 	info->lo_inode = stat.ino;
-	info->lo_rdevice = lo->lo_device ? stat.rdev : stat.dev;
+	info->lo_rdevice = old_encode_dev(lo->lo_device ? stat.rdev : stat.dev);
 	info->lo_offset = lo->lo_offset;
 	info->lo_sizelimit = lo->lo_sizelimit;
 	info->lo_flags = lo->lo_flags;
