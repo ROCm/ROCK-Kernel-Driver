@@ -249,7 +249,7 @@ static inline void dec_pending(struct dm_io *io, int error)
 			/* nudge anyone waiting on suspend queue */
 			wake_up(&io->md->wait);
 
-		bio_endio(io->bio, io->error ? 0 : io->bio->bi_size, io->error);
+		bio_endio(io->bio, io->bio->bi_size, io->error);
 		free_io(io->md, io);
 	}
 }
@@ -258,16 +258,11 @@ static int clone_endio(struct bio *bio, unsigned int done, int error)
 {
 	struct dm_io *io = bio->bi_private;
 
-	/*
-	 * Only call dec_pending if the clone has completely
-	 * finished.  If a partial io errors I'm assuming it won't
-	 * be requeued.  FIXME: check this.
-	 */
-	if (error || !bio->bi_size) {
-		dec_pending(io, error);
-		bio_put(bio);
-	}
+	if (bio->bi_size)
+		return 1;
 
+	dec_pending(io, error);
+	bio_put(bio);
 	return 0;
 }
 
@@ -454,13 +449,13 @@ static int dm_request(request_queue_t *q, struct bio *bio)
 		up_read(&md->lock);
 
 		if (bio_rw(bio) == READA) {
-			bio_io_error(bio, 0);
+			bio_io_error(bio, bio->bi_size);
 			return 0;
 		}
 
 		r = queue_io(md, bio);
 		if (r < 0) {
-			bio_io_error(bio, 0);
+			bio_io_error(bio, bio->bi_size);
 			return 0;
 
 		} else if (r == 0)
