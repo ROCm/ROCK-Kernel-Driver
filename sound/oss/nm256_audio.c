@@ -25,6 +25,7 @@
 #include <linux/module.h>
 #include <linux/pm.h>
 #include <linux/delay.h>
+#include <linux/spinlock.h>
 #include "sound_config.h"
 #include "nm256.h"
 #include "nm256_coeff.h"
@@ -262,8 +263,7 @@ nm256_startRecording (struct nm256_info *card, char *buffer, u32 amt)
 	return;
     }
 
-    save_flags (flags);
-    cli ();
+    spin_lock_irqsave(&card->lock,flags);
     /*
      * If we're not currently recording, set up the start and end registers
      * for the recording engine.
@@ -283,7 +283,7 @@ nm256_startRecording (struct nm256_info *card, char *buffer, u32 amt)
 	}
 	else {
 	    /* Not sure what else to do here.  */
-	    restore_flags (flags);
+	    spin_unlock_irqrestore(&card->lock,flags);
 	    return;
 	}
     }
@@ -303,7 +303,7 @@ nm256_startRecording (struct nm256_info *card, char *buffer, u32 amt)
 	nm256_writePort8 (card, 2, NM_RECORD_ENABLE_REG,
 			    NM_RECORD_ENABLE_FLAG | NM_RECORD_FREERUN);
 
-    restore_flags (flags);
+    spin_unlock_irqrestore(&card->lock,flags);
 }
 
 /* Stop the play engine. */
@@ -370,8 +370,7 @@ nm256_write_block (struct nm256_info *card, char *buffer, u32 amt)
 
     card->requested_amt = amt;
 
-    save_flags (flags);
-    cli ();
+    spin_lock_irqsave(&card->lock,flags);
 
     if ((card->curPlayPos + amt) >= ringsize) {
 	u32 rem = ringsize - card->curPlayPos;
@@ -418,7 +417,7 @@ nm256_write_block (struct nm256_info *card, char *buffer, u32 amt)
     if (! card->playing)
 	startPlay (card);
 
-    restore_flags (flags);
+    spin_unlock_irqrestore(&card->lock,flags);
 }
 
 /*  We just got a card playback interrupt; process it.  */
@@ -829,8 +828,7 @@ nm256_writeAC97Reg (struct ac97_hwint *dev, u8 reg, u16 value)
 
     base = card->mixer;
 
-    save_flags (flags);
-    cli ();
+    spin_lock_irqsave(&card->lock,flags);
 
     nm256_isReady (dev);
 
@@ -844,7 +842,7 @@ nm256_writeAC97Reg (struct ac97_hwint *dev, u8 reg, u16 value)
 
     }
 
-    restore_flags (flags);
+    spin_unlock_irqrestore(&card->lock,flags);
     udelay (1000);
 
     return ! done;
@@ -1055,6 +1053,7 @@ nm256_install(struct pci_dev *pcidev, enum nm256rev rev, char *verstr)
     card->playing  = 0;
     card->recording = 0;
     card->rev = rev;
+	spin_lock_init(&card->lock);
 
     /* Init the memory port info.  */
     for (x = 0; x < 2; x++) {
