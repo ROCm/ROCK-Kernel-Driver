@@ -380,6 +380,10 @@
  *      Visioneer scanners.
  *    - Added test for USB_CLASS_CDC_DATA which is used by some fingerprint scanners.
  *
+ * 0.4.16  2003-11-04
+ *    - Added vendor/product ids for Epson, Genius, Microtek, Plustek, Reflecta, and
+ *      Visioneer scanners. Removed ids for HP PSC devices as these are supported by
+ *      the hpoj userspace driver.
  *
  * TODO
  *    - Performance
