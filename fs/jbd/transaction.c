@@ -1932,9 +1932,6 @@ void __journal_file_buffer(struct journal_head *jh,
 	J_ASSERT_JH(jh, jbd_is_locked_bh_state(bh));
 	assert_spin_locked(&transaction->t_journal->j_list_lock);
 
-#ifdef __SMP__
-	J_ASSERT (current->lock_depth >= 0);
-#endif
 	J_ASSERT_JH(jh, jh->b_jlist < BJ_Types);
 	J_ASSERT_JH(jh, jh->b_transaction == transaction ||
 				jh->b_transaction == 0);
