@@ -344,7 +344,7 @@ static int rtl8150_set_mac_address(struct net_device *netdev, void *p)
 
 static int rtl8150_reset(rtl8150_t * dev)
 {
-	u8 data = 0x11;
+	u8 data = 0x10;
 	int i = HZ;
 
 	set_registers(dev, CR, 1, &data);
@@ -392,10 +392,10 @@ static void free_all_urbs(rtl8150_t * dev)
 
 static void unlink_all_urbs(rtl8150_t * dev)
 {
-	usb_unlink_urb(dev->rx_urb);
-	usb_unlink_urb(dev->tx_urb);
-	usb_unlink_urb(dev->intr_urb);
-	usb_unlink_urb(dev->ctrl_urb);
+	usb_kill_urb(dev->rx_urb);
+	usb_kill_urb(dev->tx_urb);
+	usb_kill_urb(dev->intr_urb);
+	usb_kill_urb(dev->ctrl_urb);
 }
 
 static inline struct sk_buff *pull_skb(rtl8150_t *dev)
@@ -663,7 +663,7 @@ static void rtl8150_tx_timeout(struct net_device *netdev)
 		return;
 	warn("%s: Tx timeout.", netdev->name);
 	dev->tx_urb->transfer_flags |= URB_ASYNC_UNLINK;
-	usb_unlink_urb(dev->tx_urb);
+	usb_kill_urb(dev->tx_urb);
 	dev->stats.tx_errors++;
 }
 
