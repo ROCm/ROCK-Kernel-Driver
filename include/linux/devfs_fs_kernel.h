@@ -21,9 +21,6 @@
 #define DEVFS_FL_DEFAULT        DEVFS_FL_NONE
 
 
-#define DEVFS_SPECIAL_CHR     0
-#define DEVFS_SPECIAL_BLK     1
-
 typedef struct devfs_entry * devfs_handle_t;
 
 #ifdef CONFIG_DEVFS_FS
@@ -58,10 +55,6 @@ extern int devfs_set_file_size (devfs_handle_t de, unsigned long size);
 extern int devfs_only (void);
 extern int devfs_register_tape (devfs_handle_t de);
 extern void devfs_unregister_tape(int num);
-extern int devfs_alloc_major (char type);
-extern void devfs_dealloc_major (char type, int major);
-extern dev_t devfs_alloc_devnum (char type);
-extern void devfs_dealloc_devnum (char type, dev_t devnum);
 extern int devfs_alloc_unique_number (struct unique_numspace *space);
 extern void devfs_dealloc_unique_number (struct unique_numspace *space,
 					 int number);
@@ -129,41 +122,18 @@ static inline int devfs_register_tape (devfs_handle_t de)
 static inline void devfs_unregister_tape(int num)
 {
 }
-static inline int devfs_alloc_major (char type)
-{
-    return -1;
-}
-
-static inline void devfs_dealloc_major (char type, int major)
-{
-    return;
-}
-
-static inline dev_t devfs_alloc_devnum (char type)
-{
-    return 0;
-}
-
-static inline void devfs_dealloc_devnum (char type, dev_t devnum)
-{
-    return;
-}
-
 static inline int devfs_alloc_unique_number (struct unique_numspace *space)
 {
     return -1;
 }
-
 static inline void devfs_dealloc_unique_number (struct unique_numspace *space,
 						int number)
 {
     return;
 }
-
 static inline void mount_devfs_fs (void)
 {
     return;
 }
 #endif  /*  CONFIG_DEVFS_FS  */
-
 #endif  /*  _LINUX_DEVFS_FS_KERNEL_H  */
