@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actables.h - ACPI table management
- *       $Revision: 35 $
+ *       $Revision: 36 $
  *
  *****************************************************************************/
 
@@ -71,22 +71,16 @@ acpi_tb_get_table_ptr (
 
 acpi_status
 acpi_tb_get_table (
-	ACPI_PHYSICAL_ADDRESS   physical_address,
-	acpi_table_header       *buffer_ptr,
+	ACPI_POINTER            *address,
 	acpi_table_desc         *table_info);
 
 acpi_status
 acpi_tb_verify_rsdp (
-	ACPI_PHYSICAL_ADDRESS   RSDP_physical_address);
+	ACPI_POINTER            *address);
 
-acpi_status
-acpi_tb_get_table_facs (
-	acpi_table_header       *buffer_ptr,
-	acpi_table_desc         *table_info);
-
-ACPI_PHYSICAL_ADDRESS
+void
 acpi_tb_get_rsdt_address (
-	void);
+	ACPI_POINTER            *out_address);
 
 acpi_status
 acpi_tb_validate_rsdt (
@@ -94,7 +88,7 @@ acpi_tb_validate_rsdt (
 
 acpi_status
 acpi_tb_get_table_pointer (
-	ACPI_PHYSICAL_ADDRESS   physical_address,
+	ACPI_POINTER            *address,
 	u32                     flags,
 	u32                     *size,
 	acpi_table_header       **table_ptr);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 153 $
+ *              $Revision: 155 $
  *
  *****************************************************************************/
 
@@ -56,50 +56,62 @@ acpi_format_exception (
 	acpi_status             sub_status;
 
 
-	sub_status = (status & ~AE_CODE_MASK);
+	ACPI_FUNCTION_NAME ("Format_exception");
 
+
+	sub_status = (status & ~AE_CODE_MASK);
 
 	switch (status & AE_CODE_MASK) {
 	case AE_CODE_ENVIRONMENTAL:
 
 		if (sub_status <= AE_CODE_ENV_MAX) {
 			exception = acpi_gbl_exception_names_env [sub_status];
+			break;
 		}
-		break;
+		goto unknown;
 
 	case AE_CODE_PROGRAMMER:
 
 		if (sub_status <= AE_CODE_PGM_MAX) {
 			exception = acpi_gbl_exception_names_pgm [sub_status -1];
+			break;
 		}
-		break;
+		goto unknown;
 
 	case AE_CODE_ACPI_TABLES:
 
 		if (sub_status <= AE_CODE_TBL_MAX) {
 			exception = acpi_gbl_exception_names_tbl [sub_status -1];
+			break;
 		}
-		break;
+		goto unknown;
 
 	case AE_CODE_AML:
 
 		if (sub_status <= AE_CODE_AML_MAX) {
 			exception = acpi_gbl_exception_names_aml [sub_status -1];
+			break;
 		}
-		break;
+		goto unknown;
 
 	case AE_CODE_CONTROL:
 
 		if (sub_status <= AE_CODE_CTRL_MAX) {
 			exception = acpi_gbl_exception_names_ctrl [sub_status -1];
+			break;
 		}
-		break;
+		goto unknown;
 
 	default:
-		break;
+		goto unknown;
 	}
 
 
+	return ((const char *) exception);
+
+unknown:
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown exception code: 0x%8.8X\n", status));
 	return ((const char *) exception);
 }
 
@@ -173,10 +185,10 @@ const acpi_predefined_names     acpi_gbl_pre_defined_names[] =
 	{"_SB_",    ACPI_TYPE_DEVICE},
 	{"_SI_",    INTERNAL_TYPE_DEF_ANY},
 	{"_TZ_",    INTERNAL_TYPE_DEF_ANY},
-	{"_REV",    ACPI_TYPE_INTEGER, "2"},
-	{"_OS_",    ACPI_TYPE_STRING, ACPI_OS_NAME},
-	{"_GL_",    ACPI_TYPE_MUTEX, "0"},
-	{NULL,      ACPI_TYPE_ANY}           /* Table terminator */
+	{"_REV",    ACPI_TYPE_INTEGER,          "2"},
+	{"_OS_",    ACPI_TYPE_STRING,           ACPI_OS_NAME},
+	{"_GL_",    ACPI_TYPE_MUTEX,            "0"},
+	{NULL,      ACPI_TYPE_ANY}              /* Table terminator */
 };
 
 
@@ -193,16 +205,16 @@ const u8                        acpi_gbl_ns_properties[] =
 	ACPI_NS_NORMAL,                     /* 01 Number           */
 	ACPI_NS_NORMAL,                     /* 02 String           */
 	ACPI_NS_NORMAL,                     /* 03 Buffer           */
-	ACPI_NS_LOCAL,                      /* 04 Package          */
+	ACPI_NS_NORMAL,                     /* 04 Package          */
 	ACPI_NS_NORMAL,                     /* 05 Field_unit       */
-	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 06 Device           */
-	ACPI_NS_LOCAL,                      /* 07 Acpi_event       */
-	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 08 Method           */
-	ACPI_NS_LOCAL,                      /* 09 Mutex            */
-	ACPI_NS_LOCAL,                      /* 10 Region           */
-	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 11 Power            */
-	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 12 Processor        */
-	ACPI_NS_NEWSCOPE | ACPI_NS_LOCAL,   /* 13 Thermal          */
+	ACPI_NS_NEWSCOPE,                   /* 06 Device           */
+	ACPI_NS_NORMAL,                     /* 07 Event            */
+	ACPI_NS_NEWSCOPE,                   /* 08 Method           */
+	ACPI_NS_NORMAL,                     /* 09 Mutex            */
+	ACPI_NS_NORMAL,                     /* 10 Region           */
+	ACPI_NS_NEWSCOPE,                   /* 11 Power            */
+	ACPI_NS_NEWSCOPE,                   /* 12 Processor        */
+	ACPI_NS_NEWSCOPE,                   /* 13 Thermal          */
 	ACPI_NS_NORMAL,                     /* 14 Buffer_field     */
 	ACPI_NS_NORMAL,                     /* 15 Ddb_handle       */
 	ACPI_NS_NORMAL,                     /* 16 Debug Object     */
@@ -758,6 +770,7 @@ acpi_ut_init_globals (
 
 	/* Miscellaneous variables */
 
+	acpi_gbl_table_flags                = ACPI_PHYSICAL_POINTER;
 	acpi_gbl_rsdp_original_location     = 0;
 	acpi_gbl_cm_single_step             = FALSE;
 	acpi_gbl_db_terminate_threads       = FALSE;
@@ -779,7 +792,7 @@ acpi_ut_init_globals (
 
 	acpi_gbl_root_node                  = NULL;
 
-	acpi_gbl_root_node_struct.name      = ACPI_ROOT_NAME;
+	acpi_gbl_root_node_struct.name.integer = ACPI_ROOT_NAME;
 	acpi_gbl_root_node_struct.descriptor = ACPI_DESC_TYPE_NAMED;
 	acpi_gbl_root_node_struct.type      = ACPI_TYPE_ANY;
 	acpi_gbl_root_node_struct.child     = NULL;

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utcopy - Internal to external object translation utilities
- *              $Revision: 94 $
+ *              $Revision: 95 $
  *
  *****************************************************************************/
 
@@ -654,6 +654,9 @@ acpi_ut_copy_simple_object (
 	case ACPI_TYPE_BUFFER:
 
 		dest_desc->buffer.node = NULL;
+		dest_desc->common.flags = source_desc->common.flags;
+
+		/* Fall through to common string/buffer case */
 
 	case ACPI_TYPE_STRING:
 
@@ -744,6 +747,7 @@ acpi_ut_copy_ielement_to_ielement (
 		}
 
 		target_object->package.count = source_object->package.count;
+		target_object->common.flags = source_object->common.flags;
 
 		/*
 		 * Pass the new package object back to the package walk routine
@@ -792,6 +796,7 @@ acpi_ut_copy_ipackage_to_ipackage (
 
 
 	dest_obj->common.type   = source_obj->common.type;
+	dest_obj->common.flags  = source_obj->common.flags;
 	dest_obj->package.count = source_obj->package.count;
 
 
@@ -805,10 +810,6 @@ acpi_ut_copy_ipackage_to_ipackage (
 			("Aml_build_copy_internal_package_object: Package allocation failure\n"));
 		return_ACPI_STATUS (AE_NO_MEMORY);
 	}
-
-	/* Init */
-
-	dest_obj->package.next_element = dest_obj->package.elements;
 
 	/*
 	 * Copy the package element-by-element by walking the package "tree".

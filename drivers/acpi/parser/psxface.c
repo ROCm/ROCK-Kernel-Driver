@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psxface - Parser external interfaces
- *              $Revision: 59 $
+ *              $Revision: 61 $
  *
  *****************************************************************************/
 
@@ -102,7 +102,7 @@ acpi_psx_execute (
 	 * 1) Perform the first pass parse of the method to enter any
 	 * named objects that it creates into the namespace
 	 */
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
 		"**** Begin Method Parse **** Entry=%p obj=%p\n",
 		method_node, obj_desc));
 
@@ -144,7 +144,7 @@ acpi_psx_execute (
 	/*
 	 * 2) Execute the method.  Performs second pass parse simultaneously
 	 */
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
+	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
 		"**** Begin Method Execution **** Entry=%p obj=%p\n",
 		method_node, obj_desc));
 
@@ -157,7 +157,7 @@ acpi_psx_execute (
 
 	/* Init new op with the method name and pointer back to the NS node */
 
-	acpi_ps_set_name (op, method_node->name);
+	acpi_ps_set_name (op, method_node->name.integer);
 	op->node = method_node;
 
 	/* Create and initialize a new walk state */
@@ -194,7 +194,7 @@ acpi_psx_execute (
 	 * a control exception code
 	 */
 	if (*return_obj_desc) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Method returned Obj_desc=%p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Method returned Obj_desc=%p\n",
 			*return_obj_desc));
 		ACPI_DUMP_STACK_ENTRY (*return_obj_desc);
 

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: hwtimer.c - ACPI Power Management Timer Interface
- *              $Revision: 19 $
+ *              $Revision: 20 $
  *
  *****************************************************************************/
 
@@ -88,8 +88,7 @@ acpi_get_timer (
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	acpi_os_read_port ((ACPI_IO_ADDRESS)
-		ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm_tmr_blk.address), ticks, 32);
+	*ticks = acpi_hw_low_level_read (32, &acpi_gbl_FADT->Xpm_tmr_blk, 0);
 
 	return_ACPI_STATUS (AE_OK);
 }

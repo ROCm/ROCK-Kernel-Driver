@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 152 $
+ *              $Revision: 153 $
  *
  ******************************************************************************/
 
@@ -522,8 +522,9 @@ acpi_ns_lookup (
 				return_ACPI_STATUS (status);
 			}
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-				"Setting global scope to %p\n", this_node));
+			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+				"Setting current scope to [%4.4s] (%p)\n",
+				this_node->name.ascii, this_node));
 		}
 	}
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              $Revision: 96 $
+ *              $Revision: 97 $
  *
  *****************************************************************************/
 
@@ -508,6 +508,11 @@ acpi_ut_dump_buffer (
 		return;
 	}
 
+	if ((count < 4) || (count & 0x01)) {
+		display = DB_BYTE_DISPLAY;
+	}
+
+	acpi_os_printf ("\n_offset Value\n");
 
 	/*
 	 * Nasty little dump buffer routine!

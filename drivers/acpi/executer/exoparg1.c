@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 134 $
+ *              $Revision: 135 $
  *
  *****************************************************************************/
 
@@ -791,10 +791,21 @@ acpi_ex_opcode_1A_0T_1R (
 				 */
 				switch (operand[0]->reference.target_type) {
 				case ACPI_TYPE_BUFFER_FIELD:
+
+					/* Ensure that the Buffer arguments are evaluated */
+
+					temp_desc = operand[0]->reference.object;
+#if 0
+
+					status = acpi_ds_get_buffer_arguments (temp_desc);
+					if (ACPI_FAILURE (status)) {
+						goto cleanup;
+					}
+#endif
+
 					/*
-					 * The target is a buffer, we must create a new object that
-					 * contains one element of the buffer, the element pointed
-					 * to by the index.
+					 * Create a new object that contains one element of the
+					 * buffer -- the element pointed to by the index.
 					 *
 					 * NOTE: index into a buffer is NOT a pointer to a
 					 * sub-buffer of the main buffer, it is only a pointer to a
@@ -811,7 +822,6 @@ acpi_ex_opcode_1A_0T_1R (
 					 * indexed location, we don't need to add an additional
 					 * reference to the buffer itself.
 					 */
-					temp_desc = operand[0]->reference.object;
 					return_desc->integer.value =
 						temp_desc->buffer.pointer[operand[0]->reference.offset];
 					break;
@@ -819,10 +829,17 @@ acpi_ex_opcode_1A_0T_1R (
 
 				case ACPI_TYPE_PACKAGE:
 
+#if 0
+					/* Ensure that the Package arguments are evaluated */
+
+					status = acpi_ds_get_package_arguments (operand[0]->reference.object);
+					if (ACPI_FAILURE (status)) {
+						goto cleanup;
+					}
+#endif
 					/*
-					 * The target is a package, we want to return the referenced
-					 * element of the package.  We must add another reference to
-					 * this object, however.
+					 * Return the referenced element of the package.  We must add
+					 * another reference to the referenced object, however.
 					 */
 					return_desc = *(operand[0]->reference.where);
 					if (!return_desc) {

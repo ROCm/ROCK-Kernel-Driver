@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbinstal - ACPI table installation and removal
- *              $Revision: 55 $
+ *              $Revision: 57 $
  *
  *****************************************************************************/
 
@@ -177,28 +177,35 @@ acpi_tb_recognize_table (
 	 * We only "recognize" a limited number of ACPI tables -- namely, the
 	 * ones that are used by the subsystem (DSDT, FADT, etc.)
 	 *
-	 * An AE_NOT_FOUND means that the table was not recognized.
+	 * An AE_TABLE_NOT_SUPPORTED means that the table was not recognized.
 	 * This can be any one of many valid ACPI tables, it just isn't one of
 	 * the tables that is consumed by the core subsystem
 	 */
 	status = acpi_tb_match_signature (table_header->signature, table_info);
-	if (ACPI_SUCCESS (status)) {
-		/* Return the table type and length via the info struct */
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
-		table_info->length  = table_header->length;
+	status = acpi_tb_validate_table_header (table_header);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
 
-		/*
-		 * Validate checksum for _most_ tables,
-		 * even the ones whose signature we don't recognize
-		 */
-		if (table_info->type != ACPI_TABLE_FACS) {
-			status = acpi_tb_verify_table_checksum (table_header);
-			if (ACPI_FAILURE (status) &&
-				(!ACPI_CHECKSUM_ABORT)) {
-				/* Ignore the error if configuration says so */
+	/* Return the table type and length via the info struct */
 
-				status = AE_OK;
-			}
+	table_info->length  = table_header->length;
+
+	/*
+	 * Validate checksum for _most_ tables,
+	 * even the ones whose signature we don't recognize
+	 */
+	if (table_info->type != ACPI_TABLE_FACS) {
+		status = acpi_tb_verify_table_checksum (table_header);
+		if (ACPI_FAILURE (status) &&
+			(!ACPI_CHECKSUM_ABORT)) {
+			/* Ignore the error if configuration says so */
+
+			status = AE_OK;
 		}
 	}
 
@@ -372,10 +379,6 @@ acpi_tb_delete_acpi_table (
 		return;
 	}
 
-	/* Free the table */
-
-	acpi_tb_free_acpi_tables_of_type (&acpi_gbl_acpi_tables[type]);
-
 	/* Clear the appropriate "typed" global table pointer */
 
 	switch (type) {
@@ -404,6 +407,10 @@ acpi_tb_delete_acpi_table (
 	default:
 		break;
 	}
+
+	/* Free the table */
+
+	acpi_tb_free_acpi_tables_of_type (&acpi_gbl_acpi_tables[type]);
 
 	(void) acpi_ut_release_mutex (ACPI_MTX_TABLES);
 	return_VOID;

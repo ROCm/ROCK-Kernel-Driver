@@ -3,7 +3,7 @@
  *
  * Module Name: exstoren - AML Interpreter object store support,
  *                        Store to Node (namespace object)
- *              $Revision: 46 $
+ *              $Revision: 47 $
  *
  *****************************************************************************/
 
@@ -145,7 +145,7 @@ acpi_ex_resolve_object (
  * FUNCTION:    Acpi_ex_store_object_to_object
  *
  * PARAMETERS:  Source_desc         - Object to store
- *              Dest_desc           - Object to recieve a copy of the source
+ *              Dest_desc           - Object to receive a copy of the source
  *              New_desc            - New object if Dest_desc is obsoleted
  *              Walk_state          - Current walk state
  *

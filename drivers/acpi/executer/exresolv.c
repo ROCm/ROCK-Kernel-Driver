@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 106 $
+ *              $Revision: 109 $
  *
  *****************************************************************************/
 
@@ -94,7 +94,7 @@ acpi_ex_resolve_to_value (
 		}
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Resolved object %p\n", *stack_ptr));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Resolved object %p\n", *stack_ptr));
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -177,7 +177,7 @@ acpi_ex_resolve_object_to_value (
 			acpi_ut_remove_reference (stack_desc);
 			*stack_ptr = obj_desc;
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "[Arg/Local %d] Value_obj is %p\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Arg/Local %d] Value_obj is %p\n",
 				stack_desc->reference.offset, obj_desc));
 			break;
 
@@ -290,6 +290,19 @@ acpi_ex_resolve_object_to_value (
 
 		break; /* case INTERNAL_TYPE_REFERENCE */
 
+
+	case ACPI_TYPE_BUFFER:
+
+		status = acpi_ds_get_buffer_arguments (stack_desc);
+		break;
+
+
+	case ACPI_TYPE_PACKAGE:
+
+		status = acpi_ds_get_package_arguments (stack_desc);
+		break;
+
+
 	/*
 	 * These cases may never happen here, but just in case..
 	 */
@@ -301,7 +314,7 @@ acpi_ex_resolve_object_to_value (
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Field_read Source_desc=%p Type=%X\n",
 			stack_desc, stack_desc->common.type));
 
-		status = acpi_ex_read_data_from_field (stack_desc, &obj_desc);
+		status = acpi_ex_read_data_from_field (walk_state, stack_desc, &obj_desc);
 		*stack_ptr = (void *) obj_desc;
 		break;
 

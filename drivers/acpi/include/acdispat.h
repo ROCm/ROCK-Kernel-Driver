@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdispat.h - dispatcher (parser to interpreter interface)
- *       $Revision: 51 $
+ *       $Revision: 52 $
  *
  *****************************************************************************/
 
@@ -64,6 +64,14 @@ acpi_ds_get_buffer_field_arguments (
 acpi_status
 acpi_ds_get_region_arguments (
 	acpi_operand_object     *rgn_desc);
+
+acpi_status
+acpi_ds_get_buffer_arguments (
+	acpi_operand_object     *obj_desc);
+
+acpi_status
+acpi_ds_get_package_arguments (
+	acpi_operand_object     *obj_desc);
 
 
 /* dsctrl - Parser/Interpreter interface, control stack routines */
@@ -267,9 +275,17 @@ acpi_ds_initialize_objects (
 	acpi_namespace_node     *start_node);
 
 acpi_status
+acpi_ds_build_internal_buffer_obj (
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op,
+	u32                     buffer_length,
+	acpi_operand_object     **obj_desc_ptr);
+
+acpi_status
 acpi_ds_build_internal_package_obj (
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op,
+	u32                     package_length,
 	acpi_operand_object     **obj_desc);
 
 acpi_status
@@ -303,6 +319,12 @@ acpi_status
 acpi_ds_eval_region_operands (
 	acpi_walk_state         *walk_state,
 	acpi_parse_object       *op);
+
+acpi_status
+acpi_ds_eval_data_object_operands (
+	acpi_walk_state         *walk_state,
+	acpi_parse_object       *op,
+	acpi_operand_object     *obj_desc);
 
 acpi_status
 acpi_ds_initialize_region (

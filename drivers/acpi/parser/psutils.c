@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psutils - Parser miscellaneous utilities (Parser only)
- *              $Revision: 49 $
+ *              $Revision: 50 $
  *
  *****************************************************************************/
 
@@ -97,22 +97,18 @@ acpi_ps_alloc_op (
 		size = sizeof (acpi_parse2_object);
 		flags = ACPI_PARSEOP_DEFERRED;
 	}
-
 	else if (op_info->flags & AML_NAMED) {
 		size = sizeof (acpi_parse2_object);
 		flags = ACPI_PARSEOP_NAMED;
 	}
-
 	else if (opcode == AML_INT_BYTELIST_OP) {
 		size = sizeof (acpi_parse2_object);
 		flags = ACPI_PARSEOP_BYTELIST;
 	}
-
 	else {
 		size = sizeof (acpi_parse_object);
 		flags = ACPI_PARSEOP_GENERIC;
 	}
-
 
 	if (size == sizeof (acpi_parse_object)) {
 		/*
@@ -120,7 +116,6 @@ acpi_ps_alloc_op (
 		 */
 		op = acpi_ut_acquire_from_cache (ACPI_MEM_LIST_PSNODE);
 	}
-
 	else {
 		op = acpi_ut_acquire_from_cache (ACPI_MEM_LIST_PSNODE_EXT);
 	}
@@ -157,13 +152,12 @@ acpi_ps_free_op (
 
 
 	if (op->opcode == AML_INT_RETURN_VALUE_OP) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Free retval op: %p\n", op));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Free retval op: %p\n", op));
 	}
 
 	if (op->flags == ACPI_PARSEOP_GENERIC) {
 		acpi_ut_release_to_cache (ACPI_MEM_LIST_PSNODE, op);
 	}
-
 	else {
 		acpi_ut_release_to_cache (ACPI_MEM_LIST_PSNODE_EXT, op);
 	}
