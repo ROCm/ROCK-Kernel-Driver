@@ -64,7 +64,7 @@ MODULE_SUPPORTED_DEVICE("{{Sun,CS4231}}");
 
 typedef struct snd_cs4231 {
 	spinlock_t		lock;
-	unsigned long		port;
+	void __iomem		*port;
 #ifdef EBUS_SUPPORT
 	struct ebus_dma_info	eb2c;
 	struct ebus_dma_info	eb2p;
@@ -357,7 +357,7 @@ static unsigned char snd_cs4231_original_image[32] =
 	0x00,			/* 1f/31 - cbrl */
 };
 
-static u8 __cs4231_readb(cs4231_t *cp, unsigned long reg_addr)
+static u8 __cs4231_readb(cs4231_t *cp, void __iomem *reg_addr)
 {
 #ifdef EBUS_SUPPORT
 	if (cp->flags & CS4231_FLAG_EBUS) {
@@ -372,7 +372,7 @@ static u8 __cs4231_readb(cs4231_t *cp, unsigned long reg_addr)
 #endif
 }
 
-static void __cs4231_writeb(cs4231_t *cp, u8 val, unsigned long reg_addr)
+static void __cs4231_writeb(cs4231_t *cp, u8 val, void __iomem *reg_addr)
 {
 #ifdef EBUS_SUPPORT
 	if (cp->flags & CS4231_FLAG_EBUS) {
@@ -551,7 +551,7 @@ static void snd_cs4231_mce_up(cs4231_t *chip)
 	chip->mce_bit |= CS4231_MCE;
 	timeout = __cs4231_readb(chip, CS4231P(chip, REGSEL));
 	if (timeout == 0x80)
-		snd_printk("mce_up [0x%lx]: serious init problem - codec still busy\n", chip->port);
+		snd_printk("mce_up [%p]: serious init problem - codec still busy\n", chip->port);
 	if (!(timeout & CS4231_MCE))
 		__cs4231_writeb(chip, chip->mce_bit | (timeout & 0x1f), CS4231P(chip, REGSEL));
 	spin_unlock_irqrestore(&chip->lock, flags);
@@ -576,7 +576,7 @@ static void snd_cs4231_mce_down(cs4231_t *chip)
 	timeout = __cs4231_readb(chip, CS4231P(chip, REGSEL));
 	__cs4231_writeb(chip, chip->mce_bit | (timeout & 0x1f), CS4231P(chip, REGSEL));
 	if (timeout == 0x80)
-		snd_printk("mce_down [0x%lx]: serious init problem - codec still busy\n", chip->port);
+		snd_printk("mce_down [%p]: serious init problem - codec still busy\n", chip->port);
 	if ((timeout & CS4231_MCE) == 0) {
 		spin_unlock_irqrestore(&chip->lock, flags);
 		return;
@@ -2107,9 +2107,9 @@ static int __init snd_cs4231_ebus_create(snd_card_t *card,
 	chip->eb2p.client_cookie = chip;
 	chip->eb2p.irq = edev->irqs[1];
 
-	chip->port = (unsigned long) ioremap(edev->resource[0].start, 0x10);
-	chip->eb2p.regs = (unsigned long) ioremap(edev->resource[1].start, 0x10);
-	chip->eb2c.regs = (unsigned long) ioremap(edev->resource[2].start, 0x10);
+	chip->port = ioremap(edev->resource[0].start, 0x10);
+	chip->eb2p.regs = ioremap(edev->resource[1].start, 0x10);
+	chip->eb2c.regs = ioremap(edev->resource[2].start, 0x10);
 	if (!chip->port || !chip->eb2p.regs || !chip->eb2c.regs) {
 		snd_cs4231_ebus_free(chip);
 		snd_printk("cs4231-%d: Unable to map chip registers.\n", dev);
