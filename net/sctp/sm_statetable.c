@@ -39,6 +39,7 @@
  *    Jon Grimm             <jgrimm@us.ibm.com>
  *    Hui Huang		    <hui.huang@nokia.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -706,21 +707,28 @@ chunk_event_table_unknown[SCTP_STATE_NUM_STATES] = {
 	/* SCTP_STATE_EMPTY */ \
 	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
 	/* SCTP_STATE_CLOSED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_bug, .name = "sctp_sf_bug"}, \
 	/* SCTP_STATE_COOKIE_WAIT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_do_prm_requestheartbeat,		      \
+	 .name = "sctp_sf_do_prm_requestheartbeat"},          \
 	/* SCTP_STATE_COOKIE_ECHOED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_do_prm_requestheartbeat,		      \
+	 .name = "sctp_sf_do_prm_requestheartbeat"},          \
 	/* SCTP_STATE_ESTABLISHED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_do_prm_requestheartbeat,		      \
+	 .name = "sctp_sf_do_prm_requestheartbeat"},          \
 	/* SCTP_STATE_SHUTDOWN_PENDING */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_do_prm_requestheartbeat,		      \
+	 .name = "sctp_sf_do_prm_requestheartbeat"},          \
 	/* SCTP_STATE_SHUTDOWN_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_do_prm_requestheartbeat,		      \
+	 .name = "sctp_sf_do_prm_requestheartbeat"},          \
 	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_do_prm_requestheartbeat,		      \
+	 .name = "sctp_sf_do_prm_requestheartbeat"},          \
 	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
-	{.fn = sctp_sf_not_impl, .name = "sctp_sf_not_impl"}, \
+	{.fn = sctp_sf_do_prm_requestheartbeat,		      \
+	 .name = "sctp_sf_do_prm_requestheartbeat"},          \
 } /* TYPE_SCTP_PRIMITIVE_REQUESTHEARTBEAT */
 
 #define TYPE_SCTP_PRIMITIVE_GETSRTTREPORT  { \

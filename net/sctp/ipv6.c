@@ -172,16 +172,16 @@ static inline int sctp_v6_xmit(struct sk_buff *skb)
 /* Returns the dst cache entry for the given source and destination ip
  * addresses.
  */
-struct dst_entry *sctp_v6_get_dst(sockaddr_storage_t *daddr,
-				  sockaddr_storage_t *saddr)
+struct dst_entry *sctp_v6_get_dst(union sctp_addr *daddr,
+				  union sctp_addr *saddr)
 {
 	struct dst_entry *dst;
-	struct flowi fl = { .nl_u = { .ip6_u = { .daddr = &daddr->v6.sin6_addr,
-					       } } };
+	struct flowi fl = { 
+		.nl_u = { .ip6_u = { .daddr = &daddr->v6.sin6_addr, } } };
 
 
 	SCTP_DEBUG_PRINTK("%s: DST=%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x ",
-			  __FUNCTION__, NIP6(fl.fl6_dst)); 
+			  __FUNCTION__, NIP6(fl.fl6_dst));
 
 	if (saddr) {
 		fl.fl6_src = &saddr->v6.sin6_addr;
@@ -206,12 +206,147 @@ struct dst_entry *sctp_v6_get_dst(sockaddr_storage_t *daddr,
 	return dst;
 }
 
-/* Check if the dst entry's source addr matches the given source addr. */
-int sctp_v6_cmp_saddr(struct dst_entry *dst, sockaddr_storage_t *saddr)
+/* Make a copy of all potential local addresses. */
+static void sctp_v6_copy_addrlist(struct list_head *addrlist,
+				  struct net_device *dev)
+{
+	struct inet6_dev *in6_dev;
+	struct inet6_ifaddr *ifp;
+	struct sockaddr_storage_list *addr;
+
+	read_lock(&addrconf_lock);
+	if ((in6_dev = __in6_dev_get(dev)) == NULL) {
+		read_unlock(&addrconf_lock);
+		return;
+	}
+
+	read_lock(&in6_dev->lock);
+	for (ifp = in6_dev->addr_list; ifp; ifp = ifp->if_next) {
+		/* Add the address to the local list.  */
+		addr = t_new(struct sockaddr_storage_list, GFP_ATOMIC);
+		if (addr) {
+			addr->a.v6.sin6_family = AF_INET6;
+			addr->a.v6.sin6_port = 0;
+			addr->a.v6.sin6_addr = ifp->addr;
+			INIT_LIST_HEAD(&addr->list);
+			list_add_tail(&addr->list, addrlist);
+		}
+	}
+
+	read_unlock(&in6_dev->lock);
+	read_unlock(&addrconf_lock);
+}
+
+/* Initialize a sockaddr_storage from in incoming skb. */
+static void sctp_v6_from_skb(union sctp_addr *addr,struct sk_buff *skb,
+			     int is_saddr)
+{
+	void *from;
+	__u16 *port;
+	struct sctphdr *sh;
+
+	port = &addr->v6.sin6_port;
+	addr->v6.sin6_family = AF_INET6;
+	addr->v6.sin6_flowinfo = 0; /* FIXME */
+	addr->v6.sin6_scope_id = 0; /* FIXME */
+
+	sh = (struct sctphdr *) skb->h.raw;
+	if (is_saddr) {
+		*port  = ntohs(sh->source);
+		from = &skb->nh.ipv6h->saddr;
+	} else {
+		*port = ntohs(sh->dest);
+		from = &skb->nh.ipv6h->daddr;
+	}
+	ipv6_addr_copy(&addr->v6.sin6_addr, from);
+}
+
+/* Initialize a sctp_addr from a dst_entry. */
+static void sctp_v6_dst_saddr(union sctp_addr *addr, struct dst_entry *dst)
 {
 	struct rt6_info *rt = (struct rt6_info *)dst;
+	addr->sa.sa_family = AF_INET6;
+	ipv6_addr_copy(&addr->v6.sin6_addr, &rt->rt6i_src.addr);
+}
 
-	return ipv6_addr_cmp(&rt->rt6i_src.addr, &saddr->v6.sin6_addr); 
+/* Compare addresses exactly.  Well.. almost exactly; ignore scope_id
+ * for now.  FIXME.
+ */
+static int sctp_v6_cmp_addr(const union sctp_addr *addr1, 
+			    const union sctp_addr *addr2)
+{
+	int match;
+	if (addr1->sa.sa_family != addr2->sa.sa_family)
+		return 0;
+	match = !ipv6_addr_cmp((struct in6_addr *)&addr1->v6.sin6_addr, 
+			       (struct in6_addr *)&addr2->v6.sin6_addr);
+
+	return match;
+}
+
+/* Initialize addr struct to INADDR_ANY. */
+static void sctp_v6_inaddr_any(union sctp_addr *addr, unsigned short port)
+{
+	memset(addr, 0x00, sizeof(union sctp_addr));
+	addr->v6.sin6_family = AF_INET6;
+	addr->v6.sin6_port = port;
+}
+
+/* Is this a wildcard address? */
+static int sctp_v6_is_any(const union sctp_addr *addr)
+{
+	int type;
+	type = ipv6_addr_type((struct in6_addr *)&addr->v6.sin6_addr);
+	return IPV6_ADDR_ANY == type;
+}
+
+/* This function checks if the address is a valid address to be used for
+ * SCTP.
+ *
+ * Output:
+ * Return 0 - If the address is a non-unicast or an illegal address.
+ * Return 1 - If the address is a unicast.
+ */
+static int sctp_v6_addr_valid(union sctp_addr *addr)
+{
+	int ret = sctp_ipv6_addr_type(&addr->v6.sin6_addr);
+
+	/* FIXME:  v4-mapped-v6 address support. */
+
+	/* Is this a non-unicast address */
+	if (!(ret & IPV6_ADDR_UNICAST))
+		return 0;
+
+	return 1;
+}
+
+/* What is the scope of 'addr'?  */
+static sctp_scope_t sctp_v6_scope(union sctp_addr *addr)
+{
+	int v6scope;
+	sctp_scope_t retval;
+
+	/* The IPv6 scope is really a set of bit fields.
+	 * See IFA_* in <net/if_inet6.h>.  Map to a generic SCTP scope.
+	 */
+
+	v6scope = ipv6_addr_scope(&addr->v6.sin6_addr);
+	switch (v6scope) {
+	case IFA_HOST:
+		retval = SCTP_SCOPE_LOOPBACK;
+		break;
+	case IFA_LINK:
+		retval = SCTP_SCOPE_LINK;
+		break;
+	case IFA_SITE:
+		retval = SCTP_SCOPE_PRIVATE;
+		break;
+	default:
+		retval = SCTP_SCOPE_GLOBAL;
+		break;
+	};
+
+	return retval;
 }
 
 /* Initialize a PF_INET6 socket msg_name. */
@@ -227,12 +362,13 @@ static void sctp_inet6_msgname(char *msgname, int *addr_len)
 }
 
 /* Initialize a PF_INET msgname from a ulpevent. */
-static void sctp_inet6_event_msgname(sctp_ulpevent_t *event, char *msgname, int *addrlen)
+static void sctp_inet6_event_msgname(sctp_ulpevent_t *event, char *msgname,
+				     int *addrlen)
 {
 	struct sockaddr_in6 *sin6, *sin6from;
 
 	if (msgname) {
-		sockaddr_storage_t *addr;
+		union sctp_addr *addr;
 
 		sctp_inet6_msgname(msgname, addrlen);
 		sin6 = (struct sockaddr_in6 *)msgname;
@@ -288,6 +424,49 @@ static void sctp_inet6_skb_msgname(struct sk_buff *skb, char *msgname,
 	}
 }
 
+/* Do we support this AF? */
+static int sctp_inet6_af_supported(sa_family_t family)
+{
+	/* FIXME:  v4-mapped-v6 addresses.  The I-D is still waffling
+	 * on what to do with sockaddr formats for PF_INET6 sockets.
+	 * For now assume we'll support both.
+	 */
+	switch (family) {
+	case AF_INET6:
+	case AF_INET:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+/* Address matching with wildcards allowed.  This extra level
+ * of indirection lets us choose whether a PF_INET6 should
+ * disallow any v4 addresses if we so choose. 
+ */
+static int sctp_inet6_cmp_addr(const union sctp_addr *addr1, 
+			       const union sctp_addr *addr2,
+			       struct sctp_opt *opt)
+{
+	struct sctp_func *af1, *af2;
+	
+	af1 = sctp_get_af_specific(addr1->sa.sa_family);
+	af2 = sctp_get_af_specific(addr2->sa.sa_family);
+
+	if (!af1 || !af2)
+		return 0;
+	/* Today, wildcard AF_INET/AF_INET6. */
+	if (sctp_is_any(addr1) || sctp_is_any(addr2))
+		return 1;
+
+	if (addr1->sa.sa_family != addr2->sa.sa_family)
+		return 0;
+	
+	return af1->cmp_addr(addr1, addr2);
+}
+
+
+
 static struct proto_ops inet6_seqpacket_ops = {
 	.family     = PF_INET6,
 	.release    = inet6_release,
@@ -327,7 +506,14 @@ static sctp_func_t sctp_ipv6_specific = {
 	.setsockopt      = ipv6_setsockopt,
 	.getsockopt      = ipv6_getsockopt,
 	.get_dst	 = sctp_v6_get_dst,
-	.cmp_saddr	 = sctp_v6_cmp_saddr,
+	.copy_addrlist   = sctp_v6_copy_addrlist,
+	.from_skb        = sctp_v6_from_skb,
+	.dst_saddr       = sctp_v6_dst_saddr,
+	.cmp_addr        = sctp_v6_cmp_addr,
+	.scope           = sctp_v6_scope,
+	.addr_valid      = sctp_v6_addr_valid,
+	.inaddr_any      = sctp_v6_inaddr_any,
+	.is_any          = sctp_v6_is_any,
 	.net_header_len  = sizeof(struct ipv6hdr),
 	.sockaddr_len    = sizeof(struct sockaddr_in6),
 	.sa_family       = AF_INET6,
@@ -336,6 +522,9 @@ static sctp_func_t sctp_ipv6_specific = {
 static sctp_pf_t sctp_pf_inet6_specific = {
 	.event_msgname = sctp_inet6_event_msgname,
 	.skb_msgname   = sctp_inet6_skb_msgname,
+	.af_supported  = sctp_inet6_af_supported,
+	.cmp_addr      = sctp_inet6_cmp_addr,
+	.af            = &sctp_ipv6_specific,
 };
 
 /* Initialize IPv6 support and register with inet6 stack.  */
