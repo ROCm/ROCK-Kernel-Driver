@@ -53,11 +53,15 @@ EXPORT_SYMBOL(mach_hwclk);
 EXPORT_SYMBOL(mach_get_ss);
 EXPORT_SYMBOL(mach_get_rtc_pll);
 EXPORT_SYMBOL(mach_set_rtc_pll);
+#ifdef CONFIG_INPUT_M68K_BEEP_MODULE
+EXPORT_SYMBOL(mach_beep);
+#endif
 EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(strnlen);
 EXPORT_SYMBOL(strrchr);
 EXPORT_SYMBOL(strstr);
+EXPORT_SYMBOL(strpbrk);
 EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(kernel_thread);
