@@ -499,15 +499,19 @@ module_frob_arch_sections (Elf_Ehdr *ehdr, Elf_Shdr *sechdrs, char *secstrings,
 			core_plts += count_plts(rels, numrels);
 	}
 
+	mod->arch.core_plt->sh_type = SHT_NOBITS;
 	mod->arch.core_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
 	mod->arch.core_plt->sh_addralign = 16;
 	mod->arch.core_plt->sh_size = core_plts * sizeof(struct plt_entry);
+	mod->arch.init_plt->sh_type = SHT_NOBITS;
 	mod->arch.init_plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
 	mod->arch.init_plt->sh_addralign = 16;
 	mod->arch.init_plt->sh_size = init_plts * sizeof(struct plt_entry);
+	mod->arch.got->sh_type = SHT_NOBITS;
 	mod->arch.got->sh_flags = ARCH_SHF_SMALL | SHF_ALLOC;
 	mod->arch.got->sh_addralign = 8;
 	mod->arch.got->sh_size = gots * sizeof(struct got_entry);
+	mod->arch.opd->sh_type = SHT_NOBITS;
 	mod->arch.opd->sh_flags = SHF_ALLOC;
 	mod->arch.opd->sh_addralign = 8;
 	mod->arch.opd->sh_size = fdescs * sizeof(struct fdesc);
@@ -856,7 +860,7 @@ int
 apply_relocate (Elf64_Shdr *sechdrs, const char *strtab, unsigned int symindex,
 		unsigned int relsec, struct module *mod)
 {
-	printk(KERN_ERR "module %s: REL relocs unsupported\n", mod->name);
+	printk(KERN_ERR "module %s: REL relocs in section %u unsupported\n", relsec, mod->name);
 	return -ENOEXEC;
 }
 
