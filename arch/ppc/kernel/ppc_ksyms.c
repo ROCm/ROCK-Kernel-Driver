@@ -250,6 +250,7 @@ EXPORT_SYMBOL(find_all_nodes);
 EXPORT_SYMBOL(get_property);
 EXPORT_SYMBOL(request_OF_resource);
 EXPORT_SYMBOL(release_OF_resource);
+EXPORT_SYMBOL(pci_busdev_to_OF_node);
 EXPORT_SYMBOL(pci_device_to_OF_node);
 EXPORT_SYMBOL(pci_device_from_OF_node);
 EXPORT_SYMBOL(pmac_newworld);

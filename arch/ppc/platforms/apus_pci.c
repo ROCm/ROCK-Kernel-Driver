@@ -61,49 +61,72 @@ void *pci_io_base(unsigned int bus)
 }
 
 
-#define cfg_read(val, addr, type, op)	*val = op((type)(addr))
-#define cfg_write(val, addr, type, op)	op((val), (type *)(addr)); DEFW()
-#define cfg_read_bad	*val = ~0;
-#define cfg_write_bad	;
-#define cfg_read_val(val)	*val
-#define cfg_write_val(val)	val
+int
+apus_pcibios_read_config(struct pci_bus *bus, int devfn, int offset,
+			 int len, u32 *val)
+{
+	int fnno = FNNO(devfn);
+	int devno = DEVNO(devfn);
+	volatile unsigned char *cfg_data;
 
-#define APUS_PCI_OP(rw, size, type, op, mask)					\
-int									\
-apus_pcibios_##rw##_config_##size(struct pci_dev *dev, int offset, type val)	\
-{										\
-	int fnno = FNNO(dev->devfn);						\
-	int devno = DEVNO(dev->devfn);						\
-										\
-	if (dev->bus->number > 0 || devno != 1) {				\
-		cfg_##rw##_bad;							\
-		return PCIBIOS_DEVICE_NOT_FOUND;				\
-	}									\
-	/* base address + function offset + offset ^ endianness conversion */	\
-	cfg_##rw(val, apus_hose->cfg_data + (fnno<<5) + (offset ^ mask),	\
-		 type, op);							\
-										\
-	DPRINTK(#op " b: 0x%x, d: 0x%x, f: 0x%x, o: 0x%x, v: 0x%x\n",		\
-		dev->bus->number, dev->devfn>>3, dev->devfn&7,			\
-		offset, cfg_##rw##_val(val));					\
-	return PCIBIOS_SUCCESSFUL;						\
+	if (bus->number > 0 || devno != 1) {
+		*val = ~0;
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
+	/* base address + function offset + offset ^ endianness conversion */
+	/* XXX the fnno<<5 bit seems wacky  -- paulus */
+	cfg_data = apus_hose->cfg_data + (fnno<<5) + (offset ^ (len - 1));
+	switch (len) {
+	case 1:
+		*val = readb(cfg_data);
+		break;
+	case 2:
+		*val = readw(cfg_data);
+		break;
+	default:
+		*val = readl(cfg_data);
+		break;
+	}
+
+	DPRINTK("read b: 0x%x, d: 0x%x, f: 0x%x, o: 0x%x, l: %d, v: 0x%x\n",
+		bus->number, devfn>>3, devfn&7, offset, len, *val);
+	return PCIBIOS_SUCCESSFUL;
 }
 
-APUS_PCI_OP(read, byte, u8 *, readb, 3)
-APUS_PCI_OP(read, word, u16 *, readw, 2)
-APUS_PCI_OP(read, dword, u32 *, readl, 0)
-APUS_PCI_OP(write, byte, u8, writeb, 3)
-APUS_PCI_OP(write, word, u16, writew, 2)
-APUS_PCI_OP(write, dword, u32, writel, 0)
+int
+apus_pcibios_write_config(struct pci_bus *bus, int devfn, int offset,
+			  int len, u32 *val)
+{
+	int fnno = FNNO(devfn);
+	int devno = DEVNO(devfn);
+	volatile unsigned char *cfg_data;
 
+	if (bus->number > 0 || devno != 1) {
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
+	/* base address + function offset + offset ^ endianness conversion */
+	/* XXX the fnno<<5 bit seems wacky  -- paulus */
+	cfg_data = apus_hose->cfg_data + (fnno<<5) + (offset ^ (len - 1));
+	switch (len) {
+	case 1:
+		writeb(val, cfg_data); DEFW();
+		break;
+	case 2:
+		writew(val, cfg_data); DEFW();
+		break;
+	default:
+		writel(val, cfg_data); DEFW();
+		break;
+	}
+
+	DPRINTK("write b: 0x%x, d: 0x%x, f: 0x%x, o: 0x%x, l: %d, v: 0x%x\n",
+		bus->number, devfn>>3, devfn&7, offset, len, val);
+	return PCIBIOS_SUCCESSFUL;
+}
 
 static struct pci_ops apus_pci_ops = {
-	apus_pcibios_read_config_byte,
-	apus_pcibios_read_config_word,
-	apus_pcibios_read_config_dword,
-	apus_pcibios_write_config_byte,
-	apus_pcibios_write_config_word,
-	apus_pcibios_write_config_dword
+	apus_pcibios_read_config,
+	apus_pcibios_write_config
 };
 
 static struct resource pci_mem = { "B/CVisionPPC PCI mem", CVPPC_FB_APERTURE_ONE, CVPPC_PCI_CONFIG, IORESOURCE_MEM };
