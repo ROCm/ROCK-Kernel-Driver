@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Author: Aristeu Sergio Rozanski Filho <aris@cathedrallabs.org>
- * 
+ *
  * Changes/Revisions:
  *	0.1	20/06/2002
  *		- first public version
@@ -68,7 +68,7 @@ static int uinput_dev_upload_effect(struct input_dev *dev, struct ff_effect *eff
 static int uinput_dev_erase_effect(struct input_dev *dev, int effect_id)
 {
 	return 0;
-}					
+}
 
 static int uinput_create_device(struct uinput_device *udev)
 {
@@ -123,7 +123,7 @@ static int uinput_open(struct inode *inode, struct file *file)
 	memset(newinput, 0, sizeof(struct input_dev));
 
 	newdev->dev = newinput;
-	
+
 	file->private_data = newdev;
 
 	return 0;
@@ -137,16 +137,16 @@ static int uinput_validate_absbits(struct input_dev *dev)
 {
 	unsigned int cnt;
 	int retval = 0;
-	
+
 	for (cnt = 0; cnt < ABS_MAX; cnt++) {
-		if (!test_bit(cnt, dev->absbit)) 
+		if (!test_bit(cnt, dev->absbit))
 			continue;
-		
+
 		if (/*!dev->absmin[cnt] || !dev->absmax[cnt] || */
 		    (dev->absmax[cnt] <= dev->absmin[cnt])) {
-			printk(KERN_DEBUG 
+			printk(KERN_DEBUG
 				"%s: invalid abs[%02x] min:%d max:%d\n",
-				UINPUT_NAME, cnt, 
+				UINPUT_NAME, cnt,
 				dev->absmin[cnt], dev->absmax[cnt]);
 			retval = -EINVAL;
 			break;
@@ -154,7 +154,7 @@ static int uinput_validate_absbits(struct input_dev *dev)
 
 		if ((dev->absflat[cnt] < dev->absmin[cnt]) ||
 		    (dev->absflat[cnt] > dev->absmax[cnt])) {
-			printk(KERN_DEBUG 
+			printk(KERN_DEBUG
 				"%s: absflat[%02x] out of range: %d "
 				"(min:%d/max:%d)\n",
 				UINPUT_NAME, cnt, dev->absflat[cnt],
@@ -190,7 +190,7 @@ static int uinput_alloc_device(struct file *file, const char *buffer, size_t cou
 		goto exit;
 	}
 
-	if (NULL != dev->name) 
+	if (NULL != dev->name)
 		kfree(dev->name);
 
 	size = strnlen(user_dev->name, UINPUT_MAX_NAME_SIZE) + 1;
@@ -229,7 +229,7 @@ exit:
 static ssize_t uinput_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
 {
 	struct uinput_device	*udev = file->private_data;
-	
+
 	if (test_bit(UIST_CREATED, &(udev->state))) {
 		struct input_event	ev;
 
@@ -247,7 +247,7 @@ static ssize_t uinput_read(struct file *file, char *buffer, size_t count, loff_t
 {
 	struct uinput_device *udev = file->private_data;
 	int retval = 0;
-	
+
 	if (!test_bit(UIST_CREATED, &(udev->state)))
 		return -ENODEV;
 
@@ -255,16 +255,16 @@ static ssize_t uinput_read(struct file *file, char *buffer, size_t count, loff_t
 		return -EAGAIN;
 
 	retval = wait_event_interruptible(udev->waitq,
-			(udev->head != udev->tail) || 
+			(udev->head != udev->tail) ||
 			!test_bit(UIST_CREATED, &(udev->state)));
-	
+
 	if (retval)
 		return retval;
 
 	if (!test_bit(UIST_CREATED, &(udev->state)))
 		return -ENODEV;
 
-	while ((udev->head != udev->tail) && 
+	while ((udev->head != udev->tail) &&
 	    (retval + sizeof(struct input_event) <= count)) {
 		if (copy_to_user(buffer + retval, &(udev->buff[udev->tail]),
 		    sizeof(struct input_event))) return -EFAULT;
@@ -279,12 +279,15 @@ static unsigned int uinput_poll(struct file *file, poll_table *wait)
 {
 	struct uinput_device *udev = file->private_data;
 
+	if (!test_bit(UIST_CREATED, &(udev->state)))
+		return 0;
+
 	poll_wait(file, &udev->waitq, wait);
 
 	if (udev->head != udev->tail)
 		return POLLIN | POLLRDNORM;
 
-	return 0;			
+	return 0;
 }
 
 static int uinput_burn_device(struct uinput_device *udev)
@@ -318,7 +321,7 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		case UI_DEV_CREATE:
 			retval = uinput_create_device(udev);
 			break;
-			
+
 		case UI_DEV_DESTROY:
 			retval = uinput_destroy_device(udev);
 			break;
@@ -330,7 +333,7 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			set_bit(arg, udev->dev->evbit);
 			break;
-			
+
 		case UI_SET_KEYBIT:
 			if (arg > KEY_MAX) {
 				retval = -EINVAL;
@@ -338,7 +341,7 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			set_bit(arg, udev->dev->keybit);
 			break;
-			
+
 		case UI_SET_RELBIT:
 			if (arg > REL_MAX) {
 				retval = -EINVAL;
@@ -346,7 +349,7 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			set_bit(arg, udev->dev->relbit);
 			break;
-			
+
 		case UI_SET_ABSBIT:
 			if (arg > ABS_MAX) {
 				retval = -EINVAL;
@@ -354,7 +357,7 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			set_bit(arg, udev->dev->absbit);
 			break;
-			
+
 		case UI_SET_MSCBIT:
 			if (arg > MSC_MAX) {
 				retval = -EINVAL;
@@ -362,7 +365,7 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			set_bit(arg, udev->dev->mscbit);
 			break;
-			
+
 		case UI_SET_LEDBIT:
 			if (arg > LED_MAX) {
 				retval = -EINVAL;
@@ -370,7 +373,7 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			set_bit(arg, udev->dev->ledbit);
 			break;
-			
+
 		case UI_SET_SNDBIT:
 			if (arg > SND_MAX) {
 				retval = -EINVAL;
@@ -378,7 +381,7 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			set_bit(arg, udev->dev->sndbit);
 			break;
-			
+
 		case UI_SET_FFBIT:
 			if (arg > FF_MAX) {
 				retval = -EINVAL;
@@ -386,7 +389,7 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			}
 			set_bit(arg, udev->dev->ffbit);
 			break;
-			
+
 		default:
 			retval = -EFAULT;
 	}

@@ -45,7 +45,7 @@ MODULE_LICENSE("GPL");
 #define GUILLEMOT_MAX_LENGTH	17	/* 17 bytes */
 #define GUILLEMOT_REFRESH_TIME	HZ/50	/* 20 ms */
 
-static short guillemot_abs_pad[] = 
+static short guillemot_abs_pad[] =
 	{ ABS_X, ABS_Y, ABS_THROTTLE, ABS_RUDDER, -1 };
 
 static short guillemot_btn_pad[] =
@@ -160,7 +160,7 @@ static int guillemot_open(struct input_dev *dev)
 {
 	struct guillemot *guillemot = dev->private;
 	if (!guillemot->used++)
-		mod_timer(&guillemot->timer, jiffies + GUILLEMOT_REFRESH_TIME);	
+		mod_timer(&guillemot->timer, jiffies + GUILLEMOT_REFRESH_TIME);
 	return 0;
 }
 
@@ -211,7 +211,7 @@ static void guillemot_connect(struct gameport *gameport, struct gameport_dev *de
 	if (!guillemot_type[i].name) {
 		printk(KERN_WARNING "guillemot.c: Unknown joystick on %s. [ %02x%02x:%04x, ver %d.%02d ]\n",
 			gameport->phys, data[12], data[13], data[11], data[14], data[15]);
-		goto fail2;	
+		goto fail2;
 	}
 
 	sprintf(guillemot->phys, "%s/input0", gameport->phys);
@@ -237,7 +237,7 @@ static void guillemot_connect(struct gameport *gameport, struct gameport_dev *de
 		guillemot->dev.absmax[t] = 255;
 	}
 
-	if (guillemot->type->hat) 
+	if (guillemot->type->hat)
 		for (i = 0; i < 2; i++) {
 			t = ABS_HAT0X + i;
 			set_bit(t, guillemot->dev.absbit);
