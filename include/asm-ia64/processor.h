@@ -223,7 +223,7 @@ struct thread_struct {
 	__u64 map_base;			/* base address for get_unmapped_area() */
 	__u64 task_size;		/* limit for task size */
 	struct siginfo *siginfo;	/* current siginfo struct for ptrace() */
-	__u64 last_fph_cpu;		/* CPU that may hold the contents of f32-f127 */
+	int last_fph_cpu;		/* CPU that may hold the contents of f32-f127 */
 
 #ifdef CONFIG_IA32_SUPPORT
 	__u64 eflag;			/* IA32 EFLAGS reg */
