@@ -69,6 +69,10 @@ ANY LOSS OF USE; DATA, OR PROFITS; OR BUSINESS INTERUPTION) HOWEVER CAUSED
 AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY OR 
 TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*******************************************************************************
+
+Portions (C) 2002 Red Hat, Inc. under the terms of the GNU GPL v2.
+
 *******************************************************************************/
 
 /**********************************************************************
@@ -152,7 +156,7 @@ eeprom_set_semaphore(struct e100_private *adapter)
 		}
 
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
+		schedule_timeout(1+(HZ-1)/100);
 	}
 	return false;
 }
@@ -252,19 +256,12 @@ e100_eeprom_size(struct e100_private *adapter)
 // Returns: bits in an address for that size eeprom
 //----------------------------------------------------------------------------------------
 
-static u16
+static inline int
 eeprom_address_size(u16 size)
 {
-	switch (size) {
-	case 64:
-		return 6;
-	case 128:
-		return 7;
-	case 256:
-		return 8;
-	}
-
-	return 0;		//fix compiler warning or error!
+	int isize = size;
+	
+	return ffs(isize);
 }
 
 //----------------------------------------------------------------------------------------
@@ -348,6 +345,7 @@ shift_out_bits(struct e100_private *adapter, u16 data, u16 count)
 			x |= EEDI;
 
 		writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
+		readw(&(adapter->scb->scb_status)); /* flush command to card */
 		udelay(EEPROM_STALL_TIME);
 		raise_clock(adapter, &x);
 		lower_clock(adapter, &x);
@@ -374,6 +372,7 @@ raise_clock(struct e100_private *adapter, u16 *x)
 {
 	*x = *x | EESK;
 	writew(*x, &CSR_EEPROM_CONTROL_FIELD(adapter));
+	readw(&(adapter->scb->scb_status)); /* flush command to card */
 	udelay(EEPROM_STALL_TIME);
 }
 
@@ -393,6 +392,7 @@ lower_clock(struct e100_private *adapter, u16 *x)
 {
 	*x = *x & ~EESK;
 	writew(*x, &CSR_EEPROM_CONTROL_FIELD(adapter));
+	readw(&(adapter->scb->scb_status)); /* flush command to card */
 	udelay(EEPROM_STALL_TIME);
 }
 
@@ -498,7 +498,7 @@ e100_eeprom_write_word(struct e100_private *adapter, u16 reg, u16 data)
 	x = readw(&CSR_EEPROM_CONTROL_FIELD(adapter));
 	x &= ~(EEDI | EEDO | EESK);
 	writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
-	wmb();
+	readw(&(adapter->scb->scb_status)); /* flush command to card */
 	udelay(EEPROM_STALL_TIME);
 	x |= EECS;
 	writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
@@ -587,7 +587,7 @@ eeprom_wait_cmd_done(struct e100_private *adapter)
 			return true;
 
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
+		schedule_timeout(1+(HZ-1)/100);
 	}
 
 	return false;
@@ -606,9 +606,10 @@ eeprom_stand_by(struct e100_private *adapter)
 	x = readw(&CSR_EEPROM_CONTROL_FIELD(adapter));
 	x &= ~(EECS | EESK);
 	writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
-	wmb();
+	readw(&(adapter->scb->scb_status)); /* flush command to card */
 	udelay(EEPROM_STALL_TIME);
 	x |= EECS;
 	writew(x, &CSR_EEPROM_CONTROL_FIELD(adapter));
+	readw(&(adapter->scb->scb_status)); /* flush command to card */
 	udelay(EEPROM_STALL_TIME);
 }
