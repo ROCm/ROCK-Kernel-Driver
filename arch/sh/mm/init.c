@@ -214,8 +214,8 @@ void __init paging_init(void)
 	 */
 	disable_mmu();
 #endif
-
-	free_area_init_node(0, NODE_DATA(0), 0, zones_size, __MEMORY_START >> PAGE_SHIFT, 0);
+	NODE_DATA(0)->node_mem_map = NULL;
+	free_area_init_node(0, NODE_DATA(0), zones_size, __MEMORY_START >> PAGE_SHIFT, 0);
 	/* XXX: MRB-remove - this doesn't seem sane, should this be done somewhere else ?*/
 	mem_map = NODE_DATA(0)->node_mem_map;
 

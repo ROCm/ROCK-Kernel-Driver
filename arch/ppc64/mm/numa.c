@@ -442,7 +442,6 @@ void __init paging_init(void)
 {
 	unsigned long zones_size[MAX_NR_ZONES];
 	unsigned long zholes_size[MAX_NR_ZONES];
-	struct page *node_mem_map; 
 	int nid;
 
 	memset(zones_size, 0, sizeof(zones_size));
@@ -469,11 +468,11 @@ void __init paging_init(void)
 		 * in free_area_init_node (which will fail).
 		 */
 		if (!node_data[nid].node_spanned_pages)
-			node_mem_map = alloc_bootmem(sizeof(struct page));
+			NODE_DATA(nid)->node_mem_map
+					= alloc_bootmem(sizeof(struct page));
 		else
-			node_mem_map = NULL;
-
-		free_area_init_node(nid, NODE_DATA(nid), node_mem_map,
-				    zones_size, start_pfn, zholes_size);
+			NODE_DATA(nid)->node_mem_map = NULL;
+		free_area_init_node(nid, NODE_DATA(nid), zones_size,
+							start_pfn, zholes_size);
 	}
 }
