@@ -592,18 +592,23 @@ int ntfs_readwrite_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 		 * If write extends beyond _allocated_ size, extend attribute,
 		 * updating attr->allocated and attr->size in the process. (AIA)
 		 */
-		if (offset + l > attr->allocated) {
+		if ((!attr->resident && offset + l > attr->allocated) ||
+				(attr->resident && offset + l > attr->size)) {
 			error = ntfs_resize_attr(ino, attr, offset + l);
 			if (error)
 				return error;
-		} else if (offset + l > attr->size)
-			/* If amount of data has increased: update. */
-			attr->size = offset + l;
-		/* If amount of initialised data has increased: update. */
-		if (offset + l > attr->initialized) {
-			/* FIXME: Zero-out the section between the old
-			 * initialised length and the write start. (AIA) */
-			attr->initialized = offset + l;
+		}
+		if (!attr->resident) {
+			/* Has amount of data increased? */
+			if (offset + l > attr->size)
+				attr->size = offset + l;
+			/* Has amount of initialised data increased? */
+			if (offset + l > attr->initialized) {
+				/* FIXME: Clear the section between the old
+			 	 * initialised length and the write start.
+				 * (AIA) */
+				attr->initialized = offset + l;
+			}
 		}
 	}
 	if (attr->resident) {
@@ -619,10 +624,11 @@ int ntfs_readwrite_attr(ntfs_inode *ino, ntfs_attribute *attr, __s64 offset,
 		if (offset >= attr->initialized)
 			return ntfs_read_zero(dest, l);
 		if (offset + l > attr->initialized) {
-			dest->size = chunk = offset + l - attr->initialized;
+			dest->size = chunk = attr->initialized - offset;
 			error = ntfs_readwrite_attr(ino, attr, offset, dest);
-			if (error)
+			if (error || (dest->size != chunk && (error = -EIO, 1)))
 				return error;
+			dest->size += l - chunk;
 			return ntfs_read_zero(dest, l - chunk);
 		}
 		if (attr->flags & ATTR_IS_COMPRESSED)
@@ -707,31 +713,25 @@ int ntfs_write_attr(ntfs_inode *ino, int type, char *name, __s64 offset,
 	return ntfs_readwrite_attr(ino, attr, offset, buf);
 }
 
+/* -2 = error, -1 = hole, >= 0 means real disk cluster (lcn). */
 int ntfs_vcn_to_lcn(ntfs_inode *ino, int vcn)
 {
 	int rnum;
 	ntfs_attribute *data;
 	
 	data = ntfs_find_attr(ino, ino->vol->at_data, 0);
-	/* It's hard to give an error code. */
 	if (!data || data->resident || data->flags & (ATTR_IS_COMPRESSED |
 			ATTR_IS_ENCRYPTED))
-		return -1;
+		return -2;
 	if (data->size <= (__s64)vcn << ino->vol->cluster_size_bits)
-		return -1;
-	/*
-	 * For Linux, block number 0 represents a hole. - No problem as we do
-	 * not support bmap in any form whatsoever. The FIBMAP sys call is
-	 * deprecated anyway and NTFS is not a block based file system so
-	 * allowing bmapping is complete and utter garbage IMO. Use mmap once
-	 * we implement it... (AIA)
-	 */
+		return -2;
 	if (data->initialized <= (__s64)vcn << ino->vol->cluster_size_bits)
-		return 0;
+		return -1;
 	for (rnum = 0; rnum < data->d.r.len &&
-				vcn >= data->d.r.runlist[rnum].len; rnum++)
+			vcn >= data->d.r.runlist[rnum].len; rnum++)
 		vcn -= data->d.r.runlist[rnum].len;
-	/* We need to cope with sparse runs. (AIA) */
+	if (data->d.r.runlist[rnum].lcn >= 0)
+		return data->d.r.runlist[rnum].lcn + vcn;
 	return data->d.r.runlist[rnum].lcn + vcn;
 }
 

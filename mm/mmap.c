@@ -67,8 +67,8 @@ int vm_enough_memory(long pages)
 	if (sysctl_overcommit_memory)
 	    return 1;
 
-	free = atomic_read(&buffermem_pages);
-	free += atomic_read(&page_cache_size);
+	/* The page cache contains buffer pages these days.. */
+	free = atomic_read(&page_cache_size);
 	free += nr_free_pages();
 	free += nr_swap_pages;
 

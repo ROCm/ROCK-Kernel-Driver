@@ -27,6 +27,7 @@
 #include <linux/locks.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <linux/blkdev.h>
 #include <asm/page.h>
 #include <linux/nls.h>
 #include <linux/ntfs_fs.h>
@@ -1012,22 +1013,27 @@ struct super_block *ntfs_read_super(struct super_block *sb, void *options,
 {
 	ntfs_volume *vol;
 	struct buffer_head *bh;
-	int i, to_read;
+	int i, to_read, blocksize;
 
 	ntfs_debug(DEBUG_OTHER, "ntfs_read_super\n");
 	vol = NTFS_SB2VOL(sb);
 	init_ntfs_super_block(vol);
 	if (!parse_options(vol, (char*)options))
 		goto ntfs_read_super_vol;
-	/* Assume a 512 bytes block device for now. */
-	set_blocksize(sb->s_dev, 512);
+	blocksize = get_hardsect_size(sb->s_dev);
+	if (blocksize < 512)
+		blocksize = 512;
+	if (set_blocksize(sb->s_dev, blocksize) < 0) {
+		ntfs_error("Unable to set blocksize %d.\n", blocksize);
+		goto ntfs_read_super_vol;
+	}
 	/* Read the super block (boot block). */
-	if (!(bh = bread(sb->s_dev, 0, 512))) {
+	if (!(bh = bread(sb->s_dev, 0, blocksize))) {
 		ntfs_error("Reading super block failed\n");
 		goto ntfs_read_super_unl;
 	}
 	ntfs_debug(DEBUG_OTHER, "Done reading boot block\n");
-	/* Check for 'NTFS' magic number */
+	/* Check for valid 'NTFS' boot sector. */
 	if (!is_boot_sector_ntfs(bh->b_data)) {
 		ntfs_debug(DEBUG_OTHER, "Not a NTFS volume\n");
 		bforget(bh);
@@ -1040,7 +1046,7 @@ struct super_block *ntfs_read_super(struct super_block *sb, void *options,
 		goto ntfs_read_super_unl;
 	}
 	ntfs_debug(DEBUG_OTHER, "$Mft at cluster 0x%lx\n", vol->mft_lcn);
-	bforget(bh);
+	brelse(bh);
 	NTFS_SB(vol) = sb;
 	if (vol->cluster_size > PAGE_SIZE) {
 		ntfs_error("Partition cluster size is not supported yet (it "
@@ -1050,9 +1056,12 @@ struct super_block *ntfs_read_super(struct super_block *sb, void *options,
 	ntfs_debug(DEBUG_OTHER, "Done to init volume\n");
 	/* Inform the kernel that a device block is a NTFS cluster. */
 	sb->s_blocksize = vol->cluster_size;
-	for (i = sb->s_blocksize, sb->s_blocksize_bits = 0; i != 1; i >>= 1)
-		sb->s_blocksize_bits++;
-	set_blocksize(sb->s_dev, sb->s_blocksize);
+	sb->s_blocksize_bits = vol->cluster_size_bits;
+	if (blocksize != vol->cluster_size &&
+			set_blocksize(sb->s_dev, sb->s_blocksize) < 0) {
+		ntfs_error("Cluster size too small for device.\n");
+		goto ntfs_read_super_unl;
+	}
 	ntfs_debug(DEBUG_OTHER, "set_blocksize\n");
 	/* Allocate an MFT record (MFT record can be smaller than a cluster). */
 	i = vol->cluster_size;

@@ -579,6 +579,7 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
 		if (!ret) {
 			bdev->bd_openers++;
 			bdev->bd_inode->i_size = blkdev_size(rdev);
+			bdev->bd_inode->i_blkbits = blksize_bits(block_size(rdev));
 		} else if (!bdev->bd_openers)
 			bdev->bd_op = NULL;
 	}

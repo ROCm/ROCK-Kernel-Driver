@@ -71,11 +71,6 @@ static unsigned int bh_hash_shift;
 static struct buffer_head **hash_table;
 static rwlock_t hash_table_lock = RW_LOCK_UNLOCKED;
 
-#define BUF_CLEAN	0
-#define BUF_LOCKED	1	/* Buffers scheduled for write */
-#define BUF_DIRTY	2	/* Dirty buffers, not yet scheduled for write */
-#define NR_LIST		3
-
 static struct buffer_head *lru_list[NR_LIST];
 static spinlock_t lru_list_lock = SPIN_LOCK_UNLOCKED;
 static int nr_buffers_type[NR_LIST];
@@ -672,10 +667,6 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
 			if (!atomic_read(&bh->b_count)) {
 				if (destroy_dirty_buffers || !buffer_dirty(bh)) {
 					remove_inode_queue(bh);
-#if 0
-					__remove_from_queues(bh);
-					put_last_free(bh);
-#endif
 				}
 			} else
 				printk("invalidate: busy buffer\n");
@@ -1228,20 +1219,6 @@ static struct buffer_head * get_unused_buffer_head(int async)
 		}
 		spin_unlock(&unused_list_lock);
 	}
-#if 0
-	/*
-	 * (Pending further analysis ...)
-	 * Ordinary (non-async) requests can use a different memory priority
-	 * to free up pages. Any swapping thus generated will use async
-	 * buffer heads.
-	 */
-	if(!async &&
-	   (bh = kmem_cache_alloc(bh_cachep, SLAB_KERNEL)) != NULL) {
-		memset(bh, 0, sizeof(*bh));
-		init_waitqueue_head(&bh->b_wait);
-		return bh;
-	}
-#endif
 
 	return NULL;
 }
@@ -1395,11 +1372,8 @@ int discard_bh_page(struct page *page, unsigned long offset, int drop_pagecache)
 	 * instead.
 	 */
 	if (!offset) {
-		if (!try_to_free_buffers(page, 0)) {
-			if (drop_pagecache)
-				atomic_inc(&buffermem_pages);
+		if (!try_to_free_buffers(page, 0))
 			return 0;
-		}
 	}
 
 	return 1;
@@ -2228,12 +2202,27 @@ fail:
 	return err;
 }
 
+static inline void link_dev_buffers(struct page * page, struct buffer_head *head)
+{
+	struct buffer_head *bh, *tail;
+
+	bh = head;
+	do {
+		tail = bh;
+		bh = bh->b_this_page;
+	} while (bh);
+	tail->b_this_page = head;
+	page->buffers = head;
+	page_cache_get(page);
+}
+
 /*
  * Create the page-cache page that contains the requested block
  */
 static struct page * grow_dev_page(struct block_device *bdev, unsigned long index, int size)
 {
 	struct page * page;
+	struct buffer_head *bh;
 
 	page = find_or_create_page(bdev->bd_inode->i_mapping, index, GFP_NOFS);
 	if (IS_ERR(page))
@@ -2242,22 +2231,18 @@ static struct page * grow_dev_page(struct block_device *bdev, unsigned long inde
 	if (!PageLocked(page))
 		BUG();
 
-	if (!page->buffers) {
-		struct buffer_head *bh, *tail;
-		struct buffer_head *head = create_buffers(page, size, 0);
-		if (!head)
+	bh = page->buffers;
+	if (bh) {
+		if (bh->b_size == size)
+			return page;
+		if (!try_to_free_buffers(page, GFP_NOFS))
 			goto failed;
-
-		bh = head;
-		do {
-			tail = bh;
-			bh = bh->b_this_page;
-		} while (bh);
-		tail->b_this_page = head;
-		page->buffers = head;
-		page_cache_get(page);
-		atomic_inc(&buffermem_pages);
 	}
+
+	bh = create_buffers(page, size, 0);
+	if (!bh)
+		goto failed;
+	link_dev_buffers(page, bh);
 	return page;
 
 failed:
@@ -2336,6 +2321,9 @@ static int grow_buffers(kdev_t dev, unsigned long block, int size)
 	hash_page_buffers(page, dev, block, size);
 	UnlockPage(page);
 	page_cache_release(page);
+
+	/* We hashed up this page, so increment buffermem */
+	atomic_inc(&buffermem_pages);
 	return 1;
 }
 

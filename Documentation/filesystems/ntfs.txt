@@ -98,6 +98,14 @@ list at sourceforge: linux-ntfs-dev@lists.sourceforge.net
 ChangeLog
 =========
 
+NTFS 1.1.20:
+	- Fixed two bugs in ntfs_readwrite_attr(). Thanks to Jan Kara for
+	  spotting the out of bounds one.
+	- Check return value of set_blocksize() in ntfs_read_super() and make
+	  use of get_hardsect_size() to determine the minimum block size.
+	- Fix return values of ntfs_vcn_to_lcn(). This should stop
+	  peoples start of partition being overwritten at random.
+
 NTFS 1.1.19:
 	- Fixed ntfs_getdir_unsorted(), ntfs_readdir() and ntfs_printcb() to
 	  cope with arbitrary cluster sizes. Very important for Win2k+. Also,
