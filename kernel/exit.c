@@ -1260,16 +1260,17 @@ static int wait_task_continued(task_t *p, int noreap,
 	if (unlikely(!p->signal))
 		return 0;
 
-	if (p->signal->stop_state >= 0)
+	if (!(p->signal->flags & SIGNAL_STOP_CONTINUED))
 		return 0;
 
 	spin_lock_irq(&p->sighand->siglock);
-	if (p->signal->stop_state >= 0) { /* Re-check with the lock held.  */
+	/* Re-check with the lock held.  */
+	if (!(p->signal->flags & SIGNAL_STOP_CONTINUED)) {
 		spin_unlock_irq(&p->sighand->siglock);
 		return 0;
 	}
 	if (!noreap)
-		p->signal->stop_state = 0;
+		p->signal->flags &= ~SIGNAL_STOP_CONTINUED;
 	spin_unlock_irq(&p->sighand->siglock);
 
 	pid = p->pid;

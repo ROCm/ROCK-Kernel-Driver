@@ -293,8 +293,7 @@ struct signal_struct {
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
-	/* 1 if group stopped since last SIGCONT, -1 if SIGCONT since report */
-  	int			stop_state;
+	unsigned int		flags; /* see SIGNAL_* flags below */
 
 	/* POSIX.1b Interval Timers */
 	struct list_head posix_timers;
@@ -329,6 +328,14 @@ struct signal_struct {
 	 */
 	struct rlimit rlim[RLIM_NLIMITS];
 };
+
+/*
+ * Bits in flags field of signal_struct.
+ */
+#define SIGNAL_STOP_STOPPED	0x00000001 /* job control stop in effect */
+#define SIGNAL_STOP_DEQUEUED	0x00000002 /* stop signal dequeued */
+#define SIGNAL_STOP_CONTINUED	0x00000004 /* SIGCONT since WCONTINUED reap */
+
 
 /*
  * Priority of a process goes from 0..MAX_PRIO-1, valid RT
