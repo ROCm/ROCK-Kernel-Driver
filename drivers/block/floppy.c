@@ -242,7 +242,7 @@ static int irqdma_allocated;
 #define LOCAL_END_REQUEST
 #define DEVICE_NAME "floppy"
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <linux/cdrom.h> /* for the compatibility eject ioctl */
 #include <linux/completion.h>

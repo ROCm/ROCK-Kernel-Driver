@@ -38,12 +38,17 @@
 #include "mode_kern.h"
 #include "mode.h"
 
-#define DEFAULT_COMMAND_LINE "root=6200"
+#define DEFAULT_COMMAND_LINE "root=ubd0"
 
 struct cpuinfo_um boot_cpu_data = { 
 	.loops_per_jiffy	= 0,
 	.ipi_pipe		= { -1, -1 }
 };
+
+/* Placeholder to make UML link until the vsyscall stuff is actually 
+ * implemented
+ */
+void __kernel_vsyscall;
 
 unsigned long thread_saved_pc(struct task_struct *task)
 {
@@ -61,10 +66,14 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		return 0;
 #endif
 
-	seq_printf(m, "bogomips\t: %lu.%02lu\n",
+	seq_printf(m, "processor\t: %d\n", index);
+	seq_printf(m, "vendor_id\t: User Mode Linux\n");
+	seq_printf(m, "model name\t: UML\n");
+	seq_printf(m, "mode\t\t: %s\n", CHOOSE_MODE("tt", "skas"));
+	seq_printf(m, "host\t\t: %s\n", host_info);
+	seq_printf(m, "bogomips\t: %lu.%02lu\n\n",
 		   loops_per_jiffy/(500000/HZ),
 		   (loops_per_jiffy/(5000/HZ)) % 100);
-	seq_printf(m, "host\t\t: %s\n", host_info);
 
 	return(0);
 }
@@ -134,12 +143,12 @@ void set_cmdline(char *cmd)
 	if(umid != NULL){
 		snprintf(argv1_begin, 
 			 (argv1_end - argv1_begin) * sizeof(*ptr), 
-			 "(%s)", umid);
+			 "(%s) ", umid);
 		ptr = &argv1_begin[strlen(argv1_begin)];
 	}
 	else ptr = argv1_begin;
 
-	snprintf(ptr, (argv1_end - ptr) * sizeof(*ptr), " [%s]", cmd);
+	snprintf(ptr, (argv1_end - ptr) * sizeof(*ptr), "[%s]", cmd);
 	memset(argv1_begin + strlen(argv1_begin), '\0', 
 	       argv1_end - argv1_begin - strlen(argv1_begin));
 #endif
@@ -179,7 +188,7 @@ __uml_setup("root=", uml_root_setup,
 static int __init uml_ncpus_setup(char *line, int *add)
 {
        if (!sscanf(line, "%d", &ncpus)) {
-               printk("Couldn't parse [%s]\n", line);
+               printf("Couldn't parse [%s]\n", line);
                return -1;
        }
 
@@ -210,7 +219,7 @@ static int __init mode_tt_setup(char *line, int *add)
 
 static int __init mode_tt_setup(char *line, int *add)
 {
-	printk("CONFIG_MODE_TT disabled - 'mode=tt' ignored\n");
+	printf("CONFIG_MODE_TT disabled - 'mode=tt' ignored\n");
 	return(0);
 }
 
@@ -221,7 +230,7 @@ static int __init mode_tt_setup(char *line, int *add)
 
 static int __init mode_tt_setup(char *line, int *add)
 {
-	printk("CONFIG_MODE_SKAS disabled - 'mode=tt' redundant\n");
+	printf("CONFIG_MODE_SKAS disabled - 'mode=tt' redundant\n");
 	return(0);
 }
 
@@ -369,6 +378,7 @@ int linux_main(int argc, char **argv)
 		2 * PAGE_SIZE;
 
 	task_protections((unsigned long) &init_thread_info);
+	os_flush_stdout();
 
 	return(CHOOSE_MODE(start_uml_tt(), start_uml_skas()));
 }

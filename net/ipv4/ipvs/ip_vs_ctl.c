@@ -93,7 +93,7 @@ int ip_vs_get_debug_level(void)
 /*
  *	update_defense_level is called from timer bh and from sysctl.
  */
-void update_defense_level(void)
+static void update_defense_level(void)
 {
 	struct sysinfo i;
 	static int old_secure_tcp = 0;
@@ -207,6 +207,22 @@ void update_defense_level(void)
 	if (to_change >= 0)
 		ip_vs_protocol_timeout_change(sysctl_ip_vs_secure_tcp>1);
 	write_unlock(&__ip_vs_securetcp_lock);
+}
+
+
+/*
+ *	Timer for checking the defense
+ */
+static struct timer_list defense_timer;
+#define DEFENSE_TIMER_PERIOD	1*HZ
+
+static void defense_timer_handler(unsigned long data)
+{
+	update_defense_level();
+	if (atomic_read(&ip_vs_dropentry))
+		ip_vs_random_dropentry();
+
+	mod_timer(&defense_timer, jiffies + DEFENSE_TIMER_PERIOD);
 }
 
 
@@ -2187,6 +2203,12 @@ int ip_vs_control_init(void)
 	ip_vs_stats.lock = SPIN_LOCK_UNLOCKED;
 	ip_vs_new_estimator(&ip_vs_stats);
 
+	/* Hook the defense timer */
+	init_timer(&defense_timer);
+	defense_timer.function = defense_timer_handler;
+	defense_timer.expires = jiffies + DEFENSE_TIMER_PERIOD;
+	add_timer(&defense_timer);
+
 	LeaveFunction(2);
 	return 0;
 }
@@ -2196,6 +2218,7 @@ void ip_vs_control_cleanup(void)
 {
 	EnterFunction(2);
 	ip_vs_trash_cleanup();
+	del_timer_sync(&defense_timer);
 	ip_vs_kill_estimator(&ip_vs_stats);
 	unregister_sysctl_table(ipv4_vs_table.sysctl_header);
 	proc_net_remove("ip_vs_stats");

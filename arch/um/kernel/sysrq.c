@@ -11,6 +11,10 @@
 #include "sysrq.h"
 #include "user_util.h"
 
+void show_stack(struct task_struct *task, unsigned long *sp)
+{
+}
+
 void show_trace(unsigned long * stack)
 {
         int i;

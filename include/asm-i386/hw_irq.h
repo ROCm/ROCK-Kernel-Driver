@@ -16,6 +16,7 @@
 #include <linux/profile.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
+#include <asm/sections.h>
 
 /*
  * Various low-level irq details needed by irq.c, process.c,
@@ -63,8 +64,6 @@ extern unsigned long io_apic_irqs;
 extern atomic_t irq_err_count;
 extern atomic_t irq_mis_count;
 
-extern char _stext, _etext;
-
 #define IO_APIC_IRQ(x) (((x) >= 16) || ((1<<(x)) & io_apic_irqs))
 
 /*
@@ -95,7 +94,7 @@ static inline void x86_do_profile(struct pt_regs * regs)
 	if (!((1<<smp_processor_id()) & prof_cpu_mask))
 		return;
 
-	eip -= (unsigned long) &_stext;
+	eip -= (unsigned long)_stext;
 	eip >>= prof_shift;
 	/*
 	 * Don't ignore out-of-bounds EIP values silently,
@@ -107,7 +106,7 @@ static inline void x86_do_profile(struct pt_regs * regs)
 	atomic_inc((atomic_t *)&prof_buffer[eip]);
 }
  
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_SMP)
+#if defined(CONFIG_X86_IO_APIC)
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
 {
 	if (IO_APIC_IRQ(i))

@@ -81,7 +81,7 @@
 
 #include <linux/jiffies.h>
 #include <linux/delay.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/io.h>
 
 #include "i91uscsi.h"

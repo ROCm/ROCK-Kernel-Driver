@@ -16,10 +16,13 @@
  * get_fs() == KERNEL_DS, checking is bypassed.
  *
  * For historical reasons, these macros are grossly misnamed.
+ *
+ * The fs/ds values are now the highest legal address in the "segment".
+ * This simplifies the checking in the routines below.
  */
 
-#define KERNEL_DS	((mm_segment_t) { 0 })
-#define USER_DS		((mm_segment_t) { 1 })
+#define KERNEL_DS	((mm_segment_t) { ~0UL })
+#define USER_DS		((mm_segment_t) { TASK_SIZE - 1 })
 
 #define get_ds()	(KERNEL_DS)
 #define get_fs()	(current->thread.fs)
@@ -27,14 +30,15 @@
 
 #define segment_eq(a,b)	((a).seg == (b).seg)
 
-#define __kernel_ok (segment_eq(get_fs(), KERNEL_DS))
-#define __user_ok(addr,size) (((size) <= TASK_SIZE)&&((addr) <= TASK_SIZE-(size)))
-#define __access_ok(addr,size) (__kernel_ok || __user_ok((addr),(size)))
-#define access_ok(type,addr,size) __access_ok((unsigned long)(addr),(size))
+#define __access_ok(addr,size)						    \
+	((addr) <= current->thread.fs.seg				    \
+	 && ((size) == 0 || (size) - 1 <= current->thread.fs.seg - (addr)))
+
+#define access_ok(type, addr, size) __access_ok((unsigned long)(addr),(size))
 
 extern inline int verify_area(int type, const void __user * addr, unsigned long size)
 {
-	return access_ok(type,addr,size) ? 0 : -EFAULT;
+	return access_ok(type, addr, size) ? 0 : -EFAULT;
 }
 
 
@@ -303,7 +307,7 @@ extern int __strnlen_user(const char __user *str, long len, unsigned long top);
  */
 extern __inline__ int strnlen_user(const char __user *str, long len)
 {
-	unsigned long top = __kernel_ok? ~0UL: TASK_SIZE - 1;
+	unsigned long top = current->thread.fs.seg;
 
 	if ((unsigned long)str > top)
 		return 0;

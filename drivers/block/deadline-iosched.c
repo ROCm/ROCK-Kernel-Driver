@@ -10,7 +10,6 @@
 #include <linux/blkdev.h>
 #include <linux/elevator.h>
 #include <linux/bio.h>
-#include <linux/blk.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -941,6 +940,7 @@ elevator_t iosched_deadline = {
 	.elevator_exit_fn =		deadline_exit,
 
 	.elevator_ktype =		&deadline_ktype,
+	.elevator_name =		"deadline",
 };
 
 EXPORT_SYMBOL(iosched_deadline);

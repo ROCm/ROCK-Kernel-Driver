@@ -607,7 +607,7 @@ find_p2p_bridge (acpi_handle handle, u32 lvl, void *context, void **rv)
 
 	/* check if this bridge has ejectable slots */
 	if (detect_ejectable_slots(handle) > 0) {
-		dbg("found PCI-to-PCI bridge at PCI %s\n", dev->slot_name);
+		dbg("found PCI-to-PCI bridge at PCI %s\n", pci_name(dev));
 		add_p2p_bridge(handle, seg, bus, device, function);
 	}
 
@@ -693,7 +693,7 @@ static int power_on_slot (struct acpiphp_slot *slot)
 
 		if (func->flags & FUNC_HAS_PS0) {
 			dbg("%s: executing _PS0 on %s\n", __FUNCTION__,
-			    func->pci_dev->slot_name);
+			    pci_name(func->pci_dev));
 			status = acpi_evaluate_object(func->handle, "_PS0", NULL, NULL);
 			if (ACPI_FAILURE(status)) {
 				warn("%s: _PS0 failed\n", __FUNCTION__);

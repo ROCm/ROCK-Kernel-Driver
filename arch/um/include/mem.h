@@ -13,7 +13,6 @@ struct vm_reserved {
 };
 
 extern void set_usable_vm(unsigned long start, unsigned long end);
-extern void set_kmem_end(unsigned long new);
 
 #endif
 

@@ -1110,6 +1110,7 @@ static int sym_eh_handler(int op, char *opname, Scsi_Cmnd *cmd)
 	int sts = -1;
 	struct sym_eh_wait eh, *ep = &eh;
 	char devname[20];
+	unsigned long flags;
 
 	sprintf(devname, "%s:%d:%d", sym_name(np), cmd->device->id, cmd->device->lun);
 
@@ -1201,7 +1202,11 @@ finish:
 		ep->timer.data = (u_long)cmd;
 		ep->timed_out = 1;	/* Be pessimistic for once :) */
 		add_timer(&ep->timer);
+		local_save_flags(flags);
+		spin_unlock_irq(cmd->device->host->host_lock);
 		down(&ep->sem);
+		local_irq_restore(flags);
+		spin_lock(cmd->device->host->host_lock);
 		if (ep->timed_out)
 			sts = -2;
 	}

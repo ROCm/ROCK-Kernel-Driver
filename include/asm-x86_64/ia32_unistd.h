@@ -264,7 +264,20 @@
 #define __NR_ia32_sys_epoll_wait	256
 #define __NR_ia32_remap_file_pages	257
 #define __NR_ia32_set_tid_address	258
+#define __NR_ia32_timer_create		259
+#define __NR_ia32_timer_settime	(__NR_ia32_timer_create+1)
+#define __NR_ia32_timer_gettime	(__NR_ia32_timer_create+2)
+#define __NR_ia32_timer_getoverrun	(__NR_ia32_timer_create+3)
+#define __NR_ia32_timer_delete	(__NR_ia32_timer_create+4)
+#define __NR_ia32_clock_settime	(__NR_ia32_timer_create+5)
+#define __NR_ia32_clock_gettime	(__NR_ia32_timer_create+6)
+#define __NR_ia32_clock_getres	(__NR_ia32_timer_create+7)
+#define __NR_ia32_clock_nanosleep	(__NR_ia32_timer_create+8)
+#define __NR_ia32_statfs64		268
+#define __NR_ia32_fstatfs64		269
+#define __NR_ia32_tgkill		270
+#define __NR_ia32_utimes		271
 
-#define IA32_NR_syscalls 265	/* must be > than biggest syscall! */	
+#define IA32_NR_syscalls 275	/* must be > than biggest syscall! */	
 
 #endif /* _ASM_X86_64_IA32_UNISTD_H_ */

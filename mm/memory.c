@@ -45,6 +45,7 @@
 #include <linux/pagemap.h>
 #include <linux/vcache.h>
 #include <linux/rmap-locking.h>
+#include <linux/init.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
@@ -671,6 +672,24 @@ static inline struct page *get_page_map(struct page *page)
 }
 
 
+static struct vm_area_struct fixmap_vma = {
+	/* Catch users - if there are any valid
+	   ones, we can make this be "&init_mm" or
+	   something.  */
+	.vm_mm = NULL,
+	.vm_page_prot = PAGE_READONLY,
+	.vm_flags = VM_READ | VM_EXEC,
+};
+
+static int init_fixmap_vma(void)
+{
+	fixmap_vma.vm_start = FIXADDR_START;
+	fixmap_vma.vm_end = FIXADDR_TOP;
+	return(0);
+}
+
+__initcall(init_fixmap_vma);
+
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long start, int len, int write, int force,
 		struct page **pages, struct vm_area_struct **vmas)
@@ -691,19 +710,8 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 
 		vma = find_extend_vma(mm, start);
 
-#ifdef FIXADDR_USER_START
-		if (!vma &&
-		    start >= FIXADDR_USER_START && start < FIXADDR_USER_END) {
-			static struct vm_area_struct fixmap_vma = {
-				/* Catch users - if there are any valid
-				   ones, we can make this be "&init_mm" or
-				   something.  */
-				.vm_mm = NULL,
-				.vm_start = FIXADDR_USER_START,
-				.vm_end = FIXADDR_USER_END,
-				.vm_page_prot = PAGE_READONLY,
-				.vm_flags = VM_READ | VM_EXEC,
-			};
+#ifdef FIXADDR_START
+		if (!vma && start >= FIXADDR_START && start < FIXADDR_TOP) {
 			unsigned long pg = start & PAGE_MASK;
 			pgd_t *pgd;
 			pmd_t *pmd;

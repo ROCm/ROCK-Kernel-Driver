@@ -24,7 +24,7 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/swap.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #include <asm/bootinfo.h>
 #include <asm/cacheflush.h>

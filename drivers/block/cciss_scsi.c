@@ -712,7 +712,8 @@ cciss_scsi_detect(int ctlr)
 	sh->hostdata[0] = (unsigned long) hba[ctlr];
 	sh->irq = hba[ctlr]->intr;
 	sh->unique_id = sh->irq;
-	scsi_add_host(sh, &hba[ctlr]->pdev->dev);
+	scsi_add_host(sh, &hba[ctlr]->pdev->dev); /* XXX handle failure */
+	scsi_scan_host(sh);
 
 	return 1;
 }

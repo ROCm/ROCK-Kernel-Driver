@@ -218,7 +218,8 @@ NCR_D700_probe_one(struct NCR_D700_private *p, int siop,
 		goto irq_failed;
 	}
 
-	scsi_add_host(host, p->dev);
+	scsi_add_host(host, p->dev); /* XXX handle failure */
+	scsi_scan_host(host);
 
 	p->hosts[siop] = host;
 	hostdata->dev = p->dev;
@@ -387,7 +388,6 @@ static int __init NCR_D700_init(void)
 static void __exit NCR_D700_exit(void)
 {
 	mca_unregister_driver(&NCR_D700_driver);
-	scsi_sysfs_release_attributes(&NCR_D700_driver_template);
 }
 
 module_init(NCR_D700_init);

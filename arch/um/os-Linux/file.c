@@ -342,6 +342,37 @@ int create_unix_socket(char *file, int len)
 	return(sock);
 }
 
+void os_flush_stdout(void)
+{
+	fflush(stdout);
+}
+
+int os_lock_file(int fd, int excl)
+{
+	int type = excl ? F_WRLCK : F_RDLCK;
+	struct flock lock = ((struct flock) { .l_type	= type,
+					      .l_whence	= SEEK_SET,
+					      .l_start	= 0,
+					      .l_len	= 0 } );
+	int err, save;
+
+	err = fcntl(fd, F_SETLK, &lock);
+	if(!err)
+		goto out;
+
+	save = -errno;
+	err = fcntl(fd, F_GETLK, &lock);
+	if(err){
+		err = -errno;
+		goto out;
+	}
+	
+	printk("F_SETLK failed, file already locked by pid %d\n", lock.l_pid);
+	err = save;
+ out:
+	return(err);
+}
+
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

@@ -46,7 +46,7 @@
 #include <linux/init.h>
 #include <linux/wait.h>
 #include <linux/devfs_fs_kernel.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 
 #include <asm/system.h>

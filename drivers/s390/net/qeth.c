@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth.c ($Revision: 1.118 $)
+ * linux/drivers/s390/net/qeth.c ($Revision: 1.126 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -165,7 +165,7 @@ MODULE_PARM_DESC(qeth_sparebufs, "the number of pre-allocated spare buffers "
 		 "reserved for low memory situations");
 
 /****************** MODULE STUFF **********************************/
-#define VERSION_QETH_C "$Revision: 1.118 $"
+#define VERSION_QETH_C "$Revision: 1.126 $"
 static const char *version = "qeth S/390 OSA-Express driver ("
     VERSION_QETH_C "/" VERSION_QETH_H "/" VERSION_QETH_MPC_H
     QETH_VERSION_IPV6 QETH_VERSION_VLAN ")";
@@ -1156,7 +1156,7 @@ qeth_get_skb(unsigned int len)
 	return skb;
 }
 
-static struct sk_buff *
+static inline struct sk_buff *
 qeth_get_next_skb(struct qeth_card *card,
 		  int *element_ptr, int *pos_in_el_ptr,
 		  void **hdr_ptr, struct qdio_buffer *buffer)
@@ -1464,8 +1464,21 @@ __qeth_rebuild_skb(struct qeth_card *card, struct sk_buff *skb, void *hdr_ptr)
 	skb->ip_summed = card->options.checksum_type;
 	if (card->options.checksum_type == HW_CHECKSUMMING) {
 		/* do we have a checksummed packet? */
-		if (*(__u8 *) (hdr_ptr + 11) & QETH_EXT_HEADER_CSUM_TRANSP_REQ) {
-			/* skb->ip_summed is set already */
+
+		/* 
+		 * we only check for TCP/UDP checksums when the pseudo
+		 * header was also checked successfully -- for the
+		 * rest of the packets, it's not clear, whether the
+		 * upper layer csum is alright. And they shouldn't
+		 * occur too often anyway in real life 
+		 */
+
+		if ((*(__u8*)(hdr_ptr+11) & (QETH_EXT_HEADER_CSUM_HDR_REQ |
+					     QETH_EXT_HEADER_CSUM_TRANSP_REQ)) ==
+		    (QETH_EXT_HEADER_CSUM_HDR_REQ |
+		     QETH_EXT_HEADER_CSUM_TRANSP_REQ)) {
+#if 0
+			/* csum does not need to be set inbound anyway */
 			
 			/* 
 			 * vlan is not an issue here, it's still in
@@ -1485,11 +1498,15 @@ __qeth_rebuild_skb(struct qeth_card *card, struct sk_buff *skb, void *hdr_ptr)
 					(&skb->data[ip_len +
 						    QETH_TCP_CSUM_OFFSET]);
 			}
+#endif /* 0 */
+			skb->ip_summed=CHECKSUM_UNNECESSARY;
 		} else {
 			/* make the stack check it */
 			skb->ip_summed = SW_CHECKSUMMING;
 		}
-	}
+	} else
+		skb->ip_summed=card->options.checksum_type;
+
 	__qeth_rebuild_skb_vlan(card, skb, hdr_ptr);
 }
 
@@ -1596,7 +1613,7 @@ __qeth_fill_header_add_vlan(struct qeth_hdr *hdr, struct sk_buff *skb,
 #endif
 }
 
-static __u8
+static inline __u8
 __qeth_get_flags_v4(int multicast)
 {
 	if (multicast == RTN_MULTICAST)
@@ -1606,7 +1623,7 @@ __qeth_get_flags_v4(int multicast)
 	return QETH_CAST_UNICAST;
 }
 
-static __u8
+static inline __u8
 __qeth_get_flags_v6(int multicast)
 {
 	if (multicast == RTN_MULTICAST)
@@ -1625,7 +1642,7 @@ __qeth_get_flags_v6(int multicast)
 		QETH_HEADER_IPV6;
 }
 
-static void
+static inline void
 qeth_fill_header(struct qeth_hdr *hdr, struct sk_buff *skb,
 		 int version, int multicast)
 {
@@ -1681,7 +1698,7 @@ qeth_fill_header(struct qeth_hdr *hdr, struct sk_buff *skb,
 		      __max(QETH_DBF_DATA_LEN, QETH_DBF_DATA_LEN));
 }
 
-static int inline
+static inline int
 qeth_fill_buffer(struct qdio_buffer *buffer, char *dataptr,
 		 int length, int element)
 {
@@ -1735,7 +1752,7 @@ qeth_fill_buffer(struct qdio_buffer *buffer, char *dataptr,
 	return element;
 }
 
-static void
+static inline void
 qeth_flush_packed_packets(struct qeth_card *card, int queue, int under_int)
 {
 	struct qdio_buffer *buffer;
@@ -1900,7 +1917,7 @@ qeth_determine_send_error(int cc, int qdio_error, int sbalf15)
 	return ERROR_LINK_FAILURE;	/* should never happen */
 }
 
-static void
+static inline void
 qeth_free_buffer(struct qeth_card *card, int queue, int bufno,
 		 int qdio_error, int siga_error)
 {
@@ -2013,7 +2030,7 @@ qeth_free_buffer(struct qeth_card *card, int queue, int bufno,
 	card->send_retries[queue][bufno] = 0;
 }
 
-static void
+static inline void
 qeth_free_all_skbs(struct qeth_card *card)
 {
 	int q, b;
@@ -2049,7 +2066,7 @@ qeth_flush_buffer(struct qeth_card *card, int queue, int under_int)
 }
 
 #ifdef QETH_VLAN
-void
+static inline void
 qeth_insert_ipv6_vlan_tag(struct sk_buff *__skb)
 {
 
@@ -2088,7 +2105,7 @@ __qeth_add_vlan_tag(struct qeth_card *card, struct sk_buff *skb, int version)
 #endif
 }
 
-static void
+static inline void
 qeth_send_packet_fast(struct qeth_card *card, struct sk_buff *skb,
 		      struct net_device *dev,
 		      int queue, int version, int multicast)
@@ -2183,7 +2200,7 @@ qeth_send_packet_fast(struct qeth_card *card, struct sk_buff *skb,
 
 /* no checks, if all elements are used, as then we would not be here (at most
    127 buffers are enqueued) */
-static void
+static inline void
 qeth_send_packet_packed(struct qeth_card *card, struct sk_buff *skb,
 			struct net_device *dev,
 			int queue, int version, int multicast)
@@ -2391,7 +2408,7 @@ __qeth_switch_state_if_needed(struct qeth_card *card, int queue)
 	}
 }
 
-static int
+static inline int
 qeth_do_send_packet(struct qeth_card *card, struct sk_buff *skb,
 		    struct net_device *dev)
 {
@@ -2829,23 +2846,27 @@ qeth_send_ipa_cmd(struct qeth_card *card, struct ipa_cmd *cmd, int update_cmd,
 
 	if (!buffer) {
 		if (atomic_read(&card->escape_softsetup))
-			result = 0;
+			return 0;
 		else
-			result = -1;
-	} else {
-		reply = (struct ipa_cmd *) PDU_ENCAPSULATION(buffer);
-		if ((update_cmd) && (reply))
-			memcpy(cmd, reply, sizeof (struct ipa_cmd));
-		result = reply->return_code;
-
-		/* some special sausages: */
-		if ((ipa_cmd == IPA_CMD_SETASSPARMS) && (result == 0)) {
-			result = reply->data.setassparms.return_code;
-		}
-		if ((ipa_cmd == IPA_CMD_SETADAPTERPARMS) && (result == 0)) {
-			result = reply->data.setadapterparms.return_code;
-		}
+			return -1;
 	}
+	reply = (struct ipa_cmd *) PDU_ENCAPSULATION(buffer);
+	if ((update_cmd) && (reply))
+		memcpy(cmd, reply, sizeof (struct ipa_cmd));
+	result = reply->return_code;
+
+	/* some special sausages: */
+	if ((ipa_cmd == IPA_CMD_SETASSPARMS) && (result == 0)) {
+		result = reply->data.setassparms.return_code;
+		if ((reply->data.setassparms.assist_no==IPA_INBOUND_CHECKSUM) &&
+		    (reply->data.setassparms.command_code == IPA_CMD_ASS_START))
+			card->csum_enable_mask =
+				reply->data.setassparms.data.flags_32bit;
+	}
+	if ((ipa_cmd == IPA_CMD_SETADAPTERPARMS) && (result == 0)) {
+		result = reply->data.setadapterparms.return_code;
+	}
+
 	return result;
 }
 
@@ -5599,7 +5620,7 @@ go_on_filt:
 			}
 			result=qeth_send_setassparms_simple_with_data
 				(card,IPA_INBOUND_CHECKSUM,
-				 IPA_CMD_ASS_ENABLE, IPA_CHECKSUM_ENABLE_MASK);
+				 IPA_CMD_ASS_ENABLE, card->csum_enable_mask);
 			if (result) {
 				PRINT_WARN("Could not enable inbound " \
 					   "checksumming on %s: 0x%x, " \
@@ -6881,6 +6902,14 @@ qeth_peer_func_level(int level)
 	return level;		/* hmmm... don't know what to do with that level. */
 }
 
+/* returns last four digits of bus_id */
+static inline __u16
+__raw_devno_from_bus_id(char *id)
+{
+	id += (strlen(id) - 4); 
+	return (__u16) simple_strtoul(id, &id, 16);
+}
+
 static int
 qeth_idx_activate_read(struct qeth_card *card)
 {
@@ -6905,7 +6934,7 @@ qeth_idx_activate_read(struct qeth_card *card)
 	memcpy(QETH_IDX_ACT_FUNC_LEVEL(card->dma_stuff->sendbuf),
 	       &card->func_level, 2);
 
-	temp = _ccw_device_get_device_number(card->ddev);
+	temp = __raw_devno_from_bus_id(card->ddev->dev.bus_id);
 	memcpy(QETH_IDX_ACT_QDIO_DEV_CUA(card->dma_stuff->sendbuf), &temp, 2);
 	temp = (card->cula << 8) + card->unit_addr2;
 	memcpy(QETH_IDX_ACT_QDIO_DEV_REALADDR(card->dma_stuff->sendbuf),
@@ -7501,10 +7530,8 @@ qeth_verify_dev(struct net_device *dev)
 	for (; tmp && (!result); tmp = tmp->next) {
 		if (atomic_read(&tmp->shutdown_phase))
 			continue;
-		if (dev == tmp->dev) {
-			result = QETH_VERIFY_IS_REAL_DEV;
-		}
-		result = __qeth_verify_dev_vlan(dev, tmp);
+		result = (dev == tmp->dev)?
+			QETH_VERIFY_IS_REAL_DEV:__qeth_verify_dev_vlan(dev, tmp);
 	}
 	read_unlock(&list_lock);
 	return result;
@@ -8547,6 +8574,8 @@ qeth_alloc_card(void)
 	card->ip_mc_new_state.ipm6_ifa = NULL;
 #endif /* QETH_IPV6 */
 
+	card->csum_enable_mask = IPA_CHECKSUM_DEFAULT_ENABLE_MASK;
+
 	/* setup net_device stuff */
 	card->dev->priv = card;
 
@@ -9087,21 +9116,19 @@ qeth_procfile_open(struct inode *inode, struct file *file)
 		/* FIXME: this is really a mess... */
 
 #ifdef QETH_IPV6
-		if (atomic_read(&card->rt4fld) && atomic_read(&card->rt6fld))
-			strcpy(router_str, "no");
-		else if (atomic_read(&card->rt4fld)
-			 || atomic_read(&card->rt6fld))
-			strcpy(router_str, "mix");
+		if (atomic_read(&card->rt4fld) || atomic_read(&card->rt6fld))
+			strcpy(router_str, "FLD");
 #else/* QETH_IPV6 */
 		if (atomic_read(&card->rt4fld))
-			strcpy(router_str, "no");
+			strcpy(router_str, "FLD");
 #endif /* QETH_IPV6 */
 		else if (((card->options.routing_type4 & ROUTER_MASK) ==
 			  PRIMARY_ROUTER)
 #ifdef QETH_IPV6
 			 &&
-			 ((card->options.routing_type6 & ROUTER_MASK) ==
-			  PRIMARY_ROUTER)
+			 (((card->options.routing_type6 & ROUTER_MASK) ==
+			  PRIMARY_ROUTER) ||
+			  (!qeth_is_supported(IPA_IPv6)))
 #endif /* QETH_IPV6 */
 		    ) {
 			strcpy(router_str, "pri");
@@ -9110,8 +9137,9 @@ qeth_procfile_open(struct inode *inode, struct file *file)
 			 SECONDARY_ROUTER)
 #ifdef QETH_IPV6
 			&&
-			((card->options.routing_type6 & ROUTER_MASK) ==
-			 SECONDARY_ROUTER)
+			(((card->options.routing_type6 & ROUTER_MASK) ==
+			 SECONDARY_ROUTER) ||
+			 (!qeth_is_supported(IPA_IPv6)))
 #endif /* QETH_IPV6 */
 		    ) {
 			strcpy(router_str, "sec");
@@ -9120,8 +9148,9 @@ qeth_procfile_open(struct inode *inode, struct file *file)
 			 MULTICAST_ROUTER)
 #ifdef QETH_IPV6
 			&&
-			((card->options.routing_type6 & ROUTER_MASK) ==
-			 MULTICAST_ROUTER)
+			(((card->options.routing_type6 & ROUTER_MASK) ==
+			 MULTICAST_ROUTER) ||
+			 (!qeth_is_supported(IPA_IPv6)))
 #endif /* QETH_IPV6 */
 		    ) {
 			strcpy(router_str, "mc");
@@ -9130,8 +9159,9 @@ qeth_procfile_open(struct inode *inode, struct file *file)
 			 PRIMARY_CONNECTOR)
 #ifdef QETH_IPV6
 			&&
-			((card->options.routing_type6 & ROUTER_MASK) ==
-			 PRIMARY_CONNECTOR)
+			(((card->options.routing_type6 & ROUTER_MASK) ==
+			 PRIMARY_CONNECTOR) ||
+			 (!qeth_is_supported(IPA_IPv6)))
 #endif /* QETH_IPV6 */
 		    ) {
 			strcpy(router_str, "p.c");
@@ -9140,8 +9170,9 @@ qeth_procfile_open(struct inode *inode, struct file *file)
 			 SECONDARY_CONNECTOR)
 #ifdef QETH_IPV6
 			&&
-			((card->options.routing_type6 & ROUTER_MASK) ==
-			 SECONDARY_CONNECTOR)
+			(((card->options.routing_type6 & ROUTER_MASK) ==
+			 SECONDARY_CONNECTOR) ||
+			 (!qeth_is_supported(IPA_IPv6)))
 #endif /* QETH_IPV6 */
 		    ) {
 			strcpy(router_str, "s.c");
@@ -9150,8 +9181,9 @@ qeth_procfile_open(struct inode *inode, struct file *file)
 			 NO_ROUTER)
 #ifdef QETH_IPV6
 			&&
-			((card->options.routing_type6 & ROUTER_MASK) ==
-			 NO_ROUTER)
+			(((card->options.routing_type6 & ROUTER_MASK) ==
+			 NO_ROUTER) ||
+			 (!qeth_is_supported(IPA_IPv6)))
 #endif /* QETH_IPV6 */
 		    ) {
 			strcpy(router_str, "no");
@@ -10115,7 +10147,7 @@ qeth_route4_show(struct device *dev, char *buf)
 		return -EINVAL;
 
 	if (atomic_read(&card->rt4fld))
-		return sprintf(buf, "%s\n", "no");
+		return sprintf(buf, "%s\n", "FLD");
 
 	switch (card->options.routing_type4 & ROUTER_MASK) {
 	case PRIMARY_ROUTER:
@@ -10202,7 +10234,10 @@ qeth_route6_show(struct device *dev, char *buf)
 		return -EINVAL;
 
 	if (atomic_read(&card->rt6fld))
-		return sprintf(buf, "%s\n", "no");
+		return sprintf(buf, "%s\n", "FLD");
+
+	if (!qeth_is_supported(IPA_IPv6))
+		return sprintf(buf, "%s\n", "n/a");
 
 	switch (card->options.routing_type6 & ROUTER_MASK) {
 	case PRIMARY_ROUTER:
@@ -11060,6 +11095,10 @@ qeth_set_offline(struct ccwgroup_device *gdev)
 	qeth_remove_card_from_list(card);
 
 	QETH_DBF_TEXT4(0, trace, "freecard");
+
+	memset(card->dev, 0, sizeof (struct net_device));
+	card->dev->priv = card;
+	strncpy(card->dev->name, card->dev_name, IFNAMSIZ);
 
 	ccw_device_set_offline(card->ddev);
 	ccw_device_set_offline(card->wdev);

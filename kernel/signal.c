@@ -1000,6 +1000,15 @@ void zap_other_threads(struct task_struct *p)
 		return;
 
 	for (t = next_thread(p); t != p; t = next_thread(t)) {
+		/*
+		 * We don't want to notify the parent, since we are
+		 * killed as part of a thread group due to another
+		 * thread doing an execve() or similar. So set the
+		 * exit signal to -1 to allow immediate reaping of
+		 * the process.
+		 */
+		t->exit_signal = -1;
+
 		sigaddset(&t->pending.signal, SIGKILL);
 		rm_from_queue(SIG_KERNEL_STOP_MASK, &t->pending);
 		signal_wake_up(t, 1);

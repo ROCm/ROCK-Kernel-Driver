@@ -420,10 +420,9 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 {
 	int status;
 	struct irqaction *action;
-	int cpu = smp_processor_id();
 	irq_desc_t *desc = irq_desc + irq;
 
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 	spin_lock(&desc->lock);
 	ack_irq(irq);	
 	/*

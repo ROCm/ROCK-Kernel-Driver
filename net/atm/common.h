@@ -17,7 +17,7 @@ int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 		int size, int flags);
 int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 		int total_len);
-unsigned int atm_poll(struct file *file,struct socket *sock,poll_table *wait);
+unsigned int vcc_poll(struct file *file, struct socket *sock, poll_table *wait);
 int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg);
 int vcc_setsockopt(struct socket *sock, int level, int optname, char *optval,
 		   int optlen);
@@ -25,6 +25,9 @@ int vcc_getsockopt(struct socket *sock, int level, int optname, char *optval,
 		   int *optlen);
 
 void atm_shutdown_dev(struct atm_dev *dev);
+
+void pppoatm_ioctl_set(int (*hook)(struct atm_vcc *, unsigned int, unsigned long));
+void br2684_ioctl_set(int (*hook)(struct atm_vcc *, unsigned int, unsigned long));
 
 int atmpvc_init(void);
 void atmpvc_exit(void);

@@ -4,7 +4,7 @@
 #include <linux/device.h>
 #include <linux/wait.h>
 #include <linux/list.h>
-#include <linux/workqueue.h>
+#include <linux/timer.h>
 #include <asm/semaphore.h>
 
 #include "ieee1394_types.h"
@@ -29,11 +29,12 @@ struct hpsb_host {
 
         atomic_t generation;
 
-        int refcount;
+	atomic_t refcount;
 
         struct list_head pending_packets;
         spinlock_t pending_pkt_lock;
-        struct work_struct timeout_tq;
+	struct timer_list timeout;
+	unsigned long timeout_interval;
 
         unsigned char iso_listen_count[64];
 
@@ -107,6 +108,7 @@ enum devctl_cmd {
 
 enum isoctl_cmd {
 	/* rawiso API - see iso.h for the meanings of these commands
+	   (they correspond exactly to the hpsb_iso_* API functions)
 	 * INIT = allocate resources
 	 * START = begin transmission/reception
 	 * STOP = halt transmission/reception
@@ -128,6 +130,7 @@ enum isoctl_cmd {
 	RECV_STOP,
 	RECV_RELEASE,
 	RECV_SHUTDOWN,
+	RECV_FLUSH
 };
 
 enum reset_types {

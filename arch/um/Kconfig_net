@@ -1,5 +1,5 @@
 
-menu "Network Devices"
+menu "UML Network Devices"
 	depends on NET
 
 # UML virtual driver
@@ -175,74 +175,6 @@ config UML_NET_SLIRP
         don't need UML networking, say N.
 	
         Startup example: "eth0=slirp,FE:FD:01:02:03:04,/usr/local/bin/slirp"
-
-
-# Below are hardware-independent drivers mirrored from
-# drivers/net/Config.in. It would be nice if Linux
-# had HW independent drivers separated from the other
-# but it does not. Until then each non-ISA/PCI arch
-# needs to provide it's own menu of network drivers
-config DUMMY
-	tristate "Dummy net driver support"
-
-config BONDING
-	tristate "Bonding driver support"
-
-config EQUALIZER
-	tristate "EQL (serial line load balancing) support"
-
-config TUN
-	tristate "Universal TUN/TAP device driver support"
-
-config ETHERTAP
-	tristate "Ethertap network tap (OBSOLETE)"
-	depends on EXPERIMENTAL && NETLINK
-
-config PPP
-	tristate "PPP (point-to-point protocol) support"
-
-config PPP_MULTILINK
-	bool "PPP multilink support (EXPERIMENTAL)"
-	depends on PPP && EXPERIMENTAL
-
-config PPP_FILTER
-	bool "PPP filtering"
-	depends on PPP && FILTER
-
-config PPP_ASYNC
-	tristate "PPP support for async serial ports"
-	depends on PPP
-
-config PPP_SYNC_TTY
-	tristate "PPP support for sync tty ports"
-	depends on PPP
-
-config PPP_DEFLATE
-	tristate "PPP Deflate compression"
-	depends on PPP
-
-config PPP_BSDCOMP
-	tristate "PPP BSD-Compress compression"
-	depends on PPP
-
-config PPPOE
-	tristate "PPP over Ethernet (EXPERIMENTAL)"
-	depends on PPP && EXPERIMENTAL
-
-config SLIP
-	tristate "SLIP (serial line) support"
-
-config SLIP_COMPRESSED
-	bool "CSLIP compressed headers"
-	depends on SLIP=y
-
-config SLIP_SMART
-	bool "Keepalive and linefill"
-	depends on SLIP=y
-
-config SLIP_MODE_SLIP6
-	bool "Six bit SLIP encapsulation"
-	depends on SLIP=y
 
 endmenu
 

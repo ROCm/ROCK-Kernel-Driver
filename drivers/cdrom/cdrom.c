@@ -268,6 +268,7 @@
 #include <linux/init.h>
 #include <linux/fcntl.h>
 #include <linux/blkdev.h>
+#include <linux/times.h>
 
 #include <asm/uaccess.h>
 
@@ -2171,6 +2172,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 			return -ENOSYS;
 		cdinfo(CD_DO_IOCTL, "entering CDROM_SEND_PACKET\n"); 
 		IOCTL_IN(arg, struct cdrom_generic_command, cgc);
+		cgc.timeout = clock_t_to_jiffies(cgc.timeout);
 		return cdrom_do_cmd(cdi, &cgc);
 		}
 	case CDROM_NEXT_WRITABLE: {

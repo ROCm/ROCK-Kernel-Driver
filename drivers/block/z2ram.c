@@ -30,7 +30,6 @@
 #include <linux/major.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-#include <linux/blk.h>
 #include <linux/init.h>
 #include <linux/module.h>
 

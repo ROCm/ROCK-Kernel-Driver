@@ -41,6 +41,7 @@
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/sal.h>
+#include <asm/sections.h>
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
@@ -49,13 +50,12 @@
 # error "struct cpuinfo_ia64 too big!"
 #endif
 
-extern char _end;
-
 #ifdef CONFIG_SMP
 unsigned long __per_cpu_offset[NR_CPUS];
 #endif
 
 DEFINE_PER_CPU(struct cpuinfo_ia64, cpu_info);
+DEFINE_PER_CPU(unsigned long, local_per_cpu_offset);
 DEFINE_PER_CPU(unsigned long, ia64_phys_stacked_size_p8);
 unsigned long ia64_cycles_per_usec;
 struct ia64_boot_param *ia64_boot_param;
@@ -278,7 +278,6 @@ sort_regions (struct rsvd_region *rsvd_region, int max)
 static void
 find_memory (void)
 {
-#	define KERNEL_END	(&_end)
 	unsigned long bootmap_size;
 	int n = 0;
 
@@ -299,7 +298,7 @@ find_memory (void)
 	n++;
 
 	rsvd_region[n].start = (unsigned long) ia64_imva((void *)KERNEL_START);
-	rsvd_region[n].end   = (unsigned long) ia64_imva(KERNEL_END);
+	rsvd_region[n].end   = (unsigned long) ia64_imva(_end);
 	n++;
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -362,18 +361,18 @@ find_memory (void)
 void __init
 setup_arch (char **cmdline_p)
 {
-	extern unsigned long *__start___vtop_patchlist[], *__end____vtop_patchlist[];
 	extern unsigned long ia64_iobase;
 	unsigned long phys_iobase;
 
 	unw_init();
 
-	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end____vtop_patchlist);
+	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
 	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
 
 	efi_init();
+	find_memory();
 
 #ifdef CONFIG_ACPI_BOOT
 	/* Initialize the ACPI boot-time table parser */
@@ -386,21 +385,6 @@ setup_arch (char **cmdline_p)
 	smp_build_cpu_map();	/* happens, e.g., with the Ski simulator */
 # endif
 #endif /* CONFIG_APCI_BOOT */
-
-	find_memory();
-
-#if 0
-	/* XXX fix me */
-	init_mm.start_code = (unsigned long) &_stext;
-	init_mm.end_code = (unsigned long) &_etext;
-	init_mm.end_data = (unsigned long) &_edata;
-	init_mm.brk = (unsigned long) &_end;
-
-	code_resource.start = virt_to_bus(&_text);
-	code_resource.end = virt_to_bus(&_etext) - 1;
-	data_resource.start = virt_to_bus(&_etext);
-	data_resource.end = virt_to_bus(&_edata) - 1;
-#endif
 
 	/* process SAL system table: */
 	ia64_sal_init(efi.sal_systab);
@@ -686,7 +670,6 @@ get_max_cacheline_size (void)
 void
 cpu_init (void)
 {
-	extern char __per_cpu_start[], __phys_per_cpu_start[];
 	extern void __init ia64_mmu_init (void *);
 	unsigned long num_phys_stacked;
 	pal_vm_info_2_u_t vmi;
@@ -695,7 +678,6 @@ cpu_init (void)
 	void *cpu_data;
 
 #ifdef CONFIG_SMP
-	extern char __per_cpu_end[];
 	int cpu;
 
 	/*
@@ -709,6 +691,8 @@ cpu_init (void)
 			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
 			cpu_data += PERCPU_PAGE_SIZE;
+
+			per_cpu(local_per_cpu_offset, cpu) = __per_cpu_offset[cpu];
 		}
 	}
 	cpu_data = __per_cpu_start + __per_cpu_offset[smp_processor_id()];
@@ -716,19 +700,18 @@ cpu_init (void)
 	cpu_data = __phys_per_cpu_start;
 #endif /* !CONFIG_SMP */
 
-	cpu_info = cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
-#ifdef CONFIG_NUMA
-	cpu_info->node_data = get_node_data_ptr();
-#endif
-
 	get_max_cacheline_size();
 
 	/*
 	 * We can't pass "local_cpu_data" to identify_cpu() because we haven't called
 	 * ia64_mmu_init() yet.  And we can't call ia64_mmu_init() first because it
 	 * depends on the data returned by identify_cpu().  We break the dependency by
-	 * accessing cpu_data() the old way, through identity mapped space.
+	 * accessing cpu_data() through the canonical per-CPU address.
 	 */
+	cpu_info = cpu_data + ((char *) &__ia64_per_cpu_var(cpu_info) - __per_cpu_start);
+#ifdef CONFIG_NUMA
+	cpu_info->node_data = get_node_data_ptr();
+#endif
 	identify_cpu(cpu_info);
 
 #ifdef CONFIG_MCKINLEY
@@ -810,9 +793,6 @@ cpu_init (void)
 void
 check_bugs (void)
 {
-	extern char __start___mckinley_e9_bundles[];
-	extern char __end___mckinley_e9_bundles[];
-
 	ia64_patch_mckinley_e9((unsigned long) __start___mckinley_e9_bundles,
 			       (unsigned long) __end___mckinley_e9_bundles);
 }

@@ -8,8 +8,7 @@
 #include <linux/bootmem.h>
 #include <linux/notifier.h>
 #include <linux/mm.h>
-
-extern char _stext, _etext;
+#include <asm/sections.h>
 
 unsigned int * prof_buffer;
 unsigned long prof_len;
@@ -36,7 +35,7 @@ void __init profile_init(void)
 		return;
  
 	/* only text is profiled */
-	prof_len = (unsigned long) &_etext - (unsigned long) &_stext;
+	prof_len = _etext - _stext;
 	prof_len >>= prof_shift;
 		
 	size = prof_len * sizeof(unsigned int) + PAGE_SIZE - 1;

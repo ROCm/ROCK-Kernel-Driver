@@ -57,7 +57,7 @@
 #define PORT_SUNSAB	39
 
 /* NEC v850.  */
-#define PORT_NB85E_UART	40
+#define PORT_V850E_UART	40
 
 /* NEC PC-9800 */
 #define PORT_8251_PC98	41

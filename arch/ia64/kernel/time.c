@@ -23,6 +23,7 @@
 #include <asm/hw_irq.h>
 #include <asm/ptrace.h>
 #include <asm/sal.h>
+#include <asm/sections.h>
 #include <asm/system.h>
 
 extern unsigned long wall_jiffies;
@@ -41,7 +42,6 @@ static void
 do_profile (unsigned long ip)
 {
 	extern unsigned long prof_cpu_mask;
-	extern char _stext;
 
 	if (!prof_buffer)
 		return;
@@ -49,7 +49,7 @@ do_profile (unsigned long ip)
 	if (!((1UL << smp_processor_id()) & prof_cpu_mask))
 		return;
 
-	ip -= (unsigned long) &_stext;
+	ip -= (unsigned long) _stext;
 	ip >>= prof_shift;
 	/*
 	 * Don't ignore out-of-bounds IP values silently, put them into the last

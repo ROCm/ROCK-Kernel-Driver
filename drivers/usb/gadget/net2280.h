@@ -654,7 +654,7 @@ static inline void net2280_led_shutdown (struct net2280 *dev)
 
 #define xprintk(dev,level,fmt,args...) \
 	printk(level "%s %s: " fmt , driver_name , \
-			dev->pdev->slot_name , ## args)
+			pci_name(dev->pdev) , ## args)
 
 #ifdef DEBUG
 #undef DEBUG

@@ -46,18 +46,20 @@ extern int __do_copy_from_user(void *to, const void *from, int n,
 
 static inline int copy_from_user_tt(void *to, const void *from, int n)
 {
-	return(access_ok_tt(VERIFY_READ, from, n) ?
-	       __do_copy_from_user(to, from, n, 
-				   &current->thread.fault_addr,
-				   &current->thread.fault_catcher) : n);
+	if(!access_ok_tt(VERIFY_READ, from, n)) 
+		return(n);
+
+	return(__do_copy_from_user(to, from, n, &current->thread.fault_addr,
+				   &current->thread.fault_catcher));
 }
 
 static inline int copy_to_user_tt(void *to, const void *from, int n)
 {
-	return(access_ok_tt(VERIFY_WRITE, to, n) ?
-	       __do_copy_to_user(to, from, n, 
-				   &current->thread.fault_addr,
-				   &current->thread.fault_catcher) : n);
+	if(!access_ok_tt(VERIFY_WRITE, to, n))
+		return(n);
+		
+	return(__do_copy_to_user(to, from, n, &current->thread.fault_addr,
+				 &current->thread.fault_catcher));
 }
 
 extern int __do_strncpy_from_user(char *dst, const char *src, size_t n,
@@ -67,7 +69,9 @@ static inline int strncpy_from_user_tt(char *dst, const char *src, int count)
 {
 	int n;
 
-	if(!access_ok_tt(VERIFY_READ, src, 1)) return(-EFAULT);
+	if(!access_ok_tt(VERIFY_READ, src, 1)) 
+		return(-EFAULT);
+
 	n = __do_strncpy_from_user(dst, src, count, 
 				   &current->thread.fault_addr,
 				   &current->thread.fault_catcher);
@@ -87,10 +91,11 @@ static inline int __clear_user_tt(void *mem, int len)
 
 static inline int clear_user_tt(void *mem, int len)
 {
-	return(access_ok_tt(VERIFY_WRITE, mem, len) ? 
-	       __do_clear_user(mem, len, 
-			       &current->thread.fault_addr,
-			       &current->thread.fault_catcher) : len);
+	if(!access_ok_tt(VERIFY_WRITE, mem, len))
+		return(len);
+
+	return(__do_clear_user(mem, len, &current->thread.fault_addr,
+			       &current->thread.fault_catcher));
 }
 
 extern int __do_strnlen_user(const char *str, unsigned long n,

@@ -44,9 +44,9 @@ struct as_io_context {
 	unsigned long ttime_samples;
 	unsigned long ttime_mean;
 	/* Layout pattern */
-	long seek_samples;
+	unsigned int seek_samples;
 	sector_t last_request_pos;
-	sector_t seek_total;
+	u64 seek_total;
 	sector_t seek_mean;
 };
 
@@ -165,25 +165,25 @@ struct request {
  * first three bits match BIO_RW* bits, important
  */
 enum rq_flag_bits {
-	__REQ_RW,	/* not set, read. set, write */
-	__REQ_RW_AHEAD,	/* READA */
+	__REQ_RW,		/* not set, read. set, write */
+	__REQ_FAILFAST,		/* no low level driver retries */
 	__REQ_SOFTBARRIER,	/* may not be passed by ioscheduler */
 	__REQ_HARDBARRIER,	/* may not be passed by drive either */
-	__REQ_CMD,	/* is a regular fs rw request */
-	__REQ_NOMERGE,	/* don't touch this for merging */
-	__REQ_STARTED,	/* drive already may have started this one */
-	__REQ_DONTPREP,	/* don't call prep for this one */
-	__REQ_QUEUED,	/* uses queueing */
+	__REQ_CMD,		/* is a regular fs rw request */
+	__REQ_NOMERGE,		/* don't touch this for merging */
+	__REQ_STARTED,		/* drive already may have started this one */
+	__REQ_DONTPREP,		/* don't call prep for this one */
+	__REQ_QUEUED,		/* uses queueing */
 	/*
 	 * for ATA/ATAPI devices
 	 */
-	__REQ_PC,	/* packet command (special) */
-	__REQ_BLOCK_PC,	/* queued down pc from block layer */
-	__REQ_SENSE,	/* sense retrival */
+	__REQ_PC,		/* packet command (special) */
+	__REQ_BLOCK_PC,		/* queued down pc from block layer */
+	__REQ_SENSE,		/* sense retrival */
 
-	__REQ_FAILED,	/* set if the request failed */
-	__REQ_QUIET,	/* don't worry about errors */
-	__REQ_SPECIAL,	/* driver suplied command */
+	__REQ_FAILED,		/* set if the request failed */
+	__REQ_QUIET,		/* don't worry about errors */
+	__REQ_SPECIAL,		/* driver suplied command */
 	__REQ_DRIVE_CMD,
 	__REQ_DRIVE_TASK,
 	__REQ_DRIVE_TASKFILE,
@@ -191,11 +191,11 @@ enum rq_flag_bits {
 	__REQ_PM_SUSPEND,	/* suspend request */
 	__REQ_PM_RESUME,	/* resume request */
 	__REQ_PM_SHUTDOWN,	/* shutdown request */
-	__REQ_NR_BITS,	/* stops here */
+	__REQ_NR_BITS,		/* stops here */
 };
 
 #define REQ_RW		(1 << __REQ_RW)
-#define REQ_RW_AHEAD	(1 << __REQ_RW_AHEAD)
+#define REQ_FAILFAST	(1 << __REQ_FAILFAST)
 #define REQ_SOFTBARRIER	(1 << __REQ_SOFTBARRIER)
 #define REQ_HARDBARRIER	(1 << __REQ_HARDBARRIER)
 #define REQ_CMD		(1 << __REQ_CMD)
@@ -364,6 +364,7 @@ struct request_queue
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
 #define blk_fs_request(rq)	((rq)->flags & REQ_CMD)
 #define blk_pc_request(rq)	((rq)->flags & REQ_BLOCK_PC)
+#define blk_noretry_request(rq)	((rq)->flags & REQ_FAILFAST)
 
 #define blk_pm_suspend_request(rq)	((rq)->flags & REQ_PM_SUSPEND)
 #define blk_pm_resume_request(rq)	((rq)->flags & REQ_PM_RESUME)
@@ -490,7 +491,8 @@ extern void blk_attempt_remerge(request_queue_t *, struct request *);
 extern void __blk_attempt_remerge(request_queue_t *, struct request *);
 extern struct request *blk_get_request(request_queue_t *, int, int);
 extern void blk_put_request(struct request *);
-extern void blk_insert_request(request_queue_t *, struct request *, int, void *);
+extern void blk_insert_request(request_queue_t *, struct request *, int, void *, int);
+extern void blk_requeue_request(request_queue_t *, struct request *);
 extern void blk_plug_device(request_queue_t *);
 extern int blk_remove_plug(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);

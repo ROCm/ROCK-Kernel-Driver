@@ -65,6 +65,8 @@ extern struct workqueue_struct *ccw_device_work;
 
 void io_subchannel_recog_done(struct ccw_device *cdev);
 
+void ccw_device_unregister(void *);
+
 int ccw_device_recognition(struct ccw_device *);
 int ccw_device_online(struct ccw_device *);
 int ccw_device_offline(struct ccw_device *);

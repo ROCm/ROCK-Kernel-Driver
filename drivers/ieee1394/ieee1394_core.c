@@ -29,9 +29,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
-#include <linux/proc_fs.h>
 #include <linux/bitops.h>
-#include <linux/workqueue.h>
 #include <linux/kdev_t.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
@@ -62,19 +60,22 @@ static kmem_cache_t *hpsb_packet_cache;
 /* Some globals used */
 const char *hpsb_speedto_str[] = { "S100", "S200", "S400", "S800", "S1600", "S3200" };
 
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
 static void dump_packet(const char *text, quadlet_t *data, int size)
 {
-        int i;
+	int i;
 
-        size /= 4;
-        size = (size > 4 ? 4 : size);
+	size /= 4;
+	size = (size > 4 ? 4 : size);
 
-        printk(KERN_DEBUG "ieee1394: %s", text);
-        for (i = 0; i < size; i++) {
-                printk(" %8.8x", data[i]);
-        }
-        printk("\n");
+	printk(KERN_DEBUG "ieee1394: %s", text);
+	for (i = 0; i < size; i++)
+		printk(" %08x", data[i]);
+	printk("\n");
 }
+#else
+#define dump_packet(x,y,z)
+#endif
 
 static void run_packet_complete(struct hpsb_packet *packet)
 {
@@ -355,9 +356,7 @@ static void build_speed_map(struct hpsb_host *host, int nodecount)
 void hpsb_selfid_received(struct hpsb_host *host, quadlet_t sid)
 {
         if (host->in_bus_reset) {
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-                HPSB_INFO("Including SelfID 0x%x", sid);
-#endif
+                HPSB_VERBOSE("Including SelfID 0x%x", sid);
                 host->topology_map[host->selfid_count++] = sid;
         } else {
                 HPSB_NOTICE("Spurious SelfID packet (0x%08x) received from bus %d",
@@ -384,15 +383,16 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
                 } else {
                         HPSB_NOTICE("Stopping out-of-control reset loop");
                         HPSB_NOTICE("Warning - topology map and speed map will not be valid");
+			host->reset_retries = 0;
                 }
         } else {
+		host->reset_retries = 0;
                 build_speed_map(host, host->node_count);
         }
 
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-        HPSB_INFO("selfid_complete called with successful SelfID stage "
-		"... irm_id: 0x%X node_id: 0x%X",host->irm_id,host->node_id);
-#endif
+	HPSB_VERBOSE("selfid_complete called with successful SelfID stage "
+		     "... irm_id: 0x%X node_id: 0x%X",host->irm_id,host->node_id);
+
         /* irm_id is kept up to date by check_selfids() */
         if (host->irm_id == host->node_id) {
                 host->is_irm = 1;
@@ -440,7 +440,7 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
         up(&packet->state_change);
-        schedule_work(&host->timeout_tq);
+	mod_timer(&host->timeout, jiffies + host->timeout_interval);
 }
 
 /**
@@ -550,10 +550,9 @@ int hpsb_send_packet(struct hpsb_packet *packet)
                         }
                 }
 
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
                 dump_packet("send packet local:", packet->header,
                             packet->header_size);
-#endif
+
                 hpsb_packet_sent(host, packet,  packet->expect_response?ACK_PENDING:ACK_COMPLETE);
                 hpsb_packet_received(host, data, size, 0);
 
@@ -568,7 +567,6 @@ int hpsb_send_packet(struct hpsb_packet *packet)
                                        + NODEID_TO_NODE(packet->node_id)];
         }
 
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
         switch (packet->speed_code) {
         case 2:
                 dump_packet("send packet 400:", packet->header,
@@ -582,7 +580,6 @@ int hpsb_send_packet(struct hpsb_packet *packet)
                 dump_packet("send packet 100:", packet->header,
                             packet->header_size);
         }
-#endif
 
         return host->driver->transmit_packet(host, packet);
 }
@@ -617,7 +614,7 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
         }
 
         if (lh == &host->pending_packets) {
-                HPSB_DEBUG("unsolicited response packet received - np");
+                HPSB_DEBUG("unsolicited response packet received - no tlabel match");
                 dump_packet("contents:", data, 16);
                 spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
                 return;
@@ -641,7 +638,7 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
 
         if (!tcode_match || (packet->tlabel != tlabel)
             || (packet->node_id != (data[1] >> 16))) {
-                HPSB_INFO("unsolicited response packet received");
+                HPSB_INFO("unsolicited response packet received - tcode mismatch");
                 dump_packet("contents:", data, 16);
 
                 spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
@@ -896,9 +893,7 @@ void hpsb_packet_received(struct hpsb_host *host, quadlet_t *data, size_t size,
                 return;
         }
 
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
         dump_packet("received packet:", data, size);
-#endif
 
         tcode = (data[0] >> 4) & 0xf;
 
@@ -959,28 +954,23 @@ void abort_requests(struct hpsb_host *host)
         }
 }
 
-void abort_timedouts(struct hpsb_host *host)
+void abort_timedouts(unsigned long __opaque)
 {
+	struct hpsb_host *host = (struct hpsb_host *)__opaque;
         unsigned long flags;
         struct hpsb_packet *packet;
         unsigned long expire;
-        struct list_head *lh, *next, *tlh;
+        struct list_head *lh, *tlh;
         LIST_HEAD(expiredlist);
 
         spin_lock_irqsave(&host->csr.lock, flags);
-        expire = (host->csr.split_timeout_hi * 8000 
-                  + (host->csr.split_timeout_lo >> 19))
-                * HZ / 8000;
-        /* Avoid shortening of timeout due to rounding errors: */
-        expire++;
+	expire = host->csr.expire;
         spin_unlock_irqrestore(&host->csr.lock, flags);
-
 
         spin_lock_irqsave(&host->pending_pkt_lock, flags);
 
-	for (lh = host->pending_packets.next; lh != &host->pending_packets; lh = next) {
+	list_for_each_safe(lh, tlh, &host->pending_packets) {
                 packet = list_entry(lh, struct hpsb_packet, list);
-		next = lh->next;
                 if (time_before(packet->sendtime + expire, jiffies)) {
                         list_del(&packet->list);
                         list_add(&packet->list, &expiredlist);
@@ -988,7 +978,7 @@ void abort_timedouts(struct hpsb_host *host)
         }
 
         if (!list_empty(&host->pending_packets))
-		schedule_work(&host->timeout_tq);
+		mod_timer(&host->timeout, jiffies + host->timeout_interval);
 
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
@@ -1179,8 +1169,6 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 	return retval;
 }
 
-struct proc_dir_entry *ieee1394_procfs_entry;
-
 static int __init ieee1394_init(void)
 {
 	hpsb_packet_cache = kmem_cache_create("hpsb_packet", sizeof(struct hpsb_packet),
@@ -1193,19 +1181,6 @@ static int __init ieee1394_init(void)
 		devfs_remove("ieee1394");
 		return -ENODEV;
 	}
-
-#ifdef CONFIG_PROC_FS
-	/* Must be done before we start everything else, since the drivers
-	 * may use it.  */
-	ieee1394_procfs_entry = proc_mkdir("ieee1394", proc_bus);
-	if (ieee1394_procfs_entry == NULL) {
-		HPSB_ERR("unable to create /proc/bus/ieee1394\n");
-		unregister_chrdev(IEEE1394_MAJOR, "ieee1394");
-		devfs_remove("ieee1394");
-		return -ENOMEM;
-	}
-	ieee1394_procfs_entry->owner = THIS_MODULE;
-#endif
 
 	init_hpsb_highlevel();
 	init_csr();
@@ -1227,7 +1202,6 @@ static void __exit ieee1394_cleanup(void)
 
 	unregister_chrdev(IEEE1394_MAJOR, "ieee1394");
 	devfs_remove("ieee1394");
-	remove_proc_entry("ieee1394", proc_bus);
 }
 
 module_init(ieee1394_init);
@@ -1257,7 +1231,6 @@ EXPORT_SYMBOL(hpsb_packet_sent);
 EXPORT_SYMBOL(hpsb_packet_received);
 EXPORT_SYMBOL(ieee1394_register_chardev);
 EXPORT_SYMBOL(ieee1394_unregister_chardev);
-EXPORT_SYMBOL(ieee1394_procfs_entry);
 
 /** ieee1394_transactions.c **/
 EXPORT_SYMBOL(hpsb_get_tlabel);
@@ -1341,3 +1314,4 @@ EXPORT_SYMBOL(hpsb_iso_n_ready);
 EXPORT_SYMBOL(hpsb_iso_packet_sent);
 EXPORT_SYMBOL(hpsb_iso_packet_received);
 EXPORT_SYMBOL(hpsb_iso_wake);
+EXPORT_SYMBOL(hpsb_iso_recv_flush);

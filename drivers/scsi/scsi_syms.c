@@ -11,7 +11,7 @@
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/kernel.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/fs.h>
 
 #include <asm/system.h>
@@ -34,6 +34,7 @@ EXPORT_SYMBOL(scsi_register_driver);
 EXPORT_SYMBOL(scsi_register_interface);
 EXPORT_SYMBOL(scsi_host_alloc);
 EXPORT_SYMBOL(scsi_add_host);
+EXPORT_SYMBOL(scsi_scan_host);
 EXPORT_SYMBOL(scsi_remove_host);
 EXPORT_SYMBOL(scsi_host_get);
 EXPORT_SYMBOL(scsi_host_put);

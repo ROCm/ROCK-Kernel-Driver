@@ -149,17 +149,17 @@ static int read_cow_header(int fd, int *magic_out, char **backing_file_out,
 
 static int same_backing_files(char *from_cmdline, char *from_cow, char *cow)
 {
-	struct stat buf1, buf2;
+	struct stat64 buf1, buf2;
 
 	if(from_cmdline == NULL) return(1);
 	if(!strcmp(from_cmdline, from_cow)) return(1);
 
-	if(stat(from_cmdline, &buf1) < 0){
+	if(stat64(from_cmdline, &buf1) < 0){
 		printk("Couldn't stat '%s', errno = %d\n", from_cmdline, 
 		       errno);
 		return(1);
 	}
-	if(stat(from_cow, &buf2) < 0){
+	if(stat64(from_cow, &buf2) < 0){
 		printk("Couldn't stat '%s', errno = %d\n", from_cow, errno);
 		return(1);
 	}
@@ -346,6 +346,13 @@ int open_ubd_file(char *file, struct openflags *openflags,
                 if((fd = os_open_file(file, *openflags, mode)) < 0) 
 			return(fd);
         }
+
+	err = os_lock_file(fd, openflags->w);
+	if(err){
+		printk("Failed to lock '%s', errno = %d\n", file, -err);
+		goto error;
+	}
+	
 	if(backing_file_out == NULL) return(fd);
 
 	err = read_cow_header(fd, &magic, &backing_file, &mtime, &size, 
@@ -381,7 +388,7 @@ int open_ubd_file(char *file, struct openflags *openflags,
 
         return(fd);
  error:
-	close(fd);
+	os_close_file(fd);
 	return(err);
 }
 
@@ -389,10 +396,10 @@ int create_cow_file(char *cow_file, char *backing_file, struct openflags flags,
 		    int sectorsize, int *bitmap_offset_out, 
 		    unsigned long *bitmap_len_out, int *data_offset_out)
 {
-	__u64 blocks;
-	long zero;
-	int err, fd, i;
+	__u64 offset;
+	int err, fd;
 	long long size;
+	char zero = 0;
 
 	flags.c = 1;
 	fd = open_ubd_file(cow_file, &flags, NULL, NULL, NULL, NULL, NULL);
@@ -406,22 +413,27 @@ int create_cow_file(char *cow_file, char *backing_file, struct openflags flags,
 	err = write_cow_header(cow_file, fd, backing_file, sectorsize, &size);
 	if(err) goto out_close;
 
-	blocks = (size + sectorsize - 1) / sectorsize;
-	blocks = (blocks + sizeof(long) * 8 - 1) / (sizeof(long) * 8);
-	zero = 0;
-	for(i = 0; i < blocks; i++){
-		err = write(fd, &zero, sizeof(zero));
-		if(err != sizeof(zero)){
-			printk("Write of bitmap to new COW file '%s' failed, "
-			       "errno = %d\n", cow_file, errno);
-			goto out_close;
-		}
-	}
-
 	sizes(size, sectorsize, sizeof(struct cow_header_v2), 
 	      bitmap_len_out, data_offset_out);
 	*bitmap_offset_out = sizeof(struct cow_header_v2);
 
+
+	offset = *data_offset_out + size - sizeof(zero);
+	err = os_seek_file(fd, offset);
+	if(err != 0){
+		printk("cow bitmap lseek failed : errno = %d\n", errno);
+		goto out_close;
+	}
+	/* does not really matter how much we write it is just to set EOF 
+	 * this also sets the entire COW bitmap
+	 * to zero without having to allocate it 
+	 */
+	err = os_write_file(fd, &zero, sizeof(zero));
+	if(err != sizeof(zero)){
+		printk("Write of bitmap to new COW file '%s' failed, "
+		       "errno = %d\n", cow_file, errno);
+		goto out_close;
+	}
 	return(fd);
 
  out_close:
@@ -446,14 +458,6 @@ int write_ubd_fs(int fd, char *buffer, int len)
 	n = write(fd, buffer, len);
 	if(n < 0) return(-errno);
 	else return(n);
-}
-
-int ubd_is_dir(char *file)
-{
-	struct stat64 buf;
-
-	if(stat64(file, &buf) < 0) return(0);
-	return(S_ISDIR(buf.st_mode));
 }
 
 void do_io(struct io_thread_req *req)

@@ -21,6 +21,7 @@
 #include <linux/pagemap.h>
 #include <linux/shm.h>
 #include <linux/bootmem.h>
+#include <linux/mount.h>
 
 #include <asm/setup.h>
 #include <asm/machdep.h>
@@ -37,7 +38,6 @@
 #define MAJOR_NR    Z2RAM_MAJOR
 #define do_z2_request do_stram_request
 #define DEVICE_NR(device) (minor(device))
-#include <linux/blk.h>
 #endif
 
 #undef DEBUG

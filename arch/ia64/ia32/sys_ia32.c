@@ -2204,7 +2204,7 @@ sys32_iopl (int level)
 	}
 
 	down_write(&current->mm->mmap_sem);
-	addr = do_mmap_pgoff(file, IA32_IOBASE,
+	addr = do_mmap_pgoff(current->mm, file, IA32_IOBASE,
 			     IOLEN, PROT_READ|PROT_WRITE, MAP_SHARED,
 			     (ia64_iobase & ~PAGE_OFFSET) >> PAGE_SHIFT);
 	up_write(&current->mm->mmap_sem);

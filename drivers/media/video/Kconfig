@@ -257,5 +257,30 @@ config VIDEO_DPC
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
 
+config VIDEO_HEXIUM_ORION
+	tristate "Hexium HV-PCI6 and Orion frame grabber"
+	depends on VIDEO_DEV && PCI
+	---help---
+	  This is a video4linux driver for the Hexium HV-PCI6 and
+	  Orion frame grabber cards by Hexium.
+	  
+	  This driver is available as a module called hexium_orion
+	  ( = code which can be inserted in and removed from the
+	  running kernel whenever you want). If you want to compile
+	  it as a module, say M here and read <file:Documentation/modules.txt>.
+
+config VIDEO_HEXIUM_GEMINI
+	tristate "Hexium Gemini frame grabber"
+	depends on VIDEO_DEV && PCI
+	---help---
+	  This is a video4linux driver for the Hexium Gemini frame
+	  grabber card by Hexium. Please note that the Gemini Dual
+	  card is *not* fully supported.
+	  
+	  This driver is available as a module called hexium_gemini
+	  ( = code which can be inserted in and removed from the
+	  running kernel whenever you want). If you want to compile
+	  it as a module, say M here and read <file:Documentation/modules.txt>.
+
 endmenu
 

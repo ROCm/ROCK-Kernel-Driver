@@ -33,7 +33,7 @@
 #include <linux/completion.h>
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "scsi.h"
 #include "hosts.h"
 

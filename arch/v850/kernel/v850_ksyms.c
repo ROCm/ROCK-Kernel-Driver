@@ -9,7 +9,6 @@
 #include <linux/interrupt.h>
 #include <linux/config.h>
 
-#include <asm/setup.h>
 #include <asm/pgalloc.h>
 #include <asm/irq.h>
 #include <asm/io.h>

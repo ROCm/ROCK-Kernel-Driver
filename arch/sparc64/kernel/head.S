@@ -66,7 +66,7 @@ sparc_ramdisk_image:
 sparc_ramdisk_size:
         .word   0
         .xword  reboot_command
-	.xword	bootstr_len
+	.xword	bootstr_info
 	.word	_end
 
 	/* We must be careful, 32-bit OpenBOOT will get confused if it
@@ -645,10 +645,17 @@ spitfire_vpte_base:
 	 nop
 
 not_starfire:
+	BRANCH_IF_JALAPENO(g1,g5,is_jalapeno)
 	BRANCH_IF_ANY_CHEETAH(g1,g5,is_cheetah)
 
 	ba,pt	%xcc, not_cheetah
 	 nop
+
+is_jalapeno:
+	ldxa		[%g0] ASI_JBUS_CONFIG, %g1
+	srlx		%g1, 17, %g1
+	ba,pt		%xcc, set_worklist
+	 and		%g1, 0x1f, %g1		! 5bit JBUS ID
 
 is_cheetah:
 	ldxa		[%g0] ASI_SAFARI_CONFIG, %g1
@@ -740,8 +747,9 @@ swapper_pg_dir:
 
 	.data
 	.align	8
-	.globl	prom_tba
+	.globl	prom_tba, tlb_type
 prom_tba:	.xword	0
+tlb_type:	.word	0	/* Must NOT end up in BSS */
 	.section	".fixup",#alloc,#execinstr
 	.globl	__ret_efault
 __ret_efault:

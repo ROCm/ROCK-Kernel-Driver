@@ -187,7 +187,7 @@ MODULE_LICENSE("GPL");
 #include <linux/proc_fs.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/hdreg.h>
 #include <linux/string.h>
 #include <linux/delay.h>

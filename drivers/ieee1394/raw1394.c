@@ -1566,8 +1566,8 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
               req->req.length, ((req->req.misc >> 8) & 0xFF),
               (req->req.misc & 0xFF),((req->req.misc >> 16) & 0xFFFF));
         /* check addressrange */
-        if ((((req->req.address) & ~(0xFFFFFFFFFFFF)) != 0) ||
-                (((req->req.address + req->req.length) & ~(0xFFFFFFFFFFFF)) != 0)) {
+        if ((((req->req.address) & ~((u64)0xFFFFFFFFFFFFLL)) != 0) ||
+                (((req->req.address + req->req.length) & ~((u64)0xFFFFFFFFFFFFLL)) != 0)) {
                 req->req.length = 0;
                 return (-EINVAL);
         }
@@ -2273,6 +2273,8 @@ static int raw1394_ioctl(struct inode *inode, struct file *file, unsigned int cm
 			return raw1394_iso_recv_packets(fi, (void*) arg);
 		case RAW1394_IOC_ISO_RECV_RELEASE_PACKETS:
 			return hpsb_iso_recv_release_packets(fi->iso_handle, arg);
+		case RAW1394_IOC_ISO_RECV_FLUSH:
+			return hpsb_iso_recv_flush(fi->iso_handle);
 		case RAW1394_IOC_ISO_SHUTDOWN:
 			raw1394_iso_shutdown(fi);
 			return 0;

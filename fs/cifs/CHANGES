@@ -1,3 +1,12 @@
+Version 0.83
+------------
+Fix oops when mounting to long server names caused by inverted parms to kmalloc.
+Fix MultiuserMount (/proc/fs/cifs configuration setting) so that when enabled
+we will choose a cifs user session (smb uid) that better matches the local
+uid if a) the mount uid does not match the current uid and b) we have another
+session to the same server (ip address) for a different mount which
+matches the current local uid.
+
 Version 0.82
 ------------
 Add support for mknod of block or character devices.  Fix oplock

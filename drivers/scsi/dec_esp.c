@@ -24,7 +24,7 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/slab.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 
@@ -348,7 +348,7 @@ static int dma_bytes_sent(struct NCR_ESP *esp, int fifo_count)
 static void dma_drain(struct NCR_ESP *esp)
 {
 	unsigned long nw = *scsi_scr;
-	unsigned short *p = KSEG1ADDR((unsigned short *) ((*scsi_dma_ptr) >> 3));
+	unsigned short *p = (unsigned short *)KSEG1ADDR((*scsi_dma_ptr) >> 3);
 
     /*
 	 * Is there something in the dma buffers left?
@@ -478,8 +478,7 @@ static void dma_setup(struct NCR_ESP *esp, __u32 addr, int count, int write)
  */
 static void dma_mmu_get_scsi_one(struct NCR_ESP *esp, Scsi_Cmnd * sp)
 {
-	sp->SCp.have_data_in = PHYSADDR(sp->SCp.buffer);
-	sp->SCp.ptr = (char *) ((unsigned long) sp->SCp.have_data_in);
+	sp->SCp.ptr = (char *)PHYSADDR(sp->SCp.buffer);
 }
 
 static void dma_mmu_get_scsi_sgl(struct NCR_ESP *esp, Scsi_Cmnd * sp)
@@ -523,8 +522,8 @@ static void pmaz_dma_init_write(struct NCR_ESP *esp, __u32 vaddress, int length)
 {
 	volatile int *dmareg = (volatile int *) ( esp->slot + DEC_SCSI_DMAREG );
 
-	memcpy((void *) (esp->slot + DEC_SCSI_SRAM + ESP_TGT_DMA_SIZE),
-			KSEG0ADDR((void *) vaddress), length);
+	memcpy((void *)(esp->slot + DEC_SCSI_SRAM + ESP_TGT_DMA_SIZE),
+	       (void *)KSEG0ADDR(vaddress), length);
 
 	*dmareg = TC_ESP_DMAR_WRITE | 
 		TC_ESP_DMA_ADDR(esp->slot + DEC_SCSI_SRAM + ESP_TGT_DMA_SIZE);
@@ -554,7 +553,5 @@ static void pmaz_dma_setup(struct NCR_ESP *esp, __u32 addr, int count, int write
 
 static void pmaz_dma_mmu_get_scsi_one(struct NCR_ESP *esp, Scsi_Cmnd * sp)
 {
-	sp->SCp.have_data_in = (int) sp->SCp.ptr =
-	    (char *) KSEG0ADDR((sp->request_buffer));
+	sp->SCp.ptr = (char *)KSEG0ADDR((sp->request_buffer));
 }
-

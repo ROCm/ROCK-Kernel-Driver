@@ -9,6 +9,7 @@ static int vbi_workaround(struct saa7146_dev *dev)
         u32          *cpu;
         dma_addr_t   dma_addr;
 	
+	int count = 0;
 	int i;
 
 	DECLARE_WAITQUEUE(wait, current);
@@ -443,5 +444,3 @@ struct saa7146_use_ops saa7146_vbi_uops = {
 	.irq_done	= vbi_irq_done,
 	.read 		= vbi_read,
 };
-
-EXPORT_SYMBOL_GPL(saa7146_vbi_uops);

@@ -720,7 +720,7 @@ acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 {
 	int vector = 0;
 
-	if (acpi_madt->flags.pcat_compat && (gsi < 16))
+	if (has_8259 && (gsi < 16))
 		return isa_irq_to_vector(gsi);
 
 	if (!iosapic_register_intr)

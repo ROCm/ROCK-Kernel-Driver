@@ -2,8 +2,6 @@
  *  include/asm-s390/dma.h
  *
  *  S390 version
- *
- *  This file exists so that an #include <dma.h> doesn't break anything.
  */
 
 #ifndef _ASM_DMA_H

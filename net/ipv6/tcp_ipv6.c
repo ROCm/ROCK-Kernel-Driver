@@ -971,7 +971,7 @@ static void tcp_v6_send_reset(struct sk_buff *skb)
 	if (th->rst)
 		return;
 
-	if (ipv6_addr_is_multicast(&skb->nh.ipv6h->daddr))
+	if (!ipv6_unicast_destination(skb))
 		return; 
 
 	/*
@@ -1175,8 +1175,7 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	if (skb->protocol == htons(ETH_P_IP))
 		return tcp_v4_conn_request(sk, skb);
 
-	/* FIXME: do the same check for anycast */
-	if (ipv6_addr_is_multicast(&skb->nh.ipv6h->daddr))
+	if (!ipv6_unicast_destination(skb))
 		goto drop; 
 
 	/*

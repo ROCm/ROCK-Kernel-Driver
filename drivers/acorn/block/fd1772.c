@@ -152,8 +152,6 @@
 #include <asm/uaccess.h>
 
 
-#include <linux/blk.h>
-
 /* Note: FD_MAX_UNITS could be redefined to 2 for the Atari (with
  * little additional rework in this file). But I'm not yet sure if
  * some other code depends on the number of floppies... (It is defined

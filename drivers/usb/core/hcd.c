@@ -1293,7 +1293,8 @@ rescan:
 	}
 
 	/* then kill any current requests */
-	spin_lock_irqsave (&hcd_data_lock, flags);
+	local_irq_save (flags);
+	spin_lock (&hcd_data_lock);
 	list_for_each_entry (urb, &dev->urb_list, urb_list) {
 		int	tmp = urb->pipe;
 
@@ -1311,13 +1312,13 @@ rescan:
 		if (urb->status != -EINPROGRESS)
 			continue;
 		usb_get_urb (urb);
-		spin_unlock_irqrestore (&hcd_data_lock, flags);
+		spin_unlock (&hcd_data_lock);
 
-		spin_lock_irqsave (&urb->lock, flags);
+		spin_lock (&urb->lock);
 		tmp = urb->status;
 		if (tmp == -EINPROGRESS)
 			urb->status = -ESHUTDOWN;
-		spin_unlock_irqrestore (&urb->lock, flags);
+		spin_unlock (&urb->lock);
 
 		/* kick hcd unless it's already returning this */
 		if (tmp == -EINPROGRESS) {
@@ -1340,7 +1341,8 @@ rescan:
 		/* list contents may have changed */
 		goto rescan;
 	}
-	spin_unlock_irqrestore (&hcd_data_lock, flags);
+	spin_unlock (&hcd_data_lock);
+	local_irq_restore (flags);
 
 	/* synchronize with the hardware, so old configuration state
 	 * clears out immediately (and will be freed).

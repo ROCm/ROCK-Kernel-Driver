@@ -172,6 +172,7 @@ struct nfs_inode {
 #define NFS_INO_ADVISE_RDPLUS   0x0002          /* advise readdirplus */
 #define NFS_INO_REVALIDATING	0x0004		/* revalidating attrs */
 #define NFS_INO_FLUSH		0x0008		/* inode is due for flushing */
+#define NFS_INO_FAKE_ROOT	0x0080		/* root inode placeholder */
 
 static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
@@ -207,6 +208,7 @@ do { \
 #define NFS_FLAGS(inode)		(NFS_I(inode)->flags)
 #define NFS_REVALIDATING(inode)		(NFS_FLAGS(inode) & NFS_INO_REVALIDATING)
 #define NFS_STALE(inode)		(NFS_FLAGS(inode) & NFS_INO_STALE)
+#define NFS_FAKE_ROOT(inode)		(NFS_FLAGS(inode) & NFS_INO_FAKE_ROOT)
 
 #define NFS_FILEID(inode)		(NFS_I(inode)->fileid)
 

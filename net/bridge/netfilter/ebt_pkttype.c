@@ -28,7 +28,7 @@ static int ebt_pkttype_check(const char *tablename, unsigned int hookmask,
 {
 	struct ebt_pkttype_info *info = (struct ebt_pkttype_info *)data;
 
-	if (datalen != sizeof(struct ebt_pkttype_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_pkttype_info)))
 		return -EINVAL;
 	if (info->invert != 0 && info->invert != 1)
 		return -EINVAL;

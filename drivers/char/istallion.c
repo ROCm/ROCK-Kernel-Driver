@@ -650,8 +650,6 @@ static unsigned int	stli_baudrates[] = {
  */
 
 #ifdef MODULE
-int		init_module(void);
-void		cleanup_module(void);
 static void	stli_argbrds(void);
 static int	stli_parsebrd(stlconf_t *confp, char **argp);
 

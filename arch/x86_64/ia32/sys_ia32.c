@@ -238,7 +238,7 @@ sys32_mmap(struct mmap_arg_struct *arg)
 
 	mm = current->mm; 
 	down_write(&mm->mmap_sem); 
-	retval = do_mmap_pgoff(file, a.addr, a.len, a.prot, a.flags, a.offset>>PAGE_SHIFT);
+	retval = do_mmap_pgoff(mm, file, a.addr, a.len, a.prot, a.flags, a.offset>>PAGE_SHIFT);
 	if (file)
 		fput(file);
 
@@ -1451,7 +1451,7 @@ asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
 		prot |= vm_force_exec32;
 
 	down_write(&mm->mmap_sem);
-	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+	error = do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
 	up_write(&mm->mmap_sem);
 
 	if (file)
@@ -1993,6 +1993,41 @@ asmlinkage long sys32_open(const char * filename, int flags, int mode)
 	return fd;
 }
 
+struct sigevent32 { 
+	u32 sigev_value;
+	u32 sigev_signo; 
+	u32 sigev_notify; 
+	u32 payload[(64 / 4) - 3]; 
+}; 
+
+extern asmlinkage long
+sys_timer_create(clockid_t which_clock,
+		 struct sigevent __user *timer_event_spec,
+		 timer_t __user * created_timer_id);
+
+long
+sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
+{
+	struct sigevent se;
+	if (se32) { 
+		memset(&se, 0, sizeof(struct sigevent)); 
+		if (get_user(se.sigev_value.sival_int,  &se32->sigev_value) ||
+		    __get_user(se.sigev_signo, &se32->sigev_signo) ||
+		    __get_user(se.sigev_notify, &se32->sigev_notify) ||
+		    __copy_from_user(&se._sigev_un._pad, &se32->payload, 
+				     sizeof(se32->payload)))
+			return -EFAULT;
+	} 
+	if (!access_ok(VERIFY_WRITE,timer_id,sizeof(timer_t)))
+		return -EFAULT;
+
+	mm_segment_t oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	long err = sys_timer_create(clock, se32 ? &se : NULL, timer_id);
+	set_fs(oldfs); 
+	
+	return err; 
+} 
 
 long sys32_vm86_warning(void)
 { 

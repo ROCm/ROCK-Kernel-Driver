@@ -173,6 +173,8 @@ static int dpc_init_done(struct saa7146_dev* dev)
 	return 0;
 }
 
+static struct saa7146_ext_vv vv_data;
+
 /* this function only gets called when the probing was successful */
 static int dpc_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_data *info)
 {
@@ -183,7 +185,7 @@ static int dpc_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_data
 	/* checking for i2c-devices can be omitted here, because we
 	   already did this in "dpc_vl42_probe" */
 
-	saa7146_vv_init(dev);
+	saa7146_vv_init(dev,&vv_data);
 	if( 0 != saa7146_register_device(&dpc->video_dev, dev, "dpc", VFL_TYPE_GRABBER)) {
 		ERR(("cannot register capture v4l2 device. skipping.\n"));
 		return -1;
@@ -246,8 +248,9 @@ int dpc_vbi_bypass(struct saa7146_dev* dev)
 }
 #endif
 
-static int dpc_ioctl(struct saa7146_dev *dev, unsigned int cmd, void *arg) 
+static int dpc_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg) 
 {
+	struct saa7146_dev *dev = fh->dev;
 	struct dpc* dpc = (struct dpc*)dev->ext_priv;
 /*
 	struct saa7146_vv *vv = dev->vv_data; 
@@ -307,23 +310,32 @@ static int std_callback(struct saa7146_dev* dev, struct saa7146_standard *std)
 }
 
 static struct saa7146_standard standard[] = {
-	{ "PAL-BG",	V4L2_STD_PAL_BG,	SAA7146_PAL_VALUES },
-	{ "PAL-I",	V4L2_STD_PAL_I,		SAA7146_PAL_VALUES },
-	{ "NTSC",	V4L2_STD_NTSC,		SAA7146_NTSC_VALUES },
-	{ "SECAM", 	V4L2_STD_SECAM,		SAA7146_SECAM_VALUES },
+	{
+		.name	= "PAL", 	.id	= V4L2_STD_PAL,
+		.v_offset	= 0x17,	.v_field 	= 288,	.v_calc		= 576,
+		.h_offset	= 0x14,	.h_pixels 	= 680,	.h_calc		= 680+1,
+		.v_max_out	= 576,	.h_max_out	= 768,
+	}, {
+		.name	= "NTSC", 	.id	= V4L2_STD_NTSC,
+		.v_offset	= 0x16,	.v_field 	= 240,	.v_calc		= 480,
+		.h_offset	= 0x06,	.h_pixels 	= 708,	.h_calc		= 708+1,
+		.v_max_out	= 480,	.h_max_out	= 640,
+	}, {
+		.name	= "SECAM", 	.id	= V4L2_STD_SECAM,
+		.v_offset	= 0x14,	.v_field 	= 288,	.v_calc		= 576,
+		.h_offset	= 0x14,	.h_pixels 	= 720,	.h_calc		= 720+1,
+		.v_max_out	= 576,	.h_max_out	= 768,
+	}
 };
 
-static
-struct saa7146_extension extension;
+static struct saa7146_extension extension;
 
-static
-struct saa7146_pci_extension_data dpc = {
+static struct saa7146_pci_extension_data dpc = {
         .ext_priv = "Multimedia eXtension Board",
         .ext = &extension,
 };
 
-static
-struct pci_device_id pci_tbl[] = {
+static struct pci_device_id pci_tbl[] = {
 	{
 		.vendor    = PCI_VENDOR_ID_PHILIPS,
 		.device	   = PCI_DEVICE_ID_PHILIPS_SAA7146,
@@ -337,8 +349,7 @@ struct pci_device_id pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, pci_tbl);
 
-static
-struct saa7146_ext_vv vv_data = {
+static struct saa7146_ext_vv vv_data = {
 	.inputs		= DPC_INPUTS,
 	.capabilities	= V4L2_CAP_VBI_CAPTURE,
 	.stds		= &standard[0],
@@ -348,14 +359,12 @@ struct saa7146_ext_vv vv_data = {
 	.ioctl		= dpc_ioctl,
 };
 
-static
-struct saa7146_extension extension = {
+static struct saa7146_extension extension = {
 	.name		= "dpc7146 demonstration board",
 	.flags		= SAA7146_USE_I2C_IRQ,
 	
 	.pci_tbl	= &pci_tbl[0],
 	.module		= THIS_MODULE,
-	.ext_vv_data	= &vv_data,
 
 	.probe		= dpc_probe,
 	.attach		= dpc_attach,

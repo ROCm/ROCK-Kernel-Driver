@@ -139,7 +139,7 @@
 #endif
 
 #include <linux/mm.h>		/* For fetching system memory size */
-#include <linux/blk.h>		/* For block_size() */
+#include <linux/blkdev.h>		/* For block_size() */
 
 /*
  * Lock protecting manipulation of the ahc softc list.
@@ -1811,7 +1811,8 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	ahc_unlock(ahc, &s);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	scsi_add_host(host, (ahc->dev_softc ? &ahc->dev_softc->dev : NULL));
+	scsi_add_host(host, (ahc->dev_softc ? &ahc->dev_softc->dev : NULL)); /* XXX handle failure */
+	scsi_scan_host(host);
 #endif
 	return (0);
 }

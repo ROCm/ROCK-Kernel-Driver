@@ -41,7 +41,7 @@
 #include <linux/vmalloc.h>
 #include <linux/moduleparam.h>
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsicam.h>
@@ -687,7 +687,7 @@ static int resp_mode_sense(unsigned char * cmd, int target,
 	pcontrol = (cmd[2] & 0xc0) >> 6;
 	pcode = cmd[2] & 0x3f;
 	msense_6 = (MODE_SENSE == cmd[0]);
-	alloc_len = msense_6 ? cmd[4] : ((cmd[7] << 8) | cmd[6]);
+	alloc_len = msense_6 ? cmd[4] : ((cmd[7] << 8) | cmd[8]);
 	/* printk(KERN_INFO "msense: dbd=%d pcontrol=%d pcode=%d "
 		"msense_6=%d alloc_len=%d\n", dbd, pcontrol, pcode, "
 		"msense_6, alloc_len); */
@@ -1701,7 +1701,8 @@ static int sdebug_driver_probe(struct device * dev)
                 printk(KERN_ERR "%s: scsi_add_host failed\n", __FUNCTION__);
                 error = -ENODEV;
 		scsi_host_put(hpnt);
-        }
+        } else
+		scsi_scan_host(hpnt);
 
 
         return error;

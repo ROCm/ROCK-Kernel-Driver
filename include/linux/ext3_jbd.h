@@ -30,10 +30,11 @@
 
 #define EXT3_SINGLEDATA_TRANS_BLOCKS	8U
 
-/* Extended attributes may touch two data buffers, two bitmap buffers,
- * and two group and summaries. */
+/* Extended attribute operations touch at most two data buffers,
+ * two bitmap buffers, and two group summaries, in addition to the inode
+ * and the superblock, which are already accounted for. */
 
-#define EXT3_XATTR_TRANS_BLOCKS		8
+#define EXT3_XATTR_TRANS_BLOCKS		6U
 
 /* Define the minimum size for a transaction which modifies data.  This
  * needs to take into account the fact that we may end up modifying two

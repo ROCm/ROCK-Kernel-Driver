@@ -34,7 +34,6 @@
 #include <linux/fs.h>
 #include <linux/poll.h>
 #include <linux/smp_lock.h>
-#include <linux/proc_fs.h>
 #include <linux/delay.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/bitops.h>

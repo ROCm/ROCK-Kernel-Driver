@@ -33,18 +33,19 @@ static char *uml_dir = UML_DIR;
 static int umid_is_random = 1;
 static int umid_inited = 0;
 
-static int make_umid(void);
+static int make_umid(int (*printer)(const char *fmt, ...));
 
-static int __init set_umid(char *name, int is_random)
+static int __init set_umid(char *name, int is_random, 
+			   int (*printer)(const char *fmt, ...))
 {
 	if(umid_inited){
-		printk("Unique machine name can't be set twice\n");
+		(*printer)("Unique machine name can't be set twice\n");
 		return(-1);
 	}
 
 	if(strlen(name) > UMID_LEN - 1)
-		printk("Unique machine name is being truncated to %s "
-		       "characters\n", UMID_LEN);
+		(*printer)("Unique machine name is being truncated to %s "
+			   "characters\n", UMID_LEN);
 	strlcpy(umid, name, sizeof(umid));
 
 	umid_is_random = is_random;
@@ -54,7 +55,7 @@ static int __init set_umid(char *name, int is_random)
 
 static int __init set_umid_arg(char *name, int *add)
 {
-	return(set_umid(name, 0));
+	return(set_umid(name, 0, printf));
 }
 
 __uml_setup("umid=", set_umid_arg,
@@ -67,7 +68,7 @@ int __init umid_file_name(char *name, char *buf, int len)
 {
 	int n;
 
-	if(!umid_inited && make_umid()) return(-1);
+	if(!umid_inited && make_umid(printk)) return(-1);
 
 	n = strlen(uml_dir) + strlen(umid) + strlen(name) + 1;
 	if(n > len){
@@ -92,14 +93,14 @@ static int __init create_pid_file(void)
 	fd = os_open_file(file, of_create(of_excl(of_rdwr(OPENFLAGS()))), 
 			  0644);
 	if(fd < 0){
-		printk("Open of machine pid file \"%s\" failed - "
+		printf("Open of machine pid file \"%s\" failed - "
 		       "errno = %d\n", file, -fd);
 		return 0;
 	}
 
 	sprintf(pid, "%d\n", os_getpid());
 	if(write(fd, pid, strlen(pid)) != strlen(pid))
-		printk("Write of pid file failed - errno = %d\n", errno);
+		printf("Write of pid file failed - errno = %d\n", errno);
 	close(fd);
 	return 0;
 }
@@ -197,7 +198,7 @@ static int __init set_uml_dir(char *name, int *add)
 	if((strlen(name) > 0) && (name[strlen(name) - 1] != '/')){
 		uml_dir = malloc(strlen(name) + 1);
 		if(uml_dir == NULL){
-			printk("Failed to malloc uml_dir - error = %d\n",
+			printf("Failed to malloc uml_dir - error = %d\n",
 			       errno);
 			uml_dir = name;
 			return(0);
@@ -217,7 +218,7 @@ static int __init make_uml_dir(void)
 		char *home = getenv("HOME");
 
 		if(home == NULL){
-			printk("make_uml_dir : no value in environment for "
+			printf("make_uml_dir : no value in environment for "
 			       "$HOME\n");
 			exit(1);
 		}
@@ -239,25 +240,25 @@ static int __init make_uml_dir(void)
 	strcpy(uml_dir, dir);
 	
 	if((mkdir(uml_dir, 0777) < 0) && (errno != EEXIST)){
-	        printk("Failed to mkdir %s - errno = %i\n", uml_dir, errno);
+	        printf("Failed to mkdir %s - errno = %i\n", uml_dir, errno);
 		return(-1);
 	}
 	return 0;
 }
 
-static int __init make_umid(void)
+static int __init make_umid(int (*printer)(const char *fmt, ...))
 {
 	int fd, err;
 	char tmp[strlen(uml_dir) + UMID_LEN + 1];
 
 	strlcpy(tmp, uml_dir, sizeof(tmp));
 
-	if(*umid == 0){
+	if(!umid_inited){
 		strcat(tmp, "XXXXXX");
 		fd = mkstemp(tmp);
 		if(fd < 0){
-			printk("make_umid - mkstemp failed, errno = %d\n",
-			       errno);
+			(*printer)("make_umid - mkstemp failed, errno = %d\n",
+				   errno);
 			return(1);
 		}
 
@@ -267,7 +268,7 @@ static int __init make_umid(void)
 		 * for directories.
 		 */
 		unlink(tmp);
-		set_umid(&tmp[strlen(uml_dir)], 1);
+		set_umid(&tmp[strlen(uml_dir)], 1, printer);
 	}
 	
 	sprintf(tmp, "%s%s", uml_dir, umid);
@@ -275,14 +276,14 @@ static int __init make_umid(void)
 	if((err = mkdir(tmp, 0777)) < 0){
 		if(errno == EEXIST){
 			if(not_dead_yet(tmp)){
-				printk("umid '%s' is in use\n", umid);
+				(*printer)("umid '%s' is in use\n", umid);
 				return(-1);
 			}
 			err = mkdir(tmp, 0777);
 		}
 	}
 	if(err < 0){
-		printk("Failed to create %s - errno = %d\n", umid, errno);
+		(*printer)("Failed to create %s - errno = %d\n", umid, errno);
 		return(-1);
 	}
 
@@ -295,7 +296,13 @@ __uml_setup("uml_dir=", set_uml_dir,
 );
 
 __uml_postsetup(make_uml_dir);
-__uml_postsetup(make_umid);
+
+static int __init make_umid_setup(void)
+{
+	return(make_umid(printf));
+}
+
+__uml_postsetup(make_umid_setup);
 __uml_postsetup(create_pid_file);
 
 /*

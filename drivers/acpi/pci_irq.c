@@ -253,8 +253,6 @@ acpi_pci_irq_lookup (struct pci_bus *bus, int device, int pin)
 		return_VALUE(0);
 	}
 
-	entry->irq = entry->link.index;
-
 	if (!entry->irq && entry->link.handle) {
 		entry->irq = acpi_pci_link_get_irq(entry->link.handle, entry->link.index);
 		if (!entry->irq) {
@@ -363,11 +361,7 @@ acpi_pci_irq_enable (
 		}
  	}
 
-#ifdef CONFIG_IA64
-	dev->irq = gsi_to_irq(irq);
-#else
 	dev->irq = irq;
-#endif
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device %s using IRQ %d\n", dev->slot_name, dev->irq));
 

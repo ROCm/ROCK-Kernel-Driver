@@ -67,7 +67,7 @@ static int to_atmarpd(enum atmarp_ctrl_type type,int itf,unsigned long ip)
 	ctrl->ip = ip;
 	atm_force_charge(atmarpd,skb->truesize);
 	skb_queue_tail(&atmarpd->sk->sk_receive_queue, skb);
-	wake_up(&atmarpd->sleep);
+	atmarpd->sk->sk_data_ready(atmarpd->sk, skb->len);
 	return 0;
 }
 

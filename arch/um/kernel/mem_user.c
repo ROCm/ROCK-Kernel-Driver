@@ -122,26 +122,26 @@ int setup_region(struct mem_region *region, void *entry)
 
 static int __init parse_iomem(char *str, int *add)
 {
-	struct stat buf;
+	struct stat64 buf;
 	char *file, *driver;
 	int fd;
 
 	driver = str;
 	file = strchr(str,',');
 	if(file == NULL){
-		printk("parse_iomem : failed to parse iomem\n");
+		printf("parse_iomem : failed to parse iomem\n");
 		return(1);
 	}
 	*file = '\0';
 	file++;
 	fd = os_open_file(file, of_rdwr(OPENFLAGS()), 0);
 	if(fd < 0){
-		printk("parse_iomem - Couldn't open io file, errno = %d\n", 
+		printf("parse_iomem - Couldn't open io file, errno = %d\n", 
 		       errno);
 		return(1);
 	}
-	if(fstat(fd, &buf) < 0) {
-		printk("parse_iomem - cannot fstat file, errno = %d\n", errno);
+	if(fstat64(fd, &buf) < 0) {
+		printf("parse_iomem - cannot fstat file, errno = %d\n", errno);
 		return(1);
 	}
 	add_iomem(driver, fd, buf.st_size);

@@ -91,7 +91,6 @@
 #include <asm/atariints.h>
 #include <asm/atari_stdma.h>
 #include <asm/atari_stram.h>
-#include <linux/blk.h>
 #include <linux/blkpg.h>
 
 #define	FD_MAX_UNITS 2

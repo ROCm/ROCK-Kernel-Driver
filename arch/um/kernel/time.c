@@ -15,12 +15,16 @@
 #include "process.h"
 #include "signal_user.h"
 #include "time_user.h"
+#include "kern_constants.h"
 
 extern struct timeval xtime;
+
+struct timeval local_offset = { 0, 0 };
 
 void timer(void)
 {
 	gettimeofday(&xtime, NULL);
+	timeradd(&xtime, &local_offset, &xtime);
 }
 
 void set_interval(int timer_type)
@@ -65,7 +69,7 @@ void switch_timers(int to_real)
 		       errno);
 }
 
-void idle_timer(void)
+void uml_idle_timer(void)
 {
 	if(signal(SIGVTALRM, SIG_IGN) == SIG_ERR)
 		panic("Couldn't unset SIGVTALRM handler");
@@ -81,8 +85,6 @@ void time_init(void)
 		panic("Couldn't set SIGVTALRM handler");
 	set_interval(ITIMER_VIRTUAL);
 }
-
-struct timeval local_offset = { 0, 0 };
 
 void do_gettimeofday(struct timeval *tv)
 {
@@ -100,7 +102,7 @@ int do_settimeofday(struct timespec *tv)
 	unsigned long flags;
 	struct timeval tv_in;
 
-	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+	if ((unsigned long) tv->tv_nsec >= UM_NSEC_PER_SEC)
 		return -EINVAL;
 
 	tv_in.tv_sec = tv->tv_sec;
@@ -110,6 +112,8 @@ int do_settimeofday(struct timespec *tv)
 	gettimeofday(&now, NULL);
 	timersub(&tv_in, &now, &local_offset);
 	time_unlock(flags);
+
+	return(0);
 }
 
 void idle_sleep(int secs)

@@ -53,8 +53,9 @@ static int ssl_remove(char *str);
 
 static struct line_driver driver = {
 	.name 			= "UML serial line",
-	.devfs_name 		= "tts/%d",
-	.major 			= TTYAUX_MAJOR,
+	.device_name 		= "ttS",
+	.devfs_name 		= "tts/",
+	.major 			= TTY_MAJOR,
 	.minor_start 		= 64,
 	.type 		 	= TTY_DRIVER_TYPE_SERIAL,
 	.subtype 	 	= 0,

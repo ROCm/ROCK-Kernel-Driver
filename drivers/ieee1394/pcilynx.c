@@ -42,6 +42,7 @@
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
+#include <linux/irq.h>
 #include <linux/kdev_t.h>
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
@@ -1457,6 +1458,14 @@ static void remove_card(struct pci_dev *dev)
         case have_intr:
                 reg_write(lynx, PCI_INT_ENABLE, 0);
                 free_irq(lynx->dev->irq, lynx);
+
+		/* Disable IRM Contender */
+		if (lynx->phyic.reg_1394a)
+			set_phy_reg(lynx, 4, ~0xc0 & get_phy_reg(lynx, 4));
+
+		/* Let all other nodes know to ignore us */
+		lynx_devctl(lynx->host, RESET_BUS, LONG_RESET_NO_FORCE_ROOT);
+
         case have_iomappings:
                 reg_set_bits(lynx, MISC_CONTROL, MISC_CONTROL_SWRESET);
                 /* Fix buggy cards with autoboot pin not tied low: */
@@ -1504,6 +1513,7 @@ static int __devinit add_card(struct pci_dev *dev,
         return error; \
         } while (0)
 
+	char irq_buf[16];
 	struct hpsb_host *host;
         struct ti_lynx *lynx; /* shortcut to currently handled device */
         struct ti_pcl pcl;
@@ -1603,12 +1613,18 @@ static int __devinit add_card(struct pci_dev *dev,
         /* Fix buggy cards with autoboot pin not tied low: */
         reg_write(lynx, DMA0_CHAN_CTRL, 0);
 
+#ifndef __sparc__
+	sprintf (irq_buf, "%d", dev->irq);
+#else
+	sprintf (irq_buf, "%s", __irq_itoa(dev->irq));
+#endif
+
         if (!request_irq(dev->irq, lynx_irq_handler, SA_SHIRQ,
                          PCILYNX_DRIVER_NAME, lynx)) {
-                PRINT(KERN_INFO, lynx->id, "allocated interrupt %d", dev->irq);
+                PRINT(KERN_INFO, lynx->id, "allocated interrupt %s", irq_buf);
                 lynx->state = have_intr;
         } else {
-                FAIL("failed to allocate shared interrupt %d", dev->irq);
+                FAIL("failed to allocate shared interrupt %s", irq_buf);
         }
 
         /* alloc_pcl return values are not checked, it is expected that the
@@ -1787,9 +1803,8 @@ static int __devinit add_card(struct pci_dev *dev,
                 i2c_adapter.algo_data = &i2c_adapter_data;
                 i2c_adapter_data.data = lynx;
 
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-                PRINT(KERN_DEBUG, lynx->id,"original eeprom control: %d",reg_read(lynx,SERIAL_EEPROM_CONTROL));
-#endif
+		PRINTD(KERN_DEBUG, lynx->id,"original eeprom control: %d",
+		       reg_read(lynx, SERIAL_EEPROM_CONTROL));
 
         	/* reset hardware to sane state */
         	lynx->i2c_driven_state = 0x00000070;
@@ -1832,17 +1847,16 @@ static int __devinit add_card(struct pci_dev *dev,
                         if (i2c_transfer(&i2c_adapter, msg, 2) < 0) {
                                 PRINT(KERN_ERR, lynx->id, "unable to read bus info block from i2c");
                         } else {
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
                                 int i;
-#endif
-                                PRINT(KERN_INFO, lynx->id, "got bus info block from serial eeprom");
-                                /* FIXME: probably we shoud rewrite the max_rec, max_ROM(1394a), generation(1394a) and link_spd(1394a) field
-                                   and recalculate the CRC */
 
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-                                for (i=0; i < 5 ; i++)
-                                        PRINT(KERN_DEBUG, lynx->id, "Businfo block quadlet %i: %08x",i, be32_to_cpu(lynx->config_rom[i]));
-#endif
+                                PRINT(KERN_INFO, lynx->id, "got bus info block from serial eeprom");
+				/* FIXME: probably we shoud rewrite the max_rec, max_ROM(1394a),
+				 * generation(1394a) and link_spd(1394a) field and recalculate
+				 * the CRC */
+
+                                for (i = 0; i < 5 ; i++)
+                                        PRINTD(KERN_DEBUG, lynx->id, "Businfo block quadlet %i: %08x",
+					       i, be32_to_cpu(lynx->config_rom[i]));
 
                                 /* info_length, crc_length and 1394 magic number to check, if it is really a bus info block */
                                 if (((be32_to_cpu(lynx->config_rom[0]) & 0xffff0000) == 0x04040000) &&

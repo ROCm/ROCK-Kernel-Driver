@@ -409,10 +409,13 @@ void ConfigList::updateList(ConfigItem* item)
 			item = new ConfigItem(this, 0, true);
 		last = item;
 	}
-	if (mode == singleMode && rootEntry->sym && rootEntry->prompt) {
+	if ((mode == singleMode || mode == symbolMode) &&
+	    rootEntry->sym && rootEntry->prompt) {
 		item = last ? last->nextSibling() : firstChild();
 		if (!item)
 			item = new ConfigItem(this, last, rootEntry, true);
+		else
+			item->testUpdateMenu(true);
 
 		updateMenuList(item, rootEntry);
 		triggerUpdate();

@@ -41,7 +41,7 @@
 #ifndef _SCSIGLUE_H_
 #define _SCSIGLUE_H_
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "scsi.h"
 #include "hosts.h"
 

@@ -77,7 +77,7 @@ extern unsigned long end_pfn;
 extern unsigned long table_start, table_end;
 
 extern int exception_trace;
-extern int no_iommu, force_mmu;
+extern int force_iommu, no_iommu;
 extern int using_apic_timer;
 extern int disable_apic;
 extern unsigned cpu_khz;

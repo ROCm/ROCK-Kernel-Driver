@@ -11,6 +11,7 @@
 #include <linux/netfilter_bridge/ebtables.h>
 #include <linux/netfilter_bridge/ebt_nat.h>
 #include <linux/module.h>
+#include <net/sock.h>
 
 static int ebt_target_snat(struct sk_buff **pskb, unsigned int hooknr,
    const struct net_device *in, const struct net_device *out,
@@ -18,6 +19,17 @@ static int ebt_target_snat(struct sk_buff **pskb, unsigned int hooknr,
 {
 	struct ebt_nat_info *info = (struct ebt_nat_info *) data;
 
+	if (skb_shared(*pskb) || skb_cloned(*pskb)) {
+		struct sk_buff *nskb;
+
+		nskb = skb_copy(*pskb, GFP_ATOMIC);
+		if (!nskb)
+			return NF_DROP;
+		if ((*pskb)->sk)
+			skb_set_owner_w(nskb, (*pskb)->sk);
+		kfree_skb(*pskb);
+		*pskb = nskb;
+	}
 	memcpy(((**pskb).mac.ethernet)->h_source, info->mac,
 	   ETH_ALEN * sizeof(unsigned char));
 	return info->target;
@@ -28,7 +40,7 @@ static int ebt_target_snat_check(const char *tablename, unsigned int hookmask,
 {
 	struct ebt_nat_info *info = (struct ebt_nat_info *) data;
 
-	if (datalen != sizeof(struct ebt_nat_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_nat_info)))
 		return -EINVAL;
 	if (BASE_CHAIN && info->target == EBT_RETURN)
 		return -EINVAL;

@@ -4,7 +4,6 @@
 struct page;
 
 #include "asm/arch/page.h"
-#include "asm/bug.h"
 
 #undef __pa
 #undef __va

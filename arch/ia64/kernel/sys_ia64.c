@@ -217,7 +217,7 @@ do_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, un
 	}
 
 	down_write(&current->mm->mmap_sem);
-	addr = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+	addr = do_mmap_pgoff(current->mm, file, addr, len, prot, flags, pgoff);
 	up_write(&current->mm->mmap_sem);
 
 out:	if (file)

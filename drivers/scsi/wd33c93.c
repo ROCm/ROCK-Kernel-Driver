@@ -79,7 +79,7 @@
 #include <linux/delay.h>
 #include <linux/version.h>
 #include <linux/init.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <asm/irq.h>
 
 #include "scsi.h"
@@ -1920,7 +1920,7 @@ wd33c93_proc_info(struct Scsi_Host *instance, char *buf, char **start, off_t off
 
 	char *bp;
 	char tbuf[128];
-	struct Scsi_Host *instance;
+	struct WD33C93_hostdata *hd;
 	Scsi_Cmnd *cmd;
 	int x, i;
 	static int stop = 0;

@@ -808,7 +808,17 @@ static ctl_table fs_table[] = {
 	{ .ctl_name = 0 }
 };
 
+extern int sysctl_vsyscall32;
+
 static ctl_table debug_table[] = {
+#if defined(__x86_64__) && defined(CONFIG_IA32_EMULATION)
+	{ .ctl_name = 100, 
+	  .procname = "vsyscall32", 
+	  .data = &sysctl_vsyscall32, 
+	  .maxlen = sizeof(int), 
+	  .mode = 0644, 
+	  .proc_handler = &proc_dointvec},
+#endif
 	{ .ctl_name = 0 }
 };
 

@@ -42,7 +42,7 @@
 #define _TRANSPORT_H_
 
 #include <linux/config.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "usb.h"
 #include "scsi.h"
 

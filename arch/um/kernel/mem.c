@@ -119,11 +119,6 @@ unsigned long get_kmem_end(void)
 	return(kmem_top);
 }
 
-void set_kmem_end(unsigned long new)
-{
-	kmem_top = new;
-}
-
 #ifdef CONFIG_HIGHMEM
 /* Changed during early boot */
 pte_t *kmap_pte;
@@ -218,7 +213,7 @@ static int setup_one_range(int fd, char *driver, unsigned long start,
 		if(regions[i] == NULL) break;		
 	}
 	if(i == NREGIONS){
-		printk("setup_range : no free regions\n");
+		printk("setup_one_range : no free regions\n");
 		i = -1;
 		goto out;
 	}
@@ -227,7 +222,9 @@ static int setup_one_range(int fd, char *driver, unsigned long start,
 		fd = create_mem_file(len);
 
 	if(region == NULL){
-		region = alloc_bootmem_low_pages(sizeof(*region));
+		if(kmalloc_ok)
+			region = kmalloc(sizeof(*region), GFP_KERNEL);
+		else region = alloc_bootmem_low_pages(sizeof(*region));
 		if(region == NULL)
 			panic("Failed to allocating mem_region");
 	}

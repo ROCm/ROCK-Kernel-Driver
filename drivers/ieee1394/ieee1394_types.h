@@ -61,8 +61,9 @@ typedef u16 arm_length_t;
 #define NODEID_TO_NODE(nodeid)	(nodeid & NODE_MASK)
 
 /* Can be used to consistently print a node/bus ID. */
-#define NODE_BUS_FMT		"%02d:%04d"
-#define NODE_BUS_ARGS(nodeid)	NODEID_TO_NODE(nodeid), NODEID_TO_BUS(nodeid)
+#define NODE_BUS_FMT		"%d-%02d:%04d"
+#define NODE_BUS_ARGS(__host, __nodeid)	\
+	__host->id, NODEID_TO_NODE(__nodeid), NODEID_TO_BUS(__nodeid)
 
 #define HPSB_PRINT(level, fmt, args...) printk(level "ieee1394: " fmt "\n" , ## args)
 
@@ -71,6 +72,12 @@ typedef u16 arm_length_t;
 #define HPSB_NOTICE(fmt, args...) HPSB_PRINT(KERN_NOTICE, fmt , ## args)
 #define HPSB_WARN(fmt, args...) HPSB_PRINT(KERN_WARNING, fmt , ## args)
 #define HPSB_ERR(fmt, args...) HPSB_PRINT(KERN_ERR, fmt , ## args)
+
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+#define HPSB_VERBOSE(fmt, args...) HPSB_PRINT(KERN_DEBUG, fmt , ## args)
+#else
+#define HPSB_VERBOSE(fmt, args...)
+#endif
 
 #define HPSB_PANIC(fmt, args...) panic("ieee1394: " fmt "\n" , ## args)
 

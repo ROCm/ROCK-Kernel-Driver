@@ -117,7 +117,7 @@ extern inline int safe_smp_processor_id(void)
 #ifndef CONFIG_SMP
 #define stack_smp_processor_id() 0
 #define safe_smp_processor_id() 0
-#define for_each_cpu(x) (x)=0;
+#define for_each_cpu(x,mask) (void)(mask), (x)=0;
 #define cpu_logical_map(x) (x)
 #else
 #include <asm/thread_info.h>

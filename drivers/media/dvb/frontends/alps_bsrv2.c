@@ -55,7 +55,7 @@ static u8 init_1893_tab [] = {
         0x01, 0xA4, 0x35, 0x81, 0x2A, 0x0d, 0x55, 0xC4,
         0x09, 0x69, 0x00, 0x86, 0x4c, 0x28, 0x7F, 0x00,
         0x00, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,	
-        0x80, 0x00, 0x31, 0xb0, 0x14, 0x00, 0xDC, 0x20,
+        0x80, 0x00, 0x31, 0xb0, 0x14, 0x00, 0xDC, 0x00,
         0x81, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x55, 0x00, 0x00, 0x7f, 0x00
@@ -158,6 +158,11 @@ static int ves1893_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion
 {
 	u8 val;
 
+	/*
+	 * inversion on/off are interchanged because i and q seem to
+	 * be swapped on the hardware
+	 */
+
 	switch (inversion) {
 	case INVERSION_OFF:
 		val = 0xc0;
@@ -166,13 +171,16 @@ static int ves1893_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion
 		val = 0x80;
 		break;
 	case INVERSION_AUTO:
-		val = 0x40;
+		val = 0x00;
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	return ves1893_writereg (i2c, 0x0c, (init_1893_tab[0x0c] & 0x3f) | val);
+	/* needs to be saved for FE_GET_FRONTEND */
+	init_1893_tab[0x0c] = (init_1893_tab[0x0c] & 0x3f) | val;
+
+	return ves1893_writereg (i2c, 0x0c, init_1893_tab[0x0c]);
 }
 
 
@@ -383,8 +391,14 @@ static int bsrv2_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		afc = (afc * (int)(p->u.qpsk.symbol_rate/1000/8))/16;
 
 		p->frequency -= afc;
+
+		/*
+		 * inversion indicator is only valid
+		 * if auto inversion was used
+		 */
+		if (!(init_1893_tab[0x0c] & 0x80))
 		p->inversion = (ves1893_readreg (i2c, 0x0f) & 2) ? 
-					INVERSION_ON : INVERSION_OFF;
+					INVERSION_OFF : INVERSION_ON;
 		p->u.qpsk.fec_inner = ves1893_get_fec (i2c);
 	/*  XXX FIXME: timing offset !! */
 		break;

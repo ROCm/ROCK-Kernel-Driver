@@ -35,7 +35,7 @@
  *			condition status from targets.
  */
 #include <linux/module.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
@@ -2861,6 +2861,8 @@ int fas216_add(struct Scsi_Host *host, struct device *dev)
 	ret = scsi_add_host(host, dev);
 	if (ret)
 		fas216_writeb(info, REG_CMD, CMD_RESETCHIP);
+	else
+		scsi_scan_host(host);
 
 	return ret;
 }

@@ -76,7 +76,7 @@
 #include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/stat.h>
 #include <linux/string.h>

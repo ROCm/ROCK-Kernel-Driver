@@ -9,16 +9,27 @@
 #define	PTREGS_OFF	(STACK_BIAS + STACKFRAME_SZ)
 
 #define __CHEETAH_ID	0x003e0014
+#define __JALAPENO_ID	0x003e0016
 
 #define CHEETAH_MANUF		0x003e
 #define CHEETAH_IMPL		0x0014
 #define CHEETAH_PLUS_IMPL	0x0015
+#define JALAPENO_IMPL		0x0016
 
 #define BRANCH_IF_CHEETAH_BASE(tmp1,tmp2,label)	\
 	rdpr	%ver, %tmp1;			\
 	sethi	%hi(__CHEETAH_ID), %tmp2;	\
 	srlx	%tmp1, 32, %tmp1;		\
 	or	%tmp2, %lo(__CHEETAH_ID), %tmp2;\
+	cmp	%tmp1, %tmp2;			\
+	be,pn	%icc, label;			\
+	 nop;
+
+#define BRANCH_IF_JALAPENO(tmp1,tmp2,label)	\
+	rdpr	%ver, %tmp1;			\
+	sethi	%hi(__JALAPENO_ID), %tmp2;	\
+	srlx	%tmp1, 32, %tmp1;		\
+	or	%tmp2, %lo(__JALAPENO_ID), %tmp2;\
 	cmp	%tmp1, %tmp2;			\
 	be,pn	%icc, label;			\
 	 nop;

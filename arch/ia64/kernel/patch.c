@@ -9,6 +9,7 @@
 
 #include <asm/patch.h>
 #include <asm/processor.h>
+#include <asm/sections.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
 
@@ -176,16 +177,8 @@ patch_brl_fsys_bubble_down (unsigned long start, unsigned long end)
 void
 ia64_patch_gate (void)
 {
-	extern char __start_gate_mckinley_e9_patchlist;
-	extern char __end_gate_mckinley_e9_patchlist;
-	extern char __start_gate_vtop_patchlist;
-	extern char __end_gate_vtop_patchlist;
-	extern char __start_gate_fsyscall_patchlist;
-	extern char __end_gate_fsyscall_patchlist;
-	extern char __start_gate_brl_fsys_bubble_down_patchlist;
-	extern char __end_gate_brl_fsys_bubble_down_patchlist;
-#	define START(name)	((unsigned long) &__start_gate_##name##_patchlist)
-#	define END(name)	((unsigned long)&__end_gate_##name##_patchlist)
+#	define START(name)	((unsigned long) __start_gate_##name##_patchlist)
+#	define END(name)	((unsigned long)__end_gate_##name##_patchlist)
 
 	patch_fsyscall_table(START(fsyscall), END(fsyscall));
 	patch_brl_fsys_bubble_down(START(brl_fsys_bubble_down), END(brl_fsys_bubble_down));

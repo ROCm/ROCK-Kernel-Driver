@@ -17,25 +17,6 @@
 #include <asm/rte_cb.h>		/* Common defs for Midas RTE-CB boards.  */
 
 
-/* CPU addresses of GBUS memory spaces.  */
-#define GCS0_ADDR		0x05000000 /* GCS0 - Common SRAM (2MB) */
-#define GCS0_SIZE		0x00200000 /*   2MB */
-#define GCS1_ADDR		0x06000000 /* GCS1 - Flash ROM (8MB) */
-#define GCS1_SIZE		0x00800000 /*   8MB */
-#define GCS2_ADDR		0x07900000 /* GCS2 - I/O registers */
-#define GCS2_SIZE		0x00400000 /*   4MB */
-#define GCS5_ADDR		0x04000000 /* GCS5 - PCI bus space */
-#define GCS5_SIZE		0x01000000 /*   16MB */
-#define GCS6_ADDR		0x07980000 /* GCS6 - PCI control registers */
-#define GCS6_SIZE		0x00000200 /*   512B */
-
-
-/* The GBUS GINT0 - GINT4 interrupts are connected to the INTP000 - INTP011
-   pins on the CPU.  These are shared among the GBUS interrupts.  */
-#define IRQ_GINT(n)		IRQ_INTP(n)
-#define IRQ_GINT_NUM		4
-
-
 #define PLATFORM		"rte-v850e/ma1-cb"
 #define PLATFORM_LONG		"Midas lab RTE-V850E/MA1-CB"
 
@@ -53,8 +34,30 @@
 #define SDRAM_SIZE		0x02000000 /* 32MB */
 
 
+/* CPU addresses of GBUS memory spaces.  */
+#define GCS0_ADDR		0x05000000 /* GCS0 - Common SRAM (2MB) */
+#define GCS0_SIZE		0x00200000 /*   2MB */
+#define GCS1_ADDR		0x06000000 /* GCS1 - Flash ROM (8MB) */
+#define GCS1_SIZE		0x00800000 /*   8MB */
+#define GCS2_ADDR		0x07900000 /* GCS2 - I/O registers */
+#define GCS2_SIZE		0x00400000 /*   4MB */
+#define GCS5_ADDR		0x04000000 /* GCS5 - PCI bus space */
+#define GCS5_SIZE		0x01000000 /*   16MB */
+#define GCS6_ADDR		0x07980000 /* GCS6 - PCI control registers */
+#define GCS6_SIZE		0x00000200 /*   512B */
+
+
 /* For <asm/page.h> */
 #define PAGE_OFFSET 		SRAM_ADDR
+
+
+/* The GBUS GINT0 - GINT3 interrupts are connected to the INTP000 - INTP011
+   pins on the CPU.  These are shared among the GBUS interrupts.  */
+#define IRQ_GINT(n)		IRQ_INTP(n)
+#define IRQ_GINT_NUM		4
+
+/* Used by <asm/rte_cb.h> to derive NUM_MACH_IRQS.  */
+#define NUM_RTE_CB_IRQS		NUM_CPU_IRQS
 
 
 #ifdef CONFIG_ROM_KERNEL
@@ -98,8 +101,8 @@
 
 /* Override the basic MA uart pre-initialization so that we can
    initialize extra stuff.  */
-#undef NB85E_UART_PRE_CONFIGURE	/* should be defined by <asm/ma.h> */
-#define NB85E_UART_PRE_CONFIGURE	rte_ma1_cb_uart_pre_configure
+#undef V850E_UART_PRE_CONFIGURE	/* should be defined by <asm/ma.h> */
+#define V850E_UART_PRE_CONFIGURE	rte_ma1_cb_uart_pre_configure
 #ifndef __ASSEMBLY__
 extern void rte_ma1_cb_uart_pre_configure (unsigned chan,
 					   unsigned cflags, unsigned baud);
@@ -108,9 +111,9 @@ extern void rte_ma1_cb_uart_pre_configure (unsigned chan,
 /* This board supports RTS/CTS for the on-chip UART, but only for channel 0. */
 
 /* CTS for UART channel 0 is pin P43 (bit 3 of port 4).  */
-#define NB85E_UART_CTS(chan)	((chan) == 0 ? !(MA_PORT4_IO & 0x8) : 1)
+#define V850E_UART_CTS(chan)	((chan) == 0 ? !(MA_PORT4_IO & 0x8) : 1)
 /* RTS for UART channel 0 is pin P42 (bit 2 of port 4).  */
-#define NB85E_UART_SET_RTS(chan, val)					      \
+#define V850E_UART_SET_RTS(chan, val)					      \
    do {									      \
 	   if (chan == 0) {						      \
 		   unsigned old = MA_PORT4_IO; 				      \

@@ -606,6 +606,8 @@ ext_int_handler:
 	SAVE_ALL_BASE
         SAVE_ALL __LC_EXT_OLD_PSW,0
         GET_THREAD_INFO                # load pointer to task_struct to R9
+	l	%r1,BASED(.Ldo_extint)
+	basr	%r14,%r1
 	lh	%r6,__LC_EXT_INT_CODE  # get interruption code
 	lr	%r1,%r6		       # calculate index = code & 0xff
 	n	%r1,BASED(.Lc0xff)
@@ -694,6 +696,7 @@ restart_go:
  */
 .Ls390_mcck:   .long  s390_do_machine_check
 .Ldo_IRQ:      .long  do_IRQ
+.Ldo_extint:   .long  do_extint
 .Ldo_signal:   .long  do_signal
 .Ldo_softirq:  .long  do_softirq
 .Lentry_base:  .long  entry_base

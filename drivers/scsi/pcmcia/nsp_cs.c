@@ -44,7 +44,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/major.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/stat.h>
 
 #include <asm/io.h>
@@ -1773,7 +1773,8 @@ static void nsp_cs_config(dev_link_t *link)
 		       req.Base+req.Size-1);
 	printk("\n");
 
-	scsi_add_host(host, NULL);
+	scsi_add_host(host, NULL); /* XXX handle failure */
+	scsi_scan_host(host);
 	link->state &= ~DEV_CONFIG_PENDING;
 	return;
 

@@ -4,7 +4,6 @@
 
 #include <linux/slab.h>
 #include <linux/devfs_fs_kernel.h>
-#include <linux/proc_fs.h>
 #include <asm/semaphore.h>
 #include "hosts.h"
 
@@ -88,7 +87,7 @@ static inline struct hpsb_packet *driver_packet(struct list_head *l)
 	return list_entry(l, struct hpsb_packet, driver_list);
 }
 
-void abort_timedouts(struct hpsb_host *host);
+void abort_timedouts(unsigned long __opaque);
 void abort_requests(struct hpsb_host *host);
 
 struct hpsb_packet *alloc_hpsb_packet(size_t data_size);
@@ -223,9 +222,6 @@ int  ieee1394_register_chardev(int blocknum,           /* 0-15 */
 
 /* release a block of minor numbers */
 void ieee1394_unregister_chardev(int blocknum);
-
-/* the proc_fs entry for /proc/ieee1394 */
-extern struct proc_dir_entry *ieee1394_procfs_entry;
 
 /* Our sysfs bus entry */
 extern struct bus_type ieee1394_bus_type;

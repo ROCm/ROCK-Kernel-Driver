@@ -86,7 +86,7 @@ ctl_table core_table[] = {
 	{
 		.ctl_name	= NET_CORE_NO_CONG_THRESH,
 		.procname	= "no_cong_thresh",
-		.data		= &no_cong,
+		.data		= &no_cong_thresh,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec

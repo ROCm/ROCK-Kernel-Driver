@@ -140,8 +140,9 @@ static struct task_struct *idle_thread(int cpu)
 
         current->thread.request.u.thread.proc = idle_proc;
         current->thread.request.u.thread.arg = (void *) cpu;
-	new_task = do_fork(CLONE_VM | CLONE_IDLETASK, 0, NULL, 0, NULL, NULL);
-	if(IS_ERR(new_task)) panic("do_fork failed in idle_thread");
+	new_task = copy_process(CLONE_VM | CLONE_IDLETASK, 0, NULL, 0, NULL, 
+				NULL);
+	if(IS_ERR(new_task)) panic("copy_process failed in idle_thread");
 
 	cpu_tasks[cpu] = ((struct cpu_task) 
 		          { .pid = 	new_task->thread.mode.tt.extern_pid,
@@ -150,6 +151,7 @@ static struct task_struct *idle_thread(int cpu)
 	CHOOSE_MODE(write(new_task->thread.mode.tt.switch_pipe[1], &c, 
 			  sizeof(c)),
 		    ({ panic("skas mode doesn't support SMP"); }));
+	wake_up_forked_process(new_task);
 	return(new_task);
 }
 
@@ -254,15 +256,19 @@ void smp_call_function_slave(int cpu)
 	atomic_inc(&scf_finished);
 }
 
-int smp_call_function(void (*_func)(void *info), void *_info, int nonatomic, 
-		      int wait)
+int smp_call_function_on_cpu(void (*_func)(void *info), void *_info, int wait,
+				unsigned long mask)
 {
-	int cpus = num_online_cpus() - 1;
-	int i;
+	int i, cpu, num_cpus;
 
-	if (!cpus)
-		return 0;
-
+	cpu = get_cpu();
+	mask &= ~(1UL << cpu);
+	num_cpus = hweight32(mask);
+	if(num_cpus == 0){
+		put_cpu_no_resched();
+		return(0);
+	}
+	
 	spin_lock_bh(&call_lock);
 	atomic_set(&scf_started, 0);
 	atomic_set(&scf_finished, 0);
@@ -270,19 +276,25 @@ int smp_call_function(void (*_func)(void *info), void *_info, int nonatomic,
 	info = _info;
 
 	for (i=0;i<NR_CPUS;i++)
-		if((i != current->thread_info->cpu) && 
-		   test_bit(i, &cpu_online_map))
+		if(cpu_online(i) && ((1UL << i) & mask))
 			write(cpu_data[i].ipi_pipe[1], "C", 1);
 
-	while (atomic_read(&scf_started) != cpus)
+	while(atomic_read(&scf_started) != num_cpus)
 		barrier();
 
-	if (wait)
-		while (atomic_read(&scf_finished) != cpus)
+	if(wait)
+		while(atomic_read(&scf_finished) != num_cpus)
 			barrier();
 
 	spin_unlock_bh(&call_lock);
-	return 0;
+	put_cpu_no_resched();
+	return(0);
+}
+
+int smp_call_function(void (*_func)(void *info), void *_info, int nonatomic, 
+		      int wait)
+{
+	return(smp_call_function_on_cpu(_func, _info, wait, cpu_online_map));
 }
 
 #endif

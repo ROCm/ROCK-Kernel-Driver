@@ -1,8 +1,6 @@
 #ifndef __ASM_M68K_KMAP_TYPES_H
 #define __ASM_M68K_KMAP_TYPES_H
 
-#include <linux/config.h>
-
 enum km_type {
 	KM_BOUNCE_READ,
 	KM_SKB_SUNRPC_DATA,

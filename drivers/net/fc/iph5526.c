@@ -48,7 +48,6 @@ static const char *version =
 #include <linux/timer.h>
 #include <linux/spinlock.h>
 #include <linux/netdevice.h>
-#include <linux/blk.h>
 #include <linux/fcdevice.h> /* had the declarations for init_fcdev among
 			       others + includes if_fcdevice.h */
 

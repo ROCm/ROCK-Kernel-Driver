@@ -179,7 +179,7 @@ acpi_get_firmware_table (
 
 		if ((flags & ACPI_MEMORY_MODE) == ACPI_LOGICAL_ADDRESSING) {
 			status = acpi_os_map_memory (rsdp_address.pointer.physical, sizeof (struct rsdp_descriptor),
-					  (void **) &acpi_gbl_RSDP);
+					  (void *) &acpi_gbl_RSDP);
 			if (ACPI_FAILURE (status)) {
 				return_ACPI_STATUS (status);
 			}
@@ -423,7 +423,7 @@ acpi_tb_find_rsdp (
 		 * 1) Search EBDA (low memory) paragraphs
 		 */
 		status = acpi_os_map_memory ((u64) ACPI_LO_RSDP_WINDOW_BASE, ACPI_LO_RSDP_WINDOW_SIZE,
-				  (void **) &table_ptr);
+				  (void *) &table_ptr);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %X for length %X\n",
 				ACPI_LO_RSDP_WINDOW_BASE, ACPI_LO_RSDP_WINDOW_SIZE));
@@ -447,7 +447,7 @@ acpi_tb_find_rsdp (
 		 * 2) Search upper memory: 16-byte boundaries in E0000h-F0000h
 		 */
 		status = acpi_os_map_memory ((u64) ACPI_HI_RSDP_WINDOW_BASE, ACPI_HI_RSDP_WINDOW_SIZE,
-				  (void **) &table_ptr);
+				  (void *) &table_ptr);
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not map memory at %X for length %X\n",
 				ACPI_HI_RSDP_WINDOW_BASE, ACPI_HI_RSDP_WINDOW_SIZE));

@@ -18,9 +18,6 @@
 #include <linux/types.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
-#ifdef CONFIG_BLK_DEV_RAM
-#include <linux/blk.h>
-#endif
 
 #include <asm/setup.h>
 #include <asm/uaccess.h>
@@ -222,18 +219,6 @@ void __init paging_init(void)
 #endif
 		for (i = 0; i < 16; i++)
 			pgprot_val(protection_map[i]) |= _PAGE_CACHE040;
-	}
-	/* Fix the PAGE_NONE value. */
-	if (CPU_IS_040_OR_060) {
-		/* On the 680[46]0 we can use the _PAGE_SUPER bit.  */
-		pgprot_val(protection_map[0]) |= _PAGE_SUPER;
-		pgprot_val(protection_map[VM_SHARED]) |= _PAGE_SUPER;
-	} else {
-		/* Otherwise we must fake it. */
-		pgprot_val(protection_map[0]) &= ~_PAGE_PRESENT;
-		pgprot_val(protection_map[0]) |= _PAGE_FAKE_SUPER;
-		pgprot_val(protection_map[VM_SHARED]) &= ~_PAGE_PRESENT;
-		pgprot_val(protection_map[VM_SHARED]) |= _PAGE_FAKE_SUPER;
 	}
 
 	/*

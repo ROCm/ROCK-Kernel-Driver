@@ -1262,7 +1262,6 @@ static int pegasus_probe(struct usb_interface *intf,
 	}
 	set_ethernet_addr(pegasus);
 	fill_skb_pool(pegasus);
-	printk("%s: %s\n", net->name, usb_dev_id[dev_index].name);
 	if (pegasus->features & PEGASUS_II) {
 		info("setup Pegasus II specific registers");
 		setup_pegasus_II(pegasus);
@@ -1273,9 +1272,11 @@ static int pegasus_probe(struct usb_interface *intf,
 		pegasus->phy = 1;
 	}
 	usb_set_intfdata(intf, pegasus);
+	SET_NETDEV_DEV(net, &intf->dev);
 	res = register_netdev(net);
 	if (res)
 		goto out4;
+	printk("%s: %s\n", net->name, usb_dev_id[dev_index].name);
 	return 0;
 
 out4:

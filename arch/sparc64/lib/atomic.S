@@ -33,4 +33,27 @@ __atomic_sub: /* %o0 = increment, %o1 = atomic_ptr */
 	 membar	#StoreLoad | #StoreStore
 	retl
 	 sub	%g7, %o0, %o0
+
+	.globl	__atomic64_add
+__atomic64_add: /* %o0 = increment, %o1 = atomic_ptr */
+	ldx	[%o1], %g5
+	add	%g5, %o0, %g7
+	casx	[%o1], %g5, %g7
+	cmp	%g5, %g7
+	bne,pn	%xcc, __atomic64_add
+	 membar	#StoreLoad | #StoreStore
+	retl
+	 add	%g7, %o0, %o0
+
+	.globl	__atomic64_sub
+__atomic64_sub: /* %o0 = increment, %o1 = atomic_ptr */
+	ldx	[%o1], %g5
+	sub	%g5, %o0, %g7
+	casx	[%o1], %g5, %g7
+	cmp	%g5, %g7
+	bne,pn	%xcc, __atomic64_sub
+	 membar	#StoreLoad | #StoreStore
+	retl
+	 sub	%g7, %o0, %o0
+
 atomic_impl_end:

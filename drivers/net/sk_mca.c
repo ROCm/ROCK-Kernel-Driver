@@ -254,8 +254,7 @@ static void SetLANCE(struct SKMCA_NETDEV *dev, u16 addr, u16 value)
 
 	/* disable interrupts */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&priv->lock, flags);
 
 	/* wait until no transfer is pending */
 
@@ -281,7 +280,7 @@ static void SetLANCE(struct SKMCA_NETDEV *dev, u16 addr, u16 value)
 
 	/* reenable interrupts */
 
-	restore_flags(flags);
+	spin_lock_irqrestore(&priv->lock, flags);
 }
 
 /* get LANCE register */
@@ -294,8 +293,7 @@ static u16 GetLANCE(struct SKMCA_NETDEV *dev, u16 addr)
 
 	/* disable interrupts */
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&priv->lock, flags);
 
 	/* wait until no transfer is pending */
 
@@ -321,7 +319,7 @@ static u16 GetLANCE(struct SKMCA_NETDEV *dev, u16 addr)
 
 	/* reenable interrupts */
 
-	restore_flags(flags);
+	spin_lock_irqrestore(&priv->lock, flags);
 
 	return res;
 }
@@ -968,8 +966,9 @@ static int skmca_tx(struct sk_buff *skb, struct SKMCA_NETDEV *dev)
 #endif
 
 	/* one more descriptor busy */
-	save_flags(flags);
-	cli();
+
+	spin_lock_irqsave(&priv->lock, flags);
+
 	priv->nexttxput++;
 	if (priv->nexttxput >= TXCOUNT)
 		priv->nexttxput = 0;
@@ -994,7 +993,7 @@ static int skmca_tx(struct sk_buff *skb, struct SKMCA_NETDEV *dev)
 	if (priv->txbusy == 0)
 		SetLANCE(dev, LANCE_CSR0, CSR0_INEA | CSR0_TDMD);
 
-	restore_flags(flags);
+	spin_lock_irqrestore(&priv->lock, flags);
 
       tx_done:
 
@@ -1156,6 +1155,7 @@ int __init skmca_probe(struct SKMCA_NETDEV *dev)
 	priv->cmdaddr = base + 0x3ff3;
 	priv->medium = medium;
 	memset(&(priv->stat), 0, sizeof(struct net_device_stats));
+	spin_lock_init(&priv->lock);
 
 	/* set base + irq for this device (irq not allocated so far) */
 	dev->irq = 0;

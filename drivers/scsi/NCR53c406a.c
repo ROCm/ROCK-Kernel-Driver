@@ -51,7 +51,7 @@
 #include <asm/bitops.h>
 #include <asm/irq.h>
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/spinlock.h>
 #include "scsi.h"
 #include "hosts.h"

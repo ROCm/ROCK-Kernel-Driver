@@ -73,7 +73,7 @@
 #include <linux/init.h>
 
 #include <asm/io.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #include <linux/cdrom.h>
 #include "optcd.h"

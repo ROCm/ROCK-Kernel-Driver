@@ -162,7 +162,7 @@ bad_area:
 		tsk->thread.cp0_badvaddr = address;
 		tsk->thread.error_code = write;
 #if 0
-		printk("do_page_fault() #2: sending SIGSEGV to %s for illegal %s\n"
+		printk("do_page_fault() #2: sending SIGSEGV to %s for invalid %s\n"
 		       "%08lx (epc == %08lx, ra == %08lx)\n",
 		       tsk->comm,
 		       write ? "write access to" : "read access from",

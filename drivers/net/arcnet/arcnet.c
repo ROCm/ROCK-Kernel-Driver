@@ -343,7 +343,10 @@ void arcdev_setup(struct net_device *dev)
 static int arcnet_open(struct net_device *dev)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-	int count, newmtu;
+	int count, newmtu, error;
+
+	if (!try_module_get(lp->hw.owner))
+		return -ENODEV;
 
 	BUGLVL(D_PROTO) {
 		int count;
@@ -360,8 +363,9 @@ static int arcnet_open(struct net_device *dev)
 	/* try to put the card in a defined state - if it fails the first
 	 * time, actually reset it.
 	 */
+	error = -ENODEV;
 	if (ARCRESET(0) && ARCRESET(1))
-		return -ENODEV;
+		goto out_module_put;
 
 	newmtu = choose_mtu();
 	if (newmtu < dev->mtu)
@@ -391,7 +395,7 @@ static int arcnet_open(struct net_device *dev)
 	lp->rfc1201.sequence = 1;
 
 	/* bring up the hardware driver */
-	ARCOPEN(1);
+	lp->hw.open(dev);
 
 	if (dev->dev_addr[0] == 0)
 		BUGMSG(D_NORMAL, "WARNING!  Station address 00 is reserved "
@@ -415,6 +419,10 @@ static int arcnet_open(struct net_device *dev)
 	netif_start_queue(dev);
 
 	return 0;
+
+ out_module_put:
+	module_put(lp->hw.owner);
+	return error;
 }
 
 
@@ -432,8 +440,8 @@ static int arcnet_close(struct net_device *dev)
 	mdelay(1);
 
 	/* shut down the card */
-	ARCOPEN(0);
-
+	lp->hw.close(dev);
+	module_put(lp->hw.owner);
 	return 0;
 }
 

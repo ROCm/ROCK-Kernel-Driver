@@ -122,11 +122,14 @@
 	- No filtering multicast in promisc mode (Edward Peng)
 	- Fix for Rhine-I Tx timeouts
 
+	LK1.1.19 (Roger Luethi)
+	- Increase Tx threshold for unspecified errors
+
 */
 
 #define DRV_NAME	"via-rhine"
-#define DRV_VERSION	"1.1.18-2.5"
-#define DRV_RELDATE	"July-4-2003"
+#define DRV_VERSION	"1.1.19-2.5"
+#define DRV_RELDATE	"July-12-2003"
 
 
 /* A few user-configurable values.
@@ -1664,9 +1667,13 @@ static void via_rhine_error(struct net_device *dev, int intr_status)
 	}
 	if ((intr_status & IntrTxError) && ~( IntrTxAborted | IntrTxUnderrun |
 										   IntrTxDescRace )) {
-		if (debug > 2)
-			printk(KERN_INFO "%s: Unspecified error.\n",
-				   dev->name);
+		if (np->tx_thresh < 0xE0) {
+			writeb(np->tx_thresh += 0x20, ioaddr + TxConfig);
+		}
+		if (debug > 1)
+			printk(KERN_INFO "%s: Unspecified error. Tx "
+				   "threshold now %2.2x.\n",
+				   dev->name, np->tx_thresh);
 	}
 	if (intr_status & ( IntrTxAborted | IntrTxUnderrun | IntrTxDescRace |
 						IntrTxError ))

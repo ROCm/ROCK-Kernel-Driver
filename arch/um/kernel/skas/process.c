@@ -4,6 +4,7 @@
  */
 
 #include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <signal.h>
 #include <setjmp.h>
@@ -24,6 +25,16 @@
 #include "os.h"
 #include "proc_mm.h"
 #include "skas_ptrace.h"
+#include "chan_user.h"
+
+int is_skas_winch(int pid, int fd, void *data)
+{
+	if(pid != getpid())
+		return(0);
+
+	register_winch_irq(-1, fd, -1, data);
+	return(1);
+}
 
 unsigned long exec_regs[FRAME_SIZE];
 unsigned long exec_fp_regs[HOST_FP_SIZE];
@@ -72,8 +83,6 @@ static void handle_trap(int pid, union uml_pt_regs *regs)
 	handle_syscall(regs);
 }
 
-int userspace_pid;
-
 static int userspace_tramp(void *arg)
 {
 	init_new_thread_signals(0);
@@ -82,6 +91,8 @@ static int userspace_tramp(void *arg)
 	os_stop_process(os_getpid());
 	return(0);
 }
+
+int userspace_pid;
 
 void start_userspace(void)
 {
@@ -149,6 +160,7 @@ void userspace(union uml_pt_regs *regs)
 			case SIGILL:
 			case SIGBUS:
 			case SIGFPE:
+			case SIGWINCH:
 				user_signal(WSTOPSIG(status), regs);
 				break;
 			default:

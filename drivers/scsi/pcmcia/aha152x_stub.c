@@ -44,7 +44,7 @@
 #include <linux/ioport.h>
 #include <scsi/scsi.h>
 #include <linux/major.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <scsi/scsi_ioctl.h>
 
 #include "scsi.h"
@@ -278,7 +278,8 @@ static void aha152x_config_cs(dev_link_t *link)
 	goto cs_failed;
     }
 
-    scsi_add_host(host, NULL);
+    scsi_add_host(host, NULL); /* XXX handle failure */
+    scsi_scan_host(host);
 
     sprintf(info->node.dev_name, "scsi%d", host->host_no);
     link->dev = &info->node;

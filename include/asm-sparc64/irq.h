@@ -78,6 +78,7 @@ extern unsigned char dma_sync_reg_table_entry;
 /* IMAP/ICLR register defines */
 #define IMAP_VALID		0x80000000	/* IRQ Enabled		*/
 #define IMAP_TID_UPA		0x7c000000	/* UPA TargetID		*/
+#define IMAP_TID_JBUS		0x7c000000	/* JBUS TargetID	*/
 #define IMAP_AID_SAFARI		0x7c000000	/* Safari AgentID	*/
 #define IMAP_NID_SAFARI		0x03e00000	/* Safari NodeID	*/
 #define IMAP_IGN		0x000007c0	/* IRQ Group Number	*/

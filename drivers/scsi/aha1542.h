@@ -130,7 +130,6 @@ struct ccb {			/* Command Control Block 5.3 */
 };
 
 static int aha1542_detect(Scsi_Host_Template *);
-static int aha1542_command(Scsi_Cmnd *);
 static int aha1542_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int aha1542_abort(Scsi_Cmnd * SCpnt);
 static int aha1542_bus_reset(Scsi_Cmnd * SCpnt);

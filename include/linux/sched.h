@@ -52,6 +52,7 @@ struct exec_domain;
 #define CLONE_DETACHED		0x00400000	/* parent wants no child-exit signal */
 #define CLONE_UNTRACED		0x00800000	/* set if the tracing process can't force CLONE_PTRACE on this clone */
 #define CLONE_CHILD_SETTID	0x01000000	/* set the TID in the child */
+#define CLONE_STOPPED		0x02000000	/* Start in stopped state */
 
 /*
  * List of flags we want to share for kernel threads,
@@ -486,6 +487,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SWAPOFF	0x00080000	/* I am in swapoff */
 #define PF_LESS_THROTTLE 0x01000000	/* Throttle me less: I clena memory */
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
+#define PF_READAHEAD	0x00400000	/* I am doing read-ahead */
 
 #ifdef CONFIG_SMP
 extern int set_cpus_allowed(task_t *p, unsigned long new_mask);

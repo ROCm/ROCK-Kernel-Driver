@@ -58,7 +58,7 @@
 #include <linux/interrupt.h>
 #include <linux/stat.h>
 #include <linux/config.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/spinlock.h>
 #include <asm/io.h>
 

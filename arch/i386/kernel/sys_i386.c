@@ -56,7 +56,7 @@ static inline long do_mmap2(
 	}
 
 	down_write(&current->mm->mmap_sem);
-	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+	error = do_mmap_pgoff(current->mm, file, addr, len, prot, flags, pgoff);
 	up_write(&current->mm->mmap_sem);
 
 	if (file)

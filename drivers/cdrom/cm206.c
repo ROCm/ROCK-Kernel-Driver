@@ -199,7 +199,7 @@ History:
 
 #define MAJOR_NR CM206_CDROM_MAJOR
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #undef DEBUG
 #define STATISTICS		/* record times and frequencies of events */

@@ -26,6 +26,7 @@
 #include "mconsole_kern.h"
 #include "init.h"
 #include "irq_user.h"
+#include "irq_kern.h"
 
 static spinlock_t opened_lock = SPIN_LOCK_UNLOCKED;
 LIST_HEAD(opened);
@@ -61,14 +62,14 @@ static int uml_net_rx(struct net_device *dev)
 	return pkt_len;
 }
 
-void uml_net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t uml_net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct uml_net_private *lp = dev->priv;
 	int err;
 
 	if(!netif_running(dev))
-		return;
+		return(IRQ_NONE);
 
 	spin_lock(&lp->lock);
 	while((err = uml_net_rx(dev)) > 0) ;
@@ -83,6 +84,7 @@ void uml_net_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
  out:
 	spin_unlock(&lp->lock);
+	return(IRQ_HANDLED);
 }
 
 static int uml_net_open(struct net_device *dev)
@@ -292,7 +294,7 @@ static int eth_configure(int n, void *init, char *mac,
 	struct uml_net *device;
 	struct net_device *dev;
 	struct uml_net_private *lp;
-	int err, size;
+	int save, err, size;
 
 	size = transport->private_size + sizeof(struct uml_net_private) + 
 		sizeof(((struct uml_net_private *) 0)->user);
@@ -362,21 +364,29 @@ static int eth_configure(int n, void *init, char *mac,
 		return 1;
 	lp = dev->priv;
 
-	INIT_LIST_HEAD(&lp->list);
-	spin_lock_init(&lp->lock);
-	lp->dev = dev;
-	lp->fd = -1;
-	lp->mac = { 0xfe, 0xfd, 0x0, 0x0, 0x0, 0x0 };
-	lp->have_mac = device->have_mac;
-	lp->protocol = transport->kern->protocol;
-	lp->open = transport->user->open;
-	lp->close = transport->user->close;
-	lp->remove = transport->user->remove;
-	lp->read = transport->kern->read;
-	lp->write = transport->kern->write;
-	lp->add_address = transport->user->add_address;
-	lp->delete_address = transport->user->delete_address;
-	lp->set_mtu = transport->user->set_mtu;
+	/* lp.user is the first four bytes of the transport data, which
+	 * has already been initialized.  This structure assignment will
+	 * overwrite that, so we make sure that .user gets overwritten with
+	 * what it already has.
+	 */
+	save = lp->user[0];
+	*lp = ((struct uml_net_private) 
+		{ .list  		= LIST_HEAD_INIT(lp->list),
+		  .lock 		= SPIN_LOCK_UNLOCKED,
+		  .dev 			= dev,
+		  .fd 			= -1,
+		  .mac 			= { 0xfe, 0xfd, 0x0, 0x0, 0x0, 0x0},
+		  .have_mac 		= device->have_mac,
+		  .protocol 		= transport->kern->protocol,
+		  .open 		= transport->user->open,
+		  .close 		= transport->user->close,
+		  .remove 		= transport->user->remove,
+		  .read 		= transport->kern->read,
+		  .write 		= transport->kern->write,
+		  .add_address 		= transport->user->add_address,
+		  .delete_address  	= transport->user->delete_address,
+		  .set_mtu 		= transport->user->set_mtu,
+		  .user  		= { save } });
 
 	init_timer(&lp->tl);
 	lp->tl.function = uml_net_user_timer_expire;

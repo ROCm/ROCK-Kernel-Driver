@@ -126,7 +126,7 @@ enum
 struct xfrm_user_tmpl {
 	struct xfrm_id		id;
 	xfrm_address_t		saddr;
-	__u16			reqid;
+	__u32			reqid;
 	__u8			mode;
 	__u8			share;
 	__u8			optional;
@@ -162,8 +162,8 @@ struct xfrm_usersa_info {
 	struct xfrm_lifetime_cur	curlft;
 	struct xfrm_stats		stats;
 	__u32				seq;
+	__u32				reqid;
 	__u16				family;
-	__u16				reqid;
 	__u8				mode; /* 0=transport,1=tunnel */
 	__u8				replay_window;
 };

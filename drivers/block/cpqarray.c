@@ -38,7 +38,6 @@
 #include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/spinlock.h>
-#include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/genhd.h>
 #include <asm/uaccess.h>

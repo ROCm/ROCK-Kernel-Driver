@@ -88,7 +88,11 @@ lockd(struct svc_rqst *rqstp)
 	unsigned long grace_period_expire;
 
 	/* Lock module and set up kernel thread */
-	MOD_INC_USE_COUNT;
+	/* lockd_up is waiting for us to startup, so will
+	 * be holding a reference to this module, so it
+	 * is safe to just claim another reference
+	 */
+	__module_get(THIS_MODULE);
 	lock_kernel();
 
 	/*
@@ -183,7 +187,7 @@ lockd(struct svc_rqst *rqstp)
 
 	/* Release module */
 	unlock_kernel();
-	MOD_DEC_USE_COUNT;
+	module_put_and_exit(0);
 }
 
 /*

@@ -4,6 +4,10 @@
  *  Written 1993 by Jacques Gelinas
  *
  *  Extended MS-DOS ioctl directory handling functions
+ *
+ *  Changes:
+ *  11/07/2003      Daniele Bellucci <bellucda@tiscali.it>
+ *                  - audit copy_to_user/put_user in umsdos_ioctl_fill.
  */
 
 #include <asm/uaccess.h>
@@ -36,11 +40,12 @@ static int umsdos_ioctl_fill (
 	struct UMSDOS_DIR_ONCE *d = (struct UMSDOS_DIR_ONCE *) buf;
 
 	if (d->count == 0) {
-		copy_to_user (d->ent->d_name, name, name_len);
-		put_user ('\0', d->ent->d_name + name_len);
-		put_user (name_len, &d->ent->d_reclen);
-		put_user (ino, &d->ent->d_ino);
-		put_user (offset, &d->ent->d_off);
+		if (copy_to_user (d->ent->d_name, name, name_len) ||
+		    put_user ('\0', d->ent->d_name + name_len) ||
+		    put_user (name_len, &d->ent->d_reclen) ||
+		    put_user (ino, &d->ent->d_ino) ||
+		    put_user (offset, &d->ent->d_off))
+			return -EFAULT;
 		d->count = 1;
 		ret = 0;
 	}

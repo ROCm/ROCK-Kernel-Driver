@@ -107,6 +107,7 @@ extern int create_unix_socket(char *file, int len);
 extern int os_connect_socket(char *name);
 extern int os_file_type(char *file);
 extern int os_file_mode(char *file, struct openflags *mode_out);
+extern int os_lock_file(int fd, int excl);
 
 extern unsigned long os_process_pc(int pid);
 extern int os_process_parent(int pid);
@@ -120,6 +121,7 @@ extern int os_map_memory(void *virt, int fd, unsigned long off,
 extern int os_protect_memory(void *addr, unsigned long len, 
 			     int r, int w, int x);
 extern int os_unmap_memory(void *addr, int len);
+extern void os_flush_stdout(void);
 
 #endif
 

@@ -113,7 +113,7 @@ config PCMCIA_XIRC2PS
 	  If unsure, say N.
 
 config PCMCIA_AXNET
-	tristate "broken NS8390-cards support"
+	tristate "Asix AX88190 PCMCIA support"
 	depends on NET_PCMCIA && PCMCIA
 	---help---
 	  Say Y here if you intend to attach an Asix AX88190-based PCMCIA

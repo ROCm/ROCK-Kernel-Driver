@@ -34,12 +34,15 @@
 #include <linux/root_dev.h>
 #include <linux/console.h>
 #include <linux/seq_file.h>
+#include <linux/kernel_stat.h>
+
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/smp.h>
 #include <asm/mmu_context.h>
 #include <asm/cpcmd.h>
 #include <asm/lowcore.h>
+#include <asm/irq.h>
 
 /*
  * Machine setup..
@@ -600,3 +603,40 @@ struct seq_operations cpuinfo_op = {
 	.stop	= c_stop,
 	.show	= show_cpuinfo,
 };
+
+/*
+ * show_interrupts is needed by /proc/interrupts.
+ */
+
+static const char *intrclass_names[] = {
+	"EXT",
+	"I/O",
+};
+
+int show_interrupts(struct seq_file *p, void *v)
+{
+        int i, j;
+	
+        seq_puts(p, "           ");
+	
+        for (j=0; j<NR_CPUS; j++)
+                if (cpu_online(j))
+                        seq_printf(p, "CPU%d       ",j);
+	
+        seq_putc(p, '\n');
+	
+        for (i = 0 ; i < NR_IRQS ; i++) {
+		seq_printf(p, "%s: ", intrclass_names[i]);
+#ifndef CONFIG_SMP
+		seq_printf(p, "%10u ", kstat_irqs(i));
+#else
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
+#endif
+                seq_putc(p, '\n');
+		
+        }
+	
+        return 0;
+}

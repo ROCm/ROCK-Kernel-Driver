@@ -785,8 +785,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 			ipv6_addr_all_nodes(&maddr);
 			ndisc_send_na(dev, NULL, &maddr, &ifp->addr, 
 				      ifp->idev->cnf.forwarding, 0, 
-				      ipv6_addr_type(&ifp->addr)&IPV6_ADDR_ANYCAST ? 0 : 1, 
-				      1);
+				      1, 1);
 			in6_ifa_put(ifp);
 			return;
 		}
@@ -809,8 +808,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 			if (neigh || !dev->hard_header) {
 				ndisc_send_na(dev, neigh, saddr, &ifp->addr, 
 					      ifp->idev->cnf.forwarding, 1, 
-					      ipv6_addr_type(&ifp->addr)&IPV6_ADDR_ANYCAST ? 0 : 1, 
-					      1);
+					      1, 1);
 				if (neigh)
 					neigh_release(neigh);
 			}

@@ -15,7 +15,7 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/mm.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/version.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>

@@ -601,7 +601,7 @@ handle_irq(int irq, struct pt_regs * regs)
 	if ((unsigned) irq > ACTUAL_NR_IRQS && illegal_count < MAX_ILLEGAL_IRQS ) {
 		irq_err_count++;
 		illegal_count++;
-		printk(KERN_CRIT "device_interrupt: illegal interrupt %d\n",
+		printk(KERN_CRIT "device_interrupt: invalid interrupt %d\n",
 		       irq);
 		return;
 	}

@@ -13,6 +13,7 @@
 #include <sys/time.h>
 #include "init.h"
 #include "user.h"
+#include "kern_util.h"
 #include "os.h"
 
 #define TTY_LOG_DIR "./"
@@ -24,29 +25,40 @@ static int tty_log_fd = -1;
 #define TTY_LOG_OPEN 1
 #define TTY_LOG_CLOSE 2
 #define TTY_LOG_WRITE 3
+#define TTY_LOG_EXEC 4
+
+#define TTY_READ 1
+#define TTY_WRITE 2
 
 struct tty_log_buf {
 	int what;
 	unsigned long tty;
 	int len;
+	int direction;
+	unsigned long sec;
+	unsigned long usec;
 };
 
-int open_tty_log(void *tty)
+int open_tty_log(void *tty, void *current_tty)
 {
 	struct timeval tv;
 	struct tty_log_buf data;
 	char buf[strlen(tty_log_dir) + sizeof("01234567890-01234567\0")];
 	int fd;
 
+	gettimeofday(&tv, NULL);
 	if(tty_log_fd != -1){
-		data = ((struct tty_log_buf) { what :	TTY_LOG_OPEN,
-					       tty : (unsigned long) tty,
-					       len : 0 });
+		data = ((struct tty_log_buf) { .what 	= TTY_LOG_OPEN,
+					       .tty  = (unsigned long) tty,
+					       .len  = sizeof(current_tty),
+					       .direction = 0,
+					       .sec = tv.tv_sec,
+					       .usec = tv.tv_usec } );
 		write(tty_log_fd, &data, sizeof(data));
+		write(tty_log_fd, &current_tty, data.len);
 		return(tty_log_fd);
 	}
 
-	gettimeofday(&tv, NULL);
 	sprintf(buf, "%s/%0u-%0u", tty_log_dir, (unsigned int) tv.tv_sec, 
  		(unsigned int) tv.tv_usec);
 
@@ -62,28 +74,99 @@ int open_tty_log(void *tty)
 void close_tty_log(int fd, void *tty)
 {
 	struct tty_log_buf data;
+	struct timeval tv;
 
 	if(tty_log_fd != -1){
-		data = ((struct tty_log_buf) { what :	TTY_LOG_CLOSE,
-					       tty : (unsigned long) tty,
-					       len : 0 });
+		gettimeofday(&tv, NULL);
+		data = ((struct tty_log_buf) { .what 	= TTY_LOG_CLOSE,
+					       .tty  = (unsigned long) tty,
+					       .len  = 0,
+					       .direction = 0,
+					       .sec = tv.tv_sec,
+					       .usec = tv.tv_usec } );
 		write(tty_log_fd, &data, sizeof(data));
 		return;
 	}
 	close(fd);
 }
 
-int write_tty_log(int fd, char *buf, int len, void *tty)
+static int log_chunk(int fd, char *buf, int len)
 {
+	int total = 0, try, missed, n;
+	char chunk[64];
+
+	while(len > 0){
+		try = (len > sizeof(chunk)) ? sizeof(chunk) : len;
+		missed = copy_from_user_proc(chunk, buf, try);
+		try -= missed;
+		n = write(fd, chunk, try);
+		if(n != try)
+			return(-errno);
+		if(missed != 0)
+			return(-EFAULT);
+
+		len -= try;
+		total += try;
+		buf += try;
+	}
+
+	return(total);
+}
+
+int write_tty_log(int fd, char *buf, int len, void *tty, int is_read)
+{
+	struct timeval tv;
 	struct tty_log_buf data;
+	int direction;
 
 	if(fd == tty_log_fd){
-		data = ((struct tty_log_buf) { what :	TTY_LOG_WRITE,
-					       tty : (unsigned long) tty,
-					       len : len });
+		gettimeofday(&tv, NULL);
+		direction = is_read ? TTY_READ : TTY_WRITE;
+		data = ((struct tty_log_buf) { .what 	= TTY_LOG_WRITE,
+					       .tty  = (unsigned long) tty,
+					       .len  = len,
+					       .direction = direction,
+					       .sec = tv.tv_sec,
+					       .usec = tv.tv_usec } );
 		write(tty_log_fd, &data, sizeof(data));
 	}
-	return(write(fd, buf, len));
+
+	return(log_chunk(fd, buf, len));
+}
+
+void log_exec(char **argv, void *tty)
+{
+	struct timeval tv;
+	struct tty_log_buf data;
+	char **ptr,*arg;
+	int len;
+	
+	if(tty_log_fd == -1) return;
+
+	gettimeofday(&tv, NULL);
+
+	len = 0;
+	for(ptr = argv; ; ptr++){
+		if(copy_from_user_proc(&arg, ptr, sizeof(arg)))
+			return;
+		if(arg == NULL) break;
+		len += strlen_user_proc(arg);
+	}
+
+	data = ((struct tty_log_buf) { .what 	= TTY_LOG_EXEC,
+				       .tty  = (unsigned long) tty,
+				       .len  = len,
+				       .direction = 0,
+				       .sec = tv.tv_sec,
+				       .usec = tv.tv_usec } );
+	write(tty_log_fd, &data, sizeof(data));
+
+	for(ptr = argv; ; ptr++){
+		if(copy_from_user_proc(&arg, ptr, sizeof(arg)))
+			return;
+		if(arg == NULL) break;
+		log_chunk(tty_log_fd, arg, strlen_user_proc(arg));
+	}
 }
 
 static int __init set_tty_log_dir(char *name, int *add)
@@ -104,7 +187,7 @@ static int __init set_tty_log_fd(char *name, int *add)
 
 	tty_log_fd = strtoul(name, &end, 0);
 	if((*end != '\0') || (end == name)){
-		printk("set_tty_log_fd - strtoul failed on '%s'\n", name);
+		printf("set_tty_log_fd - strtoul failed on '%s'\n", name);
 		tty_log_fd = -1;
 	}
 	return 0;

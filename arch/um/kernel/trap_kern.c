@@ -16,6 +16,7 @@
 #include "asm/tlbflush.h"
 #include "asm/a.out.h"
 #include "asm/current.h"
+#include "asm/irq.h"
 #include "user_util.h"
 #include "kern_util.h"
 #include "kern.h"
@@ -178,6 +179,11 @@ void bus_handler(int sig, union uml_pt_regs *regs)
 	if(current->thread.fault_catcher != NULL)
 		do_longjmp(current->thread.fault_catcher, 1);
 	else relay_signal(sig, regs);
+}
+
+void winch(int sig, union uml_pt_regs *regs)
+{
+	do_IRQ(WINCH_IRQ, regs);
 }
 
 void trap_init(void)

@@ -43,7 +43,7 @@
 #include <linux/init.h>
 #include <linux/reboot.h>
 #include <linux/vmalloc.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <asm/uaccess.h>
 
@@ -606,35 +606,8 @@ not_present:
 
 static void sd_rescan(struct device *dev)
 {
-	struct scsi_device *sdp = to_scsi_device(dev);
 	struct scsi_disk *sdkp = dev_get_drvdata(dev);
-	struct gendisk *gd;
-	struct scsi_request *SRpnt;
-	unsigned char *buffer;
-
-	if (!sdkp || sdp->online == FALSE || !sdkp->media_present)
-		return;
-		
-	gd = sdkp->disk;
-	
-	SCSI_LOG_HLQUEUE(3, printk("sd_rescan: disk=%s\n", gd->disk_name));
-	
-	SRpnt = scsi_allocate_request(sdp);
-	if (!SRpnt) {
-		printk(KERN_WARNING "(sd_rescan:) Request allocation "
-		       "failure.\n");
-		return;
-	}
-
-	if (sdkp->device->host->unchecked_isa_dma)
-		buffer = kmalloc(512, GFP_DMA);
-	else
-		buffer = kmalloc(512, GFP_KERNEL);
-
-    	sd_read_capacity(sdkp, gd->disk_name, SRpnt, buffer);
-	set_capacity(gd, sdkp->capacity);	
-	scsi_release_request(SRpnt);
-	kfree(buffer);
+	sd_revalidate_disk(sdkp->disk);
 }
 
 static struct block_device_operations sd_fops = {
@@ -1318,7 +1291,7 @@ static int sd_probe(struct device *dev)
 
 	sd_revalidate_disk(gd);
 
-	gd->driverfs_dev = &sdp->sdev_driverfs_dev;
+	gd->driverfs_dev = &sdp->sdev_gendev;
 	gd->flags = GENHD_FL_DRIVERFS;
 	if (sdp->removable)
 		gd->flags |= GENHD_FL_REMOVABLE;

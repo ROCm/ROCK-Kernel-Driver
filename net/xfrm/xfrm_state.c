@@ -4,7 +4,7 @@
  * Changes:
  *	Mitsuru KANDA @USAGI
  * 	Kazunori MIYAZAWA @USAGI
- * 	Kunihiro Ishiguro
+ * 	Kunihiro Ishiguro <kunihiro@ipinfusion.com>
  * 		IPv6 support
  * 	YOSHIFUJI Hideaki @USAGI
  * 		Split up af-specific functions
@@ -554,7 +554,7 @@ xfrm_state_lookup(xfrm_address_t *daddr, u32 spi, u8 proto,
 }
 
 struct xfrm_state *
-xfrm_find_acq(u8 mode, u16 reqid, u8 proto, 
+xfrm_find_acq(u8 mode, u32 reqid, u8 proto, 
 	      xfrm_address_t *daddr, xfrm_address_t *saddr, 
 	      int create, unsigned short family)
 {

@@ -20,7 +20,7 @@
  * General Public License for more details.
  */
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/string.h>

@@ -6,7 +6,6 @@ CONFIG_MMU=y
 CONFIG_SWAP=y
 CONFIG_UID16=y
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
-CONFIG_CONFIG_LOG_BUF_SHIFT=14
 
 #
 # Code maturity level options
@@ -116,7 +115,6 @@ CONFIG_PACKET=y
 CONFIG_PACKET_MMAP=y
 # CONFIG_NETLINK_DEV is not set
 # CONFIG_NETFILTER is not set
-# CONFIG_FILTER is not set
 CONFIG_UNIX=y
 # CONFIG_NET_KEY is not set
 CONFIG_INET=y
@@ -385,7 +383,6 @@ CONFIG_MTD_BLKMTD=m
 #
 # Disk-On-Chip Device Drivers
 #
-# CONFIG_MTD_DOC1000 is not set
 # CONFIG_MTD_DOC2000 is not set
 # CONFIG_MTD_DOC2001 is not set
 

@@ -1320,7 +1320,8 @@ int usb_bluetooth_init(void)
 
 	bluetooth_tty_driver->owner = THIS_MODULE;
 	bluetooth_tty_driver->driver_name = "usb-bluetooth";
-	bluetooth_tty_driver->name = "usb/ttub/";
+	bluetooth_tty_driver->name = "ttyUB";
+	bluetooth_tty_driver->devfs_name = "usb/ttub/";
 	bluetooth_tty_driver->major = BLUETOOTH_TTY_MAJOR;
 	bluetooth_tty_driver->minor_start = 0;
 	bluetooth_tty_driver->type = TTY_DRIVER_TYPE_SERIAL;

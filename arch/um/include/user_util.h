@@ -59,7 +59,6 @@ extern int wait_for_stop(int pid, int sig, int cont_type, void *relay);
 extern void *add_signal_handler(int sig, void (*handler)(int));
 extern int start_fork_tramp(void *arg, unsigned long temp_stack, 
 			    int clone_flags, int (*tramp)(void *));
-extern int clone_and_wait(int (*fn)(void *), void *arg, void *sp, int flags);
 extern int linux_main(int argc, char **argv);
 extern void set_cmdline(char *cmd);
 extern void input_cb(void (*proc)(void *), void *arg, int arg_len);

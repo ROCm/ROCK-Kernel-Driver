@@ -17,8 +17,8 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/stddef.h>
-#include <linux/blk.h>
 #include <linux/init.h>
+#include <asm/page.h>
 
 #include "mem_pieces.h"
 

@@ -123,7 +123,7 @@
 #include <linux/timer.h>
 #include <linux/stat.h>
 
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,35)
 #include <linux/init.h>
@@ -1327,7 +1327,7 @@ MODULE_PARM(sym53c8xx, "s");
 #define SetScsiAbortResult(cmd) SetScsiResult(cmd, DID_ABORT, 0xff)
 #endif
 
-static void sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
+static irqreturn_t sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void sym53c8xx_timeout(unsigned long np);
 
 #define initverbose (driver_setup.verbose)
@@ -7374,7 +7374,7 @@ void ncr_complete (ncb_p np, ccb_p cp)
 		}
 		if (cp->xerr_status & XE_BAD_PHASE) {
 			PRINT_ADDR(cmd);
-			printk ("illegal scsi phase (4/5).\n");
+			printk ("invalid scsi phase (4/5).\n");
 		}
 		if (cp->xerr_status & XE_SODL_UNRUN) {
 			PRINT_ADDR(cmd);
@@ -13660,7 +13660,7 @@ printk("sym53c8xx : command successfully queued\n");
 **   routine for each host that uses this IRQ.
 */
 
-static void sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
 {
      unsigned long flags;
      ncb_p np = (ncb_p) dev_id;
@@ -13685,6 +13685,7 @@ static void sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
           ncr_flush_done_cmds(done_list);
           NCR_UNLOCK_SCSI_DONE(done_list->device->host, flags);
      }
+     return IRQ_HANDLED;
 }
 
 /*

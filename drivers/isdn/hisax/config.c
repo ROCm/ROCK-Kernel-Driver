@@ -859,6 +859,65 @@ free_IsdnCardState(struct IsdnCardState *cs)
 	kfree(cs);
 }
 
+static void
+do_register_isdn(struct IsdnCardState *cs)
+{
+	if (!cs->iif.owner)
+		cs->iif.owner = THIS_MODULE;
+
+	cs->iif.channels = 2;
+	cs->iif.maxbufsize = MAX_DATA_SIZE;
+	cs->iif.hl_hdrlen = MAX_HEADER_LEN;
+	cs->iif.features =
+		ISDN_FEATURE_L2_X75I |
+		ISDN_FEATURE_L2_HDLC |
+		ISDN_FEATURE_L2_HDLC_56K |
+		ISDN_FEATURE_L2_TRANS |
+		ISDN_FEATURE_L3_TRANS |
+#ifdef	CONFIG_HISAX_1TR6
+		ISDN_FEATURE_P_1TR6 |
+#endif
+#ifdef	CONFIG_HISAX_EURO
+		ISDN_FEATURE_P_EURO |
+#endif
+#ifdef	CONFIG_HISAX_NI1
+		ISDN_FEATURE_P_NI1 |
+#endif
+		0;
+
+	cs->iif.command = HiSax_command;
+	cs->iif.writecmd = NULL;
+	cs->iif.writebuf_skb = HiSax_writebuf_skb;
+	cs->iif.readstat = HiSax_readstatus;
+	register_isdn(&cs->iif);
+	cs->myid = cs->iif.channels;
+	printk(KERN_INFO
+	       "HiSax: Card %d Protocol %s Id=%s (%d)\n", cs->cardnr + 1,
+	       (cs->protocol == ISDN_PTYPE_1TR6) ? "1TR6" :
+	       (cs->protocol == ISDN_PTYPE_EURO) ? "EDSS1" :
+	       (cs->protocol == ISDN_PTYPE_LEASED) ? "LEASED" :
+	       (cs->protocol == ISDN_PTYPE_NI1) ? "NI1" :
+	       "NONE", cs->iif.id, cs->myid);
+}
+
+static int
+do_init(struct IsdnCardState *cs)
+{
+	int ret;
+	
+	init_tei(cs, cs->protocol);
+	ret = CallcNewChan(cs);
+	if (ret)
+		return -EIO;
+	
+	/* ISAR needs firmware download first */
+	if (!test_bit(HW_ISAR, &cs->HW_Flags))
+		ll_run(cs, 0);
+	
+	return 0;
+}
+
+
 static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 {
 	int ret = 0;
@@ -889,41 +948,8 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 		       "HiSax: Card Type %d out of range\n", card->typ);
 		goto outf_cs;
 	}
-	cs->iif.owner = THIS_MODULE;
 	strcpy(cs->iif.id, id);
-	cs->iif.channels = 2;
-	cs->iif.maxbufsize = MAX_DATA_SIZE;
-	cs->iif.hl_hdrlen = MAX_HEADER_LEN;
-	cs->iif.features =
-		ISDN_FEATURE_L2_X75I |
-		ISDN_FEATURE_L2_HDLC |
-		ISDN_FEATURE_L2_HDLC_56K |
-		ISDN_FEATURE_L2_TRANS |
-		ISDN_FEATURE_L3_TRANS |
-#ifdef	CONFIG_HISAX_1TR6
-		ISDN_FEATURE_P_1TR6 |
-#endif
-#ifdef	CONFIG_HISAX_EURO
-		ISDN_FEATURE_P_EURO |
-#endif
-#ifdef	CONFIG_HISAX_NI1
-		ISDN_FEATURE_P_NI1 |
-#endif
-		0;
-
-	cs->iif.command = HiSax_command;
-	cs->iif.writecmd = NULL;
-	cs->iif.writebuf_skb = HiSax_writebuf_skb;
-	cs->iif.readstat = HiSax_readstatus;
-	register_isdn(&cs->iif);
-	cs->myid = cs->iif.channels;
-	printk(KERN_INFO
-	       "HiSax: Card %d Protocol %s Id=%s (%d)\n", cardnr + 1,
-	       (card->protocol == ISDN_PTYPE_1TR6) ? "1TR6" :
-	       (card->protocol == ISDN_PTYPE_EURO) ? "EDSS1" :
-	       (card->protocol == ISDN_PTYPE_LEASED) ? "LEASED" :
-	       (card->protocol == ISDN_PTYPE_NI1) ? "NI1" :
-	       "NONE", cs->iif.id, cs->myid);
+	do_register_isdn(cs);
 	switch (card->typ) {
 #ifdef CONFIG_HISAX_16_0
 	case ISDN_CTYPE_16_0:
@@ -1117,17 +1143,11 @@ static int __devinit checkcard(int cardnr, char *id, int *busy_flag)
 		ret = 0;
 		goto outf_cs;
 	}
-	init_tei(cs, cs->protocol);
-	ret = CallcNewChan(cs);
-	if (ret) {
+	if (do_init(cs)) {
 		closecard(cardnr);
 		ret = 0;
 		goto outf_cs;
 	}
-	/* ISAR needs firmware download first */
-	if (!test_bit(HW_ISAR, &cs->HW_Flags))
-		ll_run(cs, 0);
-
 	ret = 1;
 	goto out;
 
@@ -1677,43 +1697,61 @@ static void hisax_bc_close(struct BCState *bcs);
 static void hisax_bh(void *data);
 static void EChannel_proc_rcv(struct hisax_d_if *d_if);
 
+static int
+hisax_l1_open(struct PStack *st, struct IsdnCardState *cs)
+{
+	st->l1.l2l1 = hisax_d_l2l1;
+	return 0;
+}
+
 static struct dc_l1_ops hisax_l1_ops = {
+	.open    = hisax_l1_open,
 	.bh_func = hisax_bh,
+};
+
+static struct bc_l1_ops hisax_bc_l1_ops = {
+	.open    = hisax_bc_setstack,
+	.close   = hisax_bc_close,
 };
 
 int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 		   char *name, int protocol)
 {
-	int i, retval;
-	char id[20];
+	int i;
 	struct IsdnCardState *cs;
-
+	
 	for (i = 0; i < HISAX_MAX_CARDS; i++) {
 		if (!cards[i].typ)
 			break;
 	}
-
+	
 	if (i >= HISAX_MAX_CARDS)
 		return -EBUSY;
-
-	cards[i].typ = ISDN_CTYPE_DYNAMIC;
-	cards[i].protocol = protocol;
-	sprintf(id, "%s%d", name, i);
+	
 	nrcards++;
-	retval = checkcard(i, id, 0);
-	if (retval == 0) { // yuck
-		cards[i].typ = 0;
-		nrcards--;
-		return retval;
-	}
-	cs = cards[i].cs;
+
+	cs = alloc_IsdnCardState();
+	if (!cs)
+		return -ENOMEM;
+
+#if TEI_PER_CARD
+	if (protocol == ISDN_PTYPE_NI1)
+		test_and_set_bit(FLG_TWO_DCHAN, &cs->HW_Flags);
+#else
+	test_and_set_bit(FLG_TWO_DCHAN, &cs->HW_Flags);
+#endif
+	cs->cardnr = i;
+	cs->protocol = protocol;
+	cs->typ = ISDN_CTYPE_DYNAMIC;
+
+	sprintf(cs->iif.id, "%s%d", name, i);
+	do_register_isdn(cs);
+
 	hisax_d_if->cs = cs;
 	cs->hw.hisax_d_if = hisax_d_if;
-	cs->iif.owner = hisax_d_if->owner; // FIXME should be done before registering
+	cs->iif.owner = hisax_d_if->owner;
 	dc_l1_init(cs, &hisax_l1_ops);
-	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
-	cs->bc_l1_ops->open = hisax_bc_setstack;
-	cs->bc_l1_ops->close = hisax_bc_close;
+	cs->bc_l1_ops = &hisax_bc_l1_ops;
 
 	for (i = 0; i < 2; i++) {
 		b_if[i]->ifc.l1l2 = hisax_b_l1l2;
@@ -1724,6 +1762,8 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	skb_queue_head_init(&hisax_d_if->erq);
 	clear_bit(0, &hisax_d_if->ph_state);
 	
+	do_init(cs);
+
 	return 0;
 }
 

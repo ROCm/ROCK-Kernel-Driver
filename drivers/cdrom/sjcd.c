@@ -74,7 +74,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include "sjcd.h"
 
 static int sjcd_present = 0;

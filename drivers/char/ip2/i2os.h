@@ -19,8 +19,6 @@
 #ifndef I2OS_H    /* To prevent multiple includes */
 #define I2OS_H 1
 
-#define VERSION(ver,rel,seq) (((ver)<<16) | ((rel)<<8) | (seq))
-
 //-------------------------------------------------
 // Required Includes
 //-------------------------------------------------
@@ -45,22 +43,6 @@
 //--------------------------------------------
 // Interrupt control
 //--------------------------------------------
-
-#if LINUX_VERSION_CODE < 0x00020100
-typedef int spinlock_t;
-#define spin_lock_init() 
-#define spin_lock(a)
-#define spin_unlock(a)
-#define spin_lock_irqsave(a,b)			{save_flags((b));cli();}
-#define spin_unlock_irqrestore(a,b)		{restore_flags((b));}
-#define write_lock_irqsave(a,b)			spin_lock_irqsave(a,b)
-#define write_unlock_irqrestore(a,b)	spin_unlock_irqrestore(a,b)
-#define read_lock_irqsave(a,b)			spin_lock_irqsave(a,b)
-#define read_unlock_irqrestore(a,b)		spin_unlock_irqrestore(a,b)
-#endif
-
-//#define SAVE_AND_DISABLE_INTS(a,b)	spin_lock_irqsave(a,b)
-//#define RESTORE_INTS(a,b)         	spin_unlock_irqrestore(a,b)
 
 #define LOCK_INIT(a)	rwlock_init(a)
 

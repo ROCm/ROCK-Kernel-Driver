@@ -22,7 +22,7 @@ static int ebt_log_check(const char *tablename, unsigned int hookmask,
 {
 	struct ebt_log_info *info = (struct ebt_log_info *)data;
 
-	if (datalen != sizeof(struct ebt_log_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_log_info)))
 		return -EINVAL;
 	if (info->bitmask & ~EBT_LOG_MASK)
 		return -EINVAL;

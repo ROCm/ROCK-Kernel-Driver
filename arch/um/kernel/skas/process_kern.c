@@ -61,9 +61,8 @@ void new_thread_handler(int sig)
 	thread_wait(&current->thread.mode.skas.switch_buf, 
 		    current->thread.mode.skas.fork_buf);
 
-#ifdef CONFIG_SMP
-	schedule_tail(NULL);
-#endif
+	if(current->thread.prev_sched != NULL)
+		schedule_tail(current->thread.prev_sched);
 	current->thread.prev_sched = NULL;
 
 	n = run_kernel_thread(fn, arg, &current->thread.exec_buf);
@@ -93,9 +92,8 @@ void fork_handler(int sig)
 		    current->thread.mode.skas.fork_buf);
   	
 	force_flush_all();
-#ifdef CONFIG_SMP
-	schedule_tail(current->thread.prev_sched);
-#endif
+	if(current->thread.prev_sched != NULL)
+		schedule_tail(current->thread.prev_sched);
 	current->thread.prev_sched = NULL;
 	unblock_signals();
 
@@ -164,7 +162,7 @@ int start_uml_skas(void)
 	capture_signal_stack();
 
 	init_new_thread_signals(1);
-	idle_timer();
+	uml_idle_timer();
 
 	init_task.thread.request.u.thread.proc = start_kernel_proc;
 	init_task.thread.request.u.thread.arg = NULL;

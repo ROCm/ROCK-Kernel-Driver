@@ -14,30 +14,30 @@
 
 
 /* MS-DOS "device special files" */
-static const char *reserved_names[] = {
-    "CON     ","PRN     ","NUL     ","AUX     ",
-    "LPT1    ","LPT2    ","LPT3    ","LPT4    ",
-    "COM1    ","COM2    ","COM3    ","COM4    ",
-    NULL
+static const unsigned char *reserved_names[] = {
+	"CON     ","PRN     ","NUL     ","AUX     ",
+	"LPT1    ","LPT2    ","LPT3    ","LPT4    ",
+	"COM1    ","COM2    ","COM3    ","COM4    ",
+	NULL
 };
 
 /* Characters that are undesirable in an MS-DOS file name */
-static char bad_chars[] = "*?<>|\"";
-static char bad_if_strict_pc[] = "+=,; ";
-static char bad_if_strict_atari[] = " "; /* GEMDOS is less restrictive */
+static unsigned char bad_chars[] = "*?<>|\"";
+static unsigned char bad_if_strict_pc[] = "+=,; ";
+static unsigned char bad_if_strict_atari[] = " "; /* GEMDOS is less restrictive */
 #define	bad_if_strict(opts) ((opts)->atari ? bad_if_strict_atari : bad_if_strict_pc)
 
 /***** Formats an MS-DOS file name. Rejects invalid names. */
-static int msdos_format_name(const char *name,int len,
-	char *res,struct fat_mount_options *opts)
+static int msdos_format_name(const unsigned char *name, int len,
+	unsigned char *res, struct fat_mount_options *opts)
 	/* name is the proposed name, len is its length, res is
 	 * the resulting name, opts->name_check is either (r)elaxed,
 	 * (n)ormal or (s)trict, opts->dotsOK allows dots at the
 	 * beginning of name (for hidden files)
 	 */
 {
-	char *walk;
-	const char **reserved;
+	unsigned char *walk;
+	const unsigned char **reserved;
 	unsigned char c;
 	int space;
 
@@ -112,13 +112,13 @@ static int msdos_format_name(const char *name,int len,
 }
 
 /***** Locates a directory entry.  Uses unformatted name. */
-static int msdos_find(struct inode *dir, const char *name, int len,
+static int msdos_find(struct inode *dir, const unsigned char *name, int len,
 		      struct buffer_head **bh, struct msdos_dir_entry **de,
 		      loff_t *i_pos)
 {
-	int res;
+	unsigned char msdos_name[MSDOS_NAME];
 	char dotsOK;
-	char msdos_name[MSDOS_NAME];
+	int res;
 
 	dotsOK = MSDOS_SB(dir->i_sb)->options.dotsOK;
 	res = msdos_format_name(name,len, msdos_name,&MSDOS_SB(dir->i_sb)->options);
@@ -146,8 +146,8 @@ static int msdos_find(struct inode *dir, const char *name, int len,
 static int msdos_hash(struct dentry *dentry, struct qstr *qstr)
 {
 	struct fat_mount_options *options = & (MSDOS_SB(dentry->d_sb)->options);
+	unsigned char msdos_name[MSDOS_NAME];
 	int error;
-	char msdos_name[MSDOS_NAME];
 	
 	error = msdos_format_name(qstr->name, qstr->len, msdos_name, options);
 	if (!error)
@@ -162,8 +162,8 @@ static int msdos_hash(struct dentry *dentry, struct qstr *qstr)
 static int msdos_cmp(struct dentry *dentry, struct qstr *a, struct qstr *b)
 {
 	struct fat_mount_options *options = & (MSDOS_SB(dentry->d_sb)->options);
+	unsigned char a_msdos_name[MSDOS_NAME], b_msdos_name[MSDOS_NAME];
 	int error;
-	char a_msdos_name[MSDOS_NAME], b_msdos_name[MSDOS_NAME];
 
 	error = msdos_format_name(a->name, a->len, a_msdos_name, options);
 	if (error)
@@ -228,7 +228,7 @@ out:
 }
 
 /***** Creates a directory entry (name is already formatted). */
-static int msdos_add_entry(struct inode *dir, const char *name,
+static int msdos_add_entry(struct inode *dir, const unsigned char *name,
 			   struct buffer_head **bh,
 			   struct msdos_dir_entry **de,
 			   loff_t *i_pos, int is_dir, int is_hid)
@@ -270,7 +270,7 @@ int msdos_create(struct inode *dir,struct dentry *dentry,int mode,
 	struct inode *inode;
 	loff_t i_pos;
 	int res, is_hid;
-	char msdos_name[MSDOS_NAME];
+	unsigned char msdos_name[MSDOS_NAME];
 
 	lock_kernel();
 	res = msdos_format_name(dentry->d_name.name,dentry->d_name.len,
@@ -352,7 +352,7 @@ int msdos_mkdir(struct inode *dir,struct dentry *dentry,int mode)
 	struct msdos_dir_entry *de;
 	struct inode *inode;
 	int res,is_hid;
-	char msdos_name[MSDOS_NAME];
+	unsigned char msdos_name[MSDOS_NAME];
 	loff_t i_pos;
 
 	lock_kernel();
@@ -442,9 +442,9 @@ unlink_done:
 	return res;
 }
 
-static int do_msdos_rename(struct inode *old_dir, char *old_name,
+static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
     struct dentry *old_dentry,
-    struct inode *new_dir,char *new_name, struct dentry *new_dentry,
+    struct inode *new_dir, unsigned char *new_name, struct dentry *new_dentry,
     struct buffer_head *old_bh,
     struct msdos_dir_entry *old_de, loff_t old_i_pos, int is_hid)
 {
@@ -550,7 +550,7 @@ int msdos_rename(struct inode *old_dir,struct dentry *old_dentry,
 	struct msdos_dir_entry *old_de;
 	loff_t old_i_pos;
 	int error, is_hid, old_hid; /* if new file and old file are hidden */
-	char old_msdos_name[MSDOS_NAME], new_msdos_name[MSDOS_NAME];
+	unsigned char old_msdos_name[MSDOS_NAME], new_msdos_name[MSDOS_NAME];
 
 	lock_kernel();
 	error = msdos_format_name(old_dentry->d_name.name,

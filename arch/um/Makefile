@@ -26,15 +26,17 @@ core-y			+= $(ARCH_DIR)/kernel/		 \
 # Have to precede the include because the included Makefiles reference them.
 SYMLINK_HEADERS = include/asm-um/archparam.h include/asm-um/system.h \
 	include/asm-um/sigcontext.h include/asm-um/processor.h \
-	include/asm-um/ptrace.h include/asm-um/arch-signal.h
+	include/asm-um/ptrace.h include/asm-um/arch-signal.h \
+	include/asm-um/module.h
 
 ARCH_SYMLINKS = include/asm-um/arch $(ARCH_DIR)/include/sysdep $(ARCH_DIR)/os \
 	$(SYMLINK_HEADERS) $(ARCH_DIR)/include/uml-config.h
 
 GEN_HEADERS += $(ARCH_DIR)/include/task.h $(ARCH_DIR)/include/kern_constants.h
 
-include $(ARCH_DIR)/Makefile-$(SUBARCH)
-include $(ARCH_DIR)/Makefile-os-$(OS)
+.PHONY: sys_prepare
+sys_prepare:
+	@:
 
 MAKEFILE-$(CONFIG_MODE_TT) += Makefile-tt
 MAKEFILE-$(CONFIG_MODE_SKAS) += Makefile-skas
@@ -42,6 +44,9 @@ MAKEFILE-$(CONFIG_MODE_SKAS) += Makefile-skas
 ifneq ($(MAKEFILE-y),)
   include $(addprefix $(ARCH_DIR)/,$(MAKEFILE-y))
 endif
+
+include $(ARCH_DIR)/Makefile-$(SUBARCH)
+include $(ARCH_DIR)/Makefile-os-$(OS)
 
 EXTRAVERSION := $(EXTRAVERSION)-1um
 
@@ -54,14 +59,14 @@ ARCH_INCLUDE = -I$(ARCH_DIR)/include
 
 CFLAGS += $(CFLAGS-y) -D__arch_um__ -DSUBARCH=\"$(SUBARCH)\" \
 	-D_LARGEFILE64_SOURCE $(ARCH_INCLUDE) -Derrno=kernel_errno \
-	$(MODE_INCLUDE)
+	-Dsigprocmask=kernel_sigprocmask $(MODE_INCLUDE)
 
 LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 
 SIZE = (($(CONFIG_NEST_LEVEL) + $(CONFIG_KERNEL_HALF_GIGS)) * 0x20000000)
 
 ifeq ($(CONFIG_MODE_SKAS), y)
-$(SYS_HEADERS) : $(ARCH_DIR)/kernel/skas/include/skas_ptregs.h
+$(SYS_HEADERS) : $(TOPDIR)/$(ARCH_DIR)/include/skas_ptregs.h
 endif
 
 include/linux/version.h: arch/$(ARCH)/Makefile
@@ -118,6 +123,7 @@ linux: vmlinux $(LD_SCRIPT-y)
 
 USER_CFLAGS := $(patsubst -I%,,$(CFLAGS))
 USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))
+USER_CFLAGS := $(patsubst -Dsigprocmask=kernel_sigprocmask,,$(USER_CFLAGS))
 USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) $(ARCH_INCLUDE) \
 	$(MODE_INCLUDE)
 
@@ -125,9 +131,10 @@ USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) $(ARCH_INCLUDE) \
 USER_CFLAGS += -D_GNU_SOURCE
 
 CLEAN_FILES += linux x.i gmon.out $(ARCH_DIR)/uml.lds.s \
-	$(ARCH_DIR)/dyn_link.ld.s $(GEN_HEADERS)
+	$(ARCH_DIR)/dyn_link.ld.s $(ARCH_DIR)/include/uml-config.h \
+	$(GEN_HEADERS)
 
-$(ARCH_DIR)/main.o: $(ARCH_DIR)/main.c
+$(ARCH_DIR)/main.o: $(ARCH_DIR)/main.c sys_prepare
 	$(CC) $(USER_CFLAGS) $(EXTRA_CFLAGS) -c -o $@ $<
 
 archmrproper:
@@ -163,19 +170,23 @@ $(ARCH_DIR)/include/sysdep:
 $(ARCH_DIR)/os:
 	cd $(ARCH_DIR) && ln -sf os-$(OS) os
 
-$(ARCH_DIR)/include/uml-config.h :
+$(ARCH_DIR)/include/uml-config.h : $(TOPDIR)/include/linux/autoconf.h
 	sed 's/ CONFIG/ UML_CONFIG/' $(TOPDIR)/include/linux/autoconf.h > $@
 
+filechk_$(ARCH_DIR)/include/task.h := $(ARCH_DIR)/util/mk_task
+
 $(ARCH_DIR)/include/task.h : $(ARCH_DIR)/util/mk_task
-	$< > $@
+	$(call filechk,$@)
+
+filechk_$(ARCH_DIR)/include/kern_constants.h := $(ARCH_DIR)/util/mk_constants
 
 $(ARCH_DIR)/include/kern_constants.h : $(ARCH_DIR)/util/mk_constants
-	$< > $@
+	$(call filechk,$@)
 
-$(ARCH_DIR)/util/mk_task : $(ARCH_DIR)/kernel/skas/include/skas_ptregs.h \
-	$(ARCH_DIR)/util FORCE ;
+$(ARCH_DIR)/util/mk_task $(ARCH_DIR)/util/mk_constants : $(ARCH_DIR)/util \
+	sys_prepare FORCE ;
 
 $(ARCH_DIR)/util: FORCE
-	@$(call descend,$@,)
+	$(MAKE) -f scripts/Makefile.build obj=$@
 
-export SUBARCH USER_CFLAGS OS
+export SUBARCH USER_CFLAGS OS 

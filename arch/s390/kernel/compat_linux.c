@@ -250,14 +250,14 @@ asmlinkage long sys32_getegid16(void)
 static inline long get_tv32(struct timeval *o, struct compat_timeval *i)
 {
 	return (!access_ok(VERIFY_READ, tv32, sizeof(*tv32)) ||
-		(__get_user(o->tv_sec, &i->tv_sec) |
+		(__get_user(o->tv_sec, &i->tv_sec) ||
 		 __get_user(o->tv_usec, &i->tv_usec)));
 }
 
 static inline long put_tv32(struct compat_timeval *o, struct timeval *i)
 {
 	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
-		(__put_user(i->tv_sec, &o->tv_sec) |
+		(__put_user(i->tv_sec, &o->tv_sec) ||
 		 __put_user(i->tv_usec, &o->tv_usec)));
 }
 

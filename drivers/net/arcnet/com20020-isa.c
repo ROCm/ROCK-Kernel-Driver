@@ -131,14 +131,6 @@ MODULE_PARM(clockp, "i");
 MODULE_PARM(clockm, "i");
 MODULE_LICENSE("GPL");
 
-static void com20020isa_open_close(struct net_device *dev, bool open)
-{
-	if (open)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
-}
-
 int init_module(void)
 {
 	struct net_device *dev;
@@ -160,7 +152,7 @@ int init_module(void)
 	lp->clockp = clockp & 7;
 	lp->clockm = clockm & 3;
 	lp->timeout = timeout & 3;
-	lp->hw.open_close_ll = com20020isa_open_close;
+	lp->owner = THIS_MODULE;
 
 	dev->base_addr = io;
 	dev->irq = irq;

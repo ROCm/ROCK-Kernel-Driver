@@ -37,9 +37,6 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/proc_fs.h>
-#ifdef CONFIG_BLK_DEV_INITRD
-#include <linux/blk.h>		/* for initrd_* */
-#endif
 
 #include <asm/pgalloc.h>
 #include <asm/page.h>

@@ -17,9 +17,12 @@ c) multi-user mounts - multiplexed sessionsetups over single vc
 
 d) Kerberos/SPNEGO session setup support - (started)
 
-e) NTLMv2 authentication and MD5-HMAC signing SMB PDUs - (mostly implemented)
-	signing necessary for some Windows 2003 servers in domain 
-	mode.
+e) NTLMv2 authentication (mostly implemented)
+
+f) MD5-HMAC signing SMB PDUs when SPNEGO style SessionSetup 
+used (Kerberos or NTLMSSP). Signing alreadyimplemented for NTLM
+	and raw NTLMSSP already. This is important when enabling
+	extended security and mounting to Windows 2003 Servers
 
 f) Directory entry caching relies on a 1 second timer, rather than 
 using FindNotify or equivalent.  - (started)
@@ -43,11 +46,9 @@ extra copy in/out of the socket buffers in some cases.
 
 m) finish support for IPv6
 
-n) send oplock break response when sent (oplock currently disabled in
-/proc/fs/cifs)
-
-o) reduces the oplock breaks coming from windows).  Piggyback identical
-file opens on top of each other by incrementing reference count rather
+o) Better optimize open (and pathbased setfilesize) to reduce the
+oplock breaks coming from windows srv.  Piggyback identical file
+opens on top of each other by incrementing reference count rather
 than resending (helps reduce server resource utilization and avoid
 spurious oplock breaks).
 

@@ -29,6 +29,7 @@
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/device.h>
+#include <linux/percpu.h>
 
 #include <asm/atomic.h>
 #include <asm/cache.h>
@@ -544,10 +545,9 @@ struct softnet_data
 	struct sk_buff		*completion_queue;
 
 	struct net_device	backlog_dev;	/* Sorry. 8) */
-} ____cacheline_aligned;
+};
 
-
-extern struct softnet_data softnet_data[NR_CPUS];
+DECLARE_PER_CPU(struct softnet_data,softnet_data);
 
 #define HAVE_NETIF_QUEUE
 
@@ -555,12 +555,12 @@ static inline void __netif_schedule(struct net_device *dev)
 {
 	if (!test_and_set_bit(__LINK_STATE_SCHED, &dev->state)) {
 		unsigned long flags;
-		int cpu;
+		struct softnet_data *sd;
 
 		local_irq_save(flags);
-		cpu = smp_processor_id();
-		dev->next_sched = softnet_data[cpu].output_queue;
-		softnet_data[cpu].output_queue = dev;
+		sd = &__get_cpu_var(softnet_data);
+		dev->next_sched = sd->output_queue;
+		sd->output_queue = dev;
 		raise_softirq_irqoff(NET_TX_SOFTIRQ);
 		local_irq_restore(flags);
 	}
@@ -605,13 +605,13 @@ static inline int netif_running(const struct net_device *dev)
 static inline void dev_kfree_skb_irq(struct sk_buff *skb)
 {
 	if (atomic_dec_and_test(&skb->users)) {
-		int cpu;
+		struct softnet_data *sd;
 		unsigned long flags;
 
 		local_irq_save(flags);
-		cpu = smp_processor_id();
-		skb->next = softnet_data[cpu].completion_queue;
-		softnet_data[cpu].completion_queue = skb;
+		sd = &__get_cpu_var(softnet_data);
+		skb->next = sd->completion_queue;
+		sd->completion_queue = skb;
 		raise_softirq_irqoff(NET_TX_SOFTIRQ);
 		local_irq_restore(flags);
 	}
@@ -769,12 +769,10 @@ static inline int netif_rx_schedule_prep(struct net_device *dev)
 static inline void __netif_rx_schedule(struct net_device *dev)
 {
 	unsigned long flags;
-	int cpu;
 
 	local_irq_save(flags);
-	cpu = smp_processor_id();
 	dev_hold(dev);
-	list_add_tail(&dev->poll_list, &softnet_data[cpu].poll_list);
+	list_add_tail(&dev->poll_list, &__get_cpu_var(softnet_data).poll_list);
 	if (dev->quota < 0)
 		dev->quota += dev->weight;
 	else
@@ -798,13 +796,11 @@ static inline int netif_rx_reschedule(struct net_device *dev, int undo)
 {
 	if (netif_rx_schedule_prep(dev)) {
 		unsigned long flags;
-		int cpu;
 
 		dev->quota += undo;
 
 		local_irq_save(flags);
-		cpu = smp_processor_id();
-		list_add_tail(&dev->poll_list, &softnet_data[cpu].poll_list);
+		list_add_tail(&dev->poll_list, &__get_cpu_var(softnet_data).poll_list);
 		__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 		local_irq_restore(flags);
 		return 1;

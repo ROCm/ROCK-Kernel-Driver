@@ -405,7 +405,7 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 				return 1;	/* needs_arg; */
 			}
 			if ((temp_len = strnlen(value, 300)) < 300) {
-				vol->UNC = kmalloc(GFP_KERNEL, temp_len);
+				vol->UNC = kmalloc(temp_len+1,GFP_KERNEL);
 				strcpy(vol->UNC,value);
 				if (strncmp(vol->UNC, "//", 2) == 0) {
 					vol->UNC[0] = '\\';
@@ -482,7 +482,7 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 			return 1;
 		}
 		if ((temp_len = strnlen(devname, 300)) < 300) {
-			vol->UNC = kmalloc(GFP_KERNEL, temp_len);
+			vol->UNC = kmalloc(temp_len+1,GFP_KERNEL);
 			strcpy(vol->UNC,devname);
 			if (strncmp(vol->UNC, "//", 2) == 0) {
 				vol->UNC[0] = '\\';
@@ -860,7 +860,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		FreeXid(xid);
 		return -EINVAL;
 	}
-	/* BB add support to use the multiuser_mount flag BB */
+
 	existingCifsSes =
 	    find_tcp_session(sin_server.sin_addr.s_addr,
 			     volume_info.username, &srvTcp);
@@ -926,6 +926,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			if (volume_info.domainname)
 				strncpy(pSesInfo->domainName,
 					volume_info.domainname,MAX_USERNAME_SIZE);
+			pSesInfo->linux_uid = volume_info.linux_uid;
 
 			rc = setup_session(xid,pSesInfo, cifs_sb->local_nls);
 			if(!rc)

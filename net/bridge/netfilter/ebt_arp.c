@@ -99,7 +99,7 @@ static int ebt_arp_check(const char *tablename, unsigned int hookmask,
 {
 	struct ebt_arp_info *info = (struct ebt_arp_info *)data;
 
-	if (datalen != sizeof(struct ebt_arp_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_arp_info)))
 		return -EINVAL;
 	if ((e->ethproto != __constant_htons(ETH_P_ARP) &&
 	   e->ethproto != __constant_htons(ETH_P_RARP)) ||

@@ -25,7 +25,7 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/major.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
@@ -1820,7 +1820,8 @@ static int nsp32_detect(struct pci_dev *pdev)
 		goto free_irq;
         }
 
-	scsi_add_host(host, &pdev->dev);
+	scsi_add_host(host, &pdev->dev); /* XXX handle failure */
+	scsi_scan_host(host);
 	pci_set_drvdata(pdev, host);
 	return 0;
 

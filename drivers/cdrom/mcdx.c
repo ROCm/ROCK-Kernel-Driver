@@ -74,7 +74,7 @@ static const char *mcdx_c_version
 
 #include <linux/major.h>
 #define MAJOR_NR MITSUMI_X_CDROM_MAJOR
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/devfs_fs_kernel.h>
 
 /* for compatible parameter passing with "insmod" */

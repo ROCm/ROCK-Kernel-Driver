@@ -8,7 +8,6 @@
 #include <linux/fs.h>
 #include <linux/genhd.h>
 #include <linux/kernel.h>
-#include <linux/blk.h>
 #include <linux/hdreg.h>
 
 #include "check.h"

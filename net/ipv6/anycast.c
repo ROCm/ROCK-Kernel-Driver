@@ -96,7 +96,6 @@ ip6_onlink(struct in6_addr *addr, struct net_device *dev)
 	return onlink;
 }
 
-
 /*
  *	socket join an anycast group
  */
@@ -110,7 +109,11 @@ int ipv6_sock_ac_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 	int	ishost = !ipv6_devconf.forwarding;
 	int	err = 0;
 
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
 	if (ipv6_addr_type(addr) & IPV6_ADDR_MULTICAST)
+		return -EINVAL;
+	if (ipv6_chk_addr(addr, NULL))
 		return -EINVAL;
 
 	pac = sock_kmalloc(sk, sizeof(struct ipv6_ac_socklist), GFP_KERNEL);
@@ -161,21 +164,12 @@ int ipv6_sock_ac_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 	 * For hosts, allow link-local or matching prefix anycasts.
 	 * This obviates the need for propagating anycast routes while
 	 * still allowing some non-router anycast participation.
-	 *
-	 * allow anyone to join anycasts that don't require a special route
-	 * and can't be spoofs of unicast addresses (reserved anycast only)
 	 */
 	if (!ip6_onlink(addr, dev)) {
 		if (ishost)
 			err = -EADDRNOTAVAIL;
-		else if (!capable(CAP_NET_ADMIN))
-			err = -EPERM;
 		if (err)
 			goto out_dev_put;
-	} else if (!(ipv6_addr_type(addr) & IPV6_ADDR_ANYCAST) &&
-		   !capable(CAP_NET_ADMIN)) {
-		err = -EPERM;
-		goto out_dev_put;
 	}
 
 	err = ipv6_dev_ac_inc(dev, addr);
@@ -266,6 +260,13 @@ void ipv6_sock_ac_close(struct sock *sk)
 		dev_put(dev);
 }
 
+#if 0
+/* The function is not used, which is funny. Apparently, author
+ * supposed to use it to filter out datagrams inside udp/raw but forgot.
+ *
+ * It is OK, anycasts are not special comparing to delivery to unicasts.
+ */
+
 int inet6_ac_check(struct sock *sk, struct in6_addr *addr, int ifindex)
 {
 	struct ipv6_ac_socklist *pac;
@@ -285,6 +286,8 @@ int inet6_ac_check(struct sock *sk, struct in6_addr *addr, int ifindex)
 
 	return found;
 }
+
+#endif
 
 static void aca_put(struct ifacaddr6 *ac)
 {
@@ -347,7 +350,7 @@ int ipv6_dev_ac_inc(struct net_device *dev, struct in6_addr *addr)
 	idev->ac_list = aca;
 	write_unlock_bh(&idev->lock);
 
-	ip6_rt_addr_add(&aca->aca_addr, dev);
+	ip6_rt_addr_add(&aca->aca_addr, dev, 1);
 
 	addrconf_join_solict(dev, &aca->aca_addr);
 
