@@ -179,7 +179,6 @@ static inline void cursor_undrawn(void)
 static const char *fbcon_startup(void);
 static void fbcon_init(struct vc_data *vc, int init);
 static void fbcon_deinit(struct vc_data *vc);
-static int fbcon_changevar(int con);
 static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 			int width);
 static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos);
@@ -201,6 +200,7 @@ static int fbcon_scrolldelta(struct vc_data *vc, int lines);
  *  Internal routines
  */
 
+static int fbcon_changevar(int con);
 static void fbcon_set_display(int con, int init, int logo);
 static __inline__ int real_y(struct display *p, int ypos);
 static void fbcon_vbl_handler(int irq, void *dummy, struct pt_regs *fp);
@@ -267,19 +267,6 @@ void gen_set_disp(int con, struct fb_info *info)
 {
 	struct display *display = fb_display + con;
 
-	/*
-	 * If we are setting all the virtual consoles, also set
-	 * the defaults used to create new consoles.
-	 *
-	 if (con < 0 || info->var.activate & FB_ACTIVATE_ALL) {
-	 int unit;
-
-	 for (unit = 0; unit < MAX_NR_CONSOLES; unit++)
-	 if (fb_display[unit].conp && con2fb_map[unit] == minor(info->node))
-	 fb_display[unit].var = info->var;
-	 }
-	 */
-
 	display->can_soft_blank = info->fbops->fb_blank ? 1 : 0;
 #ifdef FBCON_HAS_ACCEL
 	display->scrollmode = SCROLL_YNOMOVE;
@@ -307,7 +294,7 @@ void set_con2fb_map(int unit, int newidx)
 	struct fb_info *oldfb, *newfb;
 	struct vc_data *vc;
 	char *fontdata;
-	unsigned short fontwidth, fontheight, fontwidthlog, fontheightlog;
+	unsigned short fontwidth, fontheight;
 	int userfont;
 
 	if (newidx != con2fb_map[unit]) {
@@ -329,8 +316,6 @@ void set_con2fb_map(int unit, int newidx)
 		fontdata = fb_display[unit].fontdata;
 		fontwidth = fb_display[unit]._fontwidth;
 		fontheight = fb_display[unit]._fontheight;
-		fontwidthlog = fb_display[unit]._fontwidthlog;
-		fontheightlog = fb_display[unit]._fontheightlog;
 		userfont = fb_display[unit].userfont;
 		con2fb_map[unit] = newidx;
 
@@ -338,8 +323,6 @@ void set_con2fb_map(int unit, int newidx)
 		fb_display[unit].fontdata = fontdata;
 		fb_display[unit]._fontwidth = fontwidth;
 		fb_display[unit]._fontheight = fontheight;
-		fb_display[unit]._fontwidthlog = fontwidthlog;
-		fb_display[unit]._fontheightlog = fontheightlog;
 		fb_display[unit].userfont = userfont;
 		fb_display[unit].fb_info = newfb;
 		gen_set_disp(unit, newfb);
@@ -447,7 +430,6 @@ static const char *fbcon_startup(void)
 		cursor_timer.expires = jiffies + HZ / 50;
 		add_timer(&cursor_timer);
 	}
-
 	return display_desc;
 }
 
@@ -491,10 +473,161 @@ static void fbcon_deinit(struct vc_data *vc)
 }
 
 
+#define fontwidthvalid(p,w) ((p)->dispsw->fontwidthmask & FONTWIDTH(w))
+
 static int fbcon_changevar(int con)
 {
-	if (fb_display[con].conp)
-		fbcon_set_display(con, 0, 0);
+	if (fb_display[con].conp) {
+		struct display *p = &fb_display[con];
+		struct fb_info *info = p->fb_info;
+		struct vc_data *vc = p->conp;
+		int nr_rows, nr_cols;
+		int old_rows, old_cols;
+		unsigned short *save = NULL, *q;
+		int i, charcnt = 256;
+		struct fbcon_font_desc *font;
+
+		info->var.xoffset = info->var.yoffset = p->yscroll = 0;	/* reset wrap/pan */
+
+		if (con == fg_console && info->fix.type != FB_TYPE_TEXT) {
+			if (fbcon_softback_size) {
+				if (!softback_buf) {
+					softback_buf =
+				    		(unsigned long)
+				    			kmalloc(fbcon_softback_size,
+					    		GFP_KERNEL);
+					if (!softback_buf) {
+						fbcon_softback_size = 0;
+						softback_top = 0;
+					}
+				}
+			} else {
+				if (softback_buf) {
+					kfree((void *) softback_buf);
+					softback_buf = 0;
+					softback_top = 0;
+				}
+			}
+			if (softback_buf)
+				softback_in = softback_top = softback_curr =
+			    			softback_buf;
+				softback_lines = 0;
+		}
+
+		for (i = 0; i < MAX_NR_CONSOLES; i++)
+			if (i != con && fb_display[i].fb_info == info &&
+		    		fb_display[i].conp && fb_display[i].fontdata)
+					break;
+
+		fbcon_free_font(p);
+		if (i < MAX_NR_CONSOLES) {
+			struct display *q = &fb_display[i];
+		
+			if (fontwidthvalid(p, fontwidth(q))) {
+				/* If we are not the first console on this
+				   fb, copy the font from that console */
+				p->_fontwidth = q->_fontwidth;
+				p->_fontheight = q->_fontheight;
+				p->fontdata = q->fontdata;
+				p->userfont = q->userfont;
+				if (p->userfont) {
+					REFCOUNT(p->fontdata)++;
+					charcnt = FNTCHARCNT(p->fontdata);
+				}
+				con_copy_unimap(con, i);
+			}
+		}
+
+		if (!p->fontdata) {
+			if (!p->fontname[0] ||
+		    		!(font = fbcon_find_font(p->fontname)))
+				font =
+			    		fbcon_get_default_font(info->var.xres,
+						   	info->var.yres);
+			p->_fontwidth = font->width;
+			p->_fontheight = font->height;
+			p->fontdata = font->data;
+		}
+
+		if (!fontwidthvalid(p, fontwidth(p))) {
+			/* ++Geert: changed from panic() to `correct and continue' */
+			printk(KERN_ERR
+		       		"fbcon_set_display: No support for fontwidth %d\n",
+		       		fontwidth(p));
+			p->dispsw = &fbcon_dummy;
+		}
+		if (p->dispsw->set_font)
+			p->dispsw->set_font(p, fontwidth(p), fontheight(p));
+		updatescrollmode(p);
+
+		old_cols = vc->vc_cols;
+		old_rows = vc->vc_rows;
+
+		nr_cols = info->var.xres / fontwidth(p);
+		nr_rows = info->var.yres / fontheight(p);
+
+		/*
+	 	 *  ++guenther: console.c:vc_allocate() relies on initializing
+	 	 *  vc_{cols,rows}, but we must not set those if we are only
+	 	 *  resizing the console.
+	 	 */
+		p->vrows = info->var.yres_virtual / fontheight(p);
+		if ((info->var.yres % fontheight(p)) &&
+	    	    (info->var.yres_virtual % fontheight(p) <
+	     	     info->var.yres % fontheight(p)))
+			p->vrows--;
+		vc->vc_can_do_color = info->var.bits_per_pixel != 1;
+		vc->vc_complement_mask = vc->vc_can_do_color ? 0x7700 : 0x0800;
+		if (charcnt == 256) {
+			vc->vc_hi_font_mask = 0;
+			p->fgshift = 8;
+			p->bgshift = 12;
+			p->charmask = 0xff;
+		} else {
+			vc->vc_hi_font_mask = 0x100;
+			if (vc->vc_can_do_color)
+				vc->vc_complement_mask <<= 1;
+			p->fgshift = 9;
+			p->bgshift = 13;
+			p->charmask = 0x1ff;
+		}
+
+		if (p->dispsw == &fbcon_dummy)
+			printk(KERN_WARNING
+		       		"fbcon_set_display: type %d (aux %d, depth %d) not "
+		       		"supported\n", info->fix.type, info->fix.type_aux,
+		       		info->var.bits_per_pixel);
+			p->dispsw->setup(p);
+
+		if (vc->vc_cols != nr_cols || vc->vc_rows != nr_rows)
+			vc_resize(con, nr_cols, nr_rows);
+		else if (CON_IS_VISIBLE(vc) &&
+		 	vt_cons[vc->vc_num]->vc_mode == KD_TEXT) {
+			if (p->dispsw->clear_margins)
+				p->dispsw->clear_margins(vc, p, 0);
+				update_screen(con);
+		}
+		if (save) {
+			q = (unsigned short *) (vc->vc_origin +
+						vc->vc_size_row *
+						old_rows);
+			scr_memcpyw(q, save, logo_lines * nr_cols * 2);
+			vc->vc_y += logo_lines;
+			vc->vc_pos += logo_lines * vc->vc_size_row;
+			kfree(save);
+		}
+
+		if (con == fg_console && softback_buf) {
+			int l = fbcon_softback_size / vc->vc_size_row;
+			if (l > 5)
+				softback_end = softback_buf + l * vc->vc_size_row;
+			else {
+				/* Smaller scrollback makes no sense, and 0 would screw
+			   	the operation totally */
+				softback_top = 0;
+			}
+		}
+	}	
 	return 0;
 }
 
@@ -518,22 +651,6 @@ static __inline__ void updatescrollmode(struct display *p)
 		m = __SCROLL_YMOVE;
 	p->scrollmode = (p->scrollmode & ~__SCROLL_YMASK) | m;
 }
-
-static void fbcon_font_widths(struct display *p)
-{
-	int i;
-
-	p->_fontwidthlog = 0;
-	for (i = 2; i <= 6; i++)
-		if (fontwidth(p) == (1 << i))
-			p->_fontwidthlog = i;
-	p->_fontheightlog = 0;
-	for (i = 2; i <= 6; i++)
-		if (fontheight(p) == (1 << i))
-			p->_fontheightlog = i;
-}
-
-#define fontwidthvalid(p,w) ((p)->dispsw->fontwidthmask & FONTWIDTH(w))
 
 static void fbcon_set_display(int con, int init, int logo)
 {
@@ -585,15 +702,12 @@ static void fbcon_set_display(int con, int init, int logo)
 	fbcon_free_font(p);
 	if (i < MAX_NR_CONSOLES) {
 		struct display *q = &fb_display[i];
-		struct vc_data *tmp = vc_cons[i].d;
 		
 		if (fontwidthvalid(p, fontwidth(q))) {
 			/* If we are not the first console on this
 			   fb, copy the font from that console */
 			p->_fontwidth = q->_fontwidth;
 			p->_fontheight = q->_fontheight;
-			p->_fontwidthlog = q->_fontwidthlog;
-			p->_fontheightlog = q->_fontheightlog;
 			p->fontdata = q->fontdata;
 			p->userfont = q->userfont;
 			if (p->userfont) {
@@ -613,7 +727,6 @@ static void fbcon_set_display(int con, int init, int logo)
 		p->_fontwidth = font->width;
 		p->_fontheight = font->height;
 		p->fontdata = font->data;
-		fbcon_font_widths(p);
 	}
 
 	if (!fontwidthvalid(p, fontwidth(p))) {
@@ -715,11 +828,6 @@ static void fbcon_set_display(int con, int init, int logo)
 		       "supported\n", info->fix.type, info->fix.type_aux,
 		       info->var.bits_per_pixel);
 	p->dispsw->setup(p);
-
-	p->fgcol =
-	    info->var.bits_per_pixel >
-	    2 ? 7 : (1 << info->var.bits_per_pixel) - 1;
-	p->bgcol = 0;
 
 	if (!init) {
 		if (vc->vc_cols != nr_cols || vc->vc_rows != nr_rows)
@@ -1605,8 +1713,10 @@ static int fbcon_switch(struct vc_data *vc)
 	scrollback_max = 0;
 	scrollback_current = 0;
 
+	info->currcon = unit;
+	
 	update_var(unit, info);
-
+	
 	if (p->dispsw->clear_margins && vt_cons[unit]->vc_mode == KD_TEXT)
 		p->dispsw->clear_margins(vc, p, 0);
 	if (logo_shown == -2) {
@@ -1829,7 +1939,6 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 		}
 
 	}
-	fbcon_font_widths(p);
 
 	if (resize) {
 		struct vc_data *vc = p->conp;
@@ -2234,7 +2343,7 @@ static int __init fbcon_show_logo(void)
 	u32 *palette = NULL, *saved_palette = NULL;
 #endif
 	int depth = info->var.bits_per_pixel;
-	int line = p->next_line;
+	int line = info->fix.line_length;
 	unsigned char *fb = info->screen_base;
 	unsigned char *logo;
 	unsigned char *dst, *src;
@@ -2354,7 +2463,6 @@ static int __init fbcon_show_logo(void)
 			/* planes (normal or interleaved), with color registers */
 			int bit;
 			unsigned char val, mask;
-			int plane = p->next_plane;
 
 #if defined(CONFIG_FBCON_IPLAN2P2) || defined(CONFIG_FBCON_IPLAN2P4) || \
     defined(CONFIG_FBCON_IPLAN2P8)

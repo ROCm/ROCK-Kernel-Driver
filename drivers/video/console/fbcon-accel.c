@@ -19,8 +19,6 @@
 
 void fbcon_accel_setup(struct display *p)
 {
-	p->next_line = p->fb_info->fix.line_length;
-	p->next_plane = 0;
 }
 
 void fbcon_accel_bmove(struct display *p, int sy, int sx, int dy, int dx,

@@ -63,14 +63,8 @@ struct display {
     unsigned short cursor_x;        /* current cursor position */
     unsigned short cursor_y;
     unsigned long cursor_pos;
-    int fgcol;                      /* text colors */
-    int bgcol;
-    u_long next_line;               /* offset to one line below */
-    u_long next_plane;              /* offset to next plane */
     char fontname[40];              /* Font associated to this display */	
     u_char *fontdata;
-    unsigned short _fontheightlog;
-    unsigned short _fontwidthlog;
     unsigned short _fontheight;
     unsigned short _fontwidth;
     int userfont;                   /* != 0 if fontdata kmalloc()ed */
@@ -86,7 +80,6 @@ extern char con2fb_map[MAX_NR_CONSOLES];
 extern void set_con2fb_map(int unit, int newidx);
 
 #define fontheight(p) ((p)->_fontheight)
-#define fontheightlog(p) ((p)->_fontheightlog)
 
 #ifdef CONFIG_FBCON_FONTWIDTH8_ONLY
 
@@ -96,7 +89,6 @@ extern void set_con2fb_map(int unit, int newidx);
 #define FONTWIDTHRANGE(w1,w2)	FONTWIDTH(8)
 
 #define fontwidth(p) (8)
-#define fontwidthlog(p) (0)
 
 #else
 
@@ -106,7 +98,6 @@ extern void set_con2fb_map(int unit, int newidx);
 #define FONTWIDTHRANGE(w1,w2)	(FONTWIDTH(w2+1) - FONTWIDTH(w1))
 
 #define fontwidth(p) ((p)->_fontwidth)
-#define fontwidthlog(p) ((p)->_fontwidthlog)
 
 #endif
 
