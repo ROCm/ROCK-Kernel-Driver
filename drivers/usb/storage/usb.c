@@ -1,6 +1,6 @@
 /* Driver for USB Mass Storage compliant devices
  *
- * $Id: usb.c,v 1.68 2001/10/15 07:02:33 mdharm Exp $
+ * $Id: usb.c,v 1.69 2001/11/11 03:33:03 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -262,16 +262,28 @@ void fill_inquiry_response(struct us_data *us, unsigned char *data,
 	if (data_len<36) // You lose.
 		return;
 
-	memcpy(data+8, us->unusual_dev->vendorName, 
-		strlen(us->unusual_dev->vendorName) > 8 ? 8 :
-		strlen(us->unusual_dev->vendorName));
-	memcpy(data+16, us->unusual_dev->productName, 
-		strlen(us->unusual_dev->productName) > 16 ? 16 :
-		strlen(us->unusual_dev->productName));
-	data[32] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice>>12) & 0x0F);
-	data[33] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice>>8) & 0x0F);
-	data[34] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice>>4) & 0x0F);
-	data[35] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice) & 0x0F);
+	if(data[0]&0x20) { /* USB device currently not connected. Return
+			      peripheral qualifier 001b ("...however, the
+			      physical device is not currently connected
+			      to this logical unit") and leave vendor and
+			      product identification empty. ("If the target
+			      does store some of the INQUIRY data on the
+			      device, it may return zeros or ASCII spaces 
+			      (20h) in those fields until the data is
+			      available from the device."). */
+		memset(data+8,0,28);
+	} else {
+		memcpy(data+8, us->unusual_dev->vendorName, 
+			strlen(us->unusual_dev->vendorName) > 8 ? 8 :
+			strlen(us->unusual_dev->vendorName));
+		memcpy(data+16, us->unusual_dev->productName, 
+			strlen(us->unusual_dev->productName) > 16 ? 16 :
+			strlen(us->unusual_dev->productName));
+		data[32] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice>>12) & 0x0F);
+		data[33] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice>>8) & 0x0F);
+		data[34] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice>>4) & 0x0F);
+		data[35] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice) & 0x0F);
+	}
 
 	if (us->srb->use_sg) {
 		sg = (struct scatterlist *)us->srb->request_buffer;
@@ -389,24 +401,6 @@ static int usb_stor_control_thread(void * __us)
 				break;
 			}
 
-			/* Handle those devices which need us to fake their
-			 * inquiry data */
-			if ((us->srb->cmnd[0] == INQUIRY) &&
-			    (us->flags & US_FL_FIX_INQUIRY)) {
-			    	unsigned char data_ptr[36] = {
-				    0x00, 0x80, 0x02, 0x02,
-				    0x1F, 0x00, 0x00, 0x00};
-
-			    	US_DEBUGP("Faking INQUIRY command\n");
-				fill_inquiry_response(us, data_ptr, 36);
-				us->srb->result = GOOD << 1;
-
-				set_current_state(TASK_INTERRUPTIBLE);
-				us->srb->scsi_done(us->srb);
-				us->srb = NULL;
-				break;
-			}
-
 			/* lock the device pointers */
 			down(&(us->dev_semaphore));
 
@@ -422,6 +416,13 @@ static int usb_stor_control_thread(void * __us)
 					       usb_stor_sense_notready, 
 					       sizeof(usb_stor_sense_notready));
 					us->srb->result = GOOD << 1;
+				} else if(us->srb->cmnd[0] == INQUIRY) {
+					unsigned char data_ptr[36] = {
+					    0x20, 0x80, 0x02, 0x02,
+					    0x1F, 0x00, 0x00, 0x00};
+					US_DEBUGP("Faking INQUIRY command for disconnected device\n");
+					fill_inquiry_response(us, data_ptr, 36);
+					us->srb->result = GOOD << 1;
 				} else {
 					memcpy(us->srb->sense_buffer, 
 					       usb_stor_sense_notready, 
@@ -429,9 +430,23 @@ static int usb_stor_control_thread(void * __us)
 					us->srb->result = CHECK_CONDITION << 1;
 				}
 			} else { /* !us->pusb_dev */
-				/* we've got a command, let's do it! */
-				US_DEBUG(usb_stor_show_command(us->srb));
-				us->proto_handler(us->srb, us);
+
+				/* Handle those devices which need us to fake 
+				 * their inquiry data */
+				if ((us->srb->cmnd[0] == INQUIRY) &&
+				    (us->flags & US_FL_FIX_INQUIRY)) {
+					unsigned char data_ptr[36] = {
+					    0x00, 0x80, 0x02, 0x02,
+					    0x1F, 0x00, 0x00, 0x00};
+
+					US_DEBUGP("Faking INQUIRY command\n");
+					fill_inquiry_response(us, data_ptr, 36);
+					us->srb->result = GOOD << 1;
+				} else {
+					/* we've got a command, let's do it! */
+					US_DEBUG(usb_stor_show_command(us->srb));
+					us->proto_handler(us->srb, us);
+				}
 			}
 
 			/* unlock the device pointers */

@@ -1250,11 +1250,6 @@ void reparent_to_init(void)
 	SET_LINKS(this_task);
 
 	/* Set the exit signal to SIGCHLD so we signal init on exit */
-	if (this_task->exit_signal != 0) {
-		printk(KERN_ERR "task `%s' exit_signal %d in "
-				__FUNCTION__ "\n",
-			this_task->comm, this_task->exit_signal);
-	}
 	this_task->exit_signal = SIGCHLD;
 
 	/* We also take the runqueue_lock while altering task fields

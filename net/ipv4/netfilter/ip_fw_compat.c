@@ -78,19 +78,11 @@ fw_in(unsigned int hooknum,
 {
 	int ret = FW_BLOCK;
 	u_int16_t redirpt;
-	struct sk_buff *nskb;
 
 	/* Assume worse case: any hook could change packet */
 	(*pskb)->nfcache |= NFC_UNKNOWN | NFC_ALTERED;
 	if ((*pskb)->ip_summed == CHECKSUM_HW)
 		(*pskb)->ip_summed = CHECKSUM_NONE;
-
-	/* Firewall rules can alter TOS: raw socket may have clone of
-           skb: don't disturb it --RR */
-	nskb = skb_unshare(*pskb, GFP_ATOMIC);
-	if (!nskb)
-		return NF_DROP;
-	*pskb = nskb;
 
 	switch (hooknum) {
 	case NF_IP_PRE_ROUTING:

@@ -131,7 +131,8 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 
 			if (usage->hid == HID_GD_HATSWITCH) {
 				usage->code = ABS_HAT0X;
-				usage->hat = 1 + (field->logical_maximum == 4);
+				usage->hat_min = field->logical_minimum;
+				usage->hat_max = field->logical_maximum;
 			}
 			break;
 
@@ -285,7 +286,7 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 		input->absflat[usage->code] = (b - a) >> 4;
 	}
 
-	if (usage->hat) {
+	if (usage->hat_min != usage->hat_max) {
 		int i;
 		for (i = usage->code; i < usage->code + 2 && i <= max; i++) {
 			input->absmax[i] = 1;
@@ -302,9 +303,9 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 	struct input_dev *input = &hid->input;
 	int *quirks = &hid->quirks;
 
-	if (usage->hat) {
-		if (usage->hat == 2) value = value * 2;
-		if (value > 8) value = 8;
+	if (usage->hat_min != usage->hat_max) {
+		value = (value - usage->hat_min) * 8 / (usage->hat_max - usage->hat_min + 1) + 1;
+		if (value < 0 || value > 8) value = 0;
 		input_event(input, usage->type, usage->code    , hid_hat_to_axis[value].x);
 		input_event(input, usage->type, usage->code + 1, hid_hat_to_axis[value].y);
 		return;

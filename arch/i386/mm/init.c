@@ -439,13 +439,24 @@ static inline int page_is_ram (unsigned long pagenr)
 	return 0;
 }
 
+static inline int page_kills_ppro(unsigned long pagenr)
+{
+	if(pagenr >= 0x70000 && pagenr <= 0x7003F)
+		return 1;
+	return 0;
+}
+	
 void __init mem_init(void)
 {
+	extern int ppro_with_ram_bug(void);
 	int codesize, reservedpages, datasize, initsize;
 	int tmp;
+	int bad_ppro;
 
 	if (!mem_map)
 		BUG();
+	
+	bad_ppro = ppro_with_ram_bug();
 
 #ifdef CONFIG_HIGHMEM
 	highmem_start_page = mem_map + highstart_pfn;
@@ -473,6 +484,11 @@ void __init mem_init(void)
 		struct page *page = mem_map + tmp;
 
 		if (!page_is_ram(tmp)) {
+			SetPageReserved(page);
+			continue;
+		}
+		if (bad_ppro && page_kills_ppro(tmp))
+		{
 			SetPageReserved(page);
 			continue;
 		}

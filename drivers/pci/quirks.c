@@ -411,6 +411,48 @@ static void __init quirk_cardbus_legacy(struct pci_dev *dev)
 	pci_write_config_dword(dev, PCI_CB_LEGACY_MODE_BASE, 0);
 }
 
+/*
+ * The AMD io apic can hang the box when an apic irq is masked.
+ * We check all revs >= B0 (yet not in the pre production!) as the bug
+ * is currently marked NoFix
+ *
+ * We have multiple reports of hangs with this chipset that went away with
+ * noapic specified. For the moment we assume its the errata. We may be wrong
+ * of course. However the advice is demonstrably good even if so..
+ */
+ 
+static void __init quirk_amd_ioapic(struct pci_dev *dev)
+{
+	u8 rev;
+
+	pci_read_config_byte(dev, PCI_REVISION_ID, &rev);
+	if(rev >= 0x02)
+	{
+		printk(KERN_WARNING "I/O APIC: AMD Errata #22 may be present. In the event of instability try\n");
+		printk(KERN_WARNING "        : booting with the \"noapic\" option.\n");
+	}
+}
+
+/*
+ * Following the PCI ordering rules is optional on the AMD762. I'm not
+ * sure what the designers were smoking but let's not inhale...
+ *
+ * To be fair to AMD, it follows the spec by default, its BIOS people
+ * who turn it off!
+ */
+ 
+static void __init quirk_amd_ordering(struct pci_dev *dev)
+{
+	u32 pcic;
+	
+	pci_read_config_dword(dev, 0x42, &pcic);
+	if((pcic&2)==0)
+	{
+		pcic |= 2;
+		printk(KERN_WARNING "BIOS disabled PCI ordering compliance, so we enabled it again.\n");
+		pci_write_config_dword(dev, 0x42, pcic);		
+	}
+}
 
 /*
  *  The main table of quirks.
@@ -462,6 +504,9 @@ static struct pci_fixup pci_fixups[] __initdata = {
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_2,	quirk_via_irqpic },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_5,	quirk_via_irqpic },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_6,	quirk_via_irqpic },
+
+	{ PCI_FIXUP_FINAL, 	PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_VIPER_7410,	quirk_amd_ioapic },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_FE_GATE_700C, quirk_amd_ordering },
 
 	{ 0 }
 };

@@ -45,6 +45,12 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
    else
       define_tristate CONFIG_PARPORT_ATARI n
    fi
+   if [ "$CONFIG_GSC_LASI" = "y" ]; then
+      dep_tristate '  LASI/ASP builtin parallel-port' CONFIG_PARPORT_GSC $CONFIG_PARPORT
+   else
+      define_tristate CONFIG_PARPORT_GSC n
+   fi
+
    if [ "$CONFIG_SBUS" = "y" -a "$CONFIG_EXPERIMENTAL" = "y" ]; then
       dep_tristate '  Sparc hardware (EXPERIMENTAL)' CONFIG_PARPORT_SUNBPP $CONFIG_PARPORT
    else

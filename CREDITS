@@ -1611,8 +1611,10 @@ E: greg@kroah.com
 W: http://www.kroah.com/linux-usb/
 D: USB Serial Converter driver framework, USB Handspring Visor driver
 D: ConnectTech WHITEHeat USB driver, Generic USB Serial driver
-D: USB Bluetooth driver
+D: USB I/O Edgeport driver, USB Serial IrDA driver
+D: USB Bluetooth driver, USB Skeleton driver
 D: bits and pieces of USB core code.
+D: PCI Hotplug core, PCI Hotplug Compaq driver modifications
 
 N: Russell Kroll
 E: rkroll@exploits.org

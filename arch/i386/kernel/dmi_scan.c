@@ -12,7 +12,6 @@
 
 unsigned long dmi_broken;
 int is_sony_vaio_laptop;
-int enable_acpi_smp_table;
 
 struct dmi_header
 {

@@ -535,6 +535,18 @@ void console_print(const char *s)
 }
 EXPORT_SYMBOL(console_print);
 
+void console_unblank(void)
+{
+	struct console *c;
+
+	acquire_console_sem();
+	for (c = console_drivers; c != NULL; c = c->next)
+		if ((c->flags & CON_ENABLED) && c->unblank)
+			c->unblank();
+	release_console_sem();
+}
+EXPORT_SYMBOL(console_unblank);
+
 /*
  * The console driver calls this routine during kernel initialization
  * to register the console printing procedure with printk() and to

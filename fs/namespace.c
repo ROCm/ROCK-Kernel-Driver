@@ -22,6 +22,7 @@
 #include <linux/nfs_fs.h>
 #include <linux/nfs_fs_sb.h>
 #include <linux/nfs_mount.h>
+#include <linux/seq_file.h>
 
 struct vfsmount *do_kern_mount(char *type, int flags, char *name, void *data);
 int do_remount_sb(struct super_block *sb, int flags, void * data);
@@ -167,159 +168,131 @@ void __mntput(struct vfsmount *mnt)
 	kill_super(sb);
 }
 
-/* Use octal escapes, like mount does, for embedded spaces etc. */
-static unsigned char need_escaping[] = { ' ', '\t', '\n', '\\' };
-
-static int
-mangle(const unsigned char *s, char *buf, int len) {
-        char *sp;
-        int n;
-
-        sp = buf;
-        while(*s && sp-buf < len-3) {
-                for (n = 0; n < sizeof(need_escaping); n++) {
-                        if (*s == need_escaping[n]) {
-                                *sp++ = '\\';
-                                *sp++ = '0' + ((*s & 0300) >> 6);
-                                *sp++ = '0' + ((*s & 070) >> 3);
-                                *sp++ = '0' + (*s & 07);
-                                goto next;
-                        }
-                }
-                *sp++ = *s;
-        next:
-                s++;
-        }
-        return sp - buf;	/* no trailing NUL */
-}
-
-static struct proc_fs_info {
-	int flag;
-	char *str;
-} fs_info[] = {
-	{ MS_SYNCHRONOUS, ",sync" },
-	{ MS_MANDLOCK, ",mand" },
-	{ MS_NOATIME, ",noatime" },
-	{ MS_NODIRATIME, ",nodiratime" },
-	{ 0, NULL }
-};
-
-static struct proc_fs_info mnt_info[] = {
-	{ MNT_NOSUID, ",nosuid" },
-	{ MNT_NODEV, ",nodev" },
-	{ MNT_NOEXEC, ",noexec" },
-	{ 0, NULL }
-};
-
-static struct proc_nfs_info {
-	int flag;
-	char *str;
-	char *nostr;
-} nfs_info[] = {
-	{ NFS_MOUNT_SOFT, ",soft", ",hard" },
-	{ NFS_MOUNT_INTR, ",intr", "" },
-	{ NFS_MOUNT_POSIX, ",posix", "" },
-	{ NFS_MOUNT_TCP, ",tcp", ",udp" },
-	{ NFS_MOUNT_NOCTO, ",nocto", "" },
-	{ NFS_MOUNT_NOAC, ",noac", "" },
-	{ NFS_MOUNT_NONLM, ",nolock", ",lock" },
-	{ NFS_MOUNT_BROKEN_SUID, ",broken_suid", "" },
-	{ 0, NULL, NULL }
-};
-
-int get_filesystem_info( char *buf )
+/* iterator */
+static void *m_start(struct seq_file *m, loff_t *pos)
 {
 	struct list_head *p;
-	struct proc_fs_info *fs_infop;
-	struct proc_nfs_info *nfs_infop;
-	struct nfs_server *nfss;
-	int len, prevlen;
-	char *path, *buffer = (char *) __get_free_page(GFP_KERNEL);
+	loff_t n = *pos;
 
-	if (!buffer) return 0;
-	len = prevlen = 0;
-
-#define FREEROOM	((int)PAGE_SIZE-200-len)
-#define MANGLE(s)	len += mangle((s), buf+len, FREEROOM);
-
-	for (p = vfsmntlist.next; p != &vfsmntlist; p = p->next) {
-		struct vfsmount *tmp = list_entry(p, struct vfsmount, mnt_list);
-		path = d_path(tmp->mnt_root, tmp, buffer, PAGE_SIZE);
-		if (!path)
-			continue;
-		MANGLE(tmp->mnt_devname ? tmp->mnt_devname : "none");
-		buf[len++] = ' ';
-		MANGLE(path);
-		buf[len++] = ' ';
-		MANGLE(tmp->mnt_sb->s_type->name);
-		len += sprintf(buf+len, " %s",
-			       tmp->mnt_sb->s_flags & MS_RDONLY ? "ro" : "rw");
-		for (fs_infop = fs_info; fs_infop->flag; fs_infop++) {
-			if (tmp->mnt_sb->s_flags & fs_infop->flag)
-				MANGLE(fs_infop->str);
-		}
-		for (fs_infop = mnt_info; fs_infop->flag; fs_infop++) {
-			if (tmp->mnt_flags & fs_infop->flag)
-				MANGLE(fs_infop->str);
-		}
-		if (!strcmp("nfs", tmp->mnt_sb->s_type->name)) {
-			nfss = &tmp->mnt_sb->u.nfs_sb.s_server;
-			len += sprintf(buf+len, ",v%d", nfss->rpc_ops->version);
-
-			len += sprintf(buf+len, ",rsize=%d", nfss->rsize);
-
-			len += sprintf(buf+len, ",wsize=%d", nfss->wsize);
-#if 0
-			if (nfss->timeo != 7*HZ/10) {
-				len += sprintf(buf+len, ",timeo=%d",
-					       nfss->timeo*10/HZ);
-			}
-			if (nfss->retrans != 3) {
-				len += sprintf(buf+len, ",retrans=%d",
-					       nfss->retrans);
-			}
-#endif
-			if (nfss->acregmin != 3*HZ) {
-				len += sprintf(buf+len, ",acregmin=%d",
-					       nfss->acregmin/HZ);
-			}
-			if (nfss->acregmax != 60*HZ) {
-				len += sprintf(buf+len, ",acregmax=%d",
-					       nfss->acregmax/HZ);
-			}
-			if (nfss->acdirmin != 30*HZ) {
-				len += sprintf(buf+len, ",acdirmin=%d",
-					       nfss->acdirmin/HZ);
-			}
-			if (nfss->acdirmax != 60*HZ) {
-				len += sprintf(buf+len, ",acdirmax=%d",
-					       nfss->acdirmax/HZ);
-			}
-			for (nfs_infop = nfs_info; nfs_infop->flag; nfs_infop++) {
-				char *str;
-				if (nfss->flags & nfs_infop->flag)
-					str = nfs_infop->str;
-				else
-					str = nfs_infop->nostr;
-				MANGLE(str);
-			}
-			len += sprintf(buf+len, ",addr=");
-			MANGLE(nfss->hostname);
-		}
-		len += sprintf(buf + len, " 0 0\n");
-		if (FREEROOM <= 3) {
-			len = prevlen;
-			len += sprintf(buf+len, "# truncated\n");
-			break;
-		}
-		prevlen = len;
-	}
-
-	free_page((unsigned long) buffer);
-	return len;
-#undef MANGLE
-#undef FREEROOM
+	down(&mount_sem);
+	list_for_each(p, &vfsmntlist)
+		if (!n--)
+			return list_entry(p, struct vfsmount, mnt_list);
+	return NULL;
 }
+
+static void *m_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	struct list_head *p = ((struct vfsmount *)v)->mnt_list.next;
+	(*pos)++;
+	return p==&vfsmntlist ? NULL : list_entry(p, struct vfsmount, mnt_list);
+}
+
+static void m_stop(struct seq_file *m, void *v)
+{
+	up(&mount_sem);
+}
+
+static inline void mangle(struct seq_file *m, const char *s)
+{
+	seq_escape(m, s, " \t\n\\");
+}
+
+static void show_nfs_mount(struct seq_file *m, struct vfsmount *mnt)
+{
+	static struct proc_nfs_info {
+		int flag;
+		char *str;
+		char *nostr;
+	} nfs_info[] = {
+		{ NFS_MOUNT_SOFT, ",soft", ",hard" },
+		{ NFS_MOUNT_INTR, ",intr", "" },
+		{ NFS_MOUNT_POSIX, ",posix", "" },
+		{ NFS_MOUNT_TCP, ",tcp", ",udp" },
+		{ NFS_MOUNT_NOCTO, ",nocto", "" },
+		{ NFS_MOUNT_NOAC, ",noac", "" },
+		{ NFS_MOUNT_NONLM, ",nolock", ",lock" },
+		{ NFS_MOUNT_BROKEN_SUID, ",broken_suid", "" },
+		{ 0, NULL, NULL }
+	};
+	struct proc_nfs_info *nfs_infop;
+	struct nfs_server *nfss = &mnt->mnt_sb->u.nfs_sb.s_server;
+
+	seq_printf(m, ",v%d", nfss->rpc_ops->version);
+	seq_printf(m, ",rsize=%d", nfss->rsize);
+	seq_printf(m, ",wsize=%d", nfss->wsize);
+	if (nfss->acregmin != 3*HZ)
+		seq_printf(m, ",acregmin=%d", nfss->acregmin/HZ);
+	if (nfss->acregmax != 60*HZ)
+		seq_printf(m, ",acregmax=%d", nfss->acregmax/HZ);
+	if (nfss->acdirmin != 30*HZ)
+		seq_printf(m, ",acdirmin=%d", nfss->acdirmin/HZ);
+	if (nfss->acdirmax != 60*HZ)
+		seq_printf(m, ",acdirmax=%d", nfss->acdirmax/HZ);
+	for (nfs_infop = nfs_info; nfs_infop->flag; nfs_infop++) {
+		if (nfss->flags & nfs_infop->flag)
+			seq_puts(m, nfs_infop->str);
+		else
+			seq_puts(m, nfs_infop->nostr);
+	}
+	seq_puts(m, ",addr=");
+	mangle(m, nfss->hostname);
+}
+
+static int show_vfsmnt(struct seq_file *m, void *v)
+{
+	struct vfsmount *mnt = v;
+	static struct proc_fs_info {
+		int flag;
+		char *str;
+	} fs_info[] = {
+		{ MS_SYNCHRONOUS, ",sync" },
+		{ MS_MANDLOCK, ",mand" },
+		{ MS_NOATIME, ",noatime" },
+		{ MS_NODIRATIME, ",nodiratime" },
+		{ 0, NULL }
+	};
+	static struct proc_fs_info mnt_info[] = {
+		{ MNT_NOSUID, ",nosuid" },
+		{ MNT_NODEV, ",nodev" },
+		{ MNT_NOEXEC, ",noexec" },
+		{ 0, NULL }
+	};
+	struct proc_fs_info *fs_infop;
+	char *path_buf, *path;
+
+	path_buf = (char *) __get_free_page(GFP_KERNEL);
+	if (!path_buf)
+		return -ENOMEM;
+	path = d_path(mnt->mnt_root, mnt, path_buf, PAGE_SIZE);
+
+	mangle(m, mnt->mnt_devname ? mnt->mnt_devname : "none");
+	seq_putc(m, ' ');
+	mangle(m, path);
+	free_page((unsigned long) path_buf);
+	seq_putc(m, ' ');
+	mangle(m, mnt->mnt_sb->s_type->name);
+	seq_puts(m, mnt->mnt_sb->s_flags & MS_RDONLY ? " ro" : " rw");
+	for (fs_infop = fs_info; fs_infop->flag; fs_infop++) {
+		if (mnt->mnt_sb->s_flags & fs_infop->flag)
+			seq_puts(m, fs_infop->str);
+	}
+	for (fs_infop = mnt_info; fs_infop->flag; fs_infop++) {
+		if (mnt->mnt_flags & fs_infop->flag)
+			seq_puts(m, fs_infop->str);
+	}
+	if (strcmp("nfs", mnt->mnt_sb->s_type->name) == 0)
+		show_nfs_mount(m, mnt);
+	seq_puts(m, " 0 0\n");
+	return 0;
+}
+
+struct seq_operations mounts_op = {
+	start:	m_start,
+	next:	m_next,
+	stop:	m_stop,
+	show:	show_vfsmnt
+};
 
 /*
  * Doesn't take quota and stuff into account. IOW, in some cases it will

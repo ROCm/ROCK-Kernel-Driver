@@ -308,4 +308,9 @@ extern void update_mmu_cache(struct vm_area_struct * vma,
 
 #define io_remap_page_range remap_page_range
 
+/*
+ * No page table caches to initialise
+ */
+#define pgtable_cache_init()	do { } while (0)
+
 #endif /* __ASM_SH_PAGE_H */

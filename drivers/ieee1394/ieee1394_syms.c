@@ -84,4 +84,5 @@ EXPORT_SYMBOL(hpsb_guid_fill_packet);
 EXPORT_SYMBOL(hpsb_register_protocol);
 EXPORT_SYMBOL(hpsb_unregister_protocol);
 EXPORT_SYMBOL(hpsb_release_unit_directory);
+
 MODULE_LICENSE("GPL");

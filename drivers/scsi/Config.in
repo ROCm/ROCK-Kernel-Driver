@@ -135,7 +135,16 @@ if [ "$CONFIG_SCSI_NCR53C7xx" != "n" ]; then
    bool '  allow FAST-SCSI [10MHz]' CONFIG_SCSI_NCR53C7xx_FAST
    bool '  allow DISCONNECT' CONFIG_SCSI_NCR53C7xx_DISCONNECT
 fi
-if [ "$CONFIG_PCI" = "y" -a "$CONFIG_SCSI_NCR53C7xx" != "y" ]; then
+if [ "$CONFIG_PCI" = "y" ]; then
+   dep_tristate 'SYM53C8XX Version 2 SCSI support' CONFIG_SCSI_SYM53C8XX_2 $CONFIG_SCSI
+   if [ "$CONFIG_SCSI_SYM53C8XX_2" != "n" ]; then
+      int  '  DMA addressing mode' CONFIG_SCSI_SYM53C8XX_DMA_ADDRESSING_MODE 1
+      int  '  default tagged command queue depth' CONFIG_SCSI_SYM53C8XX_DEFAULT_TAGS 16
+      int  '  maximum number of queued commands' CONFIG_SCSI_SYM53C8XX_MAX_TAGS 64
+      bool '  use normal IO' CONFIG_SCSI_SYM53C8XX_IOMAPPED
+   fi
+fi
+if [ "$CONFIG_PCI" = "y" -a "$CONFIG_SCSI_SYM53C8XX_2" != "y" ]; then
    dep_tristate 'NCR53C8XX SCSI support' CONFIG_SCSI_NCR53C8XX $CONFIG_SCSI
    dep_tristate 'SYM53C8XX SCSI support' CONFIG_SCSI_SYM53C8XX $CONFIG_SCSI
    if [ "$CONFIG_SCSI_NCR53C8XX" != "n" -o "$CONFIG_SCSI_SYM53C8XX" != "n" ]; then

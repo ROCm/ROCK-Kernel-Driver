@@ -211,7 +211,9 @@ endmenu
 
 source drivers/fc4/Config.in
 
-source drivers/message/fusion/Config.in
+if [ "$CONFIG_PCI" = "y" ]; then
+   source drivers/message/fusion/Config.in
+fi
 
 source drivers/ieee1394/Config.in
 

@@ -12,9 +12,7 @@
    
    Authors: 	Arjan van de Ven <arjanv@redhat.com>
    		
-   
-
-
+   Based on work done by Søren Schmidt for FreeBSD  
 
 */
 
@@ -54,6 +52,12 @@ static struct disk_dev devlist[]= {
 	{IDE2_MAJOR, 64,  -1 },
 	{IDE3_MAJOR,  0,  -1 },
 	{IDE3_MAJOR, 64,  -1 },
+	{IDE4_MAJOR,  0,  -1 },
+	{IDE4_MAJOR, 64,  -1 },
+	{IDE5_MAJOR,  0,  -1 },
+	{IDE5_MAJOR, 64,  -1 },
+	{IDE6_MAJOR,  0,  -1 },
+	{IDE6_MAJOR, 64,  -1 },
 };
 
 
@@ -550,14 +554,8 @@ static __init int pdcraid_init_one(int device,int raidlevel)
 	request_queue_t *q;
 	int i,count;
 
-	probedisk(0, device, raidlevel);
-	probedisk(1, device, raidlevel);
-	probedisk(2, device, raidlevel);
-	probedisk(3, device, raidlevel);
-	probedisk(4, device, raidlevel);
-	probedisk(5, device, raidlevel);
-	probedisk(6, device, raidlevel);
-	probedisk(7, device, raidlevel);
+	for (i=0; i<14; i++)
+		probedisk(i, device, raidlevel);
 	
 	if (raidlevel==0)
 		fill_cutoff(device);

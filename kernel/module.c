@@ -9,6 +9,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
+#include <linux/seq_file.h>
 
 /*
  * Originally by Anonymous (as far as I know...)
@@ -1156,51 +1157,83 @@ fini:
  * Called by the /proc file system to return a current list of ksyms.
  */
 
-int
-get_ksyms_list(char *buf, char **start, off_t offset, int length)
-{
+struct mod_sym {
 	struct module *mod;
-	char *p = buf;
-	int len     = 0;	/* code from  net/ipv4/proc.c */
-	off_t pos   = 0;
-	off_t begin = 0;
+	int index;
+};
 
-	for (mod = module_list; mod; mod = mod->next) {
-		unsigned i;
-		struct module_symbol *sym;
+/* iterator */
 
-		if (!MOD_CAN_QUERY(mod))
-			continue;
+static void *s_start(struct seq_file *m, loff_t *pos)
+{
+	struct mod_sym *p = kmalloc(sizeof(*p), GFP_KERNEL);
+	struct module *v;
+	loff_t n = *pos;
 
-		for (i = mod->nsyms, sym = mod->syms; i > 0; --i, ++sym) {
-			p = buf + len;
-			if (*mod->name) {
-				len += sprintf(p, "%0*lx %s\t[%s]\n",
-					       (int)(2*sizeof(void*)),
-					       sym->value, sym->name,
-					       mod->name);
-			} else {
-				len += sprintf(p, "%0*lx %s\n",
-					       (int)(2*sizeof(void*)),
-					       sym->value, sym->name);
-			}
-			pos = begin + len;
-			if (pos < offset) {
-				len = 0;
-				begin = pos;
-			}
-			pos = begin + len;
-			if (pos > offset+length)
-				goto leave_the_loop;
+	if (!p)
+		return ERR_PTR(-ENOMEM);
+	lock_kernel();
+	for (v = module_list, n = *pos; v; n -= v->nsyms, v = v->next) {
+		if (n < v->nsyms) {
+			p->mod = v;
+			p->index = n;
+			return p;
 		}
 	}
-leave_the_loop:
-	*start = buf + (offset - begin);
-	len -= (offset - begin);
-	if (len > length)
-		len = length;
-	return len;
+	unlock_kernel();
+	kfree(p);
+	return NULL;
 }
+
+static void *s_next(struct seq_file *m, void *p, loff_t *pos)
+{
+	struct mod_sym *v = p;
+	(*pos)++;
+	if (++v->index >= v->mod->nsyms) {
+		do {
+			v->mod = v->mod->next;
+			if (!v->mod) {
+				unlock_kernel();
+				kfree(p);
+				return NULL;
+			}
+		} while (!v->mod->nsyms);
+		v->index = 0;
+	}
+	return p;
+}
+
+static void s_stop(struct seq_file *m, void *p)
+{
+	if (p && !IS_ERR(p)) {
+		unlock_kernel();
+		kfree(p);
+	}
+}
+
+static int s_show(struct seq_file *m, void *p)
+{
+	struct mod_sym *v = p;
+	struct module_symbol *sym;
+
+	if (!MOD_CAN_QUERY(v->mod))
+		return 0;
+	sym = &v->mod->syms[v->index];
+	if (*v->mod->name)
+		seq_printf(m, "%0*lx %s\t[%s]\n", (int)(2*sizeof(void*)),
+			       sym->value, sym->name, v->mod->name);
+	else
+		seq_printf(m, "%0*lx %s\n", (int)(2*sizeof(void*)),
+			       sym->value, sym->name);
+	return 0;
+}
+
+struct seq_operations ksyms_op = {
+	start:	s_start,
+	next:	s_next,
+	stop:	s_stop,
+	show:	s_show
+};
 
 #else		/* CONFIG_MODULES */
 

@@ -234,7 +234,8 @@ struct hid_usage {
 	unsigned  hid;			/* hid usage code */
 	__u16     code;			/* input driver code */
 	__u8      type;			/* input driver type */
-	__u8	  hat;			/* hat switch fun */
+	__s8	  hat_min;		/* hat switch fun */
+	__s8	  hat_max;		/* ditto */
 };
 
 struct hid_field {

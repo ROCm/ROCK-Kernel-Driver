@@ -1042,7 +1042,7 @@ void __init pci_read_bridge_bases(struct pci_bus *child)
 	}
 }
 
-static struct pci_bus * __init pci_alloc_bus(void)
+static struct pci_bus * __devinit  pci_alloc_bus(void)
 {
 	struct pci_bus *b;
 
@@ -1055,7 +1055,7 @@ static struct pci_bus * __init pci_alloc_bus(void)
 	return b;
 }
 
-static struct pci_bus * __init pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev, int busnr)
+struct pci_bus * __devinit pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev, int busnr)
 {
 	struct pci_bus *child;
 	int i;
@@ -1087,7 +1087,7 @@ static struct pci_bus * __init pci_add_new_bus(struct pci_bus *parent, struct pc
 	return child;
 }
 
-static unsigned int __init pci_do_scan_bus(struct pci_bus *bus);
+unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus);
 
 /*
  * If it's a bridge, configure it and scan the bus behind it.
@@ -1099,7 +1099,7 @@ static unsigned int __init pci_do_scan_bus(struct pci_bus *bus);
  * them, we proceed to assigning numbers to the remaining buses in
  * order to avoid overlaps between old and new bus numbers.
  */
-static int __init pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max, int pass)
+static int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max, int pass)
 {
 	unsigned int buses;
 	unsigned short cr;
@@ -1255,7 +1255,7 @@ int pci_setup_device(struct pci_dev * dev)
  * Read the config data for a PCI device, sanity-check it
  * and fill in the dev structure...
  */
-static struct pci_dev * __init pci_scan_device(struct pci_dev *temp)
+struct pci_dev * __devinit pci_scan_device(struct pci_dev *temp)
 {
 	struct pci_dev *dev;
 	u32 l;
@@ -1285,7 +1285,7 @@ static struct pci_dev * __init pci_scan_device(struct pci_dev *temp)
 	return dev;
 }
 
-struct pci_dev * __init pci_scan_slot(struct pci_dev *temp)
+struct pci_dev * __devinit pci_scan_slot(struct pci_dev *temp)
 {
 	struct pci_bus *bus = temp->bus;
 	struct pci_dev *dev;
@@ -1323,7 +1323,7 @@ struct pci_dev * __init pci_scan_slot(struct pci_dev *temp)
 	return first_dev;
 }
 
-static unsigned int __init pci_do_scan_bus(struct pci_bus *bus)
+unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 {
 	unsigned int devfn, max, pass;
 	struct list_head *ln;
@@ -1367,7 +1367,7 @@ static unsigned int __init pci_do_scan_bus(struct pci_bus *bus)
 	return max;
 }
 
-int __init pci_bus_exists(const struct list_head *list, int nr)
+int __devinit  pci_bus_exists(const struct list_head *list, int nr)
 {
 	const struct list_head *l;
 
@@ -1379,7 +1379,7 @@ int __init pci_bus_exists(const struct list_head *list, int nr)
 	return 0;
 }
 
-struct pci_bus * __init pci_alloc_primary_bus(int bus)
+struct pci_bus * __devinit  pci_alloc_primary_bus(int bus)
 {
 	struct pci_bus *b;
 
@@ -1398,7 +1398,7 @@ struct pci_bus * __init pci_alloc_primary_bus(int bus)
 	return b;
 }
 
-struct pci_bus * __init pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata)
+struct pci_bus * __devinit  pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata)
 {
 	struct pci_bus *b = pci_alloc_primary_bus(bus);
 	if (b) {
@@ -1916,7 +1916,7 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 }
 
 
-void __init pci_init(void)
+void __devinit  pci_init(void)
 {
 	struct pci_dev *dev;
 
@@ -1931,7 +1931,7 @@ void __init pci_init(void)
 #endif
 }
 
-static int __init pci_setup(char *str)
+static int __devinit  pci_setup(char *str)
 {
 	while (str) {
 		char *k = strchr(str, ',');

@@ -7,6 +7,9 @@
  *                Ani Joshi / Jeff Garzik
  *                      - Code cleanup
  *
+ *                Andreas Hundt <andi@convergence.de>
+ *                      - FB_ACTIVATE fixes
+ *
  *  Based off of Geert's atyfb.c and vfb.c.
  *
  *  TODO:
@@ -143,7 +146,7 @@ enum {
 };
 
 /* supported Rage128 chipsets */
-static const struct aty128_chip_info aty128_pci_probe_list[] __initdata =
+static struct aty128_chip_info aty128_pci_probe_list[] __initdata =
 {
     {"Rage128 RE (PCI)", PCI_DEVICE_ID_ATI_RAGE128_RE, rage_128},
     {"Rage128 RF (AGP)", PCI_DEVICE_ID_ATI_RAGE128_RF, rage_128},
@@ -217,7 +220,7 @@ static char *font __initdata = NULL;
 static char *mode __initdata = NULL;
 static int  nomtrr __initdata = 0;
 
-static const char *mode_option __initdata = NULL;
+static char *mode_option __initdata = NULL;
 
 #ifdef CONFIG_PPC
 static int default_vmode __initdata = VMODE_1024_768_60;
@@ -880,7 +883,11 @@ aty128_var_to_crtc(const struct fb_var_screeninfo *var,
     crtc->pitch = vxres >> 3;
 
     crtc->offset = 0;
-    crtc->offset_cntl = 0;
+
+    if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW)
+ 	 crtc->offset_cntl = 0x00010000;
+    else
+	 crtc->offset_cntl = 0;
 
     crtc->vxres = vxres;
     crtc->vyres = vyres;
@@ -1363,7 +1370,7 @@ aty128fb_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *fb)
 
     aty128_encode_var(var, &par, info);
 
-    if ((var->activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_NOW)
+    if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_TEST)
 	return 0;
 
     oldxres = display->var.xres;
@@ -2591,6 +2598,7 @@ static struct display_switch fbcon_aty128_32 = {
 #ifdef MODULE
 MODULE_AUTHOR("(c)1999-2000 Brad Douglas <brad@neruo.com>");
 MODULE_DESCRIPTION("FBDev driver for ATI Rage128 / Pro cards");
+MODULE_LICENSE("GPL");
 MODULE_PARM(noaccel, "i");
 MODULE_PARM_DESC(noaccel, "Disable hardware acceleration (0 or 1=disabled) (default=0)");
 MODULE_PARM(font, "s");

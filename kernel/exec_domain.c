@@ -77,7 +77,6 @@ static struct exec_domain *
 lookup_exec_domain(u_long personality)
 {
 	struct exec_domain *	ep;
-	char			buffer[30];
 	u_long			pers = personality(personality);
 		
 	read_lock(&exec_domains_lock);
@@ -89,8 +88,11 @@ lookup_exec_domain(u_long personality)
 
 #ifdef CONFIG_KMOD
 	read_unlock(&exec_domains_lock);
-	sprintf(buffer, "personality-%ld", pers);
-	request_module(buffer);
+	{
+		char buffer[30];
+		sprintf(buffer, "personality-%ld", pers);
+		request_module(buffer);
+	}
 	read_lock(&exec_domains_lock);
 
 	for (ep = exec_domains; ep; ep = ep->next) {

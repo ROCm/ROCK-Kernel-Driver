@@ -6,7 +6,7 @@ O_TARGET	:= mddev.o
 
 export-objs	:= md.o xor.o
 list-multi	:= lvm-mod.o
-lvm-mod-objs	:= lvm.o lvm-snap.o
+lvm-mod-objs	:= lvm.o lvm-snap.o lvm-fs.o
 
 # Note: link order is important.  All raid personalities
 # and xor.o must come before md.o, as they each initialise 

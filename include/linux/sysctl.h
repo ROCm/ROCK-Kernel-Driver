@@ -62,7 +62,8 @@ enum
 	CTL_DEBUG=6,		/* Debugging */
 	CTL_DEV=7,		/* Devices */
 	CTL_BUS=8,		/* Busses */
-	CTL_ABI=9		/* Binary emulation */
+	CTL_ABI=9,		/* Binary emulation */
+	CTL_CPU=10		/* CPU stuff (speed scaling, etc) */
 };
 
 /* CTL_BUS names: */

@@ -195,7 +195,12 @@ int blkpg_ioctl(kdev_t dev, struct blkpg_ioctl_arg *arg)
 
 int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 {
+	struct gendisk *g;
+	u64 ullval = 0;
 	int intval;
+
+	if (!dev)
+		return -EINVAL;
 
 	switch (cmd) {
 		case BLKROSET:
@@ -212,7 +217,7 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 		case BLKRASET:
 			if(!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			if(!dev || arg > 0xff)
+			if(arg > 0xff)
 				return -EINVAL;
 			read_ahead[MAJOR(dev)] = arg;
 			return 0;
@@ -224,8 +229,6 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 		case BLKFLSBUF:
 			if(!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			if (!dev)
-				return -EINVAL;
 			fsync_dev(dev);
 			invalidate_buffers(dev);
 			return 0;
@@ -235,18 +238,16 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 			intval = get_hardsect_size(dev);
 			return put_user(intval, (int *) arg);
 
-#if 0
 		case BLKGETSIZE:
-			/* Today get_gendisk() requires a linear scan;
-			   add this when dev has pointer type. */
-			/* add BLKGETSIZE64 too */
+		case BLKGETSIZE64:
 			g = get_gendisk(dev);
-			if (!g)
-				ulongval = 0;
+			if (g)
+				ullval = g->part[MINOR(dev)].nr_sects;
+
+			if (cmd == BLKGETSIZE)
+				return put_user((unsigned long)ullval, (unsigned long *)arg);
 			else
-				ulongval = g->part[MINOR(dev)].nr_sects;
-			return put_user(ulongval, (unsigned long *) arg);
-#endif
+				return put_user(ullval, (u64 *)arg);
 #if 0
 		case BLKRRPART: /* Re-read partition tables */
 			if (!capable(CAP_SYS_ADMIN)) 

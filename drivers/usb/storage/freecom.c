@@ -1,6 +1,6 @@
 /* Driver for Freecom USB/IDE adaptor
  *
- * $Id: freecom.c,v 1.18 2001/11/04 13:01:17 mdharm Exp $
+ * $Id: freecom.c,v 1.19 2001/11/11 05:42:34 mdharm Exp $
  *
  * Freecom v0.1:
  *
@@ -81,27 +81,28 @@ struct freecom_status {
 
 /* Freecom stuffs the interrupt status in the INDEX_STAT bit of the ide
  * register. */
-#define FCM_INT_STATUS   INDEX_STAT
+#define FCM_INT_STATUS		0x02 /* INDEX_STAT */
+#define FCM_STATUS_BUSY		0x80
 
 /* These are the packet types.  The low bit indicates that this command
  * should wait for an interrupt. */
-#define FCM_PACKET_ATAPI  0x21
-#define FCM_PACKET_STATUS 0x20
+#define FCM_PACKET_ATAPI	0x21
+#define FCM_PACKET_STATUS	0x20
 
 /* Receive data from the IDE interface.  The ATAPI packet has already
  * waited, so the data should be immediately available. */
-#define FCM_PACKET_INPUT  0x81
+#define FCM_PACKET_INPUT	0x81
 
 /* Send data to the IDE interface. */
-#define FCM_PACKET_OUTPUT 0x01
+#define FCM_PACKET_OUTPUT	0x01
 
 /* Write a value to an ide register.  Or the ide register to write after
  * munging the address a bit. */
-#define FCM_PACKET_IDE_WRITE    0x40
-#define FCM_PACKET_IDE_READ     0xC0
+#define FCM_PACKET_IDE_WRITE	0x40
+#define FCM_PACKET_IDE_READ	0xC0
 
 /* All packets (except for status) are 64 bytes long. */
-#define FCM_PACKET_LENGTH 64
+#define FCM_PACKET_LENGTH	64
 
 /*
  * Transfer an entire SCSI command's worth of data payload over the bulk
@@ -205,6 +206,7 @@ freecom_ide_write (struct us_data *us, int reg, int value)
 
         return USB_STOR_TRANSPORT_GOOD;
 }
+#endif
 
 /* Read a value from an ide register. */
 static int
@@ -228,6 +230,8 @@ freecom_ide_read (struct us_data *us, int reg, int *value)
                 reg |= 0x10;
         else
                 reg = 0x0e;
+
+        US_DEBUGP("IDE in request for register 0x%02x\n", reg);
 
         idein->Type = FCM_PACKET_IDE_READ | reg;
         memset (idein->Pad, 0, sizeof (idein->Pad));
@@ -253,17 +257,17 @@ freecom_ide_read (struct us_data *us, int reg, int *value)
                 else
                         return USB_STOR_TRANSPORT_ERROR;
         }
+        US_DEBUGP("IDE in partial is %d\n", partial);
 
         if (desired_length == 1)
                 *value = buffer[0];
         else
                 *value = le16_to_cpu (*(__u16 *) buffer);
 
-        US_DEBUGP("IDE in  0x%02x -> 0x%02x\n", reg, *value);
+        US_DEBUGP("IDE in 0x%02x -> 0x%02x\n", reg, *value);
 
         return USB_STOR_TRANSPORT_GOOD;
 }
-#endif
 
 static int
 freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
@@ -373,13 +377,6 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
         opipe = usb_sndbulkpipe (us->pusb_dev, us->ep_out);
         ipipe = usb_rcvbulkpipe (us->pusb_dev, us->ep_in);
 
-#if 0
-        /* Yuck, let's see if this helps us.  Artificially increase the
-         * length on this. */
-        if (srb->cmnd[0] == 0x03 && srb->cmnd[4] == 0x12)
-                srb->cmnd[4] = 0x0E;
-#endif
-
         /* The ATAPI Command always goes out first. */
         fcb->Type = FCM_PACKET_ATAPI | 0x00;
         fcb->Timeout = 0;
@@ -421,17 +418,25 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 
         US_DEBUG(pdump ((void *) fst, partial));
 
-	/* while we haven't received the IRQ */
-	while (!(fst->Status & 0x2)) {
-		/* send a command to re-fetch the status */
-		US_DEBUGP("Re-attempting to get status...\n");
+	/* The firmware will time-out commands after 20 seconds. Some commands
+	 * can legitimately take longer than this, so we use a different
+	 * command that only waits for the interrupt and then sends status,
+	 * without having to send a new ATAPI command to the device. 
+	 *
+	 * NOTE: There is some indication that a data transfer after a timeout
+	 * may not work, but that is a condition that should never happen.
+	 */
+	while (fst->Status & FCM_STATUS_BUSY) {
+		US_DEBUGP("20 second USB/ATAPI bridge TIMEOUT occured!\n");
+		US_DEBUGP("fst->Status is %x\n", fst->Status);
 
+		/* Get the status again */
 		fcb->Type = FCM_PACKET_STATUS;
 		fcb->Timeout = 0;
-		memset (fcb->Atapi, 0, 12);
+		memset (fcb->Atapi, 0, sizeof(fcb->Filler));
 		memset (fcb->Filler, 0, sizeof (fcb->Filler));
 
-		/* Send it out. */
+        	/* Send it out. */
 		result = usb_stor_bulk_msg (us, fcb, opipe,
 				FCM_PACKET_LENGTH, &partial);
 
@@ -452,10 +457,12 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 			return USB_STOR_TRANSPORT_ERROR;
 		}
 
-		/* actually get the status info */
-		result = usb_stor_bulk_msg (us, fst, ipipe,
+		/* get the data */
+        	result = usb_stor_bulk_msg (us, fst, ipipe,
 				FCM_PACKET_LENGTH, &partial);
+
 		US_DEBUGP("bar Status result %d %d\n", result, partial);
+
 		/* -ENOENT -- we canceled this transfer */
 		if (result == -ENOENT) {
 			US_DEBUGP("freecom_transport(): transfer aborted\n");

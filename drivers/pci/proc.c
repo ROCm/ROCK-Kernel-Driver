@@ -386,6 +386,30 @@ int pci_proc_detach_device(struct pci_dev *dev)
 	return 0;
 }
 
+int pci_proc_attach_bus(struct pci_bus* bus)
+{
+	struct proc_dir_entry *de;
+	char name[16];
+
+	if (!(de = bus->procdir)) {
+		sprintf(name, "%02x", bus->number);
+		de = bus->procdir = proc_mkdir(name, proc_bus_pci_dir);
+		if (!de)
+			return -ENOMEM;
+	}
+	return 0;
+}
+
+int pci_proc_detach_bus(struct pci_bus* bus)
+{
+	struct proc_dir_entry *de;
+
+	if (!(de = bus->procdir)) {
+		remove_proc_entry(de->name, proc_bus_pci_dir);
+	}
+	return 0;
+}
+
 
 /*
  *  Backward compatible /proc/pci interface.

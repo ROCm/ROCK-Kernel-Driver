@@ -67,6 +67,10 @@
  *
  *  AMD Athlon/Duron/Thunderbird bluesmoke support.
  *  Dave Jones <davej@suse.de>, April 2001.
+ *
+ *  CacheSize bug workaround updates for AMD, Intel & VIA Cyrix.
+ *  Dave Jones <davej@suse.de>, September, October 2001.
+ *
  */
 
 /*
@@ -155,6 +159,8 @@ extern char _text, _etext, _edata, _end;
 
 static int disable_x86_serial_nr __initdata = 1;
 static int disable_x86_fxsr __initdata = 0;
+
+int enable_acpi_smp_table;
 
 /*
  * This is set up by the setup-routine at boot-time
@@ -753,6 +759,10 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
 				add_memory_region(start_at, mem_size, E820_RAM);
 			}
 		}
+		/* acpismp=force forces parsing and use of the ACPI SMP table */
+		if (c == ' ' && !memcmp(from, "acpismp=force", 13)) 	
+			 enable_acpi_smp_table = 1;
+	
 		c = *(from++);
 		if (!c)
 			break;
@@ -1035,6 +1045,15 @@ void __init setup_arch(char **cmdline_p)
 #endif
 }
 
+static int cachesize_override __initdata = -1;
+static int __init cachesize_setup(char *str)
+{
+	get_option (&str, &cachesize_override);
+	return 1;
+}
+__setup("cachesize=", cachesize_setup);
+
+
 #ifndef CONFIG_X86_TSC
 static int tsc_disable __initdata = 0;
 
@@ -1105,11 +1124,24 @@ static void __init display_cacheinfo(struct cpuinfo_x86 *c)
 			l2size = 256;
 	}
 
+	/* Intel PIII Tualatin. This comes in two flavours.
+	 * One has 256kb of cache, the other 512. We have no way
+	 * to determine which, so we use a boottime override
+	 * for the 512kb model, and assume 256 otherwise.
+	 */
+	if ((c->x86_vendor == X86_VENDOR_INTEL) && (c->x86 == 6) &&
+		(c->x86_model == 11) && (l2size == 0))
+		l2size = 256;
+
 	/* VIA C3 CPUs (670-68F) need further shifting. */
 	if (c->x86_vendor == X86_VENDOR_CENTAUR && (c->x86 == 6) &&
 		((c->x86_model == 7) || (c->x86_model == 8))) {
 		l2size = l2size >> 8;
 	}
+
+	/* Allow user to override all this if necessary. */
+	if (cachesize_override != -1)
+		l2size = cachesize_override;
 
 	if ( l2size == 0 )
 		return;		/* Again, no L2 cache is possible */
@@ -2301,14 +2333,14 @@ static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 }
 
 
-int __init x86_serial_nr_setup(char *s)
+static int __init x86_serial_nr_setup(char *s)
 {
 	disable_x86_serial_nr = 0;
 	return 1;
 }
 __setup("serialnumber", x86_serial_nr_setup);
 
-int __init x86_fxsr_setup(char * s)
+static int __init x86_fxsr_setup(char * s)
 {
 	disable_x86_fxsr = 1;
 	return 1;
@@ -2403,7 +2435,6 @@ static int __init id_and_try_enable_cpuid(struct cpuinfo_x86 *c)
    	        {
 			unsigned char ccr3, ccr4;
 			unsigned long flags;
-
 			printk(KERN_INFO "Enabling CPUID on Cyrix processor.\n");
 			local_irq_save(flags);
 			ccr3 = getCx86(CX86_CCR3);
@@ -2834,6 +2865,53 @@ void __init cpu_init (void)
 	stts();
 }
 
+/*
+ *	Early probe support logic for ppro memory erratum #50
+ *
+ *	This is called before we do cpu ident work
+ */
+ 
+int __init ppro_with_ram_bug(void)
+{
+	char vendor_id[16];
+	int ident;
+
+	/* Must have CPUID */
+	if(!have_cpuid_p())
+		return 0;
+	if(cpuid_eax(0)<1)
+		return 0;
+	
+	/* Must be Intel */
+	cpuid(0, &ident, 
+		(int *)&vendor_id[0],
+		(int *)&vendor_id[8],
+		(int *)&vendor_id[4]);
+	
+	if(memcmp(vendor_id, "IntelInside", 12))
+		return 0;
+	
+	ident = cpuid_eax(1);
+
+	/* Model 6 */
+
+	if(((ident>>8)&15)!=6)
+		return 0;
+	
+	/* Pentium Pro */
+
+	if(((ident>>4)&15)!=1)
+		return 0;
+	
+	if((ident&15) < 8)
+	{
+		printk(KERN_INFO "Pentium Pro with Errata#50 detected. Taking evasive action.\n");
+		return 1;
+	}
+	printk(KERN_INFO "Your Pentium Pro seems ok.\n");
+	return 0;
+}
+	
 /*
  * Local Variables:
  * mode:c

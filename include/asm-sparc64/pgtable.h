@@ -344,4 +344,9 @@ extern unsigned long get_fb_unmapped_area(struct file *filp, unsigned long, unsi
 
 #endif /* !(__ASSEMBLY__) */
 
+/*
+ * No page table caches to initialise
+ */
+#define pgtable_cache_init()	do { } while (0)
+
 #endif /* !(_SPARC64_PGTABLE_H) */

@@ -112,6 +112,11 @@ EXPORT_SYMBOL(pcibios_penalize_isa_irq);
 EXPORT_SYMBOL(pci_mem_start);
 #endif
 
+#ifdef CONFIG_PCI_BIOS
+EXPORT_SYMBOL(pcibios_set_irq_routing);
+EXPORT_SYMBOL(pcibios_get_irq_routing_table);
+#endif
+
 #ifdef CONFIG_X86_USE_3DNOW
 EXPORT_SYMBOL(_mmx_memcpy);
 EXPORT_SYMBOL(mmx_clear_page);

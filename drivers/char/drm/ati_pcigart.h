@@ -36,7 +36,7 @@
 #elif PAGE_SIZE == 4096
 # define ATI_PCIGART_TABLE_ORDER 	3
 # define ATI_PCIGART_TABLE_PAGES 	(1 << 3)
-#elif
+#else
 # error - PAGE_SIZE not 8K or 4K
 #endif
 
@@ -57,7 +57,7 @@ static unsigned long DRM(ati_alloc_pcigart_table)( void )
 
 	page = virt_to_page( address );
 
-	for ( i = 0 ; i <= ATI_PCIGART_TABLE_PAGES ; i++, page++ ) {
+	for ( i = 0 ; i < ATI_PCIGART_TABLE_PAGES ; i++, page++ ) {
 		atomic_inc( &page->count );
 		SetPageReserved( page );
 	}
@@ -74,7 +74,7 @@ static void DRM(ati_free_pcigart_table)( unsigned long address )
 
 	page = virt_to_page( address );
 
-	for ( i = 0 ; i <= ATI_PCIGART_TABLE_PAGES ; i++, page++ ) {
+	for ( i = 0 ; i < ATI_PCIGART_TABLE_PAGES ; i++, page++ ) {
 		atomic_dec( &page->count );
 		ClearPageReserved( page );
 	}

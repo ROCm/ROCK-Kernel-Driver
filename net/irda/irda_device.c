@@ -130,6 +130,9 @@ int __init irda_device_init( void)
 #ifdef CONFIG_SA1100_FIR
 	sa1100_irda_init();
 #endif
+#ifdef CONFIG_SA1100_FIR
+	sa1100_irda_init();
+#endif
 #ifdef CONFIG_NSC_FIR
 	nsc_ircc_init();
 #endif
@@ -156,6 +159,9 @@ int __init irda_device_init( void)
 #endif
 #ifdef CONFIG_OLD_BELKIN
  	old_belkin_init();
+#endif
+#ifdef CONFIG_EP7211_IR
+ 	ep7211_ir_init();
 #endif
 #ifdef CONFIG_EP7211_IR
  	ep7211_ir_init();

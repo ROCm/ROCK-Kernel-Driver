@@ -520,10 +520,11 @@ int __init vesafb_init(void)
 		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_TRUECOLOR;
 
 	if (!request_mem_region(video_base, video_size, "vesafb")) {
-		printk(KERN_ERR
+		printk(KERN_WARNING
 		       "vesafb: abort, cannot reserve video memory at 0x%lx\n",
 			video_base);
-		return -EBUSY;
+		/* We cannot make this fatal. Sometimes this comes from magic
+		   spaces our resource handlers simply don't know about */
 	}
 
         video_vbase = ioremap(video_base, video_size);
@@ -635,7 +636,12 @@ int __init vesafb_init(void)
 
 	if (mtrr) {
 		int temp_size = video_size;
-		while (mtrr_add(video_base, temp_size, MTRR_TYPE_WRCOMB, 1)==-EINVAL) {
+		/* Find the largest power-of-two */
+		while (temp_size & (temp_size - 1))
+                	temp_size &= (temp_size - 1);
+                        
+                /* Try and find a power of two to add */
+		while (temp_size && mtrr_add(video_base, temp_size, MTRR_TYPE_WRCOMB, 1)==-EINVAL) {
 			temp_size >>= 1;
 		}
 	}
@@ -666,3 +672,5 @@ int __init vesafb_init(void)
  * c-basic-offset: 8
  * End:
  */
+
+MODULE_LICENSE("GPL");

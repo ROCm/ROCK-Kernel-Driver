@@ -734,15 +734,6 @@ do_bindings(struct ip_conntrack *ct,
 	   synchronize_bh()) can vanish. */
 	READ_LOCK(&ip_nat_lock);
 	for (i = 0; i < info->num_manips; i++) {
-		struct sk_buff *nskb;
-		/* raw socket may have clone of skb: don't disturb it --RR */
-		nskb = skb_unshare(*pskb, GFP_ATOMIC);
-		if (!nskb) {
-			READ_UNLOCK(&ip_nat_lock);
-			return NF_DROP;
-		}
-		*pskb = nskb;
-
 		if (info->manips[i].direction == dir
 		    && info->manips[i].hooknum == hooknum) {
 			DEBUGP("Mangling %p: %s to %u.%u.%u.%u %u\n",

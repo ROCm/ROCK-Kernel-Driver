@@ -329,7 +329,7 @@ err_out:
 }
 
 static void __devexit streamer_remove_one(struct pci_dev *pdev) {
-  struct net_device *dev=pci_get_drv_data(pdev);
+  struct net_device *dev=pci_get_drvdata(pdev);
   struct streamer_private *streamer_priv;
 
 #if STREAMER_DEBUG

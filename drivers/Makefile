@@ -10,7 +10,7 @@ mod-subdirs :=	dio mtd sbus video macintosh usb input telephony sgi ide \
 		message/i2o message/fusion scsi md ieee1394 pnp isdn atm \
 		fc4 net/hamradio i2c acpi bluetooth
 
-subdir-y :=	parport char block net sound misc media cdrom
+subdir-y :=	parport char block net sound misc media cdrom hotplug
 subdir-m :=	$(subdir-y)
 
 
@@ -48,4 +48,3 @@ subdir-$(CONFIG_ACPI)		+= acpi
 subdir-$(CONFIG_BLUEZ)		+= bluetooth
 
 include $(TOPDIR)/Rules.make
-

@@ -4838,4 +4838,4 @@ exit_wavelan_cs(void)
 
 module_init(init_wavelan_cs);
 module_exit(exit_wavelan_cs);
-MODULE_LICENSE("BSD without advertisement clause");
+MODULE_LICENSE("Dual BSD/GPL");

@@ -37,9 +37,6 @@ extern int pcibios_last_bus;
 extern struct pci_bus *pci_root_bus;
 extern struct pci_ops *pci_root_ops;
 
-struct irq_routing_table *pcibios_get_irq_routing_table(void);
-int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
-
 /* pci-irq.c */
 
 struct irq_info {

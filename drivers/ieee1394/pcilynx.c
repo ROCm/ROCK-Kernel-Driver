@@ -1637,8 +1637,8 @@ MODULE_DEVICE_TABLE(pci, pci_table);
 
 static void __exit pcilynx_cleanup(void)
 {
+        pci_unregister_driver(&lynx_pcidriver);
         hpsb_unregister_lowlevel(&lynx_template);
-	pci_unregister_driver(&lynx_pcidriver);
         PRINT_G(KERN_INFO, "removed " PCILYNX_DRIVER_NAME " module");
 }
 
