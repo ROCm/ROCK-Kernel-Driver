@@ -782,11 +782,6 @@ static int intel_845_configure(void)
 	return 0;
 }
 
-static void intel_845_resume(void)
-{
-	intel_845_configure();
-}
-
 static int intel_850_configure(void)
 {
 	u32 temp;
@@ -902,17 +897,6 @@ static int intel_7505_configure(void)
 	return 0;
 }
 
-static unsigned long intel_mask_memory(unsigned long addr, int type)
-{
-	/* Memory type is ignored */
-	return addr | agp_bridge->driver->masks[0].mask;
-}
-
-static void intel_resume(void)
-{
-	intel_configure();
-}
-
 /* Setup function */
 static struct gatt_mask intel_generic_masks[] =
 {
@@ -957,7 +941,6 @@ static struct aper_size_info_8 intel_830mp_sizes[4] =
 
 struct agp_bridge_driver intel_generic_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_generic_sizes,
 	.size_type		= U16_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -965,7 +948,8 @@ struct agp_bridge_driver intel_generic_driver = {
 	.fetch_size		= intel_fetch_size,
 	.cleanup		= intel_cleanup,
 	.tlb_flush		= intel_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= NULL,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -976,13 +960,10 @@ struct agp_bridge_driver intel_generic_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= intel_resume,
 };
 
 struct agp_bridge_driver intel_810_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_i810_masks,
 	.aperture_sizes		= intel_i810_sizes,
 	.size_type		= FIXED_APER_SIZE,
 	.num_aperture_sizes	= 2,
@@ -992,6 +973,7 @@ struct agp_bridge_driver intel_810_driver = {
 	.cleanup		= intel_i810_cleanup,
 	.tlb_flush		= intel_i810_tlbflush,
 	.mask_memory		= intel_i810_mask_memory,
+	.masks			= intel_i810_masks,
 	.agp_enable		= intel_i810_agp_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1002,14 +984,11 @@ struct agp_bridge_driver intel_810_driver = {
 	.free_by_type		= intel_i810_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 
 struct agp_bridge_driver intel_815_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_815_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 2,
@@ -1017,7 +996,8 @@ struct agp_bridge_driver intel_815_driver = {
 	.fetch_size		= intel_815_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1028,13 +1008,10 @@ struct agp_bridge_driver intel_815_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_830_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_i810_masks,
 	.aperture_sizes		= intel_i830_sizes,
 	.size_type		= FIXED_APER_SIZE,
 	.num_aperture_sizes 	= 2,
@@ -1044,6 +1021,7 @@ struct agp_bridge_driver intel_830_driver = {
 	.cleanup		= intel_i830_cleanup,
 	.tlb_flush		= intel_i810_tlbflush,
 	.mask_memory		= intel_i810_mask_memory,
+	.masks			= intel_i810_masks,
 	.agp_enable		= intel_i810_agp_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= intel_i830_create_gatt_table,
@@ -1054,14 +1032,11 @@ struct agp_bridge_driver intel_830_driver = {
 	.free_by_type		= intel_i810_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 
 struct agp_bridge_driver intel_820_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1069,7 +1044,8 @@ struct agp_bridge_driver intel_820_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_820_cleanup,
 	.tlb_flush		= intel_820_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1080,13 +1056,10 @@ struct agp_bridge_driver intel_820_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_830mp_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_830mp_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 4,
@@ -1094,7 +1067,8 @@ struct agp_bridge_driver intel_830mp_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1105,13 +1079,10 @@ struct agp_bridge_driver intel_830mp_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_840_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1119,7 +1090,8 @@ struct agp_bridge_driver intel_840_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1130,13 +1102,10 @@ struct agp_bridge_driver intel_840_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_845_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1144,7 +1113,8 @@ struct agp_bridge_driver intel_845_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1155,13 +1125,10 @@ struct agp_bridge_driver intel_845_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= intel_845_resume,
 };
 
 struct agp_bridge_driver intel_850_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1169,7 +1136,8 @@ struct agp_bridge_driver intel_850_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1180,13 +1148,10 @@ struct agp_bridge_driver intel_850_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_860_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1194,7 +1159,8 @@ struct agp_bridge_driver intel_860_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1205,13 +1171,10 @@ struct agp_bridge_driver intel_860_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver intel_7505_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= intel_generic_masks,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -1219,7 +1182,8 @@ struct agp_bridge_driver intel_7505_driver = {
 	.fetch_size		= intel_8xx_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
-	.mask_memory		= intel_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= intel_generic_masks,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -1230,8 +1194,6 @@ struct agp_bridge_driver intel_7505_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 static int find_i810(u16 device, const char *name)
@@ -1436,6 +1398,23 @@ static void __devexit agp_intel_remove(struct pci_dev *pdev)
 	agp_put_bridge(bridge);
 }
 
+static int agp_intel_suspend(struct pci_dev *dev, u32 state)
+{
+	return 0;
+}
+
+static int agp_intel_resume(struct pci_dev *pdev)
+{
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	if (bridge->driver == &intel_generic_driver)
+		intel_configure();
+	else if (bridge->driver == &intel_845_driver)
+		intel_845_configure();
+
+	return 0;
+}
+
 static struct pci_device_id agp_intel_pci_table[] __initdata = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
@@ -1455,6 +1434,8 @@ static struct __initdata pci_driver agp_intel_pci_driver = {
 	.id_table	= agp_intel_pci_table,
 	.probe		= agp_intel_probe,
 	.remove		= agp_intel_remove,
+	.suspend	= agp_intel_suspend,
+	.resume		= agp_intel_resume,
 };
 
 /* intel_agp_init() must not be declared static for explicit

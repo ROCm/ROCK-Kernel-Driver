@@ -671,20 +671,6 @@ int agp_generic_create_gatt_table(void)
 }
 EXPORT_SYMBOL(agp_generic_create_gatt_table);
 
-int agp_generic_suspend(void)
-{
-	return 0;
-}
-EXPORT_SYMBOL(agp_generic_suspend);
-
-
-void agp_generic_resume(void)
-{
-	return;
-}
-EXPORT_SYMBOL(agp_generic_resume);
-
-
 int agp_generic_free_gatt_table(void)
 {
 	int page_order;
@@ -921,4 +907,14 @@ void global_cache_flush(void)
 #endif
 }
 EXPORT_SYMBOL(global_cache_flush);
+
+unsigned long agp_generic_mask_memory(unsigned long addr, int type)
+{
+	/* memory type is ignored in the generic routine */
+	if (agp_bridge->driver->masks)
+		return addr | agp_bridge->driver->masks[0].mask;
+	else
+		return addr;
+}
+EXPORT_SYMBOL(agp_generic_mask_memory);
 

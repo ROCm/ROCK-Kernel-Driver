@@ -38,10 +38,6 @@ static struct aper_size_info_fixed alpha_core_agp_sizes[] =
 	{ 0, 0, 0 }, /* filled in by alpha_core_agp_setup */
 };
 
-static struct gatt_mask alpha_core_agp_masks[] = {
-	{ .mask = 0, .type = 0 },
-};
-
 struct vm_operations_struct alpha_core_agp_vm_ops = {
 	.nopage = alpha_core_agp_vm_nopage,
 };
@@ -76,12 +72,6 @@ static void alpha_core_agp_tlbflush(agp_memory *mem)
 {
 	alpha_agp_info *agp = agp_bridge->dev_private_data;
 	alpha_mv.mv_pci_tbi(agp->hose, 0, -1);
-}
-
-static unsigned long alpha_core_agp_mask_memory(unsigned long addr, int type)
-{
-	/* Memory type is ignored */
-	return addr | agp_bridge->driver->masks[0].mask;
 }
 
 static void alpha_core_agp_enable(u32 mode)
@@ -127,7 +117,6 @@ static int alpha_core_agp_remove_memory(agp_memory *mem, off_t pg_start,
 
 struct agp_bridge_driver alpha_core_agp_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= alpha_core_agp_masks,
 	.aperture_sizes		= aper_size,
 	.current_size		= aper_size,	/* only one entry */
 	.size_type		= FIXED_APER_SIZE,
@@ -136,7 +125,8 @@ struct agp_bridge_driver alpha_core_agp_driver = {
 	.fetch_size		= alpha_core_agp_fetch_size,
 	.cleanup		= alpha_core_agp_cleanup,
 	.tlb_flush		= alpha_core_agp_tlbflush,
-	.mask_memory		= alpha_core_agp_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= NULL,
 	.agp_enable		= alpha_core_agp_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= alpha_core_agp_nop,

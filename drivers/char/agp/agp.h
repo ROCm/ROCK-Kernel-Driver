@@ -113,8 +113,6 @@ struct agp_bridge_driver {
 	void (*free_by_type)(agp_memory *);
 	void *(*agp_alloc_page)(void);
 	void (*agp_destroy_page)(void *);
-	int (*suspend)(void);
-	void (*resume)(void);
 };
 
 struct agp_bridge_data {
@@ -384,8 +382,6 @@ agp_memory *agp_generic_alloc_by_type(size_t page_count, int type);
 void agp_generic_free_by_type(agp_memory * curr);
 void *agp_generic_alloc_page(void);
 void agp_generic_destroy_page(void *addr);
-int agp_generic_suspend(void);
-void agp_generic_resume(void);
 void agp_free_key(int key);
 int agp_num_entries(void);
 u32 agp_collect_device_status(u32 mode, u32 command);
@@ -394,6 +390,7 @@ int agp_3_0_enable(struct agp_bridge_data *bridge, u32 mode);
 int agp_3_5_enable(struct agp_bridge_data *bridge, u32 mode);
 void global_cache_flush(void);
 void get_agp_version(struct agp_bridge_data *bridge);
+unsigned long agp_generic_mask_memory(unsigned long addr, int type);
 
 /* Standard agp registers */
 #define AGPSTAT			0x4

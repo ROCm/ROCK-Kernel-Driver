@@ -75,14 +75,6 @@ static void via_tlbflush(agp_memory * mem)
 }
 
 
-static unsigned long via_mask_memory(unsigned long addr, int type)
-{
-	/* Memory type is ignored */
-
-	return addr | agp_bridge->driver->masks[0].mask;
-}
-
-
 static struct aper_size_info_8 via_generic_sizes[7] =
 {
 	{256, 65536, 6, 0},
@@ -92,12 +84,6 @@ static struct aper_size_info_8 via_generic_sizes[7] =
 	{16, 4096, 2, 240},
 	{8, 2048, 1, 248},
 	{4, 1024, 0, 252}
-};
-
-
-static struct gatt_mask via_generic_masks[] =
-{
-	{.mask = 0x00000000, .type = 0}
 };
 
 
@@ -176,7 +162,6 @@ static struct aper_size_info_16 via_generic_agp3_sizes[11] =
 
 struct agp_bridge_driver via_agp3_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= via_generic_masks,
 	.aperture_sizes		= via_generic_agp3_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 10,
@@ -184,7 +169,8 @@ struct agp_bridge_driver via_agp3_driver = {
 	.fetch_size		= via_fetch_size_agp3,
 	.cleanup		= via_cleanup_agp3,
 	.tlb_flush		= via_tlbflush_agp3,
-	.mask_memory		= via_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= NULL,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -195,13 +181,10 @@ struct agp_bridge_driver via_agp3_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 struct agp_bridge_driver via_driver = {
 	.owner			= THIS_MODULE,
-	.masks			= via_generic_masks,
 	.aperture_sizes		= via_generic_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
@@ -209,7 +192,8 @@ struct agp_bridge_driver via_driver = {
 	.fetch_size		= via_fetch_size,
 	.cleanup		= via_cleanup,
 	.tlb_flush		= via_tlbflush,
-	.mask_memory		= via_mask_memory,
+	.mask_memory		= agp_generic_mask_memory,
+	.masks			= NULL,
 	.agp_enable		= agp_generic_enable,
 	.cache_flush		= global_cache_flush,
 	.create_gatt_table	= agp_generic_create_gatt_table,
@@ -220,8 +204,6 @@ struct agp_bridge_driver via_driver = {
 	.free_by_type		= agp_generic_free_by_type,
 	.agp_alloc_page		= agp_generic_alloc_page,
 	.agp_destroy_page	= agp_generic_destroy_page,
-	.suspend		= agp_generic_suspend,
-	.resume			= agp_generic_resume,
 };
 
 static struct agp_device_ids via_agp_device_ids[] __initdata =
