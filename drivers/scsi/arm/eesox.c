@@ -231,7 +231,8 @@ static void eesoxscsi_buffer_in(void *buf, int length, void *base)
 		 * Align buffer.
 		 */
 		if (((u32)buf) & 2 && status >= 2) {
-			*((u16 *)buf)++ = readl(reg_dmadata);
+			*(u16 *)buf = readl(reg_dmadata);
+			buf += 2;
 			status -= 2;
 			length -= 2;
 		}
@@ -243,8 +244,10 @@ static void eesoxscsi_buffer_in(void *buf, int length, void *base)
 			l1 |= readl(reg_dmadata) << 16;
 			l2 = readl(reg_dmadata) & mask;
 			l2 |= readl(reg_dmadata) << 16;
-			*((u32 *)buf)++ = l1;
-			*((u32 *)buf)++ = l2;
+			*(u32 *)buf = l1;
+			buf += 4;
+			*(u32 *)buf = l2;
+			buf += 4;
 			length -= 8;
 			continue;
 		}
@@ -255,13 +258,15 @@ static void eesoxscsi_buffer_in(void *buf, int length, void *base)
 			l1 = readl(reg_dmadata) & mask;
 			l1 |= readl(reg_dmadata) << 16;
 
-			*((u32 *)buf)++ = l1;
+			*(u32 *)buf = l1;
+			buf += 4;
 			length -= 4;
 			continue;
 		}
 
 		if (status >= 2) {
-			*((u16 *)buf)++ = readl(reg_dmadata);
+			*(u16 *)buf = readl(reg_dmadata);
+			buf += 2;
 			length -= 2;
 		}
 	} while (length);
@@ -305,7 +310,8 @@ static void eesoxscsi_buffer_out(void *buf, int length, void *base)
 		 * Align buffer.
 		 */
 		if (((u32)buf) & 2 && status >= 2) {
-			writel(*((u16 *)buf)++ << 16, reg_dmadata);
+			writel(*(u16 *)buf << 16, reg_dmadata);
+			buf += 2;
 			status -= 2;
 			length -= 2;
 		}
@@ -313,8 +319,10 @@ static void eesoxscsi_buffer_out(void *buf, int length, void *base)
 		if (status >= 8) {
 			unsigned long l1, l2;
 
-			l1 = *((u32 *)buf)++;
-			l2 = *((u32 *)buf)++;
+			l1 = *(u32 *)buf;
+			buf += 4;
+			l2 = *(u32 *)buf;
+			buf += 4;
 
 			writel(l1 << 16, reg_dmadata);
 			writel(l1, reg_dmadata);
@@ -327,7 +335,8 @@ static void eesoxscsi_buffer_out(void *buf, int length, void *base)
 		if (status >= 4) {
 			unsigned long l1;
 
-			l1 = *((u32 *)buf)++;
+			l1 = *(u32 *)buf;
+			buf += 4;
 
 			writel(l1 << 16, reg_dmadata);
 			writel(l1, reg_dmadata);
@@ -336,7 +345,8 @@ static void eesoxscsi_buffer_out(void *buf, int length, void *base)
 		}
 
 		if (status >= 2) {
-			writel(*((u16 *)buf)++ << 16, reg_dmadata);
+			writel(*(u16 *)buf << 16, reg_dmadata);
+			buf += 2;
 			length -= 2;
 		}
 	} while (length);
