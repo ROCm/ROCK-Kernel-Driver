@@ -136,8 +136,10 @@ int ah6_output(struct sk_buff *skb)
 	x->curlft.bytes += skb->len;
 	x->curlft.packets++;
 	spin_unlock_bh(&x->lock);
-	if ((skb->dst = dst_pop(dst)) == NULL)
+	if ((skb->dst = dst_pop(dst)) == NULL) {
+		err = -EHOSTUNREACH;
 		goto error_nolock;
+	}
 	return NET_XMIT_BYPASS;
 error:
 	spin_unlock_bh(&x->lock);
