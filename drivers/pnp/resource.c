@@ -328,9 +328,9 @@ static int pnp_check_port(int port, int size, int idx, struct pnp_cfg *config)
 	pnp_for_each_dev(dev) {
 		if (dev->active) {
 			for (tmp = 0; tmp < 8; tmp++) {
-				if (dev->resource[tmp].flags) {
-					rport = dev->resource[tmp].start;
-					rsize = (dev->resource[tmp].end - rport) + 1;
+				if (pnp_port_valid(dev, tmp)) {
+					rport = pnp_port_start(dev, tmp);
+					rsize = pnp_port_len(dev, tmp);
 					if (port >= rport && port < rport + rsize)
 						return 1;
 					if (port + size > rport && port + size < (rport + rsize) - 1)
@@ -340,9 +340,10 @@ static int pnp_check_port(int port, int size, int idx, struct pnp_cfg *config)
 		}
 	}
 	for (tmp = 0; tmp < 8 && tmp != idx; tmp++) {
-		if (dev->resource[tmp].flags) {
-			rport = config->request.resource[tmp].start;
-			rsize = (config->request.resource[tmp].end - rport) + 1;
+		if (pnp_port_valid(dev, tmp) &&
+		    pnp_flags_valid(&config->request.io_resource[tmp])) {
+			rport = config->request.io_resource[tmp].start;
+			rsize = (config->request.io_resource[tmp].end - rport) + 1;
 			if (port >= rport && port < rport + rsize)
 				return 1;
 			if (port + size > rport && port + size < (rport + rsize) - 1)
@@ -371,9 +372,9 @@ static int pnp_check_mem(unsigned int addr, unsigned int size, int idx, struct p
 	pnp_for_each_dev(dev) {
 		if (dev->active) {
 			for (tmp = 0; tmp < 4; tmp++) {
-				if (dev->resource[tmp + 8].flags) {
-					raddr = dev->resource[tmp + 8].start;
-					rsize = (dev->resource[tmp + 8].end - raddr) + 1;
+				if (pnp_mem_valid(dev, tmp)) {
+					raddr = pnp_mem_start(dev, tmp);
+					rsize = pnp_mem_len(dev, tmp);
 					if (addr >= raddr && addr < raddr + rsize)
 						return 1;
 					if (addr + size > raddr && addr + size < (raddr + rsize) - 1)
@@ -383,9 +384,10 @@ static int pnp_check_mem(unsigned int addr, unsigned int size, int idx, struct p
 		}
 	}
 	for (tmp = 0; tmp < 4 && tmp != idx; tmp++) {
-		if (dev->resource[tmp + 8].flags) {
-			raddr = config->request.resource[tmp + 8].start;
-			rsize = (config->request.resource[tmp + 8].end - raddr) + 1;
+		if (pnp_mem_valid(dev, tmp) &&
+		    pnp_flags_valid(&config->request.mem_resource[tmp])) {
+			raddr = config->request.mem_resource[tmp].start;
+			rsize = (config->request.mem_resource[tmp].end - raddr) + 1;
 			if (addr >= raddr && addr < raddr + rsize)
 				return 1;
 			if (addr + size > raddr && addr + size < (raddr + rsize) - 1)
@@ -417,13 +419,14 @@ static int pnp_check_interrupt(int irq, struct pnp_cfg *config)
 	}
 	pnp_for_each_dev(dev) {
 		if (dev->active) {
-			if ((dev->irq_resource[0].flags && dev->irq_resource[0].start == irq) ||
-			    (dev->irq_resource[1].flags && dev->irq_resource[1].start == irq))
+			if ((pnp_irq_valid(dev, 0) && dev->irq_resource[0].start == irq) ||
+			    (pnp_irq_valid(dev, 1) && dev->irq_resource[1].start == irq))
 				return 1;
 		}
 	}
-	if (config->request.irq_resource[0].flags && config->request.irq_resource[1].flags &&
-	   (config->request.irq_resource[0].start == irq))
+	if (pnp_flags_valid(&config->request.irq_resource[0]) &&
+	    pnp_flags_valid(&config->request.irq_resource[1]) &&
+	    (config->request.irq_resource[0].start == irq))
 		return 1;
 #ifdef CONFIG_PCI
 	if (!pnp_skip_pci_scan) {
@@ -456,13 +459,14 @@ static int pnp_check_dma(int dma, struct pnp_cfg *config)
 	}
 	pnp_for_each_dev(dev) {
 		if (dev->active) {
-			if ((dev->dma_resource[0].flags && dev->dma_resource[0].start == dma) ||
-			    (dev->dma_resource[1].flags && dev->dma_resource[1].start == dma))
+			if ((pnp_dma_valid(dev, 0) && pnp_dma(dev, 0) == dma) ||
+			    (pnp_dma_valid(dev, 1) && pnp_dma(dev, 1) == dma))
 				return 1;
 		}
 	}
-	if (config->request.dma_resource[0].flags && config->request.dma_resource[1].flags &&
-	   (config->request.dma_resource[0].start == dma))
+	if (pnp_flags_valid(&config->request.dma_resource[0]) &&
+	    pnp_flags_valid(&config->request.dma_resource[1]) &&
+	    (config->request.dma_resource[0].start == dma))
 		return 1;
 	if (request_dma(dma, "pnp"))
 		return 1;
@@ -481,11 +485,11 @@ static int pnp_generate_port(struct pnp_cfg *config, int num)
 	port = config->port[num];
 	if (!port)
 		return 0;
-	value1 = &config->request.resource[num].start;
-	value2 = &config->request.resource[num].end;
-	value3 = &config->request.resource[num].flags;
+	value1 = &config->request.io_resource[num].start;
+	value2 = &config->request.io_resource[num].end;
+	value3 = &config->request.io_resource[num].flags;
 	*value1 = port->min;
-	*value2 = *value1 + port->size -1;
+	*value2 = *value1 + port->size - 1;
 	*value3 = port->flags | IORESOURCE_IO;
 	while (pnp_check_port(*value1, port->size, num, config)) {
 		*value1 += port->align;
@@ -505,11 +509,11 @@ static int pnp_generate_mem(struct pnp_cfg *config, int num)
 	mem = config->mem[num];
 	if (!mem)
 		return 0;
-	value1 = &config->request.resource[num + 8].start;
-	value2 = &config->request.resource[num + 8].end;
-	value3 = &config->request.resource[num].flags;
+	value1 = &config->request.mem_resource[num].start;
+	value2 = &config->request.mem_resource[num].end;
+	value3 = &config->request.mem_resource[num].flags;
 	*value1 = mem->min;
-	*value2 = *value1 + mem->size -1;
+	*value2 = *value1 + mem->size - 1;
 	*value3 = mem->flags | IORESOURCE_MEM;
 	if (!(mem->flags & IORESOURCE_MEM_WRITEABLE))
 		*value3 |= IORESOURCE_READONLY;
@@ -597,19 +601,25 @@ int pnp_init_res_cfg(struct pnp_res_cfg *res_config)
 	for (idx = 0; idx < DEVICE_COUNT_IRQ; idx++) {
 		res_config->irq_resource[idx].start = -1;
 		res_config->irq_resource[idx].end = -1;
-		res_config->irq_resource[idx].flags = 0;
+		res_config->irq_resource[idx].flags = IORESOURCE_IRQ|IORESOURCE_UNSET;
 	}
 	for (idx = 0; idx < DEVICE_COUNT_DMA; idx++) {
 		res_config->dma_resource[idx].name = NULL;
 		res_config->dma_resource[idx].start = -1;
 		res_config->dma_resource[idx].end = -1;
-		res_config->dma_resource[idx].flags = 0;
+		res_config->dma_resource[idx].flags = IORESOURCE_DMA|IORESOURCE_UNSET;
 	}
-	for (idx = 0; idx < DEVICE_COUNT_RESOURCE; idx++) {
-		res_config->resource[idx].name = NULL;
-		res_config->resource[idx].start = 0;
-		res_config->resource[idx].end = 0;
-		res_config->resource[idx].flags = 0;
+	for (idx = 0; idx < DEVICE_COUNT_IO; idx++) {
+		res_config->io_resource[idx].name = NULL;
+		res_config->io_resource[idx].start = 0;
+		res_config->io_resource[idx].end = 0;
+		res_config->io_resource[idx].flags = IORESOURCE_IO|IORESOURCE_UNSET;
+	}
+	for (idx = 0; idx < DEVICE_COUNT_MEM; idx++) {
+		res_config->mem_resource[idx].name = NULL;
+		res_config->mem_resource[idx].start = 0;
+		res_config->mem_resource[idx].end = 0;
+		res_config->mem_resource[idx].flags = IORESOURCE_MEM|IORESOURCE_UNSET;
 	}
 	return 0;
 }
@@ -629,14 +639,17 @@ static int pnp_prepare_request(struct pnp_dev *dev, struct pnp_cfg *config, stru
 	if (!template)
 		return 0;
 	for (idx = 0; idx < DEVICE_COUNT_IRQ; idx++)
-		if (template->irq_resource[idx].start >= 0)
+		if (pnp_flags_valid(&template->irq_resource[idx]))
 			config->request.irq_resource[idx] = template->irq_resource[idx];
 	for (idx = 0; idx < DEVICE_COUNT_DMA; idx++)
-		if (template->dma_resource[idx].start >= 0)
+		if (pnp_flags_valid(&template->dma_resource[idx]))
 			config->request.dma_resource[idx] = template->dma_resource[idx];
-	for (idx = 0; idx < DEVICE_COUNT_RESOURCE; idx++)
-		if (template->resource[idx].start > 0)
-			config->request.resource[idx] = template->resource[idx];
+	for (idx = 0; idx < DEVICE_COUNT_IO; idx++)
+		if (pnp_flags_valid(&template->io_resource[idx]))
+			config->request.io_resource[idx] = template->io_resource[idx];
+	for (idx = 0; idx < DEVICE_COUNT_MEM; idx++)
+		if (pnp_flags_valid(&template->io_resource[idx]))
+			config->request.mem_resource[idx] = template->mem_resource[idx];
 	return 0;
 }
 
@@ -874,7 +887,7 @@ void pnp_resource_change(struct resource *resource, unsigned long start, unsigne
 {
 	if (resource == NULL)
 		return;
-	resource->flags &= ~IORESOURCE_AUTO;
+	resource->flags &= ~(IORESOURCE_AUTO|IORESOURCE_UNSET);
 	resource->start = start;
 	resource->end = start + size - 1;
 }

@@ -1182,11 +1182,7 @@ typedef struct {
 	atomic_t DSPWrite;
 	struct phone_capability caplist[30];
 	unsigned int caps;
-#if LINUX_VERSION_CODE < 0x020400
 	struct pnp_dev *dev;
-#else
-	struct pci_dev *dev;
-#endif
 	unsigned int cardtype;
 	unsigned int rec_codec;
 	unsigned int cid_rec_codec;

@@ -21,10 +21,7 @@
 
 #include <linux/isapnp.h>
 
-#define DEV_IO(dev, index) (dev->resource[index].start)
-#define DEV_IRQ(dev, index) (dev->irq_resource[index].start)
-
-#define DEV_NAME(dev) (dev->bus->name ? dev->bus->name : "ISA PnP")
+#define DEV_NAME(dev) (dev->name)
 
 #define GENERIC_HD_DATA		0
 #define GENERIC_HD_ERROR	1
@@ -44,12 +41,12 @@ static int generic_ide_offsets[IDE_NR_PORTS] __initdata = {
 /* ISA PnP device table entry */
 struct pnp_dev_t {
 	unsigned short card_vendor, card_device, vendor, device;
-	int (*init_fn)(struct pci_dev *dev, int enable);
+	int (*init_fn)(struct pnp_dev *dev, int enable);
 };
 
 /* Generic initialisation function for ISA PnP IDE interface */
 
-static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
+static int __init pnpide_generic_init(struct pnp_dev *dev, int enable)
 {
 	hw_regs_t hw;
 	ide_hwif_t *hwif;
@@ -58,21 +55,21 @@ static int __init pnpide_generic_init(struct pci_dev *dev, int enable)
 	if (!enable)
 		return 0;
 
-	if (!(DEV_IO(dev, 0) && DEV_IO(dev, 1) && DEV_IRQ(dev, 0)))
+	if (!(pnp_port_valid(dev, 0) && pnp_port_valid(dev, 1) && pnp_irq_valid(dev, 0)))
 		return 1;
 
-	ide_setup_ports(&hw, (ide_ioreg_t) DEV_IO(dev, 0),
+	ide_setup_ports(&hw, (ide_ioreg_t) pnp_port_start(dev, 0),
 			generic_ide_offsets,
-			(ide_ioreg_t) DEV_IO(dev, 1),
+			(ide_ioreg_t) pnp_port_start(dev, 1),
 			0, NULL,
 //			generic_pnp_ide_iops,
-			DEV_IRQ(dev, 0));
+			pnp_irq(dev, 0));
 
 	index = ide_register_hw(&hw, &hwif);
 
 	if (index != -1) {
 	    	printk(KERN_INFO "ide%d: %s IDE interface\n", index, DEV_NAME(dev));
-		hwif->pci_dev = dev;
+		hwif->pnp_dev = dev;
 		return 0;
 	}
 
@@ -90,7 +87,7 @@ struct pnp_dev_t idepnp_devices[] __initdata = {
 
 #define NR_PNP_DEVICES 8
 struct pnp_dev_inst {
-	struct pci_dev *dev;
+	struct pnp_dev *dev;
 	struct pnp_dev_t *dev_type;
 };
 static struct pnp_dev_inst devices[NR_PNP_DEVICES];
@@ -102,7 +99,7 @@ static int pnp_ide_dev_idx = 0;
 
 void __init pnpide_init(int enable)
 {
-	struct pci_dev *dev = NULL;
+	struct pnp_dev *dev = NULL;
 	struct pnp_dev_t *dev_type;
 
 	if (!isapnp_present())
@@ -114,33 +111,26 @@ void __init pnpide_init(int enable)
 		for (i = 0; i < pnp_ide_dev_idx; i++) {
 			dev = devices[i].dev;
 			devices[i].dev_type->init_fn(dev, 0);
-			if (dev->deactivate)
-				dev->deactivate(dev);
+			pnp_device_detach(dev);
 		}
 		return;
 	}
 
 	for (dev_type = idepnp_devices; dev_type->vendor; dev_type++) {
-		while ((dev = isapnp_find_dev(NULL, dev_type->vendor,
+		while ((dev = pnp_find_dev(NULL, dev_type->vendor,
 			dev_type->device, dev))) {
-
-			if (dev->active)
+			
+			if (pnp_device_attach(dev) < 0)
 				continue;
-
-       			if (dev->prepare && dev->prepare(dev) < 0) {
-				printk(KERN_ERR"ide-pnp: %s prepare failed\n", DEV_NAME(dev));
-				continue;
-			}
-
-			if (dev->activate && dev->activate(dev) < 0) {
+				
+			if (pnp_activate_dev(dev, NULL) < 0) {
 				printk(KERN_ERR"ide: %s activate failed\n", DEV_NAME(dev));
 				continue;
 			}
 
 			/* Call device initialization function */
 			if (dev_type->init_fn(dev, 1)) {
-				if (dev->deactivate(dev))
-					dev->deactivate(dev);
+				pnp_device_detach(dev);
 			} else {
 #ifdef MODULE
 				/*

@@ -960,19 +960,25 @@ static int isapnp_config_prepare(struct pnp_dev *dev)
 		dev->irq_resource[idx].name = NULL;
 		dev->irq_resource[idx].start = -1;
 		dev->irq_resource[idx].end = -1;
-		dev->irq_resource[idx].flags = 0;
+		dev->irq_resource[idx].flags = IORESOURCE_IRQ|IORESOURCE_UNSET;
 	}
 	for (idx = 0; idx < DEVICE_COUNT_DMA; idx++) {
 		dev->dma_resource[idx].name = NULL;
 		dev->dma_resource[idx].start = -1;
 		dev->dma_resource[idx].end = -1;
-		dev->dma_resource[idx].flags = 0;
+		dev->dma_resource[idx].flags = IORESOURCE_DMA|IORESOURCE_UNSET;
 	}
-	for (idx = 0; idx < DEVICE_COUNT_RESOURCE; idx++) {
-		dev->resource[idx].name = NULL;
-		dev->resource[idx].start = 0;
-		dev->resource[idx].end = 0;
-		dev->resource[idx].flags = 0;
+	for (idx = 0; idx < DEVICE_COUNT_IO; idx++) {
+		dev->io_resource[idx].name = NULL;
+		dev->io_resource[idx].start = 0;
+		dev->io_resource[idx].end = 0;
+		dev->io_resource[idx].flags = IORESOURCE_IO|IORESOURCE_UNSET;
+	}
+	for (idx = 0; idx < DEVICE_COUNT_MEM; idx++) {
+		dev->mem_resource[idx].name = NULL;
+		dev->mem_resource[idx].start = 0;
+		dev->mem_resource[idx].end = 0;
+		dev->mem_resource[idx].flags = IORESOURCE_MEM|IORESOURCE_UNSET;
 	}
 	return 0;
 }
@@ -997,9 +1003,10 @@ EXPORT_SYMBOL(isapnp_device);
 static int isapnp_get_resources(struct pnp_dev *dev)
 {
 	/* We don't need to do anything but this, the rest is taken care of */
-	if ((dev->resource[0].start == 0) &&
-	    (dev->irq_resource[0].start == -1) &&
-	    (dev->dma_resource[0].start == -1))
+	if (pnp_port_valid(dev, 0) == 0 &&
+	    pnp_mem_valid(dev, 0) == 0 &&
+	    pnp_irq_valid(dev, 0) == 0 &&
+	    pnp_dma_valid(dev, 0) == 0)
 		dev->active = 0;
 	else
 		dev->active = 1;
@@ -1015,21 +1022,22 @@ static int isapnp_set_resources(struct pnp_dev *dev, struct pnp_cfg *cfg)
 	dev->irq_resource[1] = cfg->request.irq_resource[1];
 	dev->dma_resource[0] = cfg->request.dma_resource[0];
 	dev->dma_resource[1] = cfg->request.dma_resource[1];
-	for (tmp = 0; tmp < 12; tmp++) {
-		dev->resource[tmp] = cfg->request.resource[tmp];
-	}
-	for (tmp = 0; tmp < 8 && dev->resource[tmp].flags; tmp++)
-		isapnp_write_word(ISAPNP_CFG_PORT+(tmp<<1), dev->resource[tmp].start);
-	for (tmp = 0; tmp < 2 && dev->irq_resource[tmp].flags; tmp++) {
-		int irq = dev->irq_resource[tmp].start;
+	for (tmp = 0; tmp < DEVICE_COUNT_IO; tmp++)
+		dev->io_resource[tmp] = cfg->request.io_resource[tmp];
+	for (tmp = 0; tmp < DEVICE_COUNT_MEM; tmp++)
+		dev->mem_resource[tmp] = cfg->request.mem_resource[tmp];
+	for (tmp = 0; tmp < 8 && pnp_port_valid(dev, tmp); tmp++)
+		isapnp_write_word(ISAPNP_CFG_PORT+(tmp<<1), pnp_port_start(dev, tmp));
+	for (tmp = 0; tmp < 2 && pnp_irq_valid(dev, tmp); tmp++) {
+		int irq = pnp_irq(dev, tmp);
 		if (irq == 2)
 			irq = 9;
 		isapnp_write_byte(ISAPNP_CFG_IRQ+(tmp<<1), irq);
 	}
-	for (tmp = 0; tmp < 2 && dev->dma_resource[tmp].flags; tmp++)
-		isapnp_write_byte(ISAPNP_CFG_DMA+tmp, dev->dma_resource[tmp].start);
-	for (tmp = 0; tmp < 4 && dev->resource[tmp+8].flags; tmp++)
-		isapnp_write_word(ISAPNP_CFG_MEM+(tmp<<2), (dev->resource[tmp + 8].start >> 8) & 0xffff);
+	for (tmp = 0; tmp < 2 && pnp_dma_valid(dev, tmp); tmp++)
+		isapnp_write_byte(ISAPNP_CFG_DMA+tmp, pnp_dma(dev, tmp));
+	for (tmp = 0; tmp < 4 && pnp_mem_valid(dev, tmp); tmp++)
+		isapnp_write_word(ISAPNP_CFG_MEM+(tmp<<2), (pnp_mem_start(dev, tmp) >> 8) & 0xffff);
 	isapnp_activate(dev->number);
 	isapnp_cfg_end();
 	return 0;

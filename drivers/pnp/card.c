@@ -110,6 +110,7 @@ int pnpc_add_card(struct pnp_card *card)
 	card->dev.parent = &card->protocol->dev;
 	card->dev.bus = &pnpc_bus_type;
 	card->dev.release = &pnp_release_card;
+	card->status = PNP_READY;
 	error = device_register(&card->dev);
 	if (error == 0){
 		struct list_head *pos;
@@ -264,6 +265,27 @@ static void pnpc_recover_devices(struct pnp_card *card)
 	}
 }
 
+int pnpc_attach(struct pnp_card *pnp_card)
+{
+	spin_lock(&pnp_lock);
+	if(pnp_card->status != PNP_READY){
+		spin_unlock(&pnp_lock);
+		return -EBUSY;
+	}
+	pnp_card->status = PNP_ATTACHED;
+	spin_unlock(&pnp_lock);
+	return 0;
+}
+ 
+void pnpc_detach(struct pnp_card *pnp_card)
+{
+	spin_lock(&pnp_lock);
+	if (pnp_card->status == PNP_ATTACHED)
+		pnp_card->status = PNP_READY;
+	spin_unlock(&pnp_lock);
+	pnpc_recover_devices(pnp_card);
+}
+
 static int pnpc_card_probe(struct device *dev)
 {
 	int error = 0;
@@ -273,6 +295,9 @@ static int pnpc_card_probe(struct device *dev)
 
 	pnp_dbg("pnp: match found with the PnP card '%s' and the driver '%s'", dev->bus_id,drv->name);
 
+	error = pnpc_attach(card);
+	if (error < 0)
+		return error;
 	if (drv->probe) {
 		card_id = match_card(drv, card);
 		if (card_id != NULL)
@@ -281,7 +306,7 @@ static int pnpc_card_probe(struct device *dev)
 			card->driver = drv;
 			error = 0;
 		} else
-			pnpc_recover_devices(card);
+			pnpc_detach(card);
 	}
 	return error;
 }
@@ -296,7 +321,7 @@ static int pnpc_card_remove(struct device *dev)
 			drv->remove(card);
 		card->driver = NULL;
 	}
-	pnpc_recover_devices(card);
+	pnpc_detach(card);
 	return 0;
 }
 
@@ -359,3 +384,5 @@ EXPORT_SYMBOL(pnp_release_card_device);
 EXPORT_SYMBOL(pnpc_register_driver);
 EXPORT_SYMBOL(pnpc_unregister_driver);
 EXPORT_SYMBOL(pnpc_add_id);
+EXPORT_SYMBOL(pnpc_attach);
+EXPORT_SYMBOL(pnpc_detach);

@@ -199,24 +199,28 @@ static int __init ne_probe_isapnp(struct net_device *dev)
 		struct pnp_dev *idev = NULL;
 
 		while ((idev = pnp_find_dev(NULL,
-					       isapnp_clone_list[i].vendor,
-					       isapnp_clone_list[i].function,
-					       idev))) {
+					    isapnp_clone_list[i].vendor,
+					    isapnp_clone_list[i].function,
+					    idev))) {
 			/* Avoid already found cards from previous calls */
-			if (pnp_activate_dev(idev, NULL))
+			if (pnp_device_attach(idev) < 0)
 				continue;
-			/* if no irq, search for next */
-			if (pnp_irq(idev, 0) == -1)
-				continue;
+			if (pnp_activate_dev(idev, NULL) < 0) {
+			      __again:
+			      	pnp_device_detach(idev);
+			}
+			/* if no io and irq, search for next */
+			if (!pnp_port_valid(idev, 0) || !pnp_irq_valid(idev, 0))
+				goto __again;
 			/* found it */
 			dev->base_addr = pnp_port_start(idev, 0);
 			dev->irq = pnp_irq(idev, 0);
 			printk(KERN_INFO "ne.c: ISAPnP reports %s at i/o %#lx, irq %d.\n",
 				(char *) isapnp_clone_list[i].driver_data,
-
 				dev->base_addr, dev->irq);
 			if (ne_probe1(dev, dev->base_addr) != 0) {	/* Shouldn't happen. */
 				printk(KERN_ERR "ne.c: Probe of ISAPnP card at %#lx failed.\n", dev->base_addr);
+				pnp_device_detach(idev);
 				return -ENXIO;
 			}
 			ei_status.priv = (unsigned long)idev;

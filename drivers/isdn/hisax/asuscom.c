@@ -262,7 +262,7 @@ static struct isapnp_device_id asus_ids[] __initdata = {
 };
 
 static struct isapnp_device_id *adev = &asus_ids[0];
-static struct pci_bus *pnp_c __devinitdata = NULL;
+static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 
 int __init
@@ -279,29 +279,38 @@ setup_asuscom(struct IsdnCard *card)
 		return (0);
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
-		struct pci_bus *pb;
-		struct pci_dev *pd;
+		struct pnp_card *pb;
+		struct pnp_dev *pd;
 
 		while(adev->card_vendor) {
-			if ((pb = isapnp_find_card(adev->card_vendor,
-				adev->card_device, pnp_c))) {
+			if ((pb = pnp_find_card(adev->card_vendor,
+						adev->card_device,
+						pnp_c))) {
 				pnp_c = pb;
 				pd = NULL;
-				if ((pd = isapnp_find_dev(pnp_c,
-					adev->vendor, adev->function, pd))) {
+				if ((pd = pnp_find_dev(pnp_c,
+						       adev->vendor,
+						       adev->function,
+						       pd))) {
 					printk(KERN_INFO "HiSax: %s detected\n",
 						(char *)adev->driver_data);
-					pd->prepare(pd);
-					pd->deactivate(pd);
-					pd->activate(pd);
-					card->para[1] = pd->resource[0].start;
-					card->para[0] = pd->irq_resource[0].start;
-					if (!card->para[0] || !card->para[1]) {
+					if (pnp_device_attach(pd) < 0) {
+						printk(KERN_ERR "AsusPnP: attach failed\n");
+						return 0;
+					}
+					if (pnp_activate_dev(pd, NULL) < 0) {
+						printk(KERN_ERR "AsusPnP: activate failed\n");
+						pnp_device_detach(pd);
+						return 0;
+					}
+					if (!pnp_irq_valid(pd, 0) || !pnp_port_valid(pd, 0)) {
 						printk(KERN_ERR "AsusPnP:some resources are missing %ld/%lx\n",
-						card->para[0], card->para[1]);
-						pd->deactivate(pd);
+							pnp_irq(pd, 0), pnp_port_start(pd, 0));
+						pnp_device_detach(pd);
 						return(0);
 					}
+					card->para[1] = pnp_port_start(pd, 0);
+					card->para[0] = pnp_irq(pd, 0);
 					break;
 				} else {
 					printk(KERN_ERR "AsusPnP: PnP error card found, no device\n");

@@ -19,12 +19,12 @@
  *
  */
 
-
+#include <linux/config.h>
+#include <linux/version.h>
+#include <linux/module.h>
 #include <linux/isapnp.h>
-#include <linux/pnp.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
-#include <linux/module.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 

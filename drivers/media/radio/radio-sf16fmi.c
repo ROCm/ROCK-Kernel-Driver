@@ -36,7 +36,7 @@ struct fmi_device
 
 static int io = -1; 
 static int radio_nr = -1;
-static struct pci_dev *dev = NULL;
+static struct pnp_dev *dev = NULL;
 static struct semaphore lock;
 
 /* freq is in 1/16 kHz to internal number, hw precision is 50 kHz */
@@ -253,24 +253,27 @@ static int isapnp_fmi_probe(void)
 	int i = 0;
 
 	while (id_table[i].card_vendor != 0 && dev == NULL) {
-		dev = isapnp_find_dev(NULL, id_table[i].vendor,
-				      id_table[i].function, NULL);
+		dev = pnp_find_dev(NULL, id_table[i].vendor,
+				   id_table[i].function, NULL);
 		i++;
 	}
 
 	if (!dev)
 		return -ENODEV;
-	if (dev->prepare(dev) < 0)
+	if (pnp_device_attach(dev) < 0)
 		return -EAGAIN;
-	if (!(dev->resource[0].flags & IORESOURCE_IO))
-		return -ENODEV;
-	if (dev->activate(dev) < 0) {
-		printk ("radio-sf16fmi: ISAPnP configure failed (out of resources?)\n");
+	if (pnp_activate_dev(dev, NULL) < 0) {
+		printk ("radio-sf16fmi: PnP configure failed (out of resources?)\n");
+		pnp_device_detach(dev);
 		return -ENOMEM;
 	}
+	if (!pnp_port_valid(dev, 0)) {
+		pnp_device_detach(dev);
+		return -ENODEV;
+	}
 
-	i = dev->resource[0].start;
-	printk ("radio-sf16fmi: ISAPnP reports card at %#x\n", i);
+	i = pnp_port_start(dev, 0);
+	printk ("radio-sf16fmi: PnP reports card at %#x\n", i);
 
 	return i;
 }
@@ -320,7 +323,7 @@ static void __exit fmi_cleanup_module(void)
 	video_unregister_device(&fmi_radio);
 	release_region(io, 2);
 	if (dev)
-		dev->deactivate(dev);
+		pnp_device_detach(dev);
 }
 
 module_init(fmi_init);

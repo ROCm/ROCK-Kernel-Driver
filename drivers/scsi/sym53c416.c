@@ -635,7 +635,7 @@ int __init sym53c416_detect(Scsi_Host_Template *tpnt)
 	struct Scsi_Host * shpnt = NULL;
 	int i;
 	int count;
-	struct pci_dev *idev = NULL;
+	struct pnp_dev *idev = NULL;
 	
 #ifdef MODULE
 	int ints[3];
@@ -669,26 +669,27 @@ int __init sym53c416_detect(Scsi_Host_Template *tpnt)
 	printk(KERN_INFO "sym53c416.c: %s\n", VERSION_STRING);
 
 	for (i=0; id_table[i].vendor != 0; i++) {
-		while((idev=isapnp_find_dev(NULL, id_table[i].vendor,
+		while((idev=pnp_find_dev(NULL, id_table[i].vendor,
 					id_table[i].function, idev))!=NULL)
 		{
 			int i[3];
 
-			if(idev->prepare(idev)<0)
+			if(pnp_device_attach(idev)<0)
 			{
-				printk(KERN_WARNING "sym53c416: unable to prepare PnP card.\n");
+				printk(KERN_WARNING "sym53c416: unable to attach PnP device.\n");
 				continue;
 			}
-			if(idev->activate(idev)<0)
+			if(pnp_activate_dev(idev, NULL)<0)
 			{
-				printk(KERN_WARNING "sym53c416: unable to activate PnP card.\n");
+				printk(KERN_WARNING "sym53c416: unable to activate PnP device.\n");
+				pnp_device_detach(idev);
 				continue;
 			
 			}
 
 			i[0] = 2;
-			i[1] = idev->resource[0].start;
- 			i[2] = idev->irq_resource[0].start;
+			i[1] = pnp_port_start(idev, 0);
+ 			i[2] = pnp_irq(idev, 0);
 
 			printk(KERN_INFO "sym53c416: ISAPnP card found and configured at 0x%X, IRQ %d.\n",
 				i[1], i[2]);

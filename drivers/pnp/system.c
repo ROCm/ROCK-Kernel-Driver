@@ -53,44 +53,33 @@ static void __init reserve_resources_of_dev( struct pnp_dev *dev )
 {
 	int i;
 
-	for (i=0;i<DEVICE_COUNT_RESOURCE;i++) {
-		if ( dev->resource[i].flags & IORESOURCE_UNSET )
+	for (i=0;i<DEVICE_COUNT_IO;i++) {
+		if (pnp_port_valid(dev, i))
 			/* end of resources */
-			break;
-		if (dev->resource[i].flags & IORESOURCE_IO) {
-			/* ioport */
-			if ( dev->resource[i].start == 0 )
-				/* disabled */
-				/* Do nothing */
-				continue;
-			if ( dev->resource[i].start < 0x100 )
-				/*
-				 * Below 0x100 is only standard PC hardware
-				 * (pics, kbd, timer, dma, ...)
-				 * We should not get resource conflicts there,
-				 * and the kernel reserves these anyway
-				 * (see arch/i386/kernel/setup.c).
-				 * So, do nothing
-				 */
-				continue;
-			if ( dev->resource[i].end < dev->resource[i].start )
-				/* invalid endpoint */
-				/* Do nothing */
-				continue;
-			reserve_ioport_range(
-				dev->dev.bus_id,
-				dev->resource[i].start,
-				dev->resource[i].end
-			);
-		} else if (dev->resource[i].flags & IORESOURCE_MEM) {
-			/* iomem */
-			/* For now do nothing */
 			continue;
-		} else {
-			/* Neither ioport nor iomem */
+		if (pnp_port_start(dev, i) == 0)
+			/* disabled */
 			/* Do nothing */
 			continue;
-		}
+		if (pnp_port_start(dev, i) < 0x100)
+			/*
+			 * Below 0x100 is only standard PC hardware
+			 * (pics, kbd, timer, dma, ...)
+			 * We should not get resource conflicts there,
+			 * and the kernel reserves these anyway
+			 * (see arch/i386/kernel/setup.c).
+			 * So, do nothing
+			 */
+			continue;
+		if (pnp_port_end(dev, i) < pnp_port_start(dev, i))
+			/* invalid endpoint */
+			/* Do nothing */
+			continue;
+		reserve_ioport_range(
+			dev->dev.bus_id,
+			pnp_port_start(dev, i),
+			pnp_port_end(dev, i)
+		);
 	}
 
 	return;
