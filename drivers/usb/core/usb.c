@@ -788,6 +788,70 @@ static struct driver_file_entry usb_altsetting_entry = {
 	show:	show_altsetting,
 };
 
+/* product driverfs file */
+static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct usb_device *udev;
+	int len;
+
+	if (off)
+		return 0;
+	udev = list_entry (dev, struct usb_device, dev);
+
+	len = usb_string(udev, udev->descriptor.iProduct, buf, PAGE_SIZE); 
+	buf[len] = '\n';
+	buf[len+1] = 0x00;
+	return len+1;
+}
+static struct driver_file_entry usb_product_entry = {
+	name:	"product",
+	mode:	S_IRUGO,
+	show:	show_product,
+};
+
+/* manufacturer driverfs file */
+static ssize_t
+show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct usb_device *udev;
+	int len;
+
+	if (off)
+		return 0;
+	udev = list_entry (dev, struct usb_device, dev);
+
+	len = usb_string(udev, udev->descriptor.iManufacturer, buf, PAGE_SIZE); 
+	buf[len] = '\n';
+	buf[len+1] = 0x00;
+	return len+1;
+}
+static struct driver_file_entry usb_manufacturer_entry = {
+	name:	"manufacturer",
+	mode:	S_IRUGO,
+	show:	show_manufacturer,
+};
+
+/* serial number driverfs file */
+static ssize_t
+show_serial (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct usb_device *udev;
+	int len;
+
+	if (off)
+		return 0;
+	udev = list_entry (dev, struct usb_device, dev);
+
+	len = usb_string(udev, udev->descriptor.iSerialNumber, buf, PAGE_SIZE); 
+	buf[len] = '\n';
+	buf[len+1] = 0x00;
+	return len+1;
+}
+static struct driver_file_entry usb_serial_entry = {
+	name:	"serial",
+	mode:	S_IRUGO,
+	show:	show_serial,
+};
 
 /*
  * This entrypoint gets called for each new device.
@@ -1319,6 +1383,12 @@ int usb_new_device(struct usb_device *dev)
 	if (err)
 		return err;
 	device_create_file (&dev->dev, &usb_config_entry);
+	if (dev->descriptor.iManufacturer)
+		device_create_file (&dev->dev, &usb_manufacturer_entry);
+	if (dev->descriptor.iProduct)
+		device_create_file (&dev->dev, &usb_product_entry);
+	if (dev->descriptor.iSerialNumber)
+		device_create_file (&dev->dev, &usb_serial_entry);
 
 	/* now that the basic setup is over, add a /proc/bus/usb entry */
 	usbfs_add_device(dev);
