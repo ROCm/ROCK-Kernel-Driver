@@ -4,7 +4,7 @@
 #include <linux/i2c.h>
 
 #include "dvb_frontend.h"
-#include "dvb_compat.h"
+#include "dvb_functions.h"
 
 
 #if 0
