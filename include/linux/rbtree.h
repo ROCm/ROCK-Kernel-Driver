@@ -34,7 +34,7 @@
 static inline struct page * rb_search_page_cache(struct inode * inode,
 						 unsigned long offset)
 {
-	rb_node_t * n = inode->i_rb_page_cache.rb_node;
+	struct rb_node * n = inode->i_rb_page_cache.rb_node;
 	struct page * page;
 
 	while (n)
@@ -53,10 +53,10 @@ static inline struct page * rb_search_page_cache(struct inode * inode,
 
 static inline struct page * __rb_insert_page_cache(struct inode * inode,
 						   unsigned long offset,
-						   rb_node_t * node)
+						   struct rb_node * node)
 {
-	rb_node_t ** p = &inode->i_rb_page_cache.rb_node;
-	rb_node_t * parent = NULL;
+	struct rb_node ** p = &inode->i_rb_page_cache.rb_node;
+	struct rb_node * parent = NULL;
 	struct page * page;
 
 	while (*p)
@@ -79,7 +79,7 @@ static inline struct page * __rb_insert_page_cache(struct inode * inode,
 
 static inline struct page * rb_insert_page_cache(struct inode * inode,
 						 unsigned long offset,
-						 rb_node_t * node)
+						 struct rb_node * node)
 {
 	struct page * ret;
 	if ((ret = __rb_insert_page_cache(inode, offset, node)))
@@ -97,38 +97,38 @@ static inline struct page * rb_insert_page_cache(struct inode * inode,
 #include <linux/kernel.h>
 #include <linux/stddef.h>
 
-typedef struct rb_node_s
+struct rb_node
 {
-	struct rb_node_s * rb_parent;
+	struct rb_node *rb_parent;
 	int rb_color;
 #define	RB_RED		0
 #define	RB_BLACK	1
-	struct rb_node_s * rb_right;
-	struct rb_node_s * rb_left;
-}
-rb_node_t;
+	struct rb_node *rb_right;
+	struct rb_node *rb_left;
+};
 
-typedef struct rb_root_s
+struct rb_root
 {
-	struct rb_node_s * rb_node;
-}
-rb_root_t;
+	struct rb_node *rb_node;
+};
 
-#define RB_ROOT	(rb_root_t) { NULL, }
+#define RB_ROOT	(struct rb_root) { NULL, }
 #define	rb_entry(ptr, type, member)					\
 	((type *)((char *)(ptr)-(unsigned long)(&((type *)0)->member)))
 
-extern void rb_insert_color(rb_node_t *, rb_root_t *);
-extern void rb_erase(rb_node_t *, rb_root_t *);
+extern void rb_insert_color(struct rb_node *, struct rb_root *);
+extern void rb_erase(struct rb_node *, struct rb_root *);
 
 /* Find logical next and previous nodes in a tree */
-extern rb_node_t *rb_next(rb_node_t *);
-extern rb_node_t *rb_prev(rb_node_t *);
+extern struct rb_node *rb_next(struct rb_node *);
+extern struct rb_node *rb_prev(struct rb_node *);
 
 /* Fast replacement of a single node without remove/rebalance/add/rebalance */
-extern void rb_replace_node(rb_node_t *victim, rb_node_t *new, rb_root_t *root);
+extern void rb_replace_node(struct rb_node *victim, struct rb_node *new, 
+			    struct rb_root *root);
 
-static inline void rb_link_node(rb_node_t * node, rb_node_t * parent, rb_node_t ** rb_link)
+static inline void rb_link_node(struct rb_node * node, struct rb_node * parent,
+				struct rb_node ** rb_link)
 {
 	node->rb_parent = parent;
 	node->rb_color = RB_RED;
