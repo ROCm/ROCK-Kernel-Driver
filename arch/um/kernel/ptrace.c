@@ -287,7 +287,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	}
 #endif
 	default:
-		ret = -EIO;
+		ret = ptrace_request(child, request, addr, data);
 		break;
 	}
  out_tsk:
