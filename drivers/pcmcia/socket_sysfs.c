@@ -132,14 +132,27 @@ static struct class_device_attribute *pccard_socket_attributes[] = {
 	NULL,
 };
 
-int pccard_sysfs_init(struct pcmcia_socket *s)
+static int __devinit pccard_sysfs_add_socket(struct class_device *class_dev)
 {
-	struct class_device_attribute *attr;
 	unsigned int i;
 	int ret = 0;
         for (i = 0; (attr = pccard_socket_attributes[i]); i++) {
-                if ((ret = class_device_create_file(&s->dev, attr)))
+                if ((ret = class_device_create_file(class_dev, attr)))
 			return (ret);
         }
 	return (ret);
 }
+
+static void __devexit pccard_sysfs_remove_socket(struct class_device *class_dev)
+{
+	struct class_device_attribute *attr;
+	unsigned int i;
+	for (i = 0; (attr = pccard_socket_attributes[i]); i++)
+		class_device_remove_file(class_dev, attr);
+}
+
+struct class_interface pccard_sysfs_interface = {
+	.class = &pcmcia_socket_class,
+	.add = &pccard_sysfs_add_socket,
+	.remove = __devexit_p(&pccard_sysfs_remove_socket),
+};

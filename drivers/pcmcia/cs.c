@@ -695,13 +695,6 @@ static int pccardd(void *__skt)
 		skt->thread = NULL;
 		complete_and_exit(&skt->thread_done, 0);
 	}
-	if (pccard_sysfs_init(skt)) {
-		printk(KERN_WARNING "PCMCIA: unable to register sysfs attributes for socket 0x%p\n",
-			skt);
-		skt->thread = NULL;
-		class_device_unregister(&skt->dev);
-		complete_and_exit(&skt->thread_done, 0);
-	}
 	complete(&skt->thread_done);
 
 	add_wait_queue(&skt->thread_wait, &wait);
@@ -2175,16 +2168,21 @@ EXPORT_SYMBOL(pcmcia_socket_class);
 
 static int __init init_pcmcia_cs(void)
 {
-    printk(KERN_INFO "%s\n", release);
-    printk(KERN_INFO "  %s\n", options);
+	int ret;
+	printk(KERN_INFO "%s\n", release);
+	printk(KERN_INFO "  %s\n", options);
 
-    return class_register(&pcmcia_socket_class);
+	ret = class_register(&pcmcia_socket_class);
+	if (ret)
+		return (ret);
+	return class_interface_register(&pccard_sysfs_interface);
 }
 
 static void __exit exit_pcmcia_cs(void)
 {
     printk(KERN_INFO "unloading Kernel Card Services\n");
     release_resource_db();
+    class_interface_unregister(&pccard_sysfs_interface);
     class_unregister(&pcmcia_socket_class);
 }
 
