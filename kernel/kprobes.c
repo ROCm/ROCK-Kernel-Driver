@@ -88,7 +88,8 @@ int register_kprobe(struct kprobe *p)
 	arch_prepare_kprobe(p);
 	p->opcode = *p->addr;
 	*p->addr = BREAKPOINT_INSTRUCTION;
-	flush_icache_range(p->addr, p->addr + sizeof(kprobe_opcode_t));
+	flush_icache_range((unsigned long) p->addr,
+			   (unsigned long) p->addr + sizeof(kprobe_opcode_t));
       out:
 	spin_unlock_irqrestore(&kprobe_lock, flags);
 	return ret;
@@ -100,7 +101,8 @@ void unregister_kprobe(struct kprobe *p)
 	spin_lock_irqsave(&kprobe_lock, flags);
 	*p->addr = p->opcode;
 	hlist_del(&p->hlist);
-	flush_icache_range(p->addr, p->addr + sizeof(kprobe_opcode_t));
+	flush_icache_range((unsigned long) p->addr,
+			   (unsigned long) p->addr + sizeof(kprobe_opcode_t));
 	spin_unlock_irqrestore(&kprobe_lock, flags);
 }
 
