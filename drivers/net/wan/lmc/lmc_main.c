@@ -101,7 +101,6 @@ static int lmc_open(struct net_device *dev);
 static int lmc_close(struct net_device *dev);
 static struct net_device_stats *lmc_get_stats(struct net_device *dev);
 static irqreturn_t lmc_interrupt(int irq, void *dev_instance, struct pt_regs *regs);
-static int lmc_set_config(struct net_device *dev, struct ifmap *map);
 static void lmc_initcsrs(lmc_softc_t * const sc, lmc_csrptr_t csr_base, size_t csr_size);
 static void lmc_softreset(lmc_softc_t * const);
 static void lmc_running_reset(struct net_device *dev);
@@ -814,7 +813,6 @@ static void lmc_setup(struct net_device * const dev) /*fold00*/
     dev->stop = lmc_close;
     dev->get_stats = lmc_get_stats;
     dev->do_ioctl = lmc_ioctl;
-    dev->set_config = lmc_set_config;
     dev->tx_timeout = lmc_driver_timeout;
     dev->watchdog_timeo = (HZ); /* 1 second */
     
@@ -1973,13 +1971,6 @@ static void lmc_softreset (lmc_softc_t * const sc) /*fold00*/
     LMC_CSR_WRITE (sc, csr_txlist, virt_to_bus (sc->lmc_txring));
 
     lmc_trace(sc->lmc_device, "lmc_softreset out");
-}
-
-static int lmc_set_config(struct net_device *dev, struct ifmap *map) /*fold00*/
-{
-    lmc_trace(dev, "lmc_set_config in");
-    lmc_trace(dev, "lmc_set_config out");
-    return -EOPNOTSUPP;
 }
 
 void lmc_gpio_mkinput(lmc_softc_t * const sc, u_int32_t bits) /*fold00*/

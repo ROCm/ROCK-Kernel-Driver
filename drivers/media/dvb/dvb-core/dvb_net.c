@@ -919,14 +919,6 @@ static void dvb_net_set_multicast_list (struct net_device *dev)
 }
 
 
-static int dvb_net_set_config(struct net_device *dev, struct ifmap *map)
-{
-	if (netif_running(dev))
-		return -EBUSY;
-	return 0;
-}
-
-
 static void wq_restart_net_feed (void *data)
 {
 	struct net_device *dev = data;
@@ -985,7 +977,6 @@ static void dvb_net_setup(struct net_device *dev)
 	dev->hard_start_xmit	= dvb_net_tx;
 	dev->get_stats		= dvb_net_get_stats;
 	dev->set_multicast_list = dvb_net_set_multicast_list;
-	dev->set_config         = dvb_net_set_config;
 	dev->set_mac_address    = dvb_net_set_mac;
 	dev->mtu		= 4096;
 	dev->mc_count           = 0;

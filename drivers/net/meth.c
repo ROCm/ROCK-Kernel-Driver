@@ -368,31 +368,6 @@ static int meth_release(struct net_device *dev)
 }
 
 /*
- * Configuration changes (passed on by ifconfig)
- */
-static int meth_config(struct net_device *dev, struct ifmap *map)
-{
-	if (dev->flags & IFF_UP) /* can't act on a running interface */
-		return -EBUSY;
-
-	/* Don't allow changing the I/O address */
-	if (map->base_addr != dev->base_addr) {
-		printk(KERN_WARNING "meth: Can't change I/O address\n");
-		return -EOPNOTSUPP;
-	}
-
-	/* Don't allow changing the IRQ */
-	if (map->irq != dev->irq) {
-		printk(KERN_WARNING "meth: Can't change IRQ\n");
-		return -EOPNOTSUPP;
-	}
-	DPRINTK("Configured\n");
-
-	/* ignore other fields */
-	return 0;
-}
-
-/*
  * Receive a packet: retrieve, encapsulate and pass over to upper levels
  */
 static void meth_rx(struct net_device* dev, unsigned long int_status)
@@ -813,7 +788,6 @@ static struct net_device *meth_init(void)
 
 	dev->open            = meth_open;
 	dev->stop            = meth_release;
-	dev->set_config      = meth_config;
 	dev->hard_start_xmit = meth_tx;
 	dev->do_ioctl        = meth_ioctl;
 	dev->get_stats       = meth_stats;
