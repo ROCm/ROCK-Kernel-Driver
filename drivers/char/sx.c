@@ -1025,8 +1025,8 @@ static void sx_transmit_chars (struct sx_port *port)
 		if (c == 0) break;
 
 
-		memcpy_toio (port->board->base + CHAN_OFFSET(port,hi_txbuf) + tx_ip, 
-		             port->gs.xmit_buf + port->gs.xmit_tail, c);
+		memcpy_toio ((char *)port->board->base + CHAN_OFFSET(port,hi_txbuf) + tx_ip, 
+		             (char *)port->gs.xmit_buf + port->gs.xmit_tail, c);
 
 		/* Update the pointer in the card */
 		sx_write_channel_byte (port, hi_txipos, (tx_ip+c) & 0xff);
@@ -1095,7 +1095,7 @@ static inline void sx_receive_chars (struct sx_port *port)
 		            read_sx_byte (port->board, CHAN_OFFSET(port,hi_rxbuf) + rx_op),
 		            CHAN_OFFSET(port, hi_rxbuf)); 
 		memcpy_fromio (tty->flip.char_buf_ptr, 
-		               port->board->base + CHAN_OFFSET(port,hi_rxbuf) + rx_op, c);
+		               (char *)port->board->base + CHAN_OFFSET(port,hi_rxbuf) + rx_op, c);
 		memset(tty->flip.flag_buf_ptr, TTY_NORMAL, c);
 
 		/* Update the kernel buffer end */

@@ -1650,7 +1650,7 @@ static int fdomain_16x0_biosparam(struct scsi_device *sdev,
    } else if (bios_major == 3
 	      && bios_minor >= 0
 	      && bios_minor < 4) { /* 3.0 and 3.2 BIOS */
-      memcpy_fromio( &i, bios_base + 0x1f71 + drive * 10,
+      memcpy_fromio( &i, (char *)bios_base + 0x1f71 + drive * 10,
 		     sizeof( struct drive_info ) );
       info_array[0] = i.heads + 1;
       info_array[1] = i.sectors;

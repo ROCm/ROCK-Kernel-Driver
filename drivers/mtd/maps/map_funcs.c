@@ -70,12 +70,12 @@ static void simple_map_write64(struct map_info *map, u64 datum, unsigned long of
 
 static void simple_map_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
 {
-	memcpy_fromio(to, map->virt + from, len);
+	memcpy_fromio(to, (char *)map->virt + from, len);
 }
 
 static void simple_map_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
 {
-	memcpy_toio(map->virt + to, from, len);
+	memcpy_toio((char *)map->virt + to, from, len);
 }
 
 void simple_map_init(struct map_info *map)
