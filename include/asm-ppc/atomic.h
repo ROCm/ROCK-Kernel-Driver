@@ -17,8 +17,10 @@ typedef struct { volatile int counter; } atomic_t;
 extern void atomic_clear_mask(unsigned long mask, unsigned long *addr);
 
 #ifdef CONFIG_SMP
+#define SMP_SYNC	"sync"
 #define SMP_ISYNC	"\n\tisync"
 #else
+#define SMP_SYNC	""
 #define SMP_ISYNC
 #endif
 
@@ -192,10 +194,11 @@ static __inline__ int atomic_dec_if_positive(atomic_t *v)
 	return t;
 }
 
-#define smp_mb__before_atomic_dec()	smp_mb()
-#define smp_mb__after_atomic_dec()	smp_mb()
-#define smp_mb__before_atomic_inc()	smp_mb()
-#define smp_mb__after_atomic_inc()	smp_mb()
+#define __MB	__asm__ __volatile__ (SMP_SYNC : : : "memory")
+#define smp_mb__before_atomic_dec()	__MB
+#define smp_mb__after_atomic_dec()	__MB
+#define smp_mb__before_atomic_inc()	__MB
+#define smp_mb__after_atomic_inc()	__MB
 
 #endif /* __KERNEL__ */
 #endif /* _ASM_PPC_ATOMIC_H_ */
