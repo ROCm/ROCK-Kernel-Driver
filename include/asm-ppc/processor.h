@@ -197,6 +197,8 @@ extern inline void prefetchw(const void *x)
 
 #define spin_lock_prefetch(x)	prefetchw(x)
 
+extern int emulate_altivec(struct pt_regs *regs);
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_PPC_PROCESSOR_H */
