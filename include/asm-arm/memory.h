@@ -108,10 +108,18 @@ static inline void *phys_to_virt(unsigned long x)
 /*
  * Virtual <-> DMA view memory address translations
  * Again, these are *only* valid on the kernel direct mapped RAM
- * memory.  Use of these is *deprecated*.
+ * memory.  Use of these is *deprecated* (and that doesn't mean
+ * use the __ prefixed forms instead.)  See dma-mapping.h.
  */
-#define virt_to_bus(x)		(__virt_to_bus((unsigned long)(x)))
-#define bus_to_virt(x)		((void *)(__bus_to_virt((unsigned long)(x))))
+static inline __deprecated unsigned long virt_to_bus(void *x)
+{
+	return __virt_to_bus((unsigned long)x);
+}
+
+static inline __deprecated void *bus_to_virt(unsigned long x)
+{
+	return (void *)__bus_to_virt(x);
+}
 
 /*
  * Conversion between a struct page and a physical address.
