@@ -4084,21 +4084,19 @@ static int *table_sup[] =
 
 static void __init register_devfs_entries (int drive)
 {
-    int base_minor, i;
+	int base_minor = (drive < 4) ? drive : (124 + drive);
 
-    base_minor = (drive < 4) ? drive : (124 + drive);
-    if (UDP->cmos < NUMBER(default_drive_params)) {
-	i = 0;
-	do {
-	    char name[16];
+	if (UDP->cmos < NUMBER(default_drive_params)) {
+		int i = 0;
+		do {
+			int minor = base_minor + (table_sup[UDP->cmos][i] << 2);
 
-	    sprintf(name, "floppy/%d%s", drive, table[table_sup[UDP->cmos][i]]);
-	    devfs_register(NULL, name, DEVFS_FL_DEFAULT, FLOPPY_MAJOR,
-			    base_minor + (table_sup[UDP->cmos][i] << 2),
-			    S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP,
-			    &floppy_fops, NULL);
-	} while (table_sup[UDP->cmos][i++]);
-    }
+			devfs_mk_bdev(MKDEV(FLOPPY_MAJOR, minor), 
+					S_IFBLK|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP,
+					"floppy/%d%s",
+					drive, table[table_sup[UDP->cmos][i]]);
+		} while (table_sup[UDP->cmos][i++]);
+	}
 }
 
 /*
