@@ -185,7 +185,7 @@ tiglusb_read (struct file *filp, char *buf, size_t count, loff_t * f_pos)
 
 	pipe = usb_rcvbulkpipe (s->dev, 1);
 	result = usb_bulk_msg (s->dev, pipe, buffer, bytes_to_read,
-			       &bytes_read, HZ / (timeout / 10));
+			       &bytes_read, HZ * 10 / timeout);
 	if (result == -ETIMEDOUT) {	/* NAK */
 		ret = result;
 		if (!bytes_read) {
@@ -242,7 +242,7 @@ tiglusb_write (struct file *filp, const char *buf, size_t count, loff_t * f_pos)
 
 	pipe = usb_sndbulkpipe (s->dev, 2);
 	result = usb_bulk_msg (s->dev, pipe, buffer, bytes_to_write,
-			       &bytes_written, HZ / (timeout / 10));
+			       &bytes_written, HZ * 10 / timeout);
 
 	if (result == -ETIMEDOUT) {	/* NAK */
 		warn ("tiglusb_write, NAK received.");
@@ -453,6 +453,8 @@ tiglusb_setup (char *str)
 	if (ints[0] > 0) {
 		timeout = ints[1];
 	}
+	if (!timeout)
+		timeout = TIMAXTIME;
 
 	return 1;
 }
@@ -494,6 +496,9 @@ tiglusb_init (void)
 
 	info (DRIVER_DESC ", " DRIVER_VERSION);
 
+	if (!timeout)
+		timeout = TIMAXTIME;
+
 	return 0;
 }
 
@@ -516,6 +521,6 @@ MODULE_DESCRIPTION (DRIVER_DESC);
 MODULE_LICENSE (DRIVER_LICENSE);
 
 MODULE_PARM (timeout, "i");
-MODULE_PARM_DESC (timeout, "Timeout (default=1.5 seconds)");
+MODULE_PARM_DESC (timeout, "Timeout in tenths of seconds (default=1.5 seconds)");
 
 /* --------------------------------------------------------------------- */

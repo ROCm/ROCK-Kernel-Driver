@@ -60,8 +60,8 @@
 
 /* Version block */
 #define PWC_MAJOR	8
-#define PWC_MINOR	7
-#define PWC_VERSION 	"8.7"
+#define PWC_MINOR	9
+#define PWC_VERSION 	"8.9"
 #define PWC_NAME 	"pwc"
 
 /* Turn certain features on/off */
@@ -130,7 +130,7 @@ struct pwc_device
    int vcinterface;		/* video control interface */
    int valternate;		/* alternate interface needed */
    int vframes, vsize;		/* frames-per-second & size (see PSZ_*) */
-   int vpalette;		/* YUV, RGB24, RGB32, etc */
+   int vpalette;		/* YUV */
    int vframe_count;		/* received frames */
    int vframes_dumped; 		/* counter for dumped frames */
    int vframes_error;		/* frames received in error */
@@ -140,7 +140,8 @@ struct pwc_device
    int vbandlength;		/* compressed band length; 0 is uncompressed */
    char vsnapshot;		/* snapshot mode */
    char vsync;			/* used by isoc handler */
-   
+   char vmirror;		/* for ToUCaM series */
+
    /* The image acquisition requires 3 to 4 steps:
       1. data is gathered in short packets from the USB controller
       2. data is synchronized and packed into a frame buffer

@@ -53,6 +53,7 @@ struct async {
         struct dev_state *ps;
 	struct task_struct *task;
 	unsigned int signr;
+	unsigned int intf;
 	void *userbuffer;
         void *userurb;
         struct urb *urb;
@@ -273,23 +274,47 @@ static void async_completed(struct urb *urb)
 	}
 }
 
-static void destroy_all_async(struct dev_state *ps)
+static void destroy_async (struct dev_state *ps, struct list_head *list)
 {
-        struct async *as;
-        unsigned long flags;
+	struct async *as;
+	unsigned long flags;
 
-        spin_lock_irqsave(&ps->lock, flags);
-        while (!list_empty(&ps->async_pending)) {
-                as = list_entry(ps->async_pending.next, struct async, asynclist);
-                list_del_init(&as->asynclist);
-                spin_unlock_irqrestore(&ps->lock, flags);
+	spin_lock_irqsave(&ps->lock, flags);
+	while (!list_empty(list)) {
+		as = list_entry(list->next, struct async, asynclist);
+		list_del_init(&as->asynclist);
+		spin_unlock_irqrestore(&ps->lock, flags);
                 /* usb_unlink_urb calls the completion handler with status == -ENOENT */
-                usb_unlink_urb(as->urb);
-                spin_lock_irqsave(&ps->lock, flags);
-        }
-        spin_unlock_irqrestore(&ps->lock, flags);
-        while ((as = async_getcompleted(ps)))
-                free_async(as);
+		usb_unlink_urb(as->urb);
+		spin_lock_irqsave(&ps->lock, flags);
+	}
+	spin_unlock_irqrestore(&ps->lock, flags);
+	while ((as = async_getcompleted(ps)))
+		free_async(as);
+}
+
+static void destroy_async_on_interface (struct dev_state *ps, unsigned int intf)
+{
+	struct async *as;
+	struct list_head *p, hitlist;
+	unsigned long flags;
+
+	INIT_LIST_HEAD(&hitlist);
+	spin_lock_irqsave(&ps->lock, flags);
+	for (p = ps->async_pending.next; p != &ps->async_pending; ) {
+		as = list_entry(p, struct async, asynclist);
+		p = p->next;
+
+		if (as->intf == intf)
+			list_move_tail(&as->asynclist, &hitlist);
+	}
+	spin_unlock_irqrestore(&ps->lock, flags);
+	destroy_async(ps, &hitlist);
+}
+
+extern __inline__ void destroy_all_async(struct dev_state *ps)
+{
+	        destroy_async(ps, &ps->async_pending);
 }
 
 /*
@@ -751,7 +776,7 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 	struct async *as;
 	struct usb_ctrlrequest *dr = NULL;
 	unsigned int u, totlen, isofrmlen;
-	int ret, interval = 0;
+	int ret, interval = 0, intf = -1;
 
 	if (copy_from_user(&uurb, arg, sizeof(uurb)))
 		return -EFAULT;
@@ -763,9 +788,9 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 	if (uurb.signr != 0 && (uurb.signr < SIGRTMIN || uurb.signr > SIGRTMAX))
 		return -EINVAL;
 	if (!(uurb.type == USBDEVFS_URB_TYPE_CONTROL && (uurb.endpoint & ~USB_ENDPOINT_DIR_MASK) == 0)) {
-		if ((ret = findintfep(ps->dev, uurb.endpoint)) < 0)
-			return ret;
-		if ((ret = checkintf(ps, ret)))
+		if ((intf = findintfep(ps->dev, uurb.endpoint)) < 0)
+			return intf;
+		if ((ret = checkintf(ps, intf)))
 			return ret;
 	}
 	switch(uurb.type) {
@@ -889,6 +914,7 @@ static int proc_submiturb(struct dev_state *ps, void *arg)
 	else
 		as->userbuffer = NULL;
 	as->signr = uurb.signr;
+	as->intf = intf;
 	as->task = current;
 	if (!(uurb.endpoint & USB_DIR_IN)) {
 		if (copy_from_user(as->urb->transfer_buffer, uurb.buffer, as->urb->transfer_buffer_length)) {
@@ -1035,7 +1061,10 @@ static int proc_releaseinterface(struct dev_state *ps, void *arg)
 		return -EFAULT;
 	if ((ret = findintfif(ps->dev, intf)) < 0)
 		return ret;
-	return releaseintf(ps, intf);
+	if ((ret = releaseintf(ps, intf)) < 0)
+		return ret;
+	destroy_async_on_interface (ps, intf);
+	return 0;
 }
 
 static int proc_ioctl (struct dev_state *ps, void *arg)

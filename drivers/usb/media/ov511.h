@@ -253,6 +253,9 @@
 /* Control transfers use up to 4 bytes */
 #define OV511_CBUF_SIZE		4
 
+/* Size of usb_make_path() buffer */
+#define OV511_USB_PATH_LEN	64
+
 /* Bridge types */
 enum {
 	BRG_UNKNOWN,
@@ -450,6 +453,7 @@ struct usb_ov511 {
 	int customid;
 	char *desc;
 	unsigned char iface;
+	char usb_path[OV511_USB_PATH_LEN];
 
 	/* Determined by sensor type */
 	int maxwidth;

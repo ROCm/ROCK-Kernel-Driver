@@ -136,7 +136,8 @@ static int newary (key_t key, int nsems, int semflg)
 	sma->sem_perm.key = key;
 
 	sma->sem_perm.security = NULL;
-	if ((retval = security_sem_alloc(sma))) {
+	retval = security_sem_alloc(sma);
+	if (retval) {
 		ipc_rcu_free(sma, size);
 		return retval;
 	}

@@ -485,7 +485,8 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
 	int new_egid = old_egid;
 	int retval;
 
-	if ((retval = security_task_setgid(rgid, egid, (gid_t)-1, LSM_SETID_RE)))
+	retval = security_task_setgid(rgid, egid, (gid_t)-1, LSM_SETID_RE);
+	if (retval)
 		return retval;
 
 	if (rgid != (gid_t) -1) {
@@ -530,7 +531,8 @@ asmlinkage long sys_setgid(gid_t gid)
 	int old_egid = current->egid;
 	int retval;
 
-	if ((retval = security_task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_ID)))
+	retval = security_task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_ID);
+	if (retval)
 		return retval;
 
 	if (capable(CAP_SETGID))
@@ -603,7 +605,8 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 	int old_ruid, old_euid, old_suid, new_ruid, new_euid;
 	int retval;
 
-	if ((retval = security_task_setuid(ruid, euid, (uid_t)-1, LSM_SETID_RE)))
+	retval = security_task_setuid(ruid, euid, (uid_t)-1, LSM_SETID_RE);
+	if (retval)
 		return retval;
 
 	new_ruid = old_ruid = current->uid;
@@ -663,7 +666,8 @@ asmlinkage long sys_setuid(uid_t uid)
 	int old_ruid, old_suid, new_ruid, new_suid;
 	int retval;
 
-	if ((retval = security_task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_ID)))
+	retval = security_task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_ID);
+	if (retval)
 		return retval;
 
 	old_ruid = new_ruid = current->uid;
@@ -700,7 +704,8 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	int old_suid = current->suid;
 	int retval;
 
-	if ((retval = security_task_setuid(ruid, euid, suid, LSM_SETID_RES)))
+	retval = security_task_setuid(ruid, euid, suid, LSM_SETID_RES);
+	if (retval)
 		return retval;
 
 	if (!capable(CAP_SETUID)) {
@@ -751,7 +756,8 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 {
 	int retval;
 
-	if ((retval = security_task_setgid(rgid, egid, sgid, LSM_SETID_RES)))
+	retval = security_task_setgid(rgid, egid, sgid, LSM_SETID_RES);
+	if (retval)
 		return retval;
 
 	if (!capable(CAP_SETGID)) {
@@ -804,7 +810,8 @@ asmlinkage long sys_setfsuid(uid_t uid)
 	int old_fsuid;
 	int retval;
 
-	if ((retval = security_task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS)))
+	retval = security_task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS);
+	if (retval)
 		return retval;
 
 	old_fsuid = current->fsuid;
@@ -820,7 +827,8 @@ asmlinkage long sys_setfsuid(uid_t uid)
 		current->fsuid = uid;
 	}
 
-	if ((retval = security_task_post_setuid(old_fsuid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS)))
+	retval = security_task_post_setuid(old_fsuid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS);
+	if (retval)
 		return retval;
 
 	return old_fsuid;
@@ -834,7 +842,8 @@ asmlinkage long sys_setfsgid(gid_t gid)
 	int old_fsgid;
 	int retval;
 
-	if ((retval = security_task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_FS)))
+	retval = security_task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_FS);
+	if (retval)
 		return retval;
 
 	old_fsgid = current->fsgid;
@@ -959,7 +968,8 @@ asmlinkage long sys_getpgid(pid_t pid)
 
 		retval = -ESRCH;
 		if (p) {
-			if (!(retval = security_task_getpgid(p)))
+			retval = security_task_getpgid(p);
+			if (!retval)
 				retval = p->pgrp;
 		}
 		read_unlock(&tasklist_lock);
@@ -986,7 +996,8 @@ asmlinkage long sys_getsid(pid_t pid)
 
 		retval = -ESRCH;
 		if(p) {
-			if (!(retval = security_task_getsid(p)))
+			retval = security_task_getsid(p);
+			if (!retval)
 				retval = p->session;
 		}
 		read_unlock(&tasklist_lock);
@@ -1067,7 +1078,8 @@ asmlinkage long sys_setgroups(int gidsetsize, gid_t *grouplist)
 		return -EINVAL;
 	if(copy_from_user(groups, grouplist, gidsetsize * sizeof(gid_t)))
 		return -EFAULT;
-	if ((retval = security_task_setgroups(gidsetsize, groups)))
+	retval = security_task_setgroups(gidsetsize, groups);
+	if (retval)
 		return retval;
 	memcpy(current->groups, groups, gidsetsize * sizeof(gid_t));
 	current->ngroups = gidsetsize;
@@ -1230,7 +1242,8 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit *rlim)
 			return -EPERM;
 	}
 
-	if ((retval = security_task_setrlimit(resource, &new_rlim)))
+	retval = security_task_setrlimit(resource, &new_rlim);
+	if (retval)
 		return retval;
 
 	*old_rlim = new_rlim;
@@ -1304,7 +1317,8 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 	int error = 0;
 	int sig;
 
-	if ((error = security_task_prctl(option, arg2, arg3, arg4, arg5)))
+	error = security_task_prctl(option, arg2, arg3, arg4, arg5);
+	if (error)
 		return error;
 
 	switch (option) {
