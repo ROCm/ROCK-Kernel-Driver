@@ -20,6 +20,7 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <linux/smp_lock.h>
 #include "ntfs.h"
 
 /**
@@ -524,6 +525,7 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	u8 *kaddr, *bmp, *index_end;
 	attr_search_context *ctx;
 
+	lock_kernel();
 	ntfs_debug("Entering for inode 0x%Lx, f_pos 0x%Lx.",
 			(unsigned long long)ndir->mft_no, filp->f_pos);
 	rc = err = 0;
@@ -792,6 +794,7 @@ done:
 		ntfs_debug("filldir returned %i, f_pos 0x%Lx, returning 0.",
 				rc, filp->f_pos);
 #endif
+	unlock_kernel();
 	return 0;
 map_page_err_out:
 	ntfs_error(sb, "Reading index allocation data failed.");
