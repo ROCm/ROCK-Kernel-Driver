@@ -644,6 +644,7 @@ int semctl_main(int semid, int semnum, int cmd, int version, union semun arg)
 		for (un = sma->undo; un; un = un->id_next)
 			un->semadj[semnum] = 0;
 		curr->semval = val;
+		curr->sempid = current->pid;
 		sma->sem_ctime = CURRENT_TIME;
 		/* maybe some queued-up processes were waiting for this */
 		update_queue(sma);
