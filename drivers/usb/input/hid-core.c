@@ -1680,6 +1680,7 @@ static struct usb_device_id hid_usb_ids [] = {
 MODULE_DEVICE_TABLE (usb, hid_usb_ids);
 
 static struct usb_driver hid_driver = {
+	.owner =	THIS_MODULE,
 	.name =		"hid",
 	.probe =	hid_probe,
 	.disconnect =	hid_disconnect,
