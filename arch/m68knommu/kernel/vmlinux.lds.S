@@ -122,9 +122,28 @@
 #define	RAM_LENGTH	0x3e0000
 #endif
 
+/*
+ *   The senTec COBRA5272 board has nearly the same
+ *   memory layout as the M5272C3.
+ *   We assume 16MB ram.
+ */
+#if defined(CONFIG_COBRA5272)
+#define RAM_START   0x20000
+#define RAM_LENGTH  0xfe0000
+#endif
+
 #if defined(CONFIG_M5282C3)
 #define	RAM_START	0x10000
 #define	RAM_LENGTH	0x3f0000
+#endif
+
+/*
+ *   The senTec COBRA5282 board has the same
+ *   memory layout as the M5282C3.
+ */
+#if defined(CONFIG_COBRA5282)
+#define  RAM_START   0x10000
+#define  RAM_LENGTH  0x3f0000
 #endif
 
 /*
@@ -202,8 +221,10 @@ SECTIONS {
 		*(.rodata) *(.rodata.*)
 		*(__vermagic)		/* Kernel version magic */
 		*(.rodata1)
+		*(.rodata.str1.1)
 
 		/* Kernel symbol table: Normal symbols */
+		. = ALIGN(4);
 		__start___ksymtab = .;
 		*(__ksymtab)
 		__stop___ksymtab = .;
