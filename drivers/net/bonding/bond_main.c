@@ -1941,6 +1941,10 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 			/* release the slave from its bond */
 			bond_detach_slave(bond, our_slave);
 
+			if (bond->primary_slave == our_slave) {
+				bond->primary_slave = NULL;
+			}
+
 			printk (KERN_INFO "%s: releasing %s interface %s",
 				master->name,
 				(our_slave->state == BOND_STATE_ACTIVE) ? "active" : "backup",
@@ -1957,10 +1961,6 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 				printk(KERN_INFO
 					"%s: now running without any active interface !\n",
 					master->name);
-			}
-
-			if (bond->primary_slave == our_slave) {
-				bond->primary_slave = NULL;
 			}
 
 			if ((bond_mode == BOND_MODE_TLB) ||
