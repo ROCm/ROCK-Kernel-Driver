@@ -27,6 +27,7 @@ void __init free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
 {
 	unsigned long size;
 
+	pgdat = &contig_page_data;
 	contig_page_data.node_id = 0;
 	contig_page_data.node_start_pfn = node_start_pfn;
 	calculate_totalpages (&contig_page_data, zones_size, zholes_size);
