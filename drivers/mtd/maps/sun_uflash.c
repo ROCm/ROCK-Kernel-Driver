@@ -1,4 +1,4 @@
-/* $Id: sun_uflash.c,v 1.4 2001/10/02 15:05:14 dwmw2 Exp $
+/* $Id: sun_uflash.c,v 1.7 2003/05/20 20:59:32 dwmw2 Exp $
  *
  * sun_uflash - Driver implementation for user-programmable flash
  * present on many Sun Microsystems SME boardsets.
@@ -48,60 +48,11 @@ struct uflash_dev {
 	struct list_head	list;
 };
 
-__u8 uflash_read8(struct map_info *map, unsigned long ofs)
-{
-	return(__raw_readb(map->map_priv_1 + ofs));
-}
-
-__u16 uflash_read16(struct map_info *map, unsigned long ofs)
-{
-	return(__raw_readw(map->map_priv_1 + ofs));
-}
-
-__u32 uflash_read32(struct map_info *map, unsigned long ofs)
-{
-	return(__raw_readl(map->map_priv_1 + ofs));
-}
-
-void uflash_copy_from(struct map_info *map, void *to, unsigned long from, 
-		      ssize_t len)
-{
-	memcpy_fromio(to, map->map_priv_1 + from, len);
-}
-
-void uflash_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	__raw_writeb(d, map->map_priv_1 + adr);
-}
-
-void uflash_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	__raw_writew(d, map->map_priv_1 + adr);
-}
-
-void uflash_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	__raw_writel(d, map->map_priv_1 + adr);
-}
-
-void uflash_copy_to(struct map_info *map, unsigned long to, const void *from,
-		    ssize_t len)
-{
-	memcpy_toio(map->map_priv_1 + to, from, len);
-}
 
 struct map_info uflash_map_templ = {
-	.name		= "SUNW,???-????",
-	.size		= UFLASH_WINDOW_SIZE,
-	.buswidth	= UFLASH_BUSWIDTH,
-	.read8		= uflash_read8,
-	.read16		= uflash_read16,
-	.read32		= uflash_read32,
-	.copy_from	= uflash_copy_from,
-	.write8		= uflash_write8,
-	.write16	= uflash_write16,
-	.write32	= uflash_write32,
-	.copy_to	= uflash_copy_to
+		.name =		"SUNW,???-????",
+		.size =		UFLASH_WINDOW_SIZE,
+		.buswidth =	UFLASH_BUSWIDTH,
 };
 
 int uflash_devinit(struct linux_ebus_device* edev)
@@ -145,20 +96,22 @@ int uflash_devinit(struct linux_ebus_device* edev)
 	if(0 != pdev->name && 0 < strlen(pdev->name)) {
 		pdev->map.name = pdev->name;
 	}
-
-	pdev->map.map_priv_1 = 
+	pdev->phys = edev->resource[0].start;
+	pdev->virt = 
 		(unsigned long)ioremap_nocache(edev->resource[0].start, pdev->map.size);
-	if(0 == pdev->map.map_priv_1) {
+	if(0 == pdev->map.virt) {
 		printk("%s: failed to map device\n", __FUNCTION__);
 		kfree(pdev->name);
 		kfree(pdev);
 		return(-1);
 	}
 
+	simple_map_init(&pdev->map);
+
 	/* MTD registration */
 	pdev->mtd = do_map_probe("cfi_probe", &pdev->map);
 	if(0 == pdev->mtd) {
-		iounmap((void *)pdev->map.map_priv_1);
+		iounmap((void *)pdev->map.virt);
 		kfree(pdev->name);
 		kfree(pdev);
 		return(-ENXIO);
@@ -166,7 +119,7 @@ int uflash_devinit(struct linux_ebus_device* edev)
 
 	list_add(&pdev->list, &device_list);
 
-	pdev->mtd->module = THIS_MODULE;
+	pdev->mtd->owner = THIS_MODULE;
 
 	add_mtd_device(pdev->mtd);
 	return(0);
@@ -211,9 +164,9 @@ static void __exit uflash_cleanup(void)
 			del_mtd_device(udev->mtd);
 			map_destroy(udev->mtd);
 		}
-		if(0 != udev->map.map_priv_1) {
-			iounmap((void*)udev->map.map_priv_1);
-			udev->map.map_priv_1 = 0;
+		if(0 != udev->map.virt) {
+			iounmap((void*)udev->map.virt);
+			udev->map.virt = 0;
 		}
 		if(0 != udev->name) {
 			kfree(udev->name);

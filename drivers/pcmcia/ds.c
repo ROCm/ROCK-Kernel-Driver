@@ -182,50 +182,6 @@ void pcmcia_unregister_driver(struct pcmcia_driver *driver)
 }
 EXPORT_SYMBOL(pcmcia_unregister_driver);
 
-
-int register_pccard_driver(dev_info_t *dev_info,
-			   dev_link_t *(*attach)(void),
-			   void (*detach)(dev_link_t *))
-{
-    struct pcmcia_driver *driver;
-
-    DEBUG(0, "ds: register_pccard_driver('%s')\n", (char *)dev_info);
-    driver = get_pcmcia_driver(dev_info);
-    if (driver)
-	    return -EBUSY;
-
-    driver = kmalloc(sizeof(struct pcmcia_driver), GFP_KERNEL);
-    if (!driver) return -ENOMEM;
-    memset(driver, 0, sizeof(struct pcmcia_driver));
-    driver->drv.name = (char *)dev_info;
-    pcmcia_register_driver(driver);
-
-    driver->attach = attach;
-    driver->detach = detach;
-
-    return 0;
-} /* register_pccard_driver */
-
-/*====================================================================*/
-
-int unregister_pccard_driver(dev_info_t *dev_info)
-{
-    struct pcmcia_driver *driver;
-
-    DEBUG(0, "ds: unregister_pccard_driver('%s')\n",
-	  (char *)dev_info);
-
-    driver = get_pcmcia_driver(dev_info);
-    if (!driver)
-	return -ENODEV;
-    
-    pcmcia_unregister_driver(driver);
-    kfree(driver);
-    return 0;
-} /* unregister_pccard_driver */
-
-/*====================================================================*/
-
 #ifdef CONFIG_PROC_FS
 static int proc_read_drivers_callback(struct device_driver *driver, void *d)
 {
@@ -875,11 +831,6 @@ static struct file_operations ds_fops = {
 	.write		= ds_write,
 	.poll		= ds_poll,
 };
-
-EXPORT_SYMBOL(register_pccard_driver);
-EXPORT_SYMBOL(unregister_pccard_driver);
-
-/*====================================================================*/
 
 static int __devinit pcmcia_bus_add_socket(struct device *dev, unsigned int socket_nr)
 {

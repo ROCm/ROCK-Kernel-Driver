@@ -1,13 +1,14 @@
 /* 
    Common Flash Interface probe code.
    (C) 2000 Red Hat. GPL'd.
-   $Id: cfi_probe.c,v 1.66 2001/10/02 15:05:12 dwmw2 Exp $
+   $Id: cfi_probe.c,v 1.71 2003/05/28 12:51:48 dwmw2 Exp $
 */
 
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <asm/byteorder.h>
 #include <linux/errno.h>
@@ -24,16 +25,13 @@
 static void print_cfi_ident(struct cfi_ident *);
 #endif
 
-int cfi_jedec_setup(struct cfi_private *p_cfi, int index);
-int cfi_jedec_lookup(int index, int mfr_id, int dev_id);
-
 static int cfi_probe_chip(struct map_info *map, __u32 base,
 			  struct flchip *chips, struct cfi_private *cfi);
 static int cfi_chip_setup(struct map_info *map, struct cfi_private *cfi);
 
 struct mtd_info *cfi_probe(struct map_info *map);
 
-/* check for QRY, or search for jedec id.
+/* check for QRY.
    in: interleave,type,mode
    ret: table index, <0 for error
  */
@@ -55,6 +53,18 @@ static int cfi_probe_chip(struct map_info *map, __u32 base,
 {
 	int i;
 	
+	if ((base + 0) >= map->size) {
+		printk(KERN_NOTICE
+			"Probe at base[0x00](0x%08lx) past the end of the map(0x%08lx)\n",
+			(unsigned long)base, map->size -1);
+		return 0;
+	}
+	if ((base + 0xff) >= map->size) {
+		printk(KERN_NOTICE
+			"Probe at base[0x55](0x%08lx) past the end of the map(0x%08lx)\n",
+			(unsigned long)base + 0x55, map->size -1);
+		return 0;
+	}
 	cfi_send_gen_cmd(0xF0, 0, base, map, cfi, cfi->device_type, NULL);
 	cfi_send_gen_cmd(0x98, 0x55, base, map, cfi, cfi->device_type, NULL);
 
@@ -139,7 +149,7 @@ static int cfi_chip_setup(struct map_info *map,
 	
 	memset(cfi->cfiq,0,sizeof(struct cfi_ident));	
 	
-	cfi->cfi_mode = 1;
+	cfi->cfi_mode = CFI_MODE_CFI;
 	cfi->fast_prog=1;		/* CFI supports fast programming */
 	
 	/* Read the CFI info structure */
@@ -250,11 +260,11 @@ static void print_cfi_ident(struct cfi_ident *cfip)
 	else
 		printk("Full buffer write not supported\n");
 	
-	printk("Typical block erase timeout: %d 탎\n", 1<<cfip->BlockEraseTimeoutTyp);
-	printk("Maximum block erase timeout: %d 탎\n", (1<<cfip->BlockEraseTimeoutMax) * (1<<cfip->BlockEraseTimeoutTyp));
+	printk("Typical block erase timeout: %d ms\n", 1<<cfip->BlockEraseTimeoutTyp);
+	printk("Maximum block erase timeout: %d ms\n", (1<<cfip->BlockEraseTimeoutMax) * (1<<cfip->BlockEraseTimeoutTyp));
 	if (cfip->ChipEraseTimeoutTyp || cfip->ChipEraseTimeoutMax) {
-		printk("Typical chip erase timeout: %d 탎\n", 1<<cfip->ChipEraseTimeoutTyp); 
-		printk("Maximum chip erase timeout: %d 탎\n", (1<<cfip->ChipEraseTimeoutMax) * (1<<cfip->ChipEraseTimeoutTyp));
+		printk("Typical chip erase timeout: %d ms\n", 1<<cfip->ChipEraseTimeoutTyp); 
+		printk("Maximum chip erase timeout: %d ms\n", (1<<cfip->ChipEraseTimeoutMax) * (1<<cfip->ChipEraseTimeoutTyp));
 	}
 	else
 		printk("Chip erase not supported\n");

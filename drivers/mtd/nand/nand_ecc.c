@@ -1,14 +1,14 @@
 /*
  *  drivers/mtd/nand_ecc.c
  *
- *  Copyright (C) 2000 Steven J. Hill (sjhill@cotw.com)
+ *  Copyright (C) 2000 Steven J. Hill (sjhill@realitydiluted.com)
  *                     Toshiba America Electronics Components, Inc.
  *
- * $Id: nand_ecc.c,v 1.6 2001/06/28 10:52:26 dwmw2 Exp $
+ * $Id: nand_ecc.c,v 1.9 2003/02/20 13:34:19 sjhill Exp $
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * version 2.1 as published by the Free Software Foundation.
  *
  * This file contains an ECC algorithm from Toshiba that detects and
  * corrects 1 bit errors in a 256 byte block of data.
@@ -209,5 +209,5 @@ EXPORT_SYMBOL(nand_calculate_ecc);
 EXPORT_SYMBOL(nand_correct_data);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Steven J. Hill <sjhill@cotw.com>");
+MODULE_AUTHOR("Steven J. Hill <sjhill@realitydiluted.com>");
 MODULE_DESCRIPTION("Generic NAND ECC support");

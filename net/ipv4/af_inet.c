@@ -1122,6 +1122,7 @@ static int __init init_ipv4_mibs(void)
 }
 
 int ipv4_proc_init(void);
+extern void ipfrag_init(void);
 
 static int __init inet_init(void)
 {
@@ -1224,6 +1225,9 @@ static int __init inet_init(void)
 		printk(KERN_CRIT "inet_init: Cannot init ipv4 mibs\n"); ;
 	
 	ipv4_proc_init();
+
+	ipfrag_init();
+
 	return 0;
 }
 

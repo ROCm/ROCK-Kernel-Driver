@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodelist.h,v 1.87 2002/11/12 13:36:18 dwmw2 Exp $
+ * $Id: nodelist.h,v 1.93 2003/02/24 21:47:28 dwmw2 Exp $
  *
  */
 
@@ -16,12 +16,17 @@
 
 #include <linux/config.h>
 #include <linux/fs.h>
-
-#include <linux/mtd/compatmac.h> /* For min/max in older kernels */
+#include <linux/types.h>
 #include <linux/jffs2.h>
 #include <linux/jffs2_fs_sb.h>
 #include <linux/jffs2_fs_i.h>
+
+#ifdef __ECOS
+#include "os-ecos.h"
+#else
+#include <linux/mtd/compatmac.h> /* For min/max in older kernels */
 #include "os-linux.h"
+#endif
 
 #ifndef CONFIG_JFFS2_FS_DEBUG
 #define CONFIG_JFFS2_FS_DEBUG 2
@@ -98,12 +103,17 @@ struct jffs2_inode_cache {
 	uint32_t ino;
 	int nlink;
 	int state;
-#define INO_STATE_UNCHECKED 0
-#define INO_STATE_CHECKING 1
-#define INO_STATE_CHECKEDABSENT 2
-#define INO_STATE_READINGINODE 3
-#define INO_STATE_PRESENT 5
 };
+
+/* Inode states for 'state' above. We need the 'GC' state to prevent
+   someone from doing a read_inode() while we're moving a 'REF_PRISTINE'
+   node without going through all the iget() nonsense */
+#define INO_STATE_UNCHECKED	0	/* CRC checks not yet done */
+#define INO_STATE_CHECKING	1	/* CRC checks in progress */
+#define INO_STATE_PRESENT	2	/* In core */
+#define INO_STATE_CHECKEDABSENT	3	/* Checked, cleared again */
+#define INO_STATE_GC		4	/* GCing a 'pristine' node */
+#define INO_STATE_READING	5	/* In read_inode() */
 
 #define INOCACHE_HASHSIZE 128
 
@@ -281,7 +291,8 @@ int jffs2_get_inode_nodes(struct jffs2_sb_info *c, ino_t ino, struct jffs2_inode
 			  struct jffs2_tmp_dnode_info **tnp, struct jffs2_full_dirent **fdp,
 			  uint32_t *highest_version, uint32_t *latest_mctime,
 			  uint32_t *mctime_ver);
-struct jffs2_inode_cache *jffs2_get_ino_cache(struct jffs2_sb_info *c, int ino);
+void jffs2_set_inocache_state(struct jffs2_sb_info *c, struct jffs2_inode_cache *ic, int state);
+struct jffs2_inode_cache *jffs2_get_ino_cache(struct jffs2_sb_info *c, uint32_t ino);
 void jffs2_add_ino_cache (struct jffs2_sb_info *c, struct jffs2_inode_cache *new);
 void jffs2_del_ino_cache(struct jffs2_sb_info *c, struct jffs2_inode_cache *old);
 void jffs2_free_ino_caches(struct jffs2_sb_info *c);
@@ -315,10 +326,10 @@ int jffs2_do_link (struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f, uint
 
 /* readinode.c */
 void jffs2_truncate_fraglist (struct jffs2_sb_info *c, struct rb_root *list, uint32_t size);
-int jffs2_add_full_dnode_to_fraglist(struct jffs2_sb_info *c, struct rb_root *list, struct jffs2_full_dnode *fn);
 int jffs2_add_full_dnode_to_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, struct jffs2_full_dnode *fn);
 int jffs2_do_read_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, 
 			uint32_t ino, struct jffs2_raw_inode *latest_node);
+int jffs2_do_crccheck_inode(struct jffs2_sb_info *c, struct jffs2_inode_cache *ic);
 void jffs2_do_clear_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f);
 
 /* malloc.c */

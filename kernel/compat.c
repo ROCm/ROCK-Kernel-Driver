@@ -368,8 +368,7 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t * stat_addr, int options,
 		ret = sys_wait4(pid, stat_addr ? &status : NULL, options, &r);
 		set_fs (old_fs);
 
-		if (!ret)
-		{
+		if (ret > 0) {
 			if (put_compat_rusage(ru, &r)) 
 				return -EFAULT;
 			if (stat_addr && put_user(status, stat_addr))

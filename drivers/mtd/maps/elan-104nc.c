@@ -16,7 +16,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
 
-   $Id: elan-104nc.c,v 1.12 2001/10/02 15:05:14 dwmw2 Exp $
+   $Id: elan-104nc.c,v 1.17 2003/05/21 15:15:07 dwmw2 Exp $
 
 The ELAN-104NC has up to 8 Mibyte of Intel StrataFlash (28F320/28F640) in x16
 mode.  This drivers uses the CFI probe and Intel Extended Command Set drivers.
@@ -27,7 +27,7 @@ The flash is accessed as follows:
    
    16 bit I/O port (0x22) for some sort of paging.
 
-The single flash device is divided into 3 partition which appear as separate
+The single flash device is divided into 3 partition which appear as seperate
 MTD devices.
 
 Linux thinks that the I/O port is used by the PIC and hence check_region() will
@@ -40,6 +40,7 @@ always fail.  So we don't do it.  I just hope it doesn't break anything.
 #include <asm/io.h>
 
 #include <linux/mtd/map.h>
+#include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 
 #define WINDOW_START 0xb0000
@@ -58,20 +59,15 @@ static spinlock_t elan_104nc_spin = SPIN_LOCK_UNLOCKED;
 /* partition_info gives details on the logical partitions that the split the 
  * single flash device into. If the size if zero we use up to the end of the
  * device. */
-static struct mtd_partition partition_info[] = {
-	{
-		.name	= "ELAN-104NC flash boot partition", 
-		.size	= 640*1024
-	},
-	{
-		.name	= "ELAN-104NC flash partition 1", 
-		.offset	= 640*1024, 
-		.size	= 896*1024
-	},
-	{
-		.name	= "ELAN-104NC flash partition 2", 
-		.offset = (640+896)*1024,
-	}
+static struct mtd_partition partition_info[]={
+    { .name = "ELAN-104NC flash boot partition", 
+      .offset = 0, 
+      .size = 640*1024 },
+    { .name = "ELAN-104NC flash partition 1", 
+      .offset = 640*1024, 
+      .size = 896*1024 },
+    { .name = "ELAN-104NC flash partition 2", 
+      .offset = (640+896)*1024 }
 };
 #define NUM_PARTITIONS (sizeof(partition_info)/sizeof(partition_info[0]))
 
@@ -200,20 +196,20 @@ static void elan_104nc_copy_to(struct map_info *map, unsigned long to, const voi
 }
 
 static struct map_info elan_104nc_map = {
-	.name		= "ELAN-104NC flash",
-	.size		= 8*1024*1024, /* this must be set to a maximum
-					  possible amount of flash so the
-					  cfi probe routines find all
-					  the chips */
-	.buswidth	= 2,
-	.read8		= elan_104nc_read8,
-	.read16		= elan_104nc_read16,
-	.read32		= elan_104nc_read32,
-	.copy_from	= elan_104nc_copy_from,
-	.write8		= elan_104nc_write8,
-	.write16	= elan_104nc_write16,
-	.write32	= elan_104nc_write32,
-	.copy_to	= elan_104nc_copy_to
+	.name = "ELAN-104NC flash",
+	.phys = NO_XIP,
+	.size = 8*1024*1024, /* this must be set to a maximum possible amount
+			of flash so the cfi probe routines find all
+			the chips */
+	.buswidth = 2,
+	.read8 = elan_104nc_read8,
+	.read16 = elan_104nc_read16,
+	.read32 = elan_104nc_read32,
+	.copy_from = elan_104nc_copy_from,
+	.write8 = elan_104nc_write8,
+	.write16 = elan_104nc_write16,
+	.write32 = elan_104nc_write32,
+	.copy_to = elan_104nc_copy_to
 };
 
 /* MTD device for all of the flash. */
@@ -266,7 +262,7 @@ int __init init_elan_104nc(void)
 		return -ENXIO;
 	}
 	
-	all_mtd->module=THIS_MODULE;
+	all_mtd->owner = THIS_MODULE;
 
 	/* Create MTD devices for each partition. */
 	add_mtd_partitions( all_mtd, partition_info, NUM_PARTITIONS );

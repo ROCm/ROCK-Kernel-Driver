@@ -1,5 +1,5 @@
 /*
- * $Id: rpxlite.c,v 1.15 2001/10/02 15:05:14 dwmw2 Exp $
+ * $Id: rpxlite.c,v 1.19 2003/05/21 12:45:19 dwmw2 Exp $
  *
  * Handle mapping of the flash on the RPX Lite and CLLF boards
  */
@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <asm/io.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -17,80 +18,31 @@
 
 static struct mtd_info *mymtd;
 
-__u8 rpxlite_read8(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readb(map->map_priv_1 + ofs);
-}
-
-__u16 rpxlite_read16(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readw(map->map_priv_1 + ofs);
-}
-
-__u32 rpxlite_read32(struct map_info *map, unsigned long ofs)
-{
-	return __raw_readl(map->map_priv_1 + ofs);
-}
-
-void rpxlite_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
-{
-	memcpy_fromio(to, (void *)(map->map_priv_1 + from), len);
-}
-
-void rpxlite_write8(struct map_info *map, __u8 d, unsigned long adr)
-{
-	__raw_writeb(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void rpxlite_write16(struct map_info *map, __u16 d, unsigned long adr)
-{
-	__raw_writew(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void rpxlite_write32(struct map_info *map, __u32 d, unsigned long adr)
-{
-	__raw_writel(d, map->map_priv_1 + adr);
-	mb();
-}
-
-void rpxlite_copy_to(struct map_info *map, unsigned long to, const void *from, ssize_t len)
-{
-	memcpy_toio((void *)(map->map_priv_1 + to), from, len);
-}
-
-struct map_info rpxlite_map = {
-	.name		= "RPX",
-	.size		= WINDOW_SIZE,
-	.buswidth	= 4,
-	.read8		= rpxlite_read8,
-	.read16		= rpxlite_read16,
-	.read32		= rpxlite_read32,
-	.copy_from	= rpxlite_copy_from,
-	.write8		= rpxlite_write8,
-	.write16	= rpxlite_write16,
-	.write32	= rpxlite_write32,
-	.copy_to	= rpxlite_copy_to
+static struct map_info rpxlite_map = {
+	.name = "RPX",
+	.size = WINDOW_SIZE,
+	.buswidth = 4,
+	.phys = WINDOW_ADDR,
 };
 
 int __init init_rpxlite(void)
 {
 	printk(KERN_NOTICE "RPX Lite or CLLF flash device: %x at %x\n", WINDOW_SIZE*4, WINDOW_ADDR);
-	rpxlite_map.map_priv_1 = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE * 4);
+	rpxlite_map.virt = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE * 4);
 
-	if (!rpxlite_map.map_priv_1) {
+	if (!rpxlite_map.virt) {
 		printk("Failed to ioremap\n");
 		return -EIO;
 	}
+	simple_map_init(&rpxlite_map);
 	mymtd = do_map_probe("cfi_probe", &rpxlite_map);
 	if (mymtd) {
-		mymtd->module = THIS_MODULE;
+		mymtd->owner = THIS_MODULE;
 		add_mtd_device(mymtd);
 		return 0;
 	}
 
-	iounmap((void *)rpxlite_map.map_priv_1);
+	iounmap((void *)rpxlite_map.virt);
 	return -ENXIO;
 }
 
@@ -100,9 +52,9 @@ static void __exit cleanup_rpxlite(void)
 		del_mtd_device(mymtd);
 		map_destroy(mymtd);
 	}
-	if (rpxlite_map.map_priv_1) {
-		iounmap((void *)rpxlite_map.map_priv_1);
-		rpxlite_map.map_priv_1 = 0;
+	if (rpxlite_map.virt) {
+		iounmap((void *)rpxlite_map.virt);
+		rpxlite_map.virt = 0;
 	}
 }
 
