@@ -307,5 +307,19 @@
 #define SERIAL_RSA_BAUD_BASE (921600)
 #define SERIAL_RSA_BAUD_BASE_LO (SERIAL_RSA_BAUD_BASE / 8)
 
+/*
+ * Extra serial register definitions for the internal UARTs
+ * in TI OMAP processors.
+ */
+#define UART_OMAP_MDR1		0x08	/* Mode definition register */
+#define UART_OMAP_MDR2		0x09	/* Mode definition register 2 */
+#define UART_OMAP_SCR		0x10	/* Supplementary control register */
+#define UART_OMAP_SSR		0x11	/* Supplementary status register */
+#define UART_OMAP_EBLR		0x12	/* BOF length register */
+#define UART_OMAP_OSC_12M_SEL	0x13	/* OMAP1510 12MHz osc select */
+#define UART_OMAP_MVER		0x14	/* Module version register */
+#define UART_OMAP_SYSC		0x15	/* System configuration register */
+#define UART_OMAP_SYSS		0x16	/* System status register */
+
 #endif /* _LINUX_SERIAL_REG_H */
 
