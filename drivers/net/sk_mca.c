@@ -280,7 +280,7 @@ static void SetLANCE(struct SKMCA_NETDEV *dev, u16 addr, u16 value)
 
 	/* reenable interrupts */
 
-	spin_lock_irqrestore(&priv->lock, flags);
+	spin_unlock_irqrestore(&priv->lock, flags);
 }
 
 /* get LANCE register */
@@ -319,7 +319,7 @@ static u16 GetLANCE(struct SKMCA_NETDEV *dev, u16 addr)
 
 	/* reenable interrupts */
 
-	spin_lock_irqrestore(&priv->lock, flags);
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	return res;
 }
@@ -993,7 +993,7 @@ static int skmca_tx(struct sk_buff *skb, struct SKMCA_NETDEV *dev)
 	if (priv->txbusy == 0)
 		SetLANCE(dev, LANCE_CSR0, CSR0_INEA | CSR0_TDMD);
 
-	spin_lock_irqrestore(&priv->lock, flags);
+	spin_unlock_irqrestore(&priv->lock, flags);
 
       tx_done:
 
