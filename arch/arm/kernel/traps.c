@@ -271,31 +271,6 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 	die_if_kernel("Oops - undefined instruction", regs, 0);
 }
 
-#ifdef CONFIG_CPU_26
-asmlinkage void do_excpt(unsigned long address, struct pt_regs *regs, int mode)
-{
-	siginfo_t info;
-
-#ifdef CONFIG_DEBUG_USER
-	printk(KERN_INFO "%s (%d): address exception: pc=%08lx\n",
-		current->comm, current->pid, instruction_pointer(regs));
-	dump_instr(regs);
-#endif
-
-	current->thread.error_code = 0;
-	current->thread.trap_no = 11;
-
-	info.si_signo = SIGBUS;
-	info.si_errno = 0;
-	info.si_code  = BUS_ADRERR;
-	info.si_addr  = (void *)address;
-
-	force_sig_info(SIGBUS, &info, current);
-
-	die_if_kernel("Oops - address exception", regs, mode);
-}
-#endif
-
 asmlinkage void do_unexp_fiq (struct pt_regs *regs)
 {
 #ifndef CONFIG_IGNORE_FIQ
@@ -405,7 +380,6 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		ptrace_break(current, regs);
 		return regs->ARM_r0;
 
-#ifdef CONFIG_CPU_32
 	/*
 	 * Flush a region from virtual address 'r0' to virtual address 'r1'
 	 * _inclusive_.  There is no alignment requirement on either address;
@@ -435,14 +409,6 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 			break;
 		regs->ARM_cpsr |= MODE32_BIT;
 		return regs->ARM_r0;
-#else
-	case NR(cacheflush):
-		return 0;
-
-	case NR(usr26):
-	case NR(usr32):
-		break;
-#endif
 
 	default:
 		/* Calls 9f00xx..9f07ff are defined to return -ENOSYS
@@ -563,7 +529,5 @@ void __init trap_init(void)
 	if (base != 0)
 		printk(KERN_DEBUG "Relocating machine vectors to 0x%08lx\n",
 			base);
-#ifdef CONFIG_CPU_32
 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-#endif
 }

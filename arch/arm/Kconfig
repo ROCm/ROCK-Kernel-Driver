@@ -175,7 +175,7 @@ source "arch/arm/mach-epxa10db/Kconfig"
 
 source "arch/arm/mach-footbridge/Kconfig"
 
-source "arch/arm/mach-iop310/Kconfig"
+source "arch/arm/mach-iop3xx/Kconfig"
 
 source "arch/arm/mach-pxa/Kconfig"
 

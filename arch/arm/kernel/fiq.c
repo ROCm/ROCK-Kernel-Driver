@@ -54,7 +54,6 @@
 
 static unsigned long no_fiq_insn;
 
-#ifdef CONFIG_CPU_32
 static inline void unprotect_page_0(void)
 {
 	modify_domain(DOMAIN_USER, DOMAIN_MANAGER);
@@ -64,12 +63,6 @@ static inline void protect_page_0(void)
 {
 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
 }
-#else
-
-#define unprotect_page_0()
-#define protect_page_0()
-
-#endif
 
 /* Default reacquire function
  * - we always relinquish FIQ control
@@ -120,17 +113,6 @@ void set_fiq_regs(struct pt_regs *regs)
 {
 	register unsigned long tmp, tmp2;
 	__asm__ volatile (
-#ifdef CONFIG_CPU_26
-	"mov	%0, pc
-	bic	%1, %0, #0x3
-	orr	%1, %1, %3
-	teqp	%1, #0		@ select FIQ mode
-	mov	r0, r0
-	ldmia	%2, {r8 - r14}
-	teqp	%0, #0		@ return to SVC mode
-	mov	r0, r0"
-#endif
-#ifdef CONFIG_CPU_32
 	"mrs	%0, cpsr
 	mov	%1, %3
 	msr	cpsr_c, %1	@ select FIQ mode
@@ -138,7 +120,6 @@ void set_fiq_regs(struct pt_regs *regs)
 	ldmia	%2, {r8 - r14}
 	msr	cpsr_c, %0	@ return to SVC mode
 	mov	r0, r0"
-#endif
 	: "=&r" (tmp), "=&r" (tmp2)
 	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE)
 	/* These registers aren't modified by the above code in a way
@@ -152,17 +133,6 @@ void get_fiq_regs(struct pt_regs *regs)
 {
 	register unsigned long tmp, tmp2;
 	__asm__ volatile (
-#ifdef CONFIG_CPU_26
-	"mov	%0, pc
-	bic	%1, %0, #0x3
-	orr	%1, %1, %3
-	teqp	%1, #0		@ select FIQ mode
-	mov	r0, r0
-	stmia	%2, {r8 - r14}
-	teqp	%0, #0		@ return to SVC mode
-	mov	r0, r0"
-#endif
-#ifdef CONFIG_CPU_32
 	"mrs	%0, cpsr
 	mov	%1, %3
 	msr	cpsr_c, %1	@ select FIQ mode
@@ -170,7 +140,6 @@ void get_fiq_regs(struct pt_regs *regs)
 	stmia	%2, {r8 - r14}
 	msr	cpsr_c, %0	@ return to SVC mode
 	mov	r0, r0"
-#endif
 	: "=&r" (tmp), "=&r" (tmp2)
 	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE)
 	/* These registers aren't modified by the above code in a way

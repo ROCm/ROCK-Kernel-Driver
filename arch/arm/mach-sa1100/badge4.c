@@ -186,11 +186,26 @@ static struct map_desc badge4_io_desc[] __initdata = {
   {0xf4000000, 0x48000000, 0x00100000, MT_DEVICE } /* SA-1111      */
 };
 
+static void
+badge4_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
+{
+	if (!state) {
+		Ser1SDCR0 |= SDCR0_UART;
+	}
+}
+
+static struct sa1100_port_fns badge4_port_fns __initdata = {
+	//.get_mctrl	= badge4_get_mctrl,
+	//.set_mctrl	= badge4_set_mctrl,
+	.pm		= badge4_uart_pm,
+};
+
 static void __init badge4_map_io(void)
 {
 	sa1100_map_io();
 	iotable_init(badge4_io_desc, ARRAY_SIZE(badge4_io_desc));
 
+	sa1100_register_uart_fns(&badge4_port_fns);
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);
 }

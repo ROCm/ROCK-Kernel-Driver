@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/mach-iop310/iop310-irq.c
+ * linux/arch/arm/mach-iop3xx/iop310-irq.c
  *
  * Generic IOP310 IRQ handling functionality
  *

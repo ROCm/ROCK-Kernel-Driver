@@ -220,7 +220,6 @@ static void ecard_do_request(struct ecard_request *req)
 	}
 }
 
-#ifdef CONFIG_CPU_32
 #include <linux/completion.h>
 
 static pid_t ecard_pid;
@@ -341,13 +340,6 @@ ecard_call(struct ecard_request *req)
 	 */
 	wait_for_completion(&ecard_completion);
 }
-#else
-/*
- * On 26-bit processors, we don't need the kcardd thread to access the
- * expansion card loaders.  We do it directly.
- */
-#define ecard_call(req)	ecard_do_request(req)
-#endif
 
 /* ======================= Mid-level card control ===================== */
 
@@ -1026,9 +1018,7 @@ static int __init ecard_init(void)
 {
 	int slot, irqhw;
 
-#ifdef CONFIG_CPU_32
 	init_waitqueue_head(&ecard_wait);
-#endif
 
 	printk("Probing expansion cards\n");
 

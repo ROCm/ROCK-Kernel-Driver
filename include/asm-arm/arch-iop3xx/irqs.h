@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-arm/arch-iop310/irqs.h
+ * linux/include/asm-arm/arch-iop3xx/irqs.h
  *
  * Author:	Nicolas Pitre
  * Copyright:	(C) 2001 MontaVista Software Inc.

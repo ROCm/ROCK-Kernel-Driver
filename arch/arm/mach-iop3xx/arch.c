@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/mach-iop310/arch.c
+ * linux/arch/arm/mach-iop3xx/arch.c
  *
  * Author: Nicolas Pitre <nico@cam.org>
  * Copyright (C) 2001 MontaVista Software, Inc.

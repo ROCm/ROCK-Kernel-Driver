@@ -1,5 +1,5 @@
 /*
- * linux/arch/arm/mach-iop310/mm.c
+ * linux/arch/arm/mach-iop3xx/mm.c
  *
  * Low level memory initialization for IOP310 based systems
  *

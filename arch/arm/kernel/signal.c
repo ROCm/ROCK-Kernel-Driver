@@ -174,9 +174,7 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 	__get_user_error(regs->ARM_sp, &sc->arm_sp, err);
 	__get_user_error(regs->ARM_lr, &sc->arm_lr, err);
 	__get_user_error(regs->ARM_pc, &sc->arm_pc, err);
-#ifdef CONFIG_CPU_32
 	__get_user_error(regs->ARM_cpsr, &sc->arm_cpsr, err);
-#endif
 
 	err |= !valid_user_regs(regs);
 
@@ -292,9 +290,7 @@ setup_sigcontext(struct sigcontext *sc, /*struct _fpstate *fpstate,*/
 	__put_user_error(regs->ARM_sp, &sc->arm_sp, err);
 	__put_user_error(regs->ARM_lr, &sc->arm_lr, err);
 	__put_user_error(regs->ARM_pc, &sc->arm_pc, err);
-#ifdef CONFIG_CPU_32
 	__put_user_error(regs->ARM_cpsr, &sc->arm_cpsr, err);
-#endif
 
 	__put_user_error(current->thread.trap_no, &sc->trap_no, err);
 	__put_user_error(current->thread.error_code, &sc->error_code, err);
@@ -328,7 +324,6 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 	unsigned long handler = (unsigned long)ka->sa.sa_handler;
 	unsigned long retcode;
 	int thumb = 0;
-#ifdef CONFIG_CPU_32
 	unsigned long cpsr = regs->ARM_cpsr & ~PSR_f;
 
 	/*
@@ -350,7 +345,6 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 		else
 			cpsr &= ~PSR_T_BIT;
 	}
-#endif
 #endif
 
 	if (ka->sa.sa_flags & SA_RESTORER) {
@@ -378,10 +372,7 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 	regs->ARM_sp = (unsigned long)frame;
 	regs->ARM_lr = retcode;
 	regs->ARM_pc = handler;
-
-#ifdef CONFIG_CPU_32
 	regs->ARM_cpsr = cpsr;
-#endif
 
 	return 0;
 }

@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-iop310/iq80310-pci.c
+ * arch/arm/mach-iop3xx/iq80310-pci.c
  *
  * PCI support for the Intel IQ80310 reference board
  *
