@@ -794,6 +794,37 @@ static void socket_remove(struct pcmcia_socket *skt)
 	module_put(skt->owner);
 }
 
+/*
+ * Process a socket card detect status change.
+ *
+ * If we don't have a card already present, delay the detect event for
+ * about 20ms (to be on the safe side) before reading the socket status.
+ *
+ * Some i82365-based systems send multiple SS_DETECT events during card
+ * insertion, and the "card present" status bit seems to bounce.  This
+ * will probably be true with GPIO-based card detection systems after
+ * the product has aged.
+ */
+static void socket_detect_change(struct pcmcia_socket *skt)
+{
+	if (!(skt->state & SOCKET_SUSPEND)) {
+		int status;
+
+		if (!(skt->state & SOCKET_PRESENT)) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(cs_to_timeout(2));
+		}
+
+		get_socket_status(skt, &status);
+		if ((skt->state & SOCKET_PRESENT) &&
+		     !(status & SS_DETECT))
+			socket_remove(skt);
+		if (!(skt->state & SOCKET_PRESENT) &&
+		    (status & SS_DETECT))
+			socket_insert(skt);
+	}
+}
+
 static int pccardd(void *__skt)
 {
 	struct pcmcia_socket *skt = __skt;
@@ -817,17 +848,8 @@ static int pccardd(void *__skt)
 
 		if (events) {
 			down(&skt->skt_sem);
-			if (events & SS_DETECT && !(skt->state & SOCKET_SUSPEND)) {
-				int status;
-
-				get_socket_status(skt, &status);
-				if ((skt->state & SOCKET_PRESENT) &&
-				     !(status & SS_DETECT))
-					socket_remove(skt);
-				if (!(skt->state & SOCKET_PRESENT) &&
-				    (status & SS_DETECT))
-					socket_insert(skt);
-			}
+			if (events & SS_DETECT)
+				socket_detect_change(skt);
 			if (events & SS_BATDEAD)
 				send_event(skt, CS_EVENT_BATTERY_DEAD, CS_EVENT_PRI_LOW);
 			if (events & SS_BATWARN)
