@@ -876,7 +876,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 		start_timer = 0;
 		queue = &q->out;
 
-		while (NULL != (chunk = sctp_outq_dequeue_data(q))) {
+		while (chunk = sctp_outq_dequeue_data(q)) {
 			/* RFC 2960 6.5 Every DATA chunk MUST carry a valid
 			 * stream identifier.
 			 */
@@ -891,9 +891,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 				if (ev)
 					sctp_ulpq_tail_event(&asoc->ulpq, ev);
 
-				/* Free the chunk. This chunk is not on any
-				 * list yet, just free it.
-				 */
+				/* Free the chunk. */
 				sctp_free_chunk(chunk);
 				continue;
 			}

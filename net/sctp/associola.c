@@ -421,8 +421,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	SCTP_DEBUG_PRINTK("sctp_assoc_add_peer:association %p PMTU set to "
 			  "%d\n", asoc, asoc->pmtu);
 
-	asoc->frag_point = asoc->pmtu;
-	asoc->frag_point -= SCTP_IP_OVERHEAD + sizeof(struct sctp_data_chunk);
+	asoc->frag_point = sctp_frag_point(asoc->pmtu);
 
 	/* The asoc->peer.port might not be meaningful yet, but
 	 * initialize the packet structure anyway.
@@ -658,32 +657,21 @@ int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 }
 
 /* Return an ecne chunk to get prepended to a packet.
- * Note:  We are sly and return a shared, prealloced chunk.
+ * Note:  We are sly and return a shared, prealloced chunk.  FIXME:
+ * No we don't, but we could/should.
  */
-sctp_chunk_t *sctp_get_ecne_prepend(sctp_association_t *asoc)
+sctp_chunk_t *sctp_get_ecne_prepend(struct sctp_association *asoc)
 {
-	sctp_chunk_t *chunk;
-	int need_ecne;
-	__u32 lowest_tsn;
+	struct sctp_chunk *chunk;
 
-	/* Can be called from task or bh.   Both need_ecne and
-	 * last_ecne_tsn are written during bh.
+	/* Send ECNE if needed. 
+	 * Not being able to allocate a chunk here is not deadly. 
 	 */
-	need_ecne = asoc->need_ecne;
-	lowest_tsn = asoc->last_ecne_tsn;
-
-	if (need_ecne) {
-		chunk = sctp_make_ecne(asoc, lowest_tsn);
-
-		/* ECNE is not mandatory to the flow.  Being unable to
-		 * alloc mem is not deadly.  We are just unable to help
-		 * out the network.  If we run out of memory, just return
-		 * NULL.
-		 */
-	} else {
+	if (asoc->need_ecne)
+		chunk = sctp_make_ecne(asoc, asoc->last_ecne_tsn);
+	else
 		chunk = NULL;
-	}
-
+	
 	return chunk;
 }
 
@@ -986,8 +974,7 @@ void sctp_assoc_sync_pmtu(sctp_association_t *asoc)
 
 	if (pmtu) {
 		asoc->pmtu = pmtu;
-		asoc->frag_point = pmtu - (SCTP_IP_OVERHEAD +
-					   sizeof(sctp_data_chunk_t));
+		asoc->frag_point = sctp_frag_point(pmtu);
 	}
 
 	SCTP_DEBUG_PRINTK("%s: asoc:%p, pmtu:%d, frag_point:%d\n",
