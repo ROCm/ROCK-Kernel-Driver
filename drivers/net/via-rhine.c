@@ -9,8 +9,8 @@
 	a complete program and may only be used when the entire operating
 	system is licensed under the GPL.
 
-	This driver is designed for the VIA VT86c100A Rhine-II PCI Fast Ethernet
-	controller.  It also works with the older 3043 Rhine-I chip.
+	This driver is designed for the VIA VT86C100A Rhine-I. 
+	It also works with the 6102 Rhine-II, and 6105/6105M Rhine-III.   
 
 	The author may be reached as becker@scyld.com, or C/O
 	Scyld Computing Corporation
@@ -81,14 +81,26 @@
 	- Add ethtool support
 	- Replace some MII-related magic numbers with constants
 	
-	LK1.1.14 (jgarzik):
-	- Merge new PCI id from 'linuxfet' driver.
+	LK1.1.14 (Ivan G.):
+ 	- fixes comments for Rhine-III
+	- removes W_MAX_TIMEOUT (unused)
+	- adds HasDavicomPhy for Rhine-I (basis: linuxfet driver; my card
+	  is R-I and has Davicom chip, flag is referenced in kernel driver)
+	- sends chip_id as a parameter to wait_for_reset since np is not
+	  initialized on first call
+	- changes mmio "else if (chip_id==VT6102)" to "else" so it will work
+	  for Rhine-III's (documentation says same bit is correct)		
+	- transmit frame queue message is off by one - fixed
+	- adds IntrNormalSummary to "Something Wicked" exclusion list
+	  so normal interrupts will not trigger the message (src: Donald Becker)
+	(Roger Lahti)
+	- cosmetic cleanups, remove 3 unused members of struct netdev_private
 
 */
 
 #define DRV_NAME	"via-rhine"
 #define DRV_VERSION	"1.1.14"
-#define DRV_RELDATE	"Feb-12-2002"
+#define DRV_RELDATE	"May-3-2002"
 
 
 /* A few user-configurable values.
@@ -139,9 +151,6 @@ static const int multicast_filter_limit = 32;
 
 #define PKT_BUF_SZ		1536			/* Size of each temporary Rx buffer.*/
 
-/* max time out delay time */
-#define W_MAX_TIMEOUT	0x0FFFU
-
 #if !defined(__OPTIMIZE__)  ||  !defined(__KERNEL__)
 #warning  You must compile this file with the correct options!
 #warning  See the last lines of the source file.
@@ -176,7 +185,7 @@ static char version[] __devinitdata =
 KERN_INFO DRV_NAME ".c:v1.10-LK" DRV_VERSION "  " DRV_RELDATE "  Written by Donald Becker\n"
 KERN_INFO "  http://www.scyld.com/network/via-rhine.html\n";
 
-static char shortname[] __devinitdata = DRV_NAME;
+static char shortname[] = DRV_NAME;
 
 
 /* This driver was written to use PCI memory space, however most versions
@@ -320,8 +329,8 @@ enum pci_flags_bit {
 enum via_rhine_chips {
 	VT86C100A = 0,
 	VT6102,
-	VT3043,
 	VT6105,
+	VT6105M
 };
 
 struct via_rhine_chip_info {
@@ -346,21 +355,21 @@ enum chip_capability_flags {
 static struct via_rhine_chip_info via_rhine_chip_info[] __devinitdata =
 {
 	{ "VIA VT86C100A Rhine", RHINE_IOTYPE, 128,
-	  CanHaveMII | ReqTxAlign },
+	  CanHaveMII | ReqTxAlign | HasDavicomPhy },
 	{ "VIA VT6102 Rhine-II", RHINE_IOTYPE, 256,
 	  CanHaveMII | HasWOL },
-	{ "VIA VT3043 Rhine",    RHINE_IOTYPE, 128,
-	  CanHaveMII | ReqTxAlign },
 	{ "VIA VT6105 Rhine-III", RHINE_IOTYPE, 256,
-	  CanHaveMII | HasWOL },
+	  CanHaveMII | HasWOL },	  
+	{ "VIA VT6105M Rhine-III", RHINE_IOTYPE, 256,
+	  CanHaveMII | HasWOL },	  	  	 
 };
 
 static struct pci_device_id via_rhine_pci_tbl[] __devinitdata =
 {
-	{0x1106, 0x6100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT86C100A},
+	{0x1106, 0x3043, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT86C100A},
 	{0x1106, 0x3065, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT6102},
-	{0x1106, 0x3043, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT3043},
 	{0x1106, 0x3106, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT6105},
+	{0x1106, 0x3053, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VT6105M},	
 	{0,}			/* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, via_rhine_pci_tbl);
@@ -377,6 +386,11 @@ enum register_offsets {
 	ConfigA=0x78, ConfigB=0x79, ConfigC=0x7A, ConfigD=0x7B,
 	RxMissed=0x7C, RxCRCErrs=0x7E,
 	StickyHW=0x83, WOLcrClr=0xA4, WOLcgClr=0xA7, PwrcsrClr=0xAC,
+};
+
+/* Bits in ConfigD (select backoff algorithm (Ethernet capture effect)) */
+enum backoff_bits {
+	BackOpt=0x01, BackAMD=0x02, BackDEC=0x04, BackRandom=0x08
 };
 
 #ifdef USE_MEM
@@ -427,11 +441,11 @@ struct tx_desc {
 	u32 next_desc;
 };
 
-/* Bits in *_desc.status */
 enum rx_status_bits {
 	RxOK=0x8000, RxWholePkt=0x0300, RxErr=0x008F
 };
 
+/* Bits in *_desc.status */
 enum desc_status_bits {
 	DescOwn=0x80000000, DescEndPacket=0x4000, DescIntr=0x1000,
 };
@@ -479,13 +493,10 @@ struct netdev_private {
 	u16 chip_cmd;						/* Current setting for ChipCmd */
 
 	/* These values are keep track of the transceiver/media in use. */
-	unsigned int full_duplex:1;			/* Full-duplex operation requested. */
-	unsigned int duplex_lock:1;
 	unsigned int default_port:4;		/* Last dev->if_port value. */
 	u8 tx_thresh, rx_thresh;
 
 	/* MII transceiver section. */
-	u16 advertising;					/* NWay media advertisement */
 	unsigned char phys[MAX_MII_CNT];			/* MII device addresses. */
 	unsigned int mii_cnt;			/* number of MIIs found, but only the first one is used */
 	u16 mii_status;						/* last read MII status */
@@ -509,15 +520,13 @@ static int via_rhine_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int  via_rhine_close(struct net_device *dev);
 static inline void clear_tally_counters(long ioaddr);
 
-static void wait_for_reset(struct net_device *dev, char *name)
+static void wait_for_reset(struct net_device *dev, int chip_id, char *name)
 {
-	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	int chip_id = np->chip_id;
 	int i;
 
-	/* 3043 may need long delay after reset (dlink) */
-	if (chip_id == VT3043 || chip_id == VT86C100A)
+	/* VT86C100A may need long delay after reset (dlink) */
+	if (chip_id == VT86C100A)
 		udelay(100);
 
 	i = 0;
@@ -538,11 +547,11 @@ static void wait_for_reset(struct net_device *dev, char *name)
 static void __devinit enable_mmio(long ioaddr, int chip_id)
 {
 	int n;
-	if (chip_id == VT3043 || chip_id == VT86C100A) {
+	if (chip_id == VT86C100A) {
 		/* More recent docs say that this bit is reserved ... */
 		n = inb(ioaddr + ConfigA) | 0x20;
 		outb(n, ioaddr + ConfigA);
-	} else if (chip_id == VT6102) {
+	} else {
 		n = inb(ioaddr + ConfigD) | 0x80;
 		outb(n, ioaddr + ConfigD);
 	}
@@ -666,7 +675,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	writew(CmdReset, ioaddr + ChipCmd);
 
 	dev->base_addr = ioaddr;
-	wait_for_reset(dev, shortname);
+	wait_for_reset(dev, chip_id, shortname);
 
 	/* Reload the station address from the EEPROM. */
 #ifdef USE_IO
@@ -787,7 +796,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 				   (option & 0x300 ? 100 : 10),
 				   (option & 0x220 ? "full" : "half"));
 			if (np->mii_cnt)
-				mdio_write(dev, np->phys[0], 0,
+				mdio_write(dev, np->phys[0], MII_BMCR,
 						   ((option & 0x300) ? 0x2000 : 0) |  /* 100mbps? */
 						   ((option & 0x220) ? 0x0100 : 0));  /* Full duplex? */
 		}
@@ -971,9 +980,9 @@ static void init_registers(struct net_device *dev)
 		writeb(dev->dev_addr[i], ioaddr + StationAddr + i);
 
 	/* Initialize other registers. */
-	writew(0x0006, ioaddr + PCIBusConfig);	/* Tune configuration??? */
-	/* Configure the FIFO thresholds. */
-	writeb(0x20, ioaddr + TxConfig);	/* Initial threshold 32 bytes */
+	writew(0x0006, ioaddr + PCIBusConfig);	/* Store & forward */
+	/* Configure initial FIFO thresholds. */
+	writeb(0x20, ioaddr + TxConfig);
 	np->tx_thresh = 0x20;
 	np->rx_thresh = 0x60;			/* Written in via_rhine_set_rx_mode(). */
 
@@ -1032,13 +1041,13 @@ static void mdio_write(struct net_device *dev, int phy_id, int regnum, int value
 
 	if (phy_id == np->phys[0]) {
 		switch (regnum) {
-		case 0:							/* Is user forcing speed/duplex? */
+		case MII_BMCR:					/* Is user forcing speed/duplex? */
 			if (value & 0x9000)			/* Autonegotiation. */
 				np->mii_if.duplex_lock = 0;
 			else
 				np->mii_if.full_duplex = (value & 0x0100) ? 1 : 0;
 			break;
-		case 4:
+		case MII_ADVERTISE:
 			np->mii_if.advertising = value;
 			break;
 		}
@@ -1077,7 +1086,7 @@ static int via_rhine_open(struct net_device *dev)
 		return i;
 	alloc_rbufs(dev);
 	alloc_tbufs(dev);
-	wait_for_reset(dev, dev->name);
+	wait_for_reset(dev, np->chip_id, dev->name);
 	init_registers(dev);
 	if (debug > 2)
 		printk(KERN_DEBUG "%s: Done via_rhine_open(), status %4.4x "
@@ -1184,7 +1193,7 @@ static void via_rhine_tx_timeout (struct net_device *dev)
 	alloc_rbufs(dev);
 
 	/* Reinitialize the hardware. */
-	wait_for_reset(dev, dev->name);
+	wait_for_reset(dev, np->chip_id, dev->name);
 	init_registers(dev);
 	
 	spin_unlock(&np->lock);
@@ -1254,7 +1263,7 @@ static int via_rhine_start_tx(struct sk_buff *skb, struct net_device *dev)
 
 	if (debug > 4) {
 		printk(KERN_DEBUG "%s: Transmit frame #%d queued in slot %d.\n",
-			   dev->name, np->cur_tx, entry);
+			   dev->name, np->cur_tx-1, entry);
 	}
 	return 0;
 }
@@ -1505,8 +1514,8 @@ static void via_rhine_error(struct net_device *dev, int intr_status)
 			printk(KERN_INFO "%s: Transmitter underrun, increasing Tx "
 				   "threshold setting to %2.2x.\n", dev->name, np->tx_thresh);
 	}
-	if ((intr_status & ~( IntrLinkChange | IntrStatsMax |
-						  IntrTxAbort | IntrTxAborted))) {
+	if (intr_status & ~( IntrLinkChange | IntrStatsMax |
+ 						 IntrTxAbort | IntrTxAborted | IntrNormalSummary)) {
 		if (debug > 1)
 			printk(KERN_ERR "%s: Something Wicked happened! %4.4x.\n",
 			   dev->name, intr_status);

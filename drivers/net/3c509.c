@@ -47,10 +47,12 @@
 			- ethtool support
 		v1.18b 1Mar2002 Zwane Mwaikambo <zwane@commfireservices.com>
 			- Power Management support
+                v1.18c 1Mar2002 David Ruggiero <jdr@farfalle.com>
+                        - Full duplex support
 */
 
 #define DRV_NAME	"3c509"
-#define DRV_VERSION	"1.18b"
+#define DRV_VERSION	"1.18c"
 #define DRV_RELDATE	"1Mar2002"
 
 /* A few values that may be tweaked. */
@@ -141,6 +143,8 @@ enum RxFilter {
 #define WN0_IRQ		0x08		/* Window 0: Set IRQ line in bits 12-15. */
 #define WN4_MEDIA	0x0A		/* Window 4: Various transcvr/media bits. */
 #define  MEDIA_TP	0x00C0		/* Enable link beat and jabber for 10baseT. */
+#define WN4_NETDIAG	0x06		/* Window 4: Net diagnostic */
+#define FD_ENABLE	0x8000		/* Enable full-duplex ("external loopback") */  
 
 /*
  * Must be a power of two (we use a binary and in the
@@ -500,12 +504,18 @@ no_pnp:
 	memcpy(dev->dev_addr, phys_addr, sizeof(phys_addr));
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
-	dev->if_port = (dev->mem_start & 0x1f) ? dev->mem_start & 3 : if_port;
+        
+	if (dev->mem_start & 0x05) { /* xcvr codes 1/3/4/12 */
+		dev->if_port = (dev->mem_start & 0x0f);
+        } else { /* xcvr codes 0/8 */
+		/* use eeprom value, but save user's full-duplex selection */
+		dev->if_port = (if_port | (dev->mem_start & 0x08) );
+	}
 
 	{
 		const char *if_names[] = {"10baseT", "AUI", "undefined", "BNC"};
 		printk("%s: 3c5x9 at %#3.3lx, %s port, address ",
-			   dev->name, dev->base_addr, if_names[dev->if_port]);
+			dev->name, dev->base_addr, if_names[(dev->if_port & 0x03)]);
 	}
 
 	/* Read in the station address. */
@@ -557,7 +567,7 @@ no_pnp:
 /* Read a word from the EEPROM using the regular EEPROM access register.
    Assume that we are in register window zero.
  */
-static ushort __init read_eeprom(int ioaddr, int index)
+static ushort read_eeprom(int ioaddr, int index)
 {
 	outw(EEPROM_READ + index, ioaddr + 10);
 	/* Pause for at least 162 us. for the read to take place. */
@@ -1083,7 +1093,7 @@ static void el3_down(struct net_device *dev)
 
 static void el3_up(struct net_device *dev)
 {
-	int i;
+	int i, sw_info, net_diag;
 	int ioaddr = dev->base_addr;
 	
 	/* Activating the board required and does no harm otherwise */
@@ -1098,12 +1108,44 @@ static void el3_up(struct net_device *dev)
 	for (i = 0; i < 6; i++)
 		outb(dev->dev_addr[i], ioaddr + i);
 
-	if (dev->if_port == 3)
+	if ((dev->if_port & 0x03) == 3) /* BNC interface */
 		/* Start the thinnet transceiver. We should really wait 50ms...*/
 		outw(StartCoax, ioaddr + EL3_CMD);
-	else if (dev->if_port == 0) {
-		/* 10baseT interface, enabled link beat and jabber check. */
+	else if ((dev->if_port & 0x03) == 0) { /* 10baseT interface */
+		/* Combine secondary sw_info word (the adapter level) and primary
+			sw_info word (duplex setting plus other useless bits) */
+		EL3WINDOW(0);
+		sw_info = (read_eeprom(ioaddr, 0x14) & 0x400f) | 
+			(read_eeprom(ioaddr, 0x0d) & 0xBff0);
+
 		EL3WINDOW(4);
+		net_diag = inw(ioaddr + WN4_NETDIAG);
+		net_diag = (net_diag | FD_ENABLE); /* temporarily assume full-duplex will be set */
+		printk("%s: ", dev->name);
+		switch (dev->if_port & 0x0c) {
+			case 12:
+				/* force full-duplex mode if 3c5x9b */
+				if (sw_info & 0x000f) {
+					printk("Forcing 3c5x9b full-duplex mode");
+					break;
+				}
+			case 8:
+				/* set full-duplex mode based on eeprom config setting */
+				if ((sw_info & 0x000f) && (sw_info & 0x8000)) {
+					printk("Setting 3c5x9b full-duplex mode (from EEPROM configuration bit)");
+					break;
+				}
+			default:
+				/* xcvr=(0 || 4) OR user has an old 3c5x9 non "B" model */
+				printk("Setting 3c5x9/3c5x9B half-duplex mode");
+				net_diag = (net_diag & ~FD_ENABLE); /* disable full duplex */
+		}
+
+		outw(net_diag, ioaddr + WN4_NETDIAG);
+		printk(" if_port: %d, sw_info: %4.4x\n", dev->if_port, sw_info);
+		if (el3_debug > 3)
+			printk("%s: 3c5x9 net diag word is now: %4.4x.\n", dev->name, net_diag);
+		/* Enable link beat and jabber check. */
 		outw(inw(ioaddr + WN4_MEDIA) | MEDIA_TP, ioaddr + WN4_MEDIA);
 	}
 
@@ -1208,11 +1250,11 @@ static int el3_pm_callback(struct pm_dev *pdev, pm_request_t rqst, void *data)
 /* Parameters that may be passed into the module. */
 static int debug = -1;
 static int irq[] = {-1, -1, -1, -1, -1, -1, -1, -1};
-static int xcvr[] = {-1, -1, -1, -1, -1, -1, -1, -1};
+static int xcvr[] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 MODULE_PARM(debug,"i");
 MODULE_PARM(irq,"1-8i");
-MODULE_PARM(xcvr,"1-8i");
+MODULE_PARM(xcvr,"1-12i");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM_DESC(debug, "debug level (0-6)");
 MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");

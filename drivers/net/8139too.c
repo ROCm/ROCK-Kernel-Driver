@@ -2329,7 +2329,7 @@ static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
 	if (cmd != SIOCETHTOOL) {
 		/* With SIOCETHTOOL, this would corrupt the pointer.  */
-		data->phy_id &= 0x1f;
+		data->phy_id &= 0x3f;
 		data->reg_num &= 0x1f;
 	}
 

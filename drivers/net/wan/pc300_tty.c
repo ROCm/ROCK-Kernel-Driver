@@ -46,7 +46,7 @@
 #include <linux/init.h>
 #include <linux/netdevice.h>
 #include <linux/spinlock.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/if.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>

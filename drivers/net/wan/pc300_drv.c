@@ -6,7 +6,7 @@ static char rcsid[] =
  * pc300.c	Cyclades-PC300(tm) Driver.
  *
  * Author:	Ivan Passos <ivan@cyclades.com>
- * Maintainer:	Daniela Squassoni <daniela@cyclades.com>
+ * Maintainer:	Henrique Gobbi <henrique@cyclades.com>
  *
  * Copyright:	(c) 1999-2002 Cyclades Corp.
  *

@@ -389,8 +389,14 @@ L:	cycsyn-devel@bazar.conectiva.com.br
 S:	Maintained
 
 CYCLADES ASYNC MUX DRIVER
-P:	Ivan Passos
-M:	ivan@cyclades.com
+P:	Henrique Gobbi
+M:	henrique@cyclades.com
+W:	http://www.cyclades.com/
+S:	Supported
+
+CYCLADES PC300 DRIVER
+P:	Henrique Gobbi
+M:	henrique@cyclades.com
 W:	http://www.cyclades.com/
 S:	Supported
 
