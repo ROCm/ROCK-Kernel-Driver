@@ -28,7 +28,7 @@ struct scsi_dev_info_list {
 static const char spaces[] = "                "; /* 16 of them */
 static unsigned scsi_default_dev_flags;
 static LIST_HEAD(scsi_dev_info_list);
-static __initdata char scsi_dev_flags[256];
+static char scsi_dev_flags[256];
 
 /*
  * scsi_static_device_list: deprecated list of devices that require
