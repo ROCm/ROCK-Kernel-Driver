@@ -29,6 +29,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>
@@ -1230,6 +1231,7 @@ int __init pm2fb_init(void)
 	return pci_module_init(&pm2fb_driver);
 }
 
+#ifdef MODULE
 /*
  *  Cleanup
  */
@@ -1238,11 +1240,13 @@ static void __exit pm2fb_exit(void)
 {
 	pci_unregister_driver(&pm2fb_driver);
 }
+#endif
 
 /*
  *  Setup
  */
 
+#ifndef MODULE
 /**
  * Parse user speficied options.
  *
@@ -1268,6 +1272,7 @@ int __init pm2fb_setup(char *options)
 	}
 	return 0;
 }
+#endif
 
 
 /* ------------------------------------------------------------------------- */
@@ -1277,12 +1282,18 @@ int __init pm2fb_setup(char *options)
 
 
 module_init(pm2fb_init);
+
+#ifdef MODULE
 module_exit(pm2fb_exit);
 
-MODULE_PARM(mode,"s");
-MODULE_PARM(lowhsync,"i");
-MODULE_PARM(lowvsync,"i");
+module_param(mode, charp, 0);
+MODULE_PARM_DESC(mode, "Preferred video mode e.g. '648x480-8@60'");
+module_param(lowhsync, bool, 0);
+MODULE_PARM_DESC(lowhsync, "Force horizontal sync low regardless of mode");
+module_param(lowvsync, bool, 0);
+MODULE_PARM_DESC(lowvsync, "Force vertical sync low regardless of mode");
 
 MODULE_AUTHOR("Jim Hague <jim.hague@acm.org>");
 MODULE_DESCRIPTION("Permedia2 framebuffer device driver");
 MODULE_LICENSE("GPL");
+#endif
