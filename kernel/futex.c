@@ -500,7 +500,7 @@ static int futex_fd(unsigned long uaddr, int signal)
 
 	if (signal) {
 		int err;
-		err = f_setown(filp, current->tgid, 1);
+		err = f_setown(filp, current->pid, 1);
 		if (err < 0) {
 			put_unused_fd(ret);
 			put_filp(filp);
