@@ -527,24 +527,30 @@ extern struct proc_dir_entry *proc_scsi;
 
 /*
  * Prototypes for functions in constants.c
+ * Some of these used to live in constants.h
  */
+extern void print_Scsi_Cmnd (Scsi_Cmnd *);
 extern void print_command(unsigned char *);
 extern void print_sense(const char *, Scsi_Cmnd *);
 extern void print_req_sense(const char *, Scsi_Request *);
 extern void print_driverbyte(int scsiresult);
 extern void print_hostbyte(int scsiresult);
-extern void print_status (int status);
+extern void print_status(unsigned char status);
+extern int print_msg(const unsigned char *);
+extern const char *scsi_sense_key_string(unsigned char);
+extern const char *scsi_extd_sense_format(unsigned char, unsigned char);
 
 /*
  *  The scsi_device struct contains what we know about each given scsi
  *  device.
  *
- * FIXME(eric) - one of the great regrets that I have is that I failed to define
- * these structure elements as something like sdev_foo instead of foo.  This would
- * make it so much easier to grep through sources and so forth.  I propose that
- * all new elements that get added to these structures follow this convention.
- * As time goes on and as people have the stomach for it, it should be possible to 
- * go back and retrofit at least some of the elements here with with the prefix.
+ * FIXME(eric) - One of the great regrets that I have is that I failed to
+ * define these structure elements as something like sdev_foo instead of foo.
+ * This would make it so much easier to grep through sources and so forth.
+ * I propose that all new elements that get added to these structures follow
+ * this convention.  As time goes on and as people have the stomach for it,
+ * it should be possible to go back and retrofit at least some of the elements
+ * here with with the prefix.
  */
 
 struct scsi_device {
@@ -851,22 +857,3 @@ struct scsi_cmnd {
 extern int scsi_reset_provider(Scsi_Device *, int);
 
 #endif
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4 
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

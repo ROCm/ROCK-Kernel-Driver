@@ -546,8 +546,11 @@ static unsigned long __init lance_probe1( struct net_device *dev,
 	if (lp->cardtype == PAM_CARD ||
 		memaddr == (unsigned short *)0xffe00000) {
 		/* PAMs card and Riebl on ST use level 5 autovector */
-		request_irq(IRQ_AUTO_5, lance_interrupt, IRQ_TYPE_PRIO,
-		            "PAM/Riebl-ST Ethernet", dev);
+		if (request_irq(IRQ_AUTO_5, lance_interrupt, IRQ_TYPE_PRIO,
+		            "PAM/Riebl-ST Ethernet", dev)) { 
+			printk( "Lance: request for irq %d failed\n", IRQ_AUTO_5 );
+			return( 0 );
+		}
 		dev->irq = (unsigned short)IRQ_AUTO_5;
 	}
 	else {
@@ -560,8 +563,11 @@ static unsigned long __init lance_probe1( struct net_device *dev,
 			printk( "Lance: request for VME interrupt failed\n" );
 			return( 0 );
 		}
-		request_irq(irq, lance_interrupt, IRQ_TYPE_PRIO,
-		            "Riebl-VME Ethernet", dev);
+		if (request_irq(irq, lance_interrupt, IRQ_TYPE_PRIO,
+		            "Riebl-VME Ethernet", dev)) {
+			printk( "Lance: request for irq %d failed\n", irq );
+			return( 0 );
+		}
 		dev->irq = irq;
 	}
 

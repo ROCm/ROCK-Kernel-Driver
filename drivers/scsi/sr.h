@@ -24,8 +24,6 @@ typedef struct {
 	Scsi_Device *device;
 	unsigned int vendor;	/* vendor code, see sr_vendor.c         */
 	unsigned long ms_offset;	/* for reading multisession-CD's        */
-	unsigned char sector_bit_size;	/* sector size = 2^sector_bit_size      */
-	unsigned char sector_bit_shift;		/* sectors/FS block = 2^sector_bit_shift */
 	unsigned needs_sector_size:1;	/* needs to get sector size */
 	unsigned use:1;		/* is this device still supportable     */
 	unsigned xa_flag:1;	/* CD has XA sectors ? */

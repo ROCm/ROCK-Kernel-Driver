@@ -2008,7 +2008,7 @@ int __init optcd_init(void)
 			"optcd: no Optics Storage CDROM Initialization\n");
 		return -EIO;
 	}
-	if (check_region(optcd_port, 4)) {
+	if (!request_region(optcd_port, 4, "optcd")) {
 		printk(KERN_ERR "optcd: conflict, I/O port 0x%x already used\n",
 			optcd_port);
 		return -EIO;
@@ -2016,21 +2016,25 @@ int __init optcd_init(void)
 
 	if (!reset_drive()) {
 		printk(KERN_ERR "optcd: drive at 0x%x not ready\n", optcd_port);
+		release_region(optcd_port, 4);
 		return -EIO;
 	}
 	if (!version_ok()) {
 		printk(KERN_ERR "optcd: unknown drive detected; aborting\n");
+		release_region(optcd_port, 4);
 		return -EIO;
 	}
 	status = exec_cmd(COMINITDOUBLE);
 	if (status < 0) {
 		printk(KERN_ERR "optcd: cannot init double speed mode\n");
+		release_region(optcd_port, 4);
 		DEBUG((DEBUG_VFS, "exec_cmd COMINITDOUBLE: %02x", -status));
 		return -EIO;
 	}
 	if (devfs_register_blkdev(MAJOR_NR, "optcd", &opt_fops) != 0)
 	{
 		printk(KERN_ERR "optcd: unable to get major %d\n", MAJOR_NR);
+		release_region(optcd_port, 4);
 		return -EIO;
 	}
 	devfs_register (NULL, "optcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
@@ -2038,7 +2042,6 @@ int __init optcd_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_optcd_request,
 		       &optcd_lock);
 	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), 2048);
-	request_region(optcd_port, 4, "optcd");
 	register_disk(NULL, mk_kdev(MAJOR_NR,0), 1, &opt_fops, 0);
 
 	printk(KERN_INFO "optcd: DOLPHIN 8000 AT CDROM at 0x%x\n", optcd_port);

@@ -116,7 +116,6 @@
 #include "hosts.h"
 #include "g_NCR5380.h"
 #include "NCR5380.h"
-#include "constants.h"
 #include "sd.h"
 #include <linux/stat.h>
 #include <linux/init.h>

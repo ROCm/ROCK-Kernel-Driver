@@ -435,7 +435,7 @@ static __devinitdata struct usb_device_id keyspan_ids_combined[] = {
 MODULE_DEVICE_TABLE(usb, keyspan_ids_combined);
 
 /* usb_device_id table for the pre-firmware download keyspan devices */
-static __devinitdata struct usb_device_id keyspan_pre_ids[] = {
+static struct usb_device_id keyspan_pre_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa18x_pre_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19_pre_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19qi_pre_product_id) },
@@ -449,7 +449,7 @@ static __devinitdata struct usb_device_id keyspan_pre_ids[] = {
 	{ } /* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id keyspan_1port_ids[] = {
+static struct usb_device_id keyspan_1port_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa18x_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19qi_product_id) },
@@ -458,14 +458,14 @@ static __devinitdata struct usb_device_id keyspan_1port_ids[] = {
 	{ } /* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id keyspan_2port_ids[] = {
+static struct usb_device_id keyspan_2port_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa28_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa28x_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa28xa_product_id) },
 	{ } /* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id keyspan_4port_ids[] = {
+static struct usb_device_id keyspan_4port_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa49w_product_id) },
 	{ } /* Terminating entry */
 };
@@ -479,7 +479,7 @@ static struct usb_serial_device_type keyspan_pre_device = {
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
 	num_ports:		1,
-	startup:		keyspan_fake_startup,
+	attach:			keyspan_fake_startup,
 };
 
 static struct usb_serial_device_type keyspan_1port_device = {
@@ -500,7 +500,7 @@ static struct usb_serial_device_type keyspan_1port_device = {
 	ioctl:			keyspan_ioctl,
 	set_termios:		keyspan_set_termios,
 	break_ctl:		keyspan_break_ctl,
-	startup:		keyspan_startup,
+	attach:			keyspan_startup,
 	shutdown:		keyspan_shutdown,
 };
 
@@ -521,7 +521,7 @@ static struct usb_serial_device_type keyspan_2port_device = {
 	unthrottle:		keyspan_rx_unthrottle,
 	ioctl:			keyspan_ioctl,
 	set_termios:		keyspan_set_termios,
-	startup:		keyspan_startup,
+	attach:			keyspan_startup,
 	shutdown:		keyspan_shutdown,
 };
 
@@ -543,7 +543,7 @@ static struct usb_serial_device_type keyspan_4port_device = {
 	ioctl:			keyspan_ioctl,
 	set_termios:		keyspan_set_termios,
 	break_ctl:		keyspan_break_ctl,
-	startup:		keyspan_startup,
+	attach:			keyspan_startup,
 	shutdown:		keyspan_shutdown,
 };
 

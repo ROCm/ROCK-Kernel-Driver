@@ -4,9 +4,9 @@
  * Distribute under GPLv2
  *
  * Copyright (c) 2002 Pavel Machek <pavel@suse.cz>
+ * Copyright (c) 2001 Patrick Mochel <mochel@osdl.org>
  */
 
-#define ACPI_C
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -25,7 +25,6 @@
 #include <asm/uaccess.h>
 #include <asm/acpi.h>
 #include <asm/tlbflush.h>
-
 
 static struct saved_context saved_context;
 
@@ -229,6 +228,7 @@ do_fpu_end(void)
         kernel_fpu_end();
 }
 
+#ifdef CONFIG_SOFTWARE_SUSPEND
 /* Local variables for do_magic */
 static int loop __nosavedata = 0;
 static int loop2 __nosavedata = 0;
@@ -300,3 +300,4 @@ void do_magic(int resume)
 
 	do_magic_resume_2();
 }
+#endif

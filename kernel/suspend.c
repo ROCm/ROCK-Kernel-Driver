@@ -44,7 +44,6 @@
 #include <linux/version.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
-#include <linux/init.h>
 #include <linux/vt_kern.h>
 #include <linux/bitops.h>
 #include <linux/interrupt.h>
@@ -845,9 +844,6 @@ void do_magic_suspend_2(void)
 	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
 	printk(KERN_WARNING "%sLeaving do_magic_suspend_2...\n", name_suspend);	
 }
-
-#define SUSPEND_C
-#include <asm/suspend.h>
 
 /*
  * We try to swap out as much as we can then make a copy of the

@@ -67,8 +67,6 @@ static char *verstr = "20020205";
 #include "st_options.h"
 #include "st.h"
 
-#include "constants.h"
-
 static int buffer_kbs;
 static int write_threshold_kbs;
 static int max_buffers = (-1);

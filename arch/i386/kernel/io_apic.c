@@ -207,7 +207,7 @@ typedef struct {
 } ____cacheline_aligned irq_balance_t;
 
 static irq_balance_t irq_balance[NR_IRQS] __cacheline_aligned
-			= { [ 0 ... NR_IRQS-1 ] = { 1, 0 } };
+			= { [ 0 ... NR_IRQS-1 ] = { 0, 0 } };
 
 extern unsigned long irq_affinity [NR_IRQS];
 
@@ -251,7 +251,7 @@ static inline void balance_irq(int irq)
 	irq_balance_t *entry = irq_balance + irq;
 	unsigned long now = jiffies;
 
-	if ((entry->timestamp != now) && (smp_num_cpus > 1)) {
+	if (entry->timestamp != now) {
 		unsigned long allowed_mask;
 		int random_number;
 
