@@ -175,32 +175,14 @@ static struct file_operations transaction_ops = {
 extern struct seq_operations nfs_exports_op;
 static int exports_open(struct inode *inode, struct file *file)
 {
-	int res;
-	char *namebuf = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	if (namebuf == NULL)
-		return -ENOMEM;
-
-	res = seq_open(file, &nfs_exports_op);
-	if (res)
-		kfree(namebuf);
-	else
-		((struct seq_file *)file->private_data)->private = namebuf;
-
-	return res;
-}
-static int exports_release(struct inode *inode, struct file *file)
-{
-	struct seq_file *m = (struct seq_file *)file->private_data;
-	kfree(m->private);
-	m->private = NULL;
-	return seq_release(inode, file);
+	return seq_open(file, &nfs_exports_op);
 }
 
 static struct file_operations exports_operations = {
 	.open		= exports_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
-	.release	= exports_release,
+	.release	= seq_release,
 };
 
 /*----------------------------------------------------------------------------*/

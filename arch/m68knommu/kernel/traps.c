@@ -82,7 +82,7 @@ void die_if_kernel(char *str, struct pt_regs *fp, int nr)
 
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 		current->comm, current->pid, PAGE_SIZE+(unsigned long)current);
-	show_stack((unsigned long *)fp);
+	show_stack(NULL, (unsigned long *)fp);
 	do_exit(SIGSEGV);
 }
 
@@ -106,7 +106,7 @@ asmlinkage void buserr_c(struct frame *fp)
 
 int kstack_depth_to_print = 48;
 
-void show_stack(unsigned long *esp)
+void show_stack(struct task_struct *task, unsigned long *esp)
 {
 	unsigned long *stack, *endstack, addr;
 	extern char _start, _etext;

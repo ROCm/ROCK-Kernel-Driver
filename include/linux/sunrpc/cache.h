@@ -80,8 +80,7 @@ struct cache_detail {
 
 	int			(*cache_show)(struct seq_file *m,
 					      struct cache_detail *cd,
-					      struct cache_head *h,
-					      char *pbuf);
+					      struct cache_head *h);
 
 	/* fields below this comment are for internal use
 	 * and should not be touched by cache owners

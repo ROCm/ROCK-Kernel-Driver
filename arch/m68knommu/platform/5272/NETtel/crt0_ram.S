@@ -116,6 +116,8 @@ _start:
 	movec	%d0, %CACR			/* Enable cache */
 	nop
 
+
+#ifdef CONFIG_ROMFS_FS
 #ifdef CONFIG_ROMFS_FROM_ROM
 	/*
 	 *	check for an in RAM romfs
@@ -159,6 +161,12 @@ _copy_romfs:
 	move.l	%a1, _ramstart		/* Set start of ram */
   done_romfs:
 #endif
+
+#else /* CONFIG_ROMFS_FS */
+	lea.l	_ebss, %a1
+	move.l	%a1, _ramstart
+#endif /* CONFIG_ROMFS_FS */
+
 
 	/*
 	 *	Zero out the bss region.

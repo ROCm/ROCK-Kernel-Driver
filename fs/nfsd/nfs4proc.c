@@ -55,12 +55,6 @@
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
-static inline int
-nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_close *close)
-{
-	return nfs_ok;
-}
-
 /* Note: The organization of the OPEN code seems a little strange; it
  * has been superfluously split into three routines, one of which is named
  * nfsd4_process_open2() even though there is no nfsd4_process_open1()!
@@ -140,10 +134,6 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	status = nfsd4_process_open2(rqstp, current_fh, open);
 	if (status)
 		return status;
-	/*
-	 * To finish the open response, we just need to set the rflags.
-	 */
-	open->op_rflags = 0;
 	return 0;
 }
 
@@ -356,14 +346,51 @@ nfsd4_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_loo
 static inline int
 nfsd4_read(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_read *read)
 {
+	struct nfs4_stateid *stp;
+	int status;
+
 	/* no need to check permission - this will be done in nfsd_read() */
 
 	if (read->rd_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+	nfsd4_lock_state();
+	status = nfs_ok;
+	/* For stateid -1, we don't check share reservations.  */
+	if (ONE_STATEID(&read->rd_stateid)) {
+		dprintk("NFSD: nfsd4_read: -1 stateid...\n");
+		goto out;
+	}
+	/*
+	* For stateid 0, the client doesn't have to have the file open, but
+	* we still check for share reservation conflicts. 
+	*/
+	if (ZERO_STATEID(&read->rd_stateid)) {
+		dprintk("NFSD: nfsd4_read: zero stateid...\n");
+		if ((status = nfs4_share_conflict(current_fh, NFS4_SHARE_DENY_READ))) {
+			dprintk("NFSD: nfsd4_read: conflicting share reservation!\n");
+			goto out;
+		}
+		status = nfs_ok;
+		goto out;
+	}
+	/* check stateid */
+	if ((status = nfs4_preprocess_stateid_op(current_fh, &read->rd_stateid, 
+					CHECK_FH, &stp))) {
+		dprintk("NFSD: nfsd4_read: couldn't process stateid!\n");
+		goto out;
+	}
+	status = nfserr_openmode;
+	if (!(stp->st_share_access & NFS4_SHARE_ACCESS_READ)) {
+		dprintk("NFSD: nfsd4_read: file not opened for read!\n");
+		goto out;
+	}
+	status = nfs_ok;
+out:
+	nfsd4_unlock_state();
 	read->rd_rqstp = rqstp;
 	read->rd_fhp = current_fh;
-	return nfs_ok;
+	return status;
 }
 
 static inline int
@@ -425,28 +452,85 @@ nfsd4_rename(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 static inline int
 nfsd4_setattr(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_setattr *setattr)
 {
-	return nfsd_setattr(rqstp, current_fh, &setattr->sa_iattr, 0, (time_t)0);
+	struct nfs4_stateid *stp;
+	int status = nfs_ok;
+
+	if (setattr->sa_iattr.ia_valid & ATTR_SIZE) {
+
+		status = nfserr_bad_stateid;
+		if (ZERO_STATEID(&setattr->sa_stateid) || ONE_STATEID(&setattr->sa_stateid)) {
+			dprintk("NFSD: nfsd4_setattr: magic stateid!\n");
+			return status;
+		}
+
+		nfsd4_lock_state();
+		if ((status = nfs4_preprocess_stateid_op(current_fh, 
+						&setattr->sa_stateid, 
+						CHECK_FH, &stp))) {
+			dprintk("NFSD: nfsd4_setattr: couldn't process stateid!\n");
+			goto out;
+		}
+		status = nfserr_openmode;
+		if (!(stp->st_share_access & NFS4_SHARE_ACCESS_WRITE)) {
+			dprintk("NFSD: nfsd4_setattr: not opened for write!\n");
+			goto out;
+		}
+		nfsd4_unlock_state();
+	}
+	return (nfsd_setattr(rqstp, current_fh, &setattr->sa_iattr, 0, (time_t)0));
+out:
+	nfsd4_unlock_state();
+	return status;
 }
 
 static inline int
 nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_write *write)
 {
+	struct nfs4_stateid *stp;
+	stateid_t *stateid = &write->wr_stateid;
 	u32 *p;
+	int status = nfs_ok;
 
 	/* no need to check permission - this will be done in nfsd_write() */
 
 	if (write->wr_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+	nfsd4_lock_state();
+	if (ZERO_STATEID(stateid) || ONE_STATEID(stateid)) {
+		dprintk("NFSD: nfsd4_write: zero stateid...\n");
+		if ((status = nfs4_share_conflict(current_fh, NFS4_SHARE_DENY_WRITE))) {
+			dprintk("NFSD: nfsd4_write: conflicting share reservation!\n");
+			goto out;
+		}
+		goto zero_stateid;
+	}
+	if ((status = nfs4_preprocess_stateid_op(current_fh, stateid, 
+					CHECK_FH, &stp))) {
+		dprintk("NFSD: nfsd4_write: couldn't process stateid!\n");
+		goto out;
+	}
+
+	status = nfserr_openmode;
+	if (!(stp->st_share_access & NFS4_SHARE_ACCESS_WRITE)) {
+		dprintk("NFSD: nfsd4_write: file not open for write!\n");
+		goto out;
+	}
+
+zero_stateid:
+	nfsd4_unlock_state();
 	write->wr_bytes_written = write->wr_buflen;
 	write->wr_how_written = write->wr_stable_how;
 	p = (u32 *)write->wr_verifier;
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
 
-	return nfsd_write(rqstp, current_fh, write->wr_offset,
+	return (nfsd_write(rqstp, current_fh, write->wr_offset,
 			  write->wr_vec, write->wr_vlen, write->wr_buflen,
-			  &write->wr_how_written);
+			  &write->wr_how_written));
+out:
+	nfsd4_unlock_state();
+	return status;
 }
 
 /* This routine never returns NFS_OK!  If there are no other errors, it
@@ -608,6 +692,12 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_OPEN:
 			op->status = nfsd4_open(rqstp, &current_fh, &op->u.open);
+			break;
+		case OP_OPEN_CONFIRM:
+			op->status = nfsd4_open_confirm(rqstp, &current_fh, &op->u.open_confirm);
+			break;
+		case OP_OPEN_DOWNGRADE:
+			op->status = nfsd4_open_downgrade(rqstp, &current_fh, &op->u.open_downgrade);
 			break;
 		case OP_PUTFH:
 			op->status = nfsd4_putfh(rqstp, &current_fh, &op->u.putfh);

@@ -1337,7 +1337,7 @@ static void bh_lru_install(struct buffer_head *bh)
 
 	check_irqs_on();
 	bh_lru_lock();
-	lru = &per_cpu(bh_lrus, smp_processor_id());
+	lru = &__get_cpu_var(bh_lrus);
 	if (lru->bhs[0] != bh) {
 		struct buffer_head *bhs[BH_LRU_SIZE];
 		int in;
@@ -1381,7 +1381,7 @@ lookup_bh_lru(struct block_device *bdev, sector_t block, int size)
 
 	check_irqs_on();
 	bh_lru_lock();
-	lru = &per_cpu(bh_lrus, smp_processor_id());
+	lru = &__get_cpu_var(bh_lrus);
 	for (i = 0; i < BH_LRU_SIZE; i++) {
 		struct buffer_head *bh = lru->bhs[i];
 
@@ -1474,15 +1474,14 @@ EXPORT_SYMBOL(__bread);
  */
 static void invalidate_bh_lru(void *arg)
 {
-	const int cpu = get_cpu();
-	struct bh_lru *b = &per_cpu(bh_lrus, cpu);
+	struct bh_lru *b = &get_cpu_var(bh_lrus);
 	int i;
 
 	for (i = 0; i < BH_LRU_SIZE; i++) {
 		brelse(b->bhs[i]);
 		b->bhs[i] = NULL;
 	}
-	put_cpu();
+	put_cpu_var(bh_lrus);
 }
 	
 static void invalidate_bh_lrus(void)
