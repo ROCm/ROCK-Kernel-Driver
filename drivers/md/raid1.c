@@ -840,7 +840,8 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 			 * we read from here, no need to write
 			 */
 			continue;
-		if (conf->mirrors[i].rdev->in_sync && mddev->in_sync)
+		if (conf->mirrors[i].rdev->in_sync && 
+			r1_bio->sector + (bio->bi_size>>9) <= mddev->recovery_cp)
 			/*
 			 * don't need to write this we are just rebuilding
 			 */
