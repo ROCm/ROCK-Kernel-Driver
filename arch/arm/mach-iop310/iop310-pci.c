@@ -360,6 +360,8 @@ int iop310_setup(int nr, struct pci_sys_data *sys)
 	if (!res)
 		panic("PCI: unable to alloc resources");
 
+	memset(res, 0, sizeof(struct resource) * 2);
+
 	switch (nr) {
 	case 0:
 		res[0].start = IOP310_PCIPRI_LOWER_IO + 0x6e000000;
