@@ -854,7 +854,7 @@ static int sa1111_remove(struct device *dev)
  *	PXA250/SA1110 machine classes.
  */
 static struct device_driver sa1111_device_driver = {
-	.name		= "SA1111",
+	.name		= "sa1111",
 	.bus		= &system_bus_type,
 	.probe		= sa1111_probe,
 	.remove		= sa1111_remove,

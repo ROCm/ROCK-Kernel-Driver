@@ -191,7 +191,7 @@ static int neponset_resume(struct device *dev, u32 level)
 }
 
 static struct device_driver neponset_device_driver = {
-	.name		= "NEPONSET",
+	.name		= "neponset",
 	.bus		= &system_bus_type,
 	.suspend	= neponset_suspend,
 	.resume		= neponset_resume,

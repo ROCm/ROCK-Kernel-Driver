@@ -337,7 +337,7 @@ static int ps2_resume(struct device *dev, u32 level)
  */
 static struct sa1111_driver ps2_driver = {
 	.drv = {
-		.name		= "SA1111 PS2",
+		.name		= "sa1111-ps2",
 		.bus		= &sa1111_bus_type,
 		.probe		= ps2_probe,
 		.remove		= ps2_remove,
