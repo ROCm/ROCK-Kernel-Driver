@@ -90,6 +90,12 @@ int vm_enough_memory(long pages)
 		 */
 		free += atomic_read(&slab_reclaim_pages);
 
+		/*
+		 * Leave the last 3% for root
+		 */
+		if (!capable(CAP_SYS_ADMIN))
+			free -= free / 32;
+		
 		if (free > pages)
 			return 1;
 		vm_unacct_memory(pages);
