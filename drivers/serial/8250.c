@@ -490,7 +490,9 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 	 * Attempt to switch to bank 2, read the value of the LOOP bit
 	 * from EXCR1. Switch back to bank 0, change it in MCR. Then
 	 * switch back to bank 2, read it from EXCR1 again and check
-	 * it's changed. If so, set baud_base in EXCR2 to 921600.
+	 * it's changed. If so, set baud_base in EXCR2 to 921600. -- dwmw2
+	 * On PowerPC we don't want to change baud_base, as we have
+	 * a number of different divisors.  -- Tom Rini
 	 */
 	serial_outp(up, UART_LCR, 0);
 	status1 = serial_in(up, UART_MCR);
@@ -506,12 +508,14 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 		serial_outp(up, UART_MCR, status1);
 
 		if ((status2 ^ status1) & UART_MCR_LOOP) {
+#ifndef CONFIG_PPC
 			serial_outp(up, UART_LCR, 0xE0);
 			status1 = serial_in(up, 0x04); /* EXCR1 */
 			status1 &= ~0xB0; /* Disable LOCK, mask out PRESL[01] */
 			status1 |= 0x10;  /* 1.625 divisor for baud_base --> 921600 */
 			serial_outp(up, 0x04, status1);
 			serial_outp(up, UART_LCR, 0);
+#endif
 
 			up->port.type = PORT_NS16550A;
 			up->port.uartclk = 921600*16;
