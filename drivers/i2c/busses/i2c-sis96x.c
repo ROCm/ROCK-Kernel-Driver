@@ -261,7 +261,6 @@ static struct i2c_algorithm smbus_algorithm = {
 
 static struct i2c_adapter sis96x_adapter = {
 	.owner		= THIS_MODULE,
-	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_SIS96X,
 	.class		= I2C_ADAP_CLASS_SMBUS,
 	.algo		= &smbus_algorithm,
 	.name		= "unset",
@@ -318,7 +317,7 @@ static int __devinit sis96x_probe(struct pci_dev *dev,
 	/* set up the driverfs linkage to our parent device */
 	sis96x_adapter.dev.parent = &dev->dev;
 
-	snprintf(sis96x_adapter.name, DEVICE_NAME_SIZE,
+	snprintf(sis96x_adapter.name, I2C_NAME_SIZE,
 		"SiS96x SMBus adapter at 0x%04x", sis96x_smbus_base);
 
 	if ((retval = i2c_add_adapter(&sis96x_adapter))) {

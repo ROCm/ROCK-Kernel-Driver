@@ -172,6 +172,8 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_serverfault	__constant_htonl(NFSERR_SERVERFAULT)
 #define	nfserr_badtype		__constant_htonl(NFSERR_BADTYPE)
 #define	nfserr_jukebox		__constant_htonl(NFSERR_JUKEBOX)
+#define	nfserr_denied		__constant_htonl(NFSERR_DENIED)
+#define	nfserr_deadlock		__constant_htonl(NFSERR_DEADLOCK)
 #define nfserr_expired          __constant_htonl(NFSERR_EXPIRED)
 #define	nfserr_bad_cookie	__constant_htonl(NFSERR_BAD_COOKIE)
 #define	nfserr_same		__constant_htonl(NFSERR_SAME)

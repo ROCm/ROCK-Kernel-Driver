@@ -481,7 +481,6 @@ static struct i2c_algorithm smbus_algorithm = {
 
 static struct i2c_adapter ali1535_adapter = {
 	.owner		= THIS_MODULE,
-	.id		= I2C_ALGO_SMBUS | I2C_HW_SMBUS_ALI1535,
 	.algo		= &smbus_algorithm,
 	.name		= "unset",
 };
@@ -507,7 +506,7 @@ static int __devinit ali1535_probe(struct pci_dev *dev, const struct pci_device_
 	/* set up the driverfs linkage to our parent device */
 	ali1535_adapter.dev.parent = &dev->dev;
 
-	snprintf(ali1535_adapter.name, DEVICE_NAME_SIZE, 
+	snprintf(ali1535_adapter.name, I2C_NAME_SIZE, 
 		"SMBus ALI1535 adapter at %04x", ali1535_smba);
 	return i2c_add_adapter(&ali1535_adapter);
 }
@@ -526,7 +525,6 @@ static struct pci_driver ali1535_driver = {
 
 static int __init i2c_ali1535_init(void)
 {
-	printk(KERN_INFO "i2c-ali1535 version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	return pci_module_init(&ali1535_driver);
 }
 

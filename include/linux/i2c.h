@@ -28,9 +28,6 @@
 #ifndef _LINUX_I2C_H
 #define _LINUX_I2C_H
 
-#define I2C_DATE "20021208"
-#define I2C_VERSION "2.7.0"
-
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/i2c-id.h>
@@ -146,6 +143,8 @@ struct i2c_driver {
 
 extern struct bus_type i2c_bus_type;
 
+#define I2C_NAME_SIZE	50
+
 /*
  * i2c_client identifies a single device (i.e. chip) that is connected to an 
  * i2c bus. The behaviour is defined by the routines of the driver. This
@@ -166,7 +165,7 @@ struct i2c_client {
 					/* to the client		*/
 	struct device dev;		/* the device structure		*/
 	struct list_head list;
-	char name[DEVICE_NAME_SIZE];
+	char name[I2C_NAME_SIZE];
 	struct completion released;
 };
 #define to_i2c_client(d) container_of(d, struct i2c_client, dev)
@@ -253,7 +252,7 @@ struct i2c_adapter {
 	int nr;
 	struct list_head clients;
 	struct list_head list;
-	char name[DEVICE_NAME_SIZE];
+	char name[I2C_NAME_SIZE];
 	struct completion dev_released;
 	struct completion class_dev_released;
 };
