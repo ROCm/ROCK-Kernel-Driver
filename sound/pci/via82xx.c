@@ -867,12 +867,12 @@ static int via_lock_rate(struct via_rate_lock *rec, int rate)
 
 	spin_lock(&rec->lock);
 	if (rec->rate != rate) {
-		if (rec->rate && rec->used > 1) { /* already set */
-			spin_unlock(&rec->lock);
-			return -EINVAL;
+		if (rec->rate && rec->used > 1) /* already set */
+			changed = -EINVAL;
+		else {
+			rec->rate = rate;
+			changed = 1;
 		}
-		rec->rate = rate;
-		changed = 1;
 	}
 	spin_unlock(&rec->lock);
 	return changed;
@@ -891,11 +891,10 @@ static int snd_via8233_playback_prepare(snd_pcm_substream_t *substream)
 
 	if ((rate_changed = via_lock_rate(&chip->rates[0], runtime->rate)) < 0)
 		return rate_changed;
-	if (rate_changed || chip->no_vra) {
+	if (rate_changed) {
 		snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE,
 				  chip->no_vra ? 48000 : runtime->rate);
-		if (rate_changed)
-			snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
+		snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
 	}
 #if 0
 	if (chip->revision == VIA_REV_8233A)
@@ -1978,6 +1977,7 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1019, .device = 0x0996, .action = VIA_DXS_48K },
 		{ .vendor = 0x1043, .device = 0x80a1, .action = VIA_DXS_NO_VRA }, /* ASUS A7V8-X */
 		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
+		{ .vendor = 0x1458, .device = 0x5002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAX */
 		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
 		{ .vendor = 0x1462, .device = 0x7120, .action = VIA_DXS_ENABLE }, /* MSI KT4V */
 		{ } /* terminator */
