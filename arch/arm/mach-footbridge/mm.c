@@ -80,7 +80,7 @@ void __init footbridge_map_io(void)
 /*
  * These two functions convert virtual addresses to PCI addresses and PCI
  * addresses to virtual addresses.  Note that it is only legal to use these
- * on memory obtained via get_free_page or kmalloc.
+ * on memory obtained via get_zeroed_page or kmalloc.
  */
 unsigned long __virt_to_bus(unsigned long res)
 {

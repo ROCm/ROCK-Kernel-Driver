@@ -111,7 +111,7 @@ static ssize_t proc_mpc_read(struct file *file, char *buff,
 	unsigned char ip_string[16];
 	if(count == 0)
 	        return 0;
-	page = get_free_page(GFP_KERNEL);
+	page = get_zeroed_page(GFP_KERNEL);
 	if(!page)
 	        return -ENOMEM;
 	atm_mpoa_disp_qos((char *)page, &length);

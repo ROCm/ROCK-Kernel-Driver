@@ -267,7 +267,7 @@ void dump_imap(const char *prefix, struct super_block * s)
 {
 #if 0
 	int i;
-	char *tmpbuf = (char *)get_free_page(GFP_KERNEL);
+	char *tmpbuf = (char *)get_zeroed_page(GFP_KERNEL);
 
 	if (!tmpbuf)
 		return;

@@ -393,7 +393,7 @@ static int write_suspend_image(void)
 	int i;
 	swp_entry_t entry, prev = { 0 };
 	int nr_pgdir_pages = SUSPEND_PD_PAGES(nr_copy_pages);
-	union diskpage *cur,  *buffer = (union diskpage *)get_free_page(GFP_ATOMIC);
+	union diskpage *cur,  *buffer = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
 	unsigned long address;
 	struct page *page;
 
@@ -554,7 +554,7 @@ static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
 		SetPageNosave(page++);
 		
 	while(nr_copy_pages--) {
-		p->address = get_free_page(GFP_ATOMIC);
+		p->address = get_zeroed_page(GFP_ATOMIC);
 		if(!p->address) {
 			free_suspend_pagedir((unsigned long) pagedir);
 			return NULL;
@@ -923,7 +923,7 @@ static int check_pagedir(void)
 		unsigned long addr;
 
 		do {
-			addr = get_free_page(GFP_ATOMIC);
+			addr = get_zeroed_page(GFP_ATOMIC);
 			if(!addr)
 				return -ENOMEM;
 		} while (does_collide(addr));
@@ -1139,7 +1139,7 @@ static int read_suspend_image(const char * specialfile, int noresume)
 	int error;
 
 	resume_device = name_to_kdev_t(specialfile);
-	scratch_page = get_free_page(GFP_ATOMIC);
+	scratch_page = get_zeroed_page(GFP_ATOMIC);
 	cur = (void *) scratch_page;
 	if (cur) {
 		struct block_device *bdev;

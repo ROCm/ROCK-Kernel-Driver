@@ -894,7 +894,7 @@ static int startup(struct esp_struct * info)
 		goto out;
 
 	if (!info->xmit_buf) {
-		info->xmit_buf = (unsigned char *)get_free_page(GFP_KERNEL);
+		info->xmit_buf = (unsigned char *)get_zeroed_page(GFP_KERNEL);
 		retval = -ENOMEM;
 		if (!info->xmit_buf)
 			goto out;
@@ -2380,7 +2380,7 @@ static int esp_open(struct tty_struct *tty, struct file * filp)
 	info->tty = tty;
 
 	if (!tmp_buf) {
-		tmp_buf = (unsigned char *) get_free_page(GFP_KERNEL);
+		tmp_buf = (unsigned char *) get_zeroed_page(GFP_KERNEL);
 		if (!tmp_buf)
 			return -ENOMEM;
 	}

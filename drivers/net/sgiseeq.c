@@ -615,7 +615,7 @@ int sgiseeq_init(struct net_device *dev, struct sgiseeq_regs *sregs,
 	int i;
 	struct sgiseeq_private *sp;
 
-	dev->priv = (struct sgiseeq_private *) get_free_page(GFP_KERNEL);
+	dev->priv = (struct sgiseeq_private *) get_zeroed_page(GFP_KERNEL);
 	if (dev->priv == NULL)
 		return -ENOMEM;
 

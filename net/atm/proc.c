@@ -496,7 +496,7 @@ static ssize_t proc_dev_atm_read(struct file *file,char *buf,size_t count,
 	int length;
 
 	if (count == 0) return 0;
-	page = get_free_page(GFP_KERNEL);
+	page = get_zeroed_page(GFP_KERNEL);
 	if (!page) return -ENOMEM;
 	dev = PDE(file->f_dentry->d_inode)->data;
 	if (!dev->ops->proc_read)
@@ -523,7 +523,7 @@ static ssize_t proc_spec_atm_read(struct file *file,char *buf,size_t count,
 	info = PDE(file->f_dentry->d_inode)->data;
 
 	if (count == 0) return 0;
-	page = get_free_page(GFP_KERNEL);
+	page = get_zeroed_page(GFP_KERNEL);
 	if (!page) return -ENOMEM;
 	length = (*info)(*pos,(char *) page);
 	if (length > count) length = -EINVAL;

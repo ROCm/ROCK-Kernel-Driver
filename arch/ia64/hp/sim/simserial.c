@@ -773,7 +773,7 @@ startup(struct async_struct *info)
 	struct serial_state *state= info->state;
 	unsigned long page;
 
-	page = get_free_page(GFP_KERNEL);
+	page = get_zeroed_page(GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;
 
@@ -900,7 +900,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	info->tty->low_latency = (info->flags & ASYNC_LOW_LATENCY) ? 1 : 0;
 
 	if (!tmp_buf) {
-		page = get_free_page(GFP_KERNEL);
+		page = get_zeroed_page(GFP_KERNEL);
 		if (!page) {
 			/* MOD_DEC_USE_COUNT; "info->tty" will cause this? */
 			return -ENOMEM;

@@ -440,6 +440,12 @@ unsigned long get_zeroed_page(unsigned int gfp_mask)
 {
 	struct page * page;
 
+	/*
+	 * get_zeroed_page() returns a 32-bit address, which cannot represent
+	 * a highmem page
+	 */
+	BUG_ON(gfp_mask & __GFP_HIGHMEM);
+
 	page = alloc_pages(gfp_mask, 0);
 	if (page) {
 		void *address = page_address(page);

@@ -671,7 +671,7 @@ qla1280_proc_info(char *buffer, char **start, off_t offset, int length,
 			free_page((unsigned long)qla1280_buffer);
 			qla1280_buffer_size = 0;
 		}
-		qla1280_buffer = (char *)get_free_page(GFP_KERNEL);
+		qla1280_buffer = (char *)get_zeroed_page(GFP_KERNEL);
 	}
 	if (qla1280_buffer == NULL) {
 		size = sprintf(buffer, "qla1280 - kmalloc error at line %d\n",

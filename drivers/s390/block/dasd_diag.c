@@ -274,7 +274,7 @@ dasd_diag_check_device(dasd_device_t *device)
 	mdsk_term_io(device);
 
 	/* figure out blocksize of device */
-	label = (long *) get_free_page(GFP_KERNEL);
+	label = (long *) get_zeroed_page(GFP_KERNEL);
 	if (label == NULL)  {
 		MESSAGE(KERN_WARNING, "%s",
 			"No memory to allocate initialization request");
@@ -437,7 +437,7 @@ dasd_diag_dump_sense(dasd_device_t *device, dasd_ccw_req_t * req)
 {
 	char *page;
 
-	page = (char *) get_free_page(GFP_KERNEL);
+	page = (char *) get_zeroed_page(GFP_KERNEL);
 	if (page == NULL) {
 		MESSAGE(KERN_ERR, "%s", "No memory to dump sense data");
 		return;

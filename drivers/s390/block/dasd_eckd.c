@@ -1344,7 +1344,7 @@ dasd_eckd_dump_sense(struct dasd_device_t *device, dasd_ccw_req_t * req)
 	ccw1_t *act;
 	int len, sl, sct;
 
-	page = (char *) get_free_page(GFP_ATOMIC);
+	page = (char *) get_zeroed_page(GFP_ATOMIC);
 	if (page == NULL) {
 		MESSAGE(KERN_ERR, "%s", "No memory to dump sense data");
 		return;

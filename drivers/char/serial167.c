@@ -802,7 +802,7 @@ startup(struct cyclades_port * info)
 	return 0;
     }
     if (!info->xmit_buf){
-	info->xmit_buf = (unsigned char *) get_free_page (GFP_KERNEL);
+	info->xmit_buf = (unsigned char *) get_zeroed_page (GFP_KERNEL);
 	if (!info->xmit_buf){
 	    return -ENOMEM;
 	}
@@ -2158,7 +2158,7 @@ cy_open(struct tty_struct *tty, struct file * filp)
     info->tty = tty;
 
     if (!tmp_buf) {
-	tmp_buf = (unsigned char *) get_free_page(GFP_KERNEL);
+	tmp_buf = (unsigned char *) get_zeroed_page(GFP_KERNEL);
 	if (!tmp_buf){
 	    return -ENOMEM;
         }

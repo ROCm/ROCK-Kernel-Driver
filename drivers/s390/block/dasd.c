@@ -228,7 +228,7 @@ dasd_alloc_device(dasd_devmap_t *devmap)
 		return ERR_PTR(-ENOMEM);
 	}
 	/* Get one page for error recovery. */
-	device->erp_mem = (void *) get_free_page(GFP_ATOMIC | GFP_DMA);
+	device->erp_mem = (void *) get_zeroed_page(GFP_ATOMIC | GFP_DMA);
 	if (device->erp_mem == NULL) {
 		free_pages((unsigned long) device->ccw_mem, 1);
 		kfree(device);

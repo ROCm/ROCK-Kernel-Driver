@@ -565,7 +565,7 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 	}
 	down(&moxaBuffSem);
 	if (!moxaXmitBuff) {
-		page = get_free_page(GFP_KERNEL);
+		page = get_zeroed_page(GFP_KERNEL);
 		if (!page) {
 			up(&moxaBuffSem);
 			return (-ENOMEM);

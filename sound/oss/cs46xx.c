@@ -3239,7 +3239,7 @@ static int cs_open(struct inode *inode, struct file *file)
 			memset(state, 0, sizeof(struct cs_state));
 			init_MUTEX(&state->sem);
 			dmabuf = &state->dmabuf;
-			dmabuf->pbuf = (void *)get_free_page(GFP_KERNEL | GFP_DMA);
+			dmabuf->pbuf = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
 			if(dmabuf->pbuf==NULL)
 			{
 				kfree(state);
@@ -3310,7 +3310,7 @@ static int cs_open(struct inode *inode, struct file *file)
 			memset(state, 0, sizeof(struct cs_state));
 			init_MUTEX(&state->sem);
 			dmabuf = &state->dmabuf;
-			dmabuf->pbuf = (void *)get_free_page(GFP_KERNEL | GFP_DMA);
+			dmabuf->pbuf = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
 			if(dmabuf->pbuf==NULL)
 			{
 				kfree(state);

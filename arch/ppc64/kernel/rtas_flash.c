@@ -43,7 +43,7 @@ static int rtas_flash_open(struct inode *inode, struct file *file)
 	if ((file->f_mode & FMODE_WRITE) && flash_possible) {
 		if (flist)
 			return -EBUSY;
-		flist = (struct flash_block_list *)get_free_page(GFP_KERNEL);
+		flist = (struct flash_block_list *)get_zeroed_page(GFP_KERNEL);
 		if (!flist)
 			return -ENOMEM;
 	}
@@ -175,7 +175,7 @@ static ssize_t rtas_flash_write(struct file *file, const char *buffer,
 	next_free = fl->num_blocks;
 	if (next_free == FLASH_BLOCKS_PER_NODE) {
 		/* Need to allocate another block_list */
-		fl->next = (struct flash_block_list *)get_free_page(GFP_KERNEL);
+		fl->next = (struct flash_block_list *)get_zeroed_page(GFP_KERNEL);
 		if (!fl->next)
 			return -ENOMEM;
 		fl = fl->next;
@@ -184,7 +184,7 @@ static ssize_t rtas_flash_write(struct file *file, const char *buffer,
 
 	if (len > PAGE_SIZE)
 		len = PAGE_SIZE;
-	p = (char *)get_free_page(GFP_KERNEL);
+	p = (char *)get_zeroed_page(GFP_KERNEL);
 	if (!p)
 		return -ENOMEM;
 	if(copy_from_user(p, buffer, len)) {

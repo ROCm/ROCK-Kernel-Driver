@@ -906,7 +906,7 @@ static int start_rx(struct atm_dev *dev)
 	struct eni_dev *eni_dev;
 
 	eni_dev = ENI_DEV(dev);
-	eni_dev->rx_map = (struct atm_vcc **) get_free_page(GFP_KERNEL);
+	eni_dev->rx_map = (struct atm_vcc **) get_zeroed_page(GFP_KERNEL);
 	if (!eni_dev->rx_map) {
 		printk(KERN_ERR DEV_LABEL "(itf %d): couldn't get free page\n",
 		    dev->number);

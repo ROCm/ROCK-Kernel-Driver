@@ -80,7 +80,7 @@ static void *spp_getpage(void)
 { 
 	void *ptr;
 	if (after_bootmem)
-		ptr = (void *) get_free_page(GFP_ATOMIC); 
+		ptr = (void *) get_zeroed_page(GFP_ATOMIC); 
 	else
 		ptr = alloc_bootmem_low(PAGE_SIZE); 
 	if (!ptr)

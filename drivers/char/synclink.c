@@ -1788,7 +1788,7 @@ static int startup(struct mgsl_struct * info)
 	
 	if (!info->xmit_buf) {
 		/* allocate a page of memory for a transmit buffer */
-		info->xmit_buf = (unsigned char *)get_free_page(GFP_KERNEL);
+		info->xmit_buf = (unsigned char *)get_zeroed_page(GFP_KERNEL);
 		if (!info->xmit_buf) {
 			printk(KERN_ERR"%s(%d):%s can't allocate transmit buffer\n",
 				__FILE__,__LINE__,info->device_name);
@@ -3633,7 +3633,7 @@ static int mgsl_open(struct tty_struct *tty, struct file * filp)
 	}
 	
 	if (!tmp_buf) {
-		page = get_free_page(GFP_KERNEL);
+		page = get_zeroed_page(GFP_KERNEL);
 		if (!page) {
 			retval = -ENOMEM;
 			goto cleanup;

@@ -1624,7 +1624,7 @@ static void vcc_rx_aal0(struct lanai_dev *lanai)
 
 /* -------------------- MANAGING HOST-BASED VCC TABLE: */
 
-/* Decide whether to use vmalloc or get_free_page for VCC table */
+/* Decide whether to use vmalloc or get_zeroed_page for VCC table */
 #if (NUM_VCI * BITS_PER_LONG) <= PAGE_SIZE
 #define VCCTABLE_GETFREEPAGE
 #else
@@ -1636,7 +1636,7 @@ static int __init vcc_table_allocate(struct lanai_dev *lanai)
 #ifdef VCCTABLE_GETFREEPAGE
 	APRINTK((lanai->num_vci) * sizeof(struct lanai_vcc *) <= PAGE_SIZE,
 	    "vcc table > PAGE_SIZE!");
-	lanai->vccs = (struct lanai_vcc **) get_free_page(GFP_KERNEL);
+	lanai->vccs = (struct lanai_vcc **) get_zeroed_page(GFP_KERNEL);
 	return (lanai->vccs == NULL) ? -ENOMEM : 0;
 #else
 	int bytes = (lanai->num_vci) * sizeof(struct lanai_vcc *);

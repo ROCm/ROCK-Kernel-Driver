@@ -552,7 +552,7 @@ olddentry->d_parent->d_name.name, olddentry->d_name.name);
 		goto out;
 
 	ret = -ENOMEM;
-	buffer = get_free_page(GFP_KERNEL);
+	buffer = get_zeroed_page(GFP_KERNEL);
 	if (!buffer)
 		goto out;
 

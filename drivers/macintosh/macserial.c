@@ -755,7 +755,7 @@ static int startup(struct mac_serial * info)
 	}
 
 	if (!info->xmit_buf) {
-		info->xmit_buf = (unsigned char *) get_free_page(GFP_KERNEL);
+		info->xmit_buf = (unsigned char *) get_zeroed_page(GFP_KERNEL);
 		if (!info->xmit_buf)
 			return -ENOMEM;
 	}
@@ -2276,7 +2276,7 @@ static int rs_open(struct tty_struct *tty, struct file * filp)
 	info->tty = tty;
 
 	if (!tmp_buf) {
-		page = get_free_page(GFP_KERNEL);
+		page = get_zeroed_page(GFP_KERNEL);
 		if (!page)
 			return -ENOMEM;
 		if (tmp_buf)

@@ -487,7 +487,7 @@ static int dmabuf_init(struct dmabuf *db)
 	db->dmasize = db->numfrag << db->fragshift;
 	for(nr = 0; nr < NRSGBUF; nr++) {
 		if (!db->sgbuf[nr]) {
-			p = (void *)get_free_page(GFP_KERNEL);
+			p = (void *)get_zeroed_page(GFP_KERNEL);
 			if (!p)
 				return -ENOMEM;
 			db->sgbuf[nr] = p;

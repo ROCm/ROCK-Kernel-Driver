@@ -451,7 +451,7 @@ static void __init attach_vidc(struct address_info *hw_config)
 		goto mixer_failed;
 
 	for (i = 0; i < 2; i++) {
-		dma_buf[i] = get_free_page(GFP_KERNEL);
+		dma_buf[i] = get_zeroed_page(GFP_KERNEL);
 		if (!dma_buf[i]) {
 			printk(KERN_ERR "%s: can't allocate required buffers\n",
 				name);

@@ -287,7 +287,7 @@ int __init sgiwd93_detect(Scsi_Host_Template *SGIblows)
 	sgiwd93_host->base = (unsigned long) hregs;
 	sgiwd93_host->irq = SGI_WD93_0_IRQ;
 
-	buf = (uchar *) get_free_page(GFP_KERNEL);
+	buf = (uchar *) get_zeroed_page(GFP_KERNEL);
 	if (!buf) {
 		printk(KERN_WARNING "sgiwd93: Could not allocate memory for host0 buffer.\n");
 		scsi_unregister(sgiwd93_host);
@@ -321,7 +321,7 @@ int __init sgiwd93_detect(Scsi_Host_Template *SGIblows)
 			sgiwd93_host1->base = (unsigned long) hregs1;
 			sgiwd93_host1->irq = SGI_WD93_1_IRQ;
 	
-			buf = (uchar *) get_free_page(GFP_KERNEL);
+			buf = (uchar *) get_zeroed_page(GFP_KERNEL);
 			if (!buf) {
 				printk(KERN_WARNING "sgiwd93: Could not allocate memory for host1 buffer.\n");
 				scsi_unregister(sgiwd93_host1);

@@ -560,7 +560,7 @@ cpu_init (void)
 	if (cpu == 0)
 		my_cpu_data = alloc_bootmem_pages(__per_cpu_end - __per_cpu_start);
 	else
-		my_cpu_data = (void *) get_free_page(GFP_KERNEL);
+		my_cpu_data = (void *) get_zeroed_page(GFP_KERNEL);
 	memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 	__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
 	my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);

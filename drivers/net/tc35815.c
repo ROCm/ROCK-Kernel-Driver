@@ -640,7 +640,7 @@ tc35815_init_queues(struct net_device *dev)
 		if ((lp->fd_buf = (void *)__get_free_pages(GFP_KERNEL, FD_PAGE_ORDER)) == 0)
 			return -ENOMEM;
 		for (i = 0; i < RX_BUF_PAGES; i++) {
-			if ((lp->data_buf[i] = (void *)get_free_page(GFP_KERNEL)) == 0) {
+			if ((lp->data_buf[i] = (void *)get_zeroed_page(GFP_KERNEL)) == 0) {
 				while (--i >= 0) {
 					free_page((unsigned long)lp->data_buf[i]);
 					lp->data_buf[i] = 0;

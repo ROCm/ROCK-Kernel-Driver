@@ -363,7 +363,7 @@ dasd_fba_dump_sense(struct dasd_device_t *device, dasd_ccw_req_t * req)
 {
 	char *page;
 
-	page = (char *) get_free_page(GFP_KERNEL);
+	page = (char *) get_zeroed_page(GFP_KERNEL);
 	if (page == NULL) {
 		MESSAGE(KERN_ERR, "%s", "No memory to dump sense data");
 		return;

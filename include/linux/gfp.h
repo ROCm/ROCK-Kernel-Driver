@@ -71,11 +71,6 @@ extern unsigned long FASTCALL(get_zeroed_page(unsigned int gfp_mask));
 		__get_free_pages((gfp_mask) | GFP_DMA,(order))
 
 /*
- * The old interface name will be removed in 2.5:
- */
-#define get_free_page get_zeroed_page
-
-/*
  * There is only one 'core' page-freeing function.
  */
 extern void FASTCALL(__free_pages(struct page *page, unsigned int order));

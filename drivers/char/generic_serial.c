@@ -952,7 +952,7 @@ int gs_init_port(struct gs_port *port)
 
 	save_flags (flags);
 	if (!tmp_buf) {
-		page = get_free_page(GFP_KERNEL);
+		page = get_zeroed_page(GFP_KERNEL);
 
 		cli (); /* Don't expect this to make a difference. */ 
 		if (tmp_buf)
@@ -970,10 +970,10 @@ int gs_init_port(struct gs_port *port)
 		return 0;
 
 	if (!port->xmit_buf) {
-		/* We may sleep in get_free_page() */
+		/* We may sleep in get_zeroed_page() */
 		unsigned long tmp;
 
-		tmp = get_free_page(GFP_KERNEL);
+		tmp = get_zeroed_page(GFP_KERNEL);
 
 		/* Spinlock? */
 		cli ();

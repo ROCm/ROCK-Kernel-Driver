@@ -555,7 +555,7 @@ static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	
 	if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
 		return -EFAULT;
-	ifr.ifr_data = (__kernel_caddr_t)get_free_page(GFP_KERNEL);
+	ifr.ifr_data = (__kernel_caddr_t)get_zeroed_page(GFP_KERNEL);
 	if (!ifr.ifr_data)
 		return -EAGAIN;
 
@@ -620,7 +620,7 @@ static int bond_ioctl(unsigned long fd, unsigned int cmd, unsigned long arg)
 	
 	if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
 		return -EFAULT;
-	ifr.ifr_data = (__kernel_caddr_t)get_free_page(GFP_KERNEL);
+	ifr.ifr_data = (__kernel_caddr_t)get_zeroed_page(GFP_KERNEL);
 	if (!ifr.ifr_data)
 		return -EAGAIN;
 

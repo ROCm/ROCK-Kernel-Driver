@@ -465,7 +465,7 @@ static int startup (struct dz_serial *info)
 	}
 
 	if (!info->xmit_buf) {
-		page = get_free_page(GFP_KERNEL);
+		page = get_zeroed_page(GFP_KERNEL);
 		if (!page) {
 			restore_flags (flags);
 		return -ENOMEM;

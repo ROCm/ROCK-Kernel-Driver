@@ -859,7 +859,7 @@ static int isicom_setup_port(struct isi_port * port)
 	if (!port->xmit_buf) {
 		unsigned long page;
 		
-		if (!(page = get_free_page(GFP_KERNEL)))
+		if (!(page = get_zeroed_page(GFP_KERNEL)))
 			return -ENOMEM;
 		
 		if (port->xmit_buf) {
@@ -1854,7 +1854,7 @@ static int isicom_init(void)
 	unsigned long page;
 	
 	if (!tmp_buf) { 
-		page = get_free_page(GFP_KERNEL);
+		page = get_zeroed_page(GFP_KERNEL);
 	      	if (!page) {
 #ifdef ISICOM_DEBUG	      	
 	      		printk(KERN_DEBUG "ISICOM: Couldn't allocate page for tmp_buf.\n");

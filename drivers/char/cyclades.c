@@ -2001,7 +2001,7 @@ startup(struct cyclades_port * info)
     card = info->card;
     channel = (info->line) - (cy_card[card].first_line);
 
-    page = get_free_page(GFP_KERNEL);
+    page = get_zeroed_page(GFP_KERNEL);
     if (!page)
 	return -ENOMEM;
 
@@ -2648,7 +2648,7 @@ cy_open(struct tty_struct *tty, struct file * filp)
         current->pid, info->count);
 #endif
     if (!tmp_buf) {
-	page = get_free_page(GFP_KERNEL);
+	page = get_zeroed_page(GFP_KERNEL);
 	if (!page)
 	    return -ENOMEM;
 	if (tmp_buf)

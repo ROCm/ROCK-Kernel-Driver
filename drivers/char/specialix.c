@@ -1232,10 +1232,10 @@ static int sx_setup_port(struct specialix_board *bp, struct specialix_port *port
 		return 0;
 	
 	if (!port->xmit_buf) {
-		/* We may sleep in get_free_page() */
+		/* We may sleep in get_zeroed_page() */
 		unsigned long tmp;
 		
-		if (!(tmp = get_free_page(GFP_KERNEL)))
+		if (!(tmp = get_zeroed_page(GFP_KERNEL)))
 			return -ENOMEM;
 
 		if (port->xmit_buf) {
@@ -2226,7 +2226,7 @@ static int sx_init_drivers(void)
 	int i;
 
 	
-	if (!(tmp_buf = (unsigned char *) get_free_page(GFP_KERNEL))) {
+	if (!(tmp_buf = (unsigned char *) get_zeroed_page(GFP_KERNEL))) {
 		printk(KERN_ERR "sx: Couldn't get free page.\n");
 		return 1;
 	}

@@ -4049,7 +4049,7 @@ nfs_uud32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 	memset(karg, 0, sizeof(*karg));
 	if(__get_user(karg->ca_version, &arg32->ca32_version))
 		return -EFAULT;
-	karg->ca_umap.ug_ident = (char *)get_free_page(GFP_USER);
+	karg->ca_umap.ug_ident = (char *)get_zeroed_page(GFP_USER);
 	if(!karg->ca_umap.ug_ident)
 		return -ENOMEM;
 	err = __get_user(uaddr, &arg32->ca32_umap.ug32_ident);

@@ -3034,7 +3034,7 @@ NCR53c7x0_soft_reset (struct Scsi_Host *host) {
  *
  * Side effects : If we haven't yet scheduled allocation of NCR53c7x0_cmd
  *	structures for this device, do so.  Attempt to complete all scheduled
- *	allocations using get_free_page(), putting NCR53c7x0_cmd structures on
+ *	allocations using get_zeroed_page(), putting NCR53c7x0_cmd structures on
  *	the free list.  Teach programmers not to drink and hack.
  *
  * Inputs : cmd - SCSI command
@@ -3101,7 +3101,7 @@ allocate_cmd (Scsi_Cmnd *cmd) {
             printk (KERN_ERR "53c7xx: allocate_cmd size > 4K\n");
 	    return NULL;
 	}
-        real = get_free_page(GFP_ATOMIC);
+        real = get_zeroed_page(GFP_ATOMIC);
         if (real == 0)
         	return NULL;
         memset((void *)real, 0, 4096);

@@ -383,7 +383,7 @@ static void v4l_fbuffer_free(struct zoran *zr)
  *
  *   If the requested buffer size is smaller than MAX_KMALLOC_MEM,
  *   kmalloc is used to request a physically contiguous area,
- *   else we allocate the memory in framgents with get_free_page.
+ *   else we allocate the memory in framgents with get_zeroed_page.
  *
  *   If a Natoma chipset is present and this is a revision 1 zr36057,
  *   each MJPEG buffer needs to be physically contiguous.
@@ -396,7 +396,7 @@ static void v4l_fbuffer_free(struct zoran *zr)
  *       Therefore there is no need to allocate them with vmalloc in order
  *       to get a contiguous virtual memory space.
  *       I don't understand why many other drivers first allocate them with
- *       vmalloc (which uses internally also get_free_page, but delivers you
+ *       vmalloc (which uses internally also get_zeroed_page, but delivers you
  *       virtual addresses) and then again have to make a lot of efforts
  *       to get the physical address.
  *
@@ -420,10 +420,10 @@ static int jpg_fbuffer_alloc(struct zoran *zr)
 
 		/* Allocate fragment table for this buffer */
 
-		mem = get_free_page(GFP_KERNEL);
+		mem = get_zeroed_page(GFP_KERNEL);
 		if (mem == 0) {
 			printk(KERN_ERR
-			       "%s: jpg_fbuffer_alloc: get_free_page (frag_tab) failed for buffer %d\n",
+			       "%s: jpg_fbuffer_alloc: get_zeroed_page (frag_tab) failed for buffer %d\n",
 			       zr->name, i);
 			jpg_fbuffer_free(zr);
 			return -ENOBUFS;
@@ -450,10 +450,10 @@ static int jpg_fbuffer_alloc(struct zoran *zr)
 			/* jpg_bufsize is allreay page aligned */
 			for (j = 0; j < zr->jpg_bufsize / PAGE_SIZE; j++) 
 			{
-				mem = get_free_page(GFP_KERNEL);
+				mem = get_zeroed_page(GFP_KERNEL);
 				if (mem == 0) {
 					printk(KERN_ERR
-					       "%s: jpg_fbuffer_alloc: get_free_page failed for buffer %d\n",
+					       "%s: jpg_fbuffer_alloc: get_zeroed_page failed for buffer %d\n",
 					       zr->name, i);
 					jpg_fbuffer_free(zr);
 					return -ENOBUFS;

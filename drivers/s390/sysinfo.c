@@ -228,7 +228,7 @@ static int proc_read_sysinfo(char *page, char **start,
                              off_t off, int count,
                              int *eof, void *data)
 {
-	unsigned long info_page = get_free_page (GFP_KERNEL); 
+	unsigned long info_page = get_zeroed_page (GFP_KERNEL); 
 	union s390_sysinfo *info = (union s390_sysinfo *) info_page;
 	int len = 0;
 	int level;

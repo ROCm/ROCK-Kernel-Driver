@@ -80,7 +80,7 @@ pmd_t *get_pointer_table (void)
 		void *page;
 		ptable_desc *new;
 
-		if (!(page = (void *)get_free_page(GFP_KERNEL)))
+		if (!(page = (void *)get_zeroed_page(GFP_KERNEL)))
 			return 0;
 
 		flush_tlb_kernel_page(page);

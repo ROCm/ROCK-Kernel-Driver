@@ -1194,10 +1194,10 @@ static int aurora_setup_port(struct Aurora_board *bp, struct Aurora_port *port)
 		return 0;
 		
 	if (!port->xmit_buf) {
-		/* We may sleep in get_free_page() */
+		/* We may sleep in get_zeroed_page() */
 		unsigned long tmp;
 		
-		if (!(tmp = get_free_page(GFP_KERNEL)))
+		if (!(tmp = get_zeroed_page(GFP_KERNEL)))
 			return -ENOMEM;
 		    
 		if (port->xmit_buf) {
@@ -2303,7 +2303,7 @@ static int aurora_init_drivers(void)
 #ifdef AURORA_DEBUG
 	printk("aurora_init_drivers: start\n");
 #endif
-	tmp_buf = (unsigned char *) get_free_page(GFP_KERNEL);
+	tmp_buf = (unsigned char *) get_zeroed_page(GFP_KERNEL);
 	if (tmp_buf == NULL) {
 		printk(KERN_ERR "aurora: Couldn't get free page.\n");
 		return 1;

@@ -760,7 +760,7 @@ static int mxser_open(struct tty_struct *tty, struct file *filp)
 	info->tty = tty;
 
 	if (!mxvar_tmp_buf) {
-		page = get_free_page(GFP_KERNEL);
+		page = get_zeroed_page(GFP_KERNEL);
 		if (!page)
 			return (-ENOMEM);
 		if (mxvar_tmp_buf)
@@ -1689,7 +1689,7 @@ static int mxser_startup(struct mxser_struct *info)
 	unsigned long flags;
 	unsigned long page;
 
-	page = get_free_page(GFP_KERNEL);
+	page = get_zeroed_page(GFP_KERNEL);
 	if (!page)
 		return (-ENOMEM);
 
