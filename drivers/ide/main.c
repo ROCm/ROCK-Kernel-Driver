@@ -296,31 +296,6 @@ int ata_revalidate(kdev_t i_rdev)
 	return res;
 }
 
-/*
- * FIXME: this is most propably just totally unnecessary.
- *
- * Look again for all drives in the system on all interfaces.
- */
-static void revalidate_drives(void)
-{
-	int i;
-
-	for (i = 0; i < MAX_HWIFS; ++i) {
-		int unit;
-		struct ata_channel *ch = &ide_hwifs[i];
-
-		for (unit = 0; unit < MAX_DRIVES; ++unit) {
-			struct ata_device *drive = &ch->drives[unit];
-
-			if (drive->revalidate) {
-				drive->revalidate = 0;
-				if (!initializing)
-					ata_revalidate(mk_kdev(ch->major, unit<<PARTN_BITS));
-			}
-		}
-	}
-}
-
 void ide_driver_module(void)
 {
 	int i;
@@ -328,13 +303,10 @@ void ide_driver_module(void)
 	/* Don't reinit the probe if there is already one channel detected. */
 	for (i = 0; i < MAX_HWIFS; ++i) {
 		if (ide_hwifs[i].present)
-			goto revalidate;
+			return;
 	}
 
 	ideprobe_init();
-
-revalidate:
-	revalidate_drives();
 }
 
 /*
@@ -614,7 +586,6 @@ found:
 
 	if (!initializing) {
 		ideprobe_init();
-		revalidate_drives();
 		/* FIXME: Do we really have to call it second time here?! */
 		ide_driver_module();
 	}
@@ -1094,8 +1065,6 @@ int ata_register_device(struct ata_device *drive, struct ata_operations *driver)
 			drive->dsc_overlap = 0;
 
 	}
-	drive->revalidate = 1;
-
 	return 0;
 }
 
@@ -1179,7 +1148,6 @@ devfs_handle_t ide_devfs_handle;
 
 EXPORT_SYMBOL(ata_register_device);
 EXPORT_SYMBOL(ata_unregister_device);
-EXPORT_SYMBOL(ata_revalidate);
 EXPORT_SYMBOL(ide_register_hw);
 EXPORT_SYMBOL(ide_unregister);
 EXPORT_SYMBOL(get_info_ptr);

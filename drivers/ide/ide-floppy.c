@@ -1755,6 +1755,7 @@ static void idefloppy_attach(struct ata_device *drive)
 	idefloppy_floppy_t *floppy;
 	char *req;
 	struct ata_channel *channel;
+	struct gendisk *disk;
 	int unit;
 
 	if (drive->type != ATA_FLOPPY)
@@ -1790,8 +1791,11 @@ static void idefloppy_attach(struct ata_device *drive)
 
 	channel = drive->channel;
 	unit = drive - channel->drives;
-
-	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
+	disk = channel->gd[unit];
+	disk->minor_shift = PARTN_BITS;
+	register_disk(disk, mk_kdev(disk->major, disk->first_minor),
+			1<<disk->minor_shift, disk->fops,
+			idefloppy_capacity(drive));
 }
 
 MODULE_DESCRIPTION("ATAPI FLOPPY Driver");

@@ -5641,13 +5641,6 @@ static void idetape_attach(struct ata_device *drive)
 		unregister_chrdev (IDETAPE_MAJOR, "ht");
 	} else
 		idetape_chrdev_present = 1;
-
-	/* Feel free to use partitions even on tapes... */
-
-	channel = drive->channel;
-	unit = drive - channel->drives;
-
-	ata_revalidate(mk_kdev(channel->major, unit << PARTN_BITS));
 }
 
 MODULE_DESCRIPTION("ATAPI Streaming TAPE Driver");
