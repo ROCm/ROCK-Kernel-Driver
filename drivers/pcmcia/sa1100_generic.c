@@ -137,7 +137,7 @@ static int sa1100_pcmcia_set_mecr(int sock)
 
 	local_irq_restore(flags);
 
-	DEBUG(4, "%s(): FAST%u %lx  BSM%u %lx  BSA%u %lx  BSIO%u %lx\n",
+	DEBUG(4, "%s(): FAST%u %X  BSM%u %X  BSA%u %X  BSIO%u %X\n",
 	      __FUNCTION__, sock, MECR_FAST_GET(mecr, sock), sock,
 	      MECR_BSM_GET(mecr, sock), sock, MECR_BSA_GET(mecr, sock),
 	      sock, MECR_BSIO_GET(mecr, sock));
