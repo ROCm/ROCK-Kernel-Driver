@@ -362,7 +362,7 @@ enum pci_mmap_state {
 #define PCI_ANY_ID (~0)
 
 /*
- * The pci_dev structure is used to describe both PCI and ISAPnP devices.
+ * The pci_dev structure is used to describe PCI devices.
  */
 struct pci_dev {
 	struct list_head global_list;	/* node in list of all PCI devices */
@@ -410,16 +410,9 @@ struct pci_dev {
 	struct resource irq_resource[DEVICE_COUNT_IRQ];
 
 	char		slot_name[8];	/* slot name */
-	int		active;		/* ISAPnP: device is active */
-	int		ro;		/* ISAPnP: read only */
-	unsigned short	regs;		/* ISAPnP: supported registers */
 
 	/* These fields are used by common fixups */
-	unsigned short	transparent:1;	/* Transparent PCI bridge */
-
-	int (*prepare)(struct pci_dev *dev);	/* ISAPnP hooks */
-	int (*activate)(struct pci_dev *dev);
-	int (*deactivate)(struct pci_dev *dev);
+	unsigned int	transparent:1;	/* Transparent PCI bridge */
 };
 
 #define pci_dev_g(n) list_entry(n, struct pci_dev, global_list)
@@ -463,13 +456,7 @@ struct pci_bus {
 	unsigned char	subordinate;	/* max number of subordinate buses */
 
 	char		name[48];
-	unsigned short	vendor;
-	unsigned short	device;
-	unsigned int	serial;		/* serial number */
-	unsigned char	pnpver;		/* Plug & Play version */
-	unsigned char	productver;	/* product version */
-	unsigned char	checksum;	/* if zero - checksum passed */
-	unsigned char	pad1;
+
 	struct	device	* dev;
 };
 
