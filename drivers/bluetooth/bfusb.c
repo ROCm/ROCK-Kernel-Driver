@@ -368,10 +368,10 @@ static void bfusb_rx_complete(struct urb *urb, struct pt_regs *regs)
 
 	BT_DBG("bfusb %p urb %p skb %p len %d", bfusb, urb, skb, skb->len);
 
-	if (!test_bit(HCI_RUNNING, &bfusb->hdev->flags))
-		return;
-
 	read_lock(&bfusb->lock);
+
+	if (!test_bit(HCI_RUNNING, &bfusb->hdev->flags))
+		goto unlock;
 
 	if (urb->status || !count)
 		goto resubmit;
@@ -423,6 +423,7 @@ resubmit:
 					bfusb->hdev->name, urb, err);
 	}
 
+unlock:
 	read_unlock(&bfusb->lock);
 }
 
