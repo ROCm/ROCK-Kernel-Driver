@@ -33,7 +33,7 @@ MODULE_DESCRIPTION("Promise SX8 (carmel) block driver");
 #undef CARM_NDEBUG
 
 #define DRV_NAME "carmel"
-#define DRV_VERSION "0.6"
+#define DRV_VERSION "0.7"
 #define PFX DRV_NAME ": "
 
 #define NEXT_RESP(idx)	((idx + 1) % RMSG_Q_LEN)
@@ -115,7 +115,10 @@ enum {
 	CARM_HAVE_RESP		= 0x01,
 	CARM_MSG_READ		= 1,
 	CARM_MSG_WRITE		= 2,
-	CARM_MSG_IOCTL		= 4,
+	CARM_MSG_VERIFY		= 3,
+	CARM_MSG_GET_CAPACITY	= 4,
+	CARM_MSG_FLUSH		= 5,
+	CARM_MSG_IOCTL		= 6,
 	CARM_MSG_ARRAY		= 8,
 	CARM_MSG_MISC		= 9,
 	CARM_CME		= (1 << 2),
@@ -127,7 +130,9 @@ enum {
 	CARM_Q_LEN		= 48,
 
 	/* CARM_MSG_IOCTL messages */
-	CARM_IOC_SCAN_CHAN	= 5,
+	CARM_IOC_SCAN_CHAN	= 5,	/* scan channels for devices */
+	CARM_IOC_GET_TCQ	= 13,	/* get tcq/ncq depth */
+	CARM_IOC_SET_TCQ	= 14,	/* set tcq/ncq depth */
 
 	IOC_SCAN_CHAN_NODEV	= 0x1f,
 	IOC_SCAN_CHAN_OFFSET	= 0x40,
@@ -149,7 +154,7 @@ enum {
 	/* CARM_MSG_MISC messages */
 	MISC_GET_FW_VER		= 2,
 	MISC_ALLOC_MEM		= 3,
-	MISC_SYNC_TIME		= 5,
+	MISC_SET_TIME		= 5,
 
 	/* MISC_GET_FW_VER feature bits */
 	FW_VER_4PORT		= (1 << 2), /* 1=4 ports, 0=8 ports */
@@ -657,7 +662,7 @@ static unsigned int carm_fill_sync_time(struct carm_host *host,
 
 	memset(st, 0, sizeof(*st));
 	st->type	= CARM_MSG_MISC;
-	st->subtype	= MISC_SYNC_TIME;
+	st->subtype	= MISC_SET_TIME;
 	st->handle	= cpu_to_le32(TAG_ENCODE(idx));
 	st->timestamp	= cpu_to_le32(tv.tv_sec);
 
@@ -1097,7 +1102,7 @@ static inline void carm_handle_resp(struct carm_host *host,
 			carm_handle_generic(host, crq, is_ok,
 					    HST_ALLOC_BUF, HST_SYNC_TIME);
 			break;
-		case MISC_SYNC_TIME:
+		case MISC_SET_TIME:
 			carm_handle_generic(host, crq, is_ok,
 					    HST_SYNC_TIME, HST_GET_FW_VER);
 			break;
