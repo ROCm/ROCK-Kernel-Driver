@@ -781,7 +781,7 @@ he_init_group(struct he_dev *he_dev, int group)
 	/* small buffer pool */
 #ifdef USE_RBPS_POOL
 	he_dev->rbps_pool = pci_pool_create("rbps", he_dev->pci_dev,
-			CONFIG_RBPS_BUFSIZE, 8, 0, SLAB_KERNEL);
+			CONFIG_RBPS_BUFSIZE, 8, 0);
 	if (he_dev->rbps_pool == NULL) {
 		hprintk("unable to create rbps pages\n");
 		return -ENOMEM;
@@ -845,7 +845,7 @@ he_init_group(struct he_dev *he_dev, int group)
 	/* large buffer pool */
 #ifdef USE_RBPL_POOL
 	he_dev->rbpl_pool = pci_pool_create("rbpl", he_dev->pci_dev,
-			CONFIG_RBPL_BUFSIZE, 8, 0, SLAB_KERNEL);
+			CONFIG_RBPL_BUFSIZE, 8, 0);
 	if (he_dev->rbpl_pool == NULL) {
 		hprintk("unable to create rbpl pool\n");
 		return -ENOMEM;
@@ -1471,7 +1471,7 @@ he_start(struct atm_dev *dev)
 
 #ifdef USE_TPD_POOL
 	he_dev->tpd_pool = pci_pool_create("tpd", he_dev->pci_dev,
-		sizeof(struct he_tpd), TPD_ALIGNMENT, 0, SLAB_KERNEL);
+		sizeof(struct he_tpd), TPD_ALIGNMENT, 0);
 	if (he_dev->tpd_pool == NULL) {
 		hprintk("unable to create tpd pci_pool\n");
 		return -ENOMEM;         
