@@ -721,6 +721,7 @@ int fb_show_logo(struct fb_info *info)
 	u32 *palette = NULL, *saved_pseudo_palette = NULL;
 	unsigned char *logo_new = NULL;
 	struct fb_image image;
+	struct fb_fillrect rect;
 	int x;
 
 	/* Return if the frame buffer is not mapped or suspended */
@@ -766,6 +767,12 @@ int fb_show_logo(struct fb_info *info)
 	image.height = fb_logo.logo->height;
 	image.dy = 0;
 
+	rect.dx = 0;
+	rect.dy = 0;
+	rect.color = 0;
+	rect.width = info->var.xres;
+	rect.height = fb_logo.logo->height;
+	info->fbops->fb_fillrect(info, &rect);
 	for (x = 0; x < num_online_cpus() * (fb_logo.logo->width + 8) &&
 	     x <= info->var.xres-fb_logo.logo->width; x += (fb_logo.logo->width + 8)) {
 		image.dx = x;
@@ -1104,11 +1111,10 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 #endif /* CONFIG_KMOD */
 		if (!registered_fb[con2fb.framebuffer])
 		    return -EINVAL;
-		if (con2fb.console != 0)
-			set_con2fb_map(con2fb.console-1, con2fb.framebuffer);
-		else
-			fb_console_init();		
-		return 0;
+		if (con2fb.console > 0 && con2fb.console < MAX_NR_CONSOLES)
+			return set_con2fb_map(con2fb.console-1,
+					      con2fb.framebuffer);
+		return -EINVAL;
 #endif	/* CONFIG_FRAMEBUFFER_CONSOLE */
 	case FBIOBLANK:
 		acquire_console_sem();
