@@ -667,9 +667,12 @@ e1000_proc_list_setup(struct e1000_adapter *adapter)
 	LIST_ADD_U("Rx_Long_Length_Errors", &adapter->stats.roc);
 	LIST_ADD_U("Rx_Short_Length_Errors", &adapter->stats.ruc);
 	
-	/* The 82542 does not have an alignment error count register */
-	if(adapter->hw.mac_type >= e1000_82543)
+	/* The 82542 does not have some of these stats */
+	if(adapter->hw.mac_type >= e1000_82543) {
 		LIST_ADD_U("Rx_Align_Errors", &adapter->stats.algnerrc);
+		LIST_ADD_U("Tx_TCP_Seg_Good", &adapter->stats.tsctc);
+		LIST_ADD_U("Tx_TCP_Seg_Failed", &adapter->stats.tsctfc);
+	}
 	
 	LIST_ADD_U("Rx_Flow_Control_XON", &adapter->stats.xonrxc);
 	LIST_ADD_U("Rx_Flow_Control_XOFF", &adapter->stats.xoffrxc);
