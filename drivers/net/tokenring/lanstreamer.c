@@ -129,6 +129,11 @@
 
 #include "lanstreamer.h"
 
+#if (BITS_PER_LONG == 64)
+#error broken on 64-bit: stores pointer to rx_ring->buffer in 32-bit int
+#endif
+
+
 /* I've got to put some intelligence into the version number so that Peter and I know
  * which version of the code somebody has got. 
  * Version Number = a.b.c.d  where a.b.c is the level of code and d is the latest author.
