@@ -235,8 +235,9 @@ handle_name:
 	}
 	nls_name.hash = full_name_hash(nls_name.name, nls_name.len);
 
-	// FIXME: Do we need dcache_lock or dparent_lock here or is the
-	// fact that i_sem is held on the parent inode sufficient? (AIA)
+	/*
+	 * Note: No need for dparent_lock as i_sem is held on the parent inode.
+	 */
 
 	/* Does a dentry matching the nls_name exist already? */
 	real_dent = d_lookup(dent->d_parent, &nls_name);

@@ -247,6 +247,12 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.9:
+	- Change decompression engine to use a single buffer. This should not
+	  affect performance except perhaps on the most heavy i/o on SMP
+	  systems when accessing multiple compressed files from multiple
+	  devices simultaneously.
+	- Minor updates and cleanups.
 2.0.8:
 	- Remove now obsolete show_inodes and posix mount option(s).
 	- Restore show_sys_files mount option.

@@ -948,8 +948,7 @@ typedef struct {
 					   data attribute. NOTE: Is a multiple
 					   of the cluster size. */
 /* 30*/	s64 data_size;			/* Byte size of actual data in data
-					   attribute. NOTE: Only present when
-					   lowest_vcn is 0. */
+					   attribute. */
 /* 38*/	FILE_ATTR_FLAGS file_attributes;	/* Flags describing the file. */
 /* 3c*/	union {
 	/* 3c*/	struct {

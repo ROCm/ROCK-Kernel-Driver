@@ -23,6 +23,17 @@ ToDo:
 	  them cleaner and make code reuse easier.
 	- Want to use dummy inodes for address space i/o.
 
+2.0.9 - Decompression engine now uses a single buffer and other cleanups.
+
+	- Change decompression engine to use a single buffer protected by a
+	  spin lock instead of per-CPU buffers. (Rusty Russel)
+	- Switch to using the new KM_BIO_SRC_IRQ for atomic kmaps. (Andrew
+	  Morton)
+	- Change buffer size in ntfs_readdir()/ntfs_filldir() to use
+	  NLS_MAX_CHARSET_SIZE which makes the buffers almost 1kiB each but
+	  it also makes everything safer so it is a good thing.
+	- Miscellaneous minor cleanups to comments.
+
 2.0.8 - Major updates for handling of case sensitivity and dcache aliasing.
 
 	Big thanks go to Al Viro and other inhabitants of #kernel for investing

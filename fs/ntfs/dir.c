@@ -995,10 +995,10 @@ typedef enum {
  * @ie:		current index entry
  * @name:	buffer to use for the converted name
  * @dirent:	vfs filldir callback context
- * filldir:	vfs filldir callback
+ * @filldir:	vfs filldir callback
  *
- * Convert the Unicode name to the loaded NLS and pass it to
- * the filldir callback.
+ * Convert the Unicode @name to the loaded NLS and pass it to the @filldir
+ * callback.
  */
 static inline int ntfs_filldir(ntfs_volume *vol, struct file *filp,
 		ntfs_inode *ndir, const INDEX_TYPE index_type,
@@ -1033,7 +1033,7 @@ static inline int ntfs_filldir(ntfs_volume *vol, struct file *filp,
 	}
 	name_len = ntfs_ucstonls(vol, (uchar_t*)&ie->key.file_name.file_name,
 			ie->key.file_name.file_name_length, &name,
-			NTFS_MAX_NAME_LEN * 3 + 1);
+			NTFS_MAX_NAME_LEN * NLS_MAX_CHARSET_SIZE + 1);
 	if (name_len <= 0) {
 		ntfs_debug("Skipping unrepresentable file.");
 		return 0;
@@ -1126,7 +1126,8 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	 * Allocate a buffer to store the current name being processed
 	 * converted to format determined by current NLS.
 	 */
-	name = (u8*)kmalloc(NTFS_MAX_NAME_LEN * 3 + 1, GFP_NOFS);
+	name = (u8*)kmalloc(NTFS_MAX_NAME_LEN * NLS_MAX_CHARSET_SIZE + 1,
+			GFP_NOFS);
 	if (!name) {
 		err = -ENOMEM;
 		goto put_unm_err_out;
