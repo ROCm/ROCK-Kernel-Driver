@@ -507,8 +507,6 @@ struct idmap;
 
 enum nfs4_client_state {
 	NFS4CLNT_OK  = 0,
-	NFS4CLNT_NEW,
-	NFS4CLNT_SETUP_STATE,
 };
 
 /*
@@ -520,7 +518,6 @@ struct nfs4_client {
 	u64			cl_clientid;	/* constant */
 	nfs4_verifier		cl_confirm;
 	unsigned long		cl_state;
-	long			cl_generation;
 
 	u32			cl_lockowner_id;
 
@@ -573,9 +570,7 @@ struct nfs4_state_owner {
 	u32                  so_id;      /* 32-bit identifier, unique */
 	struct semaphore     so_sema;
 	u32                  so_seqid;   /* protected by so_sema */
-	unsigned int         so_flags;   /* protected by so_sema */
 	atomic_t	     so_count;
-	long		     so_generation;
 
 	struct rpc_cred	     *so_cred;	 /* Associated cred */
 	struct list_head     so_states;
@@ -643,8 +638,8 @@ extern int nfs4_proc_setclientid_confirm(struct nfs4_client *);
 extern int nfs4_open_reclaim(struct nfs4_state_owner *, struct nfs4_state *);
 extern int nfs4_proc_async_renew(struct nfs4_client *);
 extern int nfs4_proc_renew(struct nfs4_client *);
-extern int _nfs4_do_close(struct inode *, struct nfs4_state *);
-extern int _nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode);
+extern int nfs4_do_close(struct inode *, struct nfs4_state *);
+extern int nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode);
 extern int nfs4_wait_clnt_recover(struct rpc_clnt *, struct nfs4_client *);
 extern struct inode *nfs4_atomic_open(struct inode *, struct dentry *, struct nameidata *);
 extern int nfs4_open_revalidate(struct inode *, struct dentry *, int);
@@ -660,6 +655,7 @@ extern void init_nfsv4_state(struct nfs_server *);
 extern void destroy_nfsv4_state(struct nfs_server *);
 extern struct nfs4_client *nfs4_get_client(struct in_addr *);
 extern void nfs4_put_client(struct nfs4_client *clp);
+extern int nfs4_init_client(struct nfs4_client *clp);
 extern u32 nfs4_alloc_lockowner_id(struct nfs4_client *);
 
 extern struct nfs4_state_owner * nfs4_get_state_owner(struct nfs_server *, struct rpc_cred *);

@@ -1510,8 +1510,13 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		memcpy(clp->cl_ipaddr, server->ip_addr, sizeof(clp->cl_ipaddr));
 		nfs_idmap_new(clp);
 	}
-	if (list_empty(&clp->cl_superblocks))
-		clear_bit(NFS4CLNT_OK, &clp->cl_state);
+	if (list_empty(&clp->cl_superblocks)) {
+		err = nfs4_init_client(clp);
+		if (err != 0) {
+			up_write(&clp->cl_sem);
+			goto out_fail;
+		}
+	}
 	list_add_tail(&server->nfs4_siblings, &clp->cl_superblocks);
 	clnt = rpc_clone_client(clp->cl_rpcclient);
 	if (!IS_ERR(clnt))

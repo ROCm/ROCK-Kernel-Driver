@@ -254,6 +254,7 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 	struct nfs4_state_owner  *sp;
 	struct nfs4_state     *state = NULL;
 	struct nfs_server       *server = NFS_SERVER(dir);
+	struct nfs4_client *clp = server->nfs4_state;
 	struct inode *inode = NULL;
 	int                     status;
 	struct nfs_fattr        f_attr = {
@@ -279,6 +280,8 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 		.rpc_cred	= cred,
 	};
 
+	/* Protect against reboot recovery conflicts */
+	down_read(&clp->cl_sem);
 	status = -ENOMEM;
 	if (!(sp = nfs4_get_state_owner(server, cred))) {
 		dprintk("nfs4_do_open: nfs4_get_state_owner failed!\n");
@@ -342,15 +345,18 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 
 	up(&sp->so_sema);
 	nfs4_put_state_owner(sp);
+	up_read(&clp->cl_sem);
 	*res = state;
 	return 0;
 out_err:
 	if (sp != NULL) {
+		if (state != NULL)
+			nfs4_put_open_state(state);
 		up(&sp->so_sema);
 		nfs4_put_state_owner(sp);
 	}
-	if (state != NULL)
-		nfs4_put_open_state(state);
+	/* Note: clp->cl_sem must be released before nfs4_put_open_state()! */
+	up_read(&clp->cl_sem);
 	if (inode != NULL)
 		iput(inode);
 	*res = NULL;
@@ -446,7 +452,7 @@ int nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
  *
  * NOTE: Caller must be holding the sp->so_owner semaphore!
  */
-int _nfs4_do_close(struct inode *inode, struct nfs4_state *state) 
+static int _nfs4_do_close(struct inode *inode, struct nfs4_state *state) 
 {
 	struct nfs4_state_owner *sp = state->owner;
 	int status = 0;
@@ -475,7 +481,27 @@ int _nfs4_do_close(struct inode *inode, struct nfs4_state *state)
 	return status;
 }
 
-int _nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode) 
+int nfs4_do_close(struct inode *inode, struct nfs4_state *state) 
+{
+	struct nfs_server *server = NFS_SERVER(state->inode);
+	struct nfs4_exception exception = { };
+	int err;
+	do {
+		err = _nfs4_do_close(inode, state);
+		switch (err) {
+			case -NFS4ERR_STALE_STATEID:
+			case -NFS4ERR_EXPIRED:
+				nfs4_schedule_state_recovery(server->nfs4_state);
+				err = 0;
+			default:
+				state->state = 0;
+		}
+		err = nfs4_handle_exception(server, err, &exception);
+	} while (exception.retry);
+	return err;
+}
+
+static int _nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode) 
 {
 	struct nfs4_state_owner *sp = state->owner;
 	int status = 0;
@@ -498,6 +524,26 @@ int _nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mod
 		memcpy(&state->stateid, &res.stateid, sizeof(state->stateid));
 
 	return status;
+}
+
+int nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode) 
+{
+	struct nfs_server *server = NFS_SERVER(state->inode);
+	struct nfs4_exception exception = { };
+	int err;
+	do {
+		err = _nfs4_do_downgrade(inode, state, mode);
+		switch (err) {
+			case -NFS4ERR_STALE_STATEID:
+			case -NFS4ERR_EXPIRED:
+				nfs4_schedule_state_recovery(server->nfs4_state);
+				err = 0;
+			default:
+				state->state = mode;
+		}
+		err = nfs4_handle_exception(server, err, &exception);
+	} while (exception.retry);
+	return err;
 }
 
 struct inode *
@@ -1829,6 +1875,8 @@ nfs4_async_handle_error(struct rpc_task *task, struct nfs_server *server)
 		case -NFS4ERR_EXPIRED:
 			rpc_sleep_on(&clp->cl_rpcwaitq, task, NULL, NULL);
 			nfs4_schedule_state_recovery(clp);
+			if (test_bit(NFS4CLNT_OK, &clp->cl_state))
+				rpc_wake_up_task(task);
 			task->tk_status = 0;
 			return -EAGAIN;
 		case -NFS4ERR_GRACE:
@@ -1844,12 +1892,11 @@ nfs4_async_handle_error(struct rpc_task *task, struct nfs_server *server)
 	return 0;
 }
 
-int
-nfs4_wait_clnt_recover(struct rpc_clnt *clnt, struct nfs4_client *clp)
+int nfs4_wait_clnt_recover(struct rpc_clnt *clnt, struct nfs4_client *clp)
 {
 	DEFINE_WAIT(wait);
 	sigset_t oldset;
-	int interruptible, res;
+	int interruptible, res = 0;
 
 	might_sleep();
 
@@ -1857,19 +1904,12 @@ nfs4_wait_clnt_recover(struct rpc_clnt *clnt, struct nfs4_client *clp)
 	interruptible = TASK_UNINTERRUPTIBLE;
 	if (clnt->cl_intr)
 		interruptible = TASK_INTERRUPTIBLE;
-	do {
-		res = 0;
-		prepare_to_wait(&clp->cl_waitq, &wait, interruptible);
-		nfs4_schedule_state_recovery(clp);
-		if (test_bit(NFS4CLNT_OK, &clp->cl_state) &&
-				!test_bit(NFS4CLNT_SETUP_STATE, &clp->cl_state))
-			break;
-		if (clnt->cl_intr && signalled()) {
-			res = -ERESTARTSYS;
-			break;
-		}
+	prepare_to_wait(&clp->cl_waitq, &wait, interruptible);
+	nfs4_schedule_state_recovery(clp);
+	if (clnt->cl_intr && signalled())
+		res = -ERESTARTSYS;
+	else if (!test_bit(NFS4CLNT_OK, &clp->cl_state))
 		schedule();
-	} while(!test_bit(NFS4CLNT_OK, &clp->cl_state));
 	finish_wait(&clp->cl_waitq, &wait);
 	rpc_clnt_sigunmask(clnt, &oldset);
 	return res;
@@ -2072,6 +2112,7 @@ static int _nfs4_proc_getlk(struct nfs4_state *state, int cmd, struct file_lock 
 	struct nfs4_lock_state *lsp;
 	int status;
 
+	down_read(&clp->cl_sem);
 	nlo.clientid = clp->cl_clientid;
 	down(&state->lock_sema);
 	lsp = nfs4_find_lock_state(state, request->fl_owner);
@@ -2105,6 +2146,7 @@ static int _nfs4_proc_getlk(struct nfs4_state *state, int cmd, struct file_lock 
 	if (lsp)
 		nfs4_put_lock_state(lsp);
 	up(&state->lock_sema);
+	up_read(&clp->cl_sem);
 	return status;
 }
 
@@ -2125,6 +2167,7 @@ static int _nfs4_proc_unlck(struct nfs4_state *state, int cmd, struct file_lock 
 {
 	struct inode *inode = state->inode;
 	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs4_client *clp = server->nfs4_state;
 	struct nfs_lockargs arg = {
 		.fh = NFS_FH(inode),
 		.type = nfs4_lck_type(cmd, request),
@@ -2144,6 +2187,7 @@ static int _nfs4_proc_unlck(struct nfs4_state *state, int cmd, struct file_lock 
 	struct nfs_locku_opargs luargs;
 	int status = 0;
 			
+	down_read(&clp->cl_sem);
 	down(&state->lock_sema);
 	lsp = nfs4_find_lock_state(state, request->fl_owner);
 	if (!lsp)
@@ -2164,6 +2208,7 @@ out:
 	up(&state->lock_sema);
 	if (status == 0)
 		posix_lock_file(request->fl_file, request);
+	up_read(&clp->cl_sem);
 	return status;
 }
 
@@ -2184,6 +2229,7 @@ static int _nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock 
 {
 	struct inode *inode = state->inode;
 	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs4_client *clp = server->nfs4_state;
 	struct nfs4_lock_state *lsp;
 	struct nfs_lockargs arg = {
 		.fh = NFS_FH(inode),
@@ -2205,6 +2251,7 @@ static int _nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock 
 	};
 	int status;
 
+	down_read(&clp->cl_sem);
 	down(&state->lock_sema);
 	lsp = nfs4_find_lock_state(state, request->fl_owner);
 	if (lsp == NULL) {
@@ -2258,6 +2305,7 @@ out:
 		if (posix_lock_file_wait(request->fl_file, request) < 0)
 			printk(KERN_WARNING "%s: VFS is out of sync with lock manager!\n", __FUNCTION__);
 	}
+	up_read(&clp->cl_sem);
 	return status;
 }
 
