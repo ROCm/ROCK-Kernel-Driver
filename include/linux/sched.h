@@ -549,7 +549,8 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define SD_BALANCE_EXEC		2	/* Balance on exec */
 #define SD_WAKE_IDLE		4	/* Wake to idle CPU on task wakeup */
 #define SD_WAKE_AFFINE		8	/* Wake task to waking CPU */
-#define SD_SHARE_CPUPOWER	16	/* Domain members share cpu power */
+#define SD_WAKE_BALANCE		16	/* Perform balancing at task wakeup */
+#define SD_SHARE_CPUPOWER	32	/* Domain members share cpu power */
 
 struct sched_group {
 	struct sched_group *next;	/* Must be a circular list */
@@ -618,7 +619,8 @@ struct sched_domain {
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
 	.flags			= SD_BALANCE_NEWIDLE	\
-				| SD_WAKE_AFFINE,	\
+				| SD_WAKE_AFFINE	\
+				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
 	.nr_balance_failed	= 0,			\
@@ -637,7 +639,8 @@ struct sched_domain {
 	.cache_hot_time		= (10*1000000),		\
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
-	.flags			= SD_BALANCE_EXEC,	\
+	.flags			= SD_BALANCE_EXEC	\
+				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
 	.nr_balance_failed	= 0,			\

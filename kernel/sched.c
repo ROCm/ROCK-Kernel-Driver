@@ -761,25 +761,28 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	new_cpu = this_cpu; /* Wake to this CPU if we can */
 
 	/*
-	 * Passive load balancing. If the queues are very out of balance
-	 * we might as well balance here rather than the periodic load
-	 * balancing.
-	 */
-	if (load > this_load + SCHED_LOAD_SCALE*2)
-		goto out_set_cpu;
-
-	/*
-	 * Migrate the task to the waking domain.
-	 * Do not violate hard affinity.
+	 * Scan domains for affine wakeup and passive balancing
+	 * possibilities.
 	 */
 	for_each_domain(this_cpu, sd) {
-		if (!(sd->flags & SD_WAKE_AFFINE))
-			break;
-		if (task_hot(p, rq->timestamp_last_tick, sd))
-			break;
+		unsigned int imbalance;
+		/*
+		 * Start passive balancing when half the imbalance_pct
+		 * limit is reached.
+		 */
+		imbalance = sd->imbalance_pct + (sd->imbalance_pct - 100) / 2;
 
-		if (cpu_isset(cpu, sd->span))
-			goto out_set_cpu;
+		if ( ((sd->flags & SD_WAKE_AFFINE) &&
+				!task_hot(p, rq->timestamp_last_tick, sd))
+			|| ((sd->flags & SD_WAKE_BALANCE) &&
+				imbalance*this_load <= 100*load) ) {
+			/*
+			 * Now sd has SD_WAKE_AFFINE and p is cache cold in sd
+			 * or sd has SD_WAKE_BALANCE and there is an imbalance
+			 */
+			if (cpu_isset(cpu, sd->span))
+				goto out_set_cpu;
+		}
 	}
 
 	new_cpu = cpu; /* Could not wake to this_cpu. Wake to cpu instead */
