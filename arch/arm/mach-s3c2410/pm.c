@@ -117,7 +117,9 @@ static struct sleep_save gpio_save[] = {
 #ifdef CONFIG_S3C2410_PM_DEBUG
 /* debug
  *
- */
+ * we send the debug to printascii() to allow it to be seen if the
+ * system never wakes up from the sleep
+*/
 
 extern void printascii(const char *);
 
@@ -338,7 +340,7 @@ static void s3c2410_pm_do_save(struct sleep_save *ptr, int count)
 {
 	for (; count > 0; count--, ptr++) {
 		ptr->val = __raw_readl(ptr->reg);
-		DBG("saved %08x value %08x\n", ptr->reg, ptr->val);
+		DBG("saved %08lx value %08lx\n", ptr->reg, ptr->val);
 	}
 }
 
@@ -346,7 +348,7 @@ static void s3c2410_pm_do_save(struct sleep_save *ptr, int count)
 static void s3c2410_pm_do_restore(struct sleep_save *ptr, int count)
 {
 	for (; count > 0; count--, ptr++) {
-		DBG("restore %08x (restore %08x, current %08x)\n",
+		DBG("restore %08lx (restore %08lx, current %08x)\n",
 		    ptr->reg, ptr->val, __raw_readl(ptr->reg));
 		__raw_writel(ptr->val, ptr->reg);
 	}
@@ -464,14 +466,14 @@ static int s3c2410_pm_enter(u32 state)
 
 	s3c2410_sleep_save_phys = virt_to_phys(regs_save);
 
-	DBG("s3c2410_sleep_save_phys=0x%08x\n", s3c2410_sleep_save_phys);
+	DBG("s3c2410_sleep_save_phys=0x%08lx\n", s3c2410_sleep_save_phys);
 
 	/* ensure at least GESTATUS3 has the resume address */
 
 	__raw_writel(virt_to_phys(s3c2410_cpu_resume), S3C2410_GSTATUS3);
 
-	DBG("GSTATUS3 0x%08lx\n", __raw_readl(S3C2410_GSTATUS3));
-	DBG("GSTATUS4 0x%08lx\n", __raw_readl(S3C2410_GSTATUS4));
+	DBG("GSTATUS3 0x%08x\n", __raw_readl(S3C2410_GSTATUS3));
+	DBG("GSTATUS4 0x%08x\n", __raw_readl(S3C2410_GSTATUS4));
 
 	/* save all necessary core registers not covered by the drivers */
 
@@ -515,7 +517,7 @@ static int s3c2410_pm_enter(u32 state)
 
 	/* check what irq (if any) restored the system */
 
-	DBG("post sleep: IRQs 0x%08lx, 0x%08lx\n",
+	DBG("post sleep: IRQs 0x%08x, 0x%08x\n",
 	    __raw_readl(S3C2410_SRCPND),
 	    __raw_readl(S3C2410_EINTPEND));
 
