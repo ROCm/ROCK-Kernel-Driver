@@ -506,9 +506,9 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		memset(slot_errbuf, 0, eeh_error_buf_size);
 
 		log_event = rtas_call(rtas_token("ibm,slot-error-detail"), 8, 1, NULL,
-				      event->dn->eeh_config_addr,
-				      BUID_HI(event->dn->phb->buid),
-				      BUID_LO(event->dn->phb->buid), NULL, 0,
+				      dn->eeh_config_addr,
+				      BUID_HI(dn->phb->buid),
+				      BUID_LO(dn->phb->buid), NULL, 0,
 				      virt_to_phys(slot_errbuf), eeh_error_buf_size,
 				      2 /* Permanent Error */);
 		if (log_event == 0) 
