@@ -31,7 +31,9 @@ void sirdev_enable_rx(struct sir_dev *dev)
 
 	/* flush rx-buffer - should also help in case of problems with echo cancelation */
 	dev->rx_buff.data = dev->rx_buff.head;
-	dev->tx_buff.len = 0;
+	dev->rx_buff.len = 0;
+	dev->rx_buff.in_frame = FALSE;
+	dev->rx_buff.state = OUTSIDE_FRAME;
 	atomic_set(&dev->enable_rx, 1);
 }
 
@@ -78,8 +80,17 @@ int sirdev_raw_write(struct sir_dev *dev, const char *buf, int len)
 
 	dev->tx_buff.data = dev->tx_buff.head;
 	memcpy(dev->tx_buff.data, buf, len);	
+	dev->tx_buff.len = len;
 
 	ret = dev->drv->do_write(dev, dev->tx_buff.data, dev->tx_buff.len);
+	if (ret > 0) {
+		IRDA_DEBUG(3, "%s(), raw-tx started\n", __FUNCTION__);
+
+		dev->tx_buff.data += ret;
+		dev->tx_buff.len -= ret;
+		dev->raw_tx = 1;
+		ret = len;		/* all data is going to be sent */
+	}
 	spin_unlock_irqrestore(&dev->tx_lock, flags);
 	return ret;
 }
@@ -95,13 +106,13 @@ int sirdev_raw_read(struct sir_dev *dev, char *buf, int len)
 
 	count = (len < dev->rx_buff.len) ? len : dev->rx_buff.len;
 
-	if (count > 0)
-		memcpy(buf, dev->rx_buff.head, count);
+	if (count > 0) {
+		memcpy(buf, dev->rx_buff.data, count);
+		dev->rx_buff.data += count;
+		dev->rx_buff.len -= count;
+	}
 
-	/* forget trailing stuff */
-	dev->rx_buff.data = dev->rx_buff.head;
-	dev->rx_buff.len = 0;
-	dev->rx_buff.state = OUTSIDE_FRAME;
+	/* remaining stuff gets flushed when re-enabling normal rx */
 
 	return count;
 }
@@ -148,6 +159,19 @@ void sirdev_write_complete(struct sir_dev *dev)
 			spin_unlock_irqrestore(&dev->tx_lock, flags);
 			return;
 		}
+	}
+
+	if (unlikely(dev->raw_tx != 0)) {
+		/* in raw mode we are just done now after the buffer was sent
+		 * completely. Since this was requested by some dongle driver
+		 * running under the control of the irda-thread we must take
+		 * care here not to re-enable the queue. The queue will be
+		 * restarted when the irda-thread has completed the request.
+		 */
+
+		IRDA_DEBUG(3, "%s(), raw-tx done\n", __FUNCTION__);
+		dev->raw_tx = 0;
+		return;
 	}
 
 	/* we have finished now sending this skb.
@@ -482,6 +506,7 @@ static int sirdev_open(struct net_device *ndev)
 		goto errout_free;
 
 	sirdev_enable_rx(dev);
+	dev->raw_tx = 0;
 
 	netif_start_queue(ndev);
 	dev->irlap = irlap_open(ndev, &dev->qos, dev->hwname);
