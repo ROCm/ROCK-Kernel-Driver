@@ -247,7 +247,7 @@ static int n2_close(struct net_device *dev)
 	sca_close(hdlc);
 	mcr |= port->phy_node ? DTR_PORT1 : DTR_PORT0; /* set DTR OFF */
 	outb(mcr, io + N2_MCR);
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 	return 0;
 }
 

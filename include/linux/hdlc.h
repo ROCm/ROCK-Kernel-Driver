@@ -231,7 +231,7 @@ static __inline__ void debug_frame(const struct sk_buff *skb)
 /* Must be called by hardware driver when HDLC device is being opened */
 int hdlc_open(struct net_device *dev);
 /* Must be called by hardware driver when HDLC device is being closed */
-void hdlc_close(hdlc_device *hdlc);
+void hdlc_close(struct net_device *dev);
 /* Called by hardware driver when DCD line level changes */
 void hdlc_set_carrier(int on, hdlc_device *hdlc);
 

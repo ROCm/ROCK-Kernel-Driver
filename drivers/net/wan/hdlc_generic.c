@@ -145,8 +145,9 @@ int hdlc_open(struct net_device *dev)
 
 
 /* Must be called by hardware driver when HDLC device is being closed */
-void hdlc_close(hdlc_device *hdlc)
+void hdlc_close(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 #ifdef DEBUG_LINK
 	printk(KERN_DEBUG "hdlc_close carrier %i open %i\n",
 	       hdlc->carrier, hdlc->open);

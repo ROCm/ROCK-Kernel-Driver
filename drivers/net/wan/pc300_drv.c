@@ -3190,7 +3190,7 @@ int cpc_close(struct net_device *dev)
 	cpc_closech(d);
 	CPC_UNLOCK(card, flags);
 
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 	if (hdlc->proto.id == IF_PROTO_PPP) {
 		d->if_ptr = NULL;
 	}

@@ -212,7 +212,7 @@ static int c101_close(struct net_device *dev)
 	sca_close(hdlc);
 	writeb(0, port->win0base + C101_DTR);
 	sca_out(CTL_NORTS, MSCI1_OFFSET + CTL, port);
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 	return 0;
 }
 

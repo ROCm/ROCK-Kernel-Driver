@@ -455,7 +455,7 @@ static int wanxl_close(struct net_device *dev)
 	unsigned long timeout;
 	int i;
 
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 	/* signal the card */
 	writel(1 << (DOORBELL_TO_CARD_CLOSE_0 + port->node),
 	       port->card->plx + PLX_DOORBELL_TO_CARD);

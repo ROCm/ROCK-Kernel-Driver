@@ -1015,7 +1015,6 @@ static void dscc4_pci_reset(struct pci_dev *pdev, unsigned long ioaddr)
 static int dscc4_open(struct net_device *dev)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
-	hdlc_device *hdlc = &dpriv->hdlc;
 	struct dscc4_pci_priv *ppriv;
 	int ret = -EAGAIN;
 
@@ -1103,7 +1102,7 @@ err_disable_scc_events:
 	scc_writel(0xffffffff, dpriv, dev, IMR);
 	scc_patchl(PowerUp | Vis, 0, dpriv, dev, CCR0);
 err_out:
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 err:
 	return ret;
 }
@@ -1155,7 +1154,6 @@ static int dscc4_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static int dscc4_close(struct net_device *dev)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
-	hdlc_device *hdlc = dev_to_hdlc(dev);
 
 	del_timer_sync(&dpriv->timer);
 	netif_stop_queue(dev);
@@ -1166,7 +1164,7 @@ static int dscc4_close(struct net_device *dev)
 
 	dpriv->flags |= FakeReset;
 
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 
 	return 0;
 }

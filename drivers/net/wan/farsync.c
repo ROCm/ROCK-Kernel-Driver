@@ -1325,7 +1325,7 @@ fst_close ( struct net_device *dev )
 {
         netif_stop_queue ( dev );
         fst_closeport ( dev_to_port ( dev ));
-        hdlc_close ( dev_to_hdlc  ( dev ));
+        hdlc_close ( dev );
         MOD_DEC_USE_COUNT;
         return 0;
 }
