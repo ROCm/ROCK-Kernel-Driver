@@ -44,12 +44,12 @@
 #include "dvb_frontend.h"
 #include "dvb_functions.h"
 
-#ifndef CONFIG_TDA1004X_MC_LOCATION
-#define CONFIG_TDA1004X_MC_LOCATION "/etc/dvb/tda1004x.mc"
+#ifndef DVB_TDA1004X_FIRMWARE_FILE
+#define DVB_TDA1004X_FIRMWARE_FILE "/etc/dvb/tda1004x.mc"
 #endif
 
 static int tda1004x_debug = 0;
-static char *tda1004x_firmware = CONFIG_TDA1004X_MC_LOCATION;
+static char *tda1004x_firmware = DVB_TDA1004X_FIRMWARE_FILE;
 
 
 #define TDA10045H_ADDRESS        0x08
