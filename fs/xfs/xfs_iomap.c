@@ -577,16 +577,42 @@ retry:
 	 */
 	if (!(ioflag & BMAPI_SYNC) && ((offset + count) > ip->i_d.di_size)) {
 		xfs_off_t	aligned_offset;
+		xfs_filblks_t   count_fsb;
 		unsigned int	iosize;
 		xfs_fileoff_t	ioalign;
+		int		n;
+		xfs_fileoff_t   start_fsb;
 
+		/*
+		 * If there are any real blocks past eof, then don't
+		 * do any speculative allocation.
+		 */
+		start_fsb = XFS_B_TO_FSBT(mp,
+					((xfs_ufsize_t)(offset + count - 1)));
+		count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)XFS_MAXIOFFSET(mp));
+		while (count_fsb > 0) {
+			nimaps = XFS_WRITE_IMAPS;
+			error = XFS_BMAPI(mp, NULL, io, start_fsb, count_fsb,
+					0, &firstblock, 0, imap, &nimaps, NULL);
+			if (error) {
+				return error;
+			}
+			for (n = 0; n < nimaps; n++) {
+				if ((imap[n].br_startblock != HOLESTARTBLOCK) &&
+				    (imap[n].br_startblock != DELAYSTARTBLOCK)) {
+					goto write_map;
+				}
+				start_fsb += imap[n].br_blockcount;
+				count_fsb -= imap[n].br_blockcount;
+			}
+		}
 		iosize = mp->m_writeio_blocks;
 		aligned_offset = XFS_WRITEIO_ALIGN(mp, (offset + count - 1));
 		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		last_fsb = ioalign + iosize;
 		aeof = 1;
 	}
-
+write_map:
 	nimaps = XFS_WRITE_IMAPS;
 	firstblock = NULLFSBLOCK;
 
