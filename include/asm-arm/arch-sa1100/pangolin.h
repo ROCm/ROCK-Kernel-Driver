@@ -6,10 +6,11 @@
  * This file contains the hardware specific definitions for Pangolin
  *
  */
-
 #ifndef __ASM_ARCH_HARDWARE_H
 #error "include <asm/hardware.h> instead"
 #endif
+
+#include <linux/config.h>
 
 #ifndef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
 

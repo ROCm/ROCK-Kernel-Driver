@@ -14,8 +14,6 @@
  *     Moved demux from asm to C - DS
  *     Fixes for various revision boards - DS
  */
-
-#include <linux/config.h>
 #include <linux/kernel_stat.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>

@@ -12,8 +12,6 @@
  * 80200 on chip interrupts. That'll change once the hardware adds
  * support for PCI though.
  */
-
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>

@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2001 MontaVista Software, Inc.
  */
-
+#include <linux/config.h>
 
 /*
  * This assumes you have a 1.8432 MHz clock for your UART.
