@@ -227,21 +227,16 @@ asmlinkage int sys_ipc(uint call, int first, int second,
 	case MSGCTL:
 		return sys_msgctl (first, second,
 				   (struct msqid_ds __user *) ptr);
-	case SHMAT:
-		switch (version) {
-		default: {
-			ulong raddr;
-			ret = do_shmat (first, (char __user *) ptr,
-					 second, &raddr);
-			if (ret)
-				return ret;
-			return put_user (raddr, (ulong __user *) third);
-		}
-		case 1:	/* iBCS2 emulator entry point */
-			if (!segment_eq(get_fs(), get_ds()))
-				return -EINVAL;
-			return do_shmat (first, (char __user *) ptr,
-					  second, (ulong *) third);
+	case SHMAT: {
+		ulong raddr;
+
+		if ((ret = verify_area(VERIFY_WRITE, (ulong __user *) third,
+				      sizeof(ulong))))
+			return ret;
+		ret = do_shmat (first, (char __user *) ptr, second, &raddr);
+		if (ret)
+			return ret;
+		return put_user (raddr, (ulong __user *) third);
 		}
 	case SHMDT:
 		return sys_shmdt ((char __user *)ptr);
