@@ -333,7 +333,6 @@ struct address_space {
 	struct list_head	i_mmap_shared;	/* list of shared mappings */
 	struct semaphore	i_shared_sem;	/* protect both above lists */
 	atomic_t		truncate_count;	/* Cover race condition with truncate */
-	unsigned long		dirtied_when;	/* jiffies of first page dirtying */
 	unsigned long		flags;		/* error bits/gfp mask */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
 	spinlock_t		private_lock;	/* for use by the address_space */
@@ -416,6 +415,7 @@ struct inode {
 	struct dnotify_struct	*i_dnotify; /* for directory notifications */
 
 	unsigned long		i_state;
+	unsigned long		dirtied_when;	/* jiffies of first dirtying */
 
 	unsigned int		i_flags;
 	unsigned char		i_sock;

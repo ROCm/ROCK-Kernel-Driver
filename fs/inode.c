@@ -132,6 +132,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 		inode->i_cdev = NULL;
 		inode->i_rdev = 0;
 		inode->i_security = NULL;
+		inode->dirtied_when = 0;
 		if (security_inode_alloc(inode)) {
 			if (inode->i_sb->s_op->destroy_inode)
 				inode->i_sb->s_op->destroy_inode(inode);
@@ -144,7 +145,6 @@ static struct inode *alloc_inode(struct super_block *sb)
  		mapping->host = inode;
 		mapping->flags = 0;
 		mapping_set_gfp_mask(mapping, GFP_HIGHUSER);
-		mapping->dirtied_when = 0;
 		mapping->assoc_mapping = NULL;
 		mapping->backing_dev_info = &default_backing_dev_info;
 		if (sb->s_bdev)

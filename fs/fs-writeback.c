@@ -44,6 +44,13 @@ extern struct super_block *blockdev_superblock;
  *
  * This function *must* be atomic for the I_DIRTY_PAGES case -
  * set_page_dirty() is called under spinlock in several places.
+ *
+ * Note that for blockdevs, inode->dirtied_when represents the dirtying time of
+ * the block-special inode (/dev/hda1) itself.  And the ->dirtied_when field of
+ * the kernel-internal blockdev inode represents the dirtying time of the
+ * blockdev's pages.  This is why for I_DIRTY_PAGES we always use
+ * page->mapping->host, so the page-dirtying time is recorded in the internal
+ * blockdev inode.
  */
 void __mark_inode_dirty(struct inode *inode, int flags)
 {
@@ -71,7 +78,6 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	spin_lock(&inode_lock);
 	if ((inode->i_state & flags) != flags) {
 		const int was_dirty = inode->i_state & I_DIRTY;
-		struct address_space *mapping = inode->i_mapping;
 
 		inode->i_state |= flags;
 
@@ -99,7 +105,7 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		 * reposition it (that would break s_dirty time-ordering).
 		 */
 		if (!was_dirty) {
-			mapping->dirtied_when = jiffies;
+			inode->dirtied_when = jiffies;
 			list_move(&inode->i_list, &sb->s_dirty);
 		}
 	}
@@ -176,11 +182,11 @@ __sync_single_inode(struct inode *inode, struct writeback_control *wbc)
 		} else if (!list_empty(&mapping->dirty_pages)) {
 			/* Redirtied */
 			inode->i_state |= I_DIRTY_PAGES;
-			mapping->dirtied_when = jiffies;
+			inode->dirtied_when = jiffies;
 			list_move(&inode->i_list, &sb->s_dirty);
 		} else if (inode->i_state & I_DIRTY) {
 			/* Redirtied */
-			mapping->dirtied_when = jiffies;
+			inode->dirtied_when = jiffies;
 			list_move(&inode->i_list, &sb->s_dirty);
 		} else if (atomic_read(&inode->i_count)) {
 			list_move(&inode->i_list, &inode_in_use);
@@ -220,7 +226,7 @@ __writeback_single_inode(struct inode *inode,
  * Write out a superblock's list of dirty inodes.  A wait will be performed
  * upon no inodes, all inodes or the final one, depending upon sync_mode.
  *
- * If older_than_this is non-NULL, then only write out mappings which
+ * If older_than_this is non-NULL, then only write out inodes which
  * had their first dirtying at a time earlier than *older_than_this.
  *
  * If we're a pdlfush thread, then implement pdflush collision avoidance
@@ -292,11 +298,11 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		}
 
 		/* Was this inode dirtied after sync_sb_inodes was called? */
-		if (time_after(mapping->dirtied_when, start))
+		if (time_after(inode->dirtied_when, start))
 			break;
 
 		/* Was this inode dirtied too recently? */
-		if (wbc->older_than_this && time_after(mapping->dirtied_when,
+		if (wbc->older_than_this && time_after(inode->dirtied_when,
 						*wbc->older_than_this))
 			break;
 
@@ -308,7 +314,7 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		__iget(inode);
 		__writeback_single_inode(inode, wbc);
 		if (wbc->sync_mode == WB_SYNC_HOLD) {
-			mapping->dirtied_when = jiffies;
+			inode->dirtied_when = jiffies;
 			list_move(&inode->i_list, &sb->s_dirty);
 		}
 		if (current_is_pdflush())
