@@ -221,6 +221,8 @@ static int sock_xmit(struct socket *sock, int send, void *buf, int size,
 			printk(KERN_ERR "nbd: %s - sock=%p at buf=%p, size=%d returned %d.\n",
 			       send? "send": "receive", sock, buf, size, result);
 #endif
+			if (result == 0)
+				result = -EPIPE; /* short read */
 			break;
 		}
 		size -= result;
@@ -309,7 +311,7 @@ void nbd_send_req(struct nbd_device *lo, struct request *req)
 	up(&lo->tx_lock);
 	return;
 
-      error_out:
+error_out:
 	up(&lo->tx_lock);
 	req->errors++;
 }
@@ -358,23 +360,22 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 	if (result <= 0) {
 		printk(KERN_ERR "%s: Receive control failed (result %d)\n",
 				lo->disk->disk_name, result);
-		lo->harderror = result;
-		return NULL;
+		goto harderror;
 	}
 	req = nbd_find_request(lo, reply.handle);
 	if (req == NULL) {
 		printk(KERN_ERR "%s: Unexpected reply (%p)\n",
 				lo->disk->disk_name, reply.handle);
-		lo->harderror = result;
-		return NULL;
+		result = -EBADR;
+		goto harderror;
 	}
 
 	if (ntohl(reply.magic) != NBD_REPLY_MAGIC) {
 		printk(KERN_ERR "%s: Wrong magic (0x%lx)\n",
 				lo->disk->disk_name,
 				(unsigned long)ntohl(reply.magic));
-		lo->harderror = result;
-		return NULL;
+		result = -EPROTO;
+		goto harderror;
 	}
 	if (ntohl(reply.error)) {
 		printk(KERN_ERR "%s: Other side returned error (%d)\n",
@@ -396,8 +397,7 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 					printk(KERN_ERR "%s: Receive data failed (result %d)\n",
 							lo->disk->disk_name,
 							result);
-					lo->harderror = result;
-					return NULL;
+					goto harderror;
 				}
 				dprintk(DBG_RX, "%s: request %p: got %d bytes data\n",
 					lo->disk->disk_name, req, bvec->bv_len);
@@ -405,6 +405,9 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 		}
 	}
 	return req;
+harderror:
+	lo->harderror = result;
+	return NULL;
 }
 
 void nbd_do_it(struct nbd_device *lo)
@@ -416,8 +419,6 @@ void nbd_do_it(struct nbd_device *lo)
 #endif
 	while ((req = nbd_read_stat(lo)) != NULL)
 		nbd_end_request(req);
-	printk(KERN_NOTICE "%s: req should never be null\n",
-			lo->disk->disk_name);
 	return;
 }
 
@@ -751,8 +752,7 @@ static int __init nbd_init(void)
 	return 0;
 out:
 	while (i--) {
-		if (nbd_dev[i].disk->queue)
-			blk_cleanup_queue(nbd_dev[i].disk->queue);
+		blk_cleanup_queue(nbd_dev[i].disk->queue);
 		put_disk(nbd_dev[i].disk);
 	}
 	return err;
@@ -764,9 +764,8 @@ static void __exit nbd_cleanup(void)
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = nbd_dev[i].disk;
 		if (disk) {
-			if (disk->queue)
-				blk_cleanup_queue(disk->queue);
 			del_gendisk(disk);
+			blk_cleanup_queue(disk->queue);
 			put_disk(disk);
 		}
 	}
