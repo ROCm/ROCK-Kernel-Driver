@@ -1,4 +1,4 @@
-#include <linux/types.h>
+#include <linux/xfrm.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
 #include <linux/skbuff.h>
@@ -9,7 +9,6 @@
 #include <net/route.h>
 
 extern struct semaphore xfrm_cfg_sem;
-
 
 /* Organization of SPD aka "XFRM rules"
    ------------------------------------
@@ -72,84 +71,6 @@ extern struct semaphore xfrm_cfg_sem;
       metrics. Plus, it will be made via sk->dst_cache. Solved.
  */
 
-/* Structure to encapsulate addresses. I do not want to use
- * "standard" structure. My apologies. */
-
-typedef union
-{
-	struct {
-		u32	addr;
-		u32	mask;	/* Use unused bits to cache mask. */
-	} a4;
-#define xfrm4_addr a4.addr
-#define xfrm4_mask a4.mask
-	u32		a6[4];
-} xfrm_address_t;
-
-/* Ident of a specific xfrm_state. It is used on input to lookup
- * the state by (spi,daddr,ah/esp) or to store information about
- * spi, protocol and tunnel address on output. */
-
-struct xfrm_id
-{
-	xfrm_address_t	daddr;
-	__u32		spi;
-	__u8		proto;
-};
-
-/* Selector, used as selector both on policy rules (SPD) and SAs. */
-
-struct xfrm_selector
-{
-	xfrm_address_t	daddr;
-	xfrm_address_t	saddr;
-	__u16	dport;
-	__u16	dport_mask;
-	__u16	sport;
-	__u16	sport_mask;
-	__u8	prefixlen_d;
-	__u8	prefixlen_s;
-	__u8	proto;
-	int	ifindex;
-	uid_t	user;
-	void	*owner;
-};
-
-#define XFRM_INF (~(u64)0)
-
-struct xfrm_lifetime_cfg
-{
-	u64	soft_byte_limit;
-	u64	hard_byte_limit;
-	u64	soft_packet_limit;
-	u64	hard_packet_limit;
-	u64	soft_add_expires_seconds;
-	u64	hard_add_expires_seconds;
-	u64	soft_use_expires_seconds;
-	u64	hard_use_expires_seconds;
-};
-
-struct xfrm_lifetime_cur
-{
-	u64	bytes;
-	u64	packets;
-	u64	add_time;
-	u64	use_time;
-};
-
-struct xfrm_replay_state
-{
-	u32	oseq;
-	u32	seq;
-	u32	bitmap;
-};
-
-struct xfrm_algo {
-	char	alg_name[CRYPTO_MAX_ALG_NAME];
-	int	alg_key_len;    /* in bits */
-	char	alg_key[0];
-};
-
 /* Full description of state of transformer. */
 struct xfrm_state
 {
@@ -191,11 +112,7 @@ struct xfrm_state
 	struct xfrm_replay_state replay;
 
 	/* Statistics */
-	struct {
-		u32		replay_window;
-		u32		replay;
-		u32		integrity_failed;
-	} stats;
+	struct xfrm_stats	stats;
 
 	struct xfrm_lifetime_cur curlft;
 	struct timer_list	timer;
