@@ -978,7 +978,6 @@ static void usbtest_disconnect (struct usb_interface *intf)
 
 	dev_set_drvdata (&intf->dev, 0);
 	info ("unbound %s", dev->id);
-	kfree (intf->private_data);
 }
 
 /* Basic testing only needs a device that can source or sink bulk traffic.

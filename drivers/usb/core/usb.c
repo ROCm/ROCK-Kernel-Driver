@@ -298,7 +298,7 @@ void usb_driver_claim_interface(struct usb_driver *driver, struct usb_interface 
 	    dbg("%s driver claimed interface %p", driver->name, iface);
 
 	iface->driver = driver;
-	iface->private_data = priv;
+	usb_set_intfdata(iface, priv);
 }
 
 /**
@@ -341,7 +341,7 @@ void usb_driver_release_interface(struct usb_driver *driver, struct usb_interfac
 		return;
 
 	iface->driver = NULL;
-	iface->private_data = NULL;
+	usb_set_intfdata(iface, NULL);
 }
 
 /**
