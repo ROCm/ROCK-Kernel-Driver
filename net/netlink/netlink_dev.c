@@ -180,7 +180,7 @@ static struct { char *name; int minor; } entries[] = {
 	{"route6", 11},
 	{"ip6_fw", 13},
 	{"dnrtmsg", 13},
-}
+};
 
 static void __init make_devfs_entries (const char *name, int minor)
 {
@@ -192,6 +192,8 @@ static void __init make_devfs_entries (const char *name, int minor)
 
 int __init init_netlink(void)
 {
+	int i;
+
 	if (register_chrdev(NETLINK_MAJOR,"netlink", &netlink_fops)) {
 		printk(KERN_ERR "netlink: unable to get major %d\n", NETLINK_MAJOR);
 		return -EIO;
