@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.30 2004/07/21 00:16:14 jwboyer Exp $
+# $Id: Kconfig,v 1.37 2004/10/20 22:57:18 dwmw2 Exp $
 
 menu "Mapping drivers for chip access"
 	depends on MTD!=n
@@ -92,6 +92,25 @@ config MTD_NETSC520
 	  demonstration board. If you have one of these boards and would like 
 	  to use the flash chips on it, say 'Y'.
 
+config MTD_TS5500
+	tristate "JEDEC Flash device mapped on Technologic Systems TS-5500"
+	depends on X86 && MTD_JEDECPROBE && MTD_PARTITIONS
+	help
+	  This provides a driver for the on-board flash of the Technologic
+	  System's TS-5500 board. The flash is split into 3 partitions
+	  which are accessed as separate MTD devices.
+
+	  mtd0 and mtd2 are the two BIOS drives. Unfortunately the BIOS
+	  uses a proprietary flash translation layer from General Software,
+	  which is not supported (the drives cannot be mounted). You can
+	  create your own file system (jffs for example), but the BIOS
+	  won't be able to boot from it.
+
+	  mtd1 allows you to reprogram your BIOS. BE VERY CAREFUL.
+
+	  Note that jumper 3 ("Write Enable Drive A") must be set
+	  otherwise detection won't succeeed.
+
 config MTD_SBC_GXX
 	tristate "CFI Flash device mapped on Arcom SBC-GXx boards"
 	depends on X86 && MTD_CFI_INTELEXT && MTD_PARTITIONS && MTD_COMPLEX_MAPPINGS
@@ -160,7 +179,7 @@ config MTD_AMD76XROM
 
 config MTD_ICHXROM
 	tristate "BIOS flash chip on Intel Controller Hub 2/3/4/5"
-	depends on X86 && MTD_JEDECPROBE && MTD_COMPLEX_MAPPINGS
+	depends on X86 && MTD_JEDECPROBE
 	help
 	  Support for treating the BIOS flash chip on ICHX motherboards
 	  as an MTD device - with this you can reprogram your BIOS.
@@ -355,11 +374,19 @@ config MTD_ARCTIC
 	  use the flash chips on it, say 'Y'.
 
 config MTD_EBONY
-	tristate "CFI Flash device mapped on IBM 440GP Ebony"
-	depends on MTD_CFI && PPC32 && 440 && EBONY
+	tristate "Flash devices mapped on IBM 440GP Ebony"
+	depends on MTD_CFI && PPC32 && 44x && EBONY
 	help
 	  This enables access routines for the flash chips on the IBM 440GP
 	  Ebony board. If you have one of these boards and would like to
+	  use the flash chips on it, say 'Y'.
+
+config MTD_OCOTEA
+	tristate "Flash devices mapped on IBM 440GX Ocotea"
+	depends on MTD_CFI && PPC32 && 44x && OCOTEA
+	help
+	  This enables access routines for the flash chips on the IBM 440GX
+	  Ocotea board. If you have one of these boards and would like to
 	  use the flash chips on it, say 'Y'.
 
 config MTD_REDWOOD
@@ -448,6 +475,12 @@ config MTD_SA1100
 	  the SA1100 and SA1110, including the Assabet and the Compaq iPAQ.
 	  If you have such a board, say 'Y'.
 
+config MTD_IPAQ
+	tristate "CFI Flash device mapped on Compaq/HP iPAQ"
+	depends on ARM && IPAQ_HANDHELD && MTD_CFI
+	help
+	  This provides a driver for the on-board flash of the iPAQ.
+
 config MTD_DC21285
 	tristate "CFI Flash device mapped on DC21285 Footbridge"
 	depends on ARM && MTD_CFI && ARCH_FOOTBRIDGE && MTD_COMPLEX_MAPPINGS
@@ -468,7 +501,7 @@ config MTD_IXP4XX
 	tristate "CFI Flash device mapped on Intel IXP4xx based systems"
 	depends on ARM && MTD_CFI && MTD_COMPLEX_MAPPINGS && ARCH_IXP4XX
 	help
-	  This eables MTD access to flash devices on platforms based 
+	  This enables MTD access to flash devices on platforms based 
 	  on Intel's IXP4xx family of network processors such as the
 	  IXDP425 and Coyote. If you have an IXP4xx based board and
 	  would like to use the flash chips on it, say 'Y'.
@@ -477,9 +510,9 @@ config MTD_IXP2000
 	tristate "CFI Flash device mapped on Intel IXP2000 based systems"
 	depends on ARM && MTD_CFI && MTD_COMPLEX_MAPPINGS && ARCH_IXP2000
 	help
-	  This enables MTD access to flash devices on platforms based
+	  This enables MTD access to flash devices on platforms based 
 	  on Intel's IXP2000 family of network processors such as the
-	  IXDP2400 and IXDP2401. If you have an IXP2000 based board and
+	  IXDP425 and Coyote. If you have an IXP2000 based board and
 	  would like to use the flash chips on it, say 'Y'.
 
 config MTD_EPXA10DB
@@ -594,6 +627,23 @@ config MTD_DMV182
 	select MTD_CFI_AMDSTD
         help
           Map driver for Dy-4 SVME/DMV-182 board.
+
+config MTD_BAST
+	tristate "Map driver for Simtec BAST (EB2410ITX)"
+	depends on ARCH_BAST
+	select MTD_PARTITIONS
+	select MTD_MAP_BANK_WIDTH_16
+	select MTD_JEDECPROBE
+	help
+	  Map driver for NOR flash on the Simtec BAST (EB2410ITX).
+
+	  Note, this driver *cannot* over-ride the WP link on the
+	  board, or currently detect the state of the link.
+
+config MTD_BAST_MAXSIZE
+	int "Maximum size for BAST flash area (MiB)"
+	depends on MTD_BAST
+	default "4"
 
 endmenu
 
