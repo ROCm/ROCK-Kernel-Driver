@@ -69,7 +69,7 @@ ssize_t oprofilefs_str_to_user(char const * str, char * buf, size_t count, loff_
 
 #define TMPBUFSIZE 50
 
-ssize_t oprofilefs_ulong_to_user(unsigned long * val, char * buf, size_t count, loff_t * offset)
+ssize_t oprofilefs_ulong_to_user(unsigned long val, char * buf, size_t count, loff_t * offset)
 {
 	char tmpbuf[TMPBUFSIZE];
 	size_t maxlen;
@@ -78,7 +78,7 @@ ssize_t oprofilefs_ulong_to_user(unsigned long * val, char * buf, size_t count, 
 		return 0;
 
 	spin_lock(&oprofilefs_lock);
-	maxlen = snprintf(tmpbuf, TMPBUFSIZE, "%lu\n", *val);
+	maxlen = snprintf(tmpbuf, TMPBUFSIZE, "%lu\n", val);
 	spin_unlock(&oprofilefs_lock);
 	if (maxlen > TMPBUFSIZE)
 		maxlen = TMPBUFSIZE;
@@ -122,7 +122,8 @@ int oprofilefs_ulong_from_user(unsigned long * val, char const * buf, size_t cou
 
 static ssize_t ulong_read_file(struct file * file, char * buf, size_t count, loff_t * offset)
 {
-	return oprofilefs_ulong_to_user(file->private_data, buf, count, offset);
+	unsigned long * val = file->private_data;
+	return oprofilefs_ulong_to_user(*val, buf, count, offset);
 }
 
 
@@ -212,9 +213,8 @@ int oprofilefs_create_ro_ulong(struct super_block * sb, struct dentry * root,
 
 static ssize_t atomic_read_file(struct file * file, char * buf, size_t count, loff_t * offset)
 {
-	atomic_t * aval = file->private_data;
-	unsigned long val = atomic_read(aval);
-	return oprofilefs_ulong_to_user(&val, buf, count, offset);
+	atomic_t * val = file->private_data;
+	return oprofilefs_ulong_to_user(atomic_read(val), buf, count, offset);
 }
  
 

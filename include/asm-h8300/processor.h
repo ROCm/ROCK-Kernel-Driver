@@ -70,12 +70,12 @@ struct thread_struct {
  * pass the data segment into user programs if it exists,
  * it can't hurt anything as far as I can tell
  */
-#if defined(__H8300S__)
+#if defined(__H8300H__)
 #define start_thread(_regs, _pc, _usp)			        \
 do {							        \
 	set_fs(USER_DS);           /* reads from user space */  \
   	(_regs)->pc = (_pc);				        \
-	(_regs)->ccr &= ~0x10;	   /* clear kernel flag */      \
+	(_regs)->ccr &= 0x00;	   /* clear kernel flag */      \
 } while(0)
 #endif
 #if defined(__H8300S__)
@@ -83,7 +83,7 @@ do {							        \
 do {							        \
 	set_fs(USER_DS);           /* reads from user space */  \
 	(_regs)->pc = (_pc);				        \
-	(_regs)->ccr &= ~0x10;	   /* clear kernel flag */      \
+	(_regs)->ccr = 0x00;	   /* clear kernel flag */      \
 	(_regs)->exr = 0x78;       /* enable all interrupts */  \
 	/* 14 = space for retaddr(4), vector(4), er0(4) and ext(2) on stack */ \
 	wrusp(((unsigned long)(_usp)) - 14);                    \

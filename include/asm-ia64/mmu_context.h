@@ -158,9 +158,7 @@ reload_context (mm_context_t context)
 	ia64_set_rr(0x4000000000000000, rr2);
 	ia64_set_rr(0x6000000000000000, rr3);
 	ia64_set_rr(0x8000000000000000, rr4);
-	ia64_insn_group_barrier();
 	ia64_srlz_i();			/* srlz.i implies srlz.d */
-	ia64_insn_group_barrier();
 }
 
 static inline void

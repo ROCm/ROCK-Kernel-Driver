@@ -18,6 +18,7 @@
 #include <linux/personality.h>
 #include <linux/sched.h>
 
+#include <asm/intrinsics.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
@@ -68,19 +69,11 @@ ia32_load_segment_descriptors (struct task_struct *task)
 void
 ia32_save_state (struct task_struct *t)
 {
-	unsigned long eflag, fsr, fcr, fir, fdr;
-
-	asm ("mov %0=ar.eflag;"
-	     "mov %1=ar.fsr;"
-	     "mov %2=ar.fcr;"
-	     "mov %3=ar.fir;"
-	     "mov %4=ar.fdr;"
-	     : "=r"(eflag), "=r"(fsr), "=r"(fcr), "=r"(fir), "=r"(fdr));
-	t->thread.eflag = eflag;
-	t->thread.fsr = fsr;
-	t->thread.fcr = fcr;
-	t->thread.fir = fir;
-	t->thread.fdr = fdr;
+	t->thread.eflag = ia64_getreg(_IA64_REG_AR_EFLAG);
+	t->thread.fsr   = ia64_getreg(_IA64_REG_AR_FSR);
+	t->thread.fcr   = ia64_getreg(_IA64_REG_AR_FCR);
+	t->thread.fir   = ia64_getreg(_IA64_REG_AR_FIR);
+	t->thread.fdr   = ia64_getreg(_IA64_REG_AR_FDR);
 	ia64_set_kr(IA64_KR_IO_BASE, t->thread.old_iob);
 	ia64_set_kr(IA64_KR_TSSD, t->thread.old_k1);
 }
@@ -99,12 +92,11 @@ ia32_load_state (struct task_struct *t)
 	fdr = t->thread.fdr;
 	tssd = load_desc(_TSS(nr));					/* TSSD */
 
-	asm volatile ("mov ar.eflag=%0;"
-		      "mov ar.fsr=%1;"
-		      "mov ar.fcr=%2;"
-		      "mov ar.fir=%3;"
-		      "mov ar.fdr=%4;"
-		      :: "r"(eflag), "r"(fsr), "r"(fcr), "r"(fir), "r"(fdr));
+	ia64_setreg(_IA64_REG_AR_EFLAG, eflag);
+	ia64_setreg(_IA64_REG_AR_FSR, fsr);
+	ia64_setreg(_IA64_REG_AR_FCR, fcr);
+	ia64_setreg(_IA64_REG_AR_FIR, fir);
+	ia64_setreg(_IA64_REG_AR_FDR, fdr);
 	current->thread.old_iob = ia64_get_kr(IA64_KR_IO_BASE);
 	current->thread.old_k1 = ia64_get_kr(IA64_KR_TSSD);
 	ia64_set_kr(IA64_KR_IO_BASE, IA32_IOBASE);
@@ -178,7 +170,7 @@ void
 ia32_cpu_init (void)
 {
 	/* initialize global ia32 state - CR0 and CR4 */
-	asm volatile ("mov ar.cflg = %0" :: "r" (((ulong) IA32_CR4 << 32) | IA32_CR0));
+	ia64_setreg(_IA64_REG_AR_CFLAG, (((ulong) IA32_CR4 << 32) | IA32_CR0));
 }
 
 static int __init

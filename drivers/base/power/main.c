@@ -25,7 +25,6 @@
 #include "power.h"
 
 LIST_HEAD(dpm_active);
-LIST_HEAD(dpm_suspended);
 LIST_HEAD(dpm_off);
 LIST_HEAD(dpm_off_irq);
 
@@ -76,6 +75,7 @@ int device_pm_add(struct device * dev)
 
 	pr_debug("PM: Adding info for %s:%s\n",
 		 dev->bus ? dev->bus->name : "No Bus", dev->kobj.name);
+	atomic_set(&dev->power.pm_users,0);
 	down(&dpm_sem);
 	list_add_tail(&dev->power.entry,&dpm_active);
 	device_pm_set_parent(dev,dev->parent);

@@ -83,7 +83,6 @@ extern spinlock_t semaphore_wake_lock;
  * "down_failed" is a special asm handler that calls the C
  * routine that actually waits. See arch/m68k/lib/semaphore.S
  */
-#if defined(__H8300H__)
 static inline void down(struct semaphore * sem)
 {
 	register atomic_t *count asm("er0");
@@ -96,9 +95,9 @@ static inline void down(struct semaphore * sem)
 	__asm__ __volatile__(
 		"stc ccr,r3l\n\t"
 		"orc #0x80,ccr\n\t"
-		"mov.l @%1, er1\n\t"
+		"mov.l %0, er1\n\t"
 		"dec.l #1,er1\n\t"
-		"mov.l er1,@%1\n\t"
+		"mov.l er1,%0\n\t"
 		"bpl 1f\n\t"
 		"ldc r3l,ccr\n\t"
 		"jsr @___down\n\t"
@@ -106,38 +105,11 @@ static inline void down(struct semaphore * sem)
 		"1:\n\t"
 		"ldc r3l,ccr\n"
 		"2:"
-		: "=m"(sem->count)
-		: "g" (count)
-		: "cc", "er1", "er2", "er3", "er4", "memory");
+		: "+m"(*count)
+		: 
+		: "cc",  "er1", "er2", "er3");
 }
-#endif
-#if defined(__H8300S__)
-static inline void down(struct semaphore * sem)
-{
-	register atomic_t *count asm("er0");
 
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
-
-	count = &(sem->count);
-	__asm__ __volatile__(
-		"stc exr,r3l\n\t"
-		"orc #0x07,exr\n\t"
-		"mov.l @%1, er1\n\t"
-		"dec.l #1,er1\n\t"
-		"mov.l er1,@%1\n\t"
-		"ldc r3l,exr\n\t"
-		"bpl 1f\n\t"
-		"jsr @___down\n"
-		"1:"
-		: "=m"(sem->count)
-		: "r" (count)
-		: "cc", "er1", "er2", "er3", "memory");
-}
-#endif
-
-#if defined(__H8300H__)
 static inline int down_interruptible(struct semaphore * sem)
 {
 	register atomic_t *count asm("er0");
@@ -148,56 +120,25 @@ static inline int down_interruptible(struct semaphore * sem)
 
 	count = &(sem->count);
 	__asm__ __volatile__(
-		"stc ccr,r3l\n\t"
+		"stc ccr,r1l\n\t"
 		"orc #0x80,ccr\n\t"
-		"mov.l @%2, er2\n\t"
+		"mov.l %1, er2\n\t"
 		"dec.l #1,er2\n\t"
-		"mov.l er2,@%2\n\t"
+		"mov.l er2,%1\n\t"
 		"bpl 1f\n\t"
-		"ldc r3l,ccr\n\t"
+		"ldc r1l,ccr\n\t"
 		"jsr @___down_interruptible\n\t"
 		"bra 2f\n"
 		"1:\n\t"
-		"ldc r3l,ccr\n\t"
-		"sub.l %0,%0\n"
-		"2:"
-		: "=r" (count),"=m"(sem->count)
-		: "r" (count)
-		: "cc", "er1", "er2", "er3", "memory");
-	return (int)count;
-}
-#endif
-#if defined(__H8300S__)
-static inline int down_interruptible(struct semaphore * sem)
-{
-	register atomic_t *count asm("er0");
-
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
-
-	count = &(sem->count);
-	__asm__ __volatile__(
-		"stc exr,r3l\n\t"
-		"orc #0x07,exr\n\t"
-		"mov.l @%2, er2\n\t"
-		"dec.l #1,er2\n\t"
-		"mov.l er2,@%2\n\t"
-		"ldc r3l,exr\n\t"
-		"bmi 1f\n\t"
+		"ldc r1l,ccr\n\t"
 		"sub.l %0,%0\n\t"
-		"bra 2f\n"
-		"1:\n\t"
-		"jsr @___down_interruptible\n"
-		"2:"
-		: "=r" (count),"=m"(sem->count)
-		: "r" (count)
-		: "cc", "er1", "er2", "er3", "memory");
+		"2:\n\t"
+		: "=r" (count),"+m" (*count)
+		:
+		: "cc", "er1", "er2", "er3");
 	return (int)count;
 }
-#endif
 
-#if defined(__H8300H__)
 static inline int down_trylock(struct semaphore * sem)
 {
 	register atomic_t *count asm("er0");
@@ -210,60 +151,26 @@ static inline int down_trylock(struct semaphore * sem)
 	__asm__ __volatile__(
 		"stc ccr,r3l\n\t"
 		"orc #0x80,ccr\n\t"
-		"mov.l @%2,er2\n\t"
+		"mov.l %0,er2\n\t"
 		"dec.l #1,er2\n\t"
-		"mov.l er2,@%2\n\t"
+		"mov.l er2,%0\n\t"
 		"bpl 1f\n\t"
 		"ldc r3l,ccr\n\t"
-		"jmp @3f\n"
-		"1:\n\t"
-		"ldc r3l,ccr\n\t"
-		"sub.l %0,%0\n"
+		"jmp @3f\n\t"
 		LOCK_SECTION_START(".align 2\n\t")
 		"3:\n\t"
 		"jsr @___down_trylock\n\t"
 		"jmp @2f\n\t"
 		LOCK_SECTION_END
+		"1:\n\t"
+		"ldc r3l,ccr\n\t"
+		"sub.l %1,%1\n"
 		"2:"
-		: "=r" (count),"=m"(sem->count)
-		: "r" (count)
-		: "cc", "er2", "er3", "memory");
+		: "+m" (*count),"=r"(count)
+		: 
+		: "cc", "er1","er2", "er3");
 	return (int)count;
 }
-#endif
-#if defined(__H8300S__)
-static inline int down_trylock(struct semaphore * sem)
-{
-	register atomic_t *count asm("er0");
-
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
-
-	count = &(sem->count);
-	__asm__ __volatile__(
-		"stc exr,r3l\n\t"
-		"orc #0x07,exr\n\t"
-		"mov.l @%2,er2\n\t"
-		"dec.l #1,er2\n\t"
-		"mov.l er2,@%2\n\t"
-		"ldc r3l,exr\n\t"
-		"bpl 1f\n\t"
-		"jmp @3f\n"
-		"1:\n\t"
-		"sub.l %0,%0\n\t"
-		LOCK_SECTION_START(".align 2\n\t")
-		"3:\n\t"
-		"jsr @___down_trylock\n\t"
-		"jmp @2f\n\t"
-		LOCK_SECTION_END
-		"2:\n\t"
-		: "=r" (count),"=m"(sem->count)
-		: "r" (count)
-		: "cc", "er1", "er2", "er3", "memory");
-	return (int)count;
-}
-#endif
 
 /*
  * Note! This is subtle. We jump to wake people up only if
@@ -271,7 +178,6 @@ static inline int down_trylock(struct semaphore * sem)
  * The default case (no contention) will result in NO
  * jumps for both down() and up().
  */
-#if defined(__H8300H__)
 static inline void up(struct semaphore * sem)
 {
 	register atomic_t *count asm("er0");
@@ -284,47 +190,19 @@ static inline void up(struct semaphore * sem)
 	__asm__ __volatile__(
 		"stc ccr,r3l\n\t"
 		"orc #0x80,ccr\n\t"
-		"mov.l @%1,er1\n\t"
+		"mov.l %0,er1\n\t"
 		"inc.l #1,er1\n\t"
-		"mov.l er1,@%1\n\t"
+		"mov.l er1,%0\n\t"
 		"ldc r3l,ccr\n\t"
 		"sub.l er2,er2\n\t"
 		"cmp.l er2,er1\n\t"
 		"bgt 1f\n\t"
 		"jsr @___up\n"
 		"1:"
-		: "=m"(sem->count)
-		: "r" (count)
-		: "cc", "er1", "er2", "er3", "memory");
+		: "+m"(*count)
+		: 
+		: "cc", "er1", "er2", "er3");
 }
-#endif
-#if defined(__H8300S__)
-static inline void up(struct semaphore * sem)
-{
-	register atomic_t *count asm("er0");
-
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
-
-	count = &(sem->count);
-	__asm__ __volatile__(
-		"stc exr,r3l\n\t"
-		"orc #0x07,exr\n\t"
-		"mov.l @%1,er1\n\t"
-		"inc.l #1,er1\n\t"
-		"mov.l er1,@%1\n\t"
-		"ldc r3l,exr\n\t"
-		"sub.l er2,er2\n\t"
-		"cmp.l er2,er1\n\t"
-		"bgt 1f\n\t"
-		"jsr @___up\n"
-		"1:"
-		: "=m"(sem->count)
-		: "r" (count)
-		: "cc", "er1", "er2", "er3", "memory");
-}
-#endif
 
 #endif /* __ASSEMBLY__ */
 

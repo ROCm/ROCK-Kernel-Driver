@@ -741,8 +741,8 @@ cpu_init (void)
 	 * shouldn't be affected by this (moral: keep your ia32 locks aligned and you'll
 	 * be fine).
 	 */
-	ia64_set_dcr(  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
-		     | IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC);
+	ia64_setreg(_IA64_REG_CR_DCR,  (  IA64_DCR_DP | IA64_DCR_DK | IA64_DCR_DX | IA64_DCR_DR
+					| IA64_DCR_DA | IA64_DCR_DD | IA64_DCR_LC));
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 	if (current->mm)
@@ -758,11 +758,11 @@ cpu_init (void)
 	ia64_set_itv(1 << 16);
 	ia64_set_lrr0(1 << 16);
 	ia64_set_lrr1(1 << 16);
-	ia64_set_pmv(1 << 16);
-	ia64_set_cmcv(1 << 16);
+	ia64_setreg(_IA64_REG_CR_PMV, 1 << 16);
+	ia64_setreg(_IA64_REG_CR_CMCV, 1 << 16);
 
 	/* clear TPR & XTP to enable all interrupt classes: */
-	ia64_set_tpr(0);
+	ia64_setreg(_IA64_REG_CR_TPR, 0);
 #ifdef CONFIG_SMP
 	normal_xtp();
 #endif

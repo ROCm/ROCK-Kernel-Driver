@@ -38,7 +38,7 @@ struct saved_context {
 extern void save_processor_state(void);
 extern void restore_processor_state(void);
 
-extern void do_magic(int resume);
+extern int do_magic(int resume);
 
 #ifdef CONFIG_ACPI_SLEEP
 extern unsigned long saved_eip;

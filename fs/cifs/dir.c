@@ -51,7 +51,6 @@ build_path_from_dentry(struct dentry *direntry)
 
 	for (temp = direntry; !IS_ROOT(temp);) {
 		namelen += (1 + temp->d_name.len);
-		cFYI(1, (" len %d ", namelen));
 		temp = temp->d_parent;
 	}
 	namelen += 1;		/* allow for trailing null */

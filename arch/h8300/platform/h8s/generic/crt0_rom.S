@@ -33,36 +33,32 @@ SYMBOL_NAME_LABEL(_start)
 	
 	/* Peripheral Setup */
 	
-	/* .bss clear */
-	mov.l	#__sbss,er5
-	mov.l	er5,er6
-	inc.l	#1,er6
-	mov.l	#__ebss,er4
-	sub.l	er5,er4
-	sub.w	r0,r0
-	mov.b	r0l,@er5
-1:	
-	eepmov.w
-	dec.w	#1,e4
-	bpl	1b
-
 	/* copy .data */
 #if !defined(CONFIG_H8S_SIM)
 	mov.l	#__begin_data,er5
 	mov.l	#__sdata,er6
 	mov.l	#__edata,er4
-	sub.l	er6,er4		
+	sub.l	er6,er4
+	shlr.l	#2,er4
 1:	
-	eepmov.w	
-	dec.w	#1,e4
-	bpl	1b	
+	mov.l	@er5+,er0
+	mov.l	er0,@er6
+	adds	#4,er6
+	dec.l	#1,er4
+	bne	1b	
 #endif
 
-	/* copy kernel commandline */
-	mov.l	#COMMAND_START,er5
-	mov.l	#SYMBOL_NAME(_command_line),er6
-	mov.w	#512,r4
-	eepmov.w
+	/* .bss clear */
+	mov.l	#__sbss,er5
+	mov.l	#__ebss,er4
+	sub.l	er5,er4
+	shlr.l	#2,er4		
+	sub.l	er0,er0
+1:
+	mov.l	er0,@er5
+	adds	#4,er5
+	dec.l	#1,er4
+	bne	1b
 
 	/* linux kernel start */
 	ldc	#0x90,ccr	/* running kernel */

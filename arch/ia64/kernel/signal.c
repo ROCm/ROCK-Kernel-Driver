@@ -1,7 +1,7 @@
 /*
  * Architecture-specific signal handling support.
  *
- * Copyright (C) 1999-2002 Hewlett-Packard Co
+ * Copyright (C) 1999-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Derived from i386 and Alpha versions.
@@ -23,6 +23,7 @@
 #include <linux/wait.h>
 
 #include <asm/ia32.h>
+#include <asm/intrinsics.h>
 #include <asm/uaccess.h>
 #include <asm/rse.h>
 #include <asm/sigcontext.h>
@@ -41,6 +42,12 @@
 # define GET_SIGSET(k,u)	__get_user((k)->sig[0], &(u)->sig[0])
 #endif
 
+#ifdef ASM_SUPPORTED
+/*
+ * Don't let GCC uses f16-f31 so that when we setup/restore the registers in the signal
+ * context in __kernel_sigtramp(), we can be sure that registers f16-f31 contain user-level
+ * values.
+ */
 register double f16 asm ("f16"); register double f17 asm ("f17");
 register double f18 asm ("f18"); register double f19 asm ("f19");
 register double f20 asm ("f20"); register double f21 asm ("f21");
@@ -50,6 +57,7 @@ register double f24 asm ("f24"); register double f25 asm ("f25");
 register double f26 asm ("f26"); register double f27 asm ("f27");
 register double f28 asm ("f28"); register double f29 asm ("f29");
 register double f30 asm ("f30"); register double f31 asm ("f31");
+#endif
 
 long
 ia64_rt_sigsuspend (sigset_t *uset, size_t sigsetsize, struct sigscratch *scr)
@@ -192,7 +200,7 @@ copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
 		      case __SI_TIMER >> 16:
 			err |= __put_user(from->si_tid, &to->si_tid);
 			err |= __put_user(from->si_overrun, &to->si_overrun);
-			err |= __put_user(from->si_value, &to->si_value);
+			err |= __put_user(from->si_ptr, &to->si_ptr);
 			break;
 		      case __SI_CHLD >> 16:
 			err |= __put_user(from->si_utime, &to->si_utime);
@@ -592,10 +600,8 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 			if (IS_IA32_PROCESS(&scr->pt)) {
 				scr->pt.r8 = scr->pt.r1;
 				scr->pt.cr_iip -= 2;
-				if (errno == ERESTART_RESTARTBLOCK) {
+				if (errno == ERESTART_RESTARTBLOCK)
 					scr->pt.r8 = 0;	/* x86 version of __NR_restart_syscall */
-					scr->pt.cr_iip -= 2;
-				}
 			} else {
 				/*
 				 * Note: the syscall number is in r15 which is saved in

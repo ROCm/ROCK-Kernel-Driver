@@ -65,9 +65,17 @@ static inline int cpu_to_logical_apicid(int cpu)
 	return (int)cpu_2_logical_apicid[cpu];
 }
 
+/*
+ * Supporting over 60 cpus on NUMA-Q requires a locality-dependent
+ * cpu to APIC ID relation to properly interact with the intelligent
+ * mode of the cluster controller.
+ */
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
-	return ((mps_cpu >> 2) << 4) | (1 << (mps_cpu & 0x3));
+	if (mps_cpu < 60)
+		return ((mps_cpu >> 2) << 4) | (1 << (mps_cpu & 0x3));
+	else
+		return BAD_APICID;
 }
 
 static inline int generate_logical_apicid(int quad, int phys_apicid)

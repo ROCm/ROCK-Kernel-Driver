@@ -91,6 +91,8 @@ const static struct irq_pins irq_assign_table1[16]={
 	{H8300_GPIO_P2,H8300_GPIO_B6},{H8300_GPIO_P2,H8300_GPIO_B7},
 };
 
+static int use_kmalloc;
+
 extern unsigned long *interrupt_redirect_table;
 
 static inline unsigned long *get_vector_address(void)
@@ -159,22 +161,6 @@ void __init init_IRQ(void)
 #endif
 }
 
-/* special request_irq */
-/* used bootmem allocater */
-void __init request_irq_boot(unsigned int irq, 
-  	                     irqreturn_t (*handler)(int, void *, struct pt_regs *),
-                             unsigned long flags, const char *devname, void *dev_id)
-{
-	irq_handler_t *irq_handle;
-	irq_handle = alloc_bootmem(sizeof(irq_handler_t));
-	irq_handle->handler = handler;
-	irq_handle->flags   = flags;
-	irq_handle->count   = 0;
-	irq_handle->dev_id  = dev_id;
-	irq_handle->devname = devname;
-	irq_list[irq] = irq_handle;
-}
-
 int request_irq(unsigned int irq,
 		irqreturn_t (*handler)(int, void *, struct pt_regs *),
                 unsigned long flags, const char *devname, void *dev_id)
@@ -202,7 +188,14 @@ int request_irq(unsigned int irq,
 		H8300_GPIO_DDR(port_no, bit_no, H8300_GPIO_INPUT);
 		*(volatile unsigned short *)ISR &= ~ptn; /* ISR clear */
 	}		
-	irq_handle = (irq_handler_t *)kmalloc(sizeof(irq_handler_t), GFP_ATOMIC);
+
+	if (use_kmalloc)
+		irq_handle = (irq_handler_t *)kmalloc(sizeof(irq_handler_t), GFP_ATOMIC);
+	else {
+		irq_handle = alloc_bootmem(sizeof(irq_handler_t));
+		(unsigned long)irq_handle |= 0x80000000; /* bootmem allocater */
+	}
+
 	if (irq_handle == NULL)
 		return -ENOMEM;
 
@@ -243,8 +236,10 @@ void free_irq(unsigned int irq, void *dev_id)
 		}
 		H8300_GPIO_FREE(port_no, bit_no);
 	}
-	kfree(irq_list[irq]);
-	irq_list[irq] = NULL;
+	if (((unsigned long)irq_list[irq] & 0x80000000) == 0) {
+		kfree(irq_list[irq]);
+		irq_list[irq] = NULL;
+	}
 }
 
 unsigned long probe_irq_on (void)
@@ -306,3 +301,10 @@ int show_interrupts(struct seq_file *p, void *v)
 void init_irq_proc(void)
 {
 }
+
+static int __init enable_kmalloc(void)
+{
+	use_kmalloc = 1;
+	return 0;
+}
+__initcall(enable_kmalloc);
