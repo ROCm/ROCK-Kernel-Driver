@@ -118,8 +118,6 @@ void ext3_journal_abort_handle(const char *caller, const char *err_fn,
 		handle->h_err = err;
 }
 
-static char error_buf[1024];
-
 /* Deal with the reporting of failure conditions on a filesystem such as
  * inconsistencies detected or read IO failures.
  *
@@ -166,12 +164,11 @@ void ext3_error (struct super_block * sb, const char * function,
 {
 	va_list args;
 
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
-
-	printk (KERN_CRIT "EXT3-fs error (device %s): %s: %s\n",
-		sb->s_id, function, error_buf);
+	va_start(args, fmt);
+	printk(KERN_CRIT "EXT3-fs error (device %s): %s: ",sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
 
 	ext3_handle_error(sb);
 }
@@ -240,21 +237,19 @@ void ext3_abort (struct super_block * sb, const char * function,
 
 	printk (KERN_CRIT "ext3_abort called.\n");
 
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
+	va_start(args, fmt);
+	printk(KERN_CRIT "EXT3-fs error (device %s): %s: ",sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
 
-	if (test_opt (sb, ERRORS_PANIC))
-		panic ("EXT3-fs panic (device %s): %s: %s\n",
-		       sb->s_id, function, error_buf);
-
-	printk (KERN_CRIT "EXT3-fs abort (device %s): %s: %s\n",
-		sb->s_id, function, error_buf);
+	if (test_opt(sb, ERRORS_PANIC))
+		panic("EXT3-fs panic from previous error\n");
 
 	if (sb->s_flags & MS_RDONLY)
 		return;
 
-	printk (KERN_CRIT "Remounting filesystem read-only\n");
+	printk(KERN_CRIT "Remounting filesystem read-only\n");
 	EXT3_SB(sb)->s_mount_state |= EXT3_ERROR_FS;
 	sb->s_flags |= MS_RDONLY;
 	EXT3_SB(sb)->s_mount_opt |= EXT3_MOUNT_ABORT;
@@ -272,15 +267,16 @@ NORET_TYPE void ext3_panic (struct super_block * sb, const char * function,
 {
 	va_list args;
 
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
+	va_start(args, fmt);
+	printk(KERN_CRIT "EXT3-fs error (device %s): %s: ",sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
 
 	/* this is to prevent panic from syncing this filesystem */
 	/* AKPM: is this sufficient? */
 	sb->s_flags |= MS_RDONLY;
-	panic ("EXT3-fs panic (device %s): %s: %s\n",
-	       sb->s_id, function, error_buf);
+	panic ("EXT3-fs panic forced\n");
 }
 
 void ext3_warning (struct super_block * sb, const char * function,
@@ -288,11 +284,12 @@ void ext3_warning (struct super_block * sb, const char * function,
 {
 	va_list args;
 
-	va_start (args, fmt);
-	vsprintf (error_buf, fmt, args);
-	va_end (args);
-	printk (KERN_WARNING "EXT3-fs warning (device %s): %s: %s\n",
-		sb->s_id, function, error_buf);
+	va_start(args, fmt);
+	printk(KERN_WARNING "EXT3-fs warning (device %s): %s: ",
+	       sb->s_id, function);
+	vprintk(fmt, args);
+	printk("\n");
+	va_end(args);
 }
 
 void ext3_update_dynamic_rev(struct super_block *sb)
