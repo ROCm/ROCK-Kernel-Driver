@@ -14,12 +14,6 @@
 #include <linux/wait.h>
 
 /*
- * Define this if you want to test the fast scheduler for async calls.
- * This is still experimental and may not work.
- */
-#undef  CONFIG_RPC_FASTSCHED
-
-/*
  * This is the actual RPC procedure call info.
  */
 struct rpc_message {

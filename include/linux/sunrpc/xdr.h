@@ -127,7 +127,6 @@ xdr_adjust_iovec(struct iovec *iov, u32 *p)
 }
 
 void xdr_shift_iovec(struct iovec *, int, size_t);
-void xdr_zero_iovec(struct iovec *, int, size_t);
 
 /*
  * Maximum number of iov's we use.
@@ -155,12 +154,6 @@ typedef size_t (*skb_read_actor_t)(skb_reader_t *desc, void *to, size_t len);
 
 extern void xdr_partial_copy_from_skb(struct xdr_buf *, unsigned int,
 		skb_reader_t *, skb_read_actor_t);
-
-extern int xdr_copy_skb(struct xdr_buf *xdr, unsigned int base,
-		struct sk_buff *skb, unsigned int offset);
-
-extern int xdr_copy_and_csum_skb(struct xdr_buf *xdr, unsigned int base,
-		struct sk_buff *skb, unsigned int offset, unsigned int csum);
 
 #endif /* __KERNEL__ */
 

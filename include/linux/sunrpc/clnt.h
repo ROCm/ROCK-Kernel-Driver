@@ -50,7 +50,6 @@ struct rpc_clnt {
 				cl_droppriv : 1,/* enable NFS suid hack */
 				cl_oneshot  : 1,/* dispose after use */
 				cl_dead     : 1;/* abandoned */
-	unsigned long		cl_hardmax;	/* max hard timeout */
 
 	struct rpc_rtt		cl_rtt;		/* RTO estimator data */
 
@@ -135,13 +134,6 @@ int rpc_call(struct rpc_clnt *clnt, u32 proc, void *argp, void *resp, int flags)
 	return rpc_call_sync(clnt, &msg, flags);
 }
 		
-
-static __inline__ void
-rpc_set_timeout(struct rpc_clnt *clnt, unsigned int retr, unsigned long incr)
-{
-	xprt_set_timeout(&clnt->cl_timeout, retr, incr);
-}
-
 extern void rpciod_wake_up(void);
 
 /*
