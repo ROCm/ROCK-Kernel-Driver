@@ -148,8 +148,8 @@ If no password is provided, mount.cifs will prompt for password entry
 Restrictions
 ============
 Servers must support the NTLM SMB dialect (which is the most recent, supported 
-by Samba and Windows NT, 2000 and XP and many other SMB/CIFS servers) and 
-servers must support either "pure-TCP" (port 445 TCP/IP CIFS connections) or RFC 
+by Samba and Windows NT version 4, 2000 and XP and many other SMB/CIFS servers) 
+Servers must support either "pure-TCP" (port 445 TCP/IP CIFS connections) or RFC 
 1001/1002 support for "Netbios-Over-TCP/IP." Neither of these is likely to be a 
 problem as most servers support this.  IPv6 support is planned for the future.  
 
@@ -275,6 +275,15 @@ tracing to the kernel message log type:
 and for more extensive tracing including the start of smb requests and responses
 
 	echo 1 > /proc/fs/cifs/traceSMB
+
+Three other experimental features are under development and to test 
+require enabling an ifdef (e.g. by  adding "#define CIFS_FCNTL" in cifsglob.h)
+
+	CIFS_QUOTA
+
+	CIFS_XATTR
+
+	CIFS_FCNTL  (fcntl needed for support of directory change notification)
 	
 Also note that "cat /proc/fs/cifs/DebugData" will display some information about 
 the active sessions and the shares that are mounted.  Note: NTLMv2 enablement 

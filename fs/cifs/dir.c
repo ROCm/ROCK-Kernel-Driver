@@ -179,14 +179,31 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	if (rc) {
 		cFYI(1, ("cifs_create returned 0x%x ", rc));
 	} else {
-	/* BB for case of overwriting existing file can we use the inode that was
-		 passed in rather than creating new one?? */
+		/* If Open reported that we actually created a file
+		then we now have to set the mode if possible */
+		if ((cifs_sb->tcon->ses->capabilities & CAP_UNIX) &&
+			(oplock & CIFS_CREATE_ACTION))
+			CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
+					(__u64)-1,
+					(__u64)-1,
+					0 /* dev */,
+					cifs_sb->local_nls);
+		else {
+			/* BB implement via Windows security descriptors */
+			/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
+			/* could set r/o dos attribute if mode & 0222 == 0 */
+		}
+
+	/* BB server might mask mode so we have to query for Unix case*/
 		if (pTcon->ses->capabilities & CAP_UNIX)
 			rc = cifs_get_inode_info_unix(&newinode, full_path,
-						      inode->i_sb);
-		else
+						 inode->i_sb);
+		else {
 			rc = cifs_get_inode_info(&newinode, full_path,
 						 buf, inode->i_sb);
+			if(newinode)
+				newinode->i_mode = mode;
+		}
 
 		if (rc != 0) {
 			cFYI(1,("Create worked but get_inode_info failed with rc = %d",
@@ -198,21 +215,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 		if((nd->flags & LOOKUP_OPEN) == FALSE) {
 			/* mknod case - do not leave file open */
 			CIFSSMBClose(xid, pTcon, fileHandle);
-			if(newinode)
-				newinode->i_mode = mode;
-			if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
-				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
-						(__u64)-1,
-						(__u64)-1,
-						0 /* dev */,
-						cifs_sb->local_nls);
-			else { /* BB implement via Windows security descriptors */
-                        /* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
-                        /* in the meantime could set r/o dos attribute when perms are eg:
-                                        mode & 0222 == 0 */
-			}
 		} else if(newinode) {
-			newinode->i_mode = mode;
 			pCifsFile = (struct cifsFileInfo *)
 			   kmalloc(sizeof (struct cifsFileInfo), GFP_KERNEL);
 		
@@ -231,26 +234,15 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 				pCifsInode = CIFS_I(newinode);
 				if(pCifsInode) {
 					list_add(&pCifsFile->flist,&pCifsInode->openFileList);
-					if(oplock == OPLOCK_EXCLUSIVE) {
+					if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 						pCifsInode->clientCanCacheAll = TRUE;
 						pCifsInode->clientCanCacheRead = TRUE;
 						cFYI(1,("Exclusive Oplock granted on inode %p",newinode));
-					} else if(oplock == OPLOCK_READ)
+					} else if((oplock & 0xF) == OPLOCK_READ)
 						pCifsInode->clientCanCacheRead = TRUE;
 				}
 				write_unlock(&GlobalSMBSeslock);
-				if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
-					CIFSSMBUnixSetPerms(xid, pTcon, full_path, inode->i_mode,
-						(__u64)-1, 
-						(__u64)-1,
-						0 /* dev */,
-						cifs_sb->local_nls);
-				else { /* BB implement via Windows security descriptors */
-			/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
-			/* in the meantime could set r/o dos attribute when perms are eg:
-					mode & 0222 == 0 */
-				}
-			}			
+			}
 		}
 	} 
 

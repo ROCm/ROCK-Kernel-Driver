@@ -139,6 +139,7 @@ struct TCP_Server_Info {
 	int capabilities; /* allow selective disabling of caps by smb sess */
 	__u16 timeZone;
 	char cryptKey[CIFS_CRYPTO_KEY_SIZE];
+	char workstation_RFC1001_name[16]; /* 16th byte is always zero */
 };
 
 /*

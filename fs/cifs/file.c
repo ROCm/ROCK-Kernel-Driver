@@ -62,8 +62,8 @@ cifs_open(struct inode *inode, struct file *file)
 		read_lock(&GlobalSMBSeslock);
 		list_for_each(tmp, &pCifsInode->openFileList) {            
 			pCifsFile = list_entry(tmp,struct cifsFileInfo, flist);           
-			if((pCifsFile->pfile == NULL)&& (pCifsFile->pid = current->pid)){		
-			/* set mode ?? */
+			if((pCifsFile->pfile == NULL)&& (pCifsFile->pid = current->pid)){
+			/* mode set in cifs_create */
 				pCifsFile->pfile = file; /* needed for writepage */
 				file->private_data = pCifsFile;
 				break;
@@ -187,6 +187,12 @@ cifs_open(struct inode *inode, struct file *file)
 							(file->f_dentry->d_inode->i_size == (loff_t)le64_to_cpu(buf->EndOfFile))) {
 							cFYI(1,("inode unchanged on server"));
 						} else {
+							if(file->f_dentry->d_inode->i_mapping) {
+							/* BB no need to lock inode until after invalidate*/
+							/* since namei code should already have it locked?*/
+								filemap_fdatawrite(file->f_dentry->d_inode->i_mapping);
+								filemap_fdatawait(file->f_dentry->d_inode->i_mapping);
+							}
 							cFYI(1,("invalidating remote inode since open detected it changed"));
 							invalidate_remote_inode(file->f_dentry->d_inode);
 						}
@@ -199,17 +205,17 @@ cifs_open(struct inode *inode, struct file *file)
 					rc = cifs_get_inode_info(&file->f_dentry->d_inode,
 						full_path, buf, inode->i_sb);
 
-				if(oplock == OPLOCK_EXCLUSIVE) {
+				if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 					pCifsInode->clientCanCacheAll = TRUE;
 					pCifsInode->clientCanCacheRead = TRUE;
 					cFYI(1,("Exclusive Oplock granted on inode %p",file->f_dentry->d_inode));
-				} else if(oplock == OPLOCK_READ)
+				} else if((oplock & 0xF) == OPLOCK_READ)
 					pCifsInode->clientCanCacheRead = TRUE;
 			} else {
 				write_unlock(&GlobalSMBSeslock);
 				write_unlock(&file->f_owner.lock);
 			}
-			if(file->f_flags & O_CREAT) {           
+			if(oplock & CIFS_CREATE_ACTION) {           
 				/* time to set mode which we can not set earlier due
 				 to problems creating new read-only files */
 				if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
@@ -330,11 +336,11 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 				rc = cifs_get_inode_info(&inode,
 						full_path, buf, inode->i_sb);
 
-			if(oplock == OPLOCK_EXCLUSIVE) {
+			if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 				pCifsInode->clientCanCacheAll =  TRUE;
 				pCifsInode->clientCanCacheRead = TRUE;
 				cFYI(1,("Exclusive Oplock granted on inode %p",file->f_dentry->d_inode));
-			} else if(oplock == OPLOCK_READ) {
+			} else if((oplock & 0xF) == OPLOCK_READ) {
 				pCifsInode->clientCanCacheRead = TRUE;
 				pCifsInode->clientCanCacheAll =  FALSE;
 			} else {
@@ -555,6 +561,10 @@ cifs_write(struct file * file, const char *write_data,
 	}
 	open_file = (struct cifsFileInfo *) file->private_data;
 
+	if(file->f_dentry->d_inode == NULL) {
+		FreeXid(xid);
+		return -EBADF;
+	}
 
 	if (*poffset > file->f_dentry->d_inode->i_size)
 		long_op = 2;  /* writes past end of file can take a long time */
@@ -565,7 +575,16 @@ cifs_write(struct file * file, const char *write_data,
 	     total_written += bytes_written) {
 		rc = -EAGAIN;
 		while(rc == -EAGAIN) {
+			if(file->private_data == NULL) {
+				/* file has been closed on us */
+				FreeXid(xid);
+				return total_written;
+			}
 			if ((open_file->invalidHandle) && (!open_file->closePend)) {
+				if((file->f_dentry == NULL) || (file->f_dentry->d_inode == NULL)) {
+					FreeXid(xid);
+					return total_written;
+				}
 				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
 				if(rc != 0)
 					break;
@@ -588,13 +607,19 @@ cifs_write(struct file * file, const char *write_data,
 			*poffset += bytes_written;
 		long_op = FALSE; /* subsequent writes fast - 15 seconds is plenty */
 	}
-	file->f_dentry->d_inode->i_ctime = file->f_dentry->d_inode->i_mtime =
-		CURRENT_TIME;
-	if (bytes_written > 0) {
-		if (*poffset > file->f_dentry->d_inode->i_size)
-			i_size_write(file->f_dentry->d_inode, *poffset);
+
+	/* since the write may have blocked check these pointers again */
+	if(file->f_dentry) {
+		if(file->f_dentry->d_inode) {
+			file->f_dentry->d_inode->i_ctime = file->f_dentry->d_inode->i_mtime =
+				CURRENT_TIME;
+			if (bytes_written > 0) {
+				if (*poffset > file->f_dentry->d_inode->i_size)
+					i_size_write(file->f_dentry->d_inode, *poffset);
+			}
+			mark_inode_dirty_sync(file->f_dentry->d_inode);
+		}
 	}
-	mark_inode_dirty_sync(file->f_dentry->d_inode);
 	FreeXid(xid);
 	return total_written;
 }
@@ -1049,7 +1074,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		} else if (bytes_read > 0) {
 			pSMBr = (struct smb_com_read_rsp *)smb_read_data;
 			cifs_copy_cache_pages(mapping, page_list, bytes_read,
-				smb_read_data + 4 /* RFC1000 hdr */ +
+				smb_read_data + 4 /* RFC1001 hdr */ +
 				le16_to_cpu(pSMBr->DataOffset), &lru_pvec);
 
 			i +=  bytes_read >> PAGE_CACHE_SHIFT;
@@ -1159,7 +1184,6 @@ fill_in_inode(struct inode *tmp_inode,
 	pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
 	cifsInfo->cifsAttrs = pfindData->ExtFileAttributes;
 	cifsInfo->time = jiffies;
-	atomic_inc(&cifsInfo->inUse);	/* inc on every refresh of inode info */
 
 	/* Linux can not store file creation time unfortunately so ignore it */
 	tmp_inode->i_atime =
@@ -1172,10 +1196,12 @@ fill_in_inode(struct inode *tmp_inode,
 	/* 2767 perms - indicate mandatory locking */
 		/* BB fill in uid and gid here? with help from winbind? 
 			or retrieve from NTFS stream extended attribute */
-	tmp_inode->i_uid = cifs_sb->mnt_uid;
-	tmp_inode->i_gid = cifs_sb->mnt_gid;
-	/* set default mode. will override for dirs below */
-	tmp_inode->i_mode = cifs_sb->mnt_file_mode;
+	if(atomic_read(&cifsInfo->inUse) == 0) {
+		tmp_inode->i_uid = cifs_sb->mnt_uid;
+		tmp_inode->i_gid = cifs_sb->mnt_gid;
+		/* set default mode. will override for dirs below */
+		tmp_inode->i_mode = cifs_sb->mnt_file_mode;
+	}
 
 	cFYI(0,
 	     ("CIFS FFIRST: Attributes came in as 0x%x",
@@ -1187,7 +1213,9 @@ fill_in_inode(struct inode *tmp_inode,
 	} else if (pfindData->ExtFileAttributes & ATTR_DIRECTORY) {
 		*pobject_type = DT_DIR;
 		/* override default perms since we do not lock dirs */
-		tmp_inode->i_mode = cifs_sb->mnt_dir_mode;
+		if(atomic_read(&cifsInfo->inUse) == 0) {
+			tmp_inode->i_mode = cifs_sb->mnt_dir_mode;
+		}
 		tmp_inode->i_mode |= S_IFDIR;
 	} else {
 		*pobject_type = DT_REG;
@@ -1198,6 +1226,10 @@ fill_in_inode(struct inode *tmp_inode,
 	}/* could add code here - to validate if device or weird share type? */
 
 	/* can not fill in nlink here as in qpathinfo version and Unx search */
+	if(atomic_read(&cifsInfo->inUse) == 0) {
+		atomic_set(&cifsInfo->inUse,1);
+	}
+
 	i_size_write(tmp_inode,pfindData->EndOfFile);
 	tmp_inode->i_blocks =
 		(tmp_inode->i_blksize - 1 + pfindData->AllocationSize) >> tmp_inode->i_blkbits;
@@ -1277,20 +1309,20 @@ unix_fill_in_inode(struct inode *tmp_inode,
                 (tmp_inode->i_blksize - 1 + pfindData->NumOfBytes) >> tmp_inode->i_blkbits;
 
 	if (S_ISREG(tmp_inode->i_mode)) {
-		cFYI(1, (" File inode "));
+		cFYI(1, ("File inode"));
 		tmp_inode->i_op = &cifs_file_inode_ops;
 		tmp_inode->i_fop = &cifs_file_ops;
 		tmp_inode->i_data.a_ops = &cifs_addr_ops;
 	} else if (S_ISDIR(tmp_inode->i_mode)) {
-		cFYI(1, (" Directory inode"));
+		cFYI(1, ("Directory inode"));
 		tmp_inode->i_op = &cifs_dir_inode_ops;
 		tmp_inode->i_fop = &cifs_dir_ops;
 	} else if (S_ISLNK(tmp_inode->i_mode)) {
-		cFYI(1, (" Symbolic Link inode "));
+		cFYI(1, ("Symbolic Link inode"));
 		tmp_inode->i_op = &cifs_symlink_inode_ops;
 /* tmp_inode->i_fop = *//* do not need to set to anything */
 	} else {
-		cFYI(1, (" Init special inode "));
+		cFYI(1, ("Special inode")); 
 		init_special_inode(tmp_inode, tmp_inode->i_mode,
 				   tmp_inode->i_rdev);
 	}
@@ -1356,6 +1388,11 @@ static void reset_resume_key(struct file * dir_file,
 	cifsFile->search_resume_name = 
 		kmalloc(cifsFile->resume_name_length, GFP_KERNEL);
 
+	if(cifsFile->search_resume_name == NULL) {
+		cERROR(1,("failed new resume key allocate, length %d",
+				  cifsFile->resume_name_length));
+		return;
+	}
 	if(Unicode)
 		cifs_strtoUCS((wchar_t *) cifsFile->search_resume_name,
 			filename, len, nls_tab);
@@ -1842,15 +1879,18 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 							file->f_pos++;
 						}
 					}
-					pfindData = (FILE_DIRECTORY_INFO *) ((char *) pfindData + le32_to_cpu(pfindData->NextEntryOffset));	/* works also for Unix find struct since this is the first field of both */
-					/* BB also should check to make sure that pointer is not beyond the end of the SMB */
+					pfindData = (FILE_DIRECTORY_INFO *) ((char *) pfindData + 
+						le32_to_cpu(pfindData->NextEntryOffset));
+	/* works also for Unix find struct since first field of both */
+	/* BB also should check to ensure pointer not beyond end of SMB */
 				} /* end for loop */
 				if (findNextParms.EndofSearch != 0) {
 					cifsFile->endOfSearch = TRUE;
 				}
 			} else {
 				cifsFile->endOfSearch = TRUE;
-				rc = 0;	/* unless parent directory disappeared - do not return error here (eg Access Denied or no more files) */
+				rc = 0;	/* unless parent directory disappeared - do not
+				return error here (eg Access Denied or no more files) */
 			}
 		}
 	} /* end switch */
