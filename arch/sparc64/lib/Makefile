@@ -10,7 +10,8 @@ lib-y := PeeCeeI.o blockops.o strlen.o strncmp.o \
 	 VIScopy.o VISbzero.o VISmemset.o VIScsum.o VIScsumcopy.o \
 	 VIScsumcopyusr.o VISsave.o atomic.o rwlock.o bitops.o \
 	 U3memcpy.o U3copy_from_user.o U3copy_to_user.o \
-	 U3copy_in_user.o mcount.o ipcsum.o rwsem.o xor.o splock.o
+	 U3copy_in_user.o mcount.o ipcsum.o rwsem.o xor.o splock.o \
+	 find_bit.o
 
 lib-$(CONFIG_DEBUG_SPINLOCK) += debuglocks.o
 lib-$(CONFIG_HAVE_DEC_LOCK) += dec_and_lock.o
