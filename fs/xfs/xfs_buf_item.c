@@ -331,6 +331,7 @@ xfs_buf_item_format(
 			vecp++;
 			first_bit = next_bit;
 			last_bit = next_bit;
+			nbits = 1;
 		} else {
 			last_bit++;
 			nbits++;
