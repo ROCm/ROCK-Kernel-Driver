@@ -13,7 +13,8 @@ config INPUT_KEYBOARD
 
 config KEYBOARD_ATKBD
 	tristate "AT keyboard support" if EMBEDDED || !X86 
-	default y
+	default y if INPUT=y && INPUT_KEYBOARD=y && SERIO=y
+	default m
 	depends on INPUT && INPUT_KEYBOARD && SERIO
 	help
 	  Say Y here if you want to use a standard AT or PS/2 keyboard. Usually
