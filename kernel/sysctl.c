@@ -403,7 +403,7 @@ int do_sysctl(int *name, int nlen, void *oldval, size_t *oldlenp,
 	return -ENOTDIR;
 }
 
-extern asmlinkage long sys_sysctl(struct __sysctl_args *args)
+asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
 {
 	struct __sysctl_args tmp;
 	int error;
@@ -444,8 +444,8 @@ static inline int ctl_perm(ctl_table *table, int op)
 }
 
 static int parse_table(int *name, int nlen,
-		       void *oldval, size_t *oldlenp,
-		       void *newval, size_t newlen,
+		       void __user *oldval, size_t __user *oldlenp,
+		       void __user *newval, size_t newlen,
 		       ctl_table *table, void **context)
 {
 	int n;
@@ -485,8 +485,8 @@ repeat:
 /* Perform the actual read/write of a sysctl table entry. */
 int do_sysctl_strategy (ctl_table *table, 
 			int *name, int nlen,
-			void *oldval, size_t *oldlenp,
-			void *newval, size_t newlen, void **context)
+			void __user *oldval, size_t __user *oldlenp,
+			void __user *newval, size_t newlen, void **context)
 {
 	int op = 0, rc;
 	size_t len;
@@ -787,10 +787,11 @@ static int proc_sys_permission(struct inode *inode, int op)
  * Returns 0 on success.
  */
 int proc_dostring(ctl_table *table, int write, struct file *filp,
-		  void *buffer, size_t *lenp)
+		  void __user *buffer, size_t *lenp)
 {
 	size_t len;
-	char *p, c;
+	char __user *p;
+	char c;
 	
 	if (!table->data || !table->maxlen || !*lenp ||
 	    (filp->f_pos && !write)) {
@@ -840,7 +841,7 @@ int proc_dostring(ctl_table *table, int write, struct file *filp,
  */
  
 static int proc_doutsstring(ctl_table *table, int write, struct file *filp,
-		  void *buffer, size_t *lenp)
+		  void __user *buffer, size_t *lenp)
 {
 	int r;
 
@@ -863,7 +864,7 @@ static int proc_doutsstring(ctl_table *table, int write, struct file *filp,
 #define OP_MIN	4
 
 static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
-		  void *buffer, size_t *lenp, int conv, int op)
+		  void __user *buffer, size_t *lenp, int conv, int op)
 {
 	int *i, vleft, first=1, neg, val;
 	size_t left, len;
@@ -885,12 +886,12 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 		if (write) {
 			while (left) {
 				char c;
-				if(get_user(c,(char *) buffer))
+				if (get_user(c,(char __user *) buffer))
 					return -EFAULT;
 				if (!isspace(c))
 					break;
 				left--;
-				((char *) buffer)++;
+				buffer++;
 			}
 			if (!left)
 				break;
@@ -979,7 +980,7 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
  * Returns 0 on success.
  */
 int proc_dointvec(ctl_table *table, int write, struct file *filp,
-		     void *buffer, size_t *lenp)
+		     void __user *buffer, size_t *lenp)
 {
     return do_proc_dointvec(table,write,filp,buffer,lenp,1,OP_SET);
 }
@@ -989,7 +990,7 @@ int proc_dointvec(ctl_table *table, int write, struct file *filp,
  */
  
 int proc_dointvec_bset(ctl_table *table, int write, struct file *filp,
-			void *buffer, size_t *lenp)
+			void __user *buffer, size_t *lenp)
 {
 	if (!capable(CAP_SYS_MODULE)) {
 		return -EPERM;
@@ -1015,7 +1016,7 @@ int proc_dointvec_bset(ctl_table *table, int write, struct file *filp,
  * Returns 0 on success.
  */
 int proc_dointvec_minmax(ctl_table *table, int write, struct file *filp,
-		  void *buffer, size_t *lenp)
+		  void __user *buffer, size_t *lenp)
 {
 	int *i, *min, *max, vleft, first=1, neg, val;
 	size_t len, left;
@@ -1043,7 +1044,7 @@ int proc_dointvec_minmax(ctl_table *table, int write, struct file *filp,
 				if (!isspace(c))
 					break;
 				left--;
-				((char *) buffer)++;
+				buffer++;
 			}
 			if (!left)
 				break;
@@ -1113,7 +1114,7 @@ int proc_dointvec_minmax(ctl_table *table, int write, struct file *filp,
 
 static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 				     struct file *filp,
-				     void *buffer, size_t *lenp,
+				     void __user *buffer, size_t *lenp,
 				     unsigned long convmul,
 				     unsigned long convdiv)
 {
@@ -1139,12 +1140,12 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 		if (write) {
 			while (left) {
 				char c;
-				if(get_user(c, (char *) buffer))
+				if (get_user(c, (char __user *) buffer))
 					return -EFAULT;
 				if (!isspace(c))
 					break;
 				left--;
-				((char *) buffer)++;
+				buffer++;
 			}
 			if (!left)
 				break;
@@ -1152,7 +1153,7 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 			len = left;
 			if (len > TMPBUFLEN-1)
 				len = TMPBUFLEN-1;
-			if(copy_from_user(buf, buffer, len))
+			if (copy_from_user(buf, buffer, len))
 				return -EFAULT;
 			buf[len] = 0;
 			p = buf;
@@ -1232,7 +1233,7 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
  * Returns 0 on success.
  */
 int proc_doulongvec_minmax(ctl_table *table, int write, struct file *filp,
-			   void *buffer, size_t *lenp)
+			   void __user *buffer, size_t *lenp)
 {
     return do_proc_doulongvec_minmax(table, write, filp, buffer, lenp, 1l, 1l);
 }
@@ -1256,7 +1257,7 @@ int proc_doulongvec_minmax(ctl_table *table, int write, struct file *filp,
  */
 int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int write,
 				      struct file *filp,
-				      void *buffer, size_t *lenp)
+				      void __user *buffer, size_t *lenp)
 {
     return do_proc_doulongvec_minmax(table, write, filp, buffer,
 				     lenp, HZ, 1000l);
@@ -1279,7 +1280,7 @@ int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int write,
  * Returns 0 on success.
  */
 int proc_dointvec_jiffies(ctl_table *table, int write, struct file *filp,
-			  void *buffer, size_t *lenp)
+			  void __user *buffer, size_t *lenp)
 {
     return do_proc_dointvec(table,write,filp,buffer,lenp,HZ,OP_SET);
 }
@@ -1345,8 +1346,8 @@ int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int write,
 
 /* The generic string strategy routine: */
 int sysctl_string(ctl_table *table, int *name, int nlen,
-		  void *oldval, size_t *oldlenp,
-		  void *newval, size_t newlen, void **context)
+		  void __user *oldval, size_t __user *oldlenp,
+		  void __user *newval, size_t newlen, void **context)
 {
 	size_t l, len;
 	
@@ -1453,7 +1454,7 @@ int sysctl_jiffies(ctl_table *table, int *name, int nlen,
 #else /* CONFIG_SYSCTL */
 
 
-extern asmlinkage long sys_sysctl(struct __sysctl_args *args)
+extern asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
 {
 	return -ENOSYS;
 }
