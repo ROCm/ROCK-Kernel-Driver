@@ -45,7 +45,6 @@
 #include <linux/uio.h>
 #include <linux/tty.h>
 #include <linux/in6.h>
-#include <linux/seq_file.h>
 #include <linux/binfmts.h>
 #include <linux/namei.h>
 #include <linux/buffer_head.h>
@@ -313,16 +312,6 @@ EXPORT_SYMBOL(securebits);
 EXPORT_SYMBOL(cap_bset);
 EXPORT_SYMBOL(daemonize);
 EXPORT_SYMBOL(csum_partial); /* for networking and md */
-EXPORT_SYMBOL(seq_escape);
-EXPORT_SYMBOL(seq_printf);
-EXPORT_SYMBOL(seq_path);
-EXPORT_SYMBOL(seq_open);
-EXPORT_SYMBOL(seq_release);
-EXPORT_SYMBOL(seq_read);
-EXPORT_SYMBOL(seq_lseek);
-EXPORT_SYMBOL(single_open);
-EXPORT_SYMBOL(single_release);
-EXPORT_SYMBOL(seq_release_private);
 
 /* Miscellaneous access points */
 EXPORT_SYMBOL(si_meminfo);
