@@ -14,6 +14,7 @@
  *  it to save wrong values...  Be aware!
  */
 #include <linux/config.h>
+#include <linux/init.h>
 #include "entry-header.S"
 #include <asm/thread_info.h>
 #include <asm/glue.h>
@@ -1013,7 +1014,7 @@ ENTRY(__switch_to)
 		mcr	p15, 0, r2, c3, c0		@ Set domain register
 		ldmib	r1, {r4 - sl, fp, sp, pc}	@ Load all regs saved previously
 
-		.section ".text.init",#alloc,#execinstr
+		__INIT
 /*
  * Vector stubs.  NOTE that we only align 'vector_IRQ' to a cache line boundary,
  * and we rely on each stub being exactly 48 (1.5 cache lines) in size.  This

@@ -133,7 +133,7 @@ extern void cpld_modify(int mask, int set);
 
 #define pcibios_assign_all_busses()	1
 
-#define PCIBIOS_MIN_IO		0x6000
-#define PCIBIOS_MIN_MEM 	0x40000000
+#define PCIBIOS_MIN_IO		0x1000
+#define PCIBIOS_MIN_MEM 	0x81000000
 
 #endif
