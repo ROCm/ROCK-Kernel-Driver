@@ -231,7 +231,7 @@ int ipv6_addr_type(const struct in6_addr *addr)
 
 	if ((addr->s6_addr32[0] | addr->s6_addr32[1]) == 0) {
 		if (addr->s6_addr32[2] == 0) {
-			if (addr->in6_u.u6_addr32[3] == 0)
+			if (addr->s6_addr32[3] == 0)
 				return IPV6_ADDR_ANY;
 
 			if (addr->s6_addr32[3] == htonl(0x00000001))
@@ -1071,7 +1071,7 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 		eui[0] ^= 2;
 		return 0;
 	case ARPHRD_ARCNET:
-		/* XXX: inherit EUI-64 fro mother interface -- yoshfuji */
+		/* XXX: inherit EUI-64 from other interface -- yoshfuji */
 		if (dev->addr_len != ARCNET_ALEN)
 			return -1;
 		memset(eui, 0, 7);

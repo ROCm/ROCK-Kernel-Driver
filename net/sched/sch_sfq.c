@@ -341,6 +341,7 @@ sfq_dequeue(struct Qdisc* sch)
 
 	/* Is the slot empty? */
 	if (q->qs[a].qlen == 0) {
+		q->ht[q->hash[a]] = SFQ_DEPTH;
 		a = q->next[a];
 		if (a == old_a) {
 			q->tail = SFQ_DEPTH;

@@ -1715,7 +1715,8 @@ config NET_POCKET
 	  <file:Documentation/Changes>) and you can say N here.
 
 	  Laptop users should read the Linux Laptop home page at
-	  <http://www.linux-on-laptops.com/>.
+	  <http://www.linux-on-laptops.com/> or
+	  Tuxmobil - Linux on Mobile Computers at <http://www.tuxmobil.org/>.
 
 	  Note that the answer to this question doesn't directly affect the
 	  kernel: saying N will just cause the configurator to skip all

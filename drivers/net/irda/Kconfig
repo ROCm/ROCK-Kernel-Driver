@@ -269,7 +269,7 @@ config MA600_DONGLE_OLD
 	  information, download the following tar gzip file.
 
 	  There is a pre-compiled module on
-	  <http://engsvr.ust.hk/~eetwl95/download/ma600-2.4.x.tar.gz>
+	  <http://engsvr.ust.hk/~eetwl95/ma600.html>
 
 config EP7211_IR
 	tristate "EP7211 I/R support"

@@ -98,6 +98,7 @@ extern void addrconf_dad_failure(struct inet6_ifaddr *ifp);
 
 extern int ipv6_chk_mcast_addr(struct net_device *dev, struct in6_addr *group,
 		struct in6_addr *src_addr);
+extern int ipv6_is_mld(struct sk_buff *skb, int nexthdr);
 
 extern void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len);
 
