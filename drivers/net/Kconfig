@@ -1752,7 +1752,7 @@ config VIA_VELOCITY
 	  If you have a VIA "Velocity" based network card say Y here.
 
 	  To compile this driver as a module, choose M here. The module
-	  will be called via-rhine.
+	  will be called via-velocity.
 
 config LAN_SAA9730
 	bool "Philips SAA9730 Ethernet support (EXPERIMENTAL)"
