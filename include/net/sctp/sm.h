@@ -334,12 +334,6 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 __u32 sctp_generate_tag(const struct sctp_endpoint *);
 __u32 sctp_generate_tsn(const struct sctp_endpoint *);
 
-/* 4th level prototypes */
-void sctp_param2sockaddr(union sctp_addr *addr, union sctp_addr_param *,
-			 __u16 port, int iif);
-int sctp_addr2sockaddr(const union sctp_params, union sctp_addr *);
-int sockaddr2sctp_addr(const union sctp_addr *, union sctp_addr_param *);
-
 /* Extern declarations for major data structures.  */
 const sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t, sctp_state_t);
 extern const sctp_sm_table_entry_t

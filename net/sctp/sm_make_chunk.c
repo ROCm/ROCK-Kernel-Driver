@@ -1214,6 +1214,7 @@ struct sctp_association *sctp_make_temp_asoc(const struct sctp_endpoint *ep,
 	struct sctp_association *asoc;
 	struct sk_buff *skb;
 	sctp_scope_t scope;
+	struct sctp_af *af;
 
 	/* Create the bare association.  */
 	scope = sctp_scope(sctp_source(chunk));
@@ -1223,29 +1224,10 @@ struct sctp_association *sctp_make_temp_asoc(const struct sctp_endpoint *ep,
 	asoc->temp = 1;
 	skb = chunk->skb;
 	/* Create an entry for the source address of the packet.  */
-	/* FIXME: Use the af specific helpers. */
-	switch (skb->nh.iph->version) {
-	case 4:
-		asoc->c.peer_addr.v4.sin_family     = AF_INET;
-		asoc->c.peer_addr.v4.sin_port = ntohs(chunk->sctp_hdr->source);
-		asoc->c.peer_addr.v4.sin_addr.s_addr = skb->nh.iph->saddr;
-                break;
-
-	case 6:
-		asoc->c.peer_addr.v6.sin6_family     = AF_INET6;
-		asoc->c.peer_addr.v6.sin6_port
-			= ntohs(chunk->sctp_hdr->source);
-		asoc->c.peer_addr.v6.sin6_flowinfo = 0; /* BUG BUG BUG */
-		asoc->c.peer_addr.v6.sin6_addr = skb->nh.ipv6h->saddr;
-		asoc->c.peer_addr.v6.sin6_scope_id =
-			((struct inet6_skb_parm *)skb->cb)->iif;
-		break;
-
-        default:
-		/* Yikes!  I never heard of this kind of address.  */
+	af = sctp_get_af_specific(ipver2af(skb->nh.iph->version));
+	if (unlikely(!af))
 		goto fail;
-	};
-
+	af->from_skb(&asoc->c.peer_addr, skb, 1);
 nodata:
 	return asoc;
 
@@ -1883,6 +1865,7 @@ int sctp_process_param(struct sctp_association *asoc, union sctp_params param,
 	int retval = 1;
 	sctp_scope_t scope;
 	time_t stale;
+	struct sctp_af *af;
 
 	/* We maintain all INIT parameters in network byte order all the
 	 * time.  This allows us to not worry about whether the parameters
@@ -1894,7 +1877,8 @@ int sctp_process_param(struct sctp_association *asoc, union sctp_params param,
 			break;
 		/* Fall through. */
 	case SCTP_PARAM_IPV4_ADDRESS:
-		sctp_param2sockaddr(&addr, param.addr, asoc->peer.port, 0);
+		af = sctp_get_af_specific(param_type2af(param.p->type));
+		af->from_addr_param(&addr, param.addr, asoc->peer.port, 0);
 		scope = sctp_scope(peer_addr);
 		if (sctp_in_scope(&addr, scope))
 			if (!sctp_assoc_add_peer(asoc, &addr, gfp))
@@ -2006,90 +1990,6 @@ __u32 sctp_generate_tsn(const struct sctp_endpoint *ep)
 	return retval;
 }
 
-/********************************************************************
- * 4th Level Abstractions
- ********************************************************************/
-
-/* Convert from an SCTP IP parameter to a union sctp_addr.  */
-void sctp_param2sockaddr(union sctp_addr *addr, union sctp_addr_param *param,
-			 __u16 port, int iif)
-{
-	switch(param->v4.param_hdr.type) {
-	case SCTP_PARAM_IPV4_ADDRESS:
-		addr->v4.sin_family = AF_INET;
-		addr->v4.sin_port = port;
-		addr->v4.sin_addr.s_addr = param->v4.addr.s_addr;
-		break;
-
-	case SCTP_PARAM_IPV6_ADDRESS:
-		addr->v6.sin6_family = AF_INET6;
-		addr->v6.sin6_port = port;
-		addr->v6.sin6_flowinfo = 0; /* BUG */
-		addr->v6.sin6_addr = param->v6.addr;
-		addr->v6.sin6_scope_id = iif;
-		break;
-
-	default:
-		SCTP_DEBUG_PRINTK("Illegal address type %d\n",
-				  ntohs(param->v4.param_hdr.type));
-		break;
-	};
-}
-
-/* Convert an IP address in an SCTP param into a sockaddr_in.  */
-/* Returns true if a valid conversion was possible.  */
-int sctp_addr2sockaddr(union sctp_params p, union sctp_addr *sa)
-{
-	switch (p.p->type) {
-	case SCTP_PARAM_IPV4_ADDRESS:
-		sa->v4.sin_addr = *((struct in_addr *)&p.v4->addr);
-		sa->v4.sin_family = AF_INET;
-		break;
-
-	case SCTP_PARAM_IPV6_ADDRESS:
-		*((struct in6_addr *)&sa->v4.sin_addr)
-			= p.v6->addr;
-		sa->v4.sin_family = AF_INET6;
-		break;
-
-        default:
-                return 0;
-        };
-
-	return 1;
-}
-
-/* Convert a sockaddr_in to an IP address in an SCTP param.
- * Returns len if a valid conversion was possible.
- */
-int sockaddr2sctp_addr(const union sctp_addr *sa, union sctp_addr_param *p)
-{
-	int len = 0;
-
-	switch (sa->v4.sin_family) {
-	case AF_INET:
-		p->v4.param_hdr.type = SCTP_PARAM_IPV4_ADDRESS;
-		p->v4.param_hdr.length = ntohs(sizeof(sctp_ipv4addr_param_t));
-		len = sizeof(sctp_ipv4addr_param_t);
-		p->v4.addr.s_addr = sa->v4.sin_addr.s_addr;
-		break;
-
-	case AF_INET6:
-		p->v6.param_hdr.type = SCTP_PARAM_IPV6_ADDRESS;
-		p->v6.param_hdr.length = ntohs(sizeof(sctp_ipv6addr_param_t));
-		len = sizeof(sctp_ipv6addr_param_t);
-		p->v6.addr = *(&sa->v6.sin6_addr);
-		break;
-
-	default:
-		printk(KERN_WARNING "sockaddr2sctp_addr: Illegal family %d.\n",
-		       sa->v4.sin_family);
-		return 0;
-	};
-
-	return len;
-}
-
 /*
  * ADDIP 3.1.1 Address Configuration Change Chunk (ASCONF)
  *      0                   1                   2                   3
@@ -2120,8 +2020,9 @@ struct sctp_chunk *sctp_make_asconf(struct sctp_association *asoc,
 	int length = sizeof(asconf) + vparam_len;
 	union sctp_params addrparam;
 	int addrlen;
+	struct sctp_af *af = sctp_get_af_specific(addr->v4.sin_family);
 
-	addrlen = sockaddr2sctp_addr(addr, (union sctp_addr_param *)&addrparam);
+	addrlen = af->to_addr_param(addr, (union sctp_addr_param *)&addrparam);
 	if (!addrlen)
 		return NULL;
 	length += addrlen;
@@ -2163,8 +2064,9 @@ struct sctp_chunk *sctp_make_asconf_set_prim(struct sctp_association *asoc,
 	int 			len = sizeof(param);
 	union sctp_params	addrparam;
 	int			addrlen;
+	struct sctp_af		*af = sctp_get_af_specific(addr->v4.sin_family);
 
-	addrlen = sockaddr2sctp_addr(addr, (union sctp_addr_param *)&addrparam);
+	addrlen = af->to_addr_param(addr, (union sctp_addr_param *)&addrparam);
 	if (!addrlen)
 		return NULL;
 	len += addrlen;

@@ -533,6 +533,19 @@ static inline int ipver2af(__u8 ipver)
 	};
 }
 
+/* Convert from an address parameter type to an address family.  */
+static inline int param_type2af(__u16 type)
+{
+	switch (type) {
+	case SCTP_PARAM_IPV4_ADDRESS:
+	        return  AF_INET;
+	case SCTP_PARAM_IPV6_ADDRESS:
+		return AF_INET6;
+	default:
+		return 0;
+	};
+}
+
 /* Perform some sanity checks. */
 static inline int sctp_sanity_check(void)
 {
