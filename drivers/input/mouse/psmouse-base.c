@@ -461,24 +461,25 @@ static int psmouse_extensions(struct psmouse *psmouse,
 			return type;
 	}
 
+	if (max_proto >= PSMOUSE_IMEX && im_explorer_detect(psmouse)) {
+
+		if (set_properties) {
+			set_bit(REL_WHEEL, psmouse->dev.relbit);
+			set_bit(BTN_SIDE, psmouse->dev.keybit);
+			set_bit(BTN_EXTRA, psmouse->dev.keybit);
+			if (!psmouse->name)
+				psmouse->name = "Explorer Mouse";
+		}
+
+		return PSMOUSE_IMEX;
+	}
+
 	if (max_proto >= PSMOUSE_IMPS && intellimouse_detect(psmouse)) {
 
 		if (set_properties) {
 			set_bit(REL_WHEEL, psmouse->dev.relbit);
 			if (!psmouse->name)
 				psmouse->name = "Wheel Mouse";
-		}
-
-		if (max_proto >= PSMOUSE_IMEX && im_explorer_detect(psmouse)) {
-
-			if (!set_properties) {
-				set_bit(BTN_SIDE, psmouse->dev.keybit);
-				set_bit(BTN_EXTRA, psmouse->dev.keybit);
-				if (!psmouse->name)
-					psmouse->name = "Explorer Mouse";
-			}
-
-			return PSMOUSE_IMEX;
 		}
 
 		return PSMOUSE_IMPS;
