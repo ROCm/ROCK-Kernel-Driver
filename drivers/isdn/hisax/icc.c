@@ -255,10 +255,6 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 			printk(KERN_WARNING "HiSax: ICC XMR\n");
 		}
 		if (exval & 0x40) {  /* XDU */
-			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
-				del_timer(&cs->dbusytimer);
-			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				sched_d_event(cs, D_CLEARBUSY);
 			xmit_xdu_d(cs, NULL);
 		}
 		if (exval & 0x04) {  /* MOS */

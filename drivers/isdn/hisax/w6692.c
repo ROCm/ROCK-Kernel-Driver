@@ -366,10 +366,6 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		if (cs->debug & L1_DEB_WARN)
 			debugl1(cs, "W6692 D_EXIR %02x", exval);
 		if (exval & (W_D_EXI_XDUN | W_D_EXI_XCOL)) {	/* Transmit underrun/collision */
-			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
-				del_timer(&cs->dbusytimer);
-			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				sched_d_event(cs, D_CLEARBUSY);
 			xmit_xdu_d(cs, NULL);
 		}
 		if (exval & W_D_EXI_RDOV) {	/* RDOV */

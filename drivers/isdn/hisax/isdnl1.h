@@ -251,6 +251,11 @@ xmit_xdu_d(struct IsdnCardState *cs, void (*reset_xmit)(struct IsdnCardState *cs
 	if (cs->debug & L1_DEB_WARN)
 		debugl1(cs, "D XDU");
 
+	if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
+		del_timer(&cs->dbusytimer);
+	if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
+		sched_d_event(cs, D_CLEARBUSY);
+
 	xmit_restart_d(cs);
 	if (reset_xmit)
 		reset_xmit(cs);
