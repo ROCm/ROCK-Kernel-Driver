@@ -323,8 +323,6 @@ struct scsi_device {
 	 */
 	struct list_head    siblings;   /* list of all devices on this host */
 	struct list_head    same_target_siblings; /* just the devices sharing same target id */
-	wait_queue_head_t   scpnt_wait;	/* Used to wait if
-					   device is busy */
 	struct Scsi_Host *host;
 	request_queue_t *request_queue;
 	volatile unsigned short device_busy;	/* commands actually active on low-level */
@@ -402,9 +400,6 @@ struct scsi_device {
   	/* default value if the device doesn't override */
 	#define SCSI_DEFAULT_DEVICE_BLOCKED	3
 
-
-	// Flag to allow revalidate to succeed in sd_open
-	int allow_revalidate;
 	struct device sdev_driverfs_dev;
 };
 #define	to_scsi_device(d)	\
