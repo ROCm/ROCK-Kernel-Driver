@@ -341,17 +341,17 @@ intelfbhw_do_blank(int blank, struct fb_info *info)
 	/* Set DPMS level */
 	tmp = INREG(ADPA) & ~ADPA_DPMS_CONTROL_MASK;
 	switch (blank) {
-	case 0:
-	case 1:
+	case FB_BLANK_UNBLANK:
+	case FB_BLANK_NORMAL:
 		tmp |= ADPA_DPMS_D0;
 		break;
-	case 2:
+	case FB_BLANK_VSYNC_SUSPEND:
 		tmp |= ADPA_DPMS_D1;
 		break;
-	case 3:
+	case FB_BLANK_HSYNC_SUSPEND:
 		tmp |= ADPA_DPMS_D2;
 		break;
-	case 4:
+	case FB_BLANK_POWERDOWN:
 		tmp |= ADPA_DPMS_D3;
 		break;
 	}

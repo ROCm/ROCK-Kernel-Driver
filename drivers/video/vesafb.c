@@ -56,6 +56,7 @@ static int             ypan       = 0;  /* 0..nothing, 1..ypan, 2..ywrap */
 static unsigned short  *pmi_base  = NULL;
 static void            (*pmi_start)(void);
 static void            (*pmi_pal)(void);
+static int             depth;
 
 /* --------------------------------------------------------------------- */
 
@@ -89,11 +90,11 @@ static int vesafb_pan_display(struct fb_var_screeninfo *var,
 }
 
 static void vesa_setpalette(int regno, unsigned red, unsigned green,
-			    unsigned blue, struct fb_var_screeninfo *var)
+			    unsigned blue)
 {
 #ifdef __i386__
 	struct { u_char blue, green, red, pad; } entry;
-	int shift = 16 - var->green.length;
+	int shift = 16 - depth;
 
 	if (pmi_setpal) {
 		entry.red   = red   >> shift;
@@ -135,7 +136,7 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 	switch (info->var.bits_per_pixel) {
 	case 8:
-		vesa_setpalette(regno,red,green,blue, &info->var);
+		vesa_setpalette(regno,red,green,blue);
 		break;
 	case 16:
 		if (info->var.red.offset == 10) {
@@ -358,6 +359,15 @@ static int __init vesafb_probe(struct device *device)
 	vesafb_defined.blue.length   = screen_info.blue_size;
 	vesafb_defined.transp.offset = screen_info.rsvd_pos;
 	vesafb_defined.transp.length = screen_info.rsvd_size;
+
+	if (vesafb_defined.bits_per_pixel <= 8) {
+		depth = vesafb_defined.green.length;
+		vesafb_defined.red.length =
+		vesafb_defined.green.length =
+		vesafb_defined.blue.length =
+		vesafb_defined.bits_per_pixel;
+	}
+
 	printk(KERN_INFO "vesafb: %s: "
 	       "size=%d:%d:%d:%d, shift=%d:%d:%d:%d\n",
 	       (vesafb_defined.bits_per_pixel > 8) ?

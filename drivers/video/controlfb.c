@@ -329,17 +329,17 @@ static int controlfb_blank(int blank_mode, struct fb_info *info)
 
 	ctrl = ld_le32(CNTRL_REG(p,ctrl));
 	if (blank_mode > 0)
-		switch (blank_mode - 1) {
-		case VESA_VSYNC_SUSPEND:
+		switch (blank_mode) {
+		case FB_BLANK_VSYNC_SUSPEND:
 			ctrl &= ~3;
 			break;
-		case VESA_HSYNC_SUSPEND:
+		case FB_BLANK_HSYNC_SUSPEND:
 			ctrl &= ~0x30;
 			break;
-		case VESA_POWERDOWN:
+		case FB_BLANK_POWERDOWN:
 			ctrl &= ~0x33;
 			/* fall through */
-		case VESA_NO_BLANKING:
+		case FB_BLANK_NORMAL:
 			ctrl |= 0x400;
 			break;
 		default:

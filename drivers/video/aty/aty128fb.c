@@ -2042,11 +2042,11 @@ static int aty128fb_blank(int blank, struct fb_info *fb)
 		set_backlight_enable(0);
 #endif /* CONFIG_PMAC_BACKLIGHT */
 
-	if (blank & VESA_VSYNC_SUSPEND)
+	if (blank & FB_BLANK_VSYNC_SUSPEND)
 		state |= 2;
-	if (blank & VESA_HSYNC_SUSPEND)
+	if (blank & FB_BLANK_HSYNC_SUSPEND)
 		state |= 1;
-	if (blank & VESA_POWERDOWN)
+	if (blank & FB_BLANK_POWERDOWN)
 		state |= 4;
 
 	aty_st_8(CRTC_EXT_CNTL+1, state);

@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-core.c,v 1.13 2004/10/12 07:33:22 kraxel Exp $
+ * $Id: cx88-core.c,v 1.15 2004/10/25 11:26:36 kraxel Exp $
  *
  * device driver for Conexant 2388x based TV cards
  * driver core
@@ -50,13 +50,12 @@ module_param(latency,int,0444);
 MODULE_PARM_DESC(latency,"pci latency timer");
 
 static unsigned int tuner[] = {[0 ... (CX88_MAXBOARDS - 1)] = UNSET };
-static int tuner_num;
-module_param_array(tuner,int,&tuner_num,0444);
-MODULE_PARM_DESC(tuner,"tuner type");
+static unsigned int card[]  = {[0 ... (CX88_MAXBOARDS - 1)] = UNSET };
 
-static unsigned int card[] = {[0 ... (CX88_MAXBOARDS - 1)] = UNSET };
-static int card_num;
-module_param_array(card,int,&card_num,0444);
+module_param_array(tuner, int, NULL, 0444);
+module_param_array(card,  int, NULL, 0444);
+
+MODULE_PARM_DESC(tuner,"tuner type");
 MODULE_PARM_DESC(card,"card type");
 
 static unsigned int nicam = 0;
@@ -137,7 +136,7 @@ static u32* cx88_risc_field(u32 *rp, struct scatterlist *sglist,
 	/* sync instruction */
 	if (sync_line != NO_SYNC_LINE)
 		*(rp++) = cpu_to_le32(RISC_RESYNC | sync_line);
-	
+
 	/* scan lines */
 	sg = sglist;
 	for (line = 0; line < lines; line++) {
@@ -291,7 +290,7 @@ cx88_free_buffer(struct pci_dev *pci, struct cx88_buffer *buf)
  *
  * Every channel has 160 bytes control data (64 bytes instruction
  * queue and 6 CDT entries), which is close to 2k total.
- * 
+ *
  * Address layout:
  *    0x0000 - 0x03ff    CMDs / reserved
  *    0x0400 - 0x0bff    instruction queues + CDs
@@ -467,7 +466,7 @@ void cx88_risc_disasm(struct cx88_core *core,
 		      struct btcx_riscmem *risc)
 {
 	unsigned int i,j,n;
-	
+
 	printk("%s: risc disasm: %p [dma=0x%08lx]\n",
 	       core->name, risc->cpu, (unsigned long)risc->dma);
 	for (i = 0; i < (risc->size >> 2); i += n) {
@@ -537,13 +536,13 @@ void cx88_sram_channel_dump(struct cx88_core *core,
 }
 
 char *cx88_pci_irqs[32] = {
-	"vid", "aud", "ts", "vip", "hst", "5", "6", "tm1", 
+	"vid", "aud", "ts", "vip", "hst", "5", "6", "tm1",
 	"src_dma", "dst_dma", "risc_rd_err", "risc_wr_err",
 	"brdg_err", "src_dma_err", "dst_dma_err", "ipb_dma_err",
 	"i2c", "i2c_rack", "ir_smp", "gpio0", "gpio1"
 };
 char *cx88_vid_irqs[32] = {
-	"y_risci1", "u_risci1", "v_risci1", "vbi_risc1", 
+	"y_risci1", "u_risci1", "v_risci1", "vbi_risc1",
 	"y_risci2", "u_risci2", "v_risci2", "vbi_risc2",
 	"y_oflow",  "u_oflow",  "v_oflow",  "vbi_oflow",
 	"y_sync",   "u_sync",   "v_sync",   "vbi_sync",

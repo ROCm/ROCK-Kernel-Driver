@@ -87,7 +87,7 @@ fastcall unsigned int do_IRQ(struct pt_regs *regs)
 		/* build the stack frame on the IRQ stack */
 		isp = (u32*) ((char*)irqctx + sizeof(*irqctx));
 		irqctx->tinfo.task = curctx->tinfo.task;
-		irqctx->tinfo.previous_esp = current_stack_pointer();
+		irqctx->tinfo.previous_esp = current_stack_pointer;
 
 		asm volatile(
 			"       xchgl   %%ebx,%%esp      \n"
@@ -168,7 +168,7 @@ asmlinkage void do_softirq(void)
 		curctx = current_thread_info();
 		irqctx = softirq_ctx[smp_processor_id()];
 		irqctx->tinfo.task = curctx->task;
-		irqctx->tinfo.previous_esp = current_stack_pointer();
+		irqctx->tinfo.previous_esp = current_stack_pointer;
 
 		/* build the stack frame on the softirq stack */
 		isp = (u32*) ((char*)irqctx + sizeof(*irqctx));

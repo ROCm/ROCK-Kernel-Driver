@@ -1,5 +1,5 @@
 /*
- * $Id: cx88.h,v 1.37 2004/10/12 07:33:22 kraxel Exp $
+ * $Id: cx88.h,v 1.40 2004/11/03 09:04:51 kraxel Exp $
  *
  * v4l2 device driver for cx2388x based TV cards
  *
@@ -26,15 +26,10 @@
 #include <linux/videodev.h>
 #include <linux/kdev_t.h>
 
-#include <dvbdev.h>
-#include <dmxdev.h>
-#include <dvb_demux.h>
-#include <dvb_net.h>
-#include <dvb_frontend.h>
-
-#include <media/video-buf.h>
 #include <media/tuner.h>
 #include <media/audiochip.h>
+#include <media/video-buf.h>
+#include <media/video-buf-dvb.h>
 
 #include "btcx-risc.h"
 #include "cx88-reg.h"
@@ -160,6 +155,7 @@ extern struct sram_channel cx88_sram_channels[];
 #define CX88_BOARD_HAUPPAUGE_DVB_T1        18
 #define CX88_BOARD_CONEXANT_DVB_T1         19
 #define CX88_BOARD_PROVIDEO_PV259          20
+#define CX88_BOARD_DVICO_FUSIONHDTV_DVB_T_PLUS 21
 
 enum cx88_itype {
 	CX88_VMUX_COMPOSITE1 = 1,
@@ -351,7 +347,6 @@ struct cx8802_fh {
 };
 
 struct cx8802_suspend_state {
-	u32                        pci_cfg[64 / sizeof(u32)];
 	int                        disabled;
 };
 
@@ -369,11 +364,6 @@ struct cx8802_dev {
 	u32                        ts_packet_size;
 	u32                        ts_packet_count;
 
-	/* error stats */
-	u32                        stopper_count;
-	u32                        error_count;
-	u32                        timeout_count;
-
 	/* other global state info */
 	struct cx8802_suspend_state state;
 
@@ -383,15 +373,7 @@ struct cx8802_dev {
 	u32                        mailbox;
 
 	/* for dvb only */
-	struct dvb_adapter         *dvb_adapter;
-	struct videobuf_queue      dvbq;
-	struct task_struct         *dvb_thread;
-	struct dvb_demux           demux;
-	struct dmxdev              dmxdev;
-	struct dmx_frontend        fe_hw;
-	struct dmx_frontend        fe_mem;
-	struct dvb_net             dvbnet;
-	int                        nfeeds;
+	struct videobuf_dvb        dvb;
 	void*                      fe_handle;
 	int                        (*fe_release)(void *handle);
 };

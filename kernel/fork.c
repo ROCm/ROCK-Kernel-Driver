@@ -118,7 +118,11 @@ void __init fork_init(unsigned long mempages)
 	 * value: the thread structures can take up at most half
 	 * of memory.
 	 */
-	max_threads = mempages / (THREAD_SIZE/PAGE_SIZE) / 8;
+	if (THREAD_SIZE >= PAGE_SIZE)
+		max_threads = mempages / (THREAD_SIZE/PAGE_SIZE) / 8;
+	else
+		max_threads = mempages / 8;
+
 	/*
 	 * we need to allow at least 20 threads to boot a system
 	 */

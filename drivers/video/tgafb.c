@@ -468,7 +468,7 @@ tgafb_blank(int blank, struct fb_info *info)
 	vvvr &= ~(TGA_VALID_VIDEO | TGA_VALID_BLANK);
 
 	switch (blank) {
-	case 0: /* Unblanking */
+	case FB_BLANK_UNBLANK: /* Unblanking */
 		if (par->vesa_blanked) {
 			TGA_WRITE_REG(par, vhcr & 0xbfffffff, TGA_HORIZ_REG);
 			TGA_WRITE_REG(par, vvcr & 0xbfffffff, TGA_VERT_REG);
@@ -477,24 +477,24 @@ tgafb_blank(int blank, struct fb_info *info)
 		TGA_WRITE_REG(par, vvvr | TGA_VALID_VIDEO, TGA_VALID_REG);
 		break;
 
-	case 1: /* Normal blanking */
+	case FB_BLANK_NORMAL: /* Normal blanking */
 		TGA_WRITE_REG(par, vvvr | TGA_VALID_VIDEO | TGA_VALID_BLANK,
 			      TGA_VALID_REG);
 		break;
 
-	case 2: /* VESA blank (vsync off) */
+	case FB_BLANK_VSYNC_SUSPEND: /* VESA blank (vsync off) */
 		TGA_WRITE_REG(par, vvcr | 0x40000000, TGA_VERT_REG);
 		TGA_WRITE_REG(par, vvvr | TGA_VALID_BLANK, TGA_VALID_REG);
 		par->vesa_blanked = 1;
 		break;
 
-	case 3: /* VESA blank (hsync off) */
+	case FB_BLANK_HSYNC_SUSPEND: /* VESA blank (hsync off) */
 		TGA_WRITE_REG(par, vhcr | 0x40000000, TGA_HORIZ_REG);
 		TGA_WRITE_REG(par, vvvr | TGA_VALID_BLANK, TGA_VALID_REG);
 		par->vesa_blanked = 1;
 		break;
 
-	case 4: /* Poweroff */
+	case FB_BLANK_POWERDOWN: /* Poweroff */
 		TGA_WRITE_REG(par, vhcr | 0x40000000, TGA_HORIZ_REG);
 		TGA_WRITE_REG(par, vvcr | 0x40000000, TGA_VERT_REG);
 		TGA_WRITE_REG(par, vvvr | TGA_VALID_BLANK, TGA_VALID_REG);

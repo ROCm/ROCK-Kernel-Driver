@@ -81,6 +81,7 @@ extern unsigned char __res[];
 #define MPC85xx_IRQ_DUART	(26 + MPC85xx_OPENPIC_IRQ_OFFSET)
 #define MPC85xx_IRQ_IIC1	(27 + MPC85xx_OPENPIC_IRQ_OFFSET)
 #define MPC85xx_IRQ_PERFMON	(28 + MPC85xx_OPENPIC_IRQ_OFFSET)
+#define MPC85xx_IRQ_SEC2	(29 + MPC85xx_OPENPIC_IRQ_OFFSET)
 #define MPC85xx_IRQ_CPM		(30 + MPC85xx_OPENPIC_IRQ_OFFSET)
 
 /* The 12 external interrupt lines */
@@ -120,6 +121,8 @@ extern unsigned char __res[];
 #define MPC85xx_PCI2_SIZE	(0x01000)
 #define MPC85xx_PERFMON_OFFSET	(0xe1000)
 #define MPC85xx_PERFMON_SIZE	(0x01000)
+#define MPC85xx_SEC2_OFFSET	(0x30000)
+#define MPC85xx_SEC2_SIZE	(0x10000)
 #define MPC85xx_UART0_OFFSET	(0x04500)
 #define MPC85xx_UART0_SIZE	(0x00100)
 #define MPC85xx_UART1_OFFSET	(0x04600)

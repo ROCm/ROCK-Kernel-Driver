@@ -154,7 +154,7 @@ MODULE_LICENSE("GPL");
 static char *setup_args[] = { "", "", "", "", "", "", "", "", "" };
 
 static char *setup_strings;
-MODULE_PARM(setup_strings, "s");
+module_param(setup_strings, charp, 0);
 
 static void wd33c93_execute(struct Scsi_Host *instance);
 

@@ -2469,7 +2469,7 @@ int __init ide_init (void)
 
 #ifdef MODULE
 char *options = NULL;
-MODULE_PARM(options,"s");
+module_param(options, charp, 0);
 MODULE_LICENSE("GPL");
 
 static void __init parse_options (char *line)

@@ -220,7 +220,7 @@ static unsigned int sony_blocks_left = 0;	/* Number of 512 byte blocks left
 /* The base I/O address of the Sony Interface.  This is a variable (not a
    #define) so it can be easily changed via some future ioctl() */
 static unsigned int cdu31a_port = 0;
-MODULE_PARM(cdu31a_port, "i");
+module_param(cdu31a_port, uint, 0);
 
 /*
  * The following are I/O addresses of the various registers for the drive.  The
@@ -298,7 +298,7 @@ static unsigned volatile char final_pos_msf[3] = { 0, 0, 0 };
 
 /* What IRQ is the drive using?  0 if none. */
 static int cdu31a_irq = 0;
-MODULE_PARM(cdu31a_irq, "i");
+module_param(cdu31a_irq, int, 0);
 
 /* The interrupt handler will wake this queue up when it gets an
    interrupts. */

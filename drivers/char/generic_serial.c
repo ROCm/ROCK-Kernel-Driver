@@ -58,7 +58,7 @@ static int gs_debug;
 
 #define RS_EVENT_WRITE_WAKEUP	1
 
-MODULE_PARM(gs_debug, "i");
+module_param(gs_debug, int, 0644);
 
 
 void gs_put_char(struct tty_struct * tty, unsigned char ch)

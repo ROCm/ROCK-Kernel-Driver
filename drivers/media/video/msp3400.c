@@ -1426,6 +1426,8 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg);
 static int msp_suspend(struct device * dev, u32 state, u32 level);
 static int msp_resume(struct device * dev, u32 level);
 
+static void msp_wake_thread(struct i2c_client *client);
+
 static struct i2c_driver driver = {
 	.owner          = THIS_MODULE,
 	.name           = "i2c msp3400 driver",
@@ -1550,7 +1552,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 		msp->kthread = kthread_run(thread_func, c, "msp34xx");
 		if (NULL == msp->kthread)
 			printk(KERN_WARNING "msp34xx: kernel_thread() failed\n");
-		wake_up_interruptible(&msp->wq);
+		msp_wake_thread(c);
 	}
 
 	/* done */

@@ -173,6 +173,7 @@ static u32 iommu_get_one(struct page *page, int npages, struct sbus_bus *sbus)
 	}
 
 	iommu_viking_flush_iotlb(iopte0, npages);
+	flush_cache_all(); // hack to fix dma errors with hypersparc
 
 	return busa0;
 }

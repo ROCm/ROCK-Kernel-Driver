@@ -147,7 +147,7 @@ void i2o_report_controller_unit(struct i2o_controller *c, struct i2o_device *d)
 }
 
 /*
-MODULE_PARM(verbose, "i");
+module_param(verbose, int, 0644);
 MODULE_PARM_DESC(verbose, "Verbose diagnostics");
 */
 /*

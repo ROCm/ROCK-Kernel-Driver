@@ -1191,7 +1191,7 @@ intelfb_set_par(struct fb_info *info)
 	DBG_MSG("intelfb_set_par (%dx%d-%d)\n", info->var.xres,
 		info->var.yres, info->var.bits_per_pixel);
 
-	intelfb_blank(1, info);
+	intelfb_blank(FB_BLANK_POWERDOWN, info);
 
 	if (dinfo->accel)
 		intelfbhw_2d_stop(dinfo);
@@ -1214,7 +1214,7 @@ intelfb_set_par(struct fb_info *info)
 
 	intelfb_pan_display(&info->var, info);
 
-	intelfb_blank(0, info);
+	intelfb_blank(FB_BLANK_UNBLANK, info);
 
 	if (ACCEL(dinfo, info)) {
 		info->flags = FBINFO_DEFAULT | FBINFO_HWACCEL_YPAN |
