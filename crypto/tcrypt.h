@@ -30,6 +30,8 @@ struct hash_testvec {
 	char digest[MAX_DIGEST_SIZE];
 	unsigned char np;
 	unsigned char tap[MAX_TAP];		
+	char key[128]; /* only used with keyed hash algorithms */
+	unsigned char ksize;
 };
 
 struct hmac_testvec {	

@@ -42,6 +42,15 @@ static void final(struct crypto_tfm *tfm, u8 *out)
 	tfm->__crt_alg->cra_digest.dia_final(crypto_tfm_ctx(tfm), out);
 }
 
+static int setkey(struct crypto_tfm *tfm, const u8 *key, unsigned int keylen)
+{
+	u32 flags;
+	if (tfm->__crt_alg->cra_digest.dia_setkey == NULL)
+		return -ENOSYS;
+	return tfm->__crt_alg->cra_digest.dia_setkey(crypto_tfm_ctx(tfm),
+						     key, keylen, &flags);
+}
+
 static void digest(struct crypto_tfm *tfm,
                    struct scatterlist *sg, unsigned int nsg, u8 *out)
 {
@@ -72,6 +81,7 @@ int crypto_init_digest_ops(struct crypto_tfm *tfm)
 	ops->dit_update	= update;
 	ops->dit_final	= final;
 	ops->dit_digest	= digest;
+	ops->dit_setkey	= setkey;
 	
 	return crypto_alloc_hmac_block(tfm);
 }
