@@ -491,7 +491,7 @@ void *iommu_alloc_consistent(struct iommu_table *tbl, size_t size,
 	 */
 	if (order >= IOMAP_MAX_ORDER) {
 		printk("iommu_alloc_consistent size too large: 0x%lx\n", size);
-		return (void *)DMA_ERROR_CODE;
+		return NULL;
 	}
 
 	if (!tbl)
