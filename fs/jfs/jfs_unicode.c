@@ -68,8 +68,7 @@ int jfs_strtoUCS(wchar_t * to,
 			jfs_err("jfs_strtoUCS: char2uni returned %d.", charlen);
 			jfs_err("charset = %s, char = 0x%x",
 				codepage->charset, (unsigned char) *from);
-			to[i] = 0x003f;	/* a question mark */
-			charlen = 1;
+			return charlen;
 		}
 	}
 
@@ -99,6 +98,11 @@ int get_UCSname(struct component_name * uniName, struct dentry *dentry,
 
 	uniName->namlen = jfs_strtoUCS(uniName->name, dentry->d_name.name,
 				       length, nls_tab);
+
+	if (uniName->namlen < 0) {
+		kfree(uniName->name);
+		return -uniName->namlen;
+	}
 
 	return 0;
 }
