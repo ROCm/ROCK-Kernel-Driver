@@ -98,10 +98,6 @@ static struct netlink_table *nl_table;
 static DECLARE_WAIT_QUEUE_HEAD(nl_table_wait);
 static unsigned int nl_nonroot[MAX_LINKS];
 
-#ifdef NL_EMULATE_DEV
-static struct socket *netlink_kernel[MAX_LINKS];
-#endif
-
 static int netlink_dump(struct sock *sk);
 static void netlink_destroy_callback(struct netlink_callback *cb);
 
