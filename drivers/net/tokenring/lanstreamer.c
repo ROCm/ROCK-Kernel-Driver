@@ -1606,7 +1606,7 @@ static void streamer_arb_cmd(struct net_device *dev)
 				i += 2;
 			}
 
-			memcpy_fromio(skb_put(mac_frame, buffer_len),
+			memcpy(skb_put(mac_frame, buffer_len),
 				      frame_data, buffer_len);
 		} while (next_ptr && (buff_off = next_ptr));
 
