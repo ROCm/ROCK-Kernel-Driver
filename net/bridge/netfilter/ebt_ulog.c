@@ -135,7 +135,7 @@ static void ebt_ulog(const struct sk_buff *skb, unsigned int hooknr,
 
 	size = NLMSG_SPACE(sizeof(*pm) + copy_len);
 	if (size > nlbufsiz) {
-		PRINTR("ebt_ulog: Size %d needed, but nlbufsiz=%d\n",
+		PRINTR("ebt_ulog: Size %Zd needed, but nlbufsiz=%d\n",
 		       size, nlbufsiz);
 		return;
 	}
