@@ -327,76 +327,6 @@ static inline void mts_urb_abort(struct mts_desc* desc) {
 	usb_unlink_urb( desc->urb );
 }
 
-static struct mts_desc * mts_list; /* list of active scanners */
-struct semaphore mts_list_semaphore;
-
-/* Internal list operations */
-
-static
-void mts_remove_nolock( struct mts_desc* to_remove )
-{
-	MTS_DEBUG( "removing 0x%x from list\n",
-		   (int)to_remove );
-
-	lock_kernel();
-	mts_urb_abort(to_remove);
-
-	MTS_DEBUG_GOT_HERE();
-
-	if ( to_remove != mts_list ) {
-		MTS_DEBUG_GOT_HERE();
-		if (to_remove->prev && to_remove->next)
-			to_remove->prev->next = to_remove->next;
-	} else {
-		MTS_DEBUG_GOT_HERE();
-		mts_list = to_remove->next;
-		if (mts_list) {
-			MTS_DEBUG_GOT_HERE();
-			mts_list->prev = 0;
-		}
-	}
-
-	if ( to_remove->next ) {
-		MTS_DEBUG_GOT_HERE();
-		to_remove->next->prev = to_remove->prev;
-	}
-
-	MTS_DEBUG_GOT_HERE();
-	scsi_unregister_host(&to_remove->ctempl);
-	unlock_kernel();
-
-	usb_free_urb(to_remove->urb);
-	kfree( to_remove );
-}
-
-static
-void mts_add_nolock( struct mts_desc* to_add )
-{
-	MTS_DEBUG( "adding 0x%x to list\n", (int)to_add );
-
-	to_add->prev = 0;
-	to_add->next = mts_list;
-	if ( mts_list ) {
-		mts_list->prev = to_add;
-	}
-
-	mts_list = to_add;
-}
-
-
-
-
-/* SCSI driver interface */
-
-/* scsi related functions - dummies for now mostly */
-
-static int mts_scsi_release(struct Scsi_Host *psh)
-{
-	MTS_DEBUG_GOT_HERE();
-
-	return 0;
-}
-
 static int mts_scsi_abort (Scsi_Cmnd *srb)
 {
 	struct mts_desc* desc = (struct mts_desc*)(srb->device->host->hostdata[0]);
@@ -418,54 +348,6 @@ static int mts_scsi_host_reset (Scsi_Cmnd *srb)
 	usb_reset_device(desc->usb_dev); /*FIXME: untested on new reset code */
 	return 0;  /* RANT why here 0 and not SUCCESS */
 }
-
-/* the core of the scsi part */
-
-/* faking a detection - which can't fail :-) */
-
-static int mts_scsi_detect (struct SHT * sht)
-{
-	/* Whole function stolen from usb-storage */
-
-	struct mts_desc * desc = (struct mts_desc *)sht->proc_dir;
-	/* What a hideous hack! */
-
-	char local_name[48];
-
-	MTS_DEBUG_GOT_HERE();
-
-	/* set up the name of our subdirectory under /proc/scsi/ */
-	sprintf(local_name, "microtek-%d", desc->host_number);
-	sht->proc_name = kmalloc (strlen(local_name) + 1, GFP_KERNEL);
-	/* FIXME: where is this freed ? */
-
-	if (!sht->proc_name) {
-		MTS_ERROR( "unable to allocate memory for proc interface!!\n" );
-		return 0;
-	}
-
-	strcpy(sht->proc_name, local_name);
-
- 	sht->proc_dir = NULL;
-
-	/* In host->hostdata we store a pointer to desc */
-	desc->host = scsi_register(sht, sizeof(desc));
-	if (desc->host == NULL) {
-		MTS_ERROR("Cannot register due to low memory");
-		kfree(sht->proc_name);
-		return 0;
-	}
-	desc->host->hostdata[0] = (unsigned long)desc;
-/* FIXME: what if sizeof(void*) != sizeof(unsigned long)? */
-
-	return 1;
-}
-
-
-
-/* Main entrypoint: SCSI commands are dispatched to here */
-
-
 
 static
 int mts_scsi_queuecommand (Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback );
@@ -744,51 +626,21 @@ int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 out:
 	return err;
 }
-/*
- * this defines our 'host'
- */
-
-/* NOTE: This is taken from usb-storage, should be right. */
-
 
 static Scsi_Host_Template mts_scsi_host_template = {
-	.name =         "microtekX6",
-	.detect =	mts_scsi_detect,
-	.release =	mts_scsi_release,
-	.queuecommand =	mts_scsi_queuecommand,
-
-	.eh_abort_handler =	mts_scsi_abort,
-	.eh_host_reset_handler =mts_scsi_host_reset,
-
+	.module			= THIS_MODULE,
+	.name			= "microtekX6",
+	.proc_name		= "microtekX6",
+	.queuecommand		= mts_scsi_queuecommand,
+	.eh_abort_handler	= mts_scsi_abort,
+	.eh_host_reset_handler	= mts_scsi_host_reset,
 	.sg_tablesize =		SG_ALL,
 	.can_queue =		1,
 	.this_id =		-1,
 	.cmd_per_lun =		1,
-	.present =		0,
-	.unchecked_isa_dma =	FALSE,
-	.use_clustering =	TRUE,
-	.emulated =		TRUE
+	.use_clustering =	1,
+	.emulated =		1,
 };
-
-
-/* USB layer driver interface implementation */
-
-static void mts_usb_disconnect (struct usb_interface *intf)
-{
-	struct mts_desc* to_remove = usb_get_intfdata(intf);
-
-	MTS_DEBUG_GOT_HERE();
-
-	usb_set_intfdata(intf, NULL);
-	if (to_remove) {
-		/* leave the list - lock it */
-		down(&mts_list_semaphore);
-
-		mts_remove_nolock(to_remove);
-
-		up(&mts_list_semaphore);
-	}
-}
 
 struct vendor_product
 {
@@ -837,8 +689,8 @@ static struct usb_device_id mts_usb_ids [] =
 MODULE_DEVICE_TABLE (usb, mts_usb_ids);
 
 
-static int mts_usb_probe (struct usb_interface *intf,
-			  const struct usb_device_id *id)
+static int mts_usb_probe(struct usb_interface *intf,
+			 const struct usb_device_id *id)
 {
 	int i;
 	int result;
@@ -930,38 +782,22 @@ static int mts_usb_probe (struct usb_interface *intf,
 	}
 	
 	
-	/* allocating a new descriptor */
-	new_desc = (struct mts_desc *)kmalloc(sizeof(struct mts_desc), GFP_KERNEL);
-	if (new_desc == NULL)
-	{
-		MTS_ERROR("couldn't allocate scanner desc, bailing out!\n");
-		return -ENOMEM;
-	}
+	new_desc = kmalloc(sizeof(struct mts_desc), GFP_KERNEL);
+	if (!new_desc)
+		goto out;
 
-	memset( new_desc, 0, sizeof(*new_desc) );
+	memset(new_desc, 0, sizeof(*new_desc));
 	new_desc->urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (!new_desc->urb) {
-		kfree(new_desc);
-		return -ENOMEM;
-	}
-		
-	/* initialising that descriptor */
-	new_desc->usb_dev = dev;
+	if (!new_desc->urb)
+		goto out_kfree;
 
+	new_desc->usb_dev = dev;
 	init_MUTEX(&new_desc->lock);
 
-	if(mts_list){
-		new_desc->host_number = mts_list->host_number+1;
-	} else {
-		new_desc->host_number = 0;
-	}
-	
 	/* endpoints */
-	
 	new_desc->ep_out = ep_out;
 	new_desc->ep_response = ep_in_set[0];
 	new_desc->ep_image = ep_in_set[1];
-
 
 	if ( new_desc->ep_out != MTS_EP_OUT )
 		MTS_WARNING( "will this work? Command EP is not usually %d\n",
@@ -975,87 +811,48 @@ static int mts_usb_probe (struct usb_interface *intf,
 		MTS_WARNING( "will this work? Image data EP is not usually %d\n",
 			     (int)new_desc->ep_image );
 
+	new_desc->host = scsi_register(&mts_scsi_host_template,
+			sizeof(new_desc));
+	if (!new_desc->host)
+		goto out_free_urb;
 
-	/* Initialize the host template based on the default one */
-	memcpy(&(new_desc->ctempl), &mts_scsi_host_template, sizeof(mts_scsi_host_template));
-	/* HACK from usb-storage - this is needed for scsi detection */
-	(struct mts_desc *)new_desc->ctempl.proc_dir = new_desc; /* FIXME */
-
-	MTS_DEBUG("registering SCSI module\n");
-
-	new_desc->ctempl.module = THIS_MODULE;
-	result = scsi_register_host(&new_desc->ctempl);
-	/* Will get hit back in microtek_detect by this func */
-	if ( result )
-	{
-		MTS_ERROR( "error %d from scsi_register_host! Help!\n",
-			   (int)result );
-
-		/* FIXME: need more cleanup? */
-		kfree( new_desc );
-		return -ENOMEM;
-	}
-	MTS_DEBUG_GOT_HERE();
-
-	/* FIXME: the bomb is armed, must the host be registered under lock ? */
-	/* join the list - lock it */
-	down(&mts_list_semaphore);
-
-	mts_add_nolock( new_desc );
-
-	up(&mts_list_semaphore);
-
-
-	MTS_DEBUG("completed probe and exiting happily\n");
+	new_desc->host->hostdata[0] = (unsigned long)new_desc;
+	scsi_add_host(new_desc->host, NULL);
 
 	usb_set_intfdata(intf, new_desc);
 	return 0;
+
+ out_free_urb:
+	usb_free_urb(new_desc->urb);
+ out_kfree:
+	kfree(new_desc);
+ out:
+	return -ENOMEM;
+}
+
+static void mts_usb_disconnect (struct usb_interface *intf)
+{
+	struct mts_desc *desc = usb_get_intfdata(intf);
+
+	usb_set_intfdata(intf, NULL);
+
+	scsi_remove_host(desc->host);
+	usb_unlink_urb(desc->urb);
+	scsi_unregister(desc->host);
+
+	usb_free_urb(desc->urb);
+	kfree(desc);
 }
 
 
-
-/* get us noticed by the rest of the kernel */
-
-int __init microtek_drv_init(void)
+static int __init microtek_drv_init(void)
 {
-	int result;
-
-	MTS_DEBUG_GOT_HERE();
-	init_MUTEX(&mts_list_semaphore);
-
-	if ((result = usb_register(&mts_usb_driver)) < 0) {
-		MTS_DEBUG("usb_register returned %d\n", result );
-		return -1;
-	} else {
-		MTS_DEBUG("driver registered.\n");
-	}
-
-	info(DRIVER_VERSION ":" DRIVER_DESC);
-
-	return 0;
+	return usb_register(&mts_usb_driver);
 }
 
-void __exit microtek_drv_exit(void)
+static void __exit microtek_drv_exit(void)
 {
-	struct mts_desc* next;
-
-	MTS_DEBUG_GOT_HERE();
-
 	usb_deregister(&mts_usb_driver);
-
-	down(&mts_list_semaphore);
-
-	while (mts_list) {
-		/* keep track of where the next one is */
-		next = mts_list->next;
-
-		mts_remove_nolock( mts_list );
-
-		/* advance the list pointer */
-		mts_list = next;
-	}
-
-	up(&mts_list_semaphore);
 }
 
 module_init(microtek_drv_init);

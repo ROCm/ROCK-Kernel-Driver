@@ -887,11 +887,8 @@ static int storage_probe(struct usb_interface *intf,
 	/* set the hostdata to prepare for scanning */
 	us->host->hostdata[0] = (unsigned long)us;
 
-	/* associate this host with our interface */
-	scsi_set_device(us->host, &intf->dev);
-
 	/* now add the host */
-	result = scsi_add_host(us->host, NULL);
+	result = scsi_add_host(us->host, &intf->dev);
 	if (result) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to add the scsi host\n");
@@ -942,15 +939,12 @@ static void storage_disconnect(struct usb_interface *intf)
 		sdev->online = 0;
 	scsi_unlock(us->host);
 
+	/* prevent new USB transfers and stop the current command */
+	set_bit(US_FLIDX_DISCONNECTING, &us->flags);
+	usb_stor_stop_transport(us);
+
 	/* lock device access -- no need to unlock, as we're going away */
 	down(&(us->dev_semaphore));
-
-	/* Complete all pending commands with * cmd->result = DID_ERROR << 16.
-	 * Since we only queue one command at a time, this is pretty easy. */
-	if (us->srb) {
-		us->srb->result = DID_ERROR << 16;
-		us->srb->scsi_done(us->srb);
-	}
 
 	/* TODO: somehow, wait for the device to
 	 * be 'idle' (tasklet completion) */

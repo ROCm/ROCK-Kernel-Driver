@@ -1199,12 +1199,18 @@ int usb_physical_reset_device(struct usb_device *dev)
 	if (port < 0)
 		return -ENOENT;
 
+	descriptor = kmalloc(sizeof *descriptor, GFP_NOIO);
+	if (!descriptor) {
+		return -ENOMEM;
+	}
+
 	down(&usb_address0_sem);
 
 	/* Send a reset to the device */
 	if (usb_hub_port_reset(parent, port, dev, HUB_SHORT_RESET_TIME)) {
 		usb_hub_port_disable(parent, port);
 		up(&usb_address0_sem);
+		kfree(descriptor);
 		return(-ENODEV);
 	}
 
@@ -1214,6 +1220,7 @@ int usb_physical_reset_device(struct usb_device *dev)
 		err("USB device not accepting new address (error=%d)", ret);
 		usb_hub_port_disable(parent, port);
 		up(&usb_address0_sem);
+		kfree(descriptor);
 		return ret;
 	}
 
@@ -1231,10 +1238,7 @@ int usb_physical_reset_device(struct usb_device *dev)
 	 * If nothing changed, we reprogram the configuration and then
 	 * the alternate settings.
 	 */
-	descriptor = kmalloc(sizeof *descriptor, GFP_NOIO);
-	if (!descriptor) {
-		return -ENOMEM;
-	}
+
 	ret = usb_get_descriptor(dev, USB_DT_DEVICE, 0, descriptor,
 			sizeof(*descriptor));
 	if (ret < 0) {
@@ -1261,7 +1265,7 @@ int usb_physical_reset_device(struct usb_device *dev)
 					"(expected %Zi, got %i)",
 					dev->devpath,
 					sizeof(dev->descriptor), ret);
-        
+
 			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 			dev->devnum = -1;
 			return -EIO;
