@@ -155,7 +155,7 @@ void ntfs_debug_dump_runlist(const runlist_element *rl)
 			int index = -lcn - 1;
 
 			if (index > -LCN_ENOENT - 1)
-				index = 4;
+				index = 3;
 			printk(KERN_DEBUG "%-16Lx %s %-16Lx%s\n",
 				(rl + i)->vcn, lcn_str[index],
 				(rl + i)->length, (rl + i)->length ?
