@@ -1157,6 +1157,7 @@ int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path)
 	struct quota_info *dqopt = sb_dqopt(sb);
 	struct quota_format_type *fmt = find_quota_format(format_id);
 	int error;
+	unsigned int oldflags;
 
 	if (!fmt)
 		return -ESRCH;
@@ -1181,10 +1182,11 @@ int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path)
 		error = -EBUSY;
 		goto out_lock;
 	}
+	oldflags = inode->i_flags;
 	dqopt->files[type] = f;
 	error = -EINVAL;
 	if (!fmt->qf_ops->check_quota_file(sb, type))
-		goto out_lock;
+		goto out_file_init;
 	/* We don't want quota on quota files */
 	dquot_drop_nolock(inode);
 	inode->i_flags |= S_NOQUOTA;
@@ -1194,7 +1196,7 @@ int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path)
 	down(&dqopt->dqio_sem);
 	if ((error = dqopt->ops[type]->read_file_info(sb, type)) < 0) {
 		up(&dqopt->dqio_sem);
-		goto out_lock;
+		goto out_file_init;
 	}
 	up(&dqopt->dqio_sem);
 	set_enable_flags(dqopt, type);
@@ -1204,9 +1206,10 @@ int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path)
 	up_write(&dqopt->dqoff_sem);
 	return 0;
 
-out_lock:
-	inode->i_flags &= ~S_NOQUOTA;
+out_file_init:
+	inode->i_flags = oldflags;
 	dqopt->files[type] = NULL;
+out_lock:
 	up_write(&dqopt->dqoff_sem);
 out_f:
 	filp_close(f, NULL);
