@@ -271,6 +271,7 @@ copy_siginfo (siginfo_t *to, siginfo_t *from)
 		memcpy(to, from, 3*sizeof(int) + sizeof(from->_sifields._sigchld));
 }
 
+#define HAVE_ARCH_COPY_SIGINFO_TO_USER
 extern int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from);
 extern int copy_siginfo_from_user(siginfo_t *to, siginfo_t *from);
 
