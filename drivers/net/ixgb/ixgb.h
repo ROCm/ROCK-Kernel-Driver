@@ -196,4 +196,4 @@ struct ixgb_adapter {
 	boolean_t have_msi;
 #endif
 };
-#endif				/* _IXGB_H_ */
+#endif /* _IXGB_H_ */

@@ -103,7 +103,7 @@ ixgb_get_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 	ecmd->port = PORT_FIBRE;
 	ecmd->transceiver = XCVR_EXTERNAL;
 
-	if (netif_carrier_ok(adapter->netdev)) {
+	if(netif_carrier_ok(adapter->netdev)) {
 		ecmd->speed = SPEED_10000;
 		ecmd->duplex = DUPLEX_FULL;
 	} else {
@@ -119,8 +119,8 @@ static int
 ixgb_set_settings(struct net_device *netdev, struct ethtool_cmd *ecmd)
 {
 	struct ixgb_adapter *adapter = netdev->priv;
-	if (ecmd->autoneg == AUTONEG_ENABLE ||
-	    ecmd->speed + ecmd->duplex != SPEED_10000 + DUPLEX_FULL)
+	if(ecmd->autoneg == AUTONEG_ENABLE ||
+	   ecmd->speed + ecmd->duplex != SPEED_10000 + DUPLEX_FULL)
 		return -EINVAL;
 	
 	if(netif_running(adapter->netdev)) {
@@ -279,8 +279,8 @@ ixgb_get_regs(struct net_device *netdev,
 	*reg++ = IXGB_READ_REG(hw, RXCSUM);	/*  20 */
 
 	for (i = 0; i < IXGB_RAR_ENTRIES; i++) {
-		*reg++ = IXGB_READ_REG_ARRAY(hw, RAL, (i << 1));	/*21,...,51 */
-		*reg++ = IXGB_READ_REG_ARRAY(hw, RAH, (i << 1));	/*22,...,52 */
+		*reg++ = IXGB_READ_REG_ARRAY(hw, RAL, (i << 1)); /*21,...,51 */
+		*reg++ = IXGB_READ_REG_ARRAY(hw, RAH, (i << 1)); /*22,...,52 */
 	}
 
 	/* Transmit */
@@ -469,11 +469,11 @@ ixgb_set_eeprom(struct net_device *netdev,
 		eeprom_buff[0] = ixgb_read_eeprom(hw, first_word);
 		ptr++;
 	}
-	if ((eeprom->offset + eeprom->len) & 1) {
+	if((eeprom->offset + eeprom->len) & 1) {
 		/* need read/modify/write of last changed EEPROM word */
 		/* only the first byte of the word is being modified */
-		eeprom_buff[last_word - first_word]
-		    = ixgb_read_eeprom(hw, last_word);
+		eeprom_buff[last_word - first_word] 
+			= ixgb_read_eeprom(hw, last_word);
 	}
 
 	memcpy(ptr, bytes, eeprom->len);
@@ -481,7 +481,7 @@ ixgb_set_eeprom(struct net_device *netdev,
 		ixgb_write_eeprom(hw, first_word + i, eeprom_buff[i]);
 
 	/* Update the checksum over the first part of the EEPROM if needed */
-	if (first_word <= EEPROM_CHECKSUM_REG)
+	if(first_word <= EEPROM_CHECKSUM_REG)
 		ixgb_update_eeprom_checksum(hw);
 
 	kfree(eeprom_buff);
@@ -586,11 +586,12 @@ err_setup_rx:
 /* bit defines for adapter->led_status */
 #define IXGB_LED_ON		0
 
-static void ixgb_led_blink_callback(unsigned long data)
+static void
+ixgb_led_blink_callback(unsigned long data)
 {
 	struct ixgb_adapter *adapter = (struct ixgb_adapter *)data;
 
-	if (test_and_change_bit(IXGB_LED_ON, &adapter->led_status))
+	if(test_and_change_bit(IXGB_LED_ON, &adapter->led_status))
 		ixgb_led_off(&adapter->hw);
 	else
 		ixgb_led_on(&adapter->hw);
