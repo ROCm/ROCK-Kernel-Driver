@@ -428,6 +428,11 @@ config CRASH_DUMP
          or other error occurs. Dumps can also be forced with the SysRq+d
          key if MAGIC_SYSRQ is enabled.
 
+config KERNTYPES
+	bool
+	depends on CRASH_DUMP
+	default y
+
 config CRASH_DUMP_BLOCKDEV
        tristate "Crash dump block device driver"
        depends on CRASH_DUMP
