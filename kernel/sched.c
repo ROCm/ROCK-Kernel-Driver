@@ -27,6 +27,8 @@
 #include <linux/completion.h>
 #include <linux/kernel_stat.h>
 #include <linux/security.h>
+#include <linux/notifier.h>
+#include <linux/delay.h>
 
 /*
  * Convert user-nice values [ -20 ... 0 ... 19 ]
@@ -1777,9 +1779,11 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	migration_req_t req;
 	runqueue_t *rq;
 
+#if 0 /* FIXME: Grab cpu_lock, return error on this case. --RR */
 	new_mask &= cpu_online_map;
 	if (!new_mask)
 		BUG();
+#endif
 
 	preempt_disable();
 	rq = task_rq_lock(p, &flags);
@@ -1812,8 +1816,6 @@ out:
 	preempt_enable();
 }
 
-static __initdata int master_migration_thread;
-
 static int migration_thread(void * bind_cpu)
 {
 	int cpu = (int) (long) bind_cpu;
@@ -1825,15 +1827,7 @@ static int migration_thread(void * bind_cpu)
 	sigfillset(&current->blocked);
 	set_fs(KERNEL_DS);
 
-	/*
-	 * The first migration thread is started on the boot CPU, it
-	 * migrates the other migration threads to their destination CPUs.
-	 */
-	if (cpu != master_migration_thread) {
-		while (!cpu_rq(master_migration_thread)->migration_thread)
-			yield();
-		set_cpus_allowed(current, 1UL << cpu);
-	}
+	set_cpus_allowed(current, 1UL << cpu);
 	printk("migration_task %d on cpu=%d\n", cpu, smp_processor_id());
 	ret = setscheduler(0, SCHED_FIFO, &param);
 
@@ -1890,29 +1884,33 @@ repeat:
 	}
 }
 
-void __init migration_init(void)
+static int migration_call(struct notifier_block *nfb,
+			  unsigned long action,
+			  void *hcpu)
 {
-	int cpu;
-
-	master_migration_thread = smp_processor_id();
-	current->cpus_allowed = 1UL << master_migration_thread;
-	
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu))
-			continue;
-		if (kernel_thread(migration_thread, (void *) (long) cpu,
-				CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
-			BUG();
+	switch (action) {
+	case CPU_ONLINE:
+		printk("Starting migration thread for cpu %li\n",
+		       (long)hcpu);
+		kernel_thread(migration_thread, hcpu,
+			      CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+		break;
 	}
-	current->cpus_allowed = -1L;
-
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu))
-			continue;
-		while (!cpu_rq(cpu)->migration_thread)
-			schedule_timeout(2);
-	}
+	return NOTIFY_OK;
 }
+
+static struct notifier_block migration_notifier = { &migration_call, NULL, 0 };
+
+int __init migration_init(void)
+{
+	/* Start one for boot CPU. */
+	migration_call(&migration_notifier, CPU_ONLINE,
+		       (void *)smp_processor_id());
+	register_cpu_notifier(&migration_notifier);
+	return 0;
+}
+
+__initcall(migration_init);
 #endif
 
 extern void init_timervecs(void);

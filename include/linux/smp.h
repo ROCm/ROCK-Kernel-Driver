@@ -32,19 +32,19 @@ extern void FASTCALL(smp_send_reschedule(int cpu));
 
 
 /*
- * Boot processor call to load the other CPU's
+ * Prepare machine for booting other CPUs.
  */
-extern void smp_boot_cpus(void);
+extern void smp_prepare_cpus(unsigned int max_cpus);
 
 /*
- * Processor call in. Must hold processors until ..
+ * Bring a CPU up
  */
-extern void smp_callin(void);
+extern int __cpu_up(unsigned int cpunum);
 
 /*
- * Multiprocessors may now schedule
+ * Final polishing of CPUs
  */
-extern void smp_commence(void);
+extern void smp_cpus_done(unsigned int max_cpus);
 
 /*
  * Call a function on all other processors
@@ -71,6 +71,13 @@ extern volatile int smp_msg_id;
 #define MSG_RESCHEDULE		0x0003	/* Reschedule request from master CPU*/
 #define MSG_CALL_FUNCTION       0x0004  /* Call function on all other CPUs */
 
+struct notifier_block;
+
+/* Need to know about CPUs going up/down? */
+extern int register_cpu_notifier(struct notifier_block *nb);
+extern void unregister_cpu_notifier(struct notifier_block *nb);
+
+int cpu_up(unsigned int cpu);
 #else /* !SMP */
 
 /*
@@ -92,6 +99,10 @@ static inline void smp_send_reschedule_all(void) { }
 #define __per_cpu_data
 #define per_cpu(var, cpu)			var
 #define this_cpu(var)				var
+
+/* Need to know about CPUs going up/down? */
+#define register_cpu_notifier(nb) 0
+#define unregister_cpu_notifier(nb) do { } while(0)
 
 #endif /* !SMP */
 
