@@ -1,11 +1,10 @@
 /*
- *	$Header: /home/cvsroot/Driver/osst.h,v 1.12 2001/10/11 00:30:15 riede Exp $
+ *	$Header: /cvsroot/osst/Driver/osst.h,v 1.14 2003/12/14 14:34:38 wriede Exp $
  */
 
 #include <asm/byteorder.h>
 #include <linux/config.h>
 #include <linux/completion.h>
-
 
 /*	FIXME - rename and use the following two types or delete them!
  *              and the types really should go to st.h anyway...
