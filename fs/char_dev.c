@@ -150,7 +150,7 @@ int register_chrdev_region(unsigned int major, unsigned int baseminor,
 
 	i = major_to_index(major);
 
-	write_lock(&chrdevs_lock);
+	write_lock_irq(&chrdevs_lock);
 	for (cp = &chrdevs[i]; *cp; cp = &(*cp)->next)
 		if ((*cp)->major > major ||
 		    ((*cp)->major == major && (*cp)->baseminor >= baseminor))
@@ -162,7 +162,7 @@ int register_chrdev_region(unsigned int major, unsigned int baseminor,
 		cd->next = *cp;
 		*cp = cd;
 	}
-	write_unlock(&chrdevs_lock);
+	write_unlock_irq(&chrdevs_lock);
 
 	return ret;
 }
@@ -183,7 +183,7 @@ int unregister_chrdev_region(unsigned int major, unsigned int baseminor,
 
 	i = major_to_index(major);
 
-	write_lock(&chrdevs_lock);
+	write_lock_irq(&chrdevs_lock);
 	for (cp = &chrdevs[i]; *cp; cp = &(*cp)->next)
 		if ((*cp)->major == major &&
 		    (*cp)->baseminor == baseminor &&
@@ -196,7 +196,7 @@ int unregister_chrdev_region(unsigned int major, unsigned int baseminor,
 		*cp = cd->next;
 		kfree(cd);
 	}
-	write_unlock(&chrdevs_lock);
+	write_unlock_irq(&chrdevs_lock);
 
 	return ret;
 }
