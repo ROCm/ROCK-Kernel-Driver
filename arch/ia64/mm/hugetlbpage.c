@@ -19,6 +19,8 @@
 
 #include <linux/sysctl.h>
 
+#define TASK_HPAGE_BASE (REGION_HPAGE << REGION_SHIFT)
+
 static long    htlbpagemem;
 int     htlbpage_max;
 static long    htlbzone_pages;
@@ -312,6 +314,29 @@ out:
 	return ret;
 }
 
+unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
+		unsigned long pgoff, unsigned long flags)
+{
+	struct vm_area_struct *vmm;
+
+	if (len > RGN_MAP_LIMIT)
+		return -ENOMEM;
+	if (len & ~HPAGE_MASK)
+		return -EINVAL;
+	/* This code assumes that REGION_HPAGE != 0. */
+	if ((REGION_NUMBER(addr) != REGION_HPAGE) || (addr & (HPAGE_SIZE - 1)))
+		addr = TASK_HPAGE_BASE;
+	else
+		addr = ALIGN(addr, HPAGE_SIZE);
+	for (vmm = find_vma(current->mm, addr); ; vmm = vmm->vm_next) {
+		/* At this point:  (!vmm || addr < vmm->vm_end). */
+		if (REGION_OFFSET(addr) + len > RGN_MAP_LIMIT)
+			return -ENOMEM;
+		if (!vmm || (addr + len) <= vmm->vm_start)
+			return addr;
+		addr = ALIGN(vmm->vm_end, HPAGE_SIZE);
+	}
+}
 void update_and_free_page(struct page *page)
 {
 	int j;
