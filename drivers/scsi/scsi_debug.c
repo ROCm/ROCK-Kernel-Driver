@@ -49,8 +49,7 @@
 
 #include "scsi_debug.h"
 
-static const char * scsi_debug_version_str = "Version: 1.64 (20021109)";
-
+static const char * scsi_debug_version_str = "Version: 1.64 (20021111 2)";
 
 #ifndef SCSI_CMD_READ_16
 #define SCSI_CMD_READ_16 0x88
@@ -69,7 +68,7 @@ static const char * scsi_debug_version_str = "Version: 1.64 (20021109)";
 #define DEF_DELAY   1
 #define DEF_MAX_LUNS   2
 #define DEF_SCSI_LEVEL   3
-#define DEF_ADD_HOST   1
+#define DEF_NUM_HOST   1
 #define MAX_NUM_HOSTS   128
 
 #define DEF_OPTS   0
@@ -86,9 +85,8 @@ static int scsi_debug_cmnd_count = 0;
 static int scsi_debug_delay = DEF_DELAY;
 static int scsi_debug_max_luns = DEF_MAX_LUNS;
 static int scsi_debug_scsi_level = DEF_SCSI_LEVEL;
-static int scsi_debug_add_host = DEF_ADD_HOST;
+static int scsi_debug_add_host = DEF_NUM_HOST;
 
-/* #define NR_HOSTS_PRESENT (((scsi_debug_num_devs - 1) / 7) + 1) */
 	/* This assumes one lun used per allocated target id */
 #define N_HEAD          8
 #define N_SECTOR        32
@@ -807,7 +805,6 @@ static void timer_intr_handler(unsigned long indx)
 	spin_unlock_irqrestore(&queued_arr_lock, iflags);
 }
 
-static int num_hosts_present = 0;
 static const char * sdebug_proc_name = "scsi_debug";
 
 static int scsi_debug_slave_attach(struct scsi_device * sdp)
@@ -1406,25 +1403,16 @@ static ssize_t sdebug_add_host_write(struct device_driver * ddp,
 				  const char * buf, size_t count, loff_t off)
 {
 	struct Scsi_Host * hpnt;
-        int add_host, num, k;
+        int delta_hosts, k;
 	char work[20];
 
         if (off)
                 return 0;
         if (1 != sscanf(buf, "%10s", work))
 		return -EINVAL;
-	{	/* temporary hack around sscanf() problem with -ve nums */
-		int neg = 0;
-
-		if ('-' == *work)
-			neg = 1;
-		if (1 != sscanf(work + neg, "%d", &add_host))
-			return -EINVAL;
-		if (neg)
-			add_host = -add_host;
-	}
-	num = 0;
-	if (add_host > 0) {
+	if (1 != sscanf(work, "%d", &delta_hosts))
+		return -EINVAL;
+	if (delta_hosts > 0) {
 		do {
 			for (k = 0; k < MAX_NUM_HOSTS; ++k) {
 				if (NULL == scsi_debug_hosts[k]) {
@@ -1435,10 +1423,9 @@ static ssize_t sdebug_add_host_write(struct device_driver * ddp,
 			}
 			if (k == MAX_NUM_HOSTS)
 				break;
-			++num;
-		} while (--add_host);
-		scsi_debug_add_host += num;
-	} else if (add_host < 0) {
+			++scsi_debug_add_host;
+		} while (--delta_hosts);
+	} else if (delta_hosts < 0) {
 		do {
 			for (k = MAX_NUM_HOSTS - 1; k >= 0; --k) {
 				if (scsi_debug_hosts[k]) {
@@ -1450,9 +1437,8 @@ static ssize_t sdebug_add_host_write(struct device_driver * ddp,
 			}
 			if (k < 0)
 				break;
-			++num;
-		} while (++add_host);
-		scsi_debug_add_host -= num;
+			--scsi_debug_add_host;
+		} while (++delta_hosts);
 	}
 	return count;
 }
@@ -1506,7 +1492,6 @@ static struct Scsi_Host * sdebug_add_shost(void)
 
 static int __init scsi_debug_init(void)
 {
-	struct Scsi_Host * hpnt;
 	int sz, k;
 
 	if (scsi_debug_num_devs > 0) {
@@ -1538,22 +1523,21 @@ static int __init scsi_debug_init(void)
 
 	sdebug_driver_template.proc_name = (char *)sdebug_proc_name;
 
+	memset(scsi_debug_hosts, 0, sizeof(struct Scsi_Host *) * MAX_NUM_HOSTS);
 	for (k = 0; (k < scsi_debug_add_host) && (k < MAX_NUM_HOSTS); k++) {
-		hpnt = sdebug_add_shost();
-		if (NULL == hpnt) {
+		scsi_debug_hosts[k] = sdebug_add_shost();
+		if (NULL == scsi_debug_hosts[k]) {
 			printk(KERN_ERR "scsi_debug_init: "
 			       "sdebug_add_shost failed k=%d\n", k);
 			break;
 		}
-		++num_hosts_present;
-		scsi_debug_hosts[k] = hpnt;
 	}
+	scsi_debug_add_host = k;	// number of hosts actually present
 
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts) {
 		printk(KERN_INFO "scsi_debug: ... built %d host(s)\n",
-		       num_hosts_present);
+		       scsi_debug_add_host);
 	}
-
 	return 0;
 }
 
@@ -1561,14 +1545,14 @@ static void __exit scsi_debug_exit(void)
 {
 	int k;
 
-	for (k = 0; k < num_hosts_present; k++) {
-		scsi_remove_host(scsi_debug_hosts[k]);
-		scsi_unregister(scsi_debug_hosts[k]);
-		scsi_debug_hosts[k] = NULL;
+	for (k = MAX_NUM_HOSTS - 1; k >= 0; --k) {
+		if (scsi_debug_hosts[k]) {
+			scsi_remove_host(scsi_debug_hosts[k]);
+			scsi_unregister(scsi_debug_hosts[k]);
+			scsi_debug_hosts[k] = NULL;
+		}
 	}
-
 	stop_all_queued();
-
 	do_remove_driverfs_files();
 	driver_unregister(&sdebug_driverfs_driver);
 
