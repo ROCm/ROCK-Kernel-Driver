@@ -157,7 +157,8 @@ static struct cpia_camera_ops cpia_pp_ops =
 	cpia_pp_streamStop,
 	cpia_pp_streamRead,
 	cpia_pp_close,
-	1
+	1,
+	THIS_MODULE
 };
 
 static struct cam_data *cam_list;
@@ -565,7 +566,7 @@ static int cpia_pp_register(struct parport *port)
 		return -ENXIO;
 	}
 	spin_lock( &cam_list_lock_pp );
-	cpia_add_to_list(cam_list, cpia);
+	cpia_add_to_list(&cam_list, &cpia);
 	spin_unlock( &cam_list_lock_pp );
 
 	return 0;
@@ -575,11 +576,11 @@ static void cpia_pp_detach (struct parport *port)
 {
 	struct cam_data *cpia;
 
-	spin_lock( &cam_list_lock_pp );
 	for(cpia = cam_list; cpia != NULL; cpia = cpia->next) {
 		struct pp_cam_entry *cam = cpia->lowlevel_data;
 		if (cam && cam->port->number == port->number) {
-			cpia_remove_from_list(cpia);
+			spin_lock( &cam_list_lock_pp );
+			cpia_remove_from_list(&cpia);
 			spin_unlock( &cam_list_lock_pp );			
 			cpia_unregister_camera(cpia);
 			
