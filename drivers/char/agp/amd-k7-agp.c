@@ -388,17 +388,14 @@ struct agp_device_ids amd_agp_device_ids[] __initdata =
 {
 	{
 		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_7006,
-		.chipset	= AMD_IRONGATE,
 		.chipset_name	= "Irongate",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_700E,
-		.chipset	= AMD_761,
 		.chipset_name	= "761",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_700C,
-		.chipset	= AMD_762,
 		.chipset_name	= "760MP",
 	},
 	{ }, /* dummy final entry, always present */
@@ -416,7 +413,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 	while (devs[j].chipset_name != NULL) {
 		if (pdev->device == devs[j].device_id) {
 			printk (KERN_INFO PFX "Detected AMD %s chipset\n", devs[j].chipset_name);
-			agp_bridge->type = devs[j].chipset;
+			agp_bridge->type = AMD_GENERIC;
 
 			if (devs[j].chipset_setup != NULL)
 				return devs[j].chipset_setup(pdev);
