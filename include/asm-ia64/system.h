@@ -205,8 +205,8 @@ extern void ia64_save_extra (struct task_struct *task);
 extern void ia64_load_extra (struct task_struct *task);
 
 #ifdef CONFIG_PERFMON
-  DECLARE_PER_CPU(int, pfm_syst_wide);
-# define PERFMON_IS_SYSWIDE() (get_cpu_var(pfm_syst_wide) != 0)
+  DECLARE_PER_CPU(unsigned long, pfm_syst_info);
+# define PERFMON_IS_SYSWIDE() (get_cpu_var(pfm_syst_info) & 0x1)
 #else
 # define PERFMON_IS_SYSWIDE() (0)
 #endif

@@ -205,6 +205,10 @@ cpu_idle (void *unused)
 void
 ia64_save_extra (struct task_struct *task)
 {
+#ifdef CONFIG_PERFMON
+	unsigned long info;
+#endif
+
 	if ((task->thread.flags & IA64_THREAD_DBG_VALID) != 0)
 		ia64_save_debug_regs(&task->thread.dbr[0]);
 
@@ -212,8 +216,9 @@ ia64_save_extra (struct task_struct *task)
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_save_regs(task);
 
-	if (__get_cpu_var(pfm_syst_wide))
-		pfm_syst_wide_update_task(task, 0);
+	info = __get_cpu_var(pfm_syst_info);
+	if (info & PFM_CPUINFO_SYST_WIDE)
+		pfm_syst_wide_update_task(task, info, 0);
 #endif
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -225,6 +230,10 @@ ia64_save_extra (struct task_struct *task)
 void
 ia64_load_extra (struct task_struct *task)
 {
+#ifdef CONFIG_PERFMON
+	unsigned long info;
+#endif
+
 	if ((task->thread.flags & IA64_THREAD_DBG_VALID) != 0)
 		ia64_load_debug_regs(&task->thread.dbr[0]);
 
@@ -232,8 +241,9 @@ ia64_load_extra (struct task_struct *task)
 	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
 		pfm_load_regs(task);
 
-	if (__get_cpu_var(pfm_syst_wide)) 
-		pfm_syst_wide_update_task(task, 1);
+	info = __get_cpu_var(pfm_syst_info);
+	if (info & PFM_CPUINFO_SYST_WIDE) 
+		pfm_syst_wide_update_task(task, info, 1);
 #endif
 
 #ifdef CONFIG_IA32_SUPPORT

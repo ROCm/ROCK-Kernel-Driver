@@ -40,6 +40,7 @@
 #define PFM_FL_INHERIT_ALL	 0x02	/* always clone pfm_context across fork() */
 #define PFM_FL_NOTIFY_BLOCK    	 0x04	/* block task on user level notifications */
 #define PFM_FL_SYSTEM_WIDE	 0x08	/* create a system wide context */
+#define PFM_FL_EXCL_IDLE         0x20   /* exclude idle task from system wide session */
 
 /*
  * PMC flags
@@ -86,11 +87,12 @@ typedef struct {
 	unsigned long	reg_long_reset;	/* reset after sampling buffer overflow (large) */
 	unsigned long	reg_short_reset;/* reset after counter overflow (small) */
 
-	unsigned long	reg_reset_pmds[4]; /* which other counters to reset on overflow */
-	unsigned long	reg_random_seed;   /* seed value when randomization is used */
-	unsigned long	reg_random_mask;   /* bitmask used to limit random value */
+	unsigned long	reg_reset_pmds[4];   /* which other counters to reset on overflow */
+	unsigned long	reg_random_seed;     /* seed value when randomization is used */
+	unsigned long	reg_random_mask;     /* bitmask used to limit random value */
+	unsigned long	reg_last_reset_value;/* last value used to reset the PMD (PFM_READ_PMDS) */
 
-	unsigned long   reserved[14];	/* for future use */
+	unsigned long   reserved[13];	/* for future use */
 } pfarg_reg_t;
 
 typedef struct {
@@ -123,7 +125,7 @@ typedef struct {
  * Define the version numbers for both perfmon as a whole and the sampling buffer format.
  */
 #define PFM_VERSION_MAJ		1U
-#define PFM_VERSION_MIN		1U
+#define PFM_VERSION_MIN		3U
 #define PFM_VERSION		(((PFM_VERSION_MAJ&0xffff)<<16)|(PFM_VERSION_MIN & 0xffff))
 
 #define PFM_SMPL_VERSION_MAJ	1U
@@ -156,12 +158,16 @@ typedef struct {
 	unsigned long	stamp;			/* timestamp */
 	unsigned long	ip;			/* where did the overflow interrupt happened */
 	unsigned long	regs;			/* bitmask of which registers overflowed */
-	unsigned long   period;			/* unused */
+	unsigned long   reserved;		/* unused */
 } perfmon_smpl_entry_t;
 
 extern int perfmonctl(pid_t pid, int cmd, void *arg, int narg);
 
 #ifdef __KERNEL__
+
+typedef struct {
+	void (*handler)(int irq, void *arg, struct pt_regs *regs);
+} pfm_intr_handler_desc_t;
 
 extern void pfm_save_regs (struct task_struct *);
 extern void pfm_load_regs (struct task_struct *);
@@ -174,9 +180,24 @@ extern void pfm_cleanup_owners (struct task_struct *);
 extern int  pfm_use_debug_registers(struct task_struct *);
 extern int  pfm_release_debug_registers(struct task_struct *);
 extern int  pfm_cleanup_smpl_buf(struct task_struct *);
-extern void pfm_syst_wide_update_task(struct task_struct *, int);
+extern void pfm_syst_wide_update_task(struct task_struct *, unsigned long info, int is_ctxswin);
 extern void pfm_ovfl_block_reset(void);
-extern void perfmon_init_percpu(void);
+extern void pfm_init_percpu(void);
+
+/* 
+ * hooks to allow VTune/Prospect to cooperate with perfmon.
+ * (reserved for system wide monitoring modules only)
+ */
+extern int pfm_install_alternate_syswide_subsystem(pfm_intr_handler_desc_t *h);
+extern int pfm_remove_alternate_syswide_subsystem(pfm_intr_handler_desc_t *h);
+
+/*
+ * describe the content of the local_cpu_date->pfm_syst_info field
+ */
+#define PFM_CPUINFO_SYST_WIDE	0x1	/* if set a system wide session exist */
+#define PFM_CPUINFO_DCR_PP	0x2	/* if set the system wide session has started */
+#define PFM_CPUINFO_EXCL_IDLE	0x4	/* the system wide session excludes the idle task */
+
 
 #endif /* __KERNEL__ */
 
