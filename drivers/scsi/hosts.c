@@ -20,16 +20,8 @@
  *  September 04, 2002 Mike Anderson (andmike@us.ibm.com)
  */
 
-
-/*
- *  This file contains the medium level SCSI
- *  host interface initialization, as well as the scsi_hosts list of SCSI
- *  hosts currently present in the system.
- */
-
-#include <linux/config.h>
 #include <linux/module.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/mm.h>
@@ -45,40 +37,7 @@
 #include "scsi_logging.h"
 
 
-static LIST_HEAD(scsi_host_list);
-static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
-
 static int scsi_host_next_hn;		/* host_no for next new host */
-
-/**
- * scsi_tp_for_each_host - call function for each scsi host off a template
- * @shost_tp:	a pointer to a scsi host template
- * @callback:	a pointer to callback function
- *
- * Return value:
- * 	0 on Success / 1 on Failure
- **/
-int scsi_tp_for_each_host(Scsi_Host_Template *shost_tp, int
-			    (*callback)(struct Scsi_Host *shost))
-{
-	struct list_head *lh, *lh_sf;
-	struct Scsi_Host *shost;
-
-	spin_lock(&scsi_host_list_lock);
-
-	list_for_each_safe(lh, lh_sf, &scsi_host_list) {
-		shost = list_entry(lh, struct Scsi_Host, sh_list);
-		if (shost->hostt == shost_tp) {
-			spin_unlock(&scsi_host_list_lock);
-			callback(shost);
-			spin_lock(&scsi_host_list_lock);
-		}
-	}
-
-	spin_unlock(&scsi_host_list_lock);
-
-	return 0;
-}
 
 /**
  * scsi_remove_host - check a scsi host for release and release
@@ -103,9 +62,6 @@ int scsi_remove_host(struct Scsi_Host *shost)
 	scsi_forget_host(shost);
 	scsi_sysfs_remove_host(shost);
 
-	if (shost->hostt->release)
-		(*shost->hostt->release)(shost);
-
 	return 0;
 }
 
@@ -129,7 +85,7 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 	if (!error) {
 		scsi_proc_host_add(shost);
 		scsi_scan_host(shost);
-	};
+	}
 			
 	return error;
 }
@@ -140,14 +96,6 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
  **/
 void scsi_free_shost(struct Scsi_Host *shost)
 {
-	/* Remove shost from scsi_host_list */
-	spin_lock(&scsi_host_list_lock);
-	list_del(&shost->sh_list);
-	spin_unlock(&scsi_host_list_lock);
-
-	/*
-	 * Next, kill the kernel error recovery thread for this host.
-	 */
 	if (shost->ehandler) {
 		DECLARE_COMPLETION(sem);
 		shost->eh_notify = &sem;
@@ -255,10 +203,6 @@ struct Scsi_Host *scsi_host_alloc(Scsi_Host_Template *sht, int privsize)
 	else
 		shost->max_sectors = SCSI_DEFAULT_MAX_SECTORS;
 
-	spin_lock(&scsi_host_list_lock);
-	list_add_tail(&shost->sh_list, &scsi_host_list);
-	spin_unlock(&scsi_host_list_lock);
-
 	rval = scsi_setup_command_freelist(shost);
 	if (rval)
 		goto fail;
@@ -273,85 +217,29 @@ struct Scsi_Host *scsi_host_alloc(Scsi_Host_Template *sht, int privsize)
 	shost->hostt->present++;
 	return shost;
  fail:
-	spin_lock(&scsi_host_list_lock);
-	list_del(&shost->sh_list);
-	spin_unlock(&scsi_host_list_lock);
 	kfree(shost);
 	return NULL;
 }
 
 struct Scsi_Host *scsi_register(Scsi_Host_Template *sht, int privsize)
 {
-	return scsi_host_alloc(sht, privsize);
+	struct Scsi_Host *shost = scsi_host_alloc(sht, privsize);
+
+	if (!sht->detect) {
+		printk(KERN_WARNING "scsi_register() called on new-style "
+				    "template for driver %s\n", sht->name);
+		dump_stack();
+	}
+
+	if (shost)
+		list_add_tail(&shost->sht_legacy_list, &sht->legacy_hosts);
+	return shost;
 }
 
 void scsi_unregister(struct Scsi_Host *shost)
 {
+	list_del(&shost->sht_legacy_list);
 	scsi_host_put(shost);
-}
-
-/**
- * scsi_register_host - register a low level host driver
- * @shost_tp:	pointer to a scsi host driver template
- *
- * Return value:
- * 	0 on Success / 1 on Failure.
- **/
-int scsi_register_host(Scsi_Host_Template *shost_tp)
-{
-	struct Scsi_Host *shost;
-
-	BUG_ON(!shost_tp->detect);
-
-	if (!shost_tp->release) {
-		printk(KERN_WARNING
-		    "scsi HBA driver %s didn't set a release method, "
-		    "please fix the template\n", shost_tp->name);
-		dump_stack();
-		return -EINVAL;
-		
-	}
-
-	shost_tp->detect(shost_tp);
-	if (!shost_tp->present)
-		return 0;
-
-	/*
-	 * XXX(hch) use scsi_tp_for_each_host() once it propagates
-	 *	    error returns properly.
-	 */
-	list_for_each_entry(shost, &scsi_host_list, sh_list)
-		if (shost->hostt == shost_tp)
-			if (scsi_add_host(shost, NULL))
-				goto out_of_space;
-
-	return 0;
-
-out_of_space:
-	scsi_unregister_host(shost_tp); /* easiest way to clean up?? */
-	return 1;
-}
-
-/**
- * scsi_unregister_host - unregister a low level host adapter driver
- * @shost_tp:	scsi host template to unregister.
- *
- * Description:
- * 	Similarly, this entry point should be called by a loadable module
- * 	if it is trying to remove a low level scsi driver from the system.
- *
- * Return value:
- * 	0 on Success / 1 on Failure
- *
- * Notes:
- * 	rmmod does not care what we return here the module will be
- * 	removed.
- **/
-int scsi_unregister_host(Scsi_Host_Template *shost_tp)
-{
-	scsi_tp_for_each_host(shost_tp, scsi_remove_host);
-	return 0;
-
 }
 
 /**

@@ -366,6 +366,14 @@ typedef struct	SHT
      */
     struct device_attribute **sdev_attrs;
 
+    /*
+     * List of hosts per template.
+     *
+     * This is only for use by scsi_module.c for legacy templates.
+     * For these access to it is synchronized implicitly by
+     * module_init/module_exit.
+     */
+    struct list_head legacy_hosts;
 } Scsi_Host_Template;
 
 /*
@@ -384,7 +392,6 @@ struct Scsi_Host
      * This information is private to the scsi mid-layer.  Wrapping it in a
      * struct private is a way of marking it in a sort of C++ type of way.
      */
-    struct list_head      sh_list;
     struct list_head	  my_devices;
 
     struct scsi_host_cmd_pool *cmd_pool;
@@ -498,6 +505,15 @@ struct Scsi_Host
     struct class_device class_dev;
 
     /*
+     * List of hosts per template.
+     *
+     * This is only for use by scsi_module.c for legacy templates.
+     * For these access to it is synchronized implicitly by
+     * module_init/module_exit.
+     */
+    struct list_head sht_legacy_list;
+
+    /*
      * We should ensure that this is aligned, both for better performance
      * and also because some compilers (m68k) don't automatically force
      * alignment to a long boundary.
@@ -569,11 +585,8 @@ extern void scsi_host_put(struct Scsi_Host *t);
 extern struct Scsi_Host *scsi_host_lookup(unsigned short);
 
 /* legacy interfaces */
-extern int scsi_register_host(Scsi_Host_Template *);
-extern int scsi_unregister_host(Scsi_Host_Template *);
 extern struct Scsi_Host *scsi_register(Scsi_Host_Template *, int);
 extern void scsi_unregister(struct Scsi_Host *);
-
 
 /**
  * scsi_find_device - find a device given the host

@@ -1,71 +1,73 @@
 /*
- *  scsi_module.c Copyright (1994, 1995) Eric Youngdale.
+ * Copyright (C) 2003 Christoph Hellwig.
+ *	Released under GPL v2.
  *
- * Support for loading low-level scsi drivers using the linux kernel loadable
- * module interface.
+ * Support for old-style host templates.
  *
- * To use, the host adapter should first define and initialize the variable
- * driver_template (datatype Scsi_Host_Template), and then include this file.
- * This should also be wrapped in a #ifdef MODULE/#endif.
- *
- * The low -level driver must also define a release function which will
- * free any irq assignments, release any dma channels, release any I/O
- * address space that might be reserved, and otherwise clean up after itself.
- * The idea is that the same driver should be able to be reloaded without
- * any difficulty.  This makes debugging new drivers easier, as you should
- * be able to load the driver, test it, unload, modify and reload.
- *
- * One *very* important caveat.  If the driver may need to do DMA on the
- * ISA bus, you must have unchecked_isa_dma set in the device template,
- * even if this might be changed during the detect routine.  This is
- * because the shpnt structure will be allocated in a special way so that
- * it will be below the appropriate DMA limit - thus if your driver uses
- * the hostdata field of shpnt, and the board must be able to access this
- * via DMA, the shpnt structure must be in a DMA accessible region of
- * memory.  This comment would be relevant for something like the buslogic
- * driver where there are many boards, only some of which do DMA onto the
- * ISA bus.  There is no convenient way of specifying whether the host
- * needs to be in a ISA DMA accessible region of memory when you call
- * scsi_register.
+ * NOTE:  Do not use this for new drivers ever.
  */
 
-#include <linux/module.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+
+#include "scsi.h"
+#include "hosts.h"
+
 
 static int __init init_this_scsi_driver(void)
 {
-	driver_template.module = THIS_MODULE;
-	scsi_register_host(&driver_template);
-	if (driver_template.present)
-		return 0;
+	Scsi_Host_Template *sht = &driver_template;
+	struct Scsi_Host *shost;
+	struct list_head *l;
+	int error;
 
-	scsi_unregister_host(&driver_template);
-	return -ENODEV;
+	if (!sht->release) {
+		printk(KERN_ERR
+		    "scsi HBA driver %s didn't set a release method.\n",
+		    sht->name);
+		return -EINVAL;
+	}
+
+	sht->module = THIS_MODULE;
+	INIT_LIST_HEAD(&sht->legacy_hosts);
+
+	sht->detect(sht);
+	if (!sht->present)
+		return -ENODEV;
+
+	list_for_each_entry(shost, &sht->legacy_hosts, sht_legacy_list) {
+		error = scsi_add_host(shost, NULL);
+		if (error)
+			goto fail;
+	}
+	return 0;
+ fail:
+	l = &shost->sht_legacy_list;
+	while ((l = l->prev) != &sht->legacy_hosts)
+		scsi_remove_host(list_entry(l, struct Scsi_Host, sht_legacy_list));
+	return error;
 }
 
 static void __exit exit_this_scsi_driver(void)
 {
-	scsi_unregister_host(&driver_template);
+	Scsi_Host_Template *sht = &driver_template;
+	struct Scsi_Host *shost, *s;
+
+	list_for_each_entry(shost, &sht->legacy_hosts, sht_legacy_list)
+		scsi_remove_host(shost);
+	list_for_each_entry_safe(shost, s, &sht->legacy_hosts, sht_legacy_list)
+		sht->release(shost);
+
+	if (list_empty(&sht->legacy_hosts))
+		return;
+
+	printk(KERN_WARNING "%s did not call scsi_unregister\n", sht->name);
+	dump_stack();
+
+	list_for_each_entry_safe(shost, s, &sht->legacy_hosts, sht_legacy_list)
+		scsi_unregister(shost);
 }
 
 module_init(init_this_scsi_driver);
 module_exit(exit_this_scsi_driver);
-
-/*
- * Overrides for Emacs so that we almost follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */
