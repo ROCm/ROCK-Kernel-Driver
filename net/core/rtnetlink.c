@@ -267,7 +267,22 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	struct net_device *dev;
 	int err, send_addr_notify = 0;
 
-	dev = dev_get_by_index(ifm->ifi_index);
+	if (ifm->ifi_index >= 0)
+		dev = dev_get_by_index(ifm->ifi_index);
+	else if (ida[IFLA_IFNAME - 1]) {
+		char ifname[IFNAMSIZ];
+
+		if (RTA_PAYLOAD(ida[IFLA_IFNAME - 1]) > RTA_ALIGN(sizeof(ifname)))
+			return -EINVAL;
+
+		memset(ifname, 0, sizeof(ifname));
+		memcpy(ifname, RTA_DATA(ida[IFLA_IFNAME - 1]),
+			RTA_PAYLOAD(ida[IFLA_IFNAME - 1]));
+		ifname[IFNAMSIZ - 1] = '\0';
+		dev = dev_get_by_name(ifname);
+	} else
+		return -EINVAL;
+
 	if (!dev)
 		return -ENODEV;
 
@@ -358,10 +373,10 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		dev->weight = *((u32 *) RTA_DATA(ida[IFLA_WEIGHT - 1]));
 	}
 
-	if (ida[IFLA_IFNAME - 1]) {
+	if (ifm->ifi_index >= 0 && ida[IFLA_IFNAME - 1]) {
 		char ifname[IFNAMSIZ];
 
-		if (ida[IFLA_IFNAME - 1]->rta_len > RTA_LENGTH(sizeof(ifname)))
+		if (RTA_PAYLOAD(ida[IFLA_IFNAME - 1]) > RTA_ALIGN(sizeof(ifname)))
 			goto out;
 
 		memset(ifname, 0, sizeof(ifname));

@@ -255,7 +255,7 @@ out:
 
 #endif	/* CONFIG_CRYPTO_HMAC */
 
-void
+static void
 test_cipher(char * algo, int mode, int enc, struct cipher_testvec * template, unsigned int tcount)
 {
 	unsigned int ret, i, j, k, temp;

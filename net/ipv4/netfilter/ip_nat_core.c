@@ -182,7 +182,6 @@ find_appropriate_src(const struct ip_conntrack_tuple *tuple,
 	return 0;
 }
 
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 /* If it's really a local destination manip, it may need to do a
    source manip too. */
 static int
@@ -202,7 +201,6 @@ do_extra_mangle(u_int32_t var_ip, u_int32_t *other_ipp)
 	ip_rt_put(rt);
 	return 1;
 }
-#endif
 
 /* Simple way to iterate through all. */
 static inline int fake_cmp(const struct ip_conntrack *ct,
@@ -301,7 +299,6 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 			 * do_extra_mangle last time. */
 			*other_ipp = saved_ip;
 
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 			if (hooknum == NF_IP_LOCAL_OUT
 			    && *var_ipp != orig_dstip
 			    && !do_extra_mangle(*var_ipp, other_ipp)) {
@@ -312,7 +309,6 @@ find_best_ips_proto(struct ip_conntrack_tuple *tuple,
 				 * anyway. */
 				continue;
 			}
-#endif
 
 			/* Count how many others map onto this. */
 			score = count_maps(tuple->src.ip, tuple->dst.ip,
@@ -356,13 +352,11 @@ find_best_ips_proto_fast(struct ip_conntrack_tuple *tuple,
 		else {
 			/* Only do extra mangle when required (breaks
                            socket binding) */
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 			if (tuple->dst.ip != mr->range[0].min_ip
 			    && hooknum == NF_IP_LOCAL_OUT
 			    && !do_extra_mangle(mr->range[0].min_ip,
 						&tuple->src.ip))
 				return NULL;
-#endif
 			tuple->dst.ip = mr->range[0].min_ip;
 		}
 	}
@@ -473,10 +467,8 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 static unsigned int opposite_hook[NF_IP_NUMHOOKS]
 = { [NF_IP_PRE_ROUTING] = NF_IP_POST_ROUTING,
     [NF_IP_POST_ROUTING] = NF_IP_PRE_ROUTING,
-#ifdef CONFIG_IP_NF_NAT_LOCAL
     [NF_IP_LOCAL_OUT] = NF_IP_LOCAL_IN,
     [NF_IP_LOCAL_IN] = NF_IP_LOCAL_OUT,
-#endif
 };
 
 unsigned int
@@ -821,6 +813,23 @@ do_bindings(struct ip_conntrack *ct,
 	/* not reached */
 }
 
+static inline int tuple_src_equal_dst(const struct ip_conntrack_tuple *t1,
+                                      const struct ip_conntrack_tuple *t2)
+{
+	if (t1->dst.protonum != t2->dst.protonum || t1->src.ip != t2->dst.ip)
+		return 0;
+	if (t1->dst.protonum != IPPROTO_ICMP)
+		return t1->src.u.all == t2->dst.u.all;
+	else {
+		struct ip_conntrack_tuple inv;
+
+		/* ICMP tuples are asymetric */
+		invert_tuplepr(&inv, t1);
+		return inv.src.u.all == t2->src.u.all &&
+		       inv.dst.u.all == t2->dst.u.all;
+	}
+}
+
 int
 icmp_reply_translation(struct sk_buff **pskb,
 		       struct ip_conntrack *conntrack,
@@ -833,6 +842,7 @@ icmp_reply_translation(struct sk_buff **pskb,
 	} *inside;
 	unsigned int i;
 	struct ip_nat_info *info = &conntrack->nat.info;
+	struct ip_conntrack_tuple *cttuple, innertuple;
 	int hdrlen;
 
 	if (!skb_ip_make_writable(pskb,(*pskb)->nh.iph->ihl*4+sizeof(*inside)))
@@ -876,6 +886,13 @@ icmp_reply_translation(struct sk_buff **pskb,
 	   such addresses are not too uncommon, as Alan Cox points
 	   out) */
 
+	if (!ip_ct_get_tuple(&inside->ip, *pskb, (*pskb)->nh.iph->ihl*4 +
+	                     sizeof(struct icmphdr) + inside->ip.ihl*4,
+	                     &innertuple,
+	                     ip_ct_find_proto(inside->ip.protocol)))
+		return 0;
+	cttuple = &conntrack->tuplehash[dir].tuple;
+
 	READ_LOCK(&ip_nat_lock);
 	for (i = 0; i < info->num_manips; i++) {
 		DEBUGP("icmp_reply: manip %u dir %s hook %u\n",
@@ -885,37 +902,52 @@ icmp_reply_translation(struct sk_buff **pskb,
 		if (info->manips[i].direction != dir)
 			continue;
 
-		/* Mapping the inner packet is just like a normal
-		   packet, except it was never src/dst reversed, so
-		   where we would normally apply a dst manip, we apply
-		   a src, and vice versa. */
-		if (info->manips[i].hooknum == hooknum) {
-			DEBUGP("icmp_reply: inner %s -> %u.%u.%u.%u %u\n",
-			       info->manips[i].maniptype == IP_NAT_MANIP_SRC
-			       ? "DST" : "SRC",
-			       NIPQUAD(info->manips[i].manip.ip),
-			       ntohs(info->manips[i].manip.u.udp.port));
-			if (!manip_pkt(inside->ip.protocol, pskb,
-				       (*pskb)->nh.iph->ihl*4
-				       + sizeof(inside->icmp),
-				       &info->manips[i].manip,
-				       !info->manips[i].maniptype))
-				goto unlock_fail;
+		/* Mapping the inner packet is just like a normal packet, except
+		 * it was never src/dst reversed, so where we would normally
+		 * apply a dst manip, we apply a src, and vice versa. */
 
-			/* Outer packet needs to have IP header NATed like
-	                   it's a reply. */
+		/* Only true for forwarded packets, locally generated packets
+		 * never hit PRE_ROUTING, we need to apply their PRE_ROUTING
+		 * manips in LOCAL_OUT. */
+		if (hooknum == NF_IP_LOCAL_OUT &&
+		    info->manips[i].hooknum == NF_IP_PRE_ROUTING)
+			hooknum = info->manips[i].hooknum;
 
-			/* Use mapping to map outer packet: 0 give no
-                           per-proto mapping */
-			DEBUGP("icmp_reply: outer %s -> %u.%u.%u.%u\n",
-			       info->manips[i].maniptype == IP_NAT_MANIP_SRC
-			       ? "SRC" : "DST",
-			       NIPQUAD(info->manips[i].manip.ip));
-			if (!manip_pkt(0, pskb, 0,
-				       &info->manips[i].manip,
-				       info->manips[i].maniptype))
-				goto unlock_fail;
+		if (info->manips[i].hooknum != hooknum)
+			continue;
+
+		/* ICMP errors may be generated locally for packets that
+		 * don't have all NAT manips applied yet. Verify manips
+		 * have been applied before reversing them */
+		if (info->manips[i].maniptype == IP_NAT_MANIP_SRC) {
+			if (!tuple_src_equal_dst(cttuple, &innertuple))
+				continue;
+		} else {
+			if (!tuple_src_equal_dst(&innertuple, cttuple))
+				continue;
 		}
+
+		DEBUGP("icmp_reply: inner %s -> %u.%u.%u.%u %u\n",
+		       info->manips[i].maniptype == IP_NAT_MANIP_SRC
+		       ? "DST" : "SRC", NIPQUAD(info->manips[i].manip.ip),
+		       ntohs(info->manips[i].manip.u.udp.port));
+		if (!manip_pkt(inside->ip.protocol, pskb,
+			       (*pskb)->nh.iph->ihl*4 + sizeof(inside->icmp),
+			       &info->manips[i].manip,
+			       !info->manips[i].maniptype))
+			goto unlock_fail;
+
+		/* Outer packet needs to have IP header NATed like
+                   it's a reply. */
+
+		/* Use mapping to map outer packet: 0 give no
+                          per-proto mapping */
+		DEBUGP("icmp_reply: outer %s -> %u.%u.%u.%u\n",
+		       info->manips[i].maniptype == IP_NAT_MANIP_SRC
+		       ? "SRC" : "DST", NIPQUAD(info->manips[i].manip.ip));
+		if (!manip_pkt(0, pskb, 0, &info->manips[i].manip,
+			       info->manips[i].maniptype))
+			goto unlock_fail;
 	}
 	READ_UNLOCK(&ip_nat_lock);
 
