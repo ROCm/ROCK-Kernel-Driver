@@ -274,7 +274,7 @@ error:
 	return -EINVAL;
 }
 
-static void __init rtas_init(void)
+static int __init rtas_init(void)
 {
 	struct proc_dir_entry *rtas_dir, *entry;
 
@@ -293,6 +293,8 @@ static void __init rtas_init(void)
 		printk(KERN_ERR "Failed to start RTAS daemon\n");
 
 	printk(KERN_ERR "RTAS daemon started\n");
+
+	return 0;
 }
 
 static int __init surveillance_setup(char *str)
