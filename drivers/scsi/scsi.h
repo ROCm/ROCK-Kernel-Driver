@@ -15,23 +15,10 @@
 #ifndef _SCSI_H
 #define _SCSI_H
 
-#include <linux/config.h>	/* for CONFIG_SCSI_LOGGING */
-#include <linux/devfs_fs_kernel.h>
-#include <linux/proc_fs.h>
-#include <linux/init.h>
-
-
-/*
- * Some of the public constants are being moved to this file.
- * We include it here so that what came from where is transparent.
- */
+#include <linux/config.h>	    /* for CONFIG_SCSI_LOGGING */
+#include <linux/devfs_fs_kernel.h>  /* some morons don't know struct pointers */
 #include <scsi/scsi.h>
 
-#include <linux/random.h>
-
-#include <asm/hardirq.h>
-#include <asm/scatterlist.h>
-#include <asm/io.h>
 
 /*
  * These are the values that the SCpnt->sc_data_direction and 
@@ -396,6 +383,7 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
  * Forward-declaration of structs for prototypes.
  */
 struct Scsi_Host;
+struct scatterlist;
 
 /*
  * Add some typedefs so that we can prototyope a bunch of the functions.
@@ -549,7 +537,7 @@ struct dev_info {
 	unsigned flags;
 };
 
-extern struct dev_info scsi_static_device_list[] __initdata;
+extern struct dev_info scsi_static_device_list[];
 
 /*
  * scsi_dev_info_list: structure to hold black/white listed devices.
