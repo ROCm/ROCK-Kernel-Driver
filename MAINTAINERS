@@ -1132,7 +1132,6 @@ NETWORKING [GENERAL]
 P:	Networking Team
 M:	netdev@oss.sgi.com
 L:	linux-net@vger.kernel.org
-W:	http://www.uk.linux.org/NetNews.html (2.0 only)
 S:	Maintained
 
 NETWORKING [IPv4/IPv6]

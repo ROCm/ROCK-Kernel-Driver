@@ -1048,11 +1048,19 @@ int isapnp_cfg_begin(int csn, int logdev)
 	isapnp_wait();
 	isapnp_key();
 	isapnp_wake(csn);
-#if 1	/* to avoid malfunction when the isapnptools package is used */
-	isapnp_set_rdp();
-	udelay(1000);	/* delay 1000us */
-	write_address(0x01);
-	udelay(1000);	/* delay 1000us */
+#if 1
+	/* to avoid malfunction when the isapnptools package is used */
+	/* we must set RDP to our value again */
+	/* it is possible to set RDP only in the isolation phase */ 
+	/*   Jens Thoms Toerring <Jens.Toerring@physik.fu-berlin.de> */
+	isapnp_write_byte(0x02, 0x04);	/* clear CSN of card */
+	mdelay(2);			/* is this necessary? */
+	isapnp_wake(csn);		/* bring card into sleep state */
+	isapnp_wake(0);			/* bring card into isolation state */
+	isapnp_set_rdp();		/* reset the RDP port */
+	udelay(1000);			/* delay 1000us */
+	isapnp_write_byte(0x06, csn);	/* reset CSN to previous value */
+	udelay(250);			/* is this necessary? */
 #endif
 	if (logdev >= 0)
 		isapnp_device(logdev);

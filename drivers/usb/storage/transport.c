@@ -859,6 +859,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
  * This must be called with scsi_lock(us->srb->host) held */
 void usb_stor_abort_transport(struct us_data *us)
 {
+	struct Scsi_Host *host;
 	int state = atomic_read(&us->sm_state);
 
 	US_DEBUGP("usb_stor_abort_transport called\n");
@@ -870,7 +871,8 @@ void usb_stor_abort_transport(struct us_data *us)
 
 	/* set state to abort and release the lock */
 	atomic_set(&us->sm_state, US_STATE_ABORTING);
-	scsi_unlock(us->srb->host);
+	host = us->srb->host;
+	scsi_unlock(host);
 
 	/* If the state machine is blocked waiting for an URB or an IRQ,
 	 * let's wake it up */
@@ -892,8 +894,8 @@ void usb_stor_abort_transport(struct us_data *us)
 	/* Wait for the aborted command to finish */
 	wait_for_completion(&us->notify);
 
-	/* Reacquire the lock */
-	scsi_lock(us->srb->host);
+	/* Reacquire the lock: note that us->srb is now NULL */
+	scsi_lock(host);
 }
 
 /*
