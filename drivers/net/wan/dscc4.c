@@ -376,6 +376,11 @@ static inline struct dscc4_dev_priv *dscc4_priv(struct net_device *dev)
 	return list_entry(dev, struct dscc4_dev_priv, hdlc.netdev);
 }
 
+static inline struct net_device *dscc4_to_dev(struct dscc4_dev_priv *p)
+{
+	return hdlc_to_dev(&p->hdlc);
+}
+
 static void scc_patchl(u32 mask, u32 value, struct dscc4_dev_priv *dpriv,
 			struct net_device *dev, int offset)
 {
@@ -883,8 +888,8 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 
 	for (i = 0; i < dev_per_card; i++) {
 		struct dscc4_dev_priv *dpriv = root + i;
-		hdlc_device *hdlc = &dpriv->hdlc;
-		struct net_device *d = hdlc_to_dev(hdlc);
+		struct net_device *d = dscc4_to_dev(dpriv);
+		hdlc_device *hdlc = dev_to_hdlc(d);
 
 	        d->base_addr = ioaddr;
 		d->init = NULL;
@@ -964,7 +969,7 @@ static int dscc4_loopback_check(struct dscc4_dev_priv *dpriv)
 	sync_serial_settings *settings = &dpriv->settings;
 
 	if (settings->loopback && (settings->clock_type != CLOCK_INT)) {
-		struct net_device *dev = hdlc_to_dev(&dpriv->hdlc);
+		struct net_device *dev = dscc4_to_dev(dpriv);
 
 		printk(KERN_INFO "%s: loopback requires clock\n", dev->name);
 		return -1;
@@ -1465,7 +1470,7 @@ static irqreturn_t dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
 	int i, handled = 1;
 
 	priv = root->pci_priv;
-	dev = hdlc_to_dev(&root->hdlc);
+	dev = dscc4_to_dev(root);
 
 	spin_lock_irqsave(&priv->lock, flags);
 
@@ -1516,7 +1521,7 @@ out:
 static inline void dscc4_tx_irq(struct dscc4_pci_priv *ppriv,
 				struct dscc4_dev_priv *dpriv)
 {
-	struct net_device *dev = hdlc_to_dev(&dpriv->hdlc);
+	struct net_device *dev = dscc4_to_dev(dpriv);
 	u32 state;
 	int cur, loop = 0;
 
@@ -1685,7 +1690,7 @@ try:
 static inline void dscc4_rx_irq(struct dscc4_pci_priv *priv,
 				    struct dscc4_dev_priv *dpriv)
 {
-	struct net_device *dev = hdlc_to_dev(&dpriv->hdlc);
+	struct net_device *dev = dscc4_to_dev(dpriv);
 	u32 state;
 	int cur;
 
@@ -1959,7 +1964,7 @@ static void __devexit dscc4_remove_one(struct pci_dev *pdev)
 	ppriv = pci_get_drvdata(pdev);
 	root = ppriv->root;
 
-	ioaddr = hdlc_to_dev(&root->hdlc)->base_addr;
+	ioaddr = dscc4_to_dev(root)->base_addr;
 
 	dscc4_pci_reset(pdev, ioaddr);
 
