@@ -410,11 +410,17 @@
 		bne	1001b
 		.endm
 
-#elif defined(CONFIG_ARCH_IQ80310)
+#elif defined(CONFIG_ARCH_IOP3XX)
 
 		.macro	addruart,rx
 		mov	\rx, #0xfe000000	@ physical
-		orr	\rx, \rx, #0x00810000
+#ifdef CONFIG_ARCH_IQ80310
+		orr	\rx, \rx, #0x00810000	@ location of the UART
+#elif defined(CONFIG_ARCH_IQ80321)
+		orr	\rx, \rx, #0x00800000	@ location of the UART
+#else
+#error Unknown IOP3XX implementation
+#endif
 		.endm
 
 		.macro	senduart,rd,rx
@@ -429,9 +435,11 @@
 		.endm
 
 		.macro	waituart,rd,rx
+#ifndef	CONFIG_ARCH_IQ80321
 1001:		ldrb	\rd, [\rx, #0x6]
 		tst	\rd, #0x10
 		beq	1001b
+#endif
 		.endm
 
 #elif defined(CONFIG_ARCH_ADI_EVB)

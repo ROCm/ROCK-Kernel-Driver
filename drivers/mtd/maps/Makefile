@@ -12,6 +12,7 @@ obj-$(CONFIG_MTD_DC21285)	+= dc21285.o
 obj-$(CONFIG_MTD_ELAN_104NC)	+= elan-104nc.o
 obj-$(CONFIG_MTD_EPXA10DB)	+= epxa10db-flash.o
 obj-$(CONFIG_MTD_IQ80310)	+= iq80310.o
+obj-$(CONFIG_MTD_IQ80321)	+= iq80321.o
 obj-$(CONFIG_MTD_L440GX)	+= l440gx.o
 obj-$(CONFIG_MTD_NORA)		+= nora.o
 obj-$(CONFIG_MTD_CEIVA)		+= ceiva.o

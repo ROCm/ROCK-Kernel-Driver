@@ -1,5 +1,5 @@
 /*
- * linux/include/asm-arm/arch-iop80310/timex.h
+ * linux/include/asm-arm/arch-iop3xx/timex.h
  *
  * IOP310 architecture timex specifications
  */
@@ -14,10 +14,14 @@
 #else
 /* This is for the underlying xs80200 PMU clock. We run the core @ 733MHz */
 #define CLOCK_TICK_RATE	733000000
-#endif
+#endif // IQ80310
+
+#elif defined(CONFIG_ARCH_IQ80321)
+
+#define CLOCK_TICK_RATE 200000000
 
 #else
 
-#error "No IOP310 timex information for this architecture"
+#error "No IOP3xx timex information for this architecture"
 
 #endif

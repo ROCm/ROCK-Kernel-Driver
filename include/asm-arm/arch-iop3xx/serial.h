@@ -29,6 +29,17 @@
 
 #endif // CONFIG_ARCH_IQ80310
 
+#ifdef CONFIG_ARCH_IQ80321
+
+#define IRQ_UART1	IRQ_IQ80321_UART
+
+#define RS_TABLE_SIZE 1
+
+#define STD_SERIAL_PORT_DEFNS			\
+       /* UART CLK      PORT        IRQ        FLAGS        */			\
+	{ 0, BASE_BAUD, 0xfe800000, IRQ_UART1, STD_COM_FLAGS },  /* ttyS0 */
+#endif // CONFIG_ARCH_IQ80321
+
 
 #define EXTRA_SERIAL_PORT_DEFNS
 

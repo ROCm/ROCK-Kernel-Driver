@@ -105,7 +105,7 @@ textaddr-$(CONFIG_ARCH_CLPS711X)   := 0xc0028000
  machine-$(CONFIG_ARCH_CLPS711X)   := clps711x
 textaddr-$(CONFIG_ARCH_FORTUNET)   := 0xc0008000
  machine-$(CONFIG_ARCH_ANAKIN)	   := anakin
- machine-$(CONFIG_ARCH_IOP310)	   := iop3xx
+ machine-$(CONFIG_ARCH_IOP3XX)	   := iop3xx
  machine-$(CONFIG_ARCH_ADIFCC)	   := adifcc
 
 MACHINE  := $(machine-y)
