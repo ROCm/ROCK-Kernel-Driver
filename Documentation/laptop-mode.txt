@@ -28,8 +28,9 @@ Contents
 The short story
 ---------------
 
-If you just want to use it, run the laptop_mode control script (which is included
-at the end of this document) as follows:
+To use laptop mode, you don't need to set any kernel configuration options
+or anything. You simply need to run the laptop_mode control script (which
+is included in this document) as follows:
 
 # laptop_mode start
 
@@ -78,12 +79,13 @@ Caveats
 The details
 -----------
 
-Laptop-mode is controlled by the flag /proc/sys/vm/laptop_mode. When this
-flag is set, any physical disk read operation (that might have caused the
-hard disk to spin up) causes Linux to flush all dirty blocks. The result
-of this is that after a disk has spun down, it will not be spun up anymore
-to write dirty blocks, because those blocks had already been written
-immediately after the most recent read operation
+Laptop-mode is controlled by the flag /proc/sys/vm/laptop_mode. This flag is
+present for all kernels that have the laptop mode patch, regardless of any
+configuration options. When the flag is set, any physical disk read operation
+(that might have caused the hard disk to spin up) causes Linux to flush all dirty
+blocks. The result of this is that after a disk has spun down, it will not be spun
+up anymore to write dirty blocks, because those blocks had already been written
+immediately after the most recent read operation.
 
 To increase the effectiveness of the laptop_mode strategy, the laptop_mode
 control script increases dirty_expire_centisecs and dirty_writeback_centisecs in
