@@ -125,17 +125,12 @@ static int i2c_create_name(char **name, const char *prefix,
    ctl_template should be a template of the newly created directory. It is
    copied in memory. The extra2 field of each file is set to point to client.
    If any driver wants subdirectories within the newly created directory,
-   this function must be updated! 
-   controlling_mod is the controlling module. It should usually be
-   THIS_MODULE when calling. Note that this symbol is not defined in
-   kernels before 2.3.13; define it to NULL in that case. We will not use it
-   for anything older than 2.3.27 anyway. */
+   this function must be updated!  */
 int i2c_register_entry(struct i2c_client *client, const char *prefix,
-			   ctl_table * ctl_template,
-			   struct module *controlling_mod)
+			   ctl_table * ctl_template)
 {
 	int i, res, len, id;
-	ctl_table *new_table;
+	ctl_table *new_table, *client_tbl, *tbl;
 	char *name;
 	struct ctl_table_header *new_header;
 
@@ -150,26 +145,33 @@ int i2c_register_entry(struct i2c_client *client, const char *prefix,
 		kfree(name);
 		return -ENOMEM;
 	}
-	id += 256;
 
+	id += 256;
+	
 	len = 0;
 	while (ctl_template[len].procname)
 		len++;
-	len += 7;
-	if (!(new_table = kmalloc(sizeof(ctl_table) * len, GFP_KERNEL))) {
+	if (!(new_table = kmalloc(sizeof(sysctl_table) + sizeof(ctl_table) * (len + 1), 
+				  GFP_KERNEL))) {
 		kfree(name);
 		return -ENOMEM;
 	}
 
-	memcpy(new_table, sysctl_table, 6 * sizeof(ctl_table));
-	new_table[0].child = &new_table[2];
-	new_table[2].child = &new_table[4];
-	new_table[4].child = &new_table[6];
-	new_table[4].procname = name;
-	new_table[4].ctl_name = id;
-	memcpy(new_table + 6, ctl_template, (len - 6) * sizeof(ctl_table));
-	for (i = 6; i < len; i++)
-		new_table[i].extra2 = client;
+	memcpy(new_table, sysctl_table, sizeof(sysctl_table));
+	tbl = new_table; /* sys/ */
+	tbl = tbl->child = tbl + 2; /* dev/ */
+	tbl = tbl->child = tbl + 2; /* sensors/ */	
+       	client_tbl = tbl->child = tbl + 2; /* XX-chip-YY-ZZ/ */
+
+	client_tbl->procname = name;
+	client_tbl->ctl_name = id;
+	client_tbl->child = client_tbl + 2;
+
+	/* Next the client sysctls. --km */
+	tbl = client_tbl->child;
+	memcpy(tbl, ctl_template, sizeof(ctl_table) * (len+1));
+	for (i = 0; i < len; i++)
+		tbl[i].extra2 = client;
 
 	if (!(new_header = register_sysctl_table(new_table, 0))) {
 		printk(KERN_ERR "i2c-proc.o: error: sysctl interface not supported by kernel!\n");
@@ -178,21 +180,21 @@ int i2c_register_entry(struct i2c_client *client, const char *prefix,
 		return -EPERM;
 	}
 
-	i2c_entries[id - 256] = new_header;
+ 	i2c_entries[id - 256] = new_header;
 
 	i2c_clients[id - 256] = client;
+
 #ifdef DEBUG
 	if (!new_header || !new_header->ctl_table ||
 	    !new_header->ctl_table->child ||
 	    !new_header->ctl_table->child->child ||
-	    !new_header->ctl_table->child->child->de) {
+	    !new_header->ctl_table->child->child->de ) {
 		printk
 		    (KERN_ERR "i2c-proc.o: NULL pointer when trying to install fill_inode fix!\n");
 		return id;
 	}
 #endif				/* DEBUG */
-	new_header->ctl_table->child->child->de->owner = controlling_mod;
-
+	client_tbl->de->owner = client->driver->owner;
 	return id;
 }
 
@@ -515,7 +517,7 @@ static int i2c_parse_reals(int *nrels, void *buffer, int bufsize,
 	return 0;
 }
 
-int i2c_write_reals(int nrels, void *buffer, size_t *bufsize,
+static int i2c_write_reals(int nrels, void *buffer, size_t *bufsize,
 			 long *results, int magnitude)
 {
 #define BUFLEN 20
