@@ -703,6 +703,8 @@ endchoice
 
 source "fs/Kconfig.binfmt"
 
+source "drivers/base/Kconfig"
+
 config PM
 	bool "Power Management support"
 	---help---

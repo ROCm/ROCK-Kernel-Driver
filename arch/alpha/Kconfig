@@ -653,6 +653,8 @@ source "drivers/parport/Kconfig"
 
 endmenu
 
+source "drivers/base/Kconfig"
+
 source "drivers/mtd/Kconfig"
 
 source "drivers/pnp/Kconfig"

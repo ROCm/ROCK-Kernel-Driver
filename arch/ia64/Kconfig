@@ -534,6 +534,8 @@ endif
 
 endmenu
 
+source "drivers/base/Kconfig"
+
 if !IA64_HP_SIM
 
 source "drivers/mtd/Kconfig"

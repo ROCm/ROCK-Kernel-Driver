@@ -229,6 +229,8 @@ config PCMCIA
 	bool
 	default n
 
+source "drivers/base/Kconfig"
+
 menu "SCSI support"
 
 config SCSI
