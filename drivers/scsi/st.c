@@ -3946,8 +3946,6 @@ out_free_tape:
 				if (cdev == STm->cdevs[j])
 					cdev = NULL;
 				sysfs_remove_link(&STm->cdevs[j]->kobj, "device");
-				cdev_unmap(MKDEV(SCSI_TAPE_MAJOR,
-						 TAPE_MINOR(dev_num, mode, j)), 1);
 				cdev_del(STm->cdevs[j]);
 			}
 		}
@@ -3990,8 +3988,6 @@ static int st_remove(struct device *dev)
 				for (j=0; j < 2; j++) {
 					sysfs_remove_link(&tpnt->modes[mode].cdevs[j]->kobj,
 							  "device");
-					cdev_unmap(MKDEV(SCSI_TAPE_MAJOR,
-							 TAPE_MINOR(i, mode, j)), 1);
 					cdev_del(tpnt->modes[mode].cdevs[j]);
 					tpnt->modes[mode].cdevs[j] = NULL;
 				}
