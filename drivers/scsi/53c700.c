@@ -115,7 +115,6 @@
 #define NCR_700_VERSION "2.8"
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/string.h>
