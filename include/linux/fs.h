@@ -621,6 +621,9 @@ extern struct list_head file_lock_list;
 
 #include <linux/fcntl.h>
 
+extern long generic_file_fcntl(int fd, unsigned int cmd,
+				unsigned long arg, struct file *filp);
+
 extern int fcntl_getlk(struct file *, struct flock __user *);
 extern int fcntl_setlk(struct file *, unsigned int, struct flock __user *);
 
@@ -830,6 +833,8 @@ struct file_operations {
 	ssize_t (*sendfile) (struct file *, loff_t *, size_t, read_actor_t, void __user *);
 	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
 	unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+	long (*fcntl)(int fd, unsigned int cmd,
+			unsigned long arg, struct file *filp);
 };
 
 struct inode_operations {
