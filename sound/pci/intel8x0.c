@@ -33,6 +33,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/gameport.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
@@ -59,7 +60,9 @@ MODULE_DEVICES("{{Intel,82801AA-ICH},"
 		"{AMD,AMD8111},"
 	        "{ALI,M5455}}");
 
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 #define SUPPORT_JOYSTICK 1
+#endif
 #define SUPPORT_MIDI 1
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
@@ -67,12 +70,7 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 #ifdef SUPPORT_JOYSTICK
-static int joystick_port[SNDRV_CARDS] =
-#ifdef CONFIG_ISA
-	{0x200};	/* enable as default */
-#else
-	{0};	/* disabled */
-#endif
+static int joystick[SNDRV_CARDS];
 #endif
 #ifdef SUPPORT_MIDI
 static int mpu_port[SNDRV_CARDS]; /* disabled */
@@ -91,9 +89,9 @@ MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:0");
 #ifdef SUPPORT_JOYSTICK
-MODULE_PARM(joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(joystick_port, "Joystick port address for Intel i8x0 soundcard. (0 = disabled)");
-MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{0x200}},dialog:list");
+MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(joystick, "Enable joystick for Intel i8x0 soundcard.");
+MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 #endif
 #ifdef SUPPORT_MIDI
 MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
@@ -2656,9 +2654,16 @@ static struct pci_driver driver = {
  * initialize joystick/midi addresses
  */
 
+#ifdef SUPPORT_JOYSTICK
+/* there is only one available device, so we keep it here */
+static struct pci_dev *ich_gameport_pci;
+static struct gameport ich_gameport = { .io = 0x200 };
+#endif
+
 static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 						 const struct pci_device_id *id)
 {
+	u16 val;
 	static int dev;
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
@@ -2667,17 +2672,24 @@ static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 		return -ENOENT;
 	}
 
-	if (joystick_port[dev] > 0 || mpu_port[dev] > 0) {
-		u16 val;
-		pci_read_config_word(pci, 0xe6, &val);
-		if (joystick_port[dev] > 0)
+	pci_read_config_word(pci, 0xe6, &val);
+#ifdef SUPPORT_JOYSTICK
+	if (joystick[dev]) {
+		if (! request_region(ich_gameport.io, 8, "ICH gameport")) {
+			printk(KERN_WARNING "intel8x0: cannot grab gameport 0x%x\n",  ich_gameport.io);
+			joystick[dev] = 0;
+		} else {
+			ich_gameport_pci = pci;
+			gameport_register_port(&ich_gameport);
 			val |= 0x100;
-		if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330)
-			val |= 0x20;
-		pci_write_config_word(pci, 0xe6, val | 0x100);
-
+		}
+	}
+#endif
+#ifdef SUPPORT_MIDI
+	if (mpu_port[dev] > 0) {
 		if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330) {
 			u8 b;
+			val |= 0x20;
 			pci_read_config_byte(pci, 0xe2, &b);
 			if (mpu_port[dev] == 0x300)
 				b |= 0x08;
@@ -2686,7 +2698,25 @@ static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
 			pci_write_config_byte(pci, 0xe2, b);
 		}
 	}
+#endif
+	pci_write_config_word(pci, 0xe6, val);
 	return 0;
+}
+
+static void __devexit snd_intel8x0_joystick_remove(struct pci_dev *pci)
+{
+	u16 val;
+#ifdef SUPPORT_JOYSTICK
+	if (ich_gameport_pci == pci) {
+		gameport_unregister_port(&ich_gameport);
+		release_region(ich_gameport.io, 8);
+		ich_gameport_pci = NULL;
+	}
+#endif
+	/* disable joystick and MIDI */
+	pci_read_config_word(pci, 0xe6, &val);
+	val &= ~0x120;
+	pci_write_config_word(pci, 0xe6, val);
 }
 
 static struct pci_device_id snd_intel8x0_joystick_ids[] = {
@@ -2707,6 +2737,7 @@ static struct pci_driver joystick_driver = {
 	.name = "Intel ICH Joystick",
 	.id_table = snd_intel8x0_joystick_ids,
 	.probe = snd_intel8x0_joystick_probe,
+	.remove = __devexit_p(snd_intel8x0_joystick_remove),
 };
 
 static int have_joystick;
@@ -2749,7 +2780,7 @@ module_exit(alsa_card_intel8x0_exit)
 
 #ifndef MODULE
 
-/* format is: snd-intel8x0=enable,index,id,ac97_clock,mpu_port */
+/* format is: snd-intel8x0=enable,index,id,ac97_clock,mpu_port,joystick */
 
 static int __init alsa_card_intel8x0_setup(char *str)
 {
@@ -2763,6 +2794,9 @@ static int __init alsa_card_intel8x0_setup(char *str)
 	       get_option(&str,&ac97_clock[nr_dev]) == 2
 #ifdef SUPPORT_MIDI
 	       && get_option(&str,&mpu_port[nr_dev]) == 2
+#endif
+#ifdef SUPPORT_JOYSTICK
+	       && get_option(&str,&joystick[nr_dev]) == 2
 #endif
 	       );
 	nr_dev++;

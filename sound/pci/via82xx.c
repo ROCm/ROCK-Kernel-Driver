@@ -50,6 +50,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/gameport.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -69,10 +70,17 @@ MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{VIA,VT82C686A/B/C,pci},{VIA,VT8233A/C,8235}}");
 
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
+#define SUPPORT_JOYSTICK 1
+#endif
+
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static long mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
+#ifdef SUPPORT_JOYSTICK
+static int joystick[SNDRV_CARDS];
+#endif
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
 static int dxs_support[SNDRV_CARDS];
 
@@ -86,8 +94,13 @@ MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable audio part of VIA 82xx bridge.");
 MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 MODULE_PARM(mpu_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(mpu_port, "MPU-401 port.");
+MODULE_PARM_DESC(mpu_port, "MPU-401 port. (VT82C686x only)");
 MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT_DESC);
+#ifdef SUPPORT_JOYSTICK
+MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(joystick, "Enable joystick. (VT82C686x only)");
+MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLE_DESC "," SNDRV_BOOLEAN_FALSE_DESC);
+#endif
 MODULE_PARM(ac97_clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
 MODULE_PARM_SYNTAX(ac97_clock, SNDRV_ENABLED ",default:48000");
@@ -461,6 +474,11 @@ struct _snd_via82xx {
 	spinlock_t reg_lock;
 	spinlock_t ac97_lock;
 	snd_info_entry_t *proc_entry;
+
+#ifdef SUPPORT_JOYSTICK
+	struct gameport gameport;
+	struct resource *res_joystick;
+#endif
 };
 
 static struct pci_device_id snd_via82xx_ids[] = {
@@ -1559,53 +1577,6 @@ static int __devinit snd_via82xx_mixer_new(via82xx_t *chip)
 }
 
 /*
- * joystick
- */
-
-static int snd_via82xx_joystick_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
-{
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
-	uinfo->count = 1;
-	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = 1;
-	return 0;
-}
-
-static int snd_via82xx_joystick_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	via82xx_t *chip = snd_kcontrol_chip(kcontrol);
-	u16 val;
-
-	pci_read_config_word(chip->pci, VIA_FUNC_ENABLE, &val);
-	ucontrol->value.integer.value[0] = (val & VIA_FUNC_ENABLE_GAME) ? 1 : 0;
-	return 0;
-}
-
-static int snd_via82xx_joystick_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
-{
-	via82xx_t *chip = snd_kcontrol_chip(kcontrol);
-	u16 val, oval;
-
-	pci_read_config_word(chip->pci, VIA_FUNC_ENABLE, &oval);
-	val = oval & ~VIA_FUNC_ENABLE_GAME;
-	if (ucontrol->value.integer.value[0])
-		val |= VIA_FUNC_ENABLE_GAME;
-	if (val != oval) {
-		pci_write_config_word(chip->pci, VIA_FUNC_ENABLE, val);
-		return 1;
-	}
-	return 0;
-}
-
-static snd_kcontrol_new_t snd_via82xx_joystick_control __devinitdata = {
-	.name = "Joystick",
-	.iface = SNDRV_CTL_ELEM_IFACE_CARD,
-	.info = snd_via82xx_joystick_info,
-	.get = snd_via82xx_joystick_get,
-	.put = snd_via82xx_joystick_put,
-};
-
-/*
  *
  */
 
@@ -1689,6 +1660,16 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 		legacy &= ~VIA_FUNC_ENABLE_MIDI;
 		mpu_port[dev] = -1;
 	}
+
+#ifdef SUPPORT_JOYSTICK
+#define JOYSTICK_ADDR	0x200
+	if (joystick[dev] &&
+	    (chip->res_joystick = request_region(JOYSTICK_ADDR, 8, "VIA686 gameport")) != NULL) {
+		legacy |= VIA_FUNC_ENABLE_GAME;
+		chip->gameport.io = JOYSTICK_ADDR;
+	}
+#endif
+
 	pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE, legacy);
 	pci_write_config_byte(chip->pci, VIA_PNP_CONTROL, legacy_cfg);
 	if (chip->mpu_res) {
@@ -1702,9 +1683,13 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 		}
 		pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE, legacy);
 	}
-	
-	/* card switches */
-	return snd_ctl_add(chip->card, snd_ctl_new1(&snd_via82xx_joystick_control, chip));
+
+#ifdef SUPPORT_JOYSTICK
+	if (chip->res_joystick)
+		gameport_register_port(&chip->gameport);
+#endif
+
+	return 0;
 }
 
 
@@ -1866,6 +1851,13 @@ static int snd_via82xx_free(via82xx_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	if (chip->chip_type == TYPE_VIA686) {
+#ifdef SUPPORT_JOYSTICK
+		if (chip->res_joystick) {
+			gameport_unregister_port(&chip->gameport);
+			release_resource(chip->res_joystick);
+			kfree_nocheck(chip->res_joystick);
+		}
+#endif
 		pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE, chip->old_legacy);
 		pci_write_config_byte(chip->pci, VIA_PNP_CONTROL, chip->old_legacy_cfg);
 	}
@@ -2155,7 +2147,7 @@ module_exit(alsa_card_via82xx_exit)
 #ifndef MODULE
 
 /* format is: snd-via82xx=enable,index,id,
-			  mpu_port,ac97_clock,dxs_support */
+			  mpu_port,joystick,ac97_clock,dxs_support */
 
 static int __init alsa_card_via82xx_setup(char *str)
 {
@@ -2167,6 +2159,9 @@ static int __init alsa_card_via82xx_setup(char *str)
 	       get_option(&str,&index[nr_dev]) == 2 &&
 	       get_id(&str,&id[nr_dev]) == 2 &&
 	       get_option_long(&str,&mpu_port[nr_dev]) == 2 &&
+#ifdef SUPPORT_JOYSTICK
+	       get_option(&str,&joystick[nr_dev]) == 2 &&
+#endif
 	       get_option(&str,&ac97_clock[nr_dev]) == 2 &&
 	       get_option(&str,&dxs_support[nr_dev]) == 2);
 	nr_dev++;

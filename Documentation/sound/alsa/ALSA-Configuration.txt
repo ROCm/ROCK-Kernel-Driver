@@ -173,8 +173,7 @@ Module parameters
     Module for soundcards based on Avance Logic ALS4000 PCI chip.
 
     joystick_port - port # for legacy joystick support.
-                        default: 0x200 for the 1st card.
-                        0 = disabled
+                    0 = disabled (default)
     
     Module supports up to 8 cards, autoprobe and PnP.
 
@@ -225,6 +224,7 @@ Module parameters
     fm_port     - 0x388 (default), -1 (disable)
     soft_ac3    - Sofware-conversion of raw SPDIF packets (model 033 only)
                   (default = 1)
+    joystick	- Enable joystick (default off)
 
     Module supports autoprobe and multiple chips (max 8).
     
@@ -377,6 +377,8 @@ Module parameters
 			* SoundBlaster PCI 64
 			* SoundBlaster PCI 128
 
+    joystick		- Enable joystick (default off)
+
     Module supports up to 8 cards and autoprobe.
     
   Module snd-ens1371
@@ -386,6 +388,9 @@ Module parameters
 			* SoundBlaster PCI 64
 			* SoundBlaster PCI 128
 			* SoundBlaster Vibra PCI
+
+    joystick_port	- port # for joystick (0x200,0x208,0x210,0x218),
+			  0 = disable (default)
 
     Module supports up to 8 cards and autoprobe.
     
@@ -451,6 +456,7 @@ Module parameters
     use_pm		- support the power-management (0 = off, 1 = on,
 			  2 = auto (default))
     enable_mpu		- enable MPU401 (0 = off, 1 = on, 2 = auto (default))
+    joystick		- enable joystick (default off)       
 
     Module supports up to 8 cards and autoprobe.
 
@@ -581,7 +587,7 @@ Module parameters
 			* ALi m5455
 
     ac97_clock	  - AC'97 codec clock base (0 = auto-detect)
-    joystick_port - Joystick port # (0 = disabled, 0x200)
+    joystick      - Enable joystick (default off)
     mpu_port      - MPU401 port # (0 = disabled, 0x330,0x300)
 
     Module supports autoprobe and multiple bus-master chips (max 8).
@@ -991,6 +997,7 @@ Module parameters
 
     mpu_port	- 0x300,0x310,0x320,0x330, otherwise obtain BIOS setup
 		  [VIA686A/686B only]
+    joystick	- Enable joystick (default off) [VIA686A/686B only]
     ac97_clock	- AC'97 codec clock base (default 48000Hz)
     dxs_support	- support DXS channels,
 		  0 = auto (defalut), 1 = enable, 2 = disable,
@@ -1117,11 +1124,15 @@ Module parameters
 
     Module for Yamaha PCI chips (YMF72x, YMF74x & YMF75x).
 
-    mpu_port	- 0x300,0x330,0x332,0x334, -1 (disable) by default
-    fm_port	- 0x388,0x398,0x3a0,0x3a8, -1 (disable) by default
-    rear_switch - enable shared rear/line-in switch (bool)
+    mpu_port      - 0x300,0x330,0x332,0x334, -1 (disable) by default
+    fm_port       - 0x388,0x398,0x3a0,0x3a8, -1 (disable) by default
+    joystick_port - 0x201,0x202,0x204,0x205, -1 (disable) by default
+    rear_switch   - enable shared rear/line-in switch (bool)
 
     Module supports autoprobe and multiple chips (max 8).
+
+    With YMF744/754 chips, the MPU401/FM/joystick port addresses are
+    chosen automatically, and enabled by default.
     
     The power-management is supported.
 
