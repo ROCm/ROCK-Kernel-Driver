@@ -165,6 +165,7 @@ static inline void e1000_rx_checksum(struct e1000_adapter *adapter,
                                      struct e1000_rx_desc *rx_desc,
                                      struct sk_buff *skb);
 static void e1000_tx_timeout(struct net_device *dev);
+static void e1000_tx_timeout_task(struct net_device *dev);
 
 static void e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp);
 static void e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid);
@@ -452,6 +453,9 @@ e1000_probe(struct pci_dev *pdev,
 	init_timer(&adapter->phy_info_timer);
 	adapter->phy_info_timer.function = &e1000_update_phy_info;
 	adapter->phy_info_timer.data = (unsigned long) adapter;
+
+	INIT_TQUEUE(&adapter->tx_timeout_task, 
+		(void (*)(void *))e1000_tx_timeout_task, netdev);
 
 	register_netdev(netdev);
 
@@ -1455,8 +1459,19 @@ e1000_tx_timeout(struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
 
+	/* Do the reset outside of interrupt context */
+	schedule_task(&adapter->tx_timeout_task);
+}
+
+static void
+e1000_tx_timeout_task(struct net_device *netdev)
+{
+	struct e1000_adapter *adapter = netdev->priv;
+
+	netif_device_detach(netdev);
 	e1000_down(adapter);
 	e1000_up(adapter);
+	netif_device_attach(netdev);
 }
 
 /**

@@ -63,6 +63,7 @@
 #include <net/pkt_sched.h>
 #include <linux/list.h>
 #include <linux/reboot.h>
+#include <linux/tqueue.h>
 #include <linux/ethtool.h>
 #include <linux/if_vlan.h>
 
@@ -158,6 +159,7 @@ struct e1000_adapter {
 	uint16_t link_duplex;
 	spinlock_t stats_lock;
 	atomic_t irq_sem;
+	struct tq_struct tx_timeout_task;
 
 	struct timer_list blink_timer;
 	unsigned long led_status;
