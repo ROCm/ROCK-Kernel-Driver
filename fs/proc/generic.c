@@ -165,6 +165,24 @@ out:
     return -EINVAL;
 }
 
+static int proc_notify_change(struct dentry *dentry, struct iattr *iattr)
+{
+	struct inode *inode = dentry->d_inode;
+	int error = inode_setattr(inode, iattr);
+	if (!error) {
+		struct proc_dir_entry *de = PDE(inode);
+		de->uid = inode->i_uid;
+		de->gid = inode->i_gid;
+		de->mode = inode->i_mode;
+	}
+
+	return error;
+}
+
+static struct inode_operations proc_file_inode_operations = {
+	.setattr	= proc_notify_change,
+};
+
 /*
  * This function parses a name such as "tty/driver/serial", and
  * returns the struct proc_dir_entry for "/proc/tty/driver", and
@@ -368,6 +386,7 @@ static struct file_operations proc_dir_operations = {
  */
 static struct inode_operations proc_dir_inode_operations = {
 	.lookup		= proc_lookup,
+	.setattr	= proc_notify_change,
 };
 
 static int proc_register(struct proc_dir_entry * dir, struct proc_dir_entry * dp)
@@ -393,6 +412,8 @@ static int proc_register(struct proc_dir_entry * dir, struct proc_dir_entry * dp
 	} else if (S_ISREG(dp->mode)) {
 		if (dp->proc_fops == NULL)
 			dp->proc_fops = &proc_file_operations;
+		if (dp->proc_iops == NULL)
+			dp->proc_iops = &proc_file_inode_operations;
 	}
 	return 0;
 }
