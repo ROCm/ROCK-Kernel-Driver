@@ -861,6 +861,7 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   unsigned long mount_options = REISERFS_SB(s)->s_mount_opt;
   unsigned long safe_mask = 0;
   unsigned int commit_max_age = (unsigned int)-1;
+  struct reiserfs_journal *journal = SB_JOURNAL(s);
 
   rs = SB_DISK_SUPER_BLOCK (s);
 
@@ -887,14 +888,14 @@ static int reiserfs_remount (struct super_block * s, int * mount_flags, char * a
   REISERFS_SB(s)->s_mount_opt = (REISERFS_SB(s)->s_mount_opt & ~safe_mask) |  (mount_options & safe_mask);
 
   if(commit_max_age != 0 && commit_max_age != (unsigned int)-1) {
-    SB_JOURNAL_MAX_COMMIT_AGE(s) = commit_max_age;
-    SB_JOURNAL_MAX_TRANS_AGE(s) = commit_max_age;
+    journal->j_max_commit_age = commit_max_age;
+    journal->j_max_trans_age = commit_max_age;
   }
   else if(commit_max_age == 0)
   {
     /* 0 means restore defaults. */
-    SB_JOURNAL_MAX_COMMIT_AGE(s) = SB_JOURNAL_DEFAULT_MAX_COMMIT_AGE(s);
-    SB_JOURNAL_MAX_TRANS_AGE(s) = JOURNAL_MAX_TRANS_AGE;
+    journal->j_max_commit_age = journal->j_default_max_commit_age;
+    journal->j_max_trans_age = JOURNAL_MAX_TRANS_AGE;
   }
 
   if(blocks) {
