@@ -15,6 +15,7 @@
 #include <linux/mmzone.h>
 #include <linux/module.h>
 #include <asm/lmb.h>
+#include <asm/machdep.h>
 
 #if 1
 #define dbg(args...) udbg_printf(args)
@@ -64,6 +65,11 @@ static int __init parse_numa_properties(void)
 	int *memory_associativity;
 	int depth;
 	int max_domain = 0;
+
+	if (strstr(saved_command_line, "numa=off")) {
+		printk(KERN_WARNING "NUMA disabled by user\n");
+		return -1;
+	}
 
 	cpu = of_find_node_by_type(NULL, "cpu");
 	if (!cpu)
