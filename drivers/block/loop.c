@@ -293,7 +293,7 @@ lo_read_actor(read_descriptor_t *desc, struct page *page,
 	      unsigned long offset, unsigned long size)
 {
 	unsigned long count = desc->count;
-	struct lo_read_data *p = (struct lo_read_data*)desc->buf;
+	struct lo_read_data *p = desc->arg.data;
 	struct loop_device *lo = p->lo;
 	sector_t IV;
 

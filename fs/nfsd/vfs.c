@@ -611,7 +611,7 @@ static int
 nfsd_read_actor(read_descriptor_t *desc, struct page *page, unsigned long offset , unsigned long size)
 {
 	unsigned long count = desc->count;
-	struct svc_rqst *rqstp = (struct svc_rqst *)desc->buf;
+	struct svc_rqst *rqstp = desc->arg.data;
 
 	if (size > count)
 		size = count;

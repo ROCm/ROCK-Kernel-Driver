@@ -973,7 +973,7 @@ static int
 tcp_data_recv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 		unsigned int offset, size_t len)
 {
-	struct rpc_xprt *xprt = (struct rpc_xprt *)rd_desc->buf;
+	struct rpc_xprt *xprt = rd_desc->arg.data;
 	skb_reader_t desc = {
 		.skb	= skb,
 		.offset	= offset,
@@ -1021,7 +1021,7 @@ static void tcp_data_ready(struct sock *sk, int bytes)
 		goto out;
 
 	/* We use rd_desc to pass struct xprt to tcp_data_recv */
-	rd_desc.buf = (char *)xprt;
+	rd_desc.arg.data = xprt;
 	rd_desc.count = 65536;
 	tcp_read_sock(sk, &rd_desc, tcp_data_recv);
 out:
