@@ -1610,7 +1610,9 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 
 	case SDEV_CANCEL:
 		switch (oldstate) {
+		case SDEV_CREATED:
 		case SDEV_RUNNING:
+		case SDEV_OFFLINE:
 			break;
 		default:
 			goto illegal;
@@ -1619,9 +1621,7 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 
 	case SDEV_DEL:
 		switch (oldstate) {
-		case SDEV_CREATED:
 		case SDEV_CANCEL:
-		case SDEV_OFFLINE:
 			break;
 		default:
 			goto illegal;
