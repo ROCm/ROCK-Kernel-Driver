@@ -29,6 +29,8 @@ ToDo/Notes:
 	  vfs ->truncate method.
 	- Add a new ntfs inode flag NInoTruncateFailed() and modify
 	  fs/ntfs/inode.c::ntfs_truncate() to set and clear it appropriately.
+	- Fix min_size and max_size definitions in ATTR_DEF structure in
+	  fs/ntfs/layout.h to be signed.
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
