@@ -175,7 +175,7 @@ extern spinlock_t dcache_lock;
 static inline void __d_drop(struct dentry *dentry)
 {
 	dentry->d_vfs_flags |= DCACHE_UNHASHED;
-	hlist_del_rcu(&dentry->d_hash);
+	hlist_del_rcu_init(&dentry->d_hash);
 }
 
 static inline void d_drop(struct dentry *dentry)
