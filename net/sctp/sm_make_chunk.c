@@ -599,11 +599,13 @@ sctp_chunk_t *sctp_make_sack(const sctp_association_t *asoc)
 	SCTP_DEBUG_PRINTK("sackCTSNAck sent is 0x%x.\n", ctsn);
 
 	/* Count the number of Gap Ack Blocks.  */
-	sctp_tsnmap_iter_init(map, &iter);
-	for (num_gabs = 0;
-	     sctp_tsnmap_next_gap_ack(map, &iter, &gab.start, &gab.end);
-	     num_gabs++) {
-		/* Do nothing. */
+	num_gabs = 0;
+
+	if (sctp_tsnmap_has_gap(map)) {
+		sctp_tsnmap_iter_init(map, &iter);
+		while (sctp_tsnmap_next_gap_ack(map, &iter, 
+						&gab.start, &gab.end))
+			num_gabs++;
 	}
 
 	num_dup_tsns = sctp_tsnmap_num_dups(map);
@@ -659,11 +661,15 @@ sctp_chunk_t *sctp_make_sack(const sctp_association_t *asoc)
 		sctp_addto_chunk(retval, sizeof(sack), &sack);
 
 	/* Put the Gap Ack Blocks into the chunk.  */
-	sctp_tsnmap_iter_init(map, &iter);
-	while(sctp_tsnmap_next_gap_ack(map, &iter, &gab.start, &gab.end)) {
-		gab.start = htons(gab.start);
-		gab.end = htons(gab.end);
-		sctp_addto_chunk(retval, sizeof(sctp_gap_ack_block_t), &gab);
+	if (num_gabs) {
+		sctp_tsnmap_iter_init(map, &iter);
+		while(sctp_tsnmap_next_gap_ack(map, &iter, 
+					       &gab.start, &gab.end)) {
+			gab.start = htons(gab.start);
+			gab.end = htons(gab.end);
+			sctp_addto_chunk(retval, sizeof(sctp_gap_ack_block_t), 
+					 &gab);
+		}
 	}
 
 	/* Register the duplicates.  */
