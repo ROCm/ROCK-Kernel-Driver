@@ -4269,8 +4269,10 @@ xfsidbg_xlog(xlog_t *log)
 	kdb_printf("iclog_bak: 0x%p  iclog_size: 0x%x (%d)  num iclogs: %d\n",
 		log->l_iclog_bak, log->l_iclog_size, log->l_iclog_size,
 		log->l_iclog_bufs);
-	kdb_printf("l_iclog_hsize %d l_iclog_heads %d\n",
-		log->l_iclog_hsize, log->l_iclog_heads);
+	kdb_printf("l_stripemask %d l_iclog_hsize %d l_iclog_heads %d\n",
+		log->l_stripemask, log->l_iclog_hsize, log->l_iclog_heads);
+	kdb_printf("l_sectbb_log %u l_sectbb_mask %u\n",
+		log->l_sectbb_log, log->l_sectbb_mask);
 	kdb_printf("&grant_lock: 0x%p  resHeadQ: 0x%p  wrHeadQ: 0x%p\n",
 		&log->l_grant_lock, log->l_reserve_headq, log->l_write_headq);
 	kdb_printf("GResCycle: %d  GResBytes: %d  GWrCycle: %d  GWrBytes: %d\n",
@@ -4712,7 +4714,6 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		(xfs_dfiloff_t)mp->m_dirfreeblk);
 	kdb_printf("chsize %d chash 0x%p\n",
 		mp->m_chsize, mp->m_chash);
-	kdb_printf("m_lstripemask %d\n", mp->m_lstripemask);
 	kdb_printf("m_frozen %d m_active_trans %d\n",
 		mp->m_frozen, mp->m_active_trans.counter);
 	if (mp->m_fsname != NULL)

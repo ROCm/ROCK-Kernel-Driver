@@ -497,8 +497,6 @@ xfs_log_mount(xfs_mount_t	*mp,
 	      xfs_daddr_t	blk_offset,
 	      int		num_bblks)
 {
-	xlog_t *log;
-
 	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY))
 		cmn_err(CE_NOTE, "XFS mounting filesystem %s", mp->m_fsname);
 	else {
@@ -508,7 +506,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 		ASSERT(XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY);
 	}
 
-	mp->m_log = log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
+	mp->m_log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug) {
@@ -528,19 +526,19 @@ xfs_log_mount(xfs_mount_t	*mp,
 		if (readonly)
 			vfsp->vfs_flag &= ~VFS_RDONLY;
 
-		error = xlog_recover(log, readonly);
+		error = xlog_recover(mp->m_log, readonly);
 
 		if (readonly)
 			vfsp->vfs_flag |= VFS_RDONLY;
 		if (error) {
 			cmn_err(CE_WARN, "XFS: log mount/recovery failed");
-			xlog_unalloc_log(log);
+			xlog_unalloc_log(mp->m_log);
 			return error;
 		}
 	}
 
 	/* Normal transactions can now occur */
-	log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
+	mp->m_log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
 
 	/* End mounting message in xfs_log_mount_finish */
 	return 0;
@@ -1191,7 +1189,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	int			i;
 	int			iclogsize;
 
-	log = (void *)kmem_zalloc(sizeof(xlog_t), KM_SLEEP);
+	log = (xlog_t *)kmem_zalloc(sizeof(xlog_t), KM_SLEEP);
 
 	log->l_mp	   = mp;
 	log->l_dev	   = log_dev;
@@ -1203,12 +1201,20 @@ xlog_alloc_log(xfs_mount_t	*mp,
 
 	log->l_prev_block  = -1;
 	ASSIGN_ANY_LSN(log->l_tail_lsn, 1, 0, ARCH_NOCONVERT);
-	/* log->l_tail_lsn    = 0x100000000LL; cycle = 1; current block = 0 */
+	/* log->l_tail_lsn = 0x100000000LL; cycle = 1; current block = 0 */
 	log->l_last_sync_lsn = log->l_tail_lsn;
 	log->l_curr_cycle  = 1;	    /* 0 is bad since this is initial value */
 	log->l_grant_reserve_cycle = 1;
 	log->l_grant_write_cycle = 1;
 
+	if (XFS_SB_VERSION_HASLOGV2(&mp->m_sb)) {
+		if (mp->m_sb.sb_logsunit <= 1) {
+			log->l_stripemask = 1;
+		} else {
+			log->l_stripemask = 1 <<
+				xfs_highbit32(mp->m_sb.sb_logsunit >> BBSHIFT);
+		}
+	}
 	if (XFS_SB_VERSION_HASSECTOR(&mp->m_sb)) {
 		log->l_sectbb_log = mp->m_sb.sb_logsectlog - BBSHIFT;
 		ASSERT(log->l_sectbb_log <= mp->m_sectbb_log);
@@ -2814,10 +2820,9 @@ xlog_state_switch_iclogs(xlog_t		*log,
 
 	/* Round up to next log-sunit */
 	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
-		if (log->l_curr_block & (log->l_mp->m_lstripemask - 1)) {
-			roundup = log->l_mp->m_lstripemask -
-				(log->l_curr_block &
-				 (log->l_mp->m_lstripemask - 1));
+		if (log->l_curr_block & (log->l_stripemask - 1)) {
+			roundup = log->l_stripemask -
+				(log->l_curr_block & (log->l_stripemask - 1));
 		} else {
 			roundup = 0;
 		}

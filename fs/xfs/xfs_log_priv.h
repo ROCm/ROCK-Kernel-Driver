@@ -533,6 +533,7 @@ typedef struct log {
     uint		l_flags;
     uint		l_quotaoffs_flag;/* XFS_DQ_*, if QUOTAOFFs found */
     struct xfs_buf_cancel **l_buf_cancel_table;
+    int			l_stripemask;	/* log stripe mask */
     int			l_iclog_hsize;  /* size of iclog header */
     int			l_iclog_heads;  /* number of iclog header sectors */
     uint		l_sectbb_log;   /* log2 of sector size in bbs */

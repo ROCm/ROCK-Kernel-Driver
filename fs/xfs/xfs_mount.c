@@ -560,16 +560,6 @@ xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
 	mp->m_blockwmask = mp->m_blockwsize - 1;
 	INIT_LIST_HEAD(&mp->m_del_inodes);
 
-
-	if (XFS_SB_VERSION_HASLOGV2(sbp)) {
-		if (sbp->sb_logsunit <= 1) {
-			mp->m_lstripemask = 1;
-		} else {
-			mp->m_lstripemask =
-				1 << xfs_highbit32(sbp->sb_logsunit >> BBSHIFT);
-		}
-	}
-
 	/*
 	 * Setup for attributes, in case they get created.
 	 * This value is for inodes getting attributes for the first time,

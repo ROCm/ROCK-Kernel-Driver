@@ -68,6 +68,7 @@ typedef struct xfs_trans_reservations {
 	((xfs_agblock_t)(XFS_BB_TO_FSBT(mp, d) % (mp)->m_sb.sb_agblocks))
 #else
 struct cred;
+struct log;
 struct vfs;
 struct vnode;
 struct xfs_mount_args;
@@ -303,7 +304,7 @@ typedef struct xfs_mount {
 	uint			m_readio_blocks; /* min read size blocks */
 	uint			m_writeio_log;	/* min write size log bytes */
 	uint			m_writeio_blocks; /* min write size blocks */
-	void			*m_log;		/* log specific stuff */
+	struct log		*m_log;		/* log specific stuff */
 	int			m_logbufs;	/* number of log buffers */
 	int			m_logbsize;	/* size of each log buffer */
 	uint			m_rsumlevels;	/* rt summary levels */
@@ -358,7 +359,6 @@ typedef struct xfs_mount {
 #endif
 	int			m_dalign;	/* stripe unit */
 	int			m_swidth;	/* stripe width */
-	int			m_lstripemask;	/* log stripe mask */
 	int			m_sinoalign;	/* stripe unit inode alignmnt */
 	int			m_attr_magicpct;/* 37% of the blocksize */
 	int			m_dir_magicpct;	/* 37% of the dir blocksize */
