@@ -1394,24 +1394,23 @@ parse_ipsecrequests(struct xfrm_policy *xp, struct sadb_x_policy *pol)
 	return 0;
 }
 
-static struct sk_buff * pfkey_xfrm_policy2msg(struct xfrm_policy *xp, int dir)
+static int pfkey_xfrm_policy2msg_size(struct xfrm_policy *xp)
+{
+	return sizeof(struct sadb_msg) +
+		(sizeof(struct sadb_lifetime) * 3) +
+		(sizeof(struct sadb_address) * 2) + 
+		(sizeof(struct sockaddr_in) * 2) + /* XXX */
+		sizeof(struct sadb_x_policy) +
+		(xp->xfrm_nr * (sizeof(struct sadb_x_ipsecrequest) +
+				(sizeof(struct sockaddr_in) * 2)));
+}
+
+static struct sk_buff * pfkey_xfrm_policy2msg_prep(struct xfrm_policy *xp)
 {
 	struct sk_buff *skb;
-	struct sadb_msg *hdr;
-	struct sadb_address *addr;
-	struct sadb_lifetime *lifetime;
-	struct sadb_x_policy *pol;
-	struct sockaddr_in   *sin;
-	int i;
 	int size;
 
-	size = sizeof(struct sadb_msg) +
-		sizeof(struct sadb_lifetime) * 3 +
-			sizeof(struct sadb_address)*2 + 
-				sizeof(struct sockaddr_in)*2 + /* XXX */
-					sizeof(struct sadb_x_policy) +
-						xp->xfrm_nr*(sizeof(struct sadb_x_ipsecrequest) +
-							     sizeof(struct sockaddr_in)*2);
+	size = pfkey_xfrm_policy2msg_size(xp);
 
 	skb =  alloc_skb(size + 16, GFP_ATOMIC);
 	if (skb == NULL)
@@ -1533,7 +1532,6 @@ static struct sk_buff * pfkey_xfrm_policy2msg(struct xfrm_policy *xp, int dir)
 	}
 	hdr->sadb_msg_len = size / sizeof(uint64_t);
 	hdr->sadb_msg_reserved = atomic_read(&xp->refcnt);
-	return skb;
 }
 
 static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr, void **ext_hdrs)
@@ -1606,7 +1604,7 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 	    (err = parse_ipsecrequests(xp, pol)) < 0)
 		goto out;
 
-	out_skb = pfkey_xfrm_policy2msg(xp, pol->sadb_x_policy_dir-1);
+	out_skb = pfkey_xfrm_policy2msg_prep(xp);
 	if (IS_ERR(out_skb)) {
 		err =  PTR_ERR(out_skb);
 		goto out;
@@ -1618,6 +1616,8 @@ static int pfkey_spdadd(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 		kfree_skb(out_skb);
 		goto out;
 	}
+
+	pfkey_xfrm_policy2msg(out_skb, xp, pol->sadb_x_policy_dir-1);
 
 	xfrm_pol_put(xp);
 
@@ -1679,11 +1679,12 @@ static int pfkey_spddelete(struct sock *sk, struct sk_buff *skb, struct sadb_msg
 
 	err = 0;
 
-	out_skb = pfkey_xfrm_policy2msg(xp, pol->sadb_x_policy_dir-1);
+	out_skb = pfkey_xfrm_policy2msg_prep(xp);
 	if (IS_ERR(out_skb)) {
 		err =  PTR_ERR(out_skb);
 		goto out;
 	}
+	pfkey_xfrm_policy2msg(out_skb, xp, pol->sadb_x_policy_dir-1);
 
 	out_hdr = (struct sadb_msg *) out_skb->data;
 	out_hdr->sadb_msg_version = hdr->sadb_msg_version;
@@ -1721,11 +1722,12 @@ static int pfkey_spdget(struct sock *sk, struct sk_buff *skb, struct sadb_msg *h
 
 	err = 0;
 
-	out_skb = pfkey_xfrm_policy2msg(xp, pol->sadb_x_policy_dir-1);
+	out_skb = pfkey_xfrm_policy2msg_prep(xp);
 	if (IS_ERR(out_skb)) {
 		err =  PTR_ERR(out_skb);
 		goto out;
 	}
+	pfkey_xfrm_policy2msg(out_skb, xp, pol->sadb_x_policy_dir-1);
 
 	out_hdr = (struct sadb_msg *) out_skb->data;
 	out_hdr->sadb_msg_version = hdr->sadb_msg_version;
@@ -1752,9 +1754,11 @@ static int dump_sp(struct xfrm_policy *xp, int dir, int count, void *ptr)
 	struct sk_buff *out_skb;
 	struct sadb_msg *out_hdr;
 
-	out_skb = pfkey_xfrm_policy2msg(xp, dir);
+	out_skb = pfkey_xfrm_policy2msg_prep(xp);
 	if (IS_ERR(out_skb))
 		return PTR_ERR(out_skb);
+
+	pfkey_xfrm_policy2msg(out_skb, xp, dir);
 
 	out_hdr = (struct sadb_msg *) out_skb->data;
 	out_hdr->sadb_msg_version = data->hdr->sadb_msg_version;
