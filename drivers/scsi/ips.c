@@ -7009,10 +7009,10 @@ static int ips_init_phase1( struct pci_dev *pci_dev, int *indexPtr )
      * are guaranteed to be < 4G.
      */
     if ( IPS_ENABLE_DMA64 && IPS_HAS_ENH_SGLIST(ha) &&
-         !pci_set_dma_mask(ha->pcidev, (u64)0xffffffffffffffff)) {
+         !pci_set_dma_mask(ha->pcidev, 0xffffffffffffffffULL)) {
        (ha)->flags |= IPS_HA_ENH_SG;
     } else {
-       if ( pci_set_dma_mask(ha->pcidev, (u64)0xffffffff) != 0 ) { 
+       if ( pci_set_dma_mask(ha->pcidev, 0xffffffffULL) != 0 ) { 
           printk(KERN_WARNING "Unable to set DMA Mask\n");
           return ips_abort_init(ha, index);
        }
