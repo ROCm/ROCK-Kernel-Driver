@@ -109,6 +109,15 @@ static unsigned long next_heartbeat;
 static int wdt_is_open;
 static int wdt_expect_close;
 
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
+
 /*
  *	Whack the dog
  */
@@ -202,6 +211,9 @@ static int fop_open(struct inode * inode, struct file * file)
 			/* Just in case we're already talking to someone... */
 			if(wdt_is_open)
 				return -EBUSY;
+			if (nowayout) {
+				MOD_INC_USE_COUNT;
+			}
 			/* Good, fire up the show */
 			wdt_is_open = 1;
 			wdt_startup();
@@ -216,7 +228,7 @@ static int fop_close(struct inode * inode, struct file * file)
 {
 	if(minor(inode->i_rdev) == WATCHDOG_MINOR) 
 	{
-		if(wdt_expect_close)
+		if(wdt_expect_close && !nowayout)
 			wdt_turnoff();
 		else {
 			del_timer(&timer);
