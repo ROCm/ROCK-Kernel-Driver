@@ -27,10 +27,13 @@
 
 /**
  * The "cpufreq driver" - the arch- or hardware-dependend low
- * level driver of CPUFreq support, and its locking mutex. 
+ * level driver of CPUFreq support, and its spinlock.
  * cpu_max_freq is in kHz.
  */
 static struct cpufreq_driver   	*cpufreq_driver;
+static spinlock_t		cpufreq_driver_lock = SPIN_LOCK_UNLOCKED;
+
+/* will go away once the locking mess is cleaned up */
 static DECLARE_MUTEX            (cpufreq_driver_sem);
 
 /**
@@ -52,21 +55,39 @@ static DECLARE_MUTEX		(cpufreq_governor_sem);
 
 static int cpufreq_cpu_get(unsigned int cpu)
 {
+	struct cpufreq_policy *data;
+	unsigned long flags;
+
 	if (cpu >= NR_CPUS)
-		return 0;
+		goto err_out;
+
+	/* get the cpufreq driver */
+	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 
 	if (!cpufreq_driver)
-		return 0;
+		goto err_out_unlock;
 
 	if (!try_module_get(cpufreq_driver->owner))
-		return 0;
+		goto err_out_unlock;
 
-	if (!kobject_get(&cpufreq_driver->policy[cpu].kobj)) {
-		module_put(cpufreq_driver->owner);
-		return 0;
-	}
+
+	/* get the CPU */
+	data = &cpufreq_driver->policy[cpu];
+
+	if (!kobject_get(&data->kobj))
+		goto err_out_put_module;
+
+
+	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 	return 1;
+
+ err_out_put_module:
+	module_put(cpufreq_driver->owner);
+ err_out_unlock:
+	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+ err_out:
+	return 0;
 }
 
 static void cpufreq_cpu_put(unsigned int cpu)
@@ -826,17 +847,19 @@ EXPORT_SYMBOL_GPL(cpufreq_notify_transition);
  */
 int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 {
+	unsigned long flags;
+
 	if (!driver_data || !driver_data->verify || !driver_data->init ||
 	    ((!driver_data->setpolicy) && (!driver_data->target)))
 		return -EINVAL;
 
-	down(&cpufreq_driver_sem);
+	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	if (cpufreq_driver) {
-		up(&cpufreq_driver_sem);		
+		spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 		return -EBUSY;
 	}
 	cpufreq_driver = driver_data;
-	up(&cpufreq_driver_sem);
+	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
 	cpufreq_driver->policy = kmalloc(NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
 	if (!cpufreq_driver->policy) {
@@ -861,14 +884,20 @@ EXPORT_SYMBOL_GPL(cpufreq_register_driver);
  */
 int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 {
+	unsigned long flags;
+
 	if (!cpufreq_driver || (driver != cpufreq_driver))
 		return -EINVAL;
 
 	sysdev_driver_unregister(&cpu_sysdev_class, &cpufreq_sysdev_driver);
 
 	down(&cpufreq_driver_sem);
+
+	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	kfree(cpufreq_driver->policy);
 	cpufreq_driver = NULL;
+	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
+
 	up(&cpufreq_driver_sem);
 
 	return 0;
