@@ -1404,6 +1404,9 @@ e100_hw_init(struct e100_private *bdp)
 		bdp->flags |= DF_UCODE_LOADED;
 	}
 
+	if ((u8) bdp->rev_id < D101A4_REV_ID)
+		e100_config_init_82557(bdp);
+		
 	if (!e100_config(bdp))
 		goto err;
 
