@@ -190,7 +190,7 @@ static int enable_periodic (struct ehci_hcd *ehci)
 	/* posted write ... PSS happens later */
 	ehci->hcd.state = USB_STATE_RUNNING;
 
-	/* make sure tasklet scans these */
+	/* make sure ehci_work scans these */
 	ehci->next_uframe = readl (&ehci->regs->frame_index)
 				% (ehci->periodic_size << 3);
 	return 0;
@@ -495,7 +495,8 @@ static unsigned
 intr_complete (
 	struct ehci_hcd	*ehci,
 	unsigned	frame,
-	struct ehci_qh	*qh
+	struct ehci_qh	*qh,
+	struct pt_regs	*regs
 ) {
 	unsigned	count;
 
@@ -509,7 +510,7 @@ intr_complete (
 	}
 	
 	/* handle any completions */
-	count = qh_completions (ehci, qh);
+	count = qh_completions (ehci, qh, regs);
 
 	if (unlikely (list_empty (&qh->qtd_list)))
 		intr_deschedule (ehci, qh, 0);
@@ -867,7 +868,8 @@ static unsigned
 itd_complete (
 	struct ehci_hcd	*ehci,
 	struct ehci_itd	*itd,
-	unsigned	uframe
+	unsigned	uframe,
+	struct pt_regs	*regs
 ) {
 	struct urb				*urb = itd->urb;
 	struct usb_iso_packet_descriptor	*desc;
@@ -922,7 +924,7 @@ itd_complete (
 
 	/* complete() can reenter this HCD */
 	spin_unlock (&ehci->lock);
-	usb_hcd_giveback_urb (&ehci->hcd, urb, NULL);
+	usb_hcd_giveback_urb (&ehci->hcd, urb, regs);
 	spin_lock (&ehci->lock);
 
 	/* defer stopping schedule; completion can submit */
@@ -973,7 +975,7 @@ static int itd_submit (struct ehci_hcd *ehci, struct urb *urb, int mem_flags)
 /*-------------------------------------------------------------------------*/
 
 static void
-scan_periodic (struct ehci_hcd *ehci)
+scan_periodic (struct ehci_hcd *ehci, struct pt_regs *regs)
 {
 	unsigned	frame, clock, now_uframe, mod;
 	unsigned	count = 0;
@@ -999,14 +1001,6 @@ scan_periodic (struct ehci_hcd *ehci)
 		u32			type, *hw_p;
 		unsigned		uframes;
 
-		/* keep latencies down: let any irqs in */
-		if (count > max_completions) {
-			spin_unlock_irq (&ehci->lock);
-			cpu_relax ();
-			count = 0;
-			spin_lock_irq (&ehci->lock);
-		}
-
 restart:
 		/* scan schedule to _before_ current frame index */
 		if (frame == clock)
@@ -1031,7 +1025,7 @@ restart:
 				temp = q.qh->qh_next;
 				type = Q_NEXT_TYPE (q.qh->hw_next);
 				count += intr_complete (ehci, frame,
-						qh_get (q.qh));
+						qh_get (q.qh), regs);
 				qh_put (ehci, q.qh);
 				q = temp;
 				break;
@@ -1064,7 +1058,7 @@ restart:
 
 						/* might free q.itd ... */
 						count += itd_complete (ehci,
-							temp.itd, uf);
+							temp.itd, uf, regs);
 						break;
 					}
 				}

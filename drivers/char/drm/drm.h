@@ -346,17 +346,30 @@ typedef struct drm_irq_busid {
 } drm_irq_busid_t;
 
 typedef enum {
-    _DRM_VBLANK_ABSOLUTE = 0x0,	/* Wait for specific vblank sequence number */
-    _DRM_VBLANK_RELATIVE = 0x1	/* Wait for given number of vblanks */
+    _DRM_VBLANK_ABSOLUTE = 0x0,		/* Wait for specific vblank sequence number */
+    _DRM_VBLANK_RELATIVE = 0x1,		/* Wait for given number of vblanks */
+    _DRM_VBLANK_SIGNAL   = 0x40000000	/* Send signal instead of blocking */
 } drm_vblank_seq_type_t;
 
-typedef struct drm_radeon_vbl_wait {
+#define _DRM_VBLANK_FLAGS_MASK _DRM_VBLANK_SIGNAL
+
+struct drm_wait_vblank_request {
+	drm_vblank_seq_type_t type;
+	unsigned int sequence;
+	unsigned long signal;
+};
+
+struct drm_wait_vblank_reply {
 	drm_vblank_seq_type_t type;
 	unsigned int sequence;
 	long tval_sec;
 	long tval_usec;
-} drm_wait_vblank_t;
+};
 
+typedef union drm_wait_vblank {
+	struct drm_wait_vblank_request request;
+	struct drm_wait_vblank_reply reply;
+} drm_wait_vblank_t;
 
 typedef struct drm_agp_mode {
 	unsigned long mode;

@@ -3,7 +3,7 @@
 
 #include <linux/sched.h>
 
-#if defined(__SMP__) || defined(CONFIG_SND_DEBUG)
+#if defined(CONFIG_SMP) || defined(CONFIG_SND_DEBUG)
 
 typedef atomic_t snd_use_lock_t;
 

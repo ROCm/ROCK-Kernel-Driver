@@ -23,7 +23,7 @@
 #include <sound/core.h>
 #include "seq_lock.h"
 
-#if defined(__SMP__) || defined(CONFIG_SND_DEBUG)
+#if defined(CONFIG_SMP) || defined(CONFIG_SND_DEBUG)
 
 #if 0 /* NOT USED */
 /* (interruptible) sleep_on during the specified spinlock */

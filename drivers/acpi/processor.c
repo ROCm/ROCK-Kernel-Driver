@@ -549,13 +549,13 @@ acpi_processor_idle (void)
 
 	case ACPI_STATE_C2:
 		/* Get start time (ticks) */
-		t1 = inl(acpi_fadt.Xpm_tmr_blk.address);
+		t1 = inl(acpi_fadt.xpm_tmr_blk.address);
 		/* Invoke C2 */
 		inb(pr->power.states[ACPI_STATE_C2].address);
 		/* Dummy op - must do something useless after P_LVL2 read */
-		t2 = inl(acpi_fadt.Xpm_tmr_blk.address);
+		t2 = inl(acpi_fadt.xpm_tmr_blk.address);
 		/* Get end time (ticks) */
-		t2 = inl(acpi_fadt.Xpm_tmr_blk.address);
+		t2 = inl(acpi_fadt.xpm_tmr_blk.address);
 		/* Re-enable interrupts */
 		local_irq_enable();
 		/* Compute time (ticks) that we were actually asleep */
@@ -566,13 +566,13 @@ acpi_processor_idle (void)
 		/* Disable bus master arbitration */
 		acpi_set_register(ACPI_BITREG_ARB_DISABLE, 1, ACPI_MTX_DO_NOT_LOCK);
 		/* Get start time (ticks) */
-		t1 = inl(acpi_fadt.Xpm_tmr_blk.address);
+		t1 = inl(acpi_fadt.xpm_tmr_blk.address);
 		/* Invoke C3 */
 		inb(pr->power.states[ACPI_STATE_C3].address);
 		/* Dummy op - must do something useless after P_LVL3 read */
-		t2 = inl(acpi_fadt.Xpm_tmr_blk.address);
+		t2 = inl(acpi_fadt.xpm_tmr_blk.address);
 		/* Get end time (ticks) */
-		t2 = inl(acpi_fadt.Xpm_tmr_blk.address);
+		t2 = inl(acpi_fadt.xpm_tmr_blk.address);
 		/* Enable bus master arbitration */
 		acpi_set_register(ACPI_BITREG_ARB_DISABLE, 0, ACPI_MTX_DO_NOT_LOCK);
 		/* Re-enable interrupts */
@@ -2348,8 +2348,10 @@ acpi_processor_remove_fs (
 {
 	ACPI_FUNCTION_TRACE("acpi_processor_remove_fs");
 
-	if (acpi_device_dir(device))
+	if (acpi_device_dir(device)) {
 		remove_proc_entry(acpi_device_bid(device), acpi_processor_dir);
+		acpi_device_dir(device) = NULL;
+	}
 
 	return_VALUE(0);
 }

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: actbl2.h - ACPI Specification Revision 2.0 Tables
- *       $Revision: 29 $
  *
  *****************************************************************************/
 
@@ -82,7 +81,7 @@ typedef struct
 	u32                     global_lock;            /* Global Lock used to synchronize access to shared hardware resources */
 	u32                     S4bios_f        : 1;    /* S4Bios_f - Indicates if S4BIOS support is present */
 	u32                     reserved1       : 31;   /* Must be 0 */
-	u64                     Xfirmware_waking_vector; /* 64bit physical address of the Firmware Waking Vector. */
+	u64                     xfirmware_waking_vector; /* 64bit physical address of the Firmware Waking Vector. */
 	u8                      version;                /* Version of this table */
 	u8                      reserved3 [31];         /* Reserved - must be zero */
 
@@ -119,16 +118,16 @@ typedef struct
 	u8                      acpi_disable;       /* Value to write to smi_cmd to disable ACPI */
 	u8                      S4bios_req;         /* Value to write to SMI CMD to enter S4BIOS state */
 	u8                      pstate_cnt;         /* Processor performance state control*/
-	u32                     V1_pm1a_evt_blk;    /* Port address of Power Mgt 1a Acpi_event Reg Blk */
-	u32                     V1_pm1b_evt_blk;    /* Port address of Power Mgt 1b Acpi_event Reg Blk */
+	u32                     V1_pm1a_evt_blk;    /* Port address of Power Mgt 1a acpi_event Reg Blk */
+	u32                     V1_pm1b_evt_blk;    /* Port address of Power Mgt 1b acpi_event Reg Blk */
 	u32                     V1_pm1a_cnt_blk;    /* Port address of Power Mgt 1a Control Reg Blk */
 	u32                     V1_pm1b_cnt_blk;    /* Port address of Power Mgt 1b Control Reg Blk */
 	u32                     V1_pm2_cnt_blk;     /* Port address of Power Mgt 2 Control Reg Blk */
 	u32                     V1_pm_tmr_blk;      /* Port address of Power Mgt Timer Ctrl Reg Blk */
-	u32                     V1_gpe0_blk;        /* Port addr of General Purpose Acpi_event 0 Reg Blk */
-	u32                     V1_gpe1_blk;        /* Port addr of General Purpose Acpi_event 1 Reg Blk */
-	u8                      pm1_evt_len;        /* Byte Length of ports at pm1_x_evt_blk */
-	u8                      pm1_cnt_len;        /* Byte Length of ports at pm1_x_cnt_blk */
+	u32                     V1_gpe0_blk;        /* Port addr of General Purpose acpi_event 0 Reg Blk */
+	u32                     V1_gpe1_blk;        /* Port addr of General Purpose acpi_event 1 Reg Blk */
+	u8                      pm1_evt_len;        /* Byte length of ports at pm1_x_evt_blk */
+	u8                      pm1_cnt_len;        /* Byte length of ports at pm1_x_cnt_blk */
 	u8                      pm2_cnt_len;        /* Byte Length of ports at pm2_cnt_blk */
 	u8                      pm_tm_len;          /* Byte Length of ports at pm_tm_blk */
 	u8                      gpe0_blk_len;       /* Byte Length of ports at gpe0_blk */
@@ -164,18 +163,18 @@ typedef struct
 	u32                     reserved6   : 18;   /* Reserved - must be zero */
 
 	acpi_generic_address    reset_register;     /* Reset register address in GAS format */
-	u8                      reset_value;        /* Value to write to the Reset_register port to reset the system. */
+	u8                      reset_value;        /* Value to write to the reset_register port to reset the system. */
 	u8                      reserved7[3];       /* These three bytes must be zero */
-	u64                     Xfirmware_ctrl;     /* 64-bit physical address of FACS */
+	u64                     xfirmware_ctrl;     /* 64-bit physical address of FACS */
 	u64                     Xdsdt;              /* 64-bit physical address of DSDT */
-	acpi_generic_address    Xpm1a_evt_blk;      /* Extended Power Mgt 1a Acpi_event Reg Blk address */
-	acpi_generic_address    Xpm1b_evt_blk;      /* Extended Power Mgt 1b Acpi_event Reg Blk address */
-	acpi_generic_address    Xpm1a_cnt_blk;      /* Extended Power Mgt 1a Control Reg Blk address */
-	acpi_generic_address    Xpm1b_cnt_blk;      /* Extended Power Mgt 1b Control Reg Blk address */
-	acpi_generic_address    Xpm2_cnt_blk;       /* Extended Power Mgt 2 Control Reg Blk address */
-	acpi_generic_address    Xpm_tmr_blk;        /* Extended Power Mgt Timer Ctrl Reg Blk address */
-	acpi_generic_address    Xgpe0_blk;          /* Extended General Purpose Acpi_event 0 Reg Blk address */
-	acpi_generic_address    Xgpe1_blk;          /* Extended General Purpose Acpi_event 1 Reg Blk address */
+	acpi_generic_address    xpm1a_evt_blk;      /* Extended Power Mgt 1a acpi_event Reg Blk address */
+	acpi_generic_address    xpm1b_evt_blk;      /* Extended Power Mgt 1b acpi_event Reg Blk address */
+	acpi_generic_address    xpm1a_cnt_blk;      /* Extended Power Mgt 1a Control Reg Blk address */
+	acpi_generic_address    xpm1b_cnt_blk;      /* Extended Power Mgt 1b Control Reg Blk address */
+	acpi_generic_address    xpm2_cnt_blk;       /* Extended Power Mgt 2 Control Reg Blk address */
+	acpi_generic_address    xpm_tmr_blk;        /* Extended Power Mgt Timer Ctrl Reg Blk address */
+	acpi_generic_address    xgpe0_blk;          /* Extended General Purpose acpi_event 0 Reg Blk address */
+	acpi_generic_address    xgpe1_blk;          /* Extended General Purpose acpi_event 1 Reg Blk address */
 
 }  fadt_descriptor_rev2;
 

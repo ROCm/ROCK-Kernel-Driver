@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exmutex - ASL Mutex Acquire/Release functions
- *              $Revision: 17 $
  *
  *****************************************************************************/
 
@@ -34,13 +33,13 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_unlink_mutex
+ * FUNCTION:    acpi_ex_unlink_mutex
  *
- * PARAMETERS:  *Obj_desc           - The mutex to be unlinked
+ * PARAMETERS:  *obj_desc           - The mutex to be unlinked
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Remove a mutex from the "Acquired_mutex" list
+ * DESCRIPTION: Remove a mutex from the "acquired_mutex" list
  *
  ******************************************************************************/
 
@@ -48,7 +47,7 @@ void
 acpi_ex_unlink_mutex (
 	acpi_operand_object     *obj_desc)
 {
-	ACPI_THREAD_STATE       *thread = obj_desc->mutex.owner_thread;
+	acpi_thread_state       *thread = obj_desc->mutex.owner_thread;
 
 
 	if (!thread) {
@@ -70,21 +69,21 @@ acpi_ex_unlink_mutex (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_link_mutex
+ * FUNCTION:    acpi_ex_link_mutex
  *
- * PARAMETERS:  *Obj_desc           - The mutex to be linked
- *              *List_head          - head of the "Acquired_mutex" list
+ * PARAMETERS:  *obj_desc           - The mutex to be linked
+ *              *list_head          - head of the "acquired_mutex" list
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Add a mutex to the "Acquired_mutex" list for this walk
+ * DESCRIPTION: Add a mutex to the "acquired_mutex" list for this walk
  *
  ******************************************************************************/
 
 void
 acpi_ex_link_mutex (
 	acpi_operand_object     *obj_desc,
-	ACPI_THREAD_STATE       *thread)
+	acpi_thread_state       *thread)
 {
 	acpi_operand_object     *list_head;
 
@@ -110,10 +109,10 @@ acpi_ex_link_mutex (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_acquire_mutex
+ * FUNCTION:    acpi_ex_acquire_mutex
  *
- * PARAMETERS:  *Time_desc          - The 'time to delay' object descriptor
- *              *Obj_desc           - The object descriptor for this op
+ * PARAMETERS:  *time_desc          - The 'time to delay' object descriptor
+ *              *obj_desc           - The object descriptor for this op
  *
  * RETURN:      Status
  *
@@ -130,7 +129,7 @@ acpi_ex_acquire_mutex (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ex_acquire_mutex", obj_desc);
+	ACPI_FUNCTION_TRACE_PTR ("ex_acquire_mutex", obj_desc);
 
 
 	if (!obj_desc) {
@@ -150,7 +149,7 @@ acpi_ex_acquire_mutex (
 	 * mutex.  This mechanism provides some deadlock prevention
 	 */
 	if (walk_state->thread->current_sync_level > obj_desc->mutex.sync_level) {
-		ACPI_REPORT_ERROR (("Cannot acquire Mutex [%4.4s], incorrect Sync_level\n",
+		ACPI_REPORT_ERROR (("Cannot acquire Mutex [%4.4s], incorrect sync_level\n",
 				obj_desc->mutex.node->name.ascii));
 		return_ACPI_STATUS (AE_AML_MUTEX_ORDER);
 	}
@@ -173,7 +172,7 @@ acpi_ex_acquire_mutex (
 
 	status = acpi_ex_system_acquire_mutex (time_desc, obj_desc);
 	if (ACPI_FAILURE (status)) {
-		/* Includes failure from a timeout on Time_desc */
+		/* Includes failure from a timeout on time_desc */
 
 		return_ACPI_STATUS (status);
 	}
@@ -195,9 +194,9 @@ acpi_ex_acquire_mutex (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_release_mutex
+ * FUNCTION:    acpi_ex_release_mutex
  *
- * PARAMETERS:  *Obj_desc           - The object descriptor for this op
+ * PARAMETERS:  *obj_desc           - The object descriptor for this op
  *
  * RETURN:      Status
  *
@@ -213,7 +212,7 @@ acpi_ex_release_mutex (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_release_mutex");
+	ACPI_FUNCTION_TRACE ("ex_release_mutex");
 
 
 	if (!obj_desc) {
@@ -252,7 +251,7 @@ acpi_ex_release_mutex (
 	 * equal to the current sync level
 	 */
 	if (obj_desc->mutex.sync_level > walk_state->thread->current_sync_level) {
-		ACPI_REPORT_ERROR (("Cannot release Mutex [%4.4s], incorrect Sync_level\n",
+		ACPI_REPORT_ERROR (("Cannot release Mutex [%4.4s], incorrect sync_level\n",
 				obj_desc->mutex.node->name.ascii));
 		return_ACPI_STATUS (AE_AML_MUTEX_ORDER);
 	}
@@ -286,9 +285,9 @@ acpi_ex_release_mutex (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_release_all_mutexes
+ * FUNCTION:    acpi_ex_release_all_mutexes
  *
- * PARAMETERS:  *Mutex_list           - Head of the mutex list
+ * PARAMETERS:  *mutex_list           - Head of the mutex list
  *
  * RETURN:      Status
  *
@@ -298,7 +297,7 @@ acpi_ex_release_mutex (
 
 void
 acpi_ex_release_all_mutexes (
-	ACPI_THREAD_STATE       *thread)
+	acpi_thread_state       *thread)
 {
 	acpi_operand_object     *next = thread->acquired_mutex_list;
 	acpi_operand_object     *this;

@@ -19,6 +19,7 @@ obj-$(CONFIG_SND_OPL3SA2) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_AD1816A) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_CS4232) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_CS4236) += snd-ainstr-fm.o
+obj-$(CONFIG_SND_PC98_CS4232) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_ES1688) += snd-ainstr-fm.o
 obj-$(CONFIG_SND_GUSCLASSIC) += snd-ainstr-iw.o snd-ainstr-gf1.o snd-ainstr-simple.o
 obj-$(CONFIG_SND_GUSMAX) += snd-ainstr-iw.o snd-ainstr-gf1.o snd-ainstr-simple.o

@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exresnte - AML Interpreter object resolution
- *              $Revision: 61 $
  *
  *****************************************************************************/
 
@@ -37,12 +36,12 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_resolve_node_to_value
+ * FUNCTION:    acpi_ex_resolve_node_to_value
  *
- * PARAMETERS:  Object_ptr      - Pointer to a location that contains
+ * PARAMETERS:  object_ptr      - Pointer to a location that contains
  *                                a pointer to a NS node, and will receive a
  *                                pointer to the resolved object.
- *              Walk_state      - Current state.  Valid only if executing AML
+ *              walk_state      - Current state.  Valid only if executing AML
  *                                code.  NULL if simply resolving an object
  *
  * RETURN:      Status
@@ -74,7 +73,7 @@ acpi_ex_resolve_node_to_value (
 	acpi_object_type        entry_type;
 
 
-	ACPI_FUNCTION_TRACE ("Ex_resolve_node_to_value");
+	ACPI_FUNCTION_TRACE ("ex_resolve_node_to_value");
 
 
 	/*
@@ -85,7 +84,7 @@ acpi_ex_resolve_node_to_value (
 	source_desc = acpi_ns_get_attached_object (node);
 	entry_type = acpi_ns_get_type ((acpi_handle) node);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Entry=%p Source_desc=%p [%s]\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Entry=%p source_desc=%p [%s]\n",
 		 node, source_desc, acpi_ut_get_type_name (entry_type)));
 
 	if (entry_type == ACPI_TYPE_LOCAL_ALIAS) {
@@ -189,7 +188,7 @@ acpi_ex_resolve_node_to_value (
 	case ACPI_TYPE_LOCAL_BANK_FIELD:
 	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Field_read Node=%p Source_desc=%p Type=%X\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "field_read Node=%p source_desc=%p Type=%X\n",
 			node, source_desc, entry_type));
 
 		status = acpi_ex_read_data_from_field (walk_state, source_desc, &obj_desc);
@@ -242,7 +241,7 @@ acpi_ex_resolve_node_to_value (
 
 		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 
-	} /* switch (Entry_type) */
+	} /* switch (entry_type) */
 
 
 	/* Put the object descriptor on the stack */

@@ -537,6 +537,10 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 
 #if __HAVE_VBL_IRQ
 	init_waitqueue_head(&dev->vbl_queue);
+
+	spin_lock_init( &dev->vbl_lock );
+
+	INIT_LIST_HEAD( &dev->vbl_sigs.head );
 #endif
 
 				/* Before installing handler */
@@ -607,7 +611,8 @@ int DRM(wait_vblank)( DRM_IOCTL_ARGS )
 	drm_device_t *dev = priv->dev;
 	drm_wait_vblank_t vblwait;
 	struct timeval now;
-	int ret;
+	int ret = 0;
+	unsigned int flags;
 
 	if (!dev->irq)
 		return -EINVAL;
@@ -615,20 +620,77 @@ int DRM(wait_vblank)( DRM_IOCTL_ARGS )
 	DRM_COPY_FROM_USER_IOCTL( vblwait, (drm_wait_vblank_t *)data,
 				  sizeof(vblwait) );
 
-	if ( vblwait.type == _DRM_VBLANK_RELATIVE ) {
-		vblwait.sequence += atomic_read( &dev->vbl_received );
+	switch ( vblwait.request.type & ~_DRM_VBLANK_FLAGS_MASK ) {
+	case _DRM_VBLANK_RELATIVE:
+		vblwait.request.sequence += atomic_read( &dev->vbl_received );
+	case _DRM_VBLANK_ABSOLUTE:
+		break;
+	default:
+		return -EINVAL;
 	}
 
-	ret = DRM(vblank_wait)( dev, &vblwait.sequence );
+	flags = vblwait.request.type & _DRM_VBLANK_FLAGS_MASK;
+	
+	if ( flags & _DRM_VBLANK_SIGNAL ) {
+		unsigned long irqflags;
+		drm_vbl_sig_t *vbl_sig = DRM_MALLOC( sizeof( drm_vbl_sig_t ) );
 
-	do_gettimeofday( &now );
-	vblwait.tval_sec = now.tv_sec;
-	vblwait.tval_usec = now.tv_usec;
+		if ( !vbl_sig )
+			return -ENOMEM;
+
+		memset( (void *)vbl_sig, 0, sizeof(*vbl_sig) );
+
+		vbl_sig->sequence = vblwait.request.sequence;
+		vbl_sig->info.si_signo = vblwait.request.signal;
+		vbl_sig->task = current;
+
+		vblwait.reply.sequence = atomic_read( &dev->vbl_received );
+
+		/* Hook signal entry into list */
+		spin_lock_irqsave( &dev->vbl_lock, irqflags );
+
+		list_add_tail( (struct list_head *) vbl_sig, &dev->vbl_sigs.head );
+
+		spin_unlock_irqrestore( &dev->vbl_lock, irqflags );
+	} else {
+		ret = DRM(vblank_wait)( dev, &vblwait.request.sequence );
+
+		do_gettimeofday( &now );
+		vblwait.reply.tval_sec = now.tv_sec;
+		vblwait.reply.tval_usec = now.tv_usec;
+	}
 
 	DRM_COPY_TO_USER_IOCTL( (drm_wait_vblank_t *)data, vblwait,
 				sizeof(vblwait) );
 
 	return ret;
+}
+
+void DRM(vbl_send_signals)( drm_device_t *dev )
+{
+	struct list_head *entry, *tmp;
+	drm_vbl_sig_t *vbl_sig;
+	unsigned int vbl_seq = atomic_read( &dev->vbl_received );
+	unsigned long flags;
+
+	spin_lock_irqsave( &dev->vbl_lock, flags );
+
+	list_for_each_safe( entry, tmp, &dev->vbl_sigs.head ) {
+
+		vbl_sig = (drm_vbl_sig_t *) entry;
+
+		if ( ( vbl_seq - vbl_sig->sequence ) <= (1<<23) ) {
+
+			vbl_sig->info.si_code = atomic_read( &dev->vbl_received );
+			send_sig_info( vbl_sig->info.si_signo, &vbl_sig->info, vbl_sig->task );
+
+			list_del( entry );
+
+			DRM_FREE( entry );
+		}
+	}
+
+	spin_unlock_irqrestore( &dev->vbl_lock, flags );
 }
 
 #endif	/* __HAVE_VBL_IRQ */

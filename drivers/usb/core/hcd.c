@@ -389,8 +389,8 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 		break;
 	case DeviceOutRequest | USB_REQ_SET_ADDRESS:
 		// wValue == urb->dev->devaddr
-		dbg ("%s root hub device address %d",
-			hcd->self.bus_name, wValue);
+		dev_dbg (*hcd->controller, "root hub device address %d\n",
+			wValue);
 		break;
 
 	/* INTERFACE REQUESTS (no defined feature/status flags) */
@@ -1188,7 +1188,6 @@ static int hcd_unlink_urb (struct urb *urb)
 	if (urb->transfer_flags & URB_ASYNC_UNLINK)
 		return -EINPROGRESS;
 
-	dev_dbg (*sys, "wait for giveback urb %p\n", urb);
 	wait_for_completion (&splice.done);
 	return 0;
 

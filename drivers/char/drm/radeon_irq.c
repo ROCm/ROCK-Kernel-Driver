@@ -70,13 +70,12 @@ void DRM(dma_service)( DRM_IRQ_ARGS )
 		DRM_WAKEUP( &dev_priv->swi_queue );
 	}
 
-#if __HAVE_VBL_IRQ
 	/* VBLANK interrupt */
 	if (stat & RADEON_CRTC_VBLANK_STAT) {
 		atomic_inc(&dev->vbl_received);
 		DRM_WAKEUP(&dev->vbl_queue);
+		DRM(vbl_send_signals)( dev );
 	}
-#endif
 
 	/* Acknowledge all the bits in GEN_INT_STATUS -- seem to get
 	 * more than we asked for...
@@ -138,7 +137,6 @@ int radeon_emit_and_wait_irq(drm_device_t *dev)
 }
 
 
-#if __HAVE_VBL_IRQ
 int DRM(vblank_wait)(drm_device_t *dev, unsigned int *sequence)
 {
   	drm_radeon_private_t *dev_priv = 
@@ -161,13 +159,12 @@ int DRM(vblank_wait)(drm_device_t *dev, unsigned int *sequence)
 	 */
 	DRM_WAIT_ON( ret, dev->vbl_queue, 3*DRM_HZ, 
 		     ( ( ( cur_vblank = atomic_read(&dev->vbl_received ) )
-			 + ~*sequence + 1 ) <= (1<<23) ) );
+			 - *sequence ) <= (1<<23) ) );
 
 	*sequence = cur_vblank;
 
 	return ret;
 }
-#endif
 
 
 /* Needs the lock as it touches the ring.

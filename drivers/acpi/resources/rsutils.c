@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: rsutils - Utilities for the resource manager
- *              $Revision: 34 $
  *
  ******************************************************************************/
 
@@ -35,10 +34,10 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_get_prt_method_data
+ * FUNCTION:    acpi_rs_get_prt_method_data
  *
  * PARAMETERS:  Handle          - a handle to the containing object
- *              Ret_buffer      - a pointer to a buffer structure for the
+ *              ret_buffer      - a pointer to a buffer structure for the
  *                                  results
  *
  * RETURN:      Status
@@ -60,7 +59,7 @@ acpi_rs_get_prt_method_data (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_get_prt_method_data");
+	ACPI_FUNCTION_TRACE ("rs_get_prt_method_data");
 
 
 	/* Parameters guaranteed valid by caller */
@@ -79,7 +78,7 @@ acpi_rs_get_prt_method_data (
 	 */
 	status = acpi_rs_create_pci_routing_table (obj_desc, ret_buffer);
 
-	/* On exit, we must delete the object returned by Evaluate_object */
+	/* On exit, we must delete the object returned by evaluate_object */
 
 	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
@@ -88,10 +87,10 @@ acpi_rs_get_prt_method_data (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_get_crs_method_data
+ * FUNCTION:    acpi_rs_get_crs_method_data
  *
  * PARAMETERS:  Handle          - a handle to the containing object
- *              Ret_buffer      - a pointer to a buffer structure for the
+ *              ret_buffer      - a pointer to a buffer structure for the
  *                                  results
  *
  * RETURN:      Status
@@ -113,7 +112,7 @@ acpi_rs_get_crs_method_data (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_get_crs_method_data");
+	ACPI_FUNCTION_TRACE ("rs_get_crs_method_data");
 
 
 	/* Parameters guaranteed valid by caller */
@@ -133,7 +132,7 @@ acpi_rs_get_crs_method_data (
 	 */
 	status = acpi_rs_create_resource_list (obj_desc, ret_buffer);
 
-	/* On exit, we must delete the object returned by evaluate_object */
+	/* on exit, we must delete the object returned by evaluate_object */
 
 	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
@@ -142,10 +141,10 @@ acpi_rs_get_crs_method_data (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_get_prs_method_data
+ * FUNCTION:    acpi_rs_get_prs_method_data
  *
  * PARAMETERS:  Handle          - a handle to the containing object
- *              Ret_buffer      - a pointer to a buffer structure for the
+ *              ret_buffer      - a pointer to a buffer structure for the
  *                                  results
  *
  * RETURN:      Status
@@ -167,7 +166,7 @@ acpi_rs_get_prs_method_data (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_get_prs_method_data");
+	ACPI_FUNCTION_TRACE ("rs_get_prs_method_data");
 
 
 	/* Parameters guaranteed valid by caller */
@@ -187,7 +186,7 @@ acpi_rs_get_prs_method_data (
 	 */
 	status = acpi_rs_create_resource_list (obj_desc, ret_buffer);
 
-	/* On exit, we must delete the object returned by evaluate_object */
+	/* on exit, we must delete the object returned by evaluate_object */
 
 	acpi_ut_remove_reference (obj_desc);
 	return_ACPI_STATUS (status);
@@ -196,10 +195,10 @@ acpi_rs_get_prs_method_data (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_rs_set_srs_method_data
+ * FUNCTION:    acpi_rs_set_srs_method_data
  *
  * PARAMETERS:  Handle          - a handle to the containing object
- *              In_buffer       - a pointer to a buffer structure of the
+ *              in_buffer       - a pointer to a buffer structure of the
  *                                  parameter
  *
  * RETURN:      Status
@@ -222,13 +221,13 @@ acpi_rs_set_srs_method_data (
 	acpi_buffer             buffer;
 
 
-	ACPI_FUNCTION_TRACE ("Rs_set_srs_method_data");
+	ACPI_FUNCTION_TRACE ("rs_set_srs_method_data");
 
 
 	/* Parameters guaranteed valid by caller */
 
 	/*
-	 * The In_buffer parameter will point to a linked list of
+	 * The in_buffer parameter will point to a linked list of
 	 * resource parameters.  It needs to be formatted into a
 	 * byte stream to be sent in as an input parameter to _SRS
 	 *
@@ -263,7 +262,7 @@ acpi_rs_set_srs_method_data (
 	status = acpi_ns_evaluate_relative (handle, "_SRS", params, NULL);
 
 	/*
-	 * Clean up and return the status from Acpi_ns_evaluate_relative
+	 * Clean up and return the status from acpi_ns_evaluate_relative
 	 */
 	acpi_ut_remove_reference (params[0]);
 	return_ACPI_STATUS (status);

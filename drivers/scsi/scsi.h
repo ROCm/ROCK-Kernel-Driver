@@ -374,6 +374,14 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define SYNC_RESET      0x40
 
 /*
+ * This specifies "machine infinity" for host templates which don't
+ * limit the transfer size.  Note this limit represents an absolute
+ * maximum, and may be over the transfer limits allowed for individual
+ * devices (e.g. 256 for SCSI-1)
+ */
+#define SCSI_DEFAULT_MAX_SECTORS	1024
+
+/*
  * This is the crap from the old error handling code.  We have it in a special
  * place so that we can more easily delete it later on.
  */

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbrsdt - ACPI RSDT table utilities
- *              $Revision: 5 $
  *
  *****************************************************************************/
 
@@ -34,7 +33,7 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_verify_rsdp
+ * FUNCTION:    acpi_tb_verify_rsdp
  *
  * PARAMETERS:  Address         - RSDP (Pointer to RSDT)
  *
@@ -46,14 +45,14 @@
 
 acpi_status
 acpi_tb_verify_rsdp (
-	ACPI_POINTER            *address)
+	acpi_pointer            *address)
 {
 	acpi_table_desc         table_info;
 	acpi_status             status;
-	RSDP_DESCRIPTOR         *rsdp;
+	rsdp_descriptor         *rsdp;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_verify_rsdp");
+	ACPI_FUNCTION_TRACE ("tb_verify_rsdp");
 
 
 	switch (address->pointer_type) {
@@ -66,7 +65,7 @@ acpi_tb_verify_rsdp (
 		/*
 		 * Obtain access to the RSDP structure
 		 */
-		status = acpi_os_map_memory (address->pointer.physical, sizeof (RSDP_DESCRIPTOR),
+		status = acpi_os_map_memory (address->pointer.physical, sizeof (rsdp_descriptor),
 				  (void **) &rsdp);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
@@ -106,7 +105,7 @@ acpi_tb_verify_rsdp (
 	/* The RSDP supplied is OK */
 
 	table_info.pointer     = ACPI_CAST_PTR (acpi_table_header, rsdp);
-	table_info.length      = sizeof (RSDP_DESCRIPTOR);
+	table_info.length      = sizeof (rsdp_descriptor);
 	table_info.allocation  = ACPI_MEM_MAPPED;
 
 	/* Save the table pointers and allocation info */
@@ -118,7 +117,7 @@ acpi_tb_verify_rsdp (
 
 	/* Save the RSDP in a global for easy access */
 
-	acpi_gbl_RSDP = ACPI_CAST_PTR (RSDP_DESCRIPTOR, table_info.pointer);
+	acpi_gbl_RSDP = ACPI_CAST_PTR (rsdp_descriptor, table_info.pointer);
 	return_ACPI_STATUS (status);
 
 
@@ -126,7 +125,7 @@ acpi_tb_verify_rsdp (
 cleanup:
 
 	if (acpi_gbl_table_flags & ACPI_PHYSICAL_POINTER) {
-		acpi_os_unmap_memory (rsdp, sizeof (RSDP_DESCRIPTOR));
+		acpi_os_unmap_memory (rsdp, sizeof (rsdp_descriptor));
 	}
 	return_ACPI_STATUS (status);
 }
@@ -134,7 +133,7 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_rsdt_address
+ * FUNCTION:    acpi_tb_get_rsdt_address
  *
  * PARAMETERS:  None
  *
@@ -147,7 +146,7 @@ cleanup:
 
 void
 acpi_tb_get_rsdt_address (
-	ACPI_POINTER            *out_address)
+	acpi_pointer            *out_address)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -170,9 +169,9 @@ acpi_tb_get_rsdt_address (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_validate_rsdt
+ * FUNCTION:    acpi_tb_validate_rsdt
  *
- * PARAMETERS:  Table_ptr       - Addressable pointer to the RSDT.
+ * PARAMETERS:  table_ptr       - Addressable pointer to the RSDT.
  *
  * RETURN:      Status
  *
@@ -187,7 +186,7 @@ acpi_tb_validate_rsdt (
 	int                     no_match;
 
 
-	ACPI_FUNCTION_NAME ("Tb_validate_rsdt");
+	ACPI_FUNCTION_NAME ("tb_validate_rsdt");
 
 
 	/*
@@ -213,7 +212,7 @@ acpi_tb_validate_rsdt (
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_ERROR,
 			"RSDT/XSDT signature at %X (%p) is invalid\n",
 			acpi_gbl_RSDP->rsdt_physical_address,
-			(void *) (NATIVE_UINT) acpi_gbl_RSDP->rsdt_physical_address));
+			(void *) (acpi_native_uint) acpi_gbl_RSDP->rsdt_physical_address));
 
 		return (AE_BAD_SIGNATURE);
 	}
@@ -224,7 +223,7 @@ acpi_tb_validate_rsdt (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_get_table_rsdt
+ * FUNCTION:    acpi_tb_get_table_rsdt
  *
  * PARAMETERS:  None
  *
@@ -240,10 +239,10 @@ acpi_tb_get_table_rsdt (
 {
 	acpi_table_desc         table_info;
 	acpi_status             status;
-	ACPI_POINTER            address;
+	acpi_pointer            address;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_get_table_rsdt");
+	ACPI_FUNCTION_TRACE ("tb_get_table_rsdt");
 
 
 	/* Get the RSDT/XSDT via the RSDP */

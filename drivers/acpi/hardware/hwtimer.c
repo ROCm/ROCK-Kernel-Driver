@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Name: hwtimer.c - ACPI Power Management Timer Interface
- *              $Revision: 21 $
  *
  *****************************************************************************/
 
@@ -32,7 +31,7 @@
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_get_timer_resolution
+ * FUNCTION:    acpi_get_timer_resolution
  *
  * PARAMETERS:  none
  *
@@ -46,7 +45,7 @@ acpi_status
 acpi_get_timer_resolution (
 	u32                     *resolution)
 {
-	ACPI_FUNCTION_TRACE ("Acpi_get_timer_resolution");
+	ACPI_FUNCTION_TRACE ("acpi_get_timer_resolution");
 
 
 	if (!resolution) {
@@ -66,7 +65,7 @@ acpi_get_timer_resolution (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_get_timer
+ * FUNCTION:    acpi_get_timer
  *
  * PARAMETERS:  none
  *
@@ -83,14 +82,14 @@ acpi_get_timer (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_timer");
+	ACPI_FUNCTION_TRACE ("acpi_get_timer");
 
 
 	if (!ticks) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	status = acpi_hw_low_level_read (32, ticks, &acpi_gbl_FADT->Xpm_tmr_blk, 0);
+	status = acpi_hw_low_level_read (32, ticks, &acpi_gbl_FADT->xpm_tmr_blk, 0);
 
 	return_ACPI_STATUS (status);
 }
@@ -98,13 +97,13 @@ acpi_get_timer (
 
 /******************************************************************************
  *
- * FUNCTION:    Acpi_get_timer_duration
+ * FUNCTION:    acpi_get_timer_duration
  *
- * PARAMETERS:  Start_ticks
- *              End_ticks
- *              Time_elapsed
+ * PARAMETERS:  start_ticks
+ *              end_ticks
+ *              time_elapsed
  *
- * RETURN:      Time_elapsed
+ * RETURN:      time_elapsed
  *
  * DESCRIPTION: Computes the time elapsed (in microseconds) between two
  *              PM Timer time stamps, taking into account the possibility of
@@ -134,7 +133,7 @@ acpi_get_timer_duration (
 	acpi_integer            out_quotient;
 
 
-	ACPI_FUNCTION_TRACE ("Acpi_get_timer_duration");
+	ACPI_FUNCTION_TRACE ("acpi_get_timer_duration");
 
 
 	if (!time_elapsed) {
@@ -172,7 +171,7 @@ acpi_get_timer_duration (
 	 *
 	 * Requires a 64-bit divide:
 	 *
-	 * Time_elapsed = (Delta_ticks * 1000000) / PM_TIMER_FREQUENCY;
+	 * time_elapsed = (delta_ticks * 1000000) / PM_TIMER_FREQUENCY;
 	 */
 	normalized_ticks.full = ((u64) delta_ticks) * 1000000;
 

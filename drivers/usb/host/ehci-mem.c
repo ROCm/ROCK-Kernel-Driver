@@ -73,8 +73,11 @@ static struct ehci_qtd *ehci_qtd_alloc (struct ehci_hcd *ehci, int flags)
 	dma_addr_t		dma;
 
 	qtd = pci_pool_alloc (ehci->qtd_pool, flags, &dma);
-	if (qtd != 0)
+	if (qtd != 0) {
 		ehci_qtd_init (qtd, dma);
+		if (ehci->async)
+			qtd->hw_alt_next = ehci->async->hw_alt_next;
+	}
 	return qtd;
 }
 

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 4 $
  *
  *****************************************************************************/
 
@@ -36,14 +35,14 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_dump_one_device
+ * FUNCTION:    acpi_ns_dump_one_device
  *
  * PARAMETERS:  Handle              - Node to be dumped
  *              Level               - Nesting level of the handle
- *              Context             - Passed into Walk_namespace
+ *              Context             - Passed into walk_namespace
  *
  * DESCRIPTION: Dump a single Node that represents a device
- *              This procedure is a User_function called by Acpi_ns_walk_namespace.
+ *              This procedure is a user_function called by acpi_ns_walk_namespace.
  *
  ******************************************************************************/
 
@@ -59,7 +58,7 @@ acpi_ns_dump_one_device (
 	u32                     i;
 
 
-	ACPI_FUNCTION_NAME ("Ns_dump_one_device");
+	ACPI_FUNCTION_NAME ("ns_dump_one_device");
 
 
 	status = acpi_ns_dump_one_object (obj_handle, level, context, return_value);
@@ -82,7 +81,7 @@ acpi_ns_dump_one_device (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_dump_root_devices
+ * FUNCTION:    acpi_ns_dump_root_devices
  *
  * PARAMETERS:  None
  *
@@ -97,7 +96,7 @@ acpi_ns_dump_root_devices (void)
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_NAME ("Ns_dump_root_devices");
+	ACPI_FUNCTION_NAME ("ns_dump_root_devices");
 
 
 	/* Only dump the table if tracing is enabled */

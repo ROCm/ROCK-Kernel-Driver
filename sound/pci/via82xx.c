@@ -613,6 +613,9 @@ static int snd_via82xx_playback_prepare(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 
 	snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE, runtime->rate);
+	snd_ac97_set_rate(chip->ac97, AC97_PCM_SURR_DAC_RATE, runtime->rate);
+	snd_ac97_set_rate(chip->ac97, AC97_PCM_LFE_DAC_RATE, runtime->rate);
+	snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
 	if (chip->chip_type == TYPE_VIA8233 &&
 	    chip->playback.reg_offset != VIA_REG_MULTPLAY_STATUS) {
 		unsigned int tmp;

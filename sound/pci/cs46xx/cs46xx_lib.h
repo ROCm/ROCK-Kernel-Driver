@@ -152,6 +152,7 @@ dsp_scb_descriptor_t * cs46xx_dsp_create_pcm_reader_scb(cs46xx_t * chip,char * s
                                                         dsp_scb_descriptor_t * parent_scb,
                                                         int scb_child_type);
 dsp_scb_descriptor_t *  cs46xx_dsp_create_src_task_scb(cs46xx_t * chip,char * scb_name,
+						       int sample_rate,
                                                        u16 src_buffer_addr,
                                                        u16 src_delay_buffer_addr,u32 dest,
                                                        dsp_scb_descriptor_t * parent_scb,
@@ -202,8 +203,6 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,u32 sa
                                                           int pcm_channel_id);
 void                       cs46xx_dsp_destroy_pcm_channel (cs46xx_t * chip,
                                                            pcm_channel_descriptor_t * pcm_channel);
-void                       cs46xx_dsp_set_src_sample_rate(cs46xx_t * chip,dsp_scb_descriptor_t * src, 
-                                                          u32 rate);
 int                        cs46xx_dsp_pcm_unlink (cs46xx_t * chip,pcm_channel_descriptor_t * pcm_channel);
 int                        cs46xx_dsp_pcm_link (cs46xx_t * chip,pcm_channel_descriptor_t * pcm_channel);
 dsp_scb_descriptor_t *     cs46xx_add_record_source (cs46xx_t *chip,dsp_scb_descriptor_t * source,
@@ -217,6 +216,6 @@ int                        cs46xx_dsp_pcm_channel_set_period (cs46xx_t * chip,
 							       int period_size);
 int                        cs46xx_dsp_pcm_ostream_set_period (cs46xx_t * chip,
 							      int period_size);
-int                        cs46xx_dsp_set_dac_volume (cs46xx_t * chip,u16 right,u16 left);
-int                        cs46xx_dsp_set_iec958_volume (cs46xx_t * chip,u16 right,u16 left);
+int                        cs46xx_dsp_set_dac_volume (cs46xx_t * chip,u16 left,u16 right);
+int                        cs46xx_dsp_set_iec958_volume (cs46xx_t * chip,u16 left,u16 right);
 #endif /* __CS46XX_LIB_H__ */

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acresrc.h - Resource Manager function prototypes
- *       $Revision: 34 $
  *
  *****************************************************************************/
 
@@ -69,7 +68,7 @@ acpi_rs_create_pci_routing_table (
 
 
 /*
- * Function prototypes called from Acpi_rs_create*
+ * Function prototypes called from acpi_rs_create*
  */
 void
 acpi_rs_dump_irq (
@@ -141,17 +140,17 @@ acpi_status
 acpi_rs_get_list_length (
 	u8                      *byte_stream_buffer,
 	u32                     byte_stream_buffer_length,
-	ACPI_SIZE               *size_needed);
+	acpi_size               *size_needed);
 
 acpi_status
 acpi_rs_get_byte_stream_length (
 	acpi_resource           *linked_list_buffer,
-	ACPI_SIZE               *size_needed);
+	acpi_size               *size_needed);
 
 acpi_status
 acpi_rs_get_pci_routing_table_length (
 	acpi_operand_object     *package_object,
-	ACPI_SIZE               *buffer_size_needed);
+	acpi_size               *buffer_size_needed);
 
 acpi_status
 acpi_rs_byte_stream_to_list (
@@ -162,203 +161,203 @@ acpi_rs_byte_stream_to_list (
 acpi_status
 acpi_rs_list_to_byte_stream (
 	acpi_resource           *linked_list,
-	ACPI_SIZE               byte_stream_size_needed,
+	acpi_size               byte_stream_size_needed,
 	u8                      *output_buffer);
 
 acpi_status
 acpi_rs_io_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_fixed_io_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_io_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_fixed_io_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_irq_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_irq_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_dma_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_dma_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_address16_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_address16_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_address32_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_address32_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_address64_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_address64_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_start_depend_fns_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_end_depend_fns_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_start_depend_fns_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_end_depend_fns_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_memory24_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_memory24_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_memory32_range_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_fixed_memory32_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_memory32_range_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_fixed_memory32_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_extended_irq_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_extended_irq_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_end_tag_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_end_tag_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 acpi_status
 acpi_rs_vendor_resource (
 	u8                      *byte_stream_buffer,
-	ACPI_SIZE               *bytes_consumed,
+	acpi_size               *bytes_consumed,
 	u8                      **output_buffer,
-	ACPI_SIZE               *structure_size);
+	acpi_size               *structure_size);
 
 acpi_status
 acpi_rs_vendor_stream (
 	acpi_resource           *linked_list,
 	u8                      **output_buffer,
-	ACPI_SIZE               *bytes_consumed);
+	acpi_size               *bytes_consumed);
 
 u8
 acpi_rs_get_resource_type (

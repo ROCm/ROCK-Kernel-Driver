@@ -77,7 +77,7 @@ acpi_purge_cached_objects (
 
 acpi_status
 acpi_install_initialization_handler (
-	ACPI_INIT_HANDLER       handler,
+	acpi_init_handler       handler,
 	u32                     function);
 
 /*
@@ -104,7 +104,7 @@ acpi_free (
 acpi_status
 acpi_find_root_pointer (
 	u32                     flags,
-	ACPI_POINTER            *rsdp_address);
+	acpi_pointer            *rsdp_address);
 
 acpi_status
 acpi_load_tables (
@@ -173,18 +173,18 @@ acpi_get_handle (
 acpi_status
 acpi_attach_data (
 	acpi_handle             obj_handle,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    *data);
 
 acpi_status
 acpi_detach_data (
 	acpi_handle             obj_handle,
-	ACPI_OBJECT_HANDLER     handler);
+	acpi_object_handler     handler);
 
 acpi_status
 acpi_get_data (
 	acpi_handle             obj_handle,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    **data);
 
 
@@ -261,7 +261,7 @@ acpi_remove_notify_handler (
 acpi_status
 acpi_install_address_space_handler (
 	acpi_handle             device,
-	ACPI_ADR_SPACE_TYPE     space_id,
+	acpi_adr_space_type     space_id,
 	acpi_adr_space_handler  handler,
 	acpi_adr_space_setup    setup,
 	void                    *context);
@@ -269,7 +269,7 @@ acpi_install_address_space_handler (
 acpi_status
 acpi_remove_address_space_handler (
 	acpi_handle             device,
-	ACPI_ADR_SPACE_TYPE     space_id,
+	acpi_adr_space_type     space_id,
 	acpi_adr_space_handler  handler);
 
 acpi_status
@@ -359,11 +359,11 @@ acpi_set_register (
 
 acpi_status
 acpi_set_firmware_waking_vector (
-	ACPI_PHYSICAL_ADDRESS   physical_address);
+	acpi_physical_address   physical_address);
 
 acpi_status
 acpi_get_firmware_waking_vector (
-	ACPI_PHYSICAL_ADDRESS   *physical_address);
+	acpi_physical_address   *physical_address);
 
 acpi_status
 acpi_get_sleep_type_data (

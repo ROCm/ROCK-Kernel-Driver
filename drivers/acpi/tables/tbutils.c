@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 57 $
  *
  *****************************************************************************/
 
@@ -34,13 +33,13 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_handle_to_object
+ * FUNCTION:    acpi_tb_handle_to_object
  *
- * PARAMETERS:  Table_id            - Id for which the function is searching
- *              Table_desc          - Pointer to return the matching table
+ * PARAMETERS:  table_id            - Id for which the function is searching
+ *              table_desc          - Pointer to return the matching table
  *                                      descriptor.
  *
- * RETURN:      Search the tables to find one with a matching Table_id and
+ * RETURN:      Search the tables to find one with a matching table_id and
  *              return a pointer to that table descriptor.
  *
  ******************************************************************************/
@@ -54,7 +53,7 @@ acpi_tb_handle_to_object (
 	acpi_table_desc         *list_head;
 
 
-	ACPI_FUNCTION_NAME ("Tb_handle_to_object");
+	ACPI_FUNCTION_NAME ("tb_handle_to_object");
 
 
 	for (i = 0; i < ACPI_TABLE_MAX; i++) {
@@ -70,16 +69,16 @@ acpi_tb_handle_to_object (
 		} while (list_head != &acpi_gbl_acpi_tables[i]);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Table_id=%X does not exist\n", table_id));
+	ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "table_id=%X does not exist\n", table_id));
 	return (AE_BAD_PARAMETER);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_validate_table_header
+ * FUNCTION:    acpi_tb_validate_table_header
  *
- * PARAMETERS:  Table_header        - Logical pointer to the table
+ * PARAMETERS:  table_header        - Logical pointer to the table
  *
  * RETURN:      Status
  *
@@ -102,7 +101,7 @@ acpi_tb_validate_table_header (
 	acpi_name               signature;
 
 
-	ACPI_FUNCTION_NAME ("Tb_validate_table_header");
+	ACPI_FUNCTION_NAME ("tb_validate_table_header");
 
 
 	/* Verify that this is a valid address */
@@ -146,9 +145,9 @@ acpi_tb_validate_table_header (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_verify_table_checksum
+ * FUNCTION:    acpi_tb_verify_table_checksum
  *
- * PARAMETERS:  *Table_header           - ACPI table to verify
+ * PARAMETERS:  *table_header           - ACPI table to verify
  *
  * RETURN:      8 bit checksum of table
  *
@@ -165,7 +164,7 @@ acpi_tb_verify_table_checksum (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE ("Tb_verify_table_checksum");
+	ACPI_FUNCTION_TRACE ("tb_verify_table_checksum");
 
 
 	/* Compute the checksum on the table */
@@ -186,7 +185,7 @@ acpi_tb_verify_table_checksum (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_tb_checksum
+ * FUNCTION:    acpi_tb_checksum
  *
  * PARAMETERS:  Buffer              - Buffer to checksum
  *              Length              - Size of the buffer

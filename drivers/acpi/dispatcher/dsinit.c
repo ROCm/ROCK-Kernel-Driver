@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dsinit - Object initialization namespace walk
- *              $Revision: 4 $
  *
  *****************************************************************************/
 
@@ -37,16 +36,16 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_init_one_object
+ * FUNCTION:    acpi_ds_init_one_object
  *
- * PARAMETERS:  Obj_handle      - Node
+ * PARAMETERS:  obj_handle      - Node
  *              Level           - Current nesting level
  *              Context         - Points to a init info struct
- *              Return_value    - Not used
+ *              return_value    - Not used
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Callback from Acpi_walk_namespace. Invoked for every object
+ * DESCRIPTION: Callback from acpi_walk_namespace. Invoked for every object
  *              within the namespace.
  *
  *              Currently, the only objects that require initialization are:
@@ -67,7 +66,7 @@ acpi_ds_init_one_object (
 	acpi_init_walk_info     *info = (acpi_init_walk_info *) context;
 
 
-	ACPI_FUNCTION_NAME ("Ds_init_one_object");
+	ACPI_FUNCTION_NAME ("ds_init_one_object");
 
 
 	/*
@@ -163,14 +162,14 @@ acpi_ds_init_one_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_initialize_objects
+ * FUNCTION:    acpi_ds_initialize_objects
  *
- * PARAMETERS:  Table_desc      - Descriptor for parent ACPI table
- *              Start_node      - Root of subtree to be initialized.
+ * PARAMETERS:  table_desc      - Descriptor for parent ACPI table
+ *              start_node      - Root of subtree to be initialized.
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Walk the namespace starting at "Start_node" and perform any
+ * DESCRIPTION: Walk the namespace starting at "start_node" and perform any
  *              necessary initialization on the objects found therein
  *
  ******************************************************************************/
@@ -184,7 +183,7 @@ acpi_ds_initialize_objects (
 	acpi_init_walk_info     info;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_initialize_objects");
+	ACPI_FUNCTION_TRACE ("ds_initialize_objects");
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
@@ -202,7 +201,7 @@ acpi_ds_initialize_objects (
 	status = acpi_walk_namespace (ACPI_TYPE_ANY, start_node, ACPI_UINT32_MAX,
 			  acpi_ds_init_one_object, &info, NULL);
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Walk_namespace failed, %s\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "walk_namespace failed, %s\n",
 			acpi_format_exception (status)));
 	}
 

@@ -2,7 +2,6 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 146 $
  *
  *****************************************************************************/
 
@@ -61,9 +60,9 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_1A_0T_0R
+ * FUNCTION:    acpi_ex_opcode_1A_0T_0R
  *
- * PARAMETERS:  Walk_state          - Current state (contains AML opcode)
+ * PARAMETERS:  walk_state          - Current state (contains AML opcode)
  *
  * RETURN:      Status
  *
@@ -80,37 +79,37 @@ acpi_ex_opcode_1A_0T_0R (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/* Examine the AML opcode */
 
 	switch (walk_state->opcode) {
-	case AML_RELEASE_OP:    /*  Release (Mutex_object) */
+	case AML_RELEASE_OP:    /*  Release (mutex_object) */
 
 		status = acpi_ex_release_mutex (operand[0], walk_state);
 		break;
 
 
-	case AML_RESET_OP:      /*  Reset (Event_object) */
+	case AML_RESET_OP:      /*  Reset (event_object) */
 
 		status = acpi_ex_system_reset_event (operand[0]);
 		break;
 
 
-	case AML_SIGNAL_OP:     /*  Signal (Event_object) */
+	case AML_SIGNAL_OP:     /*  Signal (event_object) */
 
 		status = acpi_ex_system_signal_event (operand[0]);
 		break;
 
 
-	case AML_SLEEP_OP:      /*  Sleep (Msec_time) */
+	case AML_SLEEP_OP:      /*  Sleep (msec_time) */
 
 		status = acpi_ex_system_do_suspend ((u32) operand[0]->integer.value);
 		break;
 
 
-	case AML_STALL_OP:      /*  Stall (Usec_time) */
+	case AML_STALL_OP:      /*  Stall (usec_time) */
 
 		status = acpi_ex_system_do_stall ((u32) operand[0]->integer.value);
 		break;
@@ -124,7 +123,7 @@ acpi_ex_opcode_1A_0T_0R (
 
 	default:                /*  Unknown opcode  */
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_0T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_1A_0T_0R: Unknown opcode %X\n",
 			walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		break;
@@ -136,9 +135,9 @@ acpi_ex_opcode_1A_0T_0R (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_1A_1T_0R
+ * FUNCTION:    acpi_ex_opcode_1A_1T_0R
  *
- * PARAMETERS:  Walk_state          - Current state (contains AML opcode)
+ * PARAMETERS:  walk_state          - Current state (contains AML opcode)
  *
  * RETURN:      Status
  *
@@ -155,7 +154,7 @@ acpi_ex_opcode_1A_1T_0R (
 	acpi_operand_object     **operand = &walk_state->operands[0];
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_1A_1T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_1A_1T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/* Examine the AML opcode */
@@ -168,7 +167,7 @@ acpi_ex_opcode_1A_1T_0R (
 
 	default:                        /* Unknown opcode */
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_1T_0R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_1A_1T_0R: Unknown opcode %X\n",
 			walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
@@ -183,9 +182,9 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_1A_1T_1R
+ * FUNCTION:    acpi_ex_opcode_1A_1T_1R
  *
- * PARAMETERS:  Walk_state          - Current state (contains AML opcode)
+ * PARAMETERS:  walk_state          - Current state (contains AML opcode)
  *
  * RETURN:      Status
  *
@@ -208,7 +207,7 @@ acpi_ex_opcode_1A_1T_1R (
 	acpi_integer            digit;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_1A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_1A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/* Examine the AML opcode */
@@ -236,7 +235,7 @@ acpi_ex_opcode_1A_1T_1R (
 			break;
 
 
-		case AML_FIND_SET_LEFT_BIT_OP:  /* Find_set_left_bit (Operand, Result) */
+		case AML_FIND_SET_LEFT_BIT_OP:  /* find_set_left_bit (Operand, Result) */
 
 			return_desc->integer.value = operand[0]->integer.value;
 
@@ -252,7 +251,7 @@ acpi_ex_opcode_1A_1T_1R (
 			break;
 
 
-		case AML_FIND_SET_RIGHT_BIT_OP: /* Find_set_right_bit (Operand, Result) */
+		case AML_FIND_SET_RIGHT_BIT_OP: /* find_set_right_bit (Operand, Result) */
 
 			return_desc->integer.value = operand[0]->integer.value;
 
@@ -270,7 +269,7 @@ acpi_ex_opcode_1A_1T_1R (
 			break;
 
 
-		case AML_FROM_BCD_OP:           /* From_bcd (BCDValue, Result) */
+		case AML_FROM_BCD_OP:           /* from_bcd (BCDValue, Result) */
 
 			/*
 			 * The 64-bit ACPI integer can hold 16 4-bit BCD integers
@@ -303,7 +302,7 @@ acpi_ex_opcode_1A_1T_1R (
 			break;
 
 
-		case AML_TO_BCD_OP:             /* To_bcd (Operand, Result) */
+		case AML_TO_BCD_OP:             /* to_bcd (Operand, Result) */
 
 			if (operand[0]->integer.value > ACPI_MAX_BCD_VALUE) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "BCD overflow: %8.8X%8.8X\n",
@@ -332,7 +331,7 @@ acpi_ex_opcode_1A_1T_1R (
 			break;
 
 
-		case AML_COND_REF_OF_OP:        /* Cond_ref_of (Source_object, Result) */
+		case AML_COND_REF_OF_OP:        /* cond_ref_of (source_object, Result) */
 
 			/*
 			 * This op is a little strange because the internal return value is
@@ -407,32 +406,32 @@ acpi_ex_opcode_1A_1T_1R (
 		break;
 
 
-	case AML_TO_DECSTRING_OP:       /* To_decimal_string (Data, Result) */
+	case AML_TO_DECSTRING_OP:       /* to_decimal_string (Data, Result) */
 
 		status = acpi_ex_convert_to_string (operand[0], &return_desc, 10, ACPI_UINT32_MAX, walk_state);
 		break;
 
 
-	case AML_TO_HEXSTRING_OP:       /* To_hex_string (Data, Result) */
+	case AML_TO_HEXSTRING_OP:       /* to_hex_string (Data, Result) */
 
 		status = acpi_ex_convert_to_string (operand[0], &return_desc, 16, ACPI_UINT32_MAX, walk_state);
 		break;
 
 
-	case AML_TO_BUFFER_OP:          /* To_buffer (Data, Result) */
+	case AML_TO_BUFFER_OP:          /* to_buffer (Data, Result) */
 
 		status = acpi_ex_convert_to_buffer (operand[0], &return_desc, walk_state);
 		break;
 
 
-	case AML_TO_INTEGER_OP:         /* To_integer (Data, Result) */
+	case AML_TO_INTEGER_OP:         /* to_integer (Data, Result) */
 
 		status = acpi_ex_convert_to_integer (operand[0], &return_desc, walk_state);
 		break;
 
 
-	case AML_SHIFT_LEFT_BIT_OP:     /*  Shift_left_bit (Source, Bit_num) */
-	case AML_SHIFT_RIGHT_BIT_OP:    /*  Shift_right_bit (Source, Bit_num) */
+	case AML_SHIFT_LEFT_BIT_OP:     /*  shift_left_bit (Source, bit_num) */
+	case AML_SHIFT_RIGHT_BIT_OP:    /*  shift_right_bit (Source, bit_num) */
 
 		/*
 		 * These are two obsolete opcodes
@@ -445,7 +444,7 @@ acpi_ex_opcode_1A_1T_1R (
 
 	default:                        /* Unknown opcode */
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_1T_1R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_1A_1T_1R: Unknown opcode %X\n",
 			walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;
@@ -475,9 +474,9 @@ cleanup:
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ex_opcode_1A_0T_1R
+ * FUNCTION:    acpi_ex_opcode_1A_0T_1R
  *
- * PARAMETERS:  Walk_state          - Current state (contains AML opcode)
+ * PARAMETERS:  walk_state          - Current state (contains AML opcode)
  *
  * RETURN:      Status
  *
@@ -497,7 +496,7 @@ acpi_ex_opcode_1A_0T_1R (
 	acpi_integer            value;
 
 
-	ACPI_FUNCTION_TRACE_STR ("Ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_1A_0T_0R", acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/* Examine the AML opcode */
@@ -530,8 +529,8 @@ acpi_ex_opcode_1A_0T_1R (
 		}
 
 		/*
-		 * Convert the Return_desc Reference to a Number
-		 * (This removes a reference on the Return_desc object)
+		 * Convert the return_desc Reference to a Number
+		 * (This removes a reference on the return_desc object)
 		 */
 		status = acpi_ex_resolve_operands (AML_LNOT_OP, &return_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
@@ -542,7 +541,7 @@ acpi_ex_opcode_1A_0T_1R (
 		}
 
 		/*
-		 * Return_desc is now guaranteed to be an Integer object
+		 * return_desc is now guaranteed to be an Integer object
 		 * Do the actual increment or decrement
 		 */
 		if (AML_INCREMENT_OP == walk_state->opcode) {
@@ -558,7 +557,7 @@ acpi_ex_opcode_1A_0T_1R (
 		break;
 
 
-	case AML_TYPE_OP:               /* Object_type (Source_object) */
+	case AML_TYPE_OP:               /* object_type (source_object) */
 
 		/* Get the type of the base object */
 
@@ -579,7 +578,7 @@ acpi_ex_opcode_1A_0T_1R (
 		break;
 
 
-	case AML_SIZE_OF_OP:            /* Size_of (Source_object) */
+	case AML_SIZE_OF_OP:            /* size_of (source_object) */
 
 		/* Get the base object */
 
@@ -607,7 +606,7 @@ acpi_ex_opcode_1A_0T_1R (
 			break;
 
 		default:
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Size_of, Not Buf/Str/Pkg - found type %s\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "size_of, Not Buf/Str/Pkg - found type %s\n",
 				acpi_ut_get_type_name (type)));
 			status = AE_AML_OPERAND_TYPE;
 			goto cleanup;
@@ -627,7 +626,7 @@ acpi_ex_opcode_1A_0T_1R (
 		break;
 
 
-	case AML_REF_OF_OP:             /* Ref_of (Source_object) */
+	case AML_REF_OF_OP:             /* ref_of (source_object) */
 
 		status = acpi_ex_get_object_reference (operand[0], &return_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
@@ -636,7 +635,7 @@ acpi_ex_opcode_1A_0T_1R (
 		break;
 
 
-	case AML_DEREF_OF_OP:           /* Deref_of (Obj_reference | String) */
+	case AML_DEREF_OF_OP:           /* deref_of (obj_reference | String) */
 
 		/* Check for a method local or argument, or standalone String */
 
@@ -644,7 +643,7 @@ acpi_ex_opcode_1A_0T_1R (
 			switch (ACPI_GET_OBJECT_TYPE (operand[0])) {
 			case ACPI_TYPE_LOCAL_REFERENCE:
 				/*
-				 * This is a Deref_of (Local_x | Arg_x)
+				 * This is a deref_of (local_x | arg_x)
 				 *
 				 * Must resolve/dereference the local/arg reference first
 				 */
@@ -688,7 +687,7 @@ acpi_ex_opcode_1A_0T_1R (
 			case ACPI_TYPE_STRING:
 
 				/*
-				 * This is a Deref_of (String). The string is a reference to a named ACPI object.
+				 * This is a deref_of (String). The string is a reference to a named ACPI object.
 				 *
 				 * 1) Find the owning Node
 				 * 2) Dereference the node to an actual object.  Could be a Field, so we nee
@@ -717,16 +716,16 @@ acpi_ex_opcode_1A_0T_1R (
 
 		if (ACPI_GET_DESCRIPTOR_TYPE (operand[0]) == ACPI_DESC_TYPE_NAMED) {
 			/*
-			 * This is a Deref_of (Object_reference)
+			 * This is a deref_of (object_reference)
 			 * Get the actual object from the Node (This is the dereference).
-			 * -- This case may only happen when a Local_x or Arg_x is dereferenced above.
+			 * -- This case may only happen when a local_x or arg_x is dereferenced above.
 			 */
 			return_desc = acpi_ns_get_attached_object ((acpi_namespace_node *) operand[0]);
 		}
 		else {
 			/*
 			 * This must be a reference object produced by either the Index() or
-			 * Ref_of() operator
+			 * ref_of() operator
 			 */
 			switch (operand[0]->reference.opcode) {
 			case AML_INDEX_OP:
@@ -789,7 +788,7 @@ acpi_ex_opcode_1A_0T_1R (
 
 				default:
 
-					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Index Target_type %X in obj %p\n",
+					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Index target_type %X in obj %p\n",
 						operand[0]->reference.target_type, operand[0]));
 					status = AE_AML_OPERAND_TYPE;
 					goto cleanup;
@@ -825,7 +824,7 @@ acpi_ex_opcode_1A_0T_1R (
 
 	default:
 
-		ACPI_REPORT_ERROR (("Acpi_ex_opcode_1A_0T_1R: Unknown opcode %X\n",
+		ACPI_REPORT_ERROR (("acpi_ex_opcode_1A_0T_1R: Unknown opcode %X\n",
 			walk_state->opcode));
 		status = AE_AML_BAD_OPCODE;
 		goto cleanup;

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: psscope - Parser scope stack management routines
- *              $Revision: 35 $
  *
  *****************************************************************************/
 
@@ -33,9 +32,9 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_get_parent_scope
+ * FUNCTION:    acpi_ps_get_parent_scope
  *
- * PARAMETERS:  Parser_state        - Current parser state object
+ * PARAMETERS:  parser_state        - Current parser state object
  *
  * RETURN:      Pointer to an Op object
  *
@@ -53,9 +52,9 @@ acpi_ps_get_parent_scope (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_has_completed_scope
+ * FUNCTION:    acpi_ps_has_completed_scope
  *
- * PARAMETERS:  Parser_state        - Current parser state object
+ * PARAMETERS:  parser_state        - Current parser state object
  *
  * RETURN:      Boolean, TRUE = scope completed.
  *
@@ -76,9 +75,9 @@ acpi_ps_has_completed_scope (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_init_scope
+ * FUNCTION:    acpi_ps_init_scope
  *
- * PARAMETERS:  Parser_state        - Current parser state object
+ * PARAMETERS:  parser_state        - Current parser state object
  *              Root                - the Root Node of this new scope
  *
  * RETURN:      Status
@@ -95,7 +94,7 @@ acpi_ps_init_scope (
 	acpi_generic_state      *scope;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ps_init_scope", root_op);
+	ACPI_FUNCTION_TRACE_PTR ("ps_init_scope", root_op);
 
 
 	scope = acpi_ut_create_generic_state ();
@@ -118,12 +117,12 @@ acpi_ps_init_scope (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_push_scope
+ * FUNCTION:    acpi_ps_push_scope
  *
- * PARAMETERS:  Parser_state        - Current parser state object
+ * PARAMETERS:  parser_state        - Current parser state object
  *              Op                  - Current op to be pushed
- *              Remaining_args      - List of args remaining
- *              Arg_count           - Fixed or variable number of args
+ *              remaining_args      - List of args remaining
+ *              arg_count           - Fixed or variable number of args
  *
  * RETURN:      Status
  *
@@ -141,7 +140,7 @@ acpi_ps_push_scope (
 	acpi_generic_state      *scope;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ps_push_scope", op);
+	ACPI_FUNCTION_TRACE_PTR ("ps_push_scope", op);
 
 
 	scope = acpi_ut_create_generic_state ();
@@ -179,13 +178,13 @@ acpi_ps_push_scope (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_pop_scope
+ * FUNCTION:    acpi_ps_pop_scope
  *
- * PARAMETERS:  Parser_state        - Current parser state object
+ * PARAMETERS:  parser_state        - Current parser state object
  *              Op                  - Where the popped op is returned
- *              Arg_list            - Where the popped "next argument" is
+ *              arg_list            - Where the popped "next argument" is
  *                                    returned
- *              Arg_count           - Count of objects in Arg_list
+ *              arg_count           - Count of objects in arg_list
  *
  * RETURN:      Status
  *
@@ -203,7 +202,7 @@ acpi_ps_pop_scope (
 	acpi_generic_state      *scope = parser_state->scope;
 
 
-	ACPI_FUNCTION_TRACE ("Ps_pop_scope");
+	ACPI_FUNCTION_TRACE ("ps_pop_scope");
 
 
 	/*
@@ -240,9 +239,9 @@ acpi_ps_pop_scope (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_cleanup_scope
+ * FUNCTION:    acpi_ps_cleanup_scope
  *
- * PARAMETERS:  Parser_state        - Current parser state object
+ * PARAMETERS:  parser_state        - Current parser state object
  *
  * RETURN:      Status
  *
@@ -257,7 +256,7 @@ acpi_ps_cleanup_scope (
 {
 	acpi_generic_state      *scope;
 
-	ACPI_FUNCTION_TRACE_PTR ("Ps_cleanup_scope", parser_state);
+	ACPI_FUNCTION_TRACE_PTR ("ps_cleanup_scope", parser_state);
 
 
 	if (!parser_state) {

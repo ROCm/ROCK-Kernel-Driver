@@ -129,6 +129,7 @@ static int total_bufsize[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1024 };
 static int pcm_substreams_p[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4 };
 static int pcm_substreams_c[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1 };
 static int clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
+static int use_pm[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 2};
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
@@ -151,6 +152,9 @@ MODULE_PARM_SYNTAX(pcm_substreams_c, SNDRV_ENABLED ",allows:{{0,8}}");
 MODULE_PARM(clock, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(clock, "Clock on " CARD_NAME " soundcard.  (0 = auto-detect)");
 MODULE_PARM_SYNTAX(clock, SNDRV_ENABLED);
+MODULE_PARM(use_pm, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(use_pm, "Toggle power-management.  (0 = off, 1 = on, 2 = auto)");
+MODULE_PARM_SYNTAX(use_pm, SNDRV_ENABLED ",allows:{{0,1,2}},skill:advanced");
 
 
 /* PCI Dev ID's */
@@ -493,6 +497,11 @@ enum snd_enum_apu_type {
 	ESM_APU_FREE
 };
 
+/* chip type */
+enum {
+	TYPE_MAESTRO, TYPE_MAESTRO2, TYPE_MAESTRO2E
+};
+
 /* DMA Hack! */
 struct snd_esm_memory {
 	char *buf;
@@ -558,6 +567,7 @@ struct snd_es1968 {
 	struct pci_dev *pci;
 	snd_card_t *card;
 	snd_pcm_t *pcm;
+	int do_pm;		/* power-management enabled */
 
 	/* DMA memory block */
 	struct list_head buf_list;
@@ -593,17 +603,13 @@ struct snd_es1968 {
 
 static void snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
-#define CARD_TYPE_ESS_ESOLDM1		0x12850100
-#define CARD_TYPE_ESS_ES1968		0x125d1968
-#define CARD_TYPE_ESS_ES1978		0x125d1978
-
 static struct pci_device_id snd_es1968_ids[] __devinitdata = {
 	/* Maestro 1 */
-        { 0x1285, 0x0100, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0, },
+        { 0x1285, 0x0100, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, TYPE_MAESTRO },
 	/* Maestro 2 */
-	{ 0x125d, 0x1968, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0, },
+	{ 0x125d, 0x1968, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, TYPE_MAESTRO2 },
 	/* Maestro 2E */
-        { 0x125d, 0x1978, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, 0, },
+        { 0x125d, 0x1978, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_MULTIMEDIA_AUDIO << 8, 0xffff00, TYPE_MAESTRO2E },
 	{ 0, }
 };
 
@@ -2411,6 +2417,9 @@ static void es1968_suspend(es1968_t *chip)
 {
 	snd_card_t *card = chip->card;
 
+	if (! chip->do_pm)
+		return;
+
 	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		goto __skip;
@@ -2425,6 +2434,9 @@ static void es1968_suspend(es1968_t *chip)
 static void es1968_resume(es1968_t *chip)
 {
 	snd_card_t *card = chip->card;
+
+	if (! chip->do_pm)
+		return;
 
 	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
@@ -2524,11 +2536,13 @@ static int snd_es1968_dev_free(snd_device_t *device)
 }
 
 static int __devinit snd_es1968_create(snd_card_t * card,
-				    struct pci_dev *pci,
-				    int total_bufsize,
-				    int play_streams,
-				    int capt_streams,
-				    es1968_t **chip_ret)
+				       struct pci_dev *pci,
+				       int total_bufsize,
+				       int play_streams,
+				       int capt_streams,
+				       int chip_type,
+				       int do_pm,
+				       es1968_t **chip_ret)
 {
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_es1968_dev_free,
@@ -2553,7 +2567,7 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 		return -ENOMEM;
 
 	/* Set Vars */
-	chip->type = (pci->vendor << 16) | pci->device;
+	chip->type = chip_type;
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->substream_lock);
 	spin_lock_init(&chip->bob_lock);
@@ -2595,11 +2609,26 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 	/* just to be sure */
 	pci_set_master(pci);
 
+	if (do_pm) {
+		/* disable power-management if not maestro2e or
+		 * if not on the whitelist
+		 */
+		unsigned int vend;
+		pci_read_config_dword(chip->pci, PCI_SUBSYSTEM_VENDOR_ID, &vend);
+		if (chip->type != TYPE_MAESTRO2E || (vend & 0xffff) != 0x1028) {
+			printk(KERN_INFO "es1968: not attempting power management.\n");
+			do_pm = 0;
+		}
+	}
+	chip->do_pm = do_pm;
+
 	snd_es1968_chip_init(chip);
 
 #ifdef CONFIG_PM
-	card->set_power_state = snd_es1968_set_power_state;
-	card->power_state_private_data = chip;
+	if (chip->do_pm) {
+		card->set_power_state = snd_es1968_set_power_state;
+		card->power_state_private_data = chip;
+	}
 #endif
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
@@ -2693,21 +2722,23 @@ static int __devinit snd_es1968_probe(struct pci_dev *pci,
 				     total_bufsize[dev] * 1024, /* in bytes */
 				     pcm_substreams_p[dev], 
 				     pcm_substreams_c[dev],
+				     pci_id->driver_data,
+				     use_pm[dev],
 				     &chip)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
 
 	switch (chip->type) {
-	case CARD_TYPE_ESS_ES1978:
+	case TYPE_MAESTRO2E:
 		strcpy(card->driver, "ES1978");
 		strcpy(card->shortname, "ESS ES1978 (Maestro 2E)");
 		break;
-	case CARD_TYPE_ESS_ES1968:
+	case TYPE_MAESTRO2:
 		strcpy(card->driver, "ES1968");
 		strcpy(card->shortname, "ESS ES1968 (Maestro 2)");
 		break;
-	case CARD_TYPE_ESS_ESOLDM1:
+	case TYPE_MAESTRO:
 		strcpy(card->driver, "ESM1");
 		strcpy(card->shortname, "ESS Maestro 1");
 		break;

@@ -42,8 +42,8 @@
  * task switches.
  */
 enum fixed_addresses {
-	FIX_VSYSCALL,
 	FIX_HOLE,
+	FIX_VSYSCALL,
 #ifdef CONFIG_X86_LOCAL_APIC
 	FIX_APIC_BASE,	/* local (CPU) APIC) -- required for SMP or not */
 #endif

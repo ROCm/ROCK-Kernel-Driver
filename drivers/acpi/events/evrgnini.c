@@ -1,7 +1,6 @@
 /******************************************************************************
  *
- * Module Name: evrgnini- ACPI Address_space (Op_region) init
- *              $Revision: 64 $
+ * Module Name: evrgnini- ACPI address_space (op_region) init
  *
  *****************************************************************************/
 
@@ -34,12 +33,12 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_system_memory_region_setup
+ * FUNCTION:    acpi_ev_system_memory_region_setup
  *
- * PARAMETERS:  Region_obj          - Region we are interested in
+ * PARAMETERS:  region_obj          - Region we are interested in
  *              Function            - Start or stop
- *              Handler_context     - Address space handler context
- *              Region_context      - Region specific context
+ *              handler_context     - Address space handler context
+ *              region_context      - Region specific context
  *
  * RETURN:      Status
  *
@@ -58,7 +57,7 @@ acpi_ev_system_memory_region_setup (
 	acpi_mem_space_context  *local_region_context;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_system_memory_region_setup");
+	ACPI_FUNCTION_TRACE ("ev_system_memory_region_setup");
 
 
 	if (function == ACPI_REGION_DEACTIVATE) {
@@ -88,12 +87,12 @@ acpi_ev_system_memory_region_setup (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_io_space_region_setup
+ * FUNCTION:    acpi_ev_io_space_region_setup
  *
- * PARAMETERS:  Region_obj          - Region we are interested in
+ * PARAMETERS:  region_obj          - Region we are interested in
  *              Function            - Start or stop
- *              Handler_context     - Address space handler context
- *              Region_context      - Region specific context
+ *              handler_context     - Address space handler context
+ *              region_context      - Region specific context
  *
  * RETURN:      Status
  *
@@ -108,7 +107,7 @@ acpi_ev_io_space_region_setup (
 	void                    *handler_context,
 	void                    **region_context)
 {
-	ACPI_FUNCTION_TRACE ("Ev_io_space_region_setup");
+	ACPI_FUNCTION_TRACE ("ev_io_space_region_setup");
 
 
 	if (function == ACPI_REGION_DEACTIVATE) {
@@ -124,12 +123,12 @@ acpi_ev_io_space_region_setup (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_pci_config_region_setup
+ * FUNCTION:    acpi_ev_pci_config_region_setup
  *
- * PARAMETERS:  Region_obj          - Region we are interested in
+ * PARAMETERS:  region_obj          - Region we are interested in
  *              Function            - Start or stop
- *              Handler_context     - Address space handler context
- *              Region_context      - Region specific context
+ *              handler_context     - Address space handler context
+ *              region_context      - Region specific context
  *
  * RETURN:      Status
  *
@@ -155,7 +154,7 @@ acpi_ev_pci_config_region_setup (
 	acpi_device_id          object_hID;
 
 
-	ACPI_FUNCTION_TRACE ("Ev_pci_config_region_setup");
+	ACPI_FUNCTION_TRACE ("ev_pci_config_region_setup");
 
 
 	handler_obj = region_obj->region.addr_handler;
@@ -218,8 +217,8 @@ acpi_ev_pci_config_region_setup (
 	 */
 
 	/*
-	 * If the Addr_handler.Node is still pointing to the root, we need
-	 * to scan upward for a PCI Root bridge and re-associate the Op_region
+	 * If the addr_handler.Node is still pointing to the root, we need
+	 * to scan upward for a PCI Root bridge and re-associate the op_region
 	 * handlers with that device.
 	 */
 	if (handler_obj->addr_handler.node == acpi_gbl_root_node) {
@@ -239,7 +238,7 @@ acpi_ev_pci_config_region_setup (
 							   ACPI_ADR_SPACE_PCI_CONFIG,
 							   ACPI_DEFAULT_HANDLER, NULL, NULL);
 					if (ACPI_FAILURE (status)) {
-						ACPI_REPORT_ERROR (("Could not install Pci_config handler for %4.4s, %s\n",
+						ACPI_REPORT_ERROR (("Could not install pci_config handler for %4.4s, %s\n",
 							node->name.ascii, acpi_format_exception (status)));
 					}
 					break;
@@ -270,7 +269,7 @@ acpi_ev_pci_config_region_setup (
 	}
 
 	/*
-	 * Complete this device's Pci_id
+	 * Complete this device's pci_id
 	 */
 	acpi_os_derive_pci_id (node, region_obj->region.node, &pci_id);
 
@@ -281,12 +280,12 @@ acpi_ev_pci_config_region_setup (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_pci_bar_region_setup
+ * FUNCTION:    acpi_ev_pci_bar_region_setup
  *
- * PARAMETERS:  Region_obj          - Region we are interested in
+ * PARAMETERS:  region_obj          - Region we are interested in
  *              Function            - Start or stop
- *              Handler_context     - Address space handler context
- *              Region_context      - Region specific context
+ *              handler_context     - Address space handler context
+ *              region_context      - Region specific context
  *
  * RETURN:      Status
  *
@@ -303,7 +302,7 @@ acpi_ev_pci_bar_region_setup (
 	void                    *handler_context,
 	void                    **region_context)
 {
-	ACPI_FUNCTION_TRACE ("Ev_pci_bar_region_setup");
+	ACPI_FUNCTION_TRACE ("ev_pci_bar_region_setup");
 
 
 	return_ACPI_STATUS (AE_OK);
@@ -312,12 +311,12 @@ acpi_ev_pci_bar_region_setup (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_cmos_region_setup
+ * FUNCTION:    acpi_ev_cmos_region_setup
  *
- * PARAMETERS:  Region_obj          - Region we are interested in
+ * PARAMETERS:  region_obj          - Region we are interested in
  *              Function            - Start or stop
- *              Handler_context     - Address space handler context
- *              Region_context      - Region specific context
+ *              handler_context     - Address space handler context
+ *              region_context      - Region specific context
  *
  * RETURN:      Status
  *
@@ -334,7 +333,7 @@ acpi_ev_cmos_region_setup (
 	void                    *handler_context,
 	void                    **region_context)
 {
-	ACPI_FUNCTION_TRACE ("Ev_cmos_region_setup");
+	ACPI_FUNCTION_TRACE ("ev_cmos_region_setup");
 
 
 	return_ACPI_STATUS (AE_OK);
@@ -343,12 +342,12 @@ acpi_ev_cmos_region_setup (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_default_region_setup
+ * FUNCTION:    acpi_ev_default_region_setup
  *
- * PARAMETERS:  Region_obj          - Region we are interested in
+ * PARAMETERS:  region_obj          - Region we are interested in
  *              Function            - Start or stop
- *              Handler_context     - Address space handler context
- *              Region_context      - Region specific context
+ *              handler_context     - Address space handler context
+ *              region_context      - Region specific context
  *
  * RETURN:      Status
  *
@@ -363,7 +362,7 @@ acpi_ev_default_region_setup (
 	void                    *handler_context,
 	void                    **region_context)
 {
-	ACPI_FUNCTION_TRACE ("Ev_default_region_setup");
+	ACPI_FUNCTION_TRACE ("ev_default_region_setup");
 
 
 	if (function == ACPI_REGION_DEACTIVATE) {
@@ -379,10 +378,10 @@ acpi_ev_default_region_setup (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ev_initialize_region
+ * FUNCTION:    acpi_ev_initialize_region
  *
- * PARAMETERS:  Region_obj      - Region we are initializing
- *              Acpi_ns_locked  - Is namespace locked?
+ * PARAMETERS:  region_obj      - Region we are initializing
+ *              acpi_ns_locked  - Is namespace locked?
  *
  * RETURN:      Status
  *
@@ -406,7 +405,7 @@ acpi_ev_initialize_region (
 {
 	acpi_operand_object     *handler_obj;
 	acpi_operand_object     *obj_desc;
-	ACPI_ADR_SPACE_TYPE     space_id;
+	acpi_adr_space_type     space_id;
 	acpi_namespace_node     *node;
 	acpi_status             status;
 	acpi_namespace_node     *method_node;
@@ -414,7 +413,7 @@ acpi_ev_initialize_region (
 	acpi_operand_object     *region_obj2;
 
 
-	ACPI_FUNCTION_TRACE_U32 ("Ev_initialize_region", acpi_ns_locked);
+	ACPI_FUNCTION_TRACE_U32 ("ev_initialize_region", acpi_ns_locked);
 
 
 	if (!region_obj) {
@@ -454,7 +453,7 @@ acpi_ev_initialize_region (
 
 	/*
 	 * The following loop depends upon the root Node having no parent
-	 * ie: Acpi_gbl_Root_node->Parent_entry being set to NULL
+	 * ie: acpi_gbl_root_node->parent_entry being set to NULL
 	 */
 	while (node) {
 		/*
@@ -520,7 +519,7 @@ acpi_ev_initialize_region (
 	 * If we get here, there is no handler for this region
 	 */
 	ACPI_DEBUG_PRINT ((ACPI_DB_OPREGION,
-		"No handler for Region_type %s(%X) (Region_obj %p)\n",
+		"No handler for region_type %s(%X) (region_obj %p)\n",
 		acpi_ut_get_region_name (space_id), space_id, region_obj));
 
 	return_ACPI_STATUS (AE_NOT_EXIST);

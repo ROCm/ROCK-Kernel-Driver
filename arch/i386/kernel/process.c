@@ -44,6 +44,7 @@
 #include <asm/ldt.h>
 #include <asm/processor.h>
 #include <asm/i387.h>
+#include <asm/irq.h>
 #include <asm/desc.h>
 #ifdef CONFIG_MATH_EMULATION
 #include <asm/math_emu.h>
@@ -269,6 +270,8 @@ void release_thread(struct task_struct *dead_task)
 			BUG();
 		}
 	}
+
+	release_x86_irqs(dead_task);
 }
 
 /*

@@ -61,7 +61,7 @@ typedef struct
 #include <linux/kdb.h>
 /* stuff for debugger support */
 int acpi_in_debugger = 0;
-extern NATIVE_CHAR line_buf[80];
+extern char line_buf[80];
 #endif /*ENABLE_DEBUGGER*/
 
 static int acpi_irq_irq = 0;
@@ -99,7 +99,7 @@ acpi_os_terminate(void)
 }
 
 void
-acpi_os_printf(const NATIVE_CHAR *fmt,...)
+acpi_os_printf(const char *fmt,...)
 {
 	va_list args;
 	va_start(args, fmt);
@@ -108,7 +108,7 @@ acpi_os_printf(const NATIVE_CHAR *fmt,...)
 }
 
 void
-acpi_os_vprintf(const NATIVE_CHAR *fmt, va_list args)
+acpi_os_vprintf(const char *fmt, va_list args)
 {
 	static char buffer[512];
 	
@@ -126,7 +126,7 @@ acpi_os_vprintf(const NATIVE_CHAR *fmt, va_list args)
 }
 
 void *
-acpi_os_allocate(ACPI_SIZE size)
+acpi_os_allocate(acpi_size size)
 {
 	return kmalloc(size, GFP_KERNEL);
 }
@@ -138,7 +138,7 @@ acpi_os_free(void *ptr)
 }
 
 acpi_status
-acpi_os_get_root_pointer(u32 flags, ACPI_POINTER *addr)
+acpi_os_get_root_pointer(u32 flags, acpi_pointer *addr)
 {
 #ifdef CONFIG_ACPI_EFI
 	addr->pointer_type = ACPI_PHYSICAL_POINTER;
@@ -161,7 +161,7 @@ acpi_os_get_root_pointer(u32 flags, ACPI_POINTER *addr)
 }
 
 acpi_status
-acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, ACPI_SIZE size, void **virt)
+acpi_os_map_memory(acpi_physical_address phys, acpi_size size, void **virt)
 {
 #ifdef CONFIG_ACPI_EFI
 	if (EFI_MEMORY_WB & efi_mem_attributes(phys)) {
@@ -187,13 +187,13 @@ acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, ACPI_SIZE size, void **virt)
 }
 
 void
-acpi_os_unmap_memory(void *virt, ACPI_SIZE size)
+acpi_os_unmap_memory(void *virt, acpi_size size)
 {
 	iounmap(virt);
 }
 
 acpi_status
-acpi_os_get_physical_address(void *virt, ACPI_PHYSICAL_ADDRESS *phys)
+acpi_os_get_physical_address(void *virt, acpi_physical_address *phys)
 {
 	if(!phys || !virt)
 		return AE_BAD_PARAMETER;
@@ -274,7 +274,7 @@ acpi_os_stall(u32 us)
 
 acpi_status
 acpi_os_read_port(
-	ACPI_IO_ADDRESS	port,
+	acpi_io_address	port,
 	void		*value,
 	u32		width)
 {
@@ -303,7 +303,7 @@ acpi_os_read_port(
 
 acpi_status
 acpi_os_write_port(
-	ACPI_IO_ADDRESS	port,
+	acpi_io_address	port,
 	acpi_integer	value,
 	u32		width)
 {
@@ -327,7 +327,7 @@ acpi_os_write_port(
 
 acpi_status
 acpi_os_read_memory(
-	ACPI_PHYSICAL_ADDRESS	phys_addr,
+	acpi_physical_address	phys_addr,
 	void			*value,
 	u32			width)
 {
@@ -373,7 +373,7 @@ acpi_os_read_memory(
 
 acpi_status
 acpi_os_write_memory(
-	ACPI_PHYSICAL_ADDRESS	phys_addr,
+	acpi_physical_address	phys_addr,
 	acpi_integer		value,
 	u32			width)
 {
@@ -843,7 +843,7 @@ acpi_os_signal_semaphore(
 }
 
 u32
-acpi_os_get_line(NATIVE_CHAR *buffer)
+acpi_os_get_line(char *buffer)
 {
 
 #ifdef ENABLE_DEBUGGER

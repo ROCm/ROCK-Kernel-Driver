@@ -708,40 +708,12 @@ static inline void free_vm86_irq(int irqnumber)
 	spin_unlock_irqrestore(&irqbits_lock, flags);	
 }
 
-static inline int task_valid(struct task_struct *tsk)
-{
-	struct task_struct *g, *p;
-	int ret = 0;
-
-	read_lock(&tasklist_lock);
-	do_each_thread(g, p)
-		if ((p == tsk) && (p->sig)) {
-			ret = 1;
-			goto out;
-		}
-	while_each_thread(g, p);
-out:
-	read_unlock(&tasklist_lock);
-	return ret;
-}
-
 void release_x86_irqs(struct task_struct *task)
 {
 	int i;
 	for (i=3; i<16; i++)
 	    if (vm86_irqs[i].tsk == task)
 		free_vm86_irq(i);
-}
-
-static inline void handle_irq_zombies(void)
-{
-	int i;
-	for (i=3; i<16; i++) {
-		if (vm86_irqs[i].tsk) {
-			if (task_valid(vm86_irqs[i].tsk)) continue;
-			free_vm86_irq(i);
-		}
-	}
 }
 
 static inline int get_and_reset_irq(int irqnumber)
@@ -772,7 +744,6 @@ static int do_vm86_irq_handling(int subfunction, int irqnumber)
 		case VM86_REQUEST_IRQ: {
 			int sig = irqnumber >> 8;
 			int irq = irqnumber & 255;
-			handle_irq_zombies();
 			if (!capable(CAP_SYS_ADMIN)) return -EPERM;
 			if (!((1 << sig) & ALLOWED_SIGS)) return -EPERM;
 			if ( (irq<3) || (irq>15) ) return -EPERM;
@@ -784,7 +755,6 @@ static int do_vm86_irq_handling(int subfunction, int irqnumber)
 			return irq;
 		}
 		case  VM86_FREE_IRQ: {
-			handle_irq_zombies();
 			if ( (irqnumber<3) || (irqnumber>15) ) return -EPERM;
 			if (!vm86_irqs[irqnumber].tsk) return 0;
 			if (vm86_irqs[irqnumber].tsk != current) return -EPERM;

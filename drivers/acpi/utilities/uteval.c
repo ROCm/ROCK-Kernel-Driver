@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: uteval - Object evaluation
- *              $Revision: 44 $
  *
  *****************************************************************************/
 
@@ -35,12 +34,12 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_evaluate_object
+ * FUNCTION:    acpi_ut_evaluate_object
  *
- * PARAMETERS:  Prefix_node         - Starting node
+ * PARAMETERS:  prefix_node         - Starting node
  *              Path                - Path to object from starting node
- *              Expected_return_types - Bitmap of allowed return types
- *              Return_desc         - Where a return value is stored
+ *              expected_return_types - Bitmap of allowed return types
+ *              return_desc         - Where a return value is stored
  *
  * RETURN:      Status
  *
@@ -64,7 +63,7 @@ acpi_ut_evaluate_object (
 	u32                     return_btype;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_evaluate_object");
+	ACPI_FUNCTION_TRACE ("ut_evaluate_object");
 
 
 	/* Evaluate the object/method */
@@ -145,10 +144,10 @@ acpi_ut_evaluate_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_evaluate_numeric_object
+ * FUNCTION:    acpi_ut_evaluate_numeric_object
  *
- * PARAMETERS:  *Object_name        - Object name to be evaluated
- *              Device_node         - Node for the device
+ * PARAMETERS:  *object_name        - Object name to be evaluated
+ *              device_node         - Node for the device
  *              *Address            - Where the value is returned
  *
  * RETURN:      Status
@@ -170,7 +169,7 @@ acpi_ut_evaluate_numeric_object (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_evaluate_numeric_object");
+	ACPI_FUNCTION_TRACE ("ut_evaluate_numeric_object");
 
 
 	status = acpi_ut_evaluate_object (device_node, object_name,
@@ -192,9 +191,9 @@ acpi_ut_evaluate_numeric_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_execute_HID
+ * FUNCTION:    acpi_ut_execute_HID
  *
- * PARAMETERS:  Device_node         - Node for the device
+ * PARAMETERS:  device_node         - Node for the device
  *              *Hid                - Where the HID is returned
  *
  * RETURN:      Status
@@ -215,7 +214,7 @@ acpi_ut_execute_HID (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_execute_HID");
+	ACPI_FUNCTION_TRACE ("ut_execute_HID");
 
 
 	status = acpi_ut_evaluate_object (device_node, METHOD_NAME__HID,
@@ -244,9 +243,9 @@ acpi_ut_execute_HID (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_execute_CID
+ * FUNCTION:    acpi_ut_execute_CID
  *
- * PARAMETERS:  Device_node         - Node for the device
+ * PARAMETERS:  device_node         - Node for the device
  *              *Cid                - Where the CID is returned
  *
  * RETURN:      Status
@@ -267,7 +266,7 @@ acpi_ut_execute_CID (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_execute_CID");
+	ACPI_FUNCTION_TRACE ("ut_execute_CID");
 
 
 	status = acpi_ut_evaluate_object (device_node, METHOD_NAME__CID,
@@ -318,9 +317,9 @@ acpi_ut_execute_CID (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_execute_UID
+ * FUNCTION:    acpi_ut_execute_UID
  *
- * PARAMETERS:  Device_node         - Node for the device
+ * PARAMETERS:  device_node         - Node for the device
  *              *Uid                - Where the UID is returned
  *
  * RETURN:      Status
@@ -341,7 +340,7 @@ acpi_ut_execute_UID (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_execute_UID");
+	ACPI_FUNCTION_TRACE ("ut_execute_UID");
 
 
 	status = acpi_ut_evaluate_object (device_node, METHOD_NAME__UID,
@@ -370,9 +369,9 @@ acpi_ut_execute_UID (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ut_execute_STA
+ * FUNCTION:    acpi_ut_execute_STA
  *
- * PARAMETERS:  Device_node         - Node for the device
+ * PARAMETERS:  device_node         - Node for the device
  *              *Flags              - Where the status flags are returned
  *
  * RETURN:      Status
@@ -393,7 +392,7 @@ acpi_ut_execute_STA (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE ("Ut_execute_STA");
+	ACPI_FUNCTION_TRACE ("ut_execute_STA");
 
 
 	status = acpi_ut_evaluate_object (device_node, METHOD_NAME__STA,

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: actbl.h - Table data structures defined in ACPI specification
- *       $Revision: 54 $
  *
  *****************************************************************************/
 
@@ -86,7 +85,7 @@ typedef struct  /* Root System Descriptor Pointer */
 	u8                      extended_checksum;      /* Checksum of entire table */
 	char                    reserved [3];           /* Reserved field must be 0 */
 
-} RSDP_DESCRIPTOR;
+} rsdp_descriptor;
 
 
 typedef struct  /* ACPI common table header */

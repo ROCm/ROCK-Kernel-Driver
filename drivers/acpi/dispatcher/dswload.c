@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: dswload - Dispatcher namespace load callbacks
- *              $Revision: 82 $
  *
  *****************************************************************************/
 
@@ -39,10 +38,10 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_init_callbacks
+ * FUNCTION:    acpi_ds_init_callbacks
  *
- * PARAMETERS:  Walk_state      - Current state of the parse tree walk
- *              Pass_number     - 1, 2, or 3
+ * PARAMETERS:  walk_state      - Current state of the parse tree walk
+ *              pass_number     - 1, 2, or 3
  *
  * RETURN:      Status
  *
@@ -87,9 +86,9 @@ acpi_ds_init_callbacks (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_load1_begin_op
+ * FUNCTION:    acpi_ds_load1_begin_op
  *
- * PARAMETERS:  Walk_state      - Current state of the parse tree walk
+ * PARAMETERS:  walk_state      - Current state of the parse tree walk
  *              Op              - Op that has been just been reached in the
  *                                walk;  Arguments have not been evaluated yet.
  *
@@ -112,7 +111,7 @@ acpi_ds_load1_begin_op (
 	u32                     flags;
 
 
-	ACPI_FUNCTION_NAME ("Ds_load1_begin_op");
+	ACPI_FUNCTION_NAME ("ds_load1_begin_op");
 
 
 	op = walk_state->op;
@@ -226,8 +225,8 @@ acpi_ds_load1_begin_op (
 		 * already exists:
 		 *    1) the Scope() operator can reopen a scoping object that was
 		 *       previously defined (Scope, Method, Device, etc.)
-		 *    2) Whenever we are parsing a deferred opcode (Op_region, Buffer,
-		 *       Buffer_field, or Package), the name of the object is already
+		 *    2) Whenever we are parsing a deferred opcode (op_region, Buffer,
+		 *       buffer_field, or Package), the name of the object is already
 		 *       in the namespace.
 		 */
 		flags = ACPI_NS_NO_UPSEARCH;
@@ -289,9 +288,9 @@ acpi_ds_load1_begin_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_load1_end_op
+ * FUNCTION:    acpi_ds_load1_end_op
  *
- * PARAMETERS:  Walk_state      - Current state of the parse tree walk
+ * PARAMETERS:  walk_state      - Current state of the parse tree walk
  *              Op              - Op that has been just been completed in the
  *                                walk;  Arguments have now been evaluated.
  *
@@ -311,7 +310,7 @@ acpi_ds_load1_end_op (
 	acpi_status             status = AE_OK;
 
 
-	ACPI_FUNCTION_NAME ("Ds_load1_end_op");
+	ACPI_FUNCTION_NAME ("ds_load1_end_op");
 
 
 	op = walk_state->op;
@@ -340,7 +339,7 @@ acpi_ds_load1_end_op (
 
 	if (op->common.aml_opcode == AML_REGION_OP) {
 		status = acpi_ex_create_region (op->named.data, op->named.length,
-				   (ACPI_ADR_SPACE_TYPE) ((op->common.value.arg)->common.value.integer), walk_state);
+				   (acpi_adr_space_type) ((op->common.value.arg)->common.value.integer), walk_state);
 		if (ACPI_FAILURE (status)) {
 			return (status);
 		}
@@ -358,7 +357,7 @@ acpi_ds_load1_end_op (
 
 	if (op->common.aml_opcode == AML_METHOD_OP) {
 		/*
-		 * Method_op Pkg_length Name_string Method_flags Term_list
+		 * method_op pkg_length name_string method_flags term_list
 		 *
 		 * Note: We must create the method node/object pair as soon as we
 		 * see the method declaration.  This allows later pass1 parsing
@@ -366,7 +365,7 @@ acpi_ds_load1_end_op (
 		 * arguments.)
 		 */
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-			"LOADING-Method: State=%p Op=%p Named_obj=%p\n",
+			"LOADING-Method: State=%p Op=%p named_obj=%p\n",
 			walk_state, op, op->named.node));
 
 		if (!acpi_ns_get_attached_object (op->named.node)) {
@@ -402,9 +401,9 @@ acpi_ds_load1_end_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_load2_begin_op
+ * FUNCTION:    acpi_ds_load2_begin_op
  *
- * PARAMETERS:  Walk_state      - Current state of the parse tree walk
+ * PARAMETERS:  walk_state      - Current state of the parse tree walk
  *              Op              - Op that has been just been reached in the
  *                                walk;  Arguments have not been evaluated yet.
  *
@@ -426,7 +425,7 @@ acpi_ds_load2_begin_op (
 	char                    *buffer_ptr;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_load2_begin_op");
+	ACPI_FUNCTION_TRACE ("ds_load2_begin_op");
 
 
 	op = walk_state->op;
@@ -485,7 +484,7 @@ acpi_ds_load2_begin_op (
 	case AML_INT_NAMEPATH_OP:
 
 		/*
-		 * The Name_path is an object reference to an existing object. Don't enter the
+		 * The name_path is an object reference to an existing object. Don't enter the
 		 * name into the namespace, but look it up for use later
 		 */
 		status = acpi_ns_lookup (walk_state->scope_info, buffer_ptr, object_type,
@@ -613,9 +612,9 @@ acpi_ds_load2_begin_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_load2_end_op
+ * FUNCTION:    acpi_ds_load2_end_op
  *
- * PARAMETERS:  Walk_state      - Current state of the parse tree walk
+ * PARAMETERS:  walk_state      - Current state of the parse tree walk
  *              Op              - Op that has been just been completed in the
  *                                walk;  Arguments have now been evaluated.
  *
@@ -641,7 +640,7 @@ acpi_ds_load2_end_op (
 #endif
 
 
-	ACPI_FUNCTION_TRACE ("Ds_load2_end_op");
+	ACPI_FUNCTION_TRACE ("ds_load2_end_op");
 
 	op = walk_state->op;
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Opcode [%s] Op %p State %p\n",
@@ -715,7 +714,7 @@ acpi_ds_load2_end_op (
 	 */
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-		"Create-Load [%s] State=%p Op=%p Named_obj=%p\n",
+		"Create-Load [%s] State=%p Op=%p named_obj=%p\n",
 		acpi_ps_get_opcode_name (op->common.aml_opcode), walk_state, op, node));
 
 	/* Decode the opcode */
@@ -822,7 +821,7 @@ acpi_ds_load2_end_op (
 #ifndef ACPI_NO_METHOD_EXECUTION
 		case AML_REGION_OP:
 			/*
-			 * The Op_region is not fully parsed at this time. Only valid argument is the Space_id.
+			 * The op_region is not fully parsed at this time. Only valid argument is the space_id.
 			 * (We must save the address of the AML of the address and length operands)
 			 */
 			/*
@@ -867,7 +866,7 @@ acpi_ds_load2_end_op (
 	case AML_CLASS_METHOD_CALL:
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-			"RESOLVING-Method_call: State=%p Op=%p Named_obj=%p\n",
+			"RESOLVING-method_call: State=%p Op=%p named_obj=%p\n",
 			walk_state, op, node));
 
 		/*

@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Module Name: pswalk - Parser routines to walk parsed op tree(s)
- *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -34,11 +33,11 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_get_next_walk_op
+ * FUNCTION:    acpi_ps_get_next_walk_op
  *
- * PARAMETERS:  Walk_state          - Current state of the walk
+ * PARAMETERS:  walk_state          - Current state of the walk
  *              Op                  - Current Op to be walked
- *              Ascending_callback  - Procedure called when Op is complete
+ *              ascending_callback  - Procedure called when Op is complete
  *
  * RETURN:      Status
  *
@@ -58,7 +57,7 @@ acpi_ps_get_next_walk_op (
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ps_get_next_walk_op", op);
+	ACPI_FUNCTION_TRACE_PTR ("ps_get_next_walk_op", op);
 
 
 	/* Check for a argument only if we are descending in the tree */
@@ -194,15 +193,15 @@ acpi_ps_get_next_walk_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_delete_completed_op
+ * FUNCTION:    acpi_ps_delete_completed_op
  *
  * PARAMETERS:  State           - Walk state
  *              Op              - Completed op
  *
  * RETURN:      AE_OK
  *
- * DESCRIPTION: Callback function for Acpi_ps_get_next_walk_op(). Used during
- *              Acpi_ps_delete_parse tree to delete Op objects when all sub-objects
+ * DESCRIPTION: Callback function for acpi_ps_get_next_walk_op(). Used during
+ *              acpi_ps_delete_parse tree to delete Op objects when all sub-objects
  *              have been visited (and deleted.)
  *
  ******************************************************************************/
@@ -219,9 +218,9 @@ acpi_ps_delete_completed_op (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ps_delete_parse_tree
+ * FUNCTION:    acpi_ps_delete_parse_tree
  *
- * PARAMETERS:  Subtree_root        - Root of tree (or subtree) to delete
+ * PARAMETERS:  subtree_root        - Root of tree (or subtree) to delete
  *
  * RETURN:      None
  *
@@ -234,11 +233,11 @@ acpi_ps_delete_parse_tree (
 	acpi_parse_object       *subtree_root)
 {
 	acpi_walk_state         *walk_state;
-	ACPI_THREAD_STATE       *thread;
+	acpi_thread_state       *thread;
 	acpi_status             status;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ps_delete_parse_tree", subtree_root);
+	ACPI_FUNCTION_TRACE_PTR ("ps_delete_parse_tree", subtree_root);
 
 
 	if (!subtree_root) {

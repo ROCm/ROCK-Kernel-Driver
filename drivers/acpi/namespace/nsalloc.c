@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: nsalloc - Namespace allocation and deletion utilities
- *              $Revision: 78 $
  *
  ******************************************************************************/
 
@@ -34,9 +33,9 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_create_node
+ * FUNCTION:    acpi_ns_create_node
  *
- * PARAMETERS:  Acpi_name       - Name of the new node
+ * PARAMETERS:  acpi_name       - Name of the new node
  *
  * RETURN:      None
  *
@@ -51,7 +50,7 @@ acpi_ns_create_node (
 	acpi_namespace_node     *node;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_create_node");
+	ACPI_FUNCTION_TRACE ("ns_create_node");
 
 
 	node = ACPI_MEM_CALLOCATE (sizeof (acpi_namespace_node));
@@ -71,7 +70,7 @@ acpi_ns_create_node (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_delete_node
+ * FUNCTION:    acpi_ns_delete_node
  *
  * PARAMETERS:  Node            - Node to be deleted
  *
@@ -90,7 +89,7 @@ acpi_ns_delete_node (
 	acpi_namespace_node     *next_node;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ns_delete_node", node);
+	ACPI_FUNCTION_TRACE_PTR ("ns_delete_node", node);
 
 
 	parent_node = acpi_ns_get_parent_node (node);
@@ -128,7 +127,7 @@ acpi_ns_delete_node (
 #ifdef ACPI_ALPHABETIC_NAMESPACE
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_compare_names
+ * FUNCTION:    acpi_ns_compare_names
  *
  * PARAMETERS:  Name1           - First name to compare
  *              Name2           - Second name to compare
@@ -178,10 +177,10 @@ acpi_ns_compare_names (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_install_node
+ * FUNCTION:    acpi_ns_install_node
  *
- * PARAMETERS:  Walk_state      - Current state of the walk
- *              Parent_node     - The parent of the new Node
+ * PARAMETERS:  walk_state      - Current state of the walk
+ *              parent_node     - The parent of the new Node
  *              Node            - The new Node to install
  *              Type            - ACPI object type of the new Node
  *
@@ -212,7 +211,7 @@ acpi_ns_install_node (
 #endif
 
 
-	ACPI_FUNCTION_TRACE ("Ns_install_node");
+	ACPI_FUNCTION_TRACE ("ns_install_node");
 
 
 	/*
@@ -320,9 +319,9 @@ acpi_ns_install_node (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_delete_children
+ * FUNCTION:    acpi_ns_delete_children
  *
- * PARAMETERS:  Parent_node     - Delete this objects children
+ * PARAMETERS:  parent_node     - Delete this objects children
  *
  * RETURN:      None.
  *
@@ -340,7 +339,7 @@ acpi_ns_delete_children (
 	u8                      flags;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ns_delete_children", parent_node);
+	ACPI_FUNCTION_TRACE_PTR ("ns_delete_children", parent_node);
 
 
 	if (!parent_node) {
@@ -400,9 +399,9 @@ acpi_ns_delete_children (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_delete_namespace_subtree
+ * FUNCTION:    acpi_ns_delete_namespace_subtree
  *
- * PARAMETERS:  Parent_node     - Root of the subtree to be deleted
+ * PARAMETERS:  parent_node     - Root of the subtree to be deleted
  *
  * RETURN:      None.
  *
@@ -419,7 +418,7 @@ acpi_ns_delete_namespace_subtree (
 	u32                     level = 1;
 
 
-	ACPI_FUNCTION_TRACE ("Ns_delete_namespace_subtree");
+	ACPI_FUNCTION_TRACE ("ns_delete_namespace_subtree");
 
 
 	if (!parent_node) {
@@ -481,7 +480,7 @@ acpi_ns_delete_namespace_subtree (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_remove_reference
+ * FUNCTION:    acpi_ns_remove_reference
  *
  * PARAMETERS:  Node           - Named node whose reference count is to be
  *                               decremented
@@ -535,9 +534,9 @@ acpi_ns_remove_reference (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ns_delete_namespace_by_owner
+ * FUNCTION:    acpi_ns_delete_namespace_by_owner
  *
- * PARAMETERS:  Owner_id    - All nodes with this owner will be deleted
+ * PARAMETERS:  owner_id    - All nodes with this owner will be deleted
  *
  * RETURN:      Status
  *
@@ -557,7 +556,7 @@ acpi_ns_delete_namespace_by_owner (
 	acpi_namespace_node     *parent_node;
 
 
-	ACPI_FUNCTION_TRACE_U32 ("Ns_delete_namespace_by_owner", owner_id);
+	ACPI_FUNCTION_TRACE_U32 ("ns_delete_namespace_by_owner", owner_id);
 
 
 	parent_node   = acpi_gbl_root_node;
@@ -571,7 +570,7 @@ acpi_ns_delete_namespace_by_owner (
 	 */
 	while (level > 0) {
 		/*
-		 * Get the next child of this parent node. When Child_node is NULL,
+		 * Get the next child of this parent node. When child_node is NULL,
 		 * the first child of the parent is returned
 		 */
 		child_node = acpi_ns_get_next_node (ACPI_TYPE_ANY, parent_node, child_node);

@@ -85,7 +85,7 @@ int eata_pio_proc_info(char *buffer, char **start, off_t offset, int length,
     len += size; 
     pos = begin + len;
     
-    list_for_each_entry(scd, &HBA_ptr->my_devices; siblings) {
+    list_for_each_entry(scd, &HBA_ptr->my_devices, siblings) {
 	    proc_print_scsidevice(scd, buffer, &size, len);
 	    len += size; 
 	    pos = begin + len;

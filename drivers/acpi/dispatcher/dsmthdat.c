@@ -1,7 +1,6 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 68 $
  *
  ******************************************************************************/
 
@@ -37,22 +36,22 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_method_data_init
+ * FUNCTION:    acpi_ds_method_data_init
  *
- * PARAMETERS:  Walk_state          - Current walk state object
+ * PARAMETERS:  walk_state          - Current walk state object
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Initialize the data structures that hold the method's arguments
  *              and locals.  The data struct is an array of NTEs for each.
- *              This allows Ref_of and De_ref_of to work properly for these
+ *              This allows ref_of and de_ref_of to work properly for these
  *              special data types.
  *
- * NOTES:       Walk_state fields are initialized to zero by the
+ * NOTES:       walk_state fields are initialized to zero by the
  *              ACPI_MEM_CALLOCATE().
  *
  *              A pseudo-Namespace Node is assigned to each argument and local
- *              so that Ref_of() can return a pointer to the Node.
+ *              so that ref_of() can return a pointer to the Node.
  *
  ******************************************************************************/
 
@@ -63,7 +62,7 @@ acpi_ds_method_data_init (
 	u32                     i;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_method_data_init");
+	ACPI_FUNCTION_TRACE ("ds_method_data_init");
 
 
 	/* Init the method arguments */
@@ -95,9 +94,9 @@ acpi_ds_method_data_init (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_method_data_delete_all
+ * FUNCTION:    acpi_ds_method_data_delete_all
  *
- * PARAMETERS:  Walk_state          - Current walk state object
+ * PARAMETERS:  walk_state          - Current walk state object
  *
  * RETURN:      None
  *
@@ -113,7 +112,7 @@ acpi_ds_method_data_delete_all (
 	u32                     index;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_method_data_delete_all");
+	ACPI_FUNCTION_TRACE ("ds_method_data_delete_all");
 
 
 	/* Detach the locals */
@@ -148,17 +147,17 @@ acpi_ds_method_data_delete_all (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_method_data_init_args
+ * FUNCTION:    acpi_ds_method_data_init_args
  *
  * PARAMETERS:  *Params         - Pointer to a parameter list for the method
- *              Max_param_count - The arg count for this method
- *              Walk_state      - Current walk state object
+ *              max_param_count - The arg count for this method
+ *              walk_state      - Current walk state object
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Initialize arguments for a method.  The parameter list is a list
  *              of ACPI operand objects, either null terminated or whose length
- *              is defined by Max_param_count.
+ *              is defined by max_param_count.
  *
  ******************************************************************************/
 
@@ -172,7 +171,7 @@ acpi_ds_method_data_init_args (
 	u32                     index = 0;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("Ds_method_data_init_args", params);
+	ACPI_FUNCTION_TRACE_PTR ("ds_method_data_init_args", params);
 
 
 	if (!params) {
@@ -203,12 +202,12 @@ acpi_ds_method_data_init_args (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_method_data_get_node
+ * FUNCTION:    acpi_ds_method_data_get_node
  *
  * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
- *              Index               - Which local_var or argument whose type
+ *              Index               - which local_var or argument whose type
  *                                      to get
- *              Walk_state          - Current walk state object
+ *              walk_state          - Current walk state object
  *
  * RETURN:      Get the Node associated with a local or arg.
  *
@@ -221,7 +220,7 @@ acpi_ds_method_data_get_node (
 	acpi_walk_state         *walk_state,
 	acpi_namespace_node     **node)
 {
-	ACPI_FUNCTION_TRACE ("Ds_method_data_get_node");
+	ACPI_FUNCTION_TRACE ("ds_method_data_get_node");
 
 
 	/*
@@ -265,12 +264,12 @@ acpi_ds_method_data_get_node (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_method_data_set_value
+ * FUNCTION:    acpi_ds_method_data_set_value
  *
  * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
- *              Index               - Which local_var or argument to get
+ *              Index               - which local_var or argument to get
  *              Object              - Object to be inserted into the stack entry
- *              Walk_state          - Current walk state object
+ *              walk_state          - Current walk state object
  *
  * RETURN:      Status
  *
@@ -291,7 +290,7 @@ acpi_ds_method_data_set_value (
 	acpi_operand_object     *new_desc = object;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_method_data_set_value");
+	ACPI_FUNCTION_TRACE ("ds_method_data_set_value");
 
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
@@ -335,12 +334,12 @@ acpi_ds_method_data_set_value (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_method_data_get_type
+ * FUNCTION:    acpi_ds_method_data_get_type
  *
  * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
- *              Index               - Which local_var or argument whose type
+ *              Index               - which local_var or argument whose type
  *                                      to get
- *              Walk_state          - Current walk state object
+ *              walk_state          - Current walk state object
  *
  * RETURN:      Data type of current value of the selected Arg or Local
  *
@@ -357,7 +356,7 @@ acpi_ds_method_data_get_type (
 	acpi_operand_object     *object;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_method_data_get_type");
+	ACPI_FUNCTION_TRACE ("ds_method_data_get_type");
 
 
 	/* Get the namespace node for the arg/local */
@@ -384,19 +383,19 @@ acpi_ds_method_data_get_type (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_method_data_get_value
+ * FUNCTION:    acpi_ds_method_data_get_value
  *
  * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
- *              Index               - Which local_var or argument to get
- *              Walk_state          - Current walk state object
- *              *Dest_desc          - Ptr to Descriptor into which selected Arg
+ *              Index               - which local_var or argument to get
+ *              walk_state          - Current walk state object
+ *              *dest_desc          - Ptr to Descriptor into which selected Arg
  *                                    or Local value should be copied
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Retrieve value of selected Arg or Local from the method frame
  *              at the current top of the method stack.
- *              Used only in Acpi_ex_resolve_to_value().
+ *              Used only in acpi_ex_resolve_to_value().
  *
  ******************************************************************************/
 
@@ -412,7 +411,7 @@ acpi_ds_method_data_get_value (
 	acpi_operand_object     *object;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_method_data_get_value");
+	ACPI_FUNCTION_TRACE ("ds_method_data_get_value");
 
 
 	/* Validate the object descriptor */
@@ -476,11 +475,11 @@ acpi_ds_method_data_get_value (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_method_data_delete_value
+ * FUNCTION:    acpi_ds_method_data_delete_value
  *
  * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
- *              Index               - Which local_var or argument to delete
- *              Walk_state          - Current walk state object
+ *              Index               - which local_var or argument to delete
+ *              walk_state          - Current walk state object
  *
  * RETURN:      None
  *
@@ -500,7 +499,7 @@ acpi_ds_method_data_delete_value (
 	acpi_operand_object     *object;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_method_data_delete_value");
+	ACPI_FUNCTION_TRACE ("ds_method_data_delete_value");
 
 
 	/* Get the namespace node for the arg/local */
@@ -537,18 +536,18 @@ acpi_ds_method_data_delete_value (
 
 /*******************************************************************************
  *
- * FUNCTION:    Acpi_ds_store_object_to_local
+ * FUNCTION:    acpi_ds_store_object_to_local
  *
  * PARAMETERS:  Opcode              - Either AML_LOCAL_OP or AML_ARG_OP
- *              Index               - Which local_var or argument to set
- *              Obj_desc            - Value to be stored
- *              Walk_state          - Current walk state
+ *              Index               - which local_var or argument to set
+ *              obj_desc            - Value to be stored
+ *              walk_state          - Current walk state
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Store a value in an Arg or Local.  The Obj_desc is installed
+ * DESCRIPTION: Store a value in an Arg or Local.  The obj_desc is installed
  *              as the new value for the Arg or Local and the reference count
- *              for Obj_desc is incremented.
+ *              for obj_desc is incremented.
  *
  ******************************************************************************/
 
@@ -564,7 +563,7 @@ acpi_ds_store_object_to_local (
 	acpi_operand_object     *current_obj_desc;
 
 
-	ACPI_FUNCTION_TRACE ("Ds_store_object_to_local");
+	ACPI_FUNCTION_TRACE ("ds_store_object_to_local");
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode=%d Idx=%d Obj=%p\n",
 		opcode, index, obj_desc));
 
@@ -603,12 +602,12 @@ acpi_ds_store_object_to_local (
 		 * locals, since a store to a local should overwrite
 		 * anything there, including an object reference.
 		 *
-		 * If both Arg0 and Local0 contain Ref_of (Local4):
+		 * If both Arg0 and Local0 contain ref_of (Local4):
 		 *
 		 * Store (1, Arg0)             - Causes indirect store to local4
 		 * Store (1, Local0)           - Stores 1 in local0, overwriting
 		 *                                  the reference to local4
-		 * Store (1, De_refof (Local0)) - Causes indirect store to local4
+		 * Store (1, de_refof (Local0)) - Causes indirect store to local4
 		 *
 		 * Weird, but true.
 		 */
@@ -625,13 +624,13 @@ acpi_ds_store_object_to_local (
 			}
 
 			/*
-			 * If we have a valid reference object that came from Ref_of(), do the
+			 * If we have a valid reference object that came from ref_of(), do the
 			 * indirect store
 			 */
 			if ((current_obj_desc->common.type == ACPI_TYPE_LOCAL_REFERENCE) &&
 				(current_obj_desc->reference.opcode == AML_REF_OF_OP)) {
 				ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-					"Arg (%p) is an Obj_ref(Node), storing in node %p\n",
+					"Arg (%p) is an obj_ref(Node), storing in node %p\n",
 					obj_desc, current_obj_desc));
 
 				/*
@@ -652,7 +651,7 @@ acpi_ds_store_object_to_local (
 	}
 
 	/*
-	 * Install the Obj_stack descriptor (*Obj_desc) into
+	 * Install the obj_stack descriptor (*obj_desc) into
 	 * the descriptor for the Arg or Local.
 	 * Install the new object in the stack entry
 	 * (increments the object reference count by one)

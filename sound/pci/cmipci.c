@@ -17,8 +17,18 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
  
+/* Does not work. Warning may block system in capture mode */
+/* #define USE_VAR48KRATE */
+
+/* Define this if you want soft ac3 encoding - it's still buggy..  */
+/* #define DO_SOFT_AC3 */
+/* #define USE_AES_IEC958 */
+#define DO_SOFT_AC3
+#define USE_AES_IEC958
+
 #include <sound/driver.h>
 #include <asm/io.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/pci.h>
@@ -151,9 +161,15 @@ MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x3e0}
 
 #define CM_REG_INT_STATUS	0x10
 #define CM_INTR			0x80000000
+#define CM_VCO			0x08000000	/* Voice Control? CMI8738 */
+#define CM_MCBINT		0x04000000	/* Master Control Block abort cond.? */
 #define CM_UARTINT		0x00010000
 #define CM_LTDMAINT		0x00008000
 #define CM_HTDMAINT		0x00004000
+#define CM_XDO46		0x00000080	/* Modell 033? Direct programming EEPROM (read data register) */
+#define CM_LHBTOG		0x00000040	/* High/Low status from DMA ctrl register */
+#define CM_LEG_HDMA		0x00000020	/* Legacy is in High DMA channel */
+#define CM_LEG_STEREO		0x00000010	/* Legacy is in Stereo mode */
 #define CM_CH1BUSY		0x00000008
 #define CM_CH0BUSY		0x00000004
 #define CM_CHINT1		0x00000002
@@ -218,6 +234,11 @@ MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x3e0}
 #define CM_REG_SB16_DATA	0x22
 #define CM_REG_SB16_ADDR	0x23
 
+#define CM_REFFREQ_XIN		(315*1000*1000)/22	/* 14.31818 Mhz reference clock frequency pin XIN */
+#define CM_ADCMULT_XIN		512			/* Guessed (487 best for 44.1kHz, not for 88/176kHz) */
+#define CM_TOLERANCE_RATE	0.001			/* Tolerance sample rate pitch (1000ppm) */
+#define CM_MAXIMUM_RATE		80000000		/* Note more than 80MHz */
+
 #define CM_REG_MIXER1		0x24
 #define CM_FMMUTE		0x80	/* mute FM */
 #define CM_FMMUTE_SHIFT		7
@@ -263,6 +284,39 @@ MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x3e0}
 #define CM_DMAUTO		0x01
 
 #define CM_REG_AC97		0x28	/* hmmm.. do we have ac97 link? */
+/*
+ * For CMI-8338 (0x28 - 0x2b) .. is this valid for CMI-8738
+ * or identical with AC97 codec?
+ */
+#define CM_REG_EXTERN_CODEC	CM_REG_AC97
+
+/*
+ * MPU401 pci port index address 0x40 - 0x4f (CMI-8738 spec ver. 0.6)
+ */
+#define CM_REG_MPU_PCI		0x40
+
+/*
+ * FM pci port index address 0x50 - 0x5f (CMI-8738 spec ver. 0.6)
+ */
+#define CM_REG_FM_PCI		0x50
+
+/*
+ * for CMI-8338 .. this is not valid for CMI-8738.
+ */
+#define CM_REG_EXTENT_IND	0xf0
+#define CM_VPHONE_MASK		0xe0	/* Phone volume control (0-3) << 5 */
+#define CM_VPHONE_SHIFT		5
+#define CM_VPHOM		0x10	/* Phone mute control */
+#define CM_VSPKM		0x08	/* Speaker mute control, default high */
+#define CM_RLOOPREN		0x04    /* Rec. R-channel enable */
+#define CM_RLOOPLEN		0x02	/* Rec. L-channel enable */
+
+/*
+ * CMI-8338 spec ver 0.5 (this is not valid for CMI-8738):
+ * the 8 registers 0xf8 - 0xff are used for programming m/n counter by the PLL
+ * unit (readonly?).
+ */
+#define CM_REG_PLL		0xf8
 
 /*
  * extended registers
@@ -331,12 +385,6 @@ MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{-1},{0x388},{0x3c8},{0x3e0}
 
 
 /*
- * define this if you want soft ac3 encoding - it's still buggy..
- */
-/* #define DO_SOFT_AC3 */
-
-
-/*
  * driver data
  */
 
@@ -401,6 +449,9 @@ struct snd_stru_cmipci {
 
 	unsigned int dig_status;
 	unsigned int dig_pcm_status;
+#ifdef USE_AES_IEC958
+	snd_ctl_elem_value_t *spdif_channel;
+#endif
 	snd_kcontrol_t *spdif_pcm_ctl;
 
 	snd_pcm_hardware_t *hw_info[3]; /* for playbacks */
@@ -515,10 +566,84 @@ static unsigned int snd_cmipci_rate_freq(unsigned int rate)
 	return 0;
 }
 
+#ifdef USE_VAR48KRATE
+/*
+ * Determine PLL values for frequency setup, maybe the CMI8338 (CMI8738???)
+ * does it this way .. maybe not.  Never get any information from C-Media about
+ * that <werner@suse.de>.
+ */
+static int snd_cmipci_pll_rmn(unsigned int rate, unsigned int adcmult, int *r, int *m, int *n)
+{
+	unsigned int delta, tolerance;
+	int xm, xn, xr;
+
+	for (*r = 0; rate < CM_MAXIMUM_RATE/adcmult; *r += (1<<5))
+		rate <<= 1;
+	*n = -1;
+	if (*r > 0xff)
+		goto out;
+	tolerance = rate*CM_TOLERANCE_RATE;
+
+	for (xn = (1+2); xn < (0x1f+2); xn++) {
+		for (xm = (1+2); xm < (0xff+2); xm++) {
+			xr = ((CM_REFFREQ_XIN/adcmult) * xm) / xn;
+
+			if (xr < rate)
+				delta = rate - xr;
+			else
+				delta = xr - rate;
+
+			/*
+			 * If we found one, remember this,
+			 * and try to find a closer one
+			 */
+			if (delta < tolerance) {
+				tolerance = delta;
+				*m = xm - 2;
+				*n = xn - 2;
+			}
+		}
+	}
+out:
+	return (*n > -1);
+}
+
+/*
+ * Program pll register bits, I assume that the 8 registers 0xf8 upto 0xff
+ * are mapped onto the 8 ADC/DAC sampling frequency which can be choosen
+ * at the register CM_REG_FUNCTRL1 (0x04).
+ * Problem: other ways are also possible (any information about that?)
+ */
+static void snd_cmipci_set_pll(cmipci_t *cm, unsigned int rate, unsigned int slot)
+{
+	unsigned int reg = CM_REG_PLL + slot;
+	/*
+	 * Guess that this programs at reg. 0x04 the pos 15:13/12:10
+	 * for DSFC/ASFC (000 upto 111).
+	 */
+
+	/* FIXME: Init (Do we've to set an other register first before programming?) */
+
+	/* FIXME: Is this correct? Or shouldn't the m/n/r values be used for that? */
+	snd_cmipci_write_b(cm, reg, rate>>8);
+	snd_cmipci_write_b(cm, reg, rate&0xff);
+
+	/* FIXME: Setup (Do we've to set an other register first to enable this?) */
+}
+#endif /* USE_VAR48KRATE */
+
 static int snd_cmipci_hw_params(snd_pcm_substream_t * substream,
 				snd_pcm_hw_params_t * hw_params)
 {
 	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
+}
+
+static void snd_cmipci_ch_reset(cmipci_t *cm, int ch)
+{
+	int reset = CM_RST_CH0 << (cm->channel[ch].ch);
+	snd_cmipci_write(cm, CM_REG_FUNCTRL0, cm->ctrl | reset);
+	snd_cmipci_write(cm, CM_REG_FUNCTRL0, cm->ctrl & ~reset);
+	udelay(10);
 }
 
 static int snd_cmipci_hw_free(snd_pcm_substream_t * substream)
@@ -699,7 +824,7 @@ static int snd_cmipci_pcm_trigger(cmipci_t *cm, cmipci_pcm_t *rec,
 		/* reset */
 		cm->ctrl &= ~chen;
 		snd_cmipci_write(cm, CM_REG_FUNCTRL0, cm->ctrl | reset);
-		snd_cmipci_write(cm, CM_REG_FUNCTRL0, cm->ctrl);
+		snd_cmipci_write(cm, CM_REG_FUNCTRL0, cm->ctrl & ~reset);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		cm->ctrl |= pause;
@@ -784,8 +909,10 @@ static snd_pcm_uframes_t snd_cmipci_capture_pointer(snd_pcm_substream_t *substre
  * write the raw subframe via 32bit data mode.
  */
 
+# ifndef USE_AES_IEC958
+
 /* find parity for bit 4~30 */
-static unsigned parity(unsigned int data)
+static unsigned int parity(unsigned int data)
 {
 	unsigned int parity = 0;
 	int counter = 4;
@@ -835,6 +962,187 @@ inline static u32 convert_ac3_32bit(cmipci_t *cm, u32 val)
 	return data;
 }
 
+# else  /* if USE_AES_IEC958 */
+
+/*
+ * The bitstream handling
+ */
+typedef struct iec958_stru_bitstream {
+	u32 *data;		/* Holds the current position */
+	u32  left;		/* Bits left in current 32bit frame */
+	u32  word;		/* The 32bit frame of the current position */
+	u32  bits;		/* All bits together */
+	int   err;		/* Error condition */
+} iec958_bitstream_t ;
+
+static iec958_bitstream_t bs;
+
+/* Initialize ptr on the buffer */
+static void iec958_init_bitstream(u8 *buf, u32 size)
+{
+	bs.data = (u32 *)buf;		/* Set initial position */
+	bs.word = *bs.data;		/* The first 32bit frame */
+	bs.left = 32;			/* has exactly 32bits */
+	bs.bits = size;
+	bs.err = 0;
+}
+
+/* Remove ptr on the buffer */
+static void iec958_clear_bitstream(void)
+{
+	bs.data = NULL;
+	bs.left = 0;
+	bs.err = 0;
+}
+
+/* Get bits from bitstream (max 32) */
+static inline u32 iec958_getbits(u32 bits)
+{
+	u32 res;
+
+	if (bs.bits < bits) {
+		bits = bs.bits;
+		bs.err = 1;
+	}
+	if (bits > 32) {
+		bits = 32;
+		bs.err = 1;
+	}
+	bs.bits -= bits;
+
+#  ifdef WORDS_BIGENDIAN
+	if (bits < bs.left) {		/* Within 32bit frame */
+		res = (bs.word << (32 - bs.left)) >> (32 - bits);
+		bs.left -= bits;
+		goto out;
+	}				/* We may cross the frame boundary */
+	res   = (bs.word << (32 - bs.left)) >> (32 - bs.left);
+	bits -= bs.left;
+
+	bs.word = *(++bs.data);		/* Next 32bit frame */
+
+	if (bits)			/* Add remaining bits, if any */
+		res = (res << bits) | (bs.word >> (32 - bits));
+
+#  else  /* not WORDS_BIGENDIAN */
+
+	if (bits < bs.left) {		/* Within 32bit frame */
+		res = (bs.word << (32 - bits)) >> (32 - bits);
+		bs.word >>= bits;
+		bs.left -= bits;
+		goto out;
+	}				/* We may cross the frame boundary */
+	res   = bs.word;
+	bits -= bs.left;
+
+	bs.word = *(++bs.data);		/* Next 32bit frame */
+
+	if (bits) {			/* Add remaining bits, if any */
+		res = res | (((bs.word << (32 - bits)) >> (32 - bits)) << bits);
+		bs.word >>= bits;
+	}
+#  endif /* not WORDS_BIGENDIAN */
+
+	bs.left = (32 - bits);
+out:
+	return res;
+}
+
+static inline u32 iec958_bits_avail(void)
+{
+	return bs.bits;
+}
+
+static inline int iec958_error(void)
+{
+	return bs.err;
+}
+
+/*
+ * Determine parity for time slots 4 upto 30
+ * to be sure that bit 4 upt 31 will carry
+ * an even number of ones and zeros.
+ */
+static u32 iec958_parity(u32 data)
+{
+	u32 parity = 0;
+	int counter = 4;
+
+	data >>= 4;     /* start from bit 4 */
+	while (counter++ <= 30) {
+		if (data & 0x00000001)
+			parity++;
+		data >>= 1;
+	}
+	return (parity & 0x00000001);
+}
+
+/*
+ * Compose 32bit iec958 subframe, two sub frames
+ * build one frame with two channels.
+ *
+ * bit 0-3  = preamble
+ *     4-7  = AUX (=0)
+ *     8-27 = data (12-27 for 16bit, 8-27 for 20bit, and 24bit without AUX)
+ *     28   = validity (0 for valid data, else 'in error')
+ *     29   = user data (0)
+ *     30   = channel status (24 bytes for 192 frames)
+ *     31   = parity
+ */
+
+static inline u32 iec958_subframe(cmipci_t *cm, snd_ctl_elem_value_t * ucontrol)
+{
+	u32 data;
+	u32 byte = cm->spdif_counter >> 4;
+	u32 mask = 1 << ((cm->spdif_counter >> 1) - (byte << 3));
+	u8 * status = ucontrol->value.iec958.status;
+
+	if (status[2] & IEC958_AES2_PRO_SBITS_24) {
+		/* Does this work for LE systems ??? */
+		if (status[2] & IEC958_AES2_PRO_WORDLEN_24_20) {
+			data = iec958_getbits(24);
+			data <<= 4;
+		} else {
+			data = iec958_getbits(20);
+			data <<= 8;
+		}
+	} else {
+		if (status[2] & IEC958_AES2_PRO_WORDLEN_24_20) {
+			/* Does this work for LE systems ??? */
+			data = iec958_getbits(20);
+			data <<= 8;
+		} else {
+			data = iec958_getbits(16);
+			data <<= 12;
+		}
+	}
+
+	/*
+	 * Set one of the 192 bits of the channel status (AES3 and higher)
+	 */
+	if (status[byte] & mask)
+		data |= 0x40000000;
+
+	if (iec958_parity(data))	/* parity bit 4-30 */
+		data |= 0x80000000;
+
+	/* Preamble */
+	if      (!cm->spdif_counter)
+		data |= 0x03;		/* Block start, 'Z' */
+	else if (cm->spdif_counter % 2)
+		data |= 0x05;		/* odd sub frame, 'Y' */
+	else
+		data |= 0x09;		/* even sub frame, 'X' */
+
+	/*
+	 * sub frame counter: 2 sub frame are one audio frame
+	 * and 192 frames are one block
+	 */
+	cm->spdif_counter = (++cm->spdif_counter) % 384;
+
+	return data;
+}
+# endif /* if USE_AES_IEC958 */
 
 static int snd_cmipci_ac3_copy(snd_pcm_substream_t *subs, int channel,
 			       snd_pcm_uframes_t pos, void *src,
@@ -842,9 +1150,15 @@ static int snd_cmipci_ac3_copy(snd_pcm_substream_t *subs, int channel,
 {
 	cmipci_t *cm = snd_pcm_substream_chip(subs);
 	u32 *dst;
-	u16 *srcp = src, val;
 	snd_pcm_uframes_t offset;
 	snd_pcm_runtime_t *runtime = subs->runtime;
+#ifndef USE_AES_IEC958
+	u16 *srcp = src, val;
+#else
+	char buf[1920];         /* bits can be divided by 20, 24, 16 */
+	size_t bytes = frames_to_bytes(runtime, count);
+#endif
+
 
 	if (!cm->channel[CM_CH_PLAY].ac3_shift) {
 		if (copy_from_user(runtime->dma_area +
@@ -860,14 +1174,34 @@ static int snd_cmipci_ac3_copy(snd_pcm_substream_t *subs, int channel,
 	/* frame = 16bit stereo */
 	offset = (pos << 1) % (cm->channel[CM_CH_PLAY].dma_size << 2);
 	dst = (u32*)(runtime->dma_area + offset);
-
+# ifndef USE_AES_IEC958
 	count /= 2;
 	while (count-- > 0) {
 		get_user(val, srcp);
 		srcp++;
 		*dst++ = convert_ac3_32bit(cm, val);
 	}
+# else
+	while (bytes) {
+		size_t c = bytes;
 
+		if (c > sizeof(buf))
+			c = sizeof(buf);
+
+		if (copy_from_user(buf, src, c))
+			return -EFAULT;
+		bytes -= c;
+		src   += c;
+
+		iec958_init_bitstream(buf, c*8);
+		while (iec958_bits_avail()) {
+			*(dst++) = iec958_subframe(cm, cm->spdif_channel);
+			if (iec958_error())
+				return -EINVAL;
+		}
+		iec958_clear_bitstream();
+	}
+# endif
 	return 0;
 }
 
@@ -879,7 +1213,10 @@ static int snd_cmipci_ac3_silence(snd_pcm_substream_t *subs, int channel,
 	u32 *dst;
 	snd_pcm_uframes_t offset;
 	snd_pcm_runtime_t *runtime = subs->runtime;
-
+# ifdef USE_AES_IEC958
+	char buf[1920];		/* bits can be divided by 20, 24, 16 */
+	size_t bytes = frames_to_bytes(runtime, count);
+# endif
 	if (! cm->channel[CM_CH_PLAY].ac3_shift)
 		return snd_pcm_format_set_silence(runtime->format,
 						  runtime->dma_area + frames_to_bytes(runtime, pos), count);
@@ -887,12 +1224,31 @@ static int snd_cmipci_ac3_silence(snd_pcm_substream_t *subs, int channel,
 	/* frame = 16bit stereo */
 	offset = (pos << 1) % (cm->channel[CM_CH_PLAY].dma_size << 2);
 	dst = (u32*)(subs->runtime->dma_area + offset);
-
+# ifndef USE_AES_IEC958
 	count /= 2;
 	while (count-- > 0) {
 		*dst++ = convert_ac3_32bit(cm, 0);
 	}
+# else
+	while (bytes) {
+		size_t c = bytes;
 
+		if (c > sizeof(buf))
+			c = sizeof(buf);
+
+		/* Q: Does this function know about 24bit silence? */
+		if (snd_pcm_format_set_silence(runtime->format, buf, bytes_to_frames(runtime, c)))
+			return -EINVAL;
+
+		iec958_init_bitstream(buf, c*8);
+		while (iec958_bits_avail()) {
+			*(dst++) = iec958_subframe(cm, cm->spdif_channel);
+			if (iec958_error())
+				return -EINVAL;
+		}
+		iec958_clear_bitstream();
+	}
+# endif
 	return 0;
 }
 #endif /* DO_SOFT_AC3 */
@@ -996,6 +1352,9 @@ static int snd_cmipci_spdif_stream_get(snd_kcontrol_t *kcontrol,
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	for (i = 0; i < 4; i++)
 		ucontrol->value.iec958.status[i] = (chip->dig_pcm_status >> (i * 8)) & 0xff;
+#ifdef USE_AES_IEC958
+	ucontrol = chip->spdif_channel;
+#endif
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	return 0;
 }
@@ -1014,6 +1373,9 @@ static int snd_cmipci_spdif_stream_put(snd_kcontrol_t *kcontrol,
 		val |= (unsigned int)ucontrol->value.iec958.status[i] << (i * 8);
 	change = val != chip->dig_pcm_status;
 	chip->dig_pcm_status = val;
+#ifdef USE_AES_IEC958
+	chip->spdif_channel = ucontrol;
+#endif
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 	return change;
 }
@@ -1128,9 +1490,11 @@ static void setup_ac3(cmipci_t *cm, snd_pcm_substream_t *subs, int do_ac3, int r
 		if (cm->can_ac3_hw) {
 			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_SPD24SEL);
 		} else {
+#ifdef DO_SOFT_AC3
 			snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_SPD32SEL);
 			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_SPD24SEL);
 			snd_cmipci_clear_bit(cm, CM_REG_CHFORMAT, CM_PLAYBACK_SRATE_176K);
+#endif /* DO_SOFT_AC3 */
 		}
 	}
 }
@@ -1248,7 +1612,7 @@ static int snd_cmipci_capture_spdif_hw_free(snd_pcm_substream_t *subs)
 static void snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	cmipci_t *cm = snd_magic_cast(cmipci_t, dev_id, return);
-	unsigned int status;
+	unsigned int status, mask = 0;
 	
 	/* fastpath out, to ease interrupt sharing */
 	status = snd_cmipci_read(cm, CM_REG_INT_STATUS);
@@ -1257,14 +1621,12 @@ static void snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* acknowledge interrupt */
 	spin_lock(&cm->reg_lock);
-	if (status & CM_CHINT0) {
-		snd_cmipci_clear_bit(cm, CM_REG_INT_HLDCLR, CM_CH0_INT_EN);
-		snd_cmipci_set_bit(cm, CM_REG_INT_HLDCLR, CM_CH0_INT_EN);
-	}
-	if (status & CM_CHINT1) {
-		snd_cmipci_clear_bit(cm, CM_REG_INT_HLDCLR, CM_CH1_INT_EN);
-		snd_cmipci_set_bit(cm, CM_REG_INT_HLDCLR, CM_CH1_INT_EN);
-	}
+	if (status & CM_CHINT0)
+		mask |= CM_CH0_INT_EN;
+	if (status & CM_CHINT1)
+		mask |= CM_CH1_INT_EN;
+	snd_cmipci_clear_bit(cm, CM_REG_INT_HLDCLR, mask);
+	snd_cmipci_set_bit(cm, CM_REG_INT_HLDCLR, mask);
 	spin_unlock(&cm->reg_lock);
 
 	if (cm->rmidi && (status & CM_UARTINT))
@@ -1419,6 +1781,7 @@ static void close_device_check(cmipci_t *cm, int mode)
 
 	down(&cm->open_mutex);
 	if (cm->opened[ch] == mode) {
+		snd_cmipci_ch_reset(cm, ch);
 		cm->channel[ch].running = 0;
 		cm->channel[ch].substream = NULL;
 		cm->opened[ch] = 0;
@@ -2144,9 +2507,8 @@ static snd_cmipci_switch_args_t cmipci_switch_arg_##sname = { \
 	DEFINE_SWITCH_ARG(sname, xreg, xmask, xmask, xis_byte, xac3)
 
 #if 0 /* these will be controlled in pcm device */
-DEFINE_BIT_SWITCH_ARG(spdif_in, CM_REG_FUNCTRL1, CM_SPDF_1, 0);
-DEFINE_BIT_SWITCH_ARG(spdif_0, CM_REG_FUNCTRL1, CM_SPDF_0, 0);
-DEFINE_BIT_SWITCH_ARG(spdo_48k, CM_REG_MISC_CTRL, CM_SPDF_AC97|CM_SPDIF48K, 0);
+DEFINE_BIT_SWITCH_ARG(spdif_in, CM_REG_FUNCTRL1, CM_SPDF_1, 0, 0);
+DEFINE_BIT_SWITCH_ARG(spdif_out, CM_REG_FUNCTRL1, CM_SPDF_0, 0, 0);
 #endif
 DEFINE_BIT_SWITCH_ARG(spdif_in_sel1, CM_REG_CHFORMAT, CM_SPDIF_SELECT1, 0, 0);
 DEFINE_BIT_SWITCH_ARG(spdif_in_sel2, CM_REG_MISC_CTRL, CM_SPDIF_SELECT2, 0, 0);
@@ -2156,6 +2518,7 @@ DEFINE_BIT_SWITCH_ARG(spdi_valid, CM_REG_MISC, CM_SPDVALID, 1, 0);
 DEFINE_BIT_SWITCH_ARG(spdif_copyright, CM_REG_LEGACY_CTRL, CM_SPDCOPYRHT, 0, 0);
 DEFINE_BIT_SWITCH_ARG(spdif_dac_out, CM_REG_LEGACY_CTRL, CM_DAC2SPDO, 0, 1);
 DEFINE_SWITCH_ARG(spdo_5v, CM_REG_MISC_CTRL, CM_SPDO5V, 0, 0, 0); /* inverse: 0 = 5V */
+// DEFINE_BIT_SWITCH_ARG(spdo_48k, CM_REG_MISC_CTRL, CM_SPDF_AC97|CM_SPDIF48K, 0, 1);
 DEFINE_BIT_SWITCH_ARG(spdif_loop, CM_REG_FUNCTRL1, CM_SPDFLOOP, 0, 1);
 DEFINE_BIT_SWITCH_ARG(spdi_monitor, CM_REG_MIXER1, CM_CDPLAY, 1, 0);
 /* DEFINE_BIT_SWITCH_ARG(spdi_phase, CM_REG_CHFORMAT, CM_SPDIF_INVERSE, 0, 0); */
@@ -2228,8 +2591,7 @@ static snd_kcontrol_new_t snd_cmipci_mixer_switches[] __devinitdata = {
 static snd_kcontrol_new_t snd_cmipci_8738_mixer_switches[] __devinitdata = {
 #if 0 /* controlled in pcm device */
 	DEFINE_MIXER_SWITCH("IEC958 In Record", spdif_in),
-	DEFINE_MIXER_SWITCH("IEC958 Out", spdif_0),
-	DEFINE_MIXER_SWITCH("IEC958 Out 48KHz", spdo_48k),
+	DEFINE_MIXER_SWITCH("IEC958 Out", spdif_out),
 	DEFINE_MIXER_SWITCH("IEC958 Out To DAC", spdo2dac),
 #endif
 	// DEFINE_MIXER_SWITCH("IEC958 Output Switch", spdif_enable),
@@ -2242,6 +2604,7 @@ static snd_kcontrol_new_t snd_cmipci_8738_mixer_switches[] __devinitdata = {
 	DEFINE_MIXER_SWITCH("IEC958 In Valid", spdi_valid),
 	DEFINE_MIXER_SWITCH("IEC958 Copyright", spdif_copyright),
 	DEFINE_MIXER_SWITCH("IEC958 5V", spdo_5v),
+//	DEFINE_MIXER_SWITCH("IEC958 In/Out 48KHz", spdo_48k),
 	DEFINE_MIXER_SWITCH("IEC958 Loop", spdif_loop),
 	DEFINE_MIXER_SWITCH("IEC958 In Monitor", spdi_monitor),
 };
@@ -2475,6 +2838,8 @@ static int snd_cmipci_free(cmipci_t *cm)
 		snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_FM_EN);
 		snd_cmipci_clear_bit(cm, CM_REG_LEGACY_CTRL, CM_ENSPDOUT);
 		snd_cmipci_write(cm, CM_REG_INT_HLDCLR, 0);  /* disable ints */
+		snd_cmipci_ch_reset(cm, CM_CH_PLAY);
+		snd_cmipci_ch_reset(cm, CM_CH_CAPT);
 		snd_cmipci_write(cm, CM_REG_FUNCTRL0, 0); /* disable channels */
 		snd_cmipci_write(cm, CM_REG_FUNCTRL1, 0);
 
@@ -2547,7 +2912,6 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 
 	pci_set_master(cm->pci);
 
-
 	/*
 	 * check chip version, max channels and capabilities
 	 */
@@ -2568,6 +2932,8 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 
 	/* initialize codec registers */
 	snd_cmipci_write(cm, CM_REG_INT_HLDCLR, 0);	/* disable ints */
+	snd_cmipci_ch_reset(cm, CM_CH_PLAY);
+	snd_cmipci_ch_reset(cm, CM_CH_CAPT);
 	snd_cmipci_write(cm, CM_REG_FUNCTRL0, 0);	/* disable channels */
 	snd_cmipci_write(cm, CM_REG_FUNCTRL1, 0);
 
@@ -2578,6 +2944,30 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 #else
 	snd_cmipci_clear_bit(cm, CM_REG_MISC_CTRL, CM_XCHGDAC);
 #endif
+	/* Set Bus Master Request */
+	snd_cmipci_set_bit(cm, CM_REG_FUNCTRL1, CM_BREQ);
+
+	/* Assume TX and compatible chip set (Autodetection required for VX chip sets) */
+	switch (pci->device) {
+		struct list_head *pos;
+		int txvx;
+	case PCI_DEVICE_ID_CMEDIA_CM8738:
+	case PCI_DEVICE_ID_CMEDIA_CM8738B:
+		txvx = 1;
+		list_for_each(pos, &(pci->global_list)) {
+			struct pci_dev * cur = list_entry(pos, struct pci_dev, global_list);
+			if (cur->vendor != 0x8086) /* PCI_VENDOR_ID_INTEL */
+				continue;
+			if (cur->device != 0x7030) /* PCI_DEVICE_ID_INTEL_82437VX */
+				continue;
+			txvx = 0;
+		}
+		if (txvx)
+			snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_TXVX);
+		break;
+	default:
+		break;
+	}
 
 	/* set MPU address */
 	switch (iomidi) {
@@ -2663,6 +3053,15 @@ static int __devinit snd_cmipci_create(snd_card_t *card,
 		snd_cmipci_free(cm);
 		return err;
 	}
+#ifdef USE_VAR48KRATE
+	for (val = 0; val < RATES; val++)
+		snd_cmipci_set_pll(cm, rates[val], val);
+
+	/*
+	 * (Re-)Enable external switch spdo_48k
+	 */
+	snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_SPDIF48K|CM_SPDF_AC97);
+#endif /* USE_VAR48KRATE */
 
 	*rcmipci = cm;
 	return 0;

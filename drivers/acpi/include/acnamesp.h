@@ -1,7 +1,6 @@
 /******************************************************************************
  *
  * Name: acnamesp.h - Namespace subcomponent prototypes and defines
- *       $Revision: 132 $
  *
  *****************************************************************************/
 
@@ -27,12 +26,12 @@
 #define __ACNAMESP_H__
 
 
-/* To search the entire name space, pass this as Search_base */
+/* To search the entire name space, pass this as search_base */
 
 #define ACPI_NS_ALL                 ((acpi_handle)0)
 
 /*
- * Elements of Acpi_ns_properties are bit significant
+ * Elements of acpi_ns_properties are bit significant
  * and should be one-to-one with values of acpi_object_type
  */
 #define ACPI_NS_NORMAL              0
@@ -50,7 +49,7 @@
 #define ACPI_NS_SYSTEM_BUS          "_SB_"
 
 
-/* Flags for Acpi_ns_lookup, Acpi_ns_search_and_enter */
+/* Flags for acpi_ns_lookup, acpi_ns_search_and_enter */
 
 #define ACPI_NS_NO_UPSEARCH         0
 #define ACPI_NS_SEARCH_PARENT       0x01
@@ -304,7 +303,7 @@ acpi_ns_opens_scope (
 void
 acpi_ns_build_external_path (
 	acpi_namespace_node     *node,
-	ACPI_SIZE               size,
+	acpi_size               size,
 	char                    *name_buffer);
 
 char *
@@ -332,7 +331,7 @@ acpi_ns_get_node_by_path (
 	u32                     flags,
 	acpi_namespace_node     **out_node);
 
-ACPI_SIZE
+acpi_size
 acpi_ns_get_pathname_length (
 	acpi_namespace_node     *node);
 
@@ -358,18 +357,18 @@ acpi_ns_get_secondary_object (
 acpi_status
 acpi_ns_attach_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    *data);
 
 acpi_status
 acpi_ns_detach_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler);
+	acpi_object_handler     handler);
 
 acpi_status
 acpi_ns_get_attached_data (
 	acpi_namespace_node     *node,
-	ACPI_OBJECT_HANDLER     handler,
+	acpi_object_handler     handler,
 	void                    **data);
 
 
