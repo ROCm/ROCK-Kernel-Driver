@@ -146,6 +146,8 @@ int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 
 int mii_link_ok (struct mii_if_info *mii)
 {
+	/* first, a dummy read, needed to latch some MII phys */
+	mii->mdio_read(mii->dev, mii->phy_id, MII_BMSR);
 	if (mii->mdio_read(mii->dev, mii->phy_id, MII_BMSR) & BMSR_LSTATUS)
 		return 1;
 	return 0;
