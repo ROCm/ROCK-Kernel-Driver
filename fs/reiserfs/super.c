@@ -62,7 +62,7 @@ static int is_any_reiserfs_magic_string (struct reiserfs_super_block * rs)
 static int reiserfs_remount (struct super_block * s, int * flags, char * data);
 static int reiserfs_statfs (struct super_block * s, struct kstatfs * buf);
 
-static void reiserfs_sync_fs (struct super_block * s)
+static int reiserfs_sync_fs (struct super_block * s, int wait)
 {
     if (!(s->s_flags & MS_RDONLY)) {
         struct reiserfs_transaction_handle th;
@@ -76,11 +76,12 @@ static void reiserfs_sync_fs (struct super_block * s)
     } else {
         s->s_dirt = 0;
     }
+    return 0;
 }
 
 static void reiserfs_write_super(struct super_block *s)
 {
-    reiserfs_sync_fs(s);
+    reiserfs_sync_fs(s, 1);
 }
 
 static void reiserfs_write_super_lockfs (struct super_block * s)
@@ -526,6 +527,7 @@ struct super_operations reiserfs_sops =
   .clear_inode  = reiserfs_clear_inode,
   .put_super = reiserfs_put_super,
   .write_super = reiserfs_write_super,
+  .sync_fs = reiserfs_sync_fs,
   .write_super_lockfs = reiserfs_write_super_lockfs,
   .unlockfs = reiserfs_unlockfs,
   .statfs = reiserfs_statfs,
