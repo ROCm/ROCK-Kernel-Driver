@@ -184,7 +184,7 @@ static int exact_lock(dev_t dev, void *data)
 }
 
 /**
- * add_gendisk - add partitioning information to kernel list
+ * add_disk - add partitioning information to kernel list
  * @disk: per-device partitioning information
  *
  * This function registers the partitioning information in @disk
