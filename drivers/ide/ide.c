@@ -128,8 +128,6 @@
 
 #undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
-#define _IDE_C			/* Tell ide.h it's really us */
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -153,6 +151,8 @@
 #include <linux/completion.h>
 #include <linux/reboot.h>
 #include <linux/cdrom.h>
+#include <linux/device.h>
+#include <linux/kmod.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -162,17 +162,102 @@
 
 #include "ide_modes.h"
 
-#ifdef CONFIG_KMOD
-#include <linux/kmod.h>
-#endif /* CONFIG_KMOD */
+/* Constant tables for PIO mode programming:
+ */
+
+const ide_pio_timings_t ide_pio_timings[6] = {
+	{ 70,	165,	600 },	/* PIO Mode 0 */
+	{ 50,	125,	383 },	/* PIO Mode 1 */
+	{ 30,	100,	240 },	/* PIO Mode 2 */
+	{ 30,	80,	180 },	/* PIO Mode 3 with IORDY */
+	{ 25,	70,	120 },	/* PIO Mode 4 with IORDY */
+	{ 20,	50,	100 }	/* PIO Mode 5 with IORDY (nonstandard) */
+};
+
+/*
+ * Black list. Some drives incorrectly report their maximal PIO mode,
+ * at least in respect to CMD640. Here we keep info on some known drives.
+ */
+static struct ide_pio_info {
+	const char	*name;
+	int		pio;
+} ide_pio_blacklist [] = {
+/*	{ "Conner Peripherals 1275MB - CFS1275A", 4 }, */
+	{ "Conner Peripherals 540MB - CFS540A", 3 },
+
+	{ "WDC AC2700",  3 },
+	{ "WDC AC2540",  3 },
+	{ "WDC AC2420",  3 },
+	{ "WDC AC2340",  3 },
+	{ "WDC AC2250",  0 },
+	{ "WDC AC2200",  0 },
+	{ "WDC AC21200", 4 },
+	{ "WDC AC2120",  0 },
+	{ "WDC AC2850",  3 },
+	{ "WDC AC1270",  3 },
+	{ "WDC AC1170",  1 },
+	{ "WDC AC1210",  1 },
+	{ "WDC AC280",   0 },
+/*	{ "WDC AC21000", 4 }, */
+	{ "WDC AC31000", 3 },
+	{ "WDC AC31200", 3 },
+/*	{ "WDC AC31600", 4 }, */
+
+	{ "Maxtor 7131 AT", 1 },
+	{ "Maxtor 7171 AT", 1 },
+	{ "Maxtor 7213 AT", 1 },
+	{ "Maxtor 7245 AT", 1 },
+	{ "Maxtor 7345 AT", 1 },
+	{ "Maxtor 7546 AT", 3 },
+	{ "Maxtor 7540 AV", 3 },
+
+	{ "SAMSUNG SHD-3121A", 1 },
+	{ "SAMSUNG SHD-3122A", 1 },
+	{ "SAMSUNG SHD-3172A", 1 },
+
+/*	{ "ST51080A", 4 },
+ *	{ "ST51270A", 4 },
+ *	{ "ST31220A", 4 },
+ *	{ "ST31640A", 4 },
+ *	{ "ST32140A", 4 },
+ *	{ "ST3780A",  4 },
+ */
+	{ "ST5660A",  3 },
+	{ "ST3660A",  3 },
+	{ "ST3630A",  3 },
+	{ "ST3655A",  3 },
+	{ "ST3391A",  3 },
+	{ "ST3390A",  1 },
+	{ "ST3600A",  1 },
+	{ "ST3290A",  0 },
+	{ "ST3144A",  0 },
+	{ "ST3491A",  1 },	/* reports 3, should be 1 or 2 (depending on */	
+				/* drive) according to Seagates FIND-ATA program */
+
+	{ "QUANTUM ELS127A", 0 },
+	{ "QUANTUM ELS170A", 0 },
+	{ "QUANTUM LPS240A", 0 },
+	{ "QUANTUM LPS210A", 3 },
+	{ "QUANTUM LPS270A", 3 },
+	{ "QUANTUM LPS365A", 3 },
+	{ "QUANTUM LPS540A", 3 },
+	{ "QUANTUM LIGHTNING 540A", 3 },
+	{ "QUANTUM LIGHTNING 730A", 3 },
+
+        { "QUANTUM FIREBALL_540", 3 }, /* Older Quantum Fireballs don't work */
+        { "QUANTUM FIREBALL_640", 3 }, 
+        { "QUANTUM FIREBALL_1080", 3 },
+        { "QUANTUM FIREBALL_1280", 3 },
+	{ NULL,	0 }
+};
 
 /* default maximum number of failures */
-#define IDE_DEFAULT_MAX_FAILURES 	1
+#define IDE_DEFAULT_MAX_FAILURES	1
 
 static const byte ide_hwif_to_major[] = { IDE0_MAJOR, IDE1_MAJOR, IDE2_MAJOR, IDE3_MAJOR, IDE4_MAJOR, IDE5_MAJOR, IDE6_MAJOR, IDE7_MAJOR, IDE8_MAJOR, IDE9_MAJOR };
 
 static int	idebus_parameter; /* holds the "idebus=" parameter */
-static int	system_bus_speed; /* holds what we think is VESA/PCI bus speed */
+int system_bus_speed; /* holds what we think is VESA/PCI bus speed */
 static int	initializing;     /* set while initializing built-in drivers */
 
 /*
@@ -199,6 +284,106 @@ int noautodma = 0;
  * This is declared extern in ide.h, for access by other IDE modules:
  */
 ide_hwif_t	ide_hwifs[MAX_HWIFS];	/* master data repository */
+
+
+/*
+ * This routine searches the ide_pio_blacklist for an entry
+ * matching the start/whole of the supplied model name.
+ *
+ * Returns -1 if no match found.
+ * Otherwise returns the recommended PIO mode from ide_pio_blacklist[].
+ */
+int ide_scan_pio_blacklist (char *model)
+{
+	struct ide_pio_info *p;
+
+	for (p = ide_pio_blacklist; p->name != NULL; p++) {
+		if (strncmp(p->name, model, strlen(p->name)) == 0)
+			return p->pio;
+	}
+	return -1;
+}
+
+/*
+ * This routine returns the recommended PIO settings for a given drive,
+ * based on the drive->id information and the ide_pio_blacklist[].
+ * This is used by most chipset support modules when "auto-tuning".
+ */
+
+/*
+ * Drive PIO mode auto selection
+ */
+byte ide_get_best_pio_mode (ide_drive_t *drive, byte mode_wanted, byte max_mode, ide_pio_data_t *d)
+{
+	int pio_mode;
+	int cycle_time = 0;
+	int use_iordy = 0;
+	struct hd_driveid* id = drive->id;
+	int overridden  = 0;
+	int blacklisted = 0;
+
+	if (mode_wanted != 255) {
+		pio_mode = mode_wanted;
+	} else if (!drive->id) {
+		pio_mode = 0;
+	} else if ((pio_mode = ide_scan_pio_blacklist(id->model)) != -1) {
+		overridden = 1;
+		blacklisted = 1;
+		use_iordy = (pio_mode > 2);
+	} else {
+		pio_mode = id->tPIO;
+		if (pio_mode > 2) {	/* 2 is maximum allowed tPIO value */
+			pio_mode = 2;
+			overridden = 1;
+		}
+		if (id->field_valid & 2) {	  /* drive implements ATA2? */
+			if (id->capability & 8) { /* drive supports use_iordy? */
+				use_iordy = 1;
+				cycle_time = id->eide_pio_iordy;
+				if (id->eide_pio_modes & 7) {
+					overridden = 0;
+					if (id->eide_pio_modes & 4)
+						pio_mode = 5;
+					else if (id->eide_pio_modes & 2)
+						pio_mode = 4;
+					else
+						pio_mode = 3;
+				}
+			} else {
+				cycle_time = id->eide_pio;
+			}
+		}
+
+#if 0
+		if (drive->id->major_rev_num & 0x0004) printk("ATA-2 ");
+#endif
+
+		/*
+		 * Conservative "downgrade" for all pre-ATA2 drives
+		 */
+		if (pio_mode && pio_mode < 4) {
+			pio_mode--;
+			overridden = 1;
+#if 0
+			use_iordy = (pio_mode > 2);
+#endif
+			if (cycle_time && cycle_time < ide_pio_timings[pio_mode].cycle_time)
+				cycle_time = 0; /* use standard timing */
+		}
+	}
+	if (pio_mode > max_mode) {
+		pio_mode = max_mode;
+		cycle_time = 0;
+	}
+	if (d) {
+		d->pio_mode = pio_mode;
+		d->cycle_time = cycle_time ? cycle_time : ide_pio_timings[pio_mode].cycle_time;
+		d->use_iordy = use_iordy;
+		d->overridden = overridden;
+		d->blacklisted = blacklisted;
+	}
+	return pio_mode;
+}
 
 #if (DISK_RECOVERY_TIME > 0)
 /*
@@ -308,7 +493,6 @@ static void __init init_ide_data (void)
 	ide_init_default_hwifs();
 
 	idebus_parameter = 0;
-	system_bus_speed = 0;
 }
 
 /*
@@ -340,30 +524,6 @@ int drive_is_flashcard (ide_drive_t *drive)
 		}
 	}
 	return 0;	/* no, it is not a flash memory card */
-}
-
-/*
- * ide_system_bus_speed() returns what we think is the system VESA/PCI
- * bus speed (in MHz).  This is used for calculating interface PIO timings.
- * The default is 40 for known PCI systems, 50 otherwise.
- * The "idebus=xx" parameter can be used to override this value.
- * The actual value to be used is computed/displayed the first time through.
- */
-int ide_system_bus_speed (void)
-{
-	if (!system_bus_speed) {
-		if (idebus_parameter)
-			system_bus_speed = idebus_parameter;	/* user supplied value */
-#ifdef CONFIG_PCI
-		else if (pci_present())
-			system_bus_speed = 33;	/* safe default value for PCI */
-#endif /* CONFIG_PCI */
-		else
-			system_bus_speed = 50;	/* safe default value for VESA and PCI */
-		printk("ide: Assuming %dMHz system bus speed for PIO modes%s\n", system_bus_speed,
-			idebus_parameter ? "" : "; override with idebus=xx");
-	}
-	return system_bus_speed;
 }
 
 int __ide_end_request(ide_drive_t *drive, int uptodate, int nr_secs)
@@ -2005,6 +2165,7 @@ void ide_unregister (unsigned int index)
 	hwif = &ide_hwifs[index];
 	if (!hwif->present)
 		goto abort;
+	put_device(&hwif->device);
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		drive = &hwif->drives[unit];
 		if (!drive->present)
@@ -2487,11 +2648,6 @@ void ide_delay_50ms (void)
 	__set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ/20);
 #endif /* CONFIG_BLK_DEV_IDECS */
-}
-
-int system_bus_clock (void)
-{
-	return((int) ((!system_bus_speed) ? ide_system_bus_speed() : system_bus_speed ));
 }
 
 int ide_reinit_drive (ide_drive_t *drive)
@@ -3676,9 +3832,6 @@ EXPORT_SYMBOL(ide_unregister);
 EXPORT_SYMBOL(ide_setup_ports);
 EXPORT_SYMBOL(get_info_ptr);
 EXPORT_SYMBOL(current_capacity);
-
-EXPORT_SYMBOL(system_bus_clock);
-
 EXPORT_SYMBOL(ide_reinit_drive);
 
 static int ide_notify_reboot (struct notifier_block *this, unsigned long event, void *x)
@@ -3730,17 +3883,32 @@ static struct notifier_block ide_notifier = {
 /*
  * This is gets invoked once during initialization, to set *everything* up
  */
-int __init ide_init (void)
+int __init ide_init(void)
 {
-	static char banner_printed;
 	int i;
 
-	if (!banner_printed) {
-		printk(KERN_INFO "Uniform Multi-Platform E-IDE driver " REVISION "\n");
-		ide_devfs_handle = devfs_mk_dir (NULL, "ide", NULL);
-		system_bus_speed = ide_system_bus_speed();
-		banner_printed = 1;
-	}
+	printk(KERN_INFO "Uniform Multi-Platform E-IDE driver " REVISION "\n");
+	ide_devfs_handle = devfs_mk_dir (NULL, "ide", NULL);
+
+	/* Initialize system bus speed.
+	 *
+	 * This can be changed by a particular chipse initialization module.
+	 * Otherwise we assume 33MHz as a safe value for PCI bus based systems.
+	 * 50MHz will be assumed for abolitions like VESA, since higher values
+	 * result in more conservative timing setups.
+	 *
+	 * The kernel parameter idebus=XX overrides the default settings.
+	 */
+
+	system_bus_speed = 50;
+	if (idebus_parameter)
+	    system_bus_speed = idebus_parameter;
+#ifdef CONFIG_PCI
+	else if (pci_present())
+	    system_bus_speed = 33;
+#endif
+
+	printk("ide: system bus speed %dMHz\n", system_bus_speed);
 
 	init_ide_data ();
 

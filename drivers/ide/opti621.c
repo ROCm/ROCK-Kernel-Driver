@@ -164,7 +164,7 @@ static void compute_pios(ide_drive_t *drive, byte pio)
 	}
 }
 
-int cmpt_clk(int time, int bus_speed)
+static int cmpt_clk(int time, int bus_speed)
 /* Returns (rounded up) time in clocks for time in ns,
  * with bus_speed in MHz.
  * Example: bus_speed = 40 MHz, time = 80 ns
@@ -216,14 +216,13 @@ static void compute_clocks(int pio, pio_clocks_t *clks)
 {
         if (pio != PIO_NOT_EXIST) {
         	int adr_setup, data_pls;
-		int bus_speed = system_bus_clock();
 
  	       	adr_setup = ide_pio_timings[pio].setup_time;
   	      	data_pls = ide_pio_timings[pio].active_time;
-	  	clks->address_time = cmpt_clk(adr_setup, bus_speed);
-	     	clks->data_time = cmpt_clk(data_pls, bus_speed);
+	  	clks->address_time = cmpt_clk(adr_setup, system_bus_speed);
+	     	clks->data_time = cmpt_clk(data_pls, system_bus_speed);
      		clks->recovery_time = cmpt_clk(ide_pio_timings[pio].cycle_time
-     			- adr_setup-data_pls, bus_speed);
+     			- adr_setup-data_pls, system_bus_speed);
      		if (clks->address_time<1) clks->address_time = 1;
      		if (clks->address_time>4) clks->address_time = 4;
      		if (clks->data_time<1) clks->data_time = 1;

@@ -378,11 +378,6 @@ static int idedisk_media_change (ide_drive_t *drive)
 	return drive->removable;	/* if removable, always assume it was changed */
 }
 
-static void idedisk_revalidate (ide_drive_t *drive)
-{
-	ide_revalidate_drive(drive);
-}
-
 /*
  * Queries for true maximum capacity of the drive.
  * Returns maximum LBA address (> 0) of the drive, 0 if failed.
@@ -915,13 +910,22 @@ static void idedisk_add_settings(ide_drive_t *drive)
 	ide_add_setting(drive,	"max_failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->max_failures,		NULL);
 }
 
-static void idedisk_setup (ide_drive_t *drive)
+/* This is just a hook for the overall driver tree.
+ *
+ * FIXME: This is soon goig to replace the custom linked list games played up
+ * to great extend between the different components of the IDE drivers.
+ */
+
+static struct device_driver idedisk_devdrv = {};
+
+static void idedisk_setup(ide_drive_t *drive)
 {
 	int i;
-	
+
 	struct hd_driveid *id = drive->id;
 	unsigned long capacity;
-	
+	int drvid = -1;
+
 	idedisk_add_settings(drive);
 
 	if (id == NULL)
@@ -933,7 +937,7 @@ static void idedisk_setup (ide_drive_t *drive)
 	 */
 	if (drive->removable && !drive_is_flashcard(drive)) {
 		/*
-		 * Removable disks (eg. SYQUEST); ignore 'WD' drives 
+		 * Removable disks (eg. SYQUEST); ignore 'WD' drives.
 		 */
 		if (id->model[0] != 'W' || id->model[1] != 'D') {
 			drive->doorlocking = 1;
@@ -942,11 +946,24 @@ static void idedisk_setup (ide_drive_t *drive)
 	for (i = 0; i < MAX_DRIVES; ++i) {
 		ide_hwif_t *hwif = HWIF(drive);
 
-		if (drive != &hwif->drives[i]) continue;
+		if (drive != &hwif->drives[i])
+		    continue;
+		drvid = i;
 		hwif->gd->de_arr[i] = drive->de;
 		if (drive->removable)
 			hwif->gd->flags[i] |= GENHD_FL_REMOVABLE;
 		break;
+	}
+
+	/* Register us within the device tree.
+	 */
+
+	if (drvid != -1) {
+	    sprintf(drive->device.bus_id, "%d", drvid);
+	    sprintf(drive->device.name, "ide-disk");
+	    drive->device.driver = &idedisk_devdrv;
+	    drive->device.parent = &HWIF(drive)->device;
+	    device_register(&drive->device);
 	}
 
 	/* Extract geometry if we did not already have one for the drive */
@@ -1023,6 +1040,12 @@ static void idedisk_setup (ide_drive_t *drive)
 
 static int idedisk_cleanup (ide_drive_t *drive)
 {
+
+	/* FIXME: we will have to think twice whatever this is the proper place
+	 * to do it.
+	 */
+
+	put_device(&drive->device);
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
 		if (do_idedisk_flushcache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
@@ -1050,7 +1073,7 @@ static ide_driver_t idedisk_driver = {
 	open:			idedisk_open,
 	release:		idedisk_release,
 	media_change:		idedisk_media_change,
-	revalidate:		idedisk_revalidate,
+	revalidate:		ide_revalidate_drive,
 	pre_reset:		idedisk_pre_reset,
 	capacity:		idedisk_capacity,
 	special:		idedisk_special,

@@ -283,8 +283,6 @@ static void cmd64x_tuneproc (ide_drive_t *drive, byte mode_wanted)
 	int setup_time, active_time, recovery_time, clock_time, pio_mode, cycle_time;
 	byte recovery_count2, cycle_count;
 	int setup_count, active_count, recovery_count;
-	int bus_speed = system_bus_clock();
-	/*byte b;*/
 	ide_pio_data_t  d;
 
 	switch (mode_wanted) {
@@ -309,7 +307,7 @@ static void cmd64x_tuneproc (ide_drive_t *drive, byte mode_wanted)
 	setup_time  = ide_pio_timings[pio_mode].setup_time;
 	active_time = ide_pio_timings[pio_mode].active_time;
 	recovery_time = cycle_time - (setup_time + active_time);
-	clock_time = 1000 / bus_speed;
+	clock_time = 1000 / system_bus_speed;
 	cycle_count = (cycle_time + clock_time - 1) / clock_time;
 
 	setup_count = (setup_time + clock_time - 1) / clock_time;

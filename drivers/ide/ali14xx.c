@@ -119,15 +119,14 @@ static void ali14xx_tune_drive (ide_drive_t *drive, byte pio)
 	byte param1, param2, param3, param4;
 	unsigned long flags;
 	ide_pio_data_t d;
-	int bus_speed = system_bus_clock();
 
 	pio = ide_get_best_pio_mode(drive, pio, ALI_MAX_PIO, &d);
 
 	/* calculate timing, according to PIO mode */
 	time1 = d.cycle_time;
 	time2 = ide_pio_timings[pio].active_time;
-	param3 = param1 = (time2 * bus_speed + 999) / 1000;
-	param4 = param2 = (time1 * bus_speed + 999) / 1000 - param1;
+	param3 = param1 = (time2 * system_bus_speed + 999) / 1000;
+	param4 = param2 = (time1 * system_bus_speed + 999) / 1000 - param1;
 	if (pio < 3) {
 		param3 += 8;
 		param4 += 8;

@@ -23,7 +23,7 @@
  *
  *  A.Hartgers@stud.tue.nl, JZDQC@CUNYVM.CUNY.edu, abramov@cecmow.enet.dec.com,
  *  bardj@utopia.ppp.sn.no, bart@gaga.tue.nl, bbol001@cs.auckland.ac.nz,
- *  chrisc@dbass.demon.co.uk, dalecki@namu26.Num.Math.Uni-Goettingen.de,
+ *  chrisc@dbass.demon.co.uk, dalecki@evision-ventures.com,
  *  derekn@vw.ece.cmu.edu, florian@btp2x3.phy.uni-bayreuth.de,
  *  flynn@dei.unipd.it, gadio@netvision.net.il, godzilla@futuris.net,
  *  j@pobox.com, jkemp1@mises.uni-paderborn.de, jtoppe@hiwaay.net,
@@ -596,14 +596,13 @@ static void cmd640_set_mode (unsigned int index, byte pio_mode, unsigned int cyc
 {
 	int setup_time, active_time, recovery_time, clock_time;
 	byte setup_count, active_count, recovery_count, recovery_count2, cycle_count;
-	int bus_speed = system_bus_clock();
 
 	if (pio_mode > 5)
 		pio_mode = 5;
 	setup_time  = ide_pio_timings[pio_mode].setup_time;
 	active_time = ide_pio_timings[pio_mode].active_time;
 	recovery_time = cycle_time - (setup_time + active_time);
-	clock_time = 1000 / bus_speed;
+	clock_time = 1000 / system_bus_speed;
 	cycle_count = (cycle_time + clock_time - 1) / clock_time;
 
 	setup_count = (setup_time + clock_time - 1) / clock_time;

@@ -141,7 +141,6 @@ static int calc_clk (int time, int bus_speed)
 static void compute_clocks (byte pio, pio_clocks_t *p_pclk)
 {
 	int clk1, clk2;
-	int bus_speed = system_bus_clock();	/* get speed of PCI bus */
 
 	/* we don't check against CY82C693's min and max speed,
 	 * so you can play with the idebus=xx parameter
@@ -151,17 +150,17 @@ static void compute_clocks (byte pio, pio_clocks_t *p_pclk)
 		pio = CY82C693_MAX_PIO;
 
 	/* let's calc the address setup time clocks */
-	p_pclk->address_time = (byte)calc_clk(ide_pio_timings[pio].setup_time, bus_speed);
+	p_pclk->address_time = (byte)calc_clk(ide_pio_timings[pio].setup_time, system_bus_speed);
 
 	/* let's calc the active and recovery time clocks */
-	clk1 = calc_clk(ide_pio_timings[pio].active_time, bus_speed);
+	clk1 = calc_clk(ide_pio_timings[pio].active_time, system_bus_speed);
 
 	/* calc recovery timing */
 	clk2 =	ide_pio_timings[pio].cycle_time -
 		ide_pio_timings[pio].active_time -
 		ide_pio_timings[pio].setup_time;
 
-	clk2 = calc_clk(clk2, bus_speed);
+	clk2 = calc_clk(clk2, system_bus_speed);
 
 	clk1 = (clk1<<4)|clk2;	/* combine active and recovery clocks */
 
