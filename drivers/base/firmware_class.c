@@ -361,7 +361,7 @@ request_firmware(const struct firmware **firmware, const char *name,
 
 	wait_for_completion(&fw_priv->completion);
 
-	del_timer(&fw_priv->timeout);
+	del_timer_sync(&fw_priv->timeout);
 	fw_remove_class_device(class_dev);
 
 	if (fw_priv->fw->size && !fw_priv->abort) {
