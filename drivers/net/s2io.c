@@ -305,6 +305,9 @@ static struct pci_driver s2io_driver = {
       remove:__devexit_p(s2io_rem_nic),
 };
 
+/* A simplifier macro used both by init and free shared_mem Fns(). */
+#define TXD_MEM_PAGE_CNT(len, per_each) ((len+per_each - 1) / per_each)
+
 /**
  * init_shared_mem - Allocation and Initialization of Memory
  * @nic: Device private variable.
@@ -320,6 +323,7 @@ static int init_shared_mem(struct s2io_nic *nic)
 	dma_addr_t tmp_p_addr, tmp_p_addr_next;
 	RxD_block_t *pre_rxd_blk = NULL;
 	int i, j, blk_cnt;
+	int lst_size, lst_per_page;
 	struct net_device *dev = nic->dev;
 
 	mac_info_t *mac_control;
@@ -341,39 +345,55 @@ static int init_shared_mem(struct s2io_nic *nic)
 		DBG_PRINT(ERR_DBG, "that can be used\n");
 		return FAILURE;
 	}
-	size *= (sizeof(TxD_t) * config->max_txds);
 
-	mac_control->txd_list_mem = pci_alloc_consistent
-	    (nic->pdev, size, &mac_control->txd_list_mem_phy);
-	if (!mac_control->txd_list_mem) {
-		return -ENOMEM;
-	}
-	mac_control->txd_list_mem_sz = size;
-
-	tmp_v_addr = mac_control->txd_list_mem;
-	tmp_p_addr = mac_control->txd_list_mem_phy;
-	memset(tmp_v_addr, 0, size);
-
-	DBG_PRINT(INIT_DBG, "%s:List Mem PHY: 0x%llx\n", dev->name,
-		  (unsigned long long) tmp_p_addr);
+	lst_size = (sizeof(TxD_t) * config->max_txds);
+	lst_per_page = PAGE_SIZE / lst_size;
 
 	for (i = 0; i < config->tx_fifo_num; i++) {
-		mac_control->txdl_start_phy[i] = tmp_p_addr;
-		mac_control->txdl_start[i] = (TxD_t *) tmp_v_addr;
+		int fifo_len = config->tx_cfg[i].fifo_len;
+		int list_holder_size = fifo_len * sizeof(list_info_hold_t);
+		nic->list_info[i] = kmalloc(list_holder_size, GFP_KERNEL);
+		if (!nic->list_info[i]) {
+			DBG_PRINT(ERR_DBG,
+				  "Malloc failed for list_info\n");
+			return -ENOMEM;
+		}
+		memset(nic->list_info[i], 0, list_holder_size);
+	}
+	for (i = 0; i < config->tx_fifo_num; i++) {
+		int page_num = TXD_MEM_PAGE_CNT(config->tx_cfg[i].fifo_len,
+						lst_per_page);
 		mac_control->tx_curr_put_info[i].offset = 0;
 		mac_control->tx_curr_put_info[i].fifo_len =
 		    config->tx_cfg[i].fifo_len - 1;
 		mac_control->tx_curr_get_info[i].offset = 0;
 		mac_control->tx_curr_get_info[i].fifo_len =
 		    config->tx_cfg[i].fifo_len - 1;
-
-		tmp_p_addr +=
-		    (config->tx_cfg[i].fifo_len * (sizeof(TxD_t)) *
-		     config->max_txds);
-		tmp_v_addr +=
-		    (config->tx_cfg[i].fifo_len * (sizeof(TxD_t)) *
-		     config->max_txds);
+		for (j = 0; j < page_num; j++) {
+			int k = 0;
+			dma_addr_t tmp_p;
+			void *tmp_v;
+			tmp_v = pci_alloc_consistent(nic->pdev,
+						     PAGE_SIZE, &tmp_p);
+			if (!tmp_v) {
+				DBG_PRINT(ERR_DBG,
+					  "pci_alloc_consistent ");
+				DBG_PRINT(ERR_DBG, "failed for TxDL\n");
+				return -ENOMEM;
+			}
+			while (k < lst_per_page) {
+				int l = (j * lst_per_page) + k;
+				if (l == config->tx_cfg[i].fifo_len)
+					goto end_txd_alloc;
+				nic->list_info[i][l].list_virt_addr =
+				    tmp_v + (k * lst_size);
+				nic->list_info[i][l].list_phy_addr =
+				    tmp_p + (k * lst_size);
+				k++;
+			}
+		}
 	}
+      end_txd_alloc:
 
 	/* Allocation and initialization of RXDs in Rings */
 	size = 0;
@@ -484,6 +504,7 @@ static void free_shared_mem(struct s2io_nic *nic)
 	dma_addr_t tmp_p_addr;
 	mac_info_t *mac_control;
 	struct config_param *config;
+	int lst_size, lst_per_page;
 
 
 	if (!nic)
@@ -492,11 +513,23 @@ static void free_shared_mem(struct s2io_nic *nic)
 	mac_control = &nic->mac_control;
 	config = &nic->config;
 
-	if (mac_control->txd_list_mem) {
-		pci_free_consistent(nic->pdev,
-				    mac_control->txd_list_mem_sz,
-				    mac_control->txd_list_mem,
-				    mac_control->txd_list_mem_phy);
+	lst_size = (sizeof(TxD_t) * config->max_txds);
+	lst_per_page = PAGE_SIZE / lst_size;
+
+	for (i = 0; i < config->tx_fifo_num; i++) {
+		int page_num = TXD_MEM_PAGE_CNT(config->tx_cfg[i].fifo_len,
+						lst_per_page);
+		for (j = 0; j < page_num; j++) {
+			int mem_blks = (j * lst_per_page);
+			if (!nic->list_info[i][mem_blks].list_virt_addr)
+				break;
+			pci_free_consistent(nic->pdev, PAGE_SIZE,
+					    nic->list_info[i][mem_blks].
+					    list_virt_addr,
+					    nic->list_info[i][mem_blks].
+					    list_phy_addr);
+		}
+		kfree(nic->list_info[i]);
 	}
 
 	size = (MAX_RXDS_PER_BLOCK + 1) * (sizeof(RxD_t));
@@ -1444,8 +1477,8 @@ void free_tx_buffers(struct s2io_nic *nic)
 
 	for (i = 0; i < config->tx_fifo_num; i++) {
 		for (j = 0; j < config->tx_cfg[i].fifo_len - 1; j++) {
-			txdp = mac_control->txdl_start[i] +
-			    (config->max_txds * j);
+			txdp = (TxD_t *) nic->list_info[i][j].
+			    list_virt_addr;
 			skb =
 			    (struct sk_buff *) ((unsigned long) txdp->
 						Host_Control);
@@ -1460,6 +1493,8 @@ void free_tx_buffers(struct s2io_nic *nic)
 		DBG_PRINT(INTR_DBG,
 			  "%s:forcibly freeing %d skbs on FIFO%d\n",
 			  dev->name, cnt, i);
+		mac_control->tx_curr_get_info[i].offset = 0;
+		mac_control->tx_curr_put_info[i].offset = 0;
 	}
 }
 
@@ -1896,7 +1931,7 @@ static void tx_intr_handler(struct s2io_nic *nic)
 {
 	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) nic->bar0;
 	struct net_device *dev = (struct net_device *) nic->dev;
-	tx_curr_get_info_t offset_info, offset_info1;
+	tx_curr_get_info_t get_info, put_info;
 	struct sk_buff *skb;
 	TxD_t *txdlp;
 	register u64 val64 = 0;
@@ -1916,12 +1951,12 @@ static void tx_intr_handler(struct s2io_nic *nic)
 	writeq(val64, &bar0->tx_traffic_int);
 
 	for (i = 0; i < config->tx_fifo_num; i++) {
-		offset_info = mac_control->tx_curr_get_info[i];
-		offset_info1 = mac_control->tx_curr_put_info[i];
-		txdlp = mac_control->txdl_start[i] +
-		    (config->max_txds * offset_info.offset);
+		get_info = mac_control->tx_curr_get_info[i];
+		put_info = mac_control->tx_curr_put_info[i];
+		txdlp = (TxD_t *) nic->list_info[i][get_info.offset].
+		    list_virt_addr;
 		while ((!(txdlp->Control_1 & TXD_LIST_OWN_XENA)) &&
-		       (offset_info.offset != offset_info1.offset) &&
+		       (get_info.offset != put_info.offset) &&
 		       (txdlp->Host_Control)) {
 			/* Check for TxD errors */
 			if (txdlp->Control_1 & TXD_T_CODE) {
@@ -1971,12 +2006,12 @@ static void tx_intr_handler(struct s2io_nic *nic)
 			nic->stats.tx_bytes += skb->len;
 			dev_kfree_skb_irq(skb);
 
-			offset_info.offset++;
-			offset_info.offset %= offset_info.fifo_len + 1;
-			txdlp = mac_control->txdl_start[i] +
-			    (config->max_txds * offset_info.offset);
+			get_info.offset++;
+			get_info.offset %= get_info.fifo_len + 1;
+			txdlp = (TxD_t *) nic->list_info[i]
+			    [get_info.offset].list_virt_addr;
 			mac_control->tx_curr_get_info[i].offset =
-			    offset_info.offset;
+			    get_info.offset;
 		}
 	}
 
@@ -2327,7 +2362,9 @@ int s2io_close(struct net_device *dev)
 	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
 	register u64 val64 = 0;
 	u16 cnt = 0;
+	unsigned long flags;
 
+	spin_lock_irqsave(&sp->tx_lock, flags);
 	netif_stop_queue(dev);
 
 	/* disable Tx and Rx traffic on the NIC */
@@ -2381,6 +2418,7 @@ int s2io_close(struct net_device *dev)
 	free_rx_buffers(sp);
 
 	sp->device_close_flag = TRUE;	/* Device is shut down. */
+	spin_unlock_irqrestore(&sp->tx_lock, flags);
 
 	return 0;
 }
@@ -2401,7 +2439,7 @@ int s2io_close(struct net_device *dev)
 int s2io_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	nic_t *sp = dev->priv;
-	u16 off, txd_len, frg_cnt, frg_len, i, queue, off1, queue_len;
+	u16 frg_cnt, frg_len, i, queue, queue_len, put_off, get_off;
 	register u64 val64;
 	TxD_t *txdp;
 	TxFIFO_element_t *tx_fifo;
@@ -2419,6 +2457,14 @@ int s2io_xmit(struct sk_buff *skb, struct net_device *dev)
 	DBG_PRINT(TX_DBG, "%s: In S2IO Tx routine\n", dev->name);
 
 	spin_lock_irqsave(&sp->tx_lock, flags);
+	if ((netif_queue_stopped(dev)) || (!netif_carrier_ok(dev))) {
+		DBG_PRINT(TX_DBG, "%s:s2io_xmit: Tx Queue stopped\n",
+			  dev->name);
+		dev_kfree_skb(skb);
+		spin_unlock_irqrestore(&sp->tx_lock, flags);
+		return 0;
+	}
+
 	queue = 0;
 	/* Multi FIFO Tx is disabled for now. */
 	if (!queue && tx_prio) {
@@ -2427,14 +2473,13 @@ int s2io_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 
-	off = (u16) mac_control->tx_curr_put_info[queue].offset;
-	off1 = (u16) mac_control->tx_curr_get_info[queue].offset;
-	txd_len = config->max_txds;
-	txdp = mac_control->txdl_start[queue] + (config->max_txds * off);
+	put_off = (u16) mac_control->tx_curr_put_info[queue].offset;
+	get_off = (u16) mac_control->tx_curr_get_info[queue].offset;
+	txdp = (TxD_t *) sp->list_info[queue][put_off].list_virt_addr;
 
 	queue_len = mac_control->tx_curr_put_info[queue].fifo_len + 1;
 	/* Avoid "put" pointer going beyond "get" pointer */
-	if (txdp->Host_Control || (((off + 1) % queue_len) == off1)) {
+	if (txdp->Host_Control || (((put_off + 1) % queue_len) == get_off)) {
 		DBG_PRINT(ERR_DBG, "Error in xmit, No free TXDs.\n");
 		netif_stop_queue(dev);
 		dev_kfree_skb(skb);
@@ -2479,8 +2524,7 @@ int s2io_xmit(struct sk_buff *skb, struct net_device *dev)
 	txdp->Control_1 |= TXD_GATHER_CODE_LAST;
 
 	tx_fifo = mac_control->tx_FIFO_start[queue];
-	val64 = (mac_control->txdl_start_phy[queue] +
-		 (sizeof(TxD_t) * txd_len * off));
+	val64 = sp->list_info[queue][put_off].list_phy_addr;
 	writeq(val64, &tx_fifo->TxDL_Pointer);
 
 	val64 = (TX_FIFO_LAST_TXD_NUM(frg_cnt) | TX_FIFO_FIRST_LIST |
@@ -2494,15 +2538,15 @@ int s2io_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Perform a PCI read to flush previous writes */
 	val64 = readq(&bar0->general_int_status);
 
-	off++;
-	off %= mac_control->tx_curr_put_info[queue].fifo_len + 1;
-	mac_control->tx_curr_put_info[queue].offset = off;
+	put_off++;
+	put_off %= mac_control->tx_curr_put_info[queue].fifo_len + 1;
+	mac_control->tx_curr_put_info[queue].offset = put_off;
 
 	/* Avoid "put" pointer going beyond "get" pointer */
-	if (((off + 1) % queue_len) == off1) {
+	if (((put_off + 1) % queue_len) == get_off) {
 		DBG_PRINT(TX_DBG,
 			  "No free TxDs for xmit, Put: 0x%x Get:0x%x\n",
-			  off, off1);
+			  put_off, get_off);
 		netif_stop_queue(dev);
 	}
 
@@ -3070,7 +3114,7 @@ static void s2io_ethtool_getpause_data(struct net_device *dev,
 }
 
 /**
- * s2io_ethtool-setpause_data -  set/reset pause frame generation.
+ * s2io_ethtool_setpause_data -  set/reset pause frame generation.
  * @sp : private member of the device structure, which is a pointer to the 
  *      s2io_nic structure.
  * @ep : pointer to the structure with pause parameters given by ethtool.

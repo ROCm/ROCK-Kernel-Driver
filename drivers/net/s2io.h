@@ -444,6 +444,12 @@ typedef struct _TxD {
 	u64 Host_Control;	/* reserved for host */
 } TxD_t;
 
+/* Structure to hold the phy and virt addr of every TxDL. */
+typedef struct list_info_hold {
+	dma_addr_t list_phy_addr;
+	void *list_virt_addr;
+} list_info_hold_t;
+
 /* Rx descriptor structure */
 typedef struct _RxD_t {
 	u64 Host_Control;	/* reserved for host */
@@ -532,16 +538,8 @@ typedef struct mac_info {
 	u16 mc_pause_threshold_q4q7;
 
 /* tx side stuff */
-	void *txd_list_mem;	/* original pointer to allocated mem */
-	dma_addr_t txd_list_mem_phy;
-	u32 txd_list_mem_sz;
-
 	/* logical pointer of start of each Tx FIFO */
 	TxFIFO_element_t *tx_FIFO_start[MAX_TX_FIFOS];
-
-	/* The Phy and virtual mem loactions of the Tx descriptors. */
-	TxD_t *txdl_start[MAX_TX_FIFOS];
-	dma_addr_t txdl_start_phy[MAX_TX_FIFOS];
 
 /* Current offset within tx_FIFO_start, where driver would write new Tx frame*/
 	tx_curr_put_info_t tx_curr_put_info[MAX_TX_FIFOS];
@@ -637,6 +635,9 @@ typedef struct s2io_nic {
 	rx_block_info_t rx_blocks[MAX_RX_RINGS][MAX_RX_BLOCKS_PER_RING];
 	int block_count[MAX_RX_RINGS];
 	int pkt_cnt[MAX_RX_RINGS];
+
+	/* Place holder of all the TX List's Phy and Virt addresses. */
+	list_info_hold_t *list_info[MAX_TX_FIFOS];
 
 	/*  Id timer, used to blink NIC to physically identify NIC. */
 	struct timer_list id_timer;
