@@ -51,7 +51,7 @@
 
 struct uart_sunsab_port {
 	struct uart_port		port;		/* Generic UART port	*/
-	union sab82532_async_regs	*regs;		/* Chip registers	*/
+	union sab82532_async_regs	__iomem *regs;	/* Chip registers	*/
 	unsigned long			irqflags;	/* IRQ state flags	*/
 	int				dsr;		/* Current DSR state	*/
 	unsigned int			cec_timeout;	/* Chip poll timeout... */

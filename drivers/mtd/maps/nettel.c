@@ -471,8 +471,8 @@ void __exit nettel_cleanup(void)
 		map_destroy(amd_mtd);
 	}
 	if (nettel_amd_map.virt) {
-		iounmap((void *)nettel_amd_map.virt);
-		nettel_amd_map.virt = 0;
+		iounmap(nettel_amd_map.virt);
+		nettel_amd_map.virt = NULL;
 	}
 #ifdef CONFIG_MTD_CFI_INTELEXT
 	if (intel_mtd) {

@@ -430,7 +430,7 @@ static int __init init_dnpc(void)
 			mymtd->erasesize = 0x10000;
 
 	if (!mymtd) {
-		iounmap((void *)dnpc_map.virt);
+		iounmap(dnpc_map.virt);
 		return -ENXIO;
 	}
 		
@@ -481,9 +481,9 @@ static void __exit cleanup_dnpc(void)
 		map_destroy(mymtd);
 	}
 	if (dnpc_map.virt) {
-		iounmap((void *)dnpc_map.virt);
+		iounmap(dnpc_map.virt);
 		dnpc_unmap_flash();
-		dnpc_map.virt = 0;
+		dnpc_map.virt = NULL;
 	}
 }
 

@@ -182,7 +182,7 @@ static void cleanup_elan_104nc(void)
 		map_destroy( all_mtd );
 	}
 
-	iounmap((void *)iomapadr);
+	iounmap(iomapadr);
 }
 
 static int __init init_elan_104nc(void)

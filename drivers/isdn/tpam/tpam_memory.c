@@ -23,14 +23,14 @@
  * 	addr: the address (in the board memory)
  * 	val: the value to put into the memory.
  */
-void copy_to_pam_dword(tpam_card *card, const void *addr, u32 val) {
+void copy_to_pam_dword(tpam_card *card, u32 addr, u32 val) {
 
 	/* set the page register */
-	writel(((unsigned long)addr) | TPAM_PAGE_SIZE, 
+	writel(addr | TPAM_PAGE_SIZE, 
 	       card->bar0 + TPAM_PAGE_REGISTER);
 
 	/* write the value */
-	writel(val, card->bar0 + (((unsigned long)addr) & TPAM_PAGE_SIZE));
+	writel(val, card->bar0 + (addr & TPAM_PAGE_SIZE));
 }
 
 /*
@@ -42,15 +42,15 @@ void copy_to_pam_dword(tpam_card *card, const void *addr, u32 val) {
  * 	from: the source address (in the kernel memory)
  * 	n: number of bytes
  */
-void copy_to_pam(tpam_card *card, void *to, const void *from, u32 n) {
+void copy_to_pam(tpam_card *card, u32 to, const void *from, u32 n) {
 	u32 page, offset, count;
 
 	/* need to write in dword ! */
 	while (n & 3) n++;
 
 	while (n) {
-		page = ((u32)to) | TPAM_PAGE_SIZE;
-		offset = ((u32)to) & TPAM_PAGE_SIZE;
+		page = to | TPAM_PAGE_SIZE;
+		offset = to & TPAM_PAGE_SIZE;
 		count = n < TPAM_PAGE_SIZE - offset
 				? n
 				: TPAM_PAGE_SIZE - offset;
@@ -59,7 +59,7 @@ void copy_to_pam(tpam_card *card, void *to, const void *from, u32 n) {
 		writel(page, card->bar0 + TPAM_PAGE_REGISTER);
 
 		/* copy the data */
-		memcpy_toio((void *)(card->bar0 + offset), from, count);
+		memcpy_toio(card->bar0 + offset, from, count);
 		
 		from += count;
 		to += count;
@@ -75,14 +75,14 @@ void copy_to_pam(tpam_card *card, void *to, const void *from, u32 n) {
  *
  * Return: the value read into the memory.
  */
-u32 copy_from_pam_dword(tpam_card *card, const void *addr) {
+u32 copy_from_pam_dword(tpam_card *card, u32 addr) {
 
 	/* set the page register */
 	writel(((u32)addr) | TPAM_PAGE_SIZE, 
 	       card->bar0 + TPAM_PAGE_REGISTER);
 
 	/* read the data */
-	return readl(card->bar0 + (((u32)addr) & TPAM_PAGE_SIZE));
+	return readl(card->bar0 + (addr & TPAM_PAGE_SIZE));
 }
 
 /*
@@ -93,12 +93,12 @@ u32 copy_from_pam_dword(tpam_card *card, const void *addr) {
  * 	from: the source address (in the board memory)
  * 	n: number of bytes
  */
-void copy_from_pam(tpam_card *card, void *to, const void *from, u32 n) {
+void copy_from_pam(tpam_card *card, void *to, u32 from, u32 n) {
 	u32 page, offset, count;
 
 	while (n) {
-		page = ((u32)from) | TPAM_PAGE_SIZE;
-		offset = ((u32)from) & TPAM_PAGE_SIZE;
+		page = from | TPAM_PAGE_SIZE;
+		offset = from & TPAM_PAGE_SIZE;
 		count = n < TPAM_PAGE_SIZE - offset 
 				? n 
 				: TPAM_PAGE_SIZE - offset;
@@ -107,7 +107,7 @@ void copy_from_pam(tpam_card *card, void *to, const void *from, u32 n) {
 		writel(page, card->bar0 + TPAM_PAGE_REGISTER);
 
 		/* read the data */
-		memcpy_fromio(to, (void *)(card->bar0 + offset), count);
+		memcpy_fromio(to, card->bar0 + offset, count);
 		
 		from += count;
 		to += count;
@@ -125,7 +125,7 @@ void copy_from_pam(tpam_card *card, void *to, const void *from, u32 n) {
  *
  * Return: 0 if OK, <0 if error.
  */
-int copy_from_pam_to_user(tpam_card *card, void __user *to, const void *from, u32 n) {
+int copy_from_pam_to_user(tpam_card *card, void __user *to, u32 from, u32 n) {
 	void *page;
 	u32 count;
 
@@ -148,7 +148,7 @@ int copy_from_pam_to_user(tpam_card *card, void __user *to, const void *from, u3
 		if (copy_to_user(to, page, count)) {
 			
 			/* this can fail... */
-			free_page((u32)page);
+			free_page((unsigned long)page);
 			return -EFAULT;
 		}
 		from += count;
@@ -157,7 +157,7 @@ int copy_from_pam_to_user(tpam_card *card, void __user *to, const void *from, u3
 	}
 
 	/* release allocated memory */
-	free_page((u32)page);
+	free_page((unsigned long)page);
 	return 0;
 }
 
@@ -171,7 +171,7 @@ int copy_from_pam_to_user(tpam_card *card, void __user *to, const void *from, u3
  *
  * Return: 0 if OK, <0 if error.
  */
-int copy_from_user_to_pam(tpam_card *card, void *to, const void __user *from, u32 n) {
+int copy_from_user_to_pam(tpam_card *card, u32 to, const void __user *from, u32 n) {
 	void *page;
 	u32 count;
 
@@ -188,7 +188,7 @@ int copy_from_user_to_pam(tpam_card *card, void *to, const void __user *from, u3
 		/* copy data from the user memory into the kernel memory */
 		if (copy_from_user(page, from, count)) {
 			/* this can fail... */
-			free_page((u32)page);
+			free_page((unsigned long)page);
 			return -EFAULT;
 		}
 
@@ -203,7 +203,7 @@ int copy_from_user_to_pam(tpam_card *card, void *to, const void __user *from, u3
 	}
 
 	/* release allocated memory */
-	free_page((u32)page);
+	free_page((unsigned long)page);
 	return 0;
 }
 

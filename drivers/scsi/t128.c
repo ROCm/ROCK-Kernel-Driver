@@ -211,13 +211,17 @@ int __init t128_detect(Scsi_Host_Template * tpnt){
 	    base = overrides[current_override].address;
 	else 
 	    for (; !base && (current_base < NO_BASES); ++current_base) {
+		void __iomem *p;
 #if (TDEBUG & TDEBUG_INIT)
     printk("scsi-t128 : probing address %08x\n", bases[current_base].address);
 #endif
+		if (bases[current_base].noauto)
+			continue;
+		p = ioremap(bases[current_base].address, 0x2000);
+		if (!p)
+			continue;
 		for (sig = 0; sig < NO_SIGNATURES; ++sig) 
-		    if (!bases[current_base].noauto && 
-			isa_check_signature(bases[current_base].address +
-					signatures[sig].offset,
+		    if (check_signature(p + signatures[sig].offset,
 					signatures[sig].string,
 					strlen(signatures[sig].string))) {
 			base = bases[current_base].address;
@@ -226,6 +230,7 @@ int __init t128_detect(Scsi_Host_Template * tpnt){
 #endif
 			break;
 		    }
+		iounmap(p);
 	    }
 
 #if defined(TDEBUG) && (TDEBUG & TDEBUG_INIT)

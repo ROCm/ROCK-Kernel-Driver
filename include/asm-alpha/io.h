@@ -631,16 +631,6 @@ isa_memcpy_toio(unsigned long offset, const void *src, long n)
 	iounmap(addr);
 }
 
-static inline int
-isa_check_signature(unsigned long offset, const unsigned char *sig, long len)
-{
-	void __iomem *addr = ioremap(offset, len);
-	int ret = check_signature(addr, sig, len);
-	iounmap(addr);
-	return ret;
-}
-
-
 /*
  * The Alpha Jensen hardware for some rather strange reason puts
  * the RTC clock at 0x170 instead of 0x70. Probably due to some

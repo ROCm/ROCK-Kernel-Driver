@@ -454,12 +454,18 @@ int __init seagate_st0x_detect (Scsi_Host_Template * tpnt)
  * space for the on-board RAM instead.
  */
 
-		for (i = 0; i < (sizeof (seagate_bases) / sizeof (unsigned int)); ++i)
-			for (j = 0; !base_address && j < NUM_SIGNATURES; ++j)
-				if (isa_check_signature(seagate_bases[i] + signatures[j].offset, signatures[j].signature, signatures[j].length)) {
+		for (i = 0; i < (sizeof (seagate_bases) / sizeof (unsigned int)); ++i) {
+			void __iomem *p = ioremap(seagate_base[i], 0x2000);
+			if (!p)
+				continue;
+			for (j = 0; j < NUM_SIGNATURES; ++j)
+				if (check_signature(p + signatures[j].offset, signatures[j].signature, signatures[j].length)) {
 					base_address = seagate_bases[i];
 					controller_type = signatures[j].type;
+					break;
 				}
+			iounmap(p);
+		}
 #endif				/* OVERRIDE */
 	}
 	/* (! controller_type) */
