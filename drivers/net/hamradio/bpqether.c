@@ -141,7 +141,6 @@ static inline struct net_device *bpq_get_ether_dev(struct net_device *dev)
 
 /*
  *	Get the BPQ device for the ethernet device
- * need to hold bqp_lock at least for read
  */
 static inline struct net_device *bpq_get_ax25_dev(struct net_device *dev)
 {
@@ -564,6 +563,8 @@ static int bpq_device_event(struct notifier_block *this,unsigned long event, voi
 	if (!dev_is_ethdev(dev))
 		return NOTIFY_DONE;
 
+	rcu_read_lock();
+
 	switch (event) {
 	case NETDEV_UP:		/* new ethernet device -> new BPQ interface */
 		if (bpq_get_ax25_dev(dev) == NULL)
@@ -582,6 +583,7 @@ static int bpq_device_event(struct notifier_block *this,unsigned long event, voi
 	default:
 		break;
 	}
+	rcu_read_unlock();
 
 	return NOTIFY_DONE;
 }
