@@ -426,24 +426,26 @@ static struct {
 static void cp_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 {
 	struct cp_private *cp = dev->priv;
+	unsigned long flags;
 
-	spin_lock_irq(&cp->lock);
+	spin_lock_irqsave(&cp->lock, flags);
 	cp->vlgrp = grp;
 	cp->cpcmd |= RxVlanOn;
 	cpw16(CpCmd, cp->cpcmd);
-	spin_unlock_irq(&cp->lock);
+	spin_unlock_irqrestore(&cp->lock, flags);
 }
 
 static void cp_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 {
 	struct cp_private *cp = dev->priv;
+	unsigned long flags;
 
-	spin_lock_irq(&cp->lock);
+	spin_lock_irqsave(&cp->lock, flags);
 	cp->cpcmd &= ~RxVlanOn;
 	cpw16(CpCmd, cp->cpcmd);
 	if (cp->vlgrp)
 		cp->vlgrp->vlan_devices[vid] = NULL;
-	spin_unlock_irq(&cp->lock);
+	spin_unlock_irqrestore(&cp->lock, flags);
 }
 #endif /* CP_VLAN_TAG_USED */
 
@@ -649,19 +651,22 @@ cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 	/* close possible race's with dev_close */
 	if (unlikely(!netif_running(dev))) {
 		cpw16(IntrMask, 0);
-		goto out;
+		spin_unlock(&cp->lock);
+		return IRQ_HANDLED;
 	}
 
-	if (status & (RxOK | RxErr | RxEmpty | RxFIFOOvr)) {
+	if (status & (RxOK | RxErr | RxEmpty | RxFIFOOvr))
 		if (netif_rx_schedule_prep(dev)) {
 			cpw16_f(IntrMask, cp_norx_intr_mask);
 			__netif_rx_schedule(dev);
 		}
-	}
+
 	if (status & (TxOK | TxErr | TxEmpty | SWInt))
 		cp_tx(cp);
 	if (status & LinkChg)
 		mii_check_media(&cp->mii_if, netif_msg_link(cp), FALSE);
+
+	spin_unlock(&cp->lock);
 
 	if (status & PciErr) {
 		u16 pci_status;
@@ -673,8 +678,7 @@ cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 
 		/* TODO: reset hardware */
 	}
-out:
-	spin_unlock(&cp->lock);
+
 	return IRQ_HANDLED;
 }
 
@@ -957,12 +961,13 @@ static void __cp_get_stats(struct cp_private *cp)
 static struct net_device_stats *cp_get_stats(struct net_device *dev)
 {
 	struct cp_private *cp = dev->priv;
+	unsigned long flags;
 
 	/* The chip only need report frame silently dropped. */
-	spin_lock_irq(&cp->lock);
+	spin_lock_irqsave(&cp->lock, flags);
  	if (netif_running(dev) && netif_device_present(dev))
  		__cp_get_stats(cp);
-	spin_unlock_irq(&cp->lock);
+	spin_unlock_irqrestore(&cp->lock, flags);
 
 	return &cp->net_stats;
 }
@@ -1186,6 +1191,7 @@ err_out_hw:
 static int cp_close (struct net_device *dev)
 {
 	struct cp_private *cp = dev->priv;
+	unsigned long flags;
 
 	if (netif_msg_ifdown(cp))
 		printk(KERN_DEBUG "%s: disabling interface\n", dev->name);
@@ -1193,9 +1199,9 @@ static int cp_close (struct net_device *dev)
 	netif_stop_queue(dev);
 	netif_carrier_off(dev);
 
-	spin_lock_irq(&cp->lock);
+	spin_lock_irqsave(&cp->lock, flags);
 	cp_stop_hw(cp);
-	spin_unlock_irq(&cp->lock);
+	spin_unlock_irqrestore(&cp->lock, flags);
 
 	free_irq(dev->irq, dev);
 	cp_free_rings(cp);
@@ -1207,6 +1213,7 @@ static int cp_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct cp_private *cp = dev->priv;
 	int rc;
+	unsigned long flags;
 
 	/* check for invalid MTU, according to hardware limits */
 	if (new_mtu < CP_MIN_MTU || new_mtu > CP_MAX_MTU)
@@ -1219,7 +1226,7 @@ static int cp_change_mtu(struct net_device *dev, int new_mtu)
 		return 0;
 	}
 
-	spin_lock_irq(&cp->lock);
+	spin_lock_irqsave(&cp->lock, flags);
 
 	cp_stop_hw(cp);			/* stop h/w and free rings */
 	cp_clean_rings(cp);
@@ -1230,7 +1237,7 @@ static int cp_change_mtu(struct net_device *dev, int new_mtu)
 	rc = cp_init_rings(cp);		/* realloc and restart h/w */
 	cp_start_hw(cp);
 
-	spin_unlock_irq(&cp->lock);
+	spin_unlock_irqrestore(&cp->lock, flags);
 
 	return rc;
 }
@@ -1348,10 +1355,11 @@ static int cp_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct cp_private *cp = dev->priv;
 	int rc;
+	unsigned long flags;
 
-	spin_lock_irq(&cp->lock);
+	spin_lock_irqsave(&cp->lock, flags);
 	rc = mii_ethtool_gset(&cp->mii_if, cmd);
-	spin_unlock_irq(&cp->lock);
+	spin_unlock_irqrestore(&cp->lock, flags);
 
 	return rc;
 }
@@ -1360,10 +1368,11 @@ static int cp_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct cp_private *cp = dev->priv;
 	int rc;
+	unsigned long flags;
 
-	spin_lock_irq(&cp->lock);
+	spin_lock_irqsave(&cp->lock, flags);
 	rc = mii_ethtool_sset(&cp->mii_if, cmd);
-	spin_unlock_irq(&cp->lock);
+	spin_unlock_irqrestore(&cp->lock, flags);
 
 	return rc;
 }
@@ -1405,10 +1414,12 @@ static int cp_set_rx_csum(struct net_device *dev, u32 data)
 		newcmd &= ~RxChkSum;
 
 	if (newcmd != cmd) {
-		spin_lock_irq(&cp->lock);
+		unsigned long flags;
+
+		spin_lock_irqsave(&cp->lock, flags);
 		cp->cpcmd = newcmd;
 		cpw16_f(CpCmd, newcmd);
-		spin_unlock_irq(&cp->lock);
+		spin_unlock_irqrestore(&cp->lock, flags);
 	}
 
 	return 0;
@@ -1418,34 +1429,37 @@ static void cp_get_regs(struct net_device *dev, struct ethtool_regs *regs,
 		        void *p)
 {
 	struct cp_private *cp = dev->priv;
+	unsigned long flags;
 
 	if (regs->len < CP_REGS_SIZE)
 		return /* -EINVAL */;
 
 	regs->version = CP_REGS_VER;
 
-	spin_lock_irq(&cp->lock);
+	spin_lock_irqsave(&cp->lock, flags);
 	memcpy_fromio(p, cp->regs, CP_REGS_SIZE);
-	spin_unlock_irq(&cp->lock);
+	spin_unlock_irqrestore(&cp->lock, flags);
 }
 
 static void cp_get_wol (struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct cp_private *cp = dev->priv;
+	unsigned long flags;
 
-	spin_lock_irq (&cp->lock);
+	spin_lock_irqsave (&cp->lock, flags);
 	netdev_get_wol (cp, wol);
-	spin_unlock_irq (&cp->lock);
+	spin_unlock_irqrestore (&cp->lock, flags);
 }
 
 static int cp_set_wol (struct net_device *dev, struct ethtool_wolinfo *wol)
 {
 	struct cp_private *cp = dev->priv;
+	unsigned long flags;
 	int rc;
 
-	spin_lock_irq (&cp->lock);
+	spin_lock_irqsave (&cp->lock, flags);
 	rc = netdev_set_wol (cp, wol);
-	spin_unlock_irq (&cp->lock);
+	spin_unlock_irqrestore (&cp->lock, flags);
 
 	return rc;
 }
@@ -1530,13 +1544,14 @@ static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 	struct cp_private *cp = dev->priv;
 	struct mii_ioctl_data *mii = (struct mii_ioctl_data *) &rq->ifr_data;
 	int rc;
+	unsigned long flags;
 
 	if (!netif_running(dev))
 		return -EINVAL;
 
-	spin_lock_irq(&cp->lock);
+	spin_lock_irqsave(&cp->lock, flags);
 	rc = generic_mii_ioctl(&cp->mii_if, mii, cmd, NULL);
-	spin_unlock_irq(&cp->lock);
+	spin_unlock_irqrestore(&cp->lock, flags);
 	return rc;
 }
 
