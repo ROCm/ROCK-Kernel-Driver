@@ -430,11 +430,11 @@ EXPORT_SYMBOL(uart401intr);
 
 static struct address_info cfg_mpu;
 
-static int __initdata io = -1;
-static int __initdata irq = -1;
+static int io = -1;
+static int irq = -1;
 
-MODULE_PARM(io, "i");
-MODULE_PARM(irq, "i");
+module_param(io, int, 0444);
+module_param(irq, int, 0444);
 
 
 static int __init init_uart401(void)
