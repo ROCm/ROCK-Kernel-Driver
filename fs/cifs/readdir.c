@@ -70,7 +70,7 @@ static int initiate_cifs_search(const int xid, struct file * file, char * full_p
 
 	rc = CIFSFindFirst2(xid, pTcon,full_path,cifs_sb->local_nls, 
 		&cifsFile->netfid, &cifsFile->srch_inf); 
-	cFYI(1,("search initiated with rc %d",rc)); 
+	cFYI(1,("search initiated with rc %d num entries %d",rc,cifsFile->srch_inf.entries_in_buffer)); 
 	return rc;
 }
 
@@ -182,16 +182,19 @@ static int cifs_entry_is_dot(char * current_entry, struct cifsFileInfo * cfile)
 /* We start counting in the buffer with entry 2 and increment for every
    entry (do not increment for . or .. entry) */
 static int find_cifs_entry(const int xid, struct cifsTconInfo * pTcon, 
-		const loff_t index_to_find, struct cifsFileInfo * cifsFile /* BB add missing parm */) 
+		const loff_t index_to_find, struct cifsFileInfo * cifsFile, 
+		char ** ppCurrentEntry,int * num_to_ret) 
 {
 	int rc = 0;
+	int pos_in_buf = 0;
 	loff_t first_entry_in_buffer;
-	int position_in_buf;
 	/* check if index in the buffer */
 	
-	if(cifsFile == NULL)
+	if((cifsFile == NULL) || (ppCurrentEntry == NULL) || (num_to_ret == NULL))
 		return -ENOENT;
 	
+	*ppCurrentEntry = NULL;
+
 	first_entry_in_buffer = 
 		cifsFile->srch_inf.index_of_last_entry - 
 			cifsFile->srch_inf.entries_in_buffer;
@@ -202,27 +205,25 @@ static int find_cifs_entry(const int xid, struct cifsTconInfo * pTcon,
 
 	while((index_to_find > cifsFile->srch_inf.index_of_last_entry) && 
 	      (rc == 0) && (cifsFile->srch_inf.endOfSearch == FALSE)){
+        cFYI(1,("calling findnext2"));
 		rc = CIFSFindNext2(xid,pTcon,cifsFile->netfid, &cifsFile->srch_inf);
 	}
 	if(index_to_find <= cifsFile->srch_inf.index_of_last_entry) {
 		/* we found the buffer that contains the entry */
 		/* scan and find it */
 		int i;
-		FILE_DIRECTORY_INFO * removeme;
 		char * current_entry;
 		char * end_of_smb = cifsFile->srch_inf.ntwrk_buf_start + 
 			smbCalcSize((struct smb_hdr *)cifsFile->srch_inf.ntwrk_buf_start);
 
-		cFYI(1,("Found buffer that entry is in")); /* BB removeme BB */
 		first_entry_in_buffer = cifsFile->srch_inf.index_of_last_entry -
 			cifsFile->srch_inf.entries_in_buffer;
-		position_in_buf = index_to_find - first_entry_in_buffer;
+		pos_in_buf = index_to_find - first_entry_in_buffer;
 		current_entry = cifsFile->srch_inf.srch_entries_start;
-		for(i=0;(i<position_in_buf) && (current_entry != NULL);i++) {
+		for(i=0;(i<(pos_in_buf)) && (current_entry != NULL);i++) {
 			/* go entry to next entry figuring out which we need to start with */
 			/* if( . or ..)
 				skip */
-			removeme = (FILE_DIRECTORY_INFO *)current_entry; /* BB removeme BB */
 			rc = cifs_entry_is_dot(current_entry,cifsFile);
 			if(rc == 1) /* is . or .. so skip */ {
 				cFYI(1,("Entry is .")); /* BB removeme BB */
@@ -230,22 +231,137 @@ static int find_cifs_entry(const int xid, struct cifsTconInfo * pTcon,
 			} else if (rc == 2 ) {
 				cFYI(1,("Entry is ..")); /* BB removeme BB */
 				continue;
-			} else {
-				cFYI(1,("entry is %d long",removeme->FileNameLength)); /* BB removeme BB */
 			}
 			current_entry = nxt_dir_entry(current_entry,end_of_smb);
 		}
-		for(i=position_in_buf;i<cifsFile->srch_inf.index_of_last_entry;i++) {
-			/* filldir calls */
-		}
+		rc = 0;
+		*ppCurrentEntry = current_entry;
 	}
 
+	if(pos_in_buf > cifsFile->srch_inf.entries_in_buffer) {
+		cFYI(1,("can not return entries when pos_in_buf beyond last entry"));
+		*num_to_ret = 0;
+	} else
+		*num_to_ret = cifsFile->srch_inf.entries_in_buffer - pos_in_buf;
 	return rc;
 }
 
-static int cifs_filldir_with_entries(loff_t index_to_find, struct cifsFileInfo * cifsFile)
+/* inode num, inode type and filename returned */
+static int cifs_get_name_from_search_buf(struct qstr * pqst,char * current_entry,
+			__u16 level,unsigned int unicode,struct nls_table * nlt,
+			ino_t * pinum, unsigned * pobject_type)
 {
 	int rc = 0;
+	unsigned int len = 0;
+	char * filename;
+
+	*pinum = 11; /* BB removeme BB */
+
+	if(level == 0x202) {
+		FILE_UNIX_INFO * pFindData = (FILE_UNIX_INFO *)current_entry;
+		__u32 type;
+
+		filename = &pFindData->FileName[0];
+		if(unicode) {
+			len = cifs_unicode_bytelen(filename);
+		} else {
+			/* BB should we make this strnlen of PATH_MAX? */
+			len = strnlen(filename, 5);
+		}
+
+		/* BB fixme - hash low and high 32 bits if not 64 bit arch BB fixme */
+		*pinum = pFindData->UniqueId;
+
+		type=le32_to_cpu(pFindData->Type);
+		if (type == UNIX_FILE) {
+			*pobject_type = DT_REG;
+		} else if (type == UNIX_SYMLINK) {
+			*pobject_type = DT_LNK;
+		} else if (type == UNIX_DIR) {
+			*pobject_type = DT_DIR;
+		} else if (type == UNIX_CHARDEV) {
+			*pobject_type = DT_CHR;
+		} else if (type == UNIX_BLOCKDEV) {
+		*pobject_type = DT_BLK;
+		} else if (type == UNIX_FIFO) {
+			*pobject_type = DT_FIFO;
+		} else if (type == UNIX_SOCKET) {
+			*pobject_type = DT_SOCK;
+		}
+	} else if(level == 0x101) {
+		FILE_DIRECTORY_INFO * pFindData = 
+			(FILE_DIRECTORY_INFO *)current_entry;
+		filename = &pFindData->FileName[0];
+		len = pFindData->FileNameLength;
+	} else if(level == 0x102) {
+		FILE_FULL_DIRECTORY_INFO * pFindData = 
+			(FILE_FULL_DIRECTORY_INFO *)current_entry;
+		filename = &pFindData->FileName[0];
+		len = pFindData->FileNameLength;
+	} else if(level == 0x105) {
+		SEARCH_ID_FULL_DIR_INFO * pFindData = 
+			(SEARCH_ID_FULL_DIR_INFO *)current_entry;
+		filename = &pFindData->FileName[0];
+		len = pFindData->FileNameLength;
+	} else if(level == 0x104) {
+		FILE_BOTH_DIRECTORY_INFO * pFindData = 
+			(FILE_BOTH_DIRECTORY_INFO *)current_entry;
+		filename = &pFindData->FileName[0];
+		len = pFindData->FileNameLength;
+	} else {
+		cFYI(1,("Unknown findfirst level %d",level));
+		return -EINVAL;
+	}
+	pqst->len = len;
+	if(unicode) {
+		/* BB fixme - test with long names */
+		cifs_strfromUCS_le((char *)pqst->name,(wchar_t *)filename,NAME_MAX,nlt);
+	} else {
+		pqst->name = filename;
+	}
+	pqst->hash = full_name_hash(pqst->name,pqst->len);
+	cFYI(1,("filldir on %s",pqst->name));  /* BB removeme BB */
+	return rc;
+}
+
+
+static int
+cifs_filldir2(char * pfindEntry, struct file *file, 
+			  filldir_t filldir, void *direntry,char * scratch_buf)
+{
+	int rc = 0;
+	struct qstr qstring;
+	struct cifsFileInfo * pCifsF;
+	unsigned obj_type;
+	ino_t  inum;
+	struct cifs_sb_info * cifs_sb;
+	/* get filename and len into qstring */
+	/* get dentry */
+	/* decide whether to create and populate ionde */
+	if((direntry == NULL) || (file == NULL))
+		return -EINVAL;
+
+	pCifsF = file->private_data;
+	
+	if((scratch_buf == NULL) || (pfindEntry == NULL) || (pCifsF == NULL))
+		return -ENOENT;
+
+	if(file->f_dentry == NULL)
+		return -ENOENT;
+
+	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
+
+
+	qstring.name = scratch_buf;
+	rc = cifs_get_name_from_search_buf(&qstring,pfindEntry,
+			pCifsF->srch_inf.info_level,
+			pCifsF->srch_inf.unicode,cifs_sb->local_nls,
+			&inum /* returned */,&obj_type /* returned */);
+
+	if(rc)
+		return rc;
+
+	rc = filldir(direntry,qstring.name,qstring.len,file->f_pos,inum,obj_type);
 
 	return rc;
 }
@@ -254,11 +370,15 @@ static int cifs_filldir_with_entries(loff_t index_to_find, struct cifsFileInfo *
 int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 {
 	int rc = 0;
-	int xid;
+	int xid,i;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	struct cifsFileInfo *cifsFile = NULL;
 	char *full_path = NULL;
+	char * current_entry;
+	int num_to_fill = 0;
+	char * tmp_buf = NULL;
+	char * end_of_smb;
 
 /*	int Unicode = FALSE;
 	int UnixSearch = FALSE;
@@ -295,23 +415,23 @@ int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 	cFYI(1, ("Full path: %s start at: %lld ", full_path, file->f_pos));
 
 	switch ((int) file->f_pos) {
-/*	case 0:
-		if (filldir(direntry, ".", 1, file->f_pos,
+	case 0:
+		/*if (filldir(direntry, ".", 1, file->f_pos,
 		     file->f_dentry->d_inode->i_ino, DT_DIR) < 0) {
 			cERROR(1, ("Filldir for current dir failed "));
 			rc = -ENOMEM;
 			break;
 		}
-		file->f_pos++;
+		file->f_pos++; */
 	case 1:
-		if (filldir(direntry, "..", 2, file->f_pos,
+		/* if (filldir(direntry, "..", 2, file->f_pos,
 		     file->f_dentry->d_parent->d_inode->i_ino, DT_DIR) < 0) {
 			cERROR(1, ("Filldir for parent dir failed "));
 			rc = -ENOMEM;
 			break;
 		}
 		file->f_pos++; */
-	default:
+	case 2:
 		/* 1) If search is active, 
 			is in current search buffer? 
 			if it before then restart search
@@ -319,6 +439,7 @@ int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 
 		if(file->private_data == NULL) {
 			rc = initiate_cifs_search(xid,file,full_path);
+			cFYI(1,("initiate cifs search rc %d",rc));
 			if(rc || (file->private_data == NULL)) {
 				FreeXid(xid);
 				if(full_path)
@@ -343,14 +464,35 @@ int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 			cifsFile->search_resume_name = NULL;
 		} */
 /* BB account for . and .. in f_pos */
-		find_cifs_entry(xid,pTcon, file->f_pos, cifsFile);
+		rc = find_cifs_entry(xid,pTcon, file->f_pos, cifsFile,&current_entry,&num_to_fill);
+		if(rc)
+			goto rddir2_exit;
 		/* 2) initiate search, */
 		/* 3) seek into search buffer */
 		/* 4) if not found && later - FindNext */
 		/* else if earlier in search, close search and 
 				restart, continuing search till found or EndOfSearch */
-	}
+		cFYI(1,("loop through %d times filling dir",num_to_fill)); /* BB removeme BB */
+		end_of_smb = cifsFile->srch_inf.ntwrk_buf_start + 
+			smbCalcSize((struct smb_hdr *)cifsFile->srch_inf.ntwrk_buf_start);
+		tmp_buf = kmalloc(NAME_MAX+1,GFP_KERNEL);
+		for(i=0;(i<num_to_fill) && (rc == 0);i++) {
+			if(current_entry == NULL)
+				break;
+			rc = cifs_filldir2(current_entry, file, 
+					filldir, direntry,tmp_buf);
+			file->f_pos++;
+			current_entry = nxt_dir_entry(current_entry,end_of_smb);
+		}
+		if(tmp_buf != NULL)
+			kfree(tmp_buf);
+		break;
+	default:
+		cFYI(1,("default case - exiting")); /* BB fixme BB */
+		rc = 0;
+	} /* end switch */
 
+rddir2_exit:
 	if (full_path)
 		kfree(full_path);
 
