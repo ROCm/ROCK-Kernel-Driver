@@ -464,7 +464,7 @@ static void pmc_setup_one_p4_counter(unsigned int ctr)
 	unsigned int escr = 0;
 	unsigned int high = 0;
 	unsigned int counter_bit;
-	struct p4_event_binding * ev = 0;
+	struct p4_event_binding *ev = NULL;
 	unsigned int stag;
 
 	stag = get_stagger();
