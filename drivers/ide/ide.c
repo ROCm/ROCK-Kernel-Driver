@@ -1359,8 +1359,6 @@ static int set_io_32bit(ide_drive_t *drive, int arg)
 
 static int set_using_dma (ide_drive_t *drive, int arg)
 {
-	if (!DRIVER(drive)->supports_dma)
-		return -EPERM;
 	if (!drive->id || !(drive->id->capability & 1))
 		return -EPERM;
 	if (HWIF(drive)->ide_dma_check == NULL)
@@ -2452,9 +2450,6 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 	if ((drive->autotune == IDE_TUNE_DEFAULT) ||
 		(drive->autotune == IDE_TUNE_AUTO)) {
 		/* DMA timings and setup moved to ide-probe.c */
-		if (!driver->supports_dma && HWIF(drive)->ide_dma_off_quietly)
-//			HWIF(drive)->ide_dma_off_quietly(drive);
-			HWIF(drive)->ide_dma_off(drive);
 		drive->dsc_overlap = (drive->next != drive && driver->supports_dsc_overlap);
 		drive->nice1 = 1;
 	}
