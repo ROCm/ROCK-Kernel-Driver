@@ -1,4 +1,5 @@
 extern void assabet_leds_event(led_event_t evt);
+extern void badge4_leds_event(led_event_t evt);
 extern void consus_leds_event(led_event_t evt);
 extern void brutus_leds_event(led_event_t evt);
 extern void cerf_leds_event(led_event_t evt);
