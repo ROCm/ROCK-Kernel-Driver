@@ -205,8 +205,8 @@ void xfs_dm_exit(struct file_system_type *);
 #define XFS_DM_INIT(fstype)	xfs_dm_init(fstype)
 #define XFS_DM_EXIT(fstype)	xfs_dm_exit(fstype)
 #else
-#define XFS_DM_INIT()
-#define XFS_DM_EXIT()
+#define XFS_DM_INIT(fstype)
+#define XFS_DM_EXIT(fstype)
 #endif
 
 #endif  /* __XFS_DMAPI_H__ */
