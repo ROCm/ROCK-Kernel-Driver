@@ -38,6 +38,8 @@
 
 #define ENTRIES_PER_PAGE (PAGE_CACHE_SIZE/sizeof(unsigned long))
 
+#define VM_ACCT(size)    (((size) + PAGE_CACHE_SIZE - 1) >> PAGE_SHIFT)
+
 static inline struct shmem_sb_info *SHMEM_SB(struct super_block *sb)
 {
 	return sb->u.generic_sbp;
@@ -371,10 +373,8 @@ static int shmem_notify_change(struct dentry * dentry, struct iattr *attr)
 	 	 */
 		long change;
 
-		change = ((attr->ia_size + PAGE_SIZE - 1) >> PAGE_SHIFT) -
-			((inode->i_size + PAGE_SIZE - 1 ) >> PAGE_SHIFT);
-
-		if (attr->ia_size > inode->i_size) {
+		change = VM_ACCT(attr->ia_size) - VM_ACCT(inode->i_size);
+		if (change > 0) {
 			if (!vm_enough_memory(change))
 				return -ENOMEM;
 		} else
@@ -393,13 +393,12 @@ static void shmem_delete_inode(struct inode * inode)
 {
 	struct shmem_sb_info *sbinfo = SHMEM_SB(inode->i_sb);
 
-	vm_unacct_memory((inode->i_size) >> PAGE_SHIFT);
-
-	inode->i_size = 0;
-	if (inode->i_op->truncate == shmem_truncate){ 
+	if (inode->i_op->truncate == shmem_truncate) {
 		spin_lock (&shmem_ilock);
 		list_del (&SHMEM_I(inode)->list);
 		spin_unlock (&shmem_ilock);
+		vm_unacct_memory(VM_ACCT(inode->i_size));
+		inode->i_size = 0;
 		shmem_truncate (inode);
 	}
 	spin_lock (&sbinfo->stat_lock);
@@ -886,7 +885,7 @@ shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 	maxpos = inode->i_size;
 	if (pos + count > inode->i_size) {
 		maxpos = pos + count;
-		if (!vm_enough_memory((maxpos - inode->i_size) >> PAGE_SHIFT)) {
+		if (!vm_enough_memory(VM_ACCT(maxpos) - VM_ACCT(inode->i_size))) {
 			err = -ENOMEM;
 			goto out_nc;
 		}
@@ -983,7 +982,7 @@ unlock:
 out:
 	/* Short writes give back address space */
 	if (inode->i_size != maxpos)
-		vm_unacct_memory((maxpos - inode->i_size) >> PAGE_SHIFT);
+		vm_unacct_memory(VM_ACCT(maxpos) - VM_ACCT(inode->i_size));
 out_nc:
 	up(&inode->i_sem);
 	return err;
@@ -1238,10 +1237,15 @@ static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char *
 		memcpy(info, symname, len);
 		inode->i_op = &shmem_symlink_inline_operations;
 	} else {
+		if (!vm_enough_memory(VM_ACCT(1))) {
+			iput(inode);
+			return -ENOMEM;
+		}
 		down(&info->sem);
 		page = shmem_getpage_locked(info, inode, 0);
 		if (IS_ERR(page)) {
 			up(&info->sem);
+			vm_unacct_memory(VM_ACCT(1));
 			iput(inode);
 			return PTR_ERR(page);
 		}
@@ -1648,7 +1652,7 @@ module_exit(exit_shmem_fs)
  */
 struct file *shmem_file_setup(char * name, loff_t size)
 {
-	int error = -ENOMEM;
+	int error;
 	struct file *file;
 	struct inode * inode;
 	struct dentry *dentry, *root;
@@ -1657,9 +1661,10 @@ struct file *shmem_file_setup(char * name, loff_t size)
 	if (size > (unsigned long long) SHMEM_MAX_BLOCKS << PAGE_CACHE_SHIFT)
 		return ERR_PTR(-EINVAL);
 
-	if (!vm_enough_memory((size) >> PAGE_CACHE_SHIFT))
+	if (!vm_enough_memory(VM_ACCT(size)))
 		return ERR_PTR(-ENOMEM);
 
+	error = -ENOMEM;
 	this.name = name;
 	this.len = strlen(name);
 	this.hash = 0; /* will go */
@@ -1693,9 +1698,10 @@ close_file:
 put_dentry:
 	dput (dentry);
 put_memory:
-	vm_unacct_memory((size) >> PAGE_CACHE_SHIFT);
+	vm_unacct_memory(VM_ACCT(size));
 	return ERR_PTR(error);	
 }
+
 /*
  * shmem_zero_setup - setup a shared anonymous mapping
  *
