@@ -3,7 +3,7 @@
  *
  * Copyright (C) 1996 David S. Miller
  * Copyright (C) 1997 Miguel de Icaza
- * Copyright (C) 1997, 1998 Ralf Baechle
+ * Copyright (C) 1997, 1998, 1999, 2000 Ralf Baechle
  */
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -27,7 +27,6 @@
 #include <asm/page.h>
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
-#include <asm/sgialib.h>
 #include <asm/inventory.h>
 
 /* 2,191 lines of complete and utter shit coming up... */
@@ -1249,9 +1248,9 @@ static inline void irix_xstat64_xlate(struct stat *sb)
 
 	ks.st_blksize = (s32) sb->st_blksize;
 	ks.st_blocks = (long long) sb->st_blocks;
-	memcpy(&ks.st_fstype[0], &sb->st_fstype[0], 16);
-	ks.st_pad4[0] = ks.st_pad4[1] = ks.st_pad4[2] = ks.st_pad4[3] =
-		ks.st_pad4[4] = ks.st_pad4[5] = ks.st_pad4[6] = ks.st_pad4[7] = 0;
+	memset(ks.st_fstype, 0, 16);
+	ks.st_pad4[0] = ks.st_pad4[1] = ks.st_pad4[2] = ks.st_pad4[3] = 0;
+	ks.st_pad4[4] = ks.st_pad4[5] = ks.st_pad4[6] = ks.st_pad4[7] = 0;
 
 	/* Now write it all back. */
 	copy_to_user(sb, &ks, sizeof(struct xstat64));

@@ -5,7 +5,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1997, 1998, 2000 by Ralf Baechle
+ * Copyright (C) 1996, 1997, 1998, 2000, 2001 by Ralf Baechle
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -94,9 +94,10 @@ EXPORT_SYMBOL(invalid_pte_table);
 /*
  * Semaphore stuff
  */
-EXPORT_SYMBOL(__down_read);
-EXPORT_SYMBOL(__down_write);
-EXPORT_SYMBOL(__rwsem_wake);
+EXPORT_SYMBOL(__down);
+EXPORT_SYMBOL(__down_interruptible);
+EXPORT_SYMBOL(__down_trylock);
+EXPORT_SYMBOL(__up);
 
 /*
  * Base address of ports for Intel style I/O.

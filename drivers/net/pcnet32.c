@@ -47,6 +47,16 @@ static const char *version = "pcnet32.c:v1.25kf 26.9.1999 tsbogend@alpha.franken
 
 static unsigned int pcnet32_portlist[] __initdata = {0x300, 0x320, 0x340, 0x360, 0};
 
+/*
+ * PCI device identifiers for "new style" Linux PCI Device Drivers
+ */
+static struct pci_device_id pcnet32_pci_tbl[] __devinitdata = {
+    { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE_HOME, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+    { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+    { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE, 0x1014, 0x2000, 0, 0, 0 },
+    { 0, }
+};
+
 static int pcnet32_debug = 1;
 static int tx_start = 1; /* Mapping -- 0:20, 1:64, 2:128, 3:~220 (depends on chip vers) */
 
@@ -205,16 +215,6 @@ static int full_duplex[MAX_UNITS];
 
 #define PCNET32_TOTAL_SIZE 0x20
 
-/* some PCI ids */
-#ifndef PCI_DEVICE_ID_AMD_LANCE
-#define PCI_VENDOR_ID_AMD	      0x1022
-#define PCI_DEVICE_ID_AMD_LANCE	      0x2000
-#endif
-#ifndef PCI_DEVICE_ID_AMD_PCNETHOME
-#define PCI_DEVICE_ID_AMD_PCNETHOME   0x2001
-#endif
-
-
 #define CRC_POLYNOMIAL_LE 0xedb88320UL	/* Ethernet CRC, little endian */
 
 /* The PCNET32 Rx and Tx ring descriptors. */
@@ -319,16 +319,6 @@ struct pcnet32_pci_id_info {
     int (*probe1) (unsigned long, unsigned char, int, int, struct pci_dev *);
 };
 
-
-/*
- * PCI device identifiers for "new style" Linux PCI Device Drivers
- */
-static struct pci_device_id pcnet32_pci_tbl[] __devinitdata = {
-    { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_PCNETHOME, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
-    { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
-    { PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE, 0x1014, 0x2000, 0, 0, 0 },
-    { 0, }
-};
 
 MODULE_DEVICE_TABLE (pci, pcnet32_pci_tbl);
 

@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.15 05/21/01 11:51:32 trini
+# BK Id: SCCS/s.Makefile 1.17 06/12/01 16:47:44 paulus
 #
 # arch/ppc/boot/Makefile
 #
@@ -33,13 +33,17 @@ TFTPIMAGE=/tftpboot/zImage.prep
 endif
 
 ZLINKFLAGS = -T $(TOPDIR)/arch/$(ARCH)/vmlinux.lds -Ttext 0x00800000
-OBJECTS := head.o misc.o vreset.o kbd.o ../common/misc-common.o \
+OBJECTS := head.o misc.o ../common/misc-common.o \
 		../common/string.o of1275.o
 OBJCOPY_ARGS = -O elf32-powerpc
 LIBS = ../lib/zlib.a
 
 ifeq ($(CONFIG_SERIAL_CONSOLE),y)
 OBJECTS += ns16550.o
+endif
+
+ifeq ($(CONFIG_VGA_CONSOLE),y)
+OBJECTS += vreset.o kbd.o
 endif
 
 # Tools

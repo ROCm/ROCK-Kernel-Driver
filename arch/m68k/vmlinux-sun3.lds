@@ -20,6 +20,7 @@ SECTIONS
 
   .data : {			/* Data */
 	*(.rodata)
+	*(.rodata.*)
 	*(.data)
 	CONSTRUCTORS
   	. = ALIGN(16);		/* Exception table */

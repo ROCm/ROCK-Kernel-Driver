@@ -1284,7 +1284,12 @@ void reiserfs_write_inode (struct inode * inode, int do_sync) {
 	                  inode->i_ino) ;
         return ;
     }
-    if (do_sync) {
+    /* memory pressure can sometimes initiate write_inode calls with sync == 1,
+    ** these cases are just when the system needs ram, not when the 
+    ** inode needs to reach disk for safety, and they can safely be
+    ** ignored because the altered inode has already been logged.
+    */
+    if (do_sync && !(current->flags & PF_MEMALLOC)) {
 	lock_kernel() ;
 	journal_begin(&th, inode->i_sb, jbegin_count) ;
 	reiserfs_update_sd (&th, inode);

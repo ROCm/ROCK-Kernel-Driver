@@ -1,10 +1,9 @@
-/* $Id: termios.h,v 1.8 2000/01/27 23:45:30 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996 by Ralf Baechle
+ * Copyright (C) 1995, 1996, 2001 by Ralf Baechle
  */
 #ifndef _ASM_TERMIOS_H
 #define _ASM_TERMIOS_H

@@ -8,6 +8,7 @@ SECTIONS
   {
     *(.text)
     *(.rodata)
+    *(.rodata.*)
     *(.rodata1)
     /* .gnu.warning sections are handled specially by elf32.em.  */
     *(.gnu.warning)

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.feature.c 1.10 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.feature.c 1.14 06/17/01 09:33:37 trini
  */
 /*
  *  arch/ppc/kernel/feature.c
@@ -288,11 +288,11 @@ static struct board_features_t {
   {	"AAPL,PowerBook1998",	FTR_CAN_SLEEP			}, /* Wallstreet PowerBook */
   {	"PowerBook1,1",		FTR_CAN_SLEEP			}, /* 101 (Lombard) PowerBook */
   {	"PowerBook2,1",		FTR_CAN_SLEEP 			}, /* iBook */
+  {	"PowerBook4,1",		FTR_CAN_NAP|FTR_CAN_SLEEP	}, /* iBook Dual USB */
   {	"PowerBook2,2",		FTR_CAN_SLEEP /*| FTR_CAN_NAP*/	}, /* iBook FireWire */
   {	"PowerBook3,1",		FTR_CAN_SLEEP|FTR_CAN_NAP|	   /* PowerBook 2000 (Pismo) */
   				FTR_HAS_FW_POWER		}, 
   {	"PowerBook3,2",		FTR_CAN_NAP|FTR_CAN_SLEEP	}, /* PowerBook Titanium */
-  {	"PowerBook4,1",		FTR_CAN_NAP|FTR_CAN_SLEEP	}, /* New polycarbonate iBook */
   {	NULL, 0 }
 };
 

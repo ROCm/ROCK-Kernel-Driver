@@ -1,551 +1,542 @@
-/*
- * Copyright (C) 1991, 1992, 1995  Linus Torvalds
- * Copyright (C) 1996 - 2000  Ralf Baechle
+/***********************************************************************
+ * Copyright 2001 MontaVista Software Inc.
+ * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
  *
- * This file contains the time handling details for PC-style clocks as
- * found in some MIPS systems.
+ * arch/mips/kernel/time.c
+ *     Common time service routines for MIPS machines.  See 
+ *     Documents/MIPS/time.txt. 
+ *
+ * This program is free software; you can redistribute  it and/or modify it
+ * under  the terms of  the GNU General  Public License as published by the
+ * Free Software Foundation;  either version 2 of the  License, or (at your
+ * option) any later version.
+ ***********************************************************************
  */
+
 #include <linux/config.h>
-#include <linux/errno.h>
+#include <linux/types.h>
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
-#include <linux/kernel.h>
 #include <linux/param.h>
-#include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/interrupt.h>
+#include <linux/time.h>
+#include <linux/smp.h>
 #include <linux/kernel_stat.h>
+#include <linux/spinlock.h>
+#include <linux/interrupt.h>
 
 #include <asm/bootinfo.h>
-#include <asm/mipsregs.h>
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/ddb5074.h>
+#include <asm/cpu.h>
+#include <asm/time.h>
+#include <asm/hardirq.h>
 
-#include <linux/mc146818rtc.h>
-#include <linux/timex.h>
-
-extern volatile unsigned long wall_jiffies;
-unsigned long r4k_interval;
-extern rwlock_t xtime_lock;
-
-/*
- * Change this if you have some constant time drift
+/* 
+ * macro for catching spurious errors.  Eable to LL_DEBUG in kernel hacking
+ * config menu.
  */
-/* This is the value for the PC-style PICs. */
-/* #define USECS_PER_JIFFY (1000020/HZ) */
+#ifdef CONFIG_LL_DEBUG
+#define	MIPS_ASSERT(x)	if (!(x)) { panic("MIPS_ASSERT failed at %s:%d\n", __FILE__, __LINE__); }
+#define MIPS_DEBUG(x)  do { x; } while (0)
+#else
+#define MIPS_ASSERT(x)
+#define MIPS_DEBUG(x)
+#endif
 
 /* This is for machines which generate the exact clock. */
 #define USECS_PER_JIFFY (1000000/HZ)
-
-/* Cycle counter value at the previous timer interrupt.. */
-
-static unsigned int timerhi, timerlo;
+#define USECS_PER_JIFFY_FRAC (0x100000000*1000000/HZ&0xffffffff)
 
 /*
- * On MIPS only R4000 and better have a cycle counter.
- *
- * FIXME: Does playing with the RP bit in c0_status interfere with this code?
+ * forward reference
  */
-static unsigned long do_fast_gettimeoffset(void)
-{
-	u32 count;
-	unsigned long res, tmp;
-
-	/* Last jiffy when do_fast_gettimeoffset() was called. */
-	static unsigned long last_jiffies;
-	unsigned long quotient;
-
-	/*
-	 * Cached "1/(clocks per usec)*2^32" value.
-	 * It has to be recalculated once each jiffy.
-	 */
-	static unsigned long cached_quotient;
-
-	tmp = jiffies;
-
-	quotient = cached_quotient;
-
-	if (tmp && last_jiffies != tmp) {
-		last_jiffies = tmp;
-		__asm__(".set\tnoreorder\n\t"
-			".set\tnoat\n\t"
-			".set\tmips3\n\t"
-			"lwu\t%0,%2\n\t"
-			"dsll32\t$1,%1,0\n\t"
-			"or\t$1,$1,%0\n\t"
-			"ddivu\t$0,$1,%3\n\t"
-			"mflo\t$1\n\t"
-			"dsll32\t%0,%4,0\n\t"
-			"nop\n\t"
-			"ddivu\t$0,%0,$1\n\t"
-			"mflo\t%0\n\t"
-			".set\tmips0\n\t"
-			".set\tat\n\t"
-			".set\treorder"
-			:"=&r" (quotient)
-			:"r" (timerhi),
-			 "m" (timerlo),
-			 "r" (tmp),
-			 "r" (USECS_PER_JIFFY)
-			:"$1");
-		cached_quotient = quotient;
-	}
-
-	/* Get last timer tick in absolute kernel time */
-	count = read_32bit_cp0_register(CP0_COUNT);
-
-	/* .. relative to previous jiffy (32 bits is enough) */
-	count -= timerlo;
-//printk("count: %08lx, %08lx:%08lx\n", count, timerhi, timerlo);
-
-	__asm__("multu\t%1,%2\n\t"
-		"mfhi\t%0"
-		:"=r" (res)
-		:"r" (count),
-		 "r" (quotient));
-
-	/*
- 	 * Due to possible jiffies inconsistencies, we need to check 
-	 * the result so that we'll get a timer that is monotonic.
-	 */
-	if (res >= USECS_PER_JIFFY)
-		res = USECS_PER_JIFFY-1;
-
-	return res;
-}
-
-/* This function must be called with interrupts disabled 
- * It was inspired by Steve McCanne's microtime-i386 for BSD.  -- jrs
- * 
- * However, the pc-audio speaker driver changes the divisor so that
- * it gets interrupted rather more often - it loads 64 into the
- * counter rather than 11932! This has an adverse impact on
- * do_gettimeoffset() -- it stops working! What is also not
- * good is that the interval that our timer function gets called
- * is no longer 10.0002 ms, but 9.9767 ms. To get around this
- * would require using a different timing source. Maybe someone
- * could use the RTC - I know that this can interrupt at frequencies
- * ranging from 8192Hz to 2Hz. If I had the energy, I'd somehow fix
- * it so that at startup, the timer code in sched.c would select
- * using either the RTC or the 8253 timer. The decision would be
- * based on whether there was any other device around that needed
- * to trample on the 8253. I'd set up the RTC to interrupt at 1024 Hz,
- * and then do some jiggery to have a version of do_timer that 
- * advanced the clock by 1/1024 s. Every time that reached over 1/100
- * of a second, then do all the old code. If the time was kept correct
- * then do_gettimeoffset could just return 0 - there is no low order
- * divider that can be accessed.
- *
- * Ideally, you would be able to use the RTC for the speaker driver,
- * but it appears that the speaker driver really needs interrupt more
- * often than every 120 us or so.
- *
- * Anyway, this needs more thought....		pjsg (1993-08-28)
- * 
- * If you are really that interested, you should be reading
- * comp.protocols.time.ntp!
- */
-
-#define TICK_SIZE tick
-
-static unsigned long do_slow_gettimeoffset(void)
-{
-	int count;
-
-	static int count_p = LATCH;    /* for the first call after boot */
-	static unsigned long jiffies_p;
-
-	/*
-	 * cache volatile jiffies temporarily; we have IRQs turned off. 
-	 */
-	unsigned long jiffies_t;
-
-	/* timer count may underflow right here */
-	outb_p(0x00, 0x43);	/* latch the count ASAP */
-
-	count = inb_p(0x40);	/* read the latched count */
-
-	/*
-	 * We do this guaranteed double memory access instead of a _p 
-	 * postfix in the previous port access. Wheee, hackady hack
-	 */
-	jiffies_t = jiffies;
-
-	count |= inb_p(0x40) << 8;
-
-	/*
-	 * avoiding timer inconsistencies (they are rare, but they happen)...
-	 * there are two kinds of problems that must be avoided here:
-	 *  1. the timer counter underflows
-	 *  2. hardware problem with the timer, not giving us continuous time,
-	 *     the counter does small "jumps" upwards on some Pentium systems,
-	 *     (see c't 95/10 page 335 for Neptun bug.)
-	 */
-
-	if( jiffies_t == jiffies_p ) {
-		if( count > count_p ) {
-			/* the nutcase */
-
-			outb_p(0x0A, 0x20);
-
-			/* assumption about timer being IRQ1 */
-			if (inb(0x20) & 0x01) {
-				/*
-				 * We cannot detect lost timer interrupts ... 
-				 * well, that's why we call them lost, don't we? :)
-				 * [hmm, on the Pentium and Alpha we can ... sort of]
-				 */
-				count -= LATCH;
-			} else {
-				printk("do_slow_gettimeoffset(): hardware timer problem?\n");
-			}
-		}
-	} else
-		jiffies_p = jiffies_t;
-
-	count_p = count;
-
-	count = ((LATCH-1) - count) * TICK_SIZE;
-	count = (count + LATCH/2) / LATCH;
-
-	return count;
-}
-
-static unsigned long (*do_gettimeoffset)(void) = do_slow_gettimeoffset;
+extern rwlock_t xtime_lock;
+extern volatile unsigned long wall_jiffies;
 
 /*
- * This version of gettimeofday has near microsecond resolution.
+ * By default we provide the null RTC ops
+ */
+static unsigned long null_rtc_get_time(void)
+{
+	return mktime(2000, 1, 1, 0, 0, 0);
+}
+
+static int null_rtc_set_time(unsigned long sec)
+{
+	return 0;
+}
+
+unsigned long (*rtc_get_time)(void) = null_rtc_get_time;
+int (*rtc_set_time)(unsigned long) = null_rtc_set_time;
+
+
+/*
+ * timeofday services, for syscalls.
  */
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned long flags;
+        unsigned long flags;
 
-	read_lock_irqsave (&xtime_lock, flags);
-	*tv = xtime;
-	tv->tv_usec += do_gettimeoffset();
+        read_lock_irqsave (&xtime_lock, flags);
+        *tv = xtime;
+        tv->tv_usec += do_gettimeoffset();
 
-	/*
-	 * xtime is atomically updated in timer_bh. jiffies - wall_jiffies
-	 * is nonzero if the timer bottom half hasnt executed yet.
-	 */
-	if (jiffies - wall_jiffies)
-		tv->tv_usec += USECS_PER_JIFFY;
+        /*
+         * xtime is atomically updated in timer_bh. jiffies - wall_jiffies
+         * is nonzero if the timer bottom half hasnt executed yet.
+         */
+        if (jiffies - wall_jiffies)
+                tv->tv_usec += USECS_PER_JIFFY;
 
-	read_unlock_irqrestore (&xtime_lock, flags);
+        read_unlock_irqrestore (&xtime_lock, flags);
 
-	if (tv->tv_usec >= 1000000) {
-		tv->tv_usec -= 1000000;
-		tv->tv_sec++;
-	}
+        if (tv->tv_usec >= 1000000) {
+                tv->tv_usec -= 1000000;
+                tv->tv_sec++;
+        }
 }
 
 void do_settimeofday(struct timeval *tv)
 {
-	write_lock_irq (&xtime_lock);
-	/* This is revolting. We need to set the xtime.tv_usec
-	 * correctly. However, the value in this location is
-	 * is value at the last tick.
-	 * Discover what correction gettimeofday
-	 * would have done, and then undo it!
-	 */
-	tv->tv_usec -= do_gettimeoffset();
+        write_lock_irq (&xtime_lock);
 
-	if (tv->tv_usec < 0) {
-		tv->tv_usec += 1000000;
-		tv->tv_sec--;
-	}
+        /* This is revolting. We need to set the xtime.tv_usec
+         * correctly. However, the value in this location is
+         * is value at the last tick.
+         * Discover what correction gettimeofday
+         * would have done, and then undo it!
+         */
+        tv->tv_usec -= do_gettimeoffset();
 
-	xtime = *tv;
-	time_adjust = 0;		/* stop active adjtime() */
-	time_status |= STA_UNSYNC;
-	time_maxerror = NTP_PHASE_LIMIT;
-	time_esterror = NTP_PHASE_LIMIT;
-	write_unlock_irq (&xtime_lock);
+        if (tv->tv_usec < 0) {
+                tv->tv_usec += 1000000;
+                tv->tv_sec--;
+        }
+        xtime = *tv;
+        time_adjust = 0;                /* stop active adjtime() */
+        time_status |= STA_UNSYNC;
+        time_maxerror = NTP_PHASE_LIMIT;
+        time_esterror = NTP_PHASE_LIMIT;
+
+        write_unlock_irq (&xtime_lock);
 }
+
 
 /*
- * In order to set the CMOS clock precisely, set_rtc_mmss has to be
- * called 500 ms after the second nowtime has started, because when
- * nowtime is written into the registers of the CMOS clock, it will
- * jump to the next second precisely 500 ms later. Check the Motorola
- * MC146818A or Dallas DS12887 data sheet for details.
+ * Gettimeoffset routines.  These routines returns the time duration
+ * since last timer interrupt in usecs.
  *
- * BUG: This routine does not handle hour overflow properly; it just
- *      sets the minutes. Usually you won't notice until after reboot!
+ * If the exact CPU counter frequency is known, use fixed_rate_gettimeoffset.
+ * Otherwise use calibrate_gettimeoffset()
+ *
+ * If the CPU does not have counter register all, you can either supply
+ * your own gettimeoffset() routine, or use null_gettimeoffset() routines,
+ * which gives the same resolution as HZ.
  */
-static int set_rtc_mmss(unsigned long nowtime)
-{
-	int retval = 0;
-	int real_seconds, real_minutes, cmos_minutes;
-	unsigned char save_control, save_freq_select;
 
-	save_control = CMOS_READ(RTC_CONTROL); /* tell the clock it's being set */
-	CMOS_WRITE((save_control|RTC_SET), RTC_CONTROL);
 
-	save_freq_select = CMOS_READ(RTC_FREQ_SELECT); /* stop and reset prescaler */
-	CMOS_WRITE((save_freq_select|RTC_DIV_RESET2), RTC_FREQ_SELECT);
+/* This is for machines which generate the exact clock. */
+#define USECS_PER_JIFFY (1000000/HZ)
 
-	cmos_minutes = CMOS_READ(RTC_MINUTES);
-	if (!(save_control & RTC_DM_BINARY) || RTC_ALWAYS_BCD)
-		BCD_TO_BIN(cmos_minutes);
+/* usecs per counter cycle, shifted to left by 32 bits */
+static unsigned int sll32_usecs_per_cycle=0;
 
-	/*
-	 * since we're only adjusting minutes and seconds,
-	 * don't interfere with hour overflow. This avoids
-	 * messing with unknown time zones but requires your
-	 * RTC not to be off by more than 15 minutes
-	 */
-	real_seconds = nowtime % 60;
-	real_minutes = nowtime / 60;
-	if (((abs(real_minutes - cmos_minutes) + 15)/30) & 1)
-		real_minutes += 30;		/* correct for half hour time zone */
-	real_minutes %= 60;
+/* how many counter cycles in a jiffy */
+static unsigned long cycles_per_jiffy=0;
 
-	if (abs(real_minutes - cmos_minutes) < 30) {
-		if (!(save_control & RTC_DM_BINARY) || RTC_ALWAYS_BCD) {
-			BIN_TO_BCD(real_seconds);
-			BIN_TO_BCD(real_minutes);
-		}
-		CMOS_WRITE(real_seconds,RTC_SECONDS);
-		CMOS_WRITE(real_minutes,RTC_MINUTES);
-	} else {
-		printk(KERN_WARNING
-		       "set_rtc_mmss: can't update from %d to %d\n",
-		       cmos_minutes, real_minutes);
- 		retval = -1;
-	}
+/* Cycle counter value at the previous timer interrupt.. */
+static unsigned int timerhi, timerlo;
 
-	/* The following flags have to be released exactly in this order,
-	 * otherwise the DS12887 (popular MC146818A clone with integrated
-	 * battery and quartz) will not reset the oscillator and will not
-	 * update precisely 500 ms later. You won't find this mentioned in
-	 * the Dallas Semiconductor data sheets, but who believes data
-	 * sheets anyway ...                           -- Markus Kuhn
-	 */
-	CMOS_WRITE(save_control, RTC_CONTROL);
-	CMOS_WRITE(save_freq_select, RTC_FREQ_SELECT);
-
-	return retval;
-}
-
-/* last time the cmos clock got updated */
+/* last time when xtime and rtc are sync'ed up */
 static long last_rtc_update;
 
+/* the function pointer to one of the gettimeoffset funcs*/
+unsigned long (*do_gettimeoffset)(void) = null_gettimeoffset;
+
+unsigned long null_gettimeoffset(void)
+{
+	return 0;
+}
+
+unsigned long fixed_rate_gettimeoffset(void)
+{
+	u32 count;
+	unsigned long res;
+
+	MIPS_ASSERT(mips_cpu.options & MIPS_CPU_COUNTER);
+	MIPS_ASSERT(mips_counter_frequency != 0);
+	MIPS_ASSERT(sll32_usecs_per_cycle != 0);
+
+	/* Get last timer tick in absolute kernel time */
+        count = read_32bit_cp0_register(CP0_COUNT);
+
+        /* .. relative to previous jiffy (32 bits is enough) */
+        count -= timerlo;
+
+        __asm__("multu\t%1,%2\n\t"
+                "mfhi\t%0"
+                :"=r" (res)
+                :"r" (count),
+                 "r" (sll32_usecs_per_cycle));
+
+        /*
+         * Due to possible jiffies inconsistencies, we need to check
+         * the result so that we'll get a timer that is monotonic.
+         */
+        if (res >= USECS_PER_JIFFY)
+                res = USECS_PER_JIFFY-1;
+
+        return res;
+}
+
 /*
- * timer_interrupt() needs to keep up the real-time clock,
- * as well as call the "do_timer()" routine every clocktick
+ * Cached "1/(clocks per usec)*2^32" value.
+ * It has to be recalculated once each jiffy.
  */
-static void inline
-timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static unsigned long cached_quotient;
+
+/* Last jiffy when calibrate_divXX_gettimeoffset() was called. */
+static unsigned long last_jiffies = 0;
+
+/* 
+ * copied from include/asm/div64.  
+ * We do the copy instead of include the header file because we don't
+ * want to reply on _MIPS_ISA value.
+ */
+#define do_div64_32(res, high, low, base) ({ \
+        unsigned long __quot, __mod; \
+        unsigned long __cf, __tmp, __i; \
+        \
+        __asm__(".set   push\n\t" \
+                ".set   noat\n\t" \
+                ".set   noreorder\n\t" \
+                "b      1f\n\t" \
+                " li    %4,0x21\n" \
+                "0:\n\t" \
+                "sll    $1,%0,0x1\n\t" \
+                "srl    %3,%0,0x1f\n\t" \
+                "or     %0,$1,$2\n\t" \
+                "sll    %1,%1,0x1\n\t" \
+                "sll    %2,%2,0x1\n" \
+                "1:\n\t" \
+                "bnez   %3,2f\n\t" \
+                "sltu   $2,%0,%z5\n\t" \
+                "bnez   $2,3f\n\t" \
+                "2:\n\t" \
+                " addiu %4,%4,-1\n\t" \
+                "subu   %0,%0,%z5\n\t" \
+                "addiu  %2,%2,1\n" \
+                "3:\n\t" \
+                "bnez   %4,0b\n\t" \
+                " srl   $2,%1,0x1f\n\t" \
+                ".set   pop" \
+                : "=&r" (__mod), "=&r" (__tmp), "=&r" (__quot), "=&r" (__cf), \
+                  "=&r" (__i) \
+                : "Jr" (base), "0" (high), "1" (low), "2" (0), "3" (0) \
+                /* Aarrgh!  Ran out of gcc's limit on constraints... */ \
+                : "$1", "$2"); \
+        \
+        (res) = __quot; \
+        __mod; })
+
+/*
+ * This is copied from dec/time.c:do_ioasic_gettimeoffset() by Mercij.
+ */
+unsigned long calibrate_div32_gettimeoffset(void)
 {
-#ifdef CONFIG_DDB5074
-	static unsigned cnt, period, dist;
+        u32 count;
+        unsigned long res, tmp;
+        unsigned long quotient;
 
-	if (cnt == 0 || cnt == dist)
-	    ddb5074_led_d2(1);
-	else if (cnt == 7 || cnt == dist+7)
-	    ddb5074_led_d2(0);
-	
-	if (++cnt > period) {
-	    cnt = 0;
-	    /* The hyperbolic function below modifies the heartbeat period
-	     * length in dependency of the current (5min) load. It goes
-	     * through the points f(0)=126, f(1)=86, f(5)=51,
-	     * f(inf)->30. */
-	     period = ((672<<FSHIFT)/(5*avenrun[0]+(7<<FSHIFT))) + 30;
-	     dist = period / 4;
-	}
-#endif
-	if(!user_mode(regs)) {
-		if (prof_buffer && current->pid) {
-			extern int _stext;
-			unsigned long pc = regs->cp0_epc;
+	MIPS_ASSERT(mips_cpu.options & MIPS_CPU_COUNTER);
 
-			pc -= (unsigned long) &_stext;
-			pc >>= prof_shift;
-			/*
-			 * Dont ignore out-of-bounds pc values silently,
-			 * put them into the last histogram slot, so if
-			 * present, they will show up as a sharp peak.
-			 */
-			if (pc > prof_len-1)
-				pc = prof_len-1;
-			atomic_inc((atomic_t *)&prof_buffer[pc]);
-		}
-	}
-	do_timer(regs);
+        tmp = jiffies;
 
-	/*
-	 * If we have an externally synchronized Linux clock, then update
-	 * CMOS clock accordingly every ~11 minutes. Set_rtc_mmss() has to be
-	 * called as close as possible to 500 ms before the new second starts.
-	 */
-	read_lock (&xtime_lock); 
-	if ((time_status & STA_UNSYNC) == 0 &&
-	    xtime.tv_sec > last_rtc_update + 660 &&
-	    xtime.tv_usec >= 500000 - ((unsigned) tick) / 2 &&
-	    xtime.tv_usec <= 500000 + ((unsigned) tick) / 2) {
-	  if (set_rtc_mmss(xtime.tv_sec) == 0)
-	    last_rtc_update = xtime.tv_sec;
-	  else
-	    last_rtc_update = xtime.tv_sec - 600; /* do it again in 60 s */
-	}
-	/* As we return to user mode fire off the other CPU schedulers.. this is 
-	   basically because we don't yet share IRQ's around. This message is
-	   rigged to be safe on the 386 - basically it's a hack, so don't look
-	   closely for now.. */
-	/*smp_message_pass(MSG_ALL_BUT_SELF, MSG_RESCHEDULE, 0L, 0); */
-	read_unlock (&xtime_lock); 
+        quotient = cached_quotient;
+
+        if (last_jiffies != tmp) {
+                last_jiffies = tmp;
+                if (last_jiffies != 0) {
+                        unsigned long r0;
+                        do_div64_32(r0, timerhi, timerlo, tmp);
+                        do_div64_32(quotient, USECS_PER_JIFFY,
+                                    USECS_PER_JIFFY_FRAC, r0);
+                        cached_quotient = quotient;
+                }
+        }
+
+        /* Get last timer tick in absolute kernel time */
+        count = read_32bit_cp0_register(CP0_COUNT);
+
+        /* .. relative to previous jiffy (32 bits is enough) */
+        count -= timerlo;
+
+        __asm__("multu  %2,%3"
+                : "=l" (tmp), "=h" (res)
+                : "r" (count), "r" (quotient));
+
+        /*
+         * Due to possible jiffies inconsistencies, we need to check
+         * the result so that we'll get a timer that is monotonic.
+         */
+        if (res >= USECS_PER_JIFFY)
+                res = USECS_PER_JIFFY - 1;
+
+        return res;
 }
 
-static inline void 
-r4k_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+unsigned long calibrate_div64_gettimeoffset(void)
 {
-	unsigned int count;
+        u32 count;
+        unsigned long res, tmp;
+        unsigned long quotient;
 
-	/*
-	 * The cycle counter is only 32 bit which is good for about
-	 * a minute at current count rates of upto 150MHz or so.
-	 */
-	count = read_32bit_cp0_register(CP0_COUNT);
-	timerhi += (count < timerlo);	/* Wrap around */
-	timerlo = count;
 
-#ifdef CONFIG_SGI_IP22
-	/* Since we don't get anything but r4k timer interrupts, we need to
-	 * set this up so that we'll get one next time. Fortunately since we
-	 * have timerhi/timerlo, we don't care so much if we miss one. So
-	 * we need only ask for the next in r4k_interval counts. On other
-	 * archs we have a real timer, so we don't want this.
-	 */
-	write_32bit_cp0_register (CP0_COMPARE, 
-				  (unsigned long) (count + r4k_interval));
-        kstat.irqs[0][irq]++;
-#endif
+	MIPS_ASSERT(mips_cpu.options & MIPS_CPU_COUNTER);
+	MIPS_ASSERT((mips_cpu.isa_level != MIPS_CPU_ISA_I) &&
+		    (mips_cpu.isa_level != MIPS_CPU_ISA_II) &&
+		    (mips_cpu.isa_level != MIPS_CPU_ISA_M32));
 
-	timer_interrupt(irq, dev_id, regs);
 
-	if (!jiffies)
-	{
+        tmp = jiffies;
+
+        quotient = cached_quotient;
+
+        if (tmp && last_jiffies != tmp) {
+                last_jiffies = tmp;
+                __asm__(".set\tnoreorder\n\t"
+                        ".set\tnoat\n\t"
+                        ".set\tmips3\n\t"
+                        "lwu\t%0,%2\n\t"
+                        "dsll32\t$1,%1,0\n\t"
+                        "or\t$1,$1,%0\n\t"
+                        "ddivu\t$0,$1,%3\n\t"
+                        "mflo\t$1\n\t"
+                        "dsll32\t%0,%4,0\n\t"
+                        "nop\n\t"
+                        "ddivu\t$0,%0,$1\n\t"
+                        "mflo\t%0\n\t"
+                        ".set\tmips0\n\t"
+                        ".set\tat\n\t"
+                        ".set\treorder"
+                        :"=&r" (quotient)
+                        :"r" (timerhi),
+                         "m" (timerlo),
+                         "r" (tmp),
+                         "r" (USECS_PER_JIFFY)
+                        :"$1");
+                cached_quotient = quotient;
+        }
+
+        /* Get last timer tick in absolute kernel time */
+        count = read_32bit_cp0_register(CP0_COUNT);
+
+        /* .. relative to previous jiffy (32 bits is enough) */
+        count -= timerlo;
+
+        __asm__("multu\t%1,%2\n\t"
+                "mfhi\t%0"
+                :"=r" (res)
+                :"r" (count),
+                 "r" (quotient));
+
+        /*
+         * Due to possible jiffies inconsistencies, we need to check
+         * the result so that we'll get a timer that is monotonic.
+         */
+        if (res >= USECS_PER_JIFFY)
+                res = USECS_PER_JIFFY-1;
+
+        return res;
+}
+
+
+/*
+ * high-level timer interrupt service routines.  This function
+ * is set as irqaction->handler and is invoked through do_IRQ.
+ */
+void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+{
+	if (mips_cpu.options & MIPS_CPU_COUNTER) {
+		unsigned int count;
+
 		/*
-		 * If jiffies has overflowed in this timer_interrupt we must
-		 * update the timer[hi]/[lo] to make do_fast_gettimeoffset()
-		 * quotient calc still valid. -arca
+		 * The cycle counter is only 32 bit which is good for about
+		 * a minute at current count rates of upto 150MHz or so.
 		 */
-		timerhi = timerlo = 0;
+		count = read_32bit_cp0_register(CP0_COUNT);
+		timerhi += (count < timerlo);   /* Wrap around */
+		timerlo = count;
+
+		/*
+		 * set up for next timer interrupt - no harm if the machine
+		 * is using another timer interrupt source.
+		 * Note that writing to COMPARE register clears the interrupt
+		 */
+		write_32bit_cp0_register (CP0_COMPARE,
+					  count + cycles_per_jiffy);
+
 	}
+
+        if(!user_mode(regs)) {
+		if (prof_buffer && current->pid) {
+                        extern int _stext;
+                        unsigned long pc = regs->cp0_epc;
+
+                        pc -= (unsigned long) &_stext;
+                        pc >>= prof_shift;
+                        /*
+                         * Dont ignore out-of-bounds pc values silently,
+                         * put them into the last histogram slot, so if
+                         * present, they will show up as a sharp peak.
+                         */
+                        if (pc > prof_len-1)
+                                pc = prof_len-1;
+                        atomic_inc((atomic_t *)&prof_buffer[pc]);
+                }
+        }
+
+	/*
+	 * call the generic timer interrupt handling
+	 */
+        do_timer(regs);
+
+        /*
+         * If we have an externally synchronized Linux clock, then update
+         * CMOS clock accordingly every ~11 minutes. rtc_set_time() has to be
+         * called as close as possible to 500 ms before the new second starts.
+         */
+        read_lock (&xtime_lock);
+        if ((time_status & STA_UNSYNC) == 0 &&
+            xtime.tv_sec > last_rtc_update + 660 &&
+            xtime.tv_usec >= 500000 - ((unsigned) tick) / 2 &&
+            xtime.tv_usec <= 500000 + ((unsigned) tick) / 2) {
+
+		if (rtc_set_time(xtime.tv_sec) == 0) {
+			last_rtc_update = xtime.tv_sec;
+		} else {
+			last_rtc_update = xtime.tv_sec - 600; 
+			/* do it again in 60 s */
+		}
+        }
+        read_unlock (&xtime_lock);
+
+	/*
+	 * If jiffies has overflowed in this timer_interrupt we must
+	 * update the timer[hi]/[lo] to make fast gettimeoffset funcs
+	 * quotient calc still valid. -arca
+	 */
+        if (!jiffies) {
+                timerhi = timerlo = 0;
+        }
 }
 
-void indy_r4k_timer_interrupt (struct pt_regs *regs)
+asmlinkage void ll_timer_interrupt(int irq, struct pt_regs *regs)
 {
-	static const int INDY_R4K_TIMER_IRQ = 7;
-	r4k_timer_interrupt (INDY_R4K_TIMER_IRQ, NULL, regs);
+	int cpu = smp_processor_id();
+
+	irq_enter(cpu, irq);
+	kstat.irqs[cpu][irq]++;
+
+	/* we keep interrupt disabled all the time */
+	timer_interrupt(irq, NULL, regs);
+	
+	irq_exit(cpu, irq);
+
+	/* check for bottom half */
+        if (softirq_active(cpu)&softirq_mask(cpu))
+                do_softirq();
 }
 
-char cyclecounter_available;
 
-static inline void init_cycle_counter(void)
-{
-	switch(mips_cputype) {
-	case CPU_UNKNOWN:
-	case CPU_R2000:
-	case CPU_R3000:
-	case CPU_R3000A:
-	case CPU_R3041:
-	case CPU_R3051:
-	case CPU_R3052:
-	case CPU_R3081:
-	case CPU_R3081E:
-	case CPU_R6000:
-	case CPU_R6000A:
-	case CPU_R8000:		/* Not shure about that one, play safe */
-		cyclecounter_available = 0;
-		break;
-	case CPU_R4000PC:
-	case CPU_R4000SC:
-	case CPU_R4000MC:
-	case CPU_R4200:
-	case CPU_R4400PC:
-	case CPU_R4400SC:
-	case CPU_R4400MC:
-	case CPU_R4600:
-	case CPU_R10000:
-	case CPU_R4300:
-	case CPU_R4650:
-	case CPU_R4700:
-	case CPU_R5000:
-	case CPU_R5000A:
-	case CPU_R4640:
-	case CPU_NEVADA:
-		cyclecounter_available = 1;
-		break;
-	}
-}
+/*
+ * time_init() - it does the following things.
+ *
+ * 1) board_time_init() - 
+ * 	a) (optional) set up RTC routines, 
+ *      b) (optional) calibrate and set the mips_counter_frequency
+ *	    (only needed if you intended to use fixed_rate_gettimeoffset
+ *	     or use cpu counter as timer interrupt source)
+ * 2) setup xtime based on rtc_get_time().
+ * 3) choose a appropriate gettimeoffset routine.
+ * 4) calculate a couple of cached variables for later usage
+ * 5) board_timer_setup() - 
+ *	a) (optional) over-write any choices made above by time_init().
+ *	b) machine specific code should setup the timer irqaction.
+ *	c) enable the timer interrupt
+ */ 
 
-struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0,
-                                  "timer", NULL, NULL};
+void (*board_time_init)(void) = NULL;
+void (*board_timer_setup)(struct irqaction *irq) = NULL;
 
+unsigned int mips_counter_frequency = 0;
 
-void (*board_time_init)(struct irqaction *irq);
+static struct irqaction timer_irqaction = {
+	timer_interrupt,
+	SA_INTERRUPT,
+	0,
+	"timer",
+	NULL,
+	NULL};
 
 void __init time_init(void)
 {
-	unsigned int epoch = 0, year, mon, day, hour, min, sec;
-	int i;
+	printk("New MIPS time_init() invoked.\n");
 
-	/* The Linux interpretation of the CMOS clock register contents:
-	 * When the Update-In-Progress (UIP) flag goes from 1 to 0, the
-	 * RTC registers show the second which has precisely just started.
-	 * Let's hope other operating systems interpret the RTC the same way.
-	 */
-	/* read RTC exactly on falling edge of update flag */
-	for (i = 0 ; i < 1000000 ; i++)	/* may take up to 1 second... */
-		if (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP)
-			break;
-	for (i = 0 ; i < 1000000 ; i++)	/* must try at least 2.228 ms */
-		if (!(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP))
-			break;
-	do { /* Isn't this overkill ? UIP above should guarantee consistency */
-		sec = CMOS_READ(RTC_SECONDS);
-		min = CMOS_READ(RTC_MINUTES);
-		hour = CMOS_READ(RTC_HOURS);
-		day = CMOS_READ(RTC_DAY_OF_MONTH);
-		mon = CMOS_READ(RTC_MONTH);
-		year = CMOS_READ(RTC_YEAR);
-	} while (sec != CMOS_READ(RTC_SECONDS));
-	if (!(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) || RTC_ALWAYS_BCD)
-	  {
-	    BCD_TO_BIN(sec);
-	    BCD_TO_BIN(min);
-	    BCD_TO_BIN(hour);
-	    BCD_TO_BIN(day);
-	    BCD_TO_BIN(mon);
-	    BCD_TO_BIN(year);
-	  }
+	if (board_time_init)
+		board_time_init();
 
-	/* Attempt to guess the epoch.  This is the same heuristic as in rtc.c so
-	   no stupid things will happen to timekeeping.  Who knows, maybe Ultrix
-  	   also uses 1952 as epoch ...  */
-	if (year > 10 && year < 44) {
-		epoch = 1980;
-	} else if (year < 96) {
-		epoch = 1952;
-	}
-	year += epoch;
-
-	write_lock_irq (&xtime_lock);
-	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
+	/* setup xtime */
+	write_lock_irq(&xtime_lock);
+	xtime.tv_sec = rtc_get_time();
 	xtime.tv_usec = 0;
-	write_unlock_irq (&xtime_lock);
+	write_unlock_irq(&xtime_lock);
 
-	init_cycle_counter();
+	/* choose appropriate gettimeoffset routine */
+	if ( ! (mips_cpu.options & MIPS_CPU_COUNTER) ) {
+		/* no cpu counter - sorry */
+		do_gettimeoffset = null_gettimeoffset;
+	} else if (mips_counter_frequency != 0) {
+		/* we have cpu counter and know counter frequency! */
+		do_gettimeoffset = fixed_rate_gettimeoffset;
+	} else if ((mips_cpu.isa_level == MIPS_CPU_ISA_M32) ||
+		   (mips_cpu.isa_level == MIPS_CPU_ISA_I) ||
+		   (mips_cpu.isa_level == MIPS_CPU_ISA_II) ) {
+		/* we need to calibrate the counter but we don't have
+		 * 64-bit division. */
+		do_gettimeoffset = calibrate_div32_gettimeoffset;
+	} else {
+		/* we need to calibrate the counter but we *do* have
+		 * 64-bit division. */
+		do_gettimeoffset = calibrate_div64_gettimeoffset;
+	}	
 
-	if (cyclecounter_available) {
-		write_32bit_cp0_register(CP0_COUNT, 0);
-		do_gettimeoffset = do_fast_gettimeoffset;
-		irq0.handler = r4k_timer_interrupt;
+	/* caclulate cache parameters */
+	if (mips_counter_frequency) {
+		cycles_per_jiffy = mips_counter_frequency / HZ;
+
+		/* sll32_usecs_per_cycle = 10^6 * 2^32 / mips_counter_freq */
+		/* any better way to do this? */
+		sll32_usecs_per_cycle = mips_counter_frequency / 100000;
+		sll32_usecs_per_cycle = 0xffffffff / sll32_usecs_per_cycle;
+		sll32_usecs_per_cycle *= 10;
+
+		MIPS_DEBUG(printk("cycles_per_jiffy = %d\n", 
+				  cycles_per_jiffy));
+		MIPS_DEBUG(printk("sll32_usecs_per_cycle = %d \n",
+				  sll32_usecs_per_cycle));
 	}
 
-	board_time_init(&irq0);
+	/* 
+	 * Call board specific timer interrupt setup.
+	 *
+	 * this pointer must be setup in machine setup routine. 
+	 *
+	 * Even if the machine choose to use low-level timer interrupt,
+	 * it still needs to setup the timer_irqaction.
+	 * In that case, it might be better to set timer_irqaction.handler 
+	 * to be NULL function so that we are sure the high-level code
+	 * is not invoked accidentally.
+	 */
+	MIPS_ASSERT(board_timer_setup != NULL);
+	board_timer_setup(&timer_irqaction);
 }

@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1994 - 1999 by Ralf Baechle at alii
+ * Copyright (C) 1994, 95, 96, 97, 98, 99, 2000 by Ralf Baechle at alii
  * Copyright (C) 1999 Silicon Graphics, Inc.
  */
 #ifndef _ASM_PGTABLE_H
@@ -25,38 +25,48 @@
  *  - flush_cache_page(mm, vmaddr) flushes a single page
  *  - flush_cache_range(mm, start, end) flushes a range of pages
  *  - flush_page_to_ram(page) write back kernel page to ram
+ *  - flush_icache_range(start, end) flush a range of instructions
  */
 extern void (*_flush_cache_all)(void);
+extern void (*___flush_cache_all)(void);
 extern void (*_flush_cache_mm)(struct mm_struct *mm);
 extern void (*_flush_cache_range)(struct mm_struct *mm, unsigned long start,
 				 unsigned long end);
 extern void (*_flush_cache_page)(struct vm_area_struct *vma, unsigned long page);
 extern void (*_flush_cache_sigtramp)(unsigned long addr);
 extern void (*_flush_page_to_ram)(struct page * page);
+extern void (*_flush_icache_range)(unsigned long start, unsigned long end);
+extern void (*_flush_icache_page)(struct vm_area_struct *vma,
+                                  struct page *page);
 
 #define flush_dcache_page(page)			do { } while (0)
 
 #define flush_cache_all()		_flush_cache_all()
+#define __flush_cache_all()		___flush_cache_all()
 #define flush_cache_mm(mm)		_flush_cache_mm(mm)
 #define flush_cache_range(mm,start,end)	_flush_cache_range(mm,start,end)
 #define flush_cache_page(vma,page)	_flush_cache_page(vma, page)
 #define flush_cache_sigtramp(addr)	_flush_cache_sigtramp(addr)
 #define flush_page_to_ram(page)		_flush_page_to_ram(page)
 
-#define flush_icache_range(start, end)	flush_cache_all()
-
-#define flush_icache_page(vma, page)					\
-do {									\
-	unsigned long addr;						\
-	addr = (unsigned long) page_address(page);			\
-	_flush_cache_page(vma, addr);					\
-} while (0)
+#define flush_icache_range(start, end)	_flush_icache_range(start,end)
+#define flush_icache_page(vma, page) 	_flush_icache_page(vma, page)
 
 
 /*
  * - add_wired_entry() add a fixed TLB entry, and move wired register
  */
 extern void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
+			       unsigned long entryhi, unsigned long pagemask);
+
+/*
+ * - add_temporary_entry() add a temporary TLB entry. We use TLB entries
+ *	starting at the top and working down. This is for populating the
+ *	TLB before trap_init() puts the TLB miss handler in place. It 
+ *	should be used only for entries matching the actual page tables,
+ *	to prevent inconsistencies.
+ */
+extern int add_temporary_entry(unsigned long entrylo0, unsigned long entrylo1,
 			       unsigned long entryhi, unsigned long pagemask);
 
 
@@ -130,13 +140,25 @@ extern void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
 #define _CACHE_CACHABLE_NONCOHERENT 0
 
 #else
- 
 #define _PAGE_R4KBUG                (1<<5)  /* workaround for r4k bug  */
 #define _PAGE_GLOBAL                (1<<6)
 #define _PAGE_VALID                 (1<<7)
 #define _PAGE_SILENT_READ           (1<<7)  /* synonym                 */
 #define _PAGE_DIRTY                 (1<<8)  /* The MIPS dirty bit      */
 #define _PAGE_SILENT_WRITE          (1<<8)
+#define _CACHE_MASK                 (7<<9)
+
+#if defined(CONFIG_CPU_SB1)
+
+/* No penalty for being coherent on the SB1, so just
+   use it for "noncoherent" spaces, too.  Shouldn't hurt. */
+
+#define _CACHE_UNCACHED             (2<<9)  
+#define _CACHE_CACHABLE_COW         (5<<9)  
+#define _CACHE_CACHABLE_NONCOHERENT (5<<9)  
+
+#else
+
 #define _CACHE_CACHABLE_NO_WA       (0<<9)  /* R4600 only              */
 #define _CACHE_CACHABLE_WA          (1<<9)  /* R4600 only              */
 #define _CACHE_UNCACHED             (2<<9)  /* R4[0246]00              */
@@ -145,8 +167,8 @@ extern void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
 #define _CACHE_CACHABLE_COW         (5<<9)  /* R4[04]00 only           */
 #define _CACHE_CACHABLE_CUW         (6<<9)  /* R4[04]00 only           */
 #define _CACHE_CACHABLE_ACCELERATED (7<<9)  /* R10000 only             */
-#define _CACHE_MASK                 (7<<9)
 
+#endif
 #endif
 
 #define __READABLE	(_PAGE_READ | _PAGE_SILENT_READ | _PAGE_ACCESSED)
@@ -154,17 +176,27 @@ extern void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
 
 #define _PAGE_CHG_MASK  (PAGE_MASK | _PAGE_ACCESSED | _PAGE_MODIFIED | _CACHE_MASK)
 
+#ifdef CONFIG_MIPS_UNCACHED
+#define PAGE_CACHABLE_DEFAULT	_CACHE_UNCACHED
+#else
+#ifdef CONFIG_CPU_SB1
+#define PAGE_CACHABLE_DEFAULT	_CACHE_CACHABLE_COW
+#else
+#define PAGE_CACHABLE_DEFAULT	_CACHE_CACHABLE_NONCOHERENT
+#endif
+#endif
+
 #define PAGE_NONE	__pgprot(_PAGE_PRESENT | _CACHE_CACHABLE_NONCOHERENT)
 #define PAGE_SHARED     __pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_WRITE | \
-			_CACHE_CACHABLE_NONCOHERENT)
+			PAGE_CACHABLE_DEFAULT)
 #define PAGE_COPY       __pgprot(_PAGE_PRESENT | _PAGE_READ | \
-			_CACHE_CACHABLE_NONCOHERENT)
+			PAGE_CACHABLE_DEFAULT)
 #define PAGE_READONLY   __pgprot(_PAGE_PRESENT | _PAGE_READ | \
-			_CACHE_CACHABLE_NONCOHERENT)
+			PAGE_CACHABLE_DEFAULT)
 #define PAGE_KERNEL	__pgprot(_PAGE_PRESENT | __READABLE | __WRITEABLE | \
-			_CACHE_CACHABLE_NONCOHERENT)
+			PAGE_CACHABLE_DEFAULT)
 #define PAGE_USERIO     __pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_WRITE | \
-			_CACHE_UNCACHED)
+			PAGE_CACHABLE_DEFAULT)
 #define PAGE_KERNEL_UNCACHED __pgprot(_PAGE_PRESENT | __READABLE | __WRITEABLE | \
 			_CACHE_UNCACHED)
 
@@ -200,21 +232,9 @@ extern void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
 #define pgd_ERROR(e) \
 	printk("%s:%d: bad pgd %016lx.\n", __FILE__, __LINE__, pgd_val(e))
 
-/*
- * BAD_PAGETABLE is used when we need a bogus page-table, while
- * BAD_PAGE is used for a bogus page.
- *
- * ZERO_PAGE is a global shared page that is always zero: used
- * for zero-mapped memory areas etc..
- */
-extern pte_t __bad_page(void);
-extern pte_t *__bad_pagetable(void);
-
 extern unsigned long empty_zero_page;
 extern unsigned long zero_page_mask;
 
-#define BAD_PAGETABLE __bad_pagetable()
-#define BAD_PAGE __bad_page()
 #define ZERO_PAGE(vaddr) \
 	(virt_to_page(empty_zero_page + (((unsigned long)(vaddr)) & zero_page_mask)))
 
@@ -269,6 +289,13 @@ extern inline void pte_clear(pte_t *ptep)
 }
 
 /*
+ * (pmds are folded into pgds so this doesnt get actually called,
+ * but the define is needed for a generic inline function.)
+ */
+#define set_pmd(pmdptr, pmdval) (*(pmdptr) = pmdval)
+#define set_pgd(pgdptr, pgdval) (*(pgdptr) = pgdval)
+
+/*
  * Empty pgd/pmd entries point to the invalid_pte_table.
  */
 extern inline int pmd_none(pmd_t pmd)
@@ -284,7 +311,7 @@ extern inline int pmd_bad(pmd_t pmd)
 
 extern inline int pmd_present(pmd_t pmd)
 {
-	return pmd_val(pmd);
+	return (pmd_val(pmd) != (unsigned long) invalid_pte_table);
 }
 
 extern inline void pmd_clear(pmd_t *pmdp)
@@ -303,7 +330,7 @@ extern inline int pgd_present(pgd_t pgd)	{ return 1; }
 extern inline void pgd_clear(pgd_t *pgdp)	{ }
 
 /*
- * Permanent address of a page.  On MIPS64 we never have highmem, so this
+ * Permanent address of a page.  On MIPS we never have highmem, so this
  * is simple.
  */
 #define page_address(page)	((page)->virtual)
@@ -390,7 +417,7 @@ extern inline pte_t pte_mkyoung(pte_t pte)
 
 extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 {
-	return __pte(((physpage & PAGE_MASK) - PAGE_OFFSET) | pgprot_val(pgprot));
+	return __pte(physpage | pgprot_val(pgprot));
 }
 
 extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
@@ -423,19 +450,6 @@ extern inline pte_t *pte_offset(pmd_t * dir, unsigned long address)
 	return (pte_t *) (pmd_page(*dir)) +
 	       ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1));
 }
-
-/*
- * Initialize new page directory with pointers to invalid ptes
- */
-extern void pgd_init(unsigned long page);
-
-extern void __bad_pte(pmd_t *pmd);
-extern void __bad_pte_kernel(pmd_t *pmd);
-
-#define pte_free_kernel(pte)    free_pte_fast(pte)
-#define pte_free(pte)           free_pte_fast(pte)
-#define pgd_free(pgd)           free_pgd_fast(pgd)
-#define pgd_alloc()             get_pgd_fast()
 
 extern int do_check_pgt_cache(int, int);
 
@@ -637,6 +651,19 @@ extern inline void set_wired(unsigned long val)
 		"mtc0 %0, $6\n\t"
 		".set pop"
 		: : "r" (val));
+}
+
+extern inline unsigned long get_info(void)
+{
+	unsigned long val;
+
+	__asm__(
+		".set push\n\t"
+		".set reorder\n\t"
+		"mfc0 %0, $7\n\t"
+		".set pop"
+		: "=r" (val));
+	return val;
 }
 
 /* CP0_TAGLO and CP0_TAGHI registers */

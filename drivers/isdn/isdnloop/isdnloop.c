@@ -1,4 +1,4 @@
-/* $Id: isdnloop.c,v 1.11.6.2 2001/02/16 16:43:32 kai Exp $
+/* $Id: isdnloop.c,v 1.11.6.3 2001/06/09 15:14:19 kai Exp $
 
  * ISDN low-level module implementing a dummy loop driver.
  *
@@ -26,7 +26,7 @@
 #include "isdnloop.h"
 
 static char
-*revision = "$Revision: 1.11.6.2 $";
+*revision = "$Revision: 1.11.6.3 $";
 
 static int isdnloop_addcard(char *);
 
@@ -41,10 +41,8 @@ static void
 isdnloop_free_queue(isdnloop_card * card, int channel)
 {
 	struct sk_buff_head *queue = &card->bqueue[channel];
-	struct sk_buff *skb;
 
-	while ((skb = skb_dequeue(queue)))
-		dev_kfree_skb(skb);
+	skb_queue_purge(queue);
 	card->sndcount[channel] = 0;
 }
 
@@ -1574,11 +1572,8 @@ isdnloop_exit(void)
 	}
 	card = cards;
 	while (card) {
-		struct sk_buff *skb;
-
 		last = card;
-		while ((skb = skb_dequeue(&card->dqueue)))
-			dev_kfree_skb(skb);
+		skb_queue_purge(&card->dqueue);
 		card = card->next;
 		kfree(last);
 	}

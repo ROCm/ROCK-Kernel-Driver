@@ -111,7 +111,6 @@ static struct fb_var_screeninfo default_var = {
 };
 #endif /* CONFIG_PPC */
 
-#ifndef MODULE
 /* default modedb mode */
 /* 640x480, 60 Hz, Non-Interlaced (25.172 MHz dotclock) */
 static struct fb_videomode defaultmode __initdata = {
@@ -128,7 +127,6 @@ static struct fb_videomode defaultmode __initdata = {
 	sync:		0,
 	vmode:		FB_VMODE_NONINTERLACED
 };
-#endif /* MODULE */
 
 /* struct to hold chip description information */
 struct aty128_chip_info {
@@ -213,11 +211,13 @@ static const struct aty128_meminfo ddr_sgram =
 
 static const char *aty128fb_name = "ATY Rage128";
 static char fontname[40] __initdata = { 0 };
-static int  noaccel __initdata = 0;
 
-#ifndef MODULE
+static int  noaccel __initdata = 0;
+static char *font __initdata = NULL;
+static char *mode __initdata = NULL;
+static int  nomtrr __initdata = 0;
+
 static const char *mode_option __initdata = NULL;
-#endif
 
 #ifdef CONFIG_PPC
 static int default_vmode __initdata = VMODE_1024_768_60;
@@ -528,7 +528,7 @@ aty_pll_wait_readupdate(const struct fb_info_aty128 *info)
 	}
 
     if (reset)	/* reset engine?? */
-	printk(KERN_DEBUG "aty128fb: PLL write timeout!");
+	printk(KERN_DEBUG "aty128fb: PLL write timeout!\n");
 }
 
 
@@ -1605,7 +1605,6 @@ aty128fb_rasterimg(struct fb_info *info, int start)
 }
 
 
-#ifndef MODULE
 int __init
 aty128fb_setup(char *options)
 {
@@ -1663,7 +1662,6 @@ aty128fb_setup(char *options)
     }
     return 0;
 }
-#endif /* !MODULE */
 
 
     /*
@@ -1710,10 +1708,7 @@ aty128_init(struct fb_info_aty128 *info, const char *name)
     info->fb_info.blank = &aty128fbcon_blank;
     info->fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-#ifdef MODULE
     var = default_var;
-#else
-    memset(&var, 0, sizeof(var));
 #ifdef CONFIG_PPC
     if (_machine == _MACH_Pmac) {
         if (mode_option) {
@@ -1736,7 +1731,6 @@ aty128_init(struct fb_info_aty128 *info, const char *name)
                           &defaultmode, 8) == 0)
             var = default_var;
     }
-#endif /* MODULE */
 
     if (noaccel)
         var.accel_flags &= ~FB_ACCELF_TEXT;
@@ -2598,10 +2592,39 @@ static struct display_switch fbcon_aty128_32 = {
 #ifdef MODULE
 MODULE_AUTHOR("(c)1999-2000 Brad Douglas <brad@neruo.com>");
 MODULE_DESCRIPTION("FBDev driver for ATI Rage128 / Pro cards");
+MODULE_PARM(noaccel, "i");
+MODULE_PARM_DESC(noaccel, "Disable hardware acceleration (0 or 1=disabled) (default=0)");
+MODULE_PARM(font, "s");
+MODULE_PARM_DESC(font, "Specify one of the compiled-in fonts (default=none)");
+MODULE_PARM(mode, "s");
+MODULE_PARM_DESC(mode, "Specify resolution as \"<xres>x<yres>[-<bpp>][@<refresh>]\" ");
+#ifdef CONFIG_MTRR
+MODULE_PARM(nomtrr, "i");
+MODULE_PARM_DESC(nomtrr, "Disable MTRR support (0 or 1=disabled) (default=0)");
+#endif
 
 int __init
 init_module(void)
 {
+    if (noaccel) {
+        noaccel = 1;
+        printk(KERN_INFO "aty128fb: Parameter NOACCEL set\n");
+    }
+    if (font) {
+        strncpy(fontname, font, sizeof(fontname)-1);
+        printk(KERN_INFO "aty128fb: Parameter FONT set to %s\n", font);
+    }
+    if (mode) {
+        mode_option = mode;
+        printk(KERN_INFO "aty128fb: Parameter MODE set to %s\n", mode);
+    }
+#ifdef CONFIG_MTRR
+    if (nomtrr) {
+        mtrr = 0;
+        printk(KERN_INFO "aty128fb: Parameter NOMTRR set\n");
+    }
+#endif
+    
     aty128fb_init();
     return 0;
 }

@@ -9457,6 +9457,15 @@ CONFIG_TULIP
   module, say M here and read Documentation/modules.txt as well as
   Documentation/networking/net-modules.txt.
 
+New Tulip bus configuration (EXPERIMENTAL)
+CONFIG_TULIP_MWI
+  This configures your Tulip card specifically for the card and
+  system cache line size type you are using.
+
+  This is experimental code, not yet tested on many boards.
+
+  If unsure, say N.
+
 Digi Intl. RightSwitch support
 CONFIG_DGRS
   This is support for the Digi International RightSwitch series of
@@ -12180,12 +12189,13 @@ CONFIG_NTFS_RW
 
   If unsure, say N.
 
-System V and Coherent file system support (read only)
+System V, Version 7, Xenix and Coherent filesystem support (read only)
 CONFIG_SYSV_FS
   SCO, Xenix and Coherent are commercial Unix systems for Intel
-  machines. Saying Y here would allow you to read from their floppies
-  and hard disk partitions. If you also want to write to these media,
-  say Y to "SYSV file system write support" below.
+  machines, and Version 7 was used on the DEC PDP-11. Saying Y
+  here would allow you to read from their floppies and hard disk
+  partitions. If you also want to write to these media, say Y to
+  "SYSV file system write support" below.
 
   If you have floppies or hard disk partitions like that, it is likely
   that they contain binaries from those other Unix systems; in order
@@ -12194,7 +12204,9 @@ CONFIG_SYSV_FS
   Xenix, Wyse, UnixWare, Dell Unix and System V programs under Linux
   and is often needed to run commercial software that's only available
   for those systems. It's available via FTP (user: anonymous) from
-  ftp://tsx-11.mit.edu/pub/linux/BETA ).
+  ftp://tsx-11.mit.edu/pub/linux/BETA ). NOTE: that will work only for
+  binaries from Intel-based systems; PDP ones will have to wait until
+  somebody ports Linux to -11 ;-)
 
   If you only intend to mount files from some other Unix over the
   network using NFS, you don't need the System V file system support
@@ -16127,6 +16139,20 @@ CONFIG_ISDN_DRV_ACT2000
   into the card using a utility which is part of the latest
   isdn4k-utils package. Please read the file
   Documentation/isdn/README.act2000 for more information.
+
+Auvertech TurboPAM support
+CONFIG_ISDN_DRV_TPAM
+  This enables support for the Auvertech TurboPAM ISDN-card.
+  For running this card, additional firmware is necessary, which has
+  to be downloaded into the card using a utility which is distributed
+  separately from the Auvertech's web site: http://www.auvertech.fr.
+
+  Please redirect all support questions to support@auvertech.fr.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read Documentation/modules.txt. The module will be
+  called tpam.o.
 
 Hypercope HYSDN cards (Champ, Ergo, Metro) support (module)
 CONFIG_HYSDN

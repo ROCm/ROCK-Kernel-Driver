@@ -1,4 +1,4 @@
-/* $Id: hfc_sx.c,v 1.9 2000/11/24 17:05:37 kai Exp $
+/* $Id: hfc_sx.c,v 1.9.6.1 2001/06/09 15:14:17 kai Exp $
 
  * hfc_sx.c     low level driver for CCD´s hfc-s+/sp based cards
  *
@@ -32,7 +32,7 @@
 
 extern const char *CardType[];
 
-static const char *hfcsx_revision = "$Revision: 1.9 $";
+static const char *hfcsx_revision = "$Revision: 1.9.6.1 $";
 
 /***************************************/
 /* IRQ-table for CCDs demo board       */
@@ -1288,8 +1288,8 @@ close_hfcsx(struct BCState *bcs)
 {
 	mode_hfcsx(bcs, 0, bcs->channel);
 	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		discard_queue(&bcs->rqueue);
-		discard_queue(&bcs->squeue);
+		skb_queue_purge(&bcs->rqueue);
+		skb_queue_purge(&bcs->squeue);
 		if (bcs->tx_skb) {
 			dev_kfree_skb_any(bcs->tx_skb);
 			bcs->tx_skb = NULL;

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prom.c 1.23 06/06/01 22:49:01 paulus
+ * BK Id: SCCS/s.prom.c 1.26 06/28/01 15:50:16 paulus
  */
 /*
  * Procedures for interfacing to the Open Firmware PROM on
@@ -174,7 +174,6 @@ static void prom_welcome(boot_infos_t* bi, unsigned long phys);
 #endif
 
 extern void enter_rtas(void *);
-extern unsigned long reloc_offset(void);
 void phys_call_rtas(int, int, int, ...);
 
 extern char cmd_line[512];	/* XXX */
@@ -191,6 +190,14 @@ unsigned long dev_tree_size;
 #define BOOT_INFO_IS_COMPATIBLE(bi)		((bi)->compatible_version <= BOOT_INFO_VERSION)
 #define BOOT_INFO_IS_V2_COMPATIBLE(bi)	((bi)->version >= 2)
 #define BOOT_INFO_IS_V4_COMPATIBLE(bi)	((bi)->version >= 4)
+
+/*
+ * Note that prom_init() and anything called from prom_init() must
+ * use the RELOC/PTRRELOC macros to access any static data in
+ * memory, since the kernel may be running at an address that is
+ * different from the address that it was linked at.
+ * (Note that strings count as static variables.)
+ */
 
 __init
 static void
@@ -480,13 +487,14 @@ static inline void make_pte(unsigned long htab, unsigned int hsize,
 			    unsigned int va, unsigned int pa, int mode)
 {
 	unsigned int *pteg;
-	unsigned int hash, i;
+	unsigned int hash, i, vsid;
 
-	hash = ((va >> 5) ^ (va >> 21)) & 0x7fff80;
+	vsid = ((va >> 28) * 0x111) << 12;
+	hash = ((va ^ vsid) >> 5) & 0x7fff80;
 	pteg = (unsigned int *)(htab + (hash & (hsize - 1)));
 	for (i = 0; i < 8; ++i, pteg += 4) {
 		if ((pteg[1] & 1) == 0) {
-			pteg[1] = ((va >> 16) & 0xff80) | 1;
+			pteg[1] = vsid | ((va >> 16) & 0xf80) | 1;
 			pteg[3] = pa | mode;
 			break;
 		}

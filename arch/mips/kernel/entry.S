@@ -12,6 +12,7 @@
 #include <linux/config.h>
 #include <linux/sys.h>
 
+#include <asm/addrspace.h>
 #include <asm/asm.h>
 #include <asm/current.h>
 #include <asm/errno.h>
@@ -43,11 +44,16 @@ reschedule:	jal	schedule
 EXPORT(ret_from_sys_call)
 EXPORT(ret_from_irq)
 		.type	ret_from_irq,@function
-		lw	t0, irq_stat		# softirq_active
-		lw	t1, irq_stat+4		# softirq_mask.  unused delay slot
+		la	t1, irq_stat		# softirq_active
+#ifdef CONFIG_SMP
+		lw	t0, TASK_PROCESSOR($28)
+		sll	t0, t0, 5
+		addu	t1, t0
+#endif
+		lw	t0, 0(t1)		# softirq_active
+		lw	t1, 4(t1)		# softirq_mask.  unused delay slot
 		and	t0, t1
 		bnez	t0, handle_softirq
-
 
 9:		lw	t0,PT_STATUS(sp)	# returning to kernel mode?
 		lw	t2, TASK_NEED_RESCHED($28)

@@ -1,5 +1,5 @@
 /*
- *  linux/mm/initmem.c
+ *  linux/mm/bootmem.c
  *
  *  Copyright (C) 1999 Ingo Molnar
  *  Discontiguous memory support, Kanoj Sarcar, SGI, Nov 1999

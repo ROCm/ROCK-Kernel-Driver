@@ -83,7 +83,7 @@ SECTIONS
   ia64_unw_end = .;
 
   .rodata : AT(ADDR(.rodata) - PAGE_OFFSET)
-	{ *(.rodata) }
+	{ *(.rodata) *(.rodata.*) }
   .kstrtab : AT(ADDR(.kstrtab) - PAGE_OFFSET)
 	{ *(.kstrtab) }
   .opd : AT(ADDR(.opd) - PAGE_OFFSET)

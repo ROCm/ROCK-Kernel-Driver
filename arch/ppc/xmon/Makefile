@@ -1,13 +1,14 @@
-# BK Id: SCCS/s.Makefile 1.3 05/17/01 18:14:23 cort
+# BK Id: SCCS/s.Makefile 1.6 06/27/01 14:49:58 trini
 #
 # Makefile for xmon
 
 O_TARGET	:= x.o
 
-ifeq ($(CONFIG_8xx),y)
-obj-y		:= start_8xx.o xmon.o ppc-dis.o ppc-opc.o subr_prf.o setjmp.o
+ifdef CONFIG_8xx
+obj-y		:= start_8xx.o
 else
-obj-y		:= start.o xmon.o ppc-dis.o ppc-opc.o subr_prf.o setjmp.o
+obj-y		:= start.o
 endif
+obj-y		+= xmon.o ppc-dis.o ppc-opc.o subr_prf.o setjmp.o
 
 include $(TOPDIR)/Rules.make

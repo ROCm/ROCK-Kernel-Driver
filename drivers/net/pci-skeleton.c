@@ -94,6 +94,7 @@ IVc. Errata
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
+#include <linux/mii.h>
 #include <asm/io.h>
 
 #define NETDRV_VERSION		"1.0.0"
@@ -1782,31 +1783,34 @@ static int netdrv_close (struct net_device *dev)
 static int netdrv_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdrv_private *tp = dev->priv;
-	u16 *data = (u16 *) & rq->ifr_data;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	unsigned long flags;
 	int rc = 0;
 
 	DPRINTK ("ENTER\n");
 
 	switch (cmd) {
-	case SIOCDEVPRIVATE:	/* Get the address of the PHY in use. */
-		data[0] = tp->phys[0] & 0x3f;
+	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
+	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
+		data->phy_id = tp->phys[0] & 0x3f;
 		/* Fall Through */
 
-	case SIOCDEVPRIVATE + 1:	/* Read the specified MII register. */
+	case SIOCGMIIREG:		/* Read MII PHY register. */
+	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
 		spin_lock_irqsave (&tp->lock, flags);
-		data[3] = mdio_read (dev, data[0] & 0x1f, data[1] & 0x1f);
+		data->val_out = mdio_read (dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		spin_unlock_irqrestore (&tp->lock, flags);
 		break;
 
-	case SIOCDEVPRIVATE + 2:	/* Write the specified MII register */
+	case SIOCSMIIREG:		/* Write MII PHY register. */
+	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable (CAP_NET_ADMIN)) {
 			rc = -EPERM;
 			break;
 		}
 
 		spin_lock_irqsave (&tp->lock, flags);
-		mdio_write (dev, data[0] & 0x1f, data[1] & 0x1f, data[2]);
+		mdio_write (dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
 		spin_unlock_irqrestore (&tp->lock, flags);
 		break;
 

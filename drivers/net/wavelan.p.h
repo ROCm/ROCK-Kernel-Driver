@@ -699,12 +699,15 @@ static unsigned short	iobase[]	=
 
 #ifdef	MODULE
 /* Parameters set by insmod */
-static int	io[4]	= { 0, 0, 0, 0 };
-static int	irq[4]	= { 0, 0, 0, 0 };
-static char	name[4][IFNAMSIZ] = { "", "", "", "" };
+static int	io[4];
+static int	irq[4];
+static char	name[4][IFNAMSIZ];
 MODULE_PARM(io, "1-4i");
 MODULE_PARM(irq, "1-4i");
 MODULE_PARM(name, "1-4c" __MODULE_STRING(IFNAMSIZ));
+MODULE_PARM_DESC(io, "WaveLAN I/O base address(es),required");
+MODULE_PARM_DESC(irq, "WaveLAN IRQ number(s)");
+MODULE_PARM_DESC(name, "WaveLAN interface neme(s)");
 #endif	/* MODULE */
 
 #endif	/* WAVELAN_P_H */

@@ -1373,23 +1373,28 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct yellowfin_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	u16 *data = (u16 *)&rq->ifr_data;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
 
 	switch(cmd) {
 	case SIOCETHTOOL:
 		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
-		data[0] = np->phys[0] & 0x1f;
+	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
+	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
+		data->phy_id = np->phys[0] & 0x1f;
 		/* Fall Through */
-	case SIOCDEVPRIVATE+1:		/* Read the specified MII register. */
-		data[3] = mdio_read(ioaddr, data[0] & 0x1f, data[1] & 0x1f);
+
+	case SIOCGMIIREG:		/* Read MII PHY register. */
+	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
+		data->val_out = mdio_read(ioaddr, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		return 0;
-	case SIOCDEVPRIVATE+2:		/* Write the specified MII register */
+
+	case SIOCSMIIREG:		/* Write MII PHY register. */
+	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		if (data[0] == np->phys[0]) {
-			u16 value = data[2];
-			switch (data[1]) {
+		if (data->phy_id == np->phys[0]) {
+			u16 value = data->val_in;
+			switch (data->reg_num) {
 			case 0:
 				/* Check for autonegotiation on or reset. */
 				np->medialock = (value & 0x9000) ? 0 : 1;
@@ -1400,7 +1405,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			}
 			/* Perhaps check_duplex(dev), depending on chip semantics. */
 		}
-		mdio_write(ioaddr, data[0] & 0x1f, data[1] & 0x1f, data[2]);
+		mdio_write(ioaddr, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
 		return 0;
 	default:
 		return -EOPNOTSUPP;

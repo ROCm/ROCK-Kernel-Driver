@@ -117,6 +117,7 @@ LEAF(_restore_fp_context)
 	jr	ra
 	 ctc1	t0,fcr31
 	END(_restore_fp_context)
+	.set	reorder
 
 	.type	fault@function
 	.ent	fault

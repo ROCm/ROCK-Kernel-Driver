@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.init.c 1.22 05/17/01 18:14:23 cort
+ * BK Id: SCCS/s.init.c 1.27 06/28/01 15:50:17 paulus
  */
 /*
  *  PowerPC version 
@@ -73,9 +73,15 @@
 
 #define	PGTOKB(pages)	(((pages) * PAGE_SIZE) >> 10)
 
+mm_context_t next_mmu_context;
+unsigned long context_map[(LAST_CONTEXT+1) / (8*sizeof(unsigned long))];
+#ifdef FEW_CONTEXTS
+atomic_t nr_free_contexts;
+struct mm_struct *context_mm[LAST_CONTEXT+1];
+void steal_context(void);
+#endif /* FEW_CONTEXTS */
+
 int prom_trashed;
-atomic_t next_mmu_context;
-rwlock_t context_overflow_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
 unsigned long *end_of_DRAM;
 unsigned long total_memory;
 unsigned long total_lowmem;
@@ -187,12 +193,6 @@ unsigned long __max_memory;
 /* max amount of low RAM to map in */
 unsigned long __max_low_memory = MAX_LOW_MEM;
 
-void __bad_pte(pmd_t *pmd)
-{
-	printk("Bad pmd in pte_alloc: %08lx\n", pmd_val(*pmd));
-	pmd_val(*pmd) = (unsigned long) BAD_PAGETABLE;
-}
-
 int do_check_pgt_cache(int low, int high)
 {
 	int freed = 0;
@@ -209,35 +209,6 @@ int do_check_pgt_cache(int low, int high)
 		} while (pgtable_cache_size > low);
 	}
 	return freed;
-}
-
-/*
- * BAD_PAGE is the page that is used for page faults when linux
- * is out-of-memory. Older versions of linux just did a
- * do_exit(), but using this instead means there is less risk
- * for a process dying in kernel mode, possibly leaving a inode
- * unused etc..
- *
- * BAD_PAGETABLE is the accompanying page-table: it is initialized
- * to point to BAD_PAGE entries.
- *
- * ZERO_PAGE is a special page that is used for zero-initialized
- * data and COW.
- */
-pte_t *empty_bad_page_table;
-
-pte_t * __bad_pagetable(void)
-{
-	clear_page(empty_bad_page_table);
-	return empty_bad_page_table;
-}
-
-void *empty_bad_page;
-
-pte_t __bad_page(void)
-{
-	clear_page(empty_bad_page);
-	return pte_mkdirty(mk_pte_phys(__pa(empty_bad_page), PAGE_SHARED));
 }
 
 void show_mem(void)
@@ -319,21 +290,10 @@ void show_mem(void)
 
 void si_meminfo(struct sysinfo *val)
 {
-	int i;
-
-	i = max_mapnr;
-	val->totalram = 0;
+	val->totalram = totalram_pages;
 	val->sharedram = 0;
 	val->freeram = nr_free_pages();
 	val->bufferram = atomic_read(&buffermem_pages);
-	while (i-- > 0)  {
-		if (PageReserved(mem_map+i))
-			continue;
-		val->totalram++;
-		if (!atomic_read(&mem_map[i].count))
-			continue;
-		val->sharedram += atomic_read(&mem_map[i].count) - 1;
-	}
 	val->totalhigh = totalhigh_pages;
 	val->freehigh = nr_free_highpages();
 	val->mem_unit = PAGE_SIZE;
@@ -482,14 +442,16 @@ map_page(unsigned long va, unsigned long pa, int flags)
 	if (pg != 0) {
 		err = 0;
 		set_pte(pg, mk_pte_phys(pa & PAGE_MASK, __pgprot(flags)));
-		if (mem_init_done)
-			flush_hash_page(0, va);
+#if !defined(CONFIG_4xx) && !defined(CONFIG_8xx)
+		if (mem_init_done && Hash != 0)
+			flush_hash_page(0, va, pg);
+#endif /* !4xx && !8xx */
 	}
 	spin_unlock(&init_mm.page_table_lock);
 	return err;
 }
 
-#ifndef CONFIG_8xx
+#if !defined(CONFIG_4xx) && !defined(CONFIG_8xx)
 /*
  * TLB flushing:
  *
@@ -510,19 +472,14 @@ map_page(unsigned long va, unsigned long pa, int flags)
 void
 local_flush_tlb_all(void)
 {
-#ifdef CONFIG_PPC64BRIDGE
-	/* XXX this assumes that the vmalloc arena starts no lower than
-	 * 0xd0000000 on 64-bit machines. */
-	flush_hash_segments(0xd, 0xffffff);
-#else
-	/* this could cause problems on SMP with nobats  -- paulus */
-	/* XXX no hash_table_lock?  interesting  -- paulus */
-	__clear_user(Hash, Hash_size);
-	_tlbia();
+	/* aargh!!! */
+	/* just flush the kernel part of the address space, that's
+	   all that the current callers of this require.  -- paulus. */
+	local_flush_tlb_range(&init_mm, TASK_SIZE, ~0UL);
+
 #ifdef CONFIG_SMP
 	smp_send_tlb_invalidate(0);
 #endif /* CONFIG_SMP */
-#endif /* CONFIG_PPC64BRIDGE */
 }
 
 /*
@@ -533,30 +490,18 @@ local_flush_tlb_all(void)
 void
 local_flush_tlb_mm(struct mm_struct *mm)
 {
-	if (mm->context == 0) {
-		/* don't try to reassign a new context to the kernel */
-		/*
-		 * This could cause problems on SMP if we aren't using
-		 * the BATs (e.g. on POWER4 or if the nobats option is used).
-		 * The problem scenario is that one cpu is doing
-		 * flush_hash_page or similar when another cpu clears
-		 * out the HPTEs which map the flush_hash_page text
-		 * and the hash table.  hash_page will then deadlock.
-		 * We need some way to have "protected" HPTEs or else
-		 * do all hash-table manipulation with the MMU off.
-		 *  -- paulus.
-		 */
-#ifdef CONFIG_PPC64BRIDGE
-		flush_hash_segments(0xd, 0xf);
-#else
-		flush_hash_segments(0xc, 0xf);
-#endif CONFIG_PPC64BRIDGE
+	if (Hash == 0) {
 		_tlbia();
 		return;
 	}
-	mm->context = NO_CONTEXT;
-	if (mm == current->mm)
-		activate_mm(mm, mm);
+
+	if (mm->map_count) {
+		struct vm_area_struct *mp;
+		for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
+			local_flush_tlb_range(mm, mp->vm_start, mp->vm_end);
+	} else
+		local_flush_tlb_range(mm, 0, TASK_SIZE);
+
 #ifdef CONFIG_SMP
 	smp_send_tlb_invalidate(0);
 #endif	
@@ -565,10 +510,21 @@ local_flush_tlb_mm(struct mm_struct *mm)
 void
 local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 {
-	if (vmaddr < TASK_SIZE)
-		flush_hash_page(vma->vm_mm->context, vmaddr);
-	else
-		flush_hash_page(0, vmaddr);
+	struct mm_struct *mm;
+	pmd_t *pmd;
+	pte_t *pte;
+
+	if (Hash == 0) {
+		_tlbie(vmaddr);
+		return;
+	}
+	mm = (vmaddr < TASK_SIZE)? vma->vm_mm: &init_mm;
+	pmd = pmd_offset(pgd_offset(mm, vmaddr), vmaddr);
+	if (!pmd_none(*pmd)) {
+		pte = pte_offset(pmd, vmaddr);
+		if (pte_val(*pte) & _PAGE_HASHPTE)
+			flush_hash_page(mm->context, vmaddr, pte);
+	}
 #ifdef CONFIG_SMP
 	smp_send_tlb_invalidate(0);
 #endif	
@@ -576,87 +532,49 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 
 
 /*
- * for each page addr in the range, call MMU_invalidate_page()
- * if the range is very large and the hash table is small it might be
- * faster to do a search of the hash table and just invalidate pages
- * that are in the range but that's for study later.
- * -- Cort
+ * For each address in the range, find the pte for the address
+ * and check _PAGE_HASHPTE bit; if it is set, find and destroy
+ * the corresponding HPTE.
  */
 void
 local_flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
 {
-	start &= PAGE_MASK;
+	pmd_t *pmd;
+	pte_t *pte;
+	unsigned long pmd_end;
+	unsigned int ctx = mm->context;
 
-	if (mm->context != 0) {
-		if (end > TASK_SIZE)
-			end = TASK_SIZE;
-		if (end - start > 20 * PAGE_SIZE) {
-			flush_tlb_mm(mm);
-			return;
-		}
+	if (Hash == 0) {
+		_tlbia();
+		return;
 	}
-
-	for (; start < end; start += PAGE_SIZE)
-		flush_hash_page(mm->context, start);
+	start &= PAGE_MASK;
+	if (start >= end)
+		return;
+	pmd = pmd_offset(pgd_offset(mm, start), start);
+	do {
+		pmd_end = (start + PGDIR_SIZE) & PGDIR_MASK;
+		if (!pmd_none(*pmd)) {
+			if (!pmd_end || pmd_end > end)
+				pmd_end = end;
+			pte = pte_offset(pmd, start);
+			do {
+				if ((pte_val(*pte) & _PAGE_HASHPTE) != 0)
+					flush_hash_page(ctx, start, pte);
+				start += PAGE_SIZE;
+				++pte;
+			} while (start && start < pmd_end);
+		} else {
+			start = pmd_end;
+		}
+		++pmd;
+	} while (start && start < end);
 
 #ifdef CONFIG_SMP
 	smp_send_tlb_invalidate(0);
 #endif	
 }
 
-/*
- * The context counter has overflowed.
- * We set mm->context to NO_CONTEXT for all mm's in the system.
- * We assume we can get to all mm's by looking as tsk->mm for
- * all tasks in the system.
- */
-void
-mmu_context_overflow(void)
-{
-	struct task_struct *tsk;
-
-	printk(KERN_DEBUG "mmu_context_overflow\n");
-	/* acquire the write lock for context overflow */
-	write_lock (&context_overflow_lock);
-	/* recheck if overflow still exists */
-	if (atomic_read(&next_mmu_context) == LAST_CONTEXT) {
-		read_lock(&tasklist_lock);
-		for_each_task(tsk) {
-			if (tsk->mm)
-				tsk->mm->context = NO_CONTEXT;
-		}
-		read_unlock(&tasklist_lock);
-		flush_hash_segments(0x10, 0xffffff);
-#ifdef CONFIG_SMP
-		smp_send_tlb_invalidate(0);
-#endif	
-		atomic_set(&next_mmu_context, 0);
-	}
-	write_unlock (&context_overflow_lock);
-	/* make sure current always has a context */
-	/* need to check to assure current task has an mm */
-	/*   - idle thread does not have an MM */
-	if (current->mm) {
-		current->mm->context = MUNGE_CONTEXT(atomic_inc_return(&next_mmu_context));
-		set_context(current->mm->context, current->mm->pgd);
-	}
-}
-#else /* CONFIG_8xx */
-void
-mmu_context_overflow(void)
-{
-	atomic_set(&next_mmu_context, -1);
-}
-#endif /* CONFIG_8xx */
-
-void flush_page_to_ram(struct page *page)
-{
-	unsigned long vaddr = (unsigned long) kmap(page);
-	__flush_page_to_ram(vaddr);
-	kunmap(page);
-}
-
-#if !defined(CONFIG_4xx) && !defined(CONFIG_8xx)
 /*
  * Set up one of the I/D BAT (block address translation) register pairs.
  * The parameters are not checked; in particular size must be a power
@@ -717,8 +635,6 @@ void __init setbat(int index, unsigned long virt, unsigned long phys,
 /*
  * Map in all of physical memory starting at KERNELBASE.
  */
-#define PAGE_KERNEL_RO	__pgprot(_PAGE_PRESENT | _PAGE_ACCESSED)
-
 static void __init mapin_ram(void)
 {
 	unsigned long v, p, s, f;
@@ -768,10 +684,10 @@ static void __init mapin_ram(void)
 		f = _PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_SHARED;
 #if defined(CONFIG_KGDB) || defined(CONFIG_XMON)
 		/* Allows stub to set breakpoints everywhere */
-		f |= _PAGE_RW | _PAGE_DIRTY | _PAGE_HWWRITE;
+		f |= _PAGE_RW | _PAGE_DIRTY;
 #else
 		if ((char *) v < _stext || (char *) v >= etext)
-			f |= _PAGE_RW | _PAGE_DIRTY | _PAGE_HWWRITE;
+			f |= _PAGE_RW | _PAGE_DIRTY;
 #ifndef CONFIG_8xx
 		else
 			/* On the powerpc (not 8xx), no user access
@@ -839,15 +755,58 @@ void free_initmem(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
+	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
+
 	for (; start < end; start += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(start));
 		set_page_count(virt_to_page(start), 1);
 		free_page(start);
 		totalram_pages++;
 	}
-	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 }
 #endif
+
+/*
+ * Initialize the context management stuff.
+ */
+static void mmu_context_init(void)
+{
+	context_map[0] = 1;	/* init_mm uses context 0 */
+	next_mmu_context = 1;
+#ifdef FEW_CONTEXTS
+	atomic_set(&nr_free_contexts, LAST_CONTEXT);
+	context_mm[0] = &init_mm;
+#endif /* FEW_CONTEXTS */
+}
+
+#ifdef FEW_CONTEXTS
+/*
+ * Steal a context from a task that has one at the moment.
+ * This is only used on 8xx and 4xx and we presently assume that
+ * they don't do SMP.  If they do then this will have to check
+ * whether the MM we steal is in use.
+ * We also assume that this is only used on systems that don't
+ * use an MMU hash table - this is true for 8xx and 4xx.
+ * This isn't an LRU system, it just frees up each context in
+ * turn (sort-of pseudo-random replacement :).  This would be the
+ * place to implement an LRU scheme if anyone was motivated to do it.
+ *  -- paulus
+ */
+void steal_context(void)
+{
+	struct mm_struct *mm;
+
+	/* free up context `next_mmu_context' */
+	/* if we shouldn't free context 0, don't... */
+#ifdef CONFIG_4xx
+	if (next_mmu_context == 0)
+		next_mmu_context = 1;
+#endif /* CONFIG_4xx */
+	mm = context_mm[next_mmu_context];
+	flush_tlb_mm(mm);
+	destroy_context(mm);
+}
+#endif /* FEW_CONTEXTS */
 
 extern boot_infos_t *disp_bi;
 
@@ -903,6 +862,8 @@ MMU_init(void)
 
         mtspr(SPRN_DCCR, 0x80000000);	/* 128 MB of data space at 0x0. */
         mtspr(SPRN_ICCR, 0x80000000);	/* 128 MB of instr. space at 0x0. */
+
+	mmu_context_init();
 }
 
 #else /* !CONFIG_4xx */
@@ -938,11 +899,7 @@ void __init MMU_init(void)
 	/* Map in all of RAM starting at KERNELBASE */
 	mapin_ram();
 
-#if defined(CONFIG_POWER4)
-	ioremap_base = ioremap_bot = 0xfffff000;
-	isa_io_base = (unsigned long) ioremap(0xffd00000, 0x200000) + 0x100000;
-
-#elif defined(CONFIG_8xx)
+#if defined(CONFIG_8xx)
         /* Now map in some of the I/O space that is generically needed
          * or shared with multiple devices.
          * All of this fits into the same 4Mbyte region, so it only
@@ -974,7 +931,7 @@ void __init MMU_init(void)
 #ifdef CONFIG_PCI
         ioremap(PCI_CSR_ADDR, PCI_CSR_SIZE);
 #endif
-#else /* !CONFIG_POWER4 && !CONFIG_8xx */
+#else /* !CONFIG_8xx */
 	/*
 	 * Setup the bat mappings we're going to load that cover
 	 * the io areas.  RAM was mapped by mapin_ram().
@@ -1024,7 +981,7 @@ void __init MMU_init(void)
 		break;
 	}
 	ioremap_bot = ioremap_base;
-#endif /* CONFIG_POWER4 || CONFIG_8xx */
+#endif /* CONFIG_8xx */
 
 	if ( ppc_md.progress ) ppc_md.progress("MMU:exit", 0x211);
 #ifdef CONFIG_BOOTX_TEXT
@@ -1032,6 +989,8 @@ void __init MMU_init(void)
 	if (_machine == _MACH_Pmac || _machine == _MACH_chrp)
 		map_bootx_text();
 #endif
+
+	mmu_context_init();
 }
 #endif /* CONFIG_4xx */
 
@@ -1095,12 +1054,6 @@ void __init paging_init(void)
 #endif /* CONFIG_HIGHMEM */
 
 	/*
-	 * Grab some memory for bad_page and bad_pagetable to use.
-	 */
-	empty_bad_page = alloc_bootmem_pages(PAGE_SIZE);
-	empty_bad_page_table = alloc_bootmem_pages(PAGE_SIZE);
-
-	/*
 	 * All pages are DMA-able so we put them all in the DMA zone.
 	 */
 	zones_size[ZONE_DMA] = total_lowmem >> PAGE_SHIFT;
@@ -1128,7 +1081,6 @@ void __init mem_init(void)
 	highmem_mapnr = total_lowmem >> PAGE_SHIFT;
 	highmem_start_page = mem_map + highmem_mapnr;
 	max_mapnr = total_memory >> PAGE_SHIFT;
-	totalram_pages += max_mapnr - highmem_mapnr;
 #else
 	max_mapnr = max_low_pfn;
 #endif /* CONFIG_HIGHMEM */
@@ -1201,15 +1153,17 @@ void __init mem_init(void)
 
 #if !defined(CONFIG_4xx) && !defined(CONFIG_8xx)
 /*
- * Initialize the hash table and patch the instructions in head.S.
+ * Initialize the hash table and patch the instructions in hashtable.S.
  */
 static void __init hash_init(void)
 {
 	int Hash_bits, mb, mb2;
 	unsigned int hmask, h;
 
-	extern unsigned int hash_page_patch_A[], hash_page_patch_B[],
-		hash_page_patch_C[], hash_page[];
+	extern unsigned int hash_page_patch_A[];
+	extern unsigned int hash_page_patch_B[], hash_page_patch_C[];
+	extern unsigned int hash_page[];
+	extern unsigned int flush_hash_patch_A[], flush_hash_patch_B[];
 
 #ifdef CONFIG_PPC64BRIDGE
 	/* The hash table has already been allocated and initialized
@@ -1259,6 +1213,7 @@ static void __init hash_init(void)
 	if ( Hash_size ) {
 		Hash = mem_pieces_find(Hash_size, Hash_size);
 		cacheable_memzero(Hash, Hash_size);
+		_SDR1 = __pa(Hash) | (Hash_mask >> 10);
 	} else
 		Hash = 0;
 #endif /* CONFIG_PPC64BRIDGE */
@@ -1271,10 +1226,10 @@ static void __init hash_init(void)
 		Hash_end = (PTE *) ((unsigned long)Hash + Hash_size);
 
 		/*
-		 * Patch up the instructions in head.S:hash_page
+		 * Patch up the instructions in hashtable.S:create_hpte
 		 */
 		hash_page_patch_A[0] = (hash_page_patch_A[0] & ~0xffff)
-			| (__pa(Hash) >> 16);
+			| ((unsigned int)(Hash) >> 16);
 		hash_page_patch_A[1] = (hash_page_patch_A[1] & ~0x7c0)
 			| (mb << 6);
 		hash_page_patch_A[2] = (hash_page_patch_A[2] & ~0x7c0)
@@ -1283,10 +1238,6 @@ static void __init hash_init(void)
 			| hmask;
 		hash_page_patch_C[0] = (hash_page_patch_C[0] & ~0xffff)
 			| hmask;
-#if 0	/* see hash_page in head.S, note also patch_C ref below */
-		hash_page_patch_D[0] = (hash_page_patch_D[0] & ~0xffff)
-			| hmask;
-#endif
 		/*
 		 * Ensure that the locations we've patched have been written
 		 * out from the data cache and invalidated in the instruction
@@ -1294,6 +1245,19 @@ static void __init hash_init(void)
 		 */
 		flush_icache_range((unsigned long) &hash_page_patch_A[0],
 				   (unsigned long) &hash_page_patch_C[1]);
+		/*
+		 * Patch up the instructions in hashtable.S:flush_hash_page
+		 */
+		flush_hash_patch_A[0] = (flush_hash_patch_A[0] & ~0xffff)
+			| ((unsigned int)(Hash) >> 16);
+		flush_hash_patch_A[1] = (flush_hash_patch_A[1] & ~0x7c0)
+			| (mb << 6);
+		flush_hash_patch_A[2] = (flush_hash_patch_A[2] & ~0x7c0)
+			| (mb2 << 6);
+		flush_hash_patch_B[0] = (flush_hash_patch_B[0] & ~0xffff)
+			| hmask;
+		flush_icache_range((unsigned long) &flush_hash_patch_A[0],
+				   (unsigned long) &flush_hash_patch_B[1]);
 	}
 	else {
 		Hash_end = 0;
@@ -1306,6 +1270,7 @@ static void __init hash_init(void)
 		flush_icache_range((unsigned long) &hash_page[0],
 				   (unsigned long) &hash_page[1]);
 	}
+
 	if ( ppc_md.progress ) ppc_md.progress("hash:done", 0x205);
 }
 #endif /* !CONFIG_4xx && !CONFIG_8xx */
@@ -1320,7 +1285,7 @@ set_phys_avail(unsigned long total_memory)
 	unsigned long kstart, ksize;
 
 	/*
-	 * Initially, available phyiscal memory is equivalent to all
+	 * Initially, available physical memory is equivalent to all
 	 * physical memory.
 	 */
 
@@ -1356,4 +1321,51 @@ set_phys_avail(unsigned long total_memory)
 	if (Hash)
 		mem_pieces_remove(&phys_avail, __pa(Hash), Hash_size, 1);
 #endif /* CONFIG_PPC64BRIDGE */
+}
+
+void flush_page_to_ram(struct page *page)
+{
+	unsigned long vaddr = (unsigned long) kmap(page);
+	__flush_page_to_ram(vaddr);
+	kunmap(page);
+}
+
+#if !defined(CONFIG_4xx) && !defined(CONFIG_8xx)
+/*
+ * This is called at the end of handling a user page fault, when the
+ * fault has been handled by updating a PTE in the linux page tables.
+ * We use it to preload an HPTE into the hash table corresponding to
+ * the updated linux PTE.
+ */
+void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
+		      pte_t pte)
+{
+	struct mm_struct *mm;
+	pmd_t *pmd;
+	pte_t *ptep;
+	static int nopreload;
+
+	if (Hash == 0 || nopreload)
+		return;
+	mm = (address < TASK_SIZE)? vma->vm_mm: &init_mm;
+	pmd = pmd_offset(pgd_offset(mm, address), address);
+	if (!pmd_none(*pmd)) {
+		ptep = pte_offset(pmd, address);
+		add_hash_page(mm->context, address, ptep);
+	}
+}
+#endif /* !4xx && !8xx */
+
+/*
+ * set_pte stores a linux PTE into the linux page table.
+ * On machines which use an MMU hash table we avoid changing the
+ * _PAGE_HASHPTE bit.
+ */
+void set_pte(pte_t *ptep, pte_t pte)
+{
+#if _PAGE_HASHPTE != 0
+	pte_update(ptep, ~_PAGE_HASHPTE, pte_val(pte) & ~_PAGE_HASHPTE);
+#else
+	*ptep = pte;
+#endif
 }

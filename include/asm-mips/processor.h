@@ -1,11 +1,10 @@
-/* $Id: processor.h,v 1.25 2000/02/05 06:47:37 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1994 Waldorf GMBH
- * Copyright (C) 1995, 1996, 1997, 1998 Ralf Baechle
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2001 Ralf Baechle
  * Copyright (C) 1996 Paul M. Antoine
  * Copyright (C) 1999 Silicon Graphics, Inc.
  */
@@ -30,6 +29,7 @@
 #include <asm/system.h>
 
 struct mips_cpuinfo {
+	unsigned long udelay_val;
 	unsigned long *pgd_quick;
 	unsigned long *pte_quick;
 	unsigned long pgtable_cache_sz;
@@ -44,7 +44,6 @@ extern void r3081_wait(void);
 extern void r4k_wait(void);
 extern char cyclecounter_available;	/* only available from R4000 upwards. */
 extern char dedicated_iv_available;	/* some embedded MIPS like Nevada */
-extern char vce_available;		/* Supports VCED / VCEI exceptions */
 
 extern struct mips_cpuinfo boot_cpu_data;
 extern unsigned int vced_count, vcei_count;
@@ -83,7 +82,7 @@ extern struct task_struct *last_task_used_math;
  * for a 64 bit kernel expandable to 8192EB, of which the current MIPS
  * implementations will "only" be able to use 1TB ...
  */
-#define TASK_SIZE	(0x80000000UL)
+#define TASK_SIZE	(0x7fff8000UL)
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.

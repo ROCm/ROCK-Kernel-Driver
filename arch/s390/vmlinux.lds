@@ -14,7 +14,7 @@ SECTIONS
 	*(.gnu.warning)
 	} = 0x0700
   .text.lock : { *(.text.lock) }	/* out-of-line lock text */
-  .rodata : { *(.rodata) }
+  .rodata : { *(.rodata) *(.rodata.*) }
   .kstrtab : { *(.kstrtab) }
 
   . = ALIGN(16);		/* Exception table */

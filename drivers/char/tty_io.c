@@ -1872,6 +1872,8 @@ static void __do_SAK(void *arg)
  */
 void do_SAK(struct tty_struct *tty)
 {
+	if (!tty)
+		return;
 	PREPARE_TQUEUE(&tty->SAK_tq, __do_SAK, tty);
 	schedule_task(&tty->SAK_tq);
 }

@@ -1,4 +1,4 @@
-/* $Id: isar.c,v 1.17.6.2 2001/04/08 17:51:42 kai Exp $
+/* $Id: isar.c,v 1.17.6.3 2001/06/09 15:14:17 kai Exp $
  *
  * isar.c   ISAR (Siemens PSB 7110) specific routines
  *
@@ -1650,8 +1650,8 @@ close_isarstate(struct BCState *bcs)
 			kfree(bcs->hw.isar.rcvbuf);
 			bcs->hw.isar.rcvbuf = NULL;
 		}
-		discard_queue(&bcs->rqueue);
-		discard_queue(&bcs->squeue);
+		skb_queue_purge(&bcs->rqueue);
+		skb_queue_purge(&bcs->squeue);
 		if (bcs->tx_skb) {
 			dev_kfree_skb_any(bcs->tx_skb);
 			bcs->tx_skb = NULL;

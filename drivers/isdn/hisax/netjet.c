@@ -1,4 +1,4 @@
-/* $Id: netjet.c,v 1.24.6.4 2001/02/16 16:43:28 kai Exp $
+/* $Id: netjet.c,v 1.24.6.5 2001/06/09 15:14:18 kai Exp $
  *
  * netjet.c     low level stuff for Traverse Technologie NETJet ISDN cards
  *
@@ -22,7 +22,7 @@
 #include <asm/io.h>
 #include "netjet.h"
 
-const char *NETjet_revision = "$Revision: 1.24.6.4 $";
+const char *NETjet_revision = "$Revision: 1.24.6.5 $";
 
 /* Interface functions */
 
@@ -880,8 +880,8 @@ close_tigerstate(struct BCState *bcs)
 			kfree(bcs->hw.tiger.sendbuf);
 			bcs->hw.tiger.sendbuf = NULL;
 		}
-		discard_queue(&bcs->rqueue);
-		discard_queue(&bcs->squeue);
+		skb_queue_purge(&bcs->rqueue);
+		skb_queue_purge(&bcs->squeue);
 		if (bcs->tx_skb) {
 			dev_kfree_skb_any(bcs->tx_skb);
 			bcs->tx_skb = NULL;

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.time.h 1.10 05/17/01 18:14:26 cort
+ * BK Id: SCCS/s.time.h 1.13 06/27/01 14:49:58 trini
  */
 /*
  * Common time prototypes and such for all ppc machines.
@@ -23,6 +23,8 @@ extern unsigned long disarm_decr[NR_CPUS];
 
 extern void to_tm(int tim, struct rtc_time * tm);
 extern time_t last_rtc_update;
+
+extern void set_dec_cpu6(unsigned int val);
 
 int via_calibrate_decr(void);
 

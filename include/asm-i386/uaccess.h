@@ -129,12 +129,6 @@ extern void __put_user_4(void);
 
 extern void __put_user_bad(void);
 
-#define __put_user_x(size,ret,x,ptr)					\
-	__asm__ __volatile__("call __put_user_" #size			\
-		:"=a" (ret)						\
-		:"0" (ptr),"d" (x)					\
-		:"cx")
-
 #define put_user(x,ptr)							\
   __put_user_check((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 

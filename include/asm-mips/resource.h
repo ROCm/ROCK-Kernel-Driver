@@ -1,10 +1,9 @@
-/* $Id: resource.h,v 1.4 2000/01/27 23:45:30 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 1998 by Ralf Baechle
+ * Copyright (C) 1995, 96, 98, 2000 by Ralf Baechle
  */
 #ifndef _ASM_RESOURCE_H
 #define _ASM_RESOURCE_H
@@ -26,13 +25,13 @@
 
 #define RLIM_NLIMITS 11			/* Number of limit flavors.  */
 
+#ifdef __KERNEL__
+
 /*
  * SuS says limits have to be unsigned.
  * Which makes a ton more sense anyway.
  */
 #define RLIM_INFINITY	0x7fffffffUL
-
-#ifdef __KERNEL__
 
 #define INIT_RLIMITS					\
 {							\

@@ -14,7 +14,11 @@
 #include <asm/io.h>
 
 #ifndef RTC_PORT
+#if defined(CONFIG_MIPS_ITE8172) || defined(CONFIG_MIPS_IVR)
+#define RTC_PORT(x)	(0x14014800 + (x))
+#else
 #define RTC_PORT(x)	(0x70 + (x))
+#endif
 #endif
 
 /*
@@ -45,8 +49,13 @@ extern struct rtc_ops *rtc_ops;
 
 #ifdef CONFIG_DECSTATION
 #define RTC_IRQ 0
+#elif defined(CONFIG_MIPS_ITE8172) || defined(CONFIG_MIPS_IVR)
+#include <asm/it8172/it8172_int.h>
+#define RTC_IRQ	IT8172_RTC_IRQ
 #else
 #define RTC_IRQ	8
 #endif
+
+#define RTC_DEC_YEAR	0x3f	/* Where we store the real year on DECs.  */
 
 #endif /* _ASM_MC146818RTC_H */

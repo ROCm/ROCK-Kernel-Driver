@@ -244,6 +244,7 @@
 	000f  OHCI Compliant FireWire Controller
 	0011  National PCI System I/O
 	0012  USB Controller
+	0020  DP83815 (MacPhyter) Ethernet Controller
 	d001  87410 IDE
 100c  Tseng Labs Inc
 	3202  ET4000/W32p rev A
@@ -383,10 +384,12 @@
 		1014 00cf  16/4 Token-Ring Adapter Special
 		1014 00e4  High-Speed 100/16/4 Token-Ring Adapter
 		1014 00e5  16/4 Token-Ring Adapter 2 + Wake-On-LAN
+		1014 016d  iSeries 2744 Card
 	0045  SSA Adapter
 	0046  MPIC interrupt controller
 	0047  PCI to PCI Bridge
 	0048  PCI to PCI Bridge
+	0049  Warhead SCSI Controller
 	004e  ATM Controller (14104e00)
 	004f  ATM Controller (14104f00)
 	0050  ATM Controller (14105000)
@@ -398,6 +401,10 @@
 	0090  GXT 3000P
 		1014 008E  GXT-3000P
 	0095  20H2999 PCI Docking Bridge
+	0096  Chukar chipset SCSI controller
+		1014 0099  iSeries 2748 DASD IOA
+		1014 0098  iSeries 2763 DASD IOA
+		1014 0097  iSeries 2778 DASD IOA
 	00a5  ATM Controller (1410a500)
 	00a6  ATM 155MBPS MM Controller (1410a600)
 	00b7  256-bit Graphics Rasterizer [Fire GL1]
@@ -458,6 +465,8 @@
 	2040  79c974
 	7006  AMD-751 [Irongate] System Controller
 	7007  AMD-751 [Irongate] AGP Bridge
+	700E  AMD-760 [Irongate] System Controller
+	700F  AMD-760 [Irongate] AGP Bridge
 	7400  AMD-755 [Cobra] ISA
 	7401  AMD-755 [Cobra] IDE
 	7403  AMD-755 [Cobra] ACPI
@@ -466,6 +475,10 @@
 	7409  AMD-756 [Viper] IDE
 	740b  AMD-756 [Viper] ACPI
 	740c  AMD-756 [Viper] USB
+	7410  AMD-765 [Viper] ISA
+	7411  AMD-765 [Viper] IDE
+	7413  AMD-765 [Viper] ACPI
+	7414  AMD-765 [Viper] USB
 1023  Trident Microsystems
 	0194  82C194
 	2000  4DWave DX
@@ -993,6 +1006,7 @@
 	4d30  20267
 	4d33  20246
 	4d38  20262
+	4d68  20268
 	5300  DC5300
 105b  Foxconn International, Inc.
 105c  Wipro Infotech Limited
@@ -1925,9 +1939,9 @@
 		1102 8051  CT4850 SBLive! Value
 	7002  SB Live!
 		1102 0020  Gameport Joystick
-1103  Triones Technologies, Inc.
-	0003  HPT343
-	0004  HPT366
+1103  HighPoint Technologies, Inc.
+	0003  HPT343 UltraDMA 33 IDE Controller
+	0004  HPT366/370 UltraDMA 66/100 IDE Controller
 1104  RasterOps Corp.
 1105  Sigma Designs, Inc.
 	8300  REALmagic Hollywood Plus DVD Decoder
@@ -2217,7 +2231,7 @@
 1145  Workbit Corporation
 1146  Force Computers
 1147  Interface Corp
-1148  Syskonnect (Schneider & Koch)
+1148  SysKonnect GmbH
 	4000  FDDI Adapter
 		0e11 b03b  Netelligent 100 FDDI DAS Fibre SC
 		0e11 b03c  Netelligent 100 FDDI SAS Fibre SC
@@ -2234,7 +2248,7 @@
 		1148 5841  FDDI SK-5841 (SK-NET FDDI-FP64)
 		1148 5843  FDDI SK-5843 (SK-NET FDDI-LP64)
 		1148 5844  FDDI SK-5844 (SK-NET FDDI-LP64 DAS)
-	4200  Token ring adaptor
+	4200  Token Ring adapter
 	4300  Gigabit Ethernet
 		1148 9821  SK-9821 (1000Base-T single link)
 		1148 9822  SK-9822 (1000Base-T dual link)
@@ -2242,6 +2256,8 @@
 		1148 9842  SK-9842 (1000Base-LX dual link)
 		1148 9843  SK-9843 (1000Base-SX single link)
 		1148 9844  SK-9844 (1000Base-SX dual link)
+		1148 9861  SK-9861 (1000Base-SX VF45 single link)
+		1148 9862  SK-9862 (1000Base-SX VF45 dual link)
 1149  Win System Corporation
 114a  VMIC
 	7587  VMIVME-7587
@@ -2335,13 +2351,16 @@
 1165  Imagraph Corporation
 	0001  Motion TPEG Recorder/Player with audio
 1166  ServerWorks
-	0007  CNB20-LE CPU to PCI Bridge
-	0008  CNB20HE
-	0009  CNB20LE
+	0007  CNB20-LE Host Bridge
+	0008  CNB20HE Host Bridge
+	0009  CNB20LE Host Bridge
 	0010  CIOB30
 	0011  CMIC-HE
-	0200  OSB4
-	0201  CSB5
+	0200  OSB4 South Bridge
+	0201  CSB5 South Bridge
+	0211  OSB4 IDE Controller
+	0212  CSB5 IDE Controller
+	0220  OSB4/CSB5 OHCI USB Controller
 1167  Mutoh Industries Inc
 1168  Thine Electronics Inc
 1169  Centre for Development of Advanced Computing
@@ -2455,7 +2474,9 @@
 	1221  82C092G
 119c  Information Technology Inst.
 119d  Bug, Inc. Sapporo Japan
-119e  Fujitsu Microelectronics Ltd.
+119e  Fujitsu Microelectronics Europe GMBH
+	0001 FireStream 155
+	0003 FireStream 50
 119f  Bull HN Information Systems
 11a0  Convex Computer Corporation
 11a1  Hamamatsu Photonics K.K.
@@ -3002,13 +3023,14 @@
 		8086 5643  ES1371, ES1373 AudioPCI On Motherboard Vancouver
 		8086 5753  ES1371, ES1373 AudioPCI On Motherboard WS440BX
 	5000  ES1370 [AudioPCI]
-	5880  5880 AudioPCI
+		4942 4c4c  Creative Sound Blaster AudioPCI128
+	5880  CT5880 [AudioPCI]
 		1274 2000  Creative Sound Blaster AudioPCI128
 		1274 5880  Creative Sound Blaster AudioPCI128
-		1462 6880  5880 AudioPCI On Motherboard MS-6188 1.00
-		270f 2001  5880 AudioPCI On Motherboard 6CTR
-		270f 2200  5880 AudioPCI On Motherboard 6WTX
-		270f 7040  5880 AudioPCI On Motherboard 6ATA4
+		1462 6880  CT5880 AudioPCI On Motherboard MS-6188 1.00
+		270f 2001  CT5880 AudioPCI On Motherboard 6CTR
+		270f 2200  CT5880 AudioPCI On Motherboard 6WTX
+		270f 7040  CT5880 AudioPCI On Motherboard 6ATA4
 1275  Network Appliance Corporation
 1276  Switched Network Technologies, Inc.
 1277  Comstream

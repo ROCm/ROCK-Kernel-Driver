@@ -25,8 +25,7 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 	int __res = 1;							\
 	struct elfhdr *__h = (hdr);					\
 									\
-	if ((__h->e_machine != EM_MIPS) &&				\
-	    (__h->e_machine != EM_MIPS_RS4_BE))				\
+	if (__h->e_machine != EM_MIPS)					\
 		__res = 0;						\
 	if (__h->e_flags & EF_MIPS_ARCH)				\
 		__res = 0;						\
@@ -35,17 +34,7 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 })
 
 /* This one accepts IRIX binaries.  */
-#define irix_elf_check_arch(hdr)					\
-({									\
-	int __res = 1;							\
-	struct elfhdr *__h = (hdr);					\
-									\
-	if ((__h->e_machine != EM_MIPS) &&				\
-	    (__h->e_machine != EM_MIPS_RS4_BE))				\
-		__res = 0;						\
-									\
-	__res;								\
-})
+#define irix_elf_check_arch(hdr)	((hdr)->e_machine == EM_MIPS)
 
 /*
  * These are used to set parameters in the core dumps.

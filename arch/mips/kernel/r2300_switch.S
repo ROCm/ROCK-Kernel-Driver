@@ -34,6 +34,9 @@
  *                     task_struct *next)
  */
 LEAF(resume)
+#ifndef CONFIG_CPU_HAS_LLSC
+	sw      zero, ll_bit
+#endif
 	mfc0	t1, CP0_STATUS
 	sw	t1, THREAD_STATUS(a0)
 	CPU_SAVE_NONSCRATCH(a0)

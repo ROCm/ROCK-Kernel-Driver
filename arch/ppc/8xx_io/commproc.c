@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.commproc.c 1.8 05/18/01 07:54:04 patch
+ * BK Id: SCCS/s.commproc.c 1.11 06/15/01 13:00:20 paulus
  */
 
 /*
@@ -47,12 +47,12 @@ cpm8xx_t	*cpmp;		/* Pointer to comm processor space */
 /* CPM interrupt vector functions.
 */
 struct	cpm_action {
-	void	(*handler)(void *);
+	void	(*handler)(void *, struct pt_regs * regs);
 	void	*dev_id;
 };
 static	struct	cpm_action cpm_vecs[CPMVEC_NR];
 static	void	cpm_interrupt(int irq, void * dev, struct pt_regs * regs);
-static	void	cpm_error_interrupt(void *);
+static	void	cpm_error_interrupt(void *, struct pt_regs * regs);
 
 void
 m8xx_cpm_reset(uint host_page_addr)
@@ -129,7 +129,7 @@ cpm_interrupt(int irq, void * dev, struct pt_regs * regs)
 	vec >>= 11;
 
 	if (cpm_vecs[vec].handler != 0)
-		(*cpm_vecs[vec].handler)(cpm_vecs[vec].dev_id);
+		(*cpm_vecs[vec].handler)(cpm_vecs[vec].dev_id, regs);
 	else
 		((immap_t *)IMAP_ADDR)->im_cpic.cpic_cimr &= ~(1 << vec);
 
@@ -146,14 +146,15 @@ cpm_interrupt(int irq, void * dev, struct pt_regs * regs)
  * tests in the interrupt handler.
  */
 static	void
-cpm_error_interrupt(void *dev)
+cpm_error_interrupt(void *dev, struct pt_regs *regs)
 {
 }
 
 /* Install a CPM interrupt handler.
 */
 void
-cpm_install_handler(int vec, void (*handler)(void *), void *dev_id)
+cpm_install_handler(int vec, void (*handler)(void *, struct pt_regs *regs),
+		    void *dev_id)
 {
 
 	/* If null handler, assume we are trying to free the IRQ.

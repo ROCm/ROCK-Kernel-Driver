@@ -1,4 +1,4 @@
-/* $Id: icn.c,v 1.65.6.4 2001/04/20 02:42:01 keil Exp $
+/* $Id: icn.c,v 1.65.6.5 2001/06/09 15:14:19 kai Exp $
 
  * ISDN low-level module for the ICN active ISDN-Card.
  *
@@ -34,7 +34,7 @@
 #undef MAP_DEBUG
 
 static char
-*revision = "$Revision: 1.65.6.4 $";
+*revision = "$Revision: 1.65.6.5 $";
 
 static int icn_addcard(int, char *, char *);
 
@@ -51,8 +51,7 @@ icn_free_queue(icn_card * card, int channel)
 	struct sk_buff *skb;
 	unsigned long flags;
 
-	while ((skb = skb_dequeue(queue)))
-		dev_kfree_skb(skb);
+	skb_queue_purge(queue);
 	save_flags(flags);
 	cli();
 	card->xlen[channel] = 0;

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mmu.h 1.7 05/17/01 18:14:25 cort
+ * BK Id: SCCS/s.mmu.h 1.10 06/28/01 15:50:17 paulus
  */
 /*
  * PowerPC memory management structures
@@ -115,34 +115,6 @@ typedef struct _P601_BAT {
 	P601_BATL batl;		/* Lower register */
 } P601_BAT;
 
-/*
- * Simulated two-level MMU.  This structure is used by the kernel
- * to keep track of MMU mappings and is used to update/maintain
- * the hardware HASH table which is really a cache of mappings.
- *
- * The simulated structures mimic the hardware available on other
- * platforms, notably the 80x86 and 680x0.
- */
-
-typedef struct _pte {
-   	unsigned long page_num:20;
-   	unsigned long flags:12;		/* Page flags (some unused bits) */
-} pte;
-
-#define PD_SHIFT (10+12)		/* Page directory */
-#define PD_MASK  0x02FF
-#define PT_SHIFT (12)			/* Page Table */
-#define PT_MASK  0x02FF
-#define PG_SHIFT (12)			/* Page Entry */
- 
-
-/* MMU context */
-
-typedef struct _MMU_context {
-	SEGREG	segs[16];	/* Segment registers */
-	pte	**pmap;		/* Two-level page-map structure */
-} MMU_context;
-
 extern void _tlbie(unsigned long va);	/* invalidate a TLB entry */
 extern void _tlbia(void);		/* invalidate all TLB entries */
 
@@ -166,22 +138,6 @@ extern void _tlbia(void);		/* invalidate all TLB entries */
 #define BPP_XX	0x00		/* No access */
 #define BPP_RX	0x01		/* Read only */
 #define BPP_RW	0x02		/* Read/write */
-
-/* Used to set up SDR1 register */
-#define HASH_TABLE_SIZE_64K	0x00010000
-#define HASH_TABLE_SIZE_128K	0x00020000
-#define HASH_TABLE_SIZE_256K	0x00040000
-#define HASH_TABLE_SIZE_512K	0x00080000
-#define HASH_TABLE_SIZE_1M	0x00100000
-#define HASH_TABLE_SIZE_2M	0x00200000
-#define HASH_TABLE_SIZE_4M	0x00400000
-#define HASH_TABLE_MASK_64K	0x000   
-#define HASH_TABLE_MASK_128K	0x001   
-#define HASH_TABLE_MASK_256K	0x003   
-#define HASH_TABLE_MASK_512K	0x007
-#define HASH_TABLE_MASK_1M	0x00F   
-#define HASH_TABLE_MASK_2M	0x01F   
-#define HASH_TABLE_MASK_4M	0x03F   
 
 /* Control/status registers for the MPC8xx.
  * A write operation to these registers causes serialized access.

@@ -64,4 +64,8 @@
 
 #define MAXHOSTNAMELEN	64	/* max length of hostname */
 
+#ifdef __KERNEL__
+# define CLOCKS_PER_SEC	100	/* frequency at which times() counts */
+#endif
+
 #endif /* _ASM_PARAM_H */

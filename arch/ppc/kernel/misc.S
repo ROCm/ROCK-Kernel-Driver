@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.S 1.16 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.misc.S 1.19 06/15/01 13:56:56 paulus
  */
 /*
  * This file contains miscellaneous low-level functions.
@@ -263,10 +263,13 @@ _GLOBAL(_tlbie)
  * This is a no-op on the 601.
  */
 _GLOBAL(flush_instruction_cache)
-#ifdef CONFIG_8xx
+#if defined(CONFIG_8xx)
 	isync
 	lis	r5, IDC_INVALL@h
 	mtspr	IC_CST, r5
+#elif defined(CONFIG_4xx)
+	lis	r3, KERNELBASE@h
+	iccci	0,r3
 #else
 	mfspr	r3,PVR
 	rlwinm	r3,r3,16,16,31

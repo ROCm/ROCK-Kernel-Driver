@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pci.c 1.21 05/21/01 01:31:30 cort
+ * BK Id: SCCS/s.pci.c 1.26 06/28/01 08:02:41 trini
  */
 /*
  * Common pmac/prep/chrp pci routines. -- Cort
@@ -40,11 +40,10 @@ unsigned long isa_io_base     = 0;
 unsigned long isa_mem_base    = 0;
 unsigned long pci_dram_offset = 0;
 
-static u8* pci_to_OF_bus_map;
-
 static void pcibios_fixup_resources(struct pci_dev* dev);
 #ifdef CONFIG_ALL_PPC
 static void pcibios_fixup_cardbus(struct pci_dev* dev);
+static u8* pci_to_OF_bus_map;
 #endif
 
 /* By default, we don't re-assign bus numbers. We do this only on
@@ -73,8 +72,13 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 	u32 new, check;
 	int reg;
 	struct pci_controller* hose = dev->sysdata;
+	unsigned long io_offset;
 	
 	new = res->start;
+	if (hose && res->flags & IORESOURCE_IO) {
+		io_offset = (unsigned long)hose->io_base_virt - isa_io_base;
+		new -= io_offset;
+	}
 	if (hose && res->flags & IORESOURCE_MEM)
 		new -= hose->pci_mem_offset;
 	new |= (res->flags & PCI_REGION_FLAG_MASK);
@@ -98,39 +102,42 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 }
 
 static void
-pcibios_fixup_resources(struct pci_dev* dev)
+pcibios_fixup_resources(struct pci_dev *dev)
 {
-	struct pci_controller* hose =
-		(struct pci_controller *)dev->sysdata;
+	struct pci_controller* hose = (struct pci_controller *)dev->sysdata;
 	int i;
+	unsigned long offset;
+
 	if (!hose) {
-		printk("No hose for PCI dev %x.%x !\n", dev->bus->number, dev->devfn >> 3);
+		printk(KERN_ERR "No hose for PCI dev %s!\n", dev->slot_name);
 		return;
 	}
 	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
 		struct resource *res = dev->resource + i;
-		if (!res->start)
+		if (!res->start || !res->flags)
 			continue;
-		if ((res->flags & IORESOURCE_MEM) && hose->pci_mem_offset) {
-			res->start += hose->pci_mem_offset;
-			res->end += hose->pci_mem_offset;
-#ifdef DEBUG
-			printk("Fixup mem res, dev: %x.%x, res_start: %lx->%lx\n",
-			       dev->bus->number, dev->devfn>>3, res->start-hose->pci_mem_offset,
-			       res->start);
-#endif
+		if (res->end == 0xffffffff) {
+			DBG("PCI:%s Resource %d [%08lx-%08lx] is unassigned\n",
+			    dev->slot_name, i, res->start, res->end);
+			res->end -= res->start;
+			res->start = 0;
+			continue;
 		}
-
-		if ((res->flags & IORESOURCE_IO)
-		    && (unsigned long) hose->io_base_virt != isa_io_base) {
-			unsigned long offs;
-
-			offs = (unsigned long)hose->io_base_virt - isa_io_base;
-			res->start += offs;
-			res->end += offs;
-			printk("Fixup IO res, dev: %x.%x, res_start: %lx->%lx\n",
-			       dev->bus->number, dev->devfn>>3,
-			       res->start - offs, res->start);
+		offset = 0;
+		if (res->flags & IORESOURCE_MEM) {
+			offset = hose->pci_mem_offset;
+		} else if (res->flags & IORESOURCE_IO) {
+			offset = (unsigned long) hose->io_base_virt
+				- isa_io_base;
+		}
+		if (offset != 0) {
+			res->start += offset;
+			res->end += offset;
+#ifdef DEBUG
+			printk("Fixup res %d (%lx) of dev %s: %lx -> %lx\n",
+			       i, res->flags, dev->slot_name,
+			       res->start - offset, res->start);
+#endif
 		}
 	}
 }
@@ -228,22 +235,27 @@ pcibios_allocate_bus_resources(struct list_head *bus_list)
 {
 	struct list_head *ln;
 	struct pci_bus *bus;
-	struct pci_dev *dev;
-	int idx;
-	struct resource *r, *pr;
+	int i;
+	struct resource *res, *pr;
 
 	/* Depth-First Search on bus tree */
-	for (ln=bus_list->next; ln != bus_list; ln=ln->next) {
+	for (ln = bus_list->next; ln != bus_list; ln=ln->next) {
 		bus = pci_bus_b(ln);
-		if ((dev = bus->self)) {
-			for (idx = PCI_BRIDGE_RESOURCES; idx < PCI_NUM_RESOURCES; idx++) {
-				r = &dev->resource[idx];
-				if (!r->start)
-					continue;
-				pr = pci_find_parent_resource(dev, r);
-				if (!pr || request_resource(pr, r) < 0)
-					printk(KERN_ERR "PCI: Cannot allocate resource region %d of bridge %s\n", idx, dev->slot_name);
-			}
+		for (i = 0; i < 4; ++i) {
+			if ((res = bus->resource[i]) == NULL || !res->flags)
+				continue;
+			if (bus->parent == NULL)
+				pr = (res->flags & IORESOURCE_IO)?
+					&ioport_resource: &iomem_resource;
+			else
+				pr = pci_find_parent_resource(bus->self, res);
+
+			if (pr && request_resource(pr, res) == 0)
+				continue;
+			printk(KERN_ERR "PCI: Cannot allocate resource region "
+			       "%d of PCI bridge %d\n", i, bus->number);
+			DBG("PCI: resource is %lx..%lx (%lx), parent %p\n",
+			    res->start, res->end, res->flags, pr);
 		}
 		pcibios_allocate_bus_resources(&bus->children);
 	}
@@ -253,13 +265,15 @@ static inline void alloc_resource(struct pci_dev *dev, int idx)
 {
 	struct resource *pr, *r = &dev->resource[idx];
 
-	DBG("PCI:%x:%x:%x: Resource %08lx-%08lx (f=%lx)\n",
-	    dev->bus->number, dev->devfn >> 3, dev->devfn & 7,
-	    r->start, r->end, r->flags);
+	DBG("PCI:%s: Resource %d: %08lx-%08lx (f=%lx)\n",
+	    dev->slot_name, idx, r->start, r->end, r->flags);
 	pr = pci_find_parent_resource(dev, r);
 	if (!pr || request_resource(pr, r) < 0) {
 		printk(KERN_ERR "PCI: Cannot allocate resource region %d"
 		       " of device %s\n", idx, dev->slot_name);
+		if (pr)
+			DBG("PCI:  parent is %p: %08lx-%08lx (f=%lx)\n",
+			    pr, pr->start, pr->end, pr->flags);
 		/* We'll assign a new address later */
 		r->end -= r->start;
 		r->start = 0;
@@ -276,20 +290,12 @@ pcibios_allocate_resources(int pass)
 
 	pci_for_each_dev(dev) {
 		pci_read_config_word(dev, PCI_COMMAND, &command);
-		for(idx = 0; idx < 6; idx++) {
+		for (idx = 0; idx < 6; idx++) {
 			r = &dev->resource[idx];
 			if (r->parent)		/* Already allocated */
 				continue;
 			if (!r->start)		/* Not assigned at all */
 				continue;
-			if (r->end == 0xffffffff) {
-				/* LongTrail OF quirk: unassigned */
-				DBG("PCI: Resource %08lx-%08lx was unassigned\n", r->start, r->end);
-				r->end -= r->start;
-				r->start = 0;
-				continue;
-			}
-
 			if (r->flags & IORESOURCE_IO)
 				disabled = !(command & PCI_COMMAND_IO);
 			else
@@ -306,7 +312,8 @@ pcibios_allocate_resources(int pass)
 			DBG("PCI: Switching off ROM of %s\n", dev->slot_name);
 			r->flags &= ~PCI_ROM_ADDRESS_ENABLE;
 			pci_read_config_dword(dev, dev->rom_base_reg, &reg);
-			pci_write_config_dword(dev, dev->rom_base_reg, reg & ~PCI_ROM_ADDRESS_ENABLE);
+			pci_write_config_dword(dev, dev->rom_base_reg,
+					       reg & ~PCI_ROM_ADDRESS_ENABLE);
 		}
 	}
 }
@@ -325,21 +332,14 @@ pcibios_assign_resources(void)
 		if (!class || class == PCI_CLASS_BRIDGE_HOST)
 			continue;
 
-		for(idx=0; idx<6; idx++) {
+		for (idx = 0; idx < 6; idx++) {
 			r = &dev->resource[idx];
-#if 0	/* we don't need this PC-ism */
-			/*
-			 *  Don't touch IDE controllers and I/O ports of video cards!
-			 */
-			if ((class == PCI_CLASS_STORAGE_IDE && idx < 4) ||
-			    (class == PCI_CLASS_DISPLAY_VGA && (r->flags & IORESOURCE_IO)))
-				continue;
-#endif
 
 			/*
-			 *  We shall assign a new address to this resource, either because
-			 *  the BIOS (sic) forgot to do so or because we have decided the old
-			 *  address was unusable for some reason.
+			 * We shall assign a new address to this resource,
+			 * either because the BIOS (sic) forgot to do so
+			 * or because we have decided the old address was
+			 * unusable for some reason.
 			 */
 			if (!r->start && r->end &&
 			    (!ppc_md.pcibios_enable_device_hook ||
@@ -347,13 +347,13 @@ pcibios_assign_resources(void)
 				pci_assign_resource(dev, idx);
 		}
 
-		if (0) { /* don't assign ROMs */
-			r = &dev->resource[PCI_ROM_RESOURCE];
-			r->end -= r->start;
-			r->start = 0;
-			if (r->end)
-				pci_assign_resource(dev, PCI_ROM_RESOURCE);
-		}
+#if 0 /* don't assign ROMs */
+		r = &dev->resource[PCI_ROM_RESOURCE];
+		r->end -= r->start;
+		r->start = 0;
+		if (r->end)
+			pci_assign_resource(dev, PCI_ROM_RESOURCE);
+#endif
 	}
 }
 
@@ -496,10 +496,15 @@ scan_OF_childs_for_device(struct device_node* node, u8 bus, u8 dev_fn)
 			&& ((reg[0] >> 16) & 0xff) == bus)
 			return node;
 
-		/* For PCI<->PCI bridges or CardBus bridges, we go down */
+		/* For PCI<->PCI bridges or CardBus bridges, we go down
+		 * Note: some OFs create a parent node "multifunc-device" as
+		 * a fake root for all functions of a multi-function device,
+		 * we go down them as well.
+		 */
 		class_code = (unsigned int *) get_property(node, "class-code", 0);
-		if (!class_code || ((*class_code >> 8) != PCI_CLASS_BRIDGE_PCI &&
-			(*class_code >> 8) != PCI_CLASS_BRIDGE_CARDBUS))
+		if ((!class_code || ((*class_code >> 8) != PCI_CLASS_BRIDGE_PCI &&
+			(*class_code >> 8) != PCI_CLASS_BRIDGE_CARDBUS)) &&
+			strcmp(node->name, "multifunc-device"))
 			continue;
 		sub_node = scan_OF_childs_for_device(node->child, bus, dev_fn);
 		if (sub_node)
@@ -682,9 +687,9 @@ pcibios_init(void)
 {
 	struct pci_controller *hose;
 	struct pci_bus *bus;
-	int next_busno, i;
+	int next_busno;
 
-	printk("PCI: Probing PCI hardware\n");
+	printk(KERN_INFO "PCI: Probing PCI hardware\n");
 
 	/* Scan all of the recorded PCI controllers.  */
 	for (next_busno = 0, hose = hose_head; hose; hose = hose->next) {
@@ -692,18 +697,6 @@ pcibios_init(void)
 			hose->first_busno = next_busno;
 		hose->last_busno = 0xff;
 		bus = pci_scan_bus(hose->first_busno, hose->ops, hose);
-		if (hose->io_resource.flags) {
-			unsigned long offs;
-
-			offs = (unsigned long)hose->io_base_virt - isa_io_base;
-			hose->io_resource.start += offs;
-			hose->io_resource.end += offs;
-			bus->resource[0] = &hose->io_resource;
-		}
-		for (i = 0; i < 3; ++i)
-			if (hose->mem_resources[i].flags)
-				bus->resource[i+1] = &hose->mem_resources[i];
-		hose->bus = bus;
 		hose->last_busno = bus->subordinate;
 		if (pci_assign_all_busses || next_busno <= hose->last_busno)
 			next_busno = hose->last_busno+1;
@@ -716,7 +709,7 @@ pcibios_init(void)
 	 */
 	if (pci_assign_all_busses && have_of)
 		pcibios_make_OF_bus_map();
-		
+
 	/* Call machine dependant fixup */
 	if (ppc_md.pcibios_fixup)
 		ppc_md.pcibios_fixup();
@@ -727,27 +720,7 @@ pcibios_init(void)
 	pcibios_allocate_resources(1);
 	pcibios_assign_resources();
 
-#ifdef CONFIG_BLK_DEV_IDE
-	/* OF fails to initialize IDE controllers on macs
-	 * (and maybe other machines)
-	 * 
-	 * Ideally, this should be moved to the IDE layer, but we need
-	 * to check specifically with Andre Hedrick how to do it cleanly
-	 * since the common IDE code seem to care about the fact that the
-	 * BIOS may have disabled a controller.
-	 * 
-	 * -- BenH
-	 */
-	if (_machine == _MACH_Pmac) {
-		struct pci_dev *dev;
-		pci_for_each_dev(dev)
-		{
-			if ((dev->class >> 16) == PCI_BASE_CLASS_STORAGE)
-				pci_enable_device(dev);
-		}
-	}
-#endif /* CONFIG_BLK_DEV_IDE */
-
+	/* Call machine dependent post-init code */
 	if (ppc_md.pcibios_after_init)
 		ppc_md.pcibios_after_init();
 }
@@ -775,21 +748,62 @@ unsigned long resource_fixup(struct pci_dev * dev, struct resource * res,
 
 void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
-	struct pci_controller *hose;
+	struct pci_controller *hose = (struct pci_controller *) bus->sysdata;
+	unsigned long io_offset;
+	struct resource *res;
+	int i;
 
-	pci_read_bridge_bases(bus);
+	io_offset = (unsigned long)hose->io_base_virt - isa_io_base;
+	if (bus->parent == NULL) {
+		/* This is a host bridge - fill in its resources */
+		hose->bus = bus;
 
-	hose = pci_bus_to_hose(bus->number);
-
-	/* Apply pci_mem_offset to bridge mem resource */
-	if (hose->first_busno != bus->number)
-		if (bus->resource[1]->start && (bus->resource[1]->end != -1))
-		{
-			bus->resource[1]->start += hose->pci_mem_offset;
-			bus->resource[1]->end += hose->pci_mem_offset;
+		bus->resource[0] = res = &hose->io_resource;
+		if (!res->flags) {
+			if (io_offset)
+				printk(KERN_ERR "I/O resource not set for host"
+				       " bridge %d\n", hose->index);
+			res->start = 0;
+			res->end = IO_SPACE_LIMIT;
+			res->flags = IORESOURCE_IO;
 		}
+		res->start += io_offset;
+		res->end += io_offset;
 
-	if ( ppc_md.pcibios_fixup_bus )
+		for (i = 0; i < 3; ++i) {
+			res = &hose->mem_resources[i];
+			if (!res->flags) {
+				if (i > 0)
+					continue;
+				printk(KERN_ERR "Memory resource not set for "
+				       "host bridge %d\n", hose->index);
+				res->start = hose->pci_mem_offset;
+				res->end = ~0U;
+				res->flags = IORESOURCE_MEM;
+			}
+			bus->resource[i+1] = res;
+		}
+	} else {
+		/* This is a subordinate bridge */
+		pci_read_bridge_bases(bus);
+
+		for (i = 0; i < 4; ++i) {
+			if ((res = bus->resource[i]) == NULL)
+				continue;
+			if (!res->flags)
+				continue;
+			if (io_offset && (res->flags & IORESOURCE_IO)) {
+				res->start += io_offset;
+				res->end += io_offset;
+			} else if (hose->pci_mem_offset
+				   && (res->flags & IORESOURCE_MEM)) {
+				res->start += hose->pci_mem_offset;
+				res->end += hose->pci_mem_offset;
+			}
+		}
+	}
+
+	if (ppc_md.pcibios_fixup_bus)
 		ppc_md.pcibios_fixup_bus(bus);
 }
 
@@ -881,26 +895,17 @@ pci_bus_mem_base_phys(unsigned int bus)
 	return hose->pci_mem_offset;
 }
 
-#ifdef CONFIG_POWER4
-extern unsigned long pci_address_offset(int, unsigned int);
-#endif /* CONFIG_POWER4 */
-
 unsigned long
 pci_resource_to_bus(struct pci_dev *pdev, struct resource *res)
 {
 	/* Hack alert again ! See comments in chrp_pci.c
 	 */
-#ifdef CONFIG_POWER4
-	unsigned long offset = pci_address_offset(pdev->bus->number, res->flags);
-	return res->start - offset;
-#else /* CONFIG_POWER4 */
 	struct pci_controller* hose =
 		(struct pci_controller *)pdev->sysdata;
 	if (hose && res->flags & IORESOURCE_MEM)
 		return res->start - hose->pci_mem_offset;
 	/* We may want to do something with IOs here... */
 	return res->start;
-#endif	
 }
 
 /*
@@ -1072,27 +1077,19 @@ phys_to_bus(unsigned long pa)
 unsigned long
 pci_phys_to_bus(unsigned long pa, int busnr)
 {
-#ifdef CONFIG_POWER4
-	return pa - pci_address_offset(busnr, IORESOURCE_MEM);
-#else /* CONFIG_POWER4 */
 	struct pci_controller* hose = pci_bus_to_hose(busnr);
 	if (!hose)
 		return pa;
 	return pa - hose->pci_mem_offset;
-#endif
 }
 
 unsigned long
 pci_bus_to_phys(unsigned int ba, int busnr)
 {
-#ifdef CONFIG_POWER4
-	return ba + pci_address_offset(dev->bus->number, IORESOURCE_MEM);
-#else /* CONFIG_POWER4 */
 	struct pci_controller* hose = pci_bus_to_hose(busnr);
 	if (!hose)
 		return ba;
 	return ba + hose->pci_mem_offset;
-#endif
 }
 
 /* Provide information on locations of various I/O regions in physical

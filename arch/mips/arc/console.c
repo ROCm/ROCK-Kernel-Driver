@@ -15,10 +15,6 @@
 #include <linux/kdev_t.h>
 #include <linux/major.h>
 
-#ifdef CONFIG_ARC_CONSOLE
-#define __init
-#endif
-
 /*
  * IP22 boardcache is not compatible with board caches.  Thus we disable it
  * during romvec action.  Since r4xx0.c is always compiled and linked with your
@@ -29,7 +25,7 @@
  * in some way. You should be careful with them.
  */
 
-void __init prom_putchar(char c)
+void prom_putchar(char c)
 {
 	long cnt;
 	char it = c;
@@ -53,7 +49,7 @@ char __init prom_getchar(void)
 
 static char ppbuf[1024];
 
-void __init prom_printf(char *fmt, ...)
+void prom_printf(char *fmt, ...)
 {
 	va_list args;
 	char ch, *bptr;
@@ -71,29 +67,4 @@ void __init prom_printf(char *fmt, ...)
 		prom_putchar(ch);
 	}
 	va_end(args);
-}
-
-static void
-arc_console_write(struct console *con, const char *s, unsigned n)
-{
-	prom_printf("%s", s);
-}
-
-static kdev_t 
-arc_console_dev(struct console *c)
-{
-	return MKDEV(TTY_MAJOR, 64 + c->index);
-}
-
-static struct console arc_prom_console = {
-    name:	"prom",
-    write:	arc_console_write,
-    device:	arc_console_dev,
-    flags:	CON_PRINTBUFFER,
-    index:	-1,
-};
-
-__init void arc_setup_console(void)
-{
-	register_console(&arc_prom_console);
 }

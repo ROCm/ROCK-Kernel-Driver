@@ -1,7 +1,7 @@
 /* $Id: starfire.h,v 1.1 2000/09/21 06:18:53 anton Exp $
  * starfire.h: Group all starfire specific code together.
  *
- * Copyright (C) 2000 Anton Blanchard (anton@linuxcare.com)
+ * Copyright (C) 2000 Anton Blanchard (anton@samba.org)
  */
 
 #ifndef _SPARC64_STARFIRE_H

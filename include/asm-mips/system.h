@@ -1,5 +1,4 @@
-/* $Id: system.h,v 1.20 1999/12/06 23:13:21 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -7,6 +6,12 @@
  * Copyright (C) 1994 - 1999 by Ralf Baechle
  * Copyright (C) 1996 by Paul M. Antoine
  * Copyright (C) 1994 - 1999 by Ralf Baechle
+ *
+ * Changed set_except_vector declaration to allow return of previous
+ * vector address value - necessary for "borrowing" vectors. 
+ *
+ * Kevin D. Kissell, kevink@mips.org and Carsten Langgaard, carstenl@mips.com
+ * Copyright (C) 2000 MIPS Technologies, Inc.
  */
 #ifndef _ASM_SYSTEM_H
 #define _ASM_SYSTEM_H
@@ -61,65 +66,76 @@ __cli(void)
 		: "$1", "memory");
 }
 
-#define __save_flags(x)                  \
-__asm__ __volatile__(                    \
-	".set\tpush\n\t"		 \
-	".set\treorder\n\t"              \
-	"mfc0\t%0,$12\n\t"               \
-	".set\tpop\n\t"                      \
-	: "=r" (x)                       \
-	: /* no inputs */                \
-	: "memory")
+#define __save_flags(x)							\
+__asm__ __volatile__(							\
+	".set\tpush\n\t"						\
+	".set\treorder\n\t"						\
+	"mfc0\t%0,$12\n\t"						\
+	".set\tpop\n\t"							\
+	: "=r" (x))
 
-#define __save_and_cli(x)                \
-__asm__ __volatile__(                    \
-	".set\tpush\n\t"		 \
-	".set\treorder\n\t"              \
-	".set\tnoat\n\t"                 \
-	"mfc0\t%0,$12\n\t"               \
-	"ori\t$1,%0,1\n\t"               \
-	"xori\t$1,1\n\t"                 \
-	".set\tnoreorder\n\t"		 \
-	"mtc0\t$1,$12\n\t"               \
-	"nop\n\t"                        \
-	"nop\n\t"                        \
-	"nop\n\t"                        \
-	".set\tpop\n\t"                  \
-	: "=r" (x)                       \
-	: /* no inputs */                \
+#define __save_and_cli(x)						\
+__asm__ __volatile__(							\
+	".set\tpush\n\t"						\
+	".set\treorder\n\t"						\
+	".set\tnoat\n\t"						\
+	"mfc0\t%0,$12\n\t"						\
+	"ori\t$1,%0,1\n\t"						\
+	"xori\t$1,1\n\t"						\
+	".set\tnoreorder\n\t"						\
+	"mtc0\t$1,$12\n\t"						\
+	"nop\n\t"							\
+	"nop\n\t"							\
+	"nop\n\t"							\
+	".set\tpop\n\t"							\
+	: "=r" (x)							\
+	: /* no inputs */						\
 	: "$1", "memory")
 
-extern void __inline__
-__restore_flags(int flags)
-{
-	__asm__ __volatile__(
-		".set\tpush\n\t"
-		".set\treorder\n\t"
-		"mfc0\t$8,$12\n\t"
-		"li\t$9,0xff00\n\t"
-		"and\t$8,$9\n\t"
-		"nor\t$9,$0,$9\n\t"
-		"and\t%0,$9\n\t"
-		"or\t%0,$8\n\t"
-		".set\tnoreorder\n\t"
-		"mtc0\t%0,$12\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		"nop\n\t"
-		".set\tpop\n\t"
-		:
-		: "r" (flags)
-		: "$8", "$9", "memory");
-}
+#define __restore_flags(flags)						\
+do {									\
+	unsigned long __tmp1;						\
+									\
+	__asm__ __volatile__(						\
+		".set\tnoreorder\t\t\t# __restore_flags\n\t"		\
+		".set\tnoat\n\t"					\
+		"mfc0\t$1, $12\n\t"					\
+		"andi\t%0, 1\n\t"					\
+		"ori\t$1, 1\n\t"					\
+		"xori\t$1, 1\n\t"					\
+		"or\t%0, $1\n\t"					\
+		"mtc0\t%0, $12\n\t"					\
+		"nop\n\t"						\
+		"nop\n\t"						\
+		"nop\n\t"						\
+		".set\tat\n\t"						\
+		".set\treorder"						\
+		: "=r" (__tmp1)						\
+		: "0" (flags)						\
+		: "$1", "memory");					\
+} while(0)
 
-/*
- * Non-SMP versions ...
- */
-#define sti() __sti()
-#define cli() __cli()
-#define save_flags(x) __save_flags(x)
-#define save_and_cli(x) __save_and_cli(x)
-#define restore_flags(x) __restore_flags(x)
+#ifdef CONFIG_SMP
+
+extern void __global_sti(void);
+extern void __global_cli(void);
+extern unsigned long __global_save_flags(void);
+extern void __global_restore_flags(unsigned long);
+#  define sti() __global_sti()
+#  define cli() __global_cli() 
+#  define save_flags(x) do { x = __global_save_flags(); } while (0)
+#  define restore_flags(x) __global_restore_flags(x)
+#  define save_and_cli(x) do { save_flags(x); cli(); } while(0)
+
+#else /* Single processor */
+
+#  define sti() __sti()
+#  define cli() __cli()
+#  define save_flags(x) __save_flags(x)
+#  define save_and_cli(x) __save_and_cli(x)
+#  define restore_flags(x) __restore_flags(x)
+
+#endif /* SMP */
 
 /* For spinlocks etc */
 #define local_irq_save(x)	__save_and_cli(x);
@@ -131,11 +147,14 @@ __restore_flags(int flags)
  * These are probably defined overly paranoid ...
  */
 #ifdef CONFIG_CPU_HAS_WB
+
 #include <asm/wbflush.h>
-#define rmb()
-#define wmb() wbflush()
-#define mb() wbflush()
-#else
+#define rmb()	do { } while(0)
+#define wmb()	wbflush()
+#define mb()	wbflush()
+
+#else /* CONFIG_CPU_HAS_WB  */
+
 #define mb()						\
 __asm__ __volatile__(					\
 	"# prevent instructions being moved around\n\t"	\
@@ -148,6 +167,17 @@ __asm__ __volatile__(					\
 	: "memory")
 #define rmb() mb()
 #define wmb() mb()
+
+#endif /* CONFIG_CPU_HAS_WB  */
+
+#ifdef CONFIG_SMP
+#define smp_mb()	mb()
+#define smp_rmb()	rmb()
+#define smp_wmb()	wmb()
+#else
+#define smp_mb()	barrier()
+#define smp_rmb()	barrier()
+#define smp_wmb()	barrier()
 #endif
 
 #define set_mb(var, value) \
@@ -180,17 +210,17 @@ extern __inline__ unsigned long xchg_u32(volatile int * m, unsigned long val)
 	unsigned long dummy;
 
 	__asm__ __volatile__(
-		".set\tnoreorder\n\t"
+		".set\tnoreorder\t\t\t# xchg_u32\n\t"
 		".set\tnoat\n\t"
-		"ll\t%0,(%1)\n"
-		"1:\tmove\t$1,%2\n\t"
-		"sc\t$1,(%1)\n\t"
-		"beqzl\t$1,1b\n\t"
-		"ll\t%0,(%1)\n\t"
+		"ll\t%0, %3\n"
+		"1:\tmove\t$1, %2\n\t"
+		"sc\t$1, %1\n\t"
+		"beqzl\t$1, 1b\n\t"
+		" ll\t%0, %3\n\t"
 		".set\tat\n\t"
 		".set\treorder"
-		: "=r" (val), "=r" (m), "=r" (dummy)
-		: "1" (m), "2" (val)
+		: "=r" (val), "=o" (*m), "=r" (dummy)
+		: "o" (*m), "2" (val)
 		: "memory");
 
 	return val;
@@ -207,64 +237,25 @@ extern __inline__ unsigned long xchg_u32(volatile int * m, unsigned long val)
 #endif /* Processor-dependent optimization */
 }
 
-/*
- * Only used for 64 bit kernel.
- */
-extern __inline__ unsigned long xchg_u64(volatile long * m, unsigned long val)
-{
-	unsigned long dummy;
-
-	__asm__ __volatile__(
-		".set\tnoreorder\n\t"
-		".set\tnoat\n\t"
-		"lld\t%0,(%1)\n"
-		"1:\tmove\t$1,%2\n\t"
-		"scd\t$1,(%1)\n\t"
-		"beqzl\t$1,1b\n\t"
-		"lld\t%0,(%1)\n\t"
-		".set\tat\n\t"
-		".set\treorder"
-		: "=r" (val), "=r" (m), "=r" (dummy)
-		: "1" (m), "2" (val)
-		: "memory");
-
-	return val;
-}
-
 #define xchg(ptr,x) ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
 #define tas(ptr) (xchg((ptr),1))
 
-/*
- * This function doesn't exist, so you'll get a linker error
- * if something tries to do an invalid xchg().
- *
- * This only works if the compiler isn't horribly bad at optimizing.
- * gcc-2.5.8 reportedly can't handle this, but I define that one to
- * be dead anyway.
- */
-extern void __xchg_called_with_bad_pointer(void);
-
-static __inline__ unsigned long __xchg(unsigned long x, volatile void * ptr, int size)
+static __inline__ unsigned long
+__xchg(unsigned long x, volatile void * ptr, int size)
 {
 	switch (size) {
 		case 4:
 			return xchg_u32(ptr, x);
-#if defined(__mips64)
-		case 8:
-			return xchg_u64(ptr, x);
-#endif
 	}
-	__xchg_called_with_bad_pointer();
 	return x;
 }
 
-extern void set_except_vector(int n, void *addr);
+extern void *set_except_vector(int n, void *addr);
 
 extern void __die(const char *, struct pt_regs *, const char *where,
 	unsigned long line) __attribute__((noreturn));
 extern void __die_if_kernel(const char *, struct pt_regs *, const char *where,
 	unsigned long line);
-extern int abs(int);
 
 #define die(msg, regs)							\
 	__die(msg, regs, __FILE__ ":"__FUNCTION__, __LINE__)

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.main.c 1.7 05/18/01 06:20:29 patch
+ * BK Id: SCCS/s.main.c 1.9 06/15/01 13:16:10 paulus
  */
 /*
  *    Copyright (c) 1997 Paul Mackerras <paulus@cs.anu.edu.au>
@@ -74,16 +74,6 @@
 
 #define	ALIGN_UP(x, align)	(((x) + ((align) - 1)) & ~((align) - 1))
 
-#define stringify(s)    tostring(s)
-#define tostring(s)     #s
-
-#define mtdcr(rn, v)    asm volatile("mtdcr " stringify(rn) ",%0" : : "r" (v))
-#define mfdcr(rn)       ({unsigned int rval; \
-                        asm volatile("mfdcr %0," stringify(rn) \
-                                     : "=r" (rval)); rval;})
-#define DCRN_MALCR      0x180   /* MAL Configuration                          */
-#define   MALCR_SR      0x80000000      /* Software Reset                     */
-
 /* Global Variables */
 
 /* Needed by zalloc and zfree for allocating memory */
@@ -91,15 +81,11 @@
 char *avail_ram;	/* Indicates start of RAM available for heap */
 char *end_avail;	/* Indicates end of RAM available for heap */
 
+/* Needed for serial I/O.
+*/
+extern unsigned long *com_port;
+
 bd_t	board_info;
-
-/*
- * XXX - Until either the IBM boot ROM provides a way of passing arguments to
- *       the program it launches or until I/O is working in the boot loader,
- *       this is a good spot to pass in command line arguments to the kernel
- *       (e.g. console=tty0).
- */
-
 
 /*
 ** The bootrom may change bootrom_cmdline to point to a buffer in the
@@ -116,34 +102,15 @@ char *cmdline = "";
 
 /* Function Prototypes */
 
-extern void *zalloc(void *x, unsigned items, unsigned size);
-
-/* serial I/O functions.
- * These should have generic names, although this is similar to 16550....
- */
-static volatile unsigned char *uart0_lsr = (unsigned char *)0xef600305;
-static volatile unsigned char *uart0_xcvr = (unsigned char *)0xef600300;
+extern void gunzip(void *dst, int dstlen, unsigned char *src, int *lenp);
 
 void
-serial_putc(void *unused, unsigned char c)
+kick_watchdog(void)
 {
- while ((*uart0_lsr & LSR_THRE) == 0);
- *uart0_xcvr = c;
+#ifdef CONFIG_405GP
+    mtspr(SPRN_TSR, (TSR_ENW | TSR_WIS));
+#endif
 }
-
-unsigned char
-serial_getc(void *unused)
-{
- while ((*uart0_lsr & LSR_DR) == 0);
- return (*uart0_xcvr);
-}
-
-int
-serial_tstc(void *unused)
-{
- return ((*uart0_lsr & LSR_DR) != 0);
-}
-
 
 void start(void)
 {
@@ -156,39 +123,33 @@ void start(void)
     bd_t *(*get_board_info)(void) = 
 	    (bd_t *(*)(void))(*(unsigned long *)BOARD_INFO_VECTOR);
     bd_t *bip = NULL;
-    volatile unsigned long *em0mr0 = (long *)0xEF600800;    /* ftr fixup */
 
 
+    com_port = (struct NS16550 *)serial_init(0);
 
-#if defined(CONFIG_WALNUT)
-    /* turn off ethernet */
+#ifdef CONFIG_405GP
+    /* turn off on-chip ethernet */
     /* This is to fix a problem with early walnut bootrom. */
+ 
+    {
+	/* Physical mapping of ethernet register space. */
+	static struct   ppc405_enet_regs *ppc405_enet_regp =
+	(struct ppc405_enet_regs *)PPC405_EM0_REG_ADDR;
 
-    mtdcr(DCRN_MALCR, MALCR_SR);                /* 1st reset MAL */
+	mtdcr(DCRN_MALCR, MALCR_MMSR);                /* 1st reset MAL */
 
-    while (mfdcr(DCRN_MALCR) & MALCR_SR) {};    /* wait for the reset */
-
-    *em0mr0 = 0x20000000;                       /* then reset EMAC */
-#endif
-
-
-#if 0
-    /* ftr revisit - remove printf()s */
-
-    printf("\n\nbootrom_cmdline = >%s<\n\n", bootrom_cmdline);
-    if (*bootrom_cmdline != '\0') {
-	printf("bootrom_cmdline != NULL, copying it into cmdline\n\n");
-	*treeboot_bootrom_cmdline = '\0';
-	strcat(treeboot_bootrom_cmdline, bootrom_cmdline);
-	cmdline = treeboot_bootrom_cmdline;
+	while (mfdcr(DCRN_MALCR) & MALCR_MMSR) {};    /* wait for the reset */
+    
+	ppc405_enet_regp->em0mr0 = 0x20000000;        /* then reset EMAC */
     }
 #endif
-
 
     if ((bip = get_board_info()) != NULL)
 	    memcpy(&board_info, bip, sizeof(bd_t));
 
     /* Init RAM disk (initrd) section */
+
+    kick_watchdog();
 
     if (initrdSect_start != 0 && (initrd_size = initrdSect_size) != 0) {
         initrd_start = (RAM_END - initrd_size) & ~0xFFF;
@@ -208,6 +169,8 @@ void start(void)
 
     /* Linux kernel image section */
 	
+    kick_watchdog();
+
     im = (unsigned char *)(imageSect_start);
     len = imageSect_size;
     dst = (void *)PROG_START;
@@ -233,6 +196,7 @@ void start(void)
 	memmove(dst, im, len);
     }
 
+    kick_watchdog();
 
     flush_cache(dst, len);
 

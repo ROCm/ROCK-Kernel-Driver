@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prom.h 1.11 05/18/01 08:18:10 patch
+ * BK Id: SCCS/s.prom.h 1.14 06/13/01 15:28:43 paulus
  */
 /*
  * Definitions for talking to the Open Firmware PROM on
@@ -45,6 +45,9 @@ struct property {
 	struct property *next;
 };
 
+/*
+ * Note: don't change this structure for now or you'll break BootX !
+ */
 struct device_node {
 	char	*name;
 	char	*type;
@@ -60,10 +63,6 @@ struct device_node {
 	struct	device_node *sibling;
 	struct	device_node *next;	/* next device of same type */
 	struct	device_node *allnext;	/* next in list of all nodes */
-#if 0 /* Don't change this structure for now or you'll break BootX ! */
-	int	n_addr_cells;
-	int	n_size_cells;
-#endif	
 };
 
 struct prom_args;
@@ -101,6 +100,24 @@ extern void prom_drawchar(char c);
 extern void map_bootx_text(void);
 extern void bootx_update_display(unsigned long phys, int width, int height,
 				 int depth, int pitch);
+
+/*
+ * When we call back to the Open Firmware client interface, we usually
+ * have to do that before the kernel is relocated to its final location
+ * (this is because we can't use OF after we have overwritten the
+ * exception vectors with our exception handlers).  These macros assist
+ * in performing the address calculations that we need to do to access
+ * data when the kernel is running at an address that is different from
+ * the address that the kernel is linked at.  The reloc_offset() function
+ * returns the difference between these two addresses and the macros
+ * simplify the process of adding or subtracting this offset to/from
+ * pointer values.  See arch/ppc/kernel/prom.c for how these are used.
+ */
+extern unsigned long reloc_offset(void);
+
+#define PTRRELOC(x)	((typeof(x))((unsigned long)(x) + offset))
+#define PTRUNRELOC(x)	((typeof(x))((unsigned long)(x) - offset))
+#define RELOC(x)	(*PTRRELOC(&(x)))
 
 #endif /* _PPC_PROM_H */
 #endif /* __KERNEL__ */

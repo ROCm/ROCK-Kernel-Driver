@@ -2,6 +2,9 @@
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
 #
+define_bool CONFIG_MIPS y
+define_bool CONFIG_SMP n
+
 mainmenu_name "Linux Kernel Configuration"
 
 mainmenu_option next_comment
@@ -15,18 +18,55 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    bool 'Support for Acer PICA 1 chipset' CONFIG_ACER_PICA_61
    bool 'Support for Algorithmics P4032 (EXPERIMENTAL)' CONFIG_ALGOR_P4032
    bool 'Support for BAGET MIPS series (EXPERIMENTAL)' CONFIG_BAGET_MIPS
-   bool 'Support for Cobalt Server' CONFIG_COBALT_MICRO_SERVER
-   if [ "$CONFIG_COBALT_MICRO_SERVER" = "y" ]; then
-      bool '  Support for 2800' CONFIG_COBALT_28
-   fi
    bool 'Support for DECstations (EXPERIMENTAL)' CONFIG_DECSTATION
    bool 'Support for NEC DDB Vrc-5074 (EXPERIMENTAL)' CONFIG_DDB5074
-   bool 'Support for Galileo Evaluation board or CoSine Orion' CONFIG_ORION
+   bool 'Support for Galileo EV96100 Evaluation board' CONFIG_MIPS_EV96100
+   bool 'Support for Galileo EV64120 Evaluation board' CONFIG_MIPS_EV64120
+   if [ "$CONFIG_MIPS_EV64120" = "y" ]; then
+		  bool 'Enable Second PCI (PCI1)' CONFIG_EVB_PCI1
+      choice 'Galileo Chip Clock' \
+        "75 CONFIG_SYSCLK_75\
+         83.3 CONFIG_SYSCLK_83\
+         100 CONFIG_SYSCLK_100" CONFIG_SYSCLK_83
+   fi
+   bool 'Support for MIPS Atlas board' CONFIG_MIPS_ATLAS
+   bool 'Support for MIPS Malta board' CONFIG_MIPS_MALTA
+   bool 'Support for Philips Nino (EXPERIMENTAL)' CONFIG_NINO
+   if [ "$CONFIG_NINO" = "y" ]; then
+      choice 'Nino Model Number' \
+        "Model-300/301/302/319 CONFIG_NINO_4MB \
+         Model-200/210/312/320/325/350/390 CONFIG_NINO_8MB \
+         Model-500/510 CONFIG_NINO_16MB" CONFIG_NINO_8MB
+   fi
 fi
 bool 'Support for Mips Magnum 4000' CONFIG_MIPS_MAGNUM_4000
+bool 'Support for Momentum Ocelot board' CONFIG_MOMENCO_OCELOT
+bool 'Support for NEC DDB Vrc-5476' CONFIG_DDB5476
+bool 'Support for NEC DDB Vrc-5477' CONFIG_DDB5477
 bool 'Support for Olivetti M700-10' CONFIG_OLIVETTI_M700
 bool 'Support for SGI IP22' CONFIG_SGI_IP22
 bool 'Support for SNI RM200 PCI' CONFIG_SNI_RM200_PCI
+bool 'Support for ITE 8172G board' CONFIG_MIPS_ITE8172
+   if [ "$CONFIG_MIPS_ITE8172" = "y" ]; then
+       bool '    Support for older IT8172 (Rev C)' CONFIG_IT8172_REVC
+       bool '    Enable Qtronix 990P Keyboard Support' CONFIG_QTRONIX_KEYBOARD
+       if [ "$CONFIG_QTRONIX_KEYBOARD" = "y" ]; then
+	   define_bool CONFIG_IT8172_CIR y
+       else
+           bool '    Enable PS2 Keyboard Support ' CONFIG_PC_KEYB
+       fi
+       bool '    Enable Smart Card Reader 0 Support ' CONFIG_IT8172_SCR0
+       bool '    Enable Smart Card Reader 1 Support ' CONFIG_IT8172_SCR1
+   fi
+   bool 'Support for Globespan IVR board' CONFIG_MIPS_IVR
+   if [ "$CONFIG_MIPS_IVR" = "y" ]; then
+       bool '    Enable Qtronix 990P Keyboard Support' CONFIG_QTRONIX_KEYBOARD
+       if [ "$CONFIG_QTRONIX_KEYBOARD" = "y" ]; then
+	   define_bool CONFIG_IT8172_CIR y
+       fi
+       bool '    Enable Smart Card Reader 0 Support ' CONFIG_IT8172_SCR0
+   fi
+bool 'Support for Alchemy Semi PB1000 board' CONFIG_MIPS_PB1000
 
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
@@ -35,54 +75,127 @@ define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 # Select some configuration options automatically for certain systems.
 #
 unset CONFIG_ARC32
+unset CONFIG_BOARD_SCACHE
+unset CONFIG_HAVE_STD_PC_SERIAL_PORT
+unset CONFIG_I8259
 unset CONFIG_ISA
-unset CONFIG_EISA
 unset CONFIG_PCI
 unset CONFIG_MIPS_JAZZ
+unset CONFIG_SWAP_IO_SPACE
 unset CONFIG_VIDEO_G364
 unset CONFIG_PC_KEYB
 
 define_bool CONFIG_MCA n
 define_bool CONFIG_SBUS n
 
+if [ "$CONFIG_MIPS_EV96100" = "y" ]; then
+   define_bool CONFIG_PCI y
+   define_bool CONFIG_MIPS_GT96100 y
+   define_bool CONFIG_SWAP_IO_SPACE y
+fi
+if [ "$CONFIG_MIPS_EV64120" = "y" ]; then
+   define_bool CONFIG_PCI y
+   define_bool CONFIG_ISA n
+   define_bool CONFIG_MIPS_GT64120 y
+   define_bool CONFIG_OLD_TIME_C y
+fi
+
 if [ "$CONFIG_ALGOR_P4032" = "y" ]; then
    define_bool CONFIG_PCI y
+   define_bool CONFIG_OLD_TIME_C y
 fi
 if [ "$CONFIG_MIPS_MAGNUM_4000" = "y" -o \
      "$CONFIG_OLIVETTI_M700" = "y" ]; then
    define_bool CONFIG_ARC32 y
+   define_bool CONFIG_I8259 y
    define_bool CONFIG_ISA y
    define_bool CONFIG_FB y
    define_bool CONFIG_FB_G364 y	
    define_bool CONFIG_MIPS_JAZZ y
    define_bool CONFIG_PC_KEYB y
+   define_bool CONFIG_OLD_TIME_C y
 fi
 if [ "$CONFIG_ACER_PICA_61" = "y" ]; then
    define_bool CONFIG_ARC32 y
+   define_bool CONFIG_I8259 y
    define_bool CONFIG_ISA y
    define_bool CONFIG_MIPS_JAZZ y
    define_bool CONFIG_PC_KEYB y
+   define_bool CONFIG_ROTTEN_IRQ y
+   define_bool CONFIG_OLD_TIME_C y
 fi
-if [ "$CONFIG_COBALT_MICRO_SERVER" = "y" ]; then
-   define_bool CONFIG_COBALT_27 y
-   define_bool CONFIG_COBALT_LCD y
-   define_bool CONFIG_COBALT_SERIAL y
+if [ "$CONFIG_MIPS_ATLAS" = "y" ]; then
    define_bool CONFIG_PCI y
+   define_bool CONFIG_SWAP_IO_SPACE y
+fi
+if [ "$CONFIG_MIPS_MALTA" = "y" ]; then
+   define_bool CONFIG_I8259 y
+   define_bool CONFIG_PCI y
+   define_bool CONFIG_HAVE_STD_PC_SERIAL_PORT y
+   define_bool CONFIG_SWAP_IO_SPACE y
+fi
+if [ "$CONFIG_MOMENCO_OCELOT" = "y" ]; then
+   define_bool CONFIG_PCI y
+   define_bool CONFIG_SYSCLK_100 y
+   define_bool CONFIG_SWAP_IO_SPACE y
+   define_bool CONFIG_NEW_IRQ y
+   define_bool CONFIG_OLD_TIME_C y
 fi
 if [ "$CONFIG_SGI_IP22" = "y" ]; then
    define_bool CONFIG_ARC32 y
+   define_bool CONFIG_BOARD_SCACHE y
    define_bool CONFIG_PC_KEYB y
    define_bool CONFIG_SGI y
+   define_bool CONFIG_NEW_IRQ y
+   define_bool CONFIG_OLD_TIME_C y
 fi
 if [ "$CONFIG_SNI_RM200_PCI" = "y" ]; then
    define_bool CONFIG_ARC32 y
-   define_bool CONFIG_PCI y
+   define_bool CONFIG_I8259 y
    define_bool CONFIG_ISA y
    define_bool CONFIG_PC_KEYB y
+   define_bool CONFIG_PCI y
+   define_bool CONFIG_ROTTEN_IRQ y
+   define_bool CONFIG_OLD_TIME_C y
 fi
-if [ "$CONFIG_DDB5074" = "y" ]; then
+if [ "$CONFIG_DDB5074" = "y"]; then
+   define_bool CONFIG_I8259 y
    define_bool CONFIG_ISA y
    define_bool CONFIG_PCI y
+   define_bool CONFIG_PC_KEYB y
+   define_bool CONFIG_ROTTEN_IRQ y
+   define_bool CONFIG_HAVE_STD_PC_SERIAL_PORT y
+   define_bool CONFIG_OLD_TIME_C y
+fi
+if [ "$CONFIG_DDB5476"  = "y" ]; then
+   define_bool CONFIG_I8259 y
+   define_bool CONFIG_ISA y
+   define_bool CONFIG_PCI y
+   define_bool CONFIG_PC_KEYB y
+   define_bool CONFIG_ROTTEN_IRQ y
+   define_bool CONFIG_HAVE_STD_PC_SERIAL_PORT y
+   define_bool CONFIG_NEW_TIME_C y
+fi
+if [ "$CONFIG_DDB5477" = "y" ]; then
+   define_bool CONFIG_CPU_LITTLE_ENDIAN y
+   define_bool CONFIG_PCI y
+   define_bool CONFIG_NEW_TIME_C y
+   define_bool CONFIG_NEW_IRQ y
+fi
+if [ "$CONFIG_MIPS_ITE8172" = "y" ]; then
+   define_bool CONFIG_PCI y
+   define_bool CONFIG_IT8712 y
+   define_bool CONFIG_PC_KEYB y
+fi
+if [ "$CONFIG_MIPS_IVR" = "y" ]; then
+   define_bool CONFIG_PCI y
+fi
+if [ "$CONFIG_MIPS_PB1000" = "y" ]; then
+   define_bool CONFIG_MIPS_AU1000 y
+   define_bool CONFIG_NEW_IRQ y
+fi
+if [ "$CONFIG_NINO" = "y" ]; then
+   define_bool CONFIG_PC_KEYB y
 fi
 
 if [ "$CONFIG_ISA" != "y" ]; then
@@ -94,6 +207,10 @@ fi
 
 if [ "$CONFIG_PCI" != "y" ]; then
    define_bool CONFIG_PCI n
+fi
+
+if [ "$CONFIG_I8259" != "y" ]; then
+   define_bool CONFIG_I8259 n
 fi
 endmenu
 
@@ -115,9 +232,12 @@ choice 'CPU type' \
 	 R4300 CONFIG_CPU_R4300	\
 	 R4x00 CONFIG_CPU_R4X00	\
 	 R5000 CONFIG_CPU_R5000	\
-	 R56x0 CONFIG_CPU_NEVADA \
-	 R8000 CONFIG_CPU_R8000	\
-	 R10000 CONFIG_CPU_R10000" R4x00
+         R5432 CONFIG_CPU_R5432 \
+	 RM7000 CONFIG_CPU_RM7000 \
+	 R52xx CONFIG_CPU_NEVADA \
+	 R10000 CONFIG_CPU_R10000 \
+	 SB1    CONFIG_CPU_SB1    \
+	 MIPS32 CONFIG_CPU_MIPS32" R4x00
 
 bool 'Override CPU Options' CONFIG_CPU_ADVANCED
 
@@ -134,19 +254,23 @@ else
 	 define_bool CONFIG_CPU_HAS_WB n
       fi
    else
-      define_bool CONFIG_CPU_HAS_LLSC y
-      define_bool CONFIG_CPU_HAS_WB n
+	 define_bool CONFIG_CPU_HAS_LLSC y
+	 define_bool CONFIG_CPU_HAS_WB n
    fi
 fi
 endmenu
 
 mainmenu_option next_comment
 comment 'General setup'
-if [ "$CONFIG_DECSTATION" = "y" -o "$CONFIG_DDB5074" = "y" ]; then
+if [ "$CONFIG_DECSTATION" = "y" -o \
+     "$CONFIG_DDB5074" = "y" -o    \
+     "$CONFIG_DDB5476" = "y" -o    \
+     "$CONFIG_NINO" = "y" ]; then
    define_bool CONFIG_CPU_LITTLE_ENDIAN y
 else
    bool 'Generate little endian code' CONFIG_CPU_LITTLE_ENDIAN
 fi
+bool 'Kernel floating-point emulation' CONFIG_MIPS_FPU_EMULATOR
 
 if [ "$CONFIG_PROC_FS" = "y" ]; then
    define_bool CONFIG_KCORE_ELF y
@@ -158,21 +282,29 @@ if [ "$CONFIG_CPU_LITTLE_ENDIAN" = "n" ]; then
    bool 'Include forward keyboard' CONFIG_FORWARD_KEYBOARD 
 fi
 
+if [ "$CONFIG_ARC32" = "y" ]; then
+   bool 'ARC console support' CONFIG_ARC_CONSOLE
+fi
+
 define_bool CONFIG_BINFMT_AOUT n
 define_bool CONFIG_BINFMT_ELF y
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 
 bool 'Networking support' CONFIG_NET
 
-if [ "$CONFIG_PCI" = "y" ]; then
-    source drivers/pci/Config.in
+source drivers/pci/Config.in
+
+bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
+
+if [ "$CONFIG_HOTPLUG" = "y" ] ; then
+   source drivers/pcmcia/Config.in
+else
+   define_bool CONFIG_PCMCIA n
 fi
 
 bool 'System V IPC' CONFIG_SYSVIPC
 bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
 bool 'Sysctl support' CONFIG_SYSCTL
-
-source drivers/parport/Config.in
 
 if [ "$CONFIG_DECSTATION" = "y" ]; then
     bool 'TURBOchannel support' CONFIG_TC
@@ -186,13 +318,9 @@ if [ "$CONFIG_ISA" = "y" ]; then
    source drivers/pnp/Config.in
 fi
 
-if [ "$CONFIG_HOTPLUG" = "y" ] ; then
-   source drivers/pcmcia/Config.in
-else
-   define_bool CONFIG_PCMCIA n
-fi
-
 source drivers/mtd/Config.in
+
+source drivers/parport/Config.in
 
 source drivers/block/Config.in
 
@@ -202,10 +330,7 @@ if [ "$CONFIG_NET" = "y" ]; then
    source net/Config.in
 fi
 
-if [ "$CONFIG_DECSTATION" != "y" -a \
-     "$CONFIG_SGI_IP22" != "y" ]; then
-   source drivers/telephony/Config.in
-fi
+source drivers/telephony/Config.in
 
 if [ "$CONFIG_SGI_IP22" != "y" -a \
      "$CONFIG_DECSTATION" != "y" ]; then
@@ -236,7 +361,7 @@ endmenu
 
 if [ "$CONFIG_DECSTATION" != "y" -a \
      "$CONFIG_SGI_IP22" != "y" ]; then
-   source drivers/i2o/Config.in
+   source drivers/message/i2o/Config.in
 fi
 
 if [ "$CONFIG_NET" = "y" ]; then
@@ -245,69 +370,40 @@ if [ "$CONFIG_NET" = "y" ]; then
 
    bool 'Network device support' CONFIG_NETDEVICES
    if [ "$CONFIG_NETDEVICES" = "y" ]; then
-
-      if [ "$CONFIG_SGI_IP22" != "y" -a \
-      	   "$CONFIG_DECSTATION" != "y" -a \
-	   "$CONFIG_BAGET_MIPS" != "y" ]; then
-
-	 source drivers/net/Config.in
-
-	 if [ "$CONFIG_ATM" = "y" ]; then
-	    source drivers/atm/Config.in
-	 fi
-      else
-	 tristate 'Dummy net driver support' CONFIG_DUMMY
-	 tristate 'SLIP (serial line) support' CONFIG_SLIP
-	 if [ "$CONFIG_SLIP" != "n" ]; then
-	    bool ' CSLIP compressed headers' CONFIG_SLIP_COMPRESSED
-	    bool ' Keepalive and linefill' CONFIG_SLIP_SMART
-	 fi
-	 tristate 'PPP (point-to-point) support' CONFIG_PPP
-	 if [ ! "$CONFIG_PPP" = "n" ]; then
-	    comment 'CCP compressors for PPP are only built as modules.'
-	 fi
-         if [ "$CONFIG_SGI_IP22" = "y" ]; then
-	    bool 'SGI Seeq ethernet controller support' CONFIG_SGISEEQ
-	 fi
-	 if [ "$CONFIG_DECSTATION" = "y" ]; then
-	    bool 'DEC LANCE ethernet controller support' CONFIG_DECLANCE
-	 fi
-	 if [ "$CONFIG_BAGET_MIPS" = "y" ]; then
-	    tristate 'Baget AMD LANCE support' CONFIG_BAGETLANCE
-	 fi
+      source drivers/net/Config.in
+      if [ "$CONFIG_ATM" = "y" ]; then
+         source drivers/atm/Config.in
       fi
    fi
    endmenu
 fi
 
-if [ "$CONFIG_ISA" = "y" -o "$CONFIG_PCI" = "y" ]; then
-   mainmenu_option next_comment
-   comment 'ISDN subsystem'
+source net/ax25/Config.in
 
-   if [ "$CONFIG_NET" != "n" ]; then
-      tristate 'ISDN support' CONFIG_ISDN
-      if [ "$CONFIG_ISDN" != "n" ]; then
-	 source drivers/isdn/Config.in
-      fi
+source net/irda/Config.in
+
+mainmenu_option next_comment
+comment 'ISDN subsystem'
+if [ "$CONFIG_NET" != "n" ]; then
+   tristate 'ISDN support' CONFIG_ISDN
+   if [ "$CONFIG_ISDN" != "n" ]; then
+      source drivers/isdn/Config.in
    fi
-   endmenu
-
-   mainmenu_option next_comment
-   comment 'Old CD-ROM drivers (not SCSI, not IDE)'
-
-   bool 'Support non-SCSI/IDE/ATAPI drives' CONFIG_CD_NO_IDESCSI
-   if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
-      source drivers/cdrom/Config.in
-   fi
-   endmenu
 fi
+endmenu
 
-if [ "$CONFIG_DECSTATION" != "y" -a \
-     "$CONFIG_SGI_IP22" != "y" ]; then
-   source drivers/char/Config.in
+mainmenu_option next_comment
+comment 'Old CD-ROM drivers (not SCSI, not IDE)'
 
-   source drivers/media/Config.in
+bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
+if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
+   source drivers/cdrom/Config.in
 fi
+endmenu
+
+source drivers/char/Config.in
+
+source drivers/media/Config.in
 
 if [ "$CONFIG_DECSTATION" = "y" ]; then
    mainmenu_option next_comment
@@ -332,9 +428,7 @@ if [ "$CONFIG_DECSTATION" = "y" ]; then
 #   if [ "$CONFIG_ACCESSBUS" = "y" ]; then
 #      bool 'MAXINE Access.Bus mouse (VSXXX-BB/GB) support' CONFIG_DTOP_MOUSE
 #   fi
-   bool 'Enhanced Real Time Clock Support' CONFIG_MIPS_RTC
-
-   define_tristate CONFIG_RTC $CONFIG_MIPS_RTC
+   bool 'Enhanced Real Time Clock Support' CONFIG_RTC
 
    endmenu
 fi
@@ -351,7 +445,10 @@ if [ "$CONFIG_SGI_IP22" = "y" ]; then
       else
 	 define_bool CONFIG_FONT_8x16 y
       fi
-      bool 'SGI PROM Console Support' CONFIG_SGI_PROM_CONSOLE
+   fi
+   bool 'PS/2 mouse support' CONFIG_PSMOUSE
+   if [ "$CONFIG_PSMOUSE" != "n" ]; then
+      define_bool CONFIG_MOUSE y
    fi
    bool 'Unix98 PTY support' CONFIG_UNIX98_PTYS
    if [ "$CONFIG_UNIX98_PTYS" = "y" ]; then
@@ -364,13 +461,12 @@ source fs/Config.in
 
 if [ "$CONFIG_VT" = "y" ]; then
    mainmenu_option next_comment
-
    comment 'Console drivers'
-      if [ "$CONFIG_DECSTATION" != "y" ]; then
-	 bool 'VGA text console' CONFIG_VGA_CONSOLE
-      fi
-      bool 'Support for frame buffer devices' CONFIG_FB
+   bool 'VGA text console' CONFIG_VGA_CONSOLE
+   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+      tristate 'MDA text console (dual-headed) (EXPERIMENTAL)' CONFIG_MDA_CONSOLE
       source drivers/video/Config.in
+   fi
    endmenu
 fi
 
@@ -399,8 +495,15 @@ bool 'Are you using a crosscompiler' CONFIG_CROSSCOMPILE
 if [ "$CONFIG_MODULES" = "y" ]; then
    bool ' Build fp execption handler module' CONFIG_MIPS_FPE_MODULE
 fi
-if [ "$CONFIG_SERIAL" = "y" ]; then
+if [ "$CONFIG_SERIAL" = "y" -o "$CONFIG_AU1000_UART" = "y" ]; then
   bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
+  dep_bool 'Console output to GDB' CONFIG_GDB_CONSOLE $CONFIG_REMOTE_DEBUG
+fi
+if [ "$CONFIG_SERIAL" = "y" ]; then
+  bool 'Low-level debugging' CONFIG_LL_DEBUG
 fi
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+if [ "$CONFIG_SMP" != "y" ]; then
+   bool 'Run uncached' CONFIG_MIPS_UNCACHED
+fi
 endmenu

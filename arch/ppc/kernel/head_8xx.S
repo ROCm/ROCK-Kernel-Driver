@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head_8xx.S 1.11 05/21/01 11:50:00 paulus
+ * BK Id: SCCS/s.head_8xx.S 1.14 06/28/01 15:50:16 paulus
  */
 /*
  *  arch/ppc/kernel/except_8xx.S
@@ -500,6 +500,11 @@ DataStoreTLBMiss:
 #endif
 	mtspr	MD_TWC, r21
 
+	/* Set PP0 to PP1 (== _PAGE_USER) & ~_PAGE_RW */
+	rlwimi	r20, r20, 32-1, 21, 21
+	rlwinm	r21, r20, 4, 21, 21
+	andc	r20, r20, r21
+
 	/* Set four subpage valid bits (24, 25, 26, and 27).
 	 * Clear bit 28 (which should be in the PTE, but we do this anyway).
 	 */
@@ -602,7 +607,7 @@ DataTLBError:
 
 	/* Update 'changed', among others.
 	*/
-	ori	r20, r20, _PAGE_DIRTY|_PAGE_HWWRITE|_PAGE_ACCESSED
+	ori	r20, r20, _PAGE_DIRTY|_PAGE_ACCESSED
 	mfspr	r21, MD_TWC		/* Get pte address again */
 	stw	r20, 0(r21)		/* and update pte in table */
 
@@ -939,6 +944,12 @@ start_here:
  * ASID compare register with the new "context".
  */
 _GLOBAL(set_context)
+	/* fetch the pgd from the context_mm array */
+	lis	r5, context_mm@ha
+	slwi	r6, r3, 2
+	add	r5, r5, r6
+	lwz	r5, context_mm@l(r5)	/* get the mm */
+	lwz	r4, MM_PGD(r5)		/* get the pgd from the mm */
 #ifdef CONFIG_8xx_CPU6
 	lis	r6, cpu6_errata_word@h
 	ori	r6, r6, cpu6_errata_word@l

@@ -18,14 +18,23 @@
 #define MACH_GROUP_ARC		3 /* Wreckstation Tyne, rPC44, possibly other */
 #define MACH_GROUP_SNI_RM	4 /* Siemens Nixdorf RM series                */
 #define MACH_GROUP_ACN		5
-#define MACH_GROUP_SGI          6 /* Silicon Graphics workstations and servers */
+#define MACH_GROUP_SGI          6 /* Silicon Graphics                         */
 #define MACH_GROUP_COBALT       7 /* Cobalt servers		 	      */
-#define MACH_GROUP_NEC_DDB	8 /* NEC DDB */
-#define MACH_GROUP_BAGET	9 /* Baget */
-#define MACH_GROUP_ORION       10 /* CoSine Orion */
+#define MACH_GROUP_NEC_DDB	8 /* NEC DDB                                  */
+#define MACH_GROUP_BAGET	9 /* Baget                                    */
+#define MACH_GROUP_COSINE      10 /* CoSine Orion                             */
+#define MACH_GROUP_GALILEO     11 /* Galileo Eval Boards                      */
+#define MACH_GROUP_MOMENCO     12 /* Momentum Boards                          */
+#define MACH_GROUP_ITE         13 /* ITE Semi Eval Boards                     */
+#define MACH_GROUP_PHILIPS     14
+#define MACH_GROUP_GLOBESPAN   15 /* Globespan PVR Referrence Board           */
+#define MACH_GROUP_SIBYTE      16 /* Sibyte Eval Boards                       */
+#define MACH_GROUP_TOSHIBA     17 /* Toshiba Reference Systems TSBREF         */
+#define MACH_GROUP_ALCHEMY     18 /* Alchemy Semi Eval Boards*/
 
-#define GROUP_NAMES { "unknown", "Jazz", "Digital", "ARC", \
-                      "SNI", "ACN", "SGI", "Cobalt", "NEC DDB", "Baget", "Orion" }
+#define GROUP_NAMES { "unknown", "Jazz", "Digital", "ARC", "SNI", "ACN",      \
+	"SGI", "Cobalt", "NEC DDB", "Baget", "Cosine", "Galileo", "Momentum", \
+	"ITE", "Philips", "Globepspan", "SiByte", "Toshiba", "Alchemy" }
 
 /*
  * Valid machtype values for group unknown (low order halfword of mips_machtype)
@@ -87,9 +96,11 @@
 /*
  * Valid machtype for group SGI
  */
-#define MACH_SGI_INDY		0	/* R4?K and R5K Indy workstaions */
+#define MACH_SGI_INDY		0	/* R4?K and R5K Indy workstations */
+#define MACH_SGI_CHALLENGE_S	1	/* The Challenge S server */
+#define MACH_SGI_INDIGO2	2	/* The Indigo2 system */
 
-#define GROUP_SGI_NAMES { "Indy" }
+#define GROUP_SGI_NAMES { "Indy", "Challenge S", "Indigo2" }
 
 /*
  * Valid machtype for group COBALT
@@ -103,8 +114,9 @@
  */
 #define MACH_NEC_DDB5074	 0	/* NEC DDB Vrc-5074 */
 #define MACH_NEC_DDB5476         1      /* NEC DDB Vrc-5476 */
+#define MACH_NEC_DDB5477         2      /* NEC DDB Vrc-5477 */
 
-#define GROUP_NEC_DDB_NAMES { "Vrc-5074", "Vrc-5476"}
+#define GROUP_NEC_DDB_NAMES { "Vrc-5074", "Vrc-5476", "Vrc-5477"}
 
 /*
  * Valid machtype for group BAGET
@@ -113,6 +125,74 @@
 #define MACH_BAGET202		1	/* BT23-202 */
 
 #define GROUP_BAGET_NAMES { "BT23-201", "BT23-202" }
+
+/*
+ * Cosine boards.
+ */
+#define MACH_COSINE_ORION	0
+
+#define GROUP_COSINE_NAMES { "Orion" }
+
+/*
+ * Valid machtype for group GALILEO
+ */
+#define MACH_EV96100		0	/* EV96100 */
+#define MACH_EV64120A		1	/* EV64120A */
+
+#define GROUP_GALILEO_NAMES { "EV96100" , "EV64120A" }
+
+/*
+ * Valid machtype for group MOMENCO
+ */
+#define MACH_MOMENCO_OCELOT		0
+
+#define GROUP_MOMENCO_NAMES { "Ocelot" }
+
+ 
+/*
+ * Valid machtype for group ITE
+ */
+#define MACH_QED_4N_S01B	0	/* ITE8172 based eval board */
+ 
+#define GROUP_ITE_NAMES { "QED-4N-S01B" } /* the actual board name */
+	
+/*
+ * Valid machtype for group Globespan
+ */
+#define MACH_IVR       0                  /* IVR eval board */
+
+#define GROUP_GLOBESPAN_NAMES { "IVR" }   /* the actual board name */   
+
+/*
+ * Valid machtype for group PHILIPS
+ */
+#define MACH_PHILIPS_NINO	0	/* Nino */
+#define MACH_PHILIPS_VELO	1	/* Velo */
+
+#define GROUP_PHILIPS_NAMES { "Nino" , "Velo" }
+
+/*
+ * Valid machtype for group SIBYTE
+ */
+#define MACH_SWARM              0
+
+#define GROUP_SIBYTE_NAMES {"SWARM" }
+
+/*
+ * Valid machtypes for group Toshiba
+ */
+#define MACH_PALLAS		0
+#define MACH_TOPAS		1
+#define MACH_JMR		2
+
+#define GROUP_TOSHIBA_NAMES { "Pallas", "TopasCE", "JMR" }
+
+/*
+ * Valid machtype for group Alchemy
+ */
+#define MACH_PB1000	0	         /* Au1000-based eval board */
+ 
+#define GROUP_ALCHEMY_NAMES { "PB1000" } /* the actual board name */
 
 /*
  * Valid cputype values
@@ -145,17 +225,36 @@
 #define CPU_R5000A		25
 #define CPU_R4640		26
 #define CPU_NEVADA		27	/* RM5230, RM5260 */
-#define CPU_LAST		27
+#define CPU_RM7000		28
+#define CPU_R5432		29
+#define CPU_4KC			30
+#define CPU_5KC			31
+#define CPU_R4310		32
+#define CPU_SB1			33
+#define CPU_TX3912		34
+#define CPU_TX3922		35
+#define CPU_TX3927		36
+#define CPU_AU1000		37
+#define CPU_4KEC		37
+#define CPU_4KSC		38
+#define CPU_LAST		39
 
 #define CPU_NAMES { "unknown", "R2000", "R3000", "R3000A", "R3041", "R3051", \
         "R3052", "R3081", "R3081E", "R4000PC", "R4000SC", "R4000MC",         \
         "R4200", "R4400PC", "R4400SC", "R4400MC", "R4600", "R6000",          \
         "R6000A", "R8000", "R10000", "R4300", "R4650", "R4700", "R5000",     \
-        "R5000A", "R4640", "Nevada" }
+        "R5000A", "R4640", "Nevada", "RM7000", "R5432", "MIPS 4Kc",          \
+        "MIPS 5Kc", "R4310", "SiByte SB1", "TX3912", "TX3922", "TX3927",     \
+	"Au1000", "MIPS 4KEc", "MIPS 4KSc" }
 
-#define CL_SIZE      (80)
+#define COMMAND_LINE_SIZE	256
 
-#ifndef _LANGUAGE_ASSEMBLY
+#define BOOT_MEM_MAP_MAX	32
+#define BOOT_MEM_RAM		1
+#define BOOT_MEM_ROM_DATA	2
+#define BOOT_MEM_RESERVED	3
+
+#ifndef __ASSEMBLY__
 
 /*
  * Some machine parameters passed by the bootloaders. 
@@ -183,12 +282,29 @@ typedef struct mips_arc_DisplayInfo {	/* video adapter information */
  * values in setup.c (or whereever suitable) so they are in
  * .data section
  */
-extern unsigned long mips_memory_upper;
-extern unsigned long mips_cputype;
+extern struct mips_cpu mips_cpu;
 extern unsigned long mips_machtype;
 extern unsigned long mips_machgroup;
 extern unsigned long mips_tlb_entries;
 
-#endif /* _LANGUAGE_ASSEMBLY */
+/*
+ * A memory map that's built upon what was determined
+ * or specified on the command line.
+ */
+struct boot_mem_map {
+	int nr_map;
+	struct {
+		unsigned long addr;	/* start of memory segment */
+		unsigned long size;	/* size of memory segment */
+		long type;		/* type of memory segment */
+	} map[BOOT_MEM_MAP_MAX];
+};
 
-#endif /* __ASM_MIPS_BOOTINFO_H */
+extern struct boot_mem_map boot_mem_map;
+
+extern void add_memory_region(unsigned long start, unsigned long size,
+			      long type);
+
+#endif /* !__ASSEMBLY__ */
+
+#endif /* _ASM_BOOTINFO_H */

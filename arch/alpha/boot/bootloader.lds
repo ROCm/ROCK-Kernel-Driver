@@ -6,7 +6,7 @@ SECTIONS
   .text : { *(.text) }
   _etext = .;
   PROVIDE (etext = .);
-  .rodata : { *(.rodata) }
+  .rodata : { *(.rodata) *(.rodata.*) }
   .data : { *(.data) CONSTRUCTORS }
   .got : { *(.got) }
   .sdata : { *(.sdata) }

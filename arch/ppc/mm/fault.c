@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.fault.c 1.10 05/17/01 18:14:23 cort
+ * BK Id: SCCS/s.fault.c 1.13 06/28/01 15:50:17 paulus
  */
 /*
  *  arch/ppc/mm/fault.c
@@ -44,11 +44,12 @@ extern int (*debugger_dabr_match)(struct pt_regs *);
 int debugger_kernel_faults = 1;
 #endif
 
-unsigned long htab_reloads = 0; /* updated by head.S:hash_page() */
-unsigned long htab_evicts = 0;  /* updated by head.S:hash_page() */
-unsigned long pte_misses = 0; /* updated by do_page_fault() */
-unsigned long pte_errors = 0; /* updated by do_page_fault() */
-unsigned int probingmem = 0;
+unsigned long htab_reloads;	/* updated by hashtable.S:hash_page() */
+unsigned long htab_evicts; 	/* updated by hashtable.S:hash_page() */
+unsigned long htab_preloads;	/* updated by hashtable.S:add_hash_page() */
+unsigned long pte_misses;	/* updated by do_page_fault() */
+unsigned long pte_errors;	/* updated by do_page_fault() */
+unsigned int probingmem;
 
 extern void die_if_kernel(char *, struct pt_regs *, long);
 void bad_page_fault(struct pt_regs *, unsigned long, int sig);

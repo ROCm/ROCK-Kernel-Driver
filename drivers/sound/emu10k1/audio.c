@@ -903,33 +903,46 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 
 	case SNDCTL_COPR_LOAD:
 		{
-			copr_buffer buf;
+			copr_buffer *buf;
 			u32 i;
+			int ret = -EFAULT;
 
 			DPF(2, "SNDCTL_COPR_LOAD:\n");
+			
+			buf = kmalloc(sizeof(copr_buffer), GFP_KERNEL);
+			if(buf == NULL)
+				return -ENOMEM;
 
-			if (copy_from_user(&buf, (copr_buffer *) arg, sizeof(buf)))
-				return -EFAULT;
+			if (copy_from_user(buf, (copr_buffer *) arg, sizeof(buf)))
+				goto fail;
 
-			if ((buf.command != 1) && (buf.command != 2))
-				return -EINVAL;
-
-			if ((buf.offs < 0x100)
-			    || (buf.offs < 0x000)
-			    || (buf.offs + buf.len > 0x800) || (buf.len > 1000))
-				return -EINVAL;
-
-			if (buf.command == 1) {
-				for (i = 0; i < buf.len; i++)
-					((u32 *) buf.data)[i] = sblive_readptr(wave_dev->card, buf.offs + i, 0);
-
-				if (copy_to_user((copr_buffer *) arg, &buf, sizeof(buf)))
-					return -EFAULT;
-			} else {
-				for (i = 0; i < buf.len; i++)
-					sblive_writeptr(wave_dev->card, buf.offs + i, 0, ((u32 *) buf.data)[i]);
+			if ((buf->command != 1) && (buf->command != 2))
+			{
+				ret = -EINVAL;
+				goto fail;
 			}
-			break;
+
+			if ((buf->offs < 0x100)
+			    || (buf->offs < 0x000)
+			    || (buf->offs + buf->len > 0x800) || (buf->len > 1000))
+			{
+				ret = -EINVAL;
+				goto fail;
+			}
+			if (buf->command == 1) {
+				for (i = 0; i < buf->len; i++)
+					((u32 *) buf->data)[i] = sblive_readptr(wave_dev->card, buf->offs + i, 0);
+
+				if (copy_to_user((copr_buffer *) arg, buf, sizeof(buf)))
+					goto fail;
+			} else {
+				for (i = 0; i < buf->len; i++)
+					sblive_writeptr(wave_dev->card, buf->offs + i, 0, ((u32 *) buf->data)[i]);
+			}
+			ret = 0;
+		fail:			
+			kfree(buf);
+			return ret;
 		}
 
 	default:		/* Default is unrecognized command */

@@ -284,6 +284,17 @@ drm_agp_head_t *drm_agp_init(void)
 		case AMD_IRONGATE:	head->chipset = "AMD Irongate";  break;
 		case ALI_GENERIC:	head->chipset = "ALi";           break;
 		case ALI_M1541: 	head->chipset = "ALi M1541";     break;
+		case ALI_M1621: 	head->chipset = "ALi M1621";	 break;
+		case ALI_M1631: 	head->chipset = "ALi M1631";	 break;
+		case ALI_M1632: 	head->chipset = "ALi M1632";	 break;
+		case ALI_M1641: 	head->chipset = "ALi M1641";	 break;
+		case ALI_M1647: 	head->chipset = "ALi M1647";	 break;
+		case ALI_M1651: 	head->chipset = "ALi M1651";	 break;
+		case SVWRKS_GENERIC:	head->chipset = "Serverworks Generic";
+			break;
+		case SVWRKS_HE: 	head->chipset = "Serverworks HE";
+		case SVWRKS_LE: 	head->chipset = "Serverworks LE";
+
 		default:		head->chipset = "Unknown";       break;
 		}
 		DRM_INFO("AGP %d.%d on %s @ 0x%08lx %ZuMB\n",

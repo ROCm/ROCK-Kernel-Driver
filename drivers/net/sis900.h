@@ -266,13 +266,5 @@ enum sis630_revision_id {
 #define NUM_TX_DESC     16      	/* Number of Tx descriptor registers. */
 #define NUM_RX_DESC     16       	/* Number of Rx descriptor registers. */
 
-/* PCI stuff, should be move to pic.h */
-#define PCI_DEVICE_ID_SI_900	0x900   
-#define PCI_DEVICE_ID_SI_7016	0x7016
 #define SIS630_VENDOR_ID        0x1039
 #define SIS630_DEVICE_ID        0x0630
-
-/* ioctl for accessing MII transceiver */
-#define SIOCGMIIPHY (SIOCDEVPRIVATE)		/* Get the PHY in use. */
-#define SIOCGMIIREG (SIOCDEVPRIVATE+1)		/* Read a PHY register. */
-#define SIOCSMIIREG (SIOCDEVPRIVATE+2)		/* Write a PHY register */

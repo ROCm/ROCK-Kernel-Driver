@@ -1,5 +1,4 @@
-/* $Id: unaligned.c,v 1.7 1999/12/04 03:59:00 ralf Exp $
- *
+/*
  * Handle unaligned accesses by emulation.
  *
  * This file is subject to the terms and conditions of the GNU General Public
@@ -83,6 +82,7 @@
 #include <asm/byteorder.h>
 #include <asm/inst.h>
 #include <asm/uaccess.h>
+#include <asm/system.h>
 
 #define STR(x)  __STR(x)
 #define __STR(x)  #x
@@ -91,8 +91,8 @@
  * User code may only access USEG; kernel code may access the
  * entire address space.
  */
-#define check_axs(p,a,s)                                \
-	if ((long)(~(pc) & ((a) | ((a)+(s)))) < 0)      \
+#define check_axs(pc,a,s)				\
+	if ((long)(~(pc) & ((a) | ((a)+(s)))) < 0)	\
 		goto sigbus;
 
 static inline void
@@ -365,12 +365,15 @@ fault:
 		return;
 	}
 
+	die_if_kernel ("Unhandled kernel unaligned access", regs);
 	send_sig(SIGSEGV, current, 1);
 	return;
 sigbus:
+	die_if_kernel ("Unhandled kernel unaligned access", regs);
 	send_sig(SIGBUS, current, 1);
 	return;
 sigill:
+	die_if_kernel ("Unhandled kernel unaligned access or invalid instruction", regs);
 	send_sig(SIGILL, current, 1);
 	return;
 }
@@ -380,6 +383,21 @@ unsigned long unaligned_instructions;
 asmlinkage void do_ade(struct pt_regs *regs)
 {
 	unsigned long pc;
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+        extern int do_dsemulret(struct pt_regs *);
+
+        /* 
+         * Address errors may be deliberately induced
+         * by the FPU emulator to take retake control
+         * of the CPU after executing the instruction
+         * in the delay slot of an emulated branch.
+         */
+
+        if((unsigned long)regs->cp0_epc == current->thread.dsemul_aerpc) {
+                (void)do_dsemulret(regs);
+                return;
+        }
+#endif /* CONFIG_MIPS_FPU_EMULATOR */
 
 	/*
 	 * Did we catch a fault trying to load an instruction?
@@ -401,6 +419,7 @@ asmlinkage void do_ade(struct pt_regs *regs)
 	return;
 
 sigbus:
+	die_if_kernel ("Kernel unaligned instruction access", regs);
 	force_sig(SIGBUS, current);
 
 	return;

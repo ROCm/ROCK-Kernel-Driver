@@ -1,13 +1,12 @@
-/* $Id: fcntl.h,v 1.4 1998/09/19 19:19:36 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1995, 1996, 1997, 1998 by Ralf Baechle
  */
-#ifndef __ASM_MIPS_FCNTL_H
-#define __ASM_MIPS_FCNTL_H
+#ifndef __ASM_FCNTL_H
+#define __ASM_FCNTL_H
 
 /* open/fcntl - O_SYNC is only implemented on blocks devices and on files
    located on an ext2 file system */
@@ -44,6 +43,10 @@
 #define F_SETSIG	10	/*  for sockets. */
 #define F_GETSIG	11	/*  for sockets. */
 
+#define F_GETLK64	33	/*  using 'struct flock64' */
+#define F_SETLK64	34
+#define F_SETLKW64	35
+
 /* for F_[GET|SET]FL */
 #define FD_CLOEXEC	1	/* actually anything with low bit set goes */
 
@@ -76,10 +79,19 @@ typedef struct flock {
 	short l_whence;
 	__kernel_off_t l_start;
 	__kernel_off_t l_len;
-	long  l_sysid;			/* XXXXXXXXXXXXXXXXXXXXXXXXX */
+	long  l_sysid;			/* ABI junk, unused on Linux */
 	__kernel_pid_t l_pid;
-	long  pad[4];			/* ZZZZZZZZZZZZZZZZZZZZZZZZZZ */
+	long  pad[4];			/* ABI junk, unused on Linux */
 } flock_t;
 
+typedef struct flock64 {
+	short	l_type;
+	short	l_whence;
+	loff_t	l_start;
+	loff_t	l_len;
+	pid_t	l_pid;
+} flock64_t;
+
 #define F_LINUX_SPECIFIC_BASE	1024
-#endif /* __ASM_MIPS_FCNTL_H */
+
+#endif /* __ASM_FCNTL_H */

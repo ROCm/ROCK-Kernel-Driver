@@ -38,7 +38,7 @@
 /* If we're on a ALL_PPC, assume we have a keyboard controller
  * Also note, if we're not ALL_PPC, we assume you are a serial
  * console - Tom */
-#ifdef CONFIG_ALL_PPC
+#if defined(CONFIG_ALL_PPC) && defined(CONFIG_VGA_CONSOLE)
 extern void cursor(int x, int y);
 extern void scroll(void);
 extern char *vidmem;

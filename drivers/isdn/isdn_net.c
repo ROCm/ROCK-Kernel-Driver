@@ -1,4 +1,4 @@
-/* $Id: isdn_net.c,v 1.140.6.4 2001/04/20 02:41:58 keil Exp $
+/* $Id: isdn_net.c,v 1.140.6.6 2001/06/11 22:08:37 kai Exp $
 
  * Linux ISDN subsystem, network interfaces and related functions (linklevel).
  *
@@ -190,7 +190,7 @@ static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
 static void isdn_net_ciscohdlck_connected(isdn_net_local *lp);
 static void isdn_net_ciscohdlck_disconnected(isdn_net_local *lp);
 
-char *isdn_net_revision = "$Revision: 1.140.6.4 $";
+char *isdn_net_revision = "$Revision: 1.140.6.6 $";
 
  /*
   * Code for raw-networking over ISDN
@@ -301,13 +301,11 @@ static void
 isdn_net_unbind_channel(isdn_net_local * lp)
 {
 	ulong flags;
-	struct sk_buff *skb;
 
 	save_flags(flags);
 	cli();
-	while ((skb = skb_dequeue(&lp->super_tx_queue))) {
-		kfree_skb(skb);
-	}
+	skb_queue_purge(&lp->super_tx_queue);
+
 	if (!lp->master) {	/* reset only master device */
 		/* Moral equivalent of dev_purge_queues():
 		   BEWARE! This chunk of code cannot be called from hardware

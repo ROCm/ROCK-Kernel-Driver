@@ -43,7 +43,7 @@ static int rxdmacount /* = 0 */;
 
 /* Set the copy breakpoint for the copy-only-tiny-buffer Rx method.
    Lower values use more memory, but are faster. */
-#if defined(__alpha__) || defined(__sparc__)
+#if defined(__alpha__) || defined(__sparc__) || defined(__arm__)
 static int rx_copybreak = 1518;
 #else
 static int rx_copybreak = 200;
@@ -102,6 +102,7 @@ static int debug = -1;			/* The debug level */
 #include <linux/pci.h>
 #include <linux/spinlock.h>
 #include <linux/init.h>
+#include <linux/mii.h>
 
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -125,16 +126,16 @@ MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(multicast_filter_limit, "i");
 MODULE_PARM_DESC(debug, "eepro100 debug level (0-6)");
-MODULE_PARM_DESC(options, "epro100: Bits 0-3: tranceiver type, bit 4: full duplex, bit 5: 100Mbps");
-MODULE_PARM_DESC(full_duplex, "epro100 full duplex setting(s) (1)");
-MODULE_PARM_DESC(congenb, "epro100  Enable congestion control (1)");
-MODULE_PARM_DESC(txfifo, "epro100 Tx FIFO threshold in 4 byte units, (0-15)");
-MODULE_PARM_DESC(rxfifo, "epro100 Rx FIFO threshold in 4 byte units, (0-15)");
-MODULE_PARM_DESC(txdmaccount, "epro100 Tx DMA burst length; 128 - disable (0-128)");
-MODULE_PARM_DESC(rxdmaccount, "epro100 Rx DMA burst length; 128 - disable (0-128)");
-MODULE_PARM_DESC(rx_copybreak, "epro100 copy breakpoint for copy-only-tiny-frames");
-MODULE_PARM_DESC(max_interrupt_work, "epro100 maximum events handled per interrupt");
-MODULE_PARM_DESC(multicast_filter_limit, "epro100 maximum number of filtered multicast addresses");
+MODULE_PARM_DESC(options, "eepro100: Bits 0-3: tranceiver type, bit 4: full duplex, bit 5: 100Mbps");
+MODULE_PARM_DESC(full_duplex, "eepro100 full duplex setting(s) (1)");
+MODULE_PARM_DESC(congenb, "eepro100  Enable congestion control (1)");
+MODULE_PARM_DESC(txfifo, "eepro100 Tx FIFO threshold in 4 byte units, (0-15)");
+MODULE_PARM_DESC(rxfifo, "eepro100 Rx FIFO threshold in 4 byte units, (0-15)");
+MODULE_PARM_DESC(txdmaccount, "eepro100 Tx DMA burst length; 128 - disable (0-128)");
+MODULE_PARM_DESC(rxdmaccount, "eepro100 Rx DMA burst length; 128 - disable (0-128)");
+MODULE_PARM_DESC(rx_copybreak, "eepro100 copy breakpoint for copy-only-tiny-frames");
+MODULE_PARM_DESC(max_interrupt_work, "eepro100 maximum events handled per interrupt");
+MODULE_PARM_DESC(multicast_filter_limit, "eepro100 maximum number of filtered multicast addresses");
 
 #define RUN_AT(x) (jiffies + (x))
 
@@ -155,8 +156,6 @@ static inline int null_set_power_state(struct pci_dev *dev, int state)
 									(dev)->tx_timeout = (tf); \
 									(dev)->watchdog_timeo = (tm); \
 								} while(0)
-#define netif_device_attach(dev) netif_start_queue(dev)
-#define netif_device_detach(dev) netif_stop_queue(dev)
 
 #ifndef PCI_DEVICE_ID_INTEL_ID1029
 #define PCI_DEVICE_ID_INTEL_ID1029 0x1029
@@ -472,7 +471,6 @@ struct speedo_private {
 	dma_addr_t last_rxf_dma;
 	unsigned int cur_rx, dirty_rx;		/* The next free ring entry */
 	long last_rx_time;			/* Last Rx, in jiffies, to handle Rx hang. */
-	const char *product_name;
 	struct net_device_stats stats;
 	struct speedo_stats *lstats;
 	dma_addr_t lstats_dma;
@@ -800,7 +798,7 @@ static int speedo_found1(struct pci_dev *pdev,
 	/* Return the chip to its original power state. */
 	pci_set_power_state(pdev, acpi_idle_state);
 
-	pdev->driver_data = dev;
+	pci_set_drvdata (pdev, dev);
 
 	dev->base_addr = ioaddr;
 	dev->irq = pdev->irq;
@@ -1906,32 +1904,37 @@ static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct speedo_private *sp = (struct speedo_private *)dev->priv;
 	long ioaddr = dev->base_addr;
-	u16 *data = (u16 *)&rq->ifr_data;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
 	int phy = sp->phy[0] & 0x1f;
 	int saved_acpi;
 	int t;
 
     switch(cmd) {
-	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
-		data[0] = phy;
-	case SIOCDEVPRIVATE+1:		/* Read the specified MII register. */
+	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
+	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
+		data->phy_id = phy;
+
+	case SIOCGMIIREG:		/* Read MII PHY register. */
+	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
 		/* FIXME: these operations need to be serialized with MDIO
 		   access from the timeout handler.
 		   They are currently serialized only with MDIO access from the
 		   timer routine.  2000/05/09 SAW */
 		saved_acpi = pci_set_power_state(sp->pdev, 0);
 		t = del_timer_sync(&sp->timer);
-		data[3] = mdio_read(ioaddr, data[0] & 0x1f, data[1] & 0x1f);
+		data->val_out = mdio_read(ioaddr, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		if (t)
 			add_timer(&sp->timer); /* may be set to the past  --SAW */
 		pci_set_power_state(sp->pdev, saved_acpi);
 		return 0;
-	case SIOCDEVPRIVATE+2:		/* Write the specified MII register */
+
+	case SIOCSMIIREG:		/* Write MII PHY register. */
+	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 		saved_acpi = pci_set_power_state(sp->pdev, 0);
 		t = del_timer_sync(&sp->timer);
-		mdio_write(ioaddr, data[0], data[1], data[2]);
+		mdio_write(ioaddr, data->phy_id, data->reg_num, data->val_in);
 		if (t)
 			add_timer(&sp->timer); /* may be set to the past  --SAW */
 		pci_set_power_state(sp->pdev, saved_acpi);
@@ -2143,8 +2146,11 @@ static void set_rx_mode(struct net_device *dev)
 #ifdef CONFIG_PM
 static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata (pdev);
 	long ioaddr = dev->base_addr;
+
+	if (!netif_running(dev))
+		return 0;
 
 	netif_device_detach(dev);
 	outl(PortPartialReset, ioaddr + SCBPort);
@@ -2155,9 +2161,12 @@ static int eepro100_suspend(struct pci_dev *pdev, u32 state)
 
 static int eepro100_resume(struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata (pdev);
 	struct speedo_private *sp = (struct speedo_private *)dev->priv;
 	long ioaddr = dev->base_addr;
+
+	if (!netif_running(dev))
+		return 0;
 
 	/* I'm absolutely uncertain if this part of code may work.
 	   The problems are:
@@ -2178,7 +2187,7 @@ static int eepro100_resume(struct pci_dev *pdev)
 
 static void __devexit eepro100_remove_one (struct pci_dev *pdev)
 {
-	struct net_device *dev = pdev->driver_data;
+	struct net_device *dev = pci_get_drvdata (pdev);
 	struct speedo_private *sp = (struct speedo_private *)dev->priv;
 	
 	unregister_netdev(dev);

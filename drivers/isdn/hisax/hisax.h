@@ -1,4 +1,4 @@
-/* $Id: hisax.h,v 2.52.6.5 2001/05/26 15:19:57 kai Exp $
+/* $Id: hisax.h,v 2.52.6.6 2001/06/09 15:14:17 kai Exp $
  *
  *   Basic declarations, defines and prototypes
  *
@@ -1325,7 +1325,6 @@ int QuickHex(char *txt, u_char * p, int cnt);
 void LogFrame(struct IsdnCardState *cs, u_char * p, int size);
 void dlogframe(struct IsdnCardState *cs, struct sk_buff *skb, int dir);
 void iecpy(u_char * dest, u_char * iestart, int ieoffset);
-int discard_queue(struct sk_buff_head *q);
 #ifdef ISDN_CHIP_ISAC
 void setstack_isac(struct PStack *st, struct IsdnCardState *cs);
 #endif	/* ISDN_CHIP_ISAC */

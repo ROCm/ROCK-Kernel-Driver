@@ -17,7 +17,7 @@ SECTIONS
 
   _etext = .;			/* End of text section */
 
-  .rodata : { *(.rodata) }
+  .rodata : { *(.rodata) *(.rodata.*) }
   .kstrtab : { *(.kstrtab) }
 
   . = ALIGN(16);		/* Exception table */

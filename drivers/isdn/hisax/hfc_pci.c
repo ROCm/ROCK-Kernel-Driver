@@ -1,4 +1,4 @@
-/* $Id: hfc_pci.c,v 1.34.6.5 2001/04/08 19:32:26 kai Exp $
+/* $Id: hfc_pci.c,v 1.34.6.6 2001/06/09 15:14:17 kai Exp $
 
  * hfc_pci.c     low level driver for CCD´s hfc-pci based cards
  *
@@ -35,7 +35,7 @@
 
 extern const char *CardType[];
 
-static const char *hfcpci_revision = "$Revision: 1.34.6.5 $";
+static const char *hfcpci_revision = "$Revision: 1.34.6.6 $";
 
 /* table entry in the PCI devices list */
 typedef struct {
@@ -1497,8 +1497,8 @@ close_hfcpci(struct BCState *bcs)
 {
 	mode_hfcpci(bcs, 0, bcs->channel);
 	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		discard_queue(&bcs->rqueue);
-		discard_queue(&bcs->squeue);
+		skb_queue_purge(&bcs->rqueue);
+		skb_queue_purge(&bcs->squeue);
 		if (bcs->tx_skb) {
 			dev_kfree_skb_any(bcs->tx_skb);
 			bcs->tx_skb = NULL;

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.c 1.10 06/05/01 20:20:05 paulus
+ * BK Id: SCCS/s.misc.c 1.14 06/16/01 20:43:20 trini
  */
 /*
  * misc.c
@@ -13,8 +13,9 @@
 #include <linux/types.h>
 #include "zlib.h"
 #include <asm/residual.h>
-#include <linux/elf.h>
 #include <linux/config.h>
+#include <linux/threads.h>
+#include <linux/elf.h>
 #include <linux/pci_ids.h>
 #include <asm/page.h>
 #include <asm/processor.h>
@@ -102,6 +103,7 @@ pci_read_config_32(unsigned char devfn,
 	return;
 }
 
+#ifdef CONFIG_VGA_CONSOLE
 void
 scroll()
 {
@@ -111,6 +113,7 @@ scroll()
 	for ( i = ( lines - 1 ) * cols * 2; i < lines * cols * 2; i += 2 )
 		vidmem[i] = ' ';
 }
+#endif /* CONFIG_VGA_CONSOLE */
 
 /*
  * This routine is used to control the second processor on the 
@@ -170,7 +173,9 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 #if defined(CONFIG_SERIAL_CONSOLE)
 	com_port = serial_init(0);
 #endif /* CONFIG_SERIAL_CONSOLE */
-	vga_init((char)0xC0000000);
+#if defined(CONFIG_VGA_CONSOLE)
+	vga_init((unsigned char *)0xC0000000);
+#endif /* CONFIG_VGA_CONSOLE */
 
 	if (residual)
 	{
@@ -360,8 +365,15 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	while (timer++ < 5*1000) {
 		if (tstc()) {
 			while ((ch = getc()) != '\n' && ch != '\r') {
-				if (ch == '\b') {
+				/* Test for backspace/delete */
+				if (ch == '\b' || ch == '\177') {
 					if (cp != cmd_line) {
+						cp--;
+						puts("\b \b");
+					}
+				/* Test for ^x/^u (and wipe the line) */
+				} else if (ch == '\030' || ch == '\025') {
+					while (cp != cmd_line) {
 						cp--;
 						puts("\b \b");
 					}

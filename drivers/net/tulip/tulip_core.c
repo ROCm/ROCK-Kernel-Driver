@@ -15,8 +15,8 @@
 */
 
 #define DRV_NAME	"tulip"
-#define DRV_VERSION	"0.9.15-pre5"
-#define DRV_RELDATE	"June 16, 2001"
+#define DRV_VERSION	"0.9.15-pre6"
+#define DRV_RELDATE	"July 2, 2001"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -924,66 +924,72 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct tulip_private *tp = dev->priv;
 	long ioaddr = dev->base_addr;
-	u16 *data = (u16 *) & rq->ifr_data;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	const unsigned int phy_idx = 0;
 	int phy = tp->phys[phy_idx] & 0x1f;
-	unsigned int regnum = data[1];
+	unsigned int regnum = data->reg_num;
 
 	switch (cmd) {
 	case SIOCETHTOOL:
 		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-	case SIOCDEVPRIVATE:	/* Get the address of the PHY in use. */
+
+	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
+	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
 		if (tp->mii_cnt)
-			data[0] = phy;
+			data->phy_id = phy;
 		else if (tp->flags & HAS_NWAY)
-			data[0] = 32;
+			data->phy_id = 32;
 		else if (tp->chip_id == COMET)
-			data[0] = 1;
+			data->phy_id = 1;
 		else
 			return -ENODEV;
-	case SIOCDEVPRIVATE + 1:	/* Read the specified MII register. */
-		if (data[0] == 32 && (tp->flags & HAS_NWAY)) {
+
+	case SIOCGMIIREG:		/* Read MII PHY register. */
+	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
+		if (data->phy_id == 32 && (tp->flags & HAS_NWAY)) {
 			int csr12 = inl (ioaddr + CSR12);
 			int csr14 = inl (ioaddr + CSR14);
 			switch (regnum) {
 			case 0:
                                 if (((csr14<<5) & 0x1000) ||
                                         (dev->if_port == 5 && tp->nwayset))
-                                        data[3] = 0x1000;
+                                        data->val_out = 0x1000;
                                 else
-                                        data[3] = (tulip_media_cap[dev->if_port]&MediaIs100 ? 0x2000 : 0)
+                                        data->val_out = (tulip_media_cap[dev->if_port]&MediaIs100 ? 0x2000 : 0)
                                                 | (tulip_media_cap[dev->if_port]&MediaIsFD ? 0x0100 : 0);
 				break;
 			case 1:
-                                data[3] =
+                                data->val_out =
 					0x1848 +
 					((csr12&0x7000) == 0x5000 ? 0x20 : 0) +
 					((csr12&0x06) == 6 ? 0 : 4);
                                 if (tp->chip_id != DC21041)
-                                        data[3] |= 0x6048;
+                                        data->val_out |= 0x6048;
 				break;
 			case 4:
                                 /* Advertised value, bogus 10baseTx-FD value from CSR6. */
-                                data[3] =
+                                data->val_out =
 					((inl(ioaddr + CSR6) >> 3) & 0x0040) + 
 					((csr14 >> 1) & 0x20) + 1;
                                 if (tp->chip_id != DC21041)
-                                         data[3] |= ((csr14 >> 9) & 0x03C0);
+                                         data->val_out |= ((csr14 >> 9) & 0x03C0);
 				break;
-			case 5: data[3] = tp->lpar; break;
-			default: data[3] = 0; break;
+			case 5: data->val_out = tp->lpar; break;
+			default: data->val_out = 0; break;
 			}
 		} else {
-			data[3] = tulip_mdio_read (dev, data[0] & 0x1f, regnum);
+			data->val_out = tulip_mdio_read (dev, data->phy_id & 0x1f, regnum);
 		}
 		return 0;
-	case SIOCDEVPRIVATE + 2:	/* Write the specified MII register */
+
+	case SIOCSMIIREG:		/* Write MII PHY register. */
+	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable (CAP_NET_ADMIN))
 			return -EPERM;
 		if (regnum & ~0x1f)
 			return -EINVAL;
-		if (data[0] == phy) {
-			u16 value = data[2];
+		if (data->phy_id == phy) {
+			u16 value = data->val_in;
 			switch (regnum) {
 			case 0:	/* Check for autonegotiation on or reset. */
 				tp->full_duplex_lock = (value & 0x9000) ? 0 : 1;
@@ -992,19 +998,19 @@ static int private_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 				break;
 			case 4:
 				tp->advertising[phy_idx] =
-				tp->mii_advertise = data[2];
+				tp->mii_advertise = data->val_in;
 				break;
 			}
 		}
-		if (data[0] == 32 && (tp->flags & HAS_NWAY)) {
-			u16 value = data[2];
+		if (data->phy_id == 32 && (tp->flags & HAS_NWAY)) {
+			u16 value = data->val_in;
 			if (regnum == 0) {
 				if ((value & 0x1200) == 0x1200)
 					t21142_start_nway (dev);
 			} else if (regnum == 4)
 				tp->sym_advertise = value;
 		} else {
-			tulip_mdio_write (dev, data[0] & 0x1f, regnum, data[2]);
+			tulip_mdio_write (dev, data->phy_id & 0x1f, regnum, data->val_in);
 		}
 		return 0;
 	default:

@@ -1,4 +1,4 @@
-/* $Id: amd7930.c,v 1.5.6.1 2001/02/16 16:43:25 kai Exp $
+/* $Id: amd7930.c,v 1.5.6.3 2001/06/11 22:08:37 kai Exp $
  *
  * HiSax ISDN driver - chip specific routines for AMD 7930
  *
@@ -94,7 +94,7 @@
 #include "rawhdlc.h"
 #include <linux/interrupt.h>
 
-static const char *amd7930_revision = "$Revision: 1.5.6.1 $";
+static const char *amd7930_revision = "$Revision: 1.5.6.3 $";
 
 #define RCV_BUFSIZE	1024	/* Size of raw receive buffer in bytes */
 #define RCV_BUFBLKS	4	/* Number of blocks to divide buffer into
@@ -362,12 +362,8 @@ Bchan_close(struct BCState *bcs)
 	amd7930_bclose(0, bcs->channel);
 
 	if (test_bit(BC_FLG_INIT, &bcs->Flag)) {
-		while ((skb = skb_dequeue(&bcs->rqueue))) {
-			dev_kfree_skb(skb);
-		}
-		while ((skb = skb_dequeue(&bcs->squeue))) {
-			dev_kfree_skb(skb);
-		}
+		skb_queue_purge(&bcs->rqueue);
+		skb_queue_purge(&bcs->squeue);
 	}
 	test_and_clear_bit(BC_FLG_INIT, &bcs->Flag);
 }

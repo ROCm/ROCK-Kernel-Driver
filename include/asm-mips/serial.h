@@ -1,5 +1,4 @@
-/* $Id: serial.h,v 1.9 2000/02/16 01:45:55 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -76,13 +75,87 @@
 #define JAZZ_SERIAL_PORT_DEFNS
 #endif
 
+#ifdef CONFIG_MIPS_ATLAS
+#include <asm/mips-boards/atlas.h>
+#include <asm/mips-boards/atlasint.h>
+#define ATLAS_SERIAL_PORT_DEFNS			\
+	/* UART CLK   PORT IRQ     FLAGS        */			\
+	{ 0, ATLAS_BASE_BAUD, ATLAS_UART_REGS_BASE, ATLASINT_UART, STD_COM_FLAGS },     /* ttyS0 */
+#else
+#define ATLAS_SERIAL_PORT_DEFNS
+#endif
+
+/*
+ * Both Galileo boards have the same UART mappings.
+ */
+#if defined (CONFIG_MIPS_EV96100) || defined (CONFIG_MIPS_EV64120)
+#include <asm/galileo-boards/ev96100.h>
+#include <asm/galileo-boards/ev96100int.h>
+#define EV96100_SERIAL_PORT_DEFNS                                  \
+    { baud_base: EV96100_BASE_BAUD, port: EV96100_UART0_REGS_BASE, \
+      irq: EV96100INT_UART_0, flags: STD_COM_FLAGS, type: 0x3,   \
+      iomem_base: EV96100_UART0_REGS_BASE },                       \
+    { baud_base: EV96100_BASE_BAUD, port: EV96100_UART1_REGS_BASE, \
+      irq: EV96100INT_UART_0, flags: STD_COM_FLAGS, type: 0x3,   \
+      iomem_base: EV96100_UART1_REGS_BASE },
+#else
+#define EV96100_SERIAL_PORT_DEFNS
+#endif
+
+#ifdef CONFIG_MIPS_ITE8172
+#include <asm/it8172/it8172.h>
+#include <asm/it8172/it8172_int.h>
+#include <asm/it8712.h>
+#define ITE_SERIAL_PORT_DEFNS                                  \
+    { baud_base: BASE_BAUD, port: (IT8172_PCI_IO_BASE + IT_UART_BASE), \
+      irq: IT8172_UART_IRQ, flags: STD_COM_FLAGS, type: 0x3 }, \
+    { baud_base: (24000000/(16*13)), port: (IT8172_PCI_IO_BASE + IT8712_UART1_PORT), \
+      irq: IT8172_SERIRQ_4, flags: STD_COM_FLAGS, type: 0x3 }, \
+    /* Smart Card Reader 0 */ \
+    { baud_base: BASE_BAUD, port: (IT8172_PCI_IO_BASE + IT_SCR0_BASE), \
+      irq: IT8172_SCR0_IRQ, flags: STD_COM_FLAGS, type: 0x3 }, \
+    /* Smart Card Reader 1 */ \
+    { baud_base: BASE_BAUD, port: (IT8172_PCI_IO_BASE + IT_SCR1_BASE), \
+      irq: IT8172_SCR1_IRQ, flags: STD_COM_FLAGS, type: 0x3 },
+#else
+#define ITE_SERIAL_PORT_DEFNS
+#endif
+
+#ifdef CONFIG_MIPS_IVR
+#include <asm/it8172/it8172.h>
+#include <asm/it8172/it8172_int.h>
+#define IVR_SERIAL_PORT_DEFNS                                  \
+    { baud_base: BASE_BAUD, port: (IT8172_PCI_IO_BASE + IT_UART_BASE), \
+      irq: IT8172_UART_IRQ, flags: STD_COM_FLAGS, type: 0x3 },         \
+    /* Smart Card Reader 1 */ \
+    { baud_base: BASE_BAUD, port: (IT8172_PCI_IO_BASE + IT_SCR1_BASE), \
+      irq: IT8172_SCR1_IRQ, flags: STD_COM_FLAGS, type: 0x3 },
+#else
+#define IVR_SERIAL_PORT_DEFNS
+#endif
+
+#ifdef CONFIG_AU1000_UART
+#include <asm/au1000.h>
+#define AU1000_SERIAL_PORT_DEFNS                              \
+    { baud_base: 0, port: UART0_ADDR, irq: AU1000_UART0_INT,  \
+      flags: STD_COM_FLAGS, type: 1 },                        \
+    { baud_base: 0, port: UART1_ADDR, irq: AU1000_UART1_INT,  \
+      flags: STD_COM_FLAGS, type: 1 },     \
+    { baud_base: 0, port: UART2_ADDR, irq: AU1000_UART2_INT,  \
+      flags: STD_COM_FLAGS, type: 1 },    \
+    { baud_base: 0, port: UART3_ADDR, irq: AU1000_UART3_INT,  \
+      flags: STD_COM_FLAGS, type: 1 },
+#else
+#define AU1000_SERIAL_PORT_DEFNS
+#endif
+
+#ifdef CONFIG_HAVE_STD_PC_SERIAL_PORT
 #define STD_SERIAL_PORT_DEFNS			\
 	/* UART CLK   PORT IRQ     FLAGS        */			\
 	{ 0, BASE_BAUD, 0x3F8, 4, STD_COM_FLAGS },	/* ttyS0 */	\
 	{ 0, BASE_BAUD, 0x2F8, 3, STD_COM_FLAGS },	/* ttyS1 */	\
 	{ 0, BASE_BAUD, 0x3E8, 4, STD_COM_FLAGS },	/* ttyS2 */	\
 	{ 0, BASE_BAUD, 0x2E8, 3, STD_COM4_FLAGS },	/* ttyS3 */
-
 
 #ifdef CONFIG_SERIAL_MANY_PORTS
 #define EXTRA_SERIAL_PORT_DEFNS			\
@@ -96,8 +169,8 @@
 	{ 0, BASE_BAUD, 0x2B8, 5, FOURPORT_FLAGS },	/* ttyS11 */	\
 	{ 0, BASE_BAUD, 0x330, 4, ACCENT_FLAGS },	/* ttyS12 */	\
 	{ 0, BASE_BAUD, 0x338, 4, ACCENT_FLAGS },	/* ttyS13 */	\
-	{ 0, BASE_BAUD, 0x000, 0, 0 },	/* ttyS14 (spare) */		\
-	{ 0, BASE_BAUD, 0x000, 0, 0 },	/* ttyS15 (spare) */		\
+	{ 0, BASE_BAUD, 0x000, 0, 0 },			/* ttyS14 (spare) */ \
+	{ 0, BASE_BAUD, 0x000, 0, 0 },			/* ttyS15 (spare) */ \
 	{ 0, BASE_BAUD, 0x100, 12, BOCA_FLAGS },	/* ttyS16 */	\
 	{ 0, BASE_BAUD, 0x108, 12, BOCA_FLAGS },	/* ttyS17 */	\
 	{ 0, BASE_BAUD, 0x110, 12, BOCA_FLAGS },	/* ttyS18 */	\
@@ -114,9 +187,14 @@
 	{ 0, BASE_BAUD, 0x168, 12, BOCA_FLAGS },	/* ttyS29 */	\
 	{ 0, BASE_BAUD, 0x170, 12, BOCA_FLAGS },	/* ttyS30 */	\
 	{ 0, BASE_BAUD, 0x178, 12, BOCA_FLAGS },	/* ttyS31 */
-#else
+#else /* CONFIG_SERIAL_MANY_PORTS */
 #define EXTRA_SERIAL_PORT_DEFNS
-#endif
+#endif /* CONFIG_SERIAL_MANY_PORTS */
+
+#else /* CONFIG_HAVE_STD_PC_SERIAL_PORTS */
+#define STD_SERIAL_PORT_DEFNS
+#define EXTRA_SERIAL_PORT_DEFNS
+#endif /* CONFIG_HAVE_STD_PC_SERIAL_PORTS */
 
 /* You can have up to four HUB6's in the system, but I've only
  * included two cards here for a total of twelve ports.
@@ -151,8 +229,44 @@
 #define MCA_SERIAL_PORT_DFNS
 #endif
 
+#ifdef CONFIG_MOMENCO_OCELOT
+/* Ordinary NS16552 duart with a 20MHz crystal.  */
+#define OCELOT_BASE_BAUD ( 20000000 / 16 )
+
+#define OCELOT_SERIAL1_IRQ	4
+#define OCELOT_SERIAL1_BASE	0xe0001020
+
+#define _OCELOT_SERIAL_INIT(int, base)					\
+	{ baud_base: OCELOT_BASE_BAUD, irq: int, flags: STD_COM_FLAGS,	\
+	  iomem_base: (u8 *) base, iomem_reg_shift: 2,			\
+	  io_type: SERIAL_IO_MEM }
+#define MOMENCO_OCELOT_SERIAL_PORT_DEFNS				\
+	_OCELOT_SERIAL_INIT(OCELOT_SERIAL1_IRQ, OCELOT_SERIAL1_BASE)
+#else
+#define MOMENCO_OCELOT_SERIAL_PORT_DEFNS
+#endif
+
+#ifdef CONFIG_DDB5477
+#define DDB5477_SERIAL_PORT_DEFNS                                       \
+        { baud_base: BASE_BAUD, irq: 12, flags: STD_COM_FLAGS,          \
+          iomem_base: (u8*)0xbfa04200, iomem_reg_shift: 3,              \
+          io_type: SERIAL_IO_MEM},\
+        { baud_base: BASE_BAUD, irq: 28, flags: STD_COM_FLAGS,          \
+          iomem_base: (u8*)0xbfa04240, iomem_reg_shift: 3,              \
+          io_type: SERIAL_IO_MEM},
+#else
+#define DDB5477_SERIAL_PORT_DEFNS
+#endif
+
 #define SERIAL_PORT_DFNS		\
+	IVR_SERIAL_PORT_DEFNS           \
+	ITE_SERIAL_PORT_DEFNS           \
+	ATLAS_SERIAL_PORT_DEFNS		\
+	EV96100_SERIAL_PORT_DEFNS	\
 	JAZZ_SERIAL_PORT_DEFNS		\
 	STD_SERIAL_PORT_DEFNS		\
 	EXTRA_SERIAL_PORT_DEFNS		\
-	HUB6_SERIAL_PORT_DFNS
+	HUB6_SERIAL_PORT_DFNS		\
+	MOMENCO_OCELOT_SERIAL_PORT_DEFNS\
+	AU1000_SERIAL_PORT_DEFNS	\
+	DDB5477_SERIAL_PORT_DEFNS

@@ -13,9 +13,12 @@
 
 #include <linux/delay.h>
 #include <linux/ioport.h>
+#include <linux/config.h>
 #include <asm/bootinfo.h>
 
 #define DISABLE_KBD_DURING_INTERRUPTS 0
+
+#ifdef CONFIG_PC_KEYB
 
 extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
 extern int pckbd_getkeycode(unsigned int scancode);
@@ -34,6 +37,19 @@ extern void kbd_forward_char (int ch);
 #define kbd_leds		pckbd_leds
 #define kbd_init_hw		pckbd_init_hw
 #define kbd_sysrq_xlate         pckbd_sysrq_xlate
+
+#else
+
+extern int kbd_setkeycode(unsigned int scancode, unsigned int keycode);
+extern int kbd_getkeycode(unsigned int scancode);
+extern int kbd_translate(unsigned char scancode, unsigned char *keycode,
+	char raw_mode);
+extern char kbd_unexpected_up(unsigned char keycode);
+extern void kbd_leds(unsigned char leds);
+extern void kbd_init_hw(void);
+extern unsigned char *kbd_sysrq_xlate;
+
+#endif
 
 #define SYSRQ_KEY 0x54
 

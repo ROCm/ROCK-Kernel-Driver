@@ -289,7 +289,7 @@ static unsigned char i810tco_getdevice (void)
 			pci_write_config_byte (i810tco_pci, 0xd4, val1);
 			pci_read_config_byte (i810tco_pci, 0xd4, &val1);
 			if (val1 & 0x02) {
-				printk (KERN_ERR "i810tco init: failed to reset NO_REBOOT flag\n");
+				printk (KERN_ERR "i810tco init: failed to reset NO_REBOOT flag, reboot disabled by hardware\n");
 				return 0;	/* Cannot reset NO_REBOOT bit */
 			}
 		}

@@ -39,6 +39,7 @@ SECTIONS
   .rodata    :
   {
     *(.rodata)
+    *(.rodata.*)
     *(.rodata1)
   }
   .kstrtab   : { *(.kstrtab) }

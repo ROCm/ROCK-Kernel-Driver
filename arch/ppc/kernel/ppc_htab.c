@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.ppc_htab.c 1.8 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.ppc_htab.c 1.11 06/28/01 15:50:16 paulus
  */
 /*
  * PowerPC hash table management proc entry.  Will show information
@@ -41,9 +41,12 @@ extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
 extern unsigned long _SDR1;
 extern unsigned long htab_reloads;
+extern unsigned long htab_preloads;
 extern unsigned long htab_evicts;
 extern unsigned long pte_misses;
 extern unsigned long pte_errors;
+extern unsigned int primary_pteg_full;
+extern unsigned int htab_hash_searches;
 
 /* these will go into processor.h when I'm done debugging -- Cort */
 #define MMCR0 952
@@ -110,7 +113,7 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 {
 	unsigned long mmcr0 = 0, pmc1 = 0, pmc2 = 0;
 	int n = 0, valid;
-	unsigned int kptes = 0, overflow = 0, uptes = 0, zombie_ptes = 0;
+	unsigned int kptes = 0, uptes = 0, zombie_ptes = 0;
 	PTE *ptr;
 	struct task_struct *p;
 	char buffer[512];
@@ -150,41 +153,34 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 		n += sprintf( buffer + n, "No Hash Table used\n");
 		goto return_string;
 	}
-	
-	/*
-	 * compute user/kernel pte's table this info can be
-	 * misleading since there can be valid (v bit set) entries
-	 * in the table but their vsid is used by no process (mm->context)
-	 * due to the way tlb invalidation is handled on the ppc
-	 * -- Cort
-	 */
+
+#if !defined(CONFIG_8xx) && !defined(CONFIG_4xx)
 	for ( ptr = Hash ; ptr < Hash_end ; ptr++)
 	{
-		if (ptr->v)
-		{
-			/* make sure someone is using this context/vsid */
-			valid = 0;
-			for_each_task(p)
-			{
-				if (p->mm && (ptr->vsid >> 4) == p->mm->context)
-				{
-					valid = 1;
-					break;
-				}
-			}
-			if ( !valid )
-			{
-				zombie_ptes++;
-				continue;
-			}
-			/* user not allowed read or write */
-			if (ptr->pp == PP_RWXX)
-				kptes++;
-			else
-				uptes++;
-			if (ptr->h == 1)
-				overflow++;
+		unsigned int ctx, mctx, vsid;
+
+		if (!ptr->v)
+			continue;
+		/* make sure someone is using this context/vsid */
+		/* first undo the esid skew */
+		vsid = ptr->vsid;
+		mctx = ((vsid - (vsid & 0xf) * 0x111) >> 4) & 0xfffff;
+		if (mctx == 0) {
+			kptes++;
+			continue;
 		}
+		/* now undo the context skew; 801921 * 897 == 1 mod 2^20 */
+		ctx = (mctx * 801921) & 0xfffff;
+		valid = 0;
+		for_each_task(p) {
+			if (p->mm != NULL && ctx == p->mm->context) {
+				valid = 1;
+				uptes++;
+				break;
+			}
+		}
+		if (!valid)
+			zombie_ptes++;
 	}
 	
 	n += sprintf( buffer + n,
@@ -195,29 +191,32 @@ static ssize_t ppc_htab_read(struct file * file, char * buf,
 		      "Entries\t\t: %lu\n"
 		      "User ptes\t: %u\n"
 		      "Kernel ptes\t: %u\n"
-		      "Overflows\t: %u\n"
 		      "Zombies\t\t: %u\n"
-		      "Percent full\t: %%%lu\n",
+		      "Percent full\t: %lu%%\n",
                       (unsigned long)(Hash_size>>10),
 		      (Hash_size/(sizeof(PTE)*8)),
 		      (unsigned long)Hash,
 		      Hash_size/sizeof(PTE),
                       uptes,
 		      kptes,
-		      overflow,
 		      zombie_ptes,
 		      ((kptes+uptes)*100) / (Hash_size/sizeof(PTE))
 		);
 
 	n += sprintf( buffer + n,
-		      "Reloads\t\t: %08lx\n"
-		      "Evicts\t\t: %08lx\n",
-		      htab_reloads, htab_evicts);
+		      "Reloads\t\t: %lu\n"
+		      "Preloads\t: %lu\n"
+		      "Searches\t: %u\n"
+		      "Overflows\t: %u\n"
+		      "Evicts\t\t: %lu\n",
+		      htab_reloads, htab_preloads, htab_hash_searches,
+		      primary_pteg_full, htab_evicts);
+#endif /* !8xx && !4xx */
 	
 return_string:
 	n += sprintf( buffer + n,
-		      "Non-error misses: %08lx\n"
-		      "Error misses\t: %08lx\n",
+		      "Non-error misses: %lu\n"
+		      "Error misses\t: %lu\n",
 		      pte_misses, pte_errors);
 	if (*ppos >= strlen(buffer))
 		return 0;

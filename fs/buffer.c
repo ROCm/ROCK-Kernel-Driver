@@ -168,14 +168,25 @@ static void end_buffer_write(struct buffer_head *bh, int uptodate)
 	unlock_buffer(bh);
 }
 
-/* The buffers have been marked clean and locked. Just submit the dang things.. */
+/*
+ * The buffers have been marked clean and locked.  Just submit the dang
+ * things.. 
+ *
+ * We'll wait for the first one of them - "sync" is not exactly
+ * performance-critical, and this makes us not hog the IO subsystem
+ * completely, while still allowing for a fair amount of concurrent IO. 
+ */
 static void write_locked_buffers(struct buffer_head **array, unsigned int count)
 {
+	struct buffer_head *wait = *array;
+	atomic_inc(&wait->b_count);
 	do {
 		struct buffer_head * bh = *array++;
 		bh->b_end_io = end_buffer_write;
 		submit_bh(WRITE, bh);
 	} while (--count);
+	wait_on_buffer(wait);
+	atomic_dec(&wait->b_count);
 }
 
 #define NRSYNC (32)

@@ -9,25 +9,35 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1997 by Ralf Baechle
- *
- * $Id: atomic.h,v 1.6 1999/07/26 19:42:42 harald Exp $
+ * Copyright (C) 1996, 1997, 2000 by Ralf Baechle
  */
 #ifndef __ASM_ATOMIC_H
 #define __ASM_ATOMIC_H
 
 #include <linux/config.h>
 
-#ifdef CONFIG_SMP
 typedef struct { volatile int counter; } atomic_t;
-#else
-typedef struct { int counter; } atomic_t;
-#endif
 
 #ifdef __KERNEL__
 #define ATOMIC_INIT(i)    { (i) }
 
+/*
+ * atomic_read - read atomic variable
+ * @v: pointer of type atomic_t
+ *
+ * Atomically reads the value of @v.  Note that the guaranteed
+ * useful range of an atomic_t is only 24 bits.
+ */
 #define atomic_read(v)	((v)->counter)
+
+/*
+ * atomic_set - set atomic variable
+ * @v: pointer of type atomic_t
+ * @i: required value
+ *
+ * Atomically sets the value of @v to @i.  Note that the guaranteed
+ * useful range of an atomic_t is only 24 bits.
+ */
 #define atomic_set(v,i)	((v)->counter = (i))
 
 #if !defined(CONFIG_CPU_HAS_LLSC)
@@ -37,8 +47,15 @@ typedef struct { int counter; } atomic_t;
 /*
  * The MIPS I implementation is only atomic with respect to
  * interrupts.  R3000 based multiprocessor machines are rare anyway ...
+ *
+ * atomic_add - add integer to atomic variable
+ * @i: integer value to add
+ * @v: pointer of type atomic_t
+ *
+ * Atomically adds @i to @v.  Note that the guaranteed useful range
+ * of an atomic_t is only 24 bits.
  */
-extern __inline__ void atomic_add(int i, volatile atomic_t * v)
+extern __inline__ void atomic_add(int i, atomic_t * v)
 {
 	int	flags;
 
@@ -48,7 +65,15 @@ extern __inline__ void atomic_add(int i, volatile atomic_t * v)
 	restore_flags(flags);
 }
 
-extern __inline__ void atomic_sub(int i, volatile atomic_t * v)
+/*
+ * atomic_sub - subtract the atomic variable
+ * @i: integer value to subtract
+ * @v: pointer of type atomic_t
+ *
+ * Atomically subtracts @i from @v.  Note that the guaranteed
+ * useful range of an atomic_t is only 24 bits.
+ */
+extern __inline__ void atomic_sub(int i, atomic_t * v)
 {
 	int	flags;
 
@@ -86,21 +111,6 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
 	return temp;
 }
 
-extern __inline__ void atomic_clear_mask(unsigned long mask, unsigned long * v)
-{
-        unsigned long temp;
-        int     flags;
-
-        save_flags(flags);
-        cli();
-        temp = *v;
-        temp &= ~mask;
-        *v = temp;
-        restore_flags(flags);
-
-        return;
-}
-
 #else
 
 /*
@@ -109,40 +119,45 @@ extern __inline__ void atomic_clear_mask(unsigned long mask, unsigned long * v)
  */
 
 /*
- * Make sure gcc doesn't try to be clever and move things around
- * on us. We need to use _exactly_ the address the user gave us,
- * not some alias that contains the same information.
+ * atomic_add - add integer to atomic variable
+ * @i: integer value to add
+ * @v: pointer of type atomic_t
+ *
+ * Atomically adds @i to @v.  Note that the guaranteed useful range
+ * of an atomic_t is only 24 bits.
  */
-#define __atomic_fool_gcc(x) (*(volatile struct { int a[100]; } *)x)
-
-extern __inline__ void atomic_add(int i, volatile atomic_t * v)
+extern __inline__ void atomic_add(int i, atomic_t * v)
 {
 	unsigned long temp;
 
 	__asm__ __volatile__(
-		"1:\tll\t%0,%1\n\t"
-		"addu\t%0,%2\n\t"
-		"sc\t%0,%1\n\t"
-		"beqz\t%0,1b"
-		:"=&r" (temp),
-		 "=m" (__atomic_fool_gcc(v))
-		:"Ir" (i),
-		 "m" (__atomic_fool_gcc(v)));
+		"1:   ll      %0, %1      # atomic_add\n"
+		"     addu    %0, %2                  \n"
+		"     sc      %0, %1                  \n"
+		"     beqz    %0, 1b                  \n"
+		: "=&r" (temp), "=m" (v->counter)
+		: "Ir" (i), "m" (v->counter));
 }
 
-extern __inline__ void atomic_sub(int i, volatile atomic_t * v)
+/*
+ * atomic_sub - subtract the atomic variable
+ * @i: integer value to subtract
+ * @v: pointer of type atomic_t
+ *
+ * Atomically subtracts @i from @v.  Note that the guaranteed
+ * useful range of an atomic_t is only 24 bits.
+ */
+extern __inline__ void atomic_sub(int i, atomic_t * v)
 {
 	unsigned long temp;
 
 	__asm__ __volatile__(
-		"1:\tll\t%0,%1\n\t"
-		"subu\t%0,%2\n\t"
-		"sc\t%0,%1\n\t"
-		"beqz\t%0,1b"
-		:"=&r" (temp),
-		 "=m" (__atomic_fool_gcc(v))
-		:"Ir" (i),
-		 "m" (__atomic_fool_gcc(v)));
+		"1:   ll      %0, %1      # atomic_sub\n"
+		"     subu    %0, %2                  \n"
+		"     sc      %0, %1                  \n"
+		"     beqz    %0, 1b                  \n"
+		: "=&r" (temp), "=m" (v->counter)
+		: "Ir" (i), "m" (v->counter));
 }
 
 /*
@@ -153,18 +168,17 @@ extern __inline__ int atomic_add_return(int i, atomic_t * v)
 	unsigned long temp, result;
 
 	__asm__ __volatile__(
-		".set\tnoreorder\n"
-		"1:\tll\t%1,%2\n\t"
-		"addu\t%0,%1,%3\n\t"
-		"sc\t%0,%2\n\t"
-		"beqz\t%0,1b\n\t"
-		"addu\t%0,%1,%3\n\t"
-		".set\treorder"
-		:"=&r" (result),
-		 "=&r" (temp),
-		 "=m" (__atomic_fool_gcc(v))
-		:"Ir" (i),
-		 "m" (__atomic_fool_gcc(v)));
+		".set push               # atomic_add_return\n"
+		".set noreorder                             \n"
+		"1:   ll      %1, %2                        \n"
+		"     addu    %0, %1, %3                    \n"
+		"     sc      %0, %2                        \n"
+		"     beqz    %0, 1b                        \n"
+		"     addu    %0, %1, %3                    \n"
+		".set pop                                   \n"
+		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
+		: "Ir" (i), "m" (v->counter)
+		: "memory");
 
 	return result;
 }
@@ -174,18 +188,17 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
 	unsigned long temp, result;
 
 	__asm__ __volatile__(
-		".set\tnoreorder\n"
-		"1:\tll\t%1,%2\n\t"
-		"subu\t%0,%1,%3\n\t"
-		"sc\t%0,%2\n\t"
-		"beqz\t%0,1b\n\t"
-		"subu\t%0,%1,%3\n\t"
-		".set\treorder"
-		:"=&r" (result),
-		 "=&r" (temp),
-		 "=m" (__atomic_fool_gcc(v))
-		:"Ir" (i),
-		 "m" (__atomic_fool_gcc(v)));
+		".set push                                   \n"
+		".set noreorder           # atomic_sub_return\n"
+		"1:   ll    %1, %2                           \n"
+		"     subu  %0, %1, %3                       \n"
+		"     sc    %0, %2                           \n"
+		"     beqz  %0, 1b                           \n"
+		"     subu  %0, %1, %3                       \n"
+		".set pop                                    \n"
+		: "=&r" (result), "=&r" (temp), "=m" (v->counter)
+		: "Ir" (i), "m" (v->counter)
+		: "memory");
 
 	return result;
 }
@@ -194,11 +207,71 @@ extern __inline__ int atomic_sub_return(int i, atomic_t * v)
 #define atomic_dec_return(v) atomic_sub_return(1,(v))
 #define atomic_inc_return(v) atomic_add_return(1,(v))
 
+/*
+ * atomic_sub_and_test - subtract value from variable and test result
+ * @i: integer value to subtract
+ * @v: pointer of type atomic_t
+ *
+ * Atomically subtracts @i from @v and returns
+ * true if the result is zero, or false for all
+ * other cases.  Note that the guaranteed
+ * useful range of an atomic_t is only 24 bits.
+ */
 #define atomic_sub_and_test(i,v) (atomic_sub_return((i), (v)) == 0)
+
+/*
+ * atomic_inc_and_test - increment and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1
+ * and returns true if the result is zero, or false for all
+ * other cases.  Note that the guaranteed
+ * useful range of an atomic_t is only 24 bits.
+ */
+#define atomic_inc_and_test(v) (atomic_inc_return(1, (v)) == 0)
+
+/*
+ * atomic_dec_and_test - decrement by 1 and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically decrements @v by 1 and
+ * returns true if the result is 0, or false for all other
+ * cases.  Note that the guaranteed
+ * useful range of an atomic_t is only 24 bits.
+ */
 #define atomic_dec_and_test(v) (atomic_sub_return(1, (v)) == 0)
 
+/*
+ * atomic_inc - increment atomic variable
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1.  Note that the guaranteed
+ * useful range of an atomic_t is only 24 bits.
+ */
 #define atomic_inc(v) atomic_add(1,(v))
+
+/*
+ * atomic_dec - decrement and test
+ * @v: pointer of type atomic_t
+ *
+ * Atomically decrements @v by 1.  Note that the guaranteed
+ * useful range of an atomic_t is only 24 bits.
+ */
 #define atomic_dec(v) atomic_sub(1,(v))
+
+/*
+ * atomic_add_negative - add and test if negative
+ * @v: pointer of type atomic_t
+ * @i: integer value to add
+ *
+ * Atomically adds @i to @v and returns true
+ * if the result is negative, or false when
+ * result is greater than or equal to zero.  Note that the guaranteed
+ * useful range of an atomic_t is only 24 bits.
+ *
+ * Currently not implemented for MIPS.
+ */
+
 #endif /* defined(__KERNEL__) */
 
-#endif /* __ASM_MIPS_ATOMIC_H */
+#endif /* __ASM_ATOMIC_H */

@@ -7,7 +7,7 @@
  * between kernel and user space.
  *
  * Pad space is left for:
- * - 2 miscellaneous 64-bit values
+ * - 2 miscellaneous 32-bit values
  */
 
 struct shmid64_ds {

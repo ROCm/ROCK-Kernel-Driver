@@ -24,7 +24,7 @@ SECTIONS
 		*(.fixup)
 		*(.text.__*)
 		*(.rodata)
-		*(.rodata.__*)
+		*(.rodata.*)
 	}
 
 	. = ALIGN(4);                /* Exception table */

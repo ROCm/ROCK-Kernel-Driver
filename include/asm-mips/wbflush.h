@@ -27,7 +27,7 @@ extern void (*__wbflush) (void);
  * we don't need no stinkin' wbflush
  */
 
-#define wbflush()
+#define wbflush()  do { } while(0)
 
 #endif
 

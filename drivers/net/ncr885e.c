@@ -60,7 +60,7 @@ static const char *chipname = "ncr885e";
 #define EOP           (1<<7)   /* rx: end of packet written to buffer */
 
 int ncr885e_debug = NCR885E_DEBUG;
-static int print_version = 0;
+static int print_version;
 
 struct ncr885e_private {
 
@@ -94,7 +94,7 @@ struct ncr885e_private {
 	spinlock_t lock;
 };
 
-static struct net_device *root_dev = NULL;
+static struct net_device *root_dev;
 
 static int ncr885e_open( struct net_device *dev );
 static int ncr885e_close( struct net_device *dev );

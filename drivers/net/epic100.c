@@ -45,13 +45,16 @@
 	* { fill me in }
 
 	LK1.1.8:
-	* ethtool support (jgarzik)
+	* ethtool driver info support (jgarzik)
+
+	LK1.1.9:
+	* MII ioctl support (jgarzik)
 
 */
 
 #define DRV_NAME	"epic100"
-#define DRV_VERSION	"1.11+LK1.1.8"
-#define DRV_RELDATE	"May 18, 2001"
+#define DRV_VERSION	"1.11+LK1.1.9"
+#define DRV_RELDATE	"July 2, 2001"
 
 
 /* The user-configurable values.
@@ -1351,27 +1354,30 @@ static void set_rx_mode(struct net_device *dev)
 	return;
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 {
 	struct epic_private *np = dev->priv;
 	u32 ethcmd;
-		
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+
+	if (copy_from_user (&ethcmd, useraddr, sizeof (ethcmd)))
 		return -EFAULT;
 
-        switch (ethcmd) {
-        case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		strcpy(info.bus_info, np->pci_dev->slot_name);
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO:
+		{
+			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
+			strcpy (info.driver, DRV_NAME);
+			strcpy (info.version, DRV_VERSION);
+			strcpy (info.bus_info, np->pci_dev->slot_name);
+			if (copy_to_user (useraddr, &info, sizeof (info)))
+				return -EFAULT;
+			return 0;
+		}
+
+	default:
+		break;
 	}
 
-        }
-	
 	return -EOPNOTSUPP;
 }
 
@@ -1379,20 +1385,24 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct epic_private *ep = dev->priv;
 	long ioaddr = dev->base_addr;
-	u16 *data = (u16 *)&rq->ifr_data;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
 
 	switch(cmd) {
 	case SIOCETHTOOL:
 		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
-		data[0] = ep->phys[0] & 0x1f;
+
+	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
+	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
+		data->phy_id = ep->phys[0] & 0x1f;
 		/* Fall Through */
-	case SIOCDEVPRIVATE+1:		/* Read the specified MII register. */
+
+	case SIOCGMIIREG:		/* Read MII PHY register. */
+	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
 		if (! netif_running(dev)) {
 			outl(0x0200, ioaddr + GENCTL);
 			outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
 		}
-		data[3] = mdio_read(dev, data[0] & 0x1f, data[1] & 0x1f);
+		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
 #if 0					/* Just leave on if the ioctl() is ever used. */
 		if (! netif_running(dev)) {
 			outl(0x0008, ioaddr + GENCTL);
@@ -1400,16 +1410,18 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		}
 #endif
 		return 0;
-	case SIOCDEVPRIVATE+2:		/* Write the specified MII register */
+
+	case SIOCSMIIREG:		/* Write MII PHY register. */
+	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 		if (! netif_running(dev)) {
 			outl(0x0200, ioaddr + GENCTL);
 			outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
 		}
-		if (data[0] == ep->phys[0]) {
-			u16 value = data[2];
-			switch (data[1]) {
+		if (data->phy_id == ep->phys[0]) {
+			u16 value = data->val_in;
+			switch (data->reg_num) {
 			case 0:
 				/* Check for autonegotiation on or reset. */
 				ep->duplex_lock = (value & 0x9000) ? 0 : 1;
@@ -1420,7 +1432,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			}
 			/* Perhaps check_duplex(dev), depending on chip semantics. */
 		}
-		mdio_write(dev, data[0] & 0x1f, data[1] & 0x1f, data[2]);
+		mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
 #if 0					/* Leave on if the ioctl() is used. */
 		if (! netif_running(dev)) {
 			outl(0x0008, ioaddr + GENCTL);

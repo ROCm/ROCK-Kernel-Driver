@@ -18,6 +18,11 @@ use strict;
 # 		Functions prototyped as foo(void) same as foo()
 # 		Stop eval'ing where we don't need to.
 # -- huggie@earth.li
+
+# 27/06/2001 -  Allowed whitespace after initial "/**" and
+#               allowed comments before function declarations.
+# -- Christian Kreibich <ck@whoop.org>
+
 # Still to do:
 # 	- add perldoc documentation
 # 	- Look more closely at some of the scarier bits :)
@@ -825,7 +830,7 @@ $section = "";
 
 $doc_special = "\@\%\$\&";
 
-$doc_start = "^/\\*\\*\$";
+$doc_start = "^/\\*\\*\\s*\$"; # Allow whitespace at end of comment start.
 $doc_end = "\\*/";
 $doc_com = "\\s*\\*\\s*";
 $doc_func = $doc_com."(\\w+):?";
@@ -975,7 +980,7 @@ sub process_file($) {
 	    elsif (/([^\{]*)/) {
 		$prototype .= $1;
 	    }
-	    if (/\{/ || /\#/) { # added for #define AK
+	    if (/\{/ || /\#/ || /;/) { # added for #define AK, ';' added for declarations.
 		$prototype =~ s@/\*.*?\*/@@gos;	# strip comments.
 		$prototype =~ s@[\r\n]+@ @gos; # strip newlines/cr's.
 		$prototype =~ s@^ +@@gos; # strip leading spaces

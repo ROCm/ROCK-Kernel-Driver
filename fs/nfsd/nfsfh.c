@@ -743,9 +743,31 @@ inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
 	return 2;
 }
 
-int
-fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry)
+/*
+ * for composing old style file handles
+ */
+inline void _fh_update_old(struct dentry *dentry, struct svc_export *exp,
+			   struct knfsd_fh *fh)
 {
+	fh->ofh_ino = ino_t_to_u32(dentry->d_inode->i_ino);
+	fh->ofh_generation = dentry->d_inode->i_generation;
+	if (S_ISDIR(dentry->d_inode->i_mode) ||
+	    (exp->ex_flags & NFSEXP_NOSUBTREECHECK))
+		fh->ofh_dirino = 0;
+}
+
+int
+fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, struct svc_fh *ref_fh)
+{
+	/* ref_fh is a reference file handle.
+	 * if it is non-null, then we should compose a filehandle which is
+	 * of the same version, where possible.
+	 * Currently, that means that if ref_fh->fh_handle.fh_version == 0xca
+	 * Then create a 32byte filehandle using nfs_fhbase_old
+	 * But only do this if dentry_to_fh is not available
+	 *
+	 */
+	
 	struct inode * inode = dentry->d_inode;
 	struct dentry *parent = dentry->d_parent;
 	__u32 *datap;
@@ -766,20 +788,32 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry)
 	fhp->fh_dentry = dentry; /* our internal copy */
 	fhp->fh_export = exp;
 
-	fhp->fh_handle.fh_version = 1;
-	fhp->fh_handle.fh_auth_type = 0;
-	fhp->fh_handle.fh_fsid_type = 0;
-	datap = fhp->fh_handle.fh_auth+0;
-	/* fsid_type 0 == 2byte major, 2byte minor, 4byte inode */
-	*datap++ = htonl((MAJOR(exp->ex_dev)<<16)| MINOR(exp->ex_dev));
-	*datap++ = ino_t_to_u32(exp->ex_ino);
-
-	if (inode)
-		fhp->fh_handle.fh_fileid_type =
-			_fh_update(dentry, exp, &datap, fhp->fh_maxsize-3);
-
-	fhp->fh_handle.fh_size = (datap-fhp->fh_handle.fh_auth+1)*4;
-
+	if (ref_fh &&
+	    ref_fh->fh_handle.fh_version == 0xca &&
+	    parent->d_inode->i_sb->s_op->dentry_to_fh == NULL) {
+		/* old style filehandle please */
+		memset(&fhp->fh_handle.fh_base, 0, NFS_FHSIZE);
+		fhp->fh_handle.fh_size = NFS_FHSIZE;
+		fhp->fh_handle.ofh_dcookie = 0xfeebbaca;
+		fhp->fh_handle.ofh_dev =  htonl((MAJOR(exp->ex_dev)<<16)| MINOR(exp->ex_dev));
+		fhp->fh_handle.ofh_xdev = fhp->fh_handle.ofh_dev;
+		fhp->fh_handle.ofh_xino = ino_t_to_u32(exp->ex_ino);
+		fhp->fh_handle.ofh_dirino = ino_t_to_u32(dentry->d_parent->d_inode->i_ino);
+		if (inode)
+			_fh_update_old(dentry, exp, &fhp->fh_handle);
+	} else {
+		fhp->fh_handle.fh_version = 1;
+		fhp->fh_handle.fh_auth_type = 0;
+		fhp->fh_handle.fh_fsid_type = 0;
+		datap = fhp->fh_handle.fh_auth+0;
+		/* fsid_type 0 == 2byte major, 2byte minor, 4byte inode */
+		*datap++ = htonl((MAJOR(exp->ex_dev)<<16)| MINOR(exp->ex_dev));
+		*datap++ = ino_t_to_u32(exp->ex_ino);
+		if (inode)
+			fhp->fh_handle.fh_fileid_type =
+				_fh_update(dentry, exp, &datap, fhp->fh_maxsize-3);
+		fhp->fh_handle.fh_size = (datap-fhp->fh_handle.fh_auth+1)*4;
+	}
 
 	nfsd_nr_verified++;
 	if (fhp->fh_handle.fh_fileid_type == 255)
@@ -805,11 +839,15 @@ fh_update(struct svc_fh *fhp)
 		goto out_negative;
 	if (fhp->fh_handle.fh_fileid_type != 0)
 		goto out_uptodate;
-	datap = fhp->fh_handle.fh_auth+
-		          fhp->fh_handle.fh_size/4 -1;
-	fhp->fh_handle.fh_fileid_type =
-		_fh_update(dentry, fhp->fh_export, &datap, fhp->fh_maxsize-fhp->fh_handle.fh_size);
-	fhp->fh_handle.fh_size = (datap-fhp->fh_handle.fh_auth+1)*4;
+	if (fhp->fh_handle.fh_version != 1) {
+		_fh_update_old(dentry, fhp->fh_export, &fhp->fh_handle);
+	} else {
+		datap = fhp->fh_handle.fh_auth+
+			fhp->fh_handle.fh_size/4 -1;
+		fhp->fh_handle.fh_fileid_type =
+			_fh_update(dentry, fhp->fh_export, &datap, fhp->fh_maxsize-fhp->fh_handle.fh_size);
+		fhp->fh_handle.fh_size = (datap-fhp->fh_handle.fh_auth+1)*4;
+	}
 out:
 	return 0;
 

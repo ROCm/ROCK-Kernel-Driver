@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.19 05/26/01 14:48:14 paulus
+# BK Id: SCCS/s.Makefile 1.22 06/28/01 08:01:06 trini
 #
 #
 # Makefile for the linux kernel.
@@ -39,11 +39,7 @@ obj-$(CONFIG_MODULES)		+= ppc_ksyms.o
 obj-$(CONFIG_POWER4)		+= xics.o
 obj-$(CONFIG_PCI)		+= pci.o pci-dma.o
 obj-$(CONFIG_KGDB)		+= ppc-stub.o
-obj-$(CONFIG_PMAC_PBOOK)	+= sleep.o
 obj-$(CONFIG_SMP)		+= smp.o
-obj-$(CONFIG_PPC_RTAS)		+= error_log.o proc_rtas.o
-obj-$(CONFIG_NVRAM)		+= pmac_nvram.o
-obj-$(CONFIG_PREP_RESIDUAL)	+= residual.o
 obj-$(CONFIG_4xx)		+= ppc4xx_pic.o
 obj-$(CONFIG_OAK)		+= oak_setup.o
 obj-$(CONFIG_WALNUT)		+= walnut_setup.o
@@ -52,12 +48,10 @@ obj-$(CONFIG_PCI)		+= galaxy_pci.o
 endif
 obj-$(CONFIG_8xx)		+= m8xx_setup.o ppc8xx_pic.o
 ifeq ($(CONFIG_8xx),y)
-obj-$(CONFIG_PCI)		+= qspan_pci.c
+obj-$(CONFIG_PCI)		+= qspan_pci.o
 ifndef CONFIG_MATH_EMULATION
 obj-y				+= softemu8xx.o
 endif
-else
-obj-y				+= hashtable.o
 endif
 obj-$(CONFIG_MBX)		+= i8259.o
 obj-$(CONFIG_APUS)		+= apus_setup.o
@@ -69,7 +63,11 @@ obj-$(CONFIG_ALL_PPC)		+= pmac_pic.o pmac_setup.o pmac_time.o prom.o \
 					chrp_time.o chrp_pci.o 	open_pic.o \
 					indirect_pci.o i8259.o prep_pci.o \
 					prep_time.o prep_nvram.o prep_setup.o
+obj-$(CONFIG_NVRAM)		+= pmac_nvram.o
 obj-$(CONFIG_PMAC_BACKLIGHT)	+= pmac_backlight.o
+obj-$(CONFIG_PMAC_PBOOK)	+= sleep.o
+obj-$(CONFIG_PPC_RTAS)		+= error_log.o proc_rtas.o
+obj-$(CONFIG_PREP_RESIDUAL)	+= residual.o
 obj-$(CONFIG_GEMINI)		+= gemini_prom.o gemini_pci.o gemini_setup.o \
 					open_pic.o
 obj-$(CONFIG_8260)		+= m8260_setup.o ppc8260_pic.o

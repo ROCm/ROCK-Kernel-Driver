@@ -162,6 +162,10 @@ struct VirtualAllocationTable20 {
 	Uint32  vatEntry[0];
 };
 
+/* ----------- 2.01 ------------- */
+/* UDF 2.01 6.11 */
+#define FILE_TYPE_REALTIME	0xf9U
+
 /* Sparing maps, see UDF 1.5 2.2.11 */
 typedef struct {
 	Uint32  origLocation;

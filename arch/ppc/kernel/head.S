@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head.S 1.21 05/23/01 00:38:42 cort
+ * BK Id: SCCS/s.head.S 1.23 06/28/01 15:50:16 paulus
  */
 /*
  *  PowerPC version 
@@ -25,11 +25,12 @@
  *	
  */
 
+#include <linux/config.h>
 #include "ppc_asm.h"
 #include <asm/processor.h>
 #include <asm/page.h>
-#include <linux/config.h>
 #include <asm/mmu.h>
+#include <asm/pgtable.h>
 
 #ifdef CONFIG_APUS
 #include <asm/amigappc.h>
@@ -177,7 +178,7 @@ __after_mmu_off:
 	mtspr	SDR1,r4
 	slbia
 	lis	r5,0x2000		/* set pseudo-segment reg 12 */
-	ori	r5,r5,12
+	ori	r5,r5,0x0ccc
 	mtsr	12,r5
 #endif /* CONFIG_POWER4 */
 
@@ -312,9 +313,8 @@ DataAccess:
 	mfspr	r20,DSISR
 	andis.	r0,r20,0xa470		/* weird error? */
 	bne	1f			/* if not, try to put a PTE */
-	mfspr	r3,DAR			/* into the hash table */
-	rlwinm	r4,r23,32-13,30,30	/* MSR_PR -> _PAGE_USER */
-	rlwimi	r4,r20,32-23,29,29	/* DSISR_STORE -> _PAGE_RW */
+	mfspr	r4,DAR			/* into the hash table */
+	rlwinm	r3,r20,32-15,21,21	/* DSISR_STORE -> _PAGE_RW */
 	bl	hash_page
 1:	stw	r20,_DSISR(r21)
 	mr	r5,r20
@@ -354,9 +354,8 @@ InstructionAccess:
 #endif /* CONFIG_PPC64BRIDGE */
 	andis.	r0,r23,0x4000		/* no pte found? */
 	beq	1f			/* if so, try to put a PTE */
-	mr	r3,r22			/* into the hash table */
-	rlwinm	r4,r23,32-13,30,30	/* MSR_PR -> _PAGE_USER */
-	mr	r20,r23			/* SRR1 has reason bits */
+	li	r3,0			/* into the hash table */
+	mr	r4,r22			/* SRR0 is fault address */
 	bl	hash_page
 1:	addi	r3,r1,STACK_FRAME_OVERHEAD
 	mr	r4,r22
@@ -505,10 +504,13 @@ InstructionTLBMiss:
 	lis	r1,KERNELBASE@h		/* check if kernel address */
 	cmplw	0,r3,r1
 	mfspr	r2,SPRG3
+	li	r1,_PAGE_USER|_PAGE_PRESENT /* low addresses tested as user */
 	lwz	r2,PGDIR(r2)
 	blt+	112f
 	lis	r2,swapper_pg_dir@ha	/* if kernel address, use */
 	addi	r2,r2,swapper_pg_dir@l	/* kernel page table */
+	mfspr	r1,SRR1			/* and MSR_PR bit from SRR1 */
+	rlwinm	r1,r1,32-12,29,29	/* shift MSR_PR to _PAGE_USER posn */
 112:	tophys(r2,r2)
 	rlwimi	r2,r3,12,20,29		/* insert top 10 bits of address */
 	lwz	r2,0(r2)		/* get pmd entry */
@@ -516,21 +518,23 @@ InstructionTLBMiss:
 	beq-	InstructionAddressInvalid	/* return if no mapping */
 	tophys(r2,r2)
 	rlwimi	r2,r3,22,20,29		/* insert next 10 bits of address */
-	lwz	r1,0(r2)		/* get linux-style pte */
-	/* setup access flags in r3 */
-	mfmsr	r3
-	rlwinm	r3,r3,32-13,30,30	/* MSR_PR -> _PAGE_USER */
-	ori	r3,r3,1			/* set _PAGE_PRESENT bit in access */
-	andc.	r3,r3,r1		/* check access & ~permission */
+	lwz	r3,0(r2)		/* get linux-style pte */
+	andc.	r1,r1,r3		/* check access & ~permission */
 	bne-	InstructionAddressInvalid /* return if access not permitted */
-	ori	r1,r1,0x100		/* set _PAGE_ACCESSED in pte */
-	stw	r1,0(r2)		/* update PTE (accessed bit) */
+	ori	r3,r3,_PAGE_ACCESSED	/* set _PAGE_ACCESSED in pte */
+	/*
+	 * NOTE! We are assuming this is not an SMP system, otherwise
+	 * we would need to update the pte atomically with lwarx/stwcx.
+	 */
+	stw	r3,0(r2)		/* update PTE (accessed bit) */
 	/* Convert linux-style PTE to low word of PPC-style PTE */
-	/* this computation could be done better -- Cort */
-	rlwinm	r3,r1,32-9,31,31	/* _PAGE_HWWRITE -> PP lsb */
-	rlwimi	r1,r1,32-1,31,31	/* _PAGE_USER -> PP (both bits now) */
-	ori	r3,r3,0xe04		/* clear out reserved bits */
-	andc	r1,r1,r3		/* PP=2 or 0, when _PAGE_HWWRITE */
+	rlwinm	r1,r3,32-10,31,31	/* _PAGE_RW -> PP lsb */
+	rlwinm	r2,r3,32-7,31,31	/* _PAGE_DIRTY -> PP lsb */
+	and	r1,r1,r2		/* writable if _RW and _DIRTY */
+	rlwimi	r3,r3,32-1,30,30	/* _PAGE_USER -> PP msb */
+	rlwimi	r3,r3,32-1,31,31	/* _PAGE_USER -> PP lsb */
+	ori	r1,r1,0xe14		/* clear out reserved bits and M */
+	andc	r1,r3,r1		/* PP = user? (rw&dirty? 2: 3): 0 */
 	mtspr	RPA,r1
 	mfspr	r3,IMISS
 	tlbli	r3
@@ -555,7 +559,6 @@ InstructionAddressInvalid:
 	mfmsr	r0		/* Restore "normal" registers */
 	xoris	r0,r0,MSR_TGPR>>16
 	mtcrf	0x80,r3		/* Restore CR0 */
-	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0
 	b	InstructionAccess
 
@@ -576,10 +579,13 @@ DataLoadTLBMiss:
 	lis	r1,KERNELBASE@h		/* check if kernel address */
 	cmplw	0,r3,r1
 	mfspr	r2,SPRG3
+	li	r1,_PAGE_USER|_PAGE_PRESENT /* low addresses tested as user */
 	lwz	r2,PGDIR(r2)
 	blt+	112f
 	lis	r2,swapper_pg_dir@ha	/* if kernel address, use */
 	addi	r2,r2,swapper_pg_dir@l	/* kernel page table */
+	mfspr	r1,SRR1			/* and MSR_PR bit from SRR1 */
+	rlwinm	r1,r1,32-12,29,29	/* shift MSR_PR to _PAGE_USER posn */
 112:	tophys(r2,r2)
 	rlwimi	r2,r3,12,20,29		/* insert top 10 bits of address */
 	lwz	r2,0(r2)		/* get pmd entry */
@@ -587,22 +593,23 @@ DataLoadTLBMiss:
 	beq-	DataAddressInvalid	/* return if no mapping */
 	tophys(r2,r2)
 	rlwimi	r2,r3,22,20,29		/* insert next 10 bits of address */
-	lwz	r1,0(r2)		/* get linux-style pte */
-	/* setup access flags in r3 */
-	mfmsr	r3
-	rlwinm	r3,r3,32-13,30,30	/* MSR_PR -> _PAGE_USER */
-	ori	r3,r3,1			/* set _PAGE_PRESENT bit in access */
-	/* save r2 and use it as scratch for the andc. */	
-	andc.	r3,r3,r1		/* check access & ~permission */
+	lwz	r3,0(r2)		/* get linux-style pte */
+	andc.	r1,r1,r3		/* check access & ~permission */
 	bne-	DataAddressInvalid	/* return if access not permitted */
-	ori	r1,r1,0x100		/* set _PAGE_ACCESSED in pte */
-	stw	r1,0(r2)		/* update PTE (accessed bit) */
+	ori	r3,r3,_PAGE_ACCESSED	/* set _PAGE_ACCESSED in pte */
+	/*
+	 * NOTE! We are assuming this is not an SMP system, otherwise
+	 * we would need to update the pte atomically with lwarx/stwcx.
+	 */
+	stw	r3,0(r2)		/* update PTE (accessed bit) */
 	/* Convert linux-style PTE to low word of PPC-style PTE */
-	/* this computation could be done better -- Cort */
-	rlwinm	r3,r1,32-9,31,31	/* _PAGE_HWWRITE -> PP lsb */
-	rlwimi	r1,r1,32-1,31,31	/* _PAGE_USER -> PP (both bits now) */
-	ori	r3,r3,0xe04		/* clear out reserved bits */
-	andc	r1,r1,r3		/* PP=2 or 0, when _PAGE_HWWRITE */
+	rlwinm	r1,r3,32-10,31,31	/* _PAGE_RW -> PP lsb */
+	rlwinm	r2,r3,32-7,31,31	/* _PAGE_DIRTY -> PP lsb */
+	and	r1,r1,r2		/* writable if _RW and _DIRTY */
+	rlwimi	r3,r3,32-1,30,30	/* _PAGE_USER -> PP msb */
+	rlwimi	r3,r3,32-1,31,31	/* _PAGE_USER -> PP lsb */
+	ori	r1,r1,0xe14		/* clear out reserved bits and M */
+	andc	r1,r3,r1		/* PP = user? (rw&dirty? 2: 3): 0 */
 	mtspr	RPA,r1
 	mfspr	r3,DMISS
 	tlbld	r3
@@ -625,7 +632,6 @@ DataAddressInvalid:
 	mfmsr	r0		/* Restore "normal" registers */
 	xoris	r0,r0,MSR_TGPR>>16
 	mtcrf	0x80,r3		/* Restore CR0 */
-	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0
 	b	DataAccess
 	
@@ -646,10 +652,13 @@ DataStoreTLBMiss:
 	lis	r1,KERNELBASE@h		/* check if kernel address */
 	cmplw	0,r3,r1
 	mfspr	r2,SPRG3
+	li	r1,_PAGE_RW|_PAGE_USER|_PAGE_PRESENT /* access flags */
 	lwz	r2,PGDIR(r2)
 	blt+	112f
 	lis	r2,swapper_pg_dir@ha	/* if kernel address, use */
 	addi	r2,r2,swapper_pg_dir@l	/* kernel page table */
+	mfspr	r1,SRR1			/* and MSR_PR bit from SRR1 */
+	rlwinm	r1,r1,32-12,29,29	/* shift MSR_PR to _PAGE_USER posn */
 112:	tophys(r2,r2)
 	rlwimi	r2,r3,12,20,29		/* insert top 10 bits of address */
 	lwz	r2,0(r2)		/* get pmd entry */
@@ -657,22 +666,19 @@ DataStoreTLBMiss:
 	beq-	DataAddressInvalid	/* return if no mapping */
 	tophys(r2,r2)
 	rlwimi	r2,r3,22,20,29		/* insert next 10 bits of address */
-	lwz	r1,0(r2)		/* get linux-style pte */
-	/* setup access flags in r3 */
-	mfmsr	r3
-	rlwinm	r3,r3,32-13,30,30	/* MSR_PR -> _PAGE_USER */
-	ori	r3,r3,0x5		/* _PAGE_PRESENT|_PAGE_RW */
-	/* save r2 and use it as scratch for the andc. */	
-	andc.	r3,r3,r1		/* check access & ~permission */
+	lwz	r3,0(r2)		/* get linux-style pte */
+	andc.	r1,r1,r3		/* check access & ~permission */
 	bne-	DataAddressInvalid	/* return if access not permitted */
-	ori	r1,r1,0x384		/* set _PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_RW|_PAGE_HWWRITE in pte */
-	stw	r1,0(r2)		/* update PTE (accessed bit) */
+	ori	r3,r3,_PAGE_ACCESSED|_PAGE_DIRTY
+	/*
+	 * NOTE! We are assuming this is not an SMP system, otherwise
+	 * we would need to update the pte atomically with lwarx/stwcx.
+	 */
+	stw	r3,0(r2)		/* update PTE (accessed/dirty bits) */
 	/* Convert linux-style PTE to low word of PPC-style PTE */
-	/* this computation could be done better -- Cort */
-	rlwinm	r3,r1,32-9,31,31	/* _PAGE_HWWRITE -> PP lsb */
-	rlwimi	r1,r1,32-1,31,31	/* _PAGE_USER -> PP (both bits now) */
-	ori	r3,r3,0xe04		/* clear out reserved bits */
-	andc	r1,r1,r3		/* PP=2 or 0, when _PAGE_HWWRITE */
+	rlwimi	r3,r3,32-1,30,30	/* _PAGE_USER -> PP msb */
+	li	r1,0xe15		/* clear out reserved bits and M */
+	andc	r1,r3,r1		/* PP = user? 2: 0 */
 	mtspr	RPA,r1
 	mfspr	r3,DMISS
 	tlbld	r3
@@ -901,7 +907,6 @@ load_up_altivec:
  */
 	mfmsr	r5
 	oris	r5,r5,MSR_VEC@h
-	SYNC
 	mtmsr	r5			/* enable use of AltiVec now */
 	isync
 /*
@@ -1028,6 +1033,7 @@ giveup_fpu:
 	ori	r5,r5,MSR_FP
 	SYNC
 	mtmsr	r5			/* enable use of fpu now */
+	SYNC
 	isync
 	cmpi	0,r3,0
 	beqlr-				/* if no previous owner, done */
@@ -1384,7 +1390,7 @@ load_up_mmu:
 	lis	r3,0x2000	/* Ku = 1, VSID = 0 */
 	li	r4,0
 3:	mtsrin	r3,r4
-	addi	r3,r3,1		/* increment VSID */
+	addi	r3,r3,0x111	/* increment VSID */
 	addis	r4,r4,0x1000	/* address of next segment */
 	bdnz	3b
 #ifndef CONFIG_POWER4
@@ -1490,7 +1496,8 @@ start_here:
  * Set up the segment registers for a new context.
  */
 _GLOBAL(set_context)
-	rlwinm	r3,r3,4,8,27	/* VSID = context << 4 */
+	mulli	r3,r3,897	/* multiply context by skew factor */
+	rlwinm	r3,r3,4,8,27	/* VSID = (context & 0xfffff) << 4 */
 	addis	r3,r3,0x6000	/* Set Ks, Ku bits */
 	li	r0,12		/* TASK_SIZE / SEGMENT_SIZE */
 	mtctr	r0
@@ -1500,7 +1507,8 @@ _GLOBAL(set_context)
 	slbie	r4
 #endif /* CONFIG_PPC64BRIDGE */
 	mtsrin	r3,r4
-	addi	r3,r3,1		/* next VSID */
+	addi	r3,r3,0x111	/* next VSID */
+	rlwinm	r3,r3,0,8,3	/* clear out any overflow from VSID field */
 	addis	r4,r4,0x1000	/* address of next segment */
 	bdnz	3b
 	SYNC

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.main.c 1.7 05/18/01 06:20:29 patch
+ * BK Id: SCCS/s.main.c 1.9 06/12/01 16:42:26 paulus
  */
 /*
  * Copyright (C) Paul Mackerras 1997.
@@ -100,13 +100,13 @@ chrpboot(int a1, int a2, void *prom)
 	    rec->tag = BI_MACHTYPE;
 	    rec->data[0] = _MACH_chrp;
 	    rec->data[1] = 1;
-	    rec->size = sizeof(struct bi_record) + sizeof(unsigned long);
+	    rec->size = sizeof(struct bi_record) + 2 * sizeof(unsigned long);
 	    rec = (struct bi_record *)((unsigned long)rec + rec->size);
 #if 0
 	    rec->tag = BI_SYSMAP;
 	    rec->data[0] = (unsigned long)sysmap_data;
 	    rec->data[1] = sysmap_len;
-	    rec->size = sizeof(struct bi_record) + sizeof(unsigned long);
+	    rec->size = sizeof(struct bi_record) + 2 * sizeof(unsigned long);
 	    rec = (struct bi_record *)((unsigned long)rec + rec->size);
 #endif
 	    rec->tag = BI_LAST;

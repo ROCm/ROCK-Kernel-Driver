@@ -1,5 +1,5 @@
 /*
- *	 Aironet 4500 Pcmcia driver
+ *	 Aironet 4500 /proc interface
  *
  *		Elmer Joandi, Januar 1999
  *	Copyright GPL

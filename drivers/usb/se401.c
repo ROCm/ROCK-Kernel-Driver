@@ -49,6 +49,7 @@ static const char version[] = "0.22";
 #include "se401.h"
 
 static int flickerless=0;
+static int video_nr = -1;
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 3, 0)
 static __devinitdata struct usb_device_id device_table [] = {
@@ -63,12 +64,11 @@ static __devinitdata struct usb_device_id device_table [] = {
 MODULE_DEVICE_TABLE(usb, device_table);
 #endif
 
-static int video_nr = -1;
-
 MODULE_AUTHOR("Jeroen Vreeken <pe1rxq@amsat.org>");
 MODULE_DESCRIPTION("SE401 USB Camera Driver");
 MODULE_PARM(flickerless, "i");
 MODULE_PARM_DESC(flickerless, "Net frequency to adjust exposure time to (0/50/60)");
+MODULE_PARM(video_nr, "i");
 EXPORT_NO_SYMBOLS;
 
 
@@ -1286,6 +1286,9 @@ static int se401_ioctl(struct video_device *vdev, unsigned int cmd, void *arg)
 		if (copy_from_user((void *)&frame, arg, sizeof(int)))
 			return -EFAULT;
 
+		if(frame <0 || frame >= SE401_NUMFRAMES)
+			return -EINVAL;
+			
 		ret=se401_newframe(se401, frame);
 		se401->frame[frame].grabstate=FRAME_UNUSED;
 		return ret;

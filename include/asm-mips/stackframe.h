@@ -1,13 +1,17 @@
 /*
- *  include/asm-mips/stackframe.h
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
  *
- *  Copyright (C) 1994, 1995, 1996 by Ralf Baechle and Paul M. Antoine.
- *
- * $Id: stackframe.h,v 1.10 1999/08/13 17:07:27 harald Exp $
+ *  Copyright (C) 1994, 1995, 1996, 2001 Ralf Baechle
+ *  Copyright (C) 1994, 1995, 1996 Paul M. Antoine.
  */
-#ifndef __ASM_MIPS_STACKFRAME_H
-#define __ASM_MIPS_STACKFRAME_H
+#ifndef __ASM_STACKFRAME_H
+#define __ASM_STACKFRAME_H
 
+#include <asm/addrspace.h>
+#include <asm/mipsregs.h>
+#include <asm/processor.h>
 #include <asm/asm.h>
 #include <asm/offset.h>
 #include <linux/config.h>
@@ -47,20 +51,45 @@
 #define __str2(x) #x
 #define __str(x) __str2(x)
 
-#define save_static(frame)                               \
-	__asm__ __volatile__(                            \
-		"sw\t$16,"__str(PT_R16)"(%0)\n\t"        \
-		"sw\t$17,"__str(PT_R17)"(%0)\n\t"        \
-		"sw\t$18,"__str(PT_R18)"(%0)\n\t"        \
-		"sw\t$19,"__str(PT_R19)"(%0)\n\t"        \
-		"sw\t$20,"__str(PT_R20)"(%0)\n\t"        \
-		"sw\t$21,"__str(PT_R21)"(%0)\n\t"        \
-		"sw\t$22,"__str(PT_R22)"(%0)\n\t"        \
-		"sw\t$23,"__str(PT_R23)"(%0)\n\t"        \
-		"sw\t$30,"__str(PT_R30)"(%0)\n\t"        \
-		: /* No outputs */                       \
-		: "r" (frame))
+#define save_static_function(symbol)                                    \
+__asm__ (                                                               \
+        ".globl\t" #symbol "\n\t"                                       \
+        ".align\t2\n\t"                                                 \
+        ".type\t" #symbol ", @function\n\t"                             \
+        ".ent\t" #symbol ", 0\n"                                        \
+        #symbol":\n\t"                                                  \
+        ".frame\t$29, 0, $31\n\t"                                       \
+        "sw\t$16,"__str(PT_R16)"($29)\t\t\t# save_static_function\n\t"  \
+        "sw\t$17,"__str(PT_R17)"($29)\n\t"                              \
+        "sw\t$18,"__str(PT_R18)"($29)\n\t"                              \
+        "sw\t$19,"__str(PT_R19)"($29)\n\t"                              \
+        "sw\t$20,"__str(PT_R20)"($29)\n\t"                              \
+        "sw\t$21,"__str(PT_R21)"($29)\n\t"                              \
+        "sw\t$22,"__str(PT_R22)"($29)\n\t"                              \
+        "sw\t$23,"__str(PT_R23)"($29)\n\t"                              \
+        "sw\t$30,"__str(PT_R30)"($29)\n\t"                              \
+        ".end\t" #symbol "\n\t"                                         \
+        ".size\t" #symbol",. - " #symbol)
 
+/* Used in declaration of save_static functions.  */
+#define static_unused static __attribute__((unused))
+
+
+#ifdef CONFIG_SMP
+#  define GET_SAVED_SP                                   \
+                mfc0    k0, CP0_CONTEXT;                 \
+                lui     k1, %hi(kernelsp);               \
+                srl     k0, k0, 23;                      \
+		sll     k0, k0, 2;                       \
+                addu    k1, k0;                          \
+                lw      k1, %lo(kernelsp)(k1);        
+
+#else
+#  define GET_SAVED_SP                                   \
+		lui	k1, %hi(kernelsp);               \
+		lw	k1, %lo(kernelsp)(k1);           
+#endif
+ 
 #define SAVE_SOME                                        \
 		.set	push;                            \
 		.set	reorder;                         \
@@ -71,13 +100,12 @@
 		 move	k1, sp;                          \
 		.set	reorder;                         \
 		/* Called from user mode, new stack. */  \
-		lui	k1, %hi(kernelsp);               \
-		lw	k1, %lo(kernelsp)(k1);           \
+                GET_SAVED_SP                             \
 8:                                                       \
 		move	k0, sp;                          \
 		subu	sp, k1, PT_SIZE;                 \
 		sw	k0, PT_R29(sp);                  \
-		sw	$3, PT_R3(sp);                   \
+                sw	$3, PT_R3(sp);                   \
 		sw	$0, PT_R0(sp);			 \
 		mfc0	v1, CP0_STATUS;                  \
 		sw	$2, PT_R2(sp);                   \
@@ -208,12 +236,23 @@
 
 #endif
 
+#define RESTORE_SP                                       \
+		lw	sp,  PT_R29(sp);                 \
+
+#define RESTORE_ALL                                      \
+		RESTORE_SOME;                            \
+		RESTORE_AT;                              \
+		RESTORE_TEMP;                            \
+		RESTORE_STATIC;                          \
+		RESTORE_SP
+
 #define RESTORE_ALL_AND_RET                              \
 		RESTORE_SOME;                            \
 		RESTORE_AT;                              \
 		RESTORE_TEMP;                            \
 		RESTORE_STATIC;                          \
 		RESTORE_SP_AND_RET
+
 
 /*
  * Move to kernel mode and disable interrupts.
@@ -248,4 +287,4 @@
 		xori	t0,0x1e;                        \
 		mtc0	t0,CP0_STATUS
 
-#endif /* __ASM_MIPS_STACKFRAME_H */
+#endif /* __ASM_STACKFRAME_H */

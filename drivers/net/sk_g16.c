@@ -536,8 +536,6 @@ void SK_print_ram(struct net_device *dev);
  * Check for a network adaptor of this type, and return '0' if one exists.
  * If dev->base_addr == 0, probe all likely locations.
  * If dev->base_addr == 1, always return failure.
- * If dev->base_addr == 2, allocate space for the device and return success
- *                         (detachable devices only).
  */
 
 int __init SK_init(struct net_device *dev)

@@ -23,7 +23,8 @@
 #	 unsigned long num_512blocks;   Size, rounded-up, in 512 byte blocks
 #	 unsigned long debug_flag;      Run the debugger or image after load
 #        unsigned long entry_point;	The image address to jump to after load
-#	 unsigned long reserved[3];
+#	 unsigned long checksum; 	32 bit checksum including header
+#	 unsigned long reserved[2];
 #      } boot_block_t;
 #
 #   
@@ -61,6 +62,7 @@ sub usage {
   }
 
   if ($status != 1) {
+    print("  -c         Put checksum in load information block.\n");
     print("  -h         Print out this message and exit.\n");
     print("  -l         Linux mode; if present, copy 'image' and 'initrd' sections.\n");
     print("  -v         Verbose. Print out lots of ELF information.\n");
@@ -148,8 +150,12 @@ sub file_check {
 
 sub decode_options {
 
-  if (!getopts("hlvV")) {
+  if (!getopts("chlvV")) {
     usage(1);
+  }
+
+  if ($opt_c) {
+    $do_checksum = 1;
   }
 
   if ($opt_h) {
@@ -360,14 +366,20 @@ require '../utils/elf.pl';
     $output_size += $initrd_size;
   }
 
-  $num_blocks = $output_size / 512 + 1;
+  # 
+  # Compute size with header 
+  #
+
+  $header = pack("H8N7", "0052504f", 0, 0, 0, 0, 0, 0, 0);
+  $num_blocks = ($output_size + length($header) + 511) / 512;
 
   #
   # Write IBM PowerPC evaluation board boot_block_t header
   #
 
   $header = pack("H8N7", "0052504f", $text_addr, $num_blocks, 0,
-		 $text_addr, 0, 0, 0);
+                 $text_addr, 0, 0, 0);
+
 
   $bytes = length($header);
   
@@ -412,18 +424,57 @@ require '../utils/elf.pl';
 
   #
   # Pad to a multiple of 512 bytes
+  #  If the (size of the boot image mod 512) is between 509 and 511 bytes
+  #  then the tftp to the Walnut fails.  This may be fixed in more recent
+  #  Walnut bootrom.
   #
 
-  $pad_size = 512 - (length($header) + $output_size) % 512;
-
-  if ($verbose) {
-    print("Padding boot image by an additional $pad_size bytes.\n");
+  $pad_size = 512 - ((length($header) + $output_size) % 512);
+  if ($pad_size == 512) {
+    $pad_size = 0;
   }
 
-  $pad_string = pack(("H8","deadbeef") x 128);
+  if ($pad_size != 0) {
+  
+    if ($verbose) {
+      print("Padding boot image by an additional $pad_size bytes.\n");
+    }
 
-  syswrite(BOOT, $pad_string, $pad_size) or
-    die "Could not pad boot image in output file.\n";
+    $pad_string = pack("H8","deadbeef") x 128;
+
+    syswrite(BOOT, $pad_string, $pad_size) or
+      die "Could not pad boot image in output file.\n";
+
+  }
+
+  # 
+  # Compute 32 bit checksum over entire file.
+  #
+
+  if ($do_checksum) {
+
+    close(BOOT);
+    open(BOOT, "+<$ofile") || die "Cannot open output file";
+    undef $/;
+    $temp = unpack("%32N*", <BOOT>);
+    # Solaris and PPC Linux return 0x80000000 for "-$temp" when $temp
+    # is negative.  "~($temp - 1)" negates $temp properly.
+    $csum = ~($temp - 1);
+    printf("Checksum    = 0x%08x\r\n", $csum);
+
+    #
+    # Rewrite IBM PowerPC evaluation board boot_block_t header,
+    # this time with the checksum included
+    #
+
+    $header = pack("H8N7", "0052504f", $text_addr, $num_blocks, 0,
+                    $text_addr, $csum, 0, 0);
+
+    seek(BOOT, 0, 0);
+    syswrite(BOOT, $header, length($header)) or
+         die("Could not write boot image header to output file.");
+
+  }
 
   #
   # Clean-up and leave

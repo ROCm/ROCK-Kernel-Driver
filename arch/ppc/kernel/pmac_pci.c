@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.pmac_pci.c 1.14 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.pmac_pci.c 1.18 07/01/01 12:23:31 trini
  */
 /*
  * Support for PCI bridges found on Power Macintoshes.
@@ -42,8 +42,6 @@ static int has_uninorth;
 /*
  * Magic constants for enabling cache coherency in the bandit/PSX bridge.
  */
-#define APPLE_VENDID	0x106b
-#define BANDIT_DEVID	1
 #define BANDIT_DEVID_2	8
 #define BANDIT_REVID	3
 
@@ -97,12 +95,17 @@ fixup_bus_range(struct device_node *bridge)
 }
 
 /*
- * Apple MacRISC (UniNorth, Bandit) PCI controllers.
+ * Apple MacRISC (UniNorth, Bandit, Chaos) PCI controllers.
  * 
  * The "Bandit" version is present in all early PCI PowerMacs,
  * and up to the first ones using Grackle. Some machines may
  * have 2 bandit controllers (2 PCI busses).
  * 
+ * "Chaos" is used in some "Bandit"-type machines as a bridge
+ * for the separate display bus. It is accessed the same
+ * way as bandit, but cannot be probed for devices. It therefore
+ * has its own config access functions.
+ *
  * The "UniNorth" version is present in all Core99 machines
  * (iBook, G4, new IMacs, and all the recent Apple machines).
  * It contains 3 controllers in one ASIC.
@@ -124,10 +127,6 @@ macrisc_cfg_access(struct pci_controller* hose, u8 bus, u8 dev_fn, u8 offset)
 {
 	unsigned int caddr;
 	
-#ifdef DEBUG
-//	printk("macrisc_config_access(hose: 0x%08lx, bus: 0x%x, devfb: 0x%x, offset: 0x%x)\n",
-//		hose, bus, dev_fn, offset);
-#endif
 	if (bus == hose->first_busno) {
 		if (dev_fn < (11 << 3))
 			return 0;
@@ -189,55 +188,50 @@ static struct pci_ops macrisc_pci_ops =
 	macrisc_write_config_dword
 };
 
-
 /*
- * Apple "Chaos" PCI controller.
- * 
- * This controller is present on some first generation "PowerSurge"
- * machines (8500, 8600, ...). It's a very weird beast and will die
- * in flames if we try to probe the config space.
- * The long-term solution is to provide a config space "emulation"
- * based on what we find in OF device tree
+ * Verifiy that a specific (bus, dev_fn) exists on chaos
  */
- 
-static int chaos_config_read_byte(struct pci_dev *dev, int offset, u8 *val)
+static int __pmac
+chaos_validate_dev(struct pci_dev *dev, int offset)
 {
-	return PCIBIOS_DEVICE_NOT_FOUND;
+	if(pci_device_to_OF_node(dev) == 0)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	if((dev->vendor == 0x106b) && (dev->device == 3) && (offset >= 0x10) &&
+	    (offset != 0x14) && (offset != 0x18) && (offset <= 0x24)) {
+		return PCIBIOS_BAD_REGISTER_NUMBER;
+	}
+	return PCIBIOS_SUCCESSFUL;
 }
 
-static int chaos_config_read_word(struct pci_dev *dev, int offset, u16 *val)
-{
-	return PCIBIOS_DEVICE_NOT_FOUND;
+#define CHAOS_PCI_OP(rw, size, type)					\
+static int __pmac							\
+chaos_##rw##_config_##size(struct pci_dev *dev, int off, type val)	\
+{									\
+	int result = chaos_validate_dev(dev, off);			\
+	if(result == PCIBIOS_BAD_REGISTER_NUMBER) {			\
+		cfg_##rw##_bad(val, size)				\
+		return PCIBIOS_BAD_REGISTER_NUMBER;			\
+	}								\
+	if(result == PCIBIOS_SUCCESSFUL)				\
+		return macrisc_##rw##_config_##size(dev, off, val);	\
+	return result;							\
 }
 
-static int chaos_config_read_dword(struct pci_dev *dev, int offset, u32 *val)
-{
-	return PCIBIOS_DEVICE_NOT_FOUND;
-}
-
-static int chaos_config_write_byte(struct pci_dev *dev, int offset, u8 val)
-{
-	return PCIBIOS_DEVICE_NOT_FOUND;
-}
-
-static int chaos_config_write_word(struct pci_dev *dev, int offset, u16 val)
-{
-	return PCIBIOS_DEVICE_NOT_FOUND;
-}
-
-static int chaos_config_write_dword(struct pci_dev *dev, int offset, u32 val)
-{
-	return PCIBIOS_DEVICE_NOT_FOUND;
-}
+CHAOS_PCI_OP(read, byte, u8 *)
+CHAOS_PCI_OP(read, word, u16 *)
+CHAOS_PCI_OP(read, dword, u32 *)
+CHAOS_PCI_OP(write, byte, u8)
+CHAOS_PCI_OP(write, word, u16)
+CHAOS_PCI_OP(write, dword, u32) 
 
 static struct pci_ops chaos_pci_ops =
 {
-	chaos_config_read_byte,
-	chaos_config_read_word,
-	chaos_config_read_dword,
-	chaos_config_write_byte,
-	chaos_config_write_word,
-	chaos_config_write_dword
+	chaos_read_config_byte,
+	chaos_read_config_word,
+	chaos_read_config_dword,
+	chaos_write_config_byte,
+	chaos_write_config_word,
+	chaos_write_config_dword
 };
 
 
@@ -245,7 +239,8 @@ static struct pci_ops chaos_pci_ops =
  * For a bandit bridge, turn on cache coherency if necessary.
  * N.B. we could clean this up using the hose ops directly.
  */
-static void __init init_bandit(struct pci_controller *bp)
+static void __init
+init_bandit(struct pci_controller *bp)
 {
 	unsigned int vendev, magic;
 	int rev;
@@ -254,7 +249,8 @@ static void __init init_bandit(struct pci_controller *bp)
 	out_le32(bp->cfg_addr, (1UL << BANDIT_DEVNUM) + PCI_VENDOR_ID);
 	udelay(2);
 	vendev = in_le32((volatile unsigned int *)bp->cfg_data);
-	if (vendev == (BANDIT_DEVID << 16) + APPLE_VENDID) {
+	if (vendev == (PCI_VENDOR_ID_APPLE_BANDIT << 16) + 
+			PCI_VENDOR_ID_APPLE) {
 		/* read the revision id */
 		out_le32(bp->cfg_addr,
 			 (1UL << BANDIT_DEVNUM) + PCI_REVISION_ID);
@@ -264,7 +260,7 @@ static void __init init_bandit(struct pci_controller *bp)
 			printk(KERN_WARNING
 			       "Unknown revision %d for bandit at %08lx\n",
 			       rev, bp->io_base_phys);
-	} else if (vendev != (BANDIT_DEVID_2 << 16) + APPLE_VENDID) {
+	} else if (vendev != (BANDIT_DEVID_2 << 16) + PCI_VENDOR_ID_APPLE) {
 		printk(KERN_WARNING "bandit isn't? (%x)\n", vendev);
 		return;
 	}
@@ -426,7 +422,8 @@ setup_grackle(struct pci_controller *hose, unsigned io_space_size)
  * "pci" (a MPC106) and no bandit or chaos bridges, and contrariwise,
  * if we have one or more bandit or chaos bridges, we don't have a MPC106.
  */
-static void __init add_bridges(struct device_node *dev)
+static void __init
+add_bridges(struct device_node *dev)
 {
 	int len;
 	struct pci_controller *hose;
@@ -490,17 +487,11 @@ static void __init add_bridges(struct device_node *dev)
 	}
 }
 
-static void
+static void __init
 pcibios_fixup_OF_interrupts(void)
 {	
 	struct pci_dev* dev;
 	
-	/*
-	 * FIXME: This is broken: We should not assign IRQ's to IRQless
-	 *	  devices (look at PCI_INTERRUPT_PIN) and we also should
-	 *	  honor the existence of multi-function devices where
-	 *	  different functions have different interrupt pins. [mj]
-	 */
 	pci_for_each_dev(dev)
 	{
 		/*
@@ -533,7 +524,7 @@ pmac_pcibios_fixup(void)
 	pcibios_fixup_OF_interrupts();
 }
 
-int
+int __pmac
 pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
 {
 	struct device_node* node;
@@ -563,10 +554,29 @@ pmac_pci_enable_device_hook(struct pci_dev *dev, int initial)
 /* We power down some devices after they have been probed. They'll
  * be powered back on later on
  */
-void
+void __init
 pmac_pcibios_after_init(void)
 {
 	struct device_node* nd;
+
+#ifdef CONFIG_BLK_DEV_IDE
+	struct pci_dev *dev;
+
+	/* OF fails to initialize IDE controllers on macs
+	 * (and maybe other machines)
+	 * 
+	 * Ideally, this should be moved to the IDE layer, but we need
+	 * to check specifically with Andre Hedrick how to do it cleanly
+	 * since the common IDE code seem to care about the fact that the
+	 * BIOS may have disabled a controller.
+	 * 
+	 * -- BenH
+	 */
+	pci_for_each_dev(dev) {
+		if ((dev->class >> 16) == PCI_BASE_CLASS_STORAGE)
+			pci_enable_device(dev);
+	}
+#endif /* CONFIG_BLK_DEV_IDE */
 
 	nd = find_devices("firewire");
 	while (nd) {

@@ -736,7 +736,7 @@ static struct FsmNode L1BFnList[] __initdata =
 
 #define L1B_FN_COUNT (sizeof(L1BFnList)/sizeof(struct FsmNode))
 
-int __init
+int __init 
 Isdnl1New(void)
 {
 	int retval;

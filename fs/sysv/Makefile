@@ -9,7 +9,7 @@
 
 O_TARGET := sysv.o
 
-obj-y   := ialloc.o balloc.o inode.o file.o dir.o namei.o fsync.o truncate.o
+obj-y   := ialloc.o balloc.o inode.o itree.o file.o dir.o namei.o super.o
 obj-m   := $(O_TARGET)
 
 include $(TOPDIR)/Rules.make

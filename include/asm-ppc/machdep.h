@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.machdep.h 1.11 05/17/01 18:14:25 cort
+ * BK Id: SCCS/s.machdep.h 1.14 06/28/01 16:13:50 paulus
  */
 #ifdef __KERNEL__
 #ifndef _PPC_MACHDEP_H
@@ -67,26 +67,19 @@ struct machdep_calls {
 	 * optional PCI "hooks"
 	 */
 
-	 	/* Called after scanning the bus, before allocating
-	 	 * resources
-	 	 */
+	/* Called after scanning the bus, before allocating resources */
 	void (*pcibios_fixup)(void);
 
-		/* Called for each PCI bus in the system
-		 * when it's probed
-		 */
+	/* Called for each PCI bus in the system when it's probed */
 	void (*pcibios_fixup_bus)(struct pci_bus *);
-	
-		/* Called when pci_enable_device() is called (initial=0) or
-		 * when a device with no assigned resource is found (initial=1).
-		 * Returns 0 to allow assignement/enabling of the device
-		 */
+
+	/* Called when pci_enable_device() is called (initial=0) or
+	 * when a device with no assigned resource is found (initial=1).
+	 * Returns 0 to allow assignment/enabling of the device. */
 	int  (*pcibios_enable_device_hook)(struct pci_dev *, int initial);
 
-		/* Called at then very end of pcibios_init()
-		 */
+	/* Called at then very end of pcibios_init() */
 	void (*pcibios_after_init)(void);
-		 
 
 	/* this is for modules, since _machine can be a define -- Cort */
 	int ppc_machine;

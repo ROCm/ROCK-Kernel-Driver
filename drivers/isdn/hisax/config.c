@@ -1,4 +1,4 @@
-/* $Id: config.c,v 2.57.6.14 2001/05/26 15:19:57 kai Exp $
+/* $Id: config.c,v 2.57.6.15 2001/06/09 15:14:17 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *              based on the teles driver from Jan den Ouden
@@ -837,8 +837,8 @@ closecard(int cardnr)
 		csta->bcs->BC_Close(csta->bcs);
 	}
 
-	discard_queue(&csta->rq);
-	discard_queue(&csta->sq);
+	skb_queue_purge(&csta->rq);
+	skb_queue_purge(&csta->sq);
 	if (csta->rcvbuf) {
 		kfree(csta->rcvbuf);
 		csta->rcvbuf = NULL;
@@ -1333,7 +1333,7 @@ HiSax_reportcard(int cardnr, int sel)
 static int __init HiSax_init(void)
 {
 	int i, retval;
-#ifdef MODULE
+#ifdef MODULE 
 	int j;
 	int nzproto = 0;
 #endif
@@ -1505,7 +1505,7 @@ static int __init HiSax_init(void)
 		retval = -EIO;
 		goto out_isdnl1;
 	}
-
+	
 	return 0;
 
  out_isdnl1:

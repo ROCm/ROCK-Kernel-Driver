@@ -176,7 +176,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 	 * Note: we compose the file handle now, but as the
 	 * dentry may be negative, it may need to be updated.
 	 */
-	err = fh_compose(resfh, exp, dentry);
+	err = fh_compose(resfh, exp, dentry, fhp);
 	if (!err && !dentry->d_inode)
 		err = nfserr_noent;
 out:
@@ -192,7 +192,8 @@ out_nfserr:
  * N.B. After this call fhp needs an fh_put
  */
 int
-nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap)
+nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
+	     int check_guard, time_t guardtime)
 {
 	struct dentry	*dentry;
 	struct inode	*inode;
@@ -310,21 +311,23 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap)
 		fh_lock(fhp);
 		size_change = 1;
 	}
+	err = nfserr_notsync;
+	if (!check_guard || guardtime == inode->i_ctime) {
 #ifdef CONFIG_QUOTA
-	if (iap->ia_valid & (ATTR_UID|ATTR_GID)) 
-		err = DQUOT_TRANSFER(dentry, iap);
-	else
+		if (iap->ia_valid & (ATTR_UID|ATTR_GID)) 
+			err = DQUOT_TRANSFER(dentry, iap);
+		else
 #endif
-		err = notify_change(dentry, iap);
+			err = notify_change(dentry, iap);
+		err = nfserrno(err);
+	}
 	if (size_change) {
 		fh_unlock(fhp);
 		put_write_access(inode);
 	}
-	if (err)
-		goto out_nfserr;
-	if (EX_ISSYNC(fhp->fh_export))
-		write_inode_now(inode, 1);
-	err = 0;
+	if (!err)
+		if (EX_ISSYNC(fhp->fh_export))
+			write_inode_now(inode, 1);
 out:
 	return err;
 
@@ -849,7 +852,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		err = PTR_ERR(dchild);
 		if (IS_ERR(dchild))
 			goto out_nfserr;
-		err = fh_compose(resfhp, fhp->fh_export, dchild);
+		err = fh_compose(resfhp, fhp->fh_export, dchild, fhp);
 		if (err)
 			goto out;
 	} else {
@@ -916,7 +919,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	 */
 	err = 0;
 	if ((iap->ia_valid &= ~(ATTR_UID|ATTR_GID|ATTR_MODE)) != 0)
-		err = nfsd_setattr(rqstp, resfhp, iap);
+		err = nfsd_setattr(rqstp, resfhp, iap, 0, (time_t)0);
 	/*
 	 * Update the file handle to get the new inode info.
 	 */
@@ -975,7 +978,7 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	if (IS_ERR(dchild))
 		goto out_nfserr;
 
-	err = fh_compose(resfhp, fhp->fh_export, dchild);
+	err = fh_compose(resfhp, fhp->fh_export, dchild, fhp);
 	if (err)
 		goto out;
 
@@ -1051,7 +1054,7 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	 */
  set_attr:
 	if ((iap->ia_valid &= ~(ATTR_UID|ATTR_GID)) != 0)
- 		err = nfsd_setattr(rqstp, resfhp, iap);
+ 		err = nfsd_setattr(rqstp, resfhp, iap, 0, (time_t)0);
 
  out:
 	fh_unlock(fhp);
@@ -1159,7 +1162,7 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	fh_unlock(fhp);
 
 	/* Compose the fh so the dentry will be freed ... */
-	cerr = fh_compose(resfhp, fhp->fh_export, dnew);
+	cerr = fh_compose(resfhp, fhp->fh_export, dnew, fhp);
 	if (err==0) err = cerr;
 out:
 	return err;

@@ -485,14 +485,10 @@ static void rp_do_poll(unsigned long dummy)
 	unsigned char CtlMask, AiopMask;
 
 #ifdef TIME_STAT
-	unsigned long low=0, high=0, loop_time;
+	unsigned long loop_time;
 	unsigned long long time_stat_tmp=0, time_stat_tmp2=0;
 
-	__asm__(".byte 0x0f,0x31"
-		:"=a" (low), "=d" (high));
-	time_stat_tmp = high;
-	time_stat_tmp <<= 32;
-	time_stat_tmp += low;
+	rdtscll(time_stat_tmp);
 #endif /* TIME_STAT */
 
 	for (ctrl=0; ctrl < max_board; ctrl++) {
@@ -532,11 +528,7 @@ static void rp_do_poll(unsigned long dummy)
 		mod_timer(&rocket_timer, jiffies + 1);
 	}
 #ifdef TIME_STAT
-	__asm__(".byte 0x0f,0x31"
-		:"=a" (low), "=d" (high));
-	time_stat_tmp2 = high;
-	time_stat_tmp2 <<= 32;
-	time_stat_tmp2 += low;
+	rdtscll(time_stat_tmp2);
 	time_stat_tmp2 -= time_stat_tmp;
 	time_stat += time_stat_tmp2;
 	if (time_counter == 0) 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.entry.S 1.15 06/09/01 22:16:38 paulus
+ * BK Id: SCCS/s.entry.S 1.17 06/19/01 22:40:51 paulus
  */
 /*
  *  PowerPC version 
@@ -283,6 +283,7 @@ _GLOBAL(_switch)
 	 */ 
 	mfmsr	r0		/* Get current interrupt state */
 	rlwinm	r0,r0,0,17,15	/* clear MSR_EE in r0 */
+	SYNC			/* Some chip revs have problems here... */
 	mtmsr	r0		/* Update machine state */
 	
 	lwz	r0,_MSR(r1)

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.process.c 1.15 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.process.c 1.19 06/15/01 13:56:56 paulus
  */
 /*
  *  linux/arch/ppc/kernel/process.c
@@ -267,6 +267,15 @@ void show_regs(struct pt_regs * regs)
 	printk("Last syscall: %ld ", current->thread.last_syscall);
 	printk("\nlast math %p last altivec %p", last_task_used_math,
 	       last_task_used_altivec);
+
+#ifdef CONFIG_4xx
+	printk("\nPLB0: bear= 0x%8.8x acr=   0x%8.8x besr=  0x%8.8x\n",
+	    mfdcr(DCRN_POB0_BEAR), mfdcr(DCRN_PLB0_ACR),
+	    mfdcr(DCRN_PLB0_BESR));
+	printk("PLB0 to OPB: bear= 0x%8.8x besr0= 0x%8.8x besr1= 0x%8.8x\n",
+	    mfdcr(DCRN_PLB0_BEAR), mfdcr(DCRN_POB0_BESR0),
+	    mfdcr(DCRN_POB0_BESR1));
+#endif
 	
 #ifdef CONFIG_SMP
 	printk(" CPU: %d", current->processor);
@@ -289,7 +298,8 @@ void show_regs(struct pt_regs * regs)
 			printk("\n");
 		}
 	}
-out: ;
+out:
+	print_backtrace((unsigned long *)regs->gpr[1]);
 }
 
 void exit_thread(void)

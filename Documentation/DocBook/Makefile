@@ -1,7 +1,7 @@
 BOOKS	:= wanbook.sgml z8530book.sgml mcabook.sgml videobook.sgml \
 	   kernel-api.sgml parportbook.sgml kernel-hacking.sgml \
 	   kernel-locking.sgml via-audio.sgml mousedrivers.sgml sis900.sgml \
-	   deviceiobook.sgml
+	   deviceiobook.sgml procfs-guide.sgml
 
 PS	:=	$(patsubst %.sgml, %.ps, $(BOOKS))
 PDF	:=	$(patsubst %.sgml, %.pdf, $(BOOKS))
@@ -9,6 +9,7 @@ HTML    :=      $(patsubst %.sgml, %, $(BOOKS))
 IMG-parportbook := parport-share.fig parport-multi.fig parport-structure.fig
 EPS-parportbook := $(patsubst %.fig, %.eps, $(IMG-parportbook))
 JPG-parportbook := $(patsubst %.fig, %.jpeg, $(IMG-parportbook))
+C-procfs-example = procfs_example.sgml
 
 books:	$(BOOKS)
 
@@ -27,6 +28,15 @@ html:	$(HTML)
 
 %.jpeg: %.fig
 	-fig2dev -Ljpeg $< $@
+
+%.sgml: %.c
+	echo "<programlisting>" > $@
+	expand --tabs=8 < $< | \
+	sed -e "s/&/\\&amp;/g" \
+	    -e "s/</\\&lt;/g" \
+	    -e "s/>/\\&gt;/g" >> $@
+	echo "</programlisting>" >> $@
+
 
 $(TOPDIR)/scripts/docproc:
 	$(MAKE) -C $(TOPDIR)/scripts docproc
@@ -66,6 +76,9 @@ mcabook.sgml: mcabook.tmpl $(TOPDIR)/arch/i386/kernel/mca.c
 videobook.sgml: videobook.tmpl $(TOPDIR)/drivers/media/video/videodev.c
 	$(TOPDIR)/scripts/docgen $(TOPDIR)/drivers/media/video/videodev.c \
 		<videobook.tmpl >videobook.sgml
+
+procfs-guide.sgml:  procfs-guide.tmpl procfs_example.sgml
+	$(TOPDIR)/scripts/docgen < procfs-guide.tmpl >$@
 
 APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
 		$(TOPDIR)/arch/i386/kernel/irq.c \
@@ -128,6 +141,7 @@ clean:
 	-$(RM) $(BOOKS)
 	-$(RM) $(DVI) $(AUX) $(TEX) $(LOG) $(OUT)
 	-$(RM) $(JPG-parportbook) $(EPS-parportbook)
+	-$(RM) $(C-procfs-example)
 
 mrproper: clean
 	-$(RM) $(PS) $(PDF)

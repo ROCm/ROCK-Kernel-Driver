@@ -199,7 +199,7 @@ inline static char * SVCFH_fmt(struct svc_fh *fhp)
  * Function prototypes
  */
 u32	fh_verify(struct svc_rqst *, struct svc_fh *, int, int);
-int	fh_compose(struct svc_fh *, struct svc_export *, struct dentry *);
+int	fh_compose(struct svc_fh *, struct svc_export *, struct dentry *, struct svc_fh *);
 int	fh_update(struct svc_fh *);
 void	fh_put(struct svc_fh *);
 

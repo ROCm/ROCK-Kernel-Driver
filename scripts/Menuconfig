@@ -376,6 +376,7 @@ ${var}:\\
                         /^#/b
                         /^[^ 	]/q
                         s/^  //
+			/<file:\\([^>]*\\)>/s//\\1/g
                         p
                     }" Documentation/Configure.help)
 

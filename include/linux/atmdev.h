@@ -22,6 +22,13 @@
 			   max cell rate:  353207.547 cells/sec */
 #define ATM_25_PCR	((25600000/8-8000)/54)
 			/* 25 Mbps ATM cell rate (59111) */
+#define ATM_OC12_PCR	(622080000/1080*1040/8/53)
+			/* OC12 link rate: 622080000 bps
+			   SONET overhead: /1080*1040
+			   bits per cell:  /8/53
+			   max cell rate:  1412830.188 cells/sec */
+#define ATM_DS3_PCR	(8000*12)
+			/* DS3: 12 cells in a 125 usec time slot */
 
 #define ATM_PDU_OVHD	0	/* number of bytes to charge against buffer
 				   quota per PDU */

@@ -43,6 +43,7 @@ subdir-$(CONFIG_ISDN_DRV_LOOP)		+= isdnloop
 subdir-$(CONFIG_ISDN_DRV_ACT2000)	+= act2000
 subdir-$(CONFIG_ISDN_DRV_EICON)		+= eicon
 subdir-$(CONFIG_HYSDN)			+= hysdn
+subdir-$(CONFIG_ISDN_DRV_TPAM)		+= tpam
 
 obj-y += $(addsuffix /vmlinux-obj.o, $(subdir-y))
 

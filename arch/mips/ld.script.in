@@ -1,10 +1,9 @@
-OUTPUT_FORMAT("elf32-bigmips")
 OUTPUT_ARCH(mips)
 ENTRY(kernel_entry)
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  . = 0x80000000;
+  . = @@LOADADDR@@;
   .init          : { *(.init)		} =0
   .text      :
   {
@@ -15,8 +14,22 @@ SECTIONS
     /* .gnu.warning sections are handled specially by elf32.em.  */
     *(.gnu.warning)
   } =0
+  .kstrtab : { *(.kstrtab) }
+
+  . = ALIGN(16);		/* Exception table */
+  __start___ex_table = .;
+  __ex_table : { *(__ex_table) }
+  __stop___ex_table = .;
+
+  __start___dbe_table = .;	/* Exception table for data bus errors */
+  __dbe_table : { *(__dbe_table) }
+  __stop___dbe_table = .;
+
+  __start___ksymtab = .;	/* Kernel symbol table */
+  __ksymtab : { *(__ksymtab) }
+  __stop___ksymtab = .;
+
   _etext = .;
-  PROVIDE (etext = .);
 
   . = ALIGN(8192);
   .data.init_task : { *(.data.init_task) }
@@ -63,6 +76,14 @@ SECTIONS
   {
     _fdata = . ;
     *(.data)
+
+   /* Align the initial ramdisk image (INITRD) on page boundaries. */
+   . = ALIGN(4096);
+   __rd_start = .;
+   *(.initrd)
+   __rd_end = .;
+   . = ALIGN(4096);
+
     CONSTRUCTORS
   }
   .data1   : { *(.data1) }
@@ -77,6 +98,7 @@ SECTIONS
      can access them all, and initialized data all before uninitialized, so
      we can shorten the on-disk segment size.  */
   .sdata     : { *(.sdata) }
+  . = ALIGN(4);
   _edata  =  .;
   PROVIDE (edata = .);
 
@@ -88,6 +110,7 @@ SECTIONS
    *(.dynbss)
    *(.bss)
    *(COMMON)
+   .  = ALIGN(4);
   _end = . ;
   PROVIDE (end = .);
   }
@@ -100,6 +123,8 @@ SECTIONS
         *(.exitcall.exit)
   }
 
+  /* This is the MIPS specific mdebug section.  */
+  .mdebug : { *(.mdebug) }
   /* These are needed for ELF backends which have not yet been
      converted to the new style linker.  */
   .stab 0 : { *(.stab) }
@@ -117,4 +142,6 @@ SECTIONS
   /* These must appear regardless of  .  */
   .gptab.sdata : { *(.gptab.data) *(.gptab.sdata) }
   .gptab.sbss : { *(.gptab.bss) *(.gptab.sbss) }
+  .comment : { *(.comment) }
+  .note : { *(.note) }
 }

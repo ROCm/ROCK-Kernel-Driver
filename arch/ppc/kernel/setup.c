@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.setup.c 1.32 05/23/01 00:38:42 cort
+ * BK Id: SCCS/s.setup.c 1.44 06/28/01 08:01:06 trini
  */
 /*
  * Common prep/pmac/chrp boot and setup code.
@@ -36,16 +36,16 @@
 #include <asm/mpc8260.h>
 #include <asm/immap_8260.h>
 #endif
+#ifdef CONFIG_4xx
+#include <asm/ppc4xx.h>
+#endif
 #include <asm/bootx.h>
 #include <asm/machdep.h>
 #include <asm/feature.h>
 #include <asm/uaccess.h>
 
-#ifdef CONFIG_OAK
-#include "oak_setup.h"
-#endif /* CONFIG_OAK */
 
-extern void pmac_init(unsigned long r3,
+extern void apus_init(unsigned long r3,
                       unsigned long r4,
                       unsigned long r5,
                       unsigned long r6,
@@ -57,7 +57,7 @@ extern void chrp_init(unsigned long r3,
                       unsigned long r6,
                       unsigned long r7);
 
-extern void prep_init(unsigned long r3,
+extern void gemini_init(unsigned long r3,
                       unsigned long r4,
                       unsigned long r5,
                       unsigned long r6,
@@ -69,18 +69,23 @@ extern void m8xx_init(unsigned long r3,
 		     unsigned long r6,
 		     unsigned long r7);
 
-extern void apus_init(unsigned long r3,
+extern void m8260_init(unsigned long r3,
+		     unsigned long r4,
+		     unsigned long r5,
+		     unsigned long r6,
+		     unsigned long r7);
+
+extern void pmac_init(unsigned long r3,
                       unsigned long r4,
                       unsigned long r5,
                       unsigned long r6,
                       unsigned long r7);
 
-extern void gemini_init(unsigned long r3,
+extern void prep_init(unsigned long r3,
                       unsigned long r4,
                       unsigned long r5,
                       unsigned long r6,
                       unsigned long r7);
-
 
 extern void bootx_init(unsigned long r4, unsigned long phys);
 extern unsigned long reloc_offset(void);
@@ -332,7 +337,7 @@ int get_cpuinfo(char *buffer)
 		 * Assume here that all clock rates are the same in a
 		 * smp system.  -- Cort
 		 */
-#if !defined(CONFIG_4xx) && !defined(CONFIG_8xx) && !defined(CONFIG_8260)
+#if defined(CONFIG_ALL_PPC)
 		if ( have_of )
 		{
 			struct device_node *cpu_node;
@@ -356,7 +361,7 @@ int get_cpuinfo(char *buffer)
 			len += sprintf(len+buffer, "clock\t\t: %dMHz\n",
 				       *fp / 1000000);
 		}
-#endif /* !CONFIG_4xx && !CONFIG_8xx */
+#endif /* CONFIG_ALL_PPC */
 
 		if (ppc_md.setup_residual != NULL)
 		{
@@ -379,11 +384,12 @@ int get_cpuinfo(char *buffer)
 			break;
 		}
 
-		len += sprintf(len+buffer, "revision\t: %hd.%hd\n", maj, min);
+		len += sprintf(len+buffer, "revision\t: %hd.%hd (pvr %04x %04x)\n", 
+				maj, min, PVR_VER(pvr), PVR_REV(pvr));
 
 		len += sprintf(buffer+len, "bogomips\t: %lu.%02lu\n",
-			       (CD(loops_per_jiffy)+2500)/(500000/HZ),
-			       (CD(loops_per_jiffy)+2500)/(5000/HZ) % 100);
+			       CD(loops_per_jiffy)/(500000/HZ),
+			       CD(loops_per_jiffy)/(5000/HZ) % 100);
 		bogosum += CD(loops_per_jiffy);
 	}
 
@@ -391,8 +397,8 @@ int get_cpuinfo(char *buffer)
 	if ( i )
 		len += sprintf(buffer+len, "\n");
 	len += sprintf(buffer+len,"total bogomips\t: %lu.%02lu\n",
-		       (bogosum+2500)/(500000/HZ),
-		       (bogosum+2500)/(5000/HZ) % 100);
+		       bogosum/(500000/HZ),
+		       bogosum/(5000/HZ) % 100);
 #endif /* CONFIG_SMP */
 
 	/*
@@ -441,11 +447,15 @@ intuit_machine_type(void)
 }
 #endif /* CONFIG_ALL_PPC */
 
-#ifdef CONFIG_6xx
+#if defined(CONFIG_6xx) || defined(CONFIG_PPC64BRIDGE)
 /*
  * We're called here very early in the boot.  We determine the machine
  * type and call the appropriate low-level setup functions.
  *  -- Cort <cort@fsmlabs.com>
+ *
+ * Note that the kernel may be running at an address which is different
+ * from the address that it was linked at, so we must use RELOC/PTRRELOC
+ * to access static data (including strings).  -- paulus
  */
 __init
 unsigned long
@@ -454,65 +464,36 @@ early_init(int r3, int r4, int r5)
 	extern char __bss_start, _end;
  	unsigned long phys;
 	unsigned long offset = reloc_offset();
-	unsigned long local_have_of = 1, local_machine;
-	struct bi_record *rec;
-	
+
  	/* Default */
  	phys = offset + KERNELBASE;
-	
-#if defined(CONFIG_APUS)
-	return phys;
-#endif	
-	
+
 	/* First zero the BSS -- use memset, some arches don't have
 	 * caches on yet */
-	memset_io(PTRRELOC(&__bss_start),0 , &_end - &__bss_start);
+	memset_io(PTRRELOC(&__bss_start), 0, &_end - &__bss_start);
 
-#if defined(CONFIG_ALL_PPC) || defined(CONFIG_GEMINI)
+#if defined(CONFIG_ALL_PPC)
 	/* If we came here from BootX, clear the screen,
 	 * set up some pointers and return. */
-#if defined(CONFIG_ALL_PPC)	
 	if ((r3 == 0x426f6f58) && (r5 == 0)) {
 		bootx_init(r4, phys);
 		return phys;
 	}
-#endif
 
 	/* check if we're prep, return if we are */
 	if ( *(unsigned long *)(0) == 0xdeadc0de )
 		return phys;
-	
-	/*
-	 * See if we have any bootloader info passed along.  If we do,
-	 * get the machine type and find out if we have OF.
-	 *
-	 * The strategy here is to assume that we want to call prom_init()
-	 * unless the bootinfo data passed to us tell us that we don't
-	 * have OF.
-	 * -- Cort <cort@fsmlabs.com>
-	 */
-	rec = (struct bi_record *)_ALIGN((ulong)PTRRELOC(&__bss_start)+(1<<20)-1,(1<<20));
-	if ( rec->tag == BI_FIRST )
-	{
-		for ( ; rec->tag != BI_LAST ;
-		      rec = (struct bi_record *)((ulong)rec + rec->size) )
-		{
-			ulong *data = rec->data;
-			if ( rec->tag == BI_MACHTYPE )
-			{
-				local_machine = data[0];
-				local_have_of = data[1];
-			}
-		}
-	}
 
-	if ( local_have_of )
-		phys = prom_init( r3, r4, (prom_entry)r5);
-#endif	
-	
+	/* 
+	 * for now, don't use bootinfo because it breaks yaboot 0.5
+	 * and assume that if we didn't find a magic number, we have OF
+	 */
+	phys = prom_init(r3, r4, (prom_entry)r5);
+#endif
+
 	return phys;
 }
-#endif /* CONFIG_6xx */
+#endif /* CONFIG_6xx || CONFIG_PPC64BRIDGE */
 
 /*
  * Find out what kind of machine we're on and save any data we need
@@ -522,6 +503,10 @@ unsigned long __init
 identify_machine(unsigned long r3, unsigned long r4, unsigned long r5,
 		 unsigned long r6, unsigned long r7)
 {
+#ifdef CONFIG_CMDLINE
+	strcpy(cmd_line, CONFIG_CMDLINE);
+#endif /* CONFIG_CMDLINE */
+
 	parse_bootinfo();
 
 	if ( ppc_md.progress ) ppc_md.progress("id mach(): start", 0x100);
@@ -809,7 +794,7 @@ void __init setup_arch(char **cmdline_p)
 	ppc_md.setup_arch();
 	if ( ppc_md.progress ) ppc_md.progress("arch: exit", 0x3eab);
 
-#ifdef CONFIG_PCI
+#if defined(CONFIG_PCI) && defined(CONFIG_ALL_PPC)
 	/* We create the "pci-OF-bus-map" property now so it appear in the
 	 * /proc device tree
 	 */
@@ -825,7 +810,7 @@ void __init setup_arch(char **cmdline_p)
 			prom_add_property(find_path_device("/"), of_prop);
 		}
 	}
-#endif /* CONFIG_PCI */
+#endif /* CONFIG_PCI && CONFIG_ALL_PPC */
 
 	paging_init();
 	sort_exception_table();

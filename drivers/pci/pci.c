@@ -420,11 +420,13 @@ int pci_enable_wake(struct pci_dev *dev, u32 state, int enable)
 	if (!value || !(value & (1 << state))) 
 		return enable ? -EINVAL : 0;
 
-	/* Enable PME# Generation */
 	pci_read_config_word(dev, pm + PCI_PM_CTRL, &value);
 
-	if (enable) value |= PCI_PM_CTRL_PME_STATUS;
-	else value &= ~PCI_PM_CTRL_PME_STATUS;
+	/* Clear PME_Status by writing 1 to it and enable PME# */
+	value |= PCI_PM_CTRL_PME_STATUS | PCI_PM_CTRL_PME_ENABLE;
+
+	if (!enable)
+		value &= ~PCI_PM_CTRL_PME_ENABLE;
 
 	pci_write_config_word(dev, pm + PCI_PM_CTRL, value);
 	

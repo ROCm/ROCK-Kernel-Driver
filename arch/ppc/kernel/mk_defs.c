@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.mk_defs.c 1.5 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.mk_defs.c 1.8 06/28/01 15:50:16 paulus
  */
 /*
  * This program is used to generate definitions needed by
@@ -117,5 +117,6 @@ main(void)
 	DEFINE(RESULT, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, result));
 	DEFINE(TRAP, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, trap));
 	DEFINE(CLONE_VM, CLONE_VM);
+	DEFINE(MM_PGD, offsetof(struct mm_struct, pgd));
 	return 0;
 }

@@ -39,6 +39,9 @@
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
 #include <asm/semaphore.h>
+#include "sound_config.h"
+#include "dev_table.h"
+#include "mpu401.h"
 
 
 #undef VIA_DEBUG	/* define to enable debugging output and checks */
@@ -178,6 +181,8 @@
 #define VIA_CR42_MIDI_ENABLE	0x02
 #define VIA_CR42_FM_ENABLE	0x04
 #define VIA_CR42_GAME_ENABLE	0x08
+#define VIA_CR42_MIDI_IRQMASK   0x40
+#define VIA_CR42_MIDI_PNP	0x80
 
 #define VIA_CR44_SECOND_CODEC_SUPPORT	(1 << 6)
 #define VIA_CR44_AC_LINK_ACCESS		(1 << 7)
@@ -290,6 +295,11 @@ struct via_info {
 	struct via_channel ch_in;
 	struct via_channel ch_out;
 	struct via_channel ch_fm;
+
+#ifdef CONFIG_MIDI_VIA82CXXX
+        void *midi_devc;
+        struct address_info midi_info;
+#endif
 };
 
 
@@ -720,12 +730,10 @@ static int via_chan_buffer_init (struct via_info *card, struct via_channel *chan
 
 	/* set location of DMA-able scatter-gather info table */
 	DPRINTK ("outl (0x%X, 0x%04lX)\n",
-		cpu_to_le32 (chan->sgt_handle),
-		chan->iobase + VIA_PCM_TABLE_ADDR);
+		chan->sgt_handle, chan->iobase + VIA_PCM_TABLE_ADDR);
 
 	via_ac97_wait_idle (card);
-	outl (cpu_to_le32 (chan->sgt_handle),
-	      chan->iobase + VIA_PCM_TABLE_ADDR);
+	outl (chan->sgt_handle, chan->iobase + VIA_PCM_TABLE_ADDR);
 	udelay (20);
 	via_ac97_wait_idle (card);
 
@@ -1216,25 +1224,28 @@ static u16 via_ac97_read_reg (struct ac97_codec *codec, u8 reg)
 
 	card = codec->private_data;
 
-	data = (reg << 16) | VIA_CR80_READ;
+	/* Every time we write to register 80 we cause a transaction.
+	   The only safe way to clear the valid bit is to write it at
+	   the same time as the command */
+	data = (reg << 16) | VIA_CR80_READ | VIA_CR80_VALID;
 
 	outl (data, card->baseaddr + VIA_BASE0_AC97_CTRL);
-	udelay (20);
-
 	for (counter = VIA_COUNTER_LIMIT; counter > 0; counter--) {
-		if (inl (card->baseaddr + 0x80) & VIA_CR80_VALID)
+	        udelay (1);
+		if ((((data = inl(card->baseaddr + 0x80)) &
+			(VIA_CR80_VALID|VIA_CR80_BUSY)) == VIA_CR80_VALID))
 			goto out;
-
-		udelay (15);
 	}
 
 	printk (KERN_WARNING PFX "timeout while reading AC97 codec (0x%lX)\n", data);
 	goto err_out;
 
 out:
+	/* Once the valid bit has become set, we must wait a complete AC97
+	   frame before the data has settled. */
+        udelay(25);
 	data = (unsigned long) inl (card->baseaddr + 0x80);
-	outb (0x02, card->baseaddr + 0x83);
-
+        
 	if (((data & 0x007F0000) >> 16) == reg) {
 		DPRINTK ("EXIT, success, data=0x%lx, retval=0x%lx\n",
 			 data, data & 0x0000FFFF);
@@ -1371,7 +1382,6 @@ static struct file_operations via_mixer_fops = {
 static int __init via_ac97_reset (struct via_info *card)
 {
 	struct pci_dev *pdev = card->pdev;
-	u8 tmp8;
 	u16 tmp16;
 
 	DPRINTK ("ENTER\n");
@@ -1569,10 +1579,10 @@ static void via_intr_channel (struct via_channel *chan)
 	 * and advance the h/w ptr, wrapping around to zero if needed
 	 */
 	if (n == (chan->frag_number - 1)) {
-		chan->sgtable[n].count = (chan->frag_size | VIA_EOL);
+		chan->sgtable[n].count = cpu_to_le32(chan->frag_size | VIA_EOL);
 		atomic_set (&chan->hw_ptr, 0);
 	} else {
-		chan->sgtable[n].count = (chan->frag_size | VIA_FLAG);
+		chan->sgtable[n].count = cpu_to_le32(chan->frag_size | VIA_FLAG);
 		atomic_inc (&chan->hw_ptr);
 	}
 
@@ -1628,8 +1638,12 @@ static void via_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	status32 = inl (card->baseaddr + VIA_BASE0_SGD_STATUS_SHADOW);
 	if (!(status32 & VIA_INTR_MASK))
+        {
+#ifdef CONFIG_MIDI_VIA82CXXX
+                uart401intr(irq, card->midi_devc, regs);
+#endif
 		return;
-
+    	}	    
 	DPRINTK ("intr, status32 == 0x%08X\n", status32);
 
 	/* synchronize interrupt handling under SMP.  this spinlock
@@ -1781,10 +1795,8 @@ static int __init via_dsp_init (struct via_info *card)
 
 	/* turn off legacy features, if not already */
 	pci_read_config_byte (card->pdev, VIA_FUNC_ENABLE, &tmp8);
-	if (tmp8 & (VIA_CR42_SB_ENABLE | VIA_CR42_MIDI_ENABLE |
-		    VIA_CR42_FM_ENABLE)) {
-		tmp8 &= ~(VIA_CR42_SB_ENABLE | VIA_CR42_MIDI_ENABLE |
-			  VIA_CR42_FM_ENABLE);
+	if (tmp8 & (VIA_CR42_SB_ENABLE |  VIA_CR42_FM_ENABLE)) {
+		tmp8 &= ~(VIA_CR42_SB_ENABLE | VIA_CR42_FM_ENABLE);
 		pci_write_config_byte (card->pdev, VIA_FUNC_ENABLE, tmp8);
 	}
 
@@ -2682,6 +2694,7 @@ static int via_dsp_ioctl (struct inode *inode, struct file *file,
 	/* wait until all buffers have been played, and then stop device */
 	case SNDCTL_DSP_SYNC:
 		DPRINTK ("DSP_SYNC\n");
+		rc = 0;
 		if (wr) {
 			DPRINTK ("SYNC EXIT (after calling via_dsp_drain_playback)\n");
 			rc = via_dsp_drain_playback (card, &card->ch_out, nonblock);
@@ -3010,6 +3023,9 @@ static int via_dsp_release(struct inode *inode, struct file *file)
 
 static int __init via_init_one (struct pci_dev *pdev, const struct pci_device_id *id)
 {
+#ifdef CONFIG_MIDI_VIA82CXXX
+	u8 r42;
+#endif
 	int rc;
 	struct via_info *card;
 	static int printed_version = 0;
@@ -3019,25 +3035,19 @@ static int __init via_init_one (struct pci_dev *pdev, const struct pci_device_id
 	if (printed_version++ == 0)
 		printk (KERN_INFO "Via 686a audio driver " VIA_VERSION "\n");
 
-	if (pci_enable_device (pdev)) {
-		rc = -EIO;
-		goto err_out_none;
-	}
-
-	if (!request_region (pci_resource_start (pdev, 0),
-	    		     pci_resource_len (pdev, 0),
-			     VIA_MODULE_NAME)) {
-		printk (KERN_ERR PFX "unable to obtain I/O resources, aborting\n");
-		rc = -EBUSY;
+	rc = pci_enable_device (pdev);
+	if (rc)
 		goto err_out;
-	}
 
+	rc = pci_request_regions (pdev, "via82cxxx_audio");
+	if (rc)
+		goto err_out_disable;
 
 	card = kmalloc (sizeof (*card), GFP_KERNEL);
 	if (!card) {
 		printk (KERN_ERR PFX "out of memory, aborting\n");
 		rc = -ENOMEM;
-		goto err_out_none;
+		goto err_out_res;
 	}
 
 	pci_set_drvdata (pdev, card);
@@ -3111,6 +3121,34 @@ static int __init via_init_one (struct pci_dev *pdev, const struct pci_device_id
 	printk (KERN_INFO PFX "board #%d at 0x%04lX, IRQ %d\n",
 		card->card_num + 1, card->baseaddr, pdev->irq);
 
+#ifdef CONFIG_MIDI_VIA82CXXX
+	/* Disable by default */
+	card->midi_info.io_base = 0;
+
+	pci_read_config_byte (pdev, 0x42, &r42);
+	/* Disable MIDI interrupt */
+	pci_write_config_byte (pdev, 0x42, r42 | VIA_CR42_MIDI_IRQMASK);
+	if (r42 & VIA_CR42_MIDI_ENABLE)
+	{
+		if (r42 & VIA_CR42_MIDI_PNP) /* Address selected by iobase 2 - not tested */
+			card->midi_info.io_base = pci_resource_start (pdev, 2);
+		else /* Address selected by byte 0x43 */
+		{
+			u8 r43;
+			pci_read_config_byte (pdev, 0x43, &r43);
+			card->midi_info.io_base = 0x300 + ((r43 & 0x0c) << 2);
+		}
+		
+		card->midi_info.irq = -pdev->irq;
+		if (probe_uart401(& card->midi_info, THIS_MODULE))
+		{
+			card->midi_devc=midi_devs[card->midi_info.slots[4]]->devc;
+			pci_write_config_byte(pdev, 0x42, r42 & ~VIA_CR42_MIDI_IRQMASK);
+			printk("Enabled Via MIDI\n");
+		}
+	}
+#endif
+
 	DPRINTK ("EXIT, returning 0\n");
 	return 0;
 
@@ -3129,8 +3167,12 @@ err_out_kfree:
 #endif
 	kfree (card);
 
-err_out_none:
-	release_region (pci_resource_start (pdev, 0), pci_resource_len (pdev, 0));
+err_out_res:
+	pci_release_regions (pdev);
+
+err_out_disable:
+	pci_disable_device (pdev);
+
 err_out:
 	pci_set_drvdata (pdev, NULL);
 	DPRINTK ("EXIT - returning %d\n", rc);
@@ -3148,12 +3190,15 @@ static void __exit via_remove_one (struct pci_dev *pdev)
 	card = pci_get_drvdata (pdev);
 	assert (card != NULL);
 
+#ifdef CONFIG_MIDI_VIA82CXXX
+	if (card->midi_info.io_base)
+	    unload_uart401(&card->midi_info);
+#endif
+
 	via_interrupt_cleanup (card);
 	via_card_cleanup_proc (card);
 	via_dsp_cleanup (card);
 	via_ac97_cleanup (card);
-
-	release_region (pci_resource_start (pdev, 0), pci_resource_len (pdev, 0));
 
 #ifndef VIA_NDEBUG
 	memset (card, 0xAB, sizeof (*card)); /* poison memory */
@@ -3162,7 +3207,9 @@ static void __exit via_remove_one (struct pci_dev *pdev)
 
 	pci_set_drvdata (pdev, NULL);
 
+	pci_release_regions (pdev);
 	pci_set_power_state (pdev, 3); /* ...zzzzzz */
+	pci_disable_device (pdev);
 
 	DPRINTK ("EXIT\n");
 	return;

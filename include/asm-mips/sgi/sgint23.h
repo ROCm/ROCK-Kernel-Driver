@@ -1,5 +1,4 @@
-/* $Id: sgint23.h,v 1.4 1999/09/28 21:02:12 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -7,6 +6,7 @@
  * sgint23.h: Defines for the SGI INT2 and INT3 chipsets.
  *
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
+ * Copyright (C) 1997, 98, 1999, 2000 Ralf Baechle
  * Copyright (C) 1999 Andrew R. Baker (andrewb@uab.edu) - INT2 corrections
  */
 #ifndef _ASM_SGI_SGINT23_H
@@ -25,20 +25,8 @@
 #define SGINT_HPCDMA   41  /* INDY has 11 HPCDMA irq _sources_ */
 #define SGINT_END      52  /* End of 'spaces' */
 
-/* Individual interrupt definitions for the INDY and Indigo2
- */
-
-#define SGI_WD93_0_IRQ	SGINT_LOCAL0 + 1	/* 1st onboard WD93 */
-#define SGI_WD93_1_IRQ	SGINT_LOCAL0 + 2	/* 2nd onboard WD93 */
-#define SGI_ENET_IRQ	SGINT_LOCAL0 + 3	/* onboard ethernet */
-
-#define SGI_PANEL_IRQ	SGINT_LOCAL1 + 1	/* front panel */
-
-#define SGI_EISA_IRQ	SGINT_LOCAL2 + 3	/* EISA interrupts */
-#define SGI_KEYBOARD_IRQ	SGINT_LOCAL2 + 4	/* keyboard */
-#define SGI_SERIAL_IRQ	SGINT_LOCAL2 + 5	/* onboard serial */
-
-/* Individual interrupt definitions for the INDY and Indigo2
+/*
+ * Individual interrupt definitions for the INDY and Indigo2
  */
 
 #define SGI_WD93_0_IRQ	SGINT_LOCAL0 + 1	/* 1st onboard WD93 */
@@ -215,4 +203,4 @@ extern volatile unsigned char *ioc_tclear;
 extern void sgint_init(void);
 extern void indy_timer_init(void);
 
-#endif /* !(_ASM_SGINT23_H) */
+#endif /* _ASM_SGI_SGINT23_H */

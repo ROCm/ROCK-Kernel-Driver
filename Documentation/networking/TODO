@@ -14,3 +14,5 @@ To-do items for network drivers
 
 * Add ETHTOOL_GDRVINFO ioctl support to all ethernet drivers.
 
+* dmfe PCI DMA is totally wrong and only works on x86
+

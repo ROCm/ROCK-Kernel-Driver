@@ -1,16 +1,15 @@
-/* $Id: ptrace.h,v 1.7 1999/09/28 22:27:17 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1994, 1995, 1996, 1997, 1998 by Ralf Baechle
+ * Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000 by Ralf Baechle
  *
  * Machine dependent structs and defines to help the user use
  * the ptrace system call.
  */
-#ifndef __ASM_MIPS_PTRACE_H
-#define __ASM_MIPS_PTRACE_H
+#ifndef _ASM_PTRACE_H
+#define _ASM_PTRACE_H
 
 #include <asm/isadep.h>
 #include <linux/types.h>
@@ -52,6 +51,19 @@ struct pt_regs {
 
 #endif /* !(_LANGUAGE_ASSEMBLY) */
 
+/* Arbitrarily choose the same ptrace numbers as used by the Sparc code. */
+/* #define PTRACE_GETREGS		12 */
+/* #define PTRACE_SETREGS		13 */
+/* #define PTRACE_GETFPREGS		14 */
+/* #define PTRACE_SETFPREGS		15 */
+/* #define PTRACE_GETFPXREGS		18 */
+/* #define PTRACE_SETFPXREGS		19 */
+
+#define PTRACE_SETOPTIONS	21
+
+/* options set using PTRACE_SETOPTIONS */
+#define PTRACE_O_TRACESYSGOOD	0x00000001
+
 #ifdef _LANGUAGE_ASSEMBLY
 #include <asm/offset.h>
 #endif
@@ -71,4 +83,4 @@ extern void show_regs(struct pt_regs *);
 
 #endif
 
-#endif /* __ASM_MIPS_PTRACE_H */
+#endif /* _ASM_PTRACE_H */

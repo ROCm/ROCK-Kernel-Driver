@@ -233,7 +233,7 @@ void __init mcheck_init(struct cpuinfo_x86 *c)
 	}
 }
 
-static void __init mcheck_disable(char *str, int *unused)
+static int __init mcheck_disable(char *str)
 {
 	mce_disabled = 1;
 	return 1;

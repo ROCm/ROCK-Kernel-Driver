@@ -35,10 +35,25 @@
 	 * in register PTE, a ptr into the table in which
 	 * the pte belongs is in PTR.
 	 */
+
+#ifdef CONFIG_SMP
+#define GET_PGD(scratch, ptr)        \
+	mfc0    ptr, CP0_CONTEXT;    \
+	la      scratch, current_pgd;\
+	srl     ptr, 23;             \
+	sll     ptr, 2;              \
+	addu    ptr, scratch, ptr;   \
+	lw      ptr, (ptr);          
+#else
+#define GET_PGD(scratch, ptr)    \
+	lw	ptr, current_pgd;
+#endif
+	
+	
 #define LOAD_PTE(pte, ptr) \
+	GET_PGD(pte, ptr)          \
 	mfc0	pte, CP0_BADVADDR; \
 	srl	pte, pte, 22; \
-	lw	ptr, current_pgd; \
 	sll	pte, pte, 2; \
 	addu	ptr, ptr, pte; \
 	mfc0	pte, CP0_BADVADDR; \

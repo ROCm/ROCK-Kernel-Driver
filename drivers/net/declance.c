@@ -83,7 +83,7 @@ static char *lancestr = "LANCE";
 #include <linux/etherdevice.h>
 
 #ifndef CONFIG_TC
-unsigned long system_base = 0;
+unsigned long system_base;
 unsigned long dmaptr;
 #endif
 static int type;

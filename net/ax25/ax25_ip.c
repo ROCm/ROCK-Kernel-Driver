@@ -160,7 +160,7 @@ int ax25_rebuild_header(struct sk_buff *skb)
 			dst_c = *dst;
 
 			skb_pull(ourskb, AX25_HEADER_LEN - 1);	/* Keep PID */
-			skb->nh.raw = skb->data;
+			ourskb->nh.raw = ourskb->data;
 
 			ax25_send_frame(ourskb, ax25_dev->values[AX25_VALUES_PACLEN], &src_c, 
 &dst_c, route->digipeat, dev);

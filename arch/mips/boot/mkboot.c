@@ -5,7 +5,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996 by Ralf Baechle
+ * Copyright (C) 1996, 2001 by Ralf Baechle
  *
  * This file is written in plain Kernighan & Ritchie C as it has to run
  * on all crosscompile hosts no matter how braindead.  This code might
@@ -80,7 +80,6 @@ typedef struct
  * Acceptable machine type in e_machine.
  */
 #define EM_MIPS         8               /* MIPS R3000 big-endian */
-#define EM_MIPS_RS4_BE 10               /* MIPS R4000 big-endian */
 
 /*
  * The type of ELF file we accept.
@@ -462,7 +461,7 @@ main(argc, argv)
 		fprintf(stderr, "Input file isn't a executable.\n");
 		exit(1);
 	}
-	if(eh.e_machine != EM_MIPS && eh.e_machine != EM_MIPS_RS4_BE) {
+	if(eh.e_machine != EM_MIPS) {
 		fprintf(stderr, "Input file isn't a MIPS executable.\n");
 		exit(1);
 	}

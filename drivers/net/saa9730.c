@@ -44,7 +44,7 @@ int lan_saa9730_debug;
 
 
 /* Non-zero only if the current card is a PCI with BIOS-set IRQ. */
-static unsigned int pci_irq_line = 0;
+static unsigned int pci_irq_line;
 
 #define INL(a)     inl((unsigned long)a)
 #define OUTL(x,a)  outl(x,(unsigned long)a)

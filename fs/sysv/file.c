@@ -31,3 +31,17 @@ struct inode_operations sysv_file_inode_operations = {
 	truncate:	sysv_truncate,
 	setattr:	sysv_notify_change,
 };
+
+int sysv_sync_file(struct file * file, struct dentry *dentry, int datasync)
+{
+	struct inode *inode = dentry->d_inode;
+	int err  = fsync_inode_buffers(inode);
+
+	if (!(inode->i_state & I_DIRTY))
+		return err;
+	if (datasync && !(inode->i_state & I_DIRTY_DATASYNC))
+		return err;
+	
+	err |= sysv_sync_inode(inode);
+	return err ? -EIO : 0;
+}

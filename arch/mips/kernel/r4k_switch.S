@@ -1,5 +1,4 @@
-/* $Id: r4k_switch.S,v 1.9 1999/08/18 23:37:44 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -38,6 +37,9 @@
 	.set	noreorder
 	.align	5
 	LEAF(resume)
+#ifndef CONFIG_CPU_HAS_LLSC
+	sw      zero, ll_bit
+#endif
 	mfc0	t1, CP0_STATUS
 	sw	t1, THREAD_STATUS(a0)
 	CPU_SAVE_NONSCRATCH(a0)
@@ -50,7 +52,16 @@
 	move	$28, a1
 	CPU_RESTORE_NONSCRATCH($28)
 	addiu	t0, $28, KERNEL_STACK_SIZE-32
+#ifdef CONFIG_SMP	 
+	mfc0	a3, CP0_CONTEXT
+	la	t1, kernelsp
+	srl	a3, 23
+	sll	a3, 2
+	addu	t1, a3, t1
+	sw	t0, (t1)	
+#else
 	sw	t0, kernelsp
+#endif 
 	mfc0	t1, CP0_STATUS		/* Do we really need this? */
 	li	a3, 0xff00
 	and	t1, a3

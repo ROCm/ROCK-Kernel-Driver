@@ -1431,7 +1431,7 @@ int __openfirmware powerbook_sleep_G3(void)
  		_set_L2CR(save_l2cr);
 	
 	/* Restore userland MMU context */
-	set_context(current->mm->context, current->mm->pgd);
+	set_context(current->mm->context);
 
 	/* Re-enable DEC interrupts and kick DEC */
 	asm volatile("mtdec %0" : : "r" (0x7fffffff));
@@ -1560,7 +1560,7 @@ int __openfirmware powerbook_sleep_Core99(void)
 	feature_wake_up();
 	pbook_pci_restore();
 
-	set_context(current->mm->context, current->mm->pgd);
+	set_context(current->mm->context);
 
 	/* Restore L2 cache */
 	if (save_l2cr)

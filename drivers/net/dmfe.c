@@ -130,7 +130,7 @@
 #define DMFE_TX_TIMEOUT (HZ * 1.5)	/* tx packet time-out time 1.5 s" */
 #define DMFE_TX_KICK 	(HZ * 0.5)	/* tx packet Kick-out time 0.5 s" */
 
-#define DMFE_DBUG(dbug_now, msg, vaule) if (dmfe_debug || dbug_now) printk(KERN_ERR "<DMFE>: %s %x\n", msg, vaule)
+#define DMFE_DBUG(dbug_now, msg, value) if (dmfe_debug || (dbug_now)) printk(KERN_ERR "<DMFE>: %s %lx\n", (msg), (long) (value))
 
 #define SHOW_MEDIA_TYPE(mode) printk(KERN_ERR "<DMFE>: Change Speed to %sMhz %s duplex\n",mode & 1 ?"100":"10", mode & 4 ? "full":"half");
 
@@ -182,7 +182,7 @@ struct dmfe_board_info {
 	struct pci_dev * net_dev;	/* PCI device */
 	spinlock_t lock;
 
-	u32 ioaddr;			/* I/O base address */
+	long ioaddr;			/* I/O base address */
 	u32 cr0_data;
 	u32 cr5_data;
 	u32 cr6_data;
@@ -206,10 +206,10 @@ struct dmfe_board_info {
 	struct rx_desc *first_rx_desc;
 	struct rx_desc *rx_insert_ptr;
 	struct rx_desc *rx_ready_ptr;	/* packet come pointer */
-	u32 tx_packet_cnt;		/* transmitted packet count */
-	u32 tx_queue_cnt;		/* wait to send packet count */
-	u32 rx_avail_cnt;		/* available rx descriptor count */
-	u32 interval_rx_cnt;		/* rx packet count a callback time */
+	unsigned long tx_packet_cnt;		/* transmitted packet count */
+	unsigned long tx_queue_cnt;		/* wait to send packet count */
+	unsigned long rx_avail_cnt;		/* available rx descriptor count */
+	unsigned long interval_rx_cnt;		/* rx packet count a callback time */
 
 	u16 HPNA_command;		/* For HPNA register 16 */
 	u16 HPNA_timer;			/* For HPNA remote device check */
@@ -265,20 +265,20 @@ static int __devinitdata printed_version;
 static char version[] __devinitdata =
 	KERN_INFO "Davicom DM9xxx net driver, version " DMFE_VERSION "\n";
 
-static int dmfe_debug = 0;
+static int dmfe_debug;
 static unsigned char dmfe_media_mode = DMFE_AUTO;
-static u32 dmfe_cr6_user_set = 0;
+static u32 dmfe_cr6_user_set;
 
 /* For module input parameter */
-static int debug = 0;
-static u32 cr6set = 0;
+static int debug;
+static u32 cr6set;
 static unsigned char mode = 8;
 static u8 chkmode = 1;
-static u8 HPNA_mode = 0;	/* Default: Low Power/High Speed */
-static u8 HPNA_rx_cmd = 0;	/* Default: Disable Rx remote command */
-static u8 HPNA_tx_cmd = 0;	/* Default: Don't issue remote command */
-static u8 HPNA_NoiseFloor = 0;	/* Default: HPNA NoiseFloor */
-static u8 SF_mode = 0;		/* Special Function: 1:VLAN, 2:RX Flow Control
+static u8 HPNA_mode;		/* Default: Low Power/High Speed */
+static u8 HPNA_rx_cmd;		/* Default: Disable Rx remote command */
+static u8 HPNA_tx_cmd;		/* Default: Don't issue remote command */
+static u8 HPNA_NoiseFloor;	/* Default: HPNA NoiseFloor */
+static u8 SF_mode;		/* Special Function: 1:VLAN, 2:RX Flow Control
 				   4: TX pause packet */
 
 unsigned long CrcTable[256] = {
@@ -357,15 +357,15 @@ static void dmfe_set_filter_mode(struct DEVICE *);
 static int dmfe_do_ioctl(struct DEVICE *, struct ifreq *, int);
 static u16 read_srom_word(long ,int);
 static void dmfe_interrupt(int , void *, struct pt_regs *);
-static void dmfe_descriptor_init(struct dmfe_board_info *, u32);
+static void dmfe_descriptor_init(struct dmfe_board_info *, unsigned long);
 static void allocated_rx_buffer(struct dmfe_board_info *);
-static void update_cr6(u32, u32);
+static void update_cr6(u32, unsigned long);
 static void send_filter_frame(struct DEVICE * ,int);
 static void dm9132_id_table(struct DEVICE * ,int);
-static u16 phy_read(u32, u8, u8, u32);
-static void phy_write(u32, u8, u8, u16, u32);
-static void phy_write_1bit(u32, u32);
-static u16 phy_read_1bit(u32);
+static u16 phy_read(unsigned long, u8, u8, u32);
+static void phy_write(unsigned long, u8, u8, u16, u32);
+static void phy_write_1bit(unsigned long, u32);
+static u16 phy_read_1bit(unsigned long);
 static u8 dmfe_sense_speed(struct dmfe_board_info *);
 static void dmfe_process_mode(struct dmfe_board_info *);
 static void dmfe_timer(unsigned long);
@@ -607,7 +607,7 @@ static int dmfe_open(struct DEVICE *dev)
 static void dmfe_init_dm910x(struct DEVICE *dev)
 {
 	struct dmfe_board_info *db = dev->priv;
-	u32 ioaddr = db->ioaddr;
+	unsigned long ioaddr = db->ioaddr;
 
 	DMFE_DBUG(0, "dmfe_init_dm910x()", 0);
 
@@ -693,7 +693,7 @@ static int dmfe_start_xmit(struct sk_buff *skb, struct DEVICE *dev)
 	/* No Tx resource check, it never happen nromally */
 	if (db->tx_queue_cnt >= TX_FREE_DESC_CNT) {
 		spin_unlock_irqrestore(&db->lock, flags);
-		printk(KERN_ERR "<DMFE>: No Tx resource %d\n", db->tx_queue_cnt);
+		printk(KERN_ERR "<DMFE>: No Tx resource %ld\n", db->tx_queue_cnt);
 		return 1;
 	}
 
@@ -742,7 +742,7 @@ static int dmfe_start_xmit(struct sk_buff *skb, struct DEVICE *dev)
 static int dmfe_stop(struct DEVICE *dev)
 {
 	struct dmfe_board_info *db = dev->priv;
-	u32 ioaddr = dev->base_addr;
+	unsigned long ioaddr = dev->base_addr;
 
 	DMFE_DBUG(0, "dmfe_stop", 0);
 
@@ -785,7 +785,7 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct DEVICE *dev = dev_id;
 	struct dmfe_board_info *db = (struct dmfe_board_info *) dev->priv;
-	u32 ioaddr = dev->base_addr;
+	unsigned long ioaddr = dev->base_addr;
 	unsigned long flags;
 
 	DMFE_DBUG(0, "dmfe_interrupt()", 0);
@@ -851,7 +851,7 @@ static void dmfe_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void dmfe_free_tx_pkt(struct DEVICE *dev, struct dmfe_board_info * db)
 {
 	struct tx_desc *txptr;
-	u32 ioaddr = dev->base_addr;
+	unsigned long ioaddr = dev->base_addr;
 
 	txptr = db->tx_remove_ptr;
 	while(db->tx_packet_cnt) {
@@ -1275,7 +1275,7 @@ static void dmfe_reused_skb(struct dmfe_board_info *db, struct sk_buff * skb)
  *	Using Chain structure, and allocated Tx/Rx buffer
  */
 
-static void dmfe_descriptor_init(struct dmfe_board_info *db, u32 ioaddr)
+static void dmfe_descriptor_init(struct dmfe_board_info *db, unsigned long ioaddr)
 {
 	struct tx_desc *tmp_tx;
 	struct rx_desc *tmp_rx;
@@ -1334,11 +1334,11 @@ static void dmfe_descriptor_init(struct dmfe_board_info *db, u32 ioaddr)
 
 
 /*
- *	Update CR6 vaule
+ *	Update CR6 value
  *	Firstly stop DM910X , then written value and start
  */
 
-static void update_cr6(u32 cr6_data, u32 ioaddr)
+static void update_cr6(u32 cr6_data, unsigned long ioaddr)
 {
 	u32 cr6_tmp;
 
@@ -1359,7 +1359,7 @@ static void dm9132_id_table(struct DEVICE *dev, int mc_cnt)
 {
 	struct dev_mc_list *mcptr;
 	u16 * addrptr;
-	u32 ioaddr = dev->base_addr+0xc0;		/* ID Table */
+	unsigned long ioaddr = dev->base_addr+0xc0;		/* ID Table */
 	u32 hash_val;
 	u16 i, hash_table[4];
 
@@ -1470,7 +1470,7 @@ static void allocated_rx_buffer(struct dmfe_board_info *db)
 	while(db->rx_avail_cnt < RX_DESC_CNT) {
 		if ( ( skb = dev_alloc_skb(RX_ALLOC_SIZE) ) == NULL )
 			break;
-		rxptr->rx_skb_ptr = (u32) skb;
+		rxptr->rx_skb_ptr = (u32) skb; /* FIXME */
 		rxptr->rdes2 = cpu_to_le32( pci_map_single(db->net_dev, skb->tail, RX_ALLOC_SIZE, PCI_DMA_FROMDEVICE) );
 		rxptr->rdes0 = cpu_to_le32(0x80000000);
 		rxptr = (struct rx_desc *) rxptr->next_rx_desc;
@@ -1663,10 +1663,10 @@ static void dmfe_process_mode(struct dmfe_board_info *db)
  *	Write a word to Phy register
  */
 
-static void phy_write(u32 iobase, u8 phy_addr, u8 offset, u16 phy_data, u32 chip_id)
+static void phy_write(unsigned long iobase, u8 phy_addr, u8 offset, u16 phy_data, u32 chip_id)
 {
 	u16 i;
-	u32 ioaddr;
+	unsigned long ioaddr;
 
 	if (chip_id == PCI_DM9132_ID) {
 		ioaddr = iobase + 0x80 + offset * 4;
@@ -1710,11 +1710,11 @@ static void phy_write(u32 iobase, u8 phy_addr, u8 offset, u16 phy_data, u32 chip
  *	Read a word data from phy register
  */
 
-static u16 phy_read(u32 iobase, u8 phy_addr, u8 offset, u32 chip_id)
+static u16 phy_read(unsigned long iobase, u8 phy_addr, u8 offset, u32 chip_id)
 {
 	int i;
 	u16 phy_data;
-	u32 ioaddr;
+	unsigned long ioaddr;
 
 	if (chip_id == PCI_DM9132_ID) {
 		/* DM9132 Chip */
@@ -1762,7 +1762,7 @@ static u16 phy_read(u32 iobase, u8 phy_addr, u8 offset, u32 chip_id)
  *	Write one bit data to Phy Controller
  */
 
-static void phy_write_1bit(u32 ioaddr, u32 phy_data)
+static void phy_write_1bit(unsigned long ioaddr, u32 phy_data)
 {
 	outl(phy_data, ioaddr);			/* MII Clock Low */
 	udelay(1);
@@ -1777,7 +1777,7 @@ static void phy_write_1bit(u32 ioaddr, u32 phy_data)
  *	Read one bit phy data from PHY controller
  */
 
-static u16 phy_read_1bit(u32 ioaddr)
+static u16 phy_read_1bit(unsigned long ioaddr)
 {
 	u16 phy_data;
 

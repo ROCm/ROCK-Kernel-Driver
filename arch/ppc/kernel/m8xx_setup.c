@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.m8xx_setup.c 1.17 05/18/01 07:54:04 patch
+ * BK Id: SCCS/s.m8xx_setup.c 1.20 06/27/01 14:49:58 trini
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -123,12 +123,6 @@ extern char saved_command_line[256];
 
 extern unsigned long find_available_memory(void);
 extern void m8xx_cpm_reset(uint);
-
-static void ide_interrupt_handler(void* dev_id);
-
-void __init adbdev_init(void)
-{
-}
 
 void __init
 m8xx_setup_arch(void)
@@ -359,6 +353,12 @@ m8xx_init_IRQ(void)
 /*
  * IDE stuff.
  */
+#ifdef CONFIG_BLK_DEV_MPC8xx_IDE
+void ide_interrupt_handler (void *dev)
+{
+}
+#endif
+
 void
 m8xx_ide_insw(ide_ioreg_t port, void *buf, int ns)
 {
@@ -512,12 +512,7 @@ void m8xx_ide_init_hwif_ports(hw_regs_t *hw,
 
 #endif	/* CONFIG_BLK_DEV_MPC8xx_IDE */
 }
-#endif	/* CONFIG_BLK_DEV_IDE || CONFIG_BLK_DEV_IDE_MODULE */
 
-
-/* -------------------------------------------------------------------- */
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 #ifdef CONFIG_BLK_DEV_MPC8xx_IDE
 
 /* PCMCIA Timing */
@@ -577,13 +572,9 @@ m8xx_ide_tuneproc(ide_drive_t *drive, byte pio)
 	if ((reg = pcmp->pcmc_por7 & mask) != 0)
 		pcmp->pcmc_por7 = reg | timing;
 }
-
-void ide_interrupt_handler (void *dev)
-{
-}
-
 #endif	/* CONFIG_BLK_DEV_MPC8xx_IDE */
 #endif	/* CONFIG_BLK_DEV_IDE || CONFIG_BLK_DEV_IDE_MODULE */
+
 /* -------------------------------------------------------------------- */
 
 /*

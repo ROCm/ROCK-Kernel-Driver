@@ -54,33 +54,32 @@ static int dummy_accept_fastpath(struct net_device *dev, struct dst_entry *dst)
 static int __init dummy_init(struct net_device *dev)
 {
 	/* Initialize the device structure. */
-	dev->hard_start_xmit	= dummy_xmit;
 
 	dev->priv = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL);
 	if (dev->priv == NULL)
 		return -ENOMEM;
 	memset(dev->priv, 0, sizeof(struct net_device_stats));
-	dev->get_stats	= dummy_get_stats;
 
+	dev->get_stats = dummy_get_stats;
+	dev->hard_start_xmit = dummy_xmit;
 	dev->set_multicast_list = set_multicast_list;
+#ifdef CONFIG_NET_FASTROUTE
+	dev->accept_fastpath = dummy_accept_fastpath;
+#endif
 
-	/* Fill in the fields of the device structure with ethernet-generic values. */
+	/* Fill in device structure with ethernet-generic values. */
 	ether_setup(dev);
 	dev->tx_queue_len = 0;
 	dev->flags |= IFF_NOARP;
 	dev->flags &= ~IFF_MULTICAST;
-#ifdef CONFIG_NET_FASTROUTE
-	dev->accept_fastpath = dummy_accept_fastpath;
-#endif
 
 	return 0;
 }
 
 static int dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_device_stats *stats;
+	struct net_device_stats *stats = dev->priv;
 
-	stats = (struct net_device_stats *)dev->priv;
 	stats->tx_packets++;
 	stats->tx_bytes+=skb->len;
 
@@ -106,8 +105,9 @@ static int __init dummy_init_module(void)
 	err=dev_alloc_name(&dev_dummy,"dummy%d");
 	if(err<0)
 		return err;
-	if (register_netdev(&dev_dummy) != 0)
-		return -EIO;
+	err = register_netdev(&dev_dummy);
+	if (err<0)
+		return err;
 	return 0;
 }
 

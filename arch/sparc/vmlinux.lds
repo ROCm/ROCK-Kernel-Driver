@@ -12,7 +12,7 @@ SECTIONS
   } =0
   _etext = .;
   PROVIDE (etext = .);
-  .rodata    : { *(.rodata)  }
+  .rodata    : { *(.rodata) *(.rodata.*) }
   .rodata1   : { *(.rodata1) }
   .data    :
   {

@@ -714,7 +714,7 @@ repeat:
 					SET_LINKS(p);
 					notify_parent(p, SIGCHLD);
 				} else
-					release(p);
+					release_task(p);
 				goto end_waitsys;
 			default:
 				continue;

@@ -13,7 +13,7 @@ SECTIONS
   }
   .rdata :
   {
-    *(.rodata .rdata)
+    *(.rodata .rodata.* .rdata)
   }
   .data :
   {

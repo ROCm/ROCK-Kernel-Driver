@@ -32,6 +32,9 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
+#ifndef CONFIG_MIPS_FPU_EMULATOR 
+#include <asm/inst.h>
+#endif
 
 /*
  * Machine specific interrupt handlers
@@ -90,9 +93,9 @@ void simulate_sc(struct pt_regs *regs, unsigned int opcode);
 #define RT     0x001f0000
 #define OFFSET 0x0000ffff
 #define LL     0xc0000000
-#define SC     0xd0000000
+#define SC     0xe0000000
 
-#define DEBUG_LLSC
+#undef DEBUG_LLSC
 #endif
 
 /*
@@ -268,9 +271,6 @@ static void default_be_board_handler(struct pt_regs *regs)
 	/*
 	 * Assume it would be too dangerous to continue ...
 	 */
-/* XXX */
-printk("Got Bus Error at %08x\n", (unsigned int)regs->cp0_epc);
-show_regs(regs); while(1);
 	force_sig(SIGBUS, current);
 }
 
@@ -410,7 +410,7 @@ static inline int get_insn_opcode(struct pt_regs *regs, unsigned int *opcode)
 
 	epc = (unsigned int *) (unsigned long) regs->cp0_epc;
 	if (regs->cp0_cause & CAUSEF_BD)
-		epc += 4;
+		epc++;
 
 	if (verify_area(VERIFY_READ, epc, 4)) {
 		force_sig(SIGSEGV, current);
@@ -423,6 +423,7 @@ static inline int get_insn_opcode(struct pt_regs *regs, unsigned int *opcode)
 
 void do_bp(struct pt_regs *regs)
 {
+	siginfo_t info;
 	unsigned int opcode, bcode;
 
 	/*
@@ -491,48 +492,69 @@ void do_tr(struct pt_regs *regs)
 
 #if !defined(CONFIG_CPU_HAS_LLSC)
 
+#ifdef CONFIG_SMP
+#error "ll/sc emulation is not SMP safe"
+#endif
+
 /*
  * userland emulation for R2300 CPUs
  * needed for the multithreading part of glibc
+ *
+ * this implementation can handle only sychronization between 2 or more
+ * user contexts and is not SMP safe.
  */
 void do_ri(struct pt_regs *regs)
 {
 	unsigned int opcode;
 
+	if (!user_mode(regs))
+		BUG();
+
 	if (!get_insn_opcode(regs, &opcode)) {
-		if ((opcode & OPCODE) == LL)
+		if ((opcode & OPCODE) == LL) {
 			simulate_ll(regs, opcode);
-		if ((opcode & OPCODE) == SC)
+			return;
+		}
+		if ((opcode & OPCODE) == SC) {
 			simulate_sc(regs, opcode);
-	} else {
-	printk("[%s:%d] Illegal instruction at %08lx ra=%08lx\n",
-	       current->comm, current->pid, regs->cp0_epc, regs->regs[31]);
+			return;
+		}
 	}
+	printk("[%s:%d] Illegal instruction %08lx at %08lx, ra=%08lx, CP0_STATUS=%08lx\n",
+	       current->comm, current->pid, *((unsigned long*)regs->cp0_epc), regs->cp0_epc,
+		regs->regs[31], regs->cp0_status);
 	if (compute_return_epc(regs))
 		return;
 	force_sig(SIGILL, current);
 }
 
 /*
- * the ll_bit will be cleared by r2300_switch.S
+ * The ll_bit is cleared by r*_switch.S
  */
-unsigned long ll_bit, *lladdr;
- 
+
+unsigned long ll_bit;
+#ifdef CONFIG_PROC_FS
+extern unsigned long ll_ops;
+extern unsigned long sc_ops;
+#endif
+
+static struct task_struct *ll_task = NULL;
+
 void simulate_ll(struct pt_regs *regp, unsigned int opcode)
 {
-	unsigned long *addr, *vaddr;
+	unsigned long value, *vaddr;
 	long offset;
- 
+	int signal = 0;
+
 	/*
 	 * analyse the ll instruction that just caused a ri exception
 	 * and put the referenced address to addr.
 	 */
+
 	/* sign extend offset */
 	offset = opcode & OFFSET;
-	if (offset & 0x00008000)
-		offset = -(offset & 0x00007fff);
-	else
-		offset = (offset & 0x00007fff);
+	offset <<= 16;
+	offset >>= 16;
 
 	vaddr = (unsigned long *)((long)(regp->regs[(opcode & BASE) >> 21]) + offset);
 
@@ -540,31 +562,44 @@ void simulate_ll(struct pt_regs *regp, unsigned int opcode)
 	printk("ll: vaddr = 0x%08x, reg = %d\n", (unsigned int)vaddr, (opcode & RT) >> 16);
 #endif
 
-	/*
-	 * TODO: compute physical address from vaddr
-	 */
-	panic("ll: emulation not yet finished!");
+#ifdef CONFIG_PROC_FS
+	ll_ops++;
+#endif
 
-	lladdr = addr;
-	ll_bit = 1;
-	regp->regs[(opcode & RT) >> 16] = *addr;
+	if ((unsigned long)vaddr & 3)
+		signal = SIGBUS;
+	else if (get_user(value, vaddr))
+		signal = SIGSEGV;
+	else {
+		if (ll_task == NULL || ll_task == current) {
+			ll_bit = 1;
+		} else {
+			ll_bit = 0;
+		}
+		ll_task = current;
+		regp->regs[(opcode & RT) >> 16] = value;
+	}
+	if (compute_return_epc(regp))
+		return;
+	if (signal)
+		send_sig(signal, current, 1);
 }
- 
+
 void simulate_sc(struct pt_regs *regp, unsigned int opcode)
 {
-	unsigned long *addr, *vaddr, reg;
+	unsigned long *vaddr, reg;
 	long offset;
+	int signal = 0;
 
 	/*
 	 * analyse the sc instruction that just caused a ri exception
 	 * and put the referenced address to addr.
 	 */
+
 	/* sign extend offset */
 	offset = opcode & OFFSET;
-	if (offset & 0x00008000)
-		offset = -(offset & 0x00007fff);
-	else
-		offset = (offset & 0x00007fff);
+	offset <<= 16;
+	offset >>= 16;
 
 	vaddr = (unsigned long *)((long)(regp->regs[(opcode & BASE) >> 21]) + offset);
 	reg = (opcode & RT) >> 16;
@@ -573,28 +608,34 @@ void simulate_sc(struct pt_regs *regp, unsigned int opcode)
 	printk("sc: vaddr = 0x%08x, reg = %d\n", (unsigned int)vaddr, (unsigned int)reg);
 #endif
 
-	/*
-	 * TODO: compute physical address from vaddr
-	 */
-	panic("sc: emulation not yet finished!");
+#ifdef CONFIG_PROC_FS
+	sc_ops++;
+#endif
 
-	lladdr = addr;
-
-	if (ll_bit == 0) {
+	if ((unsigned long)vaddr & 3)
+		signal = SIGBUS;
+	else if (ll_bit == 0 || ll_task != current)
 		regp->regs[reg] = 0;
+	else if (put_user(regp->regs[reg], vaddr))
+		signal = SIGSEGV;
+	else
+		regp->regs[reg] = 1;
+	if (compute_return_epc(regp))
 		return;
-	}
-
-	*addr = regp->regs[reg];
-	regp->regs[reg] = 1;
+	if (signal)
+		send_sig(signal, current, 1);
 }
 
 #else /* MIPS 2 or higher */
 
 void do_ri(struct pt_regs *regs)
 {
-	printk("[%s:%d] Illegal instruction at %08lx ra=%08lx\n",
-	       current->comm, current->pid, regs->cp0_epc, regs->regs[31]);
+	unsigned int opcode;
+
+        get_insn_opcode(regs, &opcode);
+	printk("[%s:%ld] Illegal instruction %08x at %08lx ra=%08lx\n",
+	       current->comm, (unsigned long)current->pid, opcode,
+	       regs->cp0_epc, regs->regs[31]);
 	if (compute_return_epc(regs))
 		return;
 	force_sig(SIGILL, current);
@@ -662,48 +703,99 @@ void do_watch(struct pt_regs *regs)
 	panic("Caught WATCH exception - probably caused by stack overflow.");
 }
 
+void do_mcheck(struct pt_regs *regs)
+{
+	show_regs(regs);
+	panic("Caught Machine Check exception - probably caused by multiple "
+	      "matching entries in the TLB.");
+}
+
 void do_reserved(struct pt_regs *regs)
 {
 	/*
-	 * Game over - no way to handle this if it ever occurs.
-	 * Most probably caused by a new unknown cpu type or
-	 * after another deadly hard/software error.
+	 * Game over - no way to handle this if it ever occurs.  Most probably
+	 * caused by a new unknown cpu type or after another deadly
+	 * hard/software error.
 	 */
+	show_regs(regs);
 	panic("Caught reserved exception - should not happen.");
 }
 
-static inline void watch_init(unsigned long cputype)
+static inline void watch_init(void)
 {
-	switch(cputype) {
-	case CPU_R10000:
-	case CPU_R4000MC:
-	case CPU_R4400MC:
-	case CPU_R4000SC:
-	case CPU_R4400SC:
-	case CPU_R4000PC:
-	case CPU_R4400PC:
-	case CPU_R4200:
-	case CPU_R4300:
-		set_except_vector(23, handle_watch);
-		watch_available = 1;
-		break;
-	}
+        if(mips_cpu.options & MIPS_CPU_WATCH ) {
+		(void)set_except_vector(23, handle_watch);
+ 		watch_available = 1;
+ 	}
 }
 
 /*
  * Some MIPS CPUs have a dedicated interrupt vector which reduces the
  * interrupt processing overhead.  Use it where available.
- * FIXME: more CPUs than just the Nevada have this feature.
  */
 static inline void setup_dedicated_int(void)
 {
 	extern void except_vec4(void);
-	switch(mips_cputype) {
-	case CPU_NEVADA:
+
+	if(mips_cpu.options & MIPS_CPU_DIVEC) {
 		memcpy((void *)(KSEG0 + 0x200), except_vec4, 8);
-		set_cp0_cause(CAUSEF_IV, CAUSEF_IV);
+		set_cp0_cause(CAUSEF_IV);
 		dedicated_iv_available = 1;
 	}
+}
+
+/*
+ * Some MIPS CPUs can enable/disable for cache parity detection, but does
+ * it different ways.
+ */
+static inline void parity_protection_init(void)
+{
+	switch(mips_cpu.cputype) {
+	case CPU_5KC:
+		/* Set the PE bit (bit 31) in the CP0_ECC register. */
+		printk(KERN_INFO "Enable the cache parity protection for "
+		       "MIPS 5KC CPUs.\n");
+		write_32bit_cp0_register(CP0_ECC,
+		                         read_32bit_cp0_register(CP0_ECC)
+		                         | 0x80000000); 
+		break;
+	default:
+		break;
+	}
+}
+
+void cache_parity_error(void)
+{
+        unsigned int reg_val;
+
+        /* For the moment, report the problem and hang. */
+        reg_val = read_32bit_cp0_register(CP0_ERROREPC);
+	printk("Cache error exception:\n");
+	printk("cp0_errorepc == %08x\n", reg_val);
+	reg_val = read_32bit_cp0_register(CP0_CACHEERR);
+	printk("cp0_cacheerr == %08x\n", reg_val);
+
+	printk("Decoded CP0_CACHEERR: %s cache fault in %s reference.\n",
+	       reg_val&(1<<30)?"secondary":"primary",
+	       reg_val&(1<<31)?"data":"insn");
+	printk("Error bits: %s%s%s%s%s%s%s\n",
+	       reg_val&(1<<29)?"ED ":"",
+	       reg_val&(1<<28)?"ET ":"",
+	       reg_val&(1<<26)?"EE ":"",
+	       reg_val&(1<<25)?"EB ":"",
+	       reg_val&(1<<24)?"EI ":"",
+	       reg_val&(1<<23)?"E1 ":"",
+	       reg_val&(1<<22)?"E0 ":"");
+	printk("IDX: 0x%08x\n", reg_val&((1<<22)-1));
+
+	if (reg_val&(1<<22))
+		printk("DErrAddr0: 0x%08x\n", read_32bit_cp0_set1_register(CP0_S1_DERRADDR0));
+
+	if (reg_val&(1<<23))
+		printk("DErrAddr1: 0x%08x\n", read_32bit_cp0_set1_register(CP0_S1_DERRADDR1));
+
+
+	panic("Can't handle the cache error - panic!");
 }
 
 unsigned long exception_handlers[32];
@@ -713,16 +805,28 @@ unsigned long exception_handlers[32];
  * to interrupt handlers in the address range from
  * KSEG0 <= x < KSEG0 + 256mb on the Nevada.  Oh well ...
  */
-void set_except_vector(int n, void *addr)
+void *set_except_vector(int n, void *addr)
 {
 	unsigned handler = (unsigned long) addr;
+	unsigned old_handler = exception_handlers[n];
 	exception_handlers[n] = handler;
 	if (n == 0 && dedicated_iv_available) {
 		*(volatile u32 *)(KSEG0+0x200) = 0x08000000 |
 		                                 (0x03ffffff & (handler >> 2));
 		flush_icache_range(KSEG0+0x200, KSEG0 + 0x204);
 	}
+	return (void *)old_handler;
 }
+
+asmlinkage int (*save_fp_context)(struct sigcontext *sc);
+asmlinkage int (*restore_fp_context)(struct sigcontext *sc);
+extern asmlinkage int _save_fp_context(struct sigcontext *sc);
+extern asmlinkage int _restore_fp_context(struct sigcontext *sc);
+
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+extern asmlinkage int fpu_emulator_save_context(struct sigcontext *sc);
+extern asmlinkage int fpu_emulator_restore_context(struct sigcontext *sc);
+#endif
 
 void __init trap_init(void)
 {
@@ -730,6 +834,7 @@ void __init trap_init(void)
 	extern char except_vec0_r4600, except_vec0_r2300;
 	extern char except_vec1_generic, except_vec2_generic;
 	extern char except_vec3_generic, except_vec3_r4000;
+	extern char except_vec_ejtag_debug;
 	unsigned long i;
 
 	if(mips_machtype == MACH_MIPS_MAGNUM_4000 ||
@@ -737,101 +842,121 @@ void __init trap_init(void)
 		EISA_bus = 1;
 
 	/* Some firmware leaves the BEV flag set, clear it.  */
-	set_cp0_status(ST0_BEV, 0);
+	clear_cp0_status(ST0_BEV);
 
 	/* Copy the generic exception handler code to it's final destination. */
 	memcpy((void *)(KSEG0 + 0x80), &except_vec1_generic, 0x80);
 	memcpy((void *)(KSEG0 + 0x100), &except_vec2_generic, 0x80);
 	memcpy((void *)(KSEG0 + 0x180), &except_vec3_generic, 0x80);
-
+	flush_icache_range(KSEG0 + 0x80, KSEG0 + 0x200);
 	/*
 	 * Setup default vectors
 	 */
 	for(i = 0; i <= 31; i++)
-		set_except_vector(i, handle_reserved);
+		(void)set_except_vector(i, handle_reserved);
+
+	/* 
+	 * Copy the EJTAG debug exception vector handler code to it's final 
+	 * destination.
+	 */
+	memcpy((void *)(KSEG0 + 0x300), &except_vec_ejtag_debug, 0x80);
 
 	/*
 	 * Only some CPUs have the watch exceptions or a dedicated
 	 * interrupt vector.
 	 */
-	watch_init(mips_cputype);
+	watch_init();
 	setup_dedicated_int();
 
-	set_except_vector(1, handle_mod);
-	set_except_vector(2, handle_tlbl);
-	set_except_vector(3, handle_tlbs);
-	set_except_vector(4, handle_adel);
-	set_except_vector(5, handle_ades);
+	/*
+	 * Some CPUs can enable/disable for cache parity detection, but does
+	 * it different ways.
+	 */
+	parity_protection_init();
+
+	(void)set_except_vector(1, handle_mod);
+	(void)set_except_vector(2, handle_tlbl);
+	(void)set_except_vector(3, handle_tlbs);
+	(void)set_except_vector(4, handle_adel);
+	(void)set_except_vector(5, handle_ades);
 	/*
 	 * The Data Bus Error/ Instruction Bus Errors are signaled
 	 * by external hardware.  Therefore these two expection have
 	 * board specific handlers.
 	 */
-	set_except_vector(6, handle_ibe);
-	set_except_vector(7, handle_dbe);
+	(void)set_except_vector(6, handle_ibe);
+	(void)set_except_vector(7, handle_dbe);
 	ibe_board_handler = default_be_board_handler;
 	dbe_board_handler = default_be_board_handler;
 
-	set_except_vector(8, handle_sys);
-	set_except_vector(9, handle_bp);
-	set_except_vector(10, handle_ri);
-	set_except_vector(11, handle_cpu);
-	set_except_vector(12, handle_ov);
-	set_except_vector(13, handle_tr);
-	set_except_vector(15, handle_fpe);
-
+	(void)set_except_vector(8, handle_sys);
+	(void)set_except_vector(9, handle_bp);
+	(void)set_except_vector(10, handle_ri);
+	(void)set_except_vector(11, handle_cpu);
+	(void)set_except_vector(12, handle_ov);
+	(void)set_except_vector(13, handle_tr);
+	(void)set_except_vector(15, handle_fpe);
+	
 	/*
 	 * Handling the following exceptions depends mostly of the cpu type
 	 */
-	switch(mips_cputype) {
-	case CPU_R10000:
-		/*
-		 * The R10000 is in most aspects similar to the R4400.  It
-		 * should get some special optimizations.
-		 */
-		write_32bit_cp0_register(CP0_FRAMEMASK, 0);
-		set_cp0_status(ST0_XX, ST0_XX);
-		/*
-		 * The R10k might even work for Linux/MIPS - but we're paranoid
-		 * and refuse to run until this is tested on real silicon
-		 */
-		panic("CPU too expensive - making holiday in the ANDES!");
-		break;
-	case CPU_R4000MC:
-	case CPU_R4400MC:
-	case CPU_R4000SC:
-	case CPU_R4400SC:
-		vce_available = 1;
-		/* Fall through ...  */
-	case CPU_R4000PC:
-	case CPU_R4400PC:
-	case CPU_R4200:
-	case CPU_R4300:
-     /* case CPU_R4640: */
-	case CPU_R4600:
-        case CPU_R5000:
-        case CPU_NEVADA:
-		if(mips_cputype == CPU_NEVADA) {
+	if ((mips_cpu.options & MIPS_CPU_4KEX)
+	    && (mips_cpu.options & MIPS_CPU_4KTLB)) {
+		if(mips_cpu.cputype == CPU_NEVADA) {
 			memcpy((void *)KSEG0, &except_vec0_nevada, 0x80);
-		} else if (mips_cputype == CPU_R4600)
+		} else if (mips_cpu.cputype == CPU_R4600)
 			memcpy((void *)KSEG0, &except_vec0_r4600, 0x80);
 		else
 			memcpy((void *)KSEG0, &except_vec0_r4000, 0x80);
 
 		/* Cache error vector already set above.  */
 
-		if (vce_available) {
+		if (mips_cpu.options & MIPS_CPU_VCE) {
 			memcpy((void *)(KSEG0 + 0x180), &except_vec3_r4000,
 			       0x80);
 		} else {
 			memcpy((void *)(KSEG0 + 0x180), &except_vec3_generic,
 			       0x80);
 		}
-		break;
 
+		if(mips_cpu.options & MIPS_CPU_FPU) {
+		        save_fp_context = _save_fp_context;
+			restore_fp_context = _restore_fp_context;
+#ifdef CONFIG_MIPS_FPU_EMULATOR
+		} else {
+		        save_fp_context = fpu_emulator_save_context;
+			restore_fp_context = fpu_emulator_restore_context;
+#endif
+		}
+	} else switch(mips_cpu.cputype) {
+	case CPU_R10000:
+		/*
+		 * The R10000 is in most aspects similar to the R4400.  It
+		 * should get some special optimizations.
+		 */
+		write_32bit_cp0_register(CP0_FRAMEMASK, 0);
+		set_cp0_status(ST0_XX);
+		/*
+		 * The R10k might even work for Linux/MIPS - but we're paranoid
+		 * and refuse to run until this is tested on real silicon
+		 */
+		panic("CPU too expensive - making holiday in the ANDES!");
+		break;
+	case CPU_SB1:
+		/* XXX - This should be folded in to the "cleaner" handling, above */
+		memcpy((void *)KSEG0, &except_vec0_r4000, 0x80);
+		memcpy((void *)(KSEG0 + 0x180), &except_vec3_r4000, 0x80);
+		save_fp_context = _save_fp_context;
+		restore_fp_context = _restore_fp_context;
+		/* Enable timer interrupt and scd mapped interrupt in status register */
+		clear_cp0_status(0xf000);
+		set_cp0_status(0xc00);
+		break;
 	case CPU_R6000:
 	case CPU_R6000A:
-#if 0
+	        save_fp_context = _save_fp_context;
+		restore_fp_context = _restore_fp_context;
+		
 		/*
 		 * The R6000 is the only R-series CPU that features a machine
 		 * check exception (similar to the R4000 cache error) and
@@ -840,9 +965,8 @@ void __init trap_init(void)
 		 * current list of targets for Linux/MIPS.
 		 * (Duh, crap, there is someone with a tripple R6k machine)
 		 */
-		set_except_vector(14, handle_mc);
-		set_except_vector(15, handle_ndc);
-#endif
+		//set_except_vector(14, handle_mc);
+		//set_except_vector(15, handle_ndc);
 	case CPU_R2000:
 	case CPU_R3000:
 	case CPU_R3000A:
@@ -851,12 +975,17 @@ void __init trap_init(void)
 	case CPU_R3052:
 	case CPU_R3081:
 	case CPU_R3081E:
+	case CPU_TX3912:
+	case CPU_TX3922:
+	case CPU_TX3927:
+	        save_fp_context = _save_fp_context;
+		restore_fp_context = _restore_fp_context;
 		memcpy((void *)KSEG0, &except_vec0_r2300, 0x80);
 		memcpy((void *)(KSEG0 + 0x80), &except_vec3_generic, 0x80);
 		break;
 	case CPU_R8000:
 		printk("Detected unsupported CPU type %s.\n",
-			cpu_names[mips_cputype]);
+			cpu_names[mips_cpu.cputype]);
 		panic("Can't handle CPU");
 		break;
 
@@ -868,5 +997,6 @@ void __init trap_init(void)
 
 	atomic_inc(&init_mm.mm_count);	/* XXX  UP?  */
 	current->active_mm = &init_mm;
-	current_pgd = init_mm.pgd;
+	write_32bit_cp0_register(CP0_CONTEXT, smp_processor_id()<<23);
+	current_pgd[0] = init_mm.pgd;
 }

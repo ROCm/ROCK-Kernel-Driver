@@ -190,7 +190,7 @@ static int xlate_proc_name(const char *name,
 	return 0;
 }
 
-static unsigned long proc_alloc_map[PROC_NDYNAMIC / 8];
+static unsigned long proc_alloc_map[(PROC_NDYNAMIC + BITS_PER_LONG - 1) / BITS_PER_LONG];
 
 spinlock_t proc_alloc_map_lock = SPIN_LOCK_UNLOCKED;
 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.highmem.h 1.7 05/17/01 18:14:24 cort
+ * BK Id: SCCS/s.highmem.h 1.10 06/28/01 15:50:17 paulus
  */
 /*
  * highmem.h: virtual kernel memory mappings for high memory
@@ -94,7 +94,7 @@ static inline void *kmap_atomic(struct page *page, enum km_type type)
 		BUG();
 #endif
 	set_pte(kmap_pte+idx, mk_pte(page, kmap_prot));
-	flush_hash_page(0, vaddr);
+	flush_tlb_page(0, vaddr);
 
 	return (void*) vaddr;
 }
@@ -116,7 +116,7 @@ static inline void kunmap_atomic(void *kvaddr, enum km_type type)
 	 * this pte without first remap it
 	 */
 	pte_clear(kmap_pte+idx);
-	flush_hash_page(0, vaddr);
+	flush_tlb_page(0, vaddr);
 #endif
 }
 

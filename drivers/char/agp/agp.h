@@ -123,11 +123,11 @@ struct agp_bridge_data {
 
 #define OUTREG32(mmap, addr, val)   __raw_writel((val), (mmap)+(addr))
 #define OUTREG16(mmap, addr, val)   __raw_writew((val), (mmap)+(addr))
-#define OUTREG8 (mmap, addr, val)   __raw_writeb((val), (mmap)+(addr))
+#define OUTREG8(mmap, addr, val)   __raw_writeb((val), (mmap)+(addr))
 
 #define INREG32(mmap, addr)         __raw_readl((mmap)+(addr))
 #define INREG16(mmap, addr)         __raw_readw((mmap)+(addr))
-#define INREG8 (mmap, addr)         __raw_readb((mmap)+(addr))
+#define INREG8(mmap, addr)         __raw_readb((mmap)+(addr))
 
 #define CACHE_FLUSH	agp_bridge.cache_flush
 #define A_SIZE_8(x)	((aper_size_info_8 *) x)
@@ -291,5 +291,24 @@ struct agp_bridge_data {
 #define ALI_CACHE_FLUSH_CTRL	0xD0
 #define ALI_CACHE_FLUSH_ADDR_MASK	0xFFFFF000
 #define ALI_CACHE_FLUSH_EN	0x100
+
+/* Serverworks Registers */
+#define SVWRKS_APSIZE 0x10
+#define SVWRKS_SIZE_MASK 0xfe000000
+
+#define SVWRKS_MMBASE 0x14
+#define SVWRKS_CACHING 0x4b
+#define SVWRKS_FEATURE 0x68
+
+/* func 1 registers */
+#define SVWRKS_AGP_ENABLE 0x60
+#define SVWRKS_COMMAND 0x04
+
+/* Memory mapped registers */
+#define SVWRKS_GART_CACHE 0x02
+#define SVWRKS_GATTBASE   0x04
+#define SVWRKS_TLBFLUSH   0x10
+#define SVWRKS_POSTFLUSH  0x14
+#define SVWRKS_DIRFLUSH   0x0c
 
 #endif				/* _AGP_BACKEND_PRIV_H */

@@ -1,10 +1,9 @@
-/* $Id: syscalls.h,v 1.22 2000/02/18 00:24:30 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 1997, 1998 by Ralf Baechle
+ * Copyright (C) 1995, 96, 97, 98, 99, 2000 by Ralf Baechle
  */
 
 /*
@@ -228,10 +227,11 @@ SYS(sys_ni_syscall, 0)
 SYS(sys_mmap2, 6)				/* 4210 */
 SYS(sys_truncate64, 2)
 SYS(sys_ftruncate64, 2)
-SYS(sys_stat64, 3)
-SYS(sys_lstat64, 3)
-SYS(sys_fstat64, 3)				/* 4215 */
+SYS(sys_stat64, 2)
+SYS(sys_lstat64, 2)
+SYS(sys_fstat64, 2)				/* 4215 */
 SYS(sys_pivot_root, 2)
 SYS(sys_mincore, 3)
 SYS(sys_madvise, 3)
 SYS(sys_getdents64, 3)
+SYS(sys_fcntl64, 3)				/* 4220 */

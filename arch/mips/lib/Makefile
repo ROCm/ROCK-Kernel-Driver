@@ -17,11 +17,7 @@ obj-y				+= csum_partial.o csum_partial_copy.o \
 ifdef CONFIG_CPU_R3000
   obj-y	+= r3k_dump_tlb.o 
 else
-  ifdef CONFIG_CPU_R3912
-    obj-y	+= r3k_dump_tlb.o 
-  else
-    obj-y	+= dump_tlb.o 
-  endif
+  obj-y	+= dump_tlb.o 
 endif
 
 obj-$(CONFIG_BLK_DEV_FD)	+= floppy-no.o floppy-std.o

@@ -483,14 +483,17 @@ static void free_disk_sb (mdk_rdev_t * rdev)
 	}
 }
 
-static void mark_rdev_faulty (mdk_rdev_t * rdev)
+static inline int mark_rdev_faulty (mdk_rdev_t * rdev)
 {
 	if (!rdev) {
 		MD_BUG();
-		return;
+		return 0;
 	}
+	if (rdev->faulty)
+		return 0;
 	free_disk_sb(rdev);
 	rdev->faulty = 1;
+	return 1;
 }
 
 static int read_disk_sb (mdk_rdev_t * rdev)
@@ -1645,8 +1648,7 @@ static int do_md_run (mddev_t * mddev)
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		if (rdev->faulty)
 			continue;
-		fsync_dev(rdev->dev);
-		invalidate_buffers(rdev->dev);
+		invalidate_device(rdev->dev, 1);
 		if (get_hardsect_size(rdev->dev)
 		    > md_hardsect_sizes[mdidx(mddev)]) 
 			md_hardsect_sizes[mdidx(mddev)] =
@@ -1672,7 +1674,8 @@ static int do_md_run (mddev_t * mddev)
 	 * twice as large as sectors.
 	 */
 	md_hd_struct[mdidx(mddev)].start_sect = 0;
-	md_hd_struct[mdidx(mddev)].nr_sects = md_size[mdidx(mddev)] << 1;
+	register_disk(&md_gendisk, MKDEV(MAJOR_NR,mdidx(mddev)),
+		      1, &md_fops, md_size[mdidx(mddev)]<<1);
 
 	read_ahead[MD_MAJOR] = 1024;
 	return (0);
@@ -1729,12 +1732,6 @@ static int do_md_stop (mddev_t * mddev, int ro)
  		printk(STILL_IN_USE, mdidx(mddev));
  		OUT(-EBUSY);
  	}
- 
- 	/* this shouldn't be needed as above would have fired */
-	if (!ro && is_mounted(dev)) {
-		printk (STILL_MOUNTED, mdidx(mddev));
-		OUT(-EBUSY);
-	}
 
 	if (mddev->pers) {
 		/*
@@ -1758,15 +1755,7 @@ static int do_md_stop (mddev_t * mddev, int ro)
 		down(&mddev->recovery_sem);
 		up(&mddev->recovery_sem);
 
-		/*
-		 *  sync and invalidate buffers because we cannot kill the
-		 *  main thread with valid IO transfers still around.
-		 *  the kernel lock protects us from new requests being
-		 *  added after invalidate_buffers().
-		 */
-		fsync_dev (mddev_to_kdev(mddev));
-		fsync_dev (dev);
-		invalidate_buffers (dev);
+		invalidate_device(dev, 1);
 
 		if (ro) {
 			if (mddev->ro)
@@ -2946,7 +2935,8 @@ int md_error (mddev_t *mddev, kdev_t rdev)
 		return 0;
 	}
 	rrdev = find_rdev(mddev, rdev);
-	mark_rdev_faulty(rrdev);
+	if (!mark_rdev_faulty(rrdev))
+		return 0;
 	/*
 	 * if recovery was running, stop it now.
 	 */
@@ -3228,7 +3218,6 @@ int md_do_sync(mddev_t *mddev, mdp_disk_t *spare)
 	mddev_t *mddev2;
 	unsigned int max_sectors, currspeed,
 		j, window, err, serialize;
-	kdev_t read_disk = mddev_to_kdev(mddev);
 	unsigned long mark[SYNC_MARKS];
 	unsigned long mark_cnt[SYNC_MARKS];	
 	int last_mark,m;
@@ -3361,7 +3350,6 @@ repeat:
 		} else
 			current->nice = -20;
 	}
-	fsync_dev(read_disk);
 	printk(KERN_INFO "md: md%d: sync done.\n",mdidx(mddev));
 	err = 0;
 	/*
@@ -3507,7 +3495,6 @@ static void md_geninit (void)
 		md_size[i] = 0;
 		md_hardsect_sizes[i] = 512;
 		md_maxreadahead[i] = MD_READAHEAD;
-		register_disk(&md_gendisk, MKDEV(MAJOR_NR,i), 1, &md_fops, 0);
 	}
 	blksize_size[MAJOR_NR] = md_blocksizes;
 	blk_size[MAJOR_NR] = md_size;

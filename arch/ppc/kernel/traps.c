@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.traps.c 1.11 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.traps.c 1.14 06/15/01 13:00:20 paulus
  */
 /*
  *  linux/arch/ppc/kernel/traps.c
@@ -82,7 +82,6 @@ void die(const char * str, struct pt_regs * fp, long err)
 	spin_lock_irq(&oops_lock);
 	printk("Oops: %s, sig: %ld\n", str, err);
 	show_regs(fp);
-	print_backtrace((unsigned long *)fp->gpr[1]);
 	spin_unlock_irq(&oops_lock);
 	/* do_exit() should take care of panic'ing from an interrupt
 	 * context so we don't handle it here
@@ -186,7 +185,6 @@ SMIException(struct pt_regs *regs)
 	}
 #endif
 	show_regs(regs);
-	print_backtrace((unsigned long *)regs->gpr[1]);
 	panic("System Management Interrupt");
 }
 
@@ -334,7 +332,6 @@ StackOverflow(struct pt_regs *regs)
 	debugger(regs);
 #endif
 	show_regs(regs);
-	print_backtrace((unsigned long *)regs->gpr[1]);
 	panic("kernel stack overflow");
 }
 

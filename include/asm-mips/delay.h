@@ -1,16 +1,17 @@
-/* $Id: delay.h,v 1.2 1999/01/04 16:09:20 ralf Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1994 by Waldorf Electronics
- * Copyright (C) 1995 - 1998 by Ralf Baechle
+ * Copyright (C) 1995 - 1998, 2001 by Ralf Baechle
  */
 #ifndef _ASM_DELAY_H
 #define _ASM_DELAY_H
 
 #include <linux/config.h>
+
+extern unsigned long loops_per_jiffy;
 
 extern __inline__ void
 __delay(unsigned long loops)
@@ -34,21 +35,21 @@ __delay(unsigned long loops)
  * first constant multiplications gets optimized away if the delay is
  * a constant)
  */
-extern __inline__ void __udelay(unsigned long usecs, unsigned long lps)
+extern __inline__ void __udelay(unsigned long usecs, unsigned long lpj)
 {
 	unsigned long lo;
 
-	usecs *= 0x000010c6;		/* 2**32 / 1000000 */
+	usecs *= 0x00068db8;		/* 2**32 / (1000000 / HZ) */
 	__asm__("multu\t%2,%3"
 		:"=h" (usecs), "=l" (lo)
-		:"r" (usecs),"r" (lps));
+		:"r" (usecs),"r" (lpj));
 	__delay(usecs);
 }
 
 #ifdef CONFIG_SMP
 #define __udelay_val cpu_data[smp_processor_id()].udelay_val
 #else
-#define __udelay_val loops_per_sec
+#define __udelay_val loops_per_jiffy
 #endif
 
 #define udelay(usecs) __udelay((usecs),__udelay_val)

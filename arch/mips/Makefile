@@ -17,10 +17,8 @@
 #
 ifdef CONFIG_CPU_LITTLE_ENDIAN
 tool-prefix	= mipsel-linux-
-output-format	= elf32-littlemips
 else
 tool-prefix	= mips-linux-
-output-format	= elf32-bigmips
 endif
 
 ifdef CONFIG_CROSSCOMPILE
@@ -51,9 +49,6 @@ endif
 ifdef CONFIG_CPU_R3000
 GCCFLAGS	+= -mcpu=r3000 -mips1
 endif
-ifdef CONFIG_CPU_R3912
-GCCFLAGS	+= -mcpu=r3000 -mips1
-endif
 ifdef CONFIG_CPU_R6000
 GCCFLAGS	+= -mcpu=r6000 -mips2 -Wa,--trap
 endif
@@ -67,22 +62,19 @@ ifdef CONFIG_CPU_MIPS32
 GCCFLAGS	+= -mcpu=r4600 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_R5000
-GCCFLAGS	+= -mcpu=r8000 -mips2 -Wa,--trap
+GCCFLAGS	+= -mcpu=r5000 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_R5432
-GCCFLAGS        += -mcpu=r8000 -mips2 -Wa,--trap
+GCCFLAGS        += -mcpu=r5000 -mips2 -Wa,--trap
 endif
 ifdef CONFIG_CPU_NEVADA
-GCCFLAGS	+= -mcpu=r8000 -mips2 -Wa,--trap -mmad
+GCCFLAGS	+= -mcpu=r5000 -mips2 -Wa,--trap -mmad
 endif
 ifdef CONFIG_CPU_RM7000
-GCCFLAGS	+= -mcpu=r8000 -mips2 -Wa,--trap
+GCCFLAGS	+= -mcpu=r5000 -mips2 -Wa,--trap
 endif
-ifdef CONFIG_CPU_R8000
-GCCFLAGS	+= -mcpu=r8000 -mips2 -Wa,--trap
-endif
-ifdef CONFIG_CPU_R10000
-GCCFLAGS	+= -mcpu=r8000 -mips2 -Wa,--trap
+ifdef CONFIG_CPU_SB1
+GCCFLAGS	+= -mcpu=sb1 -mips2 -Wa,--trap
 endif
 
 ifdef CONFIG_MIPS_FPU_EMULATOR
@@ -90,14 +82,11 @@ CORE_FILES	+=arch/mips/math-emu/fpu_emulator.o
 SUBDIRS		+=arch/mips/math-emu
 endif
 
-#
-# The pipe options is bad for my low-mem machine
-# Uncomment this if you want this.
-#
 GCCFLAGS	+= -pipe
 
 CFLAGS		:= -I $(TOPDIR)/include/asm/gcc $(CFLAGS) $(GCCFLAGS)
 AFLAGS		+= $(GCCFLAGS)
+ASFLAGS		+= $(GCCFLAGS)
 
 #
 # Board-dependent options and extra files
@@ -178,21 +167,23 @@ LOADADDR      += 0x80080000
 endif
 
 #
-# Orion Board
-#
-ifdef CONFIG_ORION
-LIBS          += arch/mips/orion/orionkern.a
-SUBDIRS       += arch/mips/orion
-LINKSCRIPT    = arch/mips/orion/ld.script.orion
-endif
-
-#
 #
 # NEC DDB Vrc-5476
 #
 ifdef CONFIG_DDB5476
 SUBDIRS       += arch/mips/ddb5476
 LIBS          += arch/mips/ddb5476/ddb5476.a
+LOADADDR      += 0x80080000
+endif
+
+#
+#
+# NEC DDB Vrc-5477
+#
+ifdef CONFIG_DDB5477
+SUBDIRS       += arch/mips/ddb5xxx/common arch/mips/ddb5xxx/ddb5477
+LIBS          += arch/mips/ddb5xxx/common/ddb5xxx.o \
+                 arch/mips/ddb5xxx/ddb5477/ddb5477.o
 LOADADDR      += 0x80080000
 endif
 
@@ -218,7 +209,9 @@ endif
 # Momentum Ocelot board
 #
 ifdef CONFIG_MOMENCO_OCELOT
-LIBS          += arch/mips/gt64120/common/gt64120.o arch/mips/gt64120/momenco_ocelot/momenco_ocelot.o
+# The Ocelot setup.o must be linked early - it does the ioremap() for the
+# mips_io_port_base.
+CORE_FILES    += arch/mips/gt64120/common/gt64120.o arch/mips/gt64120/momenco_ocelot/momenco_ocelot.o
 SUBDIRS       += arch/mips/gt64120/common arch/mips/gt64120/momenco_ocelot
 LOADADDR      += 0x80100000
 endif
@@ -227,9 +220,8 @@ endif
 # Philips Nino
 #
 ifdef CONFIG_NINO
-CORE_FILES    += arch/mips/philips/nino/nino.o \
-		 arch/mips/philips/drivers/drivers.o
-SUBDIRS       += arch/mips/philips/nino arch/mips/philips/drivers
+CORE_FILES    += arch/mips/philips/nino/nino.o
+SUBDIRS       += arch/mips/philips/nino
 LOADADDR      += 0x80000000
 endif
 
@@ -252,8 +244,7 @@ endif
 vmlinux: arch/$(ARCH)/ld.script
 
 arch/$(ARCH)/ld.script: arch/$(ARCH)/ld.script.in arch/$(ARCH)/Makefile
-	sed -e 's/@@OUTPUT_FORMAT@@/$(output-format)/' \
-	    -e 's/@@LOADADDR@@/$(LOADADDR)/' <$< >$@
+	sed -e 's/@@LOADADDR@@/$(LOADADDR)/' <$< >$@
 LINKFLAGS	+= -T arch/$(ARCH)/ld.script
 
 HEAD := arch/mips/kernel/head.o arch/mips/kernel/init_task.o
@@ -269,13 +260,6 @@ BAGETBOOT = $(MAKE) -C arch/$(ARCH)/baget
 balo:  vmlinux
 	$(BAGETBOOT) balo
 
-endif
-
-ifdef CONFIG_ORION
-ORIONBOOT = $(MAKE) -C arch/$(ARCH)/orion
-
-orionboot:
-	$(ORIONBOOT) orionboot
 endif
 
 ifdef CONFIG_MIPS_EV64120

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.chrp_pci.c 1.16 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.chrp_pci.c 1.17 06/28/01 16:11:56 paulus
  */
 /*
  * CHRP pci routines.
@@ -26,11 +26,6 @@
 
 #include "open_pic.h"
 #include "pci.h"
-
-
-#ifdef CONFIG_POWER4
-extern unsigned long pci_address_offset(int, unsigned int);
-#endif /* CONFIG_POWER4 */
 
 /* LongTrail */
 #define pci_config_addr(dev, offset) \
@@ -212,34 +207,6 @@ hydra_init(void)
 	return 1;
 }
 
-#ifdef CONFIG_POWER4
-static void
-power4_fixup_dev(struct pci_dev *dev)
-{
-	int i;
-	unsigned long offset;
-
-	for (i = 0; i < 6; ++i) {
-		if (dev->resource[i].start == 0)
-			continue;
-		offset = pci_address_offset(dev->bus->number,
-					    dev->resource[i].flags);
-		if (offset) {
-			dev->resource[i].start += offset;
-			dev->resource[i].end += offset;
-			printk("device %x.%x[%d] now [%lx..%lx]\n",
-			       dev->bus->number, dev->devfn, i,
-			       dev->resource[i].start,
-			       dev->resource[i].end);
-		}
-		/* zap the 2nd function of the winbond chip */
-		if (dev->resource[i].flags & IORESOURCE_IO
-		    && dev->bus->number == 0 && dev->devfn == 0x81)
-			dev->resource[i].flags &= ~IORESOURCE_IO;
-	}
-}
-#endif /* CONFIG_POWER4 */
-
 void __init
 chrp_pcibios_fixup(void)
 {
@@ -261,47 +228,8 @@ chrp_pcibios_fixup(void)
 			pci_write_config_word(dev, PCI_VENDOR_ID,
 					      PCI_VENDOR_ID_AMD);
 		}
-#ifdef CONFIG_POWER4
-		power4_fixup_dev(dev);
-#endif
 	}
 }
-
-#if 0
-static struct {
-    /* parent is iomem */
-    struct resource ram, pci_mem, isa_mem, pci_io, pci_cfg, rom_exp, flash;
-    /* parent is isa_mem */
-    struct resource nvram;
-} gg2_resources = {
-    ram:	{ "RAM", 0x00000000, 0xbfffffff, IORESOURCE_MEM },
-    pci_mem:	{ "GG2 PCI mem", 0xc0000000, 0xf6ffffff, IORESOURCE_MEM },
-    isa_mem:	{ "GG2 ISA mem", 0xf7000000, 0xf7ffffff },
-    pci_io:	{ "GG2 PCI I/O", 0xf8000000, 0xf8ffffff },
-    pci_cfg:	{ "GG2 PCI cfg", 0xfec00000, 0xfec7ffff },
-    rom_exp:	{ "ROM exp", 0xff000000, 0xff7fffff, },
-    flash:	{ "Flash ROM", 0xfff80000, 0xffffffff },
-    nvram:	{ "NVRAM", 0xf70e0000, 0xf70e7fff },
-};
-
-static void __init gg2_pcibios_fixup(void)
-{
-	int i;
-	extern unsigned long *end_of_DRAM;
-
-	chrp_pcibios_fixup();
-	gg2_resources.ram.end = (unsigned long)end_of_DRAM-PAGE_OFFSET;
-	for (i = 0; i < 7; i++)
-	    request_resource(&iomem_resource,
-		    	     &((struct resource *)&gg2_resources)[i]);
-	request_resource(&gg2_resources.isa_mem, &gg2_resources.nvram);
-}
-
-static void __init gg2_pcibios_fixup_bus(struct pci_bus *bus)
-{
-    	bus->resource[1] = &gg2_resources.pci_mem;
-}
-#endif /* 0 */
 
 /* this is largely modeled and stolen after the pmac_pci code -- tgall
  */
@@ -314,14 +242,16 @@ ibm_add_bridges(struct device_node *dev)
 	struct pci_controller *hose;
 	volatile unsigned char *cfg;
 	unsigned int *dma;
-#ifdef CONFIG_POWER3
 	struct device_node *root = find_path_device("/");
+#ifdef CONFIG_POWER3
 	unsigned int *opprop = (unsigned int *)
 		get_property(root, "platform-open-pic", NULL);
 	int i;
 #endif
 
 	for(; dev != NULL; dev = dev->next, ++index) {
+		if (dev->parent != root)
+			continue;
 		if (dev->n_addrs < 1) {
 			printk(KERN_WARNING "Can't use %s: no address\n",
 			       dev->full_name);
@@ -374,23 +304,6 @@ ibm_add_bridges(struct device_node *dev)
 	}
 }
 
-#ifdef CONFIG_POWER4
-void __init
-power4_add_bridge(void)
-{
-	struct pci_controller* hose;
-
-	hose = pcibios_alloc_controller();
-	if (!hose)
-		return;
-	hose->first_busno = 0;
-	hose->last_busno = 0xff;
-	
-	hose->ops = &rtas_pci_ops;
-	pci_dram_offset = 0;
-}
-#endif /* CONFIG_POWER4 */
-
 void __init
 chrp_find_bridges(void)
 {
@@ -400,9 +313,6 @@ chrp_find_bridges(void)
 
 	ppc_md.pcibios_fixup = chrp_pcibios_fixup;
 
-#ifdef CONFIG_POWER4
-	power4_add_bridge();
-#else /* CONFIG_POWER4 */
 	model = get_property(find_path_device("/"), "model", NULL);
         if (!strncmp("MOT", model, 3)) {
 		struct pci_controller *hose;
@@ -452,36 +362,4 @@ chrp_find_bridges(void)
 	hose->ops = &gg2_pci_ops;
 	pci_dram_offset = 0;
 	pci_process_bridge_OF_ranges(hose, find_devices("pci"), 1);
-//	ppc_md.pcibios_fixup = gg2_pcibios_fixup;
-//	ppc_md.pcibios_fixup_bus = gg2_pcibios_fixup_bus;
-#endif /* CONFIG_POWER4 */
 }
-
-#ifdef CONFIG_PPC64BRIDGE
-#ifdef CONFIG_POWER4
-/*
- * Hack alert!!!
- * 64-bit machines like POWER3 and POWER4 have > 32 bit
- * physical addresses.  For now we remap particular parts
- * of the 32-bit physical address space that the Linux
- * page table gives us into parts of the physical address
- * space above 4GB so we can access the I/O devices.
- */
-unsigned long pci_address_offset(int busnr, unsigned int flags)
-{
-	unsigned long offset = 0;
-
-	if (busnr >= 0x1e) {
-		if (flags & IORESOURCE_IO)
-			offset = -0x100000;
-		else if (flags & IORESOURCE_MEM)
-			offset = 0x38000000;
-	} else if (busnr <= 0xf) {
-		if (flags & IORESOURCE_MEM)
-			offset = -0x40000000;
-		else
-	}
-	return offset;
-}
-#endif /* CONFIG_POWER4 */
-#endif /* CONFIG_PPC64BRIDGE */

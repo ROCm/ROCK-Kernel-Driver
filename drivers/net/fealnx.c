@@ -17,7 +17,7 @@
 	http://www.scyld.com/network/pci-skeleton.html
 */
 
-static int debug = 0;		/* 1-> print debug message */
+static int debug;		/* 1-> print debug message */
 static int max_interrupt_work = 20;
 
 /* Maximum number of multicast addresses to filter (vs. Rx-all-multicast). */
@@ -25,7 +25,7 @@ static int multicast_filter_limit = 32;
 
 /* Set the copy breakpoint for the copy-only-tiny-frames scheme. */
 /* Setting to > 1518 effectively disables this feature.          */
-static int rx_copybreak = 0;
+static int rx_copybreak;
 
 /* Used to pass the media type, etc.                            */
 /* Both 'options[]' and 'full_duplex[]' should exist for driver */
@@ -71,6 +71,7 @@ static int full_duplex[MAX_UNITS] = { -1, -1, -1, -1, -1, -1, -1, -1 };
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
+#include <linux/mii.h>
 #include <asm/processor.h>	/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -1742,19 +1743,24 @@ static void set_rx_mode(struct net_device *dev)
 
 static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	u16 *data = (u16 *) & rq->ifr_data;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 
 	switch (cmd) {
-	case SIOCDEVPRIVATE:	/* Get the address of the PHY in use. */
-		data[0] = ((struct netdev_private *) dev->priv)->phys[0] & 0x1f;
+	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
+	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
+		data->phy_id = ((struct netdev_private *) dev->priv)->phys[0] & 0x1f;
 		/* Fall Through */
-	case SIOCDEVPRIVATE + 1:	/* Read the specified MII register. */
-		data[3] = mdio_read(dev, data[0] & 0x1f, data[1] & 0x1f);
+
+	case SIOCGMIIREG:		/* Read MII PHY register. */
+	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
+		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		return 0;
-	case SIOCDEVPRIVATE + 2:	/* Write the specified MII register */
+
+	case SIOCSMIIREG:		/* Write MII PHY register. */
+	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!suser())
 			return -EPERM;
-		mdio_write(dev, data[0] & 0x1f, data[1] & 0x1f, data[2]);
+		mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
 		return 0;
 	default:
 		return -EOPNOTSUPP;

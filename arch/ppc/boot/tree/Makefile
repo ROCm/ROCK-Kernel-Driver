@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.5 05/18/01 06:20:29 patch
+# BK Id: SCCS/s.Makefile 1.7 06/15/01 13:16:10 paulus
 #
 #
 #    Module name: Makefile
@@ -26,12 +26,13 @@ OBJDUMP = $(CROSS_COMPILE)objdump
 
 GZIP	= gzip -vf9
 RM	= rm -f
-MKEVIMG	= ../utils/mkevimg -l
+MKEVIMG	= ../utils/mkevimg -l -c
 MKIRIMG	= ../utils/mkirimg
+CFLAGS	+= -I$(TOPDIR)/drivers/net
 LD_ARGS = -e _start -T ld.script -Ttext 0x00200000 -Bstatic
 
 OBJS	= ../common/crt0.o main.o misc.o irSect.o ../common/string.o \
-		../common/misc-common.o
+		../common/misc-common.o ../common/ns16550.o
 LIBS	= ../lib/zlib.a
 
 treeboot: $(OBJS) $(LIBS) ld.script

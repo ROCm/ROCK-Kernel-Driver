@@ -9,7 +9,7 @@
  *                      which important things will be mapped.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
- * Copyright (C) 2000 Anton Blanchard (anton@linuxcare.com)
+ * Copyright (C) 2000 Anton Blanchard (anton@samba.org)
  */
 
 #define SRMMU_MAXMEM		0x0c000000

@@ -1,4 +1,4 @@
-/* $Id: isdn_tty.c,v 1.94.6.1 2001/02/16 16:43:22 kai Exp $
+/* $Id: isdn_tty.c,v 1.94.6.2 2001/06/09 15:14:15 kai Exp $
 
  * Linux ISDN subsystem, tty functions and AT-command emulator (linklevel).
  *
@@ -66,7 +66,7 @@ static int bit2si[8] =
 static int si2bit[8] =
 {4, 1, 4, 4, 4, 4, 4, 4};
 
-char *isdn_tty_revision = "$Revision: 1.94.6.1 $";
+char *isdn_tty_revision = "$Revision: 1.94.6.2 $";
 
 
 /* isdn_tty_try_read() is called from within isdn_tty_rcv_skb()
@@ -307,18 +307,13 @@ isdn_tty_rcv_skb(int i, int di, int channel, struct sk_buff *skb)
 void
 isdn_tty_cleanup_xmit(modem_info * info)
 {
-	struct sk_buff *skb;
 	unsigned long flags;
 
 	save_flags(flags);
 	cli();
-	if (skb_queue_len(&info->xmit_queue))
-		while ((skb = skb_dequeue(&info->xmit_queue)))
-			kfree_skb(skb);
+	skb_queue_purge(&info->xmit_queue);
 #ifdef CONFIG_ISDN_AUDIO
-	if (skb_queue_len(&info->dtmf_queue))
-		while ((skb = skb_dequeue(&info->dtmf_queue)))
-			kfree_skb(skb);
+	skb_queue_purge(&info->dtmf_queue);
 #endif
 	restore_flags(flags);
 }

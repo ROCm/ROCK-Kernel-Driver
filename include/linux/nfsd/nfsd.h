@@ -81,7 +81,7 @@ void		nfsd_racache_shutdown(void);
 int		nfsd_lookup(struct svc_rqst *, struct svc_fh *,
 				const char *, int, struct svc_fh *);
 int		nfsd_setattr(struct svc_rqst *, struct svc_fh *,
-				struct iattr *);
+				struct iattr *, int, time_t);
 int		nfsd_create(struct svc_rqst *, struct svc_fh *,
 				char *name, int len, struct iattr *attrs,
 				int type, dev_t rdev, struct svc_fh *res);
@@ -143,6 +143,7 @@ void		nfsd_lockd_unexport(struct svc_client *);
 #define	nfserr_noent		__constant_htonl(NFSERR_NOENT)
 #define	nfserr_io		__constant_htonl(NFSERR_IO)
 #define	nfserr_nxio		__constant_htonl(NFSERR_NXIO)
+#define	nfserr_eagain		__constant_htonl(NFSERR_EAGAIN)
 #define	nfserr_acces		__constant_htonl(NFSERR_ACCES)
 #define	nfserr_exist		__constant_htonl(NFSERR_EXIST)
 #define	nfserr_xdev		__constant_htonl(NFSERR_XDEV)
@@ -160,9 +161,10 @@ void		nfsd_lockd_unexport(struct svc_client *);
 #define	nfserr_dquot		__constant_htonl(NFSERR_DQUOT)
 #define	nfserr_stale		__constant_htonl(NFSERR_STALE)
 #define	nfserr_remote		__constant_htonl(NFSERR_REMOTE)
+#define	nfserr_wflush		__constant_htonl(NFSERR_WFLUSH)
 #define	nfserr_badhandle	__constant_htonl(NFSERR_BADHANDLE)
-#define	nfserr_notsync		__constant_htonl(NFSERR_NOTSYNC)
-#define	nfserr_badcookie	__constant_htonl(NFSERR_BADCOOKIE)
+#define	nfserr_notsync		__constant_htonl(NFSERR_NOT_SYNC)
+#define	nfserr_badcookie	__constant_htonl(NFSERR_BAD_COOKIE)
 #define	nfserr_notsupp		__constant_htonl(NFSERR_NOTSUPP)
 #define	nfserr_toosmall		__constant_htonl(NFSERR_TOOSMALL)
 #define	nfserr_serverfault	__constant_htonl(NFSERR_SERVERFAULT)

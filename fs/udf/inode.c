@@ -203,7 +203,6 @@ void udf_expand_file_adinicb(struct inode * inode, int newsize, int * err)
 		UDF_I_ALLOCTYPE(inode) = ICB_FLAG_AD_SHORT;
 	else
 		UDF_I_ALLOCTYPE(inode) = ICB_FLAG_AD_LONG;
-	inode->i_blocks = inode->i_sb->s_blocksize / 512;
 	mark_buffer_dirty_inode(bh, inode);
 	udf_release_data(bh);
 
@@ -1080,31 +1079,37 @@ static void udf_fill_inode(struct inode *inode, struct buffer_head *bh)
 			(inode->i_sb->s_blocksize_bits - 9);
 
 		if ( udf_stamp_to_time(&convtime, &convtime_usec,
+			lets_to_cpu(fe->accessTime)) )
+		{
+			inode->i_atime = convtime;
+		}
+		else
+		{
+			inode->i_atime = UDF_SB_RECORDTIME(inode->i_sb);
+		}
+
+		if ( udf_stamp_to_time(&convtime, &convtime_usec,
 			lets_to_cpu(fe->modificationTime)) )
 		{
 			inode->i_mtime = convtime;
 			UDF_I_UMTIME(inode) = convtime_usec;
-			inode->i_ctime = convtime;
-			UDF_I_UCTIME(inode) = convtime_usec;
 		}
 		else
 		{
 			inode->i_mtime = UDF_SB_RECORDTIME(inode->i_sb);
 			UDF_I_UMTIME(inode) = 0;
-			inode->i_ctime = UDF_SB_RECORDTIME(inode->i_sb);
-			UDF_I_UCTIME(inode) = 0;
 		}
 
 		if ( udf_stamp_to_time(&convtime, &convtime_usec,
-			lets_to_cpu(fe->accessTime)) ) 
+			lets_to_cpu(fe->attrTime)) )
 		{
-			inode->i_atime = convtime;
-			UDF_I_UATIME(inode) = convtime_usec;
+			inode->i_ctime = convtime;
+			UDF_I_UCTIME(inode) = convtime_usec;
 		}
 		else
 		{
-			inode->i_atime = UDF_SB_RECORDTIME(inode->i_sb);
-			UDF_I_UATIME(inode) = convtime_usec;
+			inode->i_ctime = UDF_SB_RECORDTIME(inode->i_sb);
+			UDF_I_UCTIME(inode) = 0;
 		}
 
 		UDF_I_UNIQUE(inode) = le64_to_cpu(fe->uniqueID);
@@ -1119,6 +1124,16 @@ static void udf_fill_inode(struct inode *inode, struct buffer_head *bh)
 			(inode->i_sb->s_blocksize_bits - 9);
 
 		if ( udf_stamp_to_time(&convtime, &convtime_usec,
+			lets_to_cpu(efe->accessTime)) )
+		{
+			inode->i_atime = convtime;
+		}
+		else
+		{
+			inode->i_atime = UDF_SB_RECORDTIME(inode->i_sb);
+		}
+
+		if ( udf_stamp_to_time(&convtime, &convtime_usec,
 			lets_to_cpu(efe->modificationTime)) )
 		{
 			inode->i_mtime = convtime;
@@ -1131,19 +1146,19 @@ static void udf_fill_inode(struct inode *inode, struct buffer_head *bh)
 		}
 
 		if ( udf_stamp_to_time(&convtime, &convtime_usec,
-			lets_to_cpu(efe->accessTime)) )
+			lets_to_cpu(efe->createTime)) )
 		{
-			inode->i_atime = convtime;
-			UDF_I_UATIME(inode) = convtime_usec;
+			UDF_I_CRTIME(inode) = convtime;
+			UDF_I_UCRTIME(inode) = convtime_usec;
 		}
 		else
 		{
-			inode->i_atime = UDF_SB_RECORDTIME(inode->i_sb);
-			UDF_I_UATIME(inode) = 0;
+			UDF_I_CRTIME(inode) = UDF_SB_RECORDTIME(inode->i_sb);
+			UDF_I_UCRTIME(inode) = 0;
 		}
 
 		if ( udf_stamp_to_time(&convtime, &convtime_usec,
-			lets_to_cpu(efe->createTime)) )
+			lets_to_cpu(efe->attrTime)) )
 		{
 			inode->i_ctime = convtime;
 			UDF_I_UCTIME(inode) = convtime_usec;
@@ -1171,6 +1186,7 @@ static void udf_fill_inode(struct inode *inode, struct buffer_head *bh)
 			inode->i_nlink ++;
 			break;
 		}
+		case FILE_TYPE_REALTIME:
 		case FILE_TYPE_REGULAR:
 		case FILE_TYPE_NONE:
 		{
@@ -1399,13 +1415,12 @@ udf_update_inode(struct inode *inode, int do_sync)
 			(inode->i_blocks + (1 << (inode->i_sb->s_blocksize_bits - 9)) - 1) >>
 			(inode->i_sb->s_blocksize_bits - 9));
 
-		if (udf_time_to_stamp(&cpu_time, inode->i_atime, UDF_I_UATIME(inode)))
+		if (udf_time_to_stamp(&cpu_time, inode->i_atime, 0))
 			fe->accessTime = cpu_to_lets(cpu_time);
 		if (udf_time_to_stamp(&cpu_time, inode->i_mtime, UDF_I_UMTIME(inode)))
-		{
 			fe->modificationTime = cpu_to_lets(cpu_time);
+		if (udf_time_to_stamp(&cpu_time, inode->i_ctime, UDF_I_UCTIME(inode)))
 			fe->attrTime = cpu_to_lets(cpu_time);
-		}
 		memset(&(fe->impIdent), 0, sizeof(EntityID));
 		strcpy(fe->impIdent.ident, UDF_ID_DEVELOPER);
 		fe->impIdent.identSuffix[0] = UDF_OS_CLASS_UNIX;
@@ -1418,19 +1433,40 @@ udf_update_inode(struct inode *inode, int do_sync)
 	}
 	else
 	{
+		efe->objectSize = cpu_to_le64(inode->i_size);
 		efe->logicalBlocksRecorded = cpu_to_le64(
-			(inode->i_blocks + (2 << (inode->i_sb->s_blocksize_bits - 9)) - 1) >>
+			(inode->i_blocks + (1 << (inode->i_sb->s_blocksize_bits - 9)) - 1) >>
 			(inode->i_sb->s_blocksize_bits - 9));
 
-		if (udf_time_to_stamp(&cpu_time, inode->i_atime, UDF_I_UATIME(inode)))
+		if (UDF_I_CRTIME(inode) >= inode->i_atime)
+		{
+			UDF_I_CRTIME(inode) = inode->i_atime;
+			UDF_I_UCRTIME(inode) = 0;
+		}
+		if (UDF_I_CRTIME(inode) > inode->i_mtime ||
+			(UDF_I_CRTIME(inode) == inode->i_mtime &&
+			 UDF_I_UCRTIME(inode) > UDF_I_UMTIME(inode)))
+		{
+			UDF_I_CRTIME(inode) = inode->i_mtime;
+			UDF_I_UCRTIME(inode) = UDF_I_UMTIME(inode);
+		}
+		if (UDF_I_CRTIME(inode) > inode->i_ctime ||
+			(UDF_I_CRTIME(inode) == inode->i_ctime &&
+			 UDF_I_UCRTIME(inode) > UDF_I_UCTIME(inode)))
+		{
+			UDF_I_CRTIME(inode) = inode->i_ctime;
+			UDF_I_UCRTIME(inode) = UDF_I_UCTIME(inode);
+		}
+
+		if (udf_time_to_stamp(&cpu_time, inode->i_atime, 0))
 			efe->accessTime = cpu_to_lets(cpu_time);
 		if (udf_time_to_stamp(&cpu_time, inode->i_mtime, UDF_I_UMTIME(inode)))
 			efe->modificationTime = cpu_to_lets(cpu_time);
-		if (udf_time_to_stamp(&cpu_time, inode->i_ctime, UDF_I_UCTIME(inode)))
-		{
+		if (udf_time_to_stamp(&cpu_time, UDF_I_CRTIME(inode), UDF_I_UCRTIME(inode)))
 			efe->createTime = cpu_to_lets(cpu_time);
+		if (udf_time_to_stamp(&cpu_time, inode->i_ctime, UDF_I_UCTIME(inode)))
 			efe->attrTime = cpu_to_lets(cpu_time);
-		}
+
 		memset(&(efe->impIdent), 0, sizeof(EntityID));
 		strcpy(efe->impIdent.ident, UDF_ID_DEVELOPER);
 		efe->impIdent.identSuffix[0] = UDF_OS_CLASS_UNIX;

@@ -7,7 +7,6 @@
 
 
 /* This code assumes
-   - a little endian processor like 386,
    - sizeof(short) = 2, sizeof(int) = 4, sizeof(long) = 4,
    - alignof(short) = 2, alignof(long) = 4.
 */
@@ -26,27 +25,17 @@
 /* Layout on disk */
 /* ============== */
 
-
-/* The block size is sb->sv_block_size which may be smaller than BLOCK_SIZE. */
-
-/* zones (= data allocation units) are blocks */
-
-/* On Coherent FS, 32 bit quantities are stored using (I quote the Coherent
-   manual) a "canonical byte ordering". This is the PDP-11 byte ordering:
-   x = 2^24 * byte3 + 2^16 * byte2 + 2^8 * byte1 + byte0 is stored
-   as { byte2, byte3, byte0, byte1 }. We need conversions.
-*/
-
-typedef u32 coh_ulong;
-
-static inline coh_ulong to_coh_ulong (u32 x)
+static inline u32 PDP_swab(u32 x)
 {
+#ifdef __LITTLE_ENDIAN
 	return ((x & 0xffff) << 16) | ((x & 0xffff0000) >> 16);
-}
-
-static inline u32 from_coh_ulong (coh_ulong x)
-{
-	return ((x & 0xffff) << 16) | ((x & 0xffff0000) >> 16);
+#else
+#ifdef __BIG_ENDIAN
+	return ((x & 0xff00ff) << 8) | ((x & 0xff00ff00) >> 8);
+#else
+#error BYTESEX
+#endif
+#endif
 }
 
 /* inode numbers are 16 bit */
@@ -103,12 +92,6 @@ struct xenix_super_block {
 								
 };
 
-/* Xenix free list block on disk */
-struct xenix_freelist_chunk {
-	u16	fl_nfree;	/* number of free blocks in fl_free, <= XENIX_NICFREE] */
-	u32	fl_free[XENIX_NICFREE] __packed2__;
-};
-
 /* SystemV FS comes in two variants:
  * sysv2: System V Release 2 (e.g. Microport), structure elements aligned(2).
  * sysv4: System V Release 4 (e.g. Consensys), structure elements aligned(4).
@@ -148,12 +131,6 @@ struct sysv4_super_block {
 								2 for 1024 byte blocks */
 };
 
-/* SystemV4 free list block on disk */
-struct sysv4_freelist_chunk {
-	u16 fl_nfree;	/* number of free blocks in fl_free, <= SYSV_NICFREE] */
-	u32  fl_free[SYSV_NICFREE];
-};
-
 /* SystemV2 super-block data on disk */
 struct sysv2_super_block {
 	u16	s_isize; 		/* index of first data zone */
@@ -182,10 +159,31 @@ struct sysv2_super_block {
 								2 for 1024 byte blocks */
 };
 
-/* SystemV2 free list block on disk */
-struct sysv2_freelist_chunk {
-	u16	fl_nfree;	/* number of free blocks in fl_free, <= SYSV_NICFREE] */
-	u32	fl_free[SYSV_NICFREE] __packed2__;
+/* V7 super-block data on disk */
+#define V7_NICINOD     100     /* number of inode cache entries */
+#define V7_NICFREE     50      /* number of free block list chunk entries */
+struct v7_super_block {
+	u16    s_isize;        /* index of first data zone */
+	u32    s_fsize __packed2__; /* total number of zones of this fs */
+	/* the start of the free block list: */
+	u16    s_nfree;        /* number of free blocks in s_free, <= V7_NICFREE */
+	u32    s_free[V7_NICFREE]; /* first free block list chunk */
+	/* the cache of free inodes: */
+	u16    s_ninode;       /* number of free inodes in s_inode, <= V7_NICINOD */
+	sysv_ino_t      s_inode[V7_NICINOD]; /* some free inodes */
+	/* locks, not used by Linux or V7: */
+	char    s_flock;        /* lock during free block list manipulation */
+	char    s_ilock;        /* lock during inode cache manipulation */
+	char    s_fmod;         /* super-block modified flag */
+	char    s_ronly;        /* flag whether fs is mounted read-only */
+	u32     s_time __packed2__; /* time of last super block update */
+	/* the following fields are not maintained by V7: */
+	u32     s_tfree __packed2__; /* total number of free zones */
+	u16     s_tinode;       /* total number of free inodes */
+	u16     s_m;            /* interleave factor */
+	u16     s_n;            /* interleave factor */
+	char    s_fname[6];     /* file system name */
+	char    s_fpack[6];     /* file system pack name */
 };
 
 /* Coherent super-block data on disk */
@@ -193,10 +191,10 @@ struct sysv2_freelist_chunk {
 #define COH_NICFREE	64	/* number of free block list chunk entries */
 struct coh_super_block {
 	u16		s_isize;	/* index of first data zone */
-	coh_ulong	s_fsize __packed2__; /* total number of zones of this fs */
+	u32		s_fsize __packed2__; /* total number of zones of this fs */
 	/* the start of the free block list: */
 	u16 s_nfree;	/* number of free blocks in s_free, <= COH_NICFREE */
-	coh_ulong	s_free[COH_NICFREE] __packed2__; /* first free block list chunk */
+	u32		s_free[COH_NICFREE] __packed2__; /* first free block list chunk */
 	/* the cache of free inodes: */
 	u16		s_ninode;	/* number of free inodes in s_inode, <= COH_NICINOD */
 	sysv_ino_t	s_inode[COH_NICINOD]; /* some free inodes */
@@ -205,8 +203,8 @@ struct coh_super_block {
 	char		s_ilock;	/* lock during inode cache manipulation */
 	char		s_fmod;		/* super-block modified flag */
 	char		s_ronly;	/* flag whether fs is mounted read-only */
-	coh_ulong	s_time __packed2__; /* time of last super block update */
-	coh_ulong	s_tfree __packed2__; /* total number of free zones */
+	u32		s_time __packed2__; /* time of last super block update */
+	u32		s_tfree __packed2__; /* total number of free zones */
 	u16		s_tinode;	/* total number of free inodes */
 	u16		s_interleave_m;	/* interleave factor */
 	u16		s_interleave_n;
@@ -214,13 +212,6 @@ struct coh_super_block {
 	char		s_fpack[6];	/* file system pack name */
 	u32		s_unique;	/* zero, not used */
 };
-
-/* Coherent free list block on disk */
-struct coh_freelist_chunk {
-	u16 fl_nfree;	/* number of free blocks in fl_free, <= COH_NICFREE] */
-	u32  fl_free[COH_NICFREE] __packed2__;
-};
-
 
 /* SystemV/Coherent inode data on disk */
 
@@ -237,8 +228,6 @@ struct sysv_inode {
 					      * then 1 triple indirection block.
 					      * Then maybe a "file generation number" ??
 					      */
-		/* devices */
-		dev_t i_rdev;
 		/* named pipes on Coherent */
 		struct {
 			char p_addp[30];
@@ -300,9 +289,12 @@ extern inline unsigned short to_coh_imode(mode_t mode)
 }
 
 /* Admissible values for i_nlink: 0.._LINK_MAX */
-#define XENIX_LINK_MAX	126	/* ?? */
-#define SYSV_LINK_MAX	126	/* 127? 251? */
-#define COH_LINK_MAX	10000	/* max number of hard links to an inode */
+enum {
+	XENIX_LINK_MAX	=	126,	/* ?? */
+	SYSV_LINK_MAX	=	126,	/* 127? 251? */
+	V7_LINK_MAX     =	126,	/* ?? */
+	COH_LINK_MAX	=	10000,
+};
 
 /* The number of inodes per block is
    sb->sv_inodes_per_block = block_size / sizeof(struct sysv_inode) */
@@ -325,12 +317,16 @@ struct sysv_dir_entry {
 /* Operations */
 /* ========== */
 
-
 /* identify the FS in memory */
-#define FSTYPE_XENIX	1
-#define FSTYPE_SYSV4	2
-#define FSTYPE_SYSV2	3
-#define FSTYPE_COH	4
+enum {
+	FSTYPE_NONE = 0,
+	FSTYPE_XENIX,
+	FSTYPE_SYSV4,
+	FSTYPE_SYSV2,
+	FSTYPE_COH,
+	FSTYPE_V7,
+	FSTYPE_END,
+};
 
 #define SYSV_MAGIC_BASE		0x012FF7B3
 
@@ -341,55 +337,112 @@ struct sysv_dir_entry {
 
 #ifdef __KERNEL__
 
-/* sv_get_hash_table(sb,dev,block) is equivalent to  get_hash_table(dev,block,block_size)  */
-static inline struct buffer_head *
-sv_get_hash_table (struct super_block *sb, kdev_t dev, unsigned int block)
-{
-	return get_hash_table (dev, block + sb->sv_block_base, sb->sv_block_size);
-}
-
-/* sv_getblk(sb,dev,block) is equivalent to  getblk(dev,block,block_size)  */
-static inline struct buffer_head *
-sv_getblk (struct super_block *sb, kdev_t dev, unsigned int block)
-{
-	return getblk (dev, block + sb->sv_block_base, sb->sv_block_size);
-}
-
-/* sv_bread(sb,dev,block) is equivalent to  bread(dev,block,block_size)  */
-static inline struct buffer_head *
-sv_bread (struct super_block *sb, kdev_t dev, unsigned int block)
-{
-	return bread (dev, block + sb->sv_block_base, sb->sv_block_size);
-}
-
+enum {
+	BYTESEX_LE,
+	BYTESEX_PDP,
+	BYTESEX_BE,
+};
 
 /*
  * Function prototypes
  */
 
-extern struct inode * sysv_new_inode(const struct inode * dir);
-extern void sysv_free_inode(struct inode * inode);
-extern unsigned long sysv_count_free_inodes(struct super_block *sb);
-extern int sysv_new_block(struct super_block * sb);
-extern void sysv_free_block(struct super_block * sb, unsigned int block);
-extern unsigned long sysv_count_free_blocks(struct super_block *sb);
-
-extern struct buffer_head * sysv_file_bread(struct inode *, int, int);
+extern struct inode * sysv_new_inode(const struct inode *, mode_t);
+extern void sysv_free_inode(struct inode *);
+extern unsigned long sysv_count_free_inodes(struct super_block *);
+extern u32 sysv_new_block(struct super_block *);
+extern void sysv_free_block(struct super_block *, u32);
+extern unsigned long sysv_count_free_blocks(struct super_block *);
 
 extern void sysv_truncate(struct inode *);
+
 extern void sysv_write_inode(struct inode *, int);
 extern int sysv_sync_inode(struct inode *);
 extern int sysv_sync_file(struct file *, struct dentry *, int);
 extern int sysv_notify_change(struct dentry *, struct iattr *);
+extern void sysv_set_inode(struct inode *, dev_t);
+
+extern struct sysv_dir_entry *sysv_find_entry(struct dentry*, struct page**);
+extern int sysv_add_link(struct dentry*, struct inode*);
+extern int sysv_delete_entry(struct sysv_dir_entry*, struct page*);
+extern int sysv_make_empty(struct inode*, struct inode*);
+extern int sysv_empty_dir(struct inode*);
+extern void sysv_set_link(struct sysv_dir_entry*, struct page*, struct inode*);
+extern struct sysv_dir_entry *sysv_dotdot(struct inode*, struct page**);
+extern ino_t sysv_inode_by_name(struct dentry*);
 
 extern struct inode_operations sysv_file_inode_operations;
-extern struct inode_operations sysv_symlink_inode_operations;
 extern struct inode_operations sysv_dir_inode_operations;
 extern struct file_operations sysv_file_operations;
 extern struct file_operations sysv_dir_operations;
 extern struct address_space_operations sysv_aops;
+extern struct super_operations sysv_sops;
+extern struct dentry_operations sysv_dentry_operations;
+
+extern struct sysv_inode *sysv_raw_inode(struct super_block *, unsigned, struct buffer_head **);
+
+static inline void dirty_sb(struct super_block *sb)
+{
+	mark_buffer_dirty(sb->sv_bh1);
+	if (sb->sv_bh1 != sb->sv_bh2)
+		mark_buffer_dirty(sb->sv_bh2);
+	sb->s_dirt = 1;
+}
+
+static inline u32 fs32_to_cpu(struct super_block *sb, u32 n)
+{
+	if (sb->sv_bytesex == BYTESEX_PDP)
+		return PDP_swab(n);
+	else if (sb->sv_bytesex == BYTESEX_LE)
+		return le32_to_cpu(n);
+	else
+		return be32_to_cpu(n);
+}
+
+static inline u32 cpu_to_fs32(struct super_block *sb, u32 n)
+{
+	if (sb->sv_bytesex == BYTESEX_PDP)
+		return PDP_swab(n);
+	else if (sb->sv_bytesex == BYTESEX_LE)
+		return cpu_to_le32(n);
+	else
+		return cpu_to_be32(n);
+}
+
+static inline u32 fs32_add(struct super_block *sb, u32 *n, int d)
+{
+	if (sb->sv_bytesex == BYTESEX_PDP)
+		return *n = PDP_swab(PDP_swab(*n)+d);
+	else if (sb->sv_bytesex == BYTESEX_LE)
+		return *n = cpu_to_le32(le32_to_cpu(*n)+d);
+	else
+		return *n = cpu_to_be32(be32_to_cpu(*n)+d);
+}
+
+static inline u16 fs16_to_cpu(struct super_block *sb, u16 n)
+{
+	if (sb->sv_bytesex != BYTESEX_BE)
+		return le16_to_cpu(n);
+	else
+		return be16_to_cpu(n);
+}
+
+static inline u16 cpu_to_fs16(struct super_block *sb, u16 n)
+{
+	if (sb->sv_bytesex != BYTESEX_BE)
+		return cpu_to_le16(n);
+	else
+		return cpu_to_be16(n);
+}
+
+static inline u16 fs16_add(struct super_block *sb, u16 *n, int d)
+{
+	if (sb->sv_bytesex != BYTESEX_BE)
+		return *n = cpu_to_le16(le16_to_cpu(*n)+d);
+	else
+		return *n = cpu_to_be16(be16_to_cpu(*n)+d);
+}
 
 #endif /* __KERNEL__ */
 
 #endif
-

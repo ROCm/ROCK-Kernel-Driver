@@ -56,7 +56,7 @@ void prom_reboot(void)
 	romvec->reboot();
 }
 
-void prom_imode(void)
+void ArcEnterInteractiveMode(void)
 {
 	bc_disable();
 	cli();

@@ -149,7 +149,7 @@ static int multicast_filter_limit = 512;
 #if defined(__ia64__) || defined(__alpha__) || defined(__sparc__)
 static int rx_copybreak = PKT_BUF_SZ;
 #else
-static int rx_copybreak = 0;
+static int rx_copybreak /* = 0 */;
 #endif
 
 /* Used to pass the media type, etc.
@@ -585,7 +585,7 @@ static int	netdev_rx(struct net_device *dev);
 static void	netdev_error(struct net_device *dev, int intr_status);
 static void	set_rx_mode(struct net_device *dev);
 static struct net_device_stats *get_stats(struct net_device *dev);
-static int	mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static int	netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int	netdev_close(struct net_device *dev);
 static void	netdev_media_change(struct net_device *dev);
 
@@ -726,7 +726,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 	dev->stop = &netdev_close;
 	dev->get_stats = &get_stats;
 	dev->set_multicast_list = &set_rx_mode;
-	dev->do_ioctl = &mii_ioctl;
+	dev->do_ioctl = &netdev_ioctl;
 
 	if (mtu)
 		dev->mtu = mtu;
@@ -1664,38 +1664,149 @@ static void set_rx_mode(struct net_device *dev)
 
 			*fptr |= cpu_to_le32(1 << (bit_nr & 31));
 		}
-		/* Clear the perfect filter list. */
-		filter_addr = ioaddr + 0x56000 + 1*16;
+		/* Clear the perfect filter list, skip first entry. */
+		filter_addr = ioaddr + PerfFilterTable + 1 * 16;
 		for (i = 1; i < 16; i++) {
 			writew(0xffff, filter_addr); filter_addr += 4;
 			writew(0xffff, filter_addr); filter_addr += 4;
 			writew(0xffff, filter_addr); filter_addr += 8;
 		}
-		for (filter_addr=ioaddr + 0x56100, i=0; i < 32; filter_addr+= 16, i++)
+		for (filter_addr = ioaddr + HashTable, i=0; i < 32; filter_addr+= 16, i++)
 			writew(mc_filter[i], filter_addr);
 		rx_mode = AcceptBroadcast | AcceptMulticast | AcceptMyPhys;
 	}
 	writel(rx_mode, ioaddr + RxFilterMode);
 }
 
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+
+
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	struct ethtool_cmd ecmd;
+	struct netdev_private *np = dev->priv;
+
+	if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
+		return -EFAULT;
+
+	switch (ecmd.cmd) {
+	case ETHTOOL_GSET:
+		ecmd.supported =
+			SUPPORTED_10baseT_Half |
+			SUPPORTED_10baseT_Full |
+			SUPPORTED_100baseT_Half |
+			SUPPORTED_100baseT_Full |
+			SUPPORTED_Autoneg |
+			SUPPORTED_MII;
+
+		ecmd.advertising = ADVERTISED_MII;
+		if (np->advertising & ADVERTISE_10HALF)
+			ecmd.advertising |= ADVERTISED_10baseT_Half;
+		if (np->advertising & ADVERTISE_10FULL)
+			ecmd.advertising |= ADVERTISED_10baseT_Full;
+		if (np->advertising & ADVERTISE_100HALF)
+			ecmd.advertising |= ADVERTISED_100baseT_Half;
+		if (np->advertising & ADVERTISE_100FULL)
+			ecmd.advertising |= ADVERTISED_100baseT_Full;
+		if (np->autoneg) {
+			ecmd.advertising |= ADVERTISED_Autoneg;
+			ecmd.autoneg = AUTONEG_ENABLE;
+		} else
+			ecmd.autoneg = AUTONEG_DISABLE;
+
+		ecmd.port = PORT_MII;
+		ecmd.transceiver = XCVR_INTERNAL;
+		ecmd.phy_address = np->phys[0];
+		ecmd.speed = np->speed100 ? SPEED_100 : SPEED_10;
+		ecmd.duplex = np->full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
+		ecmd.maxtxpkt = TX_RING_SIZE;
+		ecmd.maxrxpkt = np->intr_mitigation; /* not 100% accurate */
+
+
+		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
+			return -EFAULT;
+		return 0;
+
+	case ETHTOOL_SSET: {
+		u16 autoneg, speed100, full_duplex;
+
+		autoneg = (ecmd.autoneg == AUTONEG_ENABLE);
+		speed100 = (ecmd.speed == SPEED_100);
+		full_duplex = (ecmd.duplex == DUPLEX_FULL);
+
+		np->autoneg = autoneg;
+		if (speed100 != np->speed100 ||
+		    full_duplex != np->full_duplex) {
+			np->speed100 = speed100;
+			np->full_duplex = full_duplex;
+			/* change advertising bits */
+			np->advertising &= ~(ADVERTISE_10HALF |
+					     ADVERTISE_10FULL |
+					     ADVERTISE_100HALF |
+					     ADVERTISE_100FULL |
+					     ADVERTISE_100BASE4);
+			if (speed100) {
+				if (full_duplex)
+					np->advertising |= ADVERTISE_100FULL;
+				else
+					np->advertising |= ADVERTISE_100HALF;
+			} else {
+				if (full_duplex)
+					np->advertising |= ADVERTISE_10FULL;
+				else
+					np->advertising |= ADVERTISE_10HALF;
+			}
+		}
+		check_duplex(dev);
+		return 0;
+	}
+
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info;
+		memset(&info, 0, sizeof(info));
+		info.cmd = ecmd.cmd;
+		strcpy(info.driver, DRV_NAME);
+		strcpy(info.version, DRV_VERSION);
+		*info.fw_version = 0;
+		strcpy(info.bus_info, PCI_SLOT_NAME(np->pci_dev));
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+		       return -EFAULT;
+		return 0;
+	}
+
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+
+
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdev_private *np = dev->priv;
-	u16 *data = (u16 *)&rq->ifr_data;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
 
 	switch(cmd) {
-	case SIOCDEVPRIVATE:		/* Get the address of the PHY in use. */
-		data[0] = np->phys[0] & 0x1f;
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+
+	/* Legacy mii-diag interface */
+	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
+	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
+		data->phy_id = np->phys[0] & 0x1f;
 		/* Fall Through */
-	case SIOCDEVPRIVATE+1:		/* Read the specified MII register. */
-		data[3] = mdio_read(dev, data[0] & 0x1f, data[1] & 0x1f);
+
+	case SIOCGMIIREG:		/* Read MII PHY register. */
+	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
+		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		return 0;
-	case SIOCDEVPRIVATE+2:		/* Write the specified MII register */
+
+	case SIOCSMIIREG:		/* Write MII PHY register. */
+	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		if (data[0] == np->phys[0]) {
-			u16 value = data[2];
-			switch (data[1]) {
+		if (data->phy_id == np->phys[0]) {
+			u16 value = data->val_in;
+			switch (data->reg_num) {
 			case 0:
 				if (value & 0x9000)	/* Autonegotiation. */
 					np->autoneg = 1;
@@ -1710,7 +1821,7 @@ static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			}
 			check_duplex(dev);
 		}
-		mdio_write(dev, data[0] & 0x1f, data[1] & 0x1f, data[2]);
+		mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
 		return 0;
 	default:
 		return -EOPNOTSUPP;

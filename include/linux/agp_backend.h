@@ -45,7 +45,7 @@ enum chipset_type {
 	INTEL_BX,
 	INTEL_GX,
 	INTEL_I810,
-       INTEL_I815,
+	INTEL_I815,
 	INTEL_I840,
 	INTEL_I850,
 	VIA_GENERIC,
@@ -65,7 +65,10 @@ enum chipset_type {
 	ALI_M1641,
 	ALI_M1647,
 	ALI_M1651,
-	ALI_GENERIC
+	ALI_GENERIC,
+	SVWRKS_HE,
+	SVWRKS_LE,
+	SVWRKS_GENERIC
 };
 
 typedef struct _agp_version {

@@ -22,7 +22,7 @@ SECTIONS
 	} = 0
 
   . = ALIGN(16);
-  .rodata : { *(.rodata) }
+  .rodata : { *(.rodata) *(.rodata.*) }
   .kstrtab : { *(.kstrtab) }
 
   _etext = .;			/* End of text section */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.chrpmain.c 1.9 05/18/01 06:20:29 patch
+ * BK Id: SCCS/s.chrpmain.c 1.12 06/12/01 16:42:26 paulus
  */
 /*
  * Copyright (C) Paul Mackerras 1997.
@@ -33,15 +33,6 @@ void stop_imac_usb(void);
 #define PROG_SIZE	0x003f0000
 
 #define SCRATCH_SIZE	(128 << 10)
-
-#ifdef CONFIG_CMDLINE
-#define CMDLINE CONFIG_CMDLINE
-#else
-#define CMDLINE ""
-#endif
-char cmd_preset[] = CMDLINE;
-char cmd_buf[256];
-char *cmd_line = cmd_buf;
 
 char *avail_ram;
 char *begin_avail, *end_avail;
@@ -98,7 +89,6 @@ boot(int a1, int a2, void *prom)
     }
 
     flush_cache(dst, len);
-    memcpy (cmd_line, cmd_preset, sizeof(cmd_preset));
     make_bi_recs((unsigned long) dst + len);
 
     sa = (unsigned long)PROG_START;
@@ -133,19 +123,14 @@ void make_bi_recs(unsigned long addr)
 	rec->tag = BI_MACHTYPE;
 	rec->data[0] = _MACH_Pmac;
 	rec->data[1] = 1;
-	rec->size = sizeof(struct bi_record) + sizeof(unsigned long);
-	rec = (struct bi_record *)((unsigned long)rec + rec->size);
-
-	rec->tag = BI_CMD_LINE;
-	memcpy( (char *)rec->data, cmd_line, strlen(cmd_line)+1);
-	rec->size = sizeof(struct bi_record) + strlen(cmd_line) + 1;
+	rec->size = sizeof(struct bi_record) + 2 * sizeof(unsigned long);
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);
 
 #ifdef SYSMAP_OFFSET
 	rec->tag = BI_SYSMAP;
 	rec->data[0] = SYSMAP_OFFSET;
 	rec->data[1] = SYSMAP_SIZE;
-	rec->size = sizeof(struct bi_record) + sizeof(unsigned long);
+	rec->size = sizeof(struct bi_record) + 2 * sizeof(unsigned long);
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);
 #endif /* SYSMAP_OFFSET */
 	

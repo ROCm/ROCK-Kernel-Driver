@@ -47,6 +47,7 @@ SECTIONS
 			*(.gnu.warning)
 			*(.text.lock)	/* out-of-line lock text */
 			*(.rodata)
+			*(.rodata.*)
 			*(.glue_7)
 			*(.glue_7t)
 			*(.kstrtab)

@@ -154,7 +154,7 @@ int main(int argc, char ** argv)
 	if (sys_size > (is_big_kernel ? 0x28000 : DEF_SYSSIZE))
 		die("System is too big. Try using %smodules.",
 			is_big_kernel ? "" : "bzImage or ");
-	if (sys_size > 0xffff)
+	if (sys_size > 0xefff)
 		fprintf(stderr,"warning: kernel is too big for standalone boot "
 		    "from floppy\n");
 	while (sz > 0) {

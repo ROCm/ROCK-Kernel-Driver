@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.processor.h 1.19 05/18/01 08:18:10 patch
+ * BK Id: SCCS/s.processor.h 1.24 06/15/01 13:56:56 paulus
  */
 #ifdef __KERNEL__
 #ifndef __ASM_PPC_PROCESSOR_H
@@ -445,6 +445,7 @@
 #define	PVR_403GC	0x00200200
 #define	PVR_403GCX	0x00201400
 #define	PVR_405GP	0x40110000
+#define	PVR_STB03XXX	0x40310000 
 #define	PVR_601		0x00010000
 #define	PVR_602		0x00050000
 #define	PVR_603		0x00030000
@@ -459,6 +460,8 @@
 #define	PVR_750		PVR_740
 #define	PVR_740P	0x10080000
 #define	PVR_750P	PVR_740P
+#define	PVR_7400	0x000C0000
+#define	PVR_7410	0x800C0000
 /*
  * For the 8xx processors, all of them report the same PVR family for
  * the PowerPC core. The various versions of these processors must be
@@ -469,7 +472,6 @@
 #define	PVR_823		PVR_821
 #define	PVR_850		PVR_821
 #define	PVR_860		PVR_821
-#define	PVR_7400       	0x000C0000
 #define	PVR_8240	0x00810100
 #define	PVR_8260	PVR_8240
 

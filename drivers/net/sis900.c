@@ -53,6 +53,7 @@
 #include <linux/pci.h>
 #include <linux/netdevice.h>
 #include <linux/init.h>
+#include <linux/mii.h>
 
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -1702,19 +1703,24 @@ sis900_close(struct net_device *net_dev)
 static int mii_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd)
 {
 	struct sis900_private *sis_priv = net_dev->priv;
-	u16 *data = (u16 *)&rq->ifr_data;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
 
 	switch(cmd) {
-	case SIOCDEVPRIVATE:            	/* Get the address of the PHY in use. */
-		data[0] = sis_priv->mii->phy_addr;
+	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
+	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
+		data->phy_id = sis_priv->mii->phy_addr;
 		/* Fall Through */
-	case SIOCDEVPRIVATE+1:          	/* Read the specified MII register. */
-		data[3] = mdio_read(net_dev, data[0] & 0x1f, data[1] & 0x1f);
+
+	case SIOCGMIIREG:		/* Read MII PHY register. */
+	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
+		data->val_out = mdio_read(net_dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		return 0;
-	case SIOCDEVPRIVATE+2:          	/* Write the specified MII register */
+
+	case SIOCSMIIREG:		/* Write MII PHY register. */
+	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
-		mdio_write(net_dev, data[0] & 0x1f, data[1] & 0x1f, data[2]);
+		mdio_write(net_dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
 		return 0;
 	default:
 		return -EOPNOTSUPP;

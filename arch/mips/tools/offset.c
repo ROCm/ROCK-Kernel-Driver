@@ -1,12 +1,13 @@
-/* $Id: offset.c,v 1.11 1999/09/28 22:25:50 ralf Exp $
- *
+/*
  * offset.c: Calculate pt_regs and task_struct offsets.
  *
  * Copyright (C) 1996 David S. Miller
  * Copyright (C) 1997, 1998, 1999 Ralf Baechle
  * Copyright (C) 1999 Silicon Graphics, Inc.
+ *
+ * Kevin Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips.com
+ * Copyright (C) 2000 MIPS Technologies, Inc.
  */
-
 #include <linux/types.h>
 #include <linux/sched.h>
 
@@ -84,6 +85,7 @@ void output_task_defines(void)
 	offset("#define TASK_COUNTER       ", struct task_struct, counter);
 	offset("#define TASK_NICE          ", struct task_struct, nice);
 	offset("#define TASK_MM            ", struct task_struct, mm);
+	offset("#define TASK_PID           ", struct task_struct, pid);
 	size("#define TASK_STRUCT_SIZE   ", struct task_struct);
 	linefeed;
 }
@@ -119,6 +121,10 @@ void output_thread_defines(void)
 	       thread.irix_trampoline);
 	offset("#define THREAD_OLDCTX  ", struct task_struct, \
 	       thread.irix_oldctx);
+	offset("#define THREAD_DSEEPC  ", struct task_struct, \
+	       thread.dsemul_epc);
+	offset("#define THREAD_DSEAERPC ", struct task_struct, \
+	       thread.dsemul_aerpc);
 	linefeed;
 }
 

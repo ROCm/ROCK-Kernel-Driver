@@ -105,6 +105,10 @@ if [ "$CONFIG_ISDN_DRV_EICON" != "n" ]; then
    fi
 fi
 
+if [ "$CONFIG_EXPERIMENTAL" != "n" ]; then
+   dep_tristate    'Auvertech TurboPAM support' CONFIG_ISDN_DRV_TPAM $CONFIG_ISDN $CONFIG_PCI
+fi
+
 # CAPI subsystem
 
 tristate           'CAPI2.0 support' CONFIG_ISDN_CAPI

@@ -2984,14 +2984,9 @@ static int __init airo_init_module( void )
 	printk( KERN_INFO "airo:  Finished probing for PCI adapters\n" );
 #endif
 
-	/* arguably, we should clean up and error exit if pci_module_init
-	 * fails with an error other than -ENODEV, instead of proceeding,
-	 * if ISA devs are present.
+	/* Always exit with success, as we are a library module
+	 * as well as a driver module
 	 */
-	if (have_isa_dev)
-		return 0;
-	if (rc && (rc != -ENODEV))
-		return rc;
 	return 0;
 }
 

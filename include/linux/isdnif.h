@@ -1,4 +1,4 @@
-/* $Id: isdnif.h,v 1.37.6.2 2001/05/17 21:15:34 kai Exp $
+/* $Id: isdnif.h,v 1.37.6.4 2001/06/09 15:14:19 kai Exp $
 
  * Linux ISDN subsystem
  *
@@ -433,6 +433,7 @@ typedef struct {
 #ifdef CONFIG_ISDN_TTY_FAX
 		T30_s	*fax;	/* Pointer to ttys fax struct		*/
 #endif
+		ulong userdata;	/* User Data */
 	} parm;
 } isdn_ctrl;
 

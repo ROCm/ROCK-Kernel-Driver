@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.xmon.c 1.12 06/09/01 22:18:05 paulus
+ * BK Id: SCCS/s.xmon.c 1.14 06/28/01 15:50:17 paulus
  */
 /*
  * Routines providing a simple monitor for use on the PowerMac.
@@ -1017,7 +1017,8 @@ dump_hash_table()
 		seg_end = (seg << 28) | 0x0ffff000;
 		if (seg_end > hash_end)
 			seg_end = hash_end;
-		dump_hash_table_seg((hash_ctx << 4) + seg, seg_start, seg_end);
+		dump_hash_table_seg((hash_ctx << 4) + (seg * 0x111),
+				    seg_start, seg_end);
 		seg_start = seg_end + 0x1000;
 	}
 }

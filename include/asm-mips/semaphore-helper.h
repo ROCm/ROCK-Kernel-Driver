@@ -1,11 +1,11 @@
-/* $Id: semaphore-helper.h,v 1.6 1999/10/20 21:10:58 ralf Exp $
- *
+/*
  * SMP- and interrupt-safe semaphores helper functions.
  *
- * (C) Copyright 1996 Linus Torvalds
- * (C) Copyright 1999 Andrea Arcangeli
- * (C) Copyright 1999 Ralf Baechle
- * (C) Copyright 1999 Silicon Graphics, Inc.
+ * Copyright (C) 1996 Linus Torvalds
+ * Copyright (C) 1999 Andrea Arcangeli
+ * Copyright (C) 1999 Ralf Baechle
+ * Copyright (C) 1999 Silicon Graphics, Inc.
+ * Copyright (C) 2000 MIPS Technologies, Inc.
  */
 #ifndef _ASM_SEMAPHORE_HELPER_H
 #define _ASM_SEMAPHORE_HELPER_H
@@ -20,7 +20,7 @@ static inline void wake_one_more(struct semaphore * sem)
 	atomic_inc(&sem->waking);
 }
 
-#if !defined(CONFIG_CPU_HAS_LLSC)
+#if !defined(CONFIG_CPU_HAS_LLSC) || defined(CONFIG_CPU_MIPS32)
 
 /*
  * It doesn't make sense, IMHO, to endlessly turn interrupts off and on again.
@@ -75,6 +75,7 @@ static inline int waking_non_zero_trylock(struct semaphore *sem)
 		ret = 0;
 	}
 	restore_flags(flags);
+
 	return ret;
 }
 
@@ -92,7 +93,7 @@ waking_non_zero(struct semaphore *sem)
 	"sc\t%0, %2\n\t"
 	"beqz\t%0, 1b\n\t"
 	"2:"
-	: "=r"(ret), "=r"(tmp), "=m"(__atomic_fool_gcc(&sem->waking))
+	: "=r" (ret), "=r" (tmp), "=m" (sem->waking)
 	: "0"(0));
 
 	return ret;
@@ -133,29 +134,26 @@ waking_non_zero_interruptible(struct semaphore *sem, struct task_struct *tsk)
 {
 	long ret, tmp;
 
-        __asm__ __volatile__("
-	.set	push
-	.set	mips3
-	.set	noat
-0:	lld	%1, %2
-	li	%0, 0
-	sll	$1, %1, 0
-	blez	$1, 1f
-	daddiu	%1, %1, -1
-	li	%0, 1
-	b 	2f
-1:
-	beqz	%3, 2f
-	li	%0, %4
-	dli	$1, 0x0000000100000000
-	daddu	%1, %1, $1
-2:
-	scd	%1, %2
-	beqz	%1, 0b
-
-	.set	pop"
-	: "=&r"(ret), "=&r"(tmp), "=m"(*sem)
-	: "r"(signal_pending(tsk)), "i"(-EINTR));
+	__asm__ __volatile__(
+	".set\tpush\n\t"
+	".set\tmips3\n\t"
+	".set\tnoat\n"
+	"0:\tlld\t%1, %2\n\t"
+	"li\t%0, 0\n\t"
+	"sll\t$1, %1, 0\n\t"
+	"blez\t$1, 1f\n\t"
+	"daddiu\t%1, %1, -1\n\t"
+	"li\t%0, 1\n\t"
+	"b\t2f\n"
+	"1:\tbeqz\t%3, 2f\n\t"
+	"li\t%0, %4\n\t"
+	"dli\t$1, 0x0000000100000000\n\t"
+	"daddu\t%1, %1, $1\n"
+	"2:\tscd\t%1, %2\n\t"
+	"beqz\t%1, 0b\n\t"
+	".set\tpop"
+	: "=&r" (ret), "=&r" (tmp), "=m" (*sem)
+	: "r" (signal_pending(tsk)), "i" (-EINTR));
 
 	return ret;
 }

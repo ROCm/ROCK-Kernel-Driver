@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.sleep.S 1.7 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.sleep.S 1.10 06/28/01 15:50:17 paulus
  */
 /*
  * This file contains sleep low-level functions for PowerBook G3.
@@ -194,7 +194,7 @@ wake_up:
 	lis	r3,0x2000	/* Ku = 1, VSID = 0 */
 	li	r4,0
 3:	mtsrin	r3,r4
-	addi	r3,r3,1		/* increment VSID */
+	addi	r3,r3,0x111	/* increment VSID */
 	addis	r4,r4,0x1000	/* address of next segment */
 	bdnz	3b
 	

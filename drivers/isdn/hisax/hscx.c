@@ -1,4 +1,4 @@
-/* $Id: hscx.c,v 1.21.6.1 2001/02/16 16:43:27 kai Exp $
+/* $Id: hscx.c,v 1.21.6.2 2001/06/09 15:14:17 kai Exp $
  *
  * hscx.c   HSCX specific routines
  *
@@ -166,8 +166,8 @@ close_hscxstate(struct BCState *bcs)
 			kfree(bcs->blog);
 			bcs->blog = NULL;
 		}
-		discard_queue(&bcs->rqueue);
-		discard_queue(&bcs->squeue);
+		skb_queue_purge(&bcs->rqueue);
+		skb_queue_purge(&bcs->squeue);
 		if (bcs->tx_skb) {
 			dev_kfree_skb_any(bcs->tx_skb);
 			bcs->tx_skb = NULL;

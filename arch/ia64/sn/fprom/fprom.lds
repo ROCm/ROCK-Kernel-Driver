@@ -24,7 +24,7 @@ SECTIONS
   _data = .;
 
   .rodata : AT(ADDR(.rodata) - 0x0000000000000000 )
-	{ *(.rodata) }
+	{ *(.rodata) *(.rodata.*) }
   .opd : AT(ADDR(.opd) - 0x0000000000000000 )
 	{ *(.opd) }
   .data : AT(ADDR(.data) - 0x0000000000000000 )

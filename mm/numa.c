@@ -92,7 +92,7 @@ static struct page * alloc_pages_pgdat(pg_data_t *pgdat, int gfp_mask,
  * This can be refined. Currently, tries to do round robin, instead
  * should do concentratic circle search, starting from current node.
  */
-struct page * _alloc_pages(int gfp_mask, unsigned long order)
+struct page * _alloc_pages(unsigned int gfp_mask, unsigned long order)
 {
 	struct page *ret = 0;
 	pg_data_t *start, *temp;

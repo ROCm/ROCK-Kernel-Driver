@@ -108,8 +108,8 @@ static dev_info_t dev_info = "orinoco_cs";
    device numbers are used to derive the corresponding array index.
 */
 
-static dev_link_t *dev_list = NULL;
-static int num_instances = 0;
+static dev_link_t *dev_list;
+static int num_instances;
 
 /*====================================================================*/
 

@@ -47,6 +47,9 @@ obj-$(CONFIG_SOUND_ACI_MIXER)	+= aci.o
 obj-$(CONFIG_SOUND_AWE32_SYNTH)	+= awe_wave.o
 
 obj-$(CONFIG_SOUND_VIA82CXXX)	+= via82cxxx_audio.o ac97_codec.o
+ifeq ($(CONFIG_MIDI_VIA82CXXX),y)
+  obj-$(CONFIG_SOUND_VIA82CXXX) += sound.o uart401.o
+endif
 obj-$(CONFIG_SOUND_YMFPCI)	+= ymfpci.o ac97_codec.o
 ifeq ($(CONFIG_SOUND_YMFPCI_LEGACY),y)
   obj-$(CONFIG_SOUND_YMFPCI)    += opl3.o uart401.o

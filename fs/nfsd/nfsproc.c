@@ -71,7 +71,7 @@ nfsd_proc_setattr(struct svc_rqst *rqstp, struct nfsd_sattrargs *argp,
 		argp->attrs.ia_valid, (long) argp->attrs.ia_size);
 
 	fh_copy(&resp->fh, &argp->fh);
-	return nfsd_setattr(rqstp, &resp->fh, &argp->attrs);
+	return nfsd_setattr(rqstp, &resp->fh, &argp->attrs,0, (time_t)0);
 }
 
 /*
@@ -222,7 +222,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 		goto out_unlock;
 	}
 	fh_init(newfhp, NFS_FHSIZE);
-	nfserr = fh_compose(newfhp, dirfhp->fh_export, dchild);
+	nfserr = fh_compose(newfhp, dirfhp->fh_export, dchild, dirfhp);
 	if (!nfserr && !dchild->d_inode)
 		nfserr = nfserr_noent;
 	if (nfserr) {
@@ -331,7 +331,7 @@ nfsd_proc_create(struct svc_rqst *rqstp, struct nfsd_createargs *argp,
 		 */
 		attr->ia_valid &= ATTR_SIZE;
 		if (attr->ia_valid)
-			nfserr = nfsd_setattr(rqstp, newfhp, attr);
+			nfserr = nfsd_setattr(rqstp, newfhp, attr, 0, (time_t)0);
 	}
 
 out_unlock:

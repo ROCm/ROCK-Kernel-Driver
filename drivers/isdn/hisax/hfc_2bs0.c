@@ -1,4 +1,4 @@
-/* $Id: hfc_2bs0.c,v 1.17.6.1 2001/02/16 16:43:27 kai Exp $
+/* $Id: hfc_2bs0.c,v 1.17.6.2 2001/06/09 15:14:17 kai Exp $
  *
  *  specific routines for CCD's HFC 2BS0
  *
@@ -532,8 +532,8 @@ close_hfcstate(struct BCState *bcs)
 {
 	mode_hfc(bcs, 0, bcs->channel);
 	if (test_bit(BC_FLG_INIT, &bcs->Flag)) {
-		discard_queue(&bcs->rqueue);
-		discard_queue(&bcs->squeue);
+		skb_queue_purge(&bcs->rqueue);
+		skb_queue_purge(&bcs->squeue);
 		if (bcs->tx_skb) {
 			dev_kfree_skb_any(bcs->tx_skb);
 			bcs->tx_skb = NULL;
