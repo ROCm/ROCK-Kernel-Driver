@@ -1099,6 +1099,7 @@ qla2x00_configure_hba(scsi_qla_host_t *ha)
 	if (rval != QLA_SUCCESS) {
 		qla_printk(KERN_WARNING, ha,
 		    "ERROR -- Unable to get host loop ID.\n");
+		set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
 		return (rval);
 	}
 
@@ -1953,6 +1954,9 @@ qla2x00_lun_discovery(scsi_qla_host_t *ha, fc_port_t *fcport)
 		return;
 	}
 
+	/* Always add a fc_lun_t structure for lun 0 -- mid-layer requirement */
+	qla2x00_add_lun(fcport, 0);
+
 	/* If report LUN works, exit. */
 	if (qla2x00_rpt_lun_discovery(ha, fcport, inq, inq_dma) !=
 	    QLA_SUCCESS) {
@@ -1997,9 +2001,6 @@ qla2x00_rpt_lun_discovery(scsi_qla_host_t *ha, fc_port_t *fcport,
 	rval = qla2x00_report_lun(ha, fcport);
 	if (rval != QLA_SUCCESS)
 		return (rval);
-
-	/* Always add a fc_lun_t structure for lun 0 -- mid-layer requirement */
-	qla2x00_add_lun(fcport, 0);
 
 	/* Configure LUN list. */
 	len = be32_to_cpu(ha->rlc_rsp->list.hdr.len);
@@ -2136,6 +2137,7 @@ qla2x00_cfg_lun(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun,
     inq_cmd_rsp_t *inq, dma_addr_t inq_dma) 
 {
 	fc_lun_t *fclun;
+	uint8_t	  device_type;
 
 	/* Bypass LUNs that failed. */
 	if (qla2x00_inquiry(ha, fcport, lun, inq, inq_dma) != QLA_SUCCESS) {
@@ -2144,8 +2146,8 @@ qla2x00_cfg_lun(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun,
 
 		return (NULL);
 	}
-
-	switch (inq->inq[0]) {
+	device_type = (inq->inq[0] & 0x1f);
+	switch (device_type) {
 	case TYPE_DISK:
 	case TYPE_PROCESSOR:
 	case TYPE_WORM:
@@ -2163,11 +2165,11 @@ qla2x00_cfg_lun(scsi_qla_host_t *ha, fc_port_t *fcport, uint16_t lun,
 	default:
 		DEBUG2(printk("scsi(%ld): Unsupported lun type -- "
 		    "loop id=0x%04x lun=%d type=%x\n",
-		    ha->host_no, fcport->loop_id, lun, inq->inq[0]));
+		    ha->host_no, fcport->loop_id, lun, device_type));
 		return (NULL);
 	}
 
-	fcport->device_type = inq->inq[0];
+	fcport->device_type = device_type;
 	fclun = qla2x00_add_lun(fcport, lun);
 
 	if (fclun != NULL) {
@@ -2526,7 +2528,7 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *ha, struct list_head *new_fcports)
 {
 	int		rval;
 	uint16_t	loop_id;
-	fc_port_t	*fcport, *new_fcport;
+	fc_port_t	*fcport, *new_fcport, *fcptemp;
 	int		found;
 
 	sw_info_t	*swl;
@@ -2600,6 +2602,15 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *ha, struct list_head *new_fcports)
 			/* Send GA_NXT to the switch */
 			rval = qla2x00_ga_nxt(ha, new_fcport);
 			if (rval != QLA_SUCCESS) {
+				qla_printk(KERN_WARNING, ha,
+				    "SNS scan failed -- assuming zero-entry "
+				    "result...\n");
+				list_for_each_entry_safe(fcport, fcptemp,
+				    new_fcports, list) {
+					list_del(&fcport->list);
+					kfree(fcport);
+				}
+				rval = QLA_SUCCESS;
 				break;
 			}
 		}
@@ -3030,9 +3041,9 @@ qla2x00_fabric_login(scsi_qla_host_t *ha, fc_port_t *fcport,
 			 */
 			*next_loopid = fcport->loop_id;
 			qla2x00_fabric_logout(ha, fcport->loop_id);
-			fcport->loop_id = FC_NO_LOOP_ID;
+			qla2x00_mark_device_lost(ha, fcport, 1);
 
-			rval = 3;
+			rval = 1;
 			break;
 		} else {
 			/*
@@ -3049,7 +3060,7 @@ qla2x00_fabric_login(scsi_qla_host_t *ha, fc_port_t *fcport,
 			fcport->loop_id = FC_NO_LOOP_ID;
 			atomic_set(&fcport->state, FCS_DEVICE_DEAD);
 
-			rval = 1;
+			rval = 3;
 			break;
 		}
 	}
