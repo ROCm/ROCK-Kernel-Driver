@@ -56,7 +56,7 @@
 	CSZ presents a more precise but less flexible and less efficient
 	approach. As I understand it, the main idea is to create
 	WFQ flows for each guaranteed service and to allocate
-	the rest of bandwith to dummy flow-0. Flow-0 comprises
+	the rest of bandwidth to dummy flow-0. Flow-0 comprises
 	the predictive services and the best effort traffic;
 	it is handled by a priority scheduler with the highest
 	priority band allocated	for predictive services, and the rest ---

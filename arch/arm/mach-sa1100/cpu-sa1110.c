@@ -234,6 +234,8 @@ static int sa1110_target(struct cpufreq_policy *policy,
 		    (sa11x0_ppcr_to_freq(ppcr-1) >= policy->min))
 			ppcr--;
 		break;
+	default:
+		return -EINVAL;
 	}
 
 	freqs.old = sa11x0_getspeed();

@@ -9,6 +9,8 @@
 
 EXPORT_SYMBOL(ipv6_addr_type);
 EXPORT_SYMBOL(icmpv6_send);
+EXPORT_SYMBOL(icmpv6_statistics);
+EXPORT_SYMBOL(icmpv6_err_convert);
 EXPORT_SYMBOL(ndisc_mc_map);
 EXPORT_SYMBOL(register_inet6addr_notifier);
 EXPORT_SYMBOL(unregister_inet6addr_notifier);

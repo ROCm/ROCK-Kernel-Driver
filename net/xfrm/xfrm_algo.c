@@ -440,83 +440,6 @@ int xfrm_count_enc_supported(void)
 	return n;
 }
 
-#if defined(CONFIG_INET_AH) || defined(CONFIG_INET_AH_MODULE) || defined(CONFIG_INET6_AH) || defined(CONFIG_INET6_AH_MODULE)
-void skb_ah_walk(const struct sk_buff *skb,
-                        struct crypto_tfm *tfm, icv_update_fn_t icv_update)
-{
-	int offset = 0;
-	int len = skb->len;
-	int start = skb->len - skb->data_len;
-	int i, copy = start - offset;
-	struct scatterlist sg;
-
-	/* Checksum header. */
-	if (copy > 0) {
-		if (copy > len)
-			copy = len;
-		
-		sg.page = virt_to_page(skb->data + offset);
-		sg.offset = (unsigned long)(skb->data + offset) % PAGE_SIZE;
-		sg.length = copy;
-		
-		icv_update(tfm, &sg, 1);
-		
-		if ((len -= copy) == 0)
-			return;
-		offset += copy;
-	}
-
-	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
-		int end;
-
-		BUG_TRAP(start <= offset + len);
-
-		end = start + skb_shinfo(skb)->frags[i].size;
-		if ((copy = end - offset) > 0) {
-			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-
-			if (copy > len)
-				copy = len;
-			
-			sg.page = frag->page;
-			sg.offset = frag->page_offset + offset-start;
-			sg.length = copy;
-			
-			icv_update(tfm, &sg, 1);
-			
-			if (!(len -= copy))
-				return;
-			offset += copy;
-		}
-		start = end;
-	}
-
-	if (skb_shinfo(skb)->frag_list) {
-		struct sk_buff *list = skb_shinfo(skb)->frag_list;
-
-		for (; list; list = list->next) {
-			int end;
-
-			BUG_TRAP(start <= offset + len);
-
-			end = start + list->len;
-			if ((copy = end - offset) > 0) {
-				if (copy > len)
-					copy = len;
-				skb_ah_walk(list, tfm, icv_update);
-				if ((len -= copy) == 0)
-					return;
-				offset += copy;
-			}
-			start = end;
-		}
-	}
-	if (len)
-		BUG();
-}
-#endif
-
-#if defined(CONFIG_INET_ESP) || defined(CONFIG_INET_ESP_MODULE) || defined(CONFIG_INET6_ESP) || defined(CONFIG_INET6_ESP_MODULE)
 /* Move to common area: it is shared with AH. */
 
 void skb_icv_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
@@ -591,6 +514,7 @@ void skb_icv_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
 		BUG();
 }
 
+#if defined(CONFIG_INET_ESP) || defined(CONFIG_INET_ESP_MODULE) || defined(CONFIG_INET6_ESP) || defined(CONFIG_INET6_ESP_MODULE)
 
 /* Looking generic it is not used in another places. */
 

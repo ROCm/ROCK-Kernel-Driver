@@ -195,46 +195,14 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 	if (!data)
 		goto nodata;
 
-	/* XXX: does not include slab overhead */
-	skb->next	  = skb->prev = NULL;
-	skb->list	  = NULL;
-	skb->sk		  = NULL;
-	skb->stamp.tv_sec = 0;	/* No idea about time */
-	skb->dev	  = NULL;
-	skb->dst	  = NULL;
-	skb->sp		  = NULL;
-	memset(skb->cb, 0, sizeof(skb->cb));
-	/* Set up other state */
-	skb->len	  = 0;
-	skb->data_len	  = 0;
-	skb->csum	  = 0;
-	skb->local_df	  = 0;
-	skb->cloned	  = 0;
-	skb->pkt_type	  = PACKET_HOST;	/* Default type */
-	skb->ip_summed	  = 0;
-	skb->priority	  = 0;
-	atomic_set(&skb->users, 1);
-	skb->security	  = 0;	/* By default packets are insecure */
+	memset(skb, 0, offsetof(struct sk_buff, truesize));
 	skb->truesize = size + sizeof(struct sk_buff);
-	
-	/* Load the data pointers. */
-	skb->head = skb->data = skb->tail = data;
+	atomic_set(&skb->users, 1);
+	skb->head = data;
+	skb->data = data;
+	skb->tail = data;
 	skb->end  = data + size;
 
-	skb->destructor	  = NULL;
-#ifdef CONFIG_NETFILTER
-	skb->nfmark	= skb->nfcache = 0;
-	skb->nfct	= NULL;
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug	= 0;
-#endif
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-	skb->nf_bridge	= NULL;
-#endif
-#endif
-#ifdef CONFIG_NET_SCHED
-	skb->tc_index	= 0;
-#endif	
 	atomic_set(&(skb_shinfo(skb)->dataref), 1);
 	skb_shinfo(skb)->nr_frags  = 0;
 	skb_shinfo(skb)->tso_size = 0;
@@ -367,10 +335,10 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(nh);
 	C(mac);
 	C(dst);
-	dst_clone(n->dst);
+	dst_clone(skb->dst);
 	C(sp);
 #ifdef CONFIG_INET
-	secpath_get(n->sp);
+	secpath_get(skb->sp);
 #endif
 	memcpy(n->cb, skb->cb, sizeof(skb->cb));
 	C(len);
@@ -381,24 +349,20 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(pkt_type);
 	C(ip_summed);
 	C(priority);
-	atomic_set(&n->users, 1);
 	C(protocol);
 	C(security);
-	C(truesize);
-	C(head);
-	C(data);
-	C(tail);
-	C(end);
 	n->destructor = NULL;
 #ifdef CONFIG_NETFILTER
 	C(nfmark);
 	C(nfcache);
 	C(nfct);
+	nf_conntrack_get(skb->nfct);
 #ifdef CONFIG_NETFILTER_DEBUG
 	C(nf_debug);
 #endif
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 	C(nf_bridge);
+	nf_bridge_get(skb->nf_bridge);
 #endif
 #endif /*CONFIG_NETFILTER*/
 #if defined(CONFIG_HIPPI)
@@ -407,15 +371,16 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 #ifdef CONFIG_NET_SCHED
 	C(tc_index);
 #endif
+	C(truesize);
+	atomic_set(&n->users, 1);
+	C(head);
+	C(data);
+	C(tail);
+	C(end);
 
 	atomic_inc(&(skb_shinfo(skb)->dataref));
 	skb->cloned = 1;
-#ifdef CONFIG_NETFILTER
-	nf_conntrack_get(skb->nfct);
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-	nf_bridge_get(skb->nf_bridge);
-#endif
-#endif
+
 	return n;
 }
 
@@ -439,7 +404,6 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->nh.raw	= old->nh.raw + offset;
 	new->mac.raw	= old->mac.raw + offset;
 	memcpy(new->cb, old->cb, sizeof(old->cb));
-	atomic_set(&new->users, 1);
 	new->local_df	= old->local_df;
 	new->pkt_type	= old->pkt_type;
 	new->stamp	= old->stamp;
@@ -449,18 +413,19 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->nfmark	= old->nfmark;
 	new->nfcache	= old->nfcache;
 	new->nfct	= old->nfct;
-	nf_conntrack_get(new->nfct);
+	nf_conntrack_get(old->nfct);
 #ifdef CONFIG_NETFILTER_DEBUG
 	new->nf_debug	= old->nf_debug;
 #endif
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 	new->nf_bridge	= old->nf_bridge;
-	nf_bridge_get(new->nf_bridge);
+	nf_bridge_get(old->nf_bridge);
 #endif
 #endif
 #ifdef CONFIG_NET_SCHED
 	new->tc_index	= old->tc_index;
 #endif
+	atomic_set(&new->users, 1);
 }
 
 /**

@@ -17,9 +17,6 @@ struct ah_data
 	struct crypto_tfm	*tfm;
 };
 
-extern void skb_ah_walk(const struct sk_buff *skb,
-                        struct crypto_tfm *tfm, icv_update_fn_t icv_update);
-
 static inline void
 ah_hmac_digest(struct ah_data *ahp, struct sk_buff *skb, u8 *auth_data)
 {
@@ -27,7 +24,7 @@ ah_hmac_digest(struct ah_data *ahp, struct sk_buff *skb, u8 *auth_data)
 
 	memset(auth_data, 0, ahp->icv_trunc_len);
 	crypto_hmac_init(tfm, ahp->key, &ahp->key_len);
-	skb_ah_walk(skb, tfm, crypto_hmac_update);
+	skb_icv_walk(skb, tfm, 0, skb->len, crypto_hmac_update);
 	crypto_hmac_final(tfm, ahp->key, &ahp->key_len, ahp->work_icv);
 	memcpy(auth_data, ahp->work_icv, ahp->icv_trunc_len);
 }

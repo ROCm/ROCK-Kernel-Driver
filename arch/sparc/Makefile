@@ -54,13 +54,16 @@ NET_Y		:= $(patsubst %/, %/built-in.o, $(net-y))
 LIBS_Y		:= $(patsubst %/, %/lib.a, $(libs-y))
 export INIT_Y CORE_Y DRIVERS_Y NET_Y LIBS_Y HEAD_Y
 
-makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/$(ARCH)/boot $(1)
+# Default target
+all: image
+
+boot := arch/sparc/boot
 
 image tftpboot.img: vmlinux
-	$(call makeboot,arch/sparc/boot/$@)
+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 archclean:
-	$(Q)$(MAKE) -f scripts/Makefile.clean obj=arch/$(ARCH)/boot
+	$(Q)$(MAKE) $(clean)=$(boot)
 
 prepare: include/asm-$(ARCH)/asm_offsets.h
 
@@ -72,3 +75,9 @@ include/asm-$(ARCH)/asm_offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 
 CLEAN_FILES +=	include/asm-$(ARCH)/asm_offsets.h	\
 		arch/$(ARCH)/kernel/asm-offsets.s
+
+# Don't use tabs in echo arguments.
+define archhelp
+  echo  '* image        - kernel image ($(boot)/image)'
+  echo  '  tftpboot.img - image prepared for tftp'
+endef

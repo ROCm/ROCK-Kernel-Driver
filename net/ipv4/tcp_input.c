@@ -3363,7 +3363,7 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 
 	/*
 	 *	Header prediction.
-	 *	The code losely follows the one in the famous 
+	 *	The code loosely follows the one in the famous 
 	 *	"30 instruction TCP receive" Van Jacobson mail.
 	 *	
 	 *	Van's trick is to deposit buffers into socket queue 

@@ -77,14 +77,39 @@ static int ipv4_sysctl_forward_strategy(ctl_table *table, int *name, int nlen,
 			 void *newval, size_t newlen, 
 			 void **context)
 {
+	int *valp = table->data;
 	int new;
+
+	if (!newval || !newlen)
+		return 0;
+
 	if (newlen != sizeof(int))
 		return -EINVAL;
-	if (get_user(new,(int *)newval))
-		return -EFAULT; 
-	if (new != ipv4_devconf.forwarding) 
-		inet_forward_change(); 
-	return 0; /* caller does change again and handles handles oldval */ 
+
+	if (get_user(new, (int *)newval))
+		return -EFAULT;
+
+	if (new == *valp)
+		return 0;
+
+	if (oldval && oldlenp) {
+		size_t len;
+
+		if (get_user(len, oldlenp))
+			return -EFAULT;
+
+		if (len) {
+			if (len > table->maxlen)
+				len = table->maxlen;
+			if (copy_to_user(oldval, valp, len))
+				return -EFAULT;
+			if (put_user(len, oldlenp))
+				return -EFAULT;
+		}
+	}
+
+	inet_forward_change();
+	return 1;
 }
 
 ctl_table ipv4_table[] = {

@@ -11,4 +11,4 @@ obj-y := PeeCeeI.o blockops.o debuglocks.o strlen.o strncmp.o \
 	 VIScopy.o VISbzero.o VISmemset.o VIScsum.o VIScsumcopy.o \
 	 VIScsumcopyusr.o VISsave.o atomic.o rwlock.o bitops.o \
 	 dec_and_lock.o U3memcpy.o U3copy_from_user.o U3copy_to_user.o \
-	 U3copy_in_user.o mcount.o ipcsum.o
+	 U3copy_in_user.o mcount.o ipcsum.o rwsem.o
