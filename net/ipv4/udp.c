@@ -931,7 +931,7 @@ int udp_disconnect(struct sock *sk, int flags)
 
 static void udp_close(struct sock *sk, long timeout)
 {
-	inet_sock_release(sk);
+	sk_common_release(sk);
 }
 
 /* return:

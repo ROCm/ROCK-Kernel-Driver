@@ -945,11 +945,11 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	sctp_local_bh_disable();
 	sctp_bh_lock_sock(sk);
 
-	/* Hold the sock, since inet_sock_release() will put sock_put()
+	/* Hold the sock, since sk_common_release() will put sock_put()
 	 * and we have just a little more cleanup.
 	 */
 	sock_hold(sk);
-	inet_sock_release(sk);
+	sk_common_release(sk);
 
 	sctp_bh_unlock_sock(sk);
 	sctp_local_bh_enable();

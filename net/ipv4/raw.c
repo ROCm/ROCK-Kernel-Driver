@@ -480,7 +480,7 @@ static void raw_close(struct sock *sk, long timeout)
 	 */
 	ip_ra_control(sk, 0, NULL);
 
-	inet_sock_release(sk);
+	sk_common_release(sk);
 }
 
 /* This gets rid of all the nasties in af_inet. -DaveM */

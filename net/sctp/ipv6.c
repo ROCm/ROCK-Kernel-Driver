@@ -641,7 +641,7 @@ struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 #endif
 
 	if (newsk->sk_prot->init(newsk)) {
-		inet_sock_release(newsk);
+		sk_common_release(newsk);
 		newsk = NULL;
 	}
 
@@ -882,10 +882,10 @@ static struct proto_ops inet6_seqpacket_ops = {
 	.ioctl      = inet6_ioctl,
 	.listen     = sctp_inet_listen,
 	.shutdown   = inet_shutdown,
-	.setsockopt = inet_setsockopt,
-	.getsockopt = inet_getsockopt,
+	.setsockopt = sock_common_setsockopt,
+	.getsockopt = sock_common_getsockopt,
 	.sendmsg    = inet_sendmsg,
-	.recvmsg    = inet_recvmsg,
+	.recvmsg    = sock_common_recvmsg,
 	.mmap       = sock_no_mmap,
 };
 
