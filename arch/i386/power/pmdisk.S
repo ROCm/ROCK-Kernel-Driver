@@ -24,7 +24,7 @@ ENTRY(pmdisk_arch_suspend)
 	movl $swsusp_pg_dir-__PAGE_OFFSET,%ecx
 	movl %ecx,%cr3
 
-	movl	pm_pagedir_nosave,%ebx
+	movl	pagedir_nosave,%ebx
 	xorl	%eax, %eax
 	xorl	%edx, %edx
 	.p2align 4,,7
@@ -41,7 +41,7 @@ ENTRY(pmdisk_arch_suspend)
 
 	incl	%eax
 	addl	$16, %edx
-	cmpl	pmdisk_pages,%eax
+	cmpl	nr_copy_pages,%eax
 	jb .L1455
 	.p2align 4,,7
 .L1453:

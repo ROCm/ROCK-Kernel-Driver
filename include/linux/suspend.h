@@ -45,9 +45,6 @@ extern void drain_local_pages(void);
 /* kernel/power/swsusp.c */
 extern int software_suspend(void);
 
-extern unsigned int nr_copy_pages __nosavedata;
-extern suspend_pagedir_t *pagedir_nosave __nosavedata;
-
 #else	/* CONFIG_SOFTWARE_SUSPEND */
 static inline int software_suspend(void)
 {

@@ -47,15 +47,15 @@ extern char __nosave_begin, __nosave_end;
 extern int is_head_of_free_region(struct page *);
 
 /* Variables to be preserved over suspend */
-static int pagedir_order_check;
-static int nr_copy_pages_check;
+extern int pagedir_order_check;
+extern int nr_copy_pages_check;
 
 /* For resume= kernel option */
 static char resume_file[256] = CONFIG_PM_DISK_PARTITION;
 
 static dev_t resume_device;
 /* Local variables that should not be affected by save */
-unsigned int pmdisk_pages __nosavedata = 0;
+extern unsigned int nr_copy_pages;
 
 /* Suspend pagedir is allocated before final copy, therefore it
    must be freed after resume 
@@ -66,9 +66,9 @@ unsigned int pmdisk_pages __nosavedata = 0;
    allocated at time of resume, that travels through memory not to
    collide with anything.
  */
-suspend_pagedir_t *pm_pagedir_nosave __nosavedata = NULL;
-static suspend_pagedir_t *pagedir_save;
-static int pagedir_order __nosavedata = 0;
+extern suspend_pagedir_t *pagedir_nosave;
+extern suspend_pagedir_t *pagedir_save;
+extern int pagedir_order;
 
 
 struct pmdisk_info {
@@ -184,13 +184,13 @@ static void free_data(void)
 	swp_entry_t entry;
 	int i;
 
-	for (i = 0; i < pmdisk_pages; i++) {
-		entry = (pm_pagedir_nosave + i)->swap_address;
+	for (i = 0; i < nr_copy_pages; i++) {
+		entry = (pagedir_nosave + i)->swap_address;
 		if (entry.val)
 			swap_free(entry);
 		else
 			break;
-		(pm_pagedir_nosave + i)->swap_address = (swp_entry_t){0};
+		(pagedir_nosave + i)->swap_address = (swp_entry_t){0};
 	}
 }
 
@@ -206,12 +206,12 @@ static int write_data(void)
 	int error = 0;
 	int i;
 
-	printk( "Writing data to swap (%d pages): ", pmdisk_pages );
-	for (i = 0; i < pmdisk_pages && !error; i++) {
+	printk( "Writing data to swap (%d pages): ", nr_copy_pages );
+	for (i = 0; i < nr_copy_pages && !error; i++) {
 		if (!(i%100))
 			printk( "." );
-		error = write_swap_page((pm_pagedir_nosave+i)->address,
-					&((pm_pagedir_nosave+i)->swap_address));
+		error = write_swap_page((pagedir_nosave+i)->address,
+					&((pagedir_nosave+i)->swap_address));
 	}
 	printk(" %d Pages done.\n",i);
 	return error;
@@ -239,9 +239,9 @@ static void free_pagedir_entries(void)
 
 static int write_pagedir(void)
 {
-	unsigned long addr = (unsigned long)pm_pagedir_nosave;
+	unsigned long addr = (unsigned long)pagedir_nosave;
 	int error = 0;
-	int n = SUSPEND_PD_PAGES(pmdisk_pages);
+	int n = SUSPEND_PD_PAGES(nr_copy_pages);
 	int i;
 
 	pmdisk_info.pagedir_pages = n;
@@ -282,7 +282,7 @@ static void init_header(void)
 	memcpy(&pmdisk_info.uts,&system_utsname,sizeof(system_utsname));
 
 	pmdisk_info.cpus = num_online_cpus();
-	pmdisk_info.image_pages = pmdisk_pages;
+	pmdisk_info.image_pages = nr_copy_pages;
 }
 
 /**
@@ -396,7 +396,7 @@ static void count_pages(void)
 		if (saveable(&pfn))
 			n++;
 	}
-	pmdisk_pages = n;
+	nr_copy_pages = n;
 }
 
 
@@ -424,7 +424,7 @@ static void copy_pages(void)
 			p++;
 		}
 	}
-	BUG_ON(n != pmdisk_pages);
+	BUG_ON(n != nr_copy_pages);
 }
 
 
@@ -437,7 +437,7 @@ static void free_image_pages(void)
 	struct pbe * p;
 	int i;
 
-	for (i = 0, p = pagedir_save; i < pmdisk_pages; i++, p++) {
+	for (i = 0, p = pagedir_save; i < nr_copy_pages; i++, p++) {
 		ClearPageNosave(virt_to_page(p->address));
 		free_page(p->address);
 	}
@@ -460,13 +460,13 @@ static void calc_order(void)
 	int diff;
 	int order;
 
-	order = get_bitmask_order(SUSPEND_PD_PAGES(pmdisk_pages));
-	pmdisk_pages += 1 << order;
+	order = get_bitmask_order(SUSPEND_PD_PAGES(nr_copy_pages));
+	nr_copy_pages += 1 << order;
 	do {
-		diff = get_bitmask_order(SUSPEND_PD_PAGES(pmdisk_pages)) - order;
+		diff = get_bitmask_order(SUSPEND_PD_PAGES(nr_copy_pages)) - order;
 		if (diff) {
 			order += diff;
-			pmdisk_pages += 1 << diff;
+			nr_copy_pages += 1 << diff;
 		}
 	} while(diff);
 	pagedir_order = order;
@@ -488,7 +488,7 @@ static int alloc_pagedir(void)
 	if(!pagedir_save)
 		return -ENOMEM;
 	memset(pagedir_save,0,(1 << pagedir_order) * PAGE_SIZE);
-	pm_pagedir_nosave = pagedir_save;
+	pagedir_nosave = pagedir_save;
 	return 0;
 }
 
@@ -503,7 +503,7 @@ static int alloc_image_pages(void)
 	struct pbe * p;
 	int i;
 
-	for (i = 0, p = pagedir_save; i < pmdisk_pages; i++, p++) {
+	for (i = 0, p = pagedir_save; i < nr_copy_pages; i++, p++) {
 		p->address = get_zeroed_page(GFP_ATOMIC | __GFP_COLD);
 		if(!p->address)
 			goto Error;
@@ -529,7 +529,7 @@ static int alloc_image_pages(void)
 
 static int enough_free_mem(void)
 {
-	if(nr_free_pages() < (pmdisk_pages + PAGES_FOR_IO)) {
+	if(nr_free_pages() < (nr_copy_pages + PAGES_FOR_IO)) {
 		pr_debug("pmdisk: Not enough free pages: Have %d\n",
 			 nr_free_pages());
 		return 0;
@@ -553,7 +553,7 @@ static int enough_swap(void)
 	struct sysinfo i;
 
 	si_swapinfo(&i);
-	if (i.freeswap < (pmdisk_pages + PAGES_FOR_IO))  {
+	if (i.freeswap < (nr_copy_pages + PAGES_FOR_IO))  {
 		pr_debug("pmdisk: Not enough swap. Need %ld\n",i.freeswap);
 		return 0;
 	}
@@ -582,12 +582,12 @@ int pmdisk_suspend(void)
 
 	drain_local_pages();
 
-	pm_pagedir_nosave = NULL;
+	pagedir_nosave = NULL;
 	pr_debug("pmdisk: Counting pages to copy.\n" );
 	count_pages();
 	
 	pr_debug("pmdisk: (pages needed: %d + %d free: %d)\n",
-		 pmdisk_pages,PAGES_FOR_IO,nr_free_pages());
+		 nr_copy_pages,PAGES_FOR_IO,nr_free_pages());
 
 	if (!enough_free_mem())
 		return -ENOMEM;
@@ -605,7 +605,7 @@ int pmdisk_suspend(void)
 		return error;
 	}
 
-	nr_copy_pages_check = pmdisk_pages;
+	nr_copy_pages_check = nr_copy_pages;
 	pagedir_order_check = pagedir_order;
 
 	/* During allocating of suspend pagedir, new cold pages may appear. 
@@ -622,7 +622,7 @@ int pmdisk_suspend(void)
 	 * touch swap space! Except we must write out our image of course.
 	 */
 
-	pr_debug("pmdisk: %d pages copied\n", pmdisk_pages );
+	pr_debug("pmdisk: %d pages copied\n", nr_copy_pages );
 	return 0;
 }
 
@@ -657,7 +657,7 @@ static int suspend_save_image(void)
 
 int pmdisk_resume(void)
 {
-	BUG_ON (nr_copy_pages_check != pmdisk_pages);
+	BUG_ON (nr_copy_pages_check != nr_copy_pages);
 	BUG_ON (pagedir_order_check != pagedir_order);
 	
 	/* Even mappings of "global" things (vmalloc) need to be fixed */
@@ -838,7 +838,7 @@ static int __init check_header(void)
 		printk(KERN_ERR "pmdisk: Resume mismatch: %s\n",reason);
 		return -EPERM;
 	}
-	pmdisk_pages = pmdisk_info.image_pages;
+	nr_copy_pages = pmdisk_info.image_pages;
 	return error;
 }
 
@@ -854,7 +854,7 @@ static int __init read_pagedir(void)
 	addr =__get_free_pages(GFP_ATOMIC, pagedir_order);
 	if (!addr)
 		return -ENOMEM;
-	pm_pagedir_nosave = (struct pbe *)addr;
+	pagedir_nosave = (struct pbe *)addr;
 
 	pr_debug("pmdisk: Reading pagedir (%d Pages)\n",n);
 
@@ -866,7 +866,7 @@ static int __init read_pagedir(void)
 			error = -EFAULT;
 	}
 	if (error)
-		free_pages((unsigned long)pm_pagedir_nosave,pagedir_order);
+		free_pages((unsigned long)pagedir_nosave,pagedir_order);
 	return error;
 }
 
@@ -884,8 +884,8 @@ static int __init read_image_data(void)
 	int error = 0;
 	int i;
 
-	printk( "Reading image data (%d pages): ", pmdisk_pages );
-	for(i = 0, p = pm_pagedir_nosave; i < pmdisk_pages && !error; i++, p++) {
+	printk( "Reading image data (%d pages): ", nr_copy_pages );
+	for(i = 0, p = pagedir_nosave; i < nr_copy_pages && !error; i++, p++) {
 		if (!(i%100))
 			printk( "." );
 		error = read_page(swp_offset(p->swap_address),
@@ -913,7 +913,7 @@ static int __init read_suspend_image(void)
  Done:
 	return error;
  FreePagedir:
-	free_pages((unsigned long)pm_pagedir_nosave,pagedir_order);
+	free_pages((unsigned long)pagedir_nosave,pagedir_order);
 	goto Done;
 }
 

@@ -84,8 +84,8 @@ extern int is_head_of_free_region(struct page *);
 spinlock_t suspend_pagedir_lock __nosavedata = SPIN_LOCK_UNLOCKED;
 
 /* Variables to be preserved over suspend */
-static int pagedir_order_check;
-static int nr_copy_pages_check;
+int pagedir_order_check;
+int nr_copy_pages_check;
 
 static int resume_status;
 static char resume_file[256] = "";			/* For resume= kernel option */
@@ -107,8 +107,8 @@ unsigned int nr_copy_pages __nosavedata = 0;
    MMU hardware.
  */
 suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
-static suspend_pagedir_t *pagedir_save;
-static int pagedir_order __nosavedata = 0;
+suspend_pagedir_t *pagedir_save;
+int pagedir_order __nosavedata = 0;
 
 struct link {
 	char dummy[PAGE_SIZE - sizeof(swp_entry_t)];
