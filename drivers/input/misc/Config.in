@@ -5,4 +5,7 @@
 bool 'Misc' CONFIG_INPUT_MISC
 
 dep_tristate '  PC Speaker support' CONFIG_INPUT_PCSPKR $CONFIG_INPUT $CONFIG_INPUT_MISC
+if [ "$CONFIG_SPARC" = "y" -o "$CONFIG_SPARC64" = "y" ]; then
+   dep_tristate '  SPARC Speaker support' CONFIG_INPUT_SPARCSPKR $CONFIG_INPUT $CONFIG_INPUT_MISC
+fi
 dep_tristate '  User level driver support' CONFIG_INPUT_UINPUT $CONFIG_INPUT $CONFIG_INPUT_MISC
