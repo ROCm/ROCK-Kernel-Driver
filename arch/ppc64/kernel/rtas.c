@@ -167,9 +167,12 @@ int rtas_call(int token, int nargs, int nret, int *outputs, ...)
 
 	/* Log the error in the unlikely case that there was one. */
 	if (unlikely(logit)) {
-		buff_copy = kmalloc(RTAS_ERROR_LOG_MAX, GFP_ATOMIC);
-		if (buff_copy) {
-			memcpy(buff_copy, rtas_err_buf, RTAS_ERROR_LOG_MAX);
+		buff_copy = rtas_err_buf;
+		if (mem_init_done) {
+			buff_copy = kmalloc(RTAS_ERROR_LOG_MAX, GFP_ATOMIC);
+			if (buff_copy)
+				memcpy(buff_copy, rtas_err_buf,
+				       RTAS_ERROR_LOG_MAX);
 		}
 	}
 
@@ -178,7 +181,8 @@ int rtas_call(int token, int nargs, int nret, int *outputs, ...)
 
 	if (buff_copy) {
 		log_error(buff_copy, ERR_TYPE_RTAS_LOG, 0);
-		kfree(buff_copy);
+		if (mem_init_done)
+			kfree(buff_copy);
 	}
 	return ret;
 }
