@@ -52,6 +52,10 @@
 
 #define VM_ACCT(size)    (PAGE_CACHE_ALIGN(size) >> PAGE_SHIFT)
 
+/* info->flags needs VM_flags to handle pagein/truncate races efficiently */
+#define SHMEM_PAGEIN	 VM_READ
+#define SHMEM_TRUNCATE	 VM_WRITE
+
 /* Pretend that each entry is of this size in directory's i_size */
 #define BOGO_DIRENT_SIZE 20
 
@@ -390,6 +394,7 @@ static void shmem_truncate(struct inode *inode)
 		return;
 
 	spin_lock(&info->lock);
+	info->flags |= SHMEM_TRUNCATE;
 	limit = info->next_index;
 	info->next_index = idx;
 	if (info->swapped && idx < SHMEM_NR_DIRECT) {
@@ -490,6 +495,19 @@ done1:
 	}
 done2:
 	BUG_ON(info->swapped > info->next_index);
+	if (inode->i_mapping->nrpages && (info->flags & SHMEM_PAGEIN)) {
+		/*
+		 * Call truncate_inode_pages again: racing shmem_unuse_inode
+		 * may have swizzled a page in from swap since vmtruncate or
+		 * generic_delete_inode did it, before we lowered next_index.
+		 * Also, though shmem_getpage checks i_size before adding to
+		 * cache, no recheck after: so fix the narrow window there too.
+		 */
+		spin_unlock(&info->lock);
+		truncate_inode_pages(inode->i_mapping, inode->i_size);
+		spin_lock(&info->lock);
+	}
+	info->flags &= ~SHMEM_TRUNCATE;
 	shmem_recalc_inode(inode);
 	spin_unlock(&info->lock);
 }
@@ -523,6 +541,19 @@ static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 				(void) shmem_getpage(inode,
 					attr->ia_size>>PAGE_CACHE_SHIFT,
 						&page, SGP_READ);
+			}
+			/*
+			 * Reset SHMEM_PAGEIN flag so that shmem_truncate can
+			 * detect if any pages might have been added to cache
+			 * after truncate_inode_pages.  But we needn't bother
+			 * if it's being fully truncated to zero-length: the
+			 * nrpages check is efficient enough in that case.
+			 */
+			if (attr->ia_size) {
+				struct shmem_inode_info *info = SHMEM_I(inode);
+				spin_lock(&info->lock);
+				info->flags &= ~SHMEM_PAGEIN;
+				spin_unlock(&info->lock);
 			}
 		}
 	}
@@ -638,14 +669,10 @@ lost2:
 found:
 	idx += offset;
 	inode = &info->vfs_inode;
-
-	/* Racing against delete or truncate? Must leave out of page cache */
-	limit = (inode->i_state & I_FREEING)? 0:
-		(i_size_read(inode) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-
-	if (idx >= limit ||
-	    move_from_swap_cache(page, idx, inode->i_mapping) == 0)
+	if (move_from_swap_cache(page, idx, inode->i_mapping) == 0) {
+		info->flags |= SHMEM_PAGEIN;
 		shmem_swp_set(info, ptr + offset, 0);
+	}
 	shmem_swp_unmap(ptr);
 	spin_unlock(&info->lock);
 	/*
@@ -653,7 +680,7 @@ found:
 	 * try_to_unuse will skip over mms, then reincrement count.
 	 */
 	swap_free(entry);
-	return idx < limit;
+	return 1;
 }
 
 /*
@@ -706,7 +733,10 @@ static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 
 	spin_lock(&info->lock);
 	shmem_recalc_inode(inode);
-	BUG_ON(index >= info->next_index);
+	if (index >= info->next_index) {
+		BUG_ON(!(info->flags & SHMEM_TRUNCATE));
+		goto unlock;
+	}
 	entry = shmem_swp_entry(info, index, NULL);
 	BUG_ON(!entry);
 	BUG_ON(entry->val);
@@ -720,6 +750,7 @@ static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 	}
 
 	shmem_swp_unmap(entry);
+unlock:
 	spin_unlock(&info->lock);
 	swap_free(swap);
 redirty:
@@ -841,6 +872,7 @@ repeat:
 			swap_free(swap);
 		} else if (!(error = move_from_swap_cache(
 				swappage, idx, mapping))) {
+			info->flags |= SHMEM_PAGEIN;
 			shmem_swp_set(info, entry, 0);
 			shmem_swp_unmap(entry);
 			spin_unlock(&info->lock);
@@ -910,6 +942,7 @@ repeat:
 					goto failed;
 				goto repeat;
 			}
+			info->flags |= SHMEM_PAGEIN;
 		}
 
 		info->alloced++;
@@ -1206,12 +1239,11 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 		pos += bytes;
 		buf += bytes;
 		if (pos > inode->i_size)
-			inode->i_size = pos;
+			i_size_write(inode, pos);
 
 		flush_dcache_page(page);
 		set_page_dirty(page);
-		if (!PageReferenced(page))
-			SetPageReferenced(page);
+		mark_page_accessed(page);
 		page_cache_release(page);
 
 		if (left) {
@@ -1395,6 +1427,11 @@ shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 	int error = -ENOSPC;
 
 	if (inode) {
+		if (dir->i_mode & S_ISGID) {
+			inode->i_gid = dir->i_gid;
+			if (S_ISDIR(mode))
+				inode->i_mode |= S_ISGID;
+		}
 		dir->i_size += BOGO_DIRENT_SIZE;
 		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 		d_instantiate(dentry, inode);
@@ -1531,6 +1568,8 @@ static int shmem_symlink(struct inode *dir, struct dentry *dentry, const char *s
 		set_page_dirty(page);
 		page_cache_release(page);
 	}
+	if (dir->i_mode & S_ISGID)
+		inode->i_gid = dir->i_gid;
 	dir->i_size += BOGO_DIRENT_SIZE;
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	d_instantiate(dentry, inode);

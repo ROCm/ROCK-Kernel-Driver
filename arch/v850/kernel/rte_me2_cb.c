@@ -53,19 +53,6 @@ void __init mach_get_physical_ram (unsigned long *ram_start,
 	*ram_len = RAM_END - RAM_START;
 }
 
-void __init mach_reserve_bootmem ()
-{
-	extern char _root_fs_image_start, _root_fs_image_end;
-	u32 root_fs_image_start = (u32)&_root_fs_image_start;
-	u32 root_fs_image_end = (u32)&_root_fs_image_end;
-
-	/* Reserve the memory used by the root filesystem image if it's
-	   in RAM.  */
-	if (root_fs_image_start >= RAM_START && root_fs_image_start < RAM_END)
-		reserve_bootmem (root_fs_image_start,
-				 root_fs_image_end - root_fs_image_start);
-}
-
 void mach_gettimeofday (struct timespec *tv)
 {
 	tv->tv_sec = 0;
@@ -230,8 +217,10 @@ void cb_pic_shutdown_irq (unsigned irq)
 	CB_PIC_INT1M &= ~(1 << (irq - CB_PIC_BASE_IRQ));
 }
 
-static void cb_pic_handle_irq (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t cb_pic_handle_irq (int irq, void *dev_id,
+				      struct pt_regs *regs)
 {
+	irqreturn_t rval = IRQ_NONE;
 	unsigned status = CB_PIC_INTR;
 	unsigned enable = CB_PIC_INT1M;
 
@@ -257,13 +246,16 @@ static void cb_pic_handle_irq (int irq, void *dev_id, struct pt_regs *regs)
 
 			/* Recursively call handle_irq to handle it. */
 			handle_irq (irq, regs);
+			rval = IRQ_HANDLED;
 		} while (status);
 	}
 
 	CB_PIC_INTEN |= CB_PIC_INT1EN;
+
+	return rval;
 }
 
-
+
 static void irq_nop (unsigned irq) { }
 
 static unsigned cb_pic_startup_irq (unsigned irq)

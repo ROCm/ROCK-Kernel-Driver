@@ -793,42 +793,42 @@ int __init cpucache_init(void)
 
 __initcall(cpucache_init);
 
-/* Interface to system's page allocator. No need to hold the cache-lock.
+/*
+ * Interface to system's page allocator. No need to hold the cache-lock.
+ *
+ * If we requested dmaable memory, we will get it. Even if we
+ * did not request dmaable memory, we might get it, but that
+ * would be relatively rare and ignorable.
  */
-static inline void * kmem_getpages (kmem_cache_t *cachep, unsigned long flags)
+static inline void *kmem_getpages(kmem_cache_t *cachep, unsigned long flags)
 {
-	void	*addr;
+	void *addr;
 
-	/*
-	 * If we requested dmaable memory, we will get it. Even if we
-	 * did not request dmaable memory, we might get it, but that
-	 * would be relatively rare and ignorable.
-	 */
 	flags |= cachep->gfpflags;
-	if ( cachep->flags & SLAB_RECLAIM_ACCOUNT) 
+	if (cachep->flags & SLAB_RECLAIM_ACCOUNT)
 		atomic_add(1<<cachep->gfporder, &slab_reclaim_pages);
-	addr = (void*) __get_free_pages(flags, cachep->gfporder);
-	/* Assume that now we have the pages no one else can legally
-	 * messes with the 'struct page's.
-	 * However vm_scan() might try to test the structure to see if
-	 * it is a named-page or buffer-page.  The members it tests are
-	 * of no interest here.....
-	 */
+	addr = (void*)__get_free_pages(flags, cachep->gfporder);
+	if (addr) {
+		int i = (1 << cachep->gfporder);
+		struct page *page = virt_to_page(addr);
+
+		while (i--) {
+			SetPageSlab(page);
+			page++;
+		}
+	}
 	return addr;
 }
 
-/* Interface to system's page release. */
-static inline void kmem_freepages (kmem_cache_t *cachep, void *addr)
+/*
+ * Interface to system's page release.
+ */
+static inline void kmem_freepages(kmem_cache_t *cachep, void *addr)
 {
 	unsigned long i = (1<<cachep->gfporder);
 	struct page *page = virt_to_page(addr);
 	const unsigned long nr_freed = i;
 
-	/* free_pages() does not clear the type bit - we do that.
-	 * The pages have been unlinked from their cache-slab,
-	 * but their 'struct page's might be accessed in
-	 * vm_scan(). Shouldn't be a worry.
-	 */
 	while (i--) {
 		if (!TestClearPageSlab(page))
 			BUG();
@@ -1608,7 +1608,6 @@ static int cache_grow (kmem_cache_t * cachep, int flags)
 	do {
 		SET_PAGE_CACHE(page, cachep);
 		SET_PAGE_SLAB(page, slabp);
-		SetPageSlab(page);
 		inc_page_state(nr_slab);
 		page++;
 	} while (--i);

@@ -2335,11 +2335,8 @@ static int atp870u_detect(Scsi_Host_Template * tpnt)
 				break;
 		}
 	}
-	for (h = 0; h < MAX_ATP; h++) {
+	for (h = 0; h < card; h++) {
 		struct atp_unit tmp, *dev;
-		if (pdev[h] == NULL) {
-			return count;
-		}
 
 		/* Found an atp870u/w. */
 		base_io = pci_resource_start(pdev[h], 0);

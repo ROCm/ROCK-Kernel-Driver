@@ -104,7 +104,14 @@ int __init simcons_tty_init (void)
 	tty_driver = driver;
 	return 0;
 }
-__initcall (simcons_tty_init);
+/* We use `late_initcall' instead of just `__initcall' as a workaround for
+   the fact that (1) simcons_tty_init can't be called before tty_init,
+   (2) tty_init is called via `module_init', (3) if statically linked,
+   module_init == device_init, and (4) there's no ordering of init lists.
+   We can do this easily because simcons is always statically linked, but
+   other tty drivers that depend on tty_init and which must use
+   `module_init' to declare their init routines are likely to be broken.  */
+late_initcall(simcons_tty_init);
 
 /* Poll for input on the console, and if there's any, deliver it to the
    tty driver.  */

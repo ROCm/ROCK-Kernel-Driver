@@ -1982,9 +1982,9 @@ int snd_pcm_open(struct inode *inode, struct file *file)
 		}
 	}
 	remove_wait_queue(&pcm->open_wait, &wait);
+	up(&pcm->open_mutex);
 	if (err < 0)
 		goto __error;
-	up(&pcm->open_mutex);
 	return err;
 
       __error:

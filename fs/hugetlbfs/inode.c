@@ -412,10 +412,18 @@ static struct inode *hugetlbfs_get_inode(struct super_block *sb, uid_t uid,
 static int hugetlbfs_mknod(struct inode *dir,
 			struct dentry *dentry, int mode, dev_t dev)
 {
-	struct inode *inode = hugetlbfs_get_inode(dir->i_sb, current->fsuid, 
-					current->fsgid, mode, dev);
+	struct inode *inode;
 	int error = -ENOSPC;
+	gid_t gid;
 
+	if (dir->i_mode & S_ISGID) {
+		gid = dir->i_gid;
+		if (S_ISDIR(mode))
+			mode |= S_ISGID;
+	} else {
+		gid = current->fsgid;
+	}
+	inode = hugetlbfs_get_inode(dir->i_sb, current->fsuid, gid, mode, dev);
 	if (inode) {
 		dir->i_size += PSEUDO_DIRENT_SIZE;
 		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
@@ -444,9 +452,15 @@ static int hugetlbfs_symlink(struct inode *dir,
 {
 	struct inode *inode;
 	int error = -ENOSPC;
+	gid_t gid;
+
+	if (dir->i_mode & S_ISGID)
+		gid = dir->i_gid;
+	else
+		gid = current->fsgid;
 
 	inode = hugetlbfs_get_inode(dir->i_sb, current->fsuid,
-					current->fsgid, S_IFLNK|S_IRWXUGO, 0);
+					gid, S_IFLNK|S_IRWXUGO, 0);
 	if (inode) {
 		int l = strlen(symname)+1;
 		error = page_symlink(inode, symname, l);

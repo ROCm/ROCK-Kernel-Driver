@@ -602,6 +602,10 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			// printk(KERN_WARNING "ELF: Ambiguous type, using ELF\n");
 			interpreter_type = INTERPRETER_ELF;
 		}
+		/* Verify the interpreter has a valid arch */
+		if ((interpreter_type == INTERPRETER_ELF) &&
+		    !elf_check_arch(&interp_elf_ex))
+			goto out_free_dentry;
 	} else {
 		/* Executables without an interpreter also need a personality  */
 		SET_PERSONALITY(elf_ex, ibcs2_interpreter);

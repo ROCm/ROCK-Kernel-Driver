@@ -757,7 +757,7 @@ static int inftl_writeblock(struct mtd_blktrans_dev *mbd, unsigned long block,
 	u8 eccbuf[6];
 	char *p, *pend;
 
-	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: inftl_writeblock(inftl=0x%x,block=%d,"
+	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: inftl_writeblock(inftl=0x%x,block=%ld,"
 		"buffer=0x%x)\n", (int)inftl, block, (int)buffer);
 
 	/* Is block all zero? */
@@ -803,7 +803,7 @@ static int inftl_readblock(struct mtd_blktrans_dev *mbd, unsigned long block,
         struct inftl_bci bci;
 	size_t retlen;
 
-	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: inftl_readblock(inftl=0x%x,block=%d,"
+	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: inftl_readblock(inftl=0x%x,block=%ld,"
 		"buffer=0x%x)\n", (int)inftl, block, (int)buffer);
 
 	while (thisEUN < inftl->nb_blocks) {

@@ -324,8 +324,8 @@ static int find_matching_ucodes (void)
 					/* check extended table checksum */
 					if (ext_table_size) {
 						int ext_table_sum = 0;
-						i = ext_table_size / DWSIZE;
 						int * ext_tablep = (((void *) newmc) + MC_HEADER_SIZE + data_size);
+						i = ext_table_size / DWSIZE;
 						while (i--) ext_table_sum += ext_tablep[i];
 						if (ext_table_sum) {
 							printk(KERN_WARNING "microcode: aborting, bad extended signature table checksum\n");

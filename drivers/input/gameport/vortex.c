@@ -168,7 +168,7 @@ static struct pci_driver vortex_driver = {
 	.name =		"vortex",
 	.id_table =	vortex_id_table,
 	.probe =	vortex_probe,
-	.remove =	vortex_remove,
+	.remove =	__devexit_p(vortex_remove),
 };
 
 int __init vortex_init(void)
