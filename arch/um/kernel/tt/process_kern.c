@@ -28,7 +28,7 @@
 
 void *switch_to_tt(void *prev, void *next, void *last)
 {
-	struct task_struct *from, *to;
+	struct task_struct *from, *to, *prev_sched;
 	unsigned long flags;
 	int err, vtalrm, alrm, prof, cpu;
 	char c;
@@ -71,6 +71,18 @@ void *switch_to_tt(void *prev, void *next, void *last)
 	err = os_read_file(from->thread.mode.tt.switch_pipe[0], &c, sizeof(c));
 	if(err != sizeof(c))
 		panic("read of switch_pipe failed, errno = %d", -err);
+
+	/* If the process that we have just scheduled away from has exited,
+	 * then it needs to be killed here.  The reason is that, even though
+	 * it will kill itself when it next runs, that may be too late.  Its
+	 * stack will be freed, possibly before then, and if that happens,
+	 * we have a use-after-free situation.  So, it gets killed here
+	 * in case it has not already killed itself.
+	 */
+	prev_sched = current->thread.prev_sched;
+	if((prev_sched->state == TASK_ZOMBIE) ||
+	   (prev_sched->state == TASK_DEAD))
+		os_kill_process(prev_sched->thread.mode.tt.extern_pid, 1);
 
 	/* This works around a nasty race with 'jail'.  If we are switching
 	 * between two threads of a threaded app and the incoming process 
