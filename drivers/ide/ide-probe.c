@@ -808,7 +808,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 {
 	struct gendisk *gd;
 	struct hd_struct *part;
-	devfs_handle_t *de_arr;
 	unsigned int unit, units, minors;
 	extern devfs_handle_t ide_devfs_handle;
 	char *names;
@@ -835,11 +834,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 
 	memset(part, 0, minors * sizeof(struct hd_struct));
 
-	de_arr = kmalloc(sizeof(devfs_handle_t) * MAX_DRIVES, GFP_KERNEL);
-	if (!de_arr)
-		goto err_kmalloc_gd_de_arr;
-	memset(de_arr, 0, sizeof(devfs_handle_t) * MAX_DRIVES);
-
 	names = kmalloc (4 * MAX_DRIVES, GFP_KERNEL);
 	if (!names)
 		goto err_kmalloc_gd_names;
@@ -847,7 +841,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 
 	for (unit = 0; unit < units; ++unit) {
 		gd[unit].part = part + (unit << PARTN_BITS);
-		gd[unit].de_arr = de_arr + unit;
 		hwif->drives[unit].part = gd[unit].part;
 		gd[unit].major  = hwif->major;
 		gd[unit].first_minor = unit << PARTN_BITS;
@@ -884,8 +877,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 	return;
 
 err_kmalloc_gd_names:
-	kfree(de_arr);
-err_kmalloc_gd_de_arr:
 	kfree(part);
 err_kmalloc_gd_part:
 	kfree(gd);

@@ -203,8 +203,8 @@ void check_partition(struct gendisk *hd, struct block_device *bdev)
 	if (!state)
 		return;
 
-	if (hd->de_arr)
-		de = hd->de_arr[0];
+	if (hd->flags & GENHD_FL_DEVFS)
+		de = hd->de;
 	i = devfs_generate_path (de, buf, sizeof buf);
 	if (i >= 0) {
 		printk(KERN_INFO " /dev/%s:", buf + i);
@@ -284,8 +284,8 @@ static void devfs_register_disc(struct gendisk *dev)
 		return;
 	if (dev->flags & GENHD_FL_REMOVABLE)
 		devfs_flags |= DEVFS_FL_REMOVABLE;
-	if (dev->de_arr) {
-		dir = dev->de_arr[0];
+	if (dev->flags & GENHD_FL_DEVFS) {
+		dir = dev->de;
 		if (!dir)  /*  Aware driver wants to block disc management  */
 			return;
 		pos = devfs_generate_path(dir, dirname + 3, sizeof dirname-3);
@@ -308,7 +308,7 @@ static void devfs_register_disc(struct gendisk *dev)
 			    dev->major, dev->first_minor,
 			    S_IFBLK | S_IRUSR | S_IWUSR, dev->fops, NULL);
 	devfs_auto_unregister(p[0].de, slave);
-	if (!dev->de_arr)
+	if (!(dev->flags & GENHD_FL_DEVFS))
 		devfs_auto_unregister (slave, dir);
 }
 #endif  /*  CONFIG_DEVFS_FS  */

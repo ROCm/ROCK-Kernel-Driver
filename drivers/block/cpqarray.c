@@ -75,7 +75,6 @@ MODULE_LICENSE("GPL");
 
 static int nr_ctlr;
 static ctlr_info_t *hba[MAX_CTLR];
-static devfs_handle_t de_arr[MAX_CTLR][NWD];
 
 static int eisa[8];
 
@@ -451,7 +450,7 @@ int __init cpqarray_init(void)
 			disk->first_minor = j<<NWD_SHIFT;
 			disk->minor_shift = NWD_SHIFT;
 			disk->part = ida + i*256 + (j<<NWD_SHIFT);
-			disk->de_arr = &de_arr[i][j]; 
+			disk->flags = GENHD_FL_DEVFS;
 			disk->fops = &ida_fops; 
 			if (!drv->nr_blks)
 				continue;
@@ -1665,6 +1664,7 @@ static void getgeometry(int ctlr)
 	     (log_index < id_ctlr_buf->nr_drvs)
 	     && (log_unit < NWD);
 	     log_unit++) {
+		struct gendisk *disk = ida_gendisk + ctlr * NWD + log_unit;
 
 		size = sizeof(sense_log_drv_stat_t);
 
@@ -1729,13 +1729,10 @@ static void getgeometry(int ctlr)
                 			return;
 
 				}
-				if (!de_arr[ctlr][log_unit]) {
+				if (!disk->de) {
 					char txt[16];
-
-					sprintf(txt, "ida/c%dd%d", ctlr,
-						log_unit);
-					de_arr[ctlr][log_unit] =
-						devfs_mk_dir(NULL, txt, NULL);
+					sprintf(txt,"ida/c%dd%d",ctlr,log_unit);
+					disk->de = devfs_mk_dir(NULL,txt,NULL);
 				}
 				info_p->phys_drives =
 				    sense_config_buf->ctlr_phys_drv;

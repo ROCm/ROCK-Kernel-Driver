@@ -3148,8 +3148,8 @@ static int ide_cdrom_reinit (ide_drive_t *drive)
 	cdrom_read_toc(drive, &sense);
 	g->minor_shift = 0;
 	/* probably bogus, but that's the old behaviour */
-	g->de_arr[0] = NULL;
-	g->flags = 0;
+	g->de = NULL;
+	g->flags = GENHD_FL_DEVFS;
 	add_gendisk(g);
 	register_disk(g, mk_kdev(g->major,g->first_minor),
 		      1<<g->minor_shift, ide_fops,

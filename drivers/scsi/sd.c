@@ -1300,7 +1300,6 @@ static int sd_attach(Scsi_Device * sdp)
 	unsigned long iflags;
 	struct {
 		struct gendisk disk;
-		devfs_handle_t de;
 		char name[5];
 	} *p;
 	struct gendisk *gd;
@@ -1313,7 +1312,6 @@ static int sd_attach(Scsi_Device * sdp)
 	if (!p)
 		return 1;
 	gd = &p->disk;
-	gd->de_arr = &p->de;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
@@ -1345,7 +1343,7 @@ static int sd_attach(Scsi_Device * sdp)
 	}
 
 	sd_template.nr_dev++;
-        gd->de_arr[0] = sdp->de;
+        gd->de = sdp->de;
 	gd->major = SD_MAJOR(dsk_nr>>4);
 	gd->first_minor = (dsk_nr & 15)<<4;
 	gd->minor_shift = 4;
@@ -1358,7 +1356,7 @@ static int sd_attach(Scsi_Device * sdp)
 	gd->major_name = p->name;
         gd->flags = sdp->removable ? GENHD_FL_REMOVABLE : 0;
         gd->driverfs_dev = &sdp->sdev_driverfs_dev;
-        gd->flags |= GENHD_FL_DRIVERFS;
+        gd->flags |= GENHD_FL_DRIVERFS | GENHD_FL_DEVFS;
 	sd_disks[dsk_nr] = gd;
 	sd_dskname(dsk_nr, diskname);
 	printk(KERN_NOTICE "Attached scsi %sdisk %s at scsi%d, channel %d, "

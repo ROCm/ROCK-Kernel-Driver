@@ -1703,8 +1703,9 @@ static int idedisk_reinit(ide_drive_t *drive)
 	}
 	DRIVER(drive)->busy--;
 	g->minor_shift = PARTN_BITS;
-	g->de_arr[0] = drive->de;
+	g->de = drive->de;
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
+	g->flags |= GENHD_FL_DEVFS;
 	add_gendisk(g);
 	register_disk(g, mk_kdev(g->major,g->first_minor),
 		      1<<g->minor_shift, ide_fops,

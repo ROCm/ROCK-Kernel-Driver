@@ -67,6 +67,7 @@ struct hd_struct {
 
 #define GENHD_FL_REMOVABLE  1
 #define GENHD_FL_DRIVERFS  2
+#define GENHD_FL_DEVFS	4
 
 struct gendisk {
 	int major;			/* major number of driver */
@@ -79,7 +80,7 @@ struct gendisk {
 	struct gendisk *next;
 	struct block_device_operations *fops;
 
-	devfs_handle_t *de_arr;         /* one per physical disc */
+	devfs_handle_t de;
 	struct device *driverfs_dev;
 	int flags;
 	int number;			/* devfs crap */

@@ -2062,8 +2062,6 @@ void ide_unregister (unsigned int index)
 	if (gd) {
 		int i;
 		kfree(gd->part);
-		if (gd->de_arr)
-			kfree (gd->de_arr);
 		kfree(gd);
 		for (i = 0; i < MAX_DRIVES; i++)
 			hwif->gd[i] = NULL;
