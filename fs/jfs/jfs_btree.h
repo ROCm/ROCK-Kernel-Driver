@@ -125,14 +125,14 @@ struct btstack {
 	(btstack)->top = (btstack)->stack
 
 #define BT_STACK_FULL(btstack)\
-	( (btstack)->top == &((btstack)->stack[MAXTREEHEIGHT]))
+	( (btstack)->top == &((btstack)->stack[MAXTREEHEIGHT-1]))
 
 #define BT_PUSH(BTSTACK, BN, INDEX)\
 {\
+	assert(!BT_STACK_FULL(BTSTACK));\
 	(BTSTACK)->top->bn = BN;\
 	(BTSTACK)->top->index = INDEX;\
 	++(BTSTACK)->top;\
-	assert(!BT_STACK_FULL(BTSTACK));\
 }
 
 #define BT_POP(btstack)\
