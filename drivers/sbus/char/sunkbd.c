@@ -544,7 +544,7 @@ static void __sunkbd_inchar(unsigned char ch, struct pt_regs *regs)
 #ifdef CONFIG_MAGIC_SYSRQ			/* Handle the SysRq hack */
 	if (l1a_state.l1_down) {
 		if (!up_flag)
-			handle_sysrq(sun_sysrq_xlate[keycode], pt_regs, kbd, tty);
+			handle_sysrq(sun_sysrq_xlate[keycode], pt_regs, tty);
 		goto out;
 	}
 #endif
