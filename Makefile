@@ -35,7 +35,7 @@ KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 				  -e s/arm.*/arm/ -e s/sa110/arm/ \
-				  -e s/s390x/s390/ )
+				  -e s/s390x/s390/ -e s/parisc64/parisc/ )
 
 # Remove hyphens since they have special meaning in RPM filenames
 KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))

@@ -114,7 +114,7 @@ static void padzero(unsigned long elf_bss)
 #define STACK_ADD(sp, items) ((elf_addr_t *)(sp) + (items))
 #define STACK_ROUND(sp, items) \
 	((15 + (unsigned long) ((sp) + (items))) &~ 15UL)
-#define STACK_ALLOC(sp, len) ({ elf_addr_t *old_sp = sp; sp += len; old_sp; })
+#define STACK_ALLOC(sp, len) ({ elf_addr_t *old_sp = (elf_addr_t *)sp; sp += len; old_sp; })
 #else
 #define STACK_ADD(sp, items) ((elf_addr_t *)(sp) - (items))
 #define STACK_ROUND(sp, items) \

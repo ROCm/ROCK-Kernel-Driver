@@ -112,7 +112,9 @@ static int parisc_driver_probe(struct device *dev)
 static int parisc_driver_remove(struct device *dev)
 {
 	struct parisc_device *pa_dev = to_parisc_device(dev);
-
+	struct parisc_driver *pa_drv = to_parisc_driver(dev->driver);
+	if (pa_drv->remove)
+		pa_drv->remove(pa_dev);
 	release_mem_region(pa_dev->hpa, 0x1000);
 
 	return 0;

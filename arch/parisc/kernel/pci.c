@@ -10,11 +10,12 @@
  * Copyright (C) 1999-2001 Grant Grundler
  */
 #include <linux/config.h>
-#include <linux/types.h>
+#include <linux/init.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/init.h>		/* for __init and __devinit */
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/types.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
