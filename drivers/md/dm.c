@@ -722,6 +722,7 @@ int dm_suspend(struct mapped_device *md)
 	 * Then we wait for the already mapped ios to
 	 * complete.
 	 */
+	blk_run_queues();
 	while (1) {
 		set_current_state(TASK_INTERRUPTIBLE);
 
