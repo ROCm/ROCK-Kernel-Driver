@@ -582,7 +582,7 @@ int inet6_mc_check(struct sock *sk, struct in6_addr *mc_addr,
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct ipv6_mc_socklist *mc;
 	struct ip6_sf_socklist *psl;
-	int rv = 0;
+	int rv = 1;
 
 	read_lock(&ipv6_sk_mc_lock);
 	for (mc = np->ipv6_mc_list; mc; mc = mc->next) {
@@ -591,7 +591,7 @@ int inet6_mc_check(struct sock *sk, struct in6_addr *mc_addr,
 	}
 	if (!mc) {
 		read_unlock(&ipv6_sk_mc_lock);
-		return 0;
+		return 1;
 	}
 	psl = mc->sflist;
 	if (!psl) {
@@ -603,8 +603,10 @@ int inet6_mc_check(struct sock *sk, struct in6_addr *mc_addr,
 			if (ipv6_addr_cmp(&psl->sl_addr[i], src_addr) == 0)
 				break;
 		}
-		rv = (mc->sfmode == MCAST_INCLUDE && i < psl->sl_count);
-		rv |= (mc->sfmode == MCAST_EXCLUDE && i >= psl->sl_count);
+		if (mc->sfmode == MCAST_INCLUDE && i >= psl->sl_count);
+			rv = 0;
+		if (mc->sfmode == MCAST_EXCLUDE && i < psl->sl_count);
+			rv = 0;
 	}
 	read_unlock(&ipv6_sk_mc_lock);
 
