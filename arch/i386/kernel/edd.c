@@ -194,7 +194,7 @@ edd_show_host_bus(struct edd_device *edev, char *buf, size_t count, loff_t off)
 	} else if (!strncmp(info->params.host_bus_type, "PCIX", 4) ||
 		   !strncmp(info->params.host_bus_type, "PCI", 3)) {
 		p += snprintf(p, left,
-			     "\t%02x:%02x.%01x  channel: %u\n",
+			     "\t%02x:%02x.%d  channel: %u\n",
 			     info->params.interface_path.pci.bus,
 			     info->params.interface_path.pci.slot,
 			     info->params.interface_path.pci.function,
@@ -354,7 +354,7 @@ edd_show_raw_data(struct edd_device *edev, char *buf, size_t count, loff_t off)
 						  pci.function));
 		if (!pci_dev) {
 			p += snprintf(p, left, "Error: BIOS says this is a PCI device, but the OS doesn't know\n");
-			p += snprintf(p, left, "  about a PCI device at %02x:%02x.%01x\n",
+			p += snprintf(p, left, "  about a PCI device at %02x:%02x.%d\n",
 				     info->params.interface_path.pci.bus,
 				     info->params.interface_path.pci.slot,
 				     info->params.interface_path.pci.function);
@@ -365,7 +365,7 @@ edd_show_raw_data(struct edd_device *edev, char *buf, size_t count, loff_t off)
 		}
 	}
 
-	if (found_pci) {
+	if (found_pci && !edd_dev_is_type(edev, "SCSI")) {
 		sd = edd_find_matching_scsi_device(edev);
 		if (!sd) {
 			p += snprintf(p, left, "Error: BIOS says this is a SCSI device, but\n");
