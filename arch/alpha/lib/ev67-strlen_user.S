@@ -23,7 +23,7 @@
  * Try not to change the actual algorithm if possible for consistency.
  */
 
-#include <alpha/regdef.h>
+#include <asm/regdef.h>
 
 
 /* Allow an exception for an insn; exit if we get one.  */

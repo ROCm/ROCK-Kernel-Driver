@@ -28,7 +28,7 @@
  * Furthermore, v0, a3-a5, t11, t12, and $at are untouched.
  */
 
-#include <alpha/regdef.h>
+#include <asm/regdef.h>
 
 	.set noat
 	.set noreorder
