@@ -1699,7 +1699,7 @@ static void pfkey_xfrm_policy2msg(struct sk_buff *skb, struct xfrm_policy *xp, i
 		sin6->sin6_port = xp->selector.sport;
 		sin6->sin6_flowinfo = 0;
 		memcpy(&sin6->sin6_addr, xp->selector.saddr.a6,
-		       sizeof(struct in6_addr));;
+		       sizeof(struct in6_addr));
 		sin6->sin6_scope_id = 0;
 	}
 #endif

@@ -899,7 +899,7 @@ static u32 fb_get_hblank_by_hfreq(u32 hfreq, u32 xres)
  */
 static u32 fb_get_hblank_by_dclk(u32 dclk, u32 xres)
 {
-	u32 duty_cycle, h_period, hblank;;
+	u32 duty_cycle, h_period, hblank;
 
 	dclk /= 1000;
 	h_period = 100 - C_VAL;

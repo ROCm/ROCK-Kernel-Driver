@@ -1,4 +1,4 @@
-/* $Id: capi.c,v 1.1.2.3 2004/01/16 21:09:26 keil Exp $
+/* $Id: capi.c,v 1.1.2.4 2004/03/29 10:38:02 armin Exp $
  *
  * CAPI 2.0 Interface for Linux
  *
@@ -44,7 +44,7 @@
 #include "capifs.h"
 #endif
 
-static char *revision = "$Revision: 1.1.2.3 $";
+static char *revision = "$Revision: 1.1.2.4 $";
 
 MODULE_DESCRIPTION("CAPI4Linux: Userspace /dev/capi20 interface");
 MODULE_AUTHOR("Carsten Paeth");
@@ -200,7 +200,6 @@ static void capiminor_del_all_ack(struct capiminor *mp)
 static struct capiminor *capiminor_alloc(struct capi20_appl *ap, u32 ncci)
 {
 	struct capiminor *mp, *p;
-	struct list_head *l;
 	unsigned int minor = 0;
 	unsigned long flags;
 
@@ -219,26 +218,31 @@ static struct capiminor *capiminor_alloc(struct capi20_appl *ap, u32 ncci)
 	skb_queue_head_init(&mp->inqueue);
 	skb_queue_head_init(&mp->outqueue);
 
+	/* Allocate the least unused minor number.
+	 */
 	write_lock_irqsave(&capiminor_list_lock, flags);
-	if (list_empty(&capiminor_list)) {
+	if (list_empty(&capiminor_list))
 		list_add(&mp->list, &capiminor_list);
-		write_unlock_irqrestore(&capiminor_list_lock, flags);
-	} else {
-		list_for_each(l, &capiminor_list) {
-			p = list_entry(l, struct capiminor, list);
-			if (p->minor > minor) {
-				mp->minor = minor;
-				list_add_tail(&mp->list, &p->list);
+	else {
+		list_for_each_entry(p, &capiminor_list, list) {
+			if (p->minor > minor)
 				break;
-			}
 			minor++;
 		}
-		write_unlock_irqrestore(&capiminor_list_lock, flags);
-		if (l == &capiminor_list) {
-			kfree(mp);
-			return NULL;
+		
+		if (minor < capi_ttyminors) {
+			mp->minor = minor;
+			list_add(&mp->list, p->list.prev);
 		}
 	}
+		write_unlock_irqrestore(&capiminor_list_lock, flags);
+
+	if (!(minor < capi_ttyminors)) {
+		printk(KERN_NOTICE "capi: out of minors\n");
+			kfree(mp);
+		return 0;
+	}
+
 	return mp;
 }
 

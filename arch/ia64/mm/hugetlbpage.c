@@ -591,6 +591,13 @@ int is_hugepage_mem_enough(size_t size)
 	return 1;
 }
 
+/* Return the number pages of memory we physically have, in PAGE_SIZE units. */
+unsigned long hugetlb_total_pages(void)
+{
+	return htlbzone_pages * (HPAGE_SIZE / PAGE_SIZE);
+}
+EXPORT_SYMBOL(hugetlb_total_pages);
+
 static struct page *hugetlb_nopage(struct vm_area_struct * area, unsigned long address, int *unused)
 {
 	BUG();

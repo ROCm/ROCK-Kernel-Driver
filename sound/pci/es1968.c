@@ -162,10 +162,10 @@ MODULE_PARM_DESC(clock, "Clock on " CARD_NAME " soundcard.  (0 = auto-detect)");
 MODULE_PARM_SYNTAX(clock, SNDRV_ENABLED);
 MODULE_PARM(use_pm, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(use_pm, "Toggle power-management.  (0 = off, 1 = on, 2 = auto)");
-MODULE_PARM_SYNTAX(use_pm, SNDRV_ENABLED ",allows:{{0,1,2}},default:2,skill:advanced");
+MODULE_PARM_SYNTAX(use_pm, SNDRV_ENABLED ",allows:{{0,1,2}},skill:advanced");
 MODULE_PARM(enable_mpu, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable_mpu, "Enable MPU401.  (0 = off, 1 = on, 2 = auto)");
-MODULE_PARM_SYNTAX(enable_mpu, SNDRV_ENABLED ",allows:{{0,2}},default:2");
+MODULE_PARM_SYNTAX(enable_mpu, SNDRV_ENABLED "," SNDRV_BOOLEAN_TRUE_DESC);
 #ifdef SUPPORT_JOYSTICK
 MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(joystick, "Enable joystick.");

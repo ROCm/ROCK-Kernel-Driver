@@ -84,7 +84,7 @@ ssize_t DRM(read)(struct file *filp, char *buf, size_t count, loff_t *off)
 	}
 
 	wake_up_interruptible(&dev->buf_writers);
-	return DRM_MIN(avail, count);;
+	return DRM_MIN(avail, count);
 }
 
 

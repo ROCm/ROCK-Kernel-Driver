@@ -1358,7 +1358,7 @@ GDTH_INITFUNC(static int, gdth_init_pci(gdth_pci_str *pcistr,gdth_ha_str *ha))
         
         /* disable board interrupts, deinit services */
         gdth_writeb(0xff, &dp6_ptr->io.irqdel);
-        gdth_writeb(0x00, &dp6_ptr->io.irqen);;
+        gdth_writeb(0x00, &dp6_ptr->io.irqen);
         gdth_writeb(0x00, &dp6_ptr->u.ic.S_Status);
         gdth_writeb(0x00, &dp6_ptr->u.ic.Cmd_Index);
 

@@ -762,7 +762,7 @@ static int __devinit fcpcipnp_setup(struct fritz_adapter *adapter)
 	adapter->isac.priv = adapter;
 	switch (adapter->type) {
 	case AVM_FRITZ_PCIV2:
-		adapter->isac.read_isac       = &fcpci2_read_isac;;
+		adapter->isac.read_isac       = &fcpci2_read_isac;
 		adapter->isac.write_isac      = &fcpci2_write_isac;
 		adapter->isac.read_isac_fifo  = &fcpci2_read_isac_fifo;
 		adapter->isac.write_isac_fifo = &fcpci2_write_isac_fifo;
@@ -771,7 +771,7 @@ static int __devinit fcpcipnp_setup(struct fritz_adapter *adapter)
 		adapter->write_ctrl           = &fcpci2_write_ctrl;
 		break;
 	case AVM_FRITZ_PCI:
-		adapter->isac.read_isac       = &fcpci_read_isac;;
+		adapter->isac.read_isac       = &fcpci_read_isac;
 		adapter->isac.write_isac      = &fcpci_write_isac;
 		adapter->isac.read_isac_fifo  = &fcpci_read_isac_fifo;
 		adapter->isac.write_isac_fifo = &fcpci_write_isac_fifo;
@@ -780,7 +780,7 @@ static int __devinit fcpcipnp_setup(struct fritz_adapter *adapter)
 		adapter->write_ctrl           = &fcpci_write_ctrl;
 		break;
 	case AVM_FRITZ_PNP:
-		adapter->isac.read_isac       = &fcpci_read_isac;;
+		adapter->isac.read_isac       = &fcpci_read_isac;
 		adapter->isac.write_isac      = &fcpci_write_isac;
 		adapter->isac.read_isac_fifo  = &fcpci_read_isac_fifo;
 		adapter->isac.write_isac_fifo = &fcpci_write_isac_fifo;

@@ -2288,7 +2288,7 @@ static int in2000_proc_info(struct Scsi_Host *instance, char *buf, char **start,
 		return 0;	/* return 0 to signal end-of-file */
 	}
 	if (off > 0x40000)	/* ALWAYS stop after 256k bytes have been read */
-		stop = 1;;
+		stop = 1;
 	if (hd->proc & PR_STOP)	/* stop every other time */
 		stop = 1;
 	return strlen(bp);

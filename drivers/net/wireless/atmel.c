@@ -537,7 +537,7 @@ struct atmel_private {
 	int channel;
 	int reg_domain;
 	int tx_rate;
-	int auto_tx_rate;;
+	int auto_tx_rate;
 	int rts_threshold;
 	int frag_threshold;
 	int long_retry, short_retry;

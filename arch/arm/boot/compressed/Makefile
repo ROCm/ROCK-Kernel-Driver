@@ -59,7 +59,7 @@ SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/LOAD_ADDR/$(ZRELADDR)/;s/BSS_START/$(ZBS
 
 targets       := vmlinux vmlinux.lds piggy piggy.gz piggy.o \
                  font.o head.o $(OBJS)
-EXTRA_CFLAGS  := $(CFLAGS_BOOT) -fpic
+EXTRA_CFLAGS  := -fpic
 EXTRA_AFLAGS  := -traditional
 
 LDFLAGS_vmlinux := -p -X \

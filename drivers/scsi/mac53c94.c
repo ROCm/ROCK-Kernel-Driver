@@ -25,8 +25,11 @@
 #include <asm/pci-bridge.h>
 #include <asm/macio.h>
 
-#include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_host.h>
+
 #include "mac53c94.h"
 
 enum fsc_phase {
@@ -44,9 +47,9 @@ struct fsc_state {
 	int	dmaintr;
 	int	clk_freq;
 	struct	Scsi_Host *host;
-	Scsi_Cmnd *request_q;
-	Scsi_Cmnd *request_qtail;
-	Scsi_Cmnd *current_req;		/* req we're currently working on */
+	struct scsi_cmnd *request_q;
+	struct scsi_cmnd *request_qtail;
+	struct scsi_cmnd *current_req;		/* req we're currently working on */
 	enum fsc_phase phase;		/* what we're currently trying to do */
 	struct dbdma_cmd *dma_cmds;	/* space for dbdma commands, aligned */
 	void	*dma_cmd_space;
@@ -60,15 +63,15 @@ static void mac53c94_start(struct fsc_state *);
 static void mac53c94_interrupt(int, void *, struct pt_regs *);
 static irqreturn_t do_mac53c94_interrupt(int, void *, struct pt_regs *);
 static void cmd_done(struct fsc_state *, int result);
-static void set_dma_cmds(struct fsc_state *, Scsi_Cmnd *);
+static void set_dma_cmds(struct fsc_state *, struct scsi_cmnd *);
 
 
-static int mac53c94_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+static int mac53c94_queue(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	struct fsc_state *state;
 
 #if 0
-	if (cmd->sc_data_direction == SCSI_DATA_WRITE) {
+	if (cmd->sc_data_direction == DMA_TO_DEVICE) {
 		int i;
 		printk(KERN_DEBUG "mac53c94_queue %p: command is", cmd);
 		for (i = 0; i < cmd->cmd_len; ++i)
@@ -95,12 +98,12 @@ static int mac53c94_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 	return 0;
 }
 
-static int mac53c94_abort(Scsi_Cmnd *cmd)
+static int mac53c94_abort(struct scsi_cmnd *cmd)
 {
-	return SCSI_ABORT_SNOOZE;
+	return FAILED;
 }
 
-static int mac53c94_host_reset(Scsi_Cmnd *cmd)
+static int mac53c94_host_reset(struct scsi_cmnd *cmd)
 {
 	struct fsc_state *state = (struct fsc_state *) cmd->device->host->hostdata;
 	struct mac53c94_regs *regs = state->regs;
@@ -139,7 +142,7 @@ static void mac53c94_init(struct fsc_state *state)
  */
 static void mac53c94_start(struct fsc_state *state)
 {
-	Scsi_Cmnd *cmd;
+	struct scsi_cmnd *cmd;
 	struct mac53c94_regs *regs = state->regs;
 	int i;
 
@@ -148,7 +151,7 @@ static void mac53c94_start(struct fsc_state *state)
 	if (state->request_q == NULL)
 		return;
 	state->current_req = cmd = state->request_q;
-	state->request_q = (Scsi_Cmnd *) cmd->host_scribble;
+	state->request_q = (struct scsi_cmnd *) cmd->host_scribble;
 
 	/* Off we go */
 	writeb(0, &regs->count_lo);
@@ -190,10 +193,9 @@ static void mac53c94_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	struct fsc_state *state = (struct fsc_state *) dev_id;
 	struct mac53c94_regs *regs = state->regs;
 	struct dbdma_regs *dma = state->dma;
-	Scsi_Cmnd *cmd = state->current_req;
+	struct scsi_cmnd *cmd = state->current_req;
 	int nb, stat, seq, intr;
 	static int mac53c94_errors;
-	int dma_dir;
 
 	/*
 	 * Apparently, reading the interrupt register unlatches
@@ -308,14 +310,13 @@ static void mac53c94_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 			printk(KERN_DEBUG "intr %x before data xfer complete\n", intr);
 		}
 		writel(RUN << 16, &dma->control);	/* stop dma */
-		dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 		if (cmd->use_sg != 0) {
 			pci_unmap_sg(state->pdev,
 				(struct scatterlist *)cmd->request_buffer,
-				cmd->use_sg, dma_dir);
+				cmd->use_sg, cmd->sc_data_direction);
 		} else {
 			pci_unmap_single(state->pdev, state->dma_addr,
-				cmd->request_bufflen, dma_dir);
+				cmd->request_bufflen, cmd->sc_data_direction);
 		}
 		/* should check dma status */
 		writeb(CMD_I_COMPLETE, &regs->command);
@@ -347,7 +348,7 @@ static void mac53c94_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 
 static void cmd_done(struct fsc_state *state, int result)
 {
-	Scsi_Cmnd *cmd;
+	struct scsi_cmnd *cmd;
 
 	cmd = state->current_req;
 	if (cmd != 0) {
@@ -362,24 +363,24 @@ static void cmd_done(struct fsc_state *state, int result)
 /*
  * Set up DMA commands for transferring data.
  */
-static void set_dma_cmds(struct fsc_state *state, Scsi_Cmnd *cmd)
+static void set_dma_cmds(struct fsc_state *state, struct scsi_cmnd *cmd)
 {
 	int i, dma_cmd, total;
 	struct scatterlist *scl;
 	struct dbdma_cmd *dcmds;
 	dma_addr_t dma_addr;
 	u32 dma_len;
-	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
-	dma_cmd = cmd->sc_data_direction == SCSI_DATA_WRITE? OUTPUT_MORE:
-		INPUT_MORE;
+	dma_cmd = cmd->sc_data_direction == DMA_TO_DEVICE ?
+			OUTPUT_MORE : INPUT_MORE;
 	dcmds = state->dma_cmds;
 	if (cmd->use_sg > 0) {
 		int nseg;
 
 		total = 0;
 		scl = (struct scatterlist *) cmd->buffer;
-		nseg = pci_map_sg(state->pdev, scl, cmd->use_sg, dma_dir);
+		nseg = pci_map_sg(state->pdev, scl, cmd->use_sg,
+				cmd->sc_data_direction);
 		for (i = 0; i < nseg; ++i) {
 			dma_addr = sg_dma_address(scl);
 			dma_len = sg_dma_len(scl);
@@ -398,7 +399,7 @@ static void set_dma_cmds(struct fsc_state *state, Scsi_Cmnd *cmd)
 		if (total > 0xffff)
 			panic("mac53c94: transfer size >= 64k");
 		dma_addr = pci_map_single(state->pdev, cmd->request_buffer,
-					  total, dma_dir);
+					  total, cmd->sc_data_direction);
 		state->dma_addr = dma_addr;
 		st_le16(&dcmds->req_count, total);
 		st_le32(&dcmds->phy_addr, dma_addr);
@@ -411,7 +412,7 @@ static void set_dma_cmds(struct fsc_state *state, Scsi_Cmnd *cmd)
 	cmd->SCp.this_residual = total;
 }
 
-static Scsi_Host_Template mac53c94_template = {
+static struct scsi_host_template mac53c94_template = {
 	.proc_name	= "53c94",
 	.name		= "53C94",
 	.queuecommand	= mac53c94_queue,

@@ -2133,7 +2133,7 @@ int int_tul_bad_seq(HCS * pCurHcb)
 		tul_append_done_scb(pCurHcb, pCurScb);
 	}
 	for (i = 0; i < pCurHcb->HCS_MaxTar; i++) {
-		pCurHcb->HCS_Tcs[i].TCS_Flags &= ~(TCF_SYNC_DONE | TCF_WDTR_DONE);;
+		pCurHcb->HCS_Tcs[i].TCS_Flags &= ~(TCF_SYNC_DONE | TCF_WDTR_DONE);
 	}
 	return (-1);
 }

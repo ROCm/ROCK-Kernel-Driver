@@ -25,6 +25,7 @@
 #include <linux/netlink.h>
 #include <net/sock.h>
 #include <linux/xattr.h>
+#include <linux/hugetlb.h>
 
 static int dummy_ptrace (struct task_struct *parent, struct task_struct *child)
 {
@@ -146,7 +147,8 @@ static int dummy_vm_enough_memory(long pages)
 		return -ENOMEM;
 	}
 
-	allowed = totalram_pages * sysctl_overcommit_ratio / 100;
+	allowed = (totalram_pages - hugetlb_total_pages())
+		* sysctl_overcommit_ratio / 100;
 	allowed += total_swap_pages;
 
 	if (atomic_read(&vm_committed_space) < allowed)

@@ -619,6 +619,13 @@ int is_hugepage_mem_enough(size_t size)
 	return (size + ~HPAGE_MASK)/HPAGE_SIZE <= pm;
 }
 
+/* Return the number pages of memory we physically have, in PAGE_SIZE units. */
+unsigned long hugetlb_total_pages(void)
+{
+	return all_huge_pages() * (HPAGE_SIZE / PAGE_SIZE);
+}
+EXPORT_SYMBOL(hugetlb_total_pages);
+
 /*
  * We cannot handle pagefaults against hugetlb pages at all.  They cause
  * handle_mm_fault() to try to instantiate regular-sized pages in the

@@ -82,7 +82,7 @@ static int presto_open_upcall(int minor, struct dentry *de)
                 info.remote_generation = dd->remote_generation;
         } else
                 CERROR("get_fileid failed %d, ino: %Lx, fetching by name\n", rc,
-                       dd->remote_ino);
+                       (unsigned long long) dd->remote_ino);
 
         rc = izo_upc_open(minor, pathlen, path, fset->fset_name, &info);
         PRESTO_FREE(buffer, PAGE_SIZE);
@@ -380,7 +380,7 @@ static ssize_t presto_file_write(struct file *file, const char *buf,
                 << file->f_dentry->d_inode->i_sb->s_blocksize_bits);
 
         error = presto_reserve_space(fset->fset_cache, res_size); 
-        CDEBUG(D_INODE, "Reserved %Ld for %d\n", res_size, size); 
+        CDEBUG(D_INODE, "Reserved %Ld for %Zd\n", res_size, size);
         if ( error ) { 
                 EXIT;
                 return -ENOSPC;
@@ -440,7 +440,7 @@ static ssize_t presto_file_write(struct file *file, const char *buf,
         fops = filter_c2cffops(cache->cache_filter);
         res = fops->write(file, buf, size, off);
         if ( res != size ) {
-                CDEBUG(D_FILE, "file write returns short write: size %d, res %d\n", size, res); 
+                CDEBUG(D_FILE, "file write returns short write: size %Zd, res %Zd\n", size, res); 
         }
 
         if ( (res > 0) && fdata ) 

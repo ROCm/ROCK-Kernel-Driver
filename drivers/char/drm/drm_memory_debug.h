@@ -385,7 +385,7 @@ int DRM(free_agp)(DRM_AGP_MEM *handle, int pages)
 	if (!handle) {
 		DRM_MEM_ERROR(DRM_MEM_TOTALAGP,
 			      "Attempt to free NULL AGP handle\n");
-		return retval;;
+		return retval;
 	}
 
 	if (DRM(agp_free_memory)(handle)) {

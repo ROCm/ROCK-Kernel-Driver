@@ -36,7 +36,9 @@ void module_free(struct module *mod, void *module_region)
            table entries. */
 }
 
-/* Make generic code ignore STT_REGISTER dummy undefined symbols.  */
+/* Make generic code ignore STT_REGISTER dummy undefined symbols,
+ * and replace references to .func with func as in ppc64's dedotify.
+ */
 int module_frob_arch_sections(Elf_Ehdr *hdr,
 			      Elf_Shdr *sechdrs,
 			      char *secstrings,
@@ -44,7 +46,7 @@ int module_frob_arch_sections(Elf_Ehdr *hdr,
 {
 	unsigned int symidx;
 	Elf32_Sym *sym;
-	const char *strtab;
+	char *strtab;
 	int i;
 
 	for (symidx = 0; sechdrs[symidx].sh_type != SHT_SYMTAB; symidx++) {
@@ -57,9 +59,15 @@ int module_frob_arch_sections(Elf_Ehdr *hdr,
 	strtab = (char *)sechdrs[sechdrs[symidx].sh_link].sh_addr;
 
 	for (i = 1; i < sechdrs[symidx].sh_size / sizeof(Elf_Sym); i++) {
-		if (sym[i].st_shndx == SHN_UNDEF &&
-		    ELF32_ST_TYPE(sym[i].st_info) == STT_REGISTER)
-			sym[i].st_shndx = SHN_ABS;
+		if (sym[i].st_shndx == SHN_UNDEF) {
+			if (ELF32_ST_TYPE(sym[i].st_info) == STT_REGISTER)
+				sym[i].st_shndx = SHN_ABS;
+			else {
+				char *name = strtab + sym[i].st_name;
+				if (name[0] == '.')
+					memmove(name, name+1, strlen(name));
+			}
+		}
 	}
 	return 0;
 }

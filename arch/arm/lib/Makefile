@@ -11,30 +11,20 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
 		   strnlen_user.o strchr.o strrchr.o testchangebit.o  \
 		   testclearbit.o testsetbit.o uaccess.o getuser.o    \
 		   putuser.o ashldi3.o ashrdi3.o lshrdi3.o muldi3.o   \
-		   ucmpdi2.o udivdi3.o lib1funcs.o div64.o
-
-lib-arc		:= ecard.o io-acorn.o floppydma.o
-lib-rpc		:= ecard.o io-acorn.o floppydma.o
-lib-clps7500	:= io-acorn.o
-lib-l7200     	:= io-acorn.o
-lib-shark	:= io-shark.o
-lib-edb7211	:= io-acorn.o
-
-lib-y		+= $(lib-$(MACHINE))
+		   ucmpdi2.o udivdi3.o lib1funcs.o div64.o	      \
+		   io-readsb.o io-writesb.o io-writesl.o
 
 ifeq ($(CONFIG_CPU_32v3),y)
-  v3		:= y
-  v4		:= n
+  lib-y	+= io-readsw-armv3.o io-writesw-armv3.o io-readsl-armv3.o
 else
-  v3		:= n
-  v4		:= y
+  lib-y	+= io-readsw-armv4.o io-writesw-armv4.o io-readsl-armv4.o
 endif
 
-lib-y		+= io-readsb.o io-writesb.o
-lib-$(v3)	+= io-readsw-armv3.o io-writesw-armv3.o io-readsl-armv3.o
-lib-$(v4)	+= io-readsw-armv4.o io-writesw-armv4.o io-readsl-armv4.o
-lib-y		+= io-writesl.o
+lib-$(CONFIG_ARCH_RPC)		+= ecard.o io-acorn.o floppydma.o
+lib-$(CONFIG_ARCH_CLPS7500)	+= io-acorn.o
+lib-$(CONFIG_ARCH_L7200)	+= io-acorn.o
+lib-$(CONFIG_ARCH_SHARK)	+= io-shark.o
+lib-$(CONFIG_ARCH_CLPS711X)	+= io-acorn.o
 
 $(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
 $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
-

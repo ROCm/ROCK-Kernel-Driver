@@ -938,7 +938,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 	unsigned int npacks[MAX_URBS], urb_packs, total_packs;
 
 	/* calculate the frequency in 16.16 format */
-	if (subs->dev->speed == USB_SPEED_FULL)
+	if (snd_usb_get_speed(subs->dev) == USB_SPEED_FULL)
 		subs->freqn = get_usb_full_speed_rate(rate);
 	else
 		subs->freqn = get_usb_high_speed_rate(rate);
@@ -959,7 +959,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 	else
 		subs->curpacksize = maxsize;
 
-	if (subs->dev->speed == USB_SPEED_FULL)
+	if (snd_usb_get_speed(subs->dev) == USB_SPEED_FULL)
 		urb_packs = nrpacks;
 	else
 		urb_packs = nrpacks * 8;
@@ -1058,7 +1058,10 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 			u->urb->pipe = subs->syncpipe;
 			u->urb->transfer_flags = URB_ISO_ASAP;
 			u->urb->number_of_packets = u->packets;
-			u->urb->interval = subs->dev->speed == USB_SPEED_HIGH ? 8 : 1;
+			if (snd_usb_get_speed(subs->dev) == USB_SPEED_HIGH)
+				u->urb->interval = 8;
+			else
+				u->urb->interval = 1;
 			u->urb->context = u;
 			u->urb->complete = snd_usb_complete_callback(snd_complete_sync_urb);
 		}
@@ -1961,7 +1964,7 @@ static void proc_dump_substream_status(snd_usb_substream_t *subs, snd_info_buffe
 		snd_iprintf(buffer, "]\n");
 		snd_iprintf(buffer, "    Packet Size = %d\n", subs->curpacksize);
 		snd_iprintf(buffer, "    Momentary freq = %u Hz\n",
-			    subs->dev->speed == USB_SPEED_FULL
+			    snd_usb_get_speed(subs->dev) == USB_SPEED_FULL
 			    ? get_full_speed_hz(subs->freqm)
 			    : get_high_speed_hz(subs->freqm));
 	} else {
@@ -2013,7 +2016,7 @@ static void init_substream(snd_usb_stream_t *as, int stream, struct audioformat 
 	subs->stream = as;
 	subs->direction = stream;
 	subs->dev = as->chip->dev;
-	if (subs->dev->speed == USB_SPEED_FULL)
+	if (snd_usb_get_speed(subs->dev) == USB_SPEED_FULL)
 		subs->ops = audio_urb_ops[stream];
 	else
 		subs->ops = audio_urb_ops_high_speed[stream];
@@ -2854,9 +2857,9 @@ static int snd_usb_audio_create(struct usb_device *dev, int idx,
 	
 	*rchip = NULL;
 
-	if (dev->speed != USB_SPEED_FULL &&
-	    dev->speed != USB_SPEED_HIGH) {
-		snd_printk(KERN_ERR "unknown device speed %d\n", dev->speed);
+	if (snd_usb_get_speed(dev) != USB_SPEED_FULL &&
+	    snd_usb_get_speed(dev) != USB_SPEED_HIGH) {
+		snd_printk(KERN_ERR "unknown device speed %d\n", snd_usb_get_speed(dev));
 		return -ENXIO;
 	}
 
@@ -2924,7 +2927,7 @@ static int snd_usb_audio_create(struct usb_device *dev, int idx,
 		usb_make_path(dev, card->longname + len, sizeof(card->longname) - len);
 
 	strlcat(card->longname,
-		dev->speed == USB_SPEED_FULL ? ", full speed" : ", high speed",
+		snd_usb_get_speed(dev) == USB_SPEED_FULL ? ", full speed" : ", high speed",
 		sizeof(card->longname));
 
 	snd_usb_audio_create_proc(chip);

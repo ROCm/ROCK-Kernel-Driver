@@ -511,7 +511,7 @@ static int mct_u232_write (struct usb_serial_port *port, int from_user,
 
 	/* only do something if we have a bulk out endpoint */
 	if (!serial->num_bulk_out)
-		return(0);;
+		return(0);
 	
 	/* another write is still pending? */
 	if (port->write_urb->status == -EINPROGRESS) {

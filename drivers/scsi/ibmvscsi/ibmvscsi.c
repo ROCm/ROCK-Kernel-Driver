@@ -66,6 +66,7 @@
  * layer.
  */
 
+#include <linux/pci.h>		/* needed only for pci_dma_mapping_error */
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/dma-mapping.h>
@@ -340,10 +341,9 @@ static int map_sg_data(struct scsi_cmnd *cmd,
 	    (struct memory_descriptor *)srp_cmd->additional_data;
 	struct indirect_descriptor *indirect =
 	    (struct indirect_descriptor *)data;
-
 	sg_mapped = dma_map_sg(dev, sg, cmd->use_sg, DMA_BIDIRECTIONAL);
 
-	if (sg_mapped == 0)
+	if (pci_dma_mapping_error(sg_dma_address(&sg[0])))
 		return 0;
 
 	/* special case; we can use a single direct descriptor */
@@ -407,7 +407,7 @@ static int map_single_data(struct scsi_cmnd *cmd,
 	    (u64) (unsigned long)dma_map_single(dev, cmd->request_buffer,
 						cmd->request_bufflen,
 						DMA_BIDIRECTIONAL);
-	if (dma_mapping_error(data->virtual_address)) {
+	if (pci_dma_mapping_error(data->virtual_address)) {
 		printk(KERN_ERR
 		       "ibmvscsi: Unable to map request_buffer for command!\n");
 		return 0;
@@ -690,7 +690,7 @@ static void send_mad_adapter_info(struct ibmvscsi_host_data *hostdata)
 				    &hostdata->madapter_info,
 				    sizeof(hostdata->madapter_info),
 				    DMA_BIDIRECTIONAL);
-	if (dma_mapping_error(req.buffer)) {
+	if (pci_dma_mapping_error(req.buffer)) {
 		printk(KERN_ERR
 		       "ibmvscsi: Unable to map request_buffer "
 		       "for adapter_info!\n");
@@ -1075,7 +1075,7 @@ static int ibmvscsi_do_host_config(struct ibmvscsi_host_data *hostdata,
 	host_config.buffer = dma_map_single(hostdata->dev, buffer, length,
 					    DMA_BIDIRECTIONAL);
 
-	if (dma_mapping_error(host_config.buffer)) {
+	if (pci_dma_mapping_error(host_config.buffer)) {
 		printk(KERN_ERR
 		       "ibmvscsi: dma_mapping error " "getting host config\n");
 		rc = -1;

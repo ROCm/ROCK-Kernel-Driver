@@ -54,7 +54,7 @@ static void
 pangolin_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt,
 			     struct pcmcia_state *state)
 {
-	unsigned long levels = GPLR;;
+	unsigned long levels = GPLR;
 
 	state->detect=((levels & GPIO_PCMCIA_CD)==0)?1:0;
 	state->ready=(levels & GPIO_PCMCIA_IRQ)?1:0;

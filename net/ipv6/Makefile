@@ -22,6 +22,8 @@ obj-$(CONFIG_INET6_ESP) += esp6.o
 obj-$(CONFIG_INET6_IPCOMP) += ipcomp6.o
 obj-$(CONFIG_NETFILTER)	+= netfilter/
 
-obj-$(CONFIG_IPV6_TUNNEL) += ipv6_tunnel.o
+obj-$(CONFIG_IPV6_TUNNEL)   += ipv6_tunnel.o
 obj-$(CONFIG_IPV6_MOBILITY) += mipglue.o
-obj-$(CONFIG_IPV6_MOBILITY)	+= mobile_ip6/
+obj-$(CONFIG_IPV6_MOBILITY) += mobile_ip6/
+
+obj-y += exthdrs_core.o

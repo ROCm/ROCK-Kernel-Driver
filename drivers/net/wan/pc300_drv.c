@@ -3661,7 +3661,7 @@ static void __devexit cpc_remove_one(struct pci_dev *pdev)
 			release_mem_region(card->hw.falcphys, card->hw.falcsize);
 		}
 		for (i = 0; i < card->hw.nchan; i++)
-			if (card->chan[i].d.dev);
+			if (card->chan[i].d.dev)
 				free_netdev(card->chan[i].d.dev);
 		if (card->hw.irq)
 			free_irq(card->hw.irq, card);

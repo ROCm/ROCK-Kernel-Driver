@@ -1863,7 +1863,7 @@ static int initialize_crq_queue(struct crq_queue *queue, struct server_adapter *
 					  queue->size * sizeof(*queue->msgs),
 					  PCI_DMA_BIDIRECTIONAL);
 
-	if (vio_dma_mapping_error(queue->msg_token))
+	if (pci_dma_mapping_error(queue->msg_token))
 		goto map_failed;
 
 	rc = plpar_hcall_norets(H_REG_CRQ, adapter->dma_dev->unit_address, queue->msg_token, PAGE_SIZE);

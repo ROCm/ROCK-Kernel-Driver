@@ -39,9 +39,10 @@
 enum {
 	via_sata		= 0,
 
-	SATA_CHAN_ENAB		= 0x40,
-	SATA_INT_GATE		= 0x41,
-	SATA_NATIVE_MODE	= 0x42,
+	SATA_CHAN_ENAB		= 0x40, /* SATA channel enable */
+	SATA_INT_GATE		= 0x41, /* SATA interrupt gating */
+	SATA_NATIVE_MODE	= 0x42, /* Native mode enable */
+	SATA_PATA_SHARING	= 0x49, /* PATA/SATA sharing func ctrl */
 
 	PORT0			= (1 << 1),
 	PORT1			= (1 << 0),
@@ -51,6 +52,9 @@ enum {
 	INT_GATE_ALL		= PORT0 | PORT1,
 
 	NATIVE_MODE_ALL		= (1 << 7) | (1 << 6) | (1 << 5) | (1 << 4),
+
+	SATA_EXT_PHY		= (1 << 6), /* 0==use PATA, 1==ext phy */
+	SATA_2DEV		= (1 << 5), /* SATA is master/slave */
 };
 
 static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
@@ -136,13 +140,7 @@ static const unsigned int svia_bar_sizes[] = {
 
 static unsigned long svia_scr_addr(unsigned long addr, unsigned int port)
 {
-	if (port >= 4)
-		return 0;	/* invalid port */
-
-	addr &= ~((1 << 7) | (1 << 6));
-	addr |= ((unsigned long)port << 6);
-
-	return addr;
+	return addr + (port * 128);
 }
 
 /**
@@ -175,6 +173,13 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		goto err_out;
 
+	pci_read_config_byte(pdev, SATA_PATA_SHARING, &tmp8);
+	if (tmp8 & SATA_2DEV) {
+		printk(KERN_ERR DRV_NAME "(%s): SATA master/slave not supported (0x%x)\n",
+		       pci_name(pdev), (int) tmp8);
+		rc = -EIO;
+		goto err_out_regions;
+	}
 
 	for (i = 0; i < ARRAY_SIZE(svia_bar_sizes); i++)
 		if ((pci_resource_start(pdev, i) == 0) ||

@@ -2620,7 +2620,7 @@ zfcp_erp_adapter_strategy_open_fsf_xconfig(struct zfcp_erp_action *erp_action)
 		ZFCP_LOG_INFO("error: exchange of configuration data for "
 			      "adapter %s failed\n",
 			      zfcp_get_busid_by_adapter(adapter));
-		retval = ZFCP_ERP_FAILED;;
+		retval = ZFCP_ERP_FAILED;
 	}
 
 	return retval;

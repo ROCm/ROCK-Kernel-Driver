@@ -587,8 +587,7 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 			ASSERT(context->flags & ATTR_KERNAMELS);
 			context->count += namesp->attr_namelen +
 						sbp->namelen + 1;
-		}
-		else {
+		} else {
 			if (xfs_attr_put_listent(context, namesp,
 					sbp->name, sbp->namelen,
 					INT_GET(sbp->valuelen, ARCH_CONVERT)))

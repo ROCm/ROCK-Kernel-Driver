@@ -3713,8 +3713,7 @@ xfs_iaccess(
 			return 0;
 
 	if ((orgmode == S_IRUSR) ||
-	    (((ip->i_d.di_mode & S_IFMT) == S_IFDIR) &&
-	     (!(orgmode & ~(S_IWUSR|S_IXUSR))))) {
+	    (S_ISDIR(inode->i_mode) && (!(orgmode & S_IWUSR)))) {
 		if (capable_cred(cr, CAP_DAC_READ_SEARCH))
 			return 0;
 #ifdef	NOISE

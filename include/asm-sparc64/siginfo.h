@@ -8,6 +8,7 @@
 
 #define __ARCH_SI_PREAMBLE_SIZE	(4 * sizeof(int))
 #define __ARCH_SI_TRAPNO
+#define __ARCH_SI_BAND_T int
 
 #include <asm-generic/siginfo.h>
 

@@ -160,7 +160,6 @@ typedef struct {
 } opl3sa2_state_t;
 static opl3sa2_state_t opl3sa2_state[OPL3SA2_CARDS_MAX];
 
-static spinlock_t opl3sa2_lock = SPIN_LOCK_UNLOCKED;
 	
 
 /* Our parameters */
@@ -853,6 +852,8 @@ static struct pnp_driver opl3sa2_driver = {
 /* End of component functions */
 
 #ifdef CONFIG_PM
+static spinlock_t opl3sa2_lock = SPIN_LOCK_UNLOCKED;
+
 /* Power Management support functions */
 static int opl3sa2_suspend(struct pm_dev *pdev, unsigned int pm_mode)
 {

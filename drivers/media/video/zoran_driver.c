@@ -2815,7 +2815,7 @@ zoran_do_ioctl (struct inode *inode,
 				     fh->jpg_settings.TmpDcm);
 				fmt->fmt.pix.sizeimage =
 				    zoran_v4l2_calc_bufsize(&fh->
-							    jpg_settings);;
+							    jpg_settings);
 				fmt->fmt.pix.pixelformat =
 				    V4L2_PIX_FMT_MJPEG;
 				if (fh->jpg_settings.TmpDcm == 1)

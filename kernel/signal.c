@@ -157,7 +157,7 @@ int max_queued_signals = 1024;
 	 sigtestsetmask(&current->signal->shared_pending.signal, \
 						  M(SIGCONT) | M(SIGKILL)))
 
-static inline int sig_ignored(struct task_struct *t, int sig)
+static int sig_ignored(struct task_struct *t, int sig)
 {
 	void * handler;
 
@@ -532,7 +532,7 @@ int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
  * No need to set need_resched since signal event passing
  * goes through ->blocked
  */
-inline void signal_wake_up(struct task_struct *t, int resume)
+void signal_wake_up(struct task_struct *t, int resume)
 {
 	unsigned int mask;
 
@@ -837,7 +837,7 @@ force_sig_specific(int sig, struct task_struct *t)
 	 && (task_curr(p) || !signal_pending(p)))
 
 
-static inline void
+static void
 __group_complete_signal(int sig, struct task_struct *p, unsigned int mask)
 {
 	struct task_struct *t;
@@ -940,7 +940,7 @@ __group_complete_signal(int sig, struct task_struct *p, unsigned int mask)
 	return;
 }
 
-static inline int
+static int
 __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	unsigned int mask;
@@ -1375,7 +1375,7 @@ out:
  * Joy. Or not. Pthread wants us to wake up every thread
  * in our parent group.
  */
-static inline void __wake_up_parent(struct task_struct *p,
+static void __wake_up_parent(struct task_struct *p,
 				    struct task_struct *parent)
 {
 	struct task_struct *tsk = parent;

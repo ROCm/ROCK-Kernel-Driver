@@ -915,7 +915,7 @@ static irqreturn_t pcie_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 		rc = hp_register_read_word(php_ctlr->pci_dev, SLOT_CTRL, temp_word);
 		if (rc) {
 			err("%s : hp_register_read_word SLOT_CTRL failed\n", __FUNCTION__);
-			return IRQ_NONE;;
+			return IRQ_NONE;
 		}
 
 		temp_word = (temp_word & ~HP_INTR_ENABLE) | 0x00;
@@ -923,7 +923,7 @@ static irqreturn_t pcie_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 		rc = hp_register_write_word(php_ctlr->pci_dev, SLOT_CTRL, temp_word);
 		if (rc) {
 			err("%s : hp_register_write_word SLOT_CTRL failed\n", __FUNCTION__);
-			return IRQ_NONE;;
+			return IRQ_NONE;
 		}
 	}
 	

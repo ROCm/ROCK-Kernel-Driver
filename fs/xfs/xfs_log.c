@@ -3160,6 +3160,7 @@ xlog_ticket_get(xlog_t		*log,
 		uint		xflags)
 {
 	xlog_ticket_t	*tic;
+	uint		num_headers;
 	SPLDECL(s);
 
  alloc:
@@ -3183,21 +3184,30 @@ xlog_ticket_get(xlog_t		*log,
 	 * in the log.  A unit in this case is the amount of space for one
 	 * of these log operations.  Normal reservations have a cnt of 1
 	 * and their unit amount is the total amount of space required.
-	 * The following line of code adds one log record header length
-	 * for each part of an operation which may fall on a different
-	 * log record.
 	 *
-	 * One more XLOG_HEADER_SIZE is added to account for possible
-	 * round off errors when syncing a LR to disk.  The bytes are
-	 * subtracted if the thread using this ticket is the first writer
-	 * to a new LR.
-	 *
-	 * We add an extra log header for the possibility that the commit
-	 * record is the first data written to a new log record.  In this
-	 * case it is separate from the rest of the transaction data and
-	 * will be charged for the log record header.
+	 * The following lines of code account for non-transaction data
+	 * which occupy space in the on-disk log. 
 	 */
-	unit_bytes += log->l_iclog_hsize * (XLOG_BTOLRBB(unit_bytes) + 2);
+
+	/* for start-rec */
+	unit_bytes += sizeof(xlog_op_header_t); 
+
+	/* for padding */
+	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb) &&
+		log->l_mp->m_sb.sb_logsunit > 1) {
+		/* log su roundoff */
+		unit_bytes += log->l_mp->m_sb.sb_logsunit;  
+	} else {
+		/* BB roundoff */
+		unit_bytes += BBSIZE;
+        }
+
+	/* for commit-rec */
+	unit_bytes += sizeof(xlog_op_header_t);
+ 
+	/* for LR headers */
+	num_headers = ((unit_bytes + log->l_iclog_size-1) >> log->l_iclog_size_log);
+	unit_bytes += log->l_iclog_hsize * num_headers;
 
 	tic->t_unit_res		= unit_bytes;
 	tic->t_curr_res		= unit_bytes;

@@ -1875,9 +1875,6 @@ static void __exit exit_pmz(void)
 	/* Get rid of macio-driver (detach from macio) */
 	macio_unregister_driver(&pmz_driver);
 
-	/* Unregister UART driver */
-	uart_unregister_driver(&pmz_uart_reg);
-
 	for (i = 0; i < pmz_ports_count; i++) {
 		struct uart_pmac_port *uport = &pmz_ports[i];
 		if (uport->node != NULL) {
@@ -1885,6 +1882,8 @@ static void __exit exit_pmz(void)
 			pmz_dispose_port(uport);
 		}
 	}
+	/* Unregister UART driver */
+	uart_unregister_driver(&pmz_uart_reg);
 }
 
 #ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE

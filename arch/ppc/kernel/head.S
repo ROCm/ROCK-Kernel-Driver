@@ -462,7 +462,7 @@ Alignment:
 	EXC_XFER_EE(0x600, AlignmentException)
 
 /* Program check exception */
-	EXCEPTION(0x700, ProgramCheck, ProgramCheckException, EXC_XFER_EE)
+	EXCEPTION(0x700, ProgramCheck, ProgramCheckException, EXC_XFER_STD)
 
 /* Floating-point unavailable */
 	. = 0x800
@@ -485,7 +485,7 @@ SystemCall:
 	EXC_XFER_EE_LITE(0xc00, DoSyscall)
 
 /* Single step - not used on 601 */
-	EXCEPTION(0xd00, SingleStep, SingleStepException, EXC_XFER_EE)
+	EXCEPTION(0xd00, SingleStep, SingleStepException, EXC_XFER_STD)
 	EXCEPTION(0xe00, Trap_0e, UnknownException, EXC_XFER_EE)
 
 /*
@@ -1436,11 +1436,8 @@ _GLOBAL(set_context)
 	stw	r4, 0x4(r5)
 #endif
 	li	r4,0
-BEGIN_FTR_SECTION
-	dssall
-	sync
-END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
-3:	isync
+	isync
+3:
 #ifdef CONFIG_PPC64BRIDGE
 	slbie	r4
 #endif /* CONFIG_PPC64BRIDGE */

@@ -212,9 +212,9 @@ struct mddev_s
 
 	struct mdk_thread_s		*thread;	/* management thread */
 	struct mdk_thread_s		*sync_thread;	/* doing resync or reconstruct */
-	unsigned long			curr_resync;	/* blocks scheduled */
+	sector_t			curr_resync;	/* blocks scheduled */
 	unsigned long			resync_mark;	/* a recent timestamp */
-	unsigned long			resync_mark_cnt;/* blocks written at resync_mark */
+	sector_t			resync_mark_cnt;/* blocks written at resync_mark */
 
 	/* recovery/resync flags 
 	 * NEEDED:   we might need to start a resync/recover

@@ -183,7 +183,9 @@ extern int max_timeslice, min_timeslice;
 struct namespace;
 
 /* Maximum number of active map areas.. This is a random (large) number */
-#define MAX_MAP_COUNT	(65536)
+#define DEFAULT_MAX_MAP_COUNT	65536
+
+extern int sysctl_max_map_count;
 
 #include <linux/aio.h>
 

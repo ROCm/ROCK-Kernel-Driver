@@ -20,7 +20,7 @@ obj-$(CONFIG_ARTHUR)		+= arthur.o
 obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
 obj-$(CONFIG_PCI)		+= bios32.o
 
-ifneq ($(MACHINE),ebsa110)
+ifneq ($(CONFIG_ARCH_EBSA110),y)
   obj-y		+= io.o
 endif
 

@@ -1467,7 +1467,7 @@ malformed:
 struct __sctp_missing {
 	__u32 num_missing;
 	__u16 type;
-}  __attribute__((packed));;
+}  __attribute__((packed));
 
 /*
  * Report a missing mandatory parameter.

@@ -163,7 +163,8 @@ dump_altivec(struct pt_regs *regs, elf_vrregset_t *vrregs)
 void
 enable_kernel_altivec(void)
 {
-	preempt_disable();
+	WARN_ON(current_thread_info()->preempt_count == 0 && !irqs_disabled());
+
 #ifdef CONFIG_SMP
 	if (current->thread.regs && (current->thread.regs->msr & MSR_VEC))
 		giveup_altivec(current);
@@ -172,14 +173,15 @@ enable_kernel_altivec(void)
 #else
 	giveup_altivec(last_task_used_altivec);
 #endif /* __SMP __ */
-	preempt_enable();
 }
+EXPORT_SYMBOL(enable_kernel_altivec);
 #endif /* CONFIG_ALTIVEC */
 
 void
 enable_kernel_fp(void)
 {
-	preempt_disable();
+	WARN_ON(current_thread_info()->preempt_count == 0 && !irqs_disabled());
+
 #ifdef CONFIG_SMP
 	if (current->thread.regs && (current->thread.regs->msr & MSR_FP))
 		giveup_fpu(current);
@@ -188,8 +190,8 @@ enable_kernel_fp(void)
 #else
 	giveup_fpu(last_task_used_math);
 #endif /* CONFIG_SMP */
-	preempt_enable();
 }
+EXPORT_SYMBOL(enable_kernel_fp);
 
 int
 dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)

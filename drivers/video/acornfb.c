@@ -29,6 +29,8 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/fb.h>
+#include <linux/device.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -1254,6 +1256,11 @@ free_unused_pages(unsigned int virtual_start, unsigned int virtual_end)
 	printk("acornfb: freed %dK memory\n", mb_freed);
 }
 
+static struct device acornfb_device = {
+	.bus_id			= "acornfb",
+	.coherent_dma_mask	= 0xffffffff,
+};
+
 int __init
 acornfb_init(void)
 {
@@ -1262,6 +1269,8 @@ acornfb_init(void)
 	int rc, i;
 
 	acornfb_init_fbinfo();
+
+	current_par.dev = &acornfb_device;
 
 	if (current_par.montype == -1)
 		current_par.montype = acornfb_detect_monitortype();
@@ -1323,37 +1332,30 @@ acornfb_init(void)
 
 #if defined(HAS_VIDC20)
 	if (!current_par.using_vram) {
+		dma_addr_t handle;
+		void *base;
+
 		/*
 		 * RiscPC needs to allocate the DRAM memory
 		 * for the framebuffer if we are not using
-		 * VRAM.  Archimedes/A5000 machines use a
-		 * fixed address for their framebuffers.
+		 * VRAM.
 		 */
-		unsigned long page, top, base;
-		int order = get_order(size);
-
-		base = __get_free_pages(GFP_KERNEL, order);
-		if (base == 0) {
+		base = dma_alloc_writecombine(current_par.dev, size, &handle,
+					      GFP_KERNEL);
+		if (base == NULL) {
 			printk(KERN_ERR "acornfb: unable to allocate screen "
 			       "memory\n");
 			return -ENOMEM;
 		}
-		top = base + (PAGE_SIZE << order);
 
-		/* Mark the framebuffer pages as reserved so mmap will work. */
-		for (page = base; page < PAGE_ALIGN(base + size); page += PAGE_SIZE)
-			SetPageReserved(virt_to_page(page));
-		/* Hand back any excess pages that we allocated. */
-		for (page = base + size; page < top; page += PAGE_SIZE)
-			free_page(page);
-
-		fb_info.screen_base = (char *)base;
-		fb_info.fix.smem_start = virt_to_phys(fb_info.screen_base);
+		fb_info.screen_base = base;
+		fb_info.fix.smem_start = handle;
 	}
 #endif
 #if defined(HAS_VIDC)
 	/*
-	 * Free unused pages
+	 * Archimedes/A5000 machines use a fixed address for their
+	 * framebuffers.  Free unused pages
 	 */
 	free_unused_pages(PAGE_OFFSET + size, PAGE_OFFSET + MAX_SIZE);
 #endif

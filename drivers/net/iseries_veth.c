@@ -71,7 +71,6 @@
 #include <linux/mm.h>
 #include <linux/ethtool.h>
 #include <asm/iSeries/mf.h>
-#include <asm/iSeries/iSeries_pci.h>
 #include <asm/uaccess.h>
 
 #include <asm/iSeries/HvLpConfig.h>
@@ -112,6 +111,11 @@ MODULE_LICENSE("GPL");
 #define VETH_STATE_GOTCAPS	(0x0040)
 #define VETH_STATE_SENTCAPACK	(0x0080)
 #define VETH_STATE_READY	(0x0100)
+
+static inline u64 veth_dma_addr(void *p)
+{
+	return 0x8000000000000000LL | virt_to_absolute((unsigned long) p);
+}
 
 #define VETHSTACK(T) \
 	struct VethStack##T { \
@@ -1126,13 +1130,13 @@ static inline void veth_build_dma_list(struct dma_chunk *list, unsigned char *p,
 	 * really need to break it into PAGE_SIZE chunks, or can we do
 	 * it just at the granularity of iSeries real->absolute
 	 * mapping? */
-	list[0].addr = ISERIES_HV_ADDR(p);
+	list[0].addr = veth_dma_addr(p);
 	list[0].size = min(length,
 			   PAGE_SIZE - ((unsigned long)p & ~PAGE_MASK));
 
 	done = list[0].size;
 	while (done < length) {
-		list[i].addr = ISERIES_HV_ADDR(p + done);
+		list[i].addr = veth_dma_addr(p + done);
 		list[i].size = min(length-done, PAGE_SIZE);
 		done += list[i].size;
 		i++;
@@ -1203,8 +1207,8 @@ static void veth_receive(struct veth_lpar_connection *cnx, struct VethLpEvent *e
 					    cnx->dst_inst,
 					    HvLpDma_AddressType_RealAddress,
 					    HvLpDma_AddressType_TceIndex,
-					    ISERIES_HV_ADDR(&local_list),
-					    ISERIES_HV_ADDR(&remote_list),
+					    veth_dma_addr(&local_list),
+					    veth_dma_addr(&remote_list),
 					    length);
 		if (rc != HvLpDma_Rc_Good) {
 			dev_kfree_skb_irq(skb);

@@ -16,7 +16,9 @@ obj-$(CONFIG_LLC)		+= llc/
 obj-$(CONFIG_NET)		+= ethernet/ 802/ sched/ netlink/
 obj-$(CONFIG_INET)		+= ipv4/ xfrm/
 obj-$(CONFIG_UNIX)		+= unix/
-obj-$(CONFIG_IPV6)		+= ipv6/
+ifneq ($(CONFIG_IPV6),)
+obj-y				+= ipv6/
+endif
 obj-$(CONFIG_PACKET)		+= packet/
 obj-$(CONFIG_NET_KEY)		+= key/
 obj-$(CONFIG_NET_SCHED)		+= sched/

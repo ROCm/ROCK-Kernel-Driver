@@ -149,10 +149,12 @@ static int do_stop(void *_smdata)
 	complete(&smdata->done);
 
 	/* Wait for kthread_stop */
+	__set_current_state(TASK_INTERRUPTIBLE);
 	while (!kthread_should_stop()) {
-		__set_current_state(TASK_INTERRUPTIBLE);
 		schedule();
+		__set_current_state(TASK_INTERRUPTIBLE);
 	}
+	__set_current_state(TASK_RUNNING);
 	return ret;
 }
 

@@ -795,6 +795,14 @@ static ctl_table vm_table[] = {
 		.extra1		= &zero,
 	},
 	{
+		.ctl_name	= VM_MAX_MAP_COUNT,
+		.procname	= "max_map_count",
+		.data		= &sysctl_max_map_count,
+		.maxlen		= sizeof(sysctl_max_map_count),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{
 		.ctl_name	= VM_LAPTOP_MODE,
 		.procname	= "laptop_mode",
 		.data		= &laptop_mode,
@@ -814,15 +822,15 @@ static ctl_table vm_table[] = {
 		.strategy	= &sysctl_intvec,
 		.extra1		= &zero,
 	},
-	{
-		.ctl_name	= VM_DISABLE_CAP_MLOCK,
-		.procname	= "disable_cap_mlock",
-		.data		= &sysctl_disable_cap_mlock,
-		.maxlen		= sizeof(sysctl_disable_cap_mlock),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{ .ctl_name = 0 }
+ 	{
+ 		.ctl_name	= VM_DISABLE_CAP_MLOCK,
+ 		.procname	= "disable_cap_mlock",
+ 		.data		= &sysctl_disable_cap_mlock,
+ 		.maxlen		= sizeof(sysctl_disable_cap_mlock),
+ 		.mode		= 0644,
+ 		.proc_handler	= &proc_dointvec,
+ 	},
+  	{ .ctl_name = 0 }
 };
 
 static ctl_table proc_table[] = {

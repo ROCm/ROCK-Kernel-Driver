@@ -1595,12 +1595,18 @@ static int __init sa1100fb_map_video_memory(struct sa1100fb_info *fbi)
 	 * of the framebuffer.
 	 */
 	fbi->map_size = PAGE_ALIGN(fbi->fb.fix.smem_len + PAGE_SIZE);
-	fbi->map_cpu = consistent_alloc(GFP_KERNEL, fbi->map_size,
-					&fbi->map_dma, PTE_BUFFERABLE);
+	fbi->map_cpu = dma_alloc_writecombine(fbi->dev, fbi->map_size,
+					      &fbi->map_dma, GFP_KERNEL);
 
 	if (fbi->map_cpu) {
 		fbi->fb.screen_base = fbi->map_cpu + PAGE_SIZE;
 		fbi->screen_dma = fbi->map_dma + PAGE_SIZE;
+		/*
+		 * FIXME: this is actually the wrong thing to place in
+		 * smem_start.  But fbdev suffers from the problem that
+		 * it needs an API which doesn't exist (in this case,
+		 * dma_writecombine_mmap)
+		 */
 		fbi->fb.fix.smem_start = fbi->screen_dma;
 	}
 
@@ -1613,7 +1619,7 @@ static struct fb_monspecs monspecs __initdata = {
 };
 
 
-static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
+static struct sa1100fb_info * __init sa1100fb_init_fbinfo(struct device *dev)
 {
 	struct sa1100fb_mach_info *inf;
 	struct sa1100fb_info *fbi;
@@ -1624,6 +1630,7 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 		return NULL;
 
 	memset(fbi, 0, sizeof(struct sa1100fb_info));
+	fbi->dev = dev;
 
 	strcpy(fbi->fb.fix.id, SA1100_NAME);
 
@@ -1703,7 +1710,7 @@ static int __init sa1100fb_probe(struct device *dev)
 	if (!request_mem_region(0xb0100000, 0x10000, "LCD"))
 		return -EBUSY;
 
-	fbi = sa1100fb_init_fbinfo();
+	fbi = sa1100fb_init_fbinfo(dev);
 	ret = -ENOMEM;
 	if (!fbi)
 		goto failed;

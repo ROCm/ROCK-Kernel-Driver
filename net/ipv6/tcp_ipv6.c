@@ -1657,7 +1657,7 @@ process:
 
 no_tcp_socket:
 	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
-		goto discard_and_relse;
+		goto discard_it;
 
 	if (skb->len < (th->doff<<2) || tcp_checksum_complete(skb)) {
 bad_packet:
@@ -1680,12 +1680,14 @@ discard_and_relse:
 	goto discard_it;
 
 do_time_wait:
-	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb))
-		goto discard_and_relse;
+	if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+		tcp_tw_put((struct tcp_tw_bucket *) sk);
+		goto discard_it;
+	}
 
 	if (skb->len < (th->doff<<2) || tcp_checksum_complete(skb)) {
 		TCP_INC_STATS_BH(TcpInErrs);
-		sock_put(sk);
+		tcp_tw_put((struct tcp_tw_bucket *) sk);
 		goto discard_it;
 	}
 

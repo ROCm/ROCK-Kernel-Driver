@@ -193,7 +193,7 @@ static int rsi_parse(struct cache_detail *cd,
 	len = qword_get(&mesg, buf, mlen);
 	status = -EINVAL;
 	if (len < 0)
-		goto out;;
+		goto out;
 	status = -ENOMEM;
 	if (dup_to_netobj(&rsii.in_token, buf, len))
 		goto out;

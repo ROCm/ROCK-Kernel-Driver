@@ -2313,7 +2313,7 @@ SiS_SetCRT2ModeRegs(SiS_Private *SiS_Pr, USHORT ModeNo, USHORT ModeIdIndex,
 
 #ifdef SIS315H
 
-        unsigned char bridgerev = SiS_GetReg(SiS_Pr->SiS_Part4Port,0x01);;
+        unsigned char bridgerev = SiS_GetReg(SiS_Pr->SiS_Part4Port,0x01);
 
 	/* The following is nearly unpreditable and varies from machine
 	 * to machine. Especially the 301DH seems to be a real trouble

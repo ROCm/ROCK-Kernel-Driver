@@ -469,11 +469,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
                         driver_geo.heads = drv->heads;
                         driver_geo.sectors = drv->sectors;
                         driver_geo.cylinders = drv->cylinders;
-                } else {
-                        driver_geo.heads = 0xff;
-                        driver_geo.sectors = 0x3f;
-                        driver_geo.cylinders = (int)drv->nr_blocks / (0xff*0x3f);
-                }
+                } else
+			return -ENXIO;
                 driver_geo.start= get_start_sect(inode->i_bdev);
                 if (copy_to_user((void *) arg, &driver_geo,
                                 sizeof( struct hd_geometry)))
