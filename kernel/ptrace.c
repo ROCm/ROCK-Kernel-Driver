@@ -82,7 +82,8 @@ int ptrace_check_attach(struct task_struct *child, int kill)
 	 */
 	read_lock(&tasklist_lock);
 	if ((child->ptrace & PT_PTRACED) && child->parent == current &&
-	    child->signal != NULL) {
+	    (!(child->ptrace & PT_ATTACHED) || child->real_parent != current)
+	    && child->signal != NULL) {
 		ret = 0;
 		spin_lock_irq(&child->sighand->siglock);
 		if (child->state == TASK_STOPPED) {
@@ -131,7 +132,7 @@ int ptrace_attach(struct task_struct *task)
 		goto bad;
 
 	/* Go */
-	task->ptrace |= PT_PTRACED;
+	task->ptrace |= PT_PTRACED | PT_ATTACHED;
 	if (capable(CAP_SYS_PTRACE))
 		task->ptrace |= PT_PTRACE_CAP;
 	task_unlock(task);

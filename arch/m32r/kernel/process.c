@@ -335,8 +335,11 @@ asmlinkage int sys_execve(char __user *ufilename, char __user * __user *uargv, c
 		goto out;
 
 	error = do_execve(filename, uargv, uenvp, &regs);
-	if (error == 0)
+	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
+	}
 	putname(filename);
 out:
 	return error;
