@@ -61,7 +61,7 @@ static inline int wrmsr_eio(u32 reg, u32 eax, u32 edx)
 	return err;
 }
 
-static inline int rdmsr_eio(u32 reg, u32 * eax, u32 * edx)
+static inline int rdmsr_eio(u32 reg, u32 *eax, u32 *edx)
 {
 	int err;
 
@@ -156,7 +156,7 @@ static inline int do_wrmsr(int cpu, u32 reg, u32 eax, u32 edx)
 	return wrmsr_eio(reg, eax, edx);
 }
 
-static inline int do_rdmsr(int cpu, u32 reg, u32 * eax, u32 * edx)
+static inline int do_rdmsr(int cpu, u32 reg, u32 *eax, u32 *edx)
 {
 	return rdmsr_eio(reg, eax, edx);
 }
@@ -166,6 +166,7 @@ static inline int do_rdmsr(int cpu, u32 reg, u32 * eax, u32 * edx)
 static loff_t msr_seek(struct file *file, loff_t offset, int orig)
 {
 	loff_t ret = -EINVAL;
+
 	lock_kernel();
 	switch (orig) {
 	case 0:
@@ -205,8 +206,8 @@ static ssize_t msr_read(struct file *file, char __user * buf,
 	return ((char *)tmp) - buf;
 }
 
-static ssize_t msr_write(struct file *file, const char __user * buf,
-			 size_t count, loff_t * ppos)
+static ssize_t msr_write(struct file *file, const char __user *buf,
+			 size_t count, loff_t *ppos)
 {
 	const u32 *tmp = (const u32 *)buf;
 	u32 data[2];
@@ -273,6 +274,6 @@ void __exit msr_exit(void)
 module_init(msr_init);
 module_exit(msr_exit)
 
-    MODULE_AUTHOR("H. Peter Anvin <hpa@zytor.com>");
+MODULE_AUTHOR("H. Peter Anvin <hpa@zytor.com>");
 MODULE_DESCRIPTION("x86 generic MSR driver");
 MODULE_LICENSE("GPL");
