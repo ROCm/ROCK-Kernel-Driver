@@ -459,7 +459,7 @@ static int __init rd_init (void)
 		/* rd_size is given in kB */
 		rd_length[i] = rd_size << 10;
 		disk->major = MAJOR_NR;
-		disk->first_minor = 0;
+		disk->first_minor = i;
 		disk->minor_shift = 0;
 		disk->fops = &rd_bd_op;
 		sprintf(disk->disk_name, "rd%d", i);

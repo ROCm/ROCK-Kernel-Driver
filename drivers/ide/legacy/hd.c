@@ -50,8 +50,6 @@
 #define DEVICE_NR(device) (minor(device)>>6)
 #include <linux/blk.h>
 
-#define HD_IRQ 14	/* the standard disk interrupt */
-
 #ifdef __arm__
 #undef  HD_IRQ
 #endif

@@ -355,7 +355,7 @@ static int __init cpqarray_init(void)
 		}
 		num_cntlrs_reg++;
 		for (j=0; j<NWD; j++) {
-			ida_gendisk[i][j] = disk_alloc();
+			ida_gendisk[i][j] = alloc_disk();
 			if (!ida_gendisk[i][j])
 				goto Enomem2;
 		}

@@ -2274,7 +2274,7 @@ static int alloc_cciss_hba(void)
 	struct gendisk *disk[NWD];
 	int i, n;
 	for (n = 0; n < NWD; n++) {
-		disk[n] = disk_alloc();
+		disk[n] = alloc_disk();
 		if (!disk[n])
 			goto out;
 	}

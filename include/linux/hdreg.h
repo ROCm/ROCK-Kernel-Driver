@@ -8,6 +8,8 @@
 
 /* ide.c has its own port definitions in "ide.h" */
 
+#define HD_IRQ		14
+
 /* Hd controller regs. Ref: IBM AT Bios-listing */
 #define HD_DATA		0x1f0		/* _CTL when writing */
 #define HD_ERROR	0x1f1		/* see err-bits */
