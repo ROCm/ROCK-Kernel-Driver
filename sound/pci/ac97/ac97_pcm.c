@@ -145,6 +145,19 @@ static unsigned char rate_reg_tables[2][4][9] = {
   }
 }};
 
+/* FIXME: more various mappings for ADC? */
+static unsigned char rate_cregs[9] = {
+	AC97_PCM_LR_ADC_RATE,	/* 3 */
+	AC97_PCM_LR_ADC_RATE,	/* 4 */
+	0xff,			/* 5 */
+	AC97_PCM_MIC_ADC_RATE,	/* 6 */
+	0xff,			/* 7 */
+	0xff,			/* 8 */
+	0xff,			/* 9 */
+	0xff,			/* 10 */
+	0xff,			/* 11 */
+};
+
 static unsigned char get_slot_reg(struct ac97_pcm *pcm, unsigned short cidx,
 				  unsigned short slot, int dbl)
 {
@@ -152,7 +165,10 @@ static unsigned char get_slot_reg(struct ac97_pcm *pcm, unsigned short cidx,
 		return 0xff;
 	if (slot > 11)
 		return 0xff;
-	return rate_reg_tables[dbl][pcm->r[dbl].rate_table[cidx]][slot - 3];
+	if (pcm->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		return rate_preg_tables[dbl][pcm->r[dbl].rate_table[cidx]][slot - 3];
+	else
+		return rate_cregs[slot - 3];
 }
 
 static int set_spdif_rate(ac97_t *ac97, unsigned short rate)
@@ -380,7 +396,6 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 	const struct ac97_pcm *pcm;
 	struct ac97_pcm *rpcms, *rpcm;
 	unsigned short avail_slots[2][4];
-	unsigned short all_slots[2][4];
 	unsigned char rate_table[2][4];
 	unsigned short tmp, slots;
 	unsigned int rates;
@@ -390,7 +405,7 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 	if (rpcms == NULL)
 		return -ENOMEM;
 	memset(avail_slots, 0, sizeof(avail_slots));
-	memset(all_slots, 0, sizeof(all_slots));
+	memset(rate_table, 0, sizeof(rate_table));
 	for (i = 0; i < 4; i++) {
 		codec = bus->codec[i];
 		if (! codec)
@@ -401,8 +416,6 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 			for (j = 0; j < i; j++)
 				avail_slots[1][i] &= ~avail_slots[1][j];
 		}
-		all_slots[0][i] = avail_slots[0][i];
-		all_slots[1][i] = avail_slots[1][i];
 	}
 	/* FIXME: add double rate allocation */
 	/* first step - exclusive devices */
@@ -430,7 +443,7 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 				if (tmp) {
 					rpcm->r[0].rslots[j] = tmp;
 					rpcm->r[0].codec[j] = bus->codec[j];
-					rpcm->r[0].rate_table[j] = rate_table[0][j];
+					rpcm->r[0].rate_table[j] = rate_table[pcm->stream][j];
 					rates = get_rates(rpcm, j, tmp, 0);
 					avail_slots[pcm->stream][j] &= ~tmp;
 				}
