@@ -882,6 +882,10 @@ asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs)
 {
 }
 
+asmlinkage void __attribute__((weak)) smp_thermal_interrupt(void)
+{
+}
+
 /*
  *  'math_state_restore()' saves the current math information in the
  * old math state array, and gets the new ones from the current task
