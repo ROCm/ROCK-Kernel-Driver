@@ -14,6 +14,7 @@
 #include <linux/file.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/nfs3.h>
+#include <linux/nfs4.h>
 #include <linux/nfs_page.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_flushd.h>
