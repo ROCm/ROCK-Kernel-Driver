@@ -41,7 +41,6 @@
 #include <asm/ipc.h>
 #include <asm/semaphore.h>
 #include <asm/ppcdebug.h>
-
 #include <asm/time.h>
 
 extern unsigned long wall_jiffies;
@@ -83,8 +82,7 @@ sys_ipc (uint call, int first, int second, long third, void *ptr, long fifth)
 
 		if (!ptr)
 			break;
-		if ((ret = verify_area (VERIFY_READ, ptr, sizeof(long)))
-		    || (ret = get_user(fourth.__pad, (void **)ptr)))
+		if ((ret = get_user(fourth.__pad, (void **)ptr)))
 			break;
 		ret = sys_semctl (first, second, third, fourth);
 		break;
@@ -99,13 +97,12 @@ sys_ipc (uint call, int first, int second, long third, void *ptr, long fifth)
 
 			if (!ptr)
 				break;
-			if ((ret = verify_area (VERIFY_READ, ptr, sizeof(tmp)))
-			    || (ret = copy_from_user(&tmp,
+			if ((ret = copy_from_user(&tmp,
 						(struct ipc_kludge *) ptr,
-						sizeof (tmp))))
+						sizeof (tmp)) ? -EFAULT : 0))
 				break;
-			ret = sys_msgrcv (first, (struct msgbuf *)(unsigned long)tmp.msgp,
-						second, tmp.msgtyp, third);
+			ret = sys_msgrcv (first, tmp.msgp, second, tmp.msgtyp,
+					  third);
 			break;
 		}
 		default:
@@ -124,10 +121,6 @@ sys_ipc (uint call, int first, int second, long third, void *ptr, long fifth)
 		switch (version) {
 		default: {
 			ulong raddr;
-
-			if ((ret = verify_area(VERIFY_WRITE, (ulong*) third,
-					       sizeof(ulong))))
-				break;
 			ret = sys_shmat (first, (char *) ptr, second, &raddr);
 			if (ret)
 				break;
@@ -217,7 +210,6 @@ asmlinkage int sys_uname(struct old_utsname * name)
 	
 	return err;
 }
-
 
 asmlinkage time_t sys64_time(time_t* tloc)
 {

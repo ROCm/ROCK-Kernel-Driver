@@ -7,6 +7,7 @@ define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
 define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
 define_bool CONFIG_GENERIC_ISA_DMA y
 define_bool CONFIG_HAVE_DEC_LOCK y
+define_bool CONFIG_EARLY_PRINTK y
 
 source init/Config.in
 
@@ -21,7 +22,7 @@ define_bool CONFIG_PPC64 y
 bool 'Symmetric multi-processing support' CONFIG_SMP
 if [ "$CONFIG_SMP" = "y" ]; then
   bool '  Distribute interrupts on all CPUs by default' CONFIG_IRQ_ALL_CPUS
-  int  'Maximum number of CPUs (2-64)' CONFIG_NR_CPUS 64
+  int  'Maximum number of CPUs (2-64)' CONFIG_NR_CPUS 32
   if [ "$CONFIG_PPC_PSERIES" = "y" ]; then
     bool '  Hardware multithreading' CONFIG_HMT
     bool '  Discontiguous Memory Support' CONFIG_DISCONTIGMEM

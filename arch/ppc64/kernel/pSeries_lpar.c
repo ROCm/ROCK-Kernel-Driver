@@ -310,6 +310,8 @@ void pSeries_lpar_mm_init(void);
  */
 void pSeriesLP_init_early(void)
 {
+	struct device_node *np;
+
 	pSeries_lpar_mm_init();
 
 	ppc_md.tce_build	 = tce_build_pSeriesLP;
@@ -324,29 +326,21 @@ void pSeriesLP_init_early(void)
 	 * Leave all the interfaces NULL.
 	 */
 
-	if (0 /*naca->serialPortAddr */) {
-		void *comport = (void *)__ioremap(naca->serialPortAddr, 16, _PAGE_NO_CACHE);
-		udbg_init_uart(comport);
-		ppc_md.udbg_putc = udbg_putc;
-		ppc_md.udbg_getc = udbg_getc;
-		ppc_md.udbg_getc_poll = udbg_getc_poll;
-	} else {
-		/* lookup the first virtual terminal number in case we don't have a com port.
-		 * Zero is probably correct in case someone calls udbg before the init.
-		 * The property is a pair of numbers.  The first is the starting termno (the
-		 * one we use) and the second is the number of terminals.
-		 */
-		u32 *termno;
-		struct device_node *np = find_path_device("/rtas");
-		if (np) {
-			termno = (u32 *)get_property(np, "ibm,termno", 0);
-			if (termno)
-				vtermno = termno[0];
-		}
-		ppc_md.udbg_putc = udbg_putcLP;
-		ppc_md.udbg_getc = udbg_getcLP;
-		ppc_md.udbg_getc_poll = udbg_getc_pollLP;
+	/* lookup the first virtual terminal number in case we don't have a
+	 * com port. Zero is probably correct in case someone calls udbg
+	 * before the init. The property is a pair of numbers.  The first
+	 * is the starting termno (the one we use) and the second is the
+	 * number of terminals.
+	 */
+	np = find_path_device("/rtas");
+	if (np) {
+		u32 *termno = (u32 *)get_property(np, "ibm,termno", 0);
+		if (termno)
+			vtermno = termno[0];
 	}
+	ppc_md.udbg_putc = udbg_putcLP;
+	ppc_md.udbg_getc = udbg_getcLP;
+	ppc_md.udbg_getc_poll = udbg_getc_pollLP;
 }
 
 int hvc_get_chars(int index, char *buf, int count)

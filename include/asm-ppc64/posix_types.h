@@ -11,19 +11,10 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
-#if 0
-# define DRENG_TYPES
-#endif
 
-#ifdef DRENG_TYPES
 typedef unsigned long	__kernel_dev_t;
 typedef unsigned long	__kernel_ino_t;
 typedef unsigned long  	__kernel_nlink_t;
-#else
-typedef unsigned int	__kernel_dev_t;
-typedef unsigned int	__kernel_ino_t;
-typedef unsigned int  	__kernel_nlink_t;
-#endif
 typedef unsigned int	__kernel_mode_t;
 typedef long		__kernel_off_t;
 typedef long long	__kernel_loff_t;

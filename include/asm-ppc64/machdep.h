@@ -119,5 +119,20 @@ struct machdep_calls {
 extern struct machdep_calls ppc_md;
 extern char cmd_line[512];
 
+/* Functions to produce codes on the leds.
+ * The SRC code should be unique for the message category and should
+ * be limited to the lower 24 bits (the upper 8 are set by these funcs),
+ * and (for boot & dump) should be sorted numerically in the order
+ * the events occur.
+ */
+/* Print a boot progress message. */
+void ppc64_boot_msg(unsigned int src, const char *msg);
+/* Print a termination message (print only -- does not stop the kernel) */
+void ppc64_terminate_msg(unsigned int src, const char *msg);
+/* Print something that needs attention (device error, etc) */
+void ppc64_attention_msg(unsigned int src, const char *msg);
+/* Print a dump progress message. */
+void ppc64_dump_msg(unsigned int src, const char *msg);
+
 #endif /* _PPC64_MACHDEP_H */
 #endif /* __KERNEL__ */

@@ -27,6 +27,7 @@
 #include <linux/mman.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
+#include <linux/smp_lock.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -67,11 +68,19 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 
 #ifdef CONFIG_DEBUG_KERNEL
 	if (debugger_fault_handler && (regs->trap == 0x300 ||
-				regs->trap == 0x380)) {
+				       regs->trap == 0x380)) {
 		debugger_fault_handler(regs);
 		return;
 	}
+#endif
 
+	/* On an SLB miss we can only check for a valid exception entry */
+	if (regs->trap == 0x380) {
+		bad_page_fault(regs, address, SIGSEGV);
+		return;
+	}
+
+#ifdef CONFIG_DEBUG_KERNEL
 	if (error_code & 0x00400000) {
 		/* DABR match */
 		if (debugger_dabr_match(regs))
@@ -79,7 +88,7 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	}
 #endif
 
-	if (in_interrupt() || mm == NULL) {
+	if (in_atomic() || mm == NULL) {
 		bad_page_fault(regs, address, SIGSEGV);
 		return;
 	}
