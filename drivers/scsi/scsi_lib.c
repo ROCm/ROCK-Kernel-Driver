@@ -357,7 +357,7 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 		return SCpnt;
 	}
 
-	add_blkdev_randomness(major(req->rq_dev));
+	add_disk_randomness(req->rq_disk);
 
 	spin_lock_irqsave(q->queue_lock, flags);
 

@@ -289,6 +289,7 @@ EXPORT_SYMBOL(disk_devclass);
 static void disk_release(struct device *dev)
 {
 	struct gendisk *disk = dev->driver_data;
+	kfree(disk->random);
 	kfree(disk->part);
 	kfree(disk);
 }
@@ -316,6 +317,7 @@ struct gendisk *alloc_disk(int minors)
 		disk->disk_dev.driver_data = disk;
 		device_initialize(&disk->disk_dev);
 	}
+	rand_initialize_disk(disk);
 	return disk;
 }
 

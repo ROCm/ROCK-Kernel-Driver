@@ -8,7 +8,8 @@
 #include <linux/compiler.h>
 
 extern void set_device_ro(kdev_t dev,int flag);
-extern void add_blkdev_randomness(int major);
+extern void add_disk_randomness(struct gendisk *disk);
+extern void rand_initialize_disk(struct gendisk *disk);
 
 #ifdef CONFIG_BLK_DEV_RAM
 
@@ -62,7 +63,7 @@ static inline void end_request(struct request *req, int uptodate)
 	if (end_that_request_first(req, uptodate, req->hard_cur_sectors))
 		return;
 
-	add_blkdev_randomness(major(req->rq_dev));
+	add_disk_randomness(req->rq_disk);
 	blkdev_dequeue_request(req);
 	end_that_request_last(req);
 }

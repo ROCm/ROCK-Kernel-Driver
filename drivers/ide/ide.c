@@ -406,7 +406,7 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 	}
 
 	if (!end_that_request_first(rq, uptodate, nr_sectors)) {
-		add_blkdev_randomness(major(rq->rq_dev));
+		add_disk_randomness(rq->rq_disk);
 		if (!blk_rq_tagged(rq))
 			blkdev_dequeue_request(rq);
 		else

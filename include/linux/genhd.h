@@ -93,6 +93,9 @@ struct gendisk {
 	struct device *driverfs_dev;
 	struct device disk_dev;
 
+	struct timer_rand_state *random;
+
+
 	unsigned sync_io;		/* RAID */
 	unsigned reads, writes;
 	unsigned rio, wio;
