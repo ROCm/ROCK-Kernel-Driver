@@ -47,6 +47,8 @@
 
 #define VERSION "1.1"
 
+static int ignore = 0;
+
 static struct usb_driver bfusb_driver;
 
 static struct usb_device_id bfusb_table[] = {
@@ -655,6 +657,9 @@ static int bfusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	BT_DBG("intf %p id %p", intf, id);
 
+	if (ignore)
+		return -ENODEV;
+
 	/* Check number of endpoints */
 	if (intf->cur_altsetting->desc.bNumEndpoints < 2)
 		return -EIO;
@@ -791,6 +796,9 @@ static void __exit bfusb_exit(void)
 
 module_init(bfusb_init);
 module_exit(bfusb_exit);
+
+module_param(ignore, bool, 0644);
+MODULE_PARM_DESC(ignore, "Ignore devices from the matching table");
 
 MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("BlueFRITZ! USB driver ver " VERSION);

@@ -66,6 +66,7 @@
 #define URB_ZERO_PACKET 0
 #endif
 
+static int ignore = 0;
 static int reset = 0;
 
 #ifdef CONFIG_BT_HCIUSB_SCO
@@ -829,7 +830,7 @@ static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 			id = match;
 	}
 
-	if (id->driver_info & HCI_IGNORE)
+	if (ignore || id->driver_info & HCI_IGNORE)
 		return -ENODEV;
 
 	if (intf->cur_altsetting->desc.bInterfaceNumber > 0)
@@ -1037,6 +1038,9 @@ static void __exit hci_usb_exit(void)
 
 module_init(hci_usb_init);
 module_exit(hci_usb_exit);
+
+module_param(ignore, bool, 0644);
+MODULE_PARM_DESC(ignore, "Ignore devices from the matching table");
 
 module_param(reset, bool, 0644);
 MODULE_PARM_DESC(reset, "Send HCI reset command on initialization");
