@@ -10,33 +10,23 @@
 #define __KERNEL_SYSCALLS__
 #include <stdarg.h>
 
+#include <linux/elf.h>
 #include <linux/errno.h>
-#include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/smp.h>
-#include <linux/smp_lock.h>
+#include <linux/personality.h>
+#include <linux/ptrace.h>
+#include <linux/sched.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
-#include <linux/ptrace.h>
-#include <linux/slab.h>
-#include <linux/vmalloc.h>
-#include <linux/interrupt.h>
-#include <linux/reboot.h>
-#include <linux/init.h>
 #include <linux/version.h>
-#include <linux/elf.h>
-#include <linux/personality.h>
 
-#include <asm/machdep.h>
-#include <asm/offsets.h>
-#include <asm/uaccess.h>
-#include <asm/pgtable.h>
-#include <asm/pgalloc.h>
-#include <asm/system.h>
 #include <asm/io.h>
-#include <asm/processor.h>
+#include <asm/offsets.h>
+#include <asm/pdc.h>
 #include <asm/pdc_chassis.h>
+#include <asm/pgalloc.h>
+#include <asm/uaccess.h>
 
 int hlt_counter;
 
@@ -224,18 +214,14 @@ int
 sys_clone(unsigned long clone_flags, unsigned long usp,
 	  struct pt_regs *regs)
 {
-	struct task_struct *p;
 	int *user_tid = (int *)regs->gr[26];
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0, user_tid, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0, user_tid, NULL);
 }
 
 int
 sys_vfork(struct pt_regs *regs)
 {
-	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gr[30], regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gr[30], regs, 0, NULL, NULL);
 }
 
 int
@@ -251,7 +237,9 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	 * Make them const so the compiler knows they live in .text */
 	extern void * const ret_from_kernel_thread;
 	extern void * const child_return;
+#ifdef CONFIG_HPUX
 	extern void * const hpux_child_return;
+#endif
 
 	*cregs = *pregs;
 
@@ -295,7 +283,11 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 			+ (pregs->gr[21] & (INIT_THREAD_SIZE - 1));
 		cregs->gr[30] = usp;
 		if (p->personality == PER_HPUX) {
+#ifdef CONFIG_HPUX
 			cregs->kpc = (unsigned long) &hpux_child_return;
+#else
+			BUG();
+#endif
 		} else {
 			cregs->kpc = (unsigned long) &child_return;
 		}

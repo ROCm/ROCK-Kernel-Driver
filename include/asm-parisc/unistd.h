@@ -720,6 +720,7 @@
 #define __NR_epoll_ctl		(__NR_Linux + 225)
 #define __NR_epoll_wait		(__NR_Linux + 226)
 #define __NR_remap_file_pages	(__NR_Linux + 227)
+#define __NR_semtimedop		(__NR_Linux + 228)
 
 
 #define __NR_Linux_syscalls     228

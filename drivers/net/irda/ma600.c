@@ -52,7 +52,7 @@
 	if(!(expr)) { \
 	        printk( "Assertion failed! %s,%s,%s,line=%d\n",\
         	#expr,__FILE__,__FUNCTION__,__LINE__); \
-	        ##func}
+	        func}
 #endif
 
 /* convert hex value to ascii hex */

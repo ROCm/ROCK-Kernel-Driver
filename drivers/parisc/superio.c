@@ -90,7 +90,7 @@ superio_inform_irq(int irq)
     sio_dev.iosapic_irq = irq;
 }
 
-static void
+static irqreturn_t
 superio_interrupt(int irq, void *devp, struct pt_regs *regs)
 {
 	struct superio_device *sio = (struct superio_device *)devp;
@@ -107,7 +107,7 @@ superio_interrupt(int irq, void *devp, struct pt_regs *regs)
 		/* HACK: need to investigate why this happens if SMP enabled */
 		BUG(); /* This shouldn't happen */
 #endif
-		return;
+		return IRQ_HANDLED;
 	}
 
 	/* Check to see which device is interrupting */
@@ -117,7 +117,7 @@ superio_interrupt(int irq, void *devp, struct pt_regs *regs)
 	if (local_irq == 2 || local_irq > 7) {
 		printk(KERN_ERR "SuperIO: slave interrupted!\n");
 		BUG();
-		return;
+		return IRQ_HANDLED;
 	}
 
 	if (local_irq == 7) {
@@ -128,7 +128,7 @@ superio_interrupt(int irq, void *devp, struct pt_regs *regs)
 		results = inb(IC_PIC1+0);
 		if ((results & 0x80) == 0) { /* if ISR7 not set: spurious */
 			printk(KERN_WARNING "SuperIO: spurious interrupt!\n");
-			return;
+			return IRQ_HANDLED;
 		}
 	}
 
@@ -141,7 +141,7 @@ superio_interrupt(int irq, void *devp, struct pt_regs *regs)
 	/* set EOI */
 
 	outb((OCW2_SEOI|local_irq),IC_PIC1 + 0);
-	return;
+	return IRQ_HANDLED;
 }
 
 /* Initialize Super I/O device */

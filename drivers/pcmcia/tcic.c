@@ -42,7 +42,6 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/proc_fs.h>
 #include <linux/workqueue.h>
 #include <linux/device.h>
 
@@ -129,14 +128,6 @@ static int tcic_timer_pending;
 
 static int sockets;
 static struct tcic_socket socket_table[2];
-
-static socket_cap_t tcic_cap = {
-	/* only 16-bit cards, memory windows must be size-aligned */
-	.features = SS_CAP_PCCARD | SS_CAP_MEM_ALIGN,
-	.irq_mask = 0x4cf8,		/* irq 14, 11, 10, 7, 6, 5, 4, 3 */
-	.map_size = 0x1000,		/* 4K minimum window size */
-	/* No PCI or CardBus support */
-};
 
 /*====================================================================*/
 
@@ -445,6 +436,14 @@ static int __init init_tcic(void)
 	socket_table[sockets].handler = NULL;
 	socket_table[sockets].info = NULL;
 	socket_table[sockets].id = get_tcic_id();
+
+	/* only 16-bit cards, memory windows must be size-aligned */
+	/* No PCI or CardBus support */
+	socket_table[sockets].socket.features = SS_CAP_PCCARD | SS_CAP_MEM_ALIGN;
+	/* irq 14, 11, 10, 7, 6, 5, 4, 3 */
+	socket_table[sockets].socket.irq_mask = 0x4cf8;
+	/* 4K minimum window size */
+	socket_table[sockets].socket.map_size = 0x1000;		
 	sockets++;
     }
 
@@ -479,11 +478,13 @@ static int __init init_tcic(void)
     else
 	for (i = mask = 0; i < 16; i++)
 	    mask |= (1<<irq_list[i]);
-    mask &= tcic_cap.irq_mask;
 
+    /* irq 14, 11, 10, 7, 6, 5, 4, 3 */
+    mask &= 0x4cf8;
     /* Scan interrupts */
     mask = irq_scan(mask);
-    tcic_cap.irq_mask = mask;
+    for (i=0;i<sockets;i++)
+	    socket_table[i].socket.irq_mask = mask;
     
     /* Check for only two interrupts available */
     scan = (mask & (mask-1));
@@ -502,7 +503,7 @@ static int __init init_tcic(void)
 	if (cs_irq == 0) poll_interval = HZ;
     }
     
-    if (tcic_cap.irq_mask & (1 << 11))
+    if (socket_table[0].socket.irq_mask & (1 << 11))
 	printk("sktirq is irq 11, ");
     if (cs_irq != 0)
 	printk("status change on irq %d\n", cs_irq);
@@ -678,14 +679,6 @@ static int tcic_get_status(struct pcmcia_socket *sock, u_int *value)
     return 0;
 } /* tcic_get_status */
   
-/*====================================================================*/
-
-static int tcic_inquire_socket(struct pcmcia_socket *sock, socket_cap_t *cap)
-{
-    *cap = tcic_cap;
-    return 0;
-} /* tcic_inquire_socket */
-
 /*====================================================================*/
 
 static int tcic_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
@@ -897,10 +890,6 @@ static int tcic_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *m
 
 /*====================================================================*/
 
-static void tcic_proc_setup(struct pcmcia_socket *sock, struct proc_dir_entry *base)
-{
-}
-
 static int tcic_init(struct pcmcia_socket *s)
 {
 	int i;
@@ -930,13 +919,11 @@ static struct pccard_operations tcic_operations = {
 	.init		   = tcic_init,
 	.suspend	   = tcic_suspend,
 	.register_callback = tcic_register_callback,
-	.inquire_socket	   = tcic_inquire_socket,
 	.get_status	   = tcic_get_status,
 	.get_socket	   = tcic_get_socket,
 	.set_socket	   = tcic_set_socket,
 	.set_io_map	   = tcic_set_io_map,
 	.set_mem_map	   = tcic_set_mem_map,
-	.proc_setup	   = tcic_proc_setup,
 };
 
 /*====================================================================*/

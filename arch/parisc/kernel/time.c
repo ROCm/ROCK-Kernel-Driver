@@ -76,7 +76,7 @@ parisc_do_profile(struct pt_regs *regs)
 	atomic_inc((atomic_t *)&prof_buffer[pc]);
 }
 
-void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	long now;
 	long next_tick;
@@ -127,6 +127,8 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* check soft power switch status */
 	if (cpu == 0 && !atomic_read(&power_tasklet.count))
 		tasklet_schedule(&power_tasklet);
+
+	return IRQ_HANDLED;
 }
 
 /*** converted from ia64 ***/

@@ -1265,8 +1265,6 @@ sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk)
 	if (sdkp->media_present)
 		sd_read_cache_type(sdkp, disk->disk_name, SRpnt, buffer);
 		
-	SRpnt->sr_device->use_10_for_rw = 1;
-	SRpnt->sr_device->use_10_for_ms = 0;
 	SRpnt->sr_device->remap = 1;
 
  leave:

@@ -546,7 +546,7 @@ __kernel_thread:
 	LDREG	-PT_SZ_ALGN-RP_OFFSET(%r30), %r2
 	ldo	-PT_SZ_ALGN(%r30), %r30
 	bv	%r0(%r2)
-	ldw	TASK_PID(%r28), %r28
+	nop
 
 	/*
 	 * Child Returns here

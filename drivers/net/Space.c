@@ -398,24 +398,6 @@ static int __init ethif_probe(struct net_device *dev)
 	return -ENODEV;
 }
 
-#ifdef CONFIG_NET_FC
-static int fcif_probe(struct net_device *dev)
-{
-	if (dev->base_addr == -1)
-		return 1;
-
-	if (1
-#ifdef CONFIG_IPHASE5526
-	    && iph5526_probe(dev)
-#endif
-	    && 1 ) {
-		return 1; /* -ENODEV or -EAGAIN would be more accurate. */
-	}
-	return 0;
-}
-#endif  /* CONFIG_NET_FC */
-
-
 #ifdef CONFIG_ETHERTAP
 static struct net_device tap0_dev = {
 	.name		= "tap0",
@@ -588,22 +570,6 @@ static struct net_device tr0_dev = {
 #define      NEXT_DEV        (&tr0_dev)
 
 #endif 
-
-#ifdef CONFIG_NET_FC
-static struct net_device fc1_dev = {
-	.name		= "fc1",
-	.next		= NEXT_DEV,
-	.init		= fcif_probe
-};
-static struct net_device fc0_dev = {
-	.name		= "fc0",
-	.next		=  &fc1_dev,
-	.init		= fcif_probe
-};
-#undef       NEXT_DEV
-#define      NEXT_DEV        (&fc0_dev)
-#endif
-
 
 #ifdef CONFIG_SBNI
 static struct net_device sbni7_dev = {
