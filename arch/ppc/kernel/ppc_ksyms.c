@@ -367,9 +367,9 @@ EXPORT_SYMBOL(next_mmu_context);
 EXPORT_SYMBOL(set_context);
 EXPORT_SYMBOL(handle_mm_fault); /* For MOL */
 EXPORT_SYMBOL_NOVERS(disarm_decr);
+#ifdef CONFIG_PPC_STD_MMU
 extern long mol_trampoline;
 EXPORT_SYMBOL(mol_trampoline); /* For MOL */
-#ifdef CONFIG_PPC_STD_MMU
 EXPORT_SYMBOL(flush_hash_pages); /* For MOL */
 #ifdef CONFIG_SMP
 extern int mmu_hash_lock;

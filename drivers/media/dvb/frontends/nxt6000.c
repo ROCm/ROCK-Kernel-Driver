@@ -8,7 +8,7 @@
 	Alps TDED4 (Tuner: TI ALP510, external Nxt6000)
 	Comtech DVBT-6k07 (PLL IC: SP5730)
 
-    Copyright (C) 2002-2003 Florian Schirmer <schirmer@taytron.net>
+    Copyright (C) 2002-2003 Florian Schirmer <jolt@tuxbox.org>
     Copyright (C) 2003 Paul Andreassen <paul@andreassen.com.au>
 
     This program is free software; you can redistribute it and/or modify
@@ -55,34 +55,21 @@ static struct dvb_frontend_info nxt6000_info = {
 	.symbol_rate_max = 9360000,	/* FIXME */
 	.symbol_rate_tolerance = 4000,
 	.notifier_delay = 0,
-	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
-			FE_CAN_FEC_4_5 | FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 |
-			FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 | FE_CAN_FEC_AUTO |
-			FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO |
-			FE_CAN_TRANSMISSION_MODE_AUTO |
-			FE_CAN_GUARD_INTERVAL_AUTO |
-			FE_CAN_HIERARCHY_AUTO,
-
+	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 | FE_CAN_FEC_4_5 | FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 | FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 | FE_CAN_FEC_AUTO | FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO | FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO | FE_CAN_HIERARCHY_AUTO,
 };
 
-#pragma pack(1)
-
 struct nxt6000_config {
-
 	u8 demod_addr;
 	u8 tuner_addr;
 	u8 tuner_type;
 	u8 clock_inversion;
-
 };
-
-#pragma pack()
 
 #define TUNER_TYPE_ALP510	0
 #define TUNER_TYPE_SP5659	1
 #define TUNER_TYPE_SP5730	2
 
-#define FE2NXT(fe) ((struct nxt6000_config *)&(fe->data))
+#define FE2NXT(fe) ((struct nxt6000_config *)((fe)->data))
 #define FREQ2DIV(freq) ((freq + 36166667) / 166667)
 
 #define dprintk if (debug) printk
@@ -116,8 +103,10 @@ static u8 nxt6000_read(struct dvb_i2c_bus *i2c, u8 addr, u8 reg)
 	int ret;
 	u8 b0[] = {reg};
 	u8 b1[] = {0};
-	struct i2c_msg msgs[] = {{.addr = addr >> 1, .flags = 0, .buf = b0, .len = 1},
-							{.addr = addr >> 1, .flags = I2C_M_RD, .buf = b1, .len = 1}};
+	struct i2c_msg msgs[] = {
+		{.addr = addr >> 1,.flags = 0,.buf = b0,.len = 1},
+		{.addr = addr >> 1,.flags = I2C_M_RD,.buf = b1,.len = 1}
+	};
 
 	ret = i2c->xfer(i2c, msgs, 2);
 	
@@ -394,7 +383,7 @@ static void nxt6000_setup(struct dvb_frontend *fe)
 	nxt6000_writereg(fe, OFDM_ITB_FREQ_1, 0x06);
 	nxt6000_writereg(fe, OFDM_ITB_FREQ_2, 0x31);
 	nxt6000_writereg(fe, OFDM_CAS_CTL, (0x01 << 7) | (0x02 << 3) | 0x04);
-	nxt6000_writereg(fe, CAS_FREQ, 0xBB);	// CHECKME
+	nxt6000_writereg(fe, CAS_FREQ, 0xBB);	/* CHECKME */
 	nxt6000_writereg(fe, OFDM_SYR_CTL, 1 << 2);
 	nxt6000_writereg(fe, OFDM_PPM_CTL_1, PPM256);
 	nxt6000_writereg(fe, OFDM_TRL_NOMINALRATE_1, 0x49);
@@ -414,20 +403,20 @@ static void nxt6000_setup(struct dvb_frontend *fe)
 
 static void nxt6000_dump_status(struct dvb_frontend *fe)
 {
-
 	u8 val;
 
-//	printk("RS_COR_STAT: 0x%02X\n", nxt6000_readreg(fe, RS_COR_STAT));
-//	printk("VIT_SYNC_STATUS: 0x%02X\n", nxt6000_readreg(fe, VIT_SYNC_STATUS));
-//	printk("OFDM_COR_STAT: 0x%02X\n", nxt6000_readreg(fe, OFDM_COR_STAT));
-//	printk("OFDM_SYR_STAT: 0x%02X\n", nxt6000_readreg(fe, OFDM_SYR_STAT));
-//	printk("OFDM_TPS_RCVD_1: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RCVD_1));
-//	printk("OFDM_TPS_RCVD_2: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RCVD_2));
-//	printk("OFDM_TPS_RCVD_3: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RCVD_3));
-//	printk("OFDM_TPS_RCVD_4: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RCVD_4));
-//	printk("OFDM_TPS_RESERVED_1: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RESERVED_1));
-//	printk("OFDM_TPS_RESERVED_2: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RESERVED_2));
-
+/*
+	printk("RS_COR_STAT: 0x%02X\n", nxt6000_readreg(fe, RS_COR_STAT));
+	printk("VIT_SYNC_STATUS: 0x%02X\n", nxt6000_readreg(fe, VIT_SYNC_STATUS));
+	printk("OFDM_COR_STAT: 0x%02X\n", nxt6000_readreg(fe, OFDM_COR_STAT));
+	printk("OFDM_SYR_STAT: 0x%02X\n", nxt6000_readreg(fe, OFDM_SYR_STAT));
+	printk("OFDM_TPS_RCVD_1: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RCVD_1));
+	printk("OFDM_TPS_RCVD_2: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RCVD_2));
+	printk("OFDM_TPS_RCVD_3: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RCVD_3));
+	printk("OFDM_TPS_RCVD_4: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RCVD_4));
+	printk("OFDM_TPS_RESERVED_1: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RESERVED_1));
+	printk("OFDM_TPS_RESERVED_2: 0x%02X\n", nxt6000_readreg(fe, OFDM_TPS_RESERVED_2));
+*/
 	printk("NXT6000 status:");
 
 	val = nxt6000_readreg(fe, RS_COR_STAT);
@@ -460,13 +449,11 @@ static void nxt6000_dump_status(struct dvb_frontend *fe)
 			break;
 	
 		case 0x03: 
-		
 			printk(" VITERBI CODERATE: 5/6,");
+		break;
 
 		case 0x04: 
-		
 			printk(" VITERBI CODERATE: 7/8,");
-			
 			break;
 
 		default: 
@@ -503,13 +490,11 @@ static void nxt6000_dump_status(struct dvb_frontend *fe)
 			break;
 	
 		case 0x04:
-		
 			printk(" CoreState: WAIT_PPM,");
+		break;
 
 		case 0x01:
-		
 			printk(" CoreState: WAIT_TRL,");
-			
 			break;
 
 		case 0x05:
@@ -586,13 +571,11 @@ static void nxt6000_dump_status(struct dvb_frontend *fe)
 			break;
 	
 		case 0x03: 
-		
 			printk(" TPSLP: 5/6,");
+		break;
 
 		case 0x04: 
-		
 			printk(" TPSLP: 7/8,");
-			
 			break;
 
 		default: 
@@ -622,13 +605,11 @@ static void nxt6000_dump_status(struct dvb_frontend *fe)
 			break;
 	
 		case 0x03: 
-		
 			printk(" TPSHP: 5/6,");
+		break;
 
 		case 0x04: 
-		
 			printk(" TPSHP: 7/8,");
-			
 			break;
 
 		default: 
@@ -669,7 +650,7 @@ static void nxt6000_dump_status(struct dvb_frontend *fe)
 			
 	}
 	
-	// Strange magic required to gain access to RF_AGC_STATUS
+	/* Strange magic required to gain access to RF_AGC_STATUS */
 	nxt6000_readreg(fe, RF_AGC_VAL_1);
 	val = nxt6000_readreg(fe, RF_AGC_STATUS);
 	val = nxt6000_readreg(fe, RF_AGC_STATUS);
@@ -735,21 +716,23 @@ static int nxt6000_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	
 		case FE_READ_SIGNAL_STRENGTH:
 		{
-//			s16 *signal = (s16 *)arg;
-
-//		*signal=(((signed char)readreg(client, 0x16))+128)<<8;
-
+			s16 *signal = (s16 *) arg;
+/*
+			*signal=(((signed char)readreg(client, 0x16))+128)<<8;
+*/
+			*signal = 0;
 			return 0;
 			
 		}
 	
 		case FE_READ_SNR:
 		{
-//			s16 *snr = (s16 *)arg;
-
-//		*snr=readreg(client, 0x24)<<8;
-//		*snr|=readreg(client, 0x25);
-
+			s16 *snr = (s16 *) arg;
+/*
+			*snr=readreg(client, 0x24)<<8;
+			*snr|=readreg(client, 0x25);
+*/
+			*snr = 0;
 			break;
 		}
 	
@@ -831,70 +814,74 @@ static u8 demod_addr_tbl[] = {0x14, 0x18, 0x24, 0x28};
 
 static int nxt6000_attach(struct dvb_i2c_bus *i2c, void **data)
 {
-
 	u8 addr_nr;
 	u8 fe_count = 0;
-	struct nxt6000_config nxt;
+	struct nxt6000_config *pnxt;
 
 	dprintk("nxt6000: attach\n");
 	
+	pnxt = kmalloc(sizeof(demod_addr_tbl)*sizeof(struct nxt6000_config), GFP_KERNEL);
+	if (NULL == pnxt) {
+		dprintk("nxt6000: no memory for private data.\n");
+		return -ENOMEM;
+	}
+	*data = pnxt;
+
 	for (addr_nr = 0; addr_nr < sizeof(demod_addr_tbl); addr_nr++) {
+		struct nxt6000_config *nxt = &pnxt[addr_nr];
 	
 		if (nxt6000_read(i2c, demod_addr_tbl[addr_nr], OFDM_MSC_REV) != NXT6000ASICDEVICE)
 			continue;
 
 		if (pll_write(i2c, demod_addr_tbl[addr_nr], 0xC0, NULL, 0) == 0) {
+			nxt->tuner_addr = 0xC0;
+			nxt->tuner_type = TUNER_TYPE_ALP510;
+			nxt->clock_inversion = 1;
 	
-			nxt.tuner_addr = 0xC0;
-			nxt.tuner_type = TUNER_TYPE_ALP510;
-			nxt.clock_inversion = 1;
-			
-			dprintk("nxt6000: detected TI ALP510 tuner at 0x%02X\n", nxt.tuner_addr);
+			dprintk("nxt6000: detected TI ALP510 tuner at 0x%02X\n", nxt->tuner_addr);
 		
 		} else if (pll_write(i2c, demod_addr_tbl[addr_nr], 0xC2, NULL, 0) == 0) {
+			nxt->tuner_addr = 0xC2;
+			nxt->tuner_type = TUNER_TYPE_SP5659;
+			nxt->clock_inversion = 0;
 
-			nxt.tuner_addr = 0xC2;
-			nxt.tuner_type = TUNER_TYPE_SP5659;
-			nxt.clock_inversion = 0;
-	
-			dprintk("nxt6000: detected MITEL SP5659 tuner at 0x%02X\n", nxt.tuner_addr);
+			dprintk("nxt6000: detected MITEL SP5659 tuner at 0x%02X\n", nxt->tuner_addr);
 		
 		} else if (pll_write(i2c, demod_addr_tbl[addr_nr], 0xC0, NULL, 0) == 0) {
+			nxt->tuner_addr = 0xC0;
+			nxt->tuner_type = TUNER_TYPE_SP5730;
+			nxt->clock_inversion = 0;
 
-			nxt.tuner_addr = 0xC0;
-			nxt.tuner_type = TUNER_TYPE_SP5730;
-			nxt.clock_inversion = 0;
-	
-			dprintk("nxt6000: detected SP5730 tuner at 0x%02X\n", nxt.tuner_addr);
+			dprintk("nxt6000: detected SP5730 tuner at 0x%02X\n", nxt->tuner_addr);
 		
 		} else {
-
 			printk("nxt6000: unable to detect tuner\n");
-
 			continue;	
-		
 		}
 		
-		nxt.demod_addr = demod_addr_tbl[addr_nr];
+		nxt->demod_addr = demod_addr_tbl[addr_nr];
 	  
 		dprintk("nxt6000: attached at %d:%d\n", i2c->adapter->num, i2c->id);
 	
-		dvb_register_frontend(nxt6000_ioctl, i2c, (void *)(*((u32 *)&nxt)), &nxt6000_info);
+		dvb_register_frontend(nxt6000_ioctl, i2c, (void *)nxt, &nxt6000_info);
 		
 		fe_count++;
 	}
 	
-	return (fe_count > 0) ? 0 : -ENODEV;
+	if (fe_count == 0) {
+		kfree(pnxt);
+		return -ENODEV;
+	}
 	
+	return 0;
 }
 
 static void nxt6000_detach(struct dvb_i2c_bus *i2c, void *data)
 {
-
+	struct nxt6000_config *pnxt = (struct nxt6000_config *)data;
 	dprintk("nxt6000: detach\n");
-
 	dvb_unregister_frontend(nxt6000_ioctl, i2c);
-	
+	kfree(pnxt);
 }
 
 static __init int nxt6000_init(void)

@@ -83,6 +83,15 @@ extern int scsi_insert_special_req(struct scsi_request *sreq, int);
 extern void scsi_init_cmd_from_req(struct scsi_cmnd *cmd,
 		struct scsi_request *sreq);
 extern void __scsi_release_request(struct scsi_request *sreq);
+#ifdef CONFIG_SCSI_LOGGING
+void scsi_log_send(struct scsi_cmnd *cmd);
+void scsi_log_completion(struct scsi_cmnd *cmd, int disposition);
+#else
+static inline void scsi_log_send(struct scsi_cmnd *cmd) 
+	{ };
+static inline void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
+	{ };
+#endif
 
 /* scsi_devinfo.c */
 extern int scsi_get_device_flags(struct scsi_device *sdev,

@@ -350,7 +350,7 @@ static int __init ethif_probe(int unit)
 	 * Backwards compatibility - historically an I/O base of 1 was 
 	 * used to indicate not to probe for this ethN interface 
 	 */
-	if (dev->base_addr == 1) {
+	if (__dev_get_by_name(dev->name) || dev->base_addr == 1) {
 		free_netdev(dev);
 		return -ENXIO;
 	}

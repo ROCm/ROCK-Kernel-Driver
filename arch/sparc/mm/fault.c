@@ -36,7 +36,7 @@
 
 #define ELEMENTS(arr) (sizeof (arr)/sizeof (arr[0]))
 
-extern struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS];
+extern struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS+1];
 extern int prom_node_root;
 
 /* At boot time we determine these two values necessary for setting
@@ -72,7 +72,7 @@ int prom_probe_memory (void)
 		mlist = mlist->theres_more;
 		bytes = mlist->num_bytes;
 		tally += bytes;
-		if (i >= SPARC_PHYS_BANKS-1) {
+		if (i > SPARC_PHYS_BANKS-1) {
 			printk ("The machine has more banks than "
 				"this kernel can support\n"
 				"Increase the SPARC_PHYS_BANKS "
@@ -422,6 +422,12 @@ asmlinkage void do_sun4c_fault(struct pt_regs *regs, int text_fault, int write,
 		}
 	}
 
+	if (!mm) {
+		/* We are oopsing. */
+		do_sparc_fault(regs, text_fault, write, address);
+		BUG();	/* P3 Oops already, you bitch */
+	}
+
 	pgdp = pgd_offset(mm, address);
 	ptep = sun4c_pte_offset_kernel((pmd_t *) pgdp, address);
 
@@ -544,7 +550,7 @@ void window_overflow_fault(void)
 {
 	unsigned long sp;
 
-	sp = current->thread.rwbuf_stkptrs[0];
+	sp = current_thread_info()->rwbuf_stkptrs[0];
 	if(((sp + 0x38) & PAGE_MASK) != (sp & PAGE_MASK))
 		force_user_fault(sp + 0x38, 1);
 	force_user_fault(sp, 1);

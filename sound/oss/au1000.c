@@ -2177,7 +2177,7 @@ static int __devinit au1000_probe(void)
 	return -1;
 }
 
-static void __devinit au1000_remove(void)
+static void au1000_remove(void)
 {
 	struct au1000_state *s = &au1000_state;
 

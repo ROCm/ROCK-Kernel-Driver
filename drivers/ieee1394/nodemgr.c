@@ -516,8 +516,7 @@ static struct device nodemgr_dev_template_ne = {
 	.driver_data	= &nodemgr_driverdata_ne,
 };
 
-
-static struct device nodemgr_dev_template_host = {
+struct device nodemgr_dev_template_host = {
 	.bus		= &ieee1394_bus_type,
 	.release	= nodemgr_release_host,
 	.driver		= &nodemgr_driver_host,
@@ -1255,36 +1254,6 @@ void hpsb_unregister_protocol(struct hpsb_protocol_driver *driver)
 }
 
 
-/* Searches the list of ud's that match a ne as the parent. If the ud has
- * a driver associated with it, we call that driver's update function
- * with the ud as the argument. */
-static int nodemgr_driver_search_cb(struct device *dev, void *__data)
-{
-	struct node_entry *ne = __data;
-	struct unit_directory *ud;
-
-	if (dev->driver_data == &nodemgr_driverdata_ne ||
-	    dev->driver_data == &nodemgr_driverdata_host)
-		return 0;
-
-	ud = container_of(dev, struct unit_directory, device);
-
-	if (&ne->device != ud->device.parent)
-		return 0;
-
-	if (ud->device.driver) {
-		struct hpsb_protocol_driver *pdrv;
-
-		pdrv = container_of(ud->device.driver,
-				struct hpsb_protocol_driver, driver);
-
-		if (pdrv->update)
-			pdrv->update(ud);
-	}
-
-	return 0;
-}
-
 /*
  * This function updates nodes that were present on the bus before the
  * reset and still are after the reset.  The nodeid and the config rom
@@ -1480,9 +1449,24 @@ static int nodemgr_probe_ne_cb(struct device *dev, void *__data)
 		ne->needs_probe = 0;
 		return 1;
 	} else {
+		struct list_head *lh;
+
 		/* Update unit_dirs with attached drivers */
-		bus_for_each_dev(&ieee1394_bus_type, NULL, ne,
-				 nodemgr_driver_search_cb);
+		list_for_each(lh, &dev->children) {
+			struct unit_directory *ud;
+			
+			ud = container_of(list_to_dev(lh), struct unit_directory, device);
+
+			if (ud->device.driver) {
+				struct hpsb_protocol_driver *pdrv;
+
+				pdrv = container_of(ud->device.driver,
+						    struct hpsb_protocol_driver, driver);
+
+				if (pdrv->update)
+					pdrv->update(ud);
+			}
+		}
 	}
 	return 0;
 }
@@ -1664,7 +1648,6 @@ static int nodemgr_host_thread(void *__hi)
 	allow_signal(SIGTERM);
 
 	/* Setup our device-model entries */
-	device_register(&host->device);
 	nodemgr_create_host_dev_files(host);
 
 	/* Sit and wait for a signal to probe the nodes on the bus. This
@@ -1753,6 +1736,34 @@ struct node_entry *hpsb_nodeid_get_entry(struct hpsb_host *host, nodeid_t nodeid
 	return ne;
 }
 
+struct for_each_host_struct {
+	int (*cb)(struct hpsb_host *, void *);
+	void *data;
+};
+
+static int nodemgr_for_each_host_cb(struct device *dev, void *__data)
+{
+	struct for_each_host_struct *host_data = __data;
+	struct hpsb_host *host;
+
+	if (dev->driver_data != &nodemgr_driverdata_host)
+		return 0;
+
+	host = container_of(dev, struct hpsb_host, device);
+
+	return host_data->cb(host, host_data->data);
+}
+
+int nodemgr_for_each_host(void *__data, int (*cb)(struct hpsb_host *, void *))
+{
+	struct for_each_host_struct host_data;
+
+	host_data.cb = cb;
+	host_data.data = __data;
+
+	return bus_for_each_dev(&ieee1394_bus_type, NULL, &host_data, nodemgr_for_each_host_cb);
+}
+
 /* The following four convenience functions use a struct node_entry
  * for addressing a node on the bus.  They are intended for use by any
  * process context, not just the nodemgr thread, so we need to be a
@@ -1821,11 +1832,6 @@ static void nodemgr_add_host(struct hpsb_host *host)
 	init_completion(&hi->exited);
         sema_init(&hi->reset_sem, 0);
 
-	memcpy(&host->device, &nodemgr_dev_template_host,
-	       sizeof(host->device));
-	host->device.parent = &host->pdev->dev;
-	snprintf(host->device.bus_id, BUS_ID_SIZE, "fw-host%d", host->id);
-
 	sprintf(hi->daemon_name, "knodemgrd_%d", host->id);
 
 	hi->pid = kernel_thread(nodemgr_host_thread, hi, CLONE_KERNEL);
@@ -1879,7 +1885,6 @@ static struct hpsb_highlevel nodemgr_highlevel = {
 
 void init_ieee1394_nodemgr(void)
 {
-	bus_register(&ieee1394_bus_type);
 	driver_register(&nodemgr_driver_host);
 	driver_register(&nodemgr_driver_ne);
 
@@ -1892,5 +1897,4 @@ void cleanup_ieee1394_nodemgr(void)
 
 	driver_unregister(&nodemgr_driver_ne);
 	driver_unregister(&nodemgr_driver_host);
-	bus_unregister(&ieee1394_bus_type);
 }

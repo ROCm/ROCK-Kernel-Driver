@@ -1067,23 +1067,21 @@ static void sun4c_free_thread_info(struct thread_info *ti)
 	unsigned long pages = BUCKET_PTE_PAGE(sun4c_get_pte(tiaddr));
 	int entry = BUCKET_NUM(tiaddr);
 
-	if (atomic_dec_and_test(&ti->task->thread.refcount)) {
-		/* We are deleting a mapping, so the flush here is mandatory. */
-		sun4c_flush_page(tiaddr);
+	/* We are deleting a mapping, so the flush here is mandatory. */
+	sun4c_flush_page(tiaddr);
 #ifndef CONFIG_SUN4	
-		sun4c_flush_page(tiaddr + PAGE_SIZE);
+	sun4c_flush_page(tiaddr + PAGE_SIZE);
 #endif
-		sun4c_put_pte(tiaddr, 0);
+	sun4c_put_pte(tiaddr, 0);
 #ifndef CONFIG_SUN4	
-		sun4c_put_pte(tiaddr + PAGE_SIZE, 0);
+	sun4c_put_pte(tiaddr + PAGE_SIZE, 0);
 #endif
-		sun4c_bucket[entry] = BUCKET_EMPTY;
-		if (entry < sun4c_lowbucket_avail)
-			sun4c_lowbucket_avail = entry;
+	sun4c_bucket[entry] = BUCKET_EMPTY;
+	if (entry < sun4c_lowbucket_avail)
+		sun4c_lowbucket_avail = entry;
 
-		free_pages(pages, THREAD_INFO_ORDER);
-		garbage_collect(entry);
-	}
+	free_pages(pages, THREAD_INFO_ORDER);
+	garbage_collect(entry);
 }
 
 static void __init sun4c_init_buckets(void)
@@ -2030,18 +2028,12 @@ extern unsigned long end;
 extern unsigned long bootmem_init(unsigned long *pages_avail);
 extern unsigned long last_valid_pfn;
 
-extern unsigned long fix_kmap_begin;
-extern unsigned long fix_kmap_end;
-
 void __init sun4c_paging_init(void)
 {
 	int i, cnt;
 	unsigned long kernel_end, vaddr;
 	extern struct resource sparc_iomap;
 	unsigned long end_pfn, pages_avail;
-
-	fix_kmap_begin = KERNBASE + SRMMU_MAXMEM; /* Why bother with SRMMU_MAXMEM? */
-	fix_kmap_end = fix_kmap_begin + ((KM_TYPE_NR*NR_CPUS)-1)*PAGE_SIZE;
 
 	kernel_end = (unsigned long) &end;
 	kernel_end += (SUN4C_REAL_PGDIR_SIZE * 4);

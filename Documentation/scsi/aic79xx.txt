@@ -1,5 +1,5 @@
 ====================================================================
-=             Adaptec Ultra320 Family Manager Set v1.3.0           =
+=             Adaptec Ultra320 Family Manager Set v1.3.11          =
 =                                                                  =
 =                            README for                            =
 =                    The Linux Operating System                    =
@@ -19,57 +19,169 @@ The following information is available in this file:
    The following Adaptec SCSI Host Adapters are supported by this 
    driver set. 
 
-   Ultra320 Adapters         Description
+   Ultra320 ASIC              Description
    ----------------------------------------------------------------
-   Adaptec SCSI Card 39320   Dual Channel 64-bit PCI-X 133MHz to
-                             Ultra320 SCSI Card (one external 
-                             68-pin, two internal 68-pin)
-   Adaptec SCSI Card 39320D  Dual Channel 64-bit PCI-X 133MHz to
-                             Ultra320 SCSI Card (two external VHDC
-                             and one internal 68-pin)
-   Adaptec SCSI Card 39320D  Dual Channel 64-bit PCI-X 133MHz to
-                             Ultra320 SCSI Card (two external VHDC
-                             and one internal 68-pin) based on the
-                             AIC-7902B ASIC
-   Adaptec SCSI Card 29320   Single Channel 64-bit PCI-X 133MHz to
-                             Ultra320 SCSI Card (one external 
-                             68-pin, two internal 68-pin, one
-                             internal 50-pin)
-   Adaptec SCSI Card 29320LP Single Channel 64-bit Low Profile
-                             PCI-X 133MHz to Ultra320 SCSI Card
-                             (One external VHDC, one internal
-                             68-pin)
-   AIC-7901A                 Single Channel 64-bit PCI-X 133MHz to 
-                             Ultra320 SCSI ASIC
-   AIC-7902A4                Dual Channel 64-bit PCI-X 133MHz to 
-                             Ultra320 SCSI ASIC
-   AIC-7902B                 Dual Channel 64-bit PCI-X 133MHz to
-                             Ultra320 SCSI ASIC
+   AIC-7901A                  Single Channel 64-bit PCI-X 133MHz to 
+                              Ultra320 SCSI ASIC
+   AIC-7901B                  Single Channel 64-bit PCI-X 133MHz to 
+                              Ultra320 SCSI ASIC with Retained Training
+   AIC-7902A4                 Dual Channel 64-bit PCI-X 133MHz to 
+                              Ultra320 SCSI ASIC
+   AIC-7902B                  Dual Channel 64-bit PCI-X 133MHz to
+                              Ultra320 SCSI ASIC with Retained Training
 
+   Ultra320 Adapters          Description                              ASIC
+   --------------------------------------------------------------------------
+   Adaptec SCSI Card 39320    Dual Channel 64-bit PCI-X 133MHz to   7902A4/7902B
+                              Ultra320 SCSI Card (one external 
+                              68-pin, two internal 68-pin)
+   Adaptec SCSI Card 39320A   Dual Channel 64-bit PCI-X 133MHz to      7902B
+                              Ultra320 SCSI Card (one external 
+                              68-pin, two internal 68-pin)
+   Adaptec SCSI Card 39320D   Dual Channel 64-bit PCI-X 133MHz to      7902A4
+                              Ultra320 SCSI Card (two external VHDC
+                              and one internal 68-pin)
+   Adaptec SCSI Card 39320D   Dual Channel 64-bit PCI-X 133MHz to      7902A4
+                              Ultra320 SCSI Card (two external VHDC
+                              and one internal 68-pin) based on the
+                              AIC-7902B ASIC
+   Adaptec SCSI Card 29320    Single Channel 64-bit PCI-X 133MHz to    7901A
+                              Ultra320 SCSI Card (one external 
+                              68-pin, two internal 68-pin, one
+                              internal 50-pin)
+   Adaptec SCSI Card 29320A   Single Channel 64-bit PCI-X 133MHz to    7901B
+                              Ultra320 SCSI Card (one external 
+                              68-pin, two internal 68-pin, one
+                              internal 50-pin)
+   Adaptec SCSI Card 29320LP  Single Channel 64-bit Low Profile        7901A
+                              PCI-X 133MHz to Ultra320 SCSI Card
+                              (One external VHDC, one internal
+                              68-pin)
+   Adaptec SCSI Card 29320ALP Single Channel 64-bit Low Profile        7901B
+                              PCI-X 133MHz to Ultra320 SCSI Card
+                              (One external VHDC, one internal
+                              68-pin)
 2. Version History
 
-   (V1.3.0, January 2003) Full regression testing for all U320 products
-   completed.
+   1.3.11 (July 11, 2003)
+        - Fix several deadlock issues.
+        - Add 29320ALP and 39320B Id's.
 
-   (V1.3.0 ALPHA, November 2002) Initial Alpha release.
-   Added abort and target/lun reset error recovery handler and
-   interrupt coalessing.
+   1.3.10 (June 3rd, 2003)
+        - Align the SCB_TAG field on a 16byte boundary.  This avoids
+          SCB corruption on some PCI-33 busses.
+        - Correct non-zero luns on Rev B. hardware.
+        - Update for change in 2.5.X SCSI proc FS interface.
+        - When negotiation async via an 8bit WDTR message, send
+          an SDTR with an offset of 0 to be sure the target
+          knows we are async.  This works around a firmware defect
+          in the Quantum Atlas 10K.
+        - Implement controller susupend and resume.
+        - Clear PCI error state during driver attach so that we
+          don't disable memory mapped I/O due to a stray write
+          by some other driver probe that occurred before we
+          claimed the controller.
 
-   (V1.2.0, November 2002) Added support for Domain Validation and
-   Hewlett-Packard version of the 39320D and AIC-7902 adapters.
-   Support for previous adapters has not been fully tested and should
-   only be used at the customer's own risk.
+   1.3.9 (May 22nd, 2003)
+        - Fix compiler errors.
+        - Remove S/G splitting for segments that cross a 4GB boundary.
+          This is guaranteed not to happen in Linux.
+        - Add support for scsi_report_device_reset() found in
+          2.5.X kernels.
+        - Add 7901B support.
+        - Simplify handling of the packtized lun Rev A workaround.
+        - Correct and simplify handling of the ignore wide residue
+          message.  The previous code would fail to report a residual
+          if the transaction data length was even and we received
+          an IWR message.
 
-   (V1.1.1, September 2002) Added support for the Linux 2.5.X kernel series
+   1.3.8 (April 29th, 2003)
+        - Fix types accessed via the command line interface code.
+        - Perform a few firmware optimizations.
+        - Fix "Unexpected PKT busfree" errors.
+        - Use a sequencer interrupt to notify the host of
+          commands with bad status.  We defer the notification
+          until there are no outstanding selections to ensure
+          that the host is interrupted for as short a time as
+          possible.
+        - Remove pre-2.2.X support.
+        - Add support for new 2.5.X interrupt API.
+        - Correct big-endian architecture support.
 
-   (V1.1.0, August 2002) Added support for four additional SCSI
-   products: ASC-39320, ASC-29320, ASC-29320LP, AIC-7901.
+   1.3.7 (April 16th, 2003)
+        - Use del_timer_sync() to ensure that no timeouts
+          are pending during controller shutdown.
+        - For pre-2.5.X kernels, carefully adjust our segment
+          list size to avoid SCSI malloc pool fragmentation.
+        - Cleanup channel display in our /proc output.
+        - Workaround duplicate device entries in the mid-layer
+          devlice list during add-single-device.
 
-   (V1.1, August 2002) Added support for four additional SCSI
-   products: ASC-39320, ASC-29320, ASC-29320LP, AIC-7901.
+   1.3.6 (March 28th, 2003)
+        - Correct a double free in the Domain Validation code.
+        - Correct a reference to free'ed memory during controller
+          shutdown.
+        - Reset the bus on an SE->LVD change.  This is required
+          to reset our transcievers.
 
-   (V1.0, May 2002) This is the initial release of the 
-   Ultra320 FMS.  The following is a list of supported features:
+   1.3.5 (March 24th, 2003)
+        - Fix a few register window mode bugs.
+        - Include read streaming in the PPR flags we display in
+          diagnostics as well as /proc.
+        - Add PCI hot plug support for 2.5.X kernels.
+        - Correct default precompensation value for RevA hardware.
+        - Fix Domain Validation thread shutdown.
+        - Add a firmware workaround to make the LED blink
+          brighter during packetized operations on the H2A4.
+        - Correct /proc display of user read streaming settings.
+        - Simplify driver locking by releasing the io_request_lock
+          upon driver entry from the mid-layer.
+        - Cleanup command line parsing and move much of this code
+          to aiclib.
+
+   1.3.4 (February 28th, 2003)
+        - Correct a race condition in our error recovery handler.
+        - Allow Test Unit Ready commands to take a full 5 seconds
+          during Domain Validation.
+
+   1.3.2 (February 19th, 2003)
+        - Correct a Rev B. regression due to the GEM318
+          compatibility fix included in 1.3.1.
+          
+   1.3.1 (February 11th, 2003)
+        - Add support for the 39320A.
+        - Improve recovery for certain PCI-X errors.
+        - Fix handling of LQ/DATA/LQ/DATA for the
+          same write transaction that can occur without
+          interveining training.
+        - Correct compatibility issues with the GEM318
+          enclosure services device.
+        - Correct data corruption issue that occurred under
+          high tag depth write loads.
+        - Adapt to a change in the 2.5.X daemonize() API.
+        - Correct a "Missing case in ahd_handle_scsiint" panic.
+
+   1.3.0 (January 21st, 2003)
+        - Full regression testing for all U320 products completed.
+        - Added abort and target/lun reset error recovery handler and
+          interrupt coalessing.
+
+   1.2.0 (November 14th, 2002)
+        - Added support for Domain Validation
+        - Add support for the Hewlett-Packard version of the 39320D
+          and AIC-7902 adapters.
+        Support for previous adapters has not been fully tested and should
+        only be used at the customer's own risk.
+
+   1.1.1 (September 24th, 2002)
+        - Added support for the Linux 2.5.X kernel series
+
+   1.1.0 (September 17th, 2002)
+        - Added support for four additional SCSI products:
+          ASC-39320, ASC-29320, ASC-29320LP, AIC-7901.
+
+   1.0.0 (May 30th, 2002)
+        - Initial driver release.
 
    2.1. Software/Hardware Features
         - Support for the SPI-4 "Ultra320" standard:
@@ -82,6 +194,7 @@ The following information is available in this file:
           supported)
         - Support for the PCI-X standard up to 133MHz
         - Support for the PCI v2.2 standard
+	- Domain Validation
 
    2.2. Operating System Support:
         - Redhat Linux 7.2, 7.3, 8.0, Advanced Server 2.1

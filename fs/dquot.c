@@ -192,6 +192,8 @@ static struct list_head dquot_hash[NR_DQHASH];
 
 struct dqstats dqstats;
 
+static void dqput(struct dquot *dquot);
+
 static inline int const hashfn(struct super_block *sb, unsigned int id, int type)
 {
 	return((((unsigned long)sb>>L1_CACHE_SHIFT) ^ id) * (MAXQUOTAS - type)) % NR_DQHASH;
@@ -339,8 +341,11 @@ restart:
 			continue;
 		if (!dquot_dirty(dquot))
 			continue;
+		atomic_inc(&dquot->dq_count);
+		dqstats.lookups++;
 		spin_unlock(&dq_list_lock);
-		sb->dq_op->sync_dquot(dquot);
+		sb->dq_op->write_dquot(dquot);
+		dqput(dquot);
 		goto restart;
 	}
 	spin_unlock(&dq_list_lock);
@@ -427,7 +432,7 @@ we_slept:
 	}
 	if (dquot_dirty(dquot)) {
 		spin_unlock(&dq_list_lock);
-		commit_dqblk(dquot);
+		dquot->dq_sb->dq_op->write_dquot(dquot);
 		goto we_slept;
 	}
 	atomic_dec(&dquot->dq_count);
@@ -1083,7 +1088,7 @@ struct dquot_operations dquot_operations = {
 	.free_space	= dquot_free_space,
 	.free_inode	= dquot_free_inode,
 	.transfer	= dquot_transfer,
-	.sync_dquot	= commit_dqblk
+	.write_dquot	= commit_dqblk
 };
 
 /* Function used by filesystems for initializing the dquot_operations structure */
@@ -1207,9 +1212,9 @@ int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path)
 	error = -EINVAL;
 	if (!fmt->qf_ops->check_quota_file(sb, type))
 		goto out_file_init;
-	/* We don't want quota on quota files */
+	/* We don't want quota and atime on quota files (deadlocks possible) */
 	dquot_drop_nolock(inode);
-	inode->i_flags |= S_NOQUOTA;
+	inode->i_flags |= S_NOQUOTA | S_NOATIME;
 
 	dqopt->ops[type] = fmt->qf_ops;
 	dqopt->info[type].dqi_format = fmt;

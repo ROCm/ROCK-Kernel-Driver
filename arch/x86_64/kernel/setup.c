@@ -243,6 +243,9 @@ static __init void parse_cmdline_early (char ** cmdline_p)
 		}
 #endif
 
+		if (!memcmp(from,"oops=panic", 10))
+			panic_on_oops = 1;
+
 	next_char:
 		c = *(from++);
 		if (!c)
@@ -338,6 +341,7 @@ __setup("noreplacement", noreplacement_setup);
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long low_mem_size;
+	unsigned long kernel_end;
 
  	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
  	drive_info = DRIVE_INFO;
@@ -386,7 +390,6 @@ void __init setup_arch(char **cmdline_p)
 				(table_end - table_start) << PAGE_SHIFT);
 
 	/* reserve kernel */
-	unsigned long kernel_end;
 	kernel_end = round_up(__pa_symbol(&_end),PAGE_SIZE);
 	reserve_bootmem_generic(HIGH_MEMORY, kernel_end - HIGH_MEMORY);
 

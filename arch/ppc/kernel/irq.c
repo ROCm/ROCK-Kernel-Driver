@@ -346,17 +346,19 @@ void enable_irq(unsigned int irq)
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, j;
+	int i = *(loff_t *) v, j;
 	struct irqaction * action;
 	unsigned long flags;
 
-	seq_puts(p, "           ");
-	for (j=0; j<NR_CPUS; j++)
-		if (cpu_online(j))
-			seq_printf(p, "CPU%d       ", j);
-	seq_putc(p, '\n');
+	if (i == 0) {
+		seq_puts(p, "           ");
+		for (j=0; j<NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "CPU%d       ", j);
+		seq_putc(p, '\n');
+	}
 
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if ( !action || !action->handler )
@@ -381,22 +383,23 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 skip:
 		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
-	}
+	} else if (i == NR_IRQS) {
 #ifdef CONFIG_TAU_INT
-	if (tau_initialized){
-		seq_puts(p, "TAU: ");
-		for (j = 0; j < NR_CPUS; j++)
-			if (cpu_online(j))
-				seq_printf(p, "%10u ", tau_interrupts(j));
-		seq_puts(p, "  PowerPC             Thermal Assist (cpu temp)\n");
-	}
+		if (tau_initialized){
+			seq_puts(p, "TAU: ");
+			for (j = 0; j < NR_CPUS; j++)
+				if (cpu_online(j))
+					seq_printf(p, "%10u ", tau_interrupts(j));
+			seq_puts(p, "  PowerPC             Thermal Assist (cpu temp)\n");
+		}
 #endif
 #ifdef CONFIG_SMP
-	/* should this be per processor send/receive? */
-	seq_printf(p, "IPI (recv/sent): %10u/%u\n",
-		   atomic_read(&ipi_recv), atomic_read(&ipi_sent));
+		/* should this be per processor send/receive? */
+		seq_printf(p, "IPI (recv/sent): %10u/%u\n",
+				atomic_read(&ipi_recv), atomic_read(&ipi_sent));
 #endif
-	seq_printf(p, "BAD: %10u\n", ppc_spurious_interrupts);
+		seq_printf(p, "BAD: %10u\n", ppc_spurious_interrupts);
+	}
 	return 0;
 }
 
@@ -569,65 +572,14 @@ static struct proc_dir_entry *smp_affinity_entry[NR_IRQS];
 
 cpumask_t irq_affinity [NR_IRQS];
 
-#define HEX_DIGITS (2*sizeof(cpumask_t))
-
 static int irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	cpumask_t tmp = irq_affinity[(long)data];
-	int k, len = 0;
-
-	if (count < HEX_DIGITS+1)
+	int len = cpumask_snprintf(page, count, irq_affinity[(long)data]);
+	if (count - len < 2)
 		return -EINVAL;
-
-	for (k = 0; k < sizeof(cpumask_t)/sizeof(u16); ++k) {
-		int j = sprintf(page, "%04hx", (u16)cpus_coerce(tmp));
-		len += j;
-		page += j;
-		cpus_shift_right(tmp, tmp, 16);
-	}
-
-	len += sprintf(page, "\n");
+	len += sprintf(page + len, "\n");
 	return len;
-}
-
-static unsigned int parse_hex_value (const char __user *buffer,
-		unsigned long count, cpumask_t *ret)
-{
-	unsigned char hexnum [HEX_DIGITS];
-	cpumask_t value = CPU_MASK_NONE;
-	int i;
-
-	if (!count)
-		return -EINVAL;
-	if (count > HEX_DIGITS)
-		count = HEX_DIGITS;
-	if (copy_from_user(hexnum, buffer, count))
-		return -EFAULT;
-
-	/*
-	 * Parse the first 8 characters as a hex string, any non-hex char
-	 * is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
-	 */
-	for (i = 0; i < count; i++) {
-		unsigned int c = hexnum[i];
-		int k;
-
-		switch (c) {
-			case '0' ... '9': c -= '0'; break;
-			case 'a' ... 'f': c -= 'a'-10; break;
-			case 'A' ... 'F': c -= 'A'-10; break;
-		default:
-			goto out;
-		}
-		cpus_shift_left(value, value, 4);
-		for (k = 0; k < 4; ++k)
-			if (c & (1 << k))
-				cpu_set(k, value);
-	}
-out:
-	*ret = value;
-	return 0;
 }
 
 static int irq_affinity_write_proc (struct file *file, const char __user *buffer,
@@ -639,7 +591,7 @@ static int irq_affinity_write_proc (struct file *file, const char __user *buffer
 	if (!irq_desc[irq].handler->set_affinity)
 		return -EIO;
 
-	err = parse_hex_value(buffer, count, &new_value);
+	err = cpumask_parse(buffer, count, new_value);
 
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
@@ -664,19 +616,10 @@ static int irq_affinity_write_proc (struct file *file, const char __user *buffer
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	cpumask_t mask = *(cpumask_t *)data;
-	int k, len = 0;
-
-	if (count < HEX_DIGITS+1)
+	int len = cpumask_snprintf(page, count, *(cpumask_t *)data);
+	if (count - len < 2)
 		return -EINVAL;
-
-	for (k = 0; k < sizeof(cpumask_t)/sizeof(u16); ++k) {
-		int j = sprintf(page, "%04hx", (u16)cpus_coerce(mask));
-		len += j;
-		page += j;
-		cpus_shift_right(mask, mask, 16);
-	}
-	len += sprintf(page, "\n");
+	len += sprintf(page + len, "\n");
 	return len;
 }
 
@@ -686,7 +629,7 @@ static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffe
 	cpumask_t *mask = (cpumask_t *)data, full_count = count, err;
 	cpumask_t new_value;
 
-	err = parse_hex_value(buffer, count, &new_value);
+	err = cpumask_parse(buffer, count, new_value);
 	if (err)
 		return err;
 

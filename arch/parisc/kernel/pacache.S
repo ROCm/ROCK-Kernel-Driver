@@ -79,13 +79,13 @@ flush_tlb_all_local:
 	ldil    L%REAL_MODE_PSW, %r1
 	ldo     R%REAL_MODE_PSW(%r1), %r1
 	mtctl	%r1, %cr22
-	mtctl	%r0, %cr17
-	mtctl	%r0, %cr17
+	mtctl	%r0, %cr17	/* Clear IIASQ tail */
+	mtctl	%r0, %cr17	/* Clear IIASQ head */
 	ldil    L%PA(1f),%r1
 	ldo     R%PA(1f)(%r1),%r1
-	mtctl	%r1, %cr18
+	mtctl	%r1, %cr18	/* IIAOQ head */
 	ldo	4(%r1), %r1
-	mtctl	%r1, %cr18
+	mtctl	%r1, %cr18	/* IIAOQ tail */
 	rfi
 	nop
 
@@ -185,13 +185,13 @@ fdtdone:
 	ldo	R%KERNEL_PSW(%r1), %r1
 	or      %r1,%r19,%r1    /* Set I bit if set on entry */
 	mtctl	%r1, %cr22
-	mtctl	%r0, %cr17
-	mtctl	%r0, %cr17
+	mtctl	%r0, %cr17	/* Clear IIASQ tail */
+	mtctl	%r0, %cr17	/* Clear IIASQ head */
 	ldil    L%(2f), %r1
 	ldo     R%(2f)(%r1), %r1
-	mtctl	%r1, %cr18
+	mtctl	%r1, %cr18	/* IIAOQ head */
 	ldo	4(%r1), %r1
-	mtctl	%r1, %cr18
+	mtctl	%r1, %cr18	/* IIAOQ tail */
 	rfi
 	nop
 
@@ -837,13 +837,13 @@ disable_sr_hashing_asm:
 	ldil    L%REAL_MODE_PSW, %r1
 	ldo     R%REAL_MODE_PSW(%r1), %r1
 	mtctl	%r1, %cr22
-	mtctl	%r0, %cr17
-	mtctl	%r0, %cr17
+	mtctl	%r0, %cr17	/* Clear IIASQ tail */
+	mtctl	%r0, %cr17	/* Clear IIASQ head */
 	ldil    L%PA(1f),%r1
 	ldo     R%PA(1f)(%r1),%r1
-	mtctl	%r1, %cr18
+	mtctl	%r1, %cr18	/* IIAOQ head */
 	ldo	4(%r1), %r1
-	mtctl	%r1, %cr18
+	mtctl	%r1, %cr18	/* IIAOQ tail */
 	rfi
 	nop
 
@@ -889,13 +889,13 @@ srdis_done:
 	ldil	L%KERNEL_PSW, %r1
 	ldo	R%KERNEL_PSW(%r1), %r1
 	mtctl	%r1, %cr22
-	mtctl	%r0, %cr17
-	mtctl	%r0, %cr17
+	mtctl	%r0, %cr17	/* Clear IIASQ tail */
+	mtctl	%r0, %cr17	/* Clear IIASQ head */
 	ldil    L%(2f), %r1
 	ldo     R%(2f)(%r1), %r1
-	mtctl	%r1, %cr18
+	mtctl	%r1, %cr18	/* IIAOQ head */
 	ldo	4(%r1), %r1
-	mtctl	%r1, %cr18
+	mtctl	%r1, %cr18	/* IIAOQ tail */
 	rfi
 	nop
 

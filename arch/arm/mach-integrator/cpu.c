@@ -172,7 +172,7 @@ static int integrator_cpufreq_init(struct cpufreq_policy *policy)
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.max_freq = 160000;
 	policy->cpuinfo.min_freq = 12000;
-	policy->cpuinfo.transition_latency = 1000; /* 1 ms, assumed */
+	policy->cpuinfo.transition_latency = 1000000; /* 1 ms, assumed */
 	policy->cur = policy->min = policy->max =
 		icst525_khz(&cclk_params, vco); /* current freq */
 

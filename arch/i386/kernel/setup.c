@@ -36,6 +36,8 @@
 #include <linux/root_dev.h>
 #include <linux/highmem.h>
 #include <linux/module.h>
+#include <linux/efi.h>
+#include <linux/init.h>
 #include <video/edid.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
@@ -55,6 +57,10 @@ static inline char * __init machine_specific_memory_setup(void);
 /*
  * Machine setup..
  */
+
+#ifdef CONFIG_EFI
+int efi_enabled = 0;
+#endif
 
 /* cpu data as detected by the assembly code in head.S */
 struct cpuinfo_x86 new_cpu_data __initdata = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
@@ -141,6 +147,20 @@ static void __init limit_regions(unsigned long long size)
 	unsigned long long current_addr = 0;
 	int i;
 
+	if (efi_enabled) {
+		for (i = 0; i < memmap.nr_map; i++) {
+			current_addr = memmap.map[i].phys_addr +
+				       (memmap.map[i].num_pages << 12);
+			if (memmap.map[i].type == EFI_CONVENTIONAL_MEMORY) {
+				if (current_addr >= size) {
+					memmap.map[i].num_pages -=
+						(((current_addr-size) + PAGE_SIZE-1) >> PAGE_SHIFT);
+					memmap.nr_map = i + 1;
+					return;
+				}
+			}
+		}
+	}
 	for (i = 0; i < e820.nr_map; i++) {
 		if (e820.map[i].type == E820_RAM) {
 			current_addr = e820.map[i].addr + e820.map[i].size;
@@ -156,17 +176,21 @@ static void __init limit_regions(unsigned long long size)
 static void __init add_memory_region(unsigned long long start,
                                   unsigned long long size, int type)
 {
-	int x = e820.nr_map;
+	int x;
 
-	if (x == E820MAX) {
-	    printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
-	    return;
+	if (!efi_enabled) {
+       		x = e820.nr_map;
+
+		if (x == E820MAX) {
+		    printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
+		    return;
+		}
+
+		e820.map[x].addr = start;
+		e820.map[x].size = size;
+		e820.map[x].type = type;
+		e820.nr_map++;
 	}
-
-	e820.map[x].addr = start;
-	e820.map[x].size = size;
-	e820.map[x].type = type;
-	e820.nr_map++;
 } /* add_memory_region */
 
 #define E820_DEBUG	1
@@ -443,7 +467,6 @@ static inline void copy_edd(void)
 static void __init setup_memory_region(void)
 {
 	char *who = machine_specific_memory_setup();
-
 	printk(KERN_INFO "BIOS-provided physical RAM map:\n");
 	print_memory_map(who);
 } /* setup_memory_region */
@@ -581,6 +604,23 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 }
 
 /*
+ * Callback for efi_memory_walk.
+ */
+static int __init
+efi_find_max_pfn(unsigned long start, unsigned long end, void *arg)
+{
+	unsigned long *max_pfn = arg, pfn;
+
+	if (start < end) {
+		pfn = PFN_UP(end -1);
+		if (pfn > *max_pfn)
+			*max_pfn = pfn;
+	}
+	return 0;
+}
+
+
+/*
  * Find the highest page frame number we have available
  */
 void __init find_max_pfn(void)
@@ -588,6 +628,11 @@ void __init find_max_pfn(void)
 	int i;
 
 	max_pfn = 0;
+	if (efi_enabled) {
+		efi_memmap_walk(efi_find_max_pfn, &max_pfn);
+		return;
+	}
+
 	for (i = 0; i < e820.nr_map; i++) {
 		unsigned long start, end;
 		/* RAM? */
@@ -662,6 +707,25 @@ unsigned long __init find_max_low_pfn(void)
 }
 
 #ifndef CONFIG_DISCONTIGMEM
+
+/*
+ * Free all available memory for boot time allocation.  Used
+ * as a callback function by efi_memory_walk()
+ */
+
+static int __init
+free_available_memory(unsigned long start, unsigned long end, void *arg)
+{
+	/* check max_low_pfn */
+	if (start >= ((max_low_pfn + 1) << PAGE_SHIFT))
+		return 0;
+	if (end >= ((max_low_pfn + 1) << PAGE_SHIFT))
+		end = (max_low_pfn + 1) << PAGE_SHIFT;
+	if (start < end)
+		free_bootmem(start, end - start);
+
+	return 0;
+}
 /*
  * Register fully available low RAM pages with the bootmem allocator.
  */
@@ -669,6 +733,10 @@ static void __init register_bootmem_low_pages(unsigned long max_low_pfn)
 {
 	int i;
 
+	if (efi_enabled) {
+		efi_memmap_walk(free_available_memory, NULL);
+		return;
+	}
 	for (i = 0; i < e820.nr_map; i++) {
 		unsigned long curr_pfn, last_pfn, size;
 		/*
@@ -796,9 +864,9 @@ extern unsigned long setup_memory(void);
  * Request address space for all standard RAM and ROM resources
  * and also for regions reported as reserved by the e820.
  */
-static void __init register_memory(unsigned long max_low_pfn)
+static void __init
+legacy_init_iomem_resources(struct resource *code_resource, struct resource *data_resource)
 {
-	unsigned long low_mem_size;
 	int i;
 
 	probe_roms();
@@ -823,11 +891,26 @@ static void __init register_memory(unsigned long max_low_pfn)
 			 *  so we try it repeatedly and let the resource manager
 			 *  test it.
 			 */
-			request_resource(res, &code_resource);
-			request_resource(res, &data_resource);
+			request_resource(res, code_resource);
+			request_resource(res, data_resource);
 		}
 	}
+}
 
+/*
+ * Request address space for all standard resources
+ */
+static void __init register_memory(unsigned long max_low_pfn)
+{
+	unsigned long low_mem_size;
+	int i;
+
+	if (efi_enabled)
+		efi_initialize_iomem_resources(&code_resource, &data_resource);
+	else
+		legacy_init_iomem_resources(&code_resource, &data_resource);
+
+ 	 /* EFI systems may still have VGA */
 	request_graphics_resource();
 
 	/* request I/O space for devices used on all i[345]86 PCs */
@@ -947,6 +1030,13 @@ static int __init noreplacement_setup(char *s)
 
 __setup("noreplacement", noreplacement_setup); 
 
+/*
+ * Determine if we were loaded by an EFI loader.  If so, then we have also been
+ * passed the efi memmap, systab, etc., so we should use these data structures
+ * for initialization.  Note, the efi init code path is determined by the
+ * global efi_enabled. This allows the same kernel image to be used on existing
+ * systems (with a traditional BIOS) as well as on EFI systems.
+ */
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long max_low_pfn;
@@ -954,6 +1044,18 @@ void __init setup_arch(char **cmdline_p)
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	pre_setup_arch_hook();
 	early_cpu_init();
+
+	/*
+	 * FIXME: This isn't an official loader_type right
+	 * now but does currently work with elilo.
+	 * If we were configured as an EFI kernel, check to make
+	 * sure that we were loaded correctly from elilo and that
+	 * the system table is valid.  If not, then initialize normally.
+	 */
+#ifdef CONFIG_EFI
+	if ((LOADER_TYPE == 0x50) && EFI_SYSTAB)
+		efi_enabled = 1;
+#endif
 
  	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
  	drive_info = DRIVE_INFO;
@@ -976,7 +1078,11 @@ void __init setup_arch(char **cmdline_p)
 	rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
 #endif
 	ARCH_SETUP
-	setup_memory_region();
+	if (efi_enabled)
+		efi_init();
+	else
+		setup_memory_region();
+
 	copy_edd();
 
 	if (!MOUNT_ROOT_RDONLY)
@@ -1010,6 +1116,8 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_X86_GENERICARCH
 	generic_apic_probe(*cmdline_p);
 #endif	
+	if (efi_enabled)
+		efi_map_memmap();
 
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
@@ -1025,7 +1133,8 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
-	conswitchp = &vga_con;
+	if (!efi_enabled || (efi_mem_type(0xa0000) != EFI_CONVENTIONAL_MEMORY))
+		conswitchp = &vga_con;
 #elif defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
 #endif

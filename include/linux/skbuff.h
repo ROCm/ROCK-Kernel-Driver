@@ -107,7 +107,7 @@ struct nf_bridge_info {
 	struct net_device *netoutdev;
 #endif
 	unsigned int mask;
-	unsigned long hh[32 / sizeof(unsigned long)];
+	unsigned long data[32 / sizeof(unsigned long)];
 };
 #endif
 
@@ -764,10 +764,10 @@ static inline struct sk_buff *__skb_dequeue_tail(struct sk_buff_head *list)
 }
 
 /**
- *	skb_dequeue - remove from the head of the queue
+ *	skb_dequeue_tail - remove from the tail of the queue
  *	@list: list to dequeue from
  *
- *	Remove the head of the list. The list lock is taken so the function
+ *	Remove the tail of the list. The list lock is taken so the function
  *	may be used safely with other locking list functions. The tail item is
  *	returned or %NULL if the list is empty.
  */
@@ -1132,7 +1132,7 @@ static inline struct sk_buff *skb_padto(struct sk_buff *skb, unsigned int len)
  *	is returned and the old skb data released.
  */
 extern int __skb_linearize(struct sk_buff *skb, int gfp);
-static inline int __deprecated skb_linearize(struct sk_buff *skb, int gfp)
+static inline int skb_linearize(struct sk_buff *skb, int gfp)
 {
 	return __skb_linearize(skb, gfp);
 }

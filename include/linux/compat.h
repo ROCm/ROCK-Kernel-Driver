@@ -44,8 +44,8 @@ typedef struct {
 } compat_sigset_t;
 
 extern int cp_compat_stat(struct kstat *, struct compat_stat *);
-extern int get_compat_timespec(struct timespec *, struct compat_timespec *);
-extern int put_compat_timespec(struct timespec *, struct compat_timespec *);
+extern int get_compat_timespec(struct timespec *, const struct compat_timespec *);
+extern int put_compat_timespec(struct timespec *, const struct compat_timespec *);
 
 struct compat_iovec {
 	compat_uptr_t	iov_base;
@@ -74,20 +74,6 @@ struct compat_rusage {
 	compat_long_t	ru_nsignals;
 	compat_long_t	ru_nvcsw;
 	compat_long_t	ru_nivcsw;
-};
-
-struct compat_statfs64 {
-	__u32 f_type;
-	__u32 f_bsize;
-	__u64 f_blocks;
-	__u64 f_bfree;
-	__u64 f_bavail;
-	__u64 f_files;
-	__u64 f_ffree;
-	__kernel_fsid_t f_fsid;
-	__u32 f_namelen;
-	__u32 f_frsize;
-	__u32 f_spare[5];
 };
 
 struct compat_dirent {

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#169 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#171 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -425,7 +425,7 @@ static char *aic79xx = NULL;
 static char dummy_buffer[60] = "Please don't trounce on me insmod!!\n";
 
 MODULE_AUTHOR("Maintainer: Justin T. Gibbs <gibbs@scsiguy.com>");
-MODULE_DESCRIPTION("Adaptec Aic77XX/78XX SCSI Host Bus Adapter driver");
+MODULE_DESCRIPTION("Adaptec Aic790X U320 SCSI Host Bus Adapter driver");
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
@@ -4442,6 +4442,16 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 			}
 #endif
 			ahd_set_transaction_status(scb, CAM_UNCOR_PARITY);
+#ifdef AHD_REPORT_UNDERFLOWS
+		/*
+		 * This code is disabled by default as some
+		 * clients of the SCSI system do not properly
+		 * initialize the underflow parameter.  This
+		 * results in spurious termination of commands
+		 * that complete as expected (e.g. underflow is
+		 * allowed as command can return variable amounts
+		 * of data.
+		 */
 		} else if (amount_xferred < scb->io_ctx->underflow) {
 			u_int i;
 
@@ -4456,6 +4466,7 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 				ahd_get_residual(scb),
 				ahd_get_transfer_length(scb));
 			ahd_set_transaction_status(scb, CAM_DATA_RUN_ERR);
+#endif
 		} else {
 			ahd_set_transaction_status(scb, CAM_REQ_CMP);
 		}

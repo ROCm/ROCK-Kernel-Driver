@@ -41,75 +41,14 @@ struct budget_ci {
 	struct tasklet_struct msp430_irq_tasklet;
 };
 
-
-
-#ifndef BORROWED_FROM_AV7110_H_BUT_REALLY_BELONGS_IN_SAA7146_DEFS_H
-
-#define DEBINOSWAP 0x000e0000
-#define GPIO_IRQHI 0x10
-#define GPIO_INPUT 0x00
-
-void gpio_set(struct saa7146_dev* saa, u8 pin, u8 data)
-{
-        u32 value = 0;
-
-        /* sanity check */
-        if(pin > 3)
-                return;
-
-        /* read old register contents */
-        value = saa7146_read(saa, GPIO_CTRL );
-
-        value &= ~(0xff << (8*pin));
-        value |= (data << (8*pin));
-
-        saa7146_write(saa, GPIO_CTRL, value);
-}
-
-
-
-static int wait_for_debi_done(struct saa7146_dev *saa)
-{
-	int start = jiffies;
-
-	/* wait for registers to be programmed */
-	while (1) {
-		if (saa7146_read(saa, MC2) & 2)
-			break;
-		if (jiffies - start > HZ / 20) {
-			printk ("DVB (%s): timed out while waiting"
-				" for registers getting programmed\n",
-				__FUNCTION__);
-			return -ETIMEDOUT;
-		}
-	}
-
-	/* wait for transfer to complete */
-	start = jiffies;
-	while (1) {
-		if (!(saa7146_read(saa, PSR) & SPCI_DEBI_S))
-			break;
-		saa7146_read(saa, MC2);
-		if (jiffies - start > HZ / 4) {
-			printk ("DVB (%s): timed out while waiting"
-				" for transfer completion\n",
-				__FUNCTION__);
-			return -ETIMEDOUT;
-		}
-	}
-
-	return 0;
-}
-
-
-static u32 debiread (struct saa7146_dev *saa, u32 config, int addr, int count)
+static u32 budget_debiread4 (struct saa7146_dev *saa, u32 config, int addr, int count)
 {
 	u32 result = 0;
 
 	if (count > 4 || count <= 0)
 		return 0;
 
-	if (wait_for_debi_done(saa) < 0)
+	if (saa7146_wait_for_debi_done(saa) < 0)
 		return 0;
 
 	saa7146_write (saa, DEBI_COMMAND,
@@ -118,27 +57,13 @@ static u32 debiread (struct saa7146_dev *saa, u32 config, int addr, int count)
 	saa7146_write(saa, DEBI_CONFIG, config);
 	saa7146_write(saa, MC2, (2 << 16) | 2);
 
-	wait_for_debi_done(saa);
+	saa7146_wait_for_debi_done(saa);
 
 	result = saa7146_read(saa, DEBI_AD);
 	result &= (0xffffffffUL >> ((4 - count) * 8));
 
 	return result;
 }
-
-
-
-/* DEBI during interrupt */
-static inline u32 irdebi(struct saa7146_dev *saa, u32 config, int addr, u32 val, int count)
-{
-	u32 res;
-	res = debiread(saa, config, addr, count);
-	return res;
-}
-#endif
-
-
-
 
 /* from reading the following remotes:
    Zenith Universal 7 / TV Mode 807 / VCR Mode 837
@@ -150,7 +75,7 @@ static  u16 key_map[64] = {
 	KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8,
 	KEY_9,
 	KEY_ENTER,
-	0,
+	KEY_RED,
 	KEY_POWER,              /* RADIO on Hauppauge */
 	KEY_MUTE,
 	0,
@@ -162,11 +87,11 @@ static  u16 key_map[64] = {
 	0, 0, 0, 0, 0, 0, 0,
 	KEY_UP, KEY_DOWN,
 	KEY_OPTION,             /* RESERVED on Hauppauge */
-	0,
+	KEY_BREAK,
 	/* 0x2X */
 	KEY_CHANNELUP, KEY_CHANNELDOWN,
 	KEY_PREVIOUS,           /* Prev. Ch on Zenith, SOURCE on Hauppauge */
-	0, 0, 0,
+	0, KEY_RESTART, KEY_OK,
 	KEY_CYCLEWINDOWS,       /* MINIMIZE on Hauppauge */
 	0,
 	KEY_ENTER,              /* VCR mode on Zenith */
@@ -177,7 +102,7 @@ static  u16 key_map[64] = {
 	KEY_MENU,               /* FULL SCREEN on Hauppauge */
 	0,
 	/* 0x3X */
-	0,
+	KEY_SLOW,
 	KEY_PREVIOUS,           /* VCR mode on Zenith */
 	KEY_REWIND,
 	0,
@@ -189,7 +114,7 @@ static  u16 key_map[64] = {
 	KEY_C,
 	0,
 	KEY_EXIT,
-	0,
+	KEY_POWER2,
 	KEY_TUNER,              /* VCR mode on Zenith */
 	0,
 };
@@ -217,7 +142,7 @@ static void msp430_ir_interrupt (unsigned long data)
 	struct budget_ci *budget_ci = (struct budget_ci*) data;
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	struct input_dev *dev = &budget_ci->input_dev;
-	unsigned int code = irdebi(saa, DEBINOSWAP, 0x1234, 0, 2) >> 8;
+	unsigned int code = budget_debiread4(saa, DEBINOSWAP, 0x1234, 2) >> 8;
 
 	if (code & 0x40) {
 	        code &= 0x3f;
@@ -271,7 +196,7 @@ static int msp430_ir_init (struct budget_ci *budget_ci)
 
 	saa7146_write(saa, IER, saa7146_read(saa, IER) | MASK_06);
 
-	gpio_set(saa, 3, GPIO_IRQHI);
+	saa7146_setgpio(saa, 3, SAA7146_GPIO_IRQHI); 
 
 	return 0;
 }
@@ -283,8 +208,8 @@ static void msp430_ir_deinit (struct budget_ci *budget_ci)
 	struct input_dev *dev = &budget_ci->input_dev;
 
 	saa7146_write(saa, IER, saa7146_read(saa, IER) & ~MASK_06);
-	gpio_set(saa, 3, GPIO_INPUT);
-	gpio_set(saa, 2, GPIO_INPUT);
+	saa7146_setgpio(saa, 3, SAA7146_GPIO_INPUT);
+	saa7146_setgpio(saa, 2, SAA7146_GPIO_INPUT);
 
 	if (del_timer(&dev->timer))
 		input_event(dev, EV_KEY, key_map[dev->repeat_key], !!0);

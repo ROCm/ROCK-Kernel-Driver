@@ -532,7 +532,7 @@ static int nr_release(struct socket *sock)
 		sk->sk_state    = TCP_CLOSE;
 		sk->sk_shutdown |= SEND_SHUTDOWN;
 		sk->sk_state_change(sk);
-		sock_set_flag(sk, SOCK_DEAD);
+		sock_orphan(sk);
 		sock_set_flag(sk, SOCK_DESTROY);
 		sk->sk_socket   = NULL;
 		break;
@@ -727,6 +727,8 @@ static int nr_connect(struct socket *sock, struct sockaddr *uaddr,
 				lock_sock(sk);
 				continue;
 			}
+			current->state = TASK_RUNNING;
+			remove_wait_queue(sk->sk_sleep, &wait);
 			return -ERESTARTSYS;
 		}
 		current->state = TASK_RUNNING;
@@ -780,13 +782,18 @@ static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 
 		current->state = TASK_INTERRUPTIBLE;
 		release_sock(sk);
-		if (flags & O_NONBLOCK)
+		if (flags & O_NONBLOCK) {
+			current->state = TASK_RUNNING;
+			remove_wait_queue(sk->sk_sleep, &wait);
 			return -EWOULDBLOCK;
+		}
 		if (!signal_pending(tsk)) {
 			schedule();
 			lock_sock(sk);
 			continue;
 		}
+		current->state = TASK_RUNNING;
+		remove_wait_queue(sk->sk_sleep, &wait);
 		return -ERESTARTSYS;
 	}
 	current->state = TASK_RUNNING;
@@ -1377,7 +1384,7 @@ static int __init nr_proto_init(void)
 {
 	int i;
 
-	if (nr_ndevs > 0x7fffffff/sizeof(struct net_device)) {
+	if (nr_ndevs > 0x7fffffff/sizeof(struct net_device *)) {
 		printk(KERN_ERR "NET/ROM: nr_proto_init - nr_ndevs parameter to large\n");
 		return -1;
 	}
@@ -1405,6 +1412,7 @@ static int __init nr_proto_init(void)
 		dev->base_addr = i;
 		if (register_netdev(dev)) {
 			printk(KERN_ERR "NET/ROM: nr_proto_init - unable to register network device\n");
+			free_netdev(dev);
 			goto fail;
 		}
 		dev_nr[i] = dev;
@@ -1433,8 +1441,10 @@ static int __init nr_proto_init(void)
 	return 0;
 
  fail:
-	while (--i >= 0)
+	while (--i >= 0) {
 		unregister_netdev(dev_nr[i]);
+		free_netdev(dev_nr[i]);
+	}
 	kfree(dev_nr);
 	return -1;
 }
@@ -1474,8 +1484,10 @@ static void __exit nr_exit(void)
 
 	for (i = 0; i < nr_ndevs; i++) {
 		struct net_device *dev = dev_nr[i];
-		if (dev) 
+		if (dev) {
 			unregister_netdev(dev);
+			free_netdev(dev);
+		}
 	}
 
 	kfree(dev_nr);

@@ -541,8 +541,8 @@ EXPORT_SYMBOL(pdc_lan_station_id);
  *    o cable too long (ie SE scsi 10Mhz won't support 6m length),
  *    o bus width exported is less than what the interface chip supports.
  */
-int pdc_get_initiator( struct hardware_path *hwpath, unsigned char *scsi_id,
-	unsigned long *period, char *width, char *mode)
+int pdc_get_initiator(struct hardware_path *hwpath, unsigned char *scsi_id,
+		unsigned long *period, char *width, char *mode)
 {
 	int retval;
 
@@ -550,53 +550,49 @@ int pdc_get_initiator( struct hardware_path *hwpath, unsigned char *scsi_id,
 
 /* BCJ-XXXX series boxes. E.G. "9000/785/C3000" */
 #define IS_SPROCKETS() (strlen(boot_cpu_data.pdc.sys_model_name) == 14 && \
-	strncmp(boot_cpu_data.pdc.sys_model_name, "9000/785", 9) == 0)
+	strncmp(boot_cpu_data.pdc.sys_model_name, "9000/785", 8) == 0)
 
 	retval = mem_pdc_call(PDC_INITIATOR, PDC_GET_INITIATOR, 
 			      __pa(pdc_result), __pa(hwpath));
 
+	if (retval < PDC_OK)
+		goto fail;
 
-	if (retval >= PDC_OK) {
-		*scsi_id = (unsigned char) pdc_result[0];
+	*scsi_id = (unsigned char) pdc_result[0];
 
-		/* convert Bus speed in Mhz to period (in 1/10 ns) */
-		switch(pdc_result[1]) {
+	/* convert Bus speed in Mhz to period (in 1/10 ns) */
+	switch (pdc_result[1]) {
 		/*
-		** case  0:   driver determines rate
-		** case -1:   Settings are uninitialized.
-		*/
+		 * case  0:   driver determines rate
+		 * case -1:   Settings are uninitialized.
+		 */
 		case  5:  *period = 2000; break;
 		case 10:  *period = 1000; break;
 		case 20:  *period = 500; break;
 		case 40:  *period = 250; break;
 		default: /* Do nothing */ break;
-		}
-
-		/* 
-		** pdc_result[2]	PDC suggested SCSI id
-		** pdc_result[3]	PDC suggested SCSI rate
-		*/
-
-		if (IS_SPROCKETS()) {
-			/*
-			** Revisit: PAT PDC do the same thing?
-			** A500 also exports 50-pin SE SCSI.
-			**	0 == 8-bit
-			**	1 == 16-bit
-			*/
-			*width = (char) pdc_result[4];
-
-			/* ...in case someone needs it in the future.
-			** sym53c8xx.c comments say it can't autodetect
-			** for 825/825A/875 chips.
-			**	0 == SE, 1 == HVD, 2 == LVD
-			*/
-			*mode = (char) pdc_result[5]; 
-		}
 	}
 
+	/* 
+	 * pdc_result[2]	PDC suggested SCSI id
+	 * pdc_result[3]	PDC suggested SCSI rate
+	 */
+
+	if (IS_SPROCKETS()) {
+		/* 0 == 8-bit, 1 == 16-bit */
+		*width = (char) pdc_result[4];
+
+		/* ...in case someone needs it in the future.
+		 * sym53c8xx.c comments say it can't autodetect
+		 * for 825/825A/875 chips.
+		 *	0 == SE, 1 == HVD, 2 == LVD
+		 */
+		*mode = (char) pdc_result[5]; 
+	}
+
+ fail:
 	spin_unlock_irq(&pdc_lock);
-	return retval >= PDC_OK;
+	return (retval >= PDC_OK);
 }
 EXPORT_SYMBOL(pdc_get_initiator);
 

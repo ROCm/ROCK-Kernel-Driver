@@ -323,7 +323,7 @@ involved. In the latter case, the driver would modify and manage the
 request->buffer, request->sector and request->nr_sectors or
 request->current_nr_sectors fields itself rather than using the block layer
 end_request or end_that_request_first completion interfaces.
-(See 2.3 or Documentation/bio/request.txt for a brief explanation of
+(See 2.3 or Documentation/block/request.txt for a brief explanation of
 the request structure fields)
 
 [TBD: end_that_request_last should be usable even in this case;
@@ -517,7 +517,7 @@ request structure.
 Only some relevant fields (mainly those which changed or may be referred
 to in some of the discussion here) are listed below, not necessarily in
 the order in which they occur in the structure (see include/linux/blkdev.h)
-Refer to Documentation/bio/request.txt for details about all the request
+Refer to Documentation/block/request.txt for details about all the request
 structure fields and a quick reference about the layers which are
 supposed to use or modify those fields.
 

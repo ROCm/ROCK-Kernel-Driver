@@ -5,12 +5,12 @@
 
 #define APIC_DFR_VALUE	(APIC_DFR_FLAT)
 
-static inline cpumask_t target_cpus(void)
+static inline cpumask_const_t target_cpus(void)
 { 
 #ifdef CONFIG_SMP
-	return cpu_online_map;
+	return mk_cpumask_const(cpu_online_map);
 #else
-	return cpumask_of_cpu(0);
+	return mk_cpumask_const(cpumask_of_cpu(0));
 #endif
 } 
 #define TARGET_CPUS (target_cpus())

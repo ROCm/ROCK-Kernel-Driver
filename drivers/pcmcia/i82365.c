@@ -42,7 +42,6 @@
 #include <linux/timer.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/pci.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/workqueue.h>
@@ -188,10 +187,6 @@ static struct timer_list poll_timer;
 
 /*====================================================================*/
 
-/* Default settings for PCI command configuration register */
-#define CMD_DFLT (PCI_COMMAND_IO|PCI_COMMAND_MEMORY| \
-		  PCI_COMMAND_MASTER|PCI_COMMAND_WAIT)
-
 /* These definitions must match the pcic table! */
 typedef enum pcic_id {
     IS_I82365A, IS_I82365B, IS_I82365DF,
@@ -202,15 +197,10 @@ typedef enum pcic_id {
 /* Flags for classifying groups of controllers */
 #define IS_VADEM	0x0001
 #define IS_CIRRUS	0x0002
-#define IS_TI		0x0004
-#define IS_O2MICRO	0x0008
 #define IS_VIA		0x0010
-#define IS_TOPIC	0x0020
-#define IS_RICOH	0x0040
 #define IS_UNKNOWN	0x0400
 #define IS_VG_PWR	0x0800
 #define IS_DF_PWR	0x1000
-#define IS_PCI		0x2000
 #define IS_ALIVE	0x8000
 
 typedef struct pcic_t {
@@ -351,26 +341,24 @@ static u_int __init cirrus_set_opts(u_short s, char *buf)
     if (has_ring == -1) has_ring = 1;
     flip(p->misc2, PD67_MC2_IRQ15_RI, has_ring);
     flip(p->misc2, PD67_MC2_DYNAMIC_MODE, dynamic_mode);
+    flip(p->misc2, PD67_MC2_FREQ_BYPASS, freq_bypass);
     if (p->misc2 & PD67_MC2_IRQ15_RI)
 	strcat(buf, " [ring]");
     if (p->misc2 & PD67_MC2_DYNAMIC_MODE)
 	strcat(buf, " [dyn mode]");
+    if (p->misc2 & PD67_MC2_FREQ_BYPASS)
+	strcat(buf, " [freq bypass]");
     if (p->misc1 & PD67_MC1_INPACK_ENA)
 	strcat(buf, " [inpack]");
-    if (!(t->flags & IS_PCI)) {
-	if (p->misc2 & PD67_MC2_IRQ15_RI)
-	    mask &= ~0x8000;
-	if (has_led > 0) {
-	    strcat(buf, " [led]");
-	    mask &= ~0x1000;
-	}
-	if (has_dma > 0) {
-	    strcat(buf, " [dma]");
-	    mask &= ~0x0600;
-	flip(p->misc2, PD67_MC2_FREQ_BYPASS, freq_bypass);
-	if (p->misc2 & PD67_MC2_FREQ_BYPASS)
-	    strcat(buf, " [freq bypass]");
-	}
+    if (p->misc2 & PD67_MC2_IRQ15_RI)
+	mask &= ~0x8000;
+    if (has_led > 0) {
+	strcat(buf, " [led]");
+	mask &= ~0x1000;
+    }
+    if (has_dma > 0) {
+	strcat(buf, " [dma]");
+	mask &= ~0x0600;
     }
     if (!(t->flags & IS_VIA)) {
 	if (setup_time >= 0)
@@ -540,7 +528,6 @@ static u_int __init test_irq(u_short sock, int irq)
     return (irq_hits != 1);
 }
 
-
 static u_int __init isa_scan(u_short sock, u_int mask0)
 {
     u_int mask1 = 0;
@@ -585,7 +572,6 @@ static u_int __init isa_scan(u_short sock, u_int mask0)
     return mask1;
 }
 
-
 /*====================================================================*/
 
 /* Time conversion functions */
@@ -596,7 +582,6 @@ static int to_cycles(int ns)
 }
 
 /*====================================================================*/
-
 
 static int __init identify(u_short port, u_short sock)
 {
@@ -700,7 +685,7 @@ static void __init add_socket(u_short port, int psock, int type)
 static void __init add_pcic(int ns, int type)
 {
     u_int mask = 0, i, base;
-    int use_pci = 0, isa_irq = 0;
+    int isa_irq = 0;
     struct i82365_socket *t = &socket[sockets-ns];
 
     base = sockets-ns;
@@ -721,17 +706,16 @@ static void __init add_pcic(int ns, int type)
     mask &= I365_MASK & set_bridge_opts(base, ns);
     /* Scan for ISA interrupts */
     mask = isa_scan(base, mask);
-    printk(KERN_INFO "    PCI card interrupts,");
         
     /* Poll if only two interrupts available */
-    if (!use_pci && !poll_interval) {
+    if (!poll_interval) {
 	u_int tmp = (mask & 0xff20);
 	tmp = tmp & (tmp-1);
 	if ((tmp & (tmp-1)) == 0)
 	    poll_interval = HZ;
     }
     /* Only try an ISA cs_irq if this is the first controller */
-    if (!use_pci && !grab_irq && (cs_irq || !poll_interval)) {
+    if (!grab_irq && (cs_irq || !poll_interval)) {
 	/* Avoid irq 12 unless it is explicitly requested */
 	u_int cs_mask = mask & ((cs_irq) ? (1<<cs_irq) : ~(1<<12));
 	for (cs_irq = 15; cs_irq > 0; cs_irq--)
@@ -745,7 +729,7 @@ static void __init add_pcic(int ns, int type)
 	}
     }
     
-    if (!use_pci && !isa_irq) {
+    if (!isa_irq) {
 	if (poll_interval == 0)
 	    poll_interval = HZ;
 	printk(" polling interval = %d ms\n",
@@ -763,9 +747,7 @@ static void __init add_pcic(int ns, int type)
 
 } /* add_pcic */
 
-
 /*====================================================================*/
-
 
 #ifdef CONFIG_PNP
 static struct isapnp_device_id id_table[] __initdata = {
@@ -832,7 +814,9 @@ static void __init isa_probe(void)
 	    }
 	}
     } else {
-	for (i = 0; i < (extra_sockets ? 8 : 4); i += 2) {
+	for (i = 0; i < 8; i += 2) {
+	    if (sockets && !extra_sockets && (i == 4))
+		break;
 	    port = i365_base + 2*(i>>2);
 	    sock = (i & 3);
 	    id = identify(port, sock);
@@ -856,7 +840,6 @@ static void __init isa_probe(void)
     }
 }
 
-
 /*====================================================================*/
 
 static irqreturn_t pcic_interrupt(int irq, void *dev,
@@ -872,8 +855,7 @@ static irqreturn_t pcic_interrupt(int irq, void *dev,
     for (j = 0; j < 20; j++) {
 	active = 0;
 	for (i = 0; i < sockets; i++) {
-	    if ((socket[i].cs_irq != irq) &&
-		(socket[i].socket.pci_irq != irq))
+	    if (socket[i].cs_irq != irq)
 		continue;
 	    handled = 1;
 	    ISA_LOCK(i, flags);
@@ -911,7 +893,6 @@ static irqreturn_t pcic_interrupt(int irq, void *dev,
 static void pcic_interrupt_wrapper(u_long data)
 {
     pcic_interrupt(0, NULL, NULL);
-    init_timer(&poll_timer);
     poll_timer.expires = jiffies + poll_interval;
     add_timer(&poll_timer);
 }
@@ -1039,7 +1020,7 @@ static int i365_set_socket(u_short sock, socket_state_t *state)
     
     /* IO card, RESET flag, IO interrupt */
     reg = t->intr;
-    if (state->io_irq != t->socket.pci_irq) reg |= state->io_irq;
+    reg |= state->io_irq;
     reg |= (state->flags & SS_RESET) ? 0 : I365_PC_RESET;
     reg |= (state->flags & SS_IOCARD) ? I365_PC_IOCARD : 0;
     i365_set(sock, I365_INTCTL, reg);
@@ -1177,8 +1158,7 @@ static int i365_set_mem_map(u_short sock, struct pccard_mem_map *mem)
     if ((map > 4) || (mem->card_start > 0x3ffffff) ||
 	(mem->sys_start > mem->sys_stop) || (mem->speed > 1000))
 	return -EINVAL;
-    if (!(socket[sock].flags & IS_PCI) &&
-	((mem->sys_start > 0xffffff) || (mem->sys_stop > 0xffffff)))
+    if ((mem->sys_start > 0xffffff) || (mem->sys_stop > 0xffffff))
 	return -EINVAL;
 	
     /* Turn off the window before changing anything */
@@ -1211,6 +1191,7 @@ static int i365_set_mem_map(u_short sock, struct pccard_mem_map *mem)
     return 0;
 } /* i365_set_mem_map */
 
+#if 0 /* driver model ordering issue */
 /*======================================================================
 
     Routines for accessing socket information and register dumps via
@@ -1250,6 +1231,7 @@ static ssize_t show_exca(struct class_device *class_dev, char *buf)
 
 static CLASS_DEVICE_ATTR(exca, S_IRUGO, show_exca, NULL);
 static CLASS_DEVICE_ATTR(info, S_IRUGO, show_info, NULL);
+#endif
 
 /*====================================================================*/
 
@@ -1385,7 +1367,7 @@ static int __init init_i82365(void)
     if (driver_register(&i82365_driver))
 	return -1;
 
-    printk(KERN_INFO "Intel PCIC probe: ");
+    printk(KERN_INFO "Intel ISA PCIC probe: ");
     sockets = 0;
 
     isa_probe();
@@ -1414,10 +1396,12 @@ static int __init init_i82365(void)
 			    pcmcia_unregister_socket(&socket[i].socket);
 		    break;
 	    }
+#if 0 /* driver model ordering issue */
 	   class_device_create_file(&socket[i].socket.dev,
 			   	    &class_device_attr_info);
 	   class_device_create_file(&socket[i].socket.dev,
 			   	    &class_device_attr_exca);
+#endif
     }
 
     /* Finally, schedule a polling interrupt */

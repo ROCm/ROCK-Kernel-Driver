@@ -2475,10 +2475,11 @@ static int rtl8139_suspend (struct pci_dev *pdev, u32 state)
 	tp->stats.rx_missed_errors += RTL_R32 (RxMissed);
 	RTL_W32 (RxMissed, 0);
 
+	spin_unlock_irqrestore (&tp->lock, flags);
+
 	pci_set_power_state (pdev, 3);
 	pci_save_state (pdev, tp->pci_state);
 
-	spin_unlock_irqrestore (&tp->lock, flags);
 	return 0;
 }
 

@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#133 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#137 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -292,7 +292,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 #define AHD_SCSI_HAS_HOST_LOCK 0
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.3.9"
+#define AIC79XX_DRIVER_VERSION "1.3.11"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -590,10 +590,6 @@ ahd_delay(long usec)
 
 
 /***************************** Low Level I/O **********************************/
-#if defined(__powerpc__) || defined(__i386__) || defined(__ia64__)
-#define MMAPIO
-#endif
-
 static __inline uint8_t ahd_inb(struct ahd_softc * ahd, long port);
 static __inline uint16_t ahd_inw_atomic(struct ahd_softc * ahd, long port);
 static __inline void ahd_outb(struct ahd_softc * ahd, long port, uint8_t val);
@@ -608,16 +604,12 @@ static __inline uint8_t
 ahd_inb(struct ahd_softc * ahd, long port)
 {
 	uint8_t x;
-#ifdef MMAPIO
 
 	if (ahd->tags[0] == BUS_SPACE_MEMIO) {
 		x = readb(ahd->bshs[0].maddr + port);
 	} else {
 		x = inb(ahd->bshs[(port) >> 8].ioport + ((port) & 0xFF));
 	}
-#else
-	x = inb(ahd->bshs[(port) >> 8].ioport + ((port) & 0xFF));
-#endif
 	mb();
 	return (x);
 }
@@ -626,16 +618,12 @@ static __inline uint16_t
 ahd_inw_atomic(struct ahd_softc * ahd, long port)
 {
 	uint8_t x;
-#ifdef MMAPIO
 
 	if (ahd->tags[0] == BUS_SPACE_MEMIO) {
 		x = readw(ahd->bshs[0].maddr + port);
 	} else {
 		x = inw(ahd->bshs[(port) >> 8].ioport + ((port) & 0xFF));
 	}
-#else
-	x = inw(ahd->bshs[(port) >> 8].ioport + ((port) & 0xFF));
-#endif
 	mb();
 	return (x);
 }
@@ -643,30 +631,22 @@ ahd_inw_atomic(struct ahd_softc * ahd, long port)
 static __inline void
 ahd_outb(struct ahd_softc * ahd, long port, uint8_t val)
 {
-#ifdef MMAPIO
 	if (ahd->tags[0] == BUS_SPACE_MEMIO) {
 		writeb(val, ahd->bshs[0].maddr + port);
 	} else {
 		outb(val, ahd->bshs[(port) >> 8].ioport + (port & 0xFF));
 	}
-#else
-	outb(val, ahd->bshs[(port) >> 8].ioport + (port & 0xFF));
-#endif
 	mb();
 }
 
 static __inline void
 ahd_outw_atomic(struct ahd_softc * ahd, long port, uint16_t val)
 {
-#ifdef MMAPIO
 	if (ahd->tags[0] == BUS_SPACE_MEMIO) {
 		writew(val, ahd->bshs[0].maddr + port);
 	} else {
 		outw(val, ahd->bshs[(port) >> 8].ioport + (port & 0xFF));
 	}
-#else
-	outw(val, ahd->bshs[(port) >> 8].ioport + (port & 0xFF));
-#endif
 	mb();
 }
 
@@ -1005,7 +985,12 @@ ahd_flush_device_writes(struct ahd_softc *ahd)
 	(((dev_softc)->dma_mask = mask) && 0)
 #endif
 /**************************** Proc FS Support *********************************/
-int	ahd_linux_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+int	ahd_linux_proc_info(char *, char **, off_t, int, int, int);
+#else
+int	ahd_linux_proc_info(struct Scsi_Host *, char *, char **,
+			    off_t, int, int);
+#endif
 
 /*************************** Domain Validation ********************************/
 #define AHD_DV_CMD(cmd) ((cmd)->scsi_done == ahd_linux_dv_complete)

@@ -18,6 +18,7 @@
 #include <asm/param.h>
 #include <asm/sal.h>
 #include <asm/processor.h>
+#include <asm/mca_asm.h>
 
 /* These are the return codes from all the IA64_MCA specific interfaces */
 typedef	int ia64_mca_return_code_t;
@@ -60,6 +61,17 @@ enum {
 	IA64_MCA_RENDEZ_CHECKIN_NOTDONE	=	0x0,
 	IA64_MCA_RENDEZ_CHECKIN_DONE	=	0x1
 };
+
+/* the following data structure is used for TLB error recovery purposes */
+extern struct ia64_mca_tlb_info {
+	u64	cr_lid;
+	u64	percpu_paddr;
+	u64	ptce_base;
+	u32	ptce_count[2];
+	u32	ptce_stride[2];
+	u64	pal_paddr;
+	u64	pal_base;
+} ia64_mca_tlb_list[NR_CPUS];
 
 /* Information maintained by the MC infrastructure */
 typedef struct ia64_mc_info_s {
@@ -141,7 +153,6 @@ extern irqreturn_t ia64_mca_cpe_int_caller(int,void *,struct pt_regs *);
 extern int  ia64_log_print(int,prfunc_t);
 extern void ia64_mca_cmc_vector_setup(void);
 extern int  ia64_mca_check_errors(void);
-extern u64  ia64_log_get(int, prfunc_t);
 
 #define PLATFORM_CALL(fn, args)	printk("Platform call TBD\n")
 

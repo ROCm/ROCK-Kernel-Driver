@@ -780,11 +780,6 @@ static char *rq_flags[] = {
 	"REQ_PM_SUSPEND",
 	"REQ_PM_RESUME",
 	"REQ_PM_SHUTDOWN",
-	"REQ_IDETAPE_PC1",
-	"REQ_IDETAPE_PC2",
-	"REQ_IDETAPE_READ",
-	"REQ_IDETAPE_WRITE",
-	"REQ_IDETAPE_READ_BUFFER",
 };
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
@@ -2460,7 +2455,7 @@ static int __end_that_request_first(struct request *req, int uptodate,
 
 	if (!uptodate) {
 		error = -EIO;
-		if (!(req->flags & REQ_QUIET))
+		if (blk_fs_request(req) && !(req->flags & REQ_QUIET))
 			printk("end_request: I/O error, dev %s, sector %llu\n",
 				req->rq_disk ? req->rq_disk->disk_name : "?",
 				(unsigned long long)req->sector);

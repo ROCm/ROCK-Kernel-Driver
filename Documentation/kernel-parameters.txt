@@ -24,6 +24,7 @@ restrictions referred to are that the relevant option is valid if:
 	HW	Appropriate hardware is enabled.
 	IA-32	IA-32 aka i386 architecture is enabled.
 	IA-64	IA-64 architecture is enabled.
+	IOSCHED	More than one I/O scheduler is enabled.
 	IP_PNP	IP DCHP, BOOTP, or RARP is enabled.
 	ISAPNP	ISA PnP code is enabled.
 	ISDN	Appropriate ISDN support is enabled.
@@ -319,6 +320,10 @@ running once the system is up.
 	elanfreq=	[IA-32]
 			See comment before function elanfreq_setup() in
 			arch/i386/kernel/cpu/cpufreq/elanfreq.c.
+
+	elevator=	[IOSCHED]
+			Format: {"as"|"cfq"|"deadline"|"noop"}
+			See Documentation/as-iosched.txt for details
 
 	es1370=		[HW,OSS]
 			Format: <lineout>[,<micbias>]
@@ -807,7 +812,8 @@ running once the system is up.
 			before loading.
 			See Documentation/ramdisk.txt.
 
-	psmouse_noext	[HW,MOUSE] Disable probing for PS2 mouse protocol extensions
+	psmouse_proto=  [HW,MOUSE] Highest PS2 mouse protocol extension to
+			probe for (bare|imps|exps).
 
 	psmouse_resetafter=
 			[HW,MOUSE] Try to reset Synaptics Touchpad after so many
@@ -1161,7 +1167,7 @@ running once the system is up.
 			See header of drivers/scsi/wd7000.c.
 
 	wdt=		[WDT] Watchdog
-			See Documentation/watchdog.txt.
+			See Documentation/watchdog/watchdog.txt.
 
 	xd=		[HW,XT] Original XT pre-IDE (RLL encoded) disks.
 	xd_geo=		See header of drivers/block/xd.c.

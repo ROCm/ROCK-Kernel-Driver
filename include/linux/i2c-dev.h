@@ -43,4 +43,6 @@ struct i2c_rdwr_ioctl_data {
 	__u32 nmsgs;			/* number of i2c_msgs */
 };
 
+#define  I2C_RDRW_IOCTL_MAX_MSGS	42
+
 #endif /* _LINUX_I2C_DEV_H */

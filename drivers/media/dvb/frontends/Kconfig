@@ -1,6 +1,17 @@
 comment "Supported Frontend Modules"
 	depends on DVB
 
+config DVB_TWINHAN_DST
+	tristate "TWINHAN DST based DVB-S frontend (QPSK)"
+	depends on DVB_CORE
+	help
+	  Used in such cards as the VP-1020/1030, Twinhan DST,
+	  VVmer TV@SAT. Say Y when you want to support frontends 
+	  using this asic.
+
+	  This module requires the dvb-bt8xx driver and dvb bt878
+	  module.
+
 config DVB_STV0299
 	tristate "STV0299 based DVB-S frontend (QPSK)"
 	depends on DVB_CORE
@@ -25,6 +36,23 @@ config DVB_SP887X
  	  If you don't know what tuner module is soldered on your
  	  DVB adapter simply enable all supported frontends, the
  	  right one will get autodetected.
+
+
+config DVB_SP887X_FIRMWARE_FILE
+        string "Full pathname of sp887x firmware file"
+        depends on DVB_SP887X
+        default "/usr/lib/hotplug/firmware/sc_main.mc"
+        help
+          This driver needs a copy of the Avermedia firmware. The version tested
+	  is part of the Avermedia DVB-T 1.3.26.3 Application. This can be downloaded
+	  from the Avermedia web site.
+	  If the software is installed in Windows the file will be in the
+	  /Program Files/AVerTV DVB-T/ directory and is called sc_main.mc.
+	  Alternatively it can "extracted" from the install cab files but this will have
+	  to be done in windows as I don't know of a linux version of extract.exe.
+	  Copy this file to /usr/lib/hotplug/firmware/sc_main.mc.
+	  With this version of the file the first 10 bytes are discarded and the next
+	  0x4000 loaded. This may change in future versions.
 
 config DVB_ALPS_TDLB7
 	tristate "Alps TDLB7 (OFDM)"
@@ -138,10 +166,10 @@ config DVB_TDA1004X
 config DVB_TDA1004X_FIRMWARE_FILE
         string "Full pathname of tda1004x.bin firmware file"
         depends on DVB_TDA1004X
-        default "/etc/dvb/tda1004x.bin"
+        default "/usr/lib/hotplug/firmware/tda1004x.bin"
         help
           The TDA1004X requires additional firmware in order to function.
           The firmware file can obtained as follows:
             wget http://www.technotrend.de/new/215/TTweb_215a_budget_20_05_2003.zip
             unzip -j TTweb_215a_budget_20_05_2003.zip Software/Oem/PCI/App/ttlcdacc.dll
-            mv ttlcdacc.dll /etc/dvb/tda1004x.bin
+            mv ttlcdacc.dll /usr/lib/hotplug/firmware/tda1004x.bin

@@ -114,7 +114,7 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	pfm_default_smpl_hdr_t *hdr;
 	pfm_default_smpl_entry_t *ent;
 	void *cur, *last;
-	unsigned long *e;
+	unsigned long *e, entry_size;
 	unsigned int npmds, i;
 	unsigned char ovfl_pmd;
 	unsigned char ovfl_notify;
@@ -131,8 +131,7 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	ovfl_notify = arg->ovfl_notify;
 
 	/*
-	 * check for space against largest possibly entry.
-	 * We may waste space at the end of the buffer.
+	 * precheck for sanity
 	 */
 	if ((last - cur) < PFM_DEFAULT_MAX_ENTRY_SIZE) goto full;
 
@@ -141,6 +140,8 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	ent = (pfm_default_smpl_entry_t *)cur;
 
 	prefetch(arg->smpl_pmds_values);
+
+	entry_size = sizeof(*ent) + (npmds << 3);
 
 	/* position for first pmd */
 	e = (unsigned long *)(ent+1);
@@ -191,7 +192,13 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	/*
 	 * update position for next entry
 	 */
-	hdr->hdr_cur_offs += sizeof(*ent) + (npmds << 3);
+	hdr->hdr_cur_offs += entry_size;
+	cur               += entry_size;
+
+	/*
+	 * post check to avoid losing the last sample
+	 */
+	if ((last - cur) < PFM_DEFAULT_MAX_ENTRY_SIZE) goto full;
 
 	/*
 	 * keep same ovfl_pmds, ovfl_notify

@@ -159,7 +159,10 @@ struct zone {
 #define ZONE_DMA		0
 #define ZONE_NORMAL		1
 #define ZONE_HIGHMEM		2
-#define MAX_NR_ZONES		3
+
+#define MAX_NR_ZONES		3	/* Sync this with MAX_NR_ZONES_SHIFT */
+#define MAX_NR_ZONES_SHIFT	2	/* ceil(log2(MAX_NR_ZONES)) */
+
 #define GFP_ZONEMASK	0x03
 
 /*
@@ -284,8 +287,6 @@ struct ctl_table;
 struct file;
 int min_free_kbytes_sysctl_handler(struct ctl_table *, int, struct file *, 
 					  void *, size_t *);
-extern void setup_per_zone_pages_min(void);
-
 
 #ifdef CONFIG_NUMA
 #define MAX_NR_MEMBLKS	BITS_PER_LONG /* Max number of Memory Blocks */

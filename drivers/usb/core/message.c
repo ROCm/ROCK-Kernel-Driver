@@ -1086,6 +1086,11 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 		ret = -EINVAL;
 		goto out;
 	}
+
+	/* The USB spec says configuration 0 means unconfigured.
+	 * But if a device includes a configuration numbered 0,
+	 * we will accept it as a correctly configured state.
+	 */
 	if (cp && configuration == 0)
 		dev_warn(&dev->dev, "config 0 descriptor??\n");
 
@@ -1101,7 +1106,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 		goto out;
 
 	dev->actconfig = cp;
-	if (!configuration)
+	if (!cp)
 		dev->state = USB_STATE_ADDRESS;
 	else {
 		dev->state = USB_STATE_CONFIGURED;

@@ -252,9 +252,11 @@ static int
 irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	if (count < HEX_DIGITS+1)
+	int len = cpumask_snprintf(page, count, irq_affinity[(long)data]);
+	if (count - len < 2)
 		return -EINVAL;
-	return sprintf (page, "%016lx\n", irq_affinity[(long)data]);
+	len += sprintf(page + len, "\n");
+	return len;
 }
 
 static unsigned int
@@ -331,10 +333,11 @@ static int
 prof_cpu_mask_read_proc(char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	unsigned long *mask = (unsigned long *) data;
-	if (count < HEX_DIGITS+1)
+	int len = cpumask_snprintf(page, count, *(cpumask_t *)data);
+	if (count - len < 2)
 		return -EINVAL;
-	return sprintf (page, "%016lx\n", *mask);
+	len += sprintf(page + len, "\n");
+	return len;
 }
 
 static int
@@ -529,19 +532,21 @@ show_interrupts(struct seq_file *p, void *v)
 #ifdef CONFIG_SMP
 	int j;
 #endif
-	int i;
+	int i = *(loff_t *) v;
 	struct irqaction * action;
 	unsigned long flags;
 
 #ifdef CONFIG_SMP
-	seq_puts(p, "           ");
-	for (i = 0; i < NR_CPUS; i++)
-		if (cpu_online(i))
-			seq_printf(p, "CPU%d       ", i);
-	seq_putc(p, '\n');
+	if (i == 0) {
+		seq_puts(p, "           ");
+		for (i = 0; i < NR_CPUS; i++)
+			if (cpu_online(i))
+				seq_printf(p, "CPU%d       ", i);
+		seq_putc(p, '\n');
+	}
 #endif
 
-	for (i = 0; i < ACTUAL_NR_IRQS; i++) {
+	if (i < ACTUAL_NR_IRQS) {
 		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if (!action) 
@@ -568,15 +573,16 @@ show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 unlock:
 		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
-	}
+	} else if (i == ACTUAL_NR_IRQS) {
 #ifdef CONFIG_SMP
-	seq_puts(p, "IPI: ");
-	for (i = 0; i < NR_CPUS; i++)
-		if (cpu_online(i))
-			seq_printf(p, "%10lu ", cpu_data[i].ipi_count);
-	seq_putc(p, '\n');
+		seq_puts(p, "IPI: ");
+		for (i = 0; i < NR_CPUS; i++)
+			if (cpu_online(i))
+				seq_printf(p, "%10lu ", cpu_data[i].ipi_count);
+		seq_putc(p, '\n');
 #endif
-	seq_printf(p, "ERR: %10lu\n", irq_err_count);
+		seq_printf(p, "ERR: %10lu\n", irq_err_count);
+	}
 	return 0;
 }
 

@@ -1964,7 +1964,7 @@ static int __devinit vrc5477_ac97_probe(struct pci_dev *pcidev,
 	return -1;
 }
 
-static void __devinit vrc5477_ac97_remove(struct pci_dev *dev)
+static void __devexit vrc5477_ac97_remove(struct pci_dev *dev)
 {
 	struct vrc5477_ac97_state *s = pci_get_drvdata(dev);
 
@@ -2000,7 +2000,7 @@ static struct pci_driver vrc5477_ac97_driver = {
 	.name		= VRC5477_AC97_MODULE_NAME,
 	.id_table	= id_table,
 	.probe		= vrc5477_ac97_probe,
-	.remove		= vrc5477_ac97_remove,
+	.remove		= __devexit_p(vrc5477_ac97_remove),
 };
 
 static int __init init_vrc5477_ac97(void)

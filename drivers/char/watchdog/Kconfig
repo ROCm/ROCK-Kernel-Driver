@@ -17,7 +17,7 @@ config WATCHDOG
 	  implementation entirely in software (which can sometimes fail to
 	  reboot the machine) and a driver for hardware watchdog boards, which
 	  are more robust and can also keep track of the temperature inside
-	  your computer. For details, read <file:Documentation/watchdog.txt>
+	  your computer. For details, read <file:Documentation/watchdog/watchdog.txt>
 	  in the kernel source.
 
 	  The watchdog is usually used together with the watchdog daemon
@@ -114,7 +114,7 @@ config PCWATCHDOG
 	  This card simply watches your kernel to make sure it doesn't freeze,
 	  and if it does, it reboots your computer after a certain amount of
 	  time. This driver is like the WDT501 driver but for different
-	  hardware. Please read <file:Documentation/pcwd-watchdog.txt>. The PC
+	  hardware. Please read <file:Documentation/watchdog/pcwd-watchdog.txt>. The PC
 	  watchdog cards can be ordered from <http://www.berkprod.com/>.
 
 	  To compile this driver as a module, choose M here: the
@@ -273,6 +273,21 @@ config W83877F_WDT
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called w83877f_wdt.
+
+	  Most people will say N.
+
+config W83627HF_WDT
+	tristate "W83627HF Watchdog Timer"
+	depends on WATCHDOG
+	---help---
+	  This is the driver for the hardware watchdog on the W83627HF chipset
+	  as used in Advantech PC-9578 and Tyan S2721-533 motherboards
+	  (and likely others).  This watchdog simply watches your kernel to
+	  make sure it doesn't freeze, and if it does, it reboots your computer
+	  after a certain amount of time.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called w83627hf_wdt.
 
 	  Most people will say N.
 

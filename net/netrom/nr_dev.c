@@ -204,7 +204,6 @@ void nr_setup(struct net_device *dev)
 	dev->hard_start_xmit	= nr_xmit;
 	dev->open		= nr_open;
 	dev->stop		= nr_close;
-	dev->destructor		= free_netdev;
 
 	dev->hard_header	= nr_header;
 	dev->hard_header_len	= NR_NETWORK_LEN + NR_TRANSPORT_LEN;

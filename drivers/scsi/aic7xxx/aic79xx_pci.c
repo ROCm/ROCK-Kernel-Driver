@@ -38,7 +38,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#73 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx_pci.c#77 $
  *
  * $FreeBSD$
  */
@@ -117,6 +117,7 @@ ahd_compose_id(u_int device, u_int vendor, u_int subdevice, u_int subvendor)
 static ahd_device_setup_t ahd_aic7901_setup;
 static ahd_device_setup_t ahd_aic7901A_setup;
 static ahd_device_setup_t ahd_aic7902_setup;
+static ahd_device_setup_t ahd_aic790X_setup;
 
 struct ahd_pci_identity ahd_pci_ident_table [] =
 {
@@ -375,7 +376,7 @@ ahd_pci_config(struct ahd_softc *ahd, struct ahd_pci_identity *entry)
 
 	ahd->bus_intr = ahd_pci_intr;
 
-	error = ahd_reset(ahd);
+	error = ahd_reset(ahd, /*reinit*/FALSE);
 	if (error != 0)
 		return (ENXIO);
 
@@ -418,9 +419,11 @@ ahd_pci_config(struct ahd_softc *ahd, struct ahd_pci_identity *entry)
 int
 ahd_pci_test_register_access(struct ahd_softc *ahd)
 {
-	uint32_t	cmd;
-	int		error;
-	uint8_t		hcntrl;
+	uint32_t cmd;
+	u_int	 targpcistat;
+	u_int	 pci_status1;
+	int	 error;
+	uint8_t	 hcntrl;
 
 	error = EIO;
 
@@ -454,6 +457,18 @@ ahd_pci_test_register_access(struct ahd_softc *ahd)
 	ahd_outb(ahd, HCNTRL, hcntrl|PAUSE);
 	while (ahd_is_paused(ahd) == 0)
 		;
+
+	/* Clear any PCI errors that occurred before our driver attached. */
+	ahd_set_modes(ahd, AHD_MODE_CFG, AHD_MODE_CFG);
+	targpcistat = ahd_inb(ahd, TARGPCISTAT);
+	ahd_outb(ahd, TARGPCISTAT, targpcistat);
+	pci_status1 = ahd_pci_read_config(ahd->dev_softc,
+					  PCIR_STATUS + 1, /*bytes*/1);
+	ahd_pci_write_config(ahd->dev_softc, PCIR_STATUS + 1,
+			     pci_status1, /*bytes*/1);
+	ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
+	ahd_outb(ahd, CLRINT, CLRPCIINT);
+
 	ahd_outb(ahd, SEQCTL0, PERRORDIS);
 	ahd_outl(ahd, SRAM_BASE, 0x5aa555aa);
 	if (ahd_inl(ahd, SRAM_BASE) != 0x5aa555aa)
@@ -472,8 +487,6 @@ ahd_pci_test_register_access(struct ahd_softc *ahd)
 
 fail:
 	if ((ahd_inb(ahd, INTSTAT) & PCIINT) != 0) {
-		u_int targpcistat;
-		u_int pci_status1;
 
 		ahd_set_modes(ahd, AHD_MODE_CFG, AHD_MODE_CFG);
 		targpcistat = ahd_inb(ahd, TARGPCISTAT);
@@ -486,7 +499,6 @@ fail:
 				     pci_status1, /*bytes*/1);
 		ahd_outb(ahd, CLRINT, CLRPCIINT);
 	}
-
 	ahd_outb(ahd, SEQCTL0, PERRORDIS|FAILDIS);
 	ahd_pci_write_config(ahd->dev_softc, PCIR_COMMAND, cmd, /*bytes*/2);
 	return (error);
@@ -903,29 +915,31 @@ ahd_pci_split_intr(struct ahd_softc *ahd, u_int intstat)
 static int
 ahd_aic7901_setup(struct ahd_softc *ahd)
 {
-	int error;
 
-	error = ahd_aic7902_setup(ahd);
-	if (error != 0)
-		return (error);
 	ahd->chip = AHD_AIC7901;
-	return (0);
+	ahd->features = AHD_AIC7901_FE;
+	return (ahd_aic790X_setup(ahd));
 }
 
 static int
 ahd_aic7901A_setup(struct ahd_softc *ahd)
 {
-	int error;
 
-	error = ahd_aic7902_setup(ahd);
-	if (error != 0)
-		return (error);
 	ahd->chip = AHD_AIC7901A;
-	return (0);
+	ahd->features = AHD_AIC7901A_FE;
+	return (ahd_aic790X_setup(ahd));
 }
 
 static int
 ahd_aic7902_setup(struct ahd_softc *ahd)
+{
+	ahd->chip = AHD_AIC7902;
+	ahd->features = AHD_AIC7902_FE;
+	return (ahd_aic790X_setup(ahd));
+}
+
+static int
+ahd_aic790X_setup(struct ahd_softc *ahd)
 {
 	ahd_dev_softc_t pci;
 	u_int rev;
@@ -939,8 +953,6 @@ ahd_aic7902_setup(struct ahd_softc *ahd)
 		return (ENXIO);
 	}
 	ahd->channel = ahd_get_pci_function(pci) + 'A';
-	ahd->chip = AHD_AIC7902;
-	ahd->features = AHD_AIC7902_FE;
 	if (rev < ID_AIC7902_PCI_REV_B0) {
 		/*
 		 * Enable A series workarounds.
@@ -968,9 +980,14 @@ ahd_aic7902_setup(struct ahd_softc *ahd)
 		u_int devconfig1;
 
 		ahd->features |= AHD_RTI|AHD_NEW_IOCELL_OPTS
-			      |  AHD_NEW_DFCNTRL_OPTS;
-		ahd->bugs |= AHD_LQOOVERRUN_BUG|AHD_ABORT_LQI_BUG
-			  |  AHD_INTCOLLISION_BUG|AHD_EARLY_REQ_BUG;
+			      |  AHD_NEW_DFCNTRL_OPTS|AHD_FAST_CDB_DELIVERY;
+		ahd->bugs |= AHD_LQOOVERRUN_BUG|AHD_EARLY_REQ_BUG;
+
+		/*
+		 * Some issues have been resolved in the 7901B.
+		 */
+		if ((ahd->features & AHD_MULTI_FUNC) != 0)
+			ahd->bugs |= AHD_INTCOLLISION_BUG|AHD_ABORT_LQI_BUG;
 
 		/*
 		 * IO Cell paramter setup.

@@ -127,7 +127,7 @@ struct dvb_demux {
 
 #define DMX_MAX_PID 0x2000
 	struct list_head feed_list;
-        u8 tsbuf[188];
+        u8 tsbuf[204];
         int tsbufp;
 
 	struct semaphore mutex;
@@ -140,6 +140,7 @@ int dvb_dmx_release(struct dvb_demux *dvbdemux);
 void dvb_dmx_swfilter_packet(struct dvb_demux *dvbdmx, const u8 *buf);
 void dvb_dmx_swfilter_packets(struct dvb_demux *dvbdmx, const u8 *buf, size_t count);
 void dvb_dmx_swfilter(struct dvb_demux *demux, const u8 *buf, size_t count);
+void dvb_dmx_swfilter_204(struct dvb_demux *demux, const u8 *buf, size_t count);
 
 int dvbdmx_connect_frontend(struct dmx_demux *demux, struct dmx_frontend *frontend);
 int dvbdmx_disconnect_frontend(struct dmx_demux *demux);

@@ -282,6 +282,20 @@
 					/* 254 for set_thread_area */
 					/* 255 for get_thread_area */
 					/* 256 for set_tid_address */
+#define __NR_timer_create		(__NR_SYSCALL_BASE+257)
+#define __NR_timer_settime		(__NR_SYSCALL_BASE+258)
+#define __NR_timer_gettime		(__NR_SYSCALL_BASE+259)
+#define __NR_timer_getoverrun		(__NR_SYSCALL_BASE+260)
+#define __NR_timer_delete		(__NR_SYSCALL_BASE+261)
+#define __NR_clock_settime		(__NR_SYSCALL_BASE+262)
+#define __NR_clock_gettime		(__NR_SYSCALL_BASE+263)
+#define __NR_clock_getres		(__NR_SYSCALL_BASE+264)
+#define __NR_clock_nanosleep		(__NR_SYSCALL_BASE+265)
+#define __NR_statfs64			(__NR_SYSCALL_BASE+266)
+#define __NR_fstatfs64			(__NR_SYSCALL_BASE+267)
+#define __NR_tgkill			(__NR_SYSCALL_BASE+268)
+#define __NR_utimes			(__NR_SYSCALL_BASE+269)
+#define __NR_fadvise64_64		(__NR_SYSCALL_BASE+270)
 
 /*
  * The following SWIs are ARM private.

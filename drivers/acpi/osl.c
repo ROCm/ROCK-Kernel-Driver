@@ -41,10 +41,7 @@
 #include <acpi/acpi_bus.h>
 #include <asm/uaccess.h>
 
-#ifdef CONFIG_ACPI_EFI
 #include <linux/efi.h>
-u64 efi_mem_attributes (u64 phys_addr);
-#endif
 
 
 #define _COMPONENT		ACPI_OS_SERVICES
@@ -140,22 +137,24 @@ acpi_os_free(void *ptr)
 acpi_status
 acpi_os_get_root_pointer(u32 flags, struct acpi_pointer *addr)
 {
-#ifdef CONFIG_ACPI_EFI
-	addr->pointer_type = ACPI_PHYSICAL_POINTER;
-	if (efi.acpi20)
-		addr->pointer.physical = (acpi_physical_address) virt_to_phys(efi.acpi20);
-	else if (efi.acpi)
-		addr->pointer.physical = (acpi_physical_address) virt_to_phys(efi.acpi);
-	else {
-		printk(KERN_ERR PREFIX "System description tables not found\n");
-		return AE_NOT_FOUND;
+	if (efi_enabled) {
+		addr->pointer_type = ACPI_PHYSICAL_POINTER;
+		if (efi.acpi20)
+			addr->pointer.physical =
+				(acpi_physical_address) virt_to_phys(efi.acpi20);
+		else if (efi.acpi)
+			addr->pointer.physical =
+				(acpi_physical_address) virt_to_phys(efi.acpi);
+		else {
+			printk(KERN_ERR PREFIX "System description tables not found\n");
+			return AE_NOT_FOUND;
+		}
+	} else {
+		if (ACPI_FAILURE(acpi_find_root_pointer(flags, addr))) {
+			printk(KERN_ERR PREFIX "System description tables not found\n");
+			return AE_NOT_FOUND;
+		}
 	}
-#else
-	if (ACPI_FAILURE(acpi_find_root_pointer(flags, addr))) {
-		printk(KERN_ERR PREFIX "System description tables not found\n");
-		return AE_NOT_FOUND;
-	}
-#endif /*CONFIG_ACPI_EFI*/
 
 	return AE_OK;
 }
@@ -163,22 +162,22 @@ acpi_os_get_root_pointer(u32 flags, struct acpi_pointer *addr)
 acpi_status
 acpi_os_map_memory(acpi_physical_address phys, acpi_size size, void **virt)
 {
-#ifdef CONFIG_ACPI_EFI
-	if (EFI_MEMORY_WB & efi_mem_attributes(phys)) {
-		*virt = phys_to_virt(phys);
+	if (efi_enabled) {
+		if (EFI_MEMORY_WB & efi_mem_attributes(phys)) {
+			*virt = phys_to_virt(phys);
+		} else {
+			*virt = ioremap(phys, size);
+		}
 	} else {
-		*virt = ioremap(phys, size);
+		if (phys > ULONG_MAX) {
+			printk(KERN_ERR PREFIX "Cannot map memory that high\n");
+			return AE_BAD_PARAMETER;
+		}
+		/*
+	 	 * ioremap checks to ensure this is in reserved space
+	 	 */
+		*virt = ioremap((unsigned long) phys, size);
 	}
-#else
-	if (phys > ULONG_MAX) {
-		printk(KERN_ERR PREFIX "Cannot map memory that high\n");
-		return AE_BAD_PARAMETER;
-	}
-	/*
-	 * ioremap checks to ensure this is in reserved space
-	 */
-	*virt = ioremap((unsigned long) phys, size);
-#endif
 
 	if (!*virt)
 		return AE_NO_MEMORY;
@@ -369,19 +368,17 @@ acpi_os_read_memory(
 {
 	u32			dummy;
 	void			*virt_addr;
-
-#ifdef CONFIG_ACPI_EFI
 	int			iomem = 0;
 
-	if (EFI_MEMORY_WB & efi_mem_attributes(phys_addr)) {
+	if (efi_enabled) {
+		if (EFI_MEMORY_WB & efi_mem_attributes(phys_addr)) {
+			virt_addr = phys_to_virt(phys_addr);
+		} else {
+			iomem = 1;
+			virt_addr = ioremap(phys_addr, width);
+		}
+	} else
 		virt_addr = phys_to_virt(phys_addr);
-	} else {
-		iomem = 1;
-		virt_addr = ioremap(phys_addr, width);
-	}
-#else
-	virt_addr = phys_to_virt(phys_addr);
-#endif
 	if (!value)
 		value = &dummy;
 
@@ -399,10 +396,10 @@ acpi_os_read_memory(
 		BUG();
 	}
 
-#ifdef CONFIG_ACPI_EFI
-	if (iomem)
-		iounmap(virt_addr);
-#endif
+	if (efi_enabled) {
+		if (iomem)
+			iounmap(virt_addr);
+	}
 
 	return AE_OK;
 }
@@ -414,19 +411,17 @@ acpi_os_write_memory(
 	u32			width)
 {
 	void			*virt_addr;
-
-#ifdef CONFIG_ACPI_EFI
 	int			iomem = 0;
 
-	if (EFI_MEMORY_WB & efi_mem_attributes(phys_addr)) {
+	if (efi_enabled) {
+		if (EFI_MEMORY_WB & efi_mem_attributes(phys_addr)) {
+			virt_addr = phys_to_virt(phys_addr);
+		} else {
+			iomem = 1;
+			virt_addr = ioremap(phys_addr, width);
+		}
+	} else
 		virt_addr = phys_to_virt(phys_addr);
-	} else {
-		iomem = 1;
-		virt_addr = ioremap(phys_addr, width);
-	}
-#else
-	virt_addr = phys_to_virt(phys_addr);
-#endif
 
 	switch (width) {
 	case 8:
@@ -442,10 +437,8 @@ acpi_os_write_memory(
 		BUG();
 	}
 
-#ifdef CONFIG_ACPI_EFI
 	if (iomem)
 		iounmap(virt_addr);
-#endif
 
 	return AE_OK;
 }

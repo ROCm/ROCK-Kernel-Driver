@@ -112,12 +112,12 @@ void set_fiq_regs(struct pt_regs *regs)
 {
 	register unsigned long tmp, tmp2;
 	__asm__ volatile (
-	"mrs	%0, cpsr
-	mov	%1, %3
-	msr	cpsr_c, %1	@ select FIQ mode
-	mov	r0, r0
-	ldmia	%2, {r8 - r14}
-	msr	cpsr_c, %0	@ return to SVC mode
+	"mrs	%0, cpsr\n\
+	mov	%1, %3\n\
+	msr	cpsr_c, %1	@ select FIQ mode\n\
+	mov	r0, r0\n\
+	ldmia	%2, {r8 - r14}\n\
+	msr	cpsr_c, %0	@ return to SVC mode\n\
 	mov	r0, r0"
 	: "=&r" (tmp), "=&r" (tmp2)
 	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE)
@@ -132,12 +132,12 @@ void get_fiq_regs(struct pt_regs *regs)
 {
 	register unsigned long tmp, tmp2;
 	__asm__ volatile (
-	"mrs	%0, cpsr
-	mov	%1, %3
-	msr	cpsr_c, %1	@ select FIQ mode
-	mov	r0, r0
-	stmia	%2, {r8 - r14}
-	msr	cpsr_c, %0	@ return to SVC mode
+	"mrs	%0, cpsr\n\
+	mov	%1, %3\n\
+	msr	cpsr_c, %1	@ select FIQ mode\n\
+	mov	r0, r0\n\
+	stmia	%2, {r8 - r14}\n\
+	msr	cpsr_c, %0	@ return to SVC mode\n\
 	mov	r0, r0"
 	: "=&r" (tmp), "=&r" (tmp2)
 	: "r" (&regs->ARM_r8), "I" (PSR_I_BIT | PSR_F_BIT | FIQ_MODE)

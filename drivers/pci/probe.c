@@ -552,6 +552,7 @@ int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 		struct pci_dev *dev;
 
 		dev = pci_scan_device(bus, devfn);
+		pci_scan_msi_device(dev);
 		if (func == 0) {
 			if (!dev)
 				break;

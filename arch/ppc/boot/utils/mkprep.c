@@ -12,12 +12,14 @@
  *                  -- Cort
  *
  * Modified for x86 hosted builds by Matt Porter <porter@neta.com>
+ * Modified for Sparc hosted builds by Peter Wahl <PeterWahl@web.de>
  */
 
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -147,7 +149,7 @@ int main(int argc, char *argv[])
 void write_prep_partition(int in, int out)
 {
   unsigned char block[512];
-  partition_entry_t *pe = (partition_entry_t *)&block[0x1BE];
+  partition_entry_t pe;
   dword_t *entry  = (dword_t *)&block[0];
   dword_t *length = (dword_t *)&block[sizeof(long)];
   struct stat info;
@@ -177,8 +179,8 @@ void write_prep_partition(int in, int out)
    * Build a "PReP" partition table entry in the boot record
    *  - "PReP" may only look at the system_indicator
    */
-  pe->boot_indicator   = BootActive;
-  pe->system_indicator = SystemPrep;
+  pe.boot_indicator   = BootActive;
+  pe.system_indicator = SystemPrep;
   /*
    * The first block of the diskette is used by this "boot record" which
    * actually contains the partition table. (The first block of the
@@ -186,12 +188,12 @@ void write_prep_partition(int in, int out)
    * one partition on the diskette and it shall contain the rest of the
    * diskette.
    */
-  pe->starting_head     = 0;	/* zero-based			     */
-  pe->starting_sector   = 2;	/* one-based			     */
-  pe->starting_cylinder = 0;	/* zero-based			     */
-  pe->ending_head       = 1;	/* assumes two heads		     */
-  pe->ending_sector     = 18;	/* assumes 18 sectors/track	     */
-  pe->ending_cylinder   = 79;	/* assumes 80 cylinders/diskette     */
+  pe.starting_head     = 0;	/* zero-based			     */
+  pe.starting_sector   = 2;	/* one-based			     */
+  pe.starting_cylinder = 0;	/* zero-based			     */
+  pe.ending_head       = 1;	/* assumes two heads		     */
+  pe.ending_sector     = 18;	/* assumes 18 sectors/track	     */
+  pe.ending_cylinder   = 79;	/* assumes 80 cylinders/diskette     */
 
   /*
    * The "PReP" software ignores the above fields and just looks at
@@ -201,20 +203,20 @@ void write_prep_partition(int in, int out)
    *   - unlike the above sector numbers, the beginning sector is zero-based!
    */
 #if 0
-  pe->beginning_sector  = cpu_to_le32(1);
+  pe.beginning_sector  = cpu_to_le32(1);
 #else
   /* This has to be 0 on the PowerStack? */
 #ifdef __i386__
-  pe->beginning_sector  = 0;
+  pe.beginning_sector  = 0;
 #else
-  pe->beginning_sector  = cpu_to_le32(0);
+  pe.beginning_sector  = cpu_to_le32(0);
 #endif /* __i386__ */
 #endif
 
 #ifdef __i386__
-  pe->number_of_sectors = 2*18*80-1;
+  pe.number_of_sectors = 2*18*80-1;
 #else
-  pe->number_of_sectors = cpu_to_le32(2*18*80-1);
+  pe.number_of_sectors = cpu_to_le32(2*18*80-1);
 #endif /* __i386__ */
 
   write( out, block, sizeof(block) );

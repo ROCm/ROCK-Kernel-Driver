@@ -41,7 +41,7 @@ unsigned long phys_base;
 
 unsigned long page_kernel;
 
-struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS];
+struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS+1];
 unsigned long sparc_unmapped_base;
 
 struct pgtable_cache_struct pgt_quicklists;
@@ -61,17 +61,13 @@ pgprot_t kmap_prot;
 EXPORT_SYMBOL(kmap_prot);
 EXPORT_SYMBOL(kmap_pte);
 
-/* These are set in {srmmu,sun4c}_paging_init() */
-unsigned long fix_kmap_begin;
-unsigned long fix_kmap_end;
-
-#define kmap_get_fixed_pte(vaddr) \
+#define kmap_get_fixmap_pte(vaddr) \
 	pte_offset_kernel(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
 
 void __init kmap_init(void)
 {
 	/* cache the first kmap pte */
-	kmap_pte = kmap_get_fixed_pte(fix_kmap_begin);
+	kmap_pte = kmap_get_fixmap_pte(__fix_to_virt(FIX_KMAP_BEGIN));
 	kmap_prot = __pgprot(SRMMU_ET_PTE | SRMMU_PRIV | SRMMU_CACHE);
 }
 
@@ -209,7 +205,8 @@ unsigned long __init bootmem_init(unsigned long *pages_avail)
 	if (max_low_pfn > (SRMMU_MAXMEM >> PAGE_SHIFT)) {
 		highstart_pfn = (SRMMU_MAXMEM >> PAGE_SHIFT);
 		max_low_pfn = calc_max_low_pfn();
-		printk(KERN_NOTICE "%ldMB HIGHMEM available.\n", calc_highpages());
+		printk(KERN_NOTICE "%ldMB HIGHMEM available.\n",
+		    calc_highpages() >> (20 - PAGE_SHIFT));
 	}
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -384,12 +381,12 @@ void map_high_region(unsigned long start_pfn, unsigned long end_pfn)
 {
 	unsigned long tmp;
 
-#ifdef DEBUG_HIGHMEM
+#ifdef CONFIG_DEBUG_HIGHMEM
 	printk("mapping high region %08lx - %08lx\n", start_pfn, end_pfn);
 #endif
 
 	for (tmp = start_pfn; tmp < end_pfn; tmp++) {
-		struct page *page = mem_map + tmp;
+		struct page *page = pfn_to_page(tmp);
 
 		ClearPageReserved(page);
 		set_bit(PG_highmem, &page->flags);
@@ -406,7 +403,18 @@ void __init mem_init(void)
 	int initpages = 0; 
 	int i;
 
-	highmem_start_page = mem_map + highstart_pfn;
+	highmem_start_page = pfn_to_page(highstart_pfn);
+
+	if (PKMAP_BASE+LAST_PKMAP*PAGE_SIZE >= FIXADDR_START) {
+		prom_printf("BUG: fixmap and pkmap areas overlap\n");
+		prom_printf("pkbase: 0x%lx pkend: 0x%lx fixstart 0x%lx\n",
+		       PKMAP_BASE,
+		       (unsigned long)PKMAP_BASE+LAST_PKMAP*PAGE_SIZE,
+		       FIXADDR_START);
+		prom_printf("Please mail sparclinux@vger.kernel.org.\n");
+		prom_halt();
+	}
+
 
 	/* Saves us work later. */
 	memset((void *)&empty_zero_page, 0, PAGE_SIZE);

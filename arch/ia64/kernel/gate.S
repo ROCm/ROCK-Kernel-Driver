@@ -195,10 +195,10 @@ GLOBAL_ENTRY(__kernel_sigtramp)
 	ld8 r15=[base1]					// get address of new RBS base (or NULL)
 	cover				// push args in interrupted frame onto backing store
 	;;
-	cmp.ne p8,p0=r15,r0		// do we need to switch the rbs?
+	cmp.ne p1,p0=r15,r0		// do we need to switch rbs? (note: pr is saved by kernel)
 	mov.m r9=ar.bsp			// fetch ar.bsp
-	.spillsp.p p8, ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
-(p8)	br.cond.spnt setup_rbs		// yup -> (clobbers p8, r14-r16, and r18-r20)
+	.spillsp.p p1, ar.rnat, RNAT_OFF+SIGCONTEXT_OFF
+(p1)	br.cond.spnt setup_rbs		// yup -> (clobbers p8, r14-r16, and r18-r20)
 back_from_setup_rbs:
 	alloc r8=ar.pfs,0,0,3,0
 	ld8 out0=[base0],16		// load arg0 (signum)
@@ -237,8 +237,8 @@ back_from_setup_rbs:
 	ld8 r15=[base0],(CFM_OFF-BSP_OFF)	// fetch sc_ar_bsp and advance to CFM_OFF
 	mov r14=ar.bsp
 	;;
-	cmp.ne p8,p0=r14,r15			// do we need to restore the rbs?
-(p8)	br.cond.spnt restore_rbs		// yup -> (clobbers r14-r18, f6 & f7)
+	cmp.ne p1,p0=r14,r15			// do we need to restore the rbs?
+(p1)	br.cond.spnt restore_rbs		// yup -> (clobbers r14-r18, f6 & f7)
 	;;
 back_from_restore_rbs:
 	adds base0=(FR6_OFF+SIGCONTEXT_OFF),sp

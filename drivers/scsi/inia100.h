@@ -67,13 +67,6 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 
-static int inia100_detect(Scsi_Host_Template *);
-static int inia100_release(struct Scsi_Host *);
-static int inia100_queue(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-static int inia100_abort(Scsi_Cmnd *);
-static int inia100_device_reset(Scsi_Cmnd *);
-static int inia100_bus_reset(Scsi_Cmnd *);
-
 #define inia100_REVID "Initio INI-A100U2W SCSI device driver; Revision: 1.02d"
 
 #define ULONG   unsigned long
@@ -114,13 +107,6 @@ typedef struct ORC_SG_Struc {
 	U32 SG_Ptr;		/* Data Pointer */
 	U32 SG_Len;		/* Data Length */
 } ORC_SG;
-
-typedef struct inia100_Adpt_Struc {
-        UWORD ADPT_BIOS;        /* 0 */
-        UWORD ADPT_BASE;        /* 1 */
-        struct pci_dev *ADPT_pdev;      /* 2 */
-} INIA100_ADPT_STRUCT;
-
 
 /* SCSI related definition                                              */
 #define DISC_NOT_ALLOW          0x80	/* Disconnect is not allowed    */
@@ -211,7 +197,7 @@ typedef struct inia100_Adpt_Struc {
 
 typedef struct orc_extended_scb {	/* Extended SCB                 */
 	ORC_SG ESCB_SGList[TOTAL_SG_ENTRY];	/*0 Start of SG list              */
-	Scsi_Cmnd *SCB_Srb;	/*50 SRB Pointer */
+	struct scsi_cmnd *SCB_Srb;	/*50 SRB Pointer */
 } ESCB;
 
 /***********************************************************************
@@ -344,8 +330,8 @@ typedef struct ORC_Ha_Ctrl_Struc {
 	ORC_TCS HCS_Tcs[16];	/* 28 */
 	U32 BitAllocFlag[MAX_CHANNELS][8];	/* Max STB is 256, So 256/32 */
 	spinlock_t BitAllocFlagLock;
-	Scsi_Cmnd *pSRB_head;
-	Scsi_Cmnd *pSRB_tail;
+	struct scsi_cmnd *pSRB_head;
+	struct scsi_cmnd *pSRB_tail;
 	spinlock_t pSRB_lock;
 	struct pci_dev *pdev;
 } ORC_HCS;

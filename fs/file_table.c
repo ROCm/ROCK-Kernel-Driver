@@ -183,9 +183,9 @@ void __fput(struct file *file)
 	fops_put(file->f_op);
 	if (file->f_mode & FMODE_WRITE)
 		put_write_access(inode);
+	file_kill(file);
 	file->f_dentry = NULL;
 	file->f_vfsmnt = NULL;
-	file_kill(file);
 	file_free(file);
 	dput(dentry);
 	mntput(mnt);

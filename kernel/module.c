@@ -1618,6 +1618,16 @@ static struct module *load_module(void __user *umod,
 	/* Now do relocations. */
 	for (i = 1; i < hdr->e_shnum; i++) {
 		const char *strtab = (char *)sechdrs[strindex].sh_addr;
+		unsigned int info = sechdrs[i].sh_info;
+
+		/* Not a valid relocation section? */
+		if (info >= hdr->e_shnum)
+			continue;
+
+		/* Don't bother with non-allocated sections */
+		if (!(sechdrs[info].sh_flags & SHF_ALLOC))
+			continue;
+
 		if (sechdrs[i].sh_type == SHT_REL)
 			err = apply_relocate(sechdrs, strtab, symindex, i,mod);
 		else if (sechdrs[i].sh_type == SHT_RELA)

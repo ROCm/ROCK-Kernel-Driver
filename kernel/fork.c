@@ -642,6 +642,11 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 		goto out;
 	}
 
+	/*
+	 * Note: we may be using current for both targets (See exec.c)
+	 * This works because we cache current->files (old) as oldf. Don't
+	 * break this.
+	 */
 	tsk->files = NULL;
 	error = -ENOMEM;
 	newf = kmem_cache_alloc(files_cachep, SLAB_KERNEL);
@@ -730,6 +735,35 @@ out_release:
 	kmem_cache_free(files_cachep, newf);
 	goto out;
 }
+
+/*
+ *	Helper to unshare the files of the current task.
+ *	We don't want to expose copy_files internals to
+ *	the exec layer of the kernel.
+ */
+
+int unshare_files(void)
+{
+	struct files_struct *files  = current->files;
+	int rc;
+
+	if(!files)
+		BUG();
+
+	/* This can race but the race causes us to copy when we don't
+	   need to and drop the copy */
+	if(atomic_read(&files->count) == 1)
+	{
+		atomic_inc(&files->count);
+		return 0;
+	}
+	rc = copy_files(0, current);
+	if(rc)
+		current->files = files;
+	return rc;
+}
+
+EXPORT_SYMBOL(unshare_files);
 
 static inline int copy_sighand(unsigned long clone_flags, struct task_struct * tsk)
 {
@@ -884,7 +918,14 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->thread_info->preempt_count = 1;
 #endif
 	p->did_exec = 0;
-	p->state = TASK_UNINTERRUPTIBLE;
+
+	/*
+	 * We mark the process as running here, but have not actually
+	 * inserted it onto the runqueue yet. This guarantees that
+	 * nobody will actually run it, and a signal or other external
+	 * event cannot wake it up and insert it on the runqueue either.
+	 */
+	p->state = TASK_RUNNING;
 
 	copy_flags(clone_flags, p);
 	if (clone_flags & CLONE_IDLETASK)
@@ -1175,9 +1216,10 @@ long do_fork(unsigned long clone_flags,
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
 
-		p->state = TASK_STOPPED;
 		if (!(clone_flags & CLONE_STOPPED))
 			wake_up_forked_process(p);	/* do this last */
+		else
+			p->state = TASK_STOPPED;
 		++total_forks;
 
 		if (unlikely (trace)) {

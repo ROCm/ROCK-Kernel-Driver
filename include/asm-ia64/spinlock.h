@@ -39,7 +39,7 @@ _raw_spin_lock (spinlock_t *lock)
 {
 	register volatile unsigned int *ptr asm ("r31") = &lock->lock;
 
-#if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
+#if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
 # ifdef CONFIG_ITANIUM
 	/* don't use brl on Itanium... */
 	asm volatile ("{\n\t"

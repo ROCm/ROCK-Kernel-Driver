@@ -215,15 +215,25 @@ out_free_efault:
 
 int put_cmsg_compat(struct msghdr *kmsg, int level, int type, int len, void *data)
 {
+	struct compat_timeval ctv;
 	struct compat_cmsghdr *cm = (struct compat_cmsghdr *) kmsg->msg_control;
 	struct compat_cmsghdr cmhdr;
-	int cmlen = CMSG_COMPAT_LEN(len);
+	int cmlen;
 
 	if(cm == NULL || kmsg->msg_controllen < sizeof(*cm)) {
 		kmsg->msg_flags |= MSG_CTRUNC;
 		return 0; /* XXX: return error? check spec. */
 	}
 
+	if (level == SOL_SOCKET && type == SO_TIMESTAMP) { 
+		struct timeval *tv = (struct timeval *)data;
+		ctv.tv_sec = tv->tv_sec;
+		ctv.tv_usec = tv->tv_usec;
+		data = &ctv;
+		len = sizeof(struct compat_timeval);
+	} 
+	
+	cmlen = CMSG_COMPAT_LEN(len);
 	if(kmsg->msg_controllen < cmlen) {
 		kmsg->msg_flags |= MSG_CTRUNC;
 		cmlen = kmsg->msg_controllen;

@@ -7,14 +7,6 @@
 
 #include <linux/config.h>
 
-/*
- * These have to be done with inline assembly: that way the bit-setting
- * is guaranteed to be atomic. All bit operations return 0 if the bit
- * was cleared before the operation and != 0 if it was not.
- *
- * bit 0 is the LSB of addr; bit 32 is the LSB of (addr+1).
- */
-
 #ifdef CONFIG_SMP
 #define LOCK_PREFIX "lock ; "
 #else
@@ -363,26 +355,26 @@ static __inline__ int find_first_bit(const unsigned long * addr, unsigned size)
  */
 static __inline__ int find_next_bit(const unsigned long * addr, int size, int offset)
 {
-	unsigned int * p = ((unsigned int *) addr) + (offset >> 5);
-	int set = 0, bit = offset & 31, res;
+	const unsigned long * p = addr + (offset >> 6);
+	unsigned long set = 0, bit = offset & 63, res;
 	
 	if (bit) {
 		/*
-		 * Look for nonzero in the first 32 bits:
+		 * Look for nonzero in the first 64 bits:
 		 */
-		__asm__("bsfl %1,%0\n\t"
-			"cmovel %2,%0\n\t"
+		__asm__("bsfq %1,%0\n\t"
+			"cmoveq %2,%0\n\t"
 			: "=r" (set)
-			: "r" (*p >> bit), "r" (32));
-		if (set < (32 - bit))
+			: "r" (*p >> bit), "r" (64L));
+		if (set < (64 - bit))
 			return set + offset;
-		set = 32 - bit;
+		set = 64 - bit;
 		p++;
 	}
 	/*
 	 * No set bit yet, search remaining full words for a bit
 	 */
-	res = find_first_bit ((const unsigned long *)p, size - 32 * (p - (unsigned int *) addr));
+	res = find_first_bit (p, size - 64 * (p - addr));
 	return (offset + set + res);
 }
 

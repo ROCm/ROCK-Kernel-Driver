@@ -2,7 +2,7 @@
  * TTUSB DVB driver
  *
  * Copyright (c) 2002 Holger Waechtler <holger@convergence.de>
- * Copyright (c) 2003 Felix Domke <tmbinc@gmx.net>
+ * Copyright (c) 2003 Felix Domke <tmbinc@elitedvb.net>
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
@@ -742,11 +742,7 @@ static void ttusb_process_frame(struct ttusb *ttusb, u8 * data, int len)
 	}
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static void ttusb_iso_irq(struct urb *urb)
-#else
 static void ttusb_iso_irq(struct urb *urb, struct pt_regs *ptregs)
-#endif
 {
 	struct ttusb *ttusb = urb->context;
 
@@ -787,9 +783,7 @@ static void ttusb_iso_irq(struct urb *urb, struct pt_regs *ptregs)
 			ttusb_process_frame(ttusb, data, len);
 		}
 	}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	usb_submit_urb(urb, GFP_ATOMIC);
-#endif
 }
 
 static void ttusb_free_iso_urbs(struct ttusb *ttusb)
@@ -878,13 +872,6 @@ static int ttusb_start_iso_xfer(struct ttusb *ttusb)
 			frame_offset += ISO_FRAME_SIZE;
 		}
 	}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	for (i = 0; i < ISO_BUF_COUNT; i++) {
-		int next = (i + 1) % ISO_BUF_COUNT;
-		ttusb->iso_urb[i]->next = ttusb->iso_urb[next];
-	}
-#endif
 
 	for (i = 0; i < ISO_BUF_COUNT; i++) {
 		if ((err = usb_submit_urb(ttusb->iso_urb[i], GFP_KERNEL))) {
@@ -1076,22 +1063,6 @@ static struct file_operations stc_fops = {
 };
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static void *ttusb_probe(struct usb_device *udev, unsigned int ifnum,
-		  const struct usb_device_id *id)
-{
-	struct ttusb *ttusb;
-	int result, channel;
-
-	if (ifnum != 0)
-		return NULL;
-
-	dprintk("%s: TTUSB DVB connected\n", __FUNCTION__);
-
-	if (!(ttusb = kmalloc(sizeof(struct ttusb), GFP_KERNEL)))
-		return NULL;
-
-#else
 static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *udev;
@@ -1104,8 +1075,6 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	if (!(ttusb = kmalloc(sizeof(struct ttusb), GFP_KERNEL)))
 		return -ENOMEM;
-
-#endif
 
 	memset(ttusb, 0, sizeof(struct ttusb));
 
@@ -1180,35 +1149,22 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 			   S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
 			   | S_IROTH | S_IWOTH, &stc_fops, ttusb);
 #endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	return (void *) ttusb;
-#else
+
 	usb_set_intfdata(intf, (void *) ttusb);
 
 	return 0;
-#endif
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static void ttusb_disconnect(struct usb_device *udev, void *data)
-{
-	struct ttusb *ttusb = data;
-#else
 static void ttusb_disconnect(struct usb_interface *intf)
 {
 	struct ttusb *ttusb = usb_get_intfdata(intf);
 
 	usb_set_intfdata(intf, NULL);
-#endif
 
 	ttusb->disconnecting = 1;
 
 	ttusb_stop_iso_xfer(ttusb);
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,69))
-#undef devfs_remove
-#define devfs_remove(x)	devfs_unregister(ttusb->stc_devfs_handle);
-#endif
 #if 0
 	devfs_remove(TTUSB_BUDGET_NAME);
 #endif

@@ -16,16 +16,14 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/btfixup.h>
+#include <asm/ptrace.h>
 
 /*
  * Low level task data.
  *
- * If you change this, change the TI_* offsets below to match. XXX check_asm.
- *
- * The uwinmask is a first class citizen among w_saved and friends.
- * XXX Is this a good idea? wof.S/wuf.S have to use w_saved anyway,
- *     so they waste a register on current, and an ld on fetching it.
+ * If you change this, change the TI_* offsets below to match.
  */
+#define NSWINS 8
 struct thread_info {
 	unsigned long		uwinmask;
 	struct task_struct	*task;		/* main task structure */
@@ -42,6 +40,13 @@ struct thread_info {
 	unsigned long kpc;
 	unsigned long kpsr;
 	unsigned long kwim;
+
+	/* A place to store user windows and stack pointers
+	 * when the stack needs inspection.
+	 */
+	struct reg_window	reg_window[NSWINS];	/* align for ldd! */
+	unsigned long		rwbuf_stkptrs[NSWINS];
+	unsigned long		w_saved;
 
 	struct restart_block	restart_block;
 };
@@ -100,6 +105,7 @@ BTFIXUPDEF_CALL(void, free_thread_info, struct thread_info *)
 
 /*
  * Offsets in thread_info structure, used in assembly code
+ * The "#define REGWIN_SZ 0x40" was abolished, so no multiplications.
  */
 #define TI_UWINMASK	0x00	/* uwinmask */
 #define TI_TASK		0x04
@@ -113,7 +119,10 @@ BTFIXUPDEF_CALL(void, free_thread_info, struct thread_info *)
 #define TI_KPC		0x24	/* kpc (ldd'ed with kpc) */
 #define TI_KPSR		0x28	/* kpsr */
 #define TI_KWIM		0x2c	/* kwim (ldd'ed with kpsr) */
-#define TI_RESTART_BLOCK 0x30
+#define TI_REG_WINDOW	0x30
+#define TI_RWIN_SPTRS	0x230
+#define TI_W_SAVED	0x250
+/* #define TI_RESTART_BLOCK 0x25n */ /* Nobody cares */
 
 #define PREEMPT_ACTIVE		0x4000000
 

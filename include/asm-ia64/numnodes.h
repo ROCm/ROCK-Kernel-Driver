@@ -5,8 +5,8 @@
 /* Max 8 Nodes */
 #define NODES_SHIFT	3
 #elif defined(CONFIG_IA64_SGI_SN2) || defined(CONFIG_IA64_GENERIC)
-/* Max 128 Nodes */
-#define NODES_SHIFT	7
+/* Max 256 Nodes */
+#define NODES_SHIFT	8
 #endif
 
 #endif /* _ASM_MAX_NUMNODES_H */
