@@ -589,7 +589,8 @@ brlvger_write(struct file *file, const char *buffer,
 	struct brlvger_priv *priv = file->private_data;
 	char buf[MAX_BRLVGER_CELLS];
 	int ret;
-	int rs, off;
+	size_t rs;
+	loff_t off;
 	__u16 written;
 
 	if(!priv->dev)
