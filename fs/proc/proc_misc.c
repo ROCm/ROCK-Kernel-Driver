@@ -227,6 +227,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		vmi.largest_chunk
 		);
 
+		len += hugetlbfs_report_meminfo(page + len);
 		len += hugetlb_report_meminfo(page + len);
 
 	return proc_calc_metrics(page, start, off, count, eof, len);

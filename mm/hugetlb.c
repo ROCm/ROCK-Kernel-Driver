@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/hugetlb.h>
+#include <linux/pagemap.h>
 #include <linux/sysctl.h>
 #include <linux/highmem.h>
 
@@ -231,11 +232,65 @@ unsigned long hugetlb_total_pages(void)
 }
 EXPORT_SYMBOL(hugetlb_total_pages);
 
+int __attribute__ ((weak))
+handle_hugetlb_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
+	unsigned long addr, int write_access)
+{
+	pte_t *pte;
+	struct page *page;
+	struct address_space *mapping;
+	int idx, ret;
+
+	spin_lock(&mm->page_table_lock);
+	pte = huge_pte_alloc(mm, addr & HPAGE_MASK);
+	if (!pte)
+		goto oom;
+	if (!pte_none(*pte))
+		goto out;
+	spin_unlock(&mm->page_table_lock);
+
+	mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+	idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
+		+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
+retry:
+	page = find_get_page(mapping, idx);
+	if (!page) {
+		page = alloc_huge_page();
+		if (!page)
+			/*
+			 * with strict overcommit accounting, we should never
+			 * run out of hugetlb page, so must be a fault race
+			 * and let's retry.
+			 */
+			goto retry;
+		ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
+		if (!ret) {
+			unlock_page(page);
+		} else {
+			put_page(page);
+			if (ret == -EEXIST)
+				goto retry;
+			else
+				return VM_FAULT_OOM;
+		}
+	}
+
+	spin_lock(&mm->page_table_lock);
+	if (pte_none(*pte))
+		set_huge_pte(mm, vma, page, pte, vma->vm_flags & VM_WRITE);
+	else
+		put_page(page);
+out:
+	spin_unlock(&mm->page_table_lock);
+	return VM_FAULT_MINOR;
+oom:
+	spin_unlock(&mm->page_table_lock);
+	return VM_FAULT_OOM;
+}
+
 /*
- * We cannot handle pagefaults against hugetlb pages at all.  They cause
- * handle_mm_fault() to try to instantiate regular-sized pages in the
- * hugegpage VMA.  do_page_fault() is supposed to trap this, so BUG is we get
- * this far.
+ * We should not get here because handle_mm_fault() is supposed to trap
+ * hugetlb page fault.  BUG if we get here.
  */
 static struct page *hugetlb_nopage(struct vm_area_struct *vma,
 				unsigned long address, int *unused)

@@ -757,11 +757,6 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				|| !(flags & vma->vm_flags))
 			return i ? : -EFAULT;
 
-		if (is_vm_hugetlb_page(vma)) {
-			i = follow_hugetlb_page(mm, vma, pages, vmas,
-						&start, &len, i);
-			continue;
-		}
 		spin_lock(&mm->page_table_lock);
 		do {
 			struct page *map;
@@ -1687,7 +1682,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	inc_page_state(pgfault);
 
 	if (is_vm_hugetlb_page(vma))
-		return VM_FAULT_SIGBUS;	/* mapping truncation does this. */
+		return handle_hugetlb_mm_fault(mm, vma, address, write_access);
 
 	/*
 	 * We need the page table lock to synchronize with kswapd

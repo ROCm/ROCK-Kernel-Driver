@@ -413,62 +413,6 @@ void unmap_hugepage_range(struct vm_area_struct *vma,
 	mm->rss -= (end - start) >> PAGE_SHIFT;
 }
 
-int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
-{
-	struct mm_struct *mm = current->mm;
-	unsigned long addr;
-	int ret = 0;
-
-	WARN_ON(!is_vm_hugetlb_page(vma));
-	BUG_ON((vma->vm_start % HPAGE_SIZE) != 0);
-	BUG_ON((vma->vm_end % HPAGE_SIZE) != 0);
-
-	spin_lock(&mm->page_table_lock);
-	for (addr = vma->vm_start; addr < vma->vm_end; addr += HPAGE_SIZE) {
-		unsigned long idx;
-		hugepte_t *pte = hugepte_alloc(mm, addr);
-		struct page *page;
-
-		BUG_ON(!in_hugepage_area(mm->context, addr));
-
-		if (!pte) {
-			ret = -ENOMEM;
-			goto out;
-		}
-		if (!hugepte_none(*pte))
-			continue;
-
-		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
-			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
-		page = find_get_page(mapping, idx);
-		if (!page) {
-			/* charge the fs quota first */
-			if (hugetlb_get_quota(mapping)) {
-				ret = -ENOMEM;
-				goto out;
-			}
-			page = alloc_huge_page();
-			if (!page) {
-				hugetlb_put_quota(mapping);
-				ret = -ENOMEM;
-				goto out;
-			}
-			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
-			if (! ret) {
-				unlock_page(page);
-			} else {
-				hugetlb_put_quota(mapping);
-				free_huge_page(page);
-				goto out;
-			}
-		}
-		setup_huge_pte(mm, page, pte, vma->vm_flags & VM_WRITE);
-	}
-out:
-	spin_unlock(&mm->page_table_lock);
-	return ret;
-}
-
 /* Because we have an exclusive hugepage region which lies within the
  * normal user address space, we have to take special measures to make
  * non-huge mmap()s evade the hugepage reserved regions. */
@@ -759,4 +703,60 @@ static void flush_hash_hugepage(mm_context_t context, unsigned long ea,
 	slot += (hugepte_val(pte) & _HUGEPAGE_GROUP_IX) >> 5;
 
 	ppc_md.hpte_invalidate(slot, va, 1, local);
+}
+
+int
+handle_hugetlb_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
+	unsigned long addr, int write_access)
+{
+	hugepte_t *pte;
+	struct page *page;
+	struct address_space *mapping;
+	int idx, ret;
+
+	spin_lock(&mm->page_table_lock);
+	pte = hugepte_alloc(mm, addr & HPAGE_MASK);
+	if (!pte)
+		goto oom;
+	if (!hugepte_none(*pte))
+		goto out;
+	spin_unlock(&mm->page_table_lock);
+
+	mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+	idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
+		+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));
+retry:
+	page = find_get_page(mapping, idx);
+	if (!page) {
+		page = alloc_huge_page();
+		if (!page)
+			/*
+			 * with strict overcommit accounting, we should never
+			 * run out of hugetlb page, so must be a fault race
+			 * and let's retry.
+			 */
+			goto retry;
+		ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
+		if (!ret) {
+			unlock_page(page);
+		} else {
+			put_page(page);
+			if (ret == -EEXIST)
+				goto retry;
+			else
+				return VM_FAULT_OOM;
+		}
+	}
+
+	spin_lock(&mm->page_table_lock);
+	if (hugepte_none(*pte))
+		setup_huge_pte(mm, page, pte, vma->vm_flags & VM_WRITE);
+	else
+		put_page(page);
+out:
+	spin_unlock(&mm->page_table_lock);
+	return VM_FAULT_MINOR;
+oom:
+	spin_unlock(&mm->page_table_lock);
+	return VM_FAULT_OOM;
 }
