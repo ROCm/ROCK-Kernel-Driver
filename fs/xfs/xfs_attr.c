@@ -2234,7 +2234,8 @@ xfs_attr_trace_l_c(char *where, struct xfs_attr_list_context *context)
 		(__psunsigned_t)context->count,
 		(__psunsigned_t)context->firstu,
 		(__psunsigned_t)
-			(context->count > 0)
+			((context->count > 0) &&
+			!(context->flags & (ATTR_KERNAMELS|ATTR_KERNOVAL)))
 				? (ATTR_ENTRY(context->alist,
 					      context->count-1)->a_valuelen)
 				: 0,
@@ -2262,7 +2263,8 @@ xfs_attr_trace_l_cn(char *where, struct xfs_attr_list_context *context,
 		(__psunsigned_t)context->count,
 		(__psunsigned_t)context->firstu,
 		(__psunsigned_t)
-			(context->count > 0)
+			((context->count > 0) &&
+			!(context->flags & (ATTR_KERNAMELS|ATTR_KERNOVAL)))
 				? (ATTR_ENTRY(context->alist,
 					      context->count-1)->a_valuelen)
 				: 0,
@@ -2290,7 +2292,8 @@ xfs_attr_trace_l_cb(char *where, struct xfs_attr_list_context *context,
 		(__psunsigned_t)context->count,
 		(__psunsigned_t)context->firstu,
 		(__psunsigned_t)
-			(context->count > 0)
+			((context->count > 0) &&
+			!(context->flags & (ATTR_KERNAMELS|ATTR_KERNOVAL)))
 				? (ATTR_ENTRY(context->alist,
 					      context->count-1)->a_valuelen)
 				: 0,
@@ -2318,7 +2321,8 @@ xfs_attr_trace_l_cl(char *where, struct xfs_attr_list_context *context,
 		(__psunsigned_t)context->count,
 		(__psunsigned_t)context->firstu,
 		(__psunsigned_t)
-			(context->count > 0)
+			((context->count > 0) &&
+			!(context->flags & (ATTR_KERNAMELS|ATTR_KERNOVAL)))
 				? (ATTR_ENTRY(context->alist,
 					      context->count-1)->a_valuelen)
 				: 0,
