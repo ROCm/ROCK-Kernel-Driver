@@ -1566,6 +1566,7 @@ extern struct item_operations * item_ops [TYPE_ANY + 1];
 
 struct reiserfs_iget_args {
     __u32 objectid ;
+    __u32 dirid ;
 } ;
 
 /***************************************************************************/

@@ -453,7 +453,32 @@ int shrink_icache_memory(int priority, int gfp_mask)
  * by hand after calling find_inode now! This simplifies iunique and won't
  * add any additional branch in the common code.
  */
-static struct inode * find_inode(struct super_block * sb, unsigned long ino, struct list_head *head, int (*test)(struct inode *, void *), void *data)
+static struct inode * find_inode(struct super_block * sb, struct list_head *head, int (*test)(struct inode *, void *), void *data)
+{
+	struct list_head *tmp;
+	struct inode * inode;
+
+	tmp = head;
+	for (;;) {
+		tmp = tmp->next;
+		inode = NULL;
+		if (tmp == head)
+			break;
+		inode = list_entry(tmp, struct inode, i_hash);
+		if (inode->i_sb != sb)
+			continue;
+		if (!test(inode, data))
+			continue;
+		break;
+	}
+	return inode;
+}
+
+/*
+ * find_inode_fast is the fast path version of find_inode, see the comment at
+ * iget_locked for details.
+ */
+static struct inode * find_inode_fast(struct super_block * sb, struct list_head *head, unsigned long ino)
 {
 	struct list_head *tmp;
 	struct inode * inode;
@@ -468,8 +493,6 @@ static struct inode * find_inode(struct super_block * sb, unsigned long ino, str
 		if (inode->i_ino != ino)
 			continue;
 		if (inode->i_sb != sb)
-			continue;
-		if (test && !test(inode, data))
 			continue;
 		break;
 	}
@@ -523,10 +546,9 @@ void unlock_new_inode(struct inode *inode)
  * We no longer cache the sb_flags in i_flags - see fs.h
  *	-- rmk@arm.uk.linux.org
  */
-static struct inode * get_new_inode(struct super_block *sb, unsigned long ino, struct list_head *head, int (*test)(struct inode *, void *), int (*set)(struct inode *, void *), void *data)
+static struct inode * get_new_inode(struct super_block *sb, struct list_head *head, int (*test)(struct inode *, void *), int (*set)(struct inode *, void *), void *data)
 {
 	struct inode * inode;
-	int err = 0;
 
 	inode = alloc_inode(sb);
 	if (inode) {
@@ -534,10 +556,9 @@ static struct inode * get_new_inode(struct super_block *sb, unsigned long ino, s
 
 		spin_lock(&inode_lock);
 		/* We released the lock, so.. */
-		old = find_inode(sb, ino, head, test, data);
+		old = find_inode(sb, head, test, data);
 		if (!old) {
-			inode->i_ino = ino;
-			if (set && set(inode, data))
+			if (set(inode, data))
 				goto set_failed;
 
 			inodes_stat.nr_inodes++;
@@ -569,6 +590,49 @@ set_failed:
 	spin_unlock(&inode_lock);
 	destroy_inode(inode);
 	return NULL;
+}
+
+/*
+ * get_new_inode_fast is the fast path version of get_new_inode, see the
+ * comment at iget_locked for details.
+ */
+static struct inode * get_new_inode_fast(struct super_block *sb, struct list_head *head, unsigned long ino)
+{
+	struct inode * inode;
+
+	inode = alloc_inode(sb);
+	if (inode) {
+		struct inode * old;
+
+		spin_lock(&inode_lock);
+		/* We released the lock, so.. */
+		old = find_inode_fast(sb, head, ino);
+		if (!old) {
+			inode->i_ino = ino;
+			inodes_stat.nr_inodes++;
+			list_add(&inode->i_list, &inode_in_use);
+			list_add(&inode->i_hash, head);
+			inode->i_state = I_LOCK|I_NEW;
+			spin_unlock(&inode_lock);
+
+			/* Return the locked inode with I_NEW set, the
+			 * caller is responsible for filling in the contents
+			 */
+			return inode;
+		}
+
+		/*
+		 * Uhhuh, somebody else created the same inode under
+		 * us. Use the old inode instead of the one we just
+		 * allocated.
+		 */
+		__iget(old);
+		spin_unlock(&inode_lock);
+		destroy_inode(inode);
+		inode = old;
+		wait_on_inode(inode);
+	}
+	return inode;
 }
 
 static inline unsigned long hash(struct super_block *sb, unsigned long i_ino)
@@ -605,7 +669,8 @@ ino_t iunique(struct super_block *sb, ino_t max_reserved)
 retry:
 	if (counter > max_reserved) {
 		head = inode_hashtable + hash(sb,counter);
-		inode = find_inode(sb, res = counter++, head, NULL, NULL);
+		res = counter++;
+		inode = find_inode_fast(sb, head, res);
 		if (!inode) {
 			spin_unlock(&inode_lock);
 			return res;
@@ -644,7 +709,7 @@ struct inode *iget5_locked(struct super_block *sb, unsigned long ino, int (*test
 	struct inode * inode;
 
 	spin_lock(&inode_lock);
-	inode = find_inode(sb, ino, head, test, data);
+	inode = find_inode(sb, head, test, data);
 	if (inode) {
 		__iget(inode);
 		spin_unlock(&inode_lock);
@@ -657,12 +722,36 @@ struct inode *iget5_locked(struct super_block *sb, unsigned long ino, int (*test
 	 * get_new_inode() will do the right thing, re-trying the search
 	 * in case it had to block at any point.
 	 */
-	return get_new_inode(sb, ino, head, test, set, data);
+	return get_new_inode(sb, head, test, set, data);
 }
 
+/*
+ * Because most filesystems are based on 32-bit unique inode numbers some
+ * functions are duplicated to keep iget_locked as a fast path. We can avoid
+ * unnecessary pointer dereferences and function calls for this specific
+ * case. The duplicated functions (find_inode_fast and get_new_inode_fast)
+ * have the same pre- and post-conditions as their original counterparts.
+ */
 struct inode *iget_locked(struct super_block *sb, unsigned long ino)
 {
-	return iget5_locked(sb, ino, NULL, NULL, NULL);
+	struct list_head * head = inode_hashtable + hash(sb, ino);
+	struct inode * inode;
+
+	spin_lock(&inode_lock);
+	inode = find_inode_fast(sb, head, ino);
+	if (inode) {
+		__iget(inode);
+		spin_unlock(&inode_lock);
+		wait_on_inode(inode);
+		return inode;
+	}
+	spin_unlock(&inode_lock);
+
+	/*
+	 * get_new_inode_fast() will do the right thing, re-trying the search
+	 * in case it had to block at any point.
+	 */
+	return get_new_inode_fast(sb, head, ino);
 }
 
 EXPORT_SYMBOL(iget5_locked);

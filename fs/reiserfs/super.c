@@ -1067,7 +1067,8 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
         printk("clm-7000: Detected readonly device, marking FS readonly\n") ;
 	s->s_flags |= MS_RDONLY ;
     }
-    args.objectid = REISERFS_ROOT_PARENT_OBJECTID ;
+    args.objectid = REISERFS_ROOT_OBJECTID ;
+    args.dirid = REISERFS_ROOT_PARENT_OBJECTID ;
     root_inode = iget5_locked (s, REISERFS_ROOT_OBJECTID, reiserfs_find_actor, reiserfs_init_locked_inode, (void *)(&args));
     if (!root_inode) {
 	printk ("reiserfs_fill_super: get root inode failed\n");

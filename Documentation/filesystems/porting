@@ -175,8 +175,10 @@ the I_NEW flag set and will still be locked. read_inode has not been
 called so the file system still has to finalize the initialization. Once
 the inode is initialized it must be unlocked by calling unlock_new_inode().
 
-There is also a simpler iget_locked function that just takes the
-superblock and inode number as arguments.
+The filesystem is responsible for setting (and possibly testing) i_ino
+when appropriate. There is also a simpler iget_locked function that
+just takes the superblock and inode number as arguments and does the
+test and set for you.
 
 e.g.
        inode = iget_locked(sb, ino);

@@ -83,6 +83,7 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 
 	if (inode->i_state & I_NEW) {
 		cii = ITOC(inode);
+		inode->i_ino = ino;
 		list_add(&cii->c_cilist, &sbi->sbi_cihead);
 		unlock_new_inode(inode);
 	}

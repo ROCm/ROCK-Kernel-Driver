@@ -661,6 +661,8 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		loff_t		new_isize;
 		time_t		new_atime;
 
+		inode->i_ino = ino;
+
 		/* We can't support UPDATE_ATIME(), since the server will reset it */
 		inode->i_flags |= S_NOATIME;
 		inode->i_mode = fattr->mode;

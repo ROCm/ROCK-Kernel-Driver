@@ -1136,7 +1136,8 @@ static void reiserfs_make_bad_inode(struct inode *inode) {
 int reiserfs_init_locked_inode (struct inode * inode, void *p)
 {
     struct reiserfs_iget_args *args = (struct reiserfs_iget_args *)p ;
-    INODE_PKEY(inode)->k_dir_id = cpu_to_le32(args->objectid);
+    inode->i_ino = args->objectid;
+    INODE_PKEY(inode)->k_dir_id = cpu_to_le32(args->dirid);
     return 0;
 }
 
@@ -1149,7 +1150,7 @@ void reiserfs_read_locked_inode (struct inode * inode, struct reiserfs_iget_args
     unsigned long dirino;
     int retval;
 
-    dirino = args->objectid ;
+    dirino = args->dirid ;
 
     /* set version 1, version 2 could be used too, because stat data
        key is the same in both versions */
@@ -1223,7 +1224,8 @@ int reiserfs_find_actor( struct inode *inode, void *opaque )
 
     args = opaque;
     /* args is already in CPU order */
-    return le32_to_cpu(INODE_PKEY(inode)->k_dir_id) == args -> objectid;
+    return (inode->i_ino == args->objectid) &&
+	(le32_to_cpu(INODE_PKEY(inode)->k_dir_id) == args->dirid);
 }
 
 struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key)
@@ -1231,7 +1233,8 @@ struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key
     struct inode * inode;
     struct reiserfs_iget_args args ;
 
-    args.objectid = key->on_disk_key.k_dir_id ;
+    args.objectid = key->on_disk_key.k_objectid ;
+    args.dirid = key->on_disk_key.k_dir_id ;
     inode = iget5_locked (s, key->on_disk_key.k_objectid, 
 		   reiserfs_find_actor, reiserfs_init_locked_inode, (void *)(&args));
     if (!inode) 
