@@ -3772,7 +3772,7 @@ int CIFSSMBNotify(const int xid, struct cifsTconInfo *tcon,
 	pSMB->ByteCount = 0;
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
-			(struct smb_hdr *) pSMBr, &bytes_returned, 0);
+			(struct smb_hdr *) pSMBr, &bytes_returned, -1);
 	if (rc) {
 		cFYI(1, ("Error in Notify = %d", rc));
 	}

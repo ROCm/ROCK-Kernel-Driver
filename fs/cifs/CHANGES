@@ -1,3 +1,11 @@
+Version 1.27
+------------
+Turn off DNOTIFY (directory change notification support) by default
+(unless built with the experimental flag) to fix hang with KDE
+file browser. Fix DNOTIFY flag mappings.  Fix hang (in wait_event
+waiting on an SMB response) in SendReceive when session dies but
+reconnects quickly from another task.
+
 Version 1.26
 ------------
 Add setfacl support to allow setting of ACLs remotely to Samba 3.10 and later

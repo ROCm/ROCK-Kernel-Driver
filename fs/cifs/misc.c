@@ -175,7 +175,7 @@ cifs_buf_release(void *buf_to_free)
 {
 
 	if (buf_to_free == NULL) {
-		cFYI(1, ("Null buffer passed to cifs_buf_release"));
+		/* cFYI(1, ("Null buffer passed to cifs_buf_release"));*/
 		return;
 	}
 	mempool_free(buf_to_free,cifs_req_poolp);
@@ -390,8 +390,29 @@ is_valid_oplock_break(struct smb_hdr *buf)
 	struct cifsTconInfo *tcon;
 	struct cifsFileInfo *netfile;
 
-	/* could add check for smb response flag 0x80 */
-	cFYI(1,("Checking for oplock break"));    
+	cFYI(1,("Checking for oplock break or dnotify response"));
+	if((pSMB->hdr.Command == SMB_COM_NT_TRANSACT) &&
+	   (pSMB->hdr.Flags & SMBFLG_RESPONSE)) {
+		struct smb_com_transaction_change_notify_rsp * pSMBr =
+			(struct smb_com_transaction_change_notify_rsp *)buf;
+		struct file_notify_information * pnotify;
+		__u32 data_offset = 0;
+		if(pSMBr->ByteCount > sizeof(struct file_notify_information)) {
+			data_offset = le32_to_cpu(pSMBr->DataOffset);
+
+			pnotify = (struct file_notify_information *)((char *)&pSMBr->hdr.Protocol
+				+ data_offset);
+			cFYI(1,("dnotify on %s with action: 0x%x",pnotify->FileName,
+				pnotify->Action));  /* BB removeme BB */
+	             /*   cifs_dump_mem("Received notify Data is: ",buf,sizeof(struct smb_hdr)+60); */
+			return TRUE;
+		}
+		if(pSMBr->hdr.Status.CifsError) {
+			cFYI(1,("notify err 0x%d",pSMBr->hdr.Status.CifsError));
+			return TRUE;
+		}
+		return FALSE;
+	}  
 	if(pSMB->hdr.Command != SMB_COM_LOCKING_ANDX)
 		return FALSE;
 	if(pSMB->hdr.Flags & SMBFLG_RESPONSE) {
