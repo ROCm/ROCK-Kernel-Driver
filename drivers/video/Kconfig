@@ -424,6 +424,8 @@ config E1355_FB_BASE
 config FB_RIVA
 	tristate "nVidia Riva support"
 	depends on FB && PCI
+	select I2C_ALGOBIT if FB_RIVA_I2C
+	select I2C if FB_RIVA_I2C
 	help
 	  This driver supports graphics boards with the nVidia Riva/Geforce
 	  chips.
@@ -434,7 +436,7 @@ config FB_RIVA
 
 config FB_RIVA_I2C
        bool "Enable DDC Support"
-       depends on FB_RIVA && I2C
+       depends on FB_RIVA
        help
 	  This enables I2C support for nVidia Chipsets.  This is used
 	  only for getting EDID information from the attached display
