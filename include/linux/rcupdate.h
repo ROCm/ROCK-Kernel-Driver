@@ -39,6 +39,7 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/threads.h>
+#include <linux/percpu.h>
 
 /**
  * struct rcu_head - callback structure for use with RCU
@@ -94,16 +95,16 @@ struct rcu_data {
         long  	       	batch;           /* Batch # for current RCU batch */
         struct list_head  nxtlist;
         struct list_head  curlist;
-} ____cacheline_aligned_in_smp;
+};
 
-extern struct rcu_data rcu_data[NR_CPUS];
+DECLARE_PER_CPU(struct rcu_data, rcu_data);
 extern struct rcu_ctrlblk rcu_ctrlblk;
 
-#define RCU_qsctr(cpu) 		(rcu_data[(cpu)].qsctr)
-#define RCU_last_qsctr(cpu) 	(rcu_data[(cpu)].last_qsctr)
-#define RCU_batch(cpu) 		(rcu_data[(cpu)].batch)
-#define RCU_nxtlist(cpu) 	(rcu_data[(cpu)].nxtlist)
-#define RCU_curlist(cpu) 	(rcu_data[(cpu)].curlist)
+#define RCU_qsctr(cpu) 		(per_cpu(rcu_data, (cpu)).qsctr)
+#define RCU_last_qsctr(cpu) 	(per_cpu(rcu_data, (cpu)).last_qsctr)
+#define RCU_batch(cpu) 		(per_cpu(rcu_data, (cpu)).batch)
+#define RCU_nxtlist(cpu) 	(per_cpu(rcu_data, (cpu)).nxtlist)
+#define RCU_curlist(cpu) 	(per_cpu(rcu_data, (cpu)).curlist)
 
 #define RCU_QSCTR_INVALID	0
 
