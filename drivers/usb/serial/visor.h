@@ -28,6 +28,7 @@
 #define PALM_M125_ID			0x0040
 #define PALM_M130_ID			0x0050
 #define PALM_TUNGSTEN_T_ID		0x0060
+#define PALM_TUNGSTEN_Z_ID		0x0031
 #define PALM_ZIRE_ID			0x0070
 
 #define SONY_VENDOR_ID			0x054C
