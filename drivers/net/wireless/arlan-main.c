@@ -721,9 +721,9 @@ static int arlan_hw_tx(struct net_device *dev, char *buf, int length)
 	else
 	{
 		netif_stop_queue (dev);
-		return -1;
 		IFDEBUG(ARLAN_DEBUG_TX_CHAIN)
 			printk(KERN_ERR "TX TAIL & HEAD full, return, tailStart %d headEnd %d\n", tailStarts, headEnds);
+		return -1;
 	}
 	priv->out_bytes += length;
 	priv->out_bytes10 += length;
