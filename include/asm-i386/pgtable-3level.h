@@ -123,4 +123,6 @@ static inline pmd_t pfn_pmd(unsigned long page_nr, pgprot_t pgprot)
 #define pgoff_to_pte(off) ((pte_t) { _PAGE_FILE, (off) })
 #define PTE_FILE_MAX_BITS       32
 
+extern struct kmem_cache_s *pae_pgd_cachep;
+
 #endif /* _I386_PGTABLE_3LEVEL_H */

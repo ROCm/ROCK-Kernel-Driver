@@ -21,27 +21,15 @@
 #include <asm/bitops.h>
 #endif
 
-#include <linux/slab.h>
-#include <linux/list.h>
-#include <linux/spinlock.h>
+extern pgd_t swapper_pg_dir[1024];
+extern void paging_init(void);
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
  * for zero-mapped memory areas etc..
  */
-#define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 extern unsigned long empty_zero_page[1024];
-extern pgd_t swapper_pg_dir[1024];
-extern kmem_cache_t *pgd_cache;
-extern kmem_cache_t *pmd_cache;
-extern spinlock_t pgd_lock;
-extern struct list_head pgd_list;
-
-void pmd_ctor(void *, kmem_cache_t *, unsigned long);
-void pgd_ctor(void *, kmem_cache_t *, unsigned long);
-void pgd_dtor(void *, kmem_cache_t *, unsigned long);
-void pgtable_cache_init(void);
-void paging_init(void);
+#define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
 
 #endif /* !__ASSEMBLY__ */
 
@@ -53,8 +41,20 @@ void paging_init(void);
 #ifndef __ASSEMBLY__
 #ifdef CONFIG_X86_PAE
 # include <asm/pgtable-3level.h>
+
+/*
+ * Need to initialise the X86 PAE caches
+ */
+extern void pgtable_cache_init(void);
+
 #else
 # include <asm/pgtable-2level.h>
+
+/*
+ * No page table caches to initialise
+ */
+#define pgtable_cache_init()	do { } while (0)
+
 #endif
 #endif
 
