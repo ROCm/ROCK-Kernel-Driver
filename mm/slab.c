@@ -25,6 +25,10 @@
  * page long) and always contiguous), and each slab contains multiple
  * initialized objects.
  *
+ * This means, that your constructor is used only for newly allocated
+ * slabs and you must pass objects with the same intializations to
+ * kmem_cache_free.
+ *
  * Each cache can only support one memory type (GFP_DMA, GFP_HIGHMEM,
  * normal). If you need a special memory type, then must create a new
  * cache for that memory type.
@@ -782,7 +786,7 @@ static void poison_obj(kmem_cache_t *cachep, void *addr, unsigned char val)
 	*(unsigned char *)(addr+size-1) = POISON_END;
 }
 
-static void *fprob(unsigned char* addr, unsigned int size)
+static void *scan_poisoned_obj(unsigned char* addr, unsigned int size)
 {
 	unsigned char *end;
 	
@@ -808,7 +812,7 @@ static void check_poison_obj(kmem_cache_t *cachep, void *addr)
 	if (cachep->flags & SLAB_STORE_USER) {
 		size -= BYTES_PER_WORD;
 	}
-	end = fprob(addr, size);
+	end = scan_poisoned_obj(addr, size);
 	if (end) {
 		int s;
 		printk(KERN_ERR "Slab corruption: start=%p, expend=%p, "
