@@ -245,6 +245,9 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	if (!entry->show)
 		return 0;
 
+	if (count > PAGE_SIZE)
+		count = PAGE_SIZE;
+
 	dev = list_entry(entry->parent,struct device, dir);
 
 	page = (unsigned char*)__get_free_page(GFP_KERNEL);
@@ -260,7 +263,8 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 			if (len < 0)
 				retval = len;
 			break;
-		}
+		} else if (len > count)
+			len = count;
 
 		if (copy_to_user(buf,page,len)) {
 			retval = -EFAULT;
