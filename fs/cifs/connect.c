@@ -128,7 +128,8 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		}
 	}
 	read_unlock(&GlobalSMBSeslock);
-
+	/* do not want to be sending data on a socket we are freeing */
+	down(&server->tcpSem); 
 	if(server->ssocket) {
 		cFYI(1,("State: 0x%x Flags: 0x%lx", server->ssocket->state,
 			server->ssocket->flags));
@@ -154,7 +155,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		}
 	}
 	spin_unlock(&GlobalMid_Lock);
-
+	up(&server->tcpSem); 
 
 	while ((server->tcpStatus != CifsExiting) && (server->tcpStatus != CifsGood))
 	{
@@ -610,6 +611,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			}
 			if ((temp_len = strnlen(value, 300)) < 300) {
 				vol->UNC = kmalloc(temp_len+1,GFP_KERNEL);
+				if(vol->UNC == NULL)
+					return 1;
 				strcpy(vol->UNC,value);
 				if (strncmp(vol->UNC, "//", 2) == 0) {
 					vol->UNC[0] = '\\';
@@ -757,6 +760,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 		}
 		if ((temp_len = strnlen(devname, 300)) < 300) {
 			vol->UNC = kmalloc(temp_len+1,GFP_KERNEL);
+			if(vol->UNC == NULL)
+				return 1;
 			strcpy(vol->UNC,devname);
 			if (strncmp(vol->UNC, "//", 2) == 0) {
 				vol->UNC[0] = '\\';
@@ -1555,7 +1560,7 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 					bcc_ptr +=
 					    pSMBr->resp.SecurityBlobLength;
 
-				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
+				if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
@@ -1808,7 +1813,7 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 					      pSMBr->resp.SecurityBlobLength));
 				}
 
-				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
+				if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
@@ -2119,7 +2124,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 						ses->server->secMode |= 
 							SECMODE_SIGN_ENABLED;
 
-				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
+				if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
@@ -2515,7 +2520,7 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 				cFYI(1,
 				     ("NTLMSSP response to Authenticate "));
 
-				if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
+				if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 					if ((long) (bcc_ptr) % 2) {
 						remaining_words =
 						    (BCC(smb_buffer_response)
@@ -2714,7 +2719,7 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
         /* skip service field (NB: this field is always ASCII) */
 		bcc_ptr += length + 1;	
 		strncpy(tcon->treeName, tree, MAX_TREE_SIZE);
-		if (smb_buffer->Flags2 &= SMBFLG2_UNICODE) {
+		if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
 			length = UniStrnlen((wchar_t *) bcc_ptr, 512);
 			if (((long) bcc_ptr + (2 * length)) -
 			    (long) pByteArea(smb_buffer_response) <=

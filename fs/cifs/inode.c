@@ -442,7 +442,9 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+	down(&inode->i_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
+	up(&inode->i_sb->s_vfs_rename_sem);
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;
@@ -499,7 +501,9 @@ cifs_rmdir(struct inode *inode, struct dentry *direntry)
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+	down(&inode->i_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
+	up(&inode->i_sb->s_vfs_rename_sem);
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;
@@ -548,6 +552,8 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
                      different share. Might eventually add support for this */
 	}
 
+	/* we already  have the rename sem so we do not need
+	to grab it again here to protect the path integrity */
 	fromName = build_path_from_dentry(source_direntry);
 	toName = build_path_from_dentry(target_direntry);
 	if((fromName == NULL) || (toName == NULL)) {
@@ -558,9 +564,38 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 	rc = CIFSSMBRename(xid, pTcon, fromName, toName,
 			   cifs_sb_source->local_nls);
 	if(rc == -EEXIST) {
-		cifs_unlink(target_inode, target_direntry);
-		rc = CIFSSMBRename(xid, pTcon, fromName, toName,
-				   cifs_sb_source->local_nls);
+		/* check if they are the same file 
+		because rename of hardlinked files is a noop */
+		FILE_UNIX_BASIC_INFO * info_buf_source;
+		FILE_UNIX_BASIC_INFO * info_buf_target;
+
+		info_buf_source = 
+			kmalloc(2 * sizeof(FILE_UNIX_BASIC_INFO),GFP_KERNEL);
+		if(info_buf_source != NULL) {
+			info_buf_target = info_buf_source+1;
+			rc = CIFSSMBUnixQPathInfo(xid, pTcon, fromName, 
+				info_buf_source, cifs_sb_source->local_nls);
+			if(rc == 0) {
+				rc = CIFSSMBUnixQPathInfo(xid,pTcon,toName,
+						info_buf_target,
+						cifs_sb_target->local_nls);
+			}
+			if((rc == 0) && 
+				(info_buf_source->UniqueId == 
+				 info_buf_target->UniqueId)) {
+			/* do not rename since the files are hardlinked 
+			   which is a noop */
+			} else {
+			/* we either can not tell the files are hardlinked
+			(as with Windows servers) or files are not hardlinked 
+			so delete the target manually before renaming to
+			follow POSIX rather than Windows semantics */
+				cifs_unlink(target_inode, target_direntry);
+				rc = CIFSSMBRename(xid, pTcon, fromName, toName,
+					cifs_sb_source->local_nls);
+			}
+			kfree(info_buf_source);
+		} /* if we can not get memory just leave rc as EEXIST */
 	}
 
 	if((rc == -EIO)||(rc == -EEXIST)) {
@@ -763,7 +798,9 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	cifs_sb = CIFS_SB(direntry->d_inode->i_sb);
 	pTcon = cifs_sb->tcon;
 
+	down(&direntry->d_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(direntry);
+	up(&direntry->d_sb->s_vfs_rename_sem);
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;

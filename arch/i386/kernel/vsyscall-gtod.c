@@ -32,8 +32,17 @@
 #include <asm/unistd.h>
 #include <asm/errno.h>
 
-int errno;
-static inline _syscall2(int,gettimeofday,struct timeval *,tv,struct timezone *,tz);
+#define _my_syscall2(type,name,type1,arg1,type2,arg2) \
+type name(type1 arg1,type2 arg2) \
+{ \
+long __res; \
+__asm__ volatile ("int $0x80" \
+	: "=a" (__res) \
+	: "0" (__NR_##name),"b" ((long)(arg1)),"c" ((long)(arg2))); \
+	return (type)(__res);\
+}
+
+static inline _my_syscall2(int,gettimeofday,struct timeval *,tv,struct timezone *,tz);
 static int vsyscall_mapped = 0; /* flag variable for remap_vsyscall() */
 
 enum vsyscall_timesource_e vsyscall_timesource;
@@ -110,21 +119,12 @@ static inline unsigned long vgettimeoffset_cyclone(void)
 	return __cyclone_delay_at_last_interrupt + offset;
 }
 
-static inline void do_vgettimeofday(struct timeval * tv)
+static inline int do_vgettimeofday(struct timeval * tv)
 {
 	long sequence;
 	unsigned long usec, sec;
 	unsigned long lost;
 	unsigned long max_ntp_tick;
-
-	/* If we don't have a valid vsyscall time source,
-	 * just call gettimeofday()
-	 */
-	if (__vsyscall_timesource == VSYSCALL_GTOD_NONE) {
-		gettimeofday(tv, NULL);
-		return;
-	}
-
 
 	do {
 		sequence = read_seqbegin(&__xtime_lock);
@@ -159,6 +159,7 @@ static inline void do_vgettimeofday(struct timeval * tv)
 
 	tv->tv_sec = sec + usec / 1000000;
 	tv->tv_usec = usec % 1000000;
+	return 0;
 }
 
 static inline void do_get_tz(struct timezone * tz)
@@ -175,11 +176,19 @@ static inline void do_get_tz(struct timezone * tz)
 
 static int __vsyscall(0) asmlinkage vgettimeofday(struct timeval * tv, struct timezone * tz)
 {
+	int ret = 0;
+
+	/* If we don't have a valid vsyscall time source,
+	 * just call gettimeofday()
+	 */
+	if (__vsyscall_timesource == VSYSCALL_GTOD_NONE) 
+		return  gettimeofday(tv, tz);
+
 	if (tv)
-		do_vgettimeofday(tv);
+		ret = do_vgettimeofday(tv);
 	if (tz)
 		do_get_tz(tz);
-	return 0;
+	return ret;
 }
 
 static time_t __vsyscall(1) asmlinkage vtime(time_t * t)

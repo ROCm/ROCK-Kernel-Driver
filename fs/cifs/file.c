@@ -80,7 +80,9 @@ cifs_open(struct inode *inode, struct file *file)
 		}
 	}
 
+	down(&inode->i_sb->s_vfs_rename_sem);
 	full_path = build_path_from_dentry(file->f_dentry);
+	up(&inode->i_sb->s_vfs_rename_sem);
 	if(full_path == NULL) {
 		FreeXid(xid);
 		return -ENOMEM;
@@ -261,7 +263,7 @@ static int cifs_relock_file(struct cifsFileInfo * cifsFile)
 	return rc;
 }
 
-static int cifs_reopen_file(struct inode *inode, struct file *file)
+static int cifs_reopen_file(struct inode *inode, struct file *file, int can_flush)
 {
 	int rc = -EACCES;
 	int xid, oplock;
@@ -273,7 +275,6 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 	int desiredAccess = 0x20197;
 	int disposition = FILE_OPEN;
 	__u16 netfid;
-	FILE_ALL_INFO * buf = NULL;
 
 	if(inode == NULL)
 		return -EBADF;
@@ -298,7 +299,10 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 	}
 	cifs_sb = CIFS_SB(inode->i_sb);
 	pTcon = cifs_sb->tcon;
-
+/* can not grab rename sem here because various ops, including
+those that already have the rename sem can end up causing writepage
+to get called and if the server was down that means we end up here,
+and we can never tell if the caller already has the rename_sem */
 	full_path = build_path_from_dentry(file->f_dentry);
 	if(full_path == NULL) {
 		up(&pCifsFile->fh_sem);
@@ -323,21 +327,23 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 	else
 		oplock = FALSE;
 
-		/* BB pass O_SYNC flag through on file attributes .. BB */
+	
+	/* Can not refresh inode by passing in file_info buf to be returned
+	 by SMBOpen and then calling get_inode_info with returned buf 
+	 since file might have write behind data that needs to be flushed 
+	 and server version of file size can be stale. If we 
+	 knew for sure that inode was not dirty locally we could do this */
 
-		/* Also refresh inode by passing in file_info buf returned by SMBOpen
-		   and calling get_inode_info with returned buf (at least
-		   helps non-Unix server case */
-	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+/*	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
 	if(buf==0) {
 		up(&pCifsFile->fh_sem);
 		if (full_path)
 			kfree(full_path);
 		FreeXid(xid);
 		return -ENOMEM;
-	}
+	}*/
 	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,
-				CREATE_NOT_DIR, &netfid, &oplock, buf, cifs_sb->local_nls);
+				CREATE_NOT_DIR, &netfid, &oplock, NULL, cifs_sb->local_nls);
 	if (rc) {
 		up(&pCifsFile->fh_sem);
 		cFYI(1, ("cifs_open returned 0x%x ", rc));
@@ -348,13 +354,25 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 		up(&pCifsFile->fh_sem);
 		pCifsInode = CIFS_I(inode);
 		if(pCifsInode) {
-			if (pTcon->ses->capabilities & CAP_UNIX)
-				rc = cifs_get_inode_info_unix(&inode,
+			if(can_flush) {
+				filemap_fdatawrite(inode->i_mapping);
+				filemap_fdatawait(inode->i_mapping);
+			/* temporarily disable caching while we
+			go to server to get inode info */
+				pCifsInode->clientCanCacheAll = FALSE;
+				pCifsInode->clientCanCacheRead = FALSE;
+				if (pTcon->ses->capabilities & CAP_UNIX)
+					rc = cifs_get_inode_info_unix(&inode,
 						full_path, inode->i_sb);
-			else
-				rc = cifs_get_inode_info(&inode,
-						full_path, buf, inode->i_sb);
-
+				else
+					rc = cifs_get_inode_info(&inode,
+						full_path, NULL, inode->i_sb);
+			} /* else we are writing out data to server already
+			and could deadlock if we tried to flush data, and 
+			since we do not know if we have data that would
+			invalidate the current end of file on the server
+			we can not go to the server to get the new
+			inod info */
 			if((oplock & 0xF) == OPLOCK_EXCLUSIVE) {
 				pCifsInode->clientCanCacheAll =  TRUE;
 				pCifsInode->clientCanCacheRead = TRUE;
@@ -370,8 +388,6 @@ static int cifs_reopen_file(struct inode *inode, struct file *file)
 		}
 	}
 
-	if (buf)
-		kfree(buf);
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);
@@ -607,7 +623,11 @@ cifs_write(struct file * file, const char *write_data,
 					FreeXid(xid);
 					return total_written;
 				}
-				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+				/* we could deadlock if we called
+				 filemap_fdatawait from here so tell
+				reopen_file not to flush data to server now */
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file,FALSE);
 				if(rc != 0)
 					break;
 			}
@@ -947,14 +967,14 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 		cFYI(1,("attempting read on write only file instance"));
 	}
 
-
 	for (total_read = 0,current_offset=read_data; read_size > total_read;
 				total_read += bytes_read,current_offset+=bytes_read) {
 		current_read_size = min_t(const int,read_size - total_read,cifs_sb->rsize);
 		rc = -EAGAIN;
 		while(rc == -EAGAIN) {
 			if ((open_file->invalidHandle) && (!open_file->closePend)) {
-				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file,TRUE);
 				if(rc != 0)
 					break;
 			}
@@ -1104,7 +1124,8 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		rc = -EAGAIN;
 		while(rc == -EAGAIN) {
 			if ((open_file->invalidHandle) && (!open_file->closePend)) {
-				rc = cifs_reopen_file(file->f_dentry->d_inode,file);
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file, TRUE);
 				if(rc != 0)
 					break;
 			}
@@ -1188,26 +1209,26 @@ static int cifs_readpage_worker(struct file *file, struct page *page, loff_t * p
 	char * read_data;
 	int rc;
 
-        page_cache_get(page);
-        read_data = kmap(page);
-        /* for reads over a certain size could initiate async read ahead */
+	page_cache_get(page);
+	read_data = kmap(page);
+	/* for reads over a certain size could initiate async read ahead */
                                                                                                                            
-        rc = cifs_read(file, read_data, PAGE_CACHE_SIZE, poffset);
+	rc = cifs_read(file, read_data, PAGE_CACHE_SIZE, poffset);
                                                                                                                            
-        if (rc < 0)
-                goto io_error;
-        else {
-                cFYI(1,("Bytes read %d ",rc));
-        }
+	if (rc < 0)
+		goto io_error;
+	else {
+		cFYI(1,("Bytes read %d ",rc));
+	}
                                                                                                                            
-        file->f_dentry->d_inode->i_atime = CURRENT_TIME;
+	file->f_dentry->d_inode->i_atime = CURRENT_TIME;
                                                                                                                            
-        if(PAGE_CACHE_SIZE > rc) {
-                memset(read_data+rc, 0, PAGE_CACHE_SIZE - rc);
-        }
-        flush_dcache_page(page);
-        SetPageUptodate(page);
-        rc = 0;
+	if(PAGE_CACHE_SIZE > rc) {
+		memset(read_data+rc, 0, PAGE_CACHE_SIZE - rc);
+	}
+	flush_dcache_page(page);
+	SetPageUptodate(page);
+	rc = 0;
                                                                                                                            
 io_error:
         kunmap(page);
