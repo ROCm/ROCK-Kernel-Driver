@@ -59,14 +59,14 @@ static void revo_set_rate_val(akm4xxx_t *ak, unsigned int rate)
 		reg = 1;
 		shift = 3;
 	}
-	tmp = ak->images[0][reg];
+	tmp = snd_akm4xxx_get(ak, 0, reg);
 	old = (tmp >> shift) & 0x03;
 	if (old == dfs)
 		return;
 
 	/* reset DFS */
 	snd_akm4xxx_reset(ak, 1);
-	tmp = ak->images[0][reg];
+	tmp = snd_akm4xxx_get(ak, 0, reg);
 	tmp &= ~(0x03 << shift);
 	tmp |= dfs << shift;
 	snd_akm4xxx_write(ak, 0, reg, tmp);
@@ -121,6 +121,7 @@ static struct snd_ak4xxx_private akm_revo_surround_priv __devinitdata = {
 static int __devinit revo_init(ice1712_t *ice)
 {
 	akm4xxx_t *ak;
+	int err;
 
 	/* determine I2C, DACs and ADCs */
 	switch (ice->eeprom.subvendor) {
@@ -139,8 +140,10 @@ static int __devinit revo_init(ice1712_t *ice)
 	ice->akm_codecs = 2;
 	switch (ice->eeprom.subvendor) {
 	case VT1724_SUBDEVICE_REVOLUTION71:
-		snd_ice1712_akm4xxx_init(ak, &akm_revo_front, &akm_revo_front_priv, ice);
-		snd_ice1712_akm4xxx_init(ak + 1, &akm_revo_surround, &akm_revo_surround_priv, ice);
+		if ((err = snd_ice1712_akm4xxx_init(ak, &akm_revo_front, &akm_revo_front_priv, ice)) < 0)
+			return err;
+		if ((err = snd_ice1712_akm4xxx_init(ak + 1, &akm_revo_surround, &akm_revo_surround_priv, ice)) < 0)
+			return err;
 		/* unmute all codecs */
 		snd_ice1712_gpio_write_bits(ice, VT1724_REVO_MUTE, VT1724_REVO_MUTE);
 		break;

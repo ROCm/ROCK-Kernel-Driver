@@ -2906,7 +2906,8 @@ struct _snd_pcm_runtime {
         </para>
 
         <para>
-          This callback may be called multiple times, too.
+          This function is always called before the close callback is called.
+          Also, the callback may be called multiple times, too.
           Keep track whether the resource was already released. 
         </para>
       </section>
@@ -3007,14 +3008,16 @@ struct _snd_pcm_runtime {
         </para>
 
         <para>
-          When the pcm supports the suspend/resume operation,
+          When the pcm supports the suspend/resume operation
+        (i.e. <constant>SNDRV_PCM_INFO_RESUME</constant> flag is set),
         <constant>SUSPEND</constant> and <constant>RESUME</constant>
-        commands must be handled, too. Obviously it does suspend and
-        resume of the pcm substream. Usually, the
-        <constant>SUSPEND</constant> is identical with
-        <constant>STOP</constant> command and the
-        <constant>RESUME</constant> is identical with
-        <constant>START</constant> command.
+        commands must be handled, too.
+        These commands are issued when the power-management status is
+        changed.  Obviously, the <constant>SUSPEND</constant> and
+        <constant>RESUME</constant>
+        do suspend and resume of the pcm substream, and usually, they
+        are identical with <constant>STOP</constant> and
+        <constant>START</constant> commands, respectively.
         </para>
 
         <para>
@@ -3331,9 +3334,96 @@ struct _snd_pcm_runtime {
       </para>
 
       <para>
-        There are many different constraints. You can even define your
-      own constraint rules. I won't explain the details here, rather I
-      would like to say, <quote>Luke, use the source.</quote>
+        There are many different constraints.
+        Look in <filename>sound/asound.h</filename> for a complete list.
+        You can even define your own constraint rules.
+        For example, let's suppose my_chip can manage a substream of 1 channel
+        if and only if the format is S16_LE, otherwise it supports any format
+        specified in the <type>snd_pcm_hardware_t</type> stucture (or in any
+        other constraint_list). You can build a rule like this:
+
+        <example>
+	  <title>Example of Hardware Constraints for Channels</title>
+	  <programlisting>
+<![CDATA[
+  static int hw_rule_format_by_channels(snd_pcm_hw_params_t *params,
+                                        snd_pcm_hw_rule_t *rule)
+  {
+          snd_interval_t *c = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+          snd_mask_t *f = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
+          snd_mask_t fmt;
+
+          snd_mask_any(&fmt);    // Init the struct
+          if (c->min < 2) {
+                  fmt.bits[0] &= SNDRV_PCM_FMTBIT_S16_LE;
+                  return snd_mask_refine(f, &fmt);
+          }
+          return 0;
+  }
+]]>
+          </programlisting>
+        </example>
+      </para>
+ 
+      <para>
+        Then you need to call this function to add your rule:
+
+       <informalexample>
+	 <programlisting>
+<![CDATA[
+  snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+                      hw_rule_channels_by_format, 0, SNDRV_PCM_HW_PARAM_FORMAT,
+                      -1);
+]]>
+          </programlisting>
+        </informalexample>
+      </para>
+
+      <para>
+        The rule function is called when an application sets the number of
+        channels. But an application can set the format before the number of
+        channels. Thus you also need to define the inverse rule:
+
+       <example>
+	 <title>Example of Hardware Constraints for Channels</title>
+	 <programlisting>
+<![CDATA[
+  static int hw_rule_channels_by_format(snd_pcm_hw_params_t *params,
+                                        snd_pcm_hw_rule_t *rule)
+  {
+          snd_interval_t *c = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+          snd_mask_t *f = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
+          snd_interval_t ch;
+
+          snd_interval_any(&ch);
+          if (f->bits[0] == SNDRV_PCM_FMTBIT_S16_LE) {
+                  ch.min = ch.max = 1;
+                  ch.integer = 1;
+                  return snd_interval_refine(c, &ch);
+          }
+          return 0;
+  }
+]]>
+          </programlisting>
+        </example>
+      </para>
+
+      <para>
+      ...and in the open callback:
+       <informalexample>
+	 <programlisting>
+<![CDATA[
+  snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_FORMAT,
+                      hw_rule_format_by_channels, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+                      -1);
+]]>
+          </programlisting>
+        </informalexample>
+      </para>
+
+      <para>
+        I won't explain more details here, rather I
+        would like to say, <quote>Luke, use the source.</quote>
       </para>
     </section>
 
@@ -5755,6 +5845,10 @@ struct _snd_pcm_runtime {
     <para>
     Kevin Conder reformatted the original plain-text to the
     DocBook format.
+    </para>
+    <para>
+    Giuliano Pochini corrected typos and contributed the example codes
+    in the hardware constraints section.
     </para>
   </chapter>
 

@@ -4,7 +4,7 @@
 #
 
 snd-ice1712-objs := ice1712.o delta.o hoontech.o ews.o ak4xxx.o
-snd-ice1724-objs := ice1724.o amp.o revo.o ak4xxx.o
+snd-ice1724-objs := ice1724.o amp.o revo.o aureon.o ak4xxx.o
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ICE1712) += snd-ice1712.o

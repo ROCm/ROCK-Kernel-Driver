@@ -42,12 +42,12 @@ void snd_akm4xxx_write(akm4xxx_t *ak, int chip, unsigned char reg, unsigned char
 	/* save the data */
 	if (ak->type == SND_AK4524 || ak->type == SND_AK4528) {
 		if ((reg != 0x04 && reg != 0x05) || (reg & 0x80) == 0)
-			ak->images[chip][reg] = val;
+			snd_akm4xxx_set(ak, chip, reg, val);
 		else
-			ak->ipga_gain[chip][reg-4] = val;
+			snd_akm4xxx_set_ipga(ak, chip, reg, val);
 	} else {
 		/* AK4529, or else */
-		ak->images[chip][reg] = val;
+		snd_akm4xxx_set(ak, chip, reg, val);
 	}
 	ak->ops.unlock(ak, chip);
 }
@@ -72,12 +72,12 @@ void snd_akm4xxx_reset(akm4xxx_t *ak, int state)
 				continue;
 			/* DAC volumes */
 			for (reg = 0x04; reg < (ak->type == SND_AK4528 ? 0x06 : 0x08); reg++)
-				snd_akm4xxx_write(ak, chip, reg, ak->images[chip][reg]);
+				snd_akm4xxx_write(ak, chip, reg, snd_akm4xxx_get(ak, chip, reg));
 			if (ak->type == SND_AK4528)
 				continue;
 			/* IPGA */
 			for (reg = 0x04; reg < 0x06; reg++)
-				snd_akm4xxx_write(ak, chip, reg, ak->ipga_gain[chip][reg-4]);
+				snd_akm4xxx_write(ak, chip, reg, snd_akm4xxx_get_ipga(ak, chip, reg));
 		}
 		break;
 	case SND_AK4529:
@@ -89,7 +89,7 @@ void snd_akm4xxx_reset(akm4xxx_t *ak, int state)
 			return;
 		for (reg = 0x00; reg < 0x0a; reg++)
 			if (reg != 0x01)
-				snd_akm4xxx_write(ak, 0, reg, ak->images[0][reg]);
+				snd_akm4xxx_write(ak, 0, reg, snd_akm4xxx_get(ak, 0, reg));
 		break;
 	case SND_AK4381:
 		for (chip = 0; chip < ak->num_dacs/2; chip++) {
@@ -97,7 +97,7 @@ void snd_akm4xxx_reset(akm4xxx_t *ak, int state)
 			if (state)
 				continue;
 			for (reg = 0x01; reg < 0x05; reg++)
-				snd_akm4xxx_write(ak, chip, reg, ak->images[chip][reg]);
+				snd_akm4xxx_write(ak, chip, reg, snd_akm4xxx_get(ak, chip, reg));
 		}
 		break;
 	}
@@ -240,7 +240,7 @@ static int snd_akm4xxx_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	int addr = AK_GET_ADDR(kcontrol->private_value);
 	int invert = AK_GET_INVERT(kcontrol->private_value);
 	unsigned int mask = AK_GET_MASK(kcontrol->private_value);
-	unsigned char val = ak->images[chip][addr];
+	unsigned char val = snd_akm4xxx_get(ak, chip, addr);
 	
 	ucontrol->value.integer.value[0] = invert ? mask - val : val;
 	return 0;
@@ -258,7 +258,7 @@ static int snd_akm4xxx_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 
 	if (invert)
 		nval = mask - nval;
-	change = ak->images[chip][addr] != nval;
+	change = snd_akm4xxx_get(ak, chip, addr) != nval;
 	if (change)
 		snd_akm4xxx_write(ak, chip, addr, nval);
 	return change;
@@ -278,7 +278,7 @@ static int snd_akm4xxx_ipga_gain_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 	akm4xxx_t *ak = _snd_kcontrol_chip(kcontrol);
 	int chip = AK_GET_CHIP(kcontrol->private_value);
 	int addr = AK_GET_ADDR(kcontrol->private_value);
-	ucontrol->value.integer.value[0] = ak->ipga_gain[chip][addr-4] & 0x7f;
+	ucontrol->value.integer.value[0] = snd_akm4xxx_get_ipga(ak, chip, addr) & 0x7f;
 	return 0;
 }
 
@@ -288,7 +288,7 @@ static int snd_akm4xxx_ipga_gain_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 	int chip = AK_GET_CHIP(kcontrol->private_value);
 	int addr = AK_GET_ADDR(kcontrol->private_value);
 	unsigned char nval = (ucontrol->value.integer.value[0] % 37) | 0x80;
-	int change = ak->ipga_gain[chip][addr] != nval;
+	int change = snd_akm4xxx_get_ipga(ak, chip, addr) != nval;
 	if (change)
 		snd_akm4xxx_write(ak, chip, addr, nval);
 	return change;
@@ -314,7 +314,7 @@ static int snd_akm4xxx_deemphasis_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_va
 	int chip = AK_GET_CHIP(kcontrol->private_value);
 	int addr = AK_GET_ADDR(kcontrol->private_value);
 	int shift = AK_GET_SHIFT(kcontrol->private_value);
-	ucontrol->value.enumerated.item[0] = (ak->images[chip][addr] >> shift) & 3;
+	ucontrol->value.enumerated.item[0] = (snd_akm4xxx_get(ak, chip, addr) >> shift) & 3;
 	return 0;
 }
 
@@ -327,8 +327,8 @@ static int snd_akm4xxx_deemphasis_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 	unsigned char nval = ucontrol->value.enumerated.item[0] & 3;
 	int change;
 	
-	nval = (nval << shift) | (ak->images[chip][addr] & ~(3 << shift));
-	change = ak->images[chip][addr] != nval;
+	nval = (nval << shift) | (snd_akm4xxx_get(ak, chip, addr) & ~(3 << shift));
+	change = snd_akm4xxx_get(ak, chip, addr) != nval;
 	if (change)
 		snd_akm4xxx_write(ak, chip, addr, nval);
 	return change;
