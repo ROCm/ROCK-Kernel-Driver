@@ -33,7 +33,7 @@
 
 
 #define fd_inb(port)			inb_p(port)
-#define fd_outb(port,value)		outb_p(port,value)
+#define fd_outb(value,port)		outb_p(value,port)
 
 #define fd_request_dma()        CSW._request_dma(FLOPPY_DMA,"floppy")
 #define fd_free_dma()           CSW._free_dma(FLOPPY_DMA)
