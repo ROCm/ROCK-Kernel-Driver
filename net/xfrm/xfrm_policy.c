@@ -1043,6 +1043,20 @@ static void xfrm_dst_destroy(struct dst_entry *dst)
 	dst->xfrm = NULL;
 }
 
+static void xfrm_dst_ifdown(struct dst_entry *dst, int unregister)
+{
+	struct net_device *dev = dst->dev;
+
+	if (!unregister)
+		return;
+
+	while ((dst = dst->child) && dst->xfrm && dst->dev == dev) {
+		dst->dev = &loopback_dev;
+		dev_hold(&loopback_dev);
+		dev_put(dev);
+	}
+}
+
 static void xfrm_link_failure(struct sk_buff *skb)
 {
 	/* Impossible. Such dst must be popped before reaches point of failure. */
@@ -1166,6 +1180,8 @@ int xfrm_policy_register_afinfo(struct xfrm_policy_afinfo *afinfo)
 			dst_ops->check = xfrm_dst_check;
 		if (likely(dst_ops->destroy == NULL))
 			dst_ops->destroy = xfrm_dst_destroy;
+		if (likely(dst_ops->ifdown == NULL))
+			dst_ops->ifdown = xfrm_dst_ifdown;
 		if (likely(dst_ops->negative_advice == NULL))
 			dst_ops->negative_advice = xfrm_negative_advice;
 		if (likely(dst_ops->link_failure == NULL))
@@ -1198,6 +1214,7 @@ int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo)
 			dst_ops->kmem_cachep = NULL;
 			dst_ops->check = NULL;
 			dst_ops->destroy = NULL;
+			dst_ops->ifdown = NULL;
 			dst_ops->negative_advice = NULL;
 			dst_ops->link_failure = NULL;
 			dst_ops->get_mss = NULL;
