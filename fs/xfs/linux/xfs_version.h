@@ -39,6 +39,6 @@
 #ifndef __XFS_VERSION_H__
 #define __XFS_VERSION_H__
 
-#define XFS_VERSION_STRING "CVS-09/13/02:21"
+#define XFS_VERSION_STRING "CVS-09/15/02:17"
 
 #endif /* __XFS_VERSION_H__ */

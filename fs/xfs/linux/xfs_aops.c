@@ -653,11 +653,11 @@ STATIC int
 linvfs_direct_IO(
 	int			rw,
 	struct inode		*inode,
-	char			*buf,
+	const struct iovec	*iov,
 	loff_t			offset,
-	size_t			count)
+	unsigned long		nr_segs)
 {
-        return generic_direct_IO(rw, inode, buf, offset, count, 
+        return generic_direct_IO(rw, inode, iov, offset, nr_segs,
 					linvfs_get_blocks_direct);
 }
 
