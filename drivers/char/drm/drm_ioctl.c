@@ -326,12 +326,6 @@ int drm_setversion(DRM_IOCTL_ARGS)
 
 	DRM_COPY_FROM_USER_IOCTL(sv, argp, sizeof(sv));
 
-	/*
-	 * version.name etc need to be initialized to zero.
-	 * If we don't, driver->version() will poke random strings to
-	 * random locations in user space, causing X server segfaults
-	 * that are interesting to debug.   --eich
-	 */
 	memset(&version, 0, sizeof(version));
 
 	dev->driver->version(&version);
