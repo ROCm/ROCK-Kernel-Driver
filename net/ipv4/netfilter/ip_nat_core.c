@@ -516,12 +516,14 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 	struct ip_conntrack_tuple new_tuple, inv_tuple, reply;
 	struct ip_conntrack_tuple orig_tp;
 	struct ip_nat_info *info = &conntrack->nat.info;
+	int in_hashes = info->initialized;
 
 	MUST_BE_WRITE_LOCKED(&ip_nat_lock);
 	IP_NF_ASSERT(hooknum == NF_IP_PRE_ROUTING
 		     || hooknum == NF_IP_POST_ROUTING
 		     || hooknum == NF_IP_LOCAL_OUT);
 	IP_NF_ASSERT(info->num_manips < IP_NAT_MAX_MANIPS);
+	IP_NF_ASSERT(!(info->initialized & (1 << HOOK2MANIP(hooknum))));
 
 	/* What we've got will look like inverse of reply. Normally
 	   this is what is in the conntrack, except for prior
@@ -638,6 +640,14 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 
 	/* It's done. */
 	info->initialized |= (1 << HOOK2MANIP(hooknum));
+
+	if (in_hashes) {
+		IP_NF_ASSERT(info->bysource.conntrack);
+		replace_in_hashes(conntrack, info);
+	} else {
+		place_in_hashes(conntrack, info);
+	}
+
 	return NF_ACCEPT;
 }
 
