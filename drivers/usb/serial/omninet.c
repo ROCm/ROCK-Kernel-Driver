@@ -85,20 +85,20 @@ MODULE_DEVICE_TABLE (usb, id_table);
 
 
 static struct usb_serial_device_type zyxel_omninet_device = {
-	owner:			THIS_MODULE,
-	name:			"ZyXEL - omni.net lcd plus usb",
-	id_table:		id_table,
-	num_interrupt_in:	1,
-	num_bulk_in:		1,
-	num_bulk_out:		2,
-	num_ports:		1,
-	open:			omninet_open,
-	close:			omninet_close,
-	write:			omninet_write,
-	write_room:		omninet_write_room,
-	read_bulk_callback:	omninet_read_bulk_callback,
-	write_bulk_callback:	omninet_write_bulk_callback,
-	shutdown:		omninet_shutdown,
+	.owner =		THIS_MODULE,
+	.name =			"ZyXEL - omni.net lcd plus usb",
+	.id_table =		id_table,
+	.num_interrupt_in =	1,
+	.num_bulk_in =		1,
+	.num_bulk_out =		2,
+	.num_ports =		1,
+	.open =			omninet_open,
+	.close =		omninet_close,
+	.write =		omninet_write,
+	.write_room =		omninet_write_room,
+	.read_bulk_callback =	omninet_read_bulk_callback,
+	.write_bulk_callback =	omninet_write_bulk_callback,
+	.shutdown =		omninet_shutdown,
 };
 
 

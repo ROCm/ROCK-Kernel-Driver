@@ -90,22 +90,22 @@ MODULE_DEVICE_TABLE (usb, ipaq_id_table);
 
 /* All of the device info needed for the Compaq iPAQ */
 struct usb_serial_device_type ipaq_device = {
-	owner:			THIS_MODULE,
-	name:			"Compaq iPAQ",
-	id_table:		ipaq_id_table,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		1,
-	num_bulk_out:		1,
-	num_ports:		1,
-	open:			ipaq_open,
-	close:			ipaq_close,
-	attach:			ipaq_startup,
-	shutdown:		ipaq_shutdown,
-	write:			ipaq_write,
-	write_room:		ipaq_write_room,
-	chars_in_buffer:	ipaq_chars_in_buffer,
-	read_bulk_callback:	ipaq_read_bulk_callback,
-	write_bulk_callback:	ipaq_write_bulk_callback,
+	.owner =		THIS_MODULE,
+	.name =			"Compaq iPAQ",
+	.id_table =		ipaq_id_table,
+	.num_interrupt_in =	NUM_DONT_CARE,
+	.num_bulk_in =		1,
+	.num_bulk_out =		1,
+	.num_ports =		1,
+	.open =			ipaq_open,
+	.close =		ipaq_close,
+	.attach =		ipaq_startup,
+	.shutdown =		ipaq_shutdown,
+	.write =		ipaq_write,
+	.write_room =		ipaq_write_room,
+	.chars_in_buffer =	ipaq_chars_in_buffer,
+	.read_bulk_callback =	ipaq_read_bulk_callback,
+	.write_bulk_callback =	ipaq_write_bulk_callback,
 };
 
 static spinlock_t	write_list_lock;

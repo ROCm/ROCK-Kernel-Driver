@@ -174,22 +174,22 @@ static struct file_operations skel_fops = {
 	 * and decrement it again in the release() function
 	 * yourself.
 	 */
-	owner:		THIS_MODULE,
+	.owner =	THIS_MODULE,
 
-	read:		skel_read,
-	write:		skel_write,
-	ioctl:		skel_ioctl,
-	open:		skel_open,
-	release:	skel_release,
+	.read =		skel_read,
+	.write =	skel_write,
+	.ioctl =	skel_ioctl,
+	.open =		skel_open,
+	.release =	skel_release,
 };      
 
 
 /* usb specific object needed to register this driver with the usb subsystem */
 static struct usb_driver skel_driver = {
-	name:		"skeleton",
-	probe:		skel_probe,
-	disconnect:	skel_disconnect,
-	id_table:	skel_table,
+	.name =		"skeleton",
+	.probe =	skel_probe,
+	.disconnect =	skel_disconnect,
+	.id_table =	skel_table,
 };
 
 

@@ -2091,11 +2091,11 @@ static int usb_audio_ioctl_mixdev(struct inode *inode, struct file *file, unsign
 }
 
 static /*const*/ struct file_operations usb_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		usb_audio_ioctl_mixdev,
-	open:		usb_audio_open_mixdev,
-	release:	usb_audio_release_mixdev,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.ioctl =	usb_audio_ioctl_mixdev,
+	.open =		usb_audio_open_mixdev,
+	.release =	usb_audio_release_mixdev,
 };
 
 /* --------------------------------------------------------------------- */
@@ -2727,15 +2727,15 @@ static int usb_audio_release(struct inode *inode, struct file *file)
 }
 
 static /*const*/ struct file_operations usb_audio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		usb_audio_read,
-	write:		usb_audio_write,
-	poll:		usb_audio_poll,
-	ioctl:		usb_audio_ioctl,
-	mmap:		usb_audio_mmap,
-	open:		usb_audio_open,
-	release:	usb_audio_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.read =		usb_audio_read,
+	.write =	usb_audio_write,
+	.poll =		usb_audio_poll,
+	.ioctl =	usb_audio_ioctl,
+	.mmap =		usb_audio_mmap,
+	.open =		usb_audio_open,
+	.release =	usb_audio_release,
 };
 
 /* --------------------------------------------------------------------- */
@@ -2753,11 +2753,11 @@ static struct usb_device_id usb_audio_ids [] = {
 MODULE_DEVICE_TABLE (usb, usb_audio_ids);
 
 static struct usb_driver usb_audio_driver = {
-	name:		"audio",
-	probe:		usb_audio_probe,
-	disconnect:	usb_audio_disconnect,
-	driver_list:	LIST_HEAD_INIT(usb_audio_driver.driver_list), 
-	id_table:	usb_audio_ids,
+	.name =		"audio",
+	.probe =	usb_audio_probe,
+	.disconnect =	usb_audio_disconnect,
+	.driver_list =	LIST_HEAD_INIT(usb_audio_driver.driver_list), 
+	.id_table =	usb_audio_ids,
 };
 
 static void *find_descriptor(void *descstart, unsigned int desclen, void *after, 

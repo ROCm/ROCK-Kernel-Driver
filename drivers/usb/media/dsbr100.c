@@ -100,19 +100,19 @@ typedef struct
 
 
 static struct file_operations usb_dsbr100_fops = {
-	owner:		THIS_MODULE,
-	open:		usb_dsbr100_open,
-	release:       	usb_dsbr100_close,
-	ioctl:          usb_dsbr100_ioctl,
-	llseek:         no_llseek,
+	.owner =	THIS_MODULE,
+	.open =		usb_dsbr100_open,
+	.release =     	usb_dsbr100_close,
+	.ioctl =        usb_dsbr100_ioctl,
+	.llseek =       no_llseek,
 };
 static struct video_device usb_dsbr100_radio=
 {
-	owner:		THIS_MODULE,
-	name:		"D-Link DSB R-100 USB radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_AZTECH,
-	fops:           &usb_dsbr100_fops,
+	.owner =	THIS_MODULE,
+	.name =		"D-Link DSB R-100 USB radio",
+	.type =		VID_TYPE_TUNER,
+	.hardware =	VID_HARDWARE_AZTECH,
+	.fops =         &usb_dsbr100_fops,
 };
 
 static int users = 0;
@@ -125,10 +125,10 @@ static struct usb_device_id usb_dsbr100_table [] = {
 MODULE_DEVICE_TABLE (usb, usb_dsbr100_table);
 
 static struct usb_driver usb_dsbr100_driver = {
-	name:		"dsbr100",
-	probe:		usb_dsbr100_probe,
-	disconnect:	usb_dsbr100_disconnect,
-	id_table:	usb_dsbr100_table,
+	.name =		"dsbr100",
+	.probe =	usb_dsbr100_probe,
+	.disconnect =	usb_dsbr100_disconnect,
+	.id_table =	usb_dsbr100_table,
 };
 
 

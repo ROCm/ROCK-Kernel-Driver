@@ -1054,19 +1054,19 @@ static int usbvideo_find_struct(usbvideo_t *cams)
 }
 
 static struct file_operations usbvideo_fops = {
-	owner:	  THIS_MODULE,
-	open:     usbvideo_v4l_open,
-	release:  usbvideo_v4l_close,
-	read:     usbvideo_v4l_read,
-	mmap:     usbvideo_v4l_mmap,
-	ioctl:    usbvideo_v4l_ioctl,
-	llseek:   no_llseek,
+	.owner =  THIS_MODULE,
+	.open =   usbvideo_v4l_open,
+	.release =usbvideo_v4l_close,
+	.read =   usbvideo_v4l_read,
+	.mmap =   usbvideo_v4l_mmap,
+	.ioctl =  usbvideo_v4l_ioctl,
+	.llseek = no_llseek,
 };
 static struct video_device usbvideo_template = {
-	owner:	      THIS_MODULE,
-	type:         VID_TYPE_CAPTURE,
-	hardware:     VID_HARDWARE_CPIA,
-	fops:         &usbvideo_fops,
+	.owner =      THIS_MODULE,
+	.type =       VID_TYPE_CAPTURE,
+	.hardware =   VID_HARDWARE_CPIA,
+	.fops =       &usbvideo_fops,
 };
 
 uvd_t *usbvideo_AllocateDevice(usbvideo_t *cams)

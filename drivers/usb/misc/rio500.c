@@ -443,11 +443,11 @@ read_rio(struct file *file, char *buffer, size_t count, loff_t * ppos)
 
 static struct
 file_operations usb_rio_fops = {
-	read:		read_rio,
-	write:		write_rio,
-	ioctl:		ioctl_rio,
-	open:		open_rio,
-	release:	close_rio,
+	.read =		read_rio,
+	.write =	write_rio,
+	.ioctl =	ioctl_rio,
+	.open =		open_rio,
+	.release =	close_rio,
 };
 
 static void *probe_rio(struct usb_device *dev, unsigned int ifnum,
@@ -525,10 +525,10 @@ static struct usb_device_id rio_table [] = {
 MODULE_DEVICE_TABLE (usb, rio_table);
 
 static struct usb_driver rio_driver = {
-	name:		"rio500",
-	probe:		probe_rio,
-	disconnect:	disconnect_rio,
-	id_table:	rio_table,
+	.name =		"rio500",
+	.probe =	probe_rio,
+	.disconnect =	disconnect_rio,
+	.id_table =	rio_table,
 };
 
 int usb_rio_init(void)

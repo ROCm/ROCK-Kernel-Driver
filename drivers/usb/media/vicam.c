@@ -640,20 +640,20 @@ static int vicam_v4l_mmap(struct file *file, struct vm_area_struct *vma)
 
 /* FIXME - vicam_template - important */
 static struct file_operations vicam_fops = {
-	owner:		THIS_MODULE,
-	open:		vicam_v4l_open,
-	release:       	vicam_v4l_close,
-	read:		vicam_v4l_read,
-	mmap:		vicam_v4l_mmap,
-	ioctl:		vicam_v4l_ioctl,
-	llseek:         no_llseek,
+	.owner =	THIS_MODULE,
+	.open =		vicam_v4l_open,
+	.release =     	vicam_v4l_close,
+	.read =		vicam_v4l_read,
+	.mmap =		vicam_v4l_mmap,
+	.ioctl =	vicam_v4l_ioctl,
+	.llseek =       no_llseek,
 };
 static struct video_device vicam_template = {
-	owner:		THIS_MODULE,
-	name:		"vicam USB camera",
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_SE401, /* need to ask for own id */
-	fops:           &vicam_fops,
+	.owner =	THIS_MODULE,
+	.name =		"vicam USB camera",
+	.type =		VID_TYPE_CAPTURE,
+	.hardware =	VID_HARDWARE_SE401, /* need to ask for own id */
+	.fops =         &vicam_fops,
 };
 
 /******************************************************************************
@@ -876,11 +876,11 @@ static void vicam_disconnect(struct usb_device *udev, void *ptr)
 
 /* usb specific object needed to register this driver with the usb subsystem */
 static struct usb_driver vicam_driver = {
-	owner:		THIS_MODULE,
-	name:		"vicam",
-	probe:		vicam_probe,
-	disconnect:	vicam_disconnect,
-	id_table:	vicam_table,
+	.owner =	THIS_MODULE,
+	.name =		"vicam",
+	.probe =	vicam_probe,
+	.disconnect =	vicam_disconnect,
+	.id_table =	vicam_table,
 };
 
 /******************************************************************************

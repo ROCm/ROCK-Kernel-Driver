@@ -131,20 +131,20 @@ MODULE_DEVICE_TABLE (usb, id_table);
 
 
 struct usb_serial_device_type ir_device = {
-	owner:			THIS_MODULE,
-	name:			"IR Dongle",
-	id_table:		id_table,
-	num_interrupt_in:	1,
-	num_bulk_in:		1,
-	num_bulk_out:		1,
-	num_ports:		1,
-	set_termios:		ir_set_termios,
-	attach:			ir_startup,
-	open:			ir_open,
-	close:			ir_close,
-	write:			ir_write,
-	write_bulk_callback:	ir_write_bulk_callback,
-	read_bulk_callback:	ir_read_bulk_callback,
+	.owner =		THIS_MODULE,
+	.name =			"IR Dongle",
+	.id_table =		id_table,
+	.num_interrupt_in =	1,
+	.num_bulk_in =		1,
+	.num_bulk_out =		1,
+	.num_ports =		1,
+	.set_termios =		ir_set_termios,
+	.attach =		ir_startup,
+	.open =			ir_open,
+	.close =		ir_close,
+	.write =		ir_write,
+	.write_bulk_callback =	ir_write_bulk_callback,
+	.read_bulk_callback =	ir_read_bulk_callback,
 };
 
 static inline void irda_usb_dump_class_desc(struct irda_class_desc *desc)

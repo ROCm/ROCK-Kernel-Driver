@@ -164,10 +164,10 @@ MODULE_LICENSE("GPL");
 
 
 static struct usb_driver hpusbscsi_usb_driver = {
-	name:"hpusbscsi",
-	probe:hpusbscsi_usb_probe,
-	disconnect:hpusbscsi_usb_disconnect,
-	id_table:hpusbscsi_usb_ids,
+	.name ="hpusbscsi",
+	.probe =hpusbscsi_usb_probe,
+	.disconnect =hpusbscsi_usb_disconnect,
+	.id_table =hpusbscsi_usb_ids,
 };
 
 /* module initialisation */
