@@ -1,5 +1,6 @@
 /*
  * Athlon/Hammer specific Machine Check Exception Reporting
+ * (C) Copyright 2002 Dave Jones <davej@codemonkey.org.uk>
  */
 
 #include <linux/init.h>
