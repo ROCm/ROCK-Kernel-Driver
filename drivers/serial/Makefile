@@ -18,5 +18,7 @@ obj-$(CONFIG_SERIAL_AMBA) += amba.o
 obj-$(CONFIG_SERIAL_CLPS711X) += clps711x.o
 obj-$(CONFIG_SERIAL_SA1100) += sa1100.o
 obj-$(CONFIG_SERIAL_UART00) += uart00.o
+obj-$(CONFIG_SERIAL_SUNCORE) += suncore.o
+obj-$(CONFIG_SERIAL_SUNZILOG) += sunzilog.o
 
 include $(TOPDIR)/Rules.make
