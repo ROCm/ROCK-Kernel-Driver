@@ -378,6 +378,7 @@
  *      condition occours (Daniele Bellucci).
  *    - Added vendor/product ids for Canon, HP, Microtek, Mustek, Siemens, UMAX, and
  *      Visioneer scanners.
+ *    - Added test for USB_CLASS_CDC_DATA which is used by some fingerprint scanners.
  *
  *
  * TODO
@@ -961,6 +962,7 @@ probe_scanner(struct usb_interface *intf,
  
 	if (interface[0].desc.bInterfaceClass != USB_CLASS_VENDOR_SPEC &&
 	    interface[0].desc.bInterfaceClass != USB_CLASS_PER_INTERFACE &&
+	    interface[0].desc.bInterfaceClass != USB_CLASS_CDC_DATA &&
 	    interface[0].desc.bInterfaceClass != SCN_CLASS_SCANJET) {
 		dbg("probe_scanner: This interface doesn't look like a scanner (class=0x%x).", interface[0].desc.bInterfaceClass);
 		return -ENODEV;
