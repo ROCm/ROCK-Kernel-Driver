@@ -35,6 +35,10 @@ config GENERIC_NVRAM
 	bool
 	default y
 
+config GENERIC_IOMAP
+	bool
+	default y
+
 source "init/Kconfig"
 
 menu "Processor"

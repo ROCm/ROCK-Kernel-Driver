@@ -8,7 +8,6 @@
 #include <linux/config.h>
 /* need struct page definitions */
 #include <linux/mm.h>
-#include <linux/device.h>
 #include <asm/scatterlist.h>
 #include <asm/io.h>
 

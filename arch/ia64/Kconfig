@@ -38,6 +38,10 @@ config EFI
 	bool
 	default y
 
+config GENERIC_IOMAP
+	bool
+	default y
+
 choice
 	prompt "System type"
 	default IA64_GENERIC
