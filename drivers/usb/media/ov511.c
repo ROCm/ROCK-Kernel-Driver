@@ -3830,7 +3830,7 @@ ov51x_unlink_isoc(struct usb_ov511 *ov)
 	/* Unschedule all of the iso td's */
 	for (n = OV511_NUMSBUF - 1; n >= 0; n--) {
 		if (ov->sbuf[n].urb) {
-			usb_unlink_urb(ov->sbuf[n].urb);
+			usb_kill_urb(ov->sbuf[n].urb);
 			usb_free_urb(ov->sbuf[n].urb);
 			ov->sbuf[n].urb = NULL;
 		}

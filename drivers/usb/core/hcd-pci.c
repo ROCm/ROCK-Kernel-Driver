@@ -188,9 +188,9 @@ clean_3:
 	}
 	hcd->irq = dev->irq;
 
-	dev_info (hcd->self.controller, "irq %s, %s %p\n", bufp,
+	dev_info (hcd->self.controller, "irq %s, %s 0x%lx\n", bufp,
 		(driver->flags & HCD_MEMORY) ? "pci mem" : "io base",
-		base);
+		resource);
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
@@ -260,6 +260,8 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	}
 
 	usb_deregister_bus (&hcd->self);
+
+	pci_disable_device(dev);
 }
 EXPORT_SYMBOL (usb_hcd_pci_remove);
 

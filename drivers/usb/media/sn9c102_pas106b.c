@@ -1,5 +1,5 @@
 /***************************************************************************
- * Driver for PAS106B image sensor connected to the SN9C10[12] PC Camera   *
+ * Driver for PAS106B image sensor connected to the SN9C10x PC Camera      *
  * Controllers                                                             *
  *                                                                         *
  * Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>       *
@@ -100,26 +100,26 @@ static int pas106b_set_ctrl(struct sn9c102_device* cam,
 
 	switch (ctrl->id) {
 	case V4L2_CID_RED_BALANCE:
-		err += sn9c102_i2c_write(cam, 0x0c, ctrl->value & 0x1f);
+		err += sn9c102_i2c_write(cam, 0x0c, ctrl->value);
 		break;
 	case V4L2_CID_BLUE_BALANCE:
-		err += sn9c102_i2c_write(cam, 0x09, ctrl->value & 0x1f);
+		err += sn9c102_i2c_write(cam, 0x09, ctrl->value);
 		break;
 	case V4L2_CID_GAIN:
-		err += sn9c102_i2c_write(cam, 0x0e, ctrl->value & 0x1f);
+		err += sn9c102_i2c_write(cam, 0x0e, ctrl->value);
 		break;
 	case V4L2_CID_BRIGHTNESS:
-		err += sn9c102_i2c_write(cam, 0x0d, 0x1f-(ctrl->value & 0x1f));
+		err += sn9c102_i2c_write(cam, 0x0d, 0x1f - ctrl->value);
 		break;
 	case V4L2_CID_CONTRAST:
-		err += sn9c102_i2c_write(cam, 0x0f, ctrl->value & 0x03);
+		err += sn9c102_i2c_write(cam, 0x0f, ctrl->value);
 		break;
 	default:
 		return -EINVAL;
 	}
 	err += sn9c102_i2c_write(cam, 0x13, 0x01);
 
-	return err;
+	return err ? -EIO : 0;
 }
 
 

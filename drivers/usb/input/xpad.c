@@ -214,7 +214,7 @@ static void xpad_close (struct input_dev *dev)
 	struct usb_xpad *xpad = dev->private;
 	
 	if (!--xpad->open_count)
-		usb_unlink_urb(xpad->irq_in);
+		usb_kill_urb(xpad->irq_in);
 }
 
 static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id)
@@ -325,7 +325,7 @@ static void xpad_disconnect(struct usb_interface *intf)
 	
 	usb_set_intfdata(intf, NULL);
 	if (xpad) {
-		usb_unlink_urb(xpad->irq_in);
+		usb_kill_urb(xpad->irq_in);
 		input_unregister_device(&xpad->dev);
 		usb_free_urb(xpad->irq_in);
 		usb_buffer_free(interface_to_usbdev(intf), XPAD_PKT_LEN, xpad->idata, xpad->idata_dma);

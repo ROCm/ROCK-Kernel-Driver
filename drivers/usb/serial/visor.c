@@ -446,9 +446,9 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
 	/* shutdown our urbs */
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 	if (port->interrupt_in_urb)
-		usb_unlink_urb (port->interrupt_in_urb);
+		usb_kill_urb(port->interrupt_in_urb);
 
 	/* Try to send shutdown message, if the device is gone, this will just fail. */
 	transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
@@ -655,7 +655,7 @@ exit:
 static void visor_throttle (struct usb_serial_port *port)
 {
 	dbg("%s - port %d", __FUNCTION__, port->number);
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 }
 
 

@@ -100,6 +100,7 @@ struct usb_serial_port {
 	__u8			interrupt_in_endpointAddress;
 
 	unsigned char *		bulk_in_buffer;
+	int			bulk_in_size;
 	struct urb *		read_urb;
 	__u8			bulk_in_endpointAddress;
 

@@ -70,8 +70,6 @@ MODULE_PARM_DESC (rndis_debug, "enable debugging");
 
 #define RNDIS_MAX_CONFIGS	1
 
-static struct proc_dir_entry *rndis_connect_dir;
-static struct proc_dir_entry *rndis_connect_state [RNDIS_MAX_CONFIGS];
 
 static rndis_params rndis_per_dev_params [RNDIS_MAX_CONFIGS];
 
@@ -1275,6 +1273,8 @@ int rndis_rm_hdr (u8 *buf, u32 *length)
 	return 0;
 }
 
+#ifdef	CONFIG_USB_GADGET_DEBUG_FILES
+
 int rndis_proc_read (char *page, char **start, off_t off, int count, int *eof, 
 		     void *data)
 {
@@ -1365,43 +1365,40 @@ int rndis_proc_write (struct file *file, const char __user *buffer,
 	return count;
 }
 
+#define	NAME_TEMPLATE	"driver/rndis-%03d"
+
+static struct proc_dir_entry *rndis_connect_state [RNDIS_MAX_CONFIGS];
+
+#endif	/* CONFIG_USB_GADGET_DEBUG_FILES */
+
+
 int __init rndis_init (void)
 {
 	u8 i;
-	char name [4];
 
-	/* FIXME this should probably be /proc/driver/rndis,
-	 * and only if debugging is enabled
-	 */
-	
-	if (!(rndis_connect_dir =  proc_mkdir ("rndis", NULL))) {
-		printk (KERN_ERR "%s: couldn't create /proc/rndis entry", 
-			__FUNCTION__);
-		return -EIO;
-	}
-	
 	for (i = 0; i < RNDIS_MAX_CONFIGS; i++) {
-		sprintf (name, "%03d", i);
+#ifdef	CONFIG_USB_GADGET_DEBUG_FILES
+		char name [20];
+
+		sprintf (name, NAME_TEMPLATE, i);
 		if (!(rndis_connect_state [i]
-				= create_proc_entry (name, 0660,
-						rndis_connect_dir))) 
+				= create_proc_entry (name, 0660, NULL))) 
 		{
 			DEBUG ("%s :remove entries", __FUNCTION__);
-			for (i--; i > 0; i--) {
-				sprintf (name, "%03d", i);
-				remove_proc_entry (name, rndis_connect_dir);
+			while (i) {
+				sprintf (name, NAME_TEMPLATE, --i);
+				remove_proc_entry (name, NULL);
 			}
 			DEBUG ("\n");
-			
-			remove_proc_entry ("000", rndis_connect_dir);
-			remove_proc_entry ("rndis", NULL);
 			return -EIO;
 		}
+
 		rndis_connect_state [i]->nlink = 1;
 		rndis_connect_state [i]->write_proc = rndis_proc_write;
 		rndis_connect_state [i]->read_proc = rndis_proc_read;
 		rndis_connect_state [i]->data = (void *)
 				(rndis_per_dev_params + i);
+#endif
 		rndis_per_dev_params [i].confignr = i;
 		rndis_per_dev_params [i].used = 0;
 		rndis_per_dev_params [i].state = RNDIS_UNINITIALIZED;
@@ -1415,14 +1412,14 @@ int __init rndis_init (void)
 
 void rndis_exit (void)
 {
+#ifdef	CONFIG_USB_GADGET_DEBUG_FILES
 	u8 i;
-	char name [4];
+	char name [20];
 	
 	for (i = 0; i < RNDIS_MAX_CONFIGS; i++) {
-		sprintf (name, "%03d", i);
-		remove_proc_entry (name, rndis_connect_dir);
+		sprintf (name, NAME_TEMPLATE, i);
+		remove_proc_entry (name, NULL);
 	}
-	remove_proc_entry ("rndis", NULL);
-	return;
+#endif
 }
 
