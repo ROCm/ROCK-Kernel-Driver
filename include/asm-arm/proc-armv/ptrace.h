@@ -130,7 +130,7 @@ static inline int valid_user_regs(struct pt_regs *regs)
 	/*
 	 * Force CPSR to something logical...
 	 */
-	regs->ARM_cpsr &= (PSR_V_BIT|PSR_C_BIT|PSR_Z_BIT|PSR_N_BIT|MODE32_BIT);
+	regs->ARM_cpsr &= PSR_f | PSR_s | PSR_x | PSR_T_BIT | MODE32_BIT;
 
 	return 0;
 }
