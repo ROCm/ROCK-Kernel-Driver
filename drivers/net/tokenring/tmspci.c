@@ -243,14 +243,7 @@ static struct pci_driver tms_pci_driver = {
 
 static int __init tms_pci_init (void)
 {
-	int rc = pci_register_driver (&tms_pci_driver);
-	if (rc < 0)
-		return rc;
-	if (rc == 0) {
-		pci_unregister_driver (&tms_pci_driver);
-		return -ENODEV;
-	}
-	return 0;
+	return pci_register_driver(&tms_pci_driver);
 }
 
 static void __exit tms_pci_rmmod (void)

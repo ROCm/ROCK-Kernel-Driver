@@ -216,7 +216,6 @@ struct cx8800_fh {
 };
 
 struct cx8800_suspend_state {
-	u32                        pci_cfg[64 / sizeof(u32)];
 	int                        disabled;
 };
 

@@ -74,8 +74,8 @@ int register_vio_slot(struct device_node *dn)
 	int rc = 1;
 	struct slot *slot = NULL;
 	
-	name = rpaphp_get_drc_name(dn);
-	if (!name)
+	rc = rpaphp_get_drc_props(dn, NULL, &name, NULL, NULL);
+	if (rc)
 		goto exit_rc;
 	index = (u32 *) get_property(dn, "ibm,my-drc-index", NULL);
 	if (!index)

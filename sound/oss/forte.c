@@ -2111,12 +2111,7 @@ forte_init_module (void)
 {
 	printk (KERN_INFO PFX DRIVER_VERSION "\n");
 
-	if (!pci_register_driver (&forte_pci_driver)) {
-		pci_unregister_driver (&forte_pci_driver);
-		return -ENODEV;
-	}
-
-	return 0;
+	return pci_register_driver (&forte_pci_driver);
 }
 
 

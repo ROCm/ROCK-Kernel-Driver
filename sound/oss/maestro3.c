@@ -2940,8 +2940,7 @@ static int __init m3_init_module(void)
         return -ENODEV; /* ? */
     }
 
-    if (!pci_register_driver(&m3_pci_driver)) {
-        pci_unregister_driver(&m3_pci_driver);
+    if (pci_register_driver(&m3_pci_driver)) {
         unregister_reboot_notifier(&m3_reboot_nb);
         return -ENODEV;
     }

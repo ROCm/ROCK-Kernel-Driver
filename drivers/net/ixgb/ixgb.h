@@ -178,6 +178,5 @@ struct ixgb_adapter {
 	/* structs defined in ixgb_hw.h */
 	struct ixgb_hw hw;
 	struct ixgb_hw_stats stats;
-	uint32_t pci_state[16];
 };
 #endif				/* _IXGB_H_ */

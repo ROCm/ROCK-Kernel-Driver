@@ -106,7 +106,6 @@ typedef struct {
 
 	/* PCI bus allocation & configuration members */
 	struct pci_dev *pdev;	/* PCI structure information */
-	u32 pci_state[16];	/* used for suspend/resume */
 	char firmware[33];
 
 	void __iomem *device_base;	/* ioremapped device base address */

@@ -886,7 +886,7 @@ static int set_bus (struct slot * slot_cur)
 				break;
 			case BUS_SPEED_133:
 				/* This is to take care of the bug in CIOBX chip */
-				while ((dev = pci_find_device(PCI_VENDOR_ID_SERVERWORKS,
+				while ((dev = pci_get_device(PCI_VENDOR_ID_SERVERWORKS,
 							      0x0101, dev)) != NULL)
 					ibmphp_hpc_writeslot (slot_cur, HPC_BUS_100PCIXMODE);
 				cmd = HPC_BUS_133PCIXMODE;

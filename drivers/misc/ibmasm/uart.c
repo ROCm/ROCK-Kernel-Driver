@@ -34,7 +34,7 @@
 void ibmasm_register_uart(struct service_processor *sp)
 {
 	struct serial_struct serial;
-	unsigned char *iomem_base;
+	void __iomem *iomem_base;
 
 	iomem_base = sp->base_address + SCOUT_COM_B_BASE;
 

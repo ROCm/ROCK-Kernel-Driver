@@ -2117,7 +2117,7 @@ static int ixgb_suspend(struct pci_dev *pdev, uint32_t state)
 	if (netif_running(netdev))
 		ixgb_down(adapter, TRUE);
 
-	pci_save_state(pdev, adapter->pci_state);
+	pci_save_state(pdev);
 
 	state = (state > 0) ? 3 : 0;
 	pci_set_power_state(pdev, state);

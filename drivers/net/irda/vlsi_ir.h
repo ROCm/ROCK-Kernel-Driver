@@ -769,7 +769,6 @@ typedef struct vlsi_irda_dev {
 	spinlock_t		lock;
 	struct semaphore	sem;
 
-	u32			cfg_space[64/sizeof(u32)];
 	u8			resume_ok;	
 	struct proc_dir_entry	*proc_entry;
 

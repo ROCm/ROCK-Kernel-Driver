@@ -3944,7 +3944,7 @@ static int bttv_suspend(struct pci_dev *pci_dev, u32 state)
 	btv->state.gpio_data   = gpio_read();
 
 	/* save pci state */
-	pci_save_state(pci_dev, btv->state.pci_cfg);
+	pci_save_state(pci_dev);
 	if (0 != pci_set_power_state(pci_dev, state)) {
 		pci_disable_device(pci_dev);
 		btv->state.disabled = 1;
@@ -3965,7 +3965,7 @@ static int bttv_resume(struct pci_dev *pci_dev)
 		btv->state.disabled = 0;
 	}
 	pci_set_power_state(pci_dev, 0);
-	pci_restore_state(pci_dev, btv->state.pci_cfg);
+	pci_restore_state(pci_dev);
 
 	/* restore bt878 state */
 	bttv_reinit_bt848(btv);

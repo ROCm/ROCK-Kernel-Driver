@@ -171,7 +171,7 @@ static int speedstep_activate (void)
  */
 static unsigned int speedstep_detect_chipset (void)
 {
-	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+	speedstep_chipset_dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82801DB_12,
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
@@ -179,7 +179,7 @@ static unsigned int speedstep_detect_chipset (void)
 	if (speedstep_chipset_dev)
 		return 4; /* 4-M */
 
-	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+	speedstep_chipset_dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82801CA_12,
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
@@ -188,7 +188,7 @@ static unsigned int speedstep_detect_chipset (void)
 		return 3; /* 3-M */
 
 
-	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+	speedstep_chipset_dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82801BA_10,
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
@@ -201,7 +201,7 @@ static unsigned int speedstep_detect_chipset (void)
 		static struct pci_dev *hostbridge;
 		u8 rev = 0;
 
-		hostbridge  = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+		hostbridge  = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82815_MC,
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
@@ -214,9 +214,11 @@ static unsigned int speedstep_detect_chipset (void)
 		if (rev < 5) {
 			dprintk(KERN_INFO "cpufreq: hostbridge does not support speedstep\n");
 			speedstep_chipset_dev = NULL;
+			pci_dev_put(hostbridge);
 			return 0;
 		}
 
+		pci_dev_put(hostbridge);
 		return 2; /* 2-M */
 	}
 
@@ -411,8 +413,10 @@ static int __init speedstep_init(void)
 	}
 
 	/* activate speedstep support */
-	if (speedstep_activate())
+	if (speedstep_activate()) {
+		pci_dev_put(speedstep_chipset_dev);
 		return -EINVAL;
+	}
 
 	return cpufreq_register_driver(&speedstep_driver);
 }
@@ -425,6 +429,7 @@ static int __init speedstep_init(void)
  */
 static void __exit speedstep_exit(void)
 {
+	pci_dev_put(speedstep_chipset_dev);
 	cpufreq_unregister_driver(&speedstep_driver);
 }
 

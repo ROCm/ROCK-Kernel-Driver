@@ -172,7 +172,6 @@ struct sis900_private {
 
 	unsigned int tx_full;			/* The Tx queue is full.    */
 	u8 host_bridge_rev;
-	u32 pci_state[16];
 };
 
 MODULE_AUTHOR("Jim Huang <cmhuang@sis.com.tw>, Ollie Lho <ollie@sis.com.tw>");
@@ -2200,7 +2199,6 @@ static void __devexit sis900_remove(struct pci_dev *pci_dev)
 static int sis900_suspend(struct pci_dev *pci_dev, u32 state)
 {
 	struct net_device *net_dev = pci_get_drvdata(pci_dev);
-	struct sis900_private *sis_priv = net_dev->priv;
 	long ioaddr = net_dev->base_addr;
 
 	if(!netif_running(net_dev))
@@ -2213,7 +2211,7 @@ static int sis900_suspend(struct pci_dev *pci_dev, u32 state)
 	outl(RxDIS | TxDIS | inl(ioaddr + cr), ioaddr + cr);
 
 	pci_set_power_state(pci_dev, 3);
-	pci_save_state(pci_dev, sis_priv->pci_state);
+	pci_save_state(pci_dev);
 
 	return 0;
 }
@@ -2226,7 +2224,7 @@ static int sis900_resume(struct pci_dev *pci_dev)
 
 	if(!netif_running(net_dev))
 		return 0;
-	pci_restore_state(pci_dev, sis_priv->pci_state);
+	pci_restore_state(pci_dev);
 	pci_set_power_state(pci_dev, 0);
 
 	sis900_init_rxfilter(net_dev);

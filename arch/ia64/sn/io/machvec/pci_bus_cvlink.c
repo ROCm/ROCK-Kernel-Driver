@@ -832,7 +832,6 @@ sn_pci_init (void)
 {
 	int i = 0;
 	struct pci_controller *controller;
-	struct list_head *ln;
 	struct pci_bus *pci_bus = NULL;
 	struct pci_dev *pci_dev = NULL;
 	int ret;
@@ -879,8 +878,7 @@ sn_pci_init (void)
 	/*
 	 * Initialize the pci bus vertex in the pci_bus struct.
 	 */
-	for( ln = pci_root_buses.next; ln != &pci_root_buses; ln = ln->next) {
-		pci_bus = pci_bus_b(ln);
+	list_for_each_entry(pci_bus, &pci_root_buses, node) {
 		ret = sn_pci_fixup_bus(pci_bus);
 		if ( ret ) {
 			printk(KERN_WARNING

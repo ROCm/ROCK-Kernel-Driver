@@ -1210,7 +1210,6 @@ struct airo_info {
 	SsidRid			*SSID;
 	APListRid		*APList;
 #define	PCI_SHARED_LEN		2*MPI_MAX_FIDS*PKTSIZE+RIDSIZE
-	u32			pci_state[16];
 	char			proc_name[IFNAMSIZ];
 };
 
@@ -5492,7 +5491,7 @@ static int airo_pci_suspend(struct pci_dev *pdev, u32 state)
 	issuecommand(ai, &cmd, &rsp);
 
 	pci_enable_wake(pdev, state, 1);
-	pci_save_state(pdev, ai->pci_state);
+	pci_save_state(pdev);
 	return pci_set_power_state(pdev, state);
 }
 
@@ -5503,7 +5502,7 @@ static int airo_pci_resume(struct pci_dev *pdev)
 	Resp rsp;
 
 	pci_set_power_state(pdev, 0);
-	pci_restore_state(pdev, ai->pci_state);
+	pci_restore_state(pdev);
 	pci_enable_wake(pdev, ai->power, 0);
 
 	if (ai->power > 1) {
