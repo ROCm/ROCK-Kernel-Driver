@@ -18,7 +18,6 @@
 #define MAX_SENSE 14
 
 static int atp870u_detect(Scsi_Host_Template *);
-static int atp870u_command(Scsi_Cmnd *);
 static int atp870u_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 static int atp870u_abort(Scsi_Cmnd *);
 static int atp870u_biosparam(struct scsi_device *, struct block_device *,

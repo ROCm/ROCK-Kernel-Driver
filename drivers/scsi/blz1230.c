@@ -334,7 +334,6 @@ static Scsi_Host_Template driver_template = {
 	.name			= "Blizzard1230 SCSI IV",
 	.detect			= blz1230_esp_detect,
 	.release		= blz1230_esp_release,
-	.command		= esp_command,
 	.queuecommand		= esp_queue,
 	.eh_abort_handler	= esp_abort,
 	.eh_bus_reset_handler	= esp_reset,

@@ -2569,35 +2569,6 @@ megaraid_info(struct Scsi_Host *host)
 	return buffer;
 }
 
-volatile static int internal_done_flag = 0;
-volatile static int internal_done_errcode = 0;
-
-static DECLARE_WAIT_QUEUE_HEAD (internal_wait);
-
-static void internal_done (Scsi_Cmnd *cmd)
-{
-	internal_done_errcode = cmd->result;
-	internal_done_flag++;
-	wake_up (&internal_wait);
-}
-
-/* shouldn't be used, but included for completeness */
-
-static int
-megaraid_command (Scsi_Cmnd *cmd)
-{
-	internal_done_flag = 0;
-
-	/* Queue command, and wait until it has completed */
-	megaraid_queue (cmd, internal_done);
-
-	while (!internal_done_flag)
-		interruptible_sleep_on (&internal_wait);
-
-	return internal_done_errcode;
-}
-
-
 /*
  * Abort a previous SCSI request. Only commands on the pending list can be
  * aborted. All the commands issued to the F/W must complete.
@@ -5367,7 +5338,6 @@ static Scsi_Host_Template driver_template = {
 	.detect =			megaraid_detect,
 	.release =			megaraid_release,
 	.info =				megaraid_info,
-	.command =			megaraid_command,
 	.queuecommand =			megaraid_queue,	
 	.bios_param =			megaraid_biosparam,
 	.max_sectors =			MAX_SECTORS_PER_IO,

@@ -1882,15 +1882,6 @@ static int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	return 0;
 }
 
-/* Only queuing supported in this ESP driver. */
-static int esp_command(Scsi_Cmnd *SCpnt)
-{
-	struct esp *esp = (struct esp *) SCpnt->device->host->hostdata;
-
-	ESPLOG(("esp%d: esp_command() called...\n", esp->esp_id));
-	return -1;
-}
-
 /* Dump driver state. */
 static void esp_dump_cmd(Scsi_Cmnd *SCptr)
 {
@@ -4405,7 +4396,6 @@ static Scsi_Host_Template driver_template = {
 	.slave_destroy		= esp_slave_destroy,
 	.release		= esp_release,
 	.info			= esp_info,
-	.command		= esp_command,
 	.queuecommand		= esp_queue,
 	.eh_abort_handler	= esp_abort,
 	.eh_bus_reset_handler	= esp_reset,

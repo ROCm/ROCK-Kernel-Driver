@@ -1031,14 +1031,6 @@ static int make_code(unsigned hosterr, unsigned scsierr)
 	return (scsierr | (hosterr << 16));
 }
 
-
-static void wd7000_scsi_done(Scsi_Cmnd * SCpnt)
-{
-	dprintk("wd7000_scsi_done: 0x%06lx\n", (long) SCpnt);
-	SCpnt->SCp.phase = 0;
-}
-
-
 #define wd7000_intr_ack(host)   outb (0, host->iobase + ASC_INTR_ACK)
 
 static void wd7000_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
@@ -1187,20 +1179,6 @@ static int wd7000_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 
 	return 0;
 }
-
-
-static int wd7000_command(Scsi_Cmnd * SCpnt)
-{
-	wd7000_queuecommand(SCpnt, wd7000_scsi_done);
-
-	while (SCpnt->SCp.phase > 0) {
-		cpu_relax();
-		barrier();	/* phase counts scbs down to 0 */
-	}
-
-	return (SCpnt->result);
-}
-
 
 static int wd7000_diagnostics(Adapter * host, int code)
 {
@@ -1732,7 +1710,6 @@ static Scsi_Host_Template driver_template = {
 	.name			= "Western Digital WD-7000",
 	.detect			= wd7000_detect,
 	.release		= wd7000_release,
-	.command		= wd7000_command,
 	.queuecommand		= wd7000_queuecommand,
 	.eh_bus_reset_handler	= wd7000_bus_reset,
 	.eh_device_reset_handler = wd7000_device_reset,

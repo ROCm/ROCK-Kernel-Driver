@@ -729,13 +729,6 @@ static int seagate_st0x_queue_command (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmn
 	return 0;
 }
 
-static int seagate_st0x_command(Scsi_Cmnd * SCpnt)
-{
-	return internal_command (SCpnt->device->id, SCpnt->device->lun, SCpnt->cmnd,
-				 SCpnt->request_buffer, SCpnt->request_bufflen,
-				 (int) NO_RECONNECT);
-}
-
 static int internal_command (unsigned char target, unsigned char lun,
 		  const void *cmnd, void *buff, int bufflen, int reselect)
 {
@@ -1704,7 +1697,6 @@ static Scsi_Host_Template driver_template = {
 	.detect         	= seagate_st0x_detect,
 	.release        	= seagate_st0x_release,
 	.info           	= seagate_st0x_info,
-	.command        	= seagate_st0x_command,
 	.queuecommand   	= seagate_st0x_queue_command,
 	.eh_abort_handler	= seagate_st0x_abort,
 	.eh_bus_reset_handler	= seagate_st0x_bus_reset,

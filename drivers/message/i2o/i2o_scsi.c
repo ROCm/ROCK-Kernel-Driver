@@ -866,34 +866,6 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 }
 
 /**
- *	internal_done	-	legacy scsi glue
- *	@SCPnt: command
- *
- *	Completion function for a synchronous command
- */
-
-static void internal_done(Scsi_Cmnd * SCpnt)
-{
-	SCpnt->SCp.Status++;
-}
-
-/**
- *	i2o_scsi_command	-	issue a scsi command and wait
- *	@SCPnt: command
- *
- *	Issue a SCSI command and wait for it to complete.
- */
- 
-static int i2o_scsi_command(Scsi_Cmnd * SCpnt)
-{
-	i2o_scsi_queuecommand(SCpnt, internal_done);
-	SCpnt->SCp.Status = 0;
-	while (!SCpnt->SCp.Status)
-		barrier();
-	return SCpnt->result;
-}
-
-/**
  *	i2o_scsi_abort	-	abort a running command
  *	@SCpnt: command to abort
  *
@@ -1091,7 +1063,6 @@ static Scsi_Host_Template driver_template = {
 	.detect			= i2o_scsi_detect,
 	.release		= i2o_scsi_release,
 	.info			= i2o_scsi_info,
-	.command		= i2o_scsi_command,
 	.queuecommand		= i2o_scsi_queuecommand,
 	.eh_abort_handler	= i2o_scsi_abort,
 	.eh_bus_reset_handler	= i2o_scsi_bus_reset,

@@ -126,7 +126,6 @@ static Scsi_Host_Template driver_template = {
 	.detect			= dec_esp_detect,
 	.release		= dec_esp_release,
 	.info			= esp_info,
-	.command		= esp_command,
 	.queuecommand		= esp_queue,
 	.eh_abort_handler	= esp_abort,
 	.eh_bus_reset_handler	= esp_reset,

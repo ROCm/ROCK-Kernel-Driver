@@ -492,7 +492,6 @@ static Scsi_Host_Template eesox_template = {
 	.proc_info			= eesoxscsi_proc_info,
 	.name				= "EESOX SCSI",
 	.info				= eesoxscsi_info,
-	.command			= fas216_command,
 	.queuecommand			= fas216_queue_command,
 	.eh_host_reset_handler		= fas216_eh_host_reset,
 	.eh_bus_reset_handler		= fas216_eh_bus_reset,
