@@ -91,7 +91,7 @@ extAlloc(struct inode *ip, s64 xlen, s64 pno, xad_t * xp, boolean_t abnr)
 {
 	struct jfs_sb_info *sbi = JFS_SBI(ip->i_sb);
 	s64 nxlen, nxaddr, xoff, hint, xaddr = 0;
-	int rc, nbperpage;
+	int rc;
 	int xflag;
 
 	/* This blocks if we are low on resources */
@@ -103,9 +103,6 @@ extAlloc(struct inode *ip, s64 xlen, s64 pno, xad_t * xp, boolean_t abnr)
 	/* validate extent length */
 	if (xlen > MAXXLEN)
 		xlen = MAXXLEN;
-
-	/* get the number of blocks per page */
-	nbperpage = sbi->nbperpage;
 
 	/* get the page's starting extent offset */
 	xoff = pno << sbi->l2nbperpage;

@@ -3268,14 +3268,13 @@ static int xtRelink(tid_t tid, struct inode *ip, xtpage_t * p)
 void xtInitRoot(tid_t tid, struct inode *ip)
 {
 	xtpage_t *p;
-	struct tlock *tlck;
 
 	/*
 	 * acquire a transaction lock on the root
 	 *
 	 * action:
 	 */
-	tlck = txLock(tid, ip, (struct metapage *) &JFS_IP(ip)->bxflag,
+	txLock(tid, ip, (struct metapage *) &JFS_IP(ip)->bxflag,
 		      tlckXTREE | tlckNEW);
 	p = &JFS_IP(ip)->i_xtroot;
 
