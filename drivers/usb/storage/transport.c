@@ -518,7 +518,10 @@ int usb_stor_bulk_msg(struct us_data *us, void *data, unsigned int pipe,
 int usb_stor_clear_halt(struct us_data *us, unsigned int pipe)
 {
 	int result;
-	int endp = usb_pipeendpoint(pipe) | (usb_pipein(pipe) << 7);
+	int endp = usb_pipeendpoint(pipe);
+
+	if (usb_pipein (pipe))
+		endp |= USB_DIR_IN;
 
 	result = usb_stor_control_msg(us, us->send_ctrl_pipe,
 		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT, 0,
