@@ -3874,7 +3874,7 @@ static int st_attach(Scsi_Device * SDp)
 				S_IFCHR | S_IRUGO | S_IWUGO,
 				&st_fops, NULL);
 	}
-	devfs_register_tape (tpnt->de_r[0]);
+	disk->number = devfs_register_tape(SDp->de);
 
 	printk(KERN_WARNING
 	"Attached scsi tape %s at scsi%d, channel %d, id %d, lun %d\n",
@@ -3908,6 +3908,7 @@ static void st_detach(Scsi_Device * SDp)
 				devfs_unregister (tpnt->de_n[mode]);
 				tpnt->de_n[mode] = NULL;
 			}
+			devfs_unregister_tape(tpnt->disk->number);
 			scsi_tapes[i] = 0;
 			scsi_slave_detach(SDp);
 			st_nr_dev--;
