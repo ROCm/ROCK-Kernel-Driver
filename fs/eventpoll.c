@@ -1155,8 +1155,7 @@ static int ep_modify(struct eventpoll *ep, struct epitem *epi, struct epoll_even
 				if (waitqueue_active(&ep->poll_wait))
 					pwake++;
 			}
-		} else if (EP_IS_LINKED(&epi->rdllink))
-			EP_LIST_DEL(&epi->rdllink);
+		}
 	}
 
 	write_unlock_irqrestore(&ep->lock, flags);
