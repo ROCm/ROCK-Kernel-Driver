@@ -533,7 +533,7 @@ bail2:
 	set_blocksize(dev, BLOCK_SIZE);
 bail3:
 	kfree(sbi);
-	sb->u.generic_sbp = NULL;
+	s->u.generic_sbp = NULL;
 	return -EINVAL;	
 }
 
