@@ -69,6 +69,10 @@ mcore-$(CONFIG_X86_NUMAQ)	:= mach-default
 mflags-$(CONFIG_X86_BIGSMP)	:= -Iinclude/asm-i386/mach-bigsmp
 mcore-$(CONFIG_X86_BIGSMP)	:= mach-default
 
+#Summit subarch support
+mflags-$(CONFIG_X86_SUMMIT) := -Iinclude/asm-i386/mach-summit
+mcore-$(CONFIG_X86_SUMMIT)  := mach-default
+
 # default subarch .h files
 mflags-y += -Iinclude/asm-i386/mach-default
 

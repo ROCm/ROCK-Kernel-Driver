@@ -90,6 +90,8 @@ SECTIONS
 	{ *(.rodata) *(.rodata.*) }
   .kstrtab : AT(ADDR(.kstrtab) - PAGE_OFFSET)
 	{ *(.kstrtab) }
+  __vermagic : AT(ADDR(__vermagic) - PAGE_OFFSET)
+	{ *(__vermagic) }
   .opd : AT(ADDR(.opd) - PAGE_OFFSET)
 	{ *(.opd) }
 

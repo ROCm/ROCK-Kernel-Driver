@@ -484,14 +484,6 @@ union i2c_smbus_data {
 
 #define I2C_MAJOR	89		/* Device major number		*/
 
-#  ifndef NULL
-#    define NULL ( (void *) 0 )
-#  endif
-
-#  ifndef ENODEV
-#    include <asm/errno.h>
-#  endif
-
 /* These defines are used for probing i2c client addresses */
 /* Default fill of many variables */
 #define I2C_CLIENT_DEFAULTS {I2C_CLIENT_END, I2C_CLIENT_END, I2C_CLIENT_END, \

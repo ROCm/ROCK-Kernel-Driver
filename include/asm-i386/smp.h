@@ -22,12 +22,6 @@
 #endif
 #endif
 
-#ifdef CONFIG_X86_NUMAQ
- #define INT_DELIVERY_MODE 0     /* physical delivery on LOCAL quad */
-#else
- #define INT_DELIVERY_MODE 1     /* logical delivery broadcast to all procs */
-#endif
-
 #define BAD_APICID 0xFFu
 #ifdef CONFIG_SMP
 #ifndef __ASSEMBLY__
@@ -82,12 +76,6 @@ static inline int num_booting_cpus(void)
 	return hweight32(cpu_callout_map);
 }
 
-/* Mapping from cpu number to logical apicid */
-extern volatile u8 cpu_2_logical_apicid[];
-static inline int cpu_to_logical_apicid(int cpu)
-{
-	return (int)cpu_2_logical_apicid[cpu];
-}
 extern void map_cpu_to_logical_apicid(void);
 extern void unmap_cpu_to_logical_apicid(int cpu);
 

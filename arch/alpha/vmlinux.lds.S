@@ -1,4 +1,5 @@
 #include <linux/config.h>
+#include <asm-generic/vmlinux.lds.h>
 
 OUTPUT_FORMAT("elf64-alpha")
 OUTPUT_ARCH(alpha)
@@ -20,9 +21,7 @@ SECTIONS
 	*(.gnu.warning)
   } :kernel
   _etext = .;					/* End of text section */
-
-  .rodata : { *(.rodata) *(.rodata.*) }
-  .kstrtab : { *(.kstrtab) }
+  RODATA
 
   . = ALIGN(16);
   __start___ex_table = .;			/* Exception table */

@@ -34,4 +34,9 @@ static inline void mps_oem_check(struct mp_config_table *mpc, char *oem,
 				mpc->mpc_oemsize);
 }
 
+/* Hook from generic ACPI tables.c */
+static inline void acpi_madt_oem_check(char *oem_id, char *oem_table_id)
+{
+}
+
 #endif /* __ASM_MACH_MPPARSE_H */

@@ -1045,10 +1045,10 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		/*
 		 * Don't even attempt to start the boot CPU!
 		 */
-		if (apicid == boot_cpu_apicid)
+		if ((apicid == boot_cpu_apicid) || (apicid == BAD_APICID))
 			continue;
 
-		if (!(phys_cpu_present_map & (1 << bit)))
+		if (!check_apicid_present(bit))
 			continue;
 		if (max_cpus <= cpucount+1)
 			continue;

@@ -1,5 +1,6 @@
 #include <linux/config.h>
-
+#include <asm-generic/vmlinux.lds.h>
+	
 /* ld script to make hppa Linux kernel */
 #ifndef CONFIG_PARISC64
 OUTPUT_FORMAT("elf32-hppa-linux")
@@ -31,31 +32,17 @@ SECTIONS
 
   _etext = .;			/* End of text section */
 
-  . = ALIGN(16);
-  .rodata : { *(.rodata) *(.rodata.*) }
-  .kstrtab : { *(.kstrtab) }
-
-  .data BLOCK(8192) : {			/* Data without special */
-	data_start = .;
-	*(.data)
-	}
-
   . = ALIGN(16);		/* Exception table */
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
-  __start___ksymtab = .;	/* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) }
-  __stop___ksymtab = .;
+  RODATA
 
-  __start___gpl_ksymtab = .;	/* Kernel symbol table:	GPL-only symbols */
-  __gpl_ksymtab : { *(__gpl_ksymtab) }
-  __stop___gpl_ksymtab = .;
-
-  __start___kallsyms = .;       /* All kernel symbols */
-  __kallsyms : { *(__kallsyms) }
-  __stop___kallsyms = .;
+  .data BLOCK(8192) : {			/* Data without special */
+	data_start = .;
+	*(.data)
+	}
 
 #ifdef CONFIG_PARISC64
   . = ALIGN(16);               /* Linkage tables */
