@@ -743,13 +743,22 @@ static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
 
 static int __init kobil_init (void)
 {
-	usb_serial_register (&kobil_device);
-	usb_register (&kobil_driver);
+	int retval;
+	retval = usb_serial_register(&kobil_device);
+	if (retval)
+		goto failed_usb_serial_register;
+	retval = usb_register(&kobil_driver);
+	if (retval) 
+		goto failed_usb_register;
 
 	info(DRIVER_VERSION " " DRIVER_AUTHOR);
 	info(DRIVER_DESC);
 
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&kobil_device);
+failed_usb_serial_register:
+	return retval;
 }
 
 

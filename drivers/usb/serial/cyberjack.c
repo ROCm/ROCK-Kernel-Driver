@@ -464,13 +464,22 @@ exit:
 
 static int __init cyberjack_init (void)
 {
-	usb_serial_register (&cyberjack_device);
-	usb_register (&cyberjack_driver);
+	int retval;
+	retval  = usb_serial_register(&cyberjack_device);
+	if (retval)
+		goto failed_usb_serial_register;
+	retval = usb_register(&cyberjack_driver);
+	if (retval) 
+		goto failed_usb_register;
 
 	info(DRIVER_VERSION " " DRIVER_AUTHOR);
 	info(DRIVER_DESC);
 
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&cyberjack_device);
+failed_usb_serial_register:
+	return retval;
 }
 
 static void __exit cyberjack_exit (void)

@@ -2045,11 +2045,24 @@ opcode, line, status, val );
 
 static int __init digi_init (void)
 {
-	usb_serial_register (&digi_acceleport_2_device);
-	usb_serial_register (&digi_acceleport_4_device);
-	usb_register (&digi_driver);
+	int retval;
+	retval = usb_serial_register(&digi_acceleport_2_device);
+	if (retval)
+		goto failed_acceleport_2_device;
+	retval = usb_serial_register(&digi_acceleport_4_device);
+	if (retval) 
+		goto failed_acceleport_4_device;
+	retval = usb_register(&digi_driver);
+	if (retval)
+		goto failed_usb_register;
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&digi_acceleport_4_device);
+failed_acceleport_4_device:
+	usb_serial_deregister(&digi_acceleport_2_device);
+failed_acceleport_2_device:
+	return retval;
 }
 
 

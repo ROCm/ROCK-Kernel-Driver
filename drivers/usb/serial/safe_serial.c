@@ -422,7 +422,7 @@ static struct usb_serial_device_type safe_device = {
 
 static int __init safe_init (void)
 {
-	int i;
+	int i, retval;
 
 	info (DRIVER_VERSION " " DRIVER_AUTHOR);
 	info (DRIVER_DESC);
@@ -441,10 +441,18 @@ static int __init safe_init (void)
 		}
 	}
 
-	usb_serial_register (&safe_device);
-	usb_register (&safe_driver);
+	retval = usb_serial_register(&safe_device);
+	if (retval)
+		goto failed_usb_serial_register;
+	retval = usb_register(&safe_driver);
+	if (retval)
+		goto failed_usb_register;
 
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&safe_device);
+failed_usb_serial_register:
+	return retval;
 }
 
 static void __exit safe_exit (void)

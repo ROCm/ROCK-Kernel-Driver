@@ -24,7 +24,6 @@
 
 #include <linux/module.h>
 #include <linux/socket.h>
-#include <linux/miscdevice.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>

@@ -17,6 +17,11 @@
  * See http://ftdi-usb-sio.sourceforge.net for upto date testing info
  *	and extra documentation
  *
+ * (19/Aug/2003) Ian Abbott
+ *      Freed urb's transfer buffer in write bulk callback.
+ *      Omitted some paranoid checks in write bulk callback that don't matter.
+ *      Scheduled work in write bulk callback regardless of port's open count.
+ *
  * (05/Aug/2003) Ian Abbott
  *      Added VID/PID for ID TECH IDT1221U USB to RS-232 adapter.
  *      VID/PID provided by Steve Briggs.
@@ -1391,31 +1396,21 @@ static int ftdi_write (struct usb_serial_port *port, int from_user,
 static void ftdi_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 
-	dbg("%s", __FUNCTION__);
+	/* free up the transfer buffer, as usb_free_urb() does not do this */
+	kfree (urb->transfer_buffer);
 
 	if (port_paranoia_check (port, __FUNCTION__))
 		return;
+	
+	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {
 		dbg("nonzero write bulk status received: %d", urb->status);
 		return;
 	}
 
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
-
-	/* Have to check for validity of queueing up the tasks */
-	dbg("%s - port->open_count = %d", __FUNCTION__, port->open_count);
-
- 	if (port->open_count > 0){
-		schedule_work(&port->work);
-	} 
-
-	return;
+	schedule_work(&port->work);
 } /* ftdi_write_bulk_callback */
 
 
@@ -1999,17 +1994,42 @@ static void ftdi_unthrottle (struct usb_serial_port *port)
 
 static int __init ftdi_init (void)
 {
+	int retval;
 
 	dbg("%s", __FUNCTION__);
-	usb_serial_register (&ftdi_SIO_device);
-	usb_serial_register (&ftdi_8U232AM_device);
-	usb_serial_register (&ftdi_FT232BM_device);
-	usb_serial_register (&ftdi_USB_UIRT_device);
-	usb_serial_register (&ftdi_HE_TIRA1_device);
-	usb_register (&ftdi_driver);
+	retval = usb_serial_register(&ftdi_SIO_device);
+	if (retval)
+		goto failed_SIO_register;
+	retval = usb_serial_register(&ftdi_8U232AM_device);
+	if (retval)
+		goto failed_8U232AM_register;
+	retval = usb_serial_register(&ftdi_FT232BM_device);
+	if (retval)
+		goto failed_FT232BM_register;
+	retval = usb_serial_register(&ftdi_USB_UIRT_device);
+	if (retval)
+		goto failed_USB_UIRT_register;
+	retval = usb_serial_register(&ftdi_HE_TIRA1_device);
+	if (retval)
+		goto failed_HE_TIRA1_register;
+	retval = usb_register(&ftdi_driver);
+	if (retval) 
+		goto failed_usb_register;
 
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&ftdi_HE_TIRA1_device);
+failed_HE_TIRA1_register:
+	usb_serial_deregister(&ftdi_USB_UIRT_device);
+failed_USB_UIRT_register:
+	usb_serial_deregister(&ftdi_FT232BM_device);
+failed_FT232BM_register:
+	usb_serial_deregister(&ftdi_8U232AM_device);
+failed_8U232AM_register:
+	usb_serial_deregister(&ftdi_SIO_device);
+failed_SIO_register:
+	return retval;
 }
 
 

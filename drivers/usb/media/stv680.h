@@ -89,7 +89,7 @@ struct stv680_frame {
 
 /* this is almost the video structure uvd_t, with extra parameters for stv */
 struct usb_stv {
-	struct video_device vdev;
+	struct video_device *vdev;
 
 	struct usb_device *udev;
 
@@ -142,7 +142,6 @@ struct usb_stv {
 
 	wait_queue_head_t wq;	/* Processes waiting */
 
-	struct proc_dir_entry *proc_entry;	/* /proc/stv680/videoX */
 	int nullpackets;
 };
 

@@ -609,10 +609,19 @@ static void ir_set_termios (struct usb_serial_port *port, struct termios *old_te
 
 static int __init ir_init (void)
 {
-	usb_serial_register (&ir_device);
-	usb_register (&ir_driver);
+	int retval;
+	retval = usb_serial_register(&ir_device);
+	if (retval)
+		goto failed_usb_serial_register;
+	retval = usb_register(&ir_driver);
+	if (retval) 
+		goto failed_usb_register;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&ir_device);
+failed_usb_serial_register:
+	return retval;
 }
 
 

@@ -33,7 +33,6 @@
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
-#include <linux/miscdevice.h>
 #include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/init.h>

@@ -122,17 +122,17 @@ Drivers that connect directly to the USB subsystem should be declared
 something like this:
 
     static struct usb_driver mydriver = {
-	name:		"mydriver",
-	id_table:	mydriver_id_table,
-	probe:		my_probe,
-	disconnect:	my_disconnect,
+	.name		= "mydriver",
+	.id_table	= mydriver_id_table,
+	.probe		= my_probe,
+	.disconnect	= my_disconnect,
 
 	/*
 	if using the usb chardev framework:
-	    minor:		MY_USB_MINOR_START,
-	    fops:		my_file_ops,
+	    .minor		= MY_USB_MINOR_START,
+	    .fops		= my_file_ops,
 	if exposing any operations through usbdevfs:
-	    ioctl:		my_ioctl,
+	    .ioctl		= my_ioctl,
 	*/
     }
 

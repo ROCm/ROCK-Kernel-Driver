@@ -246,21 +246,22 @@ static void sg_complete (struct urb *urb, struct pt_regs *regs)
 		io->status = urb->status;
 
 		/* the previous urbs, and this one, completed already.
-		 * unlink the later ones so they won't rx/tx bad data,
-		 *
-		 * FIXME don't bother unlinking urbs that haven't yet been
-		 * submitted; those non-error cases shouldn't be syslogged
+		 * unlink pending urbs so they won't rx/tx bad data.
 		 */
 		for (i = 0, found = 0; i < io->entries; i++) {
+			if (!io->urbs [i])
+				continue;
 			if (found) {
 				status = usb_unlink_urb (io->urbs [i]);
-				if (status && status != -EINPROGRESS)
-					err ("sg_complete, unlink --> %d",
-							status);
+				if (status != -EINPROGRESS && status != -EBUSY)
+					dev_err (&io->dev->dev,
+						"%s, unlink --> %d\n",
+						__FUNCTION__, status);
 			} else if (urb == io->urbs [i])
 				found = 1;
 		}
 	}
+	urb->dev = 0;
 
 	/* on the last completion, signal usb_sg_wait() */
 	io->bytes += urb->actual_length;
@@ -356,7 +357,7 @@ int usb_sg_init (
 			goto nomem;
 		}
 
-		io->urbs [i]->dev = dev;
+		io->urbs [i]->dev = 0;
 		io->urbs [i]->pipe = pipe;
 		io->urbs [i]->interval = period;
 		io->urbs [i]->transfer_flags = urb_flags;
@@ -448,6 +449,7 @@ void usb_sg_wait (struct usb_sg_request *io)
 	for (i = 0; i < io->entries && !io->status; i++) {
 		int	retval;
 
+		io->urbs [i]->dev = io->dev;
 		retval = usb_submit_urb (io->urbs [i], SLAB_ATOMIC);
 
 		/* after we submit, let completions or cancelations fire;
@@ -459,9 +461,9 @@ void usb_sg_wait (struct usb_sg_request *io)
 		case -ENXIO:	// hc didn't queue this one
 		case -EAGAIN:
 		case -ENOMEM:
+			io->urbs [i]->dev = 0;
 			retval = 0;
 			i--;
-			// FIXME:  should it usb_sg_cancel() on INTERRUPT?
 			yield ();
 			break;
 
@@ -477,8 +479,10 @@ void usb_sg_wait (struct usb_sg_request *io)
 
 			/* fail any uncompleted urbs */
 		default:
+			io->urbs [i]->dev = 0;
 			io->urbs [i]->status = retval;
-			dbg ("usb_sg_msg, submit --> %d", retval);
+			dev_dbg (&io->dev->dev, "%s, submit --> %d\n",
+				__FUNCTION__, retval);
 			usb_sg_cancel (io);
 		}
 		spin_lock_irqsave (&io->lock, flags);
@@ -521,9 +525,9 @@ void usb_sg_cancel (struct usb_sg_request *io)
 			if (!io->urbs [i]->dev)
 				continue;
 			retval = usb_unlink_urb (io->urbs [i]);
-			if (retval && retval != -EINPROGRESS)
-				warn ("usb_sg_cancel, unlink --> %d", retval);
-			// FIXME don't warn on "not yet submitted" error
+			if (retval != -EINPROGRESS && retval != -EBUSY)
+				dev_warn (&io->dev->dev, "%s, unlink --> %d\n",
+					__FUNCTION__, retval);
 		}
 	}
 	spin_unlock_irqrestore (&io->lock, flags);

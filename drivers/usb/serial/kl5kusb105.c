@@ -1037,11 +1037,20 @@ static void klsi_105_unthrottle (struct usb_serial_port *port)
 
 static int __init klsi_105_init (void)
 {
-	usb_serial_register (&kl5kusb105d_device);
-	usb_register (&kl5kusb105d_driver);
+	int retval;
+	retval = usb_serial_register(&kl5kusb105d_device);
+	if (retval)
+		goto failed_usb_serial_register;
+	retval = usb_register(&kl5kusb105d_driver);
+	if (retval)
+		goto failed_usb_register;
 
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&kl5kusb105d_device);
+failed_usb_serial_register:
+	return retval;
 }
 
 
