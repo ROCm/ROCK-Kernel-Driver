@@ -226,7 +226,6 @@ typedef __u8 BOOLEAN;
 #define ELS_PRLI_ACC 0x22  // {FCP-SCSI} Process Login Accept
 #define ELS_RJT 0x1000000
 #define SCSI_REPORT_LUNS 0x0A0
-#define REPORT_LUNS 0xA0 // SCSI-3 command op-code
 #define FCP_TARGET_RESET 0x200
 
 #define ELS_LILP_FRAME 0x00000711 // 1st payload word of LILP frame
