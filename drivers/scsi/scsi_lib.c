@@ -1042,15 +1042,16 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 }
 
 /*
- * scsi_check_sdev: if we can send requests to sdev, return 0 else return 1.
+ * scsi_dev_queue_ready: if we can send requests to sdev, return 1 else
+ * return 0.
  *
  * Called with the queue_lock held.
  */
-static inline int scsi_check_sdev(struct request_queue *q,
+static inline int scsi_dev_queue_ready(struct request_queue *q,
 				  struct scsi_device *sdev)
 {
 	if (sdev->device_busy >= sdev->queue_depth)
-		return 1;
+		return 0;
 	if (sdev->device_busy == 0 && sdev->device_blocked) {
 		/*
 		 * unblock after device_blocked iterates to zero
@@ -1062,26 +1063,27 @@ static inline int scsi_check_sdev(struct request_queue *q,
 				       sdev->id, sdev->lun));
 		} else {
 			blk_plug_device(q);
-			return 1;
+			return 0;
 		}
 	}
 	if (sdev->device_blocked)
-		return 1;
+		return 0;
 
-	return 0;
+	return 1;
 }
 
 /*
- * scsi_check_shost: if we can send requests to shost, return 0 else return 1.
+ * scsi_host_queue_ready: if we can send requests to shost, return 1 else
+ * return 0.
  *
  * Called with queue_lock and host_lock held.
  */
-static inline int scsi_check_shost(struct request_queue *q,
+static inline int scsi_host_queue_ready(struct request_queue *q,
 				   struct Scsi_Host *shost,
 				   struct scsi_device *sdev)
 {
 	if (shost->in_recovery)
-		return 1;
+		return 0;
 	if (shost->host_busy == 0 && shost->host_blocked) {
 		/*
 		 * unblock after host_blocked iterates to zero
@@ -1092,11 +1094,11 @@ static inline int scsi_check_shost(struct request_queue *q,
 					shost->host_no));
 		} else {
 			blk_plug_device(q);
-			return 1;
+			return 0;
 		}
 	}
 	if (!list_empty(&sdev->starved_entry))
-		return 1;
+		return 0;
 	if ((shost->can_queue > 0 && shost->host_busy >= shost->can_queue) ||
 	    shost->host_blocked || shost->host_self_blocked) {
 		SCSI_LOG_MLQUEUE(3,
@@ -1108,10 +1110,10 @@ static inline int scsi_check_shost(struct request_queue *q,
 			       shost->host_blocked, shost->host_self_blocked));
 		list_add_tail(&sdev->starved_entry,
 			      &shost->starved_list);
-		return 1;
+		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 /*
@@ -1149,11 +1151,11 @@ static void scsi_request_fn(request_queue_t *q)
 		 */
 		req = elv_next_request(q);
 
-		if (scsi_check_sdev(q, sdev))
+		if (!scsi_dev_queue_ready(q, sdev))
 			goto completed;
 
 		spin_lock_irqsave(shost->host_lock, flags);
-		if (scsi_check_shost(q, shost, sdev))
+		if (!scsi_host_queue_ready(q, shost, sdev))
 			goto after_host_lock;
 
 		if (sdev->single_lun && !sdev->device_busy &&
