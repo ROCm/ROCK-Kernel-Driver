@@ -317,6 +317,7 @@ struct user_struct {
 	atomic_t __count;	/* reference count */
 	atomic_t processes;	/* How many processes does this user have? */
 	atomic_t files;		/* How many open files does this user have? */
+	atomic_t sigpending;	/* How many pending signals does this user have? */
 
 	/* Hash table maintenance information */
 	struct list_head uidhash_list;
@@ -815,6 +816,11 @@ extern void __set_special_pids(pid_t session, pid_t pgrp);
 
 /* per-UID process charging. */
 extern struct user_struct * alloc_uid(uid_t);
+static inline struct user_struct *get_uid(struct user_struct *u)
+{
+	atomic_inc(&u->__count);
+	return u;
+}
 extern void free_uid(struct user_struct *);
 extern void switch_uid(struct user_struct *);
 
