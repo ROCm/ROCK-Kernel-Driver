@@ -14,9 +14,10 @@
 #ifdef CONFIG_DISCONTIGMEM
 #include <asm/numnodes.h>
 #endif
-#ifndef MAX_NUMNODES
-#define MAX_NUMNODES 1
+#ifndef NODES_SHIFT
+#define NODES_SHIFT	0
 #endif
+#define MAX_NUMNODES	(1 << NODES_SHIFT)
 
 /* Free memory management - zoned buddy allocator.  */
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
