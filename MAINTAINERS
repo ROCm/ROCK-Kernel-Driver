@@ -1,9 +1,6 @@
 
 	List of maintainers and how to submit kernel changes
 
- (Please See also Documentation/DriverFixers for people who offer driver
-	 development and fixing as a business)
-
 Please try to follow the guidelines below.  This will make things
 easier on the maintainers.  Not all of these guidelines matter for every
 trivial patch so apply some common sense.
