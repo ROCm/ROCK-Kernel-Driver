@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/testsetbit.S
+ *  linux/arch/arm26/lib/testsetbit.S
  *
  *  Copyright (C) 1995-1996 Russell King
  *

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/csumpartial.S
+ *  linux/arch/arm26/lib/csumpartial.S
  *
  *  Copyright (C) 1995-1998 Russell King
  *

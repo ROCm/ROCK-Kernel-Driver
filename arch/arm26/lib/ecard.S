@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/ecard.S
+ *  linux/arch/arm26/lib/ecard.S
  *
  *  Copyright (C) 1995, 1996 Russell King
  *

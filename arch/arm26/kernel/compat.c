@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/compat.c
+ *  linux/arch/arm26/kernel/compat.c
  *
  *  Copyright (C) 2001 Russell King
  *                2003 Ian Molton
