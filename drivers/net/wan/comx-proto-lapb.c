@@ -44,7 +44,7 @@ static void comxlapb_rx(struct net_device *dev, struct sk_buff *skb)
 	if (!dev || !dev->priv) {
 		dev_kfree_skb(skb);
 	} else {
-		lapb_data_received(dev->priv, skb);
+		lapb_data_received(dev, skb);
 	}
 }
 
@@ -82,7 +82,7 @@ static int comxlapb_open(struct net_device *dev)
 		return -ENODEV;
 	}
 
-	err = lapb_connect_request(ch);
+	err = lapb_connect_request(dev);
 
 	if (ch->debug_flags & DEBUG_COMX_LAPB) {
 		comx_debug(dev, "%s: lapb opened, error code: %d\n", 
@@ -108,7 +108,7 @@ static int comxlapb_close(struct net_device *dev)
 		comx_debug(dev, "%s: lapb closed\n", dev->name);
 	}
 
-	lapb_disconnect_request(ch);
+	lapb_disconnect_request(dev);
 
 	ch->init_status &= ~LINE_OPEN;
 	ch->line_status &= ~PROTO_UP;
@@ -130,11 +130,11 @@ static int comxlapb_xmit(struct sk_buff *skb, struct net_device *dev)
 			case 0x00:	
 				break;	// transmit
 			case 0x01:	
-				lapb_connect_request(ch);
+				lapb_connect_request(dev);
 				kfree_skb(skb);
 				return 0;
 			case 0x02:	
-				lapb_disconnect_request(ch);
+				lapb_disconnect_request(dev);
 			default:
 				kfree_skb(skb);
 				return 0;
@@ -145,7 +145,7 @@ static int comxlapb_xmit(struct sk_buff *skb, struct net_device *dev)
 	netif_stop_queue(dev);
 	
 	if ((skb2 = skb_clone(skb, GFP_ATOMIC)) != NULL) {
-		lapb_data_request(ch, skb2);
+		lapb_data_request(dev, skb2);
 	}
 
 	return FRAME_ACCEPTED;
@@ -157,7 +157,7 @@ static int comxlapb_statistics(struct net_device *dev, char *page)
 	int len = 0;
 
 	len += sprintf(page + len, "Line status: ");
-	if (lapb_getparms(dev->priv, &parms) != LAPB_OK) {
+	if (lapb_getparms(dev, &parms) != LAPB_OK) {
 		len += sprintf(page + len, "not initialized\n");
 		return len;
 	}
@@ -178,7 +178,7 @@ static int comxlapb_read_proc(char *page, char **start, off_t off, int count,
 	struct lapb_parms_struct parms;
 	int len = 0;
 
-	if (lapb_getparms(dev->priv, &parms)) {
+	if (lapb_getparms(dev, &parms)) {
 		return -ENODEV;
 	}
 
@@ -223,7 +223,7 @@ static int comxlapb_write_proc(struct file *file, const char *buffer,
 	unsigned long parm;
 	char *page;
 
-	if (lapb_getparms(dev->priv, &parms)) {
+	if (lapb_getparms(dev, &parms)) {
 		return -ENODEV;
 	}
 
@@ -243,23 +243,23 @@ static int comxlapb_write_proc(struct file *file, const char *buffer,
 		parm=simple_strtoul(page,NULL,10);
 		if (parm > 0 && parm < 100) {
 			parms.t1=parm;
-			lapb_setparms(dev->priv, &parms);
+			lapb_setparms(dev, &parms);
 		}
 	} else if (strcmp(entry->name, FILENAME_T2) == 0) {
 		parm=simple_strtoul(page, NULL, 10);
 		if (parm > 0 && parm < 100) {
 			parms.t2=parm;
-			lapb_setparms(dev->priv, &parms);
+			lapb_setparms(dev, &parms);
 		}
 	} else if (strcmp(entry->name, FILENAME_N2) == 0) {
 		parm=simple_strtoul(page, NULL, 10);
 		if (parm > 0 && parm < 100) {
 			parms.n2=parm;
-			lapb_setparms(dev->priv, &parms);
+			lapb_setparms(dev, &parms);
 		}
 	} else if (strcmp(entry->name, FILENAME_WINDOW) == 0) {
 		parms.window = simple_strtoul(page, NULL, 10);
-		lapb_setparms(dev->priv, &parms);
+		lapb_setparms(dev, &parms);
 	} else if (strcmp(entry->name, FILENAME_MODE) == 0) {
 		if (comx_strcasecmp(page, "dte") == 0) {
 			parms.mode &= ~(LAPB_DCE | LAPB_DTE); 
@@ -276,7 +276,7 @@ static int comxlapb_write_proc(struct file *file, const char *buffer,
 			parms.mode &= ~LAPB_STANDARD; 
 			parms.mode |= LAPB_EXTENDED;
 		}
-		lapb_setparms(dev->priv, &parms);
+		lapb_setparms(dev, &parms);
 	} else {
 		printk(KERN_ERR "comxlapb_write_proc: internal error, filename %s\n", 
 			entry->name);
@@ -287,9 +287,9 @@ static int comxlapb_write_proc(struct file *file, const char *buffer,
 	return count;
 }
 
-static void comxlapb_connected(void *token, int reason)
+static void comxlapb_connected(struct net_device *dev, int reason)
 {
-	struct comx_channel *ch = token; 
+	struct comx_channel *ch = dev->priv; 
 	struct proc_dir_entry *comxdir = ch->procdir->subdir;
 
 	if (ch->debug_flags & DEBUG_COMX_LAPB) {
@@ -327,9 +327,9 @@ static void comxlapb_connected(void *token, int reason)
 	comx_status(ch->dev, ch->line_status);
 }
 
-static void comxlapb_disconnected(void *token, int reason)
+static void comxlapb_disconnected(struct net_device *dev, int reason)
 {
-	struct comx_channel *ch = token; 
+	struct comx_channel *ch = dev->priv; 
 	struct proc_dir_entry *comxdir = ch->procdir->subdir;
 
 	if (ch->debug_flags & DEBUG_COMX_LAPB) {
@@ -366,9 +366,9 @@ static void comxlapb_disconnected(void *token, int reason)
 	comx_status(ch->dev, ch->line_status);
 }
 
-static int comxlapb_data_indication(void *token, struct sk_buff *skb)
+static int comxlapb_data_indication(struct net_device *dev, struct sk_buff *skb)
 {
-	struct comx_channel *ch = token; 
+	struct comx_channel *ch = dev->priv; 
 
 	if (ch->dev->type == ARPHRD_X25) {
 		skb_push(skb, 1);
@@ -387,9 +387,9 @@ static int comxlapb_data_indication(void *token, struct sk_buff *skb)
 	return comx_rx(ch->dev, skb);
 }
 
-static void comxlapb_data_transmit(void *token, struct sk_buff *skb)
+static void comxlapb_data_transmit(struct net_device *dev, struct sk_buff *skb)
 {
-	struct comx_channel *ch = token; 
+	struct comx_channel *ch = dev->priv; 
 
 	if (ch->HW_send_packet) {
 		ch->HW_send_packet(ch->dev, skb);
@@ -417,7 +417,7 @@ static int comxlapb_exit(struct net_device *dev)
 	if (ch->debug_flags & DEBUG_COMX_LAPB) {
 		comx_debug(dev, "%s: unregistering lapb\n", dev->name);
 	}
-	lapb_unregister(dev->priv);
+	lapb_unregister(dev);
 
 	remove_proc_entry(FILENAME_T1, ch->procdir);
 	remove_proc_entry(FILENAME_T2, ch->procdir);
@@ -453,7 +453,7 @@ static int comxlapb_init(struct net_device *dev)
 	lapbreg.disconnect_indication = comxlapb_disconnected;
 	lapbreg.data_indication = comxlapb_data_indication;
 	lapbreg.data_transmit = comxlapb_data_transmit;
-	if (lapb_register(dev->priv, &lapbreg)) {
+	if (lapb_register(dev, &lapbreg)) {
 		return -ENOMEM;
 	}
 	if (ch->debug_flags & DEBUG_COMX_LAPB) {

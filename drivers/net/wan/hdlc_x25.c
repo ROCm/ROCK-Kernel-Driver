@@ -25,21 +25,20 @@
 
 /* These functions are callbacks called by LAPB layer */
 
-static void x25_connect_disconnect(void *token, int reason, int code)
+static void x25_connect_disconnect(struct net_device *dev, int reason, int code)
 {
-	hdlc_device *hdlc = token;
 	struct sk_buff *skb;
 	unsigned char *ptr;
 
 	if ((skb = dev_alloc_skb(1)) == NULL) {
-		printk(KERN_ERR "%s: out of memory\n", hdlc_to_name(hdlc));
+		printk(KERN_ERR "%s: out of memory\n", dev->name);
 		return;
 	}
 
 	ptr = skb_put(skb, 1);
 	*ptr = code;
 
-	skb->dev = hdlc_to_dev(hdlc);
+	skb->dev = dev;
 	skb->protocol = htons(ETH_P_X25);
 	skb->mac.raw = skb->data;
 	skb->pkt_type = PACKET_HOST;
@@ -49,23 +48,22 @@ static void x25_connect_disconnect(void *token, int reason, int code)
 
 
 
-static void x25_connected(void *token, int reason)
+static void x25_connected(struct net_device *dev, int reason)
 {
-	x25_connect_disconnect(token, reason, 1);
+	x25_connect_disconnect(dev, reason, 1);
 }
 
 
 
-static void x25_disconnected(void *token, int reason)
+static void x25_disconnected(struct net_device *dev, int reason)
 {
-	x25_connect_disconnect(token, reason, 2);
+	x25_connect_disconnect(dev, reason, 2);
 }
 
 
 
-static int x25_data_indication(void *token, struct sk_buff *skb)
+static int x25_data_indication(struct net_device *dev, struct sk_buff *skb)
 {
-	hdlc_device *hdlc = token;
 	unsigned char *ptr;
 
 	skb_push(skb, 1);
@@ -76,7 +74,7 @@ static int x25_data_indication(void *token, struct sk_buff *skb)
 	ptr  = skb->data;
 	*ptr = 0;
 
-	skb->dev = hdlc_to_dev(hdlc);
+	skb->dev = dev;
 	skb->protocol = htons(ETH_P_X25);
 	skb->mac.raw = skb->data;
 	skb->pkt_type = PACKET_HOST;
@@ -86,17 +84,16 @@ static int x25_data_indication(void *token, struct sk_buff *skb)
 
 
 
-static void x25_data_transmit(void *token, struct sk_buff *skb)
+static void x25_data_transmit(struct net_device *dev, struct sk_buff *skb)
 {
-	hdlc_device *hdlc = token;
-	hdlc->xmit(skb, hdlc_to_dev(hdlc)); /* Ignore return value :-( */
+	hdlc_device *hdlc = dev_to_hdlc(dev);
+	hdlc->xmit(skb, dev); /* Ignore return value :-( */
 }
 
 
 
 static int x25_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
 	int result;
 
 
@@ -104,31 +101,31 @@ static int x25_xmit(struct sk_buff *skb, struct net_device *dev)
 	switch (skb->data[0]) {
 	case 0:		/* Data to be transmitted */
 		skb_pull(skb, 1);
-		if ((result = lapb_data_request(hdlc, skb)) != LAPB_OK)
+		if ((result = lapb_data_request(dev, skb)) != LAPB_OK)
 			dev_kfree_skb(skb);
 		return 0;
 
 	case 1:
-		if ((result = lapb_connect_request(hdlc))!= LAPB_OK) {
+		if ((result = lapb_connect_request(dev))!= LAPB_OK) {
 			if (result == LAPB_CONNECTED)
 				/* Send connect confirm. msg to level 3 */
-				x25_connected(hdlc, 0);
+				x25_connected(dev, 0);
 			else
 				printk(KERN_ERR "%s: LAPB connect request "
 				       "failed, error code = %i\n",
-				       hdlc_to_name(hdlc), result);
+				       dev->name, result);
 		}
 		break;
 
 	case 2:
-		if ((result = lapb_disconnect_request(hdlc)) != LAPB_OK) {
+		if ((result = lapb_disconnect_request(dev)) != LAPB_OK) {
 			if (result == LAPB_NOTCONNECTED)
 				/* Send disconnect confirm. msg to level 3 */
-				x25_disconnected(hdlc, 0);
+				x25_disconnected(dev, 0);
 			else
 				printk(KERN_ERR "%s: LAPB disconnect request "
 				       "failed, error code = %i\n",
-				       hdlc_to_name(hdlc), result);
+				       dev->name, result);
 		}
 		break;
 
@@ -142,7 +139,7 @@ static int x25_xmit(struct sk_buff *skb, struct net_device *dev)
 
 
 
-static int x25_open(hdlc_device *hdlc)
+static int x25_open(struct net_device *dev)
 {
 	struct lapb_register_struct cb;
 	int result;
@@ -154,7 +151,7 @@ static int x25_open(hdlc_device *hdlc)
 	cb.data_indication = x25_data_indication;
 	cb.data_transmit = x25_data_transmit;
 
-	result = lapb_register(hdlc, &cb);
+	result = lapb_register(dev, &cb);
 	if (result != LAPB_OK)
 		return result;
 	return 0;
@@ -162,9 +159,9 @@ static int x25_open(hdlc_device *hdlc)
 
 
 
-static void x25_close(hdlc_device *hdlc)
+static void x25_close(struct net_device *dev)
 {
-	lapb_unregister(hdlc);
+	lapb_unregister(dev);
 }
 
 
@@ -178,7 +175,7 @@ static int x25_rx(struct sk_buff *skb)
 		return NET_RX_DROP;
 	}
 
-	if (lapb_data_received(hdlc, skb) == LAPB_OK)
+	if (lapb_data_received(skb->dev, skb) == LAPB_OK)
 		return NET_RX_SUCCESS;
 
 	hdlc->stats.rx_errors++;
@@ -188,9 +185,9 @@ static int x25_rx(struct sk_buff *skb)
 
 
 
-int hdlc_x25_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
+int hdlc_x25_ioctl(struct net_device *dev, struct ifreq *ifr)
 {
-	struct net_device *dev = hdlc_to_dev(hdlc);
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	int result;
 
 	switch (ifr->ifr_settings.type) {
@@ -205,7 +202,7 @@ int hdlc_x25_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if(dev->flags & IFF_UP)
 			return -EBUSY;
 
-		result=hdlc->attach(hdlc, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
+		result=hdlc->attach(dev, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
 		if (result)
 			return result;
 
