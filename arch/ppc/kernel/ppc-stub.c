@@ -626,7 +626,7 @@ handle_exception (struct pt_regs *regs)
 	*ptr++ = hexchars[SP_REGNUM >> 4];
 	*ptr++ = hexchars[SP_REGNUM & 0xf];
 	*ptr++ = ':';
-	ptr = mem2hex(((char *)&regs) + SP_REGNUM*4, ptr, 4);
+	ptr = mem2hex(((char *)regs) + SP_REGNUM*4, ptr, 4);
 	*ptr++ = ';';
 #endif
 
@@ -805,7 +805,6 @@ handle_exception (struct pt_regs *regs)
 			set_msr(msr);
 #else
 			regs->msr |= MSR_SE;
-			set_msr(msr | MSR_SE);
 #endif
 			unlock_kernel();
 			kgdb_active = 0;
