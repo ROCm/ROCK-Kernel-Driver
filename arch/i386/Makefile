@@ -51,6 +51,11 @@ cflags-$(CONFIG_MVIAC3_2)	+= $(call check_gcc,-march=c3-2,-march=i686)
 # AMD Elan support
 cflags-$(CONFIG_X86_ELAN)	+= -march=i486
 
+# -mregparm=3 works ok on gcc-3.0 and later
+#
+GCC_VERSION			:= $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh $(CC))
+cflags-$(CONFIG_REGPARM) 	+= $(shell if [ $(GCC_VERSION) -ge 0300 ] ; then echo "-mregparm=3"; fi ;)
+
 CFLAGS += $(cflags-y)
 
 # Default subarch .c files

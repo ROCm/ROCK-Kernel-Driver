@@ -54,6 +54,12 @@ struct mod_arch_specific
 #error unknown processor family
 #endif
 
-#define MODULE_ARCH_VERMAGIC MODULE_PROC_FAMILY
+#ifdef CONFIG_REGPARM
+#define MODULE_REGPARM "REGPARM "
+#else
+#define MODULE_REGPARM ""
+#endif
+
+#define MODULE_ARCH_VERMAGIC MODULE_PROC_FAMILY MODULE_REGPARM
 
 #endif /* _ASM_I386_MODULE_H */

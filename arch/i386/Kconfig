@@ -838,6 +838,19 @@ config BOOT_IOREMAP
 	depends on (((X86_SUMMIT || X86_GENERICARCH) && NUMA) || (X86 && EFI))
 	default y
 
+config REGPARM
+	bool "Use register arguments (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	default n
+	help
+	Compile the kernel with -mregparm=3. This uses an different ABI
+	and passes the first three arguments of a function call in registers.
+	This will probably break binary only modules.
+
+	This feature is only enabled for gcc-3.0 and later - earlier compilers
+	generate incorrect output with certain kernel constructs when
+	-mregparm=3 is used.
+
 endmenu
 
 
