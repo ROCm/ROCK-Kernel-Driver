@@ -2082,7 +2082,7 @@ sys_kill(int pid, int sig)
 	info.si_signo = sig;
 	info.si_errno = 0;
 	info.si_code = SI_USER;
-	info.si_pid = current->pid;
+	info.si_pid = current->tgid;
 	info.si_uid = current->uid;
 
 	return kill_something_info(sig, &info, pid);
@@ -2105,7 +2105,7 @@ sys_tkill(int pid, int sig)
 	info.si_signo = sig;
 	info.si_errno = 0;
 	info.si_code = SI_TKILL;
-	info.si_pid = current->pid;
+	info.si_pid = current->tgid;
 	info.si_uid = current->uid;
 
 	read_lock(&tasklist_lock);
