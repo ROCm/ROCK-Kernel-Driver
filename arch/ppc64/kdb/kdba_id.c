@@ -106,7 +106,7 @@ kdba_printaddress(kdb_machreg_t addr, disassemble_info *dip, int flag)
 		}
 
 	} else {
-		dip->fprintf_func(dip->stream, "0x%0*lx", 2*sizeof(addr), addr);
+		dip->fprintf_func(dip->stream, "0x%0*lx      ", 2*sizeof(addr), addr);
 	}
 
 	if (flag)
