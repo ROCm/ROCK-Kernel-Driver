@@ -86,6 +86,7 @@ static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 static inline void pdc_dma_complete (struct ata_port *ap,
                                      struct ata_queued_cmd *qc, int have_err);
+static void pdc_irq_clear(struct ata_port *ap);
 
 static Scsi_Host_Template pdc_sata_sht = {
 	.module			= THIS_MODULE,
@@ -118,6 +119,7 @@ static struct ata_port_operations pdc_sata_ops = {
 	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= pdc_eng_timeout,
 	.irq_handler		= pdc_interrupt,
+	.irq_clear		= pdc_irq_clear,
 	.scr_read		= pdc_sata_scr_read,
 	.scr_write		= pdc_sata_scr_write,
 	.port_start		= pdc_port_start,
@@ -377,6 +379,14 @@ static inline unsigned int pdc_host_intr( struct ata_port *ap,
         }
 
         return handled;
+}
+
+static void pdc_irq_clear(struct ata_port *ap)
+{
+	struct ata_host_set *host_set = ap->host_set;
+	void *mmio = host_set->mmio_base;
+
+	readl(mmio + PDC_INT_SEQMASK);
 }
 
 static irqreturn_t pdc_interrupt (int irq, void *dev_instance, struct pt_regs *regs)

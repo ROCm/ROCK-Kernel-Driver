@@ -2537,6 +2537,11 @@ void ata_bmdma_start_pio (struct ata_queued_cmd *qc)
 	     ap->ioaddr.bmdma_addr + ATA_DMA_CMD);
 }
 
+void ata_bmdma_irq_clear(struct ata_port *ap)
+{
+	ata_bmdma_ack_irq(ap);
+}
+
 /**
  *	ata_host_intr - Handle host interrupt for given (port, task)
  *	@ap: Port on which interrupt arrived (possibly...)
@@ -2879,6 +2884,7 @@ int ata_device_add(struct ata_probe_ent *ent)
 	host_set->irq = ent->irq;
 	host_set->mmio_base = ent->mmio_base;
 	host_set->private_data = ent->private_data;
+	host_set->ops = ent->port_ops;
 
 	/* register each port bound to this device */
 	for (i = 0; i < ent->n_ports; i++) {
@@ -2901,6 +2907,8 @@ int ata_device_add(struct ata_probe_ent *ent)
 	       		ap->ioaddr.bmdma_addr,
 	       		ent->irq);
 
+		ata_chk_status(ap);
+		host_set->ops->irq_clear(ap);
 		count++;
 	}
 
@@ -2908,10 +2916,6 @@ int ata_device_add(struct ata_probe_ent *ent)
 		kfree(host_set);
 		return 0;
 	}
-
-	/* TODO: ack irq here, to ensure it won't scream
-	 * when we enable it?
-	 */
 
 	/* obtain irq, that is shared between channels */
 	if (request_irq(ent->irq, ent->port_ops->irq_handler, ent->irq_flags,
@@ -3238,8 +3242,8 @@ void ata_pci_remove_one (struct pci_dev *pdev)
 	free_irq(host_set->irq, host_set);
 	if (host_set->mmio_base)
 		iounmap(host_set->mmio_base);
-	if (host_set->ports[0]->ops->host_stop)
-		host_set->ports[0]->ops->host_stop(host_set);
+	if (host_set->ops->host_stop)
+		host_set->ops->host_stop(host_set);
 
 	for (i = 0; i < host_set->n_ports; i++) {
 		ap = host_set->ports[i];
@@ -3363,6 +3367,7 @@ EXPORT_SYMBOL_GPL(ata_bmdma_setup_pio);
 EXPORT_SYMBOL_GPL(ata_bmdma_start_pio);
 EXPORT_SYMBOL_GPL(ata_bmdma_setup_mmio);
 EXPORT_SYMBOL_GPL(ata_bmdma_start_mmio);
+EXPORT_SYMBOL_GPL(ata_bmdma_irq_clear);
 EXPORT_SYMBOL_GPL(ata_port_probe);
 EXPORT_SYMBOL_GPL(sata_phy_reset);
 EXPORT_SYMBOL_GPL(ata_bus_reset);

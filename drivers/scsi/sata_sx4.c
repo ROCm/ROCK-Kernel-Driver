@@ -171,6 +171,7 @@ static void pdc20621_get_from_dimm(struct ata_probe_ent *pe,
 #endif
 static void pdc20621_put_to_dimm(struct ata_probe_ent *pe, 
 				 void *psource, u32 offset, u32 size);
+static void pdc20621_irq_clear(struct ata_port *ap);
 
 
 static Scsi_Host_Template pdc_sata_sht = {
@@ -204,6 +205,7 @@ static struct ata_port_operations pdc_20621_ops = {
 	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= pdc_eng_timeout,
 	.irq_handler		= pdc20621_interrupt,
+	.irq_clear		= pdc20621_irq_clear,
 	.port_start		= pdc_port_start,
 	.port_stop		= pdc_port_stop,
 	.host_stop		= pdc20621_host_stop,
@@ -701,6 +703,16 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 	}
 
 	return handled;
+}
+
+static void pdc20621_irq_clear(struct ata_port *ap)
+{
+	struct ata_host_set *host_set = ap->host_set;
+	void *mmio = host_set->mmio_base;
+
+	mmio += PDC_CHIP0_OFS;
+
+	readl(mmio + PDC_20621_SEQMASK);
 }
 
 static irqreturn_t pdc20621_interrupt (int irq, void *dev_instance, struct pt_regs *regs)

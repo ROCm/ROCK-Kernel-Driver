@@ -202,6 +202,7 @@ struct ata_host_set {
 	void			*mmio_base;
 	unsigned int		n_ports;
 	void			*private_data;
+	struct ata_port_operations *ops;
 	struct ata_port *	ports[0];
 };
 
@@ -318,6 +319,7 @@ struct ata_port_operations {
 	void (*eng_timeout) (struct ata_port *ap);
 
 	irqreturn_t (*irq_handler)(int, void *, struct pt_regs *);
+	void (*irq_clear) (struct ata_port *);
 
 	u32 (*scr_read) (struct ata_port *ap, unsigned int sc_reg);
 	void (*scr_write) (struct ata_port *ap, unsigned int sc_reg,
@@ -382,6 +384,7 @@ extern void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc);
 extern void ata_bmdma_start_mmio (struct ata_queued_cmd *qc);
 extern void ata_bmdma_setup_pio (struct ata_queued_cmd *qc);
 extern void ata_bmdma_start_pio (struct ata_queued_cmd *qc);
+extern void ata_bmdma_irq_clear(struct ata_port *ap);
 extern int pci_test_config_bits(struct pci_dev *pdev, struct pci_bits *bits);
 extern void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat);
 extern void ata_eng_timeout(struct ata_port *ap);
@@ -484,6 +487,7 @@ static inline void ata_tf_init(struct ata_port *ap, struct ata_taskfile *tf, uns
 static inline u8 ata_irq_on(struct ata_port *ap)
 {
 	struct ata_ioports *ioaddr = &ap->ioaddr;
+	u8 tmp;
 
 	ap->ctl &= ~ATA_NIEN;
 	ap->last_ctl = ap->ctl;
@@ -492,7 +496,11 @@ static inline u8 ata_irq_on(struct ata_port *ap)
 		writeb(ap->ctl, ioaddr->ctl_addr);
 	else
 		outb(ap->ctl, ioaddr->ctl_addr);
-	return ata_wait_idle(ap);
+	tmp = ata_wait_idle(ap);
+
+	ap->ops->irq_clear(ap);
+
+	return tmp;
 }
 
 static inline u8 ata_irq_ack(struct ata_port *ap, unsigned int chk_drq)
