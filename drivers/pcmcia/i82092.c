@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/tqueue.h>
 
 #include <pcmcia/cs_types.h>
 #include <pcmcia/ss.h>
