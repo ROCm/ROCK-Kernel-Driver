@@ -2845,6 +2845,7 @@ long ppc32_timer_create(clockid_t clock,
 		return -EFAULT;
 
 	savefs = get_fs();
+	set_fs(KERNEL_DS);
 	err = sys_timer_create(clock, &event, &t);
 	set_fs(savefs);
 
