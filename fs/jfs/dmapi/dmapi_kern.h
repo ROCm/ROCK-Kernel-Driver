@@ -47,24 +47,7 @@ struct sys_dmapi_args {
 typedef struct sys_dmapi_args sys_dmapi_args_t;
 
 #define DM_Uarg(uap,i)	uap->uarg##i.u
-/* The original XFS code used uap->uarg##i.p for pointers, but this caused a 
-   problem on 64-bit platforms because the DMAPI library is 32-bits so there
-   was a conflict in sizeof(void *) between user and kernel space.  This has
-   been fixed by overloading uap->uarg##i.u - in this manner the 32-bit user
-   space address will be stored in the low DWORD of u while the high DWORD
-   will be zero, thus creating a 64-bit address that can be accessed by the
-   kernel.
-*/
-#ifdef __KERNEL__
-  #ifdef CONFIG_COMPAT
-    #define DM_Parg(uap,i)      uap->uarg##i.u
-  #else
-    #define DM_Parg(uap,i)      (__u32)uap->uarg##i.u
-  #endif
-#else
-    #define DM_Parg(uap,i)      uap->uarg##i.u
-#endif
-
+#define DM_Parg(uap,i)	uap->uarg##i.p
 
 #ifdef __KERNEL__
 
@@ -505,68 +488,7 @@ typedef struct dm_fcntl_mapevent dm_fcntl_mapevent_t;
 
 #define DM_MAX_HANDLE_SIZE	56	/* maximum size for a file handle */
 typedef char dm_handle_t[DM_MAX_HANDLE_SIZE];
-typedef __u32 size32_t;
-struct dm_fileattr32 {
-	dm_mode_t       fa_mode;
-	uid_t           fa_uid;
-	gid_t           fa_gid;
-	u_int           fa_atime;
-	u_int           fa_mtime;
-	u_int           fa_ctime;
-	u_int           fa_dtime;
-	unsigned int    fa_pad1;                /* reserved; do not reference */
-	dm_off_t        fa_size;
-};
-typedef struct dm_fileattr32 dm_fileattr32_t;
 
-struct dm_stat32 {
-	int		_link;
-	dm_vardata_t	dt_handle;
-	dm_vardata_t	dt_compname;
-	int		dt_nevents;
-	dm_eventset_t	dt_emask;
-	int		dt_pers;
-	int		dt_pmanreg;
-	u_int		dt_dtime;
-	unsigned int	dt_change;
-	unsigned int	dt_pad1;		/* reserved; do not reference */
-	dm_dev_t	dt_dev;
-	dm_ino_t	dt_ino;
-	dm_mode_t	dt_mode;
-	dm_nlink_t	dt_nlink;
-	uid_t		dt_uid;
-	gid_t		dt_gid;
-	dm_dev_t	dt_rdev;
-	unsigned int	dt_pad2;		/* reserved; do not reference */
-	dm_off_t	dt_size;
-	u_int		dt_atime;
-	u_int		dt_mtime;
-	u_int		dt_ctime;
-	unsigned int	dt_blksize;
-	dm_size_t	dt_blocks;
-
-	/* Non-standard filesystem-specific fields.
-	*/
-
-	__u64	dt_pad3;	/* reserved; do not reference */
-	int		dt_fstype;	/* filesystem index; see sysfs(2) */
-	union	{
-		struct	{
-			dm_igen_t	igen;
-			unsigned int	xflags;
-			unsigned int	extsize;
-			unsigned int	extents;
-			unsigned short	aextents;
-			unsigned short	dmstate;
-		} sgi_xfs;
-	} fsys_dep;
-};
-typedef struct dm_stat32 dm_stat32_t;
-struct	dm_timestruct32 {
-	u_int		dm_tv_sec;
-	int		dm_tv_nsec;
-};
-typedef struct dm_timestruct32 dm_timestruct32_t;
 
 /*
  *  Opcodes for dmapi ioctl.
@@ -651,23 +573,23 @@ typedef struct dm_timestruct32 dm_timestruct32_t;
 #define JFS_DM_IOC_GET_ALLOCINFO \
 	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_ALLOCINFO, dm_extent_t)
 #define JFS_DM_IOC_GET_BULKALL \
-	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_BULKALL, dm_stat32_t)
+	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_BULKALL, dm_stat_t)
 #define JFS_DM_IOC_GET_BULKATTR \
-	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_BULKATTR, dm_stat32_t)
+	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_BULKATTR, dm_stat_t)
 #define JFS_DM_IOC_GET_CONFIG \
 	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_CONFIG, dm_size_t)
 #define JFS_DM_IOC_GET_CONFIG_EVENTS \
 	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_CONFIG_EVENTS, dm_eventset_t)
 #define JFS_DM_IOC_GET_DIRATTRS \
-	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_DIRATTRS, dm_stat32_t)
+	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_DIRATTRS, dm_stat_t)
 #define JFS_DM_IOC_GET_DMATTR \
-	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_DMATTR, size32_t)
+	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_DMATTR, size_t)
 #define JFS_DM_IOC_GET_EVENTLIST \
 	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_EVENTLIST, dm_eventset_t)
 #define JFS_DM_IOC_GET_EVENTS \
 	_IOR(JFS_DM_IOCTL_TYPE, DM_GET_EVENTS, dm_eventmsg_t)
 #define JFS_DM_IOC_GET_FILEATTR \
-	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_FILEATTR, dm_stat32_t)
+	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_FILEATTR, dm_stat_t)
 #define JFS_DM_IOC_GET_MOUNTINFO \
 	_IOWR(JFS_DM_IOCTL_TYPE, DM_GET_MOUNTINFO, dm_mount_event_t)
 #define JFS_DM_IOC_GET_REGION \
@@ -699,7 +621,7 @@ typedef struct dm_timestruct32 dm_timestruct32_t;
 #define JFS_DM_IOC_PATH_TO_HANDLE \
 	_IOWR(JFS_DM_IOCTL_TYPE, DM_PATH_TO_HANDLE, dm_handle_t)
 #define JFS_DM_IOC_PENDING \
-	_IOW(JFS_DM_IOCTL_TYPE, DM_PENDING, dm_timestruct32_t)
+	_IOW(JFS_DM_IOCTL_TYPE, DM_PENDING, dm_timestruct_t)
 #define JFS_DM_IOC_PROBE_HOLE \
 	_IOWR(JFS_DM_IOCTL_TYPE, DM_PROBE_HOLE, dm_off_t)
 #define JFS_DM_IOC_PUNCH_HOLE \
@@ -707,7 +629,7 @@ typedef struct dm_timestruct32 dm_timestruct32_t;
 #define JFS_DM_IOC_QUERY_RIGHT \
 	_IOWR(JFS_DM_IOCTL_TYPE, DM_QUERY_RIGHT, dm_right_t)
 #define JFS_DM_IOC_QUERY_SESSION \
-	_IOR(JFS_DM_IOCTL_TYPE, DM_QUERY_SESSION, size32_t)
+	_IOR(JFS_DM_IOCTL_TYPE, DM_QUERY_SESSION, size_t)
 #define JFS_DM_IOC_READ_INVIS \
 	_IOWR(JFS_DM_IOCTL_TYPE, DM_READ_INVIS, dm_handle_t)
 #define JFS_DM_IOC_RELEASE_RIGHT \
@@ -727,7 +649,7 @@ typedef struct dm_timestruct32 dm_timestruct32_t;
 #define JFS_DM_IOC_SET_EVENTLIST \
 	_IOW(JFS_DM_IOCTL_TYPE, DM_SET_EVENTLIST, dm_eventset_t)
 #define JFS_DM_IOC_SET_FILEATTR \
-	_IOW(JFS_DM_IOCTL_TYPE, DM_SET_FILEATTR, dm_fileattr32_t)
+	_IOW(JFS_DM_IOCTL_TYPE, DM_SET_FILEATTR, dm_fileattr_t)
 #define JFS_DM_IOC_SET_INHERIT \
 	_IOW(JFS_DM_IOCTL_TYPE, DM_SET_INHERIT, dm_attrname_t)
 #define JFS_DM_IOC_SET_REGION \
@@ -745,5 +667,5 @@ typedef struct dm_timestruct32 dm_timestruct32_t;
 #define JFS_DM_IOC_OPEN_BY_HANDLE \
 	_IOW(JFS_DM_IOCTL_TYPE, DM_OPEN_BY_HANDLE, dm_handle_t)
 #define JFS_DM_IOC_HANDLE_TO_PATH \
-	_IOWR(JFS_DM_IOCTL_TYPE, DM_HANDLE_TO_PATH, size32_t)
+	_IOWR(JFS_DM_IOCTL_TYPE, DM_HANDLE_TO_PATH, size_t)
 #endif /* __DMAPI_KERN_H__ */

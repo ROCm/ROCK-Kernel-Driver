@@ -873,7 +873,7 @@ dm_path_to_hdl(
 
 	if (copy_to_user(hanp, &handle, (int)hlen))
 		return(-EFAULT);
-	if (put_user(hlen,(size32_t *)hlenp))
+	if (put_user(hlen,hlenp))
 		return(-EFAULT);
 	return(0);
 }
@@ -990,7 +990,7 @@ dm_hdl_to_path(
 
 	/* Copy information back to user space */
 	if ((copy_to_user(pathbufp, totpath, pathlen)) ||
-	    (put_user(pathlen, (size32_t *)rlenp))) {
+	    (copy_to_user(rlenp, &pathlen, sizeof(pathlen)))) {
 		error = -EFAULT;
 		goto free_name2;
 	}		
@@ -1077,7 +1077,7 @@ dm_path_to_fshdl(
 	hlen = FSHSIZE;
 	if(copy_to_user(hanp, &handle, (int)hlen))
 		return(-EFAULT);
-	if (put_user(hlen,(size32_t *)hlenp))
+	if (put_user(hlen,hlenp))
 		return(-EFAULT);
 	return(0);
 }
@@ -1119,7 +1119,7 @@ dm_fd_to_hdl(
 	if (copy_to_user(hanp, &handle, (int)hlen))
 		return(-EFAULT);
 	fput(filep);
-	if (put_user(hlen,(size32_t *)hlenp))
+	if (put_user(hlen,hlenp))
 		return(-EFAULT);
 	return(0);
 }
@@ -1468,7 +1468,7 @@ dm_get_mountinfo(
 
 	/* Copy the message into the user's buffer and update his 'rlenp'. */
 
-	if (put_user(fsrp->fr_msgsize, (size32_t *)rlenp)) {
+	if (put_user(fsrp->fr_msgsize, rlenp)) {
 		error = -EFAULT;
 	} else if (fsrp->fr_msgsize > buflen) { /* user buffer not big enough */
 		error = -E2BIG;
@@ -1535,7 +1535,7 @@ dm_getall_disp(
 	for (;;) {
 		if ((fsyscnt = dm_fsys_cnt) == 0) {
 			/*if (dm_cpoutsizet(rlenp, 0))*/
-			if (put_user(0,(size32_t *)rlenp))
+			if (put_user(0,rlenp))
 				return(-EFAULT);
 			return(0);
 		}
@@ -1602,7 +1602,7 @@ dm_getall_disp(
 	mutex_spinunlock(&s->sn_qlock, lc2);	/* reverse cookie order */
 	mutex_spinunlock(&dm_reg_lock, lc1);
 
-	if (put_user(totalsize, (size32_t *)rlenp)) {
+	if (put_user(totalsize, rlenp)) {
 		error = -EFAULT;
 	} else if (totalsize > buflen) {	/* no more room */
 		error = -E2BIG;

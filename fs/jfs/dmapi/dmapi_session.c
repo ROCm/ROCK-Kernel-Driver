@@ -714,7 +714,7 @@ dm_query_session(
 
 	/* Now that the mutex is released, copy the sessinfo to the user. */
 
-	if (put_user(len, (size32_t *)rlenp)) {
+	if (put_user(len, rlenp)) {
 		error = -EFAULT;
 	} else if (len > buflen) {
 		error = -E2BIG;
@@ -858,7 +858,7 @@ dm_find_eventmsg(
 
 	/* Now copy the data to the user. */
 
-	if (put_user(msgsize,(size32_t *)rlenp)) {
+	if (put_user(msgsize,rlenp)) {
 		error = -EFAULT;
 	} else if (msgsize > buflen) {		/* user buffer not big enough */
 		error = -E2BIG;
@@ -942,13 +942,13 @@ dm_pending(
 	dm_tokevent_t	*tevp;
 	int		error;
 	unsigned long	lc;		/* lock cookie */
-	dm_timestruct32_t localdelay;				// XFS BUG #38
+	dm_timestruct_t localdelay;				// XFS BUG #38
 
 	if ((error = dm_find_msg_and_lock(sid, token, &tevp, &lc)) != 0)
 		return(error);
 
 	// XFS BUG #38 START
-	if (copy_from_user(&localdelay, delay, sizeof(dm_timestruct32_t))) {
+	if (copy_from_user(&localdelay, delay, sizeof(dm_timestruct_t))) {
 		mutex_spinunlock(&tevp->te_lock, lc);
 		return(-EFAULT);
 	}
@@ -1069,7 +1069,7 @@ dm_get_events(
 
 		if (totalsize > buflen) {	/* no more room */
 			error = -E2BIG;
-		} else if (put_user(totalsize, (size32_t *)rlenp)) {
+		} else if (put_user(totalsize, rlenp)) {
 			error = -EFAULT;
 		} else if (copy_to_user(bufp, &tevp->te_msg, msgsize)) {
 			error = -EFAULT;
@@ -1098,7 +1098,7 @@ dm_get_events(
 			mutex_spinunlock(&s->sn_qlock, lc1);
 			if (prevmsg)
 				return(0);
-			if (error == -E2BIG && put_user(totalsize,(size32_t *)rlenp))
+			if (error == -E2BIG && put_user(totalsize,rlenp))
 				error = -EFAULT;
 			return(error);
 		}

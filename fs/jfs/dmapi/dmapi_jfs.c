@@ -162,7 +162,7 @@ STATIC	dm_size_t  dm_min_dio_xfer = 0; /* direct I/O disabled for now */
 #define DM_MAX_ATTR_BYTES_ON_DESTROY	256
 
 #define DM_STAT_SIZE(mask, namelen)	\
-	(sizeof(dm_stat32_t) + \
+	(sizeof(dm_stat_t) + \
 	 (((mask) & DM_AT_HANDLE) ? sizeof(jfs_handle_t) : 0) + (namelen))
 #define MAX_DIRENT_SIZE		(sizeof(dirent_t) + JFS_NAME_MAX + 1)
 
@@ -455,7 +455,7 @@ STATIC void
 jfs_ip_to_stat(
 	struct inode	*ip,
 	u_int		mask,
-	dm_stat32_t	*buf)
+	dm_stat_t	*buf)
 {
 	int		filetype;
 	struct jfs_inode_info *jfs_ip = JFS_IP(ip);
@@ -543,11 +543,11 @@ jfs_dm_bulkstat_one(
 	int		*res)		/* bulkstat result code */
 {
 	struct inode	*ip;
-	dm_stat32_t	*buf;
+	dm_stat_t	*buf;
 	jfs_handle_t	handle;
 	u_int		statstruct_sz;
 
-	buf = (dm_stat32_t *)buffer;
+	buf = (dm_stat_t *)buffer;
 
 	ip = iget(mp->i_sb, ino);
 	if (!ip) {
@@ -703,7 +703,7 @@ jfs_dirents_to_stats(
 	size_t		*offlastlinkp)  /* offset of last stat's _link */
 {
 	struct jfs_dirent *p;
-	dm_stat32_t	*statp;
+	dm_stat_t	*statp;
 	size_t		reclen;
 	size_t		namelen;
 	size_t		spaceleft;
@@ -731,7 +731,7 @@ jfs_dirents_to_stats(
 	 * is full.
 	 */
 	p = direntp;
-	statp = (dm_stat32_t *) bufp;
+	statp = (dm_stat_t *) bufp;
 	for (reclen = (size_t) sizeof(struct jfs_dirent) + p->name_len + 1; 
 					*direntbufsz > 0;
 					*direntbufsz -= reclen,
@@ -757,7 +757,7 @@ jfs_dirents_to_stats(
 			return(0);
 		}
 
-		statp = (dm_stat32_t *) bufp;
+		statp = (dm_stat_t *) bufp;
 
 		(void)jfs_dm_bulkstat_one(ip, mask, 0, p->ino, statp, &res);
 		if (res != BULKSTAT_RV_DIDONE)
@@ -1126,7 +1126,7 @@ jfs_dm_rdwr(
 			 * undo that because this I/O was supposed to be invisible.
                          */
 			struct timespec save_atime = ip->i_atime;
-			xfer = generic_file_read(&file, bufp, len, (loff_t *)&off);
+			xfer = generic_file_read(&file, bufp, len, &off);
 			ip->i_atime = save_atime;
 	                mark_inode_dirty(ip);
 	} else {
@@ -1136,7 +1136,7 @@ jfs_dm_rdwr(
 			 */
 			struct timespec save_mtime = ip->i_mtime;
 			struct timespec save_ctime = ip->i_ctime;
-			xfer = generic_file_write(&file, bufp, len, (loff_t *)&off);
+			xfer = generic_file_write(&file, bufp, len, &off);
 			ip->i_mtime = save_mtime;
 			ip->i_ctime = save_ctime;
 	                mark_inode_dirty(ip);
@@ -1509,7 +1509,7 @@ jfs_dm_get_bulkattr_rvp(
 
 	nelems = buflen / statstruct_sz;
 	if (nelems < 1) {
-		if (put_user( statstruct_sz, (size32_t *)rlenp ))
+		if (put_user( statstruct_sz, rlenp ))
 			return(-EFAULT);
 		return(-E2BIG);
 	}
@@ -1527,7 +1527,7 @@ jfs_dm_get_bulkattr_rvp(
 		*rvalp = 0;
 	}
 
-	if (put_user( statstruct_sz * nelems, (size32_t *)rlenp ))
+	if (put_user( statstruct_sz * nelems, rlenp ))
 		return(-EFAULT);
 
 	if (copy_to_user( locp, &loc, sizeof(loc)))
@@ -1758,8 +1758,7 @@ jfs_dm_get_dirattrs_rvp(
 	int		*rvp)
 {
 	size_t		direntbufsz, statbufsz;
-	size_t		nread, spaceleft, nwritten=0;
-	size32_t	totnwritten=0;
+	size_t		nread, spaceleft, nwritten=0, totnwritten=0;
 	void		*direntp, *statbufp;
 	int		error;
 	dm_attrloc_t	loc, dirloc;
@@ -1895,7 +1894,7 @@ jfs_dm_get_dirattrs_rvp(
 	kmem_free(statbufp, statbufsz);
 	kmem_free(direntp, direntbufsz);
 	if (!error){
-		if (put_user(totnwritten, (size32_t *)rlenp))
+		if (put_user(totnwritten, rlenp))
 			return(-EFAULT);
 	}
 
@@ -1973,7 +1972,7 @@ jfs_dm_get_dmattr(
 	if (!error && copy_to_user(bufp, value, value_len))
 		error = -EFAULT;
 	if (!error || error == -E2BIG) {
-		if (put_user(value_len, (size32_t *)rlenp))
+		if (put_user(value_len, rlenp))
 			error = -EFAULT;
 	}
 
@@ -2011,7 +2010,7 @@ jfs_dm_get_fileattr(
 	u_int		mask,		/* not used; always return everything */
 	dm_stat_t	*statp)
 {
-	dm_stat32_t	stat;
+	dm_stat_t	stat;
 
 	if (right < DM_RIGHT_SHARED)
 		return(-EACCES);
@@ -2024,10 +2023,9 @@ jfs_dm_get_fileattr(
 	   field so user will see it didn't change as there is no error 
 	   indication returned */
 	if ((mask & DM_AT_DTIME) && (!jfs_dmattr_exist(ip))) {
-		dm_stat32_t *stat32p = (dm_stat32_t *)statp;
 		mask = mask & (~DM_AT_DTIME);
 		if (copy_from_user(&stat.dt_dtime,
-				   &stat32p->dt_dtime,
+				   &statp->dt_dtime,
 				   sizeof(stat.dt_dtime)))
 			return(-EFAULT);
 	}
@@ -2275,7 +2273,7 @@ error_return:
 	up_read(&JFS_IP(ip)->xattr_sem);
 
 	if (!error || error == -E2BIG) {
-		if (put_user(req_size, (size32_t *)rlenp))
+		if (put_user(req_size, rlenp))
 			error = -EFAULT;
 	}
 
@@ -2904,7 +2902,7 @@ jfs_dm_set_fileattr(
 	u_int		mask,
 	dm_fileattr_t	*statp)
 {
-	dm_fileattr32_t	stat;
+	dm_fileattr_t	stat;
 	struct iattr	at;
 	int		error;
 
