@@ -274,7 +274,7 @@ __dump_configure_header(const struct pt_regs *regs)
  *     Change irq affinities
  *     Re-enable interrupts
  */
-void
+int
 __dump_irq_enable(void)
 {
         set_irq_affinity();
@@ -287,6 +287,7 @@ __dump_irq_enable(void)
 	ia64_setreg(_IA64_REG_CR_TPR, 0);
 	ia64_srlz_d();
         local_irq_enable();
+	return 0;
 }
 
 /*
