@@ -585,11 +585,12 @@ static int loop_thread(void *data)
 	return 0;
 }
 
-static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
-		       unsigned int arg)
+static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
+		       struct block_device *bdev, unsigned int arg)
 {
 	struct file	*file;
 	struct inode	*inode;
+	kdev_t		dev = to_kdev_t(bdev->bd_dev);
 	kdev_t		lo_device;
 	int		lo_flags = 0;
 	int		error;
@@ -613,7 +614,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 
 	if (S_ISBLK(inode->i_mode)) {
 		lo_device = inode->i_rdev;
-		if (kdev_same(lo_device, dev)) {
+		if (inode->i_bdev == bdev) {
 			error = -EBUSY;
 			goto out;
 		}
@@ -828,7 +829,7 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 	down(&lo->lo_ctl_mutex);
 	switch (cmd) {
 	case LOOP_SET_FD:
-		err = loop_set_fd(lo, file, inode->i_rdev, arg);
+		err = loop_set_fd(lo, file, inode->i_bdev, arg);
 		break;
 	case LOOP_CLR_FD:
 		err = loop_clr_fd(lo, inode->i_bdev);
