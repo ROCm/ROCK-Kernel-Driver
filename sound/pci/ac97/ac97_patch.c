@@ -1105,3 +1105,37 @@ int patch_vt1616(ac97_t * ac97)
 	ac97->build_ops = &patch_vt1616_ops;
 	return 0;
 }
+
+static const snd_kcontrol_new_t snd_ac97_controls_it2646[] = {
+	AC97_SINGLE("Line-In As Surround", 0x76, 9, 1, 0),
+	AC97_SINGLE("Mic As Center/LFE", 0x76, 10, 1, 0),
+};
+
+static const snd_kcontrol_new_t snd_ac97_spdif_controls_it2646[] = {
+	AC97_SINGLE("IEC958 Capture Switch", 0x76, 11, 1, 0),
+	AC97_SINGLE("Analog to IEC958 Output", 0x76, 12, 1, 0),
+	AC97_SINGLE("IEC958 Input Monitor", 0x76, 13, 1, 0),
+};
+
+static int patch_it2646_specific(ac97_t * ac97)
+{
+	int err;
+	if ((err = patch_build_controls(ac97, snd_ac97_controls_it2646, ARRAY_SIZE(snd_ac97_controls_it2646))) < 0)
+		return err;
+	if ((err = patch_build_controls(ac97, snd_ac97_spdif_controls_it2646, ARRAY_SIZE(snd_ac97_spdif_controls_it2646))) < 0)
+		return err;
+	return 0;
+}
+
+static struct snd_ac97_build_ops patch_it2646_ops = {
+	.build_specific	= patch_it2646_specific
+};
+
+int patch_it2646(ac97_t * ac97)
+{
+	ac97->build_ops = &patch_it2646_ops;
+	/* full DAC volume */
+	snd_ac97_write_cache(ac97, 0x5E, 0x0808);
+	snd_ac97_write_cache(ac97, 0x7A, 0x0808);
+	return 0;
+}
