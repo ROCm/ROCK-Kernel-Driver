@@ -880,7 +880,7 @@ static int      sisfb_do_set_var(struct fb_var_screeninfo *var, int isactive,
 		      	struct fb_info *info);
 static void     sisfb_pre_setmode(struct sis_video_info *ivideo);
 static void     sisfb_post_setmode(struct sis_video_info *ivideo);
-static char *   sis_find_rom(struct pci_dev *pdev);
+static void __iomem *sis_find_rom(struct pci_dev *pdev);
 static BOOLEAN  sisfb_CheckVBRetrace(struct sis_video_info *ivideo);
 static BOOLEAN  sisfbcheckvretracecrt2(struct sis_video_info *ivideo);
 static BOOLEAN  sisfbcheckvretracecrt1(struct sis_video_info *ivideo);

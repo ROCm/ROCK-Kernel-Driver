@@ -360,10 +360,10 @@ struct sis_video_info {
 	unsigned long 	mmio_base;
 	unsigned long 	vga_base;
 
-	unsigned long  	video_vbase;
-	unsigned long 	mmio_vbase;
-	char  *	      	bios_vbase;
-	char  *	      	bios_abase;
+	void __iomem *	video_vbase;
+	void __iomem *	mmio_vbase;
+	void __iomem * 	bios_vbase;
+	void *		bios_abase;
 
 	int 		mtrr;
 
@@ -392,8 +392,8 @@ struct sis_video_info {
 #endif
 
 	u32 		heapstart;        /* offset  */
-	unsigned long  	sisfb_heap_start; /* address */
-	unsigned long  	sisfb_heap_end;   /* address */
+	void __iomem * 	sisfb_heap_start; /* address */
+	void __iomem * 	sisfb_heap_end;   /* address */
 	u32 	      	sisfb_heap_size;
 	int		havenoheap;
 #if 0
@@ -469,7 +469,7 @@ struct sis_video_info {
 	u8 		detectedpdca;
 	u8 		detectedlcda;
 
-	unsigned long 	hwcursor_vbase;
+	void __iomem * 	hwcursor_vbase;
 
 	int 		chronteltype;
 	int    		tvxpos, tvypos;
