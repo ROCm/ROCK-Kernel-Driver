@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_ATTR_SF_H__
-#define __XFS_ATTR_SF_H__
+#define	__XFS_ATTR_SF_H__
 
 /*
  * Attribute storage when stored inside the inode.
@@ -105,7 +105,7 @@ int xfs_attr_sf_totsize(struct xfs_inode *dp);
 #endif
 
 #ifdef XFS_ALL_TRACE
-#define XFS_ATTR_TRACE
+#define	XFS_ATTR_TRACE
 #endif
 
 #if !defined(DEBUG)
@@ -120,15 +120,15 @@ struct xfs_da_intnode;
 struct xfs_da_node_entry;
 struct xfs_attr_leafblock;
 
-#define XFS_ATTR_TRACE_SIZE	4096	/* size of global trace buffer */
+#define	XFS_ATTR_TRACE_SIZE	4096	/* size of global trace buffer */
 
 /*
  * Trace record types.
  */
-#define XFS_ATTR_KTRACE_L_C	1	/* context */
-#define XFS_ATTR_KTRACE_L_CN	2	/* context, node */
-#define XFS_ATTR_KTRACE_L_CB	3	/* context, btree */
-#define XFS_ATTR_KTRACE_L_CL	4	/* context, leaf */
+#define	XFS_ATTR_KTRACE_L_C	1	/* context */
+#define	XFS_ATTR_KTRACE_L_CN	2	/* context, node */
+#define	XFS_ATTR_KTRACE_L_CB	3	/* context, btree */
+#define	XFS_ATTR_KTRACE_L_CL	4	/* context, leaf */
 
 #if defined(XFS_ATTR_TRACE)
 
@@ -148,10 +148,10 @@ void xfs_attr_trace_enter(int type, char *where,
 			     __psunsigned_t a12, __psunsigned_t a13,
 			     __psunsigned_t a14, __psunsigned_t a15);
 #else
-#define xfs_attr_trace_l_c(w,c)
-#define xfs_attr_trace_l_cn(w,c,n)
-#define xfs_attr_trace_l_cb(w,c,b)
-#define xfs_attr_trace_l_cl(w,c,l)
+#define	xfs_attr_trace_l_c(w,c)
+#define	xfs_attr_trace_l_cn(w,c,n)
+#define	xfs_attr_trace_l_cb(w,c,b)
+#define	xfs_attr_trace_l_cl(w,c,l)
 #endif /* XFS_ATTR_TRACE */
 
 #endif	/* __XFS_ATTR_SF_H__ */

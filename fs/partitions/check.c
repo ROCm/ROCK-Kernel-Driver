@@ -125,6 +125,29 @@ const char *bdevname(struct block_device *bdev, char *buf)
 	return disk_name(bdev->bd_disk, part, buf);
 }
 
+/*
+ * NOTE: this cannot be called from interrupt context.
+ *
+ * But in interrupt context you should really have a struct
+ * block_device anyway and use bdevname() above.
+ */
+const char *__bdevname(dev_t dev, char *buffer)
+{
+	struct gendisk *disk;
+	int part;
+
+	disk = get_gendisk(dev, &part);
+	if (disk) {
+		buffer = disk_name(disk, part, buffer);
+		put_disk(disk);
+	} else {
+		snprintf(buffer, BDEVNAME_SIZE, "unknown-block(%u,%u)",
+				MAJOR(dev), MINOR(dev));
+	}
+
+	return buffer;
+}
+
 static struct parsed_partitions *
 check_partition(struct gendisk *hd, struct block_device *bdev)
 {

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -36,8 +36,8 @@
  * Header file used to associate behaviors with virtualized objects.
  *
  * A virtualized object is an internal, virtualized representation of
- * OS entities such as persistent files, processes, or sockets.	 Examples
- * of virtualized objects include vnodes, vprocs, and vsockets.	 Often
+ * OS entities such as persistent files, processes, or sockets.  Examples
+ * of virtualized objects include vnodes, vprocs, and vsockets.  Often
  * a virtualized object is referred to simply as an "object."
  *
  * A behavior is essentially an implementation layer associated with
@@ -91,7 +91,7 @@
  *     active object
  *
  */
- 
+
 struct bhv_head_lock;
 
 /*
@@ -179,10 +179,10 @@ extern void bhv_insert_initial(bhv_head_t *, bhv_desc_t *);
 	if ((bhp)->bh_first == (bdp)) {			\
 		/*					\
 		* Remove from front of chain.		\
-		 * Atomic wrt oip's.			\
+		* Atomic wrt oip's.			\
 		*/					\
 	       (bhp)->bh_first = (bdp)->bd_next;	\
-	 } else {					\
+	} else {					\
 	       /* remove from non-front of chain */	\
 	       bhv_remove_not_first(bhp, bdp);		\
 	}						\

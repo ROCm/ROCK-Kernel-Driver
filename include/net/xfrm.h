@@ -484,6 +484,10 @@ xfrm_selector_match(struct xfrm_selector *sel, struct flowi *fl,
 	return 0;
 }
 
+/* placeholder until xfrm6_tunnel.c is written */
+static inline int xfrm6_tunnel_check_size(struct sk_buff *skb)
+{ return 0; }
+
 /* A struct encoding bundle of transformations to apply to some set of flow.
  *
  * dst->child points to the next element of bundle.
@@ -756,10 +760,12 @@ extern void xfrm_state_flush(u8 proto);
 extern int xfrm_replay_check(struct xfrm_state *x, u32 seq);
 extern void xfrm_replay_advance(struct xfrm_state *x, u32 seq);
 extern int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl);
+extern int xfrm_check_output(struct xfrm_state *x, struct sk_buff *skb, unsigned short family);
 extern int xfrm4_rcv(struct sk_buff *skb);
 extern int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type);
 extern int xfrm4_tunnel_register(struct xfrm_tunnel *handler);
 extern int xfrm4_tunnel_deregister(struct xfrm_tunnel *handler);
+extern int xfrm4_tunnel_check_size(struct sk_buff *skb);
 extern int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp);
 extern int xfrm6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int dir);
 extern int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen);

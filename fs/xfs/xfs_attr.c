@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,39 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
+
+#include "xfs_macros.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_alloc.h"
+#include "xfs_btree.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
+#include "xfs_bmap.h"
+#include "xfs_da_btree.h"
+#include "xfs_attr.h"
+#include "xfs_attr_leaf.h"
+#include "xfs_error.h"
+#include "xfs_bit.h"
+#include "xfs_quota.h"
+#include "xfs_rw.h"
+#include "xfs_trans_space.h"
 
 /*
  * xfs_attr.c
@@ -71,7 +103,7 @@ STATIC int xfs_attr_rmtval_set(xfs_da_args_t *args);
 STATIC int xfs_attr_rmtval_remove(xfs_da_args_t *args);
 
 #define ATTR_RMTVALUE_MAPSIZE	1	/* # of map entries at once */
-#define ATTR_RMTVALUE_TRANSBLKS 8	/* max # of blks in a transaction */
+#define ATTR_RMTVALUE_TRANSBLKS	8	/* max # of blks in a transaction */
 
 #if defined(DEBUG)
 ktrace_t *xfs_attr_trace_buf;
@@ -88,9 +120,9 @@ int								/* error */
 xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	     int flags, struct cred *cred)
 {
-	xfs_da_args_t	args;
-	int		error;
-	int		namelen;
+	xfs_da_args_t   args;
+	int             error;
+	int             namelen;
 	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
 
 	if (!name)
@@ -170,8 +202,8 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	int		local, size;
 	uint		nblks;
 	xfs_mount_t	*mp;
-	int		rsvd = (flags & ATTR_ROOT) != 0;
-	int		namelen;
+	int             rsvd = (flags & ATTR_ROOT) != 0;
+	int             namelen;
 
 	ASSERT(MAXNAMELEN-1 <= 0xff); /* length is stored in uint8 */
 	namelen = strlen(name);
@@ -423,13 +455,13 @@ out:
 int								/* error */
 xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 {
-	xfs_da_args_t	    args;
-	xfs_inode_t	    *dp;
-	xfs_fsblock_t	    firstblock;
-	xfs_bmap_free_t	    flist;
-	int		    error;
-	xfs_mount_t	    *mp;
-	int		    namelen;
+	xfs_da_args_t       args;
+	xfs_inode_t         *dp;
+	xfs_fsblock_t       firstblock;
+	xfs_bmap_free_t     flist;
+	int                 error;
+	xfs_mount_t         *mp;
+	int                 namelen;
 
 	ASSERT(MAXNAMELEN-1<=0xff); /* length is stored in uint8 */
 	namelen = strlen(name);
@@ -575,7 +607,7 @@ out:
 
 /*
  * Generate a list of extended attribute names and optionally
- * also value lengths.	Positive return value follows the XFS
+ * also value lengths.  Positive return value follows the XFS
  * convention of being an error, zero or negative return code
  * is the length of the buffer returned (negated), indicating
  * success.
@@ -617,7 +649,7 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	context.resynch = 1;
 	context.flags = flags;
 	if (!(flags & ATTR_KERNAMELS)) {
-		context.bufsize = (bufsize & ~(sizeof(int)-1));	 /* align */
+		context.bufsize = (bufsize & ~(sizeof(int)-1));  /* align */
 		context.firstu = context.bufsize;
 		context.alist = (attrlist_t *)buffer;
 		context.alist->al_count = 0;

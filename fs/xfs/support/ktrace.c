@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -31,6 +31,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/types.h>
 #include <linux/slab.h>
 
 #include <xfs_types.h>
@@ -43,7 +44,7 @@
 
 static kmem_zone_t *ktrace_hdr_zone;
 static kmem_zone_t *ktrace_ent_zone;
-static int	    ktrace_zentries;
+static int          ktrace_zentries;
 
 void
 ktrace_init(int zentries)
@@ -76,8 +77,8 @@ ktrace_uninit(void)
 ktrace_t *
 ktrace_alloc(int nentries, int sleep)
 {
-	ktrace_t	*ktp;
-	ktrace_entry_t	*ktep;
+	ktrace_t        *ktp;
+	ktrace_entry_t  *ktep;
 
 	ktp = (ktrace_t*)kmem_zone_alloc(ktrace_hdr_zone, sleep);
 
@@ -116,9 +117,9 @@ ktrace_alloc(int nentries, int sleep)
 
 	spinlock_init(&(ktp->kt_lock), "kt_lock");
 
-	ktp->kt_entries	 = ktep;
+	ktp->kt_entries  = ktep;
 	ktp->kt_nentries = nentries;
-	ktp->kt_index	 = 0;
+	ktp->kt_index    = 0;
 	ktp->kt_rollover = 0;
 
 	return ktp;
@@ -134,7 +135,7 @@ ktrace_alloc(int nentries, int sleep)
 void
 ktrace_free(ktrace_t *ktp)
 {
-	int	entries_size;
+	int     entries_size;
 
 	if (ktp == (ktrace_t *)NULL)
 		return;
@@ -162,27 +163,27 @@ ktrace_free(ktrace_t *ktp)
  */
 void
 ktrace_enter(
-	ktrace_t	*ktp,
-	void		*val0,
-	void		*val1,
-	void		*val2,
-	void		*val3,
-	void		*val4,
-	void		*val5,
-	void		*val6,
-	void		*val7,
-	void		*val8,
-	void		*val9,
-	void		*val10,
-	void		*val11,
-	void		*val12,
-	void		*val13,
-	void		*val14,
-	void		*val15)
+	ktrace_t        *ktp,
+	void            *val0,
+	void            *val1,
+	void            *val2,
+	void            *val3,
+	void            *val4,
+	void            *val5,
+	void            *val6,
+	void            *val7,
+	void            *val8,
+	void            *val9,
+	void            *val10,
+	void            *val11,
+	void            *val12,
+	void            *val13,
+	void            *val14,
+	void            *val15)
 {
 	static lock_t   wrap_lock = SPIN_LOCK_UNLOCKED;
-	int		index;
-	ktrace_entry_t	*ktep;
+	int             index;
+	ktrace_entry_t  *ktep;
 
 	ASSERT(ktp != NULL);
 
@@ -225,7 +226,7 @@ ktrace_enter(
  */
 int
 ktrace_nentries(
-	ktrace_t	*ktp)
+	ktrace_t        *ktp)
 {
 	if (ktp == NULL) {
 		return 0;
@@ -246,15 +247,15 @@ ktrace_nentries(
  *
  * The caller must pass in a pointer to a ktrace_snap
  * structure in which we will keep some state used to
- * iterate through the buffer.	This state must not touched
+ * iterate through the buffer.  This state must not touched
  * by any code outside of this module.
  */
 ktrace_entry_t *
-ktrace_first(ktrace_t	*ktp, ktrace_snap_t	*ktsp)
+ktrace_first(ktrace_t   *ktp, ktrace_snap_t     *ktsp)
 {
-	ktrace_entry_t	*ktep;
-	int		index;
-	int		nentries;
+	ktrace_entry_t  *ktep;
+	int             index;
+	int             nentries;
 
 	if (ktp->kt_rollover)
 		index = ktp->kt_index;
@@ -288,11 +289,11 @@ ktrace_first(ktrace_t	*ktp, ktrace_snap_t	*ktsp)
  */
 ktrace_entry_t *
 ktrace_next(
-	ktrace_t	*ktp,
-	ktrace_snap_t	*ktsp)
+	ktrace_t        *ktp,
+	ktrace_snap_t   *ktsp)
 {
-	int		index;
-	ktrace_entry_t	*ktep;
+	int             index;
+	ktrace_entry_t  *ktep;
 
 	index = ktsp->ks_index;
 	if (index == ktsp->ks_start) {
@@ -325,14 +326,14 @@ EXPORT_SYMBOL(ktrace_next);
 
 ktrace_entry_t *
 ktrace_skip(
-	ktrace_t	*ktp,
-	int		count,
-	ktrace_snap_t	*ktsp)
+	ktrace_t        *ktp,
+	int             count,
+	ktrace_snap_t   *ktsp)
 {
-	int		index;
-	int		new_index;
-	ktrace_entry_t	*ktep;
-	int		nentries = ktrace_nentries(ktp);
+	int             index;
+	int             new_index;
+	ktrace_entry_t  *ktep;
+	int             nentries = ktrace_nentries(ktp);
 
 	index = ktsp->ks_index;
 	new_index = index + count;

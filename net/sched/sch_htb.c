@@ -975,9 +975,7 @@ static void htb_delay_by(struct Qdisc *sch,long delay)
 			printk(KERN_INFO "HTB delay %ld > 5sec\n", delay);
 		delay = 5*HZ;
 	}
-	del_timer(&q->timer);
-	q->timer.expires = jiffies + delay;
-	add_timer(&q->timer);
+	mod_timer(&q->timer, jiffies + delay);
 	sch->flags |= TCQ_F_THROTTLED;
 	sch->stats.overlimits++;
 	HTB_DBG(3,1,"htb_deq t_delay=%ld\n",delay);

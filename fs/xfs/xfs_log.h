@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -29,7 +29,7 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_LOG_H__
+#ifndef	__XFS_LOG_H__
 #define __XFS_LOG_H__
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -69,10 +69,10 @@ xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2, xfs_arch_t arch)
 	return 0;
 }
 
-#define XFS_LSN_CMP_ARCH(x,y,arch)	_lsn_cmp(x, y, arch)
-#define XFS_LSN_CMP(x,y) XFS_LSN_CMP_ARCH(x,y,ARCH_NOCONVERT)
-#define XFS_LSN_DIFF_ARCH(x,y,arch)	_lsn_cmp(x, y, arch)
-#define XFS_LSN_DIFF(x,y) XFS_LSN_DIFF_ARCH(x,y,ARCH_NOCONVERT)
+#define	XFS_LSN_CMP_ARCH(x,y,arch)	_lsn_cmp(x, y, arch)
+#define	XFS_LSN_CMP(x,y) XFS_LSN_CMP_ARCH(x,y,ARCH_NOCONVERT)
+#define	XFS_LSN_DIFF_ARCH(x,y,arch)	_lsn_cmp(x, y, arch)
+#define	XFS_LSN_DIFF(x,y) XFS_LSN_DIFF_ARCH(x,y,ARCH_NOCONVERT)
 
 /*
  * Macros, structures, prototypes for interface to the log manager.
@@ -86,7 +86,7 @@ xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2, xfs_arch_t arch)
 /*
  * Flags to xfs_log_done()
  */
-#define XFS_LOG_REL_PERM_RESERV 0x1
+#define XFS_LOG_REL_PERM_RESERV	0x1
 
 
 /*
@@ -137,7 +137,7 @@ typedef void* xfs_log_ticket_t;
  * to the log manager.
  */
 typedef struct xfs_log_callback {
-	struct xfs_log_callback *cb_next;
+	struct xfs_log_callback	*cb_next;
 	void			(*cb_func)(void *, int);
 	void			*cb_arg;
 } xfs_log_callback_t;
@@ -173,13 +173,13 @@ int	  xfs_log_reserve(struct xfs_mount *mp,
 			  __uint8_t	   clientid,
 			  uint		   flags);
 int	  xfs_log_write(struct xfs_mount *mp,
-			xfs_log_iovec_t	 region[],
+			xfs_log_iovec_t  region[],
 			int		 nentries,
 			xfs_log_ticket_t ticket,
 			xfs_lsn_t	 *start_lsn);
 int	  xfs_log_unmount(struct xfs_mount *mp);
 int	  xfs_log_unmount_write(struct xfs_mount *mp);
-void	  xfs_log_unmount_dealloc(struct xfs_mount *mp);
+void      xfs_log_unmount_dealloc(struct xfs_mount *mp);
 int	  xfs_log_force_umount(struct xfs_mount *mp, int logerror);
 int	  xfs_log_need_covered(struct xfs_mount *mp);
 

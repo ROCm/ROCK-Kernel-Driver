@@ -30,7 +30,41 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
+#include "xfs_fs.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_alloc.h"
+#include "xfs_dmapi.h"
+#include "xfs_quota.h"
+#include "xfs_mount.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_btree.h"
+#include "xfs_ialloc.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode.h"
+#include "xfs_bmap.h"
+#include "xfs_bit.h"
+#include "xfs_rtalloc.h"
+#include "xfs_error.h"
+#include "xfs_itable.h"
+#include "xfs_rw.h"
+#include "xfs_acl.h"
+#include "xfs_cap.h"
+#include "xfs_mac.h"
+#include "xfs_attr.h"
+#include "xfs_buf_item.h"
+#include "xfs_utils.h"
+
 #include "xfs_qm.h"
 
 #ifdef DEBUG
@@ -69,11 +103,11 @@ xfs_qm_quotactl(
 	xfs_caddr_t	addr)
 {
 	xfs_mount_t	*mp;
-	int 		error;
+	int		error;
 	struct vfs	*vfsp;
 
 	vfsp = bhvtovfs(bdp);
-        mp = XFS_VFSTOM(vfsp);
+	mp = XFS_VFSTOM(vfsp);
 
 	if (addr == NULL && cmd != Q_SYNC)
 		return XFS_ERROR(EINVAL);
@@ -84,7 +118,7 @@ xfs_qm_quotactl(
 	 * The following commands are valid even when quotaoff.
 	 */
 	switch (cmd) {
-	      	/* 
+		/*
 		 * truncate quota files. quota must be off.
 		 */
 	      case Q_XQUOTARM:
@@ -92,7 +126,7 @@ xfs_qm_quotactl(
 			return XFS_ERROR(EINVAL);
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			return XFS_ERROR(EROFS);
-		return (xfs_qm_scall_trunc_qfiles(mp, 
+		return (xfs_qm_scall_trunc_qfiles(mp,
 			       xfs_qm_import_qtype_flags(*(uint *)addr)));
 		/*
 		 * Get quota status information.
@@ -116,7 +150,7 @@ xfs_qm_quotactl(
 		if (vfsp->vfs_flag & VFS_RDONLY)
 			return XFS_ERROR(EROFS);
 		break;
-		
+
 	      default:
 		break;
 	}
@@ -133,11 +167,11 @@ xfs_qm_quotactl(
 					    B_FALSE);
 		break;
 
-		/* 
-		 * Defaults to XFS_GETUQUOTA. 
+		/*
+		 * Defaults to XFS_GETUQUOTA.
 		 */
 	      case Q_XGETQUOTA:
-		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_USER, 
+		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_USER,
 					(fs_disk_quota_t *)addr);
 		break;
 		/*
@@ -157,9 +191,9 @@ xfs_qm_quotactl(
 					     (fs_disk_quota_t *)addr);
 		break;
 
-	      		
+
 	      case Q_XGETGQUOTA:
-		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_GROUP, 
+		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_GROUP,
 					(fs_disk_quota_t *)addr);
 		break;
 

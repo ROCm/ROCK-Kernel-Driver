@@ -49,7 +49,7 @@ config BRIDGE_EBT_LOG
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
-config BRIDGE_EBT_IPF
+config BRIDGE_EBT_IP
 	tristate "ebt: IP filter support"
 	depends on BRIDGE_NF_EBTABLES
 	help
@@ -59,7 +59,7 @@ config BRIDGE_EBT_IPF
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
-config BRIDGE_EBT_ARPF
+config BRIDGE_EBT_ARP
 	tristate "ebt: ARP filter support"
 	depends on BRIDGE_NF_EBTABLES
 	help
@@ -69,7 +69,7 @@ config BRIDGE_EBT_ARPF
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
-config BRIDGE_EBT_VLANF
+config BRIDGE_EBT_VLAN
 	tristate "ebt: 802.1Q VLAN filter support"
 	depends on BRIDGE_NF_EBTABLES
 	help
@@ -79,7 +79,7 @@ config BRIDGE_EBT_VLANF
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.
 
-config BRIDGE_EBT_MARKF
+config BRIDGE_EBT_MARK
 	tristate "ebt: mark filter support"
 	depends on BRIDGE_NF_EBTABLES
 	help
@@ -87,6 +87,18 @@ config BRIDGE_EBT_MARKF
 	  the 'nfmark' value in the frame. This can be set by the mark target.
 	  This value is the same as the one used in the iptables mark match and
 	  target.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config BRIDGE_EBT_PKTTYPE
+	tristate "ebt: packet type filter support"
+	depends on BRIDGE_NF_EBTABLES
+	help
+	  This option adds the packet type match, which allows matching on the
+	  type of packet based on its Ethernet "class" (as determined by
+	  the generic networking code): broadcast, multicast,
+	  for this host alone or for another host.
 
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/modules.txt>.  If unsure, say `N'.

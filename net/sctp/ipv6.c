@@ -508,6 +508,7 @@ struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 		goto out;
 
 	sock_init_data(NULL, newsk);
+	sk_set_owner(newsk, THIS_MODULE);
 
 	newsk->type = SOCK_STREAM;
 
@@ -749,6 +750,7 @@ static int sctp_inet6_supported_addrs(const struct sctp_opt *opt,
 
 static struct proto_ops inet6_seqpacket_ops = {
 	.family     = PF_INET6,
+	.owner      = THIS_MODULE,
 	.release    = inet6_release,
 	.bind       = inet6_bind,
 	.connect    = inet_dgram_connect,

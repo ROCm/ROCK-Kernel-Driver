@@ -2551,7 +2551,7 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 
 struct proto_ops wanpipe_ops = {
 	.family = 	PF_WANPIPE,
-
+	.owner =	THIS_MODULE,
 	.release = 	wanpipe_release,
 	.bind = 	wanpipe_bind,
 	.connect = 	wanpipe_connect,

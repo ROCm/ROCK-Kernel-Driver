@@ -54,6 +54,7 @@ extern void elv_merge_requests(request_queue_t *, struct request *,
 extern void elv_merged_request(request_queue_t *, struct request *);
 extern void elv_remove_request(request_queue_t *, struct request *);
 extern int elv_queue_empty(request_queue_t *);
+extern struct request *elv_next_request(struct request_queue *q);
 extern struct request *elv_former_request(request_queue_t *, struct request *);
 extern struct request *elv_latter_request(request_queue_t *, struct request *);
 extern int elv_register_queue(struct gendisk *);

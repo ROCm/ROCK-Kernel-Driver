@@ -20,7 +20,7 @@ ctl_table unix_table[] = {
 		.procname	= "max_dgram_qlen",
 		.data		= &sysctl_unix_max_dgram_qlen,
 		.maxlen		= sizeof(int),
-		.mode		= 0600,
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
 	},
 	{ .ctl_name = 0 }

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -35,7 +35,32 @@
  * Shortform directory implementation for v2 directories.
  */
 
-#include <xfs.h>
+#include "xfs.h"
+
+#include "xfs_macros.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
+#include "xfs_da_btree.h"
+#include "xfs_dir_leaf.h"
+#include "xfs_error.h"
+#include "xfs_dir2_data.h"
+#include "xfs_dir2_leaf.h"
+#include "xfs_dir2_block.h"
+#include "xfs_dir2_trace.h"
 
 /*
  * Prototypes for internal functions.
@@ -52,7 +77,7 @@ static int xfs_dir2_sf_addname_pick(xfs_da_args_t *args, int objchange,
 #ifdef DEBUG
 static void xfs_dir2_sf_check(xfs_da_args_t *args);
 #else
-#define xfs_dir2_sf_check(args)
+#define	xfs_dir2_sf_check(args)
 #endif /* DEBUG */
 #if XFS_BIG_FILESYSTEMS
 static void xfs_dir2_sf_toino4(xfs_da_args_t *args);
@@ -165,7 +190,7 @@ xfs_dir2_block_to_sf(
 	char			*ptr;		/* current data pointer */
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
-	xfs_ino_t		temp;
+	xfs_ino_t               temp;
 
 	xfs_dir2_trace_args_sb("block_to_sf", args, size, bp);
 	dp = args->dp;
@@ -477,7 +502,7 @@ xfs_dir2_sf_addname_hard(
 	}
 	/*
 	 * Get rid of the old directory, then allocate space for
-	 * the new one.	 We do this so xfs_idata_realloc won't copy
+	 * the new one.  We do this so xfs_idata_realloc won't copy
 	 * the data.
 	 */
 	xfs_idata_realloc(dp, -old_isize, XFS_DATA_FORK);

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -39,12 +39,12 @@
 typedef struct iovec iovec_t;
 
 typedef struct uio {
-	iovec_t		*uio_iov;	/* pointer to array of iovecs */
-	int		uio_iovcnt;	/* number of iovecs */
-	int		uio_fmode;	/* file mode flags */
-	xfs_off_t	uio_offset;	/* file offset */
-	short		uio_segflg;	/* address space (kernel or user) */
-	ssize_t		uio_resid;	/* residual count */
+	iovec_t         *uio_iov;       /* pointer to array of iovecs */
+	int             uio_iovcnt;     /* number of iovecs */
+	int             uio_fmode;      /* file mode flags */
+	xfs_off_t       uio_offset;     /* file offset */
+	short           uio_segflg;     /* address space (kernel or user) */
+	ssize_t         uio_resid;      /* residual count */
 } uio_t;
 
 /*
@@ -56,11 +56,11 @@ typedef enum uio_rw { UIO_READ, UIO_WRITE } uio_rw_t;
  * Segment flag values.
  */
 typedef enum uio_seg {
-	UIO_USERSPACE,		/* uio_iov describes user space */
-	UIO_SYSSPACE,		/* uio_iov describes system space */
+	UIO_USERSPACE,          /* uio_iov describes user space */
+	UIO_SYSSPACE,           /* uio_iov describes system space */
 } uio_seg_t;
 
 
 extern int	uiomove (void *, size_t, uio_rw_t, uio_t *);
 
-#endif	/* __XFS_SUPPORT_MOVE_H__ */
+#endif  /* __XFS_SUPPORT_MOVE_H__ */

@@ -283,22 +283,19 @@
 
 #include "../scsi/scsi.h"
 #include "../scsi/hosts.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,47)
-#include "../scsi/sd.h"
-#endif
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
 #include "ieee1394_core.h"
+#include "nodemgr.h"
 #include "hosts.h"
 #include "nodemgr.h"
 #include "highlevel.h"
 #include "ieee1394_transactions.h"
-#include "ieee1394_hotplug.h"
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 912 $ James Goodwin <jamesg@filanet.com>";
+	"$Rev: 919 $ James Goodwin <jamesg@filanet.com>";
 
 /*
  * Module load parameter definitions
@@ -2914,15 +2911,9 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
 	/*
 	 * Tell scsi stack that we're done with this command
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	spin_lock_irqsave(&io_request_lock,flags);
-	done (SCpnt);
-	spin_unlock_irqrestore(&io_request_lock,flags);
-#else
 	spin_lock_irqsave(scsi_id->hi->scsi_host->host_lock,flags);
 	done (SCpnt);
 	spin_unlock_irqrestore(scsi_id->hi->scsi_host->host_lock,flags);
-#endif
 
 	return;
 }

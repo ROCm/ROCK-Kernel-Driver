@@ -230,8 +230,8 @@ need_resched:
 	jmp need_resched
 #endif
 
-/* Points to after the "sysenter" instruction in the vsyscall page */
-#define SYSENTER_RETURN 0xffffe010
+/* SYSENTER_RETURN points to after the "sysenter" instruction in
+   the vsyscall page.  See vsyscall-sysentry.S, which defines the symbol.  */
 
 	# sysenter call handler stub
 ENTRY(sysenter_entry)

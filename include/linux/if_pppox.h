@@ -140,8 +140,6 @@ struct pppox_proto {
 	int		(*create)(struct socket *sock);
 	int		(*ioctl)(struct socket *sock, unsigned int cmd,
 				 unsigned long arg);
-	int		(*release)(struct socket *sock);
-	void            (*sk_free)(struct sock *sk);
 	struct module	*owner;
 };
 
@@ -150,9 +148,6 @@ extern void unregister_pppox_proto(int proto_num);
 extern void pppox_unbind_sock(struct sock *sk);/* delete ppp-channel binding */
 extern int pppox_channel_ioctl(struct ppp_channel *pc, unsigned int cmd,
 			       unsigned long arg);
-extern struct sock *pppox_sk_alloc(struct socket *sock, int protocol,
-				   int priority, int zero_it,
-				   kmem_cache_t *slab);
 
 /* PPPoX socket states */
 enum {

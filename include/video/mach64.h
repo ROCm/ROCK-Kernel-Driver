@@ -558,7 +558,7 @@
 #define CRTC_CSYNC_EN		0x00000010
 #define CRTC_PIX_BY_2_EN	0x00000020	/* unused on RAGE */
 #define CRTC_DISPLAY_DIS	0x00000040
-#define CRTC_VGA_XOVERSCAN	0x00000080
+#define CRTC_VGA_XOVERSCAN	0x00000040
 
 #define CRTC_PIX_WIDTH_MASK	0x00000700
 #define CRTC_PIX_WIDTH_4BPP	0x00000100
@@ -849,19 +849,7 @@
 #define LI_CHIP_ID	0x4c49	/* RAGE LT PRO */
 #define LP_CHIP_ID	0x4c50	/* RAGE LT PRO */
 #define LT_CHIP_ID	0x4c54	/* RAGE LT */
-
-/* mach64CT family / (Rage XL) class */
-#define GR_CHIP_ID	0x4752	/* RAGE XL, BGA, PCI33 */
-#define GS_CHIP_ID	0x4753	/* RAGE XL, PQFP, PCI33 */
-#define GM_CHIP_ID	0x474d	/* RAGE XL, BGA, AGP 1x,2x */
-#define GN_CHIP_ID	0x474e	/* RAGE XL, PQFP,AGP 1x,2x */
-#define GO_CHIP_ID	0x474f	/* RAGE XL, BGA, PCI66 */
-#define GL_CHIP_ID	0x474c	/* RAGE XL, PQFP, PCI66 */
-
-#define IS_XL(id) ((id)==GR_CHIP_ID || (id)==GS_CHIP_ID || \
-		   (id)==GM_CHIP_ID || (id)==GN_CHIP_ID || \
-		   (id)==GO_CHIP_ID || (id)==GL_CHIP_ID)	
-
+#define XL_CHIP_ID	0x4752	/* RAGE (XL) */
 #define GT_CHIP_ID	0x4754	/* RAGE (GT) */
 #define GU_CHIP_ID	0x4755	/* RAGE II/II+ (GTB) */
 #define GV_CHIP_ID	0x4756	/* RAGE IIC, PCI */
@@ -1160,65 +1148,6 @@
 #define APC_LUT_MN		0x39
 #define APC_LUT_OP		0x3A
 
-/* Values in LCD_GEN_CTRL */
-#define CRT_ON                          0x00000001ul
-#define LCD_ON                          0x00000002ul
-#define HORZ_DIVBY2_EN                  0x00000004ul
-#define DONT_DS_ICON                    0x00000008ul
-#define LOCK_8DOT                       0x00000010ul
-#define ICON_ENABLE                     0x00000020ul
-#define DONT_SHADOW_VPAR                0x00000040ul
-#define V2CLK_PM_EN                     0x00000080ul
-#define RST_FM                          0x00000100ul
-#define DISABLE_PCLK_RESET              0x00000200ul    /* XC/XL */
-#define DIS_HOR_CRT_DIVBY2              0x00000400ul
-#define SCLK_SEL                        0x00000800ul
-#define SCLK_DELAY                      0x0000f000ul
-#define TVCLK_PM_EN                     0x00010000ul
-#define VCLK_DAC_PM_EN                  0x00020000ul
-#define VCLK_LCD_OFF                    0x00040000ul
-#define SELECT_WAIT_4MS                 0x00080000ul
-#define XTALIN_PM_EN                    0x00080000ul    /* XC/XL */
-#define V2CLK_DAC_PM_EN                 0x00100000ul
-#define LVDS_EN                         0x00200000ul
-#define LVDS_PLL_EN                     0x00400000ul
-#define LVDS_PLL_RESET                  0x00800000ul
-#define LVDS_RESERVED_BITS              0x07000000ul
-#define CRTC_RW_SELECT                  0x08000000ul    /* LTPro */
-#define USE_SHADOWED_VEND               0x10000000ul
-#define USE_SHADOWED_ROWCUR             0x20000000ul
-#define SHADOW_EN                       0x40000000ul
-#define SHADOW_RW_EN                    0x80000000ul
-
-/* Values in HORZ_STRETCHING */
-#define HORZ_STRETCH_BLEND              0x00000ffful
-#define HORZ_STRETCH_RATIO              0x0000fffful
-#define HORZ_STRETCH_LOOP               0x00070000ul
-#define HORZ_STRETCH_LOOP09                     0x00000000ul
-#define HORZ_STRETCH_LOOP11                     0x00010000ul
-#define HORZ_STRETCH_LOOP12                     0x00020000ul
-#define HORZ_STRETCH_LOOP14                     0x00030000ul
-#define HORZ_STRETCH_LOOP15                     0x00040000ul
-/*      ?                                       0x00050000ul */
-/*      ?                                       0x00060000ul */
-/*      ?                                       0x00070000ul */
-/*      ?                               0x00080000ul */
-#define HORZ_PANEL_SIZE                 0x0ff00000ul    /* XC/XL */
-/*      ?                               0x10000000ul */
-#define AUTO_HORZ_RATIO                 0x20000000ul    /* XC/XL */
-#define HORZ_STRETCH_MODE               0x40000000ul
-#define HORZ_STRETCH_EN                 0x80000000ul
-
-/* Values in VERT_STRETCHING */
-#define VERT_STRETCH_RATIO0             0x000003fful
-#define VERT_STRETCH_RATIO1             0x000ffc00ul
-#define VERT_STRETCH_RATIO2             0x3ff00000ul
-#define VERT_STRETCH_USE0               0x40000000ul
-#define VERT_STRETCH_EN                 0x80000000ul
-
-/* Values in EXT_VERT_STRETCH */
-#define AUTO_VERT_RATIO                 0x00400000ul
-#define VERT_STRETCH_MODE		0x00000400ul
 
 /* Values in LCD_MISC_CNTL */
 #define BIAS_MOD_LEVEL_MASK	0x0000ff00

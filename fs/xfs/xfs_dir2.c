@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -35,7 +35,38 @@
  * Top-level and utility routines.
  */
 
-#include <xfs.h>
+#include "xfs.h"
+
+#include "xfs_macros.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
+#include "xfs_bmap.h"
+#include "xfs_da_btree.h"
+#include "xfs_dir_leaf.h"
+#include "xfs_dir2_data.h"
+#include "xfs_dir2_leaf.h"
+#include "xfs_dir2_block.h"
+#include "xfs_dir2_node.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dir2_trace.h"
+#include "xfs_error.h"
+#include "xfs_bit.h"
 
 /*
  * Declarations for interface routines.
@@ -282,7 +313,7 @@ xfs_dir2_removename(
 	int		namelen,	/* name length of entry to remove */
 	xfs_ino_t	ino,		/* inode number of entry to remove */
 	xfs_fsblock_t	*first,		/* bmap's firstblock */
-	xfs_bmap_free_t *flist,		/* bmap's freeblock list */
+	xfs_bmap_free_t	*flist,		/* bmap's freeblock list */
 	xfs_extlen_t	total)		/* bmap's total block count */
 {
 	xfs_da_args_t	args;		/* operation arguments */
@@ -385,7 +416,7 @@ xfs_dir2_replace(
 	int		namelen,	/* name length of entry to replace */
 	xfs_ino_t	inum,		/* new inode number */
 	xfs_fsblock_t	*first,		/* bmap's firstblock */
-	xfs_bmap_free_t *flist,		/* bmap's freeblock list */
+	xfs_bmap_free_t	*flist,		/* bmap's freeblock list */
 	xfs_extlen_t	total)		/* bmap's total block count */
 {
 	xfs_da_args_t	args;		/* operation arguments */
@@ -510,9 +541,9 @@ xfs_dir2_grow_inode(
 	int		error;		/* error return value */
 	int		got;		/* blocks actually mapped */
 	int		i;		/* temp mapping index */
-	xfs_bmbt_irec_t map;		/* single structure for bmap */
+	xfs_bmbt_irec_t	map;		/* single structure for bmap */
 	int		mapi;		/* mapping index */
-	xfs_bmbt_irec_t *mapp;		/* bmap mapping structure(s) */
+	xfs_bmbt_irec_t	*mapp;		/* bmap mapping structure(s) */
 	xfs_mount_t	*mp;		/* filesystem mount point */
 	int		nmap;		/* number of bmap entries */
 	xfs_trans_t	*tp;		/* transaction pointer */

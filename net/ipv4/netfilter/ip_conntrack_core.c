@@ -28,6 +28,8 @@
 #include <linux/stddef.h>
 #include <linux/sysctl.h>
 #include <linux/slab.h>
+#include <linux/random.h>
+#include <linux/jhash.h>
 /* For ERR_PTR().  Yeah, I know... --RR */
 #include <linux/fs.h>
 
@@ -104,20 +106,19 @@ ip_conntrack_put(struct ip_conntrack *ct)
 	nf_conntrack_put(&ct->infos[0]);
 }
 
-static inline u_int32_t
+static int ip_conntrack_hash_rnd_initted;
+static unsigned int ip_conntrack_hash_rnd;
+
+static u_int32_t
 hash_conntrack(const struct ip_conntrack_tuple *tuple)
 {
 #if 0
 	dump_tuple(tuple);
 #endif
-	/* ntohl because more differences in low bits. */
-	/* To ensure that halves of the same connection don't hash
-	   clash, we add the source per-proto again. */
-	return (ntohl(tuple->src.ip + tuple->dst.ip
-		     + tuple->src.u.all + tuple->dst.u.all
-		     + tuple->dst.protonum)
-		+ ntohs(tuple->src.u.all))
-		% ip_conntrack_htable_size;
+	return (jhash_3words(tuple->src.ip,
+	                     (tuple->dst.ip ^ tuple->dst.protonum),
+	                     (tuple->src.u.all | (tuple->dst.u.all << 16)),
+	                     ip_conntrack_hash_rnd) % ip_conntrack_htable_size);
 }
 
 int
@@ -613,10 +614,15 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 {
 	struct ip_conntrack *conntrack;
 	struct ip_conntrack_tuple repl_tuple;
-	size_t hash, repl_hash;
+	size_t hash;
 	struct ip_conntrack_expect *expected;
 	int i;
 	static unsigned int drop_next = 0;
+
+	if (!ip_conntrack_hash_rnd_initted) {
+		get_random_bytes(&ip_conntrack_hash_rnd, 4);
+		ip_conntrack_hash_rnd_initted = 1;
+	}
 
 	hash = hash_conntrack(tuple);
 
@@ -641,7 +647,6 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 		DEBUGP("Can't invert tuple.\n");
 		return NULL;
 	}
-	repl_hash = hash_conntrack(&repl_tuple);
 
 	conntrack = kmem_cache_alloc(ip_conntrack_cachep, GFP_ATOMIC);
 	if (!conntrack) {

@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -67,17 +67,17 @@ typedef struct mrlock_s {
 
 extern void	mraccessf(mrlock_t *, int);
 extern void	mrupdatef(mrlock_t *, int);
-extern void	mrlock(mrlock_t *, int, int);
-extern void	mrunlock(mrlock_t *);
-extern void	mraccunlock(mrlock_t *);
-extern int	mrtryupdate(mrlock_t *);
-extern int	mrtryaccess(mrlock_t *);
+extern void     mrlock(mrlock_t *, int, int);
+extern void     mrunlock(mrlock_t *);
+extern void     mraccunlock(mrlock_t *);
+extern int      mrtryupdate(mrlock_t *);
+extern int      mrtryaccess(mrlock_t *);
 extern int	mrtrypromote(mrlock_t *);
-extern void	mrdemote(mrlock_t *);
+extern void     mrdemote(mrlock_t *);
 
 extern int	ismrlocked(mrlock_t *, int);
-extern void	mrlock_init(mrlock_t *, int type, char *name, long sequence);
-extern void	mrfree(mrlock_t *);
+extern void     mrlock_init(mrlock_t *, int type, char *name, long sequence);
+extern void     mrfree(mrlock_t *);
 
 #define mrinit(mrp, name)	mrlock_init(mrp, MRLOCK_BARRIER, name, -1)
 #define mraccess(mrp)		mraccessf(mrp, 0) /* grab for READ/ACCESS */

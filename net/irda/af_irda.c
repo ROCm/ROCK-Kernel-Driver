@@ -2408,7 +2408,7 @@ static struct net_proto_family irda_family_ops = {
 
 static struct proto_ops SOCKOPS_WRAPPED(irda_stream_ops) = {
 	.family =	PF_IRDA,
-
+	.owner =	THIS_MODULE,
 	.release =	irda_release,
 	.bind =		irda_bind,
 	.connect =	irda_connect,
@@ -2429,7 +2429,7 @@ static struct proto_ops SOCKOPS_WRAPPED(irda_stream_ops) = {
 
 static struct proto_ops SOCKOPS_WRAPPED(irda_seqpacket_ops) = {
 	.family =	PF_IRDA,
-
+	.owner =	THIS_MODULE,
 	.release =	irda_release,
 	.bind =		irda_bind,
 	.connect =	irda_connect,
@@ -2450,7 +2450,7 @@ static struct proto_ops SOCKOPS_WRAPPED(irda_seqpacket_ops) = {
 
 static struct proto_ops SOCKOPS_WRAPPED(irda_dgram_ops) = {
 	.family =	PF_IRDA,
-
+	.owner =	THIS_MODULE,
 	.release =	irda_release,
 	.bind =		irda_bind,
 	.connect =	irda_connect,
@@ -2472,7 +2472,7 @@ static struct proto_ops SOCKOPS_WRAPPED(irda_dgram_ops) = {
 #ifdef CONFIG_IRDA_ULTRA
 static struct proto_ops SOCKOPS_WRAPPED(irda_ultra_ops) = {
 	.family =	PF_IRDA,
-
+	.owner =	THIS_MODULE,
 	.release =	irda_release,
 	.bind =		irda_bind,
 	.connect =	sock_no_connect,

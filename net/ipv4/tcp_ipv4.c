@@ -58,6 +58,7 @@
 #include <linux/fcntl.h>
 #include <linux/random.h>
 #include <linux/cache.h>
+#include <linux/jhash.h>
 #include <linux/init.h>
 
 #include <net/icmp.h>
@@ -883,12 +884,9 @@ static __inline__ int tcp_v4_iif(struct sk_buff *skb)
 	return ((struct rtable *)skb->dst)->rt_iif;
 }
 
-static __inline__ unsigned tcp_v4_synq_hash(u32 raddr, u16 rport)
+static __inline__ u32 tcp_v4_synq_hash(u32 raddr, u16 rport, u32 rnd)
 {
-	unsigned h = raddr ^ rport;
-	h ^= h >> 16;
-	h ^= h >> 8;
-	return h & (TCP_SYNQ_HSIZE - 1);
+	return (jhash_2words(raddr, (u32) rport, rnd) & (TCP_SYNQ_HSIZE - 1));
 }
 
 static struct open_request *tcp_v4_search_req(struct tcp_opt *tp,
@@ -899,7 +897,7 @@ static struct open_request *tcp_v4_search_req(struct tcp_opt *tp,
 	struct tcp_listen_opt *lopt = tp->listen_opt;
 	struct open_request *req, **prev;
 
-	for (prev = &lopt->syn_table[tcp_v4_synq_hash(raddr, rport)];
+	for (prev = &lopt->syn_table[tcp_v4_synq_hash(raddr, rport, lopt->hash_rnd)];
 	     (req = *prev) != NULL;
 	     prev = &req->dl_next) {
 		if (req->rmt_port == rport &&
@@ -919,7 +917,7 @@ static void tcp_v4_synq_add(struct sock *sk, struct open_request *req)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct tcp_listen_opt *lopt = tp->listen_opt;
-	unsigned h = tcp_v4_synq_hash(req->af.v4_req.rmt_addr, req->rmt_port);
+	u32 h = tcp_v4_synq_hash(req->af.v4_req.rmt_addr, req->rmt_port, lopt->hash_rnd);
 
 	req->expires = jiffies + TCP_TIMEOUT_INIT;
 	req->retrans = 0;

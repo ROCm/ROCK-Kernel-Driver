@@ -348,7 +348,6 @@ static void bsd_free (void *state)
  * Finally release the structure itself.
  */
 	kfree (db);
-	MOD_DEC_USE_COUNT;
       }
   }
 
@@ -422,7 +421,6 @@ static void *bsd_alloc (unsigned char *options, int opt_len, int decomp)
 	return NULL;
       }
 
-    MOD_INC_USE_COUNT;
 /*
  * If this is the compression buffer then there is no length data.
  */
@@ -1141,20 +1139,21 @@ static int bsd_decompress (void *state, unsigned char *ibuf, int isize,
  *************************************************************/
 
 static struct compressor ppp_bsd_compress = {
-    CI_BSD_COMPRESS,		/* compress_proto */
-    bsd_comp_alloc,		/* comp_alloc */
-    bsd_free,			/* comp_free */
-    bsd_comp_init,		/* comp_init */
-    bsd_reset,			/* comp_reset */
-    bsd_compress,		/* compress */
-    bsd_comp_stats,		/* comp_stat */
-    bsd_decomp_alloc,		/* decomp_alloc */
-    bsd_free,			/* decomp_free */
-    bsd_decomp_init,		/* decomp_init */
-    bsd_reset,			/* decomp_reset */
-    bsd_decompress,		/* decompress */
-    bsd_incomp,			/* incomp */
-    bsd_comp_stats		/* decomp_stat */
+	.compress_proto =	CI_BSD_COMPRESS,
+	.comp_alloc =		bsd_comp_alloc,
+	.comp_free =		bsd_free,
+	.comp_init =		bsd_comp_init,
+	.comp_reset =		bsd_reset,
+	.compress =		bsd_compress,
+	.comp_stat =		bsd_comp_stats,
+	.decomp_alloc =		bsd_decomp_alloc,
+	.decomp_free =		bsd_free,
+	.decomp_init =		bsd_decomp_init,
+	.decomp_reset =		bsd_reset,
+	.decompress =		bsd_decompress,
+	.incomp =		bsd_incomp,
+	.decomp_stat =		bsd_comp_stats,
+	.owner =		THIS_MODULE
 };
 
 /*************************************************************

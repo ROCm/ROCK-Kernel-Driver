@@ -152,9 +152,10 @@ static int pfkey_create(struct socket *sock, int protocol)
 	sk = sk_alloc(PF_KEY, GFP_KERNEL, 1, NULL);
 	if (sk == NULL)
 		goto out;
-
+	
 	sock->ops = &pfkey_ops;
 	sock_init_data(sock, sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	err = -ENOMEM;
 	pfk = pfkey_sk(sk) = kmalloc(sizeof(*pfk), GFP_KERNEL);
@@ -2761,7 +2762,7 @@ out:
 
 static struct proto_ops pfkey_ops = {
 	.family		=	PF_KEY,
-
+	.owner		=	THIS_MODULE,
 	/* Operations that make no sense on pfkey sockets. */
 	.bind		=	sock_no_bind,
 	.connect	=	sock_no_connect,

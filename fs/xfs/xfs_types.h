@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_TYPES_H__
-#define __XFS_TYPES_H__
+#define	__XFS_TYPES_H__
 
 #ifdef __KERNEL__
 
@@ -95,21 +95,21 @@ typedef __uint64_t __psunsigned_t;
 #endif
 
 typedef __uint32_t	xfs_agblock_t;	/* blockno in alloc. group */
-typedef __uint32_t	xfs_extlen_t;	/* extent length in blocks */
-typedef __uint32_t	xfs_agnumber_t; /* allocation group number */
+typedef	__uint32_t	xfs_extlen_t;	/* extent length in blocks */
+typedef	__uint32_t	xfs_agnumber_t;	/* allocation group number */
 typedef __int32_t	xfs_extnum_t;	/* # of extents in a file */
 typedef __int16_t	xfs_aextnum_t;	/* # extents in an attribute fork */
-typedef __int64_t	xfs_fsize_t;	/* bytes in a file */
+typedef	__int64_t	xfs_fsize_t;	/* bytes in a file */
 typedef __uint64_t	xfs_ufsize_t;	/* unsigned bytes in a file */
 
-typedef __int32_t	xfs_suminfo_t;	/* type of bitmap summary info */
-typedef __int32_t	xfs_rtword_t;	/* word type for bitmap manipulations */
+typedef	__int32_t	xfs_suminfo_t;	/* type of bitmap summary info */
+typedef	__int32_t	xfs_rtword_t;	/* word type for bitmap manipulations */
 
-typedef __int64_t	xfs_lsn_t;	/* log sequence number */
-typedef __int32_t	xfs_tid_t;	/* transaction identifier */
+typedef	__int64_t	xfs_lsn_t;	/* log sequence number */
+typedef	__int32_t	xfs_tid_t;	/* transaction identifier */
 
-typedef __uint32_t	xfs_dablk_t;	/* dir/attr block number (in file) */
-typedef __uint32_t	xfs_dahash_t;	/* dir/attr hash value */
+typedef	__uint32_t	xfs_dablk_t;	/* dir/attr block number (in file) */
+typedef	__uint32_t	xfs_dahash_t;	/* dir/attr hash value */
 
 typedef __uint16_t	xfs_prid_t;	/* prid_t truncated to 16bits in XFS */
 
@@ -119,23 +119,23 @@ typedef __uint16_t	xfs_prid_t;	/* prid_t truncated to 16bits in XFS */
  */
 typedef __uint64_t	xfs_dfsbno_t;	/* blockno in filesystem (agno|agbno) */
 typedef __uint64_t	xfs_drfsbno_t;	/* blockno in filesystem (raw) */
-typedef __uint64_t	xfs_drtbno_t;	/* extent (block) in realtime area */
-typedef __uint64_t	xfs_dfiloff_t;	/* block number in a file */
-typedef __uint64_t	xfs_dfilblks_t; /* number of blocks in a file */
+typedef	__uint64_t	xfs_drtbno_t;	/* extent (block) in realtime area */
+typedef	__uint64_t	xfs_dfiloff_t;	/* block number in a file */
+typedef	__uint64_t	xfs_dfilblks_t;	/* number of blocks in a file */
 
 /*
  * Memory based types are conditional.
  */
 #if XFS_BIG_FILESYSTEMS
-typedef __uint64_t	xfs_fsblock_t;	/* blockno in filesystem (agno|agbno) */
-typedef __uint64_t	xfs_rfsblock_t; /* blockno in filesystem (raw) */
+typedef	__uint64_t	xfs_fsblock_t;	/* blockno in filesystem (agno|agbno) */
+typedef __uint64_t	xfs_rfsblock_t;	/* blockno in filesystem (raw) */
 typedef __uint64_t	xfs_rtblock_t;	/* extent (block) in realtime area */
-typedef __int64_t	xfs_srtblock_t; /* signed version of xfs_rtblock_t */
+typedef	__int64_t	xfs_srtblock_t;	/* signed version of xfs_rtblock_t */
 #else
-typedef __uint32_t	xfs_fsblock_t;	/* blockno in filesystem (agno|agbno) */
-typedef __uint32_t	xfs_rfsblock_t; /* blockno in filesystem (raw) */
+typedef	__uint32_t	xfs_fsblock_t;	/* blockno in filesystem (agno|agbno) */
+typedef __uint32_t	xfs_rfsblock_t;	/* blockno in filesystem (raw) */
 typedef __uint32_t	xfs_rtblock_t;	/* extent (block) in realtime area */
-typedef __int32_t	xfs_srtblock_t; /* signed version of xfs_rtblock_t */
+typedef	__int32_t	xfs_srtblock_t;	/* signed version of xfs_rtblock_t */
 #endif
 typedef __uint64_t	xfs_fileoff_t;	/* block number in a file */
 typedef __int64_t	xfs_sfiloff_t;	/* signed block number in a file */
@@ -146,28 +146,28 @@ typedef __uint8_t	xfs_arch_t;	/* architecture of an xfs fs */
 /*
  * Null values for the types.
  */
-#define NULLDFSBNO	((xfs_dfsbno_t)-1)
-#define NULLDRFSBNO	((xfs_drfsbno_t)-1)
-#define NULLDRTBNO	((xfs_drtbno_t)-1)
-#define NULLDFILOFF	((xfs_dfiloff_t)-1)
+#define	NULLDFSBNO	((xfs_dfsbno_t)-1)
+#define	NULLDRFSBNO	((xfs_drfsbno_t)-1)
+#define	NULLDRTBNO	((xfs_drtbno_t)-1)
+#define	NULLDFILOFF	((xfs_dfiloff_t)-1)
 
-#define NULLFSBLOCK	((xfs_fsblock_t)-1)
-#define NULLRFSBLOCK	((xfs_rfsblock_t)-1)
-#define NULLRTBLOCK	((xfs_rtblock_t)-1)
-#define NULLFILEOFF	((xfs_fileoff_t)-1)
+#define	NULLFSBLOCK	((xfs_fsblock_t)-1)
+#define	NULLRFSBLOCK	((xfs_rfsblock_t)-1)
+#define	NULLRTBLOCK	((xfs_rtblock_t)-1)
+#define	NULLFILEOFF	((xfs_fileoff_t)-1)
 
-#define NULLAGBLOCK	((xfs_agblock_t)-1)
-#define NULLAGNUMBER	((xfs_agnumber_t)-1)
-#define NULLEXTNUM	((xfs_extnum_t)-1)
+#define	NULLAGBLOCK	((xfs_agblock_t)-1)
+#define	NULLAGNUMBER	((xfs_agnumber_t)-1)
+#define	NULLEXTNUM	((xfs_extnum_t)-1)
 
 #define NULLCOMMITLSN	((xfs_lsn_t)-1)
 
 /*
  * Max values for extlen, extnum, aextnum.
  */
-#define MAXEXTLEN	((xfs_extlen_t)0x001fffff)	/* 21 bits */
-#define MAXEXTNUM	((xfs_extnum_t)0x7fffffff)	/* signed int */
-#define MAXAEXTNUM	((xfs_aextnum_t)0x7fff)		/* signed short */
+#define	MAXEXTLEN	((xfs_extlen_t)0x001fffff)	/* 21 bits */
+#define	MAXEXTNUM	((xfs_extnum_t)0x7fffffff)	/* signed int */
+#define	MAXAEXTNUM	((xfs_aextnum_t)0x7fff)		/* signed short */
 
 /*
  * MAXNAMELEN is the length (including the terminating null) of

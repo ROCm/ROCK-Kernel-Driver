@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_DIR2_H__
-#define __XFS_DIR2_H__
+#define	__XFS_DIR2_H__
 
 struct uio;
 struct xfs_dabuf;
@@ -57,19 +57,19 @@ struct xfs_trans;
 /*
  * Byte offset in data block and shortform entry.
  */
-typedef __uint16_t	xfs_dir2_data_off_t;
-#define NULLDATAOFF	0xffffU
+typedef	__uint16_t	xfs_dir2_data_off_t;
+#define	NULLDATAOFF	0xffffU
 typedef uint		xfs_dir2_data_aoff_t;	/* argument form */
 
 /*
  * Directory block number (logical dirblk in file)
  */
-typedef __uint32_t	xfs_dir2_db_t;
+typedef	__uint32_t	xfs_dir2_db_t;
 
 /*
  * Byte offset in a directory.
  */
-typedef xfs_off_t		xfs_dir2_off_t;
+typedef	xfs_off_t		xfs_dir2_off_t;
 
 /*
  * For getdents, argument struct for put routines.
@@ -86,7 +86,7 @@ typedef struct xfs_dir2_put_args {
 	struct uio	*uio;		/* uio control structure */
 } xfs_dir2_put_args_t;
 
-#define XFS_DIR_IS_V2(mp)	((mp)->m_dirversion == 2)
+#define	XFS_DIR_IS_V2(mp)	((mp)->m_dirversion == 2)
 extern xfs_dirops_t	xfsv2_dirops;
 
 /*

@@ -51,6 +51,7 @@
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
+#include <asm/pgtable.h>
 
 #include <linux/swapops.h>
 
@@ -687,6 +688,45 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		struct vm_area_struct *	vma;
 
 		vma = find_extend_vma(mm, start);
+
+#ifdef FIXADDR_START
+		if (!vma && start >= FIXADDR_START && start < FIXADDR_TOP) {
+			static struct vm_area_struct fixmap_vma = {
+				/* Catch users - if there are any valid
+				   ones, we can make this be "&init_mm" or
+				   something.  */
+				.vm_mm = NULL,
+				.vm_start = FIXADDR_START,
+				.vm_end = FIXADDR_TOP,
+				.vm_page_prot = PAGE_READONLY,
+				.vm_flags = VM_READ | VM_EXEC,
+			};
+			unsigned long pg = start & PAGE_MASK;
+			pgd_t *pgd;
+			pmd_t *pmd;
+			pte_t *pte;
+			pgd = pgd_offset_k(pg);
+			if (!pgd)
+				return i ? : -EFAULT;
+			pmd = pmd_offset(pgd, pg);
+			if (!pmd)
+				return i ? : -EFAULT;
+			pte = pte_offset_kernel(pmd, pg);
+			if (!pte || !pte_present(*pte) || !pte_user(*pte) ||
+			    !(write ? pte_write(*pte) : pte_read(*pte)))
+				return i ? : -EFAULT;
+			if (pages) {
+				pages[i] = pte_page(*pte);
+				get_page(pages[i]);
+			}
+			if (vmas)
+				vmas[i] = &fixmap_vma;
+			i++;
+			start += PAGE_SIZE;
+			len--;
+			continue;
+		}
+#endif
 
 		if (!vma || (pages && (vma->vm_flags & VM_IO))
 				|| !(flags & vma->vm_flags))

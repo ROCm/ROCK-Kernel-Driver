@@ -1056,11 +1056,9 @@ cbq_dequeue(struct Qdisc *sch)
 		sch->stats.overlimits++;
 		if (q->wd_expires && !netif_queue_stopped(sch->dev)) {
 			long delay = PSCHED_US2JIFFIE(q->wd_expires);
-			del_timer(&q->wd_timer);
 			if (delay <= 0)
 				delay = 1;
-			q->wd_timer.expires = jiffies + delay;
-			add_timer(&q->wd_timer);
+			mod_timer(&q->wd_timer, jiffies + delay);
 			sch->flags |= TCQ_F_THROTTLED;
 		}
 	}

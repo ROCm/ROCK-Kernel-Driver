@@ -581,6 +581,7 @@ extern void radeon_do_release(drm_device_t *dev);
 #define RADEON_TXFORMAT_ARGB4444	5
 #define RADEON_TXFORMAT_ARGB8888	6
 #define RADEON_TXFORMAT_RGBA8888	7
+#define RADEON_TXFORMAT_Y8		8
 #define RADEON_TXFORMAT_VYUY422         10
 #define RADEON_TXFORMAT_YVYU422         11
 #define RADEON_TXFORMAT_DXT1            12

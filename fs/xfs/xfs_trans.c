@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -30,7 +30,35 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs.h>
+#include "xfs.h"
+#include "xfs_macros.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
+#include "xfs_dmapi.h"
+#include "xfs_mount.h"
+#include "xfs_error.h"
+#include "xfs_trans_priv.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
+#include "xfs_btree.h"
+#include "xfs_ialloc.h"
+#include "xfs_alloc.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
+#include "xfs_dinode.h"
+#include "xfs_inode.h"
+#include "xfs_bmap.h"
+#include "xfs_da_btree.h"
+#include "xfs_quota.h"
+#include "xfs_trans_space.h"
 
 
 STATIC void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
@@ -134,8 +162,8 @@ _xfs_trans_alloc(
 
 /*
  * This is called to create a new transaction which will share the
- * permanent log reservation of the given transaction.	The remaining
- * unused block and rt extent reservations are also inherited.	This
+ * permanent log reservation of the given transaction.  The remaining
+ * unused block and rt extent reservations are also inherited.  This
  * implies that the original transaction is no longer allowed to allocate
  * blocks.  Locks and log items, however, are no inherited.  They must
  * be added to the new transaction explicitly.
@@ -214,7 +242,7 @@ xfs_trans_reserve(
 
 	/*
 	 * Attempt to reserve the needed disk blocks by decrementing
-	 * the number needed from the number available.	 This will
+	 * the number needed from the number available.  This will
 	 * fail if the count would go below zero.
 	 */
 	if (blocks > 0) {
@@ -255,7 +283,7 @@ xfs_trans_reserve(
 
 	/*
 	 * Attempt to reserve the needed realtime extents by decrementing
-	 * the number needed from the number available.	 This will
+	 * the number needed from the number available.  This will
 	 * fail if the count would go below zero.
 	 */
 	if (rtextents > 0) {
@@ -345,7 +373,7 @@ xfs_trans_mod_sb(
 	case XFS_TRANS_SB_FDBLOCKS:
 		/*
 		 * Track the number of blocks allocated in the
-		 * transaction.	 Make sure it does not exceed the
+		 * transaction.  Make sure it does not exceed the
 		 * number reserved.
 		 */
 		if (delta < 0) {
@@ -366,7 +394,7 @@ xfs_trans_mod_sb(
 	case XFS_TRANS_SB_FREXTENTS:
 		/*
 		 * Track the number of blocks allocated in the
-		 * transaction.	 Make sure it does not exceed the
+		 * transaction.  Make sure it does not exceed the
 		 * number reserved.
 		 */
 		if (delta < 0) {
@@ -532,7 +560,7 @@ xfs_trans_unreserve_and_mod_sb(
 	rsvd = (tp->t_flags & XFS_TRANS_RESERVE) != 0;
 
 	/*
-	 * Release any reserved blocks.	 Any that were allocated
+	 * Release any reserved blocks.  Any that were allocated
 	 * will be taken back again by fdblocks_delta below.
 	 */
 	if (tp->t_blk_res > 0) {
@@ -660,7 +688,7 @@ xfs_trans_commit(
 	int			error;
 	int			log_flags;
 	int			sync;
-#define XFS_TRANS_LOGVEC_COUNT	16
+#define	XFS_TRANS_LOGVEC_COUNT	16
 	xfs_log_iovec_t		log_vector_fast[XFS_TRANS_LOGVEC_COUNT];
 #if defined(XLOG_NOLOG) || defined(DEBUG)
 	static xfs_lsn_t	trans_lsn = 1;
@@ -816,7 +844,7 @@ shut_us_down:
 	 * when the transaction commit really hits the on-disk log).
 	 * After this call we cannot reference tp, because the call
 	 * can happen at any time and the call will free the transaction
-	 * structure pointed to by tp.	The only case where we call
+	 * structure pointed to by tp.  The only case where we call
 	 * the completion routine (xfs_trans_committed) directly is
 	 * if the log is turned off on a debug kernel or we're
 	 * running in simulation mode (the log is explicitly turned
@@ -887,8 +915,8 @@ shut_us_down:
 
 /*
  * Total up the number of log iovecs needed to commit this
- * transaction.	 The transaction itself needs one for the
- * transaction header.	Ask each dirty item in turn how many
+ * transaction.  The transaction itself needs one for the
+ * transaction header.  Ask each dirty item in turn how many
  * it needs to get the total.
  */
 STATIC uint
@@ -956,7 +984,7 @@ xfs_trans_uncommit(
 
 /*
  * Fill in the vector with pointers to data to be logged
- * by this transaction.	 The transaction header takes
+ * by this transaction.  The transaction header takes
  * the first vector, and then each dirty item takes the
  * number of vectors it indicated it needed in xfs_trans_count_vecs().
  *
@@ -1044,7 +1072,7 @@ xfs_trans_cancel(
 		flags &= ~XFS_TRANS_ABORT;
 	/*
 	 * See if the caller is relying on us to shut down the
-	 * filesystem.	This happens in paths where we detect
+	 * filesystem.  This happens in paths where we detect
 	 * corruption and decide to give up.
 	 */
 	if ((tp->t_flags & XFS_TRANS_DIRTY) &&

@@ -81,6 +81,29 @@ static int do_usb_entry(const char *filename,
 	return 1;
 }
 
+/* Looks like: ieee1394:venNmoNspNverN */
+static int do_ieee1394_entry(const char *filename,
+			     struct ieee1394_device_id *id, char *alias)
+{
+	id->match_flags = TO_NATIVE(id->match_flags);
+	id->vendor_id = TO_NATIVE(id->vendor_id);
+	id->model_id = TO_NATIVE(id->model_id);
+	id->specifier_id = TO_NATIVE(id->specifier_id);
+	id->version = TO_NATIVE(id->version);
+
+	strcpy(alias, "ieee1394:");
+	ADD(alias, "ven", id->match_flags & IEEE1394_MATCH_VENDOR_ID,
+	    id->vendor_id);
+	ADD(alias, "mo", id->match_flags & IEEE1394_MATCH_MODEL_ID,
+	    id->model_id);
+	ADD(alias, "sp", id->match_flags & IEEE1394_MATCH_SPECIFIER_ID,
+	    id->specifier_id);
+	ADD(alias, "ver", id->match_flags & IEEE1394_MATCH_VERSION,
+	    id->version);
+
+	return 1;
+}
+
 /* Looks like: pci:vNdNsvNsdNbcNscNiN. */
 static int do_pci_entry(const char *filename,
 			struct pci_device_id *id, char *alias)
@@ -184,6 +207,9 @@ void handle_moddevtable(struct module *mod, struct elf_info *info,
 	else if (sym_is(symname, "__mod_usb_device_table"))
 		do_table(symval, sym->st_size, sizeof(struct usb_device_id),
 			 do_usb_entry, mod);
+	else if (sym_is(symname, "__mod_ieee1394_device_table"))
+		do_table(symval, sym->st_size, sizeof(struct ieee1394_device_id),
+			 do_ieee1394_entry, mod);
 }
 
 /* Now add out buffered information to the generated C source */
