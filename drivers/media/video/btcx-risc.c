@@ -44,39 +44,6 @@ MODULE_PARM_DESC(debug,"debug messages, default is 0 (no)");
 
 static int memcnt;
 
-int btcx_riscmem_alloc(struct pci_dev *pci,
-		       struct btcx_riscmem *risc,
-		       unsigned int size)
-{
-	u32 *cpu;
-	dma_addr_t dma;
-	
-	cpu = pci_alloc_consistent(pci, size, &dma);
-	if (NULL == cpu)
-		return -ENOMEM;
-	memset(cpu,0,size);
-
-#if 0
-	if (risc->cpu && risc->size < size) {
-		/* realloc (enlarge buffer) -- copy old stuff */
-		memcpy(cpu,risc->cpu,risc->size);
-		btcx_riscmem_free(pci,risc);
-	}
-#else
-	BUG_ON(NULL != risc->cpu);
-#endif
-	risc->cpu  = cpu;
-	risc->dma  = dma;
-	risc->size = size;
-
-	if (debug) {
-		memcnt++;
-		printk("btcx: riscmem alloc size=%d [%d]\n",size,memcnt);
-	}
-
-	return 0;
-}
-
 void btcx_riscmem_free(struct pci_dev *pci,
 		       struct btcx_riscmem *risc)
 {
@@ -88,6 +55,31 @@ void btcx_riscmem_free(struct pci_dev *pci,
 		memcnt--;
 		printk("btcx: riscmem free [%d]\n",memcnt);
 	}
+}
+
+int btcx_riscmem_alloc(struct pci_dev *pci,
+		       struct btcx_riscmem *risc,
+		       unsigned int size)
+{
+	u32 *cpu;
+	dma_addr_t dma;
+
+	if (NULL != risc->cpu && risc->size < size)
+		btcx_riscmem_free(pci,risc);
+	if (NULL == risc->cpu) {
+		cpu = pci_alloc_consistent(pci, size, &dma);
+		if (NULL == cpu)
+			return -ENOMEM;
+		risc->cpu  = cpu;
+		risc->dma  = dma;
+		risc->size = size;
+		if (debug) {
+			memcnt++;
+			printk("btcx: riscmem alloc size=%d [%d]\n",size,memcnt);
+		}
+	}
+	memset(risc->cpu,0,risc->size);
+	return 0;
 }
 
 /* ---------------------------------------------------------- */

@@ -32,6 +32,8 @@ static char name_tv[]      = "Television";
 static char name_tv_mono[] = "TV (mono only)";
 static char name_comp1[]   = "Composite1";
 static char name_comp2[]   = "Composite2";
+static char name_comp3[]   = "Composite3";
+static char name_comp4[]   = "Composite4";
 static char name_svideo[]  = "S-Video";
 
 /* ------------------------------------------------------------------ */
@@ -361,14 +363,16 @@ struct saa7134_board saa7134_boards[] = {
         },
 	[SAA7134_BOARD_MD7134] = {
 		.name           = "Medion 7134",
-		.audio_clock    = 0x00200000,
+		//.audio_clock    = 0x00200000,
+		.audio_clock    = 0x00187de7,
 		.tuner_type     = TUNER_PHILIPS_FM1216ME_MK3,
 		.need_tda9887   = 1,
 		.inputs = {{
 			.name   = name_tv,
 			.vmux   = 1,
-			.amux   = LINE2,
+			.amux   = TV,
 			.tv     = 1,
+#if 0
 		},{
 			.name   = name_comp1,
 			.vmux   = 0,
@@ -381,6 +385,7 @@ struct saa7134_board saa7134_boards[] = {
 			.name   = name_svideo,
 			.vmux   = 8,
 			.amux   = LINE2,
+#endif
 		}},
 		.radio = {
 			.name   = name_radio,
@@ -388,9 +393,12 @@ struct saa7134_board saa7134_boards[] = {
 		},
 	},
 	[SAA7134_BOARD_TYPHOON_90031] = {
+		/* Christian Rothl�nder <Christian@Rothlaender.net> */
 		.name           = "Typhoon TV+Radio 90031",
 		.audio_clock    = 0x00200000,
-		.tuner_type     = TUNER_PHILIPS_PAL,
+		//.tuner_type     = TUNER_PHILIPS_PAL,
+		.tuner_type     = TUNER_PHILIPS_FM1216ME_MK3,
+		.need_tda9887   = 1,
 		.inputs         = {{
 			.name   = name_tv,
 			.vmux   = 1,
@@ -409,7 +417,7 @@ struct saa7134_board saa7134_boards[] = {
 			.name   = name_radio,
 			.amux   = LINE2,
 		},
-	},
+        },
 	[SAA7134_BOARD_ELSA] = {
 		.name           = "ELSA EX-VISION 300TV",
 		.audio_clock    = 0x00187de7,
@@ -444,14 +452,123 @@ struct saa7134_board saa7134_boards[] = {
 			.tv   = 1,
 		}},
         },
-	
+	[SAA7134_BOARD_ASUSTeK_TVFM7134] = {
+                .name           = "ASUS TV-FM 7134",
+                .audio_clock    = 0x00187de7,
+                .tuner_type     = TUNER_PHILIPS_FM1216ME_MK3,
+                .need_tda9887   = 1,
+                .inputs         = {{
+                        .name = name_tv,
+                        .vmux = 1,
+                        .amux = TV,
+                        .tv   = 1,
+#if 0 /* untested */
+                },{
+                        .name = name_comp1,
+                        .vmux = 4,
+                        .amux = LINE2,
+                },{
+                        .name = name_comp2,
+                        .vmux = 2,
+                        .amux = LINE2,
+                },{
+                        .name = name_svideo,
+                        .vmux = 6,
+                        .amux = LINE2,
+                },{
+                        .name = "S-Video2",
+                        .vmux = 7,
+                        .amux = LINE2,
+#endif
+                }},
+                .radio = {
+                        .name = name_radio,
+                        .amux = LINE1,
+                },
+	},
+	[SAA7134_BOARD_VA1000POWER] = {
+                .name           = "AOPEN VA1000 POWER",
+		.audio_clock    = 0x00187de7,
+		.tuner_type     = TUNER_PHILIPS_NTSC,
+                .inputs         = {{
+                        .name = name_svideo,
+                        .vmux = 8,
+                        .amux = LINE1,
+                },{
+                        .name = name_comp1,
+                        .vmux = 3,
+                        .amux = LINE1,
+                },{
+                        .name = name_tv,
+                        .vmux = 1,
+                        .amux = LINE2,
+                        .tv   = 1,
+                }},
+	},
+	[SAA7134_BOARD_BMK_MPEX_NOTUNER] = {
+		/* "Andrew de Quincey" <adq@lidskialf.net> */
+		.name		= "BMK MPEX No Tuner",
+		.audio_clock	= 0x200000,
+		.tuner_type	= TUNER_ABSENT,
+		.inputs         = {{
+			.name = name_comp1,
+			.vmux = 4,
+			.amux = LINE1,
+		},{
+			.name = name_comp2,
+			.vmux = 3,
+			.amux = LINE1,
+		},{
+			.name = name_comp3,
+			.vmux = 0,
+			.amux = LINE1,
+		},{
+			.name = name_comp4,
+			.vmux = 1,
+			.amux = LINE1,
+		},{
+			.name = name_svideo,
+			.vmux = 8,
+			.amux = LINE1,
+		}},
+		.i2s_rate  = 48000,
+		.has_ts    = 1,
+		.video_out = CCIR656,
+	},
+	[SAA7134_BOARD_VIDEOMATE_TV] = {
+		.name           = "Compro VideoMate TV",
+		.audio_clock    = 0x00187de7,
+		.tuner_type     = TUNER_PHILIPS_NTSC_M,
+                .inputs         = {{
+                        .name = name_svideo,
+                        .vmux = 8,
+                        .amux = LINE1,
+                },{
+                        .name = name_comp1,
+                        .vmux = 3,
+                        .amux = LINE1,
+                },{
+                        .name = name_tv,
+                        .vmux = 1,
+                        .amux = LINE2,
+                        .tv   = 1,
+                }},
+        },
+	[SAA7134_BOARD_CRONOS_PLUS] = {
+		.name           = "Matrox CronosPlus",
+		.tuner_type     = TUNER_ABSENT,
+                .inputs         = {{
+                        .name = name_comp1,
+                        .vmux = 0,
+                }},
+        },
 };
 const unsigned int saa7134_bcount = ARRAY_SIZE(saa7134_boards);
 
 /* ------------------------------------------------------------------ */
 /* PCI ids + subsystem IDs                                            */
 
-struct pci_device_id __devinitdata saa7134_pci_tbl[] = {
+struct pci_device_id saa7134_pci_tbl[] = {
 	{
 		.vendor       = PCI_VENDOR_ID_PHILIPS,
 		.device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
@@ -518,6 +635,42 @@ struct pci_device_id __devinitdata saa7134_pci_tbl[] = {
 		.subvendor    = 0x1048,
 		.subdevice    = 0x226b,
 		.driver_data  = SAA7134_BOARD_ELSA_500TV,
+	},{
+                .vendor       = PCI_VENDOR_ID_PHILIPS,
+                .device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
+                .subvendor    = PCI_VENDOR_ID_ASUSTEK,
+                .subdevice    = 0x4842,
+                .driver_data  = SAA7134_BOARD_ASUSTeK_TVFM7134,
+	},{
+                .vendor       = PCI_VENDOR_ID_PHILIPS,
+                .device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
+                .subvendor    = PCI_VENDOR_ID_ASUSTEK,
+                .subdevice    = 0x4830,
+                .driver_data  = SAA7134_BOARD_ASUSTeK_TVFM7134,
+        },{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
+		.subvendor    = PCI_VENDOR_ID_PHILIPS,
+		.subdevice    = 0xfe01,
+		.driver_data  = SAA7134_BOARD_TYPHOON_90031,
+	},{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
+                .subvendor    = 0x1131,
+                .subdevice    = 0x7133,
+		.driver_data  = SAA7134_BOARD_VA1000POWER,
+        },{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7133,
+                .subvendor    = 0x185b,
+                .subdevice    = 0xc100,
+		.driver_data  = SAA7134_BOARD_VIDEOMATE_TV,
+        },{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7130,
+                .subvendor    = PCI_VENDOR_ID_MATROX,
+                .subdevice    = 0x48d0,
+		.driver_data  = SAA7134_BOARD_CRONOS_PLUS,
 	},{
 		
 		/* --- boards without eeprom + subsystem ID --- */
@@ -595,22 +748,16 @@ static struct {
 
 static void board_flyvideo(struct saa7134_dev *dev)
 {
-	u32 value;
-
-	saa_writel(SAA7134_GPIO_GPMODE0 >> 2,   0);
-	value = saa_readl(SAA7134_GPIO_GPSTATUS0 >> 2);
 #if 0
-	{
-		int index = (value & 0x1f00) >> 8;
-		printk(KERN_INFO "%s: flyvideo: gpio is 0x%x "
-				"[model=%s,tuner=%d]\n",
-		       dev->name, value, fly_list[index].model,
-		       fly_list[index].tuner_type);
-		dev->tuner_type = fly_list[index].tuner_type;
-	}
-#else
-	printk(KERN_INFO "%s: flyvideo: gpio is 0x%x\n",
-	       dev->name, value);
+	u32 value;
+	int index;
+
+	value = dev->gpio_value;
+	index = (value & 0x1f00) >> 8;
+	printk(KERN_INFO "%s: flyvideo: gpio is 0x%x [model=%s,tuner=%d]\n",
+	       dev->name, value, fly_list[index].model,
+	       fly_list[index].tuner_type);
+	dev->tuner_type = fly_list[index].tuner_type;
 #endif
 }
 
@@ -618,10 +765,19 @@ static void board_flyvideo(struct saa7134_dev *dev)
 
 int saa7134_board_init(struct saa7134_dev *dev)
 {
+	// Always print gpio, often manufacturers encode tuner type and other info.
+	saa_writel(SAA7134_GPIO_GPMODE0 >> 2, 0);
+	dev->gpio_value = saa_readl(SAA7134_GPIO_GPSTATUS0 >> 2);
+	printk(KERN_INFO "%s: board init: gpio is %x\n", dev->name, dev->gpio_value);
+
 	switch (dev->board) {
 	case SAA7134_BOARD_FLYVIDEO2000:
 	case SAA7134_BOARD_FLYVIDEO3000:
 		board_flyvideo(dev);
+		dev->has_remote = 1;
+		break;
+	case SAA7134_BOARD_CINERGY400:
+		dev->has_remote = 1;
 		break;
 	}
 	return 0;

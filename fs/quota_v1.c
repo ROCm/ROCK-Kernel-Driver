@@ -21,7 +21,7 @@ static void v1_disk2mem_dqblk(struct mem_dqblk *m, struct v1_disk_dqblk *d)
 	m->dqb_curinodes = d->dqb_curinodes;
 	m->dqb_bhardlimit = d->dqb_bhardlimit;
 	m->dqb_bsoftlimit = d->dqb_bsoftlimit;
-	m->dqb_curspace = d->dqb_curblocks << QUOTABLOCK_BITS;
+	m->dqb_curspace = ((qsize_t)d->dqb_curblocks) << QUOTABLOCK_BITS;
 	m->dqb_itime = d->dqb_itime;
 	m->dqb_btime = d->dqb_btime;
 }

@@ -30,7 +30,6 @@
 #include <linux/string.h>
 #include <linux/stat.h>
 #include <linux/errno.h>
-#include <linux/smp_lock.h>
 #include <linux/unistd.h>
 
 #include <asm/system.h>

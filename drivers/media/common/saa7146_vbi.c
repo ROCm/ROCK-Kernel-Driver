@@ -235,7 +235,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l
 		saa7146_pgtable_free(dev->pci, &buf->pt[2]);
 		saa7146_pgtable_alloc(dev->pci, &buf->pt[2]);
 
-		err = videobuf_iolock(dev->pci,&buf->vb);
+		err = videobuf_iolock(dev->pci,&buf->vb,NULL);
 		if (err)
 			goto oops;
 		saa7146_pgtable_build_single(dev->pci, &buf->pt[2], buf->vb.dma.sglist, buf->vb.dma.sglen);
