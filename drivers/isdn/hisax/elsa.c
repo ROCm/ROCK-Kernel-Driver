@@ -251,33 +251,47 @@ static struct dc_hw_ops ipac_dc_ops = {
 };
 
 static u8
-ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
+hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.elsa.hscx, offset + (hscx ? 0x40 : 0));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
+hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.elsa.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	writefifo(cs, cs->hw.elsa.hscx, hscx ? 0x40 : 0, data, size);
+}
+
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	writefifo(cs, cs->hw.elsa.hscx, hscx ? 0x40 : 0, data, size);
+}
+
 static struct bc_hw_ops hscx_ops = {
-	.read_reg  = ReadHSCX,
-	.write_reg = WriteHSCX,
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
 };
 
 static inline u8
 readitac(struct IsdnCardState *cs, u8 off)
 {
-	register u8 ret;
+	u8 ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&elsa_lock, flags);
 	byteout(cs->hw.elsa.ale, off);
 	ret = bytein(cs->hw.elsa.itac);
 	spin_unlock_irqrestore(&elsa_lock, flags);
-	return (ret);
+	return ret;
 }
 
 static inline void

@@ -41,7 +41,7 @@ waitforXFW(struct IsdnCardState *cs, int hscx)
 }
 
 static inline void
-WriteHSCXCMDR(struct IsdnCardState *cs, int hscx, u8 data)
+hscx_writeCMDR(struct IsdnCardState *cs, int hscx, u8 data)
 {
 	waitforCEC(cs, hscx);
 	WRITEHSCX(cs, hscx, HSCX_CMDR, data);
@@ -60,14 +60,14 @@ hscx_empty_fifo(struct BCState *bcs, int count)
 	if (bcs->hw.hscx.rcvidx + count > HSCX_BUFMAX) {
 		if (cs->debug & L1_DEB_WARN)
 			debugl1(cs, "hscx_empty_fifo: incoming packet too large");
-		WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x80);
+		hscx_writeCMDR(cs, bcs->hw.hscx.hscx, 0x80);
 		bcs->hw.hscx.rcvidx = 0;
 		return;
 	}
 	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	bcs->hw.hscx.rcvidx += count;
 	READHSCXFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
-	WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, 0x80);
+	hscx_writeCMDR(cs, bcs->hw.hscx.hscx, 0x80);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -107,7 +107,7 @@ hscx_fill_fifo(struct BCState *bcs)
 	bcs->tx_cnt -= count;
 	bcs->count += count;
 	WRITEHSCXFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
-	WriteHSCXCMDR(cs, bcs->hw.hscx.hscx, more ? 0x8 : 0xa);
+	hscx_writeCMDR(cs, bcs->hw.hscx.hscx, more ? 0x8 : 0xa);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -155,7 +155,7 @@ hscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 				bcs->err_crc++;
 #endif
 			}
-			WriteHSCXCMDR(cs, hscx, 0x80);
+			hscx_writeCMDR(cs, hscx, 0x80);
 		} else {
 			count = READHSCX(cs, hscx, HSCX_RBCL) & (
 				test_bit(HW_IPAC, &cs->HW_Flags)? 0x3f: 0x1f);
@@ -198,7 +198,7 @@ hscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 static void
 reset_xmit(struct BCState *bcs)
 {
-	WriteHSCXCMDR(bcs->cs, bcs->hw.hscx.hscx, 0x01);
+	hscx_writeCMDR(bcs->cs, bcs->hw.hscx.hscx, 0x01);
 }
 
 static inline void

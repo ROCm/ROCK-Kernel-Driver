@@ -110,22 +110,36 @@ static struct dc_hw_ops isac_ops = {
 };
 
 static u8
-ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
+hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.saphir.hscx, offset + (hscx ? 0x40 : 0));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
+hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.saphir.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
-static struct bc_hw_ops hscx_ops = {
-	.read_reg  = ReadHSCX,
-	.write_reg = WriteHSCX,
-};
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	readfifo(cs, cs->hw.saphir.hscx, hscx ? 0x40 : 0, data, size);
+}
 
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	writefifo(cs, cs->hw.saphir.hscx, hscx ? 0x40 : 0, data, size);
+}
+
+static struct bc_hw_ops hscx_ops = {
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
+};
+ 
 #define READHSCX(cs, nr, reg) readreg(cs, \
 		cs->hw.saphir.hscx, reg + (nr ? 0x40 : 0))
 #define WRITEHSCX(cs, nr, reg, data) writereg(cs, \

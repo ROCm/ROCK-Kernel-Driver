@@ -70,64 +70,54 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = isac_write_fifo,
 };
 
-static inline u8
-readhscx(unsigned long adr, int hscx, u8 off)
+static u8
+hscx_read(struct IsdnCardState *cs, int hscx, u8 off)
 {
-	return readb(adr + (hscx ? 0x1c0 : 0x180) +
+	return readb(cs->hw.teles0.membase + (hscx ? 0x1c0 : 0x180) +
 		     ((off & 1) ? 0x1ff : 0) + off);
 }
 
-static inline void
-writehscx(unsigned long adr, int hscx, u8 off, u8 data)
+static void
+hscx_write(struct IsdnCardState *cs, int hscx, u8 off, u8 data)
 {
-	writeb(data, adr + (hscx ? 0x1c0 : 0x180) +
+	writeb(data, cs->hw.teles0.membase + (hscx ? 0x1c0 : 0x180) +
 	       ((off & 1) ? 0x1ff : 0) + off); mb();
 }
 
-static inline void
-read_fifo_hscx(unsigned long adr, int hscx, u8 * data, int size)
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
 {
-	register int i;
-	register u8 *ad = (u8 *) (adr + (hscx ? 0x1c0 : 0x180));
+	int i;
+	unsigned long ad = cs->hw.teles0.membase + (hscx ? 0x1c0 : 0x180);
 	for (i = 0; i < size; i++)
 		data[i] = readb(ad);
 }
 
-static inline void
-write_fifo_hscx(unsigned long adr, int hscx, u8 * data, int size)
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
 {
 	int i;
-	register u8 *ad = (u8 *) (adr + (hscx ? 0x1c0 : 0x180));
+	unsigned long ad = cs->hw.teles0.membase + (hscx ? 0x1c0 : 0x180);
 	for (i = 0; i < size; i++) {
-		writeb(data[i], ad); mb();
+		writeb(data[i], ad);
 	}
 }
 
-static u8
-ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
-{
-	return (readhscx(cs->hw.teles0.membase, hscx, offset));
-}
-
-static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
-{
-	writehscx(cs->hw.teles0.membase, hscx, offset, value);
-}
-
 static struct bc_hw_ops hscx_ops = {
-	.read_reg  = ReadHSCX,
-	.write_reg = WriteHSCX,
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
 };
 
 /*
  * fast interrupt HSCX stuff goes here
  */
 
-#define READHSCX(cs, nr, reg) readhscx(cs->hw.teles0.membase, nr, reg)
-#define WRITEHSCX(cs, nr, reg, data) writehscx(cs->hw.teles0.membase, nr, reg, data)
-#define READHSCXFIFO(cs, nr, ptr, cnt) read_fifo_hscx(cs->hw.teles0.membase, nr, ptr, cnt)
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) write_fifo_hscx(cs->hw.teles0.membase, nr, ptr, cnt)
+#define READHSCX(cs, nr, reg) hscx_read(cs, nr, reg)
+#define WRITEHSCX(cs, nr, reg, data) hscx_write(cs, nr, reg, data)
+#define READHSCXFIFO(cs, nr, ptr, cnt) hscx_read_fifo(cs, nr, ptr, cnt)
+#define WRITEHSCXFIFO(cs, nr, ptr, cnt) hscx_write_fifo(cs, nr, ptr, cnt)
 
 #include "hscx_irq.c"
 
@@ -139,7 +129,7 @@ teles0_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	int count = 0;
 
 	spin_lock(&cs->lock);
-	val = readhscx(cs->hw.teles0.membase, 1, HSCX_ISTA);
+	val = hscx_read(cs, 1, HSCX_ISTA);
       Start_HSCX:
 	if (val)
 		hscx_int_main(cs, val);
@@ -148,7 +138,7 @@ teles0_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	if (val)
 		isac_interrupt(cs, val);
 	count++;
-	val = readhscx(cs->hw.teles0.membase, 1, HSCX_ISTA);
+	val = hscx_read(cs, 1, HSCX_ISTA);
 	if (val && count < 5) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX IntStat after IntRoutine");
@@ -160,12 +150,12 @@ teles0_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			debugl1(cs, "ISAC IntStat after IntRoutine");
 		goto Start_ISAC;
 	}
-	writehscx(cs->hw.teles0.membase, 0, HSCX_MASK, 0xFF);
-	writehscx(cs->hw.teles0.membase, 1, HSCX_MASK, 0xFF);
+	hscx_write(cs, 0, HSCX_MASK, 0xFF);
+	hscx_write(cs, 1, HSCX_MASK, 0xFF);
 	isac_write(cs, ISAC_MASK, 0xFF);
 	isac_write(cs, ISAC_MASK, 0x0);
-	writehscx(cs->hw.teles0.membase, 0, HSCX_MASK, 0x0);
-	writehscx(cs->hw.teles0.membase, 1, HSCX_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0x0);
+	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
 }
 

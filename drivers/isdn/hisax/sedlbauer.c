@@ -228,20 +228,34 @@ static struct dc_hw_ops ipac_dc_ops = {
 };
 
 static u8
-ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
+hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.sedl.hscx, offset + (hscx ? 0x40 : 0));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
+hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.sedl.hscx, offset + (hscx ? 0x40 : 0), value);
 }
 
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	readfifo(cs, cs->hw.sedl.hscx, hscx ? 0x40 : 0, data, size);
+}
+
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	writefifo(cs, cs->hw.sedl.hscx, hscx ? 0x40 : 0, data, size);
+}
+
 static struct bc_hw_ops hscx_ops = {
-	.read_reg  = ReadHSCX,
-	.write_reg = WriteHSCX,
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
 };
 
 /* ISAR access routines
@@ -251,30 +265,32 @@ static struct bc_hw_ops hscx_ops = {
  */
 
 static u8
-ReadISAR(struct IsdnCardState *cs, int mode, u8 offset)
+isar_read(struct IsdnCardState *cs, int mode, u8 offset)
 {	
 	if (mode == 0)
 		return readreg(cs, cs->hw.sedl.hscx, offset);
-	else if (mode == 1)
+
+	if (mode == 1)
 		byteout(cs->hw.sedl.adr, offset);
-	return(bytein(cs->hw.sedl.hscx));
+
+	return bytein(cs->hw.sedl.hscx);
 }
 
 static void
-WriteISAR(struct IsdnCardState *cs, int mode, u8 offset, u8 value)
+isar_write(struct IsdnCardState *cs, int mode, u8 offset, u8 value)
 {
 	if (mode == 0)
-		writereg(cs, cs->hw.sedl.hscx, offset, value);
-	else {
-		if (mode == 1)
-			byteout(cs->hw.sedl.adr, offset);
-		byteout(cs->hw.sedl.hscx, value);
-	}
+		return writereg(cs, cs->hw.sedl.hscx, offset, value);
+
+	if (mode == 1)
+		byteout(cs->hw.sedl.adr, offset);
+
+	byteout(cs->hw.sedl.hscx, value);
 }
 
 static struct bc_hw_ops isar_ops = {
-	.read_reg  = ReadISAR,
-	.write_reg = WriteISAR,
+	.read_reg   = isar_read,
+	.write_reg  = isar_write,
 };
 
 /*

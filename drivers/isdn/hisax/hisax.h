@@ -351,8 +351,10 @@ struct l3_process {
 struct IsdnCardState;
 
 struct bc_hw_ops {
-	u8     (*read_reg)  (struct IsdnCardState *, int, u8);
-	void   (*write_reg) (struct IsdnCardState *, int, u8, u8);
+	u8     (*read_reg)   (struct IsdnCardState *, int, u8);
+	void   (*write_reg)  (struct IsdnCardState *, int, u8, u8);
+	void   (*read_fifo)  (struct IsdnCardState *, int, u8 *, int);
+	void   (*write_fifo) (struct IsdnCardState *, int, u8 *, int);
 };
 
 struct hscx_hw {

@@ -83,20 +83,34 @@ static struct dc_hw_ops isac_ops = {
 };
 
 static u8
-ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
+hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
-	return (readreg(cs->hw.teles3.hscx[hscx], offset));
+	return readreg(cs->hw.teles3.hscx[hscx], offset);
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
+hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs->hw.teles3.hscx[hscx], offset, value);
 }
 
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	read_fifo(cs->hw.teles3.hscxfifo[hscx], data, size);
+}
+
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	write_fifo(cs->hw.teles3.hscxfifo[hscx], data, size);
+}
+
 static struct bc_hw_ops hscx_ops = {
-	.read_reg  = ReadHSCX,
-	.write_reg = WriteHSCX,
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
 };
 
 /*

@@ -180,38 +180,8 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = isac_write_fifo,
 };
 
-static void
-ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
-{
-	switch (cs->subtyp) {
-		case R647:
-		case R685:
-			read_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
-			break;
-		case R753:
-		case R742:
-			read_fifo_ipac(cs, hscx * 0x40, data, size);
-			break;
-	}
-}
-
-static void
-WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
-{
-	switch (cs->subtyp) {
-		case R647:
-		case R685:
-			write_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
-			break;
-		case R753:
-		case R742:
-			write_fifo_ipac(cs, hscx * 0x40, data, size);
-			break;
-	}
-}
-
 static u8
-ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
+hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	u_short off2 = offset;
 
@@ -228,7 +198,7 @@ ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
+hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	u_short off2 = offset;
 
@@ -245,19 +215,51 @@ WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 	}
 }
 
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
+{
+	switch (cs->subtyp) {
+		case R647:
+		case R685:
+			read_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
+			break;
+		case R753:
+		case R742:
+			read_fifo_ipac(cs, hscx * 0x40, data, size);
+			break;
+	}
+}
+
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
+{
+	switch (cs->subtyp) {
+		case R647:
+		case R685:
+			write_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
+			break;
+		case R753:
+		case R742:
+			write_fifo_ipac(cs, hscx * 0x40, data, size);
+			break;
+	}
+}
+
 static struct bc_hw_ops hscx_ops = {
-	.read_reg  = ReadHSCX,
-	.write_reg = WriteHSCX,
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
 };
 
 /*
  * fast interrupt HSCX stuff goes here
  */
 
-#define READHSCX(cs, nr, reg) ReadHSCX(cs, nr, reg)
-#define WRITEHSCX(cs, nr, reg, data) WriteHSCX(cs, nr, reg, data)
-#define READHSCXFIFO(cs, nr, ptr, cnt) ReadHSCXfifo(cs, nr, ptr, cnt)
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) WriteHSCXfifo(cs, nr, ptr, cnt)
+#define READHSCX(cs, nr, reg) hscx_read(cs, nr, reg)
+#define WRITEHSCX(cs, nr, reg, data) hscx_write(cs, nr, reg, data)
+#define READHSCXFIFO(cs, nr, ptr, cnt) hscx_read_fifo(cs, nr, ptr, cnt)
+#define WRITEHSCXFIFO(cs, nr, ptr, cnt) hscx_write_fifo(cs, nr, ptr, cnt)
 
 #include "hscx_irq.c"
 
@@ -271,7 +273,7 @@ gazel_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 
 	spin_lock(&cs->lock);
 	do {
-		valhscx = ReadHSCX(cs, 1, HSCX_ISTA);
+		valhscx = hscx_read(cs, 1, HSCX_ISTA);
 		if (valhscx)
 			hscx_int_main(cs, valhscx);
 		valisac = isac_read(cs, ISAC_ISTA);
@@ -280,12 +282,12 @@ gazel_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		count++;
 	} while ((valhscx || valisac) && (count < MAXCOUNT));
 
-	WriteHSCX(cs, 0, HSCX_MASK, 0xFF);
-	WriteHSCX(cs, 1, HSCX_MASK, 0xFF);
+	hscx_write(cs, 0, HSCX_MASK, 0xFF);
+	hscx_write(cs, 1, HSCX_MASK, 0xFF);
 	isac_write(cs, ISAC_MASK, 0xFF);
 	isac_write(cs, ISAC_MASK, 0x0);
-	WriteHSCX(cs, 0, HSCX_MASK, 0x0);
-	WriteHSCX(cs, 1, HSCX_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0x0);
+	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
 }
 
@@ -304,7 +306,7 @@ gazel_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 	ista = readreg_ipac(cs, IPAC_ISTA);
 	do {
 		if (ista & 0x0f) {
-			val = ReadHSCX(cs, 1, HSCX_ISTA);
+			val = hscx_read(cs, 1, HSCX_ISTA);
 			if (ista & 0x01)
 				val |= 0x01;
 			if (ista & 0x04)

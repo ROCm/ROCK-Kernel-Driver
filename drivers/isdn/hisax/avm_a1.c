@@ -51,54 +51,66 @@ write_fifo(unsigned int adr, u8 * data, int size)
 	outsb(adr, data, size);
 }
 
-/* Interface functions */
-
 static u8
-ReadISAC(struct IsdnCardState *cs, u8 offset)
+isac_read(struct IsdnCardState *cs, u8 offset)
 {
-	return (readreg(cs->hw.avm.isac, offset));
+	return readreg(cs->hw.avm.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
+isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs->hw.avm.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	read_fifo(cs->hw.avm.isacfifo, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	write_fifo(cs->hw.avm.isacfifo, data, size);
 }
 
 static struct dc_hw_ops isac_ops = {
-	.read_reg   = ReadISAC,
-	.write_reg  = WriteISAC,
-	.read_fifo  = ReadISACfifo,
-	.write_fifo = WriteISACfifo,
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
 };
 
 static u8
-ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
+hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return (readreg(cs->hw.avm.hscx[hscx], offset));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
+hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs->hw.avm.hscx[hscx], offset, value);
 }
 
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	read_fifo(cs->hw.avm.hscxfifo[hscx], data, size);
+}
+
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	write_fifo(cs->hw.avm.hscxfifo[hscx], data, size);
+}
+
 static struct bc_hw_ops hscx_ops = {
-	.read_reg  = ReadHSCX,
-	.write_reg = WriteHSCX,
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
 };
 
 /*

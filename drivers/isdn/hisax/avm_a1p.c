@@ -137,43 +137,45 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = isac_write_fifo,
 };
 
-static inline u8
-ReadHSCX(struct IsdnCardState *cs, int hscx, u8 adr)
+static u8
+hscx_read(struct IsdnCardState *cs, int hscx, u8 adr)
 {
 	return readreg(cs, HSCX_REG_OFFSET + hscx*HSCX_CH_DIFF, adr);
 }
 
-static inline void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u8 adr, u8 value)
+static void
+hscx_write(struct IsdnCardState *cs, int hscx, u8 adr, u8 value)
 {
 	writereg(cs, HSCX_REG_OFFSET + hscx*HSCX_CH_DIFF, adr, value);
 }
 
-static inline void
-ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
 {
 	return readfifo(cs, HSCX_FIFO_OFFSET + hscx*HSCX_CH_DIFF, data, size);
 }
 
-static inline void
-WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
 {
 	writefifo(cs, HSCX_FIFO_OFFSET + hscx*HSCX_CH_DIFF, data, size);
 }
 
 static struct bc_hw_ops hscx_ops = {
-	.read_reg  = ReadHSCX,
-	.write_reg = WriteHSCX,
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
 };
 
 /*
  * fast interrupt HSCX stuff goes here
  */
 
-#define READHSCX(cs, nr, reg) ReadHSCX(cs, nr, reg)
-#define WRITEHSCX(cs, nr, reg, data) WriteHSCX(cs, nr, reg, data)
-#define READHSCXFIFO(cs, nr, ptr, cnt) ReadHSCXfifo(cs, nr, ptr, cnt) 
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) WriteHSCXfifo(cs, nr, ptr, cnt)
+#define READHSCX(cs, nr, reg) hscx_read(cs, nr, reg)
+#define WRITEHSCX(cs, nr, reg, data) hscx_write(cs, nr, reg, data)
+#define READHSCXFIFO(cs, nr, ptr, cnt) hscx_read_fifo(cs, nr, ptr, cnt) 
+#define WRITEHSCXFIFO(cs, nr, ptr, cnt) hscx_write_fifo(cs, nr, ptr, cnt)
 
 #include "hscx_irq.c"
 
@@ -188,7 +190,7 @@ avm_a1p_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		if (cs->debug & L1_DEB_INTSTAT)
 			debugl1(cs, "avm IntStatus %x", sval);
 		if (sval & ASL0_R_HSCX) {
-                        val = ReadHSCX(cs, 1, HSCX_ISTA);
+                        val = hscx_read(cs, 1, HSCX_ISTA);
 			if (val)
 				hscx_int_main(cs, val);
 		}
@@ -198,12 +200,12 @@ avm_a1p_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 				isac_interrupt(cs, val);
 		}
 	}
-	WriteHSCX(cs, 0, HSCX_MASK, 0xff);
-	WriteHSCX(cs, 1, HSCX_MASK, 0xff);
-	isac_write(cs, ISAC_MASK, 0xff);
-	isac_write(cs, ISAC_MASK, 0x00);
-	WriteHSCX(cs, 0, HSCX_MASK, 0x00);
-	WriteHSCX(cs, 1, HSCX_MASK, 0x00);
+	hscx_write(cs, 0, HSCX_MASK, 0xFF);
+	hscx_write(cs, 1, HSCX_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0x0);
+	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
 }
 
