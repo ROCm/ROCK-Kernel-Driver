@@ -135,3 +135,11 @@ config AGP_ALPHA_CORE
 	depends on AGP && (ALPHA_GENERIC || ALPHA_TITAN || ALPHA_MARVEL)
 	default AGP
 
+config AGP_NVIDIA
+	tristate "NVIDIA nForce/nForce2 chipset support"
+	depends on AGP && !X86_64
+	---help---
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on the following NVIDIA chipsets.  The supported chipsets
+	  include nForce and nForce2
+

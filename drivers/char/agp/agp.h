@@ -358,6 +358,17 @@ struct agp_bridge_data {
 #define SVWRKS_POSTFLUSH	0x14
 #define SVWRKS_DIRFLUSH		0x0c
 
+/* NVIDIA registers */
+#define NVIDIA_0_APBASE		0x10
+#define NVIDIA_0_APSIZE		0x80
+#define NVIDIA_1_WBC		0xf0
+#define NVIDIA_2_GARTCTRL	0xd0
+#define NVIDIA_2_APBASE		0xd8
+#define NVIDIA_2_APLIMIT	0xdc
+#define NVIDIA_2_ATTBASE(i)	(0xe0 + (i) * 4)
+#define NVIDIA_3_APBASE		0x50
+#define NVIDIA_3_APLIMIT	0x54
+
 /* HP ZX1 SBA registers */
 #define HP_ZX1_CTRL		0x200
 #define HP_ZX1_IBASE		0x300

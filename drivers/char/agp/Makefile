@@ -17,5 +17,5 @@ obj-$(CONFIG_AGP_I460)		+= i460-agp.o
 obj-$(CONFIG_AGP_HP_ZX1)	+= hp-agp.o
 obj-$(CONFIG_AGP_AMD_8151)	+= amd-k8-agp.o
 obj-$(CONFIG_AGP_ALPHA_CORE)	+= alpha-agp.o
-
+obj-$(CONFIG_AGP_NVIDIA)	+= nvidia=agp.o
 
