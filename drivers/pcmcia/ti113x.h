@@ -241,6 +241,17 @@ static int ti1250_override(struct yenta_socket *socket)
 	return 0;
 }
 
+
+static int ti12xx_override(struct yenta_socket *socket)
+{
+	/* make sure that memory burst is active */
+	ti_sysctl(socket) = config_readl(socket, TI113X_SYSTEM_CONTROL);
+	ti_sysctl(socket) |= TI122X_SCR_MRBURSTUP;
+	config_writel(socket, TI113X_SYSTEM_CONTROL, ti_sysctl(socket));
+
+	return ti113x_override(socket);
+}
+
 #endif /* CONFIG_CARDBUS */
 
 #endif /* _LINUX_TI113X_H */
