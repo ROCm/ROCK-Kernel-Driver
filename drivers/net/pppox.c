@@ -149,11 +149,8 @@ static int pppox_create(struct socket *sock, int protocol)
 		goto out;
 
 	rc = -EPROTONOSUPPORT;
-	if (!pppox_protos[protocol])
-		goto out;
-
-	rc = -EBUSY;
-	if (!try_module_get(pppox_protos[protocol]->owner))
+	if (!pppox_protos[protocol] ||
+	    !try_module_get(pppox_protos[protocol]->owner))
 		goto out;
 
 	rc = pppox_protos[protocol]->create(sock);
