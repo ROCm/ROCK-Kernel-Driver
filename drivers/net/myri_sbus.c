@@ -85,7 +85,7 @@ static char version[] =
 static struct myri_eth *root_myri_dev;
 #endif
 
-static void myri_reset_off(unsigned long lp, unsigned long cregs)
+static void myri_reset_off(void __iomem *lp, void __iomem *cregs)
 {
 	/* Clear IRQ mask. */
 	sbus_writel(0, lp + LANAI_EIMASK);
@@ -94,7 +94,7 @@ static void myri_reset_off(unsigned long lp, unsigned long cregs)
 	sbus_writel(CONTROL_ROFF, cregs + MYRICTRL_CTRL);
 }
 
-static void myri_reset_on(unsigned long cregs)
+static void myri_reset_on(void __iomem *cregs)
 {
 	/* Enable RESET function. */
 	sbus_writel(CONTROL_RON, cregs + MYRICTRL_CTRL);
@@ -103,14 +103,14 @@ static void myri_reset_on(unsigned long cregs)
 	sbus_writel(CONTROL_DIRQ, cregs + MYRICTRL_CTRL);
 }
 
-static void myri_disable_irq(unsigned long lp, unsigned long cregs)
+static void myri_disable_irq(void __iomem *lp, void __iomem *cregs)
 {
 	sbus_writel(CONTROL_DIRQ, cregs + MYRICTRL_CTRL);
 	sbus_writel(0, lp + LANAI_EIMASK);
 	sbus_writel(ISTAT_HOST, lp + LANAI_ISTAT);
 }
 
-static void myri_enable_irq(unsigned long lp, unsigned long cregs)
+static void myri_enable_irq(void __iomem *lp, void __iomem *cregs)
 {
 	sbus_writel(CONTROL_EIRQ, cregs + MYRICTRL_CTRL);
 	sbus_writel(ISTAT_HOST, lp + LANAI_EIMASK);
@@ -119,7 +119,7 @@ static void myri_enable_irq(unsigned long lp, unsigned long cregs)
 static inline void bang_the_chip(struct myri_eth *mp)
 {
 	struct myri_shmem *shmem	= mp->shmem;
-	unsigned long cregs		= mp->cregs;
+	void __iomem *cregs		= mp->cregs;
 
 	sbus_writel(1, &shmem->send);
 	sbus_writel(CONTROL_WON, cregs + MYRICTRL_CTRL);
@@ -128,7 +128,7 @@ static inline void bang_the_chip(struct myri_eth *mp)
 static int myri_do_handshake(struct myri_eth *mp)
 {
 	struct myri_shmem *shmem	= mp->shmem;
-	unsigned long cregs = mp->cregs;
+	void __iomem *cregs = mp->cregs;
 	struct myri_channel *chan	= &shmem->channel;
 	int tick 			= 0;
 
@@ -176,27 +176,27 @@ static int myri_do_handshake(struct myri_eth *mp)
 static int myri_load_lanai(struct myri_eth *mp)
 {
 	struct net_device	*dev = mp->dev;
-	struct myri_shmem	*shmem = mp->shmem;
-	unsigned char		*rptr;
+	struct myri_shmem __iomem *shmem = mp->shmem;
+	void __iomem		*rptr;
 	int 			i;
 
 	myri_disable_irq(mp->lregs, mp->cregs);
 	myri_reset_on(mp->cregs);
 
-	rptr = (unsigned char *) mp->lanai;
+	rptr = mp->lanai;
 	for (i = 0; i < mp->eeprom.ramsz; i++)
-		sbus_writeb(0, &rptr[i]);
+		sbus_writeb(0, rptr + i);
 
 	if (mp->eeprom.cpuvers >= CPUVERS_3_0)
 		sbus_writel(mp->eeprom.cval, mp->lregs + LANAI_CVAL);
 
 	/* Load executable code. */
 	for (i = 0; i < sizeof(lanai4_code); i++)
-		sbus_writeb(lanai4_code[i], &rptr[(lanai4_code_off * 2) + i]);
+		sbus_writeb(lanai4_code[i], rptr + (lanai4_code_off * 2) + i);
 
 	/* Load data segment. */
 	for (i = 0; i < sizeof(lanai4_data); i++)
-		sbus_writeb(lanai4_data[i], &rptr[(lanai4_data_off * 2) + i]);
+		sbus_writeb(lanai4_data[i], rptr + (lanai4_data_off * 2) + i);
 
 	/* Set device address. */
 	sbus_writeb(0, &shmem->addr[0]);
@@ -237,15 +237,15 @@ static int myri_load_lanai(struct myri_eth *mp)
 
 static void myri_clean_rings(struct myri_eth *mp)
 {
-	struct sendq *sq = mp->sq;
-	struct recvq *rq = mp->rq;
+	struct sendq __iomem *sq = mp->sq;
+	struct recvq __iomem *rq = mp->rq;
 	int i;
 
 	sbus_writel(0, &rq->tail);
 	sbus_writel(0, &rq->head);
 	for (i = 0; i < (RX_RING_SIZE+1); i++) {
 		if (mp->rx_skbs[i] != NULL) {
-			struct myri_rxd *rxd = &rq->myri_rxd[i];
+			struct myri_rxd __iomem *rxd = &rq->myri_rxd[i];
 			u32 dma_addr;
 
 			dma_addr = sbus_readl(&rxd->myri_scatters[0].addr);
@@ -261,7 +261,7 @@ static void myri_clean_rings(struct myri_eth *mp)
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		if (mp->tx_skbs[i] != NULL) {
 			struct sk_buff *skb = mp->tx_skbs[i];
-			struct myri_txd *txd = &sq->myri_txd[i];
+			struct myri_txd __iomem *txd = &sq->myri_txd[i];
 			u32 dma_addr;
 
 			dma_addr = sbus_readl(&txd->myri_gathers[0].addr);
@@ -274,8 +274,8 @@ static void myri_clean_rings(struct myri_eth *mp)
 
 static void myri_init_rings(struct myri_eth *mp, int from_irq)
 {
-	struct recvq *rq = mp->rq;
-	struct myri_rxd *rxd = &rq->myri_rxd[0];
+	struct recvq __iomem *rq = mp->rq;
+	struct myri_rxd __iomem *rxd = &rq->myri_rxd[0];
 	struct net_device *dev = mp->dev;
 	int gfp_flags = GFP_KERNEL;
 	int i;
@@ -343,7 +343,7 @@ static void dump_ehdr_and_myripad(unsigned char *stuff)
 
 static void myri_tx(struct myri_eth *mp, struct net_device *dev)
 {
-	struct sendq *sq	= mp->sq;
+	struct sendq __iomem *sq= mp->sq;
 	int entry		= mp->tx_old;
 	int limit		= sbus_readl(&sq->head);
 
@@ -411,8 +411,8 @@ static unsigned short myri_type_trans(struct sk_buff *skb, struct net_device *de
 
 static void myri_rx(struct myri_eth *mp, struct net_device *dev)
 {
-	struct recvq *rq	= mp->rq;
-	struct recvq *rqa	= mp->rqack;
+	struct recvq __iomem *rq = mp->rq;
+	struct recvq __iomem *rqa = mp->rqack;
 	int entry		= sbus_readl(&rqa->head);
 	int limit		= sbus_readl(&rqa->tail);
 	int drops;
@@ -423,11 +423,11 @@ static void myri_rx(struct myri_eth *mp, struct net_device *dev)
 	drops = 0;
 	DRX(("\n"));
 	while (entry != limit) {
-		struct myri_rxd *rxdack = &rqa->myri_rxd[entry];
+		struct myri_rxd __iomem *rxdack = &rqa->myri_rxd[entry];
 		u32 csum		= sbus_readl(&rxdack->csum);
 		int len			= sbus_readl(&rxdack->myri_scatters[0].len);
 		int index		= sbus_readl(&rxdack->ctx);
-		struct myri_rxd *rxd	= &rq->myri_rxd[rq->tail];
+		struct myri_rxd __iomem *rxd	= &rq->myri_rxd[rq->tail];
 		struct sk_buff *skb	= mp->rx_skbs[index];
 
 		/* Ack it. */
@@ -545,7 +545,7 @@ static irqreturn_t myri_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev		= (struct net_device *) dev_id;
 	struct myri_eth *mp		= (struct myri_eth *) dev->priv;
-	unsigned long lregs		= mp->lregs;
+	void __iomem *lregs		= mp->lregs;
 	struct myri_channel *chan	= &mp->shmem->channel;
 	unsigned long flags;
 	u32 status;
@@ -610,8 +610,8 @@ static void myri_tx_timeout(struct net_device *dev)
 static int myri_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct myri_eth *mp = (struct myri_eth *) dev->priv;
-	struct sendq *sq = mp->sq;
-	struct myri_txd *txd;
+	struct sendq __iomem *sq = mp->sq;
+	struct myri_txd __iomem *txd;
 	unsigned long flags;
 	unsigned int head, tail;
 	int len, entry;
@@ -998,22 +998,20 @@ static int __init myri_ether_init(struct sbus_dev *sdev, int num)
 			printk("MyriCOM: Cannot map MyriCOM registers.\n");
 			goto err;
 		}
-		mp->lanai = (unsigned short *) (mp->regs + (256 * 1024));
-		mp->lanai3 = (unsigned int *) mp->lanai;
-		mp->lregs = (unsigned long) &mp->lanai[0x10000];
+		mp->lanai = mp->regs + (256 * 1024);
+		mp->lregs = mp->lanai + (0x10000 * 2);
 	} else {
 		DET(("Mapping regs for cpuvers >= CPUVERS_4_0\n"));
 		mp->cregs = sbus_ioremap(&sdev->resource[0], 0,
 					 PAGE_SIZE, "MyriCOM Control Regs");
 		mp->lregs = sbus_ioremap(&sdev->resource[0], (256 * 1024),
 					 PAGE_SIZE, "MyriCOM LANAI Regs");
-		mp->lanai = (unsigned short *)
+		mp->lanai =
 			sbus_ioremap(&sdev->resource[0], (512 * 1024),
 				     mp->eeprom.ramsz, "MyriCOM SRAM");
-		mp->lanai3 = (unsigned int *) mp->lanai;
 	}
-	DET(("Registers mapped: cregs[%lx] lregs[%lx] lanai[%p] lanai3[%p]\n",
-	     mp->cregs, mp->lregs, mp->lanai, mp->lanai3));
+	DET(("Registers mapped: cregs[%p] lregs[%p] lanai[%p]\n",
+	     mp->cregs, mp->lregs, mp->lanai));
 
 	if (mp->eeprom.cpuvers >= CPUVERS_4_0)
 		mp->shmem_base = 0xf000;
@@ -1022,7 +1020,8 @@ static int __init myri_ether_init(struct sbus_dev *sdev, int num)
 
 	DET(("Shared memory base is %04x, ", mp->shmem_base));
 
-	mp->shmem = (struct myri_shmem *) &mp->lanai[mp->shmem_base];
+	mp->shmem = (struct myri_shmem __iomem *)
+		(mp->lanai + (mp->shmem_base * 2));
 	DET(("shmem mapped at %p\n", mp->shmem));
 
 	mp->rqack	= &mp->shmem->channel.recvqa;
