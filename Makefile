@@ -130,16 +130,6 @@ else
 _all: modules
 endif
 
-# Make sure we're not wasting cpu-cycles doing locale handling, yet do make
-# sure error messages appear in the user-desired language
-ifdef LC_ALL
-LANG := $(LC_ALL)
-LC_ALL :=
-endif
-LC_COLLATE := C
-LC_CTYPE := C
-export LANG LC_ALL LC_COLLATE LC_CTYPE
-
 srctree		:= $(if $(KBUILD_SRC),$(KBUILD_SRC),$(CURDIR))
 TOPDIR		:= $(srctree)
 # FIXME - TOPDIR is obsolete, use srctree/objtree
@@ -621,11 +611,20 @@ vmlinux: $(vmlinux-objs) $(kallsyms.o) arch/$(ARCH)/kernel/vmlinux.lds.s FORCE
 
 $(sort $(vmlinux-objs)) arch/$(ARCH)/kernel/vmlinux.lds.s: $(vmlinux-dirs) ;
 
-# 	Handle descending into subdirectories listed in $(vmlinux-dirs)
+# Handle descending into subdirectories listed in $(vmlinux-dirs)
+# Preset locale variables to speed up the build process. Limit locale
+# tweaks to this spot to avoid wrong language settings when running
+# make menuconfig etc.
+# Error messages still appears in the original language
 
 .PHONY: $(vmlinux-dirs)
 $(vmlinux-dirs): prepare-all scripts
-	$(Q)$(MAKE) $(build)=$@
+	$(Q)if [ ! -z $$LC_ALL ]; then          \
+		export LANG=$$LC_ALL;           \
+		export LC_ALL= ;                \
+	fi;                                     \
+	export LC_COLLATE=C; export LC_CTYPE=C; \
+	$(MAKE) $(build)=$@
 
 # Things we need to do before we recursively start building the kernel
 # or the modules are listed in "prepare-all".
