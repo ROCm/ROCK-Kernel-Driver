@@ -244,7 +244,7 @@ static void mark_offset_tsc(void)
 			clock_fallback();
 		}
 		/* ... but give the TSC a fair chance */
-		if (lost_count == 50)
+		if (lost_count > 25)
 			cpufreq_delayed_get();
 	} else
 		lost_count = 0;
@@ -331,6 +331,7 @@ static void mark_offset_tsc_hpet(void)
 #ifdef CONFIG_CPU_FREQ
 #include <linux/workqueue.h>
 
+static unsigned int cpufreq_delayed_issched = 0;
 static unsigned int cpufreq_init = 0;
 static struct work_struct cpufreq_delayed_get_work;
 
@@ -340,6 +341,7 @@ static void handle_cpufreq_delayed_get(void *v)
 	for_each_online_cpu(cpu) {
 		cpufreq_get(cpu);
 	}
+	cpufreq_delayed_issched = 0;
 }
 
 /* if we notice lost ticks, schedule a call to cpufreq_get() as it tries
@@ -348,8 +350,11 @@ static void handle_cpufreq_delayed_get(void *v)
  */
 static inline void cpufreq_delayed_get(void) 
 {
-	if (cpufreq_init)
+	if (cpufreq_init && !cpufreq_delayed_issched) {
+		cpufreq_delayed_issched = 1;
+		printk(KERN_DEBUG "Losing some ticks... checking if CPU frequency changed.\n");
 		schedule_work(&cpufreq_delayed_get_work);
+	}
 }
 
 /* If the CPU frequency is scaled, TSC-based delays will need a different
