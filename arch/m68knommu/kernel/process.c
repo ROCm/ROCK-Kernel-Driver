@@ -199,7 +199,7 @@ int copy_thread(int nr, unsigned long clone_flags,
 	struct switch_stack * childstack, *stack;
 	unsigned long stack_offset, *retp;
 
-	stack_offset = KTHREAD_SIZE - sizeof(struct pt_regs);
+	stack_offset = THREAD_SIZE - sizeof(struct pt_regs);
 	childregs = (struct pt_regs *) ((unsigned long) p->thread_info + stack_offset);
 
 	*childregs = *regs;
@@ -342,7 +342,7 @@ void dump(struct pt_regs *fp)
 			(int) current->mm->brk);
 		printk(KERN_EMERG "USER-STACK=%08x  KERNEL-STACK=%08x\n\n",
 			(int) current->mm->start_stack,
-			(int)(((unsigned long) current) + KTHREAD_SIZE));
+			(int)(((unsigned long) current) + THREAD_SIZE));
 	}
 
 	printk(KERN_EMERG "PC: %08lx\n", fp->pc);
