@@ -308,7 +308,7 @@ void pnp_free_resources(struct pnp_resources *resources)
 
 /* resource validity checking functions */
 
-static int pnp_check_port(int port, int size)
+static int pnp_check_port(int port, int size, int idx, struct pnp_cfg *config)
 {
 	int i, tmp, rport, rsize;
 	struct pnp_dev *dev;
@@ -338,10 +338,20 @@ static int pnp_check_port(int port, int size)
 			}
 		}
 	}
+	for (tmp = 0; tmp < 8 && tmp != idx; tmp++) {
+		if (dev->resource[tmp].flags) {
+			rport = config->request.resource[tmp].start;
+			rsize = (config->request.resource[tmp].end - rport) + 1;
+			if (port >= rport && port < rport + rsize)
+				return 1;
+			if (port + size > rport && port + size < (rport + rsize) - 1)
+				return 1;
+		}
+	}
 	return 0;
 }
 
-static int pnp_check_mem(unsigned int addr, unsigned int size)
+static int pnp_check_mem(unsigned int addr, unsigned int size, int idx, struct pnp_cfg *config)
 {
 	int i, tmp;
 	unsigned int raddr, rsize;
@@ -360,7 +370,7 @@ static int pnp_check_mem(unsigned int addr, unsigned int size)
 	pnp_for_each_dev(dev) {
 		if (dev->active) {
 			for (tmp = 0; tmp < 4; tmp++) {
-				if (dev->resource[tmp].flags) {
+				if (dev->resource[tmp + 8].flags) {
 					raddr = dev->resource[tmp + 8].start;
 					rsize = (dev->resource[tmp + 8].end - raddr) + 1;
 					if (addr >= raddr && addr < raddr + rsize)
@@ -369,6 +379,16 @@ static int pnp_check_mem(unsigned int addr, unsigned int size)
 						return 1;
 				}
 			}
+		}
+	}
+	for (tmp = 0; tmp < 4 && tmp != idx; tmp++) {
+		if (dev->resource[tmp + 8].flags) {
+			raddr = config->request.resource[tmp + 8].start;
+			rsize = (config->request.resource[tmp + 8].end - raddr) + 1;
+			if (addr >= raddr && addr < raddr + rsize)
+				return 1;
+			if (addr + size > raddr && addr + size < (raddr + rsize) - 1)
+				return 1;
 		}
 	}
 	return 0;
@@ -453,10 +473,11 @@ static int pnp_check_dma(int dma, struct pnp_cfg *config)
 /* config generation functions */
 static int pnp_generate_port(struct pnp_cfg *config, int num)
 {
-	struct pnp_port *port = config->port[num];
+	struct pnp_port *port;
 	unsigned long *value1, *value2, *value3;
 	if (!config || num < 0 || num > 7)
 		return -EINVAL;
+	port = config->port[num];
 	if (!port)
 		return 0;
 	value1 = &config->request.resource[num].start;
@@ -465,7 +486,7 @@ static int pnp_generate_port(struct pnp_cfg *config, int num)
 	*value1 = port->min;
 	*value2 = *value1 + port->size -1;
 	*value3 = port->flags | IORESOURCE_IO;
-	while (pnp_check_port(*value1, port->size)) {
+	while (pnp_check_port(*value1, port->size, num, config)) {
 		*value1 += port->align;
 		*value2 = *value1 + port->size - 1;
 		if (*value1 > port->max || !port->align)
@@ -476,10 +497,11 @@ static int pnp_generate_port(struct pnp_cfg *config, int num)
 
 static int pnp_generate_mem(struct pnp_cfg *config, int num)
 {
-	struct pnp_mem *mem = config->mem[num];
+	struct pnp_mem *mem;
 	unsigned long *value1, *value2, *value3;
 	if (!config || num < 0 || num > 3)
 		return -EINVAL;
+	mem = config->mem[num];
 	if (!mem)
 		return 0;
 	value1 = &config->request.resource[num + 8].start;
@@ -496,7 +518,7 @@ static int pnp_generate_mem(struct pnp_cfg *config, int num)
 		*value3 |= IORESOURCE_RANGELENGTH;
 	if (mem->flags & IORESOURCE_MEM_SHADOWABLE)
 		*value3 |= IORESOURCE_SHADOWABLE;
-	while (pnp_check_mem(*value1, mem->size)) {
+	while (pnp_check_mem(*value1, mem->size, num, config)) {
 		*value1 += mem->align;
 		*value2 = *value1 + mem->size - 1;
 		if (*value1 > mem->max || !mem->align)
@@ -507,7 +529,7 @@ static int pnp_generate_mem(struct pnp_cfg *config, int num)
 
 static int pnp_generate_irq(struct pnp_cfg *config, int num)
 {
-	struct pnp_irq *irq = config->irq[num];
+	struct pnp_irq *irq;
 	unsigned long *value1, *value2, *value3;
 	/* IRQ priority: this table is good for i386 */
 	static unsigned short xtab[16] = {
@@ -516,6 +538,7 @@ static int pnp_generate_irq(struct pnp_cfg *config, int num)
 	int i;
 	if (!config || num < 0 || num > 1)
 		return -EINVAL;
+	irq = config->irq[num];
 	if (!irq)
 		return 0;
 	value1 = &config->request.irq_resource[num].start;
@@ -536,16 +559,16 @@ static int pnp_generate_irq(struct pnp_cfg *config, int num)
 
 static int pnp_generate_dma(struct pnp_cfg *config, int num)
 {
-	struct pnp_dma *dma = config->dma[num];
+	struct pnp_dma *dma;
 	unsigned long *value1, *value2, *value3;
 	/* DMA priority: this table is good for i386 */
 	static unsigned short xtab[16] = {
 		1, 3, 5, 6, 7, 0, 2, 4
 	};
 	int i;
-
 	if (!config || num < 0 || num > 1)
 		return -EINVAL;
+	dma = config->dma[num];
 	if (!dma)
 		return 0;
 	value1 = &config->request.dma_resource[num].start;
@@ -566,10 +589,11 @@ static int pnp_generate_dma(struct pnp_cfg *config, int num)
 
 static int pnp_prepare_request(struct pnp_cfg *config)
 {
-	struct pnp_dev *dev = &config->request;
+	struct pnp_dev *dev;
 	int idx;
 	if (!config)
 		return -EINVAL;
+	dev = &config->request;
 	if (dev == NULL)
 		return -EINVAL;
 	if (dev->active || dev->ro)
@@ -629,21 +653,29 @@ static int pnp_generate_request(struct pnp_cfg *config)
 
 static struct pnp_cfg * pnp_generate_config(struct pnp_dev *dev, int depnum)
 {
-	struct pnp_cfg * config = pnp_alloc(sizeof(struct pnp_cfg));
+	struct pnp_cfg * config;
 	int nport = 0, nirq = 0, ndma = 0, nmem = 0;
-	struct pnp_resources * res = dev->res;
-	struct pnp_port * port = res->port;
-	struct pnp_mem * mem = res->mem;
-	struct pnp_irq * irq = res->irq;
-	struct pnp_dma * dma = res->dma;
+	struct pnp_resources * res;
+	struct pnp_port * port;
+	struct pnp_mem * mem;
+	struct pnp_irq * irq;
+	struct pnp_dma * dma;
 	if (!dev)
 		return NULL;
 	if (depnum < 0)
 		return NULL;
+	config = pnp_alloc(sizeof(struct pnp_cfg));
 	if (!config)
 		return NULL;
 
 	/* independent */
+	res = pnp_find_resources(dev, 0);
+	if (!res)
+		goto fail;
+	port = res->port;
+	mem = res->mem;
+	irq = res->irq;
+	dma = res->dma;
 	while (port){
 		config->port[nport] = port;
 		nport++;
@@ -669,6 +701,8 @@ static struct pnp_cfg * pnp_generate_config(struct pnp_dev *dev, int depnum)
 	if (depnum == 0)
 		return config;
 	res = pnp_find_resources(dev, depnum);
+	if (!res)
+		goto fail;
 	port = res->port;
 	mem = res->mem;
 	irq = res->irq;
@@ -695,6 +729,10 @@ static struct pnp_cfg * pnp_generate_config(struct pnp_dev *dev, int depnum)
 		dma = dma->next;
 	}
 	return config;
+	
+	fail:
+	kfree(config);
+	return NULL;
 }
 
 /* PnP Device Resource Management */
