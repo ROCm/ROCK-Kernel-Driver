@@ -1998,9 +1998,21 @@ static int wl3501_get_nick(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+static int wl3501_get_rate(struct net_device *dev, struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	/*
+	 * FIXME: have to see from where to get this info, perhaps this card
+	 * works at 1 Mbit/s too... for now leave at 2 Mbit/s that is the most
+	 * common with the Planet Access Points. -acme
+	 */
+	wrqu->bitrate.value = 2000000;
+	wrqu->bitrate.fixed = 1;
+	return 0;
+}
+
 static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWNAME	- SIOCSIWCOMMIT] = wl3501_get_name,
-	//[SIOCSIWFREQ	- SIOCSIWCOMMIT] = wl3501_set_freq,
 	[SIOCGIWFREQ	- SIOCSIWCOMMIT] = wl3501_get_freq,
 	[SIOCSIWMODE	- SIOCSIWCOMMIT] = wl3501_set_mode,
 	[SIOCGIWMODE	- SIOCSIWCOMMIT] = wl3501_get_mode,
@@ -2016,6 +2028,7 @@ static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWESSID	- SIOCSIWCOMMIT] = wl3501_get_essid,
 	[SIOCSIWNICKN	- SIOCSIWCOMMIT] = wl3501_set_nick,
 	[SIOCGIWNICKN	- SIOCSIWCOMMIT] = wl3501_get_nick,
+	[SIOCGIWRATE	- SIOCSIWCOMMIT] = wl3501_get_rate,
 };
 
 static const struct iw_handler_def wl3501_handler_def = {
