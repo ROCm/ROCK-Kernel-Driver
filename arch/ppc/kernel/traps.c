@@ -71,6 +71,7 @@ void (*debugger_fault_handler)(struct pt_regs *regs);
  * Trap & Exception support
  */
 
+extern void (*perf_irq)(struct pt_regs *);
 
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
@@ -725,6 +726,11 @@ void AltivecAssistException(struct pt_regs *regs)
 	}
 }
 #endif /* CONFIG_ALTIVEC */
+
+void PerformanceMonitorException(struct pt_regs *regs)
+{
+	perf_irq(regs);
+}
 
 #ifdef CONFIG_FSL_BOOKE
 void CacheLockingException(struct pt_regs *regs, unsigned long address,

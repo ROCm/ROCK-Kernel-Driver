@@ -643,7 +643,8 @@ interrupt_base:
 	EXCEPTION(0x2050, SPEFloatingPointRound, UnknownException, EXC_XFER_EE)
 
 	/* Performance Monitor */
-	EXCEPTION(0x2060, PerformanceMonitor, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2060, PerformanceMonitor, PerformanceMonitorException, EXC_XFER_STD)
+
 
 	/* Debug Interrupt */
 	DEBUG_EXCEPTION
