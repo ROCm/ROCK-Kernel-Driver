@@ -1891,7 +1891,6 @@ int i2o_block_init(void)
 
 #ifdef MODULE
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Red Hat Software");
 MODULE_DESCRIPTION("I2O Block Device OSM");
 MODULE_LICENSE("GPL");

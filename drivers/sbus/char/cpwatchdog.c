@@ -180,8 +180,6 @@ static int wd1_timeout = 0;
 static int wd2_timeout = 0;
 
 #ifdef MODULE
-EXPORT_NO_SYMBOLS;
-
 MODULE_PARM		(wd0_timeout, "i");
 MODULE_PARM_DESC(wd0_timeout, "Default watchdog0 timeout in 1/10secs");
 MODULE_PARM 	(wd1_timeout, "i");

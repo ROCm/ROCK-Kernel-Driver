@@ -3860,8 +3860,6 @@ static int __init synclinkmp_init(void)
 {
 	SLMP_INFO *info;
 
-	EXPORT_NO_SYMBOLS;
-
 	if (break_on_load) {
 	 	synclinkmp_get_text_ptr();
   		BREAKPOINT();

@@ -284,8 +284,6 @@ MODULE_DESCRIPTION("Radio driver for the Guillemot Maxi Radio FM2000 radio.");
 MODULE_LICENSE("GPL");
 
 
-EXPORT_NO_SYMBOLS;
-
 static int __devinit maxiradio_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	if(!request_region(pci_resource_start(pdev, 0),

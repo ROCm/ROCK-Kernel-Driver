@@ -412,8 +412,6 @@ MODULE_PARM_DESC( mx, "single digit: 1 - turn off the turner upon module exit (d
 MODULE_PARM( nr_radio, "i");
 MODULE_PARM_DESC( nr_radio, "video4linux device number to use");
 
-EXPORT_NO_SYMBOLS;
-
 module_init( gemtek_pci_init_module );
 module_exit( gemtek_pci_cleanup_module );
 

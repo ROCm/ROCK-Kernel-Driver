@@ -87,4 +87,4 @@ module_exit(mouse_rpc_exit);
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("RiscPC mouse driver");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
+

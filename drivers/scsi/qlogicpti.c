@@ -1533,5 +1533,3 @@ int qlogicpti_reset(Scsi_Cmnd *Cmnd, unsigned int reset_flags)
 static Scsi_Host_Template driver_template = QLOGICPTI;
 
 #include "scsi_module.c"
-
-EXPORT_NO_SYMBOLS;

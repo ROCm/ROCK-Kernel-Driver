@@ -299,4 +299,4 @@ module_exit(ecoscsi_exit);
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("Econet-SCSI driver for Acorn machines");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
+

@@ -4700,8 +4700,6 @@ int __init mgsl_init(void)
 {
 	int rc;
 
-	EXPORT_NO_SYMBOLS;
-	
  	printk("%s %s\n", driver_name, driver_version);
 	
 	mgsl_enum_isa_devices();

@@ -563,8 +563,6 @@ static struct block_device_operations jsfd_fops = {
 	ioctl:		jsfd_ioctl,
 };
 
-EXPORT_NO_SYMBOLS;
-
 int jsflash_init(void)
 {
 	int rc;

@@ -385,8 +385,6 @@ MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the Zoltrix Radio Plus (0x20c or 0x30c)");
 MODULE_PARM(radio_nr, "i");
 
-EXPORT_NO_SYMBOLS;
-
 static void __exit zoltrix_cleanup_module(void)
 {
 	video_unregister_device(&zoltrix_radio);

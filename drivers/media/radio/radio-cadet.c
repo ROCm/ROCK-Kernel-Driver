@@ -639,8 +639,6 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 
 MODULE_DEVICE_TABLE(isapnp, id_table);
 
-EXPORT_NO_SYMBOLS;
-
 static void __exit cadet_cleanup_module(void)
 {
 	video_unregister_device(&cadet_radio);

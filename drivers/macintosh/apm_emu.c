@@ -550,5 +550,4 @@ module_exit(apm_emu_exit);
 MODULE_AUTHOR("Benjamin Herrenschmidt");
 MODULE_DESCRIPTION("APM emulation layer for PowerMac");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 

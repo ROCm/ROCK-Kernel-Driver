@@ -311,8 +311,6 @@ MODULE_PARM(mutefreq, "i");
 MODULE_PARM_DESC(mutefreq, "Frequency used when muting the card (in kHz)");
 MODULE_PARM(radio_nr, "i");
 
-EXPORT_NO_SYMBOLS;
-
 static int io = -1;
 static int radio_nr = -1;
 

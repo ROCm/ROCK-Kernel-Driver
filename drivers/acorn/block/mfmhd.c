@@ -1459,7 +1459,6 @@ static int mfm_reread_partitions(kdev_t dev)
 
 #ifdef MODULE
 
-EXPORT_NO_SYMBOLS;
 MODULE_LICENSE("GPL");
 
 int init_module(void)

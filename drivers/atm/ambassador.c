@@ -2581,8 +2581,6 @@ static void __init amb_check_args (void) {
 /********** module stuff **********/
 
 #ifdef MODULE
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR(maintainer_string);
 MODULE_DESCRIPTION(description_string);
 MODULE_LICENSE("GPL");

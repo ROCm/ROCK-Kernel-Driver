@@ -209,7 +209,6 @@ MODULE_PARM_DESC(duplex, "ThunderLAN duplex setting(s) (0-default, 1-half, 2-ful
 MODULE_PARM_DESC(speed, "ThunderLAN port speen setting(s) (0,10,100)");
 MODULE_PARM_DESC(debug, "ThunderLAN debug mask");
 MODULE_PARM_DESC(bbuf, "ThunderLAN use big buffer (0-1)");
-EXPORT_NO_SYMBOLS;
 
 /* Define this to enable Link beat monitoring */
 #undef MONITOR

@@ -776,4 +776,3 @@ module_exit(ppdev_cleanup);
 
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;

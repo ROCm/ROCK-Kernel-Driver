@@ -760,8 +760,6 @@ static void __exit soc_cleanup(void)
 	}
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(soc_probe);
 module_exit(soc_cleanup);
 MODULE_LICENSE("GPL");

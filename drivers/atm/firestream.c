@@ -2124,4 +2124,4 @@ module_init(firestream_init_module);
 module_exit(firestream_cleanup_module);
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
+

@@ -2340,5 +2340,4 @@ static void __exit eni_cleanup(void)
 module_init(eni_init);
 module_exit(eni_cleanup);
 
-EXPORT_NO_SYMBOLS;
 MODULE_LICENSE("GPL");

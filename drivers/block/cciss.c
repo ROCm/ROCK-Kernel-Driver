@@ -2608,7 +2608,6 @@ int __init cciss_init(void)
 
 }
 
-EXPORT_NO_SYMBOLS;
 static int __init init_cciss_module(void)
 {
 	return ( cciss_init());

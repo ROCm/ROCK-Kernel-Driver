@@ -2493,4 +2493,3 @@ static int azt_bcd2bin(unsigned char bcd)
 }
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

@@ -276,8 +276,6 @@ MODULE_AUTHOR("Adam Tlalka, atlka@pg.gda.pl");
 MODULE_DESCRIPTION("Radio driver for the Maestro PCI sound card radio.");
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;
-
 void __exit maestro_radio_exit(void)
 {
 	video_unregister_device(&maestro_radio);

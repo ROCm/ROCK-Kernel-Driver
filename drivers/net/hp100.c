@@ -121,7 +121,6 @@
 
 #define LINUX_2_1
 typedef struct net_device_stats hp100_stats_t;
-EXPORT_NO_SYMBOLS;
 
 #include "hp100.h"
 

@@ -505,8 +505,6 @@ static void __exit lapbeth_cleanup_driver(void)
 }
 module_exit(lapbeth_cleanup_driver);
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Jonathan Naylor <g4klx@g4klx.demon.co.uk>");
 MODULE_DESCRIPTION("The unofficial LAPB over Ethernet driver");
 MODULE_LICENSE("GPL");
