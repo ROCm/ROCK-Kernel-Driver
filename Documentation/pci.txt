@@ -156,6 +156,11 @@ if it was in suspended state. Please note that this function can fail.
 which enables the bus master bit in PCI_COMMAND register and also fixes
 the latency timer value if it's set to something bogus by the BIOS.
 
+   If you want to use the PCI Memory-Write-Invalidate transaction,
+call pci_set_mwi().  This enables bit PCI_COMMAND bit for Mem-Wr-Inval
+and also ensures that the cache line size register is set correctly.
+Make sure to check the return value of pci_set_mwi(), not all architectures
+may support Memory-Write-Invalidate.
 
 4. How to access PCI config space
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -202,6 +207,8 @@ pci_resource_end()		Returns bus end address for a given PCI region
 pci_resource_len()		Returns the byte length of a PCI region
 pci_set_drvdata()		Set private driver data pointer for a pci_dev
 pci_get_drvdata()		Return private driver data pointer for a pci_dev
+pci_set_mwi()			Enable Memory-Write-Invalidate transactions.
+pci_clear_mwi()			Disable Memory-Write-Invalidate transactions.
 
 
 7. Miscellaneous hints
