@@ -25,8 +25,6 @@
 
 
 /* RPC scheduler */
-EXPORT_SYMBOL(rpc_allocate);
-EXPORT_SYMBOL(rpc_free);
 EXPORT_SYMBOL(rpc_execute);
 EXPORT_SYMBOL(rpc_init_task);
 EXPORT_SYMBOL(rpc_sleep_on);
@@ -134,6 +132,8 @@ EXPORT_SYMBOL(nlm_debug);
 static int __init
 init_sunrpc(void)
 {
+	if (rpc_init_mempool() != 0)
+		return -ENOMEM;
 #ifdef RPC_DEBUG
 	rpc_register_sysctl();
 #endif
@@ -148,6 +148,7 @@ init_sunrpc(void)
 static void __exit
 cleanup_sunrpc(void)
 {
+	rpc_destroy_mempool();
 	cache_unregister(&auth_domain_cache);
 	cache_unregister(&ip_map_cache);
 #ifdef RPC_DEBUG

@@ -1,3 +1,20 @@
+/*
+ * linux/net/sunrpc/timer.c
+ *
+ * Estimate RPC request round trip time.
+ *
+ * Based on packet round-trip and variance estimator algorithms described
+ * in appendix A of "Congestion Avoidance and Control" by Van Jacobson
+ * and Michael J. Karels (ACM Computer Communication Review; Proceedings
+ * of the Sigcomm '88 Symposium in Stanford, CA, August, 1988).
+ *
+ * This RTT estimator is used only for RPC over datagram protocols.
+ *
+ * Copyright (C) 2002 Trond Myklebust <trond.myklebust@fys.uio.no>
+ */
+
+#include <asm/param.h>
+
 #include <linux/version.h>
 #include <linux/types.h>
 #include <linux/unistd.h>
@@ -11,38 +28,53 @@
 #define RPC_RTO_MIN (2)
 
 void
-rpc_init_rtt(struct rpc_rtt *rt, long timeo)
+rpc_init_rtt(struct rpc_rtt *rt, unsigned long timeo)
 {
-	long t = (timeo - RPC_RTO_INIT) << 3;
-	int i;
+	unsigned long init = 0;
+	unsigned i;
+
 	rt->timeo = timeo;
-	if (t < 0)
-		t = 0;
+
+	if (timeo > RPC_RTO_INIT)
+		init = (timeo - RPC_RTO_INIT) << 3;
 	for (i = 0; i < 5; i++) {
-		rt->srtt[i] = t;
+		rt->srtt[i] = init;
 		rt->sdrtt[i] = RPC_RTO_INIT;
 	}
+
 	atomic_set(&rt->ntimeouts, 0);
 }
 
+/*
+ * NB: When computing the smoothed RTT and standard deviation,
+ *     be careful not to produce negative intermediate results.
+ */
 void
-rpc_update_rtt(struct rpc_rtt *rt, int timer, long m)
+rpc_update_rtt(struct rpc_rtt *rt, unsigned timer, long m)
 {
-	long *srtt, *sdrtt;
+	unsigned long *srtt, *sdrtt;
 
 	if (timer-- == 0)
 		return;
 
+	/* jiffies wrapped; ignore this one */
+	if (m < 0)
+		return;
+
 	if (m == 0)
-		m = 1;
+		m = 1L;
+
 	srtt = &rt->srtt[timer];
 	m -= *srtt >> 3;
 	*srtt += m;
+
 	if (m < 0)
 		m = -m;
+
 	sdrtt = &rt->sdrtt[timer];
 	m -= *sdrtt >> 2;
 	*sdrtt += m;
+
 	/* Set lower bound on the variance */
 	if (*sdrtt < RPC_RTO_MIN)
 		*sdrtt = RPC_RTO_MIN;
@@ -61,14 +93,17 @@ rpc_update_rtt(struct rpc_rtt *rt, int timer, long m)
  * other                   - timeo
  */
 
-long
-rpc_calc_rto(struct rpc_rtt *rt, int timer)
+unsigned long
+rpc_calc_rto(struct rpc_rtt *rt, unsigned timer)
 {
-	long res;
+	unsigned long res;
+
 	if (timer-- == 0)
 		return rt->timeo;
+
 	res = (rt->srtt[timer] >> 3) + rt->sdrtt[timer];
 	if (res > RPC_RTO_MAX)
 		res = RPC_RTO_MAX;
+
 	return res;
 }

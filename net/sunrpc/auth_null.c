@@ -25,7 +25,7 @@ nul_create(struct rpc_clnt *clnt)
 	struct rpc_auth	*auth;
 
 	dprintk("RPC: creating NULL authenticator for client %p\n", clnt);
-	if (!(auth = (struct rpc_auth *) rpc_allocate(0, sizeof(*auth))))
+	if (!(auth = (struct rpc_auth *) kmalloc(sizeof(*auth),GFP_KERNEL)))
 		return NULL;
 	auth->au_cslack = 4;
 	auth->au_rslack = 2;
@@ -41,7 +41,7 @@ nul_destroy(struct rpc_auth *auth)
 {
 	dprintk("RPC: destroying NULL authenticator %p\n", auth);
 	rpcauth_free_credcache(auth);
-	rpc_free(auth);
+	kfree(auth);
 }
 
 /*
@@ -52,7 +52,7 @@ nul_create_cred(int flags)
 {
 	struct rpc_cred	*cred;
 
-	if (!(cred = (struct rpc_cred *) rpc_allocate(flags, sizeof(*cred))))
+	if (!(cred = (struct rpc_cred *) kmalloc(sizeof(*cred),GFP_KERNEL)))
 		return NULL;
 	atomic_set(&cred->cr_count, 0);
 	cred->cr_flags = RPCAUTH_CRED_UPTODATE;
@@ -68,7 +68,7 @@ nul_create_cred(int flags)
 static void
 nul_destroy_cred(struct rpc_cred *cred)
 {
-	rpc_free(cred);
+	kfree(cred);
 }
 
 /*

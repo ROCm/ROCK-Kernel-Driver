@@ -22,7 +22,6 @@ ifneq ($(CONFIG_MAC),y)
 endif
 obj-$(CONFIG_MAC_EMUMOUSEBTN)	+= mac_hid.o
 obj-$(CONFIG_INPUT_ADBHID)	+= adbhid.o
-obj-$(CONFIG_PPC_RTC)		+= rtc.o
 obj-$(CONFIG_ANSLCD)		+= ans-lcd.o
 
 obj-$(CONFIG_ADB_PMU)		+= via-pmu.o
@@ -30,7 +29,6 @@ obj-$(CONFIG_ADB_CUDA)		+= via-cuda.o
 obj-$(CONFIG_PMAC_APM_EMU)	+= apm_emu.o
 
 obj-$(CONFIG_ADB)		+= adb.o
-obj-$(CONFIG_ADB_KEYBOARD)	+= mac_keyb.o
 obj-$(CONFIG_ADB_MACII)		+= via-macii.o
 obj-$(CONFIG_ADB_MACIISI)	+= via-maciisi.o
 obj-$(CONFIG_ADB_IOP)		+= adb-iop.o

@@ -389,12 +389,6 @@ xprt_close(struct rpc_xprt *xprt)
 	sk->no_check	 = 0;
 
 	sock_release(sock);
-	/*
-	 *	TCP doesn't require the rpciod now - other things may
-	 *	but rpciod handles that not us.
-	 */
-	if(xprt->stream)
-		rpciod_down();
 }
 
 /*
@@ -590,9 +584,11 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 		xprt_adjust_cwnd(xprt, copied);
 		__xprt_put_cong(xprt, req);
 	       	if (!req->rq_nresend) {
-			int timer = rpcproc_timer(clnt, task->tk_msg.rpc_proc);
+			unsigned timer =
+				rpcproc_timer(clnt, task->tk_msg.rpc_proc);
 			if (timer)
-				rpc_update_rtt(&clnt->cl_rtt, timer, (long)jiffies - req->rq_xtime);
+				rpc_update_rtt(&clnt->cl_rtt, timer,
+						(long)jiffies - req->rq_xtime);
 		}
 		rpc_clear_timeo(&clnt->cl_rtt);
 	}
@@ -911,7 +907,12 @@ tcp_data_recv(read_descriptor_t *rd_desc, struct sk_buff *skb,
 		unsigned int offset, size_t len)
 {
 	struct rpc_xprt *xprt = (struct rpc_xprt *)rd_desc->buf;
-	skb_reader_t desc = { skb, offset, len };
+	skb_reader_t desc = {
+		.skb	= skb,
+		.offset	= offset,
+		.count	= len,
+		.csum	= 0
+       	};
 
 	dprintk("RPC:      tcp_data_recv\n");
 	do {
@@ -1457,11 +1458,6 @@ xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 	/* Reset to new socket */
 	xprt->sock = sock;
 	xprt->inet = sk;
-	/*
-	 *	TCP requires the rpc I/O daemon is present
-	 */
-	if(xprt->stream)
-		rpciod_up();
 
 	return;
 }
@@ -1547,7 +1543,7 @@ xprt_create_proto(int proto, struct sockaddr_in *sap, struct rpc_timeout *to)
  out_bad:
 	dprintk("RPC:      xprt_create_proto failed\n");
 	if (xprt)
-		rpc_free(xprt);
+		kfree(xprt);
 	return NULL;
 }
 
@@ -1586,7 +1582,7 @@ xprt_destroy(struct rpc_xprt *xprt)
 	dprintk("RPC:      destroying transport %p\n", xprt);
 	xprt_shutdown(xprt);
 	xprt_close(xprt);
-	rpc_free(xprt);
+	kfree(xprt);
 
 	return 0;
 }

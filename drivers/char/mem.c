@@ -140,7 +140,7 @@ static inline pgprot_t pgprot_noncached(pgprot_t _prot)
 		prot |= _PAGE_PCD | _PAGE_PWT;
 #elif defined(__powerpc__)
 	prot |= _PAGE_NO_CACHE | _PAGE_GUARDED;
-#elif defined(__mc68000__)
+#elif defined(__mc68000__) && defined(CONFIG_MMU)
 #ifdef SUN3_PAGE_NOCACHE
 	if (MMU_IS_SUN3)
 		prot |= SUN3_PAGE_NOCACHE;

@@ -144,7 +144,6 @@ EXPORT_SYMBOL(pci_dac_dma_to_offset);
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(hwrpb);
-EXPORT_SYMBOL(wrusp);
 EXPORT_SYMBOL(start_thread);
 EXPORT_SYMBOL(alpha_read_fp_reg);
 EXPORT_SYMBOL(alpha_read_fp_reg_s);

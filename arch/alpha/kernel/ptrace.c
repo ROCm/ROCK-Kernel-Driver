@@ -249,8 +249,8 @@ void ptrace_disable(struct task_struct *child)
 }
 
 asmlinkage long
-sys_ptrace(long request, long pid, long addr, long data,
-	   int a4, int a5, struct pt_regs regs)
+do_sys_ptrace(long request, long pid, long addr, long data,
+	      struct pt_regs *regs)
 {
 	struct task_struct *child;
 	long ret;
@@ -307,14 +307,14 @@ sys_ptrace(long request, long pid, long addr, long data,
 		if (copied != sizeof(tmp))
 			goto out;
 		
-		regs.r0 = 0;	/* special return: no errors */
+		regs->r0 = 0;	/* special return: no errors */
 		ret = tmp;
 		goto out;
 	}
 
 	/* Read register number ADDR. */
 	case PTRACE_PEEKUSR:
-		regs.r0 = 0;	/* special return: no errors */
+		regs->r0 = 0;	/* special return: no errors */
 		ret = get_reg(child, addr);
 		DBG(DBG_MEM, ("peek $%ld->%#lx\n", addr, ret));
 		goto out;

@@ -37,33 +37,15 @@
 # define NFS_DEBUG
 #endif
 
-/*
- * NFS_MAX_DIRCACHE controls the number of simultaneously cached
- * directory chunks. Each chunk holds the list of nfs_entry's returned
- * in a single readdir call in a memory region of size PAGE_SIZE.
- *
- * Note that at most server->rsize bytes of the cache memory are used.
- */
-#define NFS_MAX_DIRCACHE		16
-
 #define NFS_MAX_FILE_IO_BUFFER_SIZE	32768
 #define NFS_DEF_FILE_IO_BUFFER_SIZE	4096
 
 /*
  * The upper limit on timeouts for the exponential backoff algorithm.
  */
-#define NFS_MAX_RPC_TIMEOUT		(6*HZ)
-#define NFS_READ_DELAY			(2*HZ)
 #define NFS_WRITEBACK_DELAY		(5*HZ)
 #define NFS_WRITEBACK_LOCKDELAY		(60*HZ)
 #define NFS_COMMIT_DELAY		(5*HZ)
-
-/*
- * Size of the lookup cache in units of number of entries cached.
- * It is better not to make this too large although the optimum
- * depends on a usage and environment.
- */
-#define NFS_LOOKUP_CACHE_SIZE		64
 
 /*
  * superblock magic number for NFS
@@ -74,9 +56,6 @@
  * These are the default flags for swap requests
  */
 #define NFS_RPC_SWAPFLAGS		(RPC_TASK_SWAPPER|RPC_TASK_ROOTCREDS)
-
-/* Flags in the RPC client structure */
-#define NFS_CLNTF_BUFSIZE	0x0001	/* readdir buffer in longwords */
 
 #define NFS_RW_SYNC		0x0001	/* O_SYNC handling */
 #define NFS_RW_SWAP		0x0002	/* This is a swap request */
@@ -185,8 +164,7 @@ struct nfs_inode {
 #define NFS_INO_STALE		0x0001		/* possible stale inode */
 #define NFS_INO_ADVISE_RDPLUS   0x0002          /* advise readdirplus */
 #define NFS_INO_REVALIDATING	0x0004		/* revalidating attrs */
-#define NFS_IS_SNAPSHOT		0x0010		/* a snapshot file */
-#define NFS_INO_FLUSH		0x0020		/* inode is due for flushing */
+#define NFS_INO_FLUSH		0x0008		/* inode is due for flushing */
 
 static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
@@ -198,9 +176,7 @@ static inline struct nfs_inode *NFS_I(struct inode *inode)
 #define NFS_SERVER(inode)		(NFS_SB(inode->i_sb))
 #define NFS_CLIENT(inode)		(NFS_SERVER(inode)->client)
 #define NFS_PROTO(inode)		(NFS_SERVER(inode)->rpc_ops)
-#define NFS_REQUESTLIST(inode)		(NFS_SERVER(inode)->rw_requests)
 #define NFS_ADDR(inode)			(RPC_PEERADDR(NFS_CLIENT(inode)))
-#define NFS_CONGESTED(inode)		(RPC_CONGESTED(NFS_CLIENT(inode)))
 #define NFS_COOKIEVERF(inode)		(NFS_I(inode)->cookieverf)
 #define NFS_READTIME(inode)		(NFS_I(inode)->read_cache_jiffies)
 #define NFS_MTIME_UPDATE(inode)		(NFS_I(inode)->cache_mtime_jiffies)
@@ -208,7 +184,6 @@ static inline struct nfs_inode *NFS_I(struct inode *inode)
 #define NFS_CACHE_MTIME(inode)		(NFS_I(inode)->read_cache_mtime)
 #define NFS_CACHE_ISIZE(inode)		(NFS_I(inode)->read_cache_isize)
 #define NFS_CHANGE_ATTR(inode)		(NFS_I(inode)->change_attr)
-#define NFS_NEXTSCAN(inode)		(NFS_I(inode)->nextscan)
 #define NFS_CACHEINV(inode) \
 do { \
 	NFS_READTIME(inode) = jiffies - NFS_MAXATTRTIMEO(inode) - 1; \
@@ -254,8 +229,6 @@ loff_t req_offset(struct nfs_page *req)
  * linux/fs/nfs/inode.c
  */
 extern void nfs_zap_caches(struct inode *);
-extern int nfs_inode_is_stale(struct inode *, struct nfs_fh *,
-				struct nfs_fattr *);
 extern struct inode *nfs_fhget(struct dentry *, struct nfs_fh *,
 				struct nfs_fattr *);
 extern int __nfs_refresh_inode(struct inode *, struct nfs_fattr *);
@@ -338,13 +311,9 @@ extern void nfs_commit_done(struct rpc_task *);
 extern int  nfs_sync_file(struct inode *, struct file *, unsigned long, unsigned int, int);
 extern int  nfs_flush_file(struct inode *, struct file *, unsigned long, unsigned int, int);
 extern int  nfs_flush_list(struct list_head *, int, int);
-extern int  nfs_scan_lru_dirty(struct nfs_server *, struct list_head *);
-extern int  nfs_scan_lru_dirty_timeout(struct nfs_server *, struct list_head *);
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
 extern int  nfs_commit_file(struct inode *, struct file *, unsigned long, unsigned int, int);
 extern int  nfs_commit_list(struct list_head *, int);
-extern int  nfs_scan_lru_commit(struct nfs_server *, struct list_head *);
-extern int  nfs_scan_lru_commit_timeout(struct nfs_server *, struct list_head *);
 #else
 static inline int
 nfs_commit_file(struct inode *inode, struct file *file, unsigned long offset,

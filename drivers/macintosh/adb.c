@@ -34,8 +34,10 @@
 #include <linux/wait.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/spinlock.h>
 #include <linux/completion.h>
 #include <asm/uaccess.h>
+#include <asm/semaphore.h>
 #ifdef CONFIG_PPC
 #include <asm/prom.h>
 #include <asm/hydra.h>
@@ -75,8 +77,8 @@ static struct adb_driver *adb_driver_list[] = {
 
 struct adb_driver *adb_controller;
 struct notifier_block *adb_client_list = NULL;
-static int adb_got_sleep = 0;
-static int adb_inited = 0;
+static int adb_got_sleep;
+static int adb_inited;
 static pid_t adb_probe_task_pid;
 static DECLARE_MUTEX(adb_probe_mutex);
 static struct completion adb_probe_task_comp;
@@ -94,13 +96,25 @@ static struct pmu_sleep_notifier adb_sleep_notifier = {
 static int adb_scan_bus(void);
 static int do_adb_reset_bus(void);
 static void adbdev_init(void);
-
+static int try_handler_change(int, int);
 
 static struct adb_handler {
 	void (*handler)(unsigned char *, int, struct pt_regs *, int);
 	int original_address;
 	int handler_id;
 } adb_handler[16];
+
+/*
+ * The adb_handler_sem mutex protects all accesses to the original_address
+ * and handler_id fields of adb_handler[i] for all i, and changes to the
+ * handler field.
+ * Accesses to the handler field are protected by the adb_handler_lock
+ * rwlock.  It is held across all calls to any handler, so that by the
+ * time adb_unregister returns, we know that the old handler isn't being
+ * called.
+ */
+static DECLARE_MUTEX(adb_handler_sem);
+static rwlock_t adb_handler_lock = RW_LOCK_UNLOCKED;
 
 #if 0
 static void printADBreply(struct adb_request *req)
@@ -254,25 +268,18 @@ __adb_probe_task(void *data)
 		SIGCHLD | CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 }
 
+static DECLARE_WORK(adb_reset_work, __adb_probe_task, NULL);
+
 int
 adb_reset_bus(void)
 {
-	static struct tq_struct tqs = {
-		routine:	__adb_probe_task,
-	};
-
 	if (__adb_probe_sync) {
 		do_adb_reset_bus();
 		return 0;
 	}
 
 	down(&adb_probe_mutex);
-
-	/* Create probe thread as a child of keventd */
-	if (current_is_keventd())
-		__adb_probe_task(NULL);
-	else
-		schedule_task(&tqs);
+	schedule_work(&adb_reset_work);
 	return 0;
 }
 
@@ -372,7 +379,6 @@ static int
 do_adb_reset_bus(void)
 {
 	int ret, nret, devs;
-	unsigned long flags;
 	
 	if (adb_controller == NULL)
 		return -ENXIO;
@@ -391,11 +397,11 @@ do_adb_reset_bus(void)
 		/* Let the trackpad settle down */
 		adb_wait_ms(500);
 	}
-	
-	save_flags(flags);
-	cli();
+
+	down(&adb_handler_sem);
+	write_lock_irq(&adb_handler_lock);
 	memset(adb_handler, 0, sizeof(adb_handler));
-	restore_flags(flags);
+	write_unlock_irq(&adb_handler_lock);
 
 	/* That one is still a bit synchronous, oh well... */
 	if (adb_controller->reset_bus)
@@ -413,6 +419,7 @@ do_adb_reset_bus(void)
 		if (adb_controller->autopoll)
 			adb_controller->autopoll(devs);
 	}
+	up(&adb_handler_sem);
 
 	nret = notifier_call_chain(&adb_client_list, ADB_MSG_POST_RESET, NULL);
 	if (nret & NOTIFY_STOP_MASK)
@@ -512,30 +519,41 @@ adb_register(int default_id, int handler_id, struct adb_ids *ids,
 {
 	int i;
 
+	down(&adb_handler_sem);
 	ids->nids = 0;
 	for (i = 1; i < 16; i++) {
 		if ((adb_handler[i].original_address == default_id) &&
 		    (!handler_id || (handler_id == adb_handler[i].handler_id) || 
-		    adb_try_handler_change(i, handler_id))) {
+		    try_handler_change(i, handler_id))) {
 			if (adb_handler[i].handler != 0) {
 				printk(KERN_ERR
 				       "Two handlers for ADB device %d\n",
 				       default_id);
 				continue;
 			}
+			write_lock_irq(&adb_handler_lock);
 			adb_handler[i].handler = handler;
+			write_unlock_irq(&adb_handler_lock);
 			ids->id[ids->nids++] = i;
 		}
 	}
+	up(&adb_handler_sem);
 	return ids->nids;
 }
 
 int
 adb_unregister(int index)
 {
-	if (!adb_handler[index].handler)
-		return -ENODEV;
-	adb_handler[index].handler = 0;
+	int ret = -ENODEV;
+
+	down(&adb_handler_sem);
+	write_lock_irq(&adb_handler_lock);
+	if (adb_handler[index].handler) {
+		ret = 0;
+		adb_handler[index].handler = 0;
+	}
+	write_unlock_irq(&adb_handler_lock);
+	up(&adb_handler_sem);
 	return 0;
 }
 
@@ -544,6 +562,7 @@ adb_input(unsigned char *buf, int nb, struct pt_regs *regs, int autopoll)
 {
 	int i, id;
 	static int dump_adb_input = 0;
+	void (*handler)(unsigned char *, int, struct pt_regs *, int);
 
 	/* We skip keystrokes and mouse moves when the sleep process
 	 * has been started. We stop autopoll, but this is another security
@@ -558,14 +577,15 @@ adb_input(unsigned char *buf, int nb, struct pt_regs *regs, int autopoll)
 			printk(" %x", buf[i]);
 		printk(", id = %d\n", id);
 	}
-	if (adb_handler[id].handler != 0) {
-		(*adb_handler[id].handler)(buf, nb, regs, autopoll);
-	}
+	read_lock(&adb_handler_lock);
+	handler = adb_handler[id].handler;
+	if (handler != 0)
+		(*handler)(buf, nb, regs, autopoll);
+	read_unlock(&adb_handler_lock);
 }
 
-/* Try to change handler to new_id. Will return 1 if successful */
-int
-adb_try_handler_change(int address, int new_id)
+/* Try to change handler to new_id. Will return 1 if successful. */
+static int try_handler_change(int address, int new_id)
 {
 	struct adb_request req;
 
@@ -585,11 +605,24 @@ adb_try_handler_change(int address, int new_id)
 }
 
 int
+adb_try_handler_change(int address, int new_id)
+{
+	int ret;
+
+	down(&adb_handler_sem);
+	ret = try_handler_change(address, new_id);
+	up(&adb_handler_sem);
+	return ret;
+}
+
+int
 adb_get_infos(int address, int *original_address, int *handler_id)
 {
+	down(&adb_handler_sem);
 	*original_address = adb_handler[address].original_address;
 	*handler_id = adb_handler[address].handler_id;
-	
+	up(&adb_handler_sem);
+
 	return (*original_address != 0);
 }
 

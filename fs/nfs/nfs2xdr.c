@@ -355,13 +355,6 @@ nfs_xdr_readdirargs(struct rpc_rqst *req, u32 *p, struct nfs_readdirargs *args)
 	unsigned int replen;
 	u32 count = args->count;
 
-	/*
-	 * Some servers (e.g. HP OS 9.5) seem to expect the buffer size
-	 * to be in longwords ... check whether to convert the size.
-	 */
-	if (task->tk_client->cl_flags & NFS_CLNTF_BUFSIZE)
-		count = count >> 2;
-
 	p = xdr_encode_fhandle(p, args->fh);
 	*p++ = htonl(args->cookie);
 	*p++ = htonl(count); /* see above */
