@@ -189,6 +189,12 @@ void __init s3c2410_map_io(struct map_desc *mach_desc, int mach_size)
 	printk("S3C2410: core %ld.%03ld MHz, memory %ld.%03ld MHz, peripheral %ld.%03ld MHz\n",
 	       print_mhz(s3c24xx_fclk), print_mhz(s3c24xx_hclk),
 	       print_mhz(s3c24xx_pclk));
+
+	/* initialise the clocks here, to allow other things like the
+	 * console to use them
+	 */
+
+	s3c2410_init_clocks();
 }
 
 int __init s3c2410_init(void)
