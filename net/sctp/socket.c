@@ -89,6 +89,7 @@ static int sctp_wait_for_sndbuf(struct sctp_association *, long *timeo_p,
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
 static int sctp_wait_for_connect(struct sctp_association *, long *timeo_p);
 static int sctp_wait_for_accept(struct sock *sk, long timeo);
+static void sctp_wait_for_close(struct sock *sk, long timeo);
 static inline int sctp_verify_addr(struct sock *, union sctp_addr *, int);
 static int sctp_bindx_add(struct sock *, struct sockaddr_storage *, int);
 static int sctp_bindx_rem(struct sock *, struct sockaddr_storage *, int);
@@ -671,6 +672,37 @@ SCTP_STATIC int sctp_setsockopt_bindx(struct sock* sk,
  *
  * If sd in the close() call is a branched-off socket representing only
  * one association, the shutdown is performed on that association only.
+ *
+ * 4.1.6 close() - TCP Style Syntax
+ *
+ * Applications use close() to gracefully close down an association.
+ *
+ * The syntax is:
+ *
+ *    int close(int sd);
+ *
+ *      sd      - the socket descriptor of the association to be closed.
+ *
+ * After an application calls close() on a socket descriptor, no further
+ * socket operations will succeed on that descriptor.
+ *
+ * API 7.1.4 SO_LINGER
+ *
+ * An application using the TCP-style socket can use this option to
+ * perform the SCTP ABORT primitive.  The linger option structure is:
+ *
+ *  struct  linger {
+ *     int     l_onoff;                // option on/off
+ *     int     l_linger;               // linger time 
+ * };
+ *
+ * To enable the option, set l_onoff to 1.  If the l_linger value is set
+ * to 0, calling close() is the same as the ABORT primitive.  If the
+ * value is set to a negative value, the setsockopt() call will return
+ * an error.  If the value is set to a positive value linger_time, the
+ * close() can be blocked for at most linger_time ms.  If the graceful
+ * shutdown phase does not finish during this period, close() will
+ * return but the graceful shutdown phase continues in the system.
  */
 SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 {
@@ -678,7 +710,7 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	struct sctp_association *asoc;
 	struct list_head *pos, *temp;
 
-	SCTP_DEBUG_PRINTK("sctp_close(sk: 0x%p...)\n", sk);
+	printk("sctp_close(sk: 0x%p, timeout:%ld)\n", sk, timeout);
 
 	sctp_lock_sock(sk);
 	sk->shutdown = SHUTDOWN_MASK;
@@ -689,13 +721,21 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	list_for_each_safe(pos, temp, &ep->asocs) {
 		asoc = list_entry(pos, struct sctp_association, asocs);
 
-		/* A closed association can still be in the list if it
-		 * belongs to a TCP-style listening socket that is not
-		 * yet accepted.
-		 */
-		if (sctp_style(sk, TCP) && sctp_state(asoc, CLOSED)) {
-			sctp_unhash_established(asoc);
-			sctp_association_free(asoc);
+		if (sctp_style(sk, TCP)) {
+			/* A closed association can still be in the list if
+			 * it belongs to a TCP-style listening socket that is
+			 * not yet accepted. If so, free it. If not, send an
+			 * ABORT or SHUTDOWN based on the linger options.
+			 */
+			if (sctp_state(asoc, CLOSED)) {
+				sctp_unhash_established(asoc);
+				sctp_association_free(asoc);
+
+			} else if (test_bit(SOCK_LINGER, &sk->flags) &&
+				   !sk->lingertime)
+				sctp_primitive_ABORT(asoc, NULL);
+			else
+				sctp_primitive_SHUTDOWN(asoc, NULL);
 		} else
 			sctp_primitive_SHUTDOWN(asoc, NULL);
 	}
@@ -703,6 +743,10 @@ SCTP_STATIC void sctp_close(struct sock *sk, long timeout)
 	/* Clean up any skbs sitting on the receive queue.  */
 	skb_queue_purge(&sk->receive_queue);
 	skb_queue_purge(&sctp_sk(sk)->pd_lobby);
+
+	/* On a TCP-style socket, block for at most linger_time if set. */
+	if (sctp_style(sk, TCP) && timeout)
+		sctp_wait_for_close(sk, timeout);
 
 	/* This will run the backlog queue.  */
 	sctp_release_sock(sk);
@@ -3668,6 +3712,22 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 	__set_current_state(TASK_RUNNING);
 
 	return err;
+}
+
+void sctp_wait_for_close(struct sock *sk, long timeout)
+{
+	DEFINE_WAIT(wait);
+
+	do {
+		prepare_to_wait(sk->sleep, &wait, TASK_INTERRUPTIBLE);
+		if (list_empty(&sctp_sk(sk)->ep->asocs))
+			break;
+		sctp_release_sock(sk);
+		timeout = schedule_timeout(timeout);
+		sctp_lock_sock(sk);
+	} while (!signal_pending(current) && timeout);
+
+	finish_wait(sk->sleep, &wait);
 }
 
 /* Populate the fields of the newsk from the oldsk and migrate the assoc

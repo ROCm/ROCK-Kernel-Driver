@@ -823,11 +823,16 @@ struct sctp_chunk *sctp_make_abort_user(const struct sctp_association *asoc,
 {
 	struct sctp_chunk *retval;
 	void *payload = NULL, *payoff;
-	size_t paylen;
-	struct iovec *iov = msg->msg_iov;
-	int iovlen = msg->msg_iovlen;
+	size_t paylen = 0;
+	struct iovec *iov = NULL;
+	int iovlen = 0;
 
-	paylen = get_user_iov_size(iov, iovlen);
+	if (msg) {
+		iov = msg->msg_iov;
+		iovlen = msg->msg_iovlen;
+		paylen = get_user_iov_size(iov, iovlen);
+	}
+
 	retval = sctp_make_abort(asoc, chunk, sizeof(sctp_errhdr_t) + paylen);
 	if (!retval)
 		goto err_chunk;
