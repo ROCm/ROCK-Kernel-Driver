@@ -984,7 +984,7 @@ int w83627hf_detect(struct i2c_adapter *adapter, int address,
 	if(force_addr)
 		address = force_addr & ~(WINB_EXTENT - 1);
 
-	if (!request_region(address, WINB_EXTENT, "w83627hf")) {
+	if (!request_region(address, WINB_EXTENT, w83627hf_driver.name)) {
 		err = -EBUSY;
 		goto ERROR0;
 	}
