@@ -36,26 +36,6 @@ struct major_info {
 };
 
 /*
- * Returns the queue corresponding to a device behind a kdev.
- */
-static request_queue_t *
-dasd_get_queue(kdev_t kdev)
-{
-	dasd_devmap_t *devmap;
-	dasd_device_t *device;
-	request_queue_t *queue;
-
-	devmap = dasd_devmap_from_kdev(kdev);
-	device = (devmap != NULL) ?
-		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
-	if (IS_ERR(device))
-		return NULL;
-	queue = device->request_queue;
-	dasd_put_device(devmap);
-	return queue;
-}
-
-/*
  * Register major number for the dasd driver. Call with DASD_MAJOR to
  * setup the static dasd device major 94 or with 0 to allocated a major
  * dynamically.
@@ -93,8 +73,6 @@ dasd_register_major(int major)
 	mi->major = new_major;
 
 	/* Setup block device pointers for the new major. */
-	blk_dev[new_major].queue = dasd_get_queue;
-
 	/* Insert the new major info structure into dasd_major_info list. */
 	spin_lock(&dasd_major_lock);
 	list_add_tail(&mi->list, &dasd_major_info);
@@ -115,9 +93,6 @@ dasd_unregister_major(struct major_info * mi)
 	spin_lock(&dasd_major_lock);
 	list_del(&mi->list);
 	spin_unlock(&dasd_major_lock);
-
-	/* Clear block device pointers. */
-	blk_dev[mi->major].queue = NULL;
 
 	rc = unregister_blkdev(mi->major, "dasd");
 	if (rc < 0)
@@ -273,6 +248,7 @@ dasd_setup_partitions(dasd_device_t * device)
 {
 	/* Make the disk known. */
 	set_capacity(device->gdp, device->blocks << device->s2b_shift);
+	device->gdp->queue = device->request_queue;
 	add_disk(device->gdp);
 }
 

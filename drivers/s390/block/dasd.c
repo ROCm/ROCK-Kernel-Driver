@@ -2178,10 +2178,10 @@ dasd_release(struct inode *inp, struct file *filp)
 
 struct
 block_device_operations dasd_device_operations = {
-	owner:THIS_MODULE,
-	open:dasd_open,
-	release:dasd_release,
-	ioctl:dasd_ioctl,
+	.owner		= THIS_MODULE,
+	.open		= dasd_open,
+	.release	= dasd_release,
+	.ioctl		= dasd_ioctl,
 };
 
 
