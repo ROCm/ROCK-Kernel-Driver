@@ -587,6 +587,6 @@ mem_init (void)
 	setup_gate();
 
 #ifdef CONFIG_IA32_SUPPORT
-	ia32_boot_gdt_init();
+	ia32_mem_init();
 #endif
 }

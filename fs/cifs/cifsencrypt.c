@@ -61,7 +61,7 @@ int cifs_sign_smb(struct smb_hdr * cifs_pdu, struct cifsSesInfo * ses,
 	if((cifs_pdu == NULL) || (ses == NULL))
 		return -EINVAL;
 
-	if((le32_to_cpu(cifs_pdu->Flags2) & SMBFLG2_SECURITY_SIGNATURE) == 0) 
+	if((cifs_pdu->Flags2 & SMBFLG2_SECURITY_SIGNATURE) == 0) 
 		return rc;
 
 	spin_lock(&GlobalMid_Lock);
@@ -107,13 +107,11 @@ int cifs_verify_signature(struct smb_hdr * cifs_pdu, const char * mac_key,
 	if(memcmp(cifs_pdu->Signature.SecuritySignature,"BSRSPYL ",8)==0)
 		cFYI(1,("dummy signature received for smb command 0x%x",cifs_pdu->Command));
 
-	expected_sequence_number = cpu_to_le32(expected_sequence_number);
-
 	/* save off the origiginal signature so we can modify the smb and check
 		its signature against what the server sent */
 	memcpy(server_response_sig,cifs_pdu->Signature.SecuritySignature,8);
 
-	cifs_pdu->Signature.Sequence.SequenceNumber = expected_sequence_number;
+	cifs_pdu->Signature.Sequence.SequenceNumber = cpu_to_le32(expected_sequence_number);
 	cifs_pdu->Signature.Sequence.Reserved = 0;
 
 	rc = cifs_calculate_signature(cifs_pdu, mac_key,

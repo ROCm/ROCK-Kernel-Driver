@@ -1,3 +1,5 @@
+#warning ipfwadm is obsolete, and will be removed soon.
+
 /* Minor modifications to fit on compatibility framework:
    Rusty.Russell@rustcorp.com.au
 */

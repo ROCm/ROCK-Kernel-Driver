@@ -52,10 +52,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __HAVE_COUNTERS
-#define __HAVE_COUNTERS			0
-#endif
-
 #ifndef DRIVER_IOCTLS
 #define DRIVER_IOCTLS
 #endif
@@ -194,41 +190,6 @@ static int DRM(setup)( drm_device_t *dev )
 		if ( i < 0 )
 			return i;
 	}
-
-	dev->counters  = 6 + __HAVE_COUNTERS;
-	dev->types[0]  = _DRM_STAT_LOCK;
-	dev->types[1]  = _DRM_STAT_OPENS;
-	dev->types[2]  = _DRM_STAT_CLOSES;
-	dev->types[3]  = _DRM_STAT_IOCTLS;
-	dev->types[4]  = _DRM_STAT_LOCKS;
-	dev->types[5]  = _DRM_STAT_UNLOCKS;
-#ifdef __HAVE_COUNTER6
-	dev->types[6]  = __HAVE_COUNTER6;
-#endif
-#ifdef __HAVE_COUNTER7
-	dev->types[7]  = __HAVE_COUNTER7;
-#endif
-#ifdef __HAVE_COUNTER8
-	dev->types[8]  = __HAVE_COUNTER8;
-#endif
-#ifdef __HAVE_COUNTER9
-	dev->types[9]  = __HAVE_COUNTER9;
-#endif
-#ifdef __HAVE_COUNTER10
-	dev->types[10] = __HAVE_COUNTER10;
-#endif
-#ifdef __HAVE_COUNTER11
-	dev->types[11] = __HAVE_COUNTER11;
-#endif
-#ifdef __HAVE_COUNTER12
-	dev->types[12] = __HAVE_COUNTER12;
-#endif
-#ifdef __HAVE_COUNTER13
-	dev->types[13] = __HAVE_COUNTER13;
-#endif
-#ifdef __HAVE_COUNTER14
-	dev->types[14] = __HAVE_COUNTER14;
-#endif
 
 	for ( i = 0 ; i < DRM_ARRAY_SIZE(dev->counts) ; i++ )
 		atomic_set( &dev->counts[i], 0 );
@@ -510,7 +471,16 @@ static int DRM(probe)(struct pci_dev *pdev)
 
 	/* dev_priv_size can be changed by a driver in driver_register_fns */
 	dev->dev_priv_size = sizeof(u32);
-	
+
+	/* the DRM has 6 basic counters - drivers add theirs in register_fns */
+	dev->counters = 6;
+	dev->types[0]  = _DRM_STAT_LOCK;
+	dev->types[1]  = _DRM_STAT_OPENS;
+	dev->types[2]  = _DRM_STAT_CLOSES;
+	dev->types[3]  = _DRM_STAT_IOCTLS;
+	dev->types[4]  = _DRM_STAT_LOCKS;
+	dev->types[5]  = _DRM_STAT_UNLOCKS;
+
 	DRM(init_fn_table)(dev);
 
 	DRM(driver_register_fns)(dev);

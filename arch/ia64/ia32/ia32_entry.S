@@ -311,7 +311,7 @@ ia32_syscall_table:
 	data8 sys_ni_syscall	  /* old profil syscall holder */
 	data8 compat_sys_statfs
 	data8 compat_sys_fstatfs	  /* 100 */
-	data8 sys32_ioperm
+	data8 sys_ni_syscall	/* ioperm */
 	data8 compat_sys_socketcall
 	data8 sys_syslog
 	data8 compat_sys_setitimer
@@ -320,7 +320,7 @@ ia32_syscall_table:
 	data8 compat_sys_newlstat
 	data8 compat_sys_newfstat
 	data8 sys_ni_syscall
-	data8 sys32_iopl		  /* 110 */
+	data8 sys_ni_syscall	/* iopl */	/* 110 */
 	data8 sys_vhangup
 	data8 sys_ni_syscall		/* used to be sys_idle */
 	data8 sys_ni_syscall

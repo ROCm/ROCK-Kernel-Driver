@@ -76,6 +76,9 @@ cifs_get_inode_info_unix(struct inode **pinode,
 
 	} else {
 		struct cifsInodeInfo *cifsInfo;
+		__u32 type = le32_to_cpu(findData.Type);
+		__u64 num_of_bytes = le64_to_cpu(findData.NumOfBytes);
+		__u64 end_of_file = le64_to_cpu(findData.EndOfFile);
 
 		/* get new inode */
 		if (*pinode == NULL) {
@@ -101,37 +104,34 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		inode->i_ctime =
 		    cifs_NTtimeToUnix(le64_to_cpu(findData.LastStatusChange));
 		inode->i_mode = le64_to_cpu(findData.Permissions);
-		findData.Type = le32_to_cpu(findData.Type);
-		if (findData.Type == UNIX_FILE) {
+		if (type == UNIX_FILE) {
 			inode->i_mode |= S_IFREG;
-		} else if (findData.Type == UNIX_SYMLINK) {
+		} else if (type == UNIX_SYMLINK) {
 			inode->i_mode |= S_IFLNK;
-		} else if (findData.Type == UNIX_DIR) {
+		} else if (type == UNIX_DIR) {
 			inode->i_mode |= S_IFDIR;
-		} else if (findData.Type == UNIX_CHARDEV) {
+		} else if (type == UNIX_CHARDEV) {
 			inode->i_mode |= S_IFCHR;
 			inode->i_rdev = MKDEV(le64_to_cpu(findData.DevMajor),
 				le64_to_cpu(findData.DevMinor) & MINORMASK);
-		} else if (findData.Type == UNIX_BLOCKDEV) {
+		} else if (type == UNIX_BLOCKDEV) {
 			inode->i_mode |= S_IFBLK;
 			inode->i_rdev = MKDEV(le64_to_cpu(findData.DevMajor),
 				le64_to_cpu(findData.DevMinor) & MINORMASK);
-		} else if (findData.Type == UNIX_FIFO) {
+		} else if (type == UNIX_FIFO) {
 			inode->i_mode |= S_IFIFO;
-		} else if (findData.Type == UNIX_SOCKET) {
+		} else if (type == UNIX_SOCKET) {
 			inode->i_mode |= S_IFSOCK;
 		}
 		inode->i_uid = le64_to_cpu(findData.Uid);
 		inode->i_gid = le64_to_cpu(findData.Gid);
 		inode->i_nlink = le64_to_cpu(findData.Nlinks);
-		findData.NumOfBytes = le64_to_cpu(findData.NumOfBytes);
-		findData.EndOfFile = le64_to_cpu(findData.EndOfFile);
 
 		if(is_size_safe_to_change(cifsInfo)) {
 		/* can not safely change the file size here if the 
 		   client is writing to it due to potential races */
 
-			i_size_write(inode,findData.EndOfFile);
+			i_size_write(inode, end_of_file);
 /* blksize needs to be multiple of two. So safer to default to blksize
 	and blkbits set in superblock so 2**blkbits and blksize will match */
 /*		inode->i_blksize =
@@ -143,14 +143,14 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		 
 
 /*		inode->i_blocks = 
-	                (inode->i_blksize - 1 + findData.NumOfBytes) >> inode->i_blkbits;*/
+	                (inode->i_blksize - 1 + num_of_bytes) >> inode->i_blkbits;*/
 
 		/* 512 bytes (2**9) is the fake blocksize that must be used */
 		/* for this calculation */
-			inode->i_blocks = (512 - 1 + findData.NumOfBytes) >> 9;
+			inode->i_blocks = (512 - 1 + num_of_bytes) >> 9;
 		}
 
-		if (findData.NumOfBytes < findData.EndOfFile)
+		if (num_of_bytes < end_of_file)
 			cFYI(1, ("Server inconsistency Error: it says allocation size less than end of file "));
 		cFYI(1,
 		     ("Size %ld and blocks %ld ",
@@ -237,6 +237,7 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		}
 	} else {
 		struct cifsInodeInfo *cifsInfo;
+		__u32 attr = le32_to_cpu(pfindData->Attributes);
 
 		/* get new inode */
 		if (*pinode == NULL) {
@@ -247,8 +248,7 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		}
 		inode = *pinode;
 		cifsInfo = CIFS_I(inode);
-		pfindData->Attributes = le32_to_cpu(pfindData->Attributes);
-		cifsInfo->cifsAttrs = pfindData->Attributes;
+		cifsInfo->cifsAttrs = attr;
 		cFYI(1, (" Old time %ld ", cifsInfo->time));
 		cifsInfo->time = jiffies;
 		cFYI(1, (" New time %ld ", cifsInfo->time));
@@ -266,17 +266,17 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		inode->i_ctime =
 		    cifs_NTtimeToUnix(le64_to_cpu(pfindData->ChangeTime));
 		cFYI(0,
-		     (" Attributes came in as 0x%x ", pfindData->Attributes));
+		     (" Attributes came in as 0x%x ", attr));
 
 		/* set default mode. will override for dirs below */
 		if(atomic_read(&cifsInfo->inUse) == 0)
 			/* new inode, can safely set these fields */
 			inode->i_mode = cifs_sb->mnt_file_mode;
 
-		if (pfindData->Attributes & ATTR_REPARSE) {
+		if (attr & ATTR_REPARSE) {
 	/* Can IFLNK be set as it basically is on windows with IFREG or IFDIR? */
 			inode->i_mode |= S_IFLNK;
-		} else if (pfindData->Attributes & ATTR_DIRECTORY) {
+		} else if (attr & ATTR_DIRECTORY) {
 	/* override default perms since we do not do byte range locking on dirs */
 			inode->i_mode = cifs_sb->mnt_dir_mode;
 			inode->i_mode |= S_IFDIR;
@@ -298,7 +298,6 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 			inode->i_blocks = (512 - 1 + le64_to_cpu(pfindData->AllocationSize))
 				 >> 9;
 		}
-		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
 
 		inode->i_nlink = le32_to_cpu(pfindData->NumberOfLinks);
 
@@ -951,7 +950,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	} else
 		time_buf.ChangeTime = 0;
 
-	if (set_time | time_buf.Attributes) {
+	if (set_time || time_buf.Attributes) {
 		/* BB what if setting one attribute fails  
 			(such as size) but time setting works */
 		time_buf.CreationTime = 0;	/* do not change */

@@ -1152,19 +1152,26 @@ asmlinkage long sys32_clone(unsigned int clone_flags, unsigned int newsp,
 }
 
 asmlinkage long sys32_waitid(int which, compat_pid_t pid,
-			     siginfo_t32 __user *uinfo, int options)
+			     siginfo_t32 __user *uinfo, int options,
+			     struct compat_rusage __user *uru)
 {
 	siginfo_t info;
+	struct rusage ru;
 	long ret;
 	mm_segment_t old_fs = get_fs();
 
 	info.si_signo = 0;
 	set_fs (KERNEL_DS);
-	ret = sys_waitid(which, pid, (siginfo_t __user *) &info, options);
+	ret = sys_waitid(which, pid, (siginfo_t __user *) &info, options,
+			 uru ? &ru : NULL);
 	set_fs (old_fs);
 
 	if (ret < 0 || info.si_signo == 0)
 		return ret;
+
+	if (uru && (ret = put_compat_rusage(&ru, uru)))
+		return ret;
+
 	BUG_ON(info.si_code & __SI_MASK);
 	info.si_code |= __SI_CHLD;
 	return ia32_copy_siginfo_to_user(uinfo, &info);

@@ -618,7 +618,7 @@ static inline long read(int fd, char * buf, size_t nr)
 	return sys_read(fd, buf, nr);
 }
 
-extern long execve(char *, char **, char **);
+extern int execve(char *, char **, char **);
 
 static inline long setsid(void)
 {

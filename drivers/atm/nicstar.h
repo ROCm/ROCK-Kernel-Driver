@@ -763,7 +763,7 @@ typedef struct ns_dev
 {
    int index;				/* Card ID to the device driver */
    int sram_size;			/* In k x 32bit words. 32 or 128 */
-   unsigned long membase;			/* Card's memory base address */
+   void __iomem *membase;		/* Card's memory base address */
    unsigned long max_pcr;
    int rct_size;			/* Number of entries */
    int vpibits;

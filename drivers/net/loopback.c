@@ -49,6 +49,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/ethtool.h>
 #include <net/sock.h>
 #include <net/checksum.h>
 #include <linux/if_ether.h>	/* For the statistics structure. */
@@ -183,6 +184,17 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 	return stats;
 }
 
+u32 loopback_get_link(struct net_device *dev)
+{
+	return 1;
+}
+
+static struct ethtool_ops loopback_ethtool_ops = {
+	.get_link		= loopback_get_link,
+	.get_tso		= ethtool_op_get_tso,
+	.set_tso		= ethtool_op_set_tso,
+};
+
 struct net_device loopback_dev = {
 	.name	 		= "lo",
 	.mtu			= (16 * 1024) + 20 + 20 + 12,
@@ -199,6 +211,7 @@ struct net_device loopback_dev = {
 	.features 		= NETIF_F_SG|NETIF_F_FRAGLIST
 				  |NETIF_F_NO_CSUM|NETIF_F_HIGHDMA
 				  |NETIF_F_LLTX,
+	.ethtool_ops		= &loopback_ethtool_ops,
 };
 
 /* Setup and register the of the LOOPBACK device. */

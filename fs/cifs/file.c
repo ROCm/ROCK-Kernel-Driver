@@ -1348,12 +1348,11 @@ fill_in_inode(struct inode *tmp_inode,
 {
 	struct cifsInodeInfo *cifsInfo = CIFS_I(tmp_inode);
 	struct cifs_sb_info *cifs_sb = CIFS_SB(tmp_inode->i_sb);
+	__u32 attr = le32_to_cpu(pfindData->ExtFileAttributes);
+	__u64 allocation_size = le64_to_cpu(pfindData->AllocationSize);
+	__u64 end_of_file = le64_to_cpu(pfindData->EndOfFile);
 
-	pfindData->ExtFileAttributes =
-	    le32_to_cpu(pfindData->ExtFileAttributes);
-	pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
-	pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
-	cifsInfo->cifsAttrs = pfindData->ExtFileAttributes;
+	cifsInfo->cifsAttrs = attr;
 	cifsInfo->time = jiffies;
 
 	/* Linux can not store file creation time unfortunately so ignore it */
@@ -1376,12 +1375,12 @@ fill_in_inode(struct inode *tmp_inode,
 
 	cFYI(0,
 	     ("CIFS FFIRST: Attributes came in as 0x%x",
-	      pfindData->ExtFileAttributes));
-	if (pfindData->ExtFileAttributes & ATTR_REPARSE) {
+	      attr));
+	if (attr & ATTR_REPARSE) {
 		*pobject_type = DT_LNK;
 		/* BB can this and S_IFREG or S_IFDIR be set as in Windows? */
 		tmp_inode->i_mode |= S_IFLNK;
-	} else if (pfindData->ExtFileAttributes & ATTR_DIRECTORY) {
+	} else if (attr & ATTR_DIRECTORY) {
 		*pobject_type = DT_DIR;
 		/* override default perms since we do not lock dirs */
 		if(atomic_read(&cifsInfo->inUse) == 0) {
@@ -1391,7 +1390,7 @@ fill_in_inode(struct inode *tmp_inode,
 	} else {
 		*pobject_type = DT_REG;
 		tmp_inode->i_mode |= S_IFREG;
-		if(pfindData->ExtFileAttributes & ATTR_READONLY)
+		if(attr & ATTR_READONLY)
 			tmp_inode->i_mode &= ~(S_IWUGO);
 
 	}/* could add code here - to validate if device or weird share type? */
@@ -1404,14 +1403,14 @@ fill_in_inode(struct inode *tmp_inode,
 	if(is_size_safe_to_change(cifsInfo)) {
 		/* can not safely change the file size here if the 
 		client is writing to it due to potential races */
-		i_size_write(tmp_inode,pfindData->EndOfFile);
+		i_size_write(tmp_inode,end_of_file);
 
 	/* 512 bytes (2**9) is the fake blocksize that must be used */
 	/* for this calculation, even though the reported blocksize is larger */
-		tmp_inode->i_blocks = (512 - 1 + pfindData->AllocationSize) >> 9;
+		tmp_inode->i_blocks = (512 - 1 + allocation_size) >> 9;
 	}
 
-	if (pfindData->AllocationSize < pfindData->EndOfFile)
+	if (allocation_size < end_of_file)
 		cFYI(1, ("Possible sparse file: allocation size less than end of file "));
 	cFYI(1,
 	     ("File Size %ld and blocks %ld and blocksize %ld",
@@ -1441,6 +1440,9 @@ unix_fill_in_inode(struct inode *tmp_inode,
 		   FILE_UNIX_INFO * pfindData, int *pobject_type)
 {
 	struct cifsInodeInfo *cifsInfo = CIFS_I(tmp_inode);
+	__u32 type = le32_to_cpu(pfindData->Type);
+	__u64 num_of_bytes = le64_to_cpu(pfindData->NumOfBytes);
+	__u64 end_of_file = le64_to_cpu(pfindData->EndOfFile);
 	cifsInfo->time = jiffies;
 	atomic_inc(&cifsInfo->inUse);
 
@@ -1452,30 +1454,29 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	    cifs_NTtimeToUnix(le64_to_cpu(pfindData->LastStatusChange));
 
 	tmp_inode->i_mode = le64_to_cpu(pfindData->Permissions);
-	pfindData->Type = le32_to_cpu(pfindData->Type);
-	if (pfindData->Type == UNIX_FILE) {
+	if (type == UNIX_FILE) {
 		*pobject_type = DT_REG;
 		tmp_inode->i_mode |= S_IFREG;
-	} else if (pfindData->Type == UNIX_SYMLINK) {
+	} else if (type == UNIX_SYMLINK) {
 		*pobject_type = DT_LNK;
 		tmp_inode->i_mode |= S_IFLNK;
-	} else if (pfindData->Type == UNIX_DIR) {
+	} else if (type == UNIX_DIR) {
 		*pobject_type = DT_DIR;
 		tmp_inode->i_mode |= S_IFDIR;
-	} else if (pfindData->Type == UNIX_CHARDEV) {
+	} else if (type == UNIX_CHARDEV) {
 		*pobject_type = DT_CHR;
 		tmp_inode->i_mode |= S_IFCHR;
 		tmp_inode->i_rdev = MKDEV(le64_to_cpu(pfindData->DevMajor),
 				le64_to_cpu(pfindData->DevMinor) & MINORMASK);
-	} else if (pfindData->Type == UNIX_BLOCKDEV) {
+	} else if (type == UNIX_BLOCKDEV) {
 		*pobject_type = DT_BLK;
 		tmp_inode->i_mode |= S_IFBLK;
 		tmp_inode->i_rdev = MKDEV(le64_to_cpu(pfindData->DevMajor),
 				le64_to_cpu(pfindData->DevMinor) & MINORMASK);
-	} else if (pfindData->Type == UNIX_FIFO) {
+	} else if (type == UNIX_FIFO) {
 		*pobject_type = DT_FIFO;
 		tmp_inode->i_mode |= S_IFIFO;
-	} else if (pfindData->Type == UNIX_SOCKET) {
+	} else if (type == UNIX_SOCKET) {
 		*pobject_type = DT_SOCK;
 		tmp_inode->i_mode |= S_IFSOCK;
 	}
@@ -1484,17 +1485,15 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	tmp_inode->i_gid = le64_to_cpu(pfindData->Gid);
 	tmp_inode->i_nlink = le64_to_cpu(pfindData->Nlinks);
 
-	pfindData->NumOfBytes = le64_to_cpu(pfindData->NumOfBytes);
 
 	if(is_size_safe_to_change(cifsInfo)) {
 		/* can not safely change the file size here if the 
 		client is writing to it due to potential races */
-		pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
-		i_size_write(tmp_inode,pfindData->EndOfFile);
+		i_size_write(tmp_inode,end_of_file);
 
 	/* 512 bytes (2**9) is the fake blocksize that must be used */
 	/* for this calculation, not the real blocksize */
-		tmp_inode->i_blocks = (512 - 1 + pfindData->NumOfBytes) >> 9;
+		tmp_inode->i_blocks = (512 - 1 + num_of_bytes) >> 9;
 	}
 
 	if (S_ISREG(tmp_inode->i_mode)) {
@@ -1608,7 +1607,7 @@ cifs_filldir(struct qstr *pqstring, FILE_DIRECTORY_INFO * pfindData,
 	int object_type,rc;
 
 	pqstring->name = pfindData->FileName;
-	pqstring->len = pfindData->FileNameLength;
+	/* pqstring->len is already set by caller */
 
 	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
 	if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
@@ -1746,10 +1745,12 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 		rc = CIFSFindFirst(xid, pTcon, full_path, pfindData,
 				&findParms, cifs_sb->local_nls,
 				&Unicode, &UnixSearch);
-		cFYI(1, ("Count: %d  End: %d ", findParms.SearchCount,
-			findParms.EndofSearch));
+		cFYI(1, ("Count: %d  End: %d ",
+			le16_to_cpu(findParms.SearchCount),
+			le16_to_cpu(findParms.EndofSearch)));
  
 		if (rc == 0) {
+			__u16 count = le16_to_cpu(findParms.SearchCount);
 			searchHandle = findParms.SearchHandle;
 			if(file->private_data == NULL)
 				file->private_data =
@@ -1770,7 +1771,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			renew_parental_timestamps(file->f_dentry);
 			lastFindData = 
 				(FILE_DIRECTORY_INFO *) ((char *) pfindData + 
-					findParms.LastNameOffset);
+					le16_to_cpu(findParms.LastNameOffset));
 			if((char *)lastFindData > (char *)pfindData + bufsize) {
 				cFYI(1,("last search entry past end of packet"));
 				rc = -EIO;
@@ -1833,23 +1834,21 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					pfindDataUnix->FileName, 
 					cifsFile->resume_name_length);
 			}
-			for (i = 2; i < (unsigned int)findParms.SearchCount + 2; i++) {
+			for (i = 2; i < count + 2; i++) {
 				if (UnixSearch == FALSE) {
-					pfindData->FileNameLength =
-					  le32_to_cpu(pfindData->FileNameLength);
+					__u32 len = le32_to_cpu(pfindData->FileNameLength);
 					if (Unicode == TRUE)
-						pfindData->FileNameLength =
+						len =
 						    cifs_strfromUCS_le
 						    (pfindData->FileName,
 						     (wchar_t *)
 						     pfindData->FileName,
-						     (pfindData->
-						      FileNameLength) / 2,
+						     len / 2,
 						     cifs_sb->local_nls);
-					qstring.len = pfindData->FileNameLength;
-					if (((qstring.len != 1)
+					qstring.len = len;
+					if (((len != 1)
 					     || (pfindData->FileName[0] != '.'))
-					    && ((qstring.len != 2)
+					    && ((len != 2)
 						|| (pfindData->
 						    FileName[0] != '.')
 						|| (pfindData->
@@ -1917,7 +1916,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			}	/* end for loop */
 			if ((findParms.EndofSearch != 0) && cifsFile) {
 				cifsFile->endOfSearch = TRUE;
-				if(findParms.SearchCount == 2)
+				if(findParms.SearchCount == cpu_to_le16(2))
 					cifsFile->emptyDir = TRUE;
 			}
 		} else {
@@ -1948,13 +1947,14 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				cifsFile->resume_key,
 				&Unicode, &UnixSearch);
 			cFYI(1,("Count: %d  End: %d ",
-			      findNextParms.SearchCount,
-			      findNextParms.EndofSearch));
+			      le16_to_cpu(findNextParms.SearchCount),
+			      le16_to_cpu(findNextParms.EndofSearch)));
 			if ((rc == 0) && (findNextParms.SearchCount != 0)) {
 			/* BB save off resume key, key name and name length  */
+				__u16 count = le16_to_cpu(findNextParms.SearchCount);
 				lastFindData = 
 					(FILE_DIRECTORY_INFO *) ((char *) pfindData 
-						+ findNextParms.LastNameOffset);
+					+ le16_to_cpu(findNextParms.LastNameOffset));
 				if((char *)lastFindData > (char *)pfindData + bufsize) {
 					cFYI(1,("last search entry past end of packet"));
 					rc = -EIO;
@@ -2031,24 +2031,22 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 						cifsFile->resume_name_length);
 				}
 
-				for (i = 0; i < findNextParms.SearchCount; i++) {
-					pfindData->FileNameLength =
-					    le32_to_cpu(pfindData->
+				for (i = 0; i < count; i++) {
+					__u32 len = le32_to_cpu(pfindData->
 							FileNameLength);
 					if (UnixSearch == FALSE) {
 						if (Unicode == TRUE)
-							pfindData->FileNameLength =
+							len =
 							  cifs_strfromUCS_le
 							  (pfindData->FileName,
 							  (wchar_t *)
 							  pfindData->FileName,
-							  (pfindData->FileNameLength)/ 2,
+							  len / 2,
 							  cifs_sb->local_nls);
-						qstring.len = 
-							pfindData->FileNameLength;
-						if (((qstring.len != 1)
+						qstring.len = len;
+						if (((len != 1)
 						    || (pfindData->FileName[0] != '.'))
-						    && ((qstring.len != 2)
+						    && ((len != 2)
 							|| (pfindData->FileName[0] != '.')
 							|| (pfindData->FileName[1] !=
 							    '.'))) {

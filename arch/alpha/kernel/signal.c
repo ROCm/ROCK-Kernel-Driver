@@ -228,6 +228,12 @@ struct rt_sigframe
 	unsigned int retcode[3];
 };
 
+/* If this changes, userland unwinders that Know Things about our signal
+   frame will break.  Do not undertake lightly.  It also implies an ABI
+   change wrt the size of siginfo_t, which may cause some pain.  */
+extern char compile_time_assert
+        [offsetof(struct rt_sigframe, uc.uc_mcontext) == 176 ? 1 : -1];
+
 #define INSN_MOV_R30_R16	0x47fe0410
 #define INSN_LDI_R0		0x201f0000
 #define INSN_CALLSYS		0x00000083
