@@ -6,9 +6,9 @@ OBJCOPY = $(CROSS_COMPILE)objcopy
 
 O_TARGET := 
 
-include $(TOPDIR)/Rules.make
-
 EXTRA_AFLAGS := -traditional
+
+include $(TOPDIR)/Rules.make
 
 %.lnk: %.o
 	$(LD) -Ttext 0x0 -o $@ $<
@@ -29,3 +29,5 @@ dep:
 clean:
 	rm -f image listing iplfba.boot ipleckd.boot ipldump.boot
 
+install: $(CONFIGURE) $(BOOTIMAGE)
+	sh -x ./install.sh $(KERNELRELEASE) $(BOOTIMAGE) $(TOPDIR)/System.map $(TOPDIR)/Kerntypes "$(INSTALL_PATH)"

@@ -63,7 +63,6 @@ BUILD_SMP_INTERRUPT(spurious_interrupt)
 int show_interrupts(struct seq_file *p, void *v)
 {
 	int i, j;
-	struct irqaction * action;
 
 	seq_puts(p, "           ");
 
@@ -76,36 +75,13 @@ int show_interrupts(struct seq_file *p, void *v)
 		if (ioinfo[i] == INVALID_STORAGE_AREA)
 			continue;
 
-		action = ioinfo[i]->irq_desc.action;
-		
-  		if (!action)
-			continue;
-
 		seq_printf(p, "%3d: ",i);
-#ifndef CONFIG_SMP
-		seq_printf(p, "%10u ", kstat_irqs(i));
-#else
-		for (j=0; j<smp_num_cpus; j++)
-			seq_printf( p, "%10u ",
-			              kstat.irqs[cpu_logical_map(j)][i]);
-#endif
-		seq_printf(p, " %14s", ioinfo[i]->irq_desc.handler->typename);
-		seq_printf(p, "  %s", action->name);
-
-		for (action=action->next; action; action = action->next)
-		{
-			seq_printf(p, ", %s", action->name);
-
-		} /* endfor */
+		seq_printf(p, "  %s", ioinfo[i]->irq_desc.name);
 
 		seq_putc(p, '\n');
 	
 	} /* endfor */
 
-	seq_printf(p, "NMI: %10u\n", nmi_counter);
-#ifdef CONFIG_SMP
-	seq_printf(p, "IPI: %10u\n", atomic_read(&ipi_count));
-#endif
 	return 0;
 }
 
@@ -132,10 +108,10 @@ atomic_t global_bh_count;
  */
 #define check_smp_invalidate(cpu)
 
+extern void show_stack(unsigned long* esp);
+
 static void show(char * str)
 {
-	int i;
-	unsigned long *stack;
 	int cpu = smp_processor_id();
 
 	printk("\n%s, CPU %d:\n", str, cpu);
@@ -143,13 +119,7 @@ static void show(char * str)
 	       atomic_read(&global_irq_count),local_irq_count(smp_processor_id()));
 	printk("bh:   %d [%d]\n",
 	       atomic_read(&global_bh_count),local_bh_count(smp_processor_id()));
-	stack = (unsigned long *) &str;
-	for (i = 40; i ; i--) {
-		unsigned long x = *++stack;
-		if (x > (unsigned long) &init_task_union && x < (unsigned long) &vsprintf) {
-			printk("<[%08lx]> ", x);
-		}
-	}
+	show_stack(NULL);
 }
 
 #define MAXCOUNT 100000000

@@ -56,6 +56,7 @@
 #include <linux/in.h>
 #include <linux/icmpv6.h>
 #include <linux/sysctl.h>
+#include <linux/binfmts.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
@@ -63,6 +64,7 @@
 #include <asm/semaphore.h>
 
 #include <net/scm.h>
+#include <net/sock.h>
 
 #include "linux32.h"
 
@@ -288,6 +290,21 @@ static inline long put_it32(struct itimerval32 *o, struct itimerval *i)
 
 struct msgbuf32 { s32 mtype; char mtext[1]; };
 
+struct ipc64_perm_ds32
+{
+        __kernel_key_t          key;
+        __kernel_uid32_t        uid;
+        __kernel_gid32_t        gid;
+        __kernel_uid32_t        cuid;
+        __kernel_gid32_t        cgid;
+        __kernel_mode_t32       mode;
+        unsigned short          __pad1;
+        unsigned short          seq;
+        unsigned short          __pad2;
+        unsigned int            __unused1;
+        unsigned int            __unused2;
+};
+
 struct ipc_perm32
 {
 	key_t    	  key;
@@ -311,7 +328,7 @@ struct semid_ds32 {
 };
 
 struct semid64_ds32 {
-	struct ipc64_perm sem_perm;		  /* this structure is the same on sparc32 and sparc64 */
+	struct ipc64_perm_ds32 sem_perm;
 	unsigned int	  __pad1;
 	__kernel_time_t32 sem_otime;
 	unsigned int	  __pad2;
@@ -339,7 +356,7 @@ struct msqid_ds32
 };
 
 struct msqid64_ds32 {
-	struct ipc64_perm msg_perm;
+	struct ipc64_perm_ds32 msg_perm;
 	unsigned int   __pad1;
 	__kernel_time_t32 msg_stime;
 	unsigned int   __pad2;
@@ -368,19 +385,19 @@ struct shmid_ds32 {
 };
 
 struct shmid64_ds32 {
-	struct ipc64_perm	shm_perm;
-	unsigned int		__pad1;
-	__kernel_time_t32	shm_atime;
-	unsigned int		__pad2;
-	__kernel_time_t32	shm_dtime;
-	unsigned int		__pad3;
-	__kernel_time_t32	shm_ctime;
+	struct ipc64_perm_ds32	shm_perm;
 	__kernel_size_t32	shm_segsz;
+	__kernel_time_t32	shm_atime;
+	unsigned int		__unused1;
+	__kernel_time_t32	shm_dtime;
+	unsigned int		__unused2;
+	__kernel_time_t32	shm_ctime;
+	unsigned int		__unused3;
 	__kernel_pid_t32	shm_cpid;
 	__kernel_pid_t32	shm_lpid;
 	unsigned int		shm_nattch;
-	unsigned int		__unused1;
-	unsigned int		__unused2;
+	unsigned int		__unused4;
+	unsigned int		__unused5;
 };
 
                                                         
@@ -489,13 +506,21 @@ out:
 
 static int do_sys32_msgsnd (int first, int second, int third, void *uptr)
 {
-	struct msgbuf *p = kmalloc (second + sizeof (struct msgbuf) + 4, GFP_USER);
+	struct msgbuf *p = kmalloc (second + sizeof (struct msgbuf), GFP_USER);
 	struct msgbuf32 *up = (struct msgbuf32 *)uptr;
 	mm_segment_t old_fs;
 	int err;
 
 	if (!p)
 		return -ENOMEM;
+
+	if (second > MSGMAX || first < 0 || second < 0)
+		return -EINVAL;
+
+	err = -EFAULT;
+	if (!uptr)
+		goto out;
+
 	err = get_user (p->mtype, &up->mtype);
 	err |= __copy_from_user (p->mtext, &up->mtext, second);
 	if (err)
@@ -517,6 +542,9 @@ static int do_sys32_msgrcv (int first, int second, int msgtyp, int third,
 	mm_segment_t old_fs;
 	int err;
 
+	if (first < 0 || second < 0)
+		return -EINVAL;
+
 	if (!version) {
 		struct ipc_kludge_32 *uipck = (struct ipc_kludge_32 *)uptr;
 		struct ipc_kludge_32 ipck;
@@ -531,12 +559,12 @@ static int do_sys32_msgrcv (int first, int second, int msgtyp, int third,
 		msgtyp = ipck.msgtyp;
 	}
 	err = -ENOMEM;
-	p = kmalloc (second + sizeof (struct msgbuf) + 4, GFP_USER);
+	p = kmalloc (second + sizeof (struct msgbuf), GFP_USER);
 	if (!p)
 		goto out;
 	old_fs = get_fs ();
 	set_fs (KERNEL_DS);
-	err = sys_msgrcv (first, p, second + 4, msgtyp, third);
+	err = sys_msgrcv (first, p, second, msgtyp, third);
 	set_fs (old_fs);
 	if (err < 0)
 		goto free_then_out;
@@ -864,6 +892,24 @@ asmlinkage long sys32_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg
 {
 	switch (cmd) {
 	case F_GETLK:
+		{
+			struct flock f;
+			mm_segment_t old_fs;
+			long ret;
+			
+			if(get_flock(&f, (struct flock32 *)A(arg)))
+				return -EFAULT;
+			old_fs = get_fs(); set_fs (KERNEL_DS);
+			ret = sys_fcntl(fd, cmd, (unsigned long)&f);
+			set_fs (old_fs);
+			if (ret) return ret;
+			if (f.l_start >= 0x7fffffffUL ||
+			    f.l_start + f.l_len >= 0x7fffffffUL)
+				return -EOVERFLOW;
+			if(put_flock(&f, (struct flock32 *)A(arg)))
+				return -EFAULT;
+			return 0;
+		}
 	case F_SETLK:
 	case F_SETLKW:
 		{
@@ -871,18 +917,12 @@ asmlinkage long sys32_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg
 			mm_segment_t old_fs;
 			long ret;
 			
-			if(get_flock(&f, (struct flock32 *)arg))
+			if(get_flock(&f, (struct flock32 *)A(arg)))
 				return -EFAULT;
 			old_fs = get_fs(); set_fs (KERNEL_DS);
 			ret = sys_fcntl(fd, cmd, (unsigned long)&f);
 			set_fs (old_fs);
 			if (ret) return ret;
-			if (f.l_start >= 0x7fffffffUL ||
-			    f.l_len >= 0x7fffffffUL ||
-			    f.l_start + f.l_len >= 0x7fffffffUL)
-				return -EOVERFLOW;
-			if(put_flock(&f, (struct flock32 *)arg))
-				return -EFAULT;
 			return 0;
 		}
 	default:
@@ -1332,7 +1372,7 @@ asmlinkage int sys32_select(int n, u32 *inp, u32 *outp, u32 *exp, u32 tvp_x)
 
 	timeout = MAX_SCHEDULE_TIMEOUT;
 	if (tvp) {
-		time_t sec, usec;
+		int sec, usec;
 
 		if ((ret = verify_area(VERIFY_READ, tvp, sizeof(*tvp)))
 		    || (ret = __get_user(sec, &tvp->tv_sec))
@@ -1384,7 +1424,7 @@ asmlinkage int sys32_select(int n, u32 *inp, u32 *outp, u32 *exp, u32 tvp_x)
 	ret = do_select(n, &fds, &timeout);
 
 	if (tvp && !(current->personality & STICKY_TIMEOUTS)) {
-		time_t sec = 0, usec = 0;
+		int sec = 0, usec = 0;
 		if (timeout) {
 			sec = timeout / HZ;
 			usec = timeout % HZ;
@@ -2002,15 +2042,17 @@ asmlinkage long sys32_times(struct tms32 *tbuf)
 	return ret;
 }
 
-#define RLIM_INFINITY32	0x7fffffff
-#define RESOURCE32(x) ((x > RLIM_INFINITY32) ? RLIM_INFINITY32 : x)
+#define RLIM_OLD_INFINITY32	0x7fffffff
+#define RLIM_INFINITY32		0xffffffff
+#define RESOURCE32_OLD(x)	((x > RLIM_OLD_INFINITY32) ? RLIM_OLD_INFINITY32 : x)
+#define RESOURCE32(x) 		((x > RLIM_INFINITY32) ? RLIM_INFINITY32 : x)
 
 struct rlimit32 {
 	u32	rlim_cur;
 	u32	rlim_max;
 };
 
-extern asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit *rlim);
+extern asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit *rlim);
 
 asmlinkage int sys32_old_getrlimit(unsigned int resource, struct rlimit32 *rlim)
 {
@@ -2019,7 +2061,23 @@ asmlinkage int sys32_old_getrlimit(unsigned int resource, struct rlimit32 *rlim)
 	mm_segment_t old_fs = get_fs ();
 	
 	set_fs (KERNEL_DS);
-	ret = sys_old_getrlimit(resource, &r);
+	ret = sys_getrlimit(resource, &r);
+	set_fs (old_fs);
+	if (!ret) {
+		ret = put_user (RESOURCE32_OLD(r.rlim_cur), &rlim->rlim_cur);
+		ret |= __put_user (RESOURCE32_OLD(r.rlim_max), &rlim->rlim_max);
+	}
+	return ret;
+}
+
+asmlinkage int sys32_getrlimit(unsigned int resource, struct rlimit32 *rlim)
+{
+	struct rlimit r;
+	int ret;
+	mm_segment_t old_fs = get_fs ();
+	
+	set_fs (KERNEL_DS);
+	ret = sys_getrlimit(resource, &r);
 	set_fs (old_fs);
 	if (!ret) {
 		ret = put_user (RESOURCE32(r.rlim_cur), &rlim->rlim_cur);
@@ -2463,6 +2521,7 @@ fail:
 	kmsg->msg_control = (void *) orig_cmsg_uptr;
 }
 
+#if 0
 asmlinkage int sys32_sendmsg(int fd, struct msghdr32 *user_msg, unsigned user_flags)
 {
 	struct socket *sock;
@@ -2587,6 +2646,196 @@ out:
 	if(err < 0)
 		return err;
 	return len;
+}
+#endif
+
+/*
+ *	BSD sendmsg interface
+ */
+
+int sys32_sendmsg(int fd, struct msghdr32 *msg, unsigned flags)
+{
+	struct socket *sock;
+	char address[MAX_SOCK_ADDR];
+	struct iovec iovstack[UIO_FASTIOV], *iov = iovstack;
+	unsigned char ctl[sizeof(struct cmsghdr) + 20];	/* 20 is size of ipv6_pktinfo */
+	unsigned char *ctl_buf = ctl;
+	struct msghdr msg_sys;
+	int err, ctl_len, iov_size, total_len;
+	
+	err = -EFAULT;
+	if (msghdr_from_user32_to_kern(&msg_sys, msg))
+		goto out; 
+
+	sock = sockfd_lookup(fd, &err);
+	if (!sock) 
+		goto out;
+
+	/* do not move before msg_sys is valid */
+	err = -EINVAL;
+	if (msg_sys.msg_iovlen > UIO_MAXIOV)
+		goto out_put;
+
+	/* Check whether to allocate the iovec area*/
+	err = -ENOMEM;
+	iov_size = msg_sys.msg_iovlen * sizeof(struct iovec32);
+	if (msg_sys.msg_iovlen > UIO_FASTIOV) {
+		iov = sock_kmalloc(sock->sk, iov_size, GFP_KERNEL);
+		if (!iov)
+			goto out_put;
+	}
+
+	/* This will also move the address data into kernel space */
+	err = verify_iovec32(&msg_sys, iov, address, VERIFY_READ);
+	if (err < 0) 
+		goto out_freeiov;
+	total_len = err;
+
+	err = -ENOBUFS;
+
+	if (msg_sys.msg_controllen > INT_MAX)
+		goto out_freeiov;
+	ctl_len = msg_sys.msg_controllen; 
+	if (ctl_len) 
+	{
+		if (ctl_len > sizeof(ctl))
+		{
+			ctl_buf = sock_kmalloc(sock->sk, ctl_len, GFP_KERNEL);
+			if (ctl_buf == NULL) 
+				goto out_freeiov;
+		}
+		else if (ctl_len < sizeof(struct cmsghdr))
+		{
+			/* to get same error message as on 31 bit native */
+			err = EOPNOTSUPP;
+			goto out_freeiov;
+		}
+		err = -EFAULT;
+		if (cmsghdr_from_user32_to_kern(&msg_sys, ctl_buf, ctl_len))
+			goto out_freectl;
+//		msg_sys.msg_control = ctl_buf;
+	}
+	msg_sys.msg_flags = flags;
+
+	if (sock->file->f_flags & O_NONBLOCK)
+		msg_sys.msg_flags |= MSG_DONTWAIT;
+	err = sock_sendmsg(sock, &msg_sys, total_len);
+
+out_freectl:
+	if (ctl_buf != ctl)    
+		sock_kfree_s(sock->sk, ctl_buf, ctl_len);
+out_freeiov:
+	if (iov != iovstack)
+		sock_kfree_s(sock->sk, iov, iov_size);
+out_put:
+	sockfd_put(sock);
+out:       
+	return err;
+}
+
+/*
+ *	BSD recvmsg interface
+ */
+
+int
+sys32_recvmsg (int fd, struct msghdr32 *msg, unsigned int flags)
+{
+	struct socket *sock;
+	struct iovec iovstack[UIO_FASTIOV];
+	struct iovec *iov=iovstack;
+	struct msghdr msg_sys;
+	unsigned long cmsg_ptr;
+	int err, iov_size, total_len, len;
+
+	/* kernel mode address */
+	char addr[MAX_SOCK_ADDR];
+
+	/* user mode address pointers */
+	struct sockaddr *uaddr;
+	int *uaddr_len;
+	struct scm_cookie scm;
+	
+	err=-EFAULT;
+	if (msghdr_from_user32_to_kern(&msg_sys, msg))
+		goto out;
+
+	sock = sockfd_lookup(fd, &err);
+	if (!sock)
+		goto out;
+
+	err = -EINVAL;
+	if (msg_sys.msg_iovlen > UIO_MAXIOV)
+		goto out_put;
+	
+	/* Check whether to allocate the iovec area*/
+	err = -ENOMEM;
+	iov_size = msg_sys.msg_iovlen * sizeof(struct iovec);
+	if (msg_sys.msg_iovlen > UIO_FASTIOV) {
+		iov = sock_kmalloc(sock->sk, iov_size, GFP_KERNEL);
+		if (!iov)
+			goto out_put;
+	}
+
+	/*
+	 *	Save the user-mode address (verify_iovec will change the
+	 *	kernel msghdr to use the kernel address space)
+	 */
+	 
+	uaddr = msg_sys.msg_name;
+	uaddr_len = &msg->msg_namelen;
+	err = verify_iovec32(&msg_sys, iov, addr, VERIFY_WRITE);
+	if (err < 0)
+		goto out_freeiov;
+	total_len=err;
+
+	cmsg_ptr = (unsigned long)msg_sys.msg_control;
+	msg_sys.msg_flags = 0;
+	
+	if (sock->file->f_flags & O_NONBLOCK)
+		flags |= MSG_DONTWAIT;
+	memset(&scm, 0, sizeof(scm));
+	err = sock->ops->recvmsg(sock, &msg_sys, total_len,
+				 flags, &scm);
+	if (err < 0)
+		goto out_freeiov;
+	len = err;
+
+	if (uaddr != NULL && 
+	/* in order to get same error message as on native 31 bit */
+		msg_sys.msg_namelen > 0) {
+		err = move_addr_to_user(addr, msg_sys.msg_namelen, uaddr, uaddr_len);
+		if (err < 0)
+			goto out_freeiov;
+	}
+	if(!msg_sys.msg_control) {
+		if(sock->passcred || scm.fp)
+			msg_sys.msg_flags |= MSG_CTRUNC;
+		if(scm.fp)
+			__scm_destroy(&scm);
+	} else {
+		/* If recvmsg processing itself placed some
+		 * control messages into user space, it's is
+		 * using 64-bit CMSG processing, so we need
+		 * to fix it up before we tack on more stuff.
+		 */
+		if((unsigned long) msg_sys.msg_control != cmsg_ptr)
+			cmsg32_recvmsg_fixup(&msg_sys, cmsg_ptr);
+		/* Wheee... */
+		if(sock->passcred)
+			put_cmsg32(&msg_sys,
+				SOL_SOCKET, SCM_CREDENTIALS,
+				sizeof(scm.creds), &scm.creds);
+		if(scm.fp != NULL)
+			scm_detach_fds32(&msg_sys, &scm);
+	}
+
+out_freeiov:
+	if (iov != iovstack)
+		sock_kfree_s(sock->sk, iov, iov_size);
+out_put:
+	sockfd_put(sock);
+out:
+	return err;
 }
 
 extern asmlinkage int sys_setsockopt(int fd, int level, int optname,
@@ -3520,7 +3769,7 @@ static int nfs_getfs32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32
  */
 static int nfs_getfh32_res_trans(union nfsctl_res *kres, union nfsctl_res32 *res32)
 {
-	return copy_to_user(res32, kres, sizeof(*res32));
+	return copy_to_user(res32, kres, sizeof(*res32)) ? -EFAULT : 0;
 }
 
 /*
@@ -3751,6 +4000,12 @@ asmlinkage ssize_t32 sys32_pwrite(unsigned int fd, char *ubuf,
 	return sys_pwrite(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
 }
 
+extern asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count);
+
+asmlinkage ssize_t32 sys32_readahead(int fd, u32 offhi, u32 offlo, s32 count)
+{
+	return sys_readahead(fd, ((loff_t)AA(offhi) << 32) | AA(offlo), count);
+}
 
 extern asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 
@@ -3768,6 +4023,29 @@ asmlinkage int sys32_sendfile(int out_fd, int in_fd, __kernel_off_t32 *offset, s
 	set_fs(old_fs);
 	
 	if (!ret && offset && put_user(of, offset))
+		return -EFAULT;
+		
+	return ret;
+}
+
+extern asmlinkage ssize_t sys_sendfile64(int out_fd, int in_fd, 
+					 loff_t *offset, size_t count);
+
+asmlinkage int sys32_sendfile64(int out_fd, int in_fd, 
+				__kernel_loff_t32 *offset, s32 count)
+{
+	mm_segment_t old_fs = get_fs();
+	int ret;
+	loff_t lof;
+	
+	if (offset && get_user(lof, offset))
+		return -EFAULT;
+		
+	set_fs(KERNEL_DS);
+	ret = sys_sendfile64(out_fd, in_fd, offset ? &lof : NULL, count);
+	set_fs(old_fs);
+	
+	if (offset && put_user(lof, offset))
 		return -EFAULT;
 		
 	return ret;
@@ -4195,3 +4473,52 @@ asmlinkage long sys32_socketcall(int call, u32 *args)
 	return ret;
 }
 
+extern asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
+					    unsigned long *user_mask_ptr);
+
+asmlinkage int sys32_sched_setaffinity(__kernel_pid_t32 pid, unsigned int len,
+				       u32 *user_mask_ptr)
+{
+	unsigned long kernel_mask;
+	mm_segment_t old_fs;
+	int ret;
+
+	if (get_user(kernel_mask, user_mask_ptr))
+		return -EFAULT;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_sched_setaffinity(pid,
+				    /* XXX Nice api... */
+				    sizeof(kernel_mask),
+				    &kernel_mask);
+	set_fs(old_fs);
+
+	return ret;
+}
+
+extern asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
+					    unsigned long *user_mask_ptr);
+
+asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
+				       u32 *user_mask_ptr)
+{
+	unsigned long kernel_mask;
+	mm_segment_t old_fs;
+	int ret;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_sched_getaffinity(pid,
+				    /* XXX Nice api... */
+				    sizeof(kernel_mask),
+				    &kernel_mask);
+	set_fs(old_fs);
+
+	if (ret == 0) {
+		if (put_user(kernel_mask, user_mask_ptr))
+			ret = -EFAULT;
+	}
+
+	return ret;
+}

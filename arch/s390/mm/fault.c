@@ -36,7 +36,6 @@ extern int sysctl_userprocess_debug;
 #endif
 
 extern void die(const char *,struct pt_regs *,long);
-static void force_sigsegv(struct task_struct *tsk, int code, void *address);
 
 extern spinlock_t timerlist_lock;
 
@@ -66,25 +65,95 @@ void bust_spinlocks(int yes)
 }
 
 /*
+ * Check which address space is addressed by the access
+ * register in S390_lowcore.exc_access_id.
+ * Returns 1 for user space and 0 for kernel space.
+ */
+static int __check_access_register(struct pt_regs *regs, int error_code)
+{
+	int areg = S390_lowcore.exc_access_id;
+
+	if (areg == 0)
+		/* Access via access register 0 -> kernel address */
+		return 0;
+	if (regs && areg < NUM_ACRS && regs->acrs[areg] <= 1)
+		/*
+		 * access register contains 0 -> kernel address,
+		 * access register contains 1 -> user space address
+		 */
+		return regs->acrs[areg];
+
+	/* Something unhealthy was done with the access registers... */
+	die("page fault via unknown access register", regs, error_code);
+	do_exit(SIGKILL);
+	return 0;
+}
+
+/*
+ * Check which address space the address belongs to.
+ * Returns 1 for user space and 0 for kernel space.
+ */
+static inline int check_user_space(struct pt_regs *regs, int error_code)
+{
+	/*
+	 * The lowest two bits of S390_lowcore.trans_exc_code indicate
+	 * which paging table was used:
+	 *   0: Primary Segment Table Descriptor
+	 *   1: STD determined via access register
+	 *   2: Secondary Segment Table Descriptor
+	 *   3: Home Segment Table Descriptor
+	 */
+	int descriptor = S390_lowcore.trans_exc_code & 3;
+	if (descriptor == 1)
+		return __check_access_register(regs, error_code);
+	return descriptor >> 1;
+}
+
+/*
+ * Send SIGSEGV to task.  This is an external routine
+ * to keep the stack usage of do_page_fault small.
+ */
+static void force_sigsegv(struct pt_regs *regs, unsigned long error_code,
+			  int si_code, unsigned long address)
+{
+	struct siginfo si;
+
+#if defined(CONFIG_SYSCTL) || defined(CONFIG_PROCESS_DEBUG)
+#if defined(CONFIG_SYSCTL)
+	if (sysctl_userprocess_debug)
+#endif
+	{
+		printk("User process fault: interruption code 0x%lX\n",
+		       error_code);
+		printk("failing address: %lX\n", address);
+		show_regs(regs);
+	}
+#endif
+	si.si_signo = SIGSEGV;
+	si.si_code = si_code;
+	si.si_addr = (void *) address;
+	force_sig_info(SIGSEGV, &si, current);
+}
+
+/*
  * This routine handles page faults.  It determines the address,
  * and the problem, and then passes it off to one of the appropriate
  * routines.
  *
  * error_code:
- *             ****0004       Protection           ->  Write-Protection  (suprression)
- *             ****0010       Segment translation  ->  Not present       (nullification)
- *             ****0011       Page translation     ->  Not present       (nullification)
+ *   04       Protection           ->  Write-Protection  (suprression)
+ *   10       Segment translation  ->  Not present       (nullification)
+ *   11       Page translation     ->  Not present       (nullification)
  */
-asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
+extern inline void do_exception(struct pt_regs *regs, unsigned long error_code)
 {
         struct task_struct *tsk;
         struct mm_struct *mm;
         struct vm_area_struct * vma;
         unsigned long address;
+	int user_address;
         unsigned long fixup;
-        int write;
 	int si_code = SEGV_MAPERR;
-	int kernel_address = 0;
 
         tsk = current;
         mm = tsk->mm;
@@ -94,13 +163,13 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 * as a special case because the translation exception code 
 	 * field is not guaranteed to contain valid data in this case.
 	 */
-	if ((error_code & 0xff) == 4 && !(S390_lowcore.trans_exc_code & 4)) {
+	if (error_code == 4 && !(S390_lowcore.trans_exc_code & 4)) {
 
 		/* Low-address protection hit in kernel mode means 
 		   NULL pointer write access in kernel mode.  */
  		if (!(regs->psw.mask & PSW_PROBLEM_STATE)) {
 			address = 0;
-			kernel_address = 1;
+			user_address = 0;
 			goto no_context;
 		}
 
@@ -114,52 +183,15 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
          * more specific the segment and page table portion of 
          * the address 
          */
-
         address = S390_lowcore.trans_exc_code&0x7ffff000;
-
-
-	/*
-	 * Check which address space the address belongs to
-	 */
-	switch (S390_lowcore.trans_exc_code & 3)
-	{
-	case 0: /* Primary Segment Table Descriptor */
-		kernel_address = 1;
-		goto no_context;
-
-	case 1: /* STD determined via access register */
-		if (S390_lowcore.exc_access_id == 0)
-		{
-			kernel_address = 1;
-			goto no_context;
-		}
-		if (regs && S390_lowcore.exc_access_id < NUM_ACRS)
-		{
-			if (regs->acrs[S390_lowcore.exc_access_id] == 0)
-			{
-				kernel_address = 1;
-				goto no_context;
-			}
-			if (regs->acrs[S390_lowcore.exc_access_id] == 1)
-			{
-				/* user space address */
-				break;
-			}
-		}
-		die("page fault via unknown access register", regs, error_code);
-        	do_exit(SIGKILL);
-		break;
-
-	case 2: /* Secondary Segment Table Descriptor */
-	case 3: /* Home Segment Table Descriptor */
-		/* user space address */
-		break;
-	}
+	user_address = check_user_space(regs, error_code);
 
 	/*
-	 * Check whether we have a user MM in the first place.
+	 * Verify that the fault happened in user space, that
+	 * we are not in an interrupt and that there is a 
+	 * user context.
 	 */
-        if (in_interrupt() || !mm || !(regs->psw.mask & _PSW_IO_MASK_BIT))
+        if (user_address == 0 || in_interrupt() || !mm)
                 goto no_context;
 
 	/*
@@ -167,7 +199,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 * task's user address space, so we can switch on the
 	 * interrupts again and then search the VMAs
 	 */
-
 	__sti();
 
         down_read(&mm->mmap_sem);
@@ -186,30 +217,23 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
  * we can handle it..
  */
 good_area:
-        write = 0;
 	si_code = SEGV_ACCERR;
+	if (error_code != 4) {
+		/* page not present, check vm flags */
+		if (!(vma->vm_flags & (VM_READ | VM_EXEC | VM_WRITE)))
+			goto bad_area;
+	} else {
+		if (!(vma->vm_flags & VM_WRITE))
+			goto bad_area;
+	}
 
-        switch (error_code & 0xFF) {
-                case 0x04:                                /* write, present*/
-                        write = 1;
-                        break;
-                case 0x10:                                   /* not present*/
-                case 0x11:                                   /* not present*/
-                        if (!(vma->vm_flags & (VM_READ | VM_EXEC | VM_WRITE)))
-                                goto bad_area;
-                        break;
-                default:
-                       printk("code should be 4, 10 or 11 (%lX) \n",error_code&0xFF);  
-                       goto bad_area;
-        }
-
- survive:
+survive:
 	/*
 	 * If for any reason at all we couldn't handle the fault,
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
-	switch (handle_mm_fault(mm, vma, address, write)) {
+	switch (handle_mm_fault(mm, vma, address, error_code == 4)) {
 	case 1:
 		tsk->min_flt++;
 		break;
@@ -236,22 +260,7 @@ bad_area:
         if (regs->psw.mask & PSW_PROBLEM_STATE) {
                 tsk->thread.prot_addr = address;
                 tsk->thread.trap_no = error_code;
-#ifndef CONFIG_SYSCTL
-#ifdef CONFIG_PROCESS_DEBUG
-                printk("User process fault: interruption code 0x%lX\n",error_code);
-                printk("failing address: %lX\n",address);
-		show_regs(regs);
-#endif
-#else
-		if (sysctl_userprocess_debug) {
-			printk("User process fault: interruption code 0x%lX\n",
-			       error_code);
-			printk("failing address: %lX\n", address);
-			show_regs(regs);
-		}
-#endif
-
-		force_sigsegv(tsk, si_code, (void *)address);
+		force_sigsegv(regs, error_code, si_code, address);
                 return;
 	}
 
@@ -266,8 +275,7 @@ no_context:
  * Oops. The kernel tried to access some bad page. We'll have to
  * terminate things with extreme prejudice.
  */
-
-        if (kernel_address)
+        if (user_address == 0)
                 printk(KERN_ALERT "Unable to handle kernel pointer dereference"
         	       " at virtual kernel address %08lx\n", address);
         else
@@ -285,9 +293,7 @@ no_context:
 out_of_memory:
 	up_read(&mm->mmap_sem);
 	if (tsk->pid == 1) {
-		tsk->policy |= SCHED_YIELD;
-		schedule();
-		down_read(&mm->mmap_sem);
+		yield();
 		goto survive;
 	}
 	printk("VM: killing process %s\n", tsk->comm);
@@ -311,17 +317,20 @@ do_sigbus:
 		goto no_context;
 }
 
-/*
- * Send SIGSEGV to task.  This is an external routine
- * to keep the stack usage of do_page_fault small.
- */
-static void force_sigsegv(struct task_struct *tsk, int code, void *address)
+void do_protection_exception(struct pt_regs *regs, unsigned long error_code)
 {
-	struct siginfo si;
-	si.si_signo = SIGSEGV;
-	si.si_code = code;
-	si.si_addr = address;
-	force_sig_info(SIGSEGV, &si, tsk);
+	regs->psw.addr -= (error_code >> 16);
+	do_exception(regs, 4);
+}
+
+void do_segment_exception(struct pt_regs *regs, unsigned long error_code)
+{
+	do_exception(regs, 0x10);
+}
+
+void do_page_exception(struct pt_regs *regs, unsigned long error_code)
+{
+	do_exception(regs, 0x11);
 }
 
 typedef struct _pseudo_wait_t {
@@ -343,7 +352,6 @@ do_pseudo_page_fault(struct pt_regs *regs, unsigned long error_code)
         pseudo_wait_t wait_struct;
         pseudo_wait_t *ptr, *last, *next;
         unsigned long address;
-        int kernel_address;
 
         /*
          * get the failing address
@@ -393,21 +401,7 @@ do_pseudo_page_fault(struct pt_regs *regs, unsigned long error_code)
 			 * while we are running disabled. VM will then swap
 			 * in the page synchronously.
                          */
-			kernel_address = 0;
-                         switch (S390_lowcore.trans_exc_code & 3) {
-                         case 0: /* Primary Segment Table Descriptor */
-                                 kernel_address = 1;
-                                 break;
-                         case 1: /* STD determined via access register */
-                                 if (S390_lowcore.exc_access_id == 0 ||
-                                     regs->acrs[S390_lowcore.exc_access_id]==0)
-                                         kernel_address = 1;
-                                 break;
-                         case 2: /* Secondary Segment Table Descriptor */
-                         case 3: /* Home Segment Table Descriptor */
-                                 break;
-                         }
-                         if (kernel_address)
+                         if (check_user_space(regs, error_code) == 0)
                                  /* dereference a virtual kernel address */
                                  __asm__ __volatile__ (
                                          "  ic 0,0(%0)"

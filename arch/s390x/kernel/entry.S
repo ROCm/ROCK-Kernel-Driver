@@ -17,7 +17,9 @@
 #include <asm/errno.h>
 #include <asm/smp.h>
 #include <asm/ptrace.h>
+#include <asm/thread_info.h>
 
+#include "asm-offsets.h"
 
 /*
  * Stack layout for the system_call stack entry.
@@ -45,41 +47,9 @@ SP_AREGS     =  STACK_FRAME_OVERHEAD + PT_ACR0
 SP_ORIG_R2   =  STACK_FRAME_OVERHEAD + PT_ORIGGPR2
 /* Now the additional entries */
 SP_TRAP      =  (SP_ORIG_R2+GPR_SIZE)
-#if CONFIG_REMOTE_DEBUG
-SP_CRREGS    =  (SP_TRAP+4)
-/* fpu registers are saved & restored by the gdb stub itself */
-SP_FPC       =  (SP_CRREGS+(NUM_CRS*CR_SIZE))
-SP_FPRS      =  (SP_FPC+FPC_SIZE+FPC_PAD_SIZE)
-SP_PGM_OLD_ILC= (SP_FPRS+(NUM_FPRS*FPR_SIZE))
-#else
-SP_PGM_OLD_ILC= (SP_TRAP+4)
-#endif
-SP_SIZE      =  (SP_PGM_OLD_ILC+4)
-/*
- * these defines are offsets into the thread_struct
- */
-_TSS_PTREGS  = 0
-_TSS_FPRS    = (_TSS_PTREGS+8)
-_TSS_AR2     = (_TSS_FPRS+136)
-_TSS_AR4     = (_TSS_AR2+4)
-_TSS_KSP     = (_TSS_AR4+4)
-_TSS_USERSEG = (_TSS_KSP+8)
-_TSS_PROT    = (_TSS_USERSEG+8)
-_TSS_ERROR   = (_TSS_PROT+8)
-_TSS_TRAP    = (_TSS_ERROR+4)
-_TSS_PER     = (_TSS_TRAP+4)
-_TSS_IEEE    = (_TSS_PER+72)
-_TSS_FLAGS   = (_TSS_IEEE+8)
+SP_SIZE      =  (SP_TRAP+4)
 
-/*
- * these are offsets into the task-struct.
- */
-state        =  0
-flags        =  8
-#error sigpending   = 16
-#error need_resched = 32
-#error tsk_ptrace   = 40
-processor    = 92
+_TIF_WORK_MASK = (_TIF_NOTIFY_RESUME | _TIF_SIGPENDING | _TIF_NEED_RESCHED)
 
 /*
  * Register usage in interrupt handlers:
@@ -128,7 +98,7 @@ processor    = 92
         lpswe   __LC_RETURN_PSW          # back to caller
         .endm
 
-        .macro  GET_CURRENT
+        .macro  GET_THREAD_INFO
 	lg	%r9,__LC_KERNEL_STACK    # load pointer to task_struct to %r9
 	aghi	%r9,-16384
         .endm
@@ -136,37 +106,32 @@ processor    = 92
 
 /*
  * Scheduler resume function, called by switch_to
- *  grp2 = (thread_struct *) prev->tss
- *  grp3 = (thread_struct *) next->tss
+ *  gpr2 = (task_struct *) prev
+ *  gpr3 = (task_struct *) next
  * Returns:
  *  gpr2 = prev
  */
         .globl  resume
 resume:
-        lg      %r4,_TSS_PTREGS(%r3)
-        tm      SP_PSW-SP_PTREGS(%r4),0x40 # is the new process using per ?
-        jz      resume_noper            # if not we're fine
+	tm	__THREAD_per+4(%r3),0xe8 # is the new process using per ?
+	jz	resume_noper		# if not we're fine
         stctg   %c9,%c11,48(%r15)       # We are using per stuff
-        clc     _TSS_PER(24,%r3),48(%r15)
+        clc     __THREAD_per(24,%r3),48(%r15)
         je      resume_noper            # we got away without bashing TLB's
-        lctlg   %c9,%c11,_TSS_PER(%r3)  # Nope we didn't
+        lctlg   %c9,%c11,__THREAD_per(%r3)	# Nope we didn't
 resume_noper:
         stmg    %r6,%r15,48(%r15)       # store resume registers of prev task
-        stg     %r15,_TSS_KSP(%r2) # store kernel stack ptr to prev->tss.ksp
-        lghi    %r0,-16384
-        ngr     %r0,%r15
-        lg      %r15,_TSS_KSP(%r3) # load kernel stack ptr from next->tss.ksp
-        lghi    %r1,16383
-        ogr     %r1,%r15
-        aghi    %r1,1
-        stg     %r1,__LC_KERNEL_STACK   # __LC_KERNEL_STACK = new kernel stack
-        stam    %a2,%a2,_TSS_AR2(%r2)   # store kernel access reg. 2
-        stam    %a4,%a4,_TSS_AR4(%r2)   # store kernel access reg. 4
-        lam     %a2,%a2,_TSS_AR2(%r3)   # load kernel access reg. 2
-        lam     %a4,%a4,_TSS_AR4(%r3)   # load kernel access reg. 4
-        lgr     %r2,%r0                 # return task_struct of last task
+	stg	%r15,__THREAD_ksp(%r2)	# store kernel stack to prev->tss.ksp
+	lg	%r15,__THREAD_ksp(%r3)	# load kernel stack from next->tss.ksp
+        stam    %a2,%a2,__THREAD_ar2(%r2)	# store kernel access reg. 2
+        stam    %a4,%a4,__THREAD_ar4(%r2)	# store kernel access reg. 4
+        lam     %a2,%a2,__THREAD_ar2(%r3)	# load kernel access reg. 2
+        lam     %a4,%a4,__THREAD_ar4(%r3)	# load kernel access reg. 4
         lmg     %r6,%r15,48(%r15)       # load resume registers of next task
-        br      %r14
+	lg	%r3,__THREAD_info(%r3)  # load thread_info from task struct
+	aghi	%r3,16384
+	stg	%r3,__LC_KERNEL_STACK	# __LC_KERNEL_STACK = new kernel stack
+	br	%r14
 
 /*
  * do_softirq calling function. We want to run the softirq functions on the
@@ -195,41 +160,41 @@ do_call_softirq:
 	.globl  system_call
 system_call:
         SAVE_ALL __LC_SVC_OLD_PSW,1
-	mvi     SP_PGM_OLD_ILC(%r15),1  # mark PGM_OLD_ILC as invalid
-pgm_system_call:
-        GET_CURRENT               # load pointer to task_struct to R9
-	larl    %r7,sys_call_table
-	llgc    %r8,__LC_SVC_INT_CODE+1 # get svc number from lowcore
+	llgh    %r8,__LC_SVC_INT_CODE # get svc number from lowcore
+        GET_THREAD_INFO           # load pointer to task_struct to R9
 	stosm   48(%r15),0x03     # reenable interrupts
+	larl    %r7,sys_call_table
         sll     %r8,3
         tm      SP_PSW+3(%r15),0x01  # are we running in 31 bit mode ?
         jo      sysc_noemu
-	la      %r8,4(%r8)        # use 31 bit emulation system calls
+	la      %r7,4(%r7)        # use 31 bit emulation system calls
 sysc_noemu:
         lgf     %r8,0(%r8,%r7)    # load address of system call routine
-        tm      tsk_ptrace+7(%r9),0x02 # PT_TRACESYS
-        jnz     sysc_tracesys
+	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
+        jo      sysc_tracesys
         basr    %r14,%r8          # call sys_xxxx
         stg     %r2,SP_R2(%r15)   # store return value (change R2 on stack)
                                   # ATTENTION: check sys_execve_glue before
                                   # changing anything here !!
 
 sysc_return:
-        tm      SP_PSW+1(%r15),0x01 # returning to user ?
-        jno     sysc_leave        # no-> skip bottom half, resched & signal
-#
-# check, if reschedule is needed
-#
-#error	lg      %r0,need_resched(%r9) # get need_resched from task_struct
-	ltgr    %r0,%r0
-        jnz     sysc_reschedule
-#error        icm     %r0,15,sigpending(%r9)     # get sigpending from task_struct
-        jnz     sysc_signal_return
+	stnsm   48(%r15),0xfc     # disable I/O and ext. interrupts
+	tm	__TI_flags+7(%r9),_TIF_WORK_MASK
+	jnz	sysc_work         # there is work to do (signals etc.)
 sysc_leave:
-        tm      SP_PGM_OLD_ILC(%r15),0xff
-        jz      pgm_svcret
-	stnsm   48(%r15),0xfc         # disable I/O and ext. interrupts
         RESTORE_ALL 1
+
+#
+# One of the work bits _TIF_NOTIFY_RESUME, _TIF_SIGPENDING or
+# _TIF_NEED_RESCHED is on. Find out which one.
+#
+sysc_work:
+        tm      SP_PSW+1(%r15),0x01 # returning to user ?
+        jno     sysc_leave        # no-> skip resched & signal
+	tm	__TI_flags+7(%r9),_TIF_NEED_RESCHED
+	jo	sysc_reschedule
+	# add a test for TIF_NOTIFY_RESUME here when it is used.
+	# _TIF_SIGPENDING is the only flag left
 
 #
 # call do_signal before return
@@ -237,33 +202,8 @@ sysc_leave:
 sysc_signal_return:     
         la      %r2,SP_PTREGS(%r15) # load pt_regs
         sgr     %r3,%r3             # clear *oldset
-	larl    %r14,sysc_leave
-	jg      do_signal           # return point is sysc_leave
-
-#
-# call trace before and after sys_call
-#
-sysc_tracesys:
-	lghi    %r2,-ENOSYS
-	stg     %r2,SP_R2(%r15)     # give sysc_trace an -ENOSYS retval
-#error        brasl   %r14,syscall_trace
-	lg      %r2,SP_R2(%r15)
-	cghi    %r2,-ENOSYS
-	je      sysc_tracesys_dn1   
-	sllg    %r2,%r2,56          # strace wants to change the syscall
-	srlg    %r2,%r2,53          # zap unused bits & multiply by 8
-	tm      SP_PSW+3(%r15),0x01 # are we running in 31 bit mode ?
-        jo      sysc_tracesys_noemu
-	la      %r2,4(%r2)          # use 31 bit emulation system calls
-sysc_tracesys_noemu:
-	lgf	%r8,0(%r2,%r7)      # load address of system call routine
-sysc_tracesys_dn1:	
-	lmg     %r3,%r6,SP_R3(%r15)
-	lg      %r2,SP_ORIG_R2(%r15)
-        basr    %r14,%r8            # call sys_xxx
-        stg     %r2,SP_R2(%r15)     # store return value
 	larl    %r14,sysc_return
-#error        jg      syscall_trace       # return point is sysc_return
+	jg      do_signal           # return point is sysc_return
 
 #
 # call schedule with sysc_return as return-address
@@ -273,18 +213,41 @@ sysc_reschedule:
         jg      schedule            # return point is sysc_return
 
 #
+# call syscall_trace before and after system call
+# special linkage: %r12 contains the return address for trace_svc
+#
+sysc_tracesys:
+	lghi    %r0,-ENOSYS
+	stg     %r0,SP_R2(%r15)     # give sysc_trace an -ENOSYS retval
+        brasl   %r14,syscall_trace
+	larl	%r6,.Lc256
+	clc	SP_R2(8,%r15),0(%r6)
+	jnl	sysc_tracego
+	lg      %r2,SP_R2(%r15)
+	sllg    %r2,%r2,3           # strace wants to change the syscall
+	lgf	%r8,0(%r2,%r7)
+sysc_tracego:
+	lmg     %r3,%r6,SP_R3(%r15)
+	lg      %r2,SP_ORIG_R2(%r15)
+        basr    %r14,%r8            # call sys_xxx
+        stg     %r2,SP_R2(%r15)     # store return value
+	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
+        jno     sysc_return
+	larl	%r14,sysc_return    # return point is sysc_return
+	jg	syscall_trace
+
+#
 # a new process exits the kernel with ret_from_fork
 #
         .globl  ret_from_fork
 ret_from_fork:  
-        GET_CURRENT               # load pointer to task_struct to R9
-        stosm   48(%r15),0x03     # reenable interrupts
+        GET_THREAD_INFO           # load pointer to task_struct to R9
 	xc      SP_R2(8,%r15),SP_R2(%r15) # child returns 0
-#if CONFIG_SMP || CONFIG_PREEMPT
+#ifdef CONFIG_SMP
 	larl    %r14,sysc_return
         jg      schedule_tail     # return to sysc_return
 #else
-        j       sysc_return
+	j	sysc_return
 #endif
 
 #
@@ -433,7 +396,7 @@ sys_call_table:
         .long  SYSCALL(sys_oldumount,sys32_oldumount_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys32_setuid16_wrapper)   /* old setuid16 syscall*/
         .long  SYSCALL(sys_ni_syscall,sys32_getuid16)   /* old getuid16 syscall*/
-        .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* 25 old stime syscall */
+        .long  SYSCALL(sys_ni_syscall,sys32_stime_wrapper) /* 25 old stime syscall */
         .long  SYSCALL(sys_ptrace,sys32_ptrace_wrapper)
         .long  SYSCALL(sys_alarm,sys32_alarm_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old fstat syscall */
@@ -530,7 +493,7 @@ sys_call_table:
         .long  SYSCALL(sys_sigreturn_glue,sys32_sigreturn_glue)
         .long  SYSCALL(sys_clone_glue,sys_clone_glue) /* 120 */
         .long  SYSCALL(sys_setdomainname,sys32_setdomainname_wrapper)
-        .long  SYSCALL(sys_newuname,sys32_newuname_wrapper)
+        .long  SYSCALL(s390x_newuname,sys32_newuname_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* modify_ldt for i386 */
         .long  SYSCALL(sys_adjtimex,sys32_adjtimex_wrapper)
         .long  SYSCALL(sys_mprotect,sys32_mprotect_wrapper) /* 125 */
@@ -544,7 +507,7 @@ sys_call_table:
         .long  SYSCALL(sys_fchdir,sys32_fchdir_wrapper)
         .long  SYSCALL(sys_bdflush,sys32_bdflush_wrapper)
         .long  SYSCALL(sys_sysfs,sys32_sysfs_wrapper)           /* 135 */
-        .long  SYSCALL(sys_personality,sys32_personality_wrapper)
+        .long  SYSCALL(s390x_personality,sys32_personality_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* for afs_syscall */
         .long  SYSCALL(sys_ni_syscall,sys32_setfsuid16_wrapper) /* old setfsuid16 syscall */
         .long  SYSCALL(sys_ni_syscall,sys32_setfsgid16_wrapper) /* old setfsgid16 syscall */
@@ -557,7 +520,7 @@ sys_call_table:
         .long  SYSCALL(sys_writev,sys32_writev_wrapper)
         .long  SYSCALL(sys_getsid,sys32_getsid_wrapper)
         .long  SYSCALL(sys_fdatasync,sys32_fdatasync_wrapper)
-        .long  SYSCALL(sys_sysctl,sys_ni_syscall)
+        .long  SYSCALL(sys_sysctl,sys32_sysctl_wrapper)
         .long  SYSCALL(sys_mlock,sys32_mlock_wrapper)           /* 150 */
         .long  SYSCALL(sys_munlock,sys32_munlock_wrapper)
         .long  SYSCALL(sys_mlockall,sys32_mlockall_wrapper)
@@ -599,7 +562,7 @@ sys_call_table:
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* streams1 */
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* streams2 */
         .long  SYSCALL(sys_vfork_glue,sys_vfork_glue) /* 190 */
-        .long  SYSCALL(sys_getrlimit,sys32_old_getrlimit_wrapper)
+        .long  SYSCALL(sys_getrlimit,sys32_getrlimit_wrapper)
 	.long  SYSCALL(sys_mmap2,sys32_mmap2_wrapper)
 	.long  SYSCALL(sys_ni_syscall,sys32_truncate64_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys32_ftruncate64_wrapper)
@@ -630,13 +593,27 @@ sys_call_table:
         .long  SYSCALL(sys_madvise,sys32_madvise_wrapper)
 	.long  SYSCALL(sys_getdents64,sys32_getdents64_wrapper)/* 220 */
 	.long  SYSCALL(sys_ni_syscall,sys32_fcntl64_wrapper)
-	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* 222 - reserved for posix_acl */
-	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* 223 - reserved for posix_acl */
-	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* 224 - reserved for posix_acl */
-        .rept  255-224
-	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
+	.long  SYSCALL(sys_readahead,sys32_readahead)
+	.long  SYSCALL(sys_ni_syscall,sys32_sendfile64)
+	.long  SYSCALL(sys_setxattr,sys32_setxattr_wrapper)
+	.long  SYSCALL(sys_lsetxattr,sys32_lsetxattr_wrapper)	/* 225 */
+	.long  SYSCALL(sys_fsetxattr,sys32_fsetxattr_wrapper)
+	.long  SYSCALL(sys_getxattr,sys32_getxattr_wrapper)
+	.long  SYSCALL(sys_lgetxattr,sys32_lgetxattr_wrapper)
+	.long  SYSCALL(sys_fgetxattr,sys32_fgetxattr_wrapper)
+	.long  SYSCALL(sys_listxattr,sys32_listxattr_wrapper)	/* 230 */
+	.long  SYSCALL(sys_llistxattr,sys32_llistxattr_wrapper)
+	.long  SYSCALL(sys_flistxattr,sys32_flistxattr_wrapper)
+	.long  SYSCALL(sys_removexattr,sys32_removexattr_wrapper)
+	.long  SYSCALL(sys_lremovexattr,sys32_lremovexattr_wrapper)
+	.long  SYSCALL(sys_fremovexattr,sys32_fremovexattr_wrapper)
 	.long  SYSCALL(sys_gettid,sys_gettid)
 	.long  SYSCALL(sys_tkill,sys_tkill)
+	.long  SYSCALL(sys_futex,sys32_futex_wrapper)
+	.long  SYSCALL(sys_sched_setaffinity,sys32_sched_setaffinity_wrapper)
+	.long  SYSCALL(sys_sched_getaffinity,sys32_sched_getaffinity_wrapper)
+        .rept  255-240
+	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
 	.endr
 
 /*
@@ -659,51 +636,106 @@ pgm_check_handler:
  * for LPSW?).
  */
         tm      __LC_PGM_INT_CODE+1,0x80 # check whether we got a per exception
-        jz      pgm_sv                   # skip if not
+        jnz     pgm_per                  # got per exception -> special case
+	SAVE_ALL __LC_PGM_OLD_PSW,1
+	llgh    %r8,__LC_PGM_INT_CODE
+        sll     %r8,3
+	GET_THREAD_INFO
+        larl    %r1,pgm_check_table
+        lg      %r1,0(%r8,%r1)		 # load address of handler routine
+        la      %r2,SP_PTREGS(%r15)	 # address of register-save area
+	lgf     %r3,__LC_PGM_ILC	 # load program interruption code
+	larl	%r14,sysc_return
+        br      %r1			 # branch to interrupt-handler
+
+#
+# handle per exception
+#
+pgm_per:
         tm      __LC_PGM_OLD_PSW,0x40    # test if per event recording is on
-        jnz     pgm_sv                   # skip if it is
+        jnz     pgm_per_std              # ok, normal per event from user space
 # ok its one of the special cases, now we need to find out which one
         clc     __LC_PGM_OLD_PSW(16),__LC_SVC_NEW_PSW
         je      pgm_svcper
 # no interesting special case, ignore PER event
 	lpswe   __LC_PGM_OLD_PSW
+
+#
+# Normal per exception
+#
+pgm_per_std:
+	SAVE_ALL __LC_PGM_OLD_PSW,1
+	GET_THREAD_INFO
+	lghi    %r4,0x7f
+	lgf     %r3,__LC_PGM_ILC	 # load program interruption code
+        nr      %r4,%r3			 # clear per-event-bit and ilc
+        je      pgm_per_only		 # only per of per+check ?
+        sll     %r4,3
+        larl    %r1,pgm_check_table
+        lg      %r1,0(%r4,%r1)		 # load address of handler routine
+        la      %r2,SP_PTREGS(%r15)	 # address of register-save area
+        basr    %r14,%r1		 # branch to interrupt-handler
+pgm_per_only:
+        la      %r2,SP_PTREGS(15)	 # address of register-save area
+        larl    %r14,sysc_return	 # load adr. of system return
+        jg      handle_per_exception
+
+#
 # it was a single stepped SVC that is causing all the trouble
+#
 pgm_svcper:
 	SAVE_ALL __LC_SVC_OLD_PSW,1
-        mvc     SP_PGM_OLD_ILC(4,%r15),__LC_PGM_ILC # save program check information
-        j       pgm_system_call          # now do the svc
+	llgh    %r8,__LC_SVC_INT_CODE # get svc number from lowcore
+        GET_THREAD_INFO           # load pointer to task_struct to R9
+	stosm   48(%r15),0x03     # reenable interrupts
+	larl    %r7,sys_call_table
+        sll     %r8,3
+        tm      SP_PSW+3(%r15),0x01  # are we running in 31 bit mode ?
+        jo      pgm_svcper_noemu
+	la      %r7,4(%r8)        # use 31 bit emulation system calls
+pgm_svcper_noemu:
+        lgf     %r8,0(%r8,%r7)    # load address of system call routine
+	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
+        jo      pgm_tracesys
+        basr    %r14,%r8          # call sys_xxxx
+        stg     %r2,SP_R2(%r15)   # store return value (change R2 on stack)
+                                  # ATTENTION: check sys_execve_glue before
+                                  # changing anything here !!
+
 pgm_svcret:
+	tm	__TI_flags+3(%r9),_TIF_SIGPENDING
+	jo	pgm_svcper_nosig
+        la      %r2,SP_PTREGS(%r15) # load pt_regs
+        sgr     %r3,%r3             # clear *oldset
+	brasl	%r14,do_signal
+	
+pgm_svcper_nosig:
 	lhi     %r0,__LC_PGM_OLD_PSW     # set trap indication back to pgm_chk
 	st      %r0,SP_TRAP(%r15)
-        llgh    %r7,SP_PGM_OLD_ILC(%r15) # get ilc from stack
-        mvi     SP_PGM_OLD_ILC(%r15),1   # mark PGM_OLD_ILC as invalid
-	j       pgm_no_sv
-pgm_sv:
-	SAVE_ALL __LC_PGM_OLD_PSW,1
-        mvi     SP_PGM_OLD_ILC(%r15),1   # mark PGM_OLD_ILC as invalid
-        llgh    %r7,__LC_PGM_ILC         # load instruction length
-	GET_CURRENT
-pgm_no_sv:
-        llgh    %r8,__LC_PGM_INT_CODE  # N.B. saved int code used later KEEP it
-	lghi    %r3,0x7f
-        nr      %r3,%r8           # clear per-event-bit & move to r3
-        je      pgm_dn            # none of Martins exceptions occurred bypass
-        sll     %r3,3
-        larl    %r1,pgm_check_table
-        lg      %r1,0(%r3,%r1)    # load address of handler routine
-        srl     %r3,3
-        la      %r2,SP_PTREGS(%r15) # address of register-save area
-        chi     %r3,0x4           # protection-exception ?
-        jne     pgm_go            # if not,
-        lg      %r5,SP_PSW+8(15)  # load psw addr
-        slgr    %r5,%r7           # substract ilc from psw
-        stg     %r5,SP_PSW+8(15)  # store corrected psw addr
-pgm_go: basr    %r14,%r1          # branch to interrupt-handler
-pgm_dn: nill    %r8,0x80          # check for per exception
-        je      sysc_return
         la      %r2,SP_PTREGS(15) # address of register-save area
         larl    %r14,sysc_return  # load adr. of system return
         jg      handle_per_exception
+#
+# call trace before and after sys_call
+#
+pgm_tracesys:
+	lghi    %r0,-ENOSYS
+	stg     %r0,SP_R2(%r15)     # give sysc_trace an -ENOSYS retval
+        brasl   %r14,syscall_trace
+	lg      %r2,SP_R2(%r15)
+	cghi	%r2,256
+	jnl     pgm_svc_go
+	sllg    %r2,%r2,3           # strace wants to change the syscall
+	lgf	%r8,0(%r2,%r7)
+pgm_svc_go:
+	lmg     %r3,%r6,SP_R3(%r15)
+	lg      %r2,SP_ORIG_R2(%r15)
+        basr    %r14,%r8            # call sys_xxx
+        stg     %r2,SP_R2(%r15)     # store return value
+	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
+        jno     pgm_svcret
+	larl	%r14,pgm_svcret     # return point is sysc_return
+	jg	syscall_trace
 
 /*
  * IO interrupt handler routine
@@ -711,7 +743,7 @@ pgm_dn: nill    %r8,0x80          # check for per exception
         .globl io_int_handler
 io_int_handler:
         SAVE_ALL __LC_IO_OLD_PSW,0
-        GET_CURRENT                    # load pointer to task_struct to R9
+        GET_THREAD_INFO                # load pointer to task_struct to R9
         la      %r2,SP_PTREGS(%r15)    # address of register-save area
 	llgh    %r3,__LC_SUBCHANNEL_NR # load subchannel number
         llgf    %r4,__LC_IO_INT_PARM   # load interuption parm
@@ -722,43 +754,38 @@ io_return:
 #
 # check, if bottom-half has to be done
 #
-	lgf     %r1,processor(%r9)    # get cpu number from task struture
+        lgf     %r1,__TI_cpu(%r9)
 	larl    %r2,irq_stat
 	sll     %r1,L1_CACHE_SHIFT
 	la      %r1,0(%r1,%r2)
-	icm     %r0,15,0(%r1)         # test irq_stat[#cpu].__softirq_pending
+	icm     %r0,15,0(%r1)          # test irq_stat[#cpu].__softirq_pending
         jnz     io_handle_bottom_half
 io_return_bh:	
-
-        tm      SP_PSW+1(%r15),0x01    # returning to user ?
-        jno     io_leave               # no-> skip resched & signal
-        stosm   48(%r15),0x03          # reenable interrupts
-#
-# check, if reschedule is needed
-#
-#error	lg      %r0,need_resched(%r9)  # get need_resched from task_struct
-	ltgr    %r0,%r0
-        jnz     io_reschedule
-#error        icm     %r0,15,sigpending(%r9) # get sigpending from task_struct
-        jnz     io_signal_return
+	tm	__TI_flags+7(%r9),_TIF_WORK_MASK
+	jnz	io_work                # there is work to do (signals etc.)
 io_leave:
         stnsm   48(%r15),0xfc          # disable I/O and ext. interrupts
         RESTORE_ALL 0
 
 #
-# call do_softirq and return from syscall, if interrupt-level
-# is zero
+# call do_softirq
 #
 io_handle_bottom_half:        
 	larl    %r14,io_return_bh
-        jg      do_softirq          # return point is io_return_bh
+        jg      do_softirq             # return point is io_return_bh
 
 #
-# call schedule with io_return as return-address
+# One of the work bits _TIF_NOTIFY_RESUME, _TIF_SIGPENDING or
+# _TIF_NEED_RESCHED is on. Find out which one.
 #
-io_reschedule:        
-	larl    %r14,io_return
-        jg      schedule            # call scheduler, return to io_return
+io_work:
+        tm      SP_PSW+1(%r15),0x01    # returning to user ?
+        jno     io_leave               # no-> skip resched & signal
+        stosm   48(%r15),0x03          # reenable interrupts
+	tm	__TI_flags+7(%r9),_TIF_NEED_RESCHED
+	jo	io_reschedule
+	# add a test for TIF_NOTIFY_RESUME here when it is used.
+	# _TIF_SIGPENDING is the only flag left
 
 #
 # call do_signal before return
@@ -769,33 +796,40 @@ io_signal_return:
 	larl    %r14,io_leave
         jg      do_signal           # return point is io_leave
 
+#
+# call schedule with io_return as return-address
+#
+io_reschedule:        
+	larl    %r14,io_return
+        jg      schedule            # call scheduler, return to io_return
+
 /*
  * External interrupt handler routine
  */
         .globl  ext_int_handler
 ext_int_handler:
         SAVE_ALL __LC_EXT_OLD_PSW,0
-        GET_CURRENT                    # load pointer to task_struct to R9
-        la      %r2,SP_PTREGS(%r15)    # address of register-save area
-        llgh    %r3,__LC_EXT_INT_CODE  # error code
-        lgr     %r1,%r3                # calculate index = code & 0xff
-	nill    %r1,0xff
-        sll     %r1,3
-        larl    %r4,ext_int_hash
-        lg      %r4,0(%r1,%r4)         # get first list entry for hash value
-        ltgr    %r4,%r4                # == NULL ?
-        jz      io_return              # yes, nothing to do, exit
+        GET_THREAD_INFO                # load pointer to task_struct to R9
+	llgh	%r6,__LC_EXT_INT_CODE  # get interruption code
+	lgr	%r1,%r6		       # calculate index = code & 0xff
+	nill	%r1,0xff
+	sll	%r1,3
+	larl	%r7,ext_int_hash
+	lg	%r7,0(%r1,%r7)	       # get first list entry for hash value
+	ltgr	%r7,%r7		       # == NULL ?
+	jz	io_return	       # yes, nothing to do, exit
 ext_int_loop:
-        ch      %r3,16(%r4)            # compare external interrupt code
-        je      ext_int_found
-        lg      %r4,0(%r4)             # next list entry
-	ltgr    %r4,%r4
-        jnz     ext_int_loop
-        j       io_return
-ext_int_found:
-        lg      %r4,8(%r4)             # get handler address
-        larl    %r14,io_return
-        br      %r4                    # branch to ext call handler
+	ch	%r6,16(%r7)	       # compare external interrupt code
+	jne	ext_int_next
+	lg	%r1,8(%r7)	       # get handler address
+	la	%r2,SP_PTREGS(%r15)    # address of register-save area
+	lgr	%r3,%r6		       # interruption code
+	basr	%r14,%r1	       # call handler
+ext_int_next:
+	lg	%r7,0(%r7)	       # next list entry
+	ltgr	%r7,%r7
+	jnz	ext_int_loop
+	j	io_return
 
 /*
  * Machine check handler routines
@@ -841,3 +875,4 @@ restart_go:
  */
                .align 4
 .Lc_ac:        .long  0,0,1
+.Lc256:        .quad  256

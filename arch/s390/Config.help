@@ -155,7 +155,10 @@ CONFIG_IPL
   IPL device.
 
 CONFIG_IPL_TAPE
-  Select this option if you want to IPL the image from a Tape.
+  Select "tape" if you want to IPL the image from a Tape.
+
+  Select "vm_reader" if you are running under VM/ESA and want
+  to IPL the image from the emulated card reader.
 
 CONFIG_FAST_IRQ
   Select this option in order to get the interrupts processed faster
@@ -164,8 +167,57 @@ CONFIG_FAST_IRQ
   interrupts which will also be processed before leaving the interrupt
   context.  This speeds up the I/O a lot. Say "Y".
 
+CONFIG_MACHCHK_WARNING
+  Select this option if you want the machine check handler on IBM S/390 or 
+  zSeries to process warning machine checks (e.g. on power failures). 
+  If unsure, say "Y".
+
+CONFIG_CHSC
+  Select this option if you want the s390 common I/O layer to use information
+  obtained by channel subsystem calls. This will enable Linux to process link
+  failures and resource accessibility events. Moreover, if you have procfs
+  enabled, you'll be able to toggle chpids logically offline and online. Even
+  if you don't understand what this means, you should say "Y".
+
 CONFIG_PROCESS_DEBUG
   Say Y to print all process fault locations to the console.  This is
   a debugging option; you probably do not want to set it unless you
   are an S390 port maintainer.
+
+CONFIG_PFAULT
+  Select this option, if you want to use PFAULT pseudo page fault
+  handling under VM. If running native or in LPAR, this option
+  has no effect. If your VM does not support PFAULT, PAGEEX
+  pseudo page fault handling will be used.
+  Note that VM 4.2 supports PFAULT but has a bug in its
+  implementation that causes some problems.
+  Everybody who wants to run Linux under VM != VM4.2 should select
+  this option.
+
+CONFIG_SHARED_KERNEL
+  Select this option, if you want to share the text segment of the
+  Linux kernel between different VM guests. This reduces memory
+  usage with lots of guests but greatly increases kernel size.
+  You should only select this option if you know what you are
+  doing and want to exploit this feature.
+
+CONFIG_QDIO
+  This driver provides the Queued Direct I/O base support for the
+  IBM S/390 (G5 and G6) and eServer zSeries (z800 and z900).
+
+  For details please refer to the documentation provided by IBM at
+  <http://www10.software.ibm.com/developerworks/opensource/linux390>
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called qdio.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+  If unsure, say Y.
+
+Performance statistics for QDIO base support
+CONFIG_QDIO_PERF_STATS
+  Say Y here to get performance statistics in /proc/qdio_perf
+
+  If unsure, say N.
 
