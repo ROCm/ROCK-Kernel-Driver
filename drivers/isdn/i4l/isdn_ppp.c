@@ -99,7 +99,7 @@ isdn_ppp_frame_log(char *info, char *data, int len, int maxlen,int unit,int slot
  * note: it can happen, that we hangup/free the master before the slaves
  *       in this case we bind another lp to the master device
  */
-int
+void
 isdn_ppp_free(isdn_net_local * lp)
 {
 	unsigned long flags;
@@ -108,7 +108,7 @@ isdn_ppp_free(isdn_net_local * lp)
 	if (lp->ppp_slot < 0 || lp->ppp_slot > ISDN_MAX_CHANNELS) {
 		printk(KERN_ERR "%s: ppp_slot(%d) out of range\n",
 		       __FUNCTION__ , lp->ppp_slot);
-		return 0;
+		return;
 	}
 
 	save_flags(flags);
@@ -129,7 +129,7 @@ isdn_ppp_free(isdn_net_local * lp)
 		printk(KERN_ERR "%s: ppp_slot(%d) now invalid\n",
 		       __FUNCTION__ , lp->ppp_slot);
 		restore_flags(flags);
-		return 0;
+		return;
 	}
 	is = ippp_table[lp->ppp_slot];
 	if ((is->state & IPPP_CONNECT))
@@ -144,7 +144,7 @@ isdn_ppp_free(isdn_net_local * lp)
 	lp->ppp_slot = -1;      /* is this OK ?? */
 
 	restore_flags(flags);
-	return 0;
+	return;
 }
 
 /*

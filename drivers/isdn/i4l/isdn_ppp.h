@@ -16,19 +16,17 @@ extern struct file_operations isdn_ppp_fops;
 
 extern int isdn_ppp_init(void);
 extern void isdn_ppp_cleanup(void);
-extern int isdn_ppp_free(isdn_net_local *);
-extern int isdn_ppp_bind(isdn_net_local *);
-extern int isdn_ppp_xmit(struct sk_buff *, struct net_device *);
-extern void isdn_ppp_receive(isdn_net_dev *, isdn_net_local *, struct sk_buff *);
 extern int isdn_ppp_dial_slave(char *);
-extern void isdn_ppp_wakeup_daemon(isdn_net_local *);
-
-extern int isdn_ppp_register_compressor(struct isdn_ppp_compressor *ipc);
-extern int isdn_ppp_unregister_compressor(struct isdn_ppp_compressor *ipc);
+extern int isdn_ppp_hangup_slave(char *);
 
 #ifdef CONFIG_ISDN_PPP
 
-int isdn_ppp_setup_dev(isdn_net_dev *p);
+int  isdn_ppp_setup_dev(isdn_net_dev *p);
+void isdn_ppp_wakeup_daemon(isdn_net_local *);
+int  isdn_ppp_bind(isdn_net_local *);
+void isdn_ppp_free(isdn_net_local *);
+void isdn_ppp_receive(isdn_net_dev *, isdn_net_local *, struct sk_buff *);
+int  isdn_ppp_xmit(struct sk_buff *, struct net_device *);
 
 #else
 
@@ -37,6 +35,33 @@ isdn_ppp_setup_dev(isdn_net_dev *p)
 {
 	printk(KERN_WARNING "ISDN: SyncPPP support not configured\n");
 	return -EINVAL;
+}
+
+static inline void
+isdn_ppp_wakeup_daemon(isdn_net_local *lp);
+{
+}
+
+static inline int
+isdn_ppp_bind(isdn_net_local *)
+{
+	return 0;
+}
+
+static inline void
+isdn_ppp_free(isdn_net_local *lp)
+{
+}
+
+static inline void
+isdn_ppp_receive(isdn_net_dev *, isdn_net_local *, struct sk_buff *)
+{
+}
+
+static inline int
+isdn_ppp_xmit(struct sk_buff *, struct net_device *);
+{
+	return 0;
 }
 
 #endif

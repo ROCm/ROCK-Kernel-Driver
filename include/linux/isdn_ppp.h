@@ -138,8 +138,6 @@ struct isdn_ppp_compressor {
 
 extern int isdn_ppp_register_compressor(struct isdn_ppp_compressor *);
 extern int isdn_ppp_unregister_compressor(struct isdn_ppp_compressor *);
-extern int isdn_ppp_dial_slave(char *);
-extern int isdn_ppp_hangup_slave(char *);
 
 typedef struct {
   unsigned long seqerrs;

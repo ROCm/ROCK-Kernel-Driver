@@ -16,6 +16,14 @@ struct concap_proto *isdn_concap_new(int);
 
 void isdn_x25_encap_changed(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg);
 int  isdn_x25_setup_dev(isdn_net_dev *p);
+void isdn_x25_open(struct net_device *dev);
+void isdn_x25_close(struct net_device *dev);
+void isdn_x25_connected(isdn_net_local *lp);
+void isdn_x25_bhup(isdn_net_local *lp);
+void isdn_x25_hangup(isdn_net_local *lp);
+int  isdn_x25_start_xmit(struct sk_buff *skb, struct net_device *dev);
+void isdn_x25_receive(isdn_net_local *lp, struct sk_buff *skb);
+void isdn_x25_realrm(isdn_net_dev *p);
 
 #else
 
@@ -31,5 +39,47 @@ isdn_x25_setup_dev(isdn_net_dev *p)
 	return -EINVAL;
 }
 
+static inline void
+isdn_x25_open(struct net_device *dev)
+{
+}
+
+static inline void
+isdn_x25_close(struct net_device *dev)
+{
+}
+
+static inline void
+isdn_x25_connected(isdn_net_local *lp)
+{
+}
+
+static inline void
+isdn_x25_dhup(isdn_net_local *lp)
+{
+}
+
+static inline void
+isdn_x25_bhup(isdn_net_local *lp)
+{
+}
+
+static inline void
+isdn_x25_hangup(isdn_net_local *lp)
+{
+}
+
+static inline void
+isdn_x25_receive(isdn_net_local *lp, struct sk_buff *skb)
+{
+	printk(KERN_WARNING "%s: unknown encapsulation, dropping\n",
+	       lp->name);
+	kfree_skb(skb);
+}
+
+static inline void
+isdn_x25_realrm(isdn_net_dev *p)
+{
+}
 
 #endif
