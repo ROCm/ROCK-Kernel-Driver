@@ -39,7 +39,6 @@ static int32_t e1000_setup_fiber_serdes_link(struct e1000_hw *hw);
 static int32_t e1000_adjust_serdes_amplitude(struct e1000_hw *hw);
 static int32_t e1000_phy_force_speed_duplex(struct e1000_hw *hw);
 static int32_t e1000_config_mac_to_phy(struct e1000_hw *hw);
-static int32_t e1000_force_mac_fc(struct e1000_hw *hw);
 static void e1000_raise_mdi_clk(struct e1000_hw *hw, uint32_t *ctrl);
 static void e1000_lower_mdi_clk(struct e1000_hw *hw, uint32_t *ctrl);
 static void e1000_shift_out_mdi_bits(struct e1000_hw *hw, uint32_t data, uint16_t count);
@@ -1629,7 +1628,7 @@ e1000_config_mac_to_phy(struct e1000_hw *hw)
  * by the PHY rather than the MAC. Software must also configure these
  * bits when link is forced on a fiber connection.
  *****************************************************************************/
-static int32_t
+int32_t
 e1000_force_mac_fc(struct e1000_hw *hw)
 {
     uint32_t ctrl;
@@ -1682,7 +1681,7 @@ e1000_force_mac_fc(struct e1000_hw *hw)
         ctrl &= (~E1000_CTRL_TFCE);
 
     E1000_WRITE_REG(hw, CTRL, ctrl);
-    return 0;
+    return E1000_SUCCESS;
 }
 
 /******************************************************************************

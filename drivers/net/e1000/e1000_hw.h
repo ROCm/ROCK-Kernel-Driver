@@ -264,6 +264,7 @@ int32_t e1000_config_fc_after_link_up(struct e1000_hw *hw);
 int32_t e1000_check_for_link(struct e1000_hw *hw);
 int32_t e1000_get_speed_and_duplex(struct e1000_hw *hw, uint16_t * speed, uint16_t * duplex);
 int32_t e1000_wait_autoneg(struct e1000_hw *hw);
+int32_t e1000_force_mac_fc(struct e1000_hw *hw);
 
 /* PHY */
 int32_t e1000_read_phy_reg(struct e1000_hw *hw, uint32_t reg_addr, uint16_t *phy_data);

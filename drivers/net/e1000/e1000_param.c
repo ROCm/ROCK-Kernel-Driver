@@ -140,7 +140,7 @@ E1000_PARAM(FlowControl, "Flow Control setting");
  * Valid Range: 0, 1
  *  - 0 - disables all checksum offload
  *  - 1 - enables receive IP/TCP/UDP checksum offload
- *        on 82543 based NICs
+ *        on 82543 and newer -based NICs
  *
  * Default Value: 1
  */
@@ -602,7 +602,7 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 
 	switch (speed + dplx) {
 	case 0:
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		if(Speed[bd] != OPTION_UNSET || Duplex[bd] != OPTION_UNSET)
 			printk(KERN_INFO
 			       "Speed and duplex autonegotiation enabled\n");
@@ -610,14 +610,14 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 	case HALF_DUPLEX:
 		printk(KERN_INFO "Half Duplex specified without Speed\n");
 		printk(KERN_INFO "Using Autonegotiation at Half Duplex only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF |
 		                                 ADVERTISE_100_HALF;
 		break;
 	case FULL_DUPLEX:
 		printk(KERN_INFO "Full Duplex specified without Speed\n");
 		printk(KERN_INFO "Using Autonegotiation at Full Duplex only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_FULL |
 		                                 ADVERTISE_100_FULL |
 		                                 ADVERTISE_1000_FULL;
@@ -625,38 +625,38 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 	case SPEED_10:
 		printk(KERN_INFO "10 Mbps Speed specified without Duplex\n");
 		printk(KERN_INFO "Using Autonegotiation at 10 Mbps only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_10_HALF |
 		                                 ADVERTISE_10_FULL;
 		break;
 	case SPEED_10 + HALF_DUPLEX:
 		printk(KERN_INFO "Forcing to 10 Mbps Half Duplex\n");
-		adapter->hw.autoneg = 0;
+		adapter->hw.autoneg = adapter->fc_autoneg = 0;
 		adapter->hw.forced_speed_duplex = e1000_10_half;
 		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_10 + FULL_DUPLEX:
 		printk(KERN_INFO "Forcing to 10 Mbps Full Duplex\n");
-		adapter->hw.autoneg = 0;
+		adapter->hw.autoneg = adapter->fc_autoneg = 0;
 		adapter->hw.forced_speed_duplex = e1000_10_full;
 		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_100:
 		printk(KERN_INFO "100 Mbps Speed specified without Duplex\n");
 		printk(KERN_INFO "Using Autonegotiation at 100 Mbps only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_100_HALF |
 		                                 ADVERTISE_100_FULL;
 		break;
 	case SPEED_100 + HALF_DUPLEX:
 		printk(KERN_INFO "Forcing to 100 Mbps Half Duplex\n");
-		adapter->hw.autoneg = 0;
+		adapter->hw.autoneg = adapter->fc_autoneg = 0;
 		adapter->hw.forced_speed_duplex = e1000_100_half;
 		adapter->hw.autoneg_advertised = 0;
 		break;
 	case SPEED_100 + FULL_DUPLEX:
 		printk(KERN_INFO "Forcing to 100 Mbps Full Duplex\n");
-		adapter->hw.autoneg = 0;
+		adapter->hw.autoneg = adapter->fc_autoneg = 0;
 		adapter->hw.forced_speed_duplex = e1000_100_full;
 		adapter->hw.autoneg_advertised = 0;
 		break;
@@ -664,20 +664,20 @@ e1000_check_copper_options(struct e1000_adapter *adapter)
 		printk(KERN_INFO "1000 Mbps Speed specified without Duplex\n");
 		printk(KERN_INFO
 		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	case SPEED_1000 + HALF_DUPLEX:
 		printk(KERN_INFO "Half Duplex is not supported at 1000 Mbps\n");
 		printk(KERN_INFO
 		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	case SPEED_1000 + FULL_DUPLEX:
 		printk(KERN_INFO
 		       "Using Autonegotiation at 1000 Mbps Full Duplex only\n");
-		adapter->hw.autoneg = 1;
+		adapter->hw.autoneg = adapter->fc_autoneg = 1;
 		adapter->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
 	default:

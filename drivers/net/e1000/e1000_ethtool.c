@@ -190,6 +190,55 @@ e1000_ethtool_sset(struct e1000_adapter *adapter, struct ethtool_cmd *ecmd)
 	return 0;
 }
 
+static int
+e1000_ethtool_gpause(struct e1000_adapter *adapter,
+                     struct ethtool_pauseparam *epause)
+{
+	struct e1000_hw *hw = &adapter->hw;
+	
+	epause->autoneg = 
+		(adapter->fc_autoneg ? AUTONEG_ENABLE : AUTONEG_DISABLE);
+	
+	if(hw->fc == e1000_fc_rx_pause)
+		epause->rx_pause = 1;
+	else if(hw->fc == e1000_fc_tx_pause)
+		epause->tx_pause = 1;
+	else if(hw->fc == e1000_fc_full) {
+		epause->rx_pause = 1;
+		epause->tx_pause = 1;
+	}
+	
+	return 0;
+}
+
+static int
+e1000_ethtool_spause(struct e1000_adapter *adapter,
+                     struct ethtool_pauseparam *epause)
+{
+	struct e1000_hw *hw = &adapter->hw;
+	
+	adapter->fc_autoneg = epause->autoneg;
+
+	if(epause->rx_pause && epause->tx_pause)
+		hw->fc = e1000_fc_full;
+	else if(epause->rx_pause && !epause->tx_pause)
+		hw->fc = e1000_fc_rx_pause;
+	else if(!epause->rx_pause && epause->tx_pause)
+		hw->fc = e1000_fc_tx_pause;
+	else if(!epause->rx_pause && !epause->tx_pause)
+		hw->fc = e1000_fc_none;
+
+	hw->original_fc = hw->fc;
+
+	if(netif_running(adapter->netdev)) {
+		e1000_down(adapter);
+		e1000_up(adapter);
+	} else
+		e1000_reset(adapter);
+	
+	return 0;
+}
+
 static void
 e1000_ethtool_gdrvinfo(struct e1000_adapter *adapter,
                        struct ethtool_drvinfo *drvinfo)
@@ -1448,6 +1497,19 @@ err_geeprom_ioctl:
 
 		addr += offsetof(struct ethtool_eeprom, data);
 		return e1000_ethtool_seeprom(adapter, &eeprom, addr);
+	}
+	case ETHTOOL_GPAUSEPARAM: {
+		struct ethtool_pauseparam epause = {ETHTOOL_GPAUSEPARAM};
+		e1000_ethtool_gpause(adapter, &epause);
+		if(copy_to_user(addr, &epause, sizeof(epause)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SPAUSEPARAM: {
+		struct ethtool_pauseparam epause;
+		if(copy_from_user(&epause, addr, sizeof(epause)))
+			return -EFAULT;
+		return e1000_ethtool_spause(adapter, &epause);
 	}
 	case ETHTOOL_GSTATS: {
 		struct {
