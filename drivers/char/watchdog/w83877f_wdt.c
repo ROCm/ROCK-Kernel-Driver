@@ -24,11 +24,13 @@
  *                            add CONFIG_WATCHDOG_NOWAYOUT support
  *                            fix possible wdt_is_open race
  *                            changed watchdog_info to correctly reflect what the driver offers
- *                            added WDIOC_GETSTATUS, WDIOC_GETBOOTSTATUS
- *                            and WDIOC_SETOPTIONS ioctls
+ *                            added WDIOC_GETSTATUS, WDIOC_GETBOOTSTATUS, WDIOC_SETTIMEOUT,
+ *                            WDIOC_GETTIMEOUT, and WDIOC_SETOPTIONS ioctls
  *           09/8 - 2003      [wim@iguana.be] cleanup of trailing spaces
  *                            added extra printk's for startup problems
  *                            use module_param
+ *                            made timeout (the emulated heartbeat) a module_param
+ *                            made the keepalive ping an internal subroutine
  *
  *  This WDT driver is different from most other Linux WDT
  *  drivers in that the driver will ping the watchdog by itself,
@@ -77,7 +79,11 @@
  * char to /dev/watchdog every 30 seconds.
  */
 
-#define WDT_HEARTBEAT (HZ * 30)
+#define WATCHDOG_TIMEOUT 30            /* 30 sec default timeout */
+static int timeout = WATCHDOG_TIMEOUT; /* in seconds, will be multiplied by HZ to get seconds to wait for a ping */
+module_param(timeout, int, 0);
+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds. (1<=timeout<=3600, default=" __MODULE_STRING(WATCHDOG_TIMEOUT) ")");
+
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -151,7 +157,7 @@ static void wdt_change(int writeval)
 
 static void wdt_startup(void)
 {
-	next_heartbeat = jiffies + WDT_HEARTBEAT;
+	next_heartbeat = jiffies + (timeout * HZ);
 
 	/* Start the timer */
 	timer.expires = jiffies + WDT_INTERVAL;
@@ -172,6 +178,11 @@ static void wdt_turnoff(void)
 	printk(KERN_INFO PFX "Watchdog timer is now disabled...\n");
 }
 
+static void wdt_keepalive(void)
+{
+	/* user land ping */
+	next_heartbeat = jiffies + (timeout * HZ);
+}
 
 /*
  * /dev/watchdog handling
@@ -206,7 +217,7 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 		}
 
 		/* someone wrote to us, we should restart timer */
-		next_heartbeat = jiffies + WDT_HEARTBEAT;
+		wdt_keepalive();
 	}
 	return count;
 }
@@ -240,7 +251,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	static struct watchdog_info ident=
 	{
-		.options = WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
+		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
 		.identity = "W83877F",
 	};
@@ -255,7 +266,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case WDIOC_GETBOOTSTATUS:
 			return put_user(0, (int *)arg);
 		case WDIOC_KEEPALIVE:
-			next_heartbeat = jiffies + WDT_HEARTBEAT;
+			wdt_keepalive();
 			return 0;
 		case WDIOC_SETOPTIONS:
 		{
@@ -276,6 +287,22 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 			return retval;
 		}
+		case WDIOC_SETTIMEOUT:
+		{
+			int new_timeout;
+
+			if(get_user(new_timeout, (int *)arg))
+				return -EFAULT;
+
+			if(new_timeout < 1 || new_timeout > 3600) /* arbitrary upper limit */
+				return -EINVAL;
+
+			timeout = new_timeout;
+			wdt_keepalive();
+			/* Fall through */
+		}
+		case WDIOC_GETTIMEOUT:
+			return put_user(timeout, (int *)arg);
 	}
 }
 
@@ -336,6 +363,13 @@ static int __init w83877f_wdt_init(void)
 
 	spin_lock_init(&wdt_spinlock);
 
+	if(timeout < 1 || timeout > 3600) /* arbitrary upper limit */
+	{
+		timeout = WATCHDOG_TIMEOUT;
+		printk(KERN_INFO PFX "timeout value must be 1<=x<=3600, using %d\n",
+			timeout);
+	}
+
 	if (!request_region(ENABLE_W83877F_PORT, 2, "W83877F WDT"))
 	{
 		printk(KERN_ERR PFX "I/O address 0x%04x already in use\n",
@@ -372,8 +406,8 @@ static int __init w83877f_wdt_init(void)
 		goto err_out_miscdev;
 	}
 
-	printk(KERN_INFO PFX "WDT driver for W83877F initialised. (nowayout=%d)\n",
-		nowayout);
+	printk(KERN_INFO PFX "WDT driver for W83877F initialised. timeout=%d sec (nowayout=%d)\n",
+		timeout, nowayout);
 
 	return 0;
 
