@@ -108,11 +108,18 @@
 	- New reset code uses "force reset" cmd on Rhine-II
 	- Various clean ups
 
+	LK1.1.17 (Roger Luethi)
+	- Fix race in via_rhine_start_tx()
+	- On errors, wait for Tx engine to turn off before scavenging
+	- Handle Tx descriptor write-back race on Rhine-II
+	- Force flushing for PCI posted writes
+	- More reset code changes
+
 */
 
 #define DRV_NAME	"via-rhine"
-#define DRV_VERSION	"1.1.16"
-#define DRV_RELDATE	"February-15-2003"
+#define DRV_VERSION	"1.1.17"
+#define DRV_RELDATE	"March-1-2003"
 
 
 /* A few user-configurable values.
