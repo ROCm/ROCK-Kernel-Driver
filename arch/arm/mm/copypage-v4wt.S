@@ -64,9 +64,10 @@ ENTRY(v4wt_clear_user_page)
 	mcr	p15, 0, r2, c7, c7, 0		@ flush ID cache
 	ldr	pc, [sp], #4
 
-	__INIT
+	__INITDATA
 
+	.type	v4wt_user_fns, #object
 ENTRY(v4wt_user_fns)
 	.long	v4wt_clear_user_page
 	.long	v4wt_copy_user_page
-
+	.size	v4wt_user_fns, . - v4wt_user_fns

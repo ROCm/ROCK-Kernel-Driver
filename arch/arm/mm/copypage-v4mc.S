@@ -71,9 +71,10 @@ ENTRY(v4_mc_clear_user_page)
 	bne	1b				@ 1
 	ldr	pc, [sp], #4
 
-	__INIT
+	__INITDATA
 
+	.type	v4_mc_user_fns, #object
 ENTRY(v4_mc_user_fns)
 	.long	v4_mc_clear_user_page
 	.long	v4_mc_copy_user_page
-
+	.size	v4_mc_user_fns, . - v4_mc_user_fns
