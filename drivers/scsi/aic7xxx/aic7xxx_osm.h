@@ -72,6 +72,7 @@
 #endif
 #include <linux/module.h>
 #include <asm/byteorder.h>
+#include <asm/io.h>
 
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(x,y,z) (((x)<<16)+((y)<<8)+(z))

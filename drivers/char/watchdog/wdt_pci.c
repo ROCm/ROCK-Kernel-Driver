@@ -73,6 +73,7 @@
 #endif
 
 static unsigned long wdt_is_open;
+static int expect_close = 0;
 
 /*
  *	You must set these - there is no sane way to probe for this board.
@@ -276,6 +277,16 @@ static ssize_t wdtpci_write(struct file *file, const char *buf, size_t count, lo
 
 	if(count)
 	{
+		if (!nowayout) {
+			size_t i;
+			for (i = 0; i != count; i++) {
+				char c;
+				if(get_user(c, buf+i))
+					return -EFAULT;
+				if (c == 'V')
+					expect_close = 1;
+			}
+		}
 		wdtpci_ping();
 		return 1;
 	}
@@ -332,9 +343,10 @@ static int wdtpci_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	unsigned long arg)
 {
 	static struct watchdog_info ident = {
-		.options	  = WDIOF_OVERHEAT  | WDIOF_POWERUNDER |
-				    WDIOF_POWEROVER | WDIOF_EXTERN1 |
-				    WDIOF_EXTERN2   | WDIOF_FANFAULT,
+		.options	= WDIOF_OVERHEAT  | WDIOF_POWERUNDER |
+				  WDIOF_POWEROVER | WDIOF_EXTERN1 |
+				  WDIOF_EXTERN2   | WDIOF_FANFAULT |
+				  WDIOF_SETTIMEOUT|WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
 		.identity	  = "WDT500/501PCI",
 	};

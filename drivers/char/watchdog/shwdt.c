@@ -334,21 +334,21 @@ static struct file_operations sh_wdt_fops = {
 };
 
 static struct watchdog_info sh_wdt_info = {
-	WDIOF_KEEPALIVEPING,
-	1,
-	"SH WDT",
+	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
+	.firmware_version = 1,
+	.identity = "SH WDT",
 };
 
 static struct notifier_block sh_wdt_notifier = {
-	sh_wdt_notify_sys,
-	NULL,
-	0
+	.notifier_call = sh_wdt_notify_sys,
+	.next = NULL,
+	.priority = 0
 };
 
 static struct miscdevice sh_wdt_miscdev = {
-	WATCHDOG_MINOR,
-	"watchdog",
-	&sh_wdt_fops,
+	.minor = WATCHDOG_MINOR,
+	.name = "watchdog",
+	.fops &sh_wdt_fops,
 };
 
 /**

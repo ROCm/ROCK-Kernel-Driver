@@ -126,10 +126,9 @@ VM_MASK		= 0x00020000
 	addl $4, %esp;	\
 1:	iret;		\
 .section .fixup,"ax";   \
-2:	pushl %ss;	\
-	popl %ds;	\
-	pushl %ss;	\
-	popl %es;	\
+2:	movl $(__USER_DS), %edx; \
+	movl %edx, %ds; \
+	movl %edx, %es; \
 	pushl $11;	\
 	call do_exit;	\
 .previous;		\
@@ -225,7 +224,7 @@ need_resched:
 	movl TI_FLAGS(%ebp), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
 	jz restore_all
-	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (execption path) ?
+	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (exception path) ?
 	jz restore_all
 	movl $PREEMPT_ACTIVE,TI_PRE_COUNT(%ebp)
 	sti

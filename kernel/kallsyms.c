@@ -46,7 +46,7 @@ const char *kallsyms_lookup(unsigned long addr,
 		}
 
 		/* Grab name */
-		for (i = 0; i < best; i++) { 
+		for (i = 0; i <= best; i++) { 
 			unsigned prefix = *name++;
 			strncpy(namebuf + prefix, name, 127 - prefix);
 			name += strlen(name) + 1;
