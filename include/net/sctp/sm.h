@@ -117,6 +117,7 @@ sctp_state_fn_t sctp_sf_tabort_8_4_8;
 sctp_state_fn_t sctp_sf_operr_notify;
 sctp_state_fn_t sctp_sf_t1_timer_expire;
 sctp_state_fn_t sctp_sf_t2_timer_expire;
+sctp_state_fn_t sctp_sf_t4_timer_expire;
 sctp_state_fn_t sctp_sf_t5_timer_expire;
 sctp_state_fn_t sctp_sf_sendbeat_8_3;
 sctp_state_fn_t sctp_sf_beat_8_3;
@@ -137,6 +138,8 @@ sctp_state_fn_t sctp_sf_unk_chunk;
 sctp_state_fn_t sctp_sf_do_8_5_1_E_sa;
 sctp_state_fn_t sctp_sf_cookie_echoed_err;
 sctp_state_fn_t sctp_sf_do_5_2_6_stale;
+sctp_state_fn_t sctp_sf_do_asconf;
+sctp_state_fn_t sctp_sf_do_asconf_ack;
 
 /* Prototypes for primitive event state functions.  */
 sctp_state_fn_t sctp_sf_do_prm_asoc;
@@ -154,6 +157,7 @@ sctp_state_fn_t sctp_sf_error_closed;
 sctp_state_fn_t sctp_sf_error_shutdown;
 sctp_state_fn_t sctp_sf_ignore_primitive;
 sctp_state_fn_t sctp_sf_do_prm_requestheartbeat;
+sctp_state_fn_t sctp_sf_do_prm_asconf;
 
 /* Prototypes for other event state functions.  */
 sctp_state_fn_t sctp_sf_do_9_2_start_shutdown;
@@ -183,10 +187,6 @@ sctp_state_fn_t sctp_do_9_2_reshut;
 sctp_state_fn_t sctp_do_9_2_reshutack;
 sctp_state_fn_t sctp_do_8_3_hb_err;
 sctp_state_fn_t sctp_heartoff;
-
-/* Prototypes for addip related state functions.  Not in use. */
-sctp_state_fn_t sctp_addip_do_asconf;
-sctp_state_fn_t sctp_addip_do_asconf_ack;
 
 /* Prototypes for utility support functions.  */
 __u8 sctp_get_chunk_type(struct sctp_chunk *chunk);
@@ -260,6 +260,14 @@ struct sctp_chunk *sctp_make_op_error(const struct sctp_association *,
 				 __u16 cause_code,
 				 const void *payload,
 				 size_t paylen);
+
+struct sctp_chunk *sctp_make_asconf(struct sctp_association *asoc,
+				    union sctp_addr *addr,
+				    int vparam_len);
+struct sctp_chunk *sctp_process_asconf(struct sctp_association *asoc,
+				       struct sctp_chunk *asconf,
+				       int vparam_len);
+
 void sctp_chunk_assign_tsn(struct sctp_chunk *);
 void sctp_chunk_assign_ssn(struct sctp_chunk *);
 

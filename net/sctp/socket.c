@@ -455,47 +455,6 @@ err_bindx_add:
 		}
 	}
 
-	/* Notify the peer(s), assuming we have (an) association(s).
-	 * FIXME: for UDP, we have a 1-1-many mapping amongst sk, ep and asoc,
-	 *        so we don't have to do much work on locating associations.
-	 *
-	 * However, when the separation of ep and asoc kicks in, especially
-	 * for TCP style connection, it becomes n-1-n mapping.  We will need
-	 * to do more fine work.  Until then, hold my peace.
-	 *							--xguo
-	 *
-	 * Really, I don't think that will be a problem.  The bind()
-	 * call on a socket will either know the endpoint
-	 * (e.g. TCP-style listen()ing socket, or UDP-style socket),
-	 * or exactly one association.  The former case is EXACTLY
-	 * what we have now.  In the former case we know the
-	 * association already.					--piggy
-	 *
-	 * This code will be working on either a UDP style or a TCP style
-	 * socket, or say either an endpoint or an association. The socket
-	 * type verification code need to be added later before calling the
-	 * ADDIP code.
-	 * 							--daisy
-	 */
-
-#ifdef CONFIG_IP_SCTP_ADDIP
-	/* Add these addresses to all associations on this endpoint.  */
-	if (retval >= 0) {
-		struct list_head *pos;
-		struct sctp_endpoint *ep;
-		struct sctp_association *asoc;
-		ep = sctp_sk(sk)->ep;
-
-		list_for_each(pos, &ep->asocs) {
-			asoc = list_entry(pos, struct sctp_association, asocs);
-
-			sctp_addip_addr_config(asoc,
-					       SCTP_PARAM_ADD_IP,
-					       addrs, addrcnt);
-		}
-	}
-#endif
-
 	return retval;
 }
 
@@ -591,28 +550,6 @@ err_bindx_rem:
 		}
 	}
 
-	/*
-	 * This code will be working on either a UDP style or a TCP style
-	 * socket, * or say either an endpoint or an association. The socket
-	 * type verification code need to be added later before calling the
-	 * ADDIP code.
-	 * 							--daisy
-	 */
-#ifdef CONFIG_IP_SCTP_ADDIP
-	/* Remove these addresses from all associations on this endpoint.  */
-	if (retval >= 0) {
-		struct list_head *pos;
-		struct sctp_endpoint *ep;
-		struct sctp_association *asoc;
-
-		ep = sctp_sk(sk)->ep;
-		list_for_each(pos, &ep->asocs) {
-			asoc = list_entry(pos, struct sctp_association, asocs);
-			sctp_addip_addr_config(asoc, SCTP_PARAM_DEL_IP,
-					       addrs, addrcnt);
-		}
-	}
-#endif
 	return retval;
 }
 

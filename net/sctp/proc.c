@@ -172,7 +172,7 @@ static int sctp_eps_seq_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, " ENDPT     SOCK   STY SST HBKT LPORT LADDRS\n");
 	for (hash = 0; hash < sctp_ep_hashsize; hash++) {
-		head = &sctp_ep_hashbucket[hash];
+		head = &sctp_ep_hashtable[hash];
 		read_lock(&head->lock);
 		for (epb = head->chain; epb; epb = epb->next) {
 			ep = sctp_ep(epb);
@@ -234,7 +234,7 @@ static int sctp_assocs_seq_show(struct seq_file *seq, void *v)
 	seq_printf(seq, " ASSOC     SOCK   STY SST ST HBKT LPORT RPORT "
 			"LADDRS <-> RADDRS\n");
 	for (hash = 0; hash < sctp_assoc_hashsize; hash++) {
-		head = &sctp_assoc_hashbucket[hash];
+		head = &sctp_assoc_hashtable[hash];
 		read_lock(&head->lock);
 		for (epb = head->chain; epb; epb = epb->next) {
 			assoc = sctp_assoc(epb);
