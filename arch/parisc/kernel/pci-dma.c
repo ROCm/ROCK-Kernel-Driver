@@ -349,7 +349,7 @@ pcxl_dma_init(void)
 
 __initcall(pcxl_dma_init);
 
-static void * pa11_dma_alloc_consistent (struct device *dev, size_t size, dma_addr_t *dma_handle)
+static void * pa11_dma_alloc_consistent (struct device *dev, size_t size, dma_addr_t *dma_handle, int flag)
 {
 	unsigned long vaddr;
 	unsigned long paddr;
@@ -358,7 +358,7 @@ static void * pa11_dma_alloc_consistent (struct device *dev, size_t size, dma_ad
 	order = get_order(size);
 	size = 1 << (order + PAGE_SHIFT);
 	vaddr = pcxl_alloc_range(size);
-	paddr = __get_free_pages(GFP_ATOMIC, order);
+	paddr = __get_free_pages(flag, order);
 	flush_kernel_dcache_range(paddr, size);
 	paddr = __pa(paddr);
 	map_uncached_pages(vaddr, size, paddr);
@@ -482,18 +482,18 @@ struct hppa_dma_ops pcxl_dma_ops = {
 };
 
 static void *fail_alloc_consistent(struct device *dev, size_t size,
-				   dma_addr_t *dma_handle)
+				   dma_addr_t *dma_handle, int flag)
 {
 	return NULL;
 }
 
 static void *pa11_dma_alloc_noncoherent(struct device *dev, size_t size,
-					  dma_addr_t *dma_handle)
+					  dma_addr_t *dma_handle, int flag)
 {
 	void *addr = NULL;
 
 	/* rely on kmalloc to be cacheline aligned */
-	addr = kmalloc(size, GFP_KERNEL);
+	addr = kmalloc(size, flag);
 	if(addr)
 		*dma_handle = (dma_addr_t)virt_to_phys(addr);
 

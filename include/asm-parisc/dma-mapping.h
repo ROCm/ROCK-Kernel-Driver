@@ -9,8 +9,8 @@
 */
 struct hppa_dma_ops {
 	int  (*dma_supported)(struct device *dev, u64 mask);
-	void *(*alloc_consistent)(struct device *dev, size_t size, dma_addr_t *iova);
-	void *(*alloc_noncoherent)(struct device *dev, size_t size, dma_addr_t *iova);
+	void *(*alloc_consistent)(struct device *dev, size_t size, dma_addr_t *iova, int flag);
+	void *(*alloc_noncoherent)(struct device *dev, size_t size, dma_addr_t *iova, int flag);
 	void (*free_consistent)(struct device *dev, size_t size, void *vaddr, dma_addr_t iova);
 	dma_addr_t (*map_single)(struct device *dev, void *addr, size_t size, enum dma_data_direction direction);
 	void (*unmap_single)(struct device *dev, dma_addr_t iova, size_t size, enum dma_data_direction direction);
@@ -46,15 +46,17 @@ extern struct hppa_dma_ops pcx_dma_ops;
 extern struct hppa_dma_ops *hppa_dma_ops;
 
 static inline void *
-dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle)
+dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
+		   int flag)
 {
-	return hppa_dma_ops->alloc_consistent(dev, size, dma_handle);
+	return hppa_dma_ops->alloc_consistent(dev, size, dma_handle, flag);
 }
 
 static inline void *
-dma_alloc_noncoherent(struct device *dev, size_t size, dma_addr_t *dma_handle)
+dma_alloc_noncoherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
+		      int flag)
 {
-	return hppa_dma_ops->alloc_noncoherent(dev, size, dma_handle);
+	return hppa_dma_ops->alloc_noncoherent(dev, size, dma_handle, flag);
 }
 
 static inline void
