@@ -106,9 +106,7 @@ MODULE_PARM_DESC(ulangid, "The optional preferred USB Language ID for all device
 
 MODULE_AUTHOR("NAGANO Daisuke <breeze.nagano@nifty.ne.jp>");
 MODULE_DESCRIPTION("USB-MIDI driver");
-#if LINUX_VERSION_CODE  >= KERNEL_VERSION(2,4,14)
 MODULE_LICENSE("GPL");
-#endif
 
 /* ------------------------------------------------------------------------- */
 

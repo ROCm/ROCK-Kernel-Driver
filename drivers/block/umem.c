@@ -129,6 +129,8 @@ struct cardinfo {
 				    */
 	struct bio	*bio, *currentbio, **biotail;
 
+	request_queue_t queue;
+
 	struct mm_page {
 		dma_addr_t		page_dma;
 		struct mm_dma_desc	*desc;
@@ -141,8 +143,6 @@ struct cardinfo {
 
 	struct tasklet_struct	tasklet;
 	unsigned int dma_status;
-
-	struct tq_struct plug_tq;
 
 	struct {
 		int		good;
@@ -293,7 +293,7 @@ static void dump_dmastat(struct cardinfo *card, unsigned int dmastat)
  * Whenever IO on the active page completes, the Ready page is activated
  * and the ex-Active page is clean out and made Ready.
  * Otherwise the Ready page is only activated when it becomes full, or
- * when mm_unplug_device is called via run_task_queue(&tq_disk).
+ * when mm_unplug_device is called via blk_run_queues().
  *
  * If a request arrives while both pages a full, it is queued, and b_rdev is
  * overloaded to record whether it was a read or a write.
@@ -341,8 +341,9 @@ static void mm_start_io(struct cardinfo *card)
 	offset = ((char*)desc) - ((char*)page->desc);
 	writel(cpu_to_le32((page->page_dma+offset)&0xffffffff),
 	       card->csr_remap + DMA_DESCRIPTOR_ADDR);
-	/* if sizeof(dma_addr_t) == 32, this will generate a warning, sorry */
-	writel(cpu_to_le32((page->page_dma)>>32),
+	/* Force the value to u64 before shifting otherwise >> 32 is undefined C
+	 * and on some ports will do nothing ! */
+	writel(cpu_to_le32(((u64)page->page_dma)>>32),
 	       card->csr_remap + DMA_DESCRIPTOR_ADDR + 4);
 
 	/* Go, go, go */
@@ -384,10 +385,12 @@ static inline void reset_page(struct mm_page *page)
 
 static void mm_unplug_device(void *data)
 {
-	struct cardinfo *card = data;
+	request_queue_t *q = data;
+	struct cardinfo *card = q->queuedata;
 
 	spin_lock_bh(&card->lock);
-	activate(card);
+	if (blk_remove_plug(q))
+		activate(card);
 	spin_unlock_bh(&card->lock);
 }
 
@@ -565,8 +568,7 @@ static void process_page(unsigned long data)
 */
 static int mm_make_request(request_queue_t *q, struct bio *bio)
 {
-	struct cardinfo *card = &cards[DEVICE_NR(
-		bio->bi_bdev->bd_dev)];
+	struct cardinfo *card = q->queuedata;
 	PRINTK("mm_make_request %ld %d\n", bh->b_rsector, bh->b_size);
 
 	/* set uptodate now, and clear it if there are any errors */
@@ -576,9 +578,9 @@ static int mm_make_request(request_queue_t *q, struct bio *bio)
 	*card->biotail = bio;
 	bio->bi_next = NULL;
 	card->biotail = &bio->bi_next;
+	blk_plug_device(q);
 	spin_unlock_bh(&card->lock);
 
-	queue_task(&card->plug_tq, &tq_disk);
 	return 0;
 }
 
@@ -1065,11 +1067,12 @@ static int __devinit mm_pci_probe(struct pci_dev *dev, const struct pci_device_i
 	card->bio = NULL;
 	card->biotail = &card->bio;
 
+	blk_queue_make_request(&card->queue, mm_make_request);
+	card->queue.queuedata = card;
+	card->queue.unplug_fn = mm_unplug_device;
+
 	tasklet_init(&card->tasklet, process_page, (unsigned long)card);
 
-	card->plug_tq.sync = 0;
-	card->plug_tq.routine = &mm_unplug_device;
-	card->plug_tq.data = card;
 	card->check_batteries = 0;
 	
 	mem_present = readb(card->csr_remap + MEMCTRLSTATUS_MEMORY);
@@ -1237,6 +1240,17 @@ static struct pci_driver mm_pci_driver = {
 --                               mm_init
 -----------------------------------------------------------------------------------
 */
+
+static request_queue_t * mm_queue_proc(kdev_t dev)
+{
+	int c = DEVICE_NR(kdev_val(dev));
+
+	if (c < MM_MAXCARDS)
+		return &cards[c].queue;
+	else
+		return BLK_DEFAULT_QUEUE(MAJOR_NR);
+}
+	
 int __init mm_init(void)
 {
 	int retval, i;
@@ -1276,10 +1290,8 @@ int __init mm_init(void)
 	mm_gendisk.part      = mm_partitions;
 	mm_gendisk.nr_real   = num_cards;
 
+	blk_dev[MAJOR_NR].queue = mm_queue_proc;
 	add_gendisk(&mm_gendisk);
-
-	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR),
-			       mm_make_request);
 
         blk_size[MAJOR_NR]      = mm_gendisk.sizes;
         for (i = 0; i < num_cards; i++) {

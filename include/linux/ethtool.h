@@ -39,7 +39,8 @@ struct ethtool_drvinfo {
 	char	bus_info[ETHTOOL_BUSINFO_LEN];	/* Bus info for this IF. */
 				/* For PCI devices, use pci_dev->slot_name. */
 	char	reserved1[32];
-	char	reserved2[20];
+	char	reserved2[16];
+	u32	n_stats;	/* number of u64's from ETHTOOL_GSTATS */
 	u32	testinfo_len;
 	u32	eedump_len;	/* Size of data from ETHTOOL_GEEPROM (bytes) */
 	u32	regdump_len;	/* Size of data from ETHTOOL_GREGS (bytes) */
@@ -242,6 +243,13 @@ struct ethtool_test {
 	u64	data[0];
 };
 
+/* for dumping NIC-specific statistics */
+struct ethtool_stats {
+	u32	cmd;		/* ETHTOOL_GSTATS */
+	u32	n_stats;	/* number of u64's being returned */
+	u64	data[0];
+};
+
 /* CMDs currently supported */
 #define ETHTOOL_GSET		0x00000001 /* Get settings. */
 #define ETHTOOL_SSET		0x00000002 /* Set settings, privileged. */
@@ -272,6 +280,7 @@ struct ethtool_test {
 #define ETHTOOL_TEST		0x0000001a /* execute NIC self-test, priv. */
 #define ETHTOOL_GSTRINGS	0x0000001b /* get specified string set */
 #define ETHTOOL_PHYS_ID		0x0000001c /* identify the NIC */
+#define ETHTOOL_GSTATS		0x0000001d /* get NIC-specific statistics */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET

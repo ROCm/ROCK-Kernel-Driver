@@ -220,10 +220,11 @@ struct kaweth_device
 	struct urb *rx_urb;
 	struct urb *tx_urb;
 	struct urb *irq_urb;
+	
+	struct sk_buff *tx_skb;
 
 	__u8 *firmware_buf;
 	__u8 scratch[KAWETH_SCRATCH_SIZE];
-	__u8 tx_buf[KAWETH_BUF_SIZE];
 	__u8 rx_buf[KAWETH_BUF_SIZE];
 	__u8 intbuffer[INTBUFFERSIZE];
 	__u16 packet_filter_bitmap;
@@ -650,11 +651,13 @@ static int kaweth_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 static void kaweth_usb_transmit_complete(struct urb *urb)
 {
 	struct kaweth_device *kaweth = urb->context;
+	struct sk_buff *skb = kaweth->tx_skb;
 
 	if (unlikely(urb->status != 0))
 		kaweth_dbg("%s: TX status %d.", kaweth->net->name, urb->status);
 
 	netif_wake_queue(kaweth->net);
+	dev_kfree_skb(skb);
 }
 
 /****************************************************************
@@ -663,7 +666,7 @@ static void kaweth_usb_transmit_complete(struct urb *urb)
 static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 {
 	struct kaweth_device *kaweth = net->priv;
-	int count = skb->len;
+	char *private_header;
 
 	int res;
 
@@ -679,15 +682,30 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 	kaweth_async_set_rx_mode(kaweth);
 	netif_stop_queue(net);
 
-	*((__u16 *)kaweth->tx_buf) = cpu_to_le16(skb->len);
+	/* We now decide whether we can put our special header into the sk_buff */
+	if (skb_cloned(skb) || skb_headroom(skb) < 2) {
+		/* no such luck - we make our own */
+		struct sk_buff *copied_skb;
+		copied_skb = skb_copy_expand(skb, 2, 0, GFP_ATOMIC);
+		dev_kfree_skb_any(skb);
+		skb = copied_skb;
+		if (!copied_skb) {
+			kaweth->stats.tx_errors++;
+			netif_start_queue(net);
+			spin_unlock(&kaweth->device_lock);
+			return 0;
+		}
+	}
 
-	memcpy(kaweth->tx_buf + 2, skb->data, skb->len);
+	private_header = __skb_push(skb, 2);
+	*private_header = cpu_to_le16(skb->len);
+	kaweth->tx_skb = skb;
 
 	FILL_BULK_URB(kaweth->tx_urb,
 		      kaweth->dev,
 		      usb_sndbulkpipe(kaweth->dev, 2),
-		      kaweth->tx_buf,
-		      count + 2,
+		      private_header,
+		      skb->len,
 		      kaweth_usb_transmit_complete,
 		      kaweth);
 	kaweth->end = 0;
@@ -699,6 +717,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 		kaweth->stats.tx_errors++;
 
 		netif_start_queue(net);
+		dev_kfree_skb(skb);
 	}
 	else
 	{
@@ -706,8 +725,6 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 		kaweth->stats.tx_bytes += skb->len;
 		net->trans_start = jiffies;
 	}
-
-	dev_kfree_skb(skb);
 
 	spin_unlock(&kaweth->device_lock);
 
