@@ -16,11 +16,19 @@
 
 #include <linux/threads.h>
 
-#define DECLARE_PER_CPU(type, name) extern __typeof__(type) per_cpu__##name
+#ifdef HAVE_MODEL_SMALL_ATTRIBUTE
+# define __SMALL_ADDR_AREA	__attribute__((__model__ (__small__)))
+#else
+# define __SMALL_ADDR_AREA
+#endif
+
+#define DECLARE_PER_CPU(type, name)				\
+	extern __SMALL_ADDR_AREA __typeof__(type) per_cpu__##name
 
 /* Separate out the type, so (int[3], foo) works. */
-#define DEFINE_PER_CPU(type, name) \
-    __attribute__((__section__(".data.percpu"))) __typeof__(type) per_cpu__##name
+#define DEFINE_PER_CPU(type, name)				\
+	__attribute__((__section__(".data.percpu")))		\
+	__SMALL_ADDR_AREA __typeof__(type) per_cpu__##name
 
 /*
  * Pretty much a literal copy of asm-generic/percpu.h, except that percpu_modcopy() is an
