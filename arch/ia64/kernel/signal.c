@@ -146,6 +146,7 @@ copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
 	if (from->si_code < 0) {
 		if (__copy_to_user(to, from, sizeof(siginfo_t)))
 			return -EFAULT;
+		return 0;
 	} else {
 		int err;
 
