@@ -1185,7 +1185,6 @@ void ip_mc_up(struct in_device *in_dev)
 	ASSERT_RTNL();
 
 #ifdef CONFIG_IP_MULTICAST
-	in_dev->mc_lock = RW_LOCK_UNLOCKED;
 	in_dev->mr_gq_running = 0;
 	init_timer(&in_dev->mr_gq_timer);
 	in_dev->mr_gq_timer.data=(unsigned long) in_dev;
@@ -1198,6 +1197,7 @@ void ip_mc_up(struct in_device *in_dev)
 	in_dev->mr_qrv = IGMP_Unsolicited_Report_Count;
 #endif
 
+	in_dev->mc_lock = RW_LOCK_UNLOCKED;
 	ip_mc_inc_group(in_dev, IGMP_ALL_HOSTS);
 
 	for (i=in_dev->mc_list; i; i=i->next)
