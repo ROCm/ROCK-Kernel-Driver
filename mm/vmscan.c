@@ -921,7 +921,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 			if (i < ZONE_HIGHMEM) {
 				reclaim_state->reclaimed_slab = 0;
 				shrink_slab(max_scan + nr_mapped, GFP_KERNEL);
-				to_free += reclaim_state->reclaimed_slab;
+				to_free -= reclaim_state->reclaimed_slab;
 			}
 			if (zone->all_unreclaimable)
 				continue;
