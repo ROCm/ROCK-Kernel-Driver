@@ -479,7 +479,7 @@ static int __initdata acpi_irq_penalty[ACPI_MAX_IRQS] = {
 	PIRQ_PENALTY_PCI_AVAILABLE,	/* IRQ9  PCI, often acpi */
 	PIRQ_PENALTY_PCI_AVAILABLE,	/* IRQ10 PCI */
 	PIRQ_PENALTY_PCI_AVAILABLE,	/* IRQ11 PCI */
-	PIRQ_PENALTY_ISA_TYPICAL,	/* IRQ12 mouse */
+	PIRQ_PENALTY_ISA_USED,	/* IRQ12 mouse */
 	PIRQ_PENALTY_ISA_USED,	/* IRQ13 fpe, sometimes */
 	PIRQ_PENALTY_ISA_USED,	/* IRQ14 ide0 */
 	PIRQ_PENALTY_ISA_USED,	/* IRQ15 ide1 */
@@ -546,17 +546,23 @@ static int acpi_pci_link_allocate(struct acpi_pci_link* link) {
 		if (link->irq.active == link->irq.possible[i])
 			break;
 	}
+	/*
+	 * forget active IRQ that is not in possible list
+	 */
+	if (i == link->irq.possible_count) {
+		if (acpi_strict)
+			printk(KERN_WARNING PREFIX "_CRS %d not found"
+				" in _PRS\n", link->irq.active);
+		link->irq.active = 0;
+	}
 
 	/*
 	 * if active found, use it; else pick entry from end of possible list.
 	 */
-	if (i != link->irq.possible_count) {
+	if (link->irq.active) {
 		irq = link->irq.active;
 	} else {
 		irq = link->irq.possible[link->irq.possible_count - 1];
-		if (acpi_strict)
-			printk(KERN_WARNING PREFIX "_CRS %d not found"
-				" in _PRS\n", link->irq.active);
 	}
 
 	if (acpi_irq_balance || !link->irq.active) {
