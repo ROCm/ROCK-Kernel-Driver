@@ -1330,38 +1330,6 @@ static ide_proc_entry_t idedisk_proc[] = {
 
 #endif	/* CONFIG_PROC_FS */
 
-static int idedisk_issue_flush(request_queue_t *q, struct gendisk *disk,
-			       sector_t *error_sector)
-{
-	struct request *rq = blk_get_request(q, WRITE, __GFP_WAIT);
-	ide_drive_t *drive = q->queuedata;
-	char *buf = rq->cmd;
-	int ret;
-
-	memset(buf, 0, sizeof(rq->cmd));
-
-	if (drive->id->cfs_enable_2 & 0x2400)
-		buf[0] = WIN_FLUSH_CACHE_EXT;
-	else
-		buf[0] = WIN_FLUSH_CACHE;
-
-	
-	rq->flags |= REQ_DRIVE_TASK | REQ_SOFTBARRIER;
-	rq->buffer = buf;
-
-	ret = blk_execute_rq(q, disk, rq);
-
-	blk_put_request(rq);
-
-	/*
-	 * if we failed and caller wants error offset, get it
-	 */
-	if (ret && error_sector)
-		*error_sector = ide_get_error_location(drive, buf);
-
-	return ret;
-}
-
 /*
  * This is tightly woven into the driver->do_special can not touch.
  * DON'T do it again until a total personality rewrite is committed.
@@ -1393,7 +1361,6 @@ static int set_nowerr(ide_drive_t *drive, int arg)
 static int write_cache (ide_drive_t *drive, int arg)
 {
 	ide_task_t args;
-	int err;
 
 	if (!(drive->id->cfs_enable_2 & 0x3000))
 		return 1;
@@ -1404,10 +1371,7 @@ static int write_cache (ide_drive_t *drive, int arg)
 	args.tfRegister[IDE_COMMAND_OFFSET]	= WIN_SETFEATURES;
 	args.command_type			= IDE_DRIVE_TASK_NO_DATA;
 	args.handler				= &task_no_data_intr;
-
-	err = ide_raw_taskfile(drive, &args, NULL);
-	if (err)
-		return err;
+	(void) ide_raw_taskfile(drive, &args, NULL);
 
 	drive->wcache = arg;
 	return 0;
@@ -1716,9 +1680,6 @@ static void idedisk_setup (ide_drive_t *drive)
 	if (drive->id->cfs_enable_2 & 0x3000)
 		write_cache(drive, (id->cfs_enable_2 & 0x3000));
 
-	blk_queue_ordered(drive->queue, 1);
-	blk_queue_issue_flush_fn(drive->queue, idedisk_issue_flush);
-
 #ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
 	if (drive->using_dma)
 		__ide_dma_queued_on(drive);
@@ -1767,14 +1728,10 @@ static ide_driver_t idedisk_driver = {
 static int idedisk_open(struct inode *inode, struct file *filp)
 {
 	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
-	u8 cf;
-
 	drive->usage++;
-	if (drive->usage != 1)
-		return 0;
-
-	if (drive->removable) {
+	if (drive->removable && drive->usage == 1) {
 		ide_task_t args;
+		u8 cf;
 		memset(&args, 0, sizeof(ide_task_t));
 		args.tfRegister[IDE_COMMAND_OFFSET] = WIN_DOORLOCK;
 		args.command_type = IDE_DRIVE_TASK_NO_DATA;
@@ -1787,19 +1744,18 @@ static int idedisk_open(struct inode *inode, struct file *filp)
 		 */
 		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
 			drive->doorlocking = 0;
+		drive->wcache = 0;
+		/* Cache enabled ? */
+		if (drive->id->csfo & 1)
+		drive->wcache = 1;
+		/* Cache command set available ? */
+		if (drive->id->cfs_enable_1 & (1<<5))
+			drive->wcache = 1;
+		/* ATA6 cache extended commands */
+		cf = drive->id->command_set_2 >> 24;
+		if((cf & 0xC0) == 0x40 && (cf & 0x30) != 0)
+			drive->wcache = 1;
 	}
-
-	drive->wcache = 0;
-	/* Cache enabled ? */
-	if (drive->id->csfo & 1)
-		drive->wcache = 1;
-	/* Cache command set available ? */
-	if (drive->id->cfs_enable_1 & (1<<5))
-		drive->wcache = 1;
-	/* ATA6 cache extended commands */
-	cf = drive->id->command_set_2 >> 24;
-	if((cf & 0xC0) == 0x40 && (cf & 0x30) != 0)
-		drive->wcache = 1;
 	return 0;
 }
 

@@ -914,7 +914,7 @@ static int ide_init_queue(ide_drive_t *drive)
 	if (!q)
 		return 1;
 
-	q->queuedata = drive;
+	q->queuedata = HWGROUP(drive);
 	blk_queue_segment_boundary(q, 0xffff);
 
 	if (!hwif->rqsize)
