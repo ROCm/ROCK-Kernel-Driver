@@ -239,6 +239,7 @@ acpi_walk_resources (
 	acpi_status                         status;
 	struct acpi_buffer                  buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 	struct acpi_resource                *resource;
+	struct acpi_resource                *buffer_end;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_walk_resources");
@@ -255,7 +256,13 @@ acpi_walk_resources (
 		return_ACPI_STATUS (status);
 	}
 
-	resource = (struct acpi_resource *) buffer.pointer;
+	/* Setup pointers */
+
+	resource  = (struct acpi_resource *) buffer.pointer;
+	buffer_end = (struct acpi_resource *) ((u8 *) buffer.pointer + buffer.length);
+
+	/* Walk the resource list */
+
 	for (;;) {
 		if (!resource || resource->id == ACPI_RSTYPE_END_TAG) {
 			break;
@@ -268,6 +275,7 @@ acpi_walk_resources (
 		case AE_CTRL_DEPTH:
 
 			/* Just keep going */
+
 			status = AE_OK;
 			break;
 
@@ -285,7 +293,15 @@ acpi_walk_resources (
 			goto cleanup;
 		}
 
+		/* Get the next resource descriptor */
+
 		resource = ACPI_NEXT_RESOURCE (resource);
+
+		/* Check for end-of-buffer */
+
+		if (resource >= buffer_end) {
+			goto cleanup;
+		}
 	}
 
 cleanup:

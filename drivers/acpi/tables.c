@@ -58,6 +58,7 @@ static char *acpi_table_signatures[ACPI_TABLE_COUNT] = {
 	[ACPI_SSDT]		= "SSDT",
 	[ACPI_SPMI]		= "SPMI",
 	[ACPI_HPET]		= "HPET",
+	[ACPI_MCFG]		= "MCFG",
 };
 
 static char *mps_inti_flags_polarity[] = { "dfl", "high", "res", "low" };
@@ -550,6 +551,14 @@ acpi_table_get_sdt (
 	return 0;
 }
 
+/*
+ * acpi_table_init()
+ *
+ * find RSDP, find and checksum SDT/XSDT.
+ * checksum all tables, print SDT/XSDT
+ * 
+ * result: sdt_entry[] is initialized
+ */
 
 int __init
 acpi_table_init (void)
