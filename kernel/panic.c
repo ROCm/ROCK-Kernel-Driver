@@ -88,7 +88,7 @@ NORET_TYPE void panic(const char * fmt, ...)
 		extern int stop_a_enabled;
 		/* Make sure the user can actually press L1-A */
 		stop_a_enabled = 1;
-		printk("Press L1-A to return to the boot prom\n");
+		printk(KERN_EMERG "Press L1-A to return to the boot prom\n");
 	}
 #endif
 #if defined(CONFIG_ARCH_S390)

@@ -20,6 +20,7 @@
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/buffer_head.h>
+#include <linux/mempool.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_metapage.h"
@@ -27,11 +28,6 @@
 #include "jfs_debug.h"
 
 extern struct task_struct *jfsCommitTask;
-static unsigned int metapages = 1024;	/* ??? Need a better number */
-static unsigned int free_metapages;
-static metapage_t *metapage_buf;
-static unsigned long meta_order;
-static metapage_t *meta_free_list = NULL;
 static spinlock_t meta_lock = SPIN_LOCK_UNLOCKED;
 static wait_queue_head_t meta_wait;
 
@@ -93,12 +89,51 @@ static inline void lock_metapage(struct metapage *mp)
 		__lock_metapage(mp);
 }
 
+#define METAPOOL_MIN_PAGES 32
+static kmem_cache_t *metapage_cache;
+static mempool_t *metapage_mempool;
+
+static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
+{
+	metapage_t *mp = (metapage_t *)foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR) {
+		mp->lid = 0;
+		mp->lsn = 0;
+		mp->flag = 0;
+		mp->data = NULL;
+		mp->clsn = 0;
+		mp->log = NULL;
+		set_bit(META_free, &mp->flag);
+		init_waitqueue_head(&mp->wait);
+	}
+}
+
+static inline metapage_t *alloc_metapage(int no_wait)
+{
+	return mempool_alloc(metapage_mempool, no_wait ? GFP_ATOMIC : GFP_NOFS);
+}
+
+static inline void free_metapage(metapage_t *mp)
+{
+	mp->flag = 0;
+	set_bit(META_free, &mp->flag);
+
+	mempool_free(mp, metapage_mempool);
+}
+
+static void *mp_mempool_alloc(int gfp_mask, void *pool_data)
+{
+	return kmem_cache_alloc(metapage_cache, gfp_mask);
+}
+static void mp_mempool_free(void *element, void *pool_data)
+{
+	return kmem_cache_free(metapage_cache, element);
+}
+
 int __init metapage_init(void)
 {
-	int i;
-	metapage_t *last = NULL;
-	metapage_t *mp;
-
 	/*
 	 * Initialize wait queue
 	 */
@@ -107,30 +142,18 @@ int __init metapage_init(void)
 	/*
 	 * Allocate the metapage structures
 	 */
-	for (meta_order = 0;
-	     ((PAGE_SIZE << meta_order) / sizeof(metapage_t)) < metapages;
-	     meta_order++);
-	metapages = (PAGE_SIZE << meta_order) / sizeof(metapage_t);
+	metapage_cache = kmem_cache_create("jfs_mp", sizeof(metapage_t), 0, 0,
+					   init_once, NULL);
+	if (metapage_cache == NULL)
+		return -ENOMEM;
 
-	jFYI(1, ("metapage_init: metapage size = %Zd, metapages = %d\n",
-		 sizeof(metapage_t), metapages));
+	metapage_mempool = mempool_create(METAPOOL_MIN_PAGES, mp_mempool_alloc,
+					  mp_mempool_free, NULL);
 
-	metapage_buf =
-	    (metapage_t *) __get_free_pages(GFP_KERNEL, meta_order);
-	assert(metapage_buf);
-	memset(metapage_buf, 0, PAGE_SIZE << meta_order);
-
-	mp = metapage_buf;
-	for (i = 0; i < metapages; i++, mp++) {
-		mp->flag = 0;
-		set_bit(META_free, &mp->flag);
-		init_waitqueue_head(&mp->wait);
-		mp->hash_next = last;
-		last = mp;
+	if (metapage_mempool == NULL) {
+		kmem_cache_destroy(metapage_cache);
+		return -ENOMEM;
 	}
-	meta_free_list = last;
-	free_metapages = metapages;
-
 	/*
 	 * Now the hash list
 	 */
@@ -147,64 +170,8 @@ int __init metapage_init(void)
 
 void metapage_exit(void)
 {
-	free_pages((unsigned long) metapage_buf, meta_order);
-	free_pages((unsigned long) hash_table, hash_order);
-	metapage_buf = 0;	/* This is a signal to the jfsIOwait thread */
-}
-
-/*
- * Get metapage structure from freelist
- * 
- * Caller holds meta_lock
- */
-static metapage_t *alloc_metapage(int *dropped_lock)
-{
-	metapage_t *new;
-
-	*dropped_lock = FALSE;
-
-	/*
-	 * Reserve two metapages for the lazy commit thread.  Otherwise
-	 * we may deadlock with holders of metapages waiting for tlocks
-	 * that lazy thread should be freeing.
-	 */
-	if ((free_metapages < 3) && (current != jfsCommitTask)) {
-		INCREMENT(mpStat.allocwait);
-		*dropped_lock = TRUE;
-		__SLEEP_COND(meta_wait, (free_metapages > 2),
-			     spin_lock(&meta_lock), spin_unlock(&meta_lock));
-	}
-
-	assert(meta_free_list);
-
-	new = meta_free_list;
-	meta_free_list = new->hash_next;
-	free_metapages--;
-
-	return new;
-}
-
-/*
- * Put metapage on freelist (holding meta_lock)
- */
-static inline void __free_metapage(metapage_t * mp)
-{
-	mp->flag = 0;
-	set_bit(META_free, &mp->flag);
-	mp->hash_next = meta_free_list;
-	meta_free_list = mp;
-	free_metapages++;
-	wake_up(&meta_wait);
-}
-
-/*
- * Put metapage on freelist (not holding meta_lock)
- */
-static inline void free_metapage(metapage_t * mp)
-{
-	spin_lock(&meta_lock);
-	__free_metapage(mp);
-	spin_unlock(&meta_lock);
+	mempool_destroy(metapage_mempool);
+	kmem_cache_destroy(metapage_cache);
 }
 
 /*
@@ -295,19 +262,18 @@ static int direct_bmap(struct address_space *mapping, long block)
 }
 
 struct address_space_operations direct_aops = {
-	readpage:	direct_readpage,
-	writepage:	direct_writepage,
-	sync_page:	block_sync_page,
-	prepare_write:	direct_prepare_write,
-	commit_write:	generic_commit_write,
-	bmap:		direct_bmap,
+	.readpage	= direct_readpage,
+	.writepage	= direct_writepage,
+	.sync_page	= block_sync_page,
+	.prepare_write	= direct_prepare_write,
+	.commit_write	= generic_commit_write,
+	.bmap		= direct_bmap,
 };
 
 metapage_t *__get_metapage(struct inode *inode,
 			   unsigned long lblock, unsigned int size,
 			   int absolute, unsigned long new)
 {
-	int dropped_lock;
 	metapage_t **hash_ptr;
 	int l2BlocksPerPage;
 	int l2bsize;
@@ -353,17 +319,43 @@ metapage_t *__get_metapage(struct inode *inode,
 			jERROR(1, ("MetaData crosses page boundary!!\n"));
 			return NULL;
 		}
-
-		mp = alloc_metapage(&dropped_lock);
-		if (dropped_lock) {
-			/* alloc_metapage blocked, we need to search the hash
-			 * again.  (The goto is ugly, maybe we'll clean this
-			 * up in the future.)
-			 */
+		
+		/*
+		 * Locks held on aggregate inode pages are usually
+		 * not held long, and they are taken in critical code
+		 * paths (committing dirty inodes, txCommit thread) 
+		 * 
+		 * Attempt to get metapage without blocking, tapping into
+		 * reserves if necessary.
+		 */
+		mp = NULL;
+		if (JFS_IP(inode)->fileset == AGGREGATE_I) {
+			mp =  mempool_alloc(metapage_mempool, GFP_ATOMIC);
+			if (!mp) {
+				/*
+				 * mempool is supposed to protect us from
+				 * failing here.  We will try a blocking
+				 * call, but a deadlock is possible here
+				 */
+				printk(KERN_WARNING
+				       "__get_metapage: atomic call to mempool_alloc failed.\n");
+				printk(KERN_WARNING
+				       "Will attempt blocking call\n");
+			}
+		}
+		if (!mp) {
 			metapage_t *mp2;
+
+			spin_unlock(&meta_lock);
+			mp =  mempool_alloc(metapage_mempool, GFP_NOFS);
+			spin_lock(&meta_lock);
+
+			/* we dropped the meta_lock, we need to search the
+			 * hash again.
+			 */
 			mp2 = search_hash(hash_ptr, mapping, lblock);
 			if (mp2) {
-				__free_metapage(mp);
+				free_metapage(mp);
 				mp = mp2;
 				goto page_found;
 			}
@@ -416,7 +408,7 @@ freeit:
 	remove_from_hash(mp, hash_ptr);
 	if (!absolute)
 		list_del(&mp->inode_list);
-	__free_metapage(mp);
+	free_metapage(mp);
 	spin_unlock(&meta_lock);
 	return NULL;
 }
@@ -631,12 +623,10 @@ int jfs_mpstat_read(char *buffer, char **start, off_t offset, int length,
 	len += sprintf(buffer,
 		       "JFS Metapage statistics\n"
 		       "=======================\n"
-		       "metapages in use = %d\n"
 		       "page allocations = %d\n"
 		       "page frees = %d\n"
 		       "lock waits = %d\n"
 		       "allocation waits = %d\n",
-		       metapages - free_metapages,
 		       mpStat.pagealloc,
 		       mpStat.pagefree,
 		       mpStat.lockwait,

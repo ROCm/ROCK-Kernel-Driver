@@ -76,6 +76,7 @@
  *	Revision 048:	Use sk->protinfo to store the pointer to IPX private
  *			area, remove af_ipx from sk->protinfo and move ipx_opt
  *			to include/net/ipx.h, use IPX_SK like DecNET, etc
+ *	Revision 049:	SPX support dropped, see comment in ipx_create
  *
  *	Protect the module by a MOD_INC_USE_COUNT/MOD_DEC_USE_COUNT
  *	pair. Also, now usage count is managed this way
@@ -144,17 +145,14 @@ static struct datalink_proto *pSNAP_datalink;
 
 static struct proto_ops ipx_dgram_ops;
 
-static struct net_proto_family *spx_family_ops;
-static DECLARE_RWSEM(spx_family_ops_lock);
-
-static ipx_route *ipx_routes;
+static struct ipx_route *ipx_routes;
 static rwlock_t ipx_routes_lock = RW_LOCK_UNLOCKED;
 
-static ipx_interface *ipx_interfaces;
+static struct ipx_interface *ipx_interfaces;
 static spinlock_t ipx_interfaces_lock = SPIN_LOCK_UNLOCKED;
 
-static ipx_interface *ipx_primary_net;
-static ipx_interface *ipx_internal_net;
+static struct ipx_interface *ipx_primary_net;
+static struct ipx_interface *ipx_internal_net;
 
 #undef IPX_REFCNT_DEBUG
 #ifdef IPX_REFCNT_DEBUG
@@ -180,9 +178,9 @@ static void ipxcfg_set_auto_select(char val)
 		ipx_primary_net = ipx_interfaces;
 }
 
-static int ipxcfg_get_config_data(ipx_config_data *arg)
+static int ipxcfg_get_config_data(struct ipx_config_data *arg)
 {
-	ipx_config_data	vals;
+	struct ipx_config_data vals;
 
 	vals.ipxcfg_auto_create_interfaces = ipxcfg_auto_create_interfaces;
 	vals.ipxcfg_auto_select_primary	   = ipxcfg_auto_select_primary;
@@ -192,22 +190,22 @@ static int ipxcfg_get_config_data(ipx_config_data *arg)
 
 /* Handlers for the socket list. */
 
-static inline void ipxitf_hold(ipx_interface *intrfc)
+static __inline__ void ipxitf_hold(struct ipx_interface *intrfc)
 {
 	atomic_inc(&intrfc->refcnt);
 }
 
-static void ipxitf_down(ipx_interface *intrfc);
+static void ipxitf_down(struct ipx_interface *intrfc);
 
-static inline void ipxitf_put(ipx_interface *intrfc)
+static __inline__ void ipxitf_put(struct ipx_interface *intrfc)
 {
 	if (atomic_dec_and_test(&intrfc->refcnt))
 		ipxitf_down(intrfc);
 }
 
-static void __ipxitf_down(ipx_interface *intrfc);
+static void __ipxitf_down(struct ipx_interface *intrfc);
 
-static inline void __ipxitf_put(ipx_interface *intrfc)
+static __inline__ void __ipxitf_put(struct ipx_interface *intrfc)
 {
 	if (atomic_dec_and_test(&intrfc->refcnt))
 		__ipxitf_down(intrfc);
@@ -218,11 +216,11 @@ static inline void __ipxitf_put(ipx_interface *intrfc)
  * use this facility.
  */
 
-void ipx_remove_socket(struct sock *sk)
+static void ipx_remove_socket(struct sock *sk)
 {
 	struct sock *s;
 	/* Determine interface with which socket is associated */
-	ipx_interface *intrfc = ipx_sk(sk)->intrfc;
+	struct ipx_interface *intrfc = ipx_sk(sk)->intrfc;
 
 	if (!intrfc)
 		goto out;
@@ -268,7 +266,7 @@ static void ipx_destroy_socket(struct sock *sk)
  * The following code is used to support IPX Interfaces (IPXITF).  An
  * IPX interface is defined by a physical device and a frame type.
  */
-static ipx_route * ipxrtr_lookup(__u32);
+static struct ipx_route *ipxrtr_lookup(__u32 net);
 
 /* ipxitf_clear_primary_net has to be called with ipx_interfaces_lock held */
 
@@ -277,10 +275,10 @@ static void ipxitf_clear_primary_net(void)
 	ipx_primary_net = ipxcfg_auto_select_primary ? ipx_interfaces : NULL;
 }
 
-static ipx_interface *__ipxitf_find_using_phys(struct net_device *dev,
-						unsigned short datalink)
+static struct ipx_interface *__ipxitf_find_using_phys(struct net_device *dev,
+						      unsigned short datalink)
 {
-	ipx_interface *i = ipx_interfaces;
+	struct ipx_interface *i = ipx_interfaces;
 
 	while (i && (i->if_dev != dev || i->if_dlink_type != datalink))
 		i = i->if_next;
@@ -288,10 +286,10 @@ static ipx_interface *__ipxitf_find_using_phys(struct net_device *dev,
 	return i;
 }
 
-static ipx_interface *ipxitf_find_using_phys(struct net_device *dev,
-						unsigned short datalink)
+static struct ipx_interface *ipxitf_find_using_phys(struct net_device *dev,
+						    unsigned short datalink)
 {
-	ipx_interface *i;
+	struct ipx_interface *i;
 
 	spin_lock_bh(&ipx_interfaces_lock);
 	i = __ipxitf_find_using_phys(dev, datalink);
@@ -301,9 +299,9 @@ static ipx_interface *ipxitf_find_using_phys(struct net_device *dev,
 	return i;
 }
 
-static ipx_interface *ipxitf_find_using_net(__u32 net)
+static struct ipx_interface *ipxitf_find_using_net(__u32 net)
 {
-	ipx_interface *i;
+	struct ipx_interface *i;
 
 	spin_lock_bh(&ipx_interfaces_lock);
 	if (net)
@@ -320,7 +318,7 @@ static ipx_interface *ipxitf_find_using_net(__u32 net)
 }
 
 /* Sockets are bound to a particular IPX interface. */
-static void ipxitf_insert_socket(ipx_interface *intrfc, struct sock *sk)
+static void ipxitf_insert_socket(struct ipx_interface *intrfc, struct sock *sk)
 {
 	ipxitf_hold(intrfc);
 	sock_hold(sk);
@@ -340,7 +338,7 @@ static void ipxitf_insert_socket(ipx_interface *intrfc, struct sock *sk)
 }
 
 /* caller must hold intrfc->if_sklist_lock */
-static struct sock *__ipxitf_find_socket(ipx_interface *intrfc,
+static struct sock *__ipxitf_find_socket(struct ipx_interface *intrfc,
 					 unsigned short port)
 {
 	struct sock *s = intrfc->if_sklist;
@@ -352,7 +350,7 @@ static struct sock *__ipxitf_find_socket(ipx_interface *intrfc,
 }
 
 /* caller must hold a reference to intrfc */
-static struct sock *ipxitf_find_socket(ipx_interface *intrfc,
+static struct sock *ipxitf_find_socket(struct ipx_interface *intrfc,
 					unsigned short port)
 {
 	struct sock *s;
@@ -367,8 +365,9 @@ static struct sock *ipxitf_find_socket(ipx_interface *intrfc,
 }
 
 #ifdef CONFIG_IPX_INTERN
-static struct sock *ipxitf_find_internal_socket(ipx_interface *intrfc,
-			    unsigned char *node, unsigned short port)
+static struct sock *ipxitf_find_internal_socket(struct ipx_interface *intrfc,
+						unsigned char *node,
+						unsigned short port)
 {
 	struct sock *s;
 
@@ -391,9 +390,9 @@ static struct sock *ipxitf_find_internal_socket(ipx_interface *intrfc,
 }
 #endif
 
-static void ipxrtr_del_routes(ipx_interface *);
+static void ipxrtr_del_routes(struct ipx_interface *intrfc);
 
-static void __ipxitf_down(ipx_interface *intrfc)
+static void __ipxitf_down(struct ipx_interface *intrfc)
 {
 	struct sock *s, *t;
 
@@ -421,7 +420,7 @@ static void __ipxitf_down(ipx_interface *intrfc)
 	if (intrfc == ipx_interfaces)
 		ipx_interfaces = intrfc->if_next;
 	else {
-		ipx_interface *i = ipx_interfaces;
+		struct ipx_interface *i = ipx_interfaces;
 		while (i && i->if_next != intrfc)
 		     i = i->if_next;
 		if (i && i->if_next == intrfc)
@@ -440,7 +439,7 @@ static void __ipxitf_down(ipx_interface *intrfc)
 	MOD_DEC_USE_COUNT;
 }
 
-static void ipxitf_down(ipx_interface *intrfc)
+static void ipxitf_down(struct ipx_interface *intrfc)
 {
 	spin_lock_bh(&ipx_interfaces_lock);
 	__ipxitf_down(intrfc);
@@ -451,7 +450,7 @@ static int ipxitf_device_event(struct notifier_block *notifier,
 				unsigned long event, void *ptr)
 {
 	struct net_device *dev = ptr;
-	ipx_interface *i, *tmp;
+	struct ipx_interface *i, *tmp;
 
 	if (event != NETDEV_DOWN && event != NETDEV_UP)
 		goto out;
@@ -484,10 +483,10 @@ static void ipxitf_def_skb_handler(struct sock *sock, struct sk_buff *skb)
 /* caller must hold a reference to intrfc */
 
 #ifdef CONFIG_IPX_INTERN
-static int ipxitf_demux_socket(ipx_interface *intrfc, struct sk_buff *skb,
-				int copy)
+static int ipxitf_demux_socket(struct ipx_interface *intrfc,
+			       struct sk_buff *skb, int copy)
 {
-	struct ipxhdr *ipx = skb->nh.ipxh;
+	struct ipxhdr *ipx = ipx_hdr(skb);
 	int is_broadcast = !memcmp(ipx->ipx_dest.node, ipx_broadcast_node,
 				   IPX_NODE_LEN);
 	struct sock *s;
@@ -532,7 +531,7 @@ out:	spin_unlock_bh(&intrfc->if_sklist_lock);
 	return ret;
 }
 #else
-static struct sock *ncp_connection_hack(ipx_interface *intrfc,
+static struct sock *ncp_connection_hack(struct ipx_interface *intrfc,
 					struct ipxhdr *ipx)
 {
 	/* The packet's target is a NCP connection handler. We want to hand it
@@ -566,10 +565,10 @@ static struct sock *ncp_connection_hack(ipx_interface *intrfc,
 	return sk;
 }
 
-static int ipxitf_demux_socket(ipx_interface *intrfc, struct sk_buff *skb,
-				int copy)
+static int ipxitf_demux_socket(struct ipx_interface *intrfc,
+			       struct sk_buff *skb, int copy)
 {
-	struct ipxhdr *ipx = skb->nh.ipxh;
+	struct ipxhdr *ipx = ipx_hdr(skb);
 	struct sock *sock1 = NULL, *sock2 = NULL;
 	struct sk_buff *skb1 = NULL, *skb2 = NULL;
 	int ret;
@@ -651,11 +650,11 @@ out:	if (sock1)
 }
 #endif	/* CONFIG_IPX_INTERN */
 
-static struct sk_buff *ipxitf_adjust_skbuff(ipx_interface *intrfc,
+static struct sk_buff *ipxitf_adjust_skbuff(struct ipx_interface *intrfc,
 					    struct sk_buff *skb)
 {
 	struct sk_buff *skb2;
-	int in_offset = skb->h.raw - skb->head;
+	int in_offset = (unsigned char *)ipx_hdr(skb) - skb->head;
 	int out_offset = intrfc->if_ipx_offset;
 	int len;
 
@@ -669,7 +668,7 @@ static struct sk_buff *ipxitf_adjust_skbuff(ipx_interface *intrfc,
 	if (skb2) {
 		skb_reserve(skb2, out_offset);
 		skb2->nh.raw = skb2->h.raw = skb_put(skb2, skb->len);
-		memcpy(skb2->h.raw, skb->h.raw, skb->len);
+		memcpy(ipx_hdr(skb2), ipx_hdr(skb), skb->len);
 		memcpy(skb2->cb, skb->cb, sizeof(skb->cb));
 	}
 	kfree_skb(skb);
@@ -678,9 +677,10 @@ static struct sk_buff *ipxitf_adjust_skbuff(ipx_interface *intrfc,
 
 /* caller must hold a reference to intrfc and the skb has to be unshared */
 
-static int ipxitf_send(ipx_interface *intrfc, struct sk_buff *skb, char *node)
+static int ipxitf_send(struct ipx_interface *intrfc, struct sk_buff *skb,
+		       char *node)
 {
-	struct ipxhdr *ipx = skb->nh.ipxh;
+	struct ipxhdr *ipx = ipx_hdr(skb);
 	struct net_device *dev = intrfc->if_dev;
 	struct datalink_proto *dl = intrfc->if_dlink;
 	char dest_node[IPX_NODE_LEN];
@@ -784,21 +784,24 @@ static int ipxitf_send(ipx_interface *intrfc, struct sk_buff *skb, char *node)
 out:	return 0;
 }
 
-static int ipxrtr_add_route(__u32, ipx_interface *, unsigned char *);
+static int ipxrtr_add_route(__u32 network, struct ipx_interface *intrfc,
+			    unsigned char *);
 
-static int ipxitf_add_local_route(ipx_interface *intrfc)
+static int ipxitf_add_local_route(struct ipx_interface *intrfc)
 {
 	return ipxrtr_add_route(intrfc->if_netnum, intrfc, NULL);
 }
 
-static const char * ipx_frame_name(unsigned short);
-static const char * ipx_device_name(ipx_interface *);
-static void ipxitf_discover_netnum(ipx_interface *intrfc, struct sk_buff *skb);
-static int ipxitf_pprop(ipx_interface *intrfc, struct sk_buff *skb);
+static const char *ipx_frame_name(unsigned short);
+static const char *ipx_device_name(struct ipx_interface *);
+static void ipxitf_discover_netnum(struct ipx_interface *intrfc,
+				   struct sk_buff *skb);
+static int ipxitf_pprop(struct ipx_interface *intrfc, struct sk_buff *skb);
+static int ipxrtr_route_skb(struct sk_buff *skb);
 
-static int ipxitf_rcv(ipx_interface *intrfc, struct sk_buff *skb)
+static int ipxitf_rcv(struct ipx_interface *intrfc, struct sk_buff *skb)
 {
-	struct ipxhdr	*ipx = skb->nh.ipxh;
+	struct ipxhdr *ipx = ipx_hdr(skb);
 	int ret = 0;
 
 	ipxitf_hold(intrfc);
@@ -850,13 +853,15 @@ out_intrfc:
 	return ret;
 }
 
-static void ipxitf_discover_netnum(ipx_interface *intrfc, struct sk_buff *skb)
+static void ipxitf_discover_netnum(struct ipx_interface *intrfc,
+				   struct sk_buff *skb)
 { 
 	const struct ipx_cb *cb = IPX_SKB_CB(skb);
 
 	/* see if this is an intra packet: source_net == dest_net */
 	if (cb->ipx_source_net == cb->ipx_dest_net && cb->ipx_source_net) {
-		ipx_interface *i = ipxitf_find_using_net(cb->ipx_source_net);
+		struct ipx_interface *i =
+				ipxitf_find_using_net(cb->ipx_source_net);
 		/* NB: NetWare servers lie about their hop count so we
 		 * dropped the test based on it. This is the best way
 		 * to determine this is a 0 hop count packet. */
@@ -900,11 +905,11 @@ static void ipxitf_discover_netnum(ipx_interface *intrfc, struct sk_buff *skb)
  * Returns -EINVAL for invalid packets, so that the calling function drops
  * the packet without local processing. 0 if packet is to be locally processed.
  */
-static int ipxitf_pprop(ipx_interface *intrfc, struct sk_buff *skb)
+static int ipxitf_pprop(struct ipx_interface *intrfc, struct sk_buff *skb)
 {
-	struct ipxhdr *ipx = skb->nh.ipxh;
+	struct ipxhdr *ipx = ipx_hdr(skb);
 	int i, ret = -EINVAL;
-	ipx_interface *ifcs;
+	struct ipx_interface *ifcs;
 	char *c;
 	u32 *l;
 
@@ -968,14 +973,14 @@ static int ipxitf_pprop(ipx_interface *intrfc, struct sk_buff *skb)
 out:	return ret;
 }
 
-static void ipxitf_insert(ipx_interface *intrfc)
+static void ipxitf_insert(struct ipx_interface *intrfc)
 {
 	intrfc->if_next = NULL;
 	spin_lock_bh(&ipx_interfaces_lock);
 	if (!ipx_interfaces)
 		ipx_interfaces = intrfc;
 	else {
-		ipx_interface *i = ipx_interfaces;
+		struct ipx_interface *i = ipx_interfaces;
 		while (i->if_next)
 			i = i->if_next;
 		i->if_next = intrfc;
@@ -986,12 +991,13 @@ static void ipxitf_insert(ipx_interface *intrfc)
 		ipx_primary_net = intrfc;
 }
 
-static ipx_interface *ipxitf_alloc(struct net_device *dev, __u32 netnum,
-				   unsigned short dlink_type,
-				   struct datalink_proto *dlink,
-				   unsigned char internal, int ipx_offset)
+static struct ipx_interface *ipxitf_alloc(struct net_device *dev, __u32 netnum,
+					  unsigned short dlink_type,
+					  struct datalink_proto *dlink,
+					  unsigned char internal,
+					  int ipx_offset)
 {
-	ipx_interface *intrfc = kmalloc(sizeof(*intrfc), GFP_ATOMIC);
+	struct ipx_interface *intrfc = kmalloc(sizeof(*intrfc), GFP_ATOMIC);
 
 	if (intrfc) {
 		intrfc->if_dev		= dev;
@@ -1010,9 +1016,9 @@ static ipx_interface *ipxitf_alloc(struct net_device *dev, __u32 netnum,
 	return intrfc;
 }
 
-static int ipxitf_create_internal(ipx_interface_definition *idef)
+static int ipxitf_create_internal(struct ipx_interface_definition *idef)
 {
-	ipx_interface *intrfc;
+	struct ipx_interface *intrfc;
 	int ret = -EEXIST;
 
 	/* Only one primary network allowed */
@@ -1061,12 +1067,12 @@ static int ipx_map_frame_type(unsigned char type)
 	return ret;
 }
 
-static int ipxitf_create(ipx_interface_definition *idef)
+static int ipxitf_create(struct ipx_interface_definition *idef)
 {
 	struct net_device *dev;
 	unsigned short dlink_type = 0;
 	struct datalink_proto *datalink = NULL;
-	ipx_interface *intrfc;
+	struct ipx_interface *intrfc;
 	int err;
 
 	if (idef->ipx_special == IPX_INTERNAL) {
@@ -1173,11 +1179,11 @@ out_dev:
 out:	return err;
 }
 
-static int ipxitf_delete(ipx_interface_definition *idef)
+static int ipxitf_delete(struct ipx_interface_definition *idef)
 {
 	struct net_device *dev = NULL;
 	unsigned short dlink_type = 0;
-	ipx_interface *intrfc;
+	struct ipx_interface *intrfc;
 	int ret = 0;
 
 	spin_lock_bh(&ipx_interfaces_lock);
@@ -1211,10 +1217,10 @@ out:	spin_unlock_bh(&ipx_interfaces_lock);
 	return ret;
 }
 
-static ipx_interface *ipxitf_auto_create(struct net_device *dev, 
-					 unsigned short dlink_type)
+static struct ipx_interface *ipxitf_auto_create(struct net_device *dev,
+						unsigned short dlink_type)
 {
-	ipx_interface *intrfc = NULL;
+	struct ipx_interface *intrfc = NULL;
 	struct datalink_proto *datalink;
 
 	if (!dev)
@@ -1269,7 +1275,7 @@ static int ipxitf_ioctl(unsigned int cmd, void *arg)
 	switch (cmd) {
 		case SIOCSIFADDR: {
 			struct sockaddr_ipx *sipx;
-			ipx_interface_definition f;
+			struct ipx_interface_definition f;
 
 			if (copy_from_user(&ifr, arg, sizeof(ifr)))
 				return -EFAULT;
@@ -1294,7 +1300,7 @@ static int ipxitf_ioctl(unsigned int cmd, void *arg)
 		case SIOCGIFADDR: {
 			int err = 0;
 			struct sockaddr_ipx *sipx;
-			ipx_interface *ipxif;
+			struct ipx_interface *ipxif;
 			struct net_device *dev;
 
 			if (copy_from_user(&ifr, arg, sizeof(ifr)))
@@ -1341,20 +1347,20 @@ static int ipxitf_ioctl(unsigned int cmd, void *arg)
 
 /* Routing tables for the IPX socket layer. */
 
-static inline void ipxrtr_hold(ipx_route *rt)
+static __inline__ void ipxrtr_hold(struct ipx_route *rt)
 {
 	atomic_inc(&rt->refcnt);
 }
 
-static inline void ipxrtr_put(ipx_route *rt)
+static __inline__ void ipxrtr_put(struct ipx_route *rt)
 {
 	if (atomic_dec_and_test(&rt->refcnt))
 		kfree(rt);
 }
 
-static ipx_route *ipxrtr_lookup(__u32 net)
+static struct ipx_route *ipxrtr_lookup(__u32 net)
 {
-	ipx_route *r;
+	struct ipx_route *r;
 
 	read_lock_bh(&ipx_routes_lock);
 	for (r = ipx_routes; r && r->ir_net != net; r = r->ir_next)
@@ -1368,16 +1374,16 @@ static ipx_route *ipxrtr_lookup(__u32 net)
 
 /* caller must hold a reference to intrfc */
 
-static int ipxrtr_add_route(__u32 network, ipx_interface *intrfc,
-				unsigned char *node)
+static int ipxrtr_add_route(__u32 network, struct ipx_interface *intrfc,
+			    unsigned char *node)
 {
-	ipx_route *rt;
+	struct ipx_route *rt;
 	int ret;
 
 	/* Get a route structure; either existing or create */
 	rt = ipxrtr_lookup(network);
 	if (!rt) {
-		rt = kmalloc(sizeof(ipx_route), GFP_ATOMIC);
+		rt = kmalloc(sizeof(*rt), GFP_ATOMIC);
 		ret = -EAGAIN;
 		if (!rt)
 			goto out;
@@ -1410,9 +1416,9 @@ out_put:
 out:	return ret;
 }
 
-static void ipxrtr_del_routes(ipx_interface *intrfc)
+static void ipxrtr_del_routes(struct ipx_interface *intrfc)
 {
-	ipx_route **r, *tmp;
+	struct ipx_route **r, *tmp;
 
 	write_lock_bh(&ipx_routes_lock);
 	for (r = &ipx_routes; (tmp = *r) != NULL;) {
@@ -1425,9 +1431,9 @@ static void ipxrtr_del_routes(ipx_interface *intrfc)
 	write_unlock_bh(&ipx_routes_lock);
 }
 
-static int ipxrtr_create(ipx_route_definition *rd)
+static int ipxrtr_create(struct ipx_route_definition *rd)
 {
-	ipx_interface *intrfc;
+	struct ipx_interface *intrfc;
 	int ret = -ENETUNREACH;
 
 	/* Find the appropriate interface */
@@ -1441,8 +1447,8 @@ out:	return ret;
 
 static int ipxrtr_delete(long net)
 {
-	ipx_route **r;
-	ipx_route *tmp;
+	struct ipx_route **r;
+	struct ipx_route *tmp;
 	int err;
 
 	write_lock_bh(&ipx_routes_lock);
@@ -1513,11 +1519,11 @@ static int ipxrtr_route_packet(struct sock *sk, struct sockaddr_ipx *usipx,
 {
 	struct sk_buff *skb;
 	struct ipx_opt *ipxs = ipx_sk(sk);
-	ipx_interface *intrfc;
+	struct ipx_interface *intrfc;
 	struct ipxhdr *ipx;
 	int size;
 	int ipx_offset;
-	ipx_route *rt = NULL;
+	struct ipx_route *rt = NULL;
 	int err;
 
 	/* Find the appropriate interface on which to send packet */
@@ -1544,11 +1550,11 @@ static int ipxrtr_route_packet(struct sock *sk, struct sockaddr_ipx *usipx,
 	skb->sk = sk;
 
 	/* Fill in IPX header */
-	ipx = (struct ipxhdr *)skb_put(skb, sizeof(struct ipxhdr));
+	skb->h.raw = skb->nh.raw = skb_put(skb, sizeof(struct ipxhdr));
+	ipx = ipx_hdr(skb);
 	ipx->ipx_pktsize = htons(len + sizeof(struct ipxhdr));
 	IPX_SKB_CB(skb)->ipx_tctrl = 0;
 	ipx->ipx_type 	 = usipx->sipx_type;
-	skb->h.raw 	 = (void *)skb->nh.ipxh = ipx;
 
 	IPX_SKB_CB(skb)->last_hop.index = -1;
 #ifdef CONFIG_IPX_INTERN
@@ -1596,8 +1602,8 @@ out:	return err;
  * modify the packet */
 int ipxrtr_route_skb(struct sk_buff *skb)
 {
-	struct ipxhdr *ipx = skb->nh.ipxh;
-	ipx_route *r = ipxrtr_lookup(IPX_SKB_CB(skb)->ipx_dest_net);
+	struct ipxhdr *ipx = ipx_hdr(skb);
+	struct ipx_route *r = ipxrtr_lookup(IPX_SKB_CB(skb)->ipx_dest_net);
 
 	if (!r) {	/* no known route */
 		kfree_skb(skb);
@@ -1666,7 +1672,7 @@ static const char *ipx_frame_name(unsigned short frame)
 	return ret;
 }
 
-static const char *ipx_device_name(ipx_interface *intrfc)
+static const char *ipx_device_name(struct ipx_interface *intrfc)
 {
 	return intrfc->if_internal ? "Internal" :
 		intrfc->if_dev ? intrfc->if_dev->name : "Unknown";
@@ -1676,7 +1682,7 @@ static const char *ipx_device_name(ipx_interface *intrfc)
 static int ipx_interface_get_info(char *buffer, char **start, off_t offset,
 				  int length)
 {
-	ipx_interface *i;
+	struct ipx_interface *i;
 	off_t begin = 0, pos = 0;
 	int len = 0;
 
@@ -1728,7 +1734,7 @@ static int ipx_interface_get_info(char *buffer, char **start, off_t offset,
 static int ipx_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct sock *s;
-	ipx_interface *i;
+	struct ipx_interface *i;
 	off_t begin = 0, pos = 0;
 	int len = 0;
 
@@ -1808,7 +1814,7 @@ static int ipx_get_info(char *buffer, char **start, off_t offset, int length)
 
 static int ipx_rt_get_info(char *buffer, char **start, off_t offset, int length)
 {
-	ipx_route *rt;
+	struct ipx_route *rt;
 	off_t begin = 0, pos = 0;
 	int len = 0;
 
@@ -1927,17 +1933,11 @@ static int ipx_create(struct socket *sock, int protocol)
 
 		case SOCK_SEQPACKET:
 			/*
-			 * From this point on SPX sockets are handled
-			 * by af_spx.c and the methods replaced.
+			 * SPX support is not anymore in the kernel sources. If
+			 * you want to ressurrect it, completing it and making
+			 * it understand shared skbs, be fully multithreaded,
+			 * etc, grab the sources in an early 2.5 kernel tree.
 			 */
-			down_read(&spx_family_ops_lock);
-			if (spx_family_ops) {
-				ret = spx_family_ops->create(sock, protocol);
-				up_read(&spx_family_ops_lock);
-				goto decmod;
-			}
-			up_read(&spx_family_ops_lock);
-			/* Fall through if SPX is not loaded */
 		case SOCK_STREAM:       /* Allow higher levels to piggyback */
 		default:
 			goto decmod;
@@ -1978,7 +1978,7 @@ out:	return 0;
 
 /* caller must hold a reference to intrfc */
 
-static unsigned short ipx_first_free_socketnum(ipx_interface *intrfc)
+static unsigned short ipx_first_free_socketnum(struct ipx_interface *intrfc)
 {
 	unsigned short socketNum = intrfc->if_sknum;
 
@@ -2003,7 +2003,7 @@ static int ipx_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sock *sk = sock->sk;
 	struct ipx_opt *ipxs = ipx_sk(sk);
-	ipx_interface *intrfc;
+	struct ipx_interface *intrfc;
 	struct sockaddr_ipx *addr = (struct sockaddr_ipx *)uaddr;
 	int ret = -EINVAL;
 
@@ -2101,7 +2101,7 @@ static int ipx_connect(struct socket *sock, struct sockaddr *uaddr,
 	struct ipx_opt *ipxs = ipx_sk(sk);
 	struct sockaddr_ipx *addr;
 	int ret = -EINVAL;
-	ipx_route *rt;
+	struct ipx_route *rt;
 
 	sk->state	= TCP_CLOSE;
 	sock->state 	= SS_UNCONNECTED;
@@ -2158,7 +2158,7 @@ out:	return ret;
 static int ipx_getname(struct socket *sock, struct sockaddr *uaddr,
 			int *uaddr_len, int peer)
 {
-	ipx_address *addr;
+	struct ipx_address *addr;
 	struct sockaddr_ipx sipx;
 	struct sock *sk = sock->sk;
 	struct ipx_opt *ipxs = ipx_sk(sk);
@@ -2204,7 +2204,7 @@ out:	return ret;
 int ipx_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 {
 	/* NULL here for pt means the packet was looped back */
-	ipx_interface *intrfc;
+	struct ipx_interface *intrfc;
 	struct ipxhdr *ipx;
 	u16 ipx_pktsize;
 	int ret = 0;
@@ -2216,7 +2216,7 @@ int ipx_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
 		goto out;
 
-	ipx		= skb->nh.ipxh;
+	ipx		= ipx_hdr(skb);
 	ipx_pktsize	= ntohs(ipx->ipx_pktsize);
 	
 	/* Too small or invalid header? */
@@ -2352,7 +2352,7 @@ static int ipx_recvmsg(struct socket *sock, struct msghdr *msg, int size,
 	if (!skb)
 		goto out;
 
-	ipx 	= skb->nh.ipxh;
+	ipx 	= ipx_hdr(skb);
 	copied 	= ntohs(ipx->ipx_pktsize) - sizeof(struct ipxhdr);
 	if (copied > size) {
 		copied = size;
@@ -2462,63 +2462,32 @@ static int ipx_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 }
 
 /*
- *      SPX interface support
- */
-
-int ipx_register_spx(struct proto_ops **p, struct net_proto_family *spx)
-{
-	int err;
-
-	err = -EBUSY;
-	down_write(&spx_family_ops_lock);
-        if (!spx_family_ops) {
-	        MOD_INC_USE_COUNT;
-        	*p = &ipx_dgram_ops;
-	        spx_family_ops = spx;
-	}
-        up_write(&spx_family_ops_lock);
-        return 0;
-}
-
-int ipx_unregister_spx(void)
-{
-	down_write(&spx_family_ops_lock);
-	if (spx_family_ops) {
-	        spx_family_ops = NULL;
-        	MOD_DEC_USE_COUNT;
-	}
-	up_write(&spx_family_ops_lock);
-        return 0;
-}
-
-/*
  * Socket family declarations
  */
 
 static struct net_proto_family ipx_family_ops = {
-	.family =	PF_IPX,
-	.create =	ipx_create,
+	.family		= PF_IPX,
+	.create		= ipx_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(ipx_dgram_ops) = {
-	.family =	PF_IPX,
-
-	.release =	ipx_release,
-	.bind =		ipx_bind,
-	.connect =	ipx_connect,
-	.socketpair =	sock_no_socketpair,
-	.accept =	sock_no_accept,
-	.getname =	ipx_getname,
-	.poll =		datagram_poll,
-	.ioctl =	ipx_ioctl,
-	.listen =	sock_no_listen,
-	.shutdown =	sock_no_shutdown, /* FIXME: have to support shutdown */
-	.setsockopt =	ipx_setsockopt,
-	.getsockopt =	ipx_getsockopt,
-	.sendmsg =	ipx_sendmsg,
-	.recvmsg =	ipx_recvmsg,
-	.mmap =		sock_no_mmap,
-	.sendpage =	sock_no_sendpage,
+	.family		= PF_IPX,
+	.release	= ipx_release,
+	.bind		= ipx_bind,
+	.connect	= ipx_connect,
+	.socketpair	= sock_no_socketpair,
+	.accept		= sock_no_accept,
+	.getname	= ipx_getname,
+	.poll		= datagram_poll,
+	.ioctl		= ipx_ioctl,
+	.listen		= sock_no_listen,
+	.shutdown	= sock_no_shutdown, /* FIXME: support shutdown */
+	.setsockopt	= ipx_setsockopt,
+	.getsockopt	= ipx_getsockopt,
+	.sendmsg	= ipx_sendmsg,
+	.recvmsg	= ipx_recvmsg,
+	.mmap		= sock_no_mmap,
+	.sendpage	= sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
@@ -2540,7 +2509,6 @@ static struct notifier_block ipx_dev_notifier = {
 	.notifier_call =ipxitf_device_event,
 };
 
-
 extern struct datalink_proto *make_EII_client(void);
 extern struct datalink_proto *make_8023_client(void);
 extern void destroy_EII_client(struct datalink_proto *);
@@ -2549,9 +2517,13 @@ extern void destroy_8023_client(struct datalink_proto *);
 static unsigned char ipx_8022_type = 0xE0;
 static unsigned char ipx_snap_id[5] = { 0x0, 0x0, 0x0, 0x81, 0x37 };
 static char ipx_banner[] __initdata =
-	KERN_INFO "NET4: Linux IPX 0.48 for NET4.0\n"
+	KERN_INFO "NET4: Linux IPX 0.49 for NET4.0\n"
 	KERN_INFO "IPX Portions Copyright (c) 1995 Caldera, Inc.\n" \
 	KERN_INFO "IPX Portions Copyright (c) 2000, 2001 Conectiva, Inc.\n";
+static char ipx_EII_err_msg[] __initdata =
+	KERN_CRIT "IPX: Unable to register with Ethernet II\n";
+static char ipx_8023_err_msg[] __initdata =
+	KERN_CRIT "IPX: Unable to register with 802.3\n";
 static char ipx_llc_err_msg[] __initdata =
 	KERN_CRIT "IPX: Unable to register with 802.2\n";
 static char ipx_snap_err_msg[] __initdata =
@@ -2562,10 +2534,16 @@ static int __init ipx_init(void)
 	sock_register(&ipx_family_ops);
 
 	pEII_datalink = make_EII_client();
-	dev_add_pack(&ipx_dix_packet_type);
+	if (pEII_datalink)
+		dev_add_pack(&ipx_dix_packet_type);
+	else
+		printk(ipx_EII_err_msg);
 
 	p8023_datalink = make_8023_client();
-	dev_add_pack(&ipx_8023_packet_type);
+	if (p8023_datalink)
+		dev_add_pack(&ipx_8023_packet_type);
+	else
+		printk(ipx_8023_err_msg);
 
 	p8022_datalink = register_8022_client(ipx_8022_type, ipx_rcv);
 	if (!p8022_datalink)
@@ -2587,26 +2565,6 @@ static int __init ipx_init(void)
 }
 
 module_init(ipx_init);
-
-/* Higher layers need this info to prep tx pkts */
-int ipx_if_offset(unsigned long ipx_net_number)
-{
-	ipx_route *rt = ipxrtr_lookup(ipx_net_number);
-	int ret = -ENETUNREACH;
-
-	if (!rt)
-		goto out;
-	ret = rt->ir_intrfc->if_ipx_offset;
-	ipxrtr_put(rt);
-out:	return ret;
-}
-
-/* Export symbols for higher layers */
-EXPORT_SYMBOL(ipxrtr_route_skb);
-EXPORT_SYMBOL(ipx_if_offset);
-EXPORT_SYMBOL(ipx_remove_socket);
-EXPORT_SYMBOL(ipx_register_spx);
-EXPORT_SYMBOL(ipx_unregister_spx);
 
 /* Note on MOD_{INC,DEC}_USE_COUNT:
  *

@@ -461,7 +461,7 @@ err_out_free:
 }
 
 
-static void __exit dmfe_remove_one (struct pci_dev *pdev)
+static void __devexit dmfe_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct dmfe_board_info *db = dev->priv;

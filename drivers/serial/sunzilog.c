@@ -1013,7 +1013,6 @@ static struct uart_driver sunzilog_reg = {
 	.dev_name	=	"ttyS",
 #endif
 	.major		=	TTY_MAJOR,
-	.minor		=	64,
 };
 
 static void * __init alloc_one_table(unsigned long size)
@@ -1386,7 +1385,7 @@ sunzilog_console_write(struct console *con, const char *s, unsigned int count)
 
 static kdev_t sunzilog_console_device(struct console *con)
 {
-	return mk_kdev(TTY_MAJOR, 64 + con->index);
+	return mk_kdev(sunzilog_reg.major, sunzilog_reg.minor + con->index);
 }
 
 static int __init sunzilog_console_setup(struct console *con, char *options)
@@ -1395,7 +1394,8 @@ static int __init sunzilog_console_setup(struct console *con, char *options)
 	unsigned long flags;
 	int baud, brg;
 
-	printk("Console: ttyS%d (Zilog8530)\n", con->index / 2);
+	printk("Console: ttyS%d (Zilog8530)\n",
+	       (sunzilog_reg.minor - 64) + con->index);
 
 	/* Get firmware console settings.  */
 	sunserial_console_termios(con);
@@ -1447,10 +1447,21 @@ static struct console sunzilog_console = {
 
 static int __init sunzilog_console_init(void)
 {
+	int i;
+
 	if (con_is_present())
 		return 0;
 
-	sunzilog_console.index = serial_console - 1;
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		int this_minor = sunzilog_reg.minor + i;
+
+		if ((this_minor - 64) == (serial_console - 1))
+			break;
+	}
+	if (i == NUM_CHANNELS)
+		return 0;
+
+	sunzilog_console.index = i;
 	register_console(&sunzilog_console);
 	return 0;
 }
@@ -1480,6 +1491,7 @@ static void __init sunzilog_prepare(void)
 		up[(chip * 2) + 0].port.uartclk = ZS_CLOCK;
 		up[(chip * 2) + 0].port.fifosize = 1;
 		up[(chip * 2) + 0].port.ops = &sunzilog_pops;
+		up[(chip * 2) + 0].port.type = PORT_SUNZILOG;
 		up[(chip * 2) + 0].port.flags = 0;
 		up[(chip * 2) + 0].port.line = (chip * 2) + 0;
 		up[(chip * 2) + 0].flags |= SUNZILOG_FLAG_IS_CHANNEL_A;
@@ -1490,6 +1502,7 @@ static void __init sunzilog_prepare(void)
 		up[(chip * 2) + 1].port.uartclk = ZS_CLOCK;
 		up[(chip * 2) + 1].port.fifosize = 1;
 		up[(chip * 2) + 1].port.ops = &sunzilog_pops;
+		up[(chip * 2) + 1].port.type = PORT_SUNZILOG;
 		up[(chip * 2) + 1].port.flags = 0;
 		up[(chip * 2) + 1].port.line = (chip * 2) + 1;
 		up[(chip * 2) + 1].flags |= 0;
@@ -1607,12 +1620,10 @@ static int __init sunzilog_ports_init(void)
 	 * in the system.
 	 */
 	sunzilog_reg.nr = NUM_CHANNELS;
-
-#ifdef CONFIG_SERIAL_CONSOLE
 	sunzilog_reg.cons = &sunzilog_console;
-#else
-	sunzilog_reg.cons = NULL;
-#endif
+
+	sunzilog_reg.minor = sunserial_current_minor;
+	sunserial_current_minor += NUM_CHANNELS;
 
 	ret = uart_register_driver(&sunzilog_reg);
 	if (ret == 0) {

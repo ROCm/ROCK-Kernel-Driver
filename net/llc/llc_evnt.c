@@ -56,7 +56,7 @@ int llc_stat_ev_ack_tmr_exp_eq_retry_cnt_max_retry(struct llc_station *station,
 int llc_stat_ev_rx_null_dsap_xid_c(struct llc_station *station,
 				   struct llc_station_state_ev *ev)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
 
 	return ev->type == LLC_STATION_EV_TYPE_PDU &&
 	       !LLC_PDU_IS_CMD(pdu) &&			/* command PDU */
@@ -68,7 +68,7 @@ int llc_stat_ev_rx_null_dsap_xid_c(struct llc_station *station,
 int llc_stat_ev_rx_null_dsap_0_xid_r_xid_r_cnt_eq(struct llc_station *station,
 					        struct llc_station_state_ev *ev)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
 
 	return ev->type == LLC_STATION_EV_TYPE_PDU &&
 	       !LLC_PDU_IS_RSP(pdu) &&			/* response PDU */
@@ -81,7 +81,7 @@ int llc_stat_ev_rx_null_dsap_0_xid_r_xid_r_cnt_eq(struct llc_station *station,
 int llc_stat_ev_rx_null_dsap_1_xid_r_xid_r_cnt_eq(struct llc_station *station,
 					        struct llc_station_state_ev *ev)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
 
 	return ev->type == LLC_STATION_EV_TYPE_PDU &&
 	       !LLC_PDU_IS_RSP(pdu) &&			/* response PDU */
@@ -94,7 +94,7 @@ int llc_stat_ev_rx_null_dsap_1_xid_r_xid_r_cnt_eq(struct llc_station *station,
 int llc_stat_ev_rx_null_dsap_test_c(struct llc_station *station,
 				    struct llc_station_state_ev *ev)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
 
 	return ev->type == LLC_STATION_EV_TYPE_PDU &&
 	       !LLC_PDU_IS_CMD(pdu) &&			/* command PDU */

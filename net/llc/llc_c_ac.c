@@ -46,12 +46,13 @@ int llc_conn_ac_clear_remote_busy(struct sock *sk, struct llc_conn_state_ev *ev)
 
 	if (llc->remote_busy_flag) {
 		u8 nr;
-		llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)ev->data.pdu.skb->nh.raw;
+		struct llc_pdu_sn *pdu =
+				(struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
 
 		llc->remote_busy_flag = 0;
 		del_timer(&llc->busy_state_timer.timer);
 		llc->busy_state_timer.running = 0;
-		nr = LLC_I_GET_NR(rx_pdu);
+		nr = LLC_I_GET_NR(pdu);
 		llc_conn_resend_i_pdu_as_cmd(sk, nr, 0);
 	}
 	return 0;
@@ -147,16 +148,17 @@ int llc_conn_ac_disc_ind(struct sock *sk, struct llc_conn_state_ev *ev)
 	struct llc_prim_if_block *prim = &llc_ind_prim;
 
 	if (ev->type == LLC_CONN_EV_TYPE_PDU) {
-		llc_pdu_un_t *rx_pdu = (llc_pdu_un_t *)ev->data.pdu.skb->nh.raw;
+		struct llc_pdu_un *pdu =
+				(struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
 
-		if (!LLC_PDU_IS_RSP(rx_pdu) &&
-		    !LLC_PDU_TYPE_IS_U(rx_pdu) &&
-		    LLC_U_PDU_RSP(rx_pdu) == LLC_2_PDU_RSP_DM) {
+		if (!LLC_PDU_IS_RSP(pdu) &&
+		    !LLC_PDU_TYPE_IS_U(pdu) &&
+		    LLC_U_PDU_RSP(pdu) == LLC_2_PDU_RSP_DM) {
 			reason = LLC_DISC_REASON_RX_DM_RSP_PDU;
 			rc = 0;
-		} else if (!LLC_PDU_IS_CMD(rx_pdu) &&
-			   !LLC_PDU_TYPE_IS_U(rx_pdu) &&
-			   LLC_U_PDU_CMD(rx_pdu) == LLC_2_PDU_CMD_DISC) {
+		} else if (!LLC_PDU_IS_CMD(pdu) &&
+			   !LLC_PDU_TYPE_IS_U(pdu) &&
+			   LLC_U_PDU_CMD(pdu) == LLC_2_PDU_CMD_DISC) {
 			reason = LLC_DISC_REASON_RX_DISC_CMD_PDU;
 			rc = 0;
 		}
@@ -200,21 +202,21 @@ int llc_conn_ac_rst_ind(struct sock *sk, struct llc_conn_state_ev *ev)
 {
 	u8 reason = 0;
 	int rc = 1;
-	llc_pdu_un_t *rx_pdu = (llc_pdu_un_t *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
 	union llc_u_prim_data *prim_data = llc_ind_prim.data;
 	struct llc_prim_if_block *prim = &llc_ind_prim;
 	struct llc_opt *llc = llc_sk(sk);
 
 	switch (ev->type) {
 		case LLC_CONN_EV_TYPE_PDU:
-			if (!LLC_PDU_IS_RSP(rx_pdu) &&
-			    !LLC_PDU_TYPE_IS_U(rx_pdu) &&
-			    LLC_U_PDU_RSP(rx_pdu) == LLC_2_PDU_RSP_FRMR) {
+			if (!LLC_PDU_IS_RSP(pdu) &&
+			    !LLC_PDU_TYPE_IS_U(pdu) &&
+			    LLC_U_PDU_RSP(pdu) == LLC_2_PDU_RSP_FRMR) {
 				reason = LLC_RESET_REASON_LOCAL;
 				rc = 0;
-			} else if (!LLC_PDU_IS_CMD(rx_pdu) &&
-				   !LLC_PDU_TYPE_IS_U(rx_pdu) &&
-				   LLC_U_PDU_CMD(rx_pdu) ==
+			} else if (!LLC_PDU_IS_CMD(pdu) &&
+				   !LLC_PDU_TYPE_IS_U(pdu) &&
+				   LLC_U_PDU_CMD(pdu) ==
 				   			LLC_2_PDU_CMD_SABME) {
 				reason = LLC_RESET_REASON_REMOTE;
 				rc = 0;
@@ -270,11 +272,11 @@ int llc_conn_ac_report_status(struct sock *sk, struct llc_conn_state_ev *ev)
 int llc_conn_ac_clear_remote_busy_if_f_eq_1(struct sock *sk,
 					struct llc_conn_state_ev *ev)
 {
-	llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
 
-	if (!LLC_PDU_IS_RSP(rx_pdu) &&
-	    !LLC_PDU_TYPE_IS_I(rx_pdu) &&
-	    !LLC_I_PF_IS_1(rx_pdu) && llc_sk(sk)->ack_pf)
+	if (!LLC_PDU_IS_RSP(pdu) &&
+	    !LLC_PDU_TYPE_IS_I(pdu) &&
+	    !LLC_I_PF_IS_1(pdu) && llc_sk(sk)->ack_pf)
 		llc_conn_ac_clear_remote_busy(sk, ev);
 	return 0;
 }
@@ -386,11 +388,11 @@ int llc_conn_ac_send_frmr_rsp_f_set_x(struct sock *sk,
 	u8 f_bit;
 	int rc = 1;
 	struct sk_buff *skb, *ev_skb = ev->data.pdu.skb;
-	llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)ev_skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)ev_skb->nh.raw;
 	struct llc_opt *llc = llc_sk(sk);
 
-	llc->rx_pdu_hdr = (u32)*((u32 *)rx_pdu);
-	if (!LLC_PDU_IS_CMD(rx_pdu))
+	llc->rx_pdu_hdr = *((u32 *)pdu);
+	if (!LLC_PDU_IS_CMD(pdu))
 		llc_pdu_decode_pf_bit(ev_skb, &f_bit);
 	else
 		f_bit = 0;
@@ -401,7 +403,7 @@ int llc_conn_ac_send_frmr_rsp_f_set_x(struct sock *sk,
 		skb->dev = llc->dev;
 		llc_pdu_header_init(skb, LLC_PDU_TYPE_U, sap->laddr.lsap,
 				    llc->daddr.lsap, LLC_PDU_RSP);
-		llc_pdu_init_as_frmr_rsp(skb, rx_pdu, f_bit, llc->vS,
+		llc_pdu_init_as_frmr_rsp(skb, pdu, f_bit, llc->vS,
 					 llc->vR, INCORRECT);
 		lan_hdrs_init(skb, llc->dev->dev_addr, llc->daddr.mac);
 		rc = 0;
@@ -420,12 +422,12 @@ int llc_conn_ac_resend_frmr_rsp_f_set_0(struct sock *sk,
 		u8 f_bit = 0;
 		struct llc_opt *llc = llc_sk(sk);
 		struct llc_sap *sap = llc->sap;
-		llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)&llc->rx_pdu_hdr;
+		struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)&llc->rx_pdu_hdr;
 
 		skb->dev = llc->dev;
 		llc_pdu_header_init(skb, LLC_PDU_TYPE_U, sap->laddr.lsap,
 				    llc->daddr.lsap, LLC_PDU_RSP);
-		llc_pdu_init_as_frmr_rsp(skb, rx_pdu, f_bit, llc->vS,
+		llc_pdu_init_as_frmr_rsp(skb, pdu, f_bit, llc->vS,
 					 llc->vR, INCORRECT);
 		lan_hdrs_init(skb, llc->dev->dev_addr, llc->daddr.mac);
 		rc = 0;
@@ -446,12 +448,13 @@ int llc_conn_ac_resend_frmr_rsp_f_set_p(struct sock *sk,
 	if (skb) {
 		struct llc_opt *llc = llc_sk(sk);
 		struct llc_sap *sap = llc->sap;
-		llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)ev->data.pdu.skb->nh.raw;
+		struct llc_pdu_sn *pdu =
+				(struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
 
 		skb->dev = llc->dev;
 		llc_pdu_header_init(skb, LLC_PDU_TYPE_U, sap->laddr.lsap,
 				    llc->daddr.lsap, LLC_PDU_RSP);
-		llc_pdu_init_as_frmr_rsp(skb, rx_pdu, f_bit, llc->vS,
+		llc_pdu_init_as_frmr_rsp(skb, pdu, f_bit, llc->vS,
 					 llc->vR, INCORRECT);
 		lan_hdrs_init(skb, llc->dev->dev_addr, llc->daddr.mac);
 		rc = 0;
@@ -497,9 +500,8 @@ int llc_conn_ac_send_i_cmd_p_set_0(struct sock *sk,
 int llc_conn_ac_resend_i_cmd_p_set_1(struct sock *sk,
 				     struct llc_conn_state_ev *ev)
 {
-	llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)ev->data.pdu.skb->nh.raw;
-
-	u8 nr = LLC_I_GET_NR(rx_pdu);
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
+	u8 nr = LLC_I_GET_NR(pdu);
 
 	llc_conn_resend_i_pdu_as_cmd(sk, nr, 1);
 	return 0;
@@ -508,9 +510,8 @@ int llc_conn_ac_resend_i_cmd_p_set_1(struct sock *sk,
 int llc_conn_ac_resend_i_cmd_p_set_1_or_send_rr(struct sock *sk,
 						struct llc_conn_state_ev *ev)
 {
-	llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)ev->data.pdu.skb->nh.raw;
-
-	u8 nr = LLC_I_GET_NR(rx_pdu);
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
+	u8 nr = LLC_I_GET_NR(pdu);
 	int rc = llc_conn_ac_send_rr_cmd_p_set_1(sk, ev);
 
 	if (!rc)
@@ -538,8 +539,8 @@ int llc_conn_ac_send_i_xxx_x_set_0(struct sock *sk,
 int llc_conn_ac_resend_i_xxx_x_set_0(struct sock *sk,
 				     struct llc_conn_state_ev *ev)
 {
-	llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)ev->data.pdu.skb->nh.raw;
-	u8 nr = LLC_I_GET_NR(rx_pdu);
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
+	u8 nr = LLC_I_GET_NR(pdu);
 
 	llc_conn_resend_i_pdu_as_cmd(sk, nr, 0);
 	return 0;
@@ -550,7 +551,7 @@ int llc_conn_ac_resend_i_xxx_x_set_0_or_send_rr(struct sock *sk,
 {
 	u8 nr;
 	u8 f_bit = 0;
-	llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
 	int rc = 1;
 	struct sk_buff *skb = llc_alloc_frame();
 
@@ -567,7 +568,7 @@ int llc_conn_ac_resend_i_xxx_x_set_0_or_send_rr(struct sock *sk,
 		llc_conn_send_pdu(sk, skb);
 	}
 	if (rc) {
-		nr = LLC_I_GET_NR(rx_pdu);
+		nr = LLC_I_GET_NR(pdu);
 		rc = 0;
 		llc_conn_resend_i_pdu_as_cmd(sk, nr, f_bit);
 	}
@@ -577,8 +578,8 @@ int llc_conn_ac_resend_i_xxx_x_set_0_or_send_rr(struct sock *sk,
 int llc_conn_ac_resend_i_rsp_f_set_1(struct sock *sk,
 				     struct llc_conn_state_ev *ev)
 {
-	llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)ev->data.pdu.skb->nh.raw;
-	u8 nr = LLC_I_GET_NR(rx_pdu);
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
+	u8 nr = LLC_I_GET_NR(pdu);
 
 	llc_conn_resend_i_pdu_as_rsp(sk, nr, 1);
 	return 0;
@@ -1336,10 +1337,10 @@ int llc_conn_ac_upd_nr_received(struct sock *sk, struct llc_conn_state_ev *ev)
 	u16 unacked = 0;
 	u8 fbit;
 	struct sk_buff *skb = ev->data.pdu.skb;
-	llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 	struct llc_opt *llc = llc_sk(sk);
 
-	llc->last_nr = PDU_SUPV_GET_Nr(rx_pdu);
+	llc->last_nr = PDU_SUPV_GET_Nr(pdu);
 	acked = llc_conn_remove_acked_pdus(sk, llc->last_nr, &unacked);
 	/* On loopback we don't queue I frames in unack_pdu_q queue. */
 	if (acked > 0 || (llc->dev->flags & IFF_LOOPBACK)) {
@@ -1375,10 +1376,10 @@ int llc_conn_ac_upd_nr_received(struct sock *sk, struct llc_conn_state_ev *ev)
 int llc_conn_ac_upd_p_flag(struct sock *sk, struct llc_conn_state_ev *ev)
 {
 	struct sk_buff *skb = ev->data.pdu.skb;
-	llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 	u8 f_bit;
 
-	if (!LLC_PDU_IS_RSP(rx_pdu) &&
+	if (!LLC_PDU_IS_RSP(pdu) &&
 	    !llc_pdu_decode_pf_bit(skb, &f_bit) && f_bit) {
 		llc_sk(sk)->p_flag = 0;
 		llc_conn_ac_stop_p_timer(sk, ev);
@@ -1556,8 +1557,8 @@ int llc_conn_ac_rst_vs(struct sock *sk, struct llc_conn_state_ev *ev)
 
 int llc_conn_ac_upd_vs(struct sock *sk, struct llc_conn_state_ev *ev)
 {
-	llc_pdu_sn_t *rx_pdu = (llc_pdu_sn_t *)ev->data.pdu.skb->nh.raw;
-	u8 nr = PDU_SUPV_GET_Nr(rx_pdu);
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)ev->data.pdu.skb->nh.raw;
+	u8 nr = PDU_SUPV_GET_Nr(pdu);
 
 	if (llc_circular_between(llc_sk(sk)->vS, nr, llc_sk(sk)->X))
 		llc_conn_ac_set_vs_nr(sk, ev);

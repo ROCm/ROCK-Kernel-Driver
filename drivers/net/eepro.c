@@ -23,6 +23,8 @@
 	This is a compatibility hardware problem.
 
 	Versions:
+	0.13a   in memory shortage, drop packets also in board
+		(Michael Westermann <mw@microdata-pos.de>, 07/30/2002)
 	0.13    irq sharing, rewrote probe function, fixed a nasty bug in
 		hardware_send_packet and a major cleanup (aris, 11/08/2001)
 	0.12d	fixing a problem with single card detected as eight eth devices
@@ -665,37 +667,37 @@ static void eepro_print_info (struct net_device *dev)
 
 	i = inb(dev->base_addr + ID_REG);
 	printk(KERN_DEBUG " id: %#x ",i);
-	printk(KERN_DEBUG " io: %#x ", (unsigned)dev->base_addr);
+	printk(" io: %#x ", (unsigned)dev->base_addr);
 
 	switch (lp->eepro) {
 		case LAN595FX_10ISA:
-			printk(KERN_INFO "%s: Intel EtherExpress 10 ISA\n at %#x,",
+			printk("%s: Intel EtherExpress 10 ISA\n at %#x,",
 					dev->name, (unsigned)dev->base_addr);
 			break;
 		case LAN595FX:
-			printk(KERN_INFO "%s: Intel EtherExpress Pro/10+ ISA\n at %#x,", 
+			printk("%s: Intel EtherExpress Pro/10+ ISA\n at %#x,", 
 					dev->name, (unsigned)dev->base_addr);
 			break;
 		case LAN595TX:
-			printk(KERN_INFO "%s: Intel EtherExpress Pro/10 ISA at %#x,",
+			printk("%s: Intel EtherExpress Pro/10 ISA at %#x,",
 					dev->name, (unsigned)dev->base_addr);
 			break;
 		case LAN595:
-			printk(KERN_INFO "%s: Intel 82595-based lan card at %#x,", 
+			printk("%s: Intel 82595-based lan card at %#x,", 
 					dev->name, (unsigned)dev->base_addr);
 	}
 
 	for (i=0; i < 6; i++)
-		printk(KERN_INFO "%c%02x", i ? ':' : ' ', dev->dev_addr[i]);
+		printk("%c%02x", i ? ':' : ' ', dev->dev_addr[i]);
 
 	if (net_debug > 3)
 		printk(KERN_DEBUG ", %dK RCV buffer",
 				(int)(lp->rcv_ram)/1024);
 
 	if (dev->irq > 2)
-		printk(KERN_INFO ", IRQ %d, %s.\n", dev->irq, ifmap[dev->if_port]);
+		printk(", IRQ %d, %s.\n", dev->irq, ifmap[dev->if_port]);
 	else 
-		printk(KERN_INFO ", %s.\n", ifmap[dev->if_port]);
+		printk(", %s.\n", ifmap[dev->if_port]);
 
 	if (net_debug > 3) {
 		i = read_eeprom(dev->base_addr, 5, dev);
@@ -1584,6 +1586,10 @@ eepro_rx(struct net_device *dev)
 			if (skb == NULL) {
 				printk(KERN_NOTICE "%s: Memory squeeze, dropping packet.\n", dev->name);
 				lp->stats.rx_dropped++;
+				rcv_car = lp->rx_start + RCV_HEADER + rcv_size;
+				lp->rx_start = rcv_next_frame;
+				outw(rcv_next_frame, ioaddr + HOST_ADDRESS_REG);
+
 				break;
 			}
 			skb->dev = dev;

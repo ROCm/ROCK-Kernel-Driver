@@ -245,18 +245,12 @@ typedef struct {
 #define ISDN_TIMER_MODEMPLUS   2
 #define ISDN_TIMER_MODEMRING   4
 #define ISDN_TIMER_MODEMXMIT   8
-#define ISDN_TIMER_NETDIAL    16 
 #define ISDN_TIMER_NETHANGUP  32
 #define ISDN_TIMER_CARRIER   256 /* Wait for Carrier */
 #define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD | ISDN_TIMER_MODEMPLUS | \
                               ISDN_TIMER_MODEMXMIT)
 #define ISDN_TIMER_SLOW      (ISDN_TIMER_MODEMRING | ISDN_TIMER_NETHANGUP | \
-                              ISDN_TIMER_NETDIAL | ISDN_TIMER_CARRIER)
-
-/* Timeout-Values for isdn_net_dial() */
-#define ISDN_TIMER_DTIMEOUT10 (10*HZ/(ISDN_TIMER_02SEC*(ISDN_TIMER_RES+1)))
-#define ISDN_TIMER_DTIMEOUT15 (15*HZ/(ISDN_TIMER_02SEC*(ISDN_TIMER_RES+1)))
-#define ISDN_TIMER_DTIMEOUT60 (60*HZ/(ISDN_TIMER_02SEC*(ISDN_TIMER_RES+1)))
+                              ISDN_TIMER_CARRIER)
 
 /* GLOBAL_FLAGS */
 #define ISDN_GLOBAL_STOPPED 1
@@ -291,9 +285,10 @@ typedef struct {
 typedef struct isdn_net_local_s {
   ulong                  magic;
   char                   name[10];     /* Name of device                   */
+  struct timer_list      dial_timer;   /* dial timeout                     */
+  int                    dial_event;   /* event in case of timer expiry    */
   struct net_device_stats stats;       /* Ethernet Statistics              */
-  int                    isdn_device;  /* Index to isdn-device             */
-  int                    isdn_channel; /* Index to isdn-channel            */
+  int                    isdn_slot;    /* Index to isdn device/channel     */
   int			 ppp_slot;     /* PPPD device slot number          */
   int                    pre_device;   /* Preselected isdn-device          */
   int                    pre_channel;  /* Preselected isdn-channel         */
@@ -302,7 +297,6 @@ typedef struct isdn_net_local_s {
   int                    dialretry;    /* Counter for Dialout-retries      */
   int                    dialmax;      /* Max. Number of Dial-retries      */
   int                    cbdelay;      /* Delay before Callback starts     */
-  int                    dtimer;       /* Timeout-counter for dialing      */
   char                   msn[ISDN_MSNLEN]; /* MSNs/EAZs for this interface */
   u_char                 cbhup;        /* Flag: Reject Call before Callback*/
   u_char                 dialstate;    /* State for dialing                */
@@ -387,12 +381,12 @@ typedef struct isdn_net_local_s {
 
 /* the interface itself */
 typedef struct isdn_net_dev_s {
-  isdn_net_local *local;
+  isdn_net_local local;
   isdn_net_local *queue;               /* circular list of all bundled
 					  channels, which are currently
 					  online                           */
   spinlock_t queue_lock;               /* lock to protect queue            */
-  void *next;                          /* Pointer to next isdn-interface   */
+  struct list_head global_list;        /* global list of all isdn_net_devs */
   struct net_device dev;               /* interface to upper levels        */
 #ifdef CONFIG_ISDN_PPP
   ippp_bundle * pb;		/* pointer to the common bundle structure
@@ -480,9 +474,7 @@ typedef struct modem_info {
 					 /* 2 = B-Channel is up, deliver d.*/
   int                   dialing;         /* Dial in progress or ATA        */
   int                   rcvsched;        /* Receive needs schedule         */
-  int                   isdn_driver;	 /* Index to isdn-driver           */
-  int                   isdn_channel;    /* Index to isdn-channel          */
-  int                   drv_index;       /* Index to dev->usage            */
+  int                   isdn_slot;	 /* Index to isdn-driver/channel   */
   int                   ncarrier;        /* Flag: schedule NO CARRIER      */
   unsigned char         last_cause[8];   /* Last cause message             */
   unsigned char         last_num[ISDN_MSNLEN];
@@ -608,24 +600,10 @@ typedef struct isdn_devt {
 	infostruct        *infochain;                /* List of open info-devs.    */
 	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
 	struct timer_list timer;		       /* Misc.-function Timer       */
-	int               chanmap[ISDN_MAX_CHANNELS];/* Map minor->device-channel  */
-	int               drvmap[ISDN_MAX_CHANNELS]; /* Map minor->driver-index    */
-	int               usage[ISDN_MAX_CHANNELS];  /* Used by tty/ip/voice       */
-	char              num[ISDN_MAX_CHANNELS][ISDN_MSNLEN];
-	/* Remote number of active ch.*/
-	int               m_idx[ISDN_MAX_CHANNELS];  /* Index for mdm....          */
 	driver            *drv[ISDN_MAX_DRIVERS];    /* Array of drivers           */
-	isdn_net_dev      *netdev;		       /* Linked list of net-if's    */
 	char              drvid[ISDN_MAX_DRIVERS][20];/* Driver-ID                 */
 	struct task_struct *profd;                   /* For iprofd                 */
 	modem             mdm;		       /* tty-driver-data            */
-	isdn_net_dev      *rx_netdev[ISDN_MAX_CHANNELS]; /* rx netdev-pointers     */
-	isdn_net_dev      *st_netdev[ISDN_MAX_CHANNELS]; /* stat netdev-pointers   */
-	ulong             ibytes[ISDN_MAX_CHANNELS]; /* Statistics incoming bytes  */
-	ulong             obytes[ISDN_MAX_CHANNELS]; /* Statistics outgoing bytes  */
-	int               v110emu[ISDN_MAX_CHANNELS];/* V.110 emulator-mode 0=none */
-	atomic_t          v110use[ISDN_MAX_CHANNELS];/* Usage-Semaphore for stream */
-	isdn_v110_stream  *v110[ISDN_MAX_CHANNELS];  /* V.110 private data         */
 	struct semaphore  sem;                       /* serialize list access*/
 	unsigned long     global_features;
 #ifdef CONFIG_DEVFS_FS

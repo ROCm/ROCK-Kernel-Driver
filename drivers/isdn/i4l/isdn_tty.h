@@ -105,7 +105,7 @@ extern void isdn_tty_modem_escape(void);
 extern void isdn_tty_modem_ring(void);
 extern void isdn_tty_carrier_timeout(void);
 extern void isdn_tty_modem_xmit(void);
-extern int isdn_tty_modem_init(void);
+extern int isdn_tty_init(void);
 extern void isdn_tty_readmodem(void);
 extern int isdn_tty_find_icall(int, int, setup_parm *);
 extern void isdn_tty_cleanup_xmit(modem_info *);
@@ -119,3 +119,6 @@ extern int isdn_tty_cmd_PLUSF_FAX(char **, modem_info *);
 extern int isdn_tty_fax_command(modem_info *, isdn_ctrl *);
 extern void isdn_tty_fax_bitorder(modem_info *, struct sk_buff *);
 #endif
+
+extern int isdn_tty_init(void);
+extern void isdn_tty_exit(void);

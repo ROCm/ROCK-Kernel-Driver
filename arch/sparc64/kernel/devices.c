@@ -10,12 +10,18 @@
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/string.h>
+#include <linux/spinlock.h>
 
 #include <asm/page.h>
 #include <asm/oplib.h>
 #include <asm/system.h>
 #include <asm/smp.h>
 #include <asm/spitfire.h>
+
+/* Used to synchronize acceses to NatSemi SUPER I/O chip configure
+ * operations in asm/ns87303.h
+ */
+spinlock_t ns87303_lock = SPIN_LOCK_UNLOCKED;
 
 struct prom_cpuinfo linux_cpus[NR_CPUS] __initdata = { { 0 } };
 unsigned prom_cpu_nodes[NR_CPUS];

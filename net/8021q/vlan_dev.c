@@ -125,8 +125,8 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	vid = (vlan_TCI & VLAN_VID_MASK);
 
 #ifdef VLAN_DEBUG
-	printk(VLAN_DBG __FUNCTION__ ": skb: %p vlan_id: %hx\n",
-	       skb, vid);
+	printk(VLAN_DBG "%s: skb: %p vlan_id: %hx\n",
+		__FUNCTION__, skb, vid);
 #endif
 
 	/* Ok, we will find the correct VLAN device, strip the header,
@@ -146,8 +146,8 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 		spin_unlock_bh(&vlan_group_lock);
 
 #ifdef VLAN_DEBUG
-		printk(VLAN_DBG __FUNCTION__ ": ERROR:	No net_device for VID: %i on dev: %s [%i]\n",
-		       (unsigned int)(vid), dev->name, dev->ifindex);
+		printk(VLAN_DBG "%s: ERROR: No net_device for VID: %i on dev: %s [%i]\n",
+			__FUNCTION__, (unsigned int)(vid), dev->name, dev->ifindex);
 #endif
 		kfree_skb(skb);
 		return -1;
@@ -170,8 +170,10 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 		spin_unlock_bh(&vlan_group_lock);
 
 #ifdef VLAN_DEBUG
-		printk(VLAN_DBG __FUNCTION__ ": dropping skb: %p because came in on wrong device, dev: %s  real_dev: %s, skb_dev: %s\n",
-		       skb, dev->name, VLAN_DEV_INFO(skb->dev)->real_dev->name, skb->dev->name);
+		printk(VLAN_DBG "%s: dropping skb: %p because came in on wrong device, dev: %s  real_dev: %s, skb_dev: %s\n",
+			__FUNCTION__ skb, dev->name, 
+			VLAN_DEV_INFO(skb->dev)->real_dev->name, 
+			skb->dev->name);
 #endif
 		kfree_skb(skb);
 		stats->rx_errors++;
@@ -184,8 +186,9 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	skb->priority = vlan_get_ingress_priority(skb->dev, ntohs(vhdr->h_vlan_TCI));
 
 #ifdef VLAN_DEBUG
-	printk(VLAN_DBG __FUNCTION__ ": priority: %lu  for TCI: %hu (hbo)\n",
-	       (unsigned long)(skb->priority), ntohs(vhdr->h_vlan_TCI));
+	printk(VLAN_DBG "%s: priority: %lu  for TCI: %hu (hbo)\n",
+		__FUNCTION__, (unsigned long)(skb->priority), 
+		ntohs(vhdr->h_vlan_TCI));
 #endif
 
 	/* The ethernet driver already did the pkt_type calculations
@@ -331,8 +334,8 @@ int vlan_dev_hard_header(struct sk_buff *skb, struct net_device *dev,
 	struct net_device *vdev = dev; /* save this for the bottom of the method */
 
 #ifdef VLAN_DEBUG
-	printk(VLAN_DBG __FUNCTION__ ": skb: %p type: %hx len: %x vlan_id: %hx, daddr: %p\n",
-	       skb, type, len, VLAN_DEV_INFO(dev)->vlan_id, daddr);
+	printk(VLAN_DBG "%s: skb: %p type: %hx len: %x vlan_id: %hx, daddr: %p\n",
+		__FUNCTION__, skb, type, len, VLAN_DEV_INFO(dev)->vlan_id, daddr);
 #endif
 
 	/* build vlan header only if re_order_header flag is NOT set.  This
@@ -402,7 +405,7 @@ int vlan_dev_hard_header(struct sk_buff *skb, struct net_device *dev,
 		}
 		VLAN_DEV_INFO(vdev)->cnt_inc_headroom_on_tx++;
 #ifdef VLAN_DEBUG
-		printk(VLAN_DBG __FUNCTION__ ": %s: had to grow skb.\n", vdev->name);
+		printk(VLAN_DBG "%s: %s: had to grow skb.\n", __FUNCTION__, vdev->name);
 #endif
 	}
 
@@ -445,8 +448,8 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		VLAN_DEV_INFO(dev)->cnt_encap_on_xmit++;
 
 #ifdef VLAN_DEBUG
-		printk(VLAN_DBG __FUNCTION__ ": proto to encap: 0x%hx (hbo)\n",
-		       htons(veth->h_vlan_proto));
+		printk(VLAN_DBG "%s: proto to encap: 0x%hx (hbo)\n",
+			__FUNCTION__, htons(veth->h_vlan_proto));
 #endif
 
 		if (skb_headroom(skb) < VLAN_HLEN) {
@@ -455,14 +458,14 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			kfree_skb(sk_tmp);
 			if (skb == NULL) {
 				stats->tx_dropped++;
-				return -ENOMEM;
+				return 0;
 			}
 			VLAN_DEV_INFO(dev)->cnt_inc_headroom_on_tx++;
 		} else {
 			if (!(skb = skb_unshare(skb, GFP_ATOMIC))) {
 				printk(KERN_ERR "vlan: failed to unshare skbuff\n");
 				stats->tx_dropped++;
-				return -ENOMEM;
+				return 0;
 			}
 		}
 		veth = (struct vlan_ethhdr *)skb_push(skb, VLAN_HLEN);
@@ -489,8 +492,8 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	skb->dev = VLAN_DEV_INFO(dev)->real_dev;
 
 #ifdef VLAN_DEBUG
-	printk(VLAN_DBG __FUNCTION__ ": about to send skb: %p to dev: %s\n",
-	       skb, skb->dev->name);
+	printk(VLAN_DBG "%s: about to send skb: %p to dev: %s\n",
+		__FUNCTION__, skb, skb->dev->name);
 	printk(VLAN_DBG "  %2hx.%2hx.%2hx.%2xh.%2hx.%2hx %2hx.%2hx.%2hx.%2hx.%2hx.%2hx %4hx %4hx %4hx\n",
 	       veth->h_dest[0], veth->h_dest[1], veth->h_dest[2], veth->h_dest[3], veth->h_dest[4], veth->h_dest[5],
 	       veth->h_source[0], veth->h_source[1], veth->h_source[2], veth->h_source[3], veth->h_source[4], veth->h_source[5],
@@ -609,19 +612,20 @@ int vlan_dev_set_vlan_flag(char *dev_name, __u32 flag, short flag_val)
 				dev_put(dev);
 				return 0;
 			} else {
-				printk(KERN_ERR __FUNCTION__ ": flag %i is not valid.\n",
-				       (int)(flag));
+				printk(KERN_ERR  "%s: flag %i is not valid.\n",
+					__FUNCTION__, (int)(flag));
 				dev_put(dev);
 				return -EINVAL;
 			}
 		} else {
-			printk(KERN_ERR __FUNCTION__
-			       ": %s is not a vlan device, priv_flags: %hX.\n",
-			       dev->name, dev->priv_flags);
+			printk(KERN_ERR 
+			       "%s: %s is not a vlan device, priv_flags: %hX.\n",
+			       __FUNCTION__, dev->name, dev->priv_flags);
 			dev_put(dev);
 		}
 	} else {
-		printk(KERN_ERR __FUNCTION__ ": Could not find device: %s\n", dev_name);
+		printk(KERN_ERR  "%s: Could not find device: %s\n", 
+			__FUNCTION__, dev_name);
 	}
 
 	return -EINVAL;

@@ -546,7 +546,10 @@ static void myri_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	struct myri_eth *mp		= (struct myri_eth *) dev->priv;
 	unsigned long lregs		= mp->lregs;
 	struct myri_channel *chan	= &mp->shmem->channel;
+	unsigned long flags;
 	u32 status;
+
+	spin_lock_irqsave(&mp->irq_lock, flags);
 
 	status = sbus_readl(lregs + LANAI_ISTAT);
 	DIRQ(("myri_interrupt: status[%08x] ", status));
@@ -569,6 +572,8 @@ static void myri_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		myri_enable_irq(lregs, mp->cregs);
 	}
 	DIRQ(("\n"));
+
+	spin_unlock_irqrestore(&mp->irq_lock, flags);
 }
 
 static int myri_open(struct net_device *dev)
@@ -622,7 +627,7 @@ static int myri_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		return 1;
 	}
 
-	save_and_cli(flags);
+	spin_lock_irqsave(&mp->irq_lock, flags);
 
 	DHDR(("xmit[skbdata(%p)]\n", skb->data));
 #ifdef DEBUG_HEADER
@@ -669,7 +674,7 @@ static int myri_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	DTX(("tbusy=0, returning 0\n"));
 	netif_start_queue(dev);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&mp->irq_lock, flags);
 	return 0;
 }
 
@@ -900,6 +905,7 @@ static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev,
 	printk("%s: MyriCOM MyriNET Ethernet ", dev->name);
 
 	mp = (struct myri_eth *) dev->priv;
+	spin_lock_init(&mp->irq_lock);
 	mp->myri_sdev = sdev;
 
 	/* Clean out skb arrays. */

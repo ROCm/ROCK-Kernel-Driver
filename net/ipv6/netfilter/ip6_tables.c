@@ -742,7 +742,7 @@ check_entry(struct ip6t_entry *e, const char *name, unsigned int size,
 	t = ip6t_get_target(e);
 	target = find_target_lock(t->u.user.name, &ret, &ip6t_mutex);
 	if (!target) {
-	  //		duprintf("check_entry: `%s' not found\n", t->u.name);
+		duprintf("check_entry: `%s' not found\n", t->u.user.name);
 		goto cleanup_matches;
 	}
 	if (target->me)

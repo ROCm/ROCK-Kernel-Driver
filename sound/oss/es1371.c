@@ -2972,6 +2972,11 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
  err_gp:
 	if (s->gameport.io)
 		release_region(s->gameport.io, JOY_EXTENT);
+#ifdef ES1371_DEBUG
+	if (s->ps)
+		remove_proc_entry("es1371", NULL);
+#endif
+	unregister_sound_midi(s->dev_midi);
  err_dev4:
 	unregister_sound_dsp(s->dev_dac);
  err_dev3:

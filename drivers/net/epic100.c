@@ -63,12 +63,15 @@
 	LK1.1.13:
 	* revert version 1.1.12, power-up sequence "fix"
 
+	LK1.1.14 (Kryzsztof Halasa):
+	* fix spurious bad initializations
+	* pound phy a la SMSC's app note on the subject
+
 */
 
-#define DRV_NAME	"epic100"
-#define DRV_VERSION	"1.11+LK1.1.13"
-#define DRV_RELDATE	"Mar 20, 2002"
-
+#define DRV_NAME        "epic100"
+#define DRV_VERSION     "1.11+LK1.1.14"
+#define DRV_RELDATE     "Aug 4, 2002"
 
 /* The user-configurable values.
    These may be modified when a driver module is loaded.*/
@@ -457,7 +460,9 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	/* Bring the chip out of low-power mode. */
 	outl(0x4200, ioaddr + GENCTL);
 	/* Magic?!  If we don't set this bit the MII interface won't work. */
-	outl(0x0008, ioaddr + TEST1);
+	/* This magic is documented in SMSC app note 7.15 */
+	for (i = 16; i > 0; i--)
+		outl(0x0008, ioaddr + TEST1);
 
 	/* Turn on the MII transceiver. */
 	outl(0x12, ioaddr + MIICfg);
@@ -674,7 +679,8 @@ static int epic_open(struct net_device *dev)
 
 	outl(0x4000, ioaddr + GENCTL);
 	/* This magic is documented in SMSC app note 7.15 */
-	outl(0x0008, ioaddr + TEST1);
+	for (i = 16; i > 0; i--)
+		outl(0x0008, ioaddr + TEST1);
 
 	/* Pull the chip out of low-power mode, enable interrupts, and set for
 	   PCI read multiple.  The MIIcfg setting and strange write order are
@@ -697,6 +703,8 @@ static int epic_open(struct net_device *dev)
 	outl(0x0412 | (RX_FIFO_THRESH<<8), ioaddr + GENCTL);
 #endif
 
+	udelay(20); /* Looks like EPII needs that if you want reliable RX init. FIXME: pci posting bug? */
+	
 	for (i = 0; i < 3; i++)
 		outl(cpu_to_le16(((u16*)dev->dev_addr)[i]), ioaddr + LAN0 + i*4);
 

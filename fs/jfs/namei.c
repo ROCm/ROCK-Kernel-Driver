@@ -69,8 +69,6 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode)
 
 	jFYI(1, ("jfs_create: dip:0x%p name:%s\n", dip, dentry->d_name.name));
 
-	IWRITE_LOCK(dip);
-
 	/*
 	 * search parent directory for entry/freespace
 	 * (dtSearch() returns parent directory page pinned)
@@ -91,12 +89,12 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode)
 
 	tid = txBegin(dip->i_sb, 0);
 
+	down(&JFS_IP(dip)->commit_sem);
+	down(&JFS_IP(ip)->commit_sem);
+
 	if ((rc = dtSearch(dip, &dname, &ino, &btstack, JFS_CREATE))) {
 		jERROR(1, ("jfs_create: dtSearch returned %d\n", rc));
-		ip->i_nlink = 0;
-		iput(ip);
-		txEnd(tid);
-		goto out2;
+		goto out3;
 	}
 
 	tblk = tid_to_tblock(tid);
@@ -118,16 +116,11 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode)
 	ino = ip->i_ino;
 	if ((rc = dtInsert(tid, dip, &dname, &ino, &btstack))) {
 		jERROR(1, ("jfs_create: dtInsert returned %d\n", rc));
-		/* discard new inode */
-		ip->i_nlink = 0;
-		iput(ip);
-
 		if (rc == EIO)
 			txAbort(tid, 1);	/* Marks Filesystem dirty */
 		else
 			txAbort(tid, 0);	/* Filesystem full */
-		txEnd(tid);
-		goto out2;
+		goto out3;
 	}
 
 	ip->i_op = &jfs_file_inode_operations;
@@ -143,14 +136,21 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode)
 	mark_inode_dirty(dip);
 
 	rc = txCommit(tid, 2, &iplist[0], 0);
+
+      out3:
 	txEnd(tid);
+	up(&JFS_IP(dip)->commit_sem);
+	up(&JFS_IP(ip)->commit_sem);
+	if (rc) {
+		ip->i_nlink = 0;
+		iput(ip);
+	}
 
       out2:
 	free_UCSname(&dname);
 
       out1:
 
-	IWRITE_UNLOCK(dip);
 	jFYI(1, ("jfs_create: rc:%d\n", -rc));
 	return -rc;
 }
@@ -184,8 +184,6 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 
 	jFYI(1, ("jfs_mkdir: dip:0x%p name:%s\n", dip, dentry->d_name.name));
 
-	IWRITE_LOCK(dip);
-
 	/* link count overflow on parent directory ? */
 	if (dip->i_nlink == JFS_LINK_MAX) {
 		rc = EMLINK;
@@ -212,12 +210,12 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 
 	tid = txBegin(dip->i_sb, 0);
 
+	down(&JFS_IP(dip)->commit_sem);
+	down(&JFS_IP(ip)->commit_sem);
+
 	if ((rc = dtSearch(dip, &dname, &ino, &btstack, JFS_CREATE))) {
 		jERROR(1, ("jfs_mkdir: dtSearch returned %d\n", rc));
-		ip->i_nlink = 0;
-		iput(ip);
-		txEnd(tid);
-		goto out2;
+		goto out3;
 	}
 
 	tblk = tid_to_tblock(tid);
@@ -239,16 +237,12 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 	ino = ip->i_ino;
 	if ((rc = dtInsert(tid, dip, &dname, &ino, &btstack))) {
 		jERROR(1, ("jfs_mkdir: dtInsert returned %d\n", rc));
-		/* discard new directory inode */
-		ip->i_nlink = 0;
-		iput(ip);
 
 		if (rc == EIO)
 			txAbort(tid, 1);	/* Marks Filesystem dirty */
 		else
 			txAbort(tid, 0);	/* Filesystem full */
-		txEnd(tid);
-		goto out2;
+		goto out3;
 	}
 
 	ip->i_nlink = 2;	/* for '.' */
@@ -267,14 +261,20 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 	mark_inode_dirty(dip);
 
 	rc = txCommit(tid, 2, &iplist[0], 0);
+
+      out3:
 	txEnd(tid);
+	up(&JFS_IP(dip)->commit_sem);
+	up(&JFS_IP(ip)->commit_sem);
+	if (rc) {
+		ip->i_nlink = 0;
+		iput(ip);
+	}
 
       out2:
 	free_UCSname(&dname);
 
       out1:
-
-	IWRITE_UNLOCK(dip);
 
 	jFYI(1, ("jfs_mkdir: rc:%d\n", -rc));
 	return -rc;
@@ -311,23 +311,20 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 
 	jFYI(1, ("jfs_rmdir: dip:0x%p name:%s\n", dip, dentry->d_name.name));
 
-	IWRITE_LOCK_LIST(2, dip, ip);
-
 	/* directory must be empty to be removed */
 	if (!dtEmpty(ip)) {
-		IWRITE_UNLOCK(ip);
-		IWRITE_UNLOCK(dip);
 		rc = ENOTEMPTY;
 		goto out;
 	}
 
 	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dip->i_sb)->nls_tab))) {
-		IWRITE_UNLOCK(ip);
-		IWRITE_UNLOCK(dip);
 		goto out;
 	}
 
 	tid = txBegin(dip->i_sb, 0);
+
+	down(&JFS_IP(dip)->commit_sem);
+	down(&JFS_IP(ip)->commit_sem);
 
 	iplist[0] = dip;
 	iplist[1] = ip;
@@ -345,9 +342,8 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 		if (rc == EIO)
 			txAbort(tid, 1);
 		txEnd(tid);
-
-		IWRITE_UNLOCK(ip);
-		IWRITE_UNLOCK(dip);
+		up(&JFS_IP(dip)->commit_sem);
+		up(&JFS_IP(ip)->commit_sem);
 
 		goto out2;
 	}
@@ -384,7 +380,8 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 
 	txEnd(tid);
 
-	IWRITE_UNLOCK(ip);
+	up(&JFS_IP(dip)->commit_sem);
+	up(&JFS_IP(ip)->commit_sem);
 
 	/*
 	 * Truncating the directory index table is not guaranteed.  It
@@ -396,8 +393,6 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 
 		clear_cflag(COMMIT_Stale, dip);
 	}
-
-	IWRITE_UNLOCK(dip);
 
       out2:
 	free_UCSname(&dname);
@@ -444,9 +439,12 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dip->i_sb)->nls_tab)))
 		goto out;
 
-	IWRITE_LOCK_LIST(2, ip, dip);
+	IWRITE_LOCK(ip);
 
 	tid = txBegin(dip->i_sb, 0);
+
+	down(&JFS_IP(dip)->commit_sem);
+	down(&JFS_IP(ip)->commit_sem);
 
 	iplist[0] = dip;
 	iplist[1] = ip;
@@ -460,8 +458,9 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 		if (rc == EIO)
 			txAbort(tid, 1);	/* Marks FS Dirty */
 		txEnd(tid);
+		up(&JFS_IP(dip)->commit_sem);
+		up(&JFS_IP(ip)->commit_sem);
 		IWRITE_UNLOCK(ip);
-		IWRITE_UNLOCK(dip);
 		goto out1;
 	}
 
@@ -483,8 +482,9 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 		if ((new_size = commitZeroLink(tid, ip)) < 0) {
 			txAbort(tid, 1);	/* Marks FS Dirty */
 			txEnd(tid);
+			up(&JFS_IP(dip)->commit_sem);
+			up(&JFS_IP(ip)->commit_sem);
 			IWRITE_UNLOCK(ip);
-			IWRITE_UNLOCK(dip);
 			rc = -new_size;		/* We return -rc */
 			goto out1;
 		}
@@ -511,8 +511,13 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 
 	txEnd(tid);
 
+	up(&JFS_IP(dip)->commit_sem);
+	up(&JFS_IP(ip)->commit_sem);
+
+
 	while (new_size && (rc == 0)) {
 		tid = txBegin(dip->i_sb, 0);
+		down(&JFS_IP(ip)->commit_sem);
 		new_size = xtTruncate_pmap(tid, ip, new_size);
 		if (new_size < 0) {
 			txAbort(tid, 1);	/* Marks FS Dirty */
@@ -520,6 +525,7 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 		} else
 			rc = txCommit(tid, 2, &iplist[0], COMMIT_SYNC);
 		txEnd(tid);
+		up(&JFS_IP(ip)->commit_sem);
 	}
 
 	if (ip->i_nlink == 0)
@@ -538,8 +544,6 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 
 		clear_cflag(COMMIT_Stale, dip);
 	}
-
-	IWRITE_UNLOCK(dip);
 
       out1:
 	free_UCSname(&dname);
@@ -764,9 +768,10 @@ int jfs_link(struct dentry *old_dentry,
 	     ("jfs_link: %s %s\n", old_dentry->d_name.name,
 	      dentry->d_name.name));
 
-	IWRITE_LOCK_LIST(2, dir, ip);
-
 	tid = txBegin(ip->i_sb, 0);
+
+	down(&JFS_IP(dir)->commit_sem);
+	down(&JFS_IP(ip)->commit_sem);
 
 	if (ip->i_nlink == JFS_LINK_MAX) {
 		rc = EMLINK;
@@ -801,10 +806,10 @@ int jfs_link(struct dentry *old_dentry,
 	rc = txCommit(tid, 2, &iplist[0], 0);
 
       out:
-	IWRITE_UNLOCK(dir);
-	IWRITE_UNLOCK(ip);
-
 	txEnd(tid);
+
+	up(&JFS_IP(dir)->commit_sem);
+	up(&JFS_IP(ip)->commit_sem);
 
 	jFYI(1, ("jfs_link: rc:%d\n", rc));
 	return -rc;
@@ -849,11 +854,7 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 
 	jFYI(1, ("jfs_symlink: dip:0x%p name:%s\n", dip, name));
 
-	IWRITE_LOCK(dip);
-
 	ssize = strlen(name) + 1;
-
-	tid = txBegin(dip->i_sb, 0);
 
 	/*
 	 * search parent directory for entry/freespace
@@ -863,22 +864,23 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dip->i_sb)->nls_tab)))
 		goto out1;
 
-	if ((rc = dtSearch(dip, &dname, &ino, &btstack, JFS_CREATE)))
-		goto out2;
-
-
-
 	/*
 	 * allocate on-disk/in-memory inode for symbolic link:
 	 * (iAlloc() returns new, locked inode)
 	 */
-
 	ip = ialloc(dip, S_IFLNK | 0777);
 	if (ip == NULL) {
-		BT_PUTSEARCH(&btstack);
 		rc = ENOSPC;
 		goto out2;
 	}
+
+	tid = txBegin(dip->i_sb, 0);
+
+	down(&JFS_IP(dip)->commit_sem);
+	down(&JFS_IP(ip)->commit_sem);
+
+	if ((rc = dtSearch(dip, &dname, &ino, &btstack, JFS_CREATE)))
+		goto out3;
 
 	tblk = tid_to_tblock(tid);
 	tblk->xflag |= COMMIT_CREATE;
@@ -895,9 +897,7 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 	if ((rc = dtInsert(tid, dip, &dname, &ino, &btstack))) {
 		jERROR(1, ("jfs_symlink: dtInsert returned %d\n", rc));
 		/* discard ne inode */
-		ip->i_nlink = 0;
-		iput(ip);
-		goto out2;
+		goto out3;
 
 	}
 
@@ -955,10 +955,8 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 				if (mp == NULL) {
 					dtDelete(tid, dip, &dname, &ino,
 						 JFS_REMOVE);
-					ip->i_nlink = 0;
-					iput(ip);
 					rc = EIO;
-					goto out2;
+					goto out3;
 				}
 				memcpy(mp->data, name, copy_size);
 				flush_metapage(mp);
@@ -977,10 +975,8 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 			ip->i_blocks = LBLK2PBLK(sb, xlen);
 		} else {
 			dtDelete(tid, dip, &dname, &ino, JFS_REMOVE);
-			ip->i_nlink = 0;
-			iput(ip);
 			rc = ENOSPC;
-			goto out2;
+			goto out3;
 		}
 	}
 
@@ -1008,14 +1004,19 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 	} else
 		rc = txCommit(tid, 1, &iplist[0], 0);
 
-      out2:
-
-	free_UCSname(&dname);
-      out1:
-	IWRITE_UNLOCK(dip);
-
+      out3:
 	txEnd(tid);
+	up(&JFS_IP(dip)->commit_sem);
+	up(&JFS_IP(ip)->commit_sem);
+	if (rc) {
+		ip->i_nlink = 0;
+		iput(ip);
+	}
 
+      out2:
+	free_UCSname(&dname);
+
+      out1:
 	jFYI(1, ("jfs_symlink: rc:%d\n", -rc));
 	return -rc;
 }
@@ -1053,19 +1054,6 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 	old_ip = old_dentry->d_inode;
 	new_ip = new_dentry->d_inode;
-
-	if (old_dir == new_dir) {
-		if (new_ip)
-			IWRITE_LOCK_LIST(3, old_dir, old_ip, new_ip);
-		else
-			IWRITE_LOCK_LIST(2, old_dir, old_ip);
-	} else {
-		if (new_ip)
-			IWRITE_LOCK_LIST(4, old_dir, new_dir, old_ip,
-					 new_ip);
-		else
-			IWRITE_LOCK_LIST(3, old_dir, new_dir, old_ip);
-	}
 
 	if ((rc = get_UCSname(&old_dname, old_dentry,
 			      JFS_SBI(old_dir->i_sb)->nls_tab)))
@@ -1112,14 +1100,21 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			rc = EMLINK;
 			goto out3;
 		}
-	}
+	} else if (new_ip)
+		IWRITE_LOCK(new_ip);
 
 	/*
 	 * The real work starts here
 	 */
 	tid = txBegin(new_dir->i_sb, 0);
 
+	down(&JFS_IP(new_dir)->commit_sem);
+	down(&JFS_IP(old_ip)->commit_sem);
+	if (old_dir != new_dir)
+		down(&JFS_IP(old_dir)->commit_sem);
+
 	if (new_ip) {
+		down(&JFS_IP(new_ip)->commit_sem);
 		/*
 		 * Change existing directory entry to new inode number
 		 */
@@ -1247,14 +1242,24 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	/*
 	 * Don't unlock new_ip if COMMIT_HOLDLOCK is set
 	 */
-	if (new_ip && test_cflag(COMMIT_Holdlock, new_ip))
+	if (new_ip && test_cflag(COMMIT_Holdlock, new_ip)) {
+		up(&JFS_IP(new_ip)->commit_sem);
 		new_ip = 0;
+	}
 
       out4:
 	txEnd(tid);
 
+	up(&JFS_IP(new_dir)->commit_sem);
+	up(&JFS_IP(old_ip)->commit_sem);
+	if (old_dir != new_dir)
+		up(&JFS_IP(old_dir)->commit_sem);
+	if (new_ip)
+		up(&JFS_IP(new_ip)->commit_sem);
+
 	while (new_size && (rc == 0)) {
 		tid = txBegin(new_ip->i_sb, 0);
+		down(&JFS_IP(new_ip)->commit_sem);
 		new_size = xtTruncate_pmap(tid, new_ip, new_size);
 		if (new_size < 0) {
 			txAbort(tid, 1);
@@ -1262,6 +1267,7 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		} else
 			rc = txCommit(tid, 1, &new_ip, COMMIT_SYNC);
 		txEnd(tid);
+		up(&JFS_IP(new_ip)->commit_sem);
 	}
 	if (new_ip && (new_ip->i_nlink == 0))
 		set_cflag(COMMIT_Nolink, new_ip);
@@ -1270,12 +1276,8 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
       out2:
 	free_UCSname(&old_dname);
       out1:
-	IWRITE_UNLOCK(old_ip);
-	if (old_dir != new_dir)
-		IWRITE_UNLOCK(new_dir);
-	if (new_ip)
+	if (new_ip && !S_ISDIR(new_ip->i_mode))
 		IWRITE_UNLOCK(new_ip);
-
 	/*
 	 * Truncating the directory index table is not guaranteed.  It
 	 * may need to be done iteratively
@@ -1286,8 +1288,6 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 		clear_cflag(COMMIT_Stale, old_dir);
 	}
-
-	IWRITE_UNLOCK(old_dir);
 
 	jFYI(1, ("jfs_rename: returning %d\n", rc));
 	return -rc;
@@ -1315,8 +1315,6 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dir->i_sb)->nls_tab)))
 		goto out;
 
-	IWRITE_LOCK(dir);
-
 	ip = ialloc(dir, mode);
 	if (ip == NULL) {
 		rc = ENOSPC;
@@ -1325,24 +1323,19 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 
 	tid = txBegin(dir->i_sb, 0);
 
-	if ((rc = dtSearch(dir, &dname, &ino, &btstack, JFS_CREATE))) {
-		ip->i_nlink = 0;
-		iput(ip);
-		txEnd(tid);
-		goto out1;
-	}
+	down(&JFS_IP(dir)->commit_sem);
+	down(&JFS_IP(ip)->commit_sem);
+
+	if ((rc = dtSearch(dir, &dname, &ino, &btstack, JFS_CREATE)))
+		goto out3;
 
 	tblk = tid_to_tblock(tid);
 	tblk->xflag |= COMMIT_CREATE;
 	tblk->ip = ip;
 
 	ino = ip->i_ino;
-	if ((rc = dtInsert(tid, dir, &dname, &ino, &btstack))) {
-		ip->i_nlink = 0;
-		iput(ip);
-		txEnd(tid);
-		goto out1;
-	}
+	if ((rc = dtInsert(tid, dir, &dname, &ino, &btstack)))
+		goto out3;
 
 	init_special_inode(ip, ip->i_mode, rdev);
 
@@ -1357,10 +1350,17 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 	iplist[0] = dir;
 	iplist[1] = ip;
 	rc = txCommit(tid, 2, iplist, 0);
+
+      out3:
 	txEnd(tid);
+	up(&JFS_IP(ip)->commit_sem);
+	up(&JFS_IP(dir)->commit_sem);
+	if (rc) {
+		ip->i_nlink = 0;
+		iput(ip);
+	}
 
       out1:
-	IWRITE_UNLOCK(dir);
 	free_UCSname(&dname);
 
       out:
@@ -1389,9 +1389,7 @@ static struct dentry *jfs_lookup(struct inode *dip, struct dentry *dentry)
 		if ((rc =
 		     get_UCSname(&key, dentry, JFS_SBI(dip->i_sb)->nls_tab)))
 			return ERR_PTR(-rc);
-		IREAD_LOCK(dip);
 		rc = dtSearch(dip, &key, &inum, &btstack, JFS_LOOKUP);
-		IREAD_UNLOCK(dip);
 		free_UCSname(&key);
 		if (rc == ENOENT) {
 			d_add(dentry, NULL);

@@ -363,6 +363,7 @@ static void __devexit orinoco_plx_remove_one(struct pci_dev *pdev)
 
 
 static struct pci_device_id orinoco_plx_pci_id_table[] __devinitdata = {
+	{0x10b7, 0x7770, PCI_ANY_ID, PCI_ANY_ID,},	/* 3ComAirConnect */
 	{0x111a, 0x1023, PCI_ANY_ID, PCI_ANY_ID,},	/* Siemens SpeedStream SS1023 */
 	{0x1385, 0x4100, PCI_ANY_ID, PCI_ANY_ID,},	/* Netgear MA301 */
 	{0x15e8, 0x0130, PCI_ANY_ID, PCI_ANY_ID,},	/* Correga  - does this work? */
@@ -385,9 +386,7 @@ static struct pci_driver orinoco_plx_driver = {
 	.name		= "orinoco_plx",
 	.id_table	= orinoco_plx_pci_id_table,
 	.probe		= orinoco_plx_init_one,
-	.remove		= orinoco_plx_remove_one,
-	.suspend	= 0,
-	.resume		= 0
+	.remove		= __devexit_p(orinoco_plx_remove_one),
 };
 
 static int __init orinoco_plx_init(void)

@@ -177,13 +177,23 @@ typedef void (*__cleanup_module_func_t)(void);
 #define __devinitdata
 #define __devexit
 #define __devexitdata
-#define __devexit_p(x)  &(x)
 #else
 #define __devinit __init
 #define __devinitdata __initdata
 #define __devexit __exit
 #define __devexitdata __exitdata
-#define __devexit_p(x)  0
+#endif
+
+/* Functions marked as __devexit may be discarded at kernel link time, depending
+   on config options.  Newer versions of binutils detect references from
+   retained sections to discarded sections and flag an error.  Pointers to
+   __devexit functions must use __devexit_p(function_name), the wrapper will
+   insert either the function_name or NULL, depending on the config options.
+ */
+#if defined(MODULE) || defined(CONFIG_HOTPLUG)
+#define __devexit_p(x) x
+#else
+#define __devexit_p(x) NULL
 #endif
 
 #endif /* _LINUX_INIT_H */

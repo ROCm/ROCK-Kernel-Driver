@@ -221,6 +221,8 @@ typedef enum {
 	FE2000VX,
 	ALLIED8139,
 	RTL8129,
+	FNW3603TX,
+	FNW3800TX,
 } board_t;
 
 
@@ -240,6 +242,8 @@ static struct {
 	{ "AboCom FE2000VX (RealTek RTL8139)", RTL8139_CAPS },
 	{ "Allied Telesyn 8139 CardBus", RTL8139_CAPS },
 	{ "RealTek RTL8129", RTL8129_CAPS },
+	{ "Planex FNW-3603-TX 10/100 CardBus", RTL8139_CAPS },
+	{ "Planex FNW-3800-TX 10/100 CardBus", RTL8139_CAPS },
 };
 
 
@@ -254,6 +258,8 @@ static struct pci_device_id rtl8139_pci_tbl[] __devinitdata = {
 	{0x1186, 0x1340, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DFE690TXD },
 	{0x13d1, 0xab06, PCI_ANY_ID, PCI_ANY_ID, 0, 0, FE2000VX },
 	{0x1259, 0xa117, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ALLIED8139 },
+	{0x14ea, 0xab06, PCI_ANY_ID, PCI_ANY_ID, 0, 0, FNW3603TX },
+	{0x14ea, 0xab07, PCI_ANY_ID, PCI_ANY_ID, 0, 0, FNW3800TX },
 
 #ifdef CONFIG_8139TOO_8129
 	{0x10ec, 0x8129, PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8129 },

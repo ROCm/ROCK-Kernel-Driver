@@ -17,37 +17,61 @@
 #include <linux/sysctl.h>
 
 #ifdef CONFIG_INET
-extern ctl_table ipv4_table[];
+extern struct ctl_table ipv4_table[];
 #endif
 
-extern ctl_table core_table[];
+extern struct ctl_table core_table[];
 
 #ifdef CONFIG_NET
-extern ctl_table ether_table[], e802_table[];
+extern struct ctl_table ether_table[];
 #endif
 
 #ifdef CONFIG_IPV6
-extern ctl_table ipv6_table[];
+extern struct ctl_table ipv6_table[];
 #endif
 
 #ifdef CONFIG_TR
-extern ctl_table tr_table[];
+extern struct ctl_table tr_table[];
 #endif
 
-ctl_table net_table[] = {
-	{NET_CORE,   "core",      NULL, 0, 0555, core_table},      
+struct ctl_table net_table[] = {
+	{
+		.ctl_name	= NET_CORE,
+		.procname	= "core",
+		.mode		= 0555,
+		.child		= core_table,
+	},
 #ifdef CONFIG_NET
-	{NET_802,    "802",       NULL, 0, 0555, e802_table},
-	{NET_ETHER,  "ethernet",  NULL, 0, 0555, ether_table},
+	{
+		.ctl_name	= NET_ETHER,
+		.procname	= "ethernet",
+		.mode		= 0555,
+		.child		= ether_table,
+	},
 #endif
 #ifdef CONFIG_INET
-	{NET_IPV4,   "ipv4",      NULL, 0, 0555, ipv4_table},
+	{
+		.ctl_name	= NET_IPV4,
+		.procname	= "ipv4",
+		.mode		= 0555,
+		.child		= ipv4_table
+	},
 #endif
 #ifdef CONFIG_IPV6
-	{NET_IPV6, "ipv6", NULL, 0, 0555, ipv6_table},
+	{
+		.ctl_name	= NET_IPV6,
+		.procname	= "ipv6",
+		.mode		= 0555,
+		.child		= ipv6_table,
+	},
 #endif
 #ifdef CONFIG_TR
-	{NET_TR, "token-ring", NULL, 0, 0555, tr_table},
+	{
+		.ctl_name	= NET_TR,
+		.procname	= "token-ring",
+		.mode		= 0555,
+		.child		= tr_table,
+	},
 #endif
-	{0}
+	{ 0 },
 };
