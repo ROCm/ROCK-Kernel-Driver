@@ -933,7 +933,6 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 			continue;
 		}
 
-		page_cache_get(page);
 		target = kmap_atomic(page,KM_USER0);
 
 		if(PAGE_CACHE_SIZE > bytes_read) {
@@ -947,12 +946,11 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 		}
 		kunmap_atomic(target,KM_USER0);
 
-		if (!pagevec_add(plru_pvec, page))
-			__pagevec_lru_add(plru_pvec);
 		flush_dcache_page(page);
 		SetPageUptodate(page);
-		unlock_page(page);   /* BB verify we need to unlock here */
-	   /* page_cache_release(page);*/
+		unlock_page(page);
+		if (!pagevec_add(plru_pvec, page))
+			__pagevec_lru_add(plru_pvec);
 		data += PAGE_CACHE_SIZE;
 	}
 	return;
@@ -1092,10 +1090,10 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 	pagevec_lru_add(&lru_pvec);
 
 /* need to free smb_read_data buf before exit */
-if(smb_read_data) {
-	cifs_buf_release(smb_read_data);
-	smb_read_data = 0;
-} 
+	if(smb_read_data) {
+		cifs_buf_release(smb_read_data);
+		smb_read_data = 0;
+	} 
 
 	FreeXid(xid);
 	return rc;

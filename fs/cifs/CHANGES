@@ -1,6 +1,8 @@
 Version 1.07
 ------------
-Fix some small memory leaks in some unmount error paths.
+Fix some small memory leaks in some unmount error paths. Fix major leak
+of cache pages in readpages causing multiple read oriented stress
+testcases (including fsx, and even large file copy) to fail over time. 
 
 Version 1.06
 ------------

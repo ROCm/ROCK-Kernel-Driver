@@ -44,7 +44,7 @@ extern void SMBencrypt(unsigned char *passwd, unsigned char *c8,
 		       unsigned char *p24);
 extern void SMBNTencrypt(unsigned char *passwd, unsigned char *c8,
 			 unsigned char *p24);
-extern int cifs_inet_addr(char *);
+extern int cifs_inet_pton(int, const char *, void *dst);
 
 struct smb_vol {
 	char *username;
@@ -992,7 +992,23 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	}
 
 	if (volume_info.UNCip && volume_info.UNC) {
-		sin_server.sin_addr.s_addr = cifs_inet_addr(volume_info.UNCip);
+		rc = cifs_inet_pton(AF_INET, volume_info.UNCip,&sin_server.sin_addr.s_addr);
+
+		if(rc == 0) {
+			/* not ipv4 address, try ipv6 */
+			rc = cifs_inet_pton(AF_INET6,volume_info.UNCip,&sin_server6.sin6_addr.in6_u); 
+		} 
+       
+		if(rc != 1) {
+			/* we failed translating address */
+			if(volume_info.UNC)
+				kfree(volume_info.UNC);
+			if(volume_info.password)
+				kfree(volume_info.password);
+			FreeXid(xid);
+			return -EINVAL;
+		}
+
 		cFYI(1, ("UNC: %s ip: %s  ", volume_info.UNC, volume_info.UNCip));
 	} else if (volume_info.UNCip){
 		/* BB using ip addr as server name connect to the DFS root below */
