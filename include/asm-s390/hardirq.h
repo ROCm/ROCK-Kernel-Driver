@@ -18,14 +18,17 @@
 #include <linux/cache.h>
 #include <asm/lowcore.h>
 
-/* entry.S is sensitive to the offsets of these fields */
+/* irq_cpustat_t is unused currently, but could be converted
+ * into a percpu variable instead of storing softirq_pending
+ * on the lowcore */
 typedef struct {
 	unsigned int __softirq_pending;
-	unsigned int __syscall_count;
-	struct task_struct * __ksoftirqd_task; /* waitqueue is too large */
-} ____cacheline_aligned irq_cpustat_t;
+} irq_cpustat_t;
 
-#include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
+#define softirq_pending(cpu) (lowcore_ptr[(cpu)]->softirq_pending)
+#define local_softirq_pending() (S390_lowcore.softirq_pending)
+
+#define __ARCH_IRQ_STAT
 
 /*
  * We put the hardirq and softirq counter into the preemption
@@ -76,7 +79,12 @@ typedef struct {
 #define hardirq_trylock()	(!in_interrupt())
 #define hardirq_endlock()	do { } while (0)
 
-#define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
+#define irq_enter()							\
+do {									\
+	BUG_ON( hardirq_count() );					\
+	(preempt_count() += HARDIRQ_OFFSET);				\
+} while(0)
+	
 
 extern void do_call_softirq(void);
 
@@ -93,16 +101,10 @@ extern void do_call_softirq(void);
 #define irq_exit()							\
 do {									\
 	preempt_count() -= IRQ_EXIT_OFFSET;				\
-	if (!in_interrupt() && softirq_pending(smp_processor_id()))	\
+	if (!in_interrupt() && local_softirq_pending())			\
 		/* Use the async. stack for softirq */			\
 		do_call_softirq();					\
 	preempt_enable_no_resched();					\
 } while (0)
-
-#ifndef CONFIG_SMP
-# define synchronize_irq(irq)	barrier()
-#else
-  extern void synchronize_irq(unsigned int irq);
-#endif /* CONFIG_SMP */
 
 #endif /* __ASM_HARDIRQ_H */

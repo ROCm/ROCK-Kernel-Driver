@@ -127,7 +127,8 @@ __switch_to_noper:
         stam    %a4,%a4,__THREAD_ar4(%r2)	# store kernel access reg. 4
         lam     %a2,%a2,__THREAD_ar2(%r3)	# load kernel access reg. 2
         lam     %a4,%a4,__THREAD_ar4(%r3)	# load kernel access reg. 4
-        lmg     %r6,%r15,48(%r15)       # load resume registers of next task
+        lmg     %r6,%r15,48(%r15)       # load __switch_to registers of next task
+	stg	%r3,__LC_CURRENT	# __LC_CURRENT = current task struct
 	lg	%r3,__THREAD_info(%r3)  # load thread_info from task struct
 	aghi	%r3,16384
 	stg	%r3,__LC_KERNEL_STACK	# __LC_KERNEL_STACK = new kernel stack
