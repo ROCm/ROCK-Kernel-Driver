@@ -782,8 +782,12 @@ uart_set_info(struct uart_state *state, struct serial_struct *newinfo)
 		/*
 		 * Claim and map the new regions
 		 */
-		if (port->type != PORT_UNKNOWN)
+		if (port->type != PORT_UNKNOWN) {
 			retval = port->ops->request_port(port);
+		} else {
+			/* Always success - Jean II */
+			retval = 0;
+		}
 
 		/*
 		 * If we fail to request resources for the
