@@ -4958,7 +4958,7 @@ static int __devinit hdsp_request_fw_loader(hdsp_t *hdsp)
 #ifdef SNDRV_BIG_ENDIAN
 	{
 		int i;
-		u32 *src = hdsp->data;
+		u32 *src = (void *)fw->data;
 		for (i = 0; i < ARRAY_SIZE(hdsp->firmware_cache); i++, src++)
 			hdsp->firmware_cache[i] = ((*src & 0x000000ff) << 16) |
 				((*src & 0x0000ff00) << 8)  |
