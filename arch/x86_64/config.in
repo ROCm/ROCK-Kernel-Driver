@@ -223,7 +223,6 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
    bool '  Additional run-time checks' CONFIG_CHECKING
    bool '  Debug __init statements' CONFIG_INIT_DEBUG
-   bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
 fi
 endmenu
 

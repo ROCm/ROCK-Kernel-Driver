@@ -283,7 +283,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	      "$CONFIG_FB_VIRGE" = "m" -o "$CONFIG_FB_CYBER" = "m" -o \
 	      "$CONFIG_FB_VALKYRIE" = "m" -o "$CONFIG_FB_PLATINUM" = "m" -o \
               "$CONFIG_FB_IGA" = "m" -o "$CONFIG_FB_MATROX" = "m" -o \
-	      "$CONFIG_FB_CT65550" = "m" -o "$CONFIG_FB_PM2" = "m"-o \
+	      "$CONFIG_FB_CT65550" = "m" -o "$CONFIG_FB_PM2" = "m" -o \
 	      "$CONFIG_FB_SA1100" = "m" ]; then
 	    define_tristate CONFIG_FBCON_CFB8 m
 	 fi
