@@ -42,6 +42,8 @@ struct dst_entry
 	int			obsolete;
 	int			flags;
 #define DST_HOST		1
+#define DST_NOXFRM		2
+#define DST_NOPOLICY		4
 	unsigned long		lastuse;
 	unsigned long		expires;
 
