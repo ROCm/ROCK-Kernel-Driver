@@ -270,8 +270,12 @@ static int sa1110_target(struct cpufreq_policy *policy,
 	 * We wait 20ms to be safe.
 	 */
 	sdram_set_refresh(2);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(20 * HZ / 1000);
+	if (!irqs_disabled()) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(20 * HZ / 1000);
+	} else {
+		mdelay(20);
+	}
 
 	/*
 	 * Reprogram the DRAM timings with interrupts disabled, and
