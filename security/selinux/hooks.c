@@ -1516,6 +1516,7 @@ static void selinux_bprm_compute_creds(struct linux_binprm *bprm)
 	u32 sid;
 	struct av_decision avd;
 	struct itimerval itimer;
+	struct rlimit *rlim, *initrlim;
 	int rc, i;
 
 	secondary_ops->bprm_compute_creds(bprm);
@@ -1584,6 +1585,26 @@ static void selinux_bprm_compute_creds(struct linux_binprm *bprm)
 			sigemptyset(&current->blocked);
 			recalc_sigpending();
 			spin_unlock_irq(&current->sighand->siglock);
+		}
+
+		/* Check whether the new SID can inherit resource limits
+		   from the old SID.  If not, reset all soft limits to
+		   the lower of the current task's hard limit and the init
+		   task's soft limit.  Note that the setting of hard limits 
+		   (even to lower them) can be controlled by the setrlimit 
+		   check. The inclusion of the init task's soft limit into
+	           the computation is to avoid resetting soft limits higher
+		   than the default soft limit for cases where the default
+		   is lower than the hard limit, e.g. RLIMIT_CORE or 
+		   RLIMIT_STACK.*/
+		rc = avc_has_perm(tsec->osid, tsec->sid, SECCLASS_PROCESS,
+				  PROCESS__RLIMITINH, NULL, NULL);
+		if (rc) {
+			for (i = 0; i < RLIM_NLIMITS; i++) {
+				rlim = current->rlim + i;
+				initrlim = init_task.rlim+i;
+				rlim->rlim_cur = min(rlim->rlim_max,initrlim->rlim_cur);
+			}
 		}
 
 		/* Wake up the parent if it is waiting so that it can
@@ -2222,10 +2243,15 @@ static int selinux_task_setnice(struct task_struct *p, int nice)
 
 static int selinux_task_setrlimit(unsigned int resource, struct rlimit *new_rlim)
 {
-	/* SELinux does not currently provide a process
-	   resource limit policy based on security contexts.
-	   It does control the use of the CAP_SYS_RESOURCE capability
-	   using the capable hook. */
+	struct rlimit *old_rlim = current->rlim + resource;
+
+	/* Control the ability to change the hard limit (whether
+	   lowering or raising it), so that the hard limit can
+	   later be used as a safe reset point for the soft limit
+	   upon context transitions. See selinux_bprm_compute_creds. */
+	if (old_rlim->rlim_max != new_rlim->rlim_max)
+		return task_has_perm(current, current, PROCESS__SETRLIMIT);
+
 	return 0;
 }
 

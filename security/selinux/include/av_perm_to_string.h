@@ -67,6 +67,8 @@ static struct av_perm_to_string av_perm_to_string[] = {
    { SECCLASS_PROCESS, PROCESS__SETFSCREATE, "setfscreate" },
    { SECCLASS_PROCESS, PROCESS__NOATSECURE, "noatsecure" },
    { SECCLASS_PROCESS, PROCESS__SIGINH, "siginh" },
+   { SECCLASS_PROCESS, PROCESS__SETRLIMIT, "setrlimit" },
+   { SECCLASS_PROCESS, PROCESS__RLIMITINH, "rlimitinh" },
    { SECCLASS_MSGQ, MSGQ__ENQUEUE, "enqueue" },
    { SECCLASS_MSG, MSG__SEND, "send" },
    { SECCLASS_MSG, MSG__RECEIVE, "receive" },

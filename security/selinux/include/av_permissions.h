@@ -451,6 +451,8 @@
 #define PROCESS__SETFSCREATE                      0x00040000UL
 #define PROCESS__NOATSECURE                       0x00080000UL
 #define PROCESS__SIGINH                           0x00100000UL
+#define PROCESS__SETRLIMIT                        0x00200000UL
+#define PROCESS__RLIMITINH                        0x00400000UL
 
 #define IPC__SETATTR                              0x00000008UL
 #define IPC__READ                                 0x00000010UL
