@@ -63,6 +63,7 @@
 #define ACPI_THERMAL_MAX_ACTIVE	10
 
 #define KELVIN_TO_CELSIUS(t)	((t-2732+5)/10)
+#define CELSIUS_TO_KELVIN(t)	((t+273)*10)
 
 #define _COMPONENT		ACPI_THERMAL_COMPONENT
 ACPI_MODULE_NAME		("acpi_thermal")
@@ -869,6 +870,46 @@ end:
 
 
 static int
+acpi_thermal_write_trip_points (
+        struct file		*file,
+        const char		*buffer,
+        unsigned long		count,
+        void			*data)
+{
+	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
+	char			limit_string[25] = {'\0'};
+	int			critical, hot, passive, active0, active1;
+
+	ACPI_FUNCTION_TRACE("acpi_thermal_write_trip_points");
+
+	if (!tz || (count > sizeof(limit_string) - 1)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid argument\n"));
+		return_VALUE(-EINVAL);
+	}
+	
+	if (copy_from_user(limit_string, buffer, count)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid data\n"));
+		return_VALUE(-EFAULT);
+	}
+	
+	limit_string[count] = '\0';
+
+	if (sscanf(limit_string, "%d:%d:%d:%d:%d", &critical, &hot, &passive, &active0, &active1) != 5) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid data format\n"));
+		return_VALUE(-EINVAL);
+	}
+
+	tz->trips.critical.temperature = CELSIUS_TO_KELVIN(critical);
+	tz->trips.hot.temperature = CELSIUS_TO_KELVIN(hot);
+	tz->trips.passive.temperature = CELSIUS_TO_KELVIN(passive);
+	tz->trips.active[0].temperature = CELSIUS_TO_KELVIN(active0);
+	tz->trips.active[1].temperature = CELSIUS_TO_KELVIN(active1);
+	
+	return_VALUE(count);
+}
+
+
+static int
 acpi_thermal_read_cooling_mode (
 	char			*page,
 	char			**start,
@@ -1057,15 +1098,16 @@ acpi_thermal_add_fs (
 		entry->data = acpi_driver_data(device);
 	}
 
-	/* 'trip_points' [R] */
+	/* 'trip_points' [R/W] */
 	entry = create_proc_entry(ACPI_THERMAL_FILE_TRIP_POINTS,
-		S_IRUGO, acpi_device_dir(device));
+		S_IFREG|S_IRUGO|S_IWUSR, acpi_device_dir(device));
 	if (!entry)
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
 			"Unable to create '%s' fs entry\n",
 			ACPI_THERMAL_FILE_POLLING_FREQ));
 	else {
 		entry->read_proc = acpi_thermal_read_trip_points;
+		entry->write_proc = acpi_thermal_write_trip_points;
 		entry->data = acpi_driver_data(device);
 	}
 
