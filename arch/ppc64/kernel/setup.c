@@ -121,8 +121,8 @@ unsigned long SYSRQ_KEY;
 
 static int ppc64_panic_event(struct notifier_block *, unsigned long, void *);
 static struct notifier_block ppc64_panic_block = {
-	notifier_call: ppc64_panic_event,
-	priority: INT_MIN /* may not return; must be done last */
+	.notifier_call = ppc64_panic_event,
+	.priority = INT_MIN /* may not return; must be done last */
 };
 
 /*
