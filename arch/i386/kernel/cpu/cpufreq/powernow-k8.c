@@ -718,21 +718,38 @@ static int transition_frequency(struct powernow_k8_data *data, unsigned int inde
 /* Driver entry point to switch to the target frequency */
 static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relation)
 {
+	cpumask_t oldmask = CPU_MASK_ALL;
 	struct powernow_k8_data *data = powernow_data[pol->cpu];
 	u32 checkfid = data->currfid;
 	u32 checkvid = data->currvid;
 	unsigned int newstate;
+	int ret = -EIO;
 
-	if (pending_bit_stuck()) {
-		printk(KERN_ERR PFX "drv targ fail: change pending bit set\n");
-		return -EIO;
+	/* only run on specific CPU from here on */
+	oldmask = current->cpus_allowed;
+	set_cpus_allowed(current, cpumask_of_cpu(pol->cpu));
+	schedule();
+
+	if (smp_processor_id() != pol->cpu) {
+		printk(KERN_ERR "limiting to cpu %u failed\n", pol->cpu);
+		goto err_out;
 	}
 
-	dprintk(KERN_DEBUG PFX "targ: %d kHz, min %d, max %d, relation %d\n",
-		targfreq, pol->min, pol->max, relation);
+	/* from this point, do not exit without restoring preempt and cpu */
+	preempt_disable();
 
-	if (query_current_values_with_pending_wait(data))
-		return -EIO;
+	if (pending_bit_stuck()) {
+		printk(KERN_ERR PFX "failing targ, change pending bit set\n");
+		goto err_out;
+	}
+
+	dprintk(KERN_DEBUG PFX "targ: cpu %d, %d kHz, min %d, max %d, relation %d\n",
+		pol->cpu, targfreq, pol->min, pol->max, relation);
+
+	if (query_current_values_with_pending_wait(data)) {
+		ret = -EIO;
+		goto err_out;
+	}
 
 	dprintk(KERN_DEBUG PFX "targ: curr fid 0x%x, vid 0x%x\n",
 		data->currfid, data->currvid);
@@ -744,16 +761,23 @@ static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsi
 	}
 
 	if (cpufreq_frequency_table_target(pol, data->powernow_table, targfreq, relation, &newstate))
-		return -EINVAL;
+		goto err_out;
 	
 	if (transition_frequency(data, newstate)) {
 		printk(KERN_ERR PFX "transition frequency failed\n");
-		return 1;
+		ret = 1;
+		goto err_out;
 	}
 
-	pol->cur = 1000 * find_freq_from_fid(data->currfid);
+	pol->cur = find_khz_freq_from_fid(data->currfid);
+	ret = 0;
 
-	return 0;
+err_out:
+	preempt_enable_no_resched();
+	set_cpus_allowed(current, oldmask);
+	schedule();
+
+	return ret;
 }
 
 /* Driver entry point to verify the policy and range of frequencies */
