@@ -717,7 +717,7 @@ config HIGHMEM
 
 config ISA
 	bool "Support for ISA-bus hardware"
-	depends on PREP || CHRP
+	depends on PPC_PREP || PPC_CHRP
 	help
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
