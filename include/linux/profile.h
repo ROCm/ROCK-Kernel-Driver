@@ -17,6 +17,7 @@ void __init profile_init(void);
 extern unsigned int * prof_buffer;
 extern unsigned long prof_len;
 extern unsigned long prof_shift;
+extern int prof_on;
 
 
 enum profile_type {
