@@ -45,7 +45,6 @@ struct joydev {
 	char name[16];
 	struct input_handle handle;
 	wait_queue_head_t wait;
-	devfs_handle_t devfs;
 	struct list_head list;
 	struct js_corr corr[ABS_MAX];
 	struct JS_DATA_SAVE_TYPE glue;
@@ -141,6 +140,13 @@ static int joydev_fasync(int fd, struct file *file, int on)
 	return retval < 0 ? retval : 0;
 }
 
+static void joydev_free(struct joydev *joydev)
+{
+	devfs_remove("js%d", joydev->minor);
+	joydev_table[joydev->minor] = NULL;
+	kfree(joydev);
+}
+
 static int joydev_release(struct inode * inode, struct file * file)
 {
 	struct joydev_list *list = file->private_data;
@@ -150,17 +156,13 @@ static int joydev_release(struct inode * inode, struct file * file)
 	list_del(&list->node);
 
 	if (!--list->joydev->open) {
-		if (list->joydev->exist) {
+		if (list->joydev->exist)
 			input_close_device(&list->joydev->handle);
-		} else {
-			input_unregister_minor(list->joydev->devfs);
-			joydev_table[list->joydev->minor] = NULL;
-			kfree(list->joydev);
-		}
+		else
+			joydev_free(list->joydev);
 	}
 
 	kfree(list);
-
 	return 0;
 }
 
@@ -442,7 +444,7 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 	}
 
 	joydev_table[minor] = joydev;
-	joydev->devfs = input_register_minor("js%d", minor, JOYDEV_MINOR_BASE);
+	input_register_minor("js%d", minor, JOYDEV_MINOR_BASE);
 
 	return &joydev->handle;
 }
@@ -453,13 +455,10 @@ static void joydev_disconnect(struct input_handle *handle)
 
 	joydev->exist = 0;
 
-	if (joydev->open) {
+	if (joydev->open)
 		input_close_device(handle);	
-	} else {
-		input_unregister_minor(joydev->devfs);
-		joydev_table[joydev->minor] = NULL;
-		kfree(joydev);
-	}
+	else
+		joydev_free(joydev);
 }
 
 static struct input_device_id joydev_ids[] = {

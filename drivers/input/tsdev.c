@@ -57,7 +57,6 @@ struct tsdev {
 	wait_queue_head_t wait;
 	struct list_head list;
 	struct input_handle handle;
-	devfs_handle_t devfs;
 };
 
 /* From Compaq's Touch Screen Specification version 0.2 (draft) */
@@ -115,6 +114,13 @@ static int tsdev_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static void tsdev_free(struct tsdev *tsdev)
+{
+	devfs_remove("input/ts%d", tsdev->minor);
+	tsdev_table[tsdev->minor] = NULL;
+	kfree(tsdev);
+}
+
 static int tsdev_release(struct inode *inode, struct file *file)
 {
 	struct tsdev_list *list = file->private_data;
@@ -123,13 +129,10 @@ static int tsdev_release(struct inode *inode, struct file *file)
 	list_del(&list->node);
 
 	if (!--list->tsdev->open) {
-		if (list->tsdev->exist) {
+		if (list->tsdev->exist)
 			input_close_device(&list->tsdev->handle);
-		} else {
-			input_unregister_minor(list->tsdev->devfs);
-			tsdev_table[list->tsdev->minor] = NULL;
-			kfree(list->tsdev);
-		}
+		else
+			tsdev_free(list->tsdev);
 	}
 	kfree(list);
 	return 0;
@@ -325,8 +328,7 @@ static struct input_handle *tsdev_connect(struct input_handler *handler,
 	tsdev->handle.private = tsdev;
 
 	tsdev_table[minor] = tsdev;
-	tsdev->devfs =
-	    input_register_minor("input/ts%d", minor, TSDEV_MINOR_BASE);
+	input_register_minor("input/ts%d", minor, TSDEV_MINOR_BASE);
 
 
 	return &tsdev->handle;
@@ -341,11 +343,8 @@ static void tsdev_disconnect(struct input_handle *handle)
 	if (tsdev->open) {
 		input_close_device(handle);
 		wake_up_interruptible(&tsdev->wait);
-	} else {
-		input_unregister_minor(tsdev->devfs);
-		tsdev_table[tsdev->minor] = NULL;
-		kfree(tsdev);
-	}
+	} else
+		tsdev_free(tsdev);
 }
 
 static struct input_device_id tsdev_ids[] = {
