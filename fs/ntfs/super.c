@@ -409,7 +409,7 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 #ifndef NTFS_RW
 	/* For read-only compiled driver, enforce all read-only flags. */
 	*flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
-#else /* ! NTFS_RW */
+#else /* NTFS_RW */
 	/*
 	 * For the read-write compiled driver, if we are remounting read-write,
 	 * make sure there are no volume errors and that no unsupported volume
@@ -479,28 +479,7 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 						"flags.  Run chkdsk.");
 		}
 	}
-	// TODO:  For now we enforce no atime and dir atime updates as they are
-	// not implemented.
-	if ((sb->s_flags & MS_NOATIME) && !(*flags & MS_NOATIME))
-		ntfs_warning(sb, "Atime updates are not implemented yet.  "
-				"Leaving them disabled.");
-	else if ((sb->s_flags & MS_NODIRATIME) && !(*flags & MS_NODIRATIME))
-		ntfs_warning(sb, "Directory atime updates are not implemented "
-				"yet.  Leaving them disabled.");
-	*flags |= MS_NOATIME | MS_NODIRATIME;
-#endif /* ! NTFS_RW */
-
-	// FIXME/TODO: If left like this we will have problems with rw->ro and
-	// ro->rw, as well as with sync->async and vice versa remounts.
-	// Note: The VFS already checks that there are no pending deletes and
-	// no open files for writing. So we only need to worry about dirty
-	// inode pages and dirty system files (which include dirty inodes).
-	// Either handle by flushing the whole volume NOW or by having the
-	// write routines work on MS_RDONLY fs and guarantee we don't mark
-	// anything as dirty if MS_RDONLY is set. That way the dirty data
-	// would get flushed but no new dirty data would appear. This is
-	// probably best but we need to be careful not to mark anything dirty
-	// or the MS_RDONLY will be leaking writes.
+#endif /* NTFS_RW */
 
 	// TODO: Deal with *flags.
 
@@ -2139,15 +2118,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	ntfs_debug("Entering.");
 #ifndef NTFS_RW
 	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
-#else
-	if (!(sb->s_flags & MS_NOATIME))
-		ntfs_warning(sb, "Atime updates are not implemented yet.  "
-				"Disabling them.");
-	else if (!(sb->s_flags & MS_NODIRATIME))
-		ntfs_warning(sb, "Directory atime updates are not implemented "
-				"yet.  Disabling them.");
-	sb->s_flags |= MS_NOATIME | MS_NODIRATIME;
-#endif
+#endif /* ! NTFS_RW */
 	/* Allocate a new ntfs_volume and place it in sb->s_fs_info. */
 	sb->s_fs_info = kmalloc(sizeof(ntfs_volume), GFP_NOFS);
 	vol = NTFS_SB(sb);

@@ -622,7 +622,7 @@ static int ntfs_read_locked_inode(struct inode *vi)
 	si = (STANDARD_INFORMATION*)((char*)ctx->attr +
 			le16_to_cpu(ctx->attr->data.resident.value_offset));
 
-	/* Transfer information from the standard information into vfs_ino. */
+	/* Transfer information from the standard information into vi. */
 	/*
 	 * Note: The i_?times do not quite map perfectly onto the NTFS times,
 	 * but they are close enough, and in the end it doesn't really matter
@@ -2319,21 +2319,24 @@ trunc_err:
  */
 int ntfs_write_inode(struct inode *vi, int sync)
 {
+	s64 nt;
 	ntfs_inode *ni = NTFS_I(vi);
-#if 0
 	attr_search_context *ctx;
-#endif
 	MFT_RECORD *m;
+	STANDARD_INFORMATION *si;
 	int err = 0;
+	BOOL modified = FALSE;
 
 	ntfs_debug("Entering for %sinode 0x%lx.", NInoAttr(ni) ? "attr " : "",
 			vi->i_ino);
 	/*
 	 * Dirty attribute inodes are written via their real inodes so just
-	 * clean them here.  TODO:  Take care of access time updates.
+	 * clean them here.  Access time updates are taken care off when the
+	 * real inode is written.
 	 */
 	if (NInoAttr(ni)) {
 		NInoClearDirty(ni);
+		ntfs_debug("Done.");
 		return 0;
 	}
 	/* Map, pin, and lock the mft record belonging to the inode. */
@@ -2342,8 +2345,7 @@ int ntfs_write_inode(struct inode *vi, int sync)
 		err = PTR_ERR(m);
 		goto err_out;
 	}
-#if 0
-	/* Obtain the standard information attribute. */
+	/* Update the access times in the standard information attribute. */
 	ctx = get_attr_search_ctx(ni, m);
 	if (unlikely(!ctx)) {
 		err = -ENOMEM;
@@ -2355,28 +2357,50 @@ int ntfs_write_inode(struct inode *vi, int sync)
 		err = -ENOENT;
 		goto unm_err_out;
 	}
-	// TODO:  Update the access times in the standard information attribute
-	// which is now in ctx->attr.
-	// - Probably want to have use sops->dirty_inode() to set a flag that
-	//   we need to update the times here rather than having to blindly do
-	//   it every time.  Or even don't do it here at all and do it in
-	//   sops->dirty_inode() instead.  Problem with this would be that
-	//   sops->dirty_inode() must be atomic under certain circumstances
-	//   and mapping mft records and such like is not atomic.
-	// - For atime updates also need to check whether they are enabled in
-	//   the superblock flags.
-	ntfs_warning(vi->i_sb, "Access time updates not implement yet.");
+	si = (STANDARD_INFORMATION*)((u8*)ctx->attr +
+			le16_to_cpu(ctx->attr->data.resident.value_offset));
+	/* Update the access times if they have changed. */
+	nt = utc2ntfs(vi->i_mtime);
+	if (si->last_data_change_time != nt) {
+		ntfs_debug("Updating mtime for inode 0x%lx: old = 0x%llx, "
+				"new = 0x%llx", vi->i_ino,
+				sle64_to_cpu(si->last_data_change_time),
+				sle64_to_cpu(nt));
+		si->last_data_change_time = nt;
+		modified = TRUE;
+	}
+	nt = utc2ntfs(vi->i_ctime);
+	if (si->last_mft_change_time != nt) {
+		ntfs_debug("Updating ctime for inode 0x%lx: old = 0x%llx, "
+				"new = 0x%llx", vi->i_ino,
+				sle64_to_cpu(si->last_mft_change_time),
+				sle64_to_cpu(nt));
+		si->last_mft_change_time = nt;
+		modified = TRUE;
+	}
+	nt = utc2ntfs(vi->i_atime);
+	if (si->last_access_time != nt) {
+		ntfs_debug("Updating atime for inode 0x%lx: old = 0x%llx, "
+				"new = 0x%llx", vi->i_ino,
+				sle64_to_cpu(si->last_access_time),
+				sle64_to_cpu(nt));
+		si->last_access_time = nt;
+		modified = TRUE;
+	}
 	/*
-	 * We just modified the mft record containing the standard information
-	 * attribute.  So need to mark the mft record dirty, too, but we do it
-	 * manually so that mark_inode_dirty() is not called again.
-	 * TODO:  Only do this if there was a change in any of the times!
+	 * If we just modified the standard information attribute we need to
+	 * mark the mft record it is in dirty.  We do this manually so that
+	 * mark_inode_dirty() is not called which would redirty the inode and
+	 * hence result in an infinite loop of trying to write the inode.
+	 * There is no need to mark the base inode nor the base mft record
+	 * dirty, since we are going to write this mft record below in any case
+	 * and the base mft record may actually not have been modified so it
+	 * might not need to be written out.
 	 */
-	if (!NInoTestSetDirty(ctx->ntfs_ino))
+	if (modified && !NInoTestSetDirty(ctx->ntfs_ino))
 		__set_page_dirty_nobuffers(ctx->ntfs_ino->page);
 	put_attr_search_ctx(ctx);
-#endif
-	/* Write this base mft record. */
+	/* Now the access times are updated, write the base mft record. */
 	if (NInoDirty(ni))
 		err = write_mft_record(ni, m, sync);
 	/* Write all attached extent mft records. */
@@ -2413,10 +2437,8 @@ int ntfs_write_inode(struct inode *vi, int sync)
 		goto err_out;
 	ntfs_debug("Done.");
 	return 0;
-#if 0
 unm_err_out:
 	unmap_mft_record(ni);
-#endif
 err_out:
 	if (err == -ENOMEM) {
 		ntfs_warning(vi->i_sb, "Not enough memory to write inode.  "

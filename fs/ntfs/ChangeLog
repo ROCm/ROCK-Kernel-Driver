@@ -26,13 +26,19 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
-2.1.16 - WIP.
+2.1.16 - Implement access time updates, file sync, async io, and read/writev.
 
 	- Add support for readv/writev and aio_read/aio_write (fs/ntfs/file.c).
 	  This is done by setting the appropriate file operations pointers to
 	  the generic helper functions provided by mm/filemap.c.
 	- Implement fsync, fdatasync, and msync both for files (fs/ntfs/file.c)
 	  and directories (fs/ntfs/dir.c).
+	- Add support for {a,m,c}time updates to inode.c::ntfs_write_inode().
+	  Note, except for the root directory and any other system files opened
+	  by the user, the system files will not have their access times
+	  updated as they are only accessed at the inode level an hence the
+	  file level functions which cause the times to be updated are never
+	  invoked.
 
 2.1.15 - Invalidate quotas when (re)mounting read-write.
 
