@@ -19,6 +19,12 @@ struct notifier_block;
 
 static struct firewall_ops *fwops;
 
+#ifdef CONFIG_IP_VS
+/* From ip_vs_core.c */
+extern unsigned int
+check_for_ip_vs_out(struct sk_buff **skb_p, int (*okfn)(struct sk_buff *));
+#endif
+
 /* They call these; we do what they want. */
 int register_firewall(int pf, struct firewall_ops *fw)
 {
@@ -134,8 +140,14 @@ fw_in(unsigned int hooknum,
 		return NF_ACCEPT;
 
 	case FW_MASQUERADE:
-		if (hooknum == NF_IP_FORWARD)
+		if (hooknum == NF_IP_FORWARD) {
+#ifdef CONFIG_IP_VS
+			/* check if it is for ip_vs */
+			if (check_for_ip_vs_out(pskb, okfn) == NF_STOLEN)
+				return NF_STOLEN;
+#endif
 			return do_masquerade(pskb, out);
+		}
 		else return NF_ACCEPT;
 
 	case FW_REDIRECT:
