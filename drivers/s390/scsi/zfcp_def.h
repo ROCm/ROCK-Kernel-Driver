@@ -34,7 +34,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.98 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.107 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -61,9 +61,7 @@
 #include <linux/mempool.h>
 #include <linux/syscalls.h>
 #include <linux/ioctl.h>
-#ifdef CONFIG_S390_SUPPORT
 #include <linux/ioctl32.h>
-#endif
 
 /************************ DEBUG FLAGS *****************************************/
 
@@ -71,8 +69,7 @@
 
 /********************* GENERAL DEFINES *********************************/
 
-/* zfcp version number, it consists of major, minor, and patch-level number */
-#define ZFCP_VERSION		"4.1.4"
+#define ZFCP_VERSION		"4.2.0"
 
 /**
  * zfcp_sg_to_address - determine kernel address from struct scatterlist
@@ -290,11 +287,11 @@ struct fcp_logo {
 #define R_A_TOV				10 /* seconds */
 #define ZFCP_ELS_TIMEOUT		(2 * R_A_TOV)
 
-#define ZFCP_LS_RTV			0x0E
-#define ZFCP_LS_RLS			0x0F
-#define ZFCP_LS_PDISC			0x50
+#define ZFCP_LS_RLS			0x0f
 #define ZFCP_LS_ADISC			0x52
-#define ZFCP_LS_RTV_E_D_TOV_FLAG	0x04000000
+#define ZFCP_LS_RPS			0x56
+#define ZFCP_LS_RSCN			0x61
+#define ZFCP_LS_RNID			0x78
 
 struct zfcp_ls_rjt_par {
 	u8 action;
@@ -303,82 +300,22 @@ struct zfcp_ls_rjt_par {
  	u8 vendor_unique;
 } __attribute__ ((packed));
 
-struct zfcp_ls_rtv {
-	u8		code;
-	u8		field[3];
-} __attribute__ ((packed));
-
-struct zfcp_ls_rtv_acc {
-	u8		code;
-	u8		field[3];
-	u32		r_a_tov;
-	u32		e_d_tov;
-	u32		qualifier;
-} __attribute__ ((packed));
-
-struct zfcp_ls_rls {
-	u8		code;
-	u8		field[3];
-	fc_id_t		port_id;
-} __attribute__ ((packed));
-
-struct zfcp_ls_rls_acc {
-	u8		code;
-	u8		field[3];
-	u32		link_failure_count;
-	u32		loss_of_sync_count;
-	u32		loss_of_signal_count;
-	u32		prim_seq_prot_error;
-	u32		invalid_transmition_word;
-	u32		invalid_crc_count;
-} __attribute__ ((packed));
-
-struct zfcp_ls_pdisc {
-	u8		code;
-	u8		field[3];
-	u8		common_svc_parm[16];
-		wwn_t	wwpn;
-	wwn_t		wwnn;
-	struct {
-		u8	class1[16];
-		u8	class2[16];
-		u8	class3[16];
-	} svc_parm;
-	u8		reserved[16];
-	u8		vendor_version[16];
-} __attribute__ ((packed));
-
-struct zfcp_ls_pdisc_acc {
-	u8		code;
-	u8		field[3];
-	u8		common_svc_parm[16];
-	wwn_t		wwpn;
-	wwn_t		wwnn;
-	struct {
-		u8	class1[16];
-		u8	class2[16];
-		u8	class3[16];
-	} svc_parm;
-	u8		reserved[16];
-	u8		vendor_version[16];
-} __attribute__ ((packed));
-
 struct zfcp_ls_adisc {
 	u8		code;
 	u8		field[3];
-	fc_id_t		hard_nport_id;
-	wwn_t		wwpn;
-	wwn_t		wwnn;
-	fc_id_t		nport_id;
+	u32		hard_nport_id;
+	u64		wwpn;
+	u64		wwnn;
+	u32		nport_id;
 } __attribute__ ((packed));
 
 struct zfcp_ls_adisc_acc {
 	u8		code;
 	u8		field[3];
-	fc_id_t		hard_nport_id;
-	wwn_t		wwpn;
-	wwn_t		wwnn;
-	fc_id_t		nport_id;
+	u32		hard_nport_id;
+	u64		wwpn;
+	u64		wwnn;
+	u32		nport_id;
 } __attribute__ ((packed));
 
 struct zfcp_rc_entry {
@@ -490,7 +427,7 @@ struct zfcp_rc_entry {
 /* logging routine for zfcp */
 #define _ZFCP_LOG(fmt, args...) \
 	printk(KERN_ERR ZFCP_NAME": %s(%d): " fmt, __FUNCTION__, \
-	       __LINE__ , ##args);
+	       __LINE__ , ##args)
 
 #define ZFCP_LOG(level, fmt, args...) \
 do { \
@@ -956,7 +893,7 @@ struct zfcp_adapter {
 	debug_info_t            *abort_dbf;
 	debug_info_t            *in_els_dbf;
 	debug_info_t            *cmd_dbf;
-	rwlock_t                cmd_dbf_lock;
+	spinlock_t              dbf_lock;
 	struct zfcp_adapter_mempool	pool;      /* Adapter memory pools */
 	struct qdio_initialize  qdio_init_data;    /* for qdio_establish */
 	struct device           generic_services;  /* directory for WKA ports */
@@ -1006,8 +943,6 @@ struct zfcp_unit {
         struct scsi_device     *device;        /* scsi device struct pointer */
 	struct zfcp_erp_action erp_action;     /* pending error recovery */
         atomic_t               erp_counter;
-	atomic_t               scsi_add_work;  /* used to synchronize */
-	wait_queue_head_t      scsi_add_wq;    /* wait for scsi_add_device */
 };
 
 /* FSF request */
