@@ -69,13 +69,6 @@ Caveats
 * If you have your filesystems listed as type "auto" in fstab, like I did, then
   the control script will not recognize them as filesystems that need remounting.
 
-* If you have XFS, make SURE that you set the XFS_HZ value in the control script
-  correctly, to the value of HZ of your running kernel. Laptop mode will not
-  work correctly if it is set too low, and you may lose data if it is set too
-  high. The reason for this problem is that XFS does not export its sysctl
-  variables in centisecs (like most other subsystems do) but in "jiffies",
-  which is an internal kernel measure. Once this is fixed things will get better.
-
 * It has been reported that some versions of the mutt mail client use file access
   times to determine whether a folder contains new mail. If you use mutt and
   experience this, you must disable the noatime remounting in the control script
@@ -328,10 +321,13 @@ DEF_DIRTY_RATIO=40
 DEF_XFS_AGE_BUFFER=15
 DEF_XFS_SYNC_INTERVAL=30
 
-# This must be adjusted manually to the value of HZ in the running kernel,
-# until the XFS people change their external interfaces to work in centisecs
-# like the rest of the external world. Unfortunately this cannot be automated. :(
-XFS_HZ=1000
+# This must be adjusted manually to the value of HZ in the running kernel
+# on 2.4, until the XFS people change their 2.4 external interfaces to work in
+# centisecs. This can be automated, but it's a work in progress that still needs
+# some fixes. On 2.6 kernels, XFS uses USER_HZ instead of HZ for external
+# interfaces, and that is currently always set to 100. So you don't need to
+# change this on 2.6.
+XFS_HZ=100
 
 if [ ! -e /proc/sys/vm/laptop_mode ]; then
 	echo "Kernel is not patched with laptop_mode patch."
