@@ -1001,15 +1001,24 @@ static inline char *pci_name(struct pci_dev *pdev)
  */
 
 struct pci_fixup {
-	int pass;
 	u16 vendor, device;			/* You can use PCI_ANY_ID here of course */
 	void (*hook)(struct pci_dev *dev);
 };
 
-extern struct pci_fixup pcibios_fixups[];
-
 #define PCI_FIXUP_HEADER	1		/* Called immediately after reading configuration header */
 #define PCI_FIXUP_FINAL		2		/* Final phase of device fixups */
+
+/* Anonymous variables would be nice... */
+#define DECLARE_PCI_FIXUP_HEADER(vendor, device, hook)					\
+	static struct pci_fixup __pci_fixup_##vendor##device##hook __attribute_used__	\
+	__attribute__((__section__(".pci_fixup_header"))) = {				\
+		vendor, device, hook };
+
+#define DECLARE_PCI_FIXUP_FINAL(vendor, device, hook)				\
+	static struct pci_fixup __pci_fixup_##vendor##device##hook __attribute_used__	\
+	__attribute__((__section__(".pci_fixup_final"))) = {				\
+		vendor, device, hook };
+
 
 void pci_fixup_device(int pass, struct pci_dev *dev);
 
