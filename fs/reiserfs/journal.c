@@ -838,7 +838,20 @@ static int flush_older_commits(struct super_block *s, struct reiserfs_journal_li
     unsigned long trans_id = jl->j_trans_id;
     unsigned long other_trans_id;
     unsigned long first_trans_id;
+    loff_t logstart = SB_ONDISK_JOURNAL_1st_BLOCK(s);
+    loff_t logend = logstart + SB_ONDISK_JOURNAL_SIZE(s);
 
+    logstart *= s->s_blocksize;
+    logend *= s->s_blocksize;
+
+    /*
+     * lets try to get as much log io down the pipe as we can,
+     * thanks to filemap_fdatawrite_range, we can send down
+     * all the dirty log blocks at once.  This won't
+     * include the commit blocks, but that's ok.
+     */
+    filemap_fdatawrite_range(journal->j_dev_bd->bd_inode->i_mapping,
+		       logstart, logend);
 find_first:
     /* 
      * first we walk backwards to find the oldest uncommitted transation
@@ -3096,15 +3109,6 @@ static void flush_async_commits(void *p) {
       flush_commit_list(p_s_sb, jl, 1);
   }
   unlock_kernel();
-  /*
-   * this is a little racey, but there's no harm in missing
-   * the filemap_fdata_write
-   */
-  if (!atomic_read(&journal->j_async_throttle) && !reiserfs_is_journal_aborted (journal)) {
-      atomic_inc(&journal->j_async_throttle);
-      filemap_fdatawrite(p_s_sb->s_bdev->bd_inode->i_mapping);
-      atomic_dec(&journal->j_async_throttle);
-  }
 }
 
 /*

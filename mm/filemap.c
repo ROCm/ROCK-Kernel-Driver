@@ -238,22 +238,13 @@ static ssize_t wait_on_page_writeback_range_wq(struct address_space *mapping,
 			if (page->index > end) {
 				continue;
 			}
-			/* 
-			 * the page can't be freed, we've got a reference
-			 * to it.  But the mapping can go null due to 
-			 * truncates and other fun things.
-			 *
-			 * We also know that fresh new pages with a
-			 * bad page->index shouldn't be here, since they
-			 * won't have been tagged as writeback.
-			 *
-			 * so instead of locking the page, we just
-			 * check for page->mapping.
-			 */
-			smp_mb();
-			if (!page->mapping)
+			spin_lock_irq(&mapping->tree_lock);
+			if (page->mapping != mapping) {
+				spin_unlock_irq(&mapping->tree_lock);
 				continue;
+			}
 			curr = page->index;
+			spin_unlock_irq(&mapping->tree_lock);
 			ret = wait_on_page_writeback_wq(page, wait);
 			if (ret == -EIOCBRETRY) {
 				if (curr > start)
