@@ -2299,7 +2299,8 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 	status.sstat_state = asoc->state;
 	status.sstat_rwnd =  asoc->peer.rwnd;
 	status.sstat_unackdata = asoc->unack_data;
-	status.sstat_penddata = asoc->peer.tsn_map.pending_data;
+
+	status.sstat_penddata = sctp_tsnmap_pending(&asoc->peer.tsn_map);
 	status.sstat_instrms = asoc->c.sinit_max_instreams;
 	status.sstat_outstrms = asoc->c.sinit_num_ostreams;
 	/* Just in time frag_point update. */

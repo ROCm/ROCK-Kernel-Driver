@@ -589,27 +589,17 @@ struct sctp_chunk *sctp_make_data_empty(struct sctp_association *asoc,
 struct sctp_chunk *sctp_make_sack(const struct sctp_association *asoc)
 {
 	struct sctp_chunk *retval;
-	sctp_sackhdr_t sack;
-	sctp_gap_ack_block_t gab;
-	int length;
+	struct sctp_sackhdr sack;
+	int len;
 	__u32 ctsn;
-	struct sctp_tsnmap_iter iter;
 	__u16 num_gabs, num_dup_tsns;
 	struct sctp_tsnmap *map = (struct sctp_tsnmap *)&asoc->peer.tsn_map;
 
 	ctsn = sctp_tsnmap_get_ctsn(map);
-	SCTP_DEBUG_PRINTK("sackCTSNAck sent is 0x%x.\n", ctsn);
+	SCTP_DEBUG_PRINTK("sackCTSNAck sent:  0x%x.\n", ctsn);
 
-	/* Count the number of Gap Ack Blocks.  */
-	num_gabs = 0;
-
-	if (sctp_tsnmap_has_gap(map)) {
-		sctp_tsnmap_iter_init(map, &iter);
-		while (sctp_tsnmap_next_gap_ack(map, &iter,
-						&gab.start, &gab.end))
-			num_gabs++;
-	}
-
+	/* How much room is needed in the chunk? */
+	num_gabs = sctp_tsnmap_num_gabs(map);
 	num_dup_tsns = sctp_tsnmap_num_dups(map);
 
 	/* Initialize the SACK header.  */
@@ -618,12 +608,12 @@ struct sctp_chunk *sctp_make_sack(const struct sctp_association *asoc)
 	sack.num_gap_ack_blocks     = htons(num_gabs);
 	sack.num_dup_tsns           = htons(num_dup_tsns);
 
-	length = sizeof(sack)
-		+ sizeof(sctp_gap_ack_block_t) * num_gabs
+	len = sizeof(sack)
+		+ sizeof(struct sctp_gap_ack_block) * num_gabs
 		+ sizeof(__u32) * num_dup_tsns;
 
 	/* Create the chunk.  */
-	retval = sctp_make_chunk(asoc, SCTP_CID_SACK, 0, length);
+	retval = sctp_make_chunk(asoc, SCTP_CID_SACK, 0, len);
 	if (!retval)
 		goto nodata;
 
@@ -662,21 +652,15 @@ struct sctp_chunk *sctp_make_sack(const struct sctp_association *asoc)
 	retval->subh.sack_hdr =
 		sctp_addto_chunk(retval, sizeof(sack), &sack);
 
-	/* Put the Gap Ack Blocks into the chunk.  */
-	if (num_gabs) {
-		sctp_tsnmap_iter_init(map, &iter);
-		while(sctp_tsnmap_next_gap_ack(map, &iter,
-					       &gab.start, &gab.end)) {
-			gab.start = htons(gab.start);
-			gab.end = htons(gab.end);
-			sctp_addto_chunk(retval, sizeof(sctp_gap_ack_block_t),
-					 &gab);
-		}
-	}
+	/* Add the gap ack block information.   */
+	if (num_gabs)
+		sctp_addto_chunk(retval, sizeof(__u32) * num_gabs,
+				 sctp_tsnmap_get_gabs(map));
 
-	/* Register the duplicates.  */
-	sctp_addto_chunk(retval, sizeof(__u32) * num_dup_tsns,
-			 sctp_tsnmap_get_dups(map));
+	/* Add the duplicate TSN information.  */
+	if (num_dup_tsns)
+		sctp_addto_chunk(retval, sizeof(__u32) * num_dup_tsns,
+				 sctp_tsnmap_get_dups(map));
 
 nodata:
 	return retval;
