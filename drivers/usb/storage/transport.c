@@ -511,9 +511,8 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	 * short-circuit all other processing
 	 */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-		US_DEBUGP("-- transport indicates command was aborted\n");
-		srb->result = DID_ABORT << 16;
-		return;
+		US_DEBUGP("-- command was aborted\n");
+		goto Handle_Abort;
 	}
 
 	/* if there is a transport error, reset and don't auto-sense */
@@ -634,8 +633,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("-- auto-sense aborted\n");
-			srb->result = DID_ABORT << 16;
-			return;
+			goto Handle_Abort;
 		}
 		if (temp_result != USB_STOR_TRANSPORT_GOOD) {
 			US_DEBUGP("-- auto-sense failure\n");
@@ -688,6 +686,15 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	    (result == USB_STOR_TRANSPORT_GOOD) &&
 	    ((srb->sense_buffer[2] & 0xf) == 0x0))
 		srb->sense_buffer[0] = 0x0;
+	return;
+
+	/* abort processing: the bulk-only transport requires a reset
+	 * following an abort */
+	Handle_Abort:
+	srb->result = DID_ABORT << 16;
+	if (us->protocol == US_PR_BULK) {
+		us->transport_reset(us);
+	}
 }
 
 /* Abort the currently running scsi command or device reset.
