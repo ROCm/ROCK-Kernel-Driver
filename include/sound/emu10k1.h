@@ -852,7 +852,7 @@ typedef struct {
 	unsigned int value[32];
 	unsigned int min;		/* minimum range */
 	unsigned int max;		/* maximum range */
-	unsigned int translation;	/* translation type (EMU10K1_GRP_TRANSLATION*) */
+	unsigned int translation;	/* translation type (EMU10K1_GPR_TRANSLATION*) */
 	snd_kcontrol_t *kcontrol;
 } snd_emu10k1_fx8010_ctl_t;
 
@@ -1282,8 +1282,8 @@ typedef struct {
 
 #define EMU10K1_GPR_TRANSLATION_NONE		0
 #define EMU10K1_GPR_TRANSLATION_TABLE100	1
-#define EMU10K1_GRP_TRANSLATION_BASS		2
-#define EMU10K1_GRP_TRANSLATION_TREBLE		3
+#define EMU10K1_GPR_TRANSLATION_BASS		2
+#define EMU10K1_GPR_TRANSLATION_TREBLE		3
 #define EMU10K1_GPR_TRANSLATION_ONOFF		4
 
 typedef struct {
@@ -1294,7 +1294,7 @@ typedef struct {
 	unsigned int value[32];		/* initial values */
 	unsigned int min;		/* minimum range */
 	unsigned int max;		/* maximum range */
-	unsigned int translation;	/* translation type (EMU10K1_GRP_TRANSLATION*) */
+	unsigned int translation;	/* translation type (EMU10K1_GPR_TRANSLATION*) */
 } emu10k1_fx8010_control_gpr_t;
 
 typedef struct {
