@@ -145,6 +145,11 @@ struct audit_buffer {
 	int		     count; /* Times requeued */
 };
 
+void audit_set_type(struct audit_buffer *ab, int type)
+{
+	ab->type = type;
+}
+
 struct audit_entry {
 	struct list_head  list;
 	struct audit_rule rule;
@@ -312,7 +317,6 @@ static int audit_netlink_ok(kernel_cap_t eff_cap, u16 msg_type)
 	case AUDIT_GET:
 	case AUDIT_LIST:
 	case AUDIT_SET:
-	case AUDIT_LOGIN:
 	case AUDIT_ADD:
 	case AUDIT_DEL:
 		if (!cap_raised(eff_cap, CAP_AUDIT_CONTROL))
@@ -334,7 +338,6 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	u32			uid, pid, seq;
 	void			*data;
 	struct audit_status	*status_get, status_set;
-	struct audit_login	*login;
 	int			err;
 	struct audit_buffer	*ab;
 	u16			msg_type = nlh->nlmsg_type;
@@ -396,27 +399,6 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		ab->type = AUDIT_USER;
 		ab->pid  = pid;
 		audit_log_end(ab);
-		break;
-	case AUDIT_LOGIN:
-		if (nlh->nlmsg_len < sizeof(struct audit_login))
-			return -EINVAL;
-		login = (struct audit_login *)data;
-		ab = audit_log_start(NULL);
-		if (ab) {
-			audit_log_format(ab, "login pid=%d uid=%d loginuid=%d"
-					 " length=%d msg='%.1024s'",
-					 pid, uid,
-					 login->loginuid,
-					 login->msglen,
-					 login->msg);
-			ab->type = AUDIT_LOGIN;
-			ab->pid  = pid;
-			audit_log_end(ab);
-		}
-#ifdef CONFIG_AUDITSYSCALL
-		err = audit_set_loginuid(current->audit_context,
-					 login->loginuid);
-#endif
 		break;
 	case AUDIT_ADD:
 	case AUDIT_DEL:

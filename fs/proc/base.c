@@ -71,6 +71,9 @@ enum pid_directory_inos {
 	PROC_TGID_ATTR_EXEC,
 	PROC_TGID_ATTR_FSCREATE,
 #endif
+#ifdef CONFIG_AUDITSYSCALL
+	PROC_TGID_LOGINUID,
+#endif
 	PROC_TGID_FD_DIR,
 	PROC_TGID_OOM_SCORE,
 	PROC_TGID_OOM_ADJUST,
@@ -98,6 +101,9 @@ enum pid_directory_inos {
 	PROC_TID_ATTR_PREV,
 	PROC_TID_ATTR_EXEC,
 	PROC_TID_ATTR_FSCREATE,
+#endif
+#ifdef CONFIG_AUDITSYSCALL
+	PROC_TID_LOGINUID,
 #endif
 	PROC_TID_FD_DIR = 0x8000,	/* 0x8000-0xffff */
 	PROC_TID_OOM_SCORE,
@@ -139,6 +145,9 @@ static struct pid_entry tgid_base_stuff[] = {
 #endif
 	E(PROC_TGID_OOM_SCORE, "oom_score",S_IFREG|S_IRUGO),
 	E(PROC_TGID_OOM_ADJUST,"oom_adj", S_IFREG|S_IRUGO|S_IWUSR),
+#ifdef CONFIG_AUDITSYSCALL
+	E(PROC_TGID_LOGINUID, "loginuid", S_IFREG|S_IWUSR|S_IRUGO),
+#endif
 	{0,0,NULL,0}
 };
 static struct pid_entry tid_base_stuff[] = {
@@ -166,6 +175,9 @@ static struct pid_entry tid_base_stuff[] = {
 #endif
 	E(PROC_TID_OOM_SCORE,  "oom_score",S_IFREG|S_IRUGO),
 	E(PROC_TID_OOM_ADJUST, "oom_adj", S_IFREG|S_IRUGO|S_IWUSR),
+#ifdef CONFIG_AUDITSYSCALL
+	E(PROC_TID_LOGINUID, "loginuid", S_IFREG|S_IWUSR|S_IRUGO),
+#endif
 	{0,0,NULL,0}
 };
 
@@ -730,6 +742,71 @@ static struct file_operations proc_oom_adjust_operations = {
 static struct inode_operations proc_mem_inode_operations = {
 	.permission	= proc_permission,
 };
+
+#ifdef CONFIG_AUDITSYSCALL
+#define TMPBUFLEN 21
+static ssize_t proc_loginuid_read(struct file * file, char __user * buf,
+				  size_t count, loff_t *ppos)
+{
+	struct inode * inode = file->f_dentry->d_inode;
+	struct task_struct *task = proc_task(inode);
+	ssize_t length;
+	char tmpbuf[TMPBUFLEN];
+
+	length = scnprintf(tmpbuf, TMPBUFLEN, "%u",
+				audit_get_loginuid(task->audit_context));
+	return simple_read_from_buffer(buf, count, ppos, tmpbuf, length);
+}
+
+static ssize_t proc_loginuid_write(struct file * file, const char __user * buf,
+				   size_t count, loff_t *ppos)
+{
+	struct inode * inode = file->f_dentry->d_inode;
+	char *page, *tmp;
+	ssize_t length;
+	struct task_struct *task = proc_task(inode);
+	uid_t loginuid;
+
+	if (!capable(CAP_AUDIT_CONTROL))
+		return -EPERM;
+
+	if (current != task)
+		return -EPERM;
+
+	if (count > PAGE_SIZE)
+		count = PAGE_SIZE;
+
+	if (*ppos != 0) {
+		/* No partial writes. */
+		return -EINVAL;
+	}
+	page = (char*)__get_free_page(GFP_USER);
+	if (!page)
+		return -ENOMEM;
+	length = -EFAULT;
+	if (copy_from_user(page, buf, count))
+		goto out_free_page;
+
+	loginuid = simple_strtoul(page, &tmp, 10);
+	if (tmp == page) {
+		length = -EINVAL;
+		goto out_free_page;
+
+	}
+	length = audit_set_loginuid(task->audit_context, loginuid);
+	if (likely(length == 0))
+		length = count;
+
+out_free_page:
+	free_page((unsigned long) page);
+	return length;
+}
+
+static struct file_operations proc_loginuid_operations = {
+	.read		= proc_loginuid_read,
+	.write		= proc_loginuid_write,
+};
+#endif
 
 static int proc_pid_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
@@ -1415,6 +1492,12 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 		case PROC_TGID_OOM_ADJUST:
 			inode->i_fop = &proc_oom_adjust_operations;
 			break;
+#ifdef CONFIG_AUDITSYSCALL
+		case PROC_TID_LOGINUID:
+		case PROC_TGID_LOGINUID:
+			inode->i_fop = &proc_loginuid_operations;
+			break;
+#endif
 		default:
 			printk("procfs: impossible type (%d)",p->type);
 			iput(inode);

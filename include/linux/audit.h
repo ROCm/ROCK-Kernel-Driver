@@ -114,12 +114,6 @@ struct audit_status {
 	__u32		backlog;	/* messages waiting in queue */
 };
 
-struct audit_login {
-	__u32		loginuid;
-	int		msglen;
-	char		msg[1024];
-};
-
 struct audit_rule {		/* for AUDIT_LIST, AUDIT_ADD, and AUDIT_DEL */
 	__u32		flags;	/* AUDIT_PER_{TASK,CALL}, AUDIT_PREPEND */
 	__u32		action;	/* AUDIT_NEVER, AUDIT_POSSIBLE, AUDIT_ALWAYS */
@@ -155,6 +149,7 @@ extern int  audit_receive_filter(int type, int pid, int uid, int seq,
 extern void audit_get_stamp(struct audit_context *ctx,
 			    struct timespec *t, int *serial);
 extern int  audit_set_loginuid(struct audit_context *ctx, uid_t loginuid);
+extern uid_t audit_get_loginuid(struct audit_context *ctx);
 #else
 #define audit_alloc(t) ({ 0; })
 #define audit_free(t) do { ; } while (0)
@@ -163,6 +158,7 @@ extern int  audit_set_loginuid(struct audit_context *ctx, uid_t loginuid);
 #define audit_getname(n) do { ; } while (0)
 #define audit_putname(n) do { ; } while (0)
 #define audit_inode(n,i,d) do { ; } while (0)
+#define audit_get_loginuid(c) ({ -1; })
 #endif
 
 #ifdef CONFIG_AUDIT
