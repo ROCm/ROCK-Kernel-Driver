@@ -21,7 +21,7 @@ else
 KERNELLOAD	=0xc0000000
 endif
 
-LDFLAGS_vmlinux	= -T arch/ppc/vmlinux.lds.s -Ttext $(KERNELLOAD) -Bstatic
+LDFLAGS_vmlinux	= -Ttext $(KERNELLOAD) -Bstatic
 CPPFLAGS	:= $(CPPFLAGS) -I$(TOPDIR)/arch/$(ARCH)
 AFLAGS		:= $(AFLAGS) -I$(TOPDIR)/arch/$(ARCH)
 CFLAGS		:= $(CFLAGS) -I$(TOPDIR)/arch/$(ARCH) -fsigned-char \
@@ -102,8 +102,6 @@ BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
 
 # All the instructions talk about "make bzImage".
 bzImage: zImage
-
-vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 $(BOOT_TARGETS): vmlinux
 	@$(MAKEBOOT) $@

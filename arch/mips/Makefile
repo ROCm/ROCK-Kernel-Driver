@@ -266,9 +266,6 @@ endif
 # error messages during linking.  Select a default linkscript if
 # none has been choosen above.
 #
-vmlinux: arch/$(ARCH)/vmlinux.lds.s
-
-LDFLAGS_vmlinux	+= -T arch/$(ARCH)/vmlinux.lds.s
 
 AFLAGS_vmlinux.lds.o := -DLOADADDR=$(LOADADDR)
 

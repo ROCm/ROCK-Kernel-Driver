@@ -15,8 +15,6 @@
 
 LD = $(CROSS_COMPILE)ld -mcrislinux
 
-LDFLAGS_vmlinux = -T arch/$(ARCH)/vmlinux.lds.s
-
 # objcopy is used to make binary images from the resulting linked file
 
 OBJCOPYFLAGS := -O binary -R .note -R .comment -S
@@ -46,8 +44,6 @@ LIBGCC = $(shell $(CC) $(CFLAGS) -print-file-name=libgcc.a)
 LIBS := $(TOPDIR)/arch/cris/lib/lib.a $(LIBS) $(TOPDIR)/arch/cris/lib/lib.a $(LIBGCC)
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
-
-vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 vmlinux.bin: vmlinux
 	$(OBJCOPY) $(OBJCOPYFLAGS) vmlinux vmlinux.bin

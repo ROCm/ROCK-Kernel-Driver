@@ -20,7 +20,6 @@
 FINAL_LD=$(CROSS_COMPILE)ld --warn-common --warn-section-align 
 
 OBJCOPY_FLAGS =-O binary -R .note -R .comment -S
-LDFLAGS_vmlinux =-T arch/parisc/vmlinux.lds.s
 
 CFLAGS_PIPE := -pipe
 CFLAGS_NSR  := -fno-strength-reduce
@@ -54,8 +53,6 @@ ifdef CONFIG_KWDB
 SUBDIRS := $(SUBDIRS) arch/parisc/kdb
 DRIVERS := $(DRIVERS) arch/parisc/kdb/kdb.o
 endif
-
-vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 palo: vmlinux
 	export TOPDIR=`pwd`; export CONFIG_STI_CONSOLE=$(CONFIG_STI_CONSOLE); \

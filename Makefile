@@ -297,7 +297,9 @@ define rule_link_vmlinux
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
 
-vmlinux: $(vmlinux-objs) FORCE
+LDFLAGS_vmlinux += -T arch/$(ARCH)/vmlinux.lds.s
+
+vmlinux: $(vmlinux-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
 	$(call if_changed_rule,link_vmlinux)
 
 #	The actual objects are generated when descending, 

@@ -7,7 +7,7 @@
 #
 # Copyright (C) 1995-2001 by Russell King
 
-LDFLAGS_vmlinux	:=-p -X -T arch/arm/vmlinux.lds.s
+LDFLAGS_vmlinux	:=-p -X
 OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
 #CFLAGS		+=-pipe
@@ -214,8 +214,6 @@ prepare: maketools
 maketools: include/asm-arm/.arch include/asm-arm/.proc \
 	 include/asm-arm/constants.h include/linux/version.h FORCE
 	@$(MAKETOOLS)
-
-vmlinux: arch/arm/vmlinux.lds.s
 
 bzImage zImage zinstall Image bootpImage install: vmlinux
 	@$(MAKEBOOT) $@

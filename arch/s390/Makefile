@@ -15,7 +15,7 @@
 
 LDFLAGS		:= -m elf_s390
 OBJCOPYFLAGS	:= -O binary
-LDFLAGS_vmlinux := -T arch/$(ARCH)/vmlinux.lds.s -e start
+LDFLAGS_vmlinux := -e start
 
 CFLAGS_PIPE := -pipe
 CFLAGS_NSR  := -fno-strength-reduce
@@ -40,8 +40,6 @@ listing: vmlinux
 	@$(MAKEBOOT) listing
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
-
-vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 image: vmlinux 
 	@$(MAKEBOOT) image

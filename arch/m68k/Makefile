@@ -24,10 +24,8 @@ ifneq ($(COMPILE_ARCH),$(ARCH))
 	CROSS_COMPILE = m68k-linux-
 endif
 
-ifndef CONFIG_SUN3
-LDFLAGS_vmlinux = -T $(TOPDIR)/arch/m68k/vmlinux.lds.s
-else
-LDFLAGS_vmlinux = -T $(TOPDIR)/arch/m68k/vmlinux.lds.s -N
+ifdef CONFIG_SUN3
+LDFLAGS_vmlinux = -N
 endif
 
 # without -fno-strength-reduce the 53c7xx.c driver fails ;-(
@@ -133,8 +131,6 @@ ifdef CONFIG_M68KFPU_EMU
 CORE_FILES := $(CORE_FILES) arch/m68k/math-emu/mathemu.o
 SUBDIRS := $(SUBDIRS) arch/m68k/math-emu
 endif
-
-vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 lilo:	vmlinux
 	if [ -f $(INSTALL_PATH)/vmlinux ]; then mv -f $(INSTALL_PATH)/vmlinux $(INSTALL_PATH)/vmlinux.old; fi

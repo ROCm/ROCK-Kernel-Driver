@@ -15,7 +15,7 @@
 
 LDFLAGS		:= -m elf64_s390
 OBJCOPYFLAGS	:= -O binary
-LDFLAGS_vmlinux := -T arch/$(ARCH)/vmlinux.lds.s -e start
+LDFLAGS_vmlinux := -e start
 MODFLAGS += -fpic
 
 CFLAGS_PIPE := -pipe
@@ -35,8 +35,6 @@ listing: vmlinux
 	@$(MAKEBOOT) listing
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
-
-vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 image: vmlinux 
 	@$(MAKEBOOT) image
