@@ -63,7 +63,7 @@ typedef struct xfs_acl {
 
 #ifdef __KERNEL__
 
-#ifdef CONFIG_FS_POSIX_ACL
+#ifdef CONFIG_XFS_POSIX_ACL
 
 struct vattr;
 struct vnode;

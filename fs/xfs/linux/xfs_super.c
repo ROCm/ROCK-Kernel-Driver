@@ -56,7 +56,7 @@ extern void xfs_cleanup(void);
 # define set_max_bytes(sb)	do { } while (0)
 #endif
 
-#ifdef CONFIG_FS_POSIX_ACL
+#ifdef CONFIG_XFS_POSIX_ACL
 # define set_posix_acl(sb)	((sb)->s_flags |= MS_POSIXACL)
 #else
 # define set_posix_acl(sb)	do { } while (0)

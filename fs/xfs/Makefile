@@ -59,7 +59,7 @@ xfs-obj-$(CONFIG_XFS_QUOTA)	+= xfs_dquot.o \
 				   xfs_qm_syscalls.o \
 				   xfs_qm.o
 
-xfs-obj-$(CONFIG_FS_POSIX_ACL)	+= xfs_acl.o
+xfs-obj-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
 xfs-obj-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
 xfs-obj-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
 xfs-obj-$(CONFIG_PROC_FS)	+= linux/xfs_stats.o

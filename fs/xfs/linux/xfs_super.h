@@ -32,7 +32,7 @@
 #ifndef __XFS_SUPER_H__
 #define __XFS_SUPER_H__
 
-#ifdef CONFIG_FS_POSIX_ACL
+#ifdef CONFIG_XFS_POSIX_ACL
 # define XFS_ACL_STRING		"ACLs, "
 #else
 # define XFS_ACL_STRING
