@@ -187,7 +187,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 
 	daemonize("cifsd");
 	allow_signal(SIGKILL);
-
+	current->flags |= PF_MEMALLOC;
 	server->tsk = current;	/* save process info to wake at shutdown */
 	cFYI(1, ("Demultiplex PID: %d", current->pid));
 
@@ -906,6 +906,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 		} else {
 		/* BB other socket options to set KEEPALIVE, NODELAY? */
 			cFYI(1,("Socket created"));
+	/*		(*csocket)->sk->allocation = GFP_NOFS; */ /* BB is there equivalent in 2.6 */
 		}
 	}
 
