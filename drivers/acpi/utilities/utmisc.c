@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 86 $
+ *              $Revision: 87 $
  *
  ******************************************************************************/
 
@@ -475,7 +475,6 @@ acpi_ut_strupr (
 		string++;
 	}
 
-
 	return (src_string);
 }
 
@@ -575,7 +574,6 @@ acpi_ut_create_mutex (
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-
 	if (!acpi_gbl_acpi_mutex_info[mutex_id].mutex) {
 		status = acpi_os_create_semaphore (1, 1,
 				  &acpi_gbl_acpi_mutex_info[mutex_id].mutex);
@@ -612,7 +610,6 @@ acpi_ut_delete_mutex (
 	if (mutex_id > MAX_MTX) {
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
-
 
 	status = acpi_os_delete_semaphore (acpi_gbl_acpi_mutex_info[mutex_id].mutex);
 
@@ -651,7 +648,6 @@ acpi_ut_acquire_mutex (
 		return (AE_BAD_PARAMETER);
 	}
 
-
 	this_thread_id = acpi_os_get_thread_id ();
 
 	/*
@@ -679,7 +675,6 @@ acpi_ut_acquire_mutex (
 		}
 	}
 
-
 	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX,
 			 "Thread %X attempting to acquire Mutex [%s]\n",
 			 this_thread_id, acpi_ut_get_mutex_name (mutex_id)));
@@ -693,7 +688,6 @@ acpi_ut_acquire_mutex (
 		acpi_gbl_acpi_mutex_info[mutex_id].use_count++;
 		acpi_gbl_acpi_mutex_info[mutex_id].owner_id = this_thread_id;
 	}
-
 	else {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Thread %X could not acquire Mutex [%s] %s\n",
 				 this_thread_id, acpi_ut_get_mutex_name (mutex_id),
@@ -737,7 +731,6 @@ acpi_ut_release_mutex (
 		return (AE_BAD_PARAMETER);
 	}
 
-
 	/*
 	 * Mutex must be acquired in order to release it!
 	 */
@@ -748,7 +741,6 @@ acpi_ut_release_mutex (
 
 		return (AE_NOT_ACQUIRED);
 	}
-
 
 	/*
 	 * Deadlock prevention.  Check if this thread owns any mutexes of value
@@ -769,7 +761,6 @@ acpi_ut_release_mutex (
 			return (AE_RELEASE_DEADLOCK);
 		}
 	}
-
 
 	/* Mark unlocked FIRST */
 
@@ -828,7 +819,6 @@ acpi_ut_create_update_state_and_push (
 		return (AE_NO_MEMORY);
 	}
 
-
 	acpi_ut_push_generic_state (state_list, state);
 	return (AE_OK);
 }
@@ -865,7 +855,6 @@ acpi_ut_create_pkg_state_and_push (
 	if (!state) {
 		return (AE_NO_MEMORY);
 	}
-
 
 	acpi_ut_push_generic_state (state_list, state);
 	return (AE_OK);
@@ -1129,7 +1118,6 @@ acpi_ut_create_control_state (
 		return_PTR (NULL);
 	}
 
-
 	/* Init fields specific to the control struct */
 
 	state->common.data_type = ACPI_DESC_TYPE_STATE_CONTROL;
@@ -1224,6 +1212,8 @@ acpi_ut_walk_package_tree (
 	}
 
 	while (state) {
+		/* Get one element of the package */
+
 		this_index    = state->pkg.index;
 		this_source_obj = (acpi_operand_object *)
 				  state->pkg.source_object->package.elements[this_index];
@@ -1323,6 +1313,7 @@ acpi_ut_generate_checksum (
 {
 	u32                     i;
 	signed char             sum = 0;
+
 
 	for (i = 0; i < length; i++) {
 		sum = (signed char) (sum + buffer[i]);
