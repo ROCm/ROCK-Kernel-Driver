@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#147 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#148 $
  *
  * $FreeBSD$
  */
@@ -3416,8 +3416,10 @@ reswitch:
 			 */
 			if (ahd->msgout_len != 0) {
 #ifdef AHD_DEBUG
-				if ((ahd_debug & AHD_SHOW_MESSAGES) != 0)
+				if ((ahd_debug & AHD_SHOW_MESSAGES) != 0) {
+					ahd_print_devinfo(ahd, &devinfo);
 					printf("Asserting ATN for response\n");
+				}
 #endif
 				ahd_assert_atn(ahd);
 			}
@@ -7521,8 +7523,7 @@ ahd_stat_timer(void *arg)
 			       "now %sabled. Cmds %d\n",
 			       ahd_name(ahd),
 			       (enint_coal & ENINT_COALESS) ? "en" : "dis",
-			       ahd->cmdcmplt_total,
-			       ahd->cmdcmplt_counts[ahd->cmdcmplt_bucket]);
+			       ahd->cmdcmplt_total);
 #endif
 	}
 
