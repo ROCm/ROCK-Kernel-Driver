@@ -727,8 +727,12 @@ static void td_done (struct urb *urb, struct td *td)
 
 		if (usb_pipeout (urb->pipe))
 			dlen = urb->iso_frame_desc [td->index].length;
-		else
+		else {
+			/* short reads are always OK for ISO */
+			if (cc == TD_DATAUNDERRUN)
+				cc = TD_CC_NOERROR;
 			dlen = tdPSW & 0x3ff;
+		}
 		urb->actual_length += dlen;
 		urb->iso_frame_desc [td->index].actual_length = dlen;
 		urb->iso_frame_desc [td->index].status = cc_to_error [cc];
