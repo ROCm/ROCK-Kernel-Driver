@@ -479,12 +479,19 @@ CONFIG_PPDEV=y
 #
 # Watchdog Cards
 #
-# CONFIG_WATCHDOG is not set
+CONFIG_WATCHDOG=y
+# CONFIG_WATCHDOG_NOWAYOUT is not set
+
+#
+# Watchdog Device Drivers
+#
+# CONFIG_SOFT_WATCHDOG is not set
+CONFIG_S3C2410_WATCHDOG=y
 # CONFIG_NVRAM is not set
 CONFIG_RTC=y
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
-# CONFIG_APPLICOM is not set
+
 
 #
 # Ftape, the floppy tape device driver
