@@ -1152,7 +1152,7 @@ static int via_rhine_open(struct net_device *dev)
 
 	/* Set the timer to check for link beat. */
 	init_timer(&np->timer);
-	np->timer.expires = jiffies + 2;
+	np->timer.expires = jiffies + 2 * HZ/100;
 	np->timer.data = (unsigned long)dev;
 	np->timer.function = &via_rhine_timer;				/* timer handler */
 	add_timer(&np->timer);
