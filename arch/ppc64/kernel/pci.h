@@ -56,6 +56,7 @@ typedef void *(*traverse_func)(struct device_node *me, void *data);
 void *traverse_pci_devices(struct device_node *start, traverse_func pre, traverse_func post, void *data);
 void *traverse_all_pci_devices(traverse_func pre);
 
+struct pci_dev *pci_find_dev_by_addr(unsigned long addr);
 void pci_devs_phb_init(void);
 void pci_fix_bus_sysdata(void);
 struct device_node *fetch_dev_dn(struct pci_dev *dev);
