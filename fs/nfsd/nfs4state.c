@@ -977,7 +977,7 @@ release_all_files(void)
 		while (!list_empty(&file_hashtbl[i])) {
 			fp = list_entry(file_hashtbl[i].next, struct nfs4_file, fi_hash);
 			/* this should never be more than once... */
-			if (!list_empty(&fp->fi_perfile)) {
+			if (!list_empty(&fp->fi_perfile) || !list_empty(&fp->fi_del_perfile)) {
 				printk("ERROR: release_all_files: file %p is open, creating dangling state !!!\n",fp);
 			}
 			release_file(fp);
@@ -1112,14 +1112,29 @@ init_stateid(struct nfs4_stateid *stp, struct nfs4_file *fp, struct nfs4_stateow
 	__set_bit(open->op_share_deny, &stp->st_deny_bmap);
 }
 
+/*
+* Because nfsd_close() can call locks_remove_flock() which removes leases,
+* delay nfsd_close() for delegations from the nfsd_open() clientid
+* until the delegation is reaped.
+*/
 static void
-release_stateid(struct nfs4_stateid *stp, int flags) {
+release_stateid(struct nfs4_stateid *stp, int flags)
+{
+	struct nfs4_delegation *dp;
+	struct nfs4_file *fp = stp->st_file;
 
 	list_del(&stp->st_hash);
 	list_del_perfile++;
 	list_del(&stp->st_perfile);
 	list_del(&stp->st_perfilestate);
 	if ((stp->st_vfs_set) && (flags & OPEN_STATE)) {
+		list_for_each_entry(dp, &fp->fi_del_perfile, dl_del_perfile) {
+			if(cmp_clid(&dp->dl_client->cl_clientid,
+			    &stp->st_stateowner->so_client->cl_clientid)) {
+				dp->dl_stp = stp;
+				return;
+			}
+		}
 		release_stateid_lockowner(stp);
 		nfsd_close(stp->st_vfs_file);
 		vfsclose++;
@@ -1168,7 +1183,7 @@ release_state_owner(struct nfs4_stateid *stp, struct nfs4_stateowner **sopp,
 	if (sop->so_confirmed && list_empty(&sop->so_perfilestate))
 		move_to_close_lru(sop);
 	/* unused nfs4_file's are releseed. XXX slab cache? */
-	if (list_empty(&fp->fi_perfile)) {
+	if (list_empty(&fp->fi_perfile) && list_empty(&fp->fi_del_perfile)) {
 		release_file(fp);
 	}
 }
