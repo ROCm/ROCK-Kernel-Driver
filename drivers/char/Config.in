@@ -192,7 +192,7 @@ if [ "$CONFIG_IA64" = "y" ]; then
    bool 'EFI Real Time Clock Services' CONFIG_EFI_RTC
 fi
 if [ "$CONFIG_OBSOLETE" = "y" -a "$CONFIG_ALPHA_BOOK1" = "y" ]; then
-   bool 'Tadpole ANA H8 Support'  CONFIG_H8
+   bool 'Tadpole ANA H8 Support (OBSOLETE)'  CONFIG_H8
 fi
 
 tristate 'Double Talk PC internal speech card support' CONFIG_DTLK
