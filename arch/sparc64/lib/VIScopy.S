@@ -402,7 +402,6 @@ cheetah_patch_copyops:
 	ULTRA3_PCACHE_DO_NOP(U3memcpy)
 	ULTRA3_PCACHE_DO_NOP(U3copy_from_user)
 	ULTRA3_PCACHE_DO_NOP(U3copy_to_user)
-	ULTRA3_PCACHE_DO_NOP(cheetah_copy_user_page)
 #if 0
 pcache_disabled:
 #endif
