@@ -313,7 +313,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 					connected to port 139 (the NACK is 
 					since we do not begin with RFC1001
 					session initialize frame) */
-					server->addr.sockAddr.sin_port = CIFS_PORT;
+					server->addr.sockAddr.sin_port = htons(CIFS_PORT);
 					cifs_reconnect(server);
 					csocket = server->ssocket;
 					wake_up(&server->response_q);
@@ -849,7 +849,7 @@ cifs_find_tcp_session(struct in_addr * target_ip_addr,
 }
 
 static struct cifsTconInfo *
-find_unc(__u32 new_target_ip_addr, char *uncName, char *userName)
+find_unc(__be32 new_target_ip_addr, char *uncName, char *userName)
 {
 	struct list_head *tmp;
 	struct cifsTconInfo *tcon;
@@ -968,7 +968,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 {
 	int rc = 0;
 	int connected = 0;
-	unsigned short int orig_port = 0;
+	__be16 orig_port = 0;
 
 	if(*csocket == NULL) {
 		rc = sock_create_kern(PF_INET, SOCK_STREAM, IPPROTO_TCP, csocket);
@@ -1076,7 +1076,7 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 {
 	int rc = 0;
 	int connected = 0;
-	unsigned short int orig_port = 0;
+	__be16 orig_port = 0;
 
 	if(*csocket == NULL) {
 		rc = sock_create_kern(PF_INET6, SOCK_STREAM, IPPROTO_TCP, csocket);

@@ -187,8 +187,8 @@ cifs_inet_pton(int address_family, char *cp,void *dst)
 	if (value > addr_class_max[end - bytes])
 		return 0;
 
-	address.s_addr = *((int *) bytes) | htonl(value);
-	*((int *)dst) = address.s_addr;
+	address.s_addr = *((__be32 *) bytes) | htonl(value);
+	*((__be32 *)dst) = address.s_addr;
 	return 1; /* success */
 }
 
