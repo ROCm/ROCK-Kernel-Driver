@@ -48,6 +48,15 @@ struct trh_hdr {
 	__u16 rseg[8];			/* routing registers */
 };
 
+#ifdef __KERNEL__
+#include <linux/skbuff.h>
+
+static inline struct trh_hdr *tr_hdr(const struct sk_buff *skb)
+{
+	return (struct trh_hdr *)skb->mac.raw;
+}
+#endif
+
 /* This is an Token-Ring LLC structure */
 struct trllc {
 	__u8  dsap;			/* destination SAP */
