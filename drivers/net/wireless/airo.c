@@ -1483,9 +1483,9 @@ static void airo_read_stats(struct airo_info *ai) {
 		ai->stats.rx_frame_errors = vals[2];
 		ai->stats.rx_fifo_errors = vals[0];
 	} else {
-		ai->stats_task.routine = (void (*)(void *))airo_read_stats;
+		ai->stats_task.func = (void (*)(void *))airo_read_stats;
 		ai->stats_task.data = (void *)ai;
-		schedule_task(&ai->stats_task);
+		schedule_work(&ai->stats_task);
 	}
 }
 
@@ -2101,7 +2101,7 @@ static irqreturn_t airo_interrupt ( int irq, void* dev_id, struct pt_regs *regs)
 				}
 			}
 			if (len) {
-#if WIRELESS_EXT > 15
+#if 0 && WIRELESS_EXT > 15
 #ifdef IW_WIRELESS_SPY		/* defined in iw_handler.h */
 				if (apriv->spy_data.spy_number > 0) {
 					char *sa;
@@ -5575,7 +5575,7 @@ static const struct iw_handler_def	airo_handler_def =
 	.standard	= (iw_handler *) airo_handler,
 	.private	= (iw_handler *) airo_private_handler,
 	.private_args	= (struct iw_priv_args *) airo_private_args,
-#if WIRELESS_EXT > 15
+#if 0 && WIRELESS_EXT > 15
 	.spy_offset	= ((void *) (&((struct airo_info *) NULL)->spy_data) -
 			   (void *) NULL),
 #endif /* WIRELESS_EXT > 15 */
