@@ -165,7 +165,7 @@ typedef struct marker {
 	//  = 0x02  (marker response information)
 	u8 marker_length;	 //  = 0x16
 	u16 requester_port;	 //   The number assigned to the port by the requester
-	struct mac_addr requester_system;      //   The requester’s system id
+	struct mac_addr requester_system;      //   The requester's system id
 	u32 requester_transaction_id;	//   The transaction id allocated by the requester,
 	u16 pad;		 //  = 0
 	u8 tlv_type_terminator;	     //  = 0x00

@@ -736,7 +736,7 @@ static struct sock *raw_get_idx(struct seq_file *seq, loff_t pos)
 static void *raw_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&raw_v4_lock);
-	return *pos ? raw_get_idx(seq, *pos) : SEQ_START_TOKEN;
+	return *pos ? raw_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *raw_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -831,19 +831,13 @@ static struct file_operations raw_seq_fops = {
 
 int __init raw_proc_init(void)
 {
-	struct proc_dir_entry *p;
-	int rc = 0;
-
-	p = create_proc_entry("raw", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &raw_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	if (!proc_net_fops_create("raw", S_IRUGO, &raw_seq_fops))
+		return -ENOMEM;
+	return 0;
 }
 
 void __init raw_proc_exit(void)
 {
-	remove_proc_entry("raw", proc_net);
+	proc_net_remove("raw");
 }
 #endif /* CONFIG_PROC_FS */

@@ -22,15 +22,6 @@
 #endif
 
 
-const unsigned char llc_oui[] = {
-	0xaa,	/* DSAP: non-ISO */
-	0xaa,	/* SSAP: non-ISO */
-	0x03,	/* Ctrl: Unnumbered Information Command PDU */
-	0x00,	/* OUI: EtherType */
-	0x00,
-	0x00 };
-
-
 /*
  * skb_migrate appends the list at "from" to "to", emptying "from" in the
  * process. skb_migrate is atomic with respect to all other skb operations on
@@ -67,5 +58,4 @@ void skb_migrate(struct sk_buff_head *from,struct sk_buff_head *to)
 }
 
 
-EXPORT_SYMBOL(llc_oui);
 EXPORT_SYMBOL(skb_migrate);

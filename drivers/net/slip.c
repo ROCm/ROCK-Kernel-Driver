@@ -1389,9 +1389,8 @@ static void __exit slip_exit(void)
 	 */
 	do {
 		if (busy) {
-			current->state = TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(HZ / 10);
-			current->state = TASK_RUNNING;
 		}
 
 		busy = 0;

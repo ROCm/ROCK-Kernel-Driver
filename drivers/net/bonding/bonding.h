@@ -99,7 +99,7 @@ typedef struct bonding {
 	rwlock_t ptrlock;
 	struct timer_list mii_timer;
 	struct timer_list arp_timer;
-	struct net_device_stats *stats;
+	struct net_device_stats stats;
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *bond_proc_dir;
 	struct proc_dir_entry *bond_proc_info_file;

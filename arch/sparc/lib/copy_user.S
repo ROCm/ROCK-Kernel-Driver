@@ -16,41 +16,44 @@
 #include <asm/asmmacro.h>
 #include <asm/page.h>
 
-#define EX(x,y,a,b,z) 				\
+/* Work around cpp -rob */
+#define ALLOC #alloc
+#define EXECINSTR #execinstr
+#define EX(x,y,a,b) 				\
 98: 	x,y;					\
-	.section .fixup,z##alloc,z##execinstr;	\
+	.section .fixup,ALLOC,EXECINSTR;	\
 	.align	4;				\
 99:	ba fixupretl;				\
 	 a, b, %g3;				\
-	.section __ex_table,z##alloc;		\
+	.section __ex_table,ALLOC;		\
 	.align	4;				\
 	.word	98b, 99b;			\
 	.text;					\
 	.align	4
 
-#define EX2(x,y,c,d,e,a,b,z) 			\
+#define EX2(x,y,c,d,e,a,b) 			\
 98: 	x,y;					\
-	.section .fixup,z##alloc,z##execinstr;	\
+	.section .fixup,ALLOC,EXECINSTR;	\
 	.align	4;				\
 99:	c, d, e;				\
 	ba fixupretl;				\
 	 a, b, %g3;				\
-	.section __ex_table,z##alloc;		\
+	.section __ex_table,ALLOC;		\
 	.align	4;				\
 	.word	98b, 99b;			\
 	.text;					\
 	.align	4
 
-#define EXO2(x,y,z) 				\
-98: 	x,##y;					\
-	.section __ex_table,z##alloc;		\
+#define EXO2(x,y) 				\
+98: 	x, y;					\
+	.section __ex_table,ALLOC;		\
 	.align	4;				\
 	.word	98b, 97f;			\
 	.text;					\
 	.align	4
 
-#define EXT(start,end,handler,z) 		\
-	.section __ex_table,z##alloc;		\
+#define EXT(start,end,handler)			\
+	.section __ex_table,ALLOC;		\
 	.align	4;				\
 	.word	start, 0, end, handler;		\
 	.text;					\
@@ -121,23 +124,23 @@ dword_align:
 	be	4f
 	 andcc	%o1, 2, %g0
 
-	EXO2(ldub [%o1], %g2,#)
+	EXO2(ldub [%o1], %g2)
 	add	%o1, 1, %o1
-	EXO2(stb %g2, [%o0],#)
+	EXO2(stb %g2, [%o0])
 	sub	%o2, 1, %o2
 	bne	3f
 	 add	%o0, 1, %o0
 
-	EXO2(lduh [%o1], %g2,#)
+	EXO2(lduh [%o1], %g2)
 	add	%o1, 2, %o1
-	EXO2(sth %g2, [%o0],#)
+	EXO2(sth %g2, [%o0])
 	sub	%o2, 2, %o2
 	b	3f
 	 add	%o0, 2, %o0
 4:
-	EXO2(lduh [%o1], %g2,#)
+	EXO2(lduh [%o1], %g2)
 	add	%o1, 2, %o1
-	EXO2(sth %g2, [%o0],#)
+	EXO2(sth %g2, [%o0])
 	sub	%o2, 2, %o2
 	b	3f
 	 add	%o0, 2, %o0
@@ -160,9 +163,9 @@ C_LABEL(__copy_user):	/* %o0=dst %o1=src %o2=len */
 	be	2f
 	 mov	%o2, %g1
 
-	EXO2(ld [%o1], %o4,#)
+	EXO2(ld [%o1], %o4)
 	sub	%g1, 4, %g1
-	EXO2(st %o4, [%o0],#)
+	EXO2(st %o4, [%o0])
 	add	%o1, 4, %o1
 	add	%o0, 4, %o0
 2:
@@ -177,7 +180,7 @@ C_LABEL(__copy_user):	/* %o0=dst %o1=src %o2=len */
 	MOVE_BIGCHUNK(o1, o0, 0x40, o2, o3, o4, o5, g2, g3, g4, g5)
 	MOVE_BIGCHUNK(o1, o0, 0x60, o2, o3, o4, o5, g2, g3, g4, g5)
 80:
-	EXT(5b, 80b, 50f,#)
+	EXT(5b, 80b, 50f)
 	subcc	%g7, 128, %g7
 	add	%o1, 128, %o1
 	bne	5b
@@ -204,37 +207,37 @@ copy_user_table:
 	MOVE_LASTCHUNK(o1, o0, 0x10, g2, g3, g4, g5)
 	MOVE_LASTCHUNK(o1, o0, 0x00, g2, g3, g4, g5)
 copy_user_table_end:
-	EXT(copy_user_table, copy_user_table_end, 51f,#)
+	EXT(copy_user_table, copy_user_table_end, 51f)
 	be	copy_user_last7
 	 andcc	%g1, 4, %g0
 
-	EX(ldd	[%o1], %g2, and %g1, 0xf,#)
+	EX(ldd	[%o1], %g2, and %g1, 0xf)
 	add	%o0, 8, %o0
 	add	%o1, 8, %o1
-	EX(st	%g2, [%o0 - 0x08], and %g1, 0xf,#)
-	EX2(st	%g3, [%o0 - 0x04], and %g1, 0xf, %g1, sub %g1, 4,#)
+	EX(st	%g2, [%o0 - 0x08], and %g1, 0xf)
+	EX2(st	%g3, [%o0 - 0x04], and %g1, 0xf, %g1, sub %g1, 4)
 copy_user_last7:
 	be	1f
 	 andcc	%g1, 2, %g0
 
-	EX(ld	[%o1], %g2, and %g1, 7,#)
+	EX(ld	[%o1], %g2, and %g1, 7)
 	add	%o1, 4, %o1
-	EX(st	%g2, [%o0], and %g1, 7,#)
+	EX(st	%g2, [%o0], and %g1, 7)
 	add	%o0, 4, %o0
 1:
 	be	1f
 	 andcc	%g1, 1, %g0
 
-	EX(lduh	[%o1], %g2, and %g1, 3,#)
+	EX(lduh	[%o1], %g2, and %g1, 3)
 	add	%o1, 2, %o1
-	EX(sth	%g2, [%o0], and %g1, 3,#)
+	EX(sth	%g2, [%o0], and %g1, 3)
 	add	%o0, 2, %o0
 1:
 	be	1f
 	 nop
 
-	EX(ldub	[%o1], %g2, add %g0, 1,#)
-	EX(stb	%g2, [%o0], add %g0, 1,#)
+	EX(ldub	[%o1], %g2, add %g0, 1)
+	EX(stb	%g2, [%o0], add %g0, 1)
 1:
 	retl
  	 clr	%o0
@@ -245,7 +248,7 @@ ldd_std:
 	MOVE_BIGALIGNCHUNK(o1, o0, 0x40, o2, o3, o4, o5, g2, g3, g4, g5)
 	MOVE_BIGALIGNCHUNK(o1, o0, 0x60, o2, o3, o4, o5, g2, g3, g4, g5)
 81:
-	EXT(ldd_std, 81b, 52f,#)
+	EXT(ldd_std, 81b, 52f)
 	subcc	%g7, 128, %g7
 	add	%o1, 128, %o1
 	bne	ldd_std
@@ -274,9 +277,9 @@ cannot_optimize:
 	be	10f
 	 nop
 
-	EXO2(ldub [%o1], %g2,#)
+	EXO2(ldub [%o1], %g2)
 	add	%o1, 1, %o1
-	EXO2(stb %g2, [%o0],#)
+	EXO2(stb %g2, [%o0])
 	sub	%o2, 1, %o2
 	andcc	%o2, 0xfffffff0, %o3
 	be	short_end
@@ -285,7 +288,7 @@ cannot_optimize:
 	MOVE_HALFCHUNK(o1, o0, 0x00, g2, g3, g4, g5)
 	MOVE_HALFCHUNK(o1, o0, 0x08, g2, g3, g4, g5)
 82:
-	EXT(10b, 82b, 53f,#)
+	EXT(10b, 82b, 53f)
 	subcc	%o3, 0x10, %o3
 	add	%o1, 0x10, %o1
 	bne	10b
@@ -303,7 +306,7 @@ byte_chunk:
 	MOVE_SHORTCHUNK(o1, o0, -0x0e, g2, g3)
 	MOVE_SHORTCHUNK(o1, o0, -0x10, g2, g3)
 83:
-	EXT(byte_chunk, 83b, 54f,#)
+	EXT(byte_chunk, 83b, 54f)
 	subcc	%o3, 0x10, %o3
 	add	%o1, 0x10, %o1
 	bne	byte_chunk
@@ -328,11 +331,11 @@ short_end:
 	MOVE_SHORTCHUNK(o1, o0, 0x02, g2, g3)
 	MOVE_SHORTCHUNK(o1, o0, 0x00, g2, g3)
 short_table_end:
-	EXT(84b, short_table_end, 55f,#)
+	EXT(84b, short_table_end, 55f)
 	be	1f
 	 nop
-	EX(ldub	[%o1], %g2, add %g0, 1,#)
-	EX(stb	%g2, [%o0], add %g0, 1,#)
+	EX(ldub	[%o1], %g2, add %g0, 1)
+	EX(stb	%g2, [%o0], add %g0, 1)
 1:
 	retl
  	 clr	%o0
@@ -344,11 +347,11 @@ short_aligned_end:
 	be	1f
 	 andcc	%o2, 4, %g0
 
-	EXO2(ld	[%o1 + 0x00], %g2,#)
-	EXO2(ld	[%o1 + 0x04], %g3,#)
+	EXO2(ld	[%o1 + 0x00], %g2)
+	EXO2(ld	[%o1 + 0x04], %g3)
 	add	%o1, 8, %o1
-	EXO2(st	%g2, [%o0 + 0x00],#)
-	EX(st	%g3, [%o0 + 0x04], sub %o2, 4,#)
+	EXO2(st	%g2, [%o0 + 0x00])
+	EX(st	%g3, [%o0 + 0x04], sub %o2, 4)
 	add	%o0, 8, %o0
 1:
 	b	copy_user_last7
