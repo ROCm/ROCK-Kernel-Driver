@@ -911,8 +911,9 @@ svc_tcp_sendto(struct svc_rqst *rqstp)
 
 	sent = svc_sendto(rqstp, bufp->iov, bufp->nriov);
 	if (sent != bufp->len<<2) {
-		printk(KERN_NOTICE "rpc-srv/tcp: %s: sent only %d bytes of %d - should shutdown socket\n",
+		printk(KERN_NOTICE "rpc-srv/tcp: %s: %s %d when sending %d bytes - shutting down socket\n",
 		       rqstp->rq_sock->sk_server->sv_name,
+		       (sent<0)?"got error":"sent only",
 		       sent, bufp->len << 2);
 		svc_delete_socket(rqstp->rq_sock);
 		sent = -EAGAIN;
