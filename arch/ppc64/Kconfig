@@ -128,6 +128,10 @@ config RTAS_FLASH
 	tristate "Firmware flash interface"
 	depends on !PPC_ISERIES
 
+config PPC_RTAS
+	bool "Proc interface to RTAS"
+	depends on !PPC_ISERIES
+
 endmenu
 
 

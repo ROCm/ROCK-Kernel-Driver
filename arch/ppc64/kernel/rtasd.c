@@ -49,6 +49,8 @@ static unsigned int rtas_error_log_max;
 #define SURVEILLANCE_TIMEOUT	1
 #define SURVEILLANCE_SCANRATE	1
 
+struct proc_dir_entry *proc_rtas;
+
 /*
  * Since we use 32 bit RTAS, the physical address of this must be below
  * 4G or else bad things happen. Allocate this in the kernel data and
@@ -270,13 +272,16 @@ error:
 
 static int __init rtas_init(void)
 {
-	struct proc_dir_entry *rtas_dir, *entry;
+	struct proc_dir_entry *entry;
 
-	rtas_dir = proc_mkdir("rtas", 0);
-	if (!rtas_dir) {
-		printk(KERN_ERR "Failed to create rtas proc directory\n");
+	if (proc_rtas == NULL) {
+		proc_rtas = proc_mkdir("rtas", 0);
+	}
+
+	if (proc_rtas == NULL) {
+		printk(KERN_ERR "Failed to create /proc/rtas in rtas_init\n");
 	} else {
-		entry = create_proc_entry("error_log", S_IRUSR, rtas_dir);
+		entry = create_proc_entry("error_log", S_IRUSR, proc_rtas);
 		if (entry)
 			entry->proc_fops = &proc_rtas_log_operations;
 		else
