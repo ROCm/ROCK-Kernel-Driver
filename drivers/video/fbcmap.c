@@ -181,62 +181,6 @@ void fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to, int fsfromto)
     }
 }
 
-
-/**
- *	fb_get_cmap - get a colormap
- *	@cmap: frame buffer colormap
- *	@kspc: boolean, 0 copy local, 1 put_user() function
- *	@getcolreg: pointer to a function to get a color register
- *	@info: frame buffer info structure
- *
- *	Get a colormap @cmap for a screen of device @info.
- *
- *	Returns negative errno on error, or zero on success.
- *
- */
-
-int fb_get_cmap(struct fb_cmap *cmap, int kspc,
-    	    	int (*getcolreg)(u_int, u_int *, u_int *, u_int *, u_int *,
-				 struct fb_info *),
-		struct fb_info *info)
-{
-    int i, start;
-    u16 *red, *green, *blue, *transp;
-    u_int hred, hgreen, hblue, htransp;
-
-    red = cmap->red;
-    green = cmap->green;
-    blue = cmap->blue;
-    transp = cmap->transp;
-    start = cmap->start;
-    if (start < 0)
-	return -EINVAL;
-    for (i = 0; i < cmap->len; i++) {
-	if (getcolreg(start++, &hred, &hgreen, &hblue, &htransp, info))
-	    return 0;
-	if (kspc) {
-	    *red = hred;
-	    *green = hgreen;
-	    *blue = hblue;
-	    if (transp)
-		*transp = htransp;
-	} else {
-	    put_user(hred, red);
-	    put_user(hgreen, green);
-	    put_user(hblue, blue);
-	    if (transp)
-		put_user(htransp, transp);
-	}
-	red++;
-	green++;
-	blue++;
-	if (transp)
-	    transp++;
-    }
-    return 0;
-}
-
-
 /**
  *	fb_set_cmap - set the colormap
  *	@cmap: frame buffer colormap structure
@@ -353,7 +297,6 @@ void fb_invert_cmaps(void)
 
 EXPORT_SYMBOL(fb_alloc_cmap);
 EXPORT_SYMBOL(fb_copy_cmap);
-EXPORT_SYMBOL(fb_get_cmap);
 EXPORT_SYMBOL(fb_set_cmap);
 EXPORT_SYMBOL(fb_default_cmap);
 EXPORT_SYMBOL(fb_invert_cmaps);

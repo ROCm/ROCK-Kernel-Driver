@@ -19,8 +19,8 @@
 #include <linux/delay.h>
 #include <asm/types.h>
 
-#include <video/fbcon.h>
-#include <video/fbcon-mfb.h>
+#include "fbcon.h"
+#include "fbcon-mfb.h"
 
 #include "sti.h"
 

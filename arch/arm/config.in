@@ -498,15 +498,7 @@ source drivers/media/Config.in
 
 source fs/Config.in
 
-if [ "$CONFIG_VT" = "y" ]; then
-   mainmenu_option next_comment
-   comment 'Console drivers'
-   if [ "$CONFIG_ARCH_ACORN" != "y" -a "$CONFIG_ARCH_EBSA110" != "y" ]; then
-      bool 'VGA text console' CONFIG_VGA_CONSOLE
-   fi
-   source drivers/video/Config.in
-   endmenu
-fi
+source drivers/video/Config.in
 
 if [ "$CONFIG_ARCH_ACORN" = "y" -o \
      "$CONFIG_ARCH_CLPS7500" = "y" -o \

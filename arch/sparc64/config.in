@@ -74,11 +74,7 @@ if [ "$CONFIG_PCI" = "y" ]; then
 fi
 endmenu
 
-mainmenu_option next_comment
-comment 'Console drivers'
-bool 'PROM console' CONFIG_PROM_CONSOLE
 source drivers/video/Config.in
-endmenu
 
 source drivers/serial/Config.in
 source drivers/sbus/char/Config.in
