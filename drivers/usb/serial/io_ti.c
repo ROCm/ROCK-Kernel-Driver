@@ -2635,6 +2635,7 @@ static void edge_shutdown (struct usb_serial *serial)
 static struct usb_serial_device_type edgeport_1port_device = {
 	.owner			= THIS_MODULE,
 	.name			= "Edgeport TI 1 port adapter",
+	.short_name		= "edgeport_ti_1",
 	.id_table		= edgeport_1port_id_table,
 	.num_interrupt_in	= 1,
 	.num_bulk_in		= 1,
@@ -2657,6 +2658,7 @@ static struct usb_serial_device_type edgeport_1port_device = {
 static struct usb_serial_device_type edgeport_2port_device = {
 	.owner			= THIS_MODULE,
 	.name			= "Edgeport TI 2 port adapter",
+	.short_name		= "edgeport_ti_2",
 	.id_table		= edgeport_2port_id_table,
 	.num_interrupt_in	= 1,
 	.num_bulk_in		= 2,

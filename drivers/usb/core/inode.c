@@ -487,10 +487,15 @@ static void fs_remove_file (struct dentry *dentry)
  * It will be removed when the 2.7.x development cycle is started.
  * You have been warned :)
  */
+static struct file_system_type usbdevice_fs_type;
 
 static struct super_block *usb_get_sb(struct file_system_type *fs_type,
 	int flags, char *dev_name, void *data)
 {
+	if (fs_type == &usbdevice_fs_type)
+		printk (KERN_INFO "Please use the 'usbfs' filetype instead, "
+				"the 'usbdevfs' name is depreciated.\n");
+
 	return get_sb_single(fs_type, flags, data, usbfs_fill_super);
 }
 

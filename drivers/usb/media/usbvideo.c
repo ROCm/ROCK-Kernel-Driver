@@ -42,8 +42,8 @@ MODULE_PARM(video_nr, "i");
  * Local prototypes.
  */
 #if USES_PROC_FS
-static void usbvideo_procfs_level1_create(usbvideo_t *ut);
-static void usbvideo_procfs_level1_destroy(usbvideo_t *ut);
+static void usbvideo_procfs_level1_create(struct usbvideo *ut);
+static void usbvideo_procfs_level1_destroy(struct usbvideo *ut);
 static void usbvideo_procfs_level2_create(struct uvd *uvd);
 static void usbvideo_procfs_level2_destroy(struct uvd *uvd);
 static int usbvideo_default_procfs_read_proc(
@@ -765,7 +765,7 @@ static void usbvideo_ClientDecModCount(struct uvd *uvd)
 }
 
 int usbvideo_register(
-	usbvideo_t **pCams,
+	struct usbvideo **pCams,
 	const int num_cams,
 	const int num_extra,
 	const char *driverName,
@@ -773,7 +773,7 @@ int usbvideo_register(
 	struct module *md,
 	const struct usb_device_id *id_table)
 {
-	usbvideo_t *cams;
+	struct usbvideo *cams;
 	int i, base_size;
 
 	/* Check parameters for sanity */
@@ -788,10 +788,10 @@ int usbvideo_register(
 		return -EINVAL;
 	}
 
-	base_size = num_cams * sizeof(struct uvd) + sizeof(usbvideo_t);
-	cams = (usbvideo_t *) kmalloc(base_size, GFP_KERNEL);
+	base_size = num_cams * sizeof(struct uvd) + sizeof(struct usbvideo);
+	cams = (struct usbvideo *) kmalloc(base_size, GFP_KERNEL);
 	if (cams == NULL) {
-		err("Failed to allocate %d. bytes for usbvideo_t", base_size);
+		err("Failed to allocate %d. bytes for usbvideo struct", base_size);
 		return -ENOMEM;
 	}
 	dbg("%s: Allocated $%p (%d. bytes) for %d. cameras",
@@ -823,7 +823,7 @@ int usbvideo_register(
 #else /* !USES_PROC_FS */
 	/* Report a warning so that user knows why there is no /proc entries */
 	if ((cams->cb.procfs_read != NULL) || (cams->cb.procfs_write == NULL)) {
-		dbg("%s: /proc fs support requested but not configured!", proc);
+		dbg("%s: /proc fs support requested but not configured!", __FUNCTION__);
 	}
 #endif
 	cams->num_cameras = num_cams;
@@ -889,9 +889,9 @@ EXPORT_SYMBOL(usbvideo_register);
  * if you had some dynamically allocated components in ->user field then
  * you should free them before calling here.
  */
-void usbvideo_Deregister(usbvideo_t **pCams)
+void usbvideo_Deregister(struct usbvideo **pCams)
 {
-	usbvideo_t *cams;
+	struct usbvideo *cams;
 	int i;
 
 	if (pCams == NULL) {
@@ -1049,12 +1049,12 @@ static void usbvideo_CameraRelease(struct uvd *uvd)
  * History:
  * 27-Jan-2000 Created.
  */
-static int usbvideo_find_struct(usbvideo_t *cams)
+static int usbvideo_find_struct(struct usbvideo *cams)
 {
 	int u, rv = -1;
 
 	if (cams == NULL) {
-		err("No usbvideo_t handle?");
+		err("No usbvideo handle?");
 		return -1;
 	}
 	down(&cams->lock);
@@ -1089,13 +1089,13 @@ static struct video_device usbvideo_template = {
 	.fops =       &usbvideo_fops,
 };
 
-struct uvd *usbvideo_AllocateDevice(usbvideo_t *cams)
+struct uvd *usbvideo_AllocateDevice(struct usbvideo *cams)
 {
 	int i, devnum;
 	struct uvd *uvd = NULL;
 
 	if (cams == NULL) {
-		err("No usbvideo_t handle?");
+		err("No usbvideo handle?");
 		return NULL;
 	}
 
@@ -2357,7 +2357,7 @@ static void usbvideo_SoftwareContrastAdjustment(struct uvd *uvd,
 
 extern struct proc_dir_entry *video_proc_entry;
 
-static void usbvideo_procfs_level1_create(usbvideo_t *ut)
+static void usbvideo_procfs_level1_create(struct usbvideo *ut)
 {
 	if (ut == NULL) {
 		err("%s: ut == NULL", __FUNCTION__);
@@ -2376,7 +2376,7 @@ static void usbvideo_procfs_level1_create(usbvideo_t *ut)
 	}
 }
 
-static void usbvideo_procfs_level1_destroy(usbvideo_t *ut)
+static void usbvideo_procfs_level1_destroy(struct usbvideo *ut)
 {
 	if (ut == NULL) {
 		err("%s: ut == NULL", __FUNCTION__);

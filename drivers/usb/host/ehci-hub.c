@@ -315,7 +315,7 @@ static int ehci_hub_control (
 					wIndex + 1);
 				temp |= PORT_OWNER;
 			} else {
-				ehci_vdbg (ehci, "port %d reset", wIndex + 1);
+				ehci_vdbg (ehci, "port %d reset\n", wIndex + 1);
 				temp |= PORT_RESET;
 				temp &= ~PORT_PE;
 

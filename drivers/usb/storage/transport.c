@@ -480,7 +480,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	status = usb_stor_msg_common(us);
 
 	/* return the actual length of the data transferred if no error */
-	if (status >= 0)
+	if (status == 0)
 		status = us->current_urb->actual_length;
 	return status;
 }
@@ -583,50 +583,52 @@ static int interpret_urb_result(struct us_data *us, unsigned int pipe,
 
 	US_DEBUGP("Status code %d; transferred %u/%u\n",
 			result, partial, length);
+	switch (result) {
+
+	/* no error code; did we send all the data? */
+	case 0:
+		if (partial != length) {
+			US_DEBUGP("-- short transfer\n");
+			return USB_STOR_XFER_SHORT;
+		}
+
+		US_DEBUGP("-- transfer complete\n");
+		return USB_STOR_XFER_GOOD;
 
 	/* stalled */
-	if (result == -EPIPE) {
-
-		/* for non-bulk (i.e., control) endpoints, a stall indicates
-		 * a protocol error */
-		if (!usb_pipebulk(pipe)) {
+	case -EPIPE:
+		/* for control endpoints, a stall indicates a protocol error */
+		if (usb_pipecontrol(pipe)) {
 			US_DEBUGP("-- stall on control pipe\n");
 			return USB_STOR_XFER_ERROR;
 		}
 
-		/* for a bulk endpoint, clear the stall */
+		/* for other sorts of endpoint, clear the stall */
 		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
 		if (usb_stor_clear_halt(us, pipe) < 0)
 			return USB_STOR_XFER_ERROR;
 		return USB_STOR_XFER_STALLED;
-	}
 
 	/* NAK - that means we've retried this a few times already */
-	if (result == -ETIMEDOUT) {
+	case -ETIMEDOUT:
 		US_DEBUGP("-- device NAKed\n");
 		return USB_STOR_XFER_ERROR;
-	}
 
 	/* the transfer was cancelled, presumably by an abort */
-	if (result == -ENODEV) {
+	case -ENODEV:
 		US_DEBUGP("-- transfer cancelled\n");
 		return USB_STOR_XFER_ERROR;
-	}
+
+	/* short scatter-gather read transfer */
+	case -EREMOTEIO:
+		US_DEBUGP("-- short read transfer\n");
+		return USB_STOR_XFER_SHORT;
 
 	/* the catch-all error case */
-	if (result < 0) {
+	default:
 		US_DEBUGP("-- unknown error\n");
 		return USB_STOR_XFER_ERROR;
 	}
-
-	/* no error code; did we send all the data? */
-	if (partial != length) {
-		US_DEBUGP("-- transferred only %u bytes\n", partial);
-		return USB_STOR_XFER_SHORT;
-	}
-
-	US_DEBUGP("-- transfer complete\n");
-	return USB_STOR_XFER_GOOD;
 }
 
 /*

@@ -18,21 +18,45 @@
 
 /* this file is part of ehci-hcd.c */
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,50)
+
 #define ehci_dbg(ehci, fmt, args...) \
 	dev_dbg (*(ehci)->hcd.controller, fmt, ## args )
+#define ehci_err(ehci, fmt, args...) \
+	dev_err (*(ehci)->hcd.controller, fmt, ## args )
+#define ehci_info(ehci, fmt, args...) \
+	dev_info (*(ehci)->hcd.controller, fmt, ## args )
+#define ehci_warn(ehci, fmt, args...) \
+	dev_warn (*(ehci)->hcd.controller, fmt, ## args )
 
-#ifdef EHCI_VERBOSE_DEBUG
-#define ehci_vdbg(ehci, fmt, args...) \
-	dev_dbg (*(ehci)->hcd.controller, fmt, ## args )
 #else
-#define ehci_vdbg(ehci, fmt, args...) do { } while (0)
+
+#ifdef DEBUG
+#define ehci_dbg(ehci, fmt, args...) \
+	printk(KERN_DEBUG "%s %s: " fmt, hcd_name, \
+		(ehci)->hcd.pdev->slot_name, ## args )
+#else
+#define ehci_dbg(ehci, fmt, args...) do { } while (0)
+#endif
+
+#define ehci_err(ehci, fmt, args...) \
+	printk(KERN_ERR "%s %s: " fmt, hcd_name, \
+		(ehci)->hcd.pdev->slot_name, ## args )
+#define ehci_info(ehci, fmt, args...) \
+	printk(KERN_INFO "%s %s: " fmt, hcd_name, \
+		(ehci)->hcd.pdev->slot_name, ## args )
+#define ehci_warn(ehci, fmt, args...) \
+	printk(KERN_WARNING "%s %s: " fmt, hcd_name, \
+		(ehci)->hcd.pdev->slot_name, ## args )
 #endif
 
 
 #ifdef EHCI_VERBOSE_DEBUG
 #	define vdbg dbg
+#	define ehci_vdbg ehci_dbg
 #else
-	static inline void vdbg (char *fmt, ...) { }
+#	define vdbg(fmt,args...) do { } while (0)
+#	define ehci_vdbg(ehci, fmt, args...) do { } while (0)
 #endif
 
 #ifdef	DEBUG
@@ -289,7 +313,8 @@ static void qh_lines (struct ehci_qh *qh, char **nextp, unsigned *sizep)
 
 	scratch = cpu_to_le32p (&qh->hw_info1);
 	hw_curr = cpu_to_le32p (&qh->hw_current);
-	temp = snprintf (next, size, "qh/%p dev%d %cs ep%d %08x %08x (%08x %08x)",
+	temp = snprintf (next, size,
+			"qh/%p dev%d %cs ep%d %08x %08x (%08x %08x)",
 			qh, scratch & 0x007f,
 			speed_char (scratch),
 			(scratch >> 8) & 0x000f,

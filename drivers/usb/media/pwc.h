@@ -60,8 +60,8 @@
 
 /* Version block */
 #define PWC_MAJOR	8
-#define PWC_MINOR	9
-#define PWC_VERSION 	"8.9"
+#define PWC_MINOR	10
+#define PWC_VERSION 	"8.10"
 #define PWC_NAME 	"pwc"
 
 /* Turn certain features on/off */
