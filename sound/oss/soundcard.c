@@ -592,7 +592,7 @@ static void __exit oss_cleanup(void)
 	int i, j;
 
 	for (i = 0; i < sizeof (dev_list) / sizeof *dev_list; i++) {
-		devfs_remove("snd/%s", dev_list[i].name);
+		devfs_remove("sound/%s", dev_list[i].name);
 		if (!dev_list[i].num)
 			continue;
 		for (j = 1; j < *dev_list[i].num; j++)
