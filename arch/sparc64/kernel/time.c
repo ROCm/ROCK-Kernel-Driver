@@ -37,6 +37,7 @@
 #include <asm/ebus.h>
 #include <asm/isa.h>
 #include <asm/starfire.h>
+#include <asm/smp.h>
 
 spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
