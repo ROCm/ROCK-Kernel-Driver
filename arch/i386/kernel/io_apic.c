@@ -1653,6 +1653,10 @@ static void __init setup_ioapic_ids_from_mpc(void)
 			mp_ioapics[apic].mpc_apicid = reg_00.bits.ID;
 		}
 
+		/* Don't check I/O APIC IDs for some xAPIC systems.  They have
+		 * no meaning without the serial APIC bus. */
+		if (NO_IOAPIC_CHECK)
+			continue;
 		/*
 		 * Sanity check, is the ID really free? Every APIC in a
 		 * system must have a unique ID or we get lots of nice
