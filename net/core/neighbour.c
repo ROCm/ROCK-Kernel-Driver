@@ -1126,9 +1126,6 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new,
 	neigh_hold(neigh);
 	write_lock_bh(&neigh->lock);
 	update = __neigh_update(neigh, lladdr, new, 
-#ifdef CONFIG_IPV6_NDISC_NEW
-				NEIGH_UPDATE_F_REUSEADDR |
-#endif /* CONFIG_IPV6_NDISC_NEW */
 				(override ? NEIGH_UPDATE_F_OVERRIDE : 0) |
 				(arp ? 0 : NEIGH_UPDATE_F_ADMIN));
 #ifdef CONFIG_ARPD
