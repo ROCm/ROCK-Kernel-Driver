@@ -1,0 +1,28 @@
+For now this is a raw copy from the old Documentation/modules.txt,
+which was removed in 2.6.0-test5.
+The information herein is correct but not complete.
+
+Installing modules in a non-standard location
+---------------------------------------------
+When the modules needs to be installed under another directory
+the INSTALL_MOD_PATH can be used to prefix "/lib/modules" as seen
+in the following example:
+
+make INSTALL_MOD_PATH=/frodo modules_install
+
+This will install the modules in the directory /frodo/lib/modules.
+/frodo can be a NFS mounted filesystem on another machine, allowing
+out-of-the-box support for installation on remote machines.
+
+
+Compiling modules outside the official kernel
+---------------------------------------------
+Often modules are developed outside the official kernel.
+To keep up with changes in the build system the most portable way
+to compile a module outside the kernel is to use the following command-line:
+
+make -C path/to/kernel/src SUBDIRS=$PWD modules
+
+This requires that a makefile exits made in accordance to
+Documentation/kbuild/makefiles.txt.
+

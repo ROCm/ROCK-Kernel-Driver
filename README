@@ -108,11 +108,26 @@ SOFTWARE REQUIREMENTS
    you can just update packages when obvious problems arise during
    build or operation.
 
-CONFIGURING the kernel:
+BUILD directory for the kernel:
 
- - Do a "make config" to configure the basic kernel.  "make config" needs
-   bash to work: it will search for bash in $BASH, /bin/bash and /bin/sh
-   (in that order), so one of those must be correct for it to work. 
+   When compiling the kernel all output files will per default be
+   stored together with the kernel source code.
+   Using the option "make O=output/dir" allow you to specify an alternate
+   place for the output files (including .config).
+   Example:
+     kernel source code:	/usr/src/linux-2.6.N
+     build directory:		/home/name/build/kernel
+
+   To configure and build the kernel use:
+   cd /usr/src/linux-2.6.N
+   make O=/home/name/build/kernel menuconfig
+   make O=/home/name/build/kernel
+   sudo make O=/home/name/build/kernel install_modules install
+
+   Please note: If the 'O=output/dir' option is used then it must be
+   used for all invocations of make.
+
+CONFIGURING the kernel:
 
    Do not skip this step even if you are only upgrading one minor
    version.  New configuration options are added in each release, and
