@@ -371,6 +371,8 @@ int qdisc_graft(struct net_device *dev, struct Qdisc *parent, u32 classid,
 			unsigned long cl = cops->get(parent, classid);
 			if (cl) {
 				err = cops->graft(parent, cl, new, old);
+				if (new)
+					new->parent = classid;
 				cops->put(parent, cl);
 			}
 		}
@@ -821,7 +823,7 @@ static int tc_dump_qdisc(struct sk_buff *skb, struct netlink_callback *cb)
 				q_idx++;
 				continue;
 			}
-			if (tc_fill_qdisc(skb, q, 0, NETLINK_CB(cb->skb).pid,
+			if (tc_fill_qdisc(skb, q, q->parent, NETLINK_CB(cb->skb).pid,
 					  cb->nlh->nlmsg_seq, NLM_F_MULTI, RTM_NEWQDISC) <= 0) {
 				read_unlock_bh(&qdisc_tree_lock);
 				goto done;

@@ -356,10 +356,13 @@ static void *rt_cpu_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	int cpu;
 
-	for (cpu = *pos; cpu < NR_CPUS; ++cpu) {
+	if (*pos == 0)
+		return SEQ_START_TOKEN;
+
+	for (cpu = *pos-1; cpu < NR_CPUS; ++cpu) {
 		if (!cpu_possible(cpu))
 			continue;
-		*pos = cpu;
+		*pos = cpu+1;
 		return per_cpu_ptr(rt_cache_stat, cpu);
 	}
 	return NULL;
@@ -369,10 +372,10 @@ static void *rt_cpu_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	int cpu;
 
-	for (cpu = *pos + 1; cpu < NR_CPUS; ++cpu) {
+	for (cpu = *pos; cpu < NR_CPUS; ++cpu) {
 		if (!cpu_possible(cpu))
 			continue;
-		*pos = cpu;
+		*pos = cpu+1;
 		return per_cpu_ptr(rt_cache_stat, cpu);
 	}
 	return NULL;
@@ -387,6 +390,11 @@ static void rt_cpu_seq_stop(struct seq_file *seq, void *v)
 static int rt_cpu_seq_show(struct seq_file *seq, void *v)
 {
 	struct rt_cache_stat *st = v;
+
+	if (v == SEQ_START_TOKEN) {
+		seq_printf(seq, "entries  in_hit in_slow_tot in_no_route in_brd in_martian_dst in_martian_src  out_hit out_slow_tot out_slow_mc  gc_total gc_ignored gc_goal_miss gc_dst_overflow in_hlist_search out_hlist_search\n");
+		return 0;
+	}
 	
 	seq_printf(seq,"%08x  %08x %08x %08x %08x %08x %08x %08x "
 		   " %08x %08x %08x %08x %08x %08x %08x %08x %08x \n",
@@ -2783,12 +2791,16 @@ int __init ip_rt_init(void)
 	add_timer(&rt_secret_timer);
 
 #ifdef CONFIG_PROC_FS
+	{
+	struct proc_dir_entry *rtstat_pde = NULL; /* keep gcc happy */
 	if (!proc_net_fops_create("rt_cache", S_IRUGO, &rt_cache_seq_fops) ||
-	    !proc_net_fops_create("rt_cache_stat", S_IRUGO, &rt_cpu_seq_fops)) {
+	    !(rtstat_pde = create_proc_entry("rt_cache", S_IRUGO, 
+			    		     proc_net_stat))) {
 		free_percpu(rt_cache_stat);
 		return -ENOMEM;
 	}
-
+	rtstat_pde->proc_fops = &rt_cpu_seq_fops;
+	}
 #ifdef CONFIG_NET_CLS_ROUTE
 	create_proc_read_entry("rt_acct", 0, proc_net, ip_rt_acct_read, NULL);
 #endif
