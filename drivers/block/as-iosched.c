@@ -1463,11 +1463,7 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
 	arq->state = AS_RQ_QUEUED;
 }
 
-/*
- * requeue the request. The request has not been completed, nor is it a
- * new request, so don't touch accounting.
- */
-static void as_requeue_request(request_queue_t *q, struct request *rq)
+static void as_deactivate_request(request_queue_t *q, struct request *rq)
 {
 	struct as_data *ad = q->elevator->elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
@@ -1485,10 +1481,18 @@ static void as_requeue_request(request_queue_t *q, struct request *rq)
 		WARN_ON(blk_fs_request(rq)
 			&& (!(rq->flags & (REQ_HARDBARRIER|REQ_SOFTBARRIER))) );
 
-	list_add(&rq->queuelist, ad->dispatch);
-
 	/* Stop anticipating - let this request get through */
 	as_antic_stop(ad);
+}
+
+/*
+ * requeue the request. The request has not been completed, nor is it a
+ * new request, so don't touch accounting.
+ */
+static void as_requeue_request(request_queue_t *q, struct request *rq)
+{
+	as_deactivate_request(q, rq);
+	list_add(&rq->queuelist, &q->queue_head);
 }
 
 /*
@@ -2081,6 +2085,7 @@ static struct elevator_type iosched_as = {
 		.elevator_add_req_fn =		as_insert_request,
 		.elevator_remove_req_fn =	as_remove_request,
 		.elevator_requeue_req_fn = 	as_requeue_request,
+		.elevator_deactivate_req_fn = 	as_deactivate_request,
 		.elevator_queue_empty_fn =	as_queue_empty,
 		.elevator_completed_req_fn =	as_completed_request,
 		.elevator_former_req_fn =	as_former_request,

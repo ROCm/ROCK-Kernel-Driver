@@ -46,7 +46,7 @@ static int cfq_slice_idle = HZ / 50;
 /*
  * disable queueing at the driver/hardware level
  */
-static int cfq_max_depth = 1;
+static int cfq_max_depth = 2;
 
 /*
  * for the hash of cfqq inside the cfqd
@@ -592,11 +592,7 @@ out:
 	return NULL;
 }
 
-/*
- * make sure the service time gets corrected on reissue of this request
- */
-static void cfq_enqueue(struct cfq_data *cfqd, struct request *rq);
-static void cfq_requeue_request(request_queue_t *q, struct request *rq)
+static void cfq_deactivate_request(request_queue_t *q, struct request *rq)
 {
 	struct cfq_data *cfqd = q->elevator->elevator_data;
 	struct cfq_rq *crq = RQ_DATA(rq);
@@ -616,7 +612,14 @@ static void cfq_requeue_request(request_queue_t *q, struct request *rq)
 		}
 		crq->requeued = 1;
 	}
+}
 
+/*
+ * make sure the service time gets corrected on reissue of this request
+ */
+static void cfq_requeue_request(request_queue_t *q, struct request *rq)
+{
+	cfq_deactivate_request(q, rq);
 	list_add(&rq->queuelist, &q->queue_head);
 }
 
@@ -2357,6 +2360,7 @@ static struct cfq_fs_entry cfq_max_depth_entry = {
 	.show = cfq_max_depth_show,
 	.store = cfq_max_depth_store,
 };
+
 static struct attribute *default_attrs[] = {
 	&cfq_quantum_entry.attr,
 	&cfq_queued_entry.attr,
@@ -2418,6 +2422,7 @@ static struct elevator_type iosched_cfq = {
 		.elevator_add_req_fn =		cfq_insert_request,
 		.elevator_remove_req_fn =	cfq_remove_request,
 		.elevator_requeue_req_fn =	cfq_requeue_request,
+		.elevator_deactivate_req_fn =	cfq_deactivate_request,
 		.elevator_queue_empty_fn =	cfq_queue_empty,
 		.elevator_completed_req_fn =	cfq_completed_request,
 		.elevator_former_req_fn =	cfq_former_request,

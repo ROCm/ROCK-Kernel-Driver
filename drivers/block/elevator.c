@@ -255,14 +255,26 @@ void elv_merge_requests(request_queue_t *q, struct request *rq,
 		e->ops->elevator_merge_req_fn(q, rq, next);
 }
 
-void elv_requeue_request(request_queue_t *q, struct request *rq)
+void elv_deactivate_request(request_queue_t *q, struct request *rq)
 {
+	elevator_t *e = q->elevator;
+
 	/*
 	 * it already went through dequeue, we need to decrement the
 	 * in_flight count again
 	 */
 	if (blk_account_rq(rq))
 		q->in_flight--;
+
+	rq->flags &= ~REQ_STARTED;
+
+	if (e->ops->elevator_deactivate_req_fn)
+		e->ops->elevator_deactivate_req_fn(q, rq);
+}
+
+void elv_requeue_request(request_queue_t *q, struct request *rq)
+{
+	elv_deactivate_request(q, rq);
 
 	/*
 	 * if this is the flush, requeue the original instead and drop the flush

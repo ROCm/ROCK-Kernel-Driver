@@ -407,6 +407,8 @@ struct request *blk_start_pre_flush(request_queue_t *q, struct request *rq)
 	if (!list_empty(&rq->queuelist))
 		blkdev_dequeue_request(rq);
 
+	elv_deactivate_request(q, rq);
+
 	flush_rq->end_io_data = rq;
 	flush_rq->end_io = blk_pre_flush_end_io;
 
