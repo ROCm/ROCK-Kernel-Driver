@@ -8,8 +8,10 @@
 #ifndef __ARCH_SPARC64_ATOMIC__
 #define __ARCH_SPARC64_ATOMIC__
 
+#include <linux/types.h>
+
 typedef struct { volatile int counter; } atomic_t;
-typedef struct { volatile long counter; } atomic64_t;
+typedef struct { volatile __s64 counter; } atomic64_t;
 
 #define ATOMIC_INIT(i)		{ (i) }
 #define ATOMIC64_INIT(i)	{ (i) }
@@ -21,10 +23,10 @@ typedef struct { volatile long counter; } atomic64_t;
 #define atomic64_set(v, i)	(((v)->counter) = i)
 
 extern int __atomic_add(int, atomic_t *);
-extern int __atomic64_add(int, atomic64_t *);
+extern int __atomic64_add(__s64, atomic64_t *);
 
 extern int __atomic_sub(int, atomic_t *);
-extern int __atomic64_sub(int, atomic64_t *);
+extern int __atomic64_sub(__s64, atomic64_t *);
 
 #define atomic_add(i, v) ((void)__atomic_add(i, v))
 #define atomic64_add(i, v) ((void)__atomic64_add(i, v))
