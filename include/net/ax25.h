@@ -3,11 +3,12 @@
  *
  *	Alan Cox (GW4PTS) 	10/11/93
  */
- 
 #ifndef _AX25_H
 #define _AX25_H 
+
 #include <linux/config.h>
 #include <linux/ax25.h>
+#include <linux/spinlock.h>
 
 #define	AX25_T1CLAMPLO  		1
 #define	AX25_T1CLAMPHI 			(30 * HZ)
@@ -197,7 +198,8 @@ typedef struct ax25_cb {
 #define ax25_sk(__sk) ((ax25_cb *)(__sk)->protinfo)
 
 /* af_ax25.c */
-extern ax25_cb *volatile ax25_list;
+extern ax25_cb *ax25_list;
+extern spinlock_t ax25_list_lock;
 extern void ax25_free_cb(ax25_cb *);
 extern void ax25_insert_socket(ax25_cb *);
 struct sock *ax25_find_listener(ax25_address *, int, struct net_device *, int);
