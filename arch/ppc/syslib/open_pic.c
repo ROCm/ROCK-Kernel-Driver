@@ -48,6 +48,8 @@ static u_int NumProcessors;
 static u_int NumSources;
 static int open_pic_irq_offset;
 static volatile OpenPIC_Source *ISR[NR_IRQS];
+static int openpic_cascade_irq = -1;
+static int (*openpic_cascade_fn)(struct pt_regs *);
 
 /* Global Operations */
 static void openpic_disable_8259_pass_through(void);
@@ -416,13 +418,6 @@ void __init openpic_init(int offset)
 	/* Initialize the spurious interrupt */
 	if (ppc_md.progress) ppc_md.progress("openpic: spurious",0x3bd);
 	openpic_set_spurious(OPENPIC_VEC_SPURIOUS+offset);
-
-	/* Initialize the cascade */
-	if (offset) {
-		if (request_irq(offset, no_action, SA_INTERRUPT,
-				"82c59 cascade", NULL))
-			printk("Unable to get OpenPIC IRQ 0 for cascade\n");
-	}
 	openpic_disable_8259_pass_through();
 #ifdef CONFIG_EPIC_SERIAL_MODE
 	openpic_eicr_set_clk(7);	/* Slowest value until we know better */
@@ -682,6 +677,19 @@ openpic_init_nmi_irq(u_int irq)
  *
  */
 
+/*
+ * Hookup a cascade to the OpenPIC.
+ */
+void __init
+openpic_hookup_cascade(u_int irq, char *name,
+	int (*cascade_fn)(struct pt_regs *))
+{
+	openpic_cascade_irq = irq;
+	openpic_cascade_fn = cascade_fn;
+	if (request_irq(irq, no_action, SA_INTERRUPT, name, NULL))
+		printk("Unable to get OpenPIC IRQ %d for cascade\n",
+				irq - open_pic_irq_offset);
+}
 
 /*
  *  Enable/disable an external interrupt source
@@ -841,14 +849,19 @@ openpic_get_irq(struct pt_regs *regs)
 	int irq = openpic_irq();
 
 	/*
-	 * This needs to be cleaned up.  We don't necessarily have
-	 * an i8259 cascaded or even a cascade.
+	 * Check for the cascade interrupt and call the cascaded
+	 * interrupt controller function (usually i8259_irq) if so.
+	 * This should move to irq.c eventually.  -- paulus
 	 */
-	if (open_pic_irq_offset && irq == open_pic_irq_offset) {
-		/* Get the IRQ from the cascade. */
-		irq = i8259_irq(regs);
-		openpic_eoi();
-	} else if (irq == OPENPIC_VEC_SPURIOUS + open_pic_irq_offset)
+	if (irq == openpic_cascade_irq && openpic_cascade_fn != NULL) {
+		int cirq = openpic_cascade_fn(regs);
+
+		/* Allow for the cascade being shared with other devices */
+		if (cirq != -1) {
+			irq = cirq;
+			openpic_eoi();
+		}
+        } else if (irq == OPENPIC_VEC_SPURIOUS + open_pic_irq_offset)
 		irq = -1;
 	return irq;
 }

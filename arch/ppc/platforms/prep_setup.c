@@ -856,8 +856,12 @@ prep_init_IRQ(void)
 	int i;
 	unsigned int pci_viddid, pci_did;
 
-	if (OpenPIC_Addr != NULL)
+	if (OpenPIC_Addr != NULL) {
 		openpic_init(NUM_8259_INTERRUPTS);
+		/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
+		openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+				       i8259_irq);
+	}
 	for ( i = 0 ; i < NUM_8259_INTERRUPTS ; i++ )
 		irq_desc[i].handler = &i8259_pic;
 	/* If we have a Raven PCI bridge or a Hawk PCI bridge / Memory

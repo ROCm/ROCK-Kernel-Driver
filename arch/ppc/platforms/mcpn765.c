@@ -30,9 +30,6 @@
 #include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/irq.h>
-#if 0
-#include <linux/ide.h>
-#endif
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 #include <linux/serial.h>
@@ -385,6 +382,8 @@ mcpn765_init_IRQ(void)
 		ppc_md.progress("init_irq: enter", 0);
 
 	openpic_init(NUM_8259_INTERRUPTS);
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+			i8259_irq);
 
 	for(i=0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;

@@ -208,6 +208,9 @@ lopec_init_IRQ(void)
 	openpic_set_sources(19, 1, OpenPIC_Addr + 0x110C0);
 
 	openpic_init(NUM_8259_INTERRUPTS);
+	/* We have a cascade on OpenPIC IRQ 0, Linux IRQ 16 */
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+			&i8259_irq);
 
 	/* Map i8259 interrupts */
 	for(i = 0; i < NUM_8259_INTERRUPTS; i++)
