@@ -21,7 +21,7 @@
  *  2000-01-01	Added quirks handling for buggy hardware
  *		Peter Denison <peterd@pnd-pc.demon.co.uk>
  *  2000-06-14	Added isapnp_probe_devs() and isapnp_activate_dev()
- *		Christoph Hellwig <hch@caldera.de>
+ *		Christoph Hellwig <hch@infradead.org>
  *  2001-06-03  Added release_region calls to correspond with
  *		request_region calls when a failure occurs.  Also
  *		added KERN_* constants to printk() calls.
