@@ -1064,12 +1064,13 @@ define filechk
 	tmp=$$(/bin/mktemp /tmp/kbuild.XXXXXX);	\
 	$(filechk_$(1)) < $< > $$tmp;		\
 	if [ -r $@ ] && cmp -s $@ $$tmp; then	\
-		rm -f $$tmp;			\
+		:;				\
 	else					\
 		echo '  UPD     $@';		\
 		mkdir -p $(dir $@);		\
-		mv -f $$tmp $@;			\
-	fi
+		cat $$tmp > $@;			\
+	fi					\
+	rm -f $$tmp;
 endef
 
 # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=dir
