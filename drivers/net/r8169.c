@@ -703,8 +703,10 @@ static void rtl8169_vlan_rx_register(struct net_device *dev,
 	unsigned long flags;
 
 	spin_lock_irqsave(&tp->lock, flags);
-	tp->vlgrp = grp;
-	tp->cp_cmd |= RxVlan;
+	if ((tp->vlgrp = grp))
+		tp->cp_cmd |= RxVlan;
+	else
+		tp->cp_cmd &= ~RxVlan;
 	RTL_W16(CPlusCmd, tp->cp_cmd);
 	RTL_R16(CPlusCmd);
 	spin_unlock_irqrestore(&tp->lock, flags);
@@ -713,13 +715,9 @@ static void rtl8169_vlan_rx_register(struct net_device *dev,
 static void rtl8169_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	void __iomem *ioaddr = tp->mmio_addr;
 	unsigned long flags;
 
 	spin_lock_irqsave(&tp->lock, flags);
-	tp->cp_cmd &= ~RxVlan;
-	RTL_W16(CPlusCmd, tp->cp_cmd);
-	RTL_R16(CPlusCmd);
 	if (tp->vlgrp)
 		tp->vlgrp->vlan_devices[vid] = NULL;
 	spin_unlock_irqrestore(&tp->lock, flags);
