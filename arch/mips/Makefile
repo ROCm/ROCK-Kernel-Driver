@@ -308,5 +308,3 @@ archclean:
 archmrproper:
 	@$(MAKEBOOT) mrproper
 	$(MAKE) -C arch/$(ARCH)/tools mrproper
-
-archdep:

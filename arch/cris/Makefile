@@ -100,5 +100,3 @@ archclean:
 	rm -rf $(LD_SCRIPT).tmp
 
 archmrproper:
-
-archdep:

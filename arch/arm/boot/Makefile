@@ -125,7 +125,7 @@ zImage:	compressed/vmlinux
 bootpImage: bootp/bootp
 	$(OBJCOPY) -O binary -R .note -R .comment -S bootp/bootp $@
 
-compressed/vmlinux: $(TOPDIR)/vmlinux dep
+compressed/vmlinux: $(TOPDIR)/vmlinux
 	@$(MAKE) -C compressed vmlinux
 
 bootp/bootp: zImage initrd

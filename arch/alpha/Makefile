@@ -127,8 +127,6 @@ archmrproper:
 	rm -f arch/alpha/vmlinux.lds
 	rm -f include/asm-alpha/asm_offsets.h
 
-archdep:
-
 vmlinux: arch/alpha/vmlinux.lds
 
 arch/alpha/vmlinux.lds: arch/alpha/vmlinux.lds.in

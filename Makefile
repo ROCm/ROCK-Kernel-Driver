@@ -330,18 +330,16 @@ scripts:
 # 	The targets are still named depend / dep for traditional
 #	reasons, but the only thing we do here is generating
 #	the module version checksums.
-#	FIXME: For now, we are also calling "archdep" from here,
-#	which should be replaced by a more sensible solution.
 
 .PHONY: depend dep $(patsubst %,_sfdep_%,$(SUBDIRS))
 
 depend dep: .hdepend
 
 #	.hdepend is our (misnomed) marker for whether we've run
-#	generated module versions and made archdep
+#	generated module versions
 
 .hdepend: $(if $(filter dep depend,$(MAKECMDGOALS)),FORCE)
-	@$(MAKE) archdep include/linux/modversions.h
+	@$(MAKE) include/linux/modversions.h
 	@touch $@
 
 ifdef CONFIG_MODVERSIONS

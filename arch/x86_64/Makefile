@@ -76,7 +76,7 @@ MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 vmlinux: arch/x86_64/vmlinux.lds
 
 .PHONY: zImage bzImage compressed zlilo bzlilo zdisk bzdisk install \
-		clean archclean archmrproper archdep checkoffset
+		clean archclean archmrproper
 
 bzImage: vmlinux
 	@$(MAKEBOOT) bzImage
@@ -100,9 +100,6 @@ archclean:
 	@$(MAKEBOOT) clean
 
 archmrproper:
-
-archdep:
-	@$(MAKEBOOT) dep
 
 
 prepare: include/asm-$(ARCH)/offset.h

@@ -58,7 +58,5 @@ archclean:
 
 archmrproper:
 
-archdep:
-
 install: vmlinux
 	@$(MAKEBOOT) BOOTIMAGE=image install

@@ -94,5 +94,3 @@ archclean:
 
 archmrproper:
 	rm -f arch/sh/vmlinux.lds
-
-archdep:
