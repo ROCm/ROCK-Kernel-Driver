@@ -560,7 +560,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			}
 		}
 
-#ifdef  CONFIG_SMP
+#ifdef  CONFIG_X86_SMP
 		/*
 		 * If the BIOS enumerates physical processors before logical,
 		 * maxcpus=N at enumeration-time can be used to disable HT.
