@@ -729,7 +729,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 #endif /* CONFIG_PREEMPT */
 .work_processed_kernel:
 (p6)	ld4 r31=[r17]				// load current_thread_info()->flags
-	adds r20=PT(CR_IPSR)+16,r12
+	adds r22=PT(CR_IPSR)+16,r12
 	adds r21=PT(PR)+16,r12
 	adds r2=PT(B6)+16,r12
 	adds r3=PT(R16)+16,r12
@@ -739,7 +739,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	adds r29=PT(R24)+16,r12
 	adds r30=PT(AR_CCV)+16,r12
 	;;
-	lfetch [r20]
+	lfetch [r22]
 	lfetch [r21]
 (p6)	and r19=TIF_WORK_MASK,r31		// any work other than TIF_SYSCALL_TRACE?
 	;;
