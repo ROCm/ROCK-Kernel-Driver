@@ -181,7 +181,7 @@ int copy_siginfo_to_user32(struct siginfo32 __user *to, siginfo_t *from)
 		case __SI_TIMER >> 16:
 			err |= __put_user(from->si_tid, &to->si_tid);
 			err |= __put_user(from->si_overrun, &to->si_overrun);
-			err |= __put_user((u32)(u64)from->si_ptr, &to->si_ptr);
+			err |= __put_user(from->si_int, &to->si_int);
 			break;
 		case __SI_CHLD >> 16:
 			err |= __put_user(from->si_utime, &to->si_utime);

@@ -10,76 +10,38 @@
 #include <asm/kdebug.h>
 #include <asm/signal.h>
 
-/* We do not have hardware single-stepping, so in order
- * to implement post handlers correctly we use two breakpoint
- * instructions.
+/* We do not have hardware single-stepping on sparc64.
+ * So we implement software single-stepping with breakpoint
+ * traps.  The top-level scheme is similar to that used
+ * in the x86 kprobes implementation.
  *
- *          1) ta 0x70 --> 0x91d02070
- *          2) ta 0x71 --> 0x91d02071
+ * In the kprobe->insn[] array we store the original
+ * instruction at index zero and a break instruction at
+ * index one.
  *
- * When these are hit, control is transferred to kprobe_trap()
- * below.  The arg 'level' tells us which of the two traps occurred.
+ * When we hit a kprobe we:
+ * - Run the pre-handler
+ * - Remember "regs->tnpc" and interrupt level stored in
+ *   "regs->tstate" so we can restore them later
+ * - Disable PIL interrupts
+ * - Set regs->tpc to point to kprobe->insn[0]
+ * - Set regs->tnpc to point to kprobe->insn[1]
+ * - Mark that we are actively in a kprobe
  *
- * Initially, the instruction at p->addr gets set to "ta 0x70"
- * by code in register_kprobe() by setting that memory address
- * to BREAKPOINT_INSTRUCTION.  When this breakpoint is hit
- * the following happens:
- *
- * 1) We run the pre-handler
- * 2) We replace p->addr with the original opcode
- * 3) We set the instruction at "regs->npc" to "ta 0x71"
- * 4) We mark that we are waiting for the second breakpoint
- *    to hit and return from the trap.
- *
- * At this point we wait for the second breakpoint to hit.
- * When it does:
- *
- * 1) We run the post-handler
- * 2) We re-install "ta 0x70" at p->addr
- * 3) We restore the opcode at the "ta 0x71" breakpoint
- * 4) We reset our "waiting for "ta 0x71" state
- * 5) We return from the trap
- *
- * We could use the trick used by the i386 kprobe code but I
- * think that scheme has problems with exception tables.  On i386
- * they single-step over the original instruction stored at
- * kprobe->insn.  So they set the processor to single step, and
- * set the program counter to kprobe->insn.
- *
- * But that explodes if the original opcode is a user space
- * access instruction and that faults.  It will go wrong because
- * since the location of the instruction being executed is
- * different from that recorded in the exception tables, the
- * kernel will not find it and this will cause an erroneous
- * kernel OOPS.
+ * At this point we wait for the second breakpoint at
+ * kprobe->insn[1] to hit.  When it does we:
+ * - Run the post-handler
+ * - Set regs->tpc to "remembered" regs->tnpc stored above,
+ *   restore the PIL interrupt level in "regs->tstate" as well
+ * - Make any adjustments necessary to regs->tnpc in order
+ *   to handle relative branches correctly.  See below.
+ * - Mark that we are no longer actively in a kprobe.
  */
 
 void arch_prepare_kprobe(struct kprobe *p)
 {
 	p->insn[0] = *p->addr;
-	p->insn[1] = 0xdeadbeef;
-}
-
-static void prepare_singlestep(struct kprobe *p, struct pt_regs *regs)
-{
-	u32 *insn2 = (u32 *) regs->tpc;
-
-	p->insn[1] = *insn2;
-
-	*insn2 = BREAKPOINT_INSTRUCTION_2;
-	flushi(insn2);
-}
-
-static void undo_singlestep(struct kprobe *p, struct pt_regs *regs)
-{
-	u32 *insn2 = (u32 *) regs->tpc;
-
-	BUG_ON(p->insn[1] == 0xdeadbeef);
-
-	*insn2 = p->insn[1];
-	flushi(insn2);
-
-	p->insn[1] = 0xdeadbeef;
+	p->insn[1] = BREAKPOINT_INSTRUCTION_2;
 }
 
 /* kprobe_status settings */
@@ -87,7 +49,30 @@ static void undo_singlestep(struct kprobe *p, struct pt_regs *regs)
 #define KPROBE_HIT_SS		0x00000002
 
 static struct kprobe *current_kprobe;
+static unsigned long current_kprobe_orig_tnpc;
+static unsigned long current_kprobe_orig_tstate_pil;
 static unsigned int kprobe_status;
+
+static inline void prepare_singlestep(struct kprobe *p, struct pt_regs *regs)
+{
+	current_kprobe_orig_tnpc = regs->tnpc;
+	current_kprobe_orig_tstate_pil = (regs->tstate & TSTATE_PIL);
+	regs->tstate |= TSTATE_PIL;
+
+	regs->tpc = (unsigned long) &p->insn[0];
+	regs->tnpc = (unsigned long) &p->insn[1];
+}
+
+static inline void disarm_kprobe(struct kprobe *p, struct pt_regs *regs)
+{
+	*p->addr = p->opcode;
+	flushi(p->addr);
+
+	regs->tpc = (unsigned long) p->addr;
+	regs->tnpc = current_kprobe_orig_tnpc;
+	regs->tstate = ((regs->tstate & ~TSTATE_PIL) |
+			current_kprobe_orig_tstate_pil);
+}
 
 static int kprobe_handler(struct pt_regs *regs)
 {
@@ -98,16 +83,19 @@ static int kprobe_handler(struct pt_regs *regs)
 	preempt_disable();
 
 	if (kprobe_running()) {
+		/* We *are* holding lock here, so this is safe.
+		 * Disarm the probe we just hit, and ignore it.
+		 */
 		p = get_kprobe(addr);
 		if (p) {
-			*p->addr = p->opcode;
-			flushi(p->addr);
+			disarm_kprobe(p, regs);
 			ret = 1;
 		} else {
 			p = current_kprobe;
 			if (p->break_handler && p->break_handler(p, regs))
 				goto ss_probe;
 		}
+		/* If it's not ours, can't be delete race, (we hold lock). */
 		goto no_kprobe;
 	}
 
@@ -115,8 +103,17 @@ static int kprobe_handler(struct pt_regs *regs)
 	p = get_kprobe(addr);
 	if (!p) {
 		unlock_kprobes();
-		if (*(u32 *)addr != BREAKPOINT_INSTRUCTION)
+		if (*(u32 *)addr != BREAKPOINT_INSTRUCTION) {
+			/*
+			 * The breakpoint instruction was removed right
+			 * after we hit it.  Another cpu has removed
+			 * either a probepoint or a debugger breakpoint
+			 * at this address.  In either case, no further
+			 * handling of this interrupt is appropriate.
+			 */
 			ret = 1;
+		}
+		/* Not one of ours: let kernel handle it */
 		goto no_kprobe;
 	}
 
@@ -135,17 +132,102 @@ no_kprobe:
 	return ret;
 }
 
-static int post_kprobe_handler(struct pt_regs *regs)
+/* If INSN is a relative control transfer instruction,
+ * return the corrected branch destination value.
+ *
+ * The original INSN location was REAL_PC, it actually
+ * executed at PC and produced destination address NPC.
+ */
+static unsigned long relbranch_fixup(u32 insn, unsigned long real_pc,
+				     unsigned long pc, unsigned long npc)
 {
-	u32 *insn_p = (u32 *) regs->tpc;
+	/* Branch not taken, no mods necessary.  */
+	if (npc == pc + 0x4UL)
+		return real_pc + 0x4UL;
 
-	if (!kprobe_running() || (*insn_p != BREAKPOINT_INSTRUCTION_2))
+	/* The three cases are call, branch w/prediction,
+	 * and traditional branch.
+	 */
+	if ((insn & 0xc0000000) == 0x40000000 ||
+	    (insn & 0xc1c00000) == 0x00400000 ||
+	    (insn & 0xc1c00000) == 0x00800000) {
+		/* The instruction did all the work for us
+		 * already, just apply the offset to the correct
+		 * instruction location.
+		 */
+		return (real_pc + (npc - pc));
+	}
+
+	return real_pc + 0x4UL;
+}
+
+/* If INSN is an instruction which writes it's PC location
+ * into a destination register, fix that up.
+ */
+static void retpc_fixup(struct pt_regs *regs, u32 insn, unsigned long real_pc)
+{
+	unsigned long *slot = NULL;
+
+	/* Simplest cast is call, which always uses %o7 */
+	if ((insn & 0xc0000000) == 0x40000000) {
+		slot = &regs->u_regs[UREG_I7];
+	}
+
+	/* Jmpl encodes the register inside of the opcode */
+	if ((insn & 0xc1f80000) == 0x81c00000) {
+		unsigned long rd = ((insn >> 25) & 0x1f);
+
+		if (rd <= 15) {
+			slot = &regs->u_regs[rd];
+		} else {
+			/* Hard case, it goes onto the stack. */
+			flushw_all();
+
+			rd -= 16;
+			slot = (unsigned long *)
+				(regs->u_regs[UREG_FP] + STACK_BIAS);
+			slot += rd;
+		}
+	}
+	if (slot != NULL)
+		*slot = real_pc;
+}
+
+/*
+ * Called after single-stepping.  p->addr is the address of the
+ * instruction whose first byte has been replaced by the breakpoint
+ * instruction.  To avoid the SMP problems that can occur when we
+ * temporarily put back the original opcode to single-step, we
+ * single-stepped a copy of the instruction.  The address of this
+ * copy is p->insn.
+ *
+ * This function prepares to return from the post-single-step
+ * breakpoint trap.
+ */
+static void resume_execution(struct kprobe *p, struct pt_regs *regs)
+{
+	u32 insn = p->insn[0];
+
+	regs->tpc = current_kprobe_orig_tnpc;
+	regs->tnpc = relbranch_fixup(insn,
+				     (unsigned long) p->addr,
+				     (unsigned long) &p->insn[0],
+				     regs->tnpc);
+	retpc_fixup(regs, insn, (unsigned long) p->addr);
+
+	regs->tstate = ((regs->tstate & ~TSTATE_PIL) |
+			current_kprobe_orig_tstate_pil);
+}
+
+static inline int post_kprobe_handler(struct pt_regs *regs)
+{
+	if (!kprobe_running())
 		return 0;
 
 	if (current_kprobe->post_handler)
 		current_kprobe->post_handler(current_kprobe, regs, 0);
 
-	undo_singlestep(current_kprobe, regs);
+	resume_execution(current_kprobe, regs);
 
 	unlock_kprobes();
 	preempt_enable_no_resched();
@@ -161,7 +243,7 @@ static inline int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 		return 1;
 
 	if (kprobe_status & KPROBE_HIT_SS) {
-		undo_singlestep(current_kprobe, regs);
+		resume_execution(current_kprobe, regs);
 
 		unlock_kprobes();
 		preempt_enable_no_resched();
@@ -222,12 +304,14 @@ asmlinkage void kprobe_trap(unsigned long trap_level, struct pt_regs *regs)
 
 /* Jprobes support.  */
 static struct pt_regs jprobe_saved_regs;
+static struct pt_regs *jprobe_saved_regs_location;
 static struct sparc_stackf jprobe_saved_stack;
 
 int setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
 {
 	struct jprobe *jp = container_of(p, struct jprobe, kp);
 
+	jprobe_saved_regs_location = regs;
 	memcpy(&jprobe_saved_regs, regs, sizeof(*regs));
 
 	/* Save a whole stack frame, this gets arguments
@@ -240,6 +324,7 @@ int setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
 
 	regs->tpc  = (unsigned long) jp->entry;
 	regs->tnpc = ((unsigned long) jp->entry) + 0x4UL;
+	regs->tstate |= TSTATE_PIL;
 
 	return 1;
 }
@@ -255,11 +340,23 @@ void jprobe_return(void)
 
 extern void jprobe_return_trap_instruction(void);
 
+extern void __show_regs(struct pt_regs * regs);
+
 int longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
 {
 	u32 *addr = (u32 *) regs->tpc;
 
 	if (addr == (u32 *) jprobe_return_trap_instruction) {
+		if (jprobe_saved_regs_location != regs) {
+			printk("JPROBE: Current regs (%p) does not match "
+			       "saved regs (%p).\n",
+			       regs, jprobe_saved_regs_location);
+			printk("JPROBE: Saved registers\n");
+			__show_regs(jprobe_saved_regs_location);
+			printk("JPROBE: Current registers\n");
+			__show_regs(regs);
+			BUG();
+		}
 		/* Restore old register state.  Do pt_regs
 		 * first so that UREG_FP is the original one for
 		 * the stack frame restore.
