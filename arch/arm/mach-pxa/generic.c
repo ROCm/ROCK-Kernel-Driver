@@ -30,6 +30,8 @@
 #include <asm/pgtable.h>
 #include <asm/mach/map.h>
 
+#include <asm/arch/udc.h>
+
 #include "generic.h"
 
 /*
@@ -168,8 +170,44 @@ static struct platform_device pxamci_device = {
 	.resource	= pxamci_resources,
 };
 
+
+static struct pxa2xx_udc_mach_info pxa_udc_info;
+
+void __init pxa_set_udc_info(struct pxa2xx_udc_mach_info *info)
+{
+	memcpy(&pxa_udc_info, info, sizeof *info);
+}
+EXPORT_SYMBOL(pxa_set_udc_info);
+
+static struct resource pxa2xx_udc_resources[] = {
+	[0] = {
+		.start	= 0x40600000,
+		.end	= 0x4060ffff,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= IRQ_USB,
+		.end	= IRQ_USB,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static u64 udc_dma_mask = ~(u32)0;
+
+static struct platform_device udc_device = {
+	.name		= "pxa2xx_udc",
+	.id		= 0,
+	.resource	= pxa2xx_udc_resources,
+	.num_resources	= ARRAY_SIZE(pxa2xx_udc_resources),
+	.dev		=  {
+		.platform_data	= &pxa_udc_info,
+		.dma_mask	= &udc_dma_mask,
+	}
+};
+
 static struct platform_device *devices[] __initdata = {
 	&pxamci_device,
+	&udc_device,
 };
 
 static int __init pxa_init(void)
