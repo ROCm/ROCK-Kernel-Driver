@@ -180,7 +180,8 @@ struct agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 			agp_free_memory(new);
 			return NULL;
 		}
-		new->memory[i] = virt_to_phys(addr);
+		new->memory[i] =
+			agp_bridge->driver->mask_memory(virt_to_phys(addr), type);
 		new->page_count++;
 	}
 
