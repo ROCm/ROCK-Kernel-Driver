@@ -59,14 +59,6 @@ struct capi_ctr {
 	capi_profile profile;			/* CAPI_GET_PROFILE */
 	u8 serial[CAPI_SERIAL_LEN];		/* CAPI_GET_SERIAL */
 
-	/* functions */
-        void (*ready)(struct capi_ctr * card);
-        void (*reseted)(struct capi_ctr * card);
-        void (*suspend_output)(struct capi_ctr * card);
-        void (*resume_output)(struct capi_ctr * card);
-        void (*handle_capimsg)(struct capi_ctr * card,
-			       u16 appl, struct sk_buff *skb);
-
 	/* management information for kcapi */
 
 	unsigned long nrecvctlpkt;
@@ -74,7 +66,6 @@ struct capi_ctr {
 	unsigned long nsentctlpkt;
 	unsigned long nsentdatapkt;
 
-        struct list_head driver_list;		/* contrs by driver */
 	int cnr;				/* controller number */
 	volatile unsigned short cardstate;	/* controller state */
 	volatile int blocked;			/* output blocked */
@@ -87,7 +78,11 @@ struct capi_ctr {
 int attach_capi_ctr(struct capi_ctr *);
 int detach_capi_ctr(struct capi_ctr *);
 
-
+void capi_ctr_ready(struct capi_ctr * card);
+void capi_ctr_reseted(struct capi_ctr * card);
+void capi_ctr_suspend_output(struct capi_ctr * card);
+void capi_ctr_resume_output(struct capi_ctr * card);
+void capi_ctr_handle_message(struct capi_ctr * card, u16 appl, struct sk_buff *skb);
 
 // ---------------------------------------------------------------------------
 // library functions for use by hardware controller drivers

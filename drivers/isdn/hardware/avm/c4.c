@@ -534,7 +534,7 @@ static void c4_handle_rx(avmcard *card)
 		} else {
 			memcpy(skb_put(skb, MsgLen), card->msgbuf, MsgLen);
 			memcpy(skb_put(skb, DataB3Len), card->databuf, DataB3Len);
-			ctrl->handle_capimsg(ctrl, ApplId, skb);
+			capi_ctr_handle_message(ctrl, ApplId, skb);
 		}
 		break;
 
@@ -557,7 +557,7 @@ static void c4_handle_rx(avmcard *card)
 						     CAPIMSG_NCCI(skb->data),
 						     CAPIMSG_MSGID(skb->data));
 
-			ctrl->handle_capimsg(ctrl, ApplId, skb);
+			capi_ctr_handle_message(ctrl, ApplId, skb);
 		}
 		break;
 
@@ -593,16 +593,14 @@ static void c4_handle_rx(avmcard *card)
 			queue_pollack(card);
 		for (cidx=0; cidx < card->nr_controllers; cidx++) {
 			ctrl = &card->ctrlinfo[cidx].capi_ctrl;
-			if (ctrl)
-				ctrl->resume_output(ctrl);
+			capi_ctr_resume_output(ctrl);
 		}
 		break;
 
 	case RECEIVE_STOP:
 		for (cidx=0; cidx < card->nr_controllers; cidx++) {
 			ctrl = &card->ctrlinfo[cidx].capi_ctrl;
-			if (ctrl)
-				ctrl->suspend_output(ctrl);
+			capi_ctr_suspend_output(ctrl);
 		}
 		break;
 
@@ -623,7 +621,7 @@ static void c4_handle_rx(avmcard *card)
 		       card->name,
 		       cinfo->version[VER_CARDTYPE],
 		       cinfo->version[VER_DRIVER]);
-		ctrl->ready(&cinfo->capi_ctrl);
+		capi_ctr_ready(&cinfo->capi_ctrl);
 		break;
 
 	case RECEIVE_TASK_READY:
@@ -675,7 +673,7 @@ static void c4_handle_interrupt(avmcard *card)
 			avmctrl_info *cinfo = &card->ctrlinfo[i];
 			memset(cinfo->version, 0, sizeof(cinfo->version));
 			capilib_release(&cinfo->ncci_head);
-			cinfo->capi_ctrl.reseted(&cinfo->capi_ctrl);
+			capi_ctr_reseted(&cinfo->capi_ctrl);
 		}
 		card->nlogcontr = 0;
 		return;
@@ -888,7 +886,7 @@ void c4_reset_ctr(struct capi_ctr *ctrl)
         for (i=0; i < card->nr_controllers; i++) {
 		cinfo = &card->ctrlinfo[i];
 		memset(cinfo->version, 0, sizeof(cinfo->version));
-		cinfo->capi_ctrl.reseted(&cinfo->capi_ctrl);
+		capi_ctr_reseted(&cinfo->capi_ctrl);
 	}
 	card->nlogcontr = 0;
 }

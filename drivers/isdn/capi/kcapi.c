@@ -324,8 +324,7 @@ static void recv_handler(void *dummy)
 	}
 }
 
-static void controllercb_handle_capimsg(struct capi_ctr * card,
-				u16 appl, struct sk_buff *skb)
+void capi_ctr_handle_message(struct capi_ctr * card, u16 appl, struct sk_buff *skb)
 {
 	int showctl = 0;
 	u8 cmd, subcmd;
@@ -368,7 +367,9 @@ error:
 	kfree_skb(skb);
 }
 
-static void controllercb_ready(struct capi_ctr * card)
+EXPORT_SYMBOL(capi_ctr_handle_message);
+
+void capi_ctr_ready(struct capi_ctr * card)
 {
 	u16 appl;
 	struct capi20_appl *ap;
@@ -387,7 +388,9 @@ static void controllercb_ready(struct capi_ctr * card)
 	notify_push(KCI_CONTRUP, card->cnr, 0, 0);
 }
 
-static void controllercb_reseted(struct capi_ctr * card)
+EXPORT_SYMBOL(capi_ctr_ready);
+
+void capi_ctr_reseted(struct capi_ctr * card)
 {
 	u16 appl;
 
@@ -416,7 +419,9 @@ static void controllercb_reseted(struct capi_ctr * card)
 	notify_push(KCI_CONTRDOWN, card->cnr, 0, 0);
 }
 
-static void controllercb_suspend_output(struct capi_ctr *card)
+EXPORT_SYMBOL(capi_ctr_reseted);
+
+void capi_ctr_suspend_output(struct capi_ctr *card)
 {
 	if (!card->blocked) {
 		printk(KERN_DEBUG "kcapi: card %d suspend\n", card->cnr);
@@ -424,13 +429,17 @@ static void controllercb_suspend_output(struct capi_ctr *card)
 	}
 }
 
-static void controllercb_resume_output(struct capi_ctr *card)
+EXPORT_SYMBOL(capi_ctr_suspend_output);
+
+void capi_ctr_resume_output(struct capi_ctr *card)
 {
 	if (card->blocked) {
 		printk(KERN_DEBUG "kcapi: card %d resume\n", card->cnr);
 		card->blocked = 0;
 	}
 }
+
+EXPORT_SYMBOL(capi_ctr_resume_output);
 
 /* ------------------------------------------------------------- */
 
@@ -458,12 +467,6 @@ attach_capi_ctr(struct capi_ctr *card)
 	card->blocked = 0;
 	card->traceflag = showcapimsgs;
 
-        card->ready = controllercb_ready; 
-        card->reseted = controllercb_reseted; 
-        card->suspend_output = controllercb_suspend_output;
-        card->resume_output = controllercb_resume_output;
-        card->handle_capimsg = controllercb_handle_capimsg;
-
 	sprintf(card->procfn, "capi/controllers/%d", card->cnr);
 	card->procent = create_proc_entry(card->procfn, 0, 0);
 	if (card->procent) {
@@ -484,9 +487,8 @@ EXPORT_SYMBOL(attach_capi_ctr);
 int detach_capi_ctr(struct capi_ctr *card)
 {
         if (card->cardstate != CARD_DETECTED)
-		controllercb_reseted(card);
+		capi_ctr_reseted(card);
 
-	list_del(&card->driver_list);
 	ncards--;
 
 	if (card->procent) {
@@ -496,7 +498,6 @@ int detach_capi_ctr(struct capi_ctr *card)
 	capi_cards[card->cnr - 1] = NULL;
 	printk(KERN_NOTICE "kcapi: Controller %d: %s unregistered\n",
 			card->cnr, card->name);
-	kfree(card);
 
 	return 0;
 }

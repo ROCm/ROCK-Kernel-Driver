@@ -330,7 +330,7 @@ void b1_reset_ctr(struct capi_ctr *ctrl)
 
 	memset(cinfo->version, 0, sizeof(cinfo->version));
 	capilib_release(&cinfo->ncci_head);
-	ctrl->reseted(ctrl);
+	capi_ctr_reseted(ctrl);
 }
 
 void b1_register_appl(struct capi_ctr *ctrl,
@@ -529,7 +529,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 		} else {
 			memcpy(skb_put(skb, MsgLen), card->msgbuf, MsgLen);
 			memcpy(skb_put(skb, DataB3Len), card->databuf, DataB3Len);
-			ctrl->handle_capimsg(ctrl, ApplId, skb);
+			capi_ctr_handle_message(ctrl, ApplId, skb);
 		}
 		break;
 
@@ -547,7 +547,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 						     CAPIMSG_NCCI(skb->data),
 						     CAPIMSG_MSGID(skb->data));
 
-			ctrl->handle_capimsg(ctrl, ApplId, skb);
+			capi_ctr_handle_message(ctrl, ApplId, skb);
 		}
 		break;
 
@@ -573,11 +573,11 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 
 	case RECEIVE_START:
 	   	/* b1_put_byte(card->port, SEND_POLLACK); */
-		ctrl->resume_output(ctrl);
+		capi_ctr_resume_output(ctrl);
 		break;
 
 	case RECEIVE_STOP:
-		ctrl->suspend_output(ctrl);
+		capi_ctr_suspend_output(ctrl);
 		break;
 
 	case RECEIVE_INIT:
@@ -588,7 +588,7 @@ void b1_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 		       card->name,
 		       cinfo->version[VER_CARDTYPE],
 		       cinfo->version[VER_DRIVER]);
-		ctrl->ready(ctrl);
+		capi_ctr_ready(ctrl);
 		break;
 
 	case RECEIVE_TASK_READY:
