@@ -1,8 +1,8 @@
 /*
  * Routines common to all CFI-type probes.
- * (C) 2001, 2001 Red Hat, Inc.
+ * (C) 2001-2003 Red Hat, Inc.
  * GPL'd
- * $Id: gen_probe.c,v 1.11 2003/05/21 15:15:05 dwmw2 Exp $
+ * $Id: gen_probe.c,v 1.13 2003/06/25 11:50:37 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -281,6 +281,7 @@ typedef struct mtd_info *cfi_cmdset_fn_t(struct map_info *, int);
 
 extern cfi_cmdset_fn_t cfi_cmdset_0001;
 extern cfi_cmdset_fn_t cfi_cmdset_0002;
+extern cfi_cmdset_fn_t cfi_cmdset_0020;
 
 static inline struct mtd_info *cfi_cmdset_unknown(struct map_info *map, 
 						  int primary)
