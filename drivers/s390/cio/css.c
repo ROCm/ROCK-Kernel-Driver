@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.39 $
+ *   $Revision: 1.40 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -20,6 +20,7 @@
 #include "cio.h"
 #include "cio_debug.h"
 #include "device.h" // FIXME: dito
+#include "ioasm.h"
 
 struct subchannel *ioinfo[__MAX_SUBCHANNELS];
 unsigned int highest_subchannel;
@@ -154,6 +155,7 @@ css_process_crw(int irq)
 {
 	static DECLARE_WORK(work, do_process_crw, 0);
 	struct subchannel *sch;
+	int ccode, devno;
 
 	CIO_CRW_EVENT(2, "source is subchannel %04X\n", irq);
 
@@ -164,9 +166,13 @@ css_process_crw(int irq)
 	}
 	if (!sch->dev.driver_data)
 		return;
+	devno = sch->schib.pmcw.dev;
 	/* FIXME: css_process_crw must not know about ccw_device */
 	dev_fsm_event(sch->dev.driver_data, DEV_EVENT_NOTOPER);
-	// FIXME: revalidate machine checks?
+	ccode = stsch(irq, &sch->schib);
+	if (!ccode)
+		if (devno != sch->schib.pmcw.dev)
+			schedule_work(&work);
 }
 
 /*

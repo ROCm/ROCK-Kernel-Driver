@@ -31,10 +31,10 @@ struct ccwgroup_driver {
 
 extern int  ccwgroup_driver_register   (struct ccwgroup_driver *cdriver);
 extern void ccwgroup_driver_unregister (struct ccwgroup_driver *cdriver);
-extern int ccwgroup_create_dev (struct device *root,
-				unsigned int creator_id,
-				struct ccw_driver *gdrv,
-				int argc, char *argv[]);
+extern int ccwgroup_create (struct device *root,
+			    unsigned int creator_id,
+			    struct ccw_driver *gdrv,
+			    int argc, char *argv[]);
 
 extern int ccwgroup_probe_ccwdev(struct ccw_device *cdev);
 extern int ccwgroup_remove_ccwdev(struct ccw_device *cdev);

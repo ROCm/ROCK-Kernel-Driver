@@ -1,5 +1,5 @@
 /*
- * $Id: cu3088.c,v 1.21 2002/12/03 16:26:45 cohuck Exp $
+ * $Id: cu3088.c,v 1.22 2002/12/10 09:53:55 cohuck Exp $
  *
  * CTC / LCS ccw_device driver
  *
@@ -172,5 +172,5 @@ MODULE_LICENSE("GPL");
 module_init(cu3088_init);
 module_exit(cu3088_exit);
 
-EXPORT_SYMBOL(register_cu3088_discipline);
-EXPORT_SYMBOL(unregister_cu3088_discipline);
+EXPORT_SYMBOL_GPL(register_cu3088_discipline);
+EXPORT_SYMBOL_GPL(unregister_cu3088_discipline);
