@@ -106,7 +106,7 @@ acpi_ds_parse_method (
 
 	/* Create a mutex for the method if there is a concurrency limit */
 
-	if ((obj_desc->method.concurrency != INFINITE_CONCURRENCY) &&
+	if ((obj_desc->method.concurrency != ACPI_INFINITE_CONCURRENCY) &&
 		(!obj_desc->method.semaphore)) {
 		status = acpi_os_create_semaphore (obj_desc->method.concurrency,
 				   obj_desc->method.concurrency,
@@ -300,34 +300,37 @@ acpi_ds_call_control_method (
 		return_ACPI_STATUS (status);
 	}
 
-	/* 1) Parse: Create a new walk state for the preempting walk */
+	if (!(obj_desc->method.method_flags & AML_METHOD_INTERNAL_ONLY)) {
+		/* 1) Parse: Create a new walk state for the preempting walk */
 
-	next_walk_state = acpi_ds_create_walk_state (obj_desc->method.owning_id,
-			  op, obj_desc, NULL);
-	if (!next_walk_state) {
-		return_ACPI_STATUS (AE_NO_MEMORY);
+		next_walk_state = acpi_ds_create_walk_state (obj_desc->method.owning_id,
+				  op, obj_desc, NULL);
+		if (!next_walk_state) {
+			return_ACPI_STATUS (AE_NO_MEMORY);
+		}
+
+
+		/* Create and init a Root Node */
+
+		op = acpi_ps_create_scope_op ();
+		if (!op) {
+			status = AE_NO_MEMORY;
+			goto cleanup;
+		}
+
+		status = acpi_ds_init_aml_walk (next_walk_state, op, method_node,
+				  obj_desc->method.aml_start, obj_desc->method.aml_length,
+				  NULL, NULL, 1);
+		if (ACPI_FAILURE (status)) {
+			acpi_ds_delete_walk_state (next_walk_state);
+			goto cleanup;
+		}
+
+		/* Begin AML parse */
+
+		status = acpi_ps_parse_aml (next_walk_state);
+		acpi_ps_delete_parse_tree (op);
 	}
-
-	/* Create and init a Root Node */
-
-	op = acpi_ps_create_scope_op ();
-	if (!op) {
-		status = AE_NO_MEMORY;
-		goto cleanup;
-	}
-
-	status = acpi_ds_init_aml_walk (next_walk_state, op, method_node,
-			  obj_desc->method.aml_start, obj_desc->method.aml_length,
-			  NULL, NULL, 1);
-	if (ACPI_FAILURE (status)) {
-		acpi_ds_delete_walk_state (next_walk_state);
-		goto cleanup;
-	}
-
-	/* Begin AML parse */
-
-	status = acpi_ps_parse_aml (next_walk_state);
-	acpi_ps_delete_parse_tree (op);
 
 	/* 2) Execute: Create a new state for the preempting walk */
 
@@ -337,7 +340,6 @@ acpi_ds_call_control_method (
 		status = AE_NO_MEMORY;
 		goto cleanup;
 	}
-
 	/*
 	 * The resolved arguments were put on the previous walk state's operand
 	 * stack.  Operands on the previous walk state stack always
@@ -369,16 +371,25 @@ acpi_ds_call_control_method (
 	ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
 		"Starting nested execution, newstate=%p\n", next_walk_state));
 
+	if (obj_desc->method.method_flags & AML_METHOD_INTERNAL_ONLY) {
+		status = obj_desc->method.implementation (next_walk_state);
+		return_ACPI_STATUS (status);
+	}
+
 	return_ACPI_STATUS (AE_OK);
 
 
 	/* On error, we must delete the new walk state */
 
 cleanup:
+	if (next_walk_state->method_desc) {
+		/* Decrement the thread count on the method parse tree */
+
+	   next_walk_state->method_desc->method.thread_count--;
+	}
 	(void) acpi_ds_terminate_control_method (next_walk_state);
 	acpi_ds_delete_walk_state (next_walk_state);
 	return_ACPI_STATUS (status);
-
 }
 
 
@@ -500,10 +511,30 @@ acpi_ds_terminate_control_method (
 		}
 	}
 
-	/* Decrement the thread count on the method parse tree */
+	if (walk_state->method_desc->method.thread_count) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
+			"*** Not deleting method namespace, there are still %d threads\n",
+			walk_state->method_desc->method.thread_count));
+	}
 
-	walk_state->method_desc->method.thread_count--;
 	if (!walk_state->method_desc->method.thread_count) {
+		/*
+		 * Support to dynamically change a method from not_serialized to
+		 * Serialized if it appears that the method is written foolishly and
+		 * does not support multiple thread execution.  The best example of this
+		 * is if such a method creates namespace objects and blocks.  A second
+		 * thread will fail with an AE_ALREADY_EXISTS exception
+		 *
+		 * This code is here because we must wait until the last thread exits
+		 * before creating the synchronization semaphore.
+		 */
+		if ((walk_state->method_desc->method.concurrency == 1) &&
+			(!walk_state->method_desc->method.semaphore)) {
+			status = acpi_os_create_semaphore (1,
+					 1,
+					 &walk_state->method_desc->method.semaphore);
+		}
+
 		/*
 		 * There are no more threads executing this method.  Perform
 		 * additional cleanup.

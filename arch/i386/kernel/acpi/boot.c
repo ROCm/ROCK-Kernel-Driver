@@ -128,7 +128,9 @@ static int __init acpi_parse_mcfg(unsigned long phys_addr, unsigned long size)
 
 	return 0;
 }
-#endif /* CONFIG_PCI_MMCONFIG */
+#else
+#define	acpi_parse_mcfg NULL
+#endif /* !CONFIG_PCI_MMCONFIG */
 
 #ifdef CONFIG_X86_LOCAL_APIC
 static int __init
@@ -424,6 +426,8 @@ static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
 	       hpet_address);
 	return 0;
 }
+#else
+#define	acpi_parse_hpet	NULL
 #endif
 
 /* detect the location of the ACPI PM Timer */
@@ -454,6 +458,8 @@ static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x\n", pmtmr_ioport);
 	return 0;
 }
+#else
+#define	acpi_parse_fadt	NULL
 #endif
 
 
@@ -666,7 +672,7 @@ acpi_boot_init (void)
 		return error;
 	}
 
-	(void) acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
+	acpi_table_parse(ACPI_BOOT, acpi_parse_sbf);
 
 	/*
 	 * blacklist may disable ACPI entirely
@@ -683,19 +689,9 @@ acpi_boot_init (void)
 	 */
 	acpi_process_madt();
 
-#ifdef CONFIG_X86_PM_TIMER
 	acpi_table_parse(ACPI_FADT, acpi_parse_fadt);
-#endif
-
-#ifdef CONFIG_HPET_TIMER
-	(void) acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
-#endif
-
-#ifdef CONFIG_PCI_MMCONFIG
-	error = acpi_table_parse(ACPI_MCFG, acpi_parse_mcfg);
-	if (error)
-		printk(KERN_ERR PREFIX "Error %d parsing MCFG\n", error);
-#endif
+	acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
+	acpi_table_parse(ACPI_MCFG, acpi_parse_mcfg);
 
 	return 0;
 }

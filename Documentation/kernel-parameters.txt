@@ -116,6 +116,10 @@ running once the system is up.
 	acpi_irq_isa=	[HW,ACPI] If irq_balance, Mark listed IRQs used by ISA
 			Format: <irq>,<irq>...
 
+	acpi_osi=	[HW,ACPI] empty param disables _OSI
+
+	acpi_serialize	[HW,ACPI] force serialization of AML methods
+
 	ad1816=		[HW,OSS]
 			Format: <io>,<irq>,<dma>,<dma2>
 			See also Documentation/sound/oss/AD1816.
