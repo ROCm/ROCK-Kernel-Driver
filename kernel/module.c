@@ -687,8 +687,8 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 		goto out;
 	}
 
-	/* Already dying? */
-	if (mod->state == MODULE_STATE_GOING) {
+	/* Doing init or already dying? */
+	if (mod->state != MODULE_STATE_LIVE) {
 		/* FIXME: if (force), slam module count and wake up
                    waiter --RR */
 		DEBUGP("%s already dying\n", mod->name);
