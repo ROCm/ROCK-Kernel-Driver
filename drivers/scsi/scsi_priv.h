@@ -117,6 +117,7 @@ extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
 
 extern struct class shost_class;
+extern struct class sdev_class;
 extern struct bus_type scsi_bus_type;
 
 #endif /* _SCSI_PRIV_H */

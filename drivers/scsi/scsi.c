@@ -893,17 +893,41 @@ int scsi_track_queue_full(struct scsi_device *sdev, int depth)
 
 int scsi_device_get(struct scsi_device *sdev)
 {
-	if (!try_module_get(sdev->host->hostt->module))
-		return -ENXIO;
+	struct class *class = class_get(&sdev_class);
+	int error = -ENXIO;
 
-	sdev->access_count++;
-	return 0;
+	if (class) {
+		down_write(&class->subsys.rwsem);
+		if (!test_bit(SDEV_DEL, &sdev->sdev_state))
+			if (try_module_get(sdev->host->hostt->module)) 
+				if (get_device(&sdev->sdev_gendev)) {
+					sdev->access_count++;
+					error = 0;
+				}
+		up_write(&class->subsys.rwsem);
+		class_put(&sdev_class);
+	}
+
+	return error;
 }
 
 void scsi_device_put(struct scsi_device *sdev)
 {
-	sdev->access_count--;
+	struct class *class = class_get(&sdev_class);
+
+	if (!class)
+		return;
+
+	down_write(&class->subsys.rwsem);
 	module_put(sdev->host->hostt->module);
+	if (--sdev->access_count == 0) {
+		if (test_bit(SDEV_DEL, &sdev->sdev_state))
+			device_del(&sdev->sdev_gendev);
+	}
+	put_device(&sdev->sdev_gendev);
+	up_write(&class->subsys.rwsem);
+
+	class_put(&sdev_class);
 }
 
 int scsi_device_cancel_cb(struct device *dev, void *data)
@@ -927,7 +951,7 @@ int scsi_device_cancel(struct scsi_device *sdev, int recovery)
 	struct list_head *lh, *lh_sf;
 	unsigned long flags;
 
-	sdev->online = 0;
+	set_bit(SDEV_CANCEL, &sdev->sdev_state);
 
 	spin_lock_irqsave(&sdev->list_lock, flags);
 	list_for_each_entry(scmd, &sdev->cmd_list, list) {
