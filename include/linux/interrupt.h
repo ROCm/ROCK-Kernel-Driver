@@ -5,6 +5,7 @@
 #include <linux/config.h>
 #include <linux/linkage.h>
 #include <linux/bitops.h>
+#include <linux/preempt.h>
 #include <asm/atomic.h>
 #include <asm/hardirq.h>
 #include <asm/ptrace.h>
