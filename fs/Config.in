@@ -158,6 +158,16 @@ if [ "$CONFIG_NET" = "y" ]; then
       # for fs/nls/Config.in
       define_bool CONFIG_NCPFS_NLS n
    fi
+
+   dep_tristate 'Andrew File System support (AFS) (Experimental)' CONFIG_AFS_FS $CONFIG_INET $CONFIG_EXPERIMENTAL
+   if [ "$CONFIG_AFS_FS" = "y" ]; then
+      define_tristate CONFIG_RXRPC y
+   else
+      if [ "$CONFIG_AFS_FS" = "m" ]; then
+	 define_tristate CONFIG_RXRPC m
+      fi
+   fi
+
    endmenu
 
 else

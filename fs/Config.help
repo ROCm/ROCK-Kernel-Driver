@@ -1144,3 +1144,11 @@ CONFIG_XFS_RT
 
   If unsure, say N.
 
+CONFIG_AFS_FS
+  If you say Y here, you will get an experimental Andrew File System
+  driver. It currently only supports unsecured read-only AFS access.
+
+  See Documentation/filesystems/afs.txt for more intormation.
+
+  If unsure, say N.
+

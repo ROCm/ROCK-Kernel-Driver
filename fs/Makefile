@@ -86,5 +86,6 @@ obj-$(CONFIG_REISERFS_FS)	+= reiserfs/
 obj-$(CONFIG_SUN_OPENPROMFS)	+= openpromfs/
 obj-$(CONFIG_JFS_FS)		+= jfs/
 obj-$(CONFIG_XFS_FS)		+= xfs/
+obj-$(CONFIG_AFS_FS)		+= afs/
 
 include $(TOPDIR)/Rules.make
