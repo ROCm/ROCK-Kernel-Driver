@@ -48,6 +48,8 @@
 #include <linux/usb_ch9.h>
 #include <linux/usb_gadget.h>
 
+#include "gadget_chips.h"
+
 
 /* Wait Cond */
 
@@ -123,8 +125,8 @@ do {									\
 
 /* Defines */
 
-#define GS_VERSION_STR			"v0.1"
-#define GS_VERSION_NUM			0x0001
+#define GS_VERSION_STR			"v1.0"
+#define GS_VERSION_NUM			0x0100
 
 #define GS_LONG_NAME			"Gadget Serial"
 #define GS_SHORT_NAME			"g_serial"
@@ -173,164 +175,6 @@ static int debug = G_SERIAL_DEBUG;
 #endif /* G_SERIAL_DEBUG */
 
 
-/* USB Controllers */
-
-/*
- * NetChip 2280, PCI based.
- *
- * This has half a dozen configurable endpoints, four with dedicated
- * DMA channels to manage their FIFOs.  It supports high speed.
- * Those endpoints can be arranged in any desired configuration.
- */
-#ifdef	CONFIG_USB_GADGET_NET2280
-#define CHIP				"net2280"
-#define EP0_MAXPACKET			64
-static const char EP_OUT_NAME[] =	"ep-a";
-#define EP_OUT_NUM			2
-static const char EP_IN_NAME[] =	"ep-b";
-#define EP_IN_NUM			2
-#define HIGHSPEED
-#define SELFPOWER			USB_CONFIG_ATT_SELFPOWER
-
-extern int net2280_set_fifo_mode(struct usb_gadget *gadget, int mode);
-
-static inline void hw_optimize(struct usb_gadget *gadget)
-{
-	/* we can have bigger ep-a/ep-b fifos (2KB each, 4 packets
-	 * for highspeed bulk) because we're not using ep-c/ep-d.
-	 */
-	net2280_set_fifo_mode (gadget, 1);
-}
-#endif
-
-
-/*
- * Dummy_hcd, software-based loopback controller.
- *
- * This imitates the abilities of the NetChip 2280, so we will use
- * the same configuration.
- */
-#ifdef	CONFIG_USB_GADGET_DUMMY_HCD
-#define CHIP				"dummy"
-#define EP0_MAXPACKET			64
-static const char EP_OUT_NAME[] =	"ep-a";
-#define EP_OUT_NUM			2
-static const char EP_IN_NAME[] =	"ep-b";
-#define EP_IN_NUM			2
-#define HIGHSPEED
-#define SELFPOWER			USB_CONFIG_ATT_SELFPOWER
-
-/* no hw optimizations to apply */
-#define hw_optimize(g)			do {} while (0)
-#endif
-
-
-/*
- * PXA-2xx UDC:  widely used in second gen Linux-capable PDAs.
- *
- * This has fifteen fixed-function full speed endpoints, and it
- * can support all USB transfer types.
- *
- * These supports three or four configurations, with fixed numbers.
- * The hardware interprets SET_INTERFACE, net effect is that you
- * can't use altsettings or reset the interfaces independently.
- * So stick to a single interface.
- */
-#ifdef	CONFIG_USB_GADGET_PXA2XX
-#define CHIP				"pxa2xx"
-#define EP0_MAXPACKET			16
-static const char EP_OUT_NAME[] =	"ep2out-bulk";
-#define EP_OUT_NUM			2
-static const char EP_IN_NAME[] =	"ep1in-bulk";
-#define EP_IN_NUM			1
-#define SELFPOWER 			USB_CONFIG_ATT_SELFPOWER
-
-/* no hw optimizations to apply */
-#define hw_optimize(g)			do {} while (0)
-#endif
-
-#ifdef	CONFIG_USB_GADGET_OMAP
-#define CHIP			"omap"
-#define EP0_MAXPACKET			64
-static const char EP_OUT_NAME [] = "ep2out-bulk";
-#define EP_OUT_NUM	2
-static const char EP_IN_NAME [] = "ep1in-bulk";
-#define EP_IN_NUM	1
-#define SELFPOWER 			USB_CONFIG_ATT_SELFPOWER
-/* supports remote wakeup, but this driver doesn't */
-
-/* no hw optimizations to apply */
-#define hw_optimize(g) do {} while (0)
-#endif
-
-
-/*
- * SA-1100 UDC:  widely used in first gen Linux-capable PDAs.
- *
- * This has only two fixed function endpoints, which can only
- * be used for bulk (or interrupt) transfers.  (Plus control.)
- *
- * Since it can't flush its TX fifos without disabling the UDC,
- * the current configuration or altsettings can't change except
- * in special situations.  So this is a case of "choose it right
- * during enumeration" ...
- */
-#ifdef	CONFIG_USB_GADGET_SA1100
-#define CHIP				"sa1100"
-#define EP0_MAXPACKET			8
-static const char EP_OUT_NAME[] =	"ep1out-bulk";
-#define EP_OUT_NUM			1
-static const char EP_IN_NAME [] =	"ep2in-bulk";
-#define EP_IN_NUM			2
-#define SELFPOWER			USB_CONFIG_ATT_SELFPOWER
-
-/* no hw optimizations to apply */
-#define hw_optimize(g)			do {} while (0)
-#endif
-
-
-/*
- * Toshiba TC86C001 ("Goku-S") UDC
- *
- * This has three semi-configurable full speed bulk/interrupt endpoints.
- */
-#ifdef	CONFIG_USB_GADGET_GOKU
-#define CHIP				"goku"
-#define DRIVER_VERSION_NUM		0x0116
-#define EP0_MAXPACKET			8
-static const char EP_OUT_NAME [] =	"ep1-bulk";
-#define EP_OUT_NUM			1
-static const char EP_IN_NAME [] =	"ep2-bulk";
-#define EP_IN_NUM			2
-#define SELFPOWER			USB_CONFIG_ATT_SELFPOWER
-
-/* no hw optimizations to apply */
-#define hw_optimize(g)			do {} while (0)
-#endif
-
-/*
- * USB Controller Defaults
- */
-#ifndef EP0_MAXPACKET
-#error Configure some USB peripheral controller for g_serial!
-#endif
-
-#ifndef SELFPOWER
-/* default: say we rely on bus power */
-#define SELFPOWER   			0
-/* else value must be USB_CONFIG_ATT_SELFPOWER */
-#endif
-
-#ifndef	MAX_USB_POWER
-/* any hub supports this steady state bus power consumption */
-#define MAX_USB_POWER			100	/* mA */
-#endif
-
-#ifndef	WAKEUP
-/* default: this driver won't do remote wakeup */
-#define WAKEUP				0
-/* else value must be USB_CONFIG_ATT_WAKEUP */
-#endif
 
 /* Thanks to NetChip Technologies for donating this product ID.
  *
@@ -449,10 +293,16 @@ static unsigned int gs_buf_put(struct gs_buf *gb, const char *buf,
 static unsigned int gs_buf_get(struct gs_buf *gb, char *buf,
 	unsigned int count);
 
+/* external functions */
+extern int net2280_set_fifo_mode(struct usb_gadget *gadget, int mode);
+
 
 /* Globals */
 
 static struct gs_dev *gs_device;
+
+static const char *EP_IN_NAME;
+static const char *EP_OUT_NAME;
 
 static struct semaphore	gs_open_close_sem[GS_NUM_PORTS];
 
@@ -483,7 +333,7 @@ static struct tty_driver *gs_tty_driver;
 
 /* gadget driver struct */
 static struct usb_gadget_driver gs_gadget_driver = {
-#ifdef HIGHSPEED
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 	.speed =		USB_SPEED_HIGH,
 #else
 	.speed =		USB_SPEED_FULL,
@@ -510,8 +360,9 @@ static struct usb_gadget_driver gs_gadget_driver = {
 #define GS_CONFIG_STR_ID	4
 
 /* static strings, in iso 8859/1 */
+static char manufacturer[40];
 static struct usb_string gs_strings[] = {
-	{ GS_MANUFACTURER_STR_ID, UTS_SYSNAME " " UTS_RELEASE " with " CHIP },
+	{ GS_MANUFACTURER_STR_ID, manufacturer },
 	{ GS_PRODUCT_STR_ID, GS_LONG_NAME },
 	{ GS_SERIAL_STR_ID, "0" },
 	{ GS_CONFIG_STR_ID, "Bulk" },
@@ -523,15 +374,13 @@ static struct usb_gadget_strings gs_string_table = {
 	.strings =		gs_strings,
 };
 
-static const struct usb_device_descriptor gs_device_desc = {
+static struct usb_device_descriptor gs_device_desc = {
 	.bLength =		USB_DT_DEVICE_SIZE,
 	.bDescriptorType =	USB_DT_DEVICE,
 	.bcdUSB =		__constant_cpu_to_le16(0x0200),
 	.bDeviceClass =		USB_CLASS_VENDOR_SPEC,
-	.bMaxPacketSize0 =	EP0_MAXPACKET,
 	.idVendor =		__constant_cpu_to_le16(GS_VENDOR_ID),
 	.idProduct =		__constant_cpu_to_le16(GS_PRODUCT_ID),
-	.bcdDevice =		__constant_cpu_to_le16(GS_VERSION_NUM),
 	.iManufacturer =	GS_MANUFACTURER_STR_ID,
 	.iProduct =		GS_PRODUCT_STR_ID,
 	.iSerialNumber =	GS_SERIAL_STR_ID,
@@ -545,8 +394,8 @@ static const struct usb_config_descriptor gs_config_desc = {
 	.bNumInterfaces =	GS_NUM_INTERFACES,
 	.bConfigurationValue =	GS_BULK_CONFIG_ID,
 	.iConfiguration =	GS_CONFIG_STR_ID,
-	.bmAttributes =		USB_CONFIG_ATT_ONE | SELFPOWER | WAKEUP,
-	.bMaxPower =		(MAX_USB_POWER + 1) / 2,
+	.bmAttributes =		USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
+	.bMaxPower =		1,
 };
 
 static const struct usb_interface_descriptor gs_interface_desc = {
@@ -557,46 +406,41 @@ static const struct usb_interface_descriptor gs_interface_desc = {
 	.iInterface =		GS_CONFIG_STR_ID,
 };
 
-static const struct usb_endpoint_descriptor gs_fullspeed_in_desc = {
+static struct usb_endpoint_descriptor gs_fullspeed_in_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
-	.bEndpointAddress =	EP_IN_NUM | USB_DIR_IN,
+	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	__constant_cpu_to_le16(64),
 };
 
-static const struct usb_endpoint_descriptor gs_fullspeed_out_desc = {
+static struct usb_endpoint_descriptor gs_fullspeed_out_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
-	.bEndpointAddress =	EP_OUT_NUM | USB_DIR_OUT,
+	.bEndpointAddress =	USB_DIR_OUT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-	.wMaxPacketSize =	__constant_cpu_to_le16(64),
 };
 
-static const struct usb_endpoint_descriptor gs_highspeed_in_desc = {
+static struct usb_endpoint_descriptor gs_highspeed_in_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
-	.bEndpointAddress =	EP_IN_NUM | USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	__constant_cpu_to_le16(512),
 };
 
-static const struct usb_endpoint_descriptor gs_highspeed_out_desc = {
+static struct usb_endpoint_descriptor gs_highspeed_out_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
 	.bDescriptorType =	USB_DT_ENDPOINT,
-	.bEndpointAddress =	EP_OUT_NUM | USB_DIR_OUT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	__constant_cpu_to_le16(512),
 };
 
-#ifdef HIGHSPEED
-static const struct usb_qualifier_descriptor gs_qualifier_desc = {
+#ifdef CONFIG_USB_GADGET_DUALSPEED
+static struct usb_qualifier_descriptor gs_qualifier_desc = {
 	.bLength =		sizeof(struct usb_qualifier_descriptor),
 	.bDescriptorType =	USB_DT_DEVICE_QUALIFIER,
 	.bcdUSB =		__constant_cpu_to_le16 (0x0200),
 	.bDeviceClass =		USB_CLASS_VENDOR_SPEC,
 	/* assumes ep0 uses the same value for both speeds ... */
-	.bMaxPacketSize0 =	EP0_MAXPACKET,
 	.bNumConfigurations =	GS_NUM_CONFIGS,
 };
 #endif
@@ -1416,18 +1260,78 @@ requeue:
 static int gs_bind(struct usb_gadget *gadget)
 {
 	int ret;
+	struct usb_ep *ep;
 	struct gs_dev *dev;
+
+	usb_ep_autoconfig_reset(gadget);
+
+	ep = usb_ep_autoconfig(gadget, &gs_fullspeed_in_desc);
+	if (!ep)
+		goto autoconf_fail;
+	EP_IN_NAME = ep->name;
+	ep->driver_data = ep;	/* claim the endpoint */
+
+	ep = usb_ep_autoconfig(gadget, &gs_fullspeed_out_desc);
+	if (!ep)
+		goto autoconf_fail;
+	EP_OUT_NAME = ep->name;
+	ep->driver_data = ep;	/* claim the endpoint */
+
+	/* device specific bcdDevice value in device descriptor */
+	if (gadget_is_net2280(gadget)) {
+		gs_device_desc.bcdDevice =
+			__constant_cpu_to_le16(GS_VERSION_NUM|0x0001);
+	} else if (gadget_is_pxa(gadget)) {
+		gs_device_desc.bcdDevice =
+			__constant_cpu_to_le16(GS_VERSION_NUM|0x0002);
+	} else if (gadget_is_sh(gadget)) {
+		gs_device_desc.bcdDevice =
+			__constant_cpu_to_le16(GS_VERSION_NUM|0x0003);
+	} else if (gadget_is_sa1100(gadget)) {
+		gs_device_desc.bcdDevice =
+			__constant_cpu_to_le16(GS_VERSION_NUM|0x0004);
+	} else if (gadget_is_goku(gadget)) {
+		gs_device_desc.bcdDevice =
+			__constant_cpu_to_le16(GS_VERSION_NUM|0x0005);
+	} else if (gadget_is_mq11xx(gadget)) {
+		gs_device_desc.bcdDevice =
+			__constant_cpu_to_le16(GS_VERSION_NUM|0x0006);
+	} else if (gadget_is_omap(gadget)) {
+		gs_device_desc.bcdDevice =
+			__constant_cpu_to_le16(GS_VERSION_NUM|0x0007);
+	} else {
+		printk(KERN_WARNING "gs_bind: controller '%s' not recognized\n",
+			gadget->name);
+		/* unrecognized, but safe unless bulk is REALLY quirky */
+		gs_device_desc.bcdDevice =
+			__constant_cpu_to_le16(GS_VERSION_NUM|0x0099);
+	}
+
+	gs_device_desc.bMaxPacketSize0 = gadget->ep0->maxpacket;
+#ifdef CONFIG_USB_GADGET_DUALSPEED
+	/* assume ep0 uses the same packet size for both speeds */
+	gs_qualifier_desc.bMaxPacketSize0 = gs_device_desc.bMaxPacketSize0;
+	/* assume endpoints are dual-speed */
+	gs_highspeed_in_desc.bEndpointAddress =
+		gs_fullspeed_in_desc.bEndpointAddress;
+	gs_highspeed_out_desc.bEndpointAddress =
+		gs_fullspeed_out_desc.bEndpointAddress;
+#endif /* CONFIG_USB_GADGET_DUALSPEED */
+
+	usb_gadget_set_selfpowered(gadget);
 
 	gs_device = dev = kmalloc(sizeof(struct gs_dev), GFP_KERNEL);
 	if (dev == NULL)
 		return -ENOMEM;
 
-	set_gadget_data(gadget, dev);
+	snprintf (manufacturer, sizeof(manufacturer),
+		UTS_SYSNAME " " UTS_RELEASE " with %s", gadget->name);
 
 	memset(dev, 0, sizeof(struct gs_dev));
 	dev->dev_gadget = gadget;
 	spin_lock_init(&dev->dev_lock);
 	INIT_LIST_HEAD(&dev->dev_req_list);
+	set_gadget_data(gadget, dev);
 
 	if ((ret=gs_alloc_ports(dev, GFP_KERNEL)) != 0) {
 		printk(KERN_ERR "gs_bind: cannot allocate ports\n");
@@ -1450,6 +1354,10 @@ static int gs_bind(struct usb_gadget *gadget)
 		GS_LONG_NAME, GS_VERSION_STR);
 
 	return 0;
+
+autoconf_fail:
+	printk(KERN_ERR "gs_bind: cannot autoconfigure on %s\n", gadget->name);
+	return -ENODEV;
 }
 
 /*
@@ -1505,15 +1413,17 @@ static int gs_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctr
 			memcpy(req->buf, &gs_device_desc, ret);
 			break;
 
-#ifdef HIGHSPEED
+#ifdef CONFIG_USB_GADGET_DUALSPEED
 		case USB_DT_DEVICE_QUALIFIER:
+			if (!gadget->is_dualspeed)
+				break;
 			ret = min(ctrl->wLength,
 				(u16)sizeof(struct usb_qualifier_descriptor));
 			memcpy(req->buf, &gs_qualifier_desc, ret);
 			break;
 
 		case USB_DT_OTHER_SPEED_CONFIG:
-#endif /* HIGHSPEED */
+#endif /* CONFIG_USB_GADGET_DUALSPEED */
 		case USB_DT_CONFIG:
 			ret = gs_build_config_desc(req->buf, gadget->speed,
 				ctrl->wValue >> 8, ctrl->wValue & 0xff);
@@ -1677,7 +1587,9 @@ static int gs_set_config(struct gs_dev *dev, unsigned config)
 	if (config != GS_BULK_CONFIG_ID)
 		return -EINVAL;
 
-	hw_optimize(gadget);
+	/* device specific optimizations */
+	if (gadget_is_net2280(gadget))
+		net2280_set_fifo_mode(gadget, 1);
 
 	gadget_for_each_ep(ep, gadget) {
 
