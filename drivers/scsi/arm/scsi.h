@@ -23,7 +23,7 @@ static inline int copy_SCp_to_sg(struct scatterlist *sg, Scsi_Pointer *SCp, int 
 	BUG_ON(bufs + 1 > max);
 
 	sg->page   = virt_to_page(SCp->ptr);
-	sg->offset = ((unsigned int)SCp->ptr) & ~PAGE_MASK;
+	sg->offset = offset_in_page(SCp->ptr);
 	sg->length = SCp->this_residual;
 
 	if (bufs)

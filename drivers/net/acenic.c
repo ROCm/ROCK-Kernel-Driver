@@ -1960,7 +1960,7 @@ static void ace_load_std_rx_ring(struct ace_private *ap, int nr_bufs)
 		 */
 		skb_reserve(skb, 2 + 16);
 		mapping = pci_map_page(ap->pdev, virt_to_page(skb->data),
-				       ((unsigned long)skb->data & ~PAGE_MASK),
+				       offset_in_page(skb->data),
 				       ACE_STD_BUFSIZE - (2 + 16),
 				       PCI_DMA_FROMDEVICE);
 		ap->skb->rx_std_skbuff[idx].skb = skb;
@@ -2026,7 +2026,7 @@ static void ace_load_mini_rx_ring(struct ace_private *ap, int nr_bufs)
 		 */
 		skb_reserve(skb, 2 + 16);
 		mapping = pci_map_page(ap->pdev, virt_to_page(skb->data),
-				       ((unsigned long)skb->data & ~PAGE_MASK),
+				       offset_in_page(skb->data),
 				       ACE_MINI_BUFSIZE - (2 + 16),
 				       PCI_DMA_FROMDEVICE);
 		ap->skb->rx_mini_skbuff[idx].skb = skb;
@@ -2087,7 +2087,7 @@ static void ace_load_jumbo_rx_ring(struct ace_private *ap, int nr_bufs)
 		 */
 		skb_reserve(skb, 2 + 16);
 		mapping = pci_map_page(ap->pdev, virt_to_page(skb->data),
-				       ((unsigned long)skb->data & ~PAGE_MASK),
+				       offset_in_page(skb->data),
 				       ACE_JUMBO_BUFSIZE - (2 + 16),
 				       PCI_DMA_FROMDEVICE);
 		ap->skb->rx_jumbo_skbuff[idx].skb = skb;
@@ -2743,7 +2743,7 @@ ace_map_tx_skb(struct ace_private *ap, struct sk_buff *skb,
 	struct tx_ring_info *info;
 
 	mapping = pci_map_page(ap->pdev, virt_to_page(skb->data),
-			       ((unsigned long) skb->data & ~PAGE_MASK),
+			       offset_in_page(skb->data),
 			       skb->len, PCI_DMA_TODEVICE);
 
 	info = ap->skb->tx_skbuff + idx;

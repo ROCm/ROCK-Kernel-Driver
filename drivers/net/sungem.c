@@ -725,8 +725,7 @@ static void gem_rx(struct gem *gp)
 			skb_put(new_skb, (ETH_FRAME_LEN + RX_OFFSET));
 			rxd->buffer = cpu_to_le64(pci_map_page(gp->pdev,
 							       virt_to_page(new_skb->data),
-							       ((unsigned long) new_skb->data &
-								~PAGE_MASK),
+							       offset_in_page(new_skb->data),
 							       RX_BUF_ALLOC_SIZE(gp),
 							       PCI_DMA_FROMDEVICE));
 			skb_reserve(new_skb, RX_OFFSET);
@@ -873,8 +872,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		len = skb->len;
 		mapping = pci_map_page(gp->pdev,
 				       virt_to_page(skb->data),
-				       ((unsigned long) skb->data &
-					~PAGE_MASK),
+				       offset_in_page(skb->data),
 				       len, PCI_DMA_TODEVICE);
 		ctrl |= TXDCTRL_SOF | TXDCTRL_EOF | len;
 		if (gem_intme(entry))
@@ -898,7 +896,7 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		 */
 		first_len = skb_headlen(skb);
 		first_mapping = pci_map_page(gp->pdev, virt_to_page(skb->data),
-					     ((unsigned long) skb->data & ~PAGE_MASK),
+					     offset_in_page(skb->data),
 					     first_len, PCI_DMA_TODEVICE);
 		entry = NEXT_TX(entry);
 
@@ -1464,8 +1462,7 @@ static void gem_init_rings(struct gem *gp)
 		skb_put(skb, (ETH_FRAME_LEN + RX_OFFSET));
 		dma_addr = pci_map_page(gp->pdev,
 					virt_to_page(skb->data),
-					((unsigned long) skb->data &
-					 ~PAGE_MASK),
+					offset_in_page(skb->data),
 					RX_BUF_ALLOC_SIZE(gp),
 					PCI_DMA_FROMDEVICE);
 		rxd->buffer = cpu_to_le64(dma_addr);

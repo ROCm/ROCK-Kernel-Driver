@@ -400,6 +400,8 @@ static inline int page_mapped(struct page *page)
 #define VM_FAULT_MINOR	1
 #define VM_FAULT_MAJOR	2
 
+#define offset_in_page(p)	((unsigned long)(p) & ~PAGE_MASK)
+
 extern void show_free_areas(void);
 
 struct page *shmem_nopage(struct vm_area_struct * vma,
