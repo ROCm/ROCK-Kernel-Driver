@@ -336,9 +336,10 @@
  *    - Print information about user-supplied ids only once at startup instead
  *      of everytime any USB device is plugged in.
  *    - Removed PV8630 ioctls. Use the standard ioctls instead.
+ *    - Made endpoint detection more generic. Basically, only one bulk-in 
+ *      endpoint is required, everything else is optional.
  *      
  * TODO
- *    - Remove the 2/3 endpoint limitation
  *    - Performance
  *    - Select/poll methods
  *    - More testing
@@ -879,39 +880,46 @@ probe_scanner(struct usb_interface *intf,
 	}
 
 /*
- * Start checking for one or two bulk endpoints and an optional
- * interrupt endpoint. If we have an interrupt endpoint go ahead and
+ * Start checking for bulk and interrupt endpoints. We are only using the first
+ * one of each type of endpoint. If we have an interrupt endpoint go ahead and
  * setup the handler. FIXME: This is a future enhancement...
  */
 
 	dbg("probe_scanner: Number of Endpoints:%d", (int) interface->desc.bNumEndpoints);
-
-	if ((interface->desc.bNumEndpoints < 1) || (interface->desc.bNumEndpoints > 3)) {
-		info("probe_scanner: Only 1, 2, or 3 endpoints supported.");
-		return -ENODEV;
-	}
 
 	ep_cnt = have_bulk_in = have_bulk_out = have_intr = 0;
 
 	while (ep_cnt < interface->desc.bNumEndpoints) {
 		endpoint = &interface->endpoint[ep_cnt].desc;
 
-		if (!have_bulk_in && IS_EP_BULK_IN(endpoint)) {
+		if (IS_EP_BULK_IN(endpoint)) {
 			ep_cnt++;
+			if (have_bulk_in) {
+				info ("probe_scanner: ignoring additional bulk_in_ep:%d", ep_cnt);
+				continue;
+			}
 			have_bulk_in = ep_cnt;
 			dbg("probe_scanner: bulk_in_ep:%d", have_bulk_in);
 			continue;
 		}
 
-		if (!have_bulk_out && IS_EP_BULK_OUT(endpoint)) {
+		if (IS_EP_BULK_OUT(endpoint)) {
 			ep_cnt++;
+			if (have_bulk_out) {
+				info ("probe_scanner: ignoring additional bulk_out_ep:%d", ep_cnt);
+				continue;
+			}
 			have_bulk_out = ep_cnt;
 			dbg("probe_scanner: bulk_out_ep:%d", have_bulk_out);
 			continue;
 		}
 
-		if (!have_intr && IS_EP_INTR(endpoint)) {
+		if (IS_EP_INTR(endpoint)) {
 			ep_cnt++;
+			if (have_intr) {
+				info ("probe_scanner: ignoring additional intr_ep:%d", ep_cnt);
+				continue;
+			}
 			have_intr = ep_cnt;
 			dbg("probe_scanner: intr_ep:%d", have_intr);
 			continue;
@@ -926,30 +934,10 @@ probe_scanner(struct usb_interface *intf,
  * should have.
  */
 
-	switch(interface->desc.bNumEndpoints) {
-	case 1:
-		if (!have_bulk_in) {
-			info("probe_scanner: One bulk-in endpoint required.");
-			return -EIO;
-		}
-		break;
-	case 2:
-		if (!have_bulk_in || !have_bulk_out) {
-			info("probe_scanner: Two bulk endpoints required.");
-			return -EIO;
-		}
-		break;
-	case 3:
-		if (!have_bulk_in || !have_bulk_out || !have_intr) {
-			info("probe_scanner: Two bulk endpoints and one interrupt endpoint required.");
-			return -EIO;
-		}
-		break;
-	default:
-		info("probe_scanner: Endpoint determination failed --  consult Documentation/usb/scanner.txt");
+	if (!have_bulk_in) {
+		err("probe_scanner: One bulk-in endpoint required.");
 		return -EIO;
 	}
-
 
 /*
  * Determine a minor number and initialize the structure associated
@@ -1029,7 +1017,6 @@ probe_scanner(struct usb_interface *intf,
 		break;
 	case 0x055f:		/* Mustek */
 	case 0x0400:		/* Another Mustek */
-	case 0x0ff5:		/* And yet another Mustek */
 		scn->rd_nak_timeout = HZ * 1;
 	default:
 		scn->rd_nak_timeout = RD_NAK_TIMEOUT;
