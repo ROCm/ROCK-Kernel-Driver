@@ -346,7 +346,10 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(direntry);
-
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 	rc = CIFSSMBDelFile(xid, pTcon, full_path, cifs_sb->local_nls);
 
 	if (!rc) {
@@ -428,6 +431,10 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(direntry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 	/* BB add setting the equivalent of mode via CreateX w/ACLs */
 	rc = CIFSSMBMkDir(xid, pTcon, full_path, cifs_sb->local_nls);
 	if (rc) {
@@ -481,6 +488,10 @@ cifs_rmdir(struct inode *inode, struct dentry *direntry)
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(direntry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 
 	rc = CIFSSMBRmDir(xid, pTcon, full_path, cifs_sb->local_nls);
 
@@ -527,6 +538,10 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 
 	fromName = build_path_from_dentry(source_direntry);
 	toName = build_path_from_dentry(target_direntry);
+	if((fromName == NULL) || (toName == NULL)) {
+		rc = -ENOMEM;
+		goto cifs_rename_exit;
+	}
 
 	rc = CIFSSMBRename(xid, pTcon, fromName, toName,
 			   cifs_sb_source->local_nls);
@@ -549,6 +564,8 @@ cifs_rename(struct inode *source_inode, struct dentry *source_direntry,
 			CIFSSMBClose(xid, pTcon, netfid);
 		}
 	}
+
+cifs_rename_exit:
 	if (fromName)
 		kfree(fromName);
 	if (toName)
@@ -587,6 +604,10 @@ cifs_revalidate(struct dentry *direntry)
 	cifs_sb = CIFS_SB(direntry->d_sb);
 
 	full_path = build_path_from_dentry(direntry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 	cFYI(1,
 	     ("Revalidate: %s inode 0x%p count %d dentry: 0x%p d_time %ld jiffies %ld",
 	      full_path, direntry->d_inode,
@@ -731,6 +752,10 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(direntry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 	cifsInode = CIFS_I(direntry->d_inode);
 
 	/* BB check if we need to refresh inode from server now ? BB */

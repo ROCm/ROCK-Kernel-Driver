@@ -53,10 +53,12 @@ build_path_from_dentry(struct dentry *direntry)
 		namelen += (1 + temp->d_name.len);
 		temp = temp->d_parent;
 	}
-	namelen += 1;		/* allow for trailing null */
-	full_path = kmalloc(namelen, GFP_KERNEL);
-	namelen--;
+
+	full_path = kmalloc(namelen+1, GFP_KERNEL);
+	if(full_path == NULL)
+		return full_path;
 	full_path[namelen] = 0;	/* trailing null */
+
 	for (temp = direntry; !IS_ROOT(temp);) {
 		namelen -= 1 + temp->d_name.len;
 		if (namelen < 0) {
@@ -142,10 +144,12 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(direntry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 
-	if(nd) { 
-		cFYI(1,("In create for inode %p dentry->inode %p nd flags = 0x%x for %s",inode, direntry->d_inode, nd->flags,full_path));
-
+	if(nd) {
 		if ((nd->intent.open.flags & O_ACCMODE) == O_RDONLY)
 			desiredAccess = GENERIC_READ;
 		else if ((nd->intent.open.flags & O_ACCMODE) == O_WRONLY)
@@ -173,6 +177,12 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 		oplock = REQ_OPLOCK;
 
 	buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+	if(buf == NULL) {
+		kfree(full_path);
+		FreeXid(xid);
+		return -ENOMEM;
+	}
+
 	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition,
 			 desiredAccess, CREATE_NOT_DIR,
 			 &fileHandle, &oplock, buf, cifs_sb->local_nls);
@@ -273,8 +283,10 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t dev
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(direntry);
-
-	if (pTcon->ses->capabilities & CAP_UNIX) {
+	if(full_path == NULL)
+		rc = -ENOMEM;
+	
+	if (full_path && (pTcon->ses->capabilities & CAP_UNIX)) {
 		rc = CIFSSMBUnixSetPerms(xid, pTcon,
 			full_path, mode, current->euid, current->egid,
 			device_number, cifs_sb->local_nls);
@@ -298,7 +310,8 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t dev
 struct dentry *
 cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct nameidata *nd)
 {
-	int rc, xid;
+	int xid;
+	int rc = 0; /* to get around spurious gcc warning, set to zero here */
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	struct inode *newInode = NULL;
@@ -321,6 +334,11 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct name
 	pTcon = cifs_sb->tcon;
 
 	full_path = build_path_from_dentry(direntry);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return ERR_PTR(-ENOMEM);
+	}
+
 	if (direntry->d_inode != NULL) {
 		cFYI(1, (" non-NULL inode in lookup"));
 	} else {
@@ -347,10 +365,10 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct name
 		rc = 0;
 		d_add(direntry, NULL);
 	} else {
-		cERROR(1,
-		       ("Error 0x%x or (%d decimal) on cifs_get_inode_info in lookup",
-			rc, rc));
-		/* BB special case check for Access Denied - watch security exposure of returning dir info implicitly via different rc if file exists or not but no access BB */
+		cERROR(1,("Error 0x%x or on cifs_get_inode_info in lookup",rc));
+		/* BB special case check for Access Denied - watch security 
+		exposure of returning dir info implicitly via different rc 
+		if file exists or not but no access BB */
 	}
 
 	if (full_path)
