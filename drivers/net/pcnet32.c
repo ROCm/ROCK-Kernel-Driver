@@ -1180,7 +1180,7 @@ pcnet32_open(struct net_device *dev)
 
     if (dev->irq == 0 ||
 	request_irq(dev->irq, &pcnet32_interrupt,
-		    lp->shared_irq ? SA_SHIRQ : 0, lp->name, (void *)dev)) {
+		    lp->shared_irq ? SA_SHIRQ : 0, dev->name, (void *)dev)) {
 	return -EAGAIN;
     }
 
