@@ -17,11 +17,13 @@
 
 /* Request 0x51 Image Setup */
 
+#if 0
 /* 128x98 ? 0x3180 size */
 static unsigned char s128x98bw[] = {
   0,    0x34, 0xC4, 0x00, 0x00, 0x00, 0,    0,
   0x18, 0x02, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00
 };
+#endif
 
 /* 128x122 3D80 size */
 static unsigned char s128x122bw[] = {
