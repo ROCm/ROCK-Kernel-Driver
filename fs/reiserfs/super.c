@@ -1264,6 +1264,18 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
       printk("sh-2021: reiserfs_fill_super: can not find reiserfs on %s\n", reiserfs_bdevname (s));
       goto error;    
     }
+
+    rs = SB_DISK_SUPER_BLOCK (s);
+    /* Let's do basic sanity check to verify that underlying device is not
+       smaller than the filesystem. If the check fails then abort and scream,
+       because bad stuff will happen otherwise. */
+    if ( s->s_bdev && s->s_bdev->bd_inode && i_size_read(s->s_bdev->bd_inode) < sb_block_count(rs)*sb_blocksize(rs) ) {
+	printk("Filesystem on %s cannot be mounted because it is bigger than the device\n", reiserfs_bdevname(s));
+	printk("You may need to run fsck or increase size of your LVM partition\n");
+	printk("Or may be you forgot to reboot after fdisk when it told you to\n");
+	goto error;
+    }
+
     sbi->s_mount_state = SB_REISERFS_STATE(s);
     sbi->s_mount_state = REISERFS_VALID_FS ;
 
@@ -1324,7 +1336,6 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
       goto error ;
     }
 
-    rs = SB_DISK_SUPER_BLOCK (s);
     if (is_reiserfs_3_5 (rs) || (is_reiserfs_jr (rs) && SB_VERSION (s) == REISERFS_VERSION_1))
 	set_bit(REISERFS_3_5, &(sbi->s_properties));
     else

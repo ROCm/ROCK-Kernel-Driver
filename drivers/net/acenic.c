@@ -1757,7 +1757,8 @@ static int __init ace_init(struct net_device *dev)
 	 * Wait for the firmware to spin up - max 3 seconds.
 	 */
 	myjif = jiffies + 3 * HZ;
-	while (time_before(jiffies, myjif) && !ap->fw_running);
+	while (time_before(jiffies, myjif) && !ap->fw_running)
+		cpu_relax();
 
 	if (!ap->fw_running) {
 		printk(KERN_ERR "%s: Firmware NOT running!\n", dev->name);

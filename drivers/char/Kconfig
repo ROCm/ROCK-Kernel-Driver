@@ -352,7 +352,7 @@ config STALLION
 
 config ISTALLION
 	tristate "Stallion EC8/64, ONboard, Brumby support"
-	depends on STALDRV && BROKEN
+	depends on STALDRV && BROKEN_ON_SMP
 	help
 	  If you have an EasyConnection 8/64, ONboard, Brumby or Stallion
 	  serial multiport card, say Y here. Make sure to read
@@ -959,6 +959,7 @@ source "drivers/char/pcmcia/Kconfig"
 config MWAVE
 	tristate "ACP Modem (Mwave) support"
 	depends on X86
+	select SERIAL_8250
 	---help---
 	  The ACP modem (Mwave) for Linux is a WinModem. It is composed of a
 	  kernel driver and a user level application. Together these components
@@ -1001,6 +1002,7 @@ config RAW_DRIVER
 
 config HANGCHECK_TIMER
 	tristate "Hangcheck timer"
+	depends on X86_64 || X86
 	help
 	  The hangcheck-timer module detects when the system has gone
 	  out to lunch past a certain margin.  It can reboot the system

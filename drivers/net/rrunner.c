@@ -123,7 +123,6 @@ static int __devinit rr_init_one(struct pci_dev *pdev,
 	rrpriv->pci_dev = pdev;
 
 	spin_lock_init(&rrpriv->lock);
-	sprintf(rrpriv->name, "RoadRunner serial HIPPI");
 
 	dev->irq = pdev->irq;
 	dev->open = &rr_open;
@@ -227,7 +226,7 @@ static int __devinit rr_init_one(struct pci_dev *pdev,
 		pci_set_drvdata(pdev, NULL);
 	}
  out2:
-	kfree(dev);
+	free_netdev(dev);
  out3:
 	return ret;
 }
@@ -235,9 +234,10 @@ static int __devinit rr_init_one(struct pci_dev *pdev,
 static void __devexit rr_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct rr_private *rr = (struct rr_private *)dev->priv;
 
 	if (dev) {
+		struct rr_private *rr = dev->priv;
+
 		if (!(readl(&rr->regs->HostCtrl) & NIC_HALTED)){
 			printk(KERN_ERR "%s: trying to unload running NIC\n",
 			       dev->name);
@@ -720,7 +720,8 @@ static int rr_init1(struct net_device *dev)
 	 * Give the FirmWare time to chew on the `get running' command.
 	 */
 	myjif = jiffies + 5 * HZ;
-	while (time_before(jiffies, myjif) && !rrpriv->fw_running);
+	while (time_before(jiffies, myjif) && !rrpriv->fw_running)
+		cpu_relax();
 
 	netif_start_queue(dev);
 
@@ -1200,8 +1201,7 @@ static int rr_open(struct net_device *dev)
 	readl(&regs->HostCtrl);
 	spin_unlock_irqrestore(&rrpriv->lock, flags);
 
-	if (request_irq(dev->irq, rr_interrupt, SA_SHIRQ, rrpriv->name, dev))
-	{
+	if (request_irq(dev->irq, rr_interrupt, SA_SHIRQ, dev->name, dev)) {
 		printk(KERN_WARNING "%s: Requested IRQ %d is busy\n",
 		       dev->name, dev->irq);
 		ecode = -EAGAIN;
@@ -1221,7 +1221,6 @@ static int rr_open(struct net_device *dev)
 
 	netif_start_queue(dev);
 
-	MOD_INC_USE_COUNT;
 	return ecode;
 
  error:
@@ -1413,7 +1412,6 @@ static int rr_close(struct net_device *dev)
 	free_irq(dev->irq, dev);
 	spin_unlock_irqrestore(&rrpriv->lock, flags);
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1726,7 +1724,7 @@ static struct pci_driver rr_driver = {
 	.name		= "rrunner",
 	.id_table	= rr_pci_tbl,
 	.probe		= rr_init_one,
-	.remove		= rr_remove_one,
+	.remove		= __devexit_p(rr_remove_one),
 };
 
 static int __init rr_init_module(void)

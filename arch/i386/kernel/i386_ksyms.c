@@ -63,9 +63,6 @@ extern unsigned long get_cmos_time(void);
 
 /* platform dependent support */
 EXPORT_SYMBOL(boot_cpu_data);
-#ifdef CONFIG_EISA
-EXPORT_SYMBOL(EISA_bus);
-#endif
 EXPORT_SYMBOL(MCA_bus);
 #ifdef CONFIG_DISCONTIGMEM
 EXPORT_SYMBOL(node_data);

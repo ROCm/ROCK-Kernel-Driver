@@ -416,6 +416,7 @@ unsigned long timer_tick_offset;
 unsigned long timer_tick_compare;
 
 static unsigned long timer_ticks_per_usec_quotient;
+static unsigned long timer_ticks_per_nsec_quotient;
 
 #define TICK_SIZE (tick_nsec / 1000)
 
@@ -1051,12 +1052,18 @@ static struct notifier_block sparc64_cpufreq_notifier_block = {
 #endif
 
 /* The quotient formula is taken from the IA64 port. */
+#define SPARC64_USEC_PER_CYC_SHIFT	30UL
+#define SPARC64_NSEC_PER_CYC_SHIFT	30UL
 void __init time_init(void)
 {
 	unsigned long clock = sparc64_init_timers(timer_interrupt);
 
 	timer_ticks_per_usec_quotient =
-		(((1000000UL << 30) +
+		(((1000000UL << SPARC64_USEC_PER_CYC_SHIFT) +
+		  (clock / 2)) / clock);
+
+	timer_ticks_per_nsec_quotient =
+		(((NSEC_PER_SEC << SPARC64_NSEC_PER_CYC_SHIFT) +
 		  (clock / 2)) / clock);
 
 #ifdef CONFIG_CPU_FREQ
@@ -1072,7 +1079,16 @@ static __inline__ unsigned long do_gettimeoffset(void)
 	ticks += timer_tick_offset;
 	ticks -= timer_tick_compare;
 
-	return (ticks * timer_ticks_per_usec_quotient) >> 30UL;
+	return (ticks * timer_ticks_per_usec_quotient)
+		>> SPARC64_USEC_PER_CYC_SHIFT;
+}
+
+unsigned long long sched_clock(void)
+{
+	unsigned long ticks = tick_ops->get_tick();
+
+	return (ticks * timer_ticks_per_nsec_quotient)
+		>> SPARC64_NSEC_PER_CYC_SHIFT;
 }
 
 int do_settimeofday(struct timespec *tv)

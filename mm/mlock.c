@@ -13,21 +13,24 @@ static int mlock_fixup(struct vm_area_struct * vma,
 	unsigned long start, unsigned long end, unsigned int newflags)
 {
 	struct mm_struct * mm = vma->vm_mm;
-	int pages, error;
+	int pages;
+	int ret = 0;
 
 	if (newflags == vma->vm_flags)
-		return 0;
+		goto out;
 
 	if (start != vma->vm_start) {
-		error = split_vma(mm, vma, start, 1);
-		if (error)
-			return -EAGAIN;
+		if (split_vma(mm, vma, start, 1)) {
+			ret = -EAGAIN;
+			goto out;
+		}
 	}
 
 	if (end != vma->vm_end) {
-		error = split_vma(mm, vma, end, 0);
-		if (error)
-			return -EAGAIN;
+		if (split_vma(mm, vma, end, 0)) {
+			ret = -EAGAIN;
+			goto out;
+		}
 	}
 	
 	spin_lock(&mm->page_table_lock);
@@ -40,11 +43,12 @@ static int mlock_fixup(struct vm_area_struct * vma,
 	pages = (end - start) >> PAGE_SHIFT;
 	if (newflags & VM_LOCKED) {
 		pages = -pages;
-		make_pages_present(start, end);
+		ret = make_pages_present(start, end);
 	}
 
 	vma->vm_mm->locked_vm -= pages;
-	return 0;
+out:
+	return ret;
 }
 
 static int do_mlock(unsigned long start, size_t len, int on)

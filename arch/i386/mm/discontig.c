@@ -30,6 +30,7 @@
 #include <linux/initrd.h>
 #include <asm/e820.h>
 #include <asm/setup.h>
+#include <asm/mmzone.h>
 
 struct pglist_data *node_data[MAX_NUMNODES];
 bootmem_data_t node0_bdata;
@@ -84,7 +85,7 @@ void set_pmd_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags);
  *        a single node with all available processors in it with a flat
  *        memory map.
  */
-void __init get_memcfg_numa_flat(void)
+int __init get_memcfg_numa_flat(void)
 {
 	int pfn;
 
@@ -107,6 +108,7 @@ void __init get_memcfg_numa_flat(void)
          /* Indicate there is one node available. */
 	node_set_online(0);
 	numnodes = 1;
+	return 1;
 }
 
 /*
@@ -355,17 +357,20 @@ void __init zone_sizes_init(void)
 		unsigned long low = max_low_pfn;
 		unsigned long start = node_start_pfn[nid];
 		unsigned long high = node_end_pfn[nid];
-		
+
 		max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
 
 		if (start > low) {
 #ifdef CONFIG_HIGHMEM
-		  zones_size[ZONE_HIGHMEM] = high - start;
+			BUG_ON(start > high);
+			zones_size[ZONE_HIGHMEM] = high - start;
 #endif
 		} else {
 			if (low < max_dma)
 				zones_size[ZONE_DMA] = low;
 			else {
+				BUG_ON(max_dma > low);
+				BUG_ON(low > high);
 				zones_size[ZONE_DMA] = max_dma;
 				zones_size[ZONE_NORMAL] = low - max_dma;
 #ifdef CONFIG_HIGHMEM

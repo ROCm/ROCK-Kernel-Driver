@@ -94,7 +94,6 @@ static irqreturn_t via_ircc_interrupt(int irq, void *dev_id,
 static int via_ircc_is_receiving(struct via_ircc_cb *self);
 static int via_ircc_read_dongle_id(int iobase);
 
-static int via_ircc_net_init(struct net_device *dev);
 static int via_ircc_net_open(struct net_device *dev);
 static int via_ircc_net_close(struct net_device *dev);
 static int via_ircc_net_ioctl(struct net_device *dev, struct ifreq *rq,
@@ -330,18 +329,19 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 {
 	struct net_device *dev;
 	struct via_ircc_cb *self;
-	int ret;
 	int err;
 
 	if ((via_ircc_setup(info, id)) == -1)
 		return -1;
 
 	/* Allocate new instance of the driver */
-	self = kmalloc(sizeof(struct via_ircc_cb), GFP_KERNEL);
-	if (self == NULL) {
+	dev = alloc_netdev(sizeof(struct via_ircc_cb), "irda%d",
+			   irda_device_setup);
+	if (dev == NULL) 
 		return -ENOMEM;
-	}
-	memset(self, 0, sizeof(struct via_ircc_cb));
+
+	self = dev->priv;
+	self->netdev = dev;
 	spin_lock_init(&self->lock);
 
 	/* Need to store self somewhere */
@@ -360,14 +360,12 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 	self->RxDataReady = 0;
 
 	/* Reserve the ioports that we need */
-	ret = check_region(self->io.fir_base, self->io.fir_ext);
-	if (ret < 0) {
+	if (!request_region(self->io.fir_base, self->io.fir_ext, driver_name)) {
 //              WARNING(__FUNCTION__ "(), can't get iobase of 0x%03x\n",self->io.fir_base);
-		dev_self[i] = NULL;
-		kfree(self);
-		return -ENODEV;
+		err = -ENODEV;
+		goto err_out1;
 	}
-	request_region(self->io.fir_base, self->io.fir_ext, driver_name);
+	
 	/* Initialize QoS for this device */
 	irda_init_max_qos_capabilies(&self->qos);
 	/* The only value we must override it the baudrate */
@@ -391,17 +389,16 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 	self->rx_buff.head =
 	    (__u8 *) kmalloc(self->rx_buff.truesize, GFP_KERNEL | GFP_DMA);
 	if (self->rx_buff.head == NULL) {
-		kfree(self);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_out2;
 	}
 	memset(self->rx_buff.head, 0, self->rx_buff.truesize);
 
 	self->tx_buff.head =
 	    (__u8 *) kmalloc(self->tx_buff.truesize, GFP_KERNEL | GFP_DMA);
 	if (self->tx_buff.head == NULL) {
-		kfree(self->rx_buff.head);
-		kfree(self);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_out3;
 	}
 	memset(self->tx_buff.head, 0, self->tx_buff.truesize);
 
@@ -414,30 +411,20 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 	self->tx_fifo.len = self->tx_fifo.ptr = self->tx_fifo.free = 0;
 	self->tx_fifo.tail = self->tx_buff.head;
 
-	if (!(dev = dev_alloc("irda%d", &err))) {
-		kfree(self->tx_buff.head);
-		kfree(self->rx_buff.head);
-		kfree(self);
-		return -ENOMEM;
-	}
-
-	dev->priv = (void *) self;
-	self->netdev = dev;
+	/* Keep track of module usage */
+	SET_MODULE_OWNER(dev);
 
 	/* Override the network functions we need to use */
-	dev->init = via_ircc_net_init;
 	dev->hard_start_xmit = via_ircc_hard_xmit_sir;
 	dev->open = via_ircc_net_open;
 	dev->stop = via_ircc_net_close;
 	dev->do_ioctl = via_ircc_net_ioctl;
 	dev->get_stats = via_ircc_net_get_stats;
 
-	rtnl_lock();
-	err = register_netdevice(dev);
-	rtnl_unlock();
-	if (err) {
-		return -1;
-	}
+	err = register_netdev(dev);
+	if (err)
+		goto err_out4;
+
 	MESSAGE("IrDA: Registered device %s\n", dev->name);
 
 	/* Check if user has supplied the dongle id or not */
@@ -448,6 +435,16 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 				     self->io.dongle_id);
 
 	return 0;
+ err_out4:
+	kfree(self->tx_buff.head);
+ err_out3:
+	kfree(self->rx_buff.head);
+ err_out2:
+	release_region(self->io.fir_base, self->io.fir_ext);
+ err_out1:
+	free_netdev(dev);
+	dev_self[i] = NULL;
+	return err;
 }
 
 /*
@@ -468,11 +465,7 @@ static int __exit via_ircc_close(struct via_ircc_cb *self)
 
 	ResetChip(iobase, 5);	//hardware reset.
 	/* Remove netdevice */
-	if (self->netdev) {
-		rtnl_lock();
-		unregister_netdevice(self->netdev);
-		rtnl_unlock();
-	}
+	unregister_netdev(self->netdev);
 
 	/* Release the PORT that this driver is using */
 	IRDA_DEBUG(4, "%s(), Releasing Region %03x\n",
@@ -483,7 +476,8 @@ static int __exit via_ircc_close(struct via_ircc_cb *self)
 	if (self->rx_buff.head)
 		kfree(self->rx_buff.head);
 	dev_self[self->index] = NULL;
-	kfree(self);
+
+	free_netdev(self->netdev);
 
 	return 0;
 }
@@ -1456,26 +1450,6 @@ static int via_ircc_is_receiving(struct via_ircc_cb *self)
 	return status;
 }
 
-/*
- * Function via_ircc_net_init (dev)
- *
- *    Initialize network device
- *
- */
-static int via_ircc_net_init(struct net_device *dev)
-{
-	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
-
-	/* Keep track of module usage */
-	SET_MODULE_OWNER(dev);
-
-	/* Setup to be a normal IrDA network device driver */
-	irda_device_setup(dev);
-
-	/* Insert overrides below this line! */
-
-	return 0;
-}
 
 /*
  * Function via_ircc_net_open (dev)

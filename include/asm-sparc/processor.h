@@ -27,7 +27,6 @@
 /*
  * Bus types
  */
-#define EISA_bus 0
 #define MCA_bus 0
 #define MCA_bus__is_a_macro /* for versions in ksyms.c */
 

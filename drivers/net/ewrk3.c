@@ -564,7 +564,7 @@ ewrk3_hw_init(struct net_device *dev, u_long iobase)
 								if (dev->irq < 2) {
 #ifndef MODULE
 									u_char irqnum;
-									unsigned long irq_mask, delay;
+									unsigned long irq_mask;
 			
 
 									irq_mask = probe_irq_on();
@@ -578,8 +578,7 @@ ewrk3_hw_init(struct net_device *dev, u_long iobase)
 
 									irqnum = irq[((icr & IRQ_SEL) >> 4)];
 
-									delay = jiffies + HZ/50;
-									while (time_before(jiffies, delay)) ;
+									mdelay(20);
 									dev->irq = probe_irq_off(irq_mask);
 									if ((dev->irq) && (irqnum == dev->irq)) {
 										printk(" and uses IRQ%d.\n", dev->irq);

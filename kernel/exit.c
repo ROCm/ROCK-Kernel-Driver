@@ -152,7 +152,7 @@ static int will_become_orphaned_pgrp(int pgrp, task_t *ignored_task)
 				|| p->state >= TASK_ZOMBIE 
 				|| p->real_parent->pid == 1)
 			continue;
-		if (p->real_parent->pgrp != pgrp
+		if (process_group(p->real_parent) != pgrp
 			    && p->real_parent->session == p->session) {
 			ret = 0;
 			break;
@@ -247,9 +247,9 @@ void __set_special_pids(pid_t session, pid_t pgrp)
 		curr->session = session;
 		attach_pid(curr, PIDTYPE_SID, session);
 	}
-	if (curr->pgrp != pgrp) {
+	if (process_group(curr) != pgrp) {
 		detach_pid(curr, PIDTYPE_PGID);
-		curr->pgrp = pgrp;
+		curr->group_leader->__pgrp = pgrp;
 		attach_pid(curr, PIDTYPE_PGID, pgrp);
 	}
 }
@@ -508,9 +508,9 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 	 * than we are, and it was the only connection
 	 * outside, so the child pgrp is now orphaned.
 	 */
-	if ((p->pgrp != father->pgrp) &&
+	if ((process_group(p) != process_group(father)) &&
 	    (p->session == father->session)) {
-		int pgrp = p->pgrp;
+		int pgrp = process_group(p);
 
 		if (will_become_orphaned_pgrp(pgrp, NULL) && has_stopped_jobs(pgrp)) {
 			__kill_pg_info(SIGHUP, (void *)1, pgrp);
@@ -618,12 +618,12 @@ static void exit_notify(struct task_struct *tsk)
 	 
 	t = tsk->real_parent;
 	
-	if ((t->pgrp != tsk->pgrp) &&
+	if ((process_group(t) != process_group(tsk)) &&
 	    (t->session == tsk->session) &&
-	    will_become_orphaned_pgrp(tsk->pgrp, tsk) &&
-	    has_stopped_jobs(tsk->pgrp)) {
-		__kill_pg_info(SIGHUP, (void *)1, tsk->pgrp);
-		__kill_pg_info(SIGCONT, (void *)1, tsk->pgrp);
+	    will_become_orphaned_pgrp(process_group(tsk), tsk) &&
+	    has_stopped_jobs(process_group(tsk))) {
+		__kill_pg_info(SIGHUP, (void *)1, process_group(tsk));
+		__kill_pg_info(SIGCONT, (void *)1, process_group(tsk));
 	}
 
 	/* Let father know we died 
@@ -813,10 +813,10 @@ static int eligible_child(pid_t pid, int options, task_t *p)
 		if (p->pid != pid)
 			return 0;
 	} else if (!pid) {
-		if (p->pgrp != current->pgrp)
+		if (process_group(p) != process_group(current))
 			return 0;
 	} else if (pid != -1) {
-		if (p->pgrp != -pid)
+		if (process_group(p) != -pid)
 			return 0;
 	}
 

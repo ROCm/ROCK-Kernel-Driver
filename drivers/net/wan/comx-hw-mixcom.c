@@ -41,7 +41,6 @@
 
 #include <linux/interrupt.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/netdevice.h>
 #include <linux/proc_fs.h>

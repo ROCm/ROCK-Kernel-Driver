@@ -10,7 +10,6 @@
 #ifndef _ASMARM_PGTABLE_H
 #define _ASMARM_PGTABLE_H
 
-#include <linux/config.h>
 #include <asm/memory.h>
 #include <asm/proc-fns.h>
 #include <asm/arch/vmalloc.h>

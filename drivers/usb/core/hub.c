@@ -859,8 +859,7 @@ static int hub_port_debounce(struct usb_device *hub, int port)
 		}
 	}
 
-	/* XXX Replace this with dbg() when 2.6 is about to ship. */
-	dev_info (hubdev (hub),
+	dev_dbg (hubdev (hub),
 		"debounce: port %d: delay %dms stable %d status 0x%x\n",
 		port + 1, delay_time, stable_count, portstatus);
 

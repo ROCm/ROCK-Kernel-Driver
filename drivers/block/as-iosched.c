@@ -1303,7 +1303,7 @@ static struct request *as_next_request(request_queue_t *q)
  * Add arq to a list behind alias
  */
 static inline void
-as_add_aliased_request(struct as_rq *arq, struct as_rq *alias)
+as_add_aliased_request(struct as_data *ad, struct as_rq *arq, struct as_rq *alias)
 {
 	/*
 	 * Another request with the same start sector on the rbtree.
@@ -1311,6 +1311,11 @@ as_add_aliased_request(struct as_rq *arq, struct as_rq *alias)
 	 * as_move_to_dispatch
 	 */
 	list_add_tail(&arq->request->queuelist,	&alias->request->queuelist);
+
+	/*
+	 * Don't want to have to handle merges.
+	 */
+	as_remove_merge_hints(ad->q, arq);
 
 }
 
@@ -1353,7 +1358,7 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
 		as_update_arq(ad, arq); /* keep state machine up to date */
 
 	} else {
-		as_add_aliased_request(arq, alias);
+		as_add_aliased_request(ad, arq, alias);
 		/*
 		 * have we been anticipating this request?
 		 * or does it come from the same process as the one we are
@@ -1553,8 +1558,10 @@ static void as_merged_request(request_queue_t *q, struct request *req)
 		 * currently don't bother. Ditto the next function.
 		 */
 		as_del_arq_rb(ad, arq);
-		if ((alias = as_add_arq_rb(ad, arq)) )
-			as_add_aliased_request(arq, alias);
+		if ((alias = as_add_arq_rb(ad, arq)) ) {
+			list_del_init(&arq->fifo);
+			as_add_aliased_request(ad, arq, alias);
+		}
 		/*
 		 * Note! At this stage of this and the next function, our next
 		 * request may not be optimal - eg the request may have "grown"
@@ -1586,8 +1593,10 @@ as_merged_requests(request_queue_t *q, struct request *req,
 	if (rq_rb_key(req) != arq->rb_key) {
 		struct as_rq *alias;
 		as_del_arq_rb(ad, arq);
-		if ((alias = as_add_arq_rb(ad, arq)) )
-			as_add_aliased_request(arq, alias);
+		if ((alias = as_add_arq_rb(ad, arq)) ) {
+			list_del_init(&arq->fifo);
+			as_add_aliased_request(ad, arq, alias);
+		}
 	}
 
 	/*
@@ -1926,7 +1935,7 @@ elevator_t iosched_as = {
 	.elevator_exit_fn =		as_exit,
 
 	.elevator_ktype =		&as_ktype,
-	.elevator_name =		"anticipatory scheduling",
+	.elevator_name =		"anticipatory",
 };
 
 EXPORT_SYMBOL(iosched_as);

@@ -91,7 +91,6 @@
 #if	defined(_LINUX_)	/****** Linux *******************************/
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */

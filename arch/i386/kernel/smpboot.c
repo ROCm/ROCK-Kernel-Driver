@@ -915,13 +915,13 @@ static void smp_tune_scheduling (void)
 		cacheflush_time = (cpu_khz>>10) * (cachesize<<10) / bandwidth;
 	}
 
-	cache_decay_ticks = (long)cacheflush_time/cpu_khz * HZ / 1000;
+	cache_decay_ticks = (long)cacheflush_time/cpu_khz + 1;
 
 	printk("per-CPU timeslice cutoff: %ld.%02ld usecs.\n",
 		(long)cacheflush_time/(cpu_khz/1000),
 		((long)cacheflush_time*100/(cpu_khz/1000)) % 100);
 	printk("task migration cache decay timeout: %ld msecs.\n",
-		(cache_decay_ticks + 1) * 1000 / HZ);
+		cache_decay_ticks);
 }
 
 /*

@@ -468,6 +468,15 @@ contact NetChip Technologies for development boards and product
 information.
 </para> 
 
+<para>For users of Intel's PXA 2xx series processors,
+a <filename>pxa2xx_udc</filename> driver is available.
+</para>
+
+<para>At this writing, there are people at work on drivers in
+this framework for several other USB device controllers,
+with plans to make many of them be widely available.
+</para>
+
 <!-- !Edrivers/usb/gadget/net2280.c -->
 
 <para>A partial USB simulator,
@@ -500,7 +509,7 @@ for usb controller hardware), other gadget drivers exist.
 
 <para>There's an <emphasis>ethernet</emphasis> gadget
 driver, which implements one of the most useful
-<emphasis>Communications Device Class</emphasis> models.  
+<emphasis>Communications Device Class</emphasis> (CDC) models.  
 One of the standards for cable modem interoperability even
 specifies the use of this ethernet model as one of two
 mandatory options.
@@ -509,6 +518,11 @@ an Ethernet adapter.
 It provides access to a network where the gadget's CPU is one host,
 which could easily be bridging, routing, or firewalling
 access to other networks.
+Since some hardware can't fully implement the CDC Ethernet
+requirements, this driver also implements a "good parts only"
+subset of CDC Ethernet.
+(That subset doesn't advertise itself as CDC Ethernet,
+to avoid creating problems.)
 </para>
 
 <para>There is also support for user mode gadget drivers,
@@ -520,6 +534,17 @@ Familiar tools like GDB and pthreads can be used to
 develop and debug user mode drivers, so that once a robust
 controller driver is available many applications for it
 won't require new kernel mode software.
+</para>
+
+<para>There's a USB Mass Storage class driver, which provides
+a different solution for interoperability with systems such
+as MS-Windows and MacOS.
+That <emphasis>File-backed Storage</emphasis> driver uses a
+file or block device as backing store for a drive,
+like the <filename>loop</filename> driver.
+The USB host uses the BBB, CB, or CBI versions of the mass
+storage class specification, using transparent SCSI commands
+to access the data from the backing store.
 </para>
 
 <para>Support for other kinds of gadget is expected to

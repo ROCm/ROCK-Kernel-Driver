@@ -10,6 +10,8 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/config.h>
+
 #define PXA_IRQ_SKIP	7	/* The first 7 IRQs are not yet used */
 #define PXA_IRQ(x)		((x) - PXA_IRQ_SKIP)
 

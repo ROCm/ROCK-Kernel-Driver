@@ -582,7 +582,7 @@ repeat:
 		p = list_entry(_p,struct task_struct,sibling);
 		if ((type == P_PID) && p->pid != pid)
 			continue;
-		if ((type == P_PGID) && p->pgrp != pid)
+		if ((type == P_PGID) && process_group(p) != pid)
 			continue;
 		if ((p->exit_signal != SIGCHLD))
 			continue;

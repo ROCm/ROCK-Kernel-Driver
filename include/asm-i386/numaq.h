@@ -29,8 +29,7 @@
 #ifdef CONFIG_X86_NUMAQ
 
 #define MAX_NUMNODES		16
-extern void get_memcfg_numaq(void);
-#define get_memcfg_numa() get_memcfg_numaq()
+extern int get_memcfg_numaq(void);
 
 /*
  * SYS_CFG_DATA_PRIV_ADDR, struct eachquadmem, and struct sys_cfg_data are the
