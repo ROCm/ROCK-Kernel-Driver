@@ -19,6 +19,12 @@ soundmodem-objs					:= $(soundmodem-y)
 host-progs := gentbl
 HOST_LOADLIBES := -lm
 
+# Files generated that shall be removed upon make clean
+clean-files  :=	sm_tbl_afsk1200.h   sm_tbl_afsk2400_7.h	\
+		sm_tbl_afsk2400_8.h sm_tbl_afsk2666.h	\
+		sm_tbl_psk4800.h    sm_tbl_hapn4800.h	\
+		sm_tbl_fsk9600.h
+
 include $(TOPDIR)/Rules.make
 
 # Dependencies on generates files need to be listed explicitly

@@ -43,7 +43,7 @@ aicdb.h:
 	 fi
 
 clean:
-	rm -f $(CLEANFILES) $(PROG)
+	@rm -f $(CLEANFILES) $(PROG)
 
 y.tab.h aicasm_gram.c: aicasm_gram.y
 	$(YACC) $(YFLAGS) aicasm_gram.y

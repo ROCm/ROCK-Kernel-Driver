@@ -20,6 +20,13 @@ endif
 
 #EXTRA_CFLAGS += -g
 
+# Files generated that shall be removed upon make clean
+clean-files := aic7xxx_seq.h aic7xxx_reg.h
+
+# Command to be executed upon make clean
+# Note: Assignment without ':' to force late evaluation of $(src)
+clean-rule = @$(MAKE) -C $(src)/aicasm clean
+
 include $(TOPDIR)/Rules.make
 
 # Dependencies for generated files need to be listed explicitly
@@ -30,11 +37,12 @@ $(addprefix $(obj)/,$(aic7xxx-objs)): $(obj)/aic7xxx_reg.h
 
 ifeq ($(CONFIG_AIC7XXX_BUILD_FIRMWARE),y)
 
-$(obj)/aic7xxx_seq.h $(obj)/aic7xxx_reg.h: $(src)/aic7xxx.seq \
-					   $(src)/aic7xxx.reg \
-					   $(obj)/aicasm/aicasm
+$(obj)/aic7xxx_seq.h: $(src)/aic7xxx.seq $(src)/aic7xxx.reg \
+		      $(obj)/aicasm/aicasm
 	$(obj)/aicasm/aicasm -I. -r $(obj)/aic7xxx_reg.h \
 				 -o $(obj)/aic7xxx_seq.h $(src)/aic7xxx.seq
+
+$(obj)/aic7xxx_reg.h: $(obj)/aix7xxx_seq.h
 
 $(obj)/aicasm/aicasm: $(src)/aicasm/*.[chyl]
 	$(MAKE) -C $(src)/aicasm

@@ -11,6 +11,8 @@
 
 EXTRA_TARGETS := fixdep split-include docproc conmakehash
 
+subdir-	:= lxdialog
+
 # Yikes. We need to build this stuff here even if the user only wants
 # modules.
 
@@ -23,6 +25,8 @@ KBUILD_BUILTIN := 1
 
 host-progs := fixdep split-include conmakehash docproc tkparse
 tkparse-objs := tkparse.o tkcond.o tkgen.o
+
+clean-files := kconfig.tk
 
 include $(TOPDIR)/Rules.make
 
@@ -56,8 +60,3 @@ lxdialog:
 # fixdep is needed to compile other host programs
 $(obj)/split-include $(obj)/docproc $(addprefix $(obj)/,$(tkparse-objs)) \
 $(obj)/conmakehash lxdialog: $(obj)/fixdep
-
-mrproper:
-	@rm -f $(host-progs) $(addprefix $(obj)/,$(tkparse-objs) kconfig.tk core)
-	@$(call descend,scripts/lxdialog,mrproper)
-
