@@ -225,13 +225,17 @@ struct kaweth_device
 	struct urb *rx_urb;
 	struct urb *tx_urb;
 	struct urb *irq_urb;
+
+	dma_addr_t intbufferhandle;
+	__u8 *intbuffer;
+	dma_addr_t rxbufferhandle;
+	__u8 *rx_buf;
+
 	
 	struct sk_buff *tx_skb;
 
 	__u8 *firmware_buf;
 	__u8 scratch[KAWETH_SCRATCH_SIZE];
-	__u8 rx_buf[KAWETH_BUF_SIZE];
-	__u8 intbuffer[INTBUFFERSIZE];
 	__u16 packet_filter_bitmap;
 
 	struct kaweth_ethernet_configuration configuration;
@@ -524,6 +528,8 @@ static int kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
 		      KAWETH_BUF_SIZE,
 		      kaweth_usb_receive,
 		      kaweth);
+	kaweth->rx_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+	kaweth->rx_urb->transfer_dma = kaweth->rxbufferhandle;
 
 	if((result = usb_submit_urb(kaweth->rx_urb, mem_flags))) {
 		if (result == -ENOMEM)
@@ -532,7 +538,7 @@ static int kaweth_resubmit_rx_urb(struct kaweth_device *kaweth,
 	} else {
 		kaweth->suspend_lowmem = 0;
 	}
-	
+
 	return result;
 }
 
@@ -630,6 +636,8 @@ static int kaweth_open(struct net_device *net)
 		int_callback,
 		kaweth,
 		HZ/4);
+	kaweth->irq_urb->transfer_dma = kaweth->intbufferhandle;
+	kaweth->irq_urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
 	res = usb_submit_urb(kaweth->irq_urb, GFP_KERNEL);
 	if (res) {
@@ -665,10 +673,10 @@ static int kaweth_close(struct net_device *net)
 static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 	u32 ethcmd;
-	
+
 	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
 		return -EFAULT;
-	
+
 	switch (ethcmd) {
 	case ETHTOOL_GDRVINFO: {
 		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
@@ -678,7 +686,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 		return 0;
 	}
 	}
-	
+
 	return -EOPNOTSUPP;
 }
 
@@ -1033,6 +1041,19 @@ static int kaweth_probe(
 	if (!kaweth->irq_urb)
 		goto err_tx_and_rx;
 
+	kaweth->intbuffer = usb_buffer_alloc(	kaweth->dev,
+						INTBUFFERSIZE,
+						GFP_KERNEL,
+						&kaweth->intbufferhandle);
+	if (!kaweth->intbuffer)
+		goto err_tx_and_rx_and_irq;
+	kaweth->rx_buf = usb_buffer_alloc(	kaweth->dev,
+						KAWETH_BUF_SIZE,
+						GFP_KERNEL,
+						&kaweth->rxbufferhandle);
+	if (!kaweth->rx_buf)
+		goto err_all_but_rxbuf;
+
 	kaweth->net = netdev;
 	memcpy(kaweth->net->broadcast, &bcast_addr, sizeof(bcast_addr));
 	memcpy(kaweth->net->dev_addr,
@@ -1053,7 +1074,7 @@ static int kaweth_probe(
 	kaweth->net->mtu = le16_to_cpu(kaweth->configuration.segment_size);
 
 	memset(&kaweth->stats, 0, sizeof(kaweth->stats));
-	
+
 	SET_MODULE_OWNER(netdev);
 
 	usb_set_intfdata(intf, kaweth);
@@ -1071,6 +1092,12 @@ static int kaweth_probe(
 
 err_intfdata:
 	usb_set_intfdata(intf, NULL);
+err_all:
+	usb_buffer_free(kaweth->dev, KAWETH_BUF_SIZE, (void *)kaweth->rx_buf, kaweth->rxbufferhandle);
+err_all_but_rxbuf:
+	usb_buffer_free(kaweth->dev, INTBUFFERSIZE, (void *)kaweth->intbuffer, kaweth->intbufferhandle);
+err_tx_and_rx_and_irq:
+	usb_free_urb(kaweth->irq_urb);
 err_tx_and_rx:
 	usb_free_urb(kaweth->rx_urb);
 err_only_tx:
@@ -1123,6 +1150,11 @@ static void kaweth_disconnect(struct usb_interface *intf)
 
 	usb_free_urb(kaweth->rx_urb);
 	usb_free_urb(kaweth->tx_urb);
+	usb_free_urb(kaweth->irq_urb);
+
+
+	usb_buffer_free(kaweth->dev, KAWETH_BUF_SIZE, (void *)kaweth->rx_buf, kaweth->rxbufferhandle);
+	usb_buffer_free(kaweth->dev, INTBUFFERSIZE, (void *)kaweth->intbuffer, kaweth->intbufferhandle);
 
 	kfree(kaweth);
 }
