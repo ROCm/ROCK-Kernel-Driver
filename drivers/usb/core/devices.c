@@ -584,7 +584,7 @@ static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbyte
 
 	/* enumerate busses */
 	down (&usb_bus_list_lock);
-	for (buslist = usb_bus_list.next; buslist != &usb_bus_list; buslist = buslist->next) {
+	list_for_each(buslist, &usb_bus_list) {
 		/* print devices for this bus */
 		bus = list_entry(buslist, struct usb_bus, bus_list);
 
