@@ -586,7 +586,7 @@ check_status:
 			return ide_stopped;
 	/* Complete rq->buffer based request (ioctls). */
 	if (!rq->bio && !rq->nr_sectors) {
-		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		DRIVER(drive)->end_request(drive, 1, 0);
 		return ide_stopped;
 	}
 
@@ -637,7 +637,7 @@ check_status:
 			return ide_stopped;
 	/* Complete rq->buffer based request (ioctls). */
 	if (!rq->bio && !rq->nr_sectors) {
-		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		DRIVER(drive)->end_request(drive, 1, 0);
 		return ide_stopped;
 	}
 
@@ -703,7 +703,7 @@ ide_startstop_t task_out_intr (ide_drive_t *drive)
 			return ide_stopped;
 	/* Complete rq->buffer based request (ioctls). */
 	if (!rq->bio && !rq->nr_sectors) {
-		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		DRIVER(drive)->end_request(drive, 1, 0);
 		return ide_stopped;
 	}
 
@@ -772,7 +772,7 @@ ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 			return ide_stopped;
 	/* Complete rq->buffer based request (ioctls). */
 	if (!rq->bio && !rq->nr_sectors) {
-		ide_end_drive_cmd(drive, stat, HWIF(drive)->INB(IDE_ERROR_REG));
+		DRIVER(drive)->end_request(drive, 1, 0);
 		return ide_stopped;
 	}
 
