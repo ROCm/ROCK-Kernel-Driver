@@ -658,7 +658,7 @@ xfs_setattr(
 		if (vap->va_size > ip->i_d.di_size) {
 			code = xfs_igrow_start(ip, vap->va_size, credp);
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		} else if (vap->va_size < ip->i_d.di_size) {
+		} else if (vap->va_size <= ip->i_d.di_size) {
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE,
 					    (xfs_fsize_t)vap->va_size);
@@ -701,7 +701,7 @@ xfs_setattr(
 		if (vap->va_size > ip->i_d.di_size) {
 			xfs_igrow_finish(tp, ip, vap->va_size,
 			    !(flags & ATTR_DMI));
-		} else if ((vap->va_size < ip->i_d.di_size) ||
+		} else if ((vap->va_size <= ip->i_d.di_size) ||
 			   ((vap->va_size == 0) && ip->i_d.di_nextents)) {
 			/*
 			 * signal a sync transaction unless
