@@ -98,7 +98,7 @@ static unsigned long chrp_find_phys_io_base(void)
 
 #ifdef CONFIG_MAGIC_SYSRQ
 static void sysrq_handle_xmon(int key, struct pt_regs *regs,
-			      struct kbd_struct *kbd, struct tty_struct *tty)
+			      struct tty_struct *tty) 
 {
 	xmon(regs);
 }
