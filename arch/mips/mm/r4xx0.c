@@ -209,7 +209,7 @@ static void r4k_clear_page_r4600_v2(void * page)
 {
 	unsigned int flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	*(volatile unsigned int *)KSEG1;
 	__asm__ __volatile__(
 		".set\tnoreorder\n\t"
@@ -236,7 +236,7 @@ static void r4k_clear_page_r4600_v2(void * page)
 		 "I" (PAGE_SIZE),
 		 "i" (Create_Dirty_Excl_D)
 		:"$1","memory");
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -568,7 +568,7 @@ static void r4k_copy_page_r4600_v2(void * to, void * from)
 	unsigned long reg1, reg2, reg3, reg4;
 	unsigned int flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	__asm__ __volatile__(
 		".set\tnoreorder\n\t"
 		".set\tnoat\n\t"
@@ -627,7 +627,7 @@ static void r4k_copy_page_r4600_v2(void * to, void * from)
 		:"0" (to), "1" (from),
 		 "I" (PAGE_SIZE),
 		 "i" (Create_Dirty_Excl_D));
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -911,81 +911,81 @@ static inline void r4k_flush_cache_all_s16d16i16(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache16(); blast_icache16(); blast_scache16();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void r4k_flush_cache_all_s32d16i16(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache16(); blast_icache16(); blast_scache32();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void r4k_flush_cache_all_s64d16i16(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache16(); blast_icache16(); blast_scache64();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void r4k_flush_cache_all_s128d16i16(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache16(); blast_icache16(); blast_scache128();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void r4k_flush_cache_all_s32d32i32(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache32(); blast_icache32(); blast_scache32();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void r4k_flush_cache_all_s64d32i32(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache32(); blast_icache32(); blast_scache64();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void r4k_flush_cache_all_s128d32i32(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache32(); blast_icache32(); blast_scache128();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void r4k_flush_cache_all_d16i16(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache16(); blast_icache16();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void r4k_flush_cache_all_d32i32(void)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	blast_dcache32(); blast_icache32();
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void
@@ -1011,7 +1011,7 @@ r4k_flush_cache_range_s16d16i16(struct vm_area_struct *vma,
 			pmd_t *pmd;
 			pte_t *pte;
 
-			__save_and_cli(flags);
+			local_irq_save(flags);
 			while(start < end) {
 				pgd = pgd_offset(mm, start);
 				pmd = pmd_offset(pgd, start);
@@ -1021,7 +1021,7 @@ r4k_flush_cache_range_s16d16i16(struct vm_area_struct *vma,
 					blast_scache16_page(start);
 				start += PAGE_SIZE;
 			}
-			__restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	}
 }
@@ -1049,7 +1049,7 @@ r4k_flush_cache_range_s32d16i16(struct vm_area_struct *vma,
 			pmd_t *pmd;
 			pte_t *pte;
 
-			__save_and_cli(flags);
+			local_irq_save(flags);
 			while(start < end) {
 				pgd = pgd_offset(mm, start);
 				pmd = pmd_offset(pgd, start);
@@ -1059,7 +1059,7 @@ r4k_flush_cache_range_s32d16i16(struct vm_area_struct *vma,
 					blast_scache32_page(start);
 				start += PAGE_SIZE;
 			}
-			__restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	}
 }
@@ -1086,7 +1086,7 @@ static void r4k_flush_cache_range_s64d16i16(struct vm_area_struct *vma,
 			pmd_t *pmd;
 			pte_t *pte;
 
-			__save_and_cli(flags);
+			local_irq_save(flags);
 			while(start < end) {
 				pgd = pgd_offset(mm, start);
 				pmd = pmd_offset(pgd, start);
@@ -1096,7 +1096,7 @@ static void r4k_flush_cache_range_s64d16i16(struct vm_area_struct *vma,
 					blast_scache64_page(start);
 				start += PAGE_SIZE;
 			}
-			__restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	}
 }
@@ -1123,7 +1123,7 @@ static void r4k_flush_cache_range_s128d16i16(struct vm_area_struct *vma,
 			pmd_t *pmd;
 			pte_t *pte;
 
-			__save_and_cli(flags);
+			local_irq_save(flags);
 			while(start < end) {
 				pgd = pgd_offset(mm, start);
 				pmd = pmd_offset(pgd, start);
@@ -1133,7 +1133,7 @@ static void r4k_flush_cache_range_s128d16i16(struct vm_area_struct *vma,
 					blast_scache128_page(start);
 				start += PAGE_SIZE;
 			}
-			__restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	}
 }
@@ -1160,7 +1160,7 @@ static void r4k_flush_cache_range_s32d32i32(struct vm_area_struct *vma,
 			pmd_t *pmd;
 			pte_t *pte;
 
-			__save_and_cli(flags);
+			local_irq_save(flags);
 			while(start < end) {
 				pgd = pgd_offset(mm, start);
 				pmd = pmd_offset(pgd, start);
@@ -1170,7 +1170,7 @@ static void r4k_flush_cache_range_s32d32i32(struct vm_area_struct *vma,
 					blast_scache32_page(start);
 				start += PAGE_SIZE;
 			}
-			__restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	}
 }
@@ -1197,7 +1197,7 @@ static void r4k_flush_cache_range_s64d32i32(struct vm_area_struct *vma,
 			pmd_t *pmd;
 			pte_t *pte;
 
-			__save_and_cli(flags);
+			local_irq_save(flags);
 			while(start < end) {
 				pgd = pgd_offset(mm, start);
 				pmd = pmd_offset(pgd, start);
@@ -1207,7 +1207,7 @@ static void r4k_flush_cache_range_s64d32i32(struct vm_area_struct *vma,
 					blast_scache64_page(start);
 				start += PAGE_SIZE;
 			}
-			__restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	}
 }
@@ -1234,7 +1234,7 @@ static void r4k_flush_cache_range_s128d32i32(struct vm_area_struct *vma,
 			pmd_t *pmd;
 			pte_t *pte;
 
-			__save_and_cli(flags);
+			local_irq_save(flags);
 			while(start < end) {
 				pgd = pgd_offset(mm, start);
 				pmd = pmd_offset(pgd, start);
@@ -1244,7 +1244,7 @@ static void r4k_flush_cache_range_s128d32i32(struct vm_area_struct *vma,
 					blast_scache128_page(start);
 				start += PAGE_SIZE;
 			}
-			__restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	}
 }
@@ -1261,9 +1261,9 @@ static void r4k_flush_cache_range_d16i16(struct mm_struct *vma,
 #ifdef DEBUG_CACHE
 		printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		blast_dcache16(); blast_icache16();
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -1279,9 +1279,9 @@ static void r4k_flush_cache_range_d32i32(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 		printk("crange[%d,%08lx,%08lx]", (int)mm->context, start, end);
 #endif
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		blast_dcache32(); blast_icache32();
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -1399,7 +1399,7 @@ static void r4k_flush_cache_page_s16d16i16(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -1429,7 +1429,7 @@ static void r4k_flush_cache_page_s16d16i16(struct vm_area_struct *vma,
 	} else
 		blast_scache16_page(page);
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void r4k_flush_cache_page_s32d16i16(struct vm_area_struct *vma,
@@ -1451,7 +1451,7 @@ static void r4k_flush_cache_page_s32d16i16(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -1480,7 +1480,7 @@ static void r4k_flush_cache_page_s32d16i16(struct vm_area_struct *vma,
 	} else
 		blast_scache32_page(page);
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void r4k_flush_cache_page_s64d16i16(struct vm_area_struct *vma,
@@ -1502,7 +1502,7 @@ static void r4k_flush_cache_page_s64d16i16(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -1531,7 +1531,7 @@ static void r4k_flush_cache_page_s64d16i16(struct vm_area_struct *vma,
 	} else
 		blast_scache64_page(page);
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void r4k_flush_cache_page_s128d16i16(struct vm_area_struct *vma,
@@ -1553,7 +1553,7 @@ static void r4k_flush_cache_page_s128d16i16(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -1583,7 +1583,7 @@ static void r4k_flush_cache_page_s128d16i16(struct vm_area_struct *vma,
 	} else
 		blast_scache128_page(page);
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void r4k_flush_cache_page_s32d32i32(struct vm_area_struct *vma,
@@ -1605,7 +1605,7 @@ static void r4k_flush_cache_page_s32d32i32(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -1635,7 +1635,7 @@ static void r4k_flush_cache_page_s32d32i32(struct vm_area_struct *vma,
 	} else
 		blast_scache32_page(page);
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void r4k_flush_cache_page_s64d32i32(struct vm_area_struct *vma,
@@ -1657,7 +1657,7 @@ static void r4k_flush_cache_page_s64d32i32(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -1687,7 +1687,7 @@ static void r4k_flush_cache_page_s64d32i32(struct vm_area_struct *vma,
 	} else
 		blast_scache64_page(page);
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void r4k_flush_cache_page_s128d32i32(struct vm_area_struct *vma,
@@ -1709,7 +1709,7 @@ static void r4k_flush_cache_page_s128d32i32(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -1738,7 +1738,7 @@ static void r4k_flush_cache_page_s128d32i32(struct vm_area_struct *vma,
 	} else
 		blast_scache128_page(page);
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void r4k_flush_cache_page_d16i16(struct vm_area_struct *vma,
@@ -1760,7 +1760,7 @@ static void r4k_flush_cache_page_d16i16(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -1789,7 +1789,7 @@ static void r4k_flush_cache_page_d16i16(struct vm_area_struct *vma,
 		blast_dcache16_page_indexed(page);
 	}
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void r4k_flush_cache_page_d32i32(struct vm_area_struct *vma,
@@ -1811,7 +1811,7 @@ static void r4k_flush_cache_page_d32i32(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -1841,7 +1841,7 @@ static void r4k_flush_cache_page_d32i32(struct vm_area_struct *vma,
 		blast_dcache32_page_indexed(page);
 	}
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void r4k_flush_cache_page_d32i32_r4600(struct vm_area_struct *vma,
@@ -1863,7 +1863,7 @@ static void r4k_flush_cache_page_d32i32_r4600(struct vm_area_struct *vma,
 #ifdef DEBUG_CACHE
 	printk("cpage[%d,%08lx]", (int)mm->context, page);
 #endif
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	page &= PAGE_MASK;
 	pgdp = pgd_offset(mm, page);
 	pmdp = pmd_offset(pgdp, page);
@@ -1893,7 +1893,7 @@ static void r4k_flush_cache_page_d32i32_r4600(struct vm_area_struct *vma,
 		blast_dcache32_page_indexed(page ^ dcache_waybit);
 	}
 out:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /* If the addresses passed to these routines are valid, they are
@@ -1939,9 +1939,9 @@ static void r4k_flush_page_to_ram_d32_r4600(struct page *page)
 {
 	unsigned long flags;
 
-	__save_and_cli(flags);			/* For R4600 v1.7 bug.  */
+	local_irq_save(flags);			/* For R4600 v1.7 bug.  */
 	blast_dcache32_page((unsigned long)page_address(page));
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void
@@ -1993,7 +1993,7 @@ r4k_dma_cache_wback_inv_pc(unsigned long addr, unsigned long size)
 		flush_cache_all();
 	} else {
 		/* Workaround for R4600 bug.  See comment above. */
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		*(volatile unsigned long *)KSEG1;
 
 		a = addr & ~(dc_lsize - 1);
@@ -2003,7 +2003,7 @@ r4k_dma_cache_wback_inv_pc(unsigned long addr, unsigned long size)
 			if (a == end) break;
 			a += dc_lsize;
 		}
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 	bc_wback_inv(addr, size);
 }
@@ -2037,7 +2037,7 @@ r4k_dma_cache_inv_pc(unsigned long addr, unsigned long size)
 		flush_cache_all();
 	} else {
 		/* Workaround for R4600 bug.  See comment above. */
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		*(volatile unsigned long *)KSEG1;
 
 		a = addr & ~(dc_lsize - 1);
@@ -2047,7 +2047,7 @@ r4k_dma_cache_inv_pc(unsigned long addr, unsigned long size)
 			if (a == end) break;
 			a += dc_lsize;
 		}
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 
 	bc_inv(addr, size);
@@ -2094,7 +2094,7 @@ static void r4600v20k_flush_cache_sigtramp(unsigned long addr)
 {
 	unsigned int flags;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	/* Clear internal cache refill buffer */
 	*(volatile unsigned int *)KSEG1;
@@ -2102,7 +2102,7 @@ static void r4600v20k_flush_cache_sigtramp(unsigned long addr)
 	protected_writeback_dcache_line(addr & ~(dc_lsize - 1));
 	protected_flush_icache_line(addr & ~(ic_lsize - 1));
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 #undef DEBUG_TLB
@@ -2118,7 +2118,7 @@ void flush_tlb_all(void)
 	printk("[tlball]");
 #endif
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	/* Save old context and create impossible VPN2 value */
 	old_ctx = (get_entryhi() & 0xff);
 	set_entryhi(KSEG0);
@@ -2138,7 +2138,7 @@ void flush_tlb_all(void)
 	}
 	BARRIER;
 	set_entryhi(old_ctx);
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 void flush_tlb_mm(struct mm_struct *mm)
@@ -2149,11 +2149,11 @@ void flush_tlb_mm(struct mm_struct *mm)
 #ifdef DEBUG_TLB
 		printk("[tlbmm<%d>]", mm->context);
 #endif
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		get_new_mmu_context(mm, asid_cache);
 		if (mm == current->active_mm)
 			set_entryhi(mm->context & 0xff);
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -2170,7 +2170,7 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 		printk("[tlbrange<%02x,%08lx,%08lx>]", (mm->context & 0xff),
 		       start, end);
 #endif
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		size = (end - start + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 		size = (size + 1) >> 1;
 		if(size <= mips_cpu.tlbsize/2) {
@@ -2204,7 +2204,7 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 			if (mm == current->active_mm)
 				set_entryhi(mm->context & 0xff);
 		}
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -2219,7 +2219,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 #endif
 		newpid = (vma->vm_mm->context & 0xff);
 		page &= (PAGE_MASK << 1);
-		__save_and_cli(flags);
+		local_irq_save(flags);
 		oldpid = (get_entryhi() & 0xff);
 		set_entryhi(page | newpid);
 		BARRIER;
@@ -2237,7 +2237,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 	finish:
 		BARRIER;
 		set_entryhi(oldpid);
-		__restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -2286,7 +2286,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	}
 #endif
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	address &= (PAGE_MASK << 1);
 	set_entryhi(address | (pid));
 	pgdp = pgd_offset(vma->vm_mm, address);
@@ -2309,7 +2309,7 @@ void update_mmu_cache(struct vm_area_struct * vma,
 	BARRIER;
 	set_entryhi(pid);
 	BARRIER;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 #if 0
@@ -2322,7 +2322,7 @@ static void r4k_update_mmu_cache_hwbug(struct vm_area_struct * vma,
 	pte_t *ptep;
 	int idx;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	address &= (PAGE_MASK << 1);
 	set_entryhi(address | (get_entryhi() & 0xff));
 	pgdp = pgd_offset(vma->vm_mm, address);
@@ -2338,7 +2338,7 @@ static void r4k_update_mmu_cache_hwbug(struct vm_area_struct * vma,
 	else
 		tlb_write_indexed();
 	BARRIER;
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 #endif
 
@@ -2375,7 +2375,7 @@ void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
         unsigned long old_pagemask;
         unsigned long old_ctx;
 
-        __save_and_cli(flags);
+        local_irq_save(flags);
         /* Save old context and create impossible VPN2 value */
         old_ctx = (get_entryhi() & 0xff);
         old_pagemask = get_pagemask();
@@ -2395,7 +2395,7 @@ void add_wired_entry(unsigned long entrylo0, unsigned long entrylo1,
         BARRIER;    
         set_pagemask (old_pagemask);
         flush_tlb_all();    
-        __restore_flags(flags);
+        local_irq_restore(flags);
 }
 
 /* Detect and size the various r4k caches. */
@@ -2469,7 +2469,7 @@ static int __init probe_scache(unsigned long config)
 	/* This is such a bitch, you'd think they would make it
 	 * easy to do this.  Away you daemons of stupidity!
 	 */
-	__save_and_cli(flags);
+	local_irq_save(flags);
 
 	/* Fill each size-multiple cache line with a valid tag. */
 	pow2 = (64 * 1024);
@@ -2513,7 +2513,7 @@ static int __init probe_scache(unsigned long config)
 			break;
 		pow2 <<= 1;
 	}
-	__restore_flags(flags);
+	local_irq_restore(flags);
 	addr -= begin;
 	printk("Secondary cache sized at %dK linesize %d bytes.\n",
 	       (int) (addr >> 10), sc_lsize);

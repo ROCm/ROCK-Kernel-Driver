@@ -381,7 +381,7 @@ static int arr3_protected;
 static void set_mtrr_prepare_save (struct set_mtrr_context *ctxt)
 {
     /*  Disable interrupts locally  */
-    __save_flags (ctxt->flags); __cli ();
+    local_save_flags (ctxt->flags); local_irq_disable ();
 
     if ( mtrr_if != MTRR_IF_INTEL && mtrr_if != MTRR_IF_CYRIX_ARR )
 	 return;
@@ -428,7 +428,7 @@ static void set_mtrr_cache_disable (struct set_mtrr_context *ctxt)
 static void set_mtrr_done (struct set_mtrr_context *ctxt)
 {
     if ( mtrr_if != MTRR_IF_INTEL && mtrr_if != MTRR_IF_CYRIX_ARR ) {
-	 __restore_flags (ctxt->flags);
+	 local_irq_restore (ctxt->flags);
 	 return;
     }
 
@@ -452,7 +452,7 @@ static void set_mtrr_done (struct set_mtrr_context *ctxt)
 	write_cr4(ctxt->cr4val);
 
     /*  Re-enable interrupts locally (if enabled previously)  */
-    __restore_flags (ctxt->flags);
+    local_irq_restore (ctxt->flags);
 }   /*  End Function set_mtrr_done  */
 
 /*  This function returns the number of variable MTRRs  */
@@ -546,7 +546,7 @@ static void cyrix_get_arr (unsigned int reg, unsigned long *base,
     arr = CX86_ARR_BASE + (reg << 1) + reg; /* avoid multiplication by 3 */
 
     /* Save flags and disable interrupts */
-    __save_flags (flags); __cli ();
+    local_save_flags (flags); local_irq_disable ();
 
     ccr3 = getCx86 (CX86_CCR3);
     setCx86 (CX86_CCR3, (ccr3 & 0x0f) | 0x10);		/* enable MAPEN */
@@ -557,7 +557,7 @@ static void cyrix_get_arr (unsigned int reg, unsigned long *base,
     setCx86 (CX86_CCR3, ccr3);				/* disable MAPEN */
 
     /* Enable interrupts if it was enabled previously */
-    __restore_flags (flags);
+    local_irq_restore (flags);
     shift = ((unsigned char *) base)[1] & 0x0f;
     *base >>= PAGE_SHIFT;
 

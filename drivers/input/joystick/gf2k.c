@@ -106,8 +106,8 @@ static int gf2k_read_packet(struct gameport *gameport, int length, char *data)
 
 	i = 0;
 
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 
 	gameport_trigger(gameport);
 	v = gameport_read(gameport);;
@@ -121,7 +121,7 @@ static int gf2k_read_packet(struct gameport *gameport, int length, char *data)
 		}
 	}
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	return i;
 }
@@ -137,8 +137,8 @@ static void gf2k_trigger_seq(struct gameport *gameport, short *seq)
 	unsigned long flags;
 	int i, t;
 
-        __save_flags(flags);
-        __cli();
+        local_save_flags(flags);
+        local_irq_disable();
 
 	i = 0;
         do {
@@ -150,7 +150,7 @@ static void gf2k_trigger_seq(struct gameport *gameport, short *seq)
 
 	gameport_trigger(gameport);
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*

@@ -58,30 +58,30 @@ extern void _do_write_unlock(rwlock_t *rw);
 
 #define read_lock(lock)	\
 do {	unsigned long flags; \
-	__save_and_cli(flags); \
+	local_irq_save(flags); \
 	_do_read_lock(lock, "read_lock"); \
-	__restore_flags(flags); \
+	local_irq_restore(flags); \
 } while(0)
 
 #define read_unlock(lock) \
 do {	unsigned long flags; \
-	__save_and_cli(flags); \
+	local_irq_save(flags); \
 	_do_read_unlock(lock, "read_unlock"); \
-	__restore_flags(flags); \
+	local_irq_restore(flags); \
 } while(0)
 
 #define write_lock(lock) \
 do {	unsigned long flags; \
-	__save_and_cli(flags); \
+	local_irq_save(flags); \
 	_do_write_lock(lock, "write_lock"); \
-	__restore_flags(flags); \
+	local_irq_restore(flags); \
 } while(0)
 
 #define write_unlock(lock) \
 do {	unsigned long flags; \
-	__save_and_cli(flags); \
+	local_irq_save(flags); \
 	_do_write_unlock(lock); \
-	__restore_flags(flags); \
+	local_irq_restore(flags); \
 } while(0)
 
 #else /* !SPIN_LOCK_DEBUG */
@@ -180,9 +180,9 @@ extern __inline__ void _read_lock(rwlock_t *rw)
 
 #define read_lock(lock) \
 do {	unsigned long flags; \
-	__save_and_cli(flags); \
+	local_irq_save(flags); \
 	_read_lock(lock); \
-	__restore_flags(flags); \
+	local_irq_restore(flags); \
 } while(0)
 
 extern __inline__ void _read_unlock(rwlock_t *rw)
@@ -200,9 +200,9 @@ extern __inline__ void _read_unlock(rwlock_t *rw)
 
 #define read_unlock(lock) \
 do {	unsigned long flags; \
-	__save_and_cli(flags); \
+	local_irq_save(flags); \
 	_read_unlock(lock); \
-	__restore_flags(flags); \
+	local_irq_restore(flags); \
 } while(0)
 
 extern __inline__ void write_lock(rwlock_t *rw)

@@ -62,10 +62,10 @@ struct __xchg_dummy { unsigned long a[100]; };
 #define save_flags(x) __asm__ __volatile__ ("move $ccr,%0" : "=rm" (x) : : "memory");
 #define restore_flags(x) __asm__ __volatile__ ("move %0,$ccr\n\tbtstq 5,%0\n\tbpl 1f\n\tnop\n\tpush $r0\n\tmoveq 0,$r0\n\tmove.d $r0,[0x90000000]\n\tpop $r0\n1:\n" : : "r" (x) : "memory");
 #else
-#define __cli() __asm__ __volatile__ ( "di");
-#define __sti() __asm__ __volatile__ ( "ei" );
-#define __save_flags(x) __asm__ __volatile__ ("move $ccr,%0" : "=rm" (x) : : "memory");
-#define __restore_flags(x) __asm__ __volatile__ ("move %0,$ccr" : : "rm" (x) : "memory");
+#define local_irq_disable() __asm__ __volatile__ ( "di");
+#define local_irq_enable() __asm__ __volatile__ ( "ei" );
+#define local_save_flags(x) __asm__ __volatile__ ("move $ccr,%0" : "=rm" (x) : : "memory");
+#define local_irq_restore(x) __asm__ __volatile__ ("move %0,$ccr" : : "rm" (x) : "memory");
 
 /* For spinlocks etc */
 #define local_irq_save(x) __asm__ __volatile__ ("move $ccr,%0\n\tdi" : "=rm" (x) : : "memory"); 
@@ -76,11 +76,11 @@ struct __xchg_dummy { unsigned long a[100]; };
 
 #endif
 
-#define cli() __cli()
-#define sti() __sti()
-#define save_flags(x) __save_flags(x)
-#define restore_flags(x) __restore_flags(x)
-#define save_and_cli(x) do { __save_flags(x); cli(); } while(0)
+#define cli() local_irq_disable()
+#define sti() local_irq_enable()
+#define save_flags(x) local_save_flags(x)
+#define restore_flags(x) local_irq_restore(x)
+#define save_and_cli(x) do { local_save_flags(x); cli(); } while(0)
 
 static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 {

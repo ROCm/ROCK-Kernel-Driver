@@ -93,7 +93,7 @@ menf1_restart(char *cmd)
        int     picr1;
        struct pci_dev *pdev;
 
-	__cli();
+	local_irq_disable();
 
 	/*
 	 * Firmware doesn't like re-entry using Map B (CHRP), so make sure the
@@ -130,7 +130,7 @@ menf1_restart(char *cmd)
 static void
 menf1_halt(void)
 {
-	__cli();
+	local_irq_disable();
 	while (1);
 }
 

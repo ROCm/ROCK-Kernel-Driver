@@ -67,7 +67,7 @@ void flush_tlb_all(void)
 	unsigned long old_ctx;
 	int entry;
 
-	__save_and_cli(flags);
+	local_irq_save(flags);
 	/* Save old context and create impossible VPN2 value */
 	old_ctx = (get_entryhi() & 0xff);
 	set_entrylo0(0);
@@ -78,7 +78,7 @@ void flush_tlb_all(void)
 		tlb_write_indexed();
 	}
 	set_entryhi(old_ctx);
-	__restore_flags(flags);	
+	local_irq_restore(flags);	
 }
 
 

@@ -147,7 +147,7 @@ void __init init_IRQ(void)
 	 * int-handler is not on bootstrap
 	 */
 	clear_cp0_status(ST0_IM | ST0_BEV);
-	__cli();
+	local_irq_disable();
 
 	/* Sets the first-level interrupt dispatcher. */
 	set_except_vector(0, ocelot_handle_int);

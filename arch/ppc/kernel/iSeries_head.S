@@ -1103,7 +1103,7 @@ _GLOBAL(HvCall7)
 
    /* enable and check for decrementers/lpEvents */
    mr	r3,r31
-   bl	__restore_flags
+   bl	local_irq_restore
 
    /* Restore r3, r4 and LR */
    lwz    r3,44(r1)
@@ -1292,7 +1292,7 @@ _GLOBAL(HvCall7Ret16)
 
    /* enable and check for decrementers/lpEvents */
    mr	  r3,r31
-   bl	__restore_flags
+   bl	local_irq_restore
 
    lwz    r3,40(r1)
    mtlr   r3

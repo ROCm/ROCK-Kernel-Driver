@@ -29,10 +29,10 @@
  * that dares to use kernel include files alive.
  */
 #define __bi_flags unsigned long flags
-#define __bi_cli() __cli()
-#define __bi_save_flags(x) __save_flags(x)
-#define __bi_save_and_cli(x) __save_and_cli(x)
-#define __bi_restore_flags(x) __restore_flags(x)
+#define __bi_cli() local_irq_disable()
+#define __bi_save_flags(x) local_save_flags(x)
+#define __bi_save_and_cli(x) local_irq_save(x)
+#define __bi_restore_flags(x) local_irq_restore(x)
 #else
 #define __bi_flags
 #define __bi_cli()

@@ -733,7 +733,7 @@ static void channel_probe(struct ata_channel *ch)
 
 	ch->straight8 = 0;
 
-	__save_flags(flags);
+	local_save_flags(flags);
 	local_irq_enable();	/* needed for jiffies and irq probing */
 
 	/*
@@ -852,7 +852,7 @@ static void channel_probe(struct ata_channel *ch)
 	if (ch->reset)
 		ata_reset(ch);
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	/*
 	 * Now setup the PIO transfer modes of the drives on this channel.
@@ -869,7 +869,7 @@ static void channel_probe(struct ata_channel *ch)
 	return;
 
 not_found:
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*

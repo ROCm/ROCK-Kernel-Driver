@@ -22,7 +22,7 @@ static __inline__ void release_kernel_lock(struct task_struct *task, int cpu)
 	if (task->lock_depth >= 0)
 		spin_unlock(&kernel_flag);
 	release_irqlock(cpu);
-	__sti();
+	local_irq_enable();
 }
 
 /*

@@ -190,7 +190,7 @@ __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 	spin_unlock(&irq_controller_lock);
 
 	if (!(action->flags & SA_INTERRUPT))
-		__sti();
+		local_irq_enable();
 
 	status = 0;
 	do {

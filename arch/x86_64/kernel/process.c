@@ -89,11 +89,11 @@ void enable_hlt(void)
 void default_idle(void)
 {
 	if (!hlt_counter) {
-		__cli();
+		local_irq_disable();
 		if (!need_resched())
 			safe_halt();
 		else
-			__sti();
+			local_irq_enable();
 	}
 }
 
@@ -106,7 +106,7 @@ static void poll_idle (void)
 {
 	int oldval;
 
-	__sti();
+	local_irq_enable();
 
 	/*
 	 * Deal with another CPU just having chosen a thread to

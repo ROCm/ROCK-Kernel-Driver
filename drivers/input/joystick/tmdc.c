@@ -125,8 +125,8 @@ static int tmdc_read_packet(struct gameport *gameport, unsigned char data[2][TMD
 		i[k] = j[k] = 0;
 	}
 
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 	gameport_trigger(gameport);
 	
 	w = gameport_read(gameport) >> 4;
@@ -153,7 +153,7 @@ static int tmdc_read_packet(struct gameport *gameport, unsigned char data[2][TMD
 		}
 	} while (t[0] > 0 || t[1] > 0);
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 
 	return (i[0] == TMDC_MAX_LENGTH) | ((i[1] == TMDC_MAX_LENGTH) << 1);
 }

@@ -161,8 +161,8 @@ static inline void send_IPI_mask_bitmask(int mask, int vector)
 	unsigned long cfg;
 	unsigned long flags;
 
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 
 		
 	/*
@@ -186,7 +186,7 @@ static inline void send_IPI_mask_bitmask(int mask, int vector)
 	 */
 	apic_write_around(APIC_ICR, cfg);
 
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void send_IPI_mask_sequence(int mask, int vector)
@@ -200,8 +200,8 @@ static inline void send_IPI_mask_sequence(int mask, int vector)
 	 * should be modified to do 1 message per cluster ID - mbligh
 	 */ 
 
-	__save_flags(flags);
-	__cli();
+	local_save_flags(flags);
+	local_irq_disable();
 
 	for (query_cpu = 0; query_cpu < NR_CPUS; ++query_cpu) {
 		query_mask = 1 << query_cpu;
@@ -229,7 +229,7 @@ static inline void send_IPI_mask_sequence(int mask, int vector)
 			apic_write_around(APIC_ICR, cfg);
 		}
 	}
-	__restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void send_IPI_mask(int mask, int vector)
@@ -603,7 +603,7 @@ static void stop_this_cpu (void * dummy)
 	 * Remove this CPU:
 	 */
 	clear_bit(smp_processor_id(), &cpu_online_map);
-	__cli();
+	local_irq_disable();
 	disable_local_APIC();
 	if (cpu_data[smp_processor_id()].hlt_works_ok)
 		for(;;) __asm__("hlt");
@@ -618,9 +618,9 @@ void smp_send_stop(void)
 {
 	smp_call_function(stop_this_cpu, NULL, 1, 0);
 
-	__cli();
+	local_irq_disable();
 	disable_local_APIC();
-	__sti();
+	local_irq_enable();
 }
 
 /*

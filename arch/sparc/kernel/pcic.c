@@ -780,7 +780,7 @@ void __init pci_time_init(void)
 		prom_printf("time_init: unable to attach IRQ%d\n", timer_irq);
 		prom_halt();
 	}
-	__sti();
+	local_irq_enable();
 }
 
 static __inline__ unsigned long do_gettimeoffset(void)
