@@ -170,7 +170,7 @@ static void __sctp_get_local_addr_list(struct sctp_protocol *proto)
 
 static void sctp_get_local_addr_list(struct sctp_protocol *proto)
 {
-	long flags __attribute__ ((unused));
+	unsigned long flags;
 
 	sctp_spin_lock_irqsave(&sctp_proto.local_addr_lock, flags);
 	__sctp_get_local_addr_list(&sctp_proto);
@@ -193,7 +193,7 @@ static void __sctp_free_local_addr_list(struct sctp_protocol *proto)
 /* Free the existing local addresses.  */
 static void sctp_free_local_addr_list(struct sctp_protocol *proto)
 {
-	long flags __attribute__ ((unused));
+	unsigned long flags;
 
 	sctp_spin_lock_irqsave(&proto->local_addr_lock, flags);
 	__sctp_free_local_addr_list(proto);
@@ -208,7 +208,7 @@ int sctp_copy_local_addr_list(struct sctp_protocol *proto,
 	struct sockaddr_storage_list *addr;
 	int error = 0;
 	struct list_head *pos;
-	long flags __attribute__ ((unused));
+	unsigned long flags;
 
 	sctp_spin_lock_irqsave(&proto->local_addr_lock, flags);
 	list_for_each(pos, &proto->local_addr_list) {
@@ -543,10 +543,10 @@ out:
 /* Event handler for inet address addition/deletion events.
  * Basically, whenever there is an event, we re-build our local address list.
  */
-static int sctp_inetaddr_event(struct notifier_block *this, unsigned long event,
+static int sctp_inetaddr_event(struct notifier_block *this, unsigned long ev,
 			       void *ptr)
 {
-	long flags __attribute__ ((unused));
+	unsigned long flags;
 
 	sctp_spin_lock_irqsave(&sctp_proto.local_addr_lock, flags);
 	__sctp_free_local_addr_list(&sctp_proto);
