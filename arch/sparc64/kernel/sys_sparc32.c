@@ -835,7 +835,7 @@ asmlinkage long compat_sys_ipc(u32 call, int first, int second, int third, compa
 			err = sys_shmdt(ptr);
 			goto out;
 		case SHMGET:
-			err = sys_shmget(first, second, third);
+			err = sys_shmget(first, (unsigned)second, third);
 			goto out;
 		case SHMCTL:
 			err = do_sys32_shmctl(first, second, ptr);

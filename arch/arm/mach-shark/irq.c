@@ -61,9 +61,10 @@ static void shark_enable_8259A_irq(unsigned int irq)
 
 static void shark_ack_8259A_irq(unsigned int irq){}
 
-static void bogus_int(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t bogus_int(int irq, void *dev_id, struct pt_regs *regs)
 {
 	printk("Got interrupt %i!\n",irq);
+	return IRQ_NONE;
 }
 
 static struct irqaction cascade;
@@ -103,7 +104,6 @@ void __init shark_init_irq(void)
 
 	cascade.handler = bogus_int;
 	cascade.flags = 0;
-	cascade.mask = 0;
 	cascade.name = "cascade";
 	cascade.next = NULL;
 	cascade.dev_id = NULL;

@@ -91,7 +91,7 @@ typedef struct {
 #endif
 } spinlock_t;
 
-#define SPIN_LOCK_UNLOCKED	{ 0, }
+#define SPIN_LOCK_UNLOCKED	(spinlock_t) { 0 }
 
 #define spin_lock_init(lock)   (*((unsigned char *)(lock)) = 0)
 #define spin_is_locked(lock)    (*((volatile unsigned char *)(lock)) != 0)

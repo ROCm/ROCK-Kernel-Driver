@@ -847,6 +847,9 @@ void fc_release_transport(struct scsi_transport_template *t)
 {
 	struct fc_internal *i = to_fc_internal(t);
 
+	attribute_container_unregister(&i->t.target_attrs);
+	attribute_container_unregister(&i->t.host_attrs);
+
 	kfree(i);
 }
 EXPORT_SYMBOL(fc_release_transport);

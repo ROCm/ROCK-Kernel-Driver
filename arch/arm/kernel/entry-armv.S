@@ -379,8 +379,6 @@ __und_usr:
 	.previous
 
 /*
- * r0 = instruction.
- *
  * Check whether the instruction is a co-processor instruction.
  * If yes, we need to call the relevant co-processor handler.
  *
@@ -391,8 +389,9 @@ __und_usr:
  * for the ARM6/ARM7 SWI bug.
  *
  * Emulators may wish to make use of the following registers:
- *  r0  - instruction opcode.
- *  r10 - this threads thread_info structure.
+ *  r0  = instruction opcode.
+ *  r2  = PC+4
+ *  r10 = this threads thread_info structure.
  */
 call_fpe:
 	tst	r0, #0x08000000			@ only CDP/CPRT/LDC/STC have bit 27
@@ -447,7 +446,7 @@ do_fpe:
 /*
  * The FP module is called with these registers set:
  *  r0  = instruction
- *  r5  = PC
+ *  r2  = PC+4
  *  r9  = normal "successful" return address
  *  r10 = FP workspace
  *  lr  = unrecognised FP instruction return address

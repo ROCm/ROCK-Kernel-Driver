@@ -52,7 +52,15 @@
 #define GPIO_C_VIRT		(GPIO_VIRT(2))
 #define GPIO_D_VIRT		(GPIO_VIRT(3))
 #define GPIO_E_VIRT		(GPIO_VIRT(4))
-#define GPIO_AMULSEL		(GPIO_VIRT + 0xA4)
+#define GPIO_AMULSEL		(GPIO_VIRT(0) + 0xA4)
+
+#define AMULSEL_USIN2	(1<<5)
+#define AMULSEL_USOUT2	(1<<6)
+#define AMULSEL_USIN3	(1<<13)
+#define AMULSEL_USOUT3	(1<<14)
+#define AMULSEL_IRDIN	(1<<15)
+#define AMULSEL_IRDOUT	(1<<7)
+
 /* Register offsets general purpose I/O */
 #define GPIO_DATA		0x00
 #define GPIO_DIR		0x04
@@ -162,14 +170,16 @@
 #define LCD_PALETTE_BASE 	(IO_VIRT + 0x10400)
 
 /* Serial ports */
-#define SERIAL0_VIRT 		(IO_VIRT + 0x20000)
-#define SERIAL1_VIRT 		(IO_VIRT + 0x21000)
+#define SERIAL0_OFS		0x20000
+#define SERIAL0_VIRT 		(IO_VIRT + SERIAL0_OFS)
+#define SERIAL0_BASE		(IO_PHYS + SERIAL0_OFS)
 
-#define SERIAL0_BASE		SERIAL0_VIRT
-#define SERIAL1_BASE		SERIAL1_VIRT
-#define SERIAL2_BASE		SERIAL2_VIRT
-#define SERIAL3_BASE		SERIAL3_VIRT
+#define SERIAL1_OFS		0x21000
+#define SERIAL1_VIRT 		(IO_VIRT + SERIAL1_OFS)
+#define SERIAL1_BASE		(IO_PHYS + SERIAL1_OFS)
 
+#define SERIAL_ENABLE		0x30
+#define SERIAL_ENABLE_EN	(1<<0)
 
 /* General defines to pacify gcc */
 #define PCIO_BASE 		(0)	/* for inb, outb and friends */

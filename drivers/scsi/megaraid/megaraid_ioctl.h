@@ -291,5 +291,6 @@ typedef struct mraid_mmadp {
 
 int mraid_mm_register_adp(mraid_mmadp_t *);
 int mraid_mm_unregister_adp(uint32_t);
+uint32_t mraid_mm_adapter_app_handle(uint32_t);
 
 #endif /* _MEGARAID_IOCTL_H_ */

@@ -356,6 +356,10 @@ EXPORT_SYMBOL(iscsi_attach_transport);
 void iscsi_release_transport(struct scsi_transport_template *t)
 {
 	struct iscsi_internal *i = to_iscsi_internal(t);
+
+	attribute_container_unregister(&i->t.target_attrs);
+	attribute_container_unregister(&i->t.host_attrs);
+
 	kfree(i);
 }
 

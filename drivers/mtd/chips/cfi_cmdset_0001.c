@@ -36,10 +36,7 @@
 #include <linux/mtd/cfi.h>
 
 /* #define CMDSET0001_DISABLE_ERASE_SUSPEND_ON_WRITE */
-
-#ifdef CONFIG_MTD_XIP
-#define CMDSET0001_DISABLE_WRITE_SUSPEND
-#endif
+/* #define CMDSET0001_DISABLE_WRITE_SUSPEND */
 
 // debugging, turns off buffer write mode if set to 1
 #define FORCE_WORD_WRITE 0
@@ -152,7 +149,6 @@ static void fixup_intel_strataflash(struct mtd_info *mtd, void* param)
 #endif
 
 #ifdef CMDSET0001_DISABLE_WRITE_SUSPEND
-/* The XIP config appears to have problems using write suspend at the moment */ 
 static void fixup_no_write_suspend(struct mtd_info *mtd, void* param)
 {
 	struct map_info *map = mtd->priv;
@@ -733,7 +729,7 @@ static void put_chip(struct map_info *map, struct flchip *chip, unsigned long ad
 	if (chip->priv) {
 		struct flchip_shared *shared = chip->priv;
 		spin_lock(&shared->lock);
-		if (shared->writing == chip) {
+		if (shared->writing == chip && chip->oldstate == FL_READY) {
 			/* We own the ability to write, but we're done */
 			shared->writing = shared->erasing;
 			if (shared->writing && shared->writing != chip) {
@@ -745,17 +741,24 @@ static void put_chip(struct map_info *map, struct flchip *chip, unsigned long ad
 				put_chip(map, loaner, loaner->start);
 				spin_lock(chip->mutex);
 				spin_unlock(loaner->mutex);
-			} else {
-				if (chip->oldstate != FL_ERASING) {
-					shared->erasing = NULL;
-					if (chip->oldstate != FL_WRITING)
-						shared->writing = NULL;
-				}
-				spin_unlock(&shared->lock);
+				wake_up(&chip->wq);
+				return;
 			}
-		} else {
+			shared->erasing = NULL;
+			shared->writing = NULL;
+		} else if (shared->erasing == chip && shared->writing != chip) {
+			/*
+			 * We own the ability to erase without the ability
+			 * to write, which means the erase was suspended
+			 * and some other partition is currently writing.
+			 * Don't let the switch below mess things up since
+			 * we don't have ownership to resume anything.
+			 */
 			spin_unlock(&shared->lock);
+			wake_up(&chip->wq);
+			return;
 		}
+		spin_unlock(&shared->lock);
 	}
 
 	switch(chip->oldstate) {

@@ -70,7 +70,7 @@ static int __init init_driverfs(void)
 }
 
 
-static void __exit exit_driverfs(void)
+static void exit_driverfs(void)
 {
 	sysdev_unregister(&device_oprofile);
 	sysdev_class_unregister(&oprofile_sysclass);
@@ -420,7 +420,7 @@ int __init nmi_init(struct oprofile_operations *ops)
 }
 
 
-void __exit nmi_exit(void)
+void nmi_exit(void)
 {
 	if (using_nmi)
 		exit_driverfs();

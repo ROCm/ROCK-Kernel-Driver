@@ -29,9 +29,10 @@
 #include "megaraid_ioctl.h"
 
 
-#define LSI_COMMON_MOD_VERSION	"2.20.2.3"
+#define LSI_COMMON_MOD_VERSION	"2.20.2.5"
 #define LSI_COMMON_MOD_EXT_VERSION	\
-		"(Release Date: Thu Dec  9 19:02:14 EST 2004)"
+		"(Release Date: Fri Jan 21 00:01:03 EST 2005)"
+
 
 #define LSI_DBGLVL			dbglevel
 

@@ -10,7 +10,7 @@
  *	   2 of the License, or (at your option) any later version.
  *
  * FILE		: megaraid_mm.c
- * Version	: v2.20.2.3 (Dec 09 2004)
+ * Version	: v2.20.2.5 (Jan 21 2005)
  *
  * Common management module
  */
@@ -58,6 +58,7 @@ MODULE_PARM_DESC(dlevel, "Debug level (default=0)");
 
 EXPORT_SYMBOL(mraid_mm_register_adp);
 EXPORT_SYMBOL(mraid_mm_unregister_adp);
+EXPORT_SYMBOL(mraid_mm_adapter_app_handle);
 
 static int majorno;
 static uint32_t drvr_ver	= 0x02200201;
@@ -65,7 +66,7 @@ static uint32_t drvr_ver	= 0x02200201;
 static int adapters_count_g;
 static struct list_head adapters_list_g;
 
-wait_queue_head_t wait_q;
+static wait_queue_head_t wait_q;
 
 static struct file_operations lsi_fops = {
 	.open	= mraid_mm_open,
@@ -1006,6 +1007,40 @@ memalloc_error:
 
 	return rval;
 }
+
+
+/**
+ * mraid_mm_adapter_app_handle - return the application handle for this adapter
+ *
+ * For the given driver data, locate the adadpter in our global list and
+ * return the corresponding handle, which is also used by applications to
+ * uniquely identify an adapter.
+ *
+ * @param unique_id : adapter unique identifier
+ *
+ * @return adapter handle if found in the list
+ * @return 0 if adapter could not be located, should never happen though
+ */
+uint32_t
+mraid_mm_adapter_app_handle(uint32_t unique_id)
+{
+	mraid_mmadp_t	*adapter;
+	mraid_mmadp_t	*tmp;
+	int		index = 0;
+
+	list_for_each_entry_safe(adapter, tmp, &adapters_list_g, list) {
+
+		if (adapter->unique_id == unique_id) {
+
+			return MKADAP(index);
+		}
+
+		index++;
+	}
+
+	return 0;
+}
+
 
 /**
  * mraid_mm_setup_dma_pools - Set up dma buffer pools per adapter

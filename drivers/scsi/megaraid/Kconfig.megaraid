@@ -59,6 +59,7 @@ config MEGARAID_MAILBOX
 	INTEL RAID Controller SRCU51L	1000:1960:8086:0520
 	FSC MegaRAID PCI Express ROMB	1000:0408:1734:1065
 	ACER MegaRAID ROMB-2E		1000:0408:1025:004D
+	NEC MegaRAID PCI Express ROMB	1000:0408:1033:8287
 
 	To compile this driver as a module, choose M here: the
 	module will be called megaraid_mbox
