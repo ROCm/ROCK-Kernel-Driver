@@ -189,7 +189,7 @@ struct pnp_device_id {
 	unsigned long driver_data;	/* data private to the driver */
 };
 
-struct pnp_card_id {
+struct pnp_card_device_id {
 	char id[7];
 	unsigned long driver_data;	/* data private to the driver */
 	struct {
@@ -216,9 +216,9 @@ struct pnp_driver {
 struct pnpc_driver {
 	struct list_head node;
 	char *name;
-	const struct pnp_card_id *id_table;
+	const struct pnp_card_device_id *id_table;
 	unsigned int flags;
-	int  (*probe)  (struct pnp_card *card, const struct pnp_card_id *card_id);
+	int  (*probe)  (struct pnp_card *card, const struct pnp_card_device_id *card_id);
 	void (*remove) (struct pnp_card *card);
 	struct device_driver driver;
 };
