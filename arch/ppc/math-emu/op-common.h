@@ -82,7 +82,6 @@ do {									\
 	if (X##_e <= _FP_WFRACBITS_##fs)			\
 	  {							\
 	    _FP_FRAC_SRS_##wc(X, X##_e, _FP_WFRACBITS_##fs);	\
-	    __ret |= _FP_ROUND(wc, X);				\
 	    _FP_FRAC_SLL_##wc(X, 1);				\
 	    if (_FP_FRAC_OVERP_##wc(fs, X))			\
 	      {							\
