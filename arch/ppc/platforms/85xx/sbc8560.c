@@ -73,16 +73,6 @@ struct ocp_gfar_data mpc85xx_tsec2_def = {
 	.phyregidx = 0,
 };
 
-struct ocp_gfar_data mpc85xx_fec_def = {
-	.interruptTransmit = MPC85xx_IRQ_FEC,
-	.interruptError = MPC85xx_IRQ_FEC,
-	.interruptReceive = MPC85xx_IRQ_FEC,
-	.interruptPHY = MPC85xx_IRQ_EXT5,
-	.flags = 0,
-	.phyid = 1,
-	.phyregidx = 0,
-};
-
 struct ocp_fs_i2c_data mpc85xx_i2c1_def = {
 	.flags = FS_I2C_SEPARATE_DFSRR,
 };
@@ -152,11 +142,9 @@ sbc8560_setup_arch(void)
 	/* setup PCI host bridges */
 	mpc85xx_setup_hose();
 #endif
-
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
 #endif
-
 #ifdef CONFIG_SERIAL_8250
 	sbc8560_early_serial_map();
 #endif
@@ -177,12 +165,6 @@ sbc8560_setup_arch(void)
 	if (def) {
 		einfo = (struct ocp_gfar_data *) def->additions;
 		memcpy(einfo->mac_addr, binfo->bi_enet1addr, 6);
-	}
-
-	def = ocp_get_one_device(OCP_VENDOR_FREESCALE, OCP_FUNC_GFAR, 2);
-	if (def) {
-		einfo = (struct ocp_gfar_data *) def->additions;
-		memcpy(einfo->mac_addr, binfo->bi_enet2addr, 6);
 	}
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -261,9 +243,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #if defined(CONFIG_SERIAL_8250) && defined(CONFIG_SERIAL_TEXT_DEBUG)
 	ppc_md.progress = gen550_progress;
 #endif	/* CONFIG_SERIAL_8250 && CONFIG_SERIAL_TEXT_DEBUG */
-	
+
 	if (ppc_md.progress)
 		ppc_md.progress("sbc8560_init(): exit", 0);
-
-	return;
 }

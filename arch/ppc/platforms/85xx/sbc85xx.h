@@ -21,8 +21,6 @@
 #include <linux/seq_file.h>
 #include <asm/ppcboot.h>
 
-struct pci_dev;
-
 #define BOARD_CCSRBAR		((uint)0xff700000)
 #define CCSRBAR_SIZE		((uint)1024*1024)
 
