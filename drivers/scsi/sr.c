@@ -250,7 +250,7 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	int block=0, this_count, s_size, timeout = SR_TIMEOUT;
 	Scsi_CD *cd = SCpnt->request->rq_disk->private_data;
 
-	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %s, block = %d\n", disk->disk_name, block));
+	SCSI_LOG_HLQUEUE(1, printk("Doing sr request, dev = %s, block = %d\n", cd->disk->disk_name, block));
 
 	if (!cd->device || !cd->device->online) {
 		SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", SCpnt->request->nr_sectors));

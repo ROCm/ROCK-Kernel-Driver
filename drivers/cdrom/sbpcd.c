@@ -470,8 +470,6 @@ MODULE_PARM(max_drives, "i");
 
 #define NUM_PROBE  (sizeof(sbpcd) / sizeof(int))
 
-static spinlock_t sbpcd_lock = SPIN_LOCK_UNLOCKED;
-
 /*==========================================================================*/
 
 #define INLINE inline
@@ -4869,13 +4867,12 @@ static void do_sbpcd_request(request_queue_t * q)
 		return;
 
 	req = elv_next_request(q);		/* take out our request so no other */
-
 	if (req -> sector == -1)
 		end_request(req, 0);
 	spin_unlock_irq(q->queue_lock);
 
 	down(&ioctl_read_sem);
-	if (rq_data_dir(CURRENT) != READ)
+	if (rq_data_dir(elv_next_request(q)) != READ)
 	{
 		msg(DBG_INF, "bad cmd %d\n", req->cmd[0]);
 		goto err_done;
@@ -5935,8 +5932,8 @@ static int sbpcd_media_changed(struct cdrom_device_info *cdi, int disc_nr)
         {
                 p->CD_changed=0;
                 msg(DBG_CHK,"medium changed (drive %s)\n", cdi->name);
-		invalidate_buffers(full_dev);
 		current_drive->diskstate_flags &= ~toc_bit;
+		/* we *don't* need invalidate here, it's done by caller */
 		current_drive->diskstate_flags &= ~cd_size_bit;
 #if SAFE_MIXED
 		current_drive->has_data=0;
