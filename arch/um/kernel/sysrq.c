@@ -25,12 +25,13 @@ void show_trace(unsigned long * stack)
 
         printk("Call Trace: \n");
         while (((long) stack & (THREAD_SIZE-1)) != 0) {
-                addr = *stack++;
+                addr = *stack;
 		if (__kernel_text_address(addr)) {
-			printk(" [<%08lx>]", addr);
+			printk("%08lx:  [<%08lx>]", (unsigned long) stack, addr);
 			print_symbol(" %s", addr);
 			printk("\n");
                 }
+                stack++;
         }
         printk("\n");
 }
