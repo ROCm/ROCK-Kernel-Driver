@@ -312,7 +312,7 @@ static int lookup_device(const char *path, dev_t *dev)
 	}
 
 	if (!S_ISBLK(inode->i_mode)) {
-		r = -EINVAL;
+		r = -ENOTBLK;
 		goto out;
 	}
 
@@ -356,7 +356,7 @@ static int open_dev(struct dm_dev *d, dev_t dev)
 		return -ENOMEM;
 
 	r = blkdev_get(d->bdev, d->mode, 0, BDEV_RAW);
-	if (!r)
+	if (r)
 		return r;
 
 	r = bd_claim(d->bdev, _claim_ptr);
@@ -388,7 +388,7 @@ static void close_dev(struct dm_dev *d)
 static int check_device_area(struct dm_dev *dd, sector_t start, sector_t len)
 {
 	sector_t dev_size;
-	dev_size = dd->bdev->bd_inode->i_size;
+	dev_size = dd->bdev->bd_inode->i_size >> SECTOR_SHIFT;
 	return ((start < dev_size) && (len <= (dev_size - start)));
 }
 

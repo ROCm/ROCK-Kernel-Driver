@@ -18,8 +18,7 @@
 #define HP_ZX1_SBA_IOMMU_COOKIE	0x0000badbadc0ffeeUL
 
 #define HP_ZX1_PDIR_VALID_BIT	0x8000000000000000UL
-#define HP_ZX1_IOVA_TO_PDIR(va)	((va - hp_private.iova_base) >> \
-					hp_private.io_tlb_shift)
+#define HP_ZX1_IOVA_TO_PDIR(va)	((va - hp_private.iova_base) >> hp_private.io_tlb_shift)
 
 static struct aper_size_info_fixed hp_zx1_sizes[] =
 {
@@ -330,12 +329,7 @@ static unsigned long hp_zx1_mask_memory(unsigned long addr, int type)
 	return HP_ZX1_PDIR_VALID_BIT | addr;
 }
 
-static unsigned long hp_zx1_unmask_memory(unsigned long addr)
-{
-	return addr & ~(HP_ZX1_PDIR_VALID_BIT);
-}
-
-int __init hp_zx1_setup (struct pci_dev *pdev)
+int __init hp_zx1_setup (struct pci_dev *pdev __attribute__((unused)))
 {
 	agp_bridge.masks = hp_zx1_masks;
 	agp_bridge.num_of_masks = 1;
@@ -347,7 +341,6 @@ int __init hp_zx1_setup (struct pci_dev *pdev)
 	agp_bridge.cleanup = hp_zx1_cleanup;
 	agp_bridge.tlb_flush = hp_zx1_tlbflush;
 	agp_bridge.mask_memory = hp_zx1_mask_memory;
-	agp_bridge.unmask_memory = hp_zx1_unmask_memory;
 	agp_bridge.agp_enable = agp_generic_agp_enable;
 	agp_bridge.cache_flush = global_cache_flush;
 	agp_bridge.create_gatt_table = hp_zx1_create_gatt_table;
@@ -375,8 +368,6 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 		return hp_zx1_setup(dev);
 	}
 	return -ENODEV;
-}
-
 
 static int agp_hp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {

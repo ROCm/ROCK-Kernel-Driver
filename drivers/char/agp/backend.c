@@ -36,8 +36,11 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-#define AGPGART_VERSION_MAJOR 1
-#define AGPGART_VERSION_MINOR 0
+/* Due to XFree86 brain-damage, we can't go to 1.0 until they
+ * fix some real stupidity. It's only by chance we can bump
+ * past 0.99 at all due to some boolean logic error. */
+#define AGPGART_VERSION_MAJOR 0
+#define AGPGART_VERSION_MINOR 100
 
 struct agp_bridge_data agp_bridge = { .type = NOT_SUPPORTED };
 
@@ -258,7 +261,7 @@ int agp_register_driver (struct pci_dev *dev)
 	return 0;
 }
 
-int __exit agp_unregister_driver(void)
+int agp_unregister_driver(void)
 {
 	agp_bridge.type = NOT_SUPPORTED;
 	pm_unregister_all(agp_power);
@@ -269,8 +272,23 @@ int __exit agp_unregister_driver(void)
 	return 0;
 }
 
+int __exit agp_exit(void)
+{
+	if (agp_count==0)
+		return -EBUSY;
+
+	return 0;
+}
+
 int __init agp_init(void)
 {
+	static int already_initialised=0;
+
+	if (already_initialised!=0)
+		return 0;
+
+	already_initialised = 1;
+
 	memset(&agp_bridge, 0, sizeof(struct agp_bridge_data));
 	agp_bridge.type = NOT_SUPPORTED;
 
@@ -281,11 +299,13 @@ int __init agp_init(void)
 
 #ifndef CONFIG_GART_IOMMU
 module_init(agp_init);
+module_exit(agp_exit);
 #endif
 
 EXPORT_SYMBOL(agp_backend_acquire);
 EXPORT_SYMBOL(agp_backend_release);
 EXPORT_SYMBOL_GPL(agp_register_driver);
+EXPORT_SYMBOL_GPL(agp_unregister_driver);
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_LICENSE("GPL and additional rights");

@@ -1,47 +1,95 @@
 /*
- * FIXME: Nothing ever calls this stuff!
+ * For documentation on the i460 AGP interface, see Chapter 7 (AGP Subsystem) of
+ * the "Intel 460GTX Chipset Software Developer's Manual":
+ * http://developer.intel.com/design/itanium/downloads/24870401s.htm
  */
-
+/*
+ * 460GX support by Chris Ahna <christopher.j.ahna@intel.com>
+ * Clean up & simplification by David Mosberger-Tang <davidm@hpl.hp.com>
+ */
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/agp_backend.h>
+
 #include "agp.h"
 
-/* BIOS configures the chipset so that one of two apbase registers are used */
-static u8 intel_i460_dynamic_apbase = 0x10;
+/*
+ * The i460 can operate with large (4MB) pages, but there is no sane way to support this
+ * within the current kernel/DRM environment, so we disable the relevant code for now.
+ * See also comments in ia64_alloc_page()...
+ */
+#define I460_LARGE_IO_PAGES		0
 
-/* 460 supports multiple GART page sizes, so GART pageshift is dynamic */
-static u8 intel_i460_pageshift = 12;
-static u32 intel_i460_pagesize;
+#if I460_LARGE_IO_PAGES
+# define I460_IO_PAGE_SHIFT		i460.io_page_shift
+#else
+# define I460_IO_PAGE_SHIFT		12
+#endif
 
-/* Keep track of which is larger, chipset or kernel page size. */
-static u32 intel_i460_cpk = 1;
-
-/* Structure for tracking partial use of 4MB GART pages */
-static u32 **i460_pg_detail = NULL;
-static u32 *i460_pg_count = NULL;
-
-#define I460_CPAGES_PER_KPAGE (PAGE_SIZE >> intel_i460_pageshift)
-#define I460_KPAGES_PER_CPAGE ((1 << intel_i460_pageshift) >> PAGE_SHIFT)
-
+#define I460_IOPAGES_PER_KPAGE		(PAGE_SIZE >> I460_IO_PAGE_SHIFT)
+#define I460_KPAGES_PER_IOPAGE		(1 << (I460_IO_PAGE_SHIFT - PAGE_SHIFT))
 #define I460_SRAM_IO_DISABLE		(1 << 4)
 #define I460_BAPBASE_ENABLE		(1 << 3)
 #define I460_AGPSIZ_MASK		0x7
 #define I460_4M_PS			(1 << 1)
 
-#define log2(x)				ffz(~(x))
+/* Control bits for Out-Of-GART coherency and Burst Write Combining */
+#define I460_GXBCTL_OOG		(1UL << 0)
+#define I460_GXBCTL_BWC		(1UL << 2)
 
-static inline void intel_i460_read_back (volatile u32 *entry)
+/*
+ * gatt_table entries are 32-bits wide on the i460; the generic code ought to declare the
+ * gatt_table and gatt_table_real pointers a "void *"...
+ */
+#define RD_GATT(index)		readl((u32 *) i460.gatt + (index))
+#define WR_GATT(index, val)	writel((val), (u32 *) i460.gatt + (index))
+/*
+ * The 460 spec says we have to read the last location written to make sure that all
+ * writes have taken effect
+ */
+#define WR_FLUSH_GATT(index)	RD_GATT(index)
+
+#define log2(x)			ffz(~(x))
+
+static struct {
+	void *gatt;				/* ioremap'd GATT area */
+
+	/* i460 supports multiple GART page sizes, so GART pageshift is dynamic: */
+	u8 io_page_shift;
+
+	/* BIOS configures chipset to one of 2 possible apbase values: */
+	u8 dynamic_apbase;
+
+	/* structure for tracking partial use of 4MB GART pages: */
+	struct lp_desc {
+		unsigned long *alloced_map;	/* bitmap of kernel-pages in use */
+		int refcount;			/* number of kernel pages using the large page */
+		u64 paddr;			/* physical address of large page */
+	} *lp_desc;
+} i460;
+
+static const struct aper_size_info_8 i460_sizes[3] =
 {
 	/*
-	 * The 460 spec says we have to read the last location written to
-	 * make sure that all writes have taken effect
+	 * The 32GB aperture is only available with a 4M GART page size.  Due to the
+	 * dynamic GART page size, we can't figure out page_order or num_entries until
+	 * runtime.
 	 */
-	*entry;
-}
+	{32768, 0, 0, 4},
+	{1024, 0, 0, 2},
+	{256, 0, 0, 1}
+};
 
-static int intel_i460_fetch_size(void)
+static struct gatt_mask i460_masks[] =
+{
+	{
+	  .mask = INTEL_I460_GATT_VALID | INTEL_I460_GATT_COHERENT,
+	  .type = 0
+	}
+};
+
+static int i460_fetch_size (void)
 {
 	int i;
 	u8 temp;
@@ -49,8 +97,15 @@ static int intel_i460_fetch_size(void)
 
 	/* Determine the GART page size */
 	pci_read_config_byte(agp_bridge.dev, INTEL_I460_GXBCTL, &temp);
-	intel_i460_pageshift = (temp & I460_4M_PS) ? 22 : 12;
-	intel_i460_pagesize = 1UL << intel_i460_pageshift;
+	i460.io_page_shift = (temp & I460_4M_PS) ? 22 : 12;
+	pr_debug("i460_fetch_size: io_page_shift=%d\n", i460.io_page_shift);
+
+	if (i460.io_page_shift != I460_IO_PAGE_SHIFT) {
+		printk(KERN_ERR PFX
+		       "I/O (GART) page-size %ZuKB doesn't match expected size %ZuKB\n",
+		       1UL << (i460.io_page_shift - 10), 1UL << (I460_IO_PAGE_SHIFT));
+		return 0;
+	}
 
 	values = A_SIZE_8(agp_bridge.aperture_sizes);
 
@@ -64,16 +119,16 @@ static int intel_i460_fetch_size(void)
 	}
 
 	/* Make sure we don't try to create an 2 ^ 23 entry GATT */
-	if ((intel_i460_pageshift == 0) && ((temp & I460_AGPSIZ_MASK) == 4)) {
+	if ((i460.io_page_shift == 0) && ((temp & I460_AGPSIZ_MASK) == 4)) {
 		printk(KERN_ERR PFX "We can't have a 32GB aperture with 4KB GART pages\n");
 		return 0;
 	}
 
 	/* Determine the proper APBASE register */
 	if (temp & I460_BAPBASE_ENABLE)
-		intel_i460_dynamic_apbase = INTEL_I460_BAPBASE;
+		i460.dynamic_apbase = INTEL_I460_BAPBASE;
 	else
-		intel_i460_dynamic_apbase = INTEL_I460_APBASE;
+		i460.dynamic_apbase = INTEL_I460_APBASE;
 
 	for (i = 0; i < agp_bridge.num_aperture_sizes; i++) {
 		/*
@@ -81,7 +136,7 @@ static int intel_i460_fetch_size(void)
 		 * the define aperture sizes. Take care not to shift off the end of
 		 * values[i].size.
 		 */
-		values[i].num_entries = (values[i].size << 8) >> (intel_i460_pageshift - 12);
+		values[i].num_entries = (values[i].size << 8) >> (I460_IO_PAGE_SHIFT - 12);
 		values[i].page_order = log2((sizeof(u32)*values[i].num_entries) >> PAGE_SHIFT);
 	}
 
@@ -98,7 +153,7 @@ static int intel_i460_fetch_size(void)
 }
 
 /* There isn't anything to do here since 460 has no GART TLB. */
-static void intel_i460_tlb_flush(agp_memory * mem)
+static void i460_tlb_flush (agp_memory * mem)
 {
 	return;
 }
@@ -107,7 +162,7 @@ static void intel_i460_tlb_flush(agp_memory * mem)
  * This utility function is needed to prevent corruption of the control bits
  * which are stored along with the aperture size in 460's AGPSIZ register
  */
-static void intel_i460_write_agpsiz(u8 size_value)
+static void i460_write_agpsiz (u8 size_value)
 {
 	u8 temp;
 
@@ -116,47 +171,39 @@ static void intel_i460_write_agpsiz(u8 size_value)
 			      ((temp & ~I460_AGPSIZ_MASK) | size_value));
 }
 
-static void intel_i460_cleanup(void)
+static void i460_cleanup (void)
 {
 	struct aper_size_info_8 *previous_size;
 
 	previous_size = A_SIZE_8(agp_bridge.previous_size);
-	intel_i460_write_agpsiz(previous_size->size_value);
+	i460_write_agpsiz(previous_size->size_value);
 
-	if (intel_i460_cpk == 0) {
-		vfree(i460_pg_detail);
-		vfree(i460_pg_count);
-	}
+	if (I460_IO_PAGE_SHIFT > PAGE_SHIFT)
+		kfree(i460.lp_desc);
 }
 
-
-/* Control bits for Out-Of-GART coherency and Burst Write Combining */
-#define I460_GXBCTL_OOG		(1UL << 0)
-#define I460_GXBCTL_BWC		(1UL << 2)
-
-static int intel_i460_configure(void)
+static int i460_configure (void)
 {
 	union {
 		u32 small[2];
 		u64 large;
 	} temp;
+	size_t size;
 	u8 scratch;
-	int i;
-
 	struct aper_size_info_8 *current_size;
 
 	temp.large = 0;
 
 	current_size = A_SIZE_8(agp_bridge.current_size);
-	intel_i460_write_agpsiz(current_size->size_value);
+	i460_write_agpsiz(current_size->size_value);
 
 	/*
 	 * Do the necessary rigmarole to read all eight bytes of APBASE.
 	 * This has to be done since the AGP aperture can be above 4GB on
 	 * 460 based systems.
 	 */
-	pci_read_config_dword(agp_bridge.dev, intel_i460_dynamic_apbase, &(temp.small[0]));
-	pci_read_config_dword(agp_bridge.dev, intel_i460_dynamic_apbase + 4, &(temp.small[1]));
+	pci_read_config_dword(agp_bridge.dev, i460.dynamic_apbase, &(temp.small[0]));
+	pci_read_config_dword(agp_bridge.dev, i460.dynamic_apbase + 4, &(temp.small[1]));
 
 	/* Clear BAR control bits */
 	agp_bridge.gart_bus_addr = temp.large & ~((1UL << 3) - 1);
@@ -166,403 +213,347 @@ static int intel_i460_configure(void)
 			      (scratch & 0x02) | I460_GXBCTL_OOG | I460_GXBCTL_BWC);
 
 	/*
-	 * Initialize partial allocation trackers if a GART page is bigger than
-	 * a kernel page.
+	 * Initialize partial allocation trackers if a GART page is bigger than a kernel
+	 * page.
 	 */
-	if (I460_CPAGES_PER_KPAGE >= 1) {
-		intel_i460_cpk = 1;
-	} else {
-		intel_i460_cpk = 0;
-
-		i460_pg_detail = vmalloc(sizeof(*i460_pg_detail) * current_size->num_entries);
-		i460_pg_count = vmalloc(sizeof(*i460_pg_count) * current_size->num_entries);
-
-		for (i = 0; i < current_size->num_entries; i++) {
-			i460_pg_count[i] = 0;
-			i460_pg_detail[i] = NULL;
-		}
+	if (I460_IO_PAGE_SHIFT > PAGE_SHIFT) {
+		size = current_size->num_entries * sizeof(i460.lp_desc[0]);
+		i460.lp_desc = kmalloc(size, GFP_KERNEL);
+		if (!i460.lp_desc)
+			return -ENOMEM;
+		memset(i460.lp_desc, 0, size);
 	}
 	return 0;
 }
 
-static int intel_i460_create_gatt_table(void)
+static int i460_create_gatt_table (void)
 {
-	char *table;
-	int i;
-	int page_order;
-	int num_entries;
+	int page_order, num_entries, i;
 	void *temp;
 
 	/*
-	 * Load up the fixed address of the GART SRAMS which hold our
-	 * GATT table.
+	 * Load up the fixed address of the GART SRAMS which hold our GATT table.
 	 */
-	table = (char *) __va(INTEL_I460_ATTBASE);
-
 	temp = agp_bridge.current_size;
 	page_order = A_SIZE_8(temp)->page_order;
 	num_entries = A_SIZE_8(temp)->num_entries;
 
-	agp_bridge.gatt_table_real = (u32 *) table;
-	agp_bridge.gatt_table = ioremap_nocache(virt_to_phys(table),
-						(PAGE_SIZE * (1 << page_order)));
-	agp_bridge.gatt_bus_addr = virt_to_phys(agp_bridge.gatt_table_real);
+	i460.gatt = ioremap(INTEL_I460_ATTBASE, PAGE_SIZE << page_order);
 
-	for (i = 0; i < num_entries; i++) {
-		agp_bridge.gatt_table[i] = 0;
-	}
+	/* These are no good, the should be removed from the agp_bridge strucure... */
+	agp_bridge.gatt_table_real = NULL;
+	agp_bridge.gatt_table = NULL;
+	agp_bridge.gatt_bus_addr = 0;
 
-	intel_i460_read_back(agp_bridge.gatt_table + i - 1);
+	for (i = 0; i < num_entries; ++i)
+		WR_GATT(i, 0);
+	WR_FLUSH_GATT(i - 1);
 	return 0;
 }
 
-static int intel_i460_free_gatt_table(void)
+static int i460_free_gatt_table (void)
 {
-	int num_entries;
-	int i;
+	int num_entries, i;
 	void *temp;
 
 	temp = agp_bridge.current_size;
 
 	num_entries = A_SIZE_8(temp)->num_entries;
 
-	for (i = 0; i < num_entries; i++) {
-		agp_bridge.gatt_table[i] = 0;
-	}
+	for (i = 0; i < num_entries; ++i)
+		WR_GATT(i, 0);
+	WR_FLUSH_GATT(num_entries - 1);
 
-	intel_i460_read_back(agp_bridge.gatt_table + i - 1);
-
-	iounmap(agp_bridge.gatt_table);
+	iounmap(i460.gatt);
 	return 0;
 }
 
-/* These functions are called when PAGE_SIZE exceeds the GART page size */
+/*
+ * The following functions are called when the I/O (GART) page size is smaller than
+ * PAGE_SIZE.
+ */
 
-static int intel_i460_insert_memory_cpk(agp_memory * mem, off_t pg_start, int type)
+static int i460_insert_memory_small_io_page (agp_memory *mem, off_t pg_start, int type)
 {
+	unsigned long paddr, io_pg_start, io_page_size;
 	int i, j, k, num_entries;
 	void *temp;
-	unsigned long paddr;
 
-	/*
-	 * The rest of the kernel will compute page offsets in terms of
-	 * PAGE_SIZE.
-	 */
-	pg_start = I460_CPAGES_PER_KPAGE * pg_start;
+	pr_debug("i460_insert_memory_small_io_page(mem=%p, pg_start=%ld, type=%d, paddr0=0x%lx)\n",
+		 mem, pg_start, type, mem->memory[0]);
+
+	io_pg_start = I460_IOPAGES_PER_KPAGE * pg_start;
 
 	temp = agp_bridge.current_size;
 	num_entries = A_SIZE_8(temp)->num_entries;
 
-	if ((pg_start + I460_CPAGES_PER_KPAGE * mem->page_count) > num_entries) {
+	if ((io_pg_start + I460_IOPAGES_PER_KPAGE * mem->page_count) > num_entries) {
 		printk(KERN_ERR PFX "Looks like we're out of AGP memory\n");
 		return -EINVAL;
 	}
 
-	j = pg_start;
-	while (j < (pg_start + I460_CPAGES_PER_KPAGE * mem->page_count)) {
-		if (!PGE_EMPTY(agp_bridge.gatt_table[j])) {
+	j = io_pg_start;
+	while (j < (io_pg_start + I460_IOPAGES_PER_KPAGE * mem->page_count)) {
+		if (!PGE_EMPTY(RD_GATT(j))) {
+			pr_debug("i460_insert_memory_small_io_page: GATT[%d]=0x%x is busy\n",
+				 j, RD_GATT(j));
 			return -EBUSY;
 		}
 		j++;
 	}
 
-#if 0
-	/* not necessary since 460 GART is operated in coherent mode... */
-	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
-		mem->is_flushed = TRUE;
-	}
-#endif
-
-	for (i = 0, j = pg_start; i < mem->page_count; i++) {
+	io_page_size = 1UL << I460_IO_PAGE_SHIFT;
+	for (i = 0, j = io_pg_start; i < mem->page_count; i++) {
 		paddr = mem->memory[i];
-		for (k = 0; k < I460_CPAGES_PER_KPAGE; k++, j++, paddr += intel_i460_pagesize)
-			agp_bridge.gatt_table[j] = (u32) agp_bridge.mask_memory(paddr, mem->type);
+		for (k = 0; k < I460_IOPAGES_PER_KPAGE; k++, j++, paddr += io_page_size)
+			WR_GATT(j, agp_bridge.mask_memory(paddr, mem->type));
 	}
-
-	intel_i460_read_back(agp_bridge.gatt_table + j - 1);
+	WR_FLUSH_GATT(j - 1);
 	return 0;
 }
 
-static int intel_i460_remove_memory_cpk(agp_memory * mem, off_t pg_start, int type)
+static int i460_remove_memory_small_io_page(agp_memory * mem, off_t pg_start, int type)
 {
 	int i;
 
-	pg_start = I460_CPAGES_PER_KPAGE * pg_start;
+	pr_debug("i460_remove_memory_small_io_page(mem=%p, pg_start=%ld, type=%d)\n",
+		 mem, pg_start, type);
 
-	for (i = pg_start; i < (pg_start + I460_CPAGES_PER_KPAGE * mem->page_count); i++)
-		agp_bridge.gatt_table[i] = 0;
+	pg_start = I460_IOPAGES_PER_KPAGE * pg_start;
 
-	intel_i460_read_back(agp_bridge.gatt_table + i - 1);
+	for (i = pg_start; i < (pg_start + I460_IOPAGES_PER_KPAGE * mem->page_count); i++)
+		WR_GATT(i, 0);
+	WR_FLUSH_GATT(i - 1);
 	return 0;
 }
+
+#if I460_LARGE_IO_PAGES
 
 /*
- * These functions are called when the GART page size exceeds PAGE_SIZE.
+ * These functions are called when the I/O (GART) page size exceeds PAGE_SIZE.
  *
- * This situation is interesting since AGP memory allocations that are
- * smaller than a single GART page are possible.  The structures i460_pg_count
- * and i460_pg_detail track partial allocation of the large GART pages to
- * work around this issue.
+ * This situation is interesting since AGP memory allocations that are smaller than a
+ * single GART page are possible.  The i460.lp_desc array tracks partial allocation of the
+ * large GART pages to work around this issue.
  *
- * i460_pg_count[pg_num] tracks the number of kernel pages in use within
- * GART page pg_num.  i460_pg_detail[pg_num] is an array containing a
- * psuedo-GART entry for each of the aforementioned kernel pages.  The whole
- * of i460_pg_detail is equivalent to a giant GATT with page size equal to
- * that of the kernel.
+ * i460.lp_desc[pg_num].refcount tracks the number of kernel pages in use within GART page
+ * pg_num.  i460.lp_desc[pg_num].paddr is the physical address of the large page and
+ * i460.lp_desc[pg_num].alloced_map is a bitmap of kernel pages that are in use (allocated).
  */
 
-static void *intel_i460_alloc_large_page(int pg_num)
+static int i460_alloc_large_page (struct lp_desc *lp)
 {
-	int i;
-	void *bp, *bp_end;
-	struct page *page;
+	unsigned long order = I460_IO_PAGE_SHIFT - PAGE_SHIFT;
+	size_t map_size;
+	void *lpage;
 
-	i460_pg_detail[pg_num] = (void *) vmalloc(sizeof(u32) * I460_KPAGES_PER_CPAGE);
-	if (i460_pg_detail[pg_num] == NULL) {
-		printk(KERN_ERR PFX "Out of memory, we're in trouble...\n");
-		return NULL;
-	}
-
-	for (i = 0; i < I460_KPAGES_PER_CPAGE; i++)
-		i460_pg_detail[pg_num][i] = 0;
-
-	bp = (void *) __get_free_pages(GFP_KERNEL, intel_i460_pageshift - PAGE_SHIFT);
-	if (bp == NULL) {
+	lpage = (void *) __get_free_pages(GFP_KERNEL, order);
+	if (!lpage) {
 		printk(KERN_ERR PFX "Couldn't alloc 4M GART page...\n");
-		return NULL;
+		return -ENOMEM;
 	}
 
-	bp_end = bp + ((PAGE_SIZE * (1 << (intel_i460_pageshift - PAGE_SHIFT))) - 1);
-
-	for (page = virt_to_page(bp); page <= virt_to_page(bp_end); page++) {
-		atomic_inc(&agp_bridge.current_memory_agp);
+	map_size = ((I460_KPAGES_PER_IOPAGE + BITS_PER_LONG - 1) & -BITS_PER_LONG)/8;
+	lp->alloced_map = kmalloc(map_size, GFP_KERNEL);
+	if (!lp->alloced_map) {
+		free_pages((unsigned long) lpage, order);
+		printk(KERN_ERR PFX "Out of memory, we're in trouble...\n");
+		return -ENOMEM;
 	}
-	return bp;
+	memset(lp->alloced_map, 0, map_size);
+
+	lp->paddr = virt_to_phys(lpage);
+	lp->refcount = 0;
+	atomic_add(I460_KPAGES_PER_IOPAGE, &agp_bridge.current_memory_agp);
+	return 0;
 }
 
-static void intel_i460_free_large_page(int pg_num, unsigned long addr)
+static void i460_free_large_page (struct lp_desc *lp)
 {
-	struct page *page;
-	void *bp, *bp_end;
+	kfree(lp->alloced_map);
+	lp->alloced_map = NULL;
 
-	bp = (void *) __va(addr);
-	bp_end = bp + (PAGE_SIZE * (1 << (intel_i460_pageshift - PAGE_SHIFT)));
-
-	vfree(i460_pg_detail[pg_num]);
-	i460_pg_detail[pg_num] = NULL;
-
-	for (page = virt_to_page(bp); page < virt_to_page(bp_end); page++) {
-		atomic_dec(&agp_bridge.current_memory_agp);
-	}
-
-	free_pages((unsigned long) bp, intel_i460_pageshift - PAGE_SHIFT);
+	free_pages((unsigned long) phys_to_virt(lp->paddr), I460_IO_PAGE_SHIFT - PAGE_SHIFT);
+	atomic_sub(I460_KPAGES_PER_IOPAGE, &agp_bridge.current_memory_agp);
 }
 
-static int intel_i460_insert_memory_kpc(agp_memory * mem, off_t pg_start, int type)
+static int i460_insert_memory_large_io_page (agp_memory * mem, off_t pg_start, int type)
 {
-	int i, pg, start_pg, end_pg, start_offset, end_offset, idx;
-	int num_entries;
+	int i, start_offset, end_offset, idx, pg, num_entries;
+	struct lp_desc *start, *end, *lp;
 	void *temp;
-	unsigned long paddr;
 
 	temp = agp_bridge.current_size;
 	num_entries = A_SIZE_8(temp)->num_entries;
 
 	/* Figure out what pg_start means in terms of our large GART pages */
-	start_pg 	= pg_start / I460_KPAGES_PER_CPAGE;
-	start_offset 	= pg_start % I460_KPAGES_PER_CPAGE;
-	end_pg 		= (pg_start + mem->page_count - 1) / I460_KPAGES_PER_CPAGE;
-	end_offset 	= (pg_start + mem->page_count - 1) % I460_KPAGES_PER_CPAGE;
+	start	 	= &i460.lp_desc[pg_start / I460_KPAGES_PER_IOPAGE];
+	end 		= &i460.lp_desc[(pg_start + mem->page_count - 1) / I460_KPAGES_PER_IOPAGE];
+	start_offset 	= pg_start % I460_KPAGES_PER_IOPAGE;
+	end_offset 	= (pg_start + mem->page_count - 1) % I460_KPAGES_PER_IOPAGE;
 
-	if (end_pg > num_entries) {
+	if (end > i460.lp_desc + num_entries) {
 		printk(KERN_ERR PFX "Looks like we're out of AGP memory\n");
 		return -EINVAL;
 	}
 
 	/* Check if the requested region of the aperture is free */
-	for (pg = start_pg; pg <= end_pg; pg++) {
-		/* Allocate new GART pages if necessary */
-		if (i460_pg_detail[pg] == NULL) {
-			temp = intel_i460_alloc_large_page(pg);
-			if (temp == NULL)
-				return -ENOMEM;
-			agp_bridge.gatt_table[pg] = agp_bridge.mask_memory((unsigned long) temp,
-									   0);
-			intel_i460_read_back(agp_bridge.gatt_table + pg);
-		}
+	for (lp = start; lp <= end; ++lp) {
+		if (!lp->alloced_map)
+			continue;	/* OK, the entire large page is available... */
 
-		for (idx = ((pg == start_pg) ? start_offset : 0);
-		     idx < ((pg == end_pg) ? (end_offset + 1) : I460_KPAGES_PER_CPAGE);
+		for (idx = ((lp == start) ? start_offset : 0);
+		     idx < ((lp == end) ? (end_offset + 1) : I460_KPAGES_PER_IOPAGE);
 		     idx++)
 		{
-			if (i460_pg_detail[pg][idx] != 0)
+			if (test_bit(idx, lp->alloced_map))
 				return -EBUSY;
 		}
 	}
 
-#if 0
-	/* not necessary since 460 GART is operated in coherent mode... */
-	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
-		mem->is_flushed = TRUE;
-	}
-#endif
+	for (lp = start, i = 0; lp <= end; ++lp) {
+		if (!lp->alloced_map) {
+			/* Allocate new GART pages... */
+			if (i460_alloc_large_page(lp) < 0)
+				return -ENOMEM;
+			pg = lp - i460.lp_desc;
+			WR_GATT(pg, agp_bridge.mask_memory(lp->paddr, 0));
+			WR_FLUSH_GATT(pg);
+		}
 
-	for (pg = start_pg, i = 0; pg <= end_pg; pg++) {
-		paddr = agp_bridge.unmask_memory(agp_bridge.gatt_table[pg]);
-		for (idx = ((pg == start_pg) ? start_offset : 0);
-		     idx < ((pg == end_pg) ? (end_offset + 1) : I460_KPAGES_PER_CPAGE);
+		for (idx = ((lp == start) ? start_offset : 0);
+		     idx < ((lp == end) ? (end_offset + 1) : I460_KPAGES_PER_IOPAGE);
 		     idx++, i++)
 		{
-			mem->memory[i] = paddr + (idx * PAGE_SIZE);
-			i460_pg_detail[pg][idx] = agp_bridge.mask_memory(mem->memory[i],
-									 mem->type);
-			i460_pg_count[pg]++;
+			mem->memory[i] = lp->paddr + idx*PAGE_SIZE;
+			__set_bit(idx, lp->alloced_map);
+			++lp->refcount;
 		}
 	}
-
 	return 0;
 }
 
-static int intel_i460_remove_memory_kpc(agp_memory * mem, off_t pg_start, int type)
+static int i460_remove_memory_large_io_page (agp_memory * mem, off_t pg_start, int type)
 {
-	int i, pg, start_pg, end_pg, start_offset, end_offset, idx;
-	int num_entries;
+	int i, pg, start_offset, end_offset, idx, num_entries;
+	struct lp_desc *start, *end, *lp;
 	void *temp;
-	unsigned long paddr;
 
 	temp = agp_bridge.current_size;
 	num_entries = A_SIZE_8(temp)->num_entries;
 
 	/* Figure out what pg_start means in terms of our large GART pages */
-	start_pg 	= pg_start / I460_KPAGES_PER_CPAGE;
-	start_offset 	= pg_start % I460_KPAGES_PER_CPAGE;
-	end_pg 		= (pg_start + mem->page_count - 1) / I460_KPAGES_PER_CPAGE;
-	end_offset 	= (pg_start + mem->page_count - 1) % I460_KPAGES_PER_CPAGE;
+	start	 	= &i460.lp_desc[pg_start / I460_KPAGES_PER_IOPAGE];
+	end 		= &i460.lp_desc[(pg_start + mem->page_count - 1) / I460_KPAGES_PER_IOPAGE];
+	start_offset 	= pg_start % I460_KPAGES_PER_IOPAGE;
+	end_offset 	= (pg_start + mem->page_count - 1) % I460_KPAGES_PER_IOPAGE;
 
-	for (i = 0, pg = start_pg; pg <= end_pg; pg++) {
-		for (idx = ((pg == start_pg) ? start_offset : 0);
-		    idx < ((pg == end_pg) ? (end_offset + 1) : I460_KPAGES_PER_CPAGE);
-		    idx++, i++)
+	for (i = 0, lp = start; lp <= end; ++lp) {
+		for (idx = ((lp == start) ? start_offset : 0);
+		     idx < ((lp == end) ? (end_offset + 1) : I460_KPAGES_PER_IOPAGE);
+		     idx++, i++)
 		{
 			mem->memory[i] = 0;
-			i460_pg_detail[pg][idx] = 0;
-			i460_pg_count[pg]--;
+			__clear_bit(idx, lp->alloced_map);
+			--lp->refcount;
 		}
 
 		/* Free GART pages if they are unused */
-		if (i460_pg_count[pg] == 0) {
-			paddr = agp_bridge.unmask_memory(agp_bridge.gatt_table[pg]);
-			agp_bridge.gatt_table[pg] = agp_bridge.scratch_page;
-			intel_i460_read_back(agp_bridge.gatt_table + pg);
-			intel_i460_free_large_page(pg, paddr);
+		if (lp->refcount == 0) {
+			pg = lp - i460.lp_desc;
+			WR_GATT(pg, 0);
+			WR_FLUSH_GATT(pg);
+			i460_free_large_page(lp);
 		}
 	}
 	return 0;
 }
 
-/* Dummy routines to call the approriate {cpk,kpc} function */
+/* Wrapper routines to call the approriate {small_io_page,large_io_page} function */
 
-static int intel_i460_insert_memory(agp_memory * mem, off_t pg_start, int type)
+static int i460_insert_memory (agp_memory * mem, off_t pg_start, int type)
 {
-	if (intel_i460_cpk)
-		return intel_i460_insert_memory_cpk(mem, pg_start, type);
+	if (I460_IO_PAGE_SHIFT <= PAGE_SHIFT)
+		return i460_insert_memory_small_io_page(mem, pg_start, type);
 	else
-		return intel_i460_insert_memory_kpc(mem, pg_start, type);
+		return i460_insert_memory_large_io_page(mem, pg_start, type);
 }
 
-static int intel_i460_remove_memory(agp_memory * mem, off_t pg_start, int type)
+static int i460_remove_memory (agp_memory * mem, off_t pg_start, int type)
 {
-	if (intel_i460_cpk)
-		return intel_i460_remove_memory_cpk(mem, pg_start, type);
+	if (I460_IO_PAGE_SHIFT <= PAGE_SHIFT)
+		return i460_remove_memory_small_io_page(mem, pg_start, type);
 	else
-		return intel_i460_remove_memory_kpc(mem, pg_start, type);
+		return i460_remove_memory_large_io_page(mem, pg_start, type);
 }
 
 /*
- * If the kernel page size is smaller that the chipset page size, we don't
- * want to allocate memory until we know where it is to be bound in the
- * aperture (a multi-kernel-page alloc might fit inside of an already
- * allocated GART page).  Consequently, don't allocate or free anything
- * if i460_cpk (meaning chipset pages per kernel page) isn't set.
+ * If the I/O (GART) page size is bigger than the kernel page size, we don't want to
+ * allocate memory until we know where it is to be bound in the aperture (a
+ * multi-kernel-page alloc might fit inside of an already allocated GART page).
  *
- * Let's just hope nobody counts on the allocated AGP memory being there
- * before bind time (I don't think current drivers do)...
+ * Let's just hope nobody counts on the allocated AGP memory being there before bind time
+ * (I don't think current drivers do)...
  */
-static void * intel_i460_alloc_page(void)
+static void *i460_alloc_page (void)
 {
-	if (intel_i460_cpk)
-		return agp_generic_alloc_page();
+	void *page;
 
-	/* Returning NULL would cause problems */
-	/* AK: really dubious code. */
-	return (void *)~0UL;
+	if (I460_IO_PAGE_SHIFT <= PAGE_SHIFT)
+		page = agp_generic_alloc_page();
+	else
+		/* Returning NULL would cause problems */
+		/* AK: really dubious code. */
+		page = (void *)~0UL;
+	return page;
 }
 
-static void intel_i460_destroy_page(void *page)
+static void i460_destroy_page (void *page)
 {
-	if (intel_i460_cpk)
+	if (I460_IO_PAGE_SHIFT <= PAGE_SHIFT)
 		agp_generic_destroy_page(page);
 }
 
-static struct gatt_mask intel_i460_masks[] =
-{
-	{
-	  .mask = INTEL_I460_GATT_VALID | INTEL_I460_GATT_COHERENT,
-	  .type = 0
-	}
-};
+#endif /* I460_LARGE_IO_PAGES */
 
-static unsigned long intel_i460_mask_memory(unsigned long addr, int type)
+static unsigned long i460_mask_memory (unsigned long addr, int type)
 {
 	/* Make sure the returned address is a valid GATT entry */
 	return (agp_bridge.masks[0].mask
-		| (((addr & ~((1 << intel_i460_pageshift) - 1)) & 0xffffff000) >> 12));
+		| (((addr & ~((1 << I460_IO_PAGE_SHIFT) - 1)) & 0xffffff000) >> 12));
 }
-
-static unsigned long intel_i460_unmask_memory(unsigned long addr)
-{
-	/* Turn a GATT entry into a physical address */
-	return ((addr & 0xffffff) << 12);
-}
-
-static struct aper_size_info_8 intel_i460_sizes[3] =
-{
-	/*
-	 * The 32GB aperture is only available with a 4M GART page size.
-	 * Due to the dynamic GART page size, we can't figure out page_order
-	 * or num_entries until runtime.
-	 */
-	{32768, 0, 0, 4},
-	{1024, 0, 0, 2},
-	{256, 0, 0, 1}
-};
 
 int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused)))
 {
-	agp_bridge.masks = intel_i460_masks;
-	agp_bridge.aperture_sizes = (void *) intel_i460_sizes;
+	agp_bridge.num_of_masks = 1;
+	agp_bridge.masks = i460_masks;
+	agp_bridge.aperture_sizes = (void *) i460_sizes;
 	agp_bridge.size_type = U8_APER_SIZE;
 	agp_bridge.num_aperture_sizes = 3;
 	agp_bridge.dev_private_data = NULL;
 	agp_bridge.needs_scratch_page = FALSE;
-	agp_bridge.configure = intel_i460_configure;
-	agp_bridge.fetch_size = intel_i460_fetch_size;
-	agp_bridge.cleanup = intel_i460_cleanup;
-	agp_bridge.tlb_flush = intel_i460_tlb_flush;
-	agp_bridge.mask_memory = intel_i460_mask_memory;
-	agp_bridge.unmask_memory = intel_i460_unmask_memory;
+	agp_bridge.configure = i460_configure;
+	agp_bridge.fetch_size = i460_fetch_size;
+	agp_bridge.cleanup = i460_cleanup;
+	agp_bridge.tlb_flush = i460_tlb_flush;
+	agp_bridge.mask_memory = i460_mask_memory;
 	agp_bridge.agp_enable = agp_generic_agp_enable;
 	agp_bridge.cache_flush = global_cache_flush;
-	agp_bridge.create_gatt_table = intel_i460_create_gatt_table;
-	agp_bridge.free_gatt_table = intel_i460_free_gatt_table;
-	agp_bridge.insert_memory = intel_i460_insert_memory;
-	agp_bridge.remove_memory = intel_i460_remove_memory;
+	agp_bridge.create_gatt_table = i460_create_gatt_table;
+	agp_bridge.free_gatt_table = i460_free_gatt_table;
+#if I460_LARGE_IO_PAGES
+	agp_bridge.insert_memory = i460_insert_memory;
+	agp_bridge.remove_memory = i460_remove_memory;
+	agp_bridge.agp_alloc_page = i460_alloc_page;
+	agp_bridge.agp_destroy_page = i460_destroy_page;
+#else
+	agp_bridge.insert_memory = i460_insert_memory_small_io_page;
+	agp_bridge.remove_memory = i460_remove_memory_small_io_page;
+	agp_bridge.agp_alloc_page = agp_generic_alloc_page;
+	agp_bridge.agp_destroy_page = agp_generic_destroy_page;
+#endif
 	agp_bridge.alloc_by_type = agp_generic_alloc_by_type;
 	agp_bridge.free_by_type = agp_generic_free_by_type;
-	agp_bridge.agp_alloc_page = intel_i460_alloc_page;
-	agp_bridge.agp_destroy_page = intel_i460_destroy_page;
 	agp_bridge.suspend = agp_generic_suspend;
 	agp_bridge.resume = agp_generic_resume;
 	agp_bridge.cant_use_aperture = 1;
@@ -619,6 +610,5 @@ static void __exit agp_i460_cleanup(void)
 module_init(agp_i460_init);
 module_exit(agp_i460_cleanup);
 
-MODULE_AUTHOR("Bjorn Helgaas <helgaas@fc.hp.com>");
+MODULE_AUTHOR("Chris Ahna <Christopher.J.Ahna@intel.com>");
 MODULE_LICENSE("GPL and additional rights");
-
