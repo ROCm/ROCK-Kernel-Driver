@@ -46,6 +46,10 @@ ifeq ($(CONFIG_CPU_XSCALE),y)
 OBJS		+= head-xscale.o
 endif
 
+ifeq ($(CONFIG_PXA_SHARPSL),y)
+OBJS		+= head-sharpsl.o
+endif
+
 ifeq ($(CONFIG_DEBUG_ICEDCC),y)
 OBJS            += ice-dcc.o
 endif
