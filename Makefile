@@ -377,7 +377,7 @@ cmd_kallsyms = $(NM) -n $< | scripts/kallsyms > $@
 	$(call cmd,kallsyms)
 
 .tmp_vmlinux1: $(vmlinux-objs) arch/$(ARCH)/vmlinux.lds.s FORCE
-	$(call if_changed_rule,vmlinux__)
+	+$(call if_changed_rule,vmlinux__)
 
 .tmp_vmlinux2: $(vmlinux-objs) .tmp_kallsyms1.o arch/$(ARCH)/vmlinux.lds.s FORCE
 	$(call if_changed_rule,vmlinux__)
