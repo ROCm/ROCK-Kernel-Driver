@@ -600,6 +600,15 @@ static void enqueue_task(struct task_struct *p, prio_array_t *array)
 }
 
 /*
+ * Put task to the end of the run list without the overhead of dequeue
+ * followed by enqueue.
+ */
+static void requeue_task(struct task_struct *p, prio_array_t *array)
+{
+	list_move_tail(&p->run_list, array->queue + p->prio);
+}
+
+/*
  * Used by the migration code - we pull tasks from the head of the
  * remote queue so we want these tasks to show up at the head of the
  * local queue:
@@ -2348,8 +2357,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 			set_tsk_need_resched(p);
 
 			/* put it at the end of the queue: */
-			dequeue_task(p, rq->active);
-			enqueue_task(p, rq->active);
+			requeue_task(p, rq->active);
 		}
 		goto out_unlock;
 	}
@@ -3441,8 +3449,14 @@ asmlinkage long sys_sched_yield(void)
 	} else if (!rq->expired->nr_active)
 		schedstat_inc(rq, yld_exp_empty);
 
-	dequeue_task(current, array);
-	enqueue_task(current, target);
+	if (array != target) {
+		dequeue_task(current, array);
+		enqueue_task(current, target);
+	} else
+		/*
+		 * requeue_task is cheaper so perform that if possible.
+		 */
+		requeue_task(current, array);
 
 	/*
 	 * Since we are going to call schedule() anyway, there's
