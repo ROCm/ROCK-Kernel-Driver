@@ -3646,4 +3646,15 @@ void esp_release(void)
 }
 #endif
 
+EXPORT_SYMBOL(esp_abort);
+EXPORT_SYMBOL(esp_allocate);
+EXPORT_SYMBOL(esp_deallocate);
+EXPORT_SYMBOL(esp_initialize);
+EXPORT_SYMBOL(esp_intr);
+EXPORT_SYMBOL(esp_queue);
+EXPORT_SYMBOL(esp_reset);
+EXPORT_SYMBOL(esp_slave_alloc);
+EXPORT_SYMBOL(esp_slave_destroy);
+EXPORT_SYMBOL(esps_in_use);
+
 MODULE_LICENSE("GPL");
