@@ -80,10 +80,10 @@ static void pcf_isa_setbyte(void *data, int ctl, int val)
 		break;
 	case 2: /* double mapped I/O needed for UP2000 board,
                    I don't know why this... */
-		writeb(val, address);
+		writeb(val, (void *)address);
 		/* fall */
 	case 1: /* memory mapped I/O */
-		writeb(val, address);
+		writeb(val, (void *)address);
 		break;
 	}
 }
@@ -91,7 +91,7 @@ static void pcf_isa_setbyte(void *data, int ctl, int val)
 static int pcf_isa_getbyte(void *data, int ctl)
 {
 	int address = ctl ? (base + 1) : base;
-	int val = mmapped ? readb(address) : inb(address);
+	int val = mmapped ? readb((void *)address) : inb(address);
 
 	pr_debug("i2c-elektor: Read 0x%X 0x%02X\n", address, val);
 
