@@ -36,6 +36,8 @@
 #include <asm/mpc52xx.h>
 
 
+extern int powersave_nap;
+
 /* Board data given by U-Boot */
 bd_t __res;
 EXPORT_SYMBOL(__res);	/* For modules */
@@ -154,6 +156,9 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	/* No ISA bus AFAIK */
 	isa_io_base		= 0;
 	isa_mem_base		= 0;
+
+	/* Powersave */
+	powersave_nap = 1;	/* We allow this platform to NAP */
 
 	/* Setup the ppc_md struct */
 	ppc_md.setup_arch	= lite5200_setup_arch;
