@@ -185,6 +185,11 @@ struct nfsd4_readdir {
 	u32		rd_bmval[2];        /* request */
 	struct svc_rqst *rd_rqstp;          /* response */
 	struct svc_fh * rd_fhp;             /* response */
+
+	struct readdir_cd	common;
+	u32 *			buffer;
+	int			buflen;
+	u32 *			offset;
 };
 
 struct nfsd4_readlink {

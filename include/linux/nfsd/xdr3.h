@@ -156,6 +156,13 @@ struct nfsd3_readdirres {
 	struct svc_fh		fh;
 	int			count;
 	__u32			verf[2];
+
+	struct readdir_cd	common;
+	u32 *			buffer;
+	int			buflen;
+	u32 *			offset;
+	struct svc_rqst *	rqstp;
+
 };
 
 struct nfsd3_fsstatres {

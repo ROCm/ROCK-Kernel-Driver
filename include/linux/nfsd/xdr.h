@@ -98,6 +98,11 @@ struct nfsd_readres {
 
 struct nfsd_readdirres {
 	int			count;
+
+	struct readdir_cd	common;
+	u32 *			buffer;
+	int			buflen;
+	u32 *			offset;
 };
 
 struct nfsd_statfsres {

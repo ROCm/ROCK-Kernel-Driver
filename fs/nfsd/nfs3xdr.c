@@ -644,10 +644,13 @@ nfs3svc_encode_readdirres(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd3_readdirres *resp)
 {
 	p = encode_post_op_attr(rqstp, p, &resp->fh);
+
 	if (resp->status == 0) {
 		/* stupid readdir cookie */
 		memcpy(p, resp->verf, 8); p += 2;
-		p += XDR_QUADLEN(resp->count);
+		p = resp->buffer;
+		*p++ = 0;		/* no more entries */
+		*p++ = htonl(resp->common.err == nfserr_eof);
 	}
 
 	return xdr_ressize_check(rqstp, p);
@@ -666,19 +669,15 @@ nfs3svc_encode_readdirres(struct svc_rqst *rqstp, u32 *p,
 #define NFS3_ENTRY_BAGGAGE	(2 + 1 + 2 + 1)
 #define NFS3_ENTRYPLUS_BAGGAGE	(1 + 21 + 1 + (NFS3_FHSIZE >> 2))
 static int
-encode_entry(struct readdir_cd *cd, const char *name,
+encode_entry(struct readdir_cd *ccd, const char *name,
 	     int namlen, off_t offset, ino_t ino, unsigned int d_type, int plus)
 {
+	struct nfsd3_readdirres *cd = container_of(ccd, struct nfsd3_readdirres, common);
 	u32		*p = cd->buffer;
 	int		buflen, slen, elen;
 
 	if (cd->offset)
 		xdr_encode_hyper(cd->offset, (u64) offset);
-
-	/* nfsd_readdir calls us with name == 0 when it wants us to
-	 * set the last offset entry. */
-	if (name == 0)
-		return 0;
 
 	/*
 	dprintk("encode_entry(%.*s @%ld%s)\n",
@@ -693,7 +692,7 @@ encode_entry(struct readdir_cd *cd, const char *name,
 	elen = slen + NFS3_ENTRY_BAGGAGE
 		+ (plus? NFS3_ENTRYPLUS_BAGGAGE : 0);
 	if ((buflen = cd->buflen - elen) < 0) {
-		cd->eob = 1;
+		cd->common.err = nfserr_readdir_nospc;
 		return -EINVAL;
 	}
 	*p++ = xdr_one;				 /* mark entry present */
@@ -709,8 +708,8 @@ encode_entry(struct readdir_cd *cd, const char *name,
 		struct svc_export	*exp;
 		struct dentry		*dparent, *dchild;
 
-		dparent = cd->dirfh->fh_dentry;
-		exp  = cd->dirfh->fh_export;
+		dparent = cd->fh.fh_dentry;
+		exp  = cd->fh.fh_export;
 
 		fh_init(&fh, NFS3_FHSIZE);
 		if (isdotent(name, namlen)) {
@@ -724,7 +723,7 @@ encode_entry(struct readdir_cd *cd, const char *name,
 			dchild = lookup_one_len(name, dparent,namlen);
 		if (IS_ERR(dchild))
 			goto noexec;
-		if (fh_compose(&fh, exp, dchild, cd->dirfh) != 0 || !dchild->d_inode)
+		if (fh_compose(&fh, exp, dchild, &cd->fh) != 0 || !dchild->d_inode)
 			goto noexec;
 		p = encode_post_op_attr(cd->rqstp, p, &fh);
 		*p++ = xdr_one; /* yes, a file handle follows */
@@ -735,6 +734,7 @@ encode_entry(struct readdir_cd *cd, const char *name,
 out:
 	cd->buflen = buflen;
 	cd->buffer = p;
+	cd->common.err = nfs_ok;
 	return 0;
 
 noexec:

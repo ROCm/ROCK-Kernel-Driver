@@ -457,11 +457,18 @@ nfsd3_proc_readdir(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 
 	/* Read directory and encode entries on the fly */
 	fh_copy(&resp->fh, &argp->fh);
-	nfserr = nfsd_readdir(rqstp, &resp->fh, (loff_t) argp->cookie, 
-					nfs3svc_encode_entry,
-					buffer, &count, argp->verf, NULL);
+
+	resp->buflen = count;
+	resp->common.err = nfs_ok;
+	resp->buffer = buffer;
+	resp->offset = NULL;
+	resp->rqstp = rqstp;
+	nfserr = nfsd_readdir(rqstp, &resp->fh, (loff_t*) &argp->cookie, 
+					&resp->common, nfs3svc_encode_entry);
 	memcpy(resp->verf, argp->verf, 8);
-	resp->count = count;
+	resp->count = resp->buffer - buffer;
+	if (resp->offset)
+		xdr_encode_hyper(resp->offset, argp->cookie);
 
 	RETURN_STATUS(nfserr);
 }
@@ -476,6 +483,7 @@ nfsd3_proc_readdirplus(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 {
 	u32 *	buffer;
 	int	nfserr, count, want;
+	loff_t	offset;
 
 	dprintk("nfsd: READDIR+(3) %s %d bytes at %d\n",
 				SVCFH_fmt(&argp->fh),
@@ -492,11 +500,18 @@ nfsd3_proc_readdirplus(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 
 	/* Read directory and encode entries on the fly */
 	fh_copy(&resp->fh, &argp->fh);
-	nfserr = nfsd_readdir(rqstp, &resp->fh, (loff_t) argp->cookie, 
-					nfs3svc_encode_entry_plus,
-					buffer, &count, argp->verf, NULL);
+
+	resp->buflen = count;
+	resp->common.err = nfs_ok;
+	resp->buffer = buffer;
+	resp->rqstp = rqstp;
+	offset = argp->cookie;
+	nfserr = nfsd_readdir(rqstp, &resp->fh, &offset, 
+			      &resp->common, nfs3svc_encode_entry_plus);
 	memcpy(resp->verf, argp->verf, 8);
-	resp->count = count;
+	resp->count = resp->buffer - buffer;
+	if (resp->offset)
+		xdr_encode_hyper(resp->offset, offset);
 
 	RETURN_STATUS(nfserr);
 }

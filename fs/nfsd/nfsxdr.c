@@ -380,7 +380,10 @@ int
 nfssvc_encode_readdirres(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd_readdirres *resp)
 {
-	p += XDR_QUADLEN(resp->count);
+	p = resp->buffer;
+	*p++ = 0;			/* no more entries */
+	*p++ = htonl((resp->common.err == nfserr_eof));
+
 	return xdr_ressize_check(rqstp, p);
 }
 
@@ -399,9 +402,10 @@ nfssvc_encode_statfsres(struct svc_rqst *rqstp, u32 *p,
 }
 
 int
-nfssvc_encode_entry(struct readdir_cd *cd, const char *name,
+nfssvc_encode_entry(struct readdir_cd *ccd, const char *name,
 		    int namlen, loff_t offset, ino_t ino, unsigned int d_type)
 {
+	struct nfsd_readdirres *cd = container_of(ccd, struct nfsd_readdirres, common);
 	u32	*p = cd->buffer;
 	int	buflen, slen;
 
@@ -410,8 +414,10 @@ nfssvc_encode_entry(struct readdir_cd *cd, const char *name,
 			namlen, name, offset, ino);
 	 */
 
-	if (offset > ~((u32) 0))
+	if (offset > ~((u32) 0)) {
+		cd->common.err = nfserr_fbig;
 		return -EINVAL;
+	}
 	if (cd->offset)
 		*cd->offset = htonl(offset);
 	if (namlen > NFS2_MAXNAMLEN)
@@ -419,7 +425,7 @@ nfssvc_encode_entry(struct readdir_cd *cd, const char *name,
 
 	slen = XDR_QUADLEN(namlen);
 	if ((buflen = cd->buflen - slen - 4) < 0) {
-		cd->eob = 1;
+		cd->common.err = nfserr_readdir_nospc;
 		return -EINVAL;
 	}
 	*p++ = xdr_one;				/* mark entry present */
@@ -430,6 +436,7 @@ nfssvc_encode_entry(struct readdir_cd *cd, const char *name,
 
 	cd->buflen = buflen;
 	cd->buffer = p;
+	cd->common.err = nfs_ok;
 	return 0;
 }
 

@@ -471,6 +471,7 @@ nfsd_proc_readdir(struct svc_rqst *rqstp, struct nfsd_readdirargs *argp,
 {
 	u32 *		buffer;
 	int		nfserr, count;
+	loff_t		offset;
 
 	dprintk("nfsd: READDIR  %s %d bytes at %d\n",
 		SVCFH_fmt(&argp->fh),		
@@ -488,11 +489,18 @@ nfsd_proc_readdir(struct svc_rqst *rqstp, struct nfsd_readdirargs *argp,
 	if (count < 0)
 		count = 0;
 
+	resp->buffer = buffer;
+	resp->offset = NULL;
+	resp->buflen = count;
+	resp->common.err = nfs_ok;
 	/* Read directory and encode entries on the fly */
-	nfserr = nfsd_readdir(rqstp, &argp->fh, (loff_t) argp->cookie, 
-			      nfssvc_encode_entry,
-			      buffer, &count, NULL, NULL);
-	resp->count = count;
+	offset = argp->cookie;
+	nfserr = nfsd_readdir(rqstp, &argp->fh, &offset, 
+			      &resp->common, nfssvc_encode_entry);
+
+	resp->count = resp->buffer - buffer;
+	if (resp->offset)
+		*resp->offset = (u32)offset;
 
 	fh_put(&argp->fh);
 	return nfserr;
