@@ -726,7 +726,14 @@ static struct notifier_block panic_block = {
 /* Sysrq handler */
 static void sysrq_handle_crashdump(int key, struct pt_regs *pt_regs,
 		struct tty_struct *tty) {
-	dump_execute("sysrq", pt_regs);
+	if(!pt_regs) {
+		struct pt_regs regs;
+		get_current_regs(&regs);
+		dump_execute("sysrq", &regs);
+
+	} else {
+		dump_execute("sysrq", pt_regs);
+	}
 }
 
 static struct sysrq_key_op sysrq_crashdump_op = {

@@ -47,7 +47,7 @@ struct lmb {
 	struct lmb_region reserved;
 };
 
-extern struct lmb lmb __initdata;
+extern struct lmb lmb;
 
 extern void __init lmb_init(void);
 extern void __init lmb_analyze(void);

@@ -349,6 +349,59 @@ source "arch/ppc64/oprofile/Kconfig"
 
 menu "Kernel hacking"
 
+config CRASH_DUMP
+	tristate "Crash dump support"
+	default n
+	---help---
+	   Say Y here to enable saving an image of system memory when a panic
+	   or other error occurs. Dumps can also be forced with the SysRq+d
+	   key if MAGIC_SYSRQ is enabled.
+
+config CRASH_DUMP_BLOCKDEV
+	tristate "Crash dump block device driver"
+	depends on CRASH_DUMP
+	help
+	  Say Y to allow saving crash dumps directly to a disk device.
+	
+config CRASH_DUMP_NETDEV
+	tristate "Crash dump network device driver"
+	depends on CRASH_DUMP
+	help
+	  Say Y to allow saving crash dumps over a network device.
+
+config CRASH_DUMP_MEMDEV
+	bool "Crash dump staged memory driver"
+	depends on CRASH_DUMP
+	help
+	  Say Y to allow intermediate saving crash dumps in spare
+	  memory pages which would then be written out to disk
+	  later. Need 'kexec' support for this to work.
+	     **** Not supported at present ****
+
+config CRASH_DUMP_SOFTBOOT
+	bool "Save crash dump across a soft reboot"
+	help
+	  Say Y to allow a crash dump to be preserved in memory
+	  pages across a soft reboot and written out to disk
+	  thereafter. For this to work, CRASH_DUMP must be
+	  configured as part of the kernel (not as a module).
+	  Need 'kexec' support to use this option.
+	    **** Not supported at present ****
+
+config CRASH_DUMP_COMPRESS_RLE
+	tristate "Crash dump RLE compression"
+	depends on CRASH_DUMP
+	help
+	  Say Y to allow saving dumps with Run Length Encoding compression.
+
+config CRASH_DUMP_COMPRESS_GZIP
+	tristate "Crash dump GZIP compression"
+	select ZLIB_INFLATE
+	select ZLIB_DEFLATE
+	depends on CRASH_DUMP
+	help
+	  Say Y to allow saving dumps with Gnu Zip compression.
+
 config DEBUG_KERNEL
 	bool "Kernel debugging"
 	help

@@ -16,8 +16,10 @@
 #include <linux/compile.h>
 #include <linux/module.h>
 #include <linux/mm.h>
+#include <linux/vmalloc.h>
 #include <linux/config.h>
 #include <linux/utsname.h>
+#include <linux/kernel_stat.h>
 #include <linux/dump.h>
 
 #ifdef LINUX_COMPILE_VERSION_ID_TYPE

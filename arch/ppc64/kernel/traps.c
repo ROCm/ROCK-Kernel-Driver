@@ -29,6 +29,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/dump.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -95,6 +96,7 @@ void die(const char *str, struct pt_regs *regs, long err)
 	if (nl)
 		printk("\n");
 	show_regs(regs);
+	dump((char *)str, regs);
 	bust_spinlocks(0);
 	spin_unlock_irq(&die_lock);
 

@@ -28,6 +28,7 @@
 #include <linux/spinlock.h>
 #include <linux/cache.h>
 #include <linux/err.h>
+#include <linux/dump.h>
 #include <linux/sysdev.h>
 #include <linux/cpu.h>
 
@@ -71,6 +72,7 @@ EXPORT_SYMBOL(cpu_possible_map);
 struct smp_ops_t *smp_ops;
 
 static volatile unsigned int cpu_callin_map[NR_CPUS];
+static int (*dump_ipi_function_ptr)(struct pt_regs *) = NULL;
 
 extern unsigned char stab_array[];
 
@@ -705,9 +707,16 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 		/* spare */
 		break;
 #endif
-#ifdef CONFIG_DEBUGGER
+#if defined(CONFIG_DEBUGGER) || defined(CONFIG_CRASH_DUMP) \
+	|| defined(CONFIG_CRASH_DUMP_MODULE)
 	case PPC_MSG_DEBUGGER_BREAK:
-		debugger(regs);
+		if (dump_ipi_function_ptr) {
+			dump_ipi_function_ptr(regs);
+		}
+#ifdef CONFIG_DEBUGGER
+		else
+			debugger(regs);
+#endif
 		break;
 #endif
 	default:
@@ -729,7 +738,16 @@ void smp_send_debugger_break(int cpu)
 }
 #endif
 
-static void stop_this_cpu(void *dummy)
+void dump_send_ipi(int (*dump_ipi_callback)(struct pt_regs *))
+{
+	dump_ipi_function_ptr = dump_ipi_callback;
+	if (dump_ipi_callback) {
+		mb();
+		smp_ops->message_pass(MSG_ALL_BUT_SELF, PPC_MSG_DEBUGGER_BREAK);
+	}
+}
+
+void stop_this_cpu(void *dummy)
 {
 	local_irq_disable();
 	while (1)

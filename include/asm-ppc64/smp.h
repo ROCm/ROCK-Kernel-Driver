@@ -31,7 +31,7 @@
 extern void smp_send_debugger_break(int cpu);
 struct pt_regs;
 extern void smp_message_recv(int, struct pt_regs *);
-
+extern void dump_send_ipi(int (*dump_ipi_callback)(struct pt_regs *));
 
 #define smp_processor_id() (get_paca()->xPacaIndex)
 #define hard_smp_processor_id() (get_paca()->xHwProcNum)
