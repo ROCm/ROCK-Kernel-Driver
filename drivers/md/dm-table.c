@@ -312,7 +312,7 @@ static int lookup_device(const char *path, dev_t *dev)
 	}
 
 	if (!S_ISBLK(inode->i_mode)) {
-		r = -EINVAL;
+		r = -ENOTBLK;
 		goto out;
 	}
 
