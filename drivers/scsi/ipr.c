@@ -208,6 +208,8 @@ struct ipr_error_table_t ipr_error_table[] = {
 	"Synchronization required"},
 	{0x024E0000, 0, 0,
 	"No ready, IOA shutdown"},
+	{0x025A0000, 0, 0,
+	"Not ready, IOA has been shutdown"},
 	{0x02670100, 0, 1,
 	"3020: Storage subsystem configuration error"},
 	{0x03110B00, 0, 0,
