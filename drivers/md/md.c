@@ -1809,7 +1809,7 @@ static void autorun_array(mddev_t *mddev)
  *
  * If "unit" is allocated, then bump its reference count
  */
-static void autorun_devices(kdev_t countdev)
+static void autorun_devices(void)
 {
 	struct list_head candidates;
 	struct list_head *tmp;
@@ -1863,9 +1863,7 @@ static void autorun_devices(kdev_t countdev)
 			list_del_init(&rdev->pending);
 		}
 		autorun_array(mddev);
-		if (minor(countdev) != mdidx(mddev))
-		    mddev_put(mddev);
-		/* else put will happen at md_close time */
+		mddev_put(mddev);
 	}
 	printk(KERN_INFO "md: ... autorun DONE.\n");
 }
@@ -1902,7 +1900,7 @@ static void autorun_devices(kdev_t countdev)
 #define AUTORUNNING KERN_INFO \
 "md: auto-running md%d.\n"
 
-static int autostart_array(kdev_t startdev, kdev_t countdev)
+static int autostart_array(kdev_t startdev)
 {
 	int err = -EINVAL, i;
 	mdp_super_t *sb = NULL;
@@ -1962,7 +1960,7 @@ static int autostart_array(kdev_t startdev, kdev_t countdev)
 	/*
 	 * possibly return codes
 	 */
-	autorun_devices(countdev);
+	autorun_devices();
 	return 0;
 
 abort:
@@ -2549,7 +2547,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			/*
 			 * possibly make it lock the array ...
 			 */
-			err = autostart_array(val_to_kdev(arg), dev);
+			err = autostart_array(val_to_kdev(arg));
 			if (err) {
 				printk(KERN_WARNING "md: autostart %s failed!\n",
 					partition_name(val_to_kdev(arg)));
@@ -2701,19 +2699,23 @@ abort:
 static int md_open(struct inode *inode, struct file *file)
 {
 	/*
-	 * Always succeed, but increment the usage count
+	 * Succeed if we can find or allocate a mddev structure.
 	 */
-	mddev_t *mddev = kdev_to_mddev(inode->i_rdev);
-	if (mddev)
-		mddev_get(mddev);
-	return (0);
+	mddev_t *mddev = mddev_find(minor(inode->i_rdev));
+
+	if (mddev) 
+		return 0; /* and we "own" a reference */
+	else
+		return -ENOMEM;
 }
 
 static int md_release(struct inode *inode, struct file * file)
 {
 	mddev_t *mddev = kdev_to_mddev(inode->i_rdev);
-	if (mddev)
-		mddev_put(mddev);
+	if (!mddev)
+		BUG();
+	mddev_put(mddev);
+
 	return 0;
 }
 
@@ -3548,7 +3550,7 @@ static void autostart_arrays(void)
 	}
 	dev_cnt = 0;
 
-	autorun_devices(to_kdev_t(-1));
+	autorun_devices();
 }
 
 static struct {
