@@ -571,14 +571,9 @@ serial_pxa_pm(struct uart_port *port, unsigned int state,
 	      unsigned int oldstate)
 {
 	struct uart_pxa_port *up = (struct uart_pxa_port *)port;
-	if (state) {
-		/* sleep */
-		CKEN &= ~up->cken;
-	} else {
-		/* wake */
-		CKEN |= up->cken;
+	pxa_set_cken(up->cken, !state);
+	if (!state)
 		udelay(1);
-	}
 }
 
 static void serial_pxa_release_port(struct uart_port *port)

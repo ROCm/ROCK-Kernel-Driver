@@ -131,20 +131,10 @@ void mac_drv_clear_rxd(struct s_smc *smc, volatile struct s_smt_fp_rxd *rxd,
 		       int frag_count);
 int mac_drv_rx_init(struct s_smc *smc, int len, int fc, char *look_ahead,
 		    int la_len);
-void smt_timer_poll(struct s_smc *smc);
-void ring_status_indication(struct s_smc *smc, u_long status);
-unsigned long smt_get_time(void);
-void smt_stat_counter(struct s_smc *smc, int stat);
-void cfm_state_change(struct s_smc *smc, int c_state);
-void ecm_state_change(struct s_smc *smc, int e_state);
-void pcm_state_change(struct s_smc *smc, int plc, int p_state);
-void rmt_state_change(struct s_smc *smc, int r_state);
-void drv_reset_indication(struct s_smc *smc);
 void dump_data(unsigned char *Data, int length);
 
-
 // External functions from the hardware module
-extern u_int mac_drv_check_space();
+extern u_int mac_drv_check_space(void);
 extern void read_address(struct s_smc *smc, u_char * mac_addr);
 extern void card_stop(struct s_smc *smc);
 extern int mac_drv_init(struct s_smc *smc);
@@ -157,9 +147,7 @@ extern void fddi_isr(struct s_smc *smc);
 extern void hwm_rx_frag(struct s_smc *smc, char far * virt, u_long phys,
 			int len, int frame_status);
 extern void mac_drv_rx_mode(struct s_smc *smc, int mode);
-extern void mac_drv_clear_tx_queue(struct s_smc *smc);
 extern void mac_drv_clear_rx_queue(struct s_smc *smc);
-extern void mac_clear_multicast(struct s_smc *smc);
 extern void enable_tx_irq(struct s_smc *smc, u_short queue);
 extern void mac_drv_clear_txd(struct s_smc *smc);
 
@@ -921,8 +909,7 @@ static void skfp_ctl_set_multicast_list_wo_lock(struct net_device *dev)
 				dmi = dev->mc_list;
 
 				for (i = 0; i < dev->mc_count; i++) {
-					mac_add_multicast(smc,
-							  dmi->dmi_addr, 1);
+					mac_add_multicast(smc, dmi->dmi_addr, 1);
 					PRINTK(KERN_INFO "ENABLE MC ADDRESS:");
 					PRINTK(" %02x %02x %02x ",
 					       dmi->dmi_addr[0],

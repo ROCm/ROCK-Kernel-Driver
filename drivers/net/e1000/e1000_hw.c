@@ -265,6 +265,17 @@ e1000_set_mac_type(struct e1000_hw *hw)
         return -E1000_ERR_MAC_TYPE;
     }
 
+    switch(hw->mac_type) {
+    case e1000_82541:
+    case e1000_82547:
+    case e1000_82541_rev_2:
+    case e1000_82547_rev_2:
+        hw->asf_firmware_present = TRUE;
+        break;
+    default:
+        break;
+    }
+
     return E1000_SUCCESS;
 }
 
@@ -5189,3 +5200,27 @@ e1000_set_vco_speed(struct e1000_hw *hw)
     return E1000_SUCCESS;
 }
 
+/******************************************************************************
+ * Verifies the hardware needs to allow ARPs to be processed by the host
+ *
+ * hw - Struct containing variables accessed by shared code
+ *
+ * returns: - TRUE/FALSE
+ *
+ *****************************************************************************/
+uint32_t
+e1000_enable_mng_pass_thru(struct e1000_hw *hw)
+{
+    uint32_t manc;
+
+    if (hw->asf_firmware_present) {
+        manc = E1000_READ_REG(hw, MANC);
+
+        if (!(manc & E1000_MANC_RCV_TCO_EN) ||
+            !(manc & E1000_MANC_EN_MAC_ADDR_FILTER))
+            return FALSE;
+        if ((manc & E1000_MANC_SMBUS_EN) && !(manc & E1000_MANC_ASF_EN))
+            return TRUE;
+    }
+    return FALSE;
+}

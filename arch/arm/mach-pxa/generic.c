@@ -59,6 +59,24 @@ void pxa_gpio_mode(int gpio_mode)
 EXPORT_SYMBOL(pxa_gpio_mode);
 
 /*
+ * Routine to safely enable or disable a clock in the CKEN
+ */
+void pxa_set_cken(int clock, int enable)
+{
+	unsigned long flags;
+	local_irq_save(flags);
+
+	if (enable)
+		CKEN |= clock;
+	else
+		CKEN &= ~clock;
+
+	local_irq_restore(flags);
+}
+
+EXPORT_SYMBOL(pxa_set_cken);
+
+/*
  * Intel PXA2xx internal register mapping.
  *
  * Note 1: not all PXA2xx variants implement all those addresses.

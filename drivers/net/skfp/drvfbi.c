@@ -100,14 +100,13 @@ const struct s_oem_ids oem_ids[] = {
 #endif	/* MULT_OEM */
 
 /* Prototypes of external functions */
-extern void hwt_restart() ;
 #ifdef AIX
 extern int AIX_vpdReadByte() ;
 #endif
 
 
 /* Prototypes of local functions. */
-void smt_stop_watchdog() ;
+void smt_stop_watchdog(struct s_smc *smc);
 
 #ifdef MCA
 static int read_card_id() ;
@@ -129,8 +128,7 @@ extern int AIX_vpdReadByte() ;
 /*
  * FDDI card reset
  */
-static void card_start(smc)
-struct s_smc *smc ;
+static void card_start(struct s_smc *smc)
 {
 	int i ;
 #ifdef	PCI
@@ -250,8 +248,7 @@ struct s_smc *smc ;
 	GET_PAGE(0) ;		/* necessary for BOOT */
 }
 
-void card_stop(smc)
-struct s_smc *smc ;
+void card_stop(struct s_smc *smc)
 {
 	smt_stop_watchdog(smc) ;
 	smc->hw.mac_ring_is_up = 0 ;		/* ring down */
@@ -282,14 +279,11 @@ struct s_smc *smc ;
 }
 /*--------------------------- ISR handling ----------------------------------*/
 
-#ifndef PCI
-void mac1_irq(smc,stu, stl)
-struct s_smc *smc ;
-u_short stu;
-u_short stl;
+void mac1_irq(struct s_smc *smc, u_short stu, u_short stl)
 {
 	int	restart_tx = 0 ;
 again:
+#ifndef PCI
 #ifndef ISA
 /*
  * FORMAC+ bug modified the queue pointer if many read/write accesses happens!?
@@ -344,14 +338,6 @@ again:
 }
 #else	/* PCI */
 
-void mac1_irq(smc,stu, stl)
-struct s_smc *smc ;
-u_short stu;
-u_short stl;
-{
-	int	restart_tx = 0 ;
-again:
-
 	/*
 	 * parity error: note encoding error is not possible in tag mode
 	 */
@@ -396,8 +382,7 @@ again:
  * interrupt source= plc1
  * this function is called in nwfbisr.asm
  */
-void plc1_irq(smc)
-struct s_smc *smc ;
+void plc1_irq(struct s_smc *smc)
 {
 	u_short	st = inpw(PLC(PB,PL_INTR_EVENT)) ;
 
@@ -412,8 +397,7 @@ struct s_smc *smc ;
  * interrupt source= plc2
  * this function is called in nwfbisr.asm
  */
-void plc2_irq(smc)
-struct s_smc *smc ;
+void plc2_irq(struct s_smc *smc)
 {
 	u_short	st = inpw(PLC(PA,PL_INTR_EVENT)) ;
 
@@ -428,8 +412,7 @@ struct s_smc *smc ;
 /*
  * interrupt source= timer
  */
-void timer_irq(smc)
-struct s_smc *smc ;
+void timer_irq(struct s_smc *smc)
 {
 	hwt_restart(smc);
 	smc->hw.t_stop = smc->hw.t_start;
@@ -439,8 +422,7 @@ struct s_smc *smc ;
 /*
  * return S-port (PA or PB)
  */
-int pcm_get_s_port(smc)
-struct s_smc *smc ;
+int pcm_get_s_port(struct s_smc *smc)
 {
 	SK_UNUSED(smc) ;
 	return(PS) ;
@@ -457,9 +439,7 @@ struct s_smc *smc ;
 #define STATION_LABEL_PMD_OFFSET	6
 #define STATION_LABEL_PORT_OFFSET	7
 
-void read_address(smc,mac_addr)
-struct s_smc *smc ;
-u_char *mac_addr ;
+void read_address(struct s_smc *smc, u_char *mac_addr)
 {
 	char ConnectorType ;
 	char PmdType ;
@@ -528,9 +508,7 @@ u_char *mac_addr ;
 /*
  * FDDI card soft reset
  */
-void init_board(smc,mac_addr)
-struct s_smc *smc ;
-u_char *mac_addr ;
+void init_board(struct s_smc *smc, u_char *mac_addr)
 {
 	card_start(smc) ;
 	read_address(smc,mac_addr) ;
@@ -559,9 +537,7 @@ u_char *mac_addr ;
 /*
  * insert or deinsert optical bypass (called by ECM)
  */
-void sm_pm_bypass_req(smc,mode)
-struct s_smc *smc ;
-int mode;
+void sm_pm_bypass_req(struct s_smc *smc, int mode)
 {
 #if	(defined(ISA) || defined(EISA))
 	int csra_v ;
@@ -614,8 +590,7 @@ int mode;
 /*
  * check if bypass connected
  */
-int sm_pm_bypass_present(smc)
-struct s_smc *smc ;
+int sm_pm_bypass_present(struct s_smc *smc)
 {
 #ifndef	PCI
 	return(	(inpw(CSR_A) & CS_BYSTAT) ? FALSE : TRUE ) ;
@@ -624,9 +599,7 @@ struct s_smc *smc ;
 #endif
 }
 
-void plc_clear_irq(smc,p)
-struct s_smc *smc ;
-int p ;
+void plc_clear_irq(struct s_smc *smc, int p)
 {
 	SK_UNUSED(p) ;
 
@@ -658,9 +631,7 @@ int p ;
  *	LED_Y_OFF	just switch yellow LED off
  *	LED_Y_ON	just switch yello LED on
  */
-void led_indication(smc,led_event)
-struct s_smc	*smc ;
-int		led_event;
+void led_indication(struct s_smc *smc, int led_event)
 {
 	/* use smc->hw.mac_ring_is_up == TRUE 
 	 * as indication for Ring Operational
@@ -754,10 +725,7 @@ int		led_event;
 }
 
 
-void pcm_state_change(smc,plc,p_state)
-struct s_smc *smc;
-int plc;
-int p_state;
+void pcm_state_change(struct s_smc *smc, int plc, int p_state)
 {
 	/*
 	 * the current implementation of pcm_state_change() in the driver
@@ -770,9 +738,7 @@ int p_state;
 }
 
 
-void rmt_indication(smc,i)
-struct s_smc *smc ;
-int i;
+void rmt_indication(struct s_smc *smc, int i)
 {
 	/* Call a driver special function if defined */
 	DRV_RMT_INDICATION(smc,i) ;
@@ -784,8 +750,7 @@ int i;
 /*
  * llc_recover_tx called by init_tx (fplus.c)
  */
-void llc_recover_tx(smc)
-struct s_smc *smc ;
+void llc_recover_tx(struct s_smc *smc)
 {
 #ifdef	LOAD_GEN
 	extern	int load_gen_flag ;
@@ -805,9 +770,7 @@ struct s_smc *smc ;
 /*
  * init DMA
  */
-void init_dma(smc,dma)
-struct s_smc *smc;
-int	dma;
+void init_dma(struct s_smc *smc, int dma)
 {
 	SK_UNUSED(smc) ;
 
@@ -828,9 +791,7 @@ int	dma;
 /*
  * disable DMA
  */
-void dis_dma(smc,dma)
-struct s_smc *smc ;
-int	dma;
+void dis_dma(struct s_smc *smc, int dma)
 {
 	SK_UNUSED(smc) ;
 
@@ -854,9 +815,7 @@ static const int cntr[8] = { 0x001,0x003,0x005,0x007,0,0x0c6,0x0ca,0x0ce } ;
 static const int base[8] = { 0x000,0x002,0x004,0x006,0,0x0c4,0x0c8,0x0cc } ;
 static const int page[8] = { 0x087,0x083,0x081,0x082,0,0x08b,0x089,0x08a } ;
 
-void init_dma(smc,dma)
-struct s_smc *smc ;
-int	dma;
+void init_dma(struct s_smc *smc, int dma)
 {
 	/*
 	 * extended mode register
@@ -885,9 +844,7 @@ int	dma;
 
 }
 
-void dis_dma(smc,dma)
-struct s_smc *smc ;
-int	dma;
+void dis_dma(struct s_smc *smc, int dma)
 {
 	SK_UNUSED(smc) ;
 
@@ -896,16 +853,13 @@ int	dma;
 #endif	/* EISA */
 
 #ifdef	MCA
-void init_dma(smc,dma)
-struct s_smc *smc;
-int	dma;
+void init_dma(struct s_smc *smc, int dma)
 {
 	SK_UNUSED(smc) ;
 	SK_UNUSED(dma) ;
 }
-void dis_dma(smc,dma)
-struct s_smc *smc;
-int	dma;
+
+void dis_dma(struct s_smc *smc, int dma)
 {
 	SK_UNUSED(smc) ;
 	SK_UNUSED(dma) ;
@@ -913,16 +867,13 @@ int	dma;
 #endif
 
 #ifdef	PCI
-void init_dma(smc,dma)
-struct s_smc *smc;
-int	dma;
+void init_dma(struct s_smc *smc, int dma)
 {
 	SK_UNUSED(smc) ;
 	SK_UNUSED(dma) ;
 }
-void dis_dma(smc,dma)
-struct s_smc *smc;
-int	dma;
+
+void dis_dma(struct s_smc *smc, int dma)
 {
 	SK_UNUSED(smc) ;
 	SK_UNUSED(dma) ;
@@ -930,10 +881,7 @@ int	dma;
 #endif
 
 #ifdef MULT_OEM
-static int is_equal_num(comp1,comp2,num)
-char comp1[] ;
-char comp2[] ;
-int num ;
+static int is_equal_num(char comp1[], char comp2[], int num)
 {
 	int i ;
 
@@ -954,8 +902,7 @@ int num ;
  *		2	data base empty
  *		3	no active entry	
  */
-int set_oi_id_def(smc)
-struct s_smc *smc ;
+int set_oi_id_def(struct s_smc *smc)
 {
 	int sel_id ;
 	int i ;
@@ -1029,9 +976,7 @@ struct s_smc *smc ;
  *
  ************************/
 #define LONG_CARD_ID(lo, hi)	((((hi) & 0xff) << 8) | ((lo) & 0xff))
-int exist_board(smc,slot)
-struct s_smc *smc ;
-int	slot ;
+int exist_board(struct s_smc *smc, int slot)
 {
 #ifdef MULT_OEM
 	SK_LOC_DECL(u_char,id[2]) ;
@@ -1081,9 +1026,8 @@ int	slot ;
  *	number is specified, the function returns zero.
  *
  ************************/
-static int read_card_id(smc,slot)
-struct s_smc *smc ;	/* Do not use. */
-int slot ;
+static int read_card_id(struct s_smc *smc, int slot)
+/* struct s_smc *smc ;	Do not use. */
 {
 	int card_id ;
 
@@ -1126,9 +1070,7 @@ int slot ;
  * END_MANUAL_ENTRY()
  *
  ************************/
-int get_board_para(smc,slot)
-struct s_smc *smc ;
-int slot ;
+int get_board_para(struct s_smc *smc, int slot)
 {
 	int val ;
 	int i ;
@@ -1175,9 +1117,7 @@ int slot ;
 }
 
 /* Enable access to specified MCA slot. */
-static void EnableSlotAccess(smc,slot)
-struct s_smc *smc ;
-int slot ;
+static void EnableSlotAccess(struct s_smc *smc, int slot)
 {
 	SK_UNUSED(slot) ;
 
@@ -1195,8 +1135,7 @@ int slot ;
 }
 
 /* Disable access to MCA slot formerly enabled via EnableSlotAccess(). */
-static void DisableSlotAccess(smc)
-struct s_smc *smc ;
+static void DisableSlotAccess(struct s_smc *smc)
 {
 #ifndef AIX
 	SK_UNUSED(smc) ;
@@ -1245,9 +1184,7 @@ struct s_smc *smc ;
  *	The smc pointer must be valid now.
  *
  ************************/
-int exist_board(smc,slot)
-struct s_smc *smc ;
-int	slot ;
+int exist_board(struct s_smc *smc, int slot)
 {
 	int i ;
 #ifdef MULT_OEM
@@ -1284,9 +1221,7 @@ int	slot ;
 }
 
 
-int get_board_para(smc,slot)
-struct s_smc *smc ;
-int	slot ;
+int get_board_para(struct s_smc *smc, int slot)
 {
 	int	i ;
 
@@ -1327,9 +1262,7 @@ const u_char sklogo[6] = SKLOGO_STR ;
 #endif	/* MULT_OEM */
 
 
-int exist_board(smc,port)
-struct s_smc *smc ;
-HW_PTR	port ;
+int exist_board(struct s_smc *smc, HW_PTR port)
 {
 	int	i ;
 #ifdef MULT_OEM
@@ -1400,9 +1333,7 @@ HW_PTR	port ;
 #endif	/* MULT_OEM */
 }
 
-int get_board_para(smc,slot)
-struct s_smc *smc ;
-int	slot ;
+int get_board_para(struct s_smc *smc, int slot)
 {
 	SK_UNUSED(smc) ;
 	SK_UNUSED(slot) ;
@@ -1412,9 +1343,7 @@ int	slot ;
 
 #ifdef PCI
 #ifdef USE_BIOS_FUN
-int exist_board(smc,slot)
-struct s_smc *smc ;
-int	slot ;
+int exist_board(struct s_smc *smc, int slot)
 {
 	u_short dev_id ;
 	u_short ven_id ;
@@ -1452,9 +1381,7 @@ int	slot ;
 #endif	/* PCI */
 #endif	/* USE_BIOS_FUNC */
 
-void driver_get_bia(smc, bia_addr)
-struct s_smc *smc ;
-struct fddi_addr *bia_addr ;
+void driver_get_bia(struct s_smc *smc, struct fddi_addr *bia_addr)
 {
 	int i ;
 
@@ -1465,8 +1392,7 @@ struct fddi_addr *bia_addr ;
 	}
 }
 
-void smt_start_watchdog(smc)
-struct s_smc *smc ;
+void smt_start_watchdog(struct s_smc *smc)
 {
 	SK_UNUSED(smc) ;	/* Make LINT happy. */
 
@@ -1481,8 +1407,7 @@ struct s_smc *smc ;
 #endif	/* DEBUG */
 }
 
-void smt_stop_watchdog(smc)
-struct s_smc *smc ;
+void smt_stop_watchdog(struct s_smc *smc)
 {
 	SK_UNUSED(smc) ;	/* Make LINT happy. */
 #ifndef	DEBUG
@@ -1497,9 +1422,7 @@ struct s_smc *smc ;
 }
 
 #ifdef	PCI
-static char get_rom_byte(smc,addr)
-struct s_smc *smc ;
-u_short	addr ;
+static char get_rom_byte(struct s_smc *smc, u_short addr)
 {
 	GET_PAGE(addr) ;
 	return (READ_PROM(ADDR(B2_FDP))) ;
@@ -1544,11 +1467,7 @@ u_short	addr ;
  *
  *	END_MANUAL_ENTRY
  */
-int mac_drv_vpd_read(smc,buf,size,image)
-struct s_smc *smc ;
-char *buf ;
-int size ;
-char image ;
+int mac_drv_vpd_read(struct s_smc *smc, char *buf, int size, char image)
 {
 	u_short	ibase ;
 	u_short pci_base ;
@@ -1597,16 +1516,14 @@ char image ;
 	return(len) ;
 }
 
-void mac_drv_pci_fix(smc,fix_value)
-struct s_smc *smc ;
-u_long fix_value ;
+void mac_drv_pci_fix(struct s_smc *smc, u_long fix_value)
 {
 	smc->hw.pci_fix_value = fix_value ;
 }
 
-void mac_do_pci_fix(smc)
-struct s_smc *smc ;
+void mac_do_pci_fix(struct s_smc *smc)
 {
 	SK_UNUSED(smc) ;
 }
 #endif	/* PCI */
+

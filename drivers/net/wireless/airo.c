@@ -1209,6 +1209,7 @@ struct airo_info {
 	SsidRid			*SSID;
 	APListRid		*APList;
 #define	PCI_SHARED_LEN		2*MPI_MAX_FIDS*PKTSIZE+RIDSIZE
+	u32			pci_state[16];
 };
 
 static inline int bap_read(struct airo_info *ai, u16 *pu16Dst, int bytelen,
@@ -1963,7 +1964,7 @@ static int mpi_send_packet (struct net_device *dev)
 
 	if ((skb = skb_dequeue(&ai->txq)) == 0) {
 		printk (KERN_ERR
-			"airo_mpi: %s: Dequeue'd zero in send_packet()\n",
+			"airo: %s: Dequeue'd zero in send_packet()\n",
 			__FUNCTION__);
 		return 0;
 	}
@@ -2744,6 +2745,9 @@ struct net_device *_init_airo_card( unsigned short irq, int port,
 	if (pci) {
 		SET_NETDEV_DEV(dev, &pci->dev);
 	}
+
+	if (test_bit(FLAG_MPI,&ai->flags))
+		reset_card (dev, 1);
 
 	rc = request_irq( dev->irq, airo_interrupt, SA_SHIRQ, dev->name, dev );
 	if (rc) {
@@ -4047,7 +4051,8 @@ static int PC4500_writerid(struct airo_info *ai, u16 rid,
 		Resp rsp;
 
 		if (test_bit(FLAG_ENABLED, &ai->flags))
-			printk(KERN_ERR "%s: MAC should be disabled (rid=%d)\n",
+			printk(KERN_ERR
+				"%s: MAC should be disabled (rid=%04x)\n",
 				__FUNCTION__, rid);
 		memset(&cmd, 0, sizeof(cmd));
 		memset(&rsp, 0, sizeof(rsp));
@@ -4527,6 +4532,8 @@ static ssize_t proc_write( struct file *file,
 		len = priv->maxwritelen - pos;
 	if (copy_from_user(priv->wbuffer + pos, buffer, len))
 		return -EFAULT;
+	if ( pos + len > priv->writelen )
+		priv->writelen = len + file->f_pos;
 	*offset = pos + len;
 	return len;
 }
@@ -5470,9 +5477,6 @@ static int airo_pci_suspend(struct pci_dev *pdev, u32 state)
 	Cmd cmd;
 	Resp rsp;
 
-	printk(KERN_DEBUG "%s: airo_mpi entering sleep mode (state=%d)\n",
-	       dev->name, state);
-
 	if ((ai->APList == NULL) &&
 		(ai->APList = kmalloc(sizeof(APListRid), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
@@ -5490,7 +5494,10 @@ static int airo_pci_suspend(struct pci_dev *pdev, u32 state)
 	ai->power = state;
 	cmd.cmd=HOSTSLEEP;
 	issuecommand(ai, &cmd, &rsp);
-	return 0;
+
+	pci_enable_wake(pdev, state, 1);
+	pci_save_state(pdev, ai->pci_state);
+	return pci_set_power_state(pdev, state);
 }
 
 static int airo_pci_resume(struct pci_dev *pdev)
@@ -5499,12 +5506,12 @@ static int airo_pci_resume(struct pci_dev *pdev)
 	struct airo_info *ai = dev->priv;
 	Resp rsp;
 
-	printk(KERN_DEBUG "%s: airo_mpi waking up\n", dev->name);
-
-	if (!ai->power)
-		return 0;
+	pci_set_power_state(pdev, 0);
+	pci_restore_state(pdev, ai->pci_state);
+	pci_enable_wake(pdev, ai->power, 0);
 
 	if (ai->power > 1) {
+		reset_card(dev, 0);
 		mpi_init_descriptors(ai);
 		setup_card(ai, dev->dev_addr, 0);
 		clear_bit(FLAG_RADIO_OFF, &ai->flags);
@@ -7166,6 +7173,7 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	unsigned char *iobuf;
 	int len;
 	struct airo_info *ai = dev->priv;
+	Resp rsp;
 
 	if (test_bit(FLAG_FLASHING, &ai->flags))
 		return -EIO;
@@ -7173,8 +7181,11 @@ static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	switch(comp->command)
 	{
 	case AIROGCAP:      ridcode = RID_CAPABILITIES; break;
-	case AIROGCFG: writeConfigRid (ai, 1);
-			    ridcode = RID_CONFIG;       break;
+	case AIROGCFG:      ridcode = RID_CONFIG;
+		disable_MAC (ai, 1);
+		writeConfigRid (ai, 1);
+		enable_MAC (ai, &rsp, 1);
+		break;
 	case AIROGSLIST:    ridcode = RID_SSID;         break;
 	case AIROGVLIST:    ridcode = RID_APLIST;       break;
 	case AIROGDRVNAM:   ridcode = RID_DRVNAME;      break;
@@ -7562,6 +7573,11 @@ int flashrestart(struct airo_info *ai,struct net_device *dev){
 	set_current_state (TASK_UNINTERRUPTIBLE);
 	schedule_timeout (HZ);          /* Added 12/7/00 */
 	clear_bit (FLAG_FLASHING, &ai->flags);
+	if (test_bit(FLAG_MPI, &ai->flags)) {
+		status = mpi_init_descriptors(ai);
+		if (status != SUCCESS)
+			return status;
+	}
 	status = setup_card(ai, dev->dev_addr, 1);
 
 	if (!test_bit(FLAG_MPI,&ai->flags))

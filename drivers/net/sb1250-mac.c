@@ -2900,15 +2900,15 @@ static void __exit
 sbmac_cleanup_module(void)
 {
 	struct net_device *dev;
-	sbmac_port_t port;
 	int idx;
 
 	for (idx = 0; idx < MAX_UNITS; idx++) {
+		struct sbmac_softc *sc;
 		dev = dev_sbmac[idx];
 		if (!dev)
 			continue;
 
-		struct sbmac_softc *sc = netdev_priv(dev);
+		sc = netdev_priv(dev);
 		unregister_netdev(dev);
 		sbmac_uninitctx(sc);
 		free_netdev(dev);

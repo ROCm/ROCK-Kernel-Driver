@@ -2922,7 +2922,8 @@ static int is_quattro_p(struct pci_dev *pdev)
 	struct list_head *tmp;
 	int n_hmes;
 
-	if (busdev->vendor != PCI_VENDOR_ID_DEC ||
+	if (busdev == NULL ||
+	    busdev->vendor != PCI_VENDOR_ID_DEC ||
 	    busdev->device != PCI_DEVICE_ID_DEC_21153)
 		return 0;
 

@@ -32,12 +32,16 @@
 static const char ID_sccs[] = "@(#)pmf.c	1.37 97/08/04 (C) SK " ;
 #endif
 
-static int smt_authorize() ;
-static int smt_check_set_count() ;
-static const struct s_p_tab *smt_get_ptab() ;
-static int smt_mib_phys() ;
-int smt_set_para() ;
-void smt_add_para() ;
+static int smt_authorize(struct s_smc *smc, struct smt_header *sm);
+static int smt_check_set_count(struct s_smc *smc, struct smt_header *sm);
+static const struct s_p_tab* smt_get_ptab(u_short para);
+static int smt_mib_phys(struct s_smc *smc);
+int smt_set_para(struct s_smc *smc, struct smt_para *pa, int index, int local,
+		 int set);
+void smt_add_para(struct s_smc *smc, struct s_pcon *pcon, u_short para,
+		  int index, int local);
+static SMbuf *smt_build_pmf_response(struct s_smc *smc, struct smt_header *req,
+				     int set, int local);
 
 #define MOFFSS(e)	((int)&(((struct fddi_mib *)0)->e))
 #define MOFFSA(e)	((int) (((struct fddi_mib *)0)->e))
@@ -280,13 +284,7 @@ static const struct s_p_tab {
 	{ 0 }
 } ;
 
-
-static SMbuf *smt_build_pmf_response() ;
-
-void smt_pmf_received_pack(smc,mb,local)
-struct s_smc *smc ;
-SMbuf *mb ;
-int local ;
+void smt_pmf_received_pack(struct s_smc *smc, SMbuf *mb, int local)
 {
 	struct smt_header	*sm ;
 	SMbuf		*reply ;
@@ -316,13 +314,8 @@ int local ;
 	}
 }
 
-extern	SMbuf	*smt_get_mbuf() ;
-
-static SMbuf *smt_build_pmf_response(smc,req,set,local)
-struct s_smc *smc ;
-struct smt_header *req ;
-int	set ;
-int	local ;
+static SMbuf *smt_build_pmf_response(struct s_smc *smc, struct smt_header *req,
+				     int set, int local)
 {
 	SMbuf			*mb ;
 	struct smt_header	*smt ;
@@ -509,11 +502,7 @@ int	local ;
 	return(mb) ;
 }
 
-extern void *sm_to_para() ;
-
-static int smt_authorize(smc,sm)
-struct s_smc *smc ;
-struct smt_header *sm ;
+static int smt_authorize(struct s_smc *smc, struct smt_header *sm)
 {
 	struct smt_para	*pa ;
 	int		i ;
@@ -548,9 +537,7 @@ struct smt_header *sm ;
 	return(0) ;
 }
 
-static int smt_check_set_count(smc,sm)
-struct s_smc *smc ;
-struct smt_header *sm ;
+static int smt_check_set_count(struct s_smc *smc, struct smt_header *sm)
 {
 	struct smt_para	*pa ;
 	struct smt_p_setcount	*sc ;
@@ -566,12 +553,8 @@ struct smt_header *sm ;
 	return(0) ;
 }
 
-void smt_add_para(smc,pcon,para,index,local)
-struct s_smc *smc ;
-struct s_pcon *pcon ;
-u_short para ;
-int index ;
-int local ;
+void smt_add_para(struct s_smc *smc, struct s_pcon *pcon, u_short para,
+		  int index, int local)
 {
 	struct smt_para	*pa ;
 	const struct s_p_tab	*pt ;
@@ -1095,12 +1078,8 @@ wrong_error:
 /*
  * set parameter
  */
-int smt_set_para(smc,pa,index,local,set)
-struct s_smc *smc ;
-struct smt_para	*pa ;
-int index ;
-int local ;
-int set ;
+int smt_set_para(struct s_smc *smc, struct smt_para *pa, int index, int local,
+		 int set)
 {
 #define IFSET(x)	if (set) (x)
 
@@ -1549,8 +1528,7 @@ no_author_error:
 #endif
 }
 
-static const struct s_p_tab *smt_get_ptab(para)
-u_short para ;
+static const struct s_p_tab *smt_get_ptab(u_short para)
 {
 	const struct s_p_tab	*pt ;
 	for (pt = p_tab ; pt->p_num && pt->p_num != para ; pt++)
@@ -1558,8 +1536,7 @@ u_short para ;
 	return(pt->p_num ? pt : 0) ;
 }
 
-static int smt_mib_phys(smc)
-struct s_smc *smc ;
+static int smt_mib_phys(struct s_smc *smc)
 {
 #ifdef	CONCENTRATOR
 	SK_UNUSED(smc) ;
@@ -1572,9 +1549,7 @@ struct s_smc *smc ;
 #endif
 }
 
-int port_to_mib(smc,p)
-struct s_smc *smc ;
-int p ;
+int port_to_mib(struct s_smc *smc, int p)
 {
 #ifdef	CONCENTRATOR
 	SK_UNUSED(smc) ;
@@ -1590,10 +1565,7 @@ int p ;
 
 #ifdef	DEBUG
 #ifndef	BOOT
-void dump_smt(smc,sm,text)
-struct s_smc *smc ;
-struct smt_header *sm ;
-char *text ;
+void dump_smt(struct s_smc *smc, struct smt_header *sm, char *text)
 {
 	int	len ;
 	struct smt_para	*pa ;
@@ -1680,9 +1652,7 @@ char *text ;
 	printf("-------------------------------------------------\n\n") ;
 }
 
-void dump_hex(p,len)
-char *p ;
-int len ;
+void dump_hex(char *p, int len)
 {
 	int	n = 0 ;
 	while (len--) {

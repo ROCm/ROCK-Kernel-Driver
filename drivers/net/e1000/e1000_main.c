@@ -299,7 +299,7 @@ e1000_down(struct e1000_adapter *adapter)
 void
 e1000_reset(struct e1000_adapter *adapter)
 {
-	uint32_t pba;
+	uint32_t pba, manc;
 	/* Repartition Pba for greater than 9k mtu
 	 * To take effect CTRL.RST is required.
 	 */
@@ -341,6 +341,12 @@ e1000_reset(struct e1000_adapter *adapter)
 
 	e1000_reset_adaptive(&adapter->hw);
 	e1000_phy_get_info(&adapter->hw, &adapter->phy_info);
+
+	if(adapter->en_mng_pt) {
+		manc = E1000_READ_REG(&adapter->hw, MANC);
+		manc |= (E1000_MANC_ARP_EN | E1000_MANC_EN_MNG2HOST);
+		E1000_WRITE_REG(&adapter->hw, MANC, manc);
+	}
 }
 
 /**
@@ -482,6 +488,8 @@ e1000_probe(struct pci_dev *pdev,
 
 	if(pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
+
+	adapter->en_mng_pt = e1000_enable_mng_pass_thru(&adapter->hw);
 
 	/* before reading the EEPROM, reset the controller to 
 	 * put the device in a known good starting state */
