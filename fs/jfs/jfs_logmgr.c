@@ -184,7 +184,7 @@ static int lbmRead(log_t * log, int pn, lbuf_t ** bpp);
 static void lbmWrite(log_t * log, lbuf_t * bp, int flag, int cant_block);
 static void lbmDirectWrite(log_t * log, lbuf_t * bp, int flag);
 static int lbmIOWait(lbuf_t * bp, int flag);
-static int lbmIODone(struct bio *bio, int);
+static bio_end_io_t lbmIODone;
 #ifdef _STILL_TO_PORT
 static void lbmDirectIODone(iobuf_t * ddbp);
 #endif				/* _STILL_TO_PORT */
@@ -2086,7 +2086,7 @@ static int lbmIOWait(lbuf_t * bp, int flag)
  *
  * executed at INTIODONE level
  */
-static int lbmIODone(struct bio *bio, int nr_sectors)
+static void lbmIODone(struct bio *bio)
 {
 	lbuf_t *bp = bio->bi_private;
 	lbuf_t *nextbp, *tail;
@@ -2120,7 +2120,7 @@ static int lbmIODone(struct bio *bio, int nr_sectors)
 		/* wakeup I/O initiator */
 		LCACHE_WAKEUP(&bp->l_ioevent);
 
-		return 0;
+		return;
 	}
 
 	/*
@@ -2145,7 +2145,7 @@ static int lbmIODone(struct bio *bio, int nr_sectors)
 	if (bp->l_flag & lbmDIRECT) {
 		LCACHE_WAKEUP(&bp->l_ioevent);
 		LCACHE_UNLOCK(flags);
-		return 0;
+		return;
 	}
 
 	tail = log->wqueue;
@@ -2224,7 +2224,7 @@ static int lbmIODone(struct bio *bio, int nr_sectors)
 
 		LCACHE_UNLOCK(flags);	/* unlock+enable */
 	}
-	return 0;
+	return;
 }
 
 int jfsIOWait(void *arg)
