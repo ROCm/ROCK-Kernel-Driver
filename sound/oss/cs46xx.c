@@ -1725,8 +1725,6 @@ static ssize_t cs_midi_read(struct file *file, char __user *buffer, size_t count
         unsigned ptr;
         int cnt;
 
-        if (ppos != &file->f_pos)
-                return -ESPIPE;
         if (!access_ok(VERIFY_WRITE, buffer, count))
                 return -EFAULT;
         ret = 0;
@@ -1770,8 +1768,6 @@ static ssize_t cs_midi_write(struct file *file, const char __user *buffer, size_
         unsigned ptr;
         int cnt;
 
-        if (ppos != &file->f_pos)
-                return -ESPIPE;
         if (!access_ok(VERIFY_READ, buffer, count))
                 return -EFAULT;
         ret = 0;
@@ -2106,8 +2102,6 @@ static ssize_t cs_read(struct file *file, char __user *buffer, size_t count, lof
 		return -ENODEV;
 	dmabuf = &state->dmabuf;
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (dmabuf->mapped)
 		return -ENXIO;
 	if (!access_ok(VERIFY_WRITE, buffer, count))
@@ -2215,9 +2209,6 @@ static ssize_t cs_write(struct file *file, const char __user *buffer, size_t cou
 	if (!access_ok(VERIFY_READ, buffer, count))
 		return -EFAULT;
 	dmabuf = &state->dmabuf;
-
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 
 	down(&state->sem);
 	if (dmabuf->mapped)
@@ -3370,7 +3361,7 @@ static int cs_open(struct inode *inode, struct file *file)
 			return ret;
 	}
 	CS_DBGOUT(CS_OPEN | CS_FUNCTION, 2, printk("cs46xx: cs_open()- 0\n") );
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int cs_release(struct inode *inode, struct file *file)
@@ -4104,7 +4095,7 @@ static int cs_open_mixdev(struct inode *inode, struct file *file)
 	CS_INC_USE_COUNT(&card->mixer_use_cnt);
 	CS_DBGOUT(CS_FUNCTION | CS_OPEN, 4,
 		  printk(KERN_INFO "cs46xx: cs_open_mixdev()- 0\n"));
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int cs_release_mixdev(struct inode *inode, struct file *file)

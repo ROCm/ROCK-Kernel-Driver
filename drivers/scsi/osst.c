@@ -3185,12 +3185,6 @@ static ssize_t osst_write(struct file * filp, const char __user * buf, size_t co
 		goto out;
 	}
 	
-	if (ppos != &filp->f_pos) {
-	 	/* "A request was outside the capabilities of the device." */
-		retval = (-ENXIO);
-		goto out;
-	}
-
 	if (STp->ready != ST_READY) {
 		if (STp->ready == ST_NO_TAPE)
 			retval = (-ENOMEDIUM);
@@ -3512,12 +3506,6 @@ static ssize_t osst_read(struct file * filp, char __user * buf, size_t count, lo
 		goto out;
 	}
 	
-	if (ppos != &filp->f_pos) {
-		/* "A request was outside the capabilities of the device." */
-		retval = (-ENXIO);
-		goto out;
-	}
-
 	if (STp->ready != ST_READY) {
 		if (STp->ready == ST_NO_TAPE)
 			retval = (-ENOMEDIUM);
@@ -4254,6 +4242,7 @@ static int os_scsi_tape_open(struct inode * inode, struct file * filp)
 	int            dev  = TAPE_NR(inode);
 	int            mode = TAPE_MODE(inode);
 
+	nonseekable_open(inode, filp);
 	write_lock(&os_scsi_tapes_lock);
 	if (dev >= osst_max_dev || os_scsi_tapes == NULL ||
 	    (STp = os_scsi_tapes[dev]) == NULL || !STp->device) {

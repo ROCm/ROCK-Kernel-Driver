@@ -1231,8 +1231,6 @@ ymf_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 	unsigned int swptr;
 	int cnt;			/* This many to go in this revolution */
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (dmabuf->mapped)
 		return -ENXIO;
 	if (!dmabuf->ready && (ret = prog_dmabuf(state, 1)))
@@ -1350,8 +1348,6 @@ ymf_write(struct file *file, const char __user *buffer, size_t count, loff_t *pp
 
 	YMFDBGW("ymf_write: count %d\n", count);
 
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (dmabuf->mapped)
 		return -ENXIO;
 	if (!dmabuf->ready && (ret = prog_dmabuf(state, 0)))
@@ -1965,7 +1961,7 @@ static int ymf_open(struct inode *inode, struct file *file)
 #endif
 	up(&unit->open_sem);
 
-	return 0;
+	return nonseekable_open(inode, file);
 
 out_nodma:
 	/*
@@ -2043,7 +2039,7 @@ static int ymf_open_mixdev(struct inode *inode, struct file *file)
  match:
 	file->private_data = unit->ac97_codec[i];
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int ymf_ioctl_mixdev(struct inode *inode, struct file *file,

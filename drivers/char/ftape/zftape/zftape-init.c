@@ -113,6 +113,7 @@ static int zft_open(struct inode *ino, struct file *filep)
 	int result;
 	TRACE_FUN(ft_t_flow);
 
+	nonseekable_open(ino, filep);
 	TRACE(ft_t_flow, "called for minor %d", iminor(ino));
 	if ( test_and_set_bit(0,&busy_flag) ) {
 		TRACE_ABORT(-EBUSY, ft_t_warn, "failed: already busy");

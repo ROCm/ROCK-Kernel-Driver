@@ -128,10 +128,6 @@ static ssize_t dtlk_read(struct file *file, char __user *buf,
 	char ch;
 	int i = 0, retries;
 
-	/* Can't seek (pread) on the DoubleTalk.  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	TRACE_TEXT("(dtlk_read");
 	/*  printk("DoubleTalk PC - dtlk_read()\n"); */
 
@@ -179,10 +175,6 @@ static ssize_t dtlk_write(struct file *file, const char __user *buf,
 		printk("\"");
 	}
 #endif
-
-	/* Can't seek (pwrite) on the DoubleTalk.  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 
 	if (iminor(file->f_dentry->d_inode) != DTLK_MINOR)
 		return -EINVAL;
@@ -303,11 +295,12 @@ static int dtlk_open(struct inode *inode, struct file *file)
 {
 	TRACE_TEXT("(dtlk_open");
 
+	nonseekable_open(inode, file);
 	switch (iminor(inode)) {
 	case DTLK_MINOR:
 		if (dtlk_busy)
 			return -EBUSY;
-		return 0;
+		return nonseekable_open(inode, file);
 
 	default:
 		return -ENXIO;

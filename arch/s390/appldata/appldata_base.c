@@ -88,11 +88,11 @@ struct appldata_parameter_list {
  */
 static const char appldata_proc_name[APPLDATA_PROC_NAME_LENGTH] = "appldata";
 static int appldata_timer_handler(ctl_table *ctl, int write, struct file *filp,
-				  void __user *buffer, size_t *lenp);
+				  void __user *buffer, size_t *lenp, loff_t *ppos);
 static int appldata_interval_handler(ctl_table *ctl, int write,
 					 struct file *filp,
 					 void __user *buffer,
-					 size_t *lenp);
+					 size_t *lenp, loff_t *ppos);
 
 static struct ctl_table_header *appldata_sysctl_header;
 static struct ctl_table appldata_table[] = {
@@ -315,12 +315,12 @@ __appldata_vtimer_setup(int cmd)
  */
 static int
 appldata_timer_handler(ctl_table *ctl, int write, struct file *filp,
-			   void __user *buffer, size_t *lenp)
+			   void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int len;
 	char buf[2];
 
-	if (!*lenp || filp->f_pos) {
+	if (!*lenp || *ppos) {
 		*lenp = 0;
 		return 0;
 	}
@@ -343,7 +343,7 @@ appldata_timer_handler(ctl_table *ctl, int write, struct file *filp,
 	spin_unlock(&appldata_timer_lock);
 out:
 	*lenp = len;
-	filp->f_pos += len;
+	*ppos += len;
 	return 0;
 }
 
@@ -355,12 +355,12 @@ out:
  */
 static int
 appldata_interval_handler(ctl_table *ctl, int write, struct file *filp,
-			   void __user *buffer, size_t *lenp)
+			   void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int len, interval;
 	char buf[16];
 
-	if (!*lenp || filp->f_pos) {
+	if (!*lenp || *ppos) {
 		*lenp = 0;
 		return 0;
 	}
@@ -391,7 +391,7 @@ appldata_interval_handler(ctl_table *ctl, int write, struct file *filp,
 		 interval);
 out:
 	*lenp = len;
-	filp->f_pos += len;
+	*ppos += len;
 	return 0;
 }
 
@@ -403,7 +403,7 @@ out:
  */
 static int
 appldata_generic_handler(ctl_table *ctl, int write, struct file *filp,
-			   void __user *buffer, size_t *lenp)
+			   void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	struct appldata_ops *ops = NULL, *tmp_ops;
 	int rc, len, found;
@@ -429,7 +429,7 @@ appldata_generic_handler(ctl_table *ctl, int write, struct file *filp,
 	}
 	spin_unlock_bh(&appldata_ops_lock);
 
-	if (!*lenp || filp->f_pos) {
+	if (!*lenp || *ppos) {
 		*lenp = 0;
 		module_put(ops->owner);
 		return 0;
@@ -488,7 +488,7 @@ appldata_generic_handler(ctl_table *ctl, int write, struct file *filp,
 	spin_unlock_bh(&appldata_ops_lock);
 out:
 	*lenp = len;
-	filp->f_pos += len;
+	*ppos += len;
 	module_put(ops->owner);
 	return 0;
 }

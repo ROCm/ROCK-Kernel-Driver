@@ -161,7 +161,7 @@ static int min_priority[1];
 static int max_priority[] = { 127 }; /* From DECnet spec */
 
 static int dn_forwarding_proc(ctl_table *, int, struct file *,
-			void __user *, size_t *);
+			void __user *, size_t *, loff_t *);
 static int dn_forwarding_sysctl(ctl_table *table, int __user *name, int nlen,
 			void __user *oldval, size_t __user *oldlenp,
 			void __user *newval, size_t newlen,
@@ -362,7 +362,8 @@ static void dn_dev_check_default(struct net_device *dev)
 
 static int dn_forwarding_proc(ctl_table *table, int write, 
 				struct file *filep,
-				void __user *buffer, size_t *lenp)
+				void __user *buffer,
+				size_t *lenp, loff_t *ppos)
 {
 #ifdef CONFIG_DECNET_ROUTER
 	struct net_device *dev = table->extra1;
@@ -376,7 +377,7 @@ static int dn_forwarding_proc(ctl_table *table, int write,
 	dn_db = dev->dn_ptr;
 	old = dn_db->parms.forwarding;
 
-	err = proc_dointvec(table, write, filep, buffer, lenp);
+	err = proc_dointvec(table, write, filep, buffer, lenp, ppos);
 
 	if ((err >= 0) && write) {
 		if (dn_db->parms.forwarding < 0)

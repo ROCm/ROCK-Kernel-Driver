@@ -145,16 +145,6 @@ tapechar_read(struct file *filp, char __user *data, size_t count, loff_t *ppos)
 
 	DBF_EVENT(6, "TCHAR:read\n");
 	device = (struct tape_device *) filp->private_data;
-	/* Check position. */
-	if (ppos != &filp->f_pos) {
-		/*
-		 * "A request was outside the capabilities of the device."
-		 * This check uses internal knowledge about how pread and
-		 * read work...
-		 */
-		DBF_EVENT(6, "TCHAR:ppos wrong\n");
-		return -EOVERFLOW;
-	}
 
 	/*
 	 * If the tape isn't terminated yet, do it now. And since we then
@@ -221,12 +211,6 @@ tapechar_write(struct file *filp, const char __user *data, size_t count, loff_t 
 
 	DBF_EVENT(6, "TCHAR:write\n");
 	device = (struct tape_device *) filp->private_data;
-	/* Check position */
-	if (ppos != &filp->f_pos) {
-		/* "A request was outside the capabilities of the device." */
-		DBF_EVENT(6, "TCHAR:ppos wrong\n");
-		return -EOVERFLOW;
-	}
 	/* Find out block size and number of blocks */
 	if (device->char_data.block_size != 0) {
 		if (count < device->char_data.block_size) {
@@ -329,7 +313,7 @@ tapechar_open (struct inode *inode, struct file *filp)
 	rc = tape_open(device);
 	if (rc == 0) {
 		filp->private_data = device;
-		return 0;
+		return nonseekable_open(inode, filp);
 	}
 	tape_put_device(device);
 

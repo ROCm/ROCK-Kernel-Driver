@@ -108,7 +108,7 @@ static int mixcomwd_open(struct inode *inode, struct file *file)
 			mixcomwd_timer_alive=0;
 		}
 	}
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int mixcomwd_release(struct inode *inode, struct file *file)
@@ -136,10 +136,6 @@ static int mixcomwd_release(struct inode *inode, struct file *file)
 
 static ssize_t mixcomwd_write(struct file *file, const char __user *data, size_t len, loff_t *ppos)
 {
-	if (ppos != &file->f_pos) {
-		return -ESPIPE;
-	}
-
 	if(len)
 	{
 		if (!nowayout) {

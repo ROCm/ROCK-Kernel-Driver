@@ -374,9 +374,9 @@ static inline int is_normal(struct zone *zone)
 struct ctl_table;
 struct file;
 int min_free_kbytes_sysctl_handler(struct ctl_table *, int, struct file *, 
-					void __user *, size_t *);
+					void __user *, size_t *, loff_t *);
 int lower_zone_protection_sysctl_handler(struct ctl_table *, int, struct file *,
-					void __user *, size_t *);
+					void __user *, size_t *, loff_t *);
 
 #include <linux/topology.h>
 /* Returns the number of the current Node. */

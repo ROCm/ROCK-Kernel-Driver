@@ -1423,7 +1423,7 @@ static struct notifier_block ndisc_netdev_notifier = {
 };
 
 #ifdef CONFIG_SYSCTL
-int ndisc_ifinfo_sysctl_change(struct ctl_table *ctl, int write, struct file * filp, void __user *buffer, size_t *lenp)
+int ndisc_ifinfo_sysctl_change(struct ctl_table *ctl, int write, struct file * filp, void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	struct net_device *dev = ctl->extra1;
 	struct inet6_dev *idev;
@@ -1433,7 +1433,7 @@ int ndisc_ifinfo_sysctl_change(struct ctl_table *ctl, int write, struct file * f
 		inet6_ifinfo_notify(RTM_NEWLINK, idev);
 		in6_dev_put(idev);
 	}
-	return proc_dointvec(ctl, write, filp, buffer, lenp);
+	return proc_dointvec(ctl, write, filp, buffer, lenp, ppos);
 }
 #endif
 

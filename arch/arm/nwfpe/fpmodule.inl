@@ -19,8 +19,7 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-extern __inline__
-unsigned int readRegister(const unsigned int nReg)
+static inline unsigned long readRegister(const unsigned int nReg)
 {
 	/* Note: The CPU thinks it has dealt with the current instruction.
 	   As a result the program counter has been advanced to the next
@@ -29,34 +28,31 @@ unsigned int readRegister(const unsigned int nReg)
 	   for this in this routine.  LDF/STF instructions with Rn = PC
 	   depend on the PC being correct, as they use PC+8 in their
 	   address calculations. */
-	unsigned int *userRegisters = GET_USERREG();
+	unsigned long *userRegisters = GET_USERREG();
 	unsigned int val = userRegisters[nReg];
 	if (REG_PC == nReg)
 		val -= 4;
 	return val;
 }
 
-extern __inline__
-void writeRegister(const unsigned int nReg, const unsigned int val)
+static inline void
+writeRegister(const unsigned int nReg, const unsigned long val)
 {
-	unsigned int *userRegisters = GET_USERREG();
+	unsigned long *userRegisters = GET_USERREG();
 	userRegisters[nReg] = val;
 }
 
-extern __inline__
-unsigned int readCPSR(void)
+static inline unsigned long readCPSR(void)
 {
 	return (readRegister(REG_CPSR));
 }
 
-extern __inline__
-void writeCPSR(const unsigned int val)
+static inline void writeCPSR(const unsigned long val)
 {
 	writeRegister(REG_CPSR, val);
 }
 
-extern __inline__
-unsigned int readConditionCodes(void)
+static inline unsigned long readConditionCodes(void)
 {
 #ifdef __FPEM_TEST__
 	return (0);
@@ -65,21 +61,14 @@ unsigned int readConditionCodes(void)
 #endif
 }
 
-extern __inline__
-void writeConditionCodes(const unsigned int val)
+static inline void writeConditionCodes(const unsigned long val)
 {
-	unsigned int *userRegisters = GET_USERREG();
-	unsigned int rval;
+	unsigned long *userRegisters = GET_USERREG();
+	unsigned long rval;
 	/*
 	 * Operate directly on userRegisters since
 	 * the CPSR may be the PC register itself.
 	 */
 	rval = userRegisters[REG_CPSR] & ~CC_MASK;
 	userRegisters[REG_CPSR] = rval | (val & CC_MASK);
-}
-
-extern __inline__
-unsigned int readMemoryInt(unsigned int *pMem)
-{
-	return *pMem;
 }

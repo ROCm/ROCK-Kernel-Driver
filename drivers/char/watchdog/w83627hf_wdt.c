@@ -144,10 +144,6 @@ wdt_set_heartbeat(int t)
 static ssize_t
 wdt_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
-	/*  Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	if (count) {
 		if (!nowayout) {
 			size_t i;
@@ -241,7 +237,7 @@ wdt_open(struct inode *inode, struct file *file)
 	 */
 
 	wdt_ping();
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int

@@ -58,14 +58,14 @@ rpc_unregister_sysctl(void)
 
 static int
 proc_dodebug(ctl_table *table, int write, struct file *file,
-				void __user *buffer, size_t *lenp)
+				void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	char		tmpbuf[20], c, *s;
 	char __user *p;
 	unsigned int	value;
 	size_t		left, len;
 
-	if ((file->f_pos && !write) || !*lenp) {
+	if ((*ppos && !write) || !*lenp) {
 		*lenp = 0;
 		return 0;
 	}
@@ -115,7 +115,7 @@ proc_dodebug(ctl_table *table, int write, struct file *file,
 
 done:
 	*lenp -= left;
-	file->f_pos += *lenp;
+	*ppos += *lenp;
 	return 0;
 }
 
