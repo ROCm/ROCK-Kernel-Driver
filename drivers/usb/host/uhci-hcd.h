@@ -200,8 +200,8 @@ struct uhci_td {
  * The UHCI driver places Interrupt, Control and Bulk into QH's both
  * to group together TD's for one transfer, and also to faciliate queuing
  * of URB's. To make it easy to insert entries into the schedule, we have
- * a skeleton of QH's for each predefined Interrupt latency, low speed
- * control, high speed control and terminating QH (see explanation for
+ * a skeleton of QH's for each predefined Interrupt latency, low-speed
+ * control, full-speed control and terminating QH (see explanation for
  * the terminating QH below).
  *
  * When we want to add a new QH, we add it to the end of the list for the
@@ -216,9 +216,9 @@ struct uhci_td {
  * skel int32 QH
  * ...
  * skel int1 QH
- * skel low speed control QH
+ * skel low-speed control QH
  * dev 5 control QH
- * skel high speed control QH
+ * skel full-speed control QH
  * skel bulk QH
  * dev 1 bulk QH
  * dev 2 bulk QH
@@ -227,7 +227,7 @@ struct uhci_td {
  * The terminating QH is used for 2 reasons:
  * - To place a terminating TD which is used to workaround a PIIX bug
  *   (see Intel errata for explanation)
- * - To loop back to the high speed control queue for full speed bandwidth
+ * - To loop back to the full-speed control queue for full-speed bandwidth
  *   reclamation
  *
  * Isochronous transfers are stored before the start of the skeleton
@@ -336,7 +336,7 @@ struct uhci_hcd {
 
 	spinlock_t frame_list_lock;
 	struct uhci_frame_list *fl;		/* P: uhci->frame_list_lock */
-	int fsbr;				/* Full speed bandwidth reclamation */
+	int fsbr;				/* Full-speed bandwidth reclamation */
 	unsigned long fsbrtimeout;		/* FSBR delay */
 
 	enum uhci_state state;			/* FIXME: needs a spinlock */

@@ -81,7 +81,7 @@ static int debug = 0;
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug level");
 static char *errbuf;
-#define ERRBUF_LEN    (PAGE_SIZE * 8)
+#define ERRBUF_LEN    (32 * 1024)
 
 #include "uhci-hub.c"
 #include "uhci-debug.c"
@@ -914,7 +914,7 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb, struct ur
 
 	uhci_insert_tds_in_qh(qh, urb, UHCI_PTR_BREADTH);
 
-	/* Low speed transfers get a different queue, and won't hog the bus */
+	/* Low-speed transfers get a different queue, and won't hog the bus */
 	if (urb->dev->speed == USB_SPEED_LOW)
 		skelqh = uhci->skel_ls_control_qh;
 	else {
@@ -972,7 +972,7 @@ static int usb_control_retrigger_status(struct uhci_hcd *uhci, struct urb *urb)
 	/* One TD, who cares about Breadth first? */
 	uhci_insert_tds_in_qh(urbp->qh, urb, UHCI_PTR_DEPTH);
 
-	/* Low speed transfers get a different queue */
+	/* Low-speed transfers get a different queue */
 	if (urb->dev->speed == USB_SPEED_LOW)
 		uhci_insert_qh(uhci, uhci->skel_ls_control_qh, urb);
 	else
@@ -1256,7 +1256,7 @@ static inline int uhci_submit_bulk(struct uhci_hcd *uhci, struct urb *urb, struc
 {
 	int ret;
 
-	/* Can't have low speed bulk transfers */
+	/* Can't have low-speed bulk transfers */
 	if (urb->dev->speed == USB_SPEED_LOW)
 		return -EINVAL;
 
@@ -2194,10 +2194,10 @@ static int uhci_reset(struct usb_hcd *hcd)
  *    of the queues. We don't do that here, because
  *    we'll create the actual TD entries on demand.
  *  - The first queue is the interrupt queue.
- *  - The second queue is the control queue, split into low and high speed
+ *  - The second queue is the control queue, split into low- and full-speed
  *  - The third queue is bulk queue.
  *  - The fourth queue is the bandwidth reclamation queue, which loops back
- *    to the high speed control queue.
+ *    to the full-speed control queue.
  */
 static int uhci_start(struct usb_hcd *hcd)
 {
