@@ -734,8 +734,8 @@ static inline void cpufreq_sysctl_exit(void)
 }
 
 #else
-#define cpufreq_sysctl_init()
-#define cpufreq_sysctl_exit()
+#define cpufreq_sysctl_init() do {} while(0)
+#define cpufreq_sysctl_exit() do {} while(0)
 #endif /* CONFIG_SYSCTL */
 #endif /* CONFIG_CPU_FREQ_24_API */
 
@@ -946,7 +946,7 @@ static inline void adjust_jiffies(unsigned long val, struct cpufreq_freqs *ci)
 		loops_per_jiffy = cpufreq_scale(l_p_j_ref, l_p_j_ref_freq, ci->new);
 }
 #else
-#define adjust_jiffies(...)
+#define adjust_jiffies(x...) do {} while (0)
 #endif
 
 
@@ -1131,6 +1131,6 @@ int cpufreq_restore(void)
 }
 EXPORT_SYMBOL_GPL(cpufreq_restore);
 #else
-#define cpufreq_restore()
+#define cpufreq_restore() do {} while (0)
 #endif /* CONFIG_PM */
 
