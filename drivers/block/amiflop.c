@@ -1889,6 +1889,5 @@ void cleanup_module(void)
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
 	unregister_blkdev(MAJOR_NR, "fd");
-	blk_clear(MAJOR_NR);
 }
 #endif

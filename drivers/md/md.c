@@ -3474,7 +3474,6 @@ void cleanup_module(void)
 #endif
 
 	blk_dev[MAJOR_NR].queue = NULL;
-	blk_clear(MAJOR_NR);
 }
 #endif
 

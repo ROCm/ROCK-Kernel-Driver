@@ -2002,11 +2002,6 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
     Remove the I/O Request Queue.
   */
   blk_cleanup_queue(BLK_DEFAULT_QUEUE(MajorNumber));
-  /*
-    Remove the Disk Partitions array, Partition Sizes array, Block Sizes
-    array, Max Sectors per Request array, and Max Segments per Request array.
-  */
-  blk_clear(MajorNumber);
 }
 
 static long disk_size(DAC960_Controller_T *Controller, int disk)

@@ -153,7 +153,6 @@ dasd_unregister_major(struct major_info * mi)
 	/* Clear block device pointers. */
 	major = mi->major;
 	blk_dev[major].queue = NULL;
-	blk_clear(major);
 
 	rc = unregister_blkdev(major, "dasd");
 	if (rc < 0)

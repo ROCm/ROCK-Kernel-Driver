@@ -1314,7 +1314,6 @@ static void __exit cleanup_ftl(void)
     unregister_mtd_user(&ftl_notifier);
     unregister_blkdev(FTL_MAJOR, "ftl");
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(FTL_MAJOR));
-    blk_clear(FTL_MAJOR);
 }
 
 module_init(init_ftl);

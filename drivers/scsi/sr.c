@@ -863,7 +863,6 @@ static void __exit exit_sr(void)
 	sr_registered--;
 	if (scsi_CDs != NULL)
 		kfree(scsi_CDs);
-	blk_clear(MAJOR_NR);
 
 	sr_template.dev_max = 0;
 	remove_driver(&sr_template.scsi_driverfs_driver);

@@ -418,7 +418,6 @@ static void __exit rd_cleanup (void)
 
 	devfs_unregister (devfs_handle);
 	unregister_blkdev( MAJOR_NR, "ramdisk" );
-	blk_clear(MAJOR_NR);
 }
 
 /* This is the registration and initialization section of the RAM disk driver */

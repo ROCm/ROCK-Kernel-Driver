@@ -46,16 +46,6 @@ static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 struct blk_dev_struct blk_dev[MAX_BLKDEV]; /* initialized by blk_dev_init() */
 
 /*
- * blk_size contains the size of all block-devices in units of 1024 byte
- * blocks:
- *
- * blk_size[MAJOR][MINOR]
- *
- * if (!blk_size[MAJOR]) then no minor size checking is done.
- */
-int * blk_size[MAX_BLKDEV];
-
-/*
  * How many reqeusts do we allocate per queue,
  * and how many do we "batch" on freeing them?
  */

@@ -1863,7 +1863,6 @@ void ide_unregister (unsigned int index)
 	unregister_blkdev(hwif->major, hwif->name);
 	blk_dev[hwif->major].data = NULL;
 	blk_dev[hwif->major].queue = NULL;
-	blk_clear(hwif->major);
 	gd = hwif->drives[0].disk;
 	if (gd) {
 		int i;
