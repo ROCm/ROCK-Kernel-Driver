@@ -247,6 +247,8 @@ found:
 out:
 	write_unlock(&vmlist_lock);
 	kfree(area);
+	if (printk_ratelimit())
+		printk(KERN_WARNING "allocation failed: out of vmalloc space - use vmalloc=<size> to increase size.\n");
 	return NULL;
 }
 
