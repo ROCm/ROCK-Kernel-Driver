@@ -297,7 +297,8 @@ static int save_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 	regs32.psw.addr = PSW32_ADDR_AMODE31 | (__u32) regs->psw.addr;
 	for (i = 0; i < NUM_GPRS; i++)
 		regs32.gprs[i] = (__u32) regs->gprs[i];
-	memcpy(regs32.acrs, regs->acrs, sizeof(regs32.acrs));
+	save_access_regs(current->thread.acrs);
+	memcpy(regs32.acrs, current->thread.acrs, sizeof(regs32.acrs));
 	err = __copy_to_user(&sregs->regs, &regs32, sizeof(regs32));
 	if (err)
 		return err;
@@ -323,7 +324,8 @@ static int restore_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 	regs->psw.addr = (__u64)(regs32.psw.addr & PSW32_ADDR_INSN);
 	for (i = 0; i < NUM_GPRS; i++)
 		regs->gprs[i] = (__u64) regs32.gprs[i];
-	memcpy(regs->acrs, regs32.acrs, sizeof(regs32.acrs));
+	memcpy(current->thread.acrs, regs32.acrs, sizeof(current->thread.acrs));
+	restore_access_regs(current->thread.acrs);
 
 	err = __copy_from_user(&current->thread.fp_regs, &sregs->fpregs,
 			       sizeof(_s390_fp_regs32));

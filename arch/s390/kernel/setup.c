@@ -496,7 +496,7 @@ void __init setup_arch(char **cmdline_p)
 	lc->external_new_psw.mask = PSW_KERNEL_BITS;
 	lc->external_new_psw.addr =
 		PSW_ADDR_AMODE | (unsigned long) ext_int_handler;
-	lc->svc_new_psw.mask = PSW_KERNEL_BITS;
+	lc->svc_new_psw.mask = PSW_KERNEL_BITS | PSW_MASK_IO | PSW_MASK_EXT;
 	lc->svc_new_psw.addr = PSW_ADDR_AMODE | (unsigned long) system_call;
 	lc->program_new_psw.mask = PSW_KERNEL_BITS;
 	lc->program_new_psw.addr =
@@ -512,6 +512,7 @@ void __init setup_arch(char **cmdline_p)
 	lc->async_stack = (unsigned long)
 		__alloc_bootmem(ASYNC_SIZE, ASYNC_SIZE, 0) + ASYNC_SIZE;
 	lc->current_task = (unsigned long) init_thread_union.thread_info.task;
+	lc->thread_info = (unsigned long) &init_thread_union;
 #ifdef CONFIG_ARCH_S390X
 	if (MACHINE_HAS_DIAG44)
 		lc->diag44_opcode = 0x83000044;

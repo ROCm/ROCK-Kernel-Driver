@@ -137,25 +137,36 @@ peek_user(struct task_struct *child, addr_t addr, addr_t data)
 	if ((addr & 3) || addr > sizeof(struct user) - __ADDR_MASK)
 		return -EIO;
 
-	if (addr <= (addr_t) &dummy->regs.orig_gpr2) {
+	if (addr < (addr_t) &dummy->regs.acrs) {
 		/*
-		 * psw, gprs, acrs and orig_gpr2 are stored on the stack
+		 * psw and gprs are stored on the stack
 		 */
 		tmp = *(addr_t *)((addr_t) __KSTK_PTREGS(child) + addr);
 		if (addr == (addr_t) &dummy->regs.psw.mask)
 			/* Remove per bit from user psw. */
 			tmp &= ~PSW_MASK_PER;
 
-	} else if (addr >= (addr_t) &dummy->regs.fp_regs &&
-		   addr < (addr_t) (&dummy->regs.fp_regs + 1)) {
+	} else if (addr < (addr_t) &dummy->regs.orig_gpr2) {
+		/*
+		 * access registers are stored in the thread structure
+		 */
+		offset = addr - (addr_t) &dummy->regs.acrs;
+		tmp = *(addr_t *)((addr_t) &child->thread.acrs + offset);
+
+	} else if (addr == (addr_t) &dummy->regs.orig_gpr2) {
+		/*
+		 * orig_gpr2 is stored on the kernel stack
+		 */
+		tmp = (addr_t) __KSTK_PTREGS(child)->orig_gpr2;
+
+	} else if (addr < (addr_t) (&dummy->regs.fp_regs + 1)) {
 		/* 
 		 * floating point regs. are stored in the thread structure
 		 */
 		offset = addr - (addr_t) &dummy->regs.fp_regs;
 		tmp = *(addr_t *)((addr_t) &child->thread.fp_regs + offset);
 
-	} else if (addr >= (addr_t) &dummy->regs.per_info &&
-		   addr < (addr_t) (&dummy->regs.per_info + 1)) {
+	} else if (addr < (addr_t) (&dummy->regs.per_info + 1)) {
 		/*
 		 * per_info is found in the thread structure
 		 */
@@ -187,9 +198,9 @@ poke_user(struct task_struct *child, addr_t addr, addr_t data)
 	if ((addr & 3) || addr > sizeof(struct user) - __ADDR_MASK)
 		return -EIO;
 
-	if (addr <= (addr_t) &dummy->regs.orig_gpr2) {
+	if (addr < (addr_t) &dummy->regs.acrs) {
 		/*
-		 * psw, gprs, acrs and orig_gpr2 are stored on the stack
+		 * psw and gprs are stored on the stack
 		 */
 		if (addr == (addr_t) &dummy->regs.psw.mask &&
 #ifdef CONFIG_S390_SUPPORT
@@ -206,8 +217,20 @@ poke_user(struct task_struct *child, addr_t addr, addr_t data)
 #endif
 		*(addr_t *)((addr_t) __KSTK_PTREGS(child) + addr) = data;
 
-	} else if (addr >= (addr_t) &dummy->regs.fp_regs &&
-		   addr < (addr_t) (&dummy->regs.fp_regs + 1)) {
+	} else if (addr < (addr_t) (&dummy->regs.orig_gpr2)) {
+		/*
+		 * access registers are stored in the thread structure
+		 */
+		offset = addr - (addr_t) &dummy->regs.acrs;
+		*(addr_t *)((addr_t) &child->thread.acrs + offset) = data;
+
+	} else if (addr == (addr_t) &dummy->regs.orig_gpr2) {
+		/*
+		 * orig_gpr2 is stored on the kernel stack
+		 */
+		__KSTK_PTREGS(child)->orig_gpr2 = data;
+
+	} else if (addr < (addr_t) (&dummy->regs.fp_regs + 1)) {
 		/*
 		 * floating point regs. are stored in the thread structure
 		 */
@@ -217,8 +240,7 @@ poke_user(struct task_struct *child, addr_t addr, addr_t data)
 		offset = addr - (addr_t) &dummy->regs.fp_regs;
 		*(addr_t *)((addr_t) &child->thread.fp_regs + offset) = data;
 
-	} else if (addr >= (addr_t) &dummy->regs.per_info &&
-		   addr < (addr_t) (&dummy->regs.per_info + 1)) {
+	} else if (addr < (addr_t) (&dummy->regs.per_info + 1)) {
 		/*
 		 * per_info is found in the thread structure 
 		 */
@@ -324,9 +346,9 @@ peek_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 	    (addr & 3) || addr > sizeof(struct user) - 3)
 		return -EIO;
 
-	if (addr <= (addr_t) &dummy32->regs.orig_gpr2) {
+	if (addr < (addr_t) &dummy32->regs.acrs) {
 		/*
-		 * psw, gprs, acrs and orig_gpr2 are stored on the stack
+		 * psw and gprs are stored on the stack
 		 */
 		if (addr == (addr_t) &dummy32->regs.psw.mask) {
 			/* Fake a 31 bit psw mask. */
@@ -336,28 +358,32 @@ peek_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 			/* Fake a 31 bit psw address. */
 			tmp = (__u32) __KSTK_PTREGS(child)->psw.addr |
 				PSW32_ADDR_AMODE31;
-		} else if (addr < (addr_t) &dummy32->regs.acrs[0]) {
+		} else {
 			/* gpr 0-15 */
 			tmp = *(__u32 *)((addr_t) __KSTK_PTREGS(child) + 
 					 addr*2 + 4);
-		} else if (addr < (addr_t) &dummy32->regs.orig_gpr2) {
-			offset = PT_ACR0 + addr - (addr_t) &dummy32->regs.acrs;
-			tmp = *(__u32*)((addr_t) __KSTK_PTREGS(child) + offset);
-		} else {
-			/* orig gpr 2 */
-			offset = PT_ORIGGPR2 + 4;
-			tmp = *(__u32*)((addr_t) __KSTK_PTREGS(child) + offset);
 		}
-	} else if (addr >= (addr_t) &dummy32->regs.fp_regs &&
-		   addr < (addr_t) (&dummy32->regs.fp_regs + 1)) {
+	} else if (addr < (addr_t) (&dummy32->regs.orig_gpr2)) {
+		/*
+		 * access registers are stored in the thread structure
+		 */
+		offset = addr - (addr_t) &dummy32->regs.acrs;
+		tmp = *(__u32*)((addr_t) &child->thread.acrs + offset);
+
+	} else if (addr == (addr_t) (&dummy32->regs.orig_gpr2)) {
+		/*
+		 * orig_gpr2 is stored on the kernel stack
+		 */
+		tmp = *(__u32*)((addr_t) &__KSTK_PTREGS(child)->orig_gpr2 + 4);
+
+	} else if (addr < (addr_t) (&dummy32->regs.fp_regs + 1)) {
 		/*
 		 * floating point regs. are stored in the thread structure 
 		 */
 	        offset = addr - (addr_t) &dummy32->regs.fp_regs;
 		tmp = *(__u32 *)((addr_t) &child->thread.fp_regs + offset);
 
-	} else if (addr >= (addr_t) &dummy32->regs.per_info &&
-		   addr < (addr_t) (&dummy32->regs.per_info + 1)) {
+	} else if (addr < (addr_t) (&dummy32->regs.per_info + 1)) {
 		/*
 		 * per_info is found in the thread structure
 		 */
@@ -396,7 +422,7 @@ poke_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 
 	tmp = (__u32) data;
 
-	if (addr <= (addr_t) &dummy32->regs.orig_gpr2) {
+	if (addr < (addr_t) &dummy32->regs.acrs) {
 		/*
 		 * psw, gprs, acrs and orig_gpr2 are stored on the stack
 		 */
@@ -411,19 +437,25 @@ poke_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 			/* Build a 64 bit psw address from 31 bit address. */
 			__KSTK_PTREGS(child)->psw.addr = 
 				(__u64) tmp & PSW32_ADDR_INSN;
-		} else if (addr < (addr_t) &dummy32->regs.acrs[0]) {
+		} else {
 			/* gpr 0-15 */
 			*(__u32*)((addr_t) __KSTK_PTREGS(child) + addr*2 + 4) =
 				tmp;
-		} else if (addr < (addr_t) &dummy32->regs.orig_gpr2) {
-			offset = PT_ACR0 + addr - (addr_t) &dummy32->regs.acrs;
-			*(__u32*)((addr_t) __KSTK_PTREGS(child) + offset) = tmp;
-		} else {
-			offset = PT_ORIGGPR2 + 4;
-			*(__u32*)((addr_t) __KSTK_PTREGS(child) + offset) = tmp;
 		}
-	} else if (addr >= (addr_t) &dummy32->regs.fp_regs &&
-		   addr < (addr_t) (&dummy32->regs.fp_regs + 1)) {
+	} else if (addr < (addr_t) (&dummy32->regs.orig_gpr2)) {
+		/*
+		 * access registers are stored in the thread structure
+		 */
+		offset = addr - (addr_t) &dummy32->regs.acrs;
+		*(__u32*)((addr_t) &child->thread.acrs + offset) = tmp;
+
+	} else if (addr == (addr_t) (&dummy32->regs.orig_gpr2)) {
+		/*
+		 * orig_gpr2 is stored on the kernel stack
+		 */
+		*(__u32*)((addr_t) &__KSTK_PTREGS(child)->orig_gpr2 + 4) = tmp;
+
+	} else if (addr < (addr_t) (&dummy32->regs.fp_regs + 1)) {
 		/*
 		 * floating point regs. are stored in the thread structure 
 		 */
@@ -434,8 +466,7 @@ poke_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 	        offset = addr - (addr_t) &dummy32->regs.fp_regs;
 		*(__u32 *)((addr_t) &child->thread.fp_regs + offset) = tmp;
 
-	} else if (addr >= (addr_t) &dummy32->regs.per_info &&
-		   addr < (addr_t) (&dummy32->regs.per_info + 1)) {
+	} else if (addr < (addr_t) (&dummy32->regs.per_info + 1)) {
 		/*
 		 * per_info is found in the thread structure.
 		 */
