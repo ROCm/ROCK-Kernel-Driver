@@ -614,7 +614,6 @@ static int __init mxser_module_init(void)
 	{
 		struct pci_dev *pdev = NULL;
 		int n = (sizeof(mxser_pcibrds) / sizeof(mxser_pcibrds[0])) - 1;
-		int index = 0;
 		for (b = 0; b < n; b++) {
 			while ((pdev = pci_find_device(mxser_pcibrds[b].vendor, mxser_pcibrds[b].device, pdev)))
 			{
