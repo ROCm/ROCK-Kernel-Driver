@@ -32,11 +32,7 @@
 #include <linux/smp_lock.h>
 #include <linux/pci.h>
 
-#define __KERNEL_SYSCALLS__
-
 #define SHUTDOWN_SIGS	(sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGTERM))
-
-#include <linux/unistd.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
