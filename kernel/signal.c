@@ -352,6 +352,7 @@ void __exit_signal(struct task_struct *tsk)
 		if (tsk == sig->curr_target)
 			sig->curr_target = next_thread(tsk);
 		tsk->signal = NULL;
+		exit_itimers(sig);
 		spin_unlock(&sighand->siglock);
 		flush_sigqueue(&sig->shared_pending);
 		kmem_cache_free(signal_cachep, sig);
@@ -2555,4 +2556,3 @@ void __init signals_init(void)
 	if (!sigqueue_cachep)
 		panic("signals_init(): cannot create sigqueue SLAB cache");
 }
-

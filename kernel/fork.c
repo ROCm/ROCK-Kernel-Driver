@@ -815,6 +815,7 @@ static inline int copy_signal(unsigned long clone_flags, struct task_struct * ts
 	sig->group_stop_count = 0;
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
+	INIT_LIST_HEAD(&sig->posix_timers);
 
 	sig->tty = current->signal->tty;
 	sig->pgrp = process_group(current);
@@ -932,7 +933,6 @@ struct task_struct *copy_process(unsigned long clone_flags,
 
 	INIT_LIST_HEAD(&p->children);
 	INIT_LIST_HEAD(&p->sibling);
-	INIT_LIST_HEAD(&p->posix_timers);
 	init_waitqueue_head(&p->wait_chldexit);
 	p->vfork_done = NULL;
 	spin_lock_init(&p->alloc_lock);
