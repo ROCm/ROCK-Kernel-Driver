@@ -399,7 +399,7 @@ xprt_reconnect(struct rpc_task *task)
 {
 	struct rpc_xprt	*xprt = task->tk_xprt;
 	struct socket	*sock = xprt->sock;
-	struct sock	*inet = xprt->inet;
+	struct sock	*inet;
 	int		status;
 
 	dprintk("RPC: %4d xprt_reconnect %p connected %d\n",
@@ -420,22 +420,16 @@ xprt_reconnect(struct rpc_task *task)
 	if (xprt_connected(xprt))
 		goto out_write;
 
+	if (sock && sock->state != SS_UNCONNECTED)
+		xprt_close(xprt);
 	status = -ENOTCONN;
-	if (!inet) {
+	if (!(inet = xprt->inet)) {
 		/* Create an unconnected socket */
 		if (!(sock = xprt_create_socket(xprt->prot, &xprt->timeout)))
 			goto defer;
 		xprt_bind_socket(xprt, sock);
 		inet = sock->sk;
 	}
-
-	xprt_disconnect(xprt);
-
-	/* Reset TCP record info */
-	xprt->tcp_offset = 0;
-	xprt->tcp_reclen = 0;
-	xprt->tcp_copied = 0;
-	xprt->tcp_flags = XPRT_COPY_RECM | XPRT_COPY_XID;
 
 	/* Now connect it asynchronously. */
 	dprintk("RPC: %4d connecting new socket\n", task->tk_pid);
@@ -459,17 +453,21 @@ xprt_reconnect(struct rpc_task *task)
 			goto defer;
 		}
 
+		/* Protect against TCP socket state changes */
+		lock_sock(inet);
 		dprintk("RPC: %4d connect status %d connected %d\n",
 				task->tk_pid, status, xprt_connected(xprt));
 
-		spin_lock_bh(&xprt->sock_lock);
-		if (!xprt_connected(xprt)) {
+		if (inet->state != TCP_ESTABLISHED) {
 			task->tk_timeout = xprt->timeout.to_maxval;
+			/* if the socket is already closing, delay 5 secs */
+			if ((1<<inet->state) & ~(TCP_SYN_SENT|TCP_SYN_RECV))
+				task->tk_timeout = 5*HZ;
 			rpc_sleep_on(&xprt->sending, task, xprt_reconn_status, NULL);
-			spin_unlock_bh(&xprt->sock_lock);
+			release_sock(inet);
 			return;
 		}
-		spin_unlock_bh(&xprt->sock_lock);
+		release_sock(inet);
 	}
 defer:
 	if (status < 0) {
@@ -917,6 +915,13 @@ tcp_state_change(struct sock *sk)
 	case TCP_ESTABLISHED:
 		if (xprt_test_and_set_connected(xprt))
 			break;
+
+		/* Reset TCP record info */
+		xprt->tcp_offset = 0;
+		xprt->tcp_reclen = 0;
+		xprt->tcp_copied = 0;
+		xprt->tcp_flags = XPRT_COPY_RECM | XPRT_COPY_XID;
+
 		spin_lock(&xprt->sock_lock);
 		if (xprt->snd_task && xprt->snd_task->tk_rpcwait == &xprt->sending)
 			rpc_wake_up_task(xprt->snd_task);
