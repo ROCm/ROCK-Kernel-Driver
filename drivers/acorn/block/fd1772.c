@@ -99,7 +99,7 @@
  *                Removed the busy wait loop in do_fd_request and replaced
  *                by a routine on tq_immediate; only 11% cpu on a dd off the
  *                raw disc - but the speed is the same.
- *	1/ 9/96 - Idea (failed!) - set the 'disable spin-up seqeunce'
+ *	1/ 9/96 - Idea (failed!) - set the 'disable spin-up sequence'
  *		  when we read the track if we know the motor is on; didn't
  *		  help - perhaps we have to do it in stepping as well.
  *		  Nope. Still doesn't help.

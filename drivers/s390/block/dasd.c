@@ -555,7 +555,7 @@ static inline void
 dasd_profile_end(dasd_device_t *device, dasd_ccw_req_t * cqr,
 		 struct request *req)
 {
-	long strtime, irqtime, endtime, tottime;	/* in microsecnds */
+	long strtime, irqtime, endtime, tottime;	/* in microseconds */
 	long tottimeps, sectors;
 
 	if (dasd_profile_level != DASD_PROFILE_ON)

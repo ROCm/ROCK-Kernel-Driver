@@ -1150,7 +1150,7 @@ e1000_set_mac(struct net_device *netdev, void *p)
  *
  * The set_multi entry point is called whenever the multicast address
  * list or the network interface flags are updated.  This routine is
- * resposible for configuring the hardware for proper multicast,
+ * responsible for configuring the hardware for proper multicast,
  * promiscuous mode, and all-multi behavior.
  **/
 

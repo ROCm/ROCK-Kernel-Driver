@@ -267,7 +267,7 @@ int __init fm2fb_init(void)
 		fb_info.fix = fb_fix;
 		fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-		/* The below feilds will go away !!!! */
+		/* The below fields will go away !!!! */
 		fb_alloc_cmap(&fb_info.cmap, 16, 0);
 
 		if (register_framebuffer(&fb_info) < 0)

@@ -97,7 +97,7 @@ static int stop_rtc_timers;                    /* don't requeue tasks */
 static spinlock_t gen_rtc_lock = SPIN_LOCK_UNLOCKED;
 
 /*
- * Routine to poll RTC seconds field for change as often as posible,
+ * Routine to poll RTC seconds field for change as often as possible,
  * after first RTC_UIE use timer to reduce polling
  */
 void genrtc_troutine(void *data)

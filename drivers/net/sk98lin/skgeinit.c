@@ -181,7 +181,7 @@
  *
  *	Revision 1.21  1998/10/20 12:11:56  malthoff
  *	Don't dendy the Queue config if the size of the unused
- *	rx qeueu is zero.
+ *	rx queue is zero.
  *
  *	Revision 1.20  1998/10/19 07:27:58  malthoff
  *	SkGeInitRamIface() is public to be called by diagnostics.

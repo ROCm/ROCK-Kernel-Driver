@@ -492,7 +492,7 @@ static void sch_atm_dequeue(unsigned long data)
 				(void) flow->q->ops->requeue(skb,flow->q);
 				break;
 			}
-			D2PRINTK("atm_tc_deqeueue: sending on class %p\n",flow);
+			D2PRINTK("atm_tc_dequeue: sending on class %p\n",flow);
 			/* remove any LL header somebody else has attached */
 			skb_pull(skb,(char *) skb->nh.iph-(char *) skb->data);
 			if (skb_headroom(skb) < flow->hdr_len) {

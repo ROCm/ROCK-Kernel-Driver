@@ -683,7 +683,7 @@ static inline unsigned int calc_linear_pos(viadev_t *viadev, unsigned int idx, u
 			}
 		}
 	}
-	viadev->lastpos = res; /* remember the last positiion */
+	viadev->lastpos = res; /* remember the last position */
 	if (res >= viadev->bufsize)
 		res -= viadev->bufsize;
 	return res;
