@@ -873,9 +873,6 @@ static int dummy_setprocattr(struct task_struct *p, char *name, void *value, siz
 	return -EINVAL;
 }
 
-
-struct security_operations dummy_security_ops;
-
 #define set_to_dummy_if_null(ops, function)				\
 	do {								\
 		if (!ops->function) {					\

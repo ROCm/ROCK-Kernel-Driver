@@ -367,6 +367,42 @@ int cap_vm_enough_memory(long pages)
 	return -ENOMEM;
 }
 
+#ifdef CONFIG_SECURITY
+struct security_operations capability_security_ops = {
+	.ptrace =			cap_ptrace,
+	.capget =			cap_capget,
+	.capset_check =			cap_capset_check,
+	.capset_set =			cap_capset_set,
+	.capable =			cap_capable,
+	.netlink_send =			cap_netlink_send,
+	.netlink_recv =			cap_netlink_recv,
+
+	.bprm_apply_creds =		cap_bprm_apply_creds,
+	.bprm_set_security =		cap_bprm_set_security,
+	.bprm_secureexec =		cap_bprm_secureexec,
+
+	.inode_setxattr =		cap_inode_setxattr,
+	.inode_removexattr =		cap_inode_removexattr,
+
+	.task_post_setuid =		cap_task_post_setuid,
+	.task_reparent_to_init =	cap_task_reparent_to_init,
+
+	.syslog =                       cap_syslog,
+
+	.vm_enough_memory =             cap_vm_enough_memory,
+};
+
+EXPORT_SYMBOL(capability_security_ops);
+/* Note: If the capability security module is loaded, we do NOT register
+ * the capability_security_ops but a second structure that has the
+ * identical entries. The reason is that this way,
+ * - we could stack on top of capability if it was stackable
+ * - a loaded capability module will prevent others to register, which
+ *   is the previous behaviour; if capabilities are used as default (not
+ *   because the module has been loaded), we allow the replacement.
+ */
+#endif
+
 EXPORT_SYMBOL(cap_capable);
 EXPORT_SYMBOL(cap_ptrace);
 EXPORT_SYMBOL(cap_capget);
