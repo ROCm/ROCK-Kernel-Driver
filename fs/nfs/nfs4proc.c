@@ -2510,7 +2510,7 @@ static int _nfs4_do_setlk(struct nfs4_state *state, int cmd, struct file_lock *r
 
 int nfs4_lock_reclaim(struct nfs4_state *state, struct file_lock *request)
 {
-	return _nfs4_do_setlk(state, F_SETLK64, request, 1);
+	return _nfs4_do_setlk(state, F_SETLK, request, 1);
 }
 
 static int _nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock *request)
