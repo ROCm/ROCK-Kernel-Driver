@@ -339,17 +339,9 @@ static int hci_usb_flush(struct hci_dev *hdev)
 
 	BT_DBG("%s", hdev->name);
 
-	for (i=0; i < 4; i++)
+	for (i = 0; i < 4; i++)
 		skb_queue_purge(&husb->transmit_q[i]);
 	return 0;
-}
-
-static inline void hci_usb_wait_for_urb(struct urb *urb)
-{
-	while (atomic_read(&urb->kref.refcount) > 1) {
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout((5 * HZ + 999) / 1000);
-	}
 }
 
 static void hci_usb_unlink_urbs(struct hci_usb *husb)
@@ -358,7 +350,7 @@ static void hci_usb_unlink_urbs(struct hci_usb *husb)
 
 	BT_DBG("%s", husb->hdev->name);
 
-	for (i=0; i < 4; i++) {
+	for (i = 0; i < 4; i++) {
 		struct _urb *_urb;
 		struct urb *urb;
 
@@ -367,8 +359,7 @@ static void hci_usb_unlink_urbs(struct hci_usb *husb)
 			urb = &_urb->urb;
 			BT_DBG("%s unlinking _urb %p type %d urb %p", 
 					husb->hdev->name, _urb, _urb->type, urb);
-			usb_unlink_urb(urb);
-			hci_usb_wait_for_urb(urb);
+			usb_kill_urb(urb);
 			_urb_queue_tail(__completed_q(husb, _urb->type), _urb);
 		}
 
