@@ -469,12 +469,10 @@ insert_bpts()
 		}
 	}
 
-	if (!__is_processor(PV_POWER4) && !__is_processor(PV_POWER4p)) {
-		if (dabr.enabled)
-			set_dabr(dabr.address);
-		if (iabr.enabled)
-			set_iabr(iabr.address);
-	}
+	if (cpu_has_dabr() && dabr.enabled)
+		set_dabr(dabr.address);
+	if (cpu_has_iabr() && iabr.enabled)
+		set_iabr(iabr.address);
 }
 
 static void
@@ -486,10 +484,11 @@ remove_bpts()
 
 	if (naca->platform != PLATFORM_PSERIES)
 		return;
-	if (!__is_processor(PV_POWER4) && !__is_processor(PV_POWER4p)) {
+
+	if (cpu_has_dabr())
 		set_dabr(0);
+	if (cpu_has_iabr())
 		set_iabr(0);
-	}
 
 	bp = bpts;
 	for (i = 0; i < NBPTS; ++i, ++bp) {
@@ -778,8 +777,8 @@ bpt_cmds(void)
 	cmd = inchar();
 	switch (cmd) {
 	case 'd':	/* bd - hardware data breakpoint */
-		if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p)) {
-			printf("Not implemented on POWER4\n");
+		if (cpu_has_dabr()) {
+			printf("Not implemented on this cpu\n");
 			break;
 		}
 		mode = 7;
@@ -798,7 +797,7 @@ bpt_cmds(void)
 			dabr.address = (dabr.address & ~7) | mode;
 		break;
 	case 'i':	/* bi - hardware instr breakpoint */
-		if (__is_processor(PV_POWER4) || __is_processor(PV_POWER4p)) {
+		if (cpu_has_iabr()) {
 			printf("Not implemented on POWER4\n");
 			break;
 		}

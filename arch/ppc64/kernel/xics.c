@@ -1,5 +1,5 @@
 /* 
- * arch/ppc/kernel/xics.c
+ * arch/ppc64/kernel/xics.c
  *
  * Copyright 2000 IBM Corporation.
  *
@@ -22,10 +22,11 @@
 #include <asm/smp.h>
 #include <asm/naca.h>
 #include <asm/rtas.h>
-#include "i8259.h"
 #include <asm/xics.h>
 #include <asm/ppcdebug.h>
-#include <asm/machdep.h>
+#include <asm/hvcall.h>
+
+#include "i8259.h"
 
 void xics_enable_irq(u_int irq);
 void xics_disable_irq(u_int irq);
@@ -61,44 +62,45 @@ struct hw_interrupt_type xics_8259_pic = {
 /* Want a priority other than 0.  Various HW issues require this. */
 #define	DEFAULT_PRIORITY	5
 
+/* 
+ * Mark IPIs as higher priority so we can take them inside interrupts that
+ * arent marked SA_INTERRUPT
+ */
+#define IPI_PRIORITY		4
+
 struct xics_ipl {
 	union {
-		u32	word;
-		u8	bytes[4];
+		u32 word;
+		u8 bytes[4];
 	} xirr_poll;
 	union {
 		u32 word;
-		u8	bytes[4];
+		u8 bytes[4];
 	} xirr;
-	u32	dummy;
+	u32 dummy;
 	union {
-		u32	word;
-		u8	bytes[4];
+		u32 word;
+		u8 bytes[4];
 	} qirr;
 };
 
-struct xics_info {
-	volatile struct xics_ipl *	per_cpu[NR_CPUS];
-};
+static struct xics_ipl *xics_per_cpu[NR_CPUS];
 
-struct xics_info	xics_info;
+static int xics_irq_8259_cascade = 0;
+static int xics_irq_8259_cascade_real = 0;
+static unsigned int default_server = 0xFF;
+static unsigned int default_distrib_server = 0;
 
-unsigned long long intr_base = 0;
-int xics_irq_8259_cascade = 0;
-int xics_irq_8259_cascade_real = 0;
-unsigned int default_server = 0xFF;
-unsigned int default_distrib_server = 0;
+/*
+ * XICS only has a single IPI, so encode the messages per CPU
+ */
+struct xics_ipi_struct xics_ipi_message[NR_CPUS] __cacheline_aligned;
 
 /* RTAS service tokens */
 int ibm_get_xive;
 int ibm_set_xive;
 int ibm_int_on;
 int ibm_int_off;
-
-struct xics_interrupt_node {
-	unsigned long long addr;
-	unsigned long long size;
-} inodes[NR_CPUS*2];	 
 
 typedef struct {
 	int (*xirr_info_get)(int cpu);
@@ -108,24 +110,26 @@ typedef struct {
 } xics_ops;
 
 
+/* SMP */
+
 static int pSeries_xirr_info_get(int n_cpu)
 {
-	return (xics_info.per_cpu[n_cpu]->xirr.word);
+	return xics_per_cpu[n_cpu]->xirr.word;
 }
 
 static void pSeries_xirr_info_set(int n_cpu, int value)
 {
-	xics_info.per_cpu[n_cpu]->xirr.word = value;
+	xics_per_cpu[n_cpu]->xirr.word = value;
 }
 
 static void pSeries_cppr_info(int n_cpu, u8 value)
 {
-	xics_info.per_cpu[n_cpu]->xirr.bytes[0] = value;
+	xics_per_cpu[n_cpu]->xirr.bytes[0] = value;
 }
 
-static void pSeries_qirr_info(int n_cpu , u8 value)
+static void pSeries_qirr_info(int n_cpu, u8 value)
 {
-	xics_info.per_cpu[n_cpu]->qirr.bytes[0] = value;
+	xics_per_cpu[n_cpu]->qirr.bytes[0] = value;
 }
 
 static xics_ops pSeries_ops = {
@@ -136,113 +140,174 @@ static xics_ops pSeries_ops = {
 };
 
 static xics_ops *ops = &pSeries_ops;
-extern xics_ops pSeriesLP_ops;
 
 
-void
-xics_enable_irq(
-	u_int	virq
-	)
+/* LPAR */
+
+static inline long plpar_eoi(unsigned long xirr)
 {
-	u_int		irq;
-	unsigned long	status;
-	long	        call_status;
+	return plpar_hcall_norets(H_EOI, xirr);
+}
+
+static inline long plpar_cppr(unsigned long cppr)
+{
+	return plpar_hcall_norets(H_CPPR, cppr);
+}
+
+static inline long plpar_ipi(unsigned long servernum, unsigned long mfrr)
+{
+	return plpar_hcall_norets(H_IPI, servernum, mfrr);
+}
+
+static inline long plpar_xirr(unsigned long *xirr_ret)
+{
+	unsigned long dummy;
+	return plpar_hcall(H_XIRR, 0, 0, 0, 0, xirr_ret, &dummy, &dummy);
+}
+
+static int pSeriesLP_xirr_info_get(int n_cpu)
+{
+	unsigned long lpar_rc;
+	unsigned long return_value; 
+
+	lpar_rc = plpar_xirr(&return_value);
+	if (lpar_rc != H_Success)
+		panic(" bad return code xirr - rc = %lx \n", lpar_rc); 
+	return (int)return_value;
+}
+
+static void pSeriesLP_xirr_info_set(int n_cpu, int value)
+{
+	unsigned long lpar_rc;
+	unsigned long val64 = value & 0xffffffff;
+
+	lpar_rc = plpar_eoi(val64);
+	if (lpar_rc != H_Success)
+		panic("bad return code EOI - rc = %ld, value=%lx\n", lpar_rc,
+		      val64); 
+}
+
+static void pSeriesLP_cppr_info(int n_cpu, u8 value)
+{
+	unsigned long lpar_rc;
+
+	lpar_rc = plpar_cppr(value);
+	if (lpar_rc != H_Success)
+		panic("bad return code cppr - rc = %lx\n", lpar_rc); 
+}
+
+static void pSeriesLP_qirr_info(int n_cpu , u8 value)
+{
+	unsigned long lpar_rc;
+
+	lpar_rc = plpar_ipi(n_cpu, value);
+	if (lpar_rc != H_Success)
+		panic("bad return code qirr - rc = %lx\n", lpar_rc); 
+}
+
+xics_ops pSeriesLP_ops = {
+	pSeriesLP_xirr_info_get,
+	pSeriesLP_xirr_info_set,
+	pSeriesLP_cppr_info,
+	pSeriesLP_qirr_info
+};
+
+void xics_enable_irq(u_int virq)
+{
+	u_int irq;
+	long call_status;
+	unsigned int server;
 
 	virq -= XICS_IRQ_OFFSET;
 	irq = virt_irq_to_real(virq);
 	if (irq == XICS_IPI)
 		return;
+
 #ifdef CONFIG_IRQ_ALL_CPUS
-	call_status = rtas_call(ibm_set_xive, 3, 1, (unsigned long*)&status,
-				irq, smp_threads_ready ? default_distrib_server : default_server, DEFAULT_PRIORITY);
+	if (smp_threads_ready)
+		server = default_distrib_server;
+	else
+		server = default_server;
 #else
-	call_status = rtas_call(ibm_set_xive, 3, 1, (unsigned long*)&status,
-				irq, default_server, DEFAULT_PRIORITY);
+	server = default_server;
 #endif
-	if( call_status != 0 ) {
-		printk("xics_enable_irq: irq=%x: rtas_call failed; retn=%lx, status=%lx\n",
-		       irq, call_status, status);
+
+	call_status = rtas_call(ibm_set_xive, 3, 1, NULL, irq, server,
+				DEFAULT_PRIORITY);
+	if (call_status != 0) {
+		printk("xics_enable_irq: irq=%x: ibm_set_xive returned %lx\n",
+		       irq, call_status);
 		return;
 	}
+
 	/* Now unmask the interrupt (often a no-op) */
-	call_status = rtas_call(ibm_int_on, 1, 1, (unsigned long*)&status, 
-				irq);
-	if( call_status != 0 ) {
-		printk("xics_disable_irq on: irq=%x: rtas_call failed, retn=%lx\n",
+	call_status = rtas_call(ibm_int_on, 1, 1, NULL, irq);
+	if (call_status != 0) {
+		printk("xics_enable_irq: irq=%x: ibm_int_on returned %lx\n",
 		       irq, call_status);
 		return;
 	}
 }
 
-void
-xics_disable_irq(
-	u_int	virq
-	)
+void xics_disable_irq(u_int virq)
 {
-	u_int		irq;
-	unsigned long 	status;
-	long 	        call_status;
+	u_int irq;
+	long call_status;
 
 	virq -= XICS_IRQ_OFFSET;
 	irq = virt_irq_to_real(virq);
-	call_status = rtas_call(ibm_int_off, 1, 1, (unsigned long*)&status, 
-				irq);
-	if( call_status != 0 ) {
-		printk("xics_disable_irq: irq=%x: rtas_call failed, retn=%lx\n",
+	if (irq == XICS_IPI)
+		return;
+
+	call_status = rtas_call(ibm_int_off, 1, 1, NULL, irq);
+	if (call_status != 0) {
+		printk("xics_disable_irq: irq=%x: ibm_int_off returned %lx\n",
 		       irq, call_status);
 		return;
 	}
 }
 
-void
-xics_end_irq(
-	u_int	irq
-	)
+void xics_end_irq(u_int	irq)
 {
 	int cpu = smp_processor_id();
 
-	ops->cppr_info(cpu, 0); /* actually the value overwritten by ack */
 	iosync();
-	ops->xirr_info_set(cpu, ((0xff<<24) | (virt_irq_to_real(irq-XICS_IRQ_OFFSET))));
-	iosync();
+	ops->xirr_info_set(cpu, ((0xff<<24) |
+				 (virt_irq_to_real(irq-XICS_IRQ_OFFSET))));
 }
 
-void
-xics_mask_and_ack_irq(u_int	irq)
+void xics_mask_and_ack_irq(u_int irq)
 {
 	int cpu = smp_processor_id();
 
-	if( irq < XICS_IRQ_OFFSET ) {
+	if (irq < XICS_IRQ_OFFSET) {
 		i8259_pic.ack(irq);
 		iosync();
-		ops->xirr_info_set(cpu, ((0xff<<24) | xics_irq_8259_cascade_real));
-		iosync();
-	}
-	else {
-		ops->cppr_info(cpu, 0xff);
+		ops->xirr_info_set(cpu, ((0xff<<24) |
+					 xics_irq_8259_cascade_real));
 		iosync();
 	}
 }
 
-int
-xics_get_irq(struct pt_regs *regs)
+int xics_get_irq(struct pt_regs *regs)
 {
-	u_int	cpu = smp_processor_id();
-	u_int	vec;
+	u_int cpu = smp_processor_id();
+	u_int vec;
 	int irq;
 
 	vec = ops->xirr_info_get(cpu);
 	/*  (vec >> 24) == old priority */
 	vec &= 0x00ffffff;
+
 	/* for sanity, this had better be < NR_IRQS - 16 */
-	if( vec == xics_irq_8259_cascade_real ) {
+	if (vec == xics_irq_8259_cascade_real) {
 		irq = i8259_irq(cpu);
-		if(irq == -1) {
+		if (irq == -1) {
 			/* Spurious cascaded interrupt.  Still must ack xics */
                         xics_end_irq(XICS_IRQ_OFFSET + xics_irq_8259_cascade);
 			irq = -1;
 		}
-	} else if( vec == XICS_IRQ_SPURIOUS ) {
+	} else if (vec == XICS_IRQ_SPURIOUS) {
 		irq = -1;
 	} else {
 		irq = real_irq_to_virt(vec) + XICS_IRQ_OFFSET;
@@ -250,35 +315,36 @@ xics_get_irq(struct pt_regs *regs)
 	return irq;
 }
 
-struct xics_ipi_struct {
-	volatile unsigned long value;
-} ____cacheline_aligned;
+#ifdef CONFIG_SMP
 
 extern struct xics_ipi_struct xics_ipi_message[NR_CPUS] __cacheline_aligned;
 
-#ifdef CONFIG_SMP
 void xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 
 	ops->qirr_info(cpu, 0xff);
 	while (xics_ipi_message[cpu].value) {
-		if (test_and_clear_bit(PPC_MSG_CALL_FUNCTION, &xics_ipi_message[cpu].value)) {
+		if (test_and_clear_bit(PPC_MSG_CALL_FUNCTION,
+				       &xics_ipi_message[cpu].value)) {
 			mb();
 			smp_message_recv(PPC_MSG_CALL_FUNCTION, regs);
 		}
-		if (test_and_clear_bit(PPC_MSG_RESCHEDULE, &xics_ipi_message[cpu].value)) {
+		if (test_and_clear_bit(PPC_MSG_RESCHEDULE,
+				       &xics_ipi_message[cpu].value)) {
 			mb();
 			smp_message_recv(PPC_MSG_RESCHEDULE, regs);
 		}
 #if 0
-		if (test_and_clear_bit(PPC_MSG_MIGRATE_TASK, &xics_ipi_message[cpu].value)) {
+		if (test_and_clear_bit(PPC_MSG_MIGRATE_TASK,
+				       &xics_ipi_message[cpu].value)) {
 			mb();
 			smp_message_recv(PPC_MSG_MIGRATE_TASK, regs);
 		}
 #endif
 #ifdef CONFIG_XMON
-		if (test_and_clear_bit(PPC_MSG_XMON_BREAK, &xics_ipi_message[cpu].value)) {
+		if (test_and_clear_bit(PPC_MSG_XMON_BREAK,
+				       &xics_ipi_message[cpu].value)) {
 			mb();
 			smp_message_recv(PPC_MSG_XMON_BREAK, regs);
 		}
@@ -288,7 +354,7 @@ void xics_ipi_action(int irq, void *dev_id, struct pt_regs *regs)
 
 void xics_cause_IPI(int cpu)
 {
-	ops->qirr_info(cpu,0) ;
+	ops->qirr_info(cpu, IPI_PRIORITY);
 }
 
 void xics_setup_cpu(void)
@@ -298,15 +364,20 @@ void xics_setup_cpu(void)
 	ops->cppr_info(cpu, 0xff);
 	iosync();
 }
+
 #endif /* CONFIG_SMP */
 
-void
-xics_init_IRQ( void )
+void xics_init_IRQ(void)
 {
 	int i;
 	unsigned long intr_size = 0;
 	struct device_node *np;
 	uint *ireg, ilen, indx=0;
+	unsigned long intr_base = 0;
+	struct xics_interrupt_node {
+		unsigned long long addr;
+		unsigned long long size;
+	} inodes[NR_CPUS*2]; 
 
 	ppc64_boot_msg(0x20, "XICS Init");
 
@@ -391,12 +462,13 @@ nextnode:
 		for (i = 0; i < NR_CPUS; ++i) {
 			if (!cpu_possible(i))
 				continue;
-			xics_info.per_cpu[i] =
-			  __ioremap((ulong)inodes[i].addr, 
-				  (ulong)inodes[i].size, _PAGE_NO_CACHE);
+			xics_per_cpu[i] = __ioremap((ulong)inodes[i].addr, 
+						    (ulong)inodes[i].size,
+						    _PAGE_NO_CACHE);
 		}
 #else
-		xics_info.per_cpu[0] = __ioremap((ulong)intr_base, intr_size, _PAGE_NO_CACHE);
+		xics_per_cpu[0] = __ioremap((ulong)intr_base, intr_size,
+					    _PAGE_NO_CACHE);
 #endif /* CONFIG_SMP */
 #ifdef CONFIG_PPC_PSERIES
 	/* actually iSeries does not use any of xics...but it has link dependencies
@@ -417,8 +489,8 @@ nextnode:
 	ops->cppr_info(boot_cpuid, 0xff);
 	iosync();
 	if (xics_irq_8259_cascade != -1) {
-		if (request_irq(xics_irq_8259_cascade + XICS_IRQ_OFFSET, no_action,
-				0, "8259 cascade", 0))
+		if (request_irq(xics_irq_8259_cascade + XICS_IRQ_OFFSET,
+				no_action, 0, "8259 cascade", 0))
 			printk(KERN_ERR "xics_init_IRQ: couldn't get 8259 cascade\n");
 		i8259_init();
 	}
