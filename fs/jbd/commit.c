@@ -18,6 +18,8 @@
 #include <linux/jbd.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
+#include <linux/mm.h>
+#include <linux/pagemap.h>
 #include <linux/smp_lock.h>
 
 /*
@@ -31,6 +33,49 @@ static void journal_end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 	else
 		clear_buffer_uptodate(bh);
 	unlock_buffer(bh);
+}
+
+/*
+ * When an ext3-ordered file is truncated, it is possible that many pages are
+ * not sucessfully freed, because they are attached to a committing transaction.
+ * After the transaction commits, these pages are left on the LRU, with no
+ * ->mapping, and with attached buffers.  These pages are trivially reclaimable
+ * by the VM, but their apparent absence upsets the VM accounting, and it makes
+ * the numbers in /proc/meminfo look odd.
+ *
+ * So here, we have a buffer which has just come off the forget list.  Look to
+ * see if we can strip all buffers from the backing page.
+ *
+ * Called under lock_journal(), and possibly under journal_datalist_lock.  The
+ * caller provided us with a ref against the buffer, and we drop that here.
+ */
+static void release_buffer_page(struct buffer_head *bh)
+{
+	struct page *page;
+
+	if (buffer_dirty(bh))
+		goto nope;
+	if (atomic_read(&bh->b_count) != 1)
+		goto nope;
+	page = bh->b_page;
+	if (!page)
+		goto nope;
+	if (page->mapping)
+		goto nope;
+
+	/* OK, it's a truncated page */
+	if (TestSetPageLocked(page))
+		goto nope;
+
+	page_cache_get(page);
+	__brelse(bh);
+	try_to_free_buffers(page);
+	unlock_page(page);
+	page_cache_release(page);
+	return;
+
+nope:
+	__brelse(bh);
 }
 
 /*
@@ -683,7 +728,8 @@ skip_commit: /* The journal should be unlocked by now. */
 			jh->b_transaction = 0;
 			jbd_unlock_bh_state(bh);
 			journal_remove_journal_head(bh);
-			__brelse(bh);
+			if (buffer_freed(bh))
+				release_buffer_page(bh);
 		}
 		spin_unlock(&journal->j_list_lock);
 	}
