@@ -72,7 +72,7 @@
 #define NESM_STOP_PG	0x80	/* Last page +1 of RX ring */
 
 
-int apne_probe(struct net_device *dev);
+struct net_device * __init apne_probe(int unit);
 static int apne_probe1(struct net_device *dev, int ioaddr);
 
 static int apne_open(struct net_device *dev);
@@ -138,10 +138,9 @@ struct net_device * __init apne_probe(int unit)
 		return ERR_PTR(-ENODEV);
 	}
 
-	dev = alloc_etherdev(0);
+	dev = alloc_ei_netdev();
 	if (!dev)
 		return ERR_PTR(-ENOMEM);
-	dev->priv = NULL;
 	if (unit >= 0) {
 		sprintf(dev->name, "eth%d", unit);
 		netdev_boot_setup_check(dev);
@@ -313,13 +312,6 @@ static int __init apne_probe1(struct net_device *dev, int ioaddr)
     /* Install the Interrupt handler */
     i = request_irq(IRQ_AMIGA_PORTS, apne_interrupt, SA_SHIRQ, dev->name, dev);
     if (i) return i;
-
-    /* Allocate dev->priv and fill in 8390 specific dev fields. */
-    if (ethdev_init(dev)) {
-	printk (" unable to get memory for dev->priv.\n");
-	free_irq(IRQ_AMIGA_PORTS, dev);
-	return -ENOMEM;
-    }
 
     for(i = 0; i < ETHER_ADDR_LEN; i++) {
 	printk(" %2.2x", SA_prom[i]);
@@ -572,8 +564,6 @@ static struct net_device *apne_dev;
 
 int init_module(void)
 {
-	int err;
-
 	apne_dev = apne_probe(-1);
 	if (IS_ERR(apne_dev))
 		return PTR_ERR(apne_dev);

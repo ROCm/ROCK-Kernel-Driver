@@ -280,14 +280,13 @@ static void cleanup_card(struct net_device *dev)
 {
 	mca_mark_as_unused(ei_status.priv);
 	mca_set_adapter_procfn( ei_status.priv, NULL, NULL);
-	kfree(dev->priv);
 	free_irq(dev->irq, dev);
 	release_region(dev->base_addr, NE_IO_EXTENT);
 }
 
 struct net_device * __init ne2_probe(int unit)
 {
-	struct net_device *dev = alloc_etherdev(0);
+	struct net_device *dev = alloc_ei_netdev();
 	int err;
 
 	if (!dev)
@@ -295,8 +294,6 @@ struct net_device * __init ne2_probe(int unit)
 
 	sprintf(dev->name, "eth%d", unit);
 	netdev_boot_setup_check(dev);
-
-	dev->priv = NULL;	/* until all 8390-based use alloc_etherdev() */
 
 	err = do_ne2_probe(dev);
 	if (err)
@@ -481,14 +478,6 @@ static int __init ne2_probe1(struct net_device *dev, int slot)
 	}
 
 	dev->base_addr = base_addr;
-
-	/* Allocate dev->priv and fill in 8390 specific dev fields. */
-	if (ethdev_init(dev)) {
-		printk (" unable to get memory for dev->priv.\n");
-		free_irq(dev->irq, dev);
-		retval = -ENOMEM;
-		goto out;
-	}
 
 	for(i = 0; i < ETHER_ADDR_LEN; i++) {
 		printk(" %2.2x", SA_prom[i]);
@@ -797,10 +786,9 @@ int init_module(void)
 	int this_dev, found = 0;
 
 	for (this_dev = 0; this_dev < MAX_NE_CARDS; this_dev++) {
-		dev = alloc_etherdev(0);
+		dev = alloc_ei_netdev();
 		if (!dev)
 			break;
-		dev->priv = NULL;
 		dev->irq = irq[this_dev];
 		dev->mem_end = bad[this_dev];
 		dev->base_addr = io[this_dev];

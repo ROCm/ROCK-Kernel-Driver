@@ -187,7 +187,7 @@ char __devinit *adapter_def(char type)
 #define TRC_INITV 0x02		/*  verbose init trace points     */
 unsigned char ibmtr_debug_trace = 0;
 
-int 		ibmtr_probe(struct net_device *dev);
+static int 	ibmtr_probe(struct net_device *dev);
 static int	ibmtr_probe1(struct net_device *dev, int ioaddr);
 static unsigned char get_sram_size(struct tok_info *adapt_info);
 static int 	trdev_init(struct net_device *dev);
@@ -313,6 +313,39 @@ static void __devinit find_turbo_adapters(int *iolist) {
 	}
 }
 
+static void ibmtr_cleanup_card(struct net_device *dev)
+{
+	if (dev->base_addr) {
+		outb(0,dev->base_addr+ADAPTRESET);
+		
+		schedule_timeout(TR_RST_TIME); /* wait 50ms */
+
+		outb(0,dev->base_addr+ADAPTRESETREL);
+	}
+
+#ifndef PCMCIA
+	free_irq(dev->irq, dev);
+	release_region(dev->base_addr, IBMTR_IO_EXTENT);
+
+	{ 
+		struct tok_info *ti = (struct tok_info *) dev->priv;
+		iounmap((u32 *)ti->mmio);
+		iounmap((u32 *)ti->sram_virt);
+	}
+#endif		
+}
+
+int ibmtr_probe_card(struct net_device *dev)
+{
+	int err = ibmtr_probe(dev);
+	if (!err) {
+		err = register_netdev(dev);
+		if (err)
+			ibmtr_cleanup_card(dev);
+	}
+	return err;
+}
+
 /****************************************************************************
  *	ibmtr_probe():  Routine specified in the network device structure
  *	to probe for an IBM Token Ring Adapter.  Routine outline:
@@ -325,7 +358,7 @@ static void __devinit find_turbo_adapters(int *iolist) {
  *	which references it.
  ****************************************************************************/
 
-int __devinit ibmtr_probe(struct net_device *dev)
+static int ibmtr_probe(struct net_device *dev)
 {
 	int i;
 	int base_addr = dev->base_addr;
@@ -1925,23 +1958,24 @@ static int __init ibmtr_init(void)
 	find_turbo_adapters(io);
 
 	for (i = 0; io[i] && (i < IBMTR_MAX_ADAPTERS); i++) {
+		struct net_device *dev;
 		irq[i] = 0;
 		mem[i] = 0;
-		dev_ibmtr[i] = alloc_trdev(sizeof(struct tok_info));
-		if (dev_ibmtr[i] == NULL) { 
+		dev = alloc_trdev(sizeof(struct tok_info));
+		if (dev == NULL) { 
 			if (i == 0)
 				return -ENOMEM;
 			break;
 		}
-		dev_ibmtr[i]->base_addr = io[i];
-		dev_ibmtr[i]->irq = irq[i];
-		dev_ibmtr[i]->mem_start = mem[i];
-		dev_ibmtr[i]->init = &ibmtr_probe;
-		if (register_netdev(dev_ibmtr[i]) != 0) {
-			kfree(dev_ibmtr[i]);
-			dev_ibmtr[i] = NULL;
+		dev->base_addr = io[i];
+		dev->irq = irq[i];
+		dev->mem_start = mem[i];
+
+		if (ibmtr_probe_card(dev)) {
+			free_netdev(dev);
 			continue;
 		}
+		dev_ibmtr[i] = dev;
 		count++;
 	}
 	if (count) return 0;
@@ -1957,27 +1991,9 @@ static void __exit ibmtr_cleanup(void)
 	for (i = 0; i < IBMTR_MAX_ADAPTERS; i++){
 		if (!dev_ibmtr[i])
 			continue;
-		if (dev_ibmtr[i]->base_addr) {
-			outb(0,dev_ibmtr[i]->base_addr+ADAPTRESET);
-			
-			schedule_timeout(TR_RST_TIME); /* wait 50ms */
-
-                        outb(0,dev_ibmtr[i]->base_addr+ADAPTRESETREL);
-                }
-
 		unregister_netdev(dev_ibmtr[i]);
-		free_irq(dev_ibmtr[i]->irq, dev_ibmtr[i]);
-		release_region(dev_ibmtr[i]->base_addr, IBMTR_IO_EXTENT);
-#ifndef PCMCIA
-		{ 
-			struct tok_info *ti = (struct tok_info *)
-				dev_ibmtr[i]->priv;
-			iounmap((u32 *)ti->mmio);
-			iounmap((u32 *)ti->sram_virt);
-		}
-#endif		
+		ibmtr_cleanup_card(dev_ibmtr[i]);
 		free_netdev(dev_ibmtr[i]);
-		dev_ibmtr[i] = NULL;
 	}
 }
 module_exit(ibmtr_cleanup);

@@ -495,7 +495,6 @@ int __init mac_nubus_sonic_probe(struct net_device* dev)
 {
 	static int slots;
 	struct nubus_dev* ndev = NULL;
-	struct sonic_local* lp;
 	unsigned long base_addr, prom_addr;
 	u16 sonic_dcr;
 	int id;
