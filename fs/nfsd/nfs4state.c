@@ -270,8 +270,7 @@ cmp_clid(clientid_t * cl1, clientid_t * cl2) {
 /* XXX what about NGROUP */
 static int
 cmp_creds(struct svc_cred *cr1, struct svc_cred *cr2){
-	return((cr1->cr_uid == cr2->cr_uid) &&
-	   	(cr1->cr_gid == cr2->cr_gid));
+	return(cr1->cr_uid == cr2->cr_uid);
 
 }
 
