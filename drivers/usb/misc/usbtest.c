@@ -1409,6 +1409,11 @@ static struct usb_device_id id_table [] = {
 		.driver_info = (unsigned long) &fw_info,
 		},
 
+	/* "Gadget Zero" firmware runs under Linux */
+	{ USB_DEVICE (0x0525, 0xa4a0),
+		.driver_info = (unsigned long) &fw_info,
+		},
+
 #ifdef KEYSPAN_19Qi
 	/* Keyspan 19qi uses an21xx (original EZ-USB) */
 	// this does not coexist with the real Keyspan 19qi driver!
