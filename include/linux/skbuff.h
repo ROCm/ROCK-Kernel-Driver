@@ -250,8 +250,8 @@ struct sk_buff {
 #ifdef CONFIG_NETFILTER
         unsigned long		nfmark;
 	__u32			nfcache;
-	struct nf_conntrack	*nfct;
 	__u32			nfctinfo;
+	struct nf_conntrack	*nfct;
 #ifdef CONFIG_NETFILTER_DEBUG
         unsigned int		nf_debug;
 #endif

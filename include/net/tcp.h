@@ -1271,6 +1271,13 @@ static __inline__ unsigned int tcp_packets_in_flight(struct tcp_opt *tp)
 		tcp_get_pcount(&tp->retrans_out));
 }
 
+/*
+ * Which congestion algorithim is in use on the connection.
+ */
+#define tcp_is_vegas(__tp)	((__tp)->adv_cong == TCP_VEGAS)
+#define tcp_is_westwood(__tp)	((__tp)->adv_cong == TCP_WESTWOOD)
+#define tcp_is_bic(__tp)	((__tp)->adv_cong == TCP_BIC)
+
 /* Recalculate snd_ssthresh, we want to set it to:
  *
  * Reno:
@@ -1283,7 +1290,7 @@ static __inline__ unsigned int tcp_packets_in_flight(struct tcp_opt *tp)
  */
 static inline __u32 tcp_recalc_ssthresh(struct tcp_opt *tp)
 {
-	if (sysctl_tcp_bic) {
+	if (tcp_is_bic(tp)) {
 		if (sysctl_tcp_bic_fast_convergence &&
 		    tp->snd_cwnd < tp->bictcp.last_max_cwnd)
 			tp->bictcp.last_max_cwnd
@@ -1302,11 +1309,6 @@ static inline __u32 tcp_recalc_ssthresh(struct tcp_opt *tp)
 
 /* Stop taking Vegas samples for now. */
 #define tcp_vegas_disable(__tp)	((__tp)->vegas.doing_vegas_now = 0)
-
-/* Is this TCP connection using Vegas (regardless of whether it is taking
- * Vegas measurements at the current time)?
- */
-#define tcp_is_vegas(__tp)	((__tp)->vegas.do_vegas)
     
 static inline void tcp_vegas_enable(struct tcp_opt *tp)
 {
@@ -1340,7 +1342,7 @@ static inline void tcp_vegas_enable(struct tcp_opt *tp)
 /* Should we be taking Vegas samples right now? */
 #define tcp_vegas_enabled(__tp)	((__tp)->vegas.doing_vegas_now)
 
-extern void tcp_vegas_init(struct tcp_opt *tp);
+extern void tcp_ca_init(struct tcp_opt *tp);
 
 static inline void tcp_set_ca_state(struct tcp_opt *tp, u8 ca_state)
 {
@@ -2024,7 +2026,7 @@ extern void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo);
 
 static inline void tcp_westwood_update_rtt(struct tcp_opt *tp, __u32 rtt_seq)
 {
-        if (sysctl_tcp_westwood)
+        if (tcp_is_westwood(tp))
                 tp->westwood.rtt = rtt_seq;
 }
 
@@ -2033,13 +2035,13 @@ void __tcp_westwood_slow_bw(struct sock *, struct sk_buff *);
 
 static inline void tcp_westwood_fast_bw(struct sock *sk, struct sk_buff *skb)
 {
-        if (sysctl_tcp_westwood)
+        if (tcp_is_westwood(tcp_sk(sk)))
                 __tcp_westwood_fast_bw(sk, skb);
 }
 
 static inline void tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
 {
-        if (sysctl_tcp_westwood)
+        if (tcp_is_westwood(tcp_sk(sk)))
                 __tcp_westwood_slow_bw(sk, skb);
 }
 
@@ -2052,14 +2054,14 @@ static inline __u32 __tcp_westwood_bw_rttmin(const struct tcp_opt *tp)
 
 static inline __u32 tcp_westwood_bw_rttmin(const struct tcp_opt *tp)
 {
-	return sysctl_tcp_westwood ? __tcp_westwood_bw_rttmin(tp) : 0;
+	return tcp_is_westwood(tp) ? __tcp_westwood_bw_rttmin(tp) : 0;
 }
 
 static inline int tcp_westwood_ssthresh(struct tcp_opt *tp)
 {
 	__u32 ssthresh = 0;
 
-	if (sysctl_tcp_westwood) {
+	if (tcp_is_westwood(tp)) {
 		ssthresh = __tcp_westwood_bw_rttmin(tp);
 		if (ssthresh)
 			tp->snd_ssthresh = ssthresh;  
@@ -2072,7 +2074,7 @@ static inline int tcp_westwood_cwnd(struct tcp_opt *tp)
 {
 	__u32 cwnd = 0;
 
-	if (sysctl_tcp_westwood) {
+	if (tcp_is_westwood(tp)) {
 		cwnd = __tcp_westwood_bw_rttmin(tp);
 		if (cwnd)
 			tp->snd_cwnd = cwnd;
