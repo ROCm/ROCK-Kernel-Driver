@@ -156,6 +156,7 @@ static struct uhci_td *uhci_alloc_td(struct uhci_hcd *uhci, struct usb_device *d
 	td->dev = dev;
 
 	INIT_LIST_HEAD(&td->list);
+	INIT_LIST_HEAD(&td->remove_list);
 	INIT_LIST_HEAD(&td->fl_list);
 
 	usb_get_dev(dev);
@@ -286,6 +287,8 @@ static void uhci_free_td(struct uhci_hcd *uhci, struct uhci_td *td)
 {
 	if (!list_empty(&td->list))
 		dbg("td %p is still in list!", td);
+	if (!list_empty(&td->remove_list))
+		dbg("td %p still in remove_list!", td);
 	if (!list_empty(&td->fl_list))
 		dbg("td %p is still in fl_list!", td);
 
@@ -702,6 +705,7 @@ static void uhci_destroy_urb_priv(struct uhci_hcd *uhci, struct urb *urb)
 {
 	struct list_head *head, *tmp;
 	struct urb_priv *urbp;
+	unsigned long flags;
 
 	urbp = (struct urb_priv *)urb->hcpriv;
 	if (!urbp)
@@ -713,6 +717,13 @@ static void uhci_destroy_urb_priv(struct uhci_hcd *uhci, struct urb *urb)
 	if (!list_empty(&urbp->complete_list))
 		warn("uhci_destroy_urb_priv: urb %p still on uhci->complete_list", urb);
 
+	spin_lock_irqsave(&uhci->td_remove_list_lock, flags);
+
+	/* Check to see if the remove list is empty. Set the IOC bit */
+	/* to force an interrupt so we can remove the TD's*/
+	if (list_empty(&uhci->td_remove_list))
+		uhci_set_next_interrupt(uhci);
+
 	head = &urbp->td_list;
 	tmp = head->next;
 	while (tmp != head) {
@@ -722,8 +733,10 @@ static void uhci_destroy_urb_priv(struct uhci_hcd *uhci, struct urb *urb)
 
 		uhci_remove_td_from_urb(td);
 		uhci_remove_td(uhci, td);
-		uhci_free_td(uhci, td);
+		list_add(&td->remove_list, &uhci->td_remove_list);
 	}
+
+	spin_unlock_irqrestore(&uhci->td_remove_list_lock, flags);
 
 	urb->hcpriv = NULL;
 	kmem_cache_free(uhci_up_cachep, urbp);
@@ -1801,6 +1814,26 @@ static void uhci_free_pending_qhs(struct uhci_hcd *uhci)
 	spin_unlock_irqrestore(&uhci->qh_remove_list_lock, flags);
 }
 
+static void uhci_free_pending_tds(struct uhci_hcd *uhci)
+{
+	struct list_head *tmp, *head;
+	unsigned long flags;
+
+	spin_lock_irqsave(&uhci->td_remove_list_lock, flags);
+	head = &uhci->td_remove_list;
+	tmp = head->next;
+	while (tmp != head) {
+		struct uhci_td *td = list_entry(tmp, struct uhci_td, remove_list);
+
+		tmp = tmp->next;
+
+		list_del_init(&td->remove_list);
+
+		uhci_free_td(uhci, td);
+	}
+	spin_unlock_irqrestore(&uhci->td_remove_list_lock, flags);
+}
+
 static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs)
 {
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
@@ -1898,6 +1931,8 @@ static void uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
 		uhci->resume_detect = 1;
 
 	uhci_free_pending_qhs(uhci);
+
+	uhci_free_pending_tds(uhci);
 
 	uhci_remove_pending_qhs(uhci);
 
@@ -2207,6 +2242,9 @@ static int uhci_start(struct usb_hcd *hcd)
 	spin_lock_init(&uhci->qh_remove_list_lock);
 	INIT_LIST_HEAD(&uhci->qh_remove_list);
 
+	spin_lock_init(&uhci->td_remove_list_lock);
+	INIT_LIST_HEAD(&uhci->td_remove_list);
+
 	spin_lock_init(&uhci->urb_remove_list_lock);
 	INIT_LIST_HEAD(&uhci->urb_remove_list);
 
@@ -2418,11 +2456,13 @@ static void uhci_stop(struct usb_hcd *hcd)
 	 * to this bus since there are no more parents
 	 */
 	uhci_free_pending_qhs(uhci);
+	uhci_free_pending_tds(uhci);
 	uhci_remove_pending_qhs(uhci);
 
 	reset_hc(uhci);
 
 	uhci_free_pending_qhs(uhci);
+	uhci_free_pending_tds(uhci);
 
 	release_uhci(uhci);
 }
