@@ -126,7 +126,7 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 				goto drop;
 			}
 
-			sk = llc_sk_alloc(parent->family, GFP_ATOMIC);
+			sk = llc_sk_alloc(parent->sk_family, GFP_ATOMIC);
 			if (!sk) {
 				sock_put(parent);
 				goto drop;

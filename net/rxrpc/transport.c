@@ -112,9 +112,9 @@ int rxrpc_create_transport(unsigned short port, struct rxrpc_transport **_trans)
 
 	/* set the socket up */
 	sock = trans->socket->sk;
-	sock->user_data = trans;
-	sock->data_ready = rxrpc_data_ready;
-	sock->error_report = rxrpc_error_report;
+	sock->sk_user_data = trans;
+	sock->sk_data_ready = rxrpc_data_ready;
+	sock->sk_error_report = rxrpc_error_report;
 
 	down_write(&rxrpc_proc_transports_sem);
 	list_add_tail(&trans->proc_link,&rxrpc_proc_transports);
@@ -184,7 +184,7 @@ void rxrpc_put_transport(struct rxrpc_transport *trans)
 
 	/* close the socket */
 	if (trans->socket) {
-		trans->socket->sk->user_data = NULL;
+		trans->socket->sk->sk_user_data = NULL;
 		sock_release(trans->socket);
 		trans->socket = NULL;
 	}
@@ -255,16 +255,16 @@ static void rxrpc_data_ready(struct sock *sk, int count)
 {
 	struct rxrpc_transport *trans;
 
-	_enter("%p{t=%p},%d",sk,sk->user_data,count);
+	_enter("%p{t=%p},%d",sk,sk->sk_user_data,count);
 
 	/* queue the transport for attention by krxiod */
-	trans = (struct rxrpc_transport *) sk->user_data;
+	trans = (struct rxrpc_transport *) sk->sk_user_data;
 	if (trans)
 		rxrpc_krxiod_queue_transport(trans);
 
 	/* wake up anyone waiting on the socket */
-	if (sk->sleep && waitqueue_active(sk->sleep))
-		wake_up_interruptible(sk->sleep);
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up_interruptible(sk->sk_sleep);
 
 	_leave("");
 
@@ -279,18 +279,18 @@ static void rxrpc_error_report(struct sock *sk)
 {
 	struct rxrpc_transport *trans;
 
-	_enter("%p{t=%p}",sk,sk->user_data);
+	_enter("%p{t=%p}",sk,sk->sk_user_data);
 
 	/* queue the transport for attention by krxiod */
-	trans = (struct rxrpc_transport *) sk->user_data;
+	trans = (struct rxrpc_transport *) sk->sk_user_data;
 	if (trans) {
 		trans->error_rcvd = 1;
 		rxrpc_krxiod_queue_transport(trans);
 	}
 
 	/* wake up anyone waiting on the socket */
-	if (sk->sleep && waitqueue_active(sk->sleep))
-		wake_up_interruptible(sk->sleep);
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up_interruptible(sk->sk_sleep);
 
 	_leave("");
 

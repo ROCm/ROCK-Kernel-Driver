@@ -123,10 +123,10 @@ void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	np = inet6_sk(sk);
 	icmpv6_err_convert(type, code, &err);
 	if (!sock_owned_by_user(sk) && np->recverr) {
-		sk->err = err;
-		sk->error_report(sk);
+		sk->sk_err = err;
+		sk->sk_error_report(sk);
 	} else {  /* Only an error on timeout */
-		sk->err_soft = err;
+		sk->sk_err_soft = err;
 	}
 
 out_unlock:
@@ -146,7 +146,7 @@ static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 
 	memset(&fl, 0, sizeof(fl));
 
-	fl.proto = sk->protocol;
+	fl.proto = sk->sk_protocol;
 
 	/* Fill in the dest address from the route entry passed with the skb
 	 * and the source address from the transport.
@@ -159,7 +159,7 @@ static int sctp_v6_xmit(struct sk_buff *skb, struct sctp_transport *transport,
 	if (ipv6_addr_type(&fl.fl6_src) & IPV6_ADDR_LINKLOCAL)
 		fl.oif = transport->saddr.v6.sin6_scope_id;
 	else
-		fl.oif = sk->bound_dev_if;
+		fl.oif = sk->sk_bound_dev_if;
 	fl.fl_ip_sport = inet_sk(sk)->sport;
 	fl.fl_ip_dport = transport->ipaddr.v6.sin6_port;
 
@@ -366,13 +366,13 @@ static void sctp_v6_from_sk(union sctp_addr *addr, struct sock *sk)
 	addr->v6.sin6_addr = inet6_sk(sk)->rcv_saddr;
 }
 
-/* Initialize sk->rcv_saddr from sctp_addr. */
+/* Initialize sk->sk_rcv_saddr from sctp_addr. */
 static void sctp_v6_to_sk_saddr(union sctp_addr *addr, struct sock *sk)
 {
 	inet6_sk(sk)->rcv_saddr = addr->v6.sin6_addr;
 }
 
-/* Initialize sk->daddr from sctp_addr. */
+/* Initialize sk->sk_daddr from sctp_addr. */
 static void sctp_v6_to_sk_daddr(union sctp_addr *addr, struct sock *sk)
 {
 	inet6_sk(sk)->daddr = addr->v6.sin6_addr;
@@ -500,25 +500,25 @@ struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 	struct sctp6_sock *newsctp6sk;
 
 	newsk = sk_alloc(PF_INET6, GFP_KERNEL, sizeof(struct sctp6_sock),
-			 sk->slab);
+			 sk->sk_slab);
 	if (!newsk)
 		goto out;
 
 	sock_init_data(NULL, newsk);
 	sk_set_owner(newsk, THIS_MODULE);
 
-	newsk->type = SOCK_STREAM;
+	newsk->sk_type = SOCK_STREAM;
 
-	newsk->prot = sk->prot;
-	newsk->no_check = sk->no_check;
-	newsk->reuse = sk->reuse;
+	newsk->sk_prot = sk->sk_prot;
+	newsk->sk_no_check = sk->sk_no_check;
+	newsk->sk_reuse = sk->sk_reuse;
 
-	newsk->destruct = inet_sock_destruct;
-	newsk->zapped = 0;
-	newsk->family = PF_INET6;
-	newsk->protocol = IPPROTO_SCTP;
-	newsk->backlog_rcv = sk->prot->backlog_rcv;
-	newsk->shutdown = sk->shutdown;
+	newsk->sk_destruct = inet_sock_destruct;
+	newsk->sk_zapped = 0;
+	newsk->sk_family = PF_INET6;
+	newsk->sk_protocol = IPPROTO_SCTP;
+	newsk->sk_backlog_rcv = sk->sk_prot->backlog_rcv;
+	newsk->sk_shutdown = sk->sk_shutdown;
 
 	newsctp6sk = (struct sctp6_sock *)newsk;
 	newsctp6sk->pinet6 = &newsctp6sk->inet6;
@@ -556,7 +556,7 @@ struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 	atomic_inc(&inet_sock_nr);
 #endif
 
-	if (0 != newsk->prot->init(newsk)) {
+	if (newsk->sk_prot->init(newsk)) {
 		inet_sock_release(newsk);
 		newsk = NULL;
 	}
@@ -716,8 +716,8 @@ static int sctp_inet6_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 			 */
 
 			if (addr->v6.sin6_scope_id)
-				sk->bound_dev_if = addr->v6.sin6_scope_id;
-			if (!sk->bound_dev_if)
+				sk->sk_bound_dev_if = addr->v6.sin6_scope_id;
+			if (!sk->sk_bound_dev_if)
 				return 0;
 		}
 		af = opt->pf->af;
@@ -746,8 +746,8 @@ static int sctp_inet6_send_verify(struct sctp_opt *opt, union sctp_addr *addr)
 			 */
 
 			if (addr->v6.sin6_scope_id)
-				sk->bound_dev_if = addr->v6.sin6_scope_id;
-			if (!sk->bound_dev_if)
+				sk->sk_bound_dev_if = addr->v6.sin6_scope_id;
+			if (!sk->sk_bound_dev_if)
 				return 0;
 		}
 		af = opt->pf->af;

@@ -36,7 +36,7 @@ void nr_clear_queues(struct sock *sk)
 {
 	nr_cb *nr = nr_sk(sk);
 
-	skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->sk_write_queue);
 	skb_queue_purge(&nr->ack_queue);
 	skb_queue_purge(&nr->reseq_queue);
 	skb_queue_purge(&nr->frag_queue);
@@ -75,7 +75,7 @@ void nr_requeue_frames(struct sock *sk)
 
 	while ((skb = skb_dequeue(&nr_sk(sk)->ack_queue)) != NULL) {
 		if (skb_prev == NULL)
-			skb_queue_head(&sk->write_queue, skb);
+			skb_queue_head(&sk->sk_write_queue, skb);
 		else
 			skb_append(skb_prev, skb);
 		skb_prev = skb;
@@ -272,12 +272,12 @@ void nr_disconnect(struct sock *sk, int reason)
 
 	nr_sk(sk)->state = NR_STATE_0;
 
-	sk->state     = TCP_CLOSE;
-	sk->err       = reason;
-	sk->shutdown |= SEND_SHUTDOWN;
+	sk->sk_state     = TCP_CLOSE;
+	sk->sk_err       = reason;
+	sk->sk_shutdown |= SEND_SHUTDOWN;
 
 	if (!sock_flag(sk, SOCK_DEAD)) {
-		sk->state_change(sk);
+		sk->sk_state_change(sk);
 		sock_set_flag(sk, SOCK_DEAD);
 	}
 }

@@ -229,7 +229,7 @@ struct tcp6_sock {
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 #define __ipv6_only_sock(sk)	(inet6_sk(sk)->ipv6only)
-#define ipv6_only_sock(sk)	((sk)->family == PF_INET6 && __ipv6_only_sock(sk))
+#define ipv6_only_sock(sk)	((sk)->sk_family == PF_INET6 && __ipv6_only_sock(sk))
 #else
 #define __ipv6_only_sock(sk)	0
 #define ipv6_only_sock(sk)	0

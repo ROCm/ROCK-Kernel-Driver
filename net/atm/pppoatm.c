@@ -231,7 +231,7 @@ static int pppoatm_send(struct ppp_channel *chan, struct sk_buff *skb)
 		kfree_skb(skb);
 		return 1;
 	}
-	atomic_add(skb->truesize, &ATM_SKB(skb)->vcc->sk->wmem_alloc);
+	atomic_add(skb->truesize, &ATM_SKB(skb)->vcc->sk->sk_wmem_alloc);
 	ATM_SKB(skb)->atm_options = ATM_SKB(skb)->vcc->atm_options;
 	DPRINTK("(unit %d): atm_skb(%p)->vcc(%p)->dev(%p)\n",
 	    pvcc->chan.unit, skb, ATM_SKB(skb)->vcc,

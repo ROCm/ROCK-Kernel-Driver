@@ -205,7 +205,6 @@ struct usbnet {
 	// housekeeping
 	struct usb_device	*udev;
 	struct driver_info	*driver_info;
-	struct semaphore	mutex;
 	wait_queue_head_t	*wait;
 
 	// i/o info: pipes etc
@@ -214,7 +213,7 @@ struct usbnet {
 	struct timer_list	delay;
 
 	// protocol/interface state
-	struct net_device	net;
+	struct net_device	*net;
 	struct net_device_stats	stats;
 	int			msg_level;
 	unsigned long		data [5];
@@ -295,27 +294,24 @@ MODULE_PARM (msg_level, "i");
 MODULE_PARM_DESC (msg_level, "Initial message level (default = 1)");
 
 
-#define	mutex_lock(x)	down(x)
-#define	mutex_unlock(x)	up(x)
-
 #define	RUN_CONTEXT (in_irq () ? "in_irq" \
 			: (in_interrupt () ? "in_interrupt" : "can sleep"))
 
 #ifdef DEBUG
 #define devdbg(usbnet, fmt, arg...) \
-	printk(KERN_DEBUG "%s: " fmt "\n" , (usbnet)->net.name , ## arg)
+	printk(KERN_DEBUG "%s: " fmt "\n" , (usbnet)->net->name , ## arg)
 #else
 #define devdbg(usbnet, fmt, arg...) do {} while(0)
 #endif
 
 #define deverr(usbnet, fmt, arg...) \
-	printk(KERN_ERR "%s: " fmt "\n" , (usbnet)->net.name , ## arg)
+	printk(KERN_ERR "%s: " fmt "\n" , (usbnet)->net->name , ## arg)
 #define devwarn(usbnet, fmt, arg...) \
-	printk(KERN_WARNING "%s: " fmt "\n" , (usbnet)->net.name , ## arg)
+	printk(KERN_WARNING "%s: " fmt "\n" , (usbnet)->net->name , ## arg)
 
 #define devinfo(usbnet, fmt, arg...) \
 	do { if ((usbnet)->msg_level >= 1) \
-	printk(KERN_INFO "%s: " fmt "\n" , (usbnet)->net.name , ## arg); \
+	printk(KERN_INFO "%s: " fmt "\n" , (usbnet)->net->name , ## arg); \
 	} while (0)
 
 /*-------------------------------------------------------------------------*/
@@ -505,7 +501,7 @@ static inline int get_ethernet_addr (struct usbnet *dev, struct ether_desc *e)
 	else if (tmp != 12)
 		return -EINVAL;
 	for (i = tmp = 0; i < 6; i++, tmp += 2)
-		dev->net.dev_addr [i] =
+		dev->net->dev_addr [i] =
 			 (nibble (buf [tmp]) << 4) + nibble (buf [tmp + 1]);
 	return 0;
 }
@@ -605,7 +601,7 @@ next_desc:
 	 * in routine cases.  info->ether describes the multicast support.
 	 */
 
-	dev->net.mtu = cpu_to_le16p (&info->ether->wMaxSegmentSize)
+	dev->net->mtu = cpu_to_le16p (&info->ether->wMaxSegmentSize)
 		- ETH_HLEN;
 	return 0;
 
@@ -806,18 +802,18 @@ static int genelink_check_connect (struct usbnet *dev)
 	// detect whether another side is connected
 	if ((retval = gl_control_write (dev, GENELINK_CONNECT_WRITE, 0)) != 0) {
 		dbg ("%s: genelink_check_connect write fail - %X",
-			dev->net.name, retval);
+			dev->net->name, retval);
 		return retval;
 	}
 
 	// usb interrupt read to ack another side 
 	if ((retval = gl_interrupt_read (dev)) != 0) {
 		dbg ("%s: genelink_check_connect read fail - %X",
-			dev->net.name, retval);
+			dev->net->name, retval);
 		return retval;
 	}
 
-	dbg ("%s: genelink_check_connect read success", dev->net.name);
+	dbg ("%s: genelink_check_connect read success", dev->net->name);
 	return 0;
 }
 
@@ -829,14 +825,14 @@ static int genelink_init (struct usbnet *dev)
 	// allocate the private data structure
 	if ((priv = kmalloc (sizeof *priv, GFP_KERNEL)) == 0) {
 		dbg ("%s: cannot allocate private data per device",
-			dev->net.name);
+			dev->net->name);
 		return -ENOMEM;
 	}
 
 	// allocate irq urb
 	if ((priv->irq_urb = usb_alloc_urb (0, GFP_KERNEL)) == 0) {
 		dbg ("%s: cannot allocate private irq urb per device",
-			dev->net.name);
+			dev->net->name);
 		kfree (priv);
 		return -ENOMEM;
 	}
@@ -920,14 +916,11 @@ static int genelink_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 		if (gl_skb) {
 
 			// copy the packet data to the new skb
-			memcpy (gl_skb->data, packet->packet_data, size);
-
-			// set skb data size
-			gl_skb->len = size;
-			gl_skb->dev = &dev->net;
+			memcpy(skb_put(gl_skb, size), packet->packet_data, size);
+			gl_skb->dev = dev->net;
 
 			// determine the packet's protocol ID
-			gl_skb->protocol = eth_type_trans (gl_skb, &dev->net);
+			gl_skb->protocol = eth_type_trans (gl_skb, dev->net);
 
 			// update the status
 			dev->stats.rx_packets++;
@@ -1143,7 +1136,7 @@ static void nc_dump_registers (struct usbnet *dev)
 		return;
 	}
 
-	dbg ("%s registers:", dev->net.name);
+	dbg ("%s registers:", dev->net->name);
 	for (reg = 0; reg < 0x20; reg++) {
 		int retval;
 
@@ -1156,10 +1149,10 @@ static void nc_dump_registers (struct usbnet *dev)
 		retval = nc_register_read (dev, reg, vp);
 		if (retval < 0)
 			dbg ("%s reg [0x%x] ==> error %d",
-				dev->net.name, reg, retval);
+				dev->net->name, reg, retval);
 		else
 			dbg ("%s reg [0x%x] = 0x%x",
-				dev->net.name, reg, *vp);
+				dev->net->name, reg, *vp);
 	}
 	kfree (vp);
 }
@@ -1321,7 +1314,7 @@ static int net1080_reset (struct usbnet *dev)
 
 	nc_register_write (dev, REG_TTL,
 			MK_TTL (NC_READ_TTL_MS, TTL_OTHER (ttl)) );
-	dbg ("%s: assigned TTL, %d ms", dev->net.name, NC_READ_TTL_MS);
+	dbg ("%s: assigned TTL, %d ms", dev->net->name, NC_READ_TTL_MS);
 
 	if (dev->msg_level >= 2)
 		devinfo (dev, "port %c, peer %sconnected",
@@ -1347,7 +1340,7 @@ static int net1080_check_connect (struct usbnet *dev)
 	status = *vp;
 	kfree (vp);
 	if (retval != 0) {
-		dbg ("%s net1080_check_conn read - %d", dev->net.name, retval);
+		dbg ("%s net1080_check_conn read - %d", dev->net->name, retval);
 		return retval;
 	}
 	if ((status & STATUS_CONN_OTHER) != STATUS_CONN_OTHER)
@@ -1416,11 +1409,11 @@ static int net1080_rx_fixup (struct usbnet *dev, struct sk_buff *skb)
 
 	if (!(skb->len & 0x01)
 			|| MIN_FRAMED > skb->len
-			|| skb->len > FRAMED_SIZE (dev->net.mtu)) {
+			|| skb->len > FRAMED_SIZE (dev->net->mtu)) {
 		dev->stats.rx_frame_errors++;
 		dbg ("rx framesize %d range %d..%d mtu %d", skb->len,
-			(int)MIN_FRAMED, (int)FRAMED_SIZE (dev->net.mtu),
-			dev->net.mtu);
+			(int)MIN_FRAMED, (int)FRAMED_SIZE (dev->net->mtu),
+			dev->net->mtu);
 		nc_ensure_sync (dev);
 		return 0;
 	}
@@ -1795,7 +1788,7 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 
 #ifdef CONFIG_USB_NET1080
 	if (dev->driver_info->flags & FLAG_FRAMING_NC)
-		size = FRAMED_SIZE (dev->net.mtu);
+		size = FRAMED_SIZE (dev->net->mtu);
 	else
 #endif
 #ifdef CONFIG_USB_GENESYS
@@ -1805,10 +1798,10 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 #endif
 #ifdef CONFIG_USB_ZAURUS
 	if (dev->driver_info->flags & FLAG_FRAMING_Z)
-		size = 6 + (sizeof (struct ethhdr) + dev->net.mtu);
+		size = 6 + (sizeof (struct ethhdr) + dev->net->mtu);
 	else
 #endif
-		size = (sizeof (struct ethhdr) + dev->net.mtu);
+		size = (sizeof (struct ethhdr) + dev->net->mtu);
 
 	if ((skb = alloc_skb (size, flags)) == 0) {
 		devdbg (dev, "no rx skb");
@@ -1829,8 +1822,8 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 
 	spin_lock_irqsave (&dev->rxq.lock, lockflags);
 
-	if (netif_running (&dev->net)
-			&& netif_device_present (&dev->net)
+	if (netif_running (dev->net)
+			&& netif_device_present (dev->net)
 			&& !test_bit (EVENT_RX_HALT, &dev->flags)) {
 		switch (retval = usb_submit_urb (urb, GFP_ATOMIC)){ 
 		case -EPIPE:
@@ -1841,7 +1834,7 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 			break;
 		case -ENODEV:
 			devdbg (dev, "device gone");
-			netif_device_detach (&dev->net);
+			netif_device_detach (dev->net);
 			break;
 		default:
 			devdbg (dev, "rx submit, %d", retval);
@@ -1874,8 +1867,8 @@ static inline void rx_process (struct usbnet *dev, struct sk_buff *skb)
 	if (skb->len) {
 		int	status;
 
-		skb->dev = &dev->net;
-		skb->protocol = eth_type_trans (skb, &dev->net);
+		skb->dev = dev->net;
+		skb->protocol = eth_type_trans (skb, dev->net);
 		dev->stats.rx_packets++;
 		dev->stats.rx_bytes += skb->len;
 
@@ -1968,7 +1961,7 @@ block:
 	defer_bh (dev, skb);
 
 	if (urb) {
-		if (netif_running (&dev->net)
+		if (netif_running (dev->net)
 				&& !test_bit (EVENT_RX_HALT, &dev->flags)) {
 			rx_submit (dev, urb, GFP_ATOMIC);
 			return;
@@ -2024,7 +2017,6 @@ static int usbnet_stop (struct net_device *net)
 	DECLARE_WAIT_QUEUE_HEAD (unlink_wakeup); 
 	DECLARE_WAITQUEUE (wait, current);
 
-	mutex_lock (&dev->mutex);
 	netif_stop_queue (net);
 
 	if (dev->msg_level >= 2)
@@ -2054,7 +2046,6 @@ static int usbnet_stop (struct net_device *net)
 	del_timer_sync (&dev->delay);
 	tasklet_kill (&dev->bh);
 
-	mutex_unlock (&dev->mutex);
 	return 0;
 }
 
@@ -2069,8 +2060,6 @@ static int usbnet_open (struct net_device *net)
 	struct usbnet		*dev = (struct usbnet *) net->priv;
 	int			retval = 0;
 	struct driver_info	*info = dev->driver_info;
-
-	mutex_lock (&dev->mutex);
 
 	// put into "known safe" state
 	if (info->reset && (retval = info->reset (dev)) < 0) {
@@ -2091,7 +2080,7 @@ static int usbnet_open (struct net_device *net)
 	if (dev->msg_level >= 2)
 		devinfo (dev, "open: enable queueing "
 				"(rx %d, tx %d) mtu %d %s framing",
-			RX_QLEN (dev), TX_QLEN (dev), dev->net.mtu,
+			RX_QLEN (dev), TX_QLEN (dev), dev->net->mtu,
 			(info->flags & (FLAG_FRAMING_NC | FLAG_FRAMING_GL))
 			    ? ((info->flags & FLAG_FRAMING_NC)
 				? "NetChip"
@@ -2102,7 +2091,6 @@ static int usbnet_open (struct net_device *net)
 	// delay posting reads until we're fully open
 	tasklet_schedule (&dev->bh);
 done:
-	mutex_unlock (&dev->mutex);
 	return retval;
 }
 
@@ -2201,7 +2189,7 @@ kevent (void *data)
 				status);
 		else {
 			clear_bit (EVENT_TX_HALT, &dev->flags);
-			netif_wake_queue (&dev->net);
+			netif_wake_queue (dev->net);
 		}
 	}
 	if (test_bit (EVENT_RX_HALT, &dev->flags)) {
@@ -2220,7 +2208,7 @@ kevent (void *data)
 	if (test_bit (EVENT_RX_MEMORY, &dev->flags)) {
 		struct urb	*urb = 0;
 
-		if (netif_running (&dev->net))
+		if (netif_running (dev->net))
 			urb = usb_alloc_urb (0, GFP_KERNEL);
 		else
 			clear_bit (EVENT_RX_MEMORY, &dev->flags);
@@ -2265,7 +2253,7 @@ static void tx_complete (struct urb *urb, struct pt_regs *regs)
 					jiffies + THROTTLE_JIFFIES);
 				devdbg (dev, "tx throttle %d", urb->status);
 			}
-			netif_stop_queue (&dev->net);
+			netif_stop_queue (dev->net);
 			break;
 		default:
 			devdbg (dev, "tx err %d", entry->urb->status);
@@ -2438,8 +2426,8 @@ static void usbnet_bh (unsigned long param)
 		}
 
 	// or are we maybe short a few urbs?
-	} else if (netif_running (&dev->net)
-			&& netif_device_present (&dev->net)
+	} else if (netif_running (dev->net)
+			&& netif_device_present (dev->net)
 			&& !timer_pending (&dev->delay)
 			&& !test_bit (EVENT_RX_HALT, &dev->flags)) {
 		int	temp = dev->rxq.qlen;
@@ -2461,7 +2449,7 @@ static void usbnet_bh (unsigned long param)
 				tasklet_schedule (&dev->bh);
 		}
 		if (dev->txq.qlen < TX_QLEN (dev))
-			netif_wake_queue (&dev->net);
+			netif_wake_queue (dev->net);
 	}
 }
 
@@ -2491,11 +2479,12 @@ static void usbnet_disconnect (struct usb_interface *intf)
 		xdev->bus->bus_name, xdev->devpath,
 		dev->driver_info->description);
 	
-	unregister_netdev (&dev->net);
+	unregister_netdev (dev->net);
 
 	if (dev->driver_info->unbind)
 		dev->driver_info->unbind (dev, intf);
 
+	kfree(dev->net);
 	kfree (dev);
 	usb_put_dev (xdev);
 }
@@ -2523,15 +2512,17 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	xdev = interface_to_usbdev (udev);
 	interface = &udev->altsetting [udev->act_altsetting];
 
+	usb_get_dev (xdev);
+
+	status = -ENOMEM;
+
 	// set up our own records
 	if (!(dev = kmalloc (sizeof *dev, GFP_KERNEL))) {
 		dbg ("can't kmalloc dev");
-		return -ENOMEM;
+		goto out;
 	}
 	memset (dev, 0, sizeof *dev);
 
-	init_MUTEX_LOCKED (&dev->mutex);
-	usb_get_dev (xdev);
 	dev->udev = xdev;
 	dev->driver_info = info;
 	dev->msg_level = msg_level;
@@ -2546,15 +2537,15 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	init_timer (&dev->delay);
 
 	// set up network interface records
-	net = &dev->net;
+	net = alloc_etherdev(0);
+	if (!net)
+		goto out1;
+
 	SET_MODULE_OWNER (net);
+	dev->net = net;
 	net->priv = dev;
 	strcpy (net->name, "usb%d");
 	memcpy (net->dev_addr, node_id, sizeof node_id);
-
-	// point-to-point link ... we always use Ethernet headers 
-	// supports win32 interop (some devices) and the bridge driver.
-	ether_setup (net);
 
 	// possible with some EHCI controllers
 	if (dma_supported (&udev->dev, 0xffffffffffffffffULL))
@@ -2592,26 +2583,37 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 			status = 0;
 
 	}
-	if (status < 0) {
-		kfree (dev);
-		return status;
-	}
+	if (status < 0)
+		goto out2;
+
 	dev->maxpacket = usb_maxpacket (dev->udev, dev->out, 1);
 	
-	SET_NETDEV_DEV(&dev->net, &dev->udev->dev);
-	register_netdev (&dev->net);
+	SET_NETDEV_DEV(dev->net, &dev->udev->dev);
+	status = register_netdev (dev->net);
+	if (status)
+		goto out3;
 	devinfo (dev, "register usbnet at usb-%s-%s, %s",
 		xdev->bus->bus_name, xdev->devpath,
 		dev->driver_info->description);
 
 	// ok, it's ready to go.
 	usb_set_intfdata (udev, dev);
-	mutex_unlock (&dev->mutex);
 
 	// start as if the link is up
-	netif_device_attach (&dev->net);
+	netif_device_attach (dev->net);
 
 	return 0;
+
+out3:
+	if (info->unbind)
+		info->unbind (dev, udev);
+out2:
+	kfree(net);
+out1:
+	kfree(dev);
+out:
+	usb_put_dev(xdev);
+	return status;
 }
 
 

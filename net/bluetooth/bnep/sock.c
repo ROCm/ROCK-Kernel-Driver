@@ -93,7 +93,7 @@ static int bnep_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 		if (!nsock)
 			return err;
 
-		if (nsock->sk->state != BT_CONNECTED)
+		if (nsock->sk->sk_state != BT_CONNECTED)
 			return -EBADFD;
 
 		err = bnep_add_connection(&ca, nsock);
@@ -179,8 +179,8 @@ static int bnep_sock_create(struct socket *sock, int protocol)
 
 	sock->state  = SS_UNCONNECTED;
 
-	sk->destruct = NULL;
-	sk->protocol = protocol;
+	sk->sk_destruct = NULL;
+	sk->sk_protocol = protocol;
 	return 0;
 }
 

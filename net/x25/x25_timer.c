@@ -45,18 +45,18 @@ static void x25_timer_expiry(unsigned long);
 
 void x25_start_heartbeat(struct sock *sk)
 {
-	del_timer(&sk->timer);
+	del_timer(&sk->sk_timer);
 
-	sk->timer.data     = (unsigned long)sk;
-	sk->timer.function = &x25_heartbeat_expiry;
-	sk->timer.expires  = jiffies + 5 * HZ;
+	sk->sk_timer.data     = (unsigned long)sk;
+	sk->sk_timer.function = &x25_heartbeat_expiry;
+	sk->sk_timer.expires  = jiffies + 5 * HZ;
 
-	add_timer(&sk->timer);
+	add_timer(&sk->sk_timer);
 }
 
 void x25_stop_heartbeat(struct sock *sk)
 {
-	del_timer(&sk->timer);
+	del_timer(&sk->sk_timer);
 }
 
 void x25_start_t2timer(struct sock *sk)
@@ -143,7 +143,7 @@ static void x25_heartbeat_expiry(unsigned long param)
 			 * get removed.
 			 */
 			if (sock_flag(sk, SOCK_DESTROY) ||
-			    (sk->state == TCP_LISTEN &&
+			    (sk->sk_state == TCP_LISTEN &&
 			     sock_flag(sk, SOCK_DEAD))) {
 				x25_destroy_socket(sk);
 				goto unlock;

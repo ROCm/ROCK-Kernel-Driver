@@ -2176,8 +2176,8 @@ int __init igmp6_init(struct net_proto_family *ops)
 	}
 
 	sk = igmp6_socket->sk;
-	sk->allocation = GFP_ATOMIC;
-	sk->prot->unhash(sk);
+	sk->sk_allocation = GFP_ATOMIC;
+	sk->sk_prot->unhash(sk);
 
 	np = inet6_sk(sk);
 	np->hop_limit = 1;

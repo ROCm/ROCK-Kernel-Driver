@@ -188,7 +188,7 @@ static int br2684_xmit_vcc(struct sk_buff *skb, struct br2684_dev *brdev,
 		dev_kfree_skb(skb);
 		return 0;
 		}
-	atomic_add(skb->truesize, &atmvcc->sk->wmem_alloc);
+	atomic_add(skb->truesize, &atmvcc->sk->sk_wmem_alloc);
 	ATM_SKB(skb)->atm_options = atmvcc->atm_options;
 	brdev->stats.tx_packets++;
 	brdev->stats.tx_bytes += skb->len;
@@ -551,7 +551,7 @@ Note: we do not have explicit unassign, but look at _push()
 	barrier();
 	atmvcc->push = br2684_push;
 	skb_queue_head_init(&copy);
-	skb_migrate(&atmvcc->sk->receive_queue, &copy);
+	skb_migrate(&atmvcc->sk->sk_receive_queue, &copy);
 	while ((skb = skb_dequeue(&copy))) {
 		BRPRIV(skb->dev)->stats.rx_bytes -= skb->len;
 		BRPRIV(skb->dev)->stats.rx_packets--;

@@ -133,7 +133,7 @@ struct dn_scp                                   /* Session Control Port */
 
 };
 
-#define DN_SK(__sk) ((struct dn_scp *)(__sk)->protinfo)
+#define DN_SK(__sk) ((struct dn_scp *)(__sk)->sk_protinfo)
 
 /*
  * src,dst : Source and Destination DECnet addresses

@@ -496,9 +496,9 @@ svc_sock_setbufsize(struct socket *sock, unsigned int snd, unsigned int rcv)
 	 * DaveM said I could!
 	 */
 	lock_sock(sock->sk);
-	sock->sk->sndbuf = snd * 2;
-	sock->sk->rcvbuf = rcv * 2;
-	sock->sk->userlocks |= SOCK_SNDBUF_LOCK|SOCK_RCVBUF_LOCK;
+	sock->sk->sk_sndbuf = snd * 2;
+	sock->sk->sk_rcvbuf = rcv * 2;
+	sock->sk->sk_userlocks |= SOCK_SNDBUF_LOCK|SOCK_RCVBUF_LOCK;
 	release_sock(sock->sk);
 #endif
 }
@@ -508,7 +508,7 @@ svc_sock_setbufsize(struct socket *sock, unsigned int snd, unsigned int rcv)
 static void
 svc_udp_data_ready(struct sock *sk, int count)
 {
-	struct svc_sock	*svsk = (struct svc_sock *)(sk->user_data);
+	struct svc_sock	*svsk = (struct svc_sock *)(sk->sk_user_data);
 
 	if (!svsk)
 		goto out;
@@ -517,8 +517,8 @@ svc_udp_data_ready(struct sock *sk, int count)
 	set_bit(SK_DATA, &svsk->sk_flags);
 	svc_sock_enqueue(svsk);
  out:
-	if (sk->sleep && waitqueue_active(sk->sleep))
-		wake_up_interruptible(sk->sleep);
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up_interruptible(sk->sk_sleep);
 }
 
 /*
@@ -527,7 +527,7 @@ svc_udp_data_ready(struct sock *sk, int count)
 static void
 svc_write_space(struct sock *sk)
 {
-	struct svc_sock	*svsk = (struct svc_sock *)(sk->user_data);
+	struct svc_sock	*svsk = (struct svc_sock *)(sk->sk_user_data);
 
 	if (svsk) {
 		dprintk("svc: socket %p(inet %p), write_space busy=%d\n",
@@ -535,10 +535,10 @@ svc_write_space(struct sock *sk)
 		svc_sock_enqueue(svsk);
 	}
 
-	if (sk->sleep && waitqueue_active(sk->sleep)) {
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep)) {
 		printk(KERN_WARNING "RPC svc_write_space: some sleeping on %p\n",
 		       svsk);
-		wake_up_interruptible(sk->sleep);
+		wake_up_interruptible(sk->sk_sleep);
 	}
 }
 
@@ -589,7 +589,7 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 	rqstp->rq_addr.sin_port = skb->h.uh->source;
 	rqstp->rq_addr.sin_addr.s_addr = skb->nh.iph->saddr;
 
-	svsk->sk_sk->stamp = skb->stamp;
+	svsk->sk_sk->sk_stamp = skb->stamp;
 
 	if (skb_is_nonlinear(skb)) {
 		/* we have to copy */
@@ -652,8 +652,8 @@ svc_udp_sendto(struct svc_rqst *rqstp)
 static void
 svc_udp_init(struct svc_sock *svsk)
 {
-	svsk->sk_sk->data_ready = svc_udp_data_ready;
-	svsk->sk_sk->write_space = svc_write_space;
+	svsk->sk_sk->sk_data_ready = svc_udp_data_ready;
+	svsk->sk_sk->sk_write_space = svc_write_space;
 	svsk->sk_recvfrom = svc_udp_recvfrom;
 	svsk->sk_sendto = svc_udp_sendto;
 
@@ -679,21 +679,21 @@ svc_tcp_listen_data_ready(struct sock *sk, int count_unused)
 	struct svc_sock	*svsk;
 
 	dprintk("svc: socket %p TCP (listen) state change %d\n",
-			sk, sk->state);
+			sk, sk->sk_state);
 
-	if  (sk->state != TCP_ESTABLISHED) {
+	if  (sk->sk_state != TCP_ESTABLISHED) {
 		/* Aborted connection, SYN_RECV or whatever... */
 		goto out;
 	}
-	if (!(svsk = (struct svc_sock *) sk->user_data)) {
+	if (!(svsk = (struct svc_sock *) sk->sk_user_data)) {
 		printk("svc: socket %p: no user data\n", sk);
 		goto out;
 	}
 	set_bit(SK_CONN, &svsk->sk_flags);
 	svc_sock_enqueue(svsk);
  out:
-	if (sk->sleep && waitqueue_active(sk->sleep))
-		wake_up_interruptible_all(sk->sleep);
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up_interruptible_all(sk->sk_sleep);
 }
 
 /*
@@ -705,17 +705,17 @@ svc_tcp_state_change(struct sock *sk)
 	struct svc_sock	*svsk;
 
 	dprintk("svc: socket %p TCP (connected) state change %d (svsk %p)\n",
-			sk, sk->state, sk->user_data);
+			sk, sk->sk_state, sk->sk_user_data);
 
-	if (!(svsk = (struct svc_sock *) sk->user_data)) {
+	if (!(svsk = (struct svc_sock *) sk->sk_user_data)) {
 		printk("svc: socket %p: no user data\n", sk);
 		goto out;
 	}
 	set_bit(SK_CLOSE, &svsk->sk_flags);
 	svc_sock_enqueue(svsk);
  out:
-	if (sk->sleep && waitqueue_active(sk->sleep))
-		wake_up_interruptible_all(sk->sleep);
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up_interruptible_all(sk->sk_sleep);
 }
 
 static void
@@ -724,14 +724,14 @@ svc_tcp_data_ready(struct sock *sk, int count)
 	struct svc_sock *	svsk;
 
 	dprintk("svc: socket %p TCP data ready (svsk %p)\n",
-			sk, sk->user_data);
-	if (!(svsk = (struct svc_sock *)(sk->user_data)))
+			sk, sk->sk_user_data);
+	if (!(svsk = (struct svc_sock *)(sk->sk_user_data)))
 		goto out;
 	set_bit(SK_DATA, &svsk->sk_flags);
 	svc_sock_enqueue(svsk);
  out:
-	if (sk->sleep && waitqueue_active(sk->sleep))
-		wake_up_interruptible(sk->sleep);
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up_interruptible(sk->sk_sleep);
 }
 
 /*
@@ -797,7 +797,7 @@ svc_tcp_accept(struct svc_sock *svsk)
 	/* make sure that a write doesn't block forever when
 	 * low on memory
 	 */
-	newsock->sk->sndtimeo = HZ*30;
+	newsock->sk->sk_sndtimeo = HZ*30;
 
 	if (!(newsvsk = svc_setup_socket(serv, newsock, &err, 0)))
 		goto failed;
@@ -1035,15 +1035,15 @@ svc_tcp_init(struct svc_sock *svsk)
 	svsk->sk_recvfrom = svc_tcp_recvfrom;
 	svsk->sk_sendto = svc_tcp_sendto;
 
-	if (sk->state == TCP_LISTEN) {
+	if (sk->sk_state == TCP_LISTEN) {
 		dprintk("setting up TCP socket for listening\n");
-		sk->data_ready = svc_tcp_listen_data_ready;
+		sk->sk_data_ready = svc_tcp_listen_data_ready;
 		set_bit(SK_CONN, &svsk->sk_flags);
 	} else {
 		dprintk("setting up TCP socket for reading\n");
-		sk->state_change = svc_tcp_state_change;
-		sk->data_ready = svc_tcp_data_ready;
-		sk->write_space = svc_write_space;
+		sk->sk_state_change = svc_tcp_state_change;
+		sk->sk_data_ready = svc_tcp_data_ready;
+		sk->sk_write_space = svc_write_space;
 
 		svsk->sk_reclen = 0;
 		svsk->sk_tcplen = 0;
@@ -1290,7 +1290,7 @@ svc_setup_socket(struct svc_serv *serv, struct socket *sock,
 
 	/* Register socket with portmapper */
 	if (*errp >= 0 && pmap_register)
-		*errp = svc_register(serv, inet->protocol,
+		*errp = svc_register(serv, inet->sk_protocol,
 				     ntohs(inet_sk(inet)->sport));
 
 	if (*errp < 0) {
@@ -1299,12 +1299,12 @@ svc_setup_socket(struct svc_serv *serv, struct socket *sock,
 	}
 
 	set_bit(SK_BUSY, &svsk->sk_flags);
-	inet->user_data = svsk;
+	inet->sk_user_data = svsk;
 	svsk->sk_sock = sock;
 	svsk->sk_sk = inet;
-	svsk->sk_ostate = inet->state_change;
-	svsk->sk_odata = inet->data_ready;
-	svsk->sk_owspace = inet->write_space;
+	svsk->sk_ostate = inet->sk_state_change;
+	svsk->sk_odata = inet->sk_data_ready;
+	svsk->sk_owspace = inet->sk_write_space;
 	svsk->sk_server = serv;
 	svsk->sk_lastrecv = get_seconds();
 	INIT_LIST_HEAD(&svsk->sk_deferred);
@@ -1363,7 +1363,7 @@ svc_create_socket(struct svc_serv *serv, int protocol, struct sockaddr_in *sin)
 		return error;
 
 	if (sin != NULL) {
-		sock->sk->reuse = 1; /* allow address reuse */
+		sock->sk->sk_reuse = 1; /* allow address reuse */
 		error = sock->ops->bind(sock, (struct sockaddr *) sin,
 						sizeof(*sin));
 		if (error < 0)
@@ -1398,9 +1398,9 @@ svc_delete_socket(struct svc_sock *svsk)
 	serv = svsk->sk_server;
 	sk = svsk->sk_sk;
 
-	sk->state_change = svsk->sk_ostate;
-	sk->data_ready = svsk->sk_odata;
-	sk->write_space = svsk->sk_owspace;
+	sk->sk_state_change = svsk->sk_ostate;
+	sk->sk_data_ready = svsk->sk_odata;
+	sk->sk_write_space = svsk->sk_owspace;
 
 	spin_lock_bh(&serv->sv_lock);
 
