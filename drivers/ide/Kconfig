@@ -249,12 +249,17 @@ config BLK_DEV_IDESCSI
 	tristate "SCSI emulation support"
 	depends on SCSI
 	---help---
+	  WARNING: ide-scsi is no longer needed for cd writing applications!
+	  The 2.6 kernel supports direct writing to ide-cd, which eliminates
+	  the need for ide-scsi + the entire scsi stack just for writing a
+	  cd. The new method is more efficient in every way.
+
 	  This will provide SCSI host adapter emulation for IDE ATAPI devices,
 	  and will allow you to use a SCSI device driver instead of a native
 	  ATAPI driver.
 
 	  This is useful if you have an ATAPI device for which no native
-	  driver has been written (for example, an ATAPI PD-CD or CDR drive);
+	  driver has been written (for example, an ATAPI PD-CD drive);
 	  you can then use this emulation together with an appropriate SCSI
 	  device driver. In order to do this, say Y here and to "SCSI support"
 	  and "SCSI generic support", below. You must then provide the kernel
@@ -262,8 +267,7 @@ config BLK_DEV_IDESCSI
 	  documentation of your boot loader (lilo or loadlin) about how to
 	  pass options to the kernel at boot time) for devices if you want the
 	  native EIDE sub-drivers to skip over the native support, so that
-	  this SCSI emulation can be used instead. This is required for use of
-	  CD-RW's.
+	  this SCSI emulation can be used instead.
 
 	  Note that this option does NOT allow you to attach SCSI devices to a
 	  box that doesn't have a SCSI host adapter installed.
