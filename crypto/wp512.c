@@ -25,18 +25,21 @@
 #include <asm/scatterlist.h>
 #include <linux/crypto.h>
 
-#define WHIRLPOOL_DIGEST_SIZE 64
-#define WHIRLPOOL_BLOCK_SIZE  64
-#define WHIRLPOOL_LENGTHBYTES 32
+#define WP512_DIGEST_SIZE 64
+#define WP384_DIGEST_SIZE 48
+#define WP256_DIGEST_SIZE 32
+
+#define WP512_BLOCK_SIZE  64
+#define WP512_LENGTHBYTES 32
 
 #define WHIRLPOOL_ROUNDS 10
 
-struct whirlpool_ctx {
-	u8  bitLength[WHIRLPOOL_LENGTHBYTES];
-	u8  buffer[WHIRLPOOL_BLOCK_SIZE];
+struct wp512_ctx {
+	u8  bitLength[WP512_LENGTHBYTES];
+	u8  buffer[WP512_BLOCK_SIZE];
 	int bufferBits;
 	int bufferPos;
-	u64 hash[WHIRLPOOL_DIGEST_SIZE/8];
+	u64 hash[WP512_DIGEST_SIZE/8];
 };
 
 /*
@@ -769,7 +772,7 @@ static const u64 rc[WHIRLPOOL_ROUNDS + 1] = {
  * The core Whirlpool transform.
  */
 
-static void whirlpool_process_buffer(struct whirlpool_ctx *wctx) {
+static void wp512_process_buffer(struct wp512_ctx *wctx) {
 	int i, r;
 	u64 K[8];        /* the round key */
 	u64 block[8];    /* mu(buffer) */
@@ -985,9 +988,9 @@ static void whirlpool_process_buffer(struct whirlpool_ctx *wctx) {
 
 }
 
-static void whirlpool_init (void *ctx) {
+static void wp512_init (void *ctx) {
 	int i;
-	struct whirlpool_ctx *wctx = ctx;
+	struct wp512_ctx *wctx = ctx;
 
 	memset(wctx->bitLength, 0, 32);
 	wctx->bufferBits = wctx->bufferPos = 0;
@@ -997,10 +1000,10 @@ static void whirlpool_init (void *ctx) {
 	}
 }
 
-static void whirlpool_update(void *ctx, const u8 *source, unsigned int len)
+static void wp512_update(void *ctx, const u8 *source, unsigned int len)
 {
 
-	struct whirlpool_ctx *wctx = ctx;
+	struct wp512_ctx *wctx = ctx;
 	int sourcePos    = 0;
 	unsigned int bits_len = len * 8; // convert to number of bits
 	int sourceGap    = (8 - ((int)bits_len & 7)) & 7;
@@ -1024,8 +1027,8 @@ static void whirlpool_update(void *ctx, const u8 *source, unsigned int len)
 		((source[sourcePos + 1] & 0xff) >> (8 - sourceGap));
 		buffer[bufferPos++] |= (u8)(b >> bufferRem);
 		bufferBits += 8 - bufferRem;
-		if (bufferBits == WHIRLPOOL_DIGEST_SIZE * 8) {
-			whirlpool_process_buffer(wctx);
+		if (bufferBits == WP512_BLOCK_SIZE * 8) {
+			wp512_process_buffer(wctx);
 			bufferBits = bufferPos = 0;
 		}
 		buffer[bufferPos] = b << (8 - bufferRem);
@@ -1045,8 +1048,8 @@ static void whirlpool_update(void *ctx, const u8 *source, unsigned int len)
 		bufferPos++;
 		bufferBits += 8 - bufferRem;
 		bits_len -= 8 - bufferRem;
-		if (bufferBits == WHIRLPOOL_DIGEST_SIZE * 8) {
-			whirlpool_process_buffer(wctx);
+		if (bufferBits == WP512_BLOCK_SIZE * 8) {
+			wp512_process_buffer(wctx);
 			bufferBits = bufferPos = 0;
 		}
 		buffer[bufferPos] = b << (8 - bufferRem);
@@ -1058,9 +1061,9 @@ static void whirlpool_update(void *ctx, const u8 *source, unsigned int len)
 
 }
 
-static void whirlpool_final(void *ctx, u8 *out)
+static void wp512_final(void *ctx, u8 *out)
 {
-	struct whirlpool_ctx *wctx = ctx;
+	struct wp512_ctx *wctx = ctx;
 	int i;
    	u8 *buffer      = wctx->buffer;
    	u8 *bitLength   = wctx->bitLength;
@@ -1070,22 +1073,22 @@ static void whirlpool_final(void *ctx, u8 *out)
 
    	buffer[bufferPos] |= 0x80U >> (bufferBits & 7);
    	bufferPos++;
-   	if (bufferPos > WHIRLPOOL_BLOCK_SIZE - WHIRLPOOL_LENGTHBYTES) {
-   		if (bufferPos < WHIRLPOOL_BLOCK_SIZE) {
-	   	memset(&buffer[bufferPos], 0, WHIRLPOOL_BLOCK_SIZE - bufferPos);
+   	if (bufferPos > WP512_BLOCK_SIZE - WP512_LENGTHBYTES) {
+   		if (bufferPos < WP512_BLOCK_SIZE) {
+	   	memset(&buffer[bufferPos], 0, WP512_BLOCK_SIZE - bufferPos);
    		}
-   		whirlpool_process_buffer(wctx);
+   		wp512_process_buffer(wctx);
    		bufferPos = 0;
    	}
-   	if (bufferPos < WHIRLPOOL_BLOCK_SIZE - WHIRLPOOL_LENGTHBYTES) {
+   	if (bufferPos < WP512_BLOCK_SIZE - WP512_LENGTHBYTES) {
    		memset(&buffer[bufferPos], 0,
-			  (WHIRLPOOL_BLOCK_SIZE - WHIRLPOOL_LENGTHBYTES) - bufferPos);
+			  (WP512_BLOCK_SIZE - WP512_LENGTHBYTES) - bufferPos);
    	}
-   	bufferPos = WHIRLPOOL_BLOCK_SIZE - WHIRLPOOL_LENGTHBYTES;
-   	memcpy(&buffer[WHIRLPOOL_BLOCK_SIZE - WHIRLPOOL_LENGTHBYTES],
-		   bitLength, WHIRLPOOL_LENGTHBYTES);
-   	whirlpool_process_buffer(wctx);
-   	for (i = 0; i < WHIRLPOOL_DIGEST_SIZE/8; i++) {
+   	bufferPos = WP512_BLOCK_SIZE - WP512_LENGTHBYTES;
+   	memcpy(&buffer[WP512_BLOCK_SIZE - WP512_LENGTHBYTES],
+		   bitLength, WP512_LENGTHBYTES);
+   	wp512_process_buffer(wctx);
+   	for (i = 0; i < WP512_DIGEST_SIZE/8; i++) {
 		digest[0] = (u8)(wctx->hash[i] >> 56);
 		digest[1] = (u8)(wctx->hash[i] >> 48);
 		digest[2] = (u8)(wctx->hash[i] >> 40);
@@ -1100,29 +1103,103 @@ static void whirlpool_final(void *ctx, u8 *out)
    	wctx->bufferPos    = bufferPos;
 }
 
-static struct crypto_alg alg = {
-	.cra_name	=	"whirlpool",
+static void wp384_final(void *ctx, u8 *out)
+{
+	struct wp512_ctx *wctx = ctx;
+	u8 D[64];
+
+	wp512_final (wctx, D);
+	memcpy (out, D, WP384_DIGEST_SIZE);
+	memset (D, 0, WP512_DIGEST_SIZE);
+}
+
+static void wp256_final(void *ctx, u8 *out)
+{
+	struct wp512_ctx *wctx = ctx;
+	u8 D[64];
+
+	wp512_final (wctx, D);
+	memcpy (out, D, WP256_DIGEST_SIZE);
+	memset (D, 0, WP512_DIGEST_SIZE);
+}
+
+static struct crypto_alg wp512 = {
+	.cra_name	=	"wp512",
 	.cra_flags	=	CRYPTO_ALG_TYPE_DIGEST,
-	.cra_blocksize	=	WHIRLPOOL_BLOCK_SIZE,
-	.cra_ctxsize	=	sizeof(struct whirlpool_ctx),
+	.cra_blocksize	=	WP512_BLOCK_SIZE,
+	.cra_ctxsize	=	sizeof(struct wp512_ctx),
 	.cra_module	=	THIS_MODULE,
-	.cra_list       =       LIST_HEAD_INIT(alg.cra_list),	
+	.cra_list       =       LIST_HEAD_INIT(wp512.cra_list),	
 	.cra_u		=	{ .digest = {
-	.dia_digestsize	=	WHIRLPOOL_DIGEST_SIZE,
-	.dia_init   	= 	whirlpool_init,
-	.dia_update 	=	whirlpool_update,
-	.dia_final  	=	whirlpool_final } }
+	.dia_digestsize	=	WP512_DIGEST_SIZE,
+	.dia_init   	= 	wp512_init,
+	.dia_update 	=	wp512_update,
+	.dia_final  	=	wp512_final } }
+};
+
+static struct crypto_alg wp384 = {
+	.cra_name	=	"wp384",
+	.cra_flags	=	CRYPTO_ALG_TYPE_DIGEST,
+	.cra_blocksize	=	WP512_BLOCK_SIZE,
+	.cra_ctxsize	=	sizeof(struct wp512_ctx),
+	.cra_module	=	THIS_MODULE,
+	.cra_list       =       LIST_HEAD_INIT(wp384.cra_list),	
+	.cra_u		=	{ .digest = {
+	.dia_digestsize	=	WP384_DIGEST_SIZE,
+	.dia_init   	= 	wp512_init,
+	.dia_update 	=	wp512_update,
+	.dia_final  	=	wp384_final } }
+};
+
+static struct crypto_alg wp256 = {
+	.cra_name	=	"wp256",
+	.cra_flags	=	CRYPTO_ALG_TYPE_DIGEST,
+	.cra_blocksize	=	WP512_BLOCK_SIZE,
+	.cra_ctxsize	=	sizeof(struct wp512_ctx),
+	.cra_module	=	THIS_MODULE,
+	.cra_list       =       LIST_HEAD_INIT(wp256.cra_list),	
+	.cra_u		=	{ .digest = {
+	.dia_digestsize	=	WP256_DIGEST_SIZE,
+	.dia_init   	= 	wp512_init,
+	.dia_update 	=	wp512_update,
+	.dia_final  	=	wp256_final } }
 };
 
 static int __init init(void)
 {
-	return crypto_register_alg(&alg);
+	int ret = 0;
+
+	ret = crypto_register_alg(&wp512);
+
+	if (ret < 0)
+		goto out;
+
+	ret = crypto_register_alg(&wp384);
+	if (ret < 0)
+	{
+		crypto_unregister_alg(&wp512);
+		goto out;
+	}
+
+	ret = crypto_register_alg(&wp256);
+	if (ret < 0)
+	{
+		crypto_unregister_alg(&wp512);
+		crypto_unregister_alg(&wp384);
+	}
+out:
+	return ret;
 }
 
 static void __exit fini(void)
 {
-	crypto_unregister_alg(&alg);
+	crypto_unregister_alg(&wp512);
+	crypto_unregister_alg(&wp384);
+	crypto_unregister_alg(&wp256);
 }
+
+MODULE_ALIAS("wp384");
+MODULE_ALIAS("wp256");
 
 module_init(init);
 module_exit(fini);

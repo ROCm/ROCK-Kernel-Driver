@@ -372,7 +372,6 @@ static void sfq_perturbation(unsigned long arg)
 	struct sfq_sched_data *q = qdisc_priv(sch);
 
 	q->perturbation = net_random()&0x1F;
-	q->perturb_timer.expires = jiffies + q->perturb_period;
 
 	if (q->perturb_period) {
 		q->perturb_timer.expires = jiffies + q->perturb_period;
