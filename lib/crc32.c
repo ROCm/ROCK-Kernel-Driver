@@ -265,8 +265,19 @@ u32 attribute((pure)) crc32_be(u32 crc, unsigned char const *p, size_t len)
 }
 #endif
 
+u32 bitreverse(u32 x)
+{
+	x = (x >> 16) | (x << 16);
+	x = (x >> 8 & 0x00ff00ff) | (x << 8 & 0xff00ff00);
+	x = (x >> 4 & 0x0f0f0f0f) | (x << 4 & 0xf0f0f0f0);
+	x = (x >> 2 & 0x33333333) | (x << 2 & 0xcccccccc);
+	x = (x >> 1 & 0x55555555) | (x << 1 & 0xaaaaaaaa);
+	return x;
+}
+
 EXPORT_SYMBOL(crc32_le);
 EXPORT_SYMBOL(crc32_be);
+EXPORT_SYMBOL(bitreverse);
 
 /*
  * A brief CRC tutorial.
@@ -411,16 +422,6 @@ buf_dump(char const *prefix, unsigned char const *buf, size_t len)
 
 }
 #endif
-
-static u32 attribute((const)) bitreverse(u32 x)
-{
-	x = (x >> 16) | (x << 16);
-	x = (x >> 8 & 0x00ff00ff) | (x << 8 & 0xff00ff00);
-	x = (x >> 4 & 0x0f0f0f0f) | (x << 4 & 0xf0f0f0f0);
-	x = (x >> 2 & 0x33333333) | (x << 2 & 0xcccccccc);
-	x = (x >> 1 & 0x55555555) | (x << 1 & 0xaaaaaaaa);
-	return x;
-}
 
 static void bytereverse(unsigned char *buf, size_t len)
 {
