@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#147 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#148 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -80,6 +80,11 @@ struct proc_dir_entry proc_scsi_aic79xx = {
 	S_IFDIR | S_IRUGO | S_IXUGO, 2,
 	0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+/* For dynamic sglist size calculation. */
+u_int ahd_linux_nseg;
 #endif
 
 /*
@@ -478,6 +483,7 @@ static void ahd_linux_filter_inquiry(struct ahd_softc *ahd,
 static void ahd_linux_dev_timed_unfreeze(u_long arg);
 static void ahd_linux_sem_timeout(u_long arg);
 static void ahd_linux_initialize_scsi_bus(struct ahd_softc *ahd);
+static void ahd_linux_size_nseg(void);
 static void ahd_linux_thread_run_complete_queue(struct ahd_softc *ahd);
 static void ahd_linux_start_dv(struct ahd_softc *ahd);
 static void ahd_linux_dv_timeout(struct scsi_cmnd *cmd);
@@ -824,6 +830,67 @@ static int	   ahd_linux_dev_reset(Scsi_Cmnd *);
 static int	   ahd_linux_abort(Scsi_Cmnd *);
 
 /*
+ * Calculate a safe value for AHD_NSEG (as expressed through ahd_linux_nseg).
+ *
+ * In pre-2.5.X...
+ * The midlayer allocates an S/G array dynamically when a command is issued
+ * using SCSI malloc.  This array, which is in an OS dependent format that
+ * must later be copied to our private S/G list, is sized to house just the
+ * number of segments needed for the current transfer.  Since the code that
+ * sizes the SCSI malloc pool does not take into consideration fragmentation
+ * of the pool, executing transactions numbering just a fraction of our
+ * concurrent transaction limit with SG list lengths aproaching AHC_NSEG will
+ * quickly depleat the SCSI malloc pool of usable space.  Unfortunately, the
+ * mid-layer does not properly handle this scsi malloc failures for the S/G
+ * array and the result can be a lockup of the I/O subsystem.  We try to size
+ * our S/G list so that it satisfies our drivers allocation requirements in
+ * addition to avoiding fragmentation of the SCSI malloc pool.
+ */
+static void
+ahd_linux_size_nseg(void)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	u_int cur_size;
+	u_int best_size;
+
+	/*
+	 * The SCSI allocator rounds to the nearest 512 bytes
+	 * an cannot allocate across a page boundary.  Our algorithm
+	 * is to start at 1K of scsi malloc space per-command and
+	 * loop through all factors of the PAGE_SIZE and pick the best.
+	 */
+	best_size = 0;
+	for (cur_size = 1024; cur_size <= PAGE_SIZE; cur_size *= 2) {
+		u_int nseg;
+
+		nseg = cur_size / sizeof(struct scatterlist);
+		if (nseg < AHD_LINUX_MIN_NSEG)
+			continue;
+
+		if (best_size == 0) {
+			best_size = cur_size;
+			ahd_linux_nseg = nseg;
+		} else {
+			u_int best_rem;
+			u_int cur_rem;
+
+			/*
+			 * Compare the traits of the current "best_size"
+			 * with the current size to determine if the
+			 * current size is a better size.
+			 */
+			best_rem = best_size % sizeof(struct scatterlist);
+			cur_rem = cur_size % sizeof(struct scatterlist);
+			if (cur_rem < best_rem) {
+				best_size = cur_size;
+				ahd_linux_nseg = nseg;
+			}
+		}
+	}
+#endif
+}
+
+/*
  * Try to detect an Adaptec 79XX controller.
  */
 static int
@@ -851,6 +918,10 @@ ahd_linux_detect(Scsi_Host_Template *template)
 		printf("ahd_linux_detect: Unable to attach\n");
 		return (0);
 	}
+	/*
+	 * Determine an appropriate size for our Scatter Gatther lists.
+	 */
+	ahd_linux_size_nseg();
 #ifdef MODULE
 	/*
 	 * If we've been passed any parameters, process them now.
@@ -1650,7 +1721,6 @@ Scsi_Host_Template aic79xx_driver_template = {
 #endif
 	.can_queue		= AHD_MAX_QUEUE,
 	.this_id		= -1,
-	.sg_tablesize		= AHD_NSEG,
 	.cmd_per_lun		= 2,
 	.use_clustering		= ENABLE_CLUSTERING,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
@@ -2089,6 +2159,7 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 	host->max_id = (ahd->features & AHD_WIDE) ? 16 : 8;
 	host->max_lun = AHD_NUM_LUNS;
 	host->max_channel = 0;
+	host->sg_tablesize = AHD_NSEG;
 	ahd_set_unit(ahd, ahd_linux_next_unit());
 	sprintf(buf, "scsi%d", host->host_no);
 	new_name = malloc(strlen(buf) + 1, M_DEVBUF, M_NOWAIT);

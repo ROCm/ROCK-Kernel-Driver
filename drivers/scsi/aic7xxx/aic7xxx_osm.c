@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#210 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#211 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -153,11 +153,10 @@ static int errno;
 spinlock_t ahc_list_spinlock;
 #endif
 
-/*
- * To generate the correct addresses for the controller to issue
- * on the bus.  Originally added for DEC Alpha support.
- */
-#define VIRT_TO_BUS(a) (uint32_t)virt_to_bus((void *)(a))
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+/* For dynamic sglist size calculation. */
+u_int ahc_linux_nseg;
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 struct proc_dir_entry proc_scsi_aic7xxx = {
@@ -508,6 +507,7 @@ static void ahc_linux_release_simq(u_long arg);
 static void ahc_linux_dev_timed_unfreeze(u_long arg);
 static int  ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag);
 static void ahc_linux_initialize_scsi_bus(struct ahc_softc *ahc);
+static void ahc_linux_size_nseg(void);
 static void ahc_linux_thread_run_complete_queue(struct ahc_softc *ahc);
 static void ahc_linux_start_dv(struct ahc_softc *ahc);
 static void ahc_linux_dv_timeout(struct scsi_cmnd *cmd);
@@ -824,6 +824,67 @@ static int	   ahc_linux_dev_reset(Scsi_Cmnd *);
 static int	   ahc_linux_abort(Scsi_Cmnd *);
 
 /*
+ * Calculate a safe value for AHC_NSEG (as expressed through ahc_linux_nseg).
+ *
+ * In pre-2.5.X...
+ * The midlayer allocates an S/G array dynamically when a command is issued
+ * using SCSI malloc.  This array, which is in an OS dependent format that
+ * must later be copied to our private S/G list, is sized to house just the
+ * number of segments needed for the current transfer.  Since the code that
+ * sizes the SCSI malloc pool does not take into consideration fragmentation
+ * of the pool, executing transactions numbering just a fraction of our
+ * concurrent transaction limit with list lengths aproaching AHC_NSEG will
+ * quickly depleat the SCSI malloc pool of usable space.  Unfortunately, the
+ * mid-layer does not properly handle this scsi malloc failures for the S/G
+ * array and the result can be a lockup of the I/O subsystem.  We try to size
+ * our S/G list so that it satisfies our drivers allocation requirements in
+ * addition to avoiding fragmentation of the SCSI malloc pool.
+ */
+static void
+ahc_linux_size_nseg(void)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+	u_int cur_size;
+	u_int best_size;
+
+	/*
+	 * The SCSI allocator rounds to the nearest 512 bytes
+	 * an cannot allocate across a page boundary.  Our algorithm
+	 * is to start at 1K of scsi malloc space per-command and
+	 * loop through all factors of the PAGE_SIZE and pick the best.
+	 */
+	best_size = 0;
+	for (cur_size = 1024; cur_size <= PAGE_SIZE; cur_size *= 2) {
+		u_int nseg;
+
+		nseg = cur_size / sizeof(struct scatterlist);
+		if (nseg < AHC_LINUX_MIN_NSEG)
+			continue;
+
+		if (best_size == 0) {
+			best_size = cur_size;
+			ahc_linux_nseg = nseg;
+		} else {
+			u_int best_rem;
+			u_int cur_rem;
+
+			/*
+			 * Compare the traits of the current "best_size"
+			 * with the current size to determine if the
+			 * current size is a better size.
+			 */
+			best_rem = best_size % sizeof(struct scatterlist);
+			cur_rem = cur_size % sizeof(struct scatterlist);
+			if (cur_rem < best_rem) {
+				best_size = cur_size;
+				ahc_linux_nseg = nseg;
+			}
+		}
+	}
+#endif
+}
+
+/*
  * Try to detect an Adaptec 7XXX controller.
  */
 static int
@@ -851,6 +912,7 @@ ahc_linux_detect(Scsi_Host_Template *template)
 		printf("ahc_linux_detect: Unable to attach\n");
 		return (0);
 	}
+	ahc_linux_size_nseg();
 #ifdef MODULE
 	/*
 	 * If we've been passed any parameters, process them now.
@@ -1280,7 +1342,6 @@ Scsi_Host_Template aic7xxx_driver_template = {
 #endif
 	.can_queue		= AHC_MAX_QUEUE,
 	.this_id		= -1,
-	.sg_tablesize		= AHC_NSEG,
 	.cmd_per_lun		= 2,
 	.use_clustering		= ENABLE_CLUSTERING,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,7)
@@ -1454,6 +1515,7 @@ ahc_dmamap_load(struct ahc_softc *ahc, bus_dma_tag_t dmat, bus_dmamap_t map,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 	stack_sg.ds_addr = map->bus_addr;
 #else
+#define VIRT_TO_BUS(a) (uint32_t)virt_to_bus((void *)(a))
 	stack_sg.ds_addr = VIRT_TO_BUS(buf);
 #endif
 	stack_sg.ds_len = dmat->maxsize;
@@ -1711,13 +1773,13 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	ahc->platform_data->host = host;
 	host->can_queue = AHC_MAX_QUEUE;
 	host->cmd_per_lun = 2;
-	host->sg_tablesize = AHC_NSEG;
 	/* XXX No way to communicate the ID for multiple channels */
 	host->this_id = ahc->our_id;
 	host->irq = ahc->platform_data->irq;
 	host->max_id = (ahc->features & AHC_WIDE) ? 16 : 8;
 	host->max_lun = AHC_NUM_LUNS;
 	host->max_channel = (ahc->features & AHC_TWIN) ? 1 : 0;
+	host->sg_tablesize = AHC_NSEG;
 	ahc_set_unit(ahc, ahc_linux_next_unit());
 	sprintf(buf, "scsi%d", host->host_no);
 	new_name = malloc(strlen(buf) + 1, M_DEVBUF, M_NOWAIT);

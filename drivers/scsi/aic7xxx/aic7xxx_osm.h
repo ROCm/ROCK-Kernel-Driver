@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#133 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#134 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -494,7 +494,18 @@ struct ahc_linux_target {
  * manner and are allocated below 4GB, the number of S/G segments is
  * unrestricted.
  */
-#define        AHC_NSEG 128
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+/*
+ * We dynamically adjust the number of segments in pre-2.5 kernels to
+ * avoid fragmentation issues in the SCSI mid-layer's private memory
+ * allocator.  See aic7xxx_osm.c ahc_linux_size_nseg() for details.
+ */
+extern u_int ahc_linux_nseg;
+#define	AHC_NSEG ahc_linux_nseg
+#define	AHC_LINUX_MIN_NSEG 64
+#else
+#define	AHC_NSEG 128
+#endif
 
 /*
  * Per-SCB OSM storage.
