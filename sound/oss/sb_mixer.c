@@ -278,6 +278,9 @@ int sb_common_mixer_set(sb_devc * devc, int dev, int left, int right)
 	if (regoffs == 0)
 		return -EINVAL;
 
+	if ((dev < 0) || (dev >= devc->iomap_sz))
+	    return -EINVAL;
+
 	val = sb_getmixer(devc, regoffs);
 	change_bits(devc, &val, dev, LEFT_CHN, left);
 
@@ -333,6 +336,9 @@ static int smw_mixer_set(sb_devc * devc, int dev, int left, int right)
 			break;
 
 		default:
+			/* bounds check */
+			if (dev < 0 || dev >= ARRAY_SIZE(smw_mix_regs))
+				return -EINVAL;
 			reg = smw_mix_regs[dev];
 			if (reg == 0)
 				return -EINVAL;
@@ -355,7 +361,7 @@ static int sb_mixer_set(sb_devc * devc, int dev, int value)
 	if (right > 100)
 		right = 100;
 
-	if (dev > 31)
+	if ((dev < 0) || (dev > 31))
 		return -EINVAL;
 
 	if (!(devc->supported_devices & (1 << dev)))	/*
@@ -684,6 +690,7 @@ int sb_mixer_init(sb_devc * devc, struct module *owner)
 			devc->supported_devices = SBPRO_MIXER_DEVICES;
 			devc->supported_rec_devices = SBPRO_RECORDING_DEVICES;
 			devc->iomap = &sbpro_mix;
+			devc->iomap_sz = ARRAY_SIZE(sbpro_mix);
 			break;
 
 		case MDL_ESS:
@@ -695,6 +702,7 @@ int sb_mixer_init(sb_devc * devc, struct module *owner)
 			devc->supported_devices = 0;
 			devc->supported_rec_devices = 0;
 			devc->iomap = &sbpro_mix;
+			devc->iomap_sz = ARRAY_SIZE(sbpro_mix);
 			smw_mixer_init(devc);
 			break;
 
@@ -706,11 +714,13 @@ int sb_mixer_init(sb_devc * devc, struct module *owner)
 			{
 				devc->supported_devices = SB16_MIXER_DEVICES;
 				devc->iomap = &sb16_mix;
+				devc->iomap_sz = ARRAY_SIZE(sb16_mix);
 			}
 			else
 			{
 				devc->supported_devices = ALS007_MIXER_DEVICES;
 				devc->iomap = &als007_mix;
+				devc->iomap_sz = ARRAY_SIZE(als007_mix);
 			}
 			break;
 
