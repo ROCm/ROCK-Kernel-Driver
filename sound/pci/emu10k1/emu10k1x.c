@@ -938,16 +938,16 @@ static int __devinit snd_emu10k1x_create(snd_card_t *card,
 	chip->port = pci_resource_start(pci, 0);
 	if ((chip->res_port = request_region(chip->port, 8,
 					     "EMU10K1X")) == NULL) { 
+		snd_printk(KERN_ERR "emu10k1x: cannot allocate the port 0x%lx\n", chip->port);
 		snd_emu10k1x_free(chip);
-		snd_printk(KERN_ERR "cannot allocate the port\n");
 		return -EBUSY;
 	}
 
 	if (request_irq(pci->irq, snd_emu10k1x_interrupt,
 			SA_INTERRUPT|SA_SHIRQ, "EMU10K1X",
 			(void *)chip)) {
+		snd_printk(KERN_ERR "emu10k1x: cannot grab irq %d\n", pci->irq);
 		snd_emu10k1x_free(chip);
-		snd_printk(KERN_ERR "cannot grab irq\n");
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;
