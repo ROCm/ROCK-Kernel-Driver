@@ -48,7 +48,6 @@
 #define call_yaboot(FUNC,...) do { ; } while (0)
 #endif
 
-#include <asm/init.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <asm/prom.h>
@@ -2110,7 +2109,7 @@ find_type_devices(const char *type)
 /*
  * Returns all nodes linked together
  */
-struct device_node * __openfirmware
+struct device_node *
 find_all_nodes(void)
 {
 	struct device_node *head, **prevp, *np;
@@ -2235,7 +2234,7 @@ get_property(struct device_node *np, const char *name, int *lenp)
 /*
  * Add a property to a node
  */
-void __openfirmware
+void
 prom_add_property(struct device_node* np, struct property* prop)
 {
 	struct property **next = &np->properties;
@@ -2247,7 +2246,7 @@ prom_add_property(struct device_node* np, struct property* prop)
 }
 
 #if 0
-void __openfirmware
+void
 print_properties(struct device_node *np)
 {
 	struct property *pp;

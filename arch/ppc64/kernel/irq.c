@@ -81,7 +81,7 @@ unsigned long lpEvent_count = 0;
  * this needs to be removed.
  * -- Cort
  */
-#define IRQ_KMALLOC_ENTRIES 8
+#define IRQ_KMALLOC_ENTRIES 16
 static int cache_bitmask = 0;
 static struct irqaction malloc_cache[IRQ_KMALLOC_ENTRIES];
 extern int mem_init_done;
@@ -474,7 +474,9 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	int cpu = smp_processor_id();
 	irq_desc_t *desc = irq_desc + irq;
 
-	balance_irq(irq);
+	/* XXX This causes bad performance and lockups on XICS - Anton */
+	if (naca->interrupt_controller == IC_OPEN_PIC)
+		balance_irq(irq);
 
 	kstat.irqs[cpu][irq]++;
 	spin_lock(&desc->lock);

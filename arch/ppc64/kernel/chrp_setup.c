@@ -56,7 +56,6 @@
 #include <asm/machdep.h>
 #include <asm/irq.h>
 #include <asm/keyboard.h>
-#include <asm/init.h>
 #include <asm/naca.h>
 #include <asm/time.h>
 
@@ -108,11 +107,15 @@ extern int rd_prompt;		/* 1 = prompt for ramdisk, 0 = don't prompt */
 extern int rd_image_start;	/* starting block # of image */
 #endif
 
+extern unsigned long ppc_tb_freq;
+
 void 
 chrp_get_cpuinfo(struct seq_file *m)
 {
 	struct device_node *root;
 	const char *model = "";
+
+	seq_printf(m, "timebase\t: %lu\n", ppc_tb_freq);
 
 	root = find_path_device("/");
 	if (root)
@@ -303,7 +306,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.progress("Linux ppc64\n", 0x0);
 }
 
-void __chrp
+void
 chrp_progress(char *s, unsigned short hex)
 {
 	struct device_node *root;
