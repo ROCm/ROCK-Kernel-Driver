@@ -556,7 +556,7 @@ static int snd_card_harmony_playback_prepare(snd_pcm_substream_t * substream)
 	harmony->sample_rate = snd_card_harmony_rate_bits(runtime->rate);
 
 	/* data format */
-	harmony->data_format = snd_harmony_set_data_format(haromny, runtime->format);
+	harmony->data_format = snd_harmony_set_data_format(harmony, runtime->format);
 
 	/* number of channels */
 	if (runtime->channels == 2)
@@ -587,7 +587,7 @@ static int snd_card_harmony_capture_prepare(snd_pcm_substream_t * substream)
 	harmony->sample_rate = snd_card_harmony_rate_bits(runtime->rate);
 	
 	/* data format */
-	harmony->data_format = snd_harmony_set_data_format(haromny, runtime->format);
+	harmony->data_format = snd_harmony_set_data_format(harmony, runtime->format);
 	
 	/* number of channels */
 	if (runtime->channels == 1)
