@@ -2224,6 +2224,8 @@ static int __init init_scsi(void)
 			printk(KERN_ERR "SCSI: can't init sg mempool %s\n", sgp->name);
 	}
 
+	scsi_init_procfs();
+	scsi_devfs_handle = devfs_mk_dir(NULL, "scsi", NULL);
 	scsi_host_init();
 	scsi_dev_info_list_init(scsi_dev_flags);
 	bus_register(&scsi_driverfs_bus_type);
@@ -2235,9 +2237,10 @@ static void __exit exit_scsi(void)
 {
 	int i;
 
+	bus_unregister(&scsi_driverfs_bus_type);
+	scsi_dev_info_list_delete();
 	devfs_unregister(scsi_devfs_handle);
 	scsi_exit_procfs();
-	scsi_dev_info_list_delete();
 
 	for (i = 0; i < SG_MEMPOOL_NR; i++) {
 		struct scsi_host_sg_pool *sgp = scsi_sg_pools + i;
