@@ -37,6 +37,8 @@
 #define SENSE_TIMEOUT (10*HZ)
 #endif
 
+#define START_UNIT_TIMEOUT (30*HZ)
+
 /*
  * These should *probably* be handled by the host itself.
  * Since it is allowed to sleep, it probably should.
@@ -281,6 +283,15 @@ static int scsi_check_sense(struct scsi_cmnd *scmd)
 		if ((scmd->sense_buffer[12] == 0x04) &&
 			(scmd->sense_buffer[13] == 0x01)) {
 			return NEEDS_RETRY;
+		}
+		/*
+		 * if the device is not started, we need to wake
+		 * the error handler to start the motor
+		 */
+		if (scmd->device->allow_restart &&
+		    (scmd->sense_buffer[12] == 0x04) &&
+		    (scmd->sense_buffer[13] == 0x02)) {
+			return FAILED;
 		}
 		return SUCCESS;
 
@@ -829,6 +840,105 @@ static int scsi_try_bus_device_reset(struct scsi_cmnd *scmd)
 }
 
 /**
+ * scsi_eh_try_stu - Send START_UNIT to device.
+ * @scmd:	Scsi cmd to send START_UNIT
+ *
+ * Return value:
+ *    0 - Device is ready. 1 - Device NOT ready.
+ **/
+static int scsi_eh_try_stu(struct scsi_cmnd *scmd)
+{
+	static unsigned char stu_command[6] = {START_STOP, 0, 0, 0, 1, 0};
+	int rtn;
+
+	if (!scmd->device->allow_restart)
+		return 1;
+
+	memcpy(scmd->cmnd, stu_command, sizeof(stu_command));
+
+	/*
+	 * zero the sense buffer.  the scsi spec mandates that any
+	 * untransferred sense data should be interpreted as being zero.
+	 */
+	memset(scmd->sense_buffer, 0, sizeof(scmd->sense_buffer));
+
+	scmd->request_buffer = NULL;
+	scmd->request_bufflen = 0;
+	scmd->use_sg = 0;
+	scmd->cmd_len = COMMAND_SIZE(scmd->cmnd[0]);
+	scmd->underflow = 0;
+	scmd->sc_data_direction = DMA_NONE;
+
+	rtn = scsi_send_eh_cmnd(scmd, START_UNIT_TIMEOUT);
+
+	/*
+	 * when we eventually call scsi_finish, we really wish to complete
+	 * the original request, so let's restore the original data. (db)
+	 */
+	scsi_setup_cmd_retry(scmd);
+
+	/*
+	 * hey, we are done.  let's look to see what happened.
+	 */
+	SCSI_LOG_ERROR_RECOVERY(3, printk("%s: scmd %p rtn %x\n",
+		__FUNCTION__, scmd, rtn));
+	if (rtn == SUCCESS)
+		return 0;
+	return 1;
+}
+
+ /**
+ * scsi_eh_stu - send START_UNIT if needed
+ * @shost:	scsi host being recovered.
+ * @eh_done_q:	list_head for processed commands.
+ *
+ * Notes:
+ *    If commands are failing due to not ready, initializing command required,
+ *	try revalidating the device, which will end up sending a start unit. 
+ **/
+static int scsi_eh_stu(struct Scsi_Host *shost,
+			      struct list_head *work_q,
+			      struct list_head *done_q)
+{
+	struct list_head *lh, *lh_sf;
+	struct scsi_cmnd *scmd, *stu_scmd;
+	struct scsi_device *sdev;
+
+	shost_for_each_device(sdev, shost) {
+		stu_scmd = NULL;
+		list_for_each_entry(scmd, work_q, eh_entry)
+			if (scmd->device == sdev && SCSI_SENSE_VALID(scmd) &&
+			    scsi_check_sense(scmd) == FAILED ) {
+				stu_scmd = scmd;
+				break;
+			}
+
+		if (!stu_scmd)
+			continue;
+
+		SCSI_LOG_ERROR_RECOVERY(3, printk("%s: Sending START_UNIT to sdev:"
+						  " 0x%p\n", current->comm, sdev));
+
+		if (!scsi_eh_try_stu(stu_scmd)) {
+			if (!sdev->online || !scsi_eh_tur(stu_scmd)) {
+				list_for_each_safe(lh, lh_sf, work_q) {
+					scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
+					if (scmd->device == sdev)
+						scsi_eh_finish_cmd(scmd, done_q);
+				}
+			}
+		} else {
+			SCSI_LOG_ERROR_RECOVERY(3,
+						printk("%s: START_UNIT failed to sdev:"
+						       " 0x%p\n", current->comm, sdev));
+		}
+	}
+
+	return list_empty(work_q);
+}
+
+
+/**
  * scsi_eh_bus_device_reset - send bdr if needed
  * @shost:	scsi host being recovered.
  * @eh_done_q:	list_head for processed commands.
@@ -1033,7 +1143,9 @@ static int scsi_eh_host_reset(struct list_head *work_q,
 		if (rtn == SUCCESS) {
 			list_for_each_safe(lh, lh_sf, work_q) {
 				scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
-				if (!scmd->device->online || !scsi_eh_tur(scmd)) 
+				if (!scmd->device->online ||
+				    (!scsi_eh_try_stu(scmd) && !scsi_eh_tur(scmd)) ||
+				    !scsi_eh_tur(scmd))
 					scsi_eh_finish_cmd(scmd, done_q);
 			}
 		} else {
@@ -1401,10 +1513,11 @@ static void scsi_eh_ready_devs(struct Scsi_Host *shost,
 			       struct list_head *work_q,
 			       struct list_head *done_q)
 {
-	if (!scsi_eh_bus_device_reset(shost, work_q, done_q))
-		if (!scsi_eh_bus_reset(shost, work_q, done_q))
-			if (!scsi_eh_host_reset(work_q, done_q))
-				scsi_eh_offline_sdevs(work_q, done_q);
+	if (!scsi_eh_stu(shost, work_q, done_q))
+		if (!scsi_eh_bus_device_reset(shost, work_q, done_q))
+			if (!scsi_eh_bus_reset(shost, work_q, done_q))
+				if (!scsi_eh_host_reset(work_q, done_q))
+					scsi_eh_offline_sdevs(work_q, done_q);
 }
 
 /**
