@@ -316,9 +316,13 @@ do_it:
 				err = WRITEPAGE_ACTIVATE;
 		}
 	} else {
-		err = nfs_writepage_sync(NULL, inode, page, 0, offset, priority); 
-		if (err == offset)
+		err = nfs_writepage_sync(NULL, inode, page, 0,
+						offset, priority);
+		if (err >= 0) {
+			if (err != offset)
+				redirty_page_for_writepage(wbc, page);
 			err = 0;
+		}
 	}
 	unlock_kernel();
 out:
@@ -357,8 +361,10 @@ int nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 			goto out;
 	}
 	err = nfs_commit_inode(inode, 0, 0, wb_priority(wbc));
-	if (err > 0)
+	if (err > 0) {
 		wbc->nr_to_write -= err;
+		err = 0;
+	}
 out:
 	clear_bit(BDI_write_congested, &bdi->state);
 	wake_up_all(&nfs_write_congestion);
