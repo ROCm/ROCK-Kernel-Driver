@@ -42,6 +42,13 @@
 #define TYPE_LONGHAUL_V2	2
 #define TYPE_POWERSAVER		3
 
+#define	CPU_SAMUEL	1
+#define	CPU_SAMUEL2	2
+#define	CPU_EZRA	3
+#define	CPU_EZRA_T	4
+#define	CPU_NEHEMIAH	5
+
+static int cpu_model;
 static unsigned int numscales=16, numvscales;
 static unsigned int fsb;
 static int minvid, maxvid;
@@ -121,16 +128,17 @@ static int longhaul_get_cpu_mult(void)
 static void do_powersaver(union msr_longhaul *longhaul,
 			unsigned int clock_ratio_index)
 {
-	struct cpuinfo_x86 *c = cpu_data;
 	int version;
 
-	switch (c->x86_model) {
-		case 8:	version = 3;
-				break;
-		case 9:	version = 0xf;
-				break;
+	switch (cpu_model) {
+		case CPU_EZRA_T:
+			version = 3;
+			break;
+		case CPU_NEHEMIAH:
+			version = 0xf;
+			break;
 		default:
-				return;
+			return;
 	}
 
 	rdmsrl(MSR_VIA_LONGHAUL, longhaul->val);
@@ -273,7 +281,6 @@ static int guess_fsb(void)
 
 static int __init longhaul_get_ranges(void)
 {
-	struct cpuinfo_x86 *c = cpu_data;
 	unsigned long invalue;
 	unsigned int multipliers[32]= {
 		50,30,40,100,55,35,45,95,90,70,80,60,120,75,85,65,
@@ -293,7 +300,7 @@ static int __init longhaul_get_ranges(void)
 		maxmult = longhaul_get_cpu_mult();
 		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 		invalue = (lo & (1<<18|1<<19)) >>18;
-		if (c->x86_model==6)
+		if (cpu_model==CPU_SAMUEL)
 			fsb = eblcr_fsb_table_v1[invalue];
 		else
 			fsb = guess_fsb();
@@ -301,7 +308,7 @@ static int __init longhaul_get_ranges(void)
 
 	case TYPE_POWERSAVER:
 		/* Ezra-T */
-		if (c->x86_model == 8) {
+		if (cpu_model==CPU_EZRA_T) {
 			rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 			invalue = longhaul.bits.MaxMHzBR;
 			if (longhaul.bits.MaxMHzBR4)
@@ -318,7 +325,7 @@ static int __init longhaul_get_ranges(void)
 		}
 
 		/* Nehemiah */
-		if (c->x86_model == 9) {
+		if (cpu_model==CPU_NEHEMIAH) {
 			rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 
 			/*
@@ -478,6 +485,7 @@ static unsigned int longhaul_get(unsigned int cpu)
 	return (calc_speed (longhaul_get_cpu_mult(), fsb));
 }
 
+
 static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
@@ -486,6 +494,7 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 
 	switch (c->x86_model) {
 	case 6:
+		cpu_model = CPU_SAMUEL;
 		cpuname = "C3 'Samuel' [C5A]";
 		longhaul_version = TYPE_LONGHAUL_V1;
 		memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
@@ -496,16 +505,20 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 		longhaul_version = TYPE_LONGHAUL_V1;
 		switch (c->x86_mask) {
 		case 0:
+			cpu_model = CPU_SAMUEL2;
 			cpuname = "C3 'Samuel 2' [C5B]";
 			/* Note, this is not a typo, early Samuel2's had Samuel1 ratios. */
 			memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
 			memcpy (eblcr_table, samuel2_eblcr, sizeof(samuel2_eblcr));
 			break;
 		case 1 ... 15:
-			if (c->x86_mask < 8)
+			if (c->x86_mask < 8) {
+				cpu_model = CPU_SAMUEL2;
 				cpuname = "C3 'Samuel 2' [C5B]";
-			else
+			} else {
+				cpu_model = CPU_EZRA;
 				cpuname = "C3 'Ezra' [C5C]";
+			}
 			memcpy (clock_ratio, ezra_clock_ratio, sizeof(ezra_clock_ratio));
 			memcpy (eblcr_table, ezra_eblcr, sizeof(ezra_eblcr));
 			break;
@@ -513,6 +526,7 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 		break;
 
 	case 8:
+		cpu_model = CPU_EZRA_T;
 		cpuname = "C3 'Ezra-T' [C5M]";
 		longhaul_version = TYPE_POWERSAVER;
 		numscales=32;
@@ -521,6 +535,7 @@ static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 		break;
 
 	case 9:
+		cpu_model = CPU_NEHEMIAH;
 		longhaul_version = TYPE_POWERSAVER;
 		numscales=32;
 		switch (c->x86_mask) {
