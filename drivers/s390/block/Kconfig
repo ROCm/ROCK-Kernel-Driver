@@ -11,6 +11,11 @@ config BLK_DEV_XPRAM
 	  This option is also available as a module which will be called
 	  xpram.  If unsure, say "N".
 
+config DCSSBLK
+	tristate "DCSSBLK support"
+	help
+	  Support for dcss block device
+
 config DASD
 	tristate "Support for DASD devices"
 	depends on CCW
