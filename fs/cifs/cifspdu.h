@@ -1673,11 +1673,11 @@ typedef struct {
 } FILE_BASIC_INFO;		/* size info, level 0x101 */
 
 struct file_allocation_info {
-	__u64 AllocationSize;
+	__le64 AllocationSize;
 };		/* size info, level 0x103 */
 
 struct file_end_of_file_info {
-	__u64 FileSize;		/* offset to end of file */
+	__le64 FileSize;		/* offset to end of file */
 };	/* size info, level 0x104 */
 
 typedef struct {
