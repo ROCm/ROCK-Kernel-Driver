@@ -132,6 +132,19 @@ struct pci_ops pci_root_ops = {
 	.write = pci_write,
 };
 
+#ifdef CONFIG_NUMA
+extern acpi_status acpi_map_iosapic(acpi_handle, u32, void *, void **);
+static void acpi_map_iosapics(void)
+{
+	acpi_get_devices(NULL, acpi_map_iosapic, NULL, NULL);
+}
+#else
+static void acpi_map_iosapics(void)
+{
+	return;
+}
+#endif /* CONFIG_NUMA */
+
 static int __init
 pci_acpi_init (void)
 {
@@ -139,11 +152,7 @@ pci_acpi_init (void)
 
 	printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
 
-#ifdef CONFIG_NUMA
-extern acpi_status acpi_map_iosapic (acpi_handle, u32, void*, void**);
-
-	acpi_get_devices(NULL, acpi_map_iosapic, NULL, NULL);
-#endif
+	acpi_map_iosapics();
 
 	if (pci_routeirq) {
 		/*
