@@ -5,11 +5,11 @@
 
 extern int use_cyclone;
 
-#ifdef CONFIG_NUMA
+#ifdef CONFIG_X86_SUMMIT_NUMA
 extern void setup_summit(void);
-#else /* !CONFIG_NUMA */
+#else
 #define setup_summit()	{}
-#endif /* CONFIG_NUMA */
+#endif
 
 static inline void mpc_oem_bus_info(struct mpc_config_bus *m, char *name, 
 				struct mpc_config_translation *translation)

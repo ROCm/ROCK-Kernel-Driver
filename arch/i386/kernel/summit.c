@@ -29,9 +29,8 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <asm/io.h>
-#include <mach_mpparse.h>
+#include <asm/mach-summit/mach_mpparse.h>
 
-#ifdef CONFIG_NUMA
 static void __init setup_pci_node_map_for_wpeg(int wpeg_num, struct rio_table_hdr *rth, 
 		struct scal_detail **scal_nodes, struct rio_detail **rio_nodes){
 	int twst_num = 0, node = 0, first_bus = 0;
@@ -169,4 +168,3 @@ void __init setup_summit(void)
 			/* It's a Winnipeg, it's got PCI Busses */
 			setup_pci_node_map_for_wpeg(i, rio_table_hdr, scal_devs, rio_devs);
 }
-#endif /* CONFIG_NUMA */
