@@ -222,21 +222,17 @@ config UCDIMM
 	  Support for the Arcturus Networks uDsimm module.
 
 config DRAGEN2
-	bool "Dragen Engine II board support"
+	bool "DragenEngine II board support"
 	depends on M68VZ328
 	help
-	  Support for the Dragen Engine II board.
+	  Support for the DragenEngine II board.
 
-config HWADDR_FROMEEPROM
-	bool "  Read ETH address from EEPROM"
-	depends on DRAGEN2
+config DIRECT_IO_ACCESS
+	bool "  Allow user to access IO directly"
+	depends on (UCSIMM || UCDIMM || DRAGEN2)
 	help
-	  Use MAC address from EEPROM.
-
-config HWADDR_OFFSET
-	int "  Offset from start of EEPROM"
-	default "2"
-	depends on HWADDR_FROMEEPROM
+	  Disable the CPU internal registers protection in user mode,
+          to allow a user application to read/write them.
 
 config INIT_LCD
 	bool "  Initialize LCD"
@@ -246,7 +242,7 @@ config INIT_LCD
 
 config MEMORY_RESERVE
 	int "  Memory reservation (MiB)"
-	depends on (UCSIMM || UCDIMM || DRAGEN2)
+	depends on (UCSIMM || UCDIMM)
 	help
 	  Reserve certain memory regions on 68x328 based boards.
 
