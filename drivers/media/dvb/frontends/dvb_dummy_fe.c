@@ -32,17 +32,17 @@ static int sct = 0;
 
 static
 struct dvb_frontend_info dvb_s_dummyfe_info = {
-	name: "DVB-S dummy frontend",
-	type: FE_QPSK,
-	frequency_min: 950000,
-	frequency_max: 2150000,
-	frequency_stepsize: 250,           /* kHz for QPSK frontends */
-	frequency_tolerance: 29500,
-	symbol_rate_min: 1000000,
-	symbol_rate_max: 45000000,
-/*      symbol_rate_tolerance: ???,*/
-	notifier_delay: 50,                /* 1/20 s */
-	caps:   FE_CAN_INVERSION_AUTO | 
+	.name 			= "DVB-S dummy frontend",
+	.type 			= FE_QPSK,
+	.frequency_min 		= 950000,
+	.frequency_max 		= 2150000,
+	.frequency_stepsize 	= 250,           /* kHz for QPSK frontends */
+	.frequency_tolerance 	= 29500,
+	.symbol_rate_min 	= 1000000,
+	.symbol_rate_max 	= 45000000,
+/*      .symbol_rate_tolerance 	= ???,*/
+	.notifier_delay		 = 50,                /* 1/20 s */
+	.caps = FE_CAN_INVERSION_AUTO | 
 	FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 	FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
 	FE_CAN_QPSK
@@ -58,9 +58,9 @@ struct dvb_frontend_info dvb_c_dummyfe_info = {
 	.symbol_rate_min = (57840000/2)/64,     /* SACLK/64 == (XIN/2)/64 */
 	.symbol_rate_max = (57840000/2)/4,      /* SACLK/4 */
 #if 0
-	frequency_tolerance: ???,
-	symbol_rate_tolerance: ???,  /* ppm */  /* == 8% (spec p. 5) */
-	notifier_delay: ?,
+	.frequency_tolerance	= ???,
+	.symbol_rate_tolerance	= ???,  /* ppm */  /* == 8% (spec p. 5) */
+	.notifier_delay		= ?,
 #endif
 	.caps = FE_CAN_QAM_16 | FE_CAN_QAM_32 | FE_CAN_QAM_64 |
 		FE_CAN_QAM_128 | FE_CAN_QAM_256 | 

@@ -25,9 +25,13 @@
 */    
 
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/string.h>
+#include <linux/slab.h>
 
 #include "dvb_frontend.h"
+#include "dvb_functions.h"
 
 static int debug = 0;
 #define dprintk	if (debug) printk
@@ -35,17 +39,17 @@ static int debug = 0;
 
 static
 struct dvb_frontend_info grundig_29504_491_info = {
-	name: "Grundig 29504-491, (TDA8083 based)",
-	type: FE_QPSK,
-	frequency_min: 950000,     /* FIXME: guessed! */
-	frequency_max: 1400000,    /* FIXME: guessed! */
-	frequency_stepsize: 125,   /* kHz for QPSK frontends */
-/*      frequency_tolerance: ???,*/
-	symbol_rate_min: 1000000,   /* FIXME: guessed! */
-	symbol_rate_max: 45000000,  /* FIXME: guessed! */
-/*      symbol_rate_tolerance: ???,*/
-	notifier_delay: 0,
-	caps:	FE_CAN_INVERSION_AUTO |
+	.name			= "Grundig 29504-491, (TDA8083 based)",
+	.type			= FE_QPSK,
+	.frequency_min		= 950000,     /* FIXME: guessed! */
+	.frequency_max		= 1400000,    /* FIXME: guessed! */
+	.frequency_stepsize	= 125,   /* kHz for QPSK frontends */
+/*      .frequency_tolerance	= ???,*/
+	.symbol_rate_min	= 1000000,   /* FIXME: guessed! */
+	.symbol_rate_max	= 45000000,  /* FIXME: guessed! */
+/*      .symbol_rate_tolerance	= ???,*/
+	.notifier_delay		= 0,
+	.caps = FE_CAN_INVERSION_AUTO |
 		FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 		FE_CAN_FEC_4_5 | FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 |
 		FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 | FE_CAN_FEC_AUTO |
@@ -72,7 +76,7 @@ int tda8083_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
-	struct i2c_msg msg = { addr: 0x68, flags: 0, buf: buf, len: 2 };
+	struct i2c_msg msg = { .addr = 0x68, .flags = 0, .buf = buf, .len = 2 };
 
         ret = i2c->xfer (i2c, &msg, 1);
 
@@ -88,8 +92,8 @@ static
 int tda8083_readregs (struct dvb_i2c_bus *i2c, u8 reg1, u8 *b, u8 len)
 {
 	int ret;
-	struct i2c_msg msg [] = { { addr: 0x68, flags: 0, buf: &reg1, len: 1 },
-			   { addr: 0x68, flags: I2C_M_RD, buf: b, len: len } };
+	struct i2c_msg msg [] = { { .addr = 0x68, .flags = 0, .buf = &reg1, .len = 1 },
+			   { .addr = 0x68, .flags = I2C_M_RD, .buf = b, .len = len } };
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -116,7 +120,7 @@ static
 int tsa5522_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
 	int ret;
-	struct i2c_msg msg = { addr: 0x61, flags: 0, buf: data, len: 4 };
+	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
 
 	ret = i2c->xfer (i2c, &msg, 1);
 
@@ -222,7 +226,7 @@ int tda8083_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 	tmp = (tmp % srate) << 8;
 	ratio = (ratio << 8) + tmp / srate;
 	
-	dprintk("tda8083: ratio == %08x\n", ratio);
+	dprintk("tda8083: ratio == %08x\n", (unsigned int) ratio);
 
 	tda8083_writereg (i2c, 0x05, filter);
 	tda8083_writereg (i2c, 0x02, (ratio >> 16) & 0xff);
@@ -244,8 +248,7 @@ void tda8083_wait_diseqc_fifo (struct dvb_i2c_bus *i2c, int timeout)
 	while (jiffies - start < timeout &&
                !(tda8083_readreg(i2c, 0x02) & 0x80))
 	{
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout (5);
+		dvb_delay(50);
 	};
 }
 

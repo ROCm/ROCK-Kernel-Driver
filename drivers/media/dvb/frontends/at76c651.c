@@ -22,11 +22,11 @@
  *
  */
 
-#include <linux/module.h>
 #include <linux/init.h>
-#include <linux/delay.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/string.h>
 #include <linux/slab.h>
-#include <linux/i2c.h>
 
 #if defined(__powerpc__)
 #include <asm/bitops.h>
@@ -34,6 +34,7 @@
 
 #include "dvb_frontend.h"
 #include "dvb_i2c.h"
+#include "dvb_functions.h"
 
 static int debug = 0;
 
@@ -67,8 +68,8 @@ static struct dvb_frontend_info at76c651_info = {
 	    FE_CAN_FEC_4_5 | FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 |
 	    FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 | FE_CAN_FEC_AUTO |
 	    FE_CAN_QAM_16 | FE_CAN_QAM_32 | FE_CAN_QAM_64 | FE_CAN_QAM_128 |
-	    FE_CAN_QAM_256,
-	/* FE_CAN_QAM_512 | FE_CAN_QAM_1024 |  */
+	    FE_CAN_QAM_256 /* | FE_CAN_QAM_512 | FE_CAN_QAM_1024 */ |
+	    FE_CAN_RECOVER | FE_CAN_CLEAN_SETUP | FE_CAN_MUTE_TS
 
 };
 
@@ -94,7 +95,7 @@ at76c651_writereg(struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 
 	int ret;
 	u8 buf[] = { reg, data };
-	struct i2c_msg msg = { addr:0x1a >> 1, flags:0, buf:buf, len:2 };
+	struct i2c_msg msg = { .addr = 0x1a >> 1, .flags = 0, .buf = buf, .len = 2 };
 
 	ret = i2c->xfer(i2c, &msg, 1);
 
@@ -103,7 +104,7 @@ at76c651_writereg(struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 			"(reg == 0x%02x, val == 0x%02x, ret == %i)\n",
 			__FUNCTION__, reg, data, ret);
 
-	mdelay(10);
+	dvb_delay(10);
 
 	return (ret != 1) ? -EREMOTEIO : 0;
 
@@ -116,8 +117,8 @@ at76c651_readreg(struct dvb_i2c_bus *i2c, u8 reg)
 	int ret;
 	u8 b0[] = { reg };
 	u8 b1[] = { 0 };
-	struct i2c_msg msg[] = { {addr: 0x1a >> 1, flags: 0, buf: b0, len:1},
-			  {addr: 0x1a >> 1, flags: I2C_M_RD, buf: b1, len:1} };
+	struct i2c_msg msg[] = { {.addr =  0x1a >> 1, .flags =  0, .buf =  b0, .len = 1},
+			  {.addr =  0x1a >> 1, .flags =  I2C_M_RD, .buf =  b1, .len = 1} };
 
 	ret = i2c->xfer(i2c, msg, 2);
 
@@ -192,7 +193,7 @@ dat7021_write(struct dvb_i2c_bus *i2c, u32 tw)
 
 	int ret;
 	struct i2c_msg msg =
-	    { addr:0xc2 >> 1, flags:0, buf:(u8 *) & tw, len:sizeof (tw) };
+	    { .addr = 0xc2 >> 1, .flags = 0, .buf = (u8 *) & tw, .len = sizeof (tw) };
 
 	at76c651_switch_tuner_i2c(i2c, 1);
 
