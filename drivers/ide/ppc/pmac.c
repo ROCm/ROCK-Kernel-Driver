@@ -52,7 +52,7 @@
 
 #include "ide-timing.h"
 
-#define IDE_PMAC_DEBUG
+#undef IDE_PMAC_DEBUG
 
 #define DMA_WAIT_TIMEOUT	50
 

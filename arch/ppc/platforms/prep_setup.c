@@ -882,6 +882,7 @@ prep_setup_arch(void)
 #else
 			ROOT_DEV = Root_SDA2;
 #endif
+		ROOT_DEV = Root_SDA3;
 		break;
 	}
 

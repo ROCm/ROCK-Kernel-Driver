@@ -232,6 +232,7 @@ chrp_setup_arch(void)
 	else
 #endif
 		ROOT_DEV = Root_SDA2; /* sda2 (sda1 is for the kernel) */
+	ROOT_DEV = Root_SDA3; /* sda3 (sda1 is for the kernel) */
 
 	/* Lookup PCI host bridges */
 	chrp_find_bridges();
