@@ -1040,6 +1040,11 @@ static struct module *load_module(void *umod,
 			/* Exported symbols. */
 			DEBUGP("EXPORT table in section %u\n", i);
 			exportindex = i;
+		} else if (strcmp(secstrings+sechdrs[i].sh_name,
+				  "__ksymtab_gpl") == 0) {
+			/* Exported symbols. (GPL) */
+			DEBUGP("GPL symbols found in section %u\n", i);
+			gplindex = i;
 		} else if (strcmp(secstrings+sechdrs[i].sh_name, "__param")
 			   == 0) {
 			/* Setup parameter info */
@@ -1060,11 +1065,6 @@ static struct module *load_module(void *umod,
 			/* MODULE_LICENSE() */
 			DEBUGP("Licence found in section %u\n", i);
 			licenseindex = i;
-		} else if (strcmp(secstrings+sechdrs[i].sh_name,
-				  "__gpl_ksymtab") == 0) {
-			/* EXPORT_SYMBOL_GPL() */
-			DEBUGP("GPL symbols found in section %u\n", i);
-			gplindex = i;
 		} else if (strcmp(secstrings+sechdrs[i].sh_name,
 				  "__vermagic") == 0) {
 			/* Version magic. */
@@ -1492,8 +1492,8 @@ int module_text_address(unsigned long addr)
 /* Provided by the linker */
 extern const struct kernel_symbol __start___ksymtab[];
 extern const struct kernel_symbol __stop___ksymtab[];
-extern const struct kernel_symbol __start___gpl_ksymtab[];
-extern const struct kernel_symbol __stop___gpl_ksymtab[];
+extern const struct kernel_symbol __start___ksymtab_gpl[];
+extern const struct kernel_symbol __stop___ksymtab_gpl[];
 
 static struct kernel_symbol_group kernel_symbols, kernel_gpl_symbols;
 
@@ -1504,9 +1504,10 @@ static int __init symbols_init(void)
 	kernel_symbols.syms = __start___ksymtab;
 	kernel_symbols.gplonly = 0;
 	list_add(&kernel_symbols.list, &symbols);
-	kernel_gpl_symbols.num_syms = (__stop___gpl_ksymtab
-				       - __start___gpl_ksymtab);
-	kernel_gpl_symbols.syms = __start___gpl_ksymtab;
+
+	kernel_gpl_symbols.num_syms = (__stop___ksymtab_gpl
+				       - __start___ksymtab_gpl);
+	kernel_gpl_symbols.syms = __start___ksymtab_gpl;
 	kernel_gpl_symbols.gplonly = 1;
 	list_add(&kernel_gpl_symbols.list, &symbols);
 

@@ -144,6 +144,19 @@ config OBSOLETE_MODPARM
 	  have not been converted to the new module parameter system yet.
 	  If unsure, say Y.
 
+config MODVERSIONING
+	bool "Module versioning support (EXPERIMENTAL)"
+	depends on MODULES && EXPERIMENTAL
+	help
+	---help---
+	  Usually, you have to use modules compiled with your kernel.
+	  Saying Y here makes it sometimes possible to use modules
+	  compiled for different kernels, by adding enough information
+	  to the modules to (hopefully) spot any changes which would
+	  make them incompatible with the kernel you are running.  If
+	  you say Y here, you will need a copy of genksyms.  If
+	  unsure, say N.
+
 config KMOD
 	bool "Kernel module loader"
 	depends on MODULES

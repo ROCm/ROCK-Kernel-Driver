@@ -134,29 +134,40 @@ struct exception_table
 
 
 #ifdef CONFIG_MODULES
+
 /* Get/put a kernel symbol (calls must be symmetric) */
 void *__symbol_get(const char *symbol);
 void *__symbol_get_gpl(const char *symbol);
 #define symbol_get(x) ((typeof(&x))(__symbol_get(MODULE_SYMBOL_PREFIX #x)))
 
+#ifdef CONFIG_MODVERSIONING
+/* Mark the CRC weak since genksyms apparently decides not to
+ * generate a checksums for some symbols */
+#define __CRC_SYMBOL(sym, sec)					\
+	extern void *__crc_##sym __attribute__((weak));		\
+	static const unsigned long __kcrctab_##sym		\
+	__attribute__((section("__kcrctab" sec)))		\
+	= (unsigned long) &__crc_##sym;
+#else
+#define __CRC_SYMBOL(sym, sec)
+#endif
+
 /* For every exported symbol, place a struct in the __ksymtab section */
-#define EXPORT_SYMBOL(sym)					\
+#define __EXPORT_SYMBOL(sym, sec)				\
+	__CRC_SYMBOL(sym, sec)					\
 	static const char __kstrtab_##sym[]			\
 	__attribute__((section("__ksymtab_strings")))		\
 	= MODULE_SYMBOL_PREFIX #sym;                    	\
 	static const struct kernel_symbol __ksymtab_##sym	\
-	__attribute__((section("__ksymtab")))			\
+	__attribute__((section("__ksymtab" sec)))		\
 	= { (unsigned long)&sym, __kstrtab_##sym }
 
+#define EXPORT_SYMBOL(sym)	__EXPORT_SYMBOL(sym, "")
+#define EXPORT_SYMBOL_GPL(sym)	__EXPORT_SYMBOL(sym, "_gpl")
+
+/* We don't mangle the actual symbol anymore, so no need for
+ * special casing EXPORT_SYMBOL_NOVERS */
 #define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
-
-#define EXPORT_SYMBOL_GPL(sym)					\
-	static const char __kstrtab_##sym[]			\
-	__attribute__((section("__ksymtab_strings")))		\
-	= MODULE_SYMBOL_PREFIX #sym;                    	\
-	static const struct kernel_symbol __ksymtab_##sym	\
-	__attribute__((section("__gpl_ksymtab")))		\
-	= { (unsigned long)&sym, __kstrtab_##sym }
 
 struct module_ref
 {
