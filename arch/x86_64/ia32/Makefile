@@ -11,7 +11,7 @@ obj-$(CONFIG_IA32_EMULATION) += $(sysv-y)
 
 obj-$(CONFIG_IA32_AOUT) += ia32_aout.o
 
-$(obj)/syscall32.o: $(src)/syscall32.c \
+$(obj)/syscall32_syscall.o: \
 	$(foreach F,sysenter syscall,$(obj)/vsyscall-$F.so)
 
 # Teach kbuild about targets
