@@ -73,6 +73,9 @@
  *  ->mmap_sem
  *    ->i_sem			(msync)
  *
+ *  ->i_sem
+ *    ->i_alloc_sem             (various)
+ *
  *  ->inode_lock
  *    ->sb_lock			(fs/fs-writeback.c)
  *    ->mapping->page_lock	(__sync_single_inode)
@@ -227,6 +230,18 @@ restart:
 }
 
 EXPORT_SYMBOL(filemap_fdatawait);
+
+int filemap_write_and_wait(struct address_space *mapping)
+{
+	int retval = 0;
+
+	if (mapping->nrpages) {
+		retval = filemap_fdatawrite(mapping);
+		if (retval == 0)
+			retval = filemap_fdatawait(mapping);
+	}
+	return retval;
+}
 
 /*
  * This adds a page to the page cache, starting out as locked, unreferenced,
@@ -1716,6 +1731,7 @@ EXPORT_SYMBOL(generic_write_checks);
 
 /*
  * Write to a file through the page cache. 
+ * Called under i_sem for S_ISREG files.
  *
  * We put everything into the page cache prior to writing it. This is not a
  * problem when writing full pages. With partial pages, however, we first have
@@ -1806,12 +1822,19 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 		/*
 		 * Sync the fs metadata but not the minor inode changes and
 		 * of course not the data as we did direct DMA for the IO.
+		 * i_sem is held, which protects generic_osync_inode() from
+		 * livelocking.
 		 */
 		if (written >= 0 && file->f_flags & O_SYNC)
 			status = generic_osync_inode(inode, mapping, OSYNC_METADATA);
 		if (written >= 0 && !is_sync_kiocb(iocb))
 			written = -EIOCBQUEUED;
-		goto out_status;
+		if (written != -ENOTBLK)
+			goto out_status;
+		/*
+		 * direct-io write to a hole: fall through to buffered I/O
+		 */
+		written = 0;
 	}
 
 	buf = iov->iov_base;
@@ -1900,6 +1923,14 @@ generic_file_aio_write_nolock(struct kiocb *iocb, const struct iovec *iov,
 					OSYNC_METADATA|OSYNC_DATA);
 	}
 	
+	/*
+	 * If we get here for O_DIRECT writes then we must have fallen through
+	 * to buffered writes (block instantiation inside i_size).  So we sync
+	 * the file data here, to try to honour O_DIRECT expectations.
+	 */
+	if (unlikely(file->f_flags & O_DIRECT) && written)
+		status = filemap_write_and_wait(mapping);
+
 out_status:	
 	err = written ? written : status;
 out:
@@ -1991,6 +2022,9 @@ ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
 
 EXPORT_SYMBOL(generic_file_writev);
 
+/*
+ * Called under i_sem for writes to S_ISREG files
+ */
 ssize_t
 generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	loff_t offset, unsigned long nr_segs)
@@ -1999,18 +2033,13 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	struct address_space *mapping = file->f_mapping;
 	ssize_t retval;
 
-	if (mapping->nrpages) {
-		retval = filemap_fdatawrite(mapping);
-		if (retval == 0)
-			retval = filemap_fdatawait(mapping);
-		if (retval)
-			goto out;
+	retval = filemap_write_and_wait(mapping);
+	if (retval == 0) {
+		retval = mapping->a_ops->direct_IO(rw, iocb, iov,
+						offset, nr_segs);
+		if (rw == WRITE && mapping->nrpages)
+			invalidate_inode_pages2(mapping);
 	}
-
-	retval = mapping->a_ops->direct_IO(rw, iocb, iov, offset, nr_segs);
-	if (rw == WRITE && mapping->nrpages)
-		invalidate_inode_pages2(mapping);
-out:
 	return retval;
 }
 

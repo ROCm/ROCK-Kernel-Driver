@@ -52,6 +52,10 @@
  *
  * If blkfactor is zero then the user's request was aligned to the filesystem's
  * blocksize.
+ *
+ * needs_locking is set for regular files on direct-IO-naive filesystems.  It
+ * determines whether we need to do the fancy locking which prevents direct-IO
+ * from being able to read uninitialised disk blocks.
  */
 
 struct dio {
@@ -59,6 +63,7 @@ struct dio {
 	struct bio *bio;		/* bio under assembly */
 	struct inode *inode;
 	int rw;
+	int needs_locking;		/* doesn't change */
 	unsigned blkbits;		/* doesn't change */
 	unsigned blkfactor;		/* When we're using an alignment which
 					   is finer than the filesystem's soft
@@ -206,6 +211,8 @@ static void dio_complete(struct dio *dio, loff_t offset, ssize_t bytes)
 {
 	if (dio->end_io)
 		dio->end_io(dio->inode, offset, bytes, dio->map_bh.b_private);
+	if (dio->needs_locking)
+		up_read(&dio->inode->i_alloc_sem);
 }
 
 /*
@@ -449,6 +456,7 @@ static int get_more_blocks(struct dio *dio)
 	unsigned long fs_count;	/* Number of filesystem-sized blocks */
 	unsigned long dio_count;/* Number of dio_block-sized blocks */
 	unsigned long blkmask;
+	int beyond_eof = 0;
 
 	/*
 	 * If there was a memory error and we've overwritten all the
@@ -466,8 +474,19 @@ static int get_more_blocks(struct dio *dio)
 		if (dio_count & blkmask)	
 			fs_count++;
 
+		if (dio->needs_locking) {
+			if (dio->block_in_file >= (i_size_read(dio->inode) >>
+							dio->blkbits))
+				beyond_eof = 1;
+		}
+		/*
+		 * For writes inside i_size we forbid block creations: only
+		 * overwrites are permitted.  We fall back to buffered writes
+		 * at a higher level for inside-i_size block-instantiating
+		 * writes.
+		 */
 		ret = (*dio->get_blocks)(dio->inode, fs_startblk, fs_count,
-				map_bh, dio->rw == WRITE);
+				map_bh, (dio->rw == WRITE) && beyond_eof);
 	}
 	return ret;
 }
@@ -774,6 +793,10 @@ do_holes:
 			if (!buffer_mapped(map_bh)) {
 				char *kaddr;
 
+				/* AKPM: eargh, -ENOTBLK is a hack */
+				if (dio->rw == WRITE)
+					return -ENOTBLK;
+
 				if (dio->block_in_file >=
 					i_size_read(dio->inode)>>blkbits) {
 					/* We hit eof */
@@ -839,21 +862,21 @@ out:
 	return ret;
 }
 
+/*
+ * Releases both i_sem and i_alloc_sem
+ */
 static int
 direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode, 
 	const struct iovec *iov, loff_t offset, unsigned long nr_segs, 
-	unsigned blkbits, get_blocks_t get_blocks, dio_iodone_t end_io)
+	unsigned blkbits, get_blocks_t get_blocks, dio_iodone_t end_io,
+	struct dio *dio)
 {
 	unsigned long user_addr; 
 	int seg;
 	int ret = 0;
 	int ret2;
-	struct dio *dio;
 	size_t bytes;
 
-	dio = kmalloc(sizeof(*dio), GFP_KERNEL);
-	if (!dio)
-		return -ENOMEM;
 	dio->is_async = !is_sync_kiocb(iocb);
 
 	dio->bio = NULL;
@@ -864,7 +887,6 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	dio->start_zero_done = 0;
 	dio->block_in_file = offset >> blkbits;
 	dio->blocks_available = 0;
-
 	dio->cur_page = NULL;
 
 	dio->boundary = 0;
@@ -953,6 +975,13 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 	dio_cleanup(dio);
 
 	/*
+	 * All new block allocations have been performed.  We can let i_sem
+	 * go now.
+	 */
+	if (dio->needs_locking)
+		up(&dio->inode->i_sem);
+
+	/*
 	 * OK, all BIOs are submitted, so we can decrement bio_count to truly
 	 * reflect the number of to-be-processed BIOs.
 	 */
@@ -987,11 +1016,17 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 
 /*
  * This is a library function for use by filesystem drivers.
+ *
+ * For writes to S_ISREG files, we are called under i_sem and return with i_sem
+ * held, even though it is internally dropped.
+ *
+ * For writes to S_ISBLK files, i_sem is not held on entry; it is never taken.
  */
 int
-blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode, 
+__blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	struct block_device *bdev, const struct iovec *iov, loff_t offset, 
-	unsigned long nr_segs, get_blocks_t get_blocks, dio_iodone_t end_io)
+	unsigned long nr_segs, get_blocks_t get_blocks, dio_iodone_t end_io,
+	int needs_special_locking)
 {
 	int seg;
 	size_t size;
@@ -1000,6 +1035,8 @@ blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	unsigned bdev_blkbits = 0;
 	unsigned blocksize_mask = (1 << blkbits) - 1;
 	ssize_t retval = -EINVAL;
+	struct dio *dio;
+	int needs_locking;
 
 	if (bdev)
 		bdev_blkbits = blksize_bits(bdev_hardsect_size(bdev));
@@ -1025,10 +1062,40 @@ blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 		}
 	}
 
-	retval = direct_io_worker(rw, iocb, inode, iov, offset, 
-				nr_segs, blkbits, get_blocks, end_io);
+	dio = kmalloc(sizeof(*dio), GFP_KERNEL);
+	retval = -ENOMEM;
+	if (!dio)
+		goto out;
+
+	/*
+	 * For regular files,
+	 *	readers need to grab i_sem and i_alloc_sem
+	 *	writers need to grab i_alloc_sem only (i_sem is already held)
+	 */
+	needs_locking = 0;
+	if (S_ISREG(inode->i_mode) && needs_special_locking) {
+		needs_locking = 1;
+		if (rw == READ) {
+			struct address_space *mapping;
+
+			mapping = iocb->ki_filp->f_mapping;
+			down(&inode->i_sem);
+			retval = filemap_write_and_wait(mapping);
+			if (retval) {
+				up(&inode->i_sem);
+				kfree(dio);
+				goto out;
+			}
+		}
+		down_read(&inode->i_alloc_sem);
+	}
+	dio->needs_locking = needs_locking;
+
+	retval = direct_io_worker(rw, iocb, inode, iov, offset,
+				nr_segs, blkbits, get_blocks, end_io, dio);
+	if (needs_locking && rw == WRITE)
+		down(&inode->i_sem);
 out:
 	return retval;
 }
-
-EXPORT_SYMBOL(blockdev_direct_IO);
+EXPORT_SYMBOL(__blockdev_direct_IO);
