@@ -224,7 +224,6 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 static int longrun_cpu_init(struct cpufreq_policy *policy)
 {
 	int                     result = 0;
-	struct cpuinfo_x86 *c = cpu_data;
 
 	/* capability check */
 	if (policy->cpu != 0)
