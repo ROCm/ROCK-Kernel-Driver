@@ -68,6 +68,17 @@ extern unsigned char serial_getc(unsigned long com_port);
 extern void serial_putc(unsigned long com_port, unsigned char c);
 #endif
 
+int
+printf(char const *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	_vprintk(putc, fmt, ap);
+	va_end(ap);
+	return 0;
+}
+
 void pause(void)
 {
 	puts("pause\n");
