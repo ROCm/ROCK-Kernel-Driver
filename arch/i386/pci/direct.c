@@ -13,7 +13,7 @@
 #define PCI_CONF1_ADDRESS(bus, dev, fn, reg) \
 	(0x80000000 | (bus << 16) | (dev << 11) | (fn << 8) | (reg & ~3))
 
-static int __pci_conf1_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+static int pci_conf1_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
 
@@ -41,7 +41,7 @@ static int __pci_conf1_read (int seg, int bus, int dev, int fn, int reg, int len
 	return 0;
 }
 
-static int __pci_conf1_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+static int pci_conf1_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 {
 	unsigned long flags;
 
@@ -71,19 +71,7 @@ static int __pci_conf1_write (int seg, int bus, int dev, int fn, int reg, int le
 
 #undef PCI_CONF1_ADDRESS
 
-static int pci_conf1_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
-{
-	return __pci_conf1_read(0, bus->number, PCI_SLOT(devfn), 
-		PCI_FUNC(devfn), where, size, value);
-}
-
-static int pci_conf1_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
-{
-	return __pci_conf1_write(0, bus->number, PCI_SLOT(devfn), 
-		PCI_FUNC(devfn), where, size, value);
-}
-
-struct pci_ops pci_direct_conf1 = {
+struct pci_raw_ops pci_direct_conf1 = {
 	.read =		pci_conf1_read,
 	.write =	pci_conf1_write,
 };
@@ -95,7 +83,7 @@ struct pci_ops pci_direct_conf1 = {
 
 #define PCI_CONF2_ADDRESS(dev, reg)	(u16)(0xC000 | (dev << 8) | reg)
 
-static int __pci_conf2_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+static int pci_conf2_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
 
@@ -129,7 +117,7 @@ static int __pci_conf2_read (int seg, int bus, int dev, int fn, int reg, int len
 	return 0;
 }
 
-static int __pci_conf2_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+static int pci_conf2_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 {
 	unsigned long flags;
 
@@ -165,19 +153,7 @@ static int __pci_conf2_write (int seg, int bus, int dev, int fn, int reg, int le
 
 #undef PCI_CONF2_ADDRESS
 
-static int pci_conf2_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
-{
-	return __pci_conf2_read(0, bus->number, PCI_SLOT(devfn), 
-		PCI_FUNC(devfn), where, size, value);
-}
-
-static int pci_conf2_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
-{
-	return __pci_conf2_write(0, bus->number, PCI_SLOT(devfn), 
-		PCI_FUNC(devfn), where, size, value);
-}
-
-static struct pci_ops pci_direct_conf2 = {
+static struct pci_raw_ops pci_direct_conf2 = {
 	.read =		pci_conf2_read,
 	.write =	pci_conf2_write,
 };
@@ -193,38 +169,30 @@ static struct pci_ops pci_direct_conf2 = {
  * This should be close to trivial, but it isn't, because there are buggy
  * chipsets (yes, you guessed it, by Intel and Compaq) that have no class ID.
  */
-static int __devinit pci_sanity_check(struct pci_ops *o)
+static int __devinit pci_sanity_check(struct pci_raw_ops *o)
 {
 	u32 x = 0;
-	int retval = 0;
-	struct pci_bus *bus;		/* Fake bus and device */
-	struct pci_dev *dev;
+	int devfn;
 
 	if (pci_probe & PCI_NO_CHECKS)
 		return 1;
 
-	bus = kmalloc(sizeof(*bus), GFP_ATOMIC);
-	dev = kmalloc(sizeof(*dev), GFP_ATOMIC);
-	if (!bus || !dev) {
-		printk(KERN_ERR "Out of memory in %s\n", __FUNCTION__);
-		goto exit;
+	for (devfn = 0; devfn < 0x100; devfn++) {
+		if (o->read(0, 0, PCI_SLOT(devfn), PCI_FUNC(devfn),
+						PCI_CLASS_DEVICE, 2, &x))
+			continue;
+		if (x == PCI_CLASS_BRIDGE_HOST || x == PCI_CLASS_DISPLAY_VGA)
+			return 1;
+
+		if (o->read(0, 0, PCI_SLOT(devfn), PCI_FUNC(devfn),
+						PCI_VENDOR_ID, 2, &x))
+			continue;
+		if (x == PCI_VENDOR_ID_INTEL || x == PCI_VENDOR_ID_COMPAQ)
+			return 1;
 	}
 
-	bus->number = 0;
-	dev->bus = bus;
-	for(dev->devfn=0; dev->devfn < 0x100; dev->devfn++)
-		if ((!o->read(bus, dev->devfn, PCI_CLASS_DEVICE, 2, &x) &&
-		     (x == PCI_CLASS_BRIDGE_HOST || x == PCI_CLASS_DISPLAY_VGA)) ||
-		    (!o->read(bus, dev->devfn, PCI_VENDOR_ID, 2, &x) &&
-		     (x == PCI_VENDOR_ID_INTEL || x == PCI_VENDOR_ID_COMPAQ))) {
-			retval = 1;
-			goto exit;
-		}
 	DBG("PCI: Sanity check failed\n");
-exit:
-	kfree(dev);
-	kfree(bus);
-	return retval;
+	return 0;
 }
 
 static int __init pci_direct_init(void)
@@ -247,9 +215,9 @@ static int __init pci_direct_init(void)
 			local_irq_restore(flags);
 			printk(KERN_INFO "PCI: Using configuration type 1\n");
 			if (!request_region(0xCF8, 8, "PCI conf1"))
-				pci_root_ops = NULL;
+				raw_pci_ops = NULL;
 			else
-				pci_root_ops = &pci_direct_conf1;
+				raw_pci_ops = &pci_direct_conf1;
 			return 0;
 		}
 		outl (tmp, 0xCF8);
@@ -267,9 +235,9 @@ static int __init pci_direct_init(void)
 			local_irq_restore(flags);
 			printk(KERN_INFO "PCI: Using configuration type 2\n");
 			if (!request_region(0xCF8, 4, "PCI conf2"))
-				pci_root_ops = NULL;
+				raw_pci_ops = NULL;
 			else
-				pci_root_ops = &pci_direct_conf2;
+				raw_pci_ops = &pci_direct_conf2;
 			return 0;
 		}
 	}
