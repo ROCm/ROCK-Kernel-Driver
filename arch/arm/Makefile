@@ -156,8 +156,7 @@ maketools: include/asm-arm/constants.h include/linux/version.h FORCE
 	$(Q)$(MAKE) $(build)=arch/arm/tools include/asm-arm/mach-types.h
 
 # Convert bzImage to zImage
-bzImage: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(boot)/zImage
+bzImage: zImage
 
 zImage Image bootpImage uImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
@@ -172,12 +171,9 @@ CLEAN_FILES += include/asm-arm/constants.h* include/asm-arm/mach-types.h \
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 
-# My testing targets (that short circuit a few dependencies)
-zImg:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/zImage
-Img:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/Image
+# My testing targets (bypasses dependencies)
 bp:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/bootpImage
-i:;	$(Q)$(MAKE) $(build)=$(boot) install
-zi:;	$(Q)$(MAKE) $(build)=$(boot) zinstall
+i zi:;	$(Q)$(MAKE) $(build)=$(boot) $@
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/asm-arm/.arch
@@ -189,6 +185,7 @@ define archhelp
   echo  '* zImage        - Compressed kernel image (arch/$(ARCH)/boot/zImage)'
   echo  '  Image         - Uncompressed kernel image (arch/$(ARCH)/boot/Image)'
   echo  '  bootpImage    - Combined zImage and initial RAM disk' 
+  echo  '                  (supply initrd image via make variable INITRD=<path>)'
   echo  '  install       - Install uncompressed kernel'
   echo  '  zinstall      - Install compressed kernel'
   echo  '                  Install using (your) ~/bin/installkernel or'
