@@ -728,36 +728,26 @@ allocated file  handles  come close to the maximum, but the number of actually
 used ones  is  far  behind,  you've  encountered  a peak in your usage of file
 handles and you don't need to increase the maximum.
 
-inode-state, inode-nr and inode-max
------------------------------------
-
-As with  file  handles, the kernel allocates the inode structures dynamically,
-but can't free them yet.
-
-The value  in  inode-max  denotes  the  maximum number of inode handlers. This
-value should  be  3 to 4 times larger than the value in file-max, since stdin,
-stdout, and  network  sockets also need an inode struct to handle them. If you
-regularly run out of inodes, you should increase this value.
+inode-state and inode-nr
+------------------------
 
 The file inode-nr contains the first two items from inode-state, so we'll skip
 to that file...
 
-inode-state contains  three  actual numbers and four dummy values. The numbers
-are nr_inodes, nr_free_inodes, and preshrink (in order of appearance).
+inode-state contains  two  actual numbers and five dummy values. The numbers
+are nr_inodes and nr_free_inodes (in order of appearance).
 
 nr_inodes
 ~~~~~~~~~
 
-Denotes the  number  of  inodes the system has allocated. This can be slightly
-more than inode-max because Linux allocates them one pageful at a time.
+Denotes the  number  of  inodes the system has allocated. This number will
+grow and shrink dynamically.
 
 nr_free_inodes
 --------------
 
-Represents the  number  of free inodes and preshrink is nonzero when nr_inodes
-is greater than inode-max and the system needs to prune the inode list instead
-of allocating more.
-
+Represents the  number of free inodes. Ie. The number of inuse inodes is
+(nr_inodes - nr_free_inodes).
 
 super-nr and super-max
 ----------------------
