@@ -1119,6 +1119,31 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	atomic_set(&sk->sk_refcnt, 1);
 }
 
+void lock_sock(struct sock *sk)
+{
+	might_sleep();
+	spin_lock_bh(&(sk->sk_lock.slock));
+	if (sk->sk_lock.owner)
+		__lock_sock(sk);
+	sk->sk_lock.owner = (void *)1;
+	spin_unlock_bh(&(sk->sk_lock.slock));
+}
+
+EXPORT_SYMBOL(lock_sock);
+
+void release_sock(struct sock *sk)
+{
+	spin_lock_bh(&(sk->sk_lock.slock));
+	if (sk->sk_backlog.tail)
+		__release_sock(sk);
+	sk->sk_lock.owner = NULL;
+        if (waitqueue_active(&(sk->sk_lock.wq)))
+		wake_up(&(sk->sk_lock.wq));
+	spin_unlock_bh(&(sk->sk_lock.slock));
+}
+
+EXPORT_SYMBOL(release_sock);
+
 EXPORT_SYMBOL(__lock_sock);
 EXPORT_SYMBOL(__release_sock);
 EXPORT_SYMBOL(sk_alloc);

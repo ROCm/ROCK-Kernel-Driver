@@ -542,24 +542,9 @@ static inline struct inode *SOCK_INODE(struct socket *socket)
 extern void __lock_sock(struct sock *sk);
 extern void __release_sock(struct sock *sk);
 #define sock_owned_by_user(sk)	((sk)->sk_lock.owner)
-#define lock_sock(__sk) \
-do {	might_sleep(); \
-	spin_lock_bh(&((__sk)->sk_lock.slock)); \
-	if ((__sk)->sk_lock.owner) \
-		__lock_sock(__sk); \
-	(__sk)->sk_lock.owner = (void *)1; \
-	spin_unlock_bh(&((__sk)->sk_lock.slock)); \
-} while(0)
 
-#define release_sock(__sk) \
-do {	spin_lock_bh(&((__sk)->sk_lock.slock)); \
-	if ((__sk)->sk_backlog.tail) \
-		__release_sock(__sk); \
-	(__sk)->sk_lock.owner = NULL; \
-        if (waitqueue_active(&((__sk)->sk_lock.wq))) \
-		wake_up(&((__sk)->sk_lock.wq)); \
-	spin_unlock_bh(&((__sk)->sk_lock.slock)); \
-} while(0)
+extern void lock_sock(struct sock *sk);
+extern void release_sock(struct sock *sk);
 
 /* BH context may only use the following locking interface. */
 #define bh_lock_sock(__sk)	spin_lock(&((__sk)->sk_lock.slock))
