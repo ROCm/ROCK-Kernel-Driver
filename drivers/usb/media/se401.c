@@ -1295,7 +1295,7 @@ static int se401_init(struct usb_se401 *se401, int button)
 		    &se401->button, sizeof(se401->button),
 		    se401_button_irq,
 		    se401,
-		    HZ/10
+		    8
 		);
 		if (usb_submit_urb(se401->inturb, GFP_KERNEL)) {
 			info("int urb burned down");
