@@ -162,6 +162,8 @@ extern void enter_prom(struct prom_args *args);
 extern void copy_and_flush(unsigned long dest, unsigned long src,
 			   unsigned long size, unsigned long offset);
 
+static unsigned long __initdata initrd_start /* = 0 */, initrd_len;
+
 unsigned long dev_tree_size;
 unsigned long _get_PIR(void);
 
@@ -1566,9 +1568,34 @@ check_display(unsigned long mem)
 	return DOUBLEWORD_ALIGN(mem);
 }
 
-static unsigned long __init
+/* Return (relocated) pointer to this much memory: skips initrd if any. */
+static void *__make_room(unsigned long *mem_start, unsigned long *mem_end,
+			 unsigned long needed, unsigned long align)
+{
+	void *ret;
+	unsigned long offset = reloc_offset();
+
+	*mem_start = ALIGN(*mem_start, align);
+	if (*mem_start + needed > *mem_end) {
+		if (*mem_end != RELOC(initrd_start))
+			prom_panic(RELOC("No memory for copy_device_tree"));
+		*mem_start = RELOC(initrd_start) + RELOC(initrd_len);
+		/* We can't pass huge values to OF, so use 1G. */
+		*mem_end = *mem_start + 1024*1024*1024;
+	}
+
+	ret = (void *)*mem_start;
+	*mem_start += needed;
+
+	return ret;
+}
+
+#define make_room(startp, endp, type) \
+	__make_room(startp, endp, sizeof(type), __alignof__(type))
+
+static void __init
 inspect_node(phandle node, struct device_node *dad,
-	     unsigned long mem_start, unsigned long mem_end,
+	     unsigned long *mem_start, unsigned long *mem_end,
 	     struct device_node ***allnextpp)
 {
 	int l;
@@ -1579,9 +1606,9 @@ inspect_node(phandle node, struct device_node *dad,
 	unsigned char *valp;
 	unsigned long offset = reloc_offset();
 
-	np = (struct device_node *) mem_start;
-	mem_start += sizeof(struct device_node);
+	np = make_room(mem_start, mem_end, struct device_node);
 	memset(np, 0, sizeof(*np));
+
 	np->node = node;
 	**allnextpp = PTRUNRELOC(np);
 	*allnextpp = &np->allnext;
@@ -1599,19 +1626,22 @@ inspect_node(phandle node, struct device_node *dad,
 	prev_propp = &np->properties;
 	prev_name = RELOC("");
 	for (;;) {
-		pp = (struct property *) mem_start;
-		namep = (char *) (pp + 1);
-		pp->name = PTRUNRELOC(namep);
+		/* 32 is max len of name including nul. */
+		namep = make_room(mem_start, mem_end, char[32]);
 		if ((long) call_prom(RELOC("nextprop"), 3, 1, node, prev_name,
-				    namep) <= 0)
+				     namep) <= 0) {
+			/* No more nodes: unwind alloc */
+			*mem_start = (unsigned long)namep;
 			break;
-		mem_start = DOUBLEWORD_ALIGN((unsigned long)namep + strlen(namep) + 1);
+		}
+		/* Trim off some if we can */
+		*mem_start = DOUBLEWORD_ALIGN((unsigned long)namep
+					     + strlen(namep) + 1);
+		pp = make_room(mem_start, mem_end, struct property);
+		pp->name = PTRUNRELOC(namep);
 		prev_name = namep;
-		valp = (unsigned char *) mem_start;
-		pp->value = PTRUNRELOC(valp);
-		pp->length = (int)(long)
-			call_prom(RELOC("getprop"), 4, 1, node, namep,
-				  valp, mem_end - mem_start);
+
+		pp->length = call_prom(RELOC("getproplen"), 2, 1, node, namep);
 		if (pp->length < 0)
 			continue;
 		if (pp->length > MAX_PROPERTY_LENGTH) {
@@ -1630,7 +1660,9 @@ inspect_node(phandle node, struct device_node *dad,
 
 			continue;
 		}
-		mem_start = DOUBLEWORD_ALIGN(mem_start + pp->length);
+		valp = __make_room(mem_start, mem_end, pp->length, 1);
+		pp->value = PTRUNRELOC(valp);
+		call_prom(RELOC("getprop"), 4, 1, node, namep,valp,pp->length);
 		*prev_propp = PTRUNRELOC(pp);
 		prev_propp = &pp->next;
 	}
@@ -1654,23 +1686,27 @@ inspect_node(phandle node, struct device_node *dad,
 	*prev_propp = 0;
 
 	/* get the node's full name */
+	namep = (char *)*mem_start;
 	l = (long) call_prom(RELOC("package-to-path"), 3, 1, node,
-			    (char *) mem_start, mem_end - mem_start);
+			     namep, *mem_end - *mem_start);
 	if (l >= 0) {
-		np->full_name = PTRUNRELOC((char *) mem_start);
-		*(char *)(mem_start + l) = 0;
-		mem_start = DOUBLEWORD_ALIGN(mem_start + l + 1);
+		/* Didn't fit?  Get more room. */
+		if (l+1 > *mem_end - *mem_start) {
+			namep = __make_room(mem_start, mem_end, l+1, 1);
+			call_prom(RELOC("package-to-path"),3,1,node,namep,l);
+		}
+		np->full_name = PTRUNRELOC(namep);
+		namep[l] = '\0';
+		*mem_start = DOUBLEWORD_ALIGN(*mem_start + l + 1);
 	}
 
 	/* do all our children */
 	child = call_prom(RELOC("child"), 1, 1, node);
 	while (child != (phandle)0) {
-		mem_start = inspect_node(child, np, mem_start, mem_end,
+		inspect_node(child, np, mem_start, mem_end,
 					 allnextpp);
 		child = call_prom(RELOC("peer"), 1, 1, child);
 	}
-
-	return mem_start;
 }
 
 /*
@@ -1680,20 +1716,22 @@ static unsigned long __init
 copy_device_tree(unsigned long mem_start)
 {
 	phandle root;
-	unsigned long new_start;
 	struct device_node **allnextp;
 	unsigned long offset = reloc_offset();
-	unsigned long mem_end = mem_start + (8<<20);
+	unsigned long mem_end = RELOC(initrd_start);
+
+	/* We pass mem_end-mem_start to OF: keep it well under 32-bit */
+	if (!mem_end)
+		mem_end = mem_start + 1024*1024*1024;
 
 	root = call_prom(RELOC("peer"), 1, 1, (phandle)0);
 	if (root == (phandle)0) {
 		prom_panic(RELOC("couldn't get device tree root\n"));
 	}
 	allnextp = &RELOC(allnodes);
-	mem_start = DOUBLEWORD_ALIGN(mem_start);
-	new_start = inspect_node(root, 0, mem_start, mem_end, &allnextp);
+	inspect_node(root, 0, &mem_start, &mem_end, &allnextp);
 	*allnextp = 0;
-	return new_start;
+	return mem_start;
 }
 
 /* Verify bi_recs are good */
@@ -1731,7 +1769,8 @@ prom_bi_rec_reserve(unsigned long mem)
 			switch (rec->tag) {
 #ifdef CONFIG_BLK_DEV_INITRD
 			case BI_INITRD:
-				lmb_reserve(rec->data[0], rec->data[1]);
+				RELOC(initrd_start) = rec->data[0];
+				RELOC(initrd_len) = rec->data[1];
 				break;
 #endif /* CONFIG_BLK_DEV_INITRD */
 			}
@@ -1885,6 +1924,11 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	RELOC(klimit) = mem + offset;
 
 	lmb_reserve(0, __pa(RELOC(klimit)));
+#ifdef CONFIG_BLK_DEV_INITRD
+	/* If this didn't cover the initrd, do so now */
+	if (mem < RELOC(initrd_start))
+		lmb_reserve(RELOC(initrd_start), RELOC(initrd_len));
+#endif /* CONFIG_BLK_DEV_INITRD */
 
 	if (_systemcfg->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
