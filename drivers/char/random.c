@@ -783,7 +783,7 @@ static void batch_entropy_process(void *private_)
 struct timer_rand_state {
 	__u32		last_time;
 	__s32		last_delta,last_delta2;
-	int		dont_count_entropy:1;
+	unsigned	dont_count_entropy:1;
 };
 
 static struct timer_rand_state keyboard_timer_state;

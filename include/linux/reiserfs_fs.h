@@ -1734,7 +1734,7 @@ struct reiserfs_transaction_handle {
   int t_blocks_allocated ;      /* number of blocks this writer allocated */
   unsigned long t_trans_id ;    /* sanity check, equals the current trans id */
   void *t_handle_save ;		/* save existing current->journal_info */
-  int displace_new_blocks:1;	/* if new block allocation occurres, that block
+  unsigned displace_new_blocks:1; /* if new block allocation occurres, that block
 				   should be displaced from others */
 } ;
 
@@ -2154,9 +2154,9 @@ struct buffer_head * get_FEB (struct tree_balance *);
     int prealloc_size;			/* is set in determine_prealloc_size() function, used by underlayed
 					 * function that do actual allocation */
 
-    int formatted_node:1;		/* the allocator uses different polices for getting disk space for
+    unsigned formatted_node:1;		/* the allocator uses different polices for getting disk space for
 					 * formatted/unformatted blocks with/without preallocation */
-    int preallocate:1;
+    unsigned preallocate:1;
 };
 
 typedef struct __reiserfs_blocknr_hint reiserfs_blocknr_hint_t;

@@ -45,7 +45,7 @@ struct reiserfs_inode_info {
     struct list_head i_prealloc_list; /* per-transaction list of inodes which
                                        * have preallocated blocks */
 
-    int new_packing_locality:1;	      /* new_packig_locality is created; new blocks
+    unsigned new_packing_locality:1;  /* new_packig_locality is created; new blocks
 				       * for the contents of this directory should be
 				       * displaced */
 
