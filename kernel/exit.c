@@ -647,7 +647,7 @@ fake_volatile:
 	exit_namespace(tsk);
 	exit_thread();
 
-	if (current->leader)
+	if (tsk->leader)
 		disassociate_ctty(1);
 
 	module_put(tsk->thread_info->exec_domain->module);
@@ -657,8 +657,31 @@ fake_volatile:
 	tsk->exit_code = code;
 	exit_notify();
 	preempt_disable();
-	if (current->exit_signal == -1)
-		release_task(current);
+	if (signal_pending(tsk) && !tsk->sig->group_exit
+	    && !thread_group_empty(tsk)) {
+		/*
+		 * This occurs when there was a race between our exit
+		 * syscall and a group signal choosing us as the one to
+		 * wake up.  It could be that we are the only thread
+		 * alerted to check for pending signals, but another thread
+		 * should be woken now to take the signal since we will not.
+		 * Now we'll wake all the threads in the group just to make
+		 * sure someone gets all the pending signals.
+		 */
+		struct task_struct *t;
+		read_lock(&tasklist_lock);
+		spin_lock_irq(&tsk->sig->siglock);
+		for (t = next_thread(tsk); t != tsk; t = next_thread(t))
+			if (!signal_pending(t) && !(t->flags & PF_EXITING)) {
+				recalc_sigpending_tsk(t);
+				if (signal_pending(t))
+					signal_wake_up(t, 0);
+			}
+		spin_unlock_irq(&tsk->sig->siglock);
+		read_unlock(&tasklist_lock);
+	}
+	if (tsk->exit_signal == -1)
+		release_task(tsk);
 	schedule();
 	BUG();
 /*
@@ -710,31 +733,44 @@ task_t *next_thread(task_t *p)
 }
 
 /*
+ * Take down every thread in the group.  This is called by fatal signals
+ * as well as by sys_exit_group (below).
+ */
+NORET_TYPE void
+do_group_exit(int exit_code)
+{
+	BUG_ON(exit_code & 0x80); /* core dumps don't get here */
+
+	if (current->sig->group_exit)
+		exit_code = current->sig->group_exit_code;
+	else if (!thread_group_empty(current)) {
+		struct signal_struct *const sig = current->sig;
+		read_lock(&tasklist_lock);
+		spin_lock_irq(&sig->siglock);
+		if (sig->group_exit)
+			/* Another thread got here before we took the lock.  */
+			exit_code = sig->group_exit_code;
+		else {
+		sig->group_exit = 1;
+		sig->group_exit_code = exit_code;
+			zap_other_threads(current);
+		}
+		spin_unlock_irq(&sig->siglock);
+		read_unlock(&tasklist_lock);
+	}
+
+	do_exit(exit_code);
+	/* NOTREACHED */
+}
+
+/*
  * this kills every thread in the thread group. Note that any externally
- * wait4()-ing process will get the correct exit code - even if this 
+ * wait4()-ing process will get the correct exit code - even if this
  * thread is not the thread group leader.
  */
 asmlinkage long sys_exit_group(int error_code)
 {
-	unsigned int exit_code = (error_code & 0xff) << 8;
-
-	if (!thread_group_empty(current)) {
-		struct signal_struct *sig = current->sig;
-
-		spin_lock_irq(&sig->siglock);
-		if (sig->group_exit) {
-			spin_unlock_irq(&sig->siglock);
-
-			/* another thread was faster: */
-			do_exit(sig->group_exit_code);
-		}
-		sig->group_exit = 1;
-		sig->group_exit_code = exit_code;
-		__broadcast_thread_group(current, SIGKILL);
-		spin_unlock_irq(&sig->siglock);
-	}
-
-	do_exit(exit_code);
+	do_group_exit((error_code & 0xff) << 8);
 }
 
 static int eligible_child(pid_t pid, int options, task_t *p)
@@ -800,6 +836,8 @@ repeat:
 		int ret;
 
 		list_for_each(_p,&tsk->children) {
+			int exit_code;
+
 			p = list_entry(_p,struct task_struct,sibling);
 
 			ret = eligible_child(pid, options, p);
@@ -813,20 +851,69 @@ repeat:
 					continue;
 				if (!(options & WUNTRACED) && !(p->ptrace & PT_PTRACED))
 					continue;
+				if (ret == 2 && !(p->ptrace & PT_PTRACED) &&
+				    p->sig && p->sig->group_stop_count > 0)
+					/*
+					 * A group stop is in progress and
+					 * we are the group leader.  We won't
+					 * report until all threads have
+					 * stopped.
+					 */
+					continue;
 				read_unlock(&tasklist_lock);
 
 				/* move to end of parent's list to avoid starvation */
 				write_lock_irq(&tasklist_lock);
 				remove_parent(p);
 				add_parent(p, p->parent);
+
+				/*
+				 * This uses xchg to be atomic with
+				 * the thread resuming and setting it.
+				 * It must also be done with the write
+				 * lock held to prevent a race with the
+				 * TASK_ZOMBIE case (below).
+				 */
+				exit_code = xchg(&p->exit_code, 0);
+				if (unlikely(p->state > TASK_STOPPED)) {
+					/*
+					 * The task resumed and then died.
+					 * Let the next iteration catch it
+					 * in TASK_ZOMBIE.  Note that
+					 * exit_code might already be zero
+					 * here if it resumed and did
+					 * _exit(0).  The task itself is
+					 * dead and won't touch exit_code
+					 * again; other processors in
+					 * this function are locked out.
+					 */
+					p->exit_code = exit_code;
+					exit_code = 0;
+				}
+				if (unlikely(exit_code == 0)) {
+					/*
+					 * Another thread in this function
+					 * got to it first, or it resumed,
+					 * or it resumed and then died.
+					 */
+					write_unlock_irq(&tasklist_lock);
+					continue;
+				}
+				/*
+				 * Make sure this doesn't get reaped out from
+				 * under us while we are examining it below.
+				 * We don't want to keep holding onto the
+				 * tasklist_lock while we call getrusage and
+				 * possibly take page faults for user memory.
+				 */
+				get_task_struct(p);
 				write_unlock_irq(&tasklist_lock);
 				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0; 
 				if (!retval && stat_addr) 
-					retval = put_user((p->exit_code << 8) | 0x7f, stat_addr);
-				if (!retval) {
-					p->exit_code = 0;
+					retval = put_user((exit_code << 8) | 0x7f, stat_addr);
+				if (!retval)
 					retval = p->pid;
-				}
+				put_task_struct(p);
 				goto end_wait4;
 			case TASK_ZOMBIE:
 				/*
@@ -840,6 +927,13 @@ repeat:
 				 */
 				state = xchg(&p->state, TASK_DEAD);
 				if (state != TASK_ZOMBIE)
+					continue;
+				if (unlikely(p->exit_signal == -1))
+					/*
+					 * This can only happen in a race with
+					 * a ptraced thread dying on another
+					 * processor.
+					 */
 					continue;
 				read_unlock(&tasklist_lock);
 
@@ -857,11 +951,17 @@ repeat:
 				retval = p->pid;
 				if (p->real_parent != p->parent) {
 					write_lock_irq(&tasklist_lock);
+					/* Double-check with lock held.  */
+					if (p->real_parent != p->parent) {
 					__ptrace_unlink(p);
-					do_notify_parent(p, SIGCHLD);
+						do_notify_parent(
+							p, p->exit_signal);
 					p->state = TASK_ZOMBIE;
+						p = NULL;
+					}
 					write_unlock_irq(&tasklist_lock);
-				} else
+				}
+				if (p != NULL)
 					release_task(p);
 				goto end_wait4;
 			default:

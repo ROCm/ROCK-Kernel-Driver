@@ -587,7 +587,7 @@ static inline int de_thread(struct signal_struct *oldsig)
 		return -EAGAIN;
 	}
 	oldsig->group_exit = 1;
-	__broadcast_thread_group(current, SIGKILL);
+	zap_other_threads(current);
 
 	/*
 	 * Account for the thread group leader hanging around:
@@ -659,7 +659,8 @@ static inline int de_thread(struct signal_struct *oldsig)
 			current->ptrace = ptrace;
 			__ptrace_link(current, parent);
 		}
-		
+
+		list_del(&current->tasks);
 		list_add_tail(&current->tasks, &init_task.tasks);
 		current->exit_signal = SIGCHLD;
 		state = leader->state;
@@ -680,6 +681,7 @@ out:
 	newsig->group_exit = 0;
 	newsig->group_exit_code = 0;
 	newsig->group_exit_task = NULL;
+	newsig->group_stop_count = 0;
 	memcpy(newsig->action, current->sig->action, sizeof(newsig->action));
 	init_sigpending(&newsig->shared_pending);
 

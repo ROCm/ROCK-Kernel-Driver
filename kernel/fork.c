@@ -680,6 +680,7 @@ static inline int copy_sighand(unsigned long clone_flags, struct task_struct * t
 	sig->group_exit = 0;
 	sig->group_exit_code = 0;
 	sig->group_exit_task = NULL;
+	sig->group_stop_count = 0;
 	memcpy(sig->action, current->sig->action, sizeof(sig->action));
 	sig->curr_target = NULL;
 	init_sigpending(&sig->shared_pending);
@@ -801,7 +802,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	spin_lock_init(&p->alloc_lock);
 	spin_lock_init(&p->switch_lock);
 
-	clear_tsk_thread_flag(p,TIF_SIGPENDING);
+	clear_tsk_thread_flag(p, TIF_SIGPENDING);
 	init_sigpending(&p->pending);
 
 	p->it_real_value = p->it_virt_value = p->it_prof_value = 0;
@@ -910,6 +911,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	 */
 	if (sigismember(&current->pending.signal, SIGKILL)) {
 		write_unlock_irq(&tasklist_lock);
+		retval = -EINTR;
 		goto bad_fork_cleanup_namespace;
 	}
 
@@ -934,6 +936,17 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 		}
 		p->tgid = current->tgid;
 		p->group_leader = current->group_leader;
+
+		if (current->sig->group_stop_count > 0) {
+			/*
+			 * There is an all-stop in progress for the group.
+			 * We ourselves will stop as soon as we check signals.
+			 * Make the new thread part of that group stop too.
+			 */
+			current->sig->group_stop_count++;
+			set_tsk_thread_flag(p, TIF_SIGPENDING);
+		}
+
 		spin_unlock(&current->sig->siglock);
 	}
 
@@ -1036,8 +1049,13 @@ struct task_struct *do_fork(unsigned long clone_flags,
 			init_completion(&vfork);
 		}
 
-		if (p->ptrace & PT_PTRACED)
-			send_sig(SIGSTOP, p, 1);
+		if (p->ptrace & PT_PTRACED) {
+			/*
+			 * We'll start up with an immediate SIGSTOP.
+			 */
+			sigaddset(&p->pending.signal, SIGSTOP);
+			set_tsk_thread_flag(p, TIF_SIGPENDING);
+		}
 
 		wake_up_forked_process(p);		/* do this last */
 		++total_forks;

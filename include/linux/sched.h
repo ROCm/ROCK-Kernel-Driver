@@ -235,6 +235,9 @@ struct signal_struct {
 	int			group_exit;
 	int			group_exit_code;
 	struct task_struct	*group_exit_task;
+
+	/* thread group stop support, overloads group_exit_code too */
+	int			group_stop_count;
 };
 
 /*
@@ -508,7 +511,6 @@ extern int in_egroup_p(gid_t);
 extern void proc_caches_init(void);
 extern void flush_signals(struct task_struct *);
 extern void flush_signal_handlers(struct task_struct *);
-extern void sig_exit(int, int, struct siginfo *);
 extern int dequeue_signal(sigset_t *mask, siginfo_t *info);
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
@@ -525,7 +527,7 @@ extern void do_notify_parent(struct task_struct *, int);
 extern void force_sig(int, struct task_struct *);
 extern void force_sig_specific(int, struct task_struct *);
 extern int send_sig(int, struct task_struct *, int);
-extern int __broadcast_thread_group(struct task_struct *p, int sig);
+extern void zap_other_threads(struct task_struct *p);
 extern int kill_pg(pid_t, int, int);
 extern int kill_sl(pid_t, int, int);
 extern int kill_proc(pid_t, int, int);
@@ -589,6 +591,8 @@ extern void exit_mm(struct task_struct *);
 extern void exit_files(struct task_struct *);
 extern void exit_sighand(struct task_struct *);
 extern void __exit_sighand(struct task_struct *);
+
+extern NORET_TYPE void do_group_exit(int);
 
 extern void reparent_to_init(void);
 extern void daemonize(void);
@@ -761,6 +765,8 @@ static inline void cond_resched_lock(spinlock_t * lock)
 
 extern FASTCALL(void recalc_sigpending_tsk(struct task_struct *t));
 extern void recalc_sigpending(void);
+
+extern void signal_wake_up(struct task_struct *t, int resume_stopped);
 
 /*
  * Wrappers for p->thread_info->cpu access. No-op on UP.
