@@ -4674,7 +4674,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 		tw32(BUFMGR_DMA_DESC_POOL_SIZE, NIC_SRAM_DMA_DESC_POOL_SIZE);
 	}
 #if TG3_DO_TSO != 0
-	else if (tp->dev->features & NETIF_F_TSO) {
+	else if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) {
 		int fw_len;
 
 		fw_len = (TG3_TSO5_FW_TEXT_LEN +
@@ -4891,13 +4891,10 @@ static int tg3_reset_hw(struct tg3 *tp)
 		rdmac_mode |= RDMAC_MODE_SPLIT_ENABLE;
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
 		if (tp->pci_chip_rev_id != CHIPREV_ID_5705_A0) {
-#if TG3_DO_TSO != 0
-			if (tp->dev->features & NETIF_F_TSO) {
+			if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) {
 				rdmac_mode |= RDMAC_MODE_FIFO_SIZE_128;
-			} else
-#endif
-			if (!(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH) &&
-			    !(tp->tg3_flags2 & TG3_FLG2_IS_5788)) {
+			} else if (!(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH) &&
+				   !(tp->tg3_flags2 & TG3_FLG2_IS_5788)) {
 				rdmac_mode |= RDMAC_MODE_FIFO_LONG_BURST;
 			}
 		}
@@ -4905,7 +4902,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	/* Receive/send statistics. */
 	if ((rdmac_mode & RDMAC_MODE_FIFO_SIZE_128) &&
-	    (tp->dev->features & NETIF_F_TSO)) {
+	    (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE)) {
 		val = tr32(RCVLPC_STATS_ENABLE);
 		val &= ~RCVLPC_STATSENAB_LNGBRST_RFIX;
 		tw32(RCVLPC_STATS_ENABLE, val);
@@ -5038,7 +5035,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 	}
 
 #if TG3_DO_TSO != 0
-	if (tp->dev->features & NETIF_F_TSO) {
+	if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) {
 		err = tg3_load_tso_firmware(tp);
 		if (err)
 			return err;
@@ -7665,17 +7662,16 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	    tp->pci_chip_rev_id == CHIPREV_ID_5705_A0 ||
 	    (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) != 0 ||
 	    (tp->tg3_flags2 & TG3_FLG2_IS_5788)) {
-		/* Not TSO capable. */
-		dev->features &= ~NETIF_F_TSO;
+		tp->tg3_flags2 &= ~TG3_FLG2_TSO_CAPABLE;
 	} else {
-		dev->features |= NETIF_F_TSO;
+		tp->tg3_flags2 |= TG3_FLG2_TSO_CAPABLE;
 	}
+	if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE)
+		dev->features |= NETIF_F_TSO;
 #endif
 
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5705_A1 &&
-#if TG3_DO_TSO != 0
-	    !(dev->features & NETIF_F_TSO) &&
-#endif
+	    !(tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) &&
 	    !(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH)) {
 		tp->tg3_flags2 |= TG3_FLG2_MAX_RXPEND_64;
 		tp->rx_pending = 64;
