@@ -10,6 +10,7 @@ endif
 
 obj-$(CONFIG_E1000) += e1000/
 obj-$(CONFIG_NET_BROADCOM) += bcm/
+obj-$(CONFIG_NET_BCM44) += bcm44/
 obj-$(CONFIG_IXGB) += ixgb/
 obj-$(CONFIG_BONDING) += bonding/
 
