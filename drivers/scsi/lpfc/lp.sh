@@ -10,6 +10,7 @@ cp -fv $d/$i $n
 done
 
 for i in \
+README \
 lpfc.conf \
 core.c \
 lpfc_core.c \

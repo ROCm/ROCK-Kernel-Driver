@@ -113,7 +113,7 @@
 #define LPFC_DRIVER_NAME    "lpfc"
 
 #ifndef LPFC_DRIVER_VERSION
-#define LPFC_DRIVER_VERSION "2.10e"
+#define LPFC_DRIVER_VERSION "2.10f"
 #define OSGT_DRIVER_VERSION "1.08"
 #endif
 
@@ -1054,7 +1054,7 @@ lpfc_proc_info(struct Scsi_Host *host,
 	len += sprintf(buf + len, "SerialNum: %s\n", phba->SerialNumber);
 
 	lpfc_decode_firmware_rev(phba, fwrev, 1);
-	sprintf(&buf[strlen(buf)], "Firmware Version: %s\n", fwrev);
+	len += sprintf(buf + len, "Firmware Version: %s\n", fwrev);
 
 	len += sprintf(buf + len, "Hdw: ");
 	/* Convert JEDEC ID to ascii for hardware version */
