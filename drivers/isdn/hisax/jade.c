@@ -218,6 +218,8 @@ static void jade_fill_fifo(struct BCState *bcs);
 
 static struct bc_l1_ops jade_l1_ops = {
 	.fill_fifo = jade_fill_fifo,
+	.open      = setstack_jade,
+	.close     = close_jadestate,
 };
 
 void __init
@@ -226,10 +228,6 @@ initjade(struct IsdnCardState *cs)
 	int val;
 
 	cs->bc_l1_ops = &jade_l1_ops;
-	cs->bcs[0].BC_SetStack = setstack_jade;
-	cs->bcs[1].BC_SetStack = setstack_jade;
-	cs->bcs[0].BC_Close = close_jadestate;
-	cs->bcs[1].BC_Close = close_jadestate;
 	cs->bcs[0].unit = 0;
 	cs->bcs[1].unit = 1;
 

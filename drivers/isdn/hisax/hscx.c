@@ -185,6 +185,8 @@ static void hscx_fill_fifo(struct BCState *bcs);
 
 static struct bc_l1_ops hscx_l1_ops = {
 	.fill_fifo = hscx_fill_fifo,
+	.open      = setstack_hscx,
+	.close     = close_hscxstate,
 };
 
 void __init
@@ -193,10 +195,6 @@ inithscx(struct IsdnCardState *cs)
 	int val, eval;
 	
 	cs->bc_l1_ops = &hscx_l1_ops;
-	cs->bcs[0].BC_SetStack = setstack_hscx;
-	cs->bcs[1].BC_SetStack = setstack_hscx;
-	cs->bcs[0].BC_Close = close_hscxstate;
-	cs->bcs[1].BC_Close = close_hscxstate;
 	cs->bcs[0].unit = 0;
 	cs->bcs[1].unit = 1;
 	cs->bcs[0].hw.hscx.tsaxr0 = 0x2f;

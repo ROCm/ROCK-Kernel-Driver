@@ -852,6 +852,8 @@ unsigned int __init
 
 static struct bc_l1_ops hfcd_l1_ops = {
 	.fill_fifo = hfc_fill_fifo,
+	.open      = setstack_2b,
+	.close     = close_2bs0,
 };
 
 void __init
@@ -870,10 +872,6 @@ init2bds0(struct IsdnCardState *cs)
 	if (!cs->bcs[1].hw.hfc.send)
 		cs->bcs[1].hw.hfc.send = init_send_hfcd(32);
 	cs->DC_Send_Data = hfc_fill_dfifo;
-	cs->bcs[0].BC_SetStack = setstack_2b;
-	cs->bcs[1].BC_SetStack = setstack_2b;
-	cs->bcs[0].BC_Close = close_2bs0;
-	cs->bcs[1].BC_Close = close_2bs0;
 	mode_2bs0(cs->bcs, 0, 0);
 	mode_2bs0(cs->bcs + 1, 0, 1);
 }

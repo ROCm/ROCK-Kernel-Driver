@@ -675,8 +675,6 @@ bch_setstack(struct PStack *st, struct BCState *bcs)
 static void __devinit
 bch_init(struct IsdnCardState *cs, int hscx)
 {
-	cs->bcs[hscx].BC_SetStack   = bch_setstack;
-	cs->bcs[hscx].BC_Close      = bch_close_state;
 	cs->bcs[hscx].unit          = hscx;
 	cs->bcs[hscx].cs            = cs;
 	bch_mode(cs->bcs + hscx, 0, hscx);
@@ -728,6 +726,8 @@ clear_pending_ints(struct IsdnCardState *cs)
 
 static struct bc_l1_ops ipacx_bc_l1_ops = {
 	.fill_fifo = ipacx_bc_fill_fifo,
+	.open      = bch_setstack,
+	.close     = bch_close_state,
 };
 
 //----------------------------------------------------------

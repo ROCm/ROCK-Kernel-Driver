@@ -375,11 +375,6 @@ static inline void transmit_chars(struct IsdnCardState *cs, int *intr_done)
 	}
 }
 
-static struct bc_l1_ops modem_l1_ops = {
-	.fill_fifo = modem_fill,
-};
-
-
 static void rs_interrupt_elsa(int irq, struct IsdnCardState *cs)
 {
 	int status, iir, msr;
@@ -597,7 +592,7 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 			if (open_hscxstate(st->l1.hardware, bcs))
 				return (-1);
 			st->l1.l2l1 = hscx_l2l1;
-			// bcs->cs->BC_Send_Data = hscx_fill_fifo;
+			// bcs->cs->BC_Send_Data = hscx_fill_fifo; FIXME
 			break;
 		case L1_MODE_MODEM:
 			bcs->mode = L1_MODE_MODEM;
@@ -613,7 +608,7 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 			bcs->tx_cnt = 0;
 			bcs->cs->hw.elsa.bcs = bcs;
 			st->l1.l2l1 = modem_l2l1;
-			bcs->cs->bc_l1_ops = &modem_l1_ops;
+//			bcs->cs->bc_l1_ops = &modem_l1_ops;
 			break;
 	}
 	st->l1.bcs = bcs;
@@ -623,13 +618,17 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
-void
-init_modem(struct IsdnCardState *cs) {
+static struct bc_l1_ops modem_l1_ops = {
+	.fill_fifo = modem_fill,
+	.open      = setstack_elsa,
+	.close     = close_elsastate,
+};
 
-	cs->bcs[0].BC_SetStack = setstack_elsa;
-	cs->bcs[1].BC_SetStack = setstack_elsa;
-	cs->bcs[0].BC_Close = close_elsastate;
-	cs->bcs[1].BC_Close = close_elsastate;
+void
+init_modem(struct IsdnCardState *cs)
+{
+	cs->bc_l1_ops = &modem_l1_ops;
+
 	if (!(cs->hw.elsa.rcvbuf = kmalloc(MAX_MODEM_BUF,
 		GFP_ATOMIC))) {
 		printk(KERN_WARNING

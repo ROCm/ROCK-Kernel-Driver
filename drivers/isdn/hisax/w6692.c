@@ -658,10 +658,6 @@ void __init initW6692(struct IsdnCardState *cs, int part)
 		W6692_new_ph(cs);
 		ph_command(cs, W_L1CMD_ECK);
 
-		cs->bcs[0].BC_SetStack = setstack_w6692;
-		cs->bcs[1].BC_SetStack = setstack_w6692;
-		cs->bcs[0].BC_Close = close_w6692state;
-		cs->bcs[1].BC_Close = close_w6692state;
 		W6692Bmode(cs->bcs, 0, 0);
 		W6692Bmode(cs->bcs + 1, 0, 0);
 	}
@@ -701,6 +697,8 @@ w6692_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 
 static struct bc_l1_ops w6692_bc_l1_ops = {
 	.fill_fifo = W6692B_fill_fifo,
+	.open      = setstack_w6692,
+	.close     = close_w6692state,
 };
 
 static int id_idx ;

@@ -488,8 +488,6 @@ struct BCState {
 	struct timer_list transbusy;
 	struct work_struct work;
 	unsigned long event;
-	int  (*BC_SetStack) (struct PStack *, struct BCState *);
-	void (*BC_Close) (struct BCState *);
 #ifdef ERROR_STATISTIC
 	int err_crc;
 	int err_tx;
@@ -878,6 +876,8 @@ struct dc_hw_ops {
 
 struct bc_l1_ops {
 	void   (*fill_fifo)  (struct BCState *);
+	int    (*open)       (struct PStack *, struct BCState *);
+	void   (*close)      (struct BCState *);
 };
 
 #define HW_IOM1			0

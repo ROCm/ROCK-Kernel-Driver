@@ -204,6 +204,10 @@ hdlc_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int len)
 	}
 }
 
+static struct bc_hw_ops hdlc_hw_ops = {
+	.read_fifo  = hdlc_read_fifo,
+};
+
 static inline
 struct BCState *Sel_BCS(struct IsdnCardState *cs, int channel)
 {
@@ -343,10 +347,6 @@ reset_xmit(struct BCState *bcs)
 	write_ctrl(bcs, 1);
 	hdlc_fill_fifo(bcs);
 }
-
-static struct bc_l1_ops hdlc_l1_ops = {
-	.fill_fifo = hdlc_fill_fifo,
-};
 
 static inline void
 HDLC_irq(struct BCState *bcs, u_int stat)
@@ -491,8 +491,10 @@ setstack_hdlc(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
-static struct bc_hw_ops hdlc_hw_ops = {
-	.read_fifo  = hdlc_read_fifo,
+static struct bc_l1_ops hdlc_l1_ops = {
+	.fill_fifo = hdlc_fill_fifo,
+	.open      = setstack_hdlc,
+	.close     = close_hdlcstate,
 };
 
 void __init
@@ -524,10 +526,6 @@ inithdlc(struct IsdnCardState *cs)
 		debugl1(cs, "HDLC 2 VIN %x", val);
 	}
 
-	cs->bcs[0].BC_SetStack = setstack_hdlc;
-	cs->bcs[1].BC_SetStack = setstack_hdlc;
-	cs->bcs[0].BC_Close = close_hdlcstate;
-	cs->bcs[1].BC_Close = close_hdlcstate;
 	modehdlc(cs->bcs, -1, 0);
 	modehdlc(cs->bcs + 1, -1, 1);
 }

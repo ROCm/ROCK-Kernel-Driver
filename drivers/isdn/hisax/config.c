@@ -825,9 +825,9 @@ static void closecard(int cardnr)
 {
 	struct IsdnCardState *csta = cards[cardnr].cs;
 
-	if (csta->bcs->BC_Close != NULL) {
-		csta->bcs->BC_Close(csta->bcs + 1);
-		csta->bcs->BC_Close(csta->bcs);
+	if (csta->bc_l1_ops->close) {
+		csta->bc_l1_ops->close(csta->bcs + 1);
+		csta->bc_l1_ops->close(csta->bcs);
 	}
 
 	skb_queue_purge(&csta->rq);
@@ -1774,10 +1774,10 @@ int hisax_register(struct hisax_d_if *hisax_d_if, struct hisax_b_if *b_if[],
 	cs->iif.owner = hisax_d_if->owner; // FIXME should be done before registering
 	INIT_WORK(&cs->work, hisax_bh, cs);
 	cs->channel[0].d_st->l1.l2l1 = hisax_d_l2l1;
-	for (i = 0; i < 2; i++) {
-		cs->bcs[i].BC_SetStack = hisax_bc_setstack;
-		cs->bcs[i].BC_Close = hisax_bc_close;
+	cs->bc_l1_ops->open = hisax_bc_setstack;
+	cs->bc_l1_ops->close = hisax_bc_close;
 
+	for (i = 0; i < 2; i++) {
 		b_if[i]->ifc.l1l2 = hisax_b_l1l2;
 
 		hisax_d_if->b_if[i] = b_if[i];
