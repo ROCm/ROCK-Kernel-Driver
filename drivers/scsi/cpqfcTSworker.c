@@ -2878,7 +2878,7 @@ static void ScsiReportLunsDone(Scsi_Cmnd *Cmnd)
     }
   }
 
-Done:  
+Done: ;
 }
 
 extern int is_private_data_of_cpqfc(CPQFCHBA *hba, void * pointer);

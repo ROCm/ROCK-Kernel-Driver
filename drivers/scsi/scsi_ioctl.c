@@ -98,7 +98,7 @@ static int ioctl_internal_command(struct scsi_device *sdev, char *cmd,
 
 	SCSI_LOG_IOCTL(1, printk("Trying ioctl with scsi command %d\n", *cmd));
 
-	sreq = scsi_allocate_request(sdev);
+	sreq = scsi_allocate_request(sdev, GFP_KERNEL);
 	if (!sreq) {
 		printk("SCSI internal ioctl failed, no memory\n");
 		return -ENOMEM;
@@ -321,7 +321,7 @@ int scsi_ioctl_send_command(struct scsi_device *sdev,
 		break;
 	}
 
-	sreq = scsi_allocate_request(sdev);
+	sreq = scsi_allocate_request(sdev, GFP_KERNEL);
         if (!sreq) {
                 result = -EINTR;
                 goto error;
@@ -408,30 +408,6 @@ int scsi_ioctl(struct scsi_device *sdev, int cmd, void *arg)
 		return 0;
 	case SCSI_IOCTL_GET_BUS_NUMBER:
 		return put_user(sdev->host->host_no, (int *)arg);
-	/*
-	 * The next two ioctls either need to go or need to be changed to
-	 * pass tagged queueing changes through the low level drivers.
-	 * Simply enabling or disabling tagged queueing without the knowledge
-	 * of the low level driver is a *BAD* thing.
-	 *
-	 * Oct. 10, 2002 - Doug Ledford <dledford@redhat.com>
-	 */
-	case SCSI_IOCTL_TAGGED_ENABLE:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EACCES;
-		if (!sdev->tagged_supported)
-			return -EINVAL;
-		sdev->tagged_queue = 1;
-		sdev->current_tag = 1;
-		return 0;
-	case SCSI_IOCTL_TAGGED_DISABLE:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EACCES;
-		if (!sdev->tagged_supported)
-			return -EINVAL;
-		sdev->tagged_queue = 0;
-		sdev->current_tag = 0;
-		return 0;
 	case SCSI_IOCTL_PROBE_HOST:
 		return ioctl_probe(sdev->host, arg);
 	case SCSI_IOCTL_SEND_COMMAND:

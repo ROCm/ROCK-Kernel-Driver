@@ -131,11 +131,6 @@
 /* #define SYM_CONF_IARB_SUPPORT */
 
 /*
- *  Support for some PCI fix-ups (or assumed so).
- */
-#define SYM_CONF_PCI_FIX_UP
-
-/*
  *  Number of lists for the optimization of the IO timeout handling.
  *  Not used under FreeBSD and Linux.
  */

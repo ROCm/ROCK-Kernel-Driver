@@ -1,6 +1,17 @@
 #ifndef _SCSI_PRIV_H
 #define _SCSI_PRIV_H
 
+#include <linux/config.h>
+#include <linux/device.h>
+
+struct request_queue;
+struct scsi_cmnd;
+struct scsi_device;
+struct scsi_host_template;
+struct scsi_request;
+struct Scsi_Host;
+
+
 /*
  * These are the values that the owner field can take.
  * They are used as an indication of who the command belongs to.
@@ -98,7 +109,7 @@ extern int scsi_init_queue(void);
 extern void scsi_exit_queue(void);
 
 /* scsi_proc.c */
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_SCSI_PROC_FS
 extern void scsi_proc_hostdir_add(struct scsi_host_template *);
 extern void scsi_proc_hostdir_rm(struct scsi_host_template *);
 extern void scsi_proc_host_add(struct Scsi_Host *);
@@ -115,11 +126,20 @@ extern void scsi_exit_procfs(void);
 #endif /* CONFIG_PROC_FS */
 
 /* scsi_scan.c */
-int scsi_scan_host_selected(struct Scsi_Host *, unsigned int, unsigned int,
-			    unsigned int, int);
+extern int scsi_scan_host_selected(struct Scsi_Host *, unsigned int,
+				   unsigned int, unsigned int, int);
 extern void scsi_forget_host(struct Scsi_Host *);
 extern void scsi_free_sdev(struct scsi_device *);
 extern void scsi_rescan_device(struct device *);
+
+/* scsi_sysctl.c */
+#ifdef CONFIG_SYSCTL
+extern int scsi_init_sysctl(void);
+extern void scsi_exit_sysctl(void);
+#else
+# define scsi_init_sysctl()		(0)
+# define scsi_exit_sysctl()		do { } while (0)
+#endif /* CONFIG_SYSCTL */
 
 /* scsi_sysfs.c */
 extern int scsi_device_register(struct scsi_device *);
