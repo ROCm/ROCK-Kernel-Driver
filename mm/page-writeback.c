@@ -547,13 +547,16 @@ EXPORT_SYMBOL(write_one_page);
  * For address_spaces which do not use buffers.  Just tag the page as dirty in
  * its radix tree.
  *
- * __set_page_dirty_nobuffers() may return -ENOSPC.  But if it does, the page
- * is still safe, as long as it actually manages to find some blocks at
- * writeback time.
- *
  * This is also used when a single buffer is being dirtied: we want to set the
  * page dirty in that case, but not all the buffers.  This is a "bottom-up"
  * dirtying, whereas __set_page_dirty_buffers() is a "top-down" dirtying.
+ *
+ * Most callers have locked the page, which pins the address_space in memory.
+ * But zap_pte_range() does not lock the page, however in that case the
+ * mapping is pinned by the vma's ->vm_file reference.
+ *
+ * We take care to handle the case where the page was truncated from the
+ * mapping by re-checking page_mapping() insode tree_lock.
  */
 int __set_page_dirty_nobuffers(struct page *page)
 {
@@ -565,7 +568,7 @@ int __set_page_dirty_nobuffers(struct page *page)
 		if (mapping) {
 			spin_lock_irq(&mapping->tree_lock);
 			mapping = page_mapping(page);
-			if (mapping) {	/* Race with truncate? */
+			if (page_mapping(page)) { /* Race with truncate? */
 				BUG_ON(page_mapping(page) != mapping);
 				if (!mapping->backing_dev_info->memory_backed)
 					inc_page_state(nr_dirty);
@@ -573,9 +576,11 @@ int __set_page_dirty_nobuffers(struct page *page)
 					page_index(page), PAGECACHE_TAG_DIRTY);
 			}
 			spin_unlock_irq(&mapping->tree_lock);
-			if (!PageSwapCache(page))
+			if (mapping->host) {
+				/* !PageAnon && !swapper_space */
 				__mark_inode_dirty(mapping->host,
 							I_DIRTY_PAGES);
+			}
 		}
 	}
 	return ret;
