@@ -15,7 +15,7 @@ zoran-objs      :=	zr36120.o zr36120_i2c.o zr36120_mem.o
 obj-$(CONFIG_VIDEO_DEV) += videodev.o v4l2-common.o
 
 obj-$(CONFIG_VIDEO_BT848) += bttv.o msp3400.o tvaudio.o \
-	tda7432.o tda9875.o tuner.o video-buf.o
+	tda7432.o tda9875.o tuner.o video-buf.o tda9887.o
 obj-$(CONFIG_SOUND_TVMIXER) += tvmixer.o
 
 obj-$(CONFIG_VIDEO_ZR36120) += zoran.o
