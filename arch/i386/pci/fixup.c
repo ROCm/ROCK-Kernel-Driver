@@ -148,7 +148,12 @@ static void __init pci_fixup_via_northbridge_bug(struct pci_dev *d)
 	pci_read_config_byte(d, PCI_REVISION_ID, &revision);
 
 	if (d->device == PCI_DEVICE_ID_VIA_8367_0) {
-  	        where = 0x95; /* the memory write queue timer register is 
+		/* fix pci bus latency issues resulted by NB bios error
+		   it appears on bug free^Wreduced kt266x's bios forces
+		   NB latency to zero */
+		pci_write_config_byte(d, PCI_LATENCY_TIMER, 0);
+
+		where = 0x95; /* the memory write queue timer register is 
 				different for the KT266x's: 0x95 not 0x55 */
 	} else if (d->device == PCI_DEVICE_ID_VIA_8363_0 &&
 			(revision == VIA_8363_KL133_REVISION_ID || 
@@ -157,7 +162,7 @@ static void __init pci_fixup_via_northbridge_bug(struct pci_dev *d)
 					causes screen corruption on the KL133/KM133 */
 	}
 
-        pci_read_config_byte(d, where, &v);
+	pci_read_config_byte(d, where, &v);
 	if (v & ~mask) {
 		printk(KERN_WARNING "Disabling VIA memory write queue (PCI ID %04x, rev %02x): [%02x] %02x & %02x -> %02x\n", \
 			d->device, revision, where, v, mask, v & mask);
