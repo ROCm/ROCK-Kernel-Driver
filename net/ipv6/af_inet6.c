@@ -87,6 +87,10 @@ extern int ipv6_misc_proc_init(void);
 extern int ipv6_misc_proc_exit(void);
 
 extern int anycast6_get_info(char *, char **, off_t, int);
+
+extern int if6_proc_init(void);
+extern void if6_proc_exit(void);
+
 #endif
 
 #ifdef CONFIG_SYSCTL
@@ -799,6 +803,8 @@ static int __init inet6_init(void)
 
 	if (!proc_net_create("anycast6", 0, anycast6_get_info))
 		goto proc_anycast6_fail;
+	if (if6_proc_init())
+		goto proc_if6_fail;
 #endif
 	ipv6_netdev_notif_init();
 	ipv6_packet_init();
@@ -820,6 +826,8 @@ static int __init inet6_init(void)
 	return 0;
 
 #ifdef CONFIG_PROC_FS
+proc_if6_fail:
+	proc_net_remove("anycast6");
 proc_anycast6_fail:
 	ipv6_misc_proc_exit();
 proc_misc6_fail:
@@ -852,6 +860,7 @@ static void inet6_exit(void)
 	/* First of all disallow new sockets creation. */
 	sock_unregister(PF_INET6);
 #ifdef CONFIG_PROC_FS
+	if6_proc_exit();
 	raw6_proc_exit();
 	proc_net_remove("tcp6");
 	proc_net_remove("udp6");
