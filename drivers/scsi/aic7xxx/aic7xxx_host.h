@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_host.h#12 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_host.h#13 $
  */
 
 #ifndef _AIC7XXX_HOST_H_
@@ -68,6 +68,13 @@ int		 ahc_linux_abort(Scsi_Cmnd *);
 #  define AIC7XXX_BIOSPARAM NULL
 #endif
 
+#if defined BLK_BOUNCE_HIGH
+#define	AIC7XXX_TEMPLATE_HIGHMEM_IO				\
+	highmem_io: 1,
+#else
+#define	AIC7XXX_TEMPLATE_HIGHMEM_IO
+#endif
+
 /*
  * Scsi_Host_Template (see hosts.h) for AIC-7xxx - some fields
  * to do with card config are filled in after the card is detected.
@@ -88,6 +95,7 @@ int		 ahc_linux_abort(Scsi_Cmnd *);
 	cmd_per_lun: 2,		 /* cmds per lun	      */\
 	present: 0,		 /* number of 7xxx's present  */\
 	unchecked_isa_dma: 0,	 /* no memory DMA restrictions*/\
+	AIC7XXX_TEMPLATE_HIGHMEM_IO				\
 	use_clustering: ENABLE_CLUSTERING
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)

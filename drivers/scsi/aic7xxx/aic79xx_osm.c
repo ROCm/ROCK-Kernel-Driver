@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#90 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#91 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -3005,11 +3005,11 @@ ahd_linux_fallback(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 	fallback_speed = ahd_linux_calc_speed(width, period+1, offset);
 #ifdef AHD_DEBUG
 	if (ahd_debug & AHD_SHOW_DV) {
-#endif
 		printf("cur_speed= %d, wide_speed= %d, narrow_speed= %d, "
 		       "fallback_speed= %d\n", cur_speed, wide_speed,
 		       narrow_speed, fallback_speed);
 	}
+#endif
 
 	if (cur_speed > 160000) {
 		/*
