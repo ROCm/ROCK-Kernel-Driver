@@ -15,6 +15,7 @@
 #include <linux/nfs3.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_page.h>
+#include <linux/lockd/bind.h>
 #include <linux/smp_lock.h>
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
@@ -896,8 +897,16 @@ nfs3_request_compatible(struct nfs_page *req, struct file *filp, struct page *pa
 	return 1;
 }
 
+static int
+nfs3_proc_lock(struct file *filp, int cmd, struct file_lock *fl)
+{
+	return nlmclnt_proc(filp->f_dentry->d_inode, cmd, fl);
+}
+
 struct nfs_rpc_ops	nfs_v3_clientops = {
 	.version	= 3,			/* protocol version */
+	.dentry_ops	= &nfs_dentry_operations,
+	.dir_inode_ops	= &nfs_dir_inode_operations,
 	.getroot	= nfs3_proc_get_root,
 	.getattr	= nfs3_proc_getattr,
 	.setattr	= nfs3_proc_setattr,
@@ -929,4 +938,5 @@ struct nfs_rpc_ops	nfs_v3_clientops = {
 	.file_release	= nfs_release,
 	.request_init	= nfs3_request_init,
 	.request_compatible = nfs3_request_compatible,
+	.lock		= nfs3_proc_lock,
 };

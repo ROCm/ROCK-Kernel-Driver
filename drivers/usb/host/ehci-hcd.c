@@ -473,7 +473,7 @@ static int ehci_start (struct usb_hcd *hcd)
 
 	/* wire up the root hub */
 	bus = hcd_to_bus (hcd);
-	bus->root_hub = udev = usb_alloc_dev (NULL, bus);
+	bus->root_hub = udev = usb_alloc_dev (NULL, bus, 0);
 	if (!udev) {
 done2:
 		ehci_mem_cleanup (ehci);
@@ -680,7 +680,7 @@ static void ehci_work (struct ehci_hcd *ehci, struct pt_regs *regs)
 
 /*-------------------------------------------------------------------------*/
 
-static void ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
+static irqreturn_t ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	u32			status;
@@ -689,6 +689,12 @@ static void ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
 	spin_lock (&ehci->lock);
 
 	status = readl (&ehci->regs->status);
+
+	/* shared irq */
+	if (status == 0) {
+		spin_unlock (&ehci->lock);
+		return IRQ_NONE;
+	}
 
 	/* e.g. cardbus physical eject */
 	if (status == ~(u32) 0) {
@@ -743,6 +749,7 @@ dead:
 		ehci_work (ehci, regs);
 done:
 	spin_unlock (&ehci->lock);
+	return IRQ_HANDLED;
 }
 
 /*-------------------------------------------------------------------------*/

@@ -296,12 +296,8 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		} else if (smp_num_siblings > 1 ) {
 			index_lsb = 0;
 			index_msb = 31;
-			/*
-			 * At this point we only support two siblings per
-			 * processor package.
-			 */
-#define NR_SIBLINGS	2
-			if (smp_num_siblings != NR_SIBLINGS) {
+
+			if (smp_num_siblings > NR_CPUS) {
 				printk(KERN_WARNING "CPU: Unsupported number of the siblings %d", smp_num_siblings);
 				smp_num_siblings = 1;
 				goto too_many_siblings;

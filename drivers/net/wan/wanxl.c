@@ -51,7 +51,7 @@ static const char* version = "wanXL serial card driver version: 0.47";
 
 
 typedef struct {
-	hdlc_device hdlc;	/* HDLC device struct - must be first */
+	struct net_device *dev;
 	struct card_t *card;
 	spinlock_t lock;	/* for wanxl_xmit */
         int node;		/* physical port #0 - 3 */
@@ -78,31 +78,26 @@ typedef struct card_t {
 	struct sk_buff *rx_skbs[RX_QUEUE_LENGTH];
 	card_status_t *status;	/* shared between host and card */
 	dma_addr_t status_address;
+	port_t __ports[0];
 }card_t;
 
 
 
-static inline port_t* hdlc_to_port(hdlc_device *hdlc)
-{
-        return (port_t*)hdlc;
-}
-
-
 static inline port_t* dev_to_port(struct net_device *dev)
 {
-        return hdlc_to_port(dev_to_hdlc(dev));
+        return (port_t *)dev_to_hdlc(dev)->priv;
 }
 
 
 static inline struct net_device *port_to_dev(port_t* port)
 {
-        return hdlc_to_dev(&port->hdlc);
+        return port->dev;
 }
 
 
 static inline const char* port_name(port_t *port)
 {
-	return hdlc_to_name((hdlc_device*)port);
+	return port_to_dev(port)->name;
 }
 
 
@@ -172,7 +167,7 @@ static inline void wanxl_cable_intr(port_t *port)
 	printk(KERN_INFO "%s: %s%s module, %s cable%s%s\n",
 	       port_name(port), pm, dte, cable, dsr, dcd);
 
-	hdlc_set_carrier(value & STATUS_CABLE_DCD, &port->hdlc);
+	hdlc_set_carrier(value & STATUS_CABLE_DCD, port_to_dev(port));
 }
 
 
@@ -180,6 +175,8 @@ static inline void wanxl_cable_intr(port_t *port)
 /* Transmit complete interrupt service */
 static inline void wanxl_tx_intr(port_t *port)
 {
+	struct net_device *dev = port_to_dev(port);
+	struct net_device_stats *stats = hdlc_stats(dev);
 	while (1) {
                 desc_t *desc = &get_status(port)->tx_descs[port->tx_in];
 		struct sk_buff *skb = port->tx_skbs[port->tx_in];
@@ -187,17 +184,17 @@ static inline void wanxl_tx_intr(port_t *port)
 		switch (desc->stat) {
 		case PACKET_FULL:
 		case PACKET_EMPTY:
-			netif_wake_queue(port_to_dev(port));
+			netif_wake_queue(dev);
 			return;
 
 		case PACKET_UNDERRUN:
-			port->hdlc.stats.tx_errors++;
-			port->hdlc.stats.tx_fifo_errors++;
+			stats->tx_errors++;
+			stats->tx_fifo_errors++;
 			break;
 
 		default:
-			port->hdlc.stats.tx_packets++;
-			port->hdlc.stats.tx_bytes += skb->len;
+			stats->tx_packets++;
+			stats->tx_bytes += skb->len;
 		}
                 desc->stat = PACKET_EMPTY; /* Free descriptor */
 		pci_unmap_single(port->card->pdev, desc->address, skb->len,
@@ -218,13 +215,14 @@ static inline void wanxl_rx_intr(card_t *card)
 		struct sk_buff *skb = card->rx_skbs[card->rx_in];
 		port_t *port = card->ports[desc->stat & PACKET_PORT_MASK];
 		struct net_device *dev = port_to_dev(port);
+		struct net_device_stats *stats = hdlc_stats(dev);
 
 		if ((desc->stat & PACKET_PORT_MASK) > card->n_ports)
 			printk(KERN_CRIT "wanXL %s: received packet for"
 			       " nonexistent port\n", card_name(card->pdev));
 
 		else if (!skb)
-			port->hdlc.stats.rx_dropped++;
+			stats->rx_dropped++;
 
 		else {
 			pci_unmap_single(card->pdev, desc->address,
@@ -236,8 +234,8 @@ static inline void wanxl_rx_intr(card_t *card)
 			       skb->len);
 			debug_frame(skb);
 #endif
-			port->hdlc.stats.rx_packets++;
-			port->hdlc.stats.rx_bytes += skb->len;
+			stats->rx_packets++;
+			stats->rx_bytes += skb->len;
 			skb->mac.raw = skb->data;
 			skb->dev = dev;
 			dev->last_rx = jiffies;
@@ -290,8 +288,7 @@ static irqreturn_t wanxl_intr(int irq, void* dev_id, struct pt_regs *regs)
 
 static int wanxl_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-        port_t *port = hdlc_to_port(hdlc);
+        port_t *port = dev_to_port(dev);
 	desc_t *desc;
 
         spin_lock(&port->lock);
@@ -338,10 +335,10 @@ static int wanxl_xmit(struct sk_buff *skb, struct net_device *dev)
 
 
 
-static int wanxl_attach(hdlc_device *hdlc, unsigned short encoding,
+static int wanxl_attach(struct net_device *dev, unsigned short encoding,
 			unsigned short parity)
 {
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 
 	if (encoding != ENCODING_NRZ &&
 	    encoding != ENCODING_NRZI)
@@ -365,8 +362,7 @@ static int wanxl_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	const size_t size = sizeof(sync_serial_settings);
 	sync_serial_settings line;
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 
 	if (cmd != SIOCWANDEV)
 		return hdlc_ioctl(dev, ifr, cmd);
@@ -415,8 +411,7 @@ static int wanxl_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 static int wanxl_open(struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	u8 *dbr = port->card->plx + PLX_DOORBELL_TO_CARD;
 	unsigned long timeout;
 	int i;
@@ -425,7 +420,7 @@ static int wanxl_open(struct net_device *dev)
 		printk(KERN_ERR "%s: port already open\n", port_name(port));
 		return -EIO;
 	}
-	if ((i = hdlc_open(hdlc)) != 0)
+	if ((i = hdlc_open(dev)) != 0)
 		return i;
 
 	port->tx_in = port->tx_out = 0;
@@ -450,12 +445,11 @@ static int wanxl_open(struct net_device *dev)
 
 static int wanxl_close(struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	unsigned long timeout;
 	int i;
 
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 	/* signal the card */
 	writel(1 << (DOORBELL_TO_CARD_CLOSE_0 + port->node),
 	       port->card->plx + PLX_DOORBELL_TO_CARD);
@@ -487,14 +481,13 @@ static int wanxl_close(struct net_device *dev)
 
 static struct net_device_stats *wanxl_get_stats(struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	struct net_device_stats *stats = hdlc_stats(dev);
+	port_t *port = dev_to_port(dev);
 
-	hdlc->stats.rx_over_errors = get_status(port)->rx_overruns;
-	hdlc->stats.rx_frame_errors = get_status(port)->rx_frame_errors;
-	hdlc->stats.rx_errors = hdlc->stats.rx_over_errors +
-		hdlc->stats.rx_frame_errors;
-        return &hdlc->stats;
+	stats->rx_over_errors = get_status(port)->rx_overruns;
+	stats->rx_frame_errors = get_status(port)->rx_frame_errors;
+	stats->rx_errors = stats->rx_over_errors + stats->rx_frame_errors;
+        return stats;
 }
 
 
@@ -535,13 +528,15 @@ static void wanxl_pci_remove_one(struct pci_dev *pdev)
 	card_t *card = pci_get_drvdata(pdev);
 	int i;
 
+	for (i = 0; i < 4; i++)
+		if (card->ports[i]) {
+			struct net_device *dev = port_to_dev(card->ports[i]);
+			unregister_hdlc_device(dev);
+		}
+
 	/* unregister and free all host resources */
 	if (card->irq)
 		free_irq(card->irq, card);
-
-	for (i = 0; i < 4; i++)
-		if (card->ports[i])
-			unregister_hdlc_device(&card->ports[i]->hdlc);
 
 	wanxl_reset(card);
 
@@ -559,6 +554,10 @@ static void wanxl_pci_remove_one(struct pci_dev *pdev)
 	if (card->status)
 		pci_free_consistent(pdev, sizeof(card_status_t),
 				    card->status, card->status_address);
+
+	for (i = 0; i < card->n_ports; i++)
+		if (card->__ports[i].dev)
+			free_netdev(card->__ports[i].dev);
 
 	pci_set_drvdata(pdev, NULL);
 	kfree(card);
@@ -627,6 +626,16 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 	pci_set_drvdata(pdev, card);
 	card->pdev = pdev;
 	card->n_ports = ports;
+
+	for (i = 0; i < ports; i++) {
+		card->__ports[i].dev = alloc_hdlcdev(&card->__ports[i]);
+		if (!card->__ports[i].dev) {
+			printk(KERN_ERR "wanXL %s: unable to allocate memory\n",
+			       card_name(pdev));
+			wanxl_pci_remove_one(pdev);
+			return -ENOMEM;
+		}
+	}
 
 	card->status = pci_alloc_consistent(pdev, sizeof(card_status_t),
 					    &card->status_address);
@@ -708,31 +717,6 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	for (i = 0; i < ports; i++) {
-		port_t *port = (void *)card + sizeof(card_t) +
-			i * sizeof(port_t);
-		struct net_device *dev = hdlc_to_dev(&port->hdlc);
-		spin_lock_init(&port->lock);
-		SET_MODULE_OWNER(dev);
-		dev->tx_queue_len = 50;
-		dev->do_ioctl = wanxl_ioctl;
-		dev->open = wanxl_open;
-		dev->stop = wanxl_close;
-		port->hdlc.attach = wanxl_attach;
-		port->hdlc.xmit = wanxl_xmit;
-		if(register_hdlc_device(&port->hdlc)) {
-			printk(KERN_ERR "wanXL %s: unable to register hdlc"
-			       " device\n", card_name(pdev));
-			wanxl_pci_remove_one(pdev);
-			return -ENOBUFS;
-		}
-		card->ports[i] = port;
-		dev->get_stats = wanxl_get_stats;
-		port->card = card;
-		port->node = i;
-		get_status(port)->clocking = CLOCK_EXT;
-	}
-
 	for (i = 0; i < RX_QUEUE_LENGTH; i++) {
 		struct sk_buff *skb = dev_alloc_skb(BUFFER_LENGTH);
 		card->rx_skbs[i] = skb;
@@ -800,6 +784,32 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 		return -EBUSY;
 	}
 	card->irq = pdev->irq;
+
+	for (i = 0; i < ports; i++) {
+		port_t *port = &card->__ports[i];
+		struct net_device *dev = port_to_dev(port);
+		hdlc_device *hdlc = dev_to_hdlc(dev);
+		spin_lock_init(&port->lock);
+		SET_MODULE_OWNER(dev);
+		dev->tx_queue_len = 50;
+		dev->do_ioctl = wanxl_ioctl;
+		dev->open = wanxl_open;
+		dev->stop = wanxl_close;
+		hdlc->attach = wanxl_attach;
+		hdlc->xmit = wanxl_xmit;
+		card->ports[i] = port;
+		dev->get_stats = wanxl_get_stats;
+		port->card = card;
+		port->node = i;
+		get_status(port)->clocking = CLOCK_EXT;
+		if (register_hdlc_device(dev)) {
+			printk(KERN_ERR "wanXL %s: unable to register hdlc"
+			       " device\n", card_name(pdev));
+			card->ports[i] = NULL;
+			wanxl_pci_remove_one(pdev);
+			return -ENOBUFS;
+		}
+	}
 
 	return 0;
 }

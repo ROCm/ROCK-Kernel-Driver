@@ -63,10 +63,11 @@ extern void tce_init_iSeries(void);
 static void build_iSeries_Memory_Map(void);
 static void setup_iSeries_cache_sizes(void);
 static void iSeries_bolt_kernel(unsigned long saddr, unsigned long eaddr);
-void build_valid_hpte(unsigned long vsid, unsigned long ea, unsigned long pa,
-		pte_t *ptep, unsigned hpteflags, unsigned bolted);
+extern void build_valid_hpte(unsigned long vsid, unsigned long ea, unsigned long pa,
+			     pte_t *ptep, unsigned hpteflags, unsigned bolted);
 static void iSeries_setup_dprofile(void);
-void iSeries_setup_arch(void);
+extern void iSeries_setup_arch(void);
+extern void iSeries_pci_final_fixup(void);
 
 /* Global Variables */
 static unsigned long procFreqHz;
@@ -317,6 +318,8 @@ void __init iSeries_init_early(void)
 	ppc_md.init_irq_desc = iSeries_init_irq_desc;
 	ppc_md.get_irq = iSeries_get_irq;
 	ppc_md.init = NULL;
+
+	ppc_md.pcibios_fixup  = iSeries_pci_final_fixup;
 
 	ppc_md.restart = iSeries_restart;
 	ppc_md.power_off = iSeries_power_off;

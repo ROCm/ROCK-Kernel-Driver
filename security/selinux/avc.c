@@ -166,7 +166,7 @@ void avc_dump_query(u32 ssid, u32 tsid, u16 tclass)
  *
  * Initialize the access vector cache.
  */
-void avc_init(void)
+void __init avc_init(void)
 {
 	struct avc_node	*new;
 	int i;

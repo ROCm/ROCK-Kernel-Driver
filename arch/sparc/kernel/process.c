@@ -148,11 +148,12 @@ extern char reboot_command [];
 
 extern void (*prom_palette)(int);
 
+/* XXX cli/sti -> local_irq_xxx here, check this works once SMP is fixed. */
 void machine_halt(void)
 {
-	sti();
+	local_irq_enable();
 	mdelay(8);
-	cli();
+	local_irq_disable();
 	if (!serial_console && prom_palette)
 		prom_palette (1);
 	prom_halt();
@@ -165,9 +166,9 @@ void machine_restart(char * cmd)
 {
 	char *p;
 	
-	sti();
+	local_irq_enable();
 	mdelay(8);
-	cli();
+	local_irq_disable();
 
 	p = strchr (reboot_command, '\n');
 	if (p) *p = 0;

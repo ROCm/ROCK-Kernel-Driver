@@ -763,7 +763,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_fstat64
 	.llong .sys32_pciconfig_read
 	.llong .sys32_pciconfig_write
-	.llong .sys_ni_syscall		/* 200 - old pciconfig_iobase */
+	.llong .sys32_pciconfig_iobase	/* 200 - pciconfig_iobase */
 	.llong .sys_ni_syscall		/* reserved for MacOnLinux */
 	.llong .sys_getdents64
 	.llong .sys_pivot_root
@@ -1022,7 +1022,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* 32bit only fstat64 */
 	.llong .sys_ni_syscall		/* 32bit only pciconfig_read */
 	.llong .sys_ni_syscall		/* 32bit only pciconfig_write */
-	.llong .sys_ni_syscall		/* 200 - old pciconfig_iobase */
+	.llong .sys_ni_syscall		/* 32bit only pciconfig_iobase */
 	.llong .sys_ni_syscall		/* reserved for MacOnLinux */
 	.llong .sys_getdents64
 	.llong .sys_pivot_root

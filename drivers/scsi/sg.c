@@ -1521,7 +1521,6 @@ sg_remove(struct class_device *cl_dev)
 	if (sdp) {
 		sysfs_remove_link(&scsidp->sdev_gendev.kobj, "generic");
 		class_simple_device_remove(MKDEV(SCSI_GENERIC_MAJOR, k));
-		cdev_unmap(MKDEV(SCSI_GENERIC_MAJOR, k), 1);
 		cdev_del(sdp->cdev);
 		sdp->cdev = NULL;
 		devfs_remove("%s/generic", scsidp->devfs_name);

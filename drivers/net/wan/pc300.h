@@ -331,7 +331,7 @@ typedef struct pc300dev {
 	uclong line_off;
 #ifdef __KERNEL__
 	char name[16];
-	hdlc_device *hdlc;
+	struct net_device *dev;
 
 	void *private;
 	struct sk_buff *tx_skb;
@@ -483,7 +483,7 @@ void rx_dma_start(pc300_t *, int);
 void tx_dma_stop(pc300_t *, int);
 void rx_dma_stop(pc300_t *, int);
 int cpc_queue_xmit(struct sk_buff *, struct net_device *);
-void cpc_net_rx(hdlc_device *);
+void cpc_net_rx(struct net_device *);
 void cpc_sca_status(pc300_t *, int);
 int cpc_change_mtu(struct net_device *, int);
 int cpc_ioctl(struct net_device *, struct ifreq *, int);

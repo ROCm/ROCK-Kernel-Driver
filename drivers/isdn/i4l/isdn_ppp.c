@@ -1125,12 +1125,15 @@ isdn_ppp_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		return -EINVAL;
 
 	switch (cmd) {
+
+#define PPP_VERSION "2.3.7"
 	case SIOCGPPPVER:
 		r = (char *) ifr->ifr_ifru.ifru_data;
 		len = strlen(PPP_VERSION) + 1;
 		if (copy_to_user(r, PPP_VERSION, len))
 			error = -EFAULT;
 		break;
+
 	case SIOCGPPPSTATS:
 		error = isdn_ppp_dev_ioctl_stats(ifr, dev);
 		break;

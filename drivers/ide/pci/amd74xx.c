@@ -448,7 +448,6 @@ static int __devinit amd74xx_probe(struct pci_dev *dev, const struct pci_device_
 	if (dev->device != amd_chipset->device) BUG();
 	if (dev->device != amd_config->id) BUG();
 	ide_setup_pci_device(dev, amd_chipset);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -480,13 +479,7 @@ static int amd74xx_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void amd74xx_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(amd74xx_ide_init);
-module_exit(amd74xx_ide_exit);
 
 MODULE_AUTHOR("Vojtech Pavlik");
 MODULE_DESCRIPTION("AMD PCI IDE driver");

@@ -266,6 +266,9 @@ restart:
 			if (ohci->ed_bulktail)
 				ohci->hc_control |= OHCI_CTRL_BLE;
 		}
+		if (hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs
+				|| hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs)
+			ohci->hc_control |= OHCI_CTRL_PLE|OHCI_CTRL_IE;
 		hcd->state = USB_STATE_RUNNING;
 		writel (ohci->hc_control, &ohci->regs->control);
 

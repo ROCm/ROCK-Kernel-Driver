@@ -1863,14 +1863,19 @@ static int unix_seq_show(struct seq_file *seq, void *v)
 			sock_i_ino(s));
 
 		if (u->addr) {
-			int i;
+			int i, len;
 			seq_putc(seq, ' ');
-			
-			for (i = 0; i < u->addr->len-sizeof(short); i++)
-				seq_putc(seq, u->addr->name->sun_path[i]);
 
-			if (UNIX_ABSTRACT(s))
+			i = 0;
+			len = u->addr->len - sizeof(short);
+			if (!UNIX_ABSTRACT(s))
+				len--;
+			else {
 				seq_putc(seq, '@');
+				i++;
+			}
+			for ( ; i < len; i++)
+				seq_putc(seq, u->addr->name->sun_path[i]);
 		}
 		unix_state_runlock(s);
 		seq_putc(seq, '\n');

@@ -192,7 +192,6 @@ typedef struct {
 
 #include <linux/ppp_defs.h>
 #include <linux/if_ppp.h>
-#include <linux/if_pppvar.h>
 
 #include <linux/isdn_ppp.h>
 #endif

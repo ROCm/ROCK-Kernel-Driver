@@ -110,8 +110,8 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		if (end - len >= addr &&
 		    (!vma || addr + len <= vma->vm_start))
 			return addr;
-	} else
-		addr = mm->free_area_cache;
+	}
+	addr = mm->free_area_cache;
 	if (addr < begin) 
 		addr = begin; 
 	start_addr = addr;

@@ -216,8 +216,11 @@
 #define	  HID0_BHTE	(1<<2)		/* Branch History Table Enable */
 #define	  HID0_BTCD	(1<<1)		/* Branch target cache disable */
 #define	SPRN_MSRDORM	0x3F1	/* Hardware Implementation Register 1 */
+#define SPRN_HID1	0x3F1	/* Hardware Implementation Register 1 */
 #define	SPRN_IABR	0x3F2	/* Instruction Address Breakpoint Register */
 #define	SPRN_NIADORM	0x3F3	/* Hardware Implementation Register 2 */
+#define SPRN_HID4	0x3F4	/* 970 HID4 */
+#define SPRN_HID5	0x3F6	/* 970 HID5 */
 #define	SPRN_TSC 	0x3FD	/* Thread switch control */
 #define	SPRN_TST 	0x3FC	/* Thread switch timeout */
 #define	SPRN_IAC1	0x3F4	/* Instruction Address Compare 1 */
@@ -263,6 +266,7 @@
 #define	SPRN_TBRU	0x10D	/* Time Base Read Upper Register (user, R/O) */
 #define	SPRN_TBWL	0x11C	/* Time Base Lower Register (super, W/O) */
 #define	SPRN_TBWU	0x11D	/* Time Base Write Upper Register (super, W/O) */
+#define SPRN_HIOR	0x137	/* 970 Hypervisor interrupt offset */
 #define	SPRN_TCR	0x3DA	/* Timer Control Register */
 #define	  TCR_WP(x)		(((x)&0x3)<<30)	/* WDT Period */
 #define	    WP_2_17		0		/* 2^17 clocks */
@@ -373,6 +377,7 @@
 #define	PV_ICESTAR	0x0036
 #define	PV_SSTAR	0x0037
 #define	PV_POWER4p	0x0038
+#define PV_GPUL		0x0039
 #define	PV_POWER5	0x003A
 #define	PV_630        	0x0040
 #define	PV_630p	        0x0041
@@ -382,7 +387,12 @@
 #define PLATFORM_PSERIES_LPAR 0x0101
 #define PLATFORM_ISERIES_LPAR 0x0201
 #define PLATFORM_LPAR         0x0001
-	
+#define PLATFORM_POWERMAC     0x0400
+
+/* Compatibility with drivers coming from PPC32 world */
+#define _machine	(systemcfg->platform)
+#define _MACH_Pmac	PLATFORM_POWERMAC
+
 /*
  * List of interrupt controllers.
  */
@@ -457,6 +467,14 @@ GLUE(.,name):
 			asm volatile("mfasr %0" : "=r" (rval)); rval;})
 
 #ifndef __ASSEMBLY__
+
+static inline void set_tb(unsigned int upper, unsigned int lower)
+{
+	mttbl(0);
+	mttbu(upper);
+	mttbl(lower);
+}
+
 extern unsigned long *_get_SP(void);
 
 extern int have_of;

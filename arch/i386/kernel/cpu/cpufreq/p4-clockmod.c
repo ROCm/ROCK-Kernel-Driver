@@ -246,7 +246,7 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 static int cpufreq_p4_cpu_exit(struct cpufreq_policy *policy)
 {
 	cpufreq_frequency_table_put_attr(policy->cpu);    
-	return cpufreq_p4_setdc(policy->cpu, DC_DISABLE);
+	return 0;
 }
 
 static struct freq_attr* p4clockmod_attr[] = {

@@ -615,7 +615,6 @@ static int __devinit via_init_one(struct pci_dev *dev, const struct pci_device_i
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -636,13 +635,7 @@ static int via_ide_init(void)
 	return ide_pci_register_driver(&driver);
 }
 
-static void via_ide_exit(void)
-{
-	ide_pci_unregister_driver(&driver);
-}
-
 module_init(via_ide_init);
-module_exit(via_ide_exit);
 
 MODULE_AUTHOR("Vojtech Pavlik, Michel Aubry, Jeff Garzik, Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for VIA IDE");

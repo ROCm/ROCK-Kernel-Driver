@@ -224,7 +224,7 @@ struct irlan_cb *irlan_open(__u32 saddr, __u32 daddr)
 		IRDA_DEBUG(2, "%s(), register_netdev() failed!\n", 
 			   __FUNCTION__ );
 		self = NULL;
-		kfree(dev);
+		free_netdev(dev);
 	} else {
 		rtnl_lock();
 		list_add_rcu(&self->dev_list, &irlans);

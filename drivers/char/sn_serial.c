@@ -772,7 +772,7 @@ sn_sal_read_proc(char *page, char **start, off_t off, int count,
 	int len = 0;
 	off_t	begin = 0;
 
-	len += sprintf(page, "sn_serial: nasid:%d irq:%d tx:%d rx:%d\n",
+	len += sprintf(page, "sn_serial: nasid:%ld irq:%d tx:%d rx:%d\n",
 		       ia64_sn_get_console_nasid(), sn_sal_irq,
 		       sn_total_tx_count, sn_total_rx_count);
 	*eof = 1;

@@ -40,8 +40,8 @@
 #include <asm/semaphore.h>
 #ifdef CONFIG_PPC
 #include <asm/prom.h>
-#include <asm/hydra.h>
 #endif
+
 
 EXPORT_SYMBOL(adb_controller);
 EXPORT_SYMBOL(adb_client_list);
@@ -290,7 +290,7 @@ int __init adb_init(void)
 	struct adb_driver *driver;
 	int i;
 
-#ifdef CONFIG_PPC
+#ifdef CONFIG_PPC32
 	if ( (_machine != _MACH_chrp) && (_machine != _MACH_Pmac) )
 		return 0;
 #endif

@@ -467,8 +467,8 @@ static int BusLogic_Command(struct BusLogic_HostAdapter *HostAdapter,
   while (--TimeoutCounter >= 0)
     {
       StatusRegister.All = BusLogic_ReadStatusRegister(HostAdapter);
-      if (StatusRegister.HostAdapterReady &&
-	  !StatusRegister.CommandParameterRegisterBusy)
+      if (StatusRegister.sr.HostAdapterReady &&
+	  !StatusRegister.sr.CommandParameterRegisterBusy)
 	break;
       udelay(100);
     }
@@ -504,10 +504,10 @@ static int BusLogic_Command(struct BusLogic_HostAdapter *HostAdapter,
       udelay(100);
       InterruptRegister.All = BusLogic_ReadInterruptRegister(HostAdapter);
       StatusRegister.All = BusLogic_ReadStatusRegister(HostAdapter);
-      if (InterruptRegister.CommandComplete) break;
+      if (InterruptRegister.ir.CommandComplete) break;
       if (HostAdapter->HostAdapterCommandCompleted) break;
-      if (StatusRegister.DataInRegisterReady) break;
-      if (StatusRegister.CommandParameterRegisterBusy) continue;
+      if (StatusRegister.sr.DataInRegisterReady) break;
+      if (StatusRegister.sr.CommandParameterRegisterBusy) continue;
       BusLogic_WriteCommandParameterRegister(HostAdapter, *ParameterPointer++);
       ParameterLength--;
     }
@@ -524,7 +524,7 @@ static int BusLogic_Command(struct BusLogic_HostAdapter *HostAdapter,
   if (OperationCode == BusLogic_ModifyIOAddress)
     {
       StatusRegister.All = BusLogic_ReadStatusRegister(HostAdapter);
-      if (StatusRegister.CommandInvalid)
+      if (StatusRegister.sr.CommandInvalid)
 	{
 	  BusLogic_CommandFailureReason = "Modify I/O Address Invalid";
 	  Result = -1;
@@ -562,16 +562,16 @@ static int BusLogic_Command(struct BusLogic_HostAdapter *HostAdapter,
     {
       InterruptRegister.All = BusLogic_ReadInterruptRegister(HostAdapter);
       StatusRegister.All = BusLogic_ReadStatusRegister(HostAdapter);
-      if (InterruptRegister.CommandComplete) break;
+      if (InterruptRegister.ir.CommandComplete) break;
       if (HostAdapter->HostAdapterCommandCompleted) break;
-      if (StatusRegister.DataInRegisterReady)
+      if (StatusRegister.sr.DataInRegisterReady)
 	{
 	  if (++ReplyBytes <= ReplyLength)
 	    *ReplyPointer++ = BusLogic_ReadDataInRegister(HostAdapter);
 	  else BusLogic_ReadDataInRegister(HostAdapter);
 	}
       if (OperationCode == BusLogic_FetchHostAdapterLocalRAM &&
-	  StatusRegister.HostAdapterReady) break;
+	  StatusRegister.sr.HostAdapterReady) break;
       udelay(100);
     }
   if (TimeoutCounter < 0)
@@ -602,7 +602,7 @@ static int BusLogic_Command(struct BusLogic_HostAdapter *HostAdapter,
   /*
     Process Command Invalid conditions.
   */
-  if (StatusRegister.CommandInvalid)
+  if (StatusRegister.sr.CommandInvalid)
     {
       /*
 	Some early BusLogic Host Adapters may not recover properly from
@@ -614,14 +614,14 @@ static int BusLogic_Command(struct BusLogic_HostAdapter *HostAdapter,
       */
       udelay(1000);
       StatusRegister.All = BusLogic_ReadStatusRegister(HostAdapter);
-      if (StatusRegister.CommandInvalid ||
-	  StatusRegister.Reserved ||
-	  StatusRegister.DataInRegisterReady ||
-	  StatusRegister.CommandParameterRegisterBusy ||
-	  !StatusRegister.HostAdapterReady ||
-	  !StatusRegister.InitializationRequired ||
-	  StatusRegister.DiagnosticActive ||
-	  StatusRegister.DiagnosticFailure)
+      if (StatusRegister.sr.CommandInvalid ||
+	  StatusRegister.sr.Reserved ||
+	  StatusRegister.sr.DataInRegisterReady ||
+	  StatusRegister.sr.CommandParameterRegisterBusy ||
+	  !StatusRegister.sr.HostAdapterReady ||
+	  !StatusRegister.sr.InitializationRequired ||
+	  StatusRegister.sr.DiagnosticActive ||
+	  StatusRegister.sr.DiagnosticFailure)
 	{
 	  BusLogic_SoftReset(HostAdapter);
 	  udelay(1000);
@@ -1333,11 +1333,11 @@ static boolean __init BusLogic_ProbeHostAdapter(struct BusLogic_HostAdapter *Hos
 		    HostAdapter->IO_Address, StatusRegister.All,
 		    InterruptRegister.All, GeometryRegister.All);
   if (StatusRegister.All == 0 ||
-      StatusRegister.DiagnosticActive ||
-      StatusRegister.CommandParameterRegisterBusy ||
-      StatusRegister.Reserved ||
-      StatusRegister.CommandInvalid ||
-      InterruptRegister.Reserved != 0)
+      StatusRegister.sr.DiagnosticActive ||
+      StatusRegister.sr.CommandParameterRegisterBusy ||
+      StatusRegister.sr.Reserved ||
+      StatusRegister.sr.CommandInvalid ||
+      InterruptRegister.ir.Reserved != 0)
     return false;
   /*
     Check the undocumented Geometry Register to test if there is an I/O port
@@ -1405,7 +1405,7 @@ static boolean BusLogic_HardwareResetHostAdapter(struct BusLogic_HostAdapter
   while (--TimeoutCounter >= 0)
     {
       StatusRegister.All = BusLogic_ReadStatusRegister(HostAdapter);
-      if (StatusRegister.DiagnosticActive) break;
+      if (StatusRegister.sr.DiagnosticActive) break;
       udelay(100);
     }
   if (BusLogic_GlobalOptions.TraceHardwareReset)
@@ -1426,7 +1426,7 @@ static boolean BusLogic_HardwareResetHostAdapter(struct BusLogic_HostAdapter
   while (--TimeoutCounter >= 0)
     {
       StatusRegister.All = BusLogic_ReadStatusRegister(HostAdapter);
-      if (!StatusRegister.DiagnosticActive) break;
+      if (!StatusRegister.sr.DiagnosticActive) break;
       udelay(100);
     }
   if (BusLogic_GlobalOptions.TraceHardwareReset)
@@ -1442,9 +1442,9 @@ static boolean BusLogic_HardwareResetHostAdapter(struct BusLogic_HostAdapter
   while (--TimeoutCounter >= 0)
     {
       StatusRegister.All = BusLogic_ReadStatusRegister(HostAdapter);
-      if (StatusRegister.DiagnosticFailure ||
-	  StatusRegister.HostAdapterReady ||
-	  StatusRegister.DataInRegisterReady)
+      if (StatusRegister.sr.DiagnosticFailure ||
+	  StatusRegister.sr.HostAdapterReady ||
+	  StatusRegister.sr.DataInRegisterReady)
 	break;
       udelay(100);
     }
@@ -1458,14 +1458,14 @@ static boolean BusLogic_HardwareResetHostAdapter(struct BusLogic_HostAdapter
     error occurred during the Host Adapter diagnostics.  If Data In Register
     Ready is set, then there is an Error Code available.
   */
-  if (StatusRegister.DiagnosticFailure ||
-      !StatusRegister.HostAdapterReady)
+  if (StatusRegister.sr.DiagnosticFailure ||
+      !StatusRegister.sr.HostAdapterReady)
     {
       BusLogic_CommandFailureReason = NULL;
       BusLogic_Failure(HostAdapter, "HARD RESET DIAGNOSTICS");
       BusLogic_Error("HOST ADAPTER STATUS REGISTER = %02X\n",
 		     HostAdapter, StatusRegister.All);
-      if (StatusRegister.DataInRegisterReady)
+      if (StatusRegister.sr.DataInRegisterReady)
 	{
 	  unsigned char ErrorCode = BusLogic_ReadDataInRegister(HostAdapter);
 	  BusLogic_Error("HOST ADAPTER ERROR CODE = %d\n",
@@ -1756,7 +1756,7 @@ static boolean __init BusLogic_ReadHostAdapterConfiguration(struct BusLogic_Host
   */
   GeometryRegister.All = BusLogic_ReadGeometryRegister(HostAdapter);
   HostAdapter->ExtendedTranslationEnabled =
-    GeometryRegister.ExtendedTranslationEnabled;
+    GeometryRegister.gr.ExtendedTranslationEnabled;
   /*
     Save the Scatter Gather Limits, Level Sensitive Interrupt flag, Wide
     SCSI flag, Differential SCSI flag, SCAM Supported flag, and
@@ -3184,7 +3184,7 @@ static irqreturn_t BusLogic_InterruptHandler(int IRQ_Channel,
 	Read the Host Adapter Interrupt Register.
       */
       InterruptRegister.All = BusLogic_ReadInterruptRegister(HostAdapter);
-      if (InterruptRegister.InterruptValid)
+      if (InterruptRegister.ir.InterruptValid)
 	{
 	  /*
 	    Acknowledge the interrupt and reset the Host Adapter
@@ -3197,11 +3197,11 @@ static irqreturn_t BusLogic_InterruptHandler(int IRQ_Channel,
 	    and Outgoing Mailbox Available Interrupts are ignored, as
 	    they are never enabled.
 	  */
-	  if (InterruptRegister.ExternalBusReset)
+	  if (InterruptRegister.ir.ExternalBusReset)
 	    HostAdapter->HostAdapterExternalReset = true;
-	  else if (InterruptRegister.IncomingMailboxLoaded)
+	  else if (InterruptRegister.ir.IncomingMailboxLoaded)
 	    BusLogic_ScanIncomingMailboxes(HostAdapter);
-	  else if (InterruptRegister.CommandComplete)
+	  else if (InterruptRegister.ir.CommandComplete)
 	    HostAdapter->HostAdapterCommandCompleted = true;
 	}
     }

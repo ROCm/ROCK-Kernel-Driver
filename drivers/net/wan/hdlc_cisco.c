@@ -57,7 +57,7 @@ static int cisco_hard_header(struct sk_buff *skb, struct net_device *dev,
 
 
 
-static void cisco_keepalive_send(hdlc_device *hdlc, u32 type,
+static void cisco_keepalive_send(struct net_device *dev, u32 type,
 				 u32 par1, u32 par2)
 {
 	struct sk_buff *skb;
@@ -67,12 +67,11 @@ static void cisco_keepalive_send(hdlc_device *hdlc, u32 type,
 	if (!skb) {
 		printk(KERN_WARNING
 		       "%s: Memory squeeze on cisco_keepalive_send()\n",
-		       hdlc_to_name(hdlc));
+		       dev->name);
 		return;
 	}
 	skb_reserve(skb, 4);
-	cisco_hard_header(skb, hdlc_to_dev(hdlc), CISCO_KEEPALIVE,
-			  NULL, NULL, 0);
+	cisco_hard_header(skb, dev, CISCO_KEEPALIVE, NULL, NULL, 0);
 	data = (cisco_packet*)skb->tail;
 
 	data->type = htonl(type);
@@ -84,7 +83,7 @@ static void cisco_keepalive_send(hdlc_device *hdlc, u32 type,
 
 	skb_put(skb, sizeof(cisco_packet));
 	skb->priority = TC_PRIO_CONTROL;
-	skb->dev = hdlc_to_dev(hdlc);
+	skb->dev = dev;
 	skb->nh.raw = skb->data;
 
 	dev_queue_xmit(skb);
@@ -118,7 +117,8 @@ static unsigned short cisco_type_trans(struct sk_buff *skb,
 
 static int cisco_rx(struct sk_buff *skb)
 {
-	hdlc_device *hdlc = dev_to_hdlc(skb->dev);
+	struct net_device *dev = skb->dev;
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	hdlc_header *data = (hdlc_header*)skb->data;
 	cisco_packet *cisco_data;
 	struct in_device *in_dev;
@@ -142,7 +142,7 @@ static int cisco_rx(struct sk_buff *skb)
 		    skb->len != sizeof(hdlc_header) + CISCO_BIG_PACKET_LEN) {
 			printk(KERN_INFO "%s: Invalid length of Cisco "
 			       "control packet (%d bytes)\n",
-			       hdlc_to_name(hdlc), skb->len);
+			       dev->name, skb->len);
 			goto rx_error;
 		}
 
@@ -150,7 +150,7 @@ static int cisco_rx(struct sk_buff *skb)
 
 		switch(ntohl (cisco_data->type)) {
 		case CISCO_ADDR_REQ: /* Stolen from syncppp.c :-) */
-			in_dev = hdlc_to_dev(hdlc)->ip_ptr;
+			in_dev = dev->ip_ptr;
 			addr = 0;
 			mask = ~0; /* is the mask correct? */
 
@@ -158,7 +158,7 @@ static int cisco_rx(struct sk_buff *skb)
 				struct in_ifaddr **ifap = &in_dev->ifa_list;
 
 				while (*ifap != NULL) {
-					if (strcmp(hdlc_to_name(hdlc),
+					if (strcmp(dev->name,
 						   (*ifap)->ifa_label) == 0) {
 						addr = (*ifap)->ifa_local;
 						mask = (*ifap)->ifa_mask;
@@ -167,7 +167,7 @@ static int cisco_rx(struct sk_buff *skb)
 					ifap = &(*ifap)->ifa_next;
 				}
 
-				cisco_keepalive_send(hdlc, CISCO_ADDR_REPLY,
+				cisco_keepalive_send(dev, CISCO_ADDR_REPLY,
 						     addr, mask);
 			}
 			dev_kfree_skb_any(skb);
@@ -175,7 +175,7 @@ static int cisco_rx(struct sk_buff *skb)
 
 		case CISCO_ADDR_REPLY:
 			printk(KERN_INFO "%s: Unexpected Cisco IP address "
-			       "reply\n", hdlc_to_name(hdlc));
+			       "reply\n", dev->name);
 			goto rx_error;
 
 		case CISCO_KEEPALIVE_REQ:
@@ -190,7 +190,7 @@ static int cisco_rx(struct sk_buff *skb)
 					days = hrs / 24; hrs -= days * 24;
 					printk(KERN_INFO "%s: Link up (peer "
 					       "uptime %ud%uh%um%us)\n",
-					       hdlc_to_name(hdlc), days, hrs,
+					       dev->name, days, hrs,
 					       min, sec);
 				}
 				hdlc->state.cisco.up = 1;
@@ -201,7 +201,7 @@ static int cisco_rx(struct sk_buff *skb)
 		} /* switch(keepalive type) */
 	} /* switch(protocol) */
 
-	printk(KERN_INFO "%s: Unsupported protocol %x\n", hdlc_to_name(hdlc),
+	printk(KERN_INFO "%s: Unsupported protocol %x\n", dev->name,
 	       data->protocol);
 	dev_kfree_skb_any(skb);
 	return NET_RX_DROP;
@@ -216,17 +216,18 @@ static int cisco_rx(struct sk_buff *skb)
 
 static void cisco_timer(unsigned long arg)
 {
-	hdlc_device *hdlc = (hdlc_device*)arg;
+	struct net_device *dev = (struct net_device *)arg;
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 
 	if (hdlc->state.cisco.up && jiffies - hdlc->state.cisco.last_poll >=
 	    hdlc->state.cisco.settings.timeout * HZ) {
 		hdlc->state.cisco.up = 0;
-		printk(KERN_INFO "%s: Link down\n", hdlc_to_name(hdlc));
-		if (netif_carrier_ok(&hdlc->netdev))
-			netif_carrier_off(&hdlc->netdev);
+		printk(KERN_INFO "%s: Link down\n", dev->name);
+		if (netif_carrier_ok(dev))
+			netif_carrier_off(dev);
 	}
 
-	cisco_keepalive_send(hdlc, CISCO_KEEPALIVE_REQ,
+	cisco_keepalive_send(dev, CISCO_KEEPALIVE_REQ,
 			     ++hdlc->state.cisco.txseq,
 			     hdlc->state.cisco.rxseq);
 	hdlc->state.cisco.timer.expires = jiffies +
@@ -238,8 +239,9 @@ static void cisco_timer(unsigned long arg)
 
 
 
-static void cisco_start(hdlc_device *hdlc)
+static void cisco_start(struct net_device *dev)
 {
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	hdlc->state.cisco.last_poll = 0;
 	hdlc->state.cisco.up = 0;
 	hdlc->state.cisco.txseq = hdlc->state.cisco.rxseq = 0;
@@ -247,27 +249,27 @@ static void cisco_start(hdlc_device *hdlc)
 	init_timer(&hdlc->state.cisco.timer);
 	hdlc->state.cisco.timer.expires = jiffies + HZ; /*First poll after 1s*/
 	hdlc->state.cisco.timer.function = cisco_timer;
-	hdlc->state.cisco.timer.data = (unsigned long)hdlc;
+	hdlc->state.cisco.timer.data = (unsigned long)dev;
 	add_timer(&hdlc->state.cisco.timer);
 }
 
 
 
-static void cisco_stop(hdlc_device *hdlc)
+static void cisco_stop(struct net_device *dev)
 {
-	del_timer_sync(&hdlc->state.cisco.timer);
-	if (netif_carrier_ok(&hdlc->netdev))
-		netif_carrier_off(&hdlc->netdev);
+	del_timer_sync(&dev_to_hdlc(dev)->state.cisco.timer);
+	if (netif_carrier_ok(dev))
+		netif_carrier_off(dev);
 }
 
 
 
-int hdlc_cisco_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
+int hdlc_cisco_ioctl(struct net_device *dev, struct ifreq *ifr)
 {
 	cisco_proto *cisco_s = ifr->ifr_settings.ifs_ifsu.cisco;
 	const size_t size = sizeof(cisco_proto);
 	cisco_proto new_settings;
-	struct net_device *dev = hdlc_to_dev(hdlc);
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 	int result;
 
 	switch (ifr->ifr_settings.type) {
@@ -295,7 +297,7 @@ int hdlc_cisco_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		    new_settings.timeout < 2)
 			return -EINVAL;
 
-		result=hdlc->attach(hdlc, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
+		result=hdlc->attach(dev, ENCODING_NRZ,PARITY_CRC16_PR1_CCITT);
 
 		if (result)
 			return result;

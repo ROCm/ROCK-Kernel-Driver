@@ -1022,7 +1022,30 @@ pci_create_OF_bus_map(void)
 		prom_add_property(find_path_device("/"), of_prop);
 	}
 }
+
+static ssize_t pci_show_devspec(struct device *dev, char *buf)
+{
+	struct pci_dev *pdev;
+	struct device_node *np;
+
+	pdev = to_pci_dev (dev);
+	np = pci_device_to_OF_node(pdev);
+	if (np == NULL || np->full_name == NULL)
+		return 0;
+	return sprintf(buf, "%s", np->full_name);
+}
+static DEVICE_ATTR(devspec, S_IRUGO, pci_show_devspec, NULL);
+
 #endif /* CONFIG_PPC_OF */
+
+/* Add sysfs properties */
+void pcibios_add_platform_entries(struct pci_dev *pdev)
+{
+#ifdef CONFIG_PPC_OF
+	device_create_file(&pdev->dev, &dev_attr_devspec);
+#endif /* CONFIG_PPC_OF */
+}
+
 
 #ifdef CONFIG_PPC_PMAC
 /*

@@ -16,6 +16,9 @@
  *   Cache the record across multi-block reads from user space.
  *   Support > 64 cpus.
  *   Delete module_exit and MOD_INC/DEC_COUNT, salinfo cannot be a module.
+ *
+ * Jan 28 2004	kaos@sgi.com
+ *   Periodically check for outstanding MCA or INIT records.
  */
 
 #include <linux/types.h>
@@ -23,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/timer.h>
 #include <linux/vmalloc.h>
 
 #include <asm/semaphore.h>
@@ -179,6 +183,8 @@ shift1_data_saved (struct salinfo_data *data, int shift)
 /* This routine is invoked in interrupt context.  Note: mca.c enables
  * interrupts before calling this code for CMC/CPE.  MCA and INIT events are
  * not irq safe, do not call any routines that use spinlocks, they may deadlock.
+ * MCA and INIT records are recorded, a timer event will look for any
+ * outstanding events and wake up the user space code.
  *
  * The buffer passed from mca.c points to the output from ia64_log_get. This is
  * a persistent buffer but its contents can change between the interrupt and
@@ -186,12 +192,12 @@ shift1_data_saved (struct salinfo_data *data, int shift)
  * changes.
  */
 void
-salinfo_log_wakeup(int type, u8 *buffer, u64 size)
+salinfo_log_wakeup(int type, u8 *buffer, u64 size, int irqsafe)
 {
 	struct salinfo_data *data = salinfo_data + type;
 	struct salinfo_data_saved *data_saved;
 	unsigned long flags = 0;
-	int i, irqsafe = type != SAL_INFO_TYPE_MCA && type != SAL_INFO_TYPE_INIT;
+	int i;
 	int saved_size = ARRAY_SIZE(data->data_saved);
 
 	BUG_ON(type >= ARRAY_SIZE(salinfo_log_name));
@@ -222,6 +228,35 @@ salinfo_log_wakeup(int type, u8 *buffer, u64 size)
 		if (irqsafe)
 			up(&data->sem);
 	}
+}
+
+/* Check for outstanding MCA/INIT records every 5 minutes (arbitrary) */
+#define SALINFO_TIMER_DELAY (5*60*HZ)
+static struct timer_list salinfo_timer;
+
+static void
+salinfo_timeout_check(struct salinfo_data *data)
+{
+	int i;
+	if (!data->open)
+		return;
+	for (i = 0; i < NR_CPUS; ++i) {
+		if (test_bit(i, &data->cpu_event)) {
+			/* double up() is not a problem, user space will see no
+			 * records for the additional "events".
+			 */
+			up(&data->sem);
+		}
+	}
+}
+
+static void 
+salinfo_timeout (unsigned long arg)
+{
+	salinfo_timeout_check(salinfo_data + SAL_INFO_TYPE_MCA);
+	salinfo_timeout_check(salinfo_data + SAL_INFO_TYPE_INIT);
+	salinfo_timer.expires = jiffies + SALINFO_TIMER_DELAY;
+	add_timer(&salinfo_timer);
 }
 
 static int
@@ -562,6 +597,11 @@ salinfo_init(void)
 	}
 
 	*sdir++ = salinfo_dir;
+
+	init_timer(&salinfo_timer);
+	salinfo_timer.expires = jiffies + SALINFO_TIMER_DELAY;
+	salinfo_timer.function = &salinfo_timeout;
+	add_timer(&salinfo_timer);
 
 	return 0;
 }

@@ -1739,6 +1739,11 @@ void show_stack(struct task_struct *tsk, unsigned long *_ksp)
 
 	fp = ksp + STACK_BIAS;
 	thread_base = (unsigned long) tp;
+
+	printk("Call Trace:");
+#ifdef CONFIG_KALLSYMS
+	printk("\n");
+#endif
 	do {
 		/* Bogus frame pointer? */
 		if (fp < (thread_base + sizeof(struct thread_info)) ||
@@ -1746,10 +1751,13 @@ void show_stack(struct task_struct *tsk, unsigned long *_ksp)
 			break;
 		rw = (struct reg_window *)fp;
 		pc = rw->ins[7];
-		printk("[%016lx] ", pc);
+		printk(" [%016lx] ", pc);
+		print_symbol("%s\n", pc);
 		fp = rw->ins[6] + STACK_BIAS;
 	} while (++count < 16);
+#ifndef CONFIG_KALLSYMS
 	printk("\n");
+#endif
 }
 
 void show_trace_task(struct task_struct *tsk)
@@ -1776,7 +1784,6 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 	extern void __show_regs(struct pt_regs * regs);
 	extern void smp_report_regs(void);
 	int count = 0;
-	struct reg_window *lastrw;
 	
 	/* Amuse the user. */
 	printk(
@@ -1795,17 +1802,15 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 		/* Stop the back trace when we hit userland or we
 		 * find some badly aligned kernel stack.
 		 */
-		lastrw = (struct reg_window *)current;
 		while (rw					&&
 		       count++ < 30				&&
-		       rw >= lastrw				&&
+		       (((unsigned long) rw) >= PAGE_OFFSET)	&&
 		       (char *) rw < ((char *) current)
 		       + sizeof (union thread_union) 		&&
 		       !(((unsigned long) rw) & 0x7)) {
 			printk("Caller[%016lx]", rw->ins[7]);
-			print_symbol(": %s\n", rw->ins[7]);
+			print_symbol(": %s", rw->ins[7]);
 			printk("\n");
-			lastrw = rw;
 			rw = (struct reg_window *)
 				(rw->ins[6] + STACK_BIAS);
 		}

@@ -1444,27 +1444,6 @@ as Alan Cox says, <quote>Lock data, not code</quote>.
     </para>
    </sect1>
 
-   <sect1 id="sparc">
-    <title>The Fucked Up Sparc</title>
-
-    <para>
-      Alan Cox says <quote>the irq disable/enable is in the register
-      window on a sparc</quote>.  Andi Kleen says <quote>when you do
-      restore_flags in a different function you mess up all the
-      register windows</quote>.
-    </para>
-
-    <para>
-      So never pass the flags word set by
-      <function>spin_lock_irqsave()</function> and brethren to another
-      function (unless it's declared <type>inline</type>).  Usually no-one
-      does this, but now you've been warned.  Dave Miller can never do
-      anything in a straightforward manner (I can say that, because I have
-      pictures of him and a certain PowerPC maintainer in a compromising
-      position).
-    </para>
-   </sect1>
-
   </chapter>
 
  <chapter id="Efficiency">

@@ -1,4 +1,4 @@
-/* $Id: cache-sh3.c,v 1.7 2003/08/28 16:16:09 lethal Exp $
+/* $Id: cache-sh3.c,v 1.8 2004/02/01 16:26:27 lethal Exp $
  *
  *  linux/arch/sh/mm/cache-sh3.c
  *
@@ -21,8 +21,7 @@
 #include <asm/mmu_context.h>
 #include <asm/cacheflush.h>
 
-static int __init
-detect_cpu_and_cache_system(void)
+int __init detect_cpu_and_cache_system(void)
 {
 	unsigned long addr0, addr1, data0, data1, data2, data3;
 

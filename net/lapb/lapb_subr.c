@@ -114,7 +114,7 @@ int lapb_decode(struct lapb_cb *lapb, struct sk_buff *skb,
 
 #if LAPB_DEBUG > 2
 	printk(KERN_DEBUG "lapb: (%p) S%d RX %02X %02X %02X\n",
-	       lapb->token, lapb->state,
+	       lapb->dev, lapb->state,
 	       skb->data[0], skb->data[1], skb->data[2]);
 #endif
 
@@ -287,7 +287,7 @@ void lapb_transmit_frmr(struct lapb_cb *lapb)
 
 #if LAPB_DEBUG > 1
 	printk(KERN_DEBUG "lapb: (%p) S%d TX FRMR %02X %02X %02X %02X %02X\n",
-	       lapb->token, lapb->state,
+	       lapb->dev, lapb->state,
 	       skb->data[1], skb->data[2], skb->data[3],
 	       skb->data[4], skb->data[5]);
 #endif
@@ -304,7 +304,7 @@ void lapb_transmit_frmr(struct lapb_cb *lapb)
 
 #if LAPB_DEBUG > 1
 	printk(KERN_DEBUG "lapb: (%p) S%d TX FRMR %02X %02X %02X\n",
-	       lapb->token, lapb->state, skb->data[1],
+	       lapb->dev, lapb->state, skb->data[1],
 	       skb->data[2], skb->data[3]);
 #endif
 	}

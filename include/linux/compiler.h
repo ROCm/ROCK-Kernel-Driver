@@ -9,6 +9,8 @@
 # define __kernel
 #endif
 
+#ifdef __KERNEL__
+
 #ifndef __ASSEMBLY__
 #if __GNUC__ > 3
 # include <linux/compiler-gcc+.h>	/* catch-all for GCC 4, 5, etc. */
@@ -105,5 +107,7 @@
      __ptr = (unsigned long) (ptr);				\
     (typeof(ptr)) (__ptr + (off)); })
 #endif
+
+#endif /* __KERNEL__ */
 
 #endif /* __LINUX_COMPILER_H */

@@ -697,12 +697,7 @@ int blkdev_put(struct block_device *bdev, int kind)
 	down(&bdev->bd_sem);
 	lock_kernel();
 	if (!--bdev->bd_openers) {
-		switch (kind) {
-		case BDEV_FILE:
-		case BDEV_FS:
-			sync_blockdev(bdev);
-			break;
-		}
+		sync_blockdev(bdev);
 		kill_bdev(bdev);
 	}
 	if (bdev->bd_contains == bdev) {

@@ -2,11 +2,12 @@
 #define _ALPHA_BYTEORDER_H
 
 #include <asm/types.h>
+#include <linux/compiler.h>
 #include <asm/compiler.h>
 
 #ifdef __GNUC__
 
-static __inline __u32 __attribute_const__ __arch__swab32(__u32 x)
+static __inline __attribute_const__ __u32 __arch__swab32(__u32 x)
 {
 	/*
 	 * Unfortunately, we can't use the 6 instruction sequence

@@ -818,6 +818,11 @@ S: 1382 Bordeaux Drive
 S: Sunnyvale, CA 94087
 S: USA
 
+N: Bruno Ducrot
+E: ducrot@poupinou.org
+D: CPUFreq and ACPI bugfixes.
+S: Mougin, France
+
 N: Don Dugger
 E: n0ano@valinux.com
 D: Linux/IA-64

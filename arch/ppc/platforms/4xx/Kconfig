@@ -13,48 +13,43 @@ choice
 
 config ASH
 	bool "Ash"
-
-config BEECH
-	bool "Beech"
-
-config CEDAR
-	bool "Cedar"
+	help
+	  This option enables support for the IBM NP405H evaluation board.
 
 config CPCI405
 	bool "CPCI405"
+	help
+	  This option enables support for the CPCI405 board.
 
 config EP405
 	bool "EP405/EP405PC"
+	help
+	  This option enables support for the EP405/EP405PC boards.
 
 config OAK
 	bool "Oak"
 	help
-	  Select Oak if you have an IBM 403GCX "Oak" Evaluation Board.
-
-	  Select Walnut if you have an IBM 405GP "Walnut" Evaluation Board.
-
-	  More information on these boards is available at:
-	  <http://www.chips.ibm.com/products/powerpc/tools/evk_pn.html#GCX>.
-
-config REDWOOD_4
-	bool "Redwood-4"
+	  This option enables support for the IBM 403GCX evaluation board.
 
 config REDWOOD_5
 	bool "Redwood-5"
+	help
+	  This option enables support for the IBM STB04 evaluation board.
 
 config REDWOOD_6
 	bool "Redwood-6"
+	help
+	  This option enables support for the IBM STBx25xx evaluation board.
 
 config SYCAMORE
 	bool "Sycamore"
-
-config TIVO
-	bool "Tivo"
+	help
+	  This option enables support for the IBM PPC405GPr evaluation board.
 
 config WALNUT
 	bool "Walnut"
 	help
-	  Select Walnut if you have an IBM 405GP "Walnut" Evaluation Board.
+	  This option enables support for the IBM PPC405GP evaluation board.
 
 endchoice
 
@@ -120,12 +115,6 @@ config IBM405_ERR51
 	depends on 40x && !405GPR
 	default y
 
-
-config PIN_TLB
-	bool
-	depends on 44x
-	default y
-
 config BOOKE
 	bool
 	depends on 44x
@@ -133,7 +122,7 @@ config BOOKE
 
 config IBM_OCP
 	bool
-	depends on ASH || BEECH || CEDAR || CPCI405 || EBONY || EP405 || OCOTEA || REDWOOD_4 || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
+	depends on ASH || CPCI405 || EBONY || EP405 || OCOTEA || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
 	default y
 
 config IBM_EMAC4
@@ -141,19 +130,14 @@ config IBM_EMAC4
 	depends on 440GX
 	default y
 
-config NP405L
-	bool
-	depends on CEDAR
-	default y
-
 config BIOS_FIXUP
 	bool
-	depends on CEDAR || EP405 || SYCAMORE || WALNUT
+	depends on EP405 || SYCAMORE || WALNUT
 	default y
 
 config 403GCX
 	bool
-	depends OAK || TIVO
+	depends OAK
 	default y
 
 config 405GP
@@ -165,13 +149,9 @@ config 405GPR
 	bool
 	depends on SYCAMORE
 
-config 405LP
-	bool
-	depends on CEDAR
-
 config STB03xxx
 	bool
-	depends on REDWOOD_5 || REDWOOD_4 || REDWOOD_6
+	depends on REDWOOD_5 || REDWOOD_6
 	default y
 
 config EMBEDDEDBOOT
@@ -181,12 +161,8 @@ config EMBEDDEDBOOT
 
 config IBM_OPENBIOS
 	bool
-	depends on ASH || BEECH || CEDAR || REDWOOD_4 || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
+	depends on ASH || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
 	default y
-
-config 405_DMA
-	bool "Blue Logic DMA"
-	depends on 40x
 
 config PM
 	bool "Power Management support (EXPERIMENTAL)"

@@ -186,6 +186,10 @@ extern void
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 			 struct resource *res);
 
+static inline void pcibios_add_platform_entries(struct pci_dev *dev)
+{
+}
+
 #endif /* __KERNEL__ */
  
 #endif

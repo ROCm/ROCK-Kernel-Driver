@@ -54,7 +54,7 @@ static char *hw;		/* pointer to hw=xxx command line string */
 
 
 typedef struct card_s {
-	hdlc_device hdlc;	/* HDLC device struct - must be first */
+	struct net_device *dev;
 	spinlock_t lock;	/* TX lock */
 	u8 *win0base;		/* ISA window base address */
 	u32 phy_winbase;	/* ISA physical base address */
@@ -121,6 +121,7 @@ static inline void openwin(card_t *card, u8 page)
 
 static void sca_msci_intr(port_t *port)
 {
+	struct net_device *dev = port_to_dev(port);
 	card_t* card = port_to_card(port);
 	u8 stat = sca_in(MSCI1_OFFSET + ST1, card); /* read MSCI ST1 status */
 
@@ -128,8 +129,9 @@ static void sca_msci_intr(port_t *port)
 	sca_out(stat & ST1_UDRN, MSCI0_OFFSET + ST1, card);
 
 	if (stat & ST1_UDRN) {
-		port->hdlc.stats.tx_errors++; /* TX Underrun error detected */
-		port->hdlc.stats.tx_fifo_errors++;
+		struct net_device_stats *stats = hdlc_stats(dev);
+		stats->tx_errors++; /* TX Underrun error detected */
+		stats->tx_fifo_errors++;
 	}
 
 	/* Reset MSCI CDCD status bit - uses ch#2 DCD input */
@@ -137,7 +139,7 @@ static void sca_msci_intr(port_t *port)
 
 	if (stat & ST1_CDCD)
 		hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD),
-				 &port->hdlc);
+				 dev);
 }
 
 
@@ -177,22 +179,21 @@ static void c101_set_iface(port_t *port)
 
 static int c101_open(struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 	int result;
 
-	result = hdlc_open(hdlc);
+	result = hdlc_open(dev);
 	if (result)
 		return result;
 
 	writeb(1, port->win0base + C101_DTR);
 	sca_out(0, MSCI1_OFFSET + CTL, port); /* RTS uses ch#2 output */
-	sca_open(hdlc);
+	sca_open(dev);
 	/* DCD is connected to port 2 !@#$%^& - disable MSCI0 CDCD interrupt */
 	sca_out(IE1_UDRN, MSCI0_OFFSET + IE1, port);
 	sca_out(IE0_TXINT, MSCI0_OFFSET + IE0, port);
 
-	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, port) & ST3_DCD), hdlc);
+	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, port) & ST3_DCD), dev);
 	printk(KERN_DEBUG "0x%X\n", sca_in(MSCI1_OFFSET + ST3, port));
 
 	/* enable MSCI1 CDCD interrupt */
@@ -206,13 +207,12 @@ static int c101_open(struct net_device *dev)
 
 static int c101_close(struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 
-	sca_close(hdlc);
+	sca_close(dev);
 	writeb(0, port->win0base + C101_DTR);
 	sca_out(CTL_NORTS, MSCI1_OFFSET + CTL, port);
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 	return 0;
 }
 
@@ -221,12 +221,11 @@ static int c101_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	const size_t size = sizeof(sync_serial_settings);
 	sync_serial_settings new_line, *line = ifr->ifr_settings.ifs_ifsu.sync;
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 
 #ifdef DEBUG_RINGS
 	if (cmd == SIOCDEVPRIVATE) {
-		sca_dump_rings(hdlc);
+		sca_dump_rings(dev);
 		printk(KERN_DEBUG "MSCI1: ST: %02x %02x %02x %02x\n",
 		       sca_in(MSCI1_OFFSET + ST0, port),
 		       sca_in(MSCI1_OFFSET + ST1, port),
@@ -288,6 +287,8 @@ static void c101_destroy_card(card_t *card)
 		release_mem_region(card->phy_winbase, C101_MAPPED_RAM_SIZE);
 	}
 
+	free_netdev(card->dev);
+
 	kfree(card);
 }
 
@@ -296,6 +297,7 @@ static void c101_destroy_card(card_t *card)
 static int __init c101_run(unsigned long irq, unsigned long winbase)
 {
 	struct net_device *dev;
+	hdlc_device *hdlc;
 	card_t *card;
 	int result;
 
@@ -315,6 +317,13 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 		return -ENOBUFS;
 	}
 	memset(card, 0, sizeof(card_t));
+
+	card->dev = alloc_hdlcdev(card);
+	if (!card->dev) {
+		printk(KERN_ERR "c101: unable to allocate memory\n");
+		kfree(card);
+		return -ENOBUFS;
+	}
 
 	if (request_irq(irq, sca_intr, 0, devname, card)) {
 		printk(KERN_ERR "c101: could not allocate IRQ\n");
@@ -347,7 +356,8 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 
 	sca_init(card, 0);
 
-	dev = hdlc_to_dev(&card->hdlc);
+	dev = port_to_dev(card);
+	hdlc = dev_to_hdlc(dev);
 
 	spin_lock_init(&card->lock);
 	SET_MODULE_OWNER(dev);
@@ -358,24 +368,25 @@ static int __init c101_run(unsigned long irq, unsigned long winbase)
 	dev->do_ioctl = c101_ioctl;
 	dev->open = c101_open;
 	dev->stop = c101_close;
-	card->hdlc.attach = sca_attach;
-	card->hdlc.xmit = sca_xmit;
+	hdlc->attach = sca_attach;
+	hdlc->xmit = sca_xmit;
 	card->settings.clock_type = CLOCK_EXT;
 
-	result = register_hdlc_device(&card->hdlc);
+	result = register_hdlc_device(dev);
 	if (result) {
 		printk(KERN_WARNING "c101: unable to register hdlc device\n");
 		c101_destroy_card(card);
 		return result;
 	}
 
+	/* XXX: are we OK with having that done when card is already up? */
+
 	sca_init_sync_port(card); /* Set up C101 memory */
-	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD),
-			 &card->hdlc);
+	hdlc_set_carrier(!(sca_in(MSCI1_OFFSET + ST3, card) & ST3_DCD), dev);
 
 	printk(KERN_INFO "%s: Moxa C101 on IRQ%u,"
 	       " using %u TX + %u RX packets rings\n",
-	       hdlc_to_name(&card->hdlc), card->irq,
+	       dev->name, card->irq,
 	       card->tx_ring_buffers, card->rx_ring_buffers);
 
 	*new_card = card;
@@ -424,7 +435,7 @@ static void __exit c101_cleanup(void)
 	while (card) {
 		card_t *ptr = card;
 		card = card->next_card;
-		unregister_hdlc_device(&ptr->hdlc);
+		unregister_hdlc_device(port_to_dev(ptr));
 		c101_destroy_card(ptr);
 	}
 }

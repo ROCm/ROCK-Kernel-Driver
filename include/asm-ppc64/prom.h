@@ -108,6 +108,12 @@ struct reg_property64 {
 	unsigned long size;
 };
 
+struct reg_property_pmac {
+	unsigned int address_hi;
+	unsigned int address_lo;
+	unsigned int size;
+};
+
 struct translation_property {
 	unsigned long virt;
 	unsigned long size;
@@ -207,6 +213,7 @@ struct prom_args {
 
 struct prom_t {
 	unsigned long entry;
+	ihandle root;
 	ihandle chosen;
 	int cpu;
 	ihandle stdout;

@@ -327,7 +327,7 @@ static int packet_sendmsg_spkt(struct kiocb *iocb, struct socket *sock,
 		goto out_unlock;
 
 	err = -ENOBUFS;
-	skb = sock_wmalloc(sk, len+dev->hard_header_len+15, 0, GFP_KERNEL);
+	skb = sock_wmalloc(sk, len + LL_RESERVED_SPACE(dev), 0, GFP_KERNEL);
 
 	/*
 	 *	If the write buffer is full, then tough. At this level the user gets to
@@ -346,7 +346,7 @@ static int packet_sendmsg_spkt(struct kiocb *iocb, struct socket *sock,
 	 * hard header at transmission time by themselves. PPP is the
 	 * notable one here. This should really be fixed at the driver level.
 	 */
-	skb_reserve(skb,(dev->hard_header_len+15)&~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	skb->nh.raw = skb->data;
 
 	/* Try to align data part correctly */
@@ -700,12 +700,12 @@ static int packet_sendmsg(struct kiocb *iocb, struct socket *sock,
 	if (len > dev->mtu+reserve)
 		goto out_unlock;
 
-	skb = sock_alloc_send_skb(sk, len+dev->hard_header_len+15, 
+	skb = sock_alloc_send_skb(sk, len + LL_RESERVED_SPACE(dev),
 				msg->msg_flags & MSG_DONTWAIT, &err);
 	if (skb==NULL)
 		goto out_unlock;
 
-	skb_reserve(skb, (dev->hard_header_len+15)&~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	skb->nh.raw = skb->data;
 
 	if (dev->hard_header) {

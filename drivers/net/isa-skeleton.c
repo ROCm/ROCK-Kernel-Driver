@@ -104,8 +104,6 @@ struct net_local {
 
 /* Index to functions, as function prototypes. */
 
-extern int netcard_probe(struct net_device *dev);
-
 static int	netcard_probe1(struct net_device *dev, int ioaddr);
 static int	net_open(struct net_device *dev);
 static int	net_send_packet(struct sk_buff *skb, struct net_device *dev);
@@ -129,11 +127,11 @@ static void 	chipset_init(struct net_device *dev, int startp);
  * If dev->base_addr == 2, allocate space for the device and return success
  * (detachable devices only).
  */
-int __init 
-netcard_probe(struct net_device *dev)
+static int __init do_netcard_probe(struct net_device *dev)
 {
 	int i;
 	int base_addr = dev->base_addr;
+	int irq = dev->irq;
 
 	SET_MODULE_OWNER(dev);
 
@@ -144,13 +142,48 @@ netcard_probe(struct net_device *dev)
 
 	for (i = 0; netcard_portlist[i]; i++) {
 		int ioaddr = netcard_portlist[i];
-		if (check_region(ioaddr, NETCARD_IO_EXTENT))
-			continue;
 		if (netcard_probe1(dev, ioaddr) == 0)
 			return 0;
+		dev->irq = irq;
 	}
 
 	return -ENODEV;
+}
+ 
+static void cleanup_card(struct net_device *dev)
+{
+#ifdef jumpered_dma
+	free_dma(dev->dma);
+#endif
+#ifdef jumpered_interrupts
+	free_irq(dev->irq, dev);
+#endif
+	release_region(dev->base_addr, NETCARD_IO_EXTENT);
+}
+
+struct net_device * __init netcard_probe(int unit)
+{
+	struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
+	int err;
+
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
+
+	sprintf(dev->name, "eth%d", unit);
+	netdev_boot_setup_check(dev);
+
+	err = do_netcard_probe(dev);
+	if (err)
+		goto out;
+	err = register_netdev(dev);
+	if (err)
+		goto out1;
+	return dev;
+out1:
+	cleanup_card(dev);
+out:
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 /*
@@ -163,6 +196,11 @@ static int __init netcard_probe1(struct net_device *dev, int ioaddr)
 	struct net_local *np;
 	static unsigned version_printed;
 	int i;
+	int err = -ENODEV;
+
+	/* Grab the region so that no one else tries to probe our ioports. */
+	if (!request_region(ioaddr, NETCARD_IO_EXTENT, cardname))
+		return -EBUSY;
 
 	/*
 	 * For ethernet adaptors the first three octets of the station address 
@@ -171,9 +209,8 @@ static int __init netcard_probe1(struct net_device *dev, int ioaddr)
 	 */ 
 	if (inb(ioaddr + 0) != SA_ADDR0
 		||	 inb(ioaddr + 1) != SA_ADDR1
-		||	 inb(ioaddr + 2) != SA_ADDR2) {
-		return -ENODEV;
-	}
+		||	 inb(ioaddr + 2) != SA_ADDR2)
+		goto out;
 
 	if (net_debug  &&  version_printed++ == 0)
 		printk(KERN_DEBUG "%s", version);
@@ -187,6 +224,7 @@ static int __init netcard_probe1(struct net_device *dev, int ioaddr)
 	for (i = 0; i < 6; i++)
 		printk(" %2.2x", dev->dev_addr[i] = inb(ioaddr + i));
 
+	err = -EAGAIN;
 #ifdef jumpered_interrupts
 	/*
 	 * If this board has jumpered interrupts, allocate the interrupt
@@ -217,7 +255,7 @@ static int __init netcard_probe1(struct net_device *dev, int ioaddr)
 		if (irqval) {
 			printk("%s: unable to get IRQ %d (irqval=%d).\n",
 				   dev->name, dev->irq, irqval);
-			return -EAGAIN;
+			goto out;
 		}
 	}
 #endif	/* jumpered interrupt */
@@ -229,7 +267,7 @@ static int __init netcard_probe1(struct net_device *dev, int ioaddr)
 	if (dev->dma == 0) {
 		if (request_dma(dev->dma, cardname)) {
 			printk("DMA %d allocation failed.\n", dev->dma);
-			return -EAGAIN;
+			goto out1;
 		} else
 			printk(", assigned DMA %d.\n", dev->dma);
 	} else {
@@ -256,29 +294,17 @@ static int __init netcard_probe1(struct net_device *dev, int ioaddr)
 			}
 		if (i <= 0) {
 			printk("DMA probe failed.\n");
-			return -EAGAIN;
+			goto out1;
 		} 
 		if (request_dma(dev->dma, cardname)) {
 			printk("probed DMA %d allocation failed.\n", dev->dma);
-			return -EAGAIN;
+			goto out1;
 		}
 	}
 #endif	/* jumpered DMA */
 
-	/* Initialize the device structure. */
-	if (dev->priv == NULL) {
-		dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL);
-		if (dev->priv == NULL)
-			return -ENOMEM;
-	}
-
-	memset(dev->priv, 0, sizeof(struct net_local));
-
 	np = (struct net_local *)dev->priv;
 	spin_lock_init(&np->lock);
-
-	/* Grab the region so that no one else tries to probe our ioports. */
-	request_region(ioaddr, NETCARD_IO_EXTENT, cardname);
 
 	dev->open		= net_open;
 	dev->stop		= net_close;
@@ -288,11 +314,14 @@ static int __init netcard_probe1(struct net_device *dev, int ioaddr)
 
         dev->tx_timeout		= &net_tx_timeout;
         dev->watchdog_timeo	= MY_TX_TIMEOUT; 
-
-	/* Fill in the fields of the device structure with ethernet values. */
-	ether_setup(dev);
-
 	return 0;
+out1:
+#ifdef jumpered_interrupts
+	free_irq(dev->irq, dev);
+#endif
+out:
+	release_region(base_addr, NETCARD_IO_EXTENT);
+	return err;
 }
 
 static void net_tx_timeout(struct net_device *dev)
@@ -635,7 +664,7 @@ set_multicast_list(struct net_device *dev)
 
 #ifdef MODULE
 
-static struct net_device this_device;
+static struct net_device *this_device;
 static int io = 0x300;
 static int irq;
 static int dma;
@@ -644,42 +673,38 @@ MODULE_LICENSE("GPL");
 
 int init_module(void)
 {
+	struct net_device *dev;
 	int result;
 
 	if (io == 0)
 		printk(KERN_WARNING "%s: You shouldn't use auto-probing with insmod!\n",
 			   cardname);
+	dev = alloc_etherdev(sizeof(struct net_local));
+	if (!dev)
+		return -ENOMEM;
 
 	/* Copy the parameters from insmod into the device structure. */
-	this_device.base_addr = io;
-	this_device.irq       = irq;
-	this_device.dma       = dma;
-	this_device.mem_start = mem;
-	this_device.init      = netcard_probe;
-
-	if ((result = register_netdev(&this_device)) != 0)
-		return result;
-
-	return 0;
+	dev->base_addr = io;
+	dev->irq       = irq;
+	dev->dma       = dma;
+	dev->mem_start = mem;
+	if (do_netcard_probe(dev) == 0) {
+		if (register_netdev(dev) == 0)
+			this_device = dev;
+			return 0;
+		}
+		cleanup_card(dev);
+	}
+	free_netdev(dev);
+	return -ENXIO;
 }
 
 void
 cleanup_module(void)
 {
-	unregister_netdev(&this_device);
-	/*
-	 * If we don't do this, we can't re-insmod it later.
-	 * Release irq/dma here, when you have jumpered versions and
-	 * allocate them in net_probe1().
-	 */
-	/*
-	   free_irq(this_device.irq, dev);
-	   free_dma(this_device.dma);
-	*/
-	release_region(this_device.base_addr, NETCARD_IO_EXTENT);
-
-	if (this_device.priv)
-		kfree(this_device.priv);
+	unregister_netdev(this_device);
+	cleanup_card(this_device);
+	free_netdev(this_device);
 }
 
 #endif /* MODULE */

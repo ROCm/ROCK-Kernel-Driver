@@ -2239,7 +2239,7 @@ probe_motherboard(void)
 	    	break;
 #else /* CONFIG_POWER4 */
 	    case macio_keylargo2:
-		pmac_mb.model_id = PMAC_TYPE_POWERMAC_G5;
+		pmac_mb.model_id = PMAC_TYPE_UNKNOWN_K2;
 		pmac_mb.model_name = "Unknown G5";
 	    	pmac_mb.features = g5_features;
 	    	break;

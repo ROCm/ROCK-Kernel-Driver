@@ -56,11 +56,11 @@ config USB_STORAGE_ISD200
 	  - Planex eXtreme Drive RX-25HU USB-IDE cable (not model RX-25U)
 
 config USB_STORAGE_DPCM
-	bool "Microtech CompactFlash/SmartMedia support"
+	bool "Microtech/ZiO! CompactFlash/SmartMedia support"
 	depends on USB_STORAGE
 	help
-	  Say Y here to support the Microtech ZiO! CompactFlash reader.
-	  There is a web page at <http://www.microtechint.com/zio/index.html>.
+	  Say Y here to support the Microtech/ZiO! CompactFlash reader.
+	  There is a web page at <http://www.ziocorp.com/products/>.
 
 config USB_STORAGE_HP8200e
 	bool "HP CD-Writer 82xx support (EXPERIMENTAL)"

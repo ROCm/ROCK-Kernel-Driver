@@ -247,7 +247,7 @@ int __init offb_init(void)
 {
 	struct device_node *dp;
 	unsigned int dpy;
-#ifdef CONFIG_BOOTX_TEXT
+#if defined(CONFIG_BOOTX_TEXT) && defined(CONFIG_PPC32)
 	struct device_node *displays = find_type_devices("display");
 	struct device_node *macos_display = NULL;
 
@@ -323,7 +323,7 @@ int __init offb_init(void)
 			     boot_infos->dispDeviceDepth,
 			     boot_infos->dispDeviceRowBytes, addr, NULL);
 	}
-#endif
+#endif /* defined(CONFIG_BOOTX_TEXT) && defined(CONFIG_PPC32) */
 
 	for (dpy = 0; dpy < prom_num_displays; dpy++) {
 		if ((dp = find_path_device(prom_display_paths[dpy])))

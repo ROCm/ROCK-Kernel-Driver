@@ -195,11 +195,13 @@ static void fb_flashcursor(void *private)
 {
 	struct fb_info *info = (struct fb_info *) private;
 
-	/* Test to see if the cursor is erased but still on */
-	if (!info || (info->cursor.rop == ROP_COPY))
+	if (!info || info->state != FBINFO_STATE_RUNNING ||
+	    info->cursor.rop == ROP_COPY)
 		return;
+	acquire_console_sem();
 	info->cursor.enable ^= 1;
 	info->fbops->fb_cursor(info, &info->cursor);
+	release_console_sem();
 }
 
 #if (defined(__arm__) && defined(IRQ_VSYNCPULSE)) || defined(CONFIG_ATARI) || defined(CONFIG_MAC)
@@ -226,8 +228,7 @@ static void cursor_timer_handler(unsigned long dev_addr)
 	struct fb_info *info = (struct fb_info *) dev_addr;
 	
 	schedule_work(&info->queue);	
-	cursor_timer.expires = jiffies + HZ / 5;
-	add_timer(&cursor_timer);
+	mod_timer(&cursor_timer, jiffies + HZ/5);
 }
 
 int __init fb_console_setup(char *this_opt)
@@ -353,8 +354,6 @@ static void putcs_unaligned(struct vc_data *vc, struct fb_info *info,
 		info->fbops->fb_imageblit(info, image);
 		image->dx += cnt * vc->vc_font.width;
 		count -= cnt;
-		atomic_dec(&info->pixmap.count);
-		smp_mb__after_atomic_dec();
 	}
 }
 
@@ -393,8 +392,6 @@ static void putcs_aligned(struct vc_data *vc, struct fb_info *info,
 		info->fbops->fb_imageblit(info, image);
 		image->dx += cnt * vc->vc_font.width;
 		count -= cnt;
-		atomic_dec(&info->pixmap.count);
-		smp_mb__after_atomic_dec();
 	}
 }
 
@@ -465,8 +462,6 @@ static void accel_putc(struct vc_data *vc, struct fb_info *info,
 	move_buf_aligned(info, dst, src, pitch, width, image.height);
 
 	info->fbops->fb_imageblit(info, &image);
-	atomic_dec(&info->pixmap.count);
-	smp_mb__after_atomic_dec();
 }
 
 void accel_putcs(struct vc_data *vc, struct fb_info *info,
@@ -676,7 +671,7 @@ static const char *fbcon_startup(void)
 	if (!info->queue.func) {
 		INIT_WORK(&info->queue, fb_flashcursor, info);
 		
-		cursor_timer.expires = jiffies + HZ / 50;
+		cursor_timer.expires = jiffies + HZ / 5;
 		cursor_timer.data = (unsigned long ) info;
 		add_timer(&cursor_timer);
 	}
@@ -944,6 +939,8 @@ static void fbcon_clear(struct vc_data *vc, int sy, int sx, int height,
 
 	if (!info->fbops->fb_blank && console_blanked)
 		return;
+	if (info->state != FBINFO_STATE_RUNNING)
+		return;
 
 	if (!height || !width)
 		return;
@@ -968,6 +965,8 @@ static void fbcon_putc(struct vc_data *vc, int c, int ypos, int xpos)
 
 	if (!info->fbops->fb_blank && console_blanked)
 		return;
+	if (info->state != FBINFO_STATE_RUNNING)
+		return;
 
 	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
 		return;
@@ -982,6 +981,8 @@ static void fbcon_putcs(struct vc_data *vc, const unsigned short *s,
 	struct display *p = &fb_display[vc->vc_num];
 
 	if (!info->fbops->fb_blank && console_blanked)
+		return;
+	if (info->state != FBINFO_STATE_RUNNING)
 		return;
 
 	if (vt_cons[vc->vc_num]->vc_mode != KD_TEXT)
@@ -1826,9 +1827,11 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 	vc->vc_font.height = h;
 	if (vc->vc_hi_font_mask && cnt == 256) {
 		vc->vc_hi_font_mask = 0;
-		if (vc->vc_can_do_color)
+		if (vc->vc_can_do_color) {
 			vc->vc_complement_mask >>= 1;
-
+			vc->vc_s_complement_mask >>= 1;
+		}
+			
 		/* ++Edmund: reorder the attribute bits */
 		if (vc->vc_can_do_color) {
 			unsigned short *cp =
@@ -1847,9 +1850,11 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 		}
 	} else if (!vc->vc_hi_font_mask && cnt == 512) {
 		vc->vc_hi_font_mask = 0x100;
-		if (vc->vc_can_do_color)
+		if (vc->vc_can_do_color) {
 			vc->vc_complement_mask <<= 1;
-
+			vc->vc_s_complement_mask <<= 1;
+		}
+			
 		/* ++Edmund: reorder the attribute bits */
 		{
 			unsigned short *cp =
@@ -2261,6 +2266,39 @@ static int fbcon_set_origin(struct vc_data *vc)
 	return 0;
 }
 
+static void fbcon_suspended(struct fb_info *info)
+{
+	/* Clear cursor, restore saved data */
+	info->cursor.enable = 0;
+	info->fbops->fb_cursor(info, &info->cursor);
+}
+
+static void fbcon_resumed(struct fb_info *info)
+{
+	struct vc_data *vc;
+
+	if (info->currcon < 0)
+		return;
+	vc = vc_cons[info->currcon].d;
+
+	update_screen(vc->vc_num);
+}
+static int fbcon_event_notify(struct notifier_block *self, 
+			      unsigned long action, void *data)
+{
+	struct fb_info *info = (struct fb_info *) data;
+
+	switch(action) {
+	case FB_EVENT_SUSPEND:
+		fbcon_suspended(info);
+		break;
+	case FB_EVENT_RESUME:
+		fbcon_resumed(info);
+		break;
+	}
+	return 0;
+}
+
 /*
  *  The console `switch' structure for the frame buffer based console
  */
@@ -2287,16 +2325,35 @@ const struct consw fb_con = {
 	.con_resize             = fbcon_resize,
 };
 
+static struct notifier_block fbcon_event_notifer = {
+	.notifier_call	= fbcon_event_notify,
+};
+
+static int fbcon_event_notifier_registered;
+
 int __init fb_console_init(void)
 {
 	if (!num_registered_fb)
 		return -ENODEV;
 	take_over_console(&fb_con, first_fb_vc, last_fb_vc, fbcon_is_default);
+	acquire_console_sem();
+	if (!fbcon_event_notifier_registered) {
+		fb_register_client(&fbcon_event_notifer);
+		fbcon_event_notifier_registered = 1;
+	} 
+	release_console_sem();
+
 	return 0;
 }
 
 void __exit fb_console_exit(void)
 {
+	acquire_console_sem();
+	if (fbcon_event_notifier_registered) {
+		fb_unregister_client(&fbcon_event_notifer);
+		fbcon_event_notifier_registered = 0;
+	}
+	release_console_sem();
 	give_up_console(&fb_con);
 }	
 

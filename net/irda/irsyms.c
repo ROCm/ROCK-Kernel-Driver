@@ -193,45 +193,6 @@ static struct packet_type irda_packet_type = {
 };
 
 /*
- * Function irda_device_event (this, event, ptr)
- *
- *    Called when a device is taken up or down
- *
- */
-static int irda_device_event(struct notifier_block *this, unsigned long event,
-			     void *ptr)
-{
-	struct net_device *dev = (struct net_device *) ptr;
-	
-        /* Reject non IrDA devices */
-	if (dev->type != ARPHRD_IRDA) 
-		return NOTIFY_DONE;
-	
-        switch (event) {
-	case NETDEV_UP:
-		IRDA_DEBUG(3, "%s(), NETDEV_UP\n", __FUNCTION__);
-		/* irda_dev_device_up(dev); */
-		break;
-	case NETDEV_DOWN:
-		IRDA_DEBUG(3, "%s(), NETDEV_DOWN\n", __FUNCTION__);
-		/* irda_kill_by_device(dev); */
-		/* irda_rt_device_down(dev); */
-		/* irda_dev_device_down(dev); */
-		break;
-	default:
-		break;
-        }
-
-        return NOTIFY_DONE;
-}
-
-static struct notifier_block irda_dev_notifier = {
-	irda_device_event,
-	NULL,
-	0
-};
-
-/*
  * Function irda_notify_init (notify)
  *
  *    Used for initializing the notify structure
@@ -272,9 +233,6 @@ int __init irda_init(void)
 	/* Add IrDA packet type (Start receiving packets) */
         dev_add_pack(&irda_packet_type);
 
-	/* Notifier for Interface changes */
-	register_netdevice_notifier(&irda_dev_notifier);
-
 	/* External APIs */
 #ifdef CONFIG_PROC_FS
 	irda_proc_register();
@@ -307,9 +265,6 @@ void __exit irda_cleanup(void)
 
 	/* Remove IrDA packet type (stop receiving packets) */
         dev_remove_pack(&irda_packet_type);
-	
-	/* Stop receiving interfaces notifications */
-        unregister_netdevice_notifier(&irda_dev_notifier);
 	
 	/* Remove higher layers */
 	irsock_cleanup();

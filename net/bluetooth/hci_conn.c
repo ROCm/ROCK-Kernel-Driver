@@ -353,21 +353,24 @@ int hci_get_conn_list(unsigned long arg)
 	struct hci_conn_info *ci;
 	struct hci_dev *hdev;
 	struct list_head *p;
-	int n = 0, size;
+	int n = 0, size, err;
 
 	if (copy_from_user(&req, (void *) arg, sizeof(req)))
 		return -EFAULT;
 
-	if (!(hdev = hci_dev_get(req.dev_id)))
-		return -ENODEV;
+	if (!req.conn_num || req.conn_num > (PAGE_SIZE * 2) / sizeof(*ci))
+		return -EINVAL;
 
-	size = req.conn_num * sizeof(struct hci_conn_info) + sizeof(req);
-
-	if (verify_area(VERIFY_WRITE, (void *)arg, size))
-		return -EFAULT;
+	size = sizeof(req) + req.conn_num * sizeof(*ci);
 
 	if (!(cl = (void *) kmalloc(size, GFP_KERNEL)))
 		return -ENOMEM;
+
+	if (!(hdev = hci_dev_get(req.dev_id))) {
+		kfree(cl);
+		return -ENODEV;
+	}
+
 	ci = cl->conn_info;
 
 	hci_dev_lock_bh(hdev);
@@ -381,20 +384,21 @@ int hci_get_conn_list(unsigned long arg)
 		(ci + n)->out   = c->out;
 		(ci + n)->state = c->state;
 		(ci + n)->link_mode = c->link_mode;
-		n++;
+		if (++n >= req.conn_num)
+			break;
 	}
 	hci_dev_unlock_bh(hdev);
 
 	cl->dev_id = hdev->id;
 	cl->conn_num = n;
-	size = n * sizeof(struct hci_conn_info) + sizeof(req);
+	size = sizeof(req) + n * sizeof(*ci);
 
 	hci_dev_put(hdev);
 
-	copy_to_user((void *) arg, cl, size);
+	err = copy_to_user((void *) arg, cl, size);
 	kfree(cl);
 
-	return 0;
+	return err ? -EFAULT : 0;
 }
 
 int hci_get_conn_info(struct hci_dev *hdev, unsigned long arg)
@@ -405,9 +409,6 @@ int hci_get_conn_info(struct hci_dev *hdev, unsigned long arg)
 	char *ptr = (void *) arg + sizeof(req);
 
 	if (copy_from_user(&req, (void *) arg, sizeof(req)))
-		return -EFAULT;
-
-	if (verify_area(VERIFY_WRITE, ptr, sizeof(ci)))
 		return -EFAULT;
 
 	hci_dev_lock_bh(hdev);
@@ -425,6 +426,5 @@ int hci_get_conn_info(struct hci_dev *hdev, unsigned long arg)
 	if (!conn)
 		return -ENOENT;
 
-	copy_to_user(ptr, &ci, sizeof(ci));
-	return 0;
+	return copy_to_user(ptr, &ci, sizeof(ci)) ? -EFAULT : 0;
 }

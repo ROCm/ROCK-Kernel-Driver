@@ -743,9 +743,8 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		if (TASK_SIZE - len >= addr &&
 		    (!vma || addr + len <= vma->vm_start))
 			return addr;
-	} else
-		addr = mm->free_area_cache;
-	start_addr = addr;
+	}
+	start_addr = addr = mm->free_area_cache;
 
 full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
