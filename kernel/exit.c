@@ -681,21 +681,25 @@ asmlinkage long sys_exit(int error_code)
  */
 asmlinkage long sys_exit_group(int error_code)
 {
-	struct signal_struct *sig = current->sig;
+	unsigned int exit_code = (error_code & 0xff) << 8;
 
-	spin_lock_irq(&sig->siglock);
-	if (sig->group_exit) {
+	if (!list_empty(&current->thread_group)) {
+		struct signal_struct *sig = current->sig;
+
+		spin_lock_irq(&sig->siglock);
+		if (sig->group_exit) {
+			spin_unlock_irq(&sig->siglock);
+
+			/* another thread was faster: */
+			do_exit(sig->group_exit_code);
+		}
+		sig->group_exit = 1;
+		sig->group_exit_code = exit_code;
+		__broadcast_thread_group(current, SIGKILL);
 		spin_unlock_irq(&sig->siglock);
-
-		/* another thread was faster: */
-		do_exit(sig->group_exit_code);
 	}
-	sig->group_exit = 1;
-	sig->group_exit_code = (error_code & 0xff) << 8;
-	__broadcast_thread_group(current, SIGKILL);
-	spin_unlock_irq(&sig->siglock);
 
-	do_exit(sig->group_exit_code);
+	do_exit(exit_code);
 }
 
 static int eligible_child(pid_t pid, int options, task_t *p)
