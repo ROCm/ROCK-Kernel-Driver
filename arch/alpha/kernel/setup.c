@@ -38,8 +38,9 @@
 #include <linux/sysrq.h>
 #include <linux/reboot.h>
 #endif
-
 #include <linux/notifier.h>
+#include <asm/io.h>
+
 extern struct notifier_block *panic_notifier_list;
 static int alpha_panic_event(struct notifier_block *, unsigned long, void *);
 static struct notifier_block alpha_panic_block = {
@@ -63,6 +64,11 @@ static struct notifier_block alpha_panic_block = {
 
 struct hwrpb_struct *hwrpb;
 unsigned long srm_hae;
+
+int alpha_l1i_cacheshape;
+int alpha_l1d_cacheshape;
+int alpha_l2_cacheshape;
+int alpha_l3_cacheshape;
 
 #ifdef CONFIG_VERBOSE_MCHECK
 /* 0=minimum, 1=verbose, 2=all */
@@ -113,6 +119,7 @@ static struct alpha_machine_vector *get_sysvec(unsigned long, unsigned long,
 static struct alpha_machine_vector *get_sysvec_byname(const char *);
 static void get_sysnames(unsigned long, unsigned long, unsigned long,
 			 char **, char **);
+static void determine_cpu_caches (unsigned int);
 
 static char command_line[COMMAND_LINE_SIZE];
 char saved_command_line[COMMAND_LINE_SIZE];
@@ -672,6 +679,9 @@ setup_arch(char **cmdline_p)
 	/* Find our memory.  */
 	setup_memory(kernel_end);
 
+	/* First guess at cpu cache sizes.  Do this before init_arch.  */
+	determine_cpu_caches(cpu->type);
+
 	/* Initialize the machine.  Usually has to do with setting up
 	   DMA windows and the like.  */
 	if (alpha_mv.init_arch)
@@ -1156,6 +1166,18 @@ get_nr_processors(struct percpu_struct *cpubase, unsigned long num)
 	return count;
 }
 
+static void
+show_cache_size (struct seq_file *f, const char *which, int shape)
+{
+	if (shape == -1)
+		seq_printf (f, "%s\t\t: n/a\n", which);
+	else if (shape == 0)
+		seq_printf (f, "%s\t\t: unknown\n", which);
+	else
+		seq_printf (f, "%s\t\t: %dK, %d-way, %db line\n",
+			    which, shape >> 10, shape & 15,
+			    1 << ((shape >> 4) & 15));
+}
 
 static int
 show_cpuinfo(struct seq_file *f, void *slot)
@@ -1229,7 +1251,200 @@ show_cpuinfo(struct seq_file *f, void *slot)
 		       num_online_cpus(), cpu_present_mask);
 #endif
 
+	show_cache_size (f, "L1 Icache", alpha_l1i_cacheshape);
+	show_cache_size (f, "L1 Dcache", alpha_l1d_cacheshape);
+	show_cache_size (f, "L2 cache", alpha_l2_cacheshape);
+	show_cache_size (f, "L3 cache", alpha_l3_cacheshape);
+
 	return 0;
+}
+
+static int __init
+read_mem_block(int *addr, int stride, int size)
+{
+	long nloads = size / stride, cnt, tmp;
+
+	__asm__ __volatile__(
+	"	rpcc    %0\n"
+	"1:	ldl	%3,0(%2)\n"
+	"	subq	%1,1,%1\n"
+	/* Next two XORs introduce an explicit data dependency between
+	   consecutive loads in the loop, which will give us true load
+	   latency. */
+	"	xor	%3,%2,%2\n"
+	"	xor	%3,%2,%2\n"
+	"	addq	%2,%4,%2\n"
+	"	bne	%1,1b\n"
+	"	rpcc	%3\n"
+	"	subl	%3,%0,%0\n"
+	: "=&r" (cnt), "=&r" (nloads), "=&r" (addr), "=&r" (tmp)
+	: "r" (stride), "1" (nloads), "2" (addr));
+
+	return cnt / (size / stride);
+}
+
+#define CSHAPE(totalsize, linesize, assoc) \
+  ((totalsize & ~0xff) | (linesize << 4) | assoc)
+
+/* ??? EV5 supports up to 64M, but did the systems with more than
+   16M of BCACHE ever exist? */
+#define MAX_BCACHE_SIZE	16*1024*1024
+
+/* Note that the offchip caches are direct mapped on all Alphas. */
+static int __init
+external_cache_probe(int minsize, int width)
+{
+	int cycles, prev_cycles = 1000000;
+	int stride = 1 << width;
+	long size = minsize, maxsize = MAX_BCACHE_SIZE * 2;
+
+	if (maxsize > (max_low_pfn + 1) << PAGE_SHIFT)
+		maxsize = 1 << (floor_log2(max_low_pfn + 1) + PAGE_SHIFT);
+
+	/* Get the first block cached. */
+	read_mem_block(__va(0), stride, size);
+
+	while (size < maxsize) {
+		/* Get an average load latency in cycles. */
+		cycles = read_mem_block(__va(0), stride, size);
+		if (cycles > prev_cycles * 2) {
+			/* Fine, we exceed the cache. */
+			printk("%ldK Bcache detected; load hit latency %d "
+			       "cycles, load miss latency %d cycles\n",
+			       size >> 11, prev_cycles, cycles);
+			return CSHAPE(size >> 1, width, 1);
+		}
+		/* Try to get the next block cached. */
+		read_mem_block(__va(size), stride, size);
+		prev_cycles = cycles;
+		size <<= 1;
+	}
+	return -1;	/* No BCACHE found. */
+}
+
+static void __init
+determine_cpu_caches (unsigned int cpu_type)
+{
+	int L1I, L1D, L2, L3;
+
+	switch (cpu_type) {
+	case EV4_CPU:
+	case EV45_CPU:
+	  {
+		if (cpu_type == EV4_CPU)
+			L1I = CSHAPE(8*1024, 5, 1);
+		else
+			L1I = CSHAPE(16*1024, 5, 1);
+		L1D = L1I;
+		L3 = -1;
+	
+		/* BIU_CTL is a write-only Abox register.  PALcode has a
+		   shadow copy, and may be available from some versions
+		   of the CSERVE PALcall.  If we can get it, then
+
+			unsigned long biu_ctl, size;
+			size = 128*1024 * (1 << ((biu_ctl >> 28) & 7));
+			L2 = CSHAPE (size, 5, 1);
+
+		   Unfortunately, we can't rely on that.
+		*/
+		L2 = external_cache_probe(128*1024, 5);
+		break;
+	  }
+
+	case LCA4_CPU:
+	  {
+		unsigned long car, size;
+
+		L1I = L1D = CSHAPE(8*1024, 5, 1);
+		L3 = -1;
+
+		car = *(vuip) phys_to_virt (0x120000078);
+		size = 64*1024 * (1 << ((car >> 5) & 7));
+		/* No typo -- 8 byte cacheline size.  Whodathunk.  */
+		L2 = (car & 1 ? CSHAPE (size, 3, 1) : -1);
+		break;
+	  }
+
+	case EV5_CPU:
+	case EV56_CPU:
+	  {
+		unsigned long sc_ctl, width;
+
+		L1I = L1D = CSHAPE(8*1024, 5, 1);
+
+		/* Check the line size of the Scache.  */
+		sc_ctl = *(vulp) phys_to_virt (0xfffff000a8);
+		width = sc_ctl & 0x1000 ? 6 : 5;
+		L2 = CSHAPE (96*1024, width, 3);
+
+		/* BC_CONTROL and BC_CONFIG are write-only IPRs.  PALcode
+		   has a shadow copy, and may be available from some versions
+		   of the CSERVE PALcall.  If we can get it, then
+
+			unsigned long bc_control, bc_config, size;
+			size = 1024*1024 * (1 << ((bc_config & 7) - 1));
+			L3 = (bc_control & 1 ? CSHAPE (size, width, 1) : -1);
+
+		   Unfortunately, we can't rely on that.
+		*/
+		L3 = external_cache_probe(1024*1024, width);
+		break;
+	  }
+
+	case PCA56_CPU:
+	case PCA57_CPU:
+	  {
+		unsigned long cbox_config, size;
+
+		if (cpu_type == PCA56_CPU) {
+			L1I = CSHAPE(16*1024, 6, 1);
+			L1D = CSHAPE(8*1024, 5, 1);
+		} else {
+			L1I = CSHAPE(32*1024, 6, 2);
+			L1D = CSHAPE(16*1024, 5, 1);
+		}
+		L3 = -1;
+
+		cbox_config = *(vulp) phys_to_virt (0xfffff00008);
+		size = 512*1024 * (1 << ((cbox_config >> 12) & 3));
+
+#if 0
+		L2 = ((cbox_config >> 31) & 1 ? CSHAPE (size, 6, 1) : -1);
+#else
+		L2 = external_cache_probe(512*1024, 6);
+#endif
+		break;
+	  }
+
+	case EV6_CPU:
+	case EV67_CPU:
+	case EV68CB_CPU:
+	case EV68AL_CPU:
+	case EV68CX_CPU:
+	case EV69_CPU:
+		L1I = L1D = CSHAPE(64*1024, 6, 2);
+		L2 = external_cache_probe(1024*1024, 6);
+		L3 = -1;
+		break;
+
+	case EV7_CPU:
+	case EV79_CPU:
+		L1I = L1D = CSHAPE(64*1024, 6, 2);
+		L2 = CSHAPE(7*1024*1024/4, 6, 7);
+		L3 = -1;
+		break;
+
+	default:
+		/* Nothing known about this cpu type.  */
+		L1I = L1D = L2 = L3 = 0;
+		break;
+	}
+
+	alpha_l1i_cacheshape = L1I;
+	alpha_l1d_cacheshape = L1D;
+	alpha_l2_cacheshape = L2;
+	alpha_l3_cacheshape = L3;
 }
 
 /*
@@ -1260,9 +1475,8 @@ struct seq_operations cpuinfo_op = {
 };
 
 
-static int alpha_panic_event(struct notifier_block *this,
-			     unsigned long event,
-			     void *ptr)
+static int
+alpha_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
 #if 1
 	/* FIXME FIXME FIXME */

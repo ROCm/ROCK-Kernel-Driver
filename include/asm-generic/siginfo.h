@@ -26,6 +26,15 @@ typedef union sigval {
 #define __ARCH_SI_UID_T	uid_t
 #endif
 
+/*
+ * The default "si_band" type is "long", as specified by POSIX.
+ * However, some architectures want to override this to "int"
+ * for historical compatibility reasons, so we allow that.
+ */
+#ifndef __ARCH_SI_BAND_T
+#define __ARCH_SI_BAND_T long
+#endif
+
 #ifndef HAVE_ARCH_SIGINFO_T
 
 typedef struct siginfo {
@@ -77,7 +86,7 @@ typedef struct siginfo {
 
 		/* SIGPOLL */
 		struct {
-			long _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
+			__ARCH_SI_BAND_T _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
 			int _fd;
 		} _sigpoll;
 	} _sifields;

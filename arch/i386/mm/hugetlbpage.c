@@ -532,6 +532,7 @@ unsigned long hugetlb_total_pages(void)
 {
 	return htlbzone_pages * (HPAGE_SIZE / PAGE_SIZE);
 }
+EXPORT_SYMBOL(hugetlb_total_pages);
 
 /*
  * We cannot handle pagefaults against hugetlb pages at all.  They cause

@@ -860,6 +860,7 @@ finish_tlb_load:
 	lis	r13, tlb_44x_index@ha
 	lwz	r14, tlb_44x_index@l(r13)
 	/* Load the TLB high watermark */
+	lis	r13, tlb_44x_hwater@ha
 	lwz	r11, tlb_44x_hwater@l(r13)
 
 	/* Increment, rollover, and store TLB index */
@@ -869,6 +870,7 @@ finish_tlb_load:
 	li	r14, 0
 7:
 	/* Store the next available TLB index */
+	lis	r13, tlb_44x_index@ha
 	stw	r14, tlb_44x_index@l(r13)
 
 	lwz	r13, 0(r12)			/* Get MS word of PTE */

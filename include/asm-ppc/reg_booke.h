@@ -55,8 +55,6 @@ do {						\
 
 /* Special Purpose Registers (SPRNs)*/
 #define SPRN_DECAR	0x036	/* Decrementer Auto Reload Register */
-#define SPRN_CSRR0	0x03A	/* Critical Save and Restore Register 0 */
-#define SPRN_CSRR1	0x03B	/* Critical Save and Restore Register 1 */
 #define SPRN_IVPR	0x03F	/* Interrupt Vector Prefix Register */
 #define SPRN_USPRG0	0x100	/* User Special Purpose Register General 0 */
 #define SPRN_SPRG4R	0x104	/* Special Purpose Register General 4 Read */
@@ -108,6 +106,8 @@ do {						\
  */
 #ifdef CONFIG_BOOKE
 #define SPRN_PID	0x030	/* Process ID */
+#define SPRN_CSRR0	0x03A	/* Critical Save and Restore Register 0 */
+#define SPRN_CSRR1	0x03B	/* Critical Save and Restore Register 1 */
 #define SPRN_DEAR	0x03D	/* Data Error Address Register */
 #define SPRN_ESR	0x03E	/* Exception Syndrome Register */
 #define SPRN_PIR	0x11E	/* Processor Identification Register */

@@ -1,4 +1,4 @@
-/* $Id: divasmain.c,v 1.52 2004/03/21 17:26:01 armin Exp $
+/* $Id: divasmain.c,v 1.54 2004/04/02 18:59:22 armin Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -41,7 +41,7 @@
 #include "diva_dma.h"
 #include "diva_pci.h"
 
-static char *main_revision = "$Revision: 1.52 $";
+static char *main_revision = "$Revision: 1.54 $";
 
 static int major;
 
@@ -594,11 +594,6 @@ int diva_os_schedule_soft_isr(diva_os_soft_isr_t * psoft_isr)
 
 int diva_os_cancel_soft_isr(diva_os_soft_isr_t * psoft_isr)
 {
-	if (psoft_isr && psoft_isr->object) {
-		diva_os_thread_dpc_t *pdpc =
-		    (diva_os_thread_dpc_t *) psoft_isr->object;
-		tasklet_kill(&pdpc->divas_task);
-	}
 	return (0);
 }
 
