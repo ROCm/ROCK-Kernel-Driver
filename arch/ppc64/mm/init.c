@@ -534,7 +534,9 @@ arch_initcall(mmu_context_init);
  */
 void __init mm_init_ppc64(void)
 {
+#ifndef CONFIG_PPC_ISERIES
 	unsigned long i;
+#endif
 
 	ppc64_boot_msg(0x100, "MM Init");
 
