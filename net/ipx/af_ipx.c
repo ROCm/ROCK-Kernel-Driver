@@ -2009,8 +2009,8 @@ drop:	kfree_skb(skb);
 out:	return ret;
 }
 
-static int ipx_sendmsg(struct socket *sock, struct msghdr *msg, int len,
-	struct scm_cookie *scm)
+static int ipx_sendmsg(struct kiocb *iocb, struct socket *sock,
+	struct msghdr *msg, int len, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct ipx_opt *ipxs = ipx_sk(sk);
@@ -2069,8 +2069,8 @@ out:	return ret;
 }
 
 
-static int ipx_recvmsg(struct socket *sock, struct msghdr *msg, int size,
-		int flags, struct scm_cookie *scm)
+static int ipx_recvmsg(struct kiocb *iocb, struct socket *sock,
+		struct msghdr *msg, int size, int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct ipx_opt *ipxs = ipx_sk(sk);

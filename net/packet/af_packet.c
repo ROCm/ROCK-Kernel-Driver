@@ -288,7 +288,8 @@ oom:
  *	protocol layers and you must therefore supply it with a complete frame
  */
  
-static int packet_sendmsg_spkt(struct socket *sock, struct msghdr *msg, int len,
+static int packet_sendmsg_spkt(struct kiocb *iocb, struct socket *sock,
+			       struct msghdr *msg, int len,
 			       struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
@@ -665,8 +666,8 @@ ring_is_full:
 #endif
 
 
-static int packet_sendmsg(struct socket *sock, struct msghdr *msg, int len,
-			  struct scm_cookie *scm)
+static int packet_sendmsg(struct kiocb *iocb, struct socket *sock,
+			  struct msghdr *msg, int len, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_ll *saddr=(struct sockaddr_ll *)msg->msg_name;
@@ -1020,7 +1021,8 @@ out:
  *	If necessary we block.
  */
 
-static int packet_recvmsg(struct socket *sock, struct msghdr *msg, int len,
+static int packet_recvmsg(struct kiocb *iocb, struct socket *sock,
+			  struct msghdr *msg, int len,
 			  int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;

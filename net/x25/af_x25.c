@@ -916,8 +916,8 @@ out_clear_request:
 	goto out;
 }
 
-static int x25_sendmsg(struct socket *sock, struct msghdr *msg, int len,
-		       struct scm_cookie *scm)
+static int x25_sendmsg(struct kiocb *iocb, struct socket *sock,
+		       struct msghdr *msg, int len, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct x25_opt *x25 = x25_sk(sk);
@@ -1091,7 +1091,8 @@ out_kfree_skb:
 }
 
 
-static int x25_recvmsg(struct socket *sock, struct msghdr *msg, int size,
+static int x25_recvmsg(struct kiocb *iocb, struct socket *sock,
+		       struct msghdr *msg, int size,
 		       int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;

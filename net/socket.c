@@ -90,10 +90,10 @@
 #include <linux/netfilter.h>
 
 static int sock_no_open(struct inode *irrelevant, struct file *dontcare);
-static ssize_t sock_read(struct file *file, char *buf,
-			 size_t size, loff_t *ppos);
-static ssize_t sock_write(struct file *file, const char *buf,
-			  size_t size, loff_t *ppos);
+static ssize_t sock_aio_read(struct kiocb *iocb, char *buf,
+			 size_t size, loff_t pos);
+static ssize_t sock_aio_write(struct kiocb *iocb, char *buf,
+			  size_t size, loff_t pos);
 static int sock_mmap(struct file *file, struct vm_area_struct * vma);
 
 static int sock_close(struct inode *inode, struct file *file);
@@ -117,8 +117,8 @@ static ssize_t sock_sendpage(struct file *file, struct page *page,
 
 static struct file_operations socket_file_ops = {
 	.llseek =	no_llseek,
-	.read =		sock_read,
-	.write =	sock_write,
+	.aio_read =	sock_aio_read,
+	.aio_write =	sock_aio_write,
 	.poll =		sock_poll,
 	.ioctl =	sock_ioctl,
 	.mmap =		sock_mmap,
@@ -517,64 +517,100 @@ void sock_release(struct socket *sock)
 	sock->file=NULL;
 }
 
-int sock_sendmsg(struct socket *sock, struct msghdr *msg, int size)
+static int __sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int size)
 {
+	struct sock_iocb *si = kiocb_to_siocb(iocb);
 	int err;
-	struct scm_cookie scm;
 
-	err = scm_send(sock, msg, &scm);
+	si->scm = &si->async_scm;
+	si->sock = sock;
+	si->msg = msg;
+	si->size = size;
+
+	err = scm_send(sock, msg, si->scm);
 	if (err >= 0) {
-		err = sock->ops->sendmsg(sock, msg, size, &scm);
-		scm_destroy(&scm);
+		err = sock->ops->sendmsg(iocb, sock, msg, size, si->scm);
+		if (-EIOCBQUEUED != err)
+			scm_destroy(si->scm);
 	}
 	return err;
 }
 
-int sock_recvmsg(struct socket *sock, struct msghdr *msg, int size, int flags)
+int sock_sendmsg(struct socket *sock, struct msghdr *msg, int size)
 {
-	struct scm_cookie scm;
+	struct kiocb iocb;
+	int ret;
 
-	memset(&scm, 0, sizeof(scm));
+	init_sync_kiocb(&iocb, NULL);
+	ret = __sock_sendmsg(&iocb, sock, msg, size);
+	if (-EIOCBQUEUED == ret)
+		ret = wait_on_sync_kiocb(&iocb);
+	return ret;
+}
 
-	size = sock->ops->recvmsg(sock, msg, size, flags, &scm);
+
+int __sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int size, int flags)
+{
+	struct sock_iocb *si = kiocb_to_siocb(iocb);
+
+	si->sock = sock;
+	si->scm = &si->async_scm;
+	si->sock = sock;
+	si->msg = msg;
+	si->size = size;
+	si->flags = flags;
+
+	memset(si->scm, 0, sizeof(*si->scm));
+
+	size = sock->ops->recvmsg(iocb, sock, msg, size, flags, si->scm);
 	if (size >= 0)
-		scm_recv(sock, msg, &scm, flags);
+		scm_recv(sock, msg, si->scm, flags);
 
 	return size;
 }
 
+int sock_recvmsg(struct socket *sock, struct msghdr *msg, int size, int flags)
+{
+	struct kiocb iocb;
+	int ret;
+
+        init_sync_kiocb(&iocb, NULL);
+	ret = __sock_recvmsg(&iocb, sock, msg, size, flags);
+	if (-EIOCBQUEUED == ret)
+		ret = wait_on_sync_kiocb(&iocb);
+	return ret;
+}
 
 /*
  *	Read data from a socket. ubuf is a user mode pointer. We make sure the user
  *	area ubuf...ubuf+size-1 is writable before asking the protocol.
  */
 
-static ssize_t sock_read(struct file *file, char *ubuf,
-			 size_t size, loff_t *ppos)
+static ssize_t sock_aio_read(struct kiocb *iocb, char *ubuf,
+			 size_t size, loff_t pos)
 {
+	struct sock_iocb *x = kiocb_to_siocb(iocb);
 	struct socket *sock;
-	struct iovec iov;
-	struct msghdr msg;
 	int flags;
 
-	if (ppos != &file->f_pos)
+	if (pos != 0)
 		return -ESPIPE;
 	if (size==0)		/* Match SYS5 behaviour */
 		return 0;
 
-	sock = SOCKET_I(file->f_dentry->d_inode); 
+	sock = SOCKET_I(iocb->ki_filp->f_dentry->d_inode); 
 
-	msg.msg_name=NULL;
-	msg.msg_namelen=0;
-	msg.msg_iov=&iov;
-	msg.msg_iovlen=1;
-	msg.msg_control=NULL;
-	msg.msg_controllen=0;
-	iov.iov_base=ubuf;
-	iov.iov_len=size;
-	flags = !(file->f_flags & O_NONBLOCK) ? 0 : MSG_DONTWAIT;
+	x->async_msg.msg_name = NULL;
+	x->async_msg.msg_namelen = 0;
+	x->async_msg.msg_iov = &x->async_iov;
+	x->async_msg.msg_iovlen = 1;
+	x->async_msg.msg_control = NULL;
+	x->async_msg.msg_controllen = 0;
+	x->async_iov.iov_base = ubuf;
+	x->async_iov.iov_len = size;
+	flags = !(iocb->ki_filp->f_flags & O_NONBLOCK) ? 0 : MSG_DONTWAIT;
 
-	return sock_recvmsg(sock, &msg, size, flags);
+	return __sock_recvmsg(iocb, sock, &x->async_msg, size, flags);
 }
 
 
@@ -583,33 +619,32 @@ static ssize_t sock_read(struct file *file, char *ubuf,
  *	is readable by the user process.
  */
 
-static ssize_t sock_write(struct file *file, const char *ubuf,
-			  size_t size, loff_t *ppos)
+static ssize_t sock_aio_write(struct kiocb *iocb, char *ubuf,
+			  size_t size, loff_t pos)
 {
+	struct sock_iocb *x = kiocb_to_siocb(iocb);
 	struct socket *sock;
-	struct msghdr msg;
-	struct iovec iov;
 	
-	if (ppos != &file->f_pos)
+	if (pos != 0)
 		return -ESPIPE;
 	if(size==0)		/* Match SYS5 behaviour */
 		return 0;
 
-	sock = SOCKET_I(file->f_dentry->d_inode); 
+	sock = SOCKET_I(iocb->ki_filp->f_dentry->d_inode); 
 
-	msg.msg_name=NULL;
-	msg.msg_namelen=0;
-	msg.msg_iov=&iov;
-	msg.msg_iovlen=1;
-	msg.msg_control=NULL;
-	msg.msg_controllen=0;
-	msg.msg_flags=!(file->f_flags & O_NONBLOCK) ? 0 : MSG_DONTWAIT;
+	x->async_msg.msg_name = NULL;
+	x->async_msg.msg_namelen = 0;
+	x->async_msg.msg_iov = &x->async_iov;
+	x->async_msg.msg_iovlen = 1;
+	x->async_msg.msg_control = NULL;
+	x->async_msg.msg_controllen = 0;
+	x->async_msg.msg_flags = !(iocb->ki_filp->f_flags & O_NONBLOCK) ? 0 : MSG_DONTWAIT;
 	if (sock->type == SOCK_SEQPACKET)
-		msg.msg_flags |= MSG_EOR;
-	iov.iov_base=(void *)ubuf;
-	iov.iov_len=size;
+		x->async_msg.msg_flags |= MSG_EOR;
+	x->async_iov.iov_base = (void *)ubuf;
+	x->async_iov.iov_len = size;
 	
-	return sock_sendmsg(sock, &msg, size);
+	return __sock_sendmsg(iocb, sock, &x->async_msg, size);
 }
 
 ssize_t sock_sendpage(struct file *file, struct page *page,

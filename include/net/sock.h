@@ -51,6 +51,7 @@
 
 #include <asm/atomic.h>
 #include <net/dst.h>
+#include <net/scm.h>	/* for sock_iocb */
 
 /*
  * This structure really needs to be cleaned up.
@@ -242,9 +243,10 @@ struct proto {
 	int			(*getsockopt)(struct sock *sk, int level, 
 					int optname, char *optval, 
 					int *option);  	 
-	int			(*sendmsg)(struct sock *sk, struct msghdr *msg,
-					   int len);
-	int			(*recvmsg)(struct sock *sk, struct msghdr *msg,
+	int			(*sendmsg)(struct kiocb *iocb, struct sock *sk,
+					   struct msghdr *msg, int len);
+	int			(*recvmsg)(struct kiocb *iocb, struct sock *sk,
+					   struct msghdr *msg,
 					int len, int noblock, int flags, 
 					int *addr_len);
 	int			(*bind)(struct sock *sk, 
@@ -292,7 +294,29 @@ static __inline__ void sock_prot_dec_use(struct proto *prot)
 #define SOCK_BINDADDR_LOCK	4
 #define SOCK_BINDPORT_LOCK	8
 
+/* sock_iocb: used to kick off async processing of socket ios */
+struct sock_iocb {
+	struct list_head	list;
 
+	int			flags;
+	int			size;
+	struct socket		*sock;
+	struct sock		*sk;
+	struct msghdr		*msg, async_msg;
+	struct iovec		async_iov;
+	struct scm_cookie	*scm, async_scm;
+};
+
+static inline struct sock_iocb *kiocb_to_siocb(struct kiocb *iocb)
+{
+	BUG_ON(sizeof(struct sock_iocb) > KIOCB_PRIVATE_SIZE);
+	return (struct sock_iocb *)iocb->private;
+}
+
+static inline struct kiocb *siocb_to_kiocb(struct sock_iocb *si)
+{
+	return container_of((void *)si, struct kiocb, private);
+}
 
 /* Used by processes to "lock" a socket state, so that
  * interrupts and bottom half handlers won't change it
@@ -390,10 +414,10 @@ extern int			sock_no_getsockopt(struct socket *, int , int,
 						   char *, int *);
 extern int			sock_no_setsockopt(struct socket *, int, int,
 						   char *, int);
-extern int                      sock_no_sendmsg(struct socket *,
+extern int                      sock_no_sendmsg(struct kiocb *, struct socket *,
 						struct msghdr *, int,
 						struct scm_cookie *);
-extern int                      sock_no_recvmsg(struct socket *,
+extern int                      sock_no_recvmsg(struct kiocb *, struct socket *,
 						struct msghdr *, int, int,
 						struct scm_cookie *);
 extern int			sock_no_mmap(struct file *file,
