@@ -1271,12 +1271,6 @@ static inline int uhci_submit_interrupt(struct uhci_hcd *uhci, struct urb *urb, 
 }
 
 /*
- * Bulk and interrupt use common result
- */
-#define uhci_result_bulk uhci_result_common
-#define uhci_result_interrupt uhci_result_common
-
-/*
  * Isochronous transfers
  */
 static int isochronous_find_limits(struct uhci_hcd *uhci, struct urb *urb, unsigned int *start, unsigned int *end)
@@ -1537,11 +1531,9 @@ static void uhci_transfer_result(struct uhci_hcd *uhci, struct urb *urb)
 	case PIPE_CONTROL:
 		ret = uhci_result_control(uhci, urb);
 		break;
-	case PIPE_INTERRUPT:
-		ret = uhci_result_interrupt(uhci, urb);
-		break;
 	case PIPE_BULK:
-		ret = uhci_result_bulk(uhci, urb);
+	case PIPE_INTERRUPT:
+		ret = uhci_result_common(uhci, urb);
 		break;
 	case PIPE_ISOCHRONOUS:
 		ret = uhci_result_isochronous(uhci, urb);
