@@ -100,8 +100,6 @@ void __init smp4d_callin(void)
 	 * the SMP initialization the master will be just allowed
 	 * to call the scheduler code.
 	 */
-	init_idle();
-
 	/* Get our local ticker going. */
 	smp_setup_percpu_timer();
 
