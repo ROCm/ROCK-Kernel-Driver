@@ -249,7 +249,8 @@ e1000_set_pauseparam(struct net_device *netdev,
 			e1000_reset(adapter);
 	}
 	else
-		return e1000_force_mac_fc(hw);
+		return ((hw->media_type == e1000_media_type_fiber) ?
+			e1000_setup_link(hw) : e1000_force_mac_fc(hw));
 	
 	return 0;
 }
@@ -592,6 +593,9 @@ e1000_set_ringparam(struct net_device *netdev,
 	tx_old = adapter->tx_ring;
 	rx_old = adapter->rx_ring;
 
+	if ((ring->rx_mini_pending) || (ring->rx_jumbo_pending)) 
+		return -EINVAL;
+
 	if(netif_running(adapter->netdev))
 		e1000_down(adapter);
 
@@ -636,7 +640,6 @@ err_setup_rx:
 	e1000_up(adapter);
 	return err;
 }
-
 
 #define REG_PATTERN_TEST(R, M, W)                                              \
 {                                                                              \
@@ -1017,8 +1020,8 @@ e1000_setup_desc_rings(struct e1000_adapter *adapter)
 		struct e1000_rx_desc *rx_desc = E1000_RX_DESC(*rxdr, i);
 		struct sk_buff *skb;
 
-		if(!(skb = alloc_skb(E1000_RXBUFFER_2048 + NET_IP_ALIGN,
-				     GFP_KERNEL))) {
+		if(!(skb = alloc_skb(E1000_RXBUFFER_2048 + NET_IP_ALIGN, 
+				GFP_KERNEL))) {
 			ret_val = 6;
 			goto err_nomem;
 		}
@@ -1442,6 +1445,8 @@ e1000_get_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 	case E1000_DEV_ID_82543GC_COPPER:
 	case E1000_DEV_ID_82544EI_FIBER:
 	case E1000_DEV_ID_82546EB_QUAD_COPPER:
+	case E1000_DEV_ID_82545EM_FIBER:
+	case E1000_DEV_ID_82545EM_COPPER:
 		wol->supported = 0;
 		wol->wolopts   = 0;
 		return;
