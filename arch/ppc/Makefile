@@ -22,9 +22,6 @@ CPP		= $(CC) -E $(CFLAGS)
 
 cflags-$(CONFIG_4xx)		+= -Wa,-m405
 cflags-$(CONFIG_PPC64BRIDGE)	+= -Wa,-mppc64bridge
-# Use sed to remove the quotes.
-cflags-$(CONFIG_MORE_COMPILE_OPTIONS) += \
-	$(shell echo $(CONFIG_COMPILE_OPTIONS) | sed -e 's/"//g')
 
 CFLAGS += $(cflags-y)
 

@@ -32,7 +32,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
 #include "pdc202xx_new.h"
 
 #define PDC202_DEBUG_CABLE	0

@@ -2600,7 +2600,7 @@ static int trident_ioctl(struct inode *inode, struct file *file, unsigned int cm
 static int trident_open(struct inode *inode, struct file *file)
 {
 	int i = 0;
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct trident_card *card = devs;
 	struct trident_state *state = NULL;
 	struct dmabuf *dmabuf = NULL;
@@ -3883,7 +3883,7 @@ static int ali_write_proc(struct file *file, const char *buffer, unsigned long c
 static int trident_open_mixdev(struct inode *inode, struct file *file)
 {
 	int i = 0;
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct trident_card *card = devs;
 
 	for (card = devs; card != NULL; card = card->next)

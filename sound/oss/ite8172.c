@@ -867,7 +867,7 @@ static loff_t it8172_llseek(struct file *file, loff_t offset, int origin)
 
 static int it8172_open_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = iminor(inode);
 	struct list_head *list;
 	struct it8172_state *s;
 
@@ -1771,7 +1771,7 @@ static int it8172_ioctl(struct inode *inode, struct file *file,
 
 static int it8172_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = iminor(inode);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct list_head *list;

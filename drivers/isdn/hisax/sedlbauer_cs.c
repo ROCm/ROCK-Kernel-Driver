@@ -647,7 +647,6 @@ static void __exit exit_sedlbauer_cs(void)
 
 	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
-		del_timer(&dev_list->release);
 		if (dev_list->state & DEV_CONFIG)
 			sedlbauer_release(dev_list);
 		sedlbauer_detach(dev_list);

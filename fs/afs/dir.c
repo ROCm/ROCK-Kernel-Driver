@@ -569,7 +569,7 @@ static int afs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 			spin_lock(&AFS_FS_I(inode)->lock);
 			AFS_FS_I(inode)->flags |= AFS_VNODE_DELETED;
 			spin_unlock(&AFS_FS_I(inode)->lock);
-			invalidate_inode_pages(inode->i_mapping);
+			invalidate_remote_inode(inode);
 			goto out_bad;
 		}
 

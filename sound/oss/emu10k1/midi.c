@@ -86,7 +86,7 @@ static int midiin_add_buffer(struct emu10k1_mididevice *midi_dev, struct midi_hd
 
 static int emu10k1_midi_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct emu10k1_card *card = NULL;
 	struct emu10k1_mididevice *midi_dev;
 	struct list_head *entry;

@@ -1124,7 +1124,7 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 	   to get the index of the ieee1394_driver
 	   we want */
 
-	blocknum = (minor(inode->i_rdev) >> 4) & 0xF;
+	blocknum = (iminor(inode) >> 4) & 0xF;
 
 	/* look up the driver */
 

@@ -41,7 +41,6 @@
 #include <linux/ide.h>
 #include <linux/init.h>
 
-#include "ide_modes.h"
 #include "triflex.h"
 
 static struct pci_dev *triflex_dev;

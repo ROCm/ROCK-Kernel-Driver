@@ -161,8 +161,6 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#include "ide_modes.h"
-
 
 /* default maximum number of failures */
 #define IDE_DEFAULT_MAX_FAILURES 	1
@@ -180,7 +178,9 @@ static int initializing;	/* set while initializing built-in drivers */
 DECLARE_MUTEX(ide_cfg_sem);
 spinlock_t ide_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
+#ifdef CONFIG_BLK_DEV_IDEPCI
 static int ide_scan_direction; /* THIS was formerly 2.2.x pci=reverse */
+#endif
 
 #ifdef CONFIG_IDEDMA_AUTO
 int noautodma = 0;
@@ -190,11 +190,7 @@ int noautodma = 1;
 
 EXPORT_SYMBOL(noautodma);
 
-/*
- * ide_modules keeps track of the available IDE chipset/probe/driver modules.
- */
-ide_module_t *ide_chipsets;
-ide_module_t *ide_probe;
+int (*ide_probe)(void);
 
 /*
  * This is declared extern in ide.h, for access by other IDE modules:
@@ -452,7 +448,7 @@ void ide_probe_module (void)
 		(void) request_module("ide-probe-mod");
 #endif /* (CONFIG_KMOD) && (CONFIG_BLK_DEV_IDE_MODULE) */
 	} else {
-		(void) ide_probe->init();
+		(void)ide_probe();
 	}
 }
 
@@ -1046,21 +1042,6 @@ found:
 EXPORT_SYMBOL(ide_register_hw);
 
 /*
- * Compatibility function with existing drivers.  If you want
- * something different, use the function above.
- */
-int ide_register (int arg1, int arg2, int irq)
-{
-	hw_regs_t hw;
-	ide_init_hwif_ports(&hw, (unsigned long) arg1, (unsigned long) arg2, NULL);
-	hw.irq = irq;
-	return ide_register_hw(&hw, NULL);
-}
-
-EXPORT_SYMBOL(ide_register);
-
-
-/*
  *	Locks for IDE setting functionality
  */
 
@@ -1534,15 +1515,12 @@ int ata_attach(ide_drive_t *drive)
 
 EXPORT_SYMBOL(ata_attach);
 
-int generic_ide_suspend(struct device *dev, u32 state, u32 level)
+static int generic_ide_suspend(struct device *dev, u32 state)
 {
 	ide_drive_t *drive = dev->driver_data;
 	struct request rq;
 	struct request_pm_state rqpm;
 	ide_task_t args;
-
-	if (level == dev->power_state || level != SUSPEND_SAVE_STATE)
-		return 0;
 
 	memset(&rq, 0, sizeof(rq));
 	memset(&rqpm, 0, sizeof(rqpm));
@@ -1556,17 +1534,12 @@ int generic_ide_suspend(struct device *dev, u32 state, u32 level)
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
-EXPORT_SYMBOL(generic_ide_suspend);
-
-int generic_ide_resume(struct device *dev, u32 level)
+static int generic_ide_resume(struct device *dev)
 {
 	ide_drive_t *drive = dev->driver_data;
 	struct request rq;
 	struct request_pm_state rqpm;
 	ide_task_t args;
-
-	if (level == dev->power_state || level != RESUME_RESTORE_STATE)
-		return 0;
 
 	memset(&rq, 0, sizeof(rq));
 	memset(&rqpm, 0, sizeof(rqpm));
@@ -1579,8 +1552,6 @@ int generic_ide_resume(struct device *dev, u32 level)
 
 	return ide_do_drive_cmd(drive, &rq, ide_head_wait);
 }
-
-EXPORT_SYMBOL(generic_ide_resume);
 
 int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 			unsigned long arg)
@@ -1668,11 +1639,15 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 
 		case HDIO_SCAN_HWIF:
 		{
+			hw_regs_t hw;
 			int args[3];
 			if (!capable(CAP_SYS_RAWIO)) return -EACCES;
 			if (copy_from_user(args, (void *)arg, 3 * sizeof(int)))
 				return -EFAULT;
-			if (ide_register(args[0], args[1], args[2]) == -1)
+			ide_init_hwif_ports(&hw, (unsigned long) args[0],
+					    (unsigned long) args[1], NULL);
+			hw.irq = args[2];
+			if (ide_register_hw(&hw, NULL) == -1)
 				return -EIO;
 			return 0;
 		}
@@ -2594,6 +2569,8 @@ EXPORT_SYMBOL(ide_probe);
 
 struct bus_type ide_bus_type = {
 	.name		= "ide",
+	.suspend	= generic_ide_suspend,
+	.resume		= generic_ide_resume,
 };
 
 /*

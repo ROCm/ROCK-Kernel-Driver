@@ -225,14 +225,13 @@ xmon_map_scc(void)
 static int scc_initialized = 0;
 
 void xmon_init_scc(void);
-extern void pmu_poll(void);
 extern void cuda_poll(void);
 
 static inline void do_poll_adb(void)
 {
 #ifdef CONFIG_ADB_PMU
 	if (sys_ctrler == SYS_CTRLER_PMU)
-		pmu_poll();
+		pmu_poll_adb();
 #endif /* CONFIG_ADB_PMU */
 #ifdef CONFIG_ADB_CUDA
 	if (sys_ctrler == SYS_CTRLER_CUDA)

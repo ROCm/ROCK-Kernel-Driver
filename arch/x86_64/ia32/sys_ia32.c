@@ -1170,8 +1170,6 @@ sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 *uinfo)
 	return ret;
 }
 
-extern void check_pending(int signum);
-
 asmlinkage long sys_utimes(char *, struct timeval *);
 
 asmlinkage long

@@ -1068,7 +1068,7 @@ void wakeup_kswapd(struct zone *zone)
 	wake_up_interruptible(&zone->zone_pgdat->kswapd_wait);
 }
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_PM
 /*
  * Try to free `nr_pages' of memory, system-wide.  Returns the number of freed
  * pages.

@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/cpufreq.h>
 #include <linux/init.h>
+#include <linux/sysdev.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
 #include <asm/irq.h>
@@ -31,12 +32,16 @@
 #include <asm/cputable.h>
 #include <asm/time.h>
 
+/* WARNING !!! This will cause calibrate_delay() to be called,
+ * but this is an __init function ! So you MUST go edit
+ * init/main.c to make it non-init before enabling DEBUG_FREQ
+ */
 #undef DEBUG_FREQ
 
 extern void low_choose_750fx_pll(int pll);
 extern void low_sleep_handler(void);
-extern void openpic_sleep_save_intrs(void);
-extern void openpic_sleep_restore_intrs(void);
+extern void openpic_suspend(struct sys_device *sysdev, u32 state);
+extern void openpic_resume(struct sys_device *sysdev);
 extern void enable_kernel_altivec(void);
 extern void enable_kernel_fp(void);
 
@@ -116,10 +121,7 @@ pmu_set_cpu_speed(unsigned int low_speed)
 	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));	
 #endif
 	/* Disable all interrupt sources on openpic */
-	openpic_sleep_save_intrs();
-
-	/* Make sure the PMU is idle */
-	pmu_suspend();
+	openpic_suspend(NULL, 1);
 
 	/* Make sure the decrementer won't interrupt us */
 	asm volatile("mtdec %0" : : "r" (0x7fffffff));
@@ -153,11 +155,16 @@ pmu_set_cpu_speed(unsigned int low_speed)
 	pmu_request(&req, NULL, 6, PMU_CPU_SPEED, 'W', 'O', 'O', 'F', low_speed);
 	while (!req.complete)
 		pmu_poll();
-	
-	pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,1,1);
 
+	/* Prepare the northbridge for the speed transition */
+	pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,1,1);
+	
+	/* Call low level code to backup CPU state and recover from
+	 * hardware reset
+	 */
 	low_sleep_handler();
 	
+	/* Restore the northbridge */
 	pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,1,0);
 
 	/* Restore L2 cache */
@@ -174,13 +181,14 @@ pmu_set_cpu_speed(unsigned int low_speed)
 	printk(KERN_DEBUG "HID1, after: %x\n", mfspr(SPRN_HID1));	
 #endif
 
+	/* Restore low level PMU operations */
+	pmu_unlock();
+
 	/* Restore decrementer */
 	wakeup_decrementer();
 
 	/* Restore interrupts */
-	openpic_sleep_restore_intrs();
-
-	pmu_resume();
+	openpic_resume(NULL);
 
 	/* Let interrupts flow again ... */
 	local_irq_enable();
@@ -195,12 +203,15 @@ pmu_set_cpu_speed(unsigned int low_speed)
 static int __pmac
 do_set_cpu_speed(int speed_mode)
 {
-	struct cpufreq_freqs    freqs;
+	struct cpufreq_freqs freqs;
 	int rc;
 	
 	freqs.old = cur_freq;
 	freqs.new = (speed_mode == PMAC_CPU_HIGH_SPEED) ? hi_freq : low_freq;
 	freqs.cpu = smp_processor_id();
+
+	if (freqs.old == freqs.new)
+		return 0;
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 	if (cpufreq_uses_pmu)
@@ -275,7 +286,10 @@ pmac_cpufreq_setup(void)
 	struct device_node	*cpunode;
 	u32			*value;
 	int			has_freq_ctl = 0;
-	
+       
+	if (strstr(cmd_line, "nocpufreq"))
+		return 0;
+
 	/* Assume only one CPU */
 	cpunode = find_type_devices("cpu");
 	if (!cpunode)

@@ -1013,7 +1013,6 @@ void __init mp_config_acpi_legacy_irqs (void)
 			panic("Max # of irq sources exceeded!\n");
 	}
 }
-#endif	/* CONFIG_X86_IO_APIC */
 
 #ifdef	CONFIG_ACPI
 
@@ -1150,5 +1149,5 @@ void __init mp_parse_prt (void)
 }
 
 #endif /*CONFIG_ACPI_PCI*/
-
+#endif	/* CONFIG_X86_IO_APIC */
 #endif /*CONFIG_ACPI_BOOT*/

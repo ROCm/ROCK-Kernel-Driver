@@ -924,7 +924,7 @@ asmlinkage int solaris_putmsg(unsigned int fd, u32 arg1, u32 arg2, u32 arg3)
 	if (!ino) goto out;
 
 	if (!ino->i_sock &&
-		(major(ino->i_rdev) != 30 || minor(ino->i_rdev) != 1))
+		(imajor(ino) != 30 || iminor(ino) != 1))
 		goto out;
 
 	ctlptr = (struct strbuf *)A(arg1);

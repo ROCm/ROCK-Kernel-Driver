@@ -109,21 +109,15 @@ default_init(struct task_struct *task, void *buf, unsigned int flags, int cpu, v
 }
 
 static int
-default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct pt_regs *regs)
+default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct pt_regs *regs, unsigned long stamp)
 {
 	pfm_default_smpl_hdr_t *hdr;
 	pfm_default_smpl_entry_t *ent;
 	void *cur, *last;
 	unsigned long *e;
-	unsigned long ovfl_mask;
-	unsigned long ovfl_notify;
-	unsigned long stamp;
 	unsigned int npmds, i;
-
-	/*
-	 * some time stamp
-	 */
-	stamp = ia64_get_itc();
+	unsigned char ovfl_pmd;
+	unsigned char ovfl_notify;
 
 	if (unlikely(buf == NULL || arg == NULL|| regs == NULL || task == NULL)) {
 		DPRINT(("[%d] invalid arguments buf=%p arg=%p\n", task->pid, buf, arg));
@@ -133,8 +127,8 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	hdr         = (pfm_default_smpl_hdr_t *)buf;
 	cur         = hdr->hdr_cur_pos;
 	last        = hdr->hdr_last_pos;
-	ovfl_mask   = arg->ovfl_pmds[0];
-	ovfl_notify = arg->ovfl_notify[0];
+	ovfl_pmd    = arg->ovfl_pmd;
+	ovfl_notify = arg->ovfl_notify;
 
 	/*
 	 * check for space against largest possibly entry.
@@ -153,12 +147,12 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 
 	hdr->hdr_count++;
 
-	DPRINT_ovfl(("[%d] count=%lu cur=%p last=%p free_bytes=%lu ovfl_pmds=0x%lx ovfl_notify=0x%lx npmds=%u\n",
+	DPRINT_ovfl(("[%d] count=%lu cur=%p last=%p free_bytes=%lu ovfl_pmd=%d ovfl_notify=%d npmds=%u\n",
 			task->pid,
 			hdr->hdr_count,
 			cur, last,
 			last-cur,
-			ovfl_mask,
+			ovfl_pmd,
 			ovfl_notify, npmds));
 
 	/*
@@ -172,7 +166,7 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	 * 	- this is not necessarily the task controlling the session
 	 */
 	ent->pid            = current->pid;
-	ent->cpu            = smp_processor_id();
+	ent->ovfl_pmd  	    = ovfl_pmd;
 	ent->last_reset_val = arg->pmd_last_reset; //pmd[0].reg_last_reset_val;
 
 	/*
@@ -180,13 +174,9 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	 */
 	ent->ip = regs->cr_iip | ((regs->cr_ipsr >> 41) & 0x3);
 
-	/*
-	 * which registers overflowed
-	 */
-	ent->ovfl_pmds = ovfl_mask;
 	ent->tstamp    = stamp;
+	ent->cpu       = smp_processor_id();
 	ent->set       = arg->active_set;
-	ent->reserved1 = 0;
 
 	/*
 	 * selectively store PMDs in increasing index number
@@ -206,14 +196,14 @@ default_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg, struct
 	/*
 	 * keep same ovfl_pmds, ovfl_notify
 	 */
-	arg->ovfl_ctrl.notify_user     = 0;
-	arg->ovfl_ctrl.block           = 0;
-	arg->ovfl_ctrl.stop_monitoring = 0;
-	arg->ovfl_ctrl.reset_pmds      = 1;
+	arg->ovfl_ctrl.bits.notify_user     = 0;
+	arg->ovfl_ctrl.bits.block_task      = 0;
+	arg->ovfl_ctrl.bits.mask_monitoring = 0;
+	arg->ovfl_ctrl.bits.reset_ovfl_pmds = 1; /* reset before returning from interrupt handler */
 
 	return 0;
 full:
-	DPRINT_ovfl(("sampling buffer full free=%lu, count=%lu, ovfl_notify=0x%lx\n", last-cur, hdr->hdr_count, ovfl_notify));
+	DPRINT_ovfl(("sampling buffer full free=%lu, count=%lu, ovfl_notify=%d\n", last-cur, hdr->hdr_count, ovfl_notify));
 
 	/*
 	 * increment number of buffer overflow.
@@ -222,22 +212,21 @@ full:
 	hdr->hdr_overflows++;
 
 	/*
-	 * if no notification is needed, then we just reset the buffer index.
+	 * if no notification is needed, then we saturate the buffer
 	 */
-	if (ovfl_notify == 0UL) {
+	if (ovfl_notify == 0) {
 		hdr->hdr_count = 0UL;
-		arg->ovfl_ctrl.notify_user     = 0;
-		arg->ovfl_ctrl.block           = 0;
-		arg->ovfl_ctrl.stop_monitoring = 0;
-		arg->ovfl_ctrl.reset_pmds      = 1;
+		arg->ovfl_ctrl.bits.notify_user     = 0;
+		arg->ovfl_ctrl.bits.block_task      = 0;
+		arg->ovfl_ctrl.bits.mask_monitoring = 1;
+		arg->ovfl_ctrl.bits.reset_ovfl_pmds = 0;
 	} else {
-		/* keep same ovfl_pmds, ovfl_notify */
-		arg->ovfl_ctrl.notify_user     = 1;
-		arg->ovfl_ctrl.block           = 1;
-		arg->ovfl_ctrl.stop_monitoring = 1;
-		arg->ovfl_ctrl.reset_pmds      = 0;
+		arg->ovfl_ctrl.bits.notify_user     = 1;
+		arg->ovfl_ctrl.bits.block_task      = 1; /* ignored for non-blocking context */
+		arg->ovfl_ctrl.bits.mask_monitoring = 1;
+		arg->ovfl_ctrl.bits.reset_ovfl_pmds = 0; /* no reset now */
 	}
-	return 0;
+	return -1; /* we are full, sorry */
 }
 
 static int
@@ -250,8 +239,8 @@ default_restart(struct task_struct *task, pfm_ovfl_ctrl_t *ctrl, void *buf, stru
 	hdr->hdr_count   = 0UL;
 	hdr->hdr_cur_pos = (void *)((unsigned long)buf)+sizeof(*hdr);
 
-	ctrl->stop_monitoring = 0;
-	ctrl->reset_pmds      = PFM_PMD_LONG_RESET;
+	ctrl->bits.mask_monitoring = 0;
+	ctrl->bits.reset_ovfl_pmds = 1; /* uses long-reset values */
 
 	return 0;
 }
@@ -264,15 +253,16 @@ default_exit(struct task_struct *task, void *buf, struct pt_regs *regs)
 }
 
 static pfm_buffer_fmt_t default_fmt={
-	.fmt_name 	= "default_format",
-	.fmt_uuid	= PFM_DEFAULT_SMPL_UUID,
-	.fmt_arg_size	= sizeof(pfm_default_smpl_arg_t),
-	.fmt_validate	= default_validate,
-	.fmt_getsize	= default_get_size,
-	.fmt_init	= default_init,
-	.fmt_handler	= default_handler,
-	.fmt_restart	= default_restart,
-	.fmt_exit	= default_exit,
+ 	.fmt_name 	    = "default_format",
+ 	.fmt_uuid	    = PFM_DEFAULT_SMPL_UUID,
+ 	.fmt_arg_size	    = sizeof(pfm_default_smpl_arg_t),
+ 	.fmt_validate	    = default_validate,
+ 	.fmt_getsize	    = default_get_size,
+ 	.fmt_init	    = default_init,
+ 	.fmt_handler	    = default_handler,
+ 	.fmt_restart	    = default_restart,
+ 	.fmt_restart_active = default_restart,
+ 	.fmt_exit	    = default_exit,
 };
 
 static int __init

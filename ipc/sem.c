@@ -664,7 +664,7 @@ static int semctl_main(int semid, int semnum, int cmd, int version, union semun 
 		for (un = sma->undo; un; un = un->id_next)
 			un->semadj[semnum] = 0;
 		curr->semval = val;
-		curr->sempid = current->pid;
+		curr->sempid = current->tgid;
 		sma->sem_ctime = get_seconds();
 		/* maybe some queued-up processes were waiting for this */
 		update_queue(sma);
@@ -1052,7 +1052,7 @@ retry_undos:
 	if (error)
 		goto out_unlock_free;
 
-	error = try_atomic_semop (sma, sops, nsops, un, current->pid);
+	error = try_atomic_semop (sma, sops, nsops, un, current->tgid);
 	if (error <= 0)
 		goto update;
 
@@ -1064,7 +1064,7 @@ retry_undos:
 	queue.sops = sops;
 	queue.nsops = nsops;
 	queue.undo = un;
-	queue.pid = current->pid;
+	queue.pid = current->tgid;
 	queue.id = semid;
 	if (alter)
 		append_to_queue(sma ,&queue);
@@ -1206,7 +1206,7 @@ found:
 				sem->semval += u->semadj[i];
 				if (sem->semval < 0)
 					sem->semval = 0; /* shouldn't happen */
-				sem->sempid = current->pid;
+				sem->sempid = current->tgid;
 			}
 		}
 		sma->sem_otime = get_seconds();

@@ -2106,11 +2106,11 @@ static int sq_open(struct inode *inode, struct file *file)
 	 */
 	cs4218_ctl_write(cs4218_control);
 
-	sound.minDev = MINOR(inode->i_rdev) & 0x0f;
+	sound.minDev = iminor(inode) & 0x0f;
 	sound.soft = sound.dsp;
 	sound.hard = sound.dsp;
 	sound_init();
-	if ((MINOR(inode->i_rdev) & 0x0f) == SND_DEV_AUDIO) {
+	if ((iminor(inode) & 0x0f) == SND_DEV_AUDIO) {
 		sound_set_speed(8000);
 		sound_set_stereo(0);
 		sound_set_format(AFMT_MU_LAW);

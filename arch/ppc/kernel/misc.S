@@ -1380,3 +1380,4 @@ _GLOBAL(sys_call_table)
 	.long sys_utimes
 	.long sys_statfs64
 	.long sys_fstatfs64
+	.long ppc_fadvise64_64

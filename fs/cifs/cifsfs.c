@@ -42,12 +42,17 @@
 #include <linux/mm.h>
 #define CIFS_MAGIC_NUMBER 0xFF534D42	/* the first four bytes of all SMB PDUs */
 
+#ifdef CIFS_QUOTA
+static struct quotactl_ops cifs_quotactl_ops;
+#endif
+
 extern struct file_system_type cifs_fs_type;
 
 int cifsFYI = 0;
 int cifsERROR = 1;
 int traceSMB = 0;
 unsigned int oplockEnabled = 1;
+unsigned int quotaEnabled = 0;
 unsigned int lookupCacheEnabled = 1;
 unsigned int multiuser_mount = 0;
 unsigned int extended_security = 0;
@@ -92,7 +97,9 @@ cifs_read_super(struct super_block *sb, void *data,
 	sb->s_op = &cifs_super_ops;
 /*	if(cifs_sb->tcon->ses->server->maxBuf > MAX_CIFS_HDR_SIZE + 512)
 	    sb->s_blocksize = cifs_sb->tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE; */
-
+#ifdef CIFS_QUOTA
+	sb->s_qcop = &cifs_quotactl_ops;
+#endif
 	sb->s_blocksize = CIFS_MAX_MSGSIZE;
 	sb->s_blocksize_bits = 14;	/* default 2**14 = CIFS_MAX_MSGSIZE */
 	inode = iget(sb, ROOT_I);
@@ -246,6 +253,110 @@ cifs_show_options(struct seq_file *s, struct vfsmount *m)
 	}
 	return 0;
 }
+
+#ifdef CIFS_QUOTA
+int cifs_xquota_set(struct super_block * sb, int quota_type, qid_t qid,
+		struct fs_disk_quota * pdquota)
+{
+	int xid;
+	int rc = 0;
+	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
+	struct cifsTconInfo *pTcon;
+	
+	if(cifs_sb)
+		pTcon = cifs_sb->tcon;
+	else
+		return -EIO;
+
+
+	xid = GetXid();
+	if(pTcon) {
+		cFYI(1,("set type: 0x%x id: %d",quota_type,qid));		
+	} else {
+		return -EIO;
+	}
+
+	FreeXid(xid);
+	return rc;
+}
+
+int cifs_xquota_get(struct super_block * sb, int quota_type, qid_t qid,
+                struct fs_disk_quota * pdquota)
+{
+	int xid;
+	int rc = 0;
+	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
+	struct cifsTconInfo *pTcon;
+
+	if(cifs_sb)
+		pTcon = cifs_sb->tcon;
+	else
+		return -EIO;
+
+	xid = GetXid();
+	if(pTcon) {
+                cFYI(1,("set type: 0x%x id: %d",quota_type,qid));
+	} else {
+		rc = -EIO;
+	}
+
+	FreeXid(xid);
+	return rc;
+}
+
+int cifs_xstate_set(struct super_block * sb, unsigned int flags, int operation)
+{
+	int xid; 
+	int rc = 0;
+	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
+	struct cifsTconInfo *pTcon;
+
+	if(cifs_sb)
+		pTcon = cifs_sb->tcon;
+	else
+		return -EIO;
+
+	xid = GetXid();
+	if(pTcon) {
+                cFYI(1,("flags: 0x%x operation: 0x%x",flags,operation));
+	} else {
+		rc = -EIO;
+	}
+
+	FreeXid(xid);
+	return rc;
+}
+
+int cifs_xstate_get(struct super_block * sb, struct fs_quota_stat *qstats)
+{
+	int xid;
+	int rc = 0;
+	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
+	struct cifsTconInfo *pTcon;
+
+	if(cifs_sb) {
+		pTcon = cifs_sb->tcon;
+	} else {
+		return -EIO;
+	}
+	xid = GetXid();
+	if(pTcon) {
+		cFYI(1,("pqstats %p",qstats));		
+	} else {
+		rc = -EIO;
+	}
+
+	FreeXid(xid);
+	return rc;
+}
+
+static struct quotactl_ops cifs_quotactl_ops = {
+	.set_xquota	= cifs_xquota_set,
+	.get_xquota	= cifs_xquota_set,
+	.set_xstate	= cifs_xstate_set,
+	.get_xstate	= cifs_xstate_get,
+};
+#endif
 
 struct super_operations cifs_super_ops = {
 	.read_inode = cifs_read_inode,
@@ -487,10 +598,12 @@ static int cifs_oplock_thread(void * dummyarg)
 				netfid = oplock_item->netfid;
 				DeleteOplockQEntry(oplock_item);
 				write_unlock(&GlobalMid_Lock);
-				rc = filemap_fdatawrite(inode->i_mapping);
-				if(rc)
-					CIFS_I(inode)->write_behind_rc 
-						= rc;
+				if (S_ISREG(inode->i_mode))
+					rc = filemap_fdatawrite(inode->i_mapping);
+				else
+					rc = 0;
+				if (rc)
+					CIFS_I(inode)->write_behind_rc = rc;
 				cFYI(1,("Oplock flush inode %p rc %d",inode,rc));
 				rc = CIFSSMBLock(0, pTcon, netfid,
 					0 /* len */ , 0 /* offset */, 0, 

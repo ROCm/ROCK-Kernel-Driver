@@ -654,7 +654,7 @@ static int emu10k1_mixer_ioctl(struct inode *inode, struct file *file, unsigned 
 
 static int emu10k1_mixer_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	struct emu10k1_card *card = NULL;
 	struct list_head *entry;
 

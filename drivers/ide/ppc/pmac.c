@@ -5,7 +5,7 @@
  * These IDE interfaces are memory-mapped and have a DBDMA channel
  * for doing DMA.
  *
- *  Copyright (C) 1998-2001 Paul Mackerras & Ben. Herrenschmidt
+ *  Copyright (C) 1998-2003 Paul Mackerras & Ben. Herrenschmidt
  *
  *  This program is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -16,6 +16,11 @@
  *
  *  Copyright (c) 1995-1998  Mark Lord
  *
+ * TODO: - Use pre-calculated (kauai) timing tables all the time and
+ * get rid of the "rounded" tables used previously, so we have the
+ * same table format for all controllers and can then just have one
+ * big table
+ * 
  */
 #include <linux/config.h>
 #include <linux/types.h>
@@ -27,6 +32,8 @@
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/pci.h>
+#include <linux/adb.h>
+#include <linux/pmu.h>
 
 #include <asm/prom.h>
 #include <asm/io.h>
@@ -38,26 +45,27 @@
 #include <asm/pmac_feature.h>
 #include <asm/sections.h>
 #include <asm/irq.h>
-#ifdef CONFIG_PMAC_PBOOK
-#include <linux/adb.h>
-#include <linux/pmu.h>
-#endif
-#include "ide_modes.h"
+
+#include "ide-timing.h"
 
 extern void ide_do_request(ide_hwgroup_t *hwgroup, int masked_irq);
 
 #define IDE_PMAC_DEBUG
 
-#define DMA_WAIT_TIMEOUT	500
+#define DMA_WAIT_TIMEOUT	100
 
 typedef struct pmac_ide_hwif {
 	unsigned long			regbase;
 	int				irq;
 	int				kind;
 	int				aapl_bus_id;
+	int				cable_80 : 1;
+	int				mediabay : 1;
+	int				broken_dma : 1;
+	int				broken_dma_warn : 1;
 	struct device_node*		node;
-	u32				timings[2];
-	int				index;
+	struct macio_dev		*mdev;
+	u32				timings[4];
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	/* Those fields are duplicating what is in hwif. We currently
 	 * can't use the hwif ones because of some assumptions that are
@@ -82,7 +90,15 @@ enum {
 	controller_heathrow,	/* Heathrow/Paddington */
 	controller_kl_ata3,	/* KeyLargo ATA-3 */
 	controller_kl_ata4,	/* KeyLargo ATA-4 */
-	controller_kl_ata4_80	/* KeyLargo ATA-4 with 80 conductor cable */
+	controller_un_ata6	/* UniNorth2 ATA-6 */
+};
+
+static const char* model_name[] = {
+	"OHare ATA",		/* OHare based */
+	"Heathrow ATA",		/* Heathrow/Paddington */
+	"KeyLargo ATA-3",	/* KeyLargo ATA-3 */
+	"KeyLargo ATA-4",	/* KeyLargo ATA-4 */
+	"UniNorth ATA-6"	/* UniNorth2 ATA-6 */
 };
 
 /*
@@ -90,6 +106,11 @@ enum {
  */
 #define IDE_TIMING_CONFIG	0x200
 #define IDE_INTERRUPT		0x300
+
+/* Kauai (U2) ATA has different register setup */
+#define IDE_KAUAI_PIO_CONFIG	0x200
+#define IDE_KAUAI_ULTRA_CONFIG	0x210
+#define IDE_KAUAI_POLL_CONFIG	0x220
 
 /*
  * Timing configuration register definitions
@@ -100,6 +121,28 @@ enum {
 #define SYSCLK_TICKS_66(t)	(((t) + IDE_SYSCLK_66_NS - 1) / IDE_SYSCLK_66_NS)
 #define IDE_SYSCLK_NS		30	/* 33Mhz cell */
 #define IDE_SYSCLK_66_NS	15	/* 66Mhz cell */
+
+/* 100Mhz cell, found in Uninorth 2. I don't have much infos about
+ * this one yet, it appears as a pci device (106b/0033) on uninorth
+ * internal PCI bus and it's clock is controlled like gem or fw. It
+ * appears to be an evolution of keylargo ATA4 with a timing register
+ * extended to 2 32bits registers and a similar DBDMA channel. Other
+ * registers seem to exist but I can't tell much about them.
+ * 
+ * So far, I'm using pre-calculated tables for this extracted from
+ * the values used by the MacOS X driver.
+ * 
+ * The "PIO" register controls PIO and MDMA timings, the "ULTRA"
+ * register controls the UDMA timings. At least, it seems bit 0
+ * of this one enables UDMA vs. MDMA, and bits 4..7 are the
+ * cycle time in units of 10ns. Bits 8..15 are used by I don't
+ * know their meaning yet
+ */
+#define TR_100_PIOREG_PIO_MASK		0xff000fff
+#define TR_100_PIOREG_MDMA_MASK		0x00fff000
+#define TR_100_UDMAREG_UDMA_MASK	0x0000ffff
+#define TR_100_UDMAREG_UDMA_EN		0x00000001
+
 
 /* 66Mhz cell, found in KeyLargo. Can do ultra mode 0 to 2 on
  * 40 connector cable and to 4 on 80 connector one.
@@ -115,8 +158,7 @@ enum {
  *    well, despite a comment that would lead to think it has a
  *    min value of 45ns.
  * Apple also add 60ns to the write data setup (or cycle time ?) on
- * reads. I can't explain that, I tried it and it broke everything
- * here.
+ * reads.
  */
 #define TR_66_UDMA_MASK			0xfff00000
 #define TR_66_UDMA_EN			0x00100000 /* Enable Ultra mode for DMA */
@@ -220,12 +262,12 @@ struct mdma_timings_t mdma_timings_66[] __pmacdata =
     {   0,   0,   0 }
 };
 
-/* Ultra DMA timings (rounded) */
+/* KeyLargo ATA-4 Ultra DMA timings (rounded) */
 struct {
 	int	addrSetup; /* ??? */
 	int	rdy2pause;
 	int	wrDataSetup;
-} udma_timings[] __pmacdata =
+} kl66_udma_timings[] __pmacdata =
 {
     {   0, 180,  120 },	/* Mode 0 */
     {   0, 150,  90 },	/*      1 */
@@ -233,6 +275,63 @@ struct {
     {   0, 90,   45 },	/*      3 */
     {   0, 90,   30 }	/*      4 */
 };
+
+/* UniNorth 2 ATA/100 timings */
+struct kauai_timing {
+	int	cycle_time;
+	u32	timing_reg;
+};
+
+static struct kauai_timing	kauai_pio_timings[] __pmacdata =
+{
+	{ 930	, 0x08000fff },
+	{ 600	, 0x08000a92 },
+	{ 383	, 0x0800060f },
+	{ 360	, 0x08000492 },
+	{ 330	, 0x0800048f },
+	{ 300	, 0x080003cf },
+	{ 270	, 0x080003cc },
+	{ 240	, 0x0800038b },
+	{ 239	, 0x0800030c },
+	{ 180	, 0x05000249 },
+	{ 120	, 0x04000148 }
+};
+
+static struct kauai_timing	kauai_mdma_timings[] __pmacdata =
+{
+	{ 1260	, 0x00fff000 },
+	{ 480	, 0x00618000 },
+	{ 360	, 0x00492000 },
+	{ 270	, 0x0038e000 },
+	{ 240	, 0x0030c000 },
+	{ 210	, 0x002cb000 },
+	{ 180	, 0x00249000 },
+	{ 150	, 0x00209000 },
+	{ 120	, 0x00148000 },
+	{ 0	, 0 },
+};
+
+static struct kauai_timing	kauai_udma_timings[] __pmacdata =
+{
+	{ 120	, 0x000070c0 },
+	{ 90	, 0x00005d80 },
+	{ 60	, 0x00004a60 },
+	{ 45	, 0x00003a50 },
+	{ 30	, 0x00002a30 },
+	{ 20	, 0x00002921 },
+	{ 0	, 0 },
+};
+
+static inline u32
+kauai_lookup_timing(struct kauai_timing* table, int cycle_time)
+{
+	int i;
+	
+	for (i=0; table[i].cycle_time; i++)
+		if (cycle_time > table[i+1].cycle_time)
+			return table[i].timing_reg;
+	return 0;
+}
 
 /* allow up to 256 DBDMA commands per xfer */
 #define MAX_DCMDS		256
@@ -242,24 +341,106 @@ struct {
  * NOTE: There is at least one case I know of a disk that needs about 10sec
  *       before anwering on the bus. I beleive we could add a kernel command
  *       line arg to override this delay for such cases.
+ *       
+ * NOTE2: This has to be fixed with a BSY wait loop. I'm working on adding
+ *        that to the generic probe code.
  */
 #define IDE_WAKEUP_DELAY_MS	2000
 
-static void pmac_ide_setup_dma(struct device_node *np, int ix);
-static int pmac_ide_build_dmatable(ide_drive_t *drive, int wr);
+static void pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif);
+static int pmac_ide_build_dmatable(ide_drive_t *drive, struct request *rq);
 static int pmac_ide_tune_chipset(ide_drive_t *drive, u8 speed);
 static void pmac_ide_tuneproc(ide_drive_t *drive, u8 pio);
 static void pmac_ide_selectproc(ide_drive_t *drive);
+static void pmac_ide_kauai_selectproc(ide_drive_t *drive);
 static int pmac_ide_dma_begin (ide_drive_t *drive);
 
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
 
-#ifdef CONFIG_PMAC_PBOOK
-static int idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when);
-struct pmu_sleep_notifier idepmac_sleep_notifier = {
-	idepmac_notify_sleep, SLEEP_LEVEL_BLOCK,
-};
-#endif /* CONFIG_PMAC_PBOOK */
+#ifdef CONFIG_BLK_DEV_IDE_PMAC_BLINK
+
+/* Set to 50ms */
+#define PMU_HD_BLINK_TIME	(HZ/50)
+
+static struct adb_request pmu_blink_on, pmu_blink_off;
+static spinlock_t pmu_blink_lock;
+static unsigned long pmu_blink_stoptime;
+static int pmu_blink_ledstate;
+static struct timer_list pmu_blink_timer;
+static int pmu_ide_blink_enabled;
+
+
+static void
+pmu_hd_blink_timeout(unsigned long data)
+{
+	unsigned long flags;
+	
+	spin_lock_irqsave(&pmu_blink_lock, flags);
+
+	/* We may have been triggered again in a racy way, check
+	 * that we really want to switch it off
+	 */
+	if (time_after(pmu_blink_stoptime, jiffies))
+		goto done;
+
+	/* Previous req. not complete, try 100ms more */
+	if (pmu_blink_off.complete == 0)
+		mod_timer(&pmu_blink_timer, jiffies + PMU_HD_BLINK_TIME);
+	else if (pmu_blink_ledstate) {
+		pmu_request(&pmu_blink_off, NULL, 4, 0xee, 4, 0, 0);
+		pmu_blink_ledstate = 0;
+	}
+done:
+	spin_unlock_irqrestore(&pmu_blink_lock, flags);
+}
+
+static void
+pmu_hd_kick_blink(void *data, int rw)
+{
+	unsigned long flags;
+	
+	pmu_blink_stoptime = jiffies + PMU_HD_BLINK_TIME;
+	wmb();
+	mod_timer(&pmu_blink_timer, pmu_blink_stoptime);
+	if (pmu_blink_ledstate == 1)
+		return;
+	spin_lock_irqsave(&pmu_blink_lock, flags);
+	if (pmu_blink_on.complete && !pmu_blink_ledstate) {
+		pmu_request(&pmu_blink_on, NULL, 4, 0xee, 4, 0, 1);
+		pmu_blink_ledstate = 1;
+	}
+	spin_unlock_irqrestore(&pmu_blink_lock, flags);
+}
+
+static int
+pmu_hd_blink_init(void)
+{
+	struct device_node *dt;
+	const char *model;
+
+	if (pmu_get_model() != PMU_KEYLARGO_BASED)
+		return 0;
+	
+	dt = find_devices("device-tree");
+	if (dt == NULL)
+		return 0;
+	model = (const char *)get_property(dt, "model", NULL);
+	if (model == NULL)
+		return 0;
+	if (strncmp(model, "PowerBook", strlen("PowerBook")) != 0 &&
+	    strncmp(model, "iBook", strlen("iBook")) != 0)
+	    	return 0;
+	
+	pmu_blink_on.complete = 1;
+	pmu_blink_off.complete = 1;
+	spin_lock_init(&pmu_blink_lock);
+	init_timer(&pmu_blink_timer);
+	pmu_blink_timer.function = pmu_hd_blink_timeout;
+
+	return 1;
+}
+
+#endif /* CONFIG_BLK_DEV_IDE_PMAC_BLINK */
 
 /*
  * N.B. this can't be an initfunc, because the media-bay task can
@@ -315,6 +496,41 @@ pmac_ide_selectproc(ide_drive_t *drive)
 	(void)readl((unsigned *)(IDE_DATA_REG+IDE_TIMING_CONFIG));
 }
 
+static void __pmac
+pmac_ide_kauai_selectproc(ide_drive_t *drive)
+{
+	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
+
+	if (pmif == NULL)
+		return;
+
+	if (drive->select.b.unit & 0x01) {
+		writel(pmif->timings[1],
+		       (unsigned *)(IDE_DATA_REG + IDE_KAUAI_PIO_CONFIG));
+		writel(pmif->timings[3],
+		       (unsigned *)(IDE_DATA_REG + IDE_KAUAI_ULTRA_CONFIG));
+	} else {
+		writel(pmif->timings[0],
+		       (unsigned *)(IDE_DATA_REG + IDE_KAUAI_PIO_CONFIG));
+		writel(pmif->timings[2],
+		       (unsigned *)(IDE_DATA_REG + IDE_KAUAI_ULTRA_CONFIG));
+	}
+	(void)readl((unsigned *)(IDE_DATA_REG + IDE_KAUAI_PIO_CONFIG));
+}
+
+static void __pmac
+pmac_ide_do_update_timings(ide_drive_t *drive)
+{
+	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
+
+	if (pmif == NULL)
+		return;
+
+	if (pmif->kind == controller_un_ata6)
+		pmac_ide_kauai_selectproc(drive);
+	else
+		pmac_ide_selectproc(drive);
+}
 
 static int __pmac
 pmac_ide_do_setfeature(ide_drive_t *drive, u8 command)
@@ -322,7 +538,7 @@ pmac_ide_do_setfeature(ide_drive_t *drive, u8 command)
 	ide_hwif_t *hwif = HWIF(drive);
 	int result = 1;
 	
-	disable_irq(hwif->irq);	/* disable_irq_nosync ?? */
+	disable_irq_nosync(hwif->irq);
 	udelay(1);
 	SELECT_DRIVE(drive);
 	SELECT_MASK(drive, 0);
@@ -332,22 +548,22 @@ pmac_ide_do_setfeature(ide_drive_t *drive, u8 command)
 	/* Timeout bumped for some powerbooks */
 	if (wait_for_ready(drive, 2000)) {
 		/* Timeout bumped for some powerbooks */
-		printk(KERN_ERR "pmac_ide_do_setfeature disk not ready "
-			"before SET_FEATURE!\n");
+		printk(KERN_ERR "%s: pmac_ide_do_setfeature disk not ready "
+			"before SET_FEATURE!\n", drive->name);
 		goto out;
 	}
 	udelay(10);
 	hwif->OUTB(drive->ctl | 2, IDE_CONTROL_REG);
 	hwif->OUTB(command, IDE_NSECTOR_REG);
 	hwif->OUTB(SETFEATURES_XFER, IDE_FEATURE_REG);
-	hwif->OUTB(WIN_SETFEATURES, IDE_COMMAND_REG);
+	hwif->OUTBSYNC(drive, WIN_SETFEATURES, IDE_COMMAND_REG);
 	udelay(1);
 	/* Timeout bumped for some powerbooks */
 	result = wait_for_ready(drive, 2000);
 	hwif->OUTB(drive->ctl, IDE_CONTROL_REG);
 	if (result)
-		printk(KERN_ERR "pmac_ide_do_setfeature disk not ready "
-			"after SET_FEATURE !\n");
+		printk(KERN_ERR "%s: pmac_ide_do_setfeature disk not ready "
+			"after SET_FEATURE !\n", drive->name);
 out:
 	SELECT_MASK(drive, 0);
 	if (result == 0) {
@@ -403,21 +619,27 @@ pmac_ide_tuneproc(ide_drive_t *drive, u8 pio)
 	if (pmif == NULL)
 		return;
 		
-	pio = ide_get_best_pio_mode(drive, pio, 4, &d);
-	accessTicks = SYSCLK_TICKS(ide_pio_timings[pio].active_time);
-	if (drive->select.b.unit & 0x01)
-		timings = &pmif->timings[1];
-	else
-		timings = &pmif->timings[0];
+	/* which drive is it ? */
+	timings = &pmif->timings[drive->select.b.unit & 0x01];
 
-	recTime = d.cycle_time - ide_pio_timings[pio].active_time
-			- ide_pio_timings[pio].setup_time;
-	recTime = max(recTime, 150U);
-	accessTime = ide_pio_timings[pio].active_time;
-	accessTime = max(accessTime, 150U);
-	if (pmif->kind == controller_kl_ata4 ||
-		pmif->kind == controller_kl_ata4_80) {
+	pio = ide_get_best_pio_mode(drive, pio, 4, &d);
+
+	switch (pmif->kind) {
+	case controller_un_ata6: {
+		/* 100Mhz cell */
+		u32 tr = kauai_lookup_timing(kauai_pio_timings, d.cycle_time);
+		if (tr == 0)
+			return;
+		*timings = ((*timings) & ~TR_100_PIOREG_PIO_MASK) | tr;
+		break;
+		}
+	case controller_kl_ata4:
 		/* 66Mhz cell */
+		recTime = d.cycle_time - ide_pio_timings[pio].active_time
+				- ide_pio_timings[pio].setup_time;
+		recTime = max(recTime, 150U);
+		accessTime = ide_pio_timings[pio].active_time;
+		accessTime = max(accessTime, 150U);
 		accessTicks = SYSCLK_TICKS_66(accessTime);
 		accessTicks = min(accessTicks, 0x1fU);
 		recTicks = SYSCLK_TICKS_66(recTime);
@@ -425,9 +647,15 @@ pmac_ide_tuneproc(ide_drive_t *drive, u8 pio)
 		*timings = ((*timings) & ~TR_66_PIO_MASK) |
 				(accessTicks << TR_66_PIO_ACCESS_SHIFT) |
 				(recTicks << TR_66_PIO_RECOVERY_SHIFT);
-	} else {
+		break;
+	default: {
 		/* 33Mhz cell */
 		int ebit = 0;
+		recTime = d.cycle_time - ide_pio_timings[pio].active_time
+				- ide_pio_timings[pio].setup_time;
+		recTime = max(recTime, 150U);
+		accessTime = ide_pio_timings[pio].active_time;
+		accessTime = max(accessTime, 150U);
 		accessTicks = SYSCLK_TICKS(accessTime);
 		accessTicks = min(accessTicks, 0x1fU);
 		accessTicks = max(accessTicks, 4U);
@@ -443,26 +671,31 @@ pmac_ide_tuneproc(ide_drive_t *drive, u8 pio)
 				(recTicks << TR_33_PIO_RECOVERY_SHIFT);
 		if (ebit)
 			*timings |= TR_33_PIO_E;
+		break;
+		}
 	}
 
 #ifdef IDE_PMAC_DEBUG
-	printk(KERN_ERR "ide_pmac: Set PIO timing for mode %d, reg: 0x%08x\n",
-		pio,  *timings);
+	printk(KERN_ERR "%s: Set PIO timing for mode %d, reg: 0x%08x\n",
+		drive->name, pio,  *timings);
 #endif	
 
 	if (drive->select.all == HWIF(drive)->INB(IDE_SELECT_REG))
-		pmac_ide_selectproc(drive);
+		pmac_ide_do_update_timings(drive);
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 static int __pmac
-set_timings_udma(u32 *timings, u8 speed)
+set_timings_udma_ata4(u32 *timings, u8 speed)
 {
 	unsigned rdyToPauseTicks, wrDataSetupTicks, addrTicks;
 
-	rdyToPauseTicks = SYSCLK_TICKS_66(udma_timings[speed & 0xf].rdy2pause);
-	wrDataSetupTicks = SYSCLK_TICKS_66(udma_timings[speed & 0xf].wrDataSetup);
-	addrTicks = SYSCLK_TICKS_66(udma_timings[speed & 0xf].addrSetup);
+	if (speed > XFER_UDMA_4)
+		return 1;
+
+	rdyToPauseTicks = SYSCLK_TICKS_66(kl66_udma_timings[speed & 0xf].rdy2pause);
+	wrDataSetupTicks = SYSCLK_TICKS_66(kl66_udma_timings[speed & 0xf].wrDataSetup);
+	addrTicks = SYSCLK_TICKS_66(kl66_udma_timings[speed & 0xf].addrSetup);
 
 	*timings = ((*timings) & ~(TR_66_UDMA_MASK | TR_66_MDMA_MASK)) |
 			(wrDataSetupTicks << TR_66_UDMA_WRDATASETUP_SHIFT) | 
@@ -478,11 +711,29 @@ set_timings_udma(u32 *timings, u8 speed)
 }
 
 static int __pmac
-set_timings_mdma(int intf_type, u32 *timings, u8 speed, int drive_cycle_time)
+set_timings_udma_ata6(u32 *pio_timings, u32 *ultra_timings, u8 speed)
+{
+	struct ide_timing *t = ide_timing_find_mode(speed);
+	u32 tr;
+
+	if (speed > XFER_UDMA_5 || t == NULL)
+		return 1;
+	tr = kauai_lookup_timing(kauai_udma_timings, (int)t->udma);
+	if (tr == 0)
+		return 1;
+	*ultra_timings = ((*ultra_timings) & ~TR_100_UDMAREG_UDMA_MASK) | tr;
+	*ultra_timings = (*ultra_timings) | TR_100_UDMAREG_UDMA_EN;
+
+	return 0;
+}
+
+static int __pmac
+set_timings_mdma(ide_drive_t *drive, int intf_type, u32 *timings, u32 *timings2,
+			u8 speed, int drive_cycle_time)
 {
 	int cycleTime, accessTime, recTime;
 	unsigned accessTicks, recTicks;
-	struct mdma_timings_t* tm;
+	struct mdma_timings_t* tm = NULL;
 	int i;
 
 	/* Get default cycle time for mode */
@@ -491,7 +742,7 @@ set_timings_mdma(int intf_type, u32 *timings, u8 speed, int drive_cycle_time)
 		case 1: cycleTime = 150; break;
 		case 2: cycleTime = 120; break;
 		default:
-			return -1;
+			return 1;
 	}
 	/* Adjust for drive */
 	if (drive_cycle_time && drive_cycle_time > cycleTime)
@@ -501,8 +752,9 @@ set_timings_mdma(int intf_type, u32 *timings, u8 speed, int drive_cycle_time)
 		cycleTime = 150;
 	/* Get the proper timing array for this controller */
 	switch(intf_type) {
+		case controller_un_ata6:
+			break;
 		case controller_kl_ata4:
-		case controller_kl_ata4_80:
 			tm = mdma_timings_66;
 			break;
 		case controller_kl_ata3:
@@ -512,24 +764,36 @@ set_timings_mdma(int intf_type, u32 *timings, u8 speed, int drive_cycle_time)
 			tm = mdma_timings_33;
 			break;
 	}
-	/* Lookup matching access & recovery times */
-	i = -1;
-	for (;;) {
-		if (tm[i+1].cycleTime < cycleTime)
-			break;
-		i++;
-	}
-	if (i < 0)
-		return -1;
-	cycleTime = tm[i].cycleTime;
-	accessTime = tm[i].accessTime;
-	recTime = tm[i].recoveryTime;
+	if (tm != NULL) {
+		/* Lookup matching access & recovery times */
+		i = -1;
+		for (;;) {
+			if (tm[i+1].cycleTime < cycleTime)
+				break;
+			i++;
+		}
+		if (i < 0)
+			return 1;
+		cycleTime = tm[i].cycleTime;
+		accessTime = tm[i].accessTime;
+		recTime = tm[i].recoveryTime;
 
 #ifdef IDE_PMAC_DEBUG
-	printk(KERN_ERR "ide_pmac: MDMA, cycleTime: %d, accessTime: %d, recTime: %d\n",
-		cycleTime, accessTime, recTime);
-#endif	
-	if (intf_type == controller_kl_ata4 || intf_type == controller_kl_ata4_80) {
+		printk(KERN_ERR "%s: MDMA, cycleTime: %d, accessTime: %d, recTime: %d\n",
+			drive->name, cycleTime, accessTime, recTime);
+#endif
+	}
+	switch(intf_type) {
+	case controller_un_ata6: {
+		/* 100Mhz cell */
+		u32 tr = kauai_lookup_timing(kauai_mdma_timings, cycleTime);
+		if (tr == 0)
+			return 1;
+		*timings = ((*timings) & ~TR_100_PIOREG_MDMA_MASK) | tr;
+		*timings2 = (*timings2) & ~TR_100_UDMAREG_UDMA_EN;
+		}
+		break;
+	case controller_kl_ata4:
 		/* 66Mhz cell */
 		accessTicks = SYSCLK_TICKS_66(accessTime);
 		accessTicks = min(accessTicks, 0x1fU);
@@ -541,7 +805,8 @@ set_timings_mdma(int intf_type, u32 *timings, u8 speed, int drive_cycle_time)
 		*timings = ((*timings) & ~(TR_66_MDMA_MASK | TR_66_UDMA_MASK)) |
 			(accessTicks << TR_66_MDMA_ACCESS_SHIFT) |
 			(recTicks << TR_66_MDMA_RECOVERY_SHIFT);
-	} else if (intf_type == controller_kl_ata3) {
+		break;
+	case controller_kl_ata3:
 		/* 33Mhz cell on KeyLargo */
 		accessTicks = SYSCLK_TICKS(accessTime);
 		accessTicks = max(accessTicks, 1U);
@@ -553,7 +818,8 @@ set_timings_mdma(int intf_type, u32 *timings, u8 speed, int drive_cycle_time)
 		*timings = ((*timings) & ~TR_33_MDMA_MASK) |
 				(accessTicks << TR_33_MDMA_ACCESS_SHIFT) |
 				(recTicks << TR_33_MDMA_RECOVERY_SHIFT);
-	} else {
+		break;
+	default: {
 		/* 33Mhz cell on others */
 		int halfTick = 0;
 		int origAccessTime = accessTime;
@@ -578,10 +844,11 @@ set_timings_mdma(int intf_type, u32 *timings, u8 speed, int drive_cycle_time)
 				(recTicks << TR_33_MDMA_RECOVERY_SHIFT);
 		if (halfTick)
 			*timings |= TR_33_MDMA_HALFTICK;
+		}
 	}
 #ifdef IDE_PMAC_DEBUG
-	printk(KERN_ERR "ide_pmac: Set MDMA timing for mode %d, reg: 0x%08x\n",
-		speed & 0xf,  *timings);
+	printk(KERN_ERR "%s: Set MDMA timing for mode %d, reg: 0x%08x\n",
+		drive->name, speed & 0xf,  *timings);
 #endif	
 	return 0;
 }
@@ -591,36 +858,42 @@ set_timings_mdma(int intf_type, u32 *timings, u8 speed, int drive_cycle_time)
  * our, normal mdma function is supposed to be more precise
  */
 static int __pmac
-pmac_ide_tune_chipset (ide_drive_t *drive, u8 speed)
+pmac_ide_tune_chipset (ide_drive_t *drive, byte speed)
 {
 	int unit = (drive->select.b.unit & 0x01);
 	int ret = 0;
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
-	u32 *timings;
-	
+	u32 *timings, *timings2;
+
 	if (pmif == NULL)
 		return 1;
-
+		
 	timings = &pmif->timings[unit];
+	timings2 = &pmif->timings[unit+2];
 	
 	switch(speed) {
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
+		case XFER_UDMA_5:
+			if (pmif->kind != controller_un_ata6)
+				return 1;
 		case XFER_UDMA_4:
 		case XFER_UDMA_3:
-			if (pmif->kind != controller_kl_ata4_80)
+			if (HWIF(drive)->udma_four == 0)
 				return 1;		
 		case XFER_UDMA_2:
 		case XFER_UDMA_1:
 		case XFER_UDMA_0:
-			if (pmif->kind != controller_kl_ata4 &&
-				pmif->kind != controller_kl_ata4_80)
-				return 1;		
-			ret = set_timings_udma(timings, speed);
+			if (pmif->kind == controller_kl_ata4)
+				ret = set_timings_udma_ata4(timings, speed);
+			else if (pmif->kind == controller_un_ata6)
+				ret = set_timings_udma_ata6(timings, timings2, speed);
+			else
+				ret = 1;		
 			break;
 		case XFER_MW_DMA_2:
 		case XFER_MW_DMA_1:
 		case XFER_MW_DMA_0:
-			ret = set_timings_mdma(pmif->kind, timings, speed, 0);
+			ret = set_timings_mdma(drive, pmif->kind, timings, timings2, speed, 0);
 			break;
 		case XFER_SW_DMA_2:
 		case XFER_SW_DMA_1:
@@ -644,7 +917,7 @@ pmac_ide_tune_chipset (ide_drive_t *drive, u8 speed)
 	if (ret)
 		return ret;
 		
-	pmac_ide_selectproc(drive);	
+	pmac_ide_do_update_timings(drive);	
 	drive->current_speed = speed;
 
 	return 0;
@@ -653,11 +926,14 @@ pmac_ide_tune_chipset (ide_drive_t *drive, u8 speed)
 static void __pmac
 sanitize_timings(pmac_ide_hwif_t *pmif)
 {
-	unsigned value;
+	unsigned int value, value2 = 0;
 	
 	switch(pmif->kind) {
+		case controller_un_ata6:
+			value = 0x08618a92;
+			value2 = 0x00002921;
+			break;
 		case controller_kl_ata4:
-		case controller_kl_ata4_80:
 			value = 0x0008438c;
 			break;
 		case controller_kl_ata3:
@@ -670,6 +946,7 @@ sanitize_timings(pmac_ide_hwif_t *pmif)
 			break;
 	}
 	pmif->timings[0] = pmif->timings[1] = value;
+	pmif->timings[2] = pmif->timings[3] = value2;
 }
 
 unsigned long __pmac
@@ -724,214 +1001,474 @@ pmac_find_ide_boot(char *bootdevice, int n)
 	return 0;
 }
 
-void __init
-pmac_ide_probe(void)
+/* Suspend call back, should be called after the child devices
+ * have actually been suspended
+ */
+static int
+pmac_ide_do_suspend(ide_hwif_t *hwif)
 {
-	struct device_node *np;
-	int i;
-	struct device_node *atas;
-	struct device_node *p, **pp, *removables, **rp;
-	unsigned long base;
-	int irq, big_delay;
-	ide_hwif_t *hwif;
+	pmac_ide_hwif_t *pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
+	
+	/* We clear the timings */
+	pmif->timings[0] = 0;
+	pmif->timings[1] = 0;
+	
+#ifdef CONFIG_BLK_DEV_IDE_PMAC_BLINK
+	/* Note: This code will be called for every hwif, thus we'll
+	 * try several time to stop the LED blinker timer,  but that
+	 * should be harmless
+	 */
+	if (pmu_ide_blink_enabled) {
+		unsigned long flags;
 
-	if (_machine != _MACH_Pmac)
-		return;
-	pp = &atas;
-	rp = &removables;
-	p = find_devices("ATA");
-	if (p == NULL)
-		p = find_devices("IDE");
-	if (p == NULL)
-		p = find_type_devices("ide");
-	if (p == NULL)
-		p = find_type_devices("ata");
-	/* Move removable devices such as the media-bay CDROM
-	   on the PB3400 to the end of the list. */
-	for (; p != NULL; p = p->next) {
-		if (p->parent && p->parent->type
-		    && strcasecmp(p->parent->type, "media-bay") == 0) {
-			*rp = p;
-			rp = &p->next;
-		} else {
-			*pp = p;
-			pp = &p->next;
-		}
+		/* Make sure we don't hit the PMU blink */
+		spin_lock_irqsave(&pmu_blink_lock, flags);
+		if (pmu_blink_ledstate)
+			del_timer(&pmu_blink_timer);
+		pmu_blink_ledstate = 0;
+		spin_unlock_irqrestore(&pmu_blink_lock, flags);
 	}
-	*rp = NULL;
-	*pp = removables;
-	big_delay = 0;
+#endif /* CONFIG_BLK_DEV_IDE_PMAC_BLINK */
 
-	for (i = 0, np = atas; i < MAX_HWIFS && np != NULL; np = np->next) {
-		struct device_node *tp;
-		struct pmac_ide_hwif* pmif;
-		int *bidp;
-		int in_bay = 0;
-		u8 pbus, pid;
-		struct pci_dev *pdev = NULL;
+	/* The media bay will handle itself just fine */
+	if (pmif->mediabay)
+		return 0;
+	
+	/* Disable the bus */
+	ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, pmif->node, pmif->aapl_bus_id, 0);
 
-		/*
-		 * If this node is not under a mac-io or dbdma node,
-		 * leave it to the generic PCI driver.
-		 */
-		for (tp = np->parent; tp != 0; tp = tp->parent)
-			if (tp->type && (strcmp(tp->type, "mac-io") == 0
-					 || strcmp(tp->type, "dbdma") == 0))
-				break;
-		if (tp == 0)
-			continue;
+	return 0;
+}
 
-		if (np->n_addrs == 0) {
-			printk(KERN_WARNING "ide: no address for device %s\n",
-			       np->full_name);
-			continue;
-		}
+/* Resume call back, should be called before the child devices
+ * are resumed
+ */
+static int
+pmac_ide_do_resume(ide_hwif_t *hwif)
+{
+	pmac_ide_hwif_t *pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
+	
+	/* Hard reset & re-enable controller (do we really need to reset ? -BenH) */
+	if (!pmif->mediabay) {
+		ppc_md.feature_call(PMAC_FTR_IDE_RESET, pmif->node, pmif->aapl_bus_id, 1);
+		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, pmif->node, pmif->aapl_bus_id, 1);
+		mdelay(10);
+		ppc_md.feature_call(PMAC_FTR_IDE_RESET, pmif->node, pmif->aapl_bus_id, 0);
+		mdelay(100);
+	}
 
-		/* We need to find the pci_dev of the mac-io holding the
-		 * IDE interface
-		 */
-		if (pci_device_from_OF_node(tp, &pbus, &pid) == 0)
-			pdev = pci_find_slot(pbus, pid);
-		if (pdev == NULL)
-			printk(KERN_WARNING "ide: no PCI host for device %s, DMA disabled\n",
-			       np->full_name);
+	/* Sanitize drive timings */
+	sanitize_timings(pmif);
 
-		/*
-		 * If this slot is taken (e.g. by ide-pci.c) try the next one.
-		 */
-		while (i < MAX_HWIFS
-		       && ide_hwifs[i].io_ports[IDE_DATA_OFFSET] != 0)
-			++i;
-		if (i >= MAX_HWIFS)
-			break;
-		pmif = &pmac_ide[i];
+	return 0;
+}
 
-		/*
-		 * Some older OFs have bogus sizes, causing request_OF_resource
-		 * to fail. We fix them up here
-		 */
-		if (np->addrs[0].size > 0x1000)
-			np->addrs[0].size = 0x1000;
-		if (np->n_addrs > 1 && np->addrs[1].size > 0x100)
-			np->addrs[1].size = 0x100;
+static int
+pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
+{
+	struct device_node *np = pmif->node;
+	int *bidp, i;
 
-		if (request_OF_resource(np, 0, "  (mac-io IDE IO)") == NULL) {
-			printk(KERN_ERR "ide-pmac(%s): can't request IO resource !\n", np->name);
-			continue;
-		}
-
-		base = (unsigned long) ioremap(np->addrs[0].address, 0x400);
-
-		/* XXX This is bogus. Should be fixed in the registry by checking
-		   the kind of host interrupt controller, a bit like gatwick
-		   fixes in irq.c
-		 */
-		if (np->n_intrs == 0) {
-			printk(KERN_WARNING "ide: no intrs for device %s, using 13\n",
-			       np->full_name);
-			irq = 13;
-		} else {
-			irq = np->intrs[0].line;
-		}
-		pmif->regbase = base;
-		pmif->irq = irq;
-		pmif->node = np;
-		pmif->index = i;
-		if (device_is_compatible(np, "keylargo-ata")) {
-			if (strcmp(np->name, "ata-4") == 0)
-				pmif->kind = controller_kl_ata4;
-			else
-				pmif->kind = controller_kl_ata3;
-		} else if (device_is_compatible(np, "heathrow-ata"))
-			pmif->kind = controller_heathrow;
+	pmif->cable_80 = 0;
+	pmif->broken_dma = pmif->broken_dma_warn = 0;
+	if (device_is_compatible(np, "kauai-ata"))
+		pmif->kind = controller_un_ata6;
+	else if (device_is_compatible(np, "keylargo-ata")) {
+		if (strcmp(np->name, "ata-4") == 0)
+			pmif->kind = controller_kl_ata4;
 		else
-			pmif->kind = controller_ohare;
+			pmif->kind = controller_kl_ata3;
+	} else if (device_is_compatible(np, "heathrow-ata"))
+		pmif->kind = controller_heathrow;
+	else {
+		pmif->kind = controller_ohare;
+		pmif->broken_dma = 1;
+	}
 
-		bidp = (int *)get_property(np, "AAPL,bus-id", NULL);
-		pmif->aapl_bus_id =  bidp ? *bidp : 0;
+	bidp = (int *)get_property(np, "AAPL,bus-id", NULL);
+	pmif->aapl_bus_id =  bidp ? *bidp : 0;
 
-		if (pmif->kind == controller_kl_ata4) {
-			char* cable = get_property(np, "cable-type", NULL);
-			if (cable && !strncmp(cable, "80-", 3))
-				pmif->kind = controller_kl_ata4_80;
-		}
+	/* Get cable type from device-tree */
+	if (pmif->kind == controller_kl_ata4 || pmif->kind == controller_un_ata6) {
+		char* cable = get_property(np, "cable-type", NULL);
+		if (cable && !strncmp(cable, "80-", 3))
+			pmif->cable_80 = 1;
+	}
 
-		/* Make sure we have sane timings */
-		sanitize_timings(pmif);
+	pmif->mediabay = 0;
+	
+	/* Make sure we have sane timings */
+	sanitize_timings(pmif);
 
-		if (np->parent && np->parent->name
-		    && strcasecmp(np->parent->name, "media-bay") == 0) {
+	/* XXX FIXME: Media bay stuff need re-organizing */
+	if (np->parent && np->parent->name
+	    && strcasecmp(np->parent->name, "media-bay") == 0) {
 #ifdef CONFIG_PMAC_PBOOK
-			media_bay_set_ide_infos(np->parent,base,irq,i);
+		media_bay_set_ide_infos(np->parent, pmif->regbase, pmif->irq, hwif->index);
 #endif /* CONFIG_PMAC_PBOOK */
-			in_bay = 1;
-			if (!bidp)
-				pmif->aapl_bus_id = 1;
-		} else if (pmif->kind == controller_ohare) {
-			/* The code below is having trouble on some ohare machines
-			 * (timing related ?). Until I can put my hand on one of these
-			 * units, I keep the old way
-			 */
-			ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, 0, 1);
-		} else {
- 			/* This is necessary to enable IDE when net-booting */
-			printk(KERN_INFO "pmac_ide: enabling IDE bus ID %d\n",
-				pmif->aapl_bus_id);
-			ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 1);
-			ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, pmif->aapl_bus_id, 1);
-			mdelay(10);
-			ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 0);
-			big_delay = 1;
-		}
+		pmif->mediabay = 1;
+		if (!bidp)
+			pmif->aapl_bus_id = 1;
+	} else if (pmif->kind == controller_ohare) {
+		/* The code below is having trouble on some ohare machines
+		 * (timing related ?). Until I can put my hand on one of these
+		 * units, I keep the old way
+		 */
+		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, 0, 1);
+	} else {
+ 		/* This is necessary to enable IDE when net-booting */
+		ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 1);
+		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, pmif->aapl_bus_id, 1);
+		mdelay(10);
+		ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 0);
+		mdelay(100);
+	}
 
-		hwif = &ide_hwifs[i];
-		/* Setup MMIO ops */
-		default_hwif_mmiops(hwif);
-		/* Tell common code _not_ to mess with resources */
-		hwif->mmio = 2;
-		hwif->hwif_data = pmif;
-		pmac_ide_init_hwif_ports(&hwif->hw, base, 0, &hwif->irq);
-		memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->io_ports));
-		hwif->chipset = ide_pmac;
-		hwif->noprobe = !hwif->io_ports[IDE_DATA_OFFSET] || in_bay;
-		hwif->udma_four = (pmif->kind == controller_kl_ata4_80);
-		hwif->pci_dev = pdev;
-		hwif->drives[0].unmask = 1;
-		hwif->drives[1].unmask = 1;
-		hwif->tuneproc = pmac_ide_tuneproc;
+	/* Setup MMIO ops */
+	default_hwif_mmiops(hwif);
+
+	/* Tell common code _not_ to mess with resources */
+	hwif->mmio = 2;
+	hwif->hwif_data = pmif;
+	pmac_ide_init_hwif_ports(&hwif->hw, pmif->regbase, 0, &hwif->irq);
+	memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->io_ports));
+	hwif->chipset = ide_pmac;
+	hwif->noprobe = !hwif->io_ports[IDE_DATA_OFFSET] || pmif->mediabay;
+	hwif->hold = pmif->mediabay;
+	hwif->udma_four = pmif->cable_80;
+	hwif->drives[0].unmask = 1;
+	hwif->drives[1].unmask = 1;
+	hwif->tuneproc = pmac_ide_tuneproc;
+	if (pmif->kind == controller_un_ata6)
+		hwif->selectproc = pmac_ide_kauai_selectproc;
+	else
 		hwif->selectproc = pmac_ide_selectproc;
-		hwif->speedproc = pmac_ide_tune_chipset;
+	hwif->speedproc = pmac_ide_tune_chipset;
+
+#ifdef CONFIG_BLK_DEV_IDE_PMAC_BLINK
+	pmu_ide_blink_enabled = pmu_hd_blink_init();
+
+	if (pmu_ide_blink_enabled)
+		hwif->led_act = pmu_hd_kick_blink;
+#endif
+
+	printk(KERN_INFO "ide%d: Found Apple %s controller, bus ID %d%s\n",
+			hwif->index, model_name[pmif->kind], pmif->aapl_bus_id,
+			pmif->mediabay ? " (mediabay)" : "");
+			
 #ifdef CONFIG_PMAC_PBOOK
-		if (in_bay && check_media_bay_by_base(base, MB_CD) == 0)
-			hwif->noprobe = 0;
+	if (pmif->mediabay && check_media_bay_by_base(pmif->regbase, MB_CD) == 0)
+		hwif->noprobe = 0;
 #endif /* CONFIG_PMAC_PBOOK */
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
-		if (np->n_addrs >= 2) {
-			/* has a DBDMA controller channel */
-			pmac_ide_setup_dma(np, i);
-		}
-		hwif->atapi_dma = 1;
-		hwif->ultra_mask = 0x1f;
-		hwif->mwdma_mask = 0x07;
-		hwif->swdma_mask = 0x07;
-
+	/* has a DBDMA controller channel */
+	if (pmif->dma_regs)
+		pmac_ide_setup_dma(pmif, hwif);
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
 
-		++i;
-	}
-	pmac_ide_count = i;
-	if (big_delay)
-		mdelay(IDE_WAKEUP_DELAY_MS);
+	/* We probe the hwif now */
+	probe_hwif_init(hwif);
 
-#ifdef CONFIG_PMAC_PBOOK
-	pmu_register_sleep_notifier(&idepmac_sleep_notifier);
-#endif /* CONFIG_PMAC_PBOOK */
+	/* The code IDE code will have set hwif->present if we have devices attached,
+	 * if we don't, the discard the interface except if we are on a media bay slot
+	 */
+	if (!hwif->present && !pmif->mediabay) {
+		printk(KERN_INFO "ide%d: Bus empty, interface released.\n",
+			hwif->index);
+		default_hwif_iops(hwif);
+		for (i = IDE_DATA_OFFSET; i <= IDE_CONTROL_OFFSET; ++i)
+			hwif->io_ports[i] = 0;
+		hwif->chipset = ide_unknown;
+		hwif->noprobe = 1;
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+static int __devinit
+pmac_ide_macio_attach(struct macio_dev *mdev, const struct of_match *match)
+{
+	unsigned long base, regbase;
+	int irq;
+	ide_hwif_t *hwif;
+	pmac_ide_hwif_t *pmif;
+	int i, rc;
+
+	i = 0;
+	while (i < MAX_HWIFS && (ide_hwifs[i].io_ports[IDE_DATA_OFFSET] != 0
+	    || pmac_ide[i].node != NULL))
+		++i;
+	if (i >= MAX_HWIFS) {
+		printk(KERN_ERR "ide-pmac: MacIO interface attach with no slot\n");
+		printk(KERN_ERR "          %s\n", mdev->ofdev.node->full_name);
+		return -ENODEV;
+	}
+
+	pmif = &pmac_ide[i];
+	hwif = &ide_hwifs[i];
+
+	if (mdev->ofdev.node->n_addrs == 0) {
+		printk(KERN_WARNING "ide%d: no address for %s\n",
+		       i, mdev->ofdev.node->full_name);
+		return -ENXIO;
+	}
+
+	/*
+	 * Some older OFs have bogus sizes, causing request_OF_resource
+	 * to fail. We fix them up here
+	 */
+	if (mdev->ofdev.node->addrs[0].size > 0x1000)
+		mdev->ofdev.node->addrs[0].size = 0x1000;
+	if (mdev->ofdev.node->n_addrs > 1 && mdev->ofdev.node->addrs[1].size > 0x100)
+		mdev->ofdev.node->addrs[1].size = 0x100;
+
+	/* Request memory resource for IO ports */
+	if (request_OF_resource(mdev->ofdev.node, 0, "  (mac-io ata ports)") == NULL) {
+		printk(KERN_ERR "ide%d: can't request mmio resource !\n", i);
+		return -EBUSY;
+	}
+			
+	/* XXX This is bogus. Should be fixed in the registry by checking
+	 * the kind of host interrupt controller, a bit like gatwick
+	 * fixes in irq.c. That works well enough for the single case
+	 * where that happens though...
+	 */
+	if (mdev->ofdev.node->n_intrs == 0) {
+		printk(KERN_WARNING "ide%d: no intrs for device %s, using 13\n",
+			i, mdev->ofdev.node->full_name);
+		irq = 13;
+	} else
+		irq = mdev->ofdev.node->intrs[0].line;
+
+	base =  (unsigned long) ioremap(mdev->ofdev.node->addrs[0].address, 0x400);
+	regbase = base;
+
+	hwif->pci_dev = mdev->bus->pdev;
+	hwif->gendev.parent = &mdev->ofdev.dev;
+
+	pmif->mdev = mdev;
+	pmif->node = mdev->ofdev.node;
+	pmif->regbase = regbase;
+	pmif->irq = irq;
+#ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
+	if (mdev->ofdev.node->n_addrs >= 2)
+		pmif->dma_regs = (volatile struct dbdma_regs*)
+			ioremap(mdev->ofdev.node->addrs[1].address, 0x1000);
+	else
+		pmif->dma_regs = NULL;
+#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
+	dev_set_drvdata(&mdev->ofdev.dev, hwif);
+
+	rc = pmac_ide_setup_device(pmif, hwif);
+	if (rc != 0) {
+		/* The inteface is released to the common IDE layer */
+		dev_set_drvdata(&mdev->ofdev.dev, NULL);
+		iounmap((void *)base);
+		if (pmif->dma_regs)
+			iounmap((void *)pmif->dma_regs);
+		memset(pmif, 0, sizeof(*pmif));
+		release_OF_resource(mdev->ofdev.node, 0);
+	}
+
+	return rc;
+}
+
+static int
+pmac_ide_macio_suspend(struct macio_dev *mdev, u32 state)
+{
+	ide_hwif_t	*hwif = (ide_hwif_t *)dev_get_drvdata(&mdev->ofdev.dev);
+	int		rc = 0;
+
+	if (state != mdev->ofdev.dev.power_state && state >= 2) {
+		rc = pmac_ide_do_suspend(hwif);
+		if (rc == 0)
+			mdev->ofdev.dev.power_state = state;
+	}
+
+	return rc;
+}
+
+static int
+pmac_ide_macio_resume(struct macio_dev *mdev)
+{
+	ide_hwif_t	*hwif = (ide_hwif_t *)dev_get_drvdata(&mdev->ofdev.dev);
+	int		rc = 0;
+	
+	if (mdev->ofdev.dev.power_state != 0) {
+		rc = pmac_ide_do_resume(hwif);
+		if (rc == 0)
+			mdev->ofdev.dev.power_state = 0;
+	}
+
+	return rc;
+}
+
+static int __devinit
+pmac_ide_pci_attach(struct pci_dev *pdev, const struct pci_device_id *id)
+{
+	ide_hwif_t *hwif;
+	struct device_node *np;
+	pmac_ide_hwif_t *pmif;
+	unsigned long base;
+	unsigned long rbase, rlen;
+	int i, rc;
+
+	np = pci_device_to_OF_node(pdev);
+	if (np == NULL) {
+		printk(KERN_ERR "ide-pmac: cannot find MacIO node for Kauai ATA interface\n");
+		return -ENODEV;
+	}
+	i = 0;
+	while (i < MAX_HWIFS && (ide_hwifs[i].io_ports[IDE_DATA_OFFSET] != 0
+	    || pmac_ide[i].node != NULL))
+		++i;
+	if (i >= MAX_HWIFS) {
+		printk(KERN_ERR "ide-pmac: PCI interface attach with no slot\n");
+		printk(KERN_ERR "          %s\n", np->full_name);
+		return -ENODEV;
+	}
+
+	pmif = &pmac_ide[i];
+	hwif = &ide_hwifs[i];
+
+	if (pci_enable_device(pdev)) {
+		printk(KERN_WARNING "ide%i: Can't enable PCI device for %s\n",
+			i, np->full_name);
+		return -ENXIO;
+	}
+	pci_set_master(pdev);
+			
+	if (pci_request_regions(pdev, "Kauai ATA")) {
+		printk(KERN_ERR "ide%d: Cannot obtain PCI resources for %s\n",
+			i, np->full_name);
+		return -ENXIO;
+	}
+
+	hwif->pci_dev = pdev;
+	hwif->gendev.parent = &pdev->dev;
+	pmif->mdev = NULL;
+	pmif->node = np;
+
+	rbase = pci_resource_start(pdev, 0);
+	rlen = pci_resource_len(pdev, 0);
+
+	base = (unsigned long) ioremap(rbase, rlen);
+	pmif->regbase = base + 0x2000;
+#ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
+	pmif->dma_regs = (volatile struct dbdma_regs*)(base + 0x1000);
+#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */	
+	pmif->irq = pdev->irq;
+
+	pci_set_drvdata(pdev, hwif);
+
+	rc = pmac_ide_setup_device(pmif, hwif);
+	if (rc != 0) {
+		/* The inteface is released to the common IDE layer */
+		pci_set_drvdata(pdev, NULL);
+		iounmap((void *)base);
+		memset(pmif, 0, sizeof(*pmif));
+		pci_release_regions(pdev);
+	}
+
+	return rc;
+}
+
+static int
+pmac_ide_pci_suspend(struct pci_dev *pdev, u32 state)
+{
+	ide_hwif_t	*hwif = (ide_hwif_t *)pci_get_drvdata(pdev);
+	int		rc = 0;
+	
+	if (state != pdev->dev.power_state && state >= 2) {
+		rc = pmac_ide_do_suspend(hwif);
+		if (rc == 0)
+			pdev->dev.power_state = state;
+	}
+
+	return rc;
+}
+
+static int
+pmac_ide_pci_resume(struct pci_dev *pdev)
+{
+	ide_hwif_t	*hwif = (ide_hwif_t *)pci_get_drvdata(pdev);
+	int		rc = 0;
+	
+	if (pdev->dev.power_state != 0) {
+		rc = pmac_ide_do_resume(hwif);
+		if (rc == 0)
+			pdev->dev.power_state = 0;
+	}
+
+	return rc;
+}
+
+static struct of_match pmac_ide_macio_match[] = 
+{
+	{
+	.name 		= "IDE",
+	.type		= OF_ANY_MATCH,
+	.compatible	= OF_ANY_MATCH
+	},
+	{
+	.name 		= "ATA",
+	.type		= OF_ANY_MATCH,
+	.compatible	= OF_ANY_MATCH
+	},
+	{
+	.name 		= OF_ANY_MATCH,
+	.type		= "ide",
+	.compatible	= OF_ANY_MATCH
+	},
+	{
+	.name 		= OF_ANY_MATCH,
+	.type		= "ata",
+	.compatible	= OF_ANY_MATCH
+	},
+	{},
+};
+
+static struct macio_driver pmac_ide_macio_driver = 
+{
+	.name 		= "ide-pmac",
+	.match_table	= pmac_ide_macio_match,
+	.probe		= pmac_ide_macio_attach,
+	.suspend	= pmac_ide_macio_suspend,
+	.resume		= pmac_ide_macio_resume,
+};
+
+static struct pci_device_id pmac_ide_pci_match[] __devinitdata = {
+	{ PCI_VENDOR_ID_APPLE, PCI_DEVICE_ID_APPLE_KAUAI_ATA, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+};
+
+static struct pci_driver pmac_ide_pci_driver = {
+	.name		= "ide-pmac",
+	.id_table	= pmac_ide_pci_match,
+	.probe		= pmac_ide_pci_attach,
+	.suspend	= pmac_ide_pci_suspend,
+	.resume		= pmac_ide_pci_resume,
+};
+
+void __init
+pmac_ide_probe(void)
+{
+	if (_machine != _MACH_Pmac)
+		return;
+
+#ifdef CONFIG_BLK_DEV_IDE_PMAC_ATA100FIRST
+	pci_register_driver(&pmac_ide_pci_driver);
+	macio_register_driver(&pmac_ide_macio_driver);
+#else
+	macio_register_driver(&pmac_ide_macio_driver);
+	pci_register_driver(&pmac_ide_pci_driver);
+#endif	
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 
-static int
+static int __pmac
 pmac_ide_build_sglist(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
@@ -942,7 +1479,7 @@ pmac_ide_build_sglist(ide_drive_t *drive, struct request *rq)
 	if (hwif->sg_dma_active)
 		BUG();
 		
-	nents = blk_rq_map_sg(&drive->queue, rq, sg);
+	nents = blk_rq_map_sg(drive->queue, rq, sg);
 		
 	if (rq_data_dir(rq) == READ)
 		pmif->sg_dma_direction = PCI_DMA_FROMDEVICE;
@@ -952,7 +1489,7 @@ pmac_ide_build_sglist(ide_drive_t *drive, struct request *rq)
 	return pci_map_sg(hwif->pci_dev, sg, nents, pmif->sg_dma_direction);
 }
 
-static int
+static int __pmac
 pmac_ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
@@ -968,14 +1505,14 @@ pmac_ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
 	else
 		pmif->sg_dma_direction = PCI_DMA_FROMDEVICE;
 	
-	if (sector_count > 127) {
+	if (sector_count > 128) {
 		memset(&sg[nents], 0, sizeof(*sg));
 		sg[nents].page = virt_to_page(virt_addr);
 		sg[nents].offset = offset_in_page(virt_addr);
-		sg[nents].length = 127  * SECTOR_SIZE;
+		sg[nents].length = 128  * SECTOR_SIZE;
 		nents++;
-		virt_addr = virt_addr + (127 * SECTOR_SIZE);
-		sector_count -= 127;
+		virt_addr = virt_addr + (128 * SECTOR_SIZE);
+		sector_count -= 128;
 	}
 	memset(&sg[nents], 0, sizeof(*sg));
 	sg[nents].page = virt_to_page(virt_addr);
@@ -990,16 +1527,16 @@ pmac_ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
  * pmac_ide_build_dmatable builds the DBDMA command list
  * for a transfer and sets the DBDMA channel to point to it.
  */
-static int
-pmac_ide_build_dmatable(ide_drive_t *drive, int wr)
+static int __pmac
+pmac_ide_build_dmatable(ide_drive_t *drive, struct request *rq)
 {
 	struct dbdma_cmd *table;
 	int i, count = 0;
-	struct request *rq = HWGROUP(drive)->rq;
 	ide_hwif_t *hwif = HWIF(drive);
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
 	volatile struct dbdma_regs *dma = pmif->dma_regs;
 	struct scatterlist *sg;
+	int wr = (rq_data_dir(rq) == WRITE);
 
 	/* DMA table is already aligned */
 	table = (struct dbdma_cmd *) pmif->dma_table_cpu;
@@ -1026,10 +1563,18 @@ pmac_ide_build_dmatable(ide_drive_t *drive, int wr)
 		cur_addr = sg_dma_address(sg);
 		cur_len = sg_dma_len(sg);
 
+		if (pmif->broken_dma && cur_addr & (L1_CACHE_BYTES - 1)) {
+			if (pmif->broken_dma_warn == 0) {
+				printk(KERN_WARNING "%s: DMA on non aligned address,"
+				       "switching to PIO on Ohare chipset\n", drive->name);
+				pmif->broken_dma_warn = 1;
+			}
+			goto use_pio_instead;
+		}
 		while (cur_len) {
 			unsigned int tc = (cur_len < 0xfe00)? cur_len: 0xfe00;
 
-			if (++count >= MAX_DCMDS) {
+			if (count++ >= MAX_DCMDS) {
 				printk(KERN_WARNING "%s: DMA table too small\n",
 				       drive->name);
 				goto use_pio_instead;
@@ -1070,7 +1615,7 @@ pmac_ide_build_dmatable(ide_drive_t *drive, int wr)
 }
 
 /* Teardown mappings after DMA has completed.  */
-static void
+static void __pmac
 pmac_ide_destroy_dmatable (ide_drive_t *drive)
 {
 	struct pci_dev *dev = HWIF(drive)->pci_dev;
@@ -1081,67 +1626,25 @@ pmac_ide_destroy_dmatable (ide_drive_t *drive)
 	if (nents) {
 		pci_unmap_sg(dev, sg, nents, pmif->sg_dma_direction);
 		pmif->sg_nents = 0;
+		HWIF(drive)->sg_dma_active = 0;
 	}
-}
-
-static __inline__ unsigned char
-dma_bits_to_command(unsigned char bits)
-{
-	if(bits & 0x04)
-		return XFER_MW_DMA_2;
-	if(bits & 0x02)
-		return XFER_MW_DMA_1;
-	if(bits & 0x01)
-		return XFER_MW_DMA_0;
-	return 0;
-}
-
-static __inline__ unsigned char
-udma_bits_to_command(unsigned char bits, int high_speed)
-{
-	if (high_speed) {
-		if(bits & 0x10)
-			return XFER_UDMA_4;
-		if(bits & 0x08)
-			return XFER_UDMA_3;
-	}
-	if(bits & 0x04)
-		return XFER_UDMA_2;
-	if(bits & 0x02)
-		return XFER_UDMA_1;
-	if(bits & 0x01)
-		return XFER_UDMA_0;
-	return 0;
 }
 
 /* Calculate MultiWord DMA timings */
 static int __pmac
-pmac_ide_mdma_enable(ide_drive_t *drive)
+pmac_ide_mdma_enable(ide_drive_t *drive, u16 mode)
 {
-	u8 bits = drive->id->dma_mword & 0x07;
-	u8 feature = dma_bits_to_command(bits);
-	u32 *timings;
+	ide_hwif_t *hwif = HWIF(drive);
+	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
 	int drive_cycle_time;
 	struct hd_driveid *id = drive->id;
-	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
+	u32 *timings, *timings2;
+	u32 timing_local[2];
 	int ret;
 
-	/* Set feature on drive */
-    	printk(KERN_INFO "%s: Enabling MultiWord DMA %d\n", drive->name, feature & 0xf);
-	ret = pmac_ide_do_setfeature(drive, feature);
-	if (ret) {
-	    	printk(KERN_WARNING "%s: Failed !\n", drive->name);
-	    	return 0;
-	}
-
-	if (!drive->init_speed)
-		drive->init_speed = feature;
-	
 	/* which drive is it ? */
-	if (drive->select.b.unit & 0x01)
-		timings = &pmif->timings[1];
-	else
-		timings = &pmif->timings[0];
+	timings = &pmif->timings[drive->select.b.unit & 0x01];
+	timings2 = &pmif->timings[(drive->select.b.unit & 0x01) + 2];
 
 	/* Check if drive provide explicit cycle time */
 	if ((id->field_valid & 2) && (id->eide_dma_time))
@@ -1149,201 +1652,220 @@ pmac_ide_mdma_enable(ide_drive_t *drive)
 	else
 		drive_cycle_time = 0;
 
-	/* Calculate controller timings */
-	set_timings_mdma(pmif->kind, timings, feature, drive_cycle_time);
+	/* Copy timings to local image */
+	timing_local[0] = *timings;
+	timing_local[1] = *timings2;
 
-	drive->current_speed = feature;	
+	/* Calculate controller timings */
+	ret = set_timings_mdma(	drive, pmif->kind,
+				&timing_local[0],
+				&timing_local[1],
+				mode,
+				drive_cycle_time);
+	if (ret)
+		return 0;
+
+	/* Set feature on drive */
+    	printk(KERN_INFO "%s: Enabling MultiWord DMA %d\n", drive->name, mode & 0xf);
+	ret = pmac_ide_do_setfeature(drive, mode);
+	if (ret) {
+	    	printk(KERN_WARNING "%s: Failed !\n", drive->name);
+	    	return 0;
+	}
+
+	/* Apply timings to controller */
+	*timings = timing_local[0];
+	*timings2 = timing_local[1];
+	
+	/* Set speed info in drive */
+	drive->current_speed = mode;	
+	if (!drive->init_speed)
+		drive->init_speed = mode;
+
 	return 1;
 }
 
 /* Calculate Ultra DMA timings */
 static int __pmac
-pmac_ide_udma_enable(ide_drive_t *drive, int high_speed)
+pmac_ide_udma_enable(ide_drive_t *drive, u16 mode)
 {
-	u8 bits = drive->id->dma_ultra & 0x1f;
-	u8 feature = udma_bits_to_command(bits, high_speed);
-	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
-	u32 *timings;
+	ide_hwif_t *hwif = HWIF(drive);
+	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
+	u32 *timings, *timings2;
+	u32 timing_local[2];
 	int ret;
+		
+	/* which drive is it ? */
+	timings = &pmif->timings[drive->select.b.unit & 0x01];
+	timings2 = &pmif->timings[(drive->select.b.unit & 0x01) + 2];
 
+	/* Copy timings to local image */
+	timing_local[0] = *timings;
+	timing_local[1] = *timings2;
+	
+	/* Calculate timings for interface */
+	if (pmif->kind == controller_un_ata6)
+		ret = set_timings_udma_ata6(	&timing_local[0],
+						&timing_local[1],
+						mode);
+	else
+		ret = set_timings_udma_ata4(&timing_local[0], mode);
+	if (ret)
+		return 0;
+		
 	/* Set feature on drive */
-    	printk(KERN_INFO "%s: Enabling Ultra DMA %d\n", drive->name, feature & 0xf);
-	ret = pmac_ide_do_setfeature(drive, feature);
+    	printk(KERN_INFO "%s: Enabling Ultra DMA %d\n", drive->name, mode & 0x0f);
+	ret = pmac_ide_do_setfeature(drive, mode);
 	if (ret) {
 		printk(KERN_WARNING "%s: Failed !\n", drive->name);
 		return 0;
 	}
 
+	/* Apply timings to controller */
+	*timings = timing_local[0];
+	*timings2 = timing_local[1];
+
+	/* Set speed info in drive */
+	drive->current_speed = mode;	
 	if (!drive->init_speed)
-		drive->init_speed = feature;
+		drive->init_speed = mode;
 
-	/* which drive is it ? */
-	if (drive->select.b.unit & 0x01)
-		timings = &pmif->timings[1];
-	else
-		timings = &pmif->timings[0];
-
-	set_timings_udma(timings, feature);
-
-	drive->current_speed = feature;	
 	return 1;
 }
 
-int pmac_ide_dma_check(ide_drive_t *drive)
+static int __pmac
+pmac_ide_dma_check(ide_drive_t *drive)
 {
-	int ata4, udma;
 	struct hd_driveid *id = drive->id;
 	ide_hwif_t *hwif = HWIF(drive);
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
 	int enable = 1;
-
+	int map;
 	drive->using_dma = 0;
 	
-	if (pmif == NULL)
-		return 0;
-		
 	if (drive->media == ide_floppy)
 		enable = 0;
-	if (((id->capability & 1) == 0) &&
-	    !HWIF(drive)->ide_dma_good_drive(drive))
+	if (((id->capability & 1) == 0) && !__ide_dma_good_drive(drive))
 		enable = 0;
-	if (HWIF(drive)->ide_dma_bad_drive(drive))
+	if (__ide_dma_bad_drive(drive))
 		enable = 0;
-	udma = 0;
-	ata4 = (pmif->kind == controller_kl_ata4 ||
-		pmif->kind == controller_kl_ata4_80);
-			
-	if(enable) {
-		if (ata4 && (drive->media == ide_disk) &&
-		    (id->field_valid & 0x0004) && (id->dma_ultra & 0x1f)) {
-			/* UltraDMA modes. */
-			drive->using_dma = pmac_ide_udma_enable(drive,
-				pmif->kind == controller_kl_ata4_80);
+
+	if (enable) {
+		short mode;
+		
+		map = XFER_MWDMA;
+		if (pmif->kind == controller_kl_ata4 || pmif->kind == controller_un_ata6) {
+			map |= XFER_UDMA;
+			if (pmif->cable_80) {
+				map |= XFER_UDMA_66;
+				if (pmif->kind == controller_un_ata6)
+					map |= XFER_UDMA_100;
+			}
 		}
-		if (!drive->using_dma && (id->dma_mword & 0x0007)) {
-			/* Normal MultiWord DMA modes. */
-			drive->using_dma = pmac_ide_mdma_enable(drive);
-		}
+		mode = ide_find_best_mode(drive, map);
+		if (mode & XFER_UDMA)
+			drive->using_dma = pmac_ide_udma_enable(drive, mode);
+		else if (mode & XFER_MWDMA)
+			drive->using_dma = pmac_ide_mdma_enable(drive, mode);
 		hwif->OUTB(0, IDE_CONTROL_REG);
 		/* Apply settings to controller */
-		pmac_ide_selectproc(drive);
+		pmac_ide_do_update_timings(drive);
 	}
 	return 0;
 }
 
-static int
-pmac_ide_dma_read (ide_drive_t *drive)
+static int __pmac
+pmac_ide_dma_start(ide_drive_t *drive, int reading)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
 	struct request *rq = HWGROUP(drive)->rq;
-//	ide_task_t *args = rq->special;
 	u8 unit = (drive->select.b.unit & 0x01);
 	u8 ata4;
-	u8 lba48 = (drive->addressing == 1) ? 1 : 0;
-	task_ioreg_t command = WIN_NOP;
 
 	if (pmif == NULL)
 		return 1;
+	ata4 = (pmif->kind == controller_kl_ata4);	
 
-	ata4 = (pmif->kind == controller_kl_ata4 ||
-		pmif->kind == controller_kl_ata4_80);
-
-	if (!pmac_ide_build_dmatable(drive, 0))
+	if (!pmac_ide_build_dmatable(drive, rq))
 		return 1;
+
 	/* Apple adds 60ns to wrDataSetup on reads */
 	if (ata4 && (pmif->timings[unit] & TR_66_UDMA_EN)) {
-		writel(pmif->timings[unit]+0x00800000UL,
+		writel(pmif->timings[unit] + (reading ? 0x00800000UL : 0),
 			(unsigned *)(IDE_DATA_REG+IDE_TIMING_CONFIG));
 		(void)readl((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG));
 	}
+
 	drive->waiting_for_dma = 1;
+
+	return 0;
+}
+
+static int __pmac
+pmac_ide_dma_read(ide_drive_t *drive)
+{
+	struct request *rq = HWGROUP(drive)->rq;
+	u8 lba48 = (drive->addressing == 1) ? 1 : 0;
+	task_ioreg_t command = WIN_NOP;
+
+	if (pmac_ide_dma_start(drive, 1))
+		return 1;
+
 	if (drive->media != ide_disk)
 		return 0;
-	if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
-		BUG();
-	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
-	/*
-	 * FIX ME to use only ACB ide_task_t args Struct
-	 */
-#if 0
-	{
-		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#else
+
 	command = (lba48) ? WIN_READDMA_EXT : WIN_READDMA;
+	
+	if (drive->vdma)
+		command = (lba48) ? WIN_READ_EXT: WIN_READ;
+		
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 		command = args->tfRegister[IDE_COMMAND_OFFSET];
 	}
-#endif
+
 	/* issue cmd to drive */
-	hwif->OUTB(command, IDE_COMMAND_REG);
+	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, NULL);
 
 	return pmac_ide_dma_begin(drive);
 }
 
-static int
+static int __pmac
 pmac_ide_dma_write (ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)hwif->hwif_data;
 	struct request *rq = HWGROUP(drive)->rq;
-//	ide_task_t *args = rq->special;
-	u8 unit = (drive->select.b.unit & 0x01);
-	u8 ata4;
 	u8 lba48 = (drive->addressing == 1) ? 1 : 0;
 	task_ioreg_t command = WIN_NOP;
 
-	if (pmif == NULL)
+	if (pmac_ide_dma_start(drive, 0))
 		return 1;
 
-	ata4 = (pmif->kind == controller_kl_ata4 ||
-		pmif->kind == controller_kl_ata4_80);
-
-	if (!pmac_ide_build_dmatable(drive, 1))
-		return 1;
-	/* Apple adds 60ns to wrDataSetup on reads */
-	if (ata4 && (pmif->timings[unit] & TR_66_UDMA_EN)) {
-		writel(pmif->timings[unit],
-			(unsigned *)(IDE_DATA_REG+IDE_TIMING_CONFIG));
-		(void)readl((unsigned *)(IDE_DATA_REG + IDE_TIMING_CONFIG));
-	}
-	drive->waiting_for_dma = 1;
 	if (drive->media != ide_disk)
 		return 0;
-	if (HWGROUP(drive)->handler != NULL)	/* paranoia check */
-		BUG();
-	ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
-	/*
-	 * FIX ME to use only ACB ide_task_t args Struct
-	 */
-#if 0
-	{
-		ide_task_t *args = rq->special;
-		command = args->tfRegister[IDE_COMMAND_OFFSET];
-	}
-#else
+
 	command = (lba48) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
+	if (drive->vdma)
+		command = (lba48) ? WIN_WRITE_EXT: WIN_WRITE;
+		
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 		command = args->tfRegister[IDE_COMMAND_OFFSET];
 	}
-#endif
+
 	/* issue cmd to drive */
-	hwif->OUTB(command, IDE_COMMAND_REG);
+	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, NULL);
 
 	return pmac_ide_dma_begin(drive);
 }
 
-static int
+static int __pmac
 pmac_ide_dma_count (ide_drive_t *drive)
 {
 	return HWIF(drive)->ide_dma_begin(drive);
 }
 
-static int
+static int __pmac
 pmac_ide_dma_begin (ide_drive_t *drive)
 {
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
@@ -1359,7 +1881,7 @@ pmac_ide_dma_begin (ide_drive_t *drive)
 	return 0;
 }
 
-static int
+static int __pmac
 pmac_ide_dma_end (ide_drive_t *drive)
 {
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
@@ -1378,7 +1900,7 @@ pmac_ide_dma_end (ide_drive_t *drive)
 	return (dstat & (RUN|DEAD|ACTIVE)) != RUN;
 }
 
-static int
+static int __pmac
 pmac_ide_dma_test_irq (ide_drive_t *drive)
 {
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
@@ -1418,33 +1940,33 @@ pmac_ide_dma_test_irq (ide_drive_t *drive)
 		return 1;
 	if (!drive->waiting_for_dma)
 		printk(KERN_WARNING "ide%d, ide_dma_test_irq \
-			called while not waiting\n", pmif->index);
+			called while not waiting\n", HWIF(drive)->index);
 
 	/* If dbdma didn't execute the STOP command yet, the
 	 * active bit is still set */
 	drive->waiting_for_dma++;
 	if (drive->waiting_for_dma >= DMA_WAIT_TIMEOUT) {
 		printk(KERN_WARNING "ide%d, timeout waiting \
-			for dbdma command stop\n", pmif->index);
+			for dbdma command stop\n", HWIF(drive)->index);
 		return 1;
 	}
-	udelay(1);
+	udelay(5);
 	return 0;
 }
 
-static int
+static int __pmac
 pmac_ide_dma_host_off (ide_drive_t *drive)
 {
 	return 0;
 }
 
-static int
+static int __pmac
 pmac_ide_dma_host_on (ide_drive_t *drive)
 {
 	return 0;
 }
 
-static int
+static int __pmac
 pmac_ide_dma_lostirq (ide_drive_t *drive)
 {
 	pmac_ide_hwif_t* pmif = (pmac_ide_hwif_t *)HWIF(drive)->hwif_data;
@@ -1461,316 +1983,87 @@ pmac_ide_dma_lostirq (ide_drive_t *drive)
 }
 
 static void __init 
-pmac_ide_setup_dma(struct device_node *np, int ix)
+pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 {
-	struct pmac_ide_hwif *pmif = &pmac_ide[ix];
-
-	if (request_OF_resource(np, 1, " (mac-io IDE DMA)") == NULL) {
-		printk(KERN_ERR "ide-pmac(%s): can't request DMA resource !\n", np->name);
+	/* We won't need pci_dev if we switch to generic consistent
+	 * DMA routines ...
+	 */
+	if (hwif->pci_dev == NULL)
 		return;
-	}
-
-	pmif->dma_regs =
-		(volatile struct dbdma_regs*)ioremap(np->addrs[1].address, 0x200);
-
 	/*
 	 * Allocate space for the DBDMA commands.
 	 * The +2 is +1 for the stop command and +1 to allow for
 	 * aligning the start address to a multiple of 16 bytes.
 	 */
 	pmif->dma_table_cpu = (struct dbdma_cmd*)pci_alloc_consistent(
-		ide_hwifs[ix].pci_dev,
+		hwif->pci_dev,
 		(MAX_DCMDS + 2) * sizeof(struct dbdma_cmd),
 		&pmif->dma_table_dma);
 	if (pmif->dma_table_cpu == NULL) {
 		printk(KERN_ERR "%s: unable to allocate DMA command list\n",
-		       ide_hwifs[ix].name);
+		       hwif->name);
 		return;
 	}
 
 	pmif->sg_table = kmalloc(sizeof(struct scatterlist) * MAX_DCMDS,
 				 GFP_KERNEL);
 	if (pmif->sg_table == NULL) {
-		pci_free_consistent(	ide_hwifs[ix].pci_dev,
+		pci_free_consistent(	hwif->pci_dev,
 					(MAX_DCMDS + 2) * sizeof(struct dbdma_cmd),
 				    	pmif->dma_table_cpu, pmif->dma_table_dma);
 		return;
 	}
-	ide_hwifs[ix].ide_dma_off = &__ide_dma_off;
-	ide_hwifs[ix].ide_dma_off_quietly = &__ide_dma_off_quietly;
-	ide_hwifs[ix].ide_dma_on = &__ide_dma_on;
-	ide_hwifs[ix].ide_dma_check = &pmac_ide_dma_check;
-	ide_hwifs[ix].ide_dma_read = &pmac_ide_dma_read;
-	ide_hwifs[ix].ide_dma_write = &pmac_ide_dma_write;
-	ide_hwifs[ix].ide_dma_count = &pmac_ide_dma_count;
-	ide_hwifs[ix].ide_dma_begin = &pmac_ide_dma_begin;
-	ide_hwifs[ix].ide_dma_end = &pmac_ide_dma_end;
-	ide_hwifs[ix].ide_dma_test_irq = &pmac_ide_dma_test_irq;
-	ide_hwifs[ix].ide_dma_host_off = &pmac_ide_dma_host_off;
-	ide_hwifs[ix].ide_dma_host_on = &pmac_ide_dma_host_on;
-	ide_hwifs[ix].ide_dma_good_drive = &__ide_dma_good_drive;
-	ide_hwifs[ix].ide_dma_bad_drive = &__ide_dma_bad_drive;
-	ide_hwifs[ix].ide_dma_verbose = &__ide_dma_verbose;
-	ide_hwifs[ix].ide_dma_timeout = &__ide_dma_timeout;
-	ide_hwifs[ix].ide_dma_retune = &__ide_dma_retune;
-	ide_hwifs[ix].ide_dma_lostirq = &pmac_ide_dma_lostirq;
-	ide_hwifs[ix].ide_dma_queued_on = &__ide_dma_queued_on;
-	ide_hwifs[ix].ide_dma_queued_off = &__ide_dma_queued_off;
+	hwif->ide_dma_off = &__ide_dma_off;
+	hwif->ide_dma_off_quietly = &__ide_dma_off_quietly;
+	hwif->ide_dma_on = &__ide_dma_on;
+	hwif->ide_dma_check = &pmac_ide_dma_check;
+	hwif->ide_dma_read = &pmac_ide_dma_read;
+	hwif->ide_dma_write = &pmac_ide_dma_write;
+	hwif->ide_dma_count = &pmac_ide_dma_count;
+	hwif->ide_dma_begin = &pmac_ide_dma_begin;
+	hwif->ide_dma_end = &pmac_ide_dma_end;
+	hwif->ide_dma_test_irq = &pmac_ide_dma_test_irq;
+	hwif->ide_dma_host_off = &pmac_ide_dma_host_off;
+	hwif->ide_dma_host_on = &pmac_ide_dma_host_on;
+	hwif->ide_dma_good_drive = &__ide_dma_good_drive;
+	hwif->ide_dma_bad_drive = &__ide_dma_bad_drive;
+	hwif->ide_dma_verbose = &__ide_dma_verbose;
+	hwif->ide_dma_timeout = &__ide_dma_timeout;
+	hwif->ide_dma_retune = &__ide_dma_retune;
+	hwif->ide_dma_lostirq = &pmac_ide_dma_lostirq;
+	hwif->ide_dma_queued_on = &__ide_dma_queued_on;
+	hwif->ide_dma_queued_off = &__ide_dma_queued_off;
+#ifdef CONFIG_BLK_DEV_IDE_TCQ
+	hwif->ide_dma_queued_read = __ide_dma_queued_read;
+	hwif->ide_dma_queued_write = __ide_dma_queued_write;
+	hwif->ide_dma_queued_start = __ide_dma_queued_start;
+#endif
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
 	if (!noautodma)
-		ide_hwifs[ix].autodma = 1;
+		hwif->autodma = 1;
 #endif
-	ide_hwifs[ix].drives[0].autodma = ide_hwifs[ix].autodma;
-	ide_hwifs[ix].drives[1].autodma = ide_hwifs[ix].autodma;
-}
+	hwif->drives[0].autodma = hwif->autodma;
+	hwif->drives[1].autodma = hwif->autodma;
 
-#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
-
-static void __pmac
-idepmac_sleep_device(ide_drive_t *drive, unsigned base)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	int j;
-	
-	/* FIXME: We only handle the master IDE disk, we shoud
-	 *        try to fix CD-ROMs here
-	 */
-	switch (drive->media) {
-	case ide_disk:
-		/* Spin down the drive */
-		hwif->OUTB(drive->select.all, base+0x60);
-		(void) hwif->INB(base+0x60);
-		udelay(100);
-		hwif->OUTB(0x0, base+0x30);
-		hwif->OUTB(0x0, base+0x20);
-		hwif->OUTB(0x0, base+0x40);
-		hwif->OUTB(0x0, base+0x50);
-		hwif->OUTB(0xe0, base+0x70);
-		hwif->OUTB(0x2, base+0x160);   
-		for (j = 0; j < 10; j++) {
-			u8 status;
-			mdelay(100);
-			status = hwif->INB(base+0x70);
-			if (!(status & BUSY_STAT) && (status & DRQ_STAT))
-				break;
-		}
-		break;
-	case ide_cdrom:
-		// todo
-		break;
-	case ide_floppy:
-		// todo
-		break;
-	}
-}
-
-#ifdef CONFIG_PMAC_PBOOK
-static void __pmac
-idepmac_wake_device(ide_drive_t *drive, int used_dma)
-{
-	/* We force the IDE subdriver to check for a media change
-	 * This must be done first or we may lost the condition
-	 *
-	 * Problem: This can schedule. I moved the block device
-	 * wakeup almost late by priority because of that.
-	 */
-	//if (DRIVER(drive))
-	//	check_disk_change(MKDEV(drive->disk->major, drive->disk->first_minor));
-	
-#ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
-	/* We re-enable DMA on the drive if it was active. */
-	/* This doesn't work with the CD-ROM in the media-bay, probably
-	 * because of a pending unit attention. The problem if that if I
-	 * clear the error, the filesystem dies.
-	 */
-	if (used_dma && !ide_spin_wait_hwgroup(drive)) {
-		/* Lock HW group */
-		HWGROUP(drive)->busy = 1;
-		pmac_ide_dma_check(drive);
-		HWGROUP(drive)->busy = 0;
-		if (!list_empty(&drive->queue.queue_head))
-			ide_do_request(HWGROUP(drive), 0);
-		spin_unlock_irq(&ide_lock);
-	}
-#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */
-}
-
-static void __pmac
-idepmac_sleep_interface(pmac_ide_hwif_t *pmif, unsigned base, int mediabay)
-{
-	struct device_node* np = pmif->node;
-
-	/* We clear the timings */
-	pmif->timings[0] = 0;
-	pmif->timings[1] = 0;
-	
-	/* The media bay will handle itself just fine */
-	if (mediabay)
-		return;
-	
-	/* Disable the bus */
-	ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, pmif->aapl_bus_id, 0);
-}
-
-static void __pmac
-idepmac_wake_interface(pmac_ide_hwif_t *pmif, unsigned long base, int mediabay)
-{
-	struct device_node* np = pmif->node;
-
-	if (!mediabay) {
-		/* Revive IDE disk and controller */
-		ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 1);
-		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, pmif->aapl_bus_id, 1);
-		mdelay(10);
-		ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 0);
-	}
-}
-
-static void
-idepmac_sleep_drive(ide_drive_t *drive, unsigned long base)
-{
-	int unlock = 0;
-
-	/* Wait for HW group to complete operations */
-	if (ide_spin_wait_hwgroup(drive)) {
-		// What can we do here ? Wake drive we had already
-		// put to sleep and return an error ?
-	} else {
-		unlock = 1;
-		/* Lock HW group */
-		HWGROUP(drive)->busy = 1;
-		/* Stop the device */
-		idepmac_sleep_device(drive, base);
-	}
-	if (unlock)
-		spin_unlock_irq(&ide_lock);
-}
-
-static void
-idepmac_wake_drive(ide_drive_t *drive, unsigned long base)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	unsigned long flags;
-	int j;
-	
-	/* Reset timings */
-	pmac_ide_selectproc(drive);
-	mdelay(10);
-	
-	/* Wait up to 20 seconds for the drive to be ready */
-	for (j = 0; j < 200; j++) {
-		u8 status = 0;
-		mdelay(100);
-		hwif->OUTB(drive->select.all, base + 0x60);
-		if ((hwif->INB(base + 0x60)) != drive->select.all)
-			continue;
-		status = hwif->INB(base + 0x70);
-		if (!(status & BUSY_STAT))
+	hwif->atapi_dma = 1;
+	switch(pmif->kind) {
+		case controller_un_ata6:
+			hwif->ultra_mask = pmif->cable_80 ? 0x3f : 0x07;
+			hwif->mwdma_mask = 0x07;
+			hwif->swdma_mask = 0x00;
 			break;
-	}
-
-	/* We resume processing on the HW group */
-	spin_lock_irqsave(&ide_lock, flags);
-	HWGROUP(drive)->busy = 0;
-	if (!list_empty(&drive->queue.queue_head))
-		ide_do_request(HWGROUP(drive), 0);
-	spin_unlock_irqrestore(&ide_lock, flags);
+		case controller_kl_ata4:
+			hwif->ultra_mask = pmif->cable_80 ? 0x1f : 0x07;
+			hwif->mwdma_mask = 0x07;
+			hwif->swdma_mask = 0x00;
+			break;
+		default:
+			hwif->ultra_mask = 0x00;
+			hwif->mwdma_mask = 0x07;
+			hwif->swdma_mask = 0x00;
+			break;
+	}	
 }
 
-/* Note: We support only master drives for now. This will have to be
- * improved if we want to handle sleep on the iMacDV where the CD-ROM
- * is a slave
- */
-static int __pmac
-idepmac_notify_sleep(struct pmu_sleep_notifier *self, int when)
-{
-	int i, ret;
-	unsigned long base;
-	int big_delay;
- 
-	switch (when) {
-	case PBOOK_SLEEP_REQUEST:
-		break;
-	case PBOOK_SLEEP_REJECT:
-		break;
-	case PBOOK_SLEEP_NOW:
-		for (i = 0; i < pmac_ide_count; ++i) {
-			ide_hwif_t *hwif;
-			int dn;
-
-			if ((base = pmac_ide[i].regbase) == 0)
-				continue;
-
-			hwif = &ide_hwifs[i];
-			for (dn=0; dn<MAX_DRIVES; dn++) {
-				if (!hwif->drives[dn].present)
-					continue;
-				idepmac_sleep_drive(&hwif->drives[dn], base);
-			}
-			/* Disable irq during sleep */
-			disable_irq(pmac_ide[i].irq);
-			
-			/* Check if this is a media bay with an IDE device or not
-			 * a media bay.
-			 */
-			ret = check_media_bay_by_base(base, MB_CD);
-			if ((ret == 0) || (ret == -ENODEV))
-				idepmac_sleep_interface(&pmac_ide[i], base, (ret == 0));
-		}
-		break;
-	case PBOOK_WAKE:
-		big_delay = 0;
-		for (i = 0; i < pmac_ide_count; ++i) {
-
-			if ((base = pmac_ide[i].regbase) == 0)
-				continue;
-				
-			/* Make sure we have sane timings */		
-			sanitize_timings(&pmac_ide[i]);
-
-			/* Check if this is a media bay with an IDE device or not
-			 * a media bay
-			 */
-			ret = check_media_bay_by_base(base, MB_CD);
-			if ((ret == 0) || (ret == -ENODEV)) {
-				idepmac_wake_interface(&pmac_ide[i], base, (ret == 0));				
-				big_delay = 1;
-			}
-
-		}
-		/* Let hardware get up to speed */
-		if (big_delay)
-			mdelay(IDE_WAKEUP_DELAY_MS);
-	
-		for (i = 0; i < pmac_ide_count; ++i) {
-			ide_hwif_t *hwif;
-			int used_dma, dn;
-			int irq_on = 0;
-			
-			if ((base = pmac_ide[i].regbase) == 0)
-				continue;
-				
-			hwif = &ide_hwifs[i];
-			for (dn=0; dn<MAX_DRIVES; dn++) {
-				ide_drive_t *drive = &hwif->drives[dn];
-				if (!drive->present)
-					continue;
-				/* We don't have re-configured DMA yet */
-				used_dma = drive->using_dma;
-				drive->using_dma = 0;
-				idepmac_wake_drive(drive, base);
-				if (!irq_on) {
-					enable_irq(pmac_ide[i].irq);
-					irq_on = 1;
-				}
-				idepmac_wake_device(drive, used_dma);
-			}
-			if (!irq_on)
-				enable_irq(pmac_ide[i].irq);
-		}
-		break;
-	}
-	return PBOOK_SLEEP_OK;
-}
-#endif /* CONFIG_PMAC_PBOOK */
+#endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */

@@ -66,9 +66,11 @@ drivers-$(CONFIG_IA64_HP_SIM)	+= arch/ia64/hp/sim/
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/
 drivers-$(CONFIG_IA64_GENERIC)	+= arch/ia64/hp/common/ arch/ia64/hp/zx1/ arch/ia64/hp/sim/
 
-boot := arch/ia64/boot
+boot := arch/ia64/hp/sim/boot
 
 .PHONY: boot compressed check
+
+all: compressed
 
 compressed: vmlinux.gz
 
@@ -100,6 +102,6 @@ boot:	lib/lib.a vmlinux
 
 
 define archhelp
-  echo '  compressed	- Build compressed kernel image'
+  echo '* compressed	- Build compressed kernel image'
   echo '  boot		- Build vmlinux and bootloader for Ski simulator'
 endef

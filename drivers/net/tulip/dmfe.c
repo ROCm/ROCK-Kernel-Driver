@@ -296,7 +296,7 @@ static int dmfe_start_xmit(struct sk_buff *, struct DEVICE *);
 static int dmfe_stop(struct DEVICE *);
 static struct net_device_stats * dmfe_get_stats(struct DEVICE *);
 static void dmfe_set_filter_mode(struct DEVICE *);
-static int dmfe_do_ioctl(struct DEVICE *, struct ifreq *, int);
+static struct ethtool_ops netdev_ethtool_ops;
 static u16 read_srom_word(long ,int);
 static irqreturn_t dmfe_interrupt(int , void *, struct pt_regs *);
 static void dmfe_descriptor_init(struct dmfe_board_info *, unsigned long);
@@ -417,7 +417,7 @@ static int __devinit dmfe_init_one (struct pci_dev *pdev,
 	dev->stop = &dmfe_stop;
 	dev->get_stats = &dmfe_get_stats;
 	dev->set_multicast_list = &dmfe_set_filter_mode;
-	dev->do_ioctl = &dmfe_do_ioctl;
+	dev->ethtool_ops = &netdev_ethtool_ops;
 	spin_lock_init(&db->lock);
 
 	pci_read_config_dword(pdev, 0x50, &pci_pmr);
@@ -1000,55 +1000,23 @@ static void dmfe_set_filter_mode(struct DEVICE * dev)
 	spin_unlock_irqrestore(&db->lock, flags);
 }
 
-
-/*
- *	Process the ethtool ioctl command
- */
-
-static int dmfe_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static void netdev_get_drvinfo(struct net_device *dev,
+			       struct ethtool_drvinfo *info)
 {
-	struct dmfe_board_info *db = dev->priv;
-	struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-	u32 ethcmd;
+	struct dmfe_board_info *np = dev->priv;
 
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-        switch (ethcmd) {
-        case ETHTOOL_GDRVINFO:
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		if (db->pdev)
-			strcpy(info.bus_info, pci_name(db->pdev));
-		else
-			sprintf(info.bus_info, "EISA 0x%lx %d",
-				dev->base_addr, dev->irq);
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-        }
-
-	return -EOPNOTSUPP;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	if (np->pdev)
+		strcpy(info->bus_info, pci_name(np->pdev));
+	else
+		sprintf(info->bus_info, "EISA 0x%lx %d",
+			dev->base_addr, dev->irq);
 }
 
-
-/*
- *	Process the upper socket ioctl command
- */
-
-static int dmfe_do_ioctl(struct DEVICE *dev, struct ifreq *ifr, int cmd)
-{
-	int retval = -EOPNOTSUPP;
-	DMFE_DBUG(0, "dmfe_do_ioctl()", 0);
-
-	switch(cmd) {
-	case SIOCETHTOOL:
-		return dmfe_ethtool_ioctl(dev, (void*)ifr->ifr_data);
-	}
-
-	return retval;
-}
-
+static struct ethtool_ops netdev_ethtool_ops = {
+	.get_drvinfo		= netdev_get_drvinfo,
+};
 
 /*
  *	A periodic timer routine

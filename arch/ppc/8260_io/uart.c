@@ -50,6 +50,10 @@
 #include <asm/cpm_8260.h>
 #include <asm/irq.h>
 
+#ifdef CONFIG_MAGIC_SYSRQ
+#include <linux/sysrq.h>
+#endif
+
 #ifdef CONFIG_SERIAL_CONSOLE
 #include <linux/console.h>
 
@@ -76,6 +80,14 @@ static char *serial_version = "0.02";
 
 static struct tty_driver *serial_driver;
 static int serial_console_setup(struct console *co, char *options);
+
+static void serial_console_write(struct console *c, const char *s,
+		                                unsigned count);
+static kdev_t serial_console_device(struct console *c);
+
+#if defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+static unsigned long break_pressed; /* break, really ... */
+#endif
 
 /*
  * Serial driver configuration section.  Here are the various options:
@@ -208,6 +220,15 @@ typedef struct serial_info {
 	cbd_t			*tx_cur;
 } ser_info_t;
 
+static struct console sercons = {
+	.name =		"ttyS",
+	.write =	serial_console_write,
+	.device =	serial_console_device,
+	.setup =	serial_console_setup,
+	.flags =	CON_PRINTBUFFER,
+	.index =	CONFIG_SERIAL_CONSOLE_PORT,
+};
+
 static void change_speed(ser_info_t *info);
 static void rs_8xx_wait_until_sent(struct tty_struct *tty, int timeout);
 
@@ -328,7 +349,7 @@ static _INLINE_ void rs_sched_event(ser_info_t *info,
 	schedule_work(&info->tqueue);
 }
 
-static _INLINE_ void receive_chars(ser_info_t *info)
+static _INLINE_ void receive_chars(ser_info_t *info, struct pt_regs *regs)
 {
 	struct tty_struct *tty = info->tty;
 	unsigned char ch, *cp;
@@ -450,6 +471,19 @@ static _INLINE_ void receive_chars(ser_info_t *info)
 					}
 				}
 			}
+
+#if defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+			if (break_pressed && info->line == sercons.index) {
+				if (ch != 0 && time_before(jiffies,
+							break_pressed + HZ*5)) {
+					handle_sysrq(ch, regs, NULL, NULL);
+					break_pressed = 0;
+					goto ignore_char;
+				} else
+					break_pressed = 0;
+			}
+#endif
+			
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
 				break;
 
@@ -457,6 +491,10 @@ static _INLINE_ void receive_chars(ser_info_t *info)
 			tty->flip.char_buf_ptr++;
 			tty->flip.count++;
 		}
+
+#if defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+	ignore_char:
+#endif
 
 		/* This BD is ready to be used again.  Clear status.
 		 * Get next BD.
@@ -475,7 +513,36 @@ static _INLINE_ void receive_chars(ser_info_t *info)
 	schedule_delayed_work(&tty->flip.work, 1);
 }
 
-static _INLINE_ void transmit_chars(ser_info_t *info)
+static _INLINE_ void receive_break(ser_info_t *info, struct pt_regs *regs)
+{
+	struct tty_struct *tty = info->tty;
+
+	info->state->icount.brk++;
+
+#if defined(CONFIG_SERIAL_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+	if (info->line == sercons.index) {
+		if (!break_pressed) {
+			break_pressed = jiffies;
+			return;
+		} else
+			break_pressed = 0;
+	}
+#endif
+
+	/* Check to see if there is room in the tty buffer for
+	 * the break.  If not, we exit now, losing the break.  FIXME
+	 */
+	if ((tty->flip.count + 1) >= TTY_FLIPBUF_SIZE)
+		return;
+	*(tty->flip.flag_buf_ptr++) = TTY_BREAK;
+	*(tty->flip.char_buf_ptr++) = 0;
+	tty->flip.count++;
+
+	queue_task(&tty->flip.tqueue, &tq_timer);
+}
+
+
+static _INLINE_ void transmit_chars(ser_info_t *info, struct pt_regs *regs)
 {
 	
 	if (info->flags & TX_WAKEUP) {
@@ -575,19 +642,23 @@ static irqreturn_t rs_8xx_interrupt(int irq, void * dev_id, struct pt_regs * reg
 	if ((idx = info->state->smc_scc_num) < SCC_NUM_BASE) {
 		smcp = &immr->im_smc[idx];
 		events = smcp->smc_smce;
+		if (events & SMCM_BRKE)
+			receive_break(info, regs);
 		if (events & SMCM_RX)
-			receive_chars(info);
+			receive_chars(info, regs);
 		if (events & SMCM_TX)
-			transmit_chars(info);
+			transmit_chars(info, regs);
 		smcp->smc_smce = events;
 	}
 	else {
 		sccp = &immr->im_scc[idx - SCC_IDX_BASE];
 		events = sccp->scc_scce;
+		if (events & SMCM_BRKE)
+			receive_break(info, regs);
 		if (events & SCCM_RX)
-			receive_chars(info);
+			receive_chars(info, regs);
 		if (events & SCCM_TX)
-			transmit_chars(info);
+			transmit_chars(info, regs);
 		sccp->scc_scce = events;
 	}
 	
@@ -2207,7 +2278,7 @@ static void my_console_write(int idx, const char *s,
 static void serial_console_write(struct console *c, const char *s,
 				unsigned count)
 {
-#if defined(CONFIG_KGDB) && !defined(CONFIG_USE_SERIAL2_KGDB)
+#if defined(CONFIG_KGDB_CONSOLE) && !defined(CONFIG_USE_SERIAL2_KGDB)
 	/* Try to let stub handle output. Returns true if it did. */ 
 	if (kgdb_output_string(s, count))
 		return;
@@ -2391,21 +2462,11 @@ void kgdb_map_scc(void)
 }
 #endif
 
-static kdev_t serial_console_device(struct console *c)
+static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
 	*index = c->index;
 	return serial_driver;
 }
-
-
-static struct console sercons = {
-	.name =		"ttyS",
-	.write =	serial_console_write,
-	.device =	serial_console_device,
-	.setup =	serial_console_setup,
-	.flags =	CON_PRINTBUFFER,
-	.index =	CONFIG_SERIAL_CONSOLE_PORT,
-};
 
 /*
  *	Register console.

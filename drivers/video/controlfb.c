@@ -475,7 +475,7 @@ try_again:
 
 	/* Apply default var */
 	var.activate = FB_ACTIVATE_NOW;
-	rc = fb_set_var(&var, &p->info);
+	rc = fb_set_var(&p->info, &var);
 	if (rc && (vmode != VMODE_640_480_60 || cmode != CMODE_8))
 		goto try_again;
 

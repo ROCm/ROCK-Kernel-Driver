@@ -1,7 +1,14 @@
-/* AE-3068 (aka. aki3068net) RTL8019AS Config */
+/* AE-3068 board depend header */
 
-#ifndef __H8300_AKI3068NET_NE__
-#define __H8300_AKI3068NET_NE__
+/* TIMER rate define */
+#ifdef H8300_TIMER_DEFINE
+#include <linux/config.h>
+#define H8300_TIMER_COUNT_DATA 20000*10/8192
+#define H8300_TIMER_FREQ 20000*1000/8192
+#endif
+
+/* AE-3068 RTL8019AS Config */
+#ifdef H8300_NE_DEFINE
 
 #define NE2000_ADDR		0x200000
 #define NE2000_IRQ              5

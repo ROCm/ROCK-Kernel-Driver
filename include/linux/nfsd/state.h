@@ -113,21 +113,15 @@ struct nfs4_stateowner {
 	int                     so_confirmed; /* successful OPEN_CONFIRM? */
 };
 
-typedef struct {
-	u32                     dev; /* super_block->s_dev */
-	unsigned long           ino;
-	u32                     generation;
-} nfs4_ino_desc_t;
-
 /*
 *  nfs4_file: a file opened by some number of (open) nfs4_stateowners.
 *    o fi_perfile list is used to search for conflicting 
 *      share_acces, share_deny on the file.
 */
 struct nfs4_file {
-	struct list_head        fi_hash;    /* hash by nfs4_ino_desc_t fields */
+	struct list_head        fi_hash;    /* hash by "struct inode *" */
 	struct list_head        fi_perfile; /* list: nfs4_stateid */
-	nfs4_ino_desc_t         fi_ino;
+	struct inode		*fi_inode;
 	u32                     fi_id;      /* used with stateowner->so_id 
 					     * for openstateid_hashtbl hash */
 };

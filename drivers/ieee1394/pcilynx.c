@@ -875,7 +875,7 @@ static void aux_setup_pcls(struct ti_lynx *lynx)
 
 static int mem_open(struct inode *inode, struct file *file)
 {
-        int cid = minor(inode->i_rdev);
+        int cid = iminor(inode);
         enum { t_rom, t_aux, t_ram } type;
         struct memdata *md;
         

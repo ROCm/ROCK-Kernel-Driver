@@ -225,7 +225,6 @@ struct tss_struct {
 	 * 8 bytes, for an extra "long" of ~0UL
 	 */
 	unsigned long io_bitmap[IO_BITMAP_LONGS + 1];
-	u32 __cacheline_filler[4];      /* size is 0x100 */
 } __attribute__((packed)) ____cacheline_aligned;
 
 struct thread_struct {

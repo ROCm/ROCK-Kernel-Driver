@@ -22,8 +22,6 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#include "ide_modes.h"
-
 /*
  *	IDE library routines. These are plug in code that most 
  *	drivers can use but occasionally may be weird enough
@@ -170,7 +168,7 @@ u8 ide_rate_filter (u8 mode, u8 speed)
 		BUG();
 	return min(speed, speed_max[mode]);
 #else /* !CONFIG_BLK_DEV_IDEDMA */
-	return min(speed, XFER_PIO_4);
+	return min(speed, (u8)XFER_PIO_4);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
@@ -188,6 +186,12 @@ int ide_dma_enable (ide_drive_t *drive)
 
 EXPORT_SYMBOL(ide_dma_enable);
 
+/*
+ * Standard (generic) timings for PIO modes, from ATA2 specification.
+ * These timings are for access to the IDE data port register *only*.
+ * Some drives may specify a mode, while also specifying a different
+ * value for cycle_time (from drive identification data).
+ */
 const ide_pio_timings_t ide_pio_timings[6] = {
 	{ 70,	165,	600 },	/* PIO Mode 0 */
 	{ 50,	125,	383 },	/* PIO Mode 1 */
@@ -198,6 +202,13 @@ const ide_pio_timings_t ide_pio_timings[6] = {
 };
 
 EXPORT_SYMBOL_GPL(ide_pio_timings);
+
+/*
+ * Shared data/functions for determining best PIO mode for an IDE drive.
+ * Most of this stuff originally lived in cmd640.c, and changes to the
+ * ide_pio_blacklist[] table should be made with EXTREME CAUTION to avoid
+ * breaking the fragile cmd640.c support.
+ */
 
 /*
  * Black list. Some drives incorrectly report their maximal PIO mode,

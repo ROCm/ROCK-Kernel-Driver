@@ -147,7 +147,7 @@ unsigned long isa_io_base = SPRUCE_ISA_IO_BASE;
 #define MEM_B2EA	0x60
 
 unsigned long
-decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
+load_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 {
 	int timer = 0;
 	char *cp, ch;

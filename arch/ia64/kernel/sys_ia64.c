@@ -242,7 +242,7 @@ sys_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, l
 asmlinkage unsigned long
 sys_mmap (unsigned long addr, unsigned long len, int prot, int flags, int fd, long off)
 {
-	if ((off & ~PAGE_MASK) != 0)
+	if (offset_in_page(off) != 0)
 		return -EINVAL;
 
 	addr = do_mmap2(addr, len, prot, flags, fd, off >> PAGE_SHIFT);

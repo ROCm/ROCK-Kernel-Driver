@@ -24,6 +24,7 @@
 #include <linux/wait.h>
 #include <linux/compat.h>
 
+#include <asm/intrinsics.h>
 #include <asm/uaccess.h>
 #include <asm/rse.h>
 #include <asm/sigcontext.h>
@@ -41,6 +42,11 @@
 #define __IA32_NR_sigreturn            119
 #define __IA32_NR_rt_sigreturn         173
 
+#ifdef ASM_SUPPORTED
+/*
+ * Don't let GCC uses f16-f31 so that save_ia32_fpstate_live() and
+ * restore_ia32_fpstate_live() can be sure the live register contain user-level state.
+ */
 register double f16 asm ("f16"); register double f17 asm ("f17");
 register double f18 asm ("f18"); register double f19 asm ("f19");
 register double f20 asm ("f20"); register double f21 asm ("f21");
@@ -50,6 +56,7 @@ register double f24 asm ("f24"); register double f25 asm ("f25");
 register double f26 asm ("f26"); register double f27 asm ("f27");
 register double f28 asm ("f28"); register double f29 asm ("f29");
 register double f30 asm ("f30"); register double f31 asm ("f31");
+#endif
 
 struct sigframe_ia32
 {
@@ -198,30 +205,6 @@ copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
  *    All other fields unused...
  */
 
-#define __ldfe(regnum, x)						\
-({									\
- 	register double __f__ asm ("f"#regnum);				\
-	__asm__ __volatile__ ("ldfe %0=[%1] ;;" :"=f"(__f__): "r"(x));	\
-})
-
-#define __ldf8(regnum, x)						\
-({									\
- 	register double __f__ asm ("f"#regnum);				\
-	__asm__ __volatile__ ("ldf8 %0=[%1] ;;" :"=f"(__f__): "r"(x));	\
-})
-
-#define __stfe(x, regnum)							\
-({										\
- 	register double __f__ asm ("f"#regnum);					\
-	__asm__ __volatile__ ("stfe [%0]=%1" :: "r"(x), "f"(__f__) : "memory");	\
-})
-
-#define __stf8(x, regnum)							\
-({										\
- 	register double __f__ asm ("f"#regnum);					\
-	__asm__ __volatile__ ("stf8 [%0]=%1" :: "r"(x), "f"(__f__) : "memory");	\
-})
-
 static int
 save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 {
@@ -238,18 +221,19 @@ save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	if (!access_ok(VERIFY_WRITE, save, sizeof(*save)))
 		return -EFAULT;
 
-	/* Readin fsr, fcr, fir, fdr and copy onto fpstate */
-	asm volatile ( "mov %0=ar.fsr;" : "=r"(fsr));
-	asm volatile ( "mov %0=ar.fcr;" : "=r"(fcr));
-	asm volatile ( "mov %0=ar.fir;" : "=r"(fir));
-	asm volatile ( "mov %0=ar.fdr;" : "=r"(fdr));
+	/* Read in fsr, fcr, fir, fdr and copy onto fpstate */
+	fsr = ia64_getreg(_IA64_REG_AR_FSR);
+	fcr = ia64_getreg(_IA64_REG_AR_FCR);
+	fir = ia64_getreg(_IA64_REG_AR_FIR);
+	fdr = ia64_getreg(_IA64_REG_AR_FDR);
+
 	/*
 	 * We need to clear the exception state before calling the signal handler. Clear
 	 * the bits 15, bits 0-7 in fp status word. Similar to the functionality of fnclex
 	 * instruction.
 	 */
 	new_fsr = fsr & ~0x80ff;
-	asm volatile ( "mov ar.fsr=%0;" :: "r"(new_fsr));
+	ia64_setreg(_IA64_REG_AR_FSR, new_fsr);
 
 	__put_user(fcr & 0xffff, &save->cw);
 	__put_user(fsr & 0xffff, &save->sw);
@@ -286,45 +270,45 @@ save_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	ia64f2ia32f(fpregp, &ptp->f11);
 	copy_to_user(&save->_st[(3+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
 
-	__stfe(fpregp, 12);
+	ia64_stfe(fpregp, 12);
 	copy_to_user(&save->_st[(4+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
-	__stfe(fpregp, 13);
+	ia64_stfe(fpregp, 13);
 	copy_to_user(&save->_st[(5+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
-	__stfe(fpregp, 14);
+	ia64_stfe(fpregp, 14);
 	copy_to_user(&save->_st[(6+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
-	__stfe(fpregp, 15);
+	ia64_stfe(fpregp, 15);
 	copy_to_user(&save->_st[(7+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
 
-	__stf8(&num128[0], 16);
-	__stf8(&num128[1], 17);
+	ia64_stf8(&num128[0], 16);
+	ia64_stf8(&num128[1], 17);
 	copy_to_user(&save->_xmm[0], num128, sizeof(struct _xmmreg_ia32));
 
-	__stf8(&num128[0], 18);
-	__stf8(&num128[1], 19);
+	ia64_stf8(&num128[0], 18);
+	ia64_stf8(&num128[1], 19);
 	copy_to_user(&save->_xmm[1], num128, sizeof(struct _xmmreg_ia32));
 
-	__stf8(&num128[0], 20);
-	__stf8(&num128[1], 21);
+	ia64_stf8(&num128[0], 20);
+	ia64_stf8(&num128[1], 21);
 	copy_to_user(&save->_xmm[2], num128, sizeof(struct _xmmreg_ia32));
 
-	__stf8(&num128[0], 22);
-	__stf8(&num128[1], 23);
+	ia64_stf8(&num128[0], 22);
+	ia64_stf8(&num128[1], 23);
 	copy_to_user(&save->_xmm[3], num128, sizeof(struct _xmmreg_ia32));
 
-	__stf8(&num128[0], 24);
-	__stf8(&num128[1], 25);
+	ia64_stf8(&num128[0], 24);
+	ia64_stf8(&num128[1], 25);
 	copy_to_user(&save->_xmm[4], num128, sizeof(struct _xmmreg_ia32));
 
-	__stf8(&num128[0], 26);
-	__stf8(&num128[1], 27);
+	ia64_stf8(&num128[0], 26);
+	ia64_stf8(&num128[1], 27);
 	copy_to_user(&save->_xmm[5], num128, sizeof(struct _xmmreg_ia32));
 
-	__stf8(&num128[0], 28);
-	__stf8(&num128[1], 29);
+	ia64_stf8(&num128[0], 28);
+	ia64_stf8(&num128[1], 29);
 	copy_to_user(&save->_xmm[6], num128, sizeof(struct _xmmreg_ia32));
 
-	__stf8(&num128[0], 30);
-	__stf8(&num128[1], 31);
+	ia64_stf8(&num128[0], 30);
+	ia64_stf8(&num128[1], 31);
 	copy_to_user(&save->_xmm[7], num128, sizeof(struct _xmmreg_ia32));
 	return 0;
 }
@@ -354,10 +338,10 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	 *   should remain same while writing.
 	 * So, we do a read, change specific fields and write.
 	 */
-	asm volatile ( "mov %0=ar.fsr;" : "=r"(fsr));
-	asm volatile ( "mov %0=ar.fcr;" : "=r"(fcr));
-	asm volatile ( "mov %0=ar.fir;" : "=r"(fir));
-	asm volatile ( "mov %0=ar.fdr;" : "=r"(fdr));
+	fsr = ia64_getreg(_IA64_REG_AR_FSR);
+	fcr = ia64_getreg(_IA64_REG_AR_FCR);
+	fir = ia64_getreg(_IA64_REG_AR_FIR);
+	fdr = ia64_getreg(_IA64_REG_AR_FDR);
 
 	__get_user(mxcsr, (unsigned int *)&save->mxcsr);
 	/* setting bits 0..5 8..12 with cw and 39..47 from mxcsr */
@@ -391,10 +375,10 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	num64 = (num64 << 32) | lo;
 	fdr = (fdr & (~0xffffffffffff)) | num64;
 
-	asm volatile ( "mov ar.fsr=%0;" :: "r"(fsr));
-	asm volatile ( "mov ar.fcr=%0;" :: "r"(fcr));
-	asm volatile ( "mov ar.fir=%0;" :: "r"(fir));
-	asm volatile ( "mov ar.fdr=%0;" :: "r"(fdr));
+	ia64_setreg(_IA64_REG_AR_FSR, fsr);
+	ia64_setreg(_IA64_REG_AR_FCR, fcr);
+	ia64_setreg(_IA64_REG_AR_FIR, fir);
+	ia64_setreg(_IA64_REG_AR_FDR, fdr);
 
 	/*
 	 * restore f8..f11 onto pt_regs
@@ -420,45 +404,45 @@ restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
 	ia32f2ia64f(&ptp->f11, fpregp);
 
 	copy_from_user(fpregp, &save->_st[(4+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
-	__ldfe(12, fpregp);
+	ia64_ldfe(12, fpregp);
 	copy_from_user(fpregp, &save->_st[(5+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
-	__ldfe(13, fpregp);
+	ia64_ldfe(13, fpregp);
 	copy_from_user(fpregp, &save->_st[(6+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
-	__ldfe(14, fpregp);
+	ia64_ldfe(14, fpregp);
 	copy_from_user(fpregp, &save->_st[(7+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
-	__ldfe(15, fpregp);
+	ia64_ldfe(15, fpregp);
 
 	copy_from_user(num128, &save->_xmm[0], sizeof(struct _xmmreg_ia32));
-	__ldf8(16, &num128[0]);
-	__ldf8(17, &num128[1]);
+	ia64_ldf8(16, &num128[0]);
+	ia64_ldf8(17, &num128[1]);
 
 	copy_from_user(num128, &save->_xmm[1], sizeof(struct _xmmreg_ia32));
-	__ldf8(18, &num128[0]);
-	__ldf8(19, &num128[1]);
+	ia64_ldf8(18, &num128[0]);
+	ia64_ldf8(19, &num128[1]);
 
 	copy_from_user(num128, &save->_xmm[2], sizeof(struct _xmmreg_ia32));
-	__ldf8(20, &num128[0]);
-	__ldf8(21, &num128[1]);
+	ia64_ldf8(20, &num128[0]);
+	ia64_ldf8(21, &num128[1]);
 
 	copy_from_user(num128, &save->_xmm[3], sizeof(struct _xmmreg_ia32));
-	__ldf8(22, &num128[0]);
-	__ldf8(23, &num128[1]);
+	ia64_ldf8(22, &num128[0]);
+	ia64_ldf8(23, &num128[1]);
 
 	copy_from_user(num128, &save->_xmm[4], sizeof(struct _xmmreg_ia32));
-	__ldf8(24, &num128[0]);
-	__ldf8(25, &num128[1]);
+	ia64_ldf8(24, &num128[0]);
+	ia64_ldf8(25, &num128[1]);
 
 	copy_from_user(num128, &save->_xmm[5], sizeof(struct _xmmreg_ia32));
-	__ldf8(26, &num128[0]);
-	__ldf8(27, &num128[1]);
+	ia64_ldf8(26, &num128[0]);
+	ia64_ldf8(27, &num128[1]);
 
 	copy_from_user(num128, &save->_xmm[6], sizeof(struct _xmmreg_ia32));
-	__ldf8(28, &num128[0]);
-	__ldf8(29, &num128[1]);
+	ia64_ldf8(28, &num128[0]);
+	ia64_ldf8(29, &num128[1]);
 
 	copy_from_user(num128, &save->_xmm[7], sizeof(struct _xmmreg_ia32));
-	__ldf8(30, &num128[0]);
-	__ldf8(31, &num128[1]);
+	ia64_ldf8(30, &num128[0]);
+	ia64_ldf8(31, &num128[1]);
 	return 0;
 }
 
@@ -705,7 +689,7 @@ setup_sigcontext_ia32 (struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate
 	/*
 	 *  `eflags' is in an ar register for this context
 	 */
-	asm volatile ("mov %0=ar.eflag ;;" : "=r"(flag));
+	flag = ia64_getreg(_IA64_REG_AR_EFLAG);
 	err |= __put_user((unsigned int)flag, &sc->eflags);
 	err |= __put_user(regs->r12, &sc->esp_at_signal);
 	err |= __put_user((regs->r17 >> 16) & 0xffff, (unsigned int *)&sc->ss);
@@ -790,10 +774,10 @@ restore_sigcontext_ia32 (struct pt_regs *regs, struct sigcontext_ia32 *sc, int *
 		 *  IA32 process's context.
 		 */
 		err |= __get_user(tmpflags, &sc->eflags);
-		asm volatile ("mov %0=ar.eflag ;;" : "=r"(flag));
+		flag = ia64_getreg(_IA64_REG_AR_EFLAG);
 		flag &= ~0x40DD5;
 		flag |= (tmpflags & 0x40DD5);
-		asm volatile ("mov ar.eflag=%0 ;;" :: "r"(flag));
+		ia64_setreg(_IA64_REG_AR_EFLAG, flag);
 
 		regs->r1 = -1;	/* disable syscall checks, r1 is orig_eax */
 	}

@@ -33,23 +33,6 @@
 #include <asm/regs267x.h>
 #include <asm/errno.h>
 
-#define EXT_IRQ0 16
-#define EXT_IRQ1 17
-#define EXT_IRQ2 18
-#define EXT_IRQ3 19
-#define EXT_IRQ4 20
-#define EXT_IRQ5 21
-#define EXT_IRQ6 22
-#define EXT_IRQ7 23
-#define EXT_IRQ8 24
-#define EXT_IRQ9 25
-#define EXT_IRQ10 26
-#define EXT_IRQ11 27
-#define EXT_IRQ12 28
-#define EXT_IRQ13 29
-#define EXT_IRQ14 30
-#define EXT_IRQ15 31
-
 /*
  * This structure has only 4 elements for speed reasons
  */
@@ -91,19 +74,24 @@ const static struct irq_pins irq_assign_table1[16]={
 	{H8300_GPIO_P2,H8300_GPIO_B6},{H8300_GPIO_P2,H8300_GPIO_B7},
 };
 
+static int use_kmalloc;
+
 extern unsigned long *interrupt_redirect_table;
+
+#define CPU_VECTOR ((unsigned long *)0x000000)
+#define ADDR_MASK (0xffffff)
 
 static inline unsigned long *get_vector_address(void)
 {
-	volatile unsigned long *rom_vector = (unsigned long *)0x000000;
+	volatile unsigned long *rom_vector = CPU_VECTOR;
 	unsigned long base,tmp;
 	int vec_no;
 
-	base = rom_vector[EXT_IRQ0];
+	base = rom_vector[EXT_IRQ0] & ADDR_MASK;
 	
 	/* check romvector format */
 	for (vec_no = EXT_IRQ1; vec_no <= EXT_IRQ15; vec_no++) {
-		if ((base+(vec_no - EXT_IRQ0)*4) != rom_vector[vec_no])
+		if ((base+(vec_no - EXT_IRQ0)*4) != (rom_vector[vec_no] & ADDR_MASK))
 			return NULL;
 	}
 
@@ -159,22 +147,6 @@ void __init init_IRQ(void)
 #endif
 }
 
-/* special request_irq */
-/* used bootmem allocater */
-void __init request_irq_boot(unsigned int irq, 
-  	                     irqreturn_t (*handler)(int, void *, struct pt_regs *),
-                             unsigned long flags, const char *devname, void *dev_id)
-{
-	irq_handler_t *irq_handle;
-	irq_handle = alloc_bootmem(sizeof(irq_handler_t));
-	irq_handle->handler = handler;
-	irq_handle->flags   = flags;
-	irq_handle->count   = 0;
-	irq_handle->dev_id  = dev_id;
-	irq_handle->devname = devname;
-	irq_list[irq] = irq_handle;
-}
-
 int request_irq(unsigned int irq,
 		irqreturn_t (*handler)(int, void *, struct pt_regs *),
                 unsigned long flags, const char *devname, void *dev_id)
@@ -202,7 +174,14 @@ int request_irq(unsigned int irq,
 		H8300_GPIO_DDR(port_no, bit_no, H8300_GPIO_INPUT);
 		*(volatile unsigned short *)ISR &= ~ptn; /* ISR clear */
 	}		
-	irq_handle = (irq_handler_t *)kmalloc(sizeof(irq_handler_t), GFP_ATOMIC);
+
+	if (use_kmalloc)
+		irq_handle = (irq_handler_t *)kmalloc(sizeof(irq_handler_t), GFP_ATOMIC);
+	else {
+		irq_handle = alloc_bootmem(sizeof(irq_handler_t));
+		(unsigned long)irq_handle |= 0x80000000; /* bootmem allocater */
+	}
+
 	if (irq_handle == NULL)
 		return -ENOMEM;
 
@@ -243,8 +222,10 @@ void free_irq(unsigned int irq, void *dev_id)
 		}
 		H8300_GPIO_FREE(port_no, bit_no);
 	}
-	kfree(irq_list[irq]);
-	irq_list[irq] = NULL;
+	if (((unsigned long)irq_list[irq] & 0x80000000) == 0) {
+		kfree(irq_list[irq]);
+		irq_list[irq] = NULL;
+	}
 }
 
 unsigned long probe_irq_on (void)
@@ -306,3 +287,10 @@ int show_interrupts(struct seq_file *p, void *v)
 void init_irq_proc(void)
 {
 }
+
+static int __init enable_kmalloc(void)
+{
+	use_kmalloc = 1;
+	return 0;
+}
+core_initcall(enable_kmalloc);

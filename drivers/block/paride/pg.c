@@ -527,11 +527,9 @@ static int pg_detect(void)
 	return -1;
 }
 
-#define DEVICE_NR(dev)	(minor(dev) & 0x7F)
-
 static int pg_open(struct inode *inode, struct file *file)
 {
-	int unit = DEVICE_NR(inode->i_rdev);
+	int unit = iminor(inode) & 0x7f;
 	struct pg *dev = &devices[unit];
 
 	if ((unit >= PG_UNITS) || (!dev->present))

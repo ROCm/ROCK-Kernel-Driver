@@ -29,7 +29,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
 #include "sc1200.h"
 
 #define SC1200_REV_A	0x00

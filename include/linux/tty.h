@@ -367,7 +367,7 @@ extern int espserial_init(void);
 extern int macserial_init(void);
 extern int a2232board_init(void);
 
-extern int tty_paranoia_check(struct tty_struct *tty, kdev_t device,
+extern int tty_paranoia_check(struct tty_struct *tty, struct inode *inode,
 			      const char *routine);
 extern char *tty_name(struct tty_struct *tty, char *buf);
 extern void tty_wait_until_sent(struct tty_struct * tty, long timeout);

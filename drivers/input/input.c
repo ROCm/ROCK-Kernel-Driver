@@ -280,7 +280,7 @@ static struct input_device_id *input_match_device(struct input_device_id *id, st
 			if (id->id.product != dev->id.product)
 				continue;
 		
-		if (id->flags & INPUT_DEVICE_ID_MATCH_BUS)
+		if (id->flags & INPUT_DEVICE_ID_MATCH_VERSION)
 			if (id->id.version != dev->id.version)
 				continue;
 
@@ -527,7 +527,7 @@ void input_unregister_handler(struct input_handler *handler)
 
 static int input_open_file(struct inode *inode, struct file *file)
 {
-	struct input_handler *handler = input_table[minor(inode->i_rdev) >> 5];
+	struct input_handler *handler = input_table[iminor(inode) >> 5];
 	struct file_operations *old_fops, *new_fops = NULL;
 	int err;
 

@@ -106,8 +106,10 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 {
 	if (!mps_cpu)
 		return boot_cpu_physical_apicid;
-	else
+	else if (mps_cpu < NR_CPUS)
 		return (int) bios_cpu_apicid[mps_cpu];
+	else
+		return BAD_APICID;
 }
 
 static inline physid_mask_t apicid_to_cpu_present(int phys_apicid)

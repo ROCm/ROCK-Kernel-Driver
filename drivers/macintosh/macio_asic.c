@@ -23,6 +23,8 @@
 #include <asm/prom.h>
 #include <asm/pci-bridge.h>
 
+static struct macio_chip      *macio_on_hold;
+
 static int
 macio_bus_match(struct device *dev, struct device_driver *drv) 
 {
@@ -36,21 +38,27 @@ macio_bus_match(struct device *dev, struct device_driver *drv)
 	return of_match_device(matches, &macio_dev->ofdev) != NULL;
 }
 
-struct bus_type macio_bus_type = {
-       name:	"macio",
-       match:	macio_bus_match,
-};
-
-static int __init
-macio_bus_driver_init(void)
+struct macio_dev *macio_dev_get(struct macio_dev *dev)
 {
-	return bus_register(&macio_bus_type);
+	struct device *tmp;
+
+	if (!dev)
+		return NULL;
+	tmp = get_device(&dev->ofdev.dev);
+	if (tmp)
+		return to_macio_device(tmp);
+	else
+		return NULL;
 }
 
-postcore_initcall(macio_bus_driver_init);
+void macio_dev_put(struct macio_dev *dev)
+{
+	if (dev)
+		put_device(&dev->ofdev.dev);
+}
 
-static int
-macio_device_probe(struct device *dev)
+
+static int macio_device_probe(struct device *dev)
 {
 	int error = -ENODEV;
 	struct macio_driver *drv;
@@ -63,53 +71,87 @@ macio_device_probe(struct device *dev)
 	if (!drv->probe)
 		return error;
 
-/*	if (!try_module_get(driver->owner)) {
-		printk(KERN_ERR "Can't get a module reference for %s\n", driver->name);
-		return error;
-	}
-*/
+	macio_dev_get(macio_dev);
+
 	match = of_match_device(drv->match_table, &macio_dev->ofdev);
 	if (match)
 		error = drv->probe(macio_dev, match);
-/*
- 	module_put(driver->owner);
-*/	
+	if (error)
+		macio_dev_put(macio_dev);
+
 	return error;
 }
 
-static int
-macio_device_remove(struct device *dev)
+static int macio_device_remove(struct device *dev)
 {
 	struct macio_dev * macio_dev = to_macio_device(dev);
 	struct macio_driver * drv = to_macio_driver(macio_dev->ofdev.dev.driver);
 
 	if (drv && drv->remove)
 		drv->remove(macio_dev);
+	macio_dev_put(macio_dev);
+
 	return 0;
 }
 
-static int
-macio_device_suspend(struct device *dev, u32 state, u32 level)
+static int macio_device_suspend(struct device *dev, u32 state)
 {
 	struct macio_dev * macio_dev = to_macio_device(dev);
-	struct macio_driver * drv = to_macio_driver(macio_dev->ofdev.dev.driver);
+	struct macio_driver * drv;
 	int error = 0;
 
-	if (drv && drv->suspend)
-		error = drv->suspend(macio_dev, state, level);
+	if (macio_dev->ofdev.dev.driver == NULL)
+		return 0;
+	drv = to_macio_driver(macio_dev->ofdev.dev.driver);
+	if (drv->suspend)
+		error = drv->suspend(macio_dev, state);
 	return error;
 }
 
-static int
-macio_device_resume(struct device * dev, u32 level)
+static int macio_device_resume(struct device * dev)
 {
 	struct macio_dev * macio_dev = to_macio_device(dev);
-	struct macio_driver * drv = to_macio_driver(macio_dev->ofdev.dev.driver);
+	struct macio_driver * drv;
 	int error = 0;
 
-	if (drv && drv->resume)
-		error = drv->resume(macio_dev, level);
+	if (macio_dev->ofdev.dev.driver == NULL)
+		return 0;
+	drv = to_macio_driver(macio_dev->ofdev.dev.driver);
+	if (drv->resume)
+		error = drv->resume(macio_dev);
 	return error;
+}
+
+struct bus_type macio_bus_type = {
+       .name	= "macio",
+       .match	= macio_bus_match,
+       .suspend	= macio_device_suspend,
+       .resume	= macio_device_resume,
+};
+
+static int __init
+macio_bus_driver_init(void)
+{
+	return bus_register(&macio_bus_type);
+}
+
+postcore_initcall(macio_bus_driver_init);
+
+
+/**
+ * macio_release_dev - free a macio device structure when all users of it are finished.
+ * @dev: device that's been disconnected
+ *
+ * Will be called only by the device core when all users of this macio device are
+ * done. This currently means never as we don't hot remove any macio device yet,
+ * though that will happen with mediabay based devices in a later implementation.
+ */
+static void macio_release_dev(struct device *dev)
+{
+	struct macio_dev *mdev;
+
+        mdev = to_macio_device(dev);
+	kfree(mdev);
 }
 
 /**
@@ -121,13 +163,15 @@ macio_device_resume(struct device * dev, u32 level)
  * When media-bay is changed to hotswap drivers, this function will
  * be exposed to the bay driver some way...
  */
-static struct macio_dev *
-macio_add_one_device(struct macio_chip *chip, struct device *parent,
+static struct macio_dev * macio_add_one_device(struct macio_chip *chip, struct device *parent,
 		     struct device_node *np, struct macio_dev *in_bay)
 {
 	struct macio_dev *dev;
 	u32 *reg;
 	
+	if (np == NULL)
+		return NULL;
+
 	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		return NULL;
@@ -140,6 +184,7 @@ macio_add_one_device(struct macio_chip *chip, struct device *parent,
 	dev->ofdev.dev.dma_mask = &dev->ofdev.dma_mask;
 	dev->ofdev.dev.parent = parent;
 	dev->ofdev.dev.bus = &macio_bus_type;
+	dev->ofdev.dev.release = macio_release_dev;
 
 	/* MacIO itself has a different reg, we use it's PCI base */
 	if (np == chip->of_node) {
@@ -164,8 +209,7 @@ macio_add_one_device(struct macio_chip *chip, struct device *parent,
 	return dev;
 }
 
-static int
-macio_skip_device(struct device_node *np)
+static int macio_skip_device(struct device_node *np)
 {
 	if (strncmp(np->name, "battery", 7) == 0)
 		return 1;
@@ -185,10 +229,9 @@ macio_skip_device(struct device_node *np)
  * For now, childs of media-bay are added now as well. This will
  * change rsn though.
  */
-static void
-macio_pci_add_devices(struct macio_chip *chip)
+static void macio_pci_add_devices(struct macio_chip *chip)
 {
-	struct device_node *np;
+	struct device_node *np, *pnode;
 	struct macio_dev *rdev, *mdev, *mbdev = NULL, *sdev = NULL;
 	struct device *parent = NULL;
 	
@@ -196,16 +239,23 @@ macio_pci_add_devices(struct macio_chip *chip)
 #ifdef CONFIG_PCI
 	if (chip->lbus.pdev)
 		parent = &chip->lbus.pdev->dev;
-#endif		
-	rdev = macio_add_one_device(chip, parent, chip->of_node, NULL);
+#endif
+	pnode = of_node_get(chip->of_node);
+	if (pnode == NULL)
+		return;
+
+	rdev = macio_add_one_device(chip, parent, pnode, NULL);
 	if (rdev == NULL)
 		return;
 
 	/* First scan 1st level */
-	for (np = chip->of_node->child; np != NULL; np = np->sibling) {
+	for (np = NULL; (np = of_get_next_child(pnode, np)) != NULL;) {
 		if (!macio_skip_device(np)) {
+			of_node_get(np);
 			mdev = macio_add_one_device(chip, &rdev->ofdev.dev, np, NULL);
-			if (strncmp(np->name, "media-bay", 9) == 0)
+			if (mdev == NULL)
+				of_node_put(np);
+			else if (strncmp(np->name, "media-bay", 9) == 0)
 				mbdev = mdev;
 			else if (strncmp(np->name, "escc", 4) == 0)
 				sdev = mdev;
@@ -213,17 +263,21 @@ macio_pci_add_devices(struct macio_chip *chip)
 	}
 
 	/* Add media bay devices if any */
-	if (mbdev) {
-		for (np = mbdev->ofdev.node->child; np != NULL; np = np->sibling)
-			if (!macio_skip_device(np))
-				macio_add_one_device(chip, &mbdev->ofdev.dev, np, mbdev);
-	}
+	if (mbdev)
+		for (np = NULL; (np = of_get_next_child(mbdev->ofdev.node, np)) != NULL;)
+			if (!macio_skip_device(np)) {
+				of_node_get(np);
+				if (macio_add_one_device(chip, &mbdev->ofdev.dev, np, mbdev) == NULL)
+					of_node_put(np);
+			}
 	/* Add serial ports if any */
-	if (sdev) {
-		for (np = sdev->ofdev.node->child; np != NULL; np = np->sibling)
-			if (!macio_skip_device(np))
-				macio_add_one_device(chip, &sdev->ofdev.dev, np, NULL);
-	}
+	if (sdev)
+		for (np = NULL; (np = of_get_next_child(sdev->ofdev.node, np)) != NULL;)
+			if (!macio_skip_device(np)) {
+				of_node_get(np);
+				if (macio_add_one_device(chip, &sdev->ofdev.dev, np, NULL) == NULL)
+					of_node_put(np);
+			}
 }
 
 
@@ -231,8 +285,7 @@ macio_pci_add_devices(struct macio_chip *chip)
  * macio_register_driver - Registers a new MacIO device driver
  * @drv: pointer to the driver definition structure
  */
-int
-macio_register_driver(struct macio_driver *drv)
+int macio_register_driver(struct macio_driver *drv)
 {
 	int count = 0;
 
@@ -240,8 +293,6 @@ macio_register_driver(struct macio_driver *drv)
 	drv->driver.name = drv->name;
 	drv->driver.bus = &macio_bus_type;
 	drv->driver.probe = macio_device_probe;
-	drv->driver.resume = macio_device_resume;
-	drv->driver.suspend = macio_device_suspend;
 	drv->driver.remove = macio_device_remove;
 
 	/* register with core */
@@ -253,16 +304,14 @@ macio_register_driver(struct macio_driver *drv)
  * macio_unregister_driver - Unregisters a new MacIO device driver
  * @drv: pointer to the driver definition structure
  */
-void
-macio_unregister_driver(struct macio_driver *drv)
+void macio_unregister_driver(struct macio_driver *drv)
 {
 	driver_unregister(&drv->driver);
 }
 
 #ifdef CONFIG_PCI
 
-static int __devinit
-macio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+static int __devinit macio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct device_node* np;
 	struct macio_chip* chip;
@@ -270,19 +319,27 @@ macio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (ent->vendor != PCI_VENDOR_ID_APPLE)
 		return -ENODEV;
 
+	/* Note regarding refcounting: We assume pci_device_to_OF_node() is ported
+	 * to new OF APIs and returns a node with refcount incremented. This isn't
+	 * the case today, but on the other hand ppc32 doesn't do refcounting. This
+	 * will have to be fixed when going to ppc64. --BenH.
+	 */
 	np = pci_device_to_OF_node(pdev);
 	if (np == NULL)
 		return -ENODEV;
 
+	/* We also assume that pmac_feature will have done a get() on nodes stored
+	 * in the macio chips array
+	 */
 	chip = macio_find(np, macio_unknown);
+       	of_node_put(np);
 	if (chip == NULL)
 		return -ENODEV;
 
-	/* XXX Need locking */
+	/* XXX Need locking ??? */
 	if (chip->lbus.pdev == NULL) {
 		chip->lbus.pdev = pdev;
 		chip->lbus.chip = chip;
-//		INIT_LIST_HEAD(&chip->lbus.devices);
 		pci_set_drvdata(pdev, &chip->lbus);
 		pci_set_master(pdev);
 	}
@@ -290,13 +347,28 @@ macio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	printk(KERN_INFO "MacIO PCI driver attached to %s chipset\n",
 		chip->name);
 
+	/*
+	 * HACK ALERT: The WallStreet PowerBook and some OHare based machines
+	 * have 2 macio ASICs. I must probe the "main" one first or IDE ordering
+	 * will be incorrect. So I put on "hold" the second one since it seem to
+	 * appear first on PCI
+	 */
+	if (chip->type == macio_gatwick || chip->type == macio_ohareII)
+		if (macio_chips[0].lbus.pdev == NULL) {
+			macio_on_hold = chip;
+			return 0;
+		}
+
 	macio_pci_add_devices(chip);
+	if (macio_on_hold && macio_chips[0].lbus.pdev != NULL) {
+		macio_pci_add_devices(macio_on_hold);
+		macio_on_hold = NULL;
+	}
 
 	return 0;
 }
 
-static void __devexit
-macio_pci_remove(struct pci_dev* pdev)
+static void __devexit macio_pci_remove(struct pci_dev* pdev)
 {
 	panic("removing of macio-asic not supported !\n");
 }
@@ -306,10 +378,10 @@ macio_pci_remove(struct pci_dev* pdev)
  * will then decide wether it applies or not
  */
 static const struct pci_device_id __devinitdata pci_ids [] = { {
-	.vendor =	PCI_VENDOR_ID_APPLE,
-	.device =	PCI_ANY_ID,
-	.subvendor =	PCI_ANY_ID,
-	.subdevice =	PCI_ANY_ID,
+	.vendor		= PCI_VENDOR_ID_APPLE,
+	.device		= PCI_ANY_ID,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
 
 	}, { /* end: all zeroes */ }
 };
@@ -317,17 +389,16 @@ MODULE_DEVICE_TABLE (pci, pci_ids);
 
 /* pci driver glue; this is a "new style" PCI driver module */
 static struct pci_driver macio_pci_driver = {
-	.name =		(char *) "macio",
-	.id_table =	pci_ids,
+	.name		= (char *) "macio",
+	.id_table	= pci_ids,
 
-	.probe =	macio_pci_probe,
-	.remove =	macio_pci_remove,
+	.probe		= macio_pci_probe,
+	.remove		= macio_pci_remove,
 };
 
 #endif /* CONFIG_PCI */
 
-static int __init
-macio_module_init (void) 
+static int __init macio_module_init (void) 
 {
 #ifdef CONFIG_PCI
 	int rc;
@@ -339,17 +410,9 @@ macio_module_init (void)
 	return 0;
 }
 
-/*
-static void __exit
-macio_module_cleanup (void) 
-{	
-#ifdef CONFIG_PCI
-	pci_unregister_driver(&macio_pci_driver);
-#endif
-}
-module_exit(macio_module_cleanup);
-*/
 module_init(macio_module_init);
 
 EXPORT_SYMBOL(macio_register_driver);
 EXPORT_SYMBOL(macio_unregister_driver);
+EXPORT_SYMBOL(macio_dev_get);
+EXPORT_SYMBOL(macio_dev_put);

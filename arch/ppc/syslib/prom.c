@@ -941,6 +941,184 @@ find_path_device(const char *path)
 	return NULL;
 }
 
+/*******
+ *
+ * New implementation of the OF "find" APIs, return a refcounted
+ * object, call of_node_put() when done. Currently, still lacks
+ * locking as old implementation, this is beeing done for ppc64.
+ *
+ * Note that property management will need some locking as well,
+ * this isn't dealt with yet
+ *
+ *******/
+
+/**
+ *	of_find_node_by_name - Find a node by it's "name" property
+ *	@from:	The node to start searching from or NULL, the node
+ *		you pass will not be searched, only the next one
+ *		will; typically, you pass what the previous call
+ *		returned. of_node_put() will be called on it
+ *	@name:	The name string to match against
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */ 
+struct device_node *of_find_node_by_name(struct device_node *from,
+	const char *name)
+{
+	struct device_node *np = from ? from->allnext : allnodes;
+
+	for (; np != 0; np = np->allnext)
+		if (np->name != 0 && strcasecmp(np->name, name) == 0)
+			break;
+	if (from)
+		of_node_put(from);
+	return of_node_get(np);
+}
+
+/**
+ *	of_find_node_by_type - Find a node by it's "device_type" property
+ *	@from:	The node to start searching from or NULL, the node
+ *		you pass will not be searched, only the next one
+ *		will; typically, you pass what the previous call
+ *		returned. of_node_put() will be called on it
+ *	@name:	The type string to match against
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_find_node_by_type(struct device_node *from,
+	const char *type)
+{
+	struct device_node *np = from ? from->allnext : allnodes;
+
+	for (; np != 0; np = np->allnext)
+		if (np->type != 0 && strcasecmp(np->type, type) == 0)
+			break;
+	if (from)
+		of_node_put(from);
+	return of_node_get(np);
+}
+
+/**
+ *	of_find_compatible_node - Find a node based on type and one of the
+ *                                tokens in it's "compatible" property
+ *	@from:		The node to start searching from or NULL, the node
+ *			you pass will not be searched, only the next one
+ *			will; typically, you pass what the previous call
+ *			returned. of_node_put() will be called on it
+ *	@type:		The type string to match "device_type" or NULL to ignore
+ *	@compatible:	The string to match to one of the tokens in the device
+ *			"compatible" list.
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_find_compatible_node(struct device_node *from,
+	const char *type, const char *compatible)
+{
+	struct device_node *np = from ? from->allnext : allnodes;
+
+	for (; np != 0; np = np->allnext) {
+		if (type != NULL
+		    && !(np->type != 0 && strcasecmp(np->type, type) == 0))
+			continue;
+		if (device_is_compatible(np, compatible))
+			break;
+	}
+	if (from)
+		of_node_put(from);
+	return of_node_get(np);
+}
+
+/**
+ *	of_find_node_by_path - Find a node matching a full OF path
+ *	@path:	The full path to match
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_find_node_by_path(const char *path)
+{
+	struct device_node *np = allnodes;
+
+	for (; np != 0; np = np->allnext)
+		if (np->full_name != 0 && strcasecmp(np->full_name, path) == 0)
+			break;
+	return of_node_get(np);
+}
+
+/**
+ *	of_find_all_nodes - Get next node in global list
+ *	@prev:	Previous node or NULL to start iteration
+ *		of_node_put() will be called on it
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_find_all_nodes(struct device_node *prev)
+{
+	return of_node_get(prev ? prev->allnext : allnodes);
+}
+
+/**
+ *	of_get_parent - Get a node's parent if any
+ *	@node:	Node to get parent
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_get_parent(const struct device_node *node)
+{
+	return node ? of_node_get(node->parent) : NULL;
+}
+
+/**
+ *	of_get_next_child - Iterate a node childs
+ *	@node:	parent node
+ *	@prev:	previous child of the parent node, or NULL to get first
+ *
+ *	Returns a node pointer with refcount incremented, use
+ *	of_node_put() on it when done.
+ */
+struct device_node *of_get_next_child(const struct device_node *node,
+				      struct device_node *prev)
+{
+	struct device_node *next = prev ? prev->sibling : node->child;
+
+	for (; next != 0; next = next->sibling)
+		if (of_node_get(next))
+			break;
+	if (prev)
+		of_node_put(prev);
+	return next;
+}
+
+/**
+ *	of_node_get - Increment refcount of a node
+ *	@node:	Node to inc refcount, NULL is supported to
+ *		simplify writing of callers
+ *
+ *	Returns the node itself or NULL if gone. Current implementation
+ *	does nothing as we don't yet do dynamic node allocation on ppc32
+ */
+struct device_node *of_node_get(struct device_node *node)
+{
+	return node;
+}
+
+/**
+ *	of_node_put - Decrement refcount of a node
+ *	@node:	Node to dec refcount, NULL is supported to
+ *		simplify writing of callers
+ *
+ *	Current implementation does nothing as we don't yet do dynamic node
+ *	allocation on ppc32
+ */
+void  of_node_put(struct device_node *node)
+{    
+}
+
 /*
  * Find the device_node with a given phandle.
  */

@@ -355,11 +355,6 @@ i##n:								\
  *	-- paulus.
  */
 	. = 0x200
-MachineCheck:
-BEGIN_FTR_SECTION
-	dssall
-	sync
-END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	mtspr	SPRG0,r10
 	mtspr	SPRG1,r11
 	mfcr	r10

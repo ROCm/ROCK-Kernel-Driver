@@ -92,7 +92,7 @@ ssize_t oprofilefs_str_to_user(char const * str, char * buf, size_t count, loff_
  * Convert an unsigned long value into ASCII and copy it to the user buffer @buf,
  * updating *offset appropriately. Returns bytes written or -EFAULT.
  */
-ssize_t oprofilefs_ulong_to_user(unsigned long * val, char * buf, size_t count, loff_t * offset);
+ssize_t oprofilefs_ulong_to_user(unsigned long val, char * buf, size_t count, loff_t * offset);
 
 /**
  * Read an ASCII string for a number from a userspace buffer and fill *val on success.

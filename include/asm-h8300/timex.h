@@ -6,9 +6,9 @@
 #ifndef _ASM_H8300_TIMEX_H
 #define _ASM_H8300_TIMEX_H
 
-/* Such a description is OK ? */
-#define TIMEX_DEPEND_HEADER(target) <asm/target/timer_rate.h> 
-#include TIMEX_DEPEND_HEADER(TARGET)
+#define H8300_TIMER_DEFINE
+#include <asm/machine-depend.h>
+#undef  H8300_TIMER_DEFINE
 
 #define CLOCK_TICK_RATE H8300_TIMER_FREQ
 #define CLOCK_TICK_FACTOR	20	/* Factor of both 1000000 and CLOCK_TICK_RATE */

@@ -367,7 +367,7 @@ static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 	struct net_local *lp = dev->priv;
 	int ioaddr = dev->base_addr;
 	short length = skb->len;
-	unsigned char *buf = skb->data;
+	unsigned char *buf;
 	unsigned long flags;
 
 	/* Block a transmit from overlapping.  */
@@ -385,6 +385,7 @@ static int net_send_packet(struct sk_buff *skb, struct net_device *dev)
 			return 0;
 		length = ETH_ZLEN;
 	}
+	buf = skb->data;
 	
 	if (net_debug > 4)
 		printk("%s: Transmitting a packet of length %lu.\n", dev->name,

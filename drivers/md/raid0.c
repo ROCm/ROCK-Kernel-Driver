@@ -231,6 +231,13 @@ static int raid0_run (mddev_t *mddev)
 	mdk_rdev_t *rdev;
 	struct list_head *tmp;
 
+	printk("md%d: setting max_sectors to %d, segment boundary to %d\n",
+	       mdidx(mddev),
+	       mddev->chunk_size >> 9,
+	       (mddev->chunk_size>>1)-1);
+	blk_queue_max_sectors(mddev->queue, mddev->chunk_size >> 9);
+	blk_queue_segment_boundary(mddev->queue, (mddev->chunk_size>>1) - 1);
+
 	conf = kmalloc(sizeof (raid0_conf_t), GFP_KERNEL);
 	if (!conf)
 		goto out;

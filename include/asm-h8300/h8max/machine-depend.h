@@ -1,7 +1,13 @@
-/* H8MAX RTL8019AS Config */
+/* H8MAX board depend header */
 
-#ifndef __H8300_H8MAX_NE__
-#define __H8300_H8MAX_NE__
+/* TIMER rate define */
+#ifdef H8300_TIMER_DEFINE
+#define H8300_TIMER_COUNT_DATA 25000*10/8192
+#define H8300_TIMER_FREQ 25000*1000/8192
+#endif
+
+/* H8MAX RTL8019AS Config */
+#ifdef H8300_NE_DEFINE
 
 #define NE2000_ADDR		0x800600
 #define NE2000_IRQ              4

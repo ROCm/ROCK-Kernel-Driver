@@ -117,7 +117,7 @@ static snd_minor_t *snd_minor_search(int minor)
 
 static int snd_open(struct inode *inode, struct file *file)
 {
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 	int card = SNDRV_MINOR_CARD(minor);
 	int dev = SNDRV_MINOR_DEVICE(minor);
 	snd_minor_t *mptr = NULL;

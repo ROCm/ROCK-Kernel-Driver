@@ -126,7 +126,7 @@ void macide_init(void)
 			/* probing the drive which freezes a 190.	*/
 
 			ide_drive_t *drive = &ide_hwifs[index].drives[0];
-        		drive->capacity = drive->cyl*drive->head*drive->sect;
+			drive->capacity64 = drive->cyl*drive->head*drive->sect;
 
 #ifdef CONFIG_BLK_DEV_MAC_MEDIABAY
 			request_irq(IRQ_BABOON_2, macide_mediabay_interrupt,
