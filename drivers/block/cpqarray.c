@@ -99,8 +99,6 @@ static struct board_type products[] = {
 
 static struct gendisk *ida_gendisk[MAX_CTLR][NWD];
 
-static struct proc_dir_entry *proc_array;
-
 /* Debug... */
 #define DBG(s)	do { s } while(0)
 /* Debug (general info)... */
@@ -153,8 +151,6 @@ static void ida_procinit(int i);
 static int ida_proc_get_info(char *buffer, char **start, off_t offset, int length, int *eof, void *data);
 #else
 static void ida_procinit(int i) {}
-static int ida_proc_get_info(char *buffer, char **start, off_t offset,
-			     int length, int *eof, void *data) { return 0;}
 #endif
 
 static inline drv_info_t *get_drv(struct gendisk *disk)
@@ -178,6 +174,8 @@ static struct block_device_operations ida_fops  = {
 
 
 #ifdef CONFIG_PROC_FS
+
+static struct proc_dir_entry *proc_array;
 
 /*
  * Get us a file in /proc/array that says something about each controller.
