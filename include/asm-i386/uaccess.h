@@ -454,55 +454,9 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
 	return __copy_from_user_ll(to, from, n);
 }
 
-/**
- * copy_to_user: - Copy a block of data into user space.
- * @to:   Destination address, in user space.
- * @from: Source address, in kernel space.
- * @n:    Number of bytes to copy.
- *
- * Context: User context only.  This function may sleep.
- *
- * Copy data from kernel space to user space.
- *
- * Returns number of bytes that could not be copied.
- * On success, this will be zero.
- */
-static inline unsigned long
-copy_to_user(void __user *to, const void *from, unsigned long n)
-{
-	might_sleep();
-	if (access_ok(VERIFY_WRITE, to, n))
-		n = __copy_to_user(to, from, n);
-	return n;
-}
-
-/**
- * copy_from_user: - Copy a block of data from user space.
- * @to:   Destination address, in kernel space.
- * @from: Source address, in user space.
- * @n:    Number of bytes to copy.
- *
- * Context: User context only.  This function may sleep.
- *
- * Copy data from user space to kernel space.
- *
- * Returns number of bytes that could not be copied.
- * On success, this will be zero.
- *
- * If some data could not be copied, this function will pad the copied
- * data to the requested size using zero bytes.
- */
-static inline unsigned long
-copy_from_user(void *to, const void __user *from, unsigned long n)
-{
-	might_sleep();
-	if (access_ok(VERIFY_READ, from, n))
-		n = __copy_from_user(to, from, n);
-	else
-		memset(to, 0, n);
-	return n;
-}
-
+unsigned long copy_to_user(void __user *to, const void *from, unsigned long n);
+unsigned long copy_from_user(void *to,
+			const void __user *from, unsigned long n);
 long strncpy_from_user(char *dst, const char __user *src, long count);
 long __strncpy_from_user(char *dst, const char __user *src, long count);
 
