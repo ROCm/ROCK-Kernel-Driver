@@ -174,6 +174,7 @@ static int pdc20621_qc_issue_prot(struct ata_queued_cmd *qc);
 static Scsi_Host_Template pdc_sata_sht = {
 	.module			= THIS_MODULE,
 	.name			= DRV_NAME,
+	.ioctl			= ata_scsi_ioctl,
 	.queuecommand		= ata_scsi_queuecmd,
 	.eh_strategy_handler	= ata_scsi_error,
 	.can_queue		= ATA_DEF_QUEUE,

@@ -29,6 +29,7 @@
 #include "scsi.h"
 #include <scsi/scsi_host.h>
 #include <linux/libata.h>
+#include <asm/uaccess.h>
 
 #include "libata.h"
 
@@ -36,6 +37,8 @@ typedef unsigned int (*ata_xlat_func_t)(struct ata_queued_cmd *qc, u8 *scsicmd);
 static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
 			      struct scsi_cmnd *cmd,
 			      void (*done)(struct scsi_cmnd *));
+static struct ata_device *
+ata_scsi_find_dev(struct ata_port *ap, struct scsi_device *scsidev);
 
 
 /**
@@ -67,6 +70,43 @@ int ata_std_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 	return 0;
 }
 
+int ata_scsi_ioctl(struct scsi_device *scsidev, int cmd, void __user *arg)
+{
+	struct ata_port *ap;
+	struct ata_device *dev;
+	int val = -EINVAL, rc = -EINVAL;
+
+	ap = (struct ata_port *) &scsidev->host->hostdata[0];
+	if (!ap)
+		goto out;
+
+	dev = ata_scsi_find_dev(ap, scsidev);
+	if (!dev) {
+		rc = -ENODEV;
+		goto out;
+	}
+
+	switch (cmd) {
+	case ATA_IOC_GET_IO32:
+		val = 0;
+		if (copy_to_user(arg, &val, 1))
+			return -EFAULT;
+		return 0;
+
+	case ATA_IOC_SET_IO32:
+		val = (long) arg;
+		if (val != 0)
+			return -EINVAL;
+		return 0;
+
+	default:
+		rc = -EOPNOTSUPP;
+		break;
+	}
+
+out:
+	return rc;
+}
 
 /**
  *	ata_scsi_qc_new - acquire new ata_queued_cmd reference
@@ -1172,19 +1212,19 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
  *	Associated ATA device, or %NULL if not found.
  */
 
-static inline struct ata_device *
-ata_scsi_find_dev(struct ata_port *ap, struct scsi_cmnd *cmd)
+static struct ata_device *
+ata_scsi_find_dev(struct ata_port *ap, struct scsi_device *scsidev)
 {
 	struct ata_device *dev;
 
 	/* skip commands not addressed to targets we simulate */
-	if (likely(cmd->device->id < ATA_MAX_DEVICES))
-		dev = &ap->device[cmd->device->id];
+	if (likely(scsidev->id < ATA_MAX_DEVICES))
+		dev = &ap->device[scsidev->id];
 	else
 		return NULL;
 
-	if (unlikely((cmd->device->channel != 0) ||
-		     (cmd->device->lun != 0)))
+	if (unlikely((scsidev->channel != 0) ||
+		     (scsidev->lun != 0)))
 		return NULL;
 
 	if (unlikely(!ata_dev_present(dev)))
@@ -1247,11 +1287,12 @@ static inline void ata_scsi_dump_cdb(struct ata_port *ap,
 				     struct scsi_cmnd *cmd)
 {
 #ifdef ATA_DEBUG
+	struct scsi_device *scsidev = cmd->device;
 	u8 *scsicmd = cmd->cmnd;
 
 	DPRINTK("CDB (%u:%d,%d,%d) %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
 		ap->id,
-		cmd->device->channel, cmd->device->id, cmd->device->lun,
+		scsidev->channel, scsidev->id, scsidev->lun,
 		scsicmd[0], scsicmd[1], scsicmd[2], scsicmd[3],
 		scsicmd[4], scsicmd[5], scsicmd[6], scsicmd[7],
 		scsicmd[8]);
@@ -1281,12 +1322,13 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	struct ata_port *ap;
 	struct ata_device *dev;
+	struct scsi_device *scsidev = cmd->device;
 
-	ap = (struct ata_port *) &cmd->device->host->hostdata[0];
+	ap = (struct ata_port *) &scsidev->host->hostdata[0];
 
 	ata_scsi_dump_cdb(ap, cmd);
 
-	dev = ata_scsi_find_dev(ap, cmd);
+	dev = ata_scsi_find_dev(ap, scsidev);
 	if (unlikely(!dev)) {
 		cmd->result = (DID_BAD_TARGET << 16);
 		done(cmd);

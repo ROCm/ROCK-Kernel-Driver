@@ -182,6 +182,11 @@ enum ata_tf_protocols {
 	ATA_PROT_ATAPI_DMA,	/* packet command with special DMA sauce */
 };
 
+enum ata_ioctls {
+	ATA_IOC_GET_IO32	= 0x309,
+	ATA_IOC_SET_IO32	= 0x324,
+};
+
 /* core structures */
 
 struct ata_prd {
