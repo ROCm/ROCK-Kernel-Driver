@@ -443,73 +443,6 @@ static void yenta_interrupt_wrapper(unsigned long data)
 	add_timer(&socket->poll_timer);
 }
 
-/*
- * Only probe "regular" interrupts, don't
- * touch dangerous spots like the mouse irq,
- * because there are mice that apparently
- * get really confused if they get fondled
- * too intimately.
- *
- * Default to 11, 10, 9, 7, 6, 5, 4, 3.
- */
-static u32 isa_interrupts = 0x0ef8;
-
-static unsigned int yenta_probe_irq(struct yenta_socket *socket, u32 isa_irq_mask)
-{
-	int i;
-	unsigned long val;
-	u16 bridge_ctrl;
-	u32 mask;
-
-	/* Set up ISA irq routing to probe the ISA irqs.. */
-	bridge_ctrl = config_readw(socket, CB_BRIDGE_CONTROL);
-	if (!(bridge_ctrl & CB_BRIDGE_INTR)) {
-		bridge_ctrl |= CB_BRIDGE_INTR;
-		config_writew(socket, CB_BRIDGE_CONTROL, bridge_ctrl);
-	}
-
-	/*
-	 * Probe for usable interrupts using the force
-	 * register to generate bogus card status events.
-	 */
-	cb_writel(socket, CB_SOCKET_EVENT, -1);
-	cb_writel(socket, CB_SOCKET_MASK, CB_CSTSMASK);
-	exca_writeb(socket, I365_CSCINT, 0);
-	val = probe_irq_on() & isa_irq_mask;
-	for (i = 1; i < 16; i++) {
-		if (!((val >> i) & 1))
-			continue;
-		exca_writeb(socket, I365_CSCINT, I365_CSC_STSCHG | (i << 4));
-		cb_writel(socket, CB_SOCKET_FORCE, CB_FCARDSTS);
-		udelay(100);
-		cb_writel(socket, CB_SOCKET_EVENT, -1);
-	}
-	cb_writel(socket, CB_SOCKET_MASK, 0);
-	exca_writeb(socket, I365_CSCINT, 0);
-	
-	mask = probe_irq_mask(val) & 0xffff;
-
-	bridge_ctrl &= ~CB_BRIDGE_INTR;
-	config_writew(socket, CB_BRIDGE_CONTROL, bridge_ctrl);
-
-	return mask;
-}
-
-/*
- * Set static data that doesn't need re-initializing..
- */
-static void yenta_get_socket_capabilities(struct yenta_socket *socket, u32 isa_irq_mask)
-{
-	socket->socket.features |= SS_CAP_PAGE_REGS | SS_CAP_PCCARD | SS_CAP_CARDBUS;
-	socket->socket.map_size = 0x1000;
-	socket->socket.pci_irq = socket->cb_irq;
-	socket->socket.irq_mask = yenta_probe_irq(socket, isa_irq_mask);
-	socket->socket.cb_dev = socket->dev;
-
-	printk("Yenta IRQ list %04x, PCI irq%d\n", socket->socket.irq_mask, socket->cb_irq);
-}
-
-
 static void yenta_clear_maps(struct yenta_socket *socket)
 {
 	int i;
@@ -528,42 +461,13 @@ static void yenta_clear_maps(struct yenta_socket *socket)
 	}
 }
 
-/*
- * Initialize the standard cardbus registers
- */
-static void yenta_config_init(struct yenta_socket *socket)
+/* Called at resume and initialization events */
+static int yenta_sock_init(struct pcmcia_socket *sock)
 {
+	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
 	u16 bridge;
-	struct pci_dev *dev = socket->dev;
 
-	pci_set_power_state(socket->dev, 0);
-
-	config_writel(socket, CB_LEGACY_MODE_BASE, 0);
-	config_writel(socket, PCI_BASE_ADDRESS_0, dev->resource[0].start);
-	config_writew(socket, PCI_COMMAND,
-			PCI_COMMAND_IO |
-			PCI_COMMAND_MEMORY |
-			PCI_COMMAND_MASTER |
-			PCI_COMMAND_WAIT);
-
-	/* MAGIC NUMBERS! Fixme */
-	config_writeb(socket, PCI_CACHE_LINE_SIZE, L1_CACHE_BYTES / 4);
-	config_writeb(socket, PCI_LATENCY_TIMER, 168);
-	config_writel(socket, PCI_PRIMARY_BUS,
-		(176 << 24) |			   /* sec. latency timer */
-		(dev->subordinate->subordinate << 16) | /* subordinate bus */
-		(dev->subordinate->secondary << 8) |  /* secondary bus */
-		dev->subordinate->primary);		   /* primary bus */
-
-	/*
-	 * Set up the bridging state:
-	 *  - enable write posting.
-	 *  - memory window 0 prefetchable, window 1 non-prefetchable
-	 *  - PCI interrupts enabled if a PCI interrupt exists..
-	 */
-	bridge = config_readw(socket, CB_BRIDGE_CONTROL);
-	bridge &= ~(CB_BRIDGE_CRST | CB_BRIDGE_PREFETCH1 | CB_BRIDGE_INTR | CB_BRIDGE_ISAEN | CB_BRIDGE_VGAEN);
-	bridge |= CB_BRIDGE_PREFETCH0 | CB_BRIDGE_POSTEN;
+	bridge = config_readw(socket, CB_BRIDGE_CONTROL) & ~CB_BRIDGE_INTR;
 	if (!socket->cb_irq)
 		bridge |= CB_BRIDGE_INTR;
 	config_writew(socket, CB_BRIDGE_CONTROL, bridge);
@@ -573,14 +477,7 @@ static void yenta_config_init(struct yenta_socket *socket)
 
 	/* Redo card voltage interrogation */
 	cb_writel(socket, CB_SOCKET_FORCE, CB_CVSTEST);
-}
 
-/* Called at resume and initialization events */
-static int yenta_sock_init(struct pcmcia_socket *sock)
-{
-	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
-
-	yenta_config_init(socket);
 	yenta_clear_maps(socket);
 
 	if (socket->type && socket->type->sock_init)
@@ -809,6 +706,112 @@ struct cardbus_type cardbus_type[] = {
 	},
 };
 
+
+/*
+ * Only probe "regular" interrupts, don't
+ * touch dangerous spots like the mouse irq,
+ * because there are mice that apparently
+ * get really confused if they get fondled
+ * too intimately.
+ *
+ * Default to 11, 10, 9, 7, 6, 5, 4, 3.
+ */
+static u32 isa_interrupts = 0x0ef8;
+
+static unsigned int yenta_probe_irq(struct yenta_socket *socket, u32 isa_irq_mask)
+{
+	int i;
+	unsigned long val;
+	u16 bridge_ctrl;
+	u32 mask;
+
+	/* Set up ISA irq routing to probe the ISA irqs.. */
+	bridge_ctrl = config_readw(socket, CB_BRIDGE_CONTROL);
+	if (!(bridge_ctrl & CB_BRIDGE_INTR)) {
+		bridge_ctrl |= CB_BRIDGE_INTR;
+		config_writew(socket, CB_BRIDGE_CONTROL, bridge_ctrl);
+	}
+
+	/*
+	 * Probe for usable interrupts using the force
+	 * register to generate bogus card status events.
+	 */
+	cb_writel(socket, CB_SOCKET_EVENT, -1);
+	cb_writel(socket, CB_SOCKET_MASK, CB_CSTSMASK);
+	exca_writeb(socket, I365_CSCINT, 0);
+	val = probe_irq_on() & isa_irq_mask;
+	for (i = 1; i < 16; i++) {
+		if (!((val >> i) & 1))
+			continue;
+		exca_writeb(socket, I365_CSCINT, I365_CSC_STSCHG | (i << 4));
+		cb_writel(socket, CB_SOCKET_FORCE, CB_FCARDSTS);
+		udelay(100);
+		cb_writel(socket, CB_SOCKET_EVENT, -1);
+	}
+	cb_writel(socket, CB_SOCKET_MASK, 0);
+	exca_writeb(socket, I365_CSCINT, 0);
+
+	mask = probe_irq_mask(val) & 0xffff;
+
+	bridge_ctrl &= ~CB_BRIDGE_INTR;
+	config_writew(socket, CB_BRIDGE_CONTROL, bridge_ctrl);
+
+	return mask;
+}
+
+/*
+ * Set static data that doesn't need re-initializing..
+ */
+static void yenta_get_socket_capabilities(struct yenta_socket *socket, u32 isa_irq_mask)
+{
+	socket->socket.features |= SS_CAP_PAGE_REGS | SS_CAP_PCCARD | SS_CAP_CARDBUS;
+	socket->socket.map_size = 0x1000;
+	socket->socket.pci_irq = socket->cb_irq;
+	socket->socket.irq_mask = yenta_probe_irq(socket, isa_irq_mask);
+	socket->socket.cb_dev = socket->dev;
+
+	printk(KERN_INFO "Yenta: ISA IRQ list %04x, PCI irq%d\n",
+	       socket->socket.irq_mask, socket->cb_irq);
+}
+
+/*
+ * Initialize the standard cardbus registers
+ */
+static void yenta_config_init(struct yenta_socket *socket)
+{
+	u16 bridge;
+	struct pci_dev *dev = socket->dev;
+
+	pci_set_power_state(socket->dev, 0);
+
+	config_writel(socket, CB_LEGACY_MODE_BASE, 0);
+	config_writel(socket, PCI_BASE_ADDRESS_0, dev->resource[0].start);
+	config_writew(socket, PCI_COMMAND,
+			PCI_COMMAND_IO |
+			PCI_COMMAND_MEMORY |
+			PCI_COMMAND_MASTER |
+			PCI_COMMAND_WAIT);
+
+	/* MAGIC NUMBERS! Fixme */
+	config_writeb(socket, PCI_CACHE_LINE_SIZE, L1_CACHE_BYTES / 4);
+	config_writeb(socket, PCI_LATENCY_TIMER, 168);
+	config_writel(socket, PCI_PRIMARY_BUS,
+		(176 << 24) |			   /* sec. latency timer */
+		(dev->subordinate->subordinate << 16) | /* subordinate bus */
+		(dev->subordinate->secondary << 8) |  /* secondary bus */
+		dev->subordinate->primary);		   /* primary bus */
+
+	/*
+	 * Set up the bridging state:
+	 *  - enable write posting.
+	 *  - memory window 0 prefetchable, window 1 non-prefetchable
+	 *  - PCI interrupts enabled if a PCI interrupt exists..
+	 */
+	bridge = config_readw(socket, CB_BRIDGE_CONTROL);
+	bridge &= ~(CB_BRIDGE_CRST | CB_BRIDGE_PREFETCH1 | CB_BRIDGE_INTR | CB_BRIDGE_ISAEN | CB_BRIDGE_VGAEN);
+	bridge |= CB_BRIDGE_PREFETCH0 | CB_BRIDGE_POSTEN | CB_BRIDGE_INTR;
+	config_writew(socket, CB_BRIDGE_CONTROL, bridge);
+}
 
 /*
  * Initialize a cardbus controller. Make sure we have a usable
