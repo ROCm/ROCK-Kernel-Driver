@@ -886,7 +886,7 @@ nodata:
 	return retval;
 }
 
-/* Create an Operation Error chunk with the specified space reserved. 
+/* Create an Operation Error chunk with the specified space reserved.
  * This routine can be used for containing multiple causes in the chunk.
  */
 sctp_chunk_t *sctp_make_op_error_space(const sctp_association_t *asoc,
@@ -1511,7 +1511,7 @@ int sctp_verify_param(const sctp_association_t *asoc,
  * 00 - Stop processing this SCTP chunk and discard it,
  *	do not process any further chunks within it.
  *
- * 01 - Stop processing this SCTP chunk and discard it, 
+ * 01 - Stop processing this SCTP chunk and discard it,
  *	do not process any further chunks within it, and report
  *	the unrecognized parameter in an 'Unrecognized
  *	Parameter Type' (in either an ERROR or in the INIT ACK).
@@ -1549,7 +1549,7 @@ int sctp_process_unk_param(const sctp_association_t *asoc,
 
 		if (*err_chk_p)
 			sctp_init_cause(*err_chk_p, SCTP_ERROR_UNKNOWN_PARAM,
-					(const void *)param.p, 
+					(const void *)param.p,
 					WORD_ROUND(ntohs(param.p->length)));
 
 		break;

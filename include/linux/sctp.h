@@ -155,15 +155,15 @@ typedef struct sctp_paramhdr {
 typedef enum {
 
 	/* RFC 2960 Section 3.3.5 */
-	SCTP_PARAM_HEARTBEAT_INFO		= __constant_htons(1),  
+	SCTP_PARAM_HEARTBEAT_INFO		= __constant_htons(1),
 	/* RFC 2960 Section 3.3.2.1 */
-	SCTP_PARAM_IPV4_ADDRESS			= __constant_htons(5), 
-	SCTP_PARAM_IPV6_ADDRESS			= __constant_htons(6), 
-	SCTP_PARAM_STATE_COOKIE			= __constant_htons(7),  
-	SCTP_PARAM_UNRECOGNIZED_PARAMETERS	= __constant_htons(8),  
-	SCTP_PARAM_COOKIE_PRESERVATIVE		= __constant_htons(9),  
-	SCTP_PARAM_HOST_NAME_ADDRESS		= __constant_htons(11), 
-	SCTP_PARAM_SUPPORTED_ADDRESS_TYPES	= __constant_htons(12), 
+	SCTP_PARAM_IPV4_ADDRESS			= __constant_htons(5),
+	SCTP_PARAM_IPV6_ADDRESS			= __constant_htons(6),
+	SCTP_PARAM_STATE_COOKIE			= __constant_htons(7),
+	SCTP_PARAM_UNRECOGNIZED_PARAMETERS	= __constant_htons(8),
+	SCTP_PARAM_COOKIE_PRESERVATIVE		= __constant_htons(9),
+	SCTP_PARAM_HOST_NAME_ADDRESS		= __constant_htons(11),
+	SCTP_PARAM_SUPPORTED_ADDRESS_TYPES	= __constant_htons(12),
 	SCTP_PARAM_ECN_CAPABLE			= __constant_htons(0x8000),
 
 	/* Add-IP Extension. Section 3.2 */

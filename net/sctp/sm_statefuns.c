@@ -2741,7 +2741,7 @@ sctp_disposition_t sctp_sf_shut_8_4_5(const sctp_endpoint_t *ep,
 		shut->skb->sk = ep->base.sk;
 
 		sctp_packet_append_chunk(packet, shut);
-        
+
 		sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT,
 				SCTP_PACKET(packet));
 
