@@ -207,6 +207,8 @@ struct mm_struct {
 	cpumask_t cpu_vm_mask;
 	unsigned long swap_address;
 
+	unsigned long saved_auxv[40]; /* for /proc/PID/auxv */
+
 	unsigned dumpable:1;
 #ifdef CONFIG_HUGETLB_PAGE
 	int used_hugetlb;
