@@ -1028,7 +1028,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	bl	.local_irq_restore
 	b	11f
 #else
-	beq+	fast_exception_return   /* Return from exception on success */
+	beq	fast_exception_return   /* Return from exception on success */
 	/* fall through */
 #endif
 
