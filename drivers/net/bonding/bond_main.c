@@ -3814,7 +3814,7 @@ static void bond_free_all(void)
 
 		unregister_netdev(dev);
 		bond_deinit(dev);
-		kfree(dev);
+		free_netdev(dev);
 	}
 }
 
@@ -4220,7 +4220,7 @@ static int __init bonding_init(void)
 
 		err = dev_alloc_name(dev, "bond%d");
 		if (err < 0) {
-			kfree(dev);
+			free_netdev(dev);
 			goto out_err;
 		}
 
@@ -4230,7 +4230,7 @@ static int __init bonding_init(void)
 		 */
 		err = bond_init(dev);
 		if (err < 0) {
-			kfree(dev);
+			free_netdev(dev);
 			goto out_err;
 		}
 
@@ -4239,7 +4239,7 @@ static int __init bonding_init(void)
 		err = register_netdevice(dev);
 		if (err < 0) {
 			bond_deinit(dev);
-			kfree(dev);
+			free_netdev(dev);
 			goto out_err;
 		}
 	}
