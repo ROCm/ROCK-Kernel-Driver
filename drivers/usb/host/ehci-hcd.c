@@ -46,8 +46,6 @@
 #include <asm/system.h>
 #include <asm/unaligned.h>
 
-//#undef KERN_DEBUG
-//#define KERN_DEBUG ""
 
 /*-------------------------------------------------------------------------*/
 
@@ -55,21 +53,20 @@
  * EHCI hc_driver implementation ... experimental, incomplete.
  * Based on the final 1.0 register interface specification.
  *
- * There are lots of things to help out with here ... notably
- * everything "periodic", and of course testing with all sorts
- * of usb 2.0 devices and configurations.
- *
  * USB 2.0 shows up in upcoming www.pcmcia.org technology.
  * First was PCMCIA, like ISA; then CardBus, which is PCI.
  * Next comes "CardBay", using USB 2.0 signals.
  *
- * Contains additional contributions by:
- *	Brad Hards
- *	Rory Bolt
- *	...
+ * Contains additional contributions by: Brad Hards, Rory Bolt, ...
+ *
+ * Special thanks to Intel and VIA for providing host controllers to
+ * test this driver on, and Cypress (including In-System Design) for
+ * providing early devices for those host controllers to talk to!
  *
  * HISTORY:
  *
+ * 2002-05-11	Clear TT errors for FS/LS ctrl/bulk.  Fill in some other
+ *	missing pieces:  enabling 64bit dma, handoff from BIOS/SMM.
  * 2002-05-07	Some error path cleanups to report better errors; wmb();
  *	use non-CVS version id; better iso bandwidth claim.
  * 2002-04-19	Control/bulk/interrupt submit no longer uses giveback() on
@@ -85,7 +82,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-May-07"
+#define DRIVER_VERSION "2002-May-11"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -165,6 +162,34 @@ static void ehci_ready (struct ehci_hcd *ehci)
 
 static void ehci_tasklet (unsigned long param);
 
+/* EHCI 0.96 (and later) section 5.1 says how to kick BIOS/SMM/...
+ * off the controller (maybe it can boot from highspeed USB disks).
+ */
+static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
+{
+	if (cap & (1 << 16)) {
+		int msec = 500;
+
+		/* request handoff to OS */
+		cap &= 1 << 24;
+		pci_write_config_dword (ehci->hcd.pdev, where, cap);
+
+		/* and wait a while for it to happen */
+		do {
+			wait_ms (10);
+			msec -= 10;
+			pci_read_config_dword (ehci->hcd.pdev, where, &cap);
+		} while ((cap & (1 << 16)) && msec);
+		if (cap & (1 << 16)) {
+			info ("BIOS handoff failed (%d, %04x)", where, cap);
+			return 1;
+		} 
+		dbg ("BIOS handoff succeeded");
+	} else
+		dbg ("BIOS handoff not needed");
+	return 0;
+}
+
 /* called by khubd or root hub init threads */
 
 static int ehci_start (struct usb_hcd *hcd)
@@ -176,16 +201,36 @@ static int ehci_start (struct usb_hcd *hcd)
 	u32			hcc_params;
 	u8                      tempbyte;
 
-	// FIXME:  given EHCI 0.96 or later, and a controller with
-	// the USBLEGSUP/USBLEGCTLSTS extended capability, make sure
-	// the BIOS doesn't still own this controller.
-
 	spin_lock_init (&ehci->lock);
 
 	ehci->caps = (struct ehci_caps *) hcd->regs;
 	ehci->regs = (struct ehci_regs *) (hcd->regs + ehci->caps->length);
 	dbg_hcs_params (ehci, "ehci_start");
 	dbg_hcc_params (ehci, "ehci_start");
+
+	hcc_params = readl (&ehci->caps->hcc_params);
+
+	/* EHCI 0.96 and later may have "extended capabilities" */
+	temp = HCC_EXT_CAPS (hcc_params);
+	while (temp) {
+		u32		cap;
+
+		pci_read_config_dword (ehci->hcd.pdev, temp, &cap);
+		dbg ("capability %04x at %02x", cap, temp);
+		switch (cap & 0xff) {
+		case 1:			/* BIOS/SMM/... handoff */
+			if (bios_handoff (ehci, temp, cap) != 0)
+				return -EOPNOTSUPP;
+			break;
+		case 0:			/* illegal reserved capability */
+			warn ("illegal capability!");
+			cap = 0;
+			/* FALLTHROUGH */
+		default:		/* unknown */
+			break;
+		}
+		temp = (cap >> 8) & 0xff;
+	}
 
 	/* cache this readonly data; minimize PCI reads */
 	ehci->hcs_params = readl (&ehci->caps->hcs_params);
@@ -197,7 +242,6 @@ static int ehci_start (struct usb_hcd *hcd)
 	ehci->periodic_size = DEFAULT_I_TDPS;
 	if ((retval = ehci_mem_init (ehci, SLAB_KERNEL)) < 0)
 		return retval;
-	hcc_params = readl (&ehci->caps->hcc_params);
 
 	/* controllers may cache some of the periodic schedule ... */
 	if (HCC_ISOC_CACHE (hcc_params)) 	// full frame cache
@@ -221,23 +265,24 @@ static int ehci_start (struct usb_hcd *hcd)
 	 * hcc_params controls whether ehci->regs->segment must (!!!)
 	 * be used; it constrains QH/ITD/SITD and QTD locations.
 	 * pci_pool consistent memory always uses segment zero.
+	 * streaming mappings for I/O buffers, like pci_map_single(),
+	 * can return segments above 4GB, if the device allows.
+	 *
+	 * NOTE:  layered drivers can't yet tell when we enable that,
+	 * so they can't pass this info along (like NETIF_F_HIGHDMA)
 	 */
 	if (HCC_64BIT_ADDR (hcc_params)) {
 		writel (0, &ehci->regs->segment);
-		/*
-		 * FIXME Enlarge pci_set_dma_mask() when possible.  The DMA
-		 * mapping API spec now says that'll affect only single shot
-		 * mappings, and the pci_pool data will stay safe in seg 0.
-		 * That's what we want:  no extra copies for USB transfers.
-		 */
-		info ("restricting 64bit DMA mappings to segment 0 ...");
+		if (!pci_set_dma_mask (ehci->hcd.pdev, 0xffffffffffffffffULL))
+			info ("enabled 64bit PCI DMA (DAC)");
 	}
 
 	/* clear interrupt enables, set irq latency */
 	temp = readl (&ehci->regs->command) & 0xff;
 	if (log2_irq_thresh < 0 || log2_irq_thresh > 6)
-	    log2_irq_thresh = 0;
+		log2_irq_thresh = 0;
 	temp |= 1 << (16 + log2_irq_thresh);
+	// if hc can park (ehci >= 0.96), default is 3 packets per async QH 
 	// keeping default periodic framelist size
 	temp &= ~(CMD_IAAD | CMD_ASE | CMD_PSE),
 	// Philips, Intel, and maybe others need CMD_RUN before the
@@ -433,10 +478,6 @@ static void ehci_tasklet (unsigned long param)
 	scan_async (ehci);
 	if (ehci->next_uframe != -1)
 		scan_periodic (ehci);
-
-	// FIXME:  when nothing is connected to the root hub,
-	// turn off the RUN bit so the host can enter C3 "sleep" power
-	// saving mode; make root hub code scan memory less often.
 }
 
 /*-------------------------------------------------------------------------*/
