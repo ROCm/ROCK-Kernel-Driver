@@ -144,9 +144,9 @@ static __inline__ struct ipv6_pinfo *inet6_sk_generic(struct sock *sk)
 {
 	struct ipv6_pinfo *rc = (&((struct tcp6_sock *)sk)->inet6);
 
-        if (sk->protocol == IPPROTO_UDP)
+        if (sk->sk_protocol == IPPROTO_UDP)
                 rc = (&((struct udp6_sock *)sk)->inet6);
-        else if (sk->protocol == IPPROTO_RAW)
+        else if (sk->sk_protocol == IPPROTO_RAW)
                 rc = (&((struct raw6_sock *)sk)->inet6);
         return rc;
 }
@@ -198,10 +198,10 @@ static int inet6_create(struct socket *sock, int protocol)
 	sock_init_data(sock, sk);
 	sk_set_owner(sk, THIS_MODULE);
 
-	sk->prot = answer->prot;
-	sk->no_check = answer->no_check;
+	sk->sk_prot = answer->prot;
+	sk->sk_no_check = answer->no_check;
 	if (INET_PROTOSW_REUSE & answer->flags)
-		sk->reuse = 1;
+		sk->sk_reuse = 1;
 	rcu_read_unlock();
 
 	inet = inet_sk(sk);
@@ -212,12 +212,12 @@ static int inet6_create(struct socket *sock, int protocol)
 			inet->hdrincl = 1;
 	}
 
-	sk->destruct            = inet6_sock_destruct;
-	sk->zapped		= 0;
-	sk->family		= PF_INET6;
-	sk->protocol		= protocol;
+	sk->sk_destruct		= inet6_sock_destruct;
+	sk->sk_zapped		= 0;
+	sk->sk_family		= PF_INET6;
+	sk->sk_protocol		= protocol;
 
-	sk->backlog_rcv		= answer->prot->backlog_rcv;
+	sk->sk_backlog_rcv	= answer->prot->backlog_rcv;
 
 	tcp6sk		= (struct tcp6_sock *)sk;
 	tcp6sk->pinet6 = np = inet6_sk_generic(sk);
@@ -253,10 +253,10 @@ static int inet6_create(struct socket *sock, int protocol)
 		 * creation time automatically shares.
 		 */
 		inet->sport = ntohs(inet->num);
-		sk->prot->hash(sk);
+		sk->sk_prot->hash(sk);
 	}
-	if (sk->prot->init) {
-		int err = sk->prot->init(sk);
+	if (sk->sk_prot->init) {
+		int err = sk->sk_prot->init(sk);
 		if (err != 0) {
 			inet_sock_release(sk);
 			return err;
@@ -293,8 +293,8 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	int addr_type = 0;
 
 	/* If the socket has its own bind function then use it. */
-	if(sk->prot->bind)
-		return sk->prot->bind(sk, uaddr, addr_len);
+	if (sk->sk_prot->bind)
+		return sk->sk_prot->bind(sk, uaddr, addr_len);
 
 	if (addr_len < SIN6_LEN_RFC2133)
 		return -EINVAL;
@@ -327,7 +327,7 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	lock_sock(sk);
 
 	/* Check these errors (active socket, double bind). */
-	if (sk->state != TCP_CLOSE || inet->num) {
+	if (sk->sk_state != TCP_CLOSE || inet->num) {
 		release_sock(sk);
 		return -EINVAL;
 	}
@@ -338,11 +338,11 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 			/* Override any existing binding, if another one
 			 * is supplied by user.
 			 */
-			sk->bound_dev_if = addr->sin6_scope_id;
+			sk->sk_bound_dev_if = addr->sin6_scope_id;
 		}
 
 		/* Binding to link-local address requires an interface */
-		if (sk->bound_dev_if == 0) {
+		if (!sk->sk_bound_dev_if) {
 			release_sock(sk);
 			return -EINVAL;
 		}
@@ -357,16 +357,16 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		ipv6_addr_copy(&np->saddr, &addr->sin6_addr);
 
 	/* Make sure we are allowed to bind here. */
-	if (sk->prot->get_port(sk, snum) != 0) {
+	if (sk->sk_prot->get_port(sk, snum)) {
 		inet_reset_saddr(sk);
 		release_sock(sk);
 		return -EADDRINUSE;
 	}
 
 	if (addr_type != IPV6_ADDR_ANY)
-		sk->userlocks |= SOCK_BINDADDR_LOCK;
+		sk->sk_userlocks |= SOCK_BINDADDR_LOCK;
 	if (snum)
-		sk->userlocks |= SOCK_BINDPORT_LOCK;
+		sk->sk_userlocks |= SOCK_BINDPORT_LOCK;
 	inet->sport = ntohs(inet->num);
 	inet->dport = 0;
 	inet->daddr = 0;
@@ -437,7 +437,8 @@ int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 	if (peer) {
 		if (!inet->dport)
 			return -ENOTCONN;
-		if (((1<<sk->state)&(TCPF_CLOSE|TCPF_SYN_SENT)) && peer == 1)
+		if (((1 << sk->sk_state) & (TCPF_CLOSE | TCPF_SYN_SENT)) &&
+		    peer == 1)
 			return -ENOTCONN;
 		sin->sin6_port = inet->dport;
 		ipv6_addr_copy(&sin->sin6_addr, &np->daddr);
@@ -452,7 +453,7 @@ int inet6_getname(struct socket *sock, struct sockaddr *uaddr,
 		sin->sin6_port = inet->sport;
 	}
 	if (ipv6_addr_type(&sin->sin6_addr) & IPV6_ADDR_LINKLOCAL)
-		sin->sin6_scope_id = sk->bound_dev_if;
+		sin->sin6_scope_id = sk->sk_bound_dev_if;
 	*uaddr_len = sizeof(*sin);
 	return(0);
 }
@@ -465,9 +466,9 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	switch(cmd) 
 	{
 	case SIOCGSTAMP:
-		if(sk->stamp.tv_sec==0)
+		if (!sk->sk_stamp.tv_sec)
 			return -ENOENT;
-		err = copy_to_user((void *)arg, &sk->stamp,
+		err = copy_to_user((void *)arg, &sk->sk_stamp,
 				   sizeof(struct timeval));
 		if (err)
 			return -EFAULT;
@@ -485,7 +486,8 @@ int inet6_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	case SIOCSIFDSTADDR:
 		return addrconf_set_dstaddr((void *) arg);
 	default:
-		if(sk->prot->ioctl==0 || (err=sk->prot->ioctl(sk, cmd, arg))==-ENOIOCTLCMD)
+		if (!sk->sk_prot->ioctl ||
+		    (err = sk->sk_prot->ioctl(sk, cmd, arg)) == -ENOIOCTLCMD)
 			return(dev_ioctl(cmd,(void *) arg));		
 		return err;
 	}

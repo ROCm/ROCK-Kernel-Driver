@@ -37,6 +37,7 @@
 #include <linux/rcupdate.h>
 #include <linux/moduleparam.h>
 #include <linux/writeback.h>
+#include <linux/cpu.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>

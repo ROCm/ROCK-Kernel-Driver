@@ -174,7 +174,8 @@ struct sock *ax25_find_listener(ax25_address *addr, int digi,
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if ((s->iamdigi && !digi) || (!s->iamdigi && digi))
 			continue;
-		if (s->sk != NULL && ax25cmp(&s->source_addr, addr) == 0 && s->sk->type == type && s->sk->state == TCP_LISTEN) {
+		if (s->sk && !ax25cmp(&s->source_addr, addr) &&
+		    s->sk->sk_type == type && s->sk->sk_state == TCP_LISTEN) {
 			/* If device is null we match any device */
 			if (s->ax25_dev == NULL || s->ax25_dev->dev == dev) {
 				spin_unlock_bh(&ax25_list_lock);
@@ -199,7 +200,9 @@ struct sock *ax25_get_socket(ax25_address *my_addr, ax25_address *dest_addr,
 
 	spin_lock_bh(&ax25_list_lock);
 	for (s = ax25_list; s != NULL; s = s->next) {
-		if (s->sk != NULL && ax25cmp(&s->source_addr, my_addr) == 0 && ax25cmp(&s->dest_addr, dest_addr) == 0 && s->sk->type == type) {
+		if (s->sk && !ax25cmp(&s->source_addr, my_addr) &&
+		    !ax25cmp(&s->dest_addr, dest_addr) &&
+		    s->sk->sk_type == type) {
 			sk = s->sk;
 			/* XXX Sleeps with spinlock held, use refcounts instead. XXX */
 			lock_sock(sk);
@@ -223,7 +226,7 @@ ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr,
 
 	spin_lock_bh(&ax25_list_lock);
 	for (s = ax25_list; s != NULL; s = s->next) {
-		if (s->sk != NULL && s->sk->type != SOCK_SEQPACKET)
+		if (s->sk && s->sk->sk_type != SOCK_SEQPACKET)
 			continue;
 		if (s->ax25_dev == NULL)
 			continue;
@@ -258,7 +261,7 @@ struct sock *ax25_addr_match(ax25_address *addr)
 	spin_lock_bh(&ax25_list_lock);
 	for (s = ax25_list; s != NULL; s = s->next) {
 		if (s->sk != NULL && ax25cmp(&s->source_addr, addr) == 0 &&
-		    s->sk->type == SOCK_RAW) {
+		    s->sk->sk_type == SOCK_RAW) {
 			sk = s->sk;
 			lock_sock(sk);
 			break;
@@ -274,9 +277,9 @@ void ax25_send_to_raw(struct sock *sk, struct sk_buff *skb, int proto)
 	struct sk_buff *copy;
 
 	while (sk != NULL) {
-		if (sk->type == SOCK_RAW &&
-		    sk->protocol == proto &&
-		    atomic_read(&sk->rmem_alloc) <= sk->rcvbuf) {
+		if (sk->sk_type == SOCK_RAW &&
+		    sk->sk_protocol == proto &&
+		    atomic_read(&sk->sk_rmem_alloc) <= sk->sk_rcvbuf) {
 			if ((copy = skb_clone(skb, GFP_ATOMIC)) == NULL)
 				return;
 
@@ -284,7 +287,7 @@ void ax25_send_to_raw(struct sock *sk, struct sk_buff *skb, int proto)
 				kfree_skb(copy);
 		}
 
-		sk = sk->next;
+		sk = sk->sk_next;
 	}
 }
 
@@ -322,7 +325,7 @@ void ax25_destroy_socket(ax25_cb *ax25)
 	ax25_clear_queues(ax25);	/* Flush the queues */
 
 	if (ax25->sk != NULL) {
-		while ((skb = skb_dequeue(&ax25->sk->receive_queue)) != NULL) {
+		while ((skb = skb_dequeue(&ax25->sk->sk_receive_queue)) != NULL) {
 			if (skb->sk != ax25->sk) {
 				/* A pending connection */
 				ax25_cb *sax25 = ax25_sk(skb->sk);
@@ -339,8 +342,8 @@ void ax25_destroy_socket(ax25_cb *ax25)
 	}
 
 	if (ax25->sk != NULL) {
-		if (atomic_read(&ax25->sk->wmem_alloc) != 0 ||
-		    atomic_read(&ax25->sk->rmem_alloc) != 0) {
+		if (atomic_read(&ax25->sk->sk_wmem_alloc) ||
+		    atomic_read(&ax25->sk->sk_rmem_alloc)) {
 			/* Defer: outstanding buffers */
 			init_timer(&ax25->timer);
 			ax25->timer.expires  = jiffies + 10 * HZ;
@@ -650,8 +653,9 @@ static int ax25_setsockopt(struct socket *sock, int level, int optname,
 			break;
 		}
 
-		if (sk->type == SOCK_SEQPACKET &&
-		   (sock->state != SS_UNCONNECTED || sk->state == TCP_LISTEN)) {
+		if (sk->sk_type == SOCK_SEQPACKET &&
+		   (sock->state != SS_UNCONNECTED ||
+		    sk->sk_state == TCP_LISTEN)) {
 			res = -EADDRNOTAVAIL;
 			break;
 		}
@@ -771,9 +775,9 @@ static int ax25_listen(struct socket *sock, int backlog)
 	int res = 0;
 
 	lock_sock(sk);
-	if (sk->type == SOCK_SEQPACKET && sk->state != TCP_LISTEN) {
-		sk->max_ack_backlog = backlog;
-		sk->state           = TCP_LISTEN;
+	if (sk->sk_type == SOCK_SEQPACKET && sk->sk_state != TCP_LISTEN) {
+		sk->sk_max_ack_backlog = backlog;
+		sk->sk_state           = TCP_LISTEN;
 		goto out;
 	}
 	res = -EOPNOTSUPP;
@@ -846,9 +850,9 @@ int ax25_create(struct socket *sock, int protocol)
 	sock_init_data(sock, sk);
 	sk_set_owner(sk, THIS_MODULE);
 
-	sk->destruct = ax25_free_sock;
+	sk->sk_destruct = ax25_free_sock;
 	sock->ops    = &ax25_proto_ops;
-	sk->protocol = protocol;
+	sk->sk_protocol = protocol;
 
 	ax25->sk    = sk;
 
@@ -868,7 +872,7 @@ struct sock *ax25_make_new(struct sock *osk, struct ax25_dev *ax25_dev)
 		return NULL;
 	}
 
-	switch (osk->type) {
+	switch (osk->sk_type) {
 	case SOCK_DGRAM:
 		break;
 	case SOCK_SEQPACKET:
@@ -882,17 +886,17 @@ struct sock *ax25_make_new(struct sock *osk, struct ax25_dev *ax25_dev)
 	sock_init_data(NULL, sk);
 	sk_set_owner(sk, THIS_MODULE);
 
-	sk->destruct = ax25_free_sock;
-	sk->type     = osk->type;
-	sk->socket   = osk->socket;
-	sk->priority = osk->priority;
-	sk->protocol = osk->protocol;
-	sk->rcvbuf   = osk->rcvbuf;
-	sk->sndbuf   = osk->sndbuf;
-	sk->debug    = osk->debug;
-	sk->state    = TCP_ESTABLISHED;
-	sk->sleep    = osk->sleep;
-	sk->zapped   = osk->zapped;
+	sk->sk_destruct = ax25_free_sock;
+	sk->sk_type     = osk->sk_type;
+	sk->sk_socket   = osk->sk_socket;
+	sk->sk_priority = osk->sk_priority;
+	sk->sk_protocol = osk->sk_protocol;
+	sk->sk_rcvbuf   = osk->sk_rcvbuf;
+	sk->sk_sndbuf   = osk->sk_sndbuf;
+	sk->sk_debug    = osk->sk_debug;
+	sk->sk_state    = TCP_ESTABLISHED;
+	sk->sk_sleep    = osk->sk_sleep;
+	sk->sk_zapped   = osk->sk_zapped;
 
 	oax25 = ax25_sk(osk);
 
@@ -938,7 +942,7 @@ static int ax25_release(struct socket *sock)
 	lock_sock(sk);
 	ax25 = ax25_sk(sk);
 
-	if (sk->type == SOCK_SEQPACKET) {
+	if (sk->sk_type == SOCK_SEQPACKET) {
 		switch (ax25->state) {
 		case AX25_STATE_0:
 			ax25_disconnect(ax25, 0);
@@ -978,9 +982,9 @@ static int ax25_release(struct socket *sock)
 			ax25_calculate_t1(ax25);
 			ax25_start_t1timer(ax25);
 			ax25->state = AX25_STATE_2;
-			sk->state                = TCP_CLOSE;
-			sk->shutdown            |= SEND_SHUTDOWN;
-			sk->state_change(sk);
+			sk->sk_state                = TCP_CLOSE;
+			sk->sk_shutdown            |= SEND_SHUTDOWN;
+			sk->sk_state_change(sk);
 			sock_set_flag(sk, SOCK_DEAD);
 			sock_set_flag(sk, SOCK_DESTROY);
 			break;
@@ -989,15 +993,15 @@ static int ax25_release(struct socket *sock)
 			break;
 		}
 	} else {
-		sk->state     = TCP_CLOSE;
-		sk->shutdown |= SEND_SHUTDOWN;
-		sk->state_change(sk);
+		sk->sk_state     = TCP_CLOSE;
+		sk->sk_shutdown |= SEND_SHUTDOWN;
+		sk->sk_state_change(sk);
 		sock_set_flag(sk, SOCK_DEAD);
 		ax25_destroy_socket(ax25);
 	}
 
 	sock->sk   = NULL;
-	sk->socket = NULL;	/* Not used, but we should do this */
+	sk->sk_socket = NULL;	/* Not used, but we should do this */
 	release_sock(sk);
 
 	return 0;
@@ -1041,7 +1045,7 @@ static int ax25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	lock_sock(sk);
 
 	ax25 = ax25_sk(sk);
-	if (sk->zapped == 0) {
+	if (!sk->sk_zapped) {
 		err = -EINVAL;
 		goto out;
 	}
@@ -1075,7 +1079,7 @@ static int ax25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 done:
 	ax25_insert_socket(ax25);
-	sk->zapped = 0;
+	sk->sk_zapped = 0;
 
 out:
 	release_sock(sk);
@@ -1122,7 +1126,7 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 
 	/* deal with restarts */
 	if (sock->state == SS_CONNECTING) {
-		switch (sk->state) {
+		switch (sk->sk_state) {
 		case TCP_SYN_SENT: /* still trying */
 			err = -EINPROGRESS;
 			goto out;
@@ -1138,12 +1142,12 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 		}
 	}
 
-	if (sk->state == TCP_ESTABLISHED && sk->type == SOCK_SEQPACKET) {
+	if (sk->sk_state == TCP_ESTABLISHED && sk->sk_type == SOCK_SEQPACKET) {
 		err = -EISCONN;	/* No reconnect on a seqpacket socket */
 		goto out;
 	}
 
-	sk->state   = TCP_CLOSE;
+	sk->sk_state   = TCP_CLOSE;
 	sock->state = SS_UNCONNECTED;
 
 	if (ax25->digipeat != NULL) {
@@ -1188,7 +1192,7 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 	 *	the socket is already bound, check to see if the device has
 	 *	been filled in, error if it hasn't.
 	 */
-	if (sk->zapped) {
+	if (sk->sk_zapped) {
 		/* check if we can remove this feature. It is broken. */
 		printk(KERN_WARNING "ax25_connect(): %s uses autobind, please contact jreuter@yaina.de\n",
 			current->comm);
@@ -1204,7 +1208,7 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 		}
 	}
 
-	if (sk->type == SOCK_SEQPACKET &&
+	if (sk->sk_type == SOCK_SEQPACKET &&
 	    ax25_find_cb(&ax25->source_addr, &fsa->fsa_ax25.sax25_call, digi,
 		    	 ax25->ax25_dev->dev)) {
 		if (digi != NULL)
@@ -1217,15 +1221,15 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 	ax25->digipeat  = digi;
 
 	/* First the easy one */
-	if (sk->type != SOCK_SEQPACKET) {
+	if (sk->sk_type != SOCK_SEQPACKET) {
 		sock->state = SS_CONNECTED;
-		sk->state   = TCP_ESTABLISHED;
+		sk->sk_state   = TCP_ESTABLISHED;
 		goto out;
 	}
 
 	/* Move to connecting socket, ax.25 lapb WAIT_UA.. */
 	sock->state        = SS_CONNECTING;
-	sk->state          = TCP_SYN_SENT;
+	sk->sk_state          = TCP_SYN_SENT;
 
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
 	case AX25_PROTO_STD_SIMPLEX:
@@ -1250,18 +1254,18 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 	ax25_start_heartbeat(ax25);
 
 	/* Now the loop */
-	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK)) {
+	if (sk->sk_state != TCP_ESTABLISHED && (flags & O_NONBLOCK)) {
 		err = -EINPROGRESS;
 		goto out;
 	}
 
-	if (sk->state == TCP_SYN_SENT) {
+	if (sk->sk_state == TCP_SYN_SENT) {
 		struct task_struct *tsk = current;
 		DECLARE_WAITQUEUE(wait, tsk);
 
-		add_wait_queue(sk->sleep, &wait);
+		add_wait_queue(sk->sk_sleep, &wait);
 		for (;;) {
-			if (sk->state != TCP_SYN_SENT)
+			if (sk->sk_state != TCP_SYN_SENT)
 				break;
 			set_current_state(TASK_INTERRUPTIBLE);
 			release_sock(sk);
@@ -1273,10 +1277,10 @@ static int ax25_connect(struct socket *sock, struct sockaddr *uaddr,
 			return -ERESTARTSYS;
 		}
 		current->state = TASK_RUNNING;
-		remove_wait_queue(sk->sleep, &wait);
+		remove_wait_queue(sk->sk_sleep, &wait);
 	}
 
-	if (sk->state != TCP_ESTABLISHED) {
+	if (sk->sk_state != TCP_ESTABLISHED) {
 		/* Not in ABM, not in WAIT_UA -> failed */
 		sock->state = SS_UNCONNECTED;
 		err = sock_error(sk);	/* Always set at this point */
@@ -1308,12 +1312,12 @@ static int ax25_accept(struct socket *sock, struct socket *newsock, int flags)
 		return -EINVAL;
 
 	lock_sock(sk);
-	if (sk->type != SOCK_SEQPACKET) {
+	if (sk->sk_type != SOCK_SEQPACKET) {
 		err = -EOPNOTSUPP;
 		goto out;
 	}
 
-	if (sk->state != TCP_LISTEN) {
+	if (sk->sk_state != TCP_LISTEN) {
 		err = -EINVAL;
 		goto out;
 	}
@@ -1322,9 +1326,9 @@ static int ax25_accept(struct socket *sock, struct socket *newsock, int flags)
 	 *	The read queue this time is holding sockets ready to use
 	 *	hooked into the SABM we saved
 	 */
-	add_wait_queue(sk->sleep, &wait);
+	add_wait_queue(sk->sk_sleep, &wait);
 	for (;;) {
-		skb = skb_dequeue(&sk->receive_queue);
+		skb = skb_dequeue(&sk->sk_receive_queue);
 		if (skb)
 			break;
 
@@ -1340,16 +1344,16 @@ static int ax25_accept(struct socket *sock, struct socket *newsock, int flags)
 		return -ERESTARTSYS;
 	}
 	current->state = TASK_RUNNING;
-	remove_wait_queue(sk->sleep, &wait);
+	remove_wait_queue(sk->sk_sleep, &wait);
 
-	newsk = skb->sk;
-	newsk->pair = NULL;
-	newsk->socket = newsock;
-	newsk->sleep = &newsock->wait;
+	newsk		 = skb->sk;
+	newsk->sk_pair	 = NULL;
+	newsk->sk_socket = newsock;
+	newsk->sk_sleep	 = &newsock->wait;
 
 	/* Now attach up the new socket */
 	kfree_skb(skb);
-	sk->ack_backlog--;
+	sk->sk_ack_backlog--;
 	newsock->sk    = newsk;
 	newsock->state = SS_CONNECTED;
 
@@ -1372,7 +1376,7 @@ static int ax25_getname(struct socket *sock, struct sockaddr *uaddr,
 	ax25 = ax25_sk(sk);
 
 	if (peer != 0) {
-		if (sk->state != TCP_ESTABLISHED) {
+		if (sk->sk_state != TCP_ESTABLISHED) {
 			err = -ENOTCONN;
 			goto out;
 		}
@@ -1426,12 +1430,12 @@ static int ax25_sendmsg(struct kiocb *iocb, struct socket *sock,
 	lock_sock(sk);
 	ax25 = ax25_sk(sk);
 
-	if (sk->zapped) {
+	if (sk->sk_zapped) {
 		err = -EADDRNOTAVAIL;
 		goto out;
 	}
 
-	if (sk->shutdown & SEND_SHUTDOWN) {
+	if (sk->sk_shutdown & SEND_SHUTDOWN) {
 		send_sig(SIGPIPE, current, 0);
 		err = -EPIPE;
 		goto out;
@@ -1486,7 +1490,8 @@ static int ax25_sendmsg(struct kiocb *iocb, struct socket *sock,
 		}
 
 		sax = *usax;
-		if (sk->type == SOCK_SEQPACKET && ax25cmp(&ax25->dest_addr, &sax.sax25_call) != 0) {
+		if (sk->sk_type == SOCK_SEQPACKET &&
+		    ax25cmp(&ax25->dest_addr, &sax.sax25_call)) {
 			err = -EISCONN;
 			goto out;
 		}
@@ -1500,7 +1505,7 @@ static int ax25_sendmsg(struct kiocb *iocb, struct socket *sock,
 		 *	it has become closed (not started closed) and is VC
 		 *	we ought to SIGPIPE, EPIPE
 		 */
-		if (sk->state != TCP_ESTABLISHED) {
+		if (sk->sk_state != TCP_ESTABLISHED) {
 			err = -ENOTCONN;
 			goto out;
 		}
@@ -1532,14 +1537,14 @@ static int ax25_sendmsg(struct kiocb *iocb, struct socket *sock,
 	/* Add the PID if one is not supplied by the user in the skb */
 	if (!ax25->pidincl) {
 		asmptr  = skb_push(skb, 1);
-		*asmptr = sk->protocol;
+		*asmptr = sk->sk_protocol;
 	}
 
 	SOCK_DEBUG(sk, "AX.25: Transmitting buffer\n");
 
-	if (sk->type == SOCK_SEQPACKET) {
+	if (sk->sk_type == SOCK_SEQPACKET) {
 		/* Connected mode sockets go via the LAPB machine */
-		if (sk->state != TCP_ESTABLISHED) {
+		if (sk->sk_state != TCP_ESTABLISHED) {
 			kfree_skb(skb);
 			err = -ENOTCONN;
 			goto out;
@@ -1598,7 +1603,7 @@ static int ax25_recvmsg(struct kiocb *iocb, struct socket *sock,
 	 * 	This works for seqpacket too. The receiver has ordered the
 	 *	queue for us! We do one quick check first though
 	 */
-	if (sk->type == SOCK_SEQPACKET && sk->state != TCP_ESTABLISHED) {
+	if (sk->sk_type == SOCK_SEQPACKET && sk->sk_state != TCP_ESTABLISHED) {
 		err =  -ENOTCONN;
 		goto out;
 	}
@@ -1670,7 +1675,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case TIOCOUTQ: {
 		long amount;
-		amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
 		res = put_user(amount, (int *)arg);
@@ -1681,7 +1686,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		struct sk_buff *skb;
 		long amount = 0L;
 		/* These two are safe on a single CPU system as only user tasks fiddle here */
-		if ((skb = skb_peek(&sk->receive_queue)) != NULL)
+		if ((skb = skb_peek(&sk->sk_receive_queue)) != NULL)
 			amount = skb->len;
 		res = put_user(amount, (int *)arg);
 		break;
@@ -1689,11 +1694,12 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	case SIOCGSTAMP:
 		if (sk != NULL) {
-			if (sk->stamp.tv_sec == 0) {
+			if (!sk->sk_stamp.tv_sec) {
 				res = -ENOENT;
 				break;
 			}
-			res = copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
+			res = copy_to_user((void *)arg, &sk->sk_stamp,
+					  sizeof(struct timeval)) ? -EFAULT : 0;
 			break;
 	 	}
 		res = -EINVAL;
@@ -1764,8 +1770,8 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		ax25_info.idletimer = ax25_display_timer(&ax25->idletimer) / (60 * HZ);
 		ax25_info.n2count   = ax25->n2count;
 		ax25_info.state     = ax25->state;
-		ax25_info.rcv_q     = atomic_read(&sk->rmem_alloc);
-		ax25_info.snd_q     = atomic_read(&sk->wmem_alloc);
+		ax25_info.rcv_q     = atomic_read(&sk->sk_rmem_alloc);
+		ax25_info.snd_q     = atomic_read(&sk->sk_wmem_alloc);
 		ax25_info.vs        = ax25->vs;
 		ax25_info.vr        = ax25->vr;
 		ax25_info.va        = ax25->va;
@@ -1878,9 +1884,9 @@ static int ax25_get_info(char *buffer, char **start, off_t offset, int length)
 
 		if (ax25->sk != NULL) {
 			len += sprintf(buffer + len, " %d %d %ld\n",
-				atomic_read(&ax25->sk->wmem_alloc),
-				atomic_read(&ax25->sk->rmem_alloc),
-				ax25->sk->socket != NULL ? SOCK_INODE(ax25->sk->socket)->i_ino : 0L);
+				atomic_read(&ax25->sk->sk_wmem_alloc),
+				atomic_read(&ax25->sk->sk_rmem_alloc),
+				ax25->sk->sk_socket != NULL ? SOCK_INODE(ax25->sk->sk_socket)->i_ino : 0L);
 		} else {
 			len += sprintf(buffer + len, " * * *\n");
 		}

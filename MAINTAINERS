@@ -1118,8 +1118,10 @@ M:	acme@conectiva.com.br
 S:	Maintained
 
 LINUX FOR 64BIT POWERPC
-P:	David Engebretsen
+P:	David Engebretsen (stable kernel)
 M:	engebret@us.ibm.com
+P:	Anton Blanchard (development kernel)
+M:	anton@au.ibm.com
 W:	http://linuxppc64.org
 L:	linuxppc64-dev@lists.linuxppc.org
 S:	Supported

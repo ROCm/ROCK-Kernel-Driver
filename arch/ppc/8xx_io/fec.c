@@ -1566,11 +1566,11 @@ static void set_multicast_list(struct net_device *dev)
 
 /* Initialize the FEC Ethernet on 860T.
  */
-int __init fec_enet_init(void)
+static int __init fec_enet_init(void)
 {
 	struct net_device *dev;
 	struct fec_enet_private *fep;
-	int i, j, k, err;
+	int i, j, k;
 	unsigned char	*eap, *iap, *ba;
 	unsigned long	mem_addr;
 	volatile	cbd_t	*bdp;
@@ -1586,11 +1586,17 @@ int __init fec_enet_init(void)
 
 	bd = (bd_t *)__res;
 
-	dev = alloc_etherdev(sizeof(*fep));
-	if (!dev)
+	/* Allocate some private information.
+	*/
+	fep = (struct fec_enet_private *)kmalloc(sizeof(*fep), GFP_KERNEL);
+	if (fep == NULL)
 		return -ENOMEM;
 
-	fep = dev->priv;
+	__clear_user(fep,sizeof(*fep));
+
+	/* Create an Ethernet device instance.
+	*/
+	dev = init_etherdev(0, 0);
 
 	fecp = &(immap->im_cpm.cp_fec);
 
@@ -1655,7 +1661,6 @@ int __init fec_enet_init(void)
 		/* Allocate a page.
 		*/
 		ba = (unsigned char *)consistent_alloc(GFP_KERNEL, PAGE_SIZE, &mem_addr);
-		/* BUG: no check for failure */
 
 		/* Initialize the BD for every fragment in the page.
 		*/
@@ -1710,6 +1715,7 @@ int __init fec_enet_init(void)
 #endif
 
 	dev->base_addr = (unsigned long)fecp;
+	dev->priv = fep;
 
 	/* The FEC Ethernet specific entries in the device structure. */
 	dev->open = fec_enet_open;
@@ -1746,12 +1752,6 @@ int __init fec_enet_init(void)
 	fecp->fec_mii_speed = 0;	/* turn off MDIO */
 #endif	/* CONFIG_USE_MDIO */
 
-	err = register_netdev(dev);
-	if (err) {
-		kfree(dev);
-		return err;
-	}
-
 	printk ("%s: FEC ENET Version 0.2, FEC irq %d"
 #ifdef PHY_INTERRUPT
 		", MII irq %d"
@@ -1782,6 +1782,7 @@ int __init fec_enet_init(void)
 
 	return 0;
 }
+module_init(fec_enet_init);
 
 /* This function is called to start or restart the FEC during a link
  * change.  This only happens when switching between half and full

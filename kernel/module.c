@@ -1274,6 +1274,83 @@ static char *get_modinfo(Elf_Shdr *sechdrs,
 	return NULL;
 }
 
+#ifdef CONFIG_KALLSYMS
+int is_exported(const char *name, const struct module *mod)
+{
+	unsigned int i;
+
+	if (!mod) {
+		for (i = 0; __start___ksymtab+i < __stop___ksymtab; i++)
+			if (strcmp(__start___ksymtab[i].name, name) == 0)
+				return 1;
+		return 0;
+	}
+	for (i = 0; i < mod->num_syms; i++)
+		if (strcmp(mod->syms[i].name, name) == 0)
+			return 1;
+	return 0;
+}
+
+/* As per nm */
+static char elf_type(const Elf_Sym *sym,
+		     Elf_Shdr *sechdrs,
+		     const char *secstrings,
+		     struct module *mod)
+{
+	if (ELF_ST_BIND(sym->st_info) == STB_WEAK) {
+		if (ELF_ST_TYPE(sym->st_info) == STT_OBJECT)
+			return 'v';
+		else
+			return 'w';
+	}
+	if (sym->st_shndx == SHN_UNDEF)
+		return 'U';
+	if (sym->st_shndx == SHN_ABS)
+		return 'a';
+	if (sym->st_shndx >= SHN_LORESERVE)
+		return '?';
+	if (sechdrs[sym->st_shndx].sh_flags & SHF_EXECINSTR)
+		return 't';
+	if (sechdrs[sym->st_shndx].sh_flags & SHF_ALLOC
+	    && sechdrs[sym->st_shndx].sh_type != SHT_NOBITS) {
+		if (!(sechdrs[sym->st_shndx].sh_flags & SHF_WRITE))
+			return 'r';
+		else if (sechdrs[sym->st_shndx].sh_flags & ARCH_SHF_SMALL)
+			return 'g';
+		else
+			return 'd';
+	}
+	if (sechdrs[sym->st_shndx].sh_type == SHT_NOBITS) {
+		if (sechdrs[sym->st_shndx].sh_flags & ARCH_SHF_SMALL)
+			return 's';
+		else
+			return 'b';
+	}
+	if (strncmp(secstrings + sechdrs[sym->st_shndx].sh_name,
+		    ".debug", strlen(".debug")) == 0)
+		return 'n';
+	return '?';
+}
+
+static void add_kallsyms(struct module *mod,
+			 Elf_Shdr *sechdrs,
+			 unsigned int symindex,
+			 unsigned int strindex,
+			 const char *secstrings)
+{
+	unsigned int i;
+
+	mod->symtab = (void *)sechdrs[symindex].sh_addr;
+	mod->num_symtab = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
+	mod->strtab = (void *)sechdrs[strindex].sh_addr;
+
+	/* Set types up while we still have access to sections. */
+	for (i = 0; i < mod->num_symtab; i++)
+		mod->symtab[i].st_info
+			= elf_type(&mod->symtab[i], sechdrs, secstrings, mod);
+}
+#endif
+
 /* Allocate and load the module: note that size of section 0 is always
    zero, and we rely on this for optional sections. */
 static struct module *load_module(void __user *umod,
@@ -1525,14 +1602,11 @@ static struct module *load_module(void __user *umod,
 	percpu_modcopy(mod->percpu, (void *)sechdrs[pcpuindex].sh_addr,
 		       sechdrs[pcpuindex].sh_size);
 
-#ifdef CONFIG_KALLSYMS
-	mod->symtab = (void *)sechdrs[symindex].sh_addr;
-	mod->num_symtab = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
-	mod->strtab = (void *)sechdrs[strindex].sh_addr;
-#endif
 	err = module_finalize(hdr, sechdrs, mod);
 	if (err < 0)
 		goto cleanup;
+
+	add_kallsyms(mod, sechdrs, symindex, strindex, secstrings);
 
 	mod->args = args;
 	if (obsparmindex) {
@@ -1713,6 +1787,30 @@ const char *module_address_lookup(unsigned long addr,
 			return get_ksymbol(mod, addr, size, offset);
 		}
 	}
+	return NULL;
+}
+
+struct module *module_get_kallsym(unsigned int symnum,
+				  unsigned long *value,
+				  char *type,
+				  char namebuf[128])
+{
+	struct module *mod;
+
+	down(&module_mutex);
+	list_for_each_entry(mod, &modules, list) {
+		if (symnum < mod->num_symtab) {
+			*value = mod->symtab[symnum].st_value;
+			*type = mod->symtab[symnum].st_info;
+			strncpy(namebuf,
+				mod->strtab + mod->symtab[symnum].st_name,
+				127);
+			up(&module_mutex);
+			return mod;
+		}
+		symnum -= mod->num_symtab;
+	}
+	up(&module_mutex);
 	return NULL;
 }
 #endif /* CONFIG_KALLSYMS */

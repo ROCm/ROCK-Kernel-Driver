@@ -1323,12 +1323,12 @@ int fcc_enet_set_mac_address(struct net_device *dev, void *p)
 
 /* Initialize the CPM Ethernet on FCC.
  */
-int __init fec_enet_init(void)
+static int __init fec_enet_init(void)
 {
 	struct net_device *dev;
 	struct fcc_enet_private *cep;
 	fcc_info_t	*fip;
-	int	i, np, err;
+	int	i, np;
 	volatile	immap_t		*immap;
 	volatile	iop8260_t	*io;
 
@@ -1339,15 +1339,22 @@ int __init fec_enet_init(void)
 	fip = fcc_ports;
 
 	while (np-- > 0) {
-		/* Create an Ethernet device instance.
+
+		/* Allocate some private information.
 		*/
-		dev = alloc_etherdev(sizeof(*cep));
-		if (!dev)
+		cep = (struct fcc_enet_private *)
+					kmalloc(sizeof(*cep), GFP_KERNEL);
+		if (cep == NULL)
 			return -ENOMEM;
 
-		cep = dev->priv;
+		__clear_user(cep,sizeof(*cep));
 		spin_lock_init(&cep->lock);
 		cep->fip = fip;
+
+		/* Create an Ethernet device instance.
+		*/
+		dev = init_etherdev(0, 0);
+		dev->priv = cep;
 
 		init_fcc_shutdown(fip, cep, immap);
 		init_fcc_ioports(fip, io, immap);
@@ -1369,12 +1376,6 @@ int __init fec_enet_init(void)
 
 		init_fcc_startup(fip, dev);
 
-		err = register_netdev(dev);
-		if (err) {
-			kfree(dev);
-			return err;
-		}
-
 		printk("%s: FCC ENET Version 0.3, ", dev->name);
 		for (i=0; i<5; i++)
 			printk("%02x:", dev->dev_addr[i]);
@@ -1393,6 +1394,7 @@ int __init fec_enet_init(void)
 
 	return 0;
 }
+module_init(fec_enet_init);
 
 /* Make sure the device is shut down during initialization.
 */

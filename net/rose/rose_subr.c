@@ -33,7 +33,7 @@
  */
 void rose_clear_queues(struct sock *sk)
 {
-	skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->sk_write_queue);
 	skb_queue_purge(&rose_sk(sk)->ack_queue);
 }
 
@@ -70,7 +70,7 @@ void rose_requeue_frames(struct sock *sk)
 	 */
 	while ((skb = skb_dequeue(&rose_sk(sk)->ack_queue)) != NULL) {
 		if (skb_prev == NULL)
-			skb_queue_head(&sk->write_queue, skb);
+			skb_queue_head(&sk->sk_write_queue, skb);
 		else
 			skb_append(skb_prev, skb);
 		skb_prev = skb;
@@ -506,12 +506,12 @@ void rose_disconnect(struct sock *sk, int reason, int cause, int diagnostic)
 	if (diagnostic != -1)
 		rose->diagnostic = diagnostic;
 
-	sk->state     = TCP_CLOSE;
-	sk->err       = reason;
-	sk->shutdown |= SEND_SHUTDOWN;
+	sk->sk_state     = TCP_CLOSE;
+	sk->sk_err       = reason;
+	sk->sk_shutdown |= SEND_SHUTDOWN;
 
 	if (!sock_flag(sk, SOCK_DEAD)) {
-		sk->state_change(sk);
+		sk->sk_state_change(sk);
 		sock_set_flag(sk, SOCK_DEAD);
 	}
 }

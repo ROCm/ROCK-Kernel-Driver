@@ -234,13 +234,13 @@ static __inline__ void icmp_xmit_lock(void)
 {
 	local_bh_disable();
 
-	if (unlikely(!spin_trylock(&icmp_socket->sk->lock.slock)))
+	if (unlikely(!spin_trylock(&icmp_socket->sk->sk_lock.slock)))
 		BUG();
 }
 
 static void icmp_xmit_unlock(void)
 {
-	spin_unlock_bh(&icmp_socket->sk->lock.slock);
+	spin_unlock_bh(&icmp_socket->sk->sk_lock.slock);
 }
 
 /*
@@ -344,12 +344,12 @@ static void icmp_push_reply(struct icmp_bxm *icmp_param,
 		       icmp_param->head_len,
 		       ipc, rt, MSG_DONTWAIT);
 
-	if ((skb = skb_peek(&icmp_socket->sk->write_queue)) != NULL) {
+	if ((skb = skb_peek(&icmp_socket->sk->sk_write_queue)) != NULL) {
 		struct icmphdr *icmph = skb->h.icmph;
 		unsigned int csum = 0;
 		struct sk_buff *skb1;
 
-		skb_queue_walk(&icmp_socket->sk->write_queue, skb1) {
+		skb_queue_walk(&icmp_socket->sk->sk_write_queue, skb1) {
 			csum = csum_add(csum, skb1->csum);
 		}
 		csum = csum_partial_copy_nocheck((void *)&icmp_param->data,
@@ -685,7 +685,7 @@ static void icmp_unreach(struct sk_buff *skb)
 						 iph->saddr,
 						 skb->dev->ifindex)) != NULL) {
 			raw_err(raw_sk, skb, info);
-			raw_sk = raw_sk->next;
+			raw_sk = raw_sk->sk_next;
 			iph = (struct iphdr *)skb->data;
 		}
 	}
@@ -1101,8 +1101,8 @@ void __init icmp_init(struct net_proto_family *ops)
 		if (err < 0)
 			panic("Failed to create the ICMP control socket.\n");
 
-		per_cpu(__icmp_socket, i)->sk->allocation = GFP_ATOMIC;
-		per_cpu(__icmp_socket, i)->sk->sndbuf = SK_WMEM_MAX * 2;
+		per_cpu(__icmp_socket, i)->sk->sk_allocation = GFP_ATOMIC;
+		per_cpu(__icmp_socket, i)->sk->sk_sndbuf = SK_WMEM_MAX * 2;
 		inet = inet_sk(per_cpu(__icmp_socket, i)->sk);
 		inet->uc_ttl = -1;
 		inet->pmtudisc = IP_PMTUDISC_DONT;
@@ -1111,6 +1111,6 @@ void __init icmp_init(struct net_proto_family *ops)
 		 * see it, we do not wish this socket to see incoming
 		 * packets.
 		 */
-		per_cpu(__icmp_socket, i)->sk->prot->unhash(per_cpu(__icmp_socket, i)->sk);
+		per_cpu(__icmp_socket, i)->sk->sk_prot->unhash(per_cpu(__icmp_socket, i)->sk);
 	}
 }

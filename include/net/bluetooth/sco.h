@@ -71,7 +71,7 @@ struct sco_conn {
 #define sco_conn_unlock(c)	spin_unlock(&c->lock);
 
 /* ----- SCO socket info ----- */
-#define sco_pi(sk)   ((struct sco_pinfo *) sk->protinfo)
+#define sco_pi(sk)   ((struct sco_pinfo *)sk->sk_protinfo)
 
 struct sco_pinfo {
 	__u32		flags;

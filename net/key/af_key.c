@@ -46,19 +46,19 @@ struct pfkey_opt {
 	int	registered;
 	int	promisc;
 };
-#define pfkey_sk(__sk) ((struct pfkey_opt *)(__sk)->protinfo)
+#define pfkey_sk(__sk) ((struct pfkey_opt *)(__sk)->sk_protinfo)
 
 static void pfkey_sock_destruct(struct sock *sk)
 {
-	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
 
 	if (!sock_flag(sk, SOCK_DEAD)) {
 		printk("Attempt to release alive pfkey socket: %p\n", sk);
 		return;
 	}
 
-	BUG_TRAP(atomic_read(&sk->rmem_alloc)==0);
-	BUG_TRAP(atomic_read(&sk->wmem_alloc)==0);
+	BUG_TRAP(!atomic_read(&sk->sk_rmem_alloc));
+	BUG_TRAP(!atomic_read(&sk->sk_wmem_alloc));
 
 	kfree(pfkey_sk(sk));
 
@@ -114,7 +114,7 @@ static struct proto_ops pfkey_ops;
 static void pfkey_insert(struct sock *sk)
 {
 	pfkey_table_grab();
-	sk->next = pfkey_table;
+	sk->sk_next = pfkey_table;
 	pfkey_table = sk;
 	sock_hold(sk);
 	pfkey_table_ungrab();
@@ -125,9 +125,9 @@ static void pfkey_remove(struct sock *sk)
 	struct sock **skp;
 
 	pfkey_table_grab();
-	for (skp = &pfkey_table; *skp; skp = &((*skp)->next)) {
+	for (skp = &pfkey_table; *skp; skp = &((*skp)->sk_next)) {
 		if (*skp == sk) {
-			*skp = sk->next;
+			*skp = sk->sk_next;
 			__sock_put(sk);
 			break;
 		}
@@ -165,8 +165,8 @@ static int pfkey_create(struct socket *sock, int protocol)
 	}
 	memset(pfk, 0, sizeof(*pfk));
 
-	sk->family = PF_KEY;
-	sk->destruct = pfkey_sock_destruct;
+	sk->sk_family = PF_KEY;
+	sk->sk_destruct = pfkey_sock_destruct;
 
 	atomic_inc(&pfkey_socks_nr);
 
@@ -188,7 +188,7 @@ static int pfkey_release(struct socket *sock)
 
 	sock_orphan(sk);
 	sock->sk = NULL;
-	skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->sk_write_queue);
 	sock_put(sk);
 
 	return 0;
@@ -209,11 +209,11 @@ static int pfkey_broadcast_one(struct sk_buff *skb, struct sk_buff **skb2,
 		}
 	}
 	if (*skb2 != NULL) {
-		if (atomic_read(&sk->rmem_alloc) <= sk->rcvbuf) {
+		if (atomic_read(&sk->sk_rmem_alloc) <= sk->sk_rcvbuf) {
 			skb_orphan(*skb2);
 			skb_set_owner_r(*skb2, sk);
-			skb_queue_tail(&sk->receive_queue, *skb2);
-			sk->data_ready(sk, (*skb2)->len);
+			skb_queue_tail(&sk->sk_receive_queue, *skb2);
+			sk->sk_data_ready(sk, (*skb2)->len);
 			*skb2 = NULL;
 			err = 0;
 		}
@@ -241,7 +241,7 @@ static int pfkey_broadcast(struct sk_buff *skb, int allocation,
 		return -ENOMEM;
 
 	pfkey_lock_table();
-	for (sk = pfkey_table; sk; sk = sk->next) {
+	for (sk = pfkey_table; sk; sk = sk->sk_next) {
 		struct pfkey_opt *pfk = pfkey_sk(sk);
 		int err2;
 
@@ -2694,7 +2694,7 @@ static int pfkey_sendmsg(struct kiocb *kiocb,
 		goto out;
 
 	err = -EMSGSIZE;
-	if ((unsigned)len > sk->sndbuf-32)
+	if ((unsigned)len > sk->sk_sndbuf - 32)
 		goto out;
 
 	err = -ENOBUFS;
@@ -2804,12 +2804,12 @@ static int pfkey_read_proc(char *buffer, char **start, off_t offset,
 
 	read_lock(&pfkey_table_lock);
 
-	for (s = pfkey_table; s; s = s->next) {
+	for (s = pfkey_table; s; s = s->sk_next) {
 		len += sprintf(buffer+len,"%p %-6d %-6u %-6u %-6u %-6lu",
 			       s,
-			       atomic_read(&s->refcnt),
-			       atomic_read(&s->rmem_alloc),
-			       atomic_read(&s->wmem_alloc),
+			       atomic_read(&s->sk_refcnt),
+			       atomic_read(&s->sk_rmem_alloc),
+			       atomic_read(&s->sk_wmem_alloc),
 			       sock_i_uid(s),
 			       sock_i_ino(s)
 			       );

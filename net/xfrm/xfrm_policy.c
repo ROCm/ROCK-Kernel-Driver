@@ -15,6 +15,7 @@
 
 #include <linux/config.h>
 #include <linux/slab.h>
+#include <linux/kmod.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
 
@@ -74,16 +75,25 @@ struct xfrm_type *xfrm_get_type(u8 proto, unsigned short family)
 	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
 	struct xfrm_type_map *typemap;
 	struct xfrm_type *type;
+	int modload_attempted = 0;
 
 	if (unlikely(afinfo == NULL))
 		return NULL;
 	typemap = afinfo->type_map;
 
+retry:
 	read_lock(&typemap->lock);
 	type = typemap->map[proto];
 	if (unlikely(type && !try_module_get(type->owner)))
 		type = NULL;
 	read_unlock(&typemap->lock);
+	if (!type && !modload_attempted) {
+		request_module("xfrm-type-%d-%d",
+			       (int) family, (int) proto);
+		modload_attempted = 1;
+		goto retry;
+	}
+
 	xfrm_policy_put_afinfo(afinfo);
 	return type;
 }
@@ -411,10 +421,9 @@ struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi
 	struct xfrm_policy *pol;
 
 	read_lock_bh(&xfrm_policy_lock);
-	if ((pol = sk->policy[dir]) != NULL) {
-		int match;
-
-		match = xfrm_selector_match(&pol->selector, fl, sk->family);
+	if ((pol = sk->sk_policy[dir]) != NULL) {
+		int match = xfrm_selector_match(&pol->selector, fl,
+						sk->sk_family);
 		if (match)
 			xfrm_pol_hold(pol);
 		else
@@ -450,8 +459,8 @@ int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol)
 	struct xfrm_policy *old_pol;
 
 	write_lock_bh(&xfrm_policy_lock);
-	old_pol = sk->policy[dir];
-	sk->policy[dir] = pol;
+	old_pol = sk->sk_policy[dir];
+	sk->sk_policy[dir] = pol;
 	if (pol) {
 		pol->curlft.add_time = (unsigned long)xtime.tv_sec;
 		pol->index = xfrm_gen_index(XFRM_POLICY_MAX+dir);
@@ -491,14 +500,13 @@ static struct xfrm_policy *clone_policy(struct xfrm_policy *old, int dir)
 
 int __xfrm_sk_clone_policy(struct sock *sk)
 {
-	struct xfrm_policy *p0, *p1;
-	p0 = sk->policy[0];
-	p1 = sk->policy[1];
-	sk->policy[0] = NULL;
-	sk->policy[1] = NULL;
-	if (p0 && (sk->policy[0] = clone_policy(p0, 0)) == NULL)
+	struct xfrm_policy *p0 = sk->sk_policy[0],
+			   *p1 = sk->sk_policy[1];
+
+	sk->sk_policy[0] = sk->sk_policy[1] = NULL;
+	if (p0 && (sk->sk_policy[0] = clone_policy(p0, 0)) == NULL)
 		return -ENOMEM;
-	if (p1 && (sk->policy[1] = clone_policy(p1, 1)) == NULL)
+	if (p1 && (sk->sk_policy[1] = clone_policy(p1, 1)) == NULL)
 		return -ENOMEM;
 	return 0;
 }
@@ -644,7 +652,7 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 restart:
 	genid = atomic_read(&flow_cache_genid);
 	policy = NULL;
-	if (sk && sk->policy[1])
+	if (sk && sk->sk_policy[1])
 		policy = xfrm_sk_policy_lookup(sk, XFRM_POLICY_OUT, fl);
 
 	if (!policy) {
@@ -832,7 +840,7 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 	}
 
 	pol = NULL;
-	if (sk && sk->policy[dir])
+	if (sk && sk->sk_policy[dir])
 		pol = xfrm_sk_policy_lookup(sk, dir, &fl);
 
 	if (!pol)

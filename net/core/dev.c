@@ -2863,10 +2863,6 @@ int unregister_netdevice(struct net_device *dev)
  *
  */
 
-extern void net_device_init(void);
-extern void ip_auto_config(void);
-
-
 /*
  *       This is called single threaded during boot, so no need
  *       to take the rtnl semaphore.
@@ -2999,11 +2995,6 @@ static int __init net_dev_init(void)
 #ifdef CONFIG_NET_SCHED
 	pktsched_init();
 #endif
-	/*
-	 *	Initialise network devices
-	 */
-
-	net_device_init();
 	rc = 0;
 out:
 	return rc;

@@ -465,21 +465,21 @@ static int bnep_session(void *arg)
         set_fs(KERNEL_DS);
 
 	init_waitqueue_entry(&wait, current);
-	add_wait_queue(sk->sleep, &wait);
+	add_wait_queue(sk->sk_sleep, &wait);
 	while (!atomic_read(&s->killed)) {
 		set_current_state(TASK_INTERRUPTIBLE);
 
 		// RX
-		while ((skb = skb_dequeue(&sk->receive_queue))) {
+		while ((skb = skb_dequeue(&sk->sk_receive_queue))) {
 			skb_orphan(skb);
 			bnep_rx_frame(s, skb);
 		}
 
-		if (sk->state != BT_CONNECTED)
+		if (sk->sk_state != BT_CONNECTED)
 			break;
 	
 		// TX
-		while ((skb = skb_dequeue(&sk->write_queue)))
+		while ((skb = skb_dequeue(&sk->sk_write_queue)))
 			if (bnep_tx_frame(s, skb))
 				break;
 		netif_wake_queue(dev);
@@ -487,7 +487,7 @@ static int bnep_session(void *arg)
 		schedule();
 	}
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(sk->sleep, &wait);
+	remove_wait_queue(sk->sk_sleep, &wait);
 
 	/* Cleanup session */
 	down_write(&bnep_session_sem);
@@ -609,11 +609,11 @@ int bnep_del_connection(struct bnep_conndel_req *req)
 	if (s) {
 		/* Wakeup user-space which is polling for socket errors.
 		 * This is temporary hack untill we have shutdown in L2CAP */
-		s->sock->sk->err = EUNATCH;
+		s->sock->sk->sk_err = EUNATCH;
 		
 		/* Kill session thread */
 		atomic_inc(&s->killed);
-		wake_up_interruptible(s->sock->sk->sleep);
+		wake_up_interruptible(s->sock->sk->sk_sleep);
 	} else
 		err = -ENOENT;
 

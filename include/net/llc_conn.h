@@ -67,7 +67,7 @@ struct llc_opt {
 					      Used for resending FRMR */
 };
 
-#define llc_sk(__sk) ((struct llc_opt *)(__sk)->protinfo)
+#define llc_sk(__sk) ((struct llc_opt *)(__sk)->sk_protinfo)
 
 extern struct sock *llc_sk_alloc(int family, int priority);
 extern void llc_sk_free(struct sock *sk);

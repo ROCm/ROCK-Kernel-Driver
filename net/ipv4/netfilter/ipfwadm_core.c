@@ -1435,7 +1435,7 @@ int ipfw_init_or_cleanup(int init)
 
  cleanup:
 #ifdef CONFIG_IP_FIREWALL_NETLINK
-	sock_release(ipfwsk->socket);
+	sock_release(ipfwsk->sk_socket);
 #endif
 	unregister_netdevice_notifier(&ipfw_dev_notifier);
 

@@ -88,6 +88,7 @@
 #include	<linux/seq_file.h>
 #include	<linux/notifier.h>
 #include	<linux/kallsyms.h>
+#include	<linux/cpu.h>
 #include	<asm/uaccess.h>
 
 /*

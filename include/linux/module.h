@@ -266,6 +266,13 @@ static inline int module_is_live(struct module *mod)
 /* Is this address in a module? */
 struct module *module_text_address(unsigned long addr);
 
+/* Returns module and fills in value, defined and namebuf, or NULL if
+   symnum out of range. */
+struct module *module_get_kallsym(unsigned int symnum,
+				  unsigned long *value,
+				  char *type,
+				  char namebuf[128]);
+int is_exported(const char *name, const struct module *mod);
 #ifdef CONFIG_MODULE_UNLOAD
 
 unsigned int module_refcount(struct module *mod);
@@ -409,6 +416,19 @@ static inline const char *module_address_lookup(unsigned long addr,
 						char **modname)
 {
 	return NULL;
+}
+
+static inline struct module *module_get_kallsym(unsigned int symnum,
+						unsigned long *value,
+						char *type,
+						char namebuf[128])
+{
+	return NULL;
+}
+
+static inline int is_exported(const char *name, const struct module *mod)
+{
+	return 0;
 }
 
 static inline int register_module_notifier(struct notifier_block * nb)

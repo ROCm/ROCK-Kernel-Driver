@@ -30,6 +30,7 @@
 #include <linux/notifier.h>
 #include <linux/topology.h>
 #include <linux/sysctl.h>
+#include <linux/cpu.h>
 
 DECLARE_BITMAP(node_online_map, MAX_NUMNODES);
 DECLARE_BITMAP(memblk_online_map, MAX_NR_MEMBLKS);

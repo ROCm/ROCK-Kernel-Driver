@@ -149,10 +149,10 @@ static void timod_wake_socket(unsigned int fd)
 	SOLD("wakeing socket");
 	sock = SOCKET_I(current->files->fd[fd]->f_dentry->d_inode);
 	wake_up_interruptible(&sock->wait);
-	read_lock(&sock->sk->callback_lock);
+	read_lock(&sock->sk->sk_callback_lock);
 	if (sock->fasync_list && !test_bit(SOCK_ASYNC_WAITDATA, &sock->flags))
 		__kill_fasync(sock->fasync_list, SIGIO, POLL_IN);
-	read_unlock(&sock->sk->callback_lock);
+	read_unlock(&sock->sk->sk_callback_lock);
 	SOLD("done");
 }
 
