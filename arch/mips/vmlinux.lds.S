@@ -3,7 +3,7 @@ ENTRY(kernel_entry)
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  . = @@LOADADDR@@;
+  . = LOADADDR;
   .init          : { *(.init)		} =0
   .text      :
   {
