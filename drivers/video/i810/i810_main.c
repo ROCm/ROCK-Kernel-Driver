@@ -1403,7 +1403,8 @@ static int i810fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	struct i810fb_par *par = (struct i810fb_par *)info->par;
 	u8 __iomem *mmio = par->mmio_start_virtual;
 
-	if (!info->var.accel_flags || par->dev_flags & LOCKUP) 
+	if (!(par->dev_flags & USE_HWCUR) || !info->var.accel_flags ||
+	    par->dev_flags & LOCKUP)
 		return soft_cursor(info, cursor);
 
 	if (cursor->image.width > 64 || cursor->image.height > 64)
