@@ -312,6 +312,7 @@ time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 		if (use_tsc) {
 			fast_gettimeoffset_quotient = cpufreq_scale(fast_gettimeoffset_ref, freq->new, ref_freq);
 			cpu_khz = cpufreq_scale(cpu_khz_ref, ref_freq, freq->new);
+			set_cyc2ns_scale(cpu_khz/1000);
 		}
 #endif
 	}
