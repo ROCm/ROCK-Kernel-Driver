@@ -398,7 +398,7 @@ static struct iw_statistics *netwave_get_wireless_stats(struct net_device *dev)
 {	
     unsigned long flags;
     ioaddr_t iobase = dev->base_addr;
-    netwave_private *priv = (netwave_private *) dev->priv;
+    netwave_private *priv = netdev_priv(dev);
     u_char *ramBase = priv->ramBase;
     struct iw_statistics* wstats;
 	
@@ -447,7 +447,7 @@ static dev_link_t *netwave_attach(void)
     dev = alloc_etherdev(sizeof(netwave_private));
     if (!dev)
 	return NULL;
-    priv = dev->priv;
+    priv = netdev_priv(dev);
     link = &priv->link;
     link->priv = dev;
 
@@ -591,7 +591,7 @@ static int netwave_set_nwid(struct net_device *dev,
 {
 	unsigned long flags;
 	ioaddr_t iobase = dev->base_addr;
-	netwave_private *priv = (netwave_private *) dev->priv;
+	netwave_private *priv = netdev_priv(dev);
 	u_char *ramBase = priv->ramBase;
 
 	/* Disable interrupts & save flags */
@@ -649,7 +649,7 @@ static int netwave_set_scramble(struct net_device *dev,
 {
 	unsigned long flags;
 	ioaddr_t iobase = dev->base_addr;
-	netwave_private *priv = (netwave_private *) dev->priv;
+	netwave_private *priv = netdev_priv(dev);
 	u_char *ramBase = priv->ramBase;
 
 	/* Disable interrupts & save flags */
@@ -765,7 +765,7 @@ static int netwave_get_snap(struct net_device *dev,
 {
 	unsigned long flags;
 	ioaddr_t iobase = dev->base_addr;
-	netwave_private *priv = (netwave_private *) dev->priv;
+	netwave_private *priv = netdev_priv(dev);
 	u_char *ramBase = priv->ramBase;
 
 	/* Disable interrupts & save flags */
@@ -998,7 +998,7 @@ do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 static void netwave_pcmcia_config(dev_link_t *link) {
     client_handle_t handle = link->handle;
     struct net_device *dev = link->priv;
-    netwave_private *priv = dev->priv;
+    netwave_private *priv = netdev_priv(dev);
     tuple_t tuple;
     cisparse_t parse;
     int i, j, last_ret, last_fn;
@@ -1071,7 +1071,7 @@ static void netwave_pcmcia_config(dev_link_t *link) {
 
     /* Store base address of the common window frame */
     ramBase = ioremap(req.Base, 0x8000);
-    ((netwave_private*)dev->priv)->ramBase = ramBase;
+    priv->ramBase = ramBase;
 
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
@@ -1120,7 +1120,7 @@ failed:
 static void netwave_release(dev_link_t *link)
 {
     struct net_device *dev = link->priv;
-    netwave_private *priv = dev->priv;
+    netwave_private *priv = netdev_priv(dev);
 
     DEBUG(0, "netwave_release(0x%p)\n", link);
 
@@ -1219,7 +1219,7 @@ static void netwave_doreset(ioaddr_t ioBase, u_char* ramBase) {
  */
 static void netwave_reset(struct net_device *dev) {
     /* u_char state; */
-    netwave_private *priv = (netwave_private*) dev->priv;
+    netwave_private *priv = netdev_priv(dev);
     u_char *ramBase = priv->ramBase;
     ioaddr_t iobase = dev->base_addr;
 
@@ -1310,7 +1310,7 @@ static int netwave_hw_xmit(unsigned char* data, int len,
                  DataOffset;
     int tmpcount; 
 	
-    netwave_private *priv = (netwave_private *) dev->priv;
+    netwave_private *priv = netdev_priv(dev);
     u_char* ramBase = priv->ramBase;
     ioaddr_t iobase = dev->base_addr;
 
@@ -1406,7 +1406,7 @@ static irqreturn_t netwave_interrupt(int irq, void* dev_id, struct pt_regs *regs
     ioaddr_t iobase;
     u_char *ramBase;
     struct net_device *dev = (struct net_device *)dev_id;
-    struct netwave_private *priv = dev->priv;
+    struct netwave_private *priv = netdev_priv(dev);
     dev_link_t *link = &priv->link;
     int i;
     
@@ -1536,7 +1536,7 @@ static void netwave_watchdog(struct net_device *dev) {
 } /* netwave_watchdog */
 
 static struct net_device_stats *netwave_get_stats(struct net_device *dev) {
-    netwave_private *priv = (netwave_private*)dev->priv;
+    netwave_private *priv = netdev_priv(dev);
 
     update_stats(dev);
 
@@ -1559,7 +1559,7 @@ static struct net_device_stats *netwave_get_stats(struct net_device *dev) {
 
 static void update_stats(struct net_device *dev) {
     //unsigned long flags;
-/*     netwave_private *priv = (netwave_private*) dev->priv; */
+/*     netwave_private *priv = netdev_priv(dev); */
 
     //spin_lock_irqsave(&priv->spinlock, flags);
 
@@ -1570,7 +1570,7 @@ static void update_stats(struct net_device *dev) {
 }
 
 static int netwave_rx(struct net_device *dev) {
-    netwave_private *priv = (netwave_private*)(dev->priv);
+    netwave_private *priv = netdev_priv(dev);
     u_char *ramBase = priv->ramBase;
     ioaddr_t iobase = dev->base_addr;
     u_char rxStatus;
@@ -1659,7 +1659,7 @@ static int netwave_rx(struct net_device *dev) {
 }
 
 static int netwave_open(struct net_device *dev) {
-    netwave_private *priv = dev->priv;
+    netwave_private *priv = netdev_priv(dev);
     dev_link_t *link = &priv->link;
 
     DEBUG(1, "netwave_open: starting.\n");
@@ -1676,7 +1676,7 @@ static int netwave_open(struct net_device *dev) {
 }
 
 static int netwave_close(struct net_device *dev) {
-    netwave_private *priv = (netwave_private *)dev->priv;
+    netwave_private *priv = netdev_priv(dev);
     dev_link_t *link = &priv->link;
 
     DEBUG(1, "netwave_close: finishing.\n");
@@ -1721,7 +1721,8 @@ module_exit(exit_netwave_cs);
 static void set_multicast_list(struct net_device *dev)
 {
     ioaddr_t iobase = dev->base_addr;
-    u_char* ramBase = ((netwave_private*) dev->priv)->ramBase;
+    netwave_private *priv = netdev_priv(dev);
+    u_char* ramBase = priv->ramBase;
     u_char  rcvMode = 0;
    
 #ifdef PCMCIA_DEBUG
