@@ -63,7 +63,13 @@ static int checksum_udp(struct sk_buff *skb, struct udphdr *uh,
 
 void netpoll_poll(struct netpoll *np)
 {
-	int budget = 1;
+	/*
+	 * In cases where there is bi-directional communications, reading
+	 * only one message at a time can lead to packets being dropped by
+	 * the network adapter, forcing superfluous retries and possibly
+	 * timeouts.  Thus, we set our budget to a more reasonable value.
+	 */
+	int budget = 16;
 
 	if(!np->dev || !netif_running(np->dev) || !np->dev->poll_controller)
 		return;
