@@ -688,30 +688,12 @@ static int udsl_usb_data_init (struct udsl_instance_data *instance)
 	for (i = 0, succes = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
 		struct udsl_data_ctx *ctx = &(instance->rcvbufs[i]);
 
-		ctx->urb = NULL;
-		ctx->skb = dev_alloc_skb (UDSL_RECEIVE_BUFFER_SIZE);
-		if (!ctx->skb)
-			continue;
-
-		ctx->urb = usb_alloc_urb (0, GFP_KERNEL);
-		if (!ctx->urb) {
-			kfree_skb (ctx->skb);
-			ctx->skb = NULL;
-			break;
-		};
-
 		usb_fill_bulk_urb (ctx->urb,
 			       instance->usb_dev,
 			       usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
 			       (unsigned char *) ctx->skb->data,
 			       UDSL_RECEIVE_BUFFER_SIZE,
 			       udsl_usb_data_receive, ctx);
-
-
-		ctx->instance = instance;
-
-		PDEBUG ("udsl_usb_data_init: usb with skb->truesize = %d (Asked for %d)\n",
-			ctx->skb->truesize, UDSL_RECEIVE_BUFFER_SIZE);
 
 		if (usb_submit_urb (ctx->urb, GFP_KERNEL) < 0)
 			PDEBUG ("udsl_usb_data_init: Submit failed, loosing urb.\n");
@@ -753,10 +735,6 @@ static int udsl_usb_data_exit (struct udsl_instance_data *instance)
 			continue;
 
 		usb_unlink_urb (ctx->urb);
-
-		usb_free_urb (ctx->urb);
-		kfree_skb (ctx->skb);
-		ctx->skb = NULL;
 	}
 
 	tasklet_kill (&instance->recvqueue_tasklet);
@@ -842,6 +820,27 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 	tasklet_init (&instance->recvqueue_tasklet, udsl_atm_processqueue, (unsigned long) instance);
 
+	/* receive urb init */
+	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
+		struct udsl_data_ctx *ctx = &(instance->rcvbufs[i]);
+
+		if (!(ctx->skb = dev_alloc_skb (UDSL_RECEIVE_BUFFER_SIZE))) {
+			PDEBUG ("No memory for skb %d!\n", i);
+			err = -ENOMEM;
+			goto fail_urbs;
+		}
+
+		if (!(ctx->urb = usb_alloc_urb (0, GFP_KERNEL))) {
+			PDEBUG ("No memory for receive urb %d!\n", i);
+			err = -ENOMEM;
+			goto fail_urbs;
+		}
+
+		ctx->instance = instance;
+
+		PDEBUG ("skb->truesize = %d (asked for %d)\n", ctx->skb->truesize, UDSL_RECEIVE_BUFFER_SIZE);
+	}
+
 	/* atm init */
 	if (!(instance->atm_dev = atm_dev_register (udsl_driver_name, &udsl_atm_devops, -1, 0))) {
 		PDEBUG ("failed to register ATM device!\n");
@@ -874,6 +873,16 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	return 0;
 
 fail_atm:
+fail_urbs:
+	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
+		struct udsl_data_ctx *ctx = &(instance->rcvbufs[i]);
+
+		if (ctx->skb)
+			kfree_skb (ctx->skb);
+
+		if (ctx->urb)
+			usb_free_urb (ctx->urb);
+	}
 	kfree (instance);
 fail_instance:
 	return err;
@@ -882,20 +891,32 @@ fail_instance:
 static void udsl_usb_disconnect (struct usb_interface *intf)
 {
 	struct udsl_instance_data *instance = usb_get_intfdata (intf);
+	int i;
 
 	PDEBUG ("disconnecting\n");
 
 	usb_set_intfdata (intf, NULL);
-	if (instance) {
-		/* unlinking receive buffers */
-		udsl_usb_data_exit (instance);
 
-		/* removing atm device */
-		if (instance->atm_dev)
-			udsl_atm_stopdevice (instance);
-
-		kfree (instance);
+	if (!instance) {
+		PDEBUG ("NULL instance!\n");
+		return;
 	}
+
+	/* unlinking receive buffers */
+	udsl_usb_data_exit (instance);
+
+	for (i = 0; i < UDSL_NUMBER_RCV_URBS; i++) {
+		struct udsl_data_ctx *ctx = &(instance->rcvbufs[i]);
+
+		usb_free_urb (ctx->urb);
+		kfree_skb (ctx->skb);
+	}
+
+	/* removing atm device */
+	if (instance->atm_dev)
+		udsl_atm_stopdevice (instance);
+
+	kfree (instance);
 }
 
 
