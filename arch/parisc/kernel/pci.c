@@ -146,15 +146,6 @@ char *pcibios_setup(char *str)
 	return str;
 }
 
-/* Used in drivers/pci/quirks.c */
-struct pci_fixup pcibios_fixups[] = { 
-#ifdef CONFIG_SUPERIO
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_NS,	PCI_DEVICE_ID_NS_87415,	superio_fixup_pci },
-#endif
-	{ 0 }
-};
-
-
 /*
  * Called by pci_set_master() - a driver interface.
  *

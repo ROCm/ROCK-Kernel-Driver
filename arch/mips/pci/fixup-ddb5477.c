@@ -41,6 +41,11 @@ static void ddb5477_fixup(struct pci_dev *dev)
 	pci_write_config_byte(dev, 0x41, old | 0xd0);
 }
 
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1533,
+	  ddb5477_fixup);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1535,
+	  ddb5477_fixup);
+
 /*
  * Fixup baseboard AMD chip so that tx does not underflow.
  *      bcr_18 |= 0x0800
@@ -69,12 +74,5 @@ static void ddb5477_amd_lance_fixup(struct pci_dev *dev)
 	outw(temp, ioaddr + PCNET32_WIO_BDP);
 }
 
-struct pci_fixup pcibios_fixups[] __initdata = {
-	{ PCI_FIXUP_FINAL, PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1533,
-	  ddb5477_fixup },
-	{ PCI_FIXUP_FINAL, PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1535,
-	  ddb5477_fixup },
-	{ PCI_FIXUP_FINAL, PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE,
-	  ddb5477_amd_lance_fixup },
-	{0}
-};
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_LANCE,
+          ddb5477_amd_lance_fixup);

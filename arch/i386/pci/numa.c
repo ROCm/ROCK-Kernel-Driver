@@ -100,10 +100,7 @@ static void __devinit pci_fixup_i450nx(struct pci_dev *d)
 	}
 	pcibios_last_bus = -1;
 }
-
-struct pci_fixup pcibios_fixups[] = {
-	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82451NX,	pci_fixup_i450nx },
-};
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82451NX, pci_fixup_i450nx);
 
 static int __init pci_numa_init(void)
 {

@@ -79,6 +79,8 @@ static void __init malta_piix_func0_fixup(struct pci_dev *pdev)
 	}
 }
 
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_0,
+	 malta_piix_func0_fixup);
 
 static void __init malta_piix_func1_fixup(struct pci_dev *pdev)
 {
@@ -96,10 +98,5 @@ static void __init malta_piix_func1_fixup(struct pci_dev *pdev)
 	}
 }
 
-struct pci_fixup pcibios_fixups[] __initdata = {
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB_0,
-	 malta_piix_func0_fixup},
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB,
-	 malta_piix_func1_fixup},
-	{ 0 }
-};
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371AB,
+	malta_piix_func1_fixup);

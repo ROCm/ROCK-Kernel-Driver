@@ -20,6 +20,7 @@
 #include <linux/stddef.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/pci.h>
 
 #include <asm/mpc8260.h>
 #include <asm/machdep.h>
@@ -237,6 +238,25 @@ static int sbc82xx_pci_map_irq(struct pci_dev *dev, unsigned char idsel,
 }
 
 
+static void __devinit quirk_sbc8260_cardbus(struct pci_dev *pdev)
+{
+	uint32_t ctrl;
+
+	if (pdev->bus->number != 0 || pdev->devfn != PCI_DEVFN(17, 0))
+		return;
+
+	printk(KERN_INFO "Setting up CardBus controller\n");
+
+	/* Set P2CCLK bit in System Control Register */
+	pci_read_config_dword(pdev, 0x80, &ctrl);
+	ctrl |= (1<<27);
+	pci_write_config_dword(pdev, 0x80, ctrl);
+
+	/* Set MFUNC up for PCI IRQ routing via INTA and INTB, and LEDs. */
+	pci_write_config_dword(pdev, 0x8c, 0x00c01d22);
+
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1420, quirk_sbc8260_cardbus);
 
 void __init
 platform_init(unsigned long r3, unsigned long r4, unsigned long r5,

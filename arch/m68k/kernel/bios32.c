@@ -77,11 +77,6 @@ static int disable_pci_burst;		/* If set do not allow PCI bursts. */
 static unsigned int io_base;
 static unsigned int mem_base;
 
-struct pci_fixup pcibios_fixups[] =
-{
-	{ 0 }
-};
-
 /*
  * static void disable_dev(struct pci_dev *dev)
  *

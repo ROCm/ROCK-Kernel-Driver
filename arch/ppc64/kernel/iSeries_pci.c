@@ -820,7 +820,3 @@ void iSeries_Write_Long(u32 data, void *IoAddress)
 	} while (CheckReturnCode("WWL", DevNode, rc) != 0);
 }
 EXPORT_SYMBOL(iSeries_Write_Long);
-
-void pcibios_name_device(struct pci_dev *dev)
-{
-}

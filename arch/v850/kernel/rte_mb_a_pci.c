@@ -322,8 +322,6 @@ pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 
 /* Stubs for things we don't use.  */
 
-struct pci_fixup pcibios_fixups[] = { { 0 } };
-
 /* Called after each bus is probed, but before its children are examined. */
 void pcibios_fixup_bus(struct pci_bus *b)
 {
