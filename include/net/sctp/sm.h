@@ -44,6 +44,7 @@
  *    Dajiang Zhang <dajiang.zhang@nokia.com>
  *    Sridhar Samudrala <sri@us.ibm.com>
  *    Daisy Chang <daisyc@us.ibm.com>
+ *    Ardelle Fan <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -156,6 +157,7 @@ sctp_state_fn_t sctp_sf_shutdown_ack_sent_prm_abort;
 sctp_state_fn_t sctp_sf_error_closed;
 sctp_state_fn_t sctp_sf_error_shutdown;
 sctp_state_fn_t sctp_sf_ignore_primitive;
+sctp_state_fn_t sctp_sf_do_prm_requestheartbeat;
 
 /* Prototypes for other event state functions.  */
 sctp_state_fn_t sctp_sf_do_9_2_start_shutdown;
@@ -205,9 +207,6 @@ sctp_association_t *sctp_make_temp_asoc(const sctp_endpoint_t *,
 					sctp_chunk_t *,
 					const int priority);
 __u32 sctp_generate_verification_tag(void);
-sctpParam_t sctp_get_my_addrs_raw(const sctp_association_t *,
-				  const int priority, int *addrs_len);
-
 void sctp_populate_tie_tags(__u8 *cookie, __u32 curTag, __u32 hisTag);
 
 /* Prototypes for chunk-building functions.  */
@@ -253,6 +252,9 @@ sctp_chunk_t *sctp_make_abort(const sctp_association_t *,
 sctp_chunk_t *sctp_make_abort_no_data(const sctp_association_t *,
 				      const sctp_chunk_t *,
 				      __u32 tsn);
+sctp_chunk_t *sctp_make_abort_user(const sctp_association_t *,
+				   const sctp_chunk_t *,
+				   const struct msghdr *);
 sctp_chunk_t *sctp_make_heartbeat(const sctp_association_t *,
 				  const sctp_transport_t *,
 				  const void *payload,
@@ -332,7 +334,7 @@ __u32 sctp_generate_tsn(const sctp_endpoint_t *);
 /* 4th level prototypes */
 void sctp_param2sockaddr(sockaddr_storage_t *addr, sctp_addr_param_t *,
 			 __u16 port);
-int sctp_addr2sockaddr(const sctpParam_t, sockaddr_storage_t *);
+int sctp_addr2sockaddr(const union sctp_params, sockaddr_storage_t *);
 int sockaddr2sctp_addr(const sockaddr_storage_t *, sctp_addr_param_t *);
 
 /* Extern declarations for major data structures.  */

@@ -3,34 +3,34 @@
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 International Business Machines Corp.
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email addresses:
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    Randall Stewart       <randall@sctp.chicago.il.us>
  *    Ken Morneau           <kmorneau@cisco.com>
  *    Qiaobing Xie          <qxie1@email.mot.com>
@@ -41,8 +41,8 @@
  *    Hui Huang             <hui.huang@nokia.com>
  *    Sridhar Samudrala     <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
- *    Dajiang Zhang         <dajiang.zhang@nokia.com> 
- * 
+ *    Dajiang Zhang         <dajiang.zhang@nokia.com>
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -246,8 +246,11 @@ typedef struct sctp_func {
 					 int optname,
 					 char *optval,
 					 int *optlen);
-	int		(*get_dst_mtu)	(const sockaddr_storage_t *address);
-	__u16		net_header_len;	
+	struct dst_entry *(*get_dst)	(sockaddr_storage_t *daddr,
+					 sockaddr_storage_t *saddr);
+	int		(*cmp_saddr)	(struct dst_entry *dst,
+					 sockaddr_storage_t *saddr);
+	__u16		net_header_len;
 	int		sockaddr_len;
 	sa_family_t	sa_family;
 	struct list_head list;
@@ -356,20 +359,6 @@ typedef struct sctp_signed_cookie {
 } sctp_signed_cookie_t;
 
 
-/* This convenience type allows us to avoid casting when walking
- * through a parameter list.
- */
-typedef union {
-	__u8 *v;
-	sctp_paramhdr_t *p;
-
-	sctp_cookie_preserve_param_t *bht;
-	sctp_hostname_param_t *dns;
-	sctp_cookie_param_t *cookie;
-	sctp_supported_addrs_param_t *sat;
-	sctp_ipv4addr_param_t *v4;
-	sctp_ipv6addr_param_t *v6;
-} sctpParam_t;
 
 /* This is another convenience type to allocate memory for address
  * params for the maximum size and pass such structures around
@@ -379,6 +368,21 @@ typedef union {
 	sctp_ipv4addr_param_t v4;
 	sctp_ipv6addr_param_t v6;
 } sctp_addr_param_t;
+
+/* A convenience type to allow walking through the various
+ * parameters and avoid casting all over the place.
+ */
+union sctp_params {
+	void *v;
+	sctp_paramhdr_t *p;
+	sctp_cookie_preserve_param_t *life;
+	sctp_hostname_param_t *dns;
+	sctp_cookie_param_t *cookie;
+	sctp_supported_addrs_param_t *sat;
+	sctp_ipv4addr_param_t *v4;
+	sctp_ipv6addr_param_t *v6;
+	sctp_addr_param_t *addr;
+};
 
 /* RFC 2960.  Section 3.3.5 Heartbeat.
  *    Heartbeat Information: variable length
@@ -430,7 +434,7 @@ struct SCTP_chunk {
 	 */
 
 	/* We point this at the FIRST TLV parameter to chunk_hdr.  */
-	sctpParam_t param_hdr;
+	union sctp_params param_hdr;
 	union {
 		__u8 *v;
 		sctp_datahdr_t *data_hdr;
@@ -471,11 +475,13 @@ struct SCTP_chunk {
 	__u8 ecn_ce_done;      /* Have we processed the ECN CE bit? */
 	__u8 pdiscard;	  /* Discard the whole packet now? */
 	__u8 tsn_gap_acked;	  /* Is this chunk acked by a GAP ACK? */
-	__u8 fast_retransmit;    /* Is this chunk fast retransmitted? */ 
+	__u8 fast_retransmit;    /* Is this chunk fast retransmitted? */
 	__u8 tsn_missing_report; /* Data chunk missing counter. */
 
 	/* What is the origin IP address for this chunk?  */
 	sockaddr_storage_t source;
+	/* Destination address for this chunk. */
+	sockaddr_storage_t dest;
 
 	/* For an inbound chunk, this tells us where it came from.
 	 * For an outbound chunk, it tells us where we'd like it to
@@ -492,7 +498,7 @@ void  *sctp_addto_chunk(sctp_chunk_t *chunk, int len, const void *data);
 int sctp_user_addto_chunk(sctp_chunk_t *chunk, int len, struct iovec *data);
 sctp_chunk_t *sctp_chunkify(struct sk_buff *, const sctp_association_t *,
 			    struct sock *);
-void sctp_init_source(sctp_chunk_t *chunk);
+void sctp_init_addrs(sctp_chunk_t *chunk);
 const sockaddr_storage_t *sctp_source(const sctp_chunk_t *chunk);
 
 /* This is a structure for holding either an IPv6 or an IPv4 address.  */
@@ -655,6 +661,9 @@ struct SCTP_transport {
 	/* PMTU       : The current known path MTU.  */
 	__u32 pmtu;
 
+	/* Destination */
+	struct dst_entry *dst;
+
 	/* When was the last time(in jiffies) that a data packet was sent on
 	 * this transport?  This is used to adjust the cwnd when the transport
 	 * becomes inactive.
@@ -676,13 +685,15 @@ struct SCTP_transport {
 	 */
 	unsigned long last_time_ecne_reduced;
 
-	/* state       : The current state of this destination,
-	 *             :  i.e. DOWN, UP, ALLOW-HB, NO-HEARTBEAT, etc.
+	/* active      : The current active state of this destination,
+	 *             :  i.e. DOWN, UP, etc.
 	 */
-	struct {
-		int active;
-		int hb_allowed;
-	} state;
+	int active;
+
+	/* hb_allowed  : The current heartbeat state of this destination,
+	 *             :  i.e. ALLOW-HB, NO-HEARTBEAT, etc.
+	 */
+	int hb_allowed;
 
 	/* These are the error stats for this destination.  */
 
@@ -735,6 +746,7 @@ extern sctp_transport_t *sctp_transport_new(const sockaddr_storage_t *, int);
 extern sctp_transport_t *sctp_transport_init(sctp_transport_t *,
 					     const sockaddr_storage_t *, int);
 extern void sctp_transport_set_owner(sctp_transport_t *, sctp_association_t *);
+extern void sctp_transport_route(sctp_transport_t *, sockaddr_storage_t *);
 extern void sctp_transport_free(sctp_transport_t *);
 extern void sctp_transport_destroy(sctp_transport_t *);
 extern void sctp_transport_reset_timers(sctp_transport_t *);
@@ -885,9 +897,9 @@ int sctp_add_bind_addr(sctp_bind_addr_t *, sockaddr_storage_t *,
 		       int priority);
 int sctp_del_bind_addr(sctp_bind_addr_t *, sockaddr_storage_t *);
 int sctp_bind_addr_has_addr(sctp_bind_addr_t *, const sockaddr_storage_t *);
-sctpParam_t sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
-				   int *addrs_len,
-				   int priority);
+union sctp_params sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp,
+					 int *addrs_len,
+					 int priority);
 int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp,
 			   __u8 *raw_addr_list,
 			   int addrs_len,
@@ -904,7 +916,7 @@ int sctp_addr_is_valid(const sockaddr_storage_t *addr);
 typedef enum {
 	SCTP_EP_TYPE_SOCKET,
 	SCTP_EP_TYPE_ASSOCIATION,
-} sctp_endpoint_type_t; 
+} sctp_endpoint_type_t;
 
 /*
  * A common base class to bridge the implmentation view of a
@@ -1052,22 +1064,11 @@ int sctp_verify_init(const sctp_association_t *asoc,
 		     sctp_init_chunk_t *peer_init,
 		     sctp_chunk_t *chunk,
 		     sctp_chunk_t **err_chunk);
-int sctp_verify_param(const sctp_association_t *asoc,
-		      sctpParam_t param,
-		      sctp_cid_t cid,
-		      sctp_chunk_t *chunk,
-		      sctp_chunk_t **err_chunk);
-int sctp_process_unk_param(const sctp_association_t *asoc,
-			   sctpParam_t param,
-			   sctp_chunk_t *chunk,
-			   sctp_chunk_t **err_chunk);
-void sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
-		       const sockaddr_storage_t *peer_addr,
-		       sctp_init_chunk_t  *peer_init, int priority);
-int sctp_process_param(sctp_association_t *asoc,
-		       sctpParam_t param,
-		       const sockaddr_storage_t *peer_addr,
-		       sctp_cid_t cid, int priority);
+int sctp_process_init(sctp_association_t *asoc, sctp_cid_t cid,
+		      const sockaddr_storage_t *peer_addr,
+		      sctp_init_chunk_t *peer_init, int priority);
+int sctp_process_param(sctp_association_t *asoc, union sctp_params param,
+		       const sockaddr_storage_t *peer_addr, int priority);
 __u32 sctp_generate_tag(const sctp_endpoint_t *ep);
 __u32 sctp_generate_tsn(const sctp_endpoint_t *ep);
 
@@ -1154,10 +1155,10 @@ struct SCTP_association {
 		sctp_transport_t *primary_path;
 
 		/* Cache the primary path address here, when we
-		 * need a an address for msg_name. 
+		 * need a an address for msg_name.
 		 */
 		sockaddr_storage_t primary_addr;
-		
+
 		/* active_path
 		 *   The path that we are currently using to
 		 *   transmit new data and most control chunks.
@@ -1258,7 +1259,7 @@ struct SCTP_association {
 
 	/* Overall     : The threshold for this association that if
 	 * Error       : the Overall Error Count reaches will cause
-	 * Threshold   : this association to be torn down. 
+	 * Threshold   : this association to be torn down.
 	 */
 	int overall_error_threshold;
 
@@ -1304,13 +1305,13 @@ struct SCTP_association {
 	 */
 	__u32 next_tsn;
 
-	/* 
+	/*
 	 * Last Rcvd   : This is the last TSN received in sequence.  This value
 	 * TSN         : is set initially by taking the peer's Initial TSN,
 	 *             : received in the INIT or INIT ACK chunk, and
 	 *             : subtracting one from it.
 	 *
-	 * Most of RFC 2960 refers to this as the Cumulative TSN Ack Point. 
+	 * Most of RFC 2960 refers to this as the Cumulative TSN Ack Point.
 	 */
 
 	__u32 ctsn_ack_point;

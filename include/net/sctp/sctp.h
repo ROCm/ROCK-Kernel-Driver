@@ -3,41 +3,41 @@
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
- * The base lksctp header. 
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The base lksctp header.
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Xingang Guo           <xingang.guo@intel.com>
  *    Jon Grimm             <jgrimm@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -52,10 +52,10 @@
  *       structs
  *       prototypes
  *       macros, externs, and inlines
- * 
- *   Move test_frame specific items out of the kernel headers 
+ *
+ *   Move test_frame specific items out of the kernel headers
  *   and into the test frame headers.   This is not perfect in any sense
- *   and will continue to evolve.  
+ *   and will continue to evolve.
  */
 
 
@@ -78,11 +78,12 @@
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 #include <net/ipv6.h>
 #include <net/ip6_route.h>
-#endif 
+#endif
 
 #include <asm/uaccess.h>
 #include <asm/page.h>
 #include <net/sock.h>
+#include <net/snmp.h>
 #include <net/sctp/structs.h>
 #include <net/sctp/constants.h>
 #include <net/sctp/sm.h>
@@ -104,19 +105,19 @@
 #endif
 
 
-/* Certain internal static functions need to be exported when 
+/* Certain internal static functions need to be exported when
  * compiled into the test frame.
  */
 #ifndef SCTP_STATIC
 #define SCTP_STATIC static
 #endif
 
-/* 
- * Function declarations. 
+/*
+ * Function declarations.
  */
 
 /*
- * sctp_protocol.c 
+ * sctp_protocol.c
  */
 extern sctp_protocol_t sctp_proto;
 extern struct sock *sctp_get_ctl_sock(void);
@@ -141,7 +142,7 @@ extern int sctp_primitive_ASSOCIATE(sctp_association_t *, void *arg);
 extern int sctp_primitive_SHUTDOWN(sctp_association_t *, void *arg);
 extern int sctp_primitive_ABORT(sctp_association_t *, void *arg);
 extern int sctp_primitive_SEND(sctp_association_t *, void *arg);
-
+extern int sctp_primitive_REQUESTHEARTBEAT(sctp_association_t *, void *arg);
 
 /*
  * sctp_crc32c.c
@@ -201,6 +202,11 @@ extern void sctp_hash_digest(const char *secret, const int secret_len,
 #define SCTP_SOCK_SLEEP_PRE(sk) SOCK_SLEEP_PRE(sk)
 #define SCTP_SOCK_SLEEP_POST(sk) SOCK_SLEEP_POST(sk)
 
+/* SCTP SNMP MIB stats handlers */
+extern struct sctp_mib sctp_statistics[NR_CPUS * 2];
+#define SCTP_INC_STATS(field)		SNMP_INC_STATS(sctp_statistics, field)
+#define SCTP_INC_STATS_BH(field)	SNMP_INC_STATS_BH(sctp_statistics, field)
+#define SCTP_INC_STATS_USER(field)	SNMP_INC_STATS_USER(sctp_statistics, field)
 
 /* Determine if this is a valid kernel address.  */
 static inline int sctp_is_valid_kaddr(unsigned long addr)
@@ -412,6 +418,19 @@ static inline size_t get_user_iov_size(struct iovec *iov, int iovlen)
 	return retval;
 }
 
+/* Walk through a list of TLV parameters.  Don't trust the
+ * individual parameter lengths and instead depend on
+ * the chunk length to indicate when to stop.  Make sure
+ * there is room for a param header too.
+ */
+#define sctp_walk_params(pos, chunk, member)\
+_sctp_walk_params((pos), (chunk), ntohs((chunk)->chunk_hdr.length), member)
+
+#define _sctp_walk_params(pos, chunk, end, member)\
+for (pos.v = chunk->member;\
+     pos.v <= (void *)chunk + end - sizeof(sctp_paramhdr_t) &&\
+     pos.v <= (void *)chunk + end - WORD_ROUND(ntohs(pos.p->length)); \
+     pos.v += WORD_ROUND(ntohs(pos.p->length)))
 
 /* Round an int up to the next multiple of 4.  */
 #define WORD_ROUND(s) (((s)+3)&~3)

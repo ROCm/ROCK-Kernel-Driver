@@ -43,6 +43,7 @@
  *    Hui Huang 	    <hui.huang@nokia.com>
  *    Dajiang Zhang 	    <dajiang.zhang@nokia.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -235,8 +236,7 @@ sctp_disposition_t sctp_sf_do_5_1B_init(const sctp_endpoint_t *ep,
 	chunk->subh.init_hdr = (sctp_inithdr_t *)chunk->skb->data;
 
 	/* Tag the variable length parameters.  */
-	chunk->param_hdr.v =
-		skb_pull(chunk->skb, sizeof(sctp_inithdr_t));
+	chunk->param_hdr.v = skb_pull(chunk->skb, sizeof(sctp_inithdr_t));
 
 	new_asoc = sctp_make_temp_asoc(ep, chunk, GFP_ATOMIC);
 	if (!new_asoc)
@@ -663,6 +663,38 @@ nomem:
 	return SCTP_DISPOSITION_NOMEM;
 }
 
+/* Generate and sendout a heartbeat packet.  */
+sctp_disposition_t sctp_sf_heartbeat(const sctp_endpoint_t *ep,
+				     const sctp_association_t *asoc,
+				     const sctp_subtype_t type,
+				     void *arg,
+				     sctp_cmd_seq_t *commands)
+{
+	sctp_transport_t *transport = (sctp_transport_t *) arg;
+	sctp_chunk_t *reply;
+	sctp_sender_hb_info_t hbinfo;
+	size_t paylen = 0;
+	
+	hbinfo.param_hdr.type = SCTP_PARAM_HEARTBEAT_INFO;
+	hbinfo.param_hdr.length = htons(sizeof(sctp_sender_hb_info_t));
+	hbinfo.daddr = transport->ipaddr;
+	hbinfo.sent_at = jiffies;
+
+	/* Set rto_pending indicating that an RTT measurement
+	 * is started with this heartbeat chunk.
+	 */
+	transport->rto_pending = 1;
+
+	/* Send a heartbeat to our peer.  */
+	paylen = sizeof(sctp_sender_hb_info_t);
+	reply = sctp_make_heartbeat(asoc, transport, &hbinfo, paylen);
+	if (!reply)
+		return SCTP_DISPOSITION_NOMEM;
+
+	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(reply));
+	return SCTP_DISPOSITION_CONSUME;
+}
+
 /* Generate a HEARTBEAT packet on the given transport.  */
 sctp_disposition_t sctp_sf_sendbeat_8_3(const sctp_endpoint_t *ep,
 					const sctp_association_t *asoc,
@@ -671,9 +703,6 @@ sctp_disposition_t sctp_sf_sendbeat_8_3(const sctp_endpoint_t *ep,
 					sctp_cmd_seq_t *commands)
 {
 	sctp_transport_t *transport = (sctp_transport_t *) arg;
-	sctp_chunk_t *reply;
-	sctp_sender_hb_info_t hbinfo;
-	size_t paylen = 0;
 
 	if (asoc->overall_error_count >= asoc->overall_error_threshold) {
 		/* CMD_ASSOC_FAILED calls CMD_DELETE_TCB. */
@@ -688,34 +717,21 @@ sctp_disposition_t sctp_sf_sendbeat_8_3(const sctp_endpoint_t *ep,
 	 * HEARTBEAT is sent (see Section 8.3).
 	 */
 
-	hbinfo.param_hdr.type = SCTP_PARAM_HEARTBEAT_INFO;
-	hbinfo.param_hdr.length = htons(sizeof(sctp_sender_hb_info_t));
-	hbinfo.daddr = transport->ipaddr;
-	hbinfo.sent_at = jiffies;
-
-	/* Set rto_pending indicating that an RTT measurement is started
-	 * with this heartbeat chunk.
-	 */
-	transport->rto_pending = 1;
-
-	/* Send a heartbeat to our peer.  */
-	paylen = sizeof(sctp_sender_hb_info_t);
-	reply = sctp_make_heartbeat(asoc, transport, &hbinfo, paylen);
-	if (!reply)
-		goto nomem;
-
-	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(reply));
-
-	/* Set transport error counter and association error counter
-	 * when sending heartbeat.
-	 */
-	sctp_add_cmd_sf(commands, SCTP_CMD_TRANSPORT_RESET,
+	if (transport->hb_allowed) {
+		if (SCTP_DISPOSITION_NOMEM ==
+				sctp_sf_heartbeat(ep, asoc, type, arg,
+						  commands))
+			return SCTP_DISPOSITION_NOMEM;
+		/* Set transport error counter and association error counter
+		 * when sending heartbeat.
+		 */
+		sctp_add_cmd_sf(commands, SCTP_CMD_TRANSPORT_RESET,
+				SCTP_TRANSPORT(transport));
+	}
+	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_UPDATE,
 			SCTP_TRANSPORT(transport));
-
+	
         return SCTP_DISPOSITION_CONSUME;
-
-nomem:
-	return SCTP_DISPOSITION_NOMEM;
 }
 
 /*
@@ -865,9 +881,9 @@ sctp_disposition_t sctp_sf_backbeat_8_3(const sctp_endpoint_t *ep,
 /* Helper function to send out an abort for the restart
  * condition.
  */
-static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa, 
+static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa,
 				      sctp_chunk_t *init,
-				      sctp_cmd_seq_t *commands) 
+				      sctp_cmd_seq_t *commands)
 {
 	int len;
 	sctp_packet_t *pkt;
@@ -881,7 +897,7 @@ static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa,
 	 */
 	errhdr = (sctp_errhdr_t *)buffer;
 	addrparm = (sctp_addr_param_t *)errhdr->variable;
-	
+
 	/* Copy into a parm format. */
 	len = sockaddr2sctp_addr(ssa, addrparm);
 	len += sizeof(sctp_errhdr_t);
@@ -897,7 +913,7 @@ static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa,
 	 */
 	pkt = sctp_abort_pkt_new(ep, NULL, init, errhdr, len);
 
-	if (!pkt) 
+	if (!pkt)
 		goto out;
 	sctp_add_cmd_sf(commands, SCTP_CMD_SEND_PKT, SCTP_PACKET(pkt));
 
@@ -906,18 +922,18 @@ static int sctp_sf_send_restart_abort(sockaddr_storage_t *ssa,
 
 out:
 	/* Even if there is no memory, treat as a failure so
-	 * the packet will get dropped. 
+	 * the packet will get dropped.
 	 */
 	return 0;
 }
 
-/* A restart is occuring, check to make sure no new addresses 
+/* A restart is occuring, check to make sure no new addresses
  * are being added as we may be under a takeover attack.
  */
 static int sctp_sf_check_restart_addrs(const sctp_association_t *new_asoc,
 				       const sctp_association_t *asoc,
 				       sctp_chunk_t *init,
-				       sctp_cmd_seq_t *commands) 
+				       sctp_cmd_seq_t *commands)
 {
 	sctp_transport_t *new_addr, *addr;
 	struct list_head *pos, *pos2;
@@ -956,8 +972,8 @@ static int sctp_sf_check_restart_addrs(const sctp_association_t *new_asoc,
 	if (!found && new_addr) {
 		sctp_sf_send_restart_abort(&new_addr->ipaddr, init, commands);
 	}
-	
-	/* Return success if all addresses were found. */   
+
+	/* Return success if all addresses were found. */
 	return found;
 }
 
@@ -1053,7 +1069,7 @@ static char sctp_tietags_compare(sctp_association_t *new_asoc,
  */
 static sctp_disposition_t sctp_sf_do_unexpected_init(
 	const sctp_endpoint_t *ep,
-	const sctp_association_t *asoc, 
+	const sctp_association_t *asoc,
 	const sctp_subtype_t type,
 	void *arg, sctp_cmd_seq_t *commands)
 {
@@ -1130,10 +1146,10 @@ static sctp_disposition_t sctp_sf_do_unexpected_init(
 	/* Make sure no new addresses are being added during the
 	 * restart.   Do not do this check for COOKIE-WAIT state,
 	 * since there are no peer addresses to check against.
-	 * Upon return an ABORT will have been sent if needed.  
+	 * Upon return an ABORT will have been sent if needed.
 	 */
 	if (asoc->state != SCTP_STATE_COOKIE_WAIT) {
-		if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk, 
+		if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk,
 						 commands)) {
 			retval = SCTP_DISPOSITION_CONSUME;
 			goto cleanup_asoc;
@@ -1333,9 +1349,9 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 	 * since you'd have to get inside the cookie.
 	 */
 	if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk, commands)) {
-		printk("cookie echo check\n"); 
+		printk("cookie echo check\n");
 		return SCTP_DISPOSITION_CONSUME;
-	}	
+	}
 
 	/* For now, fail any unsent/unacked data.  Consider the optional
 	 * choice of resending of this data.
@@ -1542,7 +1558,7 @@ sctp_disposition_t sctp_sf_do_5_2_4_dupcook(const sctp_endpoint_t *ep,
 	 * are in good shape.
 	 */
         chunk->subh.cookie_hdr = (sctp_signed_cookie_t *)chunk->skb->data;
-	skb_pull(chunk->skb, ntohs(chunk->chunk_hdr->length) - 
+	skb_pull(chunk->skb, ntohs(chunk->chunk_hdr->length) -
 		 sizeof(sctp_chunkhdr_t));
 
 	/* In RFC 2960 5.2.4 3, if both Verification Tags in the State Cookie
@@ -2098,18 +2114,11 @@ sctp_disposition_t sctp_sf_do_ecne(const sctp_endpoint_t *ep,
 
 	ecne = (sctp_ecnehdr_t *) chunk->skb->data;
 	skb_pull(chunk->skb, sizeof(sctp_ecnehdr_t));
-	ecne->lowest_tsn = ntohl(ecne->lowest_tsn);
-
-	/* Casting away the const, as we are just modifying the spinlock,
-	 * not the association itself.   This should go away in the near
-	 * future when we move to an endpoint based lock.
-	 */
 
 	/* If this is a newer ECNE than the last CWR packet we sent out */
-	if (TSN_lt(asoc->last_cwr_tsn, ecne->lowest_tsn)) {
-		sctp_add_cmd_sf(commands, SCTP_CMD_ECN_ECNE,
-				SCTP_U32(ecne->lowest_tsn));
-	}
+	sctp_add_cmd_sf(commands, SCTP_CMD_ECN_ECNE,
+			SCTP_U32(ntohl(ecne->lowest_tsn)));
+
 	return SCTP_DISPOSITION_CONSUME;
 }
 
@@ -2641,7 +2650,7 @@ sctp_disposition_t sctp_sf_operr_notify(const sctp_endpoint_t *ep,
 	sctp_ulpevent_t *ev;
 
 	while (chunk->chunk_end > chunk->skb->data) {
-		ev = sctp_ulpevent_make_remote_error(asoc, chunk, 0, 
+		ev = sctp_ulpevent_make_remote_error(asoc, chunk, 0,
 						     GFP_ATOMIC);
 		if (!ev)
 			goto nomem;
@@ -3401,13 +3410,14 @@ sctp_disposition_t sctp_sf_do_9_1_prm_abort(const sctp_endpoint_t *ep,
 	 * from its upper layer, but retransmits data to the far end
 	 * if necessary to fill gaps.
 	 */
+	struct msghdr *msg = arg;
 	sctp_chunk_t *abort;
 	sctp_disposition_t retval;
 
 	retval = SCTP_DISPOSITION_CONSUME;
 
 	/* Generate ABORT chunk to send the peer.  */
-	abort = sctp_make_abort(asoc, NULL, 0);
+	abort = sctp_make_abort_user(asoc, NULL, msg);
 	if (!abort)
 		retval = SCTP_DISPOSITION_NOMEM;
 	else
@@ -3525,6 +3535,7 @@ sctp_disposition_t sctp_sf_cookie_wait_prm_abort(const sctp_endpoint_t *ep,
 					void *arg,
 					sctp_cmd_seq_t *commands)
 {
+	struct msghdr *msg = arg;
 	sctp_chunk_t *abort;
 	sctp_disposition_t retval;
 
@@ -3534,7 +3545,7 @@ sctp_disposition_t sctp_sf_cookie_wait_prm_abort(const sctp_endpoint_t *ep,
 	retval = SCTP_DISPOSITION_CONSUME;
 
 	/* Generate ABORT chunk to send the peer */
-	abort = sctp_make_abort(asoc, NULL, 0);
+	abort = sctp_make_abort_user(asoc, NULL, msg);
 	if (!abort)
 		retval = SCTP_DISPOSITION_NOMEM;
 	else
@@ -3658,6 +3669,39 @@ sctp_disposition_t sctp_sf_shutdown_ack_sent_prm_abort(
 	 * common function with the SHUTDOWN-SENT state.
 	 */
 	return sctp_sf_shutdown_sent_prm_abort(ep, asoc, type, arg, commands);
+}
+
+/* 
+ * Process the REQUESTHEARTBEAT primitive
+ *
+ * 10.1 ULP-to-SCTP
+ * J) Request Heartbeat
+ *
+ * Format: REQUESTHEARTBEAT(association id, destination transport address)
+ *
+ * -> result
+ *
+ * Instructs the local endpoint to perform a HeartBeat on the specified
+ * destination transport address of the given association. The returned
+ * result should indicate whether the transmission of the HEARTBEAT
+ * chunk to the destination address is successful.
+ *
+ * Mandatory attributes:
+ *
+ * o association id - local handle to the SCTP association
+ *
+ * o destination transport address - the transport address of the
+ *   asociation on which a heartbeat should be issued.
+ */
+sctp_disposition_t sctp_sf_do_prm_requestheartbeat(
+					const sctp_endpoint_t *ep,
+					const sctp_association_t *asoc,
+					const sctp_subtype_t type,
+					void *arg,
+					sctp_cmd_seq_t *commands)
+{
+	return sctp_sf_heartbeat(ep, asoc, type, (sctp_transport_t *)arg,
+				 commands);
 }
 
 /*
@@ -4257,6 +4301,11 @@ sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
 	packet = t_new(sctp_packet_t, GFP_ATOMIC);
 	if (!packet)
 		goto nomem_packet;
+
+	/* Cache a route for the transport with the chunk's destination as
+	 * the source address.
+	 */
+	sctp_transport_route(transport, (sockaddr_storage_t *)&chunk->dest);
 
 	packet = sctp_packet_init(packet, transport, sport, dport);
 	packet = sctp_packet_config(packet, vtag, 0, NULL);

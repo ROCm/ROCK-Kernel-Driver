@@ -41,6 +41,7 @@
  *    Jon Grimm <jgrimm@us.ibm.com>
  *    Hui Huang <hui.huang@nokia.com>
  *    Daisy Chang <daisyc@us.ibm.com>
+ *    Sridhar Samudrala <sri@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -217,8 +218,8 @@ int sctp_rcv(struct sk_buff *skb)
 	/* Remember the SCTP header. */
 	chunk->sctp_hdr = sh;
 
-	/* Set the source address.  */
-	sctp_init_source(chunk);
+	/* Set the source and destination addresses of the incoming chunk.  */
+	sctp_init_addrs(chunk);
 
 	/* Remember where we came from.  */
 	chunk->transport = transport;
@@ -567,7 +568,7 @@ sctp_association_t *sctp_lookup_association(const sockaddr_storage_t *laddr,
 	sctp_local_bh_disable();
 	asoc = __sctp_lookup_association(laddr, paddr, transportp);
 	sctp_local_bh_enable();
-	
+
 	return asoc;
 }
 
@@ -613,12 +614,10 @@ static sctp_association_t *__sctp_rcv_initack_lookup(struct sk_buff *skb,
 	sockaddr_storage_t *paddr = &addr;
 	struct sctphdr *sh = (struct sctphdr *) skb->h.raw;
 	sctp_chunkhdr_t *ch;
-	__u8 *ch_end, *data;
-	sctp_paramhdr_t *parm;
+	union sctp_params params;
+	sctp_init_chunk_t *init;
 
 	ch = (sctp_chunkhdr_t *) skb->data;
-
-	ch_end = ((__u8 *) ch) + WORD_ROUND(ntohs(ch->length));
 
 	/* If this is INIT/INIT-ACK look inside the chunk too. */
 	switch (ch->type) {
@@ -645,24 +644,17 @@ static sctp_association_t *__sctp_rcv_initack_lookup(struct sk_buff *skb,
 	/* Find the start of the TLVs and the end of the chunk.  This is
 	 * the region we search for address parameters.
 	 */
-	data = skb->data + sizeof(sctp_init_chunk_t);
+	init = (sctp_init_chunk_t *)skb->data;
 
-	/* See sctp_process_init() for how to go thru TLVs. */
-	while (data < ch_end) {
-		parm = (sctp_paramhdr_t *)data;
-
-		if (!parm->length)
-			break;
-
-		data += WORD_ROUND(ntohs(parm->length));
+	/* Walk the parameters looking for embedded addresses. */
+	sctp_walk_params(params, init, init_hdr.params) {
 
 		/* Note: Ignoring hostname addresses. */
-		if ((SCTP_PARAM_IPV4_ADDRESS != parm->type) &&
-		    (SCTP_PARAM_IPV6_ADDRESS != parm->type))
+		if ((SCTP_PARAM_IPV4_ADDRESS != params.p->type) &&
+		    (SCTP_PARAM_IPV6_ADDRESS != params.p->type))
 			continue;
 
-		sctp_param2sockaddr(paddr, (sctp_addr_param_t *)parm, 
-				    ntohs(sh->source));
+		sctp_param2sockaddr(paddr, params.addr, ntohs(sh->source));
 		asoc = __sctp_lookup_association(laddr, paddr, transportp);
 		if (asoc)
 			return asoc;
