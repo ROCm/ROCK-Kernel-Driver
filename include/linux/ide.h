@@ -33,23 +33,26 @@
  */
 #define INITIAL_MULT_COUNT	0	/* off=0; on=2,4,8,16,32, etc.. */
 
-#ifndef SUPPORT_SLOW_DATA_PORTS		/* 1 to support slow data ports */
-#define SUPPORT_SLOW_DATA_PORTS	1	/* 0 to reduce kernel size */
+#ifndef SUPPORT_SLOW_DATA_PORTS			/* 1 to support slow data ports */
+# define SUPPORT_SLOW_DATA_PORTS	1	/* 0 to reduce kernel size */
 #endif
+
+/* Right now this is only needed by a promise controlled.
+ */
 #ifndef SUPPORT_VLB_SYNC		/* 1 to support weird 32-bit chips */
-#define SUPPORT_VLB_SYNC	1	/* 0 to reduce kernel size */
+# define SUPPORT_VLB_SYNC	1	/* 0 to reduce kernel size */
 #endif
 #ifndef DISK_RECOVERY_TIME		/* off=0; on=access_delay_time */
-#define DISK_RECOVERY_TIME	0	/*  for hardware that needs it */
+# define DISK_RECOVERY_TIME	0	/*  for hardware that needs it */
 #endif
 #ifndef OK_TO_RESET_CONTROLLER		/* 1 needed for good error recovery */
-#define OK_TO_RESET_CONTROLLER	1	/* 0 for use with AH2372A/B interface */
+# define OK_TO_RESET_CONTROLLER	1	/* 0 for use with AH2372A/B interface */
 #endif
 #ifndef FANCY_STATUS_DUMPS		/* 1 for human-readable drive errors */
-#define FANCY_STATUS_DUMPS	1	/* 0 to reduce kernel size */
+# define FANCY_STATUS_DUMPS	1	/* 0 to reduce kernel size */
 #endif
 #ifndef DISABLE_IRQ_NOSYNC
-#define DISABLE_IRQ_NOSYNC	0
+# define DISABLE_IRQ_NOSYNC	0
 #endif
 
 /*
@@ -262,17 +265,6 @@ void ide_setup_ports(hw_regs_t *hw,
 #define ATA_SCSI	0x21
 #define ATA_NO_LUN      0x7f
 
-typedef union {
-	unsigned all			: 8;	/* all of the bits together */
-	struct {
-		unsigned set_geometry	: 1;	/* respecify drive geometry */
-		unsigned recalibrate	: 1;	/* seek to cyl 0      */
-		unsigned set_multmode	: 1;	/* set multmode count */
-		unsigned set_tune	: 1;	/* tune interface for drive */
-		unsigned reserved	: 4;	/* unused */
-	} b;
-} special_t;
-
 struct ide_settings_s;
 /* structure describing an ATA/ATAPI device */
 typedef
@@ -300,7 +292,17 @@ struct ata_device {
 	unsigned long PADAM_service_time;	/* service time of last request */
 	unsigned long PADAM_timeout;		/* max time to wait for irq */
 
-	special_t	special;	/* special action flags */
+	/* Flags requesting/indicating one of the following special commands
+	 * executed on the request queue.
+	 */
+#define ATA_SPECIAL_GEOMETRY		0x01
+#define ATA_SPECIAL_RECALIBRATE		0x02
+#define ATA_SPECIAL_MMODE		0x04
+#define ATA_SPECIAL_TUNE		0x08
+	unsigned char special_cmd;
+	u8 mult_req;			/* requested multiple sector setting */
+	u8 tune_req;			/* requested drive tuning setting */
+
 	byte     using_dma;		/* disk is using dma for read/write */
 	byte	 retry_pio;		/* retrying dma capable host in pio */
 	byte	 state;			/* retry state */
@@ -327,8 +329,6 @@ struct ata_device {
 	byte		ctl;		/* "normal" value for IDE_CONTROL_REG */
 	byte		ready_stat;	/* min status value for drive ready */
 	byte		mult_count;	/* current multiple sector setting */
-	byte		mult_req;	/* requested multiple sector setting */
-	byte		tune_req;	/* requested drive tuning setting */
 	byte		bad_wstat;	/* used for ignoring WRERR_STAT */
 	byte		nowerr;		/* used for ignoring WRERR_STAT */
 	byte		sect0;		/* offset of first sector for DM6:DDO */
@@ -338,8 +338,7 @@ struct ata_device {
 	byte		bios_sect;	/* BIOS/fdisk/LILO sectors per track */
 	unsigned int	bios_cyl;	/* BIOS/fdisk/LILO number of cyls */
 	unsigned int	cyl;		/* "real" number of cyls */
-	unsigned long	capacity;	/* total number of sectors */
-	unsigned long long capacity48;	/* total number of sectors */
+	u64		capacity;	/* total number of sectors */
 	unsigned int	drive_data;	/* for use by tuneproc/selectproc as needed */
 
 	wait_queue_head_t wqueue;	/* used to wait for drive in open() */
@@ -462,19 +461,19 @@ struct ata_channel {
 	char		name[8];	/* name of interface */
 	int		index;		/* 0 for ide0; 1 for ide1; ... */
 	hwif_chipset_t	chipset;	/* sub-module for tuning.. */
-	unsigned	noprobe    : 1;	/* don't probe for this interface */
-	unsigned	present    : 1;	/* there is a device on this interface */
-	unsigned	serialized : 1;	/* serialized operation between channels */
-	unsigned	sharing_irq: 1;	/* 1 = sharing irq with another hwif */
-	unsigned	reset      : 1;	/* reset after probe */
-	unsigned	autodma    : 1;	/* automatically try to enable DMA at boot */
-	unsigned	udma_four  : 1;	/* 1=ATA-66 capable, 0=default */
-	unsigned	highmem	   : 1; /* can do full 32-bit dma */
-	byte		slow;		/* flag: slow data port */
-	unsigned no_io_32bit	   : 1;	/* disallow enabling 32bit I/O */
+	unsigned noprobe	: 1;	/* don't probe for this interface */
+	unsigned present	: 1;	/* there is a device on this interface */
+	unsigned serialized	: 1;	/* serialized operation between channels */
+	unsigned sharing_irq	: 1;	/* 1 = sharing irq with another hwif */
+	unsigned reset		: 1;	/* reset after probe */
+	unsigned autodma	: 1;	/* automatically try to enable DMA at boot */
+	unsigned udma_four	: 1;	/* 1=ATA-66 capable, 0=default */
+	unsigned highmem	: 1;	/* can do full 32-bit dma */
+	unsigned no_io_32bit	: 1;	/* disallow enabling 32bit I/O */
+	unsigned no_unmask	: 1;	/* disallow setting unmask bit */
 	byte		io_32bit;	/* 0=16-bit, 1=32-bit, 2/3=32bit+sync */
-	unsigned no_unmask	   : 1;	/* disallow setting unmask bit */
 	byte		unmask;		/* flag: okay to unmask other irqs */
+	byte		slow;		/* flag: slow data port */
 
 #if (DISK_RECOVERY_TIME > 0)
 	unsigned long	last_time;	/* time when previous rq was done */
@@ -616,20 +615,20 @@ read_proc_t proc_ide_read_geometry;
 
 struct ata_operations {
 	struct module *owner;
-	int (*cleanup)(ide_drive_t *);
-	int (*standby)(ide_drive_t *);
-	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, unsigned long);
-	int (*end_request)(ide_drive_t *drive, int uptodate);
+	int (*cleanup)(struct ata_device *);
+	int (*standby)(struct ata_device *);
+	ide_startstop_t	(*do_request)(struct ata_device *, struct request *, sector_t);
+	int (*end_request)(struct ata_device *, int);
 
-	int (*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
-	int (*open)(struct inode *, struct file *, ide_drive_t *);
-	void (*release)(struct inode *, struct file *, ide_drive_t *);
-	int (*check_media_change)(ide_drive_t *);
-	void (*revalidate)(ide_drive_t *);
+	int (*ioctl)(struct ata_device *, struct inode *, struct file *, unsigned int, unsigned long);
+	int (*open)(struct inode *, struct file *, struct ata_device *);
+	void (*release)(struct inode *, struct file *, struct ata_device *);
+	int (*check_media_change)(struct ata_device *);
+	void (*revalidate)(struct ata_device *);
 
-	void (*pre_reset)(ide_drive_t *);
-	unsigned long (*capacity)(ide_drive_t *);
-	ide_startstop_t	(*special)(ide_drive_t *);
+	void (*pre_reset)(struct ata_device *);
+	sector_t (*capacity)(struct ata_device *);
+	ide_startstop_t	(*special)(struct ata_device *);
 
 	ide_proc_entry_t *proc;
 };
@@ -646,7 +645,7 @@ do {	\
 		__MOD_DEC_USE_COUNT((ata)->owner);	\
 } while(0)
 
-extern unsigned long ata_capacity(ide_drive_t *drive);
+extern sector_t ata_capacity(struct ata_device *drive);
 
 /* FIXME: Actually implement and use them as soon as possible!  to make the
  * ide_scan_devices() go away! */
@@ -733,7 +732,6 @@ ide_startstop_t restart_request(ide_drive_t *);
  * This function is intended to be used prior to invoking ide_do_drive_cmd().
  */
 extern void ide_init_drive_cmd(struct request *rq);
-extern void init_taskfile_request(struct request *rq);
 
 /*
  * "action" parameter type for ide_do_drive_cmd() below.
@@ -787,10 +785,8 @@ extern ide_startstop_t task_no_data_intr(ide_drive_t *drive);
 /* This is setting up all fields in args, which depend upon the command type.
  */
 extern void ide_cmd_type_parser(struct ata_taskfile *args);
-extern int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *cmd, byte *buf);
-
-extern int ide_cmd_ioctl(ide_drive_t *drive, unsigned long arg);
-extern int ide_task_ioctl(ide_drive_t *drive, unsigned long arg);
+extern int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *cmd, byte *buf);
+extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
 
 void ide_delay_50ms(void);
 
@@ -864,13 +860,13 @@ extern int ide_register_subdriver(ide_drive_t *drive, struct ata_operations *dri
 extern int ide_unregister_subdriver(ide_drive_t *drive);
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
-#define ON_BOARD		1
-#define NEVER_BOARD		0
-#ifdef CONFIG_BLK_DEV_OFFBOARD
-# define OFF_BOARD		ON_BOARD
-#else
-# define OFF_BOARD		NEVER_BOARD
-#endif
+# define ON_BOARD		1
+# define NEVER_BOARD		0
+# ifdef CONFIG_BLK_DEV_OFFBOARD
+#  define OFF_BOARD		ON_BOARD
+# else
+#  define OFF_BOARD		NEVER_BOARD
+# endif
 
 void __init ide_scan_pcibus(int scan_direction);
 #endif
@@ -892,4 +888,4 @@ extern spinlock_t ide_lock;
 extern int drive_is_ready(ide_drive_t *drive);
 extern void revalidate_drives(void);
 
-#endif /* _IDE_H */
+#endif

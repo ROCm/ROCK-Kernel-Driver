@@ -458,9 +458,9 @@ static ide_startstop_t idescsi_issue_pc (ide_drive_t *drive, idescsi_pc_t *pc)
 }
 
 /*
- *	idescsi_do_request is our request handling function.
+ * This is our request handling function.
  */
-static ide_startstop_t idescsi_do_request (ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t idescsi_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
 #if IDESCSI_DEBUG_LOG
 	printk (KERN_INFO "rq_status: %d, rq_dev: %u, cmd: %d, errors: %d\n",rq->rq_status,(unsigned int) rq->rq_dev,rq->cmd,rq->errors);
@@ -468,20 +468,20 @@ static ide_startstop_t idescsi_do_request (ide_drive_t *drive, struct request *r
 #endif /* IDESCSI_DEBUG_LOG */
 
 	if (rq->flags & REQ_SPECIAL) {
-		return idescsi_issue_pc (drive, (idescsi_pc_t *) rq->special);
+		return idescsi_issue_pc(drive, (idescsi_pc_t *) rq->special);
 	}
 	blk_dump_rq_flags(rq, "ide-scsi: unsup command");
 	idescsi_end_request(drive, 0);
 	return ide_stopped;
 }
 
-static int idescsi_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
+static int idescsi_open(struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	MOD_INC_USE_COUNT;
 	return 0;
 }
 
-static void idescsi_ide_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
+static void idescsi_ide_release(struct inode *inode, struct file *filp, struct ata_device *drive)
 {
 	MOD_DEC_USE_COUNT;
 }
@@ -556,9 +556,7 @@ static struct ata_operations idescsi_driver = {
 	release:		idescsi_ide_release,
 	check_media_change:	NULL,
 	revalidate:		idescsi_revalidate,
-	pre_reset:		NULL,
 	capacity:		NULL,
-	special:		NULL,
 	proc:			NULL
 };
 

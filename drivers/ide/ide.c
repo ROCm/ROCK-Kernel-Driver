@@ -283,6 +283,7 @@ static void init_hwif_data(struct ata_channel *hwif, unsigned int index)
 	hwif->major = ide_major[index];
 	sprintf(hwif->name, "ide%d", index);
 	hwif->bus_state = BUSSTATE_ON;
+
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
 
@@ -292,10 +293,10 @@ static void init_hwif_data(struct ata_channel *hwif, unsigned int index)
 		drive->ctl			= 0x08;
 		drive->ready_stat		= READY_STAT;
 		drive->bad_wstat		= BAD_W_STAT;
-		drive->special.b.recalibrate	= 1;
-		drive->special.b.set_geometry	= 1;
+		drive->special_cmd = (ATA_SPECIAL_RECALIBRATE | ATA_SPECIAL_GEOMETRY);
 		sprintf(drive->name, "hd%c", 'a' + (index * MAX_DRIVES) + unit);
 		drive->max_failures		= IDE_DEFAULT_MAX_FAILURES;
+
 		init_waitqueue_head(&drive->wqueue);
 	}
 }
@@ -455,7 +456,7 @@ static void ata_pre_reset(ide_drive_t *drive)
  * The capacity of a drive according to its current geometry/LBA settings in
  * sectors.
  */
-unsigned long ata_capacity(ide_drive_t *drive)
+sector_t ata_capacity(struct ata_device *drive)
 {
 	if (!drive->present || !drive->driver)
 		return 0;
@@ -472,31 +473,31 @@ unsigned long ata_capacity(ide_drive_t *drive)
 
 /*
  * This is used to issue WIN_SPECIFY, WIN_RESTORE, and WIN_SETMULT commands to
- * a drive.  It used to do much more, but has been scaled back.
+ * a drive.
  */
-static ide_startstop_t ata_special (ide_drive_t *drive)
+static ide_startstop_t ata_special(struct ata_device *drive)
 {
-	special_t *s = &drive->special;
+	unsigned char special_cmd = drive->special_cmd;
 
 #ifdef DEBUG
-	printk("%s: ata_special: 0x%02x\n", drive->name, s->all);
+	printk("%s: ata_special: 0x%02x\n", drive->name, special_cmd);
 #endif
-	if (s->b.set_tune) {
-		s->b.set_tune = 0;
+	if (special_cmd & ATA_SPECIAL_TUNE) {
+		drive->special_cmd &= ~ATA_SPECIAL_TUNE;
 		if (drive->channel->tuneproc != NULL)
 			drive->channel->tuneproc(drive, drive->tune_req);
 	} else if (drive->driver != NULL) {
 		if (ata_ops(drive)->special)
 			return ata_ops(drive)->special(drive);
 		else {
-			drive->special.all = 0;
+			drive->special_cmd = 0;
 			drive->mult_req = 0;
 
 			return ide_stopped;
 		}
-	} else if (s->all) {
-		printk("%s: bad special flag: 0x%02x\n", drive->name, s->all);
-		s->all = 0;
+	} else if (special_cmd) {
+		printk("%s: bad special flag: 0x%02x\n", drive->name, special_cmd);
+		drive->special_cmd = 0;
 	}
 
 	return ide_stopped;
@@ -584,27 +585,25 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 			drive->failures = 0;
 		} else {
 			drive->failures++;
+			char *msg = "";
 #if FANCY_STATUS_DUMPS
-			printk("master: ");
+			printk("master:");
 			switch (tmp & 0x7f) {
-				case 1: printk("passed");
+				case 1: msg = " passed";
 					break;
-				case 2: printk("formatter device error");
+				case 2: msg = " formatter device";
 					break;
-				case 3: printk("sector buffer error");
+				case 3: msg = " sector buffer";
 					break;
-				case 4: printk("ECC circuitry error");
+				case 4: msg = " ECC circuitry";
 					break;
-				case 5: printk("controlling MPU error");
+				case 5: msg = " controlling MPU error";
 					break;
-				default:printk("error (0x%02x?)", tmp);
 			}
 			if (tmp & 0x80)
-				printk("; slave: failed");
-			printk("\n");
-#else
-			printk("failed\n");
+				printk("; slave:");
 #endif
+			printk("%s error [%02x]\n", msg, tmp);
 		}
 	}
 	hwgroup->poll_timeout = 0;	/* done polling */
@@ -705,7 +704,7 @@ static inline u32 read_24 (ide_drive_t *drive)
 /*
  * Clean up after success/failure of an explicit drive cmd
  */
-void ide_end_drive_cmd(ide_drive_t *drive, byte stat, byte err)
+void ide_end_drive_cmd(struct ata_device *drive, byte stat, byte err)
 {
 	unsigned long flags;
 	struct request *rq;
@@ -714,27 +713,16 @@ void ide_end_drive_cmd(ide_drive_t *drive, byte stat, byte err)
 	rq = HWGROUP(drive)->rq;
 
 	if (rq->flags & REQ_DRIVE_CMD) {
-		byte *args = (byte *) rq->buffer;
-		rq->errors = !OK_STAT(stat,READY_STAT,BAD_STAT);
+		u8 *args = rq->buffer;
+		rq->errors = !OK_STAT(stat, READY_STAT, BAD_STAT);
 		if (args) {
 			args[0] = stat;
 			args[1] = err;
 			args[2] = IN_BYTE(IDE_NSECTOR_REG);
 		}
-	} else if (rq->flags & REQ_DRIVE_TASK) {
-		byte *args = (byte *) rq->buffer;
-		rq->errors = !OK_STAT(stat,READY_STAT,BAD_STAT);
-		if (args) {
-			args[0] = stat;
-			args[1] = err;
-			args[2] = IN_BYTE(IDE_NSECTOR_REG);
-			args[3] = IN_BYTE(IDE_SECTOR_REG);
-			args[4] = IN_BYTE(IDE_LCYL_REG);
-			args[5] = IN_BYTE(IDE_HCYL_REG);
-			args[6] = IN_BYTE(IDE_SELECT_REG);
-		}
-	} else if (rq->flags & REQ_DRIVE_TASKFILE) {
+	} else if (rq->flags & REQ_DRIVE_ACB) {
 		struct ata_taskfile *args = rq->special;
+
 		rq->errors = !OK_STAT(stat, READY_STAT, BAD_STAT);
 		if (args) {
 			args->taskfile.feature = err;
@@ -783,16 +771,23 @@ byte ide_dump_status (ide_drive_t *drive, const char *msg, byte stat)
 	if (stat & BUSY_STAT)
 		printk("Busy ");
 	else {
-		if (stat & READY_STAT)	printk("DriveReady ");
-		if (stat & WRERR_STAT)	printk("DeviceFault ");
-		if (stat & SEEK_STAT)	printk("SeekComplete ");
-		if (stat & DRQ_STAT)	printk("DataRequest ");
-		if (stat & ECC_STAT)	printk("CorrectedError ");
-		if (stat & INDEX_STAT)	printk("Index ");
-		if (stat & ERR_STAT)	printk("Error ");
+		if (stat & READY_STAT)
+			printk("DriveReady ");
+		if (stat & WRERR_STAT)
+			printk("DeviceFault ");
+		if (stat & SEEK_STAT)
+			printk("SeekComplete ");
+		if (stat & DRQ_STAT)
+			printk("DataRequest ");
+		if (stat & ECC_STAT)
+			printk("CorrectedError ");
+		if (stat & INDEX_STAT)
+			printk("Index ");
+		if (stat & ERR_STAT)
+			printk("Error ");
 	}
 	printk("}");
-#endif	/* FANCY_STATUS_DUMPS */
+#endif
 	printk("\n");
 	if ((stat & (BUSY_STAT|ERR_STAT)) == ERR_STAT) {
 		err = GET_ERR();
@@ -839,7 +834,7 @@ byte ide_dump_status (ide_drive_t *drive, const char *msg, byte stat)
 					printk(", sector=%ld", HWGROUP(drive)->rq->sector);
 			}
 		}
-#endif	/* FANCY_STATUS_DUMPS */
+#endif
 		printk("\n");
 	}
 	__restore_flags (flags);	/* local CPU only */
@@ -907,7 +902,6 @@ ide_startstop_t ide_error(ide_drive_t *drive, const char *msg, byte stat)
 		OUT_BYTE(WIN_IDLEIMMEDIATE,IDE_COMMAND_REG);	/* force an abort */
 
 	if (rq->errors >= ERROR_MAX) {
-		/* ATA-PATTERN */
 		if (ata_ops(drive) && ata_ops(drive)->end_request)
 			ata_ops(drive)->end_request(drive, 0);
 		else
@@ -918,7 +912,7 @@ ide_startstop_t ide_error(ide_drive_t *drive, const char *msg, byte stat)
 			return do_reset1(drive, 0);
 		}
 		if ((rq->errors & ERROR_RECAL) == ERROR_RECAL)
-			drive->special.b.recalibrate = 1;
+			drive->special_cmd |= ATA_SPECIAL_RECALIBRATE;
 		++rq->errors;
 	}
 	return ide_stopped;
@@ -1020,47 +1014,55 @@ int ide_wait_stat(ide_startstop_t *startstop, ide_drive_t *drive, byte good, byt
  */
 static ide_startstop_t start_request(ide_drive_t *drive, struct request *rq)
 {
-	ide_startstop_t startstop;
-	unsigned long block;
-	unsigned int minor = minor(rq->rq_dev), unit = minor >> PARTN_BITS;
-	struct ata_channel *hwif = drive->channel;
+	sector_t block;
+	unsigned int minor = minor(rq->rq_dev);
+	unsigned int unit = minor >> PARTN_BITS;
+	struct ata_channel *ch = drive->channel;
 
 	BUG_ON(!(rq->flags & REQ_STARTED));
 
 #ifdef DEBUG
-	printk("%s: start_request: current=0x%08lx\n", hwif->name, (unsigned long) rq);
+	printk("%s: start_request: current=0x%08lx\n", ch->name, (unsigned long) rq);
 #endif
 
 	/* bail early if we've exceeded max_failures */
-	if (drive->max_failures && (drive->failures > drive->max_failures)) {
+	if (drive->max_failures && (drive->failures > drive->max_failures))
 		goto kill_rq;
-	}
 
 	if (unit >= MAX_DRIVES) {
-		printk("%s: bad device number: %s\n", hwif->name, kdevname(rq->rq_dev));
+		printk(KERN_ERR "%s: bad device number: %s\n", ch->name, kdevname(rq->rq_dev));
 		goto kill_rq;
 	}
+
 	block    = rq->sector;
 
-	/* Strange disk manager remap */
+	/* Strange disk manager remap.
+	 */
 	if ((rq->flags & REQ_CMD) &&
 	    (drive->type == ATA_DISK || drive->type == ATA_FLOPPY)) {
 		block += drive->sect0;
 	}
-	/* Yecch - this will shift the entire interval,
-	   possibly killing some innocent following sector */
+
+	/* Yecch - this will shift the entire interval, possibly killing some
+	 * innocent following sector.
+	 */
 	if (block == 0 && drive->remap_0_to_1 == 1)
 		block = 1;  /* redirect MBR access to EZ-Drive partn table */
 
 #if (DISK_RECOVERY_TIME > 0)
-	while ((read_timer() - hwif->last_time) < DISK_RECOVERY_TIME);
+	while ((read_timer() - ch->last_time) < DISK_RECOVERY_TIME);
 #endif
 
-	SELECT_DRIVE(hwif, drive);
-	if (ide_wait_stat(&startstop, drive, drive->ready_stat,
-			  BUSY_STAT|DRQ_STAT, WAIT_READY)) {
-		printk(KERN_WARNING "%s: drive not ready for command\n", drive->name);
-		return startstop;
+	{
+		ide_startstop_t res;
+
+		SELECT_DRIVE(ch, drive);
+		if (ide_wait_stat(&res, drive, drive->ready_stat,
+					BUSY_STAT|DRQ_STAT, WAIT_READY)) {
+			printk(KERN_WARNING "%s: drive not ready for command\n", drive->name);
+
+			return res;
+		}
 	}
 
 	/* FIXME: We can see nicely here that all commands should be submitted
@@ -1068,110 +1070,93 @@ static ide_startstop_t start_request(ide_drive_t *drive, struct request *rq)
 	 * go as soon as possible!
 	 */
 
-	if (!drive->special.all) {
-		if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK | REQ_DRIVE_TASKFILE)) {
-			/* This issues a special drive command, usually
-			 * initiated by ioctl() from the external hdparm
-			 * program.
-			 */
+	if (drive->special_cmd)
+		return ata_special(drive);
 
-			if (rq->flags & REQ_DRIVE_TASKFILE) {
-				struct ata_taskfile *args = rq->special;
+	/* This issues a special drive command, usually initiated by ioctl()
+	 * from the external hdparm program.
+	 */
+	if (rq->flags & REQ_DRIVE_ACB) {
+		struct ata_taskfile *args = rq->special;
 
-				if (!(args))
-					goto args_error;
+		if (!(args))
+			goto args_error;
 
-				ata_taskfile(drive, args, NULL);
+		ata_taskfile(drive, args, NULL);
 
-				if (((args->command_type == IDE_DRIVE_TASK_RAW_WRITE) ||
+		if (((args->command_type == IDE_DRIVE_TASK_RAW_WRITE) ||
 					(args->command_type == IDE_DRIVE_TASK_OUT)) &&
-						args->prehandler && args->handler)
-					return args->prehandler(drive, rq);
-				return ide_started;
+				args->prehandler && args->handler)
+			return args->prehandler(drive, rq);
 
-			} else if (rq->flags & REQ_DRIVE_TASK) {
-				byte *args = rq->buffer;
-				byte sel;
+		return ide_started;
+	}
 
-				if (!(args)) goto args_error;
+	if (rq->flags & REQ_DRIVE_CMD) {
+		u8 *args = rq->buffer;
+
+		if (!(args))
+			goto args_error;
 #ifdef DEBUG
-				printk("%s: DRIVE_TASK_CMD ", drive->name);
-				printk("cmd=0x%02x ", args[0]);
-				printk("fr=0x%02x ", args[1]);
-				printk("ns=0x%02x ", args[2]);
-				printk("sc=0x%02x ", args[3]);
-				printk("lcyl=0x%02x ", args[4]);
-				printk("hcyl=0x%02x ", args[5]);
-				printk("sel=0x%02x\n", args[6]);
+		printk("%s: DRIVE_CMD ", drive->name);
+		printk("cmd=0x%02x ", args[0]);
+		printk("sc=0x%02x ", args[1]);
+		printk("fr=0x%02x ", args[2]);
+		printk("xx=0x%02x\n", args[3]);
 #endif
-				OUT_BYTE(args[1], IDE_FEATURE_REG);
-				OUT_BYTE(args[3], IDE_SECTOR_REG);
-				OUT_BYTE(args[4], IDE_LCYL_REG);
-				OUT_BYTE(args[5], IDE_HCYL_REG);
-				sel = (args[6] & ~0x10);
-				if (drive->select.b.unit)
-					sel |= 0x10;
-				OUT_BYTE(sel, IDE_SELECT_REG);
-				ide_cmd(drive, args[0], args[2], &drive_cmd_intr);
-				return ide_started;
-			} else if (rq->flags & REQ_DRIVE_CMD) {
-				byte *args = rq->buffer;
-				if (!(args)) goto args_error;
-#ifdef DEBUG
-				printk("%s: DRIVE_CMD ", drive->name);
-				printk("cmd=0x%02x ", args[0]);
-				printk("sc=0x%02x ", args[1]);
-				printk("fr=0x%02x ", args[2]);
-				printk("xx=0x%02x\n", args[3]);
-#endif
-				if (args[0] == WIN_SMART) {
-					OUT_BYTE(0x4f, IDE_LCYL_REG);
-					OUT_BYTE(0xc2, IDE_HCYL_REG);
-					OUT_BYTE(args[2],IDE_FEATURE_REG);
-					OUT_BYTE(args[1],IDE_SECTOR_REG);
-					ide_cmd(drive, args[0], args[3], &drive_cmd_intr);
+		if (args[0] == WIN_SMART) {
+			OUT_BYTE(0x4f, IDE_LCYL_REG);
+			OUT_BYTE(0xc2, IDE_HCYL_REG);
+			OUT_BYTE(args[2],IDE_FEATURE_REG);
+			OUT_BYTE(args[1],IDE_SECTOR_REG);
+			ide_cmd(drive, args[0], args[3], &drive_cmd_intr);
 
-					return ide_started;
-				}
-				OUT_BYTE(args[2],IDE_FEATURE_REG);
-				ide_cmd(drive, args[0], args[1], &drive_cmd_intr);
-				return ide_started;
-			}
+			return ide_started;
+		}
+		OUT_BYTE(args[2],IDE_FEATURE_REG);
+		ide_cmd(drive, args[0], args[1], &drive_cmd_intr);
 
-args_error:
-			/*
-			 * NULL is actually a valid way of waiting for all
-			 * current requests to be flushed from the queue.
-			 */
-#ifdef DEBUG
-			printk("%s: DRIVE_CMD (null)\n", drive->name);
-#endif
-			ide_end_drive_cmd(drive, GET_STAT(), GET_ERR());
+		return ide_started;
+	}
+
+	/* The normal way of execution is to pass and execute the request
+	 * handler down to the device type driver.
+	 */
+	if (ata_ops(drive)) {
+		if (ata_ops(drive)->do_request)
+			return ata_ops(drive)->do_request(drive, rq, block);
+		else {
+			ide_end_request(drive, 0);
 			return ide_stopped;
 		}
-
-		/* The normal way of execution is to pass execute the request
-		 * handler.
-		 */
-
-		if (ata_ops(drive)) {
-			if (ata_ops(drive)->do_request)
-				return ata_ops(drive)->do_request(drive, rq, block);
-			else {
-				ide_end_request(drive, 0);
-				return ide_stopped;
-			}
-		}
-		printk(KERN_WARNING "%s: device type %d not supported\n",
-		       drive->name, drive->type);
-		goto kill_rq;
 	}
-	return ata_special(drive);
+
+	/*
+	 * Error handling:
+	 */
+
+	printk(KERN_WARNING "%s: device type %d not supported\n",
+			drive->name, drive->type);
+
 kill_rq:
 	if (ata_ops(drive) && ata_ops(drive)->end_request)
 		ata_ops(drive)->end_request(drive, 0);
 	else
 		ide_end_request(drive, 0);
+
+	return ide_stopped;
+
+args_error:
+
+	/* NULL as arguemnt is used by ioctls as a way of waiting for all
+	 * current requests to be flushed from the queue.
+	 */
+
+#ifdef DEBUG
+	printk("%s: DRIVE_CMD (null)\n", drive->name);
+#endif
+	ide_end_drive_cmd(drive, GET_STAT(), GET_ERR());
+
 	return ide_stopped;
 }
 
@@ -1678,7 +1663,7 @@ ide_drive_t *get_info_ptr(kdev_t i_rdev)
 /*
  * This function is intended to be used prior to invoking ide_do_drive_cmd().
  */
-void ide_init_drive_cmd (struct request *rq)
+void ide_init_drive_cmd(struct request *rq)
 {
 	memset(rq, 0, sizeof(*rq));
 	rq->flags = REQ_DRIVE_CMD;
@@ -1742,6 +1727,7 @@ int ide_do_drive_cmd(ide_drive_t *drive, struct request *rq, ide_action_t action
 		wait_for_completion(&wait);	/* wait for it to be serviced */
 		return rq->errors ? -EIO : 0;	/* return -EIO if errors */
 	}
+
 	return 0;
 
 }
@@ -2386,18 +2372,21 @@ static int set_using_dma (ide_drive_t *drive, int arg)
 	return 0;
 }
 
-static int set_pio_mode (ide_drive_t *drive, int arg)
+static int set_pio_mode(ide_drive_t *drive, int arg)
 {
 	struct request rq;
 
 	if (!drive->channel->tuneproc)
 		return -ENOSYS;
-	if (drive->special.b.set_tune)
+
+	if (drive->special_cmd & ATA_SPECIAL_TUNE)
 		return -EBUSY;
+
 	ide_init_drive_cmd(&rq);
-	drive->tune_req = (byte) arg;
-	drive->special.b.set_tune = 1;
+	drive->tune_req = (u8) arg;
+	drive->special_cmd |= ATA_SPECIAL_TUNE;
 	ide_do_drive_cmd(drive, &rq, ide_wait);
+
 	return 0;
 }
 
@@ -2433,8 +2422,7 @@ void ide_delay_50ms (void)
 #endif /* CONFIG_BLK_DEV_IDECS */
 }
 
-static int ide_ioctl (struct inode *inode, struct file *file,
-			unsigned int cmd, unsigned long arg)
+static int ide_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int err = 0, major, minor;
 	ide_drive_t *drive;
@@ -2468,7 +2456,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 		}
 	}
 
-	ide_init_drive_cmd (&rq);
+	ide_init_drive_cmd(&rq);
 	switch (cmd) {
 		case HDIO_GETGEO:
 		{
@@ -2518,13 +2506,12 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 				return -EACCES;
 			return ide_revalidate_disk(inode->i_rdev);
 
-		case HDIO_OBSOLETE_IDENTITY:
 		case HDIO_GET_IDENTITY:
 			if (minor(inode->i_rdev) & PARTN_MASK)
 				return -EINVAL;
 			if (drive->id == NULL)
 				return -ENOMSG;
-			if (copy_to_user((char *)arg, (char *)drive->id, (cmd == HDIO_GET_IDENTITY) ? sizeof(*drive->id) : 142))
+			if (copy_to_user((char *)arg, (char *)drive->id, sizeof(*drive->id)))
 				return -EFAULT;
 			return 0;
 
@@ -2537,11 +2524,6 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
 				return -EACCES;
 			return ide_cmd_ioctl(drive, arg);
-
-		case HDIO_DRIVE_TASK:
-			if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
-				return -EACCES;
-			return ide_task_ioctl(drive, arg);
 
 		case HDIO_SET_NICE:
 			if (!capable(CAP_SYS_ADMIN)) return -EACCES;

@@ -132,34 +132,31 @@ static u8 get_command(ide_drive_t *drive, int cmd)
 	return WIN_NOP;
 }
 
-static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t chs_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
-	struct hd_drive_task_hdr	taskfile;
-	struct hd_drive_hob_hdr		hobfile;
-	struct ata_taskfile		args;
-	int				sectors;
+	struct ata_taskfile args;
+	int sectors;
 
 	unsigned int track	= (block / drive->sect);
 	unsigned int sect	= (block % drive->sect) + 1;
 	unsigned int head	= (track % drive->head);
 	unsigned int cyl	= (track / drive->head);
 
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-
 	sectors = rq->nr_sectors;
 	if (sectors == 256)
 		sectors = 0;
 
-	taskfile.sector_count	= sectors;
+	memset(&args, 0, sizeof(args));
 
-	taskfile.sector_number	= sect;
-	taskfile.low_cylinder	= cyl;
-	taskfile.high_cylinder	= (cyl>>8);
+	args.taskfile.sector_count = sectors;
 
-	taskfile.device_head	= head;
-	taskfile.device_head	|= drive->select.all;
-	taskfile.command	=  get_command(drive, rq_data_dir(rq));
+	args.taskfile.sector_number = sect;
+	args.taskfile.low_cylinder = cyl;
+	args.taskfile.high_cylinder = (cyl>>8);
+
+	args.taskfile.device_head = head;
+	args.taskfile.device_head |= drive->select.all;
+	args.taskfile.command =  get_command(drive, rq_data_dir(rq));
 
 #ifdef DEBUG
 	printk("%s: %sing: ", drive->name,
@@ -167,40 +164,35 @@ static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, un
 	if (lba)	printk("LBAsect=%lld, ", block);
 	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
 	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
+	printk("buffer=%p\n", rq->buffer);
 #endif
 
-	args.taskfile = taskfile;
-	args.hobfile = hobfile;
 	ide_cmd_type_parser(&args);
 	rq->special = &args;
 
 	return ata_taskfile(drive, &args, rq);
 }
 
-static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t lba28_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
-	struct hd_drive_task_hdr	taskfile;
-	struct hd_drive_hob_hdr		hobfile;
-	struct ata_taskfile		args;
-	int				sectors;
+	struct ata_taskfile args;
+	int sectors;
 
 	sectors = rq->nr_sectors;
 	if (sectors == 256)
 		sectors = 0;
 
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+	memset(&args, 0, sizeof(args));
 
-	taskfile.sector_count	= sectors;
-	taskfile.sector_number	= block;
-	taskfile.low_cylinder	= (block >>= 8);
+	args.taskfile.sector_count = sectors;
+	args.taskfile.sector_number = block;
+	args.taskfile.low_cylinder = (block >>= 8);
 
-	taskfile.high_cylinder	= (block >>= 8);
+	args.taskfile.high_cylinder = (block >>= 8);
 
-	taskfile.device_head	= ((block >> 8) & 0x0f);
-	taskfile.device_head	|= drive->select.all;
-	taskfile.command	= get_command(drive, rq_data_dir(rq));
+	args.taskfile.device_head = ((block >> 8) & 0x0f);
+	args.taskfile.device_head |= drive->select.all;
+	args.taskfile.command = get_command(drive, rq_data_dir(rq));
 
 #ifdef DEBUG
 	printk("%s: %sing: ", drive->name,
@@ -208,11 +200,9 @@ static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, 
 	if (lba)	printk("LBAsect=%lld, ", block);
 	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
 	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
+	printk("buffer=%p\n", rq->buffer);
 #endif
 
-	args.taskfile = taskfile;
-	args.hobfile = hobfile;
 	ide_cmd_type_parser(&args);
 	rq->special = &args;
 
@@ -225,40 +215,32 @@ static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, 
  * 1073741822 == 549756 MB or 48bit addressing fake drive
  */
 
-static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, unsigned long long block)
+static ide_startstop_t lba48_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
-	struct hd_drive_task_hdr	taskfile;
-	struct hd_drive_hob_hdr		hobfile;
-	struct ata_taskfile		args;
-	int				sectors;
-
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+	struct ata_taskfile args;
+	int sectors;
 
 	sectors = rq->nr_sectors;
 	if (sectors == 65536)
 		sectors = 0;
 
-	taskfile.sector_count	= sectors;
-	hobfile.sector_count	= sectors >> 8;
+	memset(&args, 0, sizeof(args));
 
-	if (rq->nr_sectors == 65536) {
-		taskfile.sector_count	= 0x00;
-		hobfile.sector_count	= 0x00;
-	}
+	args.taskfile.sector_count = sectors;
+	args.hobfile.sector_count = sectors >> 8;
 
-	taskfile.sector_number	= block;		/* low lba */
-	taskfile.low_cylinder	= (block >>= 8);	/* mid lba */
-	taskfile.high_cylinder	= (block >>= 8);	/* hi  lba */
+	args.taskfile.sector_number = block;		/* low lba */
+	args.taskfile.low_cylinder = (block >>= 8);	/* mid lba */
+	args.taskfile.high_cylinder = (block >>= 8);	/* hi  lba */
 
-	hobfile.sector_number	= (block >>= 8);	/* low lba */
-	hobfile.low_cylinder	= (block >>= 8);	/* mid lba */
-	hobfile.high_cylinder	= (block >>= 8);	/* hi  lba */
+	args.hobfile.sector_number = (block >>= 8);	/* low lba */
+	args.hobfile.low_cylinder = (block >>= 8);	/* mid lba */
+	args.hobfile.high_cylinder = (block >>= 8);	/* hi  lba */
 
-	taskfile.device_head	= drive->select.all;
-	hobfile.device_head	= taskfile.device_head;
-	hobfile.control		= (drive->ctl|0x80);
-	taskfile.command	= get_command(drive, rq_data_dir(rq));
+	args.taskfile.device_head = drive->select.all;
+	args.hobfile.device_head = args.taskfile.device_head;
+	args.hobfile.control = (drive->ctl|0x80);
+	args.taskfile.command = get_command(drive, rq_data_dir(rq));
 
 #ifdef DEBUG
 	printk("%s: %sing: ", drive->name,
@@ -266,11 +248,9 @@ static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, 
 	if (lba)	printk("LBAsect=%lld, ", block);
 	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
 	printk("sectors=%ld, ", rq->nr_sectors);
-	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
+	printk("buffer=%p\n",rq->buffer);
 #endif
 
-	args.taskfile = taskfile;
-	args.hobfile = hobfile;
 	ide_cmd_type_parser(&args);
 	rq->special = &args;
 
@@ -282,7 +262,7 @@ static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, 
  * otherwise, to address sectors.  It also takes care of issuing special
  * DRIVE_CMDs.
  */
-static ide_startstop_t idedisk_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
+static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct request *rq, sector_t block)
 {
 	/*
 	 * Wait until all request have bin finished.
@@ -290,7 +270,7 @@ static ide_startstop_t idedisk_do_request(ide_drive_t *drive, struct request *rq
 
 	while (drive->blocked) {
 		yield();
-		printk("ide: Request while drive blocked?");
+		printk(KERN_ERR "ide: Request while drive blocked?");
 	}
 
 	if (!(rq->flags & REQ_CMD)) {
@@ -300,7 +280,7 @@ static ide_startstop_t idedisk_do_request(ide_drive_t *drive, struct request *rq
 	}
 
 	if (IS_PDC4030_DRIVE) {
-		extern ide_startstop_t promise_rw_disk(ide_drive_t *, struct request *, unsigned long);
+		extern ide_startstop_t promise_rw_disk(struct ata_device *, struct request *, unsigned long);
 
 		return promise_rw_disk(drive, rq, block);
 	}
@@ -386,256 +366,19 @@ static int idedisk_check_media_change (ide_drive_t *drive)
 	return drive->removable;
 }
 
-/*
- * Queries for true maximum capacity of the drive.
- * Returns maximum LBA address (> 0) of the drive, 0 if failed.
- */
-static unsigned long idedisk_read_native_max_address(ide_drive_t *drive)
+static sector_t idedisk_capacity(struct ata_device *drive)
 {
-	struct ata_taskfile args;
-	unsigned long addr = 0;
-
-	if (!(drive->id->command_set_1 & 0x0400) &&
-	    !(drive->id->cfs_enable_2 & 0x0100))
-		return addr;
-
-	/* Create IDE/ATA command request structure */
-	memset(&args, 0, sizeof(args));
-	args.taskfile.device_head = 0x40;
-	args.taskfile.command = WIN_READ_NATIVE_MAX;
-	args.handler = task_no_data_intr;
-
-	/* submit command request */
-	ide_raw_taskfile(drive, &args, NULL);
-
-	/* if OK, compute maximum address value */
-	if ((args.taskfile.command & 0x01) == 0) {
-		addr = ((args.taskfile.device_head & 0x0f) << 24)
-		     | (args.taskfile.high_cylinder << 16)
-		     | (args.taskfile.low_cylinder <<  8)
-		     | args.taskfile.sector_number;
-	}
-
-	addr++;	/* since the return value is (maxlba - 1), we add 1 */
-
-	return addr;
+	return drive->capacity - drive->sect0;
 }
 
-static unsigned long long idedisk_read_native_max_address_ext(ide_drive_t *drive)
+static ide_startstop_t idedisk_special(struct ata_device *drive)
 {
-	struct ata_taskfile args;
-	unsigned long long addr = 0;
+	unsigned char special_cmd = drive->special_cmd;
 
-	/* Create IDE/ATA command request structure */
-	memset(&args, 0, sizeof(args));
-
-	args.taskfile.device_head = 0x40;
-	args.taskfile.command = WIN_READ_NATIVE_MAX_EXT;
-	args.handler = task_no_data_intr;
-
-        /* submit command request */
-        ide_raw_taskfile(drive, &args, NULL);
-
-	/* if OK, compute maximum address value */
-	if ((args.taskfile.command & 0x01) == 0) {
-		u32 high = (args.hobfile.high_cylinder << 16) |
-			   (args.hobfile.low_cylinder << 8) |
-			    args.hobfile.sector_number;
-		u32 low  = (args.taskfile.high_cylinder << 16) |
-			   (args.taskfile.low_cylinder << 8) |
-			    args.taskfile.sector_number;
-		addr = ((__u64)high << 24) | low;
-	}
-
-	addr++;	/* since the return value is (maxlba - 1), we add 1 */
-
-	return addr;
-}
-
-#ifdef CONFIG_IDEDISK_STROKE
-/*
- * Sets maximum virtual LBA address of the drive.
- * Returns new maximum virtual LBA address (> 0) or 0 on failure.
- */
-static unsigned long idedisk_set_max_address(ide_drive_t *drive, unsigned long addr_req)
-{
-	struct ata_taskfile args;
-	unsigned long addr_set = 0;
-
-	addr_req--;
-	/* Create IDE/ATA command request structure */
-	memset(&args, 0, sizeof(args));
-
-	args.taskfile.sector_number = (addr_req >> 0);
-	args.taskfile.low_cylinder = (addr_req >> 8);
-	args.taskfile.high_cylinder = (addr_req >> 16);
-
-	args.taskfile.device_head = ((addr_req >> 24) & 0x0f) | 0x40;
-	args.taskfile.command = WIN_SET_MAX;
-	args.handler = task_no_data_intr;
-	/* submit command request */
-	ide_raw_taskfile(drive, &args, NULL);
-	/* if OK, read new maximum address value */
-	if ((args.taskfile.command & 0x01) == 0) {
-		addr_set = ((args.taskfile.device_head & 0x0f) << 24)
-			 | (args.taskfile.high_cylinder << 16)
-			 | (args.taskfile.low_cylinder <<  8)
-			 | args.taskfile.sector_number;
-	}
-	addr_set++;
-	return addr_set;
-}
-
-static unsigned long long idedisk_set_max_address_ext(ide_drive_t *drive, unsigned long long addr_req)
-{
-	struct ata_taskfile args;
-	unsigned long long addr_set = 0;
-
-	addr_req--;
-	/* Create IDE/ATA command request structure */
-	memset(&args, 0, sizeof(args));
-
-	args.taskfile.sector_number = (addr_req >>  0);
-	args.taskfile.low_cylinder = (addr_req >>= 8);
-	args.taskfile.high_cylinder = (addr_req >>= 8);
-	args.taskfile.device_head = 0x40;
-	args.taskfile.command = WIN_SET_MAX_EXT;
-
-	args.hobfile.sector_number = (addr_req >>= 8);
-	args.hobfile.low_cylinder = (addr_req >>= 8);
-	args.hobfile.high_cylinder = (addr_req >>= 8);
-
-	args.hobfile.device_head = 0x40;
-	args.hobfile.control = (drive->ctl | 0x80);
-
-        args.handler = task_no_data_intr;
-	/* submit command request */
-	ide_raw_taskfile(drive, &args, NULL);
-	/* if OK, compute maximum address value */
-	if ((args.taskfile.command & 0x01) == 0) {
-		u32 high = (args.hobfile.high_cylinder << 16) |
-			   (args.hobfile.low_cylinder << 8) |
-			    args.hobfile.sector_number;
-		u32 low  = (args.taskfile.high_cylinder << 16) |
-			   (args.taskfile.low_cylinder << 8) |
-			    args.taskfile.sector_number;
-		addr_set = ((__u64)high << 24) | low;
-	}
-	return addr_set;
-}
-
-/*
- * Tests if the drive supports Host Protected Area feature.
- * Returns true if supported, false otherwise.
- */
-static inline int idedisk_supports_host_protected_area(ide_drive_t *drive)
-{
-	int flag = (drive->id->cfs_enable_1 & 0x0400) ? 1 : 0;
-	printk("%s: host protected area => %d\n", drive->name, flag);
-	return flag;
-}
-
-#endif
-
-/*
- * Compute drive->capacity, the full capacity of the drive
- * Called with drive->id != NULL.
- *
- * To compute capacity, this uses either of
- *
- *    1. CHS value set by user       (whatever user sets will be trusted)
- *    2. LBA value from target drive (require new ATA feature)
- *    3. LBA value from system BIOS  (new one is OK, old one may break)
- *    4. CHS value from system BIOS  (traditional style)
- *
- * in above order (i.e., if value of higher priority is available,
- * reset will be ignored).
- */
-static void init_idedisk_capacity (ide_drive_t  *drive)
-{
-	struct hd_driveid *id = drive->id;
-	unsigned long capacity = drive->cyl * drive->head * drive->sect;
-	unsigned long set_max = idedisk_read_native_max_address(drive);
-	unsigned long long capacity_2 = capacity;
-	unsigned long long set_max_ext;
-
-	drive->capacity48 = 0;
-	drive->select.b.lba = 0;
-
-	if (id->cfs_enable_2 & 0x0400) {
-		capacity_2 = id->lba_capacity_2;
-		drive->cyl = (unsigned int) capacity_2 / (drive->head * drive->sect);
-		drive->head		= drive->bios_head = 255;
-		drive->sect		= drive->bios_sect = 63;
-		drive->select.b.lba	= 1;
-		set_max_ext = idedisk_read_native_max_address_ext(drive);
-		if (set_max_ext > capacity_2) {
-#ifdef CONFIG_IDEDISK_STROKE
-			set_max_ext = idedisk_read_native_max_address_ext(drive);
-			set_max_ext = idedisk_set_max_address_ext(drive, set_max_ext);
-			if (set_max_ext) {
-				drive->capacity48 = capacity_2 = set_max_ext;
-				drive->cyl = (unsigned int) set_max_ext / (drive->head * drive->sect);
-				drive->select.b.lba = 1;
-				drive->id->lba_capacity_2 = capacity_2;
-                        }
-#else
-			printk("%s: setmax_ext LBA %llu, native  %llu\n",
-				drive->name, set_max_ext, capacity_2);
-#endif
-		}
-		drive->bios_cyl		= drive->cyl;
-		drive->capacity48	= capacity_2;
-		drive->capacity		= (unsigned long) capacity_2;
-		return;
-	/* Determine capacity, and use LBA if the drive properly supports it */
-	} else if ((id->capability & 2) && lba_capacity_is_ok(id)) {
-		capacity = id->lba_capacity;
-		drive->cyl = capacity / (drive->head * drive->sect);
-		drive->select.b.lba = 1;
-	}
-
-	if (set_max > capacity) {
-#ifdef CONFIG_IDEDISK_STROKE
-		set_max = idedisk_read_native_max_address(drive);
-		set_max = idedisk_set_max_address(drive, set_max);
-		if (set_max) {
-			drive->capacity = capacity = set_max;
-			drive->cyl = set_max / (drive->head * drive->sect);
-			drive->select.b.lba = 1;
-			drive->id->lba_capacity = capacity;
-		}
-#else
-		printk("%s: setmax LBA %lu, native  %lu\n",
-			drive->name, set_max, capacity);
-#endif
-	}
-
-	drive->capacity = capacity;
-
-	if ((id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400)) {
-                drive->capacity48 = id->lba_capacity_2;
-		drive->head = 255;
-		drive->sect = 63;
-		drive->cyl = (unsigned long)(drive->capacity48) / (drive->head * drive->sect);
-	}
-}
-
-static unsigned long idedisk_capacity (ide_drive_t *drive)
-{
-	if (drive->id->cfs_enable_2 & 0x0400)
-		return (drive->capacity48 - drive->sect0);
-	return (drive->capacity - drive->sect0);
-}
-
-static ide_startstop_t idedisk_special (ide_drive_t *drive)
-{
-	special_t *s = &drive->special;
-
-	if (s->b.set_geometry) {
+	if (special_cmd & ATA_SPECIAL_GEOMETRY) {
 		struct ata_taskfile args;
 
-		s->b.set_geometry	= 0;
+		drive->special_cmd &= ~ATA_SPECIAL_GEOMETRY;
 
 		memset(&args, 0, sizeof(args));
 		args.taskfile.sector_number	= drive->sect;
@@ -648,8 +391,9 @@ static ide_startstop_t idedisk_special (ide_drive_t *drive)
 			args.handler = set_geometry_intr;;
 		}
 		ata_taskfile(drive, &args, NULL);
-	} else if (s->b.recalibrate) {
-		s->b.recalibrate = 0;
+	} else if (special_cmd & ATA_SPECIAL_RECALIBRATE) {
+		drive->special_cmd &= ~ATA_SPECIAL_RECALIBRATE;
+
 		if (!IS_PDC4030_DRIVE) {
 			struct ata_taskfile args;
 
@@ -659,8 +403,8 @@ static ide_startstop_t idedisk_special (ide_drive_t *drive)
 			args.handler = recal_intr;
 			ata_taskfile(drive, &args, NULL);
 		}
-	} else if (s->b.set_multmode) {
-		s->b.set_multmode = 0;
+	} else if (special_cmd & ATA_SPECIAL_MMODE) {
+		drive->special_cmd &= ~ATA_SPECIAL_MMODE;
 		if (drive->id && drive->mult_req > drive->id->max_multsect)
 			drive->mult_req = drive->id->max_multsect;
 		if (!IS_PDC4030_DRIVE) {
@@ -673,10 +417,10 @@ static ide_startstop_t idedisk_special (ide_drive_t *drive)
 
 			ata_taskfile(drive, &args, NULL);
 		}
-	} else if (s->all) {
-		int special = s->all;
-		s->all = 0;
-		printk(KERN_ERR "%s: bad special flag: 0x%02x\n", drive->name, special);
+	} else if (special_cmd) {
+		drive->special_cmd = 0;
+
+		printk(KERN_ERR "%s: bad special flag: 0x%02x\n", drive->name, special_cmd);
 		return ide_stopped;
 	}
 	return IS_PDC4030_DRIVE ? ide_stopped : ide_started;
@@ -686,13 +430,14 @@ static void idedisk_pre_reset (ide_drive_t *drive)
 {
 	int legacy = (drive->id->cfs_enable_2 & 0x0400) ? 0 : 1;
 
-	drive->special.all = 0;
-	drive->special.b.set_geometry = legacy;
-	drive->special.b.recalibrate  = legacy;
+	if (legacy)
+		drive->special_cmd = (ATA_SPECIAL_GEOMETRY | ATA_SPECIAL_RECALIBRATE);
+	else
+		drive->special_cmd = 0;
 	if (OK_TO_RESET_CONTROLLER)
 		drive->mult_count = 0;
 	if (drive->mult_req != drive->mult_count)
-		drive->special.b.set_multmode = 1;
+		drive->special_cmd |= ATA_SPECIAL_MMODE;
 }
 
 #ifdef CONFIG_PROC_FS
@@ -812,19 +557,23 @@ static ide_proc_entry_t idedisk_proc[] = {
 #endif	/* CONFIG_PROC_FS */
 
 /*
- * This is tightly woven into the driver->do_special can not touch.
+ * This is tightly woven into the driver->special can not touch.
  * DON'T do it again until a total personality rewrite is committed.
  */
 static int set_multcount(ide_drive_t *drive, int arg)
 {
-	struct request rq;
+	struct ata_taskfile args;
 
-	if (drive->special.b.set_multmode)
+	if (drive->special_cmd & ATA_SPECIAL_MMODE)
 		return -EBUSY;
-	ide_init_drive_cmd (&rq);
+
+	memset(&args, 0, sizeof(args));
+
 	drive->mult_req = arg;
-	drive->special.b.set_multmode = 1;
-	ide_do_drive_cmd (drive, &rq, ide_wait);
+	drive->special_cmd |= ATA_SPECIAL_MMODE;
+
+	ide_raw_taskfile(drive, &args, NULL);
+
 	return (drive->mult_count == arg) ? 0 : -EIO;
 }
 
@@ -835,6 +584,7 @@ static int set_nowerr(ide_drive_t *drive, int arg)
 	drive->nowerr = arg;
 	drive->bad_wstat = arg ? BAD_R_STAT : BAD_W_STAT;
 	spin_unlock_irq(&ide_lock);
+
 	return 0;
 }
 
@@ -968,12 +718,153 @@ static struct device_driver idedisk_devdrv = {
 	resume: idedisk_resume,
 };
 
-static void idedisk_setup(ide_drive_t *drive)
+/*
+ * Queries for true maximum capacity of the drive.
+ * Returns maximum LBA address (> 0) of the drive, 0 if failed.
+ */
+static unsigned long native_max_address(struct ata_device *drive)
+{
+	struct ata_taskfile args;
+	unsigned long addr = 0;
+
+	if (!(drive->id->command_set_1 & 0x0400) &&
+	    !(drive->id->cfs_enable_2 & 0x0100))
+		return addr;
+
+	/* Create IDE/ATA command request structure */
+	memset(&args, 0, sizeof(args));
+	args.taskfile.device_head = 0x40;
+	args.taskfile.command = WIN_READ_NATIVE_MAX;
+	args.handler = task_no_data_intr;
+
+	/* submit command request */
+	ide_raw_taskfile(drive, &args, NULL);
+
+	/* if OK, compute maximum address value */
+	if ((args.taskfile.command & 0x01) == 0) {
+		addr = ((args.taskfile.device_head & 0x0f) << 24)
+		     | (args.taskfile.high_cylinder << 16)
+		     | (args.taskfile.low_cylinder <<  8)
+		     | args.taskfile.sector_number;
+	}
+
+	addr++;	/* since the return value is (maxlba - 1), we add 1 */
+
+	return addr;
+}
+
+static u64 native_max_address_ext(struct ata_device *drive)
+{
+	struct ata_taskfile args;
+	u64 addr = 0;
+
+	/* Create IDE/ATA command request structure */
+	memset(&args, 0, sizeof(args));
+
+	args.taskfile.device_head = 0x40;
+	args.taskfile.command = WIN_READ_NATIVE_MAX_EXT;
+	args.handler = task_no_data_intr;
+
+        /* submit command request */
+        ide_raw_taskfile(drive, &args, NULL);
+
+	/* if OK, compute maximum address value */
+	if ((args.taskfile.command & 0x01) == 0) {
+		u32 high = (args.hobfile.high_cylinder << 16) |
+			   (args.hobfile.low_cylinder << 8) |
+			    args.hobfile.sector_number;
+		u32 low  = (args.taskfile.high_cylinder << 16) |
+			   (args.taskfile.low_cylinder << 8) |
+			    args.taskfile.sector_number;
+		addr = ((u64)high << 24) | low;
+	}
+
+	addr++;	/* since the return value is (maxlba - 1), we add 1 */
+
+	return addr;
+}
+
+#ifdef CONFIG_IDEDISK_STROKE
+/*
+ * Sets maximum virtual LBA address of the drive.
+ * Returns new maximum virtual LBA address (> 0) or 0 on failure.
+ */
+static sector_t set_max_address(ide_drive_t *drive, sector_t addr_req)
+{
+	struct ata_taskfile args;
+	sector_t addr_set = 0;
+
+	addr_req--;
+	/* Create IDE/ATA command request structure */
+	memset(&args, 0, sizeof(args));
+
+	args.taskfile.sector_number = (addr_req >> 0);
+	args.taskfile.low_cylinder = (addr_req >> 8);
+	args.taskfile.high_cylinder = (addr_req >> 16);
+
+	args.taskfile.device_head = ((addr_req >> 24) & 0x0f) | 0x40;
+	args.taskfile.command = WIN_SET_MAX;
+	args.handler = task_no_data_intr;
+	/* submit command request */
+	ide_raw_taskfile(drive, &args, NULL);
+	/* if OK, read new maximum address value */
+	if ((args.taskfile.command & 0x01) == 0) {
+		addr_set = ((args.taskfile.device_head & 0x0f) << 24)
+			 | (args.taskfile.high_cylinder << 16)
+			 | (args.taskfile.low_cylinder <<  8)
+			 | args.taskfile.sector_number;
+	}
+	addr_set++;
+	return addr_set;
+}
+
+static u64 set_max_address_ext(ide_drive_t *drive, u64 addr_req)
+{
+	struct ata_taskfile args;
+	u64 addr_set = 0;
+
+	addr_req--;
+	/* Create IDE/ATA command request structure */
+	memset(&args, 0, sizeof(args));
+
+	args.taskfile.sector_number = (addr_req >>  0);
+	args.taskfile.low_cylinder = (addr_req >>= 8);
+	args.taskfile.high_cylinder = (addr_req >>= 8);
+	args.taskfile.device_head = 0x40;
+	args.taskfile.command = WIN_SET_MAX_EXT;
+
+	args.hobfile.sector_number = (addr_req >>= 8);
+	args.hobfile.low_cylinder = (addr_req >>= 8);
+	args.hobfile.high_cylinder = (addr_req >>= 8);
+
+	args.hobfile.device_head = 0x40;
+	args.hobfile.control = (drive->ctl | 0x80);
+
+        args.handler = task_no_data_intr;
+	/* submit command request */
+	ide_raw_taskfile(drive, &args, NULL);
+	/* if OK, compute maximum address value */
+	if ((args.taskfile.command & 0x01) == 0) {
+		u32 high = (args.hobfile.high_cylinder << 16) |
+			   (args.hobfile.low_cylinder << 8) |
+			    args.hobfile.sector_number;
+		u32 low  = (args.taskfile.high_cylinder << 16) |
+			   (args.taskfile.low_cylinder << 8) |
+			    args.taskfile.sector_number;
+		addr_set = ((u64)high << 24) | low;
+	}
+	return addr_set;
+}
+
+#endif
+
+static void idedisk_setup(struct ata_device *drive)
 {
 	int i;
 
 	struct hd_driveid *id = drive->id;
-	unsigned long capacity;
+	sector_t capacity;
+	sector_t set_max;
 	int drvid = -1;
 
 	idedisk_add_settings(drive);
@@ -1024,7 +915,7 @@ static void idedisk_setup(ide_drive_t *drive)
 		drive->sect    = drive->bios_sect = id->sectors;
 	}
 
-	/* Handle logical geometry translation by the drive */
+	/* Handle logical geometry translation by the drive. */
 	if ((id->field_valid & 1) && id->cur_cyls &&
 	    id->cur_heads && (id->cur_heads <= 16) && id->cur_sectors) {
 		drive->cyl  = id->cur_cyls;
@@ -1032,31 +923,126 @@ static void idedisk_setup(ide_drive_t *drive)
 		drive->sect = id->cur_sectors;
 	}
 
-	/* Use physical geometry if what we have still makes no sense */
+	/* Use physical geometry if what we have still makes no sense. */
 	if (drive->head > 16 && id->heads && id->heads <= 16) {
 		drive->cyl  = id->cyls;
 		drive->head = id->heads;
 		drive->sect = id->sectors;
 	}
 
-	/* calculate drive capacity, and select LBA if possible */
-	init_idedisk_capacity (drive);
+	/* Calculate drive capacity, and select LBA if possible.
+	 * drive->id != NULL is spected
+	 *
+	 * To compute capacity, this uses either of
+	 *
+	 *    1. CHS value set by user       (whatever user sets will be trusted)
+	 *    2. LBA value from target drive (require new ATA feature)
+	 *    3. LBA value from system BIOS  (new one is OK, old one may break)
+	 *    4. CHS value from system BIOS  (traditional style)
+	 *
+	 * in above order (i.e., if value of higher priority is available,
+	 * reset will be ignored).
+	 */
+	capacity = drive->cyl * drive->head * drive->sect;
+	set_max = native_max_address(drive);
+
+	drive->capacity = 0;
+	drive->select.b.lba = 0;
+
+	if (id->cfs_enable_2 & 0x0400) {
+		u64 set_max_ext;
+		u64 capacity_2;
+		capacity_2 = capacity;
+		capacity_2 = id->lba_capacity_2;
+
+		drive->cyl = (unsigned int) capacity_2 / (drive->head * drive->sect);
+		drive->head = drive->bios_head = 255;
+		drive->sect = drive->bios_sect = 63;
+
+		drive->select.b.lba = 1;
+		set_max_ext = native_max_address_ext(drive);
+		if (set_max_ext > capacity_2) {
+#ifdef CONFIG_IDEDISK_STROKE
+			set_max_ext = native_max_address_ext(drive);
+			set_max_ext = set_max_address_ext(drive, set_max_ext);
+			if (set_max_ext) {
+				drive->capacity = capacity_2 = set_max_ext;
+				drive->cyl = (unsigned int) set_max_ext / (drive->head * drive->sect);
+				drive->select.b.lba = 1;
+				drive->id->lba_capacity_2 = capacity_2;
+                        }
+#else
+			printk("%s: setmax_ext LBA %llu, native  %llu\n",
+				drive->name, set_max_ext, capacity_2);
+#endif
+		}
+		drive->bios_cyl	= drive->cyl;
+		drive->capacity	= capacity_2;
+	} else {
+
+		/*
+		 * Determine capacity, and use LBA if the drive properly
+		 * supports it.
+		 */
+
+		if ((id->capability & 2) && lba_capacity_is_ok(id)) {
+			capacity = id->lba_capacity;
+			drive->cyl = capacity / (drive->head * drive->sect);
+			drive->select.b.lba = 1;
+		}
+
+		if (set_max > capacity) {
+#ifdef CONFIG_IDEDISK_STROKE
+			set_max = native_max_address(drive);
+			set_max = set_max_address(drive, set_max);
+			if (set_max) {
+				drive->capacity = capacity = set_max;
+				drive->cyl = set_max / (drive->head * drive->sect);
+				drive->select.b.lba = 1;
+				drive->id->lba_capacity = capacity;
+			}
+#else
+			printk("%s: setmax LBA %lu, native  %lu\n",
+					drive->name, set_max, capacity);
+#endif
+		}
+
+		drive->capacity = capacity;
+
+		if ((id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400)) {
+			drive->capacity = id->lba_capacity_2;
+			drive->head = 255;
+			drive->sect = 63;
+			drive->cyl = (unsigned long)(drive->capacity) / (drive->head * drive->sect);
+		}
+	}
 
 	/*
-	 * if possible, give fdisk access to more of the drive,
+	 * If possible, give fdisk access to more of the drive,
 	 * by correcting bios_cyls:
 	 */
-	capacity = idedisk_capacity (drive);
+	capacity = idedisk_capacity(drive);
 	if ((capacity >= (drive->bios_cyl * drive->bios_sect * drive->bios_head)) &&
 	    (!drive->forced_geom) && drive->bios_sect && drive->bios_head)
 		drive->bios_cyl = (capacity / drive->bios_sect) / drive->bios_head;
 	printk(KERN_INFO "%s: %ld sectors", drive->name, capacity);
 
-	/* Give size in megabytes (MB), not mebibytes (MiB). */
-	/* We compute the exact rounded value, avoiding overflow. */
-	printk(" (%ld MB)", (capacity - capacity/625 + 974)/1950);
+#if 0
 
-	/* Only print cache size when it was specified */
+	/* Right now we avoid this calculation, since it can result in the
+	 * usage of not supported compiler internal functions on 32 bit hosts.
+	 * However since the calculation appears to be an interesting piece of
+	 * number theory let's preserve the formula here.
+	 */
+
+	/* Give size in megabytes (MB), not mebibytes (MiB).
+	 * We compute the exact rounded value, avoiding overflow.
+	 */
+	printk(" (%ld MB)", (capacity - capacity/625 + 974)/1950);
+#endif
+
+	/* Only print cache size when it was specified.
+	 */
 	if (id->buf_size)
 		printk (" w/%dKiB Cache", id->buf_size/2);
 
@@ -1074,14 +1060,15 @@ static void idedisk_setup(ide_drive_t *drive)
 		id->multsect = ((id->max_multsect/2) > 1) ? id->max_multsect : 0;
 		id->multsect_valid = id->multsect ? 1 : 0;
 		drive->mult_req = id->multsect_valid ? id->max_multsect : INITIAL_MULT_COUNT;
-		drive->special.b.set_multmode = drive->mult_req ? 1 : 0;
+		if (drive->mult_req)
+			drive->special_cmd |= ATA_SPECIAL_MMODE;
 #else
 		/* original, pre IDE-NFG, per request of AC */
 		drive->mult_req = INITIAL_MULT_COUNT;
 		if (drive->mult_req > id->max_multsect)
 			drive->mult_req = id->max_multsect;
 		if (drive->mult_req || ((id->multsect_valid & 1) && id->multsect))
-			drive->special.b.set_multmode = 1;
+			drive->special_cmd |= ATA_SPECIAL_MMODE;
 #endif
 	}
 
@@ -1095,6 +1082,7 @@ static void idedisk_setup(ide_drive_t *drive)
 
 	if (drive->id->cfs_enable_2 & 0x3000)
 		write_cache(drive, (id->cfs_enable_2 & 0x3000));
+
 	probe_lba_addressing(drive, 1);
 }
 

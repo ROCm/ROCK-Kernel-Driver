@@ -295,7 +295,7 @@ int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 	int i;
 	struct scatterlist *sg;
 
-	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) {
+	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_ACB) {
 		hwif->sg_nents = i = raw_build_sglist(hwif, HWGROUP(drive)->rq);
 	} else {
 		hwif->sg_nents = i = ide_build_sglist(hwif, HWGROUP(drive)->rq);
@@ -590,9 +590,10 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 
 			BUG_ON(HWGROUP(drive)->handler);
 			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
-			if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) &&
+			if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_ACB) &&
 			    (drive->addressing == 1)) {
 				struct ata_taskfile *args = HWGROUP(drive)->rq->special;
+
 				OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
 			} else if (drive->addressing) {
 				OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);

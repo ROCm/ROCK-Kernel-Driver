@@ -338,7 +338,7 @@ void blk_queue_assign_lock(request_queue_t *q, spinlock_t *lock)
 
 static char *rq_flags[] = { "REQ_RW", "REQ_RW_AHEAD", "REQ_BARRIER",
 			   "REQ_CMD", "REQ_NOMERGE", "REQ_STARTED",
-			   "REQ_DONTPREP", "REQ_DRIVE_CMD", "REQ_DRIVE_TASK",
+			   "REQ_DONTPREP", "REQ_DRIVE_CMD",
 			   "REQ_DRIVE_ACB", "REQ_PC", "REQ_BLOCK_PC",
 			   "REQ_SENSE", "REQ_SPECIAL" };
 
