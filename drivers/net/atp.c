@@ -162,7 +162,7 @@ MODULE_PARM_DESC(max_interrupt_work, "ATP maximum events handled per interrupt")
 MODULE_PARM_DESC(debug, "ATP debug level (0-7)");
 MODULE_PARM_DESC(io, "ATP I/O base address(es)");
 MODULE_PARM_DESC(irq, "ATP IRQ number(s)");
-MODULE_PARM_DESC(xcvr, "ATP tranceiver(s) (0=internal, 1=external)");
+MODULE_PARM_DESC(xcvr, "ATP transceiver(s) (0=internal, 1=external)");
 
 /* The number of low I/O ports used by the ethercard. */
 #define ETHERCARD_TOTAL_SIZE	3

@@ -4999,7 +4999,7 @@ ahc_init(struct ahc_softc *ahc)
 		/*
 		 * Wait for up to 500ms for our transceivers
 		 * to settle.  If the adapter does not have
-		 * a cable attached, the tranceivers may
+		 * a cable attached, the transceivers may
 		 * never settle, so don't complain if we
 		 * fail here.
 		 */

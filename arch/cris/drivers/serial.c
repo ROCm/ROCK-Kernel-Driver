@@ -2802,7 +2802,7 @@ send_break(struct e100_serial * info, int duration)
 	info->tx_ctrl |= (0x80 | 0x40); /* Set bit 7 (txd) and 6 (tr_enable) */
 	info->port[REG_TR_CTRL] = info->tx_ctrl;
 
-	/* the DMA gets awfully confused if we toggle the tranceiver like this 
+	/* the DMA gets awfully confused if we toggle the transceiver like this 
 	 * so we need to reset it 
 	 */
 	*info->ocmdadr = 4;

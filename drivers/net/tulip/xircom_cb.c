@@ -121,7 +121,7 @@ static struct net_device_stats *xircom_get_stats(struct net_device *dev);
 static void investigate_read_descriptor(struct net_device *dev,struct xircom_private *card, int descnr, unsigned int bufferoffset);
 static void investigate_write_descriptor(struct net_device *dev, struct xircom_private *card, int descnr, unsigned int bufferoffset);
 static void read_mac_address(struct xircom_private *card);
-static void tranceiver_voodoo(struct xircom_private *card);
+static void transceiver_voodoo(struct xircom_private *card);
 static void initialize_card(struct xircom_private *card);
 static void trigger_transmit(struct xircom_private *card);
 static void trigger_receive(struct xircom_private *card);
@@ -301,7 +301,7 @@ static int __devinit xircom_probe(struct pci_dev *pdev, const struct pci_device_
 	
 	/* start the transmitter to get a heartbeat */
 	/* TODO: send 2 dummy packets here */
-	tranceiver_voodoo(private);
+	transceiver_voodoo(private);
 	
 	spin_lock_irqsave(&private->lock,flags);
 	  activate_transmitter(private);
@@ -1116,15 +1116,15 @@ static void read_mac_address(struct xircom_private *card)
 
 
 /*
- tranceiver_voodoo() enables the external UTP plug thingy.
+ transceiver_voodoo() enables the external UTP plug thingy.
  it's called voodoo as I stole this code and cannot cross-reference
  it with the specification.
  */
-static void tranceiver_voodoo(struct xircom_private *card)
+static void transceiver_voodoo(struct xircom_private *card)
 {
 	unsigned long flags;
 
-	enter("tranceiver_voodoo");
+	enter("transceiver_voodoo");
 
 	/* disable all powermanagement */
 	pci_write_config_dword(card->pdev, PCI_POWERMGMT, 0x0000);
@@ -1143,7 +1143,7 @@ static void tranceiver_voodoo(struct xircom_private *card)
         spin_unlock_irqrestore(&card->lock, flags);
 
 	netif_start_queue(card->dev);
-	leave("tranceiver_voodoo");
+	leave("transceiver_voodoo");
 }
 
 

@@ -6016,7 +6016,7 @@ ahd_chip_init(struct ahd_softc *ahd)
 	 * Now that termination is set, wait for up
 	 * to 500ms for our transceivers to settle.  If
 	 * the adapter does not have a cable attached,
-	 * the tranceivers may never settle, so don't
+	 * the transceivers may never settle, so don't
 	 * complain if we fail here.
 	 */
 	for (wait = 10000;

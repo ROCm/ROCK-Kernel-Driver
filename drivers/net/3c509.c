@@ -1139,7 +1139,7 @@ el3_netdev_get_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 	int ioaddr = dev->base_addr;
 	
 	EL3WINDOW(0);
-	/* obtain current tranceiver via WN4_MEDIA? */	
+	/* obtain current transceiver via WN4_MEDIA? */	
 	tmp = inw(ioaddr + WN0_ADDR_CONF);
 	ecmd->transceiver = XCVR_INTERNAL;
 	switch (tmp >> 14) {
@@ -1548,7 +1548,7 @@ MODULE_PARM(xcvr,"1-12i");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM_DESC(debug, "debug level (0-6)");
 MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
-MODULE_PARM_DESC(xcvr,"tranceiver(s) (0=internal, 1=external)");
+MODULE_PARM_DESC(xcvr,"transceiver(s) (0=internal, 1=external)");
 MODULE_PARM_DESC(max_interrupt_work, "maximum events handled per interrupt");
 #ifdef __ISAPNP__
 MODULE_PARM(nopnp, "i");

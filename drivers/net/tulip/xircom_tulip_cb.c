@@ -486,7 +486,7 @@ static void find_mii_transceivers(struct net_device *dev)
 
 /*
  * To quote Arjan van de Ven:
- *   tranceiver_voodoo() enables the external UTP plug thingy.
+ *   transceiver_voodoo() enables the external UTP plug thingy.
  *   it's called voodoo as I stole this code and cannot cross-reference
  *   it with the specification.
  * Actually it seems to go like this:

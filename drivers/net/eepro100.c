@@ -148,7 +148,7 @@ MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM(multicast_filter_limit, "i");
 MODULE_PARM_DESC(debug, "debug level (0-6)");
-MODULE_PARM_DESC(options, "Bits 0-3: tranceiver type, bit 4: full duplex, bit 5: 100Mbps");
+MODULE_PARM_DESC(options, "Bits 0-3: transceiver type, bit 4: full duplex, bit 5: 100Mbps");
 MODULE_PARM_DESC(full_duplex, "full duplex setting(s) (1)");
 MODULE_PARM_DESC(congenb, "Enable congestion control (1)");
 MODULE_PARM_DESC(txfifo, "Tx FIFO threshold in 4 byte units, (0-15)");

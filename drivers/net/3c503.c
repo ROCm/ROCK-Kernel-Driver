@@ -693,7 +693,7 @@ MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_EL2_CARDS) "i");
 MODULE_PARM(xcvr, "1-" __MODULE_STRING(MAX_EL2_CARDS) "i");
 MODULE_PARM_DESC(io, "I/O base address(es)");
 MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
-MODULE_PARM_DESC(xcvr, "tranceiver(s) (0=internal, 1=external)");
+MODULE_PARM_DESC(xcvr, "transceiver(s) (0=internal, 1=external)");
 MODULE_DESCRIPTION("3Com ISA EtherLink II, II/16 (3c503, 3c503/16) driver");
 MODULE_LICENSE("GPL");
 
