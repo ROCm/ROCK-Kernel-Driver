@@ -2988,8 +2988,10 @@ static int of_finish_dynamic_node(struct device_node *node)
 	/* now do the work of finish_node_interrupts */
 
 	ints = (unsigned int *) get_property(node, "interrupts", &intlen);
-	if (!ints)
+	if (!ints) {
+		err = -ENODEV;
 		goto out;
+	}
 
 	intrcells = prom_n_intr_cells(node);
 	intlen /= intrcells * sizeof(unsigned int);
