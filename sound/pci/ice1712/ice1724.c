@@ -1801,7 +1801,6 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
         /* enable PCI device */
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
-	pci_set_consistent_dma_mask(pci, 0xffffffff); 
 
 	ice = snd_magic_kcalloc(ice1712_t, 0, GFP_KERNEL);
 	if (ice == NULL)

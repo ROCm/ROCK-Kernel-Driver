@@ -2363,11 +2363,11 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 	/* check, if we can restrict PCI DMA transfers to 28 bits */
-	if (!pci_dma_supported(pci, 0x0fffffff)) {
+	if (pci_set_dma_mask(pci, 0x0fffffff) < 0 ||
+	    pci_set_consistent_dma_mask(pci, 0x0fffffff) < 0) {
 		snd_printk("architecture does not support 28bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_consistent_dma_mask(pci, 0x0fffffff);
 
 	ice = snd_magic_kcalloc(ice1712_t, 0, GFP_KERNEL);
 	if (ice == NULL)

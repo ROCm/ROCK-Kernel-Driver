@@ -94,16 +94,19 @@ static void *snd_pci_hack_alloc_consistent(struct pci_dev *hwdev, size_t size,
 				    dma_addr_t *dma_handle)
 {
 	void *ret;
-	u64 dma_mask;
+	u64 dma_mask, cdma_mask;
 	unsigned long mask;
 
 	if (hwdev == NULL)
 		return pci_alloc_consistent(hwdev, size, dma_handle);
-	dma_mask = hwdev->consistent_dma_mask;
-	mask = (unsigned long)dma_mask;
+	dma_mask = hwdev->dma_mask;
+	cdma_mask = hwdev->consistent_dma_mask;
+	mask = (unsigned long)dma_mask && (unsigned long)cdma_mask;
+	hwdev->dma_mask = 0xffffffff; /* do without masking */
 	hwdev->consistent_dma_mask = 0xffffffff; /* do without masking */
 	ret = pci_alloc_consistent(hwdev, size, dma_handle);
-	hwdev->consistent_dma_mask = dma_mask; /* restore */
+	hwdev->dma_mask = dma_mask; /* restore */
+	hwdev->consistent_dma_mask = cdma_mask; /* restore */
 	if (ret) {
 		/* obtained address is out of range? */
 		if (((unsigned long)*dma_handle + size - 1) & ~mask) {
@@ -841,7 +844,8 @@ static void __init preallocate_cards(void)
 			continue;
 		}
 			
-		if (pci_set_consistent_dma_mask(pci, dev->dma_mask) < 0) {
+		if (pci_set_dma_mask(pci, dev->dma_mask) < 0 ||
+		    pci_set_consistent_dma_mask(pci, dev->dma_mask) < 0) {
 			printk(KERN_ERR "snd-page-alloc: cannot set DMA mask %lx for pci %04x:%04x\n", dev->dma_mask, dev->vendor, dev->device);
 			continue;
 		}
