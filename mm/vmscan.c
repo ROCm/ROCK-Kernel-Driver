@@ -236,6 +236,27 @@ static int may_write_to_queue(struct backing_dev_info *bdi)
 }
 
 /*
+ * We detected a synchronous write error writing a page out.  Probably
+ * -ENOSPC.  We need to propagate that into the address_space for a subsequent
+ * fsync(), msync() or close().
+ *
+ * The tricky part is that after writepage we cannot touch the mapping: nothing
+ * prevents it from being freed up.  But we have a ref on the page and once
+ * that page is locked, the mapping is pinned.
+ *
+ * We're allowed to run sleeping lock_page() here because we know the caller has
+ * __GFP_FS.
+ */
+static void handle_write_error(struct address_space *mapping,
+				struct page *page, int error)
+{
+	lock_page(page);
+	if (page->mapping == mapping)
+		mapping->error = error;
+	unlock_page(page);
+}
+
+/*
  * shrink_list returns the number of reclaimed pages
  */
 static int
@@ -358,7 +379,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 
 				SetPageReclaim(page);
 				res = mapping->a_ops->writepage(page, &wbc);
-
+				if (res < 0)
+					handle_write_error(mapping, page, res);
 				if (res == WRITEPAGE_ACTIVATE) {
 					ClearPageReclaim(page);
 					goto activate_locked;

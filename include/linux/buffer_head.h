@@ -24,8 +24,9 @@ enum bh_state_bits {
 	BH_Async_Read,	/* Is under end_buffer_async_read I/O */
 	BH_Async_Write,	/* Is under end_buffer_async_write I/O */
 	BH_Delay,	/* Buffer is not yet allocated on disk */
-
 	BH_Boundary,	/* Block is followed by a discontiguity */
+	BH_Write_EIO,	/* I/O error on write */
+
 	BH_PrivateStart,/* not a state bit, but the first bit available
 			 * for private allocation by other entities
 			 */
@@ -109,12 +110,14 @@ TAS_BUFFER_FNS(Dirty, dirty)
 BUFFER_FNS(Lock, locked)
 TAS_BUFFER_FNS(Lock, locked)
 BUFFER_FNS(Req, req)
+TAS_BUFFER_FNS(Req, req)
 BUFFER_FNS(Mapped, mapped)
 BUFFER_FNS(New, new)
 BUFFER_FNS(Async_Read, async_read)
 BUFFER_FNS(Async_Write, async_write)
-BUFFER_FNS(Delay, delay);
+BUFFER_FNS(Delay, delay)
 BUFFER_FNS(Boundary, boundary)
+BUFFER_FNS(Write_EIO,write_io_error)
 
 #define bh_offset(bh)		((unsigned long)(bh)->b_data & ~PAGE_MASK)
 #define touch_buffer(bh)	mark_page_accessed(bh->b_page)
@@ -139,7 +142,8 @@ void set_bh_page(struct buffer_head *bh,
 int try_to_free_buffers(struct page *);
 void create_empty_buffers(struct page *, unsigned long,
 			unsigned long b_state);
-void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
+void end_buffer_read_sync(struct buffer_head *bh, int uptodate);
+void end_buffer_write_sync(struct buffer_head *bh, int uptodate);
 void end_buffer_async_write(struct buffer_head *bh, int uptodate);
 
 /* Things to do with buffers at mapping->private_list */

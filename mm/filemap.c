@@ -203,6 +203,14 @@ restart:
 		spin_lock(&mapping->page_lock);
 	}
 	spin_unlock(&mapping->page_lock);
+
+	/* Check for outstanding write errors */
+	if (mapping->error) {
+		if (!ret)
+			ret = mapping->error;
+		mapping->error = 0;
+	}
+
 	return ret;
 }
 
