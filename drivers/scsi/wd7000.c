@@ -1473,8 +1473,7 @@ static int wd7000_detect(struct scsi_host_template *tpnt)
 			 * ASC reset...
 			 */
 			outb(ASC_RES, iobase + ASC_CONTROL);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ / 100);
+			msleep(10);
 			outb(0, iobase + ASC_CONTROL);
 
 			if (WAIT(iobase + ASC_STAT, ASC_STATMASK, CMD_RDY, 0)) {
