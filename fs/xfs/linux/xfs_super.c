@@ -401,7 +401,7 @@ syncd(void *arg)
 
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(xfs_params.sync_interval);
+		schedule_timeout(xfs_syncd_interval);
 		/* swsusp */
 		if (current->flags & PF_FREEZE)
 			refrigerator(PF_IOTHREAD);
