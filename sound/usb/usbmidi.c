@@ -142,8 +142,7 @@ static int snd_usbmidi_urb_error(int status)
 {
 	if (status == -ENOENT)
 		return status; /* killed */
-	if (status == -ENODEV ||
-	    status == -EILSEQ ||
+	if (status == -EILSEQ ||
 	    status == -ETIMEDOUT)
 		return -ENODEV; /* device removed */
 	snd_printk(KERN_ERR "urb status %d\n", status);
