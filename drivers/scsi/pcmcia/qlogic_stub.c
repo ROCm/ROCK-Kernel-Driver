@@ -93,17 +93,6 @@ static Scsi_Host_Template qlogicfas_driver_template = {
 
 /*====================================================================*/
 
-/* Parameters that can be set with 'insmod' */
-
-/* Bit map of interrupts to choose from */
-static unsigned int irq_mask = 0xdeb8;
-static int irq_list[4] = { -1 };
-
-module_param(irq_mask, int, 0);
-module_param_array(irq_list, int, NULL, 0);
-
-/*====================================================================*/
-
 typedef struct scsi_info_t {
 	dev_link_t link;
 	dev_node_t node;
@@ -182,7 +171,7 @@ static dev_link_t *qlogic_attach(void)
 	scsi_info_t *info;
 	client_reg_t client_reg;
 	dev_link_t *link;
-	int i, ret;
+	int ret;
 
 	DEBUG(0, "qlogic_attach()\n");
 
@@ -197,12 +186,7 @@ static dev_link_t *qlogic_attach(void)
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
 	link->io.IOAddrLines = 10;
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-	if (irq_list[0] == -1)
-		link->irq.IRQInfo2 = irq_mask;
-	else
-		for (i = 0; i < 4; i++)
-			link->irq.IRQInfo2 |= 1 << irq_list[i];
+	link->irq.IRQInfo1 = IRQ_LEVEL_ID;
 	link->conf.Attributes = CONF_ENABLE_IRQ;
 	link->conf.Vcc = 50;
 	link->conf.IntType = INT_MEMORY_AND_IO;

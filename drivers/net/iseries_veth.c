@@ -642,7 +642,7 @@ static int veth_init_connection(u8 rlp)
 	return 0;
 }
 
-static void veth_destroy_connection(u8 rlp)
+static void veth_stop_connection(u8 rlp)
 {
 	struct veth_lpar_connection *cnx = veth_cnx[rlp];
 
@@ -671,9 +671,18 @@ static void veth_destroy_connection(u8 rlp)
 				      HvLpEvent_Type_VirtualLan,
 				      cnx->num_ack_events,
 				      NULL, NULL);
+}
 
-	if (cnx->msgs)
-		kfree(cnx->msgs);
+static void veth_destroy_connection(u8 rlp)
+{
+	struct veth_lpar_connection *cnx = veth_cnx[rlp];
+
+	if (! cnx)
+		return;
+
+	kfree(cnx->msgs);
+	kfree(cnx);
+	veth_cnx[rlp] = NULL;
 }
 
 /*
@@ -1375,9 +1384,18 @@ void __exit veth_module_cleanup(void)
 	vio_unregister_driver(&veth_driver);
 
 	for (i = 0; i < HVMAXARCHITECTEDLPS; ++i)
-		veth_destroy_connection(i);
+		veth_stop_connection(i);
 
 	HvLpEvent_unregisterHandler(HvLpEvent_Type_VirtualLan);
+
+	/* Hypervisor callbacks may have scheduled more work while we
+	 * were destroying connections. Now that we've disconnected from
+	 * the hypervisor make sure everything's finished. */
+	flush_scheduled_work();
+
+	for (i = 0; i < HVMAXARCHITECTEDLPS; ++i)
+		veth_destroy_connection(i);
+
 }
 module_exit(veth_module_cleanup);
 

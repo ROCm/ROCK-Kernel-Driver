@@ -49,6 +49,24 @@ error:
 	return(-errno);
 }
 
+/*
+ * UML SIGWINCH handling
+ *
+ * The point of this is to handle SIGWINCH on consoles which have host ttys and
+ * relay them inside UML to whatever might be running on the console and cares
+ * about the window size (since SIGWINCH notifies about terminal size changes).
+ *
+ * So, we have a separate thread for each host tty attached to a UML device
+ * (side-issue - I'm annoyed that one thread can't have multiple controlling
+ * ttys for purposed of handling SIGWINCH, but I imagine there are other reasons
+ * that doesn't make any sense).
+ *
+ * SIGWINCH can't be received synchronously, so you have to set up to receive it
+ * as a signal.  That being the case, if you are going to wait for it, it is
+ * convenient to sit in a pause() and wait for the signal to bounce you out of
+ * it (see below for how we make sure to exit only on SIGWINCH).
+ */
+
 static void winch_handler(int sig)
 {
 }
@@ -75,9 +93,14 @@ static int winch_thread(void *arg)
 		printk("winch_thread : failed to write synchronization "
 		       "byte, err = %d\n", -count);
 
+	/* We are not using SIG_IGN on purpose, so don't fix it as I thought to
+	 * do! If using SIG_IGN, the pause() call below would not stop on
+	 * SIGWINCH. */
+
 	signal(SIGWINCH, winch_handler);
 	sigfillset(&sigs);
 	sigdelset(&sigs, SIGWINCH);
+	/* Block anything else than SIGWINCH. */
 	if(sigprocmask(SIG_SETMASK, &sigs, NULL) < 0){
 		printk("winch_thread : sigprocmask failed, errno = %d\n", 
 		       errno);
@@ -95,12 +118,18 @@ static int winch_thread(void *arg)
 		exit(1);
 	}
 
+	/* These are synchronization calls between various UML threads on the
+	 * host - since they are not different kernel threads, we cannot use
+	 * kernel semaphores. We don't use SysV semaphores because they are
+	 * persistant. */
 	count = os_read_file(pipe_fd, &c, sizeof(c));
 	if(count != sizeof(c))
 		printk("winch_thread : failed to read synchronization byte, "
 		       "err = %d\n", -count);
 
 	while(1){
+		/* This will be interrupted by SIGWINCH only, since other signals
+		 * are blocked.*/
 		pause();
 
 		count = os_write_file(pipe_fd, &c, sizeof(c));

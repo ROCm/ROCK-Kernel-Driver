@@ -1201,8 +1201,8 @@ static int suspend(int vetoable)
 		printk(KERN_CRIT "apm: suspend was vetoed, but suspending anyway.\n");
 	}
 
-	device_suspend(3);
-	device_power_down(3);
+	device_suspend(PMSG_SUSPEND);
+	device_power_down(PMSG_SUSPEND);
 
 	/* serialize with the timer interrupt */
 	write_seqlock_irq(&xtime_lock);
@@ -1255,7 +1255,7 @@ static void standby(void)
 {
 	int	err;
 
-	device_power_down(3);
+	device_power_down(PMSG_SUSPEND);
 	/* serialize with the timer interrupt */
 	write_seqlock_irq(&xtime_lock);
 	/* If needed, notify drivers here */

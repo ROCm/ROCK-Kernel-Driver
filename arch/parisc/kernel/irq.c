@@ -54,21 +54,19 @@ extern irqreturn_t ipi_interrupt(int, void *, struct pt_regs *);
 #define DBG_IRQ(irq, x)	do { } while (0)
 #endif /* DEBUG_IRQ */
 
-#define EIEM_MASK(irq)       (1UL<<(MAX_CPU_IRQ-IRQ_OFFSET(irq)))
+#define EIEM_MASK(irq)       (1UL<<(CPU_IRQ_MAX - irq))
 
 /* Bits in EIEM correlate with cpu_irq_action[].
 ** Numbered *Big Endian*! (ie bit 0 is MSB)
 */
 static volatile unsigned long cpu_eiem = 0;
 
-static spinlock_t irq_lock = SPIN_LOCK_UNLOCKED;  /* protect IRQ regions */
-
 static void cpu_set_eiem(void *info)
 {
 	set_eiem((unsigned long) info);
 }
 
-static inline void disable_cpu_irq(void *unused, int irq)
+static inline void cpu_disable_irq(unsigned int irq)
 {
 	unsigned long eirr_bit = EIEM_MASK(irq);
 
@@ -76,7 +74,7 @@ static inline void disable_cpu_irq(void *unused, int irq)
         on_each_cpu(cpu_set_eiem, (void *) cpu_eiem, 1, 1);
 }
 
-static void enable_cpu_irq(void *unused, int irq)
+static void cpu_enable_irq(unsigned int irq)
 {
 	unsigned long eirr_bit = EIEM_MASK(irq);
 
@@ -85,172 +83,56 @@ static void enable_cpu_irq(void *unused, int irq)
         on_each_cpu(cpu_set_eiem, (void *) cpu_eiem, 1, 1);
 }
 
-/* mask and disable are the same at the CPU level
-** Difference is enable clears pending interrupts
-*/
-#define mask_cpu_irq	disable_cpu_irq
-
-static inline void unmask_cpu_irq(void *unused, int irq)
+static unsigned int cpu_startup_irq(unsigned int irq)
 {
-	unsigned long eirr_bit = EIEM_MASK(irq);
-	cpu_eiem |= eirr_bit;
-	/* NOTE: sending an IPI will cause do_cpu_irq_mask() to
-	** handle *any* unmasked pending interrupts.
-	** ie We don't need to check for pending interrupts here.
-	*/
-        on_each_cpu(cpu_set_eiem, (void *) cpu_eiem, 1, 1);
+	cpu_enable_irq(irq);
+	return 0;
 }
 
-/*
- * XXX cpu_irq_actions[] will become 2 dimensional for per CPU EIR support.
- * correspond changes needed in:
- * 	processor_probe()	initialize additional action arrays
- * 	request_irq()		handle CPU IRQ region specially
- * 	do_cpu_irq_mask()	index into the matching irq_action array.
- */
-struct irqaction cpu_irq_actions[IRQ_PER_REGION] = {
-	[IRQ_OFFSET(TIMER_IRQ)]	= {
-					.handler = timer_interrupt,
-					.name = "timer",
-				},
-#ifdef CONFIG_SMP
-	[IRQ_OFFSET(IPI_IRQ)]	= {
-					.handler = ipi_interrupt,
-					.name = "IPI",
-				},
-#endif
+void no_ack_irq(unsigned int irq) { }
+void no_end_irq(unsigned int irq) { }
+
+static struct hw_interrupt_type cpu_interrupt_type = {
+	.typename	= "CPU",
+	.startup	= cpu_startup_irq,
+	.shutdown	= cpu_disable_irq,
+	.enable		= cpu_enable_irq,
+	.disable	= cpu_disable_irq,
+	.ack		= no_ack_irq,
+	.end		= no_end_irq,
+//	.set_affinity	= cpu_set_affinity_irq,
 };
-
-
-struct irq_region cpu0_irq_region = {
-	.ops	= {
-			.disable_irq	= disable_cpu_irq,
-			.enable_irq	= enable_cpu_irq,
-			.mask_irq	= unmask_cpu_irq,
-			.unmask_irq	= unmask_cpu_irq
-	},
-	.data	= {
-			.dev		= &cpu_data[0],
-			.name		= "PARISC-CPU",
-			.irqbase 	= IRQ_FROM_REGION(CPU_IRQ_REGION),
-	},
-	.action	= cpu_irq_actions,
-};
-
-struct irq_region *irq_region[NR_IRQ_REGS] = {
-	[ 0 ]              = NULL, /* reserved for EISA, else causes data page fault (aka code 15) */
-	[ CPU_IRQ_REGION ] = &cpu0_irq_region,
-};
-
-
-/*
-** Generic interfaces that device drivers can use:
-**    mask_irq()	block IRQ
-**    unmask_irq()	re-enable IRQ and trigger if IRQ is pending
-**    disable_irq()	block IRQ
-**    enable_irq()	clear pending and re-enable IRQ
-*/
-
-void mask_irq(int irq)
-{
-	struct irq_region *region;
-
-	DBG_IRQ(irq, ("mask_irq(%d) %d+%d eiem 0x%lx\n", irq,
-				IRQ_REGION(irq), IRQ_OFFSET(irq), cpu_eiem));
-	irq = irq_canonicalize(irq);
-	region = irq_region[IRQ_REGION(irq)];
-	if (region->ops.mask_irq)
-		region->ops.mask_irq(region->data.dev, IRQ_OFFSET(irq));
-}
-
-void unmask_irq(int irq)
-{
-	struct irq_region *region;
-
-	DBG_IRQ(irq, ("unmask_irq(%d) %d+%d eiem 0x%lx\n", irq,
-				IRQ_REGION(irq), IRQ_OFFSET(irq), cpu_eiem));
-	irq = irq_canonicalize(irq);
-	region = irq_region[IRQ_REGION(irq)];
-	if (region->ops.unmask_irq)
-		region->ops.unmask_irq(region->data.dev, IRQ_OFFSET(irq));
-}
-
-void disable_irq(int irq)
-{
-	struct irq_region *region;
-
-	DBG_IRQ(irq, ("disable_irq(%d) %d+%d eiem 0x%lx\n", irq,
-				IRQ_REGION(irq), IRQ_OFFSET(irq), cpu_eiem));
-	irq = irq_canonicalize(irq);
-	region = irq_region[IRQ_REGION(irq)];
-	if (region->ops.disable_irq)
-		region->ops.disable_irq(region->data.dev, IRQ_OFFSET(irq));
-	else
-		BUG();
-}
-EXPORT_SYMBOL(disable_irq);
-
-void enable_irq(int irq)
-{
-	struct irq_region *region;
-
-	DBG_IRQ(irq, ("enable_irq(%d) %d+%d EIRR 0x%lx EIEM 0x%lx\n", irq,
-				IRQ_REGION(irq), IRQ_OFFSET(irq), mfctl(23), mfctl(15)));
-	irq = irq_canonicalize(irq);
-	region = irq_region[IRQ_REGION(irq)];
-
-	if (region->ops.enable_irq)
-		region->ops.enable_irq(region->data.dev, IRQ_OFFSET(irq));
-	else
-		BUG();
-}
-EXPORT_SYMBOL(enable_irq);
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-#ifdef CONFIG_PROC_FS
-	unsigned int regnr = *(loff_t *) v, i = 0;
+	int i = *(loff_t *) v, j;
+	unsigned long flags;
 
-	if (regnr == 0) {
-		seq_puts(p, "     ");
-#ifdef CONFIG_SMP
-		for (i = 0; i < NR_CPUS; i++)
-			if (cpu_online(i))
-#endif
-				seq_printf(p, "      CPU%02d ", i);
+	if (i == 0) {
+		seq_puts(p, "    ");
+		for_each_online_cpu(j)
+			seq_printf(p, "       CPU%d", j);
 
 #ifdef PARISC_IRQ_CR16_COUNTS
-		seq_printf(p, "[min/avg/max] (CPU cycle counts)");
+		seq_printf(p, " [min/avg/max] (CPU cycle counts)");
 #endif
 		seq_putc(p, '\n');
 	}
 
-	/* We don't need *irqsave lock variants since this is
-	** only allowed to change while in the base context.
-	*/
-	spin_lock(&irq_lock);
-	if (regnr < NR_IRQ_REGS) {
-	    struct irq_region *region = irq_region[regnr];
-
-            if (!region || !region->action)
-		    goto skip;
-
-	    for (i = 0; i <= MAX_CPU_IRQ; i++) {
-		struct irqaction *action = &region->action[i];
-		unsigned int irq_no = IRQ_FROM_REGION(regnr) + i;
-		int j = 0;
-		if (!action->handler)
-			continue;
-
-		seq_printf(p, "%3d: ", irq_no);
+	if (i < NR_IRQS) {
+		spin_lock_irqsave(&irq_desc[i].lock, flags);
+		struct irqaction *action = irq_desc[i].action;
+		if (!action)
+			goto skip;
+		seq_printf(p, "%3d: ", i);
 #ifdef CONFIG_SMP
-		for (; j < NR_CPUS; j++)
-			if (cpu_online(j))
+		for_each_online_cpu(j)
+			seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
+#else
+		seq_printf(p, "%10u ", kstat_irqs(i));
 #endif
-		  seq_printf(p, "%10u ", kstat_cpu(j).irqs[irq_no]);
 
-		seq_printf(p, " %14s",
-			    region->data.name ? region->data.name : "N/A");
+		seq_printf(p, " %14s", irq_desc[i].handler->typename);
 #ifndef PARISC_IRQ_CR16_COUNTS
 		seq_printf(p, "  %s", action->name);
 
@@ -281,12 +163,10 @@ int show_interrupts(struct seq_file *p, void *v)
 #endif
 
 		seq_putc(p, '\n');
-	    }
+ skip:
+		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
 	}
-  skip:
-	spin_unlock(&irq_lock);
 
-#endif	/* CONFIG_PROC_FS */
 	return 0;
 }
 
@@ -300,34 +180,42 @@ int show_interrupts(struct seq_file *p, void *v)
 ** Then use that to get the Transaction address and data.
 */
 
-int
-txn_alloc_irq(void)
+int cpu_claim_irq(unsigned int irq, struct hw_interrupt_type *type, void *data)
+{
+	if (irq_desc[irq].action)
+		return -EBUSY;
+	if (irq_desc[irq].handler != &cpu_interrupt_type)
+		return -EBUSY;
+
+	if (type) {
+		irq_desc[irq].handler = type;
+		irq_desc[irq].handler_data = data;
+		cpu_interrupt_type.enable(irq);
+	}
+	return 0;
+}
+
+int txn_claim_irq(int irq)
+{
+	return cpu_claim_irq(irq, NULL, NULL) ? -1 : irq;
+}
+
+int txn_alloc_irq(void)
 {
 	int irq;
 
 	/* never return irq 0 cause that's the interval timer */
-	for (irq = 1; irq <= MAX_CPU_IRQ; irq++) {
-		if (cpu_irq_actions[irq].handler == NULL) {
-			return (IRQ_FROM_REGION(CPU_IRQ_REGION) + irq);
-		}
+	for (irq = CPU_IRQ_BASE + 1; irq <= CPU_IRQ_MAX; irq++) {
+		if (cpu_claim_irq(irq, NULL, NULL) < 0)
+			continue;
+		return irq;
 	}
 
 	/* unlikely, but be prepared */
 	return -1;
 }
 
-int
-txn_claim_irq(int irq)
-{
-	if (irq_region[IRQ_REGION(irq)]->action[IRQ_OFFSET(irq)].handler ==NULL)
-		return irq;
-
-	/* unlikely, but be prepared */
-	return -1;
-}
-
-unsigned long
-txn_alloc_addr(int virt_irq)
+unsigned long txn_alloc_addr(int virt_irq)
 {
 	static int next_cpu = -1;
 
@@ -364,67 +252,19 @@ txn_alloc_addr(int virt_irq)
 ** I/O subsystem supports more bits than PA2.0 has. The first
 ** case is the problem.
 */
-unsigned int
-txn_alloc_data(int virt_irq, unsigned int bits_wide)
+unsigned int txn_alloc_data(int virt_irq, unsigned int bits_wide)
 {
 	/* XXX FIXME : bits_wide indicates how wide the transaction
 	** data is allowed to be...we may need a different virt_irq
 	** if this one won't work. Another reason to index virtual
 	** irq's into a table which can manage CPU/IRQ bit separately.
 	*/
-	if (IRQ_OFFSET(virt_irq) > (1 << (bits_wide -1)))
-	{
+	if ((virt_irq - CPU_IRQ_BASE) > (1 << (bits_wide - 1))) {
 		panic("Sorry -- didn't allocate valid IRQ for this device\n");
 	}
 
-	return (IRQ_OFFSET(virt_irq));
+	return virt_irq - CPU_IRQ_BASE;
 }
-
-void do_irq(struct irqaction *action, int irq, struct pt_regs * regs)
-{
-	int cpu = smp_processor_id();
-
-	irq_enter();
-	++kstat_cpu(cpu).irqs[irq];
-
-	DBG_IRQ(irq, ("do_irq(%d) %d+%d eiem 0x%lx\n", irq, IRQ_REGION(irq), IRQ_OFFSET(irq), cpu_eiem));
-
-	for (; action; action = action->next) {
-#ifdef PARISC_IRQ_CR16_COUNTS
-		unsigned long cr_start = mfctl(16);
-#endif
-
-		if (action->handler == NULL) {
-			if (IRQ_REGION(irq) == EISA_IRQ_REGION && irq_region[EISA_IRQ_REGION]) {
-				/* were we called due to autodetecting (E)ISA irqs ? */
-				unsigned int *status;
-				status = &irq_region[EISA_IRQ_REGION]->data.status[IRQ_OFFSET(irq)];
-				if (*status & IRQ_AUTODETECT) {
-					*status &= ~IRQ_WAITING;
-					continue; 
-				}
-			}
-			printk(KERN_ERR "IRQ:  CPU:%d No handler for IRQ %d !\n", cpu, irq);
-			continue;
-		}
-
-		action->handler(irq, action->dev_id, regs);
-
-#ifdef PARISC_IRQ_CR16_COUNTS
-		{
-			unsigned long cr_end = mfctl(16);
-			unsigned long tmp = cr_end - cr_start;
-			/* check for roll over */
-			cr_start = (cr_end < cr_start) ?  -(tmp) : (tmp);
-		}
-		action->cr16_hist[action->cr16_idx++] = (int) cr_start;
-		action->cr16_idx &= PARISC_CR16_HIST_SIZE - 1;
-#endif
-	}
-
-	irq_exit();
-}
-
 
 /* ONLY called from entry.S:intr_extint() */
 void do_cpu_irq_mask(struct pt_regs *regs)
@@ -449,9 +289,12 @@ void do_cpu_irq_mask(struct pt_regs *regs)
 	 * 3) Limit the number of times we loop to make sure other
 	 *    processing can occur.
 	 */
-	while ((eirr_val = (mfctl(23) & cpu_eiem)) && --i) {
-		unsigned long bit = (1UL<<MAX_CPU_IRQ);
+	for (;;) {
+		unsigned long bit = (1UL << (BITS_PER_LONG - 1));
 		unsigned int irq;
+		eirr_val = mfctl(23) & cpu_eiem;
+		if (!eirr_val || !i--)
+			break;
 
 		mtctl(eirr_val, 23); /* reset bits we are going to process */
 
@@ -461,408 +304,52 @@ void do_cpu_irq_mask(struct pt_regs *regs)
 #endif
 
 		/* Work our way from MSb to LSb...same order we alloc EIRs */
-		for (irq = 0; eirr_val && bit; bit>>=1, irq++)
-		{
+		for (irq = TIMER_IRQ; eirr_val && bit; bit>>=1, irq++) {
 			if (!(bit & eirr_val & cpu_eiem))
 				continue;
 
 			/* clear bit in mask - can exit loop sooner */
 			eirr_val &= ~bit;
 
-			do_irq(&cpu_irq_actions[irq], TIMER_IRQ+irq, regs);
+			__do_IRQ(irq, regs);
 		}
 	}
 	set_eiem(cpu_eiem);
 }
 
 
-/* Called from second level IRQ regions: eg dino or iosapic. */
-void do_irq_mask(unsigned long mask, struct irq_region *region, struct pt_regs *regs)
-{
-	unsigned long bit;
-	unsigned int irq;
-
-#ifdef DEBUG_IRQ
-	if (mask != (1L<<MAX_CPU_IRQ))
-	    printk(KERN_DEBUG "do_irq_mask %08lx %p %p\n", mask, region, regs);
-#endif
-
-	for (bit = (1L<<MAX_CPU_IRQ), irq = 0; mask && bit; bit>>=1, irq++) {
-		unsigned int irq_num;
-		if (!(bit&mask))
-			continue;
-
-		mask &= ~bit;	/* clear bit in mask - can exit loop sooner */
-		irq_num = region->data.irqbase + irq;
-
-		mask_irq(irq_num);
-		do_irq(&region->action[irq], irq_num, regs);
-		unmask_irq(irq_num);
-	}
-}
-
-
-static inline int find_free_region(void)
-{
-	int irqreg;
-
-	for (irqreg=1; irqreg <= (NR_IRQ_REGS); irqreg++) {
-		if (irq_region[irqreg] == NULL)
-			return irqreg;
-	}
-
-	return 0;
-}
-
-
-/*****
- * alloc_irq_region - allocate/init a new IRQ region
- * @count: number of IRQs in this region.
- * @ops: function table with request/release/mask/unmask/etc.. entries.
- * @name: name of region owner for /proc/interrupts output.
- * @dev: private data to associate with the new IRQ region.
- *
- * Every IRQ must become a MMIO write to the CPU's EIRR in
- * order to get CPU service. The IRQ region represents the
- * number of unique events the region handler can (or must)
- * identify. For PARISC CPU, that's the width of the EIR Register.
- * IRQ regions virtualize IRQs (eg EISA or PCI host bus controllers)
- * for line based devices.
- */
-struct irq_region *alloc_irq_region( int count, struct irq_region_ops *ops,
-					const char *name, void *dev)
-{
-	struct irq_region *region;
-	int index;
-
-	index = find_free_region();
-	if (index == 0) {
-		printk(KERN_ERR "Maximum number of irq regions exceeded. Increase NR_IRQ_REGS!\n");
-		return NULL;
-	}
-
-	if ((IRQ_REGION(count-1)))
-		return NULL;
-
-	if (count < IRQ_PER_REGION) {
-	    DBG_IRQ(0, ("alloc_irq_region() using minimum of %d irq lines for %s (%d)\n",
-			IRQ_PER_REGION, name, count));
-	    count = IRQ_PER_REGION;
-	}
-
-	/* if either mask *or* unmask is set, both have to be set. */
-	if((ops->mask_irq || ops->unmask_irq) &&
-		!(ops->mask_irq && ops->unmask_irq))
-			return NULL;
-
-	/* ditto for enable/disable */
-	if( (ops->disable_irq || ops->enable_irq) &&
-		!(ops->disable_irq && ops->enable_irq) )
-			return NULL;
-
-	region = kmalloc(sizeof(*region), GFP_ATOMIC);
-	if (!region)
-		return NULL;
-	memset(region, 0, sizeof(*region));
-
-	region->action = kmalloc(count * sizeof(*region->action), GFP_ATOMIC);
-	if (!region->action) {
-		kfree(region);
-		return NULL;
-	}
-	memset(region->action, 0, count * sizeof(*region->action));
-
-	region->ops = *ops;
-	region->data.irqbase = IRQ_FROM_REGION(index);
-	region->data.name = name;
-	region->data.dev = dev;
-
-	irq_region[index] = region;
-
-	return irq_region[index];
-}
-
-/* FIXME: SMP, flags, bottom halves, rest */
-
-int request_irq(unsigned int irq,
-		irqreturn_t (*handler)(int, void *, struct pt_regs *),
-		unsigned long irqflags,
-		const char * devname,
-		void *dev_id)
-{
-	struct irqaction * action;
-
-#if 0
-	printk(KERN_INFO "request_irq(%d, %p, 0x%lx, %s, %p)\n",irq, handler, irqflags, devname, dev_id);
-#endif
-
-	irq = irq_canonicalize(irq);
-	/* request_irq()/free_irq() may not be called from interrupt context. */
-	if (in_interrupt())
-		BUG();
-
-	if (!handler) {
-		printk(KERN_ERR "request_irq(%d,...): Augh! No handler for irq!\n",
-			irq);
-		return -EINVAL;
-	}
-
-	if (irq_region[IRQ_REGION(irq)] == NULL) {
-		/*
-		** Bug catcher for drivers which use "char" or u8 for
-		** the IRQ number. They lose the region number which
-		** is in pcidev->irq (an int).
-		*/
-		printk(KERN_ERR "%p (%s?) called request_irq with an invalid irq %d\n",
-			__builtin_return_address(0), devname, irq);
-		return -EINVAL;
-	}
-
-	spin_lock(&irq_lock);
-	action = &(irq_region[IRQ_REGION(irq)]->action[IRQ_OFFSET(irq)]);
-
-	/* First one is preallocated. */
-	if (action->handler) {
-		/* But it's in use...find the tail and allocate a new one */
-		while (action->next)
-			action = action->next;
-
-		action->next = kmalloc(sizeof(*action), GFP_ATOMIC);
-		memset(action->next, 0, sizeof(*action));
-
-		action = action->next;
-	}
-
-	if (!action) {
-		spin_unlock(&irq_lock);
-		printk(KERN_ERR "request_irq(): Augh! No action!\n") ;
-		return -ENOMEM;
-	}
-
-	action->handler = handler;
-	action->flags = irqflags;
-	cpus_clear(action->mask);
-	action->name = devname;
-	action->next = NULL;
-	action->dev_id = dev_id;
-	spin_unlock(&irq_lock);
-
-	enable_irq(irq);
-	return 0;
-}
-
-EXPORT_SYMBOL(request_irq);
-
-void free_irq(unsigned int irq, void *dev_id)
-{
-	struct irqaction *action, **p;
-
-	/* See comments in request_irq() about interrupt context */
-	irq = irq_canonicalize(irq);
-	
-	if (in_interrupt()) BUG();
-
-	spin_lock(&irq_lock);
-	action = &irq_region[IRQ_REGION(irq)]->action[IRQ_OFFSET(irq)];
-
-	if (action->dev_id == dev_id) {
-		if (action->next == NULL) {
-			action->handler = NULL;
-		} else {
-			memcpy(action, action->next, sizeof(*action));
-		}
-
-		spin_unlock(&irq_lock);
-		return;
-	}
-
-	p = &action->next;
-	action = action->next;
-
-	for (; (action = *p) != NULL; p = &action->next) {
-		if (action->dev_id != dev_id)
-			continue;
-
-		/* Found it - now free it */
-		*p = action->next;
-		kfree(action);
-
-		spin_unlock(&irq_lock);
-		return;
-	}
-
-	spin_unlock(&irq_lock);
-	printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
-}
-
-EXPORT_SYMBOL(free_irq);
-
+static struct irqaction timer_action = {
+	.handler = timer_interrupt,
+	.name = "timer",
+};
 
 #ifdef CONFIG_SMP
-void synchronize_irq(unsigned int irqnum)
-{
-	while (in_irq()) ;
-}
-EXPORT_SYMBOL(synchronize_irq);
+static struct irqaction ipi_action = {
+	.handler = ipi_interrupt,
+	.name = "IPI",
+};
 #endif
 
-
-/*
- * IRQ autodetection code..
- *
- * This depends on the fact that any interrupt that
- * comes in on to an unassigned handler will get stuck
- * with "IRQ_WAITING" cleared and the interrupt
- * disabled.
- */
-
-static DECLARE_MUTEX(probe_sem);
-
-/**
- *	probe_irq_on	- begin an interrupt autodetect
- *
- *	Commence probing for an interrupt. The interrupts are scanned
- *	and a mask of potential interrupt lines is returned.
- *
- */
-
-/* TODO: spin_lock_irq(desc->lock -> irq_lock) */
-
-unsigned long probe_irq_on(void)
+static void claim_cpu_irqs(void)
 {
-	unsigned int i;
-	unsigned long val;
-	unsigned long delay;
-	struct irq_region *region;
-
-	/* support for irq autoprobing is limited to EISA (irq region 0) */
-	region = irq_region[EISA_IRQ_REGION];
-	if (!EISA_bus || !region)
-		return 0;
-
-	down(&probe_sem);
-
-	/*
-	 * enable any unassigned irqs
-	 * (we must startup again here because if a longstanding irq
-	 * happened in the previous stage, it may have masked itself)
-	 */
-	for (i = EISA_MAX_IRQS-1; i > 0; i--) {
-		struct irqaction *action;
-		
-		spin_lock_irq(&irq_lock);
-		action = region->action + i;
-		if (!action->handler) {
-			region->data.status[i] |= IRQ_AUTODETECT | IRQ_WAITING;
-			region->ops.enable_irq(region->data.dev,i);
-		}
-		spin_unlock_irq(&irq_lock);
+	int i;
+	for (i = CPU_IRQ_BASE; i <= CPU_IRQ_MAX; i++) {
+		irq_desc[i].handler = &cpu_interrupt_type;
 	}
 
-	/*
-	 * Wait for spurious interrupts to trigger
-	 */
-	for (delay = jiffies + HZ/10; time_after(delay, jiffies); )
-		/* about 100ms delay */ barrier();
-
-	/*
-	 * Now filter out any obviously spurious interrupts
-	 */
-	val = 0;
-	for (i = 0; i < EISA_MAX_IRQS; i++) {
-		unsigned int status;
-
-		spin_lock_irq(&irq_lock);
-		status = region->data.status[i];
-
-		if (status & IRQ_AUTODETECT) {
-			/* It triggered already - consider it spurious. */
-			if (!(status & IRQ_WAITING)) {
-				region->data.status[i] = status & ~IRQ_AUTODETECT;
-				region->ops.disable_irq(region->data.dev,i);
-			} else
-				if (i < BITS_PER_LONG)
-					val |= (1 << i);
-		}
-		spin_unlock_irq(&irq_lock);
-	}
-
-	return val;
+	irq_desc[TIMER_IRQ].action = &timer_action;
+	irq_desc[TIMER_IRQ].status |= IRQ_PER_CPU;
+#ifdef CONFIG_SMP
+	irq_desc[IPI_IRQ].action = &ipi_action;
+	irq_desc[IPI_IRQ].status = IRQ_PER_CPU;
+#endif
 }
-
-EXPORT_SYMBOL(probe_irq_on);
-
-/*
- * Return the one interrupt that triggered (this can
- * handle any interrupt source).
- */
-
-/**
- *	probe_irq_off	- end an interrupt autodetect
- *	@val: mask of potential interrupts (unused)
- *
- *	Scans the unused interrupt lines and returns the line which
- *	appears to have triggered the interrupt. If no interrupt was
- *	found then zero is returned. If more than one interrupt is
- *	found then minus the first candidate is returned to indicate
- *	their is doubt.
- *
- *	The interrupt probe logic state is returned to its previous
- *	value.
- *
- *	BUGS: When used in a module (which arguably shouldnt happen)
- *	nothing prevents two IRQ probe callers from overlapping. The
- *	results of this are non-optimal.
- */
- 
-int probe_irq_off(unsigned long val)
-{
-        struct irq_region *region;
-	int i, irq_found, nr_irqs;
-
-        /* support for irq autoprobing is limited to EISA (irq region 0) */
-        region = irq_region[EISA_IRQ_REGION];
-        if (!EISA_bus || !region)
-		return 0;
-
-	nr_irqs = 0;
-	irq_found = 0;
-	for (i = 0; i < EISA_MAX_IRQS; i++) {
-		unsigned int status;
-		
-		spin_lock_irq(&irq_lock);
-		status = region->data.status[i];
-
-                if (status & IRQ_AUTODETECT) {
-			if (!(status & IRQ_WAITING)) {
-				if (!nr_irqs)
-					irq_found = i;
-				nr_irqs++;
-			}
-			region->ops.disable_irq(region->data.dev,i);
-			region->data.status[i] = status & ~IRQ_AUTODETECT;
-		}
-		spin_unlock_irq(&irq_lock);
-	}
-	up(&probe_sem);
-
-	if (nr_irqs > 1)
-		irq_found = -irq_found;
-	return irq_found;
-}
-
-EXPORT_SYMBOL(probe_irq_off);
-
-unsigned int probe_irq_mask(unsigned long irqs)
-{
-	return 0;
-}
-EXPORT_SYMBOL(probe_irq_mask);
 
 void __init init_IRQ(void)
 {
 	local_irq_disable();	/* PARANOID - should already be disabled */
 	mtctl(~0UL, 23);	/* EIRR : clear all pending external intr */
+	claim_cpu_irqs();
 #ifdef CONFIG_SMP
 	if (!cpu_eiem)
 		cpu_eiem = EIEM_MASK(IPI_IRQ) | EIEM_MASK(TIMER_IRQ);
@@ -873,9 +360,14 @@ void __init init_IRQ(void)
 
 }
 
-#ifdef CONFIG_PROC_FS
-/* called from kernel/sysctl.c:sysctl_init() */
-void __init init_irq_proc(void)
+void hw_resend_irq(struct hw_interrupt_type *type, unsigned int irq)
 {
+	/* XXX: Needs to be written.  We managed without it so far, but
+	 * we really ought to write it.
+	 */
 }
-#endif
+
+void ack_bad_irq(unsigned int irq)
+{
+	printk("unexpected IRQ %d\n", irq);
+}

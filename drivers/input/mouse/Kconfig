@@ -27,9 +27,9 @@ config MOUSE_PS2
 
 	  Synaptics TouchPad users might be interested in a specialized
 	  XFree86 driver at:
-		http://w1.894.telia.com/~u89404340/touchpad/index.html
-	  and a new verion of GPM at:
-		http://www.geocities.com/dt_or/gpm/gpm.html
+		<http://w1.894.telia.com/~u89404340/touchpad/index.html>
+	  and a new version of GPM at:
+		<http://www.geocities.com/dt_or/gpm/gpm.html>
 	  to take advantage of the advanced features of the touchpad.
 
 	  If unsure, say Y.

@@ -25,7 +25,6 @@
 #include <linux/pm.h>
 #include <linux/pci.h>
 #include <linux/device.h>
-#include <linux/suspend.h>
 #include <asm/system.h>
 #include <asm/irq.h>
 
@@ -122,6 +121,33 @@ static ssize_t pccard_store_eject(struct class_device *dev, const char *buf, siz
 static CLASS_DEVICE_ATTR(card_eject, 0200, NULL, pccard_store_eject);
 
 
+static ssize_t pccard_show_irq_mask(struct class_device *dev, char *buf)
+{
+	struct pcmcia_socket *s = to_socket(dev);
+	return sprintf(buf, "0x%04x\n", s->irq_mask);
+}
+
+static ssize_t pccard_store_irq_mask(struct class_device *dev, const char *buf, size_t count)
+{
+	ssize_t ret;
+	struct pcmcia_socket *s = to_socket(dev);
+	u32 mask;
+
+	if (!count)
+		return -EINVAL;
+
+	ret = sscanf (buf, "0x%x\n", &mask);
+
+	if (ret == 1) {
+		s->irq_mask &= mask;
+		ret = 0;
+	}
+
+	return ret ? ret : count;
+}
+static CLASS_DEVICE_ATTR(card_irq_mask, 0600, pccard_show_irq_mask, pccard_store_irq_mask);
+
+
 static struct class_device_attribute *pccard_socket_attributes[] = {
 	&class_device_attr_card_type,
 	&class_device_attr_card_voltage,
@@ -129,6 +155,7 @@ static struct class_device_attribute *pccard_socket_attributes[] = {
 	&class_device_attr_card_vcc,
 	&class_device_attr_card_insert,
 	&class_device_attr_card_eject,
+	&class_device_attr_card_irq_mask,
 	NULL,
 };
 

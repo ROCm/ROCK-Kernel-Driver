@@ -97,12 +97,6 @@ module_param(pc_debug, int, 0);
 #define WL3501_RESUME	0
 #define WL3501_SUSPEND	1
 
-/* Parameters that can be set with 'insmod' */
-/* Bit map of interrupts to choose from */
-/* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static unsigned int wl3501_irq_mask = 0xdeb8;
-static int wl3501_irq_list[4] = { -1 };
-
 /*
  * The event() function is this driver's Card Services event handler.  It will
  * be called by Card Services when an appropriate card status event is
@@ -1967,7 +1961,7 @@ static dev_link_t *wl3501_attach(void)
 	client_reg_t client_reg;
 	dev_link_t *link;
 	struct net_device *dev;
-	int ret, i;
+	int ret;
 
 	/* Initialize the dev_link_t structure */
 	link = kmalloc(sizeof(*link), GFP_KERNEL);
@@ -1982,11 +1976,7 @@ static dev_link_t *wl3501_attach(void)
 
 	/* Interrupt setup */
 	link->irq.Attributes	= IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-	link->irq.IRQInfo1	= IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-	link->irq.IRQInfo2	= wl3501_irq_mask;
-	if (wl3501_irq_list[0] != -1)
-		for (i = 0; i < 4; i++)
-			link->irq.IRQInfo2 |= 1 << wl3501_irq_list[i];
+	link->irq.IRQInfo1	= IRQ_LEVEL_ID;
 	link->irq.Handler = wl3501_interrupt;
 
 	/* General socket configuration */
@@ -2273,8 +2263,6 @@ static void __exit wl3501_exit_module(void)
 module_init(wl3501_init_module);
 module_exit(wl3501_exit_module);
 
-module_param(wl3501_irq_mask, uint, 0);
-module_param_array(wl3501_irq_list, int, NULL, 0);
 MODULE_AUTHOR("Fox Chen <mhchen@golf.ccl.itri.org.tw>, "
 	      "Arnaldo Carvalho de Melo <acme@conectiva.com.br>,"
 	      "Gustavo Niemeyer <niemeyer@conectiva.com>");

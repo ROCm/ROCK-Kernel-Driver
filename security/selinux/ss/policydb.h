@@ -246,6 +246,8 @@ struct policydb {
 	struct ebitmap trustedwriters;
 	struct ebitmap trustedobjects;
 #endif
+
+	unsigned int policyvers;
 };
 
 extern int policydb_init(struct policydb *p);

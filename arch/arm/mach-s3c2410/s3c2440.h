@@ -14,6 +14,7 @@
  *	04-Nov-2004 BJD  Added s3c2440_init_uarts()
  *	04-Jan-2005 BJD  Moved uart init to cpu code
  *	10-Jan-2005 BJD  Moved 2440 specific init here
+ *	14-Jan-2005 BJD  Split the clock initialisation code
 */
 
 #ifdef CONFIG_CPU_S3C2440
@@ -24,7 +25,10 @@ extern void s3c2440_map_io(struct map_desc *mach_desc, int size);
 
 extern void s3c2440_init_uarts(struct s3c2410_uartcfg *cfg, int no);
 
+extern void s3c2440_init_clocks(int xtal);
+
 #else
+#define s3c2440_init_clocks NULL
 #define s3c2440_init_uarts NULL
 #define s3c2440_map_io NULL
 #define s3c2440_init NULL

@@ -208,8 +208,8 @@ static __inline__ struct rt6_info *rt6_device_match(struct rt6_info *rt,
 /*
  *	pointer to the last default router chosen. BH is disabled locally.
  */
-struct rt6_info *rt6_dflt_pointer;
-DEFINE_SPINLOCK(rt6_dflt_lock);
+static struct rt6_info *rt6_dflt_pointer;
+static DEFINE_SPINLOCK(rt6_dflt_lock);
 
 void rt6_reset_dflt_pointer(struct rt6_info *rt)
 {

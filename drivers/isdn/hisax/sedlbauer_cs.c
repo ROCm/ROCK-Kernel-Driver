@@ -82,15 +82,6 @@ static char *version =
 
 /* Parameters that can be set with 'insmod' */
 
-/* The old way: bit map of interrupts to choose from */
-/* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static u_int irq_mask = 0xdeb8;
-/* Newer, simpler way of listing specific interrupts */
-static int irq_list[4] = { -1 };
-
-module_param(irq_mask, int, 0);
-module_param_array(irq_list, int, NULL, 0);
-
 static int protocol = 2;        /* EURO-ISDN Default */
 module_param(protocol, int, 0);
 
@@ -195,7 +186,7 @@ static dev_link_t *sedlbauer_attach(void)
     local_info_t *local;
     dev_link_t *link;
     client_reg_t client_reg;
-    int ret, i;
+    int ret;
     
     DEBUG(0, "sedlbauer_attach()\n");
 
@@ -208,14 +199,9 @@ static dev_link_t *sedlbauer_attach(void)
     
     /* Interrupt setup */
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->irq.Handler = NULL;
-    
+
     /*
       General socket configuration defaults can go here.  In this
       client, we assume very little, and rely on the CIS for almost

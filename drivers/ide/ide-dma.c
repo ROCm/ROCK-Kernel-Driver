@@ -158,7 +158,6 @@ static int in_drive_list(struct hd_driveid *id, const struct drive_list_entry *d
 	return 0;
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 /**
  *	ide_dma_intr	-	IDE DMA interrupt handler
  *	@drive: the drive the interrupt is for
@@ -188,6 +187,7 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 
 EXPORT_SYMBOL_GPL(ide_dma_intr);
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 /**
  *	ide_build_sglist	-	map IDE scatter gather for DMA I/O
  *	@drive: the drive to build the DMA table for

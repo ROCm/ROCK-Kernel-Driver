@@ -140,7 +140,8 @@ unsigned short ip_compute_csum(const unsigned char * buff, int len)
  */
 
 unsigned int
-csum_partial_copy_from_user(const char *src, char *dst, int len, int sum, int *csum_err)
+csum_partial_copy_from_user(const unsigned char *src, unsigned char *dst,
+			    int len, int sum, int *csum_err)
 {
 	if (csum_err) *csum_err = 0;
 	memcpy(dst, src, len);
@@ -152,7 +153,7 @@ csum_partial_copy_from_user(const char *src, char *dst, int len, int sum, int *c
  */
 
 unsigned int
-csum_partial_copy(const char *src, char *dst, int len, int sum)
+csum_partial_copy(const unsigned char *src, unsigned char *dst, int len, int sum)
 {
 	memcpy(dst, src, len);
 	return csum_partial(dst, len, sum);

@@ -4,7 +4,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.37 $
+ * $Revision: 1.39 $
  */
 
 #include <linux/config.h>
@@ -134,8 +134,9 @@ dasd_fba_check_characteristics(struct dasd_device *device)
 	if (private == NULL) {
 		private = kmalloc(sizeof(struct dasd_fba_private), GFP_KERNEL);
 		if (private == NULL) {
-			MESSAGE(KERN_WARNING, "%s",
-				"memory allocation failed for private data");
+			DEV_MESSAGE(KERN_WARNING, device, "%s",
+				    "memory allocation failed for private "
+				    "data");
 			return -ENOMEM;
 		}
 		device->private = (void *) private;
@@ -144,8 +145,9 @@ dasd_fba_check_characteristics(struct dasd_device *device)
 	rdc_data = (void *) &(private->rdc_data);
 	rc = read_dev_chars(device->cdev, &rdc_data, 32);
 	if (rc) {
-		MESSAGE(KERN_WARNING,
-			"Read device characteristics returned error %d", rc);
+		DEV_MESSAGE(KERN_WARNING, device,
+			    "Read device characteristics returned error %d",
+			    rc);
 		return rc;
 	}
 
@@ -227,8 +229,8 @@ dasd_fba_erp_postaction(struct dasd_ccw_req * cqr)
 	if (cqr->function == dasd_default_erp_action)
 		return dasd_default_erp_postaction;
 
-	MESSAGE(KERN_WARNING, "unknown ERP action %p", cqr->function);
-
+	DEV_MESSAGE(KERN_WARNING, cqr->device, "unknown ERP action %p",
+		    cqr->function);
 	return NULL;
 }
 
@@ -270,7 +272,8 @@ dasd_fba_build_cp(struct dasd_device * device, struct request *req)
 				return ERR_PTR(-EINVAL);
 			count += bv->bv_len >> (device->s2b_shift + 9);
 #if defined(CONFIG_ARCH_S390X)
-			if (idal_is_needed (page_address(bv->bv_page), bv->bv_len))
+			if (idal_is_needed (page_address(bv->bv_page),
+					    bv->bv_len))
 				cidaw += bv->bv_len / blksize;
 #endif
 		}
@@ -423,18 +426,107 @@ dasd_fba_dump_sense(struct dasd_device *device, struct dasd_ccw_req * req,
 		    struct irb *irb)
 {
 	char *page;
+	struct ccw1 *act, *end, *last;
+	int len, sl, sct, count;
 
-	page = (char *) get_zeroed_page(GFP_KERNEL);
+	page = (char *) get_zeroed_page(GFP_ATOMIC);
 	if (page == NULL) {
-		MESSAGE(KERN_ERR, "%s", "No memory to dump sense data");
+		DEV_MESSAGE(KERN_ERR, device, " %s",
+			    "No memory to dump sense data");
 		return;
 	}
-	sprintf(page, KERN_WARNING PRINTK_HEADER
-		"device %s: I/O status report:\n",
-		device->cdev->dev.bus_id);
+	len = sprintf(page, KERN_ERR PRINTK_HEADER
+		      " I/O status report for device %s:\n",
+		      device->cdev->dev.bus_id);
+	len += sprintf(page + len, KERN_ERR PRINTK_HEADER
+		       " in req: %p CS: 0x%02X DS: 0x%02X\n", req,
+		       irb->scsw.cstat, irb->scsw.dstat);
+	len += sprintf(page + len, KERN_ERR PRINTK_HEADER
+		       " device %s: Failing CCW: %p\n",
+		       device->cdev->dev.bus_id,
+		       (void *) (addr_t) irb->scsw.cpa);
+	if (irb->esw.esw0.erw.cons) {
+		for (sl = 0; sl < 4; sl++) {
+			len += sprintf(page + len, KERN_ERR PRINTK_HEADER
+				       " Sense(hex) %2d-%2d:",
+				       (8 * sl), ((8 * sl) + 7));
 
-	MESSAGE(KERN_ERR, "Sense data:\n%s", page);
+			for (sct = 0; sct < 8; sct++) {
+				len += sprintf(page + len, " %02x",
+					       irb->ecw[8 * sl + sct]);
+			}
+			len += sprintf(page + len, "\n");
+		}
+	} else {
+	        len += sprintf(page + len, KERN_ERR PRINTK_HEADER
+			       " SORRY - NO VALID SENSE AVAILABLE\n");
+	}
+	MESSAGE_LOG(KERN_ERR, "%s",
+		    page + sizeof(KERN_ERR PRINTK_HEADER));
 
+	/* dump the Channel Program */
+	/* print first CCWs (maximum 8) */
+	act = req->cpaddr;
+        for (last = act; last->flags & (CCW_FLAG_CC | CCW_FLAG_DC); last++);
+	end = min(act + 8, last);
+	len = sprintf(page, KERN_ERR PRINTK_HEADER
+		      " Related CP in req: %p\n", req);
+	while (act <= end) {
+		len += sprintf(page + len, KERN_ERR PRINTK_HEADER
+			       " CCW %p: %08X %08X DAT:",
+			       act, ((int *) act)[0], ((int *) act)[1]);
+		for (count = 0; count < 32 && count < act->count;
+		     count += sizeof(int))
+			len += sprintf(page + len, " %08X",
+				       ((int *) (addr_t) act->cda)
+				       [(count>>2)]);
+		len += sprintf(page + len, "\n");
+		act++;
+	}
+	MESSAGE_LOG(KERN_ERR, "%s",
+		    page + sizeof(KERN_ERR PRINTK_HEADER));
+
+
+	/* print failing CCW area */
+	len = 0;
+	if (act <  ((struct ccw1 *)(addr_t) irb->scsw.cpa) - 2) {
+		act = ((struct ccw1 *)(addr_t) irb->scsw.cpa) - 2;
+		len += sprintf(page + len, KERN_ERR PRINTK_HEADER "......\n");
+	}
+	end = min((struct ccw1 *)(addr_t) irb->scsw.cpa + 2, last);
+	while (act <= end) {
+		len += sprintf(page + len, KERN_ERR PRINTK_HEADER
+			       " CCW %p: %08X %08X DAT:",
+			       act, ((int *) act)[0], ((int *) act)[1]);
+		for (count = 0; count < 32 && count < act->count;
+		     count += sizeof(int))
+			len += sprintf(page + len, " %08X",
+				       ((int *) (addr_t) act->cda)
+				       [(count>>2)]);
+		len += sprintf(page + len, "\n");
+		act++;
+	}
+
+	/* print last CCWs */
+	if (act <  last - 2) {
+		act = last - 2;
+		len += sprintf(page + len, KERN_ERR PRINTK_HEADER "......\n");
+	}
+	while (act <= last) {
+		len += sprintf(page + len, KERN_ERR PRINTK_HEADER
+			       " CCW %p: %08X %08X DAT:",
+			       act, ((int *) act)[0], ((int *) act)[1]);
+		for (count = 0; count < 32 && count < act->count;
+		     count += sizeof(int))
+			len += sprintf(page + len, " %08X",
+				       ((int *) (addr_t) act->cda)
+				       [(count>>2)]);
+		len += sprintf(page + len, "\n");
+		act++;
+	}
+	if (len > 0)
+		MESSAGE_LOG(KERN_ERR, "%s",
+			    page + sizeof(KERN_ERR PRINTK_HEADER));
 	free_page((unsigned long) page);
 }
 

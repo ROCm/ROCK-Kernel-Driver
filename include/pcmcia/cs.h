@@ -191,7 +191,7 @@ typedef struct io_req_t {
 typedef struct irq_req_t {
     u_int	Attributes;
     u_int	AssignedIRQ;
-    u_int	IRQInfo1, IRQInfo2;
+    u_int	IRQInfo1, IRQInfo2; /* IRQInfo2 is ignored */
     void	*Handler;
     void	*Instance;
 } irq_req_t;

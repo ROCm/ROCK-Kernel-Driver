@@ -327,12 +327,25 @@ static void iommu_bus_setup_pSeries(struct pci_bus *bus)
 		/* Root bus */
 		if (is_python(dn)) {
 			struct iommu_table *tbl;
+			unsigned int *iohole;
 
 			DBG("Python root bus %s\n", bus->name);
 
-			/* 1GB window by default */
-			dn->phb->dma_window_size = 1 << 30;
-			dn->phb->dma_window_base_cur = 0;
+			iohole = (unsigned int *)get_property(dn, "io-hole", 0);
+
+			if (iohole) {
+				/* On first bus we need to leave room for the
+				 * ISA address space. Just skip the first 256MB
+				 * alltogether. This leaves 768MB for the window.
+				 */
+				DBG("PHB has io-hole, reserving 256MB\n");
+				dn->phb->dma_window_size = 3 << 28;
+				dn->phb->dma_window_base_cur = 1 << 28;
+			} else {
+				/* 1GB window by default */
+				dn->phb->dma_window_size = 1 << 30;
+				dn->phb->dma_window_base_cur = 0;
+			}
 
 			tbl = kmalloc(sizeof(struct iommu_table), GFP_KERNEL);
 

@@ -213,16 +213,19 @@ static inline void __nodes_shift_left(nodemask_t *dstp,
 	bitmap_shift_left(dstp->bits, srcp->bits, n, nbits);
 }
 
-#define first_node(src) __first_node(&(src), MAX_NUMNODES)
-static inline int __first_node(const nodemask_t *srcp, int nbits)
+/* FIXME: better would be to fix all architectures to never return
+          > MAX_NUMNODES, then the silly min_ts could be dropped. */
+
+#define first_node(src) __first_node(&(src))
+static inline int __first_node(const nodemask_t *srcp)
 {
-	return min_t(int, nbits, find_first_bit(srcp->bits, nbits));
+	return min_t(int, MAX_NUMNODES, find_first_bit(srcp->bits, MAX_NUMNODES));
 }
 
-#define next_node(n, src) __next_node((n), &(src), MAX_NUMNODES)
-static inline int __next_node(int n, const nodemask_t *srcp, int nbits)
+#define next_node(n, src) __next_node((n), &(src))
+static inline int __next_node(int n, const nodemask_t *srcp)
 {
-	return min_t(int, nbits, find_next_bit(srcp->bits, nbits, n+1));
+	return min_t(int,MAX_NUMNODES,find_next_bit(srcp->bits, MAX_NUMNODES, n+1));
 }
 
 #define nodemask_of_node(node)						\

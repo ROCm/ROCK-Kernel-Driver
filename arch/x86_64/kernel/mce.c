@@ -340,12 +340,12 @@ static void __init mce_cpu_features(struct cpuinfo_x86 *c)
  */
 void __init mcheck_init(struct cpuinfo_x86 *c)
 {
-	static unsigned long mce_cpus __initdata = 0;
+	static cpumask_t mce_cpus __initdata = CPU_MASK_NONE;
 
 	mce_cpu_quirks(c); 
 
 	if (mce_dont_init ||
-	    test_and_set_bit(smp_processor_id(), &mce_cpus) ||
+	    cpu_test_and_set(smp_processor_id(), mce_cpus) ||
 	    !mce_available(c))
 		return;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004, Voltaire, Inc. All rights reserved.
+ * Copyright (c) 2004, 2005, Voltaire, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -127,6 +127,7 @@ struct ib_mad_send_wr_private {
 struct ib_mad_local_private {
 	struct list_head completion_list;
 	struct ib_mad_private *mad_priv;
+	struct ib_mad_agent_private *recv_mad_agent;
 	struct ib_send_wr send_wr;
 	struct ib_sge sg_list[IB_MAD_SEND_REQ_MAX_SG];
 	u64 wr_id;			/* client WR ID */

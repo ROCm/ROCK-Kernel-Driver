@@ -621,7 +621,7 @@ config NET_PKTGEN
 	  stress testing and performance analysis.  If you don't understand
 	  what was just said, you don't need it: say N.
 
-	  Documentation on how to use the packet generaor can be found
+	  Documentation on how to use the packet generator can be found
 	  at <file:Documentation/networking/pktgen.txt>.
 
 	  To compile this code as a module, choose M here: the

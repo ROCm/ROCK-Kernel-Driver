@@ -87,9 +87,9 @@ EXPORT_SYMBOL($global$);
 #include <asm/io.h>
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
-EXPORT_SYMBOL(__memcpy_toio);
-EXPORT_SYMBOL(__memcpy_fromio);
-EXPORT_SYMBOL(__memset_io);
+EXPORT_SYMBOL(memcpy_toio);
+EXPORT_SYMBOL(memcpy_fromio);
+EXPORT_SYMBOL(memset_io);
 
 #include <asm/unistd.h>
 EXPORT_SYMBOL(sys_open);

@@ -100,7 +100,8 @@ nul_marshal(struct rpc_task *task, u32 *p, int ruid)
 static int
 nul_refresh(struct rpc_task *task)
 {
-	return task->tk_status = -EACCES;
+	task->tk_msg.rpc_cred->cr_flags |= RPCAUTH_CRED_UPTODATE;
+	return 0;
 }
 
 static u32 *

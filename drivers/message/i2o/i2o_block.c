@@ -61,6 +61,10 @@
 
 #include "i2o_block.h"
 
+#define OSM_NAME	"block-osm"
+#define OSM_VERSION	"$Rev$"
+#define OSM_DESCRIPTION	"I2O Block Device OSM"
+
 static struct i2o_driver i2o_block_driver;
 
 /* global Block OSM request mempool */
@@ -100,8 +104,7 @@ static int i2o_block_remove(struct device *dev)
 	struct i2o_device *i2o_dev = to_i2o_device(dev);
 	struct i2o_block_device *i2o_blk_dev = dev_get_drvdata(dev);
 
-	printk(KERN_INFO "block-osm: Device removed %s\n",
-	       i2o_blk_dev->gd->disk_name);
+	osm_info("Device removed %s\n", i2o_blk_dev->gd->disk_name);
 
 	i2o_event_register(i2o_dev, &i2o_block_driver, 0, 0);
 
@@ -137,7 +140,7 @@ static int i2o_block_device_flush(struct i2o_device *dev)
 	writel(I2O_CMD_BLOCK_CFLUSH << 24 | HOST_TID << 12 | dev->lct_data.tid,
 	       &msg->u.head[1]);
 	writel(60 << 16, &msg->body[0]);
-	pr_debug("Flushing...\n");
+	osm_debug("Flushing...\n");
 
 	return i2o_msg_post_wait(dev->iop, m, 60);
 };
@@ -166,7 +169,7 @@ static int i2o_block_device_mount(struct i2o_device *dev, u32 media_id)
 	       &msg->u.head[1]);
 	writel(-1, &msg->body[0]);
 	writel(0, &msg->body[1]);
-	pr_debug("Mounting...\n");
+	osm_debug("Mounting...\n");
 
 	return i2o_msg_post_wait(dev->iop, m, 2);
 };
@@ -194,7 +197,7 @@ static int i2o_block_device_lock(struct i2o_device *dev, u32 media_id)
 	writel(I2O_CMD_BLOCK_MLOCK << 24 | HOST_TID << 12 | dev->lct_data.tid,
 	       &msg->u.head[1]);
 	writel(-1, &msg->body[0]);
-	pr_debug("Locking...\n");
+	osm_debug("Locking...\n");
 
 	return i2o_msg_post_wait(dev->iop, m, 2);
 };
@@ -222,7 +225,7 @@ static int i2o_block_device_unlock(struct i2o_device *dev, u32 media_id)
 	writel(I2O_CMD_BLOCK_MUNLOCK << 24 | HOST_TID << 12 | dev->lct_data.tid,
 	       &msg->u.head[1]);
 	writel(media_id, &msg->body[0]);
-	pr_debug("Unlocking...\n");
+	osm_debug("Unlocking...\n");
 
 	return i2o_msg_post_wait(dev->iop, m, 2);
 };
@@ -252,7 +255,7 @@ static int i2o_block_device_power(struct i2o_block_device *dev, u8 op)
 	writel(I2O_CMD_BLOCK_POWER << 24 | HOST_TID << 12 | i2o_dev->lct_data.
 	       tid, &msg->u.head[1]);
 	writel(op << 24, &msg->body[0]);
-	pr_debug("Power...\n");
+	osm_debug("Power...\n");
 
 	rc = i2o_msg_post_wait(c, m, 60);
 	if (!rc)
@@ -350,7 +353,7 @@ static int i2o_block_prep_req_fn(struct request_queue *q, struct request *req)
 
 	/* request is already processed by us, so return */
 	if (req->flags & REQ_SPECIAL) {
-		pr_debug("REQ_SPECIAL already set!\n");
+		osm_debug("REQ_SPECIAL already set!\n");
 		req->flags |= REQ_DONTPREP;
 		return BLKPREP_OK;
 	}
@@ -359,7 +362,7 @@ static int i2o_block_prep_req_fn(struct request_queue *q, struct request *req)
 	if (!req->special) {
 		ireq = i2o_block_request_alloc();
 		if (unlikely(IS_ERR(ireq))) {
-			pr_debug("unable to allocate i2o_block_request!\n");
+			osm_debug("unable to allocate i2o_block_request!\n");
 			return BLKPREP_DEFER;
 		}
 
@@ -435,7 +438,7 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 
 		req = i2o_cntxt_list_get(c, le32_to_cpu(pmsg->u.s.tcntxt));
 		if (unlikely(!req)) {
-			printk(KERN_ERR "block-osm: NULL reply received!\n");
+			osm_err("NULL reply received!\n");
 			return -1;
 		}
 
@@ -465,7 +468,7 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 
 	req = i2o_cntxt_list_get(c, le32_to_cpu(msg->u.s.tcntxt));
 	if (unlikely(!req)) {
-		printk(KERN_ERR "block-osm: NULL reply received!\n");
+		osm_err("NULL reply received!\n");
 		return -1;
 	}
 
@@ -482,8 +485,7 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 		 * goes kaput...
 		 */
 		req->errors++;
-		printk(KERN_WARNING
-		       "I2O Block: Data transfer to deleted device!\n");
+		osm_warn("Data transfer to deleted device!\n");
 		spin_lock_irqsave(q->queue_lock, flags);
 		while (end_that_request_chunk
 		       (req, !req->errors, le32_to_cpu(msg->body[1]))) ;
@@ -537,8 +539,8 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 		 *      Don't stick a supertrak100 into cache aggressive modes
 		 */
 
-		printk(KERN_ERR "/dev/%s error: %s", dev->gd->disk_name,
-		       bsa_errors[le32_to_cpu(msg->body[0]) & 0xffff]);
+		osm_err("block-osm: /dev/%s error: %s", dev->gd->disk_name,
+			bsa_errors[le32_to_cpu(msg->body[0]) & 0xffff]);
 		if (le32_to_cpu(msg->body[0]) & 0x00ff0000)
 			printk(KERN_ERR " - DDM attempted %d retries",
 			       (le32_to_cpu(msg->body[0]) >> 16) & 0x00ff);
@@ -563,14 +565,14 @@ static int i2o_block_reply(struct i2o_controller *c, u32 m,
 		i2o_block_sglist_free(ireq);
 		i2o_block_request_free(ireq);
 	} else
-		printk(KERN_ERR "i2o_block: still remaining chunks\n");
+		osm_err("still remaining chunks\n");
 
 	return 1;
 };
 
 static void i2o_block_event(struct i2o_event *evt)
 {
-	printk(KERN_INFO "block-osm: event received\n");
+	osm_info("block-osm: event received\n");
 };
 
 /*
@@ -648,7 +650,7 @@ static int i2o_block_open(struct inode *inode, struct file *file)
 
 	i2o_block_device_lock(dev->i2o_dev, -1);
 
-	pr_debug("Ready.\n");
+	osm_debug("Ready.\n");
 
 	return 0;
 };
@@ -877,10 +879,10 @@ static int i2o_block_transfer(struct request *req)
 		 (unsigned long)&msg->u.head[0]) >> 2) | SGL_OFFSET_8,
 	       &msg->u.head[0]);
 
-	i2o_msg_post(c, m);
-
 	list_add_tail(&ireq->queue, &dev->open_queue);
 	dev->open_queue_depth++;
+
+	i2o_msg_post(c, m);
 
 	return 0;
 
@@ -936,7 +938,7 @@ static void i2o_block_request_fn(struct request_queue *q)
 			INIT_WORK(&dreq->work, i2o_block_delayed_request_fn,
 				  dreq);
 
-			printk(KERN_INFO "block-osm: transfer error\n");
+			osm_info("transfer error\n");
 			if (!queue_delayed_work(i2o_block_driver.event_queue,
 						&dreq->work,
 						I2O_BLOCK_RETRY_TIME))
@@ -977,8 +979,7 @@ static struct i2o_block_device *i2o_block_device_alloc(void)
 
 	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev) {
-		printk(KERN_ERR "block-osm: Insufficient memory to allocate "
-		       "I2O Block disk.\n");
+		osm_err("Insufficient memory to allocate I2O Block disk.\n");
 		rc = -ENOMEM;
 		goto exit;
 	}
@@ -992,8 +993,7 @@ static struct i2o_block_device *i2o_block_device_alloc(void)
 	/* allocate a gendisk with 16 partitions */
 	gd = alloc_disk(16);
 	if (!gd) {
-		printk(KERN_ERR "block-osm: Insufficient memory to allocate "
-		       "gendisk.\n");
+		osm_err("Insufficient memory to allocate gendisk.\n");
 		rc = -ENOMEM;
 		goto cleanup_dev;
 	}
@@ -1001,8 +1001,7 @@ static struct i2o_block_device *i2o_block_device_alloc(void)
 	/* initialize the request queue */
 	queue = blk_init_queue(i2o_block_request_fn, &dev->lock);
 	if (!queue) {
-		printk(KERN_ERR "block-osm: Insufficient memory to allocate "
-		       "request queue.\n");
+		osm_err("Insufficient memory to allocate request queue.\n");
 		rc = -ENOMEM;
 		goto cleanup_queue;
 	}
@@ -1054,24 +1053,21 @@ static int i2o_block_probe(struct device *dev)
 
 	/* skip devices which are used by IOP */
 	if (i2o_dev->lct_data.user_tid != 0xfff) {
-		pr_debug("skipping used device %03x\n", i2o_dev->lct_data.tid);
+		osm_debug("skipping used device %03x\n", i2o_dev->lct_data.tid);
 		return -ENODEV;
 	}
 
-	printk(KERN_INFO "block-osm: New device detected (TID: %03x)\n",
-	       i2o_dev->lct_data.tid);
+	osm_info("New device detected (TID: %03x)\n", i2o_dev->lct_data.tid);
 
 	if (i2o_device_claim(i2o_dev)) {
-		printk(KERN_WARNING "block-osm: Unable to claim device. "
-		       "Installation aborted\n");
+		osm_warn("Unable to claim device. Installation aborted\n");
 		rc = -EFAULT;
 		goto exit;
 	}
 
 	i2o_blk_dev = i2o_block_device_alloc();
 	if (IS_ERR(i2o_blk_dev)) {
-		printk(KERN_ERR "block-osm: could not alloc a new I2O block"
-		       "device");
+		osm_err("could not alloc a new I2O block device");
 		rc = PTR_ERR(i2o_blk_dev);
 		goto claim_release;
 	}
@@ -1106,9 +1102,9 @@ static int i2o_block_probe(struct device *dev)
 
 	blk_queue_max_hw_segments(queue, segments);
 
-	pr_debug("max sectors:   %d\n", I2O_MAX_SECTORS);
-	pr_debug("phys segments: %d\n", I2O_MAX_SEGMENTS);
-	pr_debug("hw segments:   %d\n", segments);
+	osm_debug("max sectors = %d\n", I2O_MAX_SECTORS);
+	osm_debug("phys segments = %d\n", I2O_MAX_SEGMENTS);
+	osm_debug("hw segments = %d\n", segments);
 
 	/*
 	 *      Ask for the current media data. If that isn't supported
@@ -1119,7 +1115,7 @@ static int i2o_block_probe(struct device *dev)
 		i2o_parm_field_get(i2o_dev, 0x0000, 3, &blocksize, 4);
 		i2o_parm_field_get(i2o_dev, 0x0000, 4, &size, 8);
 	}
-	pr_debug("blocksize:     %d\n", blocksize);
+	osm_debug("blocksize = %d\n", blocksize);
 
 	if (i2o_parm_field_get(i2o_dev, 0x0000, 2, &power, 2))
 		power = 0;
@@ -1145,7 +1141,7 @@ static int i2o_block_probe(struct device *dev)
 
 /* Block OSM driver struct */
 static struct i2o_driver i2o_block_driver = {
-	.name = "block-osm",
+	.name = OSM_NAME,
 	.event = i2o_block_event,
 	.reply = i2o_block_reply,
 	.classes = i2o_block_class_id,
@@ -1168,8 +1164,7 @@ static int __init i2o_block_init(void)
 	int rc;
 	int size;
 
-	printk(KERN_INFO "I2O Block Storage OSM v0.9\n");
-	printk(KERN_INFO "   (c) Copyright 1999-2001 Red Hat Software.\n");
+	printk(KERN_INFO OSM_DESCRIPTION " v" OSM_VERSION "\n");
 
 	/* Allocate request mempool and slab */
 	size = sizeof(struct i2o_block_request);
@@ -1177,7 +1172,7 @@ static int __init i2o_block_init(void)
 						  SLAB_HWCACHE_ALIGN, NULL,
 						  NULL);
 	if (!i2o_blk_req_pool.slab) {
-		printk(KERN_ERR "block-osm: can't init request slab\n");
+		osm_err("can't init request slab\n");
 		rc = -ENOMEM;
 		goto exit;
 	}
@@ -1187,7 +1182,7 @@ static int __init i2o_block_init(void)
 					       mempool_free_slab,
 					       i2o_blk_req_pool.slab);
 	if (!i2o_blk_req_pool.pool) {
-		printk(KERN_ERR "block-osm: can't init request mempool\n");
+		osm_err("can't init request mempool\n");
 		rc = -ENOMEM;
 		goto free_slab;
 	}
@@ -1195,18 +1190,17 @@ static int __init i2o_block_init(void)
 	/* Register the block device interfaces */
 	rc = register_blkdev(I2O_MAJOR, "i2o_block");
 	if (rc) {
-		printk(KERN_ERR "block-osm: unable to register block device\n");
+		osm_err("unable to register block device\n");
 		goto free_mempool;
 	}
 #ifdef MODULE
-	printk(KERN_INFO "block-osm: registered device at major %d\n",
-	       I2O_MAJOR);
+	osm_info("registered device at major %d\n", I2O_MAJOR);
 #endif
 
 	/* Register Block OSM into I2O core */
 	rc = i2o_driver_register(&i2o_block_driver);
 	if (rc) {
-		printk(KERN_ERR "block-osm: Could not register Block driver\n");
+		osm_err("Could not register Block driver\n");
 		goto unregister_blkdev;
 	}
 
@@ -1245,8 +1239,9 @@ static void __exit i2o_block_exit(void)
 };
 
 MODULE_AUTHOR("Red Hat");
-MODULE_DESCRIPTION("I2O Block Device OSM");
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION(OSM_DESCRIPTION);
+MODULE_VERSION(OSM_VERSION);
 
 module_init(i2o_block_init);
 module_exit(i2o_block_exit);

@@ -21,8 +21,7 @@ struct powernow_k8_data {
 	u32 plllock; /* pll lock time, units 1 us */
 
 	/* keep track of the current fid / vid */
-	u32 currvid;
-	u32 currfid;
+	u32 currvid, currfid;
 
 	/* the powernow_table includes all frequency and vid/fid pairings:
 	 * fid are the lower 8 bits of the index, vid are the upper 8 bits.
@@ -152,14 +151,14 @@ struct psb_s {
 	u8 signature[10];
 	u8 tableversion;
 	u8 flags1;
-	u16 voltagestabilizationtime;
+	u16 vstable;
 	u8 flags2;
-	u8 numpst;
+	u8 num_tables;
 	u32 cpuid;
 	u8 plllocktime;
 	u8 maxfid;
 	u8 maxvid;
-	u8 numpstates;
+	u8 numps;
 };
 
 /* Pairs of fid/vid values are appended to the version 1.4 PSB table. */

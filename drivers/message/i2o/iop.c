@@ -29,6 +29,9 @@
 #include <linux/i2o.h>
 #include <linux/delay.h>
 
+#define OSM_VERSION	"$Rev$"
+#define OSM_DESCRIPTION	"I2O subsystem"
+
 /* global I2O controller list */
 LIST_HEAD(i2o_controllers);
 
@@ -126,12 +129,13 @@ u32 i2o_cntxt_list_add(struct i2o_controller * c, void *ptr)
 	unsigned long flags;
 
 	if (!ptr)
-		printk(KERN_ERR "NULL pointer found!\n");
+		printk(KERN_ERR "%s: couldn't add NULL pointer to context list!"
+		       "\n", c->name);
 
 	entry = kmalloc(sizeof(*entry), GFP_ATOMIC);
 	if (!entry) {
-		printk(KERN_ERR "i2o: Could not allocate memory for context "
-		       "list element\n");
+		printk(KERN_ERR "%s: Could not allocate memory for context "
+		       "list element\n", c->name);
 		return 0;
 	}
 
@@ -150,7 +154,7 @@ u32 i2o_cntxt_list_add(struct i2o_controller * c, void *ptr)
 
 	spin_unlock_irqrestore(&c->context_list_lock, flags);
 
-	pr_debug("Add context to list %p -> %d\n", ptr, context);
+	pr_debug("%s: Add context to list %p -> %d\n", c->name, ptr, context);
 
 	return entry->context;
 };
@@ -182,10 +186,11 @@ u32 i2o_cntxt_list_remove(struct i2o_controller * c, void *ptr)
 	spin_unlock_irqrestore(&c->context_list_lock, flags);
 
 	if (!context)
-		printk(KERN_WARNING "i2o: Could not remove nonexistent ptr "
-		       "%p\n", ptr);
+		printk(KERN_WARNING "%s: Could not remove nonexistent ptr "
+		       "%p\n", c->name, ptr);
 
-	pr_debug("remove ptr from context list %d -> %p\n", context, ptr);
+	pr_debug("%s: remove ptr from context list %d -> %p\n", c->name,
+		 context, ptr);
 
 	return context;
 };
@@ -215,9 +220,11 @@ void *i2o_cntxt_list_get(struct i2o_controller *c, u32 context)
 	spin_unlock_irqrestore(&c->context_list_lock, flags);
 
 	if (!ptr)
-		printk(KERN_WARNING "i2o: context id %d not found\n", context);
+		printk(KERN_WARNING "%s: context id %d not found\n", c->name,
+		       context);
 
-	pr_debug("get ptr from context list %d -> %p\n", context, ptr);
+	pr_debug("%s: get ptr from context list %d -> %p\n", c->name, context,
+		 ptr);
 
 	return ptr;
 };
@@ -245,10 +252,11 @@ u32 i2o_cntxt_list_get_ptr(struct i2o_controller * c, void *ptr)
 	spin_unlock_irqrestore(&c->context_list_lock, flags);
 
 	if (!context)
-		printk(KERN_WARNING "i2o: Could not find nonexistent ptr "
-		       "%p\n", ptr);
+		printk(KERN_WARNING "%s: Could not find nonexistent ptr "
+		       "%p\n", c->name, ptr);
 
-	pr_debug("get context id from context list %p -> %d\n", ptr, context);
+	pr_debug("%s: get context id from context list %p -> %d\n", c->name,
+		 ptr, context);
 
 	return context;
 };
@@ -467,7 +475,7 @@ static int i2o_iop_reset(struct i2o_controller *c)
 	i2o_status_block *sb = c->status_block.virt;
 	int rc = 0;
 
-	pr_debug("Resetting controller\n");
+	pr_debug("%s: Resetting controller\n", c->name);
 
 	m = i2o_msg_get_wait(c, &msg, I2O_TIMEOUT_MESSAGE_GET);
 	if (m == I2O_QUEUE_EMPTY)
@@ -494,7 +502,7 @@ static int i2o_iop_reset(struct i2o_controller *c)
 	timeout = jiffies + I2O_TIMEOUT_RESET * HZ;
 	while (!*status) {
 		if (time_after(jiffies, timeout)) {
-			printk(KERN_ERR "IOP reset timeout.\n");
+			printk(KERN_ERR "%s: IOP reset timeout.\n", c->name);
 			rc = -ETIMEDOUT;
 			goto exit;
 		}
@@ -526,7 +534,8 @@ static int i2o_iop_reset(struct i2o_controller *c)
 		m = i2o_msg_get_wait(c, &msg, I2O_TIMEOUT_RESET);
 		while (m == I2O_QUEUE_EMPTY) {
 			if (time_after(jiffies, timeout)) {
-				printk(KERN_ERR "IOP reset timeout.\n");
+				printk(KERN_ERR "%s: IOP reset timeout.\n",
+				       c->name);
 				rc = -ETIMEDOUT;
 				goto exit;
 			}
@@ -676,14 +685,14 @@ static int i2o_iop_activate(struct i2o_controller *c)
 
 	rc = i2o_status_get(c);
 	if (rc) {
-		printk(KERN_INFO "Unable to obtain status of %s, "
+		printk(KERN_INFO "%s: Unable to obtain status, "
 		       "attempting a reset.\n", c->name);
 		if (i2o_iop_reset(c))
 			return rc;
 	}
 
 	if (sb->i2o_version > I2OVER15) {
-		printk(KERN_ERR "%s: Not running vrs. 1.5. of the I2O "
+		printk(KERN_ERR "%s: Not running version 1.5 of the I2O "
 		       "Specification.\n", c->name);
 		return -ENODEV;
 	}
@@ -697,7 +706,7 @@ static int i2o_iop_activate(struct i2o_controller *c)
 	case ADAPTER_STATE_OPERATIONAL:
 	case ADAPTER_STATE_HOLD:
 	case ADAPTER_STATE_FAILED:
-		pr_debug("already running, trying to reset...\n");
+		pr_debug("%s: already running, trying to reset...\n", c->name);
 		if (i2o_iop_reset(c))
 			return -ENODEV;
 	}
@@ -751,15 +760,16 @@ static int i2o_iop_systab_set(struct i2o_controller *c)
 		       c->name);
 		root = pci_find_parent_resource(c->pdev, res);
 		if (root == NULL)
-			printk(KERN_WARNING "Can't find parent resource!\n");
+			printk(KERN_WARNING "%s: Can't find parent resource!\n",
+			       c->name);
 		if (root && allocate_resource(root, res, sb->desired_mem_size, sb->desired_mem_size, sb->desired_mem_size, 1 << 20,	/* Unspecified, so use 1Mb and play safe */
 					      NULL, NULL) >= 0) {
 			c->mem_alloc = 1;
 			sb->current_mem_size = 1 + res->end - res->start;
 			sb->current_mem_base = res->start;
-			printk(KERN_INFO
-			       "%s: allocated %ld bytes of PCI memory at 0x%08lX.\n",
-			       c->name, 1 + res->end - res->start, res->start);
+			printk(KERN_INFO "%s: allocated %ld bytes of PCI memory"
+			       " at 0x%08lX.\n", c->name,
+			       1 + res->end - res->start, res->start);
 		}
 	}
 
@@ -773,15 +783,16 @@ static int i2o_iop_systab_set(struct i2o_controller *c)
 		       c->name);
 		root = pci_find_parent_resource(c->pdev, res);
 		if (root == NULL)
-			printk(KERN_WARNING "Can't find parent resource!\n");
+			printk(KERN_WARNING "%s: Can't find parent resource!\n",
+			       c->name);
 		if (root && allocate_resource(root, res, sb->desired_io_size, sb->desired_io_size, sb->desired_io_size, 1 << 20,	/* Unspecified, so use 1Mb and play safe */
 					      NULL, NULL) >= 0) {
 			c->io_alloc = 1;
 			sb->current_io_size = 1 + res->end - res->start;
 			sb->current_mem_base = res->start;
-			printk(KERN_INFO
-			       "%s: allocated %ld bytes of PCI I/O at 0x%08lX.\n",
-			       c->name, 1 + res->end - res->start, res->start);
+			printk(KERN_INFO "%s: allocated %ld bytes of PCI I/O at"
+			       " 0x%08lX.\n", c->name,
+			       1 + res->end - res->start, res->start);
 		}
 	}
 
@@ -871,7 +882,7 @@ void i2o_iop_remove(struct i2o_controller *c)
 {
 	struct i2o_device *dev, *tmp;
 
-	pr_debug("Deleting controller %s\n", c->name);
+	pr_debug("%s: deleting controller\n", c->name);
 
 	i2o_driver_notify_controller_remove_all(c);
 
@@ -1114,7 +1125,7 @@ struct i2o_controller *i2o_iop_alloc(void)
 
 	c = kmalloc(sizeof(*c), GFP_KERNEL);
 	if (!c) {
-		printk(KERN_ERR "i2o: Insufficient memory to allocate the "
+		printk(KERN_ERR "i2o: Insufficient memory to allocate a I2O "
 		       "controller.\n");
 		return ERR_PTR(-ENOMEM);
 	}
@@ -1162,27 +1173,27 @@ int i2o_iop_add(struct i2o_controller *c)
 	       "devices\n", c->name);
 
 	if ((rc = i2o_iop_activate(c))) {
-		printk(KERN_ERR "%s: controller could not activated\n",
+		printk(KERN_ERR "%s: could not activate controller\n",
 		       c->name);
 		i2o_iop_reset(c);
 		return rc;
 	}
 
-	pr_debug("building sys table %s...\n", c->name);
+	pr_debug("%s: building sys table...\n", c->name);
 
 	if ((rc = i2o_systab_build())) {
 		i2o_iop_reset(c);
 		return rc;
 	}
 
-	pr_debug("online controller %s...\n", c->name);
+	pr_debug("%s: online controller...\n", c->name);
 
 	if ((rc = i2o_iop_online(c))) {
 		i2o_iop_reset(c);
 		return rc;
 	}
 
-	pr_debug("getting LCT %s...\n", c->name);
+	pr_debug("%s: getting LCT...\n", c->name);
 
 	if ((rc = i2o_exec_lct_get(c))) {
 		i2o_iop_reset(c);
@@ -1247,7 +1258,7 @@ static int __init i2o_iop_init(void)
 {
 	int rc = 0;
 
-	printk(KERN_INFO "I2O Core - (C) Copyright 1999 Red Hat Software\n");
+	printk(KERN_INFO OSM_DESCRIPTION " v" OSM_VERSION "\n");
 
 	rc = i2o_device_init();
 	if (rc)
@@ -1297,8 +1308,9 @@ module_init(i2o_iop_init);
 module_exit(i2o_iop_exit);
 
 MODULE_AUTHOR("Red Hat Software");
-MODULE_DESCRIPTION("I2O Core");
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION(OSM_DESCRIPTION);
+MODULE_VERSION(OSM_VERSION);
 
 #if BITS_PER_LONG == 64
 EXPORT_SYMBOL(i2o_cntxt_list_add);

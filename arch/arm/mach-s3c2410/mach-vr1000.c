@@ -20,6 +20,7 @@
  *     04-Nov-2004 BJD  Clock and serial configuration update
  *     04-Jan-2005 BJD  Updated uart init call
  *     10-Jan-2005 BJD  Removed include of s3c2410.h
+ *     14-Jan-2005 BJD  Added clock init
 */
 
 #include <linux/kernel.h>
@@ -205,6 +206,7 @@ void __init vr1000_map_io(void)
 	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
 
 	s3c24xx_init_io(vr1000_iodesc, ARRAY_SIZE(vr1000_iodesc));
+	s3c24xx_init_clocks(0);
 	s3c24xx_init_uarts(vr1000_uartcfgs, ARRAY_SIZE(vr1000_uartcfgs));
 	s3c24xx_set_board(&vr1000_board);
 	usb_simtec_init();

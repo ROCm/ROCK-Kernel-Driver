@@ -37,6 +37,12 @@ extern void cpm2_reset(void);
 extern void m8260_find_bridges(void);
 extern void idma_pci9_init(void);
 
+/* Place-holder for board-specific init */
+void __attribute__ ((weak)) __init
+m82xx_board_setup(void)
+{
+}
+
 static void __init
 m8260_setup_arch(void)
 {
@@ -56,6 +62,7 @@ m8260_setup_arch(void)
 	if (initrd_start)
 		ROOT_DEV = Root_RAM0;
 #endif
+	m82xx_board_setup();
 }
 
 /* The decrementer counts at the system (internal) clock frequency
@@ -203,7 +210,7 @@ m8260_map_io(void)
 	io_block_mapping(IO_VIRT_ADDR, IO_PHYS_ADDR, 0x10000000, _PAGE_IO);
 }
 
-/* Place-holder for board-specific init */
+/* Place-holder for board-specific ppc_md hooking */
 void __attribute__ ((weak)) __init
 m82xx_board_init(void)
 {

@@ -109,7 +109,7 @@ config LANMEDIA
 	  V.24, V.35 or V.36 interface) to your Linux box.
 
 	  - LMC 1200 with on board DSU board allows you to connect your Linux
-	  box dirrectly to a T1 or E1 circuit.
+	  box directly to a T1 or E1 circuit.
 
 	  - LMC 5200 board provides a HSSI interface capable of running up to
 	  52 Mbits per second.
@@ -459,7 +459,7 @@ config WANPIPE_FR
 	depends on VENDOR_SANGOMA
 	help
 	  Connect a WANPIPE card to a Frame Relay network, or use Frame Felay
-	  API to develope custom applications.
+	  API to develop custom applications.
 
 	  Contains the Ethernet Bridging over Frame Relay feature, where
 	  a WANPIPE frame relay link can be directly connected to the Linux

@@ -420,7 +420,7 @@ sys_call_table:
 	PTR	sys32_rt_sigaction
 	PTR	sys32_rt_sigprocmask 		/* 4195 */
 	PTR	sys32_rt_sigpending
-	PTR	compat_rt_sigtimedwait
+	PTR	compat_sys_rt_sigtimedwait
 	PTR	sys32_rt_sigqueueinfo
 	PTR	sys32_rt_sigsuspend
 	PTR	sys32_pread			/* 4200 */

@@ -52,7 +52,7 @@ extern void load_gs_index(unsigned gs);
 
 extern unsigned long end_pfn_map; 
 
-extern unsigned long cpu_initialized;
+extern cpumask_t cpu_initialized;
 
 extern void show_trace(unsigned long * rsp);
 extern void show_registers(struct pt_regs *regs);

@@ -61,22 +61,12 @@ static char *version = "$Revision: 1.2 $";
 
 /*====================================================================*/
 
-/* Parameters that can be set with 'insmod' */
-
-/* The old way: bit map of interrupts to choose from */
-/* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static u_int irq_mask = 0xdeb8;
-/* Newer, simpler way of listing specific interrupts */
-static int irq_list[4] = { -1 };
-
 MODULE_AUTHOR("Benjamin Reed");
 MODULE_DESCRIPTION("Support for Cisco/Aironet 802.11 wireless ethernet \
                    cards.  This is the module that links the PCMCIA card \
 		   with the airo module.");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_SUPPORTED_DEVICE("Aironet 4500, 4800 and Cisco 340 PCMCIA cards");
-module_param(irq_mask, int, 0);
-module_param_array(irq_list, int, NULL, 0);
 
 /*====================================================================*/
 
@@ -178,7 +168,7 @@ static dev_link_t *airo_attach(void)
 	client_reg_t client_reg;
 	dev_link_t *link;
 	local_info_t *local;
-	int ret, i;
+	int ret;
 	
 	DEBUG(0, "airo_attach()\n");
 
@@ -192,12 +182,7 @@ static dev_link_t *airo_attach(void)
 	
 	/* Interrupt setup */
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-	if (irq_list[0] == -1)
-		link->irq.IRQInfo2 = irq_mask;
-	else
-		for (i = 0; i < 4; i++)
-			link->irq.IRQInfo2 |= 1 << irq_list[i];
+	link->irq.IRQInfo1 = IRQ_LEVEL_ID;
 	link->irq.Handler = NULL;
 	
 	/*

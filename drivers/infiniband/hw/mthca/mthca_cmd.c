@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -40,6 +40,7 @@
 #include "mthca_dev.h"
 #include "mthca_config_reg.h"
 #include "mthca_cmd.h"
+#include "mthca_memfree.h"
 
 #define CMD_POLL_TOKEN 0xffff
 
@@ -508,38 +509,38 @@ int mthca_SYS_DIS(struct mthca_dev *dev, u8 *status)
 	return mthca_cmd(dev, 0, 0, 0, CMD_SYS_DIS, HZ, status);
 }
 
-int mthca_MAP_FA(struct mthca_dev *dev, int count,
-		 struct scatterlist *sglist, u8 *status)
+int mthca_MAP_FA(struct mthca_dev *dev, struct mthca_icm *icm, u8 *status)
 {
 	u32 *inbox;
 	dma_addr_t indma;
+	struct mthca_icm_iter iter;
 	int lg;
 	int nent = 0;
-	int i, j;
+	int i;
 	int err = 0;
 	int ts = 0;
 
 	inbox = pci_alloc_consistent(dev->pdev, PAGE_SIZE, &indma);
 	memset(inbox, 0, PAGE_SIZE);
 
-	for (i = 0; i < count; ++i) {
+	for (mthca_icm_first(icm, &iter); !mthca_icm_last(&iter); mthca_icm_next(&iter)) {
 		/*
 		 * We have to pass pages that are aligned to their
 		 * size, so find the least significant 1 in the
 		 * address or size and use that as our log2 size.
 		 */
-		lg = ffs(sg_dma_address(sglist + i) | sg_dma_len(sglist + i)) - 1;
+		lg = ffs(mthca_icm_addr(&iter) | mthca_icm_size(&iter)) - 1;
 		if (lg < 12) {
-			mthca_warn(dev, "Got FW area not aligned to 4K (%llx/%x).\n",
-				   (unsigned long long) sg_dma_address(sglist + i),
-				   sg_dma_len(sglist + i));
+			mthca_warn(dev, "Got FW area not aligned to 4K (%llx/%lx).\n",
+				   (unsigned long long) mthca_icm_addr(&iter),
+				   mthca_icm_size(&iter));
 			err = -EINVAL;
 			goto out;
 		}
-		for (j = 0; j < sg_dma_len(sglist + i) / (1 << lg); ++j, ++nent) {
+		for (i = 0; i < mthca_icm_size(&iter) / (1 << lg); ++i, ++nent) {
 			*((__be64 *) (inbox + nent * 4 + 2)) =
-				cpu_to_be64((sg_dma_address(sglist + i) +
-					     (j << lg)) |
+				cpu_to_be64((mthca_icm_addr(&iter) +
+					     (i << lg)) |
 					    (lg - 12));
 			ts += 1 << (lg - 10);
 			if (nent == PAGE_SIZE / 16) {
@@ -958,9 +959,9 @@ int mthca_QUERY_DEV_LIM(struct mthca_dev *dev,
 		MTHCA_GET(field, outbox, QUERY_DEV_LIM_RSZ_SRQ_OFFSET);
 		dev_lim->hca.arbel.resize_srq = field & 1;
 		MTHCA_GET(size, outbox, QUERY_DEV_LIM_MTT_ENTRY_SZ_OFFSET);
-		dev_lim->hca.arbel.mtt_entry_sz = size;
+		dev_lim->mtt_seg_sz = size;
 		MTHCA_GET(size, outbox, QUERY_DEV_LIM_MPT_ENTRY_SZ_OFFSET);
-		dev_lim->hca.arbel.mpt_entry_sz = size;
+		dev_lim->mpt_entry_sz = size;
 		MTHCA_GET(field, outbox, QUERY_DEV_LIM_PBL_SZ_OFFSET);
 		dev_lim->hca.arbel.max_pbl_sz = 1 << (field & 0x3f);
 		MTHCA_GET(dev_lim->hca.arbel.bmme_flags, outbox,
@@ -986,6 +987,8 @@ int mthca_QUERY_DEV_LIM(struct mthca_dev *dev,
 	} else {
 		MTHCA_GET(field, outbox, QUERY_DEV_LIM_MAX_AV_OFFSET);
 		dev_lim->hca.tavor.max_avs = 1 << (field & 0x3f);
+		dev_lim->mtt_seg_sz   = MTHCA_MTT_SEG_SIZE;
+		dev_lim->mpt_entry_sz = MTHCA_MPT_ENTRY_SIZE;
 	}
 
 out:

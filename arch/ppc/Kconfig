@@ -326,7 +326,7 @@ config RPXLITE
 
 	  HERMES:
 	  Hermes-Pro ISDN/LAN router with integrated 8 x hub
-	  Manufacturer: Multidata Gesellschaft für Datentechnik und Informatik
+	  Manufacturer: Multidata Gesellschaft fur Datentechnik und Informatik
 	  <http://www.multidata.de/>
 	  Date of Release: 2000 (?)
 	  End of life: -
@@ -623,6 +623,12 @@ config TQM8260
 config ADS8272
 	bool "ADS8272"
 
+config PQ2FADS
+	bool "Freescale-PQ2FADS"
+	help
+	  Select PQ2FADS if you wish to configure for a Freescale
+	  PQ2FADS board (-VR or -ZU).
+
 config LITE5200
 	bool "Freescale LITE5200 / (IceCube)"
 	select PPC_MPC52xx
@@ -655,7 +661,7 @@ config PPC_MPC52xx
 config 8260
 	bool "CPM2 Support" if WILLOW
 	depends on 6xx
-	default y if TQM8260 || RPX8260 || EST8260 || SBS8260 || SBC82xx
+	default y if TQM8260 || RPX8260 || EST8260 || SBS8260 || SBC82xx || PQ2FADS
 	help
 	  The MPC8260 is a typical embedded CPU made by Motorola.  Selecting
 	  this option means that you wish to build a kernel for a machine with

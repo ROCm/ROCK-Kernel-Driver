@@ -69,7 +69,7 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 	if (type > EV_MAX || !test_bit(type, dev->evbit))
 		return;
 
-	add_mouse_randomness((type << 4) ^ code ^ (code >> 4) ^ value);
+	add_input_randomness(type, code, value);
 
 	switch (type) {
 

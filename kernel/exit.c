@@ -747,7 +747,9 @@ static void exit_notify(struct task_struct *tsk)
 	}
 
 	state = EXIT_ZOMBIE;
-	if (tsk->exit_signal == -1 && tsk->ptrace == 0)
+	if (tsk->exit_signal == -1 &&
+	    (likely(tsk->ptrace == 0) ||
+	     unlikely(tsk->parent->signal->flags & SIGNAL_GROUP_EXIT)))
 		state = EXIT_DEAD;
 	tsk->exit_state = state;
 

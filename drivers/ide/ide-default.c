@@ -46,6 +46,7 @@ ide_driver_t idedefault_driver = {
 	.name		=	"ide-default",
 	.version	=	IDEDEFAULT_VERSION,
 	.attach		=	idedefault_attach,
+	.cleanup	=	ide_unregister_subdriver,
 	.drives		=	LIST_HEAD_INIT(idedefault_driver.drives)
 };
 

@@ -10,7 +10,7 @@ config SCC_ENET
 	depends on NET_ETHERNET
 	help
 	  Enable Ethernet support via the Motorola MPC8xx serial
-	  commmunications controller.
+	  communications controller.
 
 choice
 	prompt "SCC used for Ethernet"

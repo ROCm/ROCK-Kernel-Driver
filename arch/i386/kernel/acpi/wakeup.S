@@ -278,7 +278,7 @@ save_registers:
 	movl %edi, saved_context_edi
 	pushfl ; popl saved_context_eflags
 
-	movl $ret_point,saved_eip
+	movl $ret_point, saved_eip
 	ret
 
 
@@ -295,7 +295,7 @@ ENTRY(do_suspend_lowlevel)
 	call	save_registers
 	pushl	$3
 	call	acpi_enter_sleep_state
-	addl	$4,%esp
+	addl	$4, %esp
 	ret
 	.p2align 4,,7
 ret_point:

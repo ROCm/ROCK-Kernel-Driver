@@ -197,7 +197,7 @@ int mthca_mr_alloc_phys(struct mthca_dev *dev, u32 pd,
 	for (i = dev->limits.mtt_seg_size / 8, mr->order = 0;
 	     i < list_len;
 	     i <<= 1, ++mr->order)
-		/* nothing */ ;
+		; /* nothing */
 
 	mr->first_seg = mthca_alloc_mtt(dev, mr->order);
 	if (mr->first_seg == -1)
@@ -337,7 +337,7 @@ int __devinit mthca_init_mr_table(struct mthca_dev *dev)
 	for (i = 1, dev->mr_table.max_mtt_order = 0;
 	     i < dev->limits.num_mtt_segs;
 	     i <<= 1, ++dev->mr_table.max_mtt_order)
-		/* nothing */ ;
+		; /* nothing */
 
 	dev->mr_table.mtt_buddy = kmalloc((dev->mr_table.max_mtt_order + 1) *
 					  sizeof (long *),

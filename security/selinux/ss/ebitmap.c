@@ -237,7 +237,7 @@ void ebitmap_destroy(struct ebitmap *e)
 
 int ebitmap_read(struct ebitmap *e, void *fp)
 {
-	int rc = -EINVAL;
+	int rc;
 	struct ebitmap_node *n, *l;
 	u32 buf[3], mapsize, count, i;
 	u64 map;
@@ -256,7 +256,7 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 		printk(KERN_ERR "security: ebitmap: map size %u does not "
 		       "match my size %Zd (high bit was %d)\n", mapsize,
 		       MAPSIZE, e->highbit);
-		goto out;
+		goto bad;
 	}
 	if (!e->highbit) {
 		e->node = NULL;
@@ -329,6 +329,8 @@ out:
 bad_free:
 	kfree(n);
 bad:
+	if (!rc)
+		rc = -EINVAL;
 	ebitmap_destroy(e);
 	goto out;
 }

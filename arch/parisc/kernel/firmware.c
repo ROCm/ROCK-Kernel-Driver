@@ -11,6 +11,7 @@
  * Copyright 1999 The Puffin Group, (Alex deVries, David Kennedy)
  * Copyright 2003 Grant Grundler <grundler parisc-linux org>
  * Copyright 2003,2004 Ryan Bradetich <rbrad@parisc-linux.org>
+ * Copyright 2004 Thibaut VARENE <varenet@parisc-linux.org>
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -573,14 +574,118 @@ int pdc_lan_station_id(char *lan_addr, unsigned long hpa)
 }
 EXPORT_SYMBOL(pdc_lan_station_id);
 
+/**
+ * pdc_stable_read - Read data from Stable Storage.
+ * @staddr: Stable Storage address to access.
+ * @memaddr: The memory address where Stable Storage data shall be copied.
+ * @count: number of bytes to transfert. count is multiple of 4.
+ *
+ * This PDC call reads from the Stable Storage address supplied in staddr
+ * and copies count bytes to the memory address memaddr.
+ * The call will fail if staddr+count > PDC_STABLE size.
+ */
+int pdc_stable_read(unsigned long staddr, void *memaddr, unsigned long count)
+{
+       int retval;
+
+       spin_lock_irq(&pdc_lock);
+       retval = mem_pdc_call(PDC_STABLE, PDC_STABLE_READ, staddr,
+               __pa(pdc_result), count);
+       convert_to_wide(pdc_result);
+       memcpy(memaddr, pdc_result, count);
+       spin_unlock_irq(&pdc_lock);
+
+       return retval;
+}
+EXPORT_SYMBOL(pdc_stable_read);
+
+/**
+ * pdc_stable_write - Write data to Stable Storage.
+ * @staddr: Stable Storage address to access.
+ * @memaddr: The memory address where Stable Storage data shall be read from.
+ * @count: number of bytes to transfert. count is multiple of 4.
+ *
+ * This PDC call reads count bytes from the supplied memaddr address,
+ * and copies count bytes to the Stable Storage address staddr.
+ * The call will fail if staddr+count > PDC_STABLE size.
+ */
+int pdc_stable_write(unsigned long staddr, void *memaddr, unsigned long count)
+{
+       int retval;
+
+       spin_lock_irq(&pdc_lock);
+       memcpy(pdc_result, memaddr, count);
+       convert_to_wide(pdc_result);
+       retval = mem_pdc_call(PDC_STABLE, PDC_STABLE_WRITE, staddr,
+               __pa(pdc_result), count);
+       spin_unlock_irq(&pdc_lock);
+
+       return retval;
+}
+EXPORT_SYMBOL(pdc_stable_write);
+
+/**
+ * pdc_stable_get_size - Get Stable Storage size in bytes.
+ * @size: pointer where the size will be stored.
+ *
+ * This PDC call returns the number of bytes in the processor's Stable
+ * Storage, which is the number of contiguous bytes implemented in Stable
+ * Storage starting from staddr=0. size in an unsigned 64-bit integer
+ * which is a multiple of four.
+ */
+int pdc_stable_get_size(unsigned long *size)
+{
+       int retval;
+
+       spin_lock_irq(&pdc_lock);
+       retval = mem_pdc_call(PDC_STABLE, PDC_STABLE_RETURN_SIZE, __pa(pdc_result));
+       *size = pdc_result[0];
+       spin_unlock_irq(&pdc_lock);
+
+       return retval;
+}
+EXPORT_SYMBOL(pdc_stable_get_size);
+
+/**
+ * pdc_stable_verify_contents - Checks that Stable Storage contents are valid.
+ *
+ * This PDC call is meant to be used to check the integrity of the current
+ * contents of Stable Storage.
+ */
+int pdc_stable_verify_contents(void)
+{
+       int retval;
+
+       spin_lock_irq(&pdc_lock);
+       retval = mem_pdc_call(PDC_STABLE, PDC_STABLE_VERIFY_CONTENTS);
+       spin_unlock_irq(&pdc_lock);
+
+       return retval;
+}
+EXPORT_SYMBOL(pdc_stable_verify_contents);
+
+/**
+ * pdc_stable_initialize - Sets Stable Storage contents to zero and initialize
+ * the validity indicator.
+ *
+ * This PDC call will erase all contents of Stable Storage. Use with care!
+ */
+int pdc_stable_initialize(void)
+{
+       int retval;
+
+       spin_lock_irq(&pdc_lock);
+       retval = mem_pdc_call(PDC_STABLE, PDC_STABLE_INITIALIZE);
+       spin_unlock_irq(&pdc_lock);
+
+       return retval;
+}
+EXPORT_SYMBOL(pdc_stable_initialize);
 
 /**
  * pdc_get_initiator - Get the SCSI Interface Card params (SCSI ID, SDTR, SE or LVD)
  * @hwpath: fully bc.mod style path to the device.
- * @scsi_id: what someone told firmware the ID should be.
- * @period: time in cycles 
- * @width: 8 or 16-bit wide bus
- * @mode: 0,1,2 -> SE,HVD,LVD signalling mode
+ * @initiator: the array to return the result into
  *
  * Get the SCSI operational parameters from PDC.
  * Needed since HPUX never used BIOS or symbios card NVRAM.
@@ -591,8 +696,7 @@ EXPORT_SYMBOL(pdc_lan_station_id);
  *    o cable too long (ie SE scsi 10Mhz won't support 6m length),
  *    o bus width exported is less than what the interface chip supports.
  */
-int pdc_get_initiator(struct hardware_path *hwpath, unsigned char *scsi_id,
-		unsigned long *period, char *width, char *mode)
+int pdc_get_initiator(struct hardware_path *hwpath, struct pdc_initiator *initiator)
 {
 	int retval;
 
@@ -604,44 +708,38 @@ int pdc_get_initiator(struct hardware_path *hwpath, unsigned char *scsi_id,
 
 	retval = mem_pdc_call(PDC_INITIATOR, PDC_GET_INITIATOR, 
 			      __pa(pdc_result), __pa(hwpath));
-
 	if (retval < PDC_OK)
-		goto fail;
+		goto out;
 
-	*scsi_id = (unsigned char) pdc_result[0];
-
-	/* convert Bus speed in Mhz to period (in 1/10 ns) */
-	switch (pdc_result[1]) {
-		/*
-		 * case  0:   driver determines rate
-		 * case -1:   Settings are uninitialized.
-		 */
-		case  5:  *period = 2000; break;
-		case 10:  *period = 1000; break;
-		case 20:  *period = 500; break;
-		case 40:  *period = 250; break;
-		case 80:  *period = 125; break;
-		default: /* Do nothing */ break;
+	if (pdc_result[0] < 16) {
+		initiator->host_id = pdc_result[0];
+	} else {
+		initiator->host_id = -1;
 	}
 
-	/* 
-	 * pdc_result[2]	PDC suggested SCSI id
-	 * pdc_result[3]	PDC suggested SCSI rate
+	/*
+	 * Sprockets and Piranha return 20 or 40 (MT/s).  Prelude returns
+	 * 1, 2, 5 or 10 for 5, 10, 20 or 40 MT/s, respectively
 	 */
+	switch (pdc_result[1]) {
+		case  1: initiator->factor = 50; break;
+		case  2: initiator->factor = 25; break;
+		case  5: initiator->factor = 12; break;
+		case 25: initiator->factor = 10; break;
+		case 20: initiator->factor = 12; break;
+		case 40: initiator->factor = 10; break;
+		default: initiator->factor = -1; break;
+	}
 
 	if (IS_SPROCKETS()) {
-		/* 0 == 8-bit, 1 == 16-bit */
-		*width = (char) pdc_result[4];
-
-		/* ...in case someone needs it in the future.
-		 * sym53c8xx.c comments say it can't autodetect
-		 * for 825/825A/875 chips.
-		 *	0 == SE, 1 == HVD, 2 == LVD
-		 */
-		*mode = (char) pdc_result[5]; 
+		initiator->width = pdc_result[4];
+		initiator->mode = pdc_result[5];
+	} else {
+		initiator->width = -1;
+		initiator->mode = -1;
 	}
 
- fail:
+ out:
 	spin_unlock_irq(&pdc_lock);
 	return (retval >= PDC_OK);
 }

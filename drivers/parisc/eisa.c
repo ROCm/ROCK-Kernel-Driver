@@ -29,7 +29,7 @@
 
 #include <linux/init.h>
 #include <linux/ioport.h>
-#include <linux/irq.h>
+#include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
@@ -142,7 +142,7 @@ static unsigned int eisa_irq_level; /* default to edge triggered */
 
 
 /* called by free irq */
-static void eisa_disable_irq(void *irq_dev, int irq)
+static void eisa_disable_irq(unsigned int irq)
 {
 	unsigned long flags;
 
@@ -162,7 +162,7 @@ static void eisa_disable_irq(void *irq_dev, int irq)
 }
 
 /* called by request irq */
-static void eisa_enable_irq(void *irq_dev, int irq)
+static void eisa_enable_irq(unsigned int irq)
 {
 	unsigned long flags;
 	EISA_DBG("enable irq %d\n", irq);
@@ -180,52 +180,24 @@ static void eisa_enable_irq(void *irq_dev, int irq)
 	EISA_DBG("pic1 mask %02x\n", eisa_in8(0xa1));
 }
 
-static void eisa_mask_irq(void *irq_dev, int irq)
+static unsigned int eisa_startup_irq(unsigned int irq)
 {
-	unsigned long flags;
-	EISA_DBG("mask irq %d\n", irq);
-	
-        /* mask irq */
-	spin_lock_irqsave(&eisa_irq_lock, flags);
-	if (irq & 8) {
-		slave_mask |= (1 << (irq&7));
-		eisa_out8(slave_mask, 0xa1);
-	} else {
-		master_mask |= (1 << (irq&7));
-		eisa_out8(master_mask, 0x21);
-	}
-	spin_unlock_irqrestore(&eisa_irq_lock, flags);
+	eisa_enable_irq(irq);
+	return 0;
 }
 
-static void eisa_unmask_irq(void *irq_dev, int irq)
-{
-	unsigned long flags;
-	EISA_DBG("unmask irq %d\n", irq);
-        
-	/* unmask */
-	spin_lock_irqsave(&eisa_irq_lock, flags);
-	if (irq & 8) {
-		slave_mask &= ~(1 << (irq&7));
-		eisa_out8(slave_mask, 0xa1);
-	} else {
-		master_mask &= ~(1 << (irq&7));
-		eisa_out8(master_mask, 0x21);
-	}
-	spin_unlock_irqrestore(&eisa_irq_lock, flags);
-}
-
-static struct irqaction action[IRQ_PER_REGION];
-
-/* EISA needs to be fixed at IRQ region #0 (EISA_IRQ_REGION) */
-static struct irq_region eisa_irq_region = {
-	.ops	= { eisa_disable_irq, eisa_enable_irq, eisa_mask_irq, eisa_unmask_irq },
-	.data	= { .name = "EISA", .irqbase = 0 },
-	.action	= action,
+static struct hw_interrupt_type eisa_interrupt_type = {
+	.typename =	"EISA",
+	.startup =	eisa_startup_irq,
+	.shutdown =	eisa_disable_irq,
+	.enable =	eisa_enable_irq,
+	.disable =	eisa_disable_irq,
+	.ack =		no_ack_irq,
+	.end =		no_end_irq,
 };
 
-static irqreturn_t eisa_irq(int _, void *intr_dev, struct pt_regs *regs)
+static irqreturn_t eisa_irq(int wax_irq, void *intr_dev, struct pt_regs *regs)
 {
-	extern void do_irq(struct irqaction *a, int i, struct pt_regs *p);
 	int irq = gsc_readb(0xfc01f000); /* EISA supports 16 irqs */
 	unsigned long flags;
         
@@ -259,8 +231,7 @@ static irqreturn_t eisa_irq(int _, void *intr_dev, struct pt_regs *regs)
 	}
 	spin_unlock_irqrestore(&eisa_irq_lock, flags);
 
-   
-	do_irq(&eisa_irq_region.action[irq], EISA_IRQ_REGION + irq, regs);
+	__do_IRQ(irq, regs);
    
 	spin_lock_irqsave(&eisa_irq_lock, flags);
 	/* unmask */
@@ -280,6 +251,11 @@ static irqreturn_t dummy_irq2_handler(int _, void *dev, struct pt_regs *regs)
 	printk(KERN_ALERT "eisa: uhh, irq2?\n");
 	return IRQ_HANDLED;
 }
+
+static struct irqaction irq2_action = {
+	.handler = dummy_irq2_handler,
+	.name = "cascade",
+};
 
 static void init_eisa_pic(void)
 {
@@ -331,7 +307,7 @@ static void init_eisa_pic(void)
 
 static int __devinit eisa_probe(struct parisc_device *dev)
 {
-	int result;
+	int i, result;
 
 	char *name = is_mongoose(dev) ? "Mongoose" : "Wax";
 
@@ -361,18 +337,18 @@ static int __devinit eisa_probe(struct parisc_device *dev)
 	}
 	pcibios_register_hba(&eisa_dev.hba);
 
-	result = request_irq(dev->irq, eisa_irq, SA_SHIRQ, "EISA", NULL);
+	result = request_irq(dev->irq, eisa_irq, SA_SHIRQ, "EISA", &eisa_dev);
 	if (result) {
 		printk(KERN_ERR "EISA: request_irq failed!\n");
 		return result;
 	}
 	
 	/* Reserve IRQ2 */
-	action[2].handler = dummy_irq2_handler;
-	action[2].name = "cascade";
+	irq_desc[2].action = &irq2_action;
 	
-	eisa_irq_region.data.dev = dev;
-	irq_region[0] = &eisa_irq_region;
+	for (i = 0; i < 16; i++) {
+		irq_desc[i].handler = &eisa_interrupt_type;
+	}
 	
 	EISA_bus = 1;
 	if (dev->num_addrs) {

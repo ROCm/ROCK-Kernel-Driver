@@ -157,9 +157,6 @@ static void start_net(u_long local);
 
 /*===========================================================================*/
 /* Parameters that can be set with 'insmod' */
-/* Bit map of interrupts to choose from */
-/* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static u_long irq_mask = 0xdeb8;
 
 /* ADHOC=0, Infrastructure=1 */
 static int net_type = ADHOC;
@@ -222,7 +219,6 @@ MODULE_AUTHOR("Corey Thomas <corey@world.std.com>");
 MODULE_DESCRIPTION("Raylink/WebGear wireless LAN driver");
 MODULE_LICENSE("GPL");
 
-module_param(irq_mask, ulong, 0);
 module_param(net_type, int, 0);
 module_param(hop_dwell, int, 0);
 module_param(beacon_period, int, 0);
@@ -354,8 +350,7 @@ static dev_link_t *ray_attach(void)
 
     /* Interrupt setup. For PCMCIA, driver takes what's given */
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-    link->irq.IRQInfo2 = irq_mask;
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->irq.Handler = &ray_interrupt;
 
     /* General socket configuration */
