@@ -444,15 +444,15 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 			temp >>= 1;
 		}
 		nbd_bytesizes[dev] &= ~(nbd_blksizes[dev]-1); 
-		set_capacity(&lo->disk, nbd_bytesizes[dev] >> 9);
+		set_capacity(lo->disk, nbd_bytesizes[dev] >> 9);
 		return 0;
 	case NBD_SET_SIZE:
 		nbd_bytesizes[dev] = arg & ~(nbd_blksizes[dev]-1); 
-		set_capacity(&lo->disk, nbd_bytesizes[dev] >> 9);
+		set_capacity(lo->disk, nbd_bytesizes[dev] >> 9);
 		return 0;
 	case NBD_SET_SIZE_BLOCKS:
 		nbd_bytesizes[dev] = ((u64) arg) << nbd_blksize_bits[dev]; 
-		set_capacity(&lo->disk, nbd_bytesizes[dev] >> 9);
+		set_capacity(lo->disk, nbd_bytesizes[dev] >> 9);
 		return 0;
 	case NBD_DO_IT:
 		if (!lo->file)
@@ -498,6 +498,7 @@ static struct block_device_operations nbd_fops =
 
 static int __init nbd_init(void)
 {
+	int err = -ENOMEM;
 	int i;
 
 	if (sizeof(struct nbd_request) != 28) {
@@ -505,17 +506,25 @@ static int __init nbd_init(void)
 		return -EIO;
 	}
 
+	for (i = 0; i < MAX_NBD; i++) {
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			goto out;
+		nbd_dev[i].disk = disk;
+	}
+
 	if (register_blkdev(MAJOR_NR, "nbd", &nbd_fops)) {
 		printk("Unable to get major number %d for NBD\n",
 		       MAJOR_NR);
-		return -EIO;
+		err = -EIO;
+		goto out;
 	}
 #ifdef MODULE
 	printk("nbd: registered device at major %d\n", MAJOR_NR);
 #endif
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request, &nbd_lock);
 	for (i = 0; i < MAX_NBD; i++) {
-		struct gendisk *disk = &nbd_dev[i].disk;
+		struct gendisk *disk = nbd_dev[i].disk;
 		nbd_dev[i].refcnt = 0;
 		nbd_dev[i].file = NULL;
 		nbd_dev[i].magic = LO_MAGIC;
@@ -541,13 +550,19 @@ static int __init nbd_init(void)
 			       &nbd_fops, NULL);
 
 	return 0;
+out:
+	while (i--)
+		put_disk(nbd_dev[i].disk);
+	return err;
 }
 
 static void __exit nbd_cleanup(void)
 {
 	int i;
-	for (i = 0; i < MAX_NBD; i++)
-		del_gendisk(&nbd_dev[i].disk);
+	for (i = 0; i < MAX_NBD; i++) {
+		del_gendisk(nbd_dev[i].disk);
+		put_disk(nbd_dev[i].disk);
+	}
 	devfs_unregister (devfs_handle);
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 
