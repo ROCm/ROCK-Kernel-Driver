@@ -876,18 +876,19 @@ static int __init ipip_init(void)
 					   ipip_tunnel_setup);
 	if (!ipip_fb_tunnel_dev) {
 		err = -ENOMEM;
-		goto fail;
+		goto err1;
 	}
 
 	ipip_fb_tunnel_dev->init = ipip_fb_tunnel_init;
 
 	if ((err = register_netdev(ipip_fb_tunnel_dev)))
-	    goto fail;
+		goto err2;
  out:
 	return err;
- fail:
-	xfrm4_tunnel_deregister(&ipip_handler);
+ err2:
 	free_netdev(ipip_fb_tunnel_dev);
+ err1:
+	xfrm4_tunnel_deregister(&ipip_handler);
 	goto out;
 }
 
