@@ -256,8 +256,8 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 
 #ifndef elf_map
 
-static inline unsigned long
-elf_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int prot, int type)
+static unsigned long elf_map(struct file *filep, unsigned long addr,
+			struct elf_phdr *eppnt, int prot, int type)
 {
 	unsigned long map_addr;
 
@@ -934,7 +934,7 @@ static int dump_seek(struct file *file, off_t off)
  *
  * I think we should skip something. But I am not sure how. H.J.
  */
-static inline int maydump(struct vm_area_struct *vma)
+static int maydump(struct vm_area_struct *vma)
 {
 	/*
 	 * If we may not read the contents, don't allow us to dump
@@ -1046,7 +1046,7 @@ static inline void fill_elf_note_phdr(struct elf_phdr *phdr, int sz, off_t offse
 	return;
 }
 
-static inline void fill_note(struct memelfnote *note, const char *name, int type, 
+static void fill_note(struct memelfnote *note, const char *name, int type, 
 		unsigned int sz, void *data)
 {
 	note->name = name;
@@ -1060,7 +1060,8 @@ static inline void fill_note(struct memelfnote *note, const char *name, int type
  * fill up all the fields in prstatus from the given task struct, except registers
  * which need to be filled up separately.
  */
-static inline void fill_prstatus(struct elf_prstatus *prstatus, struct task_struct *p, long signr) 
+static void fill_prstatus(struct elf_prstatus *prstatus,
+			struct task_struct *p, long signr) 
 {
 	prstatus->pr_info.si_signo = prstatus->pr_cursig = signr;
 	prstatus->pr_sigpend = p->pending.signal.sig[0];
@@ -1075,7 +1076,7 @@ static inline void fill_prstatus(struct elf_prstatus *prstatus, struct task_stru
 	jiffies_to_timeval(p->cstime, &prstatus->pr_cstime);
 }
 
-static inline void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p)
+static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p)
 {
 	int i, len;
 	
