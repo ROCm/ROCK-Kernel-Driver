@@ -48,6 +48,7 @@ extern void cap_bprm_compute_creds (struct linux_binprm *bprm);
 extern int cap_task_post_setuid (uid_t old_ruid, uid_t old_euid, uid_t old_suid, int flags);
 extern void cap_task_kmod_set_label (void);
 extern void cap_task_reparent_to_init (struct task_struct *p);
+extern int cap_syslog (int type);
 
 static inline int cap_netlink_send (struct sk_buff *skb)
 {
@@ -61,7 +62,6 @@ static inline int cap_netlink_recv (struct sk_buff *skb)
 		return -EPERM;
 	return 0;
 }
-
 
 /*
  * Values used in the task_security_ops calls
@@ -351,10 +351,6 @@ struct swap_info_struct;
  *	@mnt is the vfsmount where the dentry was looked up
  *	@dentry contains the dentry structure for the file.
  *	Return 0 if permission is granted.
- * @inode_post_lookup:
- *	Set the security attributes for a file after it has been looked up.
- *	@inode contains the inode structure for parent directory.
- *	@d contains the dentry structure for the file.
  * @inode_delete:
  *	@inode contains the inode structure for deleted inode.
  *	This hook is called when a deleted inode is released (i.e. an inode
@@ -926,11 +922,23 @@ struct swap_info_struct;
  *	is NULL.
  *	@file contains the file structure for the accounting file (may be NULL).
  *	Return 0 if permission is granted.
+ * @sysctl:
+ *	Check permission before accessing the @table sysctl variable in the
+ *	manner specified by @op.
+ *	@table contains the ctl_table structure for the sysctl variable.
+ *	@op contains the operation (001 = search, 002 = write, 004 = read).
+ *	Return 0 if permission is granted.
  * @capable:
  *	Check whether the @tsk process has the @cap capability.
  *	@tsk contains the task_struct for the process.
  *	@cap contains the capability <include/linux/capability.h>.
  *	Return 0 if the capability is granted for @tsk.
+ * @syslog:
+ *	Check permission before accessing the kernel message ring or changing
+ *	logging to the console.
+ *	See the syslog(2) manual page for an explanation of the @type values.  
+ *	@type contains the type of action.
+ *	Return 0 if permission is granted.
  *
  * @register_security:
  * 	allow module stacking.
@@ -957,9 +965,11 @@ struct security_operations {
 			    kernel_cap_t * inheritable,
 			    kernel_cap_t * permitted);
 	int (*acct) (struct file * file);
+	int (*sysctl) (ctl_table * table, int op);
 	int (*capable) (struct task_struct * tsk, int cap);
 	int (*quotactl) (int cmds, int type, int id, struct super_block * sb);
 	int (*quota_on) (struct file * f);
+	int (*syslog) (int type);
 
 	int (*bprm_alloc_security) (struct linux_binprm * bprm);
 	void (*bprm_free_security) (struct linux_binprm * bprm);
@@ -969,6 +979,7 @@ struct security_operations {
 
 	int (*sb_alloc_security) (struct super_block * sb);
 	void (*sb_free_security) (struct super_block * sb);
+	int (*sb_kern_mount) (struct super_block *sb);
 	int (*sb_statfs) (struct super_block * sb);
 	int (*sb_mount) (char *dev_name, struct nameidata * nd,
 			 char *type, unsigned long flags, void *data);
@@ -1022,7 +1033,6 @@ struct security_operations {
 	int (*inode_permission_lite) (struct inode *inode, int mask);
 	int (*inode_setattr)	(struct dentry *dentry, struct iattr *attr);
 	int (*inode_getattr) (struct vfsmount *mnt, struct dentry *dentry);
-	void (*inode_post_lookup) (struct inode *inode, struct dentry *d);
         void (*inode_delete) (struct inode *inode);
 	int (*inode_setxattr) (struct dentry *dentry, char *name, void *value,
 			       size_t size, int flags);
@@ -1111,6 +1121,8 @@ struct security_operations {
 	int (*unregister_security) (const char *name,
 	                            struct security_operations *ops);
 
+	void (*d_instantiate) (struct dentry *dentry, struct inode *inode);
+
 #ifdef CONFIG_SECURITY_NETWORK
 	int (*unix_stream_connect) (struct socket * sock,
 				    struct socket * other, struct sock * newsk);
@@ -1178,6 +1190,11 @@ static inline int security_acct (struct file *file)
 	return security_ops->acct (file);
 }
 
+static inline int security_sysctl(ctl_table * table, int op)
+{
+	return security_ops->sysctl(table, op);
+}
+
 static inline int security_quotactl (int cmds, int type, int id,
 				     struct super_block *sb)
 {
@@ -1187,6 +1204,11 @@ static inline int security_quotactl (int cmds, int type, int id,
 static inline int security_quota_on (struct file * file)
 {
 	return security_ops->quota_on (file);
+}
+
+static inline int security_syslog(int type)
+{
+	return security_ops->syslog(type);
 }
 
 static inline int security_bprm_alloc (struct linux_binprm *bprm)
@@ -1218,6 +1240,11 @@ static inline int security_sb_alloc (struct super_block *sb)
 static inline void security_sb_free (struct super_block *sb)
 {
 	security_ops->sb_free_security (sb);
+}
+
+static inline int security_sb_kern_mount (struct super_block *sb)
+{
+	return security_ops->sb_kern_mount (sb);
 }
 
 static inline int security_sb_statfs (struct super_block *sb)
@@ -1424,12 +1451,6 @@ static inline int security_inode_getattr (struct vfsmount *mnt,
 					  struct dentry *dentry)
 {
 	return security_ops->inode_getattr (mnt, dentry);
-}
-
-static inline void security_inode_post_lookup (struct inode *inode,
-					       struct dentry *dentry)
-{
-	security_ops->inode_post_lookup (inode, dentry);
 }
 
 static inline void security_inode_delete (struct inode *inode)
@@ -1729,6 +1750,11 @@ static inline int security_sem_semop (struct sem_array * sma,
 	return security_ops->sem_semop(sma, sops, nsops, alter);
 }
 
+static inline void security_d_instantiate (struct dentry *dentry, struct inode *inode)
+{
+	security_ops->d_instantiate (dentry, inode);
+}
+
 static inline int security_netlink_send(struct sk_buff * skb)
 {
 	return security_ops->netlink_send(skb);
@@ -1793,6 +1819,11 @@ static inline int security_acct (struct file *file)
 	return 0;
 }
 
+static inline int security_sysctl(ctl_table * table, int op)
+{
+	return 0;
+}
+
 static inline int security_quotactl (int cmds, int type, int id,
 				     struct super_block * sb)
 {
@@ -1802,6 +1833,11 @@ static inline int security_quotactl (int cmds, int type, int id,
 static inline int security_quota_on (struct file * file)
 {
 	return 0;
+}
+
+static inline int security_syslog(int type)
+{
+	return cap_syslog(type);
 }
 
 static inline int security_bprm_alloc (struct linux_binprm *bprm)
@@ -1834,6 +1870,11 @@ static inline int security_sb_alloc (struct super_block *sb)
 
 static inline void security_sb_free (struct super_block *sb)
 { }
+
+static inline int security_sb_kern_mount (struct super_block *sb)
+{
+	return 0;
+}
 
 static inline int security_sb_statfs (struct super_block *sb)
 {
@@ -2012,10 +2053,6 @@ static inline int security_inode_getattr (struct vfsmount *mnt,
 {
 	return 0;
 }
-
-static inline void security_inode_post_lookup (struct inode *inode,
-					       struct dentry *dentry)
-{ }
 
 static inline void security_inode_delete (struct inode *inode)
 { }
@@ -2299,6 +2336,9 @@ static inline int security_sem_semop (struct sem_array * sma,
 {
 	return 0;
 }
+
+static inline void security_d_instantiate (struct dentry *dentry, struct inode *inode)
+{ }
 
 /*
  * The netlink capability defaults need to be used inline by default

@@ -75,6 +75,11 @@ static int dummy_capable (struct task_struct *tsk, int cap)
 	return -EPERM;
 }
 
+static int dummy_sysctl (ctl_table * table, int op)
+{
+	return 0;
+}
+
 static int dummy_quotactl (int cmds, int type, int id, struct super_block *sb)
 {
 	return 0;
@@ -82,6 +87,13 @@ static int dummy_quotactl (int cmds, int type, int id, struct super_block *sb)
 
 static int dummy_quota_on (struct file *f)
 {
+	return 0;
+}
+
+static int dummy_syslog (int type)
+{
+	if ((type != 3) && current->euid)
+		return -EPERM;
 	return 0;
 }
 
@@ -118,6 +130,11 @@ static int dummy_sb_alloc_security (struct super_block *sb)
 static void dummy_sb_free_security (struct super_block *sb)
 {
 	return;
+}
+
+static int dummy_sb_kern_mount (struct super_block *sb)
+{
+	return 0;
 }
 
 static int dummy_sb_statfs (struct super_block *sb)
@@ -304,11 +321,6 @@ static int dummy_inode_setattr (struct dentry *dentry, struct iattr *iattr)
 static int dummy_inode_getattr (struct vfsmount *mnt, struct dentry *dentry)
 {
 	return 0;
-}
-
-static void dummy_inode_post_lookup (struct inode *ino, struct dentry *d)
-{
-	return;
 }
 
 static void dummy_inode_delete (struct inode *ino)
@@ -719,6 +731,12 @@ static int dummy_unregister_security (const char *name, struct security_operatio
 	return -EINVAL;
 }
 
+static void dummy_d_instantiate (struct dentry *dentry, struct inode *inode)
+{
+	return;
+}
+
+
 struct security_operations dummy_security_ops;
 
 #define set_to_dummy_if_null(ops, function)				\
@@ -740,6 +758,8 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, capable);
 	set_to_dummy_if_null(ops, quotactl);
 	set_to_dummy_if_null(ops, quota_on);
+	set_to_dummy_if_null(ops, sysctl);
+	set_to_dummy_if_null(ops, syslog);
 	set_to_dummy_if_null(ops, bprm_alloc_security);
 	set_to_dummy_if_null(ops, bprm_free_security);
 	set_to_dummy_if_null(ops, bprm_compute_creds);
@@ -747,6 +767,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, bprm_check_security);
 	set_to_dummy_if_null(ops, sb_alloc_security);
 	set_to_dummy_if_null(ops, sb_free_security);
+	set_to_dummy_if_null(ops, sb_kern_mount);
 	set_to_dummy_if_null(ops, sb_statfs);
 	set_to_dummy_if_null(ops, sb_mount);
 	set_to_dummy_if_null(ops, sb_check_sb);
@@ -780,7 +801,6 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, inode_permission_lite);
 	set_to_dummy_if_null(ops, inode_setattr);
 	set_to_dummy_if_null(ops, inode_getattr);
-	set_to_dummy_if_null(ops, inode_post_lookup);
 	set_to_dummy_if_null(ops, inode_delete);
 	set_to_dummy_if_null(ops, inode_setxattr);
 	set_to_dummy_if_null(ops, inode_getxattr);
@@ -839,6 +859,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, netlink_recv);
 	set_to_dummy_if_null(ops, register_security);
 	set_to_dummy_if_null(ops, unregister_security);
+	set_to_dummy_if_null(ops, d_instantiate);
 #ifdef CONFIG_SECURITY_NETWORK
 	set_to_dummy_if_null(ops, unix_stream_connect);
 	set_to_dummy_if_null(ops, unix_may_send);
