@@ -40,9 +40,9 @@
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/timer.h>
+#include <linux/poll.h>
 #include <linux/unistd.h>
 #include <linux/byteorder/swabb.h>
-#include <linux/poll.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <stdarg.h>
@@ -194,16 +194,21 @@ static u32 debiread(struct av7110 *av7110, u32 config, int addr, int count)
 	return result;
 }
 
-/* DEBI during interrupt */
 
-/* fixme: val can be a pointer to a memory or an u32 value -- this 
-   won't work on 64bit platforms! */
+/* DEBI during interrupt */
+/* single word writes */
 static inline void iwdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
 {
-        if (count>4 && val)
-                memcpy(av7110->debi_virt, (char *) val, count);
         debiwrite(av7110, config, addr, val, count);
 }
+
+/* buffer writes */
+static inline void mwdebi(struct av7110 *av7110, u32 config, int addr, char *val, int count)
+{
+	memcpy(av7110->debi_virt, val, count);
+        debiwrite(av7110, config, addr, 0, count);
+}
+
 
 static inline u32 irdebi(struct av7110 *av7110, u32 config, int addr, u32 val, int count)
 {
@@ -1913,8 +1918,8 @@ static int load_dram(struct av7110 *av7110, u32 *data, int len)
                 if (waitdebi(av7110, BOOT_STATE, BOOTSTATE_BUFFER_EMPTY) < 0)
                         return -1;
                 DEB_D(("Writing DRAM block %d\n",i));
-                iwdebi(av7110, DEBISWAB, bootblock,
-                       i*(BOOT_MAX_SIZE)+(u32)data,
+                mwdebi(av7110, DEBISWAB, bootblock,
+                       ((char*)data) + i*(BOOT_MAX_SIZE),
                        BOOT_MAX_SIZE);
                 bootblock^=0x1400;
                 iwdebi(av7110, DEBISWAB, BOOT_BASE, swab32(base), 4);
@@ -1927,9 +1932,9 @@ static int load_dram(struct av7110 *av7110, u32 *data, int len)
                 if (waitdebi(av7110, BOOT_STATE, BOOTSTATE_BUFFER_EMPTY) < 0)
                         return -1;
                 if (rest>4)
-                        iwdebi(av7110, DEBISWAB, bootblock, i*(BOOT_MAX_SIZE)+(u32)data, rest);
+                        mwdebi(av7110, DEBISWAB, bootblock, ((char*)data) + i*(BOOT_MAX_SIZE), rest);
                 else
-                        iwdebi(av7110, DEBISWAB, bootblock, i*(BOOT_MAX_SIZE)-4+(u32)data, rest+4);
+                        mwdebi(av7110, DEBISWAB, bootblock, ((char*)data) + i*(BOOT_MAX_SIZE) - 4, rest+4);
                 
                 iwdebi(av7110, DEBISWAB, BOOT_BASE, swab32(base), 4);
                 iwdebi(av7110, DEBINOSWAP, BOOT_SIZE, rest, 2);
@@ -2013,7 +2018,7 @@ static int bootarm(struct av7110 *av7110)
         //saa7146_setgpio(dev, DEBI_DONE_LINE, SAA7146_GPIO_INPUT);
         //saa7146_setgpio(dev, 3, SAA7146_GPIO_INPUT);
 
-        iwdebi(av7110, DEBISWAB, DPRAM_BASE, (u32) bootcode, sizeof(bootcode));
+	mwdebi(av7110, DEBISWAB, DPRAM_BASE, bootcode, sizeof(bootcode));
         iwdebi(av7110, DEBINOSWAP, BOOT_STATE, BOOTSTATE_BUFFER_FULL, 2);
         
         wait_for_debi_done(av7110);
@@ -2031,7 +2036,7 @@ static int bootarm(struct av7110 *av7110)
         
         DEB_D(("bootarm: load dpram code\n"));
 
-	iwdebi(av7110, DEBISWAB, DPRAM_BASE, (u32) Dpram, sizeof(Dpram));
+	mwdebi(av7110, DEBISWAB, DPRAM_BASE, Dpram, sizeof(Dpram));
 
 	wait_for_debi_done(av7110);
 
@@ -2755,7 +2760,7 @@ int av7110_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 
 		DEB_EE(("VIDIOC_G_TUNER: %d\n", t->index));
 
-		if( 0 == av7110->has_analog_tuner || av7110->current_input != 1 ) {
+		if( 0 == av7110->has_analog_tuner || t->index != 0 ) {
 			return -EINVAL;
 		}
 
@@ -3270,7 +3275,7 @@ static int dvb_get_stc(struct dmx_demux *demux, unsigned int num,
 	DEB_EE(("av7110: fwstc = %04hx %04hx %04hx %04hx\n",
 			fwstc[0], fwstc[1], fwstc[2], fwstc[3]));
 
-	*stc =  (((uint64_t)(~fwstc[2]) & 1) << 32) |
+	*stc =  (((uint64_t) ((fwstc[3] & 0x8000) >> 15)) << 32) |
 		(((uint64_t)fwstc[1])     << 16) | ((uint64_t)fwstc[0]);
 	*base = 1;
 
@@ -3643,17 +3648,22 @@ static unsigned int dvb_video_poll(struct file *file, poll_table *wait)
 
 	DEB_EE(("av7110: %p\n",av7110));
 
+	if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
 	poll_wait(file, &av7110->avout.queue, wait);
+	}
+	
 	poll_wait(file, &av7110->video_events.wait_queue, wait);
 
 	if (av7110->video_events.eventw != av7110->video_events.eventr)
 		mask = POLLPRI;
 
+	if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
 	if (av7110->playing) {
                 if (FREE_COND)
                         mask |= (POLLOUT | POLLWRNORM);
         } else /* if not playing: may play if asked for */
                 mask |= (POLLOUT | POLLWRNORM);
+	}
 
         return mask;
 }
@@ -3665,6 +3675,10 @@ static ssize_t dvb_video_write(struct file *file, const char *buf,
         struct av7110 *av7110=(struct av7110 *) dvbdev->priv;
 
 	DEB_EE(("av7110: %p\n",av7110));
+
+	if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
+		return -EPERM;
+	}
 
         if (av7110->videostate.stream_source!=VIDEO_SOURCE_MEMORY) 
                 return -EPERM;
@@ -3703,6 +3717,10 @@ static int play_iframe(struct av7110 *av7110, u8 *buf, unsigned int len, int non
                 n=MIN_IFRAME/len+1;
         }
 
+	/* setting n always > 1, fixes problems when playing stillframes
+	   consisting of I- and P-Frames */
+	n=MIN_IFRAME/len+1;
+	
 	/* FIXME: nonblock? */
 	dvb_play(av7110, iframe_header, sizeof(iframe_header), 0, 1, 0);
 
@@ -3724,9 +3742,12 @@ static int dvb_video_ioctl(struct inode *inode, struct file *file,
         
 	DEB_EE(("av7110: %p\n",av7110));
 
-        if (((file->f_flags&O_ACCMODE)==O_RDONLY) &&
-            (cmd!=VIDEO_GET_STATUS))
+        if ((file->f_flags&O_ACCMODE)==O_RDONLY) {
+		if ( cmd!=VIDEO_GET_STATUS && cmd!=VIDEO_GET_EVENT && 
+		     cmd!=VIDEO_GET_SIZE ) {
                 return -EPERM;
+		}
+	}
         
         switch (cmd) {
         case VIDEO_STOP:
@@ -4040,15 +4061,17 @@ static int dvb_video_open(struct inode *inode, struct file *file)
 
         if ((err=dvb_generic_open(inode, file))<0)
                 return err;
+
+	if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
         dvb_ringbuffer_flush_spinlock_wakeup(&av7110->aout);
         dvb_ringbuffer_flush_spinlock_wakeup(&av7110->avout);
         av7110->video_blank=1;
         av7110->audiostate.AV_sync_state=1;
         av7110->videostate.stream_source=VIDEO_SOURCE_DEMUX;
 
-	if ((file->f_flags & O_ACCMODE) != O_RDONLY)
 		/*  empty event queue */
 		av7110->video_events.eventr = av7110->video_events.eventw = 0;
+	}
 
         return 0;
 }
@@ -4060,7 +4083,10 @@ static int dvb_video_release(struct inode *inode, struct file *file)
 
 	DEB_EE(("av7110: %p\n",av7110));
 
+	if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
         AV_Stop(av7110, RP_VIDEO);
+	}
+
         return dvb_generic_release(inode, file);
 }
 
@@ -4107,7 +4133,8 @@ static struct file_operations dvb_video_fops = {
 
 static struct dvb_device dvbdev_video = {
 	.priv		= 0,
-	.users		= 1,
+	.users		= 6,
+	.readers	= 5,	/* arbitrary */
 	.writers	= 1,
 	.fops		= &dvb_video_fops,
 	.kernel_ioctl	= dvb_video_ioctl,
@@ -4699,6 +4726,7 @@ MAKE_AV7110_INFO(unkwn0, "Technotrend/Hauppauge PCI rev?(unknown0)?");
 MAKE_AV7110_INFO(unkwn1, "Technotrend/Hauppauge PCI rev?(unknown1)?");
 MAKE_AV7110_INFO(unkwn2, "Technotrend/Hauppauge PCI rev?(unknown2)?");
 MAKE_AV7110_INFO(nexus,  "Technotrend/Hauppauge Nexus PCI DVB-S");
+MAKE_AV7110_INFO(dvboc11,"Octal/Technotrend DVB-C for iTV");
 
 static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(fs_1_5, 0x110a, 0xffff),
@@ -4715,6 +4743,7 @@ static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(unkwn1, 0xffc2, 0x0000),
 	MAKE_EXTENSION_PCI(unkwn2, 0x00a1, 0x00a1),
 	MAKE_EXTENSION_PCI(nexus,  0x00a1, 0xa1a0),
+	MAKE_EXTENSION_PCI(dvboc11,0x13c2, 0x000a),
 	{
 		.vendor    = 0,
 	}
