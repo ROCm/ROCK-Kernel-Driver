@@ -488,7 +488,7 @@ typedef pte_t *pte_addr_t;
 #define pgtable_cache_init()	do { } while (0)
 
 /* These tell get_user_pages() that the first gate page is accessible from user-level.  */
-#define FIXADDR_START	GATE_ADDR
-#define FIXADDR_TOP	(GATE_ADDR + 2*PAGE_SIZE)
+#define FIXADDR_USER_START	GATE_ADDR
+#define FIXADDR_USER_END	(GATE_ADDR + 2*PAGE_SIZE)
 
 #endif /* _ASM_IA64_PGTABLE_H */
