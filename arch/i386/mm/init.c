@@ -130,7 +130,7 @@ static void __init page_table_range_init (unsigned long start, unsigned long end
 
 static inline int is_kernel_text(unsigned long addr)
 {
-	if (addr >= (unsigned long)_stext && addr <= (unsigned long)__init_end)
+	if (addr >= PAGE_OFFSET && addr <= (unsigned long)__init_end)
 		return 1;
 	return 0;
 }
