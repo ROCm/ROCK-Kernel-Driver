@@ -103,22 +103,23 @@
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
-#include <linux/sched.h>
+#include <linux/interrupt.h>
+#include <linux/wait.h>
+#include <linux/mm.h>
 #include <linux/delay.h>
 #include <linux/sound.h>
 #include <linux/slab.h>
 #include <linux/soundcard.h>
 #include <linux/pci.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/wrapper.h>
-#include <asm/uaccess.h>
-#include <asm/hardirq.h>
 #include <linux/gameport.h>
+
+#include <asm/io.h>
+#include <asm/uaccess.h>
 
 #include "dm.h"
 

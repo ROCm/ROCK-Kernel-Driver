@@ -22,6 +22,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
 /* Mon Nov 22 22:38:35 MET 1993 marco@driq.home.usn.nl:

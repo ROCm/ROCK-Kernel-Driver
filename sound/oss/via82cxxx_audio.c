@@ -22,6 +22,7 @@
 #include <linux/mm.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
 #include <linux/sound.h>
@@ -34,7 +35,6 @@
 #include <linux/delay.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
 #include <asm/semaphore.h>
 #include "sound_config.h"
 #include "dev_table.h"

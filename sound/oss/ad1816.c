@@ -35,6 +35,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/isapnp.h>
 #include <linux/stddef.h>
 #include <linux/spinlock.h>
