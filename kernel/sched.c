@@ -4631,7 +4631,7 @@ void __might_sleep(char *file, int line)
 	static unsigned long prev_jiffy;	/* ratelimiting */
 
 	if ((in_atomic() || irqs_disabled()) &&
-	    system_state == SYSTEM_RUNNING) {
+	    system_state == SYSTEM_RUNNING && !oops_in_progress) {
 		if (time_before(jiffies, prev_jiffy + HZ) && prev_jiffy)
 			return;
 		prev_jiffy = jiffies;
