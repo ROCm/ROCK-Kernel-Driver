@@ -158,7 +158,7 @@ sctp_xmit_t sctp_packet_transmit_chunk(struct sctp_packet *packet,
 /* Append a chunk to the offered packet reporting back any inability to do
  * so.
  */
-sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet, 
+sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 				     struct sctp_chunk *chunk)
 {
 	sctp_xmit_t retval = SCTP_XMIT_OK;
@@ -180,7 +180,7 @@ sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
 		/* Both control chunks and data chunks with TSNs are
 		 * non-fragmentable.
 		 */
-		int fragmentable = sctp_chunk_is_data(chunk) && 
+		int fragmentable = sctp_chunk_is_data(chunk) &&
 			(!chunk->has_tsn);
 		if (packet_empty) {
 			if (fragmentable) {
@@ -470,15 +470,16 @@ static void sctp_packet_reset(struct sctp_packet *packet)
 }
 
 /* This private function handles the specifics of appending DATA chunks.  */
-static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet, 
+static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 					   struct sctp_chunk *chunk)
 {
 	sctp_xmit_t retval = SCTP_XMIT_OK;
 	size_t datasize, rwnd, inflight;
 	struct sctp_transport *transport = packet->transport;
 	__u32 max_burst_bytes;
-	struct sctp_opt *sp = sctp_sk(transport->asoc->base.sk);
-	struct sctp_outq *q = &transport->asoc->outqueue;
+	struct sctp_association *asoc = transport->asoc;
+	struct sctp_opt *sp = sctp_sk(asoc->base.sk);
+	struct sctp_outq *q = &asoc->outqueue;
 
 	/* RFC 2960 6.1  Transmission of DATA Chunks
 	 *
@@ -493,8 +494,8 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 	 * receiver to the data sender.
 	 */
 
-	rwnd = transport->asoc->peer.rwnd;
-	inflight = transport->asoc->outqueue.outstanding_bytes;
+	rwnd = asoc->peer.rwnd;
+	inflight = asoc->outqueue.outstanding_bytes;
 
 	datasize = sctp_data_size(chunk);
 
@@ -516,7 +517,7 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 	 * 	if ((flightsize + Max.Burst * MTU) < cwnd)
 	 *		cwnd = flightsize + Max.Burst * MTU
 	 */
-	max_burst_bytes = transport->asoc->max_burst * transport->asoc->pmtu;
+	max_burst_bytes = asoc->max_burst * asoc->pmtu;
 	if ((transport->flight_size + max_burst_bytes) < transport->cwnd) {
 		transport->cwnd = transport->flight_size + max_burst_bytes;
 		SCTP_DEBUG_PRINTK("%s: cwnd limited by max_burst: "
@@ -549,26 +550,20 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 		}
 
 	/* Nagle's algorithm to solve small-packet problem:
-	 * inhibit the sending of new chunks when new outgoing data arrives 
-	 * if any proeviously transmitted data on the connection remains
-	 * unacknowledged. Unless the connection was previously idle. Check 
-	 * whether the connection is idle. No outstanding means idle, flush
-	 * it. If outstanding bytes are less than half cwnd, the connection
-	 * is not in the state of congestion, so also flush it. 
+	 * Inhibit the sending of new chunks when new outgoing data arrives
+	 * if any previously transmitted data on the connection remains
+	 * unacknowledged.
 	 */
-	if (!sp->nodelay && q->outstanding_bytes >= transport->cwnd >> 1) {
-		/* Check whether this chunk and all the rest of pending 
-		 * data will fit or whether we'll choose to delay in
-		 * hopes of bundling a full sized packet. 
+	if (!sp->nodelay && q->outstanding_bytes) {
+		unsigned len = datasize + q->out_qlen;
+		/* Check whether this chunk and all the rest of pending
+		 * data will fit or delay in hopes of bundling a full
+		 * sized packet.
 		 */
-		if ((datasize + q->out_qlen) < transport->asoc->frag_point) {
-						    
-			/* If the the chunk should be delay
-			 * for future sending, we could not
-			 * append it.
-			 */
+
+		if (len < asoc->pmtu - SCTP_IP_OVERHEAD) {
 			retval = SCTP_XMIT_NAGLE_DELAY;
-			goto finish;		
+			goto finish;
 		}
 	}
 
@@ -576,16 +571,15 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 	transport->flight_size += datasize;
 
 	/* Keep track of how many bytes are in flight to the receiver. */
-	transport->asoc->outqueue.outstanding_bytes += datasize;
+	asoc->outqueue.outstanding_bytes += datasize;
 
 	/* Update our view of the receiver's rwnd. */
-	if (datasize < rwnd) {
+	if (datasize < rwnd)
 		rwnd -= datasize;
-	} else {
+	else
 		rwnd = 0;
-	}
 
-	transport->asoc->peer.rwnd = rwnd;
+	asoc->peer.rwnd = rwnd;
 
 finish:
 	return retval;

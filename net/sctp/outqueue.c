@@ -89,6 +89,16 @@ static inline void sctp_outq_tail_data(struct sctp_outq *q,
 	return;
 }
 
+/* Insert a chunk behind chunk 'pos'. */
+static inline void sctp_outq_insert_data(struct sctp_outq *q,
+					 struct sctp_chunk *ch,
+					 struct sctp_chunk *pos)
+{
+	__skb_insert((struct sk_buff *)ch, (struct sk_buff *)pos->prev, 
+		     (struct sk_buff *)pos, pos->list);
+	q->out_qlen += ch->skb->len;
+}
+
 /* Generate a new outqueue.  */
 struct sctp_outq *sctp_outq_new(sctp_association_t *asoc)
 {
@@ -478,8 +488,8 @@ static int sctp_outq_flush_rtx(struct sctp_outq *q, struct sctp_packet *pkt,
  * queue.  'pos' points to the next chunk in the output queue after the
  * chunk that is currently in the process of fragmentation.
  */
-void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
-		    struct sctp_packet *packet, sctp_chunk_t *frag, __u32 tsn)
+void sctp_xmit_frag(struct sctp_outq *q, struct sctp_chunk *pos,
+		struct sctp_packet *packet, struct sctp_chunk *frag, __u32 tsn)
 {
 	struct sctp_transport *transport = packet->transport;
 	struct sk_buff_head *queue = &q->out;
@@ -497,11 +507,10 @@ void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
 		SCTP_DEBUG_PRINTK("sctp_xmit_frag: q not empty. "
 				  "adding 0x%x to outqueue\n",
 				  ntohl(frag->subh.data_hdr->tsn));
-		if (pos)
-			__skb_insert((struct sk_buff *)frag, pos->prev,
-				     pos, pos->list);
+		if (pos)		
+			sctp_outq_insert_data(q, frag, pos);
 		else
-			__skb_queue_tail(queue, (struct sk_buff *) frag);
+			sctp_outq_tail_data(q, frag);
 		return;
 	}
 
@@ -514,10 +523,9 @@ void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
 				  "adding 0x%x to outqueue\n",
 				  ntohl(frag->subh.data_hdr->tsn));
 		if (pos)
-			__skb_insert((struct sk_buff *)frag, pos->prev,
-				     pos, pos->list);
+			sctp_outq_insert_data(q, frag, pos);
 		else
-			__skb_queue_tail(queue, (struct sk_buff *)frag);
+			sctp_outq_tail_data(q, frag);
 		break;
 
 	case SCTP_XMIT_OK:
@@ -530,10 +538,9 @@ void sctp_xmit_frag(struct sctp_outq *q, struct sk_buff *pos,
 					  "failed. adding 0x%x to outqueue\n",
 					  ntohl(frag->subh.data_hdr->tsn));
 			if (pos)
-				__skb_insert((struct sk_buff *)frag, pos->prev,
-					     pos, pos->list);
+				sctp_outq_insert_data(q, frag, pos);
 			else
-				__skb_queue_tail(queue,(struct sk_buff *)frag);
+				sctp_outq_tail_data(q, frag);
 		} else {
 			SCTP_DEBUG_PRINTK("sctp_xmit_frag: force output "
 					  "success. 0x%x sent\n",
@@ -561,7 +568,7 @@ void sctp_xmit_fragmented_chunks(struct sctp_outq *q, struct sctp_packet *pkt,
 	struct list_head *lfrag, *frag_list;
 	__u32 tsn;
 	int nfrags = 1;
-	struct sk_buff *pos;
+	struct sctp_chunk *pos;
 
 	/* Count the number of fragments. */
 	frag_list = &frag->frag_list;
@@ -572,7 +579,7 @@ void sctp_xmit_fragmented_chunks(struct sctp_outq *q, struct sctp_packet *pkt,
 	/* Get a TSN block of nfrags TSNs. */
 	tsn = sctp_association_get_tsn_block(asoc, nfrags);
 
-	pos = skb_peek(&q->out);
+	pos = (struct sctp_chunk *)skb_peek(&q->out);
 	/* Transmit the first fragment. */
 	sctp_xmit_frag(q, pos, pkt, frag, tsn++);
 
@@ -735,7 +742,7 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 	}
 
 	queue = &q->control;
-	while (NULL != (chunk = (sctp_chunk_t *)skb_dequeue(queue))) {
+	while ((chunk = (sctp_chunk_t *)skb_dequeue(queue))) {
 		/* Pick the right transport to use. */
 		new_transport = chunk->transport;
 
