@@ -138,7 +138,11 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev,
 	const int offset = ALIGN(sizeof(struct scsi_request), 4);
 	const int size = offset + sizeof(struct request);
 	struct scsi_request *sreq;
-  
+
+
+	if (!get_device(&sdev->sdev_gendev))
+		return NULL;
+
 	sreq = kmalloc(size, gfp_mask);
 	if (likely(sreq != NULL)) {
 		memset(sreq, 0, size);
@@ -147,7 +151,8 @@ struct scsi_request *scsi_allocate_request(struct scsi_device *sdev,
 		sreq->sr_host = sdev->host;
 		sreq->sr_magic = SCSI_REQ_MAGIC;
 		sreq->sr_data_direction = DMA_BIDIRECTIONAL;
-	}
+	} else
+		put_device(&sdev->sdev_gendev);
 
 	return sreq;
 }
@@ -190,6 +195,10 @@ void __scsi_release_request(struct scsi_request *sreq)
 void scsi_release_request(struct scsi_request *sreq)
 {
 	__scsi_release_request(sreq);
+
+	if (sreq->sr_device)
+		put_device(&sreq->sr_device->sdev_gendev);
+
 	kfree(sreq);
 }
 EXPORT_SYMBOL(scsi_release_request);
