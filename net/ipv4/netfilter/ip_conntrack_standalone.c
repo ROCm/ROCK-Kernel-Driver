@@ -15,7 +15,6 @@
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
 #include <linux/version.h>
-#include <linux/brlock.h>
 #include <net/checksum.h>
 
 #define ASSERT_READ_LOCK(x) MUST_BE_READ_LOCKED(&ip_conntrack_lock)
@@ -342,8 +341,7 @@ void ip_conntrack_protocol_unregister(struct ip_conntrack_protocol *proto)
 	WRITE_UNLOCK(&ip_conntrack_lock);
 	
 	/* Somebody could be still looking at the proto in bh. */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
+	synchronize_net();
 
 	/* Remove all contrack entries for this protocol */
 	ip_ct_selective_cleanup(kill_proto, &proto->proto);
