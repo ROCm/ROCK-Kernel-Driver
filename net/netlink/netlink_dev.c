@@ -225,6 +225,8 @@ int init_module(void)
 
 void cleanup_module(void)
 {
+	int i;
+
 	for (i = 0; i < sizeof(entries)/sizeof(entries[0]); i++)
 		devfs_remove("netlink/%s", entries[i].name);
 	for (i = 0; i < 16; i++)
