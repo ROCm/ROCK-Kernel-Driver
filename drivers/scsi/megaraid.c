@@ -4068,7 +4068,6 @@ mega_support_ext_cdb(adapter_t *adapter)
 static int
 mega_del_logdrv(adapter_t *adapter, int logdrv)
 {
-	DECLARE_WAIT_QUEUE_HEAD(wq);
 	unsigned long flags;
 	scb_t *scb;
 	int rval;
@@ -4083,11 +4082,9 @@ mega_del_logdrv(adapter_t *adapter, int logdrv)
 	 * Wait till all the issued commands are complete and there are no
 	 * commands in the pending queue
 	 */
-	while( atomic_read(&adapter->pend_cmds) > 0 ||
-			!list_empty(&adapter->pending_list) ) {
-
-		sleep_on_timeout( &wq, 1*HZ );	/* sleep for 1s */
-	}
+	while (atomic_read(&adapter->pend_cmds) > 0 ||
+	       !list_empty(&adapter->pending_list))
+		msleep(1000);	/* sleep for 1s */
 
 	rval = mega_do_del_logdrv(adapter, logdrv);
 
