@@ -420,6 +420,7 @@ struct block_device {
 	struct list_head	bd_inodes;
 	void *			bd_holder;
 	int			bd_holders;
+	struct block_device *	bd_contains;
 };
 
 struct inode {
