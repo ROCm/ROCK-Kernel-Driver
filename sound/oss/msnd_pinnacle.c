@@ -645,7 +645,7 @@ static int mixer_ioctl(unsigned int cmd, unsigned long arg)
 
 static int dev_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 
 	if (cmd == OSS_GETVERSION) {
 		int sound_version = SOUND_VERSION;
@@ -757,7 +757,7 @@ static void set_default_audio_parameters(void)
 
 static int dev_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	int err = 0;
 
 	if (minor == dev.dsp_minor) {
@@ -792,7 +792,7 @@ static int dev_open(struct inode *inode, struct file *file)
 
 static int dev_release(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	int err = 0;
 
 	lock_kernel();
@@ -982,7 +982,7 @@ static int dsp_write(const char *buf, size_t len)
 
 static ssize_t dev_read(struct file *file, char *buf, size_t count, loff_t *off)
 {
-	int minor = MINOR(file->f_dentry->d_inode->i_rdev);
+	int minor = minor(file->f_dentry->d_inode->i_rdev);
 	if (minor == dev.dsp_minor)
 		return dsp_read(buf, count);
 	else
@@ -991,7 +991,7 @@ static ssize_t dev_read(struct file *file, char *buf, size_t count, loff_t *off)
 
 static ssize_t dev_write(struct file *file, const char *buf, size_t count, loff_t *off)
 {
-	int minor = MINOR(file->f_dentry->d_inode->i_rdev);
+	int minor = minor(file->f_dentry->d_inode->i_rdev);
 	if (minor == dev.dsp_minor)
 		return dsp_write(buf, count);
 	else
