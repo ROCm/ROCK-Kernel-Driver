@@ -376,6 +376,11 @@ static void hidinput_configure_usage(struct hid_input *hidinput, struct hid_fiel
 	}
 
 	set_bit(usage->type, input->evbit);
+	if ((usage->type == EV_REL)
+			&& (device->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK)
+			&& (usage->code == REL_WHEEL)) {
+		set_bit(REL_HWHEEL, bit);
+	}
 
 	while (usage->code <= max && test_and_set_bit(usage->code, bit)) {
 		usage->code = find_next_zero_bit(bit, max + 1, usage->code);
@@ -425,6 +430,20 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 		return;
 
 	input_regs(input, regs);
+
+	if ((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK)
+			&& (usage->code == BTN_BACK)) {
+		if (value)
+			hid->quirks |= HID_QUIRK_2WHEEL_MOUSE_HACK_ON;
+		else
+			hid->quirks &= ~HID_QUIRK_2WHEEL_MOUSE_HACK_ON;
+		return;
+	}
+	if ((hid->quirks & HID_QUIRK_2WHEEL_MOUSE_HACK_ON)
+			&& (usage->code == REL_WHEEL)) {
+		input_event(input, usage->type, REL_HWHEEL, value);
+		return;
+	}
 
 	if (usage->hat_min != usage->hat_max) {
 		value = (value - usage->hat_min) * 8 / (usage->hat_max - usage->hat_min + 1) + 1;
