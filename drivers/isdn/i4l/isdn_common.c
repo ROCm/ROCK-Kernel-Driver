@@ -2249,6 +2249,21 @@ isdn_slot_st_netdev(int sl)
 	return slot[sl].st_netdev;
 }
 
+int
+isdn_hard_header_len(void)
+{
+	int drvidx;
+	int max = 0;
+	
+	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++) {
+		if (dev->drv[drvidx] && 
+		    max < dev->drv[drvidx]->interface->hl_hdrlen) {
+			max = dev->drv[drvidx]->interface->hl_hdrlen;
+		}
+	}
+	return max;
+}
+
 /*
  *****************************************************************************
  * And now the modules code.

@@ -1215,45 +1215,16 @@ isdn_net_rcv_skb(int idx, struct sk_buff *skb)
 static int
 isdn_net_init(struct net_device *ndev)
 {
-	ushort max_hlhdr_len = 0;
-	int drvidx, i;
-
-	ether_setup(ndev);
-
 	/* Setup the generic properties */
 
-	ndev->hard_header = NULL;
-	ndev->hard_header_cache = NULL;
-	ndev->header_cache_update = NULL;
 	ndev->mtu = 1500;
-	ndev->flags = IFF_NOARP|IFF_POINTOPOINT;
-	ndev->type = ARPHRD_ETHER;
-	ndev->addr_len = ETH_ALEN;
-
-	/* for clients with MPPP maybe higher values better */
-	ndev->tx_queue_len = 30;
-
-	for (i = 0; i < ETH_ALEN; i++)
-		ndev->broadcast[i] = 0xff;
-
-	/* The ISDN-specific entries in the device structure. */
+	ndev->tx_queue_len = 10;
 	ndev->open = &isdn_net_open;
 	ndev->hard_start_xmit = &isdn_net_start_xmit;
-
-	/*
-	 *  up till binding we ask the protocol layer to reserve as much
-	 *  as we might need for HL layer
-	 */
-
-	for (drvidx = 0; drvidx < ISDN_MAX_DRIVERS; drvidx++)
-		if (dev->drv[drvidx])
-			if (max_hlhdr_len < dev->drv[drvidx]->interface->hl_hdrlen)
-				max_hlhdr_len = dev->drv[drvidx]->interface->hl_hdrlen;
-
-	ndev->hard_header_len = ETH_HLEN + max_hlhdr_len;
+	ndev->hard_header_len = ETH_HLEN + isdn_hard_header_len();
 	ndev->stop = &isdn_net_close;
 	ndev->get_stats = &isdn_net_get_stats;
-	ndev->do_ioctl = NULL;
+
 	return 0;
 }
 
@@ -1738,10 +1709,7 @@ isdn_net_set_encap(isdn_net_dev *p, int encap)
 	lp->ops = netif_ops[encap];
 
 	p->dev.hard_header         = lp->ops->hard_header;
-	p->dev.rebuild_header      = lp->ops->rebuild_header;
 	p->dev.do_ioctl            = lp->ops->do_ioctl;
-	p->dev.hard_header_cache   = lp->ops->hard_header_cache;
-	p->dev.header_cache_update = lp->ops->header_cache_update;
 	p->dev.flags               = lp->ops->flags;
 	p->dev.type                = lp->ops->type;
 	p->dev.addr_len            = lp->ops->addr_len;
@@ -2404,15 +2372,22 @@ isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp,
 	netif_rx(skb);
 }
 
+static int
+isdn_ether_init(isdn_net_local *lp)
+{
+	struct net_device *dev = &lp->netdev->dev;
+
+	ether_setup(dev);
+	dev->tx_queue_len = 10;
+	dev->hard_header_len += isdn_hard_header_len();
+
+	return 0;
+}
+
 static struct isdn_netif_ops ether_ops = {
 	.hard_header         = eth_header,
-	.hard_header_cache   = eth_header_cache,
-	.header_cache_update = eth_header_cache_update,
-	.rebuild_header      = eth_rebuild_header,
-	.flags               = IFF_BROADCAST | IFF_MULTICAST,
-	.type                = ARPHRD_ETHER,
-	.addr_len            = ETH_ALEN,
 	.receive             = isdn_ether_receive,
+	.init                = isdn_ether_init,
 };
 
 // ======================================================================
