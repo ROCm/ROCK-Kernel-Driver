@@ -601,7 +601,7 @@ int find_io_region(ioaddr_t *base, ioaddr_t num, unsigned long align,
 	int ret;
 
 	if (align == 0)
-		align = 0x10000UL;
+		align = 0x10000;
 
 	data.mask = align - 1;
 	data.offset = *base & data.mask;
