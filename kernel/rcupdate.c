@@ -82,9 +82,11 @@ void fastcall call_rcu(struct rcu_head *head, void (*func)(void *arg), void *arg
 
 	head->func = func;
 	head->arg = arg;
+	head->next = NULL;
 	local_irq_save(flags);
 	cpu = smp_processor_id();
-	list_add_tail(&head->list, &RCU_nxtlist(cpu));
+	*RCU_nxttail(cpu) = head;
+	RCU_nxttail(cpu) = &head->next;
 	local_irq_restore(flags);
 }
 
@@ -92,16 +94,14 @@ void fastcall call_rcu(struct rcu_head *head, void (*func)(void *arg), void *arg
  * Invoke the completed RCU callbacks. They are expected to be in
  * a per-cpu list.
  */
-static void rcu_do_batch(struct list_head *list)
+static void rcu_do_batch(struct rcu_head *list)
 {
-	struct list_head *entry;
-	struct rcu_head *head;
+	struct rcu_head *next;
 
-	while (!list_empty(list)) {
-		entry = list->next;
-		list_del(entry);
-		head = list_entry(entry, struct rcu_head, list);
-		head->func(head->arg);
+	while (list) {
+		next = list->next;
+		list->func(list->arg);
+		list = next;
 	}
 }
 
@@ -262,20 +262,21 @@ void rcu_restart_cpu(int cpu)
 static void rcu_process_callbacks(unsigned long unused)
 {
 	int cpu = smp_processor_id();
-	LIST_HEAD(list);
+	struct rcu_head *rcu_list = NULL;
 
-	if (!list_empty(&RCU_curlist(cpu)) &&
-			!rcu_batch_before(rcu_ctrlblk.completed,RCU_batch(cpu))) {
-		__list_splice(&RCU_curlist(cpu), &list);
-		INIT_LIST_HEAD(&RCU_curlist(cpu));
+	if (RCU_curlist(cpu) &&
+	    !rcu_batch_before(rcu_ctrlblk.completed, RCU_batch(cpu))) {
+		rcu_list = RCU_curlist(cpu);
+		RCU_curlist(cpu) = NULL;
 	}
 
 	local_irq_disable();
-	if (!list_empty(&RCU_nxtlist(cpu)) && list_empty(&RCU_curlist(cpu))) {
+	if (RCU_nxtlist(cpu) && !RCU_curlist(cpu)) {
 		int next_pending, seq;
 
-		__list_splice(&RCU_nxtlist(cpu), &RCU_curlist(cpu));
-		INIT_LIST_HEAD(&RCU_nxtlist(cpu));
+		RCU_curlist(cpu) = RCU_nxtlist(cpu);
+		RCU_nxtlist(cpu) = NULL;
+		RCU_nxttail(cpu) = &RCU_nxtlist(cpu);
 		local_irq_enable();
 
 		/*
@@ -298,8 +299,8 @@ static void rcu_process_callbacks(unsigned long unused)
 		local_irq_enable();
 	}
 	rcu_check_quiescent_state();
-	if (!list_empty(&list))
-		rcu_do_batch(&list);
+	if (rcu_list)
+		rcu_do_batch(rcu_list);
 }
 
 void rcu_check_callbacks(int cpu, int user)
@@ -315,8 +316,7 @@ static void __devinit rcu_online_cpu(int cpu)
 {
 	memset(&per_cpu(rcu_data, cpu), 0, sizeof(struct rcu_data));
 	tasklet_init(&RCU_tasklet(cpu), rcu_process_callbacks, 0UL);
-	INIT_LIST_HEAD(&RCU_nxtlist(cpu));
-	INIT_LIST_HEAD(&RCU_curlist(cpu));
+	RCU_nxttail(cpu) = &RCU_nxtlist(cpu);
 	RCU_quiescbatch(cpu) = rcu_ctrlblk.completed;
 	RCU_qs_pending(cpu) = 0;
 }

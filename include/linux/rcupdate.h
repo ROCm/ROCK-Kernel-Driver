@@ -36,7 +36,6 @@
 #ifdef __KERNEL__
 
 #include <linux/cache.h>
-#include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/threads.h>
 #include <linux/percpu.h>
@@ -45,21 +44,20 @@
 
 /**
  * struct rcu_head - callback structure for use with RCU
- * @list: list_head to queue the update requests
+ * @next: next update requests in a list
  * @func: actual update function to call after the grace period.
  * @arg: argument to be passed to the actual update function.
  */
 struct rcu_head {
-	struct list_head list;
+	struct rcu_head *next;
 	void (*func)(void *obj);
 	void *arg;
 };
 
-#define RCU_HEAD_INIT(head) \
-		{ .list = LIST_HEAD_INIT(head.list), .func = NULL, .arg = NULL }
+#define RCU_HEAD_INIT(head) { .next = NULL, .func = NULL, .arg = NULL }
 #define RCU_HEAD(head) struct rcu_head head = RCU_HEAD_INIT(head)
 #define INIT_RCU_HEAD(ptr) do { \
-       INIT_LIST_HEAD(&(ptr)->list); (ptr)->func = NULL; (ptr)->arg = NULL; \
+       (ptr)->next = NULL; (ptr)->func = NULL; (ptr)->arg = NULL; \
 } while (0)
 
 
@@ -99,8 +97,9 @@ struct rcu_data {
 
 	/* 2) batch handling */
         long  	       	batch;           /* Batch # for current RCU batch */
-        struct list_head  nxtlist;
-        struct list_head  curlist;
+        struct rcu_head *nxtlist;
+	struct rcu_head **nxttail;
+        struct rcu_head *curlist;
 };
 
 DECLARE_PER_CPU(struct rcu_data, rcu_data);
@@ -113,22 +112,25 @@ extern struct rcu_ctrlblk rcu_ctrlblk;
 #define RCU_batch(cpu) 		(per_cpu(rcu_data, (cpu)).batch)
 #define RCU_nxtlist(cpu) 	(per_cpu(rcu_data, (cpu)).nxtlist)
 #define RCU_curlist(cpu) 	(per_cpu(rcu_data, (cpu)).curlist)
+#define RCU_nxttail(cpu) 	(per_cpu(rcu_data, (cpu)).nxttail)
 
 static inline int rcu_pending(int cpu) 
 {
 	/* This cpu has pending rcu entries and the grace period
 	 * for them has completed.
 	 */
-	if (!list_empty(&RCU_curlist(cpu)) &&
+	if (RCU_curlist(cpu) &&
 		  !rcu_batch_before(rcu_ctrlblk.completed,RCU_batch(cpu)))
 		return 1;
+
 	/* This cpu has no pending entries, but there are new entries */
-	if (list_empty(&RCU_curlist(cpu)) &&
-			 !list_empty(&RCU_nxtlist(cpu)))
+	if (!RCU_curlist(cpu) && RCU_nxtlist(cpu))
 		return 1;
+
 	/* The rcu core waits for a quiescent state from the cpu */
 	if (RCU_quiescbatch(cpu) != rcu_ctrlblk.cur || RCU_qs_pending(cpu))
 		return 1;
+
 	/* nothing to do */
 	return 0;
 }
