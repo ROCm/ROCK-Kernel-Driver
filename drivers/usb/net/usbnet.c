@@ -825,7 +825,7 @@ static void ax8817x_unbind(struct usbnet *dev, struct usb_interface *intf)
 {
 	struct ax8817x_data *data = (struct ax8817x_data *)dev->data;
 
-	usb_unlink_urb(data->int_urb);
+	usb_kill_urb(data->int_urb);
 	usb_free_urb(data->int_urb);
 	kfree(data->int_buf);
 }
@@ -1437,7 +1437,7 @@ static int genelink_free (struct usbnet *dev)
 // handling needs to be generic)
 
 	// cancel irq urb first
-	usb_unlink_urb (priv->irq_urb);
+	usb_kill_urb (priv->irq_urb);
 
 	// free irq urb
 	usb_free_urb (priv->irq_urb);
