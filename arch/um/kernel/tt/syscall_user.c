@@ -17,10 +17,6 @@
 #include "syscall_user.h"
 #include "tt.h"
 
-/* XXX Bogus */
-#define ERESTARTSYS	512
-#define ERESTARTNOINTR	513
-#define ERESTARTNOHAND	514
 
 void syscall_handler_tt(int sig, union uml_pt_regs *regs)
 {
@@ -42,9 +38,6 @@ void syscall_handler_tt(int sig, union uml_pt_regs *regs)
 	UPT_SC(regs) = sc;
 
 	SC_SET_SYSCALL_RETURN(sc, result);
-	if((result == -ERESTARTNOHAND) || (result == -ERESTARTSYS) || 
-	   (result == -ERESTARTNOINTR))
-		do_signal(result);
 
 	syscall_trace(regs, 1);
 	record_syscall_end(index, result);
@@ -63,7 +56,8 @@ int do_syscall(void *task, int pid, int local_using_sysemu)
 	regs = TASK_REGS(task);
 	UPT_SYSCALL_NR(regs) = syscall;
 
-	if(syscall < 1) return(0);
+	if(syscall < 0)
+		return(0);
 
 	if((syscall != __NR_sigreturn) &&
 	   ((unsigned long *) PT_IP(proc_regs) >= &_stext) && 

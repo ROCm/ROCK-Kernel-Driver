@@ -91,7 +91,7 @@ s3c2410_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct irqaction s3c2410_timer_irq = {
-	.name		= "S32410 Timer Tick",
+	.name		= "S3C2410 Timer Tick",
 	.flags		= SA_INTERRUPT,
 	.handler	= s3c2410_timer_interrupt
 };

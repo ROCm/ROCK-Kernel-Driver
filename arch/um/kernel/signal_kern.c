@@ -38,54 +38,55 @@ EXPORT_SYMBOL(unblock_signals);
 /*
  * OK, we're invoking a handler
  */	
-static void handle_signal(struct pt_regs *regs, unsigned long signr,
-			  struct k_sigaction *ka, siginfo_t *info,
-			  sigset_t *oldset)
+static int handle_signal(struct pt_regs *regs, unsigned long signr,
+			 struct k_sigaction *ka, siginfo_t *info,
+			 sigset_t *oldset)
 {
-        __sighandler_t handler;
-	void (*restorer)(void);
 	unsigned long sp;
-	sigset_t save;
-	int error, err, ret;
+	int err;
 
-	error = PT_REGS_SYSCALL_RET(&current->thread.regs);
-	ret = 0;
 	/* Always make any pending restarted system calls return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
-	switch(error){
-	case -ERESTART_RESTARTBLOCK:
-	case -ERESTARTNOHAND:
-		ret = -EINTR;
-		break;
 
-	case -ERESTARTSYS:
-		if (!(ka->sa.sa_flags & SA_RESTART)) {
-			ret = -EINTR;
+	/* Did we come from a system call? */
+	if(PT_REGS_SYSCALL_NR(regs) >= 0){
+		/* If so, check system call restarting.. */
+		switch(PT_REGS_SYSCALL_RET(regs)){
+		case -ERESTART_RESTARTBLOCK:
+		case -ERESTARTNOHAND:
+			PT_REGS_SYSCALL_RET(regs) = -EINTR;
+			break;
+
+		case -ERESTARTSYS:
+			if (!(ka->sa.sa_flags & SA_RESTART)) {
+				PT_REGS_SYSCALL_RET(regs) = -EINTR;
+				break;
+			}
+		/* fallthrough */
+		case -ERESTARTNOINTR:
+			PT_REGS_RESTART_SYSCALL(regs);
+			PT_REGS_ORIG_SYSCALL(regs) = PT_REGS_SYSCALL_NR(regs);
 			break;
 		}
-		/* fallthrough */
-	case -ERESTARTNOINTR:
-		PT_REGS_RESTART_SYSCALL(regs);
-		PT_REGS_ORIG_SYSCALL(regs) = PT_REGS_SYSCALL_NR(regs);
-
-		/* This is because of the UM_SET_SYSCALL_RETURN and the fact
-		 * that on i386 the system call number and return value are
-		 * in the same register.  When the system call restarts, %eax
-		 * had better have the system call number in it.  Since the
-		 * return value doesn't matter (except that it shouldn't be
-		 * -ERESTART*), we'll stick the system call number there.
-		 */
-		ret = PT_REGS_SYSCALL_NR(regs);
-		break;
 	}
 
-	handler = ka->sa.sa_handler;
-	save = *oldset;
+	sp = PT_REGS_SP(regs);
+	if((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags(sp) == 0))
+		sp = current->sas_ss_sp + current->sas_ss_size;
 
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
+	if(ka->sa.sa_flags & SA_SIGINFO)
+		err = setup_signal_stack_si(sp, signr, ka, regs, info, oldset);
+	else
+		err = setup_signal_stack_sc(sp, signr, ka, regs, oldset);
 
-	if (!(ka->sa.sa_flags & SA_NODEFER)) {
+	if(err){
+		spin_lock_irq(&current->sighand->siglock);
+		current->blocked = *oldset;
+		recalc_sigpending();
+		spin_unlock_irq(&current->sighand->siglock);
+		force_sigsegv(signr, current);
+	}
+	else if(!(ka->sa.sa_flags & SA_NODEFER)){
 		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked, &current->blocked, 
 			  &ka->sa.sa_mask);
@@ -94,44 +95,24 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 		spin_unlock_irq(&current->sighand->siglock);
 	}
 
-	sp = PT_REGS_SP(regs);
-
-	if((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags(sp) == 0))
-		sp = current->sas_ss_sp + current->sas_ss_size;
-	
-	if(error != 0) PT_REGS_SET_SYSCALL_RETURN(regs, ret);
-
-	if (ka->sa.sa_flags & SA_RESTORER) restorer = ka->sa.sa_restorer;
-	else restorer = NULL;
-
-	if(ka->sa.sa_flags & SA_SIGINFO)
-		err = setup_signal_stack_si(sp, signr, (unsigned long) handler,
-					    restorer, regs, info, &save);
-	else
-		err = setup_signal_stack_sc(sp, signr, (unsigned long) handler,
-					    restorer, regs, &save);
-	if(err)
-		force_sigsegv(signr, current);
+	return err;
 }
 
 static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
 {
 	struct k_sigaction ka_copy;
 	siginfo_t info;
-	int sig;
+	int sig, handled_sig = 0;
 
-	if (!oldset)
-		oldset = &current->blocked;
-
-	sig = get_signal_to_deliver(&info, &ka_copy, regs, NULL);
-	if(sig > 0){
+	while((sig = get_signal_to_deliver(&info, &ka_copy, regs, NULL)) > 0){
+		handled_sig = 1;
 		/* Whee!  Actually deliver the signal.  */
-		handle_signal(regs, sig, &ka_copy, &info, oldset);
-		return(1);
+		if(!handle_signal(regs, sig, &ka_copy, &info, oldset))
+			break;
 	}
 
 	/* Did we come from a system call? */
-	if(PT_REGS_SYSCALL_NR(regs) >= 0){
+	if(!handled_sig && (PT_REGS_SYSCALL_NR(regs) >= 0)){
 		/* Restart the system call - no handlers present */
 		if(PT_REGS_SYSCALL_RET(regs) == -ERESTARTNOHAND ||
 		   PT_REGS_SYSCALL_RET(regs) == -ERESTARTSYS ||
@@ -155,18 +136,18 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
 	if(current->ptrace & PT_DTRACE)
 		current->thread.singlestep_syscall =
 			is_syscall(PT_REGS_IP(&current->thread.regs));
-	return(0);
+	return(handled_sig);
 }
 
-int do_signal(int error)
+int do_signal(void)
 {
-	return(kern_do_signal(&current->thread.regs, NULL));
+	return(kern_do_signal(&current->thread.regs, &current->blocked));
 }
 
 /*
  * Atomically swap in the new signal mask, and wait for a signal.
  */
-int sys_sigsuspend(int history0, int history1, old_sigset_t mask)
+long sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 {
 	sigset_t saveset;
 
@@ -186,7 +167,7 @@ int sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 	}
 }
 
-int sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
+long sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
 {
 	sigset_t saveset, newset;
 
@@ -244,7 +225,7 @@ int sys_sigaction(int sig, const struct old_sigaction __user *act,
 	return ret;
 }
 
-int sys_sigaltstack(const stack_t *uss, stack_t *uoss)
+long sys_sigaltstack(const stack_t *uss, stack_t *uoss)
 {
 	return(do_sigaltstack(uss, uoss, PT_REGS_SP(&current->thread.regs)));
 }
@@ -262,7 +243,7 @@ static int copy_sc_from_user(struct pt_regs *to, void *from,
 	return(ret);
 }
 
-int sys_sigreturn(struct pt_regs regs)
+long sys_sigreturn(struct pt_regs regs)
 {
 	void __user *sc = sp_to_sc(PT_REGS_SP(&current->thread.regs));
 	void __user *mask = sp_to_mask(PT_REGS_SP(&current->thread.regs));
@@ -280,7 +261,7 @@ int sys_sigreturn(struct pt_regs regs)
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
 }
 
-int sys_rt_sigreturn(struct pt_regs regs)
+long sys_rt_sigreturn(struct pt_regs regs)
 {
 	unsigned long sp = PT_REGS_SP(&current->thread.regs);
 	struct ucontext __user *uc = sp_to_uc(sp);

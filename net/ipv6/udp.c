@@ -1033,6 +1033,7 @@ void udp6_proc_exit(void) {
 
 struct proto udpv6_prot = {
 	.name =		"UDP",
+	.owner =	THIS_MODULE,
 	.close =	udpv6_close,
 	.connect =	ip6_datagram_connect,
 	.disconnect =	udp_disconnect,

@@ -460,7 +460,7 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
  *	If a I2O controller is added, we catch the notification to add a
  *	corresponding Scsi_Host.
  */
-void i2o_scsi_notify_controller_add(struct i2o_controller *c)
+static void i2o_scsi_notify_controller_add(struct i2o_controller *c)
 {
 	struct i2o_scsi_host *i2o_shost;
 	int rc;
@@ -492,7 +492,7 @@ void i2o_scsi_notify_controller_add(struct i2o_controller *c)
  *	If a I2O controller is removed, we catch the notification to remove the
  *	corresponding Scsi_Host.
  */
-void i2o_scsi_notify_controller_remove(struct i2o_controller *c)
+static void i2o_scsi_notify_controller_remove(struct i2o_controller *c)
 {
 	struct i2o_scsi_host *i2o_shost;
 	i2o_shost = i2o_scsi_get_host(c);
@@ -717,7 +717,7 @@ static int i2o_scsi_queuecommand(struct scsi_cmnd *SCpnt,
  *	Returns 0 if the command is successfully aborted or negative error code
  *	on failure.
  */
-int i2o_scsi_abort(struct scsi_cmnd *SCpnt)
+static int i2o_scsi_abort(struct scsi_cmnd *SCpnt)
 {
 	struct i2o_device *i2o_dev;
 	struct i2o_controller *c;

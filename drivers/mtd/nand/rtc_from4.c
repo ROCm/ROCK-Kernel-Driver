@@ -6,7 +6,7 @@
  *  Derived from drivers/mtd/nand/spia.c
  *       Copyright (C) 2000 Steven J. Hill (sjhill@realitydiluted.com)
  *
- * $Id: rtc_from4.c,v 1.6 2004/10/05 22:11:46 gleixner Exp $
+ * $Id: rtc_from4.c,v 1.7 2004/11/04 12:53:10 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -90,8 +90,6 @@ static struct mtd_info *rtc_from4_mtd = NULL;
  * Module stuff
  */
 static void __iomem *rtc_from4_fio_base = P2SEGADDR(RTC_FROM4_FIO_BASE);
-
-MODULE_PARM(rtc_from4_fio_base, "i");
 
 const static struct mtd_partition partition_info[] = {
         {

@@ -9,11 +9,11 @@
  *
  * Adaption to the kernel by Thomas Gleixner (tglx@linutronix.de)
  *
- * $Id: decode_rs.c,v 1.5 2004/10/05 22:07:53 gleixner Exp $
+ * $Id: decode_rs.c,v 1.6 2004/10/22 15:41:47 gleixner Exp $
  *
  */
 
-/* Generic data witdh independend code which is included by the 
+/* Generic data width independent code which is included by the 
  * wrappers.
  */
 { 
@@ -28,7 +28,7 @@
 	uint16_t *index_of = rs->index_of;
 	uint16_t u, q, tmp, num1, num2, den, discr_r, syn_error;
 	/* Err+Eras Locator poly and syndrome poly The maximum value
-	 * of nroots is 8. So the neccecary stacksize will be about
+	 * of nroots is 8. So the necessary stack size will be about
 	 * 220 bytes max.
 	 */
 	uint16_t lambda[nroots + 1], syn[nroots];
@@ -42,7 +42,7 @@
 	if (pad < 0 || pad >= nn)
 		return -ERANGE;
 		
-	/* Deos the caller provide the syndrome ? */
+	/* Does the caller provide the syndrome ? */
 	if (s != NULL) 
 		goto decode;
 

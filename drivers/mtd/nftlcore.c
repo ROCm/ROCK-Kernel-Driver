@@ -1,7 +1,7 @@
 /* Linux driver for NAND Flash Translation Layer      */
 /* (c) 1999 Machine Vision Holdings, Inc.             */
 /* Author: David Woodhouse <dwmw2@infradead.org>      */
-/* $Id: nftlcore.c,v 1.96 2004/06/28 13:52:55 dbrown Exp $ */
+/* $Id: nftlcore.c,v 1.97 2004/11/16 18:28:59 dwmw2 Exp $ */
 
 /*
   The contents of this file are distributed under the GNU General
@@ -421,7 +421,7 @@ static u16 NFTL_foldchain (struct NFTLrecord *nftl, unsigned thisVUC, unsigned p
 	return targetEUN;
 }
 
-u16 NFTL_makefreeblock( struct NFTLrecord *nftl , unsigned pendingblock)
+static u16 NFTL_makefreeblock( struct NFTLrecord *nftl , unsigned pendingblock)
 {
 	/* This is the part that needs some cleverness applied. 
 	   For now, I'm doing the minimum applicable to actually
@@ -731,7 +731,7 @@ static int nftl_getgeo(struct mtd_blktrans_dev *dev,  struct hd_geometry *geo)
  ****************************************************************************/
 
 
-struct mtd_blktrans_ops nftl_tr = {
+static struct mtd_blktrans_ops nftl_tr = {
 	.name		= "nftl",
 	.major		= NFTL_MAJOR,
 	.part_bits	= NFTL_PARTN_BITS,
@@ -747,9 +747,9 @@ struct mtd_blktrans_ops nftl_tr = {
 
 extern char nftlmountrev[];
 
-int __init init_nftl(void)
+static int __init init_nftl(void)
 {
-	printk(KERN_INFO "NFTL driver: nftlcore.c $Revision: 1.96 $, nftlmount.c %s\n", nftlmountrev);
+	printk(KERN_INFO "NFTL driver: nftlcore.c $Revision: 1.97 $, nftlmount.c %s\n", nftlmountrev);
 
 	return register_mtd_blktrans(&nftl_tr);
 }

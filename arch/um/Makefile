@@ -129,6 +129,7 @@ USER_CFLAGS := $(patsubst -Derrno=kernel_errno,,$(USER_CFLAGS))
 USER_CFLAGS := $(patsubst -Dsigprocmask=kernel_sigprocmask,,$(USER_CFLAGS))
 USER_CFLAGS := $(patsubst -D__KERNEL__,,$(USER_CFLAGS)) $(ARCH_INCLUDE) \
 	$(MODE_INCLUDE)
+USER_CFLAGS += $(ARCH_USER_CFLAGS)
 
 # To get a definition of F_SETSIG
 USER_CFLAGS += -D_GNU_SOURCE

@@ -738,7 +738,7 @@ static int savagefb_check_var (struct fb_var_screeninfo   *var,
 		}
 	}
 
-	if (!mode_valid && !list_empty(&info->modelist))
+	if (!mode_valid && info->monspecs.modedb_len)
 		return -EINVAL;
 
 	/* Is the mode larger than the LCD panel? */
@@ -1817,43 +1817,43 @@ static int __devinit savage_init_fb_info (struct fb_info *info,
 		break;
 	case FB_ACCEL_SAVAGE_MX_MV:
 		par->chip = S3_SAVAGE_MX;
-		snprintf (info->fix.id, 16, "S3 Savage/MX-MV");
+		snprintf (info->fix.id, 16, "Savage/MX-MV");
 		break;
 	case FB_ACCEL_SAVAGE_MX:
 		par->chip = S3_SAVAGE_MX;
-		snprintf (info->fix.id, 16, "S3 Savage/MX");
+		snprintf (info->fix.id, 16, "Savage/MX");
 		break;
 	case FB_ACCEL_SAVAGE_IX_MV:
 		par->chip = S3_SAVAGE_MX;
-		snprintf (info->fix.id, 16, "S3 Savage/IX-MV");
+		snprintf (info->fix.id, 16, "Savage/IX-MV");
 		break;
 	case FB_ACCEL_SAVAGE_IX:
 		par->chip = S3_SAVAGE_MX;
-		snprintf (info->fix.id, 16, "S3 Savage/IX");
+		snprintf (info->fix.id, 16, "Savage/IX");
 		break;
 	case FB_ACCEL_PROSAVAGE_PM:
 		par->chip = S3_PROSAVAGE;
-		snprintf (info->fix.id, 16, "S3 ProSavage");
+		snprintf (info->fix.id, 16, "ProSavagePM");
 		break;
 	case FB_ACCEL_PROSAVAGE_KM:
 		par->chip = S3_PROSAVAGE;
-		snprintf (info->fix.id, 16, "S3 ProSavage");
+		snprintf (info->fix.id, 16, "ProSavageKM");
 		break;
 	case FB_ACCEL_S3TWISTER_P:
 		par->chip = S3_PROSAVAGE;
-		snprintf (info->fix.id, 16, "S3 Twister");
+		snprintf (info->fix.id, 16, "TwisterP");
 		break;
 	case FB_ACCEL_S3TWISTER_K:
 		par->chip = S3_PROSAVAGE;
-		snprintf (info->fix.id, 16, "S3 TwisterK");
+		snprintf (info->fix.id, 16, "TwisterK");
 		break;
 	case FB_ACCEL_PROSAVAGE_DDR:
 		par->chip = S3_PROSAVAGE;
-		snprintf (info->fix.id, 16, "S3 ProSavage DDR");
+		snprintf (info->fix.id, 16, "ProSavageDDR");
 		break;
 	case FB_ACCEL_PROSAVAGE_DDRK:
 		par->chip = S3_PROSAVAGE;
-		snprintf (info->fix.id, 16, "S3 ProSavage DDR-K");
+		snprintf (info->fix.id, 16, "ProSavage8");
 		break;
 	}
 
@@ -2029,14 +2029,13 @@ static int __devinit savagefb_probe (struct pci_dev* dev,
 
 
 	fb_destroy_modedb(info->monspecs.modedb);
-	info->monspecs.modedb_len = 0;
 	info->monspecs.modedb = NULL;
 
 	err = register_framebuffer (info);
 	if (err < 0)
 		goto failed;
 
-	printk (KERN_INFO "fb: %s frame buffer device\n",
+	printk (KERN_INFO "fb: S3 %s frame buffer device\n",
 		info->fix.id);
 
 	/*

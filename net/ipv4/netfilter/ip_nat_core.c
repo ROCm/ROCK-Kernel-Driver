@@ -128,15 +128,12 @@ in_range(const struct ip_conntrack_tuple *tuple,
 	unsigned int i;
 
 	for (i = 0; i < mr->rangesize; i++) {
-		/* If we are allowed to map IPs, then we must be in the
-		   range specified, otherwise we must be unchanged. */
+		/* If we are supposed to map IPs, then we must be in the
+		   range specified. */
 		if (mr->range[i].flags & IP_NAT_RANGE_MAP_IPS) {
 			if (ntohl(tuple->src.ip) < ntohl(mr->range[i].min_ip)
 			    || (ntohl(tuple->src.ip)
 				> ntohl(mr->range[i].max_ip)))
-				continue;
-		} else {
-			if (tuple->src.ip != tuple->src.ip)
 				continue;
 		}
 
@@ -687,7 +684,7 @@ manip_pkt(u_int16_t proto,
 	iph = (void *)(*pskb)->data + iphdroff;
 
 	/* Manipulate protcol part. */
-	if (!ip_nat_find_proto(proto)->manip_pkt(pskb, iphdroff + iph->ihl*4,
+	if (!ip_nat_find_proto(proto)->manip_pkt(pskb, iphdroff,
 	                                         manip, maniptype))
 		return 0;
 

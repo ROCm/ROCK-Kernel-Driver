@@ -529,7 +529,6 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 	/* We don't want people slaying init.  */
 	if (p->exit_signal != -1)
 		p->exit_signal = SIGCHLD;
-	p->self_exec_id++;
 
 	if (p->pdeath_signal)
 		/* We already hold the tasklist_lock here.  */

@@ -72,7 +72,7 @@ extern char *ide_xfer_verbose (byte xfer_rate);
 /*
  * Set a new transfer mode at the drive
  */
-int sc1200_set_xfer_mode (ide_drive_t *drive, byte mode)
+static int sc1200_set_xfer_mode (ide_drive_t *drive, byte mode)
 {
 	printk("%s: sc1200_set_xfer_mode(%s)\n", drive->name, ide_xfer_verbose(mode));
 	return ide_config_drive_speed(drive, mode);
@@ -263,7 +263,7 @@ static int sc1200_config_dma (ide_drive_t *drive)
  *
  *  returns 1 on error, 0 otherwise
  */
-int sc1200_ide_dma_end (ide_drive_t *drive)
+static int sc1200_ide_dma_end (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	unsigned long dma_base = hwif->dma_base;

@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/s390/misc/z90main.c
+ *  linux/drivers/s390/crypto/z90main.c
  *
  *  z90crypt 1.3.2
  *
@@ -51,13 +51,13 @@
 #  error "This kernel is too recent: not supported by this file"
 #endif
 
-#define VERSION_Z90MAIN_C "$Revision: 1.54 $"
+#define VERSION_Z90MAIN_C "$Revision: 1.57 $"
 
-static char z90cmain_version[] __initdata =
+static char z90main_version[] __initdata =
 	"z90main.o (" VERSION_Z90MAIN_C "/"
                       VERSION_Z90COMMON_H "/" VERSION_Z90CRYPT_H ")";
 
-extern char z90chardware_version[];
+extern char z90hardware_version[];
 
 /**
  * Defaults that may be modified.
@@ -97,7 +97,7 @@ extern char z90chardware_version[];
  * older than CLEANUPTIME seconds in the past.
  */
 #ifndef CLEANUPTIME
-#define CLEANUPTIME 15
+#define CLEANUPTIME 20
 #endif
 
 /**
@@ -670,8 +670,8 @@ z90crypt_init_module(void)
 		PRINTKN("Version %d.%d.%d loaded, built on %s %s\n",
 			z90crypt_VERSION, z90crypt_RELEASE, z90crypt_VARIANT,
 			__DATE__, __TIME__);
-		PRINTKN("%s\n", z90cmain_version);
-		PRINTKN("%s\n", z90chardware_version);
+		PRINTKN("%s\n", z90main_version);
+		PRINTKN("%s\n", z90hardware_version);
 		PDEBUG("create_z90crypt (domain index %d) successful.\n",
 		       domain);
 	} else
@@ -2372,7 +2372,7 @@ receive_from_crypto_device(int index, unsigned char *psmid, int *buff_len_p,
 			break;
 		}
 		if (dev_ptr->dev_self_x != index) {
-			PRINTK("Corrupt dev ptr in receive_from_AP\n");
+			PRINTKC("Corrupt dev ptr\n");
 			z90crypt.terminating = 1;
 			rv = REC_FATAL_ERROR;
 			break;

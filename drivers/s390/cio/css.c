@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.82 $
+ *   $Revision: 1.84 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -188,6 +188,12 @@ css_evaluate_subchannel(int irq, int slow)
 			put_device(&sch->dev);
 		return 0; /* Already processed. */
 	}
+	/*
+	 * We've got a machine check, so running I/O won't get an interrupt.
+	 * Kill any pending timers.
+	 */
+	if (sch)
+		device_kill_pending_timer(sch);
 	if (!disc && !slow) {
 		if (sch)
 			put_device(&sch->dev);

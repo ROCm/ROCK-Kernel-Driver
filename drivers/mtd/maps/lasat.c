@@ -7,7 +7,7 @@
  * modify it under the terms of the GNU General Public License version
  * 2 as published by the Free Software Foundation.
  *
- * $Id: lasat.c,v 1.8 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: lasat.c,v 1.9 2004/11/04 13:24:15 gleixner Exp $
  *
  */
 
@@ -50,7 +50,7 @@ static int __init init_lasat(void)
 	ENABLE_VPP((&lasat_map));
 
 	lasat_map.phys = lasat_flash_partition_start(LASAT_MTD_BOOTLOADER);
-	lasat_map.virt = (void __iomem *)ioremap_nocache(
+	lasat_map.virt = ioremap_nocache(
 		        lasat_map.phys, lasat_board_info.li_flash_size);
 	lasat_map.size = lasat_board_info.li_flash_size;
 

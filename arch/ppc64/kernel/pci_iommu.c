@@ -43,6 +43,13 @@
 #include <asm/iSeries/iSeries_pci.h>
 #endif /* CONFIG_PPC_ISERIES */
 
+/*
+ * We can use ->sysdata directly and avoid the extra work in
+ * pci_device_to_OF_node since ->sysdata will have been initialised
+ * in the iommu init code for all devices.
+ */
+#define PCI_GET_DN(dev) ((struct device_node *)((dev)->sysdata))
+
 static inline struct iommu_table *devnode_table(struct pci_dev *dev)
 {
 	if (!dev)

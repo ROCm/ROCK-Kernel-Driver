@@ -34,7 +34,7 @@
 #include <asm/rtas.h>
 #include <asm/system.h>
 
-#define MODULE_VERS "1.4"
+#define MODULE_VERS "1.5"
 #define MODULE_NAME "lparcfg"
 
 /* #define LPARCFG_DEBUG */
@@ -70,6 +70,28 @@ static struct proc_dir_entry *proc_ppc64_lparcfg;
 
 #ifdef CONFIG_PPC_ISERIES
 
+/*
+ * For iSeries legacy systems, the PPA purr function is available from the
+ * xEmulatedTimeBase field in the paca.
+ */
+static unsigned long get_purr(void)
+{
+	unsigned long sum_purr = 0;
+	int cpu;
+	struct paca_struct *lpaca;
+
+	for_each_cpu(cpu) {
+		lpaca = paca + cpu;
+		sum_purr += lpaca->xLpPaca.xEmulatedTimeBase;
+
+#ifdef PURR_DEBUG
+		printk(KERN_INFO "get_purr for cpu (%d) has value (%ld) \n",
+			cpu, lpaca->xLpPaca.xEmulatedTimeBase);
+#endif
+	}
+	return sum_purr;
+}
+
 #define lparcfg_write NULL
 
 /* 
@@ -81,6 +103,9 @@ static int lparcfg_data(struct seq_file *m, void *v)
 	int shared, entitled_capacity, max_entitled_capacity;
 	int processors, max_processors;
 	struct paca_struct *lpaca = get_paca();
+	unsigned long purr = get_purr();
+
+	seq_printf(m, "%s %s \n", MODULE_NAME, MODULE_VERS);
 
 	shared = (int)(lpaca->lppaca_ptr->xSharedProc);
 	seq_printf(m, "serial_number=%c%c%c%c%c%c%c\n",
@@ -131,6 +156,7 @@ static int lparcfg_data(struct seq_file *m, void *v)
 		seq_printf(m, "pool_capacity=%d\n",
 			   (int)(HvLpConfig_getNumProcsInSharedPool(pool_id) *
 				 100));
+		seq_printf(m, "purr=%ld\n", purr);
 	}
 
 	seq_printf(m, "shared_processor_mode=%d\n", shared);

@@ -538,11 +538,11 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
-		barrier();
+		cpu_relax();
 
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
-			barrier();
+			cpu_relax();
 	spin_unlock(&call_lock);
 
 	return 0;

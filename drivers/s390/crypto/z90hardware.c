@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/s390/misc/z90hardware.c
+ *  linux/drivers/s390/crypto/z90hardware.c
  *
  *  z90crypt 1.3.2
  *
@@ -32,9 +32,9 @@
 #include "z90crypt.h"
 #include "z90common.h"
 
-#define VERSION_Z90HARDWARE_C "$Revision: 1.32 $"
+#define VERSION_Z90HARDWARE_C "$Revision: 1.33 $"
 
-char z90chardware_version[] __initdata =
+char z90hardware_version[] __initdata =
 	"z90hardware.o (" VERSION_Z90HARDWARE_C "/"
 	                  VERSION_Z90COMMON_H "/" VERSION_Z90CRYPT_H ")";
 

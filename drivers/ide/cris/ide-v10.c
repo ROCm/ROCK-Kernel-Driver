@@ -30,6 +30,7 @@
 #include <linux/hdreg.h>
 #include <linux/ide.h>
 #include <linux/init.h>
+#include <linux/scatterlist.h>
 
 #include <asm/io.h>
 #include <asm/arch/svinto.h>
@@ -49,6 +50,9 @@ static int e100_read_command = 0;
 
 #define LOWDB(x)
 #define D(x)
+
+static int e100_ide_build_dmatable (ide_drive_t *drive);
+static ide_startstop_t etrax_dma_intr (ide_drive_t *drive);
 
 void
 etrax100_ide_outw(unsigned short data, unsigned long reg) {
@@ -202,16 +206,13 @@ etrax100_ide_inb(unsigned long reg)
 #define ATA_PIO0_HOLD    4
 
 static int e100_dma_check (ide_drive_t *drive);
-static int e100_dma_begin (ide_drive_t *drive);
+static void e100_dma_start(ide_drive_t *drive);
 static int e100_dma_end (ide_drive_t *drive);
-static int e100_dma_read (ide_drive_t *drive);
-static int e100_dma_write (ide_drive_t *drive);
 static void e100_ide_input_data (ide_drive_t *drive, void *, unsigned int);
 static void e100_ide_output_data (ide_drive_t *drive, void *, unsigned int);
 static void e100_atapi_input_bytes(ide_drive_t *drive, void *, unsigned int);
 static void e100_atapi_output_bytes(ide_drive_t *drive, void *, unsigned int);
 static int e100_dma_off (ide_drive_t *drive);
-static int e100_dma_verbose (ide_drive_t *drive);
 
 
 /*
@@ -276,6 +277,40 @@ static void tune_e100_ide(ide_drive_t *drive, byte pio)
 	}
 }
 
+static int e100_dma_setup(ide_drive_t *drive)
+{
+	struct request *rq = drive->hwif->hwgroup->rq;
+
+	if (rq_data_dir(rq)) {
+		e100_read_command = 0;
+
+		RESET_DMA(ATA_TX_DMA_NBR); /* sometimes the DMA channel get stuck so we need to do this */
+		WAIT_DMA(ATA_TX_DMA_NBR);
+	} else {
+		e100_read_command = 1;
+
+		RESET_DMA(ATA_RX_DMA_NBR); /* sometimes the DMA channel get stuck so we need to do this */
+		WAIT_DMA(ATA_RX_DMA_NBR);
+	}
+
+	/* set up the Etrax DMA descriptors */
+	if (e100_ide_build_dmatable(drive)) {
+		ide_map_sg(drive, rq);
+		return 1;
+	}
+
+	return 0;
+}
+
+static void e100_dma_exec_cmd(ide_drive_t *drive, u8 command)
+{
+	/* set the irq handler which will finish the request when DMA is done */
+	ide_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
+
+	/* issue cmd to drive */
+	etrax100_ide_outb(command, IDE_COMMAND_REG);
+}
+
 void __init
 init_e100_ide (void)
 {
@@ -297,18 +332,15 @@ init_e100_ide (void)
                 hwif->atapi_output_bytes = &e100_atapi_output_bytes;
                 hwif->ide_dma_check = &e100_dma_check;
                 hwif->ide_dma_end = &e100_dma_end;
-		hwif->ide_dma_write = &e100_dma_write;
-		hwif->ide_dma_read = &e100_dma_read;
-		hwif->ide_dma_begin = &e100_dma_begin;
+		hwif->dma_setup = &e100_dma_setup;
+		hwif->dma_exec_cmd = &e100_dma_exec_cmd;
+		hwif->dma_start = &e100_dma_start;
 		hwif->OUTB = &etrax100_ide_outb;
 		hwif->OUTW = &etrax100_ide_outw;
 		hwif->OUTBSYNC = &etrax100_ide_outbsync;
 		hwif->INB = &etrax100_ide_inb;
 		hwif->INW = &etrax100_ide_inw;
 		hwif->ide_dma_off_quietly = &e100_dma_off;
-		hwif->ide_dma_verbose = &e100_dma_verbose;
-		hwif->sg_table =
-		  kmalloc(sizeof(struct scatterlist) * PRD_ENTRIES, GFP_KERNEL);
 	}
 
 	/* actually reset and configure the etrax100 ide/ata interface */
@@ -398,12 +430,6 @@ init_e100_ide (void)
 
 static int e100_dma_off (ide_drive_t *drive)
 {
-	return 0;
-}
-
-static int e100_dma_verbose (ide_drive_t *drive)
-{
-	printk(", DMA(mode 2)");
 	return 0;
 }
 
@@ -618,20 +644,9 @@ static int e100_ide_build_dmatable (ide_drive_t *drive)
 
 	ata_tot_size = 0;
 
-	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) {
-		u8 *virt_addr = rq->buffer;
-		int sector_count = rq->nr_sectors;
-		memset(&sg[0], 0, sizeof(*sg));
-		sg[0].page = virt_to_page(virt_addr);
-		sg[0].offset = offset_in_page(virt_addr);
-		sg[0].length =  sector_count  * SECTOR_SIZE;
-		hwif->sg_nents = i = 1;
-	}
-	else
-	{
-		hwif->sg_nents = i = blk_rq_map_sg(drive->queue, rq, hwif->sg_table);
-	}
+	ide_map_sg(drive, rq);
 
+	i = hwif->sg_nents;
 
 	while(i) {
 		/*
@@ -768,10 +783,6 @@ static ide_startstop_t etrax_dma_intr (ide_drive_t *drive)
  * sector address using CHS or LBA.  All that remains is to prepare for DMA
  * and then issue the actual read/write DMA/PIO command to the drive.
  *
- * For ATAPI devices, we just prepare for DMA and return. The caller should
- * then issue the packet command to the drive and call us again with
- * ide_dma_begin afterwards.
- *
  * Returns 0 if all went well.
  * Returns 1 if DMA read/write could not be started, in which case
  * the caller should revert to PIO for the current request.
@@ -788,35 +799,9 @@ static int e100_dma_end(ide_drive_t *drive)
 	return 0;
 }
 
-static int e100_start_dma(ide_drive_t *drive, int atapi, int reading)
+static void e100_dma_start(ide_drive_t *drive)
 {
-	if(reading) {
-
-		RESET_DMA(ATA_RX_DMA_NBR); /* sometimes the DMA channel get stuck so we need to do this */
-		WAIT_DMA(ATA_RX_DMA_NBR);
-
-		/* set up the Etrax DMA descriptors */
-
-		if(e100_ide_build_dmatable (drive))
-			return 1;
-
-		if(!atapi) {
-			/* set the irq handler which will finish the request when DMA is done */
-
-			ide_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
-
-			/* issue cmd to drive */
-                        if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) &&
-			    (drive->addressing == 1)) {
-				ide_task_t *args = HWGROUP(drive)->rq->special;
-				etrax100_ide_outb(args->tfRegister[IDE_COMMAND_OFFSET], IDE_COMMAND_REG);
-			} else if (drive->addressing) {
-				etrax100_ide_outb(WIN_READDMA_EXT, IDE_COMMAND_REG);
-			} else {
-				etrax100_ide_outb(WIN_READDMA, IDE_COMMAND_REG);
-			}
-		}
-
+	if (e100_read_command) {
 		/* begin DMA */
 
 		/* need to do this before RX DMA due to a chip bug
@@ -849,32 +834,6 @@ static int e100_start_dma(ide_drive_t *drive, int atapi, int reading)
 
 	} else {
 		/* writing */
-
-		RESET_DMA(ATA_TX_DMA_NBR); /* sometimes the DMA channel get stuck so we need to do this */
-		WAIT_DMA(ATA_TX_DMA_NBR);
-
-		/* set up the Etrax DMA descriptors */
-
-		if(e100_ide_build_dmatable (drive))
-			return 1;
-
-		if(!atapi) {
-			/* set the irq handler which will finish the request when DMA is done */
-
-			ide_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
-
-			/* issue cmd to drive */
-			if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) &&
-			    (drive->addressing == 1)) {
-				ide_task_t *args = HWGROUP(drive)->rq->special;
-				etrax100_ide_outb(args->tfRegister[IDE_COMMAND_OFFSET], IDE_COMMAND_REG);
-			} else if (drive->addressing) {
-				etrax100_ide_outb(WIN_WRITEDMA_EXT, IDE_COMMAND_REG);
-			} else {
-				etrax100_ide_outb(WIN_WRITEDMA, IDE_COMMAND_REG);
-			}
-		}
-
 		/* begin DMA */
 
 		*R_DMA_CH2_FIRST = virt_to_phys(ata_descrs);
@@ -897,44 +856,4 @@ static int e100_start_dma(ide_drive_t *drive, int atapi, int reading)
 
 		D(printk("dma write of %d bytes.\n", ata_tot_size));
 	}
-	return 0;
-}
-
-static int e100_dma_write(ide_drive_t *drive)
-{
-	e100_read_command = 0;
-	/* ATAPI-devices (not disks) first call ide_dma_read/write to set the direction
-	 * then they call ide_dma_begin after they have issued the appropriate drive command
-	 * themselves to actually start the chipset DMA. so we just return here if we're
-	 * not a diskdrive.
-	 */
-	if (drive->media != ide_disk)
-                return 0;
-	return e100_start_dma(drive, 0, 0);
-}
-
-static int e100_dma_read(ide_drive_t *drive)
-{
-	e100_read_command = 1;
-	/* ATAPI-devices (not disks) first call ide_dma_read/write to set the direction
-	 * then they call ide_dma_begin after they have issued the appropriate drive command
-	 * themselves to actually start the chipset DMA. so we just return here if we're
-	 * not a diskdrive.
-	 */
-	if (drive->media != ide_disk)
-                return 0;
-	return e100_start_dma(drive, 0, 1);
-}
-
-static int e100_dma_begin(ide_drive_t *drive)
-{
-	/* begin DMA, used by ATAPI devices which want to issue the
-	 * appropriate IDE command themselves.
-	 *
-	 * they have already called ide_dma_read/write to set the
-	 * static reading flag, now they call ide_dma_begin to do
-	 * the real stuff. we tell our code below not to issue
-	 * any IDE commands itself and jump into it.
-	 */
-	 return e100_start_dma(drive, 1, e100_read_command);
 }

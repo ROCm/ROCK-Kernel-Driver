@@ -24,7 +24,7 @@ module_param_named(max_drivers, i2o_max_drivers, uint, 0);
 MODULE_PARM_DESC(max_drivers, "maximum number of OSM's to support");
 
 /* I2O drivers lock and array */
-static spinlock_t i2o_drivers_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t i2o_drivers_lock;
 static struct i2o_driver **i2o_drivers;
 
 /**
@@ -326,6 +326,8 @@ void i2o_driver_notify_device_remove_all(struct i2o_device *i2o_dev)
 int __init i2o_driver_init(void)
 {
 	int rc = 0;
+
+	spin_lock_init(&i2o_drivers_lock);
 
 	if ((i2o_max_drivers < 2) || (i2o_max_drivers > 64) ||
 	    ((i2o_max_drivers ^ (i2o_max_drivers - 1)) !=

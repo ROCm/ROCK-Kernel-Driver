@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: pnc2000.c,v 1.16 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: pnc2000.c,v 1.17 2004/11/16 18:29:02 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -26,7 +26,7 @@
  */
 
 
-struct map_info pnc_map = {
+static struct map_info pnc_map = {
 	.name = "PNC-2000",
 	.size = WINDOW_SIZE,
 	.bankwidth = 4,
@@ -62,7 +62,7 @@ static struct mtd_partition pnc_partitions[3] = {
  */
 static struct mtd_info *mymtd;
 
-int __init init_pnc2000(void)
+static int __init init_pnc2000(void)
 {
 	printk(KERN_NOTICE "Photron PNC-2000 flash mapping: %x at %x\n", WINDOW_SIZE, WINDOW_ADDR);
 

@@ -1,7 +1,7 @@
 /*
  * Kernel support for the ptrace() and syscall tracing interfaces.
  *
- * Copyright (C) 1999-2003 Hewlett-Packard Co
+ * Copyright (C) 1999-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Derived from the x86 and Alpha versions.  Most of the code in here
@@ -304,7 +304,6 @@ put_rnat (struct task_struct *task, struct switch_stack *sw,
 	long num_regs, nbits;
 	struct pt_regs *pt;
 	unsigned long cfm, *urbs_kargs;
-	struct unw_frame_info info;
 
 	pt = ia64_task_regs(task);
 	kbsp = (unsigned long *) sw->ar_bspstore;
@@ -316,11 +315,8 @@ put_rnat (struct task_struct *task, struct switch_stack *sw,
 		 * If entered via syscall, don't allow user to set rnat bits
 		 * for syscall args.
 		 */
-		unw_init_from_blocked_task(&info,task);
-		if (unw_unwind_to_user(&info) == 0) {
-			unw_get_cfm(&info,&cfm);
-			urbs_kargs = ia64_rse_skip_regs(urbs_end,-(cfm & 0x7f));
-		}
+		cfm = pt->cr_ifs;
+		urbs_kargs = ia64_rse_skip_regs(urbs_end, -(cfm & 0x7f));
 	}
 
 	if (urbs_kargs >= urnat_addr)
@@ -480,27 +476,18 @@ ia64_poke (struct task_struct *child, struct switch_stack *child_stack, unsigned
 unsigned long
 ia64_get_user_rbs_end (struct task_struct *child, struct pt_regs *pt, unsigned long *cfmp)
 {
-	unsigned long *krbs, *bspstore, cfm;
-	struct unw_frame_info info;
+	unsigned long *krbs, *bspstore, cfm = pt->cr_ifs;
 	long ndirty;
 
 	krbs = (unsigned long *) child + IA64_RBS_OFFSET/8;
 	bspstore = (unsigned long *) pt->ar_bspstore;
 	ndirty = ia64_rse_num_regs(krbs, krbs + (pt->loadrs >> 19));
-	cfm = pt->cr_ifs & ~(1UL << 63);
 
-	if (in_syscall(pt)) {
-		/*
-		 * If bit 63 of cr.ifs is cleared, the kernel was entered via a system
-		 * call and we need to recover the CFM that existed on entry to the
-		 * kernel by unwinding the kernel stack.
-		 */
-		unw_init_from_blocked_task(&info, child);
-		if (unw_unwind_to_user(&info) == 0) {
-			unw_get_cfm(&info, &cfm);
-			ndirty += (cfm & 0x7f);
-		}
-	}
+	if (in_syscall(pt))
+		ndirty += (cfm & 0x7f);
+	else
+		cfm &= ~(1UL << 63);	/* clear valid bit */
+
 	if (cfmp)
 		*cfmp = cfm;
 	return (unsigned long) ia64_rse_skip_regs(bspstore, ndirty);

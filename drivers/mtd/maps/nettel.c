@@ -6,7 +6,7 @@
  *      (C) Copyright 2000-2001, Greg Ungerer (gerg@snapgear.com)
  *      (C) Copyright 2001-2002, SnapGear (www.snapgear.com)
  *
- *	$Id: nettel.c,v 1.7 2004/10/20 22:17:30 dwmw2 Exp $
+ *	$Id: nettel.c,v 1.8 2004/11/04 13:24:15 gleixner Exp $
  */
 
 /****************************************************************************/
@@ -273,7 +273,7 @@ int __init nettel_init(void)
 	__asm__ ("wbinvd");
 
 	nettel_amd_map.phys = amdaddr;
-	nettel_amd_map.virt = (void __iomem *) ioremap_nocache(amdaddr, maxsize);
+	nettel_amd_map.virt = ioremap_nocache(amdaddr, maxsize);
 	if (!nettel_amd_map.virt) {
 		printk("SNAPGEAR: failed to ioremap() BOOTCS\n");
 		return(-EIO);

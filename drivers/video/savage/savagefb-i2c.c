@@ -141,32 +141,37 @@ static int prosavage_gpio_getsda(void* data)
 static int savage_setup_i2c_bus(struct savagefb_i2c_chan *chan,
 				const char *name)
 {
-	int rc;
+	int (*add_bus)(struct i2c_adapter *) = symbol_get(i2c_bit_add_bus);
+	int rc = 0;
 
-	strcpy(chan->adapter.name, name);
-	chan->adapter.owner		= THIS_MODULE;
-	chan->adapter.id		= I2C_ALGO_SAVAGE;
-	chan->adapter.algo_data		= &chan->algo;
-	chan->adapter.dev.parent	= &chan->par->pcidev->dev;
-	chan->algo.udelay		= 40;
-	chan->algo.mdelay               = 5;
-	chan->algo.timeout		= 20;
-	chan->algo.data 		= chan;
+	if (add_bus && chan->par) {
+		strcpy(chan->adapter.name, name);
+		chan->adapter.owner		= THIS_MODULE;
+		chan->adapter.id		= I2C_ALGO_SAVAGE;
+		chan->adapter.algo_data		= &chan->algo;
+		chan->adapter.dev.parent	= &chan->par->pcidev->dev;
+		chan->algo.udelay		= 40;
+		chan->algo.mdelay               = 5;
+		chan->algo.timeout		= 20;
+		chan->algo.data 		= chan;
 
-	i2c_set_adapdata(&chan->adapter, chan);
+		i2c_set_adapdata(&chan->adapter, chan);
 
-	/* Raise SCL and SDA */
-	chan->algo.setsda(chan, 1);
-	chan->algo.setscl(chan, 1);
-	udelay(20);
+		/* Raise SCL and SDA */
+		chan->algo.setsda(chan, 1);
+		chan->algo.setscl(chan, 1);
+		udelay(20);
 
-	rc = i2c_bit_add_bus(&chan->adapter);
-	if (rc == 0)
-		dev_dbg(&chan->par->pcidev->dev,
-			"I2C bus %s registered.\n", name);
-	else
-		dev_warn(&chan->par->pcidev->dev,
-			 "Failed to register I2C bus %s.\n", name);
+		rc = add_bus(&chan->adapter);
+		if (rc == 0)
+			dev_dbg(&chan->par->pcidev->dev,
+				"I2C bus %s registered.\n", name);
+		else
+			dev_warn(&chan->par->pcidev->dev,
+				 "Failed to register I2C bus %s.\n", name);
+	} else
+		chan->par = NULL;
+
 	return rc;
 }
 
@@ -193,6 +198,8 @@ void savagefb_create_i2c_busses(struct fb_info *info)
 		par->chan.algo.getsda = savage4_gpio_getsda;
 		par->chan.algo.getscl = savage4_gpio_getscl;
 		break;
+	default:
+		par->chan.par = NULL;
 	}
 
 	savage_setup_i2c_bus(&par->chan, "SAVAGE DDC2");
@@ -202,9 +209,12 @@ EXPORT_SYMBOL(savagefb_create_i2c_busses);
 void savagefb_delete_i2c_busses(struct fb_info *info)
 {
 	struct savagefb_par *par = (struct savagefb_par *)info->par;
+	int (*del_bus)(struct i2c_adapter *) =
+		symbol_get(i2c_bit_del_bus);
 
-	if (par->chan.par)
-		i2c_bit_del_bus(&par->chan.adapter);
+	if (del_bus && par->chan.par)
+		del_bus(&par->chan.adapter);
+
 	par->chan.par = NULL;
 }
 EXPORT_SYMBOL(savagefb_delete_i2c_busses);
@@ -212,6 +222,8 @@ EXPORT_SYMBOL(savagefb_delete_i2c_busses);
 static u8 *savage_do_probe_i2c_edid(struct savagefb_i2c_chan *chan)
 {
 	u8 start = 0x0;
+	int (*transfer)(struct i2c_adapter *, struct i2c_msg *, int) =
+		symbol_get(i2c_transfer);
 	struct i2c_msg msgs[] = {
 		{
 			.addr	= SAVAGE_DDC,
@@ -223,20 +235,23 @@ static u8 *savage_do_probe_i2c_edid(struct savagefb_i2c_chan *chan)
 			.len	= EDID_LENGTH,
 		},
 	};
-	u8 *buf;
+	u8 *buf = NULL;
 
-	buf = kmalloc(EDID_LENGTH, GFP_KERNEL);
-	if (!buf) {
-		dev_warn(&chan->par->pcidev->dev, "Out of memory!\n");
-		return NULL;
+	if (transfer && chan->par) {
+		buf = kmalloc(EDID_LENGTH, GFP_KERNEL);
+		if (buf) {
+			msgs[1].buf = buf;
+
+			if (transfer(&chan->adapter, msgs, 2) != 2) {
+				dev_dbg(&chan->par->pcidev->dev,
+					"Unable to read EDID block.\n");
+				kfree(buf);
+				buf = NULL;
+			}
+		}
 	}
-	msgs[1].buf = buf;
 
-	if (i2c_transfer(&chan->adapter, msgs, 2) == 2)
-		return buf;
-	dev_dbg(&chan->par->pcidev->dev, "Unable to read EDID block.\n");
-	kfree(buf);
-	return NULL;
+	return buf;
 }
 
 int savagefb_probe_i2c_connector(struct savagefb_par *par, u8 **out_edid)

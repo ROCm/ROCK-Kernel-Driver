@@ -259,6 +259,7 @@
 #define __NR_mq_getsetattr		1267
 #define __NR_kexec_load			1268
 #define __NR_vserver			1269
+#define __NR_waitid			1270
 
 #ifdef __KERNEL__
 
@@ -385,7 +386,7 @@ asmlinkage long sys_rt_sigaction(int sig,
  * "Conditional" syscalls
  *
  * Note, this macro can only be used in the file which defines sys_ni_syscall, i.e., in
- * kernel/sys.c.  This version causes warnings because the declaration isn't a
+ * kernel/sys_ni.c.  This version causes warnings because the declaration isn't a
  * proper prototype, but we can't use __typeof__ either, because not all cond_syscall()
  * declarations have prototypes at the moment.
  */

@@ -1,5 +1,5 @@
 /*
- * $Id: blkmtd.c,v 1.23 2004/08/09 14:03:19 dwmw2 Exp $
+ * $Id: blkmtd.c,v 1.24 2004/11/16 18:29:01 dwmw2 Exp $
  *
  * blkmtd.c - use a block device as a fake MTD
  *
@@ -39,7 +39,7 @@
 
 /* Default erase size in K, always make it a multiple of PAGE_SIZE */
 #define CONFIG_MTD_BLKDEV_ERASESIZE (128 << 10)	/* 128KiB */
-#define VERSION "$Revision: 1.23 $"
+#define VERSION "$Revision: 1.24 $"
 
 /* Info for the block device */
 struct blkmtd_dev {
@@ -59,10 +59,10 @@ static void blkmtd_sync(struct mtd_info *mtd);
 #define MAX_DEVICES 4
 
 /* Module parameters passed by insmod/modprobe */
-char *device[MAX_DEVICES];    /* the block device to use */
-int erasesz[MAX_DEVICES];     /* optional default erase size */
-int ro[MAX_DEVICES];          /* optional read only flag */
-int sync;
+static char *device[MAX_DEVICES];    /* the block device to use */
+static int erasesz[MAX_DEVICES];     /* optional default erase size */
+static int ro[MAX_DEVICES];          /* optional read only flag */
+static int sync;
 
 
 MODULE_LICENSE("GPL");

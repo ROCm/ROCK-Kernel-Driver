@@ -1001,6 +1001,29 @@ int call_netdevice_notifiers(unsigned long val, void *v)
 	return notifier_call_chain(&netdev_chain, val, v);
 }
 
+/* When > 0 there are consumers of rx skb time stamps */
+static atomic_t netstamp_needed = ATOMIC_INIT(0);
+
+void net_enable_timestamp(void)
+{
+	atomic_inc(&netstamp_needed);
+}
+
+void net_disable_timestamp(void)
+{
+	atomic_dec(&netstamp_needed);
+}
+
+static inline void net_timestamp(struct timeval *stamp)
+{
+	if (atomic_read(&netstamp_needed))
+		do_gettimeofday(stamp);
+	else {
+		stamp->tv_sec = 0;
+		stamp->tv_usec = 0;
+	}
+}
+
 /*
  *	Support routine. Sends outgoing frames to any network
  *	taps currently in use.
@@ -3215,6 +3238,8 @@ EXPORT_SYMBOL(skb_checksum_help);
 EXPORT_SYMBOL(synchronize_net);
 EXPORT_SYMBOL(unregister_netdevice);
 EXPORT_SYMBOL(unregister_netdevice_notifier);
+EXPORT_SYMBOL(net_enable_timestamp);
+EXPORT_SYMBOL(net_disable_timestamp);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);
