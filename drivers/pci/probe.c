@@ -144,9 +144,11 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 			pci_write_config_dword(dev, reg+4, ~0);
 			pci_read_config_dword(dev, reg+4, &sz);
 			pci_write_config_dword(dev, reg+4, l);
-			if (~sz)
-				res->end = res->start + 0xffffffff +
-						(((unsigned long) ~sz) << 32);
+			sz = pci_size(l, sz, 0xffffffff);
+			if (sz) {
+				/* This BAR needs > 4GB?  Wow. */
+				res->end |= (unsigned long)sz<<32;
+			}
 #else
 			if (l) {
 				printk(KERN_ERR "PCI: Unable to handle 64-bit address for device %s\n", pci_name(dev));
@@ -243,15 +245,23 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		u32 mem_base_hi, mem_limit_hi;
 		pci_read_config_dword(dev, PCI_PREF_BASE_UPPER32, &mem_base_hi);
 		pci_read_config_dword(dev, PCI_PREF_LIMIT_UPPER32, &mem_limit_hi);
+
+		/*
+		 * Some bridges set the base > limit by default, and some
+		 * (broken) BIOSes do not initialize them.  If we find
+		 * this, just assume they are not being used.
+		 */
+		if (mem_base_hi <= mem_limit_hi) {
 #if BITS_PER_LONG == 64
-		base |= ((long) mem_base_hi) << 32;
-		limit |= ((long) mem_limit_hi) << 32;
+			base |= ((long) mem_base_hi) << 32;
+			limit |= ((long) mem_limit_hi) << 32;
 #else
-		if (mem_base_hi || mem_limit_hi) {
-			printk(KERN_ERR "PCI: Unable to handle 64-bit address space for %s\n", child->name);
-			return;
-		}
+			if (mem_base_hi || mem_limit_hi) {
+				printk(KERN_ERR "PCI: Unable to handle 64-bit address space for bridge %s\n", pci_name(dev));
+				return;
+			}
 #endif
+		}
 	}
 	if (base <= limit) {
 		res->flags = (mem_base_lo & PCI_MEMORY_RANGE_TYPE_MASK) | IORESOURCE_MEM | IORESOURCE_PREFETCH;
