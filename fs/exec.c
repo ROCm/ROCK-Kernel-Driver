@@ -358,11 +358,11 @@ int setup_arg_pages(struct linux_binprm *bprm)
 		memmove(to, to + offset, PAGE_SIZE - offset);
 		from = kmap(bprm->page[j]);
 		memcpy(to + PAGE_SIZE - offset, from, offset);
-		kunmap(bprm[j - 1]);
+		kunmap(bprm->page[j - 1]);
 		to = from;
 	}
 	memmove(to, to + offset, PAGE_SIZE - offset);
-	kunmap(bprm[j - 1]);
+	kunmap(bprm->page[j - 1]);
 
 	/* Adjust bprm->p to point to the end of the strings. */
 	bprm->p = PAGE_SIZE * i - offset;
