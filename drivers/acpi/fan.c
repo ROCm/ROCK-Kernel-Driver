@@ -157,6 +157,7 @@ acpi_fan_add_fs (
 			acpi_fan_dir);
 		if (!acpi_device_dir(device))
 			return_VALUE(-ENODEV);
+		acpi_device_dir(device)->owner = THIS_MODULE;
 	}
 
 	/* 'status' [R/W] */
@@ -170,6 +171,7 @@ acpi_fan_add_fs (
 		entry->read_proc = acpi_fan_read_state;
 		entry->write_proc = acpi_fan_write_state;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	return_VALUE(0);
@@ -183,6 +185,8 @@ acpi_fan_remove_fs (
 	ACPI_FUNCTION_TRACE("acpi_fan_remove_fs");
 
 	if (acpi_device_dir(device)) {
+		remove_proc_entry(ACPI_FAN_FILE_STATE,
+				  acpi_device_dir(device));
 		remove_proc_entry(acpi_device_bid(device), acpi_fan_dir);
 		acpi_device_dir(device) = NULL;
 	}
@@ -273,6 +277,7 @@ acpi_fan_init (void)
 	acpi_fan_dir = proc_mkdir(ACPI_FAN_CLASS, acpi_root_dir);
 	if (!acpi_fan_dir)
 		return_VALUE(-ENODEV);
+	acpi_fan_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&acpi_fan_driver);
 	if (result < 0) {

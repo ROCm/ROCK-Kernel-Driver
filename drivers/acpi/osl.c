@@ -34,14 +34,12 @@
 #include <linux/interrupt.h>
 #include <linux/kmod.h>
 #include <linux/delay.h>
-#include <linux/init.h>
 #include <linux/workqueue.h>
 #include <linux/nmi.h>
 #include <acpi/acpi.h>
 #include <asm/io.h>
 #include <acpi/acpi_bus.h>
 #include <asm/uaccess.h>
-#include <linux/vmalloc.h>
 
 #include <linux/efi.h>
 
@@ -65,9 +63,10 @@ int acpi_in_debugger;
 extern char line_buf[80];
 #endif /*ENABLE_DEBUGGER*/
 
-static int acpi_irq_irq;
+static unsigned int acpi_irq_irq;
 static OSD_HANDLER acpi_irq_handler;
 static void *acpi_irq_context;
+static struct workqueue_struct *kacpid_wq;
 
 acpi_status
 acpi_os_initialize(void)
@@ -82,6 +81,8 @@ acpi_os_initialize(void)
 		return AE_NULL_ENTRY;
 	}
 #endif
+	kacpid_wq = create_singlethread_workqueue("kacpid");
+	BUG_ON(!kacpid_wq);
 
 	return AE_OK;
 }
@@ -93,6 +94,8 @@ acpi_os_terminate(void)
 		acpi_os_remove_interrupt_handler(acpi_irq_irq,
 						 acpi_irq_handler);
 	}
+
+	destroy_workqueue(kacpid_wq);
 
 	return AE_OK;
 }
@@ -217,7 +220,8 @@ acpi_os_predefined_override (const struct acpi_predefined_names *init_val,
 
 	*new_val = NULL;
 	if (!memcmp (init_val->name, "_OS_", 4) && strlen(acpi_os_name)) {
-		printk(KERN_INFO PREFIX "Overriding _OS definition\n");
+		printk(KERN_INFO PREFIX "Overriding _OS definition %s\n",
+			acpi_os_name);
 		*new_val = acpi_os_name;
 	}
 
@@ -264,23 +268,22 @@ acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 acpi_status
-acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
+acpi_os_install_interrupt_handler(u32 gsi, OSD_HANDLER handler, void *context)
 {
+	unsigned int irq;
+
 	/*
-	 * Ignore the irq from the core, and use the value in our copy of the
+	 * Ignore the GSI from the core, and use the value in our copy of the
 	 * FADT. It may not be the same if an interrupt source override exists
 	 * for the SCI.
 	 */
-	irq = acpi_fadt.sci_int;
-
-#if defined(CONFIG_IA64) || defined(CONFIG_PCI_USE_VECTOR)
-	irq = acpi_irq_to_vector(irq);
-	if (irq < 0) {
-		printk(KERN_ERR PREFIX "SCI (ACPI interrupt %d) not registered\n",
-		       acpi_fadt.sci_int);
+	gsi = acpi_fadt.sci_int;
+	if (acpi_gsi_to_irq(gsi, &irq) < 0) {
+		printk(KERN_ERR PREFIX "SCI (ACPI GSI %d) not registered\n",
+		       gsi);
 		return AE_OK;
 	}
-#endif
+
 	acpi_irq_handler = handler;
 	acpi_irq_context = context;
 	if (request_irq(irq, acpi_irq, SA_SHIRQ, "acpi", acpi_irq)) {
@@ -296,9 +299,6 @@ acpi_status
 acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
 {
 	if (irq) {
-#if defined(CONFIG_IA64) || defined(CONFIG_PCI_USE_VECTOR)
-		irq = acpi_irq_to_vector(irq);
-#endif
 		free_irq(irq, acpi_irq);
 		acpi_irq_handler = NULL;
 		acpi_irq_irq = 0;
@@ -681,13 +681,20 @@ acpi_os_queue_for_execution(
 	task = (void *)(dpc+1);
 	INIT_WORK(task, acpi_os_execute_deferred, (void*)dpc);
 
-	if (!schedule_work(task)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to schedule_work() failed.\n"));
+	if (!queue_work(kacpid_wq, task)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to queue_work() failed.\n"));
 		kfree(dpc);
 		status = AE_ERROR;
 	}
 
 	return_ACPI_STATUS (status);
+}
+
+void
+acpi_os_wait_events_complete(
+	void *context)
+{
+	flush_workqueue(kacpid_wq);
 }
 
 /*

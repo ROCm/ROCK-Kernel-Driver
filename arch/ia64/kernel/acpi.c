@@ -52,6 +52,9 @@
 #include <asm/sal.h>
 #include <asm/cyclone.h>
 
+#define BAD_MADT_ENTRY(entry, end) (                                        \
+		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
+		((acpi_table_entry_header *)entry)->length != sizeof(*entry))
 
 #define PREFIX			"ACPI: "
 
@@ -158,12 +161,14 @@ static u8			has_8259;
 
 
 static int __init
-acpi_parse_lapic_addr_ovr (acpi_table_entry_header *header)
+acpi_parse_lapic_addr_ovr (
+	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_lapic_addr_ovr *lapic;
 
 	lapic = (struct acpi_table_lapic_addr_ovr *) header;
-	if (!lapic)
+
+	if (BAD_MADT_ENTRY(lapic, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
@@ -177,12 +182,13 @@ acpi_parse_lapic_addr_ovr (acpi_table_entry_header *header)
 
 
 static int __init
-acpi_parse_lsapic (acpi_table_entry_header *header)
+acpi_parse_lsapic (acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_lsapic *lsapic;
 
 	lsapic = (struct acpi_table_lsapic *) header;
-	if (!lsapic)
+
+	if (BAD_MADT_ENTRY(lsapic, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
@@ -210,12 +216,13 @@ acpi_parse_lsapic (acpi_table_entry_header *header)
 
 
 static int __init
-acpi_parse_lapic_nmi (acpi_table_entry_header *header)
+acpi_parse_lapic_nmi (acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_lapic_nmi *lacpi_nmi;
 
 	lacpi_nmi = (struct acpi_table_lapic_nmi*) header;
-	if (!lacpi_nmi)
+
+	if (BAD_MADT_ENTRY(lacpi_nmi, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
@@ -226,12 +233,13 @@ acpi_parse_lapic_nmi (acpi_table_entry_header *header)
 
 
 static int __init
-acpi_parse_iosapic (acpi_table_entry_header *header)
+acpi_parse_iosapic (acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_iosapic *iosapic;
 
 	iosapic = (struct acpi_table_iosapic *) header;
-	if (!iosapic)
+
+	if (BAD_MADT_ENTRY(iosapic, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
@@ -243,13 +251,15 @@ acpi_parse_iosapic (acpi_table_entry_header *header)
 
 
 static int __init
-acpi_parse_plat_int_src (acpi_table_entry_header *header)
+acpi_parse_plat_int_src (
+	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_plat_int_src *plintsrc;
 	int vector;
 
 	plintsrc = (struct acpi_table_plat_int_src *) header;
-	if (!plintsrc)
+
+	if (BAD_MADT_ENTRY(plintsrc, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
@@ -272,12 +282,14 @@ acpi_parse_plat_int_src (acpi_table_entry_header *header)
 
 
 static int __init
-acpi_parse_int_src_ovr (acpi_table_entry_header *header)
+acpi_parse_int_src_ovr (
+	acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_int_src_ovr *p;
 
 	p = (struct acpi_table_int_src_ovr *) header;
-	if (!p)
+
+	if (BAD_MADT_ENTRY(p, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
@@ -290,12 +302,13 @@ acpi_parse_int_src_ovr (acpi_table_entry_header *header)
 
 
 static int __init
-acpi_parse_nmi_src (acpi_table_entry_header *header)
+acpi_parse_nmi_src (acpi_table_entry_header *header, const unsigned long end)
 {
 	struct acpi_table_nmi_src *nmi_src;
 
 	nmi_src = (struct acpi_table_nmi_src*) header;
-	if (!nmi_src)
+
+	if (BAD_MADT_ENTRY(nmi_src, end))
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);

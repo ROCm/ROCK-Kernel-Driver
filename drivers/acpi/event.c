@@ -63,8 +63,9 @@ acpi_system_read_event (
 			return_VALUE(-EAGAIN);
 
 		result = acpi_bus_receive_event(&event);
-		if (result)
-			return result;
+		if (result) {
+			return_VALUE(-EIO);
+		}
 
 		chars_remaining = sprintf(str, "%s %s %08x %08x\n", 
 			event.device_class?event.device_class:"<unknown>",

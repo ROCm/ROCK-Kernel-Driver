@@ -1060,6 +1060,7 @@ acpi_thermal_add_fs (
 			acpi_thermal_dir);
 		if (!acpi_device_dir(device))
 			return_VALUE(-ENODEV);
+		acpi_device_dir(device)->owner = THIS_MODULE;
 	}
 
 	/* 'state' [R] */
@@ -1072,6 +1073,7 @@ acpi_thermal_add_fs (
 	else {
 		entry->proc_fops = &acpi_thermal_state_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'temperature' [R] */
@@ -1084,6 +1086,7 @@ acpi_thermal_add_fs (
 	else {
 		entry->proc_fops = &acpi_thermal_temp_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'trip_points' [R/W] */
@@ -1096,6 +1099,7 @@ acpi_thermal_add_fs (
 	else {
 		entry->proc_fops = &acpi_thermal_trip_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'cooling_mode' [R/W] */
@@ -1108,6 +1112,7 @@ acpi_thermal_add_fs (
 	else {
 		entry->proc_fops = &acpi_thermal_cooling_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	/* 'polling_frequency' [R/W] */
@@ -1120,6 +1125,7 @@ acpi_thermal_add_fs (
 	else {
 		entry->proc_fops = &acpi_thermal_polling_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	return_VALUE(0);
@@ -1133,6 +1139,16 @@ acpi_thermal_remove_fs (
 	ACPI_FUNCTION_TRACE("acpi_thermal_remove_fs");
 
 	if (acpi_device_dir(device)) {
+		remove_proc_entry(ACPI_THERMAL_FILE_POLLING_FREQ,
+				  acpi_device_dir(device));
+		remove_proc_entry(ACPI_THERMAL_FILE_COOLING_MODE,
+				  acpi_device_dir(device));
+		remove_proc_entry(ACPI_THERMAL_FILE_TRIP_POINTS,
+				  acpi_device_dir(device));
+		remove_proc_entry(ACPI_THERMAL_FILE_TEMPERATURE,
+				  acpi_device_dir(device));
+		remove_proc_entry(ACPI_THERMAL_FILE_STATE,
+				  acpi_device_dir(device));
 		remove_proc_entry(acpi_device_bid(device), acpi_thermal_dir);
 		acpi_device_dir(device) = NULL;
 	}
@@ -1338,6 +1354,7 @@ acpi_thermal_init (void)
 	acpi_thermal_dir = proc_mkdir(ACPI_THERMAL_CLASS, acpi_root_dir);
 	if (!acpi_thermal_dir)
 		return_VALUE(-ENODEV);
+	acpi_thermal_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&acpi_thermal_driver);
 	if (result < 0) {

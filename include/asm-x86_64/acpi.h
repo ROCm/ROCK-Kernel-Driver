@@ -106,8 +106,15 @@ extern int acpi_ioapic;
 extern int acpi_noirq;
 extern int acpi_strict;
 extern int acpi_disabled;
+extern int acpi_pci_disabled;
 extern int acpi_ht;
-static inline void disable_acpi(void) { acpi_disabled = 1; acpi_ht = 0; }
+static inline void disable_acpi(void) 
+{ 
+	acpi_disabled = 1; 
+	acpi_ht = 0; 
+	acpi_pci_disabled = 1;
+	acpi_noirq = 1;
+}
 
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES 4
@@ -121,9 +128,15 @@ extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
 
 #ifdef CONFIG_ACPI_PCI
 static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
+static inline void acpi_disable_pci(void) 
+{
+	acpi_pci_disabled = 1; 
+	acpi_noirq_set();
+}
 extern int acpi_irq_balance_set(char *str);
 #else
 static inline void acpi_noirq_set(void) { }
+static inline void acpi_disable_pci(void) { }
 static inline int acpi_irq_balance_set(char *str) { return 0; }
 #endif
 
@@ -144,6 +157,7 @@ extern void acpi_reserve_bootmem(void);
 #define boot_cpu_physical_apicid boot_cpu_id
 
 extern int acpi_disabled;
+extern int acpi_pci_disabled;
 
 #define dmi_broken (0)
 #define BROKEN_ACPI_Sx		0x0001

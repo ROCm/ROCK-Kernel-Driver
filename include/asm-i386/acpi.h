@@ -109,7 +109,14 @@ extern int acpi_noirq;
 extern int acpi_strict;
 extern int acpi_disabled;
 extern int acpi_ht;
-static inline void disable_acpi(void) { acpi_disabled = 1; acpi_ht = 0; }
+extern int acpi_pci_disabled;
+static inline void disable_acpi(void) 
+{ 
+	acpi_disabled = 1; 
+	acpi_ht = 0;
+	acpi_pci_disabled = 1;
+	acpi_noirq = 1;
+}
 
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES 4
@@ -118,6 +125,7 @@ extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
 #ifdef CONFIG_X86_IO_APIC
 extern int skip_ioapic_setup;
 extern int acpi_irq_to_vector(u32 irq);	/* deprecated in favor of acpi_gsi_to_irq */
+extern int acpi_skip_timer_override;
 
 static inline void disable_ioapic_setup(void)
 {
@@ -143,9 +151,15 @@ static inline void disable_ioapic_setup(void)
 
 #ifdef CONFIG_ACPI_PCI
 static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
+static inline void acpi_disable_pci(void) 
+{
+	acpi_pci_disabled = 1; 
+	acpi_noirq_set();
+}
 extern int acpi_irq_balance_set(char *str);
 #else
 static inline void acpi_noirq_set(void) { }
+static inline void acpi_disable_pci(void) { }
 static inline int acpi_irq_balance_set(char *str) { return 0; }
 #endif
 

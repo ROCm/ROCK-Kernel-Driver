@@ -79,8 +79,8 @@ static struct irq_pin_list {
 	int apic, pin, next;
 } irq_2_pin[PIN_MAP_SIZE];
 
+int vector_irq[NR_VECTORS] = { [0 ... NR_VECTORS - 1] = -1};
 #ifdef CONFIG_PCI_USE_VECTOR
-int vector_irq[NR_IRQS] = { [0 ... NR_IRQS -1] = -1};
 #define vector_to_irq(vector) 	\
 	(platform_legacy_irq(vector) ? vector : vector_irq[vector])
 #else
@@ -1161,12 +1161,16 @@ static inline int IO_APIC_irq_trigger(int irq)
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
 u8 irq_vector[NR_IRQ_VECTORS] = { FIRST_DEVICE_VECTOR , 0 };
 
-#ifndef CONFIG_PCI_USE_VECTOR
+#ifdef CONFIG_PCI_USE_VECTOR
+int assign_irq_vector(int irq)
+#else
 int __init assign_irq_vector(int irq)
+#endif
 {
 	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
+
 	BUG_ON(irq >= NR_IRQ_VECTORS);
-	if (IO_APIC_VECTOR(irq) > 0)
+	if (irq != AUTO_ASSIGN && IO_APIC_VECTOR(irq) > 0)
 		return IO_APIC_VECTOR(irq);
 next:
 	current_vector += 8;
@@ -1178,15 +1182,18 @@ next:
 #endif	/* CONFIG_KDB */
 
 	if (current_vector >= FIRST_SYSTEM_VECTOR) {
-		offset = (offset + 1) & 7;
+		offset++;
+		if (!(offset%8))
+			return -ENOSPC;
 		current_vector = FIRST_DEVICE_VECTOR + offset;
 	}
 
+	vector_irq[current_vector] = irq;
+	if (irq != AUTO_ASSIGN)
 	IO_APIC_VECTOR(irq) = current_vector;
 
 	return current_vector;
 }
-#endif
 
 static struct hw_interrupt_type ioapic_level_type;
 static struct hw_interrupt_type ioapic_edge_type;
@@ -2275,18 +2282,10 @@ static inline void check_timer(void)
 
 /*
  *
- * IRQ's that are handled by the old PIC in all cases:
+ * IRQ's that are handled by the PIC in the MPS IOAPIC case.
  * - IRQ2 is the cascade IRQ, and cannot be a io-apic IRQ.
  *   Linux doesn't really care, as it's not actually used
  *   for any interrupt handling anyway.
- * - There used to be IRQ13 here as well, but all
- *   MPS-compliant must not use it for FPU coupling and we
- *   want to use exception 16 anyway.  And there are
- *   systems who connect it to an I/O APIC for other uses.
- *   Thus we don't mark it special any longer.
- *
- * Additionally, something is definitely wrong with irq9
- * on PIIX4 boards.
  */
 #define PIC_IRQS	(1 << PIC_CASCADE_IR)
 
@@ -2294,7 +2293,11 @@ void __init setup_IO_APIC(void)
 {
 	enable_IO_APIC();
 
+	if (acpi_ioapic)
+		io_apic_irqs = ~0;	/* all IRQs go through IOAPIC */
+	else
 	io_apic_irqs = ~PIC_IRQS;
+
 	printk("ENABLING IO-APIC IRQs\n");
 
 	/*
@@ -2464,7 +2467,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
 	entry.vector = assign_irq_vector(irq);
 
-	printk(KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry (%d-%d -> 0x%x -> "
+	Dprintk(KERN_DEBUG "IOAPIC[%d]: Set PCI routing entry (%d-%d -> 0x%x -> "
 		"IRQ %d Mode:%i Active:%i)\n", ioapic, 
 		mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq, edge_level, active_high_low);
 

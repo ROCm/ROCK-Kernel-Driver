@@ -112,6 +112,14 @@ acpi_bus_get_status (
 	else
 		STRUCT_TO_INT(device->status) = 0x0F;
 
+	if (device->status.functional && !device->status.present) {
+		printk(KERN_WARNING PREFIX "Device [%s] status [%08x]: "
+			"functional but not present; setting present\n",
+			device->pnp.bus_id,
+			(u32) STRUCT_TO_INT(device->status));
+		device->status.present = 1;
+	}
+
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device [%s] status [%08x]\n", 
 		device->pnp.bus_id, (u32) STRUCT_TO_INT(device->status)));
 

@@ -406,6 +406,15 @@ acpi_remove_notify_handler (
 			goto unlock_and_exit;
 		}
 
+		/* Make sure all deferred tasks are completed */
+
+		(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+		acpi_os_wait_events_complete(NULL);
+		status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+ 		}
+
 		if (handler_type == ACPI_SYSTEM_NOTIFY) {
 			acpi_gbl_system_notify.node  = NULL;
 			acpi_gbl_system_notify.handler = NULL;
@@ -451,6 +460,15 @@ acpi_remove_notify_handler (
 			status = AE_BAD_PARAMETER;
 			goto unlock_and_exit;
 		}
+
+		/* Make sure all deferred tasks are completed */
+
+		(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+		acpi_os_wait_events_complete(NULL);
+		status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+ 		}
 
 		/* Remove the handler */
 
@@ -613,6 +631,15 @@ acpi_remove_gpe_handler (
 		status = AE_BAD_PARAMETER;
 		goto unlock_and_exit;
 	}
+
+	/* Make sure all deferred tasks are completed */
+
+	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	acpi_os_wait_events_complete(NULL);
+	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+ 	}
 
 	/* Remove the handler */
 
