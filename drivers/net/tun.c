@@ -181,12 +181,16 @@ static unsigned int tun_chr_poll(struct file *file, poll_table * wait)
 }
 
 /* Get packet from user space buffer(already verified) */
-static __inline__ ssize_t tun_get_user(struct tun_struct *tun, const char *buf, size_t count)
+static __inline__ ssize_t
+tun_get_user(struct tun_struct *tun, const struct iovec *iov,
+	     unsigned long count, size_t total)
 {
 	struct tun_pi pi = { 0, __constant_htons(ETH_P_IP) };
-	register const char *ptr = buf; 
-	register int len = count;
+	const struct iovec *vector = &iov[0];
+	register const char *ptr = vector->iov_base;
+	register int len = vector->iov_len;
 	struct sk_buff *skb;
+	ssize_t sent = 0;
 
 	if (!(tun->flags & TUN_NO_PI)) {
 		if ((len -= sizeof(pi)) < 0)
@@ -194,15 +198,33 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, const char *buf, 
 
 		copy_from_user(&pi, ptr, sizeof(pi));
 		ptr += sizeof(pi);
+
+		if (len == 0) {
+			vector++;
+			count--;
+
+			ptr = vector->iov_base;
+			len = vector->iov_len;
+		}
 	}
  
-	if (!(skb = alloc_skb(len + 2, GFP_KERNEL))) {
+	if (!(skb = alloc_skb(total + 2, GFP_KERNEL))) {
 		tun->stats.rx_dropped++;
 		return -ENOMEM;
 	}
 
 	skb_reserve(skb, 2);
-	copy_from_user(skb_put(skb, len), ptr, len); 
+
+	while (count > 0) {
+		copy_from_user(skb_put(skb, len), ptr, len); 
+		sent += len;
+
+		vector++;
+		count--;
+
+		ptr = vector->iov_base;
+		len = vector->iov_len;
+	}
 
 	skb->dev = &tun->dev;
 	switch (tun->flags & TUN_TYPE_MASK) {
@@ -221,9 +243,9 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, const char *buf, 
 	netif_rx_ni(skb);
    
 	tun->stats.rx_packets++;
-	tun->stats.rx_bytes += len;
+	tun->stats.rx_bytes += sent;
 
-	return count;
+	return total;
 } 
 
 /* Write */
@@ -231,6 +253,7 @@ static ssize_t tun_chr_write(struct file * file, const char * buf,
 			     size_t count, loff_t *pos)
 {
 	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct iovec iov;
 
 	if (!tun)
 		return -EBADFD;
@@ -240,7 +263,30 @@ static ssize_t tun_chr_write(struct file * file, const char * buf,
 	if (verify_area(VERIFY_READ, buf, count))
 		return -EFAULT;
 
-	return tun_get_user(tun, buf, count);
+	iov.iov_base = (char *) buf;
+	iov.iov_len = count;
+
+	return tun_get_user(tun, &iov, 1, count);
+}
+
+/* Writev */
+static ssize_t tun_chr_writev(struct file * file, const struct iovec *iov,
+			      unsigned long count, loff_t *pos)
+{
+	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	size_t total = 0;
+	unsigned long i;
+
+	if (!tun)
+		return -EBADFD;
+
+	for (i = 0; i < count; i++) {
+		if (verify_area(VERIFY_READ, iov[i].iov_base, iov[i].iov_len))
+			return -EFAULT;
+		total += iov[i].iov_len;
+	}
+
+	return tun_get_user(tun, iov, count, total);
 }
 
 /* Put packet to user space buffer(already verified) */
@@ -547,6 +593,7 @@ static struct file_operations tun_fops = {
 	llseek:	no_llseek,
 	read:	tun_chr_read,
 	write:	tun_chr_write,
+	writev:	tun_chr_writev,
 	poll:	tun_chr_poll,
 	ioctl:	tun_chr_ioctl,
 	open:	tun_chr_open,
