@@ -15,11 +15,13 @@
 void show_trace(unsigned long * stack)
 {
 	/* XXX: Copy the CONFIG_FRAME_POINTER stack-walking backtrace from
-	 * arch/i386/kernel/traps.c. */
+	 * arch/i386/kernel/traps.c, and then move this to sys-i386/sysrq.c.*/
         unsigned long addr;
 
-        if (!stack)
+        if (!stack) {
                 stack = (unsigned long*) &stack;
+		WARN_ON(1);
+	}
 
         printk("Call Trace: \n");
         while (((long) stack & (THREAD_SIZE-1)) != 0) {
@@ -34,7 +36,8 @@ void show_trace(unsigned long * stack)
 }
 
 /*
- * The architecture-independent dump_stack generator
+ * stack dumps generator - this is used by arch-independent code.
+ * And this is identical to i386 currently.
  */
 void dump_stack(void)
 {
@@ -44,7 +47,34 @@ void dump_stack(void)
 }
 EXPORT_SYMBOL(dump_stack);
 
-void show_stack(struct task_struct *task, unsigned long *sp)
+/*Stolen from arch/i386/kernel/traps.c */
+static int kstack_depth_to_print = 24;
+
+/* This recently started being used in arch-independent code too, as in
+ * kernel/sched.c.*/
+void show_stack(struct task_struct *task, unsigned long *esp)
 {
-	show_trace(sp);
+	unsigned long *stack;
+	int i;
+
+	if (esp == NULL) {
+		if (task != current) {
+			esp = (unsigned long *) KSTK_ESP(task);
+			/* Which one? No actual difference - just coding style.*/
+			//esp = (unsigned long *) PT_REGS_IP(&task->thread.regs);
+		} else {
+			esp = (unsigned long *) &esp;
+		}
+	}
+
+	stack = esp;
+	for(i = 0; i < kstack_depth_to_print; i++) {
+		if (kstack_end(stack))
+			break;
+		if (i && ((i % 8) == 0))
+			printk("\n       ");
+		printk("%08lx ", *stack++);
+	}
+
+	show_trace(esp);
 }
