@@ -280,8 +280,9 @@ void uart_write_wakeup(struct uart_port *port);
  */
 void uart_update_timeout(struct uart_port *port, unsigned int cflag,
 			 unsigned int quot);
-unsigned int uart_get_baud_rate(struct uart_port *port,
-				struct termios *termios);
+unsigned int uart_get_baud_rate(struct uart_port *port, struct termios *termios
+				struct termios *old, unsigned int min,
+				unsigned int max);
 unsigned int uart_get_divisor(struct uart_port *port, struct termios *termios,
 			      struct termios *old_termios);
 
