@@ -16,19 +16,19 @@ soundmodem-$(CONFIG_SOUNDMODEM_PSK4800)		+= sm_psk4800.o
 soundmodem-$(CONFIG_SOUNDMODEM_FSK9600)		+= sm_fsk9600.o
 soundmodem-objs					:= $(soundmodem-y)
 
-all:		all_targets
-.PHONY:		all
+include $(TOPDIR)/Rules.make
 
-gentbl:		gentbl.c
-		$(HOSTCC) $(HOSTCFLAGS) $< -o $@ -lm
+# Dependencies on generates files need to be listed explicitly
 
-TBLHDR		:= sm_tbl_afsk1200.h sm_tbl_afsk2400_8.h 
-TBLHDR		+= sm_tbl_afsk2666.h sm_tbl_psk4800.h
-TBLHDR		+= sm_tbl_hapn4800.h sm_tbl_fsk9600.h
+sm_%.o: sm_tbl_%.h
+
+TBLHDR		:= sm_tbl_afsk1200.h sm_tbl_afsk2400_7.h sm_tbl_afsk2400_8.h \
+		   sm_tbl_afsk2666.h sm_tbl_psk4800.h	 sm_tbl_hapn4800.h \
+		   sm_tbl_fsk9600.h
 
 $(TBLHDR):	gentbl
 		./gentbl
 
-fastdep:	$(TBLHDR)
+gentbl:		gentbl.c
+		$(HOSTCC) $(HOSTCFLAGS) $< -o $@ -lm
 
-include $(TOPDIR)/Rules.make
