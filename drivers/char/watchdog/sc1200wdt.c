@@ -175,12 +175,12 @@ static int sc1200wdt_ioctl(struct inode *inode, struct file *file, unsigned int 
 	static struct watchdog_info ident = {
 		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.firmware_version = 0,
-		.identity = "PC87307/PC97307"
+		.identity = "PC87307/PC97307",
 	};
 
 	switch (cmd) {
 		default:
-			return -ENOTTY;	/* Keep Pavel Machek amused ;) */
+			return -ENOIOCTLCMD;	/* Keep Pavel Machek amused ;) */
 
 		case WDIOC_GETSUPPORT:
 			if (copy_to_user((struct watchdog_info *)arg, &ident, sizeof ident))
@@ -256,7 +256,7 @@ static ssize_t sc1200wdt_write(struct file *file, const char *data, size_t len, 
 {
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
-	
+
 	if (len) {
 		if (!nowayout) {
 			size_t i;
@@ -292,7 +292,7 @@ static int sc1200wdt_notify_sys(struct notifier_block *this, unsigned long code,
 
 static struct notifier_block sc1200wdt_notifier =
 {
-	notifier_call:	sc1200wdt_notify_sys
+	.notifier_call =	sc1200wdt_notify_sys,
 };
 
 static struct file_operations sc1200wdt_fops =
@@ -301,7 +301,7 @@ static struct file_operations sc1200wdt_fops =
 	.write		= sc1200wdt_write,
 	.ioctl		= sc1200wdt_ioctl,
 	.open		= sc1200wdt_open,
-	.release	= sc1200wdt_release
+	.release	= sc1200wdt_release,
 };
 
 static struct miscdevice sc1200wdt_miscdev =
@@ -320,7 +320,7 @@ static int __init sc1200wdt_probe(void)
 	 * Nb. This could be done with accuracy by reading the SID registers, but
 	 * we don't have access to those io regions.
 	 */
-	
+
 	unsigned char reg;
 
 	sc1200wdt_read_data(PMC3, &reg);
@@ -334,7 +334,7 @@ static int __init sc1200wdt_probe(void)
 struct pnp_device_id scl200wdt_pnp_devices[] = {
 	/* National Semiconductor PC87307/PC97307 watchdog component */
 	{.id = "NSC0800", .driver_data = 0},
-	{.id = ""}
+	{.id = ""},
 };
 
 static int scl200wdt_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
@@ -409,7 +409,7 @@ static int __init sc1200wdt_init(void)
 		ret = -EBUSY;
 		goto out_clean;
 	}
-	
+
 	ret = sc1200wdt_probe();
 	if (ret)
 		goto out_io;
@@ -438,7 +438,7 @@ out_io:
 	release_region(io, io_len);
 
 	goto out_clean;
-}	
+}
 
 
 static void __exit sc1200wdt_exit(void)

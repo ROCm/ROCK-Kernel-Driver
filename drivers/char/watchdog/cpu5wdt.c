@@ -105,8 +105,8 @@ static void cpu5wdt_start(void)
 {
 	if ( !cpu5wdt_device.queue ) {
 		cpu5wdt_device.queue = 1;
-		outb(0, port + CPU5WDT_TIME_A_REG);  
-		outb(0, port + CPU5WDT_TIME_B_REG);  
+		outb(0, port + CPU5WDT_TIME_A_REG);
+		outb(0, port + CPU5WDT_TIME_B_REG);
 		outb(1, port + CPU5WDT_MODE_REG);
 		outb(0, port + CPU5WDT_RESET_REG);
 		outb(0, port + CPU5WDT_ENABLE_REG);
@@ -134,23 +134,15 @@ static int cpu5wdt_stop(void)
 
 static int cpu5wdt_open(struct inode *inode, struct file *file)
 {
-	switch(iminor(inode)) {
-		case WATCHDOG_MINOR:
-			if ( test_and_set_bit(0, &cpu5wdt_device.inuse) )
-				return -EBUSY;
-			break;
-		default:
-			return -ENODEV;
-	}
+	if ( test_and_set_bit(0, &cpu5wdt_device.inuse) )
+		return -EBUSY;
 	return 0;
 
 }
 
 static int cpu5wdt_release(struct inode *inode, struct file *file)
 {
-	if(iminor(inode)==WATCHDOG_MINOR) {
-		clear_bit(0, &cpu5wdt_device.inuse);
-	}
+	clear_bit(0, &cpu5wdt_device.inuse);
 	return 0;
 }
 
@@ -160,15 +152,15 @@ static int cpu5wdt_ioctl(struct inode *inode, struct file *file, unsigned int cm
 	static struct watchdog_info ident =
 	{
 		.options = WDIOF_CARDRESET,
-		.identity = "CPU5 WDT"
+		.identity = "CPU5 WDT",
 	};
-  
+
 	switch(cmd) {
 		case WDIOC_KEEPALIVE:
 			cpu5wdt_reset();
 			break;
-		case WDIOC_GETSTATUS:    
-			value = inb(port + CPU5WDT_STATUS_REG); 
+		case WDIOC_GETSTATUS:
+			value = inb(port + CPU5WDT_STATUS_REG);
 			value = (value >> 2) & 1;
 			if ( copy_to_user((int *)arg, (int *)&value, sizeof(int)) )
 				return -EFAULT;
@@ -191,7 +183,7 @@ static int cpu5wdt_ioctl(struct inode *inode, struct file *file, unsigned int cm
 			}
 			break;
 		default:
-    			return -EINVAL;
+    			return -ENOIOCTLCMD;
 	}
 	return 0;
 }
@@ -200,7 +192,7 @@ static ssize_t cpu5wdt_write(struct file *file, const char *buf, size_t count, l
 {
 	if ( !count )
 		return -EIO;
-	
+
 	cpu5wdt_reset();
 	return count;
 
@@ -217,7 +209,7 @@ static struct file_operations cpu5wdt_fops = {
 static struct miscdevice cpu5wdt_misc = {
 	.minor	= WATCHDOG_MINOR,
 	.name	= "watchdog",
-	.fops	= &cpu5wdt_fops
+	.fops	= &cpu5wdt_fops,
 };
 
 /* init/exit function */
@@ -242,7 +234,7 @@ static int __devinit cpu5wdt_init(void)
 	}
 
 	/* watchdog reboot? */
-	val = inb(port + CPU5WDT_STATUS_REG); 
+	val = inb(port + CPU5WDT_STATUS_REG);
 	val = (val >> 2) & 1;
 	if ( !val )
 		printk(KERN_INFO PFX "sorry, was my fault\n");
