@@ -107,33 +107,7 @@
 /* Control operations through platform specific headers */
 # define __WANT_IO_DEF
 
-# if defined(CONFIG_SH_HP600)
-#  include <asm/io_hd64461.h>
-# elif defined(CONFIG_SH_SOLUTION_ENGINE)
-#  include <asm/io_se.h>
-# elif defined(CONFIG_SH_SH2000)
-#  include <asm/io_sh2000.h>
-# elif defined(CONFIG_SH_DMIDA) || \
-       defined(CONFIG_SH_STB1_HARP) || \
-       defined(CONFIG_SH_STB1_OVERDRIVE)
-#  include <asm/io_hd64465.h>
-# elif defined(CONFIG_SH_EC3104)
-#  include <asm/io_ec3104.h>
-# elif defined(CONFIG_SH_DREAMCAST)
-#  include <asm/io_dc.h>
-# elif defined(CONFIG_SH_CAT68701)
-#  include <asm/io_cat68701.h>
-# elif defined(CONFIG_SH_BIGSUR)
-#  include <asm/io_bigsur.h>
-# elif defined(CONFIG_SH_7751_SOLUTION_ENGINE)
-#  include <asm/io_7751se.h>
-# elif defined(CONFIG_SH_ADX)
-#  include <asm/io_adx.h>
-# elif defined(CONFIG_SH_UNKNOWN)
-#  include <asm/io_unknown.h>
-# else
-#  error "What system is this?"
-#endif
+# include <asm/mach/io.h>
 
 #undef __WANT_IO_DEF
 

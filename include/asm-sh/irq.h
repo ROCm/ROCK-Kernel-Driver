@@ -14,10 +14,10 @@
 #include <asm/machvec.h>
 #include <asm/ptrace.h>		/* for pt_regs */
 
-#if defined(__sh3__)
+#if defined(CONFIG_CPU_SH3)
 #define INTC_IPRA  	0xfffffee2UL
 #define INTC_IPRB  	0xfffffee4UL
-#elif defined(__SH4__)
+#elif defined(CONFIG_CPU_SH4)
 #define INTC_IPRA	0xffd00004UL
 #define INTC_IPRB	0xffd00008UL
 #define INTC_IPRC	0xffd0000cUL
@@ -33,7 +33,7 @@
 #define RTC_IPR_POS	 0
 #define RTC_PRIORITY	TIMER_PRIORITY
 
-#if defined(__sh3__)
+#if defined(CONFIG_CPU_SH3)
 #define DMTE0_IRQ	48
 #define DMTE1_IRQ	49
 #define DMTE2_IRQ	50
@@ -41,7 +41,7 @@
 #define DMA_IPR_ADDR	INTC_IPRE
 #define DMA_IPR_POS	3
 #define DMA_PRIORITY	7
-#elif defined(__SH4__)
+#elif defined(CONFIG_CPU_SH4)
 #define DMTE0_IRQ	34
 #define DMTE1_IRQ	35
 #define DMTE2_IRQ	36
@@ -109,7 +109,9 @@
 #ifdef CONFIG_SH_GENERIC
 # define ONCHIP_NR_IRQS 144
 #else
-# if defined(CONFIG_CPU_SUBTYPE_SH7707)
+# if defined(CONFIG_CPU_SUBTYPE_SH7604)
+#  define ONCHIP_NR_IRQS 24	// Actually 21
+# elif defined(CONFIG_CPU_SUBTYPE_SH7707)
 #  define ONCHIP_NR_IRQS 64
 #  define PINT_NR_IRQS   16
 # elif defined(CONFIG_CPU_SUBTYPE_SH7708)
@@ -331,12 +333,21 @@ extern int cat68701_irq_demux(int irq);
 extern int systemasic_irq_demux(int irq);
 #define irq_demux systemasic_irq_demux
 
+#elif defined(CONFIG_SH_MPC1211)
+
+extern int mpc1211_irq_demux(int irq);
+#define irq_demux mpc1211_irq_demux
+
 #else
 
 #define irq_demux(irq) __irq_demux(irq)
 
 #endif
 
+static __inline__ int irq_canonicalize(int irq)
+{
+	return irq;
+}
 
 
 #endif /* __ASM_SH_IRQ_H */

@@ -55,6 +55,11 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 {
 	return (pmd_t *) dir;
 }
+
+#define pte_pfn(x)		((unsigned long)(((x).pte >> PAGE_SHIFT)))
+#define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+#define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_SH_PGTABLE_2LEVEL_H */

@@ -4,6 +4,7 @@
 #include <linux/types.h>
 
 /* Avoid too many header ordering problems.  */
+struct pt_regs;
 struct siginfo;
 
 #define _NSIG		64

@@ -15,6 +15,7 @@
 
 #include <linux/spinlock.h>
 #include <linux/rwsem.h>
+#include <linux/wait.h>
 
 #include <asm/system.h>
 #include <asm/atomic.h>
@@ -23,12 +24,12 @@ struct semaphore {
 	atomic_t count;
 	int sleepers;
 	wait_queue_head_t wait;
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	long __magic;
 #endif
 };
 
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 # define __SEM_DEBUG_INIT(name) \
 		, (int)&(name).__magic
 #else
@@ -59,7 +60,7 @@ static inline void sema_init (struct semaphore *sem, int val)
 	atomic_set(&sem->count, val);
 	sem->sleepers = 0;
 	init_waitqueue_head(&sem->wait);
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	sem->__magic = (int)&sem->__magic;
 #endif
 }
@@ -90,10 +91,11 @@ extern spinlock_t semaphore_wake_lock;
 
 static inline void down(struct semaphore * sem)
 {
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
+	might_sleep();
 	if (atomic_dec_return(&sem->count) < 0)
 		__down(sem);
 }
@@ -101,7 +103,7 @@ static inline void down(struct semaphore * sem)
 static inline int down_interruptible(struct semaphore * sem)
 {
 	int ret = 0;
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
@@ -113,7 +115,7 @@ static inline int down_interruptible(struct semaphore * sem)
 static inline int down_trylock(struct semaphore * sem)
 {
 	int ret = 0;
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
@@ -128,7 +130,7 @@ static inline int down_trylock(struct semaphore * sem)
  */
 static inline void up(struct semaphore * sem)
 {
-#if WAITQUEUE_DEBUG
+#ifdef WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 	if (atomic_inc_return(&sem->count) <= 0)

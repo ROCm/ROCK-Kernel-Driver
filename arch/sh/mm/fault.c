@@ -1,4 +1,4 @@
-/* $Id: fault.c,v 1.49 2001/10/06 19:46:00 lethal Exp $
+/* $Id: fault.c,v 1.10 2003/05/04 19:29:54 lethal Exp $
  *
  *  linux/arch/sh/mm/fault.c
  *  Copyright (C) 1999  Niibe Yutaka
@@ -19,6 +19,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -26,6 +27,11 @@
 #include <asm/pgalloc.h>
 #include <asm/hardirq.h>
 #include <asm/mmu_context.h>
+#include <asm/cacheflush.h>
+
+#if defined(CONFIG_SH_KGDB)
+#include <asm/kgdb.h>
+#endif
 
 extern void die(const char *,struct pt_regs *,long);
 
@@ -41,7 +47,12 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	struct mm_struct *mm;
 	struct vm_area_struct * vma;
 	unsigned long page;
-	unsigned long fixup;
+	const struct exception_table_entry *fixup;
+
+#if defined(CONFIG_SH_KGDB)
+	if (kgdb_nofault && kgdb_bus_err_hook)
+	  kgdb_bus_err_hook();
+#endif
 
 	tsk = current;
 	mm = tsk->mm;
@@ -115,9 +126,9 @@ bad_area:
 
 no_context:
 	/* Are we prepared to handle this kernel fault?  */
-	fixup = search_exception_table(regs->pc);
-	if (fixup != 0) {
-		regs->pc = fixup;
+	fixup = search_exception_tables(regs->pc);
+	if (fixup) {
+		regs->pc = fixup->fixup;
 		return;
 	}
 
@@ -192,6 +203,10 @@ asmlinkage int __do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	pte_t *pte;
 	pte_t entry;
 
+#if defined(CONFIG_SH_KGDB)
+	if (kgdb_nofault && kgdb_bus_err_hook)
+	  kgdb_bus_err_hook();
+#endif
 	if (address >= P3SEG && address < P4SEG)
 		dir = pgd_offset_k(address);
 	else if (address >= TASK_SIZE)
@@ -209,7 +224,7 @@ asmlinkage int __do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 		pmd_clear(pmd);
 		return 1;
 	}
-	pte = pte_offset(pmd, address);
+	pte = pte_offset_kernel(pmd, address);
 	entry = *pte;
 	if (pte_none(entry) || pte_not_present(entry)
 	    || (writeaccess && !pte_write(entry)))
@@ -218,7 +233,7 @@ asmlinkage int __do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	if (writeaccess)
 		entry = pte_mkdirty(entry);
 	entry = pte_mkyoung(entry);
-#if defined(__SH4__)
+#if defined(CONFIG_CPU_SH4)
 	/*
 	 * ITLB is not affected by "ldtlb" instruction.
 	 * So, we need to flush the entry by ourselves.
@@ -228,81 +243,6 @@ asmlinkage int __do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 	set_pte(pte, entry);
 	update_mmu_cache(NULL, address, entry);
 	return 0;
-}
-
-void update_mmu_cache(struct vm_area_struct * vma,
-		      unsigned long address, pte_t pte)
-{
-	unsigned long flags;
-	unsigned long pteval;
-	unsigned long vpn;
-#if defined(__SH4__)
-	struct page *page;
-	unsigned long pfn;
-	unsigned long ptea;
-#endif
-
-	/* Ptrace may call this routine. */
-	if (vma && current->active_mm != vma->vm_mm)
-		return;
-
-#if defined(__SH4__)
-	pfn = pte_pfn(pte);
-	if (pfn_valid(pfn)) {
-		page = pfn_to_page(pfn);
-		if (!test_bit(PG_mapped, &page->flags)) {
-			unsigned long phys = pte_val(pte) & PTE_PHYS_MASK;
-			__flush_wback_region((void *)P1SEGADDR(phys), PAGE_SIZE);
-			__set_bit(PG_mapped, &page->flags);
-		}
-	}
-#endif
-
-	save_and_cli(flags);
-
-	/* Set PTEH register */
-	vpn = (address & MMU_VPN_MASK) | get_asid();
-	ctrl_outl(vpn, MMU_PTEH);
-
-	pteval = pte_val(pte);
-#if defined(__SH4__)
-	/* Set PTEA register */
-	/* TODO: make this look less hacky */
-	ptea = ((pteval >> 28) & 0xe) | (pteval & 0x1);
-	ctrl_outl(ptea, MMU_PTEA);
-#endif
-
-	/* Set PTEL register */
-	pteval &= _PAGE_FLAGS_HARDWARE_MASK; /* drop software flags */
-	/* conveniently, we want all the software flags to be 0 anyway */
-	ctrl_outl(pteval, MMU_PTEL);
-
-	/* Load the TLB */
-	asm volatile("ldtlb": /* no output */ : /* no input */ : "memory");
-	restore_flags(flags);
-}
-
-void __flush_tlb_page(unsigned long asid, unsigned long page)
-{
-	unsigned long addr, data;
-
-	/*
-	 * NOTE: PTEH.ASID should be set to this MM
-	 *       _AND_ we need to write ASID to the array.
-	 *
-	 * It would be simple if we didn't need to set PTEH.ASID...
-	 */
-#if defined(__sh3__)
-	addr = MMU_TLB_ADDRESS_ARRAY |(page & 0x1F000)| MMU_PAGE_ASSOC_BIT;
-	data = (page & 0xfffe0000) | asid; /* VALID bit is off */
-	ctrl_outl(data, addr);
-#elif defined(__SH4__)
-	addr = MMU_UTLB_ADDRESS_ARRAY | MMU_PAGE_ASSOC_BIT;
-	data = page | asid; /* VALID bit is off */
-	jump_to_P2();
-	ctrl_outl(data, addr);
-	back_to_P1();
-#endif
 }
 
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
@@ -315,7 +255,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 		asid = vma->vm_mm->context & MMU_CONTEXT_ASID_MASK;
 		page &= PAGE_MASK;
 
-		save_and_cli(flags);
+		local_irq_save(flags);
 		if (vma->vm_mm != current->mm) {
 			saved_asid = get_asid();
 			set_asid(asid);
@@ -323,7 +263,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long page)
 		__flush_tlb_page(asid, page);
 		if (saved_asid != MMU_NO_ASID)
 			set_asid(saved_asid);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -336,7 +276,7 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 		unsigned long flags;
 		int size;
 
-		save_and_cli(flags);
+		local_irq_save(flags);
 		size = (end - start + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 		if (size > (MMU_NTLB_ENTRIES/4)) { /* Too many TLB to flush */
 			mm->context = NO_CONTEXT;
@@ -360,8 +300,34 @@ void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 			if (saved_asid != MMU_NO_ASID)
 				set_asid(saved_asid);
 		}
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
+}
+
+void flush_tlb_kernel_range(unsigned long start, unsigned long end)
+{
+	unsigned long flags;
+	int size;
+
+	local_irq_save(flags);
+	size = (end - start + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
+	if (size > (MMU_NTLB_ENTRIES/4)) { /* Too many TLB to flush */
+		flush_tlb_all();
+	} else {
+		unsigned long asid = init_mm.context&MMU_CONTEXT_ASID_MASK;
+		unsigned long saved_asid = get_asid();
+
+		start &= PAGE_MASK;
+		end += (PAGE_SIZE - 1);
+		end &= PAGE_MASK;
+		set_asid(asid);
+		while (start < end) {
+			__flush_tlb_page(asid, start);
+			start += PAGE_SIZE;
+		}
+		set_asid(saved_asid);
+	}
+	local_irq_restore(flags);
 }
 
 void flush_tlb_mm(struct mm_struct *mm)
@@ -371,11 +337,11 @@ void flush_tlb_mm(struct mm_struct *mm)
 	if (mm->context != NO_CONTEXT) {
 		unsigned long flags;
 
-		save_and_cli(flags);
+		local_irq_save(flags);
 		mm->context = NO_CONTEXT;
 		if (mm == current->mm)
 			activate_context(mm);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 }
 
@@ -390,9 +356,9 @@ void flush_tlb_all(void)
 	 * 	TF-bit for SH-3, TI-bit for SH-4.
 	 *      It's same position, bit #2.
 	 */
-	save_and_cli(flags);
+	local_irq_save(flags);
 	status = ctrl_inl(MMUCR);
 	status |= 0x04;		
 	ctrl_outl(status, MMUCR);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }

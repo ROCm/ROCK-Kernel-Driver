@@ -43,7 +43,7 @@ asmlinkage int sys_pipe(unsigned long r4, unsigned long r5,
 	return error;
 }
 
-#if defined(__SH4__)
+#if defined(CONFIG_CPU_SH4)
 /*
  * To avoid cache alias, we map the shard page with same color.
  */
@@ -142,7 +142,12 @@ asmlinkage int sys_ipc(uint call, int first, int second,
 	if (call <= SEMCTL)
 		switch (call) {
 		case SEMOP:
-			return sys_semop (first, (struct sembuf *)ptr, second);
+			return sys_semtimedop(first, (struct sembuf *)ptr,
+					      second, NULL);
+		case SEMTIMEDOP:
+			return sys_semtimedop(first, (struct sembuf *)ptr,
+					      second,
+					      (const struct timespec *)fifth);
 		case SEMGET:
 			return sys_semget (first, second, third);
 		case SEMCTL: {
@@ -230,4 +235,20 @@ asmlinkage int sys_uname(struct old_utsname * name)
 	err=copy_to_user(name, &system_utsname, sizeof (*name));
 	up_read(&uts_sem);
 	return err?-EFAULT:0;
+}
+
+asmlinkage ssize_t sys_pread_wrapper(unsigned int fd, char * buf,
+			     size_t count, long dummy, loff_t pos)
+{
+	extern asmlinkage ssize_t sys_pread64(unsigned int fd, char * buf,
+					size_t count, loff_t pos);
+	return sys_pread64(fd, buf, count, pos);
+}
+
+asmlinkage ssize_t sys_pwrite_wrapper(unsigned int fd, const char * buf,
+			      size_t count, long dummy, loff_t pos)
+{
+	extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char * buf,
+					size_t count, loff_t pos);
+	return sys_pwrite64(fd, buf, count, pos);
 }

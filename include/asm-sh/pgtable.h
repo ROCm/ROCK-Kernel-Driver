@@ -1,8 +1,12 @@
 #ifndef __ASM_SH_PGTABLE_H
 #define __ASM_SH_PGTABLE_H
 
-/* Copyright (C) 1999 Niibe Yutaka */
+/*
+ * Copyright (C) 1999 Niibe Yutaka
+ * Copyright (C) 2002, 2003 Paul Mundt
+ */
 
+#include <linux/config.h>
 #include <asm/pgtable-2level.h>
 
 /*
@@ -16,70 +20,6 @@
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern void paging_init(void);
-
-#if defined(__sh3__)
-/* Cache flushing:
- *
- *  - flush_cache_all() flushes entire cache
- *  - flush_cache_mm(mm) flushes the specified mm context's cache lines
- *  - flush_cache_page(mm, vmaddr) flushes a single page
- *  - flush_cache_range(vma, start, end) flushes a range of pages
- *
- *  - flush_dcache_page(pg) flushes(wback&invalidates) a page for dcache
- *  - flush_icache_range(start, end) flushes(invalidates) a range for icache
- *  - flush_icache_page(vma, pg) flushes(invalidates) a page for icache
- *
- *  Caches are indexed (effectively) by physical address on SH-3, so
- *  we don't need them.
- */
-#define flush_cache_all()			do { } while (0)
-#define flush_cache_mm(mm)			do { } while (0)
-#define flush_cache_range(vma, start, end)	do { } while (0)
-#define flush_cache_page(vma, vmaddr)		do { } while (0)
-#define flush_dcache_page(page)			do { } while (0)
-#define flush_icache_range(start, end)		do { } while (0)
-#define flush_icache_page(vma,pg)		do { } while (0)
-#define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
-#define flush_cache_sigtramp(vaddr)		do { } while (0)
-
-#define p3_cache_init()				do { } while (0)
-
-#elif defined(__SH4__)
-/*
- *  Caches are broken on SH-4, so we need them.
- */
-
-/* Page is 4K, OC size is 16K, there are four lines. */
-#define CACHE_ALIAS 0x00003000
-
-extern void flush_cache_all(void);
-extern void flush_cache_mm(struct mm_struct *mm);
-extern void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
-			      unsigned long end);
-extern void flush_cache_page(struct vm_area_struct *vma, unsigned long addr);
-extern void flush_dcache_page(struct page *pg);
-extern void flush_icache_range(unsigned long start, unsigned long end);
-extern void flush_cache_sigtramp(unsigned long addr);
-
-#define flush_icache_page(vma,pg)		do { } while (0)
-#define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
-
-/* Initialization of P3 area for copy_user_page */
-extern void p3_cache_init(void);
-
-#define PG_mapped	PG_arch_1
-
-/* We provide our own get_unmapped_area to avoid cache alias issue */
-#define HAVE_ARCH_UNMAPPED_AREA
-#endif
-
-/* Flush (write-back only) a region (smaller than a page) */
-extern void __flush_wback_region(void *start, int size);
-/* Flush (write-back & invalidate) a region (smaller than a page) */
-extern void __flush_purge_region(void *start, int size);
-/* Flush (invalidate only) a region (smaller than a page) */
-extern void __flush_invalidate_region(void *start, int size);
-
 
 /*
  * Basically we have the same two-level (which is the logical three level
@@ -127,6 +67,7 @@ extern unsigned long empty_zero_page[1024];
 #define _PAGE_ACCESSED 	0x400  /* software: page referenced */
 #define _PAGE_U0_SHARED 0x800  /* software: page is shared in user space */
 
+#define	_PAGE_FILE	0x080  /* software: pagecache or swap? */
 
 /* software: moves to PTEA.TC (Timing Control) */
 #define _PAGE_PCC_AREA5	0x00000000	/* use BSC registers for area5 */
@@ -142,15 +83,18 @@ extern unsigned long empty_zero_page[1024];
 #define _PAGE_PCC_ATR16	0x60000001	/* Attribute Memory space, 6 bit bus */
 
 
-/* Mask which drop software flags */
-#if defined(__sh3__)
+/* Mask which drop software flags
+ * We also drop SZ1 bit since it is always 0 and used for _PAGE_FILE
+ * bit in this implementation.
+ */
+#if defined(CONFIG_CPU_SH3)
 /*
  * MMU on SH-3 has bug on SH-bit: We can't use it if MMUCR.IX=1.
  * Work around: Just drop SH-bit.
  */
-#define _PAGE_FLAGS_HARDWARE_MASK	0x1ffff1fc
+#define _PAGE_FLAGS_HARDWARE_MASK	0x1ffff17c
 #else
-#define _PAGE_FLAGS_HARDWARE_MASK	0x1ffff1fe
+#define _PAGE_FLAGS_HARDWARE_MASK	0x1ffff17e
 #endif
 /* Hardware flags: SZ=1 (4k-byte) */
 #define _PAGE_FLAGS_HARD		0x00000010
@@ -161,6 +105,7 @@ extern unsigned long empty_zero_page[1024];
 #define _KERNPG_TABLE	(_PAGE_PRESENT | _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY)
 #define _PAGE_CHG_MASK	(PTE_MASK | _PAGE_ACCESSED | _PAGE_CACHABLE | _PAGE_DIRTY | _PAGE_SHARED)
 
+#ifdef CONFIG_MMU
 #define PAGE_NONE	__pgprot(_PAGE_PROTNONE | _PAGE_CACHABLE |_PAGE_ACCESSED | _PAGE_FLAGS_HARD)
 #define PAGE_SHARED	__pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_USER | _PAGE_CACHABLE |_PAGE_ACCESSED | _PAGE_SHARED | _PAGE_FLAGS_HARD)
 #define PAGE_COPY	__pgprot(_PAGE_PRESENT | _PAGE_USER | _PAGE_CACHABLE | _PAGE_ACCESSED | _PAGE_FLAGS_HARD)
@@ -169,6 +114,15 @@ extern unsigned long empty_zero_page[1024];
 #define PAGE_KERNEL_RO	__pgprot(_PAGE_PRESENT | _PAGE_CACHABLE | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_HW_SHARED | _PAGE_FLAGS_HARD)
 #define PAGE_KERNEL_PCC(slot, type) \
 			__pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_FLAGS_HARD | (slot ? _PAGE_PCC_AREA5 : _PAGE_PCC_AREA6) | (type))
+#else /* no mmu */
+#define PAGE_NONE	__pgprot(0)
+#define PAGE_SHARED	__pgprot(0)
+#define PAGE_COPY	__pgprot(0)
+#define PAGE_READONLY	__pgprot(0)
+#define PAGE_KERNEL	__pgprot(0)
+#define PAGE_KERNEL_RO	__pgprot(0)
+#define PAGE_KERNEL_PCC	__pgprot(0)
+#endif
 
 /*
  * As i386 and MIPS, SuperH can't do page protection for execute, and
@@ -214,6 +168,7 @@ static inline int pte_read(pte_t pte) { return pte_val(pte) & _PAGE_USER; }
 static inline int pte_exec(pte_t pte) { return pte_val(pte) & _PAGE_USER; }
 static inline int pte_dirty(pte_t pte){ return pte_val(pte) & _PAGE_DIRTY; }
 static inline int pte_young(pte_t pte){ return pte_val(pte) & _PAGE_ACCESSED; }
+static inline int pte_file(pte_t pte) { return pte_val(pte) & _PAGE_FILE; }
 static inline int pte_write(pte_t pte){ return pte_val(pte) & _PAGE_RW; }
 static inline int pte_not_present(pte_t pte){ return !(pte_val(pte) & _PAGE_PRESENT); }
 
@@ -247,25 +202,18 @@ static inline pgprot_t pgprot_noncached(pgprot_t _prot)
  *
  * extern pte_t mk_pte(struct page *page, pgprot_t pgprot)
  */
-#define mk_pte(page,pgprot)						\
-({	pte_t __pte;							\
-									\
-	set_pte(&__pte, __pte(PHYSADDR(page_address(page))		\
-				+pgprot_val(pgprot)));			\
-	__pte;								\
-})
-
-/* This takes a physical page address that is used by the remapping functions */
-#define mk_pte_phys(physpage, pgprot) \
-({ pte_t __pte; set_pte(&__pte, __pte(physpage + pgprot_val(pgprot))); __pte; })
+#define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 { set_pte(&pte, __pte((pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot))); return pte; }
 
 #define page_pte(page) page_pte_prot(page, __pgprot(0))
 
-#define pmd_page(pmd) \
+#define pmd_page_kernel(pmd) \
 ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+
+#define pmd_page(pmd) \
+	(phys_to_page(pmd_val(pmd)))
 
 /* to find an entry in a page-table-directory. */
 #define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
@@ -277,22 +225,34 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 /* Find an entry in the third-level page table.. */
 #define pte_index(address) \
 		((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-#define pte_offset(dir, address) ((pte_t *) pmd_page(*(dir)) + \
-			pte_index(address))
+#define pte_offset_kernel(dir, address) \
+	((pte_t *) pmd_page_kernel(*(dir)) + pte_index(address))
+#define pte_offset_map(dir, address) pte_offset_kernel(dir, address)
+#define pte_offset_map_nested(dir, address) pte_offset_kernel(dir, address)
+#define pte_unmap(pte)		do { } while (0)
+#define pte_unmap_nested(pte)	do { } while (0)
 
+struct vm_area_struct;
 extern void update_mmu_cache(struct vm_area_struct * vma,
 			     unsigned long address, pte_t pte);
 
 /* Encode and de-code a swap entry */
 /*
  * NOTE: We should set ZEROs at the position of _PAGE_PRESENT
- *       and _PAGE_PROTONOE bits
+ *       and _PAGE_PROTNONE bits
  */
 #define __swp_type(x)		((x).val & 0xff)
 #define __swp_offset(x)		((x).val >> 10)
 #define __swp_entry(type, offset) ((swp_entry_t) { (type) | ((offset) << 10) })
 #define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)	((pte_t) { (x).val })
+
+/*
+ * Encode and decode a nonlinear file mapping entry
+ */
+#define PTE_FILE_MAX_BITS	29
+#define pte_to_pgoff(pte)	(pte_val(pte))
+#define pgoff_to_pte(off)	((pte_t) { (off) | _PAGE_FILE })
 
 /*
  * Routines for update of PTE 
@@ -317,4 +277,9 @@ typedef pte_t *pte_addr_t;
  */
 #define pgtable_cache_init()	do { } while (0)
 
+#ifndef CONFIG_MMU
+extern unsigned int kobjsize(const void *objp);
+#endif /* !CONFIG_MMU */
+
 #endif /* __ASM_SH_PAGE_H */
+

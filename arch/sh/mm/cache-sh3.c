@@ -1,9 +1,9 @@
-/* $Id: cache-sh3.c,v 1.6 2001/09/10 08:59:59 dwmw2 Exp $
+/* $Id: cache-sh3.c,v 1.5 2003/05/06 23:28:48 lethal Exp $
  *
  *  linux/arch/sh/mm/cache-sh3.c
  *
  * Copyright (C) 1999, 2000  Niibe Yutaka
- *
+ * Copyright (C) 2002 Paul Mundt
  */
 
 #include <linux/init.h>
@@ -19,71 +19,9 @@
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
+#include <asm/cacheflush.h>
 
-
-#define CCR		0xffffffec	/* Address of Cache Control Register */
-
-#define CCR_CACHE_CE	0x01	/* Cache Enable */
-#define CCR_CACHE_WT	0x02	/* Write-Through (for P0,U0,P3) (else writeback) */
-#define CCR_CACHE_CB	0x04	/* Write-Back (for P1) (else writethrough) */
-#define CCR_CACHE_CF	0x08	/* Cache Flush */
-#define CCR_CACHE_RA	0x20	/* RAM mode */
-
-#define CCR_CACHE_VAL	(CCR_CACHE_CB|CCR_CACHE_CE)	/* 8k-byte cache, P1-wb, enable */
-#define CCR_CACHE_INIT	(CCR_CACHE_CF|CCR_CACHE_VAL)	/* 8k-byte cache, CF, P1-wb, enable */
-
-#define CACHE_OC_ADDRESS_ARRAY 0xf0000000
-#define CACHE_VALID	  1
-#define CACHE_UPDATED	  2
-#define CACHE_PHYSADDR_MASK 0x1ffffc00
-
-/* 7709A/7729 has 16K cache (256-entry), while 7702 has only 2K(direct)
-   7702 is not supported (yet) */
-struct _cache_system_info {
-	int way_shift;
-	int entry_mask;
-	int num_entries;
-};
-
-/* Data at BSS is cleared after setting this variable.
-   So, we Should not placed this variable at BSS section.
-   Initialize this, it is placed at data section. */
-static struct _cache_system_info cache_system_info = {0,};
-
-#define CACHE_OC_WAY_SHIFT	(cache_system_info.way_shift)
-#define CACHE_OC_ENTRY_SHIFT    4
-#define CACHE_OC_ENTRY_MASK	(cache_system_info.entry_mask)
-#define CACHE_OC_NUM_ENTRIES	(cache_system_info.num_entries)
-#define CACHE_OC_NUM_WAYS	4
-#define CACHE_OC_ASSOC_BIT    (1<<3)
-
-
-/*
- * Write back all the cache.
- *
- * For SH-4, we only need to flush (write back) Operand Cache,
- * as Instruction Cache doesn't have "updated" data.
- *
- * Assumes that this is called in interrupt disabled context, and P2.
- * Shuld be INLINE function.
- */
-static inline void cache_wback_all(void)
-{
-	unsigned long addr, data, i, j;
-
-	for (i=0; i<CACHE_OC_NUM_ENTRIES; i++) {
-		for (j=0; j<CACHE_OC_NUM_WAYS; j++) {
-			addr = CACHE_OC_ADDRESS_ARRAY|(j<<CACHE_OC_WAY_SHIFT)|
-				(i<<CACHE_OC_ENTRY_SHIFT);
-			data = ctrl_inl(addr);
-			if ((data & (CACHE_UPDATED|CACHE_VALID))
-			    == (CACHE_UPDATED|CACHE_VALID))
-				ctrl_outl(data & ~CACHE_UPDATED, addr);
-		}
-	}
-}
-
-static void __init
+static int __init
 detect_cpu_and_cache_system(void)
 {
 	unsigned long addr0, addr1, data0, data1, data2, data3;
@@ -99,54 +37,53 @@ detect_cpu_and_cache_system(void)
 
 	/* First, write back & invalidate */
 	data0  = ctrl_inl(addr0);
-	ctrl_outl(data0&~(CACHE_VALID|CACHE_UPDATED), addr0);
+	ctrl_outl(data0&~(SH_CACHE_VALID|SH_CACHE_UPDATED), addr0);
 	data1  = ctrl_inl(addr1);
-	ctrl_outl(data1&~(CACHE_VALID|CACHE_UPDATED), addr1);
+	ctrl_outl(data1&~(SH_CACHE_VALID|SH_CACHE_UPDATED), addr1);
 
 	/* Next, check if there's shadow or not */
 	data0 = ctrl_inl(addr0);
-	data0 ^= CACHE_VALID;
+	data0 ^= SH_CACHE_VALID;
 	ctrl_outl(data0, addr0);
 	data1 = ctrl_inl(addr1);
-	data2 = data1 ^ CACHE_VALID;
+	data2 = data1 ^ SH_CACHE_VALID;
 	ctrl_outl(data2, addr1);
 	data3 = ctrl_inl(addr0);
 
 	/* Lastly, invaliate them. */
-	ctrl_outl(data0&~CACHE_VALID, addr0);
-	ctrl_outl(data2&~CACHE_VALID, addr1);
+	ctrl_outl(data0&~SH_CACHE_VALID, addr0);
+	ctrl_outl(data2&~SH_CACHE_VALID, addr1);
+
 	back_to_P1();
 
+	cpu_data->dcache.ways		= 4;
+	cpu_data->dcache.entry_shift	= 4;
+	cpu_data->dcache.linesz		= L1_CACHE_BYTES;
+	cpu_data->dcache.flags		= 0;
+
+	/*
+	 * 7709A/7729 has 16K cache (256-entry), while 7702 has only
+	 * 2K(direct) 7702 is not supported (yet)
+	 */
 	if (data0 == data1 && data2 == data3) {	/* Shadow */
-		cache_system_info.way_shift = 11;
-		cache_system_info.entry_mask = 0x7f0;
-		cache_system_info.num_entries = 128;
+		cpu_data->dcache.way_shift	= 11;
+		cpu_data->dcache.entry_mask	= 0x7f0;
+		cpu_data->dcache.sets		= 128;
 		cpu_data->type = CPU_SH7708;
 	} else {				/* 7709A or 7729  */
-		cache_system_info.way_shift = 12;
-		cache_system_info.entry_mask = 0xff0;
-		cache_system_info.num_entries = 256;
+		cpu_data->dcache.way_shift	= 12;
+		cpu_data->dcache.entry_mask	= 0xff0;
+		cpu_data->dcache.sets		= 256;
 		cpu_data->type = CPU_SH7729;
 	}
-}
 
-void __init cache_init(void)
-{
-	unsigned long ccr;
-
-	detect_cpu_and_cache_system();
-
-	jump_to_P2();
-	ccr = ctrl_inl(CCR);
-	if (ccr & CCR_CACHE_CE)
 		/*
-		 * XXX: Should check RA here. 
-		 * If RA was 1, we only need to flush the half of the caches.
+	 * SH-3 doesn't have seperate caches
 		 */
-		cache_wback_all();
+	cpu_data->dcache.flags |= SH_CACHE_COMBINED;
+	cpu_data->icache = cpu_data->dcache;
 
-	ctrl_outl(CCR_CACHE_INIT, CCR);
-	back_to_P1();
+	return 0;
 }
 
 /*
@@ -170,23 +107,24 @@ void __flush_wback_region(void *start, int size)
 		& ~(L1_CACHE_BYTES-1);
 
 	for (v = begin; v < end; v+=L1_CACHE_BYTES) {
-		for (j=0; j<CACHE_OC_NUM_WAYS; j++) {
+		for (j = 0; j < cpu_data->dcache.ways; j++) {
 			unsigned long data, addr, p;
 
 			p = __pa(v);
-			addr = CACHE_OC_ADDRESS_ARRAY|(j<<CACHE_OC_WAY_SHIFT)|
-				(v&CACHE_OC_ENTRY_MASK);
-			save_and_cli(flags);
+			addr = CACHE_OC_ADDRESS_ARRAY |
+				(j << cpu_data->dcache.way_shift)|
+				(v & cpu_data->dcache.entry_mask);
+			local_irq_save(flags);
 			data = ctrl_inl(addr);
 			
 			if ((data & CACHE_PHYSADDR_MASK) ==
 			    (p & CACHE_PHYSADDR_MASK)) {
-				data &= ~CACHE_UPDATED;
+				data &= ~SH_CACHE_UPDATED;
 				ctrl_outl(data, addr);
-				restore_flags(flags);
+				local_irq_restore(flags);
 				break;
 			}
-			restore_flags(flags);
+			local_irq_restore(flags);
 		}
 	}
 }
@@ -210,8 +148,8 @@ void __flush_purge_region(void *start, int size)
 		unsigned long data, addr;
 
 		data = (v & 0xfffffc00); /* _Virtual_ address, ~U, ~V */
-		addr = CACHE_OC_ADDRESS_ARRAY | (v&CACHE_OC_ENTRY_MASK) | 
-			CACHE_OC_ASSOC_BIT;
+		addr = CACHE_OC_ADDRESS_ARRAY |
+			(v & cpu_data->dcache.entry_mask) | SH_CACHE_ASSOC;
 		ctrl_outl(data, addr);
 	}
 }

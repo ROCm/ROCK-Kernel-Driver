@@ -53,7 +53,5 @@ struct sh_machine_vector mv_sh2000 __initmv = {
 
         mv_ioremap:             generic_ioremap,
         mv_iounmap:             generic_iounmap,
-
-        mv_hw_sh2000:           1,
 };
 ALIAS_MV(sh2000)

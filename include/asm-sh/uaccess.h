@@ -1,8 +1,9 @@
-/* $Id: uaccess.h,v 1.13 2001/10/01 02:22:01 gniibe Exp $
+/* $Id: uaccess.h,v 1.9 2003/05/06 23:28:51 lethal Exp $
  *
  * User space memory access functions
  *
- * Copyright (C) 1999  Niibe Yutaka
+ * Copyright (C) 1999, 2002  Niibe Yutaka
+ * Copyright (C) 2003  Paul Mundt
  *
  *  Based on:
  *     MIPS implementation version 1.15 by
@@ -15,8 +16,20 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 
+/*
+ * NOTE: Macro/functions in this file depends on threads_info.h implementation.
+ * Assumes:
+ * TI_FLAGS == 8
+ * TIF_USERSPACE == 31
+ * USER_ADDR_LIMIT == 0x80000000
+ */
+
 #define VERIFY_READ    0
 #define VERIFY_WRITE   1
+
+typedef struct {
+	unsigned int is_user_space;
+} mm_segment_t;
 
 /*
  * The fs value determines whether argument validity checking should be
@@ -27,34 +40,111 @@
  */
 
 #define MAKE_MM_SEG(s)	((mm_segment_t) { (s) })
+#define segment_eq(a,b)	((a).is_user_space == (b).is_user_space)
 
-#define KERNEL_DS	MAKE_MM_SEG(0xFFFFFFFF)
-#define USER_DS		MAKE_MM_SEG(0x80000000)
+#define USER_ADDR_LIMIT	0x80000000
+
+#define KERNEL_DS	MAKE_MM_SEG(0)
+#define USER_DS		MAKE_MM_SEG(1)
 
 #define get_ds()	(KERNEL_DS)
-#define get_fs()        (current->addr_limit)
-#define set_fs(x)       (current->addr_limit=(x))
 
-#define segment_eq(a,b)	((a).seg == (b).seg)
+#if !defined(CONFIG_MMU)
+static inline mm_segment_t get_fs(void)
+{
+	return USER_DS;
+}
 
-#define __addr_ok(addr) ((unsigned long)(addr) < (current->addr_limit.seg))
+static inline void set_fs(mm_segment_t s)
+{
+}
 
 /*
- * Uhhuh, this needs 33-bit arithmetic. We have a carry..
+ * __access_ok: Check if address with size is OK or not.
  *
- * sum := addr + size;  carry? --> flag = true;
- * if (sum >= addr_limit) flag = true;
+ * If we don't have an MMU (or if its disabled) the only thing we really have
+ * to look out for is if the address resides somewhere outside of what
+ * available RAM we have.
+ *
+ * TODO: This check could probably also stand to be restricted somewhat more..
+ * though it still does the Right Thing(tm) for the time being.
  */
-#define __range_ok(addr,size) ({					      \
-	unsigned long flag,sum; 					      \
-	__asm__("clrt; addc %3, %1; movt %0; cmp/hi %4, %1; rotcl %0"	      \
-		:"=&r" (flag), "=r" (sum) 				      \
-		:"1" (addr), "r" ((int)(size)), "r" (current->addr_limit.seg) \
-		:"t"); 							      \
-	flag; })
+static inline int __access_ok(unsigned long addr, unsigned long size)
+{
+	extern unsigned long memory_start, memory_end;
 
-#define access_ok(type,addr,size) (__range_ok(addr,size) == 0)
-#define __access_ok(addr,size) (__range_ok(addr,size) == 0)
+	return ((addr >= memory_start) && ((addr + size) < memory_end));
+}
+#else /* CONFIG_MMU */
+static inline mm_segment_t get_fs(void)
+{
+	return MAKE_MM_SEG(test_thread_flag(TIF_USERSPACE));
+}
+
+static inline void set_fs(mm_segment_t s)
+{
+	unsigned long ti, flag;
+	__asm__ __volatile__(
+		"stc	r7_bank, %0\n\t"
+		"mov.l	@(8,%0), %1\n\t"
+		"shal	%1\n\t"
+		"cmp/pl	%2\n\t"
+		"rotcr	%1\n\t"
+		"mov.l	%1, @(8,%0)"
+		: "=&r" (ti), "=&r" (flag)
+		: "r" (s.is_user_space)
+		: "t");
+/****
+	if (s.is_user_space)
+		set_thread_flag(TIF_USERSPACE);
+	else
+		clear_thread_flag(TIF_USERSPACE);
+****/
+}
+
+/*
+ * __access_ok: Check if address with size is OK or not.
+ *
+ * We do three checks:
+ * (1) is it user space? 
+ * (2) addr + size --> carry?
+ * (3) addr + size >= 0x80000000  (USER_ADDR_LIMIT)
+ *
+ * (1) (2) (3) | RESULT
+ *  0   0   0  |  ok
+ *  0   0   1  |  ok
+ *  0   1   0  |  bad
+ *  0   1   1  |  bad
+ *  1   0   0  |  ok
+ *  1   0   1  |  bad
+ *  1   1   0  |  bad
+ *  1   1   1  |  bad
+ */
+static inline int __access_ok(unsigned long addr, unsigned long size)
+{
+	unsigned long flag, tmp;
+
+	__asm__("stc	r7_bank, %0\n\t"
+		"mov.l	@(8,%0), %0\n\t"
+		"clrt\n\t"
+		"addc	%2, %1\n\t"
+		"and	%1, %0\n\t"
+		"rotcl	%0\n\t"
+		"rotcl	%0\n\t"
+		"and	#3, %0"
+		: "=&z" (flag), "=r" (tmp)
+		: "r" (addr), "1" (size)
+		: "t");
+
+	return flag == 0;
+}
+#endif /* CONFIG_MMU */
+
+static inline int access_ok(int type, const void *p, unsigned long size)
+{
+	unsigned long addr = (unsigned long)p;
+	return __access_ok(addr, size);
+}
 
 static inline int verify_area(int type, const void * addr, unsigned long size)
 {
@@ -101,20 +191,92 @@ case 4: __get_user_asm("l"); break; \
 default: __get_user_unknown(); break; \
 } x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
 
-#define __get_user_check(x,ptr,size) ({ \
-long __gu_err; \
-__typeof__(*(ptr)) __gu_val; \
-long __gu_addr; \
-__asm__("":"=r" (__gu_val)); \
-__gu_addr = (long) (ptr); \
-__asm__("":"=r" (__gu_err)); \
-if (__access_ok(__gu_addr,size)) { \
-switch (size) { \
-case 1: __get_user_asm("b"); break; \
-case 2: __get_user_asm("w"); break; \
-case 4: __get_user_asm("l"); break; \
-default: __get_user_unknown(); break; \
-} } x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
+#define __get_user_check(x,ptr,size)			\
+({ __typeof__(*(ptr)) __val; long __err;		\
+ switch(size) {						\
+ case 1: __err = __get_user_1(__val, ptr); break;	\
+ case 2: __err = __get_user_2(__val, ptr); break;	\
+ case 4: __err = __get_user_4(__val, ptr); break;	\
+ default: __get_user_unknown(); break;			\
+ }							\
+ (x) = __val; __err; })
+
+#define __get_user_1(x,ptr) ({			\
+long __gu_err;					\
+__typeof__(*(ptr)) __gu_val;			\
+long __gu_addr = (long) (ptr);			\
+__asm__("stc	r7_bank, %1\n\t"		\
+	"mov.l	@(8,%1), %1\n\t"		\
+	"and	%2, %1\n\t"			\
+	"cmp/pz	%1\n\t"				\
+	"bt/s	1f\n\t"				\
+	" mov	#0, %0\n\t"			\
+	"0:\n"					\
+	"mov	#-14, %0\n\t"			\
+	"bra	2f\n\t"				\
+	" mov	#0, %1\n"			\
+	"1:\n\t"				\
+	"mov.b	@%2, %1\n\t"			\
+	"extu.b	%1, %1\n"			\
+	"2:\n"					\
+	".section	__ex_table,\"a\"\n\t"	\
+	".long	1b, 0b\n\t"			\
+	".previous"				\
+	: "=&r" (__gu_err), "=&r" (__gu_val)	\
+	: "r" (__gu_addr)			\
+	: "t");					\
+x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
+
+#define __get_user_2(x,ptr) ({			\
+long __gu_err;					\
+__typeof__(*(ptr)) __gu_val;			\
+long __gu_addr = (long) (ptr);			\
+__asm__("stc	r7_bank, %1\n\t"		\
+	"mov.l	@(8,%1), %1\n\t"		\
+	"and	%2, %1\n\t"			\
+	"cmp/pz	%1\n\t"				\
+	"bt/s	1f\n\t"				\
+	" mov	#0, %0\n\t"			\
+	"0:\n"					\
+	"mov	#-14, %0\n\t"			\
+	"bra	2f\n\t"				\
+	" mov	#0, %1\n"			\
+	"1:\n\t"				\
+	"mov.w	@%2, %1\n\t"			\
+	"extu.w	%1, %1\n"			\
+	"2:\n"					\
+	".section	__ex_table,\"a\"\n\t"	\
+	".long	1b, 0b\n\t"			\
+	".previous"				\
+	: "=&r" (__gu_err), "=&r" (__gu_val)	\
+	: "r" (__gu_addr)			\
+	: "t");					\
+x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
+
+#define __get_user_4(x,ptr) ({			\
+long __gu_err;					\
+__typeof__(*(ptr)) __gu_val;			\
+long __gu_addr = (long) (ptr);			\
+__asm__("stc	r7_bank, %1\n\t"		\
+	"mov.l	@(8,%1), %1\n\t"		\
+	"and	%2, %1\n\t"			\
+	"cmp/pz	%1\n\t"				\
+	"bt/s	1f\n\t"				\
+	" mov	#0, %0\n\t"			\
+	"0:\n"					\
+	"mov	#-14, %0\n\t"			\
+	"bra	2f\n\t"				\
+	" mov	#0, %1\n"			\
+	"1:\n\t"				\
+	"mov.l	@%2, %1\n\t"			\
+	"2:\n"					\
+	".section	__ex_table,\"a\"\n\t"	\
+	".long	1b, 0b\n\t"			\
+	".previous"				\
+	: "=&r" (__gu_err), "=&r" (__gu_val)	\
+	: "r" (__gu_addr)			\
+	: "t");					\
+x = (__typeof__(*(ptr))) __gu_val; __gu_err; })
 
 #define __get_user_asm(insn) \
 ({ \
@@ -244,42 +406,7 @@ extern void __put_user_unknown(void);
 
 /* Generic arbitrary sized copy.  */
 /* Return the number of bytes NOT copied */
-/* XXX: should be such that: 4byte and the rest. */
-static __inline__ __kernel_size_t
-__copy_user(void *__to, const void *__from, __kernel_size_t __n)
-{
-	unsigned long __dummy, _f, _t;
-	__kernel_size_t res;
-
-	if ((res = __n))
-	__asm__ __volatile__(
-		"9:\n\t"
-		"mov.b	@%2+, %1\n\t"
-		"dt	%0\n"
-		"1:\n\t"
-		"mov.b	%1, @%3\n\t"
-		"bf/s	9b\n\t"
-		" add	#1, %3\n"
-		"2:\n"
-		".section .fixup,\"ax\"\n"
-		"3:\n\t"
-		"mov.l	5f, %1\n\t"
-		"jmp	@%1\n\t"
-		" add	#1, %0\n\t"
-		".balign 4\n"
-		"5:	.long 2b\n"
-		".previous\n"
-		".section __ex_table,\"a\"\n"
-		"	.balign 4\n"
-		"	.long 9b,2b\n"
-		"	.long 1b,3b\n"
-		".previous"
-		: "=r" (res), "=&z" (__dummy), "=r" (_f), "=r" (_t)
-		: "2" (__from), "3" (__to), "0" (res)
-		: "memory", "t");
-
-	return res;
-}
+extern __kernel_size_t __copy_user(void *to, const void *from, __kernel_size_t n);
 
 #define copy_to_user(to,from,n) ({ \
 void *__copy_to = (void *) (to); \
@@ -308,39 +435,11 @@ __copy_res; })
 	__copy_user((void *)(to),		\
 		    (void *)(from), n)
 
-/* XXX: Not sure it works well..
-   should be such that: 4byte clear and the rest. */
-static __inline__ __kernel_size_t
-__clear_user(void *addr, __kernel_size_t size)
-{
-	unsigned long __a;
-
-	__asm__ __volatile__(
-		"9:\n\t"
-		"dt	%0\n"
-		"1:\n\t"
-		"mov.b	%4, @%1\n\t"
-		"bf/s	9b\n\t"
-		" add	#1, %1\n"
-		"2:\n"
-		".section .fixup,\"ax\"\n"
-		"3:\n\t"
-		"mov.l	4f, %1\n\t"
-		"jmp	@%1\n\t"
-		" nop\n"
-		".balign 4\n"
-		"4:	.long 2b\n"
-		".previous\n"
-		".section __ex_table,\"a\"\n"
-		"	.balign 4\n"
-		"	.long 1b,3b\n"
-		".previous"
-		: "=r" (size), "=r" (__a)
-		: "0" (size), "1" (addr), "r" (0)
-		: "memory", "t");
-
-	return size;
-}
+/*
+ * Clear the area and return remaining number of bytes
+ * (on failure.  Usually it's 0.)
+ */
+extern __kernel_size_t __clear_user(void *addr, __kernel_size_t size);
 
 #define clear_user(addr,n) ({ \
 void * __cl_addr = (addr); \
@@ -396,8 +495,6 @@ if(__access_ok(__sfu_src, __sfu_count)) { \
 __sfu_res = __strncpy_from_user((unsigned long) (dest), __sfu_src, __sfu_count); \
 } __sfu_res; })
 
-#define strlen_user(str) strnlen_user(str, ~0UL >> 1)
-
 /*
  * Return the size of a string (including the ending 0!)
  */
@@ -436,24 +533,23 @@ static __inline__ long __strnlen_user(const char *__s, long __n)
 
 static __inline__ long strnlen_user(const char *s, long n)
 {
-	if (!__addr_ok(s))
+	if (!access_ok(VERIFY_READ, s, n))
 		return 0;
 	else
 		return __strnlen_user(s, n);
+}
+
+static __inline__ long strlen_user(const char *s)
+{
+	if (!access_ok(VERIFY_READ, s, 0))
+		return 0;
+	else
+		return __strnlen_user(s, ~0UL >> 1);
 }
 
 struct exception_table_entry
 {
 	unsigned long insn, fixup;
 };
-
-/* Returns 0 if exception not found and fixup.unit otherwise.  */
-extern unsigned long search_exception_table(unsigned long addr);
-
-/* Returns the new pc */
-#define fixup_exception(map_reg, fixup_unit, pc)                \
-({                                                              \
-	fixup_unit;                                             \
-})
 
 #endif /* __ASM_SH_UACCESS_H */

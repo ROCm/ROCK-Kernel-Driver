@@ -1,5 +1,5 @@
 /*
- * $Id: gpio.c,v 1.1.2.3 2002/11/04 20:33:57 lethal Exp $
+ * $Id: gpio.c,v 1.4 2003/05/19 22:24:18 lethal Exp $
  * by Greg Banks <gbanks@pocketpenguins.com>
  * (c) 2000 PocketPenguins Inc
  *
@@ -85,7 +85,7 @@ static struct {
     void *dev;
 } handlers[GPIO_NPORTS * 8];
 
-static void hd64465_gpio_interrupt(int irq, void *dev, struct pt_regs *regs)
+static irqreturn_t hd64465_gpio_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
     	unsigned short port, pin, isr, mask, portpin;
 	
@@ -107,6 +107,8 @@ static void hd64465_gpio_interrupt(int irq, void *dev, struct pt_regs *regs)
 	    /* Write 1s back to ISR to clear it?  That's what the manual says.. */
 	    outw(isr, GPIO_ISR(port));
 	}
+
+	return IRQ_HANDLED;
 }
 
 void hd64465_gpio_register_irq(int portpin, int mode,
@@ -165,13 +167,20 @@ void hd64465_gpio_unregister_irq(int portpin)
 
 static int __init hd64465_gpio_init(void)
 {
-    	/* TODO: check return values */
-    	request_region(HD64465_REG_GPACR, 0x1000, MODNAME);
-	request_irq(HD64465_IRQ_GPIO, hd64465_gpio_interrupt,
-	    SA_INTERRUPT, MODNAME, 0);
+	if (!request_region(HD64465_REG_GPACR, 0x1000, MODNAME))
+		return -EBUSY;
+	if (request_irq(HD64465_IRQ_GPIO, hd64465_gpio_interrupt,
+	    		SA_INTERRUPT, MODNAME, 0))
+		goto out_irqfailed;
 
     	printk("HD64465 GPIO layer on irq %d\n", HD64465_IRQ_GPIO);
+
 	return 0;
+
+out_irqfailed:
+	release_region(HD64465_REG_GPACR, 0x1000);
+
+	return -EINVAL;
 }
 
 static void __exit hd64465_gpio_exit(void)
@@ -182,3 +191,6 @@ static void __exit hd64465_gpio_exit(void)
 
 module_init(hd64465_gpio_init);
 module_exit(hd64465_gpio_exit);
+
+MODULE_LICENSE("GPL");
+

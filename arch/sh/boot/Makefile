@@ -8,25 +8,13 @@
 # Copyright (C) 1999 Stuart Menefy
 #
 
-SYSTEM  =$(TOPDIR)/vmlinux
+targets := zImage
+subdir- := compressed
 
-Image:	$(SYSTEM)
-	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
+$(obj)/zImage: $(obj)/compressed/vmlinux FORCE
+	$(call if_changed,objcopy)
+	@echo 'Kernel: $@ is ready'
 
-zImage: compressed/vmlinux
-	$(OBJCOPY) $(OBJCOPYFLAGS) $< $@
+$(obj)/compressed/vmlinux: FORCE
+	$(Q)$(MAKE) -f scripts/Makefile.build obj=$(obj)/compressed $@
 
-compressed/vmlinux: $(TOPDIR)/vmlinux
-	$(MAKE) -C compressed vmlinux
-
-install: Image
-	sh -x ./install.sh $(KERNELRELEASE) Image $(TOPDIR)/System.map "$(INSTALL_PATH)"
-
-zinstall: zImage
-	sh -x ./install.sh $(KERNELRELEASE) zImage $(TOPDIR)/System.map "$(INSTALL_PATH)"
-
-clean:
-	rm -f tools/build
-	rm -f setup bootsect zImage compressed/vmlinux.out
-	rm -f bsetup bbootsect bzImage compressed/bvmlinux.out
-	@$(MAKE) -C compressed clean

@@ -60,7 +60,5 @@ struct sh_machine_vector mv_adx __initmv = {
 	mv_isa_port2addr:	adx_isa_port2addr,
 
 	mv_init_irq:		init_adx_IRQ,
-
-	mv_hw_adx:		1,
 };
 ALIAS_MV(adx)

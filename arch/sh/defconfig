@@ -17,7 +17,6 @@ CONFIG_UID16=y
 #
 # Processor type and features
 #
-CONFIG_SH_GENERIC=y
 # CONFIG_SH_SOLUTION_ENGINE is not set
 # CONFIG_SH_OVERDRIVE is not set
 # CONFIG_SH_HP600 is not set
