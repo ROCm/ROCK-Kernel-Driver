@@ -1,4 +1,4 @@
-# Makefile for the act2000 ISDN device driver
+# Makefile for the icn ISDN device driver
 
 # The target object and module list name.
 
