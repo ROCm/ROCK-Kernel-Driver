@@ -247,7 +247,7 @@ static inline void *ebus_alloc(size_t size)
 
 	mem = kmalloc(size, GFP_ATOMIC);
 	if (!mem)
-		panic(__FUNCTION__ ": out of memory");
+		panic("ebus_alloc: out of memory");
 	memset((char *)mem, 0, size);
 	return mem;
 }
