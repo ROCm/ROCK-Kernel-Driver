@@ -63,7 +63,8 @@ int do_syscall(void *task, int pid, int local_using_sysemu)
 	regs = TASK_REGS(task);
 	UPT_SYSCALL_NR(regs) = syscall;
 
-	if(syscall < 1) return(0);
+	if(syscall < 0)
+		return(0);
 
 	if((syscall != __NR_sigreturn) &&
 	   ((unsigned long *) PT_IP(proc_regs) >= &_stext) && 
