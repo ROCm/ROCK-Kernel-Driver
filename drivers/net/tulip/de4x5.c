@@ -440,8 +440,6 @@
     =========================================================================
 */
 
-static char version[] __initdata = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.com\n";
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -476,6 +474,8 @@ static char version[] __initdata = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultr
 #endif /* CONFIG_PPC */
 
 #include "de4x5.h"
+
+static char version[] __initdata = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.com\n";
 
 #define c_char const char
 #define TWIDDLE(a) (u_short)le16_to_cpu(get_unaligned((u_short *)(a)))

@@ -92,7 +92,7 @@ int bt_sock_unregister(int proto)
 
 static int bt_sock_create(struct socket *sock, int proto)
 {
-	if (proto > BT_MAX_PROTO)
+	if (proto >= BT_MAX_PROTO)
 		return -EINVAL;
 
 #if defined(CONFIG_KMOD)

@@ -960,9 +960,10 @@ void journal_update_superblock(journal_t *journal, int wait)
 
 	BUFFER_TRACE(bh, "marking dirty");
 	mark_buffer_dirty(bh);
-	ll_rw_block(WRITE, 1, &bh);
 	if (wait)
-		wait_on_buffer(bh);
+		sync_dirty_buffer(bh);
+	else
+		ll_rw_block(WRITE, 1, &bh);
 
 	/* If we have just flushed the log (by marking s_start==0), then
 	 * any future commit will have to be careful to update the
@@ -1296,8 +1297,7 @@ static int journal_convert_superblock_v1(journal_t *journal,
 	bh = journal->j_sb_buffer;
 	BUFFER_TRACE(bh, "marking dirty");
 	mark_buffer_dirty(bh);
-	ll_rw_block(WRITE, 1, &bh);
-	wait_on_buffer(bh);
+	sync_dirty_buffer(bh);
 	return 0;
 }
 

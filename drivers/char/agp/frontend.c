@@ -97,7 +97,9 @@ static agp_segment_priv *agp_find_seg_in_client(const agp_client * client,
 					    int size, pgprot_t page_prot)
 {
 	agp_segment_priv *seg;
-	int num_segments, pg_start, pg_count, i;
+	int num_segments, i;
+	off_t pg_start;
+	size_t pg_count;
 
 	pg_start = offset / 4096;
 	pg_count = size / 4096;
@@ -174,7 +176,7 @@ static int agp_create_segment(agp_client * client, agp_region * region)
 	agp_segment_priv **ret_seg;
 	agp_segment_priv *seg;
 	agp_segment *user_seg;
-	int i;
+	size_t i;
 
 	seg = kmalloc((sizeof(agp_segment_priv) * region->seg_count), GFP_KERNEL);
 	if (seg == NULL) {
@@ -578,8 +580,7 @@ static int agp_remove_client(pid_t id)
 
 static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	int size;
-	int current_size;
+	unsigned int size, current_size;
 	unsigned long offset;
 	agp_client *client;
 	agp_file_private *priv = (agp_file_private *) file->private_data;
@@ -611,8 +612,11 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 		if (!agp_find_seg_in_client(client, offset, size, vma->vm_page_prot))
 			goto out_inval;
 
-		if (remap_page_range(vma, vma->vm_start, (kerninfo.aper_base + offset),
-				     size, vma->vm_page_prot)) {
+		if (kerninfo.vm_ops) {
+			vma->vm_ops = kerninfo.vm_ops;
+		} else if (remap_page_range(vma, vma->vm_start, 
+					    (kerninfo.aper_base + offset),
+					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
 		AGP_UNLOCK();
@@ -623,8 +627,11 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 		if (size != current_size)
 			goto out_inval;
 
-		if (remap_page_range(vma, vma->vm_start, kerninfo.aper_base,
-				     size, vma->vm_page_prot)) {
+		if (kerninfo.vm_ops) {
+			vma->vm_ops = kerninfo.vm_ops;
+		} else if (remap_page_range(vma, vma->vm_start, 
+					    kerninfo.aper_base,
+					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
 		AGP_UNLOCK();

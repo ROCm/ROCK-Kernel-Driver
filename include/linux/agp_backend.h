@@ -53,17 +53,6 @@ enum chipset_type {
 	INTEL_460GX,
 	INTEL_I7505,
 	VIA_GENERIC,
-	VIA_VP3,
-	VIA_MVP3,
-	VIA_MVP4,
-	VIA_APOLLO_PRO,
-	VIA_APOLLO_KX133,
-	VIA_APOLLO_KT133,
-	VIA_APOLLO_KT400,
-	VIA_APOLLO_KT400_3,
-	VIA_APOLLO_PRO_266,
-	VIA_VT8605,
-	VIA_P4X,
 	SIS_GENERIC,
 	AMD_GENERIC,
 	AMD_IRONGATE,
@@ -84,6 +73,7 @@ enum chipset_type {
 	SVWRKS_LE,
 	SVWRKS_GENERIC,
 	HP_ZX1,
+	ALPHA_CORE_AGP,
 };
 
 struct agp_version {
@@ -102,6 +92,7 @@ typedef struct _agp_kern_info {
 	int current_memory;
 	int cant_use_aperture;
 	unsigned long page_mask;
+	struct vm_operations_struct *vm_ops;
 } agp_kern_info;
 
 /* 

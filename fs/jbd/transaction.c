@@ -1079,8 +1079,7 @@ int journal_dirty_data (handle_t *handle, struct buffer_head *bh)
 				atomic_inc(&bh->b_count);
 				spin_unlock(&journal_datalist_lock);
 				need_brelse = 1;
-				ll_rw_block(WRITE, 1, &bh);
-				wait_on_buffer(bh);
+				sync_dirty_buffer(bh);
 				spin_lock(&journal_datalist_lock);
 				/* The buffer may become locked again at any
 				   time if it is redirtied */
@@ -1361,8 +1360,7 @@ void journal_sync_buffer(struct buffer_head *bh)
 		}
 		atomic_inc(&bh->b_count);
 		spin_unlock(&journal_datalist_lock);
-		ll_rw_block (WRITE, 1, &bh);
-		wait_on_buffer(bh);
+		sync_dirty_buffer(bh);
 		__brelse(bh);
 		goto out;
 	}

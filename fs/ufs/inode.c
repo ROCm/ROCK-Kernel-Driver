@@ -298,10 +298,8 @@ repeat:
 	}
 
 	mark_buffer_dirty(bh);
-	if (IS_SYNC(inode)) {
-		ll_rw_block (WRITE, 1, &bh);
-		wait_on_buffer (bh);
-	}
+	if (IS_SYNC(inode))
+		sync_dirty_buffer(bh);
 	inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
 out:
@@ -635,10 +633,8 @@ static int ufs_update_inode(struct inode * inode, int do_sync)
 		memset (ufs_inode, 0, sizeof(struct ufs_inode));
 		
 	mark_buffer_dirty(bh);
-	if (do_sync) {
-		ll_rw_block (WRITE, 1, &bh);
-		wait_on_buffer (bh);
-	}
+	if (do_sync)
+		sync_dirty_buffer(bh);
 	brelse (bh);
 	
 	UFSD(("EXIT\n"))

@@ -1627,10 +1627,8 @@ static void ext3_commit_super (struct super_block * sb,
 	es->s_wtime = cpu_to_le32(get_seconds());
 	BUFFER_TRACE(EXT3_SB(sb)->s_sbh, "marking dirty");
 	mark_buffer_dirty(EXT3_SB(sb)->s_sbh);
-	if (sync) {
-		ll_rw_block(WRITE, 1, &EXT3_SB(sb)->s_sbh);
-		wait_on_buffer(EXT3_SB(sb)->s_sbh);
-	}
+	if (sync)
+		sync_dirty_buffer(EXT3_SB(sb)->s_sbh);
 }
 
 
