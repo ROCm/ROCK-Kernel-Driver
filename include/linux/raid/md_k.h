@@ -279,6 +279,7 @@ struct mdk_personality_s
 	int (*hot_remove_disk) (mddev_t *mddev, int number);
 	int (*spare_active) (mddev_t *mddev);
 	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
+	int (*resize) (mddev_t *mddev, sector_t sectors);
 };
 
 

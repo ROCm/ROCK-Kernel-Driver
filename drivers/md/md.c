@@ -2377,6 +2377,76 @@ static int set_array_info(mddev_t * mddev, mdu_array_info_t *info)
 	return 0;
 }
 
+/*
+ * update_array_info is used to change the configuration of an
+ * on-line array.
+ * The version, ctime,level,size,raid_disks,not_persistent, layout,chunk_size
+ * fields in the info are checked against the array.
+ * Any differences that cannot be handled will cause an error.
+ * Normally, only one change can be managed at a time.
+ */
+static int update_array_info(mddev_t *mddev, mdu_array_info_t *info)
+{
+	int rv = 0;
+
+	if (mddev->major_version != info->major_version ||
+	    mddev->minor_version != info->minor_version ||
+/*	    mddev->patch_version != info->patch_version || */
+	    mddev->ctime         != info->ctime         ||
+	    mddev->level         != info->level         ||
+	    mddev->raid_disks    != info->raid_disks    ||
+	    mddev->layout        != info->layout        ||
+	    !mddev->persistent	 != info->not_persistent||
+	    mddev->chunk_size    != info->chunk_size    )
+		return -EINVAL;
+	/* that leaves only size */
+	if (mddev->size != info->size) {
+		mdk_rdev_t * rdev;
+		struct list_head *tmp;
+		if (mddev->pers->resize == NULL)
+			return -EINVAL;
+		/* The "size" is the amount of each device that is used.
+		 * This can only make sense for arrays with redundancy.
+		 * linear and raid0 always use whatever space is available
+		 * We can only consider changing the size of no resync
+		 * or reconstruction is happening, and if the new size
+		 * is acceptable. It must fit before the sb_offset or,
+		 * if that is <data_offset, it must fit before the
+		 * size of each device.
+		 * If size is zero, we find the largest size that fits.
+		 */
+		if (mddev->sync_thread)
+			return -EBUSY;
+		ITERATE_RDEV(mddev,rdev,tmp) {
+			sector_t avail;
+			int fit = (info->size == 0);
+			if (rdev->sb_offset > rdev->data_offset)
+				avail = (rdev->sb_offset*2) - rdev->data_offset;
+			else
+				avail = get_capacity(rdev->bdev->bd_disk)
+					- rdev->data_offset;
+			if (fit && (info->size == 0 || info->size > avail/2))
+				info->size = avail/2;
+			if (avail < ((sector_t)info->size << 1))
+				return -ENOSPC;
+		}
+		rv = mddev->pers->resize(mddev, (sector_t)info->size *2);
+		if (!rv) {
+			struct block_device *bdev;
+
+			bdev = bdget_disk(mddev->gendisk, 0);
+			if (bdev) {
+				down(&bdev->bd_inode->i_sem);
+				i_size_write(bdev->bd_inode, mddev->array_size << 10);
+				up(&bdev->bd_inode->i_sem);
+				bdput(bdev);
+			}
+		}
+	}
+	md_update_sb(mddev);
+	return rv;
+}
+
 static int set_disk_faulty(mddev_t *mddev, dev_t dev)
 {
 	mdk_rdev_t *rdev;
@@ -2469,21 +2539,6 @@ static int md_ioctl(struct inode *inode, struct file *file,
 	switch (cmd)
 	{
 		case SET_ARRAY_INFO:
-
-			if (!list_empty(&mddev->disks)) {
-				printk(KERN_WARNING 
-					"md: array %s already has disks!\n",
-					mdname(mddev));
-				err = -EBUSY;
-				goto abort_unlock;
-			}
-			if (mddev->raid_disks) {
-				printk(KERN_WARNING 
-					"md: array %s already initialised!\n",
-					mdname(mddev));
-				err = -EBUSY;
-				goto abort_unlock;
-			}
 			{
 				mdu_array_info_t info;
 				if (!arg)
@@ -2492,10 +2547,33 @@ static int md_ioctl(struct inode *inode, struct file *file,
 					err = -EFAULT;
 					goto abort_unlock;
 				}
+				if (mddev->pers) {
+					err = update_array_info(mddev, &info);
+					if (err) {
+						printk(KERN_WARNING "md: couldn't update"
+						       " array info. %d\n", err);
+						goto abort_unlock;
+					}
+					goto done_unlock;
+				}
+				if (!list_empty(&mddev->disks)) {
+					printk(KERN_WARNING
+					       "md: array %s already has disks!\n",
+					       mdname(mddev));
+					err = -EBUSY;
+					goto abort_unlock;
+				}
+				if (mddev->raid_disks) {
+					printk(KERN_WARNING
+					       "md: array %s already initialised!\n",
+					       mdname(mddev));
+					err = -EBUSY;
+					goto abort_unlock;
+				}
 				err = set_array_info(mddev, &info);
 				if (err) {
 					printk(KERN_WARNING "md: couldn't set"
-						" array info. %d\n", err);
+					       " array info. %d\n", err);
 					goto abort_unlock;
 				}
 			}

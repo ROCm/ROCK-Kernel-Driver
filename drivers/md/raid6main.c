@@ -2000,6 +2000,27 @@ static int raid6_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	return found;
 }
 
+static int raid6_resize(mddev_t *mddev, sector_t sectors)
+{
+	/* no resync is happening, and there is enough space
+	 * on all devices, so we can resize.
+	 * We need to make sure resync covers any new space.
+	 * If the array is shrinking we should possibly wait until
+	 * any io in the removed space completes, but it hardly seems
+	 * worth it.
+	 */
+	sectors &= ~((sector_t)mddev->chunk_size/512 - 1);
+	mddev->array_size = (sectors * (mddev->raid_disks-2))>>1;
+	set_capacity(mddev->gendisk, mddev->array_size << 1);
+	mddev->changed = 1;
+	if (sectors/2  > mddev->size && mddev->recovery_cp == MaxSector) {
+		mddev->recovery_cp = mddev->size << 1;
+		set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+	}
+	mddev->size = sectors /2;
+	return 0;
+}
+
 static mdk_personality_t raid6_personality=
 {
 	.name		= "raid6",
@@ -2013,6 +2034,7 @@ static mdk_personality_t raid6_personality=
 	.hot_remove_disk= raid6_remove_disk,
 	.spare_active	= raid6_spare_active,
 	.sync_request	= sync_request,
+	.resize		= raid6_resize,
 };
 
 static int __init raid6_init (void)
