@@ -667,3 +667,4 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 	drm_vm_open(vma);
 	return 0;
 }
+EXPORT_SYMBOL(drm_mmap);

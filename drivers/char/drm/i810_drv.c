@@ -107,6 +107,15 @@ static struct drm_driver driver = {
 	.version = version,
 	.ioctls = ioctls,
 	.num_ioctls = DRM_ARRAY_SIZE(ioctls),
+	.fops = {
+		.owner = THIS_MODULE,
+		.open = drm_open,
+		.release = drm_release,
+		.ioctl = drm_ioctl,
+		.mmap = i810_mmap_buffers,
+		.poll = drm_poll,
+		.fasync = drm_fasync,
+	},
 	.pci_driver = {
 		.name          = DRIVER_NAME,
 		.id_table      = pciidlist,

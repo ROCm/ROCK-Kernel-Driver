@@ -74,6 +74,15 @@ static struct drm_driver driver = {
 	.get_reg_ofs = drm_core_get_reg_ofs,
 	.postinit = postinit,
 	.version = version,
+	.fops = {
+		.owner = THIS_MODULE,
+		.open = drm_open,
+		.release = drm_release,
+		.ioctl = drm_ioctl,
+		.mmap = drm_mmap,
+		.poll = drm_poll,
+		.fasync = drm_fasync,
+	},
 	.pci_driver = {
 		.name          = DRIVER_NAME,
 		.id_table      = pciidlist,

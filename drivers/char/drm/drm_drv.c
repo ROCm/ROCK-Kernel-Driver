@@ -55,18 +55,6 @@
 #include "drmP.h"
 #include "drm_core.h"
 
-struct file_operations	drm_fops = {
-	.owner   = THIS_MODULE,
-	.open	 = drm_open,
-	.flush	 = drm_flush,
-	.release = drm_release,
-	.ioctl	 = drm_ioctl,
-	.mmap	 = drm_mmap,
-	.fasync  = drm_fasync,
-	.poll	 = drm_poll,
-	.read	 = drm_read,
-};
-
 /** Ioctl table */
 drm_ioctl_desc_t		  drm_ioctls[] = {
 	[DRM_IOCTL_NR(DRM_IOCTL_VERSION)]       = { drm_version,     0, 0 },
@@ -382,7 +370,6 @@ int drm_fill_in_dev(drm_device_t *dev, struct pci_dev *pdev, const struct pci_de
 	sema_init( &dev->struct_sem, 1 );
 	sema_init( &dev->ctxlist_sem, 1 );
 
-	dev->fops   = &drm_fops;
 	dev->pdev   = pdev;
 
 #ifdef __alpha__

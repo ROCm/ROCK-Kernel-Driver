@@ -587,6 +587,7 @@ struct drm_driver {
 	int dev_priv_size;
 	drm_ioctl_desc_t *ioctls;
 	int num_ioctls;
+	struct file_operations fops;
 	struct pci_driver pci_driver;
 };
 /**
@@ -714,9 +715,6 @@ typedef struct drm_device {
 	void		  *dev_private; /**< device private data */
 	drm_sigdata_t     sigdata; /**< For block_all_signals */
 	sigset_t          sigmask;
-
-	struct file_operations *fops;	/**< file operations */
-	struct proc_dir_entry  *dev_root; /**< proc directory entry */
 
 	struct            drm_driver *driver;
 	drm_local_map_t   *agp_buffer_map;

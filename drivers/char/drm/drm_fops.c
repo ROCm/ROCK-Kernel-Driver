@@ -149,6 +149,7 @@ unsigned int drm_poll(struct file *filp, struct poll_table_struct *wait)
 {
 	return 0;
 }
+EXPORT_SYMBOL(drm_poll);
 
 
 /** No-op. */
