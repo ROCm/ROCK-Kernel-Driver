@@ -1629,11 +1629,17 @@ static void idedisk_setup (ide_drive_t *drive)
 
 static int idedisk_cleanup (ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = HWIF(drive);
+	int unit = drive - hwif->drives;
+	struct gendisk *g = hwif->gd[unit];
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
 		if (do_idedisk_flushcache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
-	return ide_unregister_subdriver(drive);
+	if (ide_unregister_subdriver(drive))
+		return 1;
+	del_gendisk(g);
+	return 0;
 }
 
 static int idedisk_reinit(ide_drive_t *drive);
@@ -1677,6 +1683,10 @@ MODULE_DESCRIPTION("ATA DISK Driver");
 
 static int idedisk_reinit(ide_drive_t *drive)
 {
+	ide_hwif_t *hwif = HWIF(drive);
+	int unit = drive - hwif->drives;
+	struct gendisk *g = hwif->gd[unit];
+
 	/* strstr("foo", "") is non-NULL */
 	if (!strstr("ide-disk", drive->driver_req))
 		goto failed;
@@ -1694,11 +1704,20 @@ static int idedisk_reinit(ide_drive_t *drive)
 	if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
 		printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n",
 			drive->name, drive->head);
-		(void) idedisk_cleanup(drive);
+		if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
+			if (do_idedisk_flushcache(drive))
+				printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
+					drive->name);
+		ide_unregister_subdriver(drive);
 		DRIVER(drive)->busy--;
 		goto failed;
 	}
 	DRIVER(drive)->busy--;
+	g->minor_shift = PARTN_BITS;
+	add_gendisk(g);
+	register_disk(g, mk_kdev(g->major,g->first_minor),
+		      1<<g->minor_shift, ide_fops,
+		      current_capacity(drive));
 	return 0;
 failed:
 	return 1;

@@ -864,7 +864,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 		gd[unit].nr_real = 1;
 		gd[unit].fops = ide_fops;
 		hwif->gd[unit] = gd + unit;
-		add_gendisk(gd + unit);
 	}
 
 	for (unit = 0; unit < units; ++unit) {

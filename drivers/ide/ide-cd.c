@@ -3005,14 +3005,8 @@ int ide_cdrom_check_media_change (ide_drive_t *drive)
 static
 void ide_cdrom_revalidate (ide_drive_t *drive)
 {
-	ide_hwif_t *hwif = HWIF(drive);
-	int unit = drive - hwif->drives;
-	struct gendisk *g = hwif->gd[unit];
 	struct request_sense sense;
-
 	cdrom_read_toc(drive, &sense);
-	g->minor_shift = 0;
-	grok_partitions(mk_kdev(g->major, drive->select.b.unit), current_capacity(drive));
 }
 
 static
@@ -3031,6 +3025,9 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 {
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *devinfo = &info->devinfo;
+	ide_hwif_t *hwif = HWIF(drive);
+	int unit = drive - hwif->drives;
+	struct gendisk *g = hwif->gd[unit];
 
 	if (ide_unregister_subdriver (drive))
 		return 1;
@@ -3044,6 +3041,7 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 		printk ("%s: ide_cdrom_cleanup failed to unregister device from the cdrom driver.\n", drive->name);
 	kfree(info);
 	drive->driver_data = NULL;
+	del_gendisk(g);
 	return 0;
 }
 
@@ -3094,6 +3092,10 @@ MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
 static int ide_cdrom_reinit (ide_drive_t *drive)
 {
 	struct cdrom_info *info;
+	ide_hwif_t *hwif = HWIF(drive);
+	int unit = drive - hwif->drives;
+	struct gendisk *g = hwif->gd[unit];
+	struct request_sense sense;
 
 	if (!strstr("ide-cdrom", drive->driver_req))
 		goto failed;
@@ -3126,12 +3128,29 @@ static int ide_cdrom_reinit (ide_drive_t *drive)
 	drive->driver_data = info;
 	DRIVER(drive)->busy++;
 	if (ide_cdrom_setup (drive)) {
+		struct cdrom_device_info *devinfo = &info->devinfo;
 		DRIVER(drive)->busy--;
-		if (ide_cdrom_cleanup (drive))
-			printk ("%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
+		ide_unregister_subdriver (drive);
+		if (info->buffer != NULL)
+			kfree(info->buffer);
+		if (info->toc != NULL)
+			kfree(info->toc);
+		if (info->changer_info != NULL)
+			kfree(info->changer_info);
+		if (devinfo->handle == drive && unregister_cdrom (devinfo))
+			printk ("%s: ide_cdrom_cleanup failed to unregister device from the cdrom driver.\n", drive->name);
+		kfree(info);
+		drive->driver_data = NULL;
 		goto failed;
 	}
 	DRIVER(drive)->busy--;
+
+	cdrom_read_toc(drive, &sense);
+	g->minor_shift = 0;
+	add_gendisk(g);
+	register_disk(g, mk_kdev(g->major,g->first_minor),
+		      1<<g->minor_shift, ide_fops,
+		      g->part[0].nr_sects);
 	return 0;
 failed:
 	return 1;

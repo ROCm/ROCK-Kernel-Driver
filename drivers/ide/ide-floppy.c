@@ -2122,11 +2122,15 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 static int idefloppy_cleanup (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
+	ide_hwif_t *hwif = HWIF(drive);
+	int unit = drive - hwif->drives;
+	struct gendisk *g = hwif->gd[unit];
 
 	if (ide_unregister_subdriver (drive))
 		return 1;
 	drive->driver_data = NULL;
 	kfree (floppy);
+	del_gendisk(g);
 	return 0;
 }
 
@@ -2187,6 +2191,9 @@ static ide_driver_t idefloppy_driver = {
 static int idefloppy_reinit (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy;
+	ide_hwif_t *hwif = HWIF(drive);
+	int unit = drive - hwif->drives;
+	struct gendisk *g = hwif->gd[unit];
 	if (!strstr("ide-floppy", drive->driver_req))
 		goto failed;
 	if (!drive->present)
@@ -2213,6 +2220,11 @@ static int idefloppy_reinit (ide_drive_t *drive)
 	DRIVER(drive)->busy++;
 	idefloppy_setup (drive, floppy);
 	DRIVER(drive)->busy--;
+	g->minor_shift = PARTN_BITS;
+	add_gendisk(g);
+	register_disk(g, mk_kdev(g->major,g->first_minor),
+		      1<<g->minor_shift, ide_fops,
+		      g->part[0].nr_sects);
 	return 0;
 failed:
 	return 1;
