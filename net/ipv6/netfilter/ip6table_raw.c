@@ -74,7 +74,7 @@ static struct
 		{
 			.entry = {
 				.target_offset = sizeof(struct ip6t_entry),
-				.next_offset sizeof(struct ip6t_standard),
+				.next_offset = sizeof(struct ip6t_standard),
 			},
 			.target = {
 				.target = {
