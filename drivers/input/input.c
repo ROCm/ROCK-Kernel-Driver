@@ -472,7 +472,7 @@ void input_register_device(struct input_dev *dev)
 
 	while (handler) {
 		if ((id = input_match_device(handler->id_table, dev)))
-			if ((handle = handler->connect(handler, dev)))
+			if ((handle = handler->connect(handler, dev, id)))
 				input_link_handle(handle);
 		handler = handler->next;
 	}
