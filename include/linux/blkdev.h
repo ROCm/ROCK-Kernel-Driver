@@ -2,7 +2,6 @@
 #define _LINUX_BLKDEV_H
 
 #include <linux/major.h>
-#include <linux/sched.h>
 #include <linux/genhd.h>
 #include <linux/list.h>
 #include <linux/pagemap.h>
