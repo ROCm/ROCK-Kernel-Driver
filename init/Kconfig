@@ -54,6 +54,16 @@ endmenu
 
 menu "General setup"
 
+config LOCALVERSION
+	string "Local version - append to kernel release"
+	help
+	  Append an extra string to the end of your kernel version.
+	  This will show up when you type uname, for example.
+	  The string you set here will be appended after the contents of
+	  any files with a filename matching localversion* in your
+	  object and source tree, in that order.  Your total string can
+	  be a maximum of 64 characters.
+
 config SWAP
 	bool "Support for paging of anonymous memory (swap)"
 	depends on MMU
@@ -282,16 +292,6 @@ config CC_OPTIMIZE_FOR_SIZE
 	  option.  If problems are observed, a gcc upgrade may be needed.
 
 	  If unsure, say N.
-
-config LOCALVERSION
-	string "Local Version"
-	help
-	  Append an extra string to the end of your kernel version.
-	  This will show up when you type uname, for example.
-	  The string you set here will be appended after the contents of=20
-	  any files with a filename matching localversion* in your=20
-	  object and source tree, in that order.  Your total string can
-	  be a maximum of 64 characters.
 
 endmenu		# General setup
 
