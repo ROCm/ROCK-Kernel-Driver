@@ -646,6 +646,9 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	 * may do I/O */
 	scsi_device_set_state(sdev, SDEV_RUNNING);
 
+	if (*bflags & BLIST_MS_192_BYTES_FOR_3F)
+		sdev->use_192_bytes_for_3f = 1;
+
 	if(sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);
 

@@ -333,7 +333,7 @@ int scsi_get_device_flags(struct scsi_device *sdev, unsigned char *vendor,
 	struct scsi_dev_info_list *devinfo;
 	unsigned int bflags;
 
-	bflags = sdev->host->hostt->flags;
+	bflags = sdev->sdev_bflags;
 	if (!bflags)
 		bflags = scsi_default_dev_flags;
 

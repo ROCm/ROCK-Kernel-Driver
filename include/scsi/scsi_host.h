@@ -345,12 +345,6 @@ struct scsi_host_template {
 	 * module_init/module_exit.
 	 */
 	struct list_head legacy_hosts;
-
-	/*
-	 * Default flags settings, these modify the setting of scsi_device
-	 * bits.
-	 */
-	unsigned int flags;
 };
 
 /*
