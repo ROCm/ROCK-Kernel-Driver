@@ -145,6 +145,7 @@ static void __aarp_send_query(struct aarp_entry *a)
 	aarp_dl->request(aarp_dl, skb, aarp_eth_multicast);
 	/* Update the sending count */
 	a->xmit_count++;
+	a->last_sent = jiffies;
 }
 
 /* This runs under aarp_lock and in softint context, so only atomic memory
