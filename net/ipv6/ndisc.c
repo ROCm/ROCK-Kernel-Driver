@@ -434,7 +434,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 	len = sizeof(struct icmp6hdr) + sizeof(struct in6_addr);
 
 	/* for anycast or proxy, solicited_addr != src_addr */
-	ifp = ipv6_get_ifaddr(solicited_addr, dev);
+	ifp = ipv6_get_ifaddr(solicited_addr, dev, 1);
  	if (ifp) {
 		src_addr = solicited_addr;
 		in6_ifa_put(ifp);
@@ -680,7 +680,7 @@ static void ndisc_solicit(struct neighbour *neigh, struct sk_buff *skb)
 	struct in6_addr *target = (struct in6_addr *)&neigh->primary_key;
 	int probes = atomic_read(&neigh->probes);
 
-	if (skb && ipv6_chk_addr(&skb->nh.ipv6h->saddr, dev))
+	if (skb && ipv6_chk_addr(&skb->nh.ipv6h->saddr, dev, 1))
 		saddr = &skb->nh.ipv6h->saddr;
 
 	if ((probes -= neigh->parms->ucast_probes) < 0) {
@@ -758,7 +758,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		}
 	}
 
-	if ((ifp = ipv6_get_ifaddr(&msg->target, dev)) != NULL) {
+	if ((ifp = ipv6_get_ifaddr(&msg->target, dev, 1)) != NULL) {
 		if (ifp->flags & IFA_F_TENTATIVE) {
 			/* Address is tentative. If the source
 			   is unspecified address, it is someone
@@ -955,7 +955,7 @@ static void ndisc_recv_na(struct sk_buff *skb)
 			return;
 		}
 	}
-	if ((ifp = ipv6_get_ifaddr(&msg->target, dev))) {
+	if ((ifp = ipv6_get_ifaddr(&msg->target, dev, 1))) {
 		if (ifp->flags & IFA_F_TENTATIVE) {
 			addrconf_dad_failure(ifp);
 			return;

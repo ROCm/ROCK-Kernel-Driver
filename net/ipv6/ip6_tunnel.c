@@ -777,10 +777,10 @@ static void ip6_tnl_set_cap(struct ip6_tnl *t)
 		if (p->link)
 			ldev = dev_get_by_index(p->link);
 		
-		if ((ltype&IPV6_ADDR_UNICAST) && !ipv6_chk_addr(laddr, ldev))
+		if (ltype&IPV6_ADDR_UNICAST && !ipv6_chk_addr(laddr, ldev, 0))
 			l_ok = 0;
 		
-		if ((rtype&IPV6_ADDR_UNICAST) && ipv6_chk_addr(raddr, NULL))
+		if (rtype&IPV6_ADDR_UNICAST && ipv6_chk_addr(raddr, NULL, 0))
 			r_ok = 0;
 		
 		if (l_ok && r_ok) {

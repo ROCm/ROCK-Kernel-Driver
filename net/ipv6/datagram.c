@@ -295,7 +295,7 @@ int datagram_send_ctl(struct msghdr *msg, struct flowi *fl,
 
 			addr_type = ipv6_addr_type(&src_info->ipi6_addr);
 
-			if (ipv6_addr_type == IPV6_ADDR_ANY)
+			if (addr_type == IPV6_ADDR_ANY)
 				break;
 			
 			if (addr_type & IPV6_ADDR_LINKLOCAL) {
@@ -307,7 +307,7 @@ int datagram_send_ctl(struct msghdr *msg, struct flowi *fl,
 						return -ENODEV;
 				}
 			}
-			if (!ipv6_chk_addr(&src_info->ipi6_addr, dev)) {
+			if (!ipv6_chk_addr(&src_info->ipi6_addr, dev, 0)) {
 				if (dev)
 					dev_put(dev);
 				err = -EINVAL;

@@ -46,7 +46,7 @@ const struct raid6_calls * const raid6_algos[] = {
 	&raid6_intx16,
 	&raid6_intx32,
 #endif
-#if defined(__i386__) || defined(__x86_64__)
+#if defined(__i386__)
 	&raid6_mmxx1,
 	&raid6_mmxx2,
 	&raid6_sse1x1,
@@ -55,6 +55,8 @@ const struct raid6_calls * const raid6_algos[] = {
 	&raid6_sse2x2,
 #endif
 #if defined(__x86_64__)
+	&raid6_sse2x1,
+	&raid6_sse2x2,
 	&raid6_sse2x4,
 #endif
 	NULL
