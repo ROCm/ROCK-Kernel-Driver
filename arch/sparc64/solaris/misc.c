@@ -21,6 +21,7 @@
 #include <asm/string.h>
 #include <asm/oplib.h>
 #include <asm/idprom.h>
+#include <asm/smp.h>
 
 #include "conv.h"
 
@@ -336,8 +337,6 @@ asmlinkage int solaris_sysinfo(int cmd, u32 buf, s32 count)
 #define	SOLARIS_CONFIG_PHYS_PAGES		26
 #define	SOLARIS_CONFIG_AVPHYS_PAGES		27
 
-extern unsigned prom_cpu_nodes[NR_CPUS];
-
 asmlinkage int solaris_sysconf(int id)
 {
 	switch (id) {
@@ -353,7 +352,7 @@ asmlinkage int solaris_sysconf(int id)
 					  "clock-frequency", 167000000);
 #ifdef CONFIG_SMP	
 	case SOLARIS_CONFIG_NPROC_CONF:	return NR_CPUS;
-	case SOLARIS_CONFIG_NPROC_ONLN:	return smp_num_cpus;
+	case SOLARIS_CONFIG_NPROC_ONLN:	return num_online_cpus();
 #else
 	case SOLARIS_CONFIG_NPROC_CONF:	return 1;
 	case SOLARIS_CONFIG_NPROC_ONLN:	return 1;
