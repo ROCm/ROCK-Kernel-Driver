@@ -314,7 +314,7 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 	if (mapSize > t64) {
 		printk(KERN_ERR
 		       "jfs_extendfs: mapSize (0x%llx) > t64 (0x%llx)\n",
-		       mapSize, t64);
+		       (long long) mapSize, (long long) t64);
 		rc = EIO;
 		goto error_out;
 	}

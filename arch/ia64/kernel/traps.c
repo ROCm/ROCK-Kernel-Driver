@@ -49,10 +49,15 @@ static fpswa_interface_t *fpswa_interface;
 void __init
 trap_init (void)
 {
-	printk("fpswa interface at %lx\n", ia64_boot_param->fpswa);
-	if (ia64_boot_param->fpswa)
+	int major = 0, minor = 0;
+
+	if (ia64_boot_param->fpswa) {
 		/* FPSWA fixup: make the interface pointer a kernel virtual address: */
 		fpswa_interface = __va(ia64_boot_param->fpswa);
+		major = fpswa_interface->revision & 0xffff;
+		minor = fpswa_interface->revision >> 16;
+	}
+	printk("fpswa interface at %lx (rev %d.%d)\n", ia64_boot_param->fpswa, major, minor);
 }
 
 /*
@@ -62,27 +67,26 @@ trap_init (void)
 void
 bust_spinlocks (int yes)
 {
+	int loglevel_save = console_loglevel;
+
 	spin_lock_init(&timerlist_lock);
 	if (yes) {
 		oops_in_progress = 1;
-#ifdef CONFIG_SMP
-		global_irq_lock = 0;	/* Many serial drivers do __global_cli() */
-#endif
-	} else {
-		int loglevel_save = console_loglevel;
-#ifdef CONFIG_VT
-		unblank_screen();
-#endif
-		oops_in_progress = 0;
-		/*
-		 * OK, the message is on the console.  Now we call printk() without
-		 * oops_in_progress set so that printk will give klogd a poke.  Hold onto
-		 * your hats...
-		 */
-		console_loglevel = 15;		/* NMI oopser may have shut the console up */
-		printk(" ");
-		console_loglevel = loglevel_save;
+		return;
 	}
+
+#ifdef CONFIG_VT
+	unblank_screen();
+#endif
+	oops_in_progress = 0;
+	/*
+	 * OK, the message is on the console.  Now we call printk() without
+	 * oops_in_progress set so that printk will give klogd a poke.  Hold onto
+	 * your hats...
+	 */
+	console_loglevel = 15;		/* NMI oopser may have shut the console up */
+	printk(" ");
+	console_loglevel = loglevel_save;
 }
 
 void
@@ -93,9 +97,9 @@ die (const char *str, struct pt_regs *regs, long err)
 		int lock_owner;
 		int lock_owner_depth;
 	} die = {
-		lock:			SPIN_LOCK_UNLOCKED,
-		lock_owner:		-1,
-		lock_owner_depth:	0
+		.lock =			SPIN_LOCK_UNLOCKED,
+		.lock_owner =		-1,
+		.lock_owner_depth =	0
 	};
 
 	if (die.lock_owner != smp_processor_id()) {
@@ -130,6 +134,8 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 {
 	siginfo_t siginfo;
 	int sig, code;
+
+	die_if_kernel("bad break", regs, break_num);
 
 	/* SIGILL, SIGFPE, SIGSEGV, and SIGBUS want these field initialized: */
 	siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
@@ -247,10 +253,9 @@ disabled_fph_fault (struct pt_regs *regs)
 
 		if (fpu_owner)
 			ia64_flush_fph(fpu_owner);
-
-		ia64_set_fpu_owner(current);
 	}
 #endif /* !CONFIG_SMP */
+	ia64_set_fpu_owner(current);
 	if ((current->thread.flags & IA64_THREAD_FPH_VALID) != 0) {
 		__ia64_load_fpu(current->thread.fph);
 		psr->mfh = 0;
@@ -435,7 +440,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	unsigned long code, error = isr;
 	struct siginfo siginfo;
 	char buf[128];
-	int result;
+	int result, sig;
 	static const char *reason[] = {
 		"IA-64 Illegal Operation fault",
 		"IA-64 Privileged Operation fault",
@@ -479,6 +484,30 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		break;
 
 	      case 26: /* NaT Consumption */
+		if (user_mode(regs)) {
+			if (((isr >> 4) & 0xf) == 2) {
+				/* NaT page consumption */
+				sig = SIGSEGV;
+				code = SEGV_ACCERR;
+			} else {
+				/* register NaT consumption */
+				sig = SIGILL;
+				code = ILL_ILLOPN;
+			}
+			siginfo.si_signo = sig;
+			siginfo.si_code = code;
+			siginfo.si_errno = 0;
+			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+			siginfo.si_imm = vector;
+			siginfo.si_flags = __ISR_VALID;
+			siginfo.si_isr = isr;
+			force_sig_info(sig, &siginfo, current);
+			return;
+		} else if (done_with_exception(regs))
+			return;
+		sprintf(buf, "NaT consumption");
+		break;
+
 	      case 31: /* Unsupported Data Reference */
 		if (user_mode(regs)) {
 			siginfo.si_signo = SIGILL;
@@ -491,7 +520,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			force_sig_info(SIGILL, &siginfo, current);
 			return;
 		}
-		sprintf(buf, (vector == 26) ? "NaT consumption" : "Unsupported data reference");
+		sprintf(buf, "Unsupported data reference");
 		break;
 
 	      case 29: /* Debug */
@@ -508,16 +537,15 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			if (ia64_psr(regs)->is == 0)
 			  ifa = regs->cr_iip;
 #endif
-			siginfo.si_addr = (void *) ifa;
 			break;
-		      case 35: siginfo.si_code = TRAP_BRANCH; break;
-		      case 36: siginfo.si_code = TRAP_TRACE; break;
+		      case 35: siginfo.si_code = TRAP_BRANCH; ifa = 0; break;
+		      case 36: siginfo.si_code = TRAP_TRACE; ifa = 0; break;
 		}
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
 		siginfo.si_flags = 0;
 		siginfo.si_isr = 0;
-		siginfo.si_addr = 0;
+		siginfo.si_addr = (void *) ifa;
 		siginfo.si_imm = 0;
 		force_sig_info(SIGTRAP, &siginfo, current);
 		return;

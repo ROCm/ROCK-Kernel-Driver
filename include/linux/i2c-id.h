@@ -20,7 +20,7 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.		     */
 /* ------------------------------------------------------------------------- */
 
-/* $Id: i2c-id.h,v 1.41 2002/03/11 07:18:55 simon Exp $ */
+/* $Id: i2c-id.h,v 1.52 2002/07/10 13:28:44 abz Exp $ */
 
 #ifndef I2C_ID_H
 #define I2C_ID_H
@@ -90,8 +90,12 @@
 #define I2C_DRIVERID_DRP3510	43     /* ADR decoder (Astra Radio)	*/
 #define I2C_DRIVERID_SP5055	44     /* Satellite tuner		*/
 #define I2C_DRIVERID_STV0030	45     /* Multipurpose switch		*/
-#define I2C_DRIVERID_SAA7108    46     /* video decoder, image scaler   */
-
+#define I2C_DRIVERID_SAA7108	46     /* video decoder, image scaler   */
+#define I2C_DRIVERID_DS1307	47     /* DS1307 real time clock	*/
+#define I2C_DRIVERID_ADV717x	48     /* ADV 7175/7176 video encoder	*/
+#define I2C_DRIVERID_ZR36067	49     /* Zoran 36067 video encoder	*/
+#define I2C_DRIVERID_ZR36120	50     /* Zoran 36120 video encoder	*/
+#define I2C_DRIVERID_24LC32A	51		/* Microchip 24LC32A 32k EEPROM	*/
 
 
 
@@ -102,6 +106,8 @@
 
 #define I2C_DRIVERID_I2CDEV	900
 #define I2C_DRIVERID_I2CPROC	901
+#define I2C_DRIVERID_ARP        902    /* SMBus ARP Client              */
+#define I2C_DRIVERID_ALERT      903    /* SMBus Alert Responder Client  */
 
 /* IDs --   Use DRIVERIDs 1000-1999 for sensors. 
    These were originally in sensors.h in the lm_sensors package */
@@ -134,6 +140,9 @@
 #define I2C_DRIVERID_FSCPOS 1028
 #define I2C_DRIVERID_FSCSCY 1029
 #define I2C_DRIVERID_PCF8591 1030
+#define I2C_DRIVERID_SMSC47M1 1031
+#define I2C_DRIVERID_VT1211 1032
+#define I2C_DRIVERID_LM92 1033
 
 /*
  * ---- Adapter types ----------------------------------------------------
@@ -155,6 +164,7 @@
 #define I2C_ALGO_EC     0x100000        /* ACPI embedded controller     */
 
 #define I2C_ALGO_MPC8XX 0x110000	/* MPC8xx PowerPC I2C algorithm */
+#define I2C_ALGO_OCP    0x120000	/* IBM or otherwise On-chip I2C algorithm */
 
 #define I2C_ALGO_EXP	0x800000	/* experimental			*/
 
@@ -182,9 +192,11 @@
 #define I2C_HW_B_I810	0x0a	/* Intel I810 				*/
 #define I2C_HW_B_VOO	0x0b	/* 3dfx Voodoo 3 / Banshee      	*/
 #define I2C_HW_B_PPORT  0x0c	/* Primitive parallel port adapter	*/
+#define I2C_HW_B_SAVG	0x0d	/* Savage 4                     	*/
 #define I2C_HW_B_RIVA	0x10	/* Riva based graphics cards		*/
 #define I2C_HW_B_IOC	0x11	/* IOC bit-wiggling			*/
 #define I2C_HW_B_TSUNA  0x12	/* DEC Tsunami chipset			*/
+#define I2C_HW_B_FRODO  0x13    /* 2d3D, Inc. SA-1110 Development Board */
 
 /* --- PCF 8584 based algorithms					*/
 #define I2C_HW_P_LP	0x00	/* Parallel port interface		*/
@@ -199,6 +211,10 @@
 
 /* --- ITE based algorithms						*/
 #define I2C_HW_I_IIC	0x00	/* controller on the ITE */
+
+/* --- PowerPC on-chip adapters						*/
+#define I2C_HW_OCP 0x00	/* IBM on-chip I2C adapter 	*/
+
 
 /* --- SMBus only adapters						*/
 #define I2C_HW_SMBUS_PIIX4	0x00

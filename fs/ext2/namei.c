@@ -359,13 +359,13 @@ out:
 }
 
 struct inode_operations ext2_dir_inode_operations = {
-	create:		ext2_create,
-	lookup:		ext2_lookup,
-	link:		ext2_link,
-	unlink:		ext2_unlink,
-	symlink:	ext2_symlink,
-	mkdir:		ext2_mkdir,
-	rmdir:		ext2_rmdir,
-	mknod:		ext2_mknod,
-	rename:		ext2_rename,
+	.create		= ext2_create,
+	.lookup		= ext2_lookup,
+	.link		= ext2_link,
+	.unlink		= ext2_unlink,
+	.symlink	= ext2_symlink,
+	.mkdir		= ext2_mkdir,
+	.rmdir		= ext2_rmdir,
+	.mknod		= ext2_mknod,
+	.rename		= ext2_rename,
 };

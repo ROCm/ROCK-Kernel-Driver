@@ -26,12 +26,12 @@
 
 static sector_t max_block(struct block_device *bdev)
 {
-	sector_t retval = ~0U;
+	sector_t retval = ~((sector_t)0);
 	loff_t sz = bdev->bd_inode->i_size;
 
 	if (sz) {
-		sector_t size = block_size(bdev);
-		unsigned sizebits = blksize_bits(size);
+		unsigned int size = block_size(bdev);
+		unsigned int sizebits = blksize_bits(size);
 		retval = (sz >> sizebits);
 	}
 	return retval;
@@ -797,7 +797,7 @@ static int blkdev_reread_part(struct block_device *bdev)
 	part = disk->part + minor(dev) - disk->first_minor;
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	if (down_trylock(&bdev->bd_sem));
+	if (down_trylock(&bdev->bd_sem))
 		return -EBUSY;
 	if (bdev->bd_part_count) {
 		up(&bdev->bd_sem);
@@ -874,7 +874,7 @@ struct file_operations def_blk_fops = {
 	release:	blkdev_close,
 	llseek:		block_llseek,
 	read:		generic_file_read,
-	write:		generic_file_write,
+	write:		generic_file_write_nolock,
 	mmap:		generic_file_mmap,
 	fsync:		block_fsync,
 	ioctl:		blkdev_ioctl,

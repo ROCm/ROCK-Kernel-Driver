@@ -415,7 +415,7 @@ void handler_irq(int irq, struct pt_regs * regs)
 	extern void smp4m_irq_rotate(int cpu);
 #endif
 
-	irq_enter(cpu, irq);
+	irq_enter();
 	disable_pil_irq(irq);
 #ifdef CONFIG_SMP
 	/* Only rotate on lower priority IRQ's (scsi, ethernet, etc.). */
@@ -431,9 +431,7 @@ void handler_irq(int irq, struct pt_regs * regs)
 		action = action->next;
 	} while (action);
 	enable_pil_irq(irq);
-	irq_exit(cpu, irq);
-	if (softirq_pending(cpu))
-		do_softirq();
+	irq_exit();
 }
 
 #ifdef CONFIG_BLK_DEV_FD
@@ -444,13 +442,14 @@ void sparc_floppy_irq(int irq, void *dev_id, struct pt_regs *regs)
 	int cpu = smp_processor_id();
 
 	disable_pil_irq(irq);
-	irq_enter(cpu, irq);
+	irq_enter();
 	kstat.irqs[cpu][irq]++;
 	floppy_interrupt(irq, dev_id, regs);
-	irq_exit(cpu, irq);
+	irq_exit();
 	enable_pil_irq(irq);
-	if (softirq_pending(cpu))
-		do_softirq();
+	// XXX Eek, it's totally changed with preempt_count() and such
+	// if (softirq_pending(cpu))
+	//	do_softirq();
 }
 #endif
 
@@ -644,7 +643,7 @@ void __init init_IRQ(void)
 	extern void sun4c_init_IRQ( void );
 	extern void sun4m_init_IRQ( void );
 	extern void sun4d_init_IRQ( void );
-    
+
 	switch(sparc_cpu_model) {
 	case sun4c:
 	case sun4:

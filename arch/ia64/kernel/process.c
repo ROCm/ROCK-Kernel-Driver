@@ -194,7 +194,7 @@ ia64_save_extra (struct task_struct *task)
 		pfm_save_regs(task);
 
 # ifdef CONFIG_SMP
-	if (this_cpu(pfm_syst_wide))
+	if (__get_cpu_var(pfm_syst_wide))
 		pfm_syst_wide_update_task(task, 0);
 # endif
 #endif
@@ -216,7 +216,7 @@ ia64_load_extra (struct task_struct *task)
 		pfm_load_regs(task);
 
 # ifdef CONFIG_SMP
-	if (this_cpu(pfm_syst_wide)) pfm_syst_wide_update_task(task, 1);
+	if (__get_cpu_var(pfm_syst_wide)) pfm_syst_wide_update_task(task, 1);
 # endif
 #endif
 
@@ -325,6 +325,11 @@ copy_thread (int nr, unsigned long clone_flags,
 
 	/* copy parts of thread_struct: */
 	p->thread.ksp = (unsigned long) child_stack - 16;
+
+	/* stop some PSR bits from being inherited: */
+	child_ptregs->cr_ipsr =  ((child_ptregs->cr_ipsr | IA64_PSR_BITS_TO_SET)
+				  & ~IA64_PSR_BITS_TO_CLEAR);
+
 	/*
 	 * NOTE: The calling convention considers all floating point
 	 * registers in the high partition (fph) to be scratch.  Since

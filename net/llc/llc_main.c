@@ -50,15 +50,7 @@ static struct llc_station_state_trans *
 					       struct llc_station_state_ev *ev);
 static int llc_rtn_all_conns(struct llc_sap *sap);
 
-extern void llc_register_sap(unsigned char sap,
-			     int (*rcvfunc)(struct sk_buff *skb,
-					    struct net_device *dev,
-					    struct packet_type *pt));
-extern void llc_unregister_sap(unsigned char sap);
-
 static struct llc_station llc_main_station;	/* only one of its kind */
-struct llc_prim_if_block llc_ind_prim, llc_cfm_prim;
-static union llc_u_prim_data llc_ind_data_prim, llc_cfm_data_prim;
 
 /**
  *	llc_sap_alloc - allocates and initializes sap.
@@ -76,6 +68,8 @@ struct llc_sap *llc_sap_alloc(void)
 		spin_lock_init(&sap->sk_list.lock);
 		INIT_LIST_HEAD(&sap->sk_list.list);
 		skb_queue_head_init(&sap->mac_pdu_q);
+		sap->llc_ind_prim.data = &sap->llc_ind_data_prim;
+		sap->llc_cfm_prim.data = &sap->llc_cfm_data_prim;
 	}
 	return sap;
 }
@@ -238,7 +232,7 @@ void __llc_sock_free(struct sock *sk, u8 free)
 	/* stop all (possibly) running timers */
 	llc_conn_ac_stop_all_timers(sk, NULL);
 	/* handle return of frames on lists */
-	printk(KERN_INFO __FUNCTION__ ": unackq=%d, txq=%d\n",
+	printk(KERN_INFO "%s: unackq=%d, txq=%d\n", __FUNCTION__,
 		skb_queue_len(&llc->pdu_unack_q),
 		skb_queue_len(&sk->write_queue));
 	skb_queue_purge(&sk->write_queue);
@@ -580,6 +574,18 @@ unlock:
 	return len;
 }
 
+static struct packet_type llc_packet_type = {
+	.type = __constant_htons(ETH_P_802_2),
+	.func = mac_indicate,
+	.data = (void *)1,
+};
+
+static struct packet_type llc_tr_packet_type = {
+	.type = __constant_htons(ETH_P_TR_802_2),
+	.func = mac_indicate,
+	.data = (void *)1,
+};
+
 static char llc_banner[] __initdata =
 		KERN_INFO "LLC 2.0 by Procom, 1997, Arnaldo C. Melo, 2001\n"
 		KERN_INFO "NET4.0 IEEE 802.2 extended support\n";
@@ -612,12 +618,10 @@ static int __init llc_init(void)
 	ev->type	= LLC_STATION_EV_TYPE_SIMPLE;
 	ev->data.a.ev	= LLC_STATION_EV_ENABLE_WITHOUT_DUP_ADDR_CHECK;
 	rc = llc_station_next_state(&llc_main_station, ev);
-	llc_ind_prim.data = &llc_ind_data_prim;
-	llc_cfm_prim.data = &llc_cfm_data_prim;
 	proc_net_create("802.2", 0, llc_proc_get_info);
-	/* initialize the station component */
-	llc_register_sap(0, mac_indicate);
 	llc_ui_init();
+	dev_add_pack(&llc_packet_type);
+	dev_add_pack(&llc_tr_packet_type);
 out:
 	return rc;
 err:
@@ -629,7 +633,8 @@ err:
 static void __exit llc_exit(void)
 {
 	llc_ui_exit();
-	llc_unregister_sap(0);
+	dev_remove_pack(&llc_packet_type);
+	dev_remove_pack(&llc_tr_packet_type);
 	proc_net_remove("802.2");
 }
 

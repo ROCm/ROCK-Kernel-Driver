@@ -238,14 +238,14 @@ static void fbcon_riva8_clear_margins(struct vc_data *conp, struct display *p,
 }
 
 struct display_switch fbcon_riva8 = {
-	setup:		fbcon_riva8_setup,
-	bmove:		fbcon_riva_bmove,
-	clear:		fbcon_riva8_clear,
-	putc:		fbcon_riva8_putc,
-	putcs:		fbcon_riva8_putcs,
-	revc:		fbcon_riva8_revc,
-	clear_margins:	fbcon_riva8_clear_margins,
-	fontwidthmask:	FONTWIDTHRANGE(4, 16)
+	.setup =	fbcon_riva8_setup,
+	.bmove =	fbcon_riva_bmove,
+	.clear =	fbcon_riva8_clear,
+	.putc =		fbcon_riva8_putc,
+	.putcs =	fbcon_riva8_putcs,
+	.revc =		fbcon_riva8_revc,
+	.clear_margins =fbcon_riva8_clear_margins,
+	.fontwidthmask =FONTWIDTHRANGE(4, 16)
 };
 #endif
 
@@ -341,14 +341,14 @@ static void fbcon_riva16_clear_margins(struct vc_data *conp, struct display *p,
 }
 
 struct display_switch fbcon_riva16 = {
-	setup:		fbcon_riva16_setup,
-	bmove:		fbcon_riva_bmove,
-	clear:		fbcon_riva16_clear,
-	putc:		fbcon_riva16_putc,
-	putcs:		fbcon_riva16_putcs,
-	revc:		fbcon_riva1632_revc,
-	clear_margins:	fbcon_riva16_clear_margins,
-	fontwidthmask:	FONTWIDTHRANGE(4, 16)
+	.setup =	fbcon_riva16_setup,
+	.bmove =	fbcon_riva_bmove,
+	.clear =	fbcon_riva16_clear,
+	.putc =		fbcon_riva16_putc,
+	.putcs =	fbcon_riva16_putcs,
+	.revc =		fbcon_riva1632_revc,
+	.clear_margins =fbcon_riva16_clear_margins,
+	.fontwidthmask =FONTWIDTHRANGE(4, 16)
 };
 #endif
 
@@ -415,13 +415,13 @@ static void fbcon_riva32_clear_margins(struct vc_data *conp, struct display *p,
 }
 
 struct display_switch fbcon_riva32 = {
-	setup:		fbcon_riva32_setup,
-	bmove:		fbcon_riva_bmove,
-	clear:		fbcon_riva32_clear,
-	putc:		fbcon_riva32_putc,
-	putcs:		fbcon_riva32_putcs,
-	revc:		fbcon_riva1632_revc,
-	clear_margins:	fbcon_riva32_clear_margins,
-	fontwidthmask:	FONTWIDTHRANGE(4, 16)
+	.setup =	fbcon_riva32_setup,
+	.bmove =	fbcon_riva_bmove,
+	.clear =	fbcon_riva32_clear,
+	.putc =		fbcon_riva32_putc,
+	.putcs =	fbcon_riva32_putcs,
+	.revc =		fbcon_riva1632_revc,
+	.clear_margins =fbcon_riva32_clear_margins,
+	.fontwidthmask =FONTWIDTHRANGE(4, 16)
 };
 #endif

@@ -768,11 +768,14 @@ static void wake_up_parent(struct task_struct *parent)
 /*
  * Let a parent know about a status change of a child.
  */
-
 void do_notify_parent(struct task_struct *tsk, int sig)
 {
 	struct siginfo info;
 	int why, status;
+
+	/* is the thread detached? */
+	if (sig == -1 || tsk->exit_signal == -1)
+		BUG();
 
 	info.si_signo = sig;
 	info.si_errno = 0;
@@ -823,9 +826,11 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 void
 notify_parent(struct task_struct *tsk, int sig)
 {
-	read_lock(&tasklist_lock);
-	do_notify_parent(tsk, sig);
-	read_unlock(&tasklist_lock);
+	if (sig != -1) {
+		read_lock(&tasklist_lock);
+		do_notify_parent(tsk, sig);
+		read_unlock(&tasklist_lock);
+	}
 }
 
 #ifndef HAVE_ARCH_GET_SIGNAL_TO_DELIVER

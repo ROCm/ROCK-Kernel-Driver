@@ -1005,9 +1005,14 @@ delay:
 	ret
 
 # Descriptor tables
+#
+# NOTE: if you think the GDT is large, you can make it smaller by just
+# defining the KERNEL_CS and KERNEL_DS entries and shifting the gdt
+# address down by GDT_ENTRY_KERNEL_CS*8. This puts bogus entries into
+# the GDT, but those wont be used so it's not a problem.
+#
 gdt:
-	.word	0, 0, 0, 0			# dummy
-	.word	0, 0, 0, 0			# unused
+	.fill GDT_ENTRY_KERNEL_CS,8,0
 
 	.word	0xFFFF				# 4Gb - (0x100000*0x1000 = 4Gb)
 	.word	0				# base address = 0

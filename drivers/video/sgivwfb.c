@@ -55,34 +55,34 @@ static int ypan = 0;
 static int ywrap = 0;
 
 static struct fb_fix_screeninfo sgivwfb_fix __initdata = {
-	id:		"SGI Vis WS FB",
-	type:		FB_TYPE_PACKED_PIXELS,
-        visual:		FB_VISUAL_PSEUDOCOLOR,
-	mmio_start:	DBE_REG_PHYS,
-	mmio_len:	DBE_REG_SIZE,
-        accel_flags:	FB_ACCEL_NONE
+	.id		= "SGI Vis WS FB",
+	.type		= FB_TYPE_PACKED_PIXELS,
+        .visual		= FB_VISUAL_PSEUDOCOLOR,
+	.mmio_start	= DBE_REG_PHYS,
+	.mmio_len	= DBE_REG_SIZE,
+        .accel_flags	= FB_ACCEL_NONE
 };
 
 static struct fb_var_screeninfo sgivwfb_var __initdata = {
         /* 640x480, 8 bpp */
-        xres:		640,
-	yres:		480,
-	xres_virtual:	640,
-	yres_virtual:	480,
-	bits_per_pixel:	8,
-        red:		{0, 8, 0},
-	green:		{0, 8, 0},
-	blue:		{0, 8, 0},
-        height:		-1,
-	width:		-1,
-	pixclock:	20000,
-	left_margin:	64,
-	right_margin:	64,
-	upper_margin:	32,
-	lower_margin:	32,
-	hsync_len:	64,
-	vsync_len:	2,
-        vmode:		FB_VMODE_NONINTERLACED
+        .xres		= 640,
+	.yres		= 480,
+	.xres_virtual	= 640,
+	.yres_virtual	= 480,
+	.bits_per_pixel	= 8,
+        .red		= {0, 8, 0},
+	.green		= {0, 8, 0},
+	.blue		= {0, 8, 0},
+        .height		= -1,
+	.width		= -1,
+	.pixclock	= 20000,
+	.left_margin	= 64,
+	.right_margin	= 64,
+	.upper_margin	= 32,
+	.lower_margin	= 32,
+	.hsync_len	= 64,
+	.vsync_len	= 2,
+        .vmode		= FB_VMODE_NONINTERLACED
 };
 
 /* console related variables */
@@ -103,19 +103,17 @@ static int sgivwfb_mmap(struct fb_info *info, struct file *file,
 			struct vm_area_struct *vma);
 
 static struct fb_ops sgivwfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_check_var:	sgivwfb_check_var,
-	fb_set_par:	sgivwfb_set_par,
-	fb_setcolreg:	sgivwfb_setcolreg,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
-	fb_mmap:	sgivwfb_mmap,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_check_var	= sgivwfb_check_var,
+	.fb_set_par	= sgivwfb_set_par,
+	.fb_setcolreg	= sgivwfb_setcolreg,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
+	.fb_mmap	= sgivwfb_mmap,
 };
 
 /*

@@ -75,17 +75,19 @@ static DAC960_Controller_T
   *DAC960_Controllers[DAC960_MaxControllers] =	{ NULL };
 
 
+static int DAC960_revalidate(kdev_t);
 /*
   DAC960_BlockDeviceOperations is the Block Device Operations structure for
   DAC960 Logical Disk Devices.
 */
 
-static BlockDeviceOperations_T
-  DAC960_BlockDeviceOperations =
-    { owner:		    THIS_MODULE,
-      open:		    DAC960_Open,
-      release:		    DAC960_Release,
-      ioctl:		    DAC960_IOCTL };
+static struct block_device_operations DAC960_BlockDeviceOperations = {
+	owner:		THIS_MODULE,
+	open:		DAC960_Open,
+	release:	DAC960_Release,
+	ioctl:		DAC960_IOCTL,
+	revalidate:	DAC960_revalidate,
+};
 
 
 /*
@@ -306,9 +308,9 @@ static inline void DAC960_DeallocateCommand(DAC960_Command_T *Command)
 
 static void DAC960_WaitForCommand(DAC960_Controller_T *Controller)
 {
-  spin_unlock_irq(&Controller->RequestQueue->queue_lock);
+  spin_unlock_irq(Controller->RequestQueue->queue_lock);
   __wait_event(Controller->CommandWaitQueue, Controller->FreeCommands);
-  spin_lock_irq(&Controller->RequestQueue->queue_lock);
+  spin_lock_irq(Controller->RequestQueue->queue_lock);
 }
 
 
@@ -1920,7 +1922,6 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
   return true;
 }
 
-
 /*
   DAC960_RegisterBlockDevice registers the Block Device structures
   associated with Controller.
@@ -1929,8 +1930,16 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
 static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 {
   int MajorNumber = DAC960_MAJOR + Controller->ControllerNumber;
+  char *names;
   RequestQueue_T *RequestQueue;
   int MinorNumber;
+  int n;
+
+  names = kmalloc(9 * DAC960_MaxLogicalDrives, GFP_KERNEL);
+  if (!names) {
+      DAC960_Error("out of memory", Controller);
+      return false;
+  }
   /*
     Register the Block Device Major Number for this DAC960 Controller.
   */
@@ -1939,13 +1948,15 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
     {
       DAC960_Error("UNABLE TO ACQUIRE MAJOR NUMBER %d - DETACHING\n",
 		   Controller, MajorNumber);
+      kfree(names);
       return false;
     }
   /*
     Initialize the I/O Request Queue.
   */
   RequestQueue = BLK_DEFAULT_QUEUE(MajorNumber);
-  blk_init_queue(RequestQueue, DAC960_RequestFunction);
+  Controller->queue_lock = SPIN_LOCK_UNLOCKED;
+  blk_init_queue(RequestQueue, DAC960_RequestFunction, &Controller->queue_lock);
   RequestQueue->queuedata = Controller;
   blk_queue_max_hw_segments(RequestQueue,
 			    Controller->DriverScatterGatherLimit);
@@ -1953,27 +1964,19 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   blk_queue_max_sectors(RequestQueue, Controller->MaxBlocksPerCommand);
 
   Controller->RequestQueue = RequestQueue;
-  /*
-    Initialize the Disk Partitions array, Partition Sizes array, Block Sizes
-    array, and Max Sectors per Request array.
-  */
-  for (MinorNumber = 0; MinorNumber < DAC960_MinorCount; MinorNumber++)
-    Controller->MaxSectorsPerRequest[MinorNumber] =
-      Controller->MaxBlocksPerCommand;
-  Controller->GenericDiskInfo.part = Controller->DiskPartitions;
-  /*
-    Complete initialization of the Generic Disk Information structure.
-  */
-  Controller->GenericDiskInfo.major = MajorNumber;
-  Controller->GenericDiskInfo.major_name = "rd";
-  Controller->GenericDiskInfo.minor_shift = DAC960_MaxPartitionsBits;
-  Controller->GenericDiskInfo.nr_real = DAC960_MaxLogicalDrives;
-  Controller->GenericDiskInfo.next = NULL;
-  Controller->GenericDiskInfo.fops = &DAC960_BlockDeviceOperations;
-  /*
-    Install the Generic Disk Information structure at the end of the list.
-  */
-  add_gendisk(&Controller->GenericDiskInfo);
+  for (n = 0; n < DAC960_MaxLogicalDrives; n++) {
+	struct gendisk *disk = &Controller->disks[n];
+	memset(disk, 0, sizeof(struct gendisk));
+	sprintf(names + 9 * n, "rd/c%dd%d", Controller->ControllerNumber, n);
+	disk->part = Controller->DiskPartitions + (n<<DAC960_MaxPartitionsBits);
+	disk->major = MajorNumber;
+	disk->first_minor = n << DAC960_MaxPartitionsBits;
+	disk->major_name = names + 9 * n;
+	disk->minor_shift = DAC960_MaxPartitionsBits;
+	disk->nr_real = 1;
+	disk->fops = &DAC960_BlockDeviceOperations;
+	add_gendisk(disk);
+   }
   /*
     Indicate the Block Device Registration completed successfully,
   */
@@ -1989,6 +1992,11 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
 {
   int MajorNumber = DAC960_MAJOR + Controller->ControllerNumber;
+  int disk;
+  for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++) {
+	  del_gendisk(&Controller->disks[disk]);
+	  kfree(Controller->disks[0].major_name);
+  }
   /*
     Unregister the Block Device Major Number for this DAC960 Controller.
   */
@@ -2001,14 +2009,23 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
     Remove the Disk Partitions array, Partition Sizes array, Block Sizes
     array, Max Sectors per Request array, and Max Segments per Request array.
   */
-  Controller->GenericDiskInfo.part = NULL;
   blk_clear(MajorNumber);
-  /*
-    Remove the Generic Disk Information structure from the list.
-  */
-  del_gendisk(&Controller->GenericDiskInfo);
 }
 
+static long disk_size(DAC960_Controller_T *Controller, int disk)
+{
+	if (Controller->FirmwareType == DAC960_V1_Controller) {
+		if (disk >= Controller->LogicalDriveCount)
+			return 0;
+		return Controller->V1.LogicalDriveInformation[disk].LogicalDriveSize;
+	} else {
+		DAC960_V2_LogicalDeviceInfo_T *LogicalDeviceInfo =
+			Controller->V2.LogicalDeviceInformation[disk];
+		if (LogicalDeviceInfo == NULL)
+			return 0;
+		return LogicalDeviceInfo->ConfigurableDeviceSize;
+	}
+}
 
 /*
   DAC960_ComputeGenericDiskInfo computes the values for the Generic Disk
@@ -2017,58 +2034,20 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
 
 static void DAC960_ComputeGenericDiskInfo(DAC960_Controller_T *Controller)
 {
-  GenericDiskInfo_T *GenericDiskInfo = &Controller->GenericDiskInfo;
-  int LogicalDriveNumber, i;
-  for (LogicalDriveNumber = 0;
-       LogicalDriveNumber < DAC960_MaxLogicalDrives;
-       LogicalDriveNumber++)
-    {
-      int MinorNumber = DAC960_MinorNumber(LogicalDriveNumber, 0);
-      if (Controller->FirmwareType == DAC960_V1_Controller)
-	{
-	  if (LogicalDriveNumber < Controller->LogicalDriveCount)
-	    GenericDiskInfo->part[MinorNumber].nr_sects =
-	      Controller->V1.LogicalDriveInformation
-			     [LogicalDriveNumber].LogicalDriveSize;
-	  else GenericDiskInfo->part[MinorNumber].nr_sects = 0;
-	}
-      else
-	{
-	  DAC960_V2_LogicalDeviceInfo_T *LogicalDeviceInfo =
-	    Controller->V2.LogicalDeviceInformation[LogicalDriveNumber];
-	  if (LogicalDeviceInfo != NULL)
-	    GenericDiskInfo->part[MinorNumber].nr_sects =
-	      LogicalDeviceInfo->ConfigurableDeviceSize;
-	  else GenericDiskInfo->part[MinorNumber].nr_sects = 0;
-	}
-    }
+	struct gendisk *disks = Controller->disks;
+	int disk;
+	for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++)
+		disks->part[0].nr_sects = disk_size(Controller, disk);
 }
 
-
-/*
-  DAC960_RegisterDisk registers the DAC960 Logical Disk Device for Logical
-  Drive Number if it exists.
-*/
-
-static void DAC960_RegisterDisk(DAC960_Controller_T *Controller,
-				int LogicalDriveNumber)
+static int DAC960_revalidate(kdev_t dev)
 {
-  long size;
-  if (Controller->FirmwareType == DAC960_V1_Controller) {
-      if (LogicalDriveNumber > Controller->LogicalDriveCount - 1) return;
-      size = Controller->V1.LogicalDriveInformation
-				   [LogicalDriveNumber].LogicalDriveSize;
-  } else {
-      DAC960_V2_LogicalDeviceInfo_T *LogicalDeviceInfo =
-	Controller->V2.LogicalDeviceInformation[LogicalDriveNumber];
-      if (LogicalDeviceInfo == NULL) return;
-      size = LogicalDeviceInfo->ConfigurableDeviceSize;
-  }
-  register_disk(&Controller->GenericDiskInfo,
-    DAC960_KernelDevice(Controller->ControllerNumber, LogicalDriveNumber, 0),
-    DAC960_MaxPartitions, &DAC960_BlockDeviceOperations, size);
+	int ctlr = DAC960_ControllerNumber(dev);
+	int disk = DAC960_LogicalDriveNumber(dev);
+	DAC960_Controller_T *p = DAC960_Controllers[ctlr];
+	p->disks[disk].part[0].nr_sects = disk_size(p, disk);
+	return 0;
 }
-
 
 /*
   DAC960_ReportErrorStatus reports Controller BIOS Messages passed through
@@ -2642,14 +2621,15 @@ static int DAC960_Initialize(void)
        ControllerNumber++)
     {
       DAC960_Controller_T *Controller = DAC960_Controllers[ControllerNumber];
-      int LogicalDriveNumber;
+      int disk;
       if (Controller == NULL) continue;
       DAC960_InitializeController(Controller);
-      DAC960_ComputeGenericDiskInfo(Controller);
-      for (LogicalDriveNumber = 0;
-	   LogicalDriveNumber < DAC960_MaxLogicalDrives;
-	   LogicalDriveNumber++)
-	DAC960_RegisterDisk(Controller, LogicalDriveNumber);
+      for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++) {
+	long size = disk_size(Controller, disk);
+	register_disk(&Controller->disks[disk],
+	    DAC960_KernelDevice(Controller->ControllerNumber, disk, 0),
+	    DAC960_MaxPartitions, &DAC960_BlockDeviceOperations, size);
+      }
     }
   DAC960_CreateProcEntries();
   register_reboot_notifier(&DAC960_NotifierBlock);
@@ -2732,17 +2712,17 @@ static void DAC960_V1_QueueReadWriteCommand(DAC960_Command_T *Command)
 	  if (bio_data(BufferHeader) == LastDataEndPointer)
 	    {
 	      ScatterGatherList[SegmentNumber-1].SegmentByteCount +=
-		bio_size(BufferHeader);
-	      LastDataEndPointer += bio_size(BufferHeader);
+		BufferHeader->bi_size;
+	      LastDataEndPointer += BufferHeader->bi_size;
 	    }
 	  else
 	    {
 	      ScatterGatherList[SegmentNumber].SegmentDataPointer =
 		Virtual_to_Bus32(bio_data(BufferHeader));
 	      ScatterGatherList[SegmentNumber].SegmentByteCount =
-		bio_size(BufferHeader);
+		BufferHeader->bi_size;
 	      LastDataEndPointer = bio_data(BufferHeader) +
-		bio_size(BufferHeader);
+		BufferHeader->bi_size;
 	      if (SegmentNumber++ > Controller->DriverScatterGatherLimit)
 		panic("DAC960: Scatter/Gather Segment Overflow\n");
 	    }
@@ -2823,17 +2803,17 @@ static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *Command)
 	  if (bio_data(BufferHeader) == LastDataEndPointer)
 	    {
 	      ScatterGatherList[SegmentNumber-1].SegmentByteCount +=
-		bio_size(BufferHeader);
-	      LastDataEndPointer += bio_size(BufferHeader);
+		BufferHeader->bi_size;
+	      LastDataEndPointer += BufferHeader->bi_size;
 	    }
 	  else
 	    {
 	      ScatterGatherList[SegmentNumber].SegmentDataPointer =
 		Virtual_to_Bus64(bio_data(BufferHeader));
 	      ScatterGatherList[SegmentNumber].SegmentByteCount =
-		bio_size(BufferHeader);
+		BufferHeader->bi_size;
 	      LastDataEndPointer = bio_data(BufferHeader) +
-		bio_size(BufferHeader);
+		BufferHeader->bi_size;
 	      if (SegmentNumber++ > Controller->DriverScatterGatherLimit)
 		panic("DAC960: Scatter/Gather Segment Overflow\n");
 	    }
@@ -3055,7 +3035,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      Command->CommandType = DAC960_WriteRetryCommand;
 	      CommandMailbox->Type5.CommandOpcode = DAC960_V1_Write;
 	    }
-	  Command->BlockCount = bio_size(BufferHeader) >> DAC960_BlockSizeBits;
+	  Command->BlockCount = BufferHeader->bi_size >> DAC960_BlockSizeBits;
 	  CommandMailbox->Type5.LD.TransferLength = Command->BlockCount;
 	  CommandMailbox->Type5.BusAddress =
 	    Virtual_to_Bus32(bio_data(BufferHeader));
@@ -3104,9 +3084,9 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  DAC960_V1_CommandMailbox_T *CommandMailbox =
 	    &Command->V1.CommandMailbox;
 	  Command->BlockNumber +=
-	    bio_size(BufferHeader) >> DAC960_BlockSizeBits;
+	    BufferHeader->bi_size >> DAC960_BlockSizeBits;
 	  Command->BlockCount =
-	    bio_size(NextBufferHeader) >> DAC960_BlockSizeBits;
+	    NextBufferHeader->bi_size >> DAC960_BlockSizeBits;
 	  Command->BufferHeader = NextBufferHeader;
 	  CommandMailbox->Type5.LD.TransferLength = Command->BlockCount;
 	  CommandMailbox->Type5.LogicalBlockAddress = Command->BlockNumber;
@@ -4152,7 +4132,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  if (CommandType == DAC960_ReadCommand)
 	    Command->CommandType = DAC960_ReadRetryCommand;
 	  else Command->CommandType = DAC960_WriteRetryCommand;
-	  Command->BlockCount = bio_size(BufferHeader) >> DAC960_BlockSizeBits;
+	  Command->BlockCount = BufferHeader->bi_size >> DAC960_BlockSizeBits;
 	  CommandMailbox->SCSI_10.CommandControlBits
 				 .AdditionalScatterGatherListMemory = false;
 	  CommandMailbox->SCSI_10.DataTransferSize =
@@ -4208,9 +4188,9 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
       if (NextBufferHeader != NULL)
 	{
 	  Command->BlockNumber +=
-	    bio_size(BufferHeader) >> DAC960_BlockSizeBits;
+	    BufferHeader->bi_size >> DAC960_BlockSizeBits;
 	  Command->BlockCount =
-	    bio_size(NextBufferHeader) >> DAC960_BlockSizeBits;
+	    NextBufferHeader->bi_size >> DAC960_BlockSizeBits;
 	  Command->BufferHeader = NextBufferHeader;
 	  CommandMailbox->SCSI_10.DataTransferSize =
 	    Command->BlockCount << DAC960_BlockSizeBits;
@@ -5289,11 +5269,15 @@ static int DAC960_Open(Inode_T *Inode, File_T *File)
     }
   if (!Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber])
     {
+      long size;
       Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber] = true;
-      DAC960_ComputeGenericDiskInfo(Controller);
-      DAC960_RegisterDisk(Controller, LogicalDriveNumber);
+      size = disk_size(Controller, LogicalDriveNumber);
+      /* BROKEN, same as modular ide-floppy/ide-disk; same fix - ->probe() */
+      register_disk(&Controller->disks[LogicalDriveNumber],
+	    DAC960_KernelDevice(Controller->ControllerNumber, LogicalDriveNumber, 0),
+	    DAC960_MaxPartitions, &DAC960_BlockDeviceOperations, size);
     }
-  if (Controller->GenericDiskInfo.part[minor(Inode->i_rdev)].nr_sects == 0)
+  if (Controller->disks[LogicalDriveNumber].part[0].nr_sects == 0)
     return -ENXIO;
   /*
     Increment Controller and Logical Drive Usage Counts.
@@ -5391,18 +5375,6 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
       Geometry.start = get_start_sect(Inode->i_bdev);
       return (copy_to_user(UserGeometry, &Geometry,
 			   sizeof(DiskGeometry_T)) ? -EFAULT : 0);
-
-    case BLKRRPART:
-      /* Re-Read Partition Table. */
-      if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-      if (Controller->LogicalDriveUsageCount[LogicalDriveNumber] > 1)
-	return -EBUSY;
-      res = wipe_partitions(Inode->i_rdev);
-      if (res) /* nothing */
-	return res;
-
-      DAC960_RegisterDisk(Controller, LogicalDriveNumber);
-      return 0;
     }
   return -EINVAL;
 }
@@ -5528,11 +5500,11 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	    while (Controller->V1.DirectCommandActive[DCDB.Channel]
 						     [DCDB.TargetID])
 	      {
-		spin_unlock_irq(&Controller->RequestQueue->queue_lock);
+		spin_unlock_irq(Controller->RequestQueue->queue_lock);
 		__wait_event(Controller->CommandWaitQueue,
 			     !Controller->V1.DirectCommandActive
 					     [DCDB.Channel][DCDB.TargetID]);
-		spin_lock_irq(&Controller->RequestQueue->queue_lock);
+		spin_lock_irq(Controller->RequestQueue->queue_lock);
 	      }
 	    Controller->V1.DirectCommandActive[DCDB.Channel]
 					      [DCDB.TargetID] = true;
@@ -5570,7 +5542,6 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 			     DataTransferBuffer, DataTransferLength))
 		ErrorCode = -EFAULT;
 		goto Failure1;
-	  }
 	  }
 	if (CommandOpcode == DAC960_V1_DCDB)
 	  {

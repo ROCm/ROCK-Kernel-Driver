@@ -399,7 +399,7 @@ static u16 bond_check_dev_link(struct net_device *dev)
 {
 	static int (* ioctl)(struct net_device *, struct ifreq *, int);
 	struct ifreq ifr;
-	struct mii_ioctl_data mii;
+	struct mii_ioctl_data *mii;
 	struct ethtool_value etool;
 
 	if ((ioctl = dev->do_ioctl) != NULL)  { /* ioctl to access MII */
@@ -425,21 +425,24 @@ static u16 bond_check_dev_link(struct net_device *dev)
 			} 
 		}
 
-		ifr.ifr_data = (char*)&mii;
-                /* try MIIPHY first then, if that doesn't work, try MIIREG */
-		if (ioctl(dev, &ifr, SIOCGMIIPHY) == 0) {
-			/* now, mii.phy_id contains info about link status :
-			- mii.phy_id & 0x04 means link up
-			- mii.phy_id & 0x20 means end of auto-negociation
-			*/
-			return mii.phy_id;
+		/*
+		 * We cannot assume that SIOCGMIIPHY will also read a
+		 * register; not all network drivers support that.
+		 */
+
+		/* Yes, the mii is overlaid on the ifreq.ifr_ifru */
+		mii = (struct mii_ioctl_data *)&ifr.ifr_data;
+		if (ioctl(dev, &ifr, SIOCGMIIPHY) != 0) {
+			return MII_LINK_READY;	 /* can't tell */
 		}
 
-		mii.reg_num = 1; /* the MII register we want to read */  
+		mii->reg_num = 1;
 		if (ioctl(dev, &ifr, SIOCGMIIREG) == 0) {
-			/* mii.val_out contians the same link info as phy_id */
-			/* above                                             */
-			return mii.val_out;
+			/*
+			 * mii->val_out contains MII reg 1, BMSR
+			 * 0x0004 means link established
+			 */
+			return mii->val_out;
 		}
 
 	}
@@ -641,12 +644,6 @@ static void set_multicast_list(struct net_device *master)
 	 */
 	write_lock_irqsave(&bond->lock, flags);
 
-	/*
-	 * Lock the master device so that noone trys to transmit
-	 * while we're changing things
-	 */
-	spin_lock_bh(&master->xmit_lock);
-
 	/* set promiscuity flag to slaves */
 	if ( (master->flags & IFF_PROMISC) && !(bond->flags & IFF_PROMISC) )
 		bond_set_promiscuity(bond, 1); 
@@ -680,7 +677,6 @@ static void set_multicast_list(struct net_device *master)
 	bond_mc_list_destroy (bond);
 	bond_mc_list_copy (master->mc_list, bond, GFP_KERNEL);
 
-	spin_unlock_bh(&master->xmit_lock);
 	write_unlock_irqrestore(&bond->lock, flags);
 }
 

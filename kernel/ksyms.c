@@ -50,6 +50,7 @@
 #include <linux/namei.h>
 #include <linux/buffer_head.h>
 #include <linux/root_dev.h>
+#include <linux/percpu.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -109,6 +110,8 @@ EXPORT_SYMBOL(vfree);
 EXPORT_SYMBOL(__vmalloc);
 EXPORT_SYMBOL(vmalloc);
 EXPORT_SYMBOL(vmalloc_32);
+EXPORT_SYMBOL(vmap);
+EXPORT_SYMBOL(vunmap);
 EXPORT_SYMBOL(vmalloc_to_page);
 EXPORT_SYMBOL(mem_map);
 EXPORT_SYMBOL(remap_page_range);
@@ -220,6 +223,7 @@ EXPORT_SYMBOL(generic_file_read);
 EXPORT_SYMBOL(generic_file_sendfile);
 EXPORT_SYMBOL(do_generic_file_read);
 EXPORT_SYMBOL(generic_file_write);
+EXPORT_SYMBOL(generic_file_write_nolock);
 EXPORT_SYMBOL(generic_file_mmap);
 EXPORT_SYMBOL(generic_ro_fops);
 EXPORT_SYMBOL(file_lock_list);
@@ -340,7 +344,7 @@ EXPORT_SYMBOL(register_disk);
 EXPORT_SYMBOL(read_dev_sector);
 EXPORT_SYMBOL(init_buffer);
 EXPORT_SYMBOL(wipe_partitions);
-EXPORT_SYMBOL(generic_file_direct_IO);
+EXPORT_SYMBOL_GPL(generic_file_direct_IO);
 
 /* tty routines */
 EXPORT_SYMBOL(tty_hangup);
@@ -501,6 +505,7 @@ EXPORT_SYMBOL(vsscanf);
 EXPORT_SYMBOL(kdevname);
 EXPORT_SYMBOL(__bdevname);
 EXPORT_SYMBOL(cdevname);
+EXPORT_SYMBOL(simple_strtoull);
 EXPORT_SYMBOL(simple_strtoul);
 EXPORT_SYMBOL(simple_strtol);
 EXPORT_SYMBOL(system_utsname);	/* UTS data */
@@ -595,3 +600,6 @@ EXPORT_SYMBOL(init_thread_union);
 
 EXPORT_SYMBOL(tasklist_lock);
 EXPORT_SYMBOL(pidhash);
+#if defined(CONFIG_SMP) && defined(__GENERIC_PER_CPU)
+EXPORT_SYMBOL(__per_cpu_offset);
+#endif

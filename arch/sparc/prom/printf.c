@@ -1,11 +1,15 @@
-/* $Id: printf.c,v 1.7 2000/02/08 20:24:23 davem Exp $
+/*
  * printf.c:  Internal prom library printf facility.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
- */
-
-/* This routine is internal to the prom library, no one else should know
- * about or use it!  It's simple and smelly anyway....
+ * Copyright (c) 2002 Pete Zaitcev (zaitcev@yahoo.com)
+ *
+ * We used to warn all over the code: DO NOT USE prom_printf(),
+ * and yet people do. Anton's banking code was outputing banks
+ * with prom_printf for most of the 2.4 lifetime. Since an effective
+ * stick is not available, we deployed a carrot: an early printk
+ * through PROM by means of -p boot option. This ought to fix it.
+ * USE printk; if you need, deploy -p.
  */
 
 #include <linux/kernel.h>
@@ -16,23 +20,27 @@
 static char ppbuf[1024];
 
 void
+prom_write(const char *buf, unsigned int n)
+{
+	char ch;
+
+	while (n != 0) {
+		--n;
+		if ((ch = *buf++) == '\n')
+			prom_putchar('\r');
+		prom_putchar(ch);
+	}
+}
+
+void
 prom_printf(char *fmt, ...)
 {
 	va_list args;
-	char ch, *bptr;
 	int i;
 
 	va_start(args, fmt);
-	i = vsprintf(ppbuf, fmt, args);
-
-	bptr = ppbuf;
-
-	while((ch = *(bptr++)) != 0) {
-		if(ch == '\n')
-			prom_putchar('\r');
-
-		prom_putchar(ch);
-	}
+	i = vsnprintf(ppbuf, sizeof(ppbuf), fmt, args);
 	va_end(args);
-	return;
+
+	prom_write(ppbuf, i);
 }

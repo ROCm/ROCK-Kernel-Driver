@@ -28,7 +28,7 @@ int llc_sap_ev_activation_req(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 
 int llc_sap_ev_rx_ui(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 {
-	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_un *pdu = llc_pdu_un_hdr(ev->data.pdu.skb);
 
 	return ev->type == LLC_SAP_EV_TYPE_PDU && !LLC_PDU_IS_CMD(pdu) &&
 	       !LLC_PDU_TYPE_IS_U(pdu) &&
@@ -52,7 +52,7 @@ int llc_sap_ev_xid_req(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 
 int llc_sap_ev_rx_xid_c(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 {
-	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_un *pdu = llc_pdu_un_hdr(ev->data.pdu.skb);
 
 	return ev->type == LLC_SAP_EV_TYPE_PDU && !LLC_PDU_IS_CMD(pdu) &&
 	       !LLC_PDU_TYPE_IS_U(pdu) &&
@@ -61,7 +61,7 @@ int llc_sap_ev_rx_xid_c(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 
 int llc_sap_ev_rx_xid_r(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 {
-	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_un *pdu = llc_pdu_un_hdr(ev->data.pdu.skb);
 
 	return ev->type == LLC_SAP_EV_TYPE_PDU && !LLC_PDU_IS_RSP(pdu) &&
 	       !LLC_PDU_TYPE_IS_U(pdu) &&
@@ -77,7 +77,7 @@ int llc_sap_ev_test_req(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 
 int llc_sap_ev_rx_test_c(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 {
-	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_un *pdu = llc_pdu_un_hdr(ev->data.pdu.skb);
 
 	return ev->type == LLC_SAP_EV_TYPE_PDU && !LLC_PDU_IS_CMD(pdu) &&
 	       !LLC_PDU_TYPE_IS_U(pdu) &&
@@ -86,7 +86,7 @@ int llc_sap_ev_rx_test_c(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 
 int llc_sap_ev_rx_test_r(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 {
-	struct llc_pdu_un *pdu = (struct llc_pdu_un *)ev->data.pdu.skb->nh.raw;
+	struct llc_pdu_un *pdu = llc_pdu_un_hdr(ev->data.pdu.skb);
 
 	return ev->type == LLC_SAP_EV_TYPE_PDU && !LLC_PDU_IS_RSP(pdu) &&
 	       !LLC_PDU_TYPE_IS_U(pdu) &&

@@ -411,10 +411,10 @@ static unsigned int centaur_size_cache(struct cpuinfo_x86 * c, unsigned int size
 }
 
 static struct cpu_dev centaur_cpu_dev __initdata = {
-	c_vendor:	"Centaur",
-	c_ident:	{ "CentaurHauls" },
-	c_init:		init_centaur,
-	c_size_cache:	centaur_size_cache,
+	.c_vendor	= "Centaur",
+	.c_ident	= { "CentaurHauls" },
+	.c_init		= init_centaur,
+	.c_size_cache	= centaur_size_cache,
 };
 
 int __init centaur_init_cpu(void)

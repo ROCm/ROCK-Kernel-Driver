@@ -112,18 +112,18 @@ static int sbusfb_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 			    u_int *transp, struct fb_info *info);
 
 static struct fb_ops sbusfb_ops = {
-	owner:		THIS_MODULE,
-	fb_open:	sbusfb_open,
-	fb_release:	sbusfb_release,
-	fb_get_fix:	sbusfb_get_fix,
-	fb_get_var:	sbusfb_get_var,
-	fb_set_var:	sbusfb_set_var,
-	fb_get_cmap:	sbusfb_get_cmap,
-	fb_set_cmap:	sbusfb_set_cmap,
-	fb_setcolreg:	sbusfb_setcolreg,
-	fb_blank:	sbusfb_blank,
-	fb_ioctl:	sbusfb_ioctl,
-	fb_mmap:	sbusfb_mmap,
+	.owner =	THIS_MODULE,
+	.fb_open =	sbusfb_open,
+	.fb_release =	sbusfb_release,
+	.fb_get_fix =	sbusfb_get_fix,
+	.fb_get_var =	sbusfb_get_var,
+	.fb_set_var =	sbusfb_set_var,
+	.fb_get_cmap =	sbusfb_get_cmap,
+	.fb_set_cmap =	sbusfb_set_cmap,
+	.fb_setcolreg =	sbusfb_setcolreg,
+	.fb_blank =	sbusfb_blank,
+	.fb_ioctl =	sbusfb_ioctl,
+	.fb_mmap =	sbusfb_mmap,
 };
 
     /*

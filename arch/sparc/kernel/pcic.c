@@ -55,10 +55,6 @@ asmlinkage int sys_pciconfig_write(unsigned long bus,
 
 #else
 
-#ifdef CONFIG_SUN_JSFLASH
-extern int jsflash_init(void);
-#endif
-
 struct pci_fixup pcibios_fixups[] = {
 	{ 0 }
 };
@@ -435,7 +431,7 @@ static void __init pcic_pbm_scan_bus(struct linux_pcic *pcic)
 /*
  * Main entry point from the PCI subsystem.
  */
-void __init pcibios_init(void)
+static int __init pcibios_init(void)
 {
 	struct linux_pcic *pcic;
 
@@ -444,7 +440,7 @@ void __init pcibios_init(void)
 	 * So, here we report the presence of PCIC and do some magic passes.
 	 */
 	if(!pcic0_up)
-		return;
+		return 0;
 	pcic = &pcic0;
 
 	/*
@@ -465,9 +461,7 @@ void __init pcibios_init(void)
 	pcic_pbm_scan_bus(pcic);
 
 	ebus_init();
-#ifdef CONFIG_SUN_JSFLASH
-	jsflash_init();
-#endif
+	return 0;
 }
 
 int pcic_present(void)
@@ -1037,3 +1031,5 @@ void insl(unsigned long addr, void *dst, unsigned long count) {
 }
 
 #endif
+
+subsys_initcall(pcibios_init);

@@ -867,14 +867,14 @@ struct fbgen_hwswitch tgafb_hwswitch = {
      */
 
 static struct fb_ops tgafb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	fbgen_get_fix,
-	fb_get_var:	fbgen_get_var,
-	fb_set_var:	fbgen_set_var,
-	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	tgafb_set_cmap,
-	fb_setcolreg:	tgafb_setcolreg,
-	fb_blank:	fbgen_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	fbgen_get_fix,
+	.fb_get_var =	fbgen_get_var,
+	.fb_set_var =	fbgen_set_var,
+	.fb_get_cmap =	fbgen_get_cmap,
+	.fb_set_cmap =	tgafb_set_cmap,
+	.fb_setcolreg =	tgafb_setcolreg,
+	.fb_blank =	fbgen_blank,
 };
 
 

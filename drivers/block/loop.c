@@ -74,6 +74,7 @@
 #include <linux/slab.h>
 #include <linux/loop.h>
 #include <linux/suspend.h>
+#include <linux/writeback.h>
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
 
 #include <asm/uaccess.h>
@@ -235,6 +236,7 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 	up(&mapping->host->i_sem);
 out:
 	kunmap(bvec->bv_page);
+	balance_dirty_pages(mapping);
 	return ret;
 
 unlock:

@@ -28,7 +28,7 @@
 /* The devfs code is contributed by Philipp Matthias Hahn 
    <pmhahn@titan.lahn.de> */
 
-/* $Id: i2c-dev.c,v 1.44 2001/11/19 18:45:02 mds Exp $ */
+/* $Id: i2c-dev.c,v 1.46 2002/07/06 02:07:39 mds Exp $ */
 
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -236,6 +236,12 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		else
 			client->flags &= ~I2C_M_TEN;
 		return 0;
+	case I2C_PEC:
+		if (arg)
+			client->flags |= I2C_CLIENT_PEC;
+		else
+			client->flags &= ~I2C_CLIENT_PEC;
+		return 0;
 	case I2C_FUNCS:
 		funcs = i2c_get_functionality(client->adapter);
 		return (copy_to_user((unsigned long *)arg,&funcs,
@@ -312,7 +318,8 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		    (data_arg.size != I2C_SMBUS_WORD_DATA) &&
 		    (data_arg.size != I2C_SMBUS_PROC_CALL) &&
 		    (data_arg.size != I2C_SMBUS_BLOCK_DATA) &&
-		    (data_arg.size != I2C_SMBUS_I2C_BLOCK_DATA)) {
+		    (data_arg.size != I2C_SMBUS_I2C_BLOCK_DATA) &&
+		    (data_arg.size != I2C_SMBUS_BLOCK_PROC_CALL)) {
 #ifdef DEBUG
 			printk(KERN_DEBUG "i2c-dev.o: size out of range (%x) in ioctl I2C_SMBUS.\n",
 			       data_arg.size);
@@ -355,10 +362,11 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		else if ((data_arg.size == I2C_SMBUS_WORD_DATA) || 
 		         (data_arg.size == I2C_SMBUS_PROC_CALL))
 			datasize = sizeof(data_arg.data->word);
-		else /* size == I2C_SMBUS_BLOCK_DATA */
+		else /* size == smbus block, i2c block, or block proc. call */
 			datasize = sizeof(data_arg.data->block);
 
 		if ((data_arg.size == I2C_SMBUS_PROC_CALL) || 
+		    (data_arg.size == I2C_SMBUS_BLOCK_PROC_CALL) || 
 		    (data_arg.read_write == I2C_SMBUS_WRITE)) {
 			if (copy_from_user(&temp, data_arg.data, datasize))
 				return -EFAULT;
@@ -367,6 +375,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 		      data_arg.read_write,
 		      data_arg.command,data_arg.size,&temp);
 		if (! res && ((data_arg.size == I2C_SMBUS_PROC_CALL) || 
+		              (data_arg.size == I2C_SMBUS_BLOCK_PROC_CALL) || 
 			      (data_arg.read_write == I2C_SMBUS_READ))) {
 			if (copy_to_user(data_arg.data, &temp, datasize))
 				return -EFAULT;
@@ -534,6 +543,8 @@ int i2cdev_cleanup(void)
 	}
 	return 0;
 }
+
+EXPORT_NO_SYMBOLS;
 
 #ifdef MODULE
 

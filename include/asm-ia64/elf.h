@@ -2,7 +2,7 @@
 #define _ASM_IA64_ELF_H
 
 /*
- * ELF archtecture specific definitions.
+ * ELF-specific definitions.
  *
  * Copyright (C) 1998, 1999, 2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>

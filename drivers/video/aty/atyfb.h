@@ -3,7 +3,7 @@
  */
 
 #include <linux/config.h>
-
+#include <video/fbcon.h>
 
     /*
      *  Elements of the hardware specific atyfb_par structure
@@ -12,9 +12,6 @@
 struct crtc {
 	u32 vxres;
 	u32 vyres;
-	u32 xoffset;
-	u32 yoffset;
-	u32 bpp;
 	u32 h_tot_disp;
 	u32 h_sync_strt_wid;
 	u32 v_tot_disp;
@@ -94,7 +91,6 @@ struct atyfb_par {
 	u8 ram_type;
 	u8 mem_refresh_rate;
 	u8 blitter_may_be_busy;
-	u32 accel_flags;
 #ifdef __sparc__
 	struct pci_mmap_map *mmap_map;
 	int consolecnt;
@@ -103,6 +99,7 @@ struct atyfb_par {
 	int open;
 #endif
 #ifdef CONFIG_PMAC_PBOOK
+	struct fb_info *next;
 	unsigned char *save_framebuffer;
 	unsigned long save_pll[64];
 #endif
@@ -161,7 +158,7 @@ static inline void aty_st_le32(int regindex, u32 val,
 		regindex -= 0x800;
 
 #ifdef CONFIG_ATARI
-	out_le32((volatile u32 *)(par->ati_regbase + regindex));
+	out_le32((volatile u32 *)(par->ati_regbase + regindex), val);
 #else
 	writel(val, par->ati_regbase + regindex);
 #endif
@@ -280,13 +277,4 @@ static inline void wait_for_idle(struct atyfb_par *par)
 extern void aty_reset_engine(const struct atyfb_par *par);
 extern void aty_init_engine(struct atyfb_par *par,
 			    struct fb_info *info);
-extern void atyfb_fillrect(struct fb_info *info, struct fb_fillrect *rect);
 
-    /*
-     *  Text console acceleration
-     */
-
-extern const struct display_switch fbcon_aty8;
-extern const struct display_switch fbcon_aty16;
-extern const struct display_switch fbcon_aty24;
-extern const struct display_switch fbcon_aty32;

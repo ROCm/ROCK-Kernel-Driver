@@ -55,12 +55,9 @@ static int i2c_debug = 0;
   in some functions, called from the algo-pcf module. Sometimes it's
   need to be rewriten - but for now just remove this for simpler reading */
 
-#if (LINUX_VERSION_CODE < 0x020301)
-static struct wait_queue *pcf_wait = NULL;
-#else
 static wait_queue_head_t pcf_wait;
-#endif
 static int pcf_pending;
+spinlock_t irq_driver_lock = SPIN_LOCK_UNLOCKED;
 
 /* ----- global defines -----------------------------------------------	*/
 #define DEB(x)	if (i2c_debug>=1) x
@@ -121,12 +118,12 @@ static void pcf_isa_waitforpin(void) {
 	int timeout = 2;
 
 	if (irq > 0) {
-		cli();
+		spin_lock_irq(&irq_driver_lock);
 		if (pcf_pending == 0) {
 			interruptible_sleep_on_timeout(&pcf_wait, timeout*HZ );
 		} else
 			pcf_pending = 0;
-		sti();
+		spin_unlock_irq(&irq_driver_lock);
 	} else {
 		udelay(100);
 	}
@@ -280,9 +277,7 @@ int __init i2c_pcfisa_init(void)
 		base = DEFAULT_BASE;
 	}
 
-#if (LINUX_VERSION_CODE >= 0x020301)
 	init_waitqueue_head(&pcf_wait);
-#endif
 	if (pcf_isa_init() == 0) {
 		if (i2c_pcf_add_bus(&pcf_isa_ops) < 0) {
 			pcf_isa_exit();
@@ -297,6 +292,7 @@ int __init i2c_pcfisa_init(void)
 	return 0;
 }
 
+EXPORT_NO_SYMBOLS;
 
 #ifdef MODULE
 MODULE_AUTHOR("Hans Berglund <hb@spacetec.no>");

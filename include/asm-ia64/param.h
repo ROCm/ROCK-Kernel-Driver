@@ -4,8 +4,8 @@
 /*
  * Fundamental kernel parameters.
  *
- * Copyright (C) 1998, 1999 Hewlett-Packard Co
- * Copyright (C) 1998, 1999 David Mosberger-Tang <davidm@hpl.hp.com>
+ * Copyright (C) 1998, 1999, 2002 Hewlett-Packard Co
+ *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #include <linux/config.h>
@@ -33,6 +33,7 @@
 #define MAXHOSTNAMELEN	64	/* max length of hostname */
 
 #ifdef __KERNEL__
+# define USER_HZ	HZ
 # define CLOCKS_PER_SEC	HZ	/* frequency at which times() counts */
 #endif
 

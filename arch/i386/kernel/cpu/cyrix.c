@@ -322,10 +322,10 @@ static void cyrix_identify(struct cpuinfo_x86 * c)
 }
 
 static struct cpu_dev cyrix_cpu_dev __initdata = {
-	c_vendor:	"Cyrix",
-	c_ident: 	{ "CyrixInstead" },
-	c_init:		init_cyrix,
-	c_identify:	cyrix_identify,
+	.c_vendor	= "Cyrix",
+	.c_ident 	= { "CyrixInstead" },
+	.c_init		= init_cyrix,
+	.c_identify	= cyrix_identify,
 };
 
 int __init cyrix_init_cpu(void)
@@ -337,10 +337,10 @@ int __init cyrix_init_cpu(void)
 //early_arch_initcall(cyrix_init_cpu);
 
 static struct cpu_dev nsc_cpu_dev __initdata = {
-	c_vendor:	"NSC",
-	c_ident: 	{ "Geode by NSC" },
-	c_init:		init_cyrix,
-	c_identify:	generic_identify,
+	.c_vendor	= "NSC",
+	.c_ident 	= { "Geode by NSC" },
+	.c_init		= init_cyrix,
+	.c_identify	= generic_identify,
 };
 
 int __init nsc_init_cpu(void)

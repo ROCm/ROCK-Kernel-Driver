@@ -2195,7 +2195,6 @@ typedef struct bio BufferHeader_T;
 typedef struct file File_T;
 typedef struct block_device_operations BlockDeviceOperations_T;
 typedef struct completion Completion_T;
-typedef struct gendisk GenericDiskInfo_T;
 typedef struct hd_geometry DiskGeometry_T;
 typedef struct hd_struct DiskPartition_T;
 typedef struct inode Inode_T;
@@ -2362,11 +2361,12 @@ typedef struct DAC960_Controller
   boolean MonitoringAlertMode;
   boolean SuppressEnclosureMessages;
   Timer_T MonitoringTimer;
-  GenericDiskInfo_T GenericDiskInfo;
+  struct gendisk disks[DAC960_MaxLogicalDrives];
   DAC960_Command_T *FreeCommands;
   unsigned char *CombinedStatusBuffer;
   unsigned char *CurrentStatusBuffer;
   RequestQueue_T *RequestQueue;
+  spinlock_t queue_lock;
   WaitQueue_T CommandWaitQueue;
   WaitQueue_T HealthStatusWaitQueue;
   DAC960_Command_T InitialCommand;
@@ -2506,7 +2506,7 @@ static inline
 void DAC960_AcquireControllerLock(DAC960_Controller_T *Controller,
 				  ProcessorFlags_T *ProcessorFlags)
 {
-  spin_lock_irqsave(&Controller->RequestQueue->queue_lock, *ProcessorFlags);
+  spin_lock_irqsave(Controller->RequestQueue->queue_lock, *ProcessorFlags);
 }
 
 
@@ -2518,7 +2518,7 @@ static inline
 void DAC960_ReleaseControllerLock(DAC960_Controller_T *Controller,
 				  ProcessorFlags_T *ProcessorFlags)
 {
-  spin_unlock_irqrestore(&Controller->RequestQueue->queue_lock, *ProcessorFlags);
+  spin_unlock_irqrestore(Controller->RequestQueue->queue_lock, *ProcessorFlags);
 }
 
 
@@ -2555,7 +2555,7 @@ static inline
 void DAC960_AcquireControllerLockIH(DAC960_Controller_T *Controller,
 				    ProcessorFlags_T *ProcessorFlags)
 {
-  spin_lock_irqsave(&Controller->RequestQueue->queue_lock, *ProcessorFlags);
+  spin_lock_irqsave(Controller->RequestQueue->queue_lock, *ProcessorFlags);
 }
 
 
@@ -2568,7 +2568,7 @@ static inline
 void DAC960_ReleaseControllerLockIH(DAC960_Controller_T *Controller,
 				    ProcessorFlags_T *ProcessorFlags)
 {
-  spin_unlock_irqrestore(&Controller->RequestQueue->queue_lock, *ProcessorFlags);
+  spin_unlock_irqrestore(Controller->RequestQueue->queue_lock, *ProcessorFlags);
 }
 
 #error I am a non-portable driver, please convert me to use the Documentation/DMA-mapping.txt interfaces
@@ -4229,13 +4229,5 @@ static void DAC960_Message(DAC960_MessageLevel_T, unsigned char *,
 			   DAC960_Controller_T *, ...);
 static void DAC960_CreateProcEntries(void);
 static void DAC960_DestroyProcEntries(void);
-
-
-/*
-  Export the Kernel Mode IOCTL interface.
-*/
-
-EXPORT_SYMBOL(DAC960_KernelIOCTL);
-
 
 #endif /* DAC960_DriverVersion */

@@ -90,7 +90,8 @@ static struct {
 static union pnp_bios_expansion_header * pnp_bios_hdr = NULL;
 
 /* The PnP BIOS entries in the GDT */
-#define PNP_GDT    (0x0060)
+#define PNP_GDT    (GDT_ENTRY_PNPBIOS_BASE * 8)
+
 #define PNP_CS32   (PNP_GDT+0x00)	/* segment for calling fn */
 #define PNP_CS16   (PNP_GDT+0x08)	/* code segment for BIOS */
 #define PNP_DS     (PNP_GDT+0x10)	/* data segment for BIOS */

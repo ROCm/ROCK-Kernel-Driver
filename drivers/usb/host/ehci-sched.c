@@ -220,31 +220,31 @@ static int disable_periodic (struct ehci_hcd *ehci)
 
 /*-------------------------------------------------------------------------*/
 
+// FIXME microframe periods not yet handled
+
 static void intr_deschedule (
 	struct ehci_hcd	*ehci,
-	unsigned	frame,
 	struct ehci_qh	*qh,
-	unsigned	period
+	int		wait
 ) {
 	unsigned long	flags;
 	int		status;
-
-	period >>= 3;		// FIXME microframe periods not handled yet
+	unsigned	frame = qh->start;
 
 	spin_lock_irqsave (&ehci->lock, flags);
 
 	do {
 		periodic_unlink (ehci, frame, qh);
 		qh_put (ehci, qh);
-		frame += period;
+		frame += qh->period;
 	} while (frame < ehci->periodic_size);
 
 	qh->qh_state = QH_STATE_UNLINK;
 	qh->qh_next.ptr = 0;
-	ehci->periodic_urbs--;
+	ehci->periodic_sched--;
 
 	/* maybe turn off periodic schedule */
-	if (!ehci->periodic_urbs)
+	if (!ehci->periodic_sched)
 		status = disable_periodic (ehci);
 	else {
 		status = 0;
@@ -258,21 +258,35 @@ static void intr_deschedule (
 	 * (yeech!) to be sure it's done.
 	 * No other threads may be mucking with this qh.
 	 */
-	if (!status && ((ehci_get_frame (&ehci->hcd) - frame) % period) == 0)
-		udelay (125);
+	if (((ehci_get_frame (&ehci->hcd) - frame) % qh->period) == 0) {
+		if (wait) {
+			udelay (125);
+			qh->hw_next = EHCI_LIST_END;
+		} else {
+			/* we may not be IDLE yet, but if the qh is empty
+			 * the race is very short.  then if qh also isn't
+			 * rescheduled soon, it won't matter.  otherwise...
+			 */
+			vdbg ("intr_deschedule...");
+		}
+	} else
+		qh->hw_next = EHCI_LIST_END;
 
 	qh->qh_state = QH_STATE_IDLE;
-	qh->hw_next = EHCI_LIST_END;
+
+	/* update per-qh bandwidth utilization (for usbfs) */
+	ehci->hcd.self.bandwidth_allocated -= 
+		(qh->usecs + qh->c_usecs) / qh->period;
 
 	vdbg ("descheduled qh %p, per = %d frame = %d count = %d, urbs = %d",
-		qh, period, frame,
-		atomic_read (&qh->refcount), ehci->periodic_urbs);
+		qh, qh->period, frame,
+		atomic_read (&qh->refcount), ehci->periodic_sched);
 }
 
 static int check_period (
 	struct ehci_hcd *ehci, 
 	unsigned	frame,
-	int		uframe,
+	unsigned	uframe,
 	unsigned	period,
 	unsigned	usecs
 ) {
@@ -309,19 +323,142 @@ static int check_period (
 	return 1;
 }
 
+static int check_intr_schedule (
+	struct ehci_hcd		*ehci, 
+	unsigned		frame,
+	unsigned		uframe,
+	const struct ehci_qh	*qh,
+	u32			*c_maskp
+)
+{
+    	int		retval = -ENOSPC;
+
+	if (!check_period (ehci, frame, uframe, qh->period, qh->usecs))
+		goto done;
+	if (!qh->c_usecs) {
+		retval = 0;
+		*c_maskp = cpu_to_le32 (0);
+		goto done;
+	}
+
+	/* This is a split transaction; check the bandwidth available for
+	 * the completion too.  Check both worst and best case gaps: worst
+	 * case is SPLIT near uframe end, and CSPLIT near start ... best is
+	 * vice versa.  Difference can be almost two uframe times, but we
+	 * reserve unnecessary bandwidth (waste it) this way.  (Actually
+	 * even better cases exist, like immediate device NAK.)
+	 *
+	 * FIXME don't even bother unless we know this TT is idle in that
+	 * range of uframes ... for now, check_period() allows only one
+	 * interrupt transfer per frame, so needn't check "TT busy" status
+	 * when scheduling a split (QH, SITD, or FSTN).
+	 *
+	 * FIXME ehci 0.96 and above can use FSTNs
+	 */
+	if (!check_period (ehci, frame, uframe + qh->gap_uf + 1,
+				qh->period, qh->c_usecs))
+		goto done;
+	if (!check_period (ehci, frame, uframe + qh->gap_uf,
+				qh->period, qh->c_usecs))
+		goto done;
+
+	*c_maskp = cpu_to_le32 (0x03 << (8 + uframe + qh->gap_uf));
+	retval = 0;
+done:
+	return retval;
+}
+
+static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
+{
+	int 		status;
+	unsigned	uframe;
+	u32		c_mask;
+	unsigned	frame;		/* 0..(qh->period - 1), or NO_FRAME */
+
+	qh->hw_next = EHCI_LIST_END;
+	frame = qh->start;
+
+	/* reuse the previous schedule slots, if we can */
+	if (frame < qh->period) {
+		uframe = ffs (le32_to_cpup (&qh->hw_info2) & 0x00ff);
+		status = check_intr_schedule (ehci, frame, --uframe,
+				qh, &c_mask);
+	} else {
+		uframe = 0;
+		c_mask = 0;
+		status = -ENOSPC;
+	}
+
+	/* else scan the schedule to find a group of slots such that all
+	 * uframes have enough periodic bandwidth available.
+	 */
+	if (status) {
+		frame = qh->period - 1;
+		do {
+			for (uframe = 0; uframe < 8; uframe++) {
+				status = check_intr_schedule (ehci,
+						frame, uframe, qh,
+						&c_mask);
+				if (status == 0)
+					break;
+			}
+		} while (status && --frame);
+		if (status)
+			goto done;
+		qh->start = frame;
+
+		/* reset S-frame and (maybe) C-frame masks */
+		qh->hw_info2 &= ~0xffff;
+		qh->hw_info2 |= cpu_to_le32 (1 << uframe) | c_mask;
+	} else
+		dbg ("reused previous qh %p schedule", qh);
+
+	/* stuff into the periodic schedule */
+	qh->qh_state = QH_STATE_LINKED;
+	dbg ("qh %p usecs %d/%d period %d.0 starting %d.%d (gap %d)",
+		qh, qh->usecs, qh->c_usecs,
+		qh->period, frame, uframe, qh->gap_uf);
+	do {
+		if (unlikely (ehci->pshadow [frame].ptr != 0)) {
+
+// FIXME -- just link toward the end, before any qh with a shorter period,
+// AND accomodate it already having been linked here (after some other qh)
+// AS WELL AS updating the schedule checking logic
+
+			BUG ();
+		} else {
+			ehci->pshadow [frame].qh = qh_get (qh);
+			ehci->periodic [frame] =
+				QH_NEXT (qh->qh_dma);
+		}
+		wmb ();
+		frame += qh->period;
+	} while (frame < ehci->periodic_size);
+
+	/* update per-qh bandwidth for usbfs */
+	ehci->hcd.self.bandwidth_allocated += 
+		(qh->usecs + qh->c_usecs) / qh->period;
+
+	/* maybe enable periodic schedule processing */
+	if (!ehci->periodic_sched++)
+		status = enable_periodic (ehci);
+done:
+	return status;
+}
+
 static int intr_submit (
 	struct ehci_hcd		*ehci,
 	struct urb		*urb,
 	struct list_head	*qtd_list,
 	int			mem_flags
 ) {
-	unsigned		epnum, period;
-	unsigned short		usecs, c_usecs, gap_uf;
+	unsigned		epnum;
 	unsigned long		flags;
 	struct ehci_qh		*qh;
 	struct hcd_dev		*dev;
 	int			is_input;
 	int			status = 0;
+	struct list_head	empty;
 
 	/* get endpoint and transfer/schedule data */
 	epnum = usb_pipeendpoint (urb->pipe);
@@ -329,198 +466,30 @@ static int intr_submit (
 	if (is_input)
 		epnum |= 0x10;
 
-	/*
-	 * HS interrupt transfers are simple -- only one microframe.  FS/LS
-	 * interrupt transfers involve a SPLIT in one microframe and CSPLIT
-	 * sometime later.  We need to know how much time each will be
-	 * needed in each microframe and, for FS/LS, how many microframes
-	 * separate the two in the best case.
-	 */
-	usecs = usb_calc_bus_time (USB_SPEED_HIGH, is_input, 0,
-			urb->transfer_buffer_length);
-	if (urb->dev->speed == USB_SPEED_HIGH) {
-		gap_uf = 0;
-		c_usecs = 0;
+	spin_lock_irqsave (&ehci->lock, flags);
+	dev = (struct hcd_dev *)urb->dev->hcpriv;
 
-		/* FIXME handle HS periods of less than 1 frame. */
-		period = urb->interval >> 3;
-		if (period < 1) {
-			dbg ("intr period %d uframes, NYET!", urb->interval);
-			status = -EINVAL;
-			goto done;
-		}
-	} else {
-		/* gap is a function of full/low speed transfer times */
-		gap_uf = 1 + usb_calc_bus_time (urb->dev->speed, is_input, 0,
-				urb->transfer_buffer_length) / (125 * 1000);
-
-		/* FIXME this just approximates SPLIT/CSPLIT times */
-		if (is_input) {		// SPLIT, gap, CSPLIT+DATA
-			c_usecs = usecs + HS_USECS (0);
-			usecs = HS_USECS (1);
-		} else {		// SPLIT+DATA, gap, CSPLIT
-			usecs = usecs + HS_USECS (1);
-			c_usecs = HS_USECS (0);
-		}
-
-		period = urb->interval;
-	}
-
-	/*
-	 * NOTE: current completion/restart logic doesn't handle more than
-	 * one qtd in a periodic qh ... 16-20 KB/urb is pretty big for this.
-	 * such big requests need many periods to transfer.
-	 *
-	 * FIXME want to change hcd core submit model to expect queuing
-	 * for all transfer types ... not just ISO and (with flag) BULK.
-	 * that means: getting rid of this check; handling the "interrupt
-	 * urb already queued" case below like bulk queuing is handled (no
-	 * errors possible!); and completly getting rid of that annoying
-	 * qh restart logic.  simpler/smaller overall, and more flexible.
-	 */
-	if (unlikely (qtd_list->next != qtd_list->prev)) {
-		dbg ("only one intr qtd per urb allowed"); 
-		status = -EINVAL;
+	/* get qh and force any scheduling errors */
+	INIT_LIST_HEAD (&empty);
+	qh = qh_append_tds (ehci, urb, &empty, epnum, &dev->ep [epnum]);
+	if (qh == 0) {
+		status = -ENOMEM;
 		goto done;
 	}
-
-	spin_lock_irqsave (&ehci->lock, flags);
-
-	/* get the qh (must be empty and idle) */
-	dev = (struct hcd_dev *)urb->dev->hcpriv;
-	qh = (struct ehci_qh *) dev->ep [epnum];
-	if (qh) {
-		/* only allow one queued interrupt urb per EP */
-		if (unlikely (qh->qh_state != QH_STATE_IDLE
-				|| !list_empty (&qh->qtd_list))) {
-			dbg ("interrupt urb already queued");
-			status = -EBUSY;
-		} else {
-			/* maybe reset hardware's data toggle in the qh */
-			if (unlikely (!usb_gettoggle (urb->dev, epnum & 0x0f,
-					!(epnum & 0x10)))) {
-				qh->hw_token |=
-					__constant_cpu_to_le32 (QTD_TOGGLE);
-				usb_settoggle (urb->dev, epnum & 0x0f,
-					!(epnum & 0x10), 1);
-			}
-			/* trust the QH was set up as interrupt ... */
-			list_splice (qtd_list, &qh->qtd_list);
-			qh_update (qh, list_entry (qtd_list->next,
-						struct ehci_qtd, qtd_list));
-			qtd_list = &qh->qtd_list;
-		}
-	} else {
-		/* can't sleep here, we have ehci->lock... */
-		qh = ehci_qh_make (ehci, urb, qtd_list, SLAB_ATOMIC);
-		if (likely (qh != 0)) {
-			// dbg ("new INTR qh %p", qh);
-			dev->ep [epnum] = qh;
-			qtd_list = &qh->qtd_list;
-		} else
-			status = -ENOMEM;
+	if (qh->qh_state == QH_STATE_IDLE) {
+		if ((status = qh_schedule (ehci, qh)) != 0)
+			goto done;
 	}
 
-	/* Schedule this periodic QH. */
-	if (likely (status == 0)) {
-		unsigned	frame = period;
+	/* then queue the urb's tds to the qh */
+	qh = qh_append_tds (ehci, urb, qtd_list, epnum, &dev->ep [epnum]);
+	BUG_ON (qh == 0);
 
-		qh->hw_next = EHCI_LIST_END;
-		qh->usecs = usecs;
-		qh->c_usecs = c_usecs;
+	/* ... update usbfs periodic stats */
+	ehci->hcd.self.bandwidth_int_reqs++;
 
-		urb->hcpriv = qh_get (qh);
-		status = -ENOSPC;
-
-		/* pick a set of schedule slots, link the QH into them */
-		do {
-			int	uframe;
-			u32	c_mask = 0;
-
-			/* pick a set of slots such that all uframes have
-			 * enough periodic bandwidth available.
-			 */
-			frame--;
-			for (uframe = 0; uframe < 8; uframe++) {
-				if (check_period (ehci, frame, uframe,
-						period, usecs) == 0)
-					continue;
-
-				/* If this is a split transaction, check the
-				 * bandwidth available for the completion
-				 * too.  check both best and worst case gaps:
-				 * worst case is SPLIT near uframe end, and
-				 * CSPLIT near start ... best is vice versa.
-				 * Difference can be almost two uframe times.
-				 *
-				 * FIXME don't even bother unless we know
-				 * this TT is idle in that uframe ... right
-				 * now we know only one interrupt transfer
-				 * will be scheduled per frame, so we don't
-				 * need to update/check TT state when we
-				 * schedule a split (QH, SITD, or FSTN).
-				 *
-				 * FIXME ehci 0.96 and above can use FSTNs
-				 */
-				if (!c_usecs)
-				    	break;
-				if (check_period (ehci, frame,
-						uframe + gap_uf,
-						period, c_usecs) == 0)
-					continue;
-				if (check_period (ehci, frame,
-						uframe + gap_uf + 1,
-						period, c_usecs) == 0)
-					continue;
-
-				c_mask = 0x03 << (8 + uframe + gap_uf);
-				c_mask = cpu_to_le32 (c_mask);
-				break;
-			}
-			if (uframe == 8)
-				continue;
-
-			/* QH will run once each period, starting there  */
-			urb->start_frame = frame;
-			status = 0;
-
-			/* reset S-frame and (maybe) C-frame masks */
-			qh->hw_info2 &= ~0xffff;
-			qh->hw_info2 |= cpu_to_le32 (1 << uframe) | c_mask;
-			// dbg_qh ("Schedule INTR qh", ehci, qh);
-
-			/* stuff into the periodic schedule */
-			qh->qh_state = QH_STATE_LINKED;
-			vdbg ("qh %p usecs %d period %d.0 starting %d.%d",
-				qh, qh->usecs, period, frame, uframe);
-			do {
-				if (unlikely (ehci->pshadow [frame].ptr != 0)) {
-// FIXME -- just link toward the end, before any qh with a shorter period,
-// AND handle it already being (implicitly) linked into this frame
-// AS WELL AS updating the check_period() logic
-					BUG ();
-				} else {
-					ehci->pshadow [frame].qh = qh_get (qh);
-					ehci->periodic [frame] =
-						QH_NEXT (qh->qh_dma);
-				}
-				wmb ();
-				frame += period;
-			} while (frame < ehci->periodic_size);
-
-			/* update bandwidth utilization records (for usbfs) */
-			usb_claim_bandwidth (urb->dev, urb,
-				(usecs + c_usecs) / period, 0);
-
-			/* maybe enable periodic schedule processing */
-			if (!ehci->periodic_urbs++)
-				status = enable_periodic (ehci);
-			break;
-
-		} while (frame);
-	}
-	spin_unlock_irqrestore (&ehci->lock, flags);
 done:
+	spin_unlock_irqrestore (&ehci->lock, flags);
 	if (status)
 		qtd_list_free (ehci, urb, qtd_list);
 
@@ -534,10 +503,6 @@ intr_complete (
 	struct ehci_qh	*qh,
 	unsigned long	flags		/* caller owns ehci->lock ... */
 ) {
-	struct ehci_qtd	*qtd;
-	struct urb	*urb;
-	int		unlinking;
-
 	/* nothing to report? */
 	if (likely ((qh->hw_token & __constant_cpu_to_le32 (QTD_STS_ACTIVE))
 			!= 0))
@@ -547,43 +512,14 @@ intr_complete (
 		return flags;
 	}
 	
-	qtd = list_entry (qh->qtd_list.next, struct ehci_qtd, qtd_list);
-	urb = qtd->urb;
-	unlinking = (urb->status == -ENOENT) || (urb->status == -ECONNRESET);
-
-	/* call any completions, after patching for reactivation */
+	/* handle any completions */
 	spin_unlock_irqrestore (&ehci->lock, flags);
-	/* NOTE:  currently restricted to one qtd per qh! */
-	if (qh_completions (ehci, qh, 0) == 0)
-		urb = 0;
+	qh_completions (ehci, qh);
 	spin_lock_irqsave (&ehci->lock, flags);
 
-	/* never reactivate requests that were unlinked ... */
-	if (likely (urb != 0)) {
-		if (unlinking
-				|| urb->status == -ECONNRESET
-				|| urb->status == -ENOENT
-				// || (urb->dev == null)
-				|| ehci->hcd.state == USB_STATE_HALT)
-			urb = 0;
-		// FIXME look at all those unlink cases ... we always
-		// need exactly one completion that reports unlink.
-		// the one above might not have been it!
-	}
+	if (unlikely (list_empty (&qh->qtd_list)))
+		intr_deschedule (ehci, qh, 0);
 
-	/* normally reactivate */
-	if (likely (urb != 0)) {
-		if (usb_pipeout (urb->pipe))
-			pci_dma_sync_single (ehci->hcd.pdev,
-				qtd->buf_dma,
-				urb->transfer_buffer_length,
-				PCI_DMA_TODEVICE);
-		urb->status = -EINPROGRESS;
-		urb->actual_length = 0;
-
-		/* patch qh and restart */
-		qh_update (qh, qtd);
-	}
 	return flags;
 }
 
@@ -594,11 +530,6 @@ itd_free_list (struct ehci_hcd *ehci, struct urb *urb)
 {
 	struct ehci_itd *first_itd = urb->hcpriv;
 
-	pci_unmap_single (ehci->hcd.pdev,
-		first_itd->buf_dma, urb->transfer_buffer_length,
-		usb_pipein (urb->pipe)
-		    ? PCI_DMA_FROMDEVICE
-		    : PCI_DMA_TODEVICE);
 	while (!list_empty (&first_itd->itd_list)) {
 		struct ehci_itd	*itd;
 
@@ -694,16 +625,7 @@ itd_urb_transaction (
 	int			frame_index;
 	struct ehci_itd		*first_itd, *itd;
 	int			status;
-	dma_addr_t		buf_dma, itd_dma;
-
-	/* set up one dma mapping for this urb */
-	buf_dma = pci_map_single (ehci->hcd.pdev,
-		urb->transfer_buffer, urb->transfer_buffer_length,
-		usb_pipein (urb->pipe)
-		    ? PCI_DMA_FROMDEVICE
-		    : PCI_DMA_TODEVICE);
-	if (buf_dma == 0)
-		return -ENOMEM;
+	dma_addr_t		itd_dma;
 
 	/* allocate/init ITDs */
 	for (frame_index = 0, first_itd = 0;
@@ -717,7 +639,8 @@ itd_urb_transaction (
 		memset (itd, 0, sizeof *itd);
 		itd->itd_dma = itd_dma;
 
-		status = itd_fill (ehci, itd, urb, frame_index, buf_dma);
+		status = itd_fill (ehci, itd, urb, frame_index,
+				urb->transfer_dma);
 		if (status != 0)
 			goto fail;
 
@@ -806,7 +729,7 @@ static int get_iso_range (
 
 	/* calculate the legal range [start,max) */
 	now = readl (&ehci->regs->frame_index) + 1;	/* next uframe */
-	if (!ehci->periodic_urbs)
+	if (!ehci->periodic_sched)
 		now += 8;				/* startup delay */
 	now %= mod;
 	end = now + mod;
@@ -926,7 +849,7 @@ itd_schedule (struct ehci_hcd *ehci, struct urb *urb)
 		usb_claim_bandwidth (urb->dev, urb, usecs, 1);
 
 		/* maybe enable periodic schedule processing */
-		if (!ehci->periodic_urbs++) {
+		if (!ehci->periodic_sched++) {
 			if ((status =  enable_periodic (ehci)) != 0) {
 				// FIXME deschedule right away
 				err ("itd_schedule, enable = %d", status);
@@ -1009,8 +932,8 @@ itd_complete (
 	spin_lock_irqsave (&ehci->lock, flags);
 
 	/* defer stopping schedule; completion can submit */
-	ehci->periodic_urbs--;
-	if (!ehci->periodic_urbs)
+	ehci->periodic_sched--;
+	if (!ehci->periodic_sched)
 		(void) disable_periodic (ehci);
 
 	return flags;

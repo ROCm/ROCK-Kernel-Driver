@@ -639,8 +639,8 @@ bad_ctc:
 }
 
 static struct device device_i8253 = {
-	name:	       	"i8253",
-	bus_id:		"0040",
+	.name	       	= "i8253",
+	.bus_id		= "0040",
 };
 
 static int time_init_driverfs(void)

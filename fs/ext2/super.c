@@ -194,16 +194,16 @@ static void destroy_inodecache(void)
 }
 
 static struct super_operations ext2_sops = {
-	alloc_inode:	ext2_alloc_inode,
-	destroy_inode:	ext2_destroy_inode,
-	read_inode:	ext2_read_inode,
-	write_inode:	ext2_write_inode,
-	put_inode:	ext2_put_inode,
-	delete_inode:	ext2_delete_inode,
-	put_super:	ext2_put_super,
-	write_super:	ext2_write_super,
-	statfs:		ext2_statfs,
-	remount_fs:	ext2_remount,
+	.alloc_inode	= ext2_alloc_inode,
+	.destroy_inode	= ext2_destroy_inode,
+	.read_inode	= ext2_read_inode,
+	.write_inode	= ext2_write_inode,
+	.put_inode	= ext2_put_inode,
+	.delete_inode	= ext2_delete_inode,
+	.put_super	= ext2_put_super,
+	.write_super	= ext2_write_super,
+	.statfs		= ext2_statfs,
+	.remount_fs	= ext2_remount,
 };
 
 /* Yes, most of these are left as NULL!!
@@ -213,7 +213,7 @@ static struct super_operations ext2_sops = {
  */
 struct dentry *ext2_get_parent(struct dentry *child);
 static struct export_operations ext2_export_ops = {
-	get_parent: ext2_get_parent,
+	.get_parent = ext2_get_parent,
 };
 
 /*
@@ -698,6 +698,9 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 			printk(KERN_ERR "EXT2-fs: get root inode failed\n");
 		goto failed_mount2;
 	}
+	if (EXT2_HAS_COMPAT_FEATURE(sb, EXT3_FEATURE_COMPAT_HAS_JOURNAL))
+		ext2_warning(sb, __FUNCTION__,
+			"mounting ext3 filesystem as ext2\n");
 	ext2_setup_super (sb, es, sb->s_flags & MS_RDONLY);
 	return 0;
 failed_mount2:
@@ -871,11 +874,11 @@ static struct super_block *ext2_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type ext2_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"ext2",
-	get_sb:		ext2_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "ext2",
+	.get_sb		= ext2_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_ext2_fs(void)

@@ -575,22 +575,22 @@ static int promcon_dummy(void)
 #define DUMMY (void *) promcon_dummy
 
 const struct consw prom_con = {
-	con_startup:		promcon_startup,
-	con_init:		promcon_init,
-	con_deinit:		promcon_deinit,
-	con_clear:		promcon_clear,
-	con_putc:		promcon_putc,
-	con_putcs:		promcon_putcs,
-	con_cursor:		promcon_cursor,
-	con_scroll:		promcon_scroll,
-	con_bmove:		promcon_bmove,
-	con_switch:		promcon_switch,
-	con_blank:		promcon_blank,
-	con_font_op:		promcon_font_op,
-	con_set_palette:	DUMMY,
-	con_scrolldelta:	DUMMY,
+	.con_startup =		promcon_startup,
+	.con_init =		promcon_init,
+	.con_deinit =		promcon_deinit,
+	.con_clear =		promcon_clear,
+	.con_putc =		promcon_putc,
+	.con_putcs =		promcon_putcs,
+	.con_cursor =		promcon_cursor,
+	.con_scroll =		promcon_scroll,
+	.con_bmove =		promcon_bmove,
+	.con_switch =		promcon_switch,
+	.con_blank =		promcon_blank,
+	.con_font_op =		promcon_font_op,
+	.con_set_palette =	DUMMY,
+	.con_scrolldelta =	DUMMY,
 #if !(PROMCON_COLOR)
-	con_build_attr:		promcon_build_attr,
+	.con_build_attr =	promcon_build_attr,
 #endif
 };
 

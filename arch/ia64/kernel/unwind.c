@@ -140,13 +140,13 @@ static struct {
 	} stat;
 # endif
 } unw = {
-	tables: &unw.kernel_table,
-	lock: SPIN_LOCK_UNLOCKED,
-	save_order: {
+	.tables = &unw.kernel_table,
+	.lock = SPIN_LOCK_UNLOCKED,
+	.save_order = {
 		UNW_REG_RP, UNW_REG_PFS, UNW_REG_PSP, UNW_REG_PR,
 		UNW_REG_UNAT, UNW_REG_LC, UNW_REG_FPSR, UNW_REG_PRI_UNAT_GR
 	},
-	preg_index: {
+	.preg_index = {
 		struct_offset(struct unw_frame_info, pri_unat_loc)/8,	/* PRI_UNAT_GR */
 		struct_offset(struct unw_frame_info, pri_unat_loc)/8,	/* PRI_UNAT_MEM */
 		struct_offset(struct unw_frame_info, bsp_loc)/8,
@@ -189,9 +189,9 @@ static struct {
 		struct_offset(struct unw_frame_info, fr_loc[30 - 16])/8,
 		struct_offset(struct unw_frame_info, fr_loc[31 - 16])/8,
 	},
-	hash : { [0 ... UNW_HASH_SIZE - 1] = -1 },
+	.hash = { [0 ... UNW_HASH_SIZE - 1] = -1 },
 #if UNW_DEBUG
-	preg_name: {
+	.preg_name = {
 		"pri_unat_gr", "pri_unat_mem", "bsp", "bspstore", "ar.pfs", "ar.rnat", "psp", "rp",
 		"r4", "r5", "r6", "r7",
 		"ar.unat", "pr", "ar.lc", "ar.fpsr",
@@ -634,8 +634,8 @@ alloc_spill_area (unsigned long *offp, unsigned long regsize,
 	for (reg = hi; reg >= lo; --reg) {
 		if (reg->where == UNW_WHERE_SPILL_HOME) {
 			reg->where = UNW_WHERE_PSPREL;
-			reg->val = 0x10 - *offp;
-			*offp += regsize;
+			*offp -= regsize;
+			reg->val = *offp;
 		}
 	}
 }
@@ -814,7 +814,8 @@ desc_frgr_mem (unsigned char grmask, unw_word frmask, struct unw_state_record *s
 	}
 	for (i = 0; i < 20; ++i) {
 		if ((frmask & 1) != 0) {
-			set_reg(sr->curr.reg + UNW_REG_F2 + i, UNW_WHERE_SPILL_HOME,
+			int base = (i < 4) ? UNW_REG_F2 : UNW_REG_F16 - 4;
+			set_reg(sr->curr.reg + base + i, UNW_WHERE_SPILL_HOME,
 				sr->region_start + sr->region_len - 1, 0);
 			sr->any_spills = 1;
 		}

@@ -1,0 +1,45 @@
+Primitive parallel port is driver for i2c bus, which exploits 
+features of modern bidirectional parallel ports. 
+
+Bidirectional ports have particular bits connected in following way:
+   
+                        |
+            /-----|     R
+         --o|     |-----|
+      read  \-----|     /------- Out pin
+                      |/
+                   - -|\
+                write   V
+                        |
+                       ---  
+
+
+It means when output is set to 1 we can read the port. Therefore 
+we can use 2 pins of parallel port as SDA and SCL for i2c bus. It 
+is not necessary to add any external - additional parts, we can 
+read and write the same port simultaneously.
+	I only use register base+2 so it is possible to use all 
+8 data bits of parallel port for other applications (I have 
+connected EEPROM and LCD display). I do not use bit Enable Bi-directional
+ Port. The only disadvantage is we can only support 5V chips.
+
+Layout:
+
+Cannon 25 pin
+
+SDA - connect to pin 14 (Auto Linefeed)
+SCL - connect to pin 16 (Initialize Printer)
+GND - connect to pin 18-25
++5V - use external supply (I use 5V from 3.5" floppy connector)
+      
+no pullups  requied
+
+Module parameters:
+
+base = 0xXXX
+XXX - 278 or 378
+
+That's all.
+
+Daniel Smolik
+marvin@sitour.cz

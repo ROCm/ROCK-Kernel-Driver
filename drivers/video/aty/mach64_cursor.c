@@ -129,7 +129,7 @@ static void aty_set_cursor(struct fb_info *info, int on)
 #endif
 
 	if (on) {
-		x = c->pos.x - c->hot.x - par->crtc.xoffset;
+		x = c->pos.x - c->hot.x - info->var.xoffset;
 		if (x < 0) {
 			xoff = -x;
 			x = 0;
@@ -137,7 +137,7 @@ static void aty_set_cursor(struct fb_info *info, int on)
 			xoff = 0;
 		}
 
-		y = c->pos.y - c->hot.y - par->crtc.yoffset;
+		y = c->pos.y - c->hot.y - info->var.yoffset;
 		if (y < 0) {
 			yoff = -y;
 			y = 0;

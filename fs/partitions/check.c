@@ -137,22 +137,11 @@ char *disk_name (struct gendisk *hd, int minor, char *buf)
 			sprintf(s, "%s%d", "md", unit);
 			maj = s;
 			break;
-		case COMPAQ_CISS_MAJOR ... COMPAQ_CISS_MAJOR+7:
-			sprintf(s, "cciss/c%dd%d",
-				hd->major - COMPAQ_CISS_MAJOR, unit);
-			maj = s;
-			break;
-		case DAC960_MAJOR ... DAC960_MAJOR+7:
-			sprintf(s, "rd/c%dd%d",
-				hd->major - DAC960_MAJOR, unit);
-			maj = s;
-			break;
 		case ATARAID_MAJOR:
 			sprintf(s, "ataraid/d%d", unit);
 			maj = s;
 			break;
 		case ACSI_MAJOR:
-		case XT_DISK_MAJOR:
 		case I2O_MAJOR:
 		case DASD_MAJOR:
 			sprintf(s, "%s%c", hd->major_name, unit + 'a');
@@ -175,14 +164,14 @@ static ssize_t partition_device_kdev_read(struct device *driverfs_dev,
 	kdev.value=(int)(long)driverfs_dev->driver_data;
 	return off ? 0 : sprintf (page, "%x\n",kdev.value);
 }
-static DEVICE_ATTR(kdev,"kdev",S_IRUGO,partition_device_kdev_read,NULL);
+static DEVICE_ATTR(kdev,S_IRUGO,partition_device_kdev_read,NULL);
 
 static ssize_t partition_device_type_read(struct device *driverfs_dev, 
 			char *page, size_t count, loff_t off) 
 {
 	return off ? 0 : sprintf (page, "BLK\n");
 }
-static DEVICE_ATTR(type,"type",S_IRUGO,partition_device_type_read,NULL);
+static DEVICE_ATTR(type,S_IRUGO,partition_device_type_read,NULL);
 
 void driverfs_create_partitions(struct gendisk *hd, int minor)
 {

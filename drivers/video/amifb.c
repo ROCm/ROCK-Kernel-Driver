@@ -1164,16 +1164,16 @@ static void ami_rebuild_copper(void);
 
 
 static struct fb_ops amifb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	amifb_get_fix,
-	fb_get_var:	amifb_get_var,
-	fb_set_var:	amifb_set_var,
-	fb_get_cmap:	amifb_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	amifb_setcolreg,
-	fb_pan_display:	amifb_pan_display,
-	fb_blank:	amifb_blank,
-	fb_ioctl:	amifb_ioctl,
+	.owner		= THIS_MODULE,
+	.fb_get_fix	= amifb_get_fix,
+	.fb_get_var	= amifb_get_var,
+	.fb_set_var	= amifb_set_var,
+	.fb_get_cmap	= amifb_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= amifb_setcolreg,
+	.fb_pan_display	= amifb_pan_display,
+	.fb_blank	= amifb_blank,
+	.fb_ioctl	= amifb_ioctl,
 };
 
 static void __init amifb_setup_mcap(char *spec)

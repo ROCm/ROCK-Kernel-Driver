@@ -688,16 +688,16 @@ struct fbgen_hwswitch pm3fb_switch = {
 };
 
 static struct fb_ops pm3fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	fbgen_get_fix,
-	fb_get_var:	fbgen_get_var,
-	fb_set_var:	fbgen_set_var,
-	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	fbgen_set_cmap,
-	fb_setcolreg:	pm3fb_setcolreg,
-	fb_pan_display:	fbgen_pan_display,
-	fb_blank:	fbgen_blank,
-	fb_ioctl:	pm3fb_ioctl,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	fbgen_get_fix,
+	.fb_get_var =	fbgen_get_var,
+	.fb_set_var =	fbgen_set_var,
+	.fb_get_cmap =	fbgen_get_cmap,
+	.fb_set_cmap =	fbgen_set_cmap,
+	.fb_setcolreg =	pm3fb_setcolreg,
+	.fb_pan_display =fbgen_pan_display,
+	.fb_blank =	fbgen_blank,
+	.fb_ioctl =	pm3fb_ioctl,
 };
 #endif /* KERNEL_2_4 or KERNEL_2_5 */
 #ifdef PM3FB_USE_ACCEL

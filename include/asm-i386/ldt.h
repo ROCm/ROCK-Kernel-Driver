@@ -12,7 +12,7 @@
 #define LDT_ENTRY_SIZE	8
 
 #ifndef __ASSEMBLY__
-struct modify_ldt_ldt_s {
+struct user_desc {
 	unsigned int  entry_number;
 	unsigned long base_addr;
 	unsigned int  limit;

@@ -25,7 +25,9 @@
 
 void fbcon_cfb24_setup(struct display *p)
 {
-    p->next_line = p->line_length ? p->line_length : p->var.xres_virtual*3;
+    struct fb_info *info = p->fb_info;	
+
+    p->next_line = info->fix.line_length ? info->fix.line_length : p->var.xres_virtual*3;
     p->next_plane = 0;
 }
 

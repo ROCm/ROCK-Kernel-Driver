@@ -221,9 +221,9 @@ static void ncp_set_attr(struct inode *inode, struct ncp_entry_info *nwinfo)
 }
 
 static struct inode_operations ncp_symlink_inode_operations = {
-	readlink:	page_readlink,
-	follow_link:	page_follow_link,
-	setattr:	ncp_notify_change,
+	.readlink	= page_readlink,
+	.follow_link	= page_follow_link,
+	.setattr	= ncp_notify_change,
 };
 
 /*

@@ -104,7 +104,7 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
  * XXX prepare_arch_switch() is much smarter than this in sparc64, are we sure?
  * XXX Cosider if doing it the flush_user_windows way is faster (by uwinmask).
  */
-#define prepare_arch_switch(rq) do { \
+#define prepare_arch_switch(rq, next) do { \
 	__asm__ __volatile__( \
 	".globl\tflush_patch_switch\nflush_patch_switch:\n\t" \
 	"save %sp, -0x40, %sp; save %sp, -0x40, %sp; save %sp, -0x40, %sp\n\t" \
@@ -112,7 +112,7 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	"save %sp, -0x40, %sp\n\t" \
 	"restore; restore; restore; restore; restore; restore; restore"); \
 } while(0)
-#define finish_arch_switch(rq)	do{ }while(0)
+#define finish_arch_switch(rq, next)	do{ }while(0)
 
 	/* Much care has gone into this code, do not touch it.
 	 *

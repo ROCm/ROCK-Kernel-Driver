@@ -29,6 +29,7 @@
 #include <linux/slab.h>
 #include <linux/completion.h>
 #include <linux/uts.h>			/* for UTS_SYSNAME */
+#include <linux/pci.h>			/* for hcd->pdev and dma addressing */
 #include <asm/byteorder.h>
 
 
@@ -454,7 +455,6 @@ static int rh_status_urb (struct usb_hcd *hcd, struct urb *urb)
 	/* rh_timer protected by hcd_data_lock */
 	if (timer_pending (&hcd->rh_timer)
 			|| urb->status != -EINPROGRESS
-			|| !HCD_IS_RUNNING (hcd->state)
 			|| urb->transfer_buffer_length < len) {
 		dbg ("not queuing status urb, stat %d", urb->status);
 		return -EINVAL;
@@ -508,8 +508,12 @@ static void rh_report_status (unsigned long ptr)
 				BUG ();
 			}
 			spin_unlock_irqrestore (&hcd_data_lock, flags);
-		} else
+		} else {
 			spin_unlock_irqrestore (&urb->lock, flags);
+			spin_lock_irqsave (&hcd_data_lock, flags);
+			rh_status_urb (hcd, urb);
+			spin_unlock_irqrestore (&hcd_data_lock, flags);
+		}
 	} else {
 		/* this urb's been unlinked */
 		urb->hcpriv = 0;
@@ -1018,6 +1022,24 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	if (status)
 		return status;
 
+	/* lower level hcd code should use *_dma exclusively */
+	if (!(urb->transfer_flags & URB_NO_DMA_MAP)) {
+		if (usb_pipecontrol (urb->pipe))
+			urb->setup_dma = pci_map_single (
+					hcd->pdev,
+					urb->setup_packet,
+					sizeof (struct usb_ctrlrequest),
+					PCI_DMA_TODEVICE);
+		if (urb->transfer_buffer_length != 0)
+			urb->transfer_dma = pci_map_single (
+					hcd->pdev,
+					urb->transfer_buffer,
+					urb->transfer_buffer_length,
+					usb_pipein (urb->pipe)
+					    ? PCI_DMA_FROMDEVICE
+					    : PCI_DMA_TODEVICE);
+	}
+
 	/* increment urb's reference count as part of giving it to the HCD
 	 * (which now controls it).  HCD guarantees that it either returns
 	 * an error or calls giveback(), but not both.
@@ -1245,6 +1267,11 @@ struct usb_operations usb_hcd_operations = {
 	.submit_urb =		hcd_submit_urb,
 	.unlink_urb =		hcd_unlink_urb,
 	.deallocate =		hcd_free_dev,
+	.buffer_alloc =		hcd_buffer_alloc,
+	.buffer_free =		hcd_buffer_free,
+	.buffer_map =		hcd_buffer_map,
+	.buffer_dmasync =	hcd_buffer_dmasync,
+	.buffer_unmap =		hcd_buffer_unmap,
 };
 EXPORT_SYMBOL (usb_hcd_operations);
 
@@ -1280,6 +1307,20 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 	if (urb->status)
 		dbg ("giveback urb %p status %d len %d",
 			urb, urb->status, urb->actual_length);
+
+	/* lower level hcd code should use *_dma exclusively */
+	if (!(urb->transfer_flags & URB_NO_DMA_MAP)) {
+		if (usb_pipecontrol (urb->pipe))
+			pci_unmap_single (hcd->pdev, urb->setup_dma,
+					sizeof (struct usb_ctrlrequest),
+					PCI_DMA_TODEVICE);
+		if (urb->transfer_buffer_length != 0)
+			pci_unmap_single (hcd->pdev, urb->transfer_dma,
+					urb->transfer_buffer_length,
+					usb_pipein (urb->pipe)
+					    ? PCI_DMA_FROMDEVICE
+					    : PCI_DMA_TODEVICE);
+	}
 
 	/* pass ownership to the completion handler */
 	urb->complete (urb);

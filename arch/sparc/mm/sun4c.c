@@ -1710,13 +1710,13 @@ static void sun4c_pgd_set(pgd_t * pgdp, pmd_t * pmdp)
 
 static void sun4c_pmd_set(pmd_t * pmdp, pte_t * ptep)
 {
-	*pmdp = __pmd(PGD_TABLE | (unsigned long) ptep);
+	pmdp->pmdv[0] = PGD_TABLE | (unsigned long) ptep;
 }
 
 static void sun4c_pmd_populate(pmd_t * pmdp, struct page * ptep)
 {
 	if (page_address(ptep) == NULL) BUG();	/* No highmem on sun4c */
-	*pmdp = __pmd(PGD_TABLE | (unsigned long) page_address(ptep));
+	pmdp->pmdv[0] = PGD_TABLE | (unsigned long) page_address(ptep);
 }
 
 static int sun4c_pte_present(pte_t pte)
@@ -1735,7 +1735,14 @@ static int sun4c_pmd_present(pmd_t pmd)
 {
 	return ((pmd_val(pmd) & PGD_PRESENT) != 0);
 }
+
+#if 0 /* if PMD takes one word */
 static void sun4c_pmd_clear(pmd_t *pmdp)	{ *pmdp = __pmd(0); }
+#else /* if pmd_t is a longish aggregate */
+static void sun4c_pmd_clear(pmd_t *pmdp) {
+	memset((void *)pmdp, 0, sizeof(pmd_t));
+}
+#endif
 
 static int sun4c_pgd_none(pgd_t pgd)		{ return 0; }
 static int sun4c_pgd_bad(pgd_t pgd)		{ return 0; }
@@ -1913,7 +1920,7 @@ static void sun4c_pte_free(struct page *pte)
  * allocating and freeing a pmd is trivial: the 1-entry pmd is
  * inside the pgd, so has no extra memory associated with it.
  */
-static pmd_t *sun4c_pmd_alloc_one_fast(struct mm_struct *mm, unsigned long address)
+static pmd_t *sun4c_pmd_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	BUG();
 	return NULL;
@@ -2176,7 +2183,7 @@ void __init ld_mmu_sun4c(void)
 	BTFIXUPSET_CALL(pte_alloc_one_kernel, sun4c_pte_alloc_one_kernel, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(pte_alloc_one, sun4c_pte_alloc_one, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(free_pmd_fast, sun4c_free_pmd_fast, BTFIXUPCALL_NOP);
-	BTFIXUPSET_CALL(pmd_alloc_one_fast, sun4c_pmd_alloc_one_fast, BTFIXUPCALL_RETO0);
+	BTFIXUPSET_CALL(pmd_alloc_one, sun4c_pmd_alloc_one, BTFIXUPCALL_RETO0);
 	BTFIXUPSET_CALL(free_pgd_fast, sun4c_free_pgd_fast, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(get_pgd_fast, sun4c_get_pgd_fast, BTFIXUPCALL_NORM);
 

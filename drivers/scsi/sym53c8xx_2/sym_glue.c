@@ -1107,7 +1107,6 @@ static void sym_eh_timeout(u_long p) { __sym_eh_done((Scsi_Cmnd *)p, 1); }
 static int sym_eh_handler(int op, char *opname, Scsi_Cmnd *cmd)
 {
 	hcb_p np = SYM_SOFTC_PTR(cmd);
-	unsigned long flags;
 	SYM_QUEHEAD *qp;
 	int to_do = SYM_EH_DO_IGNORE;
 	int sts = -1;
@@ -1117,8 +1116,6 @@ static int sym_eh_handler(int op, char *opname, Scsi_Cmnd *cmd)
 	sprintf(devname, "%s:%d:%d", sym_name(np), cmd->target, cmd->lun);
 
 	printf_warning("%s: %s operation started.\n", devname, opname);
-
-	SYM_LOCK_HCB(np, flags);
 
 #if 0
 	/* This one should be the result of some race, thus to ignore */
@@ -1197,8 +1194,6 @@ finish:
 	/* Complete the command with locks held as required by the driver */
 	if (to_do == SYM_EH_DO_COMPLETE)
 		sym_xpt_done2(np, cmd, CAM_REQ_ABORTED);
-
-	SYM_UNLOCK_HCB(np, flags);
 
 	/* Wait for completion with locks released, as required by kernel */
 	if (to_do == SYM_EH_DO_WAIT) {

@@ -189,8 +189,8 @@ static unsigned int amd_size_cache(struct cpuinfo_x86 * c, unsigned int size)
 }
 
 static struct cpu_dev amd_cpu_dev __initdata = {
-	c_vendor:	"AMD",
-	c_ident: 	{ "AuthenticAMD" },
+	.c_vendor	= "AMD",
+	.c_ident 	= { "AuthenticAMD" },
 	c_models: {
 		{ X86_VENDOR_AMD,	4,
 		  {
@@ -203,9 +203,9 @@ static struct cpu_dev amd_cpu_dev __initdata = {
 		  }
 		},
 	},
-	c_init:		init_amd,
-	c_identify:	amd_identify,
-	c_size_cache:	amd_size_cache,
+	.c_init		= init_amd,
+	.c_identify	= amd_identify,
+	.c_size_cache	= amd_size_cache,
 };
 
 int __init amd_init_cpu(void)

@@ -137,7 +137,7 @@ void usb_unbind_driver(struct usb_device *device, struct usb_interface *intf)
 	driver = intf->driver;
 	priv = intf->private_data;
 	
-	if (!driver)
+	if (!driver || !driver->disconnect)
 		return;
 
 	/* as soon as we increase the module use count we drop the BKL
@@ -836,7 +836,7 @@ show_config (struct device *dev, char *buf, size_t count, loff_t off)
 	return sprintf (buf, "%u\n", udev->actconfig->bConfigurationValue);
 }
 
-static DEVICE_ATTR(config,"configuration",S_IRUGO,show_config,NULL);
+static DEVICE_ATTR(configuration,S_IRUGO,show_config,NULL);
 
 /* interfaces have one current setting; alternates
  * can have different endpoints and class info.
@@ -851,7 +851,7 @@ show_altsetting (struct device *dev, char *buf, size_t count, loff_t off)
 	interface = to_usb_interface (dev);
 	return sprintf (buf, "%u\n", interface->altsetting->bAlternateSetting);
 }
-static DEVICE_ATTR(altsetting,"altsetting",S_IRUGO,show_altsetting,NULL);
+static DEVICE_ATTR(altsetting,S_IRUGO,show_altsetting,NULL);
 
 /* product driverfs file */
 static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t off)
@@ -863,12 +863,14 @@ static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t
 		return 0;
 	udev = to_usb_device (dev);
 
-	len = usb_string(udev, udev->descriptor.iProduct, buf, PAGE_SIZE); 
+	len = usb_string(udev, udev->descriptor.iProduct, buf, PAGE_SIZE);
+	if (len < 0)
+		return 0;
 	buf[len] = '\n';
-	buf[len+1] = 0x00;
+	buf[len+1] = 0;
 	return len+1;
 }
-static DEVICE_ATTR(product,"product",S_IRUGO,show_product,NULL);
+static DEVICE_ATTR(product,S_IRUGO,show_product,NULL);
 
 /* manufacturer driverfs file */
 static ssize_t
@@ -881,12 +883,14 @@ show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
 		return 0;
 	udev = to_usb_device (dev);
 
-	len = usb_string(udev, udev->descriptor.iManufacturer, buf, PAGE_SIZE); 
+	len = usb_string(udev, udev->descriptor.iManufacturer, buf, PAGE_SIZE);
+	if (len < 0)
+		return 0;
 	buf[len] = '\n';
-	buf[len+1] = 0x00;
+	buf[len+1] = 0;
 	return len+1;
 }
-static DEVICE_ATTR(manufacturer,"manufacturer",S_IRUGO,show_manufacturer,NULL);
+static DEVICE_ATTR(manufacturer,S_IRUGO,show_manufacturer,NULL);
 
 /* serial number driverfs file */
 static ssize_t
@@ -899,12 +903,14 @@ show_serial (struct device *dev, char *buf, size_t count, loff_t off)
 		return 0;
 	udev = to_usb_device (dev);
 
-	len = usb_string(udev, udev->descriptor.iSerialNumber, buf, PAGE_SIZE); 
+	len = usb_string(udev, udev->descriptor.iSerialNumber, buf, PAGE_SIZE);
+	if (len < 0)
+		return 0;
 	buf[len] = '\n';
-	buf[len+1] = 0x00;
+	buf[len+1] = 0;
 	return len+1;
 }
-static DEVICE_ATTR(serial,"serial",S_IRUGO,show_serial,NULL);
+static DEVICE_ATTR(serial,S_IRUGO,show_serial,NULL);
 
 /*
  * This entrypoint gets called for each new device.
@@ -918,13 +924,13 @@ static void usb_find_drivers(struct usb_device *dev)
 	unsigned claimed = 0;
 
 	/* FIXME should get called for each new configuration not just the
-	 * first one for a device. switching configs (or altesettings) should
+	 * first one for a device. switching configs (or altsettings) should
 	 * undo driverfs and HCD state for the previous interfaces.
 	 */
 	for (ifnum = 0; ifnum < dev->actconfig->bNumInterfaces; ifnum++) {
 		struct usb_interface *interface = &dev->actconfig->interface[ifnum];
 		struct usb_interface_descriptor *desc = interface->altsetting;
-		
+
 		/* register this interface with driverfs */
 		interface->dev.parent = &dev->dev;
 		interface->dev.bus = &usb_bus_type;
@@ -1434,7 +1440,7 @@ int usb_new_device(struct usb_device *dev)
 	err = device_register (&dev->dev);
 	if (err)
 		return err;
-	device_create_file (&dev->dev, &dev_attr_config);
+	device_create_file (&dev->dev, &dev_attr_configuration);
 	if (dev->descriptor.iManufacturer)
 		device_create_file (&dev->dev, &dev_attr_manufacturer);
 	if (dev->descriptor.iProduct)
@@ -1454,6 +1460,152 @@ int usb_new_device(struct usb_device *dev)
 	return 0;
 }
 
+
+/**
+ * usb_buffer_alloc - allocate dma-consistent buffer for URB_NO_DMA_MAP
+ * @dev: device the buffer will be used with
+ * @size: requested buffer size
+ * @mem_flags: affect whether allocation may block
+ * @dma: used to return DMA address of buffer
+ *
+ * Return value is either null (indicating no buffer could be allocated), or
+ * the cpu-space pointer to a buffer that may be used to perform DMA to the
+ * specified device.  Such cpu-space buffers are returned along with the DMA
+ * address (through the pointer provided).
+ *
+ * These buffers are used with URB_NO_DMA_MAP set in urb->transfer_flags to
+ * avoid behaviors like using "DMA bounce buffers", or tying down I/O mapping
+ * hardware for long idle periods.  The implementation varies between
+ * platforms, depending on details of how DMA will work to this device.
+ *
+ * When the buffer is no longer used, free it with usb_buffer_free().
+ */
+void *usb_buffer_alloc (
+	struct usb_device *dev,
+	size_t size,
+	int mem_flags,
+	dma_addr_t *dma
+)
+{
+	if (!dev || !dev->bus || !dev->bus->op || !dev->bus->op->buffer_alloc)
+		return 0;
+	return dev->bus->op->buffer_alloc (dev->bus, size, mem_flags, dma);
+}
+
+/**
+ * usb_buffer_free - free memory allocated with usb_buffer_alloc()
+ * @dev: device the buffer was used with
+ * @size: requested buffer size
+ * @addr: CPU address of buffer
+ * @dma: DMA address of buffer
+ *
+ * This reclaims an I/O buffer, letting it be reused.  The memory must have
+ * been allocated using usb_buffer_alloc(), and the parameters must match
+ * those provided in that allocation request. 
+ */
+void usb_buffer_free (
+	struct usb_device *dev,
+	size_t size,
+	void *addr,
+	dma_addr_t dma
+)
+{
+	if (!dev || !dev->bus || !dev->bus->op || !dev->bus->op->buffer_free)
+	    	return;
+	dev->bus->op->buffer_free (dev->bus, size, addr, dma);
+}
+
+/**
+ * usb_buffer_map - create DMA mapping(s) for an urb
+ * @urb: urb whose transfer_buffer will be mapped
+ *
+ * Return value is either null (indicating no buffer could be mapped), or
+ * the parameter.  URB_NO_DMA_MAP is added to urb->transfer_flags if the
+ * operation succeeds.
+ *
+ * This call would normally be used for an urb which is reused, perhaps
+ * as the target of a large periodic transfer, with usb_buffer_dmasync()
+ * calls to synchronize memory and dma state.  It may not be used for
+ * control requests.
+ *
+ * Reverse the effect of this call with usb_buffer_unmap().
+ */
+struct urb *usb_buffer_map (struct urb *urb)
+{
+	struct usb_bus		*bus;
+	struct usb_operations	*op;
+
+	if (!urb
+			|| usb_pipecontrol (urb->pipe)
+			|| !urb->dev
+			|| !(bus = urb->dev->bus)
+			|| !(op = bus->op)
+			|| !op->buffer_map)
+		return 0;
+
+	if (op->buffer_map (bus,
+			urb->transfer_buffer,
+			&urb->transfer_dma,
+			urb->transfer_buffer_length,
+			usb_pipein (urb->pipe)
+				? USB_DIR_IN
+				: USB_DIR_OUT))
+		return 0;
+	urb->transfer_flags |= URB_NO_DMA_MAP;
+	return urb;
+}
+
+/**
+ * usb_buffer_dmasync - synchronize DMA and CPU view of buffer(s)
+ * @urb: urb whose transfer_buffer will be synchronized
+ */
+void usb_buffer_dmasync (struct urb *urb)
+{
+	struct usb_bus		*bus;
+	struct usb_operations	*op;
+
+	if (!urb
+			|| !(urb->transfer_flags & URB_NO_DMA_MAP)
+			|| !urb->dev
+			|| !(bus = urb->dev->bus)
+			|| !(op = bus->op)
+			|| !op->buffer_dmasync)
+		return;
+
+	op->buffer_dmasync (bus,
+			urb->transfer_dma,
+			urb->transfer_buffer_length,
+			usb_pipein (urb->pipe)
+				? USB_DIR_IN
+				: USB_DIR_OUT);
+}
+
+/**
+ * usb_buffer_unmap - free DMA mapping(s) for an urb
+ * @urb: urb whose transfer_buffer will be unmapped
+ *
+ * Reverses the effect of usb_buffer_map().
+ */
+void usb_buffer_unmap (struct urb *urb)
+{
+	struct usb_bus		*bus;
+	struct usb_operations	*op;
+
+	if (!urb
+			|| !(urb->transfer_flags & URB_NO_DMA_MAP)
+			|| !urb->dev
+			|| !(bus = urb->dev->bus)
+			|| !(op = bus->op)
+			|| !op->buffer_unmap)
+		return;
+
+	op->buffer_unmap (bus,
+			urb->transfer_dma,
+			urb->transfer_buffer_length,
+			usb_pipein (urb->pipe)
+				? USB_DIR_IN
+				: USB_DIR_OUT);
+}
 
 #ifdef CONFIG_PROC_FS
 struct list_head *usb_driver_get_list(void)
@@ -1489,10 +1641,10 @@ static int __init usb_init(void)
  */
 static void __exit usb_exit(void)
 {
-	put_bus(&usb_bus_type);
 	usb_major_cleanup();
 	usbfs_cleanup();
 	usb_hub_cleanup();
+	put_bus(&usb_bus_type);
 }
 
 subsys_initcall(usb_init);
@@ -1533,5 +1685,12 @@ EXPORT_SYMBOL(usb_unbind_driver);
 EXPORT_SYMBOL(__usb_get_extra_descriptor);
 
 EXPORT_SYMBOL(usb_get_current_frame_number);
+
+EXPORT_SYMBOL (usb_buffer_alloc);
+EXPORT_SYMBOL (usb_buffer_free);
+
+EXPORT_SYMBOL (usb_buffer_map);
+EXPORT_SYMBOL (usb_buffer_dmasync);
+EXPORT_SYMBOL (usb_buffer_unmap);
 
 MODULE_LICENSE("GPL");

@@ -151,16 +151,16 @@ struct tasklet_head
 
 /* Some compilers disobey section attribute on statics when not
    initialized -- RR */
-static struct tasklet_head tasklet_vec __per_cpu_data = { NULL };
-static struct tasklet_head tasklet_hi_vec __per_cpu_data = { NULL };
+static DEFINE_PER_CPU(struct tasklet_head, tasklet_vec) = { NULL };
+static DEFINE_PER_CPU(struct tasklet_head, tasklet_hi_vec) = { NULL };
 
 void __tasklet_schedule(struct tasklet_struct *t)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
-	t->next = this_cpu(tasklet_vec).list;
-	this_cpu(tasklet_vec).list = t;
+	t->next = __get_cpu_var(tasklet_vec).list;
+	__get_cpu_var(tasklet_vec).list = t;
 	cpu_raise_softirq(smp_processor_id(), TASKLET_SOFTIRQ);
 	local_irq_restore(flags);
 }
@@ -170,8 +170,8 @@ void __tasklet_hi_schedule(struct tasklet_struct *t)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	t->next = this_cpu(tasklet_hi_vec).list;
-	this_cpu(tasklet_hi_vec).list = t;
+	t->next = __get_cpu_var(tasklet_hi_vec).list;
+	__get_cpu_var(tasklet_hi_vec).list = t;
 	cpu_raise_softirq(smp_processor_id(), HI_SOFTIRQ);
 	local_irq_restore(flags);
 }
@@ -181,8 +181,8 @@ static void tasklet_action(struct softirq_action *a)
 	struct tasklet_struct *list;
 
 	local_irq_disable();
-	list = this_cpu(tasklet_vec).list;
-	this_cpu(tasklet_vec).list = NULL;
+	list = __get_cpu_var(tasklet_vec).list;
+	__get_cpu_var(tasklet_vec).list = NULL;
 	local_irq_enable();
 
 	while (list) {
@@ -202,8 +202,8 @@ static void tasklet_action(struct softirq_action *a)
 		}
 
 		local_irq_disable();
-		t->next = this_cpu(tasklet_vec).list;
-		this_cpu(tasklet_vec).list = t;
+		t->next = __get_cpu_var(tasklet_vec).list;
+		__get_cpu_var(tasklet_vec).list = t;
 		__cpu_raise_softirq(smp_processor_id(), TASKLET_SOFTIRQ);
 		local_irq_enable();
 	}
@@ -214,8 +214,8 @@ static void tasklet_hi_action(struct softirq_action *a)
 	struct tasklet_struct *list;
 
 	local_irq_disable();
-	list = this_cpu(tasklet_hi_vec).list;
-	this_cpu(tasklet_hi_vec).list = NULL;
+	list = __get_cpu_var(tasklet_hi_vec).list;
+	__get_cpu_var(tasklet_hi_vec).list = NULL;
 	local_irq_enable();
 
 	while (list) {
@@ -235,8 +235,8 @@ static void tasklet_hi_action(struct softirq_action *a)
 		}
 
 		local_irq_disable();
-		t->next = this_cpu(tasklet_hi_vec).list;
-		this_cpu(tasklet_hi_vec).list = t;
+		t->next = __get_cpu_var(tasklet_hi_vec).list;
+		__get_cpu_var(tasklet_hi_vec).list = t;
 		__cpu_raise_softirq(smp_processor_id(), HI_SOFTIRQ);
 		local_irq_enable();
 	}
@@ -412,7 +412,7 @@ static struct notifier_block cpu_nfb = { &cpu_callback, NULL, 0 };
 
 __init int spawn_ksoftirqd(void)
 {
-	cpu_callback(&cpu_nfb, CPU_ONLINE, (void *)smp_processor_id());
+	cpu_callback(&cpu_nfb, CPU_ONLINE, (void *)(long)smp_processor_id());
 	register_cpu_notifier(&cpu_nfb);
 	return 0;
 }

@@ -734,17 +734,17 @@ static ssize_t sr_device_kdev_read(struct device *driverfs_dev,
 				   char *page, size_t count, loff_t off)
 {
 	kdev_t kdev; 
-	kdev.value=(int)driverfs_dev->driver_data;
+	kdev.value=(int)(long)driverfs_dev->driver_data;
 	return off ? 0 : sprintf(page, "%x\n",kdev.value);
 }
-static DEVICE_ATTR(kdev,"kdev",S_IRUGO,sr_device_kdev_read,NULL);
+static DEVICE_ATTR(kdev,S_IRUGO,sr_device_kdev_read,NULL);
 
 static ssize_t sr_device_type_read(struct device *driverfs_dev, 
 				   char *page, size_t count, loff_t off) 
 {
 	return off ? 0 : sprintf (page, "CHR\n");
 }
-static DEVICE_ATTR(type,"type",S_IRUGO,sr_device_type_read,NULL);
+static DEVICE_ATTR(type,S_IRUGO,sr_device_type_read,NULL);
 
 
 void sr_finish()
@@ -800,7 +800,7 @@ void sr_finish()
 			&SCp->device->sdev_driverfs_dev;
 		SCp->cdi.cdrom_driverfs_dev.bus = &scsi_driverfs_bus_type;
 		SCp->cdi.cdrom_driverfs_dev.driver_data = 
-			(void *)__mkdev(MAJOR_NR, i);
+			(void *)(long)__mkdev(MAJOR_NR, i);
 		device_register(&SCp->cdi.cdrom_driverfs_dev);
 		device_create_file(&SCp->cdi.cdrom_driverfs_dev,
 				   &dev_attr_type);

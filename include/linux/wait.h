@@ -43,16 +43,16 @@ typedef struct __wait_queue_head wait_queue_head_t;
  */
 
 #define __WAITQUEUE_INITIALIZER(name, tsk) {				\
-	task:		tsk,						\
-	func:		default_wake_function,				\
-	task_list:	{ NULL, NULL } }
+	.task		= tsk,						\
+	.func		= default_wake_function,			\
+	.task_list	= { NULL, NULL } }
 
 #define DECLARE_WAITQUEUE(name, tsk)					\
 	wait_queue_t name = __WAITQUEUE_INITIALIZER(name, tsk)
 
 #define __WAIT_QUEUE_HEAD_INITIALIZER(name) {				\
-	lock:		SPIN_LOCK_UNLOCKED,				\
-	task_list:	{ &(name).task_list, &(name).task_list } }
+	.lock		= SPIN_LOCK_UNLOCKED,				\
+	.task_list	= { &(name).task_list, &(name).task_list } }
 
 #define DECLARE_WAIT_QUEUE_HEAD(name) \
 	wait_queue_head_t name = __WAIT_QUEUE_HEAD_INITIALIZER(name)

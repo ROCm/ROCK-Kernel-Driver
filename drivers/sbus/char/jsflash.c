@@ -674,10 +674,9 @@ int jsfd_init(void) {
 	return 0;
 }
 
-#ifdef MODULE
 MODULE_LICENSE("GPL");
 
-int init_module(void) {
+static int __init jsflash_init_module(void) {
 	int rc;
 
 	if ((rc = jsflash_init()) == 0) {
@@ -687,7 +686,7 @@ int init_module(void) {
 	return rc;
 }
 
-void cleanup_module(void) {
+static void __exit jsflash_cleanup_module(void) {
 
 	/* for (all probed units) {  } */
 	if (jsf0.busy)
@@ -700,4 +699,6 @@ void cleanup_module(void) {
 		printk("jsfd: cleanup_module failed\n");
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 }
-#endif
+
+module_init(jsflash_init_module);
+module_exit(jsflash_cleanup_module);

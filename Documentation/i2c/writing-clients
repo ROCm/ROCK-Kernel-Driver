@@ -365,7 +365,7 @@ The detect client function
 
 The detect client function is called by i2c_probe or i2c_detect.
 The `kind' parameter contains 0 if this call is due to a `force'
-parameter, and 0 otherwise (for i2c_detect, it contains 0 if
+parameter, and -1 otherwise (for i2c_detect, it contains 0 if
 this call is due to the generic `force' parameter, and the chip type
 number if it is due to a specific `force' parameter).
 

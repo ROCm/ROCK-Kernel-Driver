@@ -2,6 +2,16 @@ ToDo:
 	- Find and fix bugs.
 	- Enable NFS exporting of NTFS.
 
+2.0.25 - Small bug fixes and cleanups.
+
+	- Unlock the page in an out of memory error code path in
+	  fs/ntfs/aops.c::ntfs_read_block().
+	- If fs/ntfs/aops.c::ntfs_read_page() is called on an uptodate page,
+	  just unlock the page and return. (This can happen due to ->writepage
+	  clearing PageUptodate() during write out of MstProtected()
+	  attributes.
+	- Remove leaked write code again.
+
 2.0.24 - Cleanups.
 
 	- Treat BUG_ON() as ASSERT() not VERIFY(), i.e. do not use side effects
