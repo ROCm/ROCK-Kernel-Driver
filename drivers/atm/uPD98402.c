@@ -239,10 +239,10 @@ static int uPD98402_stop(struct atm_dev *dev)
 
 
 static const struct atmphy_ops uPD98402_ops = {
-	start:		uPD98402_start,
-	ioctl:		uPD98402_ioctl,
-	interrupt:	uPD98402_int,
-	stop:		uPD98402_stop,
+	.start		= uPD98402_start,
+	.ioctl		= uPD98402_ioctl,
+	.interrupt	= uPD98402_int,
+	.stop		= uPD98402_stop,
 };
 
 

@@ -1695,12 +1695,12 @@ static int amb_proc_read (struct atm_dev * atm_dev, loff_t * pos, char * page) {
 /********** Operation Structure **********/
 
 static const struct atmdev_ops amb_ops = {
-  open:		amb_open,
-  close:	amb_close,
-  send:		amb_send,
-  sg_send:	amb_sg_send,
-  proc_read:	amb_proc_read,
-  owner:	THIS_MODULE,
+  .open	= amb_open,
+  .close	= amb_close,
+  .send	= amb_send,
+  .sg_send	= amb_sg_send,
+  .proc_read	= amb_proc_read,
+  .owner	= THIS_MODULE,
 };
 
 /********** housekeeping **********/

@@ -2829,21 +2829,21 @@ static int lanai_proc_read(struct atm_dev *atmdev, loff_t *pos, char *page)
 /* -------------------- HOOKS: */
 
 static const struct atmdev_ops ops = {
-	dev_close:	lanai_dev_close,
-	open:		lanai_open,
-	close:		lanai_close,
-	ioctl:		lanai_ioctl,
-	getsockopt:	NULL,
-	setsockopt:	NULL,
-	send:		lanai_send,
-	sg_send:	NULL,		/* no scatter-gather on card */
-	send_oam:	NULL,		/* OAM support not in linux yet */
-	phy_put:	NULL,
-	phy_get:	NULL,
-	feedback:	NULL,
-	change_qos:	lanai_change_qos,
-	free_rx_skb:	NULL,
-	proc_read:	lanai_proc_read
+	.dev_close	= lanai_dev_close,
+	.open		= lanai_open,
+	.close		= lanai_close,
+	.ioctl		= lanai_ioctl,
+	.getsockopt	= NULL,
+	.setsockopt	= NULL,
+	.send		= lanai_send,
+	.sg_send	= NULL,		/* no scatter-gather on card */
+	.send_oam	= NULL,		/* OAM support not in linux yet */
+	.phy_put	= NULL,
+	.phy_get	= NULL,
+	.feedback	= NULL,
+	.change_qos	= lanai_change_qos,
+	.free_rx_skb	= NULL,
+	.proc_read	= lanai_proc_read
 };
 
 /* detect one type of card LANAI2 or LANAIHB */

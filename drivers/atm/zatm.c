@@ -1793,17 +1793,17 @@ static unsigned char zatm_phy_get(struct atm_dev *dev,unsigned long addr)
 
 
 static const struct atmdev_ops ops = {
-	open:		zatm_open,
-	close:		zatm_close,
-	ioctl:		zatm_ioctl,
-	getsockopt:	zatm_getsockopt,
-	setsockopt:	zatm_setsockopt,
-	send:		zatm_send,
+	.open		= zatm_open,
+	.close		= zatm_close,
+	.ioctl		= zatm_ioctl,
+	.getsockopt	= zatm_getsockopt,
+	.setsockopt	= zatm_setsockopt,
+	.send		= zatm_send,
 	/*zatm_sg_send*/
-	phy_put:	zatm_phy_put,
-	phy_get:	zatm_phy_get,
-	feedback:	zatm_feedback,
-	change_qos:	zatm_change_qos,
+	.phy_put	= zatm_phy_put,
+	.phy_get	= zatm_phy_get,
+	.feedback	= zatm_feedback,
+	.change_qos	= zatm_change_qos,
 };
 
 

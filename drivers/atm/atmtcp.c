@@ -293,13 +293,13 @@ done:
 
 
 static struct atmdev_ops atmtcp_v_dev_ops = {
-	dev_close:	atmtcp_v_dev_close,
-	open:		atmtcp_v_open,
-	close:		atmtcp_v_close,
-	ioctl:		atmtcp_v_ioctl,
-	send:		atmtcp_v_send,
-	proc_read:	atmtcp_v_proc,
-	owner:		THIS_MODULE
+	.dev_close	= atmtcp_v_dev_close,
+	.open		= atmtcp_v_open,
+	.close		= atmtcp_v_close,
+	.ioctl		= atmtcp_v_ioctl,
+	.send		= atmtcp_v_send,
+	.proc_read	= atmtcp_v_proc,
+	.owner		= THIS_MODULE
 };
 
 
@@ -309,8 +309,8 @@ static struct atmdev_ops atmtcp_v_dev_ops = {
 
 
 static struct atmdev_ops atmtcp_c_dev_ops = {
-	close:		atmtcp_c_close,
-	send:		atmtcp_c_send
+	.close		= atmtcp_c_close,
+	.send		= atmtcp_c_send
 };
 
 

@@ -141,15 +141,15 @@ static void idt77252_softint(void *dev_id);
 
 static struct atmdev_ops idt77252_ops =
 {
-	dev_close:	idt77252_dev_close,
-	open:		idt77252_open,
-	close:		idt77252_close,
-	send:		idt77252_send,
-	send_oam:	idt77252_send_oam,
-	phy_put:	idt77252_phy_put,
-	phy_get:	idt77252_phy_get,
-	change_qos:	idt77252_change_qos,
-	proc_read:	idt77252_proc_read
+	.dev_close	= idt77252_dev_close,
+	.open		= idt77252_open,
+	.close		= idt77252_close,
+	.send		= idt77252_send,
+	.send_oam	= idt77252_send_oam,
+	.phy_put	= idt77252_phy_put,
+	.phy_get	= idt77252_phy_get,
+	.change_qos	= idt77252_change_qos,
+	.proc_read	= idt77252_proc_read
 };
 
 static struct idt77252_dev *idt77252_chain = NULL;
@@ -3843,9 +3843,9 @@ static struct pci_device_id idt77252_pci_tbl[] __devinitdata =
 };
 
 static struct pci_driver idt77252_driver = {
-	name:		"idt77252",
-	id_table:	idt77252_pci_tbl,
-	probe:		idt77252_init_one,
+	.name		= "idt77252",
+	.id_table	= idt77252_pci_tbl,
+	.probe		= idt77252_init_one,
 };
 
 static int __init idt77252_init(void)
