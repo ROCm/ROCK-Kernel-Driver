@@ -73,6 +73,7 @@ extern int printk_ratelimit_jiffies;
 extern int printk_ratelimit_burst;
 extern int shm_use_hugepages;
 extern int mmap_use_hugepages, mmap_hugepages_map_sz;
+extern int kernel_map_hugetlb;
 
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
@@ -730,6 +731,14 @@ static ctl_table kern_table[] = {
 		.ctl_name	= KERN_HPAGES_MAP_SZ,
 		.procname	= "mmap-hugepages-min-mapping",
 		.data		= &mmap_hugepages_map_sz,
+		.maxlen		= sizeof(int),
+		.mode		0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= KERN_MAP_HUGETLB,
+		.procname	= "mmap-map-hugetlb",
+		.data		= &kernel_map_hugetlb,
 		.maxlen		= sizeof(int),
 		.mode		0644,
 		.proc_handler	= &proc_dointvec,

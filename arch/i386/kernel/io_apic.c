@@ -1289,6 +1289,7 @@ void __init setup_IO_APIC_irqs(void)
 		if (need_timer_irq_tweak && irq == 0) {
 			entry.delivery_mode = 0;
 			entry.dest_mode = 0;
+			printk("Timer IRQ delivery and dest mode set to 0\n");
 		}
 		spin_lock_irqsave(&ioapic_lock, flags);
 		io_apic_write(apic, 0x11+2*pin, *(((int *)&entry)+1));
@@ -1327,6 +1328,12 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 	entry.polarity = 0;
 	entry.trigger = 0;
 	entry.vector = vector;
+
+	if (need_timer_irq_tweak) {
+		entry.delivery_mode = 0;
+		entry.dest_mode = 0;
+		printk("ExtINT_IRQ0_pin: delivery and dest mode set to 0\n");
+	}
 
 	/*
 	 * The timer IRQ doesn't have to know that behind the

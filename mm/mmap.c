@@ -77,6 +77,8 @@ EXPORT_SYMBOL(vm_committed_space);
 
 int mmap_use_hugepages = 0;
 int mmap_hugepages_map_sz = 256;
+/* Enable dubious MAP_HUGETLB flag */
+int kernel_map_hugetlb = 0;
 
 /*
  * Requires inode->i_mapping->i_shared_sem
@@ -828,10 +830,11 @@ unsigned long __do_mmap_pgoff(struct mm_struct *mm,
 {
 	struct file *hugetlb_file = NULL;
 	int hugetlb_implicit = 0;
+	static int warn1 = 0, warn2 = 0;
 	unsigned long result;
 
 	if (file) {
-		if ((flags & MAP_HUGETLB) && !is_file_hugepages(file))
+		if (kernel_map_hugetlb && (flags & MAP_HUGETLB) && !is_file_hugepages(file))
 			return -EINVAL;
 
 		if (!file->f_op || !file->f_op->mmap)
@@ -857,9 +860,13 @@ unsigned long __do_mmap_pgoff(struct mm_struct *mm,
 	if (current->mm->map_count > sysctl_max_map_count)
 		return -ENOMEM;
 
+	if (!file && !kernel_map_hugetlb && (flags & MAP_HUGETLB) && !(warn1++))
+	       printk("MAP_HUGETLB is non-std and disabled by default!\n");
 	/* Create an implicit hugetlb file if necessary */
-	if (!file && ((flags & MAP_HUGETLB) ||
+	if (!file && (((flags & MAP_HUGETLB) && kernel_map_hugetlb) ||
 			(hugetlb_implicit = mmap_hugetlb_implicit(len)))) {
+		if ((flags & MAP_HUGETLB) && !(warn2++))
+			printk("MAP_HUGETLB is deprecated and will go away!\n");
 		file = hugetlb_file = hugetlb_zero_setup(len);
 		if (IS_ERR(file)) {
 			if (!hugetlb_implicit)
