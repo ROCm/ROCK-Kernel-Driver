@@ -35,8 +35,8 @@
 #include <linux/slab.h>
 
 #include <xfs_types.h>
-#include "kmem.h"
-#include "spin.h"
+#include <kmem.h>
+#include <spin.h>
 #include "debug.h"
 #include "ktrace.h"
 

@@ -62,9 +62,12 @@
 
 #include <support/ktrace.h>
 #include <support/debug.h>
-#include <support/kmem.h>
+#include "kmem.h"
 
-#include "page_buf.h"
+#include "xfs_types.h"
+#include "xfs_cred.h"
+#include "xfs_lrw.h"
+#include "xfs_buf.h"
 
 #define BBSHIFT		9
 #define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - BBSHIFT)) - 1)

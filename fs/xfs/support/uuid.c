@@ -33,11 +33,11 @@
 #include <linux/types.h>
 #include <xfs_types.h>
 #include <xfs_arch.h>
-#include "time.h"
+#include <time.h>
+#include <kmem.h>
+#include <mutex.h>
 #include "uuid.h"
-#include "kmem.h"
 #include "debug.h"
-#include "mutex.h"
 
 static mutex_t	uuid_monitor;
 static int	uuid_table_size;
