@@ -230,6 +230,7 @@ void reparent_to_init(void)
 	/* signals? */
 	security_task_reparent_to_init(current);
 	memcpy(current->rlim, init_task.rlim, sizeof(*(current->rlim)));
+	atomic_inc(&(INIT_USER->__count));
 	switch_uid(INIT_USER);
 
 	write_unlock_irq(&tasklist_lock);
