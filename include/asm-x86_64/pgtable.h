@@ -119,8 +119,8 @@ extern inline void pgd_clear (pgd_t * pgd)
 #define MAXMEM		 0x3fffffffffffUL
 #define VMALLOC_START    0xffffc20000000000UL
 #define VMALLOC_END      0xffffe1ffffffffffUL
-#define MODULES_VADDR    0xffffffff88000000
-#define MODULES_END      0xfffffffffff00000
+#define MODULES_VADDR    0xffffffff88000000UL
+#define MODULES_END      0xfffffffffff00000UL
 #define MODULES_LEN   (MODULES_END - MODULES_VADDR)
 
 #define _PAGE_BIT_PRESENT	0
