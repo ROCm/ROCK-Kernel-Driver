@@ -329,7 +329,8 @@ static size_t parport_pc_epp_read_data (struct parport *port, void *buf,
 				left -= 16;
 			} else {
 				/* grab single byte from the warp fifo */
-				*((char *)buf)++ = inb (EPPDATA (port));
+				*((char *)buf) = inb (EPPDATA (port));
+				buf++;
 				got++;
 				left--;
 			}
@@ -356,7 +357,8 @@ static size_t parport_pc_epp_read_data (struct parport *port, void *buf,
 		return length;
 	}
 	for (; got < length; got++) {
-		*((char*)buf)++ = inb (EPPDATA(port));
+		*((char*)buf) = inb (EPPDATA(port));
+		buf++;
 		if (inb (STATUS (port)) & 0x01) {
 			/* EPP timeout */
 			clear_epp_timeout (port);
@@ -385,7 +387,8 @@ static size_t parport_pc_epp_write_data (struct parport *port, const void *buf,
 		return length;
 	}
 	for (; written < length; written++) {
-		outb (*((char*)buf)++, EPPDATA(port));
+		outb (*((char*)buf), EPPDATA(port));
+		buf++;
 		if (inb (STATUS(port)) & 0x01) {
 			clear_epp_timeout (port);
 			break;
@@ -409,7 +412,8 @@ static size_t parport_pc_epp_read_addr (struct parport *port, void *buf,
 		return length;
 	}
 	for (; got < length; got++) {
-		*((char*)buf)++ = inb (EPPADDR (port));
+		*((char*)buf) = inb (EPPADDR (port));
+		buf++;
 		if (inb (STATUS (port)) & 0x01) {
 			clear_epp_timeout (port);
 			break;
@@ -434,7 +438,8 @@ static size_t parport_pc_epp_write_addr (struct parport *port,
 		return length;
 	}
 	for (; written < length; written++) {
-		outb (*((char*)buf)++, EPPADDR (port));
+		outb (*((char*)buf), EPPADDR (port));
+		buf++;
 		if (inb (STATUS (port)) & 0x01) {
 			clear_epp_timeout (port);
 			break;
