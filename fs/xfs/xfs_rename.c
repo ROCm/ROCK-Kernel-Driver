@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -343,8 +343,7 @@ xfs_rename(
 	src_is_directory = ((src_ip->i_d.di_mode & S_IFMT) == S_IFDIR);
 
 	/*
-	 * Drop the locks on our inodes so that we can do the ancestor
-	 * check if necessary and start the transaction.
+	 * Drop the locks on our inodes so that we can start the transaction.
 	 */
 	xfs_rename_unlock4(inodes, XFS_ILOCK_SHARED);
 
