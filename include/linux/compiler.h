@@ -25,6 +25,23 @@
 #define __deprecated
 #endif
 
+/*
+ * Allow us to avoid 'defined but not used' warnings on functions and data,
+ * as well as force them to be emitted to the assembly file.
+ *
+ * As of gcc 3.3, static functions that are not marked with attribute((used))
+ * may be elided from the assembly file.  As of gcc 3.3, static data not so
+ * marked will not be elided, but this may change in a future gcc version.
+ *
+ * In prior versions of gcc, such functions and data would be emitted, but
+ * would be warned about except with attribute((unused)).
+ */
+#if __GNUC__ == 3 && __GNUC_MINOR__ >= 3 || __GNUC__ > 3
+#define __attribute_used__	__attribute__((__used__))
+#else
+#define __attribute_used__	__attribute__((__unused__))
+#endif
+
 /* This macro obfuscates arithmetic on a variable address so that gcc
    shouldn't recognize the original var, and make assumptions about it */
 #define RELOC_HIDE(ptr, off)					\
