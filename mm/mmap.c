@@ -987,6 +987,15 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 		return -EFAULT;
 
 	/*
+	 * We must make sure the anon-vma is allocated
+	 * to make sure the anon-vma locking is not a noop.
+	 */
+	if (unlikely(anon_vma_prepare(vma)))
+		return -ENOMEM;
+
+	anon_vma_lock(vma);
+
+	/*
 	 * vma->vm_start/vm_end cannot change under us because the caller
 	 * is required to hold the mmap_sem in read mode. We need to get
 	 * the spinlock only before relocating the vma range ourself.
@@ -996,13 +1005,15 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	grow = (address - vma->vm_end) >> PAGE_SHIFT;
 
 	/* Overcommit.. */
-	if (security_vm_enough_memory(grow)) {
+	if (unlikely(security_vm_enough_memory(grow))) {
+		anon_vma_unlock(vma);
 		return -ENOMEM;
 	}
 	
-	if (address - vma->vm_start > current->rlim[RLIMIT_STACK].rlim_cur ||
-			((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
-			current->rlim[RLIMIT_AS].rlim_cur) {
+	if (unlikely(address - vma->vm_start > current->rlim[RLIMIT_STACK].rlim_cur ||
+		     ((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
+		     current->rlim[RLIMIT_AS].rlim_cur)) {
+		anon_vma_unlock(vma);
 		vm_unacct_memory(grow);
 		return -ENOMEM;
 	}
@@ -1010,6 +1021,9 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	vma->vm_mm->total_vm += grow;
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
+
+	anon_vma_unlock(vma);
+
 	return 0;
 }
 
@@ -1038,6 +1052,24 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	unsigned long grow;
 
 	/*
+	 * We must make sure the anon-vma is allocated
+	 * to make sure the anon-vma locking is not a noop.
+	 */
+	if (unlikely(anon_vma_prepare(vma)))
+		return -ENOMEM;
+
+	/*
+	 * We must serialize against other thread and against
+	 * objrmap while moving the vm_start/vm_pgoff of anon-vmas.
+	 * The total_vm/locked_vm as well needs serialization
+	 * against other threads, the serialization of
+	 * locked_vm/total_vm against syscalls is provided by
+	 * the mmap_sem that we hold in read mode here (all
+	 * syscalls holds it in write mode).
+	 */
+	anon_vma_lock(vma);
+
+	/*
 	 * vma->vm_start/vm_end cannot change under us because the caller
 	 * is required to hold the mmap_sem in read mode. We need to get
 	 * the spinlock only before relocating the vma range ourself.
@@ -1046,13 +1078,15 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	grow = (vma->vm_start - address) >> PAGE_SHIFT;
 
 	/* Overcommit.. */
-	if (security_vm_enough_memory(grow)) {
+	if (unlikely(security_vm_enough_memory(grow))) {
+		anon_vma_unlock(vma);
 		return -ENOMEM;
 	}
 	
-	if (vma->vm_end - address > current->rlim[RLIMIT_STACK].rlim_cur ||
-			((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
-			current->rlim[RLIMIT_AS].rlim_cur) {
+	if (unlikely(vma->vm_end - address > current->rlim[RLIMIT_STACK].rlim_cur ||
+		     ((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
+		     current->rlim[RLIMIT_AS].rlim_cur)) {
+		anon_vma_unlock(vma);
 		vm_unacct_memory(grow);
 		return -ENOMEM;
 	}
@@ -1061,6 +1095,9 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	vma->vm_mm->total_vm += grow;
 	if (vma->vm_flags & VM_LOCKED)
 		vma->vm_mm->locked_vm += grow;
+
+	anon_vma_unlock(vma);
+
 	return 0;
 }
 
@@ -1308,7 +1345,6 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 
 	if (mapping)
 		down(&mapping->i_shared_sem);
-	spin_lock(&mm->page_table_lock);
 	anon_vma_lock(vma);
 
 	if (new_below)
@@ -1320,7 +1356,6 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	__insert_vm_struct(mm, new);
 
 	anon_vma_unlock(vma);
-	spin_unlock(&mm->page_table_lock);
 	if (mapping)
 		up(&mapping->i_shared_sem);
 
