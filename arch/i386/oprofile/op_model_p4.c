@@ -419,9 +419,28 @@ static void p4_fill_in_addresses(struct op_msrs * const msrs)
 		msrs->controls[i].addr = addr;
 	}
 	
-	/* 43 ESCR registers in three discontiguous group */
+	/* 43 ESCR registers in three or four discontiguous group */
 	for (addr = MSR_P4_BSU_ESCR0 + stag;
-	     addr <= MSR_P4_SSU_ESCR0; ++i, addr += addr_increment()) { 
+	     addr < MSR_P4_IQ_ESCR0; ++i, addr += addr_increment()) {
+		msrs->controls[i].addr = addr;
+	}
+
+	/* no IQ_ESCR0/1 on some models, we save a seconde time BSU_ESCR0/1
+	 * to avoid special case in nmi_{save|restore}_registers() */
+	if (boot_cpu_data.x86_model >= 0x3) {
+		for (addr = MSR_P4_BSU_ESCR0 + stag;
+		     addr <= MSR_P4_BSU_ESCR1; ++i, addr += addr_increment()) {
+			msrs->controls[i].addr = addr;
+		}
+	} else {
+		for (addr = MSR_P4_IQ_ESCR0 + stag;
+		     addr <= MSR_P4_IQ_ESCR1; ++i, addr += addr_increment()) {
+			msrs->controls[i].addr = addr;
+		}
+	}
+
+	for (addr = MSR_P4_RAT_ESCR0 + stag;
+	     addr <= MSR_P4_SSU_ESCR0; ++i, addr += addr_increment()) {
 		msrs->controls[i].addr = addr;
 	}
 	
@@ -553,7 +572,18 @@ static void p4_setup_ctrs(struct op_msrs const * const msrs)
 
 	/* clear all escrs (including those outside our concern) */
 	for (addr = MSR_P4_BSU_ESCR0 + stag;
-	     addr <= MSR_P4_SSU_ESCR0; addr += addr_increment()) { 
+	     addr <  MSR_P4_IQ_ESCR0; addr += addr_increment()) {
+		wrmsr(addr, 0, 0);
+	}
+
+	/* On older models clear also MSR_P4_IQ_ESCR0/1 */
+	if (boot_cpu_data.x86_model < 0x3) {
+		wrmsr(MSR_P4_IQ_ESCR0, 0, 0);
+		wrmsr(MSR_P4_IQ_ESCR1, 0, 0);
+	}
+
+	for (addr = MSR_P4_RAT_ESCR0 + stag;
+	     addr <= MSR_P4_SSU_ESCR0; ++i, addr += addr_increment()) {
 		wrmsr(addr, 0, 0);
 	}
 	
