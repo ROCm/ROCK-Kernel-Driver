@@ -1,9 +1,6 @@
 ARCH_DIR = arch/um
 OS := $(shell uname -s)
 
-include $(ARCH_DIR)/Makefile-$(SUBARCH)
-include $(ARCH_DIR)/Makefile-os-$(OS)
-
 EXTRAVERSION := $(EXTRAVERSION)-1um
 include/linux/version.h: arch/$(ARCH)/Makefile
 
@@ -58,6 +55,9 @@ ARCH_SYMLINKS = include/asm-um/arch arch/um/include/sysdep arch/um/os \
 	$(SYMLINK_HEADERS)
 
 GEN_HEADERS = $(ARCH_DIR)/include/task.h
+
+include $(ARCH_DIR)/Makefile-$(SUBARCH)
+include $(ARCH_DIR)/Makefile-os-$(OS)
 
 $(ARCH_DIR)/vmlinux.lds.S :
 	touch $@

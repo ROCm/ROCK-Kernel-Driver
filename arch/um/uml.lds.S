@@ -65,7 +65,7 @@ SECTIONS
   .uml.postsetup.init : { *(.uml.postsetup.init) }
   __uml_postsetup_end = .;
   __setup_start = .;
-  .setup.init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
   __per_cpu_start = . ; 
   .data.percpu : { *(.data.percpu) }

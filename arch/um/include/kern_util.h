@@ -6,6 +6,7 @@
 #ifndef __KERN_UTIL_H__
 #define __KERN_UTIL_H__
 
+#include "linux/threads.h"
 #include "sysdep/ptrace.h"
 
 extern int ncpus;
@@ -14,6 +15,7 @@ extern char *gdb_init;
 extern int kmalloc_ok;
 extern int timer_irq_inited;
 extern int jail;
+extern struct task_struct *idle_threads[NR_CPUS];
 
 #define ROUND_DOWN(addr) ((void *)(((unsigned long) addr) & PAGE_MASK))
 #define ROUND_UP(addr) ROUND_DOWN(((unsigned long) addr) + PAGE_SIZE - 1)

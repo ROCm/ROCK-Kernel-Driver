@@ -767,8 +767,8 @@ void set_thread_sc(void *sc)
 
 int smp_sigio_handler(void)
 {
-	int cpu = current->thread_info->cpu;
 #ifdef CONFIG_SMP
+	int cpu = current->thread_info->cpu;
 	IPI_handler(cpu);
 	if(cpu != 0)
 		return(1);
