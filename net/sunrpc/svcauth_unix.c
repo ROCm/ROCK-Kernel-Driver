@@ -119,7 +119,8 @@ static inline int ip_map_match(struct ip_map *item, struct ip_map *tmp)
 }
 static inline void ip_map_init(struct ip_map *new, struct ip_map *item)
 {
-	new->m_class = strdup(item->m_class);
+	new->m_class = item->m_class;
+	item->m_class = NULL;
 	new->m_addr.s_addr = item->m_addr.s_addr;
 }
 static inline void ip_map_update(struct ip_map *new, struct ip_map *item)
@@ -191,7 +192,9 @@ static int ip_map_parse(struct cache_detail *cd,
 	} else
 		dom = NULL;
 
-	ipm.m_class = class;
+	ipm.m_class = strdup(class);
+	if (ipm.m_class == NULL)
+		return -ENOMEM;
 	ipm.m_addr.s_addr =
 		htonl((((((b1<<8)|b2)<<8)|b3)<<8)|b4);
 	ipm.h.flags = 0;
@@ -207,6 +210,7 @@ static int ip_map_parse(struct cache_detail *cd,
 		ip_map_put(&ipmp->h, &ip_map_cache);
 	if (dom)
 		auth_domain_put(dom);
+	if (ipm.m_class) kfree(ipm.m_class);
 	if (!ipmp)
 		return -ENOMEM;
 	cache_flush();
@@ -266,7 +270,9 @@ int auth_unix_add_addr(struct in_addr addr, struct auth_domain *dom)
 	if (dom->flavour != RPC_AUTH_UNIX)
 		return -EINVAL;
 	udom = container_of(dom, struct unix_domain, h);
-	ip.m_class = "nfsd";
+	ip.m_class = strdup("nfsd");
+	if (!ip.m_class)
+		return -ENOMEM;
 	ip.m_addr = addr;
 	ip.m_client = udom;
 	ip.m_add_change = udom->addr_changes+1;
@@ -274,6 +280,7 @@ int auth_unix_add_addr(struct in_addr addr, struct auth_domain *dom)
 	ip.h.expiry_time = NEVER;
 	
 	ipmp = ip_map_lookup(&ip, 1);
+	if (ip.m_class) kfree(ip.m_class);
 	if (ipmp) {
 		ip_map_put(&ipmp->h, &ip_map_cache);
 		return 0;
