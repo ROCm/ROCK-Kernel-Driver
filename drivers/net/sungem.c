@@ -2923,20 +2923,20 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	dev = init_etherdev(NULL, sizeof(*gp));
+	dev = alloc_etherdev(sizeof(*gp));
 	if (!dev) {
-		printk(KERN_ERR PFX "Etherdev init failed, aborting.\n");
+		printk(KERN_ERR PFX "Etherdev alloc failed, aborting.\n");
 		return -ENOMEM;
 	}
 	SET_MODULE_OWNER(dev);
 
-	if (!request_mem_region(gemreg_base, gemreg_len, dev->name)) {
-		printk(KERN_ERR PFX "MMIO resource (0x%lx@0x%lx) unavailable, "
-		       "aborting.\n", gemreg_base, gemreg_len);
+	gp = dev->priv;
+
+	if (pci_request_regions(pdev, dev->name)) {
+		printk(KERN_ERR PFX "Cannot obtain PCI resources, "
+		       "aborting.\n");
 		goto err_out_free_netdev;
 	}
-
-	gp = dev->priv;
 
 	gp->pdev = pdev;
 	dev->base_addr = (long) pdev;
@@ -2970,7 +2970,7 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if (gp->regs == 0UL) {
 		printk(KERN_ERR PFX "Cannot map device registers, "
 		       "aborting.\n");
-		goto err_out_free_mmio_res;
+		goto err_out_free_res;
 	}
 
 	/* On Apple, we power the chip up now in order for check
@@ -3006,21 +3006,27 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 		goto err_out_iounmap;
 	}
 
-	pci_set_drvdata(pdev, dev);
-
-	printk(KERN_INFO "%s: Sun GEM (PCI) 10/100/1000BaseT Ethernet ",
-	       dev->name);
-
 #ifdef CONFIG_ALL_PPC
 	gp->of_node = pci_device_to_OF_node(pdev);
 #endif	
 	if (gem_get_device_address(gp))
-		goto err_out_iounmap;
+		goto err_out_free_consistent;
+
+	if (register_netdev(dev)) {
+		printk(KERN_ERR PFX "Cannot register net device, "
+		       "aborting.\n");
+		goto err_out_free_consistent;
+	}
+
+	printk(KERN_INFO "%s: Sun GEM (PCI) 10/100/1000BaseT Ethernet ",
+	       dev->name);
 
 	for (i = 0; i < 6; i++)
 		printk("%2.2x%c", dev->dev_addr[i],
 		       i == 5 ? ' ' : ':');
 	printk("\n");
+
+	pci_set_drvdata(pdev, dev);
 
 	dev->open = gem_open;
 	dev->stop = gem_close;
@@ -3045,6 +3051,12 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 
 	return 0;
 
+err_out_free_consistent:
+	pci_free_consistent(pdev,
+			    sizeof(struct gem_init_block),
+			    gp->init_block,
+			    gp->gblock_dvma);
+
 err_out_iounmap:
 	down(&gp->pm_sem);
 	/* Stop the PM timer & task */
@@ -3053,13 +3065,13 @@ err_out_iounmap:
 	if (gp->hw_running)
 		gem_shutdown(gp);
 	up(&gp->pm_sem);
+
 	iounmap((void *) gp->regs);
 
-err_out_free_mmio_res:
-	release_mem_region(gemreg_base, gemreg_len);
+err_out_free_res:
+	pci_release_regions(pdev);
 
 err_out_free_netdev:
-	unregister_netdev(dev);
 	kfree(dev);
 
 	return -ENODEV;
@@ -3088,8 +3100,7 @@ static void __devexit gem_remove_one(struct pci_dev *pdev)
 				    gp->init_block,
 				    gp->gblock_dvma);
 		iounmap((void *) gp->regs);
-		release_mem_region(pci_resource_start(pdev, 0),
-				   pci_resource_len(pdev, 0));
+		pci_release_regions(pdev);
 		kfree(dev);
 
 		pci_set_drvdata(pdev, NULL);

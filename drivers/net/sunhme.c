@@ -2658,20 +2658,13 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	}
 
 	err = -ENOMEM;
-	dev = init_etherdev(NULL, sizeof(struct happy_meal));
+	dev = alloc_etherdev(sizeof(struct happy_meal));
 	if (!dev)
 		goto err_out;
 	SET_MODULE_OWNER(dev);
 
 	if (hme_version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
-
-	if (qfe_slot != -1)
-		printk(KERN_INFO "%s: Quattro HME slot %d (SBUS) 10/100baseT Ethernet ",
-		       dev->name, qfe_slot);
-	else
-		printk(KERN_INFO "%s: HAPPY MEAL (SBUS) 10/100baseT Ethernet ",
-		       dev->name);
 
 	/* If user did not specify a MAC address specifically, use
 	 * the Quattro local-mac-address property...
@@ -2692,11 +2685,6 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	} else {
 		memcpy(dev->dev_addr, idprom->id_ethaddr, 6);
 	}
-
-	for (i = 0; i < 6; i++)
-		printk("%2.2x%c",
-		       dev->dev_addr[i], i == 5 ? ' ' : ':');
-	printk("\n");
 
 	hp = dev->priv;
 	memset(hp, 0, sizeof(*hp));
@@ -2822,16 +2810,37 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	 */
 	happy_meal_set_initial_advertisement(hp);
 
-	ether_setup(dev);
+	if (register_netdev(hp->dev)) {
+		printk(KERN_ERR "happymeal: Cannot register net device, "
+		       "aborting.\n");
+		goto err_out_free_consistent;
+	}
+
+	if (qfe_slot != -1)
+		printk(KERN_INFO "%s: Quattro HME slot %d (SBUS) 10/100baseT Ethernet ",
+		       dev->name, qfe_slot);
+	else
+		printk(KERN_INFO "%s: HAPPY MEAL (SBUS) 10/100baseT Ethernet ",
+		       dev->name);
+
+	for (i = 0; i < 6; i++)
+		printk("%2.2x%c",
+		       dev->dev_addr[i], i == 5 ? ' ' : ':');
+	printk("\n");
 
 	/* We are home free at this point, link us in to the happy
 	 * device list.
 	 */
-	dev->ifindex = dev_new_index();
 	hp->next_module = root_happy_dev;
 	root_happy_dev = hp;
 
 	return 0;
+
+err_out_free_consistent:
+	sbus_free_consistent(hp->happy_dev,
+			     PAGE_SIZE,
+			     hp->happy_block,
+			     hp->hblock_dvma);
 
 err_out_iounmap:
 	if (hp->gregs)
@@ -2846,7 +2855,6 @@ err_out_iounmap:
 		sbus_iounmap(hp->tcvregs, TCVR_REG_SIZE);
 
 err_out_free_netdev:
-	unregister_netdev(dev);
 	kfree(dev);
 
 err_out:
@@ -2996,7 +3004,7 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 			goto err_out;
 	}
 
-	dev = init_etherdev(NULL, sizeof(struct happy_meal));
+	dev = alloc_etherdev(sizeof(struct happy_meal));
 	err = -ENOMEM;
 	if (!dev)
 		goto err_out;
@@ -3004,29 +3012,6 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 
 	if (hme_version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
-
-	if (!qfe_slot) {
-		struct pci_dev *qpdev = qp->quattro_dev;
-
-		prom_name[0] = 0;
-		if (!strncmp(dev->name, "eth", 3)) {
-			int i = simple_strtoul(dev->name + 3, NULL, 10);
-			sprintf(prom_name, "-%d", i + 3);
-		}
-		printk(KERN_INFO "%s%s: Quattro HME (PCI/CheerIO) 10/100baseT Ethernet ", dev->name, prom_name);
-		if (qpdev->vendor == PCI_VENDOR_ID_DEC &&
-		    qpdev->device == PCI_DEVICE_ID_DEC_21153)
-			printk("DEC 21153 PCI Bridge\n");
-		else
-			printk("unknown bridge %04x.%04x\n", 
-				qpdev->vendor, qpdev->device);
-	}
-	if (qfe_slot != -1)
-		printk(KERN_INFO "%s: Quattro HME slot %d (PCI/CheerIO) 10/100baseT Ethernet ",
-		       dev->name, qfe_slot);
-	else
-		printk(KERN_INFO "%s: HAPPY MEAL (PCI/CheerIO) 10/100BaseT Ethernet ",
-		       dev->name);
 
 	dev->base_addr = (long) pdev;
 
@@ -3049,9 +3034,15 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 		printk(KERN_ERR "happymeal(PCI): Cannot find proper PCI device base address.\n");
 		goto err_out_clear_quattro;
 	}
+	if (pci_request_regions(pdev, dev->name)) {
+		printk(KERN_ERR "happymeal(PCI): Cannot obtain PCI resources, "
+		       "aborting.\n");
+		goto err_out_clear_quattro;
+	}
+
 	if ((hpreg_base = (unsigned long) ioremap(hpreg_base, 0x8000)) == 0) {
 		printk(KERN_ERR "happymeal(PCI): Unable to remap card memory.\n");
-		return -ENODEV;
+		goto err_out_free_res;
 	}
 
 	for (i = 0; i < 6; i++) {
@@ -3076,11 +3067,6 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 #endif
 	}
 	
-	for (i = 0; i < 6; i++)
-		printk("%2.2x%c", dev->dev_addr[i], i == 5 ? ' ' : ':');
-
-	printk("\n");
-
 	/* Layout registers. */
 	hp->gregs      = (hpreg_base + 0x0000UL);
 	hp->etxregs    = (hpreg_base + 0x2000UL);
@@ -3159,12 +3145,44 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	 */
 	happy_meal_set_initial_advertisement(hp);
 
-	ether_setup(dev);
+	if (register_netdev(hp->dev)) {
+		printk(KERN_ERR "happymeal(PCI): Cannot register net device, "
+		       "aborting.\n");
+		goto err_out_iounmap;
+	}
+
+	if (!qfe_slot) {
+		struct pci_dev *qpdev = qp->quattro_dev;
+
+		prom_name[0] = 0;
+		if (!strncmp(dev->name, "eth", 3)) {
+			int i = simple_strtoul(dev->name + 3, NULL, 10);
+			sprintf(prom_name, "-%d", i + 3);
+		}
+		printk(KERN_INFO "%s%s: Quattro HME (PCI/CheerIO) 10/100baseT Ethernet ", dev->name, prom_name);
+		if (qpdev->vendor == PCI_VENDOR_ID_DEC &&
+		    qpdev->device == PCI_DEVICE_ID_DEC_21153)
+			printk("DEC 21153 PCI Bridge\n");
+		else
+			printk("unknown bridge %04x.%04x\n", 
+				qpdev->vendor, qpdev->device);
+	}
+
+	if (qfe_slot != -1)
+		printk(KERN_INFO "%s: Quattro HME slot %d (PCI/CheerIO) 10/100baseT Ethernet ",
+		       dev->name, qfe_slot);
+	else
+		printk(KERN_INFO "%s: HAPPY MEAL (PCI/CheerIO) 10/100BaseT Ethernet ",
+		       dev->name);
+
+	for (i = 0; i < 6; i++)
+		printk("%2.2x%c", dev->dev_addr[i], i == 5 ? ' ' : ':');
+
+	printk("\n");
 
 	/* We are home free at this point, link us in to the happy
 	 * device list.
 	 */
-	dev->ifindex = dev_new_index();
 	hp->next_module = root_happy_dev;
 	root_happy_dev = hp;
 
@@ -3173,11 +3191,13 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 err_out_iounmap:
 	iounmap((void *)hp->gregs);
 
+err_out_free_res:
+	pci_release_regions(pdev);
+
 err_out_clear_quattro:
 	if (qp != NULL)
 		qp->happy_meals[qfe_slot] = NULL;
 
-	unregister_netdev(dev);
 	kfree(dev);
 
 err_out:
@@ -3228,6 +3248,7 @@ static int __init happy_meal_pci_probe(void)
 				       PCI_DEVICE_ID_SUN_HAPPYMEAL, pdev)) != NULL) {
 		if (pci_enable_device(pdev))
 			continue;
+		pci_set_master(pdev);
 		cards++;
 		happy_meal_pci_init(pdev);
 	}
@@ -3302,6 +3323,7 @@ static void __exit happy_meal_cleanup_module(void)
 					    hp->happy_block,
 					    hp->hblock_dvma);
 			iounmap((void *)hp->gregs);
+			pci_release_regions(hp->happy_dev);
 		}
 #endif
 		kfree(dev);
