@@ -1156,8 +1156,10 @@ static int velocity_init_td_ring(struct velocity_info *vptr)
 		for (i = 0; i < vptr->options.numtx; i++, curr += sizeof(struct tx_desc)) {
 			td = &(vptr->td_rings[j][i]);
 			td_info = &(vptr->td_infos[j][i]);
-			td_info->buf = vptr->tx_bufs + (i + j) * PKT_BUF_SZ;
-			td_info->buf_dma = vptr->tx_bufs_dma + (i + j) * PKT_BUF_SZ;
+			td_info->buf = vptr->tx_bufs +
+				(j * vptr->options.numtx + i) * PKT_BUF_SZ;
+			td_info->buf_dma = vptr->tx_bufs_dma +
+				(j * vptr->options.numtx + i) * PKT_BUF_SZ;
 		}
 		vptr->td_tail[j] = vptr->td_curr[j] = vptr->td_used[j] = 0;
 	}
