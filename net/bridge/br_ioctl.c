@@ -84,17 +84,20 @@ static int br_ioctl_device(struct net_bridge *br,
 
 	case BRCTL_GET_PORT_LIST:
 	{
-		int i;
-		int indices[256];
+		int *indices;
+		int ret = 0;
 
-		for (i=0;i<256;i++)
-			indices[i] = 0;
+		indices = kmalloc(256*sizeof(int), GFP_KERNEL);
+		if (indices == NULL)
+			return -ENOMEM;
+
+		memset(indices, 0, 256*sizeof(int));
 
 		br_get_port_ifindices(br, indices);
 		if (copy_to_user((void *)arg0, indices, 256*sizeof(int)))
-			return -EFAULT;
-
-		return 0;
+			ret =  -EFAULT;
+		kfree(indices);
+		return ret;
 	}
 
 	case BRCTL_SET_BRIDGE_FORWARD_DELAY:
@@ -212,19 +215,24 @@ static int br_ioctl_deviceless(unsigned int cmd,
 
 	case BRCTL_GET_BRIDGES:
 	{
-		int i;
-		int indices[64];
-
-		for (i=0;i<64;i++)
-			indices[i] = 0;
+		int *indices;
+		int ret = 0;
 
 		if (arg1 > 64)
 			arg1 = 64;
-		arg1 = br_get_bridge_ifindices(indices, arg1);
-		if (copy_to_user((void *)arg0, indices, arg1*sizeof(int)))
-			return -EFAULT;
 
-		return arg1;
+		indices = kmalloc(arg1*sizeof(int), GFP_KERNEL);
+		if (indices == NULL)
+			return -ENOMEM;
+
+		memset(indices, 0, arg1*sizeof(int));
+		arg1 = br_get_bridge_ifindices(indices, arg1);
+
+		ret = copy_to_user((void *)arg0, indices, arg1*sizeof(int))
+			? -EFAULT : arg1;
+
+		kfree(indices);
+		return ret;
 	}
 
 	case BRCTL_ADD_BRIDGE:
