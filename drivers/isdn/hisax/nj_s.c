@@ -184,6 +184,14 @@ setup_netjet_s(struct IsdnCard *card)
 				printk(KERN_WARNING "NETjet-S: No IO-Adr for PCI card found\n");
 				return(0);
 			}
+ 			/* 2001/10/04 Christoph Ersfeld, Formula-n Europe AG www.formula-n.com */
+ 			if ((dev_netjet->subsystem_vendor == 0x55) &&
+ 				(dev_netjet->subsystem_device == 0x02)) {
+ 				printk(KERN_WARNING "Netjet: You tried to load this driver with an incompatible TigerJet-card\n");
+ 				printk(KERN_WARNING "Use type=41 for Formula-n enter:now ISDN PCI and compatible\n");
+ 				return(0);
+ 			}
+ 			/* end new code */
 			cs->hw.njet.pdev = dev_netjet;
 		} else {
 			printk(KERN_WARNING "NETjet-S: No PCI card found\n");

@@ -68,6 +68,8 @@ Gazel ISDN cards
 HFC-PCI based cards
 Winbond W6692 based cards
 HFC-S+, HFC-SP/PCMCIA cards
+formula-n enternow
+Gerdes Power ISDN
 
 Note: PCF, PCF-Pro: up to now, only the ISDN part is supported
       PCC-8: not tested yet
@@ -192,6 +194,8 @@ Card types:
    37	HFC 2BDS0 S+, SP         irq,io 
    38	NETspider U PCI card     none
    39	HFC 2BDS0 SP/PCMCIA      irq,io (set with cardmgr)
+   40   hotplug interface
+   41   Formula-n enter:now PCI  none
 
 At the moment IRQ sharing is only possible with PCI cards. Please make sure
 that your IRQ is free and enabled for ISA use.
@@ -297,7 +301,9 @@ type
    36	W6692 based PCI cards   none
    37	HFC 2BDS0 S+,SP/PCMCIA  ONLY WORKS AS A MODULE !
    38	NETspider U PCI card    none
-
+   39	HFC 2BDS0 SP/PCMCIA     ONLY WORKS AS A MODULE !
+   40   hotplug interface	ONLY WORKS AS A MODULE !
+   41   Formula-n enter:now PCI none
 
 Running the driver
 ------------------

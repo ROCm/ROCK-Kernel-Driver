@@ -57,6 +57,7 @@ hisax-objs-$(CONFIG_HISAX_BKM_A4T) += bkm_a4t.o isac.o arcofi.o jade.o
 hisax-objs-$(CONFIG_HISAX_SCT_QUADRO) += bkm_a8.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_GAZEL) += gazel.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_W6692) += w6692.o
+hisax-objs-$(CONFIG_HISAX_ENTERNOW_PCI) += enternow_pci.o amd7930_fn.o
 #hisax-objs-$(CONFIG_HISAX_TESTEMU) += testemu.o
 
 hisax-objs += $(hisax-objs-y)
