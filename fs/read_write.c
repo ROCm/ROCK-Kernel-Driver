@@ -186,14 +186,21 @@ bad:
 int rw_verify_area(int read_write, struct file *file, loff_t *ppos, size_t count)
 {
 	struct inode *inode;
+	loff_t pos;
 
-	if (count > file->f_maxcount)
-		return -EINVAL;
+	if (unlikely(count > file->f_maxcount))
+		goto Einval;
+	pos = *ppos;
+	if (unlikely((pos < 0) || (loff_t) (pos + count) < 0))
+		goto Einval;
 
 	inode = file->f_dentry->d_inode;
 	if (inode->i_flock && MANDATORY_LOCK(inode))
-		return locks_mandatory_area(read_write == READ ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE, inode, file, *ppos, count);
+		return locks_mandatory_area(read_write == READ ? FLOCK_VERIFY_READ : FLOCK_VERIFY_WRITE, inode, file, pos, count);
 	return 0;
+
+Einval:
+	return -EINVAL;
 }
 
 ssize_t do_sync_read(struct file *filp, char __user *buf, size_t len, loff_t *ppos)
@@ -220,6 +227,8 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 		return -EBADF;
 	if (!file->f_op || (!file->f_op->read && !file->f_op->aio_read))
 		return -EINVAL;
+	if (unlikely(!access_ok(VERIFY_WRITE, buf, count)))
+		return -EFAULT;
 
 	ret = rw_verify_area(READ, file, pos, count);
 	if (!ret) {
@@ -266,6 +275,8 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 		return -EBADF;
 	if (!file->f_op || (!file->f_op->write && !file->f_op->aio_write))
 		return -EINVAL;
+	if (unlikely(!access_ok(VERIFY_READ, buf, count)))
+		return -EFAULT;
 
 	ret = rw_verify_area(WRITE, file, pos, count);
 	if (!ret) {
@@ -397,6 +408,9 @@ unsigned long iov_shorten(struct iovec *iov, unsigned long nr_segs, size_t to)
 
 EXPORT_SYMBOL(iov_shorten);
 
+/* A write operation does a read from user space and vice versa */
+#define vrfy_dir(type) ((type) == READ ? VERIFY_WRITE : VERIFY_READ)
+
 static ssize_t do_readv_writev(int type, struct file *file,
 			       const struct iovec __user * uvector,
 			       unsigned long nr_segs, loff_t *pos)
@@ -450,8 +464,11 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	tot_len = 0;
 	ret = -EINVAL;
 	for (seg = 0; seg < nr_segs; seg++) {
+		void __user *buf = iov[seg].iov_base;
 		ssize_t len = (ssize_t)iov[seg].iov_len;
 
+		if (unlikely(!access_ok(vrfy_dir(type), buf, len)))
+			goto Efault;
 		if (len < 0)	/* size_t not fitting an ssize_t .. */
 			goto out;
 		tot_len += len;
@@ -510,6 +527,9 @@ out:
 		dnotify_parent(file->f_dentry,
 				(type == READ) ? DN_ACCESS : DN_MODIFY);
 	return ret;
+Efault:
+	ret = -EFAULT;
+	goto out;
 }
 
 ssize_t vfs_readv(struct file *file, const struct iovec __user *vec,

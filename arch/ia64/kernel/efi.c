@@ -415,8 +415,8 @@ efi_memmap_walk (efi_freemem_callback_t callback, void *arg)
  * Abstraction Layer chapter 11 in ADAG
  */
 
-static efi_memory_desc_t *
-pal_code_memdesc (void)
+void *
+efi_get_pal_addr (void)
 {
 	void *efi_map_start, *efi_map_end, *p;
 	efi_memory_desc_t *md;
@@ -474,51 +474,31 @@ pal_code_memdesc (void)
 			md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT),
 			vaddr & mask, (vaddr & mask) + IA64_GRANULE_SIZE);
 #endif
-		return md;
+		return __va(md->phys_addr);
 	}
-
+	printk(KERN_WARNING "%s: no PAL-code memory-descriptor found",
+	       __FUNCTION__);
 	return NULL;
-}
-
-void
-efi_get_pal_addr (void)
-{
-	efi_memory_desc_t *md = pal_code_memdesc();
-	u64 vaddr, mask;
-	struct cpuinfo_ia64 *cpuinfo;
-
-	if (md != NULL) {
-
-		vaddr = PAGE_OFFSET + md->phys_addr;
-		mask  = ~((1 << IA64_GRANULE_SHIFT) - 1);
-
-		cpuinfo = (struct cpuinfo_ia64 *)__va(ia64_get_kr(IA64_KR_PA_CPU_INFO));
-		cpuinfo->pal_base = vaddr & mask;
-		cpuinfo->pal_paddr = pte_val(mk_pte_phys(md->phys_addr, PAGE_KERNEL));
-	}
 }
 
 void
 efi_map_pal_code (void)
 {
-	efi_memory_desc_t *md = pal_code_memdesc();
-	u64 vaddr, mask, psr;
+	void *pal_vaddr = efi_get_pal_addr ();
+	u64 psr;
 
-	if (md != NULL) {
+	if (!pal_vaddr)
+		return;
 
-		vaddr = PAGE_OFFSET + md->phys_addr;
-		mask  = ~((1 << IA64_GRANULE_SHIFT) - 1);
-
-		/*
-		 * Cannot write to CRx with PSR.ic=1
-		 */
-		psr = ia64_clear_ic();
-		ia64_itr(0x1, IA64_TR_PALCODE, vaddr & mask,
-			pte_val(pfn_pte(md->phys_addr >> PAGE_SHIFT, PAGE_KERNEL)),
-			IA64_GRANULE_SHIFT);
-		ia64_set_psr(psr);		/* restore psr */
-		ia64_srlz_i();
-	}
+	/*
+	 * Cannot write to CRx with PSR.ic=1
+	 */
+	psr = ia64_clear_ic();
+	ia64_itr(0x1, IA64_TR_PALCODE, GRANULEROUNDDOWN((unsigned long) pal_vaddr),
+		 pte_val(pfn_pte(__pa(pal_vaddr) >> PAGE_SHIFT, PAGE_KERNEL)),
+		 IA64_GRANULE_SHIFT);
+	ia64_set_psr(psr);		/* restore psr */
+	ia64_srlz_i();
 }
 
 void __init

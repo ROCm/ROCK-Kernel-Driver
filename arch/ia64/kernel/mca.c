@@ -67,6 +67,7 @@
 
 #include <asm/delay.h>
 #include <asm/machvec.h>
+#include <asm/meminit.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
@@ -86,6 +87,12 @@
 ia64_mca_sal_to_os_state_t	ia64_sal_to_os_handoff_state;
 ia64_mca_os_to_sal_state_t	ia64_os_to_sal_handoff_state;
 u64				ia64_mca_serialize;
+DEFINE_PER_CPU(u64, ia64_mca_data); /* == __per_cpu_mca[smp_processor_id()] */
+DEFINE_PER_CPU(u64, ia64_mca_per_cpu_pte); /* PTE to map per-CPU area */
+DEFINE_PER_CPU(u64, ia64_mca_pal_pte);	    /* PTE to map PAL code */
+DEFINE_PER_CPU(u64, ia64_mca_pal_base);    /* vaddr PAL code granule */
+
+unsigned long __per_cpu_mca[NR_CPUS];
 
 /* In mca_asm.S */
 extern void			ia64_monarch_init_handler (void);
@@ -1194,6 +1201,53 @@ static struct irqaction mca_cpep_irqaction = {
 	.name =		"cpe_poll"
 };
 #endif /* CONFIG_ACPI */
+
+/* Do per-CPU MCA-related initialization.  */
+
+void __devinit
+ia64_mca_cpu_init(void *cpu_data)
+{
+	void *pal_vaddr;
+
+	if (smp_processor_id() == 0) {
+		void *mca_data;
+		int cpu;
+
+		mca_data = alloc_bootmem(sizeof(struct ia64_mca_cpu)
+					 * NR_CPUS);
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+			__per_cpu_mca[cpu] = __pa(mca_data);
+			mca_data += sizeof(struct ia64_mca_cpu);
+		}
+	}
+
+        /*
+         * The MCA info structure was allocated earlier and its
+         * physical address saved in __per_cpu_mca[cpu].  Copy that
+         * address * to ia64_mca_data so we can access it as a per-CPU
+         * variable.
+         */
+	__get_cpu_var(ia64_mca_data) = __per_cpu_mca[smp_processor_id()];
+
+	/*
+	 * Stash away a copy of the PTE needed to map the per-CPU page.
+	 * We may need it during MCA recovery.
+	 */
+	__get_cpu_var(ia64_mca_per_cpu_pte) =
+		pte_val(mk_pte_phys(__pa(cpu_data), PAGE_KERNEL));
+
+        /*
+         * Also, stash away a copy of the PAL address and the PTE
+         * needed to map it.
+         */
+        pal_vaddr = efi_get_pal_addr();
+	if (!pal_vaddr)
+		return;
+	__get_cpu_var(ia64_mca_pal_base) =
+		GRANULEROUNDDOWN((unsigned long) pal_vaddr);
+	__get_cpu_var(ia64_mca_pal_pte) = pte_val(mk_pte_phys(__pa(pal_vaddr),
+							      PAGE_KERNEL));
+}
 
 /*
  * ia64_mca_init

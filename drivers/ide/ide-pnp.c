@@ -21,7 +21,7 @@
 #include <linux/ide.h>
 
 /* Add your devices here :)) */
-struct pnp_device_id idepnp_devices[] = {
+static struct pnp_device_id idepnp_devices[] = {
   	/* Generic ESDI/IDE/ATA compatible hard disk controller */
 	{.id = "PNP0600", .driver_data = 0},
 	{.id = ""}

@@ -178,7 +178,7 @@ find_memory (void)
 void *
 per_cpu_init (void)
 {
-	void *cpu_data, *mca_data;
+	void *cpu_data;
 	int cpu;
 
 	/*
@@ -189,14 +189,11 @@ per_cpu_init (void)
 	if (smp_processor_id() == 0) {
 		cpu_data = __alloc_bootmem(PERCPU_PAGE_SIZE * NR_CPUS,
 					   PERCPU_PAGE_SIZE, __pa(MAX_DMA_ADDRESS));
-		mca_data = alloc_bootmem(PERCPU_MCA_SIZE * NR_CPUS);
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 			memcpy(cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 			__per_cpu_offset[cpu] = (char *) cpu_data - __per_cpu_start;
 			cpu_data += PERCPU_PAGE_SIZE;
 			per_cpu(local_per_cpu_offset, cpu) = __per_cpu_offset[cpu];
-			__per_cpu_mca[cpu] = (unsigned long)__pa(mca_data);
-			mca_data += PERCPU_MCA_SIZE;
 		}
 	}
 	return __per_cpu_start + __per_cpu_offset[smp_processor_id()];

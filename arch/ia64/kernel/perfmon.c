@@ -5,13 +5,13 @@
  * The initial version of perfmon.c was written by
  * Ganesh Venkitachalam, IBM Corp.
  *
- * Then it was modified for perfmon-1.x by Stephane Eranian and 
+ * Then it was modified for perfmon-1.x by Stephane Eranian and
  * David Mosberger, Hewlett Packard Co.
- * 
- * Version Perfmon-2.x is a rewrite of perfmon-1.x
- * by Stephane Eranian, Hewlett Packard Co. 
  *
- * Copyright (C) 1999-2003  Hewlett Packard Co
+ * Version Perfmon-2.x is a rewrite of perfmon-1.x
+ * by Stephane Eranian, Hewlett Packard Co.
+ *
+ * Copyright (C) 1999-2003, 2005  Hewlett Packard Co
  *               Stephane Eranian <eranian@hpl.hp.com>
  *               David Mosberger-Tang <davidm@hpl.hp.com>
  *
@@ -4778,10 +4778,8 @@ recheck:
  * system-call entry point (must return long)
  */
 asmlinkage long
-sys_perfmonctl (int fd, int cmd, void __user *arg, int count, long arg5, long arg6, long arg7,
-		long arg8, long stack)
+sys_perfmonctl (int fd, int cmd, void __user *arg, int count)
 {
-	struct pt_regs *regs = (struct pt_regs *)&stack;
 	struct file *file = NULL;
 	pfm_context_t *ctx = NULL;
 	unsigned long flags = 0UL;
@@ -4905,7 +4903,7 @@ restart_args:
 	if (unlikely(ret)) goto abort_locked;
 
 skip_fd:
-	ret = (*func)(ctx, args_k, count, regs);
+	ret = (*func)(ctx, args_k, count, ia64_task_regs(current));
 
 	call_made = 1;
 
@@ -6671,8 +6669,7 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 }
 #else  /* !CONFIG_PERFMON */
 asmlinkage long
-sys_perfmonctl (int fd, int cmd, void *arg, int count, long arg5, long arg6, long arg7,
-		long arg8, long stack)
+sys_perfmonctl (int fd, int cmd, void *arg, int count)
 {
 	return -ENOSYS;
 }

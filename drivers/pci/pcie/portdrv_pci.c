@@ -63,34 +63,18 @@ static int __devinit pcie_portdrv_probe (struct pci_dev *dev,
 
 static void pcie_portdrv_remove (struct pci_dev *dev)
 {
-	struct pcie_device *pciedev;
-
-      	pciedev = (struct pcie_device *)pci_get_drvdata(dev);
-	if (pciedev) {
-		pcie_port_device_remove(pciedev);
-		pci_set_drvdata(dev, NULL); 
-	}
+	pcie_port_device_remove(dev);
 }
 
 #ifdef CONFIG_PM
 static int pcie_portdrv_suspend (struct pci_dev *dev, u32 state)
 {
-	struct pcie_device *pciedev;
-	
-      	pciedev = (struct pcie_device *)pci_get_drvdata(dev);
-	if (pciedev) 
-		pcie_port_device_suspend(pciedev, state);
-	return 0;
+	return pcie_port_device_suspend(dev, state);
 }
 
 static int pcie_portdrv_resume (struct pci_dev *dev)
 {
-	struct pcie_device *pciedev;
-	
-      	pciedev = (struct pcie_device *)pci_get_drvdata(dev);
-	if (pciedev) 
-		pcie_port_device_resume(pciedev);
-	return 0;
+	return pcie_port_device_resume(dev);
 }
 #endif
 

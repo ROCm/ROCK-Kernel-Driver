@@ -1295,12 +1295,15 @@ static int hid_get_class_descriptor(struct usb_device *dev, int ifnum,
 		unsigned char type, void *buf, int size)
 {
 	int result, retries = 4;
+
+	memset(buf,0,size);	// Make sure we parse really received data
+
 	do {
 		result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 				USB_REQ_GET_DESCRIPTOR, USB_RECIP_INTERFACE | USB_DIR_IN,
 				(type << 8), ifnum, buf, size, HZ * USB_CTRL_GET_TIMEOUT);
 		retries--;
-	} while (result < 0 && retries);
+	} while (result < size && retries);
 	return result;
 }
 
@@ -1663,7 +1666,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	printk("\n");
 #endif
 
-	if (!(hid = hid_parse_report(rdesc, rsize))) {
+	if (!(hid = hid_parse_report(rdesc, n))) {
 		dbg("parsing report descriptor failed");
 		kfree(rdesc);
 		return NULL;
@@ -1740,7 +1743,7 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 		strcat(hid->name, buf);
 		if (usb_string(dev, dev->descriptor.iProduct, buf, 64) > 0)
 			snprintf(hid->name, 64, "%s %s", hid->name, buf);
-	} else if (usb_string(dev, dev->descriptor.iProduct, buf, 128) > 0) {
+	} else if (usb_string(dev, dev->descriptor.iProduct, buf, 64) > 0) {
 			snprintf(hid->name, 128, "%s", buf);
 	} else
 		snprintf(hid->name, 128, "%04x:%04x", 

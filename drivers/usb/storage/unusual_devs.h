@@ -210,7 +210,15 @@ UNUSUAL_DEV(  0x04e6, 0x0005, 0x0100, 0x0208,
 		0), 
 #endif
 
-UNUSUAL_DEV(  0x04e6, 0x0006, 0x0100, 0x0205, 
+/* Reported by Markus Demleitner <msdemlei@cl.uni-heidelberg.de> */
+UNUSUAL_DEV(  0x04e6, 0x0006, 0x0100, 0x0100, 
+		"SCM Microsystems Inc.",
+		"eUSB MMC Adapter",
+		US_SC_SCSI, US_PR_CB, NULL, 
+		US_FL_SINGLE_LUN), 
+
+/* Reported by Daniel Nouri <dpunktnpunkt@web.de> */
+UNUSUAL_DEV(  0x04e6, 0x0006, 0x0205, 0x0205, 
 		"Shuttle",
 		"eUSB MMC Adapter",
 		US_SC_SCSI, US_PR_DEVICE, NULL, 

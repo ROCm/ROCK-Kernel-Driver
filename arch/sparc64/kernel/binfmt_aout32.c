@@ -335,7 +335,7 @@ beyond_if:
 	if (!(orig_thr_flags & _TIF_32BIT)) {
 		unsigned long pgd_cache;
 
-		pgd_cache = ((unsigned long)current->mm->pgd[0])<<11UL;
+		pgd_cache = ((unsigned long)pgd_val(current->mm->pgd[0]))<<11;
 		__asm__ __volatile__("stxa\t%0, [%1] %2\n\t"
 				     "membar #Sync"
 				     : /* no outputs */

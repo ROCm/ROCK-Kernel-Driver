@@ -3286,6 +3286,10 @@ static const struct usb_device_id	products [] = {
 	// Surecom EP-1427X-2
 	USB_DEVICE (0x1189, 0x0893),
 	.driver_info = (unsigned long) &ax8817x_info,
+}, {
+	// goodway corp usb gwusb2e
+	USB_DEVICE (0x1631, 0x6200),
+	.driver_info = (unsigned long) &ax8817x_info,
 },
 #endif
 

@@ -585,7 +585,7 @@ static void idefloppy_input_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, uns
 			count = min(bvec->bv_len, bcount);
 
 			data = bvec_kmap_irq(bvec, &flags);
-			atapi_input_bytes(drive, data, count);
+			drive->hwif->atapi_input_bytes(drive, data, count);
 			bvec_kunmap_irq(data, &flags);
 
 			bcount -= count;
@@ -619,7 +619,7 @@ static void idefloppy_output_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, un
 			count = min(bvec->bv_len, bcount);
 
 			data = bvec_kmap_irq(bvec, &flags);
-			atapi_output_bytes(drive, data, count);
+			drive->hwif->atapi_output_bytes(drive, data, count);
 			bvec_kunmap_irq(data, &flags);
 
 			bcount -= count;

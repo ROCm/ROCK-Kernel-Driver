@@ -13,7 +13,7 @@
 #include <asm/sn/arch.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/pda.h>
-#include "shubio.h"
+#include <asm/sn/shubio.h>
 #include <asm/nodedata.h>
 #include <asm/delay.h>
 
