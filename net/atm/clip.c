@@ -737,7 +737,8 @@ static int atm_init_atmarp(struct atm_vcc *vcc)
 	set_bit(ATM_VF_META,&vcc->flags);
 	set_bit(ATM_VF_READY,&vcc->flags);
 	    /* allow replies and avoid getting closed if signaling dies */
-	bind_vcc(vcc,&atmarpd_dev);
+	vcc->dev = &atmarpd_dev;
+	vcc_insert_socket(vcc->sk);
 	vcc->push = NULL;
 	vcc->pop = NULL; /* crash */
 	vcc->push_oam = NULL; /* crash */

@@ -293,7 +293,6 @@ struct atm_vcc {
 	struct k_atm_aal_stats *stats;	/* pointer to AAL stats group */
 	wait_queue_head_t sleep;	/* if socket is busy */
 	struct sock	*sk;		/* socket backpointer */
-	struct atm_vcc	*prev,*next;
 	/* SVC part --- may move later ------------------------------------- */
 	short		itf;		/* interface number */
 	struct sockaddr_atmsvc local;
@@ -320,8 +319,6 @@ struct atm_dev {
 					/* (NULL) */
 	const char	*type;		/* device type name */
 	int		number;		/* device index */
-	struct atm_vcc	*vccs;		/* VCC table (or NULL) */
-	struct atm_vcc	*last;		/* last VCC (or undefined) */
 	void		*dev_data;	/* per-device data */
 	void		*phy_data;	/* private PHY date */
 	unsigned long	flags;		/* device flags (ATM_DF_*) */
@@ -390,6 +387,9 @@ struct atm_skb_data {
 	unsigned long	atm_options;	/* ATM layer options */
 };
 
+extern struct hlist_head vcc_sklist;
+extern rwlock_t vcc_sklist_lock;
+
 #define ATM_SKB(skb) (((struct atm_skb_data *) (skb)->cb))
 
 struct atm_dev *atm_dev_register(const char *type,const struct atmdev_ops *ops,
@@ -397,7 +397,8 @@ struct atm_dev *atm_dev_register(const char *type,const struct atmdev_ops *ops,
 struct atm_dev *atm_dev_lookup(int number);
 void atm_dev_deregister(struct atm_dev *dev);
 void shutdown_atm_dev(struct atm_dev *dev);
-void bind_vcc(struct atm_vcc *vcc,struct atm_dev *dev);
+void vcc_insert_socket(struct sock *sk);
+void vcc_remove_socket(struct sock *sk);
 
 
 /*
@@ -436,7 +437,7 @@ static inline void atm_dev_hold(struct atm_dev *dev)
 }
 
 
-static inline void atm_dev_release(struct atm_dev *dev)
+static inline void atm_dev_put(struct atm_dev *dev)
 {
 	atomic_dec(&dev->refcnt);
 

@@ -23,11 +23,6 @@
 #include "addr.h"
 
 
-#ifndef NULL
-#define NULL 0
-#endif
-
-
 LIST_HEAD(atm_devs);
 spinlock_t atm_dev_lock = SPIN_LOCK_UNLOCKED;
 
@@ -91,7 +86,7 @@ struct atm_dev *atm_dev_register(const char *type, const struct atmdev_ops *ops,
 	spin_lock(&atm_dev_lock);
 	if (number != -1) {
 		if ((inuse = __atm_dev_lookup(number))) {
-			atm_dev_release(inuse);
+			atm_dev_put(inuse);
 			spin_unlock(&atm_dev_lock);
 			__free_atm_dev(dev);
 			return NULL;
@@ -100,7 +95,7 @@ struct atm_dev *atm_dev_register(const char *type, const struct atmdev_ops *ops,
 	} else {
 		dev->number = 0;
 		while ((inuse = __atm_dev_lookup(dev->number))) {
-			atm_dev_release(inuse);
+			atm_dev_put(inuse);
 			dev->number++;
 		}
 	}
@@ -402,78 +397,12 @@ int atm_dev_ioctl(unsigned int cmd, unsigned long arg)
 	else
 		error = 0;
 done:
-	atm_dev_release(dev);
+	atm_dev_put(dev);
 	return error;
 }
 
-
-struct sock *alloc_atm_vcc_sk(int family)
-{
-	struct sock *sk;
-	struct atm_vcc *vcc;
-
-	sk = sk_alloc(family, GFP_KERNEL, 1, NULL);
-	if (!sk)
-		return NULL;
-	vcc = atm_sk(sk) = kmalloc(sizeof(*vcc), GFP_KERNEL);
-	if (!vcc) {
-		sk_free(sk);
-		return NULL;
-	}
-	sock_init_data(NULL, sk);
-	memset(vcc, 0, sizeof(*vcc));
-	vcc->sk = sk;
-
-	return sk;
-}
-
-
-static void unlink_vcc(struct atm_vcc *vcc)
-{
-	unsigned long flags;
-	if (vcc->dev) {
-		spin_lock_irqsave(&vcc->dev->lock, flags);
-		if (vcc->prev)
-			vcc->prev->next = vcc->next;
-		else
-			vcc->dev->vccs = vcc->next;
-
-		if (vcc->next)
-			vcc->next->prev = vcc->prev;
-		else
-			vcc->dev->last = vcc->prev;
-		spin_unlock_irqrestore(&vcc->dev->lock, flags);
-	}
-}
-
-
-void free_atm_vcc_sk(struct sock *sk)
-{
-	unlink_vcc(atm_sk(sk));
-	sk_free(sk);
-}
-
-void bind_vcc(struct atm_vcc *vcc,struct atm_dev *dev)
-{
-	unsigned long flags;
-
-	unlink_vcc(vcc);
-	vcc->dev = dev;
-	if (dev) {
-		spin_lock_irqsave(&dev->lock, flags);
-		vcc->next = NULL;
-		vcc->prev = dev->last;
-		if (dev->vccs)
-			dev->last->next = vcc;
-		else
-			dev->vccs = vcc;
-		dev->last = vcc;
-		spin_unlock_irqrestore(&dev->lock, flags);
-	}
-}
 
 EXPORT_SYMBOL(atm_dev_register);
 EXPORT_SYMBOL(atm_dev_deregister);
 EXPORT_SYMBOL(atm_dev_lookup);
 EXPORT_SYMBOL(shutdown_atm_dev);
-EXPORT_SYMBOL(bind_vcc);

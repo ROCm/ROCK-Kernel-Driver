@@ -79,7 +79,6 @@
 #include <linux/sonet.h>
 
 #define USE_TASKLET
-#define USE_HE_FIND_VCC
 #undef USE_SCATTERGATHER
 #undef USE_CHECKSUM_HW			/* still confused about this */
 #define USE_RBPS
@@ -328,25 +327,25 @@ he_readl_internal(struct he_dev *he_dev, unsigned addr, unsigned flags)
 		he_writel_rcm(dev, val, 0x00000 | (cid << 3) | 7)
 
 static __inline__ struct atm_vcc*
-he_find_vcc(struct he_dev *he_dev, unsigned cid)
+__find_vcc(struct he_dev *he_dev, unsigned cid)
 {
-	unsigned long flags;
 	struct atm_vcc *vcc;
+	struct hlist_node *node;
+	struct sock *s;
 	short vpi;
 	int vci;
 
 	vpi = cid >> he_dev->vcibits;
 	vci = cid & ((1 << he_dev->vcibits) - 1);
 
-	spin_lock_irqsave(&he_dev->atm_dev->lock, flags);
-	for (vcc = he_dev->atm_dev->vccs; vcc; vcc = vcc->next)
-		if (vcc->vci == vci && vcc->vpi == vpi
-			&& vcc->qos.rxtp.traffic_class != ATM_NONE) {
-				spin_unlock_irqrestore(&he_dev->atm_dev->lock, flags);
+	sk_for_each(s, node, &vcc_sklist) {
+		vcc = atm_sk(s);
+		if (vcc->dev == he_dev->atm_dev &&
+		    vcc->vci == vci && vcc->vpi == vpi &&
+		    vcc->qos.rxtp.traffic_class != ATM_NONE) {
 				return vcc;
-			}
-
-	spin_unlock_irqrestore(&he_dev->atm_dev->lock, flags);
+		}
+	}
 	return NULL;
 }
 
@@ -1566,17 +1565,6 @@ he_start(struct atm_dev *dev)
 	reg |= RX_ENABLE;
 	he_writel(he_dev, reg, RC_CONFIG);
 
-#ifndef USE_HE_FIND_VCC
-	he_dev->he_vcc_table = kmalloc(sizeof(struct he_vcc_table) * 
-			(1 << (he_dev->vcibits + he_dev->vpibits)), GFP_KERNEL);
-	if (he_dev->he_vcc_table == NULL) {
-		hprintk("failed to alloc he_vcc_table\n");
-		return -ENOMEM;
-	}
-	memset(he_dev->he_vcc_table, 0, sizeof(struct he_vcc_table) *
-				(1 << (he_dev->vcibits + he_dev->vpibits)));
-#endif
-
 	for (i = 0; i < HE_NUM_CS_STPER; ++i) {
 		he_dev->cs_stper[i].inuse = 0;
 		he_dev->cs_stper[i].pcr = -1;
@@ -1712,11 +1700,6 @@ he_stop(struct he_dev *he_dev)
 							he_dev->tpd_base, he_dev->tpd_base_phys);
 #endif
 
-#ifndef USE_HE_FIND_VCC
-	if (he_dev->he_vcc_table)
-		kfree(he_dev->he_vcc_table);
-#endif
-
 	if (he_dev->pci_dev) {
 		pci_read_config_word(he_dev->pci_dev, PCI_COMMAND, &command);
 		command &= ~(PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER);
@@ -1798,6 +1781,7 @@ he_service_rbrq(struct he_dev *he_dev, int group)
 	int pdus_assembled = 0;
 	int updated = 0;
 
+	read_lock(&vcc_sklist_lock);
 	while (he_dev->rbrq_head != rbrq_tail) {
 		++updated;
 
@@ -1823,13 +1807,10 @@ he_service_rbrq(struct he_dev *he_dev, int group)
 		buf_len = RBRQ_BUFLEN(he_dev->rbrq_head) * 4;
 		cid = RBRQ_CID(he_dev->rbrq_head);
 
-#ifdef USE_HE_FIND_VCC
 		if (cid != lastcid)
-			vcc = he_find_vcc(he_dev, cid);
+			vcc = __find_vcc(he_dev, cid);
 		lastcid = cid;
-#else
-		vcc = HE_LOOKUP_VCC(he_dev, cid);
-#endif
+
 		if (vcc == NULL) {
 			hprintk("vcc == NULL  (cid 0x%x)\n", cid);
 			if (!RBRQ_HBUF_ERR(he_dev->rbrq_head))
@@ -1966,6 +1947,7 @@ next_rbrq_entry:
 					RBRQ_MASK(++he_dev->rbrq_head));
 
 	}
+	read_unlock(&vcc_sklist_lock);
 
 	if (updated) {
 		if (updated > he_dev->rbrq_peak)
@@ -2565,10 +2547,6 @@ he_open(struct atm_vcc *vcc, short vpi, int vci)
 #endif
 
 		spin_unlock_irqrestore(&he_dev->global_lock, flags);
-
-#ifndef USE_HE_FIND_VCC
-		HE_LOOKUP_VCC(he_dev, cid) = vcc;
-#endif
 	}
 
 open_failed:
@@ -2634,9 +2612,6 @@ he_close(struct atm_vcc *vcc)
 		if (timeout == 0)
 			hprintk("close rx timeout cid 0x%x\n", cid);
 
-#ifndef USE_HE_FIND_VCC
-		HE_LOOKUP_VCC(he_dev, cid) = NULL;
-#endif
 		HPRINTK("close rx cid 0x%x complete\n", cid);
 
 	}

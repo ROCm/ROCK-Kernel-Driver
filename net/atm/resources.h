@@ -14,8 +14,6 @@ extern struct list_head atm_devs;
 extern spinlock_t atm_dev_lock;
 
 
-struct sock *alloc_atm_vcc_sk(int family);
-void free_atm_vcc_sk(struct sock *sk);
 int atm_dev_ioctl(unsigned int cmd, unsigned long arg);
 
 

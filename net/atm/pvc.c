@@ -17,10 +17,6 @@
 #include "resources.h"		/* devs and vccs */
 #include "common.h"		/* common for PVCs and SVCs */
 
-#ifndef NULL
-#define NULL 0
-#endif
-
 
 static int pvc_shutdown(struct socket *sock,int how)
 {
@@ -109,7 +105,7 @@ static int pvc_getname(struct socket *sock,struct sockaddr *sockaddr,
 static struct proto_ops pvc_proto_ops = {
 	.family =	PF_ATMPVC,
 
-	.release =	atm_release,
+	.release =	vcc_release,
 	.bind =		pvc_bind,
 	.connect =	pvc_connect,
 	.socketpair =	sock_no_socketpair,
@@ -131,7 +127,7 @@ static struct proto_ops pvc_proto_ops = {
 static int pvc_create(struct socket *sock,int protocol)
 {
 	sock->ops = &pvc_proto_ops;
-	return atm_create(sock,protocol,PF_ATMPVC);
+	return vcc_create(sock, protocol, PF_ATMPVC);
 }
 
 
