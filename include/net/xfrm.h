@@ -336,7 +336,7 @@ extern struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
 
 static inline void xfrm_pol_hold(struct xfrm_policy *policy)
 {
-	if (likely(policy))
+	if (likely(policy != NULL))
 		atomic_inc(&policy->refcnt);
 }
 
