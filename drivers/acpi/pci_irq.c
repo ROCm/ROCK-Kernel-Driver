@@ -180,7 +180,7 @@ acpi_pci_irq_add_prt (
 	 *       (either a PCI root bridge or PCI-PCI bridge).
 	 */
 
-	buffer.length = sizeof(pathname);
+	buffer.length = ACPI_PATHNAME_MAX;
 	buffer.pointer = pathname;
 	acpi_get_name(handle, ACPI_FULL_PATHNAME, &buffer);
 
@@ -193,17 +193,16 @@ acpi_pci_irq_add_prt (
 
 	buffer.length = 0;
 	buffer.pointer = NULL;
+	kfree(pathname);
 	status = acpi_get_irq_routing_table(handle, &buffer);
 	if (status != AE_BUFFER_OVERFLOW) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PRT [%s]\n",
 			acpi_format_exception(status)));
-		kfree(pathname);
 		return_VALUE(-ENODEV);
 	}
 
 	prt = kmalloc(buffer.length, GFP_KERNEL);
 	if (!prt){
-		kfree(pathname);
 		return_VALUE(-ENOMEM);
 	}
 	memset(prt, 0, buffer.length);
@@ -213,7 +212,6 @@ acpi_pci_irq_add_prt (
 	if (ACPI_FAILURE(status)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PRT [%s]\n",
 			acpi_format_exception(status)));
-		kfree(pathname);
 		kfree(buffer.pointer);
 		return_VALUE(-ENODEV);
 	}
@@ -226,7 +224,6 @@ acpi_pci_irq_add_prt (
 			((unsigned long) entry + entry->length);
 	}
 
-	kfree(pathname);
 	kfree(prt);
 
 	return_VALUE(0);
