@@ -301,27 +301,24 @@ xfs_qm_unmount_quotadestroy(
 
 /*
  * This is called from xfs_mountfs to start quotas and initialize all
- * necessary data structures like quotainfo, and in the rootfs's case
- * xfs_Gqm. This is also responsible for running a quotacheck as necessary.
- * We are guaranteed that the superblock is consistently read in at this
- * point.
+ * necessary data structures like quotainfo.  This is also responsible for
+ * running a quotacheck as necessary.  We are guaranteed that the superblock
+ * is consistently read in at this point.
  */
 int
 xfs_qm_mount_quotas(
 	xfs_mount_t	*mp)
 {
-	unsigned long		s;
-	int		error;
+	unsigned long	s;
+	int		error = 0;
 	uint		sbf;
 
-	error = 0;
 	/*
-	 * If a non-root file system had quotas running earlier, but decided
-	 * to mount without -o quota/pquota options, revoke the quotachecked
-	 * license, and bail out.
+	 * If a file system had quotas running earlier, but decided to
+	 * mount without -o quota/uquota/gquota options, revoke the
+	 * quotachecked license, and bail out.
 	 */
 	if (! XFS_IS_QUOTA_ON(mp) &&
-	    (mp->m_dev != rootdev) &&
 	    (mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT))) {
 		mp->m_qflags = 0;
 		goto write_changes;
@@ -342,32 +339,6 @@ xfs_qm_mount_quotas(
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 	cmn_err(CE_NOTE, "Attempting to turn on disk quotas.");
 #endif
-	/*
-	 * If this is the root file system, mark flags in mount struct first.
-	 * We couldn't do this earlier because we didn't have the superblock
-	 * read in.
-	 */
-	if (mp->m_dev == rootdev) {
-		ASSERT(XFS_SB_VERSION_HASQUOTA(&mp->m_sb));
-		ASSERT(mp->m_sb.sb_qflags &
-		       (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT));
-		if (xfs_Gqm == NULL) {
-			if ((xfs_Gqm = xfs_qm_init()) == NULL) {
-				mp->m_qflags = 0;
-				error = EINVAL;
-				goto write_changes;
-			}
-		}
-		mp->m_qflags = mp->m_sb.sb_qflags;
-		if (mp->m_qflags & XFS_UQUOTA_ACCT)
-			mp->m_qflags |= XFS_UQUOTA_ACTIVE;
-		if (mp->m_qflags & XFS_GQUOTA_ACCT)
-			mp->m_qflags |= XFS_GQUOTA_ACTIVE;
-		/*
-		 * The quotainode of the root file system may or may not
-		 * exist at this point.
-		 */
-	}
 
 	ASSERT(XFS_IS_QUOTA_RUNNING(mp));
 	/*
@@ -544,20 +515,6 @@ again:
 		xfs_dqunlock(dqp);
 		if (error)
 			return (error);
-
-		/*
-		 * If this is the root filesystem doing a quotacheck,
-		 * we should do periodic bflushes. This is because there's
-		 * no bflushd at this point.
-		 */
-		if (mp->m_flags & XFS_MOUNT_ROOTQCHECK) {
-			if (++niters == XFS_QM_MAX_DQCLUSTER_LOGSZ) {
-				xfs_log_force(mp, (xfs_lsn_t)0,
-					      XFS_LOG_FORCE | XFS_LOG_SYNC);
-				XFS_bflush(mp->m_ddev_targp);
-				niters = 0;
-			}
-		}
 
 		xfs_qm_mplist_lock(mp);
 		if (recl != XFS_QI_MPLRECLAIMS(mp)) {
@@ -1569,22 +1526,6 @@ xfs_qm_dqiter_bufs(
 					     XFS_DQ_USER : XFS_DQ_GROUP);
 		xfs_bdwrite(mp, bp);
 		/*
-		 * When quotachecking the root filesystem,
-		 * we may not have bdflush, and we may fill
-		 * up all available freebufs.
-		 * The workaround here is to push on the
-		 * log and do a bflush on the rootdev
-		 * periodically.
-		 */
-		if (mp->m_flags & XFS_MOUNT_ROOTQCHECK) {
-			if (++notcommitted == incr) {
-				xfs_log_force(mp, (xfs_lsn_t)0,
-					      XFS_LOG_FORCE | XFS_LOG_SYNC);
-				XFS_bflush(mp->m_ddev_targp);
-				notcommitted = 0;
-			}
-		}
-		/*
 		 * goto the next block.
 		 */
 		bno++;
@@ -1982,7 +1923,6 @@ xfs_qm_quotacheck(
 
  error_return:
 	cmn_err(CE_NOTE, "XFS quotacheck %s: Done.", mp->m_fsname);
-	mp->m_flags &= ~(XFS_MOUNT_ROOTQCHECK);
 	return (error);
 }
 
@@ -2034,9 +1974,9 @@ xfs_qm_init_quotainos(
 	/*
 	 * Create the two inodes, if they don't exist already. The changes
 	 * made above will get added to a transaction and logged in one of
-	 * the qino_alloc calls below.
+	 * the qino_alloc calls below.  If the device is readonly,
+	 * temporarily switch to read-write to do this.
 	 */
-
 	if (XFS_IS_UQUOTA_ON(mp) && uip == NULL) {
 		if ((error = xfs_qm_qino_alloc(mp, &uip,
 					      sbflags | XFS_SB_UQUOTINO,
@@ -2145,20 +2085,6 @@ xfs_qm_shake_freelist(
 		 */
 		if (XFS_DQ_IS_DIRTY(dqp)) {
 			xfs_dqtrace_entry(dqp, "DQSHAKE: DQDIRTY");
-			/*
-			 * We'll be doing a dqflush, and it is
-			 * possible to fill up the entire buffer cache
-			 * with dirty delayed write buffers when doing
-			 * this on a root filesystem, if bdflush isn't
-			 * running. So, do a flush periodically.
-			 */
-			if (dqp->q_mount->m_flags & XFS_MOUNT_ROOTQCHECK) {
-				if (!(++nflushes % XFS_QM_MAX_DQCLUSTER_LOGSZ)){
-					xfs_log_force(dqp->q_mount, (xfs_lsn_t)0,
-						 XFS_LOG_FORCE | XFS_LOG_SYNC);
-					XFS_bflush(dqp->q_mount->m_ddev_targp);
-				}
-			}
 			/*
 			 * We flush it delayed write, so don't bother
 			 * releasing the mplock.
@@ -2329,21 +2255,6 @@ xfs_qm_dqreclaim_one(void)
 		 */
 		if (XFS_DQ_IS_DIRTY(dqp)) {
 			xfs_dqtrace_entry(dqp, "DQRECLAIM: DQDIRTY");
-			/*
-			 * We'll be doing a dqflush, and it is
-			 * possible to fill up the entire buffer cache
-			 * with dirty delayed write buffers when doing
-			 * this on a root filesystem, if bdflush isn't
-			 * running. So, do a flush periodically.
-			 */
-			if (dqp->q_mount->m_flags & XFS_MOUNT_ROOTQCHECK) {
-				if (!(++nflushes % XFS_QM_MAX_DQCLUSTER_LOGSZ)) {
-					xfs_log_force(dqp->q_mount, (xfs_lsn_t)0,
-						XFS_LOG_FORCE | XFS_LOG_SYNC);
-					XFS_bflush(dqp->q_mount->m_ddev_targp);
-				}
-			}
-
 			/*
 			 * We flush it delayed write, so don't bother
 			 * releasing the freelist lock.

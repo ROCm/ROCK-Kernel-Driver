@@ -33,6 +33,7 @@
 #define __XFS_H__
 
 #include <linux/config.h>
+#include <linux/types.h>
 
 #include <xfs_types.h>
 #include <xfs_arch.h>
