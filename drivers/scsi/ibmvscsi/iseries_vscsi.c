@@ -164,7 +164,8 @@ int __init ibmvscsi_module_init(void)
 
 void __exit ibmvscsi_module_exit(void)
 {
-	ibmvscsi_remove(single_host_data);
+	if (single_host_data)
+		ibmvscsi_remove(single_host_data);
 	device_unregister(&iseries_vscsi_dev.dev);
 }
 
