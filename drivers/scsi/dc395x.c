@@ -4792,8 +4792,8 @@ static void banner_display(void)
 static int __devinit dc395x_init_one(struct pci_dev *dev,
 		const struct pci_device_id *id)
 {
-	struct Scsi_Host *scsi_host;
-	struct AdapterCtlBlk *acb;
+	struct Scsi_Host *scsi_host = NULL;
+	struct AdapterCtlBlk *acb = NULL;
 	unsigned long io_port_base;
 	unsigned int io_port_len;
 	unsigned int irq;
@@ -4816,7 +4816,7 @@ static int __devinit dc395x_init_one(struct pci_dev *dev,
 				    sizeof(struct AdapterCtlBlk));
 	if (!scsi_host) {
 		dprintkl(KERN_INFO, "scsi_host_alloc failed\n");
-		return -ENOMEM;
+		goto fail;
 	}
  	acb = (struct AdapterCtlBlk*)scsi_host->hostdata;
  	acb->scsi_host = scsi_host;
@@ -4825,8 +4825,7 @@ static int __devinit dc395x_init_one(struct pci_dev *dev,
 	/* initialise the adapter and everything we need */
  	if (adapter_init(acb, io_port_base, io_port_len, irq)) {
 		dprintkl(KERN_INFO, "adapter init failed\n");
-		scsi_host_put(scsi_host);
-		return -ENODEV;
+		goto fail;
 	}
 
 	pci_set_master(dev);
@@ -4834,14 +4833,20 @@ static int __devinit dc395x_init_one(struct pci_dev *dev,
 	/* get the scsi mid level to scan for new devices on the bus */
 	if (scsi_add_host(scsi_host, &dev->dev)) {
 		dprintkl(KERN_ERR, "scsi_add_host failed\n");
-		adapter_uninit(acb);
-		scsi_host_put(scsi_host);
-		return -ENODEV;
+		goto fail;
 	}
 	pci_set_drvdata(dev, scsi_host);
 	scsi_scan_host(scsi_host);
         	
 	return 0;
+
+fail:
+	if (acb != NULL)
+		adapter_uninit(acb);
+	if (scsi_host != NULL)
+		scsi_host_put(scsi_host);
+	pci_disable_device(dev);
+	return -ENODEV;
 }
 
 
@@ -4860,6 +4865,7 @@ static void __devexit dc395x_remove_one(struct pci_dev *dev)
 
 	scsi_remove_host(scsi_host);
 	adapter_uninit(acb);
+	pci_disable_device(dev);
 	scsi_host_put(scsi_host);
 	pci_set_drvdata(dev, NULL);
 }
