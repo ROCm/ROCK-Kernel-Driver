@@ -312,7 +312,12 @@ acpi_bus_match (
 	struct acpi_device	*device,
 	struct acpi_driver	*driver)
 {
-	return acpi_match_ids(device, driver->ids);
+	int error = 0;
+
+	error = driver->ops.match ? driver->ops.match(device, driver) : 
+			acpi_match_ids(device, driver->ids) ;
+
+	return error;
 }
 
 
