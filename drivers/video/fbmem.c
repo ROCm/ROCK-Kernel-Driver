@@ -768,9 +768,6 @@ static struct file_operations fb_fops = {
 #endif
 };
 
-static devfs_handle_t devfs_handle;
-
-
 /**
  *	register_framebuffer - registers a frame buffer device
  *	@fb_info: frame buffer info structure
@@ -784,7 +781,7 @@ static devfs_handle_t devfs_handle;
 int
 register_framebuffer(struct fb_info *fb_info)
 {
-	char name_buf[8];
+	char name_buf[12];
 	int i;
 
 	if (num_registered_fb == FB_MAX)
@@ -795,11 +792,10 @@ register_framebuffer(struct fb_info *fb_info)
 			break;
 	fb_info->node = mk_kdev(FB_MAJOR, i);
 	registered_fb[i] = fb_info;
-	sprintf (name_buf, "%d", i);
-	fb_info->devfs_handle =
-	    devfs_register (devfs_handle, name_buf, DEVFS_FL_DEFAULT,
-			    FB_MAJOR, i, S_IFCHR | S_IRUGO | S_IWUGO,
-			    &fb_fops, NULL);
+	sprintf(name_buf, "fb/%d", i);
+	devfs_register(NULL, name_buf, DEVFS_FL_DEFAULT,
+			FB_MAJOR, i, S_IFCHR | S_IRUGO | S_IWUGO,
+			&fb_fops, NULL);
 	return 0;
 }
 
@@ -822,10 +818,7 @@ unregister_framebuffer(struct fb_info *fb_info)
 	i = minor(fb_info->node);
 	if (!registered_fb[i])
 		return -EINVAL;
-	devfs_unregister (fb_info->devfs_handle);
-	fb_info->devfs_handle = NULL;
-	devfs_unregister (fb_info->devfs_lhandle);
-	fb_info->devfs_lhandle = NULL;
+	devfs_remove("fb/%d", i);
 	registered_fb[i]=NULL;
 	num_registered_fb--;
 	return 0;
@@ -848,7 +841,7 @@ fbmem_init(void)
 
 	create_proc_read_entry("fb", 0, 0, fbmem_read_proc, NULL);
 
-	devfs_handle = devfs_mk_dir (NULL, "fb", NULL);
+	devfs_mk_dir(NULL, "fb", NULL);
 	if (register_chrdev(FB_MAJOR,"fb",&fb_fops))
 		printk("unable to get major %d for fb devs\n", FB_MAJOR);
 

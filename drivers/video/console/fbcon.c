@@ -220,7 +220,7 @@ static void fbcon_vbl_detect(int irq, void *dummy, struct pt_regs *fp)
 static void cursor_timer_handler(unsigned long dev_addr);
 
 static struct timer_list cursor_timer =
-	TIMER_INITIALIZER(cursor_timer_handler, 0, 0);
+		TIMER_INITIALIZER(cursor_timer_handler, 0, 0);
 
 static void cursor_timer_handler(unsigned long dev_addr)
 {
