@@ -1958,6 +1958,7 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 			VOLUME_ADD(icode, &ptr, capture + z, tmp + 0, gpr + z);
 		}
 		snd_emu10k1_init_stereo_control(controls + i++, "Line2 LiveDrive Capture Volume", gpr, 0);
+		controls[i-1].id.index = 1;
 		snd_emu10k1_init_stereo_onoff_control(controls + i++, "Line2 LiveDrive Capture Switch", gpr + 2, 0);
 		controls[i-1].id.index = 1;
 		gpr += 4;
