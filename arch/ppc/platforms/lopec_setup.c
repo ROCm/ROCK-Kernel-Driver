@@ -378,7 +378,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
 
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_ID_MODULE)
+#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 	ppc_ide_md.default_irq = lopec_ide_default_irq;
 	ppc_ide_md.default_io_base = lopec_ide_default_io_base;
 	ppc_ide_md.ide_init_hwif = lopec_ide_init_hwif_ports;
