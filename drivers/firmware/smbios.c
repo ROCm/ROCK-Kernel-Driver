@@ -10,9 +10,9 @@
  *
  * This code takes information provided by SMBIOS tables
  * and presents it in sysfs as:
- *    /sys/firmware/smbios/smbios
- *				|--> /table_entry_point
- *				|--> /table
+ *    /sys/firmware/smbios
+ *			|--> /table_entry_point
+ *			|--> /table
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License v2.0 as published by
@@ -42,7 +42,6 @@ MODULE_LICENSE("GPL");
 struct smbios_device {
 	struct smbios_table_entry_point table_eps;
 	unsigned int smbios_table_real_length;
-	struct kobject kobj;
 };
 
 /* there shall be only one */
@@ -143,7 +142,7 @@ static ssize_t
 smbios_read_table_entry_point(struct kobject *kobj, char *buffer,
 				loff_t pos, size_t size)
 {
-	struct smbios_device *sdev = to_smbios_device(kobj);
+	struct smbios_device *sdev = &the_smbios_device;
 	const char *p = (const char *)&(sdev->table_eps);
 	unsigned int count =
 		size > sizeof(sdev->table_eps) ?
@@ -156,7 +155,7 @@ static ssize_t
 smbios_read_table(struct kobject *kobj, char *buffer,
 				loff_t pos, size_t size)
 {
-	struct smbios_device *sdev = to_smbios_device(kobj);
+	struct smbios_device *sdev = &the_smbios_device;
 	u8 *buf;
 	unsigned int count = sdev->smbios_table_real_length - pos;
 	int i = 0;
@@ -204,30 +203,16 @@ static struct kobj_type ktype_smbios = {
 
 static decl_subsys(smbios,&ktype_smbios,NULL);
 
-static inline void
-smbios_device_unregister(struct smbios_device *sdev)
+static void smbios_device_unregister(void)
 {
-	sysfs_remove_bin_file(&sdev->kobj, &tep_attr );
-	sysfs_remove_bin_file(&sdev->kobj, &table_attr );
-	kobject_unregister(&sdev->kobj);
+	sysfs_remove_bin_file(&smbios_subsys.kset.kobj, &tep_attr );
+	sysfs_remove_bin_file(&smbios_subsys.kset.kobj, &table_attr );
 }
 
-static int
-smbios_device_register(struct smbios_device *sdev)
+static void __init smbios_device_register(void)
 {
-	int error;
-
-	if (!sdev)
-		return 1;
-
-	kobject_set_name(&sdev->kobj, "smbios");
-	kobj_set_kset_s(sdev,smbios_subsys);
-	error = kobject_register(&sdev->kobj);
-	if (!error){
-		sysfs_create_bin_file(&sdev->kobj, &tep_attr );
-		sysfs_create_bin_file(&sdev->kobj, &table_attr );
-	}
-	return error;
+	sysfs_create_bin_file(&smbios_subsys.kset.kobj, &tep_attr );
+	sysfs_create_bin_file(&smbios_subsys.kset.kobj, &table_attr );
 }
 
 static int __init
@@ -247,10 +232,7 @@ smbios_init(void)
 	if (rc)
 		return rc;
 
-	rc = smbios_device_register(&the_smbios_device);
-
-	if (rc)
-		firmware_unregister(&smbios_subsys);
+	smbios_device_register();
 
 	return rc;
 }
@@ -258,7 +240,7 @@ smbios_init(void)
 static void __exit
 smbios_exit(void)
 {
-	smbios_device_unregister(&the_smbios_device);
+	smbios_device_unregister();
 	firmware_unregister(&smbios_subsys);
 }
 
