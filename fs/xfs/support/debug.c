@@ -55,7 +55,7 @@ assfail(char *a, char *f, int l)
     BUG();
 }
 
-#ifdef DEBUG
+#if (defined(DEBUG) || defined(INDUCE_IO_ERRROR))
 
 unsigned long
 random(void)
