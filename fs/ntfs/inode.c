@@ -23,6 +23,7 @@
 #include <linux/buffer_head.h>
 #include <linux/smp_lock.h>
 #include <linux/quotaops.h>
+#include <linux/mount.h>
 
 #include "ntfs.h"
 #include "dir.h"
