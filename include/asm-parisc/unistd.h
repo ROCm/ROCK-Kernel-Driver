@@ -789,7 +789,7 @@
 			K_LDW_ASM_PIC					\
 			: "=r" (__res)					\
 			: "i" (SYS_ify(name)) K_ASM_ARGS_##nr   	\
-			: K_CALL_CLOB_REGS K_CLOB_ARGS_##nr		\
+			: "memory", K_CALL_CLOB_REGS K_CLOB_ARGS_##nr	\
 		);							\
 		__sys_res = (long)__res;				\
 	}								\
