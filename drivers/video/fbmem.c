@@ -386,6 +386,7 @@ static void __init fb_set_logocmap(struct fb_info *info)
 	palette_cmap.red = palette_red;
 	palette_cmap.green = palette_green;
 	palette_cmap.blue = palette_blue;
+	palette_cmap.transp = NULL;
 
 	for (i = 0; i < LINUX_LOGO_COLORS; i += n) {
 		n = LINUX_LOGO_COLORS - i;
@@ -767,6 +768,7 @@ fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
 int
 fb_blank(int blank, struct fb_info *info)
 {	
+	/* ??? Varible sized stack allocation.  */
 	u16 black[info->cmap.len];
 	struct fb_cmap cmap;
 	
@@ -775,8 +777,7 @@ fb_blank(int blank, struct fb_info *info)
 	if (blank) { 
 		memset(black, 0, info->cmap.len * sizeof(u16));
 		cmap.red = cmap.green = cmap.blue = black;
-		if (info->cmap.transp)
-			cmap.transp = black;
+		cmap.transp = info->cmap.transp ? black : NULL;
 		cmap.start = info->cmap.start;
 		cmap.len = info->cmap.len;
 	} else
