@@ -100,9 +100,11 @@ ENTRY(v4_flush_kern_tlb_page)
 
 	.section ".text.init", #alloc, #execinstr
 
+	.type	v4_tlb_fns, #object
 ENTRY(v4_tlb_fns)
 	.long	v4_flush_kern_tlb_all
 	.long	v4_flush_user_tlb_mm
 	.long	v4_flush_user_tlb_range
 	.long	v4_flush_user_tlb_page
 	.long	v4_flush_kern_tlb_page
+	.size	v4_tlb_fns, . - v4_tlb_fns

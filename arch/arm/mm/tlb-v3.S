@@ -81,10 +81,11 @@ ENTRY(v3_flush_kern_tlb_page)
 
 	.section ".text.init", #alloc, #execinstr
 
+	.type	v3_tlb_fns, #object
 ENTRY(v3_tlb_fns)
 	.long	v3_flush_kern_tlb_all
 	.long	v3_flush_user_tlb_mm
 	.long	v3_flush_user_tlb_range
 	.long	v3_flush_user_tlb_page
 	.long	v3_flush_kern_tlb_page
-
+	.size	v3_tlb_fns, . - v3_tlb_fns

@@ -248,24 +248,16 @@ static void ecard_init_pgtables(struct mm_struct *mm)
 	 * FIXME: we don't follow this 100% yet.
 	 */
 	pgd_t *src_pgd, *dst_pgd;
-	unsigned int dst_addr = IO_START;
 
 	src_pgd = pgd_offset(mm, IO_BASE);
-	dst_pgd = pgd_offset(mm, dst_addr);
+	dst_pgd = pgd_offset(mm, IO_START);
 
-	while (dst_addr < IO_START + IO_SIZE) {
-		*dst_pgd++ = *src_pgd++;
-		dst_addr += PGDIR_SIZE;
-	}
+	memcpy(dst_pgd, src_pgd, sizeof(pgd_t) * (IO_SIZE / PGDIR_SIZE));
 
-	dst_addr = EASI_START;
 	src_pgd = pgd_offset(mm, EASI_BASE);
-	dst_pgd = pgd_offset(mm, dst_addr);
+	dst_pgd = pgd_offset(mm, EASI_START);
 
-	while (dst_addr < EASI_START + EASI_SIZE) {
-		*dst_pgd++ = *src_pgd++;
-		dst_addr += PGDIR_SIZE;
-	}
+	memcpy(dst_pgd, src_pgd, sizeof(pgd_t) * (EASI_SIZE / PGDIR_SIZE));
 
 	vma.vm_mm = mm;
 

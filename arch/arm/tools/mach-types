@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Fri Mar 8 20:08:02 2002
+# Last update: Sat Mar 16 10:55:44 2002
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -176,3 +176,5 @@ iam			SA1100_IAM		IAM			164
 tt530			SA1100_TT530		TT530			165
 sam2400			ARCH_SAM2400		SAM2400			166
 jornada56x		ARCH_JORNADA56X		JORNADA56X		167
+active			SA1100_ACTIVE		ACTIVE			168
+iq80321			ARCH_IQ80321		IQ80321			169

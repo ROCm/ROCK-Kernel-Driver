@@ -84,7 +84,7 @@ extern void __do_softirq(void);
     __MODULE_STRING(sym);			\
  const struct module_symbol __ksymtab_##sym	\
   __attribute__((section("__ksymtab"))) =	\
-    { (unsigned long)&##orig, __kstrtab_##sym };
+    { (unsigned long)&orig, __kstrtab_##sym };
 
 /*
  * floating point math emulator support.

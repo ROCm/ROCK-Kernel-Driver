@@ -146,17 +146,20 @@ ENTRY(v4wbi_flush_kern_tlb_page)
 
 	.section ".text.init", #alloc, #execinstr
 
+	.type	v4wb_tlb_fns, #object
 ENTRY(v4wb_tlb_fns)
 	.long	v4wb_flush_kern_tlb_all
 	.long	v4wb_flush_user_tlb_mm
 	.long	v4wb_flush_user_tlb_range
 	.long	v4wb_flush_user_tlb_page
 	.long	v4wb_flush_kern_tlb_page
+	.size	v4wb_tlb_fns, . - v4wb_tlb_fns
 
+	.type	v4wbi_tlb_fns, #object
 ENTRY(v4wbi_tlb_fns)
 	.long	v4wbi_flush_kern_tlb_all
 	.long	v4wbi_flush_user_tlb_mm
 	.long	v4wbi_flush_user_tlb_range
 	.long	v4wbi_flush_user_tlb_page
 	.long	v4wbi_flush_kern_tlb_page
-
+	.size	v4wbi_tlb_fns, . - v4wbi_tlb_fns

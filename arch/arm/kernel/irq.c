@@ -325,9 +325,8 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 				   !check_irq_lock(desc, irq, regs)))
 				desc->chip->unmask(irq);
 		}
+		irq_exit(cpu, irq);
 	}
-
-	irq_exit(cpu, irq);
 }
 
 /*
