@@ -368,6 +368,7 @@ source "net/Kconfig"
 
 source "fs/Kconfig"
 
+source "arch/s390/oprofile/Kconfig"
 
 menu "Kernel hacking"
 

@@ -1234,6 +1234,14 @@ sys_epoll_wait_wrapper:
 	lgfr	%r5,%r5			# int
 	jg	sys_epoll_wait		# branch to system call
 
+	.globl	sys32_lookup_dcookie_wrapper
+sys32_lookup_dcookie_wrapper:
+	sllg	%r2,%r2,32		# get high word of 64bit dcookie
+	or	%r2,%r3			# get low word of 64bit dcookie
+	llgtr	%r3,%r4			# char *
+	llgfr	%r4,%r5			# size_t
+	jg	sys_lookup_dcookie
+
 	.globl	sys32_fadvise64_wrapper
 sys32_fadvise64_wrapper:
 	lgfr	%r2,%r2			# int
