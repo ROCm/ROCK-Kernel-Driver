@@ -65,6 +65,3 @@ archclean:
 	@$(MAKEBOOT) clean
 
 archmrproper:
-
-prepare:
-	$(MAKEBOOT) dep

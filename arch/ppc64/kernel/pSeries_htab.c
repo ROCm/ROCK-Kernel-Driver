@@ -20,6 +20,7 @@
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
+#include <asm/tlb.h>
 
 /*
  * Create a pte. Used during initialization only.
@@ -214,7 +215,7 @@ static inline void set_pp_bit(unsigned long pp, HPTE *addr)
 
 	__asm__ __volatile__(
 	"1:	ldarx	%0,0,%3\n\
-		rldimi	%0,%2,0,62\n\
+		rldimi	%0,%2,0,61\n\
 		stdcx.	%0,0,%3\n\
 		bne	1b"
 	: "=&r" (old), "=m" (*p)
@@ -264,8 +265,6 @@ static long pSeries_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	Hpte_dword0 dw0;
 	unsigned long vpn, avpn;
 	unsigned long flags;
-
-	udbg_printf("updatepp\n");
 
 	if (large)
 		vpn = va >> LARGE_PAGE_SHIFT;
@@ -372,31 +371,32 @@ static void pSeries_flush_hash_range(unsigned long context,
 {
 	unsigned long vsid, vpn, va, hash, secondary, slot, flags, avpn;
 	int i, j;
-	unsigned long va_array[MAX_BATCH_FLUSH];
 	HPTE *hptep;
 	Hpte_dword0 dw0;
-	struct tlb_batch_data *ptes = &tlb_batch_array[smp_processor_id()][0];
+	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[smp_processor_id()];
 	/* XXX fix for large ptes */
 	unsigned long large = 0;
+
 	j = 0;
 	for (i = 0; i < number; i++) {
-		if ((ptes->addr >= USER_START) && (ptes->addr <= USER_END))
-			vsid = get_vsid(context, ptes->addr);
+		if ((batch->addr[i] >= USER_START) &&
+		    (batch->addr[i] <= USER_END))
+			vsid = get_vsid(context, batch->addr[i]);
 		else
-			vsid = get_kernel_vsid(ptes->addr);
+			vsid = get_kernel_vsid(batch->addr[i]);
 
-		va = (vsid << 28) | (ptes->addr & 0x0fffffff);
-		va_array[j] = va;
+		va = (vsid << 28) | (batch->addr[i] & 0x0fffffff);
+		batch->vaddr[j] = va;
 		if (large)
 			vpn = va >> LARGE_PAGE_SHIFT;
 		else
 			vpn = va >> PAGE_SHIFT;
 		hash = hpt_hash(vpn, large);
-		secondary = (pte_val(ptes->pte) & _PAGE_SECONDARY) >> 15;
+		secondary = (pte_val(batch->pte[i]) & _PAGE_SECONDARY) >> 15;
 		if (secondary)
 			hash = ~hash;
 		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
-		slot += (pte_val(ptes->pte) & _PAGE_GROUP_IX) >> 12;
+		slot += (pte_val(batch->pte[i]) & _PAGE_GROUP_IX) >> 12;
 
 		hptep = htab_data.htab + slot;
 		avpn = vpn >> 11;
@@ -404,8 +404,6 @@ static void pSeries_flush_hash_range(unsigned long context,
 		pSeries_lock_hpte(hptep);
 
 		dw0 = hptep->dw0.dw0;
-
-		ptes++;
 
 		if ((dw0.avpn != avpn) || !dw0.v) {
 			pSeries_unlock_hpte(hptep);
@@ -426,7 +424,7 @@ static void pSeries_flush_hash_range(unsigned long context,
 			asm volatile("\n\
 			clrldi  %0,%0,16\n\
 			tlbiel   %0"
-			: : "r" (va_array[i]) : "memory" );
+			: : "r" (batch->vaddr[i]) : "memory" );
 		}
 
 		asm volatile("ptesync":::"memory");
@@ -440,7 +438,7 @@ static void pSeries_flush_hash_range(unsigned long context,
 			asm volatile("\n\
 			clrldi  %0,%0,16\n\
 			tlbie   %0"
-			: : "r" (va_array[i]) : "memory" );
+			: : "r" (batch->vaddr[i]) : "memory" );
 		}
 
 		asm volatile("eieio; tlbsync; ptesync":::"memory");

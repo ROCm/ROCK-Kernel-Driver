@@ -71,7 +71,7 @@ struct paca_struct {
 	struct ItLpRegSave *xLpRegSavePtr; /* Pointer to LpRegSave for PLIC	0x08 */
 	u64 xCurrent;  		        /* Pointer to current			0x10 */
 	u16 xPacaIndex;			/* Logical processor number		0x18 */
-	u16 xHwProcNum;			/* Actual Hardware Processor Number	0x1a */
+	u16 active;			/* Is this cpu active?			0x1a */
 	u32 default_decr;		/* Default decrementer value		0x1c */	
 	u64 xHrdIntStack;		/* Stack for hardware interrupts	0x20 */
 	u64 xKsave;			/* Saved Kernel stack addr or zero	0x28 */

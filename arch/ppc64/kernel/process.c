@@ -44,8 +44,6 @@
 #include <asm/machdep.h>
 #include <asm/iSeries/HvCallHpt.h>
 
-int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs);
-
 struct task_struct *last_task_used_math = NULL;
 
 struct mm_struct ioremap_mm = { pgd             : ioremap_dir  
@@ -306,7 +304,9 @@ void initialize_paca_hardware_interrupt_stack(void)
 	unsigned long stack;
 	unsigned long end_of_stack =0;
 
-	for (i=1; i < naca->processorCount; i++) {
+	for (i=1; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
 		/* Carve out storage for the hardware interrupt stack */
 		stack = __get_free_pages(GFP_KERNEL, get_order(8*PAGE_SIZE));
 
@@ -329,7 +329,9 @@ void initialize_paca_hardware_interrupt_stack(void)
 	if (__is_processor(PV_POWER4))
 		return;
 
-	for (i=0; i < naca->processorCount; i++) {
+	for (i=0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
 		/* set page at the top of stack to be protected - prevent overflow */
 		end_of_stack = paca[i].xHrdIntStack - (8*PAGE_SIZE - STACK_FRAME_OVERHEAD);
 		ppc_md.hpte_updateboltedpp(PP_RXRX,end_of_stack);

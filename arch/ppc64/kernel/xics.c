@@ -340,7 +340,7 @@ nextnode:
 	/* Find the server numbers for the boot cpu. */
 	for (np = find_type_devices("cpu"); np; np = np->next) {
 		ireg = (uint *)get_property(np, "reg", &ilen);
-		if (ireg && ireg[0] == hard_smp_processor_id()) {
+		if (ireg && ireg[0] == smp_processor_id()) {
 			ireg = (uint *)get_property(np, "ibm,ppc-interrupt-gserver#s", &ilen);
 			i = ilen / sizeof(int);
 			if (ireg && i > 0) {
@@ -371,10 +371,12 @@ nextnode:
 
 	if (naca->platform == PLATFORM_PSERIES) {
 #ifdef CONFIG_SMP
-		for (i = 0; i < naca->processorCount; ++i) {
+		for (i = 0; i < NR_CPUS; ++i) {
+			if (!paca[i].active)
+				continue;
 			xics_info.per_cpu[i] =
-			  __ioremap((ulong)inodes[get_hard_smp_processor_id(i)].addr, 
-				  (ulong)inodes[get_hard_smp_processor_id(i)].size, _PAGE_NO_CACHE);
+			  __ioremap((ulong)inodes[i].addr, 
+				  (ulong)inodes[i].size, _PAGE_NO_CACHE);
 		}
 #else
 		xics_info.per_cpu[0] = __ioremap((ulong)intr_base, intr_size, _PAGE_NO_CACHE);
@@ -395,7 +397,7 @@ nextnode:
 	for (; i < NR_IRQS; ++i)
 		irq_desc[i].handler = &xics_pic;
 
-	ops->cppr_info(0, 0xff);
+	ops->cppr_info(boot_cpuid, 0xff);
 	iosync();
 	if (xics_irq_8259_cascade != -1) {
 		if (request_irq(xics_irq_8259_cascade + XICS_IRQ_OFFSET, no_action,
@@ -418,23 +420,6 @@ void xics_isa_init(void)
 			0, "8259 cascade", 0))
 		printk(KERN_ERR "xics_init_IRQ: couldn't get 8259 cascade\n");
 	i8259_init();
-}
-
-/*
- * Find first logical cpu and return its physical cpu number
- */
-static inline u32 physmask(u32 cpumask)
-{
-	int i;
-
-	for (i = 0; i < smp_num_cpus; ++i, cpumask >>= 1) {
-		if (cpumask & 1)
-			return get_hard_smp_processor_id(i);
-	}
-
-	printk(KERN_ERR "xics_set_affinity: invalid irq mask\n");
-
-	return default_distrib_server;
 }
 
 void xics_set_affinity(unsigned int virq, unsigned long cpumask)
@@ -462,10 +447,13 @@ void xics_set_affinity(unsigned int virq, unsigned long cpumask)
 	}
 
 	/* For the moment only implement delivery to all cpus or one cpu */
-	if (cpumask == 0xffffffff)
+	if (cpumask == 0xffffffff) {
 		newmask = default_distrib_server;
-	else
-		newmask = physmask(cpumask);
+	} else {
+		if (!(cpumask & cpu_online_map))
+			goto out;
+		newmask = find_first_bit(&cpumask, 32);
+	}
 
 	status = rtas_call(ibm_set_xive, 3, 1, NULL,
 				irq, newmask, xics_status[1]);

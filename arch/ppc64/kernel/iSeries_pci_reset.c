@@ -32,7 +32,6 @@
 #include <linux/irq.h>
 
 #include <asm/io.h>
-#include <asm/init.h>
 #include <asm/iSeries/HvCallPci.h>
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/mf.h>

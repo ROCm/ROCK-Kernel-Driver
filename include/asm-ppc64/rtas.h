@@ -2,6 +2,7 @@
 #define _PPC64_RTAS_H
 
 #include <linux/spinlock.h>
+#include <asm/page.h>
 
 /*
  * Definitions for talking to the RTAS on CHRP machines.
@@ -128,6 +129,29 @@ struct rtas_error_log {
 	unsigned char buffer[1];		/* allocated by klimit bump */
 };
 
+struct flash_block {
+	char *data;
+	unsigned long length;
+};
+
+/* This struct is very similar but not identical to
+ * that needed by the rtas flash update.
+ * All we need to do for rtas is rewrite num_blocks
+ * into a version/length and translate the pointers
+ * to absolute.
+ */
+#define FLASH_BLOCKS_PER_NODE ((PAGE_SIZE - 16) / sizeof(struct flash_block))
+struct flash_block_list {
+	unsigned long num_blocks;
+	struct flash_block_list *next;
+	struct flash_block blocks[FLASH_BLOCKS_PER_NODE];
+};
+struct flash_block_list_header { /* just the header of flash_block_list */
+	unsigned long num_blocks;
+	struct flash_block_list *next;
+};
+extern struct flash_block_list_header rtas_firmware_flash_list;
+
 extern struct rtas_t rtas;
 
 extern void enter_rtas(struct rtas_args *);
@@ -139,5 +163,8 @@ extern void call_rtas_display_status(char);
 extern void rtas_restart(char *cmd);
 extern void rtas_power_off(void);
 extern void rtas_halt(void);
+
+extern struct proc_dir_entry *rtas_proc_dir;
+
 
 #endif /* _PPC64_RTAS_H */

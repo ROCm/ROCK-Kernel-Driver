@@ -9,18 +9,10 @@
  */
 
 #include <linux/config.h>
-#include <linux/kdev_t.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/hw_irq.h>
 #include <asm/memory.h>
-
-/*
- * System defines.
- */
-#define KERNEL_START_PHYS	0x800000 
-#define KERNEL_START	        (PAGE_OFFSET+KERNEL_START_PHYS)
-#define START_ADDR	        (PAGE_OFFSET+KERNEL_START_PHYS+0x00000)
 
 /*
  * Memory barrier.
@@ -85,28 +77,22 @@ extern void (*xmon_fault_handler)(struct pt_regs *regs);
 extern void print_backtrace(unsigned long *);
 extern void show_regs(struct pt_regs * regs);
 extern void flush_instruction_cache(void);
-extern void hard_reset_now(void);
-extern void poweroff_now(void);
 extern int _get_PVR(void);
-extern long _get_L2CR(void);
-extern void _set_L2CR(unsigned long);
-extern void via_cuda_init(void);
-extern void pmac_nvram_init(void);
-extern void pmac_find_display(void);
 extern void giveup_fpu(struct task_struct *);
 extern void enable_kernel_fp(void);
-extern void giveup_altivec(struct task_struct *);
-extern void load_up_altivec(struct task_struct *);
 extern void cvt_fd(float *from, double *to, unsigned long *fpscr);
 extern void cvt_df(double *from, float *to, unsigned long *fpscr);
 extern int abs(int);
 
-struct device_node;
-
 struct task_struct;
 #define prepare_to_switch()	do { } while(0)
-#define switch_to(prev,next) _switch_to((prev),(next))
+#define switch_to(prev,next,last) _switch_to((prev),(next))
 extern void _switch_to(struct task_struct *, struct task_struct *);
+
+#define prepare_arch_schedule(prev)		do { } while(0)
+#define finish_arch_schedule(prev)		do { } while(0)
+#define prepare_arch_switch(rq)			do { } while(0)
+#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
 
 struct thread_struct;
 extern void _switch(struct thread_struct *prev, struct thread_struct *next);

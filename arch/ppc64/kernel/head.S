@@ -575,7 +575,8 @@ stab_bolted_user_return:
 	bl	.do_stab_SI
 	b	1f
 
-2:	bl	.do_hash_page_DSI 	/* Try to handle as hpte fault */
+2:	li	r5,0x300
+	bl	.do_hash_page_DSI 	/* Try to handle as hpte fault */
 1:
 	ld      r4,_DAR(r1)
 	ld      r5,_DSISR(r1)
@@ -627,9 +628,8 @@ InstructionAccess_common:
 	bl	.do_stab_SI
 	b	1f
 
-2:	andis.	r0,r23,0x4000		/* no pte found? */
-	beq	1f			/* if so, try to put a PTE */
-	mr	r3,r22			/* into the hash table */
+2:	mr	r3,r22
+	li	r5,0x400
 	bl	.do_hash_page_ISI	/* Try to handle as hpte fault */
 1:
 	mr	r4,r22
@@ -804,6 +804,7 @@ _GLOBAL(do_hash_page_DSI)
 	/*
 	 * r3 contains the faulting address
 	 * r4 contains the required access permissions
+	 * r5 contains the trap number
 	 *
 	 * at return r3 = 0 for success
 	 */
@@ -852,11 +853,13 @@ _GLOBAL(do_stab_bolted)
 	ld	r22,8(r21)	/* get SRR1 */
 	andi.	r22,r22,MSR_PR	/* check if from user */
 	bne+	stab_bolted_user_return  /* from user, send the error on up */
+#if 0
 	li	r3,0
 #ifdef CONFIG_XMON
 	bl	.xmon
 #endif
 1:	b	1b
+#endif
 2:
 	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
 	mfspr	r21,DAR
@@ -1119,7 +1122,7 @@ _GLOBAL(save_remaining_regs)
 	rldimi	r22,r20,15,48		/* Insert desired EE value */
 #endif
 
-	mtmsrd  r22
+	mtmsrd  r22,1
 	blr
 
 

@@ -13,7 +13,6 @@
 #include <linux/threads.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
-#include <asm/init.h>
 #include <asm/naca.h>
 #include <asm/abs_addr.h>
 #include <asm/bitops.h>

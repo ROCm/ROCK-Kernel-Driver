@@ -353,7 +353,7 @@ recheck:
 	li	r4,0
 	ori	r4,r4,MSR_EE|MSR_RI
 	andc	r10,r10,r4	/* clear MSR_EE and MSR_RI */
-	mtmsrd	r10		/* Update machine state */
+	mtmsrd	r10,1		/* Update machine state */
 
 #ifdef CONFIG_PPC_ISERIES
 #error fix iSeries soft disable
@@ -411,7 +411,7 @@ restore:
 do_work:
 	/* Enable interrupts */
 	ori	r10,r10,MSR_EE|MSR_RI
-	mtmsrd	r10
+	mtmsrd	r10,1
 
 	andi.	r0,r3,_TIF_NEED_RESCHED
 	beq	1f

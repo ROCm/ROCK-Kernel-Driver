@@ -117,19 +117,6 @@ SECTIONS
   . = ALIGN(4096);
   __init_end = .;
 
-  __chrp_begin = .;
-  .text.chrp : { *(.text.chrp) }
-  .data.chrp : { *(.data.chrp) }
-  . = ALIGN(4096);
-  __chrp_end = .;
-
-  . = ALIGN(4096);
-  __openfirmware_begin = .;
-  .text.openfirmware : { *(.text.openfirmware) }
-  .data.openfirmware : { *(.data.openfirmware) }
-  . = ALIGN(4096);
-  __openfirmware_end = .;
-
   __toc_start = .;
   .toc       :
   {
