@@ -1389,7 +1389,7 @@ sys_call_table:
 	.long sys_epoll_ctl	/* 255 */
 	.long sys_epoll_wait
  	.long __MMU(sys_remap_file_pages)
- 	.long sys_ni_syscall	//sys_set_tid_address
+ 	.long sys_set_tid_address
  	.long sys_timer_create
  	.long sys_timer_settime		/* 260 */
  	.long sys_timer_gettime
@@ -1415,6 +1415,17 @@ sys_call_table:
 	.long sys_mq_notify
 	.long sys_mq_getsetattr
 	.long sys_ni_syscall		/* reserved for kexec */
+	.long sys_waitid
+	.long sys_ni_syscall		/* 285 */ /* available */
+	.long sys_add_key
+	.long sys_request_key
+	.long sys_keyctl
+	.long sys_perfctr_info
+	.long sys_vperfctr_open		/* 290 */
+	.long sys_vperfctr_control
+	.long sys_vperfctr_unlink
+	.long sys_vperfctr_iresume
+	.long sys_vperfctr_read
 
 
 syscall_table_size = (. - sys_call_table)
