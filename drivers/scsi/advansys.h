@@ -47,14 +47,14 @@
 /*
  * Scsi_Host_Template function prototypes.
  */
-int advansys_detect(Scsi_Host_Template *);
+int advansys_detect(struct scsi_host_template *);
 int advansys_release(struct Scsi_Host *);
 const char *advansys_info(struct Scsi_Host *);
-int advansys_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
-int advansys_reset(Scsi_Cmnd *);
+int advansys_queuecommand(struct scsi_cmnd *, void (* done)(struct scsi_cmnd *));
+int advansys_reset(struct scsi_cmnd *);
 int advansys_biosparam(struct scsi_device *, struct block_device *,
 		sector_t, int[]);
-static int advansys_slave_configure(Scsi_Device *);
+static int advansys_slave_configure(struct scsi_device *);
 
 /* init/main.c setup function */
 void advansys_setup(char *, int *);

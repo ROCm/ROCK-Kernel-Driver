@@ -791,7 +791,23 @@
 #include <asm/system.h>
 #include <asm/dma.h>
 
-#include "scsi.h"
+/* FIXME: (by jejb@steeleye.com) This warning is present for two
+ * reasons:
+ *
+ * 1) This driver badly needs converting to the correct driver model
+ *    probing API
+ *
+ * 2) Although all of the necessary command mapping places have the
+ * appropriate dma_map.. APIs, the driver still processes its internal
+ * queue using bus_to_virt() and virt_to_bus() which are illegal under
+ * the API.  The entire queue processing structure will need to be
+ * altered to fix this.
+ */
+#warning this driver is still not properly converted to the DMA API
+
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 #include "advansys.h"
 #ifdef CONFIG_PCI
@@ -3500,7 +3516,7 @@ typedef struct {
 #define ASC_BUSY        0
 #define ASC_ERROR       (-1)
 
-/* Scsi_Cmnd function return codes */
+/* struct scsi_cmnd function return codes */
 #define STATUS_BYTE(byte)   (byte)
 #define MSG_BYTE(byte)      ((byte) << 8)
 #define HOST_BYTE(byte)     ((byte) << 16)
@@ -3517,7 +3533,7 @@ typedef struct {
  *  REQPTIME(reqp) - reqp's time stamp value
  *  REQTIMESTAMP() - system time stamp value
  */
-typedef Scsi_Cmnd            REQ, *REQP;
+typedef struct scsi_cmnd     REQ, *REQP;
 #define REQPNEXT(reqp)       ((REQP) ((reqp)->host_scribble))
 #define REQPNEXTP(reqp)      ((REQP *) &((reqp)->host_scribble))
 #define REQPTID(reqp)        ((reqp)->device->id)
@@ -3832,7 +3848,7 @@ typedef struct adv_sgblk {
 typedef struct adv_req {
     ADV_SCSI_REQ_Q      scsi_req_q;   /* Adv Library request structure. */
     uchar               align[32];    /* Request structure padding. */
-    Scsi_Cmnd           *cmndp;       /* Mid-Level SCSI command pointer. */
+    struct scsi_cmnd	*cmndp;       /* Mid-Level SCSI command pointer. */
     adv_sgblk_t         *sgblkp;      /* Adv Library scatter-gather pointer. */
     struct adv_req      *next_reqp;   /* Next Request Structure. */
 } adv_req_t;
@@ -3860,7 +3876,7 @@ typedef struct asc_board {
     asc_queue_t          waiting;               /* Waiting command queue */
     asc_queue_t          done;                  /* Done command queue */
     ADV_SCSI_BIT_ID_TYPE init_tidmask;          /* Target init./valid mask */
-    Scsi_Device          *device[ADV_MAX_TID+1]; /* Mid-Level Scsi Device */
+    struct scsi_device	*device[ADV_MAX_TID+1]; /* Mid-Level Scsi Device */
     ushort               reqcnt[ADV_MAX_TID+1]; /* Starvation request count */
     ADV_SCSI_BIT_ID_TYPE queue_full;            /* Queue full mask */
     ushort               queue_full_cnt[ADV_MAX_TID+1]; /* Queue full count */
@@ -4009,12 +4025,12 @@ STATIC PortAddr     _asc_def_iop_base[];
  */
 
 STATIC irqreturn_t advansys_interrupt(int, void *, struct pt_regs *);
-STATIC int	  advansys_slave_configure(Scsi_Device *);
-STATIC void       asc_scsi_done_list(Scsi_Cmnd *);
-STATIC int        asc_execute_scsi_cmnd(Scsi_Cmnd *);
-STATIC int        asc_build_req(asc_board_t *, Scsi_Cmnd *);
-STATIC int        adv_build_req(asc_board_t *, Scsi_Cmnd *, ADV_SCSI_REQ_Q **);
-STATIC int        adv_get_sglist(asc_board_t *, adv_req_t *, Scsi_Cmnd *, int);
+STATIC int	  advansys_slave_configure(struct scsi_device *);
+STATIC void       asc_scsi_done_list(struct scsi_cmnd *);
+STATIC int        asc_execute_scsi_cmnd(struct scsi_cmnd *);
+STATIC int        asc_build_req(asc_board_t *, struct scsi_cmnd *);
+STATIC int        adv_build_req(asc_board_t *, struct scsi_cmnd *, ADV_SCSI_REQ_Q **);
+STATIC int        adv_get_sglist(asc_board_t *, adv_req_t *, struct scsi_cmnd *, int);
 STATIC void       asc_isr_callback(ASC_DVC_VAR *, ASC_QDONE_INFO *);
 STATIC void       adv_isr_callback(ADV_DVC_VAR *, ADV_SCSI_REQ_Q *);
 STATIC void       adv_async_callback(ADV_DVC_VAR *, uchar);
@@ -4051,7 +4067,7 @@ STATIC int          asc_prt_target_stats(struct Scsi_Host *, int, char *, int);
 /* Debug function prototypes. */
 #ifdef ADVANSYS_DEBUG
 STATIC void         asc_prt_scsi_host(struct Scsi_Host *);
-STATIC void         asc_prt_scsi_cmnd(Scsi_Cmnd *);
+STATIC void         asc_prt_scsi_cmnd(struct scsi_cmnd *);
 STATIC void         asc_prt_asc_dvc_cfg(ASC_DVC_CFG *);
 STATIC void         asc_prt_asc_dvc_var(ASC_DVC_VAR *);
 STATIC void         asc_prt_asc_scsi_q(ASC_SCSI_Q *);
@@ -4306,7 +4322,7 @@ advansys_proc_info(struct Scsi_Host *shost, char *buffer, char **start,
  * and scsi_free().
  */
 int __init
-advansys_detect(Scsi_Host_Template *tpnt)
+advansys_detect(struct scsi_host_template *tpnt)
 {
     static int          detect_called = ASC_FALSE;
     int                 iop;
@@ -5582,12 +5598,12 @@ advansys_info(struct Scsi_Host *shp)
  * in the 'scp' result field.
  */
 int
-advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
+advansys_queuecommand(struct scsi_cmnd *scp, void (*done)(struct scsi_cmnd *))
 {
     struct Scsi_Host    *shp;
     asc_board_t         *boardp;
     ulong               flags;
-    Scsi_Cmnd           *done_scp;
+    struct scsi_cmnd           *done_scp;
 
     shp = scp->device->host;
     boardp = ASC_BOARDP(shp);
@@ -5670,15 +5686,15 @@ advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
  * required. Returns SUCCESS or FAILED.
  */
 int
-advansys_reset(Scsi_Cmnd *scp)
+advansys_reset(struct scsi_cmnd *scp)
 {
     struct Scsi_Host     *shp;
     asc_board_t          *boardp;
     ASC_DVC_VAR          *asc_dvc_varp;
     ADV_DVC_VAR          *adv_dvc_varp;
     ulong                flags;
-    Scsi_Cmnd            *done_scp = NULL, *last_scp = NULL;
-    Scsi_Cmnd            *tscp, *new_last_scp;
+    struct scsi_cmnd            *done_scp = NULL, *last_scp = NULL;
+    struct scsi_cmnd            *tscp, *new_last_scp;
     int                  status;
     int                  ret = SUCCESS;
 
@@ -5967,7 +5983,7 @@ advansys_setup(char *str, int *ints)
  * --- Loadable Driver Support
  */
 
-static Scsi_Host_Template driver_template = {
+static struct scsi_host_template driver_template = {
     .proc_name                  = "advansys",
 #ifdef CONFIG_PROC_FS
     .proc_info                  = advansys_proc_info,
@@ -6017,8 +6033,8 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     ulong           flags;
     int             i;
     asc_board_t     *boardp;
-    Scsi_Cmnd       *done_scp = NULL, *last_scp = NULL;
-    Scsi_Cmnd       *new_last_scp;
+    struct scsi_cmnd       *done_scp = NULL, *last_scp = NULL;
+    struct scsi_cmnd       *new_last_scp;
     struct Scsi_Host *shp;
 
     ASC_DBG(1, "advansys_interrupt: begin\n");
@@ -6109,7 +6125,7 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  * specified host adapter.
  */
 STATIC int
-advansys_slave_configure(Scsi_Device *device)
+advansys_slave_configure(struct scsi_device *device)
 {
     asc_board_t        *boardp;
 
@@ -6144,9 +6160,9 @@ advansys_slave_configure(Scsi_Device *device)
  * Interrupts can be enabled on entry.
  */
 STATIC void
-asc_scsi_done_list(Scsi_Cmnd *scp)
+asc_scsi_done_list(struct scsi_cmnd *scp)
 {
-    Scsi_Cmnd    *tscp;
+    struct scsi_cmnd    *tscp;
 
     ASC_DBG(2, "asc_scsi_done_list: begin\n");
     while (scp != NULL) {
@@ -6216,7 +6232,7 @@ asc_scsi_done_list(Scsi_Cmnd *scp)
  *  host driver fields:
  *    SCp - Scsi_Pointer used for command processing status
  *    scsi_done - used to save caller's done function
- *    host_scribble - used for pointer to another Scsi_Cmnd
+ *    host_scribble - used for pointer to another struct scsi_cmnd
  *
  * If this function returns ASC_NOERROR the request has been enqueued
  * on the board's 'active' queue and will be completed from the
@@ -6229,13 +6245,13 @@ asc_scsi_done_list(Scsi_Cmnd *scp)
  * caller on the target's waiting queue and re-tried later.
  */
 STATIC int
-asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
+asc_execute_scsi_cmnd(struct scsi_cmnd *scp)
 {
     asc_board_t        *boardp;
     ASC_DVC_VAR        *asc_dvc_varp;
     ADV_DVC_VAR        *adv_dvc_varp;
     ADV_SCSI_REQ_Q     *adv_scsiqp;
-    Scsi_Device        *device;
+    struct scsi_device *device;
     int                ret;
 
     ASC_DBG2(1, "asc_execute_scsi_cmnd: scp 0x%lx, done 0x%lx\n",
@@ -6402,7 +6418,7 @@ asc_execute_scsi_cmnd(Scsi_Cmnd *scp)
  * queue and return ASC_ERROR.
  */
 STATIC int
-asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
+asc_build_req(asc_board_t *boardp, struct scsi_cmnd *scp)
 {
     struct device *dev = boardp->dvc_cfg.asc_dvc_cfg.dev;
 
@@ -6413,7 +6429,7 @@ asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
     memset(&asc_scsi_q, 0, sizeof(ASC_SCSI_Q));
 
     /*
-     * Point the ASC_SCSI_Q to the 'Scsi_Cmnd'.
+     * Point the ASC_SCSI_Q to the 'struct scsi_cmnd'.
      */
     asc_scsi_q.q2.srb_ptr = ASC_VADDR_TO_U32(scp);
 
@@ -6539,7 +6555,7 @@ asc_build_req(asc_board_t *boardp, Scsi_Cmnd *scp)
  * to little-endian order.
  */
 STATIC int
-adv_build_req(asc_board_t *boardp, Scsi_Cmnd *scp,
+adv_build_req(asc_board_t *boardp, struct scsi_cmnd *scp,
     ADV_SCSI_REQ_Q **adv_scsiqpp)
 {
     adv_req_t           *reqp;
@@ -6578,7 +6594,7 @@ adv_build_req(asc_board_t *boardp, Scsi_Cmnd *scp,
     scsiqp->srb_ptr = ASC_VADDR_TO_U32(reqp);
 
     /*
-     * Set the adv_req_t 'cmndp' to point to the Scsi_Cmnd structure.
+     * Set the adv_req_t 'cmndp' to point to the struct scsi_cmnd structure.
      */
     reqp->cmndp = scp;
 
@@ -6709,7 +6725,7 @@ adv_build_req(asc_board_t *boardp, Scsi_Cmnd *scp,
  *      ADV_ERROR(-1) - SG List creation failed
  */
 STATIC int
-adv_get_sglist(asc_board_t *boardp, adv_req_t *reqp, Scsi_Cmnd *scp, int use_sg)
+adv_get_sglist(asc_board_t *boardp, adv_req_t *reqp, struct scsi_cmnd *scp, int use_sg)
 {
     adv_sgblk_t         *sgblkp;
     ADV_SCSI_REQ_Q      *scsiqp;
@@ -6821,7 +6837,7 @@ STATIC void
 asc_isr_callback(ASC_DVC_VAR *asc_dvc_varp, ASC_QDONE_INFO *qdonep)
 {
     asc_board_t         *boardp;
-    Scsi_Cmnd           *scp;
+    struct scsi_cmnd           *scp;
     struct Scsi_Host    *shp;
     int                 i;
 
@@ -6830,10 +6846,10 @@ asc_isr_callback(ASC_DVC_VAR *asc_dvc_varp, ASC_QDONE_INFO *qdonep)
     ASC_DBG_PRT_ASC_QDONE_INFO(2, qdonep);
 
     /*
-     * Get the Scsi_Cmnd structure and Scsi_Host structure for the
+     * Get the struct scsi_cmnd structure and Scsi_Host structure for the
      * command that has been completed.
      */
-    scp = (Scsi_Cmnd *) ASC_U32_TO_VADDR(qdonep->d2.srb_ptr);
+    scp = (struct scsi_cmnd *) ASC_U32_TO_VADDR(qdonep->d2.srb_ptr);
     ASC_DBG1(1, "asc_isr_callback: scp 0x%lx\n", (ulong) scp);
 
     if (scp == NULL) {
@@ -6968,7 +6984,7 @@ asc_isr_callback(ASC_DVC_VAR *asc_dvc_varp, ASC_QDONE_INFO *qdonep)
     }
 
     /*
-     * Because interrupts may be enabled by the 'Scsi_Cmnd' done
+     * Because interrupts may be enabled by the 'struct scsi_cmnd' done
      * function, add the command to the end of the board's done queue.
      * The done function for the command will be called from
      * advansys_interrupt().
@@ -6989,7 +7005,7 @@ adv_isr_callback(ADV_DVC_VAR *adv_dvc_varp, ADV_SCSI_REQ_Q *scsiqp)
     asc_board_t         *boardp;
     adv_req_t           *reqp;
     adv_sgblk_t         *sgblkp;
-    Scsi_Cmnd           *scp;
+    struct scsi_cmnd           *scp;
     struct Scsi_Host    *shp;
     int                 i;
     ADV_DCNT            resid_cnt;
@@ -7012,7 +7028,7 @@ adv_isr_callback(ADV_DVC_VAR *adv_dvc_varp, ADV_SCSI_REQ_Q *scsiqp)
     }
 
     /*
-     * Get the Scsi_Cmnd structure and Scsi_Host structure for the
+     * Get the struct scsi_cmnd structure and Scsi_Host structure for the
      * command that has been completed.
      *
      * Note: The adv_req_t request structure and adv_sgblk_t structure,
@@ -7147,7 +7163,7 @@ adv_isr_callback(ADV_DVC_VAR *adv_dvc_varp, ADV_SCSI_REQ_Q *scsiqp)
     }
 
     /*
-     * Because interrupts may be enabled by the 'Scsi_Cmnd' done
+     * Because interrupts may be enabled by the 'struct scsi_cmnd' done
      * function, add the command to the end of the board's done queue.
      * The done function for the command will be called from
      * advansys_interrupt().
@@ -7471,7 +7487,7 @@ asc_rmqueue(asc_queue_t *ascq, REQP reqp)
 /*
  * Execute as many queued requests as possible for the specified queue.
  *
- * Calls asc_execute_scsi_cmnd() to execute a REQP/Scsi_Cmnd.
+ * Calls asc_execute_scsi_cmnd() to execute a REQP/struct scsi_cmnd.
  */
 STATIC void
 asc_execute_queue(asc_queue_t *ascq)
@@ -7491,7 +7507,7 @@ asc_execute_queue(asc_queue_t *ascq)
             if (scan_tidmask & ADV_TID_TO_TIDMASK(i)) {
                 if ((reqp = asc_dequeue(ascq, i)) == NULL) {
                     scan_tidmask &= ~ADV_TID_TO_TIDMASK(i);
-                } else if (asc_execute_scsi_cmnd((Scsi_Cmnd *) reqp)
+                } else if (asc_execute_scsi_cmnd((struct scsi_cmnd *) reqp)
                             == ASC_BUSY) {
                     scan_tidmask &= ~ADV_TID_TO_TIDMASK(i);
                     /*
@@ -9175,9 +9191,9 @@ asc_prt_scsi_host(struct Scsi_Host *s)
  * asc_prt_scsi_cmnd()
  */
 STATIC void
-asc_prt_scsi_cmnd(Scsi_Cmnd *s)
+asc_prt_scsi_cmnd(struct scsi_cmnd *s)
 {
-    printk("Scsi_Cmnd at addr 0x%lx\n", (ulong) s);
+    printk("struct scsi_cmnd at addr 0x%lx\n", (ulong) s);
 
     printk(
 " host 0x%lx, device 0x%lx, target %u, lun %u, channel %u,\n",
