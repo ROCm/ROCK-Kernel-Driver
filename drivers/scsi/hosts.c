@@ -561,15 +561,16 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 			shost = list_entry(lh, struct Scsi_Host, sh_list);
 			for (sdev = shost->host_queue; sdev; sdev = sdev->next)
 				if (sdev->host->hostt == shost_tp) {
+					scsi_build_commandblocks(sdev);
+					if (sdev->current_queue_depth == 0)
+						goto out_of_space;
 					for (sdev_tp = scsi_devicelist;
 					     sdev_tp;
 					     sdev_tp = sdev_tp->next)
 						if (sdev_tp->attach)
 							(*sdev_tp->attach) (sdev);
-					if (sdev->attached) {
-						scsi_build_commandblocks(sdev);
-						if (sdev->current_queue_depth == 0)
-							goto out_of_space;
+					if (!sdev->attached) {
+                                                scsi_release_commandblocks(sdev);
 					}
 				}
 		}

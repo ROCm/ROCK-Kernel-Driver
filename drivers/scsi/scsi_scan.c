@@ -1995,24 +1995,28 @@ static void scsi_scan_selected_lun(struct Scsi_Host *shost, uint channel,
 	sdevscan->scsi_level = scsi_find_scsi_level(channel, id, shost);
 	res = scsi_probe_and_add_lun(sdevscan, &sdev, NULL);
 	scsi_free_sdev(sdevscan);
-	if (res == SCSI_SCAN_LUN_PRESENT) {
-		BUG_ON(sdev == NULL);
 
-		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-			if (sdt->init && sdt->dev_noticed)
-				(*sdt->init) ();
+	if (res != SCSI_SCAN_LUN_PRESENT) 
+		return;
 
-		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-			if (sdt->attach) {
-				(*sdt->attach) (sdev);
-				if (sdev->attached) {
-					scsi_build_commandblocks(sdev);
-					if (sdev->current_queue_depth == 0)
-						printk(ALLOC_FAILURE_MSG,
-						       __FUNCTION__);
-				}
-			}
+	BUG_ON(sdev == NULL);
+
+	scsi_build_commandblocks(sdev);
+	if (sdev->current_queue_depth == 0) {
+		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+		return;
 	}
+
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->init && sdt->dev_noticed)
+			(*sdt->init) ();
+
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->attach)
+			(*sdt->attach) (sdev);
+
+	if (!sdev->attached)
+		scsi_release_commandblocks(sdev);
 }
 
 /**

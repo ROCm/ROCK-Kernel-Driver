@@ -481,10 +481,10 @@ static int sr_attach(Scsi_Device * SDp)
 	if (i >= sr_template.dev_max)
 		panic("scsi_devices corrupt (sr)");
 
+	scsi_CDs[i].device = SDp;
+
 	if (sr_init_one(cpnt, i))
 		goto fail;
-
-	scsi_CDs[i].device = SDp;
 
 	sr_template.nr_dev++;
 	if (sr_template.nr_dev > sr_template.dev_max)

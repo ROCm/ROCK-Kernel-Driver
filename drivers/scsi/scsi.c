@@ -2019,18 +2019,22 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	     shpnt = scsi_host_get_next(shpnt)) {
 		for (SDpnt = shpnt->host_queue; SDpnt;
 		     SDpnt = SDpnt->next) {
+			scsi_build_commandblocks(SDpnt);
+			if (SDpnt->current_queue_depth == 0) {
+				out_of_space = 1;
+				continue;
+			}
 			if (tpnt->attach)
 				(*tpnt->attach) (SDpnt);
+
 			/*
 			 * If this driver attached to the device, and don't have any
 			 * command blocks for this device, allocate some.
 			 */
-			if (SDpnt->attached && SDpnt->current_queue_depth == 0) {
+			if (SDpnt->attached)
 				SDpnt->online = TRUE;
-				scsi_build_commandblocks(SDpnt);
-				if (SDpnt->current_queue_depth == 0)
-					out_of_space = 1;
-			}
+			else
+				scsi_release_commandblocks(SDpnt);
 		}
 	}
 
