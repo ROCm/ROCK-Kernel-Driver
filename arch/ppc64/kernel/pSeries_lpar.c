@@ -234,9 +234,7 @@ static int find_udbg_vterm(void)
 	}
 
 	if (strncmp(name, "vty", 3) == 0) {
-		char *compatible;
-		compatible = (char *)get_property(stdout_node, "compatible", 0);
-		if (compatible && (strncmp(compatible, "hvterm1", 7) == 0)) {
+		if (device_is_compatible(stdout_node, "hvterm1")) {
 			termno = (u32 *)get_property(stdout_node, "reg", 0);
 			if (termno) {
 				vtermno = termno[0];
