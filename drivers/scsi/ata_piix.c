@@ -72,6 +72,13 @@ static struct pci_device_id piix_pci_tbl[] = {
 	{ 0x8086, 0x25a3, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
 	{ 0x8086, 0x25b0, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich5_sata },
 
+	/* ICH6 operates in two modes, "looks-like-ICH5" mode,
+	 * and enhanced mode, with queueing and other fancy stuff.
+	 * This is distinguished by PCI class code.
+	 */
+	{ 0x8086, 0x2562, PCI_ANY_ID, PCI_ANY_ID,
+	  PCI_CLASS_STORAGE_IDE << 8, 0xffff00, ich5_sata },
+
 	{ }	/* terminate list */
 };
 
