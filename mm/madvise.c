@@ -57,7 +57,7 @@ static long madvise_willneed(struct vm_area_struct * vma,
 {
 	struct file *file = vma->vm_file;
 
-	if (!vma->vm_file)
+	if (!file)
 		return -EBADF;
 
 	start = ((start - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;

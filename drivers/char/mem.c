@@ -619,7 +619,7 @@ static ssize_t kmsg_write(struct file * file, const char * buf,
 }
 
 static struct file_operations kmsg_fops = {
-	write:		kmsg_write,
+	.write =	kmsg_write,
 };
 
 static int memory_open(struct inode * inode, struct file * filp)
