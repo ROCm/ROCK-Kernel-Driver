@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#149 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#150 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -557,16 +557,14 @@ static void ahd_runq_tasklet(unsigned long data);
 static int aic79xx_setup(char *c);
 
 /****************************** Inlines ***************************************/
-static __inline void ahd_schedule_completeq(struct ahd_softc *ahd,
-					    struct ahd_cmd *acmd);
+static __inline void ahd_schedule_completeq(struct ahd_softc *ahd);
 static __inline void ahd_schedule_runq(struct ahd_softc *ahd);
 static __inline void ahd_setup_runq_tasklet(struct ahd_softc *ahd);
 static __inline void ahd_teardown_runq_tasklet(struct ahd_softc *ahd);
 static __inline struct ahd_linux_device*
 		     ahd_linux_get_device(struct ahd_softc *ahd, u_int channel,
 					  u_int target, u_int lun, int alloc);
-static struct ahd_cmd *ahd_linux_run_complete_queue(struct ahd_softc *ahd,
-						    struct ahd_cmd *acmd);
+static struct ahd_cmd *ahd_linux_run_complete_queue(struct ahd_softc *ahd);
 static __inline void ahd_linux_check_device_queue(struct ahd_softc *ahd,
 						  struct ahd_linux_device *dev);
 static __inline struct ahd_linux_device *
@@ -579,26 +577,8 @@ static __inline int ahd_linux_map_seg(struct ahd_softc *ahd, struct scb *scb,
 				      bus_addr_t addr, bus_size_t len);
 
 static __inline void
-ahd_schedule_completeq(struct ahd_softc *ahd, struct ahd_cmd *acmd)
+ahd_schedule_completeq(struct ahd_softc *ahd)
 {
-	while (acmd != NULL) {
-		struct ahd_completeq *completeq;
-		struct ahd_cmd *list_cmd;
-		struct ahd_cmd *next_cmd;
-
-		next_cmd = TAILQ_NEXT(acmd, acmd_links.tqe);
-		completeq = &ahd->platform_data->completeq;
-		list_cmd = TAILQ_FIRST(completeq);
-		while (list_cmd != NULL
-		    && acmd_scsi_cmd(list_cmd).serial_number
-		     < acmd_scsi_cmd(acmd).serial_number)
-			list_cmd = TAILQ_NEXT(list_cmd, acmd_links.tqe);
-		if (list_cmd != NULL)
-			TAILQ_INSERT_BEFORE(list_cmd, acmd, acmd_links.tqe);
-		else
-			TAILQ_INSERT_TAIL(completeq, acmd, acmd_links.tqe);
-		acmd = next_cmd;
-	}
 	if ((ahd->platform_data->flags & AHD_RUN_CMPLT_Q_TIMER) == 0) {
 		ahd->platform_data->flags |= AHD_RUN_CMPLT_Q_TIMER;
 		ahd->platform_data->completeq_timer.expires = jiffies;
@@ -667,24 +647,16 @@ ahd_linux_get_device(struct ahd_softc *ahd, u_int channel, u_int target,
 
 #define AHD_LINUX_MAX_RETURNED_ERRORS 4
 static struct ahd_cmd *
-ahd_linux_run_complete_queue(struct ahd_softc *ahd, struct ahd_cmd *acmd)
+ahd_linux_run_complete_queue(struct ahd_softc *ahd)
 {	
+	struct	ahd_cmd *acmd;
 	u_long	done_flags;
 	int	with_errors;
 
 	with_errors = 0;
 	ahd_done_lock(ahd, &done_flags);
-	while (acmd != NULL) {
+	while ((acmd = TAILQ_FIRST(&ahd->platform_data->completeq)) != NULL) {
 		Scsi_Cmnd *cmd;
-
-		cmd = &acmd_scsi_cmd(acmd);
-		acmd = TAILQ_NEXT(acmd, acmd_links.tqe);
-		cmd->host_scribble = NULL;
-		if (ahd_cmd_get_transaction_status(cmd) != DID_OK
-		 || (cmd->result & 0xFF) != SCSI_STATUS_OK)
-			with_errors++;
-
-		cmd->scsi_done(cmd);
 
 		if (with_errors > AHD_LINUX_MAX_RETURNED_ERRORS) {
 			/*
@@ -695,8 +667,20 @@ ahd_linux_run_complete_queue(struct ahd_softc *ahd, struct ahd_cmd *acmd)
 			 * the operating system in case they are going
 			 * to be retried. "ick"
 			 */
+			ahd_schedule_completeq(ahd);
 			break;
 		}
+		TAILQ_REMOVE(&ahd->platform_data->completeq,
+			     acmd, acmd_links.tqe);
+		cmd = &acmd_scsi_cmd(acmd);
+		acmd = TAILQ_NEXT(acmd, acmd_links.tqe);
+		cmd->host_scribble = NULL;
+		if (ahd_cmd_get_transaction_status(cmd) != DID_OK
+		 || (cmd->result & 0xFF) != SCSI_STATUS_OK)
+			with_errors++;
+
+		cmd->scsi_done(cmd);
+
 	}
 	ahd_done_unlock(ahd, &done_flags);
 	return (acmd);
@@ -1061,7 +1045,7 @@ ahd_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 
 		ahd_cmd_set_transaction_status(cmd, CAM_REQUEUE_REQ);
 		ahd_linux_queue_cmd_complete(ahd, cmd);
-		ahd_schedule_completeq(ahd, NULL);
+		ahd_schedule_completeq(ahd);
 		ahd_midlayer_entrypoint_unlock(ahd, &flags);
 		return (0);
 	}
@@ -1071,7 +1055,7 @@ ahd_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 	if (dev == NULL) {
 		ahd_cmd_set_transaction_status(cmd, CAM_RESRC_UNAVAIL);
 		ahd_linux_queue_cmd_complete(ahd, cmd);
-		ahd_schedule_completeq(ahd, NULL);
+		ahd_schedule_completeq(ahd);
 		ahd_midlayer_entrypoint_unlock(ahd, &flags);
 		printf("%s: aic79xx_linux_queue - Unable to allocate device!\n",
 		       ahd_name(ahd));
@@ -1569,14 +1553,8 @@ done:
 		}
 		spin_lock_irq(&ahd->platform_data->spin_lock);
 	}
-	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
-	TAILQ_INIT(&ahd->platform_data->completeq);
 	ahd_schedule_runq(ahd);
-	if (acmd != NULL) {
-		acmd = ahd_linux_run_complete_queue(ahd, acmd);
-		if (acmd != NULL)
-			ahd_schedule_completeq(ahd, acmd);
-	}
+	ahd_linux_run_complete_queue(ahd);
 	ahd_midlayer_entrypoint_unlock(ahd, &s);
 	return (retval);
 }
@@ -1601,7 +1579,6 @@ ahd_linux_dev_reset(Scsi_Cmnd *cmd)
 	struct	ahd_tmode_tstate *tstate;
 	struct	scb *scb;
 	struct	hardware_scb *hscb;
-	struct	ahd_cmd *acmd;
 	u_long	s;
 	struct	timer_list timer;
 	int	retval;
@@ -1672,14 +1649,8 @@ ahd_linux_dev_reset(Scsi_Cmnd *cmd)
 		retval = FAILED;
 	}
 	spin_lock_irq(&ahd->platform_data->spin_lock);
-	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
-	TAILQ_INIT(&ahd->platform_data->completeq);
 	ahd_schedule_runq(ahd);
-	if (acmd != NULL) {
-		acmd = ahd_linux_run_complete_queue(ahd, acmd);
-		if (acmd != NULL)
-			ahd_schedule_completeq(ahd, acmd);
-	}
+	ahd_linux_run_complete_queue(ahd);
 	ahd_midlayer_entrypoint_unlock(ahd, &s);
 	printf("%s: Device reset returning 0x%x\n", ahd_name(ahd), retval);
 	return (retval);
@@ -1692,7 +1663,6 @@ static int
 ahd_linux_bus_reset(Scsi_Cmnd *cmd)
 {
 	struct ahd_softc *ahd;
-	struct ahd_cmd *acmd;
 	u_long s;
 	int    found;
 
@@ -1705,14 +1675,7 @@ ahd_linux_bus_reset(Scsi_Cmnd *cmd)
 	ahd_midlayer_entrypoint_lock(ahd, &s);
 	found = ahd_reset_channel(ahd, cmd->device->channel + 'A',
 				  /*initiate reset*/TRUE);
-	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
-	TAILQ_INIT(&ahd->platform_data->completeq);
-
-	if (acmd != NULL) {
-		acmd = ahd_linux_run_complete_queue(ahd, acmd);
-		if (acmd != NULL)
-			ahd_schedule_completeq(ahd, acmd);
-	}
+	ahd_linux_run_complete_queue(ahd);
 	ahd_midlayer_entrypoint_unlock(ahd, &s);
 
 	if (bootverbose)
@@ -2605,19 +2568,12 @@ ahd_platform_abort_scbs(struct ahd_softc *ahd, int target, char channel,
 static void
 ahd_linux_thread_run_complete_queue(struct ahd_softc *ahd)
 {
-	struct ahd_cmd *acmd;
 	u_long flags;
 
 	ahd_lock(ahd, &flags);
 	del_timer(&ahd->platform_data->completeq_timer);
 	ahd->platform_data->flags &= ~AHD_RUN_CMPLT_Q_TIMER;
-	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
-	TAILQ_INIT(&ahd->platform_data->completeq);
-	if (acmd != NULL) {
-		acmd = ahd_linux_run_complete_queue(ahd, acmd);
-		if (acmd != NULL)
-			ahd_schedule_completeq(ahd, acmd);
-	}
+	ahd_linux_run_complete_queue(ahd);
 	ahd_unlock(ahd, &flags);
 }
 
@@ -3823,7 +3779,6 @@ static void
 ahd_linux_dv_timeout(struct scsi_cmnd *cmd)
 {
 	struct	ahd_softc *ahd;
-	struct	ahd_cmd *acmd;
 	struct	scb *scb;
 	u_long	flags;
 
@@ -3870,16 +3825,9 @@ ahd_linux_dv_timeout(struct scsi_cmnd *cmd)
 	ahd->platform_data->reset_timer.function =
 	    (ahd_linux_callback_t *)ahd_release_simq;
 	add_timer(&ahd->platform_data->reset_timer);
-	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
-	TAILQ_INIT(&ahd->platform_data->completeq);
 	if (ahd_linux_next_device_to_run(ahd) != NULL)
 		ahd_schedule_runq(ahd);
-	if (acmd != NULL) {
-		acmd = ahd_linux_run_complete_queue(ahd, acmd);
-		if (acmd != NULL) {
-			ahd_schedule_completeq(ahd, acmd);
-		}
-	}
+	ahd_linux_run_complete_queue(ahd);
 	ahd_unlock(ahd, &flags);
 }
 
@@ -4268,34 +4216,23 @@ void
 ahd_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct	ahd_softc *ahd;
-	struct	ahd_cmd *acmd;
 	u_long	flags;
 
 	ahd = (struct ahd_softc *) dev_id;
 	ahd_lock(ahd, &flags); 
 	ahd_intr(ahd);
-	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
-	TAILQ_INIT(&ahd->platform_data->completeq);
 	if (ahd_linux_next_device_to_run(ahd) != NULL)
 		ahd_schedule_runq(ahd);
-	if (acmd != NULL) {
-		acmd = ahd_linux_run_complete_queue(ahd, acmd);
-		if (acmd != NULL) {
-			ahd_schedule_completeq(ahd, acmd);
-		}
-	}
+	ahd_linux_run_complete_queue(ahd);
 	ahd_unlock(ahd, &flags);
 }
 
 void
 ahd_platform_flushwork(struct ahd_softc *ahd)
 {
-	struct ahd_cmd *acmd;
 
-	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
-	TAILQ_INIT(&ahd->platform_data->completeq);
-	while (acmd != NULL)
-		acmd = ahd_linux_run_complete_queue(ahd, acmd);
+	while (ahd_linux_run_complete_queue(ahd) != 0)
+		;
 }
 
 static struct ahd_linux_target*
