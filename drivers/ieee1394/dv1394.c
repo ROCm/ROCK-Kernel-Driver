@@ -2588,9 +2588,7 @@ static int dv1394_devfs_add_dir(char *name)
 
 void dv1394_devfs_del(char *name)
 {
-	char s[64];
-	sprintf(s, "ieee1394/%s", name);
-	devfs_find_and_unregister(NULL, s, 0, 0, 0, 0);
+	devfs_remove("ieee1394/%s", name);
 }
 #endif /* CONFIG_DEVFS_FS */
 

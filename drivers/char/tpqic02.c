@@ -2766,22 +2766,14 @@ void cleanup_module(void)
 	if (status_zombie == NO)
 		qic02_release_resources();
 		
-	devfs_find_and_unregister(NULL, "ntpqic11", QIC02_TAPE_MAJOR, 2,
-				  DEVFS_SPECIAL_CHR, 0);
-	devfs_find_and_unregister(NULL, "tpqic11", QIC02_TAPE_MAJOR, 3,
-				  DEVFS_SPECIAL_CHR, 0);
-	devfs_find_and_unregister(NULL, "ntpqic24", QIC02_TAPE_MAJOR, 4,
-				  DEVFS_SPECIAL_CHR, 0);
-	devfs_find_and_unregister(NULL, "tpqic24", QIC02_TAPE_MAJOR, 5,
-				  DEVFS_SPECIAL_CHR, 0);
-	devfs_find_and_unregister(NULL, "ntpqic120", QIC02_TAPE_MAJOR, 6,
-				  DEVFS_SPECIAL_CHR, 0);
-	devfs_find_and_unregister(NULL, "tpqic120", QIC02_TAPE_MAJOR, 7,
-				  DEVFS_SPECIAL_CHR, 0);
-	devfs_find_and_unregister(NULL, "ntpqic150", QIC02_TAPE_MAJOR, 8,
-				  DEVFS_SPECIAL_CHR, 0);
-	devfs_find_and_unregister(NULL, "tpqic150", QIC02_TAPE_MAJOR, 9,
-				  DEVFS_SPECIAL_CHR, 0);
+	devfs_remove("ntpqic11");
+	devfs_remove("tpqic11");
+	devfs_remove("ntpqic24");
+	devfs_remove("tpqic24");
+	devfs_remove("ntpqic120");
+	devfs_remove("tpqic120");
+	devfs_remove("ntpqic150");
+	devfs_remove("tpqic150");
 }
 
 int init_module(void)

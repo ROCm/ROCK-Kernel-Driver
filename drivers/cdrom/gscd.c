@@ -883,7 +883,7 @@ static void __exit gscd_exit(void)
 {
 	CLEAR_TIMER;
 
-	devfs_find_and_unregister(NULL, "gscd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	devfs_remove("gscd");
 	del_gendisk(gscd_disk);
 	put_disk(gscd_disk);
 	if ((unregister_blkdev(MAJOR_NR, "gscd") == -EINVAL)) {

@@ -1111,7 +1111,7 @@ void dm_interface_exit(void)
 {
 	dm_hash_exit();
 
-	devfs_find_and_unregister(NULL, DM_DIR "/control", 0, 0, 0, 0);
+	devfs_remove(DM_DIR "/control");
 
 	if (misc_deregister(&_dm_misc) < 0)
 		DMERR("misc_deregister failed for control device");

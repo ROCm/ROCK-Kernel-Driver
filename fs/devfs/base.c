@@ -1902,6 +1902,20 @@ void devfs_find_and_unregister (devfs_handle_t dir, const char *name,
     devfs_put (de);
 }   /*  End Function devfs_find_and_unregister  */
 
+void devfs_remove(const char *fmt, ...)
+{
+	char buf[64];
+	va_list args;
+	int n;
+
+	va_start(args, fmt);
+	n = vsnprintf(buf, 64, fmt, args);
+	if (n < 64) {
+		devfs_handle_t de = devfs_get_handle(NULL, buf, 0, 0, 0, 0);
+		devfs_unregister(de);
+		devfs_put(de);
+	}
+}
 
 /**
  *	devfs_get_flags - Get the flags for a devfs entry.
@@ -2317,6 +2331,7 @@ EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_get_handle);
 EXPORT_SYMBOL(devfs_find_and_unregister);
+EXPORT_SYMBOL(devfs_remove);
 EXPORT_SYMBOL(devfs_get_flags);
 EXPORT_SYMBOL(devfs_set_flags);
 EXPORT_SYMBOL(devfs_get_maj_min);

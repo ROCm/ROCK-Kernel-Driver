@@ -2050,14 +2050,7 @@ void tty_register_devfs (struct tty_driver *driver, unsigned int flags, unsigned
 
 void tty_unregister_devfs (struct tty_driver *driver, unsigned minor)
 {
-#ifdef CONFIG_DEVFS_FS
-	int idx = minor - driver->minor_start;
-	char buf[32];
-
-	sprintf(buf, driver->name, idx + driver->name_base);
-	devfs_find_and_unregister(NULL, buf, driver->major, minor,
-				  DEVFS_SPECIAL_CHR, 0);
-#endif /* CONFIG_DEVFS_FS */
+	devfs_remove(driver->name, minor-driver->minor_start+driver->name_base);
 }
 
 EXPORT_SYMBOL(tty_register_devfs);

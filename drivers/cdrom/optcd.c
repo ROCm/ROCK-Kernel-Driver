@@ -2067,7 +2067,7 @@ static int __init optcd_init(void)
 
 static void __exit optcd_exit(void)
 {
-	devfs_find_and_unregister(NULL, "optcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	devfs_remove("optcd");
 	del_gendisk(optcd_disk);
 	put_disk(optcd_disk);
 	if (unregister_blkdev(MAJOR_NR, "optcd") == -EINVAL) {

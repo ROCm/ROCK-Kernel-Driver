@@ -1671,8 +1671,7 @@ static sony535_exit(void)
 	kfree(sony_buffer);
 	kfree(last_sony_subcode);
 	kfree(sony_toc);
-	devfs_find_and_unregister(NULL, CDU535_HANDLE, 0, 0,
-				  DEVFS_SPECIAL_BLK, 0);
+	devfs_remove(CDU535_HANDLE);
 	del_gendisk(cdu_disk);
 	put_disk(cdu_disk);
 	blk_cleanup_queue(&sonycd535_queue);

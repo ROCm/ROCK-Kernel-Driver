@@ -99,11 +99,8 @@ EXPORT_SYMBOL(devfs_register_tape);
 
 void devfs_unregister_tape(int num)
 {
-	if (num >= 0) {
-		char name[32];
-		sprintf(name, "tapes/tape%u", num);
-		devfs_find_and_unregister(NULL, name, 0, 0, 0, 0);
-	}
+	if (num >= 0)
+		devfs_remove("tapes/tape%u", num);
 }
 
 EXPORT_SYMBOL(devfs_unregister_tape);

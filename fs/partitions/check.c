@@ -254,15 +254,11 @@ static void devfs_remove_partitions(struct gendisk *dev)
 	devfs_unregister(dev->disk_de);
 	dev->disk_de = NULL;
 	if (dev->flags & GENHD_FL_CD) {
-		char name[64];
-		sprintf(name, "cdroms/cdrom%d", dev->number);
 		if (dev->de)
-			devfs_find_and_unregister(NULL, name, 0, 0, 0, 0);
+			devfs_remove("cdroms/cdrom%d", dev->number);
 		devfs_dealloc_unique_number(&cdrom_numspace, dev->number);
 	} else {
-		char name[64];
-		sprintf(name, "discs/disc%d", dev->number);
-		devfs_find_and_unregister(NULL, name, 0, 0, 0, 0);
+		devfs_remove("discs/disc%d", dev->number);
 		if (!(dev->flags & GENHD_FL_DEVFS)) {
 			devfs_unregister(dev->de);
 			dev->de = NULL;

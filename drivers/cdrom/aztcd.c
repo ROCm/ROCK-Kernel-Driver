@@ -1934,7 +1934,7 @@ static int __init aztcd_init(void)
 err_out3:
 	put_disk(azt_disk);
 err_out2:
-	devfs_find_and_unregister(NULL, "aztcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	devfs_remove("aztcd");
 err_out:
 	if ((azt_port == 0x1f0) || (azt_port == 0x170)) {
 		SWITCH_IDE_MASTER;
@@ -1947,7 +1947,7 @@ err_out:
 
 static void __exit aztcd_exit(void)
 {
-	devfs_find_and_unregister(NULL, "aztcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
+	devfs_remove("aztcd");
 	del_gendisk(azt_disk);
 	put_disk(azt_disk);
 	if ((unregister_blkdev(MAJOR_NR, "aztcd") == -EINVAL)) {

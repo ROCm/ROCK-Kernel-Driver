@@ -39,6 +39,8 @@
 
 typedef struct devfs_entry * devfs_handle_t;
 
+extern void devfs_remove(const char *fmt, ...) __attribute__((format (printf, 1, 2)));
+
 #ifdef CONFIG_DEVFS_FS
 
 struct unique_numspace
@@ -157,6 +159,9 @@ static inline void devfs_find_and_unregister (devfs_handle_t dir,
 					      unsigned int major,
 					      unsigned int minor,
 					      char type, int traverse_symlinks)
+{
+}
+static inline void devfs_remove(const char *fmt, ...)
 {
 }
 static inline int devfs_get_flags (devfs_handle_t de, unsigned int *flags)

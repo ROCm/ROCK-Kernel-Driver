@@ -542,38 +542,6 @@ static const struct {
 	 &num_audiodevs},
 };
 
-static char * 
-soundcard_make_name(char *buf, char *name, int idx) {
-	if (idx==0)
-		sprintf(buf, "sound/%s", name);
-	else
-		sprintf(buf, "sound/%s%d", name, idx);
-	return buf;
-}
-	
-/* Register/unregister audio entries */
-static void soundcard_register_devfs (int do_register)
-{
-	char name_buf[32];
-	int i, j, num;
-
-	for (i = 0; i < sizeof (dev_list) / sizeof *dev_list; i++) {
-		num = (dev_list[i].num == NULL) ? 0 : *dev_list[i].num;
-		for (j = 0; j < num || j == 0; j++) {
-			soundcard_make_name (name_buf, dev_list[i].name, j);
-			if (do_register)
-				devfs_register (NULL, name_buf, DEVFS_FL_NONE,
-					SOUND_MAJOR, dev_list[i].minor+ (j* 0x10),
-					S_IFCHR | dev_list[i].mode,
-					&oss_sound_fops, NULL);
-			else
-				devfs_find_and_unregister(NULL, name_buf, 0, 0,
-							  DEVFS_SPECIAL_CHR,0);
-		}
-	}
-}
-
-
 static int dmabuf = 0;
 static int dmabug = 0;
 
@@ -583,6 +551,8 @@ MODULE_PARM(dmabug, "i");
 static int __init oss_init(void)
 {
 	int             err;
+	char name_buf[32];
+	int i, j;
 	
 	/* drag in sound_syms.o */
 	{
@@ -604,7 +574,22 @@ static int __init oss_init(void)
 	/* Protecting the innocent */
 	sound_dmap_flag = (dmabuf > 0 ? 1 : 0);
 
-	soundcard_register_devfs(1);
+	for (i = 0; i < sizeof (dev_list) / sizeof *dev_list; i++) {
+		sprintf(name_buf, "sound/%s", dev_list[i].name);
+		devfs_register (NULL, name_buf, DEVFS_FL_NONE,
+			SOUND_MAJOR, dev_list[i].minor,
+			S_IFCHR | dev_list[i].mode,
+			&oss_sound_fops, NULL);
+		if (!dev_list[i].num)
+			continue;
+		for (j = 1; j < *dev_list[i].num; j++) {
+			sprintf(name_buf, "sound/%s%d", dev_list[i].name, j);
+			devfs_register (NULL, name_buf, DEVFS_FL_NONE,
+				SOUND_MAJOR, dev_list[i].minor + (j * 0x10),
+				S_IFCHR | dev_list[i].mode,
+				&oss_sound_fops, NULL);
+		}
+	}
 
 	if (sound_nblocks >= 1024)
 		printk(KERN_ERR "Sound warning: Deallocation table was too small.\n");
@@ -614,12 +599,18 @@ static int __init oss_init(void)
 
 static void __exit oss_cleanup(void)
 {
-	int i;
+	int i, j;
 
 	if (MOD_IN_USE)
 		return;
 
-	soundcard_register_devfs (0);
+	for (i = 0; i < sizeof (dev_list) / sizeof *dev_list; i++) {
+		devfs_remove("snd/%s", dev_list[i].name);
+		if (!dev_list[i].num)
+			continue;
+		for (j = 1; j < *dev_list[i].num; j++)
+			devfs_remove("sound/%s%d", dev_list[i].name, j);
+	}
 	
 	unregister_sound_special(1);
 	unregister_sound_special(8);
