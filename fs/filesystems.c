@@ -62,7 +62,7 @@ static struct file_system_type **find_filesystem(const char *name)
  *	unregistered.
  */
  
-int register_filesystem(struct file_system_type * fs)
+int __register_filesystem(struct file_system_type * fs, int lifo)
 {
 	int res = 0;
 	struct file_system_type ** p;
@@ -76,13 +76,19 @@ int register_filesystem(struct file_system_type * fs)
 	p = find_filesystem(fs->name);
 	if (*p)
 		res = -EBUSY;
-	else
-		*p = fs;
+	else {
+		if (!lifo)
+			*p = fs;
+		else {
+			fs->next = file_systems;
+			file_systems = fs;
+		}
+	}
 	write_unlock(&file_systems_lock);
 	return res;
 }
 
-EXPORT_SYMBOL(register_filesystem);
+EXPORT_SYMBOL(__register_filesystem);
 
 /**
  *	unregister_filesystem - unregister a file system

@@ -1052,7 +1052,9 @@ struct super_block *get_sb_pseudo(struct file_system_type *, char *,
 #define fops_put(fops) \
 	do { if (fops) module_put((fops)->owner); } while(0)
 
-extern int register_filesystem(struct file_system_type *);
+extern int __register_filesystem(struct file_system_type *, int);
+#define register_filesystem(fs) __register_filesystem(fs, 0)
+#define register_filesystem_lifo(fs) __register_filesystem(fs, 1)
 extern int unregister_filesystem(struct file_system_type *);
 extern struct vfsmount *kern_mount(struct file_system_type *);
 extern int may_umount(struct vfsmount *);

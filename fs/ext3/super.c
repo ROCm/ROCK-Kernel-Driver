@@ -2018,7 +2018,7 @@ static int __init init_ext3_fs(void)
 	old_write_dquot = ext3_qops.write_dquot;
 	ext3_qops.write_dquot = ext3_write_dquot;
 #endif
-        err = register_filesystem(&ext3_fs_type);
+        err = register_filesystem_lifo(&ext3_fs_type);
 	if (err)
 		goto out;
 	return 0;
