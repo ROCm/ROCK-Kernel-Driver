@@ -335,22 +335,22 @@ int hvc_put_chars(int index, const char *buf, int count)
  * vterms */
 int hvc_count(int *start_termno)
 {
-	u32 *termno;
 	struct device_node *vty;
+	int num_found = 0;
 
 	/* consider only the first vty node.
 	 * we should _always_ be able to find one. */
 	vty = of_find_node_by_name(NULL, "vty");
-	if (vty) {
-		if ((termno = (u32 *)get_property(vty, "reg", 0)) != NULL) {
+	if (vty && device_is_compatible(vty, "hvterm1")) {
+		u32 *termno = (u32 *)get_property(vty, "reg", 0);
+
+		if (termno && start_termno)
 			*start_termno = *termno;
-		}
+		num_found = 1;
 		of_node_put(vty);
-		return 1; /* we can't support >1 with this interface */
 	}
 
-	/* couldn't find any vterms */
-	return 0;
+	return num_found;
 }
 
 long pSeries_lpar_hpte_insert(unsigned long hpte_group,
