@@ -48,6 +48,32 @@ struct spi_transport_attrs {
 #define spi_rd_strm(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->rd_strm)
 #define spi_rti(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->rti)
 #define spi_pcomp_en(x)	(((struct spi_transport_attrs *)&(x)->transport_data)->pcomp_en)
-extern struct scsi_transport_template spi_transport_template;
+
+/* The functions by which the transport class and the driver communicate */
+struct spi_function_template {
+	void	(*get_period)(struct scsi_device *);
+	void	(*set_period)(struct scsi_device *, int);
+	void	(*get_offset)(struct scsi_device *);
+	void	(*set_offset)(struct scsi_device *, int);
+	void	(*get_width)(struct scsi_device *);
+	void	(*set_width)(struct scsi_device *, int);
+	void	(*get_iu)(struct scsi_device *);
+	void	(*set_iu)(struct scsi_device *, int);
+	void	(*get_dt)(struct scsi_device *);
+	void	(*set_dt)(struct scsi_device *, int);
+	void	(*get_qas)(struct scsi_device *);
+	void	(*set_qas)(struct scsi_device *, int);
+	void	(*get_wr_flow)(struct scsi_device *);
+	void	(*set_wr_flow)(struct scsi_device *, int);
+	void	(*get_rd_strm)(struct scsi_device *);
+	void	(*set_rd_strm)(struct scsi_device *, int);
+	void	(*get_rti)(struct scsi_device *);
+	void	(*set_rti)(struct scsi_device *, int);
+	void	(*get_pcomp_en)(struct scsi_device *);
+	void	(*set_pcomp_en)(struct scsi_device *, int);
+};
+
+struct scsi_transport_template *spi_attach_transport(struct spi_function_template *);
+void spi_release_transport(struct scsi_transport_template *);
 
 #endif /* SCSI_TRANSPORT_SPI_H */
