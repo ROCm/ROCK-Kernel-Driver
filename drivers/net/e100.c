@@ -158,7 +158,12 @@
 
 
 #define DRV_NAME		"e100"
-#define DRV_VERSION		"3.0.18"
+#ifndef CONFIG_E100_NAPI
+#define DRV_EXT
+#else
+#define DRV_EXT		"-NAPI"
+#endif
+#define DRV_VERSION		"3.0.27-k2"DRV_EXT
 #define DRV_DESCRIPTION		"Intel(R) PRO/100 Network Driver"
 #define DRV_COPYRIGHT		"Copyright(c) 1999-2004 Intel Corporation"
 #define PFX			DRV_NAME ": "
