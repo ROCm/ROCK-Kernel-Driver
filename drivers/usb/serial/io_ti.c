@@ -473,7 +473,7 @@ static int TIIsTxActive (struct edgeport_port *port)
 
 	oedb = kmalloc (sizeof (* oedb), GFP_KERNEL);
 	if (!oedb) {
-		err ("%s - out of memory", __FUNCTION__);
+		dev_err (port->port->dev, "%s - out of memory\n", __FUNCTION__);
 		return -ENOMEM;
 	}
 
@@ -592,7 +592,7 @@ static int TIChooseConfiguration (struct usb_device *dev)
 	dbg ("%s - MAX Power            = %d", __FUNCTION__, dev->config->desc.bMaxPower*2);
 
 	if (dev->config->desc.bNumInterfaces != 1) {
-		err ("%s - bNumInterfaces is not 1, ERROR!", __FUNCTION__);
+		dev_err (dev->dev, "%s - bNumInterfaces is not 1, ERROR!\n", __FUNCTION__);
 		return -ENODEV;
 	}
 
@@ -684,6 +684,7 @@ static int ValidChecksum(struct ti_i2c_desc *rom_desc, __u8 *buffer)
 /* Make sure that the I2C image is good */
 static int TiValidateI2cImage (struct edgeport_serial *serial)
 {
+	struct device *dev = &serial->serial->dev->dev;
 	int status = 0;
 	struct ti_i2c_desc *rom_desc;
 	int start_address = 2;
@@ -691,12 +692,12 @@ static int TiValidateI2cImage (struct edgeport_serial *serial)
 
 	rom_desc = kmalloc (sizeof (*rom_desc), GFP_KERNEL);
 	if (!rom_desc) {
-		err ("%s - out of memory", __FUNCTION__);
+		dev_err (*dev, "%s - out of memory\n", __FUNCTION__);
 		return -ENOMEM;
 	}
 	buffer = kmalloc (TI_MAX_I2C_SIZE, GFP_KERNEL);
 	if (!buffer) {
-		err ("%s - out of memory when allocating buffer", __FUNCTION__);
+		dev_err (*dev, "%s - out of memory when allocating buffer\n", __FUNCTION__);
 		kfree (rom_desc);
 		return -ENOMEM;
 	}
@@ -707,7 +708,7 @@ static int TiValidateI2cImage (struct edgeport_serial *serial)
 		goto ExitTiValidateI2cImage; 
 
 	if (*buffer != 0x52) {
-		err ("%s - invalid buffer signature", __FUNCTION__);
+		dev_err (*dev, "%s - invalid buffer signature\n", __FUNCTION__);
 		status = -ENODEV;
 		goto ExitTiValidateI2cImage;
 	}
@@ -765,7 +766,7 @@ static int TIReadManufDescriptor (struct edgeport_serial *serial, __u8 *buffer)
 
 	rom_desc = kmalloc (sizeof (*rom_desc), GFP_KERNEL);
 	if (!rom_desc) {
-		err ("%s - out of memory", __FUNCTION__);
+		dev_err (serial->serial->dev->dev, "%s - out of memory\n", __FUNCTION__);
 		return -ENOMEM;
 	}
 	start_address = TIGetDescriptorAddress (serial, I2C_DESC_TYPE_ION, rom_desc);
@@ -800,7 +801,7 @@ exit:
 }
 
 /* Build firmware header used for firmware update */
-static int BuildI2CFirmwareHeader (__u8 *header)
+static int BuildI2CFirmwareHeader (__u8 *header, struct device *dev)
 {
 	__u8 *buffer;
 	int buffer_size;
@@ -822,7 +823,7 @@ static int BuildI2CFirmwareHeader (__u8 *header)
 
 	buffer = kmalloc (buffer_size, GFP_KERNEL);
 	if (!buffer) {
-		err ("%s - out of memory", __FUNCTION__);
+		dev_err (*dev, "%s - out of memory\n", __FUNCTION__);
 		return -ENOMEM;
 	}
 	
@@ -960,6 +961,7 @@ static int TIConfigureBootDevice (struct usb_device *dev)
  */
 static int TIDownloadFirmware (struct edgeport_serial *serial)
 {
+	struct device *dev = &serial->serial->dev->dev;
 	int status = 0;
 	int start_address;
 	struct edge_ti_manuf_descriptor *ti_manuf_desc;
@@ -982,7 +984,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 
 	interface = &serial->serial->dev->config->interface->altsetting->desc;
 	if (!interface) {
-		err ("%s - no interface set, error!", __FUNCTION__);
+		dev_err (serial->serial->dev->dev, "%s - no interface set, error!", __FUNCTION__);
 		return -ENODEV;
 	}
 
@@ -1019,7 +1021,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 		 */
 		ti_manuf_desc = kmalloc (sizeof (*ti_manuf_desc), GFP_KERNEL);
 		if (!ti_manuf_desc) {
-			err ("%s - out of memory.", __FUNCTION__);
+			dev_err (*dev, "%s - out of memory.\n", __FUNCTION__);
 			return -ENOMEM;
 		}
 		status = TIReadManufDescriptor (serial, (__u8 *)ti_manuf_desc);
@@ -1038,7 +1040,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 
 		rom_desc = kmalloc (sizeof (*rom_desc), GFP_KERNEL);
 		if (!rom_desc) {
-			err ("%s - out of memory.", __FUNCTION__);
+			dev_err (*dev, "%s - out of memory.\n", __FUNCTION__);
 			kfree (ti_manuf_desc);
 			return -ENOMEM;
 		}
@@ -1052,7 +1054,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 
 			firmware_version = kmalloc (sizeof (*firmware_version), GFP_KERNEL);
 			if (!firmware_version) {
-				err ("%s - out of memory.", __FUNCTION__);
+				dev_err (*dev, "%s - out of memory.\n", __FUNCTION__);
 				kfree (rom_desc);
 				kfree (ti_manuf_desc);
 				return -ENOMEM;
@@ -1129,7 +1131,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 				}
 
 				if (record != I2C_DESC_TYPE_FIRMWARE_BLANK) {
-					err ("%s - error resetting device", __FUNCTION__);
+					dev_err (*dev, "%s - error resetting device\n", __FUNCTION__);
 					kfree (firmware_version);
 					kfree (rom_desc);
 					kfree (ti_manuf_desc);
@@ -1160,7 +1162,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 
 			header  = kmalloc (HEADER_SIZE, GFP_KERNEL);
 			if (!header) {
-				err ("%s - out of memory.", __FUNCTION__);
+				dev_err (*dev, "%s - out of memory.\n", __FUNCTION__);
 				kfree (rom_desc);
 				kfree (ti_manuf_desc);
 				return -ENOMEM;
@@ -1168,7 +1170,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 				
 			vheader = kmalloc (HEADER_SIZE, GFP_KERNEL);
 			if (!vheader) {
-				err ("%s - out of memory.", __FUNCTION__);
+				dev_err (*dev, "%s - out of memory.\n", __FUNCTION__);
 				kfree (header);
 				kfree (rom_desc);
 				kfree (ti_manuf_desc);
@@ -1183,7 +1185,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 			// And finally when the device comes back up in download mode the driver will cause 
 			// the new firmware to be copied from the UMP Ram to I2C and the firmware will update
 			// the record type from 0xf2 to 0x02.
-			status = BuildI2CFirmwareHeader(header);
+			status = BuildI2CFirmwareHeader(header, dev);
 			if (status) {
 				kfree (vheader);
 				kfree (header);
@@ -1300,7 +1302,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 		 */
 		ti_manuf_desc = kmalloc (sizeof (*ti_manuf_desc), GFP_KERNEL);
 		if (!ti_manuf_desc) {
-			err ("%s - out of memory.", __FUNCTION__);
+			dev_err (*dev, "%s - out of memory.\n", __FUNCTION__);
 			return -ENOMEM;
 		}
 		status = TIReadManufDescriptor (serial, (__u8 *)ti_manuf_desc);
@@ -1335,7 +1337,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 		buffer_size = (((1024 * 16) - 512) + sizeof(struct ti_i2c_image_header));
 		buffer = kmalloc (buffer_size, GFP_KERNEL);
 		if (!buffer) {
-			err ("%s - out of memory", __FUNCTION__);
+			dev_err (*dev, "%s - out of memory\n", __FUNCTION__);
 			return -ENOMEM;
 		}
 		
@@ -1616,7 +1618,7 @@ static void handle_new_lsr (struct edgeport_port *edge_port, int lsr_data, __u8 
 
 static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 {
-	struct edgeport_serial	*edge_serial = (struct edgeport_serial *)urb->context;
+	struct edgeport_serial *edge_serial = (struct edgeport_serial *)urb->context;
 	struct usb_serial_port *port;
 	struct edgeport_port *edge_port;
 	unsigned char *data = urb->transfer_buffer;
@@ -1700,8 +1702,8 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 		break;
 
 	default:
-		err ("%s - Unknown Interrupt code from UMP %x\n",
-		     __FUNCTION__, data[1]);
+		dev_err (urb->dev->dev, "%s - Unknown Interrupt code from UMP %x\n",
+			 __FUNCTION__, data[1]);
 		break;
 		
 	}
@@ -1709,8 +1711,8 @@ static void edge_interrupt_callback (struct urb *urb, struct pt_regs *regs)
 exit:
 	status = usb_submit_urb (urb, GFP_ATOMIC);
 	if (status)
-		err ("%s - usb_submit_urb failed with result %d",
-		     __FUNCTION__, status);
+		dev_err (urb->dev->dev, "%s - usb_submit_urb failed with result %d\n",
+			 __FUNCTION__, status);
 }
 
 static void edge_bulk_in_callback (struct urb *urb, struct pt_regs *regs)
@@ -1777,8 +1779,8 @@ exit:
 	/* continue always trying to read */
 	status = usb_submit_urb (urb, GFP_ATOMIC);
 	if (status)
-		err ("%s - usb_submit_urb failed with result %d",
-		     __FUNCTION__, status);
+		dev_err (urb->dev->dev, "%s - usb_submit_urb failed with result %d\n",
+			 __FUNCTION__, status);
 }
 
 static void edge_bulk_out_callback (struct urb *urb, struct pt_regs *regs)
@@ -1853,7 +1855,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 			edge_port->dma_address = UMPD_OEDB2_ADDRESS;
 			break;
 		default:
-			err ("Unknown port number!!!");
+			dev_err (port->dev, "Unknown port number!!!\n");
 			return -ENODEV;
 	}
 
@@ -1929,7 +1931,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 		/* we are the first port to be opened, let's post the interrupt urb */
 		urb = edge_serial->serial->port[0].interrupt_in_urb;
 		if (!urb) {
-			err ("%s - no interrupt urb present, exiting", __FUNCTION__);
+			dev_err (port->dev, "%s - no interrupt urb present, exiting\n", __FUNCTION__);
 			return -EINVAL;
 		}
 		urb->complete = edge_interrupt_callback;
@@ -1937,7 +1939,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 		urb->dev = dev;
 		status = usb_submit_urb (urb, GFP_KERNEL);
 		if (status) {
-			err ("%s - usb_submit_urb failed with value %d", __FUNCTION__, status);
+			dev_err (port->dev, "%s - usb_submit_urb failed with value %d\n", __FUNCTION__, status);
 			return status;
 		}
 	}
@@ -1952,7 +1954,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	/* start up our bulk read urb */
 	urb = port->read_urb;
 	if (!urb) {
-		err ("%s - no read urb present, exiting", __FUNCTION__);
+		dev_err (port->dev, "%s - no read urb present, exiting\n", __FUNCTION__);
 		return -EINVAL;
 	}
 	urb->complete = edge_bulk_in_callback;
@@ -1960,7 +1962,7 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	urb->dev = dev;
 	status = usb_submit_urb (urb, GFP_KERNEL);
 	if (status) {
-		err ("%s - read bulk usb_submit_urb failed with value %d", __FUNCTION__, status);
+		dev_err (port->dev, "%s - read bulk usb_submit_urb failed with value %d\n", __FUNCTION__, status);
 		return status;
 	}
 
@@ -2070,7 +2072,7 @@ static int edge_write (struct usb_serial_port *port, int from_user, const unsign
 	/* send the data out the bulk port */
 	result = usb_submit_urb(port->write_urb, GFP_ATOMIC);
 	if (result)
-		err("%s - failed submitting write urb, error %d", __FUNCTION__, result);
+		dev_err(port->dev, "%s - failed submitting write urb, error %d\n", __FUNCTION__, result);
 	else
 		result = count;
 
@@ -2189,7 +2191,7 @@ static void edge_unthrottle (struct usb_serial_port *port)
 	port->read_urb->dev = port->serial->dev;
 	status = usb_submit_urb (port->read_urb, GFP_ATOMIC);
 	if (status) {
-		err ("%s - usb_submit_urb failed with value %d", __FUNCTION__, status);
+		dev_err (port->dev, "%s - usb_submit_urb failed with value %d\n", __FUNCTION__, status);
 	}
 }
 
@@ -2215,7 +2217,7 @@ static void change_port_settings (struct edgeport_port *edge_port, struct termio
 
 	config = kmalloc (sizeof (*config), GFP_KERNEL);
 	if (!config) {
-		err ("%s - out of memory", __FUNCTION__);
+		dev_err (edge_port->port->dev, "%s - out of memory\n", __FUNCTION__);
 		return;
 	}
 
@@ -2588,7 +2590,7 @@ static int edge_startup (struct usb_serial *serial)
 	/* create our private serial structure */
 	edge_serial = kmalloc (sizeof(struct edgeport_serial), GFP_KERNEL);
 	if (edge_serial == NULL) {
-		err("%s - Out of memory", __FUNCTION__);
+		dev_err(serial->dev->dev, "%s - Out of memory\n", __FUNCTION__);
 		return -ENOMEM;
 	}
 	memset (edge_serial, 0, sizeof(struct edgeport_serial));
@@ -2605,7 +2607,7 @@ static int edge_startup (struct usb_serial *serial)
 	for (i = 0; i < serial->num_ports; ++i) {
 		edge_port = kmalloc (sizeof(struct edgeport_port), GFP_KERNEL);
 		if (edge_port == NULL) {
-			err("%s - Out of memory", __FUNCTION__);
+			dev_err(serial->dev->dev, "%s - Out of memory\n", __FUNCTION__);
 			return -ENOMEM;
 		}
 		memset (edge_port, 0, sizeof(struct edgeport_port));
