@@ -28,6 +28,9 @@
    
 ======================================================================*/
 
+#define DRV_NAME	"fmvj18x_cs"
+#define DRV_VERSION	"2.6"
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -39,6 +42,9 @@
 #include <linux/interrupt.h>
 #include <linux/in.h>
 #include <linux/delay.h>
+#include <linux/ethtool.h>
+
+#include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -74,7 +80,7 @@ INT_MODULE_PARM(sram_config, 0);
 #ifdef PCMCIA_DEBUG
 INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
-static char *version = "fmvj18x_cs.c 2.6 2001/09/17";
+static char *version = DRV_NAME ".c " DRV_VERSION " 2001/09/17";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -104,6 +110,7 @@ static void fjn_reset(struct net_device *dev);
 static struct net_device_stats *fjn_get_stats(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
 static void fjn_tx_timeout(struct net_device *dev);
+static int fjn_ioctl(struct net_device *, struct ifreq *, int);
 
 static dev_info_t dev_info = "fmvj18x_cs";
 static dev_link_t *dev_list;
@@ -316,6 +323,7 @@ static dev_link_t *fmvj18x_attach(void)
     dev->tx_timeout = fjn_tx_timeout;
     dev->watchdog_timeo = TX_TIMEOUT;
 #endif
+    dev->do_ioctl = fjn_ioctl;
     
     /* Register with Card Services */
     link->next = dev_list;
@@ -1102,6 +1110,65 @@ static void fjn_rx(struct net_device *dev)
 } /* fjn_rx */
 
 /*====================================================================*/
+
+static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+
+	/* dev_ioctl() in ../../net/core/dev.c has already checked
+	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
+
+	if (get_user(ethcmd, (u32 *)useraddr))
+		return -EFAULT;
+
+	switch (ethcmd) {
+
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
+		strcpy (info.driver, DRV_NAME);
+		strcpy (info.version, DRV_VERSION);
+		sprintf(info.bus_info, "PCMCIA 0x%lx", dev->base_addr);
+		if (copy_to_user (useraddr, &info, sizeof (info)))
+			return -EFAULT;
+		return 0;
+	}
+
+#ifdef PCMCIA_DEBUG
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = pc_debug;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+		pc_debug = edata.data;
+		return 0;
+	}
+#endif
+
+	default:
+		break;
+	}
+
+	return -EOPNOTSUPP;
+}
+
+static int fjn_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+{
+	switch (cmd) {
+	case SIOCETHTOOL:
+		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+
+	default:
+		return -EOPNOTSUPP;
+	}
+}
 
 static int fjn_config(struct net_device *dev, struct ifmap *map){
     return 0;

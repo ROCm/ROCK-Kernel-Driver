@@ -17,6 +17,9 @@
 
 ======================================================================*/
 
+#define DRV_NAME	"3c589_cs"
+#define DRV_VERSION	"1.162"
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -28,6 +31,9 @@
 #include <linux/interrupt.h>
 #include <linux/in.h>
 #include <linux/delay.h>
+#include <linux/ethtool.h>
+
+#include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -134,7 +140,7 @@ MODULE_PARM(irq_list, "1-4i");
 INT_MODULE_PARM(pc_debug, PCMCIA_DEBUG);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
-"3c589_cs.c 1.162 2001/10/13 00:08:50 (David Hinds)";
+DRV_NAME ".c " DRV_VERSION " 2001/10/13 00:08:50 (David Hinds)";
 #else
 #define DEBUG(n, args...)
 #endif
@@ -159,6 +165,7 @@ static int el3_rx(struct net_device *dev);
 static int el3_close(struct net_device *dev);
 static void el3_tx_timeout(struct net_device *dev);
 static void set_multicast_list(struct net_device *dev);
+static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
 
 static dev_info_t dev_info = "3c589_cs";
 
@@ -249,7 +256,8 @@ static dev_link_t *tc589_attach(void)
     dev->tx_timeout = el3_tx_timeout;
     dev->watchdog_timeo = TX_TIMEOUT;
 #endif
-    
+    dev->do_ioctl = netdev_ioctl;
+
     /* Register with Card Services */
     link->next = dev_list;
     dev_list = link;
@@ -638,6 +646,71 @@ static void tc589_reset(struct net_device *dev)
 	 ioaddr + EL3_CMD);
     outw(SetIntrEnb | IntLatch | TxAvailable | RxComplete | StatsFull
 	 | AdapterFailure, ioaddr + EL3_CMD);
+}
+
+static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+
+	/* dev_ioctl() in ../../net/core/dev.c has already checked
+	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
+
+	if (get_user(ethcmd, (u32 *)useraddr))
+		return -EFAULT;
+
+	switch (ethcmd) {
+
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
+		strcpy (info.driver, DRV_NAME);
+		strcpy (info.version, DRV_VERSION);
+		sprintf(info.bus_info, "PCMCIA 0x%lx", dev->base_addr);
+		if (copy_to_user (useraddr, &info, sizeof (info)))
+			return -EFAULT;
+		return 0;
+	}
+
+#ifdef PCMCIA_DEBUG
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = pc_debug;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+		pc_debug = edata.data;
+		return 0;
+	}
+#endif
+
+	default:
+		break;
+	}
+
+	return -EOPNOTSUPP;
+}
+
+static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
+{
+	int rc;
+
+	switch (cmd) {
+	case SIOCETHTOOL:
+		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		break;
+
+	default:
+		rc = -EOPNOTSUPP;
+		break;
+	}
+
+	return rc;
 }
 
 static int el3_config(struct net_device *dev, struct ifmap *map)
