@@ -2130,6 +2130,15 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 	__u64 cfg_base_addr_index;
 	int i;
 
+	/* check to see if controller has been disabled */
+	/* BEFORE trying to enable it */
+	(void) pci_read_config_word(pdev, PCI_COMMAND,&command);
+	if(!(command & 0x02))
+	{
+		printk(KERN_WARNING "cciss: controller appears to be disabled\n");
+		return(-1);
+	}
+
 	if (pci_enable_device(pdev))
 	{
 		printk(KERN_ERR "cciss: Unable to Enable PCI device\n");
@@ -2145,7 +2154,6 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 	device_id = pdev->device;
 	irq = pdev->irq;
 
-	(void) pci_read_config_word(pdev, PCI_COMMAND,&command);
 	(void) pci_read_config_byte(pdev, PCI_CLASS_REVISION, &revision);
 	(void) pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE,
 						&cache_line_size);
@@ -2153,13 +2161,6 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 						&latency_timer);
 	(void) pci_read_config_dword(pdev, PCI_SUBSYSTEM_VENDOR_ID, 
 						&board_id);
-
-	/* check to see if controller has been disabled */
-	if(!(command & 0x02))
-	{
-		printk(KERN_WARNING "cciss: controller appears to be disabled\n");
-		return(-1);
-	}
 
 	/* search for our IO range so we can protect it */
 	for(i=0; i<DEVICE_COUNT_RESOURCE; i++)
