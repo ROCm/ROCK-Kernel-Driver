@@ -162,7 +162,7 @@
 
 #define CNVT_TOHW(val,width) ((((val)<<(width))+0x7FFF-(val))>>16)
 
-/* G100, G200 and Mystique have (almost) same DAC */
+/* G-series and Mystique have (almost) same DAC */
 #undef NEED_DAC1064
 #if defined(CONFIG_FB_MATROX_MYSTIQUE) || defined(CONFIG_FB_MATROX_G100)
 #define NEED_DAC1064 1
@@ -305,6 +305,21 @@ struct my_timming {
 	unsigned int delay;	/* CRTC delay */
 };
 
+enum { M_SYSTEM_PLL, M_PIXEL_PLL_A, M_PIXEL_PLL_B, M_PIXEL_PLL_C, M_VIDEO_PLL };
+
+struct matrox_pll_cache {
+	unsigned int	valid;
+	struct {
+		unsigned int	mnp_key;
+		unsigned int	mnp_value;
+		      } data[4];
+};
+
+struct matrox_pll_limits {
+	unsigned int	vcomin;
+	unsigned int	vcomax;
+};
+
 struct matrox_pll_features {
 	unsigned int	vco_freq_min;
 	unsigned int	ref_freq;
@@ -371,6 +386,8 @@ struct matrox_hw_state {
 
 	/* CRTC2 only */
 	/* u_int32_t	TBD */
+
+	unsigned int	vidclk;
 };
 
 struct matrox_accel_data {
@@ -382,13 +399,27 @@ struct matrox_accel_data {
 };
 
 struct matrox_altout {
-	int		(*compute)(void* altout_dev, struct my_timming* input, struct matrox_hw_state* state);
-	int		(*program)(void* altout_dev, const struct matrox_hw_state* state);
+	int		(*compute)(void* altout_dev, struct my_timming* input);
+	int		(*program)(void* altout_dev);
 	int		(*start)(void* altout_dev);
 	void		(*incuse)(void* altout_dev);
 	void		(*decuse)(void* altout_dev);
 	int		(*setmode)(void* altout_dev, u_int32_t mode);
 	int		(*getmode)(void* altout_dev, u_int32_t* mode);
+};
+
+enum mga_chip { MGA_2064, MGA_2164, MGA_1064, MGA_1164, MGA_G100, MGA_G200, MGA_G400, MGA_G450, MGA_G550 };
+
+struct matrox_bios {
+	unsigned int	bios_valid : 1;
+	unsigned int	pins_len;
+	unsigned char	pins[128];
+	struct {
+		unsigned char vMaj, vMin, vRev;
+		      } version;
+	struct {
+		unsigned char state, tvout;
+		      } output;
 };
 
 struct matrox_switch;
@@ -404,10 +435,7 @@ struct matrox_fb_info {
 	unsigned int		usecount;
 
 	struct matroxfb_par	curr;
-	struct matrox_hw_state	hw1;
-	struct matrox_hw_state	hw2;
-	struct matrox_hw_state*	newhw;
-	struct matrox_hw_state*	currenthw;
+	struct matrox_hw_state	hw;
 
 	struct matrox_accel_data accel;
 
@@ -464,6 +492,8 @@ struct matrox_fb_info {
 		spinlock_t	accel;
 			      } lock;
 
+	enum mga_chip		chip;
+
 	int			interleave;
 	int			millenium;
 	int			milleniumII;
@@ -514,8 +544,8 @@ struct matrox_fb_info {
 						/* 0 except for 6MB Millenium */
 		int		memtype;
 		int		g450dac;
-		int		g550dac;
 		int		dfp_type;
+		unsigned int	fbResource;
 			      } devflags;
 	struct display_switch	dispsw;
 	struct {
@@ -529,6 +559,38 @@ struct matrox_fb_info {
 		int		redraw;
 		struct timer_list timer;
 			      } cursor;
+	struct matrox_bios	bios;
+	struct {
+		struct matrox_pll_limits	pixel;
+		struct matrox_pll_limits	system;
+		struct matrox_pll_limits	video;
+			      } limits;
+	struct {
+		struct matrox_pll_cache	pixel;
+		struct matrox_pll_cache	system;
+		struct matrox_pll_cache	video;
+				      } cache;
+	struct {
+		struct {
+			unsigned int	video;
+			unsigned int	system;
+				      } pll;
+		struct {
+			u_int32_t	opt;
+			u_int32_t	opt2;
+			u_int32_t	opt3;
+			u_int32_t	mctlwtst;
+			u_int32_t	mctlwtst_core;
+			u_int32_t	memmisc;
+			u_int32_t	memrdbk;
+			u_int32_t	maccess;
+				      } reg;
+		struct {
+			unsigned int	ddr:1,
+			                emrswen:1,
+					dll:1;
+				      } memory;
+			      } values;
 	struct { unsigned red, green, blue, transp; } palette[256];
 #if defined(CONFIG_FB_COMPAT_XPMAC)
 	char	matrox_name[32];
@@ -599,10 +661,10 @@ static inline struct matrox_fb_info* mxinfo(const struct display* p) {
 #endif
 
 struct matrox_switch {
-	int	(*preinit)(WPMINFO struct matrox_hw_state*);
-	void	(*reset)(WPMINFO struct matrox_hw_state*);
-	int	(*init)(CPMINFO struct matrox_hw_state*, struct my_timming*, struct display*);
-	void	(*restore)(WPMINFO struct matrox_hw_state*, struct matrox_hw_state*, struct display*);
+	int	(*preinit)(WPMINFO2);
+	void	(*reset)(WPMINFO2);
+	int	(*init)(WPMINFO struct my_timming*, struct display*);
+	void	(*restore)(WPMINFO struct display*);
 	int	(*selhwcursor)(WPMINFO struct display*);
 };
 
@@ -617,8 +679,13 @@ int matroxfb_register_driver(struct matroxfb_driver* drv);
 void matroxfb_unregister_driver(struct matroxfb_driver* drv);
 
 #define PCI_OPTION_REG	0x40
+#define   PCI_OPTION_ENABLE_ROM		0x40000000
+
 #define PCI_MGA_INDEX	0x44
 #define PCI_MGA_DATA	0x48
+#define PCI_OPTION2_REG	0x50
+#define PCI_OPTION3_REG	0x54
+#define PCI_MEMMISC_REG	0x58
 
 #define M_DWGCTL	0x1C00
 #define M_MACCESS	0x1C04
@@ -737,6 +804,8 @@ void matroxfb_unregister_driver(struct matroxfb_driver* drv);
 #define DAC_XGENIOCTRL		0x2A
 #define DAC_XGENIODATA		0x2B
 
+#define M_C2CTL		0x3E10
+
 #ifdef __LITTLE_ENDIAN
 #define MX_OPTION_BSWAP		0x00000000
 
@@ -794,6 +863,7 @@ extern void matroxfb_DAC_out(CPMINFO int reg, int val);
 extern int matroxfb_DAC_in(CPMINFO int reg);
 extern struct list_head matroxfb_list;
 extern void matroxfb_var2my(struct fb_var_screeninfo* fvsi, struct my_timming* mt);
+extern int matroxfb_switch(int con, struct fb_info *);
 
 #ifdef MATROXFB_USE_SPINLOCKS
 #define CRITBEGIN  spin_lock_irqsave(&ACCESS_FBINFO(lock.accel), critflags);

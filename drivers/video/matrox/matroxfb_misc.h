@@ -12,10 +12,11 @@ static inline int PLL_calcclock(CPMINFO unsigned int freq, unsigned int fmax,
 }
 
 void matroxfb_createcursorshape(WPMINFO struct display* p, int vmode);
-int matroxfb_vgaHWinit(CPMINFO struct matrox_hw_state* hw, struct my_timming* m, struct display* p);
-void matroxfb_vgaHWrestore(WPMINFO struct matrox_hw_state* hw, struct matrox_hw_state* oldhw);
+int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p);
+void matroxfb_vgaHWrestore(WPMINFO2);
 void matroxfb_fastfont_init(struct matrox_fb_info* minfo);
 int matrox_text_loadfont(WPMINFO struct display* p);
 int matroxfb_fastfont_tryset(WPMINFO struct display* p);
+void matroxfb_read_pins(WPMINFO2);
 
 #endif	/* __MATROXFB_MISC_H__ */

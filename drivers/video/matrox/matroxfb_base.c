@@ -4,7 +4,9 @@
  *
  * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.54 2001/09/09
+ * Portions Copyright (c) 2001 Matrox Graphics Inc.
+ *
+ * Version: 1.62 2001/11/29
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -161,11 +163,11 @@ static void matrox_pan_var(WPMINFO struct fb_var_screeninfo *var) {
 		pos = (var->yoffset * var->xres_virtual + var->xoffset) * ACCESS_FBINFO(curr.final_bppShift) / 32;
 		pos += ACCESS_FBINFO(curr.ydstorg.chunks);
 	}
-	p0 = ACCESS_FBINFO(currenthw)->CRTC[0x0D] = pos & 0xFF;
-	p1 = ACCESS_FBINFO(currenthw)->CRTC[0x0C] = (pos & 0xFF00) >> 8;
-	p2 = ACCESS_FBINFO(currenthw)->CRTCEXT[0] = (ACCESS_FBINFO(currenthw)->CRTCEXT[0] & 0xB0) | ((pos >> 16) & 0x0F) | ((pos >> 14) & 0x40);
+	p0 = ACCESS_FBINFO(hw).CRTC[0x0D] = pos & 0xFF;
+	p1 = ACCESS_FBINFO(hw).CRTC[0x0C] = (pos & 0xFF00) >> 8;
+	p2 = ACCESS_FBINFO(hw).CRTCEXT[0] = (ACCESS_FBINFO(hw).CRTCEXT[0] & 0xB0) | ((pos >> 16) & 0x0F) | ((pos >> 14) & 0x40);
 #ifdef CONFIG_FB_MATROX_32MB
-	p3 = ACCESS_FBINFO(currenthw)->CRTCEXT[8] = pos >> 21;
+	p3 = ACCESS_FBINFO(hw).CRTCEXT[8] = pos >> 21;
 #endif
 
 	CRITBEGIN
@@ -814,7 +816,6 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 
 		{	struct my_timming mt;
 			struct matrox_hw_state* hw;
-			struct matrox_hw_state* ohw;
 
 			matroxfb_var2my(var, &mt);
 			/* CRTC1 delays */
@@ -826,16 +827,12 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 				default:	mt.delay = 31 + 8; break;
 			}
 
-			hw = ACCESS_FBINFO(newhw);
-			ohw = ACCESS_FBINFO(currenthw);
-
-			/* copy last setting... */
-			memcpy(hw, ohw, sizeof(*hw));
+			hw = &ACCESS_FBINFO(hw);
 
 			del_timer_sync(&ACCESS_FBINFO(cursor.timer));
 			ACCESS_FBINFO(cursor.state) = CM_ERASE;
 
-			ACCESS_FBINFO(hw_switch->init(PMINFO hw, &mt, display));
+			ACCESS_FBINFO(hw_switch->init(PMINFO &mt, display));
 			if (display->type == FB_TYPE_TEXT) {
 				if (fontheight(display))
 					pos = var->yoffset / fontheight(display) * display->next_line / ACCESS_FBINFO(devflags.textstep) + var->xoffset / (fontwidth(display)?fontwidth(display):8);
@@ -852,28 +849,26 @@ static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 			hw->CRTCEXT[8] = pos >> 21;
 			if (ACCESS_FBINFO(output.ph) & (MATROXFB_OUTPUT_CONN_PRIMARY | MATROXFB_OUTPUT_CONN_DFP)) {
 				if (ACCESS_FBINFO(primout))
-					ACCESS_FBINFO(primout)->compute(MINFO, &mt, hw);
+					ACCESS_FBINFO(primout)->compute(MINFO, &mt);
 			}
 			if (ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 				down_read(&ACCESS_FBINFO(altout.lock));
 				if (ACCESS_FBINFO(altout.output))
-					ACCESS_FBINFO(altout.output)->compute(ACCESS_FBINFO(altout.device), &mt, hw);
+					ACCESS_FBINFO(altout.output)->compute(ACCESS_FBINFO(altout.device), &mt);
 				up_read(&ACCESS_FBINFO(altout.lock));
 			}
-			ACCESS_FBINFO(hw_switch->restore(PMINFO hw, ohw, display));
+			ACCESS_FBINFO(hw_switch->restore(PMINFO display));
 			if (ACCESS_FBINFO(output.ph) & (MATROXFB_OUTPUT_CONN_PRIMARY | MATROXFB_OUTPUT_CONN_DFP)) {
 				if (ACCESS_FBINFO(primout))
-					ACCESS_FBINFO(primout)->program(MINFO, hw);
+					ACCESS_FBINFO(primout)->program(MINFO);
 			}
 			if (ACCESS_FBINFO(output.ph) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 				down_read(&ACCESS_FBINFO(altout.lock));
 				if (ACCESS_FBINFO(altout.output))
-					ACCESS_FBINFO(altout.output)->program(ACCESS_FBINFO(altout.device), hw);
+					ACCESS_FBINFO(altout.output)->program(ACCESS_FBINFO(altout.device));
 				up_read(&ACCESS_FBINFO(altout.lock));
 			}
 			ACCESS_FBINFO(cursor.redraw) = 1;
-			ACCESS_FBINFO(currenthw) = hw;
-			ACCESS_FBINFO(newhw) = ohw;
 			if (ACCESS_FBINFO(output.ph) & (MATROXFB_OUTPUT_CONN_PRIMARY | MATROXFB_OUTPUT_CONN_DFP)) {
 				if (ACCESS_FBINFO(primout))
 					ACCESS_FBINFO(primout)->start(MINFO);
@@ -1004,7 +999,7 @@ static int matroxfb_get_vblank(CPMINFO struct fb_vblank *vblank)
 		vblank->flags |= FB_VBLANK_HBLANKING;
 	if (sts1 & 8)
 		vblank->flags |= FB_VBLANK_VSYNCING;
-	if (vblank->count >= ACCESS_FBINFO(currcon_display)->var.yres)
+	if (vblank->vcount >= ACCESS_FBINFO(currcon_display)->var.yres)
 		vblank->flags |= FB_VBLANK_VBLANKING;
 	vblank->hcount = 0;
 	vblank->count = 0;
@@ -1416,7 +1411,7 @@ static struct video_board vbG400		= {0x2000000, 0x1000000, FB_ACCEL_MATROX_MGAG4
 #define DEVF_CROSS4MB		0x0010
 #define DEVF_TEXT4B		0x0020
 #define DEVF_DDC_8_2		0x0040
-#define DEVF_G550DAC		0x0080
+/* #define DEVF_recycled	0x0080	*/
 #define DEVF_SUPPORT32MB	0x0100
 #define DEVF_ANY_VXRES		0x0200
 #define DEVF_TEXT16B		0x0400
@@ -1432,12 +1427,13 @@ static struct video_board vbG400		= {0x2000000, 0x1000000, FB_ACCEL_MATROX_MGAG4
 #define DEVF_G400	(DEVF_G2CORE | DEVF_SUPPORT32MB | DEVF_TEXT16B | DEVF_CRTC2)
 /* if you'll find how to drive DFP... */
 #define DEVF_G450	(DEVF_GCORE | DEVF_ANY_VXRES | DEVF_SUPPORT32MB | DEVF_TEXT16B | DEVF_CRTC2 | DEVF_G450DAC | DEVF_SRCORG)
-#define DEVF_G550	(DEVF_G450 | DEVF_G550DAC | DEVF_BOTHDACS)
+#define DEVF_G550	(DEVF_G450 | DEVF_BOTHDACS)
 
 static struct board {
 	unsigned short vendor, device, rev, svid, sid;
 	unsigned int flags;
 	unsigned int maxclk;
+	enum mga_chip chip;
 	struct video_board* base;
 	const char* name;
 		} dev_list[] = {
@@ -1446,18 +1442,21 @@ static struct board {
 		0,			0,
 		DEVF_TEXT4B,
 		230000,
+		MGA_2064,
 		&vbMillennium,
 		"Millennium (PCI)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MIL_2,	0xFF,
 		0,			0,
 		DEVF_SWAPS,
 		220000,
+		MGA_2164,
 		&vbMillennium2,
 		"Millennium II (PCI)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MIL_2_AGP,	0xFF,
 		0,			0,
 		DEVF_SWAPS,
 		250000,
+		MGA_2164,
 		&vbMillennium2A,
 		"Millennium II (AGP)"},
 #endif
@@ -1466,127 +1465,113 @@ static struct board {
 		0,			0,
 		DEVF_VIDEO64BIT | DEVF_CROSS4MB,
 		180000,
+		MGA_1064,
 		&vbMystique,
 		"Mystique (PCI)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_MYS,	0xFF,
 		0,			0,
 		DEVF_VIDEO64BIT | DEVF_SWAPS | DEVF_CROSS4MB,
 		220000,
+		MGA_1164,
 		&vbMystique,
 		"Mystique 220 (PCI)"},
 #endif
 #ifdef CONFIG_FB_MATROX_G100
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_MM,	0xFF,
-		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_MGA_G100_PCI,
+		0,			0,
 		DEVF_G100,
 		230000,
+		MGA_G100,
 		&vbG100,
 		"MGA-G100 (PCI)"},
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_MM,	0xFF,
-		0,			0,
-		DEVF_G100,
-		230000,
-		&vbG100,
-		"unknown G100 (PCI)"},
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_AGP,	0xFF,
-		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_GENERIC,
-		DEVF_G100,
-		230000,
-		&vbG100,
-		"MGA-G100 (AGP)"},
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_AGP,	0xFF,
-		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_MGA_G100_AGP,
-		DEVF_G100,
-		230000,
-		&vbG100,
-		"MGA-G100 (AGP)"},
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_AGP,	0xFF,
-		PCI_SS_VENDOR_ID_SIEMENS_NIXDORF,	PCI_SS_ID_SIEMENS_MGA_G100_AGP,
-		DEVF_G100,
-		230000,
-		&vbG100,
-		"MGA-G100 (AGP)"},
-	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_AGP,	0xFF,
-		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_PRODUCTIVA_G100_AGP,
-		DEVF_G100,
-		230000,
-		&vbG100,
-		"Productiva G100 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G100_AGP,	0xFF,
 		0,			0,
 		DEVF_G100,
 		230000,
+		MGA_G100,
 		&vbG100,
-		"unknown G100 (AGP)"},
+		"MGA-G100 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G200_PCI,	0xFF,
 		0,			0,
 		DEVF_G200,
 		250000,
+		MGA_G200,
 		&vbG200,
-		"unknown G200 (PCI)"},
+		"MGA-G200 (PCI)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G200_AGP,	0xFF,
 		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_GENERIC,
 		DEVF_G200,
 		220000,
+		MGA_G200,
 		&vbG200,
 		"MGA-G200 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G200_AGP,	0xFF,
 		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_MYSTIQUE_G200_AGP,
 		DEVF_G200,
 		230000,
+		MGA_G200,
 		&vbG200,
 		"Mystique G200 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G200_AGP,	0xFF,
 		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_MILLENIUM_G200_AGP,
 		DEVF_G200,
 		250000,
+		MGA_G200,
 		&vbG200,
 		"Millennium G200 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G200_AGP,	0xFF,
 		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_MARVEL_G200_AGP,
 		DEVF_G200,
 		230000,
+		MGA_G200,
 		&vbG200,
 		"Marvel G200 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G200_AGP,	0xFF,
 		PCI_SS_VENDOR_ID_SIEMENS_NIXDORF,	PCI_SS_ID_SIEMENS_MGA_G200_AGP,
 		DEVF_G200,
 		230000,
+		MGA_G200,
 		&vbG200,
 		"MGA-G200 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G200_AGP,	0xFF,
 		0,			0,
 		DEVF_G200,
 		230000,
+		MGA_G200,
 		&vbG200,
 		"G200 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400,	0x80,
 		PCI_SS_VENDOR_ID_MATROX,	PCI_SS_ID_MATROX_MILLENNIUM_G400_MAX_AGP,
 		DEVF_G400,
 		360000,
+		MGA_G400,
 		&vbG400,
 		"Millennium G400 MAX (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400,	0x80,
 		0,			0,
 		DEVF_G400,
 		300000,
+		MGA_G400,
 		&vbG400,
 		"G400 (AGP)"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G400,	0xFF,
 		0,			0,
 		DEVF_G450,
-		500000,		/* ??? vco goes up to 900MHz... */
+		360000,
+		MGA_G450,
 		&vbG400,
 		"G450"},
 	{PCI_VENDOR_ID_MATROX,	PCI_DEVICE_ID_MATROX_G550,	0xFF,
 		0,			0,
 		DEVF_G550,
-		500000,
+		360000,
+		MGA_G550,
 		&vbG400,
 		"G550"},
 #endif
 	{0,			0,				0xFF,
 		0,			0,
+		0,
 		0,
 		0,
 		NULL,
@@ -1606,7 +1591,6 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 	unsigned long ctrlptr_phys = 0;
 	unsigned long video_base_phys = 0;
 	unsigned int memsize;
-	struct matrox_hw_state* hw = ACCESS_FBINFO(currenthw);
 	int err;
 
 	DBG("initMatrox2")
@@ -1620,6 +1604,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 
 	printk(KERN_INFO "matroxfb: Matrox %s detected\n", b->name);
 	ACCESS_FBINFO(capable.plnwt) = 1;
+	ACCESS_FBINFO(chip) = b->chip;
 	ACCESS_FBINFO(capable.srcorg) = b->flags & DEVF_SRCORG;
 	ACCESS_FBINFO(devflags.video64bits) = b->flags & DEVF_VIDEO64BIT;
 	if (b->flags & DEVF_TEXT4B) {
@@ -1657,7 +1642,6 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 	}
 	ACCESS_FBINFO(devflags.dfp_type) = dfp_type;
 	ACCESS_FBINFO(devflags.g450dac) = b->flags & DEVF_G450DAC;
-	ACCESS_FBINFO(devflags.g550dac) = b->flags & DEVF_G550DAC;
 	ACCESS_FBINFO(devflags.textstep) = ACCESS_FBINFO(devflags.vgastep) * ACCESS_FBINFO(devflags.textmode);
 	ACCESS_FBINFO(devflags.textvram) = 65536 / ACCESS_FBINFO(devflags.textmode);
 
@@ -1666,9 +1650,11 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 	if (b->flags & DEVF_SWAPS) {
 		ctrlptr_phys = pci_resource_start(ACCESS_FBINFO(pcidev), 1);
 		video_base_phys = pci_resource_start(ACCESS_FBINFO(pcidev), 0);
+		ACCESS_FBINFO(devflags.fbResource) = PCI_BASE_ADDRESS_0;
 	} else {
 		ctrlptr_phys = pci_resource_start(ACCESS_FBINFO(pcidev), 0);
 		video_base_phys = pci_resource_start(ACCESS_FBINFO(pcidev), 1);
+		ACCESS_FBINFO(devflags.fbResource) = PCI_BASE_ADDRESS_1;
 	}
 	err = -EINVAL;
 	if (!ctrlptr_phys) {
@@ -1725,7 +1711,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 		}
 		pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_COMMAND, cmd);
 		pci_write_config_dword(ACCESS_FBINFO(pcidev), PCI_OPTION_REG, mga_option);
-		hw->MXoptionReg = mga_option;
+		ACCESS_FBINFO(hw).MXoptionReg = mga_option;
 
 		/* select non-DMA memory for PCI_MGA_DATA, otherwise dump of PCI cfg space can lock PCI bus */
 		/* maybe preinit() candidate, but it is same... for all devices... at this time... */
@@ -1733,7 +1719,8 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 	}
 
 	err = -ENXIO;
-	if (ACCESS_FBINFO(hw_switch)->preinit(PMINFO hw)) {
+	matroxfb_read_pins(PMINFO2);
+	if (ACCESS_FBINFO(hw_switch)->preinit(PMINFO2)) {
 		goto failVideoIO;
 	}
 
@@ -1746,13 +1733,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 
 	ACCESS_FBINFO(currcon) = -1;
 	ACCESS_FBINFO(currcon_display) = d;
-	mga_iounmap(ACCESS_FBINFO(video.vbase));
 	ACCESS_FBINFO(video.base) = video_base_phys;
-	if (mga_ioremap(video_base_phys, ACCESS_FBINFO(video.len), MGA_IOREMAP_FB, &ACCESS_FBINFO(video.vbase))) {
-		printk(KERN_ERR "matroxfb: cannot ioremap(%lX, %d), matroxfb disabled\n",
-			video_base_phys, ACCESS_FBINFO(video.len));
-		goto failCtrlIO;
-	}
 	ACCESS_FBINFO(video.len_usable) = ACCESS_FBINFO(video.len);
 	if (ACCESS_FBINFO(video.len_usable) > b->base->maxdisplayable)
 		ACCESS_FBINFO(video.len_usable) = b->base->maxdisplayable;
@@ -1766,7 +1747,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 
 	if (!ACCESS_FBINFO(devflags.novga))
 		request_region(0x3C0, 32, "matrox");
-	ACCESS_FBINFO(hw_switch->reset(PMINFO hw));
+	ACCESS_FBINFO(hw_switch->reset(PMINFO2));
 
 	ACCESS_FBINFO(fbcon.monspecs.hfmin) = 0;
 	ACCESS_FBINFO(fbcon.monspecs.hfmax) = fh;
@@ -1789,7 +1770,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 
 	strcpy(ACCESS_FBINFO(fbcon.modename), "MATROX VGA");
 	ACCESS_FBINFO(fbcon.changevar) = NULL;
-	ACCESS_FBINFO(fbcon.node) = -1;
+	ACCESS_FBINFO(fbcon.node) = NODEV;
 	ACCESS_FBINFO(fbcon.fbops) = &matroxfb_ops;
 	ACCESS_FBINFO(fbcon.disp) = d;
 	ACCESS_FBINFO(fbcon.switch_con) = &matroxfb_switch;
@@ -1848,9 +1829,9 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 			          + vesafb_defined.right_margin + vesafb_defined.hsync_len);
 			if ((tmp < maxclk) || (maxclk == 0)) maxclk = tmp;
 		}
-		maxclk = (maxclk + 499) / 500;
-		if (maxclk) {
-			tmp = (2000000000 + maxclk) / maxclk;
+		tmp = (maxclk + 499) / 500;
+		if (tmp) {
+			tmp = (2000000000 + tmp) / tmp;
 			if (tmp > pixclock) pixclock = tmp;
 		}
 	}
@@ -2070,8 +2051,6 @@ static int matroxfb_probe(struct pci_dev* pdev, const struct pci_device_id* dumm
 	memset(MINFO, 0, sizeof(*MINFO));
 	memset(d, 0, sizeof(*d));
 
-	ACCESS_FBINFO(currenthw) = &ACCESS_FBINFO(hw1);
-	ACCESS_FBINFO(newhw) = &ACCESS_FBINFO(hw2);
 	ACCESS_FBINFO(pcidev) = pdev;
 	ACCESS_FBINFO(dead) = 0;
 	ACCESS_FBINFO(usecount) = 0;

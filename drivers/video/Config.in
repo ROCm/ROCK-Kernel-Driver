@@ -121,14 +121,14 @@ if [ "$CONFIG_FB" = "y" ]; then
 	 if [ "$CONFIG_FB_MATROX" != "n" ]; then
 	    bool '    Millennium I/II support' CONFIG_FB_MATROX_MILLENIUM
 	    bool '    Mystique support' CONFIG_FB_MATROX_MYSTIQUE
-	    bool '    G100/G200/G400/G450 support' CONFIG_FB_MATROX_G100
+	    bool '    G100/G200/G400/G450/G550 support' CONFIG_FB_MATROX_G100
             if [ "$CONFIG_I2C" != "n" ]; then
 	       dep_tristate '      Matrox I2C support' CONFIG_FB_MATROX_I2C $CONFIG_FB_MATROX $CONFIG_I2C_ALGOBIT
 	       if [ "$CONFIG_FB_MATROX_G100" = "y" ]; then
 	          dep_tristate '      G400 second head support' CONFIG_FB_MATROX_MAVEN $CONFIG_FB_MATROX_I2C
 	       fi
             fi
-            dep_tristate '      G450 second head support' CONFIG_FB_MATROX_G450 $CONFIG_FB_MATROX_G100
+            dep_tristate '      G450/G550 second head support (mandatory for G550)' CONFIG_FB_MATROX_G450 $CONFIG_FB_MATROX_G100
 	    bool '    Multihead support' CONFIG_FB_MATROX_MULTIHEAD
 	 fi
 	 tristate '  ATI Mach64 display support (EXPERIMENTAL)' CONFIG_FB_ATY

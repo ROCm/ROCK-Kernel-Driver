@@ -13,8 +13,8 @@ extern struct matrox_switch matrox_mystique;
 extern struct matrox_switch matrox_G100;
 #endif
 #ifdef NEED_DAC1064
-void DAC1064_global_init(CPMINFO struct matrox_hw_state*);
-void DAC1064_global_restore(CPMINFO const struct matrox_hw_state*);
+void DAC1064_global_init(WPMINFO2);
+void DAC1064_global_restore(WPMINFO2);
 #endif
 
 #define M1064_INDEX	0x00
@@ -139,10 +139,10 @@ void DAC1064_global_restore(CPMINFO const struct matrox_hw_state*);
 
 #define M1064_XOUTPUTCONN	0x8A
 #define M1064_XSYNCCTRL		0x8B
-#define M1064_XPIXPLL2STAT	0x8C
-#define M1064_XPIXPLL2P		0x8D
-#define M1064_XPIXPLL2N		0x8E
-#define M1064_XPIXPLL2M		0x8F
+#define M1064_XVIDPLLSTAT	0x8C
+#define M1064_XVIDPLLP		0x8D
+#define M1064_XVIDPLLM		0x8E
+#define M1064_XVIDPLLN		0x8F
 
 #define M1064_XPWRCTRL		0xA0
 

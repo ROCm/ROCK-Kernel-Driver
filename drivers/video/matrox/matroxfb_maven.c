@@ -862,12 +862,20 @@ static int maven_get_output_mode(struct maven_data* md, u_int32_t *arg) {
 
 /******************************************************/
 
-static int maven_out_compute(void* md, struct my_timming* mt, struct matrox_hw_state* mr) {
-	return maven_compute_timming(md, mt, &mr->maven);
+static int maven_out_compute(void* md, struct my_timming* mt) {
+#define mdinfo ((struct maven_data*)md)
+#define minfo (mdinfo->primary_head)
+	return maven_compute_timming(md, mt, &ACCESS_FBINFO(hw).maven);
+#undef minfo
+#undef mdinfo
 }
 
-static int maven_out_program(void* md, const struct matrox_hw_state* mr) {
-	return maven_program_timming(md, &mr->maven);
+static int maven_out_program(void* md) {
+#define mdinfo ((struct maven_data*)md)
+#define minfo (mdinfo->primary_head)
+	return maven_program_timming(md, &ACCESS_FBINFO(hw).maven);
+#undef minfo
+#undef mdinfo
 }
 
 static int maven_out_start(void* md) {
