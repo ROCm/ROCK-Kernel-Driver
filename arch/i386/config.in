@@ -25,6 +25,7 @@ choice 'Processor family' \
 	 Pentium-4				CONFIG_MPENTIUM4 \
 	 K6/K6-II/K6-III			CONFIG_MK6 \
 	 Athlon/Duron/K7			CONFIG_MK7 \
+	 Elan					CONFIG_MELAN \
 	 Crusoe					CONFIG_MCRUSOE \
 	 Winchip-C6				CONFIG_MWINCHIPC6 \
 	 Winchip-2				CONFIG_MWINCHIP2 \
@@ -118,6 +119,11 @@ if [ "$CONFIG_MK7" = "y" ]; then
    define_bool CONFIG_X86_USE_3DNOW y
    define_bool CONFIG_X86_PGE y
    define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
+fi
+if [ "$CONFIG_MELAN" = "y" ]; then
+   define_int  CONFIG_X86_L1_CACHE_SHIFT 4
+   define_bool CONFIG_X86_USE_STRING_486 y
+   define_bool CONFIG_X86_ALIGNMENT_16 y
 fi
 if [ "$CONFIG_MCYRIXIII" = "y" ]; then
    define_int  CONFIG_X86_L1_CACHE_SHIFT 5
