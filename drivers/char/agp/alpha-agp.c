@@ -195,6 +195,8 @@ alpha_core_agp_setup(void)
 
 static int __init agp_alpha_core_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	if (alpha_mv.agp_info)
 		return alpha_core_agp_setup();
 	return -ENODEV;

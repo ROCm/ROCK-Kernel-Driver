@@ -532,8 +532,8 @@ static void i460_destroy_page (void *page)
 static unsigned long i460_mask_memory (unsigned long addr, int type)
 {
 	/* Make sure the returned address is a valid GATT entry */
-	return (agp_bridge->driver->masks[0].mask
-		| (((addr & ~((1 << I460_IO_PAGE_SHIFT) - 1)) & 0xffffff000) >> 12));
+	return agp_bridge->driver->masks[0].mask
+		| (((addr & ~((1 << I460_IO_PAGE_SHIFT) - 1)) & 0xffffff000) >> 12);
 }
 
 struct agp_bridge_driver intel_i460_driver = {
@@ -585,6 +585,8 @@ static int __devinit agp_intel_i460_probe(struct pci_dev *pdev,
 	bridge->dev = pdev;
 	bridge->capndx = cap_ptr;
 
+	printk(KERN_INFO PFX "Detected Intel 460GX chipset\n");
+
 	pci_set_drvdata(pdev, bridge);
 	return agp_add_bridge(bridge);
 }
@@ -620,6 +622,8 @@ static struct pci_driver agp_intel_i460_pci_driver = {
 
 static int __init agp_intel_i460_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	return pci_module_init(&agp_intel_i460_pci_driver);
 }
 

@@ -53,8 +53,10 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 	}
 	global_cache_flush();
 
-	for (i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++)
+	for (i = 0; i < PAGE_SIZE / sizeof(unsigned long); i++) {
 		writel(agp_bridge->scratch_page, page_map->remapped+i);
+		readl(page_map->remapped+i);	/* PCI Posting. */
+	}
 
 	return 0;
 }
@@ -167,6 +169,7 @@ static int amd_create_gatt_table(void)
 	for (i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
 		writel(virt_to_phys(amd_irongate_private.gatt_pages[i]->real) | 1,
 			page_dir.remapped+GET_PAGE_DIR_OFF(addr));
+		readl(page_dir.remapped+GET_PAGE_DIR_OFF(addr));	/* PCI Posting. */
 	}
 
 	return 0;
@@ -220,8 +223,8 @@ static int amd_irongate_configure(void)
 	amd_irongate_private.registers = (volatile u8 __iomem *) ioremap(temp, 4096);
 
 	/* Write out the address of the gatt table */
-	OUTREG32(amd_irongate_private.registers, AMD_ATTBASE,
-		 agp_bridge->gatt_bus_addr);
+	writel(agp_bridge->gatt_bus_addr, amd_irongate_private.registers+AMD_ATTBASE);
+	readl(amd_irongate_private.registers+AMD_ATTBASE);	/* PCI Posting. */
 
 	/* Write the Sync register */
 	pci_write_config_byte(agp_bridge->dev, AMD_MODECNTL, 0x80);
@@ -230,19 +233,19 @@ static int amd_irongate_configure(void)
 	pci_write_config_byte(agp_bridge->dev, AMD_MODECNTL2, 0x00);
 
 	/* Write the enable register */
-	enable_reg = INREG16(amd_irongate_private.registers, AMD_GARTENABLE);
+	enable_reg = readw(amd_irongate_private.registers+AMD_GARTENABLE);
 	enable_reg = (enable_reg | 0x0004);
-	OUTREG16(amd_irongate_private.registers, AMD_GARTENABLE, enable_reg);
+	writew(enable_reg, amd_irongate_private.registers+AMD_GARTENABLE);
+	readw(amd_irongate_private.registers+AMD_GARTENABLE);	/* PCI Posting. */
 
 	/* Write out the size register */
 	pci_read_config_dword(agp_bridge->dev, AMD_APSIZE, &temp);
-	temp = (((temp & ~(0x0000000e)) | current_size->size_value)
-		| 0x00000001);
+	temp = (((temp & ~(0x0000000e)) | current_size->size_value) | 1);
 	pci_write_config_dword(agp_bridge->dev, AMD_APSIZE, temp);
 
 	/* Flush the tlb */
-	OUTREG32(amd_irongate_private.registers, AMD_TLBFLUSH, 0x00000001);
-
+	writel(1, amd_irongate_private.registers+AMD_TLBFLUSH);
+	readl(amd_irongate_private.registers+AMD_TLBFLUSH);	/* PCI Posting.*/
 	return 0;
 }
 
@@ -254,9 +257,10 @@ static void amd_irongate_cleanup(void)
 
 	previous_size = A_SIZE_LVL2(agp_bridge->previous_size);
 
-	enable_reg = INREG16(amd_irongate_private.registers, AMD_GARTENABLE);
+	enable_reg = readw(amd_irongate_private.registers+AMD_GARTENABLE);
 	enable_reg = (enable_reg & ~(0x0004));
-	OUTREG16(amd_irongate_private.registers, AMD_GARTENABLE, enable_reg);
+	writew(enable_reg, amd_irongate_private.registers+AMD_GARTENABLE);
+	readw(amd_irongate_private.registers+AMD_GARTENABLE);	/* PCI Posting. */
 
 	/* Write back the previous size and disable gart translation */
 	pci_read_config_dword(agp_bridge->dev, AMD_APSIZE, &temp);
@@ -275,7 +279,8 @@ static void amd_irongate_cleanup(void)
 
 static void amd_irongate_tlbflush(struct agp_memory *temp)
 {
-	OUTREG32(amd_irongate_private.registers, AMD_TLBFLUSH, 0x00000001);
+	writel(1, amd_irongate_private.registers+AMD_TLBFLUSH);
+	readl(amd_irongate_private.registers+AMD_TLBFLUSH);	/* PCI Posting. */
 }
 
 static int amd_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
@@ -310,6 +315,7 @@ static int amd_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
 		writel(agp_generic_mask_memory(mem->memory[i], mem->type), cur_gatt+GET_GATT_OFF(addr));
+		readl(cur_gatt+GET_GATT_OFF(addr));	/* PCI Posting. */
 	}
 	amd_irongate_tlbflush(mem);
 	return 0;
@@ -328,6 +334,7 @@ static int amd_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
 		addr = (i * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = GET_GATT(addr);
 		writel(agp_bridge->scratch_page, cur_gatt+GET_GATT_OFF(addr));
+		readl(cur_gatt+GET_GATT_OFF(addr));	/* PCI Posting. */
 	}
 
 	amd_irongate_tlbflush(mem);
@@ -471,6 +478,8 @@ static struct pci_driver agp_amdk7_pci_driver = {
 
 static int __init agp_amdk7_init(void)
 {
+	if (agp_off)
+		return -EINVAL;
 	return pci_module_init(&agp_amdk7_pci_driver);
 }
 
