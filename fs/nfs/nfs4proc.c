@@ -734,9 +734,8 @@ static int nfs4_proc_lookup(struct inode *dir, struct qstr *name,
 	return nfs4_map_errors(status);
 }
 
-static int nfs4_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
+static int nfs4_proc_access(struct inode *inode, struct nfs_access_entry *entry)
 {
-	int			status;
 	struct nfs4_accessargs args = {
 		.fh = NFS_FH(inode),
 	};
@@ -745,8 +744,10 @@ static int nfs4_proc_access(struct inode *inode, struct rpc_cred *cred, int mode
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_ACCESS],
 		.rpc_argp = &args,
 		.rpc_resp = &res,
-		.rpc_cred = cred,
+		.rpc_cred = entry->cred,
 	};
+	int mode = entry->mask;
+	int status;
 
 	/*
 	 * Determine which access bits we want to ask for...
@@ -758,8 +759,7 @@ static int nfs4_proc_access(struct inode *inode, struct rpc_cred *cred, int mode
 			args.access |= NFS4_ACCESS_MODIFY | NFS4_ACCESS_EXTEND | NFS4_ACCESS_DELETE;
 		if (mode & MAY_EXEC)
 			args.access |= NFS4_ACCESS_LOOKUP;
-	}
-	else {
+	} else {
 		if (mode & MAY_WRITE)
 			args.access |= NFS4_ACCESS_MODIFY | NFS4_ACCESS_EXTEND;
 		if (mode & MAY_EXEC)
@@ -767,11 +767,13 @@ static int nfs4_proc_access(struct inode *inode, struct rpc_cred *cred, int mode
 	}
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
 	if (!status) {
-		if (args.access != res.supported) {
-			printk(KERN_NOTICE "NFS: server didn't support all access bits!\n");
-			status = -ENOTSUPP;
-		} else if ((args.access & res.access) != args.access)
-			status = -EACCES;
+		entry->mask = 0;
+		if (res.access & NFS4_ACCESS_READ)
+			entry->mask |= MAY_READ;
+		if (res.access & (NFS4_ACCESS_MODIFY | NFS4_ACCESS_EXTEND | NFS4_ACCESS_DELETE))
+			entry->mask |= MAY_WRITE;
+		if (res.access & (NFS4_ACCESS_LOOKUP|NFS4_ACCESS_EXECUTE))
+			entry->mask |= MAY_EXEC;
 	}
 	return nfs4_map_errors(status);
 }

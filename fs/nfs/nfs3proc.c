@@ -164,8 +164,7 @@ nfs3_proc_lookup(struct inode *dir, struct qstr *name,
 	return status;
 }
 
-static int
-nfs3_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
+static int nfs3_proc_access(struct inode *inode, struct nfs_access_entry *entry)
 {
 	struct nfs_fattr	fattr;
 	struct nfs3_accessargs	arg = {
@@ -178,9 +177,10 @@ nfs3_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_ACCESS],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
-		.rpc_cred	= cred
+		.rpc_cred	= entry->cred
 	};
-	int	status;
+	int mode = entry->mask;
+	int status;
 
 	dprintk("NFS call  access\n");
 	fattr.valid = 0;
@@ -200,10 +200,16 @@ nfs3_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
 	}
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
 	nfs_refresh_inode(inode, &fattr);
-	dprintk("NFS reply access\n");
-
-	if (status == 0 && (arg.access & res.access) != arg.access)
-		status = -EACCES;
+	if (status == 0) {
+		entry->mask = 0;
+		if (res.access & NFS3_ACCESS_READ)
+			entry->mask |= MAY_READ;
+		if (res.access & (NFS3_ACCESS_MODIFY | NFS3_ACCESS_EXTEND | NFS3_ACCESS_DELETE))
+			entry->mask |= MAY_WRITE;
+		if (res.access & (NFS3_ACCESS_LOOKUP|NFS3_ACCESS_EXECUTE))
+			entry->mask |= MAY_EXEC;
+	}
+	dprintk("NFS reply access, status = %d\n", status);
 	return status;
 }
 

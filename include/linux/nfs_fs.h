@@ -75,13 +75,12 @@
 #ifdef __KERNEL__
 
 /*
- * NFSv3 Access mode cache
+ * NFSv3/v4 Access mode cache entry
  */
-struct nfs_access_cache {
+struct nfs_access_entry {
 	unsigned long		jiffies;
 	struct rpc_cred *	cred;
 	int			mask;
-	int			err;
 };
 
 /*
@@ -137,7 +136,7 @@ struct nfs_inode {
 	 */
 	atomic_t		data_updates;
 
-	struct nfs_access_cache	cache_access;
+	struct nfs_access_entry	cache_access;
 
 	/*
 	 * This is the cookie verifier used for NFSv3 readdir
