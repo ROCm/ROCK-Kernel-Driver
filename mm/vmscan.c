@@ -132,13 +132,15 @@ shrink_list(struct list_head *page_list, int nr_pages, zone_t *classzone,
 			goto activate_locked;
 		}
 
+		mapping = page->mapping;
+
 		/*
 		 * Anonymous process memory without backing store. Try to
 		 * allocate it some swap space here.
 		 *
 		 * XXX: implement swap clustering ?
 		 */
-		if (page->pte.chain && !page->mapping && !PagePrivate(page)) {
+		if (page->pte.chain && !mapping && !PagePrivate(page)) {
 			pte_chain_unlock(page);
 			if (!add_to_swap(page))
 				goto activate_locked;
@@ -149,7 +151,7 @@ shrink_list(struct list_head *page_list, int nr_pages, zone_t *classzone,
 		 * The page is mapped into the page tables of one or more
 		 * processes. Try to unmap it here.
 		 */
-		if (page->pte.chain) {
+		if (page->pte.chain && mapping) {
 			switch (try_to_unmap(page)) {
 			case SWAP_ERROR:
 			case SWAP_FAIL:
@@ -163,7 +165,6 @@ shrink_list(struct list_head *page_list, int nr_pages, zone_t *classzone,
 			}
 		}
 		pte_chain_unlock(page);
-		mapping = page->mapping;
 
 		/*
 		 * FIXME: this is CPU-inefficient for shared mappings.
