@@ -208,6 +208,7 @@ extern void update_atime (struct inode *);
 extern void buffer_init(unsigned long);
 extern void inode_init(unsigned long);
 extern void mnt_init(unsigned long);
+extern void files_init(unsigned long);
 
 /* bh state bits */
 enum bh_state_bits {
@@ -1492,8 +1493,6 @@ static inline int is_mounted(kdev_t dev)
 	}
 	return 0;
 }
-unsigned long generate_cluster(kdev_t, int b[], int);
-unsigned long generate_cluster_swab32(kdev_t, int b[], int);
 extern kdev_t ROOT_DEV;
 extern char root_device_name[];
 
