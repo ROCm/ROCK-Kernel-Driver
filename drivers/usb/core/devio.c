@@ -491,7 +491,7 @@ static int usbdev_open(struct inode *inode, struct file *file)
 	 */
 	lock_kernel();
 	ret = -ENOENT;
-	dev = file->f_dentry->d_parent->d_fsdata;
+	dev = inode->u.generic_ip;
 	if (!dev)
 		goto out;
 	ret = -ENOMEM;

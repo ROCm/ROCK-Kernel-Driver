@@ -43,11 +43,13 @@
 static struct super_operations usbfs_ops;
 static struct file_operations default_file_operations;
 static struct inode_operations usbfs_dir_inode_operations;
+static struct vfsmount *usbdevfs_mount;
 static struct vfsmount *usbfs_mount;
 static spinlock_t mount_lock = SPIN_LOCK_UNLOCKED;
 static int mount_count;	/* = 0 */
 
-static struct dentry *devices_dentry;
+static struct dentry *devices_usbdevfs_dentry;
+static struct dentry *devices_usbfs_dentry;
 static int num_buses;	/* = 0 */
 
 static uid_t devuid;	/* = 0 */
@@ -319,12 +321,8 @@ static loff_t default_file_lseek (struct file *file, loff_t offset, int orig)
 
 static int default_open (struct inode *inode, struct file *file)
 {
-	void *data;
-
-	data = file->f_dentry->d_parent->d_fsdata;
-	if (!data)
-		return -EFAULT;
-	file->private_data = data;
+	if (inode->u.generic_ip)
+		file->private_data = inode->u.generic_ip;
 
 	return 0;
 }
@@ -393,13 +391,11 @@ static struct dentry * get_dentry(struct dentry *parent, const char *name)
  * @mode:	type of file
  * @parent:	dentry of directory to create it in
  * @dentry:	resulting dentry of file
- * @data:	data to put in this dentry
  *
  * This function handles both regular files and directories.
  */
 static int fs_create_by_name (const char *name, mode_t mode,
-			      struct dentry *parent, struct dentry **dentry,
-			      void *data)
+			      struct dentry *parent, struct dentry **dentry)
 {
 	int error = 0;
 
@@ -423,7 +419,6 @@ static int fs_create_by_name (const char *name, mode_t mode,
 	down(&parent->d_inode->i_sem);
 	*dentry = get_dentry (parent, name);
 	if (!IS_ERR(dentry)) {
-		(*dentry)->d_fsdata = data;
 		if ((mode & S_IFMT) == S_IFDIR)
 			error = usbfs_mkdir (parent->d_inode, *dentry, mode);
 		else 
@@ -445,11 +440,13 @@ static struct dentry *fs_create_file (const char *name, mode_t mode,
 
 	dbg("creating file '%s'",name);
 
-	error = fs_create_by_name (name, mode, parent, &dentry, data);
+	error = fs_create_by_name (name, mode, parent, &dentry);
 	if (error) {
 		dentry = NULL;
 	} else {
 		if (dentry->d_inode) {
+			if (data)
+				dentry->d_inode->u.generic_ip = data;
 			if (fops)
 				dentry->d_inode->i_fop = fops;
 			dentry->d_inode->i_uid = uid;
@@ -511,32 +508,32 @@ static struct file_system_type usb_fs_type = {
 };
 
 /* --------------------------------------------------------------------- */
-static int get_mount (void)
+static int get_mount (struct file_system_type *fs_type, struct vfsmount **mount)
 {
 	struct vfsmount *mnt;
 
 	spin_lock (&mount_lock);
-	if (usbfs_mount) {
-		mntget(usbfs_mount);
+	if (*mount) {
+		mntget(*mount);
 		++mount_count;
 		spin_unlock (&mount_lock);
 		goto go_ahead;
 	}
 
 	spin_unlock (&mount_lock);
-	mnt = kern_mount (&usbdevice_fs_type);
+	mnt = kern_mount (fs_type);
 	if (IS_ERR(mnt)) {
 		err ("could not mount the fs...erroring out!\n");
 		return -ENODEV;
 	}
 	spin_lock (&mount_lock);
-	if (!usbfs_mount) {
-		usbfs_mount = mnt;
+	if (!*mount) {
+		*mount = mnt;
 		++mount_count;
 		spin_unlock (&mount_lock);
 		goto go_ahead;
 	}
-	mntget(usbfs_mount);
+	mntget(*mount);
 	++mount_count;
 	spin_unlock (&mount_lock);
 	mntput(mnt);
@@ -546,15 +543,15 @@ go_ahead:
 	return 0;
 }
 
-static void remove_mount (void)
+static void put_mount (struct vfsmount **mount)
 {
 	struct vfsmount *mnt;
 
 	spin_lock (&mount_lock);
-	mnt = usbfs_mount;
+	mnt = *mount;
 	--mount_count;
 	if (!mount_count)
-		usbfs_mount = NULL;
+		*mount = NULL;
 
 	spin_unlock (&mount_lock);
 	mntput(mnt);
@@ -563,18 +560,31 @@ static void remove_mount (void)
 
 static int create_special_files (void)
 {
+	struct dentry *parent;
 	int retval;
 
 	/* create the devices special file */
-	retval = get_mount ();
+	retval = get_mount (&usbdevice_fs_type, &usbdevfs_mount);
 	if (retval)
 		return retval;
-	devices_dentry = fs_create_file ("devices",
-					 listmode | S_IFREG,
-					 NULL, NULL,
-					 &usbdevfs_devices_fops,
-					 listuid, listgid);
-	if (devices_dentry == NULL) {
+	retval = get_mount (&usb_fs_type, &usbfs_mount);
+	if (retval) {
+		put_mount (&usbfs_mount);
+		return retval;
+	}
+	parent = usbfs_mount->mnt_sb->s_root;
+	devices_usbfs_dentry = fs_create_file ("devices", listmode | S_IFREG, parent,
+					       NULL, &usbdevfs_devices_fops,
+					       listuid, listgid);
+	if (devices_usbfs_dentry == NULL) {
+		err ("Unable to create devices usbfs file");
+		return -ENODEV;
+	}
+	parent = usbdevfs_mount->mnt_sb->s_root;
+	devices_usbdevfs_dentry = fs_create_file ("devices", listmode | S_IFREG, parent,
+						  NULL, &usbdevfs_devices_fops,
+						  listuid, listgid);
+	if (devices_usbdevfs_dentry == NULL) {
 		err ("Unable to create devices usbfs file");
 		return -ENODEV;
 	}
@@ -584,18 +594,27 @@ static int create_special_files (void)
 
 static void remove_special_files (void)
 {
-	if (devices_dentry)
-		fs_remove_file (devices_dentry);
-	devices_dentry = NULL;
-	remove_mount();
+	if (devices_usbdevfs_dentry)
+		fs_remove_file (devices_usbdevfs_dentry);
+	if (devices_usbfs_dentry)
+		fs_remove_file (devices_usbfs_dentry);
+	devices_usbdevfs_dentry = NULL;
+	devices_usbfs_dentry = NULL;
+	put_mount (&usbdevfs_mount);
+	put_mount (&usbfs_mount);
 }
 
 void usbfs_update_special (void)
 {
 	struct inode *inode;
 
-	if (devices_dentry) {
-		inode = devices_dentry->d_inode;
+	if (devices_usbdevfs_dentry) {
+		inode = devices_usbdevfs_dentry->d_inode;
+		if (inode)
+			inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	}
+	if (devices_usbfs_dentry) {
+		inode = devices_usbfs_dentry->d_inode;
 		if (inode)
 			inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	}
@@ -603,6 +622,7 @@ void usbfs_update_special (void)
 
 void usbfs_add_bus(struct usb_bus *bus)
 {
+	struct dentry *parent;
 	char name[8];
 	int retval;
 
@@ -615,12 +635,22 @@ void usbfs_add_bus(struct usb_bus *bus)
 	++num_buses;
 
 	sprintf (name, "%03d", bus->busnum);
-	bus->dentry = fs_create_file (name,
-				      busmode | S_IFDIR,
-				      NULL, bus, NULL,
-				      busuid, busgid);
-	if (bus->dentry == NULL)
+
+	parent = usbfs_mount->mnt_sb->s_root;
+	bus->usbfs_dentry = fs_create_file (name, busmode | S_IFDIR, parent,
+					    bus, NULL, busuid, busgid);
+	if (bus->usbfs_dentry == NULL) {
+		err ("error creating usbfs bus entry");
 		return;
+	}
+
+	parent = usbdevfs_mount->mnt_sb->s_root;
+	bus->usbdevfs_dentry = fs_create_file (name, busmode | S_IFDIR, parent,
+					       bus, NULL, busuid, busgid);
+	if (bus->usbdevfs_dentry == NULL) {
+		err ("error creating usbdevfs bus entry");
+		return;
+	}
 
 	usbfs_update_special();
 	usbdevfs_conn_disc_event();
@@ -629,9 +659,13 @@ void usbfs_add_bus(struct usb_bus *bus)
 
 void usbfs_remove_bus(struct usb_bus *bus)
 {
-	if (bus->dentry) {
-		fs_remove_file (bus->dentry);
-		bus->dentry = NULL;
+	if (bus->usbfs_dentry) {
+		fs_remove_file (bus->usbfs_dentry);
+		bus->usbfs_dentry = NULL;
+	}
+	if (bus->usbdevfs_dentry) {
+		fs_remove_file (bus->usbdevfs_dentry);
+		bus->usbdevfs_dentry = NULL;
 	}
 
 	--num_buses;
@@ -651,13 +685,22 @@ void usbfs_add_device(struct usb_device *dev)
 	int i_size;
 
 	sprintf (name, "%03d", dev->devnum);
-	dev->dentry = fs_create_file (name,
-				      devmode | S_IFREG,
-				      dev->bus->dentry, dev,
-				      &usbdevfs_device_file_operations,
-				      devuid, devgid);
-	if (dev->dentry == NULL)
+	dev->usbfs_dentry = fs_create_file (name, devmode | S_IFREG,
+					    dev->bus->usbfs_dentry, dev,
+					    &usbdevfs_device_file_operations,
+					    devuid, devgid);
+	if (dev->usbfs_dentry == NULL) {
+		err ("error creating usbfs device entry");
 		return;
+	}
+	dev->usbdevfs_dentry = fs_create_file (name, devmode | S_IFREG,
+					       dev->bus->usbdevfs_dentry, dev,
+					       &usbdevfs_device_file_operations,
+					       devuid, devgid);
+	if (dev->usbdevfs_dentry == NULL) {
+		err ("error creating usbdevfs device entry");
+		return;
+	}
 
 	/* Set the size of the device's file to be
 	 * equal to the size of the device descriptors. */
@@ -667,8 +710,10 @@ void usbfs_add_device(struct usb_device *dev)
 			(struct usb_config_descriptor *)dev->rawdescriptors[i];
 		i_size += le16_to_cpu (config->wTotalLength);
 	}
-	if (dev->dentry->d_inode)
-		dev->dentry->d_inode->i_size = i_size;
+	if (dev->usbfs_dentry->d_inode)
+		dev->usbfs_dentry->d_inode->i_size = i_size;
+	if (dev->usbdevfs_dentry->d_inode)
+		dev->usbdevfs_dentry->d_inode->i_size = i_size;
 
 	usbfs_update_special();
 	usbdevfs_conn_disc_event();
@@ -679,9 +724,13 @@ void usbfs_remove_device(struct usb_device *dev)
 	struct dev_state *ds;
 	struct siginfo sinfo;
 
-	if (dev->dentry) {
-		fs_remove_file (dev->dentry);
-		dev->dentry = NULL;
+	if (dev->usbfs_dentry) {
+		fs_remove_file (dev->usbfs_dentry);
+		dev->usbfs_dentry = NULL;
+	}
+	if (dev->usbdevfs_dentry) {
+		fs_remove_file (dev->usbdevfs_dentry);
+		dev->usbdevfs_dentry = NULL;
 	}
 	while (!list_empty(&dev->filelist)) {
 		ds = list_entry(dev->filelist.next, struct dev_state, list);
