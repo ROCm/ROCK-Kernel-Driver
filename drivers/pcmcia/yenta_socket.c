@@ -1026,7 +1026,13 @@ static int yenta_dev_suspend (struct pci_dev *dev, u32 state)
 		pci_save_state(dev);
 		pci_read_config_dword(dev, 16*4, &socket->saved_state[0]);
 		pci_read_config_dword(dev, 17*4, &socket->saved_state[1]);
-		pci_set_power_state(dev, 3);
+
+		/*
+		 * Some laptops (IBM T22) do not like us putting the Cardbus
+		 * bridge into D3.  At a guess, some other laptop will
+		 * probably require this, so leave it commented out for now.
+		 */
+		/* pci_set_power_state(dev, 3); */
 	}
 
 	return ret;
