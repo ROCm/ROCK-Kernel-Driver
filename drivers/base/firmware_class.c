@@ -263,6 +263,8 @@ fw_class_dev_release(struct class_device *class_dev)
 
 	kfree(fw_priv);
 	kfree(class_dev);
+
+	module_put(THIS_MODULE);
 }
 
 static void
@@ -325,6 +327,7 @@ error_kfree:
 	kfree(class_dev);
 	return retval;
 }
+
 static int
 fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
 		      const char *fw_name, struct device *device)
@@ -337,6 +340,9 @@ fw_setup_class_device(struct firmware *fw, struct class_device **class_dev_p,
 	retval = fw_register_class_device(&class_dev, fw_name, device);
 	if (retval)
 		goto out;
+
+	/* Need to pin this module until class device is destroyed */
+	__module_get(THIS_MODULE);
 
 	fw_priv = class_get_devdata(class_dev);
 
