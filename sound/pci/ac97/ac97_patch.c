@@ -1779,6 +1779,140 @@ int patch_cm9739(ac97_t * ac97)
 	return 0;
 }
 
+#define AC97_CM9761_MULTI_CHAN	0x64
+#define AC97_CM9761_SPDIF_CTRL	0x6c
+
+static int snd_ac97_cm9761_linein_rear_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	if (ac97->regs[AC97_CM9739_MULTI_CHAN] & 0x0400)
+		ucontrol->value.integer.value[0] = 1;
+	else
+		ucontrol->value.integer.value[0] = 0;
+	return 0;
+}
+
+static int snd_ac97_cm9761_linein_rear_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	unsigned short vals[2][2] = {
+		{ 0x0008, 0x0400 }, /* off, on */
+		{ 0x0000, 0x0408 }, /* off, on (9761-82 rev.B) */
+	};
+	return snd_ac97_update_bits(ac97, AC97_CM9739_MULTI_CHAN, 0x0408,
+				    vals[ac97->spec.dev_flags][!!ucontrol->value.integer.value[0]]);
+}
+
+static int snd_ac97_cm9761_center_mic_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	if (ac97->regs[AC97_CM9739_MULTI_CHAN] & 0x1000)
+		ucontrol->value.integer.value[0] = 1;
+	else
+		ucontrol->value.integer.value[0] = 0;
+	if (ac97->spec.dev_flags) /* 9761-82 rev.B */
+		ucontrol->value.integer.value[0] = !ucontrol->value.integer.value[0];
+	return 0;
+}
+
+static int snd_ac97_cm9761_center_mic_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	unsigned short vals[2][2] = {
+		{ 0x2000, 0x1880 }, /* off, on */
+		{ 0x1000, 0x2880 }, /* off, on (9761-82 rev.B) */
+	};
+	return snd_ac97_update_bits(ac97, AC97_CM9739_MULTI_CHAN, 0x3880,
+				    vals[ac97->spec.dev_flags][!!ucontrol->value.integer.value[0]]);
+}
+
+static const snd_kcontrol_new_t snd_ac97_cm9761_controls[] = {
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Line-In As Surround",
+		.info = snd_ac97_info_single,
+		.get = snd_ac97_cm9761_linein_rear_get,
+		.put = snd_ac97_cm9761_linein_rear_put,
+		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
+	},
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = "Mic As Center/LFE",
+		.info = snd_ac97_info_single,
+		.get = snd_ac97_cm9761_center_mic_get,
+		.put = snd_ac97_cm9761_center_mic_put,
+		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
+	},
+};
+
+static int patch_cm9761_specific(ac97_t * ac97)
+{
+	return patch_build_controls(ac97, snd_ac97_cm9761_controls, ARRAY_SIZE(snd_ac97_cm9761_controls));
+}
+
+static struct snd_ac97_build_ops patch_cm9761_ops = {
+	.build_specific	= patch_cm9761_specific,
+	.build_post_spdif = patch_cm9739_post_spdif /* hope it's identical... */
+};
+
+int patch_cm9761(ac97_t *ac97)
+{
+	unsigned short val;
+
+	ac97->spec.dev_flags = 0; /* 1 = model 82 revision B */
+	if (ac97->id == AC97_ID_CM9761_82) {
+		unsigned short tmp;
+		/* check page 1, reg 0x60 */
+		val = snd_ac97_read(ac97, AC97_INT_PAGING);
+		snd_ac97_write_cache(ac97, AC97_INT_PAGING, (val & ~0x0f) | 0x01);
+		tmp = snd_ac97_read(ac97, 0x60);
+		ac97->spec.dev_flags = tmp & 1; /* revision B? */
+		snd_ac97_write_cache(ac97, AC97_INT_PAGING, val);
+	}
+
+	ac97->build_ops = &patch_cm9761_ops;
+
+	/* enable spdif */
+	/* force the SPDIF bit in ext_id - codec doesn't set this bit! */
+        ac97->ext_id |= AC97_EI_SPDIF;
+	/* to be sure: we overwrite the ext status bits */
+	snd_ac97_write_cache(ac97, AC97_EXTENDED_STATUS, 0x05c0);
+	snd_ac97_write_cache(ac97, AC97_CM9761_SPDIF_CTRL, 0x0209);
+	ac97->rates[AC97_RATES_SPDIF] = SNDRV_PCM_RATE_48000; /* 48k only */
+
+	/* set-up multi channel */
+	/* bit 15: pc master beep off
+	 * bit 14: ??
+	 * bit 13: vref ctl [= cm9739]
+	 * bit 12: center/mic [= cm9739] (reverted on rev B)
+	 * bit 11: ?? (mic/center/lfe) (reverted on rev B)
+	 * bit 10: suddound/line [= cm9739]
+	 * bit  9: mix 2 surround
+	 * bit  8: ?
+	 * bit  7: ?? (mic/center/lfe)
+	 * bit  4: ?? (front)
+	 * bit  3: ?? (line-in/rear share) (revereted with rev B)
+	 * bit  2: ?? (surround)
+	 * bit  1: front mic
+	 * bit  0: mic boost
+	 */
+
+#if 0
+	if (ac97->spec.dev_flags)
+		val = 0x0214;
+	else
+		val = 0x321c;
+	snd_ac97_write_cache(ac97, AC97_CM9761_MULTI_CHAN, val);
+#endif
+
+	/* FIXME: set up GPIO */
+	snd_ac97_write_cache(ac97, 0x70, 0x0100);
+	snd_ac97_write_cache(ac97, 0x72, 0x0020);
+
+	return 0;
+}
+       
+
 /*
  * VIA VT1616 codec
  */

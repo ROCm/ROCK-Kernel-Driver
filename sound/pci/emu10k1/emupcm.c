@@ -1192,7 +1192,7 @@ static void fx8010_pb_trans_copy(snd_pcm_substream_t *substream,
 	}
 	snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages.area + tram_pos,
 					       (unsigned short *)emu->fx8010.etram_pages.area + tram_pos + tram_size / 2,
-					       src, frames, tram_shift++);
+					       src, frames, tram_shift);
 	tram_pos -= frames;
 	pcm->tram_pos = tram_pos;
 	pcm->tram_shift = tram_shift;

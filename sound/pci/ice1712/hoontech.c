@@ -49,24 +49,24 @@ static void __devinit snd_ice1712_stdsp24_gpio_write(ice1712_t *ice, unsigned ch
 static void __devinit snd_ice1712_stdsp24_darear(ice1712_t *ice, int activate)
 {
 	down(&ice->gpio_mutex);
-	ICE1712_STDSP24_0_DAREAR(ice->hoontech_boxbits, activate);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[0]);
+	ICE1712_STDSP24_0_DAREAR(ice->spec.hoontech.boxbits, activate);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[0]);
 	up(&ice->gpio_mutex);
 }
 
 static void __devinit snd_ice1712_stdsp24_mute(ice1712_t *ice, int activate)
 {
 	down(&ice->gpio_mutex);
-	ICE1712_STDSP24_3_MUTE(ice->hoontech_boxbits, activate);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[3]);
+	ICE1712_STDSP24_3_MUTE(ice->spec.hoontech.boxbits, activate);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[3]);
 	up(&ice->gpio_mutex);
 }
 
 static void __devinit snd_ice1712_stdsp24_insel(ice1712_t *ice, int activate)
 {
 	down(&ice->gpio_mutex);
-	ICE1712_STDSP24_3_INSEL(ice->hoontech_boxbits, activate);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[3]);
+	ICE1712_STDSP24_3_INSEL(ice->spec.hoontech.boxbits, activate);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[3]);
 	up(&ice->gpio_mutex);
 }
 
@@ -75,45 +75,45 @@ static void __devinit snd_ice1712_stdsp24_box_channel(ice1712_t *ice, int box, i
 	down(&ice->gpio_mutex);
 
 	/* select box */
-	ICE1712_STDSP24_0_BOX(ice->hoontech_boxbits, box);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[0]);
+	ICE1712_STDSP24_0_BOX(ice->spec.hoontech.boxbits, box);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[0]);
 
 	/* prepare for write */
 	if (chn == 3)
-		ICE1712_STDSP24_2_CHN4(ice->hoontech_boxbits, 0);
-	ICE1712_STDSP24_2_MIDI1(ice->hoontech_boxbits, activate);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[2]);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[3]);
+		ICE1712_STDSP24_2_CHN4(ice->spec.hoontech.boxbits, 0);
+	ICE1712_STDSP24_2_MIDI1(ice->spec.hoontech.boxbits, activate);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[2]);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[3]);
 
-	ICE1712_STDSP24_1_CHN1(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_1_CHN2(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_1_CHN3(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_2_CHN4(ice->hoontech_boxbits, 1);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[1]);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[2]);
+	ICE1712_STDSP24_1_CHN1(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_1_CHN2(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_1_CHN3(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_2_CHN4(ice->spec.hoontech.boxbits, 1);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[1]);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[2]);
 	udelay(100);
 	if (chn == 3) {
-		ICE1712_STDSP24_2_CHN4(ice->hoontech_boxbits, 0);
-		snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[2]);
+		ICE1712_STDSP24_2_CHN4(ice->spec.hoontech.boxbits, 0);
+		snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[2]);
 	} else {
 		switch (chn) {
-		case 0:	ICE1712_STDSP24_1_CHN1(ice->hoontech_boxbits, 0); break;
-		case 1:	ICE1712_STDSP24_1_CHN2(ice->hoontech_boxbits, 0); break;
-		case 2:	ICE1712_STDSP24_1_CHN3(ice->hoontech_boxbits, 0); break;
+		case 0:	ICE1712_STDSP24_1_CHN1(ice->spec.hoontech.boxbits, 0); break;
+		case 1:	ICE1712_STDSP24_1_CHN2(ice->spec.hoontech.boxbits, 0); break;
+		case 2:	ICE1712_STDSP24_1_CHN3(ice->spec.hoontech.boxbits, 0); break;
 		}
-		snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[1]);
+		snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[1]);
 	}
 	udelay(100);
-	ICE1712_STDSP24_1_CHN1(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_1_CHN2(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_1_CHN3(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_2_CHN4(ice->hoontech_boxbits, 1);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[1]);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[2]);
+	ICE1712_STDSP24_1_CHN1(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_1_CHN2(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_1_CHN3(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_2_CHN4(ice->spec.hoontech.boxbits, 1);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[1]);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[2]);
 	udelay(100);
 
-	ICE1712_STDSP24_2_MIDI1(ice->hoontech_boxbits, 0);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[2]);
+	ICE1712_STDSP24_2_MIDI1(ice->spec.hoontech.boxbits, 0);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[2]);
 
 	up(&ice->gpio_mutex);
 }
@@ -123,23 +123,23 @@ static void __devinit snd_ice1712_stdsp24_box_midi(ice1712_t *ice, int box, int 
 	down(&ice->gpio_mutex);
 
 	/* select box */
-	ICE1712_STDSP24_0_BOX(ice->hoontech_boxbits, box);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[0]);
+	ICE1712_STDSP24_0_BOX(ice->spec.hoontech.boxbits, box);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[0]);
 
-	ICE1712_STDSP24_2_MIDIIN(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_2_MIDI1(ice->hoontech_boxbits, master);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[2]);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[3]);
+	ICE1712_STDSP24_2_MIDIIN(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_2_MIDI1(ice->spec.hoontech.boxbits, master);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[2]);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[3]);
 
 	udelay(100);
 	
-	ICE1712_STDSP24_2_MIDIIN(ice->hoontech_boxbits, 0);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[2]);
+	ICE1712_STDSP24_2_MIDIIN(ice->spec.hoontech.boxbits, 0);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[2]);
 	
 	mdelay(10);
 	
-	ICE1712_STDSP24_2_MIDIIN(ice->hoontech_boxbits, 1);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[2]);
+	ICE1712_STDSP24_2_MIDIIN(ice->spec.hoontech.boxbits, 1);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[2]);
 
 	up(&ice->gpio_mutex);
 }
@@ -147,8 +147,8 @@ static void __devinit snd_ice1712_stdsp24_box_midi(ice1712_t *ice, int box, int 
 static void __devinit snd_ice1712_stdsp24_midi2(ice1712_t *ice, int activate)
 {
 	down(&ice->gpio_mutex);
-	ICE1712_STDSP24_3_MIDI2(ice->hoontech_boxbits, activate);
-	snd_ice1712_stdsp24_gpio_write(ice, ice->hoontech_boxbits[3]);
+	ICE1712_STDSP24_3_MIDI2(ice->spec.hoontech.boxbits, activate);
+	snd_ice1712_stdsp24_gpio_write(ice, ice->spec.hoontech.boxbits[3]);
 	up(&ice->gpio_mutex);
 }
 
@@ -159,57 +159,57 @@ static int __devinit snd_ice1712_hoontech_init(ice1712_t *ice)
 	ice->num_total_dacs = 8;
 	ice->num_total_adcs = 8;
 
-	ice->hoontech_boxbits[0] = 
-	ice->hoontech_boxbits[1] = 
-	ice->hoontech_boxbits[2] = 
-	ice->hoontech_boxbits[3] = 0;	/* should be already */
+	ice->spec.hoontech.boxbits[0] = 
+	ice->spec.hoontech.boxbits[1] = 
+	ice->spec.hoontech.boxbits[2] = 
+	ice->spec.hoontech.boxbits[3] = 0;	/* should be already */
 
-	ICE1712_STDSP24_SET_ADDR(ice->hoontech_boxbits, 0);
-	ICE1712_STDSP24_CLOCK(ice->hoontech_boxbits, 0, 1);
-	ICE1712_STDSP24_0_BOX(ice->hoontech_boxbits, 0);
-	ICE1712_STDSP24_0_DAREAR(ice->hoontech_boxbits, 0);
+	ICE1712_STDSP24_SET_ADDR(ice->spec.hoontech.boxbits, 0);
+	ICE1712_STDSP24_CLOCK(ice->spec.hoontech.boxbits, 0, 1);
+	ICE1712_STDSP24_0_BOX(ice->spec.hoontech.boxbits, 0);
+	ICE1712_STDSP24_0_DAREAR(ice->spec.hoontech.boxbits, 0);
 
-	ICE1712_STDSP24_SET_ADDR(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_CLOCK(ice->hoontech_boxbits, 1, 1);
-	ICE1712_STDSP24_1_CHN1(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_1_CHN2(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_1_CHN3(ice->hoontech_boxbits, 1);
+	ICE1712_STDSP24_SET_ADDR(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_CLOCK(ice->spec.hoontech.boxbits, 1, 1);
+	ICE1712_STDSP24_1_CHN1(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_1_CHN2(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_1_CHN3(ice->spec.hoontech.boxbits, 1);
 	
-	ICE1712_STDSP24_SET_ADDR(ice->hoontech_boxbits, 2);
-	ICE1712_STDSP24_CLOCK(ice->hoontech_boxbits, 2, 1);
-	ICE1712_STDSP24_2_CHN4(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_2_MIDIIN(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_2_MIDI1(ice->hoontech_boxbits, 0);
+	ICE1712_STDSP24_SET_ADDR(ice->spec.hoontech.boxbits, 2);
+	ICE1712_STDSP24_CLOCK(ice->spec.hoontech.boxbits, 2, 1);
+	ICE1712_STDSP24_2_CHN4(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_2_MIDIIN(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_2_MIDI1(ice->spec.hoontech.boxbits, 0);
 
-	ICE1712_STDSP24_SET_ADDR(ice->hoontech_boxbits, 3);
-	ICE1712_STDSP24_CLOCK(ice->hoontech_boxbits, 3, 1);
-	ICE1712_STDSP24_3_MIDI2(ice->hoontech_boxbits, 0);
-	ICE1712_STDSP24_3_MUTE(ice->hoontech_boxbits, 1);
-	ICE1712_STDSP24_3_INSEL(ice->hoontech_boxbits, 0);
+	ICE1712_STDSP24_SET_ADDR(ice->spec.hoontech.boxbits, 3);
+	ICE1712_STDSP24_CLOCK(ice->spec.hoontech.boxbits, 3, 1);
+	ICE1712_STDSP24_3_MIDI2(ice->spec.hoontech.boxbits, 0);
+	ICE1712_STDSP24_3_MUTE(ice->spec.hoontech.boxbits, 1);
+	ICE1712_STDSP24_3_INSEL(ice->spec.hoontech.boxbits, 0);
 
 	/* let's go - activate only functions in first box */
-	ice->hoontech_config = 0;
+	ice->spec.hoontech.config = 0;
 			    /* ICE1712_STDSP24_MUTE |
 			       ICE1712_STDSP24_INSEL |
 			       ICE1712_STDSP24_DAREAR; */
-	ice->hoontech_boxconfig[0] = ICE1712_STDSP24_BOX_CHN1 |
+	ice->spec.hoontech.boxconfig[0] = ICE1712_STDSP24_BOX_CHN1 |
 				     ICE1712_STDSP24_BOX_CHN2 |
 				     ICE1712_STDSP24_BOX_CHN3 |
 				     ICE1712_STDSP24_BOX_CHN4 |
 				     ICE1712_STDSP24_BOX_MIDI1 |
 				     ICE1712_STDSP24_BOX_MIDI2;
-	ice->hoontech_boxconfig[1] = 
-	ice->hoontech_boxconfig[2] = 
-	ice->hoontech_boxconfig[3] = 0;
-	snd_ice1712_stdsp24_darear(ice, (ice->hoontech_config & ICE1712_STDSP24_DAREAR) ? 1 : 0);
-	snd_ice1712_stdsp24_mute(ice, (ice->hoontech_config & ICE1712_STDSP24_MUTE) ? 1 : 0);
-	snd_ice1712_stdsp24_insel(ice, (ice->hoontech_config & ICE1712_STDSP24_INSEL) ? 1 : 0);
+	ice->spec.hoontech.boxconfig[1] = 
+	ice->spec.hoontech.boxconfig[2] = 
+	ice->spec.hoontech.boxconfig[3] = 0;
+	snd_ice1712_stdsp24_darear(ice, (ice->spec.hoontech.config & ICE1712_STDSP24_DAREAR) ? 1 : 0);
+	snd_ice1712_stdsp24_mute(ice, (ice->spec.hoontech.config & ICE1712_STDSP24_MUTE) ? 1 : 0);
+	snd_ice1712_stdsp24_insel(ice, (ice->spec.hoontech.config & ICE1712_STDSP24_INSEL) ? 1 : 0);
 	for (box = 0; box < 4; box++) {
 		for (chn = 0; chn < 4; chn++)
-			snd_ice1712_stdsp24_box_channel(ice, box, chn, (ice->hoontech_boxconfig[box] & (1 << chn)) ? 1 : 0);
+			snd_ice1712_stdsp24_box_channel(ice, box, chn, (ice->spec.hoontech.boxconfig[box] & (1 << chn)) ? 1 : 0);
 		snd_ice1712_stdsp24_box_midi(ice, box,
-				(ice->hoontech_boxconfig[box] & ICE1712_STDSP24_BOX_MIDI1) ? 1 : 0);
-		if (ice->hoontech_boxconfig[box] & ICE1712_STDSP24_BOX_MIDI2)
+				(ice->spec.hoontech.boxconfig[box] & ICE1712_STDSP24_BOX_MIDI1) ? 1 : 0);
+		if (ice->spec.hoontech.boxconfig[box] & ICE1712_STDSP24_BOX_MIDI2)
 			snd_ice1712_stdsp24_midi2(ice, 1);
 	}
 

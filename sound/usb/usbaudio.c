@@ -737,11 +737,11 @@ static int deactivate_urbs(snd_usb_substream_t *subs, int force, int can_sleep)
 		if (test_bit(i, &subs->active_mask)) {
 			if (! test_and_set_bit(i, &subs->unlink_mask)) {
 				struct urb *u = subs->dataurb[i].urb;
-				if (async)
+				if (async) {
 					u->transfer_flags |= URB_ASYNC_UNLINK;
-				else
-					u->transfer_flags &= ~URB_ASYNC_UNLINK;
-				usb_unlink_urb(u);
+					usb_unlink_urb(u);
+				} else
+					usb_kill_urb(u);
 			}
 		}
 	}
@@ -750,11 +750,11 @@ static int deactivate_urbs(snd_usb_substream_t *subs, int force, int can_sleep)
 			if (test_bit(i+16, &subs->active_mask)) {
  				if (! test_and_set_bit(i+16, &subs->unlink_mask)) {
 					struct urb *u = subs->syncurb[i].urb;
-					if (async)
+					if (async) {
 						u->transfer_flags |= URB_ASYNC_UNLINK;
-					else
-						u->transfer_flags &= ~URB_ASYNC_UNLINK;
-					usb_unlink_urb(u);
+						usb_unlink_urb(u);
+					} else
+						usb_kill_urb(u);
 				}
 			}
 		}
@@ -2747,12 +2747,13 @@ static int create_standard_interface_quirk(snd_usb_audio_t *chip,
 }
 
 /*
- * Create a stream for an Edirol UA-700 interface.  The only way
+ * Create a stream for an Edirol UA-700/UA-25 interface.  The only way
  * to detect the sample rate is by looking at wMaxPacketSize.
  */
-static int create_ua700_quirk(snd_usb_audio_t *chip, struct usb_interface *iface)
+static int create_ua700_ua25_quirk(snd_usb_audio_t *chip,
+				   struct usb_interface *iface)
 {
-	static const struct audioformat ua700_format = {
+	static const struct audioformat ua_format = {
 		.format = SNDRV_PCM_FORMAT_S24_3LE,
 		.channels = 2,
 		.fmt_type = USB_FORMAT_TYPE_I,
@@ -2772,15 +2773,28 @@ static int create_ua700_quirk(snd_usb_audio_t *chip, struct usb_interface *iface
 	altsd = get_iface_desc(alts);
 
 	if (altsd->bNumEndpoints == 2) {
-		static const snd_usb_midi_endpoint_info_t ep = {
+		static const snd_usb_midi_endpoint_info_t ua700_ep = {
 			.out_cables = 0x0003,
 			.in_cables  = 0x0003
 		};
-		static const snd_usb_audio_quirk_t quirk = {
+		static const snd_usb_audio_quirk_t ua700_quirk = {
 			.type = QUIRK_MIDI_FIXED_ENDPOINT,
-			.data = &ep
+			.data = &ua700_ep
 		};
-		return snd_usb_create_midi_interface(chip, iface, &quirk);
+		static const snd_usb_midi_endpoint_info_t ua25_ep = {
+			.out_cables = 0x0001,
+			.in_cables  = 0x0001
+		};
+		static const snd_usb_audio_quirk_t ua25_quirk = {
+			.type = QUIRK_MIDI_FIXED_ENDPOINT,
+			.data = &ua25_ep
+		};
+		if (chip->dev->descriptor.idProduct == 0x002b)
+			return snd_usb_create_midi_interface(chip, iface,
+							     &ua700_quirk);
+		else
+			return snd_usb_create_midi_interface(chip, iface,
+							     &ua25_quirk);
 	}
 
 	if (altsd->bNumEndpoints != 1)
@@ -2789,7 +2803,7 @@ static int create_ua700_quirk(snd_usb_audio_t *chip, struct usb_interface *iface
 	fp = kmalloc(sizeof(*fp), GFP_KERNEL);
 	if (!fp)
 		return -ENOMEM;
-	memcpy(fp, &ua700_format, sizeof(*fp));
+	memcpy(fp, &ua_format, sizeof(*fp));
 
 	fp->iface = altsd->bInterfaceNumber;
 	fp->endpoint = get_endpoint(alts, 0)->bEndpointAddress;
@@ -2801,9 +2815,11 @@ static int create_ua700_quirk(snd_usb_audio_t *chip, struct usb_interface *iface
 		fp->rate_max = fp->rate_min = 44100;
 		break;
 	case 0x138:
+	case 0x140:
 		fp->rate_max = fp->rate_min = 48000;
 		break;
 	case 0x258:
+	case 0x260:
 		fp->rate_max = fp->rate_min = 96000;
 		break;
 	default:
@@ -2960,8 +2976,8 @@ static int snd_usb_create_quirk(snd_usb_audio_t *chip,
 	case QUIRK_AUDIO_STANDARD_INTERFACE:
 	case QUIRK_MIDI_STANDARD_INTERFACE:
 		return create_standard_interface_quirk(chip, iface, quirk);
-	case QUIRK_AUDIO_EDIROL_UA700:
-		return create_ua700_quirk(chip, iface);
+	case QUIRK_AUDIO_EDIROL_UA700_UA25:
+		return create_ua700_ua25_quirk(chip, iface);
 	case QUIRK_AUDIO_EDIROL_UA1000:
 		return create_ua1000_quirk(chip, iface);
 	default:

@@ -715,9 +715,9 @@ void snd_usbmidi_disconnect(struct list_head* p, struct usb_driver *driver)
 	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i) {
 		snd_usb_midi_endpoint_t* ep = &umidi->endpoints[i];
 		if (ep->out && ep->out->urb)
-			usb_unlink_urb(ep->out->urb);
+			usb_kill_urb(ep->out->urb);
 		if (ep->in && ep->in->urb)
-			usb_unlink_urb(ep->in->urb);
+			usb_kill_urb(ep->in->urb);
 	}
 }
 
@@ -1161,7 +1161,7 @@ void snd_usbmidi_input_stop(struct list_head* p)
 	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i) {
 		snd_usb_midi_endpoint_t* ep = &umidi->endpoints[i];
 		if (ep->in)
-			usb_unlink_urb(ep->in->urb);
+			usb_kill_urb(ep->in->urb);
 	}
 }
 

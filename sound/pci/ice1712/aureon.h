@@ -47,6 +47,11 @@ extern struct snd_ice1712_card_info  snd_vt1724_aureon_cards[];
 #define AUREON_DIGITAL_SEL1	(1 << 15)
 #define AUREON_HP_SEL		(1 << 14)
 #define AUREON_WM_CS		(1 << 12)
+#define AUREON_AC97_COMMIT	(1 << 11)
+#define AUREON_AC97_ADDR	(1 << 10)
+#define AUREON_AC97_DATA_LOW	(1 << 9)
+#define AUREON_AC97_DATA_HIGH	(1 << 8)
+#define AUREON_AC97_DATA_MASK	0xFF
 
 /* Prodigy has different pin assignment for chip select */
 #define PRODIGY_CS8415_CS	(1 << 23)

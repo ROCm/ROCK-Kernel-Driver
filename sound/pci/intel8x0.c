@@ -410,6 +410,7 @@ struct _snd_intel8x0 {
 	int fix_nocache: 1; /* workaround for 440MX */
 	int buggy_irq: 1; /* workaround for buggy mobos */
 	int xbox: 1;	  /* workaround for Xbox AC'97 detection */
+	int spdif_idx;	/* SPDIF BAR index; *_SPBAR or -1 if use PCMOUT */
 
 	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[3];
@@ -957,8 +958,8 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 				ichdev->pcm->r[dbl].slots);
 	if (err >= 0) {
 		ichdev->pcm_open_flag = 1;
-		/* FIXME: hack to enable spdif support */
-		if (ichdev->ichd == ICHD_PCMOUT && chip->device_type == DEVICE_SIS)
+		/* Force SPDIF setting */
+		if (ichdev->ichd == ICHD_PCMOUT && chip->spdif_idx < 0)
 			snd_ac97_set_rate(ichdev->pcm->r[0].codec[0], AC97_SPDIF, params_rate(hw_params));
 	}
 	return err;
@@ -1883,7 +1884,6 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	int err;
 	unsigned int i, codecs;
 	unsigned int glob_sta = 0;
-	int spdif_idx = -1; /* disabled */
 	ac97_bus_ops_t *ops;
 	static ac97_bus_ops_t standard_bus_ops = {
 		.write = snd_intel8x0_codec_write,
@@ -1894,16 +1894,16 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 		.read = snd_intel8x0_ali_codec_read,
 	};
 
+	chip->spdif_idx = -1; /* use PCMOUT (or disabled) */
 	switch (chip->device_type) {
 	case DEVICE_NFORCE:
-		spdif_idx = NVD_SPBAR;
+		chip->spdif_idx = NVD_SPBAR;
 		break;
 	case DEVICE_ALI:
-		spdif_idx = ALID_AC97SPDIFOUT;
+		chip->spdif_idx = ALID_AC97SPDIFOUT;
 		break;
-	default:
-		if (chip->device_type == DEVICE_INTEL_ICH4)
-			spdif_idx = ICHD_SPBAR;
+	case DEVICE_INTEL_ICH4:
+		chip->spdif_idx = ICHD_SPBAR;
 		break;
 	};
 
@@ -1981,7 +1981,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	i = ARRAY_SIZE(ac97_pcm_defs);
 	if (chip->device_type != DEVICE_INTEL_ICH4)
 		i -= 2;		/* do not allocate PCM2IN and MIC2 */
-	if (spdif_idx < 0)
+	if (chip->spdif_idx < 0)
 		i--;		/* do not allocate S/PDIF */
 	err = snd_ac97_pcm_assign(pbus, i, ac97_pcm_defs);
 	if (err < 0)
@@ -1989,8 +1989,8 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	chip->ichd[ICHD_PCMOUT].pcm = &pbus->pcms[0];
 	chip->ichd[ICHD_PCMIN].pcm = &pbus->pcms[1];
 	chip->ichd[ICHD_MIC].pcm = &pbus->pcms[2];
-	if (spdif_idx >= 0)
-		chip->ichd[spdif_idx].pcm = &pbus->pcms[3];
+	if (chip->spdif_idx >= 0)
+		chip->ichd[chip->spdif_idx].pcm = &pbus->pcms[3];
 	if (chip->device_type == DEVICE_INTEL_ICH4) {
 		chip->ichd[ICHD_PCM2IN].pcm = &pbus->pcms[4];
 		chip->ichd[ICHD_MIC2].pcm = &pbus->pcms[5];
@@ -2028,7 +2028,15 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	}
 	if (chip->device_type == DEVICE_NFORCE) {
 		/* 48kHz only */
-		chip->ichd[spdif_idx].pcm->rates = SNDRV_PCM_RATE_48000;
+		chip->ichd[chip->spdif_idx].pcm->rates = SNDRV_PCM_RATE_48000;
+	}
+	if (chip->device_type == DEVICE_INTEL_ICH4) {
+		/* use slot 10/11 for SPDIF */
+		u32 val;
+		val = igetdword(chip, ICHREG(GLOB_CNT)) & ~ICH_PCM_SPDIF_MASK;
+		val |= ICH_PCM_SPDIF_1011;
+		iputdword(chip, ICHREG(GLOB_CNT), val);
+		snd_ac97_update_bits(chip->ac97[0], AC97_EXTENDED_STATUS, 0x03 << 4, 0x03 << 4);
 	}
 	chip->in_ac97_init = 0;
 	return 0;
@@ -2676,6 +2684,9 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 	switch (pci_id->driver_data) {
 	case DEVICE_NFORCE:
 		strcpy(card->driver, "NFORCE");
+		break;
+	case DEVICE_INTEL_ICH4:
+		strcpy(card->driver, "ICH4");
 		break;
 	default:
 		strcpy(card->driver, "ICH");
