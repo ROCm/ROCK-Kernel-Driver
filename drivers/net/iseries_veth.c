@@ -90,6 +90,16 @@ extern struct pci_dev *iSeries_veth_dev;
 
 #define VETH_NUMBUFFERS		120
 
+#if VETH_NUMBUFFERS < 10
+#define ACK_THRESHOLD 1
+#elif VETH_NUMBUFFERS < 20
+#define ACK_THRESHOLD 4
+#elif VETH_NUMBUFFERS < 40
+#define ACK_THRESHOLD 10
+#else
+#define ACK_THRESHOLD 20
+#endif
+
 static int veth_open(struct net_device *dev);
 static int veth_close(struct net_device *dev);
 static int veth_start_xmit(struct sk_buff *skb, struct net_device *dev);
@@ -694,7 +704,7 @@ static void veth_handle_int(struct VethLpEvent *event)
 		for (i = 0; i < VETH_MAX_ACKS_PER_MSG; ++i) {
 			u16 msgnum = event->u.frames_ack_data.token[i];
 
-			if (msgnum < cnx->num_msgs)
+			if (msgnum < VETH_NUMBUFFERS)
 				veth_recycle_msg(cnx, cnx->msgs + msgnum);
 		}
 		break;
@@ -752,8 +762,6 @@ static void veth_init_connection(struct veth_lpar_connection *cnx, u8 rlp)
 		VETHSTACKPUSH(&cnx->msg_stack, msgs + i);
 	}
 
-	cnx->num_msgs = VETH_NUMBUFFERS;
-
 	cnx->mNumberAllocated = veth_allocate_events(rlp, 2);
 
 	if (cnx->mNumberAllocated < 2) {
@@ -765,6 +773,10 @@ static void veth_init_connection(struct veth_lpar_connection *cnx, u8 rlp)
 
 	cnx->mNumberRcvMsgs = veth_allocate_events(cnx->remote_lp,
 						   VETH_NUMBUFFERS);
+
+	cnx->local_caps.num_buffers = VETH_NUMBUFFERS;
+	cnx->local_caps.ack_threshold = ACK_THRESHOLD;
+	cnx->local_caps.ack_timeout = VETH_ACKTIMEOUT;
 }
 
 static void veth_open_connection(u8 rlp)
@@ -796,19 +808,6 @@ static void veth_open_connection(u8 rlp)
 						  HvLpEvent_Type_VirtualLan);
 
 	spin_unlock_irq(&cnx->ack_gate);
-
-	cnx->local_caps.num_buffers = cnx->num_msgs;
-
-	if (cnx->num_msgs < 10)
-		cnx->local_caps.ack_threshold = 1;
-	else if (cnx->num_msgs < 20)
-		cnx->local_caps.ack_threshold = 4;
-	else if (cnx->num_msgs < 40)
-		cnx->local_caps.ack_threshold = 10;
-	else
-		cnx->local_caps.ack_threshold = 20;
-
-	cnx->local_caps.ack_timeout = VETH_ACKTIMEOUT;
 
 	rc = veth_signalevent(cnx, VethEventTypeCap,
 			      HvLpEvent_AckInd_DoAck,
@@ -955,7 +954,7 @@ static void veth_close_connection(u8 rlp)
 		spin_unlock_irqrestore(&cnx->ack_gate, flags);
 
 		/* Clean up any leftover messages */
-		for (i = 0; i < cnx->num_msgs; ++i)
+		for (i = 0; i < VETH_NUMBUFFERS; ++i)
 			veth_recycle_msg(cnx, cnx->msgs + i);
 	}
 

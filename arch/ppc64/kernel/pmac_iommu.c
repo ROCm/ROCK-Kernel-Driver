@@ -289,8 +289,11 @@ void iommu_setup_pmac(void)
 	 * things simple. Setup all PCI devices to point to this table
 	 */
 	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-		dn = PCI_GET_DN(dev);
-
+		/* We must use pci_device_to_OF_node() to make sure that
+		 * we get the real "final" pointer to the device in the
+		 * pci_dev sysdata and not the temporary PHB one
+		 */
+		struct device_node *dn = pci_device_to_OF_node(dev);
 		if (dn)
 			dn->iommu_table = &iommu_table_pmac;
 	}

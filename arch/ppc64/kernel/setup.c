@@ -387,11 +387,11 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	 */
 	if (systemcfg->platform != PLATFORM_ISERIES_LPAR) {
 		struct device_node *cpu_node;
-		int *fp;
+		unsigned int *fp;
 
 		cpu_node = of_find_node_by_type(NULL, "cpu");
 		if (cpu_node) {
-			fp = (int *) get_property(cpu_node, "clock-frequency",
+			fp = (unsigned int *) get_property(cpu_node, "clock-frequency",
 						  NULL);
 			if (fp)
 				seq_printf(m, "clock\t\t: %dMHz\n",

@@ -106,4 +106,7 @@ int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata,
 struct ibmvscsi_host_data *ibmvscsi_probe(struct device *dev);
 void ibmvscsi_remove(struct ibmvscsi_host_data *hostdata);
 
+int ibmvscsi_do_host_config(struct ibmvscsi_host_data *hostdata, 
+			    unsigned char *buffer, int length);
+
 #endif				/* IBMVSCSI_H */

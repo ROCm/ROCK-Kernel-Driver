@@ -904,6 +904,46 @@ void ibmvscsi_handle_crq(struct VIOSRP_CRQ *crq,
 	spin_unlock_irqrestore(evt_struct->hostdata->host->host_lock, flags);
 }
 
+/**
+ * ibmvscsi_get_host_config: Send the command to the server to get host
+ * configuration data.  The data is opaque to us.
+ */
+int ibmvscsi_do_host_config(struct ibmvscsi_host_data *hostdata, 
+			    unsigned char *buffer, int length) {
+	struct VIOSRP_HOST_CONFIG host_config;
+	struct srp_event_struct *evt_struct;
+	int rc;
+	
+	memset(&host_config, 0x00, sizeof(host_config));
+	host_config.common.type = VIOSRP_HOST_CONFIG_TYPE;
+	host_config.common.length = length;
+	host_config.buffer = dma_map_single(hostdata->dev, buffer, length,
+					    DMA_BIDIRECTIONAL);
+	
+	evt_struct = evt_struct_for(&hostdata->pool, 
+				    (union VIOSRP_IU *)&host_config, 
+				    NULL, 
+				    sync_completion);
+	
+	if (!evt_struct) {
+		printk(KERN_ERR 
+		       "ibmvscsi: could't allocate event for HOST_CONFIG!\n");
+		rc = -1;
+	} else {
+		evt_struct->crq.format = VIOSRP_MAD_FORMAT;
+		init_completion(&evt_struct->comp);
+		rc =  ibmvscsi_send_srp_event(evt_struct, hostdata);
+		if (rc == 0) {
+			wait_for_completion(&evt_struct->comp);
+		}
+	}
+	
+	dma_unmap_single(hostdata->dev, host_config.buffer, length, 
+			 DMA_BIDIRECTIONAL);
+
+	return rc ? rc : host_config.common.status;
+}
+
 /* ------------------------------------------------------------
  * SCSI driver registration
  */

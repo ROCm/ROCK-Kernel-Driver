@@ -221,6 +221,24 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 }
 
 /**
+ * Return host configuration data.  This interface is exported
+ * because it is used by arch/ppc64 code to retrieve host
+ * configuration information.
+ */
+int ibmvscsi_get_host_config(struct vio_dev *vdev,
+			     unsigned char *buffer, 
+			     int length) {
+	struct ibmvscsi_host_data *hostdata = 
+		(struct ibmvscsi_host_data *) vdev->driver_data;
+
+	if (hostdata == NULL)
+		return -1;
+
+	return ibmvscsi_do_host_config(hostdata,buffer,length);
+}
+EXPORT_SYMBOL(ibmvscsi_get_host_config);
+
+/**
  * rpa_device_table: Used by vio.c to match devices in the device tree we 
  * support.
  */

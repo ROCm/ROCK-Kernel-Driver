@@ -44,6 +44,7 @@ obj-$(CONFIG_PPC_RTAS)		+= rtas-proc.o
 obj-$(CONFIG_SCANLOG)		+= scanlog.o
 obj-$(CONFIG_VIOPATH)		+= viopath.o
 obj-$(CONFIG_LPARCFG)		+= lparcfg.o
+obj-$(CONFIG_VIOCFG)		+= vioconfig.o
 obj-$(CONFIG_HVC_CONSOLE)	+= hvconsole.o
 obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
 

@@ -1424,7 +1424,7 @@ static void processReportLUNs(struct iu_entry *iue) {
 	spin_lock_irqsave(&iue->adapter->lock,flags);
 
 	/* send lunlist of size 1 when requesting lun is not all zeros */
-	if (iue->req.vd->lun != 0x0LL) {
+	if (iue->iu->srp.cmd.lun != 0x0LL) {
 		*lunlist = ((u64)1*8) << 32;
 		goto send_lunlist;
 	}

@@ -210,6 +210,14 @@ config LPARCFG
 	Provide system capacity information via human readable 
 	<key word>=<value> pairs through a /proc/ppc64/lparcfg interface.
 
+config VIOCFG
+	tristate "Virtual I/O Configuration Data"
+	depends on PPC_PSERIES && SCSI_IBMVSCSI
+	help
+	Provide configuration information from a virtual I/O host.
+	Data is in the form
+	<key word>=<value> pairs in /proc/vioconfig.
+
 endmenu
 
 

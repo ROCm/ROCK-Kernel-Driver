@@ -85,7 +85,6 @@ struct veth_lpar_connection {
 	struct work_struct finish_open_wq;
 	struct work_struct monitor_ack_wq;
 	struct timer_list ack_timer;
-	u32 num_msgs;
 	struct veth_msg *msgs;
 
 	HvLpInstanceId src_inst;
