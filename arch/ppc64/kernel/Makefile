@@ -20,7 +20,7 @@ obj-$(CONFIG_PPC_ISERIES) += iSeries_pci.o       iSeries_pci_reset.o \
 			     mf.o HvLpEvent.o iSeries_proc.o 
 
 obj-$(CONFIG_PPC_PSERIES) += pSeries_pci.o pSeries_lpar.o pSeries_hvCall.o \
-			     eeh.o rtasd.o nvram.o ras.o
+			     eeh.o nvram.o rtasd.o ras.o
 
 # Change this to pSeries only once we've got iSeries up to date
 obj-y			  += open_pic.o xics.o pSeries_htab.o rtas.o \

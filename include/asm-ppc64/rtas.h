@@ -22,6 +22,13 @@
 /* Buffer size for ppc_rtas system call. */
 #define RTAS_RMOBUF_MAX (64 * 1024)
 
+/* RTAS return codes */
+#define RTAS_BUSY		-2	/* RTAS Return Status - Busy */
+#define RTAS_EXTENDED_DELAY_MIN 9900
+#define RTAS_EXTENDED_DELAY_MAX 9905
+
+#define RTAS_UNKNOWN_OP		-1099	/* Return Status - Unknown RTAS Token */
+
 /*
  * In general to call RTAS use rtas_token("string") to lookup
  * an RTAS token for the given string (e.g. "event-scan").
@@ -179,16 +186,37 @@ static inline int rtas_is_extended_busy(int status)
 	return status >= 9900 && status <= 9909;
 }
 
+extern void pSeries_log_error(char *buf, unsigned int err_type, int fatal);
+
+/* Error types logged.  */
+#define ERR_FLAG_ALREADY_LOGGED	0x0
+#define ERR_FLAG_BOOT		0x1 	/* log was pulled from NVRAM on boot */
+#define ERR_TYPE_RTAS_LOG	0x2	/* from rtas event-scan */
+#define ERR_TYPE_KERNEL_PANIC	0x4	/* from panic() */
+
+/* All the types and not flags */
+#define ERR_TYPE_MASK	(ERR_TYPE_RTAS_LOG | ERR_TYPE_KERNEL_PANIC)
+
+#define RTAS_ERR KERN_ERR "RTAS: "
+ 
+#define RTAS_ERROR_LOG_MAX 2048
+ 
+ 
+/* Event Scan Parameters */
+#define EVENT_SCAN_ALL_EVENTS	0xf0000000
+#define SURVEILLANCE_TOKEN	9000
+#define SURVEILLANCE_TIMEOUT	1
+#define SURVEILLANCE_SCANRATE	1
+#define LOG_NUMBER		64		/* must be a power of two */
+#define LOG_NUMBER_MASK		(LOG_NUMBER-1)
+
 /* Some RTAS ops require a data buffer and that buffer must be < 4G.
  * Rather than having a memory allocator, just use this buffer
  * (get the lock first), make the RTAS call.  Copy the data instead
  * of holding the buffer for long.
  */
-#define RTAS_DATA_BUF_SIZE 1024
 
-#define RTAS_UNKNOWN_OP	-1099	/* Return Status - Unknown RTAS Token */
-#define RTAS_BUSY	-2	/* RTAS Return Status - Busy */
-
+#define RTAS_DATA_BUF_SIZE 4096
 extern spinlock_t rtas_data_buf_lock;
 extern char rtas_data_buf[RTAS_DATA_BUF_SIZE];
 

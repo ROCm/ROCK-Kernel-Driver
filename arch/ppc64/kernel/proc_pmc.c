@@ -95,15 +95,21 @@ void proc_ppc64_init(void)
 	 *   /proc/ppc64/pmc/cpu0 
 	 */
 	spin_lock(&proc_ppc64_lock);
-	proc_ppc64_root = proc_mkdir("ppc64", 0);
-	if (!proc_ppc64_root) return;
+	if (proc_ppc64.root == NULL) {
+		proc_ppc64_init();
+		if (!proc_ppc64.root) {
+			spin_unlock(&proc_ppc64_lock);
+			return;
+		}
+	}
 	spin_unlock(&proc_ppc64_lock);
 
 	/* Placeholder for rtas interfaces. */
-	rtas_proc_dir = proc_mkdir("rtas", proc_ppc64_root);
+	if (proc_ppc64.rtas == NULL) {
+		return;
+	}
 
-
-	proc_ppc64_pmc_root = proc_mkdir("pmc", proc_ppc64_root);
+	proc_ppc64_pmc_root = proc_mkdir("pmc", proc_ppc64.root);
 
 	proc_ppc64_pmc_system_root = proc_mkdir("system", proc_ppc64_pmc_root);
 	for (i = 0; i < NR_CPUS; i++) {
@@ -113,7 +119,6 @@ void proc_ppc64_init(void)
 				proc_mkdir(buf, proc_ppc64_pmc_root);
 		}
 	}
-
 
 	/* Create directories for the software counters. */
 	for (i = 0; i < NR_CPUS; i++) {

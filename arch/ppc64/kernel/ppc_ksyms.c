@@ -39,6 +39,7 @@
 #include <asm/hw_irq.h>
 #include <asm/abs_addr.h>
 #include <asm/cacheflush.h>
+#include <asm/proc_fs.h>
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/iSeries_pci.h>
 #include <asm/iSeries/iSeries_proc.h>
@@ -222,3 +223,4 @@ EXPORT_SYMBOL(debugger_fault_handler);
 
 EXPORT_SYMBOL(tb_ticks_per_usec);
 EXPORT_SYMBOL(paca);
+EXPORT_SYMBOL(proc_ppc64);
