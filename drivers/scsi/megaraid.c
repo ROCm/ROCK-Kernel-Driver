@@ -1739,7 +1739,7 @@ bug_blocked_mailbox:
  * Find out if our device is interrupting. If yes, acknowledge the interrupt
  * and service the completed commands.
  */
-static void
+static irqreturn_t
 megaraid_isr_iomapped(int irq, void *devp, struct pt_regs *regs)
 {
 	adapter_t	*adapter = devp;
@@ -1748,6 +1748,7 @@ megaraid_isr_iomapped(int irq, void *devp, struct pt_regs *regs)
 	u8	nstatus;
 	u8	completed[MAX_FIRMWARE_STATUS];
 	u8	byte;
+	int	handled = 0;
 
 
 	/*
@@ -1762,8 +1763,7 @@ megaraid_isr_iomapped(int irq, void *devp, struct pt_regs *regs)
 			/*
 			 * No more pending commands
 			 */
-			spin_unlock_irqrestore(&adapter->lock, flags);
-			return;
+			goto out_unlock;
 		}
 		set_irq_state(adapter, byte);
 
@@ -1788,6 +1788,8 @@ megaraid_isr_iomapped(int irq, void *devp, struct pt_regs *regs)
 
 		mega_rundoneq(adapter);
 
+		handled = 1;
+
 		/* Loop through any pending requests */
 		if(atomic_read(&adapter->quiescent) == 0) {
 			mega_runpendq(adapter);
@@ -1795,9 +1797,11 @@ megaraid_isr_iomapped(int irq, void *devp, struct pt_regs *regs)
 
 	} while(1);
 
+ out_unlock:
+
 	spin_unlock_irqrestore(&adapter->lock, flags);
 
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 
@@ -1811,7 +1815,7 @@ megaraid_isr_iomapped(int irq, void *devp, struct pt_regs *regs)
  * Find out if our device is interrupting. If yes, acknowledge the interrupt
  * and service the completed commands.
  */
-static void
+static irqreturn_t
 megaraid_isr_memmapped(int irq, void *devp, struct pt_regs *regs)
 {
 	adapter_t	*adapter = devp;
@@ -1820,6 +1824,7 @@ megaraid_isr_memmapped(int irq, void *devp, struct pt_regs *regs)
 	u32	dword = 0;
 	u8	nstatus;
 	u8	completed[MAX_FIRMWARE_STATUS];
+	int	handled = 0;
 
 
 	/*
@@ -1834,8 +1839,7 @@ megaraid_isr_memmapped(int irq, void *devp, struct pt_regs *regs)
 			/*
 			 * No more pending commands
 			 */
-			spin_unlock_irqrestore(&adapter->lock, flags);
-			return;
+			goto out_unlock;
 		}
 		WROUTDOOR(adapter, 0x10001234);
 
@@ -1857,6 +1861,8 @@ megaraid_isr_memmapped(int irq, void *devp, struct pt_regs *regs)
 		/* Acknowledge interrupt */
 		WRINDOOR(adapter, 0x2);
 
+		handled = 1;
+
 		while( RDINDOOR(adapter) & 0x02 ) cpu_relax();
 
 		mega_cmd_done(adapter, completed, nstatus, status);
@@ -1870,9 +1876,11 @@ megaraid_isr_memmapped(int irq, void *devp, struct pt_regs *regs)
 
 	} while(1);
 
+ out_unlock:
+
 	spin_unlock_irqrestore(&adapter->lock, flags);
 
-	return;
+	return IRQ_RETVAL(handled);
 }
 /**
  * mega_cmd_done()
