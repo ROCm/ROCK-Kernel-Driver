@@ -3435,15 +3435,6 @@ static inline int nsp32_prom_get(nsp32_hw_data *data, int bit)
  * Power Management
  */
 #ifdef CONFIG_PM
-/* Save Device Context */
-static int nsp32_save_state(struct pci_dev *pdev, u32 state)
-{
-	struct Scsi_Host *host = pci_get_drvdata(pdev);
-
-	nsp32_msg(KERN_INFO, "pci-save_state: stub, pdev=0x%p, state=%ld, slot=%s, host=0x%p", pdev, state, pci_name(pdev), host);
-
-	return 0;
-}
 
 /* Device suspended */
 static int nsp32_suspend(struct pci_dev *pdev, u32 state)
@@ -3573,7 +3564,6 @@ static struct pci_driver nsp32_driver = {
 	.probe		= nsp32_probe,
 	.remove		= __devexit_p(nsp32_remove),
 #ifdef CONFIG_PM
-	.save_state     = nsp32_save_state,
 	.suspend	= nsp32_suspend, 
 	.resume		= nsp32_resume, 
 	.enable_wake    = nsp32_enable_wake,
