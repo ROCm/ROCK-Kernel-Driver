@@ -54,7 +54,7 @@ struct systemcfg *systemcfg;
 		.xFPRegsInUse = 1,					    \
 		.xDynProcStatus = 2,					    \
 		.xDecrVal = 0x00ff0000,					    \
-		.xEndOfQuantum = 0xffffffffffffffff			    \
+		.xEndOfQuantum = 0xfffffffffffffffful			    \
 	},								    \
 	.xRegSav = {							    \
 		.xDesc = 0xd397d9e2,	/* "LpRS" */			    \
