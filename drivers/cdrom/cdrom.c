@@ -868,13 +868,11 @@ static void cdrom_mmc3_profile(struct cdrom_device_info *cdi)
 	cgc.cmd[8] = sizeof(buffer);		/* Allocation Length */
 	cgc.quiet = 1;
 
-	if ((ret = cdi->ops->generic_packet(cdi, &cgc))) {
+	if ((ret = cdi->ops->generic_packet(cdi, &cgc)))
 		mmc3_profile = 0xffff;
-	} else {
+	else
 		mmc3_profile = (buffer[6] << 8) | buffer[7];
-		printk(KERN_INFO "cdrom: %s: mmc-3 profile capable, current profile: %Xh\n",
-		       cdi->name, mmc3_profile);
-	}
+
 	cdi->mmc3_profile = mmc3_profile;
 }
 
