@@ -1042,14 +1042,12 @@ static int __origin_write(struct list_head *snapshots, struct bio *bio)
 int do_origin(struct dm_dev *origin, struct bio *bio)
 {
 	struct origin *o;
-	int r;
+	int r = 1;
 
 	down_read(&_origins_lock);
 	o = __lookup_origin(origin->bdev);
-	if (!o)
-		BUG();
-
-	r = __origin_write(&o->snapshots, bio);
+	if (o)
+		r = __origin_write(&o->snapshots, bio);
 	up_read(&_origins_lock);
 
 	return r;
