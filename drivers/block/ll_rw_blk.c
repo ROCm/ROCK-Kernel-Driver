@@ -919,7 +919,7 @@ void blk_start_queue(request_queue_t *q)
  * __blk_stop_queue: see blk_stop_queue()
  *
  * Description:
- *  Like blk_stop_queue(), bust queue_lock must be held
+ *  Like blk_stop_queue(), but queue_lock must be held
  **/
 void __blk_stop_queue(request_queue_t *q)
 {

@@ -22,6 +22,7 @@
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/percpu.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/blkdev.h>
@@ -2513,7 +2514,7 @@ int try_to_free_buffers(struct page *page)
 		 * This only applies in the rare case where try_to_free_buffers
 		 * succeeds but the page is not freed.
 		 */
-		ClearPageDirty(page);
+		clear_page_dirty(page);
 	}
 	spin_unlock(&mapping->private_lock);
 out:
@@ -2555,9 +2556,44 @@ asmlinkage long sys_bdflush(int func, long data)
 static kmem_cache_t *bh_cachep;
 static mempool_t *bh_mempool;
 
+/*
+ * Once the number of bh's in the machine exceeds this level, we start
+ * stripping them in writeback.
+ */
+static int max_buffer_heads;
+
+int buffer_heads_over_limit;
+
+struct bh_accounting {
+	int nr;			/* Number of live bh's */
+	int ratelimit;		/* Limit cacheline bouncing */
+};
+
+static DEFINE_PER_CPU(struct bh_accounting, bh_accounting) = {0, 0};
+
+static void recalc_bh_state(void)
+{
+	int i;
+	int tot = 0;
+
+	if (__get_cpu_var(bh_accounting).ratelimit++ < 4096)
+		return;
+	__get_cpu_var(bh_accounting).ratelimit = 0;
+	for (i = 0; i < NR_CPUS; i++)
+		tot += per_cpu(bh_accounting, i).nr;
+	buffer_heads_over_limit = (tot > max_buffer_heads);
+}
+	
 struct buffer_head *alloc_buffer_head(void)
 {
-	return mempool_alloc(bh_mempool, GFP_NOFS);
+	struct buffer_head *ret = mempool_alloc(bh_mempool, GFP_NOFS);
+	if (ret) {
+		preempt_disable();
+		__get_cpu_var(bh_accounting).nr++;
+		recalc_bh_state();
+		preempt_enable();
+	}
+	return ret;
 }
 EXPORT_SYMBOL(alloc_buffer_head);
 
@@ -2565,6 +2601,10 @@ void free_buffer_head(struct buffer_head *bh)
 {
 	BUG_ON(!list_empty(&bh->b_assoc_buffers));
 	mempool_free(bh, bh_mempool);
+	preempt_disable();
+	__get_cpu_var(bh_accounting).nr--;
+	recalc_bh_state();
+	preempt_enable();
 }
 EXPORT_SYMBOL(free_buffer_head);
 
@@ -2595,6 +2635,7 @@ static void bh_mempool_free(void *element, void *pool_data)
 void __init buffer_init(void)
 {
 	int i;
+	int nrpages;
 
 	bh_cachep = kmem_cache_create("buffer_head",
 			sizeof(struct buffer_head), 0,
@@ -2603,4 +2644,10 @@ void __init buffer_init(void)
 				bh_mempool_free, NULL);
 	for (i = 0; i < ARRAY_SIZE(bh_wait_queue_heads); i++)
 		init_waitqueue_head(&bh_wait_queue_heads[i].wqh);
+
+	/*
+	 * Limit the bh occupancy to 10% of ZONE_NORMAL
+	 */
+	nrpages = (nr_free_buffer_pages() * 10) / 100;
+	max_buffer_heads = nrpages * (PAGE_SIZE / sizeof(struct buffer_head));
 }

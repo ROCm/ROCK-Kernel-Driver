@@ -80,7 +80,6 @@ struct serial_struct {
 #define SERIAL_IO_PORT	0
 #define SERIAL_IO_HUB6	1
 #define SERIAL_IO_MEM	2
-#define SERIAL_IO_GSC	3
 
 struct serial_uart_config {
 	char	*name;

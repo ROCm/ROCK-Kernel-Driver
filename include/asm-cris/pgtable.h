@@ -515,4 +515,6 @@ static inline void update_mmu_cache(struct vm_area_struct * vma,
  */
 #define pgtable_cache_init()   do { } while (0)
 
+typedef pte_t *pte_addr_t;
+
 #endif /* _CRIS_PGTABLE_H */

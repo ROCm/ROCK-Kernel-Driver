@@ -420,6 +420,8 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 /* We provide our own get_unmapped_area to cope with VA holes for userland */
 #define HAVE_ARCH_UNMAPPED_AREA
 
+typedef pte_t *pte_addr_t;
+
 # endif /* !__ASSEMBLY__ */
 
 /*

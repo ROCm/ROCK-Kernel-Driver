@@ -377,5 +377,7 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 extern void hpte_init_pSeries(void);
 extern void hpte_init_iSeries(void);
 
+typedef pte_t *pte_addr_t;
+
 #endif /* __ASSEMBLY__ */
 #endif /* _PPC64_PGTABLE_H */

@@ -52,7 +52,7 @@
 #define PG_referenced		 2
 #define PG_uptodate		 3
 
-#define PG_dirty_dontuse	 4
+#define PG_dirty	 	 4
 #define PG_lru			 5
 #define PG_active		 6
 #define PG_slab			 7	/* slab debug (Suparna wants this) */
@@ -120,37 +120,11 @@ extern void get_page_state(struct page_state *ret);
 #define SetPageUptodate(page)	set_bit(PG_uptodate, &(page)->flags)
 #define ClearPageUptodate(page)	clear_bit(PG_uptodate, &(page)->flags)
 
-#define PageDirty(page)		test_bit(PG_dirty_dontuse, &(page)->flags)
-#define SetPageDirty(page)						\
-	do {								\
-		if (!test_and_set_bit(PG_dirty_dontuse,			\
-					&(page)->flags))		\
-			inc_page_state(nr_dirty);			\
-	} while (0)
-#define TestSetPageDirty(page)						\
-	({								\
-		int ret;						\
-		ret = test_and_set_bit(PG_dirty_dontuse,		\
-				&(page)->flags);			\
-		if (!ret)						\
-			inc_page_state(nr_dirty);			\
-		ret;							\
-	})
-#define ClearPageDirty(page)						\
-	do {								\
-		if (test_and_clear_bit(PG_dirty_dontuse,		\
-				&(page)->flags))			\
-			dec_page_state(nr_dirty);			\
-	} while (0)
-#define TestClearPageDirty(page)					\
-	({								\
-		int ret;						\
-		ret = test_and_clear_bit(PG_dirty_dontuse,		\
-				&(page)->flags);			\
-		if (ret)						\
-			dec_page_state(nr_dirty);			\
-		ret;							\
-	})
+#define PageDirty(page)		test_bit(PG_dirty, &(page)->flags)
+#define SetPageDirty(page)	set_bit(PG_dirty, &(page)->flags)
+#define TestSetPageDirty(page)	test_and_set_bit(PG_dirty, &(page)->flags)
+#define ClearPageDirty(page)	clear_bit(PG_dirty, &(page)->flags)
+#define TestClearPageDirty(page) test_and_clear_bit(PG_dirty, &(page)->flags)
 
 #define SetPageLRU(page)	set_bit(PG_lru, &(page)->flags)
 #define PageLRU(page)		test_bit(PG_lru, &(page)->flags)
@@ -234,5 +208,12 @@ extern void get_page_state(struct page_state *ret);
  */
 extern struct address_space swapper_space;
 #define PageSwapCache(page) ((page)->mapping == &swapper_space)
+
+int test_clear_page_dirty(struct page *page);
+
+static inline void clear_page_dirty(struct page *page)
+{
+	test_clear_page_dirty(page);
+}
 
 #endif	/* PAGE_FLAGS_H */

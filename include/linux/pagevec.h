@@ -20,6 +20,7 @@ void __pagevec_free(struct pagevec *pvec);
 void __pagevec_lru_add(struct pagevec *pvec);
 void lru_add_drain(void);
 void pagevec_deactivate_inactive(struct pagevec *pvec);
+void pagevec_strip(struct pagevec *pvec);
 
 static inline void pagevec_init(struct pagevec *pvec)
 {

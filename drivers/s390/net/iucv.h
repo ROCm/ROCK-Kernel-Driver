@@ -446,7 +446,7 @@ int iucv_reject (u16 pathid, u32 msgid, u32 trgcls);
  *        buflen - Length of reply buffer.                              
  * Output: residual_buffer - Address of buffer updated by the number 
  *                    of bytes you have moved.              
- *         residual_length - Contains on the the following values
+ *         residual_length - Contains one of the following values:
  *		If the answer buffer is the same length as the reply, this field
  *		 contains zero.
  *		If the answer buffer is longer than the reply, this field contains
@@ -480,7 +480,7 @@ int iucv_reply (u16 pathid,
  *        buffer - Address of array of reply buffers.                     
  *        buflen - Total length of reply buffers.                         
  * Output: residual_buffer - Address of buffer which IUCV is currently working on.
- *         residual_length - Contains on the the following values
+ *         residual_length - Contains one of the following values:
  *              If the answer buffer is the same length as the reply, this field
  *               contains zero.
  *              If the answer buffer is longer than the reply, this field contains

@@ -182,13 +182,13 @@ static void __devexit snd_card_cs46xx_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	name: "Sound Fusion CS46xx",
-	id_table: snd_cs46xx_ids,
-	probe: snd_card_cs46xx_probe,
-	remove: __devexit_p(snd_card_cs46xx_remove),
+	.name = "Sound Fusion CS46xx",
+	.id_table = snd_cs46xx_ids,
+	.probe = snd_card_cs46xx_probe,
+	.remove = __devexit_p(snd_card_cs46xx_remove),
 #ifdef CONFIG_PM
-	suspend: snd_card_cs46xx_suspend,
-	resume: snd_card_cs46xx_resume,
+	.suspend = snd_card_cs46xx_suspend,
+	.resume = snd_card_cs46xx_resume,
 #endif
 };
 

@@ -131,9 +131,9 @@ char * __init pcibios_setup(char *str)
 	return str;
 }
 
-int pcibios_enable_device(struct pci_dev *dev)
+int pcibios_enable_device(struct pci_dev *dev, int mask)
 {
-	return pcibios_enable_resources(dev);
+	return pcibios_enable_resources(dev, mask);
 }
 
 void __init pcibios_penalize_isa_irq(irq)

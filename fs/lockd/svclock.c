@@ -237,17 +237,8 @@ nlmsvc_delete_block(struct nlm_block *block, int unlock)
 
 	/* Remove block from list */
 	nlmsvc_remove_block(block);
-
-	/* If granted, unlock it, else remove from inode block list */
-	if (unlock && block->b_granted) {
-		dprintk("lockd: deleting granted lock\n");
-		fl->fl_type = F_UNLCK;
-		posix_lock_file(&block->b_file->f_file, fl, 0);
-		block->b_granted = 0;
-	} else {
-		dprintk("lockd: unblocking blocked lock\n");
-		posix_unblock_lock(fl);
-	}
+	posix_unblock_lock(&file->f_file, fl);
+	block->b_granted = 0;
 
 	/* If the block is in the middle of a GRANT callback,
 	 * don't kill it yet. */
@@ -324,7 +315,7 @@ nlmsvc_lock(struct svc_rqst *rqstp, struct nlm_file *file,
 
 again:
 	if (!(conflock = posix_test_lock(&file->f_file, &lock->fl))) {
-		error = posix_lock_file(&file->f_file, &lock->fl, 0);
+		error = posix_lock_file(&file->f_file, &lock->fl);
 
 		if (block)
 			nlmsvc_delete_block(block, 0);
@@ -428,7 +419,7 @@ nlmsvc_unlock(struct nlm_file *file, struct nlm_lock *lock)
 	nlmsvc_cancel_blocked(file, lock);
 
 	lock->fl.fl_type = F_UNLCK;
-	error = posix_lock_file(&file->f_file, &lock->fl, 0);
+	error = posix_lock_file(&file->f_file, &lock->fl);
 
 	return (error < 0)? nlm_lck_denied_nolocks : nlm_granted;
 }
@@ -532,7 +523,7 @@ nlmsvc_grant_blocked(struct nlm_block *block)
 	 * following yields an error, this is most probably due to low
 	 * memory. Retry the lock in a few seconds.
 	 */
-	if ((error = posix_lock_file(&file->f_file, &lock->fl, 0)) < 0) {
+	if ((error = posix_lock_file(&file->f_file, &lock->fl)) < 0) {
 		printk(KERN_WARNING "lockd: unexpected error %d in %s!\n",
 				-error, __FUNCTION__);
 		nlmsvc_insert_block(block, 10 * HZ);

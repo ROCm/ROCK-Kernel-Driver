@@ -288,6 +288,7 @@ static int __init apne_probe1(struct net_device *dev, int ioaddr)
     /* Allocate dev->priv and fill in 8390 specific dev fields. */
     if (ethdev_init(dev)) {
 	printk (" unable to get memory for dev->priv.\n");
+	free_irq(IRQ_AMIGA_PORTS, dev);
 	return -ENOMEM;
     }
 

@@ -161,6 +161,8 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 #define io_remap_page_range(vma,from,phys,size,prot) \
 		remap_page_range(vma,from,phys,size,prot)
 
+typedef pte_t *pte_addr_t;
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* _ASMARM_PGTABLE_H */

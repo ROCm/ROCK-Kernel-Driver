@@ -881,15 +881,13 @@ out_unlock:
  * control characters do (^C, ^Z etc)
  */
 
-int
-kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
+int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 {
 	int retval = -EINVAL;
 	if (pgrp > 0) {
 		struct task_struct *p;
 
 		retval = -ESRCH;
-		read_lock(&tasklist_lock);
 		for_each_task(p) {
 			if (p->pgrp == pgrp && thread_group_leader(p)) {
 				int err = send_sig_info(sig, info, p);
@@ -897,8 +895,19 @@ kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 					retval = err;
 			}
 		}
-		read_unlock(&tasklist_lock);
 	}
+	return retval;
+}
+
+int
+kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
+{
+	int retval;
+
+	read_lock(&tasklist_lock);
+	retval = __kill_pg_info(sig, info, pgrp);
+	read_unlock(&tasklist_lock);
+
 	return retval;
 }
 
