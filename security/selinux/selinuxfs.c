@@ -17,6 +17,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/security.h>
+#include <linux/major.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 
@@ -886,12 +887,17 @@ err:
 	goto out;
 }
 
+#define NULL_FILE_NAME "null"
+
+struct dentry *selinux_null = NULL;
+
 static int sel_fill_super(struct super_block * sb, void * data, int silent)
 {
 	int ret;
 	struct dentry *dentry;
 	struct inode *inode;
 	struct qstr qname;
+	struct inode_security_struct *isec;
 
 	static struct tree_descr selinux_files[] = {
 		[SEL_LOAD] = {"load", &sel_load_ops, S_IRUSR|S_IWUSR},
@@ -929,10 +935,29 @@ static int sel_fill_super(struct super_block * sb, void * data, int silent)
 	if (ret)
 		goto out;
 
+	qname.name = NULL_FILE_NAME;
+	qname.len = strlen(qname.name);
+	qname.hash = full_name_hash(qname.name, qname.len);
+	dentry = d_alloc(sb->s_root, &qname);
+	if (!dentry)
+		return -ENOMEM;
+
+	inode = sel_make_inode(sb, S_IFCHR | S_IRUGO | S_IWUGO);
+	if (!inode)
+		goto out;
+	isec = (struct inode_security_struct*)inode->i_security;
+	isec->sid = SECINITSID_DEVNULL;
+	isec->sclass = SECCLASS_CHR_FILE;
+	isec->initialized = 1;
+
+	init_special_inode(inode, S_IFCHR | S_IRUGO | S_IWUGO, MKDEV(MEM_MAJOR, 3));
+	d_add(dentry, inode);
+	selinux_null = dentry;
+
 	return 0;
 out:
 	dput(dentry);
-	printk(KERN_ERR "security:	error creating conditional out_dput\n");
+	printk(KERN_ERR "%s:  failed while creating inodes\n", __FUNCTION__);
 	return -ENOMEM;
 }
 
@@ -948,9 +973,24 @@ static struct file_system_type sel_fs_type = {
 	.kill_sb	= kill_litter_super,
 };
 
+struct vfsmount *selinuxfs_mount;
+
 static int __init init_sel_fs(void)
 {
-	return selinux_enabled ? register_filesystem(&sel_fs_type) : 0;
+	int err;
+
+	if (!selinux_enabled)
+		return 0;
+	err = register_filesystem(&sel_fs_type);
+	if (!err) {
+		selinuxfs_mount = kern_mount(&sel_fs_type);
+		if (IS_ERR(selinuxfs_mount)) {
+			printk(KERN_ERR "selinuxfs:  could not mount!\n");
+			err = PTR_ERR(selinuxfs_mount);
+			selinuxfs_mount = NULL;
+		}
+	}
+	return err;
 }
 
 __initcall(init_sel_fs);
