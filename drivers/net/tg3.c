@@ -3910,7 +3910,7 @@ static int tg3_load_5701_a0_firmware_fix(struct tg3 *tp)
 #define TG3_TSO_FW_START_ADDR		0x08000000
 #define TG3_TSO_FW_TEXT_ADDR		0x08000000
 #define TG3_TSO_FW_TEXT_LEN		0x1a90
-#define TG3_TSO_FW_RODATA_ADDR		0x08001a900
+#define TG3_TSO_FW_RODATA_ADDR		0x08001a90
 #define TG3_TSO_FW_RODATA_LEN		0x60
 #define TG3_TSO_FW_DATA_ADDR		0x08001b20
 #define TG3_TSO_FW_DATA_LEN		0x20
