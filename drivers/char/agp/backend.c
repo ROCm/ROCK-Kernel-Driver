@@ -257,6 +257,7 @@ frontend_err:
 err_out:
 	agp_bridge.type = NOT_SUPPORTED;
 	module_put(drv->owner);
+	drv->dev = NULL;
 	return ret_val;
 }
 
