@@ -68,6 +68,9 @@
 
 #include <asm/sun3ints.h>
 #include <asm/dvma.h>
+#include <asm/idprom.h>
+#include <asm/machines.h>
+
 /* dma on! */
 #define REAL_DMA
 
@@ -113,7 +116,7 @@ static Scsi_Cmnd *sun3_dma_setup_done = NULL;
 #define	AFTER_RESET_DELAY	(HZ/2)
 
 /* ms to wait after hitting dma regs */
-#define SUN3_DMA_DELAY 5
+#define SUN3_DMA_DELAY 10
 
 /* dvma buffer to allocate -- 32k should hopefully be more than sufficient */
 #define SUN3_DVMA_BUFSIZE 0xe000
@@ -125,9 +128,10 @@ static volatile unsigned char *sun3_scsi_regp;
 static volatile struct sun3_dma_regs *dregs;
 static unsigned char *dmabuf = NULL; /* dma memory buffer */
 static struct sun3_udc_regs *udc_regs = NULL;
-static void *sun3_dma_orig_addr = NULL;
+static unsigned char *sun3_dma_orig_addr = NULL;
 static unsigned long sun3_dma_orig_count = 0;
 static int sun3_dma_active = 0;
+static unsigned long last_residual = 0;
 
 /*
  * NCR 5380 register access functions
@@ -189,6 +193,16 @@ int sun3scsi_detect(Scsi_Host_Template * tpnt)
 	static int called = 0;
 	struct Scsi_Host *instance;
 
+	/* check that this machine has an onboard 5380 */
+	switch(idprom->id_machtype) {
+	case SM_SUN3|SM_3_50:
+	case SM_SUN3|SM_3_60:
+		break;
+
+	default:
+		return 0;
+	}
+
 	if(called)
 		return 0;
 
@@ -233,17 +247,17 @@ int sun3scsi_detect(Scsi_Host_Template * tpnt)
 	sun3_scsi_regp = (unsigned char *)ioaddr;
 	dregs = (struct sun3_dma_regs *)(((unsigned char *)ioaddr) + 8);
 
-	if((dmabuf = sun3_dvma_malloc(SUN3_DVMA_BUFSIZE)) == NULL) {
-	     printk("SUN3 Scsi couldn't allocate DVMA memory!\n");
-	     return 0;
-	}
-
-	if((udc_regs = sun3_dvma_malloc(sizeof(struct sun3_udc_regs)))
+	if((udc_regs = dvma_malloc(sizeof(struct sun3_udc_regs)))
 	   == NULL) {
 	     printk("SUN3 Scsi couldn't allocate DVMA memory!\n");
 	     return 0;
 	}
-
+#ifdef OLDDMA
+	if((dmabuf = dvma_malloc_align(SUN3_DVMA_BUFSIZE, 0x10000)) == NULL) {
+	     printk("SUN3 Scsi couldn't allocate DVMA memory!\n");
+	     return 0;
+	}
+#endif
 #ifdef SUPPORT_TAGS
 	if (setup_use_tagged_queuing < 0)
 		setup_use_tagged_queuing = DEFAULT_USE_TAGGED_QUEUING;
@@ -403,13 +417,21 @@ void sun3_sun3_debug (void)
 /* sun3scsi_dma_setup() -- initialize the dma controller for a read/write */
 static unsigned long sun3scsi_dma_setup(void *data, unsigned long count, int write_flag)
 {
+#ifdef OLDDMA
 	if(write_flag) 
 		memcpy(dmabuf, data, count);
 	else {
 		sun3_dma_orig_addr = data;
 		sun3_dma_orig_count = count;
 	}
+#else
+	void *addr;
 
+//	addr = sun3_dvma_page((unsigned long)data, (unsigned long)dmabuf);
+	addr = (void *)dvma_map((unsigned long) data, count);
+	sun3_dma_orig_addr = addr;
+	sun3_dma_orig_count = count;
+#endif
 	dregs->fifo_count = 0;
 	sun3_udc_write(UDC_RESET, UDC_CSR);
 	
@@ -441,8 +463,13 @@ static unsigned long sun3scsi_dma_setup(void *data, unsigned long count, int wri
 	}
 
 	/* setup udc */
-	udc_regs->addr_hi = ((sun3_dvma_vtop(dmabuf) & 0xff0000) >> 8);
-	udc_regs->addr_lo = (sun3_dvma_vtop(dmabuf) & 0xffff);
+#ifdef OLDDMA
+	udc_regs->addr_hi = ((dvma_vtob(dmabuf) & 0xff0000) >> 8);
+	udc_regs->addr_lo = (dvma_vtob(dmabuf) & 0xffff);
+#else
+	udc_regs->addr_hi = (((unsigned long)(addr) & 0xff0000) >> 8);
+	udc_regs->addr_lo = ((unsigned long)(addr) & 0xffff);
+#endif
 	udc_regs->count = count/2; /* count in words */
 	udc_regs->mode_hi = UDC_MODE_HIWORD;
 	if(write_flag) {
@@ -456,10 +483,10 @@ static unsigned long sun3scsi_dma_setup(void *data, unsigned long count, int wri
 	}
 	
 	/* announce location of regs block */
-	sun3_udc_write(((sun3_dvma_vtop(udc_regs) & 0xff0000) >> 8),
+	sun3_udc_write(((dvma_vtob(udc_regs) & 0xff0000) >> 8),
 		       UDC_CHN_HI); 
 
-	sun3_udc_write((sun3_dvma_vtop(udc_regs) & 0xffff), UDC_CHN_LO);
+	sun3_udc_write((dvma_vtob(udc_regs) & 0xffff), UDC_CHN_LO);
 
 	/* set dma master on */
 	sun3_udc_write(0xd, UDC_MODE);
@@ -471,7 +498,7 @@ static unsigned long sun3scsi_dma_setup(void *data, unsigned long count, int wri
 
 }
 
-static inline unsigned long sun3scsi_dma_residual(struct Scsi_Host *instance)
+static inline unsigned long sun3scsi_dma_count(struct Scsi_Host *instance)
 {
 	unsigned short resid;
 
@@ -484,6 +511,11 @@ static inline unsigned long sun3scsi_dma_residual(struct Scsi_Host *instance)
 	return (unsigned long) resid;
 }
 
+static inline unsigned long sun3scsi_dma_residual(struct Scsi_Host *instance)
+{
+	return last_residual;
+}
+
 static inline unsigned long sun3scsi_dma_xfer_len(unsigned long wanted, Scsi_Cmnd *cmd,
 				    int write_flag)
 {
@@ -494,14 +526,32 @@ static inline unsigned long sun3scsi_dma_xfer_len(unsigned long wanted, Scsi_Cmn
 }
 
 /* clean up after our dma is done */
-static int sun3scsi_dma_finish(void)
+static int sun3scsi_dma_finish(int write_flag)
 {
 	unsigned short count;
+	unsigned short fifo;
 	int ret = 0;
 	
-	count = sun3scsi_dma_residual(default_instance);
-
 	sun3_dma_active = 0;
+
+	// check to empty the fifo on a read
+	if(!write_flag) {
+		int tmo = 200000; /* 2 sec */
+		
+		while(1) {
+			if(dregs->csr & CSR_FIFO_EMPTY)
+				break;
+
+			if(--tmo <= 0) 
+				return 1;
+
+			udelay(10);
+		}
+	}
+		
+
+	count = sun3scsi_dma_count(default_instance);
+#ifdef OLDDMA
 
 	/* if we've finished a read, copy out the data we read */
  	if(sun3_dma_orig_addr) {
@@ -518,9 +568,29 @@ static int sun3scsi_dma_finish(void)
 		sun3_dma_orig_addr = NULL;
 
 	}
-	
+#else
+
+	fifo = dregs->fifo_count;
+	last_residual = fifo;
+
+	/* empty bytes from the fifo which didn't make it */
+	if((!write_flag) && (count - fifo) == 2) {
+		unsigned short data;
+		unsigned char *vaddr;
+
+		data = dregs->fifo_data;
+		vaddr = (unsigned char *)dvma_btov(sun3_dma_orig_addr);
+		
+		vaddr += (sun3_dma_orig_count - fifo);
+
+		vaddr[-2] = (data & 0xff00) >> 8;
+		vaddr[-1] = (data & 0xff);
+	}
+
+	dvma_unmap(sun3_dma_orig_addr);
+#endif
 	sun3_udc_write(UDC_RESET, UDC_CSR);
-	
+	dregs->fifo_count = 0;
 	dregs->csr &= ~CSR_SEND;
 
 	/* reset fifo */

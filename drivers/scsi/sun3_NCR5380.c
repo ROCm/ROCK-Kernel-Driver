@@ -647,10 +647,10 @@ __inline__ void NCR5380_print_phase(struct Scsi_Host *instance) { };
 
 static volatile int main_running = 0;
 static struct tq_struct NCR5380_tqueue = {
-    NULL,		/* next */
-    0,			/* sync */
-    (void (*)(void*))NCR5380_main,  /* routine, must have (void *) arg... */
-    NULL		/* data */
+//    NULL,		/* next */
+    sync: 0,			/* sync */
+    routine: (void (*)(void*))NCR5380_main,  /* routine, must have (void *) arg... */
+    data: NULL		/* data */
 };
 
 static __inline__ void queue_main(void)
@@ -1217,7 +1217,7 @@ static void NCR5380_dma_complete( struct Scsi_Host *instance )
 	       HOSTNO, NCR5380_read(BUS_AND_STATUS_REG),
 	       NCR5380_read(STATUS_REG));
 
-    if((sun3scsi_dma_finish())) {
+    if((sun3scsi_dma_finish(hostdata->connected->request.cmd))) {
 	    printk("scsi%d: overrun in UDC counter -- not prepared to deal with this!\n", HOSTNO);
 	    printk("please e-mail sammy@oh.verio.com with a description of how this\n");
 	    printk("error was produced.\n");

@@ -44,7 +44,7 @@ struct stat {
 struct stat64 {
 	unsigned char	__pad0[6];
 	unsigned short	st_dev;
-	unsigned char	__pad1[4];
+	unsigned char	__pad1[2];
 
 #define STAT64_HAS_BROKEN_ST_INO	1
 	unsigned long	__st_ino;
@@ -57,7 +57,7 @@ struct stat64 {
 
 	unsigned char	__pad2[6];
 	unsigned short	st_rdev;
-	unsigned char	__pad3[4];
+	unsigned char	__pad3[2];
 
 	long long	st_size;
 	unsigned long	st_blksize;

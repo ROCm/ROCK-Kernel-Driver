@@ -11,6 +11,7 @@
 #include <asm/hardware.h>
 #include <asm/irq.h>
 #include <asm/arch/pcmcia.h>
+#include <asm/arch/assabet.h>
 
 static int neponset_pcmcia_init(struct pcmcia_init *init){
   int return_val=0;

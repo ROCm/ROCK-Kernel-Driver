@@ -1,6 +1,6 @@
 /*
  * linux/include/asm-arm/arch-shark/keyboard.h
- * by Alexander Schulz <aschulz@netwinder.org>
+ * by Alexander Schulz
  * 
  * Derived from linux/include/asm-arm/arch-ebsa285/keyboard.h
  * (C) 1998 Russell King
@@ -11,6 +11,12 @@
 #include <asm/io.h>
 #include <asm/system.h>
 
+#define KEYBOARD_IRQ			IRQ_ISA_KEYBOARD
+#define NR_SCANCODES			128
+
+#define kbd_disable_irq()		do { } while (0)
+#define kbd_enable_irq()		do { } while (0)
+
 extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
 extern int pckbd_getkeycode(unsigned int scancode);
 extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
@@ -20,22 +26,25 @@ extern void pckbd_leds(unsigned char leds);
 extern void pckbd_init_hw(void);
 extern unsigned char pckbd_sysrq_xlate[128];
 
-#define KEYBOARD_IRQ			IRQ_ISA_KEYBOARD
+static inline void kbd_init_hw(void)
+{
+	if (have_isa_bridge) {
+		k_setkeycode    = pckbd_setkeycode;
+		k_getkeycode    = pckbd_getkeycode;
+		k_translate     = pckbd_translate;
+		k_unexpected_up = pckbd_unexpected_up;
+		k_leds          = pckbd_leds;
+#ifdef CONFIG_MAGIC_SYSRQ
+		k_sysrq_key     = 0x54;
+		k_sysrq_xlate   = pckbd_sysrq_xlate;
+#endif
+		pckbd_init_hw();
+	}
+}
 
-#define NR_SCANCODES 128
-
-#define kbd_setkeycode(sc,kc)		pckbd_setkeycode(sc,kc)
-#define kbd_getkeycode(sc)		pckbd_getkeycode(sc)
-#define kbd_translate(sc, kcp, rm)	pckbd_translate(sc, kcp, rm)
-#define kbd_unexpected_up		pckbd_unexpected_up
-#define kbd_leds(leds)			pckbd_leds(leds)
-#define kbd_init_hw()			pckbd_init_hw()
-#define kbd_sysrq_xlate			pckbd_sysrq_xlate
-
-#define kbd_disable_irq()
-#define kbd_enable_irq()
-
-#define SYSRQ_KEY	0x54
+/*
+ * PC Keyboard specifics
+ */
 
 /* resource allocation */
 #define kbd_request_region() request_region(0x60, 16, "keyboard")

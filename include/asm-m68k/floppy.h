@@ -36,8 +36,6 @@ asmlinkage void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs);
 
 /* basically PC init + set use_virtual_dma */
 #define  FDC1 m68k_floppy_init()
-static int FDC2 = -1;
-
 
 #define N_FDC 1
 #define N_DRIVE 8
@@ -89,7 +87,7 @@ static int fd_request_irq(void)
 {
 	if(MACH_IS_Q40)
 		return request_irq(FLOPPY_IRQ, floppy_hardint,SA_INTERRUPT,
-						   "floppy", NULL);
+						   "floppy", floppy_hardint);
 	else if(MACH_IS_SUN3X) 
 		return sun3xflop_request_irq();
 	
@@ -98,7 +96,7 @@ static int fd_request_irq(void)
 static void fd_free_irq(void)
 {
 	if(MACH_IS_Q40)
-		free_irq(FLOPPY_IRQ, NULL);
+		free_irq(FLOPPY_IRQ, floppy_hardint);
 }
 
 #define fd_request_dma()        vdma_request_dma(FLOPPY_DMA,"floppy")
@@ -254,5 +252,4 @@ asmlinkage void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 }
 
-
-
+#define EXTRA_FLOPPY_PARAMS

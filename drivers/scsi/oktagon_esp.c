@@ -27,7 +27,7 @@
 #include <asm/system.h>
 #include <asm/ptrace.h>
 #include <asm/pgtable.h>
-#include <asm/io.h>
+
 
 #include "scsi.h"
 #include "hosts.h"
@@ -106,7 +106,7 @@ static int direction;
 static struct NCR_ESP *current_esp;
 
 
-volatile unsigned char cmd_buffer[16];
+static volatile unsigned char cmd_buffer[16];
 				/* This is where all commands are put
 				 * before they are trasfered to the ESP chip
 				 * via PIO.

@@ -235,6 +235,7 @@ static struct file_operations ftl_blk_fops = {
 };
 #else
 static struct block_device_operations ftl_blk_fops = {
+    owner:	THIS_MODULE,
     open:	ftl_open,
     release:	ftl_close,
     ioctl:	ftl_ioctl,
@@ -894,16 +895,11 @@ static int ftl_open(struct inode *inode, struct file *file)
     if (ftl_gendisk.part[minor].nr_sects == 0)
 	return -ENXIO;
 
-    MOD_INC_USE_COUNT;
-
-    if (!get_mtd_device(partition->mtd, -1)) {
-	    MOD_DEC_USE_COUNT;
+    if (!get_mtd_device(partition->mtd, -1))
 	    return /* -E'SBUGGEREDOFF */ -ENXIO;
-    }
-    
+
     if ((file->f_mode & 2) && !(partition->mtd->flags & MTD_CLEAR_BITS) ) {
 	    put_mtd_device(partition->mtd);
-	    MOD_DEC_USE_COUNT;
             return -EROFS;
     }
     
@@ -939,7 +935,6 @@ static release_t ftl_close(struct inode *inode, struct file *file)
     atomic_dec(&part->open);
 
     put_mtd_device(part->mtd);
-    MOD_DEC_USE_COUNT;
     release_return(0);
 } /* ftl_close */
 

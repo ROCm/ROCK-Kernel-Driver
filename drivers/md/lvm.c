@@ -357,6 +357,7 @@ struct proc_dir_entry *pde = NULL;
 
 static struct file_operations lvm_chr_fops =
 {
+	owner:		THIS_MODULE,
 	open:		lvm_chr_open,
 	release:	lvm_chr_close,
 	ioctl:		lvm_chr_ioctl,
@@ -366,6 +367,7 @@ static struct file_operations lvm_chr_fops =
 /* block device operations structure needed for 2.3.38? and above */
 static struct block_device_operations lvm_blk_dops =
 {
+	owner:		THIS_MODULE,
 	open: 		lvm_blk_open,
 	release:	lvm_blk_close,
 	ioctl:		lvm_blk_ioctl,
@@ -543,8 +545,6 @@ static int lvm_chr_open(struct inode *inode,
 	if (VG_CHR(minor) > MAX_VG) return -ENXIO;
 
 	lvm_chr_open_count++;
-
-	MOD_INC_USE_COUNT;
 
 	return 0;
 } /* lvm_chr_open() */
@@ -786,8 +786,6 @@ static int lvm_chr_close(struct inode *inode, struct file *file)
 		wake_up_interruptible(&lvm_wait);
 	}
 
-	MOD_DEC_USE_COUNT;
-
 	return 0;
 } /* lvm_chr_close() */
 
@@ -839,8 +837,6 @@ static int lvm_blk_open(struct inode *inode, struct file *file)
                 /* be sure to increment VG counter */
 		if (lv_ptr->lv_open == 0) vg_ptr->lv_open++;
 		lv_ptr->lv_open++;
-
-		MOD_INC_USE_COUNT;
 
 #ifdef DEBUG_LVM_BLK_OPEN
 		printk(KERN_DEBUG
@@ -1042,8 +1038,6 @@ static int lvm_blk_close(struct inode *inode, struct file *file)
 
 	if (lv_ptr->lv_open == 1) vg_ptr->lv_open--;
 	lv_ptr->lv_open--;
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 } /* lvm_blk_close() */

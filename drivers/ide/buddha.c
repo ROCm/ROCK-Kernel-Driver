@@ -1,9 +1,11 @@
 /*
- *  linux/drivers/ide/buddha.c -- Amiga Buddha and Catweasel IDE Driver
+ *  linux/drivers/ide/buddha.c -- Amiga Buddha, Catweasel and X-Surf IDE Driver
  *
  *	Copyright (C) 1997 by Geert Uytterhoeven
  *
- *  This driver was written by based on the specifications in README.buddha.
+ *  This driver was written by based on the specifications in README.buddha and
+ *  the X-Surf info from Inside_XSurf.txt available at 
+ *  http://www.jschoenfeld.com
  *
  *  This file is subject to the terms and conditions of the GNU General Public
  *  License.  See the file COPYING in the main directory of this archive for
@@ -28,12 +30,12 @@
 
 
     /*
-     *  The Buddha has 2 IDE interfaces, the Catweasel has 3
+     *  The Buddha has 2 IDE interfaces, the Catweasel has 3, X-Surf has 2
      */
 
 #define BUDDHA_NUM_HWIFS	2
 #define CATWEASEL_NUM_HWIFS	3
-
+#define XSURF_NUM_HWIFS         2
 
     /*
      *  Bases of the IDE interfaces (relative to the board address)
@@ -43,8 +45,15 @@
 #define BUDDHA_BASE2	0xa00
 #define BUDDHA_BASE3	0xc00
 
+#define XSURF_BASE1     0xb000 /* 2.5" Interface */
+#define XSURF_BASE2     0xd000 /* 3.5" Interface */
+
 static u_int buddha_bases[CATWEASEL_NUM_HWIFS] __initdata = {
     BUDDHA_BASE1, BUDDHA_BASE2, BUDDHA_BASE3
+};
+
+static const u_int xsurf_bases[XSURF_NUM_HWIFS] __initdata = {
+     XSURF_BASE1, XSURF_BASE2
 };
 
 
@@ -61,12 +70,17 @@ static u_int buddha_bases[CATWEASEL_NUM_HWIFS] __initdata = {
 #define BUDDHA_SELECT	0x1a		/* 101dhhhh , d=drive, hhhh=head */
 #define BUDDHA_STATUS	0x1e		/* see status-bits */
 #define BUDDHA_CONTROL	0x11a
+#define XSURF_CONTROL   -1              /* X-Surf has no CS1* (Control/AltStat) */
 
 static int buddha_offsets[IDE_NR_PORTS] __initdata = {
     BUDDHA_DATA, BUDDHA_ERROR, BUDDHA_NSECTOR, BUDDHA_SECTOR, BUDDHA_LCYL,
-    BUDDHA_HCYL, BUDDHA_SELECT, BUDDHA_STATUS, BUDDHA_CONTROL
+    BUDDHA_HCYL, BUDDHA_SELECT, BUDDHA_STATUS, BUDDHA_CONTROL, -1
 };
 
+static int xsurf_offsets[IDE_NR_PORTS] __initdata = {
+    BUDDHA_DATA, BUDDHA_ERROR, BUDDHA_NSECTOR, BUDDHA_SECTOR, BUDDHA_LCYL,
+    BUDDHA_HCYL, BUDDHA_SELECT, BUDDHA_STATUS, XSURF_CONTROL, -1
+};
 
     /*
      *  Other registers
@@ -76,8 +90,15 @@ static int buddha_offsets[IDE_NR_PORTS] __initdata = {
 #define BUDDHA_IRQ2	0xf40		/* interrupt */
 #define BUDDHA_IRQ3	0xf80
 
+#define XSURF_IRQ1      0x7e
+#define XSURF_IRQ2      0x7e
+
 static int buddha_irqports[CATWEASEL_NUM_HWIFS] __initdata = {
     BUDDHA_IRQ1, BUDDHA_IRQ2, BUDDHA_IRQ3
+};
+
+static const int xsurf_irqports[XSURF_NUM_HWIFS] __initdata = {
+    XSURF_IRQ1, XSURF_IRQ2
 };
 
 #define BUDDHA_IRQ_MR	0xfc0		/* master interrupt enable */
@@ -87,8 +108,8 @@ static int buddha_irqports[CATWEASEL_NUM_HWIFS] __initdata = {
      *  Board information
      */
 
-static u_long buddha_board;
-static int buddha_num_hwifs = -1;
+enum BuddhaType_Enum {BOARD_BUDDHA, BOARD_CATWEASEL, BOARD_XSURF};
+typedef enum BuddhaType_Enum BuddhaType;
 
 
     /*
@@ -99,64 +120,100 @@ static int buddha_ack_intr(ide_hwif_t *hwif)
 {
     unsigned char ch;
 
-    ch = inb(hwif->io_ports[IDE_IRQ_OFFSET]);
+    ch = z_readb(hwif->io_ports[IDE_IRQ_OFFSET]);
     if (!(ch & 0x80))
-	return 0;
+	    return 0;
     return 1;
 }
 
-
-    /*
-     *  Any Buddha or Catweasel boards present?
-     */
-
-static int __init find_buddha(void)
+static int xsurf_ack_intr(ide_hwif_t *hwif)
 {
-    struct zorro_dev *z = NULL;
+    unsigned char ch;
 
-    buddha_num_hwifs = 0;
-    while ((z = zorro_find_device(ZORRO_WILDCARD, z))) {
-	unsigned long board;
-	if (z->id == ZORRO_PROD_INDIVIDUAL_COMPUTERS_BUDDHA)
-	    buddha_num_hwifs = BUDDHA_NUM_HWIFS;
-	else if (z->id == ZORRO_PROD_INDIVIDUAL_COMPUTERS_CATWEASEL)
-	    buddha_num_hwifs = CATWEASEL_NUM_HWIFS;
-	else
-	    continue;
-	board = z->resource.start;
-	if (!request_mem_region(board+BUDDHA_BASE1, 0x800, "IDE"))
-	    continue;
-	buddha_board = ZTWO_VADDR(board);
-	/* write to BUDDHA_IRQ_MR to enable the board IRQ */
-	*(char *)(buddha_board+BUDDHA_IRQ_MR) = 0;
-	break;
-    }
-    return buddha_num_hwifs;
+    ch = z_readb(hwif->io_ports[IDE_IRQ_OFFSET]);
+    /* X-Surf needs a 0 written to IRQ register to ensure ISA bit A11 stays at 0 */
+    z_writeb(0, hwif->io_ports[IDE_IRQ_OFFSET]); 
+    if (!(ch & 0x80))
+	    return 0;
+    return 1;
 }
-
 
     /*
      *  Probe for a Buddha or Catweasel IDE interface
-     *  We support only _one_ of them, no multiple boards!
      */
 
 void __init buddha_init(void)
 {
-    hw_regs_t hw;
-    int i, index;
+	hw_regs_t hw;
+	int i, index;
 
-    if (buddha_num_hwifs < 0 && !find_buddha())
-	return;
+	struct zorro_dev *z = NULL;
+	u_long buddha_board = 0;
+	BuddhaType type;
+	int buddha_num_hwifs;
 
-    for (i = 0; i < buddha_num_hwifs; i++) {
-	ide_setup_ports(&hw, (ide_ioreg_t)(buddha_board+buddha_bases[i]),
-			buddha_offsets, 0,
-			(ide_ioreg_t)(buddha_board+buddha_irqports[i]),
-			buddha_ack_intr, IRQ_AMIGA_PORTS);
-	index = ide_register_hw(&hw, NULL);
-	if (index != -1)
-	    printk("ide%d: %s IDE interface\n", index,
-		   buddha_num_hwifs == BUDDHA_NUM_HWIFS ? "Buddha" :
-		   					  "Catweasel");
-    }
+	while ((z = zorro_find_device(ZORRO_WILDCARD, z))) {
+		unsigned long board;
+		if (z->id == ZORRO_PROD_INDIVIDUAL_COMPUTERS_BUDDHA) {
+			buddha_num_hwifs = BUDDHA_NUM_HWIFS;
+			type=BOARD_BUDDHA;
+		} else if (z->id == ZORRO_PROD_INDIVIDUAL_COMPUTERS_CATWEASEL) {
+			buddha_num_hwifs = CATWEASEL_NUM_HWIFS;
+			type=BOARD_CATWEASEL;
+		} else if (z->id == ZORRO_PROD_INDIVIDUAL_COMPUTERS_X_SURF) {
+			buddha_num_hwifs = XSURF_NUM_HWIFS;
+			type=BOARD_XSURF;
+		} else 
+			continue;
+		
+		board = z->resource.start;
+		
+		if(type != BOARD_XSURF) {
+			if (!request_mem_region(board+BUDDHA_BASE1, 0x800, "IDE"))
+				continue;
+		} else {
+			if (!request_mem_region(board+XSURF_BASE1, 0x1000, "IDE"))
+				continue;
+			if (!request_mem_region(board+XSURF_BASE2, 0x1000, "IDE"))
+				continue;
+			if (!request_mem_region(board+XSURF_IRQ1, 0x8, "IDE"))
+				continue;
+		}	  
+		buddha_board = ZTWO_VADDR(board);
+		
+		/* write to BUDDHA_IRQ_MR to enable the board IRQ */
+		/* X-Surf doesn't have this.  IRQs are always on */
+		if(type != BOARD_XSURF) *(char *)(buddha_board+BUDDHA_IRQ_MR) = 0;
+		
+		for(i=0;i<buddha_num_hwifs;i++) {
+			if(type != BOARD_XSURF) {
+				ide_setup_ports(&hw, (ide_ioreg_t)(buddha_board+buddha_bases[i]),
+						buddha_offsets, 0,
+						(ide_ioreg_t)(buddha_board+buddha_irqports[i]),
+						buddha_ack_intr, IRQ_AMIGA_PORTS);
+			} else {
+				ide_setup_ports(&hw, (ide_ioreg_t)(buddha_board+xsurf_bases[i]),
+						xsurf_offsets, 0,
+						(ide_ioreg_t)(buddha_board+xsurf_irqports[i]),
+						xsurf_ack_intr, IRQ_AMIGA_PORTS);
+			}	
+			
+			index = ide_register_hw(&hw, NULL);
+			if (index != -1) {
+				printk("ide%d: ", index);
+				switch(type) {
+				case BOARD_BUDDHA:
+					printk("Buddha");
+					break;
+				case BOARD_CATWEASEL:
+					printk("Catweasel");
+					break;
+				case BOARD_XSURF:
+					printk("X-Surf");
+					break;
+				}
+				printk(" IDE interface\n");	    
+			}		      
+		}
+	}
 }

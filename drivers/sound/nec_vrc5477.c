@@ -1774,6 +1774,7 @@ static unsigned int devindex = 0;
 
 MODULE_AUTHOR("Monta Vista Software, jsun@mvista.com or jsun@junsun.net");
 MODULE_DESCRIPTION("NEC Vrc5477 audio (AC97) Driver");
+MODULE_LICENSE("GPL");
 
 /* --------------------------------------------------------------------- */
 extern void jsun_scan_pci_bus(void);

@@ -473,25 +473,16 @@ static int have_wrcomb (void)
     unsigned long config, dummy;
     struct pci_dev *dev = NULL;
     
-   /* ServerWorks LE chipsets have problems with  write-combining 
-      Don't allow it and  leave room for other chipsets to be tagged */
+   /* ServerWorks LE chipsets have problems with write-combining 
+      Don't allow it and leave room for other chipsets to be tagged */
 
-    if ((dev = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8, NULL)) != NULL) {
-	switch(dev->vendor) {
-        case PCI_VENDOR_ID_SERVERWORKS:
- 	    switch (dev->device) {
-	    case PCI_DEVICE_ID_SERVERWORKS_LE:
+	if ((dev = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8, NULL)) != NULL) {
+		if ((dev->vendor == PCI_VENDOR_ID_SERVERWORKS) &&
+			(dev->device == PCI_DEVICE_ID_SERVERWORKS_LE)) {
+		printk (KERN_INFO "mtrr: Serverworks LE detected. Write-combining disabled.\n");
 		return 0;
-		break;
-	    default:
-		break;
-	    }
-	    break;
-	default:
-	    break;
+		}
 	}
-    }
-
 
     switch ( mtrr_if )
     {

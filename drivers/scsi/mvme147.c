@@ -65,6 +65,7 @@ static void dma_stop (struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
 int mvme147_detect(Scsi_Host_Template *tpnt)
 {
     static unsigned char called = 0;
+    wd33c93_regs regs;
 
     if (!MACH_IS_MVME147 || called)
 	return 0;
@@ -74,13 +75,19 @@ int mvme147_detect(Scsi_Host_Template *tpnt)
     tpnt->proc_info = &wd33c93_proc_info;
 
     mvme147_host = scsi_register (tpnt, sizeof(struct WD33C93_hostdata));
+    if (!mvme147_host)
+	    goto err_out;
+
     mvme147_host->base = 0xfffe4000;
     mvme147_host->irq = MVME147_IRQ_SCSI_PORT;
-    wd33c93_init(mvme147_host, (wd33c93_regs *)0xfffe4000,
-		 dma_setup, dma_stop, WD33C93_FS_8_10);
+    regs.SASR = (volatile unsigned char *)0xfffe4000;
+    regs.SCMD = (volatile unsigned char *)0xfffe4001;
+    wd33c93_init(mvme147_host, regs, dma_setup, dma_stop, WD33C93_FS_8_10);
 
-    request_irq(MVME147_IRQ_SCSI_PORT, mvme147_intr, 0, "MVME147 SCSI PORT", mvme147_intr);
-    request_irq(MVME147_IRQ_SCSI_DMA, mvme147_intr, 0, "MVME147 SCSI DMA", mvme147_intr);
+    if (request_irq(MVME147_IRQ_SCSI_PORT, mvme147_intr, 0, "MVME147 SCSI PORT", mvme147_intr))
+	    goto err_unregister;
+    if (request_irq(MVME147_IRQ_SCSI_DMA, mvme147_intr, 0, "MVME147 SCSI DMA", mvme147_intr))
+	    goto err_free_irq;
 #if 0	/* Disabled; causes problems booting */
     m147_pcc->scsi_interrupt = 0x10;	/* Assert SCSI bus reset */
     udelay(100);
@@ -94,6 +101,14 @@ int mvme147_detect(Scsi_Host_Template *tpnt)
     m147_pcc->dma_intr = 0x89;		/* Ack and enable ints */
 
     return 1;
+
+ err_free_irq:
+    free_irq(MVME147_IRQ_SCSI_PORT, mvme147_intr);
+ err_unregister:
+    wd33c93_release();
+    scsi_unregister(mvme147_host);
+ err_out:
+    return 0;
 }
 
 #define HOSTS_C

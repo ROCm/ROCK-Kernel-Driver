@@ -17,23 +17,24 @@
 
 	See the file COPYING in this distribution for more information.
 
-	TODO:
+	TODO, in rough priority order:
 	* dev->tx_timeout
-	* Constants (module parms?) for Rx work limit
-	* support 64-bit PCI DMA
-	* ETHTOOL_[GS]SET, ETHTOOL_GREGS, ETHTOOL_[GS]WOL,
-	  ETHTOOL_[GS]MSGLVL, ETHTOOL_NWAY_RST
-	* Complete reset on PciErr
-	* LinkChg and LenChg interrupts
-	* Consider Rx interrupt mitigation using TimerIntr
-	* Implement 8139C+ statistics dump
+	* LinkChg interrupt
+	* ETHTOOL_[GS]SET
 	* Support forcing media type with a module parameter,
 	  like dl2k.c/sundance.c
+	* Implement PCI suspend/resume
+	* Constants (module parms?) for Rx work limit
+	* support 64-bit PCI DMA
+	* Complete reset on PciErr
+	* Consider Rx interrupt mitigation using TimerIntr
+	* Implement 8139C+ statistics dump; maybe not...
+	  h/w stats can be reset only by software reset
 	* Rx checksumming
 	* Tx checksumming
+	* ETHTOOL_GREGS, ETHTOOL_[GS]WOL,
+	  ETHTOOL_[GS]MSGLVL, ETHTOOL_NWAY_RST
 	* Jumbo frames / dev->change_mtu
-	* Tx abort stops Tx DMA?
-	* Investigate IntrStatus bit 10 purpose and use
 	* Investigate using skb->priority with h/w VLAN priority
 	* Investigate using High Priority Tx Queue with skb->priority
 	* Adjust Rx FIFO threshold and Max Rx DMA burst on Rx FIFO error

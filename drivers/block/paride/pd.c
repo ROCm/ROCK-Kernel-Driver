@@ -354,6 +354,7 @@ static struct gendisk pd_gendisk = {
 };
 
 static struct block_device_operations pd_fops = {
+	owner:			THIS_MODULE,
         open:			pd_open,
         release:		pd_release,
         ioctl:			pd_ioctl,
@@ -429,8 +430,6 @@ static int pd_open (struct inode *inode, struct file *file)
 {       int unit = DEVICE_NR(inode->i_rdev);
 
         if ((unit >= PD_UNITS) || (!PD.present)) return -ENODEV;
-
-        MOD_INC_USE_COUNT;
 
 	wait_event (pd_wait_open, pd_valid);
 
@@ -515,8 +514,6 @@ static int pd_release (struct inode *inode, struct file *file)
 
         if (!PD.access && PD.removable)
 		pd_doorlock(unit,IDE_DOORUNLOCK);
-
-        MOD_DEC_USE_COUNT;
 
 	return 0;
 }

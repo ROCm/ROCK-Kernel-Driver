@@ -31,6 +31,7 @@
 
 #include <linux/delay.h>
 #include <linux/if_ether.h>
+#include <asm/byteorder.h>
 
 /*
  * Limits and constants

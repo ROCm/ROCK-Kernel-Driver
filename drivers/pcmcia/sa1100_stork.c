@@ -161,7 +161,7 @@ static int stork_pcmcia_configure_socket(const struct pcmcia_configure *configur
 */
 	switch (configure->vcc) {
 	case 0:
-		storkClearLatchA(STORK_PCMCIA_PULL_UPS_POWER_ON);
+/*		storkClearLatchA(STORK_PCMCIA_PULL_UPS_POWER_ON); */
                 storkClearLatchA(POWER);
 		break;
 

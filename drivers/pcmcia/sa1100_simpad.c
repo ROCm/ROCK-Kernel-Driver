@@ -1,5 +1,5 @@
 /*
- * drivers/pcmcia/sa1100_pangolin.c
+ * drivers/pcmcia/sa1100_simpad.c
  *
  * PCMCIA implementation routines for simpad
  *
@@ -10,16 +10,23 @@
 #include <asm/hardware.h>
 #include <asm/irq.h>
 #include <asm/arch/pcmcia.h>
+ 
+extern long get_cs3_shadow(void);
+extern void set_cs3_bit(int value); 
+extern void clear_cs3_bit(int value);
+
 
 static int simpad_pcmcia_init(struct pcmcia_init *init){
   int irq, res;
 
   /* set GPIO_CF_CD & GPIO_CF_IRQ as inputs */
   GPDR &= ~(GPIO_CF_CD|GPIO_CF_IRQ);
-  //init_simpad_cs3();
-  printk("\nCS3:%x\n",cs3_shadow);
-  PCMCIA_setbit(PCMCIA_RESET);
-  PCMCIA_clearbit(PCMCIA_BUFF_DIS);
+  
+  set_cs3_bit(PCMCIA_RESET);
+  clear_cs3_bit(PCMCIA_BUFF_DIS);
+  clear_cs3_bit(PCMCIA_RESET);
+
+  clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
 
   /* Set transition detect */
   set_GPIO_IRQ_edge( GPIO_CF_CD, GPIO_BOTH_EDGES );
@@ -42,11 +49,12 @@ static int simpad_pcmcia_shutdown(void)
 {
   /* disable IRQs */
   free_irq( IRQ_GPIO_CF_CD, NULL );
-
+  
   /* Disable CF bus: */
-
-  PCMCIA_setbit(PCMCIA_BUFF_DIS);
-  PCMCIA_clearbit(PCMCIA_RESET);
+  
+  //set_cs3_bit(PCMCIA_BUFF_DIS);
+  clear_cs3_bit(PCMCIA_RESET);       
+  
   return 0;
 }
 
@@ -54,10 +62,11 @@ static int simpad_pcmcia_socket_state(struct pcmcia_state_array
 				       *state_array)
 {
   unsigned long levels;
+  unsigned long *cs3reg = CS3_BASE;
 
   if(state_array->size<2) return -1;
 
-  memset(state_array->state, 0,
+  memset(state_array->state, 0, 
 	 (state_array->size)*sizeof(struct pcmcia_state));
 
   levels=GPLR;
@@ -72,10 +81,15 @@ static int simpad_pcmcia_socket_state(struct pcmcia_state_array
 
   state_array->state[1].wrprot=0; /* Not available on Simpad. */
 
-  state_array->state[1].vs_3v=1;  /* Can only apply 3.3V on Simpad. */
-
-  state_array->state[1].vs_Xv=0;
-
+  
+  if((*cs3reg & 0x0c) == 0x0c) {
+    state_array->state[1].vs_3v=0;
+    state_array->state[1].vs_Xv=0;
+  } else
+  {
+    state_array->state[1].vs_3v=1;
+    state_array->state[1].vs_Xv=0;
+  }
   return 1;
 }
 
@@ -100,21 +114,27 @@ static int simpad_pcmcia_configure_socket(const struct pcmcia_configure
 
   save_flags_cli(flags);
 
-  /* Murphy: BUS_ON different from POWER ? */
+  /* Murphy: see table of MIC2562a-1 */
 
   switch(configure->vcc){
   case 0:
-    PCMCIA_setbit(PCMCIA_BUFF_DIS);
+    clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
     break;
 
-  case 33:
+  case 33:  
+    clear_cs3_bit(VCC_3V_EN|EN0);
+    set_cs3_bit(VCC_5V_EN|EN1);
+    break;
+
   case 50:
-    PCMCIA_setbit(PCMCIA_BUFF_DIS);
+    clear_cs3_bit(VCC_5V_EN|EN1);
+    set_cs3_bit(VCC_3V_EN|EN0);
     break;
 
   default:
     printk(KERN_ERR "%s(): unrecognized Vcc %u\n", __FUNCTION__,
 	   configure->vcc);
+    clear_cs3_bit(VCC_3V_EN|VCC_5V_EN|EN0|EN1);
     restore_flags(flags);
     return -1;
   }
@@ -126,7 +146,7 @@ static int simpad_pcmcia_configure_socket(const struct pcmcia_configure
   return 0;
 }
 
-struct pcmcia_low_level simpad_pcmcia_ops = {
+struct pcmcia_low_level simpad_pcmcia_ops = { 
   simpad_pcmcia_init,
   simpad_pcmcia_shutdown,
   simpad_pcmcia_socket_state,

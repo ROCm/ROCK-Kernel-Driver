@@ -34,6 +34,11 @@
 
 #define SA1111_SAC_DMA_MIN_XFER	(0x800)
 
+/*
+ * SA1111 register definitions.
+ */
+#define __CCREG(x)	__REGP(SA1111_VBASE + (x))
+
 /* System Bus Interface (SBI)
  *
  * Registers
@@ -42,15 +47,15 @@
  *    SKID	ID Register
  */
 
-#define _SBI_SKCR	_SA1111( 0x0000 )
-#define _SBI_SMCR	_SA1111( 0x0004 )
-#define _SBI_SKID	_SA1111( 0x0008 )
+#define _SBI_SKCR	_SA1111(0x0000)
+#define _SBI_SMCR	_SA1111(0x0004)
+#define _SBI_SKID	_SA1111(0x0008)
 
 #if LANGUAGE == C
 
-#define SBI_SKCR	(*((volatile Word *) SA1111_p2v (_SBI_SKCR)))
-#define SBI_SMCR	(*((volatile Word *) SA1111_p2v (_SBI_SMCR)))
-#define SBI_SKID	(*((volatile Word *) SA1111_p2v (_SBI_SKID)))
+#define SBI_SKCR	__CCREG(0x0000)
+#define SBI_SMCR	__CCREG(0x0004)
+#define SBI_SKID	__CCREG(0x0008)
 
 #endif  /* LANGUAGE == C */
 
@@ -120,15 +125,15 @@
 
 #if LANGUAGE == C
 
-#define SKPCR		(*((volatile Word *) SA1111_p2v (_SKPCR)))
-#define SKCDR		(*((volatile Word *) SA1111_p2v (_SKCDR)))
-#define SKAUD		(*((volatile Word *) SA1111_p2v (_SKAUD)))
-#define SKPMC		(*((volatile Word *) SA1111_p2v (_SKPMC)))
-#define SKPTC		(*((volatile Word *) SA1111_p2v (_SKPTC)))
-#define SKPEN0		(*((volatile Word *) SA1111_p2v (_SKPEN0)))
-#define SKPWM0		(*((volatile Word *) SA1111_p2v (_SKPWM0)))
-#define SKPEN1		(*((volatile Word *) SA1111_p2v (_SKPEN1)))
-#define SKPWM1		(*((volatile Word *) SA1111_p2v (_SKPWM1)))
+#define SKPCR		__CCREG(0x0200)
+#define SKCDR		__CCREG(0x0204)
+#define SKAUD		__CCREG(0x0208)
+#define SKPMC		__CCREG(0x020c)
+#define SKPTC		__CCREG(0x0210)
+#define SKPEN0		__CCREG(0x0214)
+#define SKPWM0		__CCREG(0x0218)
+#define SKPEN1		__CCREG(0x021c)
+#define SKPWM1		__CCREG(0x0220)
 
 #endif  /* LANGUAGE == C */
 
@@ -154,10 +159,10 @@
 
 #if LANGUAGE == C
 
-#define USB_OHCI_OP_BASE	(*((volatile Word *) SA1111_p2v (_USB_OHCI_OP_BASE)))
-#define USB_STATUS		(*((volatile Word *) SA1111_p2v (_USB_STATUS)))
-#define USB_RESET		(*((volatile Word *) SA1111_p2v (_USB_RESET)))
-#define USB_INTERRUPTEST	(*((volatile Word *) SA1111_p2v (_USB_INTERRUPTEST)))
+#define USB_OHCI_OP_BASE	__CCREG(0x0400)
+#define USB_STATUS		__CCREG(0x0518)
+#define USB_RESET		__CCREG(0x051c)
+#define USB_INTERRUPTEST	__CCReG(0x0520)
 
 #endif  /* LANGUAGE == C */
 
@@ -227,30 +232,30 @@
 
 #if LANGUAGE == C
 
-#define SACR0		(*((volatile Word *) SA1111_p2v (_SACR0)))
-#define SACR1		(*((volatile Word *) SA1111_p2v (_SACR1)))
-#define SACR2		(*((volatile Word *) SA1111_p2v (_SACR2)))
-#define SASR0		(*((volatile Word *) SA1111_p2v (_SASR0)))
-#define SASR1		(*((volatile Word *) SA1111_p2v (_SASR1)))
-#define SASCR		(*((volatile Word *) SA1111_p2v (_SASCR)))
-#define L3_CAR		(*((volatile Word *) SA1111_p2v (_L3_CAR)))
-#define L3_CDR		(*((volatile Word *) SA1111_p2v (_L3_CDR)))
-#define ACCAR		(*((volatile Word *) SA1111_p2v (_ACCAR)))
-#define ACCDR		(*((volatile Word *) SA1111_p2v (_ACCDR)))
-#define ACSAR		(*((volatile Word *) SA1111_p2v (_ACSAR)))
-#define ACSDR		(*((volatile Word *) SA1111_p2v (_ACSDR)))
-#define SADTCS		(*((volatile Word *) SA1111_p2v (_SADTCS)))
-#define SADTSA		(*((volatile Word *) SA1111_p2v (_SADTSA)))
-#define SADTCA		(*((volatile Word *) SA1111_p2v (_SADTCA)))
-#define SADTSB		(*((volatile Word *) SA1111_p2v (_SADTSB)))
-#define SADTCB		(*((volatile Word *) SA1111_p2v (_SADTCB)))
-#define SADRCS		(*((volatile Word *) SA1111_p2v (_SADRCS)))
-#define SADRSA		(*((volatile Word *) SA1111_p2v (_SADRSA)))
-#define SADRCA		(*((volatile Word *) SA1111_p2v (_SADRCA)))
-#define SADRSB		(*((volatile Word *) SA1111_p2v (_SADRSB)))
-#define SADRCB		(*((volatile Word *) SA1111_p2v (_SADRCB)))
-#define SAITR		(*((volatile Word *) SA1111_p2v (_SAITR)))
-#define SADR		(*((volatile Word *) SA1111_p2v (_SADR)))
+#define SACR0		__CCREG(0x0600)
+#define SACR1		__CCREG(0x0604)
+#define SACR2		__CCREG(0x0608)
+#define SASR0		__CCREG(0x060c)
+#define SASR1		__CCREG(0x0610)
+#define SASCR		__CCREG(0x0618)
+#define L3_CAR		__CCREG(0x061c)
+#define L3_CDR		__CCREG(0x0620)
+#define ACCAR		__CCREG(0x0624)
+#define ACCDR		__CCREG(0x0628)
+#define ACSAR		__CCREG(0x062c)
+#define ACSDR		__CCREG(0x0630)
+#define SADTCS		__CCREG(0x0634)
+#define SADTSA		__CCREG(0x0638)
+#define SADTCA		__CCREG(0x063c)
+#define SADTSB		__CCREG(0x0640)
+#define SADTCB		__CCREG(0x0644)
+#define SADRCS		__CCREG(0x0648)
+#define SADRSA		__CCREG(0x064c)
+#define SADRCA		__CCREG(0x0650)
+#define SADRSB		__CCREG(0x0654)
+#define SADRCB		__CCREG(0x0658)
+#define SAITR		__CCREG(0x065c)
+#define SADR		__CCREG(0x0680)
 
 #endif  /* LANGUAGE == C */
 
@@ -376,21 +381,21 @@
 
 #if LANGUAGE == C
 
-#define PA_DDR		(*((volatile Word *) SA1111_p2v (_PA_DDR)))
-#define PA_DRR		(*((volatile Word *) SA1111_p2v (_PA_DRR)))
-#define PA_DWR		(*((volatile Word *) SA1111_p2v (_PA_DWR)))
-#define PA_SDR		(*((volatile Word *) SA1111_p2v (_PA_SDR)))
-#define PA_SSR		(*((volatile Word *) SA1111_p2v (_PA_SSR)))
-#define PB_DDR		(*((volatile Word *) SA1111_p2v (_PB_DDR)))
-#define PB_DRR		(*((volatile Word *) SA1111_p2v (_PB_DRR)))
-#define PB_DWR		(*((volatile Word *) SA1111_p2v (_PB_DWR)))
-#define PB_SDR		(*((volatile Word *) SA1111_p2v (_PB_SDR)))
-#define PB_SSR		(*((volatile Word *) SA1111_p2v (_PB_SSR)))
-#define PC_DDR		(*((volatile Word *) SA1111_p2v (_PC_DDR)))
-#define PC_DRR		(*((volatile Word *) SA1111_p2v (_PC_DRR)))
-#define PC_DWR		(*((volatile Word *) SA1111_p2v (_PC_DWR)))
-#define PC_SDR		(*((volatile Word *) SA1111_p2v (_PC_SDR)))
-#define PC_SSR		(*((volatile Word *) SA1111_p2v (_PC_SSR)))
+#define PA_DDR		__CCREG(0x1000)
+#define PA_DRR		__CCREG(0x1004)
+#define PA_DWR		__CCREG(0x1004)
+#define PA_SDR		__CCREG(0x1008)
+#define PA_SSR		__CCREG(0x100c)
+#define PB_DDR		__CCREG(0x1010)
+#define PB_DRR		__CCREG(0x1014)
+#define PB_DWR		__CCREG(0x1014)
+#define PB_SDR		__CCREG(0x1018)
+#define PB_SSR		__CCREG(0x101c)
+#define PC_DDR		__CCREG(0x1020)
+#define PC_DRR		__CCREG(0x1024)
+#define PC_DWR		__CCREG(0x1024)
+#define PC_SDR		__CCREG(0x1028)
+#define PC_SSR		__CCREG(0x102c)
 
 #endif  /* LANGUAGE == C */
 
@@ -433,21 +438,21 @@
 
 #if LANGUAGE == C
 
-#define INTTEST0	(*((volatile Word *) SA1111_p2v (_INTTEST0)))
-#define INTTEST1	(*((volatile Word *) SA1111_p2v (_INTTEST1)))
-#define INTEN0		(*((volatile Word *) SA1111_p2v (_INTEN0)))
-#define INTEN1		(*((volatile Word *) SA1111_p2v (_INTEN1)))
-#define INTPOL0		(*((volatile Word *) SA1111_p2v (_INTPOL0)))
-#define INTPOL1		(*((volatile Word *) SA1111_p2v (_INTPOL1)))
-#define INTTSTSEL	(*((volatile Word *) SA1111_p2v (_INTTSTSEL)))
-#define INTSTATCLR0	(*((volatile Word *) SA1111_p2v (_INTSTATCLR0)))
-#define INTSTATCLR1	(*((volatile Word *) SA1111_p2v (_INTSTATCLR1)))
-#define INTSET0		(*((volatile Word *) SA1111_p2v (_INTSET0)))
-#define INTSET1		(*((volatile Word *) SA1111_p2v (_INTSET1)))
-#define WAKE_EN0	(*((volatile Word *) SA1111_p2v (_WAKE_EN0)))
-#define WAKE_EN1	(*((volatile Word *) SA1111_p2v (_WAKE_EN1)))
-#define WAKE_POL0	(*((volatile Word *) SA1111_p2v (_WAKE_POL0)))
-#define WAKE_POL1	(*((volatile Word *) SA1111_p2v (_WAKE_POL1)))
+#define INTTEST0	__CCREG(0x1600)
+#define INTTEST1	__CCREG(0x1604)
+#define INTEN0		__CCREG(0x1608)
+#define INTEN1		__CCREG(0x160c)
+#define INTPOL0		__CCREG(0x1610)
+#define INTPOL1		__CCREG(0x1614)
+#define INTTSTSEL	__CCREG(0x1618)
+#define INTSTATCLR0	__CCREG(0x161c)
+#define INTSTATCLR1	__CCREG(0x1620)
+#define INTSET0		__CCREG(0x1624)
+#define INTSET1		__CCREG(0x1628)
+#define WAKE_EN0	__CCREG(0x162c)
+#define WAKE_EN1	__CCREG(0x1630)
+#define WAKE_POL0	__CCREG(0x1634)
+#define WAKE_POL1	__CCREG(0x1638)
 
 #endif  /* LANGUAGE == C */
 
@@ -479,12 +484,12 @@
 #define _KBD( x )   _SA1111( 0x0A00 )
 #define _MSE( x )   _SA1111( 0x0C00 )
 
-#define _KBDCR      _SA1111( 0x0A00 )
+#define _KBDCR	    _SA1111( 0x0A00 )
 #define _KBDSTAT    _SA1111( 0x0A04 )
 #define _KBDDATA    _SA1111( 0x0A08 )
 #define _KBDCLKDIV  _SA1111( 0x0A0C )
 #define _KBDPRECNT  _SA1111( 0x0A10 )
-#define _MSECR      _SA1111( 0x0C00 )
+#define _MSECR	    _SA1111( 0x0C00 )
 #define _MSESTAT    _SA1111( 0x0C04 )
 #define _MSEDATA    _SA1111( 0x0C08 )
 #define _MSECLKDIV  _SA1111( 0x0C0C )
@@ -492,24 +497,16 @@
 
 #if ( LANGUAGE == C )
 
-#define KBDCR       (*((volatile Word *) SA1111_p2v (_KBDCR)))
-#define KBDSTAT     (*((volatile Word *) SA1111_p2v (_KBDSTAT)))
-#define KBDDATA     (*((volatile Word *) SA1111_p2v (_KBDDATA)))
-#define KBDCLKDIV   (*((volatile Word *) SA1111_p2v (_KBDCLKDIV)))
-#define KBDPRECNT   (*((volatile Word *) SA1111_p2v (_KBDPRECNT)))
-#define KBDTEST1    (*((volatile Word *) SA1111_p2v (_KBDTEST1)))
-#define KBDTEST2    (*((volatile Word *) SA1111_p2v (_KBDTEST2)))
-#define KBDTEST3    (*((volatile Word *) SA1111_p2v (_KBDTEST3)))
-#define KBDTEST4    (*((volatile Word *) SA1111_p2v (_KBDTEST4)))
-#define MSECR       (*((volatile Word *) SA1111_p2v (_MSECR)))
-#define MSESTAT     (*((volatile Word *) SA1111_p2v (_MSESTAT)))
-#define MSEDATA     (*((volatile Word *) SA1111_p2v (_MSEDATA)))
-#define MSECLKDIV   (*((volatile Word *) SA1111_p2v (_MSECLKDIV)))
-#define MSEPRECNT   (*((volatile Word *) SA1111_p2v (_MSEPRECNT)))
-#define MSETEST1    (*((volatile Word *) SA1111_p2v (_MSETEST1)))
-#define MSETEST2    (*((volatile Word *) SA1111_p2v (_MSETEST2)))
-#define MSETEST3    (*((volatile Word *) SA1111_p2v (_MSETEST3)))
-#define MSETEST4    (*((volatile Word *) SA1111_p2v (_MSETEST4)))
+#define KBDCR		__CCREG(0x0a00)
+#define KBDSTAT		__CCREG(0x0a04)
+#define KBDDATA		__CCREG(0x0a08)
+#define KBDCLKDIV	__CCREG(0x0a0c)
+#define KBDPRECNT	__CCREG(0x0a10)
+#define MSECR		__CCREG(0x0c00)
+#define MSESTAT		__CCREG(0x0c04)
+#define MSEDATA		__CCREG(0x0c08)
+#define MSECLKDIV	__CCREG(0x0c0c)
+#define MSEPRECNT	__CCREG(0x0c10)
 
 #define KBDCR_ENA        0x08
 #define KBDCR_FKD        0x02
@@ -614,9 +611,9 @@
 
 #if LANGUAGE == C
 
-#define PCCR		(*((volatile Word *) SA1111_p2v (_PCCR)))
-#define PCSSR		(*((volatile Word *) SA1111_p2v (_PCSSR)))
-#define PCSR		(*((volatile Word *) SA1111_p2v (_PCSR)))
+#define PCCR		__CCREG(0x1800)
+#define PCSSR		__CCREG(0x1804)
+#define PCSR		__CCREG(0x1808)
 
 #endif  /* LANGUAGE == C */
 

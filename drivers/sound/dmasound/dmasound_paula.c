@@ -720,3 +720,4 @@ static void __exit dmasound_paula_cleanup(void)
 
 module_init(dmasound_paula_init);
 module_exit(dmasound_paula_cleanup);
+MODULE_LICENSE("GPL");

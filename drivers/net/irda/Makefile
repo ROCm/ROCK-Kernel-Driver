@@ -1,3 +1,4 @@
+# File: drivers/irda/Makefile
 #
 # Makefile for the Linux IrDA infrared port device drivers.
 #
@@ -15,6 +16,7 @@ obj-$(CONFIG_IRPORT_SIR)	+= 		irport.o
 obj-$(CONFIG_USB_IRDA)		+= irda-usb.o
 obj-$(CONFIG_NSC_FIR)		+= nsc-ircc.o
 obj-$(CONFIG_WINBOND_FIR)	+= w83977af_ir.o
+obj-$(CONFIG_SA1100_FIR)	+= sa1100_ir.o
 obj-$(CONFIG_TOSHIBA_FIR)	+= toshoboe.o
 obj-$(CONFIG_SMC_IRCC_FIR)	+= smc-ircc.o	irport.o
 obj-$(CONFIG_ALI_FIR)		+= ali-ircc.o
@@ -25,5 +27,6 @@ obj-$(CONFIG_ACTISYS_DONGLE)	+= actisys.o
 obj-$(CONFIG_GIRBIL_DONGLE)	+= girbil.o
 obj-$(CONFIG_LITELINK_DONGLE)	+= litelink.o
 obj-$(CONFIG_OLD_BELKIN_DONGLE)	+= old_belkin.o
+obj-$(CONFIG_EP7211_IR)		+= ep7211_ir.o
 
 include $(TOPDIR)/Rules.make

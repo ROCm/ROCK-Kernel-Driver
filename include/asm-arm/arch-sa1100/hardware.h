@@ -59,6 +59,31 @@
 #define io_v2p( x )             \
    ( (((x)&0x00ffffff) | (((x)&(0x30000000>>VIO_SHIFT))<<VIO_SHIFT)) + PIO_START )
 
+#ifndef __ASSEMBLY__
+
+#if 0
+# define __REG(x)	(*((volatile unsigned long *)io_p2v(x)))
+#else
+/*
+ * This __REG() version gives the same results as the one above,  except
+ * that we are fooling gcc somehow so it generates far better and smaller
+ * assembly code for access to contigous registers.  It's a shame that gcc
+ * doesn't guess this by itself.
+ */
+typedef struct { volatile unsigned long offset[4096]; } __regbase;
+# define __REGP(x)	((__regbase *)((x)&~4095))->offset[((x)&4095)>>2]
+# define __REG(x)	__REGP(io_p2v(x))
+#endif
+
+# define __PREG(x)	(io_v2p((unsigned long)&(x)))
+
+#else
+
+# define __REG(x)	io_p2v(x)
+# define __PREG(x)	io_v2p(x)
+
+#endif
+
 #include "SA-1100.h"
 
 
@@ -83,19 +108,17 @@ extern unsigned short get_cclk_frequency(void);
 
 
 /*
- * Implementation specifics
+ * Implementation specifics.
+ *
+ * *** NOTE ***
+ * Any definitions in these files should be prefixed by an identifier -
+ * eg, ASSABET_UCB1300_IRQ  This will allow us to eleminate these
+ * ifdefs, and lots of other preprocessor gunk elsewhere.
  */
 
 #ifdef CONFIG_SA1100_PANGOLIN
 #include "pangolin.h"
 #endif
-
-#ifdef CONFIG_SA1100_ASSABET
-#include "assabet.h"
-#else
-#define machine_has_neponset()	(0)
-#endif
-
 
 #ifdef CONFIG_SA1100_HUW_WEBPANEL
 #include "huw_webpanel.h"
@@ -190,8 +213,14 @@ extern unsigned short get_cclk_frequency(void);
 
 #ifdef CONFIG_SA1111
 
-#define SA1111_p2v( x )         ((x) - SA1111_BASE + 0xf4000000)
-#define SA1111_v2p( x )         ((x) - 0xf4000000 + SA1111_BASE)
+/*
+ * The SA1111 is always located at virtual 0xf4000000.
+ */
+
+#define SA1111_VBASE		0xf4000000
+
+#define SA1111_p2v( x )         ((x) - SA1111_BASE + SA1111_VBASE)
+#define SA1111_v2p( x )         ((x) - SA1111_VBASE + SA1111_BASE)
 
 #include "SA-1111.h"
 

@@ -16,6 +16,7 @@
 #include <linux/config.h>
 #include "entry-header.S"
 
+
 #ifdef IOC_BASE
 /* IOC / IOMD based hardware */
 #include <asm/hardware/iomd.h>
@@ -494,6 +495,27 @@ ENTRY(soft_irq_mask)
 		addeq	\irqnr, \irqnr, #1
 		moveq	\stat, \stat, lsr #1
 		tst	\stat, #1			@ bit 0 should be set
+		.endm
+
+		.macro	irq_prio_table
+		.endm
+	
+#elif defined (CONFIG_ARCH_CAMELOT)
+#include <asm/arch/platform.h>
+#undef IRQ_MODE /* same name defined in asm/proc/ptrace.h */
+#include <asm/arch/int_ctrl00.h>
+	
+		.macro	disable_fiq
+		.endm
+
+		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+	
+		ldr	\irqstat, =INT_ID(IO_ADDRESS(EXC_INT_CTRL00_BASE))
+		ldr	\irqnr,[\irqstat]		
+		cmp	\irqnr,#0
+		subne	\irqnr,\irqnr,#1
+
+	
 		.endm
 
 		.macro	irq_prio_table

@@ -17,9 +17,6 @@
 Disclaimer
 ----------
 
-THIS DRIVER IS A DEVELOPMENT RELEASE FOR A DEVELOPMENT KERNEL.  DO NOT
-USE IN A PRODUCTION ENVIRONMENT.
-
 DO NOT CONTACT DONALD BECKER FOR SUPPORT OF THIS DRIVER, his driver is
 completely different and maintained independently of the 8139too code base.
 
@@ -95,6 +92,7 @@ OPTION 2: Build outside kernel tree
 Tested Adapters
 ---------------
 AOpen ALN-325C
+AT-2500TX 10/100 PCI Fast Ethernet Network Adapter Card
 KTI KF-230TX
 KTI KF-230TX/2
 Lantech FastNet TX

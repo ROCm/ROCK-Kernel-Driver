@@ -803,9 +803,10 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 			outw(HCCR_CLEAR_RISC_INTR, host->io_port + HOST_HCCR);
 			isp2x00_enable_irqs(host);
 			/* wait for the loop to come up */
-			for (wait_time = jiffies + 10 * HZ; wait_time > jiffies && hostdata->adapter_state == AS_LOOP_DOWN;)
+			for (wait_time = jiffies + 10 * HZ; wait_time > jiffies && hostdata->adapter_state == AS_LOOP_DOWN;) {
 			        barrier();
-
+				cpu_relax();
+			}
 			if (hostdata->adapter_state == AS_LOOP_DOWN) {
 			        printk("qlogicfc%d : link is not up\n", hostdata->host_id);
 			}
@@ -819,8 +820,10 @@ int isp2x00_detect(Scsi_Host_Template * tmpt)
 	   some time before recognizing it is attached to a fabric */
 
 #if ISP2x00_FABRIC
-	for (wait_time = jiffies + 5 * HZ; wait_time > jiffies;)
+	for (wait_time = jiffies + 5 * HZ; wait_time > jiffies;) {
 		barrier();
+		cpu_relax();
+	}
 #endif
 
 	LEAVE("isp2x00_detect");
@@ -1840,8 +1843,10 @@ static int isp2x00_reset_hardware(struct Scsi_Host *host)
 	outw(HCCR_BIOS_DISABLE, host->io_port + HOST_HCCR);
 
 	loop_count = DEFAULT_LOOP_COUNT;
-	while (--loop_count && inw(host->io_port + HOST_HCCR) == RISC_BUSY)
+	while (--loop_count && inw(host->io_port + HOST_HCCR) == RISC_BUSY) {
 		barrier();
+		cpu_relax();
+	}
 	if (!loop_count)
 		printk("qlogicfc%d : reset_hardware loop timeout\n", hostdata->host_id);
 
@@ -2118,8 +2123,10 @@ static int isp2x00_mbox_command(struct Scsi_Host *host, u_short param[])
 		return 1;
 
 	loop_count = DEFAULT_LOOP_COUNT;
-	while (--loop_count && inw(host->io_port + HOST_HCCR) & 0x0080)
+	while (--loop_count && inw(host->io_port + HOST_HCCR) & 0x0080) {
 		barrier();
+		cpu_relax();
+	}
 	if (!loop_count) {
 		printk("qlogicfc%d : mbox_command loop timeout #1\n", hostdata->host_id);
 		param[0] = 0x4006;
@@ -2153,8 +2160,9 @@ static int isp2x00_mbox_command(struct Scsi_Host *host, u_short param[])
 
 	while (1) {
 		loop_count = DEFAULT_LOOP_COUNT;
-		while (--loop_count && !(inw(host->io_port + PCI_INTER_STS) & 0x08)) {
+		while (--loop_count && !(inw(host->io_port + PCI_INTER_STS) & 0x08)) { 
 			barrier();
+			cpu_relax();
 		}
 
 		if (!loop_count) {
@@ -2172,6 +2180,7 @@ static int isp2x00_mbox_command(struct Scsi_Host *host, u_short param[])
 	loop_count = DEFAULT_LOOP_COUNT;
 	while (--loop_count && inw(host->io_port + MBOX0) == 0x04) {
 		barrier();
+		cpu_relax();
 	}
 	if (!loop_count)
 		printk("qlogicfc%d : mbox_command loop timeout #3\n", hostdata->host_id);

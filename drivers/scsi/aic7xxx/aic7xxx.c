@@ -2,6 +2,7 @@
  * Core routines and tables shareable across OS platforms.
  *
  * Copyright (c) 1994-2001 Justin T. Gibbs.
+ * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,25 +11,33 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
  *    without modification.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * Alternatively, this software may be distributed under the terms of the
- * GNU General Public License ("GPL").
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/src/aic7xxx/aic7xxx.c#44 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#50 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.c,v 1.61 2000/11/13 03:35:43 gibbs Exp $
  */
@@ -129,6 +138,7 @@ static struct ahc_syncrate ahc_syncrates[] =
 #include "aic7xxx_seq.h"
 
 /**************************** Function Declarations ***************************/
+static void		ahc_force_renegotiation(struct ahc_softc *ahc);
 static struct ahc_tmode_tstate*
 			ahc_alloc_tstate(struct ahc_softc *ahc,
 					 u_int scsi_id, char channel);
@@ -203,9 +213,6 @@ static u_int		ahc_rem_scb_from_disc_list(struct ahc_softc *ahc,
 static void		ahc_add_curscb_to_free_list(struct ahc_softc *ahc);
 static u_int		ahc_rem_wscb(struct ahc_softc *ahc,
 				     u_int scbpos, u_int prev);
-static int		ahc_abort_scbs(struct ahc_softc *ahc, int target,
-				       char channel, int lun, u_int tag,
-				       role_t role, uint32_t status);
 static void		ahc_reset_current_bus(struct ahc_softc *ahc);
 #ifdef AHC_DUMP_SEQ
 static void		ahc_dumpseq(struct ahc_softc *ahc);
@@ -240,6 +247,7 @@ ahc_restart(struct ahc_softc *ahc)
 	ahc_outb(ahc, SCSISIGO, 0);		/* De-assert BSY */
 	ahc_outb(ahc, MSG_OUT, MSG_NOOP);	/* No message to send */
 	ahc_outb(ahc, SXFRCTL1, ahc_inb(ahc, SXFRCTL1) & ~BITBUCKET);
+	ahc_outb(ahc, LASTPHASE, P_BUSFREE);
 
 	/*
 	 * Ensure that the sequencer's idea of TQINPOS
@@ -705,19 +713,20 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 					    MSG_TYPE_INITIATOR_MSGIN;
 					ahc->msgin_index = 0;
 				}
-			} else {
+			}
+#if AHC_TARGET_MODE
+			else {
 				if (bus_phase == P_MESGOUT) {
 					ahc->msg_type =
 					    MSG_TYPE_TARGET_MSGOUT;
 					ahc->msgin_index = 0;
 				}
-#if AHC_TARGET_MODE
 				else 
 					ahc_setup_target_msgin(ahc,
 							       &devinfo,
 							       scb);
-#endif
 			}
+#endif
 		}
 
 		ahc_handle_message_phase(ahc);
@@ -1063,10 +1072,16 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 			else
 				ahc_outb(ahc, MSG_OUT, mesg_out);
 		}
+		/*
+		 * Force a renegotiation with this target just in
+		 * case we are out of sync for some external reason
+		 * unknown (or unreported) by the target.
+		 */
+		ahc_force_renegotiation(ahc);
 		ahc_outb(ahc, CLRINT, CLRSCSIINT);
 		ahc_unpause(ahc);
 	} else if ((status & SELTO) != 0) {
-		u_int scbptr;
+		u_int	scbptr;
 
 		/* Stop the selection */
 		ahc_outb(ahc, SCSISEQ, 0);
@@ -1102,6 +1117,16 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 			ahc_freeze_devq(ahc, scb);
 		}
 		ahc_outb(ahc, CLRINT, CLRSCSIINT);
+		/*
+		 * Force a renegotiation with this target just in
+		 * case the cable was pulled and will later be
+		 * re-attached.  The target may forget its negotiation
+		 * settings with us should it attempt to reselect
+		 * during the interruption.  The target will not issue
+		 * a unit attention in this case, so we must always
+		 * renegotiate.
+		 */
+		ahc_force_renegotiation(ahc);
 		ahc_restart(ahc);
 	} else if ((status & BUSFREE) != 0
 		&& (ahc_inb(ahc, SIMODE1) & ENBUSFREE) != 0) {
@@ -1167,7 +1192,6 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 				printerror = 0;
 			} else if (ahc_sent_msg(ahc, AHCMSG_1B,
 						MSG_BUS_DEV_RESET, TRUE)) {
-				struct ahc_devinfo devinfo;
 #ifdef __FreeBSD__
 				/*
 				 * Don't mark the user's request for this BDR
@@ -1277,6 +1301,27 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 	}
 }
 
+/*
+ * Force renegotiation to occur the next time we initiate
+ * a command to the current device.
+ */
+static void
+ahc_force_renegotiation(struct ahc_softc *ahc)
+{
+	struct	ahc_devinfo devinfo;
+	struct	ahc_initiator_tinfo *targ_info;
+	struct	ahc_tmode_tstate *tstate;
+
+	ahc_fetch_devinfo(ahc, &devinfo);
+	targ_info = ahc_fetch_transinfo(ahc,
+					devinfo.channel,
+					devinfo.our_scsiid,
+					devinfo.target,
+					&tstate);
+	ahc_update_neg_request(ahc, &devinfo, tstate,
+			       targ_info, /*force*/TRUE);
+}
+
 #define AHC_MAX_STEPS 2000
 void
 ahc_clear_critical_section(struct ahc_softc *ahc)
@@ -1382,21 +1427,9 @@ ahc_print_scb(struct scb *scb)
 	       hscb->scsiid,
 	       hscb->lun,
 	       hscb->cdb_len);
-	printf("Shared Data: %#02x %#02x %#02x %#02x\n",
-	       hscb->shared_data.cdb[0],
-	       hscb->shared_data.cdb[1],
-	       hscb->shared_data.cdb[2],
-	       hscb->shared_data.cdb[3]);
-	printf("             %#02x %#02x %#02x %#02x\n",
-	       hscb->shared_data.cdb[4],
-	       hscb->shared_data.cdb[5],
-	       hscb->shared_data.cdb[6],
-	       hscb->shared_data.cdb[7]);
-	printf("             %#02x %#02x %#02x %#02x\n",
-	       hscb->shared_data.cdb[8],
-	       hscb->shared_data.cdb[9],
-	       hscb->shared_data.cdb[10],
-	       hscb->shared_data.cdb[11]);
+	printf("Shared Data: ");
+	for (i = 0; i < sizeof(hscb->shared_data.cdb); i++)
+		printf("%#02x", hscb->shared_data.cdb[i]);
 	printf("        dataptr:%#x datacnt:%#x sgptr:%#x tag:%#x\n",
 		ahc_le32toh(hscb->dataptr),
 		ahc_le32toh(hscb->datacnt),
@@ -2296,7 +2329,7 @@ ahc_construct_sdtr(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 }
 
 /*
- * Build a wide negotiateion message in our message
+ * Build a wide negotiation message in our message
  * buffer based on the input parameters.
  */
 static void
@@ -2358,6 +2391,8 @@ ahc_clear_msg_state(struct ahc_softc *ahc)
 		ahc_outb(ahc, CLRSINT1, CLRATNO);
 	}
 	ahc_outb(ahc, MSG_OUT, MSG_NOOP);
+	ahc_outb(ahc, SEQ_FLAGS2,
+		 ahc_inb(ahc, SEQ_FLAGS2) & ~TARGET_MSG_PENDING);
 }
 
 /*
@@ -2994,6 +3029,7 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 		}
 		break;
 	}
+#ifdef AHC_TARGET_MODE
 	case MSG_BUS_DEV_RESET:
 		ahc_handle_devreset(ahc, devinfo,
 				    CAM_BDR_SENT,
@@ -3005,18 +3041,20 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	case MSG_ABORT_TAG:
 	case MSG_ABORT:
 	case MSG_CLEAR_QUEUE:
-#ifdef AHC_TARGET_MODE
+	{
+		int tag;
+
 		/* Target mode messages */
 		if (devinfo->role != ROLE_TARGET) {
 			reject = TRUE;
 			break;
 		}
+		tag = SCB_LIST_NULL;
+		if (ahc->msgin_buf[0] == MSG_ABORT_TAG)
+			tag = ahc_inb(ahc, INITIATOR_TAG);
 		ahc_abort_scbs(ahc, devinfo->target, devinfo->channel,
-			       devinfo->lun,
-			       ahc->msgin_buf[0] == MSG_ABORT_TAG
-						  ? SCB_LIST_NULL
-						  : ahc_inb(ahc, INITIATOR_TAG),
-			       ROLE_TARGET, CAM_REQ_ABORTED);
+			       devinfo->lun, tag, ROLE_TARGET,
+			       CAM_REQ_ABORTED);
 
 		tstate = ahc->enabled_targets[devinfo->our_scsiid];
 		if (tstate != NULL) {
@@ -3027,12 +3065,14 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 				ahc_queue_lstate_event(ahc, lstate,
 						       devinfo->our_scsiid,
 						       ahc->msgin_buf[0],
-						       /*arg*/0);
+						       /*arg*/tag);
 				ahc_send_lstate_events(ahc, lstate);
 			}
 		}
-		done = MSGLOOP_MSGCOMPLETE;
+		ahc_restart(ahc);
+		done = MSGLOOP_TERMINATED;
 		break;
+	}
 #endif
 	case MSG_TERM_IO_PROC:
 	default:
@@ -3501,8 +3541,10 @@ ahc_softc_init(struct ahc_softc *ahc)
 {
 
 	/* The IRQMS bit is only valid on VL and EISA chips */
-	if ((ahc->chip & AHC_PCI) != 0)
-		ahc->unpause &= ~IRQMS;
+	if ((ahc->chip & AHC_PCI) == 0)
+		ahc->unpause = ahc_inb(ahc, HCNTRL) & IRQMS;
+	else
+		ahc->unpause = 0;
 	ahc->pause = ahc->unpause | PAUSE; 
 	/* XXX The shared scb data stuff should be deprecated */
 	if (ahc->scb_data == NULL) {
@@ -3842,11 +3884,11 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 
 	/* Allocate SCB resources */
 	scb_data->scbarray =
-	    (struct scb *)malloc(sizeof(struct scb) * AHC_SCB_MAX,
+	    (struct scb *)malloc(sizeof(struct scb) * AHC_SCB_MAX_ALLOC,
 				 M_DEVBUF, M_NOWAIT);
 	if (scb_data->scbarray == NULL)
 		return (ENOMEM);
-	memset(scb_data->scbarray, 0, sizeof(struct scb) * AHC_SCB_MAX);
+	memset(scb_data->scbarray, 0, sizeof(struct scb) * AHC_SCB_MAX_ALLOC);
 
 	/* Determine the number of hardware SCBs and initialize them */
 
@@ -3881,7 +3923,7 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
-			       AHC_SCB_MAX * sizeof(struct hardware_scb),
+			       AHC_SCB_MAX_ALLOC * sizeof(struct hardware_scb),
 			       /*nsegments*/1,
 			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
 			       /*flags*/0, &scb_data->hscb_dmat) != 0) {
@@ -3902,7 +3944,7 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 	/* And permanently map them */
 	ahc_dmamap_load(ahc, scb_data->hscb_dmat, scb_data->hscb_dmamap,
 			scb_data->hscbs,
-			AHC_SCB_MAX * sizeof(struct hardware_scb),
+			AHC_SCB_MAX_ALLOC * sizeof(struct hardware_scb),
 			ahc_dmamap_cb, &scb_data->hscb_busaddr, /*flags*/0);
 
 	scb_data->init_level++;
@@ -3913,7 +3955,7 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
-			       AHC_SCB_MAX * sizeof(struct scsi_sense_data),
+			       AHC_SCB_MAX_ALLOC * sizeof(struct scsi_sense_data),
 			       /*nsegments*/1,
 			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
 			       /*flags*/0, &scb_data->sense_dmat) != 0) {
@@ -3934,7 +3976,7 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 	/* And permanently map them */
 	ahc_dmamap_load(ahc, scb_data->sense_dmat, scb_data->sense_dmamap,
 			scb_data->sense,
-			AHC_SCB_MAX * sizeof(struct scsi_sense_data),
+			AHC_SCB_MAX_ALLOC * sizeof(struct scsi_sense_data),
 			ahc_dmamap_cb, &scb_data->sense_busaddr, /*flags*/0);
 
 	scb_data->init_level++;
@@ -3954,7 +3996,8 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 	scb_data->init_level++;
 
 	/* Perform initial CCB allocation */
-	memset(scb_data->hscbs, 0, AHC_SCB_MAX * sizeof(struct hardware_scb));
+	memset(scb_data->hscbs, 0,
+	       AHC_SCB_MAX_ALLOC * sizeof(struct hardware_scb));
 	ahc_alloc_scbs(ahc);
 
 	if (scb_data->numscbs == 0) {
@@ -4046,7 +4089,7 @@ ahc_alloc_scbs(struct ahc_softc *ahc)
 	int i;
 
 	scb_data = ahc->scb_data;
-	if (scb_data->numscbs >= AHC_SCB_MAX)
+	if (scb_data->numscbs >= AHC_SCB_MAX_ALLOC)
 		/* Can't allocate any more */
 		return;
 
@@ -4075,7 +4118,8 @@ ahc_alloc_scbs(struct ahc_softc *ahc)
 	physaddr = sg_map->sg_physaddr;
 
 	newcount = (PAGE_SIZE / (AHC_NSEG * sizeof(struct ahc_dma_seg)));
-	for (i = 0; scb_data->numscbs < AHC_SCB_MAX && i < newcount; i++) {
+	newcount = MIN(newcount, (AHC_SCB_MAX_ALLOC - scb_data->numscbs));
+	for (i = 0; i < newcount; i++) {
 		struct scb_platform_data *pdata;
 #ifndef __linux__
 		int error;
@@ -4147,7 +4191,7 @@ ahc_controller_info(struct ahc_softc *ahc, char *buf)
 
 	if ((ahc->flags & AHC_PAGESCBS) != 0)
 		sprintf(buf, "%d/%d SCBs",
-			ahc->scb_data->maxhscbs, AHC_SCB_MAX);
+			ahc->scb_data->maxhscbs, AHC_MAX_QUEUE);
 	else
 		sprintf(buf, "%d SCBs", ahc->scb_data->maxhscbs);
 }
@@ -4313,7 +4357,7 @@ ahc_init(struct ahc_softc *ahc)
 	ahc_outb(ahc, SEQ_FLAGS, 0);
 	ahc_outb(ahc, SEQ_FLAGS2, 0);
 
-	if (ahc->scb_data->maxhscbs < AHC_SCB_MAX) {
+	if (ahc->scb_data->maxhscbs < AHC_SCB_MAX_ALLOC) {
 		ahc->flags |= AHC_PAGESCBS;
 	} else {
 		ahc->flags &= ~AHC_PAGESCBS;
@@ -5517,24 +5561,40 @@ ahc_abort_scbs(struct ahc_softc *ahc, int target, char channel,
 		maxlun = lun + 1;
 	}
 
-	for (;i < maxtarget; i++) {
-		for (j = minlun;j < maxlun; j++)
-			ahc_unbusy_tcl(ahc, BUILD_TCL(i << 4, j));
+	if (role != ROLE_TARGET) {
+		for (;i < maxtarget; i++) {
+			for (j = minlun;j < maxlun; j++) {
+				u_int scbid;
+				u_int tcl;
+
+				tcl = BUILD_TCL(i << 4, j);
+				scbid = ahc_index_busy_tcl(ahc, tcl);
+				scbp = ahc_lookup_scb(ahc, scbid);
+				if (scbp == NULL
+				 || ahc_match_scb(ahc, scbp, target, channel,
+						  lun, tag, role) == 0)
+					continue;
+				ahc_unbusy_tcl(ahc, BUILD_TCL(i << 4, j));
+			}
+		}
+
+		/*
+		 * Go through the disconnected list and remove any entries we
+		 * have queued for completion, 0'ing their control byte too.
+		 * We save the active SCB and restore it ourselves, so there
+		 * is no reason for this search to restore it too.
+		 */
+		ahc_search_disc_list(ahc, target, channel, lun, tag,
+				     /*stop_on_first*/FALSE, /*remove*/TRUE,
+				     /*save_state*/FALSE);
 	}
 
 	/*
-	 * Go through the disconnected list and remove any entries we
-	 * have queued for completion, 0'ing their control byte too.
-	 * We save the active SCB and restore it ourselves, so there
-	 * is no reason for this search to restore it too.
-	 */
-	ahc_search_disc_list(ahc, target, channel, lun, tag,
-			     /*stop_on_first*/FALSE, /*remove*/TRUE,
-			     /*save_state*/FALSE);
-
-	/*
 	 * Go through the hardware SCB array looking for commands that
-	 * were active but not on any list.
+	 * were active but not on any list.  In some cases, these remnants
+	 * might not still have mappings in the scbindex array (e.g. unexpected
+	 * bus free with the same scb queued for an abort).  Don't hold this
+	 * against them.
 	 */
 	for (i = 0; i < ahc->scb_data->maxhscbs; i++) {
 		u_int scbid;
@@ -5542,8 +5602,9 @@ ahc_abort_scbs(struct ahc_softc *ahc, int target, char channel,
 		ahc_outb(ahc, SCBPTR, i);
 		scbid = ahc_inb(ahc, SCB_TAG);
 		scbp = ahc_lookup_scb(ahc, scbid);
-		if (scbp != NULL
-		 && ahc_match_scb(ahc, scbp, target, channel, lun, tag, role))
+		if ((scbp == NULL && scbid != SCB_LIST_NULL)
+		 || (scbp != NULL
+		  && ahc_match_scb(ahc, scbp, target, channel, lun, tag, role)))
 			ahc_add_curscb_to_free_list(ahc);
 	}
 

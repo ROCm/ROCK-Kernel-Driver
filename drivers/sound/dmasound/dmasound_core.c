@@ -135,6 +135,7 @@ MODULE_PARM(numWriteBufs, "i");
 MODULE_PARM(writeBufSize, "i");
 MODULE_PARM(numReadBufs, "i");
 MODULE_PARM(readBufSize, "i");
+MODULE_LICENSE("GPL");
 
 #ifdef MODULE
 static int sq_unit = -1;

@@ -232,7 +232,6 @@ printk("reading %p len %d\n",addr, len);
 #endif
 #undef STAT
 
-#ifndef HOSTS_C
 #define NCR5380_implementation_fields \
     int port, ctrl
 

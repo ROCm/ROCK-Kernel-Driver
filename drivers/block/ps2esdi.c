@@ -150,6 +150,7 @@ static struct ps2esdi_i_struct ps2esdi_info[MAX_HD] =
 
 static struct block_device_operations ps2esdi_fops =
 {
+	owner:		THIS_MODULE,
 	open:		ps2esdi_open,
 	release:	ps2esdi_release,
 	ioctl:		ps2esdi_ioctl,

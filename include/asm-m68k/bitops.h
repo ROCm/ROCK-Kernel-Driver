@@ -45,6 +45,8 @@ extern __inline__ int __generic_test_and_set_bit(int nr,volatile void * vaddr)
    __constant_set_bit(nr, vaddr) : \
    __generic_set_bit(nr, vaddr))
 
+#define __set_bit(nr,vaddr) set_bit(nr,vaddr) 
+
 extern __inline__ void __constant_set_bit(int nr, volatile void * vaddr)
 {
 	__asm__ __volatile__ ("bset %1,%0"
@@ -61,6 +63,8 @@ extern __inline__ void __generic_set_bit(int nr, volatile void * vaddr)
   (__builtin_constant_p(nr) ? \
    __constant_test_and_clear_bit(nr, vaddr) : \
    __generic_test_and_clear_bit(nr, vaddr))
+
+#define __test_and_clear_bit(nr,vaddr) test_and_clear_bit(nr,vaddr)
 
 extern __inline__ int __constant_test_and_clear_bit(int nr, volatile void * vaddr)
 {

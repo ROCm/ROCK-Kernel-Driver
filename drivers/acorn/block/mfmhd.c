@@ -1208,11 +1208,6 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 			return -EFAULT;
 		return 0;
 
-	case BLKGETSIZE:
-		return put_user (mfm[minor].nr_sects, (unsigned long *)arg);
-	case BLKGETSIZE64:
-		return put_user ((u64)mfm[minor].nr_sects << 9, (u64 *)arg);
-
 	case BLKFRASET:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
@@ -1230,6 +1225,8 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 			return -EACCES;
 		return mfm_reread_partitions(dev);
 
+	case BLKGETSIZE:
+	case BLKGETSIZE64:
 	case BLKFLSBUF:
 	case BLKROSET:
 	case BLKROGET:
@@ -1250,7 +1247,6 @@ static int mfm_open(struct inode *inode, struct file *file)
 	if (dev >= mfm_drives)
 		return -ENODEV;
 
-	MOD_INC_USE_COUNT;
 	while (mfm_info[dev].busy)
 		sleep_on (&mfm_wait_open);
 
@@ -1265,7 +1261,6 @@ static int mfm_open(struct inode *inode, struct file *file)
 static int mfm_release(struct inode *inode, struct file *file)
 {
 	mfm_info[DEVICE_NR(MINOR(inode->i_rdev))].access_count--;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1324,6 +1319,7 @@ static struct gendisk mfm_gendisk = {
 
 static struct block_device_operations mfm_fops =
 {
+	owner:		THIS_MODULE,
 	open:		mfm_open,
 	release:	mfm_release,
 	ioctl:		mfm_ioctl,

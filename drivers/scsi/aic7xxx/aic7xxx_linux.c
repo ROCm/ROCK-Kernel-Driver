@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.c#72 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_linux.c#79 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -38,8 +38,8 @@
  *  SCB paging, and other rework of the code.
  *
  * --------------------------------------------------------------------------
- * Copyright (c) 1994, 1995, 1996, 1997, 1998, 1999, 2000 Justin T. Gibbs.
- * Copyright (c) 2000 Adaptec Inc.
+ * Copyright (c) 1994-2000 Justin T. Gibbs.
+ * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,23 +48,31 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
  *    without modification.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * Alternatively, this software may be distributed under the terms of the
- * GNU General Public License ("GPL").
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  *
  *---------------------------------------------------------------------------
  *
@@ -79,8 +87,6 @@
  *
  *    Form:  aic7xxx=extended
  *           aic7xxx=no_reset
- *           aic7xxx=ultra
- *           aic7xxx=irq_trigger:[0,1]  # 0 edge, 1 level
  *           aic7xxx=verbose
  *
  *  Daniel M. Eischen, deischen@iworks.InterWorks.org, 1/23/97
@@ -112,15 +118,6 @@
  *  8: SMP friendliness has been improved
  *
  */
-
-/*
- * The next three defines are user configurable.  These should be the only
- * defines a user might need to get in here and change.  There are other
- * defines buried deeper in the code, but those really shouldn't need touched
- * under normal conditions.
- */
-
-#include <linux/module.h>
 
 #include "aic7xxx_osm.h"
 #include "aic7xxx_inline.h"
@@ -324,83 +321,6 @@ static int aic7xxx_reverse_scan = 0;
 static uint32_t aic7xxx_extended = 0;
 
 /*
- * The IRQ trigger method used on EISA controllers. Does not effect PCI cards.
- *   -1 = Use detected settings.
- *    0 = Force Edge triggered mode.
- *    1 = Force Level triggered mode.
- */
-static int aic7xxx_irq_trigger = -1;
-
-/*
- * This variable is used to override the termination settings on a controller.
- * This should not be used under normal conditions.  However, in the case
- * that a controller does not have a readable SEEPROM (so that we can't
- * read the SEEPROM settings directly) and that a controller has a buggered
- * version of the cable detection logic, this can be used to force the
- * correct termination.  It is preferable to use the manual termination
- * settings in the BIOS if possible, but some motherboard controllers store
- * those settings in a format we can't read.  In other cases, auto term
- * should also work, but the chipset was put together with no auto term
- * logic (common on motherboard controllers).  In those cases, we have
- * 32 bits here to work with.  That's good for 8 controllers/channels.  The
- * bits are organized as 4 bits per channel, with scsi0 getting the lowest
- * 4 bits in the int.  A 1 in a bit position indicates the termination setting
- * that corresponds to that bit should be enabled, a 0 is disabled.
- * It looks something like this:
- *
- *    0x0f =  1111-Single Ended Low Byte Termination on/off
- *            ||\-Single Ended High Byte Termination on/off
- *            |\-LVD Low Byte Termination on/off
- *            \-LVD High Byte Termination on/off
- *
- * For non-Ultra2 controllers, the upper 2 bits are not important.  So, to
- * enable both high byte and low byte termination on scsi0, I would need to
- * make sure that the override_term variable was set to 0x03 (bits 0011).
- * To make sure that all termination is enabled on an Ultra2 controller at
- * scsi2 and only high byte termination on scsi1 and high and low byte
- * termination on scsi0, I would set override_term=0xf23 (bits 1111 0010 0011)
- *
- * For the most part, users should never have to use this, that's why I
- * left it fairly cryptic instead of easy to understand.  If you need it,
- * most likely someone will be telling you what your's needs to be set to.
- */
-static int aic7xxx_override_term = -1;
-
-/*
- * Certain motherboard chipset controllers tend to screw
- * up the polarity of the term enable output pin.  Use this variable
- * to force the correct polarity for your system.  This is a bitfield variable
- * similar to the previous one, but this one has one bit per channel instead
- * of four.
- *    0 = Force the setting to active low.
- *    1 = Force setting to active high.
- * Most Adaptec cards are active high, several motherboards are active low.
- * To force a 2940 card at SCSI 0 to active high and a motherboard 7895
- * controller at scsi1 and scsi2 to active low, and a 2910 card at scsi3
- * to active high, you would need to set stpwlev=0x9 (bits 1001).
- *
- * People shouldn't need to use this, but if you are experiencing lots of
- * SCSI timeout problems, this may help.  There is one sure way to test what
- * this option needs to be.  Using a boot floppy to boot the system, configure
- * your system to enable all SCSI termination (in the Adaptec SCSI BIOS) and
- * if needed then also pass a value to override_term to make sure that the
- * driver is enabling SCSI termination, then set this variable to either 0
- * or 1.  When the driver boots, make sure there are *NO* SCSI cables
- * connected to your controller.  If it finds and inits the controller
- * without problem, then the setting you passed to stpwlev was correct.  If
- * the driver goes into a reset loop and hangs the system, then you need the
- * other setting for this variable.  If neither setting lets the machine
- * boot then you have definite termination problems that may not be fixable.
- */
-static int aic7xxx_stpwlev = -1;
-
-/*
- * Set this to non-0 in order to force the driver to panic the kernel
- * and print out debugging info on a SCSI abort or reset cycle.
- */
-static int aic7xxx_panic_on_abort = 0;
-
-/*
  * PCI bus parity checking of the Adaptec controllers.  This is somewhat
  * dubious at best.  To my knowledge, this option has never actually
  * solved a PCI parity problem, but on certain machines with broken PCI
@@ -416,15 +336,6 @@ static int aic7xxx_panic_on_abort = 0;
  * -1.
  */
 static int aic7xxx_pci_parity = 0;
-
-/*
- * Set this to a non-0 value to make us dump out the 32 bit instruction
- * registers on the card after completing the sequencer download.  This
- * allows the actual sequencer download to be verified.  It is possible
- * to use this option and still boot up and run your system.  This is
- * only intended for debugging purposes.
- */
-static int aic7xxx_dump_sequencer = 0;
 
 /*
  * Certain newer motherboards have put new PCI based devices into the
@@ -458,13 +369,20 @@ int aic7xxx_detect_complete;
 static int aic7xxx_seltime = 0x00;
 
 /*
- * So that insmod can find the variable and make it point to something
+ * Certain devices do not perform any aging on commands.  Should the
+ * device be saturated by commands in one portion of the disk, it is
+ * possible for transactions on far away sectors to never be serviced.
+ * To handle these devices, we can periodically send an ordered tag to
+ * force all outstanding transactions to be serviced prior to a new
+ * transaction.
+ */
+int aic7xxx_periodic_otag;
+
+/*
+ * Module information and settable options.
  */
 #ifdef MODULE
 static char *aic7xxx = NULL;
-
-MODULE_PARM(aic7xxx, "s");
-
 /*
  * Just in case someone uses commas to separate items on the insmod
  * command line, we define a dummy buffer here to avoid having insmod
@@ -472,6 +390,32 @@ MODULE_PARM(aic7xxx, "s");
  */
 static char dummy_buffer[60] = "Please don't trounce on me insmod!!\n";
 
+MODULE_AUTHOR("Maintainer: Justin T. Gibbs <gibbs@scsiguy.com>");
+MODULE_DESCRIPTION("Adaptec Aic77XX/78XX SCSI Host Bus Adapter driver");
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,10)
+MODULE_LICENSE("Dual BSD/GPL");
+#endif
+MODULE_PARM(aic7xxx, "s");
+MODULE_PARM_DESC(aic7xxx, "period delimited, options string.
+	verbose			Enable verbose/diagnostic logging
+	no_probe		Disable EISA/VLB controller probing
+	no_reset		Supress initial bus resets
+	extended		Enable extended geometry on all controllers
+	periodic_otag		Send an ordered tagged transaction periodically
+				to prevent tag starvation.  This may be
+				required by some older disk drives/RAID arrays. 
+	reverse_scan		Sort PCI devices highest Bus/Slot to lowest
+	tag_info:<tag_str>	Set per-target tag depth
+	seltime:<int>		Selection Timeout(0/256ms,1/128ms,2/64ms,3/32ms)
+
+	Sample /etc/modules.conf line:
+		Enable verbose logging
+		Disable EISA/VLB probing
+		Set tag depth on Controller 2/Target 2 to 10 tags
+		Shorten the selection timeout to 128ms from its default of 256
+
+	options aic7xxx='\"verbose.no_probe.tag_info:{{}.{}.{..10}}.seltime:1\"'
+");
 #endif
 
 static void ahc_linux_handle_scsi_status(struct ahc_softc *,
@@ -661,11 +605,17 @@ ahc_linux_unmap_scb(struct ahc_softc *ahc, struct scb *scb)
 		sg = (struct scatterlist *)cmd->request_buffer;
 		pci_unmap_sg(ahc->dev_softc, sg, cmd->use_sg,
 			     scsi_to_pci_dma_dir(cmd->sc_data_direction));
-	} else if (cmd->request_bufflen != 0)
+	} else if (cmd->request_bufflen != 0) {
+		u_int32_t high_addr;
+
+		high_addr = ahc_le32toh(scb->sg_list[0].len)
+			  & AHC_SG_HIGH_ADDR_MASK;
 		pci_unmap_single(ahc->dev_softc,
-				 ahc_le32toh(scb->sg_list[0].addr),
+				 ahc_le32toh(scb->sg_list[0].addr)
+			        | (((dma_addr_t)high_addr) << 8),
 				 cmd->request_bufflen,
 				 scsi_to_pci_dma_dir(cmd->sc_data_direction));
+	}
 }
 
 static __inline int
@@ -722,8 +672,10 @@ static int ahc_linux_halt(struct notifier_block *nb, u_long event, void *buf)
 {
 	struct ahc_softc *ahc;
 
-	TAILQ_FOREACH(ahc, &ahc_tailq, links) {
-		ahc_shutdown(ahc);
+	if (event == SYS_DOWN || event == SYS_HALT) {
+		TAILQ_FOREACH(ahc, &ahc_tailq, links) {
+			ahc_shutdown(ahc);
+		}
 	}
 	return (NOTIFY_OK);
 }
@@ -786,22 +738,24 @@ ahc_dmamem_alloc(struct ahc_softc *ahc, bus_dma_tag_t dmat, void** vaddr,
 	 * address).  For this reason, we have to reset
 	 * our dma mask when doing allocations.
 	 */
+	if(ahc->dev_softc)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
-	pci_set_dma_mask(ahc->dev_softc, 0xFFFFFFFF);
+		pci_set_dma_mask(ahc->dev_softc, 0xFFFFFFFF);
 #else
-	ahc->dev_softc->dma_mask = 0xFFFFFFFF;
+		ahc->dev_softc->dma_mask = 0xFFFFFFFF;
 #endif
 	*vaddr = pci_alloc_consistent(ahc->dev_softc,
 				      dmat->maxsize, &map->bus_addr);
+	if (ahc->dev_softc)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,3)
-	pci_set_dma_mask(ahc->dev_softc, ahc->platform_data->hw_dma_mask);
+		pci_set_dma_mask(ahc->dev_softc, ahc->platform_data->hw_dma_mask);
 #else
-	ahc->dev_softc->dma_mask = ahc->platform_data->hw_dma_mask;
+		ahc->dev_softc->dma_mask = ahc->platform_data->hw_dma_mask;
 #endif
 #else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) */
 	/*
 	 * At least in 2.2.14, malloc is a slab allocator so all
-	 * allocations are aligned.  We assume, for these kernel versions
+	 * allocations are aligned.  We assume for these kernel versions
 	 * that all allocations will be bellow 4Gig, physically contiguous,
 	 * and accessable via DMA by the controller.
 	 */
@@ -906,12 +860,20 @@ ahc_softc_comp(struct ahc_softc *lahc, struct ahc_softc *rahc)
 	{
 		char primary_channel;
 
-		value = ahc_get_pci_bus(lahc->dev_softc)
-		      - ahc_get_pci_bus(rahc->dev_softc);
+		if (aic7xxx_reverse_scan != 0)
+			value = ahc_get_pci_bus(rahc->dev_softc)
+			      - ahc_get_pci_bus(lahc->dev_softc);
+		else
+			value = ahc_get_pci_bus(lahc->dev_softc)
+			      - ahc_get_pci_bus(rahc->dev_softc);
 		if (value != 0)
 			break;
-		value = ahc_get_pci_slot(lahc->dev_softc)
-		      - ahc_get_pci_slot(rahc->dev_softc);
+		if (aic7xxx_reverse_scan != 0)
+			value = ahc_get_pci_slot(rahc->dev_softc)
+			      - ahc_get_pci_slot(lahc->dev_softc);
+		else
+			value = ahc_get_pci_slot(lahc->dev_softc)
+			      - ahc_get_pci_slot(rahc->dev_softc);
 		if (value != 0)
 			break;
 		/*
@@ -1028,7 +990,7 @@ ahc_linux_setup_tag_info(char *p, char *end)
 /*
  * Handle Linux boot parameters. This routine allows for assigning a value
  * to a parameter with a ':' between the parameter and the value.
- * ie. aic7xxx=unpause:0x0A,extended
+ * ie. aic7xxx=stpwlev:1,extended
  */
 int
 aic7xxx_setup(char *s)
@@ -1043,15 +1005,11 @@ aic7xxx_setup(char *s)
 	} options[] = {
 		{ "extended", &aic7xxx_extended },
 		{ "no_reset", &aic7xxx_no_reset },
-		{ "irq_trigger", &aic7xxx_irq_trigger },
 		{ "verbose", &aic7xxx_verbose },
 		{ "reverse_scan", &aic7xxx_reverse_scan },
-		{ "override_term", &aic7xxx_override_term },
-		{ "stpwlev", &aic7xxx_stpwlev },
 		{ "no_probe", &aic7xxx_no_probe },
-		{ "panic_on_abort", &aic7xxx_panic_on_abort },
+		{ "periodic_otag", &aic7xxx_periodic_otag },
 		{ "pci_parity", &aic7xxx_pci_parity },
-		{ "dump_sequencer", &aic7xxx_dump_sequencer },
 		{ "seltime", &aic7xxx_seltime },
 		{ "tag_info", NULL }
 	};
@@ -1133,7 +1091,8 @@ ahc_linux_detect(Scsi_Host_Template *template)
 	ahc_linux_pci_probe(template);
 #endif
 
-	aic7770_linux_probe(template);
+	if (aic7xxx_no_probe == 0)
+		aic7770_linux_probe(template);
 
 	/*
 	 * Register with the SCSI layer all
@@ -1174,8 +1133,8 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	host->this_id = ahc->our_id;
 	host->irq = ahc->platform_data->irq;
 	host->max_id = (ahc->features & AHC_WIDE) ? 16 : 8;
-	host->max_channel = (ahc->features & AHC_TWIN) ? 1 : 0;
 	host->max_lun = AHC_NUM_LUNS;
+	host->max_channel = (ahc->features & AHC_TWIN) ? 1 : 0;
 	ahc_set_unit(ahc, ahc_linux_next_unit());
 	sprintf(buf, "scsi%d", host->host_no);
 	new_name = malloc(strlen(buf) + 1, M_DEVBUF, M_NOWAIT);
@@ -1387,7 +1346,7 @@ ahc_platform_set_tags(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		dev->qfrozen++;
 	}
 
-	dev->flags &= ~(AHC_DEV_Q_BASIC|AHC_DEV_Q_TAGGED);
+	dev->flags &= ~(AHC_DEV_Q_BASIC|AHC_DEV_Q_TAGGED|AHC_DEV_PERIODIC_OTAG);
 	if (now_queuing) {
 
 		if (!was_queuing) {
@@ -1399,9 +1358,11 @@ ahc_platform_set_tags(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 			dev->maxtags = AHC_MAX_QUEUE;
 			dev->openings = dev->maxtags - dev->active;
 		}
-		if (alg == AHC_QUEUE_TAGGED)
+		if (alg == AHC_QUEUE_TAGGED) {
 			dev->flags |= AHC_DEV_Q_TAGGED;
-		else
+			if (aic7xxx_periodic_otag != 0)
+				dev->flags |= AHC_DEV_PERIODIC_OTAG;
+		} else
 			dev->flags |= AHC_DEV_Q_BASIC;
 	} else {
 		/* We can only have one opening */
@@ -1548,8 +1509,8 @@ ahc_linux_device_queue_depth(struct ahc_softc *ahc, Scsi_Device * device)
 	if (tags != 0) {
 		device->queue_depth = tags;
 		ahc_set_tags(ahc, &devinfo, AHC_QUEUE_TAGGED);
-		printf("scsi%d:%d:%d:%d: Tagged Queuing enabled.  Depth %d\n",
-	       	       ahc->platform_data->host->host_no, device->channel,
+		printf("scsi%d:%c:%d:%d: Tagged Queuing enabled.  Depth %d\n",
+	       	       ahc->platform_data->host->host_no, device->channel + 'A',
 		       device->id, device->lun, tags);
 	} else {
 		/*
@@ -1770,7 +1731,8 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 		dev->openings--;
 		dev->active++;
 		dev->commands_issued++;
-		dev->commands_since_idle_or_otag++;
+		if ((dev->flags & AHC_DEV_PERIODIC_OTAG) != 0)
+			dev->commands_since_idle_or_otag++;
 
 		/*
 		 * We only allow one untagged transaction
@@ -2324,10 +2286,10 @@ ahc_linux_filter_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd, struct scb *scb)
 		 * are not large enough for us to pull the spi3 bits.
 		 * In this case, we assume that a device that tells us
 		 * they can provide inquiry data that spans the SPI3
-		 * bits can handle a PPR request.  If the inquiry
-		 * request has sufficient buffer space to cover these
-		 * bits, we check them to see if any ppr options are
-		 * available.
+		 * bits and says its SCSI3 can handle a PPR request.
+		 * If the inquiry request has sufficient buffer space to
+		 * cover these bits, we check them to see if any ppr options
+		 * are available.
 		 */
 		if ((sid->additional_length + 4) >= minlen) {
 			if (transferred_len >= minlen
@@ -2336,6 +2298,8 @@ ahc_linux_filter_command(struct ahc_softc *ahc, Scsi_Cmnd *cmd, struct scb *scb)
 
 			if (targ_info->curr.protocol_version > SCSI_REV_2)
 				targ_info->curr.transport_version = 3;
+			else
+				ppr_options = 0;
 		} else {
 			ppr_options = 0;
 		}
@@ -2536,8 +2500,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	ahc->flags &= ~AHC_ALL_INTERRUPTS;
 	paused = TRUE;
 
-	if (bootverbose)
-		ahc_dump_card_state(ahc);
+	ahc_dump_card_state(ahc);
 
 	if ((pending_scb->flags & SCB_ACTIVE) == 0) {
 		printf("%s:%d:%d:%d: Command already completed\n",
@@ -2597,7 +2560,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 		 * Actually re-queue this SCB in an attempt
 		 * to select the device before it reconnects.
 		 * In either case (selection or reselection),
-		 * we will now issue a the approprate message
+		 * we will now issue the approprate message
 		 * to the timed-out device.
 		 *
 		 * Set the MK_MESSAGE control bit indicating
@@ -2672,7 +2635,7 @@ done:
 	if (paused)
 		ahc_unpause(ahc);
 	if (wait) {
-    		struct timer_list timer;
+		struct timer_list timer;
 		int ret;
 
 		ahc_unlock(ahc, &s);
@@ -2711,7 +2674,7 @@ ahc_linux_abort(Scsi_Cmnd *cmd)
 
 	error = ahc_linux_queue_recovery_cmd(cmd, SCB_ABORT);
 	if (error != 0)
-		printf("aic7xxx_abort returns %d\n", error);
+		printf("aic7xxx_abort returns 0x%x\n", error);
 	return (error);
 }
 
@@ -2725,7 +2688,7 @@ ahc_linux_dev_reset(Scsi_Cmnd *cmd)
 
 	error = ahc_linux_queue_recovery_cmd(cmd, SCB_DEVICE_RESET);
 	if (error != 0)
-		printf("aic7xxx_dev_reset returns %d\n", error);
+		printf("aic7xxx_dev_reset returns 0x%x\n", error);
 	return (error);
 }
 
@@ -2792,7 +2755,9 @@ ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	sectors = 32;
 	cylinders = disk->capacity / (heads * sectors);
 
-	if (disk->device->channel == 0)
+	if (aic7xxx_extended != 0)
+		extended = 1;
+	else if (disk->device->channel == 0)
 		extended = (ahc->flags & AHC_EXTENDED_TRANS_A) != 0;
 	else
 		extended = (ahc->flags & AHC_EXTENDED_TRANS_B) != 0;
@@ -2868,8 +2833,6 @@ ahc_platform_dump_card_state(struct ahc_softc *ahc)
 		}
 	}
 }
-
-MODULE_LICENSE("Dual BSD/GPL");
 
 #if defined(MODULE) || LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static Scsi_Host_Template driver_template = AIC7XXX;

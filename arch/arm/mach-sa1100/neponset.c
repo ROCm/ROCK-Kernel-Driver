@@ -7,6 +7,7 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/ptrace.h>
+#include <linux/serial_core.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
@@ -14,7 +15,7 @@
 #include <asm/mach/irq.h>
 #include <asm/arch/irq.h>
 #include <asm/mach/serial_sa1100.h>
-#include <linux/serial_core.h>
+#include <asm/arch/assabet.h>
 
 #include "sa1111.h"
 
@@ -68,8 +69,8 @@ static void __init neponset_init_irq(void)
 	irq = NEPONSET_USAR_IRQ;
 	irq_desc[irq].valid	= 1;
 	irq_desc[irq].probe_ok	= 1;
-	set_GPIO_IRQ_edge( GPIO_NEP_IRQ, GPIO_RISING_EDGE );
-	setup_arm_irq( IRQ_GPIO_NEP_IRQ, &neponset_irq );
+	set_GPIO_IRQ_edge(ASSABET_GPIO_NEP_IRQ, GPIO_RISING_EDGE);
+	setup_arm_irq(ASSABET_IRQ_GPIO_NEP_IRQ, &neponset_irq);
 }
 
 static int __init neponset_init(void)

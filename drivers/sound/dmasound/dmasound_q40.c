@@ -585,3 +585,4 @@ static void __exit dmasound_q40_cleanup(void)
 
 module_init(dmasound_q40_init);
 module_exit(dmasound_q40_cleanup);
+MODULE_LICENSE("GPL");

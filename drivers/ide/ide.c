@@ -1950,11 +1950,9 @@ search:
 static int ide_open (struct inode * inode, struct file * filp)
 {
 	ide_drive_t *drive;
-	int rc;
 
 	if ((drive = get_info_ptr(inode->i_rdev)) == NULL)
 		return -ENXIO;
-	MOD_INC_USE_COUNT;
 	if (drive->driver == NULL)
 		ide_driver_module();
 #ifdef CONFIG_KMOD
@@ -1972,14 +1970,10 @@ static int ide_open (struct inode * inode, struct file * filp)
 	while (drive->busy)
 		sleep_on(&drive->wqueue);
 	drive->usage++;
-	if (drive->driver != NULL) {
-		if ((rc = DRIVER(drive)->open(inode, filp, drive)))
-			MOD_DEC_USE_COUNT;
-		return rc;
-	}
+	if (drive->driver != NULL)
+		return DRIVER(drive)->open(inode, filp, drive);
 	printk ("%s: driver not present\n", drive->name);
 	drive->usage--;
-	MOD_DEC_USE_COUNT;
 	return -ENXIO;
 }
 
@@ -1995,7 +1989,6 @@ static int ide_release (struct inode * inode, struct file * file)
 		drive->usage--;
 		if (drive->driver != NULL)
 			DRIVER(drive)->release(inode, file, drive);
-		MOD_DEC_USE_COUNT;
 	}
 	return 0;
 }
@@ -3643,6 +3636,7 @@ void ide_unregister_module (ide_module_t *module)
 }
 
 struct block_device_operations ide_fops[] = {{
+	owner:			THIS_MODULE,
 	open:			ide_open,
 	release:		ide_release,
 	ioctl:			ide_ioctl,

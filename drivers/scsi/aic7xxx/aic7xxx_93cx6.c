@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/src/aic7xxx/aic7xxx_93cx6.c#8 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_93cx6.c#10 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_93cx6.c,v 1.9 2000/11/10 20:13:41 gibbs Exp $
  */

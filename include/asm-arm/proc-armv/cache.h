@@ -128,7 +128,14 @@ static inline void flush_dcache_page(struct page *page)
 #define clean_dcache_entry(_s)		cpu_dcache_clean_entry((unsigned long)(_s))
 
 /*
- * I cache only
+ * I cache coherency stuff.
+ *
+ * This *is not* just icache.  It is to make data written to memory
+ * consistent such that instructions fetched from the region are what
+ * we expect.
+ *
+ * This generally means that we have to clean out the Dcache and write
+ * buffers, and maybe flush the Icache in the specified range.
  */
 #define flush_icache_range(_s,_e)					\
 	do {								\

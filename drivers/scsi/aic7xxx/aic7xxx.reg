@@ -1,7 +1,8 @@
 /*
  * Aic7xxx register and scratch ram definitions.
  *
- * Copyright (c) 1994-2001 Justin Gibbs.
+ * Copyright (c) 1994-2001 Justin T. Gibbs.
+ * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,27 +11,35 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
  *    without modification.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * Alternatively, this software may be distributed under the terms of the
- * GNU Public License ("GPL").
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.reg,v 1.31 2000/11/10 20:13:40 gibbs Exp $
  */
-VERSION = "$Id: //depot/src/aic7xxx/aic7xxx.reg#19 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic7xxx.reg#24 $"
 
 /*
  * This file is processed by the aic7xxx_asm utility for use in assembling
@@ -328,6 +337,7 @@ register SSTAT3 {
 	access_mode RO
 	mask	SCSICNT		0xf0
 	mask	OFFCNT		0x0f
+	mask	U2OFFCNT	0x7f
 }
 
 /*
@@ -1004,7 +1014,6 @@ scb {
 		size	4
 		alias	SCB_RESIDUAL_DATACNT
 		alias	SCB_CDB_STORE
-		alias	SCB_TARGET_INFO
 	}
 	SCB_RESIDUAL_SGPTR {
 		size	4
@@ -1012,8 +1021,14 @@ scb {
 	SCB_SCSI_STATUS {
 		size	1
 	}
-	SCB_CDB_STORE_PAD {
-		size	3
+	SCB_TARGET_PHASES {
+		size	1
+	}
+	SCB_TARGET_DATA_DIR {
+		size	1
+	}
+	SCB_TARGET_ITAG {
+		size	1
 	}
 	SCB_DATAPTR {
 		size	4
@@ -1464,7 +1479,8 @@ scratch_ram {
 
 	SEQ_FLAGS2 {
 		size		1
-		bit	SCB_DMA		0x01
+		bit	SCB_DMA			  0x01
+		bit	TARGET_MSG_PENDING	  0x02
 	}
 	/*
 	 * These are reserved registers in the card's scratch ram.  Some of
@@ -1529,10 +1545,6 @@ const CMD_GROUP_CODE_SHIFT	0x05
 
 const STATUS_BUSY		0x08
 const STATUS_QUEUE_FULL	0x28
-const SCB_TARGET_PHASES		0
-const SCB_TARGET_DATA_DIR	1
-const SCB_TARGET_STATUS		2
-const SCB_INITIATOR_TAG		3
 const TARGET_DATA_IN		1
 
 /*

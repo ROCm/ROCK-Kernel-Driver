@@ -1,7 +1,7 @@
 /*
  * linux/include/asm-arm/arch-shark/time.h
  *
- * by Alexander Schulz <aschulz@netwinder.org>
+ * by Alexander Schulz
  *
  * Uses the real time clock because you can't run
  * the timer with level triggered interrupts and

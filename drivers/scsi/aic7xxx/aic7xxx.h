@@ -2,6 +2,7 @@
  * Core definitions and data structures shareable across OS platforms.
  *
  * Copyright (c) 1994-2001 Justin T. Gibbs.
+ * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,25 +11,33 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
  *    without modification.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * Alternatively, this software may be distributed under the terms of the
- * GNU Public License ("GPL").
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/src/aic7xxx/aic7xxx.h#29 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.h#34 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.h,v 1.30 2000/11/10 20:13:40 gibbs Exp $
  */
@@ -145,6 +154,13 @@ struct scb_platform_data;
  *	   precede it.
  */
 #define AHC_MAX_QUEUE	253
+
+/*
+ * The maximum amount of SCB storage we allocate in host memory.  This
+ * number should reflect the 1 additional SCB we require to handle our
+ * qinfifo mechanism.
+ */
+#define AHC_SCB_MAX_ALLOC (AHC_MAX_QUEUE+1)
 
 /*
  * Ring Buffer of incoming target commands.
@@ -373,10 +389,12 @@ struct status_pkt {
  * Target mode version of the shared data SCB segment.
  */
 struct target_data {
-	uint8_t	target_phases;		/* Bitmap of phases to execute */
-	uint8_t	data_phase;		/* Data-In or Data-Out */
-	uint8_t	scsi_status;		/* SCSI status to give to initiator */
-	uint8_t	initiator_tag;		/* Initiator's transaction tag */
+	uint32_t residual_datacnt;	/* Residual in the current S/G seg */
+	uint32_t residual_sg_ptr;	/* The next S/G for this transfer */
+	uint8_t  scsi_status;		/* SCSI status to give to initiator */
+	uint8_t  target_phases;		/* Bitmap of phases to execute */
+	uint8_t  data_phase;		/* Data-In or Data-Out */
+	uint8_t  initiator_tag;		/* Initiator's transaction tag */
 };
 
 struct hardware_scb {
@@ -387,10 +405,10 @@ struct hardware_scb {
 		 * of the cdb payload as seen by the chip and a DMA
 		 * is used to pull it in.
 		 */
-		uint8_t	cdb[12];
-		uint32_t	cdb_ptr;
-		struct		status_pkt status;
-		struct		target_data tdata;
+		uint8_t	 cdb[12];
+		uint32_t cdb_ptr;
+		struct	 status_pkt status;
+		struct	 target_data tdata;
 	} shared_data;
 /*
  * A word about residuals.
@@ -544,7 +562,15 @@ struct scb_data {
 					 * Pool of SCBs ready to be assigned
 					 * commands to execute.
 					 */
-	struct	scb *scbindex[AHC_SCB_MAX + 1];/* Mapping from tag to SCB */
+	struct	scb *scbindex[256];	/*
+					 * Mapping from tag to SCB.
+					 * As tag identifiers are an
+					 * 8bit value, we provide space
+					 * for all possible tag values.
+					 * Any lookups to entries at or
+					 * above AHC_SCB_MAX_ALLOC will
+					 * always fail.
+					 */
 	struct	hardware_scb	*hscbs;	/* Array of hardware SCBs */
 	struct	scb *scbarray;		/* Array of kernel SCBs */
 	struct	scsi_sense_data *sense; /* Per SCB sense data */
@@ -1127,6 +1153,9 @@ int			ahc_search_disc_list(struct ahc_softc *ahc, int target,
 void			ahc_freeze_devq(struct ahc_softc *ahc, struct scb *scb);
 int			ahc_reset_channel(struct ahc_softc *ahc, char channel,
 					  int initiate_reset);
+int			ahc_abort_scbs(struct ahc_softc *ahc, int target,
+				       char channel, int lun, u_int tag,
+				       role_t role, uint32_t status);
 void			ahc_restart(struct ahc_softc *ahc);
 void			ahc_calc_residual(struct scb *scb);
 /*************************** Utility Functions ********************************/

@@ -96,8 +96,6 @@ static struct sun_floppy_ops sun_fdops;
  */
 #define FDC1                      sun_floppy_init()
 
-static int FDC2=-1;
-
 #define N_FDC    1
 #define N_DRIVE  8
 
@@ -365,5 +363,7 @@ static int sparc_eject(void)
 }
 
 #define fd_eject(drive) sparc_eject()
+
+#define EXTRA_FLOPPY_PARAMS
 
 #endif /* !(__ASM_SPARC_FLOPPY_H) */

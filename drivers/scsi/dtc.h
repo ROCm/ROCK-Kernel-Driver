@@ -80,29 +80,29 @@ int dtc_proc_info (char *buffer, char **start, off_t offset,
 #define DTC_address(reg) (base + DTC_5380_OFFSET + reg)
 
 #define dbNCR5380_read(reg)                                              \
-    (rval=readb(DTC_address(reg)), \
+    (rval=isa_readb(DTC_address(reg)), \
      (((unsigned char) printk("DTC : read register %d at addr %08x is: %02x\n"\
     , (reg), (int)DTC_address(reg), rval)), rval ) )
 
 #define dbNCR5380_write(reg, value) do {                                  \
     printk("DTC : write %02x to register %d at address %08x\n",         \
             (value), (reg), (int)DTC_address(reg));     \
-    writeb(value, DTC_address(reg));} while(0)
+    isa_writeb(value, DTC_address(reg));} while(0)
 
 
 #if !(DTCDEBUG & DTCDEBUG_TRANSFER) 
-#define NCR5380_read(reg) (readb(DTC_address(reg)))
-#define NCR5380_write(reg, value) (writeb(value, DTC_address(reg)))
+#define NCR5380_read(reg) (isa_readb(DTC_address(reg)))
+#define NCR5380_write(reg, value) (isa_writeb(value, DTC_address(reg)))
 #else
-#define NCR5380_read(reg) (readb(DTC_address(reg)))
+#define NCR5380_read(reg) (isa_readb(DTC_address(reg)))
 #define xNCR5380_read(reg)						\
     (((unsigned char) printk("DTC : read register %d at address %08x\n"\
-    , (reg), DTC_address(reg))), readb(DTC_address(reg)))
+    , (reg), DTC_address(reg))), isa_readb(DTC_address(reg)))
 
 #define NCR5380_write(reg, value) do {					\
     printk("DTC : write %02x to register %d at address %08x\n", 	\
 	    (value), (reg), (int)DTC_address(reg));	\
-    writeb(value, DTC_address(reg));} while(0)
+    isa_writeb(value, DTC_address(reg));} while(0)
 #endif
 
 #define NCR5380_intr dtc_intr

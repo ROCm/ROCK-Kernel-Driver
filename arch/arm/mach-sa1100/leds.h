@@ -6,3 +6,4 @@ extern void graphicsclient_leds_event(led_event_t evt);
 extern void lart_leds_event(led_event_t evt);
 extern void pfs168_leds_event(led_event_t evt);
 extern void graphicsmaster_leds_event(led_event_t evt);
+extern void adsbitsy_leds_event(led_event_t evt);

@@ -171,35 +171,41 @@ static void dma_stop (struct Scsi_Host *instance, Scsi_Cmnd *SCpnt,
 
 int __init a3000_detect(Scsi_Host_Template *tpnt)
 {
-    static unsigned char called = 0;
-
-    if (called)
-	return 0;
+    wd33c93_regs regs;
 
     if  (!MACH_IS_AMIGA || !AMIGAHW_PRESENT(A3000_SCSI))
 	return 0;
     if (!request_mem_region(0xDD0000, 256, "wd33c93"))
-	return -EBUSY;
+	return 0;
 
     tpnt->proc_name = "A3000";
     tpnt->proc_info = &wd33c93_proc_info;
 
     a3000_host = scsi_register (tpnt, sizeof(struct WD33C93_hostdata));
-    if (a3000_host == NULL) {
-	release_mem_region(0xDD0000, 256);
-    	return 0;
-    }
+    if (a3000_host == NULL)
+	goto fail_register;
+
     a3000_host->base = ZTWO_VADDR(0xDD0000);
     a3000_host->irq = IRQ_AMIGA_PORTS;
     DMA(a3000_host)->DAWR = DAWR_A3000;
-    wd33c93_init(a3000_host, (wd33c93_regs *)&(DMA(a3000_host)->SASR),
-		 dma_setup, dma_stop, WD33C93_FS_12_15);
-    request_irq(IRQ_AMIGA_PORTS, a3000_intr, SA_SHIRQ, "A3000 SCSI",
-		a3000_intr);
+    regs.SASR = &(DMA(a3000_host)->SASR);
+    regs.SCMD = &(DMA(a3000_host)->SCMD);
+    wd33c93_init(a3000_host, regs, dma_setup, dma_stop, WD33C93_FS_12_15);
+    if (request_irq(IRQ_AMIGA_PORTS, a3000_intr, SA_SHIRQ, "A3000 SCSI",
+		    a3000_intr))
+        goto fail_irq;
     DMA(a3000_host)->CNTR = CNTR_PDMD | CNTR_INTEN;
-    called = 1;
 
     return 1;
+
+fail_irq:
+#ifdef MODULE
+    wd33c93_release();
+#endif /* MODULE */
+    scsi_unregister(a3000_host);
+fail_register:
+    release_mem_region(0xDD0000, 256);
+    return 0;
 }
 
 #define HOSTS_C
@@ -208,13 +214,13 @@ static Scsi_Host_Template driver_template = _A3000_SCSI;
 
 #include "scsi_module.c"
 
-int a3000_release(struct Scsi_Host *instance)
+int __exit a3000_release(struct Scsi_Host *instance)
 {
 #ifdef MODULE
     wd33c93_release();
+#endif /* MODULE*/
     DMA(instance)->CNTR = 0;
     release_mem_region(0xDD0000, 256);
     free_irq(IRQ_AMIGA_PORTS, a3000_intr);
-#endif
     return 1;
 }

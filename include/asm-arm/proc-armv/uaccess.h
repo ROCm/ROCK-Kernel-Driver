@@ -57,8 +57,9 @@ static inline void set_fs (mm_segment_t fs)
 #define __put_user_asm_half(x,addr,err)				\
 ({								\
 	unsigned long __temp = (unsigned long)(x);		\
-	__put_user_asm_byte(__temp, addr, err);			\
-	__put_user_asm_byte(__temp >> 8, (int)(addr) + 1, err);	\
+	unsigned long __ptr  = (unsigned long)(addr);		\
+	__put_user_asm_byte(__temp, __ptr, err);		\
+	__put_user_asm_byte(__temp >> 8, __ptr + 1, err);	\
 })
 
 #define __put_user_asm_word(x,addr,err)				\
@@ -96,9 +97,9 @@ static inline void set_fs (mm_segment_t fs)
 
 #define __get_user_asm_half(x,addr,err)				\
 ({								\
-	unsigned long __b1, __b2;				\
-	__get_user_asm_byte(__b1, addr, err);			\
-	__get_user_asm_byte(__b2, (int)(addr) + 1, err);	\
+	unsigned long __b1, __b2, __ptr = (unsigned long)addr;	\
+	__get_user_asm_byte(__b1, __ptr, err);			\
+	__get_user_asm_byte(__b2, __ptr + 1, err);		\
 	(x) = __b1 | (__b2 << 8);				\
 })
 

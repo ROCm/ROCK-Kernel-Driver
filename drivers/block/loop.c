@@ -941,6 +941,7 @@ static int lo_release(struct inode *inode, struct file *file)
 }
 
 static struct block_device_operations lo_fops = {
+	owner:		THIS_MODULE,
 	open:		lo_open,
 	release:	lo_release,
 	ioctl:		lo_ioctl,

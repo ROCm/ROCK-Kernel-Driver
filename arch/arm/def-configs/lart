@@ -62,13 +62,15 @@ CONFIG_ARCH_SA1100=y
 #
 # CONFIG_SA1100_ASSABET is not set
 # CONFIG_ASSABET_NEPONSET is not set
+# CONFIG_SA1100_ADSBITSY is not set
 # CONFIG_SA1100_BRUTUS is not set
 # CONFIG_SA1100_CERF is not set
-# CONFIG_SA1100_BITSY is not set
+# CONFIG_SA1100_H3600 is not set
 # CONFIG_SA1100_EXTENEX1 is not set
 # CONFIG_SA1100_FLEXANET is not set
 # CONFIG_SA1100_FREEBIRD is not set
 # CONFIG_SA1100_GRAPHICSCLIENT is not set
+# CONFIG_SA1100_GRAPHICSMASTER is not set
 # CONFIG_SA1100_JORNADA720 is not set
 # CONFIG_SA1100_HUW_WEBPANEL is not set
 # CONFIG_SA1100_ITSY is not set
@@ -90,7 +92,12 @@ CONFIG_SA1100_USB_CHAR=m
 #
 # CLPS711X/EP721X Implementations
 #
+# CONFIG_ARCH_CDB89712 is not set
+# CONFIG_ARCH_CLEP7312 is not set
+# CONFIG_ARCH_EDB7211 is not set
 # CONFIG_ARCH_P720T is not set
+# CONFIG_ARCH_EP7211 is not set
+# CONFIG_ARCH_EP7212 is not set
 # CONFIG_ARCH_ACORN is not set
 # CONFIG_FOOTBRIDGE is not set
 # CONFIG_FOOTBRIDGE_HOST is not set
@@ -126,6 +133,10 @@ CONFIG_NET=y
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
+
+#
+# At least one math emulation must be selected
+#
 CONFIG_FPE_NWFPE=y
 # CONFIG_FPE_FASTFPE is not set
 CONFIG_KCORE_ELF=y
@@ -136,7 +147,7 @@ CONFIG_BINFMT_ELF=y
 CONFIG_PM=y
 CONFIG_APM=m
 # CONFIG_ARTHUR is not set
-CONFIG_CMDLINE="console=ttySA0,9600"
+CONFIG_CMDLINE="console=ttySA0,9600 root=/dev/ram"
 # CONFIG_PFS168_CMDLINE is not set
 CONFIG_LEDS=y
 # CONFIG_LEDS_TIMER is not set
@@ -151,10 +162,10 @@ CONFIG_ALIGNMENT_TRAP=y
 #
 # Memory Technology Devices (MTD)
 #
-CONFIG_MTD=m
+CONFIG_MTD=y
 CONFIG_MTD_DEBUG=y
 CONFIG_MTD_DEBUG_VERBOSE=1
-# CONFIG_MTD_PARTITIONS is not set
+CONFIG_MTD_PARTITIONS=y
 # CONFIG_MTD_REDBOOT_PARTS is not set
 # CONFIG_MTD_BOOTLDR_PARTS is not set
 # CONFIG_MTD_AFS_PARTS is not set
@@ -162,28 +173,16 @@ CONFIG_MTD_DEBUG_VERBOSE=1
 #
 # User Modules And Translation Layers
 #
-CONFIG_MTD_CHAR=m
-CONFIG_MTD_BLOCK=m
-CONFIG_MTD_BLOCK_RO=m
+CONFIG_MTD_CHAR=y
+CONFIG_MTD_BLOCK=y
 # CONFIG_FTL is not set
 # CONFIG_NFTL is not set
 
 #
 # RAM/ROM/Flash chip drivers
 #
-CONFIG_MTD_CFI=m
-CONFIG_MTD_CFI_ADV_OPTIONS=y
-CONFIG_MTD_CFI_NOSWAP=y
-# CONFIG_MTD_CFI_BE_BYTE_SWAP is not set
-# CONFIG_MTD_CFI_LE_BYTE_SWAP is not set
-CONFIG_MTD_CFI_GEOMETRY=y
-# CONFIG_MTD_CFI_B1 is not set
-# CONFIG_MTD_CFI_B2 is not set
-CONFIG_MTD_CFI_B4=y
-# CONFIG_MTD_CFI_I1 is not set
-CONFIG_MTD_CFI_I2=y
-# CONFIG_MTD_CFI_I4 is not set
-CONFIG_MTD_CFI_INTELEXT=m
+# CONFIG_MTD_CFI is not set
+# CONFIG_MTD_CFI_INTELEXT is not set
 # CONFIG_MTD_CFI_AMDSTD is not set
 # CONFIG_MTD_AMDSTD is not set
 # CONFIG_MTD_SHARP is not set
@@ -204,28 +203,27 @@ CONFIG_MTD_CFI_INTELEXT=m
 # CONFIG_MTD_NETSC520 is not set
 # CONFIG_MTD_SBC_GXX is not set
 # CONFIG_MTD_ELAN_104NC is not set
-# CONFIG_MTD_SA1100 is not set
-# CONFIG_MTD_SA1100_REDBOOT_PARTITIONS is not set
-# CONFIG_MTD_SA1100_BOOTLDR_PARTITIONS is not set
-# CONFIG_MTD_DC21285 is not set
-# CONFIG_MTD_IQ80310 is not set
 # CONFIG_MTD_DBOX2 is not set
 # CONFIG_MTD_CSTM_MIPS_IXX is not set
 # CONFIG_MTD_CFI_FLAGADM is not set
-# CONFIG_MTD_ARM_INTEGRATOR is not set
 # CONFIG_MTD_SOLUTIONENGINE is not set
 # CONFIG_MTD_MIXMEM is not set
 # CONFIG_MTD_OCTAGON is not set
 # CONFIG_MTD_VMAX is not set
 # CONFIG_MTD_OCELOT is not set
 # CONFIG_MTD_L440GX is not set
+# CONFIG_MTD_ARM_INTEGRATOR is not set
+# CONFIG_MTD_CDB89712 is not set
+# CONFIG_MTD_SA1100 is not set
+# CONFIG_MTD_DC21285 is not set
+# CONFIG_MTD_IQ80310 is not set
 
 #
 # Self-contained MTD device drivers
 #
 # CONFIG_MTD_PMC551 is not set
 # CONFIG_MTD_SLRAM is not set
-# CONFIG_MTD_LART is not set
+CONFIG_MTD_LART=y
 # CONFIG_MTD_MTDRAM is not set
 # CONFIG_MTD_BLKMTD is not set
 
@@ -247,6 +245,7 @@ CONFIG_MTD_CFI_INTELEXT=m
 #
 # CONFIG_PNP is not set
 # CONFIG_ISAPNP is not set
+# CONFIG_PNPBIOS is not set
 
 #
 # Block devices
@@ -296,7 +295,7 @@ CONFIG_SYN_COOKIES=y
 # CONFIG_ATM is not set
 
 #
-#
+#  
 #
 # CONFIG_IPX is not set
 # CONFIG_ATALK is not set
@@ -351,8 +350,9 @@ CONFIG_NET_ETHERNET=y
 # Ethernet (1000 Mbit)
 #
 # CONFIG_ACENIC is not set
-# CONFIG_ACENIC_OMIT_TIGON_I is not set
+# CONFIG_DL2K is not set
 # CONFIG_MYRI_SBUS is not set
+# CONFIG_NS83820 is not set
 # CONFIG_HAMACHI is not set
 # CONFIG_YELLOWFIN is not set
 # CONFIG_SK98LIN is not set
@@ -439,6 +439,8 @@ CONFIG_IRDA_DEBUG=y
 # CONFIG_WINBOND_FIR is not set
 # CONFIG_TOSHIBA_FIR is not set
 # CONFIG_SMC_IRCC_FIR is not set
+# CONFIG_ALI_FIR is not set
+# CONFIG_VLSI_FIR is not set
 CONFIG_SA1100_FIR=m
 
 #
@@ -483,6 +485,9 @@ CONFIG_BLK_DEV_IDECD=m
 # CONFIG_IDEDMA_AUTO is not set
 # CONFIG_DMA_NONPCI is not set
 # CONFIG_BLK_DEV_IDE_MODES is not set
+# CONFIG_BLK_DEV_ATARAID is not set
+# CONFIG_BLK_DEV_ATARAID_PDC is not set
+# CONFIG_BLK_DEV_ATARAID_HPT is not set
 
 #
 # SCSI support
@@ -507,6 +512,10 @@ CONFIG_BLK_DEV_IDECD=m
 # Input core support
 #
 # CONFIG_INPUT is not set
+# CONFIG_INPUT_KEYBDEV is not set
+# CONFIG_INPUT_MOUSEDEV is not set
+# CONFIG_INPUT_JOYDEV is not set
+# CONFIG_INPUT_EVDEV is not set
 
 #
 # Character devices
@@ -515,18 +524,30 @@ CONFIG_BLK_DEV_IDECD=m
 # CONFIG_SERIAL is not set
 # CONFIG_SERIAL_EXTENDED is not set
 # CONFIG_SERIAL_NONSTANDARD is not set
-# CONFIG_SERIAL_21285 is not set
-# CONFIG_SERIAL_21285_OLD is not set
-# CONFIG_SERIAL_21285_CONSOLE is not set
+
+#
+# Serial drivers
+#
+# CONFIG_SERIAL_ANAKIN is not set
+# CONFIG_SERIAL_ANAKIN_CONSOLE is not set
 # CONFIG_SERIAL_AMBA is not set
 # CONFIG_SERIAL_AMBA_CONSOLE is not set
 # CONFIG_SERIAL_CLPS711X is not set
 # CONFIG_SERIAL_CLPS711X_CONSOLE is not set
+# CONFIG_SERIAL_21285 is not set
+# CONFIG_SERIAL_21285_OLD is not set
+# CONFIG_SERIAL_21285_CONSOLE is not set
 CONFIG_SERIAL_SA1100=y
 CONFIG_SERIAL_SA1100_CONSOLE=y
 CONFIG_SA1100_DEFAULT_BAUDRATE=9600
 # CONFIG_SERIAL_8250 is not set
 # CONFIG_SERIAL_8250_CONSOLE is not set
+# CONFIG_SERIAL_8250_EXTENDED is not set
+# CONFIG_SERIAL_8250_MANY_PORTS is not set
+# CONFIG_SERIAL_8250_SHARE_IRQ is not set
+# CONFIG_SERIAL_8250_DETECT_IRQ is not set
+# CONFIG_SERIAL_8250_MULTIPORT is not set
+# CONFIG_SERIAL_8250_HUB6 is not set
 CONFIG_SERIAL_CORE=y
 CONFIG_SERIAL_CORE_CONSOLE=y
 CONFIG_UNIX98_PTYS=y
@@ -535,7 +556,7 @@ CONFIG_UCB1200=m
 CONFIG_TOUCHSCREEN_UCB1200=m
 CONFIG_AUDIO_UCB1200=m
 CONFIG_ADC_UCB1200=m
-# CONFIG_TOUCHSCREEN_BITSY is not set
+# CONFIG_TOUCHSCREEN_H3600 is not set
 CONFIG_PROFILER=m
 # CONFIG_PFS168_SPI is not set
 # CONFIG_PFS168_DTMF is not set
@@ -547,6 +568,24 @@ CONFIG_PROFILER=m
 # CONFIG_I2C is not set
 
 #
+# L3 serial bus support
+#
+# CONFIG_L3 is not set
+# CONFIG_L3_ALGOBIT is not set
+# CONFIG_L3_BIT_SA1100_GPIO is not set
+
+#
+# Other L3 adapters
+#
+# CONFIG_L3_SA1111 is not set
+
+#
+# L3 driver support
+#
+# CONFIG_L3_DRV_UDA1341 is not set
+# CONFIG_BIT_SA1100_GPIO is not set
+
+#
 # Mice
 #
 # CONFIG_BUSMOUSE is not set
@@ -555,7 +594,11 @@ CONFIG_PROFILER=m
 #
 # Joysticks
 #
-# CONFIG_JOYSTICK is not set
+# CONFIG_INPUT_GAMEPORT is not set
+
+#
+# Input core support is needed for gameports
+#
 
 #
 # Input core support is needed for joysticks
@@ -573,6 +616,7 @@ CONFIG_SA1100_RTC=m
 # CONFIG_DTLK is not set
 # CONFIG_R3964 is not set
 # CONFIG_APPLICOM is not set
+# CONFIG_SONYPI is not set
 
 #
 # Ftape, the floppy tape device driver
@@ -594,18 +638,22 @@ CONFIG_SA1100_RTC=m
 # CONFIG_AUTOFS4_FS is not set
 CONFIG_REISERFS_FS=m
 # CONFIG_REISERFS_CHECK is not set
+# CONFIG_REISERFS_PROC_INFO is not set
 # CONFIG_ADFS_FS is not set
 # CONFIG_ADFS_FS_RW is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
 # CONFIG_BFS_FS is not set
+# CONFIG_CMS_FS is not set
+CONFIG_EXT3_FS=m
+CONFIG_JBD=m
+# CONFIG_JBD_DEBUG is not set
 # CONFIG_FAT_FS is not set
 # CONFIG_MSDOS_FS is not set
 # CONFIG_UMSDOS_FS is not set
 # CONFIG_VFAT_FS is not set
 # CONFIG_EFS_FS is not set
-CONFIG_JFFS_FS=m
-CONFIG_JFFS_FS_VERBOSE=1
+# CONFIG_JFFS_FS is not set
 CONFIG_JFFS2_FS=m
 CONFIG_JFFS2_FS_DEBUG=1
 CONFIG_CRAMFS=m
@@ -614,7 +662,7 @@ CONFIG_RAMFS=m
 CONFIG_ISO9660_FS=m
 CONFIG_JOLIET=y
 # CONFIG_MINIX_FS is not set
-# CONFIG_VXFS_FS is not set
+# CONFIG_FREEVXFS_FS is not set
 # CONFIG_NTFS_FS is not set
 # CONFIG_NTFS_RW is not set
 # CONFIG_HPFS_FS is not set
@@ -637,6 +685,7 @@ CONFIG_UDF_FS=m
 # Network File Systems
 #
 # CONFIG_CODA_FS is not set
+# CONFIG_INTERMEZZO_FS is not set
 CONFIG_NFS_FS=m
 CONFIG_NFS_V3=y
 # CONFIG_ROOT_NFS is not set
@@ -709,10 +758,7 @@ CONFIG_NLS_UTF8=m
 # Sound
 #
 CONFIG_SOUND=m
-# CONFIG_SOUND_ASSABET_UDA1341 is not set
-# CONFIG_SOUND_BITSY_UDA1341 is not set
-# CONFIG_SOUND_SA1111_UDA1341 is not set
-CONFIG_SOUND_SA1100SSP=m
+# CONFIG_SOUND_BT878 is not set
 # CONFIG_SOUND_CMPCI is not set
 # CONFIG_SOUND_EMU10K1 is not set
 # CONFIG_SOUND_FUSION is not set
@@ -723,19 +769,120 @@ CONFIG_SOUND_SA1100SSP=m
 # CONFIG_SOUND_MAESTRO is not set
 # CONFIG_SOUND_MAESTRO3 is not set
 # CONFIG_SOUND_ICH is not set
+# CONFIG_SOUND_RME96XX is not set
 # CONFIG_SOUND_SONICVIBES is not set
 # CONFIG_SOUND_TRIDENT is not set
 # CONFIG_SOUND_MSNDCLAS is not set
 # CONFIG_SOUND_MSNDPIN is not set
 # CONFIG_SOUND_VIA82CXXX is not set
 # CONFIG_MIDI_VIA82CXXX is not set
+# CONFIG_SOUND_ASSABET_UDA1341 is not set
+# CONFIG_SOUND_H3600_UDA1341 is not set
+# CONFIG_SOUND_PANGOLIN_UDA1341 is not set
+# CONFIG_SOUND_SA1111_UDA1341 is not set
+CONFIG_SOUND_SA1100SSP=m
 # CONFIG_SOUND_OSS is not set
+# CONFIG_SOUND_WAVEARTIST is not set
 # CONFIG_SOUND_TVMIXER is not set
 
 #
 # USB support
 #
 # CONFIG_USB is not set
+
+#
+# USB Controllers
+#
+# CONFIG_USB_UHCI is not set
+# CONFIG_USB_UHCI_ALT is not set
+# CONFIG_USB_OHCI is not set
+
+#
+# USB Device Class drivers
+#
+# CONFIG_USB_AUDIO is not set
+# CONFIG_USB_BLUETOOTH is not set
+# CONFIG_USB_STORAGE is not set
+# CONFIG_USB_STORAGE_DEBUG is not set
+# CONFIG_USB_STORAGE_DATAFAB is not set
+# CONFIG_USB_STORAGE_FREECOM is not set
+# CONFIG_USB_STORAGE_JUMPSHOT is not set
+# CONFIG_USB_STORAGE_DPCM is not set
+# CONFIG_USB_STORAGE_SDDR09 is not set
+# CONFIG_USB_ACM is not set
+# CONFIG_USB_PRINTER is not set
+
+#
+# USB Human Interface Devices (HID)
+#
+
+#
+#   Input core support is needed for USB HID
+#
+
+#
+# USB Imaging devices
+#
+# CONFIG_USB_DC2XX is not set
+# CONFIG_USB_MDC800 is not set
+# CONFIG_USB_SCANNER is not set
+# CONFIG_USB_MICROTEK is not set
+# CONFIG_USB_HPUSBSCSI is not set
+
+#
+# USB Multimedia devices
+#
+
+#
+#   Video4Linux support is needed for USB Multimedia device support
+#
+# CONFIG_USB_DABUSB is not set
+
+#
+# USB Network adaptors
+#
+# CONFIG_USB_PLUSB is not set
+# CONFIG_USB_PEGASUS is not set
+# CONFIG_USB_KAWETH is not set
+# CONFIG_USB_CATC is not set
+# CONFIG_USB_CDCETHER is not set
+# CONFIG_USB_USBNET is not set
+
+#
+# USB port drivers
+#
+# CONFIG_USB_USS720 is not set
+
+#
+# USB Serial Converter support
+#
+# CONFIG_USB_SERIAL is not set
+# CONFIG_USB_SERIAL_GENERIC is not set
+# CONFIG_USB_SERIAL_BELKIN is not set
+# CONFIG_USB_SERIAL_WHITEHEAT is not set
+# CONFIG_USB_SERIAL_DIGI_ACCELEPORT is not set
+# CONFIG_USB_SERIAL_EMPEG is not set
+# CONFIG_USB_SERIAL_FTDI_SIO is not set
+# CONFIG_USB_SERIAL_VISOR is not set
+# CONFIG_USB_SERIAL_EDGEPORT is not set
+# CONFIG_USB_SERIAL_KEYSPAN_PDA is not set
+# CONFIG_USB_SERIAL_KEYSPAN is not set
+# CONFIG_USB_SERIAL_KEYSPAN_USA28 is not set
+# CONFIG_USB_SERIAL_KEYSPAN_USA28X is not set
+# CONFIG_USB_SERIAL_KEYSPAN_USA19 is not set
+# CONFIG_USB_SERIAL_KEYSPAN_USA18X is not set
+# CONFIG_USB_SERIAL_KEYSPAN_USA19W is not set
+# CONFIG_USB_SERIAL_KEYSPAN_USA49W is not set
+# CONFIG_USB_SERIAL_MCT_U232 is not set
+# CONFIG_USB_SERIAL_PL2303 is not set
+# CONFIG_USB_SERIAL_CYBERJACK is not set
+# CONFIG_USB_SERIAL_OMNINET is not set
+
+#
+# Miscellaneous USB drivers
+#
+# CONFIG_USB_RIO500 is not set
+# CONFIG_USB_ID75 is not set
 
 #
 # Bluetooth support

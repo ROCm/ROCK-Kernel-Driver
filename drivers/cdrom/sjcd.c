@@ -1551,8 +1551,6 @@ int sjcd_open(struct inode *ip, struct file *fp)
 	if (fp->f_mode & 2)
 		return (-EROFS);
 
-	MOD_INC_USE_COUNT;
-
 	if (sjcd_open_count == 0) {
 		int s, sjcd_open_tries;
 /* We don't know that, do we? */
@@ -1618,7 +1616,6 @@ int sjcd_open(struct inode *ip, struct file *fp)
 	return (0);
 
       err_out:
-	MOD_DEC_USE_COUNT;
 	return (-EIO);
 }
 
@@ -1631,9 +1628,6 @@ static int sjcd_release(struct inode *inode, struct file *file)
 
 #if defined( SJCD_TRACE )
 	printk("SJCD: release\n");
-#endif
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
 #endif
 	if (--sjcd_open_count == 0) {
 		sjcd_invalidate_buffers();
@@ -1662,6 +1656,7 @@ static int sjcd_release(struct inode *inode, struct file *file)
  * A list of file operations allowed for this cdrom.
  */
 static struct block_device_operations sjcd_fops = {
+	owner:THIS_MODULE,
 	open:sjcd_open,
 	release:sjcd_release,
 	ioctl:sjcd_ioctl,

@@ -189,27 +189,11 @@ int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		    void *arg);
 int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
 
-static int mcd_dev_open(struct inode *inode, struct file *file)
-{
-	int err;
-	MOD_INC_USE_COUNT;
-	err = cdrom_open(inode, file);
-	if (err)
-		MOD_DEC_USE_COUNT;
-	return err;
-}
-
-static int mcd_dev_release(struct inode *inode, struct file *file)
-{
-	int err = cdrom_release(inode, file);
-	MOD_DEC_USE_COUNT;
-	return err;
-}
-
 struct block_device_operations mcd_bdops =
 {
-	open:			mcd_dev_open,
-	release:		mcd_dev_release,
+	owner:			THIS_MODULE,
+	open:			cdrom_open,
+	release:		cdrom_release,
 	ioctl:			cdrom_ioctl,
 	check_media_change:	cdrom_media_changed,
 };

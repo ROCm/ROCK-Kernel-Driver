@@ -7,7 +7,7 @@
  *  License.  See the file COPYING in the main directory of this archive for
  *  more details.
  */
-
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
@@ -16,6 +16,7 @@
 #include <linux/ide.h>
 #include <linux/init.h>
 
+#include <asm/setup.h>
 #include <asm/atarihw.h>
 #include <asm/atariints.h>
 #include <asm/atari_stdma.h>
@@ -41,7 +42,7 @@
 #define ATA_HD_STATUS	0x1d		/* see status-bits */
 #define ATA_HD_CONTROL	0x39
 
-static int __init falconide_offsets[IDE_NR_PORTS] = {
+static int falconide_offsets[IDE_NR_PORTS] __initdata = {
     ATA_HD_DATA, ATA_HD_ERROR, ATA_HD_NSECTOR, ATA_HD_SECTOR, ATA_HD_LCYL,
     ATA_HD_HCYL, ATA_HD_SELECT, ATA_HD_STATUS, ATA_HD_CONTROL, -1
 };

@@ -192,6 +192,8 @@ int __init i2o_pci_install(struct pci_dev *dev)
 	if(dev->subsystem_vendor == PCI_VENDOR_ID_PROMISE)
 	{
 		c->bus.pci.queue_buggy=1;
+		if (dev->subsystem_device == 0x0000) /* SX6000 ???? */
+			c->bus.pci.queue_buggy=2;
 		printk(KERN_INFO "I2O: Promise workarounds activated.\n");
 	}
 

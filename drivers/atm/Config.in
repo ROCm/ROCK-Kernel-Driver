@@ -7,6 +7,7 @@ if [ "$CONFIG_INET" = "y" ]; then
    tristate 'ATM over TCP' CONFIG_ATM_TCP
 fi
 if [ "$CONFIG_PCI" = "y" ]; then
+   tristate 'Efficient Networks Speedstream 3010' CONFIG_ATM_LANAI
    tristate 'Efficient Networks ENI155P' CONFIG_ATM_ENI
    if [ "$CONFIG_ATM_ENI" != "n" ]; then
       bool '  Enable extended debugging' CONFIG_ATM_ENI_DEBUG

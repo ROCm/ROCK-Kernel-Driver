@@ -67,7 +67,7 @@
 
 /* Embedded module documentation macros - see module.h */
 MODULE_AUTHOR("Compaq Computer Corporation");
-MODULE_DESCRIPTION("Driver for Compaq 64-bit/66Mhz PCI Fibre Channel HBA");
+MODULE_DESCRIPTION("Driver for Compaq 64-bit/66Mhz PCI Fibre Channel HBA v. 2.1.1");
 MODULE_LICENSE("GPL");
   
 int cpqfcTS_TargetDeviceReset( Scsi_Device *ScsiDev, unsigned int reset_flags);
@@ -304,6 +304,13 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
     while( (PciDev =
       pci_find_device( PCIids[i].vendor_id, PCIids[i].device_id, PciDev) ))
     {
+
+      if (pci_set_dma_mask(PciDev, CPQFCTS_DMA_MASK) != 0) {
+	printk(KERN_WARNING 
+		"cpqfc: HBA cannot support required DMA mask, skipping.\n");
+	continue;
+      }
+
       // NOTE: (kernel 2.2.12-32) limits allocation to 128k bytes...
       printk(" scsi_register allocating %d bytes for FC HBA\n",
 		      (ULONG)sizeof(CPQFCHBA));
@@ -415,8 +422,10 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
 
 
       // now initialize our hardware...
-
-      cpqfcHBAdata->fcChip.InitializeTachyon( cpqfcHBAdata, 1,1);
+      if (cpqfcHBAdata->fcChip.InitializeTachyon( cpqfcHBAdata, 1,1)) {
+	printk(KERN_WARNING "cpqfc: initialization of HBA hardware failed.\n");
+	// FIXME: might want to do something better than nothing here.
+      }
 
       cpqfcHBAdata->fcStatsTime = jiffies;  // (for FC Statistics delta)
       
@@ -660,7 +669,7 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
 
 
 
-      case SCSI_IOCTL_FC_TARGET_ADDRESS:
+      case CPQFC_IOCTL_FC_TARGET_ADDRESS:
       result = 
         verify_area(VERIFY_WRITE, arg, sizeof(Scsi_FCTargAddress));
       if (result) 
@@ -678,7 +687,7 @@ int cpqfcTS_ioctl( Scsi_Device *ScsiDev, int Cmnd, void *arg)
         break;
 
 
-      case SCSI_IOCTL_FC_TDR:
+      case CPQFC_IOCTL_FC_TDR:
           
         result = cpqfcTS_TargetDeviceReset( ScsiDev, 0);
 
@@ -880,7 +889,6 @@ int cpqfcTS_proc_info (char *buffer, char **start, off_t offset, int length,
   cpqfcTSDecodeGBICtype( &cpqfcHBA->fcChip, &buf[0]);
   cpqfcTSGetLPSM( &cpqfcHBA->fcChip, &buf[ strlen(buf)]);
   copy_info(&info, "%s\n", buf); 
-		  
 
 #define DISPLAY_WWN_INFO
 #ifdef DISPLAY_WWN_INFO
@@ -905,6 +913,9 @@ int cpqfcTS_proc_info (char *buffer, char **start, off_t offset, int length,
     }
   }
 #endif
+
+
+
   
   
 // Unfortunately, the proc_info buffer isn't big enough
@@ -1191,6 +1202,9 @@ static void QueLinkDownCmnd( CPQFCHBA *cpqfcHBAdata, Scsi_Cmnd *Cmnd)
 
 // The file "hosts.h" says not to call scsi_done from
 // inside _queuecommand, so we'll do it from the heartbeat timer
+// (clarification: Turns out it's ok to call scsi_done from queuecommand 
+// for cases that don't go to the hardware like scsi cmds destined
+// for LUNs we know don't exist, so this code might be simplified...)
 
 static void QueBadTargetCmnd( CPQFCHBA *cpqfcHBAdata, Scsi_Cmnd *Cmnd)
 {
@@ -1675,8 +1689,15 @@ void cpqfcTS_intr_handler( int irq,
   	printk(" cpqfcTS adapter PCI master address crossed 45-bit boundary\n");
       if( IntPending & 0x2 )
 	printk(" cpqfcTS adapter DMA error detected\n");
-      if( IntPending & 0x1 )
+      if( IntPending & 0x1 ) {
+  	UCHAR IntStat;
   	printk(" cpqfcTS adapter PCI error detected\n");
+  	IntStat = readb( cpqfcHBA->fcChip.Registers.INTSTAT.address);
+	if (IntStat & 0x4) printk("(INT)\n");
+	if (IntStat & 0x8) 
+		printk("CRS: PCI master address crossed 46 bit bouandary\n");
+	if (IntStat & 0x10) printk("MRE: external memory parity error.\n");
+      }
     }      
   }
   spin_unlock_irqrestore( &io_request_lock, flags);
@@ -1859,8 +1880,9 @@ int cpqfcTSGetLPSM( PTACHYON fcChip, char cErrorString[])
 // we need about 8 allocations per HBA.  Figuring at most 10 HBAs per server
 // size the dynamic_mem array at 80.
 
-void* fcMemManager( ALIGNED_MEM *dynamic_mem, ULONG n_alloc, ULONG ab,
-                   ULONG u32_AlignedAddress)
+void* fcMemManager( struct pci_dev *pdev, ALIGNED_MEM *dynamic_mem, 
+		   ULONG n_alloc, ULONG ab, ULONG u32_AlignedAddress,
+			dma_addr_t *dma_handle)
 {
   USHORT allocBoundary=1;   // compiler specific - worst case 1
                                   // best case - replace malloc() call
@@ -1882,38 +1904,51 @@ void* fcMemManager( ALIGNED_MEM *dynamic_mem, ULONG n_alloc, ULONG ab,
       if( dynamic_mem[i].AlignedAddress == u32_AlignedAddress )
       {
         alloc_address = dynamic_mem[i].BaseAllocated; // 'success' status
-        kfree( dynamic_mem[i].BaseAllocated);  // return pages to kernel
+	pci_free_consistent(pdev,dynamic_mem[i].size, 
+				alloc_address, 
+				dynamic_mem[i].dma_handle);
         dynamic_mem[i].BaseAllocated = 0;   // clear for next use
         dynamic_mem[i].AlignedAddress = 0;
+        dynamic_mem[i].size = 0;
         break;                        // quit for loop; done
       }
     }
   }
   else if( n_alloc )                   // want new memory?
   {
+    dma_addr_t handle;
     t_alloc = n_alloc + (ab - allocBoundary); // pad bytes for alignment
-//    printk("kmalloc() for Tach alignment: %ld bytes\n", t_alloc);
+//    printk("pci_alloc_consistent() for Tach alignment: %ld bytes\n", t_alloc);
 
+// (would like to) allow thread block to free pages 
     alloc_address =                  // total bytes (NumberOfBytes)
-      kmalloc( t_alloc, GFP_KERNEL); // allow thread block to free pages 
-
+      pci_alloc_consistent(pdev, t_alloc, &handle); 
 
                                   // now mask off least sig. bits of address
     if( alloc_address )           // (only if non-NULL)
     {
                                   // find place to store ptr, so we
                                   // can free it later...
+
+      mask = (LONG)(ab - 1);            // mask all low-order bits
+      mask = ~mask;                            // invert bits
       for( i=0; i<DYNAMIC_ALLOCATIONS; i++) // look for free slot
       {
         if( dynamic_mem[i].BaseAllocated == 0) // take 1st available
         {
           dynamic_mem[i].BaseAllocated = alloc_address;// address from O/S
+          dynamic_mem[i].dma_handle = handle;
+	  if (dma_handle != NULL) 
+	  {
+//             printk("handle = %p, ab=%d, boundary = %d, mask=0x%08x\n", 
+//			handle, ab, allocBoundary, mask);
+	    *dma_handle = (dma_addr_t) 
+		((((ULONG)handle) + (ab - allocBoundary)) & mask);
+	  }
+          dynamic_mem[i].size = t_alloc;
           break;
         }
       }
-      mask = (LONG)(ab - 1);            // mask all low-order bits
-      mask = ~mask;                            // invert bits
-
       ulAddress = (unsigned long)alloc_address;
       
       ulAddress += (ab - allocBoundary);    // add the alignment bytes-

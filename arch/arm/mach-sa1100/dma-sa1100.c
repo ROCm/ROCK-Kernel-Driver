@@ -611,7 +611,7 @@ static int __init sa1100_init_dma(void)
 	int channel;
 	for (channel = 0; channel < SA1100_DMA_CHANNELS; channel++) {
 		dma_chan[channel].regs =
-		    (dma_regs_t *) io_p2v(_DDAR(channel));
+		    (dma_regs_t *) &DDAR(channel);
 		dma_chan[channel].irq = IRQ_DMA0 + channel;
 	}
 	return 0;

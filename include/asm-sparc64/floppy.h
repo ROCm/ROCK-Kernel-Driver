@@ -104,7 +104,6 @@ static int sun_floppy_types[2] = { 0, 0 };
 #define FLOPPY1_TYPE		sun_floppy_types[1]
 
 #define FDC1			((unsigned long)sun_fdc)
-static int FDC2 =		-1;
 
 #define N_FDC    1
 #define N_DRIVE  8
@@ -883,5 +882,7 @@ static unsigned long __init sun_floppy_init(void)
 
 	return sun_floppy_types[0];
 }
+
+#define EXTRA_FLOPPY_PARAMS
 
 #endif /* !(__ASM_SPARC64_FLOPPY_H) */

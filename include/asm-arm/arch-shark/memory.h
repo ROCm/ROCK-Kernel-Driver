@@ -1,7 +1,7 @@
 /*
  * linux/include/asm-arm/arch-shark/memory.h
  *
- * by Alexander Schulz <aschulz@netwinder.org>
+ * by Alexander Schulz
  *
  * derived from:
  * linux/include/asm-arm/arch-ebsa110/memory.h

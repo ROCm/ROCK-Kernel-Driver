@@ -245,32 +245,58 @@ nico@cam.org
 June 12, 2001
 
 
-Status of peripherals in -rmk tree
-----------------------------------
+Status of peripherals in -rmk tree (updated 14/10/2001)
+-------------------------------------------------------
 
 Assabet:
  Serial ports:
-  Radio:	TX, RX, CTS, DSR, DCD, RI
-  COM:		TX, RX, CTS, DSR, DCD, RTS, DTR, PM
-  I2C:		TX, RX
-  L3:		No
+  Radio:		TX, RX, CTS, DSR, DCD, RI
+   PM:			Not tested.
+  COM:			TX, RX, CTS, DSR, DCD, RTS, DTR, PM
+   PM:			Not tested.
+  I2C:			Implemented, not fully tested.
+  L3:			Fully tested, pass.
+   PM:			Not tested.
 
  Video:
-  LCD:		PM
-  Video out:	Not fully
-  Touchscreen:	No
+  LCD:			Fully tested.  PM
+			(LCD doesn't like being blanked with
+			 neponset connected)
+  Video out:		Not fully
 
  Audio:
-  Codec:	No
-  POTS:		No
+  UDA1341:
+   Playback:		Fully tested, pass.
+   Record:		Implemented, not tested.
+   PM:			Not tested.
+
+  UCB1200:
+   Audio play:		Implemented, not heavily tested.
+   Audio rec:		Implemented, not heavily tested.
+   Telco audio play:	Implemented, not heavily tested.
+   Telco audio rec:	Implemented, not heavily tested.
+   POTS control:	No
+   Touchscreen:		Yes
+   PM:			Not tested.
 
  Other:
-  PCMCIA:	Yes
-  USB:		No
+  PCMCIA:
+   LPE:			Fully tested, pass.
+  USB:			No
+  IRDA:
+   SIR:			Fully tested, pass.
+   FIR:			Fully tested, pass.
+   PM:			Not tested.
 
 Neponset:
  Serial ports:
   COM1,2:	TX, RX, CTS, DSR, DCD, RTS, DTR
+   PM:			Not tested.
+  USB:			Implemented, not heavily tested.
+  PCMCIA:		Implemented, not heavily tested.
+   PM:			Not tested.
+  CF:			Implemented, not heavily tested.
+   PM:			Not tested.
 
 More stuff can be found in the -np (Nicolas Pitre's) tree.
 

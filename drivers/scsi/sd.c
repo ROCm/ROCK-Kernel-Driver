@@ -555,6 +555,7 @@ static int sd_release(struct inode *inode, struct file *file)
 
 static struct block_device_operations sd_fops =
 {
+	owner:			THIS_MODULE,
 	open:			sd_open,
 	release:		sd_release,
 	ioctl:			sd_ioctl,

@@ -14,6 +14,9 @@ if [ "$CONFIG_DONGLE" != "n" ]; then
    dep_tristate '  Greenwich GIrBIL dongle' CONFIG_GIRBIL_DONGLE $CONFIG_IRDA
    dep_tristate '  Parallax LiteLink dongle' CONFIG_LITELINK_DONGLE $CONFIG_IRDA
    dep_tristate '  Old Belkin dongle' CONFIG_OLD_BELKIN_DONGLE $CONFIG_IRDA   
+   if [ "$CONFIG_ARCH_EP7211" = "y" ]; then
+      dep_tristate '  EP7211 I/R support' CONFIG_EP7211_IR $CONFIG_IRDA
+   fi
 fi
 
 comment 'FIR device drivers'
@@ -25,6 +28,9 @@ if [ "$CONFIG_EXPERIMENTAL" != "n" ]; then
 dep_tristate 'SMC IrCC (Experimental)' CONFIG_SMC_IRCC_FIR $CONFIG_IRDA
 dep_tristate 'ALi M5123 FIR (Experimental)' CONFIG_ALI_FIR $CONFIG_IRDA
 dep_tristate 'VLSI 82C147 SIR/MIR/FIR (Experimental)' CONFIG_VLSI_FIR $CONFIG_IRDA
+fi
+if [ "$CONFIG_ARCH_SA1100" = "y" ]; then
+   dep_tristate 'SA1100 Internal IR' CONFIG_SA1100_FIR $CONFIG_IRDA
 fi
 
 endmenu

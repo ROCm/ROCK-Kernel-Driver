@@ -608,7 +608,6 @@ int xpram_open (struct inode *inode, struct file *filp)
                      dev->size,dev->device_name, atomic_read(&(dev->usage)));
 
 	atomic_inc(&(dev->usage));
-	MOD_INC_USE_COUNT;
 	return 0;          /* success */
 }
 
@@ -627,7 +626,6 @@ int xpram_release (struct inode *inode, struct file *filp)
 		/* but flush it right now */
 		/* Everything is already flushed by caller -- AV */
 	}
-	MOD_DEC_USE_COUNT;
 	return(0);
 }
 
@@ -740,6 +738,7 @@ struct file_operations xpram_fops = {
 #if (XPRAM_VERSION == 24)
 struct block_device_operations xpram_devops =
 {
+	owner:   THIS_MODULE,
 	ioctl:   xpram_ioctl,
 	open:    xpram_open,
 	release: xpram_release,

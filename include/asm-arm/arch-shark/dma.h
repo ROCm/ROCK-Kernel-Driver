@@ -1,7 +1,7 @@
 /*
  * linux/include/asm-arm/arch-shark/dma.h
  *
- * by Alexander Schulz <aschulz@netwinder.org>
+ * by Alexander Schulz
  */
 #ifndef __ASM_ARCH_DMA_H
 #define __ASM_ARCH_DMA_H

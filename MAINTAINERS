@@ -93,7 +93,12 @@ M:	ajk@iehk.rwth-aachen.de
 L:	linux-hams@vger.kernel.org
 S:	Maintained
 
-8139TOO ETHERNET DRIVER
+8139CP 10/100 FAST ETHERNET DRIVER
+P:	Jeff Garzik
+M:	jgarzik@mandrakesoft.com
+S:	Maintained
+
+8139TOO 10/100 FAST ETHERNET DRIVER
 P:	Jeff Garzik
 M:	jgarzik@mandrakesoft.com
 W:	http://sourceforge.net/projects/gkernel/
@@ -638,6 +643,13 @@ i386 BOOT CODE
 P:	Riley H. Williams
 M:	rhw@memalpha.cx
 L:	Linux-Kernel@vger.kernel.org
+S:	Maintained
+
+i386 SETUP CODE / CPU ERRATA WORKAROUNDS
+P:	Dave Jones
+M:	davej@suse.de
+P:	H. Peter Anvin
+M:	hpa@zytor.com
 S:	Maintained
 
 i810 TCO TIMER WATCHDOG

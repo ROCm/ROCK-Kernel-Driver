@@ -4,11 +4,10 @@
 
 O_TARGET := cramfs.o
 
-obj-y  := inode.o uncompress.o inflate/zlib.o
+obj-y  := inode.o uncompress.o
 
 obj-m := $(O_TARGET)
 
-include $(TOPDIR)/Rules.make
+CFLAGS_uncompress.o := -I $(TOPDIR)/fs/inflate_fs
 
-inflate/zlib.o:
-	make -C inflate
+include $(TOPDIR)/Rules.make

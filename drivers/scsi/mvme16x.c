@@ -52,3 +52,6 @@ int mvme16x_scsi_detect(Scsi_Host_Template *tpnt)
     called = 1;
     return 1;
 }
+
+static Scsi_Host_Template driver_template = MVME16x_SCSI;
+#include "scsi_module.c"

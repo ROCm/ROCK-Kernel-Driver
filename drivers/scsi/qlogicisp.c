@@ -1279,8 +1279,10 @@ static int isp1020_reset_hardware(struct Scsi_Host *host)
 	isp_outw(HCCR_BIOS_DISABLE, host, HOST_HCCR);
 
 	loop_count = DEFAULT_LOOP_COUNT;
-	while (--loop_count && isp_inw(host, HOST_HCCR) == RISC_BUSY)
+	while (--loop_count && isp_inw(host, HOST_HCCR) == RISC_BUSY) {
 		barrier();
+		cpu_relax();
+	}
 	if (!loop_count)
 		printk("qlogicisp: reset_hardware loop timeout\n");
 
@@ -1904,8 +1906,10 @@ static int isp1020_mbox_command(struct Scsi_Host *host, u_short param[])
 		return 1;
 
 	loop_count = DEFAULT_LOOP_COUNT;
-	while (--loop_count && isp_inw(host, HOST_HCCR) & 0x0080)
+	while (--loop_count && isp_inw(host, HOST_HCCR) & 0x0080) {
 		barrier();
+		cpu_relax();
+	}
 	if (!loop_count)
 		printk("qlogicisp: mbox_command loop timeout #1\n");
 
@@ -1925,14 +1929,18 @@ static int isp1020_mbox_command(struct Scsi_Host *host, u_short param[])
 	isp_outw(HCCR_SET_HOST_INTR, host, HOST_HCCR);
 
 	loop_count = DEFAULT_LOOP_COUNT;
-	while (--loop_count && !(isp_inw(host, PCI_INTF_STS) & 0x04))
+	while (--loop_count && !(isp_inw(host, PCI_INTF_STS) & 0x04)) {
 		barrier();
+		cpu_relax();
+	}
 	if (!loop_count)
 		printk("qlogicisp: mbox_command loop timeout #2\n");
 
 	loop_count = DEFAULT_LOOP_COUNT;
-	while (--loop_count && isp_inw(host, MBOX0) == 0x04)
+	while (--loop_count && isp_inw(host, MBOX0) == 0x04) {
 		barrier();
+		cpu_relax();
+	}
 	if (!loop_count)
 		printk("qlogicisp: mbox_command loop timeout #3\n");
 

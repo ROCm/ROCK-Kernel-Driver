@@ -3,7 +3,6 @@
  */
 
 #include <linux/time.h>
-#include <linux/fs.h>
 #include <linux/iso_fs.h>
 
 /* 

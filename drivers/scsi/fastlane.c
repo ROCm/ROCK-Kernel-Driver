@@ -41,7 +41,7 @@
 
 #include <linux/zorro.h>
 #include <asm/irq.h>
-#include <asm/io.h>
+
 #include <asm/amigaints.h>
 #include <asm/amigahw.h>
 
@@ -74,7 +74,7 @@ static unsigned char ctrl_data = 0;	/* Keep backup of the stuff written
 				 * the hardware register!
 				 */
 
-volatile unsigned char cmd_buffer[16];
+static volatile unsigned char cmd_buffer[16];
 				/* This is where all commands are put
 				 * before they are transferred to the ESP chip
 				 * via PIO.

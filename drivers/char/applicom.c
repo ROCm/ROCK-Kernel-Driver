@@ -72,6 +72,17 @@ static char *applicom_pci_devnames[] = {
 	"PCI2000PFB"
 };
 
+static struct pci_device_id applicom_pci_tbl[] = {
+	{ PCI_VENDOR_ID_APPLICOM, PCI_DEVICE_ID_APPLICOM_PCIGENERIC,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_VENDOR_ID_APPLICOM, PCI_DEVICE_ID_APPLICOM_PCI2000IBS_CAN,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_VENDOR_ID_APPLICOM, PCI_DEVICE_ID_APPLICOM_PCI2000PFB,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ 0 }
+};
+MODULE_DEVICE_TABLE(pci, applicom_pci_tbl);
+
 MODULE_AUTHOR("David Woodhouse & Applicom International");
 MODULE_DESCRIPTION("Driver for Applicom Profibus card");
 MODULE_LICENSE("GPL");
@@ -437,7 +448,7 @@ static ssize_t ac_write(struct file *file, const char *buf, size_t count, loff_t
 	}
 
 	/* We may not have actually slept */
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&apbs[IndexCard].FlagSleepSend, &wait);
 
 	writeb(1, apbs[IndexCard].RamIO + DATA_FROM_PC_READY);

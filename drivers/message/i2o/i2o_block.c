@@ -1247,7 +1247,6 @@ static int i2ob_release(struct inode *inode, struct file *file)
 		
 		DEBUG("Unclaim\n");
 	}
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1306,7 +1305,6 @@ static int i2ob_open(struct inode *inode, struct file *file)
 		i2o_post_wait(dev->controller, msg, 20, 2);
 		DEBUG("Ready.\n");
 	}		
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -1371,33 +1369,33 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 
 	for(i=unit;i<=unit+15;i++)
 	{
-		if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.queue_buggy)
+		i2ob_max_sectors[i] = 256;
+		i2ob_dev[i].max_segments = (d->controller->status_block->inbound_frame_size - 8)/2;
+
+		if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.queue_buggy == 2)
+			i2ob_dev[i].depth = 32;
+
+		if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.queue_buggy == 1)
 		{
 			i2ob_max_sectors[i] = 32;
 			i2ob_dev[i].max_segments = 8;
 			i2ob_dev[i].depth = 4;
 		}
-		else if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.short_req)
+
+		if(d->controller->type == I2O_TYPE_PCI && d->controller->bus.pci.short_req)
 		{
 			i2ob_max_sectors[i] = 8;
 			i2ob_dev[i].max_segments = 8;
 		}
-		else
-		{
-			/* MAX_SECTORS was used but 255 is a dumb number for
-			   striped RAID */
-			i2ob_max_sectors[i]=256;
-			i2ob_dev[i].max_segments = (d->controller->status_block->inbound_frame_size - 8)/2;
-		}
 	}
 
-	printk(KERN_INFO "Max segments set to %d\n", 
-				i2ob_dev[unit].max_segments);
-	printk(KERN_INFO "Byte limit is %d.\n", limit);
+
+	sprintf(d->dev_name, "%s%c", i2ob_gendisk.major_name, 'a' + (unit>>4));
+
+	printk(KERN_INFO "%s: Max segments %d, queue depth %d, byte limit %d.\n",
+		 d->dev_name, i2ob_dev[unit].max_segments, i2ob_dev[unit].depth, limit);
 
 	i2ob_query_device(dev, 0x0000, 0, &type, 1);
-	
-	sprintf(d->dev_name, "%s%c", i2ob_gendisk.major_name, 'a' + (unit>>4));
 
 	printk(KERN_INFO "%s: ", d->dev_name);
 	switch(type)
@@ -1417,7 +1415,7 @@ static int i2ob_install_device(struct i2o_controller *c, struct i2o_device *d, i
 		printk(KERN_INFO " Not loaded.\n");
 		return 1;
 	}
-	printk("- %dMb, %d byte sectors",
+	printk(": %dMB, %d byte sectors",
 		(int)(size>>20), blocksize);
 	if(status&(1<<0))
 	{
@@ -1838,6 +1836,7 @@ static void i2ob_reboot_event(void)
 
 static struct block_device_operations i2ob_fops =
 {
+	owner:			THIS_MODULE,
 	open:			i2ob_open,
 	release:		i2ob_release,
 	ioctl:			i2ob_ioctl,

@@ -184,8 +184,10 @@ static int qlogicpti_mbox_command(struct qlogicpti *qpti, u_short param[], int f
 
 	/* Wait for host IRQ bit to clear. */
 	loop_count = DEFAULT_LOOP_COUNT;
-	while (--loop_count && (sbus_readw(qpti->qregs + HCCTRL) & HCCTRL_HIRQ))
+	while (--loop_count && (sbus_readw(qpti->qregs + HCCTRL) & HCCTRL_HIRQ)) {
 		barrier();
+		cpu_relax();
+	}
 	if (!loop_count)
 		printk(KERN_EMERG "qlogicpti: mbox_command loop timeout #1\n");
 

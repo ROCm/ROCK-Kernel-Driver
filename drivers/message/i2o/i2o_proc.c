@@ -955,13 +955,14 @@ int i2o_proc_read_drivers_stored(char *buf, char **start, off_t offset,
 	i2o_driver_result_table *result;
 	i2o_driver_store_table *dst;
 
-	spin_lock(&i2o_proc_lock);
 
 	len = 0;
 	
 	result = kmalloc(sizeof(i2o_driver_result_table), GFP_KERNEL);
 	if(result == NULL)
 		return -ENOMEM;
+
+	spin_lock(&i2o_proc_lock);
 
 	token = i2o_query_table(I2O_PARAMS_TABLE_GET,
 				c, ADAPTER_TID, 0x0005, -1, NULL, 0, 

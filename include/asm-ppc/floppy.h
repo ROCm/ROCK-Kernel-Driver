@@ -58,4 +58,7 @@ static int FDC2 = -1;
 #define CROSS_64KB(a,s)	(0)
 
 #endif /* __ASM_PPC_FLOPPY_H */
+
+#define EXTRA_FLOPPY_PARAMS
+
 #endif /* __KERNEL__ */

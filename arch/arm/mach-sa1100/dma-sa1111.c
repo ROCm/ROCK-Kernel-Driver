@@ -23,7 +23,6 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 
-
 // #define DEBUG
 #ifdef DEBUG
 #define DPRINTK( s, arg... )  printk( "dma<%s>: " s, dma->device_id , ##arg )
@@ -305,7 +304,7 @@ int sa1111_check_dma_bug(dma_addr_t addr){
 	 * SDRAM bank 1 on Neponset). The default configuration selects
 	 * Assabet, so any address in bank 1 is necessarily invalid.
 	 */
-	if((machine_is_assabet() || machine_is_pfs168()) && addr >= _DRAMBnk1)
+	if((machine_is_assabet() || machine_is_pfs168()) && addr >= 0xc8000000)
 	  	return -1;
 
 	/* The bug only applies to buffers located more than one megabyte
@@ -340,7 +339,7 @@ int sa1111_check_dma_bug(dma_addr_t addr){
 		  	return -1;
 		break;
 	default:
-	  	printk(KERN_ERR "%s(): invalid SMCR DRAC value 0%o\n",
+	  	printk(KERN_ERR "%s(): invalid SMCR DRAC value 0%lo\n",
 		       __FUNCTION__, FExtr(SBI_SMCR, SMCR_DRAC));
 		return -1;
 	}

@@ -59,6 +59,9 @@ extern unsigned long search_exception_table(unsigned long);
     case 4:						\
 	__put_user_asm(__pu_err, __pu_val, ptr, l);	\
 	break;						\
+    case 8:                                             \
+       __pu_err = __constant_copy_to_user(ptr, &__pu_val, 8);        \
+       break;                                           \
     default:						\
 	__pu_err = __put_user_bad();			\
 	break;						\
@@ -105,6 +108,9 @@ __asm__ __volatile__					\
     case 4:							\
 	__get_user_asm(__gu_err, __gu_val, ptr, l, "=r");	\
 	break;							\
+    case 8:                                                     \
+        __gu_err = __constant_copy_from_user(&__gu_val, ptr, 8);  \
+        break;                                                  \
     default:							\
 	__gu_val = 0;						\
 	__gu_err = __get_user_bad();				\

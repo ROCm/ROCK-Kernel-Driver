@@ -39,6 +39,7 @@ choice 'ARM system type' \
  	 CLPS711x/EP721x-based	CONFIG_ARCH_CLPS711X \
 	 Co-EBSA285		CONFIG_ARCH_CO285 \
 	 EBSA-110		CONFIG_ARCH_EBSA110 \
+ 	 Epxa10db               CONFIG_ARCH_CAMELOT \
 	 FootBridge		CONFIG_ARCH_FOOTBRIDGE \
 	 Integrator		CONFIG_ARCH_INTEGRATOR \
 	 LinkUp-L7200		CONFIG_ARCH_L7200 \
@@ -73,7 +74,16 @@ dep_bool '  ADS Bitsy' CONFIG_SA1100_ADSBITSY $CONFIG_ARCH_SA1100
 dep_bool '  Brutus' CONFIG_SA1100_BRUTUS $CONFIG_ARCH_SA1100
 dep_bool '  CerfBoard' CONFIG_SA1100_CERF $CONFIG_ARCH_SA1100
 if [ "$CONFIG_SA1100_CERF" = "y" ]; then
-   bool '    32MB Cerf support' CONFIG_SA1100_CERF_32MB
+   choice 'Cerf RAM available' \
+        "8MB   CONFIG_SA1100_CERF_8MB \
+         16MB   CONFIG_SA1100_CERF_16MB \
+         32MB   CONFIG_SA1100_CERF_32MB \
+         64MB   CONFIG_SA1100_CERF_64MB" CerfRam
+   choice 'Cerf Flash available'  \
+        "8MB    CONFIG_SA1100_CERF_FLASH_8MB \
+         16MB   CONFIG_SA1100_CERF_FLASH_16MB \
+         32MB   CONFIG_SA1100_CERF_FLASH_32MB" CerfFlash
+   bool 'Cerf w/CPLD support (CerfPDA)' CONFIG_SA1100_CERF_CPLD
 fi
 dep_bool '  Compaq iPAQ H3600' CONFIG_SA1100_H3600 $CONFIG_ARCH_SA1100
 #dep_bool '  Empeg' CONFIG_SA1100_EMPEG $CONFIG_ARCH_SA1100
@@ -194,7 +204,8 @@ if [ "$CONFIG_ARCH_EBSA110"    = "y" -o "$CONFIG_FOOTBRIDGE"    = "y" -o \
      "$CONFIG_ARCH_TBOX"       = "y" -o "$CONFIG_ARCH_SHARK"    = "y" -o \
      "$CONFIG_ARCH_NEXUSPCI"   = "y" -o "$CONFIG_ARCH_CLPS711X" = "y" -o \
      "$CONFIG_ARCH_INTEGRATOR" = "y" -o "$CONFIG_ARCH_SA1100"   = "y" -o \
-     "$CONFIG_ARCH_L7200"      = "y" -o "$CONFIG_ARCH_ANAKIN"	= "y" ]; then
+     "$CONFIG_ARCH_L7200"      = "y" -o "$CONFIG_ARCH_ANAKIN"	= "y" -o \
+     "$CONFIG_ARCH_CAMELOT"    = "y" ]; then
    define_bool CONFIG_CPU_32v4 y
 else
    define_bool CONFIG_CPU_32v4 n
@@ -369,6 +380,7 @@ if [ "$CONFIG_ARCH_EBSA110" = "y" -o         \
      "$CONFIG_ARCH_CATS" = "y" -o            \
      "$CONFIG_ARCH_P720T" = "y" -o	     \
      "$CONFIG_ARCH_CDB89712" = "y" -o	     \
+     "$CONFIG_ARCH_CAMELOT" = "y" -o	     \
      "$CONFIG_ARCH_ANAKIN" = "y" ]; then
    string 'Default kernel command string' CONFIG_CMDLINE ""
 fi
@@ -562,7 +574,9 @@ bool 'Compile kernel without frame pointer' CONFIG_NO_FRAME_POINTER
 bool 'Verbose kernel error messages' CONFIG_DEBUG_ERRORS
 bool 'Verbose user fault messages' CONFIG_DEBUG_USER
 bool 'Include debugging information in kernel binary' CONFIG_DEBUG_INFO
+bool 'Debug memory allocations' CONFIG_DEBUG_SLAB
 bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+bool 'Spinlock debugging' CONFIG_DEBUG_SPINLOCK
 dep_bool 'Disable pgtable cache' CONFIG_NO_PGT_CACHE $CONFIG_CPU_26
 # These options are only for real kernel hackers who want to get their hands dirty. 
 dep_bool 'Kernel low-level debugging functions' CONFIG_DEBUG_LL $CONFIG_EXPERIMENTAL

@@ -9,9 +9,9 @@
  *              as published by the Free Software Foundation; either version
  *              2 of the License, or (at your option) any later version.
  *
- * Version : v1.17a (July 13, 2001)
+ * Version : v1.18 (Oct 11, 2001)
  *
- * Description: Linux device driver for AMI MegaRAID controller
+ * Description: Linux device driver for LSI Logic MegaRAID controller
  *
  * Supported controllers: MegaRAID 418, 428, 438, 466, 762, 467, 471, 490
  *                                      493.
@@ -427,11 +427,38 @@
  * our current formula working to calculate logical drive number, return
  * failure for LUN > 7
  *
+ *
+ * Version 1.17b
+ * Mon Jul 30 19:24:02 EDT 2001 - AM
+ *
+ * Added support for random deletion of logical drives
+ *
+ * Version 1.17c
+ * Tue Sep 25 09:37:49 EDT 2001 - Atul Mukker <atulm@lsil.com>
+ *
+ * With single and dual channel controllers, some virtaul channels are
+ * displayed negative.
+ *
  * Version 1.17a-ac
  * Mon Aug 6 14:59:29 BST 2001 - "Michael Johnson" <johnsom@home.com>
  *
  * Make the HP print formatting and check for buggy firmware runtime not
  * ifdef dependant.
+ *
+ *
+ * Version 1.17d
+ * Thu Oct 11 10:48:45 EDT 2001 - Atul Mukker <atulm@lsil.com>
+ *
+ * Driver 1.17c oops when loaded without controller.
+ *
+ * Special case for "use_sg == 1" removed while building the scatter gather
+ * list.
+ *
+ * Version 1.18
+ * Thu Oct 11 15:02:53 EDT 2001 - Atul Mukker <atulm@lsil.com>
+ *
+ * References to AMI have been changed to LSI Logic.
+ *
  *
  * BUGS:
  *     Some older 2.1 kernels (eg. 2.1.90) have a bug in pci.c that
@@ -550,16 +577,15 @@ static void WROUTDOOR (mega_host_config * megaCfg, ulong value)
  *	queue task is a simple api without irq forms
  */
 
-MODULE_AUTHOR ("American Megatrends Inc.");
-MODULE_DESCRIPTION ("AMI MegaRAID driver");
-MODULE_LICENSE("GPL");
-
+MODULE_AUTHOR ("LSI Logic Corporation");
+MODULE_DESCRIPTION ("LSI Logic MegaRAID driver");
+MODULE_LICENSE ("GPL");
 
 #define DRIVER_LOCK_T
 #define DRIVER_LOCK_INIT(p)
 #define DRIVER_LOCK(p)
 #define DRIVER_UNLOCK(p)
-#define IO_LOCK_T unsigned long io_flags = 0;
+#define IO_LOCK_T unsigned long io_flags = 0
 #define IO_LOCK spin_lock_irqsave(&io_request_lock,io_flags);
 #define IO_UNLOCK spin_unlock_irqrestore(&io_request_lock,io_flags);
 
@@ -578,14 +604,14 @@ MODULE_LICENSE("GPL");
  */
 
 static char kernel_version[] = UTS_RELEASE;
-MODULE_AUTHOR ("American Megatrends Inc.");
-MODULE_DESCRIPTION ("AMI MegaRAID driver");
+MODULE_AUTHOR ("LSI Logic Corporation");
+MODULE_DESCRIPTION ("LSI Logic MegaRAID driver");
 
 #define DRIVER_LOCK_T
 #define DRIVER_LOCK_INIT(p)
 #define DRIVER_LOCK(p)
 #define DRIVER_UNLOCK(p)
-#define IO_LOCK_T unsigned long io_flags = 0;
+#define IO_LOCK_T unsigned long io_flags = 0
 #define IO_LOCK spin_lock_irqsave(&io_request_lock,io_flags);
 #define IO_UNLOCK spin_unlock_irqrestore(&io_request_lock,io_flags);
 
@@ -746,7 +772,7 @@ static struct file_operations megadev_fops = {
 static struct mcontroller mcontroller[MAX_CONTROLLERS];
 
 /* The current driver version */
-static u32 driver_ver = 117;
+static u32 driver_ver = 114;
 
 /* major number used by the device for character interface */
 static int major;
@@ -1050,7 +1076,11 @@ static void mega_cmd_done (mega_host_config * megaCfg, mega_scb * pScb, int stat
 		panic(KERN_ERR "megaraid:Problem...!\n");
 	}
 
+	islogical = ( (SCpnt->channel >= megaCfg->productInfo.SCSIChanPresent) &&
+					(SCpnt->channel <= megaCfg->host->max_channel) );
+#if 0
 	islogical = (SCpnt->channel == megaCfg->host->max_channel);
+#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	/* Special Case to handle PassThrough->XferAddrress > 4GB */
@@ -1174,7 +1204,8 @@ static mega_scb *mega_build_cmd (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 	mega_ext_passthru *epthru;
 	long seg;
 	char islogical;
-	char lun = SCpnt->lun;
+	int lun = SCpnt->lun;
+	int		max_lun;
 
 	if ((SCpnt->cmnd[0] == MEGADEVIOC))
 		return megadev_doioctl (megaCfg, SCpnt);
@@ -1191,8 +1222,12 @@ static mega_scb *mega_build_cmd (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 	}
 #endif
 
+	islogical = ( (SCpnt->channel >= megaCfg->productInfo.SCSIChanPresent) &&
+					(SCpnt->channel <= megaCfg->host->max_channel) );
+#if 0
 	islogical = (IS_RAID_CH(SCpnt->channel) && /* virtual ch is raid - AM */
 						(SCpnt->channel == megaCfg->host->max_channel));
+#endif
 
 	if ( ! megaCfg->support_ext_cdb ) {
 		if (!islogical && lun != 0) {
@@ -1208,21 +1243,28 @@ static mega_scb *mega_build_cmd (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 		return NULL;
 	}
 
-	/*
-	 * Return error for LUN > 7. The way we calculate logical drive number
-	 * requires it to be so.
-	 */
-	if( lun > 7 ) {
-		SCpnt->result = (DID_BAD_TARGET << 16);
-		callDone (SCpnt);
-		return NULL;
-	}
-
 	if (islogical) {
 
-		lun = (SCpnt->target * 8) + lun;
+		/* have just LUN 0 for each target on virtual channels */
+		if( SCpnt->lun != 0 ) {
+			SCpnt->result = (DID_BAD_TARGET << 16);
+			callDone (SCpnt);
+			return NULL;
+		}
 
-		if(lun >= megaCfg->numldrv ) {
+		lun = mega_get_lun(megaCfg, SCpnt);
+
+	    max_lun = (megaCfg->flag & BOARD_40LD) ?
+						FC_MAX_LOGICAL_DRIVES : MAX_LOGICAL_DRIVES;
+
+		 /*
+		  * max_lun increases by 0x80 if some logical drive was deleted.
+		  */
+		if(megaCfg->read_ldidmap) {
+			max_lun += 0x80;
+		}
+
+		if( lun > max_lun ) {
 			SCpnt->result = (DID_BAD_TARGET << 16);
 			callDone (SCpnt);
 			return NULL;
@@ -1240,6 +1282,13 @@ static mega_scb *mega_build_cmd (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 					lun--;
 				}
 			}
+		}
+	} else {
+		if ( lun > 7) {
+				/* Do not support lun >7 for physically accessed devices */
+			SCpnt->result = (DID_BAD_TARGET << 16);
+			callDone (SCpnt);
+			return NULL;
 		}
 	}
 	/*-----------------------------------------------------
@@ -1502,6 +1551,44 @@ static mega_scb *mega_build_cmd (mega_host_config * megaCfg, Scsi_Cmnd * SCpnt)
 	}
 	return NULL;
 }
+
+static int
+mega_get_lun(mega_host_config *this_hba, Scsi_Cmnd *sc)
+{
+	int		tgt;
+	int		lun;
+	int		virt_chan;
+
+	tgt = sc->target;
+	
+	if ( tgt > 7 ) tgt--;	/* we do not get inquires for tgt 7 */
+
+	virt_chan = sc->channel - this_hba->productInfo.SCSIChanPresent;
+	lun = (virt_chan * 15) + tgt;
+
+	/*
+	 * If "delete logical drive" feature is enabled on this controller.
+	 * Do only if at least one delete logical drive operation was done.
+	 *
+	 * Also, after logical drive deletion, instead of logical drive number,
+	 * the value returned should be 0x80+logical drive id.
+	 *
+	 * These is valid only for IO commands.
+	 */
+
+	 if( this_hba->support_random_del && this_hba->read_ldidmap ) {
+		switch(sc->cmnd[0]) {
+		case READ_6:	/* fall through */
+		case WRITE_6:	/* fall through */
+		case READ_10:	/* fall through */
+		case WRITE_10:
+			lun += 0x80;
+		}
+	 }
+
+	 return lun;
+}
+
 
 static mega_passthru *
 mega_prepare_passthru(mega_host_config *megacfg, mega_scb *scb, Scsi_Cmnd *sc)
@@ -1969,7 +2056,7 @@ static void showMbox (mega_scb * pScb)
  *--------------------------------------------------------------------*/
 static void megaraid_isr (int irq, void *devp, struct pt_regs *regs)
 {
-	IO_LOCK_T
+	IO_LOCK_T;
 	mega_host_config * megaCfg;
 	u_char byte, idx, sIdx, tmpBox[MAILBOX_SIZE];
 	u32 dword = 0;
@@ -2367,7 +2454,7 @@ mega_build_sglist (mega_host_config * megaCfg, mega_scb * scb,
 	}
 
 	sgList = (struct scatterlist *) scb->SCpnt->request_buffer;
-
+#if 0
 	if (scb->SCpnt->use_sg == 1) {
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
@@ -2395,7 +2482,7 @@ mega_build_sglist (mega_host_config * megaCfg, mega_scb * scb,
 
 		return 0;
 	}
-
+#endif
 	/* Copy Scatter-Gather list info into controller structure */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	sgcnt = pci_map_sg (megaCfg->dev,
@@ -2640,7 +2727,7 @@ static int mega_i_query_adapter (mega_host_config * megaCfg)
 		mboxData[2] = NC_SUBOP_PRODUCT_INFO;	/* i.e. 0x0E */
 
 		if ((retval = megaIssueCmd (megaCfg, mboxData, NULL, 0)) != 0)
-			printk ("ami:Product_info cmd failed with error: %d\n",
+			printk ("megaraid: Product_info cmd failed with error: %d\n",
 				retval);
 
 		pci_unmap_single (megaCfg->dev,
@@ -2649,12 +2736,21 @@ static int mega_i_query_adapter (mega_host_config * megaCfg)
 				  PCI_DMA_FROMDEVICE);
 	}
 
-	megaCfg->host->max_channel = megaCfg->productInfo.SCSIChanPresent;
+	/*
+	 * kernel scans the channels from 0 to <= max_channel
+	 */
+	megaCfg->host->max_channel =
+		megaCfg->productInfo.SCSIChanPresent + NVIRT_CHAN -1;
+
 	megaCfg->host->max_id = 16;	/* max targets per channel */
 	/*(megaCfg->flag & BOARD_40LD)?FC_MAX_TARGETS_PER_CHANNEL:MAX_TARGET+1; */
+#if 0
 	megaCfg->host->max_lun =	/* max lun */
-	    (megaCfg->
-	     flag & BOARD_40LD) ? FC_MAX_LOGICAL_DRIVES : MAX_LOGICAL_DRIVES;
+	    (megaCfg->flag & BOARD_40LD) ?
+			FC_MAX_LOGICAL_DRIVES : MAX_LOGICAL_DRIVES;
+#endif
+	megaCfg->host->max_lun = 7;	/* Upto 7 luns for non disk devices */
+
 	megaCfg->host->cmd_per_lun = MAX_CMD_PER_LUN;
 
 	megaCfg->numldrv = enquiry3Pnt->numLDrv;
@@ -2670,27 +2766,27 @@ static int mega_i_query_adapter (mega_host_config * megaCfg)
 	}
 #endif
 
- /* use HP firmware and bios version encoding */
-if (megaCfg->productInfo.subSystemVendorID == HP_SUBSYS_ID) {
-	sprintf (megaCfg->fwVer, "%c%d%d.%d%d",
-		 megaCfg->productInfo.FwVer[2],
-		 megaCfg->productInfo.FwVer[1] >> 8,
-		 megaCfg->productInfo.FwVer[1] & 0x0f,
-		 megaCfg->productInfo.FwVer[2] >> 8,
-		 megaCfg->productInfo.FwVer[2] & 0x0f);
-	sprintf (megaCfg->biosVer, "%c%d%d.%d%d",
-		 megaCfg->productInfo.BiosVer[2],
-		 megaCfg->productInfo.BiosVer[1] >> 8,
-		 megaCfg->productInfo.BiosVer[1] & 0x0f,
-		 megaCfg->productInfo.BiosVer[2] >> 8,
-		 megaCfg->productInfo.BiosVer[2] & 0x0f);
-} else {
-	memcpy (megaCfg->fwVer, (char *) megaCfg->productInfo.FwVer, 4);
-	megaCfg->fwVer[4] = 0;
+	/* use HP firmware and bios version encoding */
+	if (megaCfg->productInfo.subSystemVendorID == HP_SUBSYS_ID) {
+		sprintf (megaCfg->fwVer, "%c%d%d.%d%d",
+			 megaCfg->productInfo.FwVer[2],
+			 megaCfg->productInfo.FwVer[1] >> 8,
+			 megaCfg->productInfo.FwVer[1] & 0x0f,
+			 megaCfg->productInfo.FwVer[0] >> 8,
+			 megaCfg->productInfo.FwVer[0] & 0x0f);
+		sprintf (megaCfg->biosVer, "%c%d%d.%d%d",
+			 megaCfg->productInfo.BiosVer[2],
+			 megaCfg->productInfo.BiosVer[1] >> 8,
+			 megaCfg->productInfo.BiosVer[1] & 0x0f,
+			 megaCfg->productInfo.BiosVer[0] >> 8,
+			 megaCfg->productInfo.BiosVer[0] & 0x0f);
+	} else {
+		memcpy (megaCfg->fwVer, (char *) megaCfg->productInfo.FwVer, 4);
+		megaCfg->fwVer[4] = 0;
 
-	memcpy (megaCfg->biosVer, (char *) megaCfg->productInfo.BiosVer, 4);
-	megaCfg->biosVer[4] = 0;
-}
+		memcpy (megaCfg->biosVer, (char *) megaCfg->productInfo.BiosVer, 4);
+		megaCfg->biosVer[4] = 0;
+	}
 	megaCfg->support_ext_cdb = mega_support_ext_cdb(megaCfg);
 
 	printk (KERN_NOTICE "megaraid: [%s:%s] detected %d logical drives" M_RD_CRLFSTR,
@@ -2737,7 +2833,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 	u32 magic64;
 #endif
 
-	int i;
+	int		i;
 
 #ifdef __LP64__
 	u64 megaBase;
@@ -2859,7 +2955,6 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		if (!host)
 			goto err_unmap;
 
-#if 0
 		/*
 		 * Comment the following initialization if you know 'max_sectors' is
 		 * not defined for this kernel.
@@ -2867,7 +2962,6 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		 * greatly increases the IO performance - AM
 		 */
 		host->max_sectors = 1024;
-#endif
 
 		scsi_set_pci_device(host, pdev);
 		megaCfg = (mega_host_config *) host->hostdata;
@@ -2894,6 +2988,9 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		megaCfg->lock_pend = SPIN_LOCK_UNLOCKED;
 		megaCfg->lock_scsicmd = SPIN_LOCK_UNLOCKED;
 		megaCfg->flag = flag;
+		megaCfg->int_qh = NULL;
+		megaCfg->int_qt = NULL;
+		megaCfg->int_qlen = 0;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		megaCfg->dev = pdev;
@@ -2999,7 +3096,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		 * Find out which channel is raid and which is scsi
 		 */
 		mega_enum_raid_scsi(megaCfg);
-		for( i = 0; i < megaCfg->host->max_channel; i++ ) {
+		for( i = 0; i < megaCfg->productInfo.SCSIChanPresent; i++ ) {
 			if(IS_RAID_CH(i))
 				printk(KERN_NOTICE"megaraid: channel[%d] is raid.\n", i+1);
 			else
@@ -3013,6 +3110,12 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		mega_get_boot_ldrv(megaCfg);
 
 		mega_hbas[numCtlrs].hostdata_addr = megaCfg;
+
+		/*
+		 * Do we support random deletion and addition of logical drives
+		 */
+		megaCfg->read_ldidmap = 0;	/* set it after first logdrv delete cmd */
+		megaCfg->support_random_del = mega_support_random_del(megaCfg);
 
 		/* Initialize SCBs */
 		if (mega_init_scb (megaCfg)) {
@@ -3100,7 +3203,7 @@ int megaraid_detect (Scsi_Host_Template * pHostTmpl)
 		skip_id = (skip_id > 15) ? -1 : skip_id;
 	}
 
-	printk (KERN_NOTICE "megaraid: " MEGARAID_VERSION M_RD_CRLFSTR);
+	printk (KERN_NOTICE "megaraid: " MEGARAID_VERSION);
 
 	memset (mega_hbas, 0, sizeof (mega_hbas));
 
@@ -3267,6 +3370,7 @@ mega_enum_raid_scsi(mega_host_config *megacfg)
 {
 	mega_mailbox *mboxp;
 	unsigned char mbox[16];
+	int		i;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	dma_addr_t	dma_handle;
@@ -3299,8 +3403,10 @@ mega_enum_raid_scsi(mega_host_config *megacfg)
 	if( megaIssueCmd(megacfg, mbox, NULL, 0) == 0 ) {
 		mega_ch_class = *((char *)megacfg->mega_buffer);
 
-		/* logical drives channel is RAID */
-		mega_ch_class |= (0x01 << megacfg->host->max_channel);
+		for( i = 0; i < NVIRT_CHAN; i++ ) {
+			/* logical drives channel is RAID */
+			mega_ch_class |= (0x01 << (megacfg->productInfo.SCSIChanPresent+i));
+		}
 	}
 	else {
 		mega_ch_class = 0xFF;
@@ -3572,7 +3678,7 @@ const char *megaraid_info (struct Scsi_Host *pSHost)
 	megaCfg = (mega_host_config *) pSHost->hostdata;
 
 	sprintf (buffer,
-		 "AMI MegaRAID %s %d commands %d targs %d chans %d luns",
+		 "LSI Logic MegaRAID %s %d commands %d targs %d chans %d luns",
 		 megaCfg->fwVer, megaCfg->productInfo.MaxConcCmds,
 		 megaCfg->host->max_id, megaCfg->host->max_channel,
 		 megaCfg->host->max_lun);
@@ -3604,14 +3710,15 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 	DRIVER_LOCK (megaCfg);
 
 	if (!(megaCfg->flag & (1L << SCpnt->channel))) {
-		if (SCpnt->channel < SCpnt->host->max_channel)
+		if (SCpnt->channel < megaCfg->productInfo.SCSIChanPresent)
 			printk ( KERN_NOTICE
-				"scsi%d: scanning channel %c for devices.\n",
-				megaCfg->host->host_no, SCpnt->channel + '1');
+				"scsi%d: scanning channel %d for devices.\n",
+				megaCfg->host->host_no, SCpnt->channel);
 		else
 			printk ( KERN_NOTICE
-				"scsi%d: scanning virtual channel for logical drives.\n",
-				megaCfg->host->host_no);
+				"scsi%d: scanning virtual channel %d for logical drives.\n",
+				megaCfg->host->host_no,
+				SCpnt->channel-megaCfg->productInfo.SCSIChanPresent+1);
 
 		megaCfg->flag |= (1L << SCpnt->channel);
 	}
@@ -3657,21 +3764,38 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 	megaCfg->flag |= IN_QUEUE;
 	/* Allocate and build a SCB request */
 	if ((pScb = mega_build_cmd (megaCfg, SCpnt)) != NULL) {
-		/*build SCpnt for M_RD_IOCTL_CMD_NEW cmd in mega_ioctl() */
-		/* Add SCB to the head of the pending queue */
-		/* Add SCB to the head of the pending queue */
-		if (megaCfg->qPendingH == NULL) {
-			megaCfg->qPendingH = megaCfg->qPendingT = pScb;
-		} else {
-			megaCfg->qPendingT->next = pScb;
-			megaCfg->qPendingT = pScb;
-		}
-		megaCfg->qPendingT->next = NULL;
-		megaCfg->qPcnt++;
 
-		if (mega_runpendq (megaCfg) == -1) {
-			DRIVER_UNLOCK (megaCfg);
-			return 0;
+		/*
+		 * Check if the HBA is in quiescent state, e.g., during a delete
+		 * logical drive opertion. If it is, queue the commands in the
+		 * internal queue until the delete operation is complete.
+		 */
+		if( ! megaCfg->quiescent ) {
+			/* Add SCB to the head of the pending queue */
+			if (megaCfg->qPendingH == NULL) {
+				megaCfg->qPendingH = megaCfg->qPendingT = pScb;
+			} else {
+				megaCfg->qPendingT->next = pScb;
+				megaCfg->qPendingT = pScb;
+			}
+			megaCfg->qPendingT->next = NULL;
+			megaCfg->qPcnt++;
+
+			if (mega_runpendq (megaCfg) == -1) {
+				DRIVER_UNLOCK (megaCfg);
+				return 0;
+			}
+		}
+		else {
+			/* Add SCB to the internal queue */
+			if (megaCfg->int_qh == NULL) {
+				megaCfg->int_qh = megaCfg->int_qt = pScb;
+			} else {
+				megaCfg->int_qt->next = pScb;
+				megaCfg->int_qt = pScb;
+			}
+			megaCfg->int_qt->next = NULL;
+			megaCfg->int_qlen++;
 		}
 
 		if (pScb->SCpnt->cmnd[0] == M_RD_IOCTL_CMD_NEW) {
@@ -4184,6 +4308,7 @@ mega_partsize(Disk * disk, kdev_t dev, int *geom)
 		return -1;
 
 	if( *(unsigned short *)(bh->b_data + 510) == 0xAA55 ) {
+
 		for( largest_cyl = -1, p = (struct partition *)(0x1BE + bh->b_data),
 				i = 0; i < 4; ++i, ++p) {
 
@@ -4197,6 +4322,7 @@ mega_partsize(Disk * disk, kdev_t dev, int *geom)
 			}
 		}
 	}
+
 	if (largest) {
 		heads = largest->end_head + 1;
 		sectors = largest->end_sector & 0x3f;
@@ -4519,6 +4645,14 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		break;
 
 	case M_RD_IOCTL_CMD_NEW:
+
+		/*
+		 * Deletion of logical drives is only handled in 0x80 commands
+		 */
+		if( ioc.mbox[0] == FC_DEL_LOGDRV && ioc.mbox[2] == OP_DEL_LOGDRV ) {
+			return -EINVAL;
+		}
+
 		/* which adapter?  */
 		adapno = ioc.ui.fcs.adapno;
 
@@ -4686,6 +4820,28 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		}
 		if(shpnt == NULL)  return -ENODEV;
 
+		/*
+		 * ioctls for deleting logical drives is a special case, so check
+		 * for it first
+		 */
+		if( ioc.mbox[0] == FC_DEL_LOGDRV && ioc.mbox[2] == OP_DEL_LOGDRV ) {
+
+			if( !megacfg->support_random_del ) {
+				printk("megaraid: logdrv delete on non supporting f/w.\n");
+				return -EINVAL;
+			}
+
+			uioc = (struct uioctl_t *)arg;
+
+			ret = mega_del_logdrv(megacfg, ioc.mbox[3]);
+
+			put_user(1, &uioc->mbox[16]);	/* numstatus */
+			put_user(ret, &uioc->mbox[17]);	/* status */
+
+			/* if deletion failed, let the user know by failing ioctl */
+			return ret;
+		}
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		scsicmd = (Scsi_Cmnd *)kmalloc(sizeof(Scsi_Cmnd), GFP_KERNEL|GFP_DMA);
 #else
@@ -4760,8 +4916,7 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 			put_user (scsicmd->result, &uioc->pthru.scsistatus);
 		} else {
 			put_user (1, &uioc->mbox[16]);	/* numstatus */
-			/* status */
-			put_user (scsicmd->result, &uioc->mbox[17]);
+			put_user (scsicmd->result, &uioc->mbox[17]); /* status */
 		}
 
 		if (kvaddr) {
@@ -4918,6 +5073,139 @@ mega_support_ext_cdb(mega_host_config *this_hba)
 	return !ret;
 }
 
+
+/*
+ * Find out if this controller supports random deletion and addition of
+ * logical drives
+ */
+static int
+mega_support_random_del(mega_host_config *this_hba)
+{
+	mega_mailbox *mboxpnt;
+	unsigned char mbox[16];
+	int ret;
+
+	mboxpnt = (mega_mailbox *)mbox;
+
+	memset(mbox, 0, sizeof(mbox));
+
+	/*
+	 * issue command
+	 */
+	mbox[0] = FC_DEL_LOGDRV;
+	mbox[2] = OP_SUP_DEL_LOGDRV;
+
+	ret = megaIssueCmd(this_hba, mbox, NULL, 0);
+
+	return !ret;
+}
+
+static int
+mega_del_logdrv(mega_host_config *this_hba, int logdrv)
+{
+	int		rval;
+	IO_LOCK_T;
+	DECLARE_WAIT_QUEUE_HEAD(wq);
+	mega_scb	*scbp;
+
+	/*
+	 * Stop sending commands to the controller, queue them internally.
+	 * When deletion is complete, ISR will flush the queue.
+	 */
+	IO_LOCK;
+	this_hba->quiescent = 1;
+	IO_UNLOCK;
+
+	while( this_hba->qPcnt ) {
+			sleep_on_timeout( &wq, 1*HZ );	/* sleep for 1s */
+	}
+	rval = mega_do_del_logdrv(this_hba, logdrv);
+
+	IO_LOCK;
+	/*
+	 * Attach the internal queue to the pending queue
+	 */
+	if( this_hba->qPendingH == NULL ) {
+		/*
+		 * If pending queue head is null, make internal queue as
+		 * pending queue
+		 */
+		this_hba->qPendingH = this_hba->int_qh;
+		this_hba->qPendingT = this_hba->int_qt;
+		this_hba->qPcnt = this_hba->int_qlen;
+	}
+	else {
+		/*
+		 * Append pending queue to internal queue
+		 */
+		if( this_hba->int_qt ) {
+			this_hba->int_qt->next = this_hba->qPendingH;
+
+			this_hba->qPendingH = this_hba->int_qh;
+			this_hba->qPcnt += this_hba->int_qlen;
+		}
+	}
+
+	this_hba->int_qh = this_hba->int_qt = NULL;
+	this_hba->int_qlen = 0;
+
+	/*
+	 * If delete operation was successful, add 0x80 to the logical drive
+	 * ids for commands in the pending queue.
+	 */
+	if( this_hba->read_ldidmap) {
+		for( scbp = this_hba->qPendingH; scbp; scbp = scbp->next ) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
+			if( scbp->pthru->logdrv < 0x80 )
+				scbp->pthru->logdrv += 0x80;
+#else
+			if( scbp->pthru.logdrv < 0x80 )
+				scbp->pthru.logdrv += 0x80;
+#endif
+		}
+	}
+	this_hba->quiescent = 0;
+
+	IO_UNLOCK;
+
+	return rval;
+}
+
+
+static int
+mega_do_del_logdrv(mega_host_config *this_hba, int logdrv)
+{
+	mega_mailbox *mboxpnt;
+	unsigned char mbox[16];
+	int rval;
+
+	mboxpnt = (mega_mailbox *)mbox;
+
+	memset(mbox, 0, sizeof(mbox));
+
+	mbox[0] = FC_DEL_LOGDRV;
+	mbox[2] = OP_DEL_LOGDRV;
+	mbox[3] = logdrv;
+
+	rval = megaIssueCmd(this_hba, mbox, NULL, 0);
+
+	/* log this event */
+	if( rval != 0 ) {
+		printk("megaraid: Attempt to delete logical drive %d failed.",
+				logdrv);
+		return rval;
+	}
+
+	printk("megaraid: logical drive %d deleted.\n", logdrv);
+
+	/*
+	 * After deleting first logical drive, the logical drives must be
+	 * addressed by adding 0x80 to the logical drive id.
+	 */
+	this_hba->read_ldidmap = 1;
+
+	return rval;
+}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
 void *

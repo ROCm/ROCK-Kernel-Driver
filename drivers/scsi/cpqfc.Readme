@@ -7,6 +7,21 @@ Tested in single and dual HBA configuration, 32 and 64bit busses,
 SEST size 512 Exchanges (simultaneous I/Os) limited by module kmalloc() 
 	max of 128k bytes contiguous.
 
+Ver 2.1.1  Oct 18, 2001
+   * reinitialize Cmnd->SCp.sent_command (used to identify commands as
+     passthrus) on calling scsi_done, since the scsi mid layer does not
+     use (or reinitialize) this field to prevent subsequent comands from
+     having it set incorrectly. 
+
+Ver 2.1.0  Aug 27, 2001
+   * Revise driver to use new kernel 2.4.x PCI DMA API, instead of 
+     virt_to_bus().  (enables driver to work w/ ia64 systems with >2Gb RAM.)
+     Rework main scatter-gather code to handle cases where SG element
+     lengths are larger than 0x7FFFF bytes and use as many scatter 
+     gather pages as necessary. (Steve Cameron)
+   * Makefile changes to bring cpqfc into line w/ rest of SCSI drivers
+     (thanks to Keith Owens)
+
 Ver 2.0.5  Aug 06, 2001
    * Reject non-existent luns in the driver rather than letting the 
      hardware do it.  (some HW behaves differently than others in this area.)

@@ -452,20 +452,12 @@ static int rd_open(struct inode * inode, struct file * filp)
 		rd_bdev[unit]->bd_inode->i_mapping->a_ops = &ramdisk_aops;
 	}
 
-	MOD_INC_USE_COUNT;
-
-	return 0;
-}
-
-static int rd_release(struct inode * inode, struct file * filp)
-{
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 static struct block_device_operations rd_bd_op = {
+	owner:		THIS_MODULE,
 	open:		rd_open,
-	release:	rd_release,
 	ioctl:		rd_ioctl,
 };
 

@@ -190,6 +190,7 @@ int __init a2091_detect(Scsi_Host_Template *tpnt)
     struct Scsi_Host *instance;
     unsigned long address;
     struct zorro_dev *z = NULL;
+    wd33c93_regs regs;
 
     if (!MACH_IS_AMIGA || called)
 	return 0;
@@ -215,8 +216,9 @@ int __init a2091_detect(Scsi_Host_Template *tpnt)
 	instance->irq = IRQ_AMIGA_PORTS;
 	instance->unique_id = z->slotaddr;
 	DMA(instance)->DAWR = DAWR_A2091;
-	wd33c93_init(instance, (wd33c93_regs *)&(DMA(instance)->SASR),
-		     dma_setup, dma_stop, WD33C93_FS_8_10);
+	regs.SASR = &(DMA(instance)->SASR);
+	regs.SCMD = &(DMA(instance)->SCMD);
+	wd33c93_init(instance, regs, dma_setup, dma_stop, WD33C93_FS_8_10);
 	if (num_a2091++ == 0) {
 	    first_instance = instance;
 	    a2091_template = instance->hostt;

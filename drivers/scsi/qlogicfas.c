@@ -271,8 +271,10 @@ static int	ql_wai(void)
 int	i,k;
 	k = 0;
 	i = jiffies + WATCHDOG;
-	while ( i > jiffies && !qabort && !((k = inb(qbase + 4)) & 0xe0))
+	while ( i > jiffies && !qabort && !((k = inb(qbase + 4)) & 0xe0)) {
 		barrier();
+		cpu_relax();
+	}
 	if (i <= jiffies)
 		return (DID_TIME_OUT);
 	if (qabort)
@@ -431,6 +433,7 @@ rtrc(1)
 	i = inb(qbase + 5);	/* should be bus service */
 	while (!qabort && ((i & 0x20) != 0x20)) {
 		barrier();
+		cpu_relax();
 		i |= inb(qbase + 5);
 	}
 rtrc(0)
@@ -513,8 +516,10 @@ int	qlogicfas_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 
 	cmd->scsi_done = done;
 /* wait for the last command's interrupt to finish */
-	while (qlcmd != NULL)
+	while (qlcmd != NULL) {
 		barrier();
+		cpu_relax();
+	}
 	ql_icmd(cmd);
 	return 0;
 }

@@ -20,6 +20,18 @@
  */
 static rwlock_t adfs_map_lock;
 
+#define GET_FRAG_ID(_map,_start,_idmask)				\
+	({								\
+		unsigned long _v2, _frag;				\
+		unsigned int _tmp;					\
+		_tmp = _start >> 5;					\
+		_frag = le32_to_cpu(_map[_tmp]);			\
+		_v2   = le32_to_cpu(_map[_tmp + 1]);			\
+		_tmp = start & 31;					\
+		_frag = (_frag >> _tmp) | (_v2 << (32 - _tmp));		\
+		_frag & _idmask;					\
+	})
+
 /*
  * return the map bit offset of the fragment frag_id in
  * the zone dm.
@@ -40,25 +52,7 @@ lookup_zone(const struct adfs_discmap *dm, const unsigned int idlen,
 	do {
 		unsigned long frag;
 
-		/*
-		 * get fragment id
-		 */
-		{
-			unsigned long v2;
-			unsigned int tmp;
-
-			tmp = start >> 5;
-
-			frag = le32_to_cpu(map[tmp]);
-			v2   = le32_to_cpu(map[tmp + 1]);
-
-			tmp  = start & 31;
-
-			frag = (frag >> tmp) | (v2 << (32 - tmp));
-
-			frag &= idmask;
-		}
-
+		frag = GET_FRAG_ID(map, start, idmask);
 		mapptr = start + idlen;
 
 		/*
@@ -117,21 +111,7 @@ scan_free_map(struct adfs_sb_info *asb, struct adfs_discmap *dm)
 	/*
 	 * get fragment id
 	 */
-	{
-		unsigned long v2;
-		unsigned int tmp;
-
-		tmp = start >> 5;
-
-		frag = le32_to_cpu(map[tmp]);
-		v2   = le32_to_cpu(map[tmp + 1]);
-
-		tmp  = start & 31;
-
-		frag = (frag >> tmp) | (v2 << (32 - tmp));
-
-		frag &= idmask;
-	}
+	frag = GET_FRAG_ID(map, start, idmask);
 
 	/*
 	 * If the freelink is null, then no free fragments
@@ -146,22 +126,7 @@ scan_free_map(struct adfs_sb_info *asb, struct adfs_discmap *dm)
 		/*
 		 * get fragment id
 		 */
-		{
-			unsigned long v2;
-			unsigned int tmp;
-
-			tmp = start >> 5;
-
-			frag = le32_to_cpu(map[tmp]);
-			v2   = le32_to_cpu(map[tmp + 1]);
-
-			tmp  = start & 31;
-
-			frag = (frag >> tmp) | (v2 << (32 - tmp));
-
-			frag &= idmask;
-		}
-
+		frag = GET_FRAG_ID(map, start, idmask);
 		mapptr = start + idlen;
 
 		/*

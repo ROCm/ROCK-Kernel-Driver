@@ -1,6 +1,6 @@
 /*
  * arch/arm/kernel/leds-shark.c
- * by Alexander Schulz <aschulz@netwinder.org>
+ * by Alexander Schulz
  *
  * derived from:
  * arch/arm/kernel/leds-footbridge.c

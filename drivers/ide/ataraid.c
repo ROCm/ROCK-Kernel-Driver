@@ -51,6 +51,7 @@ static int ataraid_gendisk_sizes[256];
 static int ataraid_readahead[256];
 
 static struct block_device_operations ataraid_fops = {
+	owner:			THIS_MODULE,
 	open:                   ataraid_open,
 	release:                ataraid_release,
 	ioctl:                  ataraid_ioctl,
@@ -208,11 +209,9 @@ static void ataraid_split_request(request_queue_t *q, int rw, struct buffer_head
 int ataraid_get_device(struct raid_device_operations *fops)
 {
 	int bit;
-	MOD_INC_USE_COUNT;
 	down(&ataraid_sem);
 	if (ataraiduse==~0U) {
 		up(&ataraid_sem);
-		MOD_DEC_USE_COUNT;
 		return -ENODEV;
 	}
 	bit=ffz(ataraiduse); 
@@ -232,7 +231,6 @@ void ataraid_release_device(int device)
 	ataraiduse &= ~(1<<device);
 	ataraid_ops[device] = NULL;
 	up(&ataraid_sem);
-	MOD_DEC_USE_COUNT;
 }
 
 void ataraid_register_disk(int device,long size)

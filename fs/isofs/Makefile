@@ -11,7 +11,10 @@ O_TARGET := isofs.o
 
 obj-y  := namei.o inode.o dir.o util.o rock.o
 obj-$(CONFIG_JOLIET) += joliet.o
+obj-$(CONFIG_ZISOFS) += compress.o
 
 obj-m  := $(O_TARGET)
+
+CFLAGS_compress.o := -I $(TOPDIR)/fs/inflate_fs
 
 include $(TOPDIR)/Rules.make

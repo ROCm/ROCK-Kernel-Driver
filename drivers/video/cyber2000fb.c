@@ -1680,8 +1680,6 @@ static struct pci_device_id cyberpro_pci_table[] __devinitdata = {
 	{ 0, }
 };
 
-MODULE_DEVICE_TABLE(pci, cyberpro_pci_table);
-
 static struct pci_driver cyberpro_driver = {
 	name:		"CyberPro",
 	probe:		cyberpro_probe,
@@ -1713,4 +1711,5 @@ module_exit(cyberpro_exit);
 
 MODULE_AUTHOR("Russell King");
 MODULE_DESCRIPTION("CyberPro 2000, 2010 and 5000 framebuffer driver");
+MODULE_DEVICE_TABLE(pci,cyberpro_pci_table);
 MODULE_LICENSE("GPL");

@@ -4574,7 +4574,7 @@ static void gdth_flush(int hanum)
     Scsi_Device     sdev;
 #endif
     char            cmnd[MAX_COMMAND_SIZE];   
-    memset(cmnd, 0xff, 12);
+    memset(cmnd, 0xff, MAX_COMMAND_SIZE);
 
     TRACE2(("gdth_flush() hanum %d\n",hanum));
     ha = HADATA(gdth_ctr_tab[hanum]);
@@ -4652,7 +4652,7 @@ void gdth_halt(void)
 
 #ifndef __alpha__
         /* controller reset */
-        memset(cmnd, 0xff, 12);
+        memset(cmnd, 0xff, MAX_COMMAND_SIZE);
 #if LINUX_VERSION_CODE >= 0x020322
         sdev = scsi_get_host_dev(gdth_ctr_tab[hanum]);
         scp  = scsi_allocate_device(sdev, 1, FALSE);

@@ -984,11 +984,8 @@ static int nftl_open(struct inode *ip, struct file *fp)
 #endif /* !CONFIG_NFTL_RW */
 
 	thisNFTL->usecount++;
-	MOD_INC_USE_COUNT;
-	if (!get_mtd_device(thisNFTL->mtd, -1)) {
-		MOD_DEC_USE_COUNT;
+	if (!get_mtd_device(thisNFTL->mtd, -1))
 		return /* -E'SBUGGEREDOFF */ -ENXIO;
-	}
 
 	return 0;
 }
@@ -1006,7 +1003,6 @@ static int nftl_release(struct inode *inode, struct file *fp)
 	if (thisNFTL->mtd->sync)
 		thisNFTL->mtd->sync(thisNFTL->mtd);
 	thisNFTL->usecount--;
-	MOD_DEC_USE_COUNT;
 
 	put_mtd_device(thisNFTL->mtd);
 
@@ -1024,6 +1020,7 @@ static struct file_operations nftl_fops = {
 #else
 static struct block_device_operations nftl_fops = 
 {
+	owner:		THIS_MODULE,
 	open:		nftl_open,
 	release:	nftl_release,
 	ioctl: 		nftl_ioctl

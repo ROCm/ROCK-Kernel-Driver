@@ -51,10 +51,10 @@ struct sa1100fb_mach_info {
 
 /* Shadows for LCD controller registers */
 struct sa1100fb_lcd_reg {
-	Word lccr0;
-	Word lccr1;
-	Word lccr2;
-	Word lccr3;
+	unsigned long lccr0;
+	unsigned long lccr1;
+	unsigned long lccr2;
+	unsigned long lccr3;
 };
 
 #define RGB_8	(0)

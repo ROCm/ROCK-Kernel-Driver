@@ -50,6 +50,11 @@ static void __init freebird_map_io(void)
 
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);
+
+	/* Set up sleep mode registers */
+	PWER = 0x1;
+	PGSR = 0x0;
+	PCFR = PCFR_OPDE | PCFR_FP | PCFR_FS;
 }
 
 MACHINE_START(FREEBIRD, "Freebird-HPC-1.1")

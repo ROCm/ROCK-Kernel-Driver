@@ -2180,3 +2180,4 @@ static void __exit dmasound_awacs_cleanup(void)
 
 module_init(dmasound_awacs_init);
 module_exit(dmasound_awacs_cleanup);
+MODULE_LICENSE("GPL");

@@ -387,7 +387,7 @@ static inline void ixj_fsk_alloc(IXJ *j)
 #ifdef PERFMON_STATS
 #define ixj_perfmon(x)	((x)++)
 #else
-#deifne ixj_perfmon(x)	do {} while(0);
+#define ixj_perfmon(x)	do {} while(0);
 #endif
 
 static int ixj_convert_loaded;

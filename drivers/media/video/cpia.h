@@ -416,6 +416,26 @@ void cpia_unregister_camera(struct cam_data *cam);
   } while (0)
 
 
+static inline void cpia_add_to_list(struct cam_data* l, struct cam_data* drv)
+{
+	drv->next = l;
+	drv->previous = &l;
+	l = drv;
+}
+
+
+static inline void cpia_remove_from_list(struct cam_data* drv)
+{
+	if (drv->previous != NULL) {
+		if (drv->next != NULL)
+			drv->next->previous = drv->previous;
+		*(drv->previous) = drv->next;
+		drv->previous = NULL;
+		drv->next = NULL;
+	}
+}
+
+
 #endif /* __KERNEL__ */
 
 #endif /* cpia_h */

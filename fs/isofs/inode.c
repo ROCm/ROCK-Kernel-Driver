@@ -32,6 +32,8 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
+#include "zisofs.h"
+
 /*
  * We have no support for "multi volume" CDs, but more and more disks carry
  * wrong information within the volume descriptors.
@@ -109,6 +111,7 @@ struct iso9660_options{
 	char joliet;
 	char cruft;
 	char unhide;
+	char nocompress;
 	unsigned char check;
 	unsigned int blocksize;
 	mode_t mode;
@@ -278,6 +281,7 @@ static int parse_options(char *options, struct iso9660_options * popt)
 	popt->cruft = 'n';
 	popt->unhide = 'n';
 	popt->check = 'u';		/* unset */
+	popt->nocompress = 0;
 	popt->blocksize = 1024;
 	popt->mode = S_IRUGO | S_IXUGO; /* r-x for all.  The disc could
 					   be shared with DOS machines so
@@ -309,6 +313,10 @@ static int parse_options(char *options, struct iso9660_options * popt)
 		}
 	        if (strncmp(this_char,"utf8",4) == 0) {
 		  popt->utf8 = 1;
+		  continue;
+		}
+	        if (strncmp(this_char,"nocompress",10) == 0) {
+		  popt->nocompress = 1;
 		  continue;
 		}
 		if ((value = strchr(this_char,'=')) != NULL)
@@ -758,6 +766,7 @@ root_found:
 	s->u.isofs_sb.s_uid = opt.uid;
 	s->u.isofs_sb.s_gid = opt.gid;
 	s->u.isofs_sb.s_utf8 = opt.utf8;
+	s->u.isofs_sb.s_nocompress = opt.nocompress;
 	/*
 	 * It would be incredibly stupid to allow people to mark every file
 	 * on the disk as suid, so we merely allow them to set the default
@@ -874,93 +883,108 @@ static int isofs_statfs (struct super_block *sb, struct statfs *buf)
 	return 0;
 }
 
-/* Life is simpler than for other filesystem since we never
- * have to create a new block, only find an existing one.
+/*
+ * Get a set of blocks; filling in buffer_heads if already allocated
+ * or getblk() if they are not.  Returns the number of blocks inserted
+ * (0 == error.)
  */
-static int isofs_get_block(struct inode *inode, long iblock,
-		    struct buffer_head *bh_result, int create)
+int isofs_get_blocks(struct inode *inode, long iblock,
+		     struct buffer_head **bh_result, unsigned long nblocks)
 {
 	unsigned long b_off;
 	unsigned offset, sect_size;
 	unsigned int firstext;
 	unsigned long nextino;
-	int i, err;
+	int section, rv;
+	unsigned int blocksize = inode->i_sb->s_blocksize;
 
 	lock_kernel();
 
-	err = -EROFS;
-	if (create)
-		goto abort_create_attempted;
-
-	err = -EIO;
-	if (iblock < 0)
-		goto abort_negative;
+	rv = 0;
+	if (iblock < 0) {
+		printk("isofs_get_blocks: block < 0\n");
+		goto abort;
+	}
 
 	b_off = iblock;
-
-	/* If we are *way* beyond the end of the file, print a message.
-	 * Access beyond the end of the file up to the next page boundary
-	 * is normal, however because of the way the page cache works.
-	 * In this case, we just return 0 so that we can properly fill
-	 * the page with useless information without generating any
-	 * I/O errors.
-	 */
-	if (b_off > ((inode->i_size + PAGE_SIZE - 1) >> ISOFS_BUFFER_BITS(inode)))
-		goto abort_beyond_end;
-
+	
 	offset    = 0;
 	firstext  = inode->u.isofs_i.i_first_extent;
 	sect_size = inode->u.isofs_i.i_section_size >> ISOFS_BUFFER_BITS(inode);
 	nextino   = inode->u.isofs_i.i_next_section_ino;
+	section   = 0;
 
-	i = 0;
-	if (nextino) {
-		while (b_off >= (offset + sect_size)) {
-			struct inode *ninode;
-
-			offset += sect_size;
-			if (nextino == 0)
-				goto abort;
-			ninode = iget(inode->i_sb, nextino);
-			if (!ninode)
-				goto abort;
-			firstext  = ninode->u.isofs_i.i_first_extent;
-			sect_size = ninode->u.isofs_i.i_section_size;
-			nextino   = ninode->u.isofs_i.i_next_section_ino;
-			iput(ninode);
-
-			if (++i > 100)
-				goto abort_too_many_sections;
+	while ( nblocks ) {
+		/* If we are *way* beyond the end of the file, print a message.
+		 * Access beyond the end of the file up to the next page boundary
+		 * is normal, however because of the way the page cache works.
+		 * In this case, we just return 0 so that we can properly fill
+		 * the page with useless information without generating any
+		 * I/O errors.
+		 */
+		if (b_off > ((inode->i_size + PAGE_CACHE_SIZE - 1) >> ISOFS_BUFFER_BITS(inode))) {
+			printk("isofs_get_blocks: block >= EOF (%ld, %ld)\n",
+			       iblock, (unsigned long) inode->i_size);
+			goto abort;
 		}
+		
+		if (nextino) {
+			while (b_off >= (offset + sect_size)) {
+				struct inode *ninode;
+				
+				offset += sect_size;
+				if (nextino == 0)
+					goto abort;
+				ninode = iget(inode->i_sb, nextino);
+				if (!ninode)
+					goto abort;
+				firstext  = ninode->u.isofs_i.i_first_extent;
+				sect_size = ninode->u.isofs_i.i_section_size;
+				nextino   = ninode->u.isofs_i.i_next_section_ino;
+				iput(ninode);
+				
+				if (++section > 100) {
+					printk("isofs_get_blocks: More than 100 file sections ?!?, aborting...\n");
+					printk("isofs_get_blocks: ino=%lu block=%ld firstext=%u sect_size=%u nextino=%lu\n",
+					       inode->i_ino, iblock, firstext, (unsigned) sect_size, nextino);
+					goto abort;
+				}
+			}
+		}
+		
+		if ( *bh_result ) {
+			(*bh_result)->b_dev      = inode->i_dev;
+			(*bh_result)->b_blocknr  = firstext + b_off - offset;
+			(*bh_result)->b_state   |= (1UL << BH_Mapped);
+		} else {
+			*bh_result = getblk(inode->i_dev, firstext+b_off-offset, blocksize);
+			if ( !*bh_result )
+				goto abort;
+		}
+		bh_result++;	/* Next buffer head */
+		b_off++;	/* Next buffer offset */
+		nblocks--;
+		rv++;
 	}
 
-	bh_result->b_dev = inode->i_dev;
-	bh_result->b_blocknr = firstext + b_off - offset;
-	bh_result->b_state |= (1UL << BH_Mapped);
-	err = 0;
 
 abort:
 	unlock_kernel();
-	return err;
+	return rv;
+}
 
-abort_create_attempted:
-	printk("isofs_get_block: Kernel tries to allocate a block\n");
-	goto abort;
+/*
+ * Used by the standard interfaces.
+ */
+static int isofs_get_block(struct inode *inode, long iblock,
+		    struct buffer_head *bh_result, int create)
+{
+	if ( create ) {
+		printk("isofs_get_block: Kernel tries to allocate a block\n");
+		return -EROFS;
+	}
 
-abort_negative:
-	printk("isofs_get_block: block < 0\n");
-	goto abort;
-
-abort_beyond_end:
-	printk("isofs_get_block: block >= EOF (%ld, %ld)\n",
-	       iblock, (unsigned long) inode->i_size);
-	goto abort;
-
-abort_too_many_sections:
-	printk("isofs_get_block: More than 100 file sections ?!?, aborting...\n");
-	printk("isofs_get_block: ino=%lu block=%ld firstext=%u sect_size=%u nextino=%lu\n",
-	       inode->i_ino, iblock, firstext, (unsigned) sect_size, nextino);
-	goto abort;
+	return isofs_get_blocks(inode, iblock, &bh_result, 1) ? 0 : -EIO;
 }
 
 static int isofs_bmap(struct inode *inode, int block)
@@ -1151,6 +1175,9 @@ static void isofs_read_inode(struct inode * inode)
 		de = tmpde;
 	}
 
+	/* Assume it is a normal-format file unless told otherwise */
+	inode->u.isofs_i.i_file_format = isofs_file_normal;
+
 	if (de->flags[-high_sierra] & 2) {
 		inode->i_mode = S_IRUGO | S_IXUGO | S_IFDIR;
 		inode->i_nlink = 1; /* Set to 1.  We know there are 2, but
@@ -1237,6 +1264,10 @@ static void isofs_read_inode(struct inode * inode)
 	inode->u.isofs_i.i_first_extent = (isonum_733 (de->extent) +
 					   isonum_711 (de->ext_attr_length));
 
+	/* Set the number of blocks for stat() - should be done before RR */
+	inode->i_blksize = PAGE_CACHE_SIZE; /* For stat() only */
+	inode->i_blocks  = (inode->i_size + 511) >> 9;
+
 	/*
 	 * Now test for possible Rock Ridge extensions which will override
 	 * some of these numbers in the inode structure.
@@ -1276,7 +1307,16 @@ static void isofs_read_inode(struct inode * inode)
 	{
 		if (S_ISREG(inode->i_mode)) {
 			inode->i_fop = &generic_ro_fops;
-			inode->i_data.a_ops = &isofs_aops;
+			switch ( inode->u.isofs_i.i_file_format ) {
+#ifdef CONFIG_ZISOFS
+			case isofs_file_compressed:
+				inode->i_data.a_ops = &zisofs_aops;
+				break;
+#endif
+			default:
+				inode->i_data.a_ops = &isofs_aops;
+				break;
+			}
 		} else if (S_ISDIR(inode->i_mode)) {
 			inode->i_op = &isofs_dir_inode_operations;
 			inode->i_fop = &isofs_dir_operations;
@@ -1336,15 +1376,27 @@ static DECLARE_FSTYPE_DEV(iso9660_fs_type, "iso9660", isofs_read_super);
 
 static int __init init_iso9660_fs(void)
 {
+#ifdef CONFIG_ZISOFS
+	int err;
+
+	err = zisofs_init();
+	if ( err )
+		return err;
+#endif
         return register_filesystem(&iso9660_fs_type);
 }
 
 static void __exit exit_iso9660_fs(void)
 {
         unregister_filesystem(&iso9660_fs_type);
+#ifdef CONFIG_ZISOFS
+	zisofs_cleanup();
+#endif
 }
 
 EXPORT_NO_SYMBOLS;
 
 module_init(init_iso9660_fs)
 module_exit(exit_iso9660_fs)
+MODULE_LICENSE("GPL");
+

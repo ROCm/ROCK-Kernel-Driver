@@ -42,7 +42,7 @@ export-objs	:= armksyms.o dma.o ecard.o fiq.o io.o oldlatches.o time.o
 
 no-irq-arch	:= $(CONFIG_ARCH_INTEGRATOR) $(CONFIG_ARCH_CLPS711X) \
 		   $(CONFIG_FOOTBRIDGE) $(CONFIG_ARCH_EBSA110) \
-		   $(CONFIG_ARCH_SA1100)
+		   $(CONFIG_ARCH_SA1100) $(CONFIG_ARCH_CAMELOT)
 
 ifneq ($(findstring y,$(no-irq-arch)),y)
   obj-y		+= irq-arch.o

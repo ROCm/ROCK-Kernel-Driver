@@ -27,14 +27,62 @@
 
 static int h3600_egpio = EGPIO_H3600_RS232_ON;
 
+void init_h3600_egpio(void)
+{
+#ifdef CONFIG_IPAQ_H3100
+	int h3100_controls = (GPIO_H3100_BT_ON
+			      | GPIO_H3100_QMUTE
+			      | GPIO_H3100_LCD_3V_ON 
+			      | GPIO_H3100_AUD_ON
+			      | GPIO_H3100_AUD_PWR_ON
+			      | GPIO_H3100_IR_ON
+			      | GPIO_H3100_IR_FSEL);
+	GPDR |= h3100_controls;
+	GPCR = h3100_controls;
+	GAFR = GPIO_SSP_CLK;
+#endif
+}
+
 void clr_h3600_egpio(unsigned long x)
 {
+#ifdef CONFIG_IPAQ_H3100
+	unsigned long gpcr = 0;
+	if (x&EGPIO_H3600_QMUTE)
+		gpcr |= GPIO_H3100_QMUTE;
+	if (x&EGPIO_H3600_LCD_ON)
+		gpcr |= GPIO_H3100_LCD_3V_ON;
+	if (x&EGPIO_H3600_AUD_AMP_ON)
+		gpcr |= GPIO_H3100_AUD_ON;
+	if (x&EGPIO_H3600_AUD_PWR_ON)
+		gpcr |= GPIO_H3100_AUD_PWR_ON;
+	if (x&EGPIO_H3600_IR_ON)
+		gpcr |= GPIO_H3100_IR_ON;
+	if (x&EGPIO_H3600_IR_FSEL)
+		gpcr |= GPIO_H3100_IR_FSEL;
+	GPCR = gpcr;
+#endif
 	h3600_egpio &= ~x;
 	H3600_EGPIO = h3600_egpio;
 }
 
 void set_h3600_egpio(unsigned long x)
 {
+#ifdef CONFIG_IPAQ_H3100
+	unsigned long gpsr = 0;
+	if (x&EGPIO_H3600_QMUTE)
+		gpsr |= GPIO_H3100_QMUTE;
+	if (x&EGPIO_H3600_LCD_ON)
+		gpsr |= GPIO_H3100_LCD_3V_ON;
+	if (x&EGPIO_H3600_AUD_AMP_ON)
+		gpsr |= GPIO_H3100_AUD_ON;
+	if (x&EGPIO_H3600_AUD_PWR_ON)
+		gpsr |= GPIO_H3100_AUD_PWR_ON;
+	if (x&EGPIO_H3600_IR_ON)
+		gpsr |= GPIO_H3100_IR_ON;
+	if (x&EGPIO_H3600_IR_FSEL)
+		gpsr |= GPIO_H3100_IR_FSEL;
+	GPSR = gpsr;
+#endif
 	h3600_egpio |= x;
 	H3600_EGPIO = h3600_egpio;
 }
@@ -153,8 +201,8 @@ static struct map_desc h3600_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
   { 0xf0000000, 0x49000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* EGPIO 0 */
-  { 0xf1000000, 0x10000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* static memory bank 2 */
-  { 0xf3000000, 0x40000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* static memory bank 4 */
+  { 0xf1000000, 0x10000000, 0x02800000, DOMAIN_IO, 1, 1, 0, 0 }, /* static memory bank 2 */
+  { 0xf3800000, 0x40000000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* static memory bank 4 */
   LAST_DESC
 };
 
@@ -166,7 +214,7 @@ static void __init h3600_map_io(void)
 	sa1100_register_uart_fns(&h3600_port_fns);
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1); /* isn't this one driven elsewhere? */
-	sa1100_register_uart(2, 2);
+	init_h3600_egpio();
 
 	/*
 	 * Default GPIO settings.
@@ -179,6 +227,11 @@ static void __init h3600_map_io(void)
 	 */
 	PPDR |= PPC_TXD4 | PPC_SCLK | PPC_SFRM;
 	PPSR &= ~(PPC_TXD4 | PPC_SCLK | PPC_SFRM);
+
+	/* Configure suspend conditions */
+	PGSR = 0;
+	PWER = 0x1 | (1 << 31);
+	PCFR = PCFR_OPDE | PCFR_FP | PCFR_FS;
 }
 
 MACHINE_START(H3600, "Compaq iPAQ")

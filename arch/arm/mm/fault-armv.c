@@ -514,7 +514,7 @@ bad:
 	 * Oops, we didn't handle the instruction.
 	 */
 	printk(KERN_ERR "Alignment trap: not handling instruction "
-		"%08lx at [<%08lx>]", instr, instrptr);
+		"%08lx at [<%08lx>]\n", instr, instrptr);
 	ai_skipped += 1;
 	return 1;
 

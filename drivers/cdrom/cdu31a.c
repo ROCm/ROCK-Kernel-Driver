@@ -3102,23 +3102,6 @@ static int scd_spinup(void)
 	return 0;
 }
 
-static int scd_dev_open(struct inode *inode, struct file *file)
-{
-	int err;
-	MOD_INC_USE_COUNT;
-	err = cdrom_open(inode, file);
-	if (err)
-		MOD_DEC_USE_COUNT;
-	return err;
-}
-
-static int scd_dev_release(struct inode *inode, struct file *file)
-{
-	int err = cdrom_release(inode, file);
-	MOD_DEC_USE_COUNT;
-	return err;
-}
-
 /*
  * Open the drive for operations.  Spin the drive up and read the table of
  * contents if these have not already been done.
@@ -3200,8 +3183,9 @@ static void scd_release(struct cdrom_device_info *cdi)
 
 struct block_device_operations scd_bdops =
 {
-	open:			scd_dev_open,
-	release:		scd_dev_release,
+	owner:			THIS_MODULE,
+	open:			cdrom_open,
+	release:		cdrom_release,
 	ioctl:			cdrom_ioctl,
 	check_media_change:	cdrom_media_changed,
 };

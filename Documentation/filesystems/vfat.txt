@@ -48,8 +48,15 @@ check=s|r|n   -- Case sensitivity checking setting.
                  r: relaxed, case insensitive
                  n: normal, default setting, currently case insensitive
 
-nocase        -- Returning with having the 8.3 format alias kept in
-                 the disk. Default, return lowercase letter.
+shortname=lower|win95|winnt|mixed
+	      -- Shortname display/create setting.
+		 lower: convert to lowercase for display,
+			emulate the Windows 95 rule for create.
+		 win95: emulate the Windows 95 rule for display/create.
+		 winnt: emulate the Windows NT rule for display/create.
+		 mixed: emulate the Windows NT rule for display,
+			emulate the Windows 95 rule for create.
+		 Default setting is `lower'.
 
 <bool>: 0,1,yes,no,true,false
 

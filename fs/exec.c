@@ -275,6 +275,7 @@ void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long a
 		goto out;
 	if (!pte_none(*pte))
 		goto out;
+	lru_cache_add(page);
 	flush_dcache_page(page);
 	flush_page_to_ram(page);
 	set_pte(pte, pte_mkdirty(pte_mkwrite(mk_pte(page, PAGE_COPY))));

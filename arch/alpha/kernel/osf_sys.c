@@ -1320,3 +1320,62 @@ asmlinkage int sys_old_adjtimex(struct timex32 *txc_p)
 
 	return ret;
 }
+
+/* Get an address range which is currently unmapped.  Similar to the
+   generic version except that we know how to honor ADDR_LIMIT_32BIT.  */
+
+static unsigned long
+arch_get_unmapped_area_1(unsigned long addr, unsigned long len,
+		         unsigned long limit)
+{
+	struct vm_area_struct *vma = find_vma(current->mm, addr);
+
+	while (1) {
+		/* At this point:  (!vma || addr < vma->vm_end). */
+		if (limit - len < addr)
+			return -ENOMEM;
+		if (!vma || addr + len <= vma->vm_start)
+			return addr;
+		addr = vma->vm_end;
+		vma = vma->vm_next;
+	}
+}
+
+unsigned long
+arch_get_unmapped_area(struct file *filp, unsigned long addr,
+		       unsigned long len, unsigned long pgoff,
+		       unsigned long flags)
+{
+	unsigned long limit;
+
+	/* "32 bit" actually means 31 bit, since pointers sign extend.  */
+	if (current->personality & ADDR_LIMIT_32BIT)
+		limit = 0x80000000;
+	else
+		limit = TASK_SIZE;
+
+	if (len > limit)
+		return -ENOMEM;
+
+	/* First, see if the given suggestion fits.  */
+	if (addr) {
+		struct vm_area_struct *vma;
+
+		addr = PAGE_ALIGN(addr);
+		vma = find_vma(current->mm, addr);
+		if (limit - len >= addr &&
+		    (!vma || addr + len <= vma->vm_start))
+			return addr;
+	}
+
+	/* Next, try allocating at TASK_UNMAPPED_BASE.  */
+	addr = arch_get_unmapped_area_1 (PAGE_ALIGN(TASK_UNMAPPED_BASE),
+					 len, limit);
+	if (addr != -ENOMEM)
+		return addr;
+
+	/* Finally, try allocating in low memory.  */
+	addr = arch_get_unmapped_area_1 (PAGE_SIZE, len, limit);
+
+	return addr;
+}

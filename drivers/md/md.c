@@ -2895,6 +2895,7 @@ static int md_release(struct inode *inode, struct file * file)
 
 static struct block_device_operations md_fops=
 {
+	owner:		THIS_MODULE,
 	open:		md_open,
 	release:	md_release,
 	ioctl:		md_ioctl,

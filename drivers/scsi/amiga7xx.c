@@ -20,7 +20,7 @@
 #include <asm/pgtable.h>
 #include <asm/amigaints.h>
 #include <asm/amigahw.h>
-#include <asm/io.h>
+
 #include <asm/irq.h>
 
 #include "scsi.h"
@@ -133,3 +133,6 @@ int __init amiga7xx_detect(Scsi_Host_Template *tpnt)
     called = 1;
     return num;
 }
+
+static Scsi_Host_Template driver_template = AMIGA7XX_SCSI;
+#include "scsi_module.c"

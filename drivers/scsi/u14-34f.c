@@ -334,6 +334,7 @@
  *  the driver sets host->wish_block = TRUE for all ISA boards.
  */
 
+#include <linux/module.h>
 #include <linux/version.h>
 
 #ifndef LinuxVersionCode
@@ -341,9 +342,6 @@
 #endif
 
 #define MAX_INT_PARAM 10
-
-#if defined(MODULE)
-#include <linux/module.h>
 
 MODULE_PARM(boot_options, "s");
 MODULE_PARM(io_port, "1-" __MODULE_STRING(MAX_INT_PARAM) "i");
@@ -353,8 +351,6 @@ MODULE_PARM(link_statistics, "i");
 MODULE_PARM(max_queue_depth, "i");
 MODULE_PARM(ext_tran, "i");
 MODULE_AUTHOR("Dario Ballabio");
-
-#endif
 
 #include <linux/string.h>
 #include <linux/sched.h>

@@ -136,7 +136,7 @@ struct iso_path_table{
 	char extent[4];		/* 731 */
 	char  parent[2];	/* 721 */
 	char name[0];
-};
+} __attribute__((packed));
 
 /* high sierra is identical to iso, except that the date is only 6 bytes, and
    there is an extra reserved byte after the flags */
@@ -153,7 +153,7 @@ struct iso_directory_record {
 	char volume_sequence_number	[ISODCL (29, 32)]; /* 723 */
 	unsigned char name_len		[ISODCL (33, 33)]; /* 711 */
 	char name			[0];
-};
+} __attribute__((packed));
 
 #define ISOFS_BLOCK_BITS 11
 #define ISOFS_BLOCK_SIZE 2048
@@ -207,6 +207,8 @@ static inline int isonum_733(char *p)
 }
 extern int iso_date(char *, int);
 
+struct inode;		/* To make gcc happy */
+
 extern int parse_rock_ridge_inode(struct iso_directory_record *, struct inode *);
 extern int get_rock_ridge_filename(struct iso_directory_record *, char *, struct inode *);
 extern int isofs_name_translate(struct iso_directory_record *, char *, struct inode *);
@@ -218,6 +220,7 @@ int get_acorn_filename(struct iso_directory_record *, char *, struct inode *);
 
 extern struct dentry *isofs_lookup(struct inode *, struct dentry *);
 extern struct buffer_head *isofs_bread(struct inode *, unsigned int, unsigned int);
+extern int isofs_get_blocks(struct inode *, long, struct buffer_head **, unsigned long);
 
 extern struct inode_operations isofs_dir_inode_operations;
 extern struct file_operations isofs_dir_operations;

@@ -1738,6 +1738,7 @@ static int amiga_floppy_change(kdev_t dev)
 }
 
 static struct block_device_operations floppy_fops = {
+	owner:			THIS_MODULE,
 	open:			floppy_open,
 	release:		floppy_release,
 	ioctl:			fd_ioctl,

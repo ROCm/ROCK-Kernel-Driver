@@ -352,7 +352,8 @@ static int ess_calc_best_speed
 		*speedp = speed1;
 		retval  = 1;
 	} else {
-		*divp   = div2;
+	/*	*divp   = div2; */
+		*divp   = 0x80 | div2;
 		*speedp = speed2;
 		retval  = 2;
 	}
@@ -376,10 +377,19 @@ static void ess_common_speed (sb_devc *devc, int *speedp, int *divp)
 		/*
 		 * The 0x80 is important for the first audio channel
 		 */
-		div = 0x80 | ess_calc_div (795500, 128, speedp, &diff);
+		if (devc->submodel == SUBMDL_ES1888) {
+			div = 0x80 | ess_calc_div (795500, 256, speedp, &diff);
+		} else {
+			div = 0x80 | ess_calc_div (795500, 128, speedp, &diff);
+		}
 	} else if(devc->caps & SB_CAP_ES18XX_RATE) {
-		ess_calc_best_speed(ES18XX_CLOCK1, 128, ES18XX_CLOCK2, 256, 
+		if (devc->submodel == SUBMDL_ES1888) {
+			ess_calc_best_speed(397700, 128, 795500, 256, 
 						&div, speedp);
+		} else {
+			ess_calc_best_speed(ES18XX_CLOCK1, 128, ES18XX_CLOCK2, 256, 
+						&div, speedp);
+		}
 	} else {
 		if (*speedp > 22000) {
 			div = 0x80 | ess_calc_div (ES1688_CLOCK1, 256, speedp, &diff);

@@ -4104,7 +4104,7 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 			if ((hwrpb->sys_type) == 201) {
 				printk(KERN_INFO "trident: Running on Alpha system type Nautilus\n");
 				ac97_data = ali_ac97_get(card, 0, AC97_POWER_CONTROL);
-				ali_ac97_set(card, 0, AC97_POWER_CONTROL, ac97_data |
+				ali_ac97_set(card, 0, AC97_POWER_CONTROL, ac97_data | ALI_EAPD_POWER_DOWN);
 			}
 		}
 #endif

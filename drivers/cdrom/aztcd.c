@@ -355,6 +355,7 @@ static int aztcd_release(struct inode *inode, struct file *file);
 int aztcd_init(void);
 
 static struct block_device_operations azt_fops = {
+	owner:THIS_MODULE,
 	open:aztcd_open,
 	release:aztcd_release,
 	ioctl:aztcd_ioctl,
@@ -1658,8 +1659,6 @@ int aztcd_open(struct inode *ip, struct file *fp)
 	if (aztPresent == 0)
 		return -ENXIO;	/* no hardware */
 
-	MOD_INC_USE_COUNT;
-
 	if (!azt_open_count && azt_state == AZT_S_IDLE) {
 		azt_invalidate_buffers();
 
@@ -1691,7 +1690,6 @@ int aztcd_open(struct inode *ip, struct file *fp)
 	return 0;
 
       err_out:
-	MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
@@ -1706,7 +1704,6 @@ static int aztcd_release(struct inode *inode, struct file *file)
 	printk("inode: %p, inode->i_rdev: %x    file: %p\n", inode,
 	       inode->i_rdev, file);
 #endif
-	MOD_DEC_USE_COUNT;
 	if (!--azt_open_count) {
 		azt_invalidate_buffers();
 		aztUnlockDoor();

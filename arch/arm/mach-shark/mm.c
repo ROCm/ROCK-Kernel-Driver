@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/mach-shark/mm.c
  *
- *  by Alexander Schulz <aschulz@netwinder.org>
+ *  by Alexander Schulz
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as

@@ -42,7 +42,7 @@ asmlinkage void resume(void);
   register void *_last __asm__ ("d1"); \
   __asm__ __volatile__("jbsr " SYMBOL_NAME_STR(resume) \
 		       : "=d" (_last) : "a" (_prev), "a" (_next) \
-		       : "d0", "d1", "d2", "d3", "d4", "d5", "a0", "a1"); \
+		       : "d0", /* "d1", */ "d2", "d3", "d4", "d5", "a0", "a1"); \
   (last) = _last; \
 }
 

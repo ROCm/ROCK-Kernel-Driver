@@ -315,5 +315,6 @@ static int FDC2 = -1;
 
 #define AUTO_DMA
 
+#define EXTRA_FLOPPY_PARAMS
 
 #endif /* __ASM_I386_FLOPPY_H */

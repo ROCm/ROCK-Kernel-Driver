@@ -56,8 +56,9 @@ static int video_nr = -1;
 
 #ifdef MODULE
 MODULE_PARM(video_nr,"i");
-MODULE_AUTHOR("Scott J. Bertin <sbertin@mindspring.com> & Peter Pregler <Peter_Pregler@email.com> & Johannes Erdfelt <johannes@erdfelt.com>");
+MODULE_AUTHOR("Scott J. Bertin <sbertin@mindspring.com> & Peter Pregler <Peter_Pregler@email.com> & Johannes Erdfelt <jerdfelt@valinux.com>");
 MODULE_DESCRIPTION("V4L-driver for Vision CPiA based cameras");
+MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("video");
 #endif
 
@@ -2869,7 +2870,7 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 
 		/* set video size */
 		video_size = match_videosize(vm.width, vm.height);
-		if (cam->video_size < 0) {
+		if (video_size < 0) {
 			retval = -EINVAL;
 			break;
 		}
@@ -3253,41 +3254,7 @@ void cpia_unregister_camera(struct cam_data *cam)
 	}
 }
 
-/****************************************************************************
- *
- *  Module routines
- *
- ***************************************************************************/
-
-#ifdef MODULE
-int init_module(void)
-{
-	printk(KERN_INFO "%s v%d.%d.%d\n", ABOUT,
-	       CPIA_MAJ_VER, CPIA_MIN_VER, CPIA_PATCH_VER);
-#ifdef CONFIG_PROC_FS
-	proc_cpia_create();
-#endif
-#ifdef CONFIG_KMOD
-#ifdef CONFIG_VIDEO_CPIA_PP_MODULE
-	request_module("cpia_pp");
-#endif
-#ifdef CONFIG_VIDEO_CPIA_USB_MODULE
-	request_module("cpia_usb");
-#endif
-#endif
-return 0;
-}
-
-void cleanup_module(void)
-{
-#ifdef CONFIG_PROC_FS
-	proc_cpia_destroy();
-#endif
-}
-
-#else
-
-int cpia_init(struct video_init *unused)
+static int __init cpia_init(void)
 {
 	printk(KERN_INFO "%s v%d.%d.%d\n", ABOUT,
 	       CPIA_MAJ_VER, CPIA_MIN_VER, CPIA_PATCH_VER);
@@ -3313,9 +3280,17 @@ int cpia_init(struct video_init *unused)
 	return 0;
 }
 
+static void __exit cpia_exit(void)
+{
+#ifdef CONFIG_PROC_FS
+	proc_cpia_destroy();
+#endif
+}
+
+module_init(cpia_init);
+module_exit(cpia_exit);
+
 /* Exported symbols for modules. */
 
 EXPORT_SYMBOL(cpia_register_camera);
 EXPORT_SYMBOL(cpia_unregister_camera);
-
-#endif

@@ -41,8 +41,11 @@ static const q40ide_ioreg_t pcide_bases[Q40IDE_NUM_HWIFS] = {
      *  Offsets from one of the above bases
      */
 
+
+/* HD_DATA was redefined in asm-m68k/ide.h */
 #undef HD_DATA
 #define HD_DATA  0x1f0
+
 
 #define PCIDE_REG(x)	((q40ide_ioreg_t)(HD_##x-PCIDE_BASE1))
 

@@ -501,7 +501,6 @@ static int jsfd_open(struct inode *inode, struct file *file)
 	jdp = &jsf0.dv[dev];
 	jdp->refcnt++;
 
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -531,7 +530,6 @@ static int jsfd_release(struct inode *inode, struct file *file)
 		--jdp->refcnt;
 	}
 	/* N.B. Doesn't lo->file need an fput?? */
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -549,6 +547,7 @@ static struct file_operations jsf_fops = {
 static struct miscdevice jsf_dev = { JSF_MINOR, "jsflash", &jsf_fops };
 
 static struct block_device_operations jsfd_fops = {
+	owner:		THIS_MODULE,
 	open:		jsfd_open,
 	release:	jsfd_release,
 	ioctl:		jsfd_ioctl,

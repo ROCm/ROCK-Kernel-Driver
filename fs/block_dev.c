@@ -537,14 +537,20 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 		bdev->bd_op = get_blkfops(MAJOR(dev));
 	if (bdev->bd_op) {
 		ret = 0;
+		if (bdev->bd_op->owner)
+			__MOD_INC_USE_COUNT(bdev->bd_op->owner);
 		if (bdev->bd_op->open)
 			ret = bdev->bd_op->open(inode, file);
 		if (!ret) {
 			bdev->bd_openers++;
 			bdev->bd_inode->i_size = blkdev_size(dev);
 			bdev->bd_inode->i_blkbits = blksize_bits(block_size(dev));
-		} else if (!bdev->bd_openers)
-			bdev->bd_op = NULL;
+		} else {
+			if (bdev->bd_op->owner)
+				__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
+			if (!bdev->bd_openers)
+				bdev->bd_op = NULL;
+		}
 	}
 	unlock_kernel();
 	up(&bdev->bd_sem);
@@ -605,6 +611,8 @@ int blkdev_put(struct block_device *bdev, int kind)
 		kill_bdev(bdev);
 	if (bdev->bd_op->release)
 		ret = bdev->bd_op->release(bd_inode, NULL);
+	if (bdev->bd_op->owner)
+		__MOD_DEC_USE_COUNT(bdev->bd_op->owner);
 	if (!bdev->bd_openers)
 		bdev->bd_op = NULL;
 	unlock_kernel();

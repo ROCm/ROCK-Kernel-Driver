@@ -54,6 +54,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>
+#include <asm/arch/assabet.h>
 
 #include "sa1100.h"
 
@@ -375,11 +376,26 @@ static int sa1100_pcmcia_init(unsigned int sock){
  *
  * Returns: 0
  */
-static int sa1100_pcmcia_suspend(unsigned int sock){
+static int sa1100_pcmcia_suspend(unsigned int sock)
+{
+  struct pcmcia_configure conf;
+  int ret;
 
   DEBUG(2, "%s(): suspending socket %u\n", __FUNCTION__, sock);
 
-  return 0;
+  conf.sock = sock;
+  conf.vcc = 0;
+  conf.vpp = 0;
+  conf.output = 0;
+  conf.speaker = 0;
+  conf.reset = 1;
+
+  ret = pcmcia_low_level->configure_socket(&conf);
+
+  if (ret == 0)
+    sa1100_pcmcia_socket[sock].cs_state = dead_socket;
+
+  return ret;
 }
 
 

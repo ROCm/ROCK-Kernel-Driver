@@ -186,6 +186,7 @@ int __init gvp11_detect(Scsi_Host_Template *tpnt)
     unsigned int epc;
     struct zorro_dev *z = NULL;
     unsigned int default_dma_xfer_mask;
+    wd33c93_regs regs;
 #ifdef CHECK_WD33C93
     volatile unsigned char *sasr_3393, *scmd_3393;
     unsigned char save_sasr;
@@ -329,12 +330,11 @@ int __init gvp11_detect(Scsi_Host_Template *tpnt)
 	/*
 	 * Check for 14MHz SCSI clock
 	 */
-	if (epc & GVP_SCSICLKMASK)
-		wd33c93_init(instance, (wd33c93_regs *)&(DMA(instance)->SASR),
-			     dma_setup, dma_stop, WD33C93_FS_8_10);
-	else
-		wd33c93_init(instance, (wd33c93_regs *)&(DMA(instance)->SASR),
-			     dma_setup, dma_stop, WD33C93_FS_12_15);
+	regs.SASR = &(DMA(instance)->SASR);
+	regs.SCMD = &(DMA(instance)->SCMD);
+	wd33c93_init(instance, regs, dma_setup, dma_stop,
+		     (epc & GVP_SCSICLKMASK) ? WD33C93_FS_8_10
+					     : WD33C93_FS_12_15);
 
 	if (num_gvp11++ == 0) {
 		first_instance = instance;

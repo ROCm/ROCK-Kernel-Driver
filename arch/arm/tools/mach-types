@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Fri Oct 5 18:40:53 2001
+# Last update: Mon Oct 22 09:49:06 2001
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -114,7 +114,7 @@ sa1100_elf		SA1100_SA1100_ELF	SA1100_ELF		102
 gator			SA1100_GATOR		GATOR			103
 granite			ARCH_GRANITE		GRANITE			104
 consus			SA1100_CONSUS		CONSUS			105
-agilent_aaed2000	ARCH_AAEC2000_AAED2000	AAEC2000_AAED2000	106
+aaed2000		ARCH_AAED2000		AAED2000		106
 cdb89712		ARCH_CDB89712		CDB89712		107
 graphicsmaster		SA1100_GRAPHICSMASTER	GRAPHICSMASTER		108
 adsbitsy		SA1100_ADSBITSY		ADSBITSY		109
@@ -131,3 +131,6 @@ uengine			ARCH_UENGINE		UENGINE			119
 bluestem		SA1100_BLUESTEM		BLUESTEM		120
 xingu8			ARCH_XINGU8		XINGU8			121
 bushstb			ARCH_BUSHSTB		BUSHSTB			122
+epsilon1		SA1100_EPSILON1		EPSILON1		123
+balloon			SA1100_BALLOON		BALLOON			124
+puppy			ARCH_PUPPY		PUPPY			125

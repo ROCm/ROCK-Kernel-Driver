@@ -3,7 +3,8 @@
  *      3940, 2940, aic7895, aic7890, aic7880,
  *	aic7870, aic7860 and aic7850 SCSI controllers
  *
- * Copyright (c) 1995-2000 Justin T. Gibbs
+ * Copyright (c) 1994-2001 Justin T. Gibbs.
+ * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,26 +12,34 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
- *    without modification, immediately at the beginning of the file.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ *    without modification.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * Alternatively, this software may be distributed under the terms of the
- * GNU General Public License ("GPL").
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/src/aic7xxx/aic7xxx_pci.c#28 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#32 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_pci.c,v 1.6 2000/11/10 20:13:41 gibbs Exp $
  */
@@ -137,7 +146,7 @@ ahc_compose_id(u_int device, u_int vendor, u_int subdevice, u_int subvendor)
 #define DEVID_9005_TYPE(id) ((id) & 0xF)
 #define		DEVID_9005_TYPE_HBA		0x0	/* Standard Card */
 #define		DEVID_9005_TYPE_AAA		0x3	/* RAID Card */
-#define		DEVID_9005_TYPE_SISL		0x5	/* Low Cost Card */
+#define		DEVID_9005_TYPE_SISL		0x5	/* Container ROMB */
 #define		DEVID_9005_TYPE_MB		0xF	/* On Motherboard */
 
 #define DEVID_9005_MAXRATE(id) (((id) & 0x30) >> 4)
@@ -645,6 +654,8 @@ const u_int ahc_num_pci_devs = NUM_ELEMENTS(ahc_pci_ident_table);
 #define		CACHESIZE	0x0000003ful	/* only 5 bits */
 #define		LATTIME		0x0000ff00ul
 
+static int ahc_9005_subdevinfo_valid(uint16_t vendor, uint16_t device,
+				     uint16_t subvendor, uint16_t subdevice);
 static int ahc_ext_scbram_present(struct ahc_softc *ahc);
 static void ahc_scbram_config(struct ahc_softc *ahc, int enable,
 				  int pcheck, int fast, int large);
@@ -674,6 +685,40 @@ static void release_seeprom(struct seeprom_descriptor *sd);
 static void write_brdctl(struct ahc_softc *ahc, uint8_t value);
 static uint8_t read_brdctl(struct ahc_softc *ahc);
 
+static int
+ahc_9005_subdevinfo_valid(uint16_t device, uint16_t vendor,
+			  uint16_t subdevice, uint16_t subvendor)
+{
+	int result;
+
+	/* Default to invalid. */
+	result = 0;
+	if (vendor == 0x9005
+	 && subvendor == 0x9005
+         && subdevice != device
+         && SUBID_9005_TYPE_KNOWN(subdevice) != 0) {
+
+		switch (SUBID_9005_TYPE(subdevice)) {
+		case SUBID_9005_TYPE_MB:
+			break;
+		case SUBID_9005_TYPE_CARD:
+		case SUBID_9005_TYPE_LCCARD:
+			/*
+			 * Currently only trust Adaptec cards to
+			 * get the sub device info correct.
+			 */
+			if (DEVID_9005_TYPE(device) == DEVID_9005_TYPE_HBA)
+				result = 1;
+			break;
+		case SUBID_9005_TYPE_RAID:
+			break;
+		default:
+			break;
+		}
+	}
+	return (result);
+}
+
 struct ahc_pci_identity *
 ahc_find_pci_device(ahc_dev_softc_t pci)
 {
@@ -702,9 +747,7 @@ ahc_find_pci_device(ahc_dev_softc_t pci)
 	 * ID as valid.
 	 */
 	if (ahc_get_pci_function(pci) > 0
-	 && subvendor == 0x9005
-	 && subdevice != device
-	 && SUBID_9005_TYPE_KNOWN(subdevice) != 0
+	 && ahc_9005_subdevinfo_valid(vendor, device, subvendor, subdevice)
 	 && SUBID_9005_MFUNCENB(subdevice) == 0)
 		return (NULL);
 

@@ -204,8 +204,6 @@ MODULE_PARM(drive3,"1-6i");
 int pcd_init(void);
 void cleanup_module( void );
 
-static int pcd_dev_open(struct inode *inode, struct file *file);
-static void pcd_dev_release(struct inode *inode, struct file *file);
 static int pcd_open(struct cdrom_device_info *cdi, int purpose);
 static void pcd_release(struct cdrom_device_info *cdi);
 static int pcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);
@@ -267,9 +265,10 @@ static int pcd_warned = 0;		/* Have we logged a phase warning ? */
 
 /* kernel glue structures */
 
-struct block_device_operations pcd_bdops = {
-	open:			pcd_dev_open,
-	release:		pcd_dev_release,
+static struct block_device_operations pcd_bdops = {
+	owner:			THIS_MODULE,
+	open:			cdrom_open,
+	release:		cdrom_release,
 	ioctl:			cdrom_ioctl,
 	check_media_change:	cdrom_media_changed,
 }
@@ -363,24 +362,6 @@ int pcd_init (void)	/* preliminary initialisation */
         blksize_size[MAJOR_NR] = pcd_blocksizes;
 
 	return 0;
-}
-
-static int pcd_dev_open(struct inode *inode, struct file *file)
-{
-	int err;
-
-	MOD_INC_USE_COUNT;
-	err = cdrom_open(inode, file);
-	if (err)
-		MOD_DEC_USE_COUNT;
-	return err;
-}
-
-static int pcd_dev_release(struct inode *inode, struct file *file)
-{
-	int err = cdrom_release(inode, file);
-	MOD_DEC_USE_COUNT;
-	return err;
 }
 
 static int pcd_open(struct cdrom_device_info *cdi, int purpose)

@@ -1871,8 +1871,6 @@ static int opt_open(struct inode *ip, struct file *fp)
 {
 	DEBUG((DEBUG_VFS, "starting opt_open"));
 
-	MOD_INC_USE_COUNT;
-
 	if (!open_count && state == S_IDLE) {
 		int status;
 
@@ -1916,7 +1914,6 @@ static int opt_open(struct inode *ip, struct file *fp)
 	return 0;
 
 err_out:
-    MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
@@ -1944,7 +1941,6 @@ static int opt_release(struct inode *ip, struct file *fp)
 		del_timer(&delay_timer);
 		del_timer(&req_timer);
 	}
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -2005,6 +2001,7 @@ static int __init version_ok(void)
 
 
 static struct block_device_operations opt_fops = {
+	owner:			THIS_MODULE,
 	open:			opt_open,
 	release:		opt_release,
 	ioctl:			opt_ioctl,

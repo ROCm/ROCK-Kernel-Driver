@@ -54,39 +54,6 @@ ENTRY(outsl)
 		mov	r1, lr
 		b	SYMBOL_NAME(printk)
 
-/* Purpose: read a block of data from a hardware register to memory.
- * Proto  : void insw(int from_port, void *to, int len_in_words);
- * Notes  : increment to, 'to' must be 16-bit aligned
- */
-
-ENTRY(insw)
-		addr	r0
-		teq	r2, #0
-		bne	__raw_readsw
-		RETINSTR(mov, pc, lr)
-
-ENTRY(insb)
-		addr	r0
-		teq	r2, #0
-		bne	__raw_readsb
-		RETINSTR(mov, pc, lr)
-
-@ Purpose: write a block of data from memory to a hardware register.
-@ Proto  : outsw(int to_reg, void *from, int len_in_words);
-@ Notes  : increments from
-
-ENTRY(outsw)
-		addr	r0
-		teq	r2, #0
-		bne	__raw_writesw
-		RETINSTR(mov, pc, lr)
-
-ENTRY(outsb)
-		addr	r0
-		teq	r2, #0
-		bne	__raw_writesb
-		RETINSTR(mov, pc, lr)
-
 @ Purpose: write a memc register
 @ Proto  : void memc_write(int register, int value);
 @ Returns: nothing

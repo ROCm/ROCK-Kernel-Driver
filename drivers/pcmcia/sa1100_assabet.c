@@ -10,29 +10,29 @@
 #include <asm/hardware.h>
 #include <asm/irq.h>
 #include <asm/arch/pcmcia.h>
-
+#include <asm/arch/assabet.h>
 
 static int assabet_pcmcia_init(struct pcmcia_init *init){
   int irq, res;
 
   /* Enable CF bus: */
-  BCR_clear(BCR_CF_BUS_OFF);
+  ASSABET_BCR_clear(ASSABET_BCR_CF_BUS_OFF);
 
   /* All those are inputs */
-  GPDR &= ~(GPIO_CF_CD | GPIO_CF_BVD2 | GPIO_CF_BVD1 | GPIO_CF_IRQ);
+  GPDR &= ~(ASSABET_GPIO_CF_CD | ASSABET_GPIO_CF_BVD2 | ASSABET_GPIO_CF_BVD1 | ASSABET_GPIO_CF_IRQ);
 
   /* Set transition detect */
-  set_GPIO_IRQ_edge( GPIO_CF_CD|GPIO_CF_BVD2|GPIO_CF_BVD1, GPIO_BOTH_EDGES );
-  set_GPIO_IRQ_edge( GPIO_CF_IRQ, GPIO_FALLING_EDGE );
+  set_GPIO_IRQ_edge( ASSABET_GPIO_CF_CD|ASSABET_GPIO_CF_BVD2|ASSABET_GPIO_CF_BVD1, GPIO_BOTH_EDGES );
+  set_GPIO_IRQ_edge( ASSABET_GPIO_CF_IRQ, GPIO_FALLING_EDGE );
 
   /* Register interrupts */
-  irq = IRQ_GPIO_CF_CD;
+  irq = ASSABET_IRQ_GPIO_CF_CD;
   res = request_irq( irq, init->handler, SA_INTERRUPT, "CF_CD", NULL );
   if( res < 0 ) goto irq_err;
-  irq = IRQ_GPIO_CF_BVD2;
+  irq = ASSABET_IRQ_GPIO_CF_BVD2;
   res = request_irq( irq, init->handler, SA_INTERRUPT, "CF_BVD2", NULL );
   if( res < 0 ) goto irq_err;
-  irq = IRQ_GPIO_CF_BVD1;
+  irq = ASSABET_IRQ_GPIO_CF_BVD1;
   res = request_irq( irq, init->handler, SA_INTERRUPT, "CF_BVD1", NULL );
   if( res < 0 ) goto irq_err;
 
@@ -47,12 +47,12 @@ irq_err:
 static int assabet_pcmcia_shutdown(void)
 {
   /* disable IRQs */
-  free_irq( IRQ_GPIO_CF_CD, NULL );
-  free_irq( IRQ_GPIO_CF_BVD2, NULL );
-  free_irq( IRQ_GPIO_CF_BVD1, NULL );
+  free_irq( ASSABET_IRQ_GPIO_CF_CD, NULL );
+  free_irq( ASSABET_IRQ_GPIO_CF_BVD2, NULL );
+  free_irq( ASSABET_IRQ_GPIO_CF_BVD1, NULL );
   
   /* Disable CF bus: */
-  BCR_set(BCR_CF_BUS_OFF);
+  ASSABET_BCR_set(ASSABET_BCR_CF_BUS_OFF);
 
   return 0;
 }
@@ -68,13 +68,13 @@ static int assabet_pcmcia_socket_state(struct pcmcia_state_array
 
   levels=GPLR;
 
-  state_array->state[1].detect=((levels & GPIO_CF_CD)==0)?1:0;
+  state_array->state[1].detect=((levels & ASSABET_GPIO_CF_CD)==0)?1:0;
 
-  state_array->state[1].ready=(levels & GPIO_CF_IRQ)?1:0;
+  state_array->state[1].ready=(levels & ASSABET_GPIO_CF_IRQ)?1:0;
 
-  state_array->state[1].bvd1=(levels & GPIO_CF_BVD1)?1:0;
+  state_array->state[1].bvd1=(levels & ASSABET_GPIO_CF_BVD1)?1:0;
 
-  state_array->state[1].bvd2=(levels & GPIO_CF_BVD2)?1:0;
+  state_array->state[1].bvd2=(levels & ASSABET_GPIO_CF_BVD2)?1:0;
 
   state_array->state[1].wrprot=0; /* Not available on Assabet. */
 
@@ -90,7 +90,7 @@ static int assabet_pcmcia_get_irq_info(struct pcmcia_irq_info *info){
   if(info->sock>1) return -1;
 
   if(info->sock==1)
-    info->irq=IRQ_GPIO_CF_IRQ;
+    info->irq=ASSABET_IRQ_GPIO_CF_IRQ;
 
   return 0;
 }
@@ -110,7 +110,7 @@ static int assabet_pcmcia_configure_socket(const struct pcmcia_configure
 
   switch(configure->vcc){
   case 0:
-    value &= ~BCR_CF_PWR;
+    value &= ~ASSABET_BCR_CF_PWR;
     break;
 
   case 50:
@@ -118,7 +118,7 @@ static int assabet_pcmcia_configure_socket(const struct pcmcia_configure
 	   __FUNCTION__);
 
   case 33:  /* Can only apply 3.3V to the CF slot. */
-    value |= BCR_CF_PWR;
+    value |= ASSABET_BCR_CF_PWR;
     break;
 
   default:
@@ -128,11 +128,11 @@ static int assabet_pcmcia_configure_socket(const struct pcmcia_configure
     return -1;
   }
 
-  value = (configure->reset) ? (value | BCR_CF_RST) : (value & ~BCR_CF_RST);
+  value = (configure->reset) ? (value | ASSABET_BCR_CF_RST) : (value & ~ASSABET_BCR_CF_RST);
 
   /* Silently ignore Vpp, output enable, speaker enable. */
 
-  BCR = BCR_value = value;
+  ASSABET_BCR = BCR_value = value;
 
   restore_flags(flags);
 

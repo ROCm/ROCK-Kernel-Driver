@@ -318,6 +318,117 @@ icside_set_speed(ide_drive_t *drive, byte speed)
 	return icside_config_if(drive, speed);
 }
 
+/*
+ * dma_intr() is the handler for disk read/write DMA interrupts
+ */
+static ide_startstop_t icside_dmaintr(ide_drive_t *drive)
+{
+	int i;
+	byte stat, dma_stat;
+
+	dma_stat = HWIF(drive)->dmaproc(ide_dma_end, drive);
+	stat = GET_STAT();			/* get drive status */
+	if (OK_STAT(stat,DRIVE_READY,drive->bad_wstat|DRQ_STAT)) {
+		if (!dma_stat) {
+			struct request *rq = HWGROUP(drive)->rq;
+			rq = HWGROUP(drive)->rq;
+			for (i = rq->nr_sectors; i > 0;) {
+				i -= rq->current_nr_sectors;
+				ide_end_request(1, HWGROUP(drive));
+			}
+			return ide_stopped;
+		}
+		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n", 
+		       drive->name, dma_stat);
+	}
+	return ide_error(drive, "dma_intr", stat);
+}
+
+/*
+ * The following is a sick duplication from ide-dma.c ;(
+ *
+ * This should be defined in one place only.
+ */
+struct drive_list_entry {
+	char * id_model;
+	char * id_firmware;
+};
+
+static struct drive_list_entry drive_whitelist [] = {
+	{ "Micropolis 2112A",			"ALL"		},
+	{ "CONNER CTMA 4000",			"ALL"		},
+	{ "CONNER CTT8000-A",			"ALL"		},
+	{ "ST34342A",				"ALL"		},
+	{ NULL,					0		}
+};
+
+static struct drive_list_entry drive_blacklist [] = {
+	{ "WDC AC11000H",			"ALL"		},
+	{ "WDC AC22100H",			"ALL"		},
+	{ "WDC AC32500H",			"ALL"		},
+	{ "WDC AC33100H",			"ALL"		},
+	{ "WDC AC31600H",			"ALL"		},
+	{ "WDC AC32100H",			"24.09P07"	},
+	{ "WDC AC23200L",			"21.10N21"	},
+	{ "Compaq CRD-8241B",			"ALL"		},
+	{ "CRD-8400B",				"ALL"		},
+	{ "CRD-8480B",				"ALL"		},
+	{ "CRD-8480C",				"ALL"		},
+	{ "CRD-8482B",				"ALL"		},
+ 	{ "CRD-84",				"ALL"		},
+	{ "SanDisk SDP3B",			"ALL"		},
+	{ "SanDisk SDP3B-64",			"ALL"		},
+	{ "SANYO CD-ROM CRD",			"ALL"		},
+	{ "HITACHI CDR-8",			"ALL"		},
+	{ "HITACHI CDR-8335",			"ALL"		},
+	{ "HITACHI CDR-8435",			"ALL"		},
+	{ "Toshiba CD-ROM XM-6202B",		"ALL"		},
+	{ "CD-532E-A",				"ALL"		},
+	{ "E-IDE CD-ROM CR-840",		"ALL"		},
+	{ "CD-ROM Drive/F5A",			"ALL"		},
+	{ "RICOH CD-R/RW MP7083A",		"ALL"		},
+	{ "WPI CDD-820",			"ALL"		},
+	{ "SAMSUNG CD-ROM SC-148C",		"ALL"		},
+	{ "SAMSUNG CD-ROM SC-148F",		"ALL"		},
+	{ "SAMSUNG CD-ROM SC",			"ALL"		},
+	{ "SanDisk SDP3B-64",			"ALL"		},
+	{ "SAMSUNG CD-ROM SN-124",		"ALL"		},
+	{ "PLEXTOR CD-R PX-W8432T",		"ALL"		},
+	{ "ATAPI CD-ROM DRIVE 40X MAXIMUM",	"ALL"		},
+	{ "_NEC DV5800A",			"ALL"		},
+	{ NULL,					0		}
+};
+
+static int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_table)
+{
+	for ( ; drive_table->id_model ; drive_table++)
+		if ((!strcmp(drive_table->id_model, id->model)) &&
+		    ((!strstr(drive_table->id_firmware, id->fw_rev)) ||
+		     (!strcmp(drive_table->id_firmware, "ALL"))))
+			return 1;
+	return 0;
+}
+
+/*
+ *  For both Blacklisted and Whitelisted drives.
+ *  This is setup to be called as an extern for future support
+ *  to other special driver code.
+ */
+static int check_drive_lists(ide_drive_t *drive, int good_bad)
+{
+	struct hd_driveid *id = drive->id;
+
+	if (good_bad) {
+		return in_drive_list(id, drive_whitelist);
+	} else {
+		int blacklist = in_drive_list(id, drive_blacklist);
+		if (blacklist)
+			printk("%s: Disabling DMA for %s\n", drive->name, id->model);
+		return(blacklist);
+	}
+	return 0;
+}
+
 static int
 icside_dma_check(ide_drive_t *drive)
 {
@@ -333,7 +444,7 @@ icside_dma_check(ide_drive_t *drive)
 	/*
 	 * Consult the list of known "bad" drives
 	 */
-	if (ide_dmaproc(ide_dma_bad_drive, drive)) {
+	if (check_drive_lists(drive, 0)) {
 		func = ide_dma_off;
 		goto out;
 	}
@@ -358,7 +469,7 @@ icside_dma_check(ide_drive_t *drive)
 	/*
 	 * Consult the list of known "good" drives
 	 */
-	if (ide_dmaproc(ide_dma_good_drive, drive)) {
+	if (check_drive_lists(drive, 1)) {
 		if (id->eide_dma_time > 150)
 			goto out;
 		xfer_mode = XFER_MW_DMA_1;
@@ -372,12 +483,28 @@ out:
 }
 
 static int
+icside_dma_verbose(ide_drive_t *drive)
+{
+	printk(", DMA");
+	return 1;
+}
+
+static int
 icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	int count, reading = 0;
 
 	switch (func) {
+	case ide_dma_off:
+		printk("%s: DMA disabled\n", drive->name);
+		/*FALLTHROUGH*/
+
+	case ide_dma_off_quietly:
+	case ide_dma_on:
+		drive->using_dma = (func == ide_dma_on);
+		return 0;
+
 	case ide_dma_check:
 		return icside_dma_check(drive);
 
@@ -407,7 +534,7 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		if (drive->media != ide_disk)
 			return 0;
 
-		ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, NULL);
+		ide_set_handler(drive, &icside_dmaintr, WAIT_CMD, NULL);
 		OUT_BYTE(reading ? WIN_READDMA : WIN_WRITEDMA,
 			 IDE_COMMAND_REG);
 
@@ -424,9 +551,19 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 	case ide_dma_test_irq:
 		return inb((unsigned long)hwif->hw.priv) & 1;
 
+	case ide_dma_bad_drive:
+	case ide_dma_good_drive:
+		return check_drive_lists(drive, (func == ide_dma_good_drive));
+
+	case ide_dma_verbose:
+		return icside_dma_verbose(drive);
+
+	case ide_dma_timeout:
 	default:
-		return ide_dmaproc(func, drive);
+		printk("icside_dmaproc: unsupported %s func: %d\n",
+			ide_dmafunc_verbose(func), func);
 	}
+	return 1;
 }
 
 static int
@@ -464,13 +601,13 @@ icside_find_hwif(unsigned long dataport)
 
 	for (index = 0; index < MAX_HWIFS; ++index) {
 		hwif = &ide_hwifs[index];
-		if (hwif->hw.io_ports[IDE_DATA_OFFSET] == (ide_ioreg_t)dataport)
+		if (hwif->io_ports[IDE_DATA_OFFSET] == (ide_ioreg_t)dataport)
 			goto found;
 	}
 
 	for (index = 0; index < MAX_HWIFS; ++index) {
 		hwif = &ide_hwifs[index];
-		if (!hwif->hw.io_ports[IDE_DATA_OFFSET])
+		if (!hwif->io_ports[IDE_DATA_OFFSET])
 			goto found;
 	}
 
@@ -493,10 +630,13 @@ icside_setup(unsigned long base, struct cardinfo *info, int irq)
 
 		for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
 			hwif->hw.io_ports[i] = (ide_ioreg_t)port;
+			hwif->io_ports[i] = (ide_ioreg_t)port;
 			port += 1 << info->stepping;
 		}
 		hwif->hw.io_ports[IDE_CONTROL_OFFSET] = base + info->ctrloffset;
+		hwif->io_ports[IDE_CONTROL_OFFSET] = base + info->ctrloffset;
 		hwif->hw.irq  = irq;
+		hwif->irq     = irq;
 		hwif->hw.dma  = NO_DMA;
 		hwif->noprobe = 0;
 		hwif->chipset = ide_acorn;
@@ -579,9 +719,8 @@ static int __init icside_register_v6(struct expansion_card *ec, int autodma)
 			icside_setup_dma(mate, autodma);
 		}
 	}
-#endif
-
 no_dma:
+#endif
 	return hwif || mate ? 0 : -1;
 }
 

@@ -37,6 +37,9 @@
 #include <linux/soundcard.h>
 #include <linux/ac97_codec.h>
 #include <linux/pci.h>
+#include <linux/slab.h>
+#include <linux/sched.h>
+#include <asm/io.h>
 
 #include "efxmgr.h"
 #include "passthrough.h"

@@ -38,6 +38,8 @@ TODO:
 #include <linux/soundcard.h>
 #include <linux/pci.h>
 #include <linux/smp_lock.h>
+#include <linux/delay.h>
+#include <linux/slab.h>
 #include <asm/dma.h>
 #include <linux/init.h>
 #include <linux/poll.h>

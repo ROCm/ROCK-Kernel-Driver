@@ -55,6 +55,21 @@ static void fcParseLinkStatusCounters(TACHYON * fcChip);
 static void CpqTsGetSFQEntry(TACHYON * fcChip, 
 	      USHORT pi, ULONG * buffr, BOOLEAN UpdateChip); 
 
+static void 
+cpqfc_free_dma_consistent(CPQFCHBA *cpqfcHBAdata)
+{
+  	// free up the primary EXCHANGES struct and Link Q
+	PTACHYON fcChip = &cpqfcHBAdata->fcChip;
+
+	if (fcChip->Exchanges != NULL)
+		pci_free_consistent(cpqfcHBAdata->PciDev, sizeof(FC_EXCHANGES),
+			fcChip->Exchanges, fcChip->exch_dma_handle);
+	fcChip->Exchanges = NULL;
+	if (cpqfcHBAdata->fcLQ != NULL)
+		pci_free_consistent(cpqfcHBAdata->PciDev, sizeof(FC_LINK_QUE),
+			cpqfcHBAdata->fcLQ, cpqfcHBAdata->fcLQ_dma_handle);
+	cpqfcHBAdata->fcLQ = NULL;
+}
 
 // Note special requirements for Q alignment!  (TL/TS UG pg. 190)
 // We place critical index pointers at end of QUE elements to assist
@@ -68,7 +83,8 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
 
   int iStatus=0;
   unsigned long ulAddr;
-
+  dma_addr_t ERQdma, IMQdma, SPQdma, SESTdma;
+  int i;
 
   // NOTE! fcMemManager() will return system virtual addresses.
   // System (kernel) virtual addresses, though non-paged, still
@@ -78,15 +94,18 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
 
 
   // Allocate primary EXCHANGES array...
+  fcChip->Exchanges = NULL;
+  cpqfcHBAdata->fcLQ = NULL;
   
   printk("Allocating %u for %u Exchanges ", 
 	  (ULONG)sizeof(FC_EXCHANGES), TACH_MAX_XID);
-  fcChip->Exchanges = kmalloc( sizeof( FC_EXCHANGES), GFP_KERNEL );
+  fcChip->Exchanges = pci_alloc_consistent(cpqfcHBAdata->PciDev, 
+			sizeof(FC_EXCHANGES), &fcChip->exch_dma_handle);
   printk("@ %p\n", fcChip->Exchanges);
 
   if( fcChip->Exchanges == NULL ) // fatal error!!
   {
-    printk("kmalloc failure on Exchanges: fatal error\n");
+    printk("pci_alloc_consistent failure on Exchanges: fatal error\n");
     return -1;
   }
   // zero out the entire EXCHANGE space
@@ -94,25 +113,24 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
 
 
   printk("Allocating %u for LinkQ ", (ULONG)sizeof(FC_LINK_QUE));
-  cpqfcHBAdata->fcLQ = kmalloc( sizeof( FC_LINK_QUE), GFP_KERNEL );
+  cpqfcHBAdata->fcLQ = pci_alloc_consistent(cpqfcHBAdata->PciDev,
+				 sizeof( FC_LINK_QUE), &cpqfcHBAdata->fcLQ_dma_handle);
   printk("@ %p (%u elements)\n", cpqfcHBAdata->fcLQ, FC_LINKQ_DEPTH);
   memset( cpqfcHBAdata->fcLQ, 0, sizeof( FC_LINK_QUE));
 
   if( cpqfcHBAdata->fcLQ == NULL ) // fatal error!!
   {
-    printk("kmalloc failure on fc Link Que: fatal error\n");
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
+    printk("pci_alloc_consistent() failure on fc Link Que: fatal error\n");
     return -1;
   }
   // zero out the entire EXCHANGE space
   memset( cpqfcHBAdata->fcLQ, 0, sizeof( FC_LINK_QUE));  
-
-
-
   
   // Verify that basic Tach I/O registers are not NULL  
-  
   if( !fcChip->Registers.ReMapMemBase )
   {
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
     printk("HBA base address NULL: fatal error\n");
     return -1;
   }
@@ -125,18 +143,21 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
 
   // Allocate Tach's Exchange Request Queue (each ERQ entry 32 bytes)
   
-  fcChip->ERQ = fcMemManager( &cpqfcHBAdata->dynamic_mem[0],
-		  sizeof( TachLiteERQ ), 32*(ERQ_LEN), 0L );
+  fcChip->ERQ = fcMemManager( cpqfcHBAdata->PciDev, 
+			&cpqfcHBAdata->dynamic_mem[0], 
+			sizeof( TachLiteERQ ), 32*(ERQ_LEN), 0L, &ERQdma);
   if( !fcChip->ERQ )
   {
-    printk("kmalloc/alignment failure on ERQ: fatal error\n");
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
+    printk("pci_alloc_consistent/alignment failure on ERQ: fatal error\n");
     return -1;
   }
   fcChip->ERQ->length = ERQ_LEN-1;
-  ulAddr = virt_to_bus( fcChip->ERQ);
+  ulAddr = (ULONG) ERQdma; 
 #if BITS_PER_LONG > 32
   if( (ulAddr >> 32) )
   {
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
     printk(" FATAL! ERQ ptr %p exceeds Tachyon's 32-bit register size\n",
 		    (void*)ulAddr);
     return -1;  // failed
@@ -147,19 +168,22 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
 
   // Allocate Tach's Inbound Message Queue (32 bytes per entry)
   
-  fcChip->IMQ = fcMemManager( &cpqfcHBAdata->dynamic_mem[0],
-		  sizeof( TachyonIMQ ), 32*(IMQ_LEN), 0L );
+  fcChip->IMQ = fcMemManager( cpqfcHBAdata->PciDev, 
+		  &cpqfcHBAdata->dynamic_mem[0],
+		  sizeof( TachyonIMQ ), 32*(IMQ_LEN), 0L, &IMQdma );
   if( !fcChip->IMQ )
   {
-    printk("kmalloc/alignment failure on IMQ: fatal error\n");
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
+    printk("pci_alloc_consistent/alignment failure on IMQ: fatal error\n");
     return -1;
   }
   fcChip->IMQ->length = IMQ_LEN-1;
 
-  ulAddr = virt_to_bus( fcChip->IMQ);
+  ulAddr = IMQdma;
 #if BITS_PER_LONG > 32
   if( (ulAddr >> 32) )
   {
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
     printk(" FATAL! IMQ ptr %p exceeds Tachyon's 32-bit register size\n",
 		    (void*)ulAddr);
     return -1;  // failed
@@ -169,20 +193,23 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
 
 
   // Allocate Tach's  Single Frame Queue (64 bytes per entry)
-  fcChip->SFQ = fcMemManager( &cpqfcHBAdata->dynamic_mem[0],
-		  sizeof( TachLiteSFQ ), 64*(SFQ_LEN),0L );
+  fcChip->SFQ = fcMemManager( cpqfcHBAdata->PciDev, 
+		  &cpqfcHBAdata->dynamic_mem[0],
+		  sizeof( TachLiteSFQ ), 64*(SFQ_LEN),0L, &SPQdma );
   if( !fcChip->SFQ )
   {
-    printk("kmalloc/alignment failure on SFQ: fatal error\n");
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
+    printk("pci_alloc_consistent/alignment failure on SFQ: fatal error\n");
     return -1;
   }
   fcChip->SFQ->length = SFQ_LEN-1;      // i.e. Que length [# entries -
                                        // min. 32; max.  4096 (0xffff)]
   
-  ulAddr = virt_to_bus( fcChip->SFQ);
+  ulAddr = SPQdma;
 #if BITS_PER_LONG > 32
   if( (ulAddr >> 32) )
   {
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
     printk(" FATAL! SFQ ptr %p exceeds Tachyon's 32-bit register size\n",
 		    (void*)ulAddr);
     return -1;  // failed
@@ -197,22 +224,28 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
   // be on physical page (e.g. 4k) boundary.
   printk("Allocating %u for TachSEST for %u Exchanges\n", 
 		 (ULONG)sizeof(TachSEST), TACH_SEST_LEN);
-  fcChip->SEST = fcMemManager( &cpqfcHBAdata->dynamic_mem[0],
-		  sizeof(TachSEST),  4, 0L );
+  fcChip->SEST = fcMemManager( cpqfcHBAdata->PciDev,
+		  &cpqfcHBAdata->dynamic_mem[0],
+		  sizeof(TachSEST),  4, 0L, &SESTdma );
 //		  sizeof(TachSEST),  64*TACH_SEST_LEN, 0L );
   if( !fcChip->SEST )
   {
-    printk("kmalloc/alignment failure on SEST: fatal error\n");
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
+    printk("pci_alloc_consistent/alignment failure on SEST: fatal error\n");
     return -1;
   }
+
+  for( i=0; i < TACH_SEST_LEN; i++)  // for each exchange
+      fcChip->SEST->sgPages[i] = NULL;
 
   fcChip->SEST->length = TACH_SEST_LEN;  // e.g. DON'T subtract one 
                                        // (TL/TS UG, pg 153)
 
-  ulAddr = virt_to_bus( fcChip->SEST);
+  ulAddr = SESTdma; 
 #if BITS_PER_LONG > 32
   if( (ulAddr >> 32) )
   {
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
     printk(" FATAL! SFQ ptr %p exceeds Tachyon's 32-bit register size\n",
 		    (void*)ulAddr);
     return -1;  // failed
@@ -241,7 +274,8 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
 		// NOTE! write consumer index last, since the write
 		// causes Tachyon to process the other registers
 
-  ulAddr = virt_to_bus( &fcChip->ERQ->consumerIndex);
+  ulAddr = ((unsigned long)&fcChip->ERQ->consumerIndex - 
+		(unsigned long)fcChip->ERQ) + (unsigned long) ERQdma;
 
   // NOTE! Tachyon DMAs to the ERQ consumer Index host
 		// address; must be correctly aligned
@@ -269,10 +303,13 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
 		// NOTE: TachLite DMAs to the producerIndex host address
 		// must be correctly aligned with address bits 1-0 cleared
     // Writing the BASE register clears the PI register, so write it last
-  ulAddr = virt_to_bus( &fcChip->IMQ->producerIndex);
+  ulAddr = ((unsigned long)&fcChip->IMQ->producerIndex - 
+		(unsigned long)fcChip->IMQ) + (unsigned long) IMQdma;
+
 #if BITS_PER_LONG > 32
   if( (ulAddr >> 32) )
   {
+    cpqfc_free_dma_consistent(cpqfcHBAdata);
     printk(" FATAL! IMQ ptr %p exceeds Tachyon's 32-bit register size\n",
 		    (void*)ulAddr);
     return -1;  // failed
@@ -1225,7 +1262,7 @@ int CpqTsProcessIMQEntry(void *host)
 #endif
 
             Exchanges->fcExchange[i].status |= INITIATOR_ABORT;
-            cpqfcTSCompleteExchange( fcChip, i); // abort on LDn
+            cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev, fcChip, i); // abort on LDn
           }
         }
 
@@ -1505,7 +1542,7 @@ int CpqTsProcessIMQEntry(void *host)
         if( RPCset )             // SEST transaction Response frame rec'd
         {
     	  // complete the command in our driver...
-          cpqfcTSCompleteExchange( fcChip, x_ID);
+          cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev,fcChip, x_ID);
 
         }  // end "RPCset"
 	
@@ -1709,16 +1746,15 @@ int CpqTsInitializeTachLite( void *pHBA, int opcode1, int opcode2)
     case 3:       // allocate mem, set Tachyon Que registers
       iStatus = CpqTsCreateTachLiteQues( cpqfcHBAdata, opcode2);
 
+      if( iStatus )
+        break;
+
       // now that the Queues exist, Tach can DMA to them, so
       // we can begin processing INTs
       // INTEN register - enable INT (TachLite interrupt)
       writeb( 0x1F, fcChip->Registers.ReMapMemBase + IINTEN);
 
-
-      if( iStatus )
-        break;
-
-
+	// Fall through
     case 4:       // Config Fame Manager, Init Loop Command, laser on
 
                  // L_PORT or loopback
@@ -1750,9 +1786,11 @@ int CpqTsDestroyTachLiteQues( void *pHBA, int opcode)
 {
   CPQFCHBA *cpqfcHBAdata = (CPQFCHBA*)pHBA;
   PTACHYON fcChip = &cpqfcHBAdata->fcChip;
-  USHORT i, j, iStatus=0;
+  USHORT i, iStatus=0;
   void* vPtr;  // mem Align manager sets this to the freed address on success
   unsigned long ulPtr;  // for 64-bit pointer cast (e.g. Alpa machine)
+  FC_EXCHANGES *Exchanges = fcChip->Exchanges;
+  PSGPAGES j, next;
 
   ENTER("DestroyTachLiteQues");
 
@@ -1760,19 +1798,25 @@ int CpqTsDestroyTachLiteQues( void *pHBA, int opcode)
   {
                 // search out and free Pool for Extended S/G list pages
 
-    for( i=0, j=0; i < TACH_SEST_LEN; i++, j=0)  // for each exchange
+    for( i=0; i < TACH_SEST_LEN; i++)  // for each exchange
     {
-      // It's possible that extended S/G pages were allocated and
+      // It's possible that extended S/G pages were allocated, mapped, and
       // not cleared due to error conditions or O/S driver termination.
       // Make sure they're all gone.
-      while( fcChip->SEST->sgPages[i].PoolPage[j] &&
-        (j < TL_MAX_SGPAGES))
-        kfree( fcChip->SEST->sgPages[i].PoolPage[j++]);
+      if (Exchanges->fcExchange[i].Cmnd != NULL) 
+      	cpqfc_pci_unmap(cpqfcHBAdata->PciDev, Exchanges->fcExchange[i].Cmnd, 
+			fcChip, i); // undo DMA mappings.
 
+      for (j=fcChip->SEST->sgPages[i] ; j != NULL ; j = next) {
+		next = j->next;
+		kfree(j);
+      }
+      fcChip->SEST->sgPages[i] = NULL;
     }
     ulPtr = (unsigned long)fcChip->SEST;
-    vPtr = fcMemManager( &cpqfcHBAdata->dynamic_mem[0],
-		    0,0, (ULONG)ulPtr ); // 'free' mem
+    vPtr = fcMemManager( cpqfcHBAdata->PciDev, 
+		    &cpqfcHBAdata->dynamic_mem[0],
+		    0,0, (ULONG)ulPtr, NULL ); // 'free' mem
     fcChip->SEST = 0L;  // null invalid ptr
     if( !vPtr )
     {
@@ -1785,8 +1829,9 @@ int CpqTsDestroyTachLiteQues( void *pHBA, int opcode)
   {
 
     ulPtr = (unsigned long)fcChip->SFQ;
-    vPtr = fcMemManager( &cpqfcHBAdata->dynamic_mem[0],
-		    0,0, (ULONG)ulPtr ); // 'free' mem
+    vPtr = fcMemManager( cpqfcHBAdata->PciDev, 
+		    &cpqfcHBAdata->dynamic_mem[0],
+		    0,0, (ULONG)ulPtr, NULL ); // 'free' mem
     fcChip->SFQ = 0L;  // null invalid ptr
     if( !vPtr )
     {
@@ -1803,8 +1848,8 @@ int CpqTsDestroyTachLiteQues( void *pHBA, int opcode)
     fcChip->IMQ->consumerIndex = 0;
 
     ulPtr = (unsigned long)fcChip->IMQ;
-    vPtr = fcMemManager( &cpqfcHBAdata->dynamic_mem[0],
-		    0,0, (ULONG)ulPtr ); // 'free' mem
+    vPtr = fcMemManager( cpqfcHBAdata->PciDev, &cpqfcHBAdata->dynamic_mem[0],
+		    0,0, (ULONG)ulPtr, NULL ); // 'free' mem
     fcChip->IMQ = 0L;  // null invalid ptr
     if( !vPtr )
     {
@@ -1816,8 +1861,8 @@ int CpqTsDestroyTachLiteQues( void *pHBA, int opcode)
   if( fcChip->ERQ )         // release memory blocks used by the queues
   {
     ulPtr = (unsigned long)fcChip->ERQ;
-    vPtr = fcMemManager( &cpqfcHBAdata->dynamic_mem[0],
-		    0,0, (ULONG)ulPtr ); // 'free' mem
+    vPtr = fcMemManager( cpqfcHBAdata->PciDev, &cpqfcHBAdata->dynamic_mem[0],
+		    0,0, (ULONG)ulPtr, NULL ); // 'free' mem
     fcChip->ERQ = 0L;  // null invalid ptr
     if( !vPtr )
     {
@@ -1826,19 +1871,8 @@ int CpqTsDestroyTachLiteQues( void *pHBA, int opcode)
     }
   }
     
-  // free up the primary EXCHANGES struct
-  if( fcChip->Exchanges != NULL)
-  {
-//    printk("kfree() on Exchanges @%p\n", fcChip->Exchanges);
-    kfree( fcChip->Exchanges);
-  }
-
-  // free up Link Q
-  if( cpqfcHBAdata->fcLQ != NULL )
-  {
-//    printk("kfree() on LinkQ @%p\n", fcChip->fcLQ);
-    kfree( cpqfcHBAdata->fcLQ);
-  }
+  // free up the primary EXCHANGES struct and Link Q
+  cpqfc_free_dma_consistent(cpqfcHBAdata);
   
   LEAVE("DestroyTachLiteQues");
   

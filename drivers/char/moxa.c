@@ -105,18 +105,16 @@ static char *moxa_brdname[] =
 	"CP-204J series",
 };
 
-typedef struct {
-	unsigned short vendor_id;
-	unsigned short device_id;
-	unsigned short board_type;
-} moxa_pciinfo;
-
-static moxa_pciinfo moxa_pcibrds[] =
-{
-	{PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C218, MOXA_BOARD_C218_PCI},
-	{PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C320, MOXA_BOARD_C320_PCI},
-	{PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CP204J, MOXA_BOARD_CP204J},
+static struct pci_device_id moxa_pcibrds[] = {
+	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C218, PCI_ANY_ID, PCI_ANY_ID, 
+	  0, 0, MOXA_BOARD_C218_PCI },
+	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C320, PCI_ANY_ID, PCI_ANY_ID, 
+	  0, 0, MOXA_BOARD_C320_PCI },
+	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_CP204J, PCI_ANY_ID, PCI_ANY_ID, 
+	  0, 0, MOXA_BOARD_CP204J },
+	{ 0 }
 };
+MODULE_DEVICE_TABLE(pci, moxa_pcibrds);
 
 typedef struct _moxa_isa_board_conf {
 	int boardType;
@@ -487,10 +485,10 @@ int moxa_init(void)
 #ifdef CONFIG_PCI
 	{
 		struct pci_dev *p = NULL;
-		n = sizeof(moxa_pcibrds) / sizeof(moxa_pciinfo);
+		n = (sizeof(moxa_pcibrds) / sizeof(moxa_pcibrds[0])) - 1;
 		i = 0;
 		while (i < n) {
-			while((p = pci_find_device(moxa_pcibrds[i].vendor_id, moxa_pcibrds[i].device_id, p))!=NULL)
+			while ((p = pci_find_device(moxa_pcibrds[i].vendor, moxa_pcibrds[i].device, p))!=NULL)
 			{
 				if (pci_enable_device(p))
 					continue;
@@ -498,7 +496,7 @@ int moxa_init(void)
 					if (verbose)
 						printk("More than %d MOXA Intellio family boards found. Board is ignored.", MAX_BOARDS);
 				} else {
-					moxa_get_PCI_conf(p, moxa_pcibrds[i].board_type,
+					moxa_get_PCI_conf(p, moxa_pcibrds[i].driver_data,
 						&moxa_boards[numBoards]);
 					numBoards++;
 				}
@@ -686,7 +684,7 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 	ch->tty = 0;
 	if (ch->blocked_open) {
 		if (ch->close_delay) {
-			current->state = TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(ch->close_delay);
 		}
 		wake_up_interruptible(&ch->open_wait);
@@ -1140,7 +1138,7 @@ static int block_till_ready(struct tty_struct *tty, struct file *filp,
 	restore_flags(flags);
 	ch->blocked_open++;
 	while (1) {
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		if (tty_hung_up_p(filp) ||
 		    !(ch->asyncflags & ASYNC_INITIALIZED)) {
 #ifdef SERIAL_DO_RESTART
@@ -1164,7 +1162,7 @@ static int block_till_ready(struct tty_struct *tty, struct file *filp,
 		}
 		schedule();
 	}
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&ch->open_wait, &wait);
 	if (!tty_hung_up_p(filp))
 		ch->count++;

@@ -164,6 +164,7 @@ static int AudioEnd_f;
 static struct timer_list gscd_timer;
 
 static struct block_device_operations gscd_fops = {
+	owner:THIS_MODULE,
 	open:gscd_open,
 	release:gscd_release,
 	ioctl:gscd_ioctl,
@@ -381,13 +382,10 @@ static int gscd_open(struct inode *ip, struct file *fp)
 	if (gscdPresent == 0)
 		return -ENXIO;	/* no hardware */
 
-	MOD_INC_USE_COUNT;
-
 	get_status();
 	st = disk_state & (ST_NO_DISK | ST_DOOR_OPEN);
 	if (st) {
 		printk("GSCD: no disk or door open\n");
-		MOD_DEC_USE_COUNT;
 		return -ENXIO;
 	}
 
@@ -412,7 +410,6 @@ static int gscd_release(struct inode *inode, struct file *file)
 
 	gscd_bn = -1;
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

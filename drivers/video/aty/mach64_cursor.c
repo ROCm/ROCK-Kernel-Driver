@@ -3,7 +3,7 @@
  *  ATI Mach64 CT/VT/GT/LT Cursor Support
  */
 
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/console.h>
 #include <linux/fb.h>
 #include <linux/init.h>

@@ -243,9 +243,7 @@ type name(void) \
 { \
 register long __res __asm__ ("%d0") = __NR_##name; \
 __asm__ __volatile__ ("trap  #0" \
-                      : "=g" (__res) \
-		      : "0" (__res) \
-		      : "%d0"); \
+                      : "+d" (__res) ); \
 __syscall_return(type,__res); \
 }
 
@@ -255,9 +253,8 @@ type name(atype a) \
 register long __res __asm__ ("%d0") = __NR_##name; \
 register long __a __asm__ ("%d1") = (long)(a); \
 __asm__ __volatile__ ("trap  #0" \
-		      : "=d" (__res) \
-		      : "0" (__res), "d" (__a) \
-		      : "%d0"); \
+		      : "+d" (__res) \
+		      : "d" (__a)  ); \
 __syscall_return(type,__res); \
 }
 
@@ -268,9 +265,9 @@ register long __res __asm__ ("%d0") = __NR_##name; \
 register long __a __asm__ ("%d1") = (long)(a); \
 register long __b __asm__ ("%d2") = (long)(b); \
 __asm__ __volatile__ ("trap  #0" \
-		      : "=d" (__res) \
-                      : "0" (__res), "d" (__a), "d" (__b) \
-		      : "%d0"); \
+		      : "+d" (__res) \
+                      : "d" (__a), "d" (__b) \
+		     ); \
 __syscall_return(type,__res); \
 }
 
@@ -282,10 +279,10 @@ register long __a __asm__ ("%d1") = (long)(a); \
 register long __b __asm__ ("%d2") = (long)(b); \
 register long __c __asm__ ("%d3") = (long)(c); \
 __asm__ __volatile__ ("trap  #0" \
-		      : "=d" (__res) \
-                      : "0" (__res), "d" (__a), "d" (__b), \
+		      : "+d" (__res) \
+                      : "d" (__a), "d" (__b), \
 			"d" (__c) \
-		      : "%d0"); \
+		     ); \
 __syscall_return(type,__res); \
 }
 
@@ -298,10 +295,10 @@ register long __b __asm__ ("%d2") = (long)(b); \
 register long __c __asm__ ("%d3") = (long)(c); \
 register long __d __asm__ ("%d4") = (long)(d); \
 __asm__ __volatile__ ("trap  #0" \
-                      : "=d" (__res) \
-                      : "0" (__res), "d" (__a), "d" (__b), \
+                      : "+d" (__res) \
+                      : "d" (__a), "d" (__b), \
 			"d" (__c), "d" (__d)  \
-		      : "%d0"); \
+		     ); \
 __syscall_return(type,__res); \
 }
 
@@ -315,10 +312,10 @@ register long __c __asm__ ("%d3") = (long)(c); \
 register long __d __asm__ ("%d4") = (long)(d); \
 register long __e __asm__ ("%d5") = (long)(e); \
 __asm__ __volatile__ ("trap  #0" \
-		      : "=d" (__res) \
-		      : "0" (__res), "d" (__a), "d" (__b), \
+		      : "+d" (__res) \
+		      : "d" (__a), "d" (__b), \
 			"d" (__c), "d" (__d), "d" (__e)  \
-                      : "%d0"); \
+                     ); \
 __syscall_return(type,__res); \
 }
 

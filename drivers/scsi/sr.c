@@ -484,27 +484,11 @@ static int sr_init_command(Scsi_Cmnd * SCpnt)
 	return 1;
 }
 
-static int sr_dev_open(struct inode *inode, struct file *file)
-{
-	int err;
-	MOD_INC_USE_COUNT;
-	err = cdrom_open(inode, file);
-	if (err)
-		MOD_DEC_USE_COUNT;
-	return err;
-}
-
-static int sr_dev_release(struct inode *inode, struct file *file)
-{
-	int err = cdrom_release(inode, file);
-	MOD_DEC_USE_COUNT;
-	return err;
-}
-
 struct block_device_operations sr_bdops =
 {
-	open:			sr_dev_open,
-	release:		sr_dev_release,
+	owner:			THIS_MODULE,
+	open:			cdrom_open,
+	release:		cdrom_release,
 	ioctl:			cdrom_ioctl,
 	check_media_change:	cdrom_media_changed,
 };

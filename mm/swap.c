@@ -110,7 +110,6 @@ void __lru_cache_del(struct page * page)
 	} else {
 //		printk("VM: __lru_cache_del, found unknown page ?!\n");
 	}
-	DEBUG_LRU_PAGE(page);
 }
 
 /**

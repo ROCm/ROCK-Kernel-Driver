@@ -397,6 +397,7 @@ static struct {
 static struct floppy_drive_params drive_params[N_DRIVE];
 static struct floppy_drive_struct drive_state[N_DRIVE];
 static struct floppy_write_errors write_errors[N_DRIVE];
+static struct timer_list motor_off_timer[N_DRIVE];
 static struct floppy_raw_cmd *raw_cmd, default_raw_cmd;
 
 /*
@@ -926,17 +927,6 @@ static void motor_off_callback(unsigned long nr)
 
 	set_dor(FDC(nr), mask, 0);
 }
-
-static struct timer_list motor_off_timer[N_DRIVE] = {
-	{ data: 0, function: motor_off_callback },
-	{ data: 1, function: motor_off_callback },
-	{ data: 2, function: motor_off_callback },
-	{ data: 3, function: motor_off_callback },
-	{ data: 4, function: motor_off_callback },
-	{ data: 5, function: motor_off_callback },
-	{ data: 6, function: motor_off_callback },
-	{ data: 7, function: motor_off_callback }
-};
 
 /* schedules motor off */
 static void floppy_off(unsigned int drive)
@@ -3902,6 +3892,7 @@ static int floppy_revalidate(kdev_t dev)
 }
 
 static struct block_device_operations floppy_fops = {
+	owner:			THIS_MODULE,
 	open:			floppy_open,
 	release:		floppy_release,
 	ioctl:			fd_ioctl,
@@ -4067,8 +4058,10 @@ static void __init set_cmos(int *ints, int dummy, int dummy2)
 		DPRINT("bad drive for set_cmos\n");
 		return;
 	}
+#if N_FDC > 1
 	if (current_drive >= 4 && !FDC2)
 		FDC2 = 0x370;
+#endif
 	DP->cmos = ints[2];
 	DPRINT("setting CMOS code to %d\n", ints[2]);
 }
@@ -4088,10 +4081,10 @@ static struct param_table {
 	{ "dma", 0, &FLOPPY_DMA, 2, 0 },
 
 	{ "daring", daring, 0, 1, 0},
-
+#if N_FDC > 1
 	{ "two_fdc",  0, &FDC2, 0x370, 0 },
 	{ "one_fdc", 0, &FDC2, 0, 0 },
-
+#endif
 	{ "thinkpad", floppy_set_flags, 0, 1, FD_INVERTED_DCL },
 	{ "broken_dcl", floppy_set_flags, 0, 1, FD_BROKEN_DCL },
 	{ "messages", floppy_set_flags, 0, 1, FTD_MSG },
@@ -4112,6 +4105,8 @@ static struct param_table {
 	{ "unexpected_interrupts", 0, &print_unex, 1, 0 },
 	{ "no_unexpected_interrupts", 0, &print_unex, 0, 0 },
 	{ "L40SX", 0, &print_unex, 0, 0 }
+
+	EXTRA_FLOPPY_PARAMS
 };
 
 static int __init floppy_setup(char *str)
@@ -4275,6 +4270,8 @@ int __init floppy_init(void)
 	}
 	
 	for (drive = 0; drive < N_DRIVE; drive++) {
+		motor_off_timer[drive].data = drive;
+		motor_off_timer[drive].function = motor_off_callback;
 		if (!(allowed_drive_mask & (1 << drive)))
 			continue;
 		if (fdc_state[FDC(drive)].version == FDC_NONE)

@@ -29,6 +29,17 @@
  *  - We don't limit the CPU clock rate nor the mode selection
  *    according to the available SDRAM bandwidth.
  *
+ * Other notes:
+ *	- Linear grayscale palettes and the kernel.
+ *	  Such code does not belong in the kernel.  The kernel frame buffer
+ *	  drivers do not expect a linear colourmap, but a colourmap based on
+ *	  the VT100 standard mapping.
+ *
+ *	  If your _userspace_ requires a linear colourmap, then the setup of
+ *	  such a colourmap belongs _in userspace_, not in the kernel.  Code
+ *	  to set the colourmap correctly from user space has been sent to
+ *	  David Neuer.  It's around 8 lines of C code, plus another 4 to
+ *	  detect if we are using grayscale.
  *
  * Code Status:
  * 1999/04/01:
@@ -130,6 +141,12 @@
  *
  * 2001/07/27: <rmk@arm.linux.org.uk>
  *	- Halve YRES on dual scan LCDs.
+ *
+ * 2001/08/22: <rmk@arm.linux.org.uk>
+ *	- Add b/w iPAQ pixclock value.
+ *
+ * 2001/10/12: <rmk@arm.linux.org.uk>
+ *	- Add patch 681/1 and clean up stork definitions.
  */
 
 #include <linux/config.h>
@@ -151,6 +168,7 @@
 #include <asm/irq.h>
 #include <asm/mach-types.h>
 #include <asm/uaccess.h>
+#include <asm/arch/assabet.h>
 
 #include <video/fbcon.h>
 #include <video/fbcon-mfb.h>
@@ -191,7 +209,7 @@ sa1100fb_check_shadow(struct sa1100fb_lcd_reg *new_regs,
 	/*
 	 * These machines are good machines!
 	 */
-	if (machine_is_assabet() || machine_is_bitsy())
+	if (machine_is_assabet() || machine_is_h3600())
 		return;
 
 	/*
@@ -272,59 +290,6 @@ sa1100fb_check_shadow(struct sa1100fb_lcd_reg *new_regs,
 		    LCCR3_PixRsEdg + LCCR3_VrtSnchH +
 		    LCCR3_HorSnchH + LCCR3_ACBsCntOff + LCCR3_ACBsDiv(2);
 	}
-#ifdef CONFIG_SA1100_CERF
-	if (machine_is_cerf()) {
-		DPRINTK("Configuring Cerf LCD\n");
-#if defined (CONFIG_CERF_LCD_72_A)
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Color + LCCR0_Dual +
-		    LCCR0_LDM + LCCR0_BAM + LCCR0_ERM + LCCR0_Pas +
-		    LCCR0_LtlEnd + LCCR0_DMADel(0);
-		shadow.lccr1 =
-		    LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(5) +
-		    LCCR1_BegLnDel(61) + LCCR1_EndLnDel(9);
-		shadow.lccr2 =
-		    LCCR2_DisHght(var->yres / 2) + LCCR2_VrtSnchWdth(1) +
-		    LCCR2_BegFrmDel(3) + LCCR2_EndFrmDel(0);
-		shadow.lccr3 =
-		    LCCR3_OutEnH + LCCR3_PixRsEdg + LCCR3_VrtSnchH +
-		    LCCR3_HorSnchH + LCCR3_ACBsCntOff +
-		    LCCR3_ACBsDiv(2) + LCCR3_PixClkDiv(38);
-#elif defined (CONFIG_CERF_LCD_57_A)
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Color + LCCR0_Sngl +
-		    LCCR0_LDM + LCCR0_BAM + LCCR0_ERM + LCCR0_Pas +
-		    LCCR0_LtlEnd + LCCR0_DMADel(0);
-		shadow.lccr1 =
-		    LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(5) +
-		    LCCR1_BegLnDel(61) + LCCR1_EndLnDel(9);
-		shadow.lccr2 =
-		    LCCR2_DisHght(var->yres) + LCCR2_VrtSnchWdth(1) +
-		    LCCR2_BegFrmDel(3) + LCCR2_EndFrmDel(0);
-		shadow.lccr3 =
-		    LCCR3_OutEnH + LCCR3_PixRsEdg + LCCR3_VrtSnchH +
-		    LCCR3_HorSnchH + LCCR3_ACBsCntOff +
-		    LCCR3_ACBsDiv(2) + LCCR3_PixClkDiv(38);
-#elif defined (CONFIG_CERF_LCD_38_A)
-		shadow.lccr0 =
-		    LCCR0_LEN + LCCR0_Color + LCCR0_Sngl +
-		    LCCR0_LDM + LCCR0_BAM + LCCR0_ERM + LCCR0_Pas +
-		    LCCR0_LtlEnd + LCCR0_DMADel(0);
-		shadow.lccr1 =
-		    LCCR1_DisWdth(var->xres) + LCCR1_HorSnchWdth(5) +
-		    LCCR1_BegLnDel(61) + LCCR1_EndLnDel(9);
-		shadow.lccr2 =
-		    LCCR2_DisHght(var->yres) + LCCR2_VrtSnchWdth(1) +
-		    LCCR2_BegFrmDel(3) + LCCR2_EndFrmDel(0);
-		shadow.lccr3 =
-		    LCCR3_OutEnH + LCCR3_PixRsEdg + LCCR3_VrtSnchH +
-		    LCCR3_HorSnchH + LCCR3_ACBsCntOff +
-		    LCCR3_ACBsDiv(2) + LCCR3_PixClkDiv(38);
-#else
-#error "Must have a CerfBoard LCD form factor selected"
-#endif
-	}
-#endif
 	if (machine_is_lart()) {
 		DPRINTK("Configuring LART LCD\n");
 #if defined LART_GREY_LCD
@@ -487,8 +452,27 @@ static struct sa1100fb_rgb def_rgb_16 = {
 };
 
 #ifdef CONFIG_SA1100_ASSABET
-static struct sa1100fb_mach_info assabet_info __initdata = {
-#ifdef ASSABET_PAL_VIDEO
+#ifndef ASSABET_PAL_VIDEO
+/*
+ * The assabet uses a sharp LQ039Q2DS54 LCD module.  It is actually
+ * takes an RGB666 signal, but we provide it with an RGB565 signal
+ * instead (def_rgb_16).
+ */
+static struct sa1100fb_mach_info lq039q2ds54_info __initdata = {
+	pixclock:	171521,		bpp:		16,
+	xres:		320,		yres:		240,
+
+	hsync_len:	5,		vsync_len:	1,
+	left_margin:	61,		upper_margin:	3,
+	right_margin:	9,		lower_margin:	0,
+
+	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+
+	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
+};
+#else
+static struct sa1100fb_mach_info pal_info __initdata = {
 	pixclock:	67797,		bpp:		16,
 	xres:		640,		yres:		512,
 
@@ -500,26 +484,14 @@ static struct sa1100fb_mach_info assabet_info __initdata = {
 
 	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
 	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg |	LCCR3_ACBsDiv(512),
-#else
-	pixclock:	171521,		bpp:		16,
-	xres:		320,		yres:		240,
-
-	hsync_len:	5,		vsync_len:	1,
-	left_margin:	61,		upper_margin:	3,
-	right_margin:	9,		lower_margin:	0,
-
-	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-
-	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg |	LCCR3_ACBsDiv(2),
-#endif
 };
 #endif
+#endif
 
-#ifdef CONFIG_SA1100_BITSY
-static struct sa1100fb_mach_info bitsy_info __initdata = {
+#ifdef CONFIG_SA1100_H3600
+static struct sa1100fb_mach_info h3600_info __initdata = {
 #ifdef CONFIG_IPAQ_H3100
-	pixclock:	0,		bpp:		4,
+	pixclock:	407766,		bpp:		4,
 	xres:		320,		yres:		240,
 
 	hsync_len:	26,		vsync_len:	41,
@@ -532,14 +504,8 @@ static struct sa1100fb_mach_info bitsy_info __initdata = {
 
 	lccr0:		LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
 	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
-#error FIXME
-	/*
-	 * Sorry, this should have read:
-	 * FIXME: please get rid of the PCD and PixClkDiv definitions
-	 * in favour of pixclock. --rmk
-	 */
 #else
-	pixclock:	5722222,	bpp:		16,
+	pixclock:	174757,		bpp:		16,
 	xres:		320,		yres:		240,
 
 	hsync_len:	3,		vsync_len:	3,
@@ -553,7 +519,7 @@ static struct sa1100fb_mach_info bitsy_info __initdata = {
 #endif
 };
 
-static struct sa1100fb_rgb bitsy_rgb_16 = {
+static struct sa1100fb_rgb h3600_rgb_16 = {
 	red:	{ offset: 12, length: 4, },
 	green:	{ offset: 7,  length: 4, },
 	blue:	{ offset: 1,  length: 4, },
@@ -580,21 +546,29 @@ static struct sa1100fb_mach_info brutus_info __initdata = {
 
 #ifdef CONFIG_SA1100_CERF
 static struct sa1100fb_mach_info cerf_info __initdata = {
-	pixclock:	171521,		bpp:		8,
 #if defined(CONFIG_CERF_LCD_72_A)
+	pixclock:       171521,         bpp:            8,
 	xres:		640,		yres:		480,
 	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
 	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
 			LCCR3_PixClkDiv(38),
 #elif defined(CONFIG_CERF_LCD_57_A)
+	pixclock:       171521,         bpp:            8,
 	xres:		320,		yres:		240,
 	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
 	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
 			LCCR3_PixClkDiv(38),
 #elif defined(CONFIG_CERF_LCD_38_A)
+	pixclock:       171521,         bpp:            8,
 	xres:		240,		yres:		320,
 	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Pas,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
+	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
+			LCCR3_PixClkDiv(38),
+#elif defined(CONFIG_CERF_LCD_38_B)
+	pixclock:	171521, 	bpp:		4,
+	xres:		320,		yres:		240,
+	lccr0:		LCCR0_Mono | LCCR0_4PixMono | LCCR0_Sngl | LCCR0_Pas,
+	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(56) |
 			LCCR3_PixClkDiv(38),
 #else
 #error "Must have a CerfBoard LCD form factor selected"
@@ -607,6 +581,15 @@ static struct sa1100fb_mach_info cerf_info __initdata = {
 	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
 };
+
+#if 0
+static struct sa1100fb_rgb cerf_rgb_16 = {
+	red:	{ offset: 8,	length: 4, },
+	green:	{ offset: 4,	length: 4, },
+	blue:	{ offset: 0,	length: 4, },
+	transp:	{ offset: 0,	length: 0, },
+};
+#endif
 #endif
 
 #ifdef CONFIG_SA1100_FREEBIRD
@@ -635,7 +618,7 @@ static struct sa1100fb_rgb freebird_rgb_16 = {
 
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
 static struct sa1100fb_mach_info graphicsclient_info __initdata = {
-	pixclock:	0,		bpp:		8,
+	pixclock:	53500,		bpp:		8,
 	xres:		640,		yres:		480,
 
 	hsync_len:	9,		vsync_len:	9,
@@ -645,8 +628,7 @@ static struct sa1100fb_mach_info graphicsclient_info __initdata = {
 	sync:		0,
 
 	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2) |
-			LCCR3_PixClkDiv(10),
+	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg | LCCR3_ACBsDiv(2),
 };
 #endif
 
@@ -774,6 +756,61 @@ static struct sa1100fb_mach_info pangolin_info __initdata = {
 };
 #endif
 
+#ifdef CONFIG_SA1100_STORK
+#if STORK_TFT			/* ie the NEC TFT */
+/*
+ * pixclock is ps per clock. say 72Hz, 800x600 clocks => (1/72)/(800*600)
+ * = 28935 and a bit
+ * NB likely to be increased to ease bus timings wrt pcmcia interface
+ */
+static struct sa1100fb_mach_info stork_tft_info __initdata = {
+	pixclock:	28935,		bpp:		16,
+	xres:		640,		yres:		480,
+
+	hsync_len:	64,		vsync_len:	2,
+	left_margin:	48,		upper_margin:	12,
+	right_margin:	48,		lower_margin:	31,
+
+	sync:		0,
+
+	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
+	lccr3:		LCCR3_OutEnH | LCCR3_PixRsEdg,
+};
+
+static struct sa1100fb_rgb stork_tft_rgb_16 = {
+	red:	{ offset: 11, length: 5, },
+	green:	{ offset: 5,  length: 6, },
+	blue:	{ offset: 0,  length: 5, },
+	transp:	{ offset: 0,  length: 0, },
+};
+
+#else	/* Kyocera DSTN */
+
+static struct sa1100fb_mach_info stork_dstn_info __initdata = {
+	pixclock:	0,		bpp:		16,
+	xres:		640,		yres:		480,
+
+	hsync_len:	2,		vsync_len:	2,
+	left_margin:	2,		upper_margin:	0,
+	right_margin:	2,		lower_margin:	0,
+
+	sync:		FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT ,
+
+	lccr0:		LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
+#error Fixme
+	lccr3:		0xff00 |
+			0x18		/* ought to be 0x14 but DMA isn't up to that as yet */
+};
+
+static struct sa1100fb_rgb stork_dstn_rgb_16 = {
+	red:	{ offset: 8,  length: 4, },
+	green:	{ offset: 4,  length: 4, },
+	blue:	{ offset: 0,  length: 4, },
+	transp:	{ offset: 0,  length: 0, },
+};
+#endif
+#endif
+
 #ifdef CONFIG_SA1100_XP860
 static struct sa1100fb_mach_info xp860_info __initdata = {
 	pixclock:	0,		bpp:		8,
@@ -790,6 +827,8 @@ static struct sa1100fb_mach_info xp860_info __initdata = {
 };
 #endif
 
+
+
 static struct sa1100fb_mach_info * __init
 sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 {
@@ -798,18 +837,22 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 	/*
 	 *            R        G       B       T
 	 * default  {11,5}, { 5,6}, { 0,5}, { 0,0}
-	 * bitsy    {12,4}, { 7,4}, { 1,4}, { 0,0}
+	 * h3600    {12,4}, { 7,4}, { 1,4}, { 0,0}
 	 * freebird { 8,4}, { 4,4}, { 0,4}, {12,4}
 	 */
 #ifdef CONFIG_SA1100_ASSABET
 	if (machine_is_assabet()) {
-		inf = &assabet_info;
+#ifndef ASSABET_PAL_VIDEO
+		inf = &lq039q2ds54_info;
+#else
+		inf = &pal_info;
+#endif
 	}
 #endif
-#ifdef CONFIG_SA1100_BITSY
-	if (machine_is_bitsy()) {
-		inf = &bitsy_info;
-		fbi->rgb[RGB_16] = &bitsy_rgb_16;
+#ifdef CONFIG_SA1100_H3600
+	if (machine_is_h3600()) {
+		inf = &h3600_info;
+		fbi->rgb[RGB_16] = &h3600_rgb_16;
 	}
 #endif
 #ifdef CONFIG_SA1100_BRUTUS
@@ -867,6 +910,17 @@ sa1100fb_get_machine_info(struct sa1100fb_info *fbi)
 #ifdef CONFIG_SA1100_XP860
 	if (machine_is_xp860()) {
 		inf = &xp860_info;
+	}
+#endif
+#ifdef CONFIG_SA1100_STORK
+	if (machine_is_stork()) {
+#if STORK_TFT
+		inf = &stork_tft_info;
+		fbi->rgb[RGB_16] = &stork_tft_rgb_16;
+#else
+		inf = &stork_dstn_info;
+		fbi->rgb[RGB_16] = &stork_dstn_rgb_16;
+#endif
 	}
 #endif
 	return inf;
@@ -1097,9 +1151,11 @@ sa1100fb_validate_var(struct fb_var_screeninfo *var,
 		break;
 	}
 
-	printk(KERN_DEBUG "dma period = %d ps, clock = %d kHz",
+#ifdef CONFIG_CPU_FREQ
+	printk(KERN_DEBUG "dma period = %d ps, clock = %d kHz\n",
 		sa1100fb_display_dma_period(var),
 		cpufreq_get(smp_processor_id()));
+#endif
 
 	return ret;
 }
@@ -1107,23 +1163,22 @@ sa1100fb_validate_var(struct fb_var_screeninfo *var,
 static inline void sa1100fb_set_truecolor(u_int is_true_color)
 {
 	DPRINTK("true_color = %d\n", is_true_color);
-#ifdef CONFIG_SA1100_ASSABET
+
 	if (machine_is_assabet()) {
 #if 1
 		// phase 4 or newer Assabet's
 		if (is_true_color)
-			BCR_set(BCR_LCD_12RGB);
+			ASSABET_BCR_set(ASSABET_BCR_LCD_12RGB);
 		else
-			BCR_clear(BCR_LCD_12RGB);
+			ASSABET_BCR_clear(ASSABET_BCR_LCD_12RGB);
 #else
 		// older Assabet's
 		if (is_true_color)
-			BCR_clear(BCR_LCD_12RGB);
+			ASSABET_BCR_clear(ASSABET_BCR_LCD_12RGB);
 		else
-			BCR_set(BCR_LCD_12RGB);
+			ASSABET_BCR_set(ASSABET_BCR_LCD_12RGB);
 #endif
 	}
-#endif
 }
 
 static void
@@ -1528,7 +1583,7 @@ static inline int get_pcd(unsigned int pixclock)
 /*
  * sa1100fb_activate_var():
  *	Configures LCD Controller based on entries in var parameter.  Settings are      
- *      only written to the controller if changes were made.  
+ *	only written to the controller if changes were made.  
  */
 static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_info *fbi)
 {
@@ -1631,7 +1686,7 @@ static int sa1100fb_activate_var(struct fb_var_screeninfo *var, struct sa1100fb_
 	 */
 	if ((LCCR0 != fbi->reg_lccr0)       || (LCCR1 != fbi->reg_lccr1) ||
 	    (LCCR2 != fbi->reg_lccr2)       || (LCCR3 != fbi->reg_lccr3) ||
-	    (DBAR1 != (Address) fbi->dbar1) || (DBAR2 != (Address) fbi->dbar2))
+	    (DBAR1 != fbi->dbar1) || (DBAR2 != fbi->dbar2))
 		sa1100fb_schedule_task(fbi, C_REENABLE);
 
 	return 0;
@@ -1678,9 +1733,6 @@ static void sa1100fb_backlight_on(struct sa1100fb_info *fbi)
 	if (machine_is_omnimeter())
 		LEDBacklightOn();
 #endif
-#ifdef CONFIG_SA1100_BITSY
-	/* what rmk said --dneuer */
-#endif
 }
 
 /*
@@ -1703,18 +1755,15 @@ static void sa1100fb_backlight_off(struct sa1100fb_info *fbi)
 	if (machine_is_omnimeter())
 		LEDBacklightOff();
 #endif
-#ifdef CONFIG_SA1100_BITSY
-	/* what rmk said --dneuer */
-#endif
 }
 
 static void sa1100fb_power_up_lcd(struct sa1100fb_info *fbi)
 {
 	DPRINTK("LCD power on\n");
 
-#if defined(CONFIG_SA1100_ASSABET) && !defined(ASSABET_PAL_VIDEO)
+#ifndef ASSABET_PAL_VIDEO
 	if (machine_is_assabet())
-		BCR_set(BCR_LCD_ON);
+		ASSABET_BCR_set(ASSABET_BCR_LCD_ON);
 #endif
 #ifdef CONFIG_SA1100_HUW_WEBPANEL
 	if (machine_is_huw_webpanel())
@@ -1724,13 +1773,19 @@ static void sa1100fb_power_up_lcd(struct sa1100fb_info *fbi)
 	if (machine_is_omnimeter())
 		LCDPowerOn();
 #endif
-#ifdef CONFIG_SA1100_BITSY
-	if (machine_is_bitsy()) {
-		set_bitsy_egpio(EGPIO_BITSY_LCD_ON |
-				EGPIO_BITSY_LCD_PCI |
-				EGPIO_BITSY_LCD_5V_ON |
-				EGPIO_BITSY_LVDD_ON);
+#ifdef CONFIG_SA1100_H3600
+	if (machine_is_h3600()) {
+		set_h3600_egpio(EGPIO_H3600_LCD_ON |
+				EGPIO_H3600_LCD_PCI |
+				EGPIO_H3600_LCD_5V_ON |
+				EGPIO_H3600_LVDD_ON);
 	}
+#endif
+#ifdef CONFIG_SA1100_STORK
+	if (machine_is_stork()) {
+		storkSetLCDCPLD(0, 1);
+		storkSetLatchA(STORK_LCD_BACKLIGHT_INVERTER_ON);
+ 	}
 #endif
 }
 
@@ -1738,21 +1793,27 @@ static void sa1100fb_power_down_lcd(struct sa1100fb_info *fbi)
 {
 	DPRINTK("LCD power off\n");
 
-#if defined(CONFIG_SA1100_ASSABET) && !defined(ASSABET_PAL_VIDEO)
+#ifndef ASSABET_PAL_VIDEO
 	if (machine_is_assabet())
-		BCR_clear(BCR_LCD_ON);
+		ASSABET_BCR_clear(ASSABET_BCR_LCD_ON);
 #endif
 #ifdef CONFIG_SA1100_HUW_WEBPANEL
 	// dont forget to set the control lines to zero (?)
 	if (machine_is_huw_webpanel())
 		BCR_set(BCR_TFT_NPWR);
 #endif
-#ifdef CONFIG_SA1100_BITSY
-	if (machine_is_bitsy()) {
-		clr_bitsy_egpio(EGPIO_BITSY_LCD_ON |
-				EGPIO_BITSY_LCD_PCI |
-				EGPIO_BITSY_LCD_5V_ON |
-				EGPIO_BITSY_LVDD_ON);
+#ifdef CONFIG_SA1100_H3600
+	if (machine_is_h3600()) {
+		clr_h3600_egpio(EGPIO_H3600_LCD_ON |
+				EGPIO_H3600_LCD_PCI |
+				EGPIO_H3600_LCD_5V_ON |
+				EGPIO_H3600_LVDD_ON);
+	}
+#endif
+#ifdef CONFIG_SA1100_STORK
+	if (machine_is_stork()) {
+		storkSetLCDCPLD(0, 0);
+		storkClearLatchA(STORK_LCD_BACKLIGHT_INVERTER_ON);
 	}
 #endif
 }
@@ -1791,12 +1852,21 @@ static void sa1100fb_setup_gpio(struct sa1100fb_info *fbi)
 			GPIO_LDD11 | GPIO_LDD10 | GPIO_LDD9  | GPIO_LDD8;
 	}
 #endif
-#ifdef CONFIG_SA1100_CERF
-#error Please contact <rmk@arm.linux.org.uk> about this
 	if (machine_is_cerf()) {
 		/* GPIO15 is used as a bypass for 3.8" displays */
 		mask |= GPIO_GPIO15;
-
+#ifdef CONFIG_SA1100_CERF
+#warning Read Me Now!
+#endif
+#if 0 /* if this causes you problems, mail <rmk@arm.linux.org.uk> please. */
+      /*
+       * This was enabled for the 72_A version only, which is a _color_
+       * _dual_ LCD.  Now look at the generic test above, and calculate
+       * the mask value for a colour dual display...
+       *
+       * I therefore conclude that the code below is redundant, and will
+       * be killed at the start of November 2001.
+       */
 		/* FIXME: why is this? The Cerf's display doesn't seem
 		 * to be dual scan or active. I just leave it here,
 		 * but in my opinion this is definitively wrong.
@@ -1812,8 +1882,8 @@ static void sa1100fb_setup_gpio(struct sa1100fb_info *fbi)
 		/* color {dual/single} passive */
 		mask |= GPIO_LDD15 | GPIO_LDD14 | GPIO_LDD13 | GPIO_LDD12 |
 			GPIO_LDD11 | GPIO_LDD10 | GPIO_LDD9  | GPIO_LDD8;
-	}
 #endif
+	}
 
 	if (mask) {
 		GPDR |= mask;
@@ -1836,8 +1906,8 @@ static void sa1100fb_enable_controller(struct sa1100fb_info *fbi)
 	LCCR2 = fbi->reg_lccr2;
 	LCCR1 = fbi->reg_lccr1;
 	LCCR0 = fbi->reg_lccr0 & ~LCCR0_LEN;
-	DBAR1 = (Address) fbi->dbar1;
-	DBAR2 = (Address) fbi->dbar2;
+	DBAR1 = fbi->dbar1;
+	DBAR2 = fbi->dbar2;
 	LCCR0 |= LCCR0_LEN;
 
 #ifdef CONFIG_SA1100_GRAPHICSCLIENT
@@ -2032,7 +2102,7 @@ static unsigned int sa1100fb_min_dma_period(struct sa1100fb_info *fbi)
 		/*
 		 * Ok, calculate its DMA period
 		 */
-		period = sa1100fb_display_dma_period(get_con_var(fbi, i));
+		period = sa1100fb_display_dma_period(get_con_var(&fbi->fb, i));
 		if (period < min_period)
 			min_period = period;
 	}
@@ -2236,13 +2306,13 @@ int __init sa1100fb_init(void)
 	ret = request_irq(IRQ_LCD, sa1100fb_handle_irq, SA_INTERRUPT,
 			  fbi->fb.fix.id, fbi);
 	if (ret) {
-		printk(KERN_ERR "sa1100fb: failed in request_irq: %d\n", ret);
+		printk(KERN_ERR "sa1100fb: request_irq failed: %d\n", ret);
 		goto failed;
 	}
 
-#if defined(CONFIG_SA1100_ASSABET) && defined(ASSABET_PAL_VIDEO)
+#ifdef ASSABET_PAL_VIDEO
 	if (machine_is_assabet())
-		BCR_clear(BCR_LCD_ON);
+		ASSABET_BCR_clear(ASSABET_BCR_LCD_ON);
 #endif
 
 #ifdef CONFIG_SA1100_FREEBIRD
@@ -2332,4 +2402,5 @@ int __init sa1100fb_setup(char *options)
 	return 0;
 }
 
+MODULE_DESCRIPTION("StrongARM-1100/1110 framebuffer driver");
 MODULE_LICENSE("GPL");

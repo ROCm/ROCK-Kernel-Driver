@@ -640,8 +640,8 @@ static ssize_t ds_read(struct file *file, char *buf,
 	if (signal_pending(current))
 	    return -EINTR;
     }
-    put_user(get_queued_event(user), (int *)buf);
-    return 4;
+
+    return put_user(get_queued_event(user), (int *)buf) ? -EFAULT : 4;
 } /* ds_read */
 
 /*====================================================================*/

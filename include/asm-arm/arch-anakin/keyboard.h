@@ -10,20 +10,6 @@
  *  Changelog:
  *   11-Apr-2001 TTC	Created
  */
-
-#ifndef __ASM_ARCH_KEYBOARD_H
-#define __ASM_ARCH_KEYBOARD_H
-
-#define kbd_setkeycode(s, k)	(-EINVAL)
-#define kbd_getkeycode(s)	(-EINVAL)
-#define kbd_translate(s, k, r)	0
-#define kbd_unexpected_up(k)	0
-#define kbd_leds(l)
-#define kbd_init_hw()
-#define kbd_sysrq_xlate		((int *) 0)
-#define kbd_disable_irq()
-#define kbd_enable_irq()
-
-#define SYSRQ_KEY		0x54
-
-#endif
+#define kbd_init_hw()		do { } while (0)
+#define kbd_enable_irq()	do { } while (0)
+#define kbd_disable_irq()	do { } while (0)

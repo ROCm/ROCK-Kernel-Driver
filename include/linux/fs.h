@@ -793,6 +793,7 @@ struct block_device_operations {
 	int (*ioctl) (struct inode *, struct file *, unsigned, unsigned long);
 	int (*check_media_change) (kdev_t);
 	int (*revalidate) (kdev_t);
+	struct module *owner;
 };
 
 /*

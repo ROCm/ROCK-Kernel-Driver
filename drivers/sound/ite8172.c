@@ -1721,6 +1721,7 @@ MODULE_PARM_DESC(spdif, "if 1 the S/PDIF digital output is enabled");
 
 MODULE_AUTHOR("Monta Vista Software, stevel@mvista.com");
 MODULE_DESCRIPTION("IT8172 AudioPCI97 Driver");
+MODULE_LICENSE("GPL");
 
 /* --------------------------------------------------------------------- */
 

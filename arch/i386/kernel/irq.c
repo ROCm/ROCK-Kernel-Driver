@@ -512,6 +512,7 @@ void disable_irq(unsigned int irq)
 	if (!local_irq_count(smp_processor_id())) {
 		do {
 			barrier();
+			cpu_relax();
 		} while (irq_desc[irq].status & IRQ_INPROGRESS);
 	}
 }
@@ -766,8 +767,10 @@ void free_irq(unsigned int irq, void *dev_id)
 
 #ifdef CONFIG_SMP
 			/* Wait to make sure it's not being used on another CPU */
-			while (desc->status & IRQ_INPROGRESS)
+			while (desc->status & IRQ_INPROGRESS) {
 				barrier();
+				cpu_relax();
+			}
 #endif
 			kfree(action);
 			return;

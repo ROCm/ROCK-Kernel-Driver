@@ -32,6 +32,8 @@ sa1100_leds_init(void)
 		leds_event = pfs168_leds_event;
 	if (machine_is_graphicsmaster())
 		leds_event = graphicsmaster_leds_event;
+	if (machine_is_adsbitsy())
+		leds_event = adsbitsy_leds_event;
 
 	leds_event(led_start);
 	return 0;

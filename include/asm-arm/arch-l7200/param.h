@@ -20,4 +20,13 @@
  */
 #define HZ 128
 
+/*
+ * Define hz_to_std, since we have a non 100Hz define
+ * (see include/asm-arm/param.h)
+ */
+
+#if defined(__KERNEL__)
+#define hz_to_std(a) ((a * HZ)/100)
+#endif
+
 #endif

@@ -126,6 +126,7 @@ extern inline void __flush_page_to_ram(unsigned long address)
 }
 
 #define flush_dcache_page(page)			do { } while (0)
+#define flush_icache_page(vma,pg)              do { } while (0)
 
 /* Push n pages at kernel virtual address and clear the icache */
 /* RZ: use cpush %bc instead of cpush %dc, cinv %ic */
@@ -153,7 +154,7 @@ extern inline void flush_icache_range (unsigned long address,
 	}
 }
 
-#define flush_icache_page(vma,pg)              do { } while (0)
+
 
 
 #ifdef CONFIG_SUN3

@@ -8,8 +8,4 @@ tristate 'Plug and Play support' CONFIG_PNP
 
 dep_tristate '  ISA Plug and Play support' CONFIG_ISAPNP $CONFIG_PNP
 
-if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   dep_bool '  PNPBIOS support (EXPERIMENTAL)' CONFIG_PNPBIOS $CONFIG_PNP
-fi
-
 endmenu

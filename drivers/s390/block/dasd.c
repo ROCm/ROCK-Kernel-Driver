@@ -2563,7 +2563,6 @@ dasd_open (struct inode *inp, struct file *filp)
         unsigned long flags;
 	dasd_device_t *device;
 
-        MOD_INC_USE_COUNT;
 	if ((!inp) || !(inp->i_rdev)) {
 		rc = -EINVAL;
                 goto fail;
@@ -2595,13 +2594,10 @@ dasd_open (struct inode *inp, struct file *filp)
 	if (atomic_inc_return (&device->open_count) == 1 ) {
                 if ( device->discipline->owner )
                         __MOD_INC_USE_COUNT(device->discipline->owner);
-        } else {
-                MOD_DEC_USE_COUNT;
         }
  unlock:
         spin_unlock_irqrestore(&discipline_lock,flags);
  fail:
-        if (rc) MOD_DEC_USE_COUNT;
 	return rc;
 }
 
@@ -2637,13 +2633,11 @@ dasd_release (struct inode *inp, struct file *filp)
 		rc = -ENODEV;
                 goto out;
 	}
-	// fsync_dev (inp->i_rdev);	/* sync the device */
         count = atomic_dec_return (&device->open_count);
         if ( count == 0) {
                 invalidate_buffers (inp->i_rdev);
                 if ( device->discipline->owner )
                         __MOD_DEC_USE_COUNT(device->discipline->owner);
-                MOD_DEC_USE_COUNT;
 	} else if ( count == -1 ) { /* paranoia only */
                 atomic_set (&device->open_count,0);
                 printk (KERN_WARNING PRINTK_HEADER
@@ -2656,6 +2650,7 @@ dasd_release (struct inode *inp, struct file *filp)
 static struct
 block_device_operations dasd_device_operations =
 {
+	owner:THIS_MODULE,
 	open:dasd_open,
 	release:dasd_release,
 	ioctl:dasd_ioctl,

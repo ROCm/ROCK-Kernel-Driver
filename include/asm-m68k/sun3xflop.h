@@ -143,10 +143,10 @@ asmlinkage void sun3xflop_hardint(int irq, void *dev_id, struct pt_regs * regs)
 
 		for(lcount=virtual_dma_count, lptr=virtual_dma_addr; 
 		    lcount; lcount--, lptr++) {
-//			st=fd_inb(virtual_dma_port+4) & 0x80 ;
+/*			st=fd_inb(virtual_dma_port+4) & 0x80 ;  */
 			st = *(sun3x_fdc.status_r);
-//			if(st != 0xa0)
-//				break;
+/*			if(st != 0xa0)                  */
+/*				break;                  */
 	
 			if((st & 0x80) == 0) {
 				virtual_dma_count = lcount;
@@ -158,16 +158,16 @@ asmlinkage void sun3xflop_hardint(int irq, void *dev_id, struct pt_regs * regs)
 				break;
 		
 			if(virtual_dma_mode)
-//				fd_outb(*lptr, virtual_dma_port+5);
+/*				fd_outb(*lptr, virtual_dma_port+5); */
 				*(sun3x_fdc.data_r) = *lptr;
 			else
-//				*lptr = fd_inb(virtual_dma_port+5);
+/*				*lptr = fd_inb(virtual_dma_port+5); */
 				*lptr = *(sun3x_fdc.data_r);
 		}
 		
 		virtual_dma_count = lcount;
 		virtual_dma_addr = lptr;
-//		st = fd_inb(virtual_dma_port+4);
+/*		st = fd_inb(virtual_dma_port+4);   */
 		st = *(sun3x_fdc.status_r);
 	}
 

@@ -2,6 +2,7 @@
  * Inline routines shareable across OS platforms.
  *
  * Copyright (c) 1994-2001 Justin T. Gibbs.
+ * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,25 +11,33 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
  *    without modification.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * Alternatively, this software may be distributed under the terms of the
- * GNU Public License ("GPL").
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/src/aic7xxx/aic7xxx_inline.h#27 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_inline.h#31 $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_inline.h,v 1.8 2000/11/12 05:19:46 gibbs Exp $
  */
@@ -482,7 +491,6 @@ static __inline void
 ahc_intr(struct ahc_softc *ahc)
 {
 	u_int	intstat;
-	u_int 	queuestat;
 
 	/*
 	 * Instead of directly reading the interrupt status register,
@@ -491,15 +499,10 @@ ahc_intr(struct ahc_softc *ahc)
 	 * most cases.
 	 */
 	if ((ahc->flags & (AHC_ALL_INTERRUPTS|AHC_EDGE_INTERRUPT)) == 0
-	 && (queuestat = ahc_check_cmdcmpltqueues(ahc)) != 0)
+	 && (ahc_check_cmdcmpltqueues(ahc) != 0))
 		intstat = CMDCMPLT;
 	else {
 		intstat = ahc_inb(ahc, INTSTAT);
-		queuestat = AHC_RUN_QOUTFIFO;
-#ifdef AHC_TARGET_MODE
-		if ((ahc->flags & AHC_TARGETROLE) != 0)
-			queuestat |= AHC_RUN_TQINFIFO;
-#endif
 	}
 
 	if (intstat & CMDCMPLT) {
@@ -515,11 +518,11 @@ ahc_intr(struct ahc_softc *ahc)
 		 */
 		ahc_flush_device_writes(ahc);
 #ifdef AHC_TARGET_MODE
-		if ((queuestat & AHC_RUN_QOUTFIFO) != 0)
+		if ((ahc->flags & AHC_INITIATORROLE) != 0)
 #endif
 			ahc_run_qoutfifo(ahc);
 #ifdef AHC_TARGET_MODE
-		if ((queuestat & AHC_RUN_TQINFIFO) != 0)
+		if ((ahc->flags & AHC_TARGETROLE) != 0)
 			ahc_run_tqinfifo(ahc, /*paused*/FALSE);
 #endif
 	}

@@ -82,7 +82,8 @@ static DAC960_Controller_T
 
 static BlockDeviceOperations_T
   DAC960_BlockDeviceOperations =
-    { open:		    DAC960_Open,
+    { owner:		    THIS_MODULE,
+      open:		    DAC960_Open,
       release:		    DAC960_Release,
       ioctl:		    DAC960_IOCTL };
 
@@ -5378,7 +5379,6 @@ static int DAC960_Open(Inode_T *Inode, File_T *File)
   Controller->ControllerUsageCount++;
   Controller->LogicalDriveUsageCount[LogicalDriveNumber]++;
  ModuleOnly:
-  MOD_INC_USE_COUNT;
   return 0;
 }
 
@@ -5401,7 +5401,6 @@ static int DAC960_Release(Inode_T *Inode, File_T *File)
   Controller->LogicalDriveUsageCount[LogicalDriveNumber]--;
   Controller->ControllerUsageCount--;
  ModuleOnly:
-  MOD_DEC_USE_COUNT;
   return 0;
 }
 

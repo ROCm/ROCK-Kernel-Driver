@@ -119,6 +119,7 @@ static void cciss_procinit(int i) {}
 #endif /* CONFIG_PROC_FS */
 
 static struct block_device_operations cciss_fops  = {
+	owner:			THIS_MODULE,
 	open:			cciss_open, 
 	release:        	cciss_release,
         ioctl:			cciss_ioctl,
@@ -347,7 +348,6 @@ static int cciss_open(struct inode *inode, struct file *filep)
 
 	hba[ctlr]->drv[dsk].usage_count++;
 	hba[ctlr]->usage_count++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 /*
@@ -366,7 +366,6 @@ static int cciss_release(struct inode *inode, struct file *filep)
 
 	hba[ctlr]->drv[dsk].usage_count--;
 	hba[ctlr]->usage_count--;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

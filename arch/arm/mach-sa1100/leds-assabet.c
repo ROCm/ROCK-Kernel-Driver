@@ -15,6 +15,7 @@
 #include <asm/hardware.h>
 #include <asm/leds.h>
 #include <asm/system.h>
+#include <asm/arch/assabet.h>
 
 #include "leds.h"
 
@@ -25,7 +26,7 @@
 static unsigned int led_state;
 static unsigned int hw_led_state;
 
-#define BCR_LED_MASK	(BCR_LED_GREEN | BCR_LED_RED)
+#define ASSABET_BCR_LED_MASK	(ASSABET_BCR_LED_GREEN | ASSABET_BCR_LED_RED)
 
 void assabet_leds_event(led_event_t evt)
 {
@@ -35,7 +36,7 @@ void assabet_leds_event(led_event_t evt)
 
 	switch (evt) {
 	case led_start:
-		hw_led_state = BCR_LED_RED | BCR_LED_GREEN;
+		hw_led_state = ASSABET_BCR_LED_RED | ASSABET_BCR_LED_GREEN;
 		led_state = LED_STATE_ENABLED;
 		break;
 
@@ -45,30 +46,30 @@ void assabet_leds_event(led_event_t evt)
 
 	case led_claim:
 		led_state |= LED_STATE_CLAIMED;
-		hw_led_state = BCR_LED_RED | BCR_LED_GREEN;
+		hw_led_state = ASSABET_BCR_LED_RED | ASSABET_BCR_LED_GREEN;
 		break;
 
 	case led_release:
 		led_state &= ~LED_STATE_CLAIMED;
-		hw_led_state = BCR_LED_RED | BCR_LED_GREEN;
+		hw_led_state = ASSABET_BCR_LED_RED | ASSABET_BCR_LED_GREEN;
 		break;
 
 #ifdef CONFIG_LEDS_TIMER
 	case led_timer:
 		if (!(led_state & LED_STATE_CLAIMED))
-			hw_led_state ^= BCR_LED_GREEN;
+			hw_led_state ^= ASSABET_BCR_LED_GREEN;
 		break;
 #endif
 
 #ifdef CONFIG_LEDS_CPU
 	case led_idle_start:
 		if (!(led_state & LED_STATE_CLAIMED))
-			hw_led_state |= BCR_LED_RED;
+			hw_led_state |= ASSABET_BCR_LED_RED;
 		break;
 
 	case led_idle_end:
 		if (!(led_state & LED_STATE_CLAIMED))
-			hw_led_state &= ~BCR_LED_RED;
+			hw_led_state &= ~ASSABET_BCR_LED_RED;
 		break;
 #endif
 
@@ -77,12 +78,12 @@ void assabet_leds_event(led_event_t evt)
 
 	case led_green_on:
 		if (led_state & LED_STATE_CLAIMED)
-			hw_led_state &= ~BCR_LED_GREEN;
+			hw_led_state &= ~ASSABET_BCR_LED_GREEN;
 		break;
 
 	case led_green_off:
 		if (led_state & LED_STATE_CLAIMED)
-			hw_led_state |= BCR_LED_GREEN;
+			hw_led_state |= ASSABET_BCR_LED_GREEN;
 		break;
 
 	case led_amber_on:
@@ -93,12 +94,12 @@ void assabet_leds_event(led_event_t evt)
 
 	case led_red_on:
 		if (led_state & LED_STATE_CLAIMED)
-			hw_led_state &= ~BCR_LED_RED;
+			hw_led_state &= ~ASSABET_BCR_LED_RED;
 		break;
 
 	case led_red_off:
 		if (led_state & LED_STATE_CLAIMED)
-			hw_led_state |= BCR_LED_RED;
+			hw_led_state |= ASSABET_BCR_LED_RED;
 		break;
 
 	default:
@@ -106,7 +107,8 @@ void assabet_leds_event(led_event_t evt)
 	}
 
 	if  (led_state & LED_STATE_ENABLED)
-		BCR = BCR_value = (BCR_value & ~BCR_LED_MASK) | hw_led_state;
+		ASSABET_BCR = BCR_value = (BCR_value & ~ASSABET_BCR_LED_MASK) |
+			hw_led_state;
 
 	local_irq_restore(flags);
 }

@@ -116,4 +116,6 @@ static int FDC2 = -1;
 # endif
 #endif
 
+#define EXTRA_FLOPPY_PARAMS
+
 #endif /* __ASM_ALPHA_FLOPPY_H */

@@ -271,7 +271,7 @@ ENTRY(cpu_sa110_cache_clean_invalidate_range)
 	bic	r0, r0, #DCACHELINESIZE - 1
 	sub	r3, r1, r0
 	cmp	r3, #MAX_AREA_SIZE
-	bgt	cpu_sa110_cache_clean_invalidate_all_r2
+	bhi	cpu_sa110_cache_clean_invalidate_all_r2
 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
 	add	r0, r0, #DCACHELINESIZE
@@ -279,7 +279,7 @@ ENTRY(cpu_sa110_cache_clean_invalidate_range)
 	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
 	add	r0, r0, #DCACHELINESIZE
 	cmp	r0, r1
-	blt	1b
+	blo	1b
 	teq	r2, #0
 	movne	r0, #0
 	mcrne	p15, 0, r0, c7, c5, 0		@ invalidate I cache
@@ -288,7 +288,7 @@ ENTRY(cpu_sa110_cache_clean_invalidate_range)
 ENTRY(cpu_sa1100_cache_clean_invalidate_range)
 	sub	r3, r1, r0
 	cmp	r3, #MAX_AREA_SIZE
-	bgt	cpu_sa1100_cache_clean_invalidate_all_r2
+	bhi	cpu_sa1100_cache_clean_invalidate_all_r2
 	b	1b
 
 /*
@@ -335,7 +335,7 @@ ENTRY(cpu_sa1100_dcache_invalidate_range)
 1:	mcr	p15, 0, r0, c7, c6, 1		@ invalidate D entry
 	add	r0, r0, #DCACHELINESIZE
 	cmp	r0, r1
-	blt	1b
+	blo	1b
 	mov	pc, lr
 
 /*
@@ -354,7 +354,7 @@ ENTRY(cpu_sa110_dcache_clean_range)
 	sub	r1, r1, r0
 	cmp	r1, #MAX_AREA_SIZE
 	mov	r2, #0
-	bgt	cpu_sa110_cache_clean_invalidate_all_r2
+	bhi	cpu_sa110_cache_clean_invalidate_all_r2
 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	add	r0, r0, #DCACHELINESIZE
 	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
@@ -369,7 +369,7 @@ ENTRY(cpu_sa1100_dcache_clean_range)
 	sub	r1, r1, r0
 	cmp	r1, #MAX_AREA_SIZE
 	mov	r2, #0
-	bgt	cpu_sa1100_cache_clean_invalidate_all_r2
+	bhi	cpu_sa1100_cache_clean_invalidate_all_r2
 	b	1b
 
 /*
@@ -423,6 +423,7 @@ ENTRY(cpu_sa1100_dcache_clean_entry)
 	.align	5
 ENTRY(cpu_sa110_icache_invalidate_range)
 ENTRY(cpu_sa1100_icache_invalidate_range)
+	bic	r0, r0, #DCACHELINESIZE - 1
 1:	mcr	p15, 0, r0, c7, c10, 1		@ Clean D entry
 	add	r0, r0, #DCACHELINESIZE
 	cmp	r0, r1
@@ -460,12 +461,14 @@ ENTRY(cpu_sa1100_tlb_invalidate_all)
 	.align	5
 ENTRY(cpu_sa110_tlb_invalidate_range)
 ENTRY(cpu_sa1100_tlb_invalidate_range)
+	bic	r0, r0, #0x0ff
+	bic	r0, r0, #0xf00
 	mov	r3, #0
 	mcr	p15, 0, r3, c7, c10, 4		@ drain WB
 1:	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
 	add	r0, r0, #PAGESIZE
 	cmp	r0, r1
-	blt	1b
+	blo	1b
 	mcr	p15, 0, r3, c8, c5, 0		@ invalidate I TLB
 	mov	pc, lr
 

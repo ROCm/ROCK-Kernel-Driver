@@ -175,7 +175,7 @@ static void *cramfs_read(struct super_block *sb, unsigned int offset, unsigned i
 		struct buffer_head * bh = bh_array[i];
 		if (bh) {
 			memcpy(data, bh->b_data, PAGE_CACHE_SIZE);
-			bforget(bh);
+			brelse(bh);
 		} else
 			memset(data, 0, PAGE_CACHE_SIZE);
 		data += PAGE_CACHE_SIZE;
@@ -446,3 +446,5 @@ static void __exit exit_cramfs_fs(void)
 
 module_init(init_cramfs_fs)
 module_exit(exit_cramfs_fs)
+MODULE_LICENSE("GPL");
+

@@ -943,6 +943,7 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 		}
 		count++;
 		sgpnt[count - 1].address = bh->b_data;
+		sgpnt[count - 1].page = NULL;
 		sgpnt[count - 1].length += bh->b_size;
 		if (!dma_host) {
 			SCpnt->request_bufflen += bh->b_size;

@@ -1,8 +1,9 @@
 PROG=	aicasm
 
+.SUFFIXES= .l .y .c
+
 CSRCS=	aicasm.c aicasm_symbol.c
 GENSRCS= aicasm_gram.c aicasm_scan.c
-DEPHDRS= aicdb.h
 GENHDRS= y.tab.h aicdb.h
 
 SRCS=	${GENSRCS} ${CSRCS}
@@ -25,9 +26,7 @@ YFLAGS+= -t -v
 LFLAGS= -d
 endif
 
-.SUFFIXES= .l .y .c
-
-$(PROG): $(SRCS) $(DEPHDRS)
+$(PROG):  $(SRCS) $(GENHDRS)
 	$(AICASM_CC) $(AICASM_CFLAGS) $(SRCS) -o $(PROG)
 
 aicdb.h:
@@ -45,3 +44,9 @@ aicdb.h:
 
 clean:
 	rm -f $(CLEANFILES) $(PROG)
+
+y.tab.h aicasm_gram.c: aicasm_gram.y
+	$(YACC) $(YFLAGS) aicasm_gram.y
+	mv y.tab.c aicasm_gram.c
+
+aicasm_scan.c: y.tab.h

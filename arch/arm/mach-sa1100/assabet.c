@@ -17,6 +17,7 @@
 #include <linux/tty.h>
 #include <linux/module.h>
 #include <linux/errno.h>
+#include <linux/serial_core.h>
 
 #include <asm/hardware.h>
 #include <asm/setup.h>
@@ -26,13 +27,13 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
-#include <linux/serial_core.h>
+#include <asm/arch/assabet.h>
 
 #include "generic.h"
 
 
-unsigned long BCR_value = BCR_DB1110;
-unsigned long SCR_value = SCR_INIT;
+unsigned long BCR_value = ASSABET_BCR_DB1110;
+unsigned long SCR_value = ASSABET_SCR_INIT;
 EXPORT_SYMBOL(BCR_value);
 EXPORT_SYMBOL(SCR_value);
 
@@ -46,7 +47,7 @@ static int __init assabet_init(void)
 		 * This must precede any driver calls to BCR_set()
 		 * or BCR_clear().
 		 */
-		BCR = BCR_value = BCR_DB1111;
+		ASSABET_BCR = BCR_value = ASSABET_BCR_DB1111;
 		NCR_0 = 0;
 
 #ifndef CONFIG_ASSABET_NEPONSET
@@ -68,7 +69,7 @@ __initcall(assabet_init);
  */
 static void __init map_sa1100_gpio_regs( void )
 {
-	unsigned long phys = _GPLR & PMD_MASK;
+	unsigned long phys = __PREG(GPLR) & PMD_MASK;
 	unsigned long virt = io_p2v(phys);
 	int prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_DOMAIN(DOMAIN_IO);
 	pmd_t pmd;
@@ -185,17 +186,17 @@ static void assabet_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
 {
 	if (port->mapbase == _Ser1UTCR0) {
 		if (state)
-			BCR_clear(BCR_RS232EN);
+			ASSABET_BCR_clear(ASSABET_BCR_RS232EN);
 		else
-			BCR_set(BCR_RS232EN);
+			ASSABET_BCR_set(ASSABET_BCR_RS232EN);
 	}
 }
 
 /*
  * Note! this can be called from IRQ context.
- * FIXME: You _need_ to handle BCR carefully, which doesn't
+ * FIXME: You _need_ to handle ASSABET_BCR carefully, which doesn't
  * happen at the moment.  Suggest putting interrupt save/restore
- * in BCR_set/clear.
+ * in ASSABET_BCR_set/clear.
  *
  * NB: Assabet uses COM_RTS and COM_DTR for both UART1 (com port)
  * and UART3 (radio module).  We only handle them for UART1 here.
@@ -206,43 +207,43 @@ static void assabet_set_mctrl(struct uart_port *port, u_int mctrl)
 		u_int set = 0, clear = 0;
 
 		if (mctrl & TIOCM_RTS)
-			set |= BCR_COM_RTS;
+			set |= ASSABET_BCR_COM_RTS;
 		else
-			clear |= BCR_COM_RTS;
+			clear |= ASSABET_BCR_COM_RTS;
 
 		if (mctrl & TIOCM_DTR)
-			set |= BCR_COM_DTR;
+			set |= ASSABET_BCR_COM_DTR;
 		else
-			clear |= BCR_COM_DTR;
+			clear |= ASSABET_BCR_COM_DTR;
 
-		BCR_clear(clear);
-		BCR_set(set);
+		ASSABET_BCR_clear(clear);
+		ASSABET_BCR_set(set);
 	}
 }
 
 static int assabet_get_mctrl(struct uart_port *port)
 {
 	u_int ret = 0;
-	u_int bsr = BSR;
+	u_int bsr = ASSABET_BSR;
 
 	/* need 2 reads to read current value */
-	bsr = BSR;
+	bsr = ASSABET_BSR;
 
 	if (port->mapbase == _Ser1UTCR0) {
-		if (bsr & BSR_COM_DCD)
+		if (bsr & ASSABET_BSR_COM_DCD)
 			ret |= TIOCM_CD;
-		if (bsr & BSR_COM_CTS)
+		if (bsr & ASSABET_BSR_COM_CTS)
 			ret |= TIOCM_CTS;
-		if (bsr & BSR_COM_DSR)
+		if (bsr & ASSABET_BSR_COM_DSR)
 			ret |= TIOCM_DSR;
 	} else if (port->mapbase == _Ser3UTCR0) {
-		if (bsr & BSR_RAD_DCD)
+		if (bsr & ASSABET_BSR_RAD_DCD)
 			ret |= TIOCM_CD;
-		if (bsr & BSR_RAD_CTS)
+		if (bsr & ASSABET_BSR_RAD_CTS)
 			ret |= TIOCM_CTS;
-		if (bsr & BSR_RAD_DSR)
+		if (bsr & ASSABET_BSR_RAD_DSR)
 			ret |= TIOCM_DSR;
-		if (bsr & BSR_RAD_RI)
+		if (bsr & ASSABET_BSR_RAD_RI)
 			ret |= TIOCM_RI;
 	} else {
 		ret = TIOCM_CD | TIOCM_CTS | TIOCM_DSR;
@@ -304,6 +305,18 @@ static void __init assabet_map_io(void)
 	 */
 	GPDR |= GPIO_SSP_TXD | GPIO_SSP_SCLK | GPIO_SSP_SFRM;
 	GPCR = GPIO_SSP_TXD | GPIO_SSP_SCLK | GPIO_SSP_SFRM;
+
+	/*
+	 * Set up registers for sleep mode.
+	 */
+	PWER = PWER_GPIO0;
+	PGSR = 0;
+	PCFR = 0;
+
+	/*
+	 * Clear all possible wakeup reasons.
+	 */
+	RCSR = RCSR_HWR | RCSR_SWR | RCSR_WDR | RCSR_SMR;
 }
 
 

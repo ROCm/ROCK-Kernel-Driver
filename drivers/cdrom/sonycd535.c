@@ -1399,13 +1399,11 @@ cdu_open(struct inode *inode,
 	if (check_drive_status() != 0)
 		return -EIO;
 	sony_inuse = 1;
-	MOD_INC_USE_COUNT;
 
 	if (spin_up_drive(status) != 0) {
 		printk(CDU535_MESSAGE_NAME " error 0x%.2x (cdu_open, spin up)\n",
 				status[0]);
 		sony_inuse = 0;
-		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 	sony_get_toc();
@@ -1413,7 +1411,6 @@ cdu_open(struct inode *inode,
 		cmd_buff[0] = SONY535_SPIN_DOWN;
 		do_sony_cmd(cmd_buff, 1, status, NULL, 0, 0);
 		sony_inuse = 0;
-		MOD_DEC_USE_COUNT;
 		return -EIO;
 	}
 	if (inode) {
@@ -1442,7 +1439,6 @@ cdu_release(struct inode *inode,
 	Byte status[2], cmd_no;
 
 	sony_inuse = 0;
-	MOD_DEC_USE_COUNT;
 
 	if (0 < sony_usage) {
 		sony_usage--;
@@ -1463,9 +1459,9 @@ cdu_release(struct inode *inode,
 	return 0;
 }
 
-
 static struct block_device_operations cdu_fops =
 {
+	owner:			THIS_MODULE,
 	open:			cdu_open,
 	release:		cdu_release,
 	ioctl:			cdu_ioctl,

@@ -1,7 +1,7 @@
 /*
  * linux/include/asm-arm/arch-shark/system.h
  *
- * by Alexander Schulz <aschulz@netwinder.org>
+ * by Alexander Schulz
  */
 #ifndef __ASM_ARCH_SYSTEM_H
 #define __ASM_ARCH_SYSTEM_H

@@ -5,6 +5,7 @@
 #define _ASM_MC146818RTC_H
 
 #include <linux/config.h>
+#include <asm/atarihw.h>
 
 #ifdef CONFIG_ATARI
 /* RTC in Atari machines */
@@ -36,12 +37,12 @@
 #define RTC_MINYEAR		epoch
 
 #define CMOS_READ(addr) ({ \
-outb_p((addr),RTC_PORT(0)); \
-inb_p(RTC_PORT(1)); \
+atari_outb_p((addr),RTC_PORT(0)); \
+atari_inb_p(RTC_PORT(1)); \
 })
 #define CMOS_WRITE(val, addr) ({ \
-outb_p((addr),RTC_PORT(0)); \
-outb_p((val),RTC_PORT(1)); \
+atari_outb_p((addr),RTC_PORT(0)); \
+atari_outb_p((val),RTC_PORT(1)); \
 })
 #endif /* CONFIG_ATARI */
 

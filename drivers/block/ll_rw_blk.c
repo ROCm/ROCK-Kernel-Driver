@@ -568,6 +568,15 @@ inline void blkdev_release_request(struct request *req)
 	 */
 	if (q) {
 		/*
+		 * If nobody is waiting for requests, don't bother
+		 * batching up.
+		 */
+		if (!list_empty(&q->request_freelist[rw])) {
+			list_add(&req->queue, &q->request_freelist[rw]);
+			return;
+		}
+
+		/*
 		 * Add to pending free list and batch wakeups
 		 */
 		list_add(&req->queue, &q->pending_freelist[rw]);
@@ -1135,7 +1144,7 @@ int __init blk_dev_init(void)
 	/*
 	 * Batch frees according to queue length
 	 */
-	batch_requests = queue_nr_requests >> 3;
+	batch_requests = queue_nr_requests/3;
 	printk("block: %d slots per queue, batch=%d\n", queue_nr_requests, batch_requests);
 
 #ifdef CONFIG_AMIGA_Z2RAM

@@ -189,11 +189,35 @@ out:
 	return retval;
 }
 
+/*
+ *	Cache management
+ *
+ *	This needed for two cases
+ *	1. Out of order aware processors
+ *	2. Accidentally out of order processors (PPro errata #51)
+ */
+ 
+#if defined(CONFIG_X86_OOSTORE) || defined(CONFIG_X86_PPRO_FENCE)
+
+static inline void flush_write_buffers(void)
+{
+	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory");
+}
+
+#define dma_cache_inv(_start,_size)		flush_write_buffers()
+#define dma_cache_wback(_start,_size)		flush_write_buffers()
+#define dma_cache_wback_inv(_start,_size)	flush_write_buffers()
+
+#else
+
 /* Nothing to do */
 
 #define dma_cache_inv(_start,_size)		do { } while (0)
 #define dma_cache_wback(_start,_size)		do { } while (0)
 #define dma_cache_wback_inv(_start,_size)	do { } while (0)
+#define flush_write_buffers()
+
+#endif
 
 #endif /* __KERNEL__ */
 

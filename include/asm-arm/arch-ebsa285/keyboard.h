@@ -3,12 +3,18 @@
  *
  * Keyboard driver definitions for EBSA285 architecture
  *
- * (C) 1998 Russell King
+ * Copyright (C) 1998-2001 Russell King
  * (C) 1998 Phil Blundell
  */
 #include <linux/ioport.h>
 #include <asm/irq.h>
 #include <asm/system.h>
+
+#define KEYBOARD_IRQ		IRQ_ISA_KEYBOARD
+#define NR_SCANCODES		128
+
+#define kbd_disable_irq()	do { } while (0)
+#define kbd_enable_irq()	do { } while (0)
 
 extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
 extern int pckbd_getkeycode(unsigned int scancode);
@@ -19,55 +25,26 @@ extern void pckbd_leds(unsigned char leds);
 extern void pckbd_init_hw(void);
 extern unsigned char pckbd_sysrq_xlate[128];
 
-#define KEYBOARD_IRQ			IRQ_ISA_KEYBOARD
+static inline void kbd_init_hw(void)
+{
+	if (have_isa_bridge) {
+		k_setkeycode    = pckbd_setkeycode;
+		k_getkeycode    = pckbd_getkeycode;
+		k_translate     = pckbd_translate;
+		k_unexpected_up = pckbd_unexpected_up;
+		k_leds          = pckbd_leds;
+#ifdef CONFIG_MAGIC_SYSRQ
+		k_sysrq_key     = 0x54;
+		k_sysrq_xlate   = pckbd_sysrq_xlate;
+#endif
+		pckbd_init_hw();
+	}
+}
 
-#define NR_SCANCODES 128
 
-#define kbd_setkeycode(sc,kc)				\
-	({						\
-		int __ret;				\
-		if (have_isa_bridge)			\
-			__ret = pckbd_setkeycode(sc,kc);\
-		else					\
-			__ret = -EINVAL;		\
-		__ret;					\
-	})
-
-#define kbd_getkeycode(sc)				\
-	({						\
-		int __ret;				\
-		if (have_isa_bridge)			\
-			__ret = pckbd_getkeycode(sc);	\
-		else					\
-			__ret = -EINVAL;		\
-		__ret;					\
-	})
-
-#define kbd_translate(sc, kcp, rm)			\
-	({						\
-		pckbd_translate(sc, kcp, rm);		\
-	})
-
-#define kbd_unexpected_up		pckbd_unexpected_up
-
-#define kbd_leds(leds)					\
-	do {						\
-		if (have_isa_bridge)			\
-			pckbd_leds(leds);		\
-	} while (0)
-
-#define kbd_init_hw()					\
-	do {						\
-		if (have_isa_bridge)			\
-			pckbd_init_hw();		\
-	} while (0)
-
-#define kbd_sysrq_xlate			pckbd_sysrq_xlate
-
-#define kbd_disable_irq()
-#define kbd_enable_irq()
-
-#define SYSRQ_KEY	0x54
+/*
+ * The rest of this file is to do with supporting pc_keyb.c
+ */
 
 /* resource allocation */
 #define kbd_request_region()	request_region(0x60, 16, "keyboard")

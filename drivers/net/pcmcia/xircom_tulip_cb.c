@@ -101,7 +101,9 @@ static int csr0 = 0x00A00000 | 0x4800;
 #include <linux/init.h>
 #include <linux/mii.h>
 #include <linux/ethtool.h>
-#include <asm/processor.h>		/* Processor type for cache alignment. */
+
+#include <asm/io.h>
+#include <asm/processor.h>	/* Processor type for cache alignment. */
 #include <asm/uaccess.h>
 
 

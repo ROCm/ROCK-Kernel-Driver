@@ -14,9 +14,12 @@ obj-m :=
 obj-n :=
 obj-  :=
 
-export-objs :=	assabet.o h3600.o freebird.o huw_webpanel.o yopy.o \
-		generic.o hwtimer.o irq.o usb_ctl.o usb_recv.o usb_send.o \
-		dma-sa1100.o dma-sa1111.o pcipool.o sa1111-pcibuf.o
+export-objs :=	assabet.o dma-sa1100.o dma-sa1111.o freebird.o generic.o \
+		h3600.o huw_webpanel.o irq.o pcipool.o sa1111-pcibuf.o   \
+		yopy.o
+
+# These aren't present yet, and prevents a plain -ac kernel building.
+# hwtimer.o usb_ctl.o usb_recv.o usb_send.o
 
 # Common support (must be linked before board specific support)
 obj-y += generic.o irq.o dma-sa1100.o
@@ -27,6 +30,7 @@ obj-y += generic.o irq.o dma-sa1100.o
 # We link the CPU support next, so that RAM timings can be tuned.
 ifeq ($(CONFIG_CPU_FREQ),y)
 obj-$(CONFIG_SA1100_ASSABET) += cpu-sa1110.o
+obj-$(CONFIG_SA1100_CERF) += cpu-sa1110.o
 obj-$(CONFIG_SA1100_LART) += cpu-sa1100.o
 endif
 
@@ -63,14 +67,19 @@ obj-$(CONFIG_SA1100_YOPY) += yopy.o
 
 # LEDs support
 leds-y := leds.o
+leds-$(CONFIG_SA1100_ADSBITSY) += leds-adsbitsy.o
 leds-$(CONFIG_SA1100_ASSABET) += leds-assabet.o
 leds-$(CONFIG_SA1100_BRUTUS) += leds-brutus.o
 leds-$(CONFIG_SA1100_CERF) += leds-cerf.o
 leds-$(CONFIG_SA1100_FLEXANET) += leds-flexanet.o
 leds-$(CONFIG_SA1100_GRAPHICSCLIENT) += leds-graphicsclient.o
+leds-$(CONFIG_SA1100_GRAPHICSMASTER) += leds-graphicsmaster.o
 leds-$(CONFIG_SA1100_LART) += leds-lart.o
 leds-$(CONFIG_SA1100_PFS168) += leds-pfs168.o
-leds-$(CONFIG_SA1100_GRAPHICSMASTER) += leds-graphicsmaster.o
+leds-$(CONFIG_SA1100_SIMPAD) += leds-simpad.o  
 obj-$(CONFIG_LEDS) += $(leds-y)
+
+# Miscelaneous functions
+obj-$(CONFIG_PM) += pm.o sleep.o
 
 include $(TOPDIR)/Rules.make

@@ -126,7 +126,7 @@ extern inline int down_interruptible(struct semaphore * sem)
 		".previous"
 		: "=d" (result)
 		: "a" (sem1)
-		: "%d0", "memory");
+		: "memory");
 	return result;
 }
 
@@ -152,7 +152,7 @@ extern inline int down_trylock(struct semaphore * sem)
 		".previous"
 		: "=d" (result)
 		: "a" (sem1)
-		: "%d0", "memory");
+		: "memory");
 	return result;
 }
 

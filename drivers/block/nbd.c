@@ -82,7 +82,6 @@ static int nbd_open(struct inode *inode, struct file *file)
 		return -ENODEV;
 
 	nbd_dev[dev].refcnt++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -467,12 +466,12 @@ static int nbd_release(struct inode *inode, struct file *file)
 		printk(KERN_ALERT "nbd_release: refcount(%d) <= 0\n", lo->refcnt);
 	lo->refcnt--;
 	/* N.B. Doesn't lo->file need an fput?? */
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 static struct block_device_operations nbd_fops =
 {
+	owner:		THIS_MODULE.
 	open:		nbd_open,
 	release:	nbd_release,
 	ioctl:		nbd_ioctl,

@@ -207,11 +207,100 @@ static struct map_desc graphicsmaster_io_desc[] __initdata = {
   LAST_DESC
 };
 
+static int graphicsmaster_uart_open(struct uart_port *port, struct uart_info *info)
+{
+	int	ret = 0;
+
+	if (port->mapbase == _Ser1UTCR0) {
+		Ser1SDCR0 |= SDCR0_UART;
+		/* Set RTS Output */
+		GPSR = GPIO_GPIO15;
+		GPDR |= GPIO_GPIO15;
+		/* Set CTS Input */
+		GPDR &= ~GPIO_GPIO14;
+	}
+	else if (port->mapbase == _Ser2UTCR0) {
+		Ser2UTCR4 = Ser2HSCR0 = 0;
+		/* Set RTS Output */
+		GPSR = GPIO_GPIO17;
+		GPDR |= GPIO_GPIO17;
+		/* Set CTS Input */
+		GPDR &= ~GPIO_GPIO16;
+	}
+	else if (port->mapbase == _Ser3UTCR0) {
+	        /* Set RTS Output */
+		GPSR = GPIO_GPIO19;
+		GPDR |= GPIO_GPIO19;
+		/* Set CTS Input */
+		GPDR &= ~GPIO_GPIO18;
+	}
+	return ret;
+}
+
+static int graphicsmaster_get_mctrl(struct uart_port *port)
+{
+	int result = TIOCM_CD | TIOCM_DSR;
+
+	if (port->mapbase == _Ser1UTCR0) {
+		if (!(GPLR & GPIO_GPIO14))
+			result |= TIOCM_CTS;
+	} else if (port->mapbase == _Ser2UTCR0) {
+		if (!(GPLR & GPIO_GPIO16))
+			result |= TIOCM_CTS;
+	} else if (port->mapbase == _Ser3UTCR0) {
+		if (!(GPLR & GPIO_GPIO17))
+			result |= TIOCM_CTS;
+	} else {
+		result = TIOCM_CTS;
+	}
+
+	return result;
+}
+
+static void graphicsmaster_set_mctrl(struct uart_port *port, u_int mctrl)
+{
+	if (port->mapbase == _Ser1UTCR0) {
+		if (mctrl & TIOCM_RTS)
+			GPCR = GPIO_GPIO15;
+		else
+			GPSR = GPIO_GPIO15;
+	} else if (port->mapbase == _Ser2UTCR0) {
+		if (mctrl & TIOCM_RTS)
+			GPCR = GPIO_GPIO17;
+		else
+			GPSR = GPIO_GPIO17;
+	} else if (port->mapbase == _Ser3UTCR0) {
+		if (mctrl & TIOCM_RTS)
+			GPCR = GPIO_GPIO19;
+		else
+			GPSR = GPIO_GPIO19;
+	}
+}
+
+static void
+graphicsmaster_uart_pm(struct uart_port *port, u_int state, u_int oldstate)
+{
+	if (!state) {
+		/* make serial ports work ... */
+		Ser2UTCR4 = 0;
+		Ser2HSCR0 = 0; 
+		Ser1SDCR0 |= SDCR0_UART;
+	}
+}
+
+static struct sa1100_port_fns graphicsmaster_port_fns __initdata = {
+	open:		graphicsmaster_uart_open,
+	get_mctrl:	graphicsmaster_get_mctrl,
+	set_mctrl:	graphicsmaster_set_mctrl,
+	pm:		graphicsmaster_uart_pm,
+};
+
 static void __init graphicsmaster_map_io(void)
 {
 	sa1100_map_io();
 	iotable_init(graphicsmaster_io_desc);
 
+	sa1100_register_uart_fns(&graphicsmaster_port_fns);
 	sa1100_register_uart(0, 3);
 	sa1100_register_uart(1, 1);
 	sa1100_register_uart(2, 2);

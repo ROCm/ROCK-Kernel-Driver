@@ -66,9 +66,6 @@ typedef struct {
   char rw_flag;		/* Read CDB or Write CDB */
 } cpqfc_passthru_t;
 
-
-
-
 /*
 ** Defines for the IOCTLS.
 */
@@ -81,4 +78,17 @@ typedef struct {
 
 #define CPQFCTS_SCSI_PASSTHRU _IOWR( CCPQFCTS_IOC_MAGIC,11, VENDOR_IOCTL_REQ)
 
+/* We would rather have equivalent generic, low-level driver agnostic 
+ioctls that do what CPQFC_IOCTL_FC_TARGET_ADDRESS and 
+CPQFC_IOCTL_FC_TDR 0x5388 do, but currently, we do not have them, 
+consequently applications would have to know they are talking to cpqfc. */
+   
+/* Used to get Fibre Channel WWN and port_id from device */
+// #define CPQFC_IOCTL_FC_TARGET_ADDRESS 0x5387
+#define CPQFC_IOCTL_FC_TARGET_ADDRESS \
+	_IOR( CCPQFCTS_IOC_MAGIC, 13, Scsi_FCTargAddress)
+
+/* Used to invoke Target Defice Reset for Fibre Channel */
+// #define CPQFC_IOCTL_FC_TDR 0x5388
+#define CPQFC_IOCTL_FC_TDR _IO( CCPQFCTS_IOC_MAGIC, 15)
 

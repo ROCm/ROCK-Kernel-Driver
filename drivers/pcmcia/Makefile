@@ -29,6 +29,9 @@ ifeq ($(CONFIG_PCMCIA),y)
   ifeq ($(CONFIG_I82365),y)
     obj-y += i82365.o
   endif
+  ifeq ($(CONFIG_I82092),y)
+    obj-y += i82092.o
+  endif
   ifeq ($(CONFIG_TCIC),y)
     obj-y += tcic.o
   endif
@@ -40,6 +43,9 @@ else
     obj-m   := pcmcia_core.o ds.o
     ifeq ($(CONFIG_I82365),y)
       obj-m += i82365.o
+    endif
+    ifeq ($(CONFIG_I82092),y)
+      obj-m += i82092.o
     endif
     ifeq ($(CONFIG_TCIC),y)
       obj-m += tcic.o

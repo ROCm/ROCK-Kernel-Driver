@@ -65,7 +65,7 @@ static void dma_setup_quick(struct NCR_ESP * esp, __u32 addr, int count, int wri
 static int esp_dafb_dma_irq_p(struct NCR_ESP * espdev);
 static int esp_iosb_dma_irq_p(struct NCR_ESP * espdev);
 
-volatile unsigned char cmd_buffer[16];
+static volatile unsigned char cmd_buffer[16];
 				/* This is where all commands are put
 				 * before they are transferred to the ESP chip
 				 * via PIO.

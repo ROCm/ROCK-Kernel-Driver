@@ -68,7 +68,7 @@ static void dma_led_off(struct NCR_ESP *);
  *  53c9x via PIO.
  */
 
-volatile unsigned char cmd_buffer[16];
+static volatile unsigned char cmd_buffer[16];
 
 /*
  * We keep the structure that is used to access the registers on the 53c9x

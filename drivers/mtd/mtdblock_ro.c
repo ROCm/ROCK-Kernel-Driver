@@ -62,8 +62,6 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 		return -EINVAL;
 	}
 
-	MOD_INC_USE_COUNT;
-
 	mtd_sizes[dev] = mtd->size>>9;
 
 	DEBUG(1, "ok\n");
@@ -88,7 +86,6 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 
 	if (!mtd) {
 		printk(KERN_WARNING "MTD device is absent on mtd_release!\n");
-		MOD_DEC_USE_COUNT;
 		release_return(-ENODEV);
 	}
 	
@@ -99,7 +96,6 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 
 	DEBUG(1, "ok\n");
 
-	MOD_DEC_USE_COUNT;
 	release_return(0);
 }  
 
@@ -244,6 +240,7 @@ static struct file_operations mtd_fops =
 #else
 static struct block_device_operations mtd_fops = 
 {
+	owner: THIS_MODULE,
 	open: mtdblock_open,
 	release: mtdblock_release,
 	ioctl: mtdblock_ioctl

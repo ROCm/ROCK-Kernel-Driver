@@ -12,21 +12,14 @@
 
 
 
-#ifndef BITFIELD
-#define BITFIELD
+#ifndef __BITFIELD_H
+#define __BITFIELD_H
 
-#ifndef LANGUAGE
-#define LANGUAGE	C
-#endif /* !defined (LANGUAGE) */
-
-#define C       	0
-#define Assembly	1
-
-#if LANGUAGE == C
-#define UData(Data)	((unsigned int) (Data))
-#elif LANGUAGE == Assembly
+#ifndef __ASSEMBLY__
+#define UData(Data)	((unsigned long) (Data))
+#else
 #define UData(Data)	(Data)
-#endif /* LANGUAGE == C || LANGUAGE == Assembly */
+#endif
 
 
 /*
@@ -117,7 +110,4 @@
                 	((UData (Data) >> FShft (Field)) & FAlnMsk (Field))
 
 
-#undef C
-#undef Assembly
-
-#endif /* !defined (BITFIELD) */
+#endif /* __BITFIELD_H */

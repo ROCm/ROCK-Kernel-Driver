@@ -375,6 +375,7 @@ extern void *memset(void *,int,__kernel_size_t);
  __memset_g((s),(c),(count)))
 
 #define __HAVE_ARCH_MEMCPY
+extern void * memcpy(void *, const void *, size_t );
 /*
  * __builtin_memcpy() does not handle page-sized memcpys very well,
  * thus following the same assumptions as for page-sized memsets, this
@@ -545,6 +546,7 @@ static inline void * memmove(void * dest,const void * src, size_t n)
 }
 
 #define __HAVE_ARCH_MEMCMP
+extern int memcmp(const void * ,const void * ,size_t );
 #define memcmp(cs, ct, n) \
 (__builtin_constant_p(n) ? \
  __builtin_memcmp((cs),(ct),(n)) : \

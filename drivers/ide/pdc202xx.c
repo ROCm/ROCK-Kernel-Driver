@@ -563,7 +563,7 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 
 	if (((ultra_66) || (ultra_100)) && (EP & c_mask)) {
 #ifdef DEBUG
-		printk("ULTRA66: %s channel of Ultra 66 requires an 80-pin cable for Ultra66 operation.\n", hwif->channel ? "Secondary", "Primary");
+		printk("ULTRA66: %s channel of Ultra 66 requires an 80-pin cable for Ultra66 operation.\n", hwif->channel ? "Secondary" : "Primary");
 		printk("         Switching to Ultra33 mode.\n");
 #endif /* DEBUG */
 		/* Primary   : zero out second bit */

@@ -40,6 +40,7 @@ static struct block_device_operations tapeblock_fops = {
 #else
 static struct file_operations tapeblock_fops = {
 #endif
+    owner   : THIS_MODULE,
     open    : tapeblock_open,      /* open */
     release : tapeblock_release,   /* release */
         };
@@ -184,9 +185,6 @@ tapeblock_open(struct inode *inode, struct file *filp) {
         ti->cqr=NULL;
 	s390irq_spin_unlock_irqrestore (ti->devinfo.irq, lockflags);
     
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif				/* MODULE */
 	return 0;
 }
 
@@ -221,9 +219,6 @@ tapeblock_release(struct inode *inode, struct file *filp) {
 	s390irq_spin_lock_irqsave (ti->devinfo.irq, lockflags);
 	tapestate_set (ti, TS_UNUSED);
 	s390irq_spin_unlock_irqrestore (ti->devinfo.irq, lockflags);
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif				/* MODULE */
 	invalidate_buffers(inode->i_rdev);
 	return 0;
 }

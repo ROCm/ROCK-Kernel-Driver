@@ -30,6 +30,7 @@
 #include <asm/bitops.h>
 #include <asm/irq.h>
 #include <asm/hardware.h>
+#include <asm/keyboard.h>
 #include <asm/io.h>
 #include <asm/hardware/iomd.h>
 #include <asm/system.h>
@@ -212,7 +213,7 @@ static unsigned char keycode_translate[256] =
 };
 
 #ifdef CONFIG_MAGIC_SYSRQ
-unsigned char ps2kbd_sysrq_xlate[] = 
+static unsigned char ps2kbd_sysrq_xlate[] = 
 {
     27,    0,    0,    0,    0,    0,    0,    0,
      0,    0,    0,    0,    0,    0,    0,    0,
@@ -360,7 +361,7 @@ static void handle_rawcode(int keyval)
 	status = 0;
 }
 
-void ps2kbd_leds(unsigned int leds)
+static void ps2kbd_leds(unsigned char leds)
 {
 	ps2kbd_sendbyte(KBD_SETLEDS);
 	ps2kbd_sendbyte(leds);
@@ -380,6 +381,17 @@ static void ps2kbd_tx(int irq, void *dev_id, struct pt_regs *regs)
 {
 }
 
+static int ps2kbd_translate(unsigned char scancode, unsigned char *keycode, char rawmode)
+{
+	*keycode = scancode;
+	return 1;
+}
+
+static char ps2kbd_unexpected_up(unsigned char scancode)
+{
+	return 0200;
+}
+
 int __init ps2kbd_init_hw(void)
 {
 	/* Reset the keyboard state machine. */
@@ -391,6 +403,14 @@ int __init ps2kbd_init_hw(void)
 		panic("Could not allocate keyboard receive IRQ!");
 	if (request_irq (IRQ_KEYBOARDTX, ps2kbd_tx, 0, "keyboard", NULL) != 0)
 		panic("Could not allocate keyboard transmit IRQ!");
+
+	k_translate	= ps2kbd_translate;
+	k_unexpected_up	= ps2kbd_unexpected_up;
+	k_leds		= ps2kbd_leds;
+#ifdef CONFIG_MAGIC_SYSRQ
+	k_sysrq_xlate	= ps2kbd_sysrq_xlate;
+	k_sysrq_key	= 13;
+#endif
 
 	return 0;
 }

@@ -50,7 +50,7 @@ static void dma_led_on(struct NCR_ESP *esp);
 static int  dma_ports_p(struct NCR_ESP *esp);
 static void dma_setup(struct NCR_ESP *esp, __u32 addr, int count, int write);
 
-volatile unsigned char cmd_buffer[16];
+static volatile unsigned char cmd_buffer[16];
 				/* This is where all commands are put
 				 * before they are transferred to the ESP chip
 				 * via PIO.

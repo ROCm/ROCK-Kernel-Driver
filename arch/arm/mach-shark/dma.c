@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/mach-shark/dma.c
  *
- *  by Alexander Schulz <aschulz@netwinder.org>
+ *  by Alexander Schulz
  *
  *  derived from:
  *  arch/arm/kernel/dma-ebsa285.c

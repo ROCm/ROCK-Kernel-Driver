@@ -703,8 +703,7 @@ void cpqfcTS_WorkTask( struct Scsi_Host *HostAdapter)
       {
 //            printk(" *Terminating x_ID %Xh on %Xh* ", 
 //		    x_ID, Exchanges->fcExchange[x_ID].status);
-        cpqfcTSCompleteExchange( fcChip, x_ID);
-
+        cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev, fcChip, x_ID);
 
       }
     } // end of ABTS case
@@ -2061,7 +2060,7 @@ static void ProcessELS_Reply(
 Done:
   // Regardless of whether the Reply is valid or not, the
   // the exchange is done - complete
-  cpqfcTSCompleteExchange( fcChip, (fchs->ox_rx_id >>16)); // complete
+  cpqfcTSCompleteExchange(cpqfcHBAdata->PciDev, fcChip, (fchs->ox_rx_id >>16)); 
 	  
 Quit:    
   return;
@@ -2146,7 +2145,7 @@ static void ProcessFCS_Reply(
 
   // Regardless of whether the Reply is valid or not, the
   // the exchange is done - complete
-  cpqfcTSCompleteExchange( fcChip, (fchs->ox_rx_id >>16)); // complete
+  cpqfcTSCompleteExchange(cpqfcHBAdata->PciDev, fcChip, (fchs->ox_rx_id >>16));
 	  
 Quit:    
   return;
@@ -2328,7 +2327,7 @@ static void AnalyzeIncomingFrame(
               !(fcChip->SEST->u[ ExchangeID].IWE.Hdr_Len
                & 0x80000000))
           {
-            cpqfcTSCompleteExchange( fcChip, ExchangeID);
+            cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev, fcChip, ExchangeID);
           }
           else
           {
@@ -2370,7 +2369,7 @@ static void AnalyzeIncomingFrame(
              ((Exchanges->fcExchange[ ExchangeID].fchs.d_id & 0xFFFFFF) ==
              (fchs->s_id & 0xFFFFFF)) )
           {
-            cpqfcTSCompleteExchange( fcChip, ExchangeID );
+            cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev, fcChip, ExchangeID );
 	  }
         }              
       }
@@ -2409,7 +2408,7 @@ static void AnalyzeIncomingFrame(
 	    // already completed the exchange...
 	    
 //            printk("complete x_ID %Xh on ABTS RJT\n", ExchangeID);
-            cpqfcTSCompleteExchange( fcChip, ExchangeID );
+            cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev, fcChip, ExchangeID );
 	  }
 	} 
       }  // end of ABTS check
@@ -2672,7 +2671,7 @@ static void SendLogins( CPQFCHBA *cpqfcHBAdata, __u32 *FabricPortIds )
  	printk("completing x_ID %X on status %Xh\n", 
           ExchangeID, Exchanges->fcExchange[ExchangeID].status);
 #endif
-        cpqfcTSCompleteExchange( fcChip, ExchangeID);
+        cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev, fcChip, ExchangeID);
       }
     }
     else   // Xchange setup failed...
@@ -2915,6 +2914,22 @@ static void ScsiReportLunsDone(Scsi_Cmnd *Cmnd)
 Done:  
 }
 
+static void 
+call_scsi_done(Scsi_Cmnd *Cmnd)
+{
+	// We have to reinitialize sent_command here, so the scsi-mid
+	// layer won't re-use the scsi command leaving it set incorrectly.
+	// (incorrectly for our purposes...it's normally unused.)
+
+        if (Cmnd->SCp.sent_command != 0) {	// was it a passthru?
+		Cmnd->SCp.sent_command = 0;
+		Cmnd->result &= 0xff00ffff;
+		Cmnd->result |= (DID_PASSTHROUGH << 16);  // prevents retry
+	}
+	if (Cmnd->scsi_done != NULL)
+		(*Cmnd->scsi_done)(Cmnd);
+}
+
 // After successfully getting a "Process Login" (PRLI) from an
 // FC port, we want to Discover the LUNs so that we know the
 // addressing type (e.g., FCP-SCSI Volume Set Address, Peripheral
@@ -3035,8 +3050,7 @@ static void CompleteBoardLockCmnd( CPQFCHBA *cpqfcHBAdata)
       Cmnd->result = (DID_SOFT_ERROR << 16);  // ask for retry
 //      printk(" BoardLockCmnd[%d] %p Complete, chnl/target/lun %d/%d/%d\n",
 //        i,Cmnd, Cmnd->channel, Cmnd->target, Cmnd->lun);
-      if( Cmnd->scsi_done != NULL)
-        (*Cmnd->scsi_done)(Cmnd);
+      call_scsi_done(Cmnd);
     }
   }
 }
@@ -3083,7 +3097,9 @@ void cpqfcTSheartbeat( unsigned long ptr )
 
   // Complete the "bad target" commands (normally only used during
   // initialization, since we aren't supposed to call "scsi_done"
-  // inside the queuecommand() function).
+  // inside the queuecommand() function).  (this is overly contorted,
+  // scsi_done can be safely called from queuecommand for
+  // this bad target case.  May want to simplify this later)
 
   for( i=0; i< CPQFCTS_MAX_TARGET_ID; i++)
   {
@@ -3092,8 +3108,7 @@ void cpqfcTSheartbeat( unsigned long ptr )
       Scsi_Cmnd *Cmnd = cpqfcHBAdata->BadTargetCmnd[i];
       cpqfcHBAdata->BadTargetCmnd[i] = NULL;
       Cmnd->result = (DID_BAD_TARGET << 16);
-      if( Cmnd->scsi_done != NULL)
-        (*Cmnd->scsi_done)(Cmnd);
+      call_scsi_done(Cmnd);
     }
     else
       break;
@@ -3153,7 +3168,7 @@ void cpqfcTSheartbeat( unsigned long ptr )
 
         if( i >= TACH_SEST_LEN ) // Link Service Exchange
         {
-          cpqfcTSCompleteExchange( fcChip, i);  // Don't "abort" LinkService
+          cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev, fcChip, i);  // Don't "abort" LinkService
         }
         
         else  // SEST Exchange TO -- may post ABTS to Worker Thread Que
@@ -3511,11 +3526,14 @@ static void UnblockScsiDevice( struct Scsi_Host *HostAdapter,
           (Cmnd->channel == pLoggedInPort->ScsiNexus.channel) )
       {
         Cmnd->result = (DID_SOFT_ERROR <<16); // force retry
-        if( Cmnd->scsi_done != NULL)
-          (*Cmnd->scsi_done)(Cmnd);
-        else
+        if( Cmnd->scsi_done == NULL) 
+	{
           printk("LinkDnCmnd scsi_done ptr null, port_id %Xh\n",
 		  pLoggedInPort->port_id);
+	  Cmnd->SCp.sent_command = 0;
+	}
+	else
+	  call_scsi_done(Cmnd);
         *SCptr = NULL;  // free this slot for next use
       }
     }
@@ -4035,10 +4053,11 @@ static void  buildFCPstatus(
 static LONG FindFreeExchange( PTACHYON fcChip, ULONG type );
 
 static ULONG build_SEST_sgList( 
+  struct pci_dev *pcidev,
   ULONG *SESTalPairStart,
   Scsi_Cmnd *Cmnd,
   ULONG *sgPairs,
-  PSGPAGES sgPages  // link list of TL Ext. S/G pages from O/S Pool
+  PSGPAGES *sgPages_head  // link list of TL Ext. S/G pages from O/S Pool
 );
 
 static int build_FCP_payload( Scsi_Cmnd *Cmnd, 
@@ -4201,7 +4220,6 @@ ULONG cpqfcTSBuildExchange(
   {
                      // assign tmp ptr (shorthand)
     CMDfchs = &Exchanges->fcExchange[ *fcExchangeIndex].fchs; 
-
 
     if( Cmnd != NULL ) // (necessary for ABTS cases)
     {
@@ -4575,21 +4593,26 @@ ULONG cpqfcTSBuildExchange(
       
       
       pIWE->Hdr_Len |= fl; // add xmit FC frame len for data phase
-      pIWE->Hdr_Addr = virt_to_bus( dataHDR );
+      pIWE->Hdr_Addr = fcChip->SEST->base + 
+		((unsigned long)&fcChip->SEST->DataHDR[*fcExchangeIndex] - 
+			(unsigned long)fcChip->SEST);
+
       pIWE->RSP_Len = sizeof(TachFCHDR_RSP) ; // hdr+data (recv'd RSP frame)
       pIWE->RSP_Len |= (InFCHS->s_id << 8); // MS 24 bits Remote_ID
       
       memset( &fcChip->SEST->RspHDR[ *fcExchangeIndex].pl, 0, 
         sizeof( FCP_STATUS_RESPONSE) );  // clear out previous status
-  
-      pIWE->RSP_Addr = virt_to_bus(
-                         &fcChip->SEST->RspHDR[ *fcExchangeIndex ]);
+ 
+      pIWE->RSP_Addr = fcChip->SEST->base + 
+		((unsigned long)&fcChip->SEST->RspHDR[*fcExchangeIndex] - 
+			(unsigned long)fcChip->SEST);
 
                    // Do we need local or extended gather list?
                    // depends on size - we can handle 3 len/addr pairs
                    // locally.
 
       fcp_dl = build_SEST_sgList( 
+	cpqfcHBAdata->PciDev,
         &pIWE->GLen1, 
         Cmnd,       // S/G list
         &sgPairs,   // return # of pairs in S/G list (from "Data" descriptor)
@@ -4690,16 +4713,16 @@ ULONG cpqfcTSBuildExchange(
       pIRE->RSP_Len = sizeof(TachFCHDR_RSP) ; // hdr+data (recv'd RSP frame)
       pIRE->RSP_Len |= (InFCHS->s_id << 8); // MS 24 bits Remote_ID
 
-                            
-      pIRE->RSP_Addr = virt_to_bus(
-                              &fcChip->SEST->RspHDR[ *fcExchangeIndex ]);
-      
+      pIRE->RSP_Addr = fcChip->SEST->base + 
+		((unsigned long)&fcChip->SEST->RspHDR[*fcExchangeIndex] - 
+			(unsigned long)fcChip->SEST);
       
                    // Do we need local or extended gather list?
                    // depends on size - we can handle 3 len/addr pairs
                    // locally.
 
       fcp_dl = build_SEST_sgList( 
+	cpqfcHBAdata->PciDev,
         &pIRE->SLen1, 
         Cmnd,       // SCSI command Data desc. with S/G list
         &sgPairs,   // return # of pairs in S/G list (from "Data" descriptor)
@@ -4806,6 +4829,7 @@ ULONG cpqfcTSBuildExchange(
                    // locally.
 
       fcp_dl = build_SEST_sgList( 
+	cpqfcHBAdata->PciDev,
         &pTWE->SLen1, 
         Cmnd,       // S/G list
         &sgPairs,   // return # of pairs in S/G list (from "Data" descriptor)
@@ -4900,17 +4924,24 @@ ULONG cpqfcTSBuildExchange(
 
       // VALid entry:Dir outbound:enable CM:enal INT:
       pTRE->Hdr_Len = 0x86010020L; // data frame Len always 32 bytes
-      pTRE->Hdr_Addr = virt_to_bus( dataHDR );
+      pTRE->Hdr_Addr =  // bus address of dataHDR;
+            fcChip->SEST->base + 
+		((unsigned long)&fcChip->SEST->DataHDR[ *fcExchangeIndex ] -
+			(unsigned long)fcChip->SEST);
+	
       pTRE->RSP_Len = 64L; // hdr+data (TL assisted RSP frame)
       pTRE->RSP_Len |= (InFCHS->s_id << 8); // MS 24 bits Remote_ID
-      pTRE->RSP_Addr = virt_to_bus( rspHDR );
-
+      pTRE->RSP_Addr = // bus address of rspHDR
+		fcChip->SEST->base + 
+			((unsigned long)&fcChip->SEST->RspHDR[ *fcExchangeIndex ] -
+				(unsigned long)fcChip->SEST);
 
                    // Do we need local or extended gather list?
                    // depends on size - we can handle 3 len/addr pairs
                    // locally.
 
       fcp_dl = build_SEST_sgList( 
+	cpqfcHBAdata->PciDev,
         &pTRE->GLen1, 
         Cmnd,       // S/G list
         &sgPairs,   // return # of pairs in S/G list (from "Data" descriptor)
@@ -5001,8 +5032,10 @@ ULONG cpqfcTSBuildExchange(
     
                           // len & flags according to command type above
       pIRB->Req_A_SFS_Len = SfsLen;  // includes IRB flags & len
-      pIRB->Req_A_SFS_Addr = virt_to_bus(CMDfchs); // TL needs physical addr
-                                                  // of frame to send
+      pIRB->Req_A_SFS_Addr = // TL needs physical addr of frame to send
+		fcChip->exch_dma_handle + (unsigned long)CMDfchs - 
+			(unsigned long)Exchanges;
+
       pIRB->Req_A_SFS_D_ID = CMDfchs->d_id << 8; // Dest_ID must be consistent!
 
     // Exchange is complete except for "fix-up" fields to be set
@@ -5017,7 +5050,7 @@ ULONG cpqfcTSBuildExchange(
       printk( "FC Error: SEST build Pool Allocation failed\n");
 #endif
       // return resources...
-      cpqfcTSCompleteExchange( fcChip, *fcExchangeIndex);  // SEST build failed
+      cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev, fcChip, *fcExchangeIndex);  // SEST build failed
     }
   }
   else  // no Exchanges available
@@ -5059,7 +5092,61 @@ static void  buildFCPstatus( PTACHYON fcChip, ULONG ExchangeID)
 }
 
 
+static dma_addr_t 
+cpqfc_pci_map_sg_page(
+    		struct pci_dev *pcidev,
+		ULONG *hw_paddr, 	// where to put phys addr for HW use
+		void *sgp_vaddr,	// the virtual address of the sg page 
+	 	dma_addr_t *umap_paddr,	// where to put phys addr for unmap
+		unsigned int *maplen,	// where to store sg entry length
+		int PairCount)		// number of sg pairs used in the page.	
+{
+	unsigned long aligned_addr = (unsigned long) sgp_vaddr;
 
+	*maplen = PairCount * 8;
+        aligned_addr += TL_EXT_SG_PAGE_BYTELEN;
+        aligned_addr &= ~(TL_EXT_SG_PAGE_BYTELEN -1);
+	
+	*umap_paddr = pci_map_single(pcidev, (void *) aligned_addr, 
+				*maplen, PCI_DMA_TODEVICE);
+	*hw_paddr = (ULONG) *umap_paddr;
+
+#       if BITS_PER_LONG > 32
+       		if( *umap_paddr >>32 ) {
+       	  		printk("cqpfcTS:Tach SG DMA addr %p>32 bits\n", 
+	  			(void*)umap_paddr);
+       			return 0;
+       		}
+#       endif
+	return *umap_paddr;
+}
+
+static void
+cpqfc_undo_SEST_mappings(struct pci_dev *pcidev,
+			unsigned long contigaddr, int len, int dir,
+  			struct scatterlist *sgl, int use_sg,
+    			PSGPAGES *sgPages_head,
+			int allocated_pages)
+{
+	PSGPAGES i, next;
+
+	if (contigaddr != (unsigned long) NULL)
+		pci_unmap_single(pcidev, contigaddr, len, dir);
+
+	if (sgl != NULL)
+		pci_unmap_sg(pcidev, sgl, use_sg, dir);
+
+	for (i=*sgPages_head; i != NULL ;i = next)
+	{
+		pci_unmap_single(pcidev, i->busaddr, i->maplen, 
+			scsi_to_pci_dma_dir(PCI_DMA_TODEVICE));
+		i->busaddr = (dma_addr_t) NULL; 
+		i->maplen = 0L; 
+		next = i->next;
+		kfree(i); 
+	}
+	*sgPages_head = NULL;
+}
 
 // This routine builds scatter/gather lists into SEST entries
 // INPUTS:
@@ -5077,263 +5164,380 @@ static void  buildFCPstatus( PTACHYON fcChip, ULONG ExchangeID)
 
 //#define DBG_SEST_SGLIST 1 // for printing out S/G pairs with Ext. pages
 
+static int ap_hi_water = TL_DANGER_SGPAGES;
+
 static ULONG build_SEST_sgList( 
+    struct pci_dev *pcidev,
     ULONG *SESTalPairStart,  // the 3 len/address buffers in SEST
     Scsi_Cmnd *Cmnd,
     ULONG *sgPairs, 
-    PSGPAGES sgPages)  // link list of TL Ext. S/G pages from O/S Pool
+    PSGPAGES *sgPages_head)  // link list of TL Ext. S/G pages from O/S Pool
     
 {
   ULONG i, AllocatedPages=0; // Tach Ext. S/G page allocations
   ULONG* alPair = SESTalPairStart;
-  ULONG alignedPageAddress;  // TL hardware alignment requirement
+  ULONG* ext_sg_page_phys_addr_place = NULL;
   int PairCount;
-  unsigned long ulBuff;
+  unsigned long ulBuff, contigaddr;
   ULONG total_data_len=0; // (in bytes)
   ULONG bytes_to_go = Cmnd->request_bufflen; // total xfer (S/G sum)
   ULONG thisMappingLen;
-  struct scatterlist *sgl;  // S/G list (Linux format)
+  struct scatterlist *sgl = NULL;  // S/G list (Linux format)
+  int sg_count, totalsgs; 
+  dma_addr_t busaddr;
+  unsigned long thislen, offset;
+  PSGPAGES *sgpage = sgPages_head;
+  PSGPAGES prev_page = NULL;
 
-
+# define WE_HAVE_SG_LIST (sgl != (unsigned long) NULL)
+  contigaddr = (unsigned long) NULL;
 
   if( !Cmnd->use_sg )  // no S/G list?
   {
-    *sgPairs = 1;      // use "local" S/G pair in SEST entry
-                       // (for now, ignore address bits above #31)
-    *alPair++ = bytes_to_go & 0x7ffff; // bits 18-0, length
-    ulBuff = virt_to_bus( Cmnd->request_buffer);
-#if BITS_PER_LONG > 32
-    if( ulBuff >>32 )
-    {
-      printk("FATAL! Tachyon DMA address %p exceeds 32 bits\n", (void*)ulBuff );
-      return 0;
-    }
-#endif
-    *alPair = (ULONG)ulBuff;      
-    return bytes_to_go;
+	if (bytes_to_go <= TL_MAX_SG_ELEM_LEN)
+	{
+    		*sgPairs = 1;	// use "local" S/G pair in SEST entry
+				// (for now, ignore address bits above #31)
+
+		*alPair++ = bytes_to_go; // bits 18-0, length
+
+		if (bytes_to_go != 0) {
+			contigaddr = ulBuff = pci_map_single(pcidev, 
+				Cmnd->request_buffer, 
+				Cmnd->request_bufflen,
+				scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+			// printk("ms %p ", ulBuff);
+		}
+		else {
+			// No data transfer, (e.g.: Test Unit Ready)
+			// printk("btg=0 ");
+			*sgPairs = 0;
+			memset(alPair, 0, sizeof(*alPair));
+			return 0;
+		}
+
+#		if BITS_PER_LONG > 32
+    			if( ulBuff >>32 ) {
+      				printk("FATAL! Tachyon DMA address %p "
+					"exceeds 32 bits\n", (void*)ulBuff );
+      				return 0;
+    			}
+#		endif
+    		*alPair = (ULONG)ulBuff;      
+    		return bytes_to_go;
+	} 
+	else	// We have a single large (too big) contiguous buffer.
+	{	// We will have to break it up.  We'll use the scatter
+		// gather code way below, but use contigaddr instead
+		// of sg_dma_addr(). (this is a very rare case).
+
+		unsigned long btg;
+		contigaddr = pci_map_single(pcidev, Cmnd->request_buffer, 
+				Cmnd->request_bufflen,
+				scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+
+		// printk("contigaddr = %p, len = %d\n", 
+		//	(void *) contigaddr, bytes_to_go);
+		totalsgs = 0;
+		for (btg = bytes_to_go; btg > 0; ) {
+			btg -= ( btg > TL_MAX_SG_ELEM_LEN ? 
+				TL_MAX_SG_ELEM_LEN : btg );
+			totalsgs++;
+		}
+		sgl = NULL;
+		*sgPairs = totalsgs;
+	}
+  }
+  else  // we do have a scatter gather list
+  {
+	// [TBD - update for Linux to support > 32 bits addressing]
+	// since the format for local & extended S/G lists is different,
+	// check if S/G pairs exceeds 3.
+	// *sgPairs = Cmnd->use_sg; Nope, that's wrong.
+ 
+	sgl = (struct scatterlist*)Cmnd->request_buffer;  
+	sg_count = pci_map_sg(pcidev, sgl, Cmnd->use_sg, 
+		scsi_to_pci_dma_dir(Cmnd->sc_data_direction));
+        // printk("sgl = %p, sg_count = %d\n", (void *) sgl, sg_count);
+  	if( sg_count <= 3 ) {
+
+	// we need to be careful here that no individual mapping
+	// is too large, and if any is, that breaking it up
+	// doesn't push us over 3 sgs, or, if it does, that we
+	// handle that case.  Tachyon can take 0x7FFFF bits for length,
+	// but sg structure uses "unsigned int", on the face of it, 
+	// up to 0xFFFFFFFF or even more.
+
+		int i;
+		unsigned long thislen;
+
+		totalsgs = 0;
+		for (i=0;i<sg_count;i++) {
+      			thislen = sg_dma_len(&sgl[i]);
+			while (thislen >= TL_MAX_SG_ELEM_LEN) {
+				totalsgs++;
+				thislen -= TL_MAX_SG_ELEM_LEN;
+			}
+			if (thislen > 0) totalsgs++;
+		}
+		*sgPairs = totalsgs;
+  	} else totalsgs = 999; // as a first estimate, definitely >3, 
+			      
+	// if (totalsgs != sg_count) 
+	//	printk("totalsgs = %d, sgcount=%d\n",totalsgs,sg_count);
   }
 
-
-  // [TBD - update for Linux to support > 32 bits addressing]
-  // since the format for local & extended S/G lists is different,
-  // check if S/G pairs exceeds 3.
-  *sgPairs = Cmnd->use_sg;
-  sgl = (struct scatterlist*)Cmnd->request_buffer;  
-  
-  if( *sgPairs <= 3 ) // need "local" SEST list
+  // printk("totalsgs = %d, sgcount=%d\n", totalsgs, sg_count);
+  if( totalsgs <= 3 ) // can (must) use "local" SEST list
   {
     while( bytes_to_go)
     {
-      thisMappingLen = sgl->length;  // we want them ALL on every pass
-      bytes_to_go = bytes_to_go - thisMappingLen;
+      offset = 0L;
 
-      // we have L/A pair; L = thisMappingLen, A = physicalAddress
-      // load into SEST...
-      total_data_len += thisMappingLen & 0x7ffff;  // mask in valid bits
-                                                   // per SEST format
-      *alPair = thisMappingLen & 0x7ffff; // bits 18-0, length
-//      physicalAddress.HighPart <= 19;  // shift to bit 19
+      if ( WE_HAVE_SG_LIST ) 
+	thisMappingLen = sg_dma_len(sgl);
+      else					// or contiguous buffer?
+	thisMappingLen = bytes_to_go;
 
-                   // pick up bits 44-32 of upper 64-bit address
-                   // and load into 31-19 LBAU (upper addr) of SEST entry
-//      *alPair++ |=(ULONG)((physicalAddress.HighPart & 0xFFF8)); 
-      // on Tachlite TS's local S/G, we can handle 13 extra address bits
-      // i.e., bits 31-19 are actually bits  44-32 of physicalAddress
+      while (thisMappingLen > 0)
+      {  
+	thislen = thisMappingLen > TL_MAX_SG_ELEM_LEN ? 
+		TL_MAX_SG_ELEM_LEN : thisMappingLen;
+	bytes_to_go = bytes_to_go - thislen;
 
-      alPair++;
+	// we have L/A pair; L = thislen, A = physicalAddress
+	// load into SEST...
 
-      ulBuff = virt_to_bus( sgl->address);
-#if BITS_PER_LONG > 32
-      if( ulBuff >>32 )
-      {
-        printk("cqpfcTS: Tach DMA address %p > 32 bits\n", (void*)ulBuff );
-        return 0;
+	total_data_len += thislen;
+	*alPair = thislen; // bits 18-0, length
+
+	alPair++;
+
+	if ( WE_HAVE_SG_LIST ) 
+		ulBuff = sg_dma_address(sgl) + offset;
+	else
+		ulBuff = contigaddr + offset;
+
+	offset += thislen;
+
+#	if BITS_PER_LONG > 32
+		if( ulBuff >>32 ) {
+        		printk("cqpfcTS: 2Tach DMA address %p > 32 bits\n", 
+				(void*)ulBuff );
+		    printk("%s = %p, offset = %ld\n", 
+			WE_HAVE_SG_LIST ? "ulBuff" : "contigaddr",
+			WE_HAVE_SG_LIST ? (void *) ulBuff : (void *) contigaddr,
+				offset);
+        		return 0;
+      		}
+#	endif
+        *alPair++ = (ULONG)ulBuff; // lower 32 bits (31-0)
+	thisMappingLen -= thislen;
       }
-#endif
-      *alPair++ = (ULONG)ulBuff; // lower 32 bits (31-0)
 
-      ++sgl;  // next S/G pair
-#ifdef DBG_SEST_SGLIST
-      printk(" thisLen %d ", thisMappingLen);
-      printk(" remain %d\n", bytes_to_go);
-#endif
+      if ( WE_HAVE_SG_LIST ) ++sgl;  // next S/G pair
+	else if (bytes_to_go != 0) printk("BTG not zero!\n");
+
+#     ifdef DBG_SEST_SGLIST
+	printk("L=%d ", thisMappingLen);
+	printk("btg=%d ", bytes_to_go);
+#     endif
 
     }
+    // printk("i:%d\n", *sgPairs);
   }
-
-
-
-
   else    // more than 3 pairs requires Extended S/G page (Pool Allocation)
   {
     // clear out SEST DWORDs (local S/G addr) C-F (A-B set in following logic)
-
-
-    
     for( i=2; i<6; i++)
       alPair[i] = 0;
 
     PairCount = TL_EXT_SG_PAGE_COUNT;    // forces initial page allocation
-
+    totalsgs = 0;
     while( bytes_to_go )
     {
-
-
-      // Per SEST format, we can support 524287 byte lenghts per
+      // Per SEST format, we can support 524287 byte lengths per
       // S/G pair.  Typical user buffers are 4k, and very rarely
       // exceed 12k due to fragmentation of physical memory pages.
       // However, on certain O/S system (not "user") buffers (on platforms 
-      // with huge memories like 256Meg), it's possible to exceed this
-      // length in a single S/G address/len mapping.
-      //
-      // Check for Tachyon length boundary
-      //
-      if( sgl->length > 0x7ffff )
-      {
-        // never ask for more than we can handle
-  	thisMappingLen = sgl->length & 0x7ffff;  
-      }
+      // with huge memories), it's possible to exceed this
+      // length in a single S/G address/len mapping, so we have to handle
+      // that.
+
+      offset = 0L;
+      if ( WE_HAVE_SG_LIST ) 
+	thisMappingLen = sg_dma_len(sgl);
       else
-        thisMappingLen = sgl->length;        
-      
+	thisMappingLen = bytes_to_go;
 
-
-      // should we load into "this" extended S/G page, or allocate
-      // new page?
-
-      if( PairCount >= TL_EXT_SG_PAGE_COUNT )
+      while (thisMappingLen > 0)
       {
-        // have we exceeded the max possible extended pages?      
-        if( AllocatedPages >= TL_MAX_SGPAGES)
-        {
-          printk("Error: aborted loop on %d Ext. S/G page allocations\n",
-            AllocatedPages);
-
-          total_data_len = 0;  // failure!! Ext. S/G is All-or-none affair
-          break; // failed
-        }
-        
-        // Allocate the TL Extended S/G list page from O/S pool.  We have
-        // to allocated twice what we want to ensure required TL alignment
-        // (Tachlite TL/TS User Man. Rev 6.0, p 168)
-        // We store the original allocated PVOID so we can free later
-
-        sgPages->PoolPage[ AllocatedPages] = 
-          kmalloc( TL_EXT_SG_PAGE_BYTELEN*2,GFP_ATOMIC); // double for alignment
-
-        
-        if( !sgPages->PoolPage[ AllocatedPages] )  // Allocation failed?
-        {
-
-          printk("Error: Allocation failed @ %d S/G page allocations\n",
-            AllocatedPages);
-
-          total_data_len = 0;  // failure!! Ext. S/G is All-or-none affair
-          break;               // give up
-        }
-                               // clear out memory we just allocated                     
-        memset( sgPages->PoolPage[AllocatedPages], 0,
-          TL_EXT_SG_PAGE_BYTELEN*2);
-
+	thislen = thisMappingLen > TL_MAX_SG_ELEM_LEN ? 
+		TL_MAX_SG_ELEM_LEN : thisMappingLen;
+	// printk("%d/%d/%d\n", thislen, thisMappingLen, bytes_to_go);
       
-        // align the memory - TL requires sizeof() Ext. S/G page alignment.
-        // We doubled the actual required size so we could mask off LSBs 
-        // to get desired offset
+  	// should we load into "this" extended S/G page, or allocate
+	// new page?
 
-        ulBuff = virt_to_bus( sgPages->PoolPage[AllocatedPages]);
+	if( PairCount >= TL_EXT_SG_PAGE_COUNT )
+	{
+	  // Now, we have to map the previous page, (triggering buffer bounce)
+	  // The first time thru the loop, there won't be a previous page.
+	  if (prev_page != NULL) // is there a prev page? 
+	  {
+		// this code is normally kind of hard to trigger, 
+		// you have to use up more than 256 scatter gather 
+		// elements to get here.  Cranking down TL_MAX_SG_ELEM_LEN
+		// to an absurdly low value (128 bytes or so) to artificially
+		// break i/o's into a zillion pieces is how I tested it. 
+		busaddr = cpqfc_pci_map_sg_page(pcidev,
+				ext_sg_page_phys_addr_place,
+				prev_page->page,
+        			&prev_page->busaddr,
+        			&prev_page->maplen,
+				PairCount);
+          } 
+          // Allocate the TL Extended S/G list page.  We have
+          // to allocate twice what we want to ensure required TL alignment
+          // (Tachlite TL/TS User Man. Rev 6.0, p 168)
+          // We store the original allocated PVOID so we can free later
+	  *sgpage = kmalloc( sizeof(SGPAGES), GFP_ATOMIC);
+	  if ( ! *sgpage )
+          {
+		printk("cpqfc: Allocation failed @ %d S/G page allocations\n",
+			AllocatedPages);
+		total_data_len = 0;  // failure!! Ext. S/G is All-or-none affair
 
-#if BITS_PER_LONG > 32
-        if( ulBuff >>32 )
-        {
-          printk("cqpfcTS: Tach ext. S/G DMA address %p > 32 bits\n", 
-		  (void*)ulBuff );
-          return 0;
-        }
-#endif
-	
-        ulBuff += TL_EXT_SG_PAGE_BYTELEN; // ensures we pass align. boundary
-        ulBuff &= (0xFFFFFFFF - (TL_EXT_SG_PAGE_BYTELEN -1) );// mask off LSBs
-         
-        alignedPageAddress = (ULONG)ulBuff;
-#ifdef DBG_SEST_SGLIST
-        printk("new PoolPage: %p, alignedPageAddress %lXh\n", 
-          sgPages->PoolPage[AllocatedPages], ulBuff);
-#endif
+	        // unmap the previous mappings, if any.
 
+	        cpqfc_undo_SEST_mappings(pcidev, contigaddr, 
+			Cmnd->request_bufflen,
+			scsi_to_pci_dma_dir(Cmnd->sc_data_direction),
+  			sgl, Cmnd->use_sg, sgPages_head, AllocatedPages+1);
 
-        // set pointer, in SEST if first Ext. S/G page, or in last pair
-        // of linked Ext. S/G pages...
-        // (Only 32-bit PVOIDs, so just load lower 32 bits)
-        // NOTE: the Len field must be '0' if this is the first Ext. S/G
-        // pointer in SEST, and not 0 otherwise.
-        if( alPair == SESTalPairStart) // initial Ext. S/G list?
-          *alPair = 0;
-        else // not the SEST entry... Len must be non-0, so
-             // arbitrarily set it to number bytes remaining
-          *alPair = ( bytes_to_go & 0x7ffff);
+		// FIXME: testing shows that if we get here, 
+		// it's bad news.  (this has been this way for a long 
+		// time though, AFAIK.  Not that that excuses it.)
 
-#ifdef DBG_SEST_SGLIST
-        printk("PairCount %d @%p even %Xh, ", 
-          PairCount, alPair, *alPair);
-#endif
-        alPair++;  // next DWORD
+		return 0; // give up (and probably hang the system)
+          }
+                               // clear out memory we just allocated
+	  memset( (*sgpage)->page,0,TL_EXT_SG_PAGE_BYTELEN*2);
+	  (*sgpage)->next = NULL;
+	  (*sgpage)->busaddr = (dma_addr_t) NULL;
+	  (*sgpage)->maplen = 0L;
+      
+	  // align the memory - TL requires sizeof() Ext. S/G page alignment.
+	  // We doubled the actual required size so we could mask off LSBs 
+	  // to get desired offset 
 
-        *alPair = alignedPageAddress; // TL needs 32-bit physical
-#ifdef DBG_SEST_SGLIST
+	  ulBuff = (unsigned long) (*sgpage)->page;
+	  ulBuff += TL_EXT_SG_PAGE_BYTELEN;
+	  ulBuff &= ~(TL_EXT_SG_PAGE_BYTELEN -1);
+
+	  // set pointer, in SEST if first Ext. S/G page, or in last pair
+	  // of linked Ext. S/G pages... (Only 32-bit PVOIDs, so just 
+	  // load lower 32 bits)
+	  // NOTE: the Len field must be '0' if this is the first Ext. S/G
+	  // pointer in SEST, and not 0 otherwise (we know thislen != 0).
+
+	  *alPair = (alPair != SESTalPairStart) ? thislen : 0;
+
+#	  ifdef DBG_SEST_SGLIST
+        	printk("PairCount %d @%p even %Xh, ", 
+			PairCount, alPair, *alPair);
+#	  endif
+
+	  // Save the place where we need to store the physical
+	  // address of this scatter gather page which we get when we map it
+	  // (and mapping we can do only after we fill it in.)
+	  alPair++;  // next DWORD, will contain phys addr of the ext page
+	  ext_sg_page_phys_addr_place = alPair;
+
+	  // Now, set alPair = the virtual addr of the (Extended) S/G page
+	  // which will accept the Len/ PhysicalAddress pairs
+	  alPair = (ULONG *) ulBuff;
+
+	  AllocatedPages++;
+	  if (AllocatedPages >= ap_hi_water)
+	  {
+		// This message should rarely, if ever, come out.
+		// Previously (cpqfc version <= 2.0.5) the driver would
+		// just puke if more than 4 SG pages were used, and nobody
+		// ever complained about that.  This only comes out if 
+		// more than 8 pages are used.
+
+		printk(KERN_WARNING
+		"cpqfc: Possible danger.  %d scatter gather pages used.\n"
+			"cpqfc: detected seemingly extreme memory "
+			"fragmentation or huge data transfers.\n", 
+			AllocatedPages);
+		ap_hi_water = AllocatedPages+1;
+	  }
+		
+	  PairCount = 1;  // starting new Ext. S/G page
+	  prev_page = (*sgpage);  // remember this page, for next time thru
+	  sgpage = &((*sgpage)->next);
+	}  // end of new TL Ext. S/G page allocation
+
+	*alPair = thislen; // bits 18-0, length (range check above)
+      
+#	ifdef DBG_SEST_SGLIST
+	  printk("PairCount %d @%p, even %Xh, ", PairCount, alPair, *alPair);
+#	endif
+
+	alPair++;    // next DWORD, physical address 
+
+	if ( WE_HAVE_SG_LIST ) 
+		ulBuff = sg_dma_address(sgl) + offset;
+	else
+		ulBuff = contigaddr + offset;
+	offset += thislen;
+
+#	if BITS_PER_LONG > 32
+          if( ulBuff >>32 )
+	  {
+	    printk("cqpfcTS: 1Tach DMA address %p > 32 bits\n", (void*)ulBuff );
+	    printk("%s = %p, offset = %ld\n", 
+		WE_HAVE_SG_LIST ? "ulBuff" : "contigaddr",
+		WE_HAVE_SG_LIST ? (void *) ulBuff : (void *) contigaddr,
+			offset);
+	    return 0;
+	  }
+#	endif
+
+	*alPair = (ULONG) ulBuff; // lower 32 bits (31-0)
+
+#       ifdef DBG_SEST_SGLIST
         printk("odd %Xh\n", *alPair);
-#endif
-                   
-        // now reset the pointer to the ACTUAL (Extended) S/G page
-        // which will accept the Len/ PhysicalAddress pairs
-        alPair = bus_to_virt(alignedPageAddress);
-        
-        AllocatedPages++;
-        PairCount = 1;  // starting new Ext. S/G page
-      }  // end of new TL Ext. S/G page allocation
-
-      
-      *alPair = thisMappingLen; // bits 18-0, length (range check above)
-      
-      
-//      physicalAddress.HighPart <= 19;  // shift to bit 19
-      
-                   // pick up bits 44-32 of upper 64-bit address
-                   // and load into 31-19 LBAU (upper addr) of SEST entry
-//      *alPair |=(ULONG)((physicalAddress.HighPart & 0xFFF8)); 
-
-      
-#ifdef DBG_SEST_SGLIST
-      printk("PairCount %d @%p, even %Xh, ", 
-        PairCount, alPair, *alPair);
-#endif
-
-      alPair++;    // next DWORD
-      // on Tachlite TS's local S/G, we can handle 13 extra address bits
-      // i.e., bits 31-19 are actually bits  44-32 of physicalAddress
-
-
-      ulBuff = virt_to_bus( sgl->address);
-#if BITS_PER_LONG > 32
-      if( ulBuff >>32 )
-      {
-        printk("cqpfcTS: Tach DMA address %p > 32 bits\n", (void*)ulBuff );
-        return 0;
-      }
-#endif
-      *alPair = (ULONG)ulBuff; // lower 32 bits (31-0)
-
-
-#ifdef DBG_SEST_SGLIST
-      printk("odd %Xh\n", *alPair);
-#endif
-      alPair++;    // next DWORD
+#       endif
+	alPair++;    // next DWORD, next address/length pair
                                            
+	PairCount++; // next Length/Address pair
 
-      PairCount++; // next Length/Address pair
-      bytes_to_go -= thisMappingLen;
-      total_data_len += thisMappingLen;  
-      sgl++;  // next S/G pair
-    }
+	// if (PairCount > pc_hi_water)
+	// {
+		// printk("pc hi = %d ", PairCount);
+		// pc_hi_water = PairCount;
+	// }
+	bytes_to_go -= thislen;
+	total_data_len += thislen;  
+	thisMappingLen -= thislen;
+	totalsgs++;
+      } // while (thisMappingLen > 0)
+      if ( WE_HAVE_SG_LIST ) sgl++;  // next S/G pair
+    } // while (bytes_to_go)
+
+    // printk("Totalsgs=%d\n", totalsgs);
+    *sgPairs = totalsgs;
+
+    // PCI map (and bounce) the last (and usually only) extended SG page
+    busaddr = cpqfc_pci_map_sg_page(pcidev,
+		ext_sg_page_phys_addr_place,
+		prev_page->page, 
+		&prev_page->busaddr, 
+		&prev_page->maplen,
+		PairCount);
   }
   return total_data_len;
 }
@@ -5584,7 +5788,7 @@ printk("fcStartExchange: PSM offline (%Xh), x_ID %Xh, type %Xh, port_id %Xh\n",
       if( CompleteExchange ||   // flag from Reply frames
           pExchange->status )   // typically, can get FRAME_TO
       {
-    	cpqfcTSCompleteExchange( fcChip, ExchangeID);  
+    	cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev, fcChip, ExchangeID);  
       }
     }
 
@@ -5594,7 +5798,7 @@ printk("fcStartExchange: PSM offline (%Xh), x_ID %Xh, type %Xh, port_id %Xh\n",
       
       if( CompleteExchange )   // by Type of exchange (e.g. end-of-xchng)
       {
-    	cpqfcTSCompleteExchange( fcChip, ExchangeID);  
+    	cpqfcTSCompleteExchange( cpqfcHBAdata->PciDev, fcChip, ExchangeID);  
       }
        
       else
@@ -5738,9 +5942,46 @@ static LONG FindFreeExchange( PTACHYON fcChip, ULONG type )
   return i;  
 }
 
+static void
+cpqfc_pci_unmap_extended_sg(struct pci_dev *pcidev,
+	PTACHYON fcChip,
+	ULONG x_ID)
+{
+	// Unmaps the memory regions used to hold the scatter gather lists
 
+	PSGPAGES i;
 
+	// Were there any such regions needing unmapping?
+	if (! USES_EXTENDED_SGLIST(fcChip->SEST, x_ID))
+		return;	// No such regions, we're outta here.
 
+	// for each extended scatter gather region needing unmapping... 
+	for (i=fcChip->SEST->sgPages[x_ID] ; i != NULL ; i = i->next)
+		pci_unmap_single(pcidev, i->busaddr, i->maplen,
+			scsi_to_pci_dma_dir(PCI_DMA_TODEVICE));
+}
+
+// Called also from cpqfcTScontrol.o, so can't be static
+void
+cpqfc_pci_unmap(struct pci_dev *pcidev, 
+	Scsi_Cmnd *cmd, 
+	PTACHYON fcChip, 
+	ULONG x_ID)
+{
+	// Undo the DMA mappings
+	if (cmd->use_sg) {	// Used scatter gather list for data buffer?
+		cpqfc_pci_unmap_extended_sg(pcidev, fcChip, x_ID);
+		pci_unmap_sg(pcidev, cmd->buffer, cmd->use_sg,
+			scsi_to_pci_dma_dir(cmd->sc_data_direction));
+		// printk("umsg %d\n", cmd->use_sg);
+	}
+	else if (cmd->request_bufflen) {
+		// printk("ums %p ", fcChip->SEST->u[ x_ID ].IWE.GAddr1);
+		pci_unmap_single(pcidev, fcChip->SEST->u[ x_ID ].IWE.GAddr1,
+			cmd->request_bufflen,
+			scsi_to_pci_dma_dir(cmd->sc_data_direction));
+	}	 
+}
 
 // We call this routine to free an Exchange for any reason:
 // completed successfully, completed with error, aborted, etc.
@@ -5751,10 +5992,12 @@ static LONG FindFreeExchange( PTACHYON fcChip, ULONG type )
 //scompleteexchange
 
 void cpqfcTSCompleteExchange( 
+       struct pci_dev *pcidev,
        PTACHYON fcChip, 
        ULONG x_ID)
 {
   FC_EXCHANGES *Exchanges = fcChip->Exchanges;
+  int already_unmapped = 0;
   
   if( x_ID < TACH_SEST_LEN ) // SEST-based (or LinkServ for FCP exchange)
   {
@@ -5883,9 +6126,38 @@ void cpqfcTSCompleteExchange(
       // case for.  Need code maintenance!  Return "ERROR"
       else
       {
-        printk("DEFAULT result %Xh, x_ID %Xh, Cmnd %p\n", 
+	unsigned int stat = Exchanges->fcExchange[ x_ID ].status;
+        printk("DEFAULT result %Xh, x_ID %Xh, Cmnd %p", 
           Exchanges->fcExchange[ x_ID ].status, x_ID, 
 	  Exchanges->fcExchange[ x_ID ].Cmnd);
+
+	if (stat & INVALID_ARGS)	printk(" INVALID_ARGS ");
+	if (stat & LNKDWN_OSLS)		printk(" LNKDWN_OSLS ");
+	if (stat & LNKDWN_LASER)	printk(" LNKDWN_LASER ");
+	if (stat & OUTQUE_FULL)		printk(" OUTQUE_FULL ");
+	if (stat & DRIVERQ_FULL)	printk(" DRIVERQ_FULL ");
+	if (stat & SEST_FULL)		printk(" SEST_FULL ");
+	if (stat & BAD_ALPA)		printk(" BAD_ALPA ");
+	if (stat & OVERFLOW)		printk(" OVERFLOW ");
+	if (stat & COUNT_ERROR)		printk(" COUNT_ERROR ");
+	if (stat & LINKFAIL_RX)		printk(" LINKFAIL_RX ");
+	if (stat & ABORTSEQ_NOTIFY)	printk(" ABORTSEQ_NOTIFY ");
+	if (stat & LINKFAIL_TX)		printk(" LINKFAIL_TX ");
+	if (stat & HOSTPROG_ERR)	printk(" HOSTPROG_ERR ");
+	if (stat & FRAME_TO)		printk(" FRAME_TO ");
+	if (stat & INV_ENTRY)		printk(" INV_ENTRY ");
+	if (stat & SESTPROG_ERR)	printk(" SESTPROG_ERR ");
+	if (stat & OUTBOUND_TIMEOUT)	printk(" OUTBOUND_TIMEOUT ");
+	if (stat & INITIATOR_ABORT)	printk(" INITIATOR_ABORT ");
+	if (stat & MEMPOOL_FAIL)	printk(" MEMPOOL_FAIL ");
+	if (stat & FC2_TIMEOUT)		printk(" FC2_TIMEOUT ");
+	if (stat & TARGET_ABORT)	printk(" TARGET_ABORT ");
+	if (stat & EXCHANGE_QUEUED)	printk(" EXCHANGE_QUEUED ");
+	if (stat & PORTID_CHANGED)	printk(" PORTID_CHANGED ");
+	if (stat & DEVICE_REMOVED)	printk(" DEVICE_REMOVED ");
+	if (stat & SFQ_FRAME)		printk(" SFQ_FRAME ");
+	printk("\n");
+
         Exchanges->fcExchange[ x_ID ].Cmnd->result = (DID_ERROR <<16);
       }
     }
@@ -5895,6 +6167,10 @@ void cpqfcTSCompleteExchange(
       fcChip->fcStats.ok++;
       cpqfcTSCheckandSnoopFCP( fcChip, x_ID);  // (will set ->result)    
     }
+
+    cpqfc_pci_unmap(pcidev, Exchanges->fcExchange[x_ID].Cmnd, 
+			fcChip, x_ID); // undo DMA mappings.
+    already_unmapped = 1;
 
     // OK, we've set the Scsi "->result" field, so proceed with calling
     // Linux Scsi "done" (if not NULL), and free any kernel memory we
@@ -5910,17 +6186,17 @@ void cpqfcTSCompleteExchange(
       if( Exchanges->fcExchange[ x_ID ].Cmnd->result != (DID_ABORT<<16) )
       {
         PCI_TRACE(0xAC)
-        (*Exchanges->fcExchange[ x_ID ].Cmnd->scsi_done)
-	   (Exchanges->fcExchange[ x_ID ].Cmnd);
+	call_scsi_done(Exchanges->fcExchange[ x_ID ].Cmnd);
       }
       else
       {
-
+	Exchanges->fcExchange[ x_ID ].Cmnd->SCp.sent_command = 0;
 //	printk(" not calling scsi_done on x_ID %Xh, Cmnd %p\n",
 //			x_ID, Exchanges->fcExchange[ x_ID ].Cmnd);
       }
     }
     else{
+	Exchanges->fcExchange[ x_ID ].Cmnd->SCp.sent_command = 0;
       printk(" x_ID %Xh, type %Xh, Cdb0 %Xh\n", x_ID,
 	Exchanges->fcExchange[ x_ID ].type, 
 	Exchanges->fcExchange[ x_ID ].Cmnd->cmnd[0]);	      
@@ -5930,22 +6206,23 @@ void cpqfcTSCompleteExchange(
 
     // Now, clean up non-Scsi_Cmnd items...
 CleanUpSestResources:
-    
+   
+    if (!already_unmapped) 
+	cpqfc_pci_unmap(pcidev, Exchanges->fcExchange[x_ID].Cmnd, 
+			fcChip, x_ID); // undo DMA mappings.
+
     // Was an Extended Scatter/Gather page allocated?  We know
     // this by checking DWORD 4, bit 31 ("LOC") of SEST entry
     if( !(fcChip->SEST->u[ x_ID ].IWE.Buff_Off & 0x80000000))
     {
-      int i = 0;
+      PSGPAGES p, next;
 
       // extended S/G list was used -- Free the allocated ext. S/G pages
-
-      while( fcChip->SEST->sgPages[x_ID].PoolPage[i] && 
-             (i < TL_MAX_SGPAGES) )
-      {
-        kfree( fcChip->SEST->sgPages[x_ID].PoolPage[i]);
-        fcChip->SEST->sgPages[x_ID].PoolPage[i] = NULL;
-        i++;
+      for (p = fcChip->SEST->sgPages[x_ID]; p != NULL; p = next) {
+	 next = p->next;
+	 kfree(p);
       }
+      fcChip->SEST->sgPages[x_ID] = NULL;
     }
   
     Exchanges->fcExchange[ x_ID ].Cmnd = NULL; 

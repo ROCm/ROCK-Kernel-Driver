@@ -51,7 +51,7 @@ static int  dma_irq_p(struct NCR_ESP *esp);
 static int  dma_ports_p(struct NCR_ESP *esp);
 static void dma_setup(struct NCR_ESP *esp, __u32 addr, int count, int write);
 
-volatile unsigned char cmd_buffer[16];
+static volatile unsigned char cmd_buffer[16];
 				/* This is where all commands are put
 				 * before they are transferred to the ESP chip
 				 * via PIO.
@@ -64,6 +64,7 @@ int __init blz1230_esp_detect(Scsi_Host_Template *tpnt)
 	struct zorro_dev *z = NULL;
 	unsigned long address;
 	struct ESP_regs *eregs;
+	unsigned long board;
 
 #if MKIV
 #define REAL_BLZ1230_ID		ZORRO_PROD_PHASE5_BLIZZARD_1230_IV_1260
@@ -76,7 +77,7 @@ int __init blz1230_esp_detect(Scsi_Host_Template *tpnt)
 #endif
 
 	if ((z = zorro_find_device(REAL_BLZ1230_ID, z))) {
-	    unsigned long board = z->resource.start;
+	    board = z->resource.start;
 	    if (request_mem_region(board+REAL_BLZ1230_ESP_ADDR,
 				   sizeof(struct ESP_regs), "NCR53C9x")) {
 		/* Do some magic to figure out if the blizzard is

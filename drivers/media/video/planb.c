@@ -64,7 +64,7 @@
 
 #if 0
 #define IDEBUG(x...) printk(KERN_DEBUG ## x) /* Debug interrupt part */
-#endif
+#else
 #define IDEBUG(x...) 		/* Don't debug interrupt part */
 #endif
 

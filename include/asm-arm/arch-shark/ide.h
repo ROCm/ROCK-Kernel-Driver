@@ -1,7 +1,7 @@
 /*
  * linux/include/asm-arm/arch-shark/ide.h
  *
- * by Alexander Schulz <aschulz@netwinder.org>
+ * by Alexander Schulz
  *
  * derived from:
  * linux/include/asm-arm/arch-ebsa285/ide.h

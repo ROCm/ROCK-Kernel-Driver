@@ -18,9 +18,9 @@
  * along with this program; see the file COPYING.  If not, write to
  * the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
  * 
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#65 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#72 $
  *
- * Copyright (c) 2000, 2001 Adaptec Inc.
+ * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,25 +29,33 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
  *    without modification.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * Alternatively, this software may be distributed under the terms of the
- * GNU Public License ("GPL").
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/src/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#65 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_linux.h#72 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -61,6 +69,8 @@
 #include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/version.h>
+#include <linux/module.h>
+#include <asm/byteorder.h>
 
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(x,y,z) (((x)<<16)+((y)<<8)+(z))
@@ -102,6 +112,23 @@ typedef Scsi_Cmnd      *ahc_io_ctx_t;
 #define ahc_le16toh(x)	le16_to_cpu(x)
 #define ahc_le32toh(x)	le32_to_cpu(x)
 #define ahc_le64toh(x)	le64_to_cpu(x)
+
+#ifndef LITTLE_ENDIAN
+#define LITTLE_ENDIAN 1234
+#endif
+
+#ifndef BIG_ENDIAN
+#define BIG_ENDIAN 4321
+#endif
+
+#ifndef BYTE_ORDER
+#if defined(__BIG_ENDIAN)
+#define BYTE_ORDER BIG_ENDIAN
+#endif
+#if defined(__LITTLE_ENDIAN)
+#define BYTE_ORDER LITTLE_ENDIAN
+#endif
+#endif /* BYTE_ORDER */
 
 /************************* Configuration Data *********************************/
 extern int aic7xxx_no_probe;
@@ -376,7 +403,7 @@ struct scsi_inquiry_data
 #include <linux/smp.h>
 #endif
 
-#define AIC7XXX_DRIVER_VERSION  "6.2.1"
+#define AIC7XXX_DRIVER_VERSION  "6.2.4"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -422,7 +449,8 @@ typedef enum {
 	AHC_DEV_TIMER_ACTIVE	 = 0x04, /* Our timer is active */
 	AHC_DEV_ON_RUN_LIST	 = 0x08, /* Queued to be run later */
 	AHC_DEV_Q_BASIC		 = 0x10, /* Allow basic device queuing */
-	AHC_DEV_Q_TAGGED	 = 0x20  /* Allow full SCSI2 command queueing */
+	AHC_DEV_Q_TAGGED	 = 0x20, /* Allow full SCSI2 command queueing */
+	AHC_DEV_PERIODIC_OTAG	 = 0x40	 /* Send OTAG to prevent starvation */
 } ahc_dev_flags;
 
 struct ahc_linux_target;
@@ -491,10 +519,14 @@ struct ahc_linux_device {
 	/*
 	 * How many transactions have been queued
 	 * without the device going idle.  We use
-	 * this statistic to 
+	 * this statistic to determine when to issue
+	 * an ordered tag to prevent transaction
+	 * starvation.  This statistic is only updated
+	 * if the AHC_DEV_PERIODIC_OTAG flag is set
+	 * on this device.
 	 */
 	u_int		commands_since_idle_or_otag;
-#define AHC_OTAG_THRESH	250
+#define AHC_OTAG_THRESH	500
 
 	int		lun;
 	struct		ahc_linux_target *target;
@@ -580,7 +612,7 @@ ahc_delay(long usec)
 
 
 /***************************** Low Level I/O **********************************/
-#if defined(__powerpc__) || defined(__i386__) || defined(__ia64__) || defined(__x86_64__)
+#if defined(__powerpc__) || defined(__i386__) || defined(__ia64__)
 #define MMAPIO
 #endif
 
@@ -594,19 +626,19 @@ static __inline void ahc_insb(struct ahc_softc * ahc, long port,
 static __inline uint8_t
 ahc_inb(struct ahc_softc * ahc, long port)
 {
-#ifdef MMAPIO
 	uint8_t x;
+#ifdef MMAPIO
 
 	if (ahc->tag == BUS_SPACE_MEMIO) {
 		x = readb(ahc->bsh.maddr + port);
 	} else {
 		x = inb(ahc->bsh.ioport + port);
 	}
+#else
+	x = inb(ahc->bsh.ioport + port);
+#endif
 	mb();
 	return (x);
-#else
-	return (inb(ahc->bsh.ioport + port));
-#endif
 }
 
 static __inline void
@@ -618,10 +650,10 @@ ahc_outb(struct ahc_softc * ahc, long port, uint8_t val)
 	} else {
 		outb(val, ahc->bsh.ioport + port);
 	}
-	mb();
 #else
 	outb(val, ahc->bsh.ioport + port);
 #endif
+	mb();
 }
 
 static __inline void

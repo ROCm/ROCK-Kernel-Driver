@@ -66,5 +66,27 @@
 #define	WACMD_RST_MIXER		0x33
 #define	WACMD_SET_MONO		0x34
 
+/*
+ * Definitions for left/right recording input mux
+ */
+#define ADC_MUX_NONE	0
+#define ADC_MUX_MIXER	1
+#define ADC_MUX_LINE	2
+#define ADC_MUX_AUX2	3
+#define ADC_MUX_AUX1	4
+#define ADC_MUX_MIC	5
+
+/*
+ * Definitions for mixer gain settings
+ */
+#define MIX_GAIN_LINE	0	/* line in	 */
+#define MIX_GAIN_AUX1	1	/* aux1		 */
+#define MIX_GAIN_AUX2	2	/* aux2		 */
+#define MIX_GAIN_XMIC	3	/* crossover mic */
+#define MIX_GAIN_MIC	4	/* normal mic	 */
+#define MIX_GAIN_PREMIC	5	/* preamp mic	 */
+#define MIX_GAIN_OUT	6	/* output	 */
+#define MIX_GAIN_MONO	7	/* mono in	 */
+
 int wa_sendcmd(unsigned int cmd);
 int wa_writecmd(unsigned int cmd, unsigned int arg);

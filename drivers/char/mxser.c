@@ -159,17 +159,14 @@ static int mxser_numports[] =
 #define         MOXA_GET_CUMAJOR      (MOXA + 64)
 #define         MOXA_GETMSTATUS       (MOXA + 65)
 
-typedef struct {
-	unsigned short vendor_id;
-	unsigned short device_id;
-	unsigned short board_type;
-} mxser_pciinfo;
-
-static mxser_pciinfo mxser_pcibrds[] =
-{
-	{PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C168, MXSER_BOARD_C168_PCI},
-	{PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C104, MXSER_BOARD_C104_PCI},
+static struct pci_device_id mxser_pcibrds[] = {
+	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C168, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+	  MXSER_BOARD_C168_PCI },
+	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C104, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
+	  MXSER_BOARD_C104_PCI },
+	{ 0 }
 };
+MODULE_DEVICE_TABLE(pci, mxser_pcibrds);
 
 static int ioaddr[MXSER_BOARDS];
 static int ttymajor = MXSERMAJOR;
@@ -614,22 +611,22 @@ int mxser_init(void)
 	{
 		struct pci_dev *pdev = NULL;
 
-		n = sizeof(mxser_pcibrds) / sizeof(mxser_pciinfo);
+		n = (sizeof(mxser_pcibrds) / sizeof(mxser_pcibrds[0])) - 1;
 		index = 0;
 		for (b = 0; b < n; b++) {
-			pdev = pci_find_device(mxser_pcibrds[b].vendor_id,
-					       mxser_pcibrds[b].device_id, pdev);
+			pdev = pci_find_device(mxser_pcibrds[b].vendor,
+					       mxser_pcibrds[b].device, pdev);
 			if (!pdev || pci_enable_device(pdev))
 				continue;
 			hwconf.pdev = pdev;
 			printk("Found MOXA %s board(BusNo=%d,DevNo=%d)\n",
-				mxser_brdname[mxser_pcibrds[b].board_type],
+				mxser_brdname[mxser_pcibrds[b].driver_data],
 				pdev->bus->number, PCI_SLOT(pdev->devfn));
 			if (m >= MXSER_BOARDS) {
 				printk("Too many Smartio family boards found (maximum %d),board not configured\n", MXSER_BOARDS);
 			} else {
 				retval = mxser_get_PCI_conf(pdev,
-				   mxser_pcibrds[b].board_type, &hwconf);
+				   mxser_pcibrds[b].driver_data, &hwconf);
 				if (retval < 0) {
 					if (retval == MXSER_ERR_IRQ)
 						printk("Invalid interrupt number,board not configured\n");
@@ -848,7 +845,7 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 		 */
 		timeout = jiffies + HZ;
 		while (!(inb(info->base + UART_LSR) & UART_LSR_TEMT)) {
-			current->state = TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(5);
 			if (jiffies > timeout)
 				break;
@@ -864,7 +861,7 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 	info->tty = 0;
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			current->state = TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(info->close_delay);
 		}
 		wake_up_interruptible(&info->open_wait);
@@ -1622,7 +1619,7 @@ static int mxser_block_til_ready(struct tty_struct *tty, struct file *filp,
 			outb(inb(info->base + UART_MCR) | UART_MCR_DTR | UART_MCR_RTS,
 			     info->base + UART_MCR);
 		restore_flags(flags);
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		if (tty_hung_up_p(filp) || !(info->flags & ASYNC_INITIALIZED)) {
 #ifdef SERIAL_DO_RESTART
 			if (info->flags & ASYNC_HUP_NOTIFY)
@@ -1644,7 +1641,7 @@ static int mxser_block_til_ready(struct tty_struct *tty, struct file *filp,
 		}
 		schedule();
 	}
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&info->open_wait, &wait);
 	if (!tty_hung_up_p(filp))
 		info->count++;
@@ -2227,7 +2224,7 @@ static void mxser_send_break(struct mxser_struct *info, int duration)
 	unsigned long flags;
 	if (!info->base)
 		return;
-	current->state = TASK_INTERRUPTIBLE;
+	set_current_state(TASK_INTERRUPTIBLE);
 	save_flags(flags);
 	cli();
 	outb(inb(info->base + UART_LCR) | UART_LCR_SBC, info->base + UART_LCR);

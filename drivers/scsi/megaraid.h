@@ -5,11 +5,14 @@
 #include <linux/version.h>
 #endif
 
+/*
+ * For state flag. Do not use LSB(8 bits) which are
+ * reserved for storing info about channels.
+ */
 #define IN_ISR		  	0x80000000L
 #define IN_ABORT		0x40000000L
 #define IN_RESET		0x20000000L
 #define IN_QUEUE		0x10000000L
-
 #define BOARD_QUARTZ	0x08000000L
 #define BOARD_40LD	   	0x04000000L
 #define BOARD_64BIT		0x02000000L
@@ -27,7 +30,7 @@
 #define M_RD_IOCTL_CMD_NEW		0x81
 #define M_RD_DRIVER_IOCTL_INTERFACE	0x82
 
-#define MEGARAID_VERSION "v1.17a (Release Date: Fri Jul 13 18:44:01 EDT 2001)"
+#define MEGARAID_VERSION "v1.18 (Release Date: Thu Oct 11 15:02:53 EDT 2001\n)"
 
 #define MEGARAID_IOCTL_VERSION 	114
 
@@ -767,6 +770,17 @@ typedef struct _mega_host_config {
 	int		support_ext_cdb;
 	int		boot_ldrv_enabled;
 	int		boot_ldrv;
+
+	int		support_random_del;	/* Do we support random deletion of logdrvs */
+	int		read_ldidmap;	/* set after logical drive deltion. The logical
+								drive number must be read from the map */
+	int		quiescent;	/* a stage reached when delete logical drive needs to
+						   be done. Stop sending requests to the hba till
+						   delete operation is completed */
+
+	mega_scb	*int_qh;	/* commands are queued in the internal queue */
+	mega_scb	*int_qt;	/* while the hba is quiescent */
+	int			int_qlen;
 } mega_host_config;
 
 typedef struct _driver_info {
@@ -911,6 +925,16 @@ struct private_bios_data {
 };
 #pragma pack()
 
+#define NVIRT_CHAN		4	/* # of virtual channels to represent 60 logical
+							drives */
+
+/*
+ * Command for random deletion of logical drives
+ */
+#define	FC_DEL_LOGDRV		0xA4	/* f/w command */
+#define	OP_SUP_DEL_LOGDRV	0x2A	/* is feature supported */
+#define OP_GET_LDID_MAP		0x18	/* get logdrv id and logdrv number map */
+#define OP_DEL_LOGDRV		0x1C	/* delete logical drive */
 
 /*================================================================
  *
@@ -975,6 +999,10 @@ static mega_ext_passthru* mega_prepare_extpassthru(mega_host_config *,
 static void mega_enum_raid_scsi(mega_host_config *);
 static int mega_partsize(Disk *, kdev_t, int *);
 static void mega_get_boot_ldrv(mega_host_config *);
+static int mega_get_lun(mega_host_config *, Scsi_Cmnd *);
+static int mega_support_random_del(mega_host_config *);
+static int mega_del_logdrv(mega_host_config *, int);
+static int mega_do_del_logdrv(mega_host_config *, int);
 
 #endif
 

@@ -275,6 +275,7 @@
 	0011  National PCI System I/O
 	0012  USB Controller
 	0020  DP83815
+	0022  DP83820
 	d001  87410 IDE
 100c  Tseng Labs Inc
 	3202  ET4000/W32p rev A
@@ -3669,6 +3670,7 @@
 1384  Reality Simulation Systems Inc
 1385  Netgear
 	620a  GA620
+	622a  GA622
 	f311  FA311
 1386  Video Domain Technologies
 1387  Systran Corp

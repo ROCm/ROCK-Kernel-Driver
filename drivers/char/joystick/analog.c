@@ -146,7 +146,7 @@ struct analog_port {
 #define DELTA(x,y)	((y)-(x))
 #define TIME_NAME	"TSC"
 #elif __alpha__
-#define GET_TIME(x)	get_cycles(x)
+#define GET_TIME(x)	((x) = get_cycles())
 #define DELTA(x,y)	((y)-(x))
 #define TIME_NAME	"PCC"
 #else

@@ -99,7 +99,7 @@ struct tag_core {
 };
 
 /* it is allowed to have multiple ATAG_MEM nodes */
-#define ATAG_MEM		0x54410002
+#define ATAG_MEM	0x54410002
 
 struct tag_mem32 {
 	u32	size;

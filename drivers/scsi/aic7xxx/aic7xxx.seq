@@ -1,7 +1,8 @@
 /*
  * Adaptec 274x/284x/294x device driver firmware for Linux and FreeBSD.
  *
- * Copyright (c) 1994-2001 Justin Gibbs.
+ * Copyright (c) 1994-2001 Justin T. Gibbs.
+ * Copyright (c) 2000-2001 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,28 +11,36 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
  *    without modification.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * Alternatively, this software may be distributed under the terms of the
- * GNU Public License ("GPL").
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.seq,v 1.106 2000/11/12 05:19:46 gibbs Exp $
  */
 
-VERSION = "$Id: //depot/src/aic7xxx/aic7xxx.seq#33 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic7xxx.seq#37 $"
 
 #include "aic7xxx.reg"
 #include "scsi_message.h"
@@ -242,6 +251,7 @@ select_in:
 		} else {
 			mov	DFDAT, DINDEX;
 		}
+		and	SAVED_LUN, MSG_IDENTIFY_LUNMASK, DINDEX;
 
 		/* Remember for disconnection decision */
 		test	DINDEX, MSG_IDENTIFY_DISCFLAG jnz . + 2;
@@ -257,9 +267,10 @@ select_in:
 		 * < MSG_IGN_WIDE_RESIDUE.
 		 */
 		add	A, -MSG_SIMPLE_Q_TAG, DINDEX;
-		jnc	ident_messages_done;
+		jnc	ident_messages_done_msg_pending;
 		add	A, -MSG_IGN_WIDE_RESIDUE, DINDEX;
-		jc	ident_messages_done;
+		jc	ident_messages_done_msg_pending;
+
 		/* Store for host */
 		if ((ahc->features & AHC_CMD_CHAN) != 0) {
 			mov	CCSCBRAM, DINDEX;
@@ -285,9 +296,23 @@ select_in:
 		}
 		mov	INITIATOR_TAG, DINDEX;
 		or	SEQ_FLAGS, TARGET_CMD_IS_TAGGED;
-		test	SCSISIGI, ATNI	jz . + 2;
-		/* Initiator still wants to give us messages */
-		call	target_inb;
+
+ident_messages_done:
+		/* Terminate the ident list */
+		if ((ahc->features & AHC_CMD_CHAN) != 0) {
+			mvi	CCSCBRAM, SCB_LIST_NULL;
+		} else {
+			mvi	DFDAT, SCB_LIST_NULL;
+		}
+		or	SEQ_FLAGS, TARG_CMD_PENDING|IDENTIFY_SEEN;
+		test	SEQ_FLAGS2, TARGET_MSG_PENDING
+			jnz target_mesgout_pending;
+		test	SCSISIGI, ATNI jnz target_mesgout_continue;
+		jmp	target_ITloop;
+
+
+ident_messages_done_msg_pending:
+		or	SEQ_FLAGS2, TARGET_MSG_PENDING;
 		jmp	ident_messages_done;
 
 		/*
@@ -299,31 +324,6 @@ host_target_message_loop:
 		cmp	RETURN_1, EXIT_MSG_LOOP	je target_ITloop;
 		test	SSTAT0, SPIORDY jz .;
 		jmp	host_target_message_loop;
-
-ident_messages_done:
-		/* If ring buffer is full, return busy or queue full */
-		if ((ahc->features & AHC_HS_MAILBOX) != 0) {
-			and	A, HOST_TQINPOS, HS_MAILBOX;
-		} else {
-			mov	A, KERNEL_TQINPOS;
-		}
-		cmp	TQINPOS, A jne tqinfifo_has_space;
-		mvi	P_STATUS|BSYO call change_phase;
-		test	SEQ_FLAGS, TARGET_CMD_IS_TAGGED jz . + 3;
-		mvi	STATUS_QUEUE_FULL call target_outb;
-		jmp	target_busfree_wait;
-		mvi	STATUS_BUSY call target_outb;
-		jmp	target_busfree_wait;
-tqinfifo_has_space:	
-		/* Terminate the ident list */
-		if ((ahc->features & AHC_CMD_CHAN) != 0) {
-			mvi	CCSCBRAM, SCB_LIST_NULL;
-		} else {
-			mvi	DFDAT, SCB_LIST_NULL;
-		}
-		or	SEQ_FLAGS, TARG_CMD_PENDING|IDENTIFY_SEEN;
-		test	SCSISIGI, ATNI	jnz target_mesgout_pending;
-		jmp	target_ITloop;
 	}
 
 if ((ahc->flags & AHC_INITIATORROLE) != 0) {
@@ -464,13 +464,13 @@ select_out:
 		 */
 		test	SCB_CONTROL, TAG_ENB	jz . + 3;
 		mvi	MSG_SIMPLE_Q_TAG call target_outb;
-		mov	SCB_TARGET_INFO[SCB_INITIATOR_TAG] call target_outb;
+		mov	SCB_TARGET_ITAG call target_outb;
 target_synccmd:
 		/*
 		 * Now determine what phases the host wants us
 		 * to go through.
 		 */
-		mov	SEQ_FLAGS, SCB_TARGET_INFO[SCB_TARGET_PHASES];
+		mov	SEQ_FLAGS, SCB_TARGET_PHASES;
 		
 		test	SCB_CONTROL, MK_MESSAGE	jz target_ITloop;
 		mvi	P_MESGIN|BSYO call change_phase;
@@ -528,6 +528,24 @@ target_busfree:
 		jmp	poll_for_work;
 
 target_cmdphase:
+		/*
+		 * The target has dropped ATN (doesn't want to abort or BDR)
+		 * and we believe this selection to be valid.  If the ring
+		 * buffer for new commands is full, return busy or queue full.
+		 */
+		if ((ahc->features & AHC_HS_MAILBOX) != 0) {
+			and	A, HOST_TQINPOS, HS_MAILBOX;
+		} else {
+			mov	A, KERNEL_TQINPOS;
+		}
+		cmp	TQINPOS, A jne tqinfifo_has_space;
+		mvi	P_STATUS|BSYO call change_phase;
+		test	SEQ_FLAGS, TARGET_CMD_IS_TAGGED jz . + 3;
+		mvi	STATUS_QUEUE_FULL call target_outb;
+		jmp	target_busfree_wait;
+		mvi	STATUS_BUSY call target_outb;
+		jmp	target_busfree_wait;
+tqinfifo_has_space:	
 		mvi	P_COMMAND|BSYO call change_phase;
 		call	target_inb;
 		mov	A, DINDEX;
@@ -576,15 +594,14 @@ target_dphase:
 		 * data direction of the DMA.  Toggle it for
 		 * target transfers.
 		 */
-		xor	LASTPHASE, IOI, SCB_TARGET_INFO[SCB_TARGET_DATA_DIR];
-		or	SCB_TARGET_INFO[SCB_TARGET_DATA_DIR], BSYO
-			call change_phase;
+		xor	LASTPHASE, IOI, SCB_TARGET_DATA_DIR;
+		or	SCB_TARGET_DATA_DIR, BSYO call change_phase;
 		jmp	p_data;
 
 target_sphase:
 		mvi	P_STATUS|BSYO call change_phase;
 		mvi	LASTPHASE, P_STATUS;
-		mov	SCB_TARGET_INFO[SCB_TARGET_STATUS] call target_outb;
+		mov	SCB_SCSI_STATUS call target_outb;
 		/* XXX Watch for ATN or parity errors??? */
 		mvi	SCSISIGO, P_MESGIN|BSYO;
 		/* MSG_CMDCMPLT is 0, but we can't do an immediate of 0 */
@@ -1318,10 +1335,19 @@ residual_update_done:
 		and	SEQ_FLAGS, ~DPHASE_PENDING;
 		/*
 		 * For data-in phases, wait for any pending acks from the
-		 * initiator before changing phase.
+		 * initiator before changing phase.  We only need to
+		 * send Ignore Wide Residue messages for data-in phases.
 		 */
 		test	DFCNTRL, DIRECTION jz target_ITloop;
 		test	SSTAT1, REQINIT	jnz .;
+		test	DATA_COUNT_ODD, 0x1 jz target_ITloop;
+		test	SCSIRATE, WIDEXFER jz target_ITloop;
+		/*
+		 * Issue an Ignore Wide Residue Message.
+		 */
+		mvi	P_MESGIN|BSYO call change_phase;
+		mvi	MSG_IGN_WIDE_RESIDUE call target_outb;
+		mvi	1 call target_outb;
 		jmp	target_ITloop;
 	} else {
 		jmp	ITloop;

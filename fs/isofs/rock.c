@@ -24,7 +24,7 @@
  * returns a symbolic link name, and a fourth one returns the extent number
  * for the file. */
 
-#define SIG(A,B) ((A << 8) | B)
+#define SIG(A,B) ((A) | ((B) << 8)) /* isonum_721() */
 
 
 /* This is a way of ensuring that we have something in the system
@@ -113,7 +113,7 @@ int find_rock_ridge_relocation(struct iso_directory_record * de,
     while (len > 1){ /* There may be one byte for padding somewhere */
       rr = (struct rock_ridge *) chr;
       if (rr->len == 0) goto out; /* Something got screwed up here */
-      sig = (chr[0] << 8) + chr[1];
+      sig = isonum_721(chr);
       chr += rr->len; 
       len -= rr->len;
 
@@ -174,7 +174,7 @@ int get_rock_ridge_filename(struct iso_directory_record * de,
     while (len > 1){ /* There may be one byte for padding somewhere */
       rr = (struct rock_ridge *) chr;
       if (rr->len == 0) goto out; /* Something got screwed up here */
-      sig = (chr[0] << 8) + chr[1];
+      sig = isonum_721(chr);
       chr += rr->len; 
       len -= rr->len;
 
@@ -254,15 +254,17 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
     while (len > 1){ /* There may be one byte for padding somewhere */
       rr = (struct rock_ridge *) chr;
       if (rr->len == 0) goto out; /* Something got screwed up here */
-      sig = (chr[0] << 8) + chr[1];
+      sig = isonum_721(chr);
       chr += rr->len; 
       len -= rr->len;
       
       switch(sig){
+#ifndef CONFIG_ZISOFS		/* No flag for SF or ZF */
       case SIG('R','R'):
 	if((rr->u.RR.flags[0] & 
  	    (RR_PX | RR_TF | RR_SL | RR_CL)) == 0) goto out;
 	break;
+#endif
       case SIG('S','P'):
 	CHECK_SP(goto out);
 	break;
@@ -375,11 +377,36 @@ int parse_rock_ridge_inode_internal(struct iso_directory_record * de,
 	inode->i_gid = reloc->i_gid;
 	inode->i_rdev = reloc->i_rdev;
 	inode->i_size = reloc->i_size;
+	inode->i_blocks = reloc->i_blocks;
 	inode->i_atime = reloc->i_atime;
 	inode->i_ctime = reloc->i_ctime;
 	inode->i_mtime = reloc->i_mtime;
 	iput(reloc);
 	break;
+#ifdef CONFIG_ZISOFS
+      case SIG('Z','F'):
+	      if ( !inode->i_sb->u.isofs_sb.s_nocompress ) {
+		      int algo;
+		      algo = isonum_721(rr->u.ZF.algorithm);
+		      if ( algo == SIG('p','z') ) {
+			      int block_shift = isonum_711(&rr->u.ZF.parms[1]);
+			      if ( block_shift < PAGE_CACHE_SHIFT || block_shift > 17 ) {
+				      printk(KERN_WARNING "isofs: Can't handle ZF block size of 2^%d\n", block_shift);
+			      } else {
+				/* Note: we don't change i_blocks here */
+				      inode->u.isofs_i.i_file_format = isofs_file_compressed;
+				/* Parameters to compression algorithm (header size, block size) */
+				      inode->u.isofs_i.i_format_parm[0] = isonum_711(&rr->u.ZF.parms[0]);
+				      inode->u.isofs_i.i_format_parm[1] = isonum_711(&rr->u.ZF.parms[1]);
+				      inode->i_size = isonum_733(rr->u.ZF.real_size);
+			      }
+		      } else {
+			      printk(KERN_WARNING "isofs: Unknown ZF compression algorithm: %c%c\n",
+				     rr->u.ZF.algorithm[0], rr->u.ZF.algorithm[1]);
+		      }
+	      }
+	      break;
+#endif
       default:
 	break;
       }
@@ -508,7 +535,7 @@ static int rock_ridge_symlink_readpage(struct file *file, struct page *page)
 		rr = (struct rock_ridge *) chr;
 		if (rr->len == 0)
 			goto out;	/* Something got screwed up here */
-		sig = (chr[0] << 8) + chr[1];
+		sig = isonum_721(chr);
 		chr += rr->len;
 		len -= rr->len;
 

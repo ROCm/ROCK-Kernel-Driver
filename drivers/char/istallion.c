@@ -431,6 +431,12 @@ int		stli_eisaprobe = STLI_EISAPROBE;
 #endif
 #endif
 
+static struct pci_device_id istallion_pci_tbl[] = {
+	{ PCI_VENDOR_ID_STALLION, PCI_DEVICE_ID_ECRA, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ 0 }
+};
+MODULE_DEVICE_TABLE(pci, istallion_pci_tbl);
+
 /*****************************************************************************/
 
 /*
@@ -1529,9 +1535,9 @@ static void stli_delay(int len)
 	printk("stli_delay(len=%d)\n", len);
 #endif
 	if (len > 0) {
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(len);
-		current->state = TASK_RUNNING;
+		set_current_state(TASK_RUNNING);
 	}
 }
 

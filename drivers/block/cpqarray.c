@@ -188,6 +188,7 @@ static void ida_geninit(int ctlr)
 }
 
 static struct block_device_operations ida_fops  = {
+	owner:		THIS_MODULE,
 	open:		ida_open,
 	release:	ida_release,
 	ioctl:		ida_ioctl,
@@ -853,7 +854,6 @@ static int ida_open(struct inode *inode, struct file *filep)
 
 	hba[ctlr]->drv[dsk].usage_count++;
 	hba[ctlr]->usage_count++;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -869,7 +869,6 @@ static int ida_release(struct inode *inode, struct file *filep)
 
 	hba[ctlr]->drv[dsk].usage_count--;
 	hba[ctlr]->usage_count--;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

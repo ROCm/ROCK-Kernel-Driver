@@ -117,8 +117,8 @@ extern int __put_user_bad(void);
 
 #define put_user(x,p)							\
 	({								\
-		const register typeof(*(p)) *__p asm("r0") = (p);	\
 		const register typeof(*(p)) __r1 asm("r1") = (x);	\
+		const register typeof(*(p)) *__p asm("r0") = (p);	\
 		register int __e asm("r0");				\
 		switch (sizeof(*(p))) {					\
 		case 1:							\

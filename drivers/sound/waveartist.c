@@ -39,26 +39,22 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-#include <linux/smp.h>
 #include <linux/spinlock.h>
+#include <linux/bitops.h>
 
-#include <asm/hardware.h>
-#include <asm/mach-types.h>
 #include <asm/system.h>
 
 #include "sound_config.h"
 #include "waveartist.h"
 
-#ifndef _ISA_DMA
-#define _ISA_DMA(x) (x)
-#endif
-#ifndef _ISA_IRQ
-#define _ISA_IRQ(x) (x)
+#ifdef CONFIG_ARM
+#include <asm/hardware.h>
+#include <asm/mach-types.h>
 #endif
 
-#define POSSIBLE_RECORDING_DEVICES	(SOUND_MASK_LINE       |\
-					 SOUND_MASK_MIC	       |\
-					 SOUND_MASK_LINE1)
+#ifndef NO_DMA
+#define NO_DMA	255
+#endif
 
 #define SUPPORTED_MIXER_DEVICES		(SOUND_MASK_SYNTH      |\
 					 SOUND_MASK_PCM        |\
@@ -75,15 +71,15 @@ static unsigned short levels[SOUND_MIXER_NRDEVICES] = {
 	0x0000,		/* Treble		 */
 	0x2323,		/* Synth (FM)		 */
 	0x4b4b,		/* PCM			 */
-	0x0000,		/* PC Speaker		 */
+	0x6464,		/* PC Speaker		 */
 	0x0000,		/* Ext Line		 */
 	0x0000,		/* Mic			 */
 	0x0000,		/* CD			 */
-	0x0000,		/* Recording monitor	 */
+	0x6464,		/* Recording monitor	 */
 	0x0000,		/* SB PCM (ALT PCM)	 */
 	0x0000,		/* Recording level	 */
-	0x0000,		/* Input gain		 */
-	0x0000,		/* Output gain		 */
+	0x6464,		/* Input gain		 */
+	0x6464,		/* Output gain		 */
 	0x0000,		/* Line1 (Aux1)		 */
 	0x0000,		/* Line2 (Aux2)		 */
 	0x0000,		/* Line3 (Aux3)		 */
@@ -91,7 +87,7 @@ static unsigned short levels[SOUND_MIXER_NRDEVICES] = {
 	0x0000,		/* Digital2		 */
 	0x0000,		/* Digital3		 */
 	0x0000,		/* Phone In		 */
-	0x0000,		/* Phone Out		 */
+	0x6464,		/* Phone Out		 */
 	0x0000,		/* Video		 */
 	0x0000,		/* Radio		 */
 	0x0000		/* Monitor		 */
@@ -110,10 +106,10 @@ typedef struct {
 	int		dev_no;
 
 	/* Mixer parameters */
+	const struct waveartist_mixer_info *mix;
+
 	unsigned short	*levels;	   /* cache of volume settings   */
 	int		recmask;	   /* currently enabled recording device! */
-	int             supported_devices; /* SUPPORTED_MIXER_DEVICES    */
-	int             rec_devices;	   /* POSSIBLE_RECORDING_DEVICES */
 
 #ifdef CONFIG_ARCH_NETWINDER
 	signed int	slider_vol;	   /* hardware slider volume     */
@@ -126,6 +122,21 @@ typedef struct {
 #endif
 } wavnc_info;
 
+/*
+ * This is the implementation specific mixer information.
+ */
+struct waveartist_mixer_info {
+	unsigned int	supported_devs;	   /* Supported devices */
+	unsigned int	recording_devs;	   /* Recordable devies */
+	unsigned int	stereo_devs;	   /* Stereo devices	*/
+
+	unsigned int	(*select_input)(wavnc_info *, unsigned int,
+					unsigned char *, unsigned char *);
+	int		(*decode_mixer)(wavnc_info *, int,
+					unsigned char, unsigned char);
+	int		(*get_mixer)(wavnc_info *, int);
+};
+
 typedef struct wavnc_port_info {
 	int		open_mode;
 	int		speed;
@@ -137,14 +148,14 @@ static int		nr_waveartist_devs;
 static wavnc_info	adev_info[MAX_AUDIO_DEV];
 static spinlock_t	waveartist_lock = SPIN_LOCK_UNLOCKED;
 
-#ifndef machine_is_netwinder
+#ifndef CONFIG_ARCH_NETWINDER
 #define machine_is_netwinder() 0
-#endif
-
+#else
 static struct timer_list vnc_timer;
-static void vnc_configure_mixer(wavnc_info *devc);
+static void vnc_configure_mixer(wavnc_info *devc, unsigned int input_mask);
 static int vnc_private_ioctl(int dev, unsigned int cmd, caddr_t arg);
 static void vnc_slider_tick(unsigned long data);
+#endif
 
 static inline void
 waveartist_set_ctlr(struct address_info *hw, unsigned char clear, unsigned char set)
@@ -176,7 +187,7 @@ waveartist_sleep(int timeout_ms)
 	unsigned int timeout = timeout_ms * 10 * HZ / 100;
 
 	do {
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		timeout = schedule_timeout(timeout);
 	} while (timeout);
 
@@ -804,21 +815,21 @@ waveartist_set_bits(int dev, unsigned int arg)
 }
 
 static struct audio_driver waveartist_audio_driver = {
-	owner:		THIS_MODULE,
-	open:		waveartist_open,
-	close:		waveartist_close,
-	output_block:	waveartist_output_block,
-	start_input:	waveartist_start_input,
-	ioctl:		waveartist_ioctl,
+	owner:			THIS_MODULE,
+	open:			waveartist_open,
+	close:			waveartist_close,
+	output_block:		waveartist_output_block,
+	start_input:		waveartist_start_input,
+	ioctl:			waveartist_ioctl,
 	prepare_for_input:	waveartist_prepare_for_input,
 	prepare_for_output:	waveartist_prepare_for_output,
-	halt_io:	waveartist_halt,
-	halt_input:	waveartist_halt_input,
-	halt_output:	waveartist_halt_output,
-	trigger:	waveartist_trigger,
-	set_speed:	waveartist_set_speed,
-	set_bits:	waveartist_set_bits,
-	set_channels:	waveartist_set_channels
+	halt_io:		waveartist_halt,
+	halt_input:		waveartist_halt_input,
+	halt_output:		waveartist_halt_output,
+	trigger:		waveartist_trigger,
+	set_speed:		waveartist_set_speed,
+	set_bits:		waveartist_set_bits,
+	set_channels:		waveartist_set_channels
 };
 
 
@@ -864,219 +875,337 @@ waveartist_intr(int irq, void *dev_id, struct pt_regs *regs)
 /* -------------------------------------------------------------------------
  * Mixer stuff
  */
+struct mix_ent {
+	unsigned char	reg_l;
+	unsigned char	reg_r;
+	unsigned char	shift;
+	unsigned char	max;
+};
+
+static const struct mix_ent mix_devs[SOUND_MIXER_NRDEVICES] = {
+	{ 2, 6, 1,  7 }, /* SOUND_MIXER_VOLUME   */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_BASS     */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_TREBLE   */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_SYNTH    */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_PCM      */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_SPEAKER  */
+	{ 0, 4, 6, 31 }, /* SOUND_MIXER_LINE     */
+	{ 2, 6, 4,  3 }, /* SOUND_MIXER_MIC      */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_CD       */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_IMIX     */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_ALTPCM   */
+#if 0
+	{ 3, 7, 0, 10 }, /* SOUND_MIXER_RECLEV   */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_IGAIN    */
+#else
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_RECLEV   */
+	{ 3, 7, 0,  7 }, /* SOUND_MIXER_IGAIN    */
+#endif
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_OGAIN    */
+	{ 0, 4, 1, 31 }, /* SOUND_MIXER_LINE1    */
+	{ 1, 5, 6, 31 }, /* SOUND_MIXER_LINE2    */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_LINE3    */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_DIGITAL1 */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_DIGITAL2 */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_DIGITAL3 */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_PHONEIN  */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_PHONEOUT */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_VIDEO    */
+	{ 0, 0, 0,  0 }, /* SOUND_MIXER_RADIO    */
+	{ 0, 0, 0,  0 }  /* SOUND_MIXER_MONITOR  */
+};
+
 static void
 waveartist_mixer_update(wavnc_info *devc, int whichDev)
 {
-	unsigned int mask, reg_l, reg_r;
 	unsigned int lev_left, lev_right;
-	unsigned int vals[3];
 
 	lev_left  = devc->levels[whichDev] & 0xff;
 	lev_right = devc->levels[whichDev] >> 8;
+
+	if (lev_left > 100)
+		lev_left = 100;
+	if (lev_right > 100)
+		lev_right = 100;
 
 #define SCALE(lev,max)	((lev) * (max) / 100)
 
 	if (machine_is_netwinder() && whichDev == SOUND_MIXER_PHONEOUT)
 		whichDev = SOUND_MIXER_VOLUME;
 
-	switch(whichDev) {
-	case SOUND_MIXER_VOLUME:
-		mask  = 0x000e;
-		reg_l = 0x200;
-		reg_r = 0x600;
-		lev_left  = SCALE(lev_left,  7) << 1;
-		lev_right = SCALE(lev_right, 7) << 1;
-		break;
+	if (mix_devs[whichDev].reg_l || mix_devs[whichDev].reg_r) {
+		const struct mix_ent *mix = mix_devs + whichDev;
+		unsigned int mask, left, right;
 
-	case SOUND_MIXER_LINE:
-		if ((devc->recmask & SOUND_MASK_LINE) == 0)
-			return;
-		mask  = 0x07c0;
-		reg_l = 0x000;
-		reg_r = 0x400;
-		lev_left  = SCALE(lev_left,  31) << 6;
-		lev_right = SCALE(lev_right, 31) << 6;
-		break;
+		mask = mix->max << mix->shift;
+		lev_left  = SCALE(lev_left,  mix->max) << mix->shift;
+		lev_right = SCALE(lev_right, mix->max) << mix->shift;
 
-	case SOUND_MIXER_MIC:
-		if ((devc->recmask & SOUND_MASK_MIC) == 0)
-			return;
-		mask  = 0x0030;
-		reg_l = 0x200;
-		reg_r = 0x600;
-		lev_left  = SCALE(lev_left,  3) << 4;
-		lev_right = SCALE(lev_right, 3) << 4;
-		break;
+		/* read left setting */
+		left  = waveartist_cmd1_r(devc, WACMD_GET_LEVEL |
+					       mix->reg_l << 8);
 
-	case SOUND_MIXER_RECLEV:
-		mask  = 0x000f;
-		reg_l = 0x300;
-		reg_r = 0x700;
-		lev_left  = SCALE(lev_left,  10);
-		lev_right = SCALE(lev_right, 10);
-		break;
+		/* read right setting */
+		right = waveartist_cmd1_r(devc, WACMD_GET_LEVEL |
+						mix->reg_r << 8);
 
-	case SOUND_MIXER_LINE1:
-		if ((devc->recmask & SOUND_MASK_LINE1) == 0)
-			return;
-		mask  = 0x003e;
-		reg_l = 0x000;
-		reg_r = 0x400;
-		lev_left  = SCALE(lev_left,  31) << 1;
-		lev_right = SCALE(lev_right, 31) << 1;
-		break;
+		left  = (left  & ~mask) | (lev_left  & mask);
+		right = (right & ~mask) | (lev_right & mask);
 
-	case SOUND_MIXER_PCM:
-		waveartist_cmd3(devc, WACMD_SET_LEVEL,
-				SCALE(lev_left,  32767),
-				SCALE(lev_right, 32767));
-		return;
+		/* write left,right back */
+		waveartist_cmd3(devc, WACMD_SET_MIXER, left, right);
+	} else {
+		switch(whichDev) {
+		case SOUND_MIXER_PCM:
+			waveartist_cmd3(devc, WACMD_SET_LEVEL,
+					SCALE(lev_left,  32767),
+					SCALE(lev_right, 32767));
+			break;
 
-	case SOUND_MIXER_SYNTH:
-		waveartist_cmd3(devc, 0x0100 | WACMD_SET_LEVEL,
-				SCALE(lev_left,  32767),
-				SCALE(lev_right, 32767));
-		return;
-
-	default:
-		return;
+		case SOUND_MIXER_SYNTH:
+			waveartist_cmd3(devc, 0x0100 | WACMD_SET_LEVEL,
+					SCALE(lev_left,  32767),
+					SCALE(lev_right, 32767));
+			break;
+		}
 	}
-
-	/* read left setting */
-	vals[0] = reg_l + WACMD_GET_LEVEL;
-	waveartist_cmd(devc, 1, vals, 1, vals + 1);
-
-	/* read right setting */
-	vals[0] = reg_r + 0x30;
-	waveartist_cmd(devc, 1, vals, 1, vals + 2);
-
-	vals[1] = (vals[1] & ~mask) | (lev_left  & mask);
-	vals[2] = (vals[2] & ~mask) | (lev_right & mask);
-
-	/* write left,right back */
-	vals[0] = WACMD_SET_MIXER;
-	waveartist_cmd(devc, 3, vals, 0, NULL);
 }
 
+/*
+ * Set the ADC MUX to the specified values.  We do NOT do any
+ * checking of the values passed, since we assume that the
+ * relevant *_select_input function has done that for us.
+ */
 static void
-waveartist_select_input(wavnc_info *devc, unsigned int input)
+waveartist_set_adc_mux(wavnc_info *devc, char left_dev, char right_dev)
 {
-	unsigned int vals[3];
+	unsigned int reg_08, reg_09;
 
-	/*
-	 * Get reg 9
-	 */
-	vals[0] = 0x0830;
-	waveartist_cmd(devc, 1, vals, 1, vals + 1);
+	reg_08 = waveartist_cmd1_r(devc, WACMD_GET_LEVEL | 0x0800);
+	reg_09 = waveartist_cmd1_r(devc, WACMD_GET_LEVEL | 0x0900);
 
-	/*
-	 * Get reg 10, only so that we can write it back.
-	 */
-	vals[0] = 0x0930;
-	waveartist_cmd(devc, 1, vals, 1, vals + 2);
+	reg_08 = (reg_08 & ~0x3f) | right_dev << 3 | left_dev;
 
-	if (debug_flg & DEBUG_MIXER)
-		printk("RECSRC: old left: 0x%04X, old right: 0x%04X.\n",
-			vals[1] & 0x07, (vals[1] >> 3) & 0x07);
+	waveartist_cmd3(devc, WACMD_SET_MIXER, reg_08, reg_09);
+}
 
-	/*
-	 * kill current left/right mux input select
-	 */
-	vals[1] &= ~0x03F;
+/*
+ * Decode a recording mask into a mixer selection as follows:
+ *
+ *     OSS Source	WA Source	Actual source
+ *  SOUND_MASK_IMIX	Mixer		Mixer output (same as AD1848)
+ *  SOUND_MASK_LINE	Line		Line in
+ *  SOUND_MASK_LINE1	Aux 1		Aux 1 in
+ *  SOUND_MASK_LINE2	Aux 2		Aux 2 in
+ *  SOUND_MASK_MIC	Mic		Microphone
+ */
+static unsigned int
+waveartist_select_input(wavnc_info *devc, unsigned int recmask,
+			unsigned char *dev_l, unsigned char *dev_r)
+{
+	unsigned int recdev = ADC_MUX_NONE;
 
-	switch (input) {
-	case SOUND_MASK_MIC:
-		/*
-		 * right=mic, left=mic
-		 */
-		vals[1] |= 0x002D;
-		break;
-
-	case SOUND_MASK_LINE1:
-		/*
-		 * right=none, left=Aux1;
-		 */
-		vals[1] |= 0x0004;
-		break;
-
-	case SOUND_MASK_LINE:
-		/*
-		 * right=Line, left=Line;
-		 */
-		vals[1] |= 0x0012;
-		break;
+	if (recmask & SOUND_MASK_IMIX) {
+		recmask = SOUND_MASK_IMIX;
+		recdev = ADC_MUX_MIXER;
+	} else if (recmask & SOUND_MASK_LINE2) {
+		recmask = SOUND_MASK_LINE2;
+		recdev = ADC_MUX_AUX2;
+	} else if (recmask & SOUND_MASK_LINE1) {
+		recmask = SOUND_MASK_LINE1;
+		recdev = ADC_MUX_AUX1;
+	} else if (recmask & SOUND_MASK_LINE) {
+		recmask = SOUND_MASK_LINE;
+		recdev = ADC_MUX_LINE;
+	} else if (recmask & SOUND_MASK_MIC) {
+		recmask = SOUND_MASK_MIC;
+		recdev = ADC_MUX_MIC;
 	}
 
-	if (debug_flg & DEBUG_MIXER)
-		printk("RECSRC %d: left=0x%04X, right=0x%04X.\n", input,
-			vals[1] & 0x07, (vals[1] >> 3) & 0x07);
+	*dev_l = *dev_r = recdev;
 
-	/*
-	 * and finally - write the reg pair back....
-	 */
-	vals[0] = WACMD_SET_MIXER;
-
-	waveartist_cmd(devc, 3, vals, 0, NULL);
+	return recmask;
 }
 
 static int
-waveartist_mixer_set(wavnc_info *devc, int whichDev, unsigned int level)
+waveartist_decode_mixer(wavnc_info *devc, int dev, unsigned char lev_l,
+			unsigned char lev_r)
 {
-	unsigned int lev_left  = level & 0x007f;
-	unsigned int lev_right = (level & 0x7f00) >> 8;
-	int left, right, devmask;
-
-	left = level & 0x7f;
-	right = (level & 0x7f00) >> 8;
-
-	if (debug_flg & DEBUG_MIXER)
-		printk("wa_mixer_set(dev=%d, level=%X)\n",
-			whichDev, level);
-
-	switch (whichDev) {
-	case SOUND_MIXER_VOLUME:	/* master volume (0-7)       */
-	case SOUND_MIXER_LINE:		/* external line (0-31)      */
-	case SOUND_MIXER_MIC:		/* mono mic (0-3)            */
-	case SOUND_MIXER_RECLEV:	/* recording level (0-7)     */
-	case SOUND_MIXER_LINE1:		/* mono external aux1 (0-31) */
-	case SOUND_MIXER_PCM:		/* Waveartist PCM (0-32767)  */
-	case SOUND_MIXER_SYNTH:		/* internal synth (0-31)     */
-	case SOUND_MIXER_IMIX:		/* recording feedback        */
-		devc->levels[whichDev] = lev_left | lev_right << 8;
-		waveartist_mixer_update(devc, whichDev);
+	switch (dev) {
+	case SOUND_MIXER_VOLUME:
+	case SOUND_MIXER_SYNTH:
+	case SOUND_MIXER_PCM:
+	case SOUND_MIXER_LINE:
+	case SOUND_MIXER_MIC:
+	case SOUND_MIXER_IGAIN:
+	case SOUND_MIXER_LINE1:
+	case SOUND_MIXER_LINE2:
+		devc->levels[dev] = lev_l | lev_r << 8;
 		break;
 
-	/* Select recording input source
-	 */
-	case SOUND_MIXER_RECSRC:
-		devmask = level & devc->rec_devices;
-
-#ifdef CONFIG_ARCH_NETWINDER
-		if (machine_is_netwinder())
-			vnc_configure_mixer(devc);
-		else
-#endif
-		{
-			waveartist_select_input(devc, level);
-
-			/*
-			 * if record monitoring is on, make sure the bit is set
-			 */
-			if (devc->levels[SOUND_MIXER_IMIX])
-				waveartist_mixer_update(devc, SOUND_MIXER_IMIX);
-		}
-
-		/*
-		 * do not save in "levels", return current setting
-		 */
-		return devc->recmask;
+	case SOUND_MIXER_IMIX:
+		break;
 
 	default:
-		return -EINVAL;
+		dev = -EINVAL;
+		break;
 	}
 
-	return devc->levels[whichDev];
+	return dev;
 }
+
+static int waveartist_get_mixer(wavnc_info *devc, int dev)
+{
+	return devc->levels[dev];
+}
+
+static const struct waveartist_mixer_info waveartist_mixer = {
+	supported_devs:	SUPPORTED_MIXER_DEVICES | SOUND_MASK_IGAIN,
+	recording_devs:	SOUND_MASK_LINE  | SOUND_MASK_MIC   |
+			SOUND_MASK_LINE1 | SOUND_MASK_LINE2 |
+			SOUND_MASK_IMIX,
+	stereo_devs:	(SUPPORTED_MIXER_DEVICES | SOUND_MASK_IGAIN) & ~
+			(SOUND_MASK_SPEAKER | SOUND_MASK_IMIX),
+	select_input:	waveartist_select_input,
+	decode_mixer:	waveartist_decode_mixer,
+	get_mixer:	waveartist_get_mixer,
+};
+
+static void
+waveartist_set_recmask(wavnc_info *devc, unsigned int recmask)
+{
+	unsigned char dev_l, dev_r;
+
+	recmask &= devc->mix->recording_devs;
+
+	/*
+	 * If more than one recording device selected,
+	 * disable the device that is currently in use.
+	 */
+	if (hweight32(recmask) > 1)
+		recmask &= ~devc->recmask;
+
+	/*
+	 * Translate the recording device mask into
+	 * the ADC multiplexer settings.
+	 */
+	devc->recmask = devc->mix->select_input(devc, recmask,
+						&dev_l, &dev_r);
+
+	waveartist_set_adc_mux(devc, dev_l, dev_r);
+}
+
+static int
+waveartist_set_mixer(wavnc_info *devc, int dev, unsigned int level)
+{
+	unsigned int lev_left  = level & 0x00ff;
+	unsigned int lev_right = (level & 0xff00) >> 8;
+
+	if (lev_left > 100)
+		lev_left = 100;
+	if (lev_right > 100)
+		lev_right = 100;
+
+	/*
+	 * Mono devices have their right volume forced to their
+	 * left volume.  (from ALSA driver OSS emulation).
+	 */
+	if (!(devc->mix->stereo_devs & (1 << dev)))
+		lev_right = lev_left;
+
+	dev = devc->mix->decode_mixer(devc, dev, lev_left, lev_right);
+
+	if (dev >= 0)
+		waveartist_mixer_update(devc, dev);
+
+	return dev < 0 ? dev : 0;
+}
+
+static int
+waveartist_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
+{
+	wavnc_info *devc = (wavnc_info *)audio_devs[dev]->devc;
+	int ret = 0, val, nr;
+
+	/*
+	 * All SOUND_MIXER_* ioctls use type 'M'
+	 */
+	if (((cmd >> 8) & 255) != 'M')
+		return -ENOIOCTLCMD;
+
+#ifdef CONFIG_ARCH_NETWINDER
+	if (machine_is_netwinder()) {
+		ret = vnc_private_ioctl(dev, cmd, arg);
+		if (ret != -ENOIOCTLCMD)
+			return ret;
+		else
+			ret = 0;
+	}
+#endif
+
+	nr = cmd & 0xff;
+
+	if (_SIOC_DIR(cmd) & _SIOC_WRITE) {
+		if (get_user(val, (int *)arg))
+			return -EFAULT;
+
+		switch (nr) {
+		case SOUND_MIXER_RECSRC:
+			waveartist_set_recmask(devc, val);
+			break;
+
+		default:
+			ret = -EINVAL;
+			if (nr < SOUND_MIXER_NRDEVICES &&
+			    devc->mix->supported_devs & (1 << nr))
+				ret = waveartist_set_mixer(devc, nr, val);
+		}
+	}
+
+	if (ret == 0 && _SIOC_DIR(cmd) & _SIOC_READ) {
+		ret = -EINVAL;
+
+		switch (nr) {
+		case SOUND_MIXER_RECSRC:
+			ret = devc->recmask;
+			break;
+
+		case SOUND_MIXER_DEVMASK:
+			ret = devc->mix->supported_devs;
+			break;
+
+		case SOUND_MIXER_STEREODEVS:
+			ret = devc->mix->stereo_devs;
+			break;
+
+		case SOUND_MIXER_RECMASK:
+			ret = devc->mix->recording_devs;
+			break;
+
+		case SOUND_MIXER_CAPS:
+			ret = SOUND_CAP_EXCL_INPUT;
+			break;
+
+		default:
+			if (nr < SOUND_MIXER_NRDEVICES)
+				ret = devc->mix->get_mixer(devc, nr);
+			break;
+		}
+
+		if (ret >= 0)
+			ret = put_user(ret, (int *)arg) ? -EFAULT : 0;
+	}
+
+	return ret;
+}
+
+static struct mixer_operations waveartist_mixer_operations =
+{
+	owner:	THIS_MODULE,
+	id:	"WaveArtist",
+	name:	"WaveArtist",
+	ioctl:	waveartist_mixer_ioctl
+};
 
 static void
 waveartist_mixer_reset(wavnc_info *devc)
@@ -1098,7 +1227,7 @@ waveartist_mixer_reset(wavnc_info *devc)
 	waveartist_cmd3(devc, WACMD_SET_MIXER, 0x9800, 0xa836);
 
 	/*
-	 * set mixer input select to none, RX filter gains 0 db
+	 * set mixer input select to none, RX filter gains 0 dB
 	 */
 	waveartist_cmd3(devc, WACMD_SET_MIXER, 0x4c00, 0x8c00);
 
@@ -1110,89 +1239,11 @@ waveartist_mixer_reset(wavnc_info *devc)
 	/* set default input device = internal mic
 	 * current recording device = none
 	 */
-	devc->recmask = 0;
+	waveartist_set_recmask(devc, 0);
 
 	for (i = 0; i < SOUND_MIXER_NRDEVICES; i++)
 		waveartist_mixer_update(devc, i);
-
-	devc->supported_devices = SUPPORTED_MIXER_DEVICES;
-	devc->rec_devices = POSSIBLE_RECORDING_DEVICES;
-
-	if (machine_is_netwinder()) {
-		devc->supported_devices |= SOUND_MASK_PHONEIN | SOUND_MASK_PHONEOUT;
-		devc->rec_devices |= SOUND_MASK_PHONEIN;
-	}
 }
-
-static int
-waveartist_mixer_ioctl(int dev, unsigned int cmd, caddr_t arg)
-{
-	wavnc_info *devc = (wavnc_info *)audio_devs[dev]->devc;
-	int ret;
-
-#ifdef CONFIG_ARCH_NETWINDER
-	if (machine_is_netwinder()) {
-		ret = vnc_private_ioctl(dev, cmd, arg);
-		if (ret != -ENOIOCTLCMD)
-			return ret;
-	}
-#endif
-
-	if (((cmd >> 8) & 0xff) == 'M') {
-		if (_SIOC_DIR(cmd) & _SIOC_WRITE) {
-			int val;
-
-			if (get_user(val, (int *)arg))
-				return -EFAULT;
-
-			return waveartist_mixer_set(devc, cmd & 0xff, val);
-		} else {
-			/*
-			 * Return parameters
-			 */
-			switch (cmd & 0xff) {
-			case SOUND_MIXER_RECSRC:
-				ret = devc->recmask;
-				break;
-
-			case SOUND_MIXER_DEVMASK:
-				ret = devc->supported_devices;
-				break;
-
-			case SOUND_MIXER_STEREODEVS:
-				ret = devc->supported_devices &
-					~(SOUND_MASK_SPEAKER|SOUND_MASK_IMIX);
-				break;
-
-			case SOUND_MIXER_RECMASK:
-				ret = devc->rec_devices;
-				break;
-
-			case SOUND_MIXER_CAPS:
-				ret = SOUND_CAP_EXCL_INPUT;
-				break;
-
-			default:
-				if ((cmd & 0xff) < SOUND_MIXER_NRDEVICES)
-					ret = devc->levels[cmd & 0xff];
-				else
-					return -EINVAL;
-			}
-
-			return put_user(ret, (int *)arg) ? -EFAULT : 0;
-		}
-	}
-
-	return -ENOIOCTLCMD;
-}
-
-static struct mixer_operations waveartist_mixer_operations =
-{
-	owner:	THIS_MODULE,
-	id:	"WaveArtist",
-	name:	"WaveArtist NetWinder",
-	ioctl:	waveartist_mixer_ioctl
-};
 
 static int __init waveartist_init(wavnc_info *devc)
 {
@@ -1297,13 +1348,13 @@ static int __init probe_waveartist(struct address_info *hw_config)
 		return 0;
 	}
 
-	if (hw_config->irq > _ISA_IRQ(15) || hw_config->irq < _ISA_IRQ(0)) {
+	if (hw_config->irq > 15 || hw_config->irq < 0) {
 		printk(KERN_WARNING "WaveArtist: Bad IRQ %d\n",
 		       hw_config->irq);
 		return 0;
 	}
 
-	if (hw_config->dma != _ISA_DMA(3)) {
+	if (hw_config->dma != 3) {
 		printk(KERN_WARNING "WaveArtist: Bad DMA %d\n",
 		       hw_config->dma);
 		return 0;
@@ -1317,7 +1368,8 @@ static int __init probe_waveartist(struct address_info *hw_config)
 	return 1;
 }
 
-static void __init attach_waveartist(struct address_info *hw)
+static void __init
+attach_waveartist(struct address_info *hw, const struct waveartist_mixer_info *mix)
 {
 	wavnc_info *devc = &adev_info[nr_waveartist_devs];
 
@@ -1339,6 +1391,7 @@ static void __init attach_waveartist(struct address_info *hw)
 
 	request_region(hw->io_base, 15, devc->hw.name);
 
+	devc->mix = mix;
 	devc->dev_no = waveartist_init(devc);
 
 	if (devc->dev_no < 0)
@@ -1352,7 +1405,9 @@ static void __init attach_waveartist(struct address_info *hw)
 			vnc_timer.data     = nr_waveartist_devs;
 			add_timer(&vnc_timer);
 
-			vnc_configure_mixer(devc);
+			vnc_configure_mixer(devc, 0);
+
+			devc->no_autoselect = 1;
 		}
 #endif
 		nr_waveartist_devs += 1;
@@ -1408,10 +1463,14 @@ static void __exit unload_waveartist(struct address_info *hw)
 		       "to unload\n");
 }
 
+#ifdef CONFIG_ARCH_NETWINDER
+
 /*
  * Rebel.com Netwinder specifics...
  */
 
+#include <asm/hardware/dec21285.h>
+ 
 #define	VNC_TIMER_PERIOD (HZ/4)	//check slider 4 times/sec
 
 #define	MIXER_PRIVATE3_RESET	0x53570000
@@ -1427,7 +1486,7 @@ static void __exit unload_waveartist(struct address_info *hw)
 extern spinlock_t gpio_lock;
 
 static inline void
-vnc_update_spkr_mute(wavnc_info *devc)
+vnc_mute_spkr(wavnc_info *devc)
 {
 	unsigned long flags;
 
@@ -1437,8 +1496,22 @@ vnc_update_spkr_mute(wavnc_info *devc)
 }
 
 static void
-vnc_mute_lout(wavnc_info *devc, int mute)
+vnc_mute_lout(wavnc_info *devc)
 {
+	unsigned int left, right;
+
+	left  = waveartist_cmd1_r(devc, WACMD_GET_LEVEL);
+	right = waveartist_cmd1_r(devc, WACMD_GET_LEVEL | 0x400);
+
+	if (devc->line_mute_state) {
+		left &= ~1;
+		right &= ~1;
+	} else {
+		left |= 1;
+		right |= 1;
+	}
+	waveartist_cmd3(devc, WACMD_SET_MIXER, left, right);
+		
 }
 
 static int
@@ -1491,17 +1564,162 @@ vnc_volume_slider(wavnc_info *devc)
 	return old_slider_volume;
 }
 
-static void
-vnc_configure_mixer(wavnc_info *devc)
+/*
+ * Decode a recording mask into a mixer selection on the NetWinder
+ * as follows:
+ *
+ *     OSS Source	WA Source	Actual source
+ *  SOUND_MASK_IMIX	Mixer		Mixer output (same as AD1848)
+ *  SOUND_MASK_LINE	Line		Line in
+ *  SOUND_MASK_LINE1	Left Mic	Handset
+ *  SOUND_MASK_PHONEIN	Left Aux	Telephone microphone
+ *  SOUND_MASK_MIC	Right Mic	Builtin microphone
+ */
+static unsigned int
+netwinder_select_input(wavnc_info *devc, unsigned int recmask,
+		       unsigned char *dev_l, unsigned char *dev_r)
 {
-	u_int vals[3];
+	unsigned int recdev_l = ADC_MUX_NONE, recdev_r = ADC_MUX_NONE;
 
+	if (recmask & SOUND_MASK_IMIX) {
+		recmask = SOUND_MASK_IMIX;
+		recdev_l = ADC_MUX_MIXER;
+		recdev_r = ADC_MUX_MIXER;
+	} else if (recmask & SOUND_MASK_LINE) {
+		recmask = SOUND_MASK_LINE;
+		recdev_l = ADC_MUX_LINE;
+		recdev_r = ADC_MUX_LINE;
+	} else if (recmask & SOUND_MASK_LINE1) {
+		recmask = SOUND_MASK_LINE1;
+		waveartist_cmd1(devc, WACMD_SET_MONO); /* left */
+		recdev_l = ADC_MUX_MIC;
+		recdev_r = ADC_MUX_NONE;
+	} else if (recmask & SOUND_MASK_PHONEIN) {
+		recmask = SOUND_MASK_PHONEIN;
+		waveartist_cmd1(devc, WACMD_SET_MONO); /* left */
+		recdev_l = ADC_MUX_AUX1;
+		recdev_r = ADC_MUX_NONE;
+	} else if (recmask & SOUND_MASK_MIC) {
+		recmask = SOUND_MASK_MIC;
+		waveartist_cmd1(devc, WACMD_SET_MONO | 0x100);	/* right */
+		recdev_l = ADC_MUX_NONE;
+		recdev_r = ADC_MUX_MIC;
+	}
+
+	*dev_l = recdev_l;
+	*dev_r = recdev_r;
+
+	return recmask;
+}
+
+static int
+netwinder_decode_mixer(wavnc_info *devc, int dev, unsigned char lev_l,
+		       unsigned char lev_r)
+{
+	switch (dev) {
+	case SOUND_MIXER_VOLUME:
+	case SOUND_MIXER_SYNTH:
+	case SOUND_MIXER_PCM:
+	case SOUND_MIXER_LINE:
+	case SOUND_MIXER_IGAIN:
+		devc->levels[dev] = lev_l | lev_r << 8;
+		break;
+
+	case SOUND_MIXER_MIC:		/* right mic only */
+		devc->levels[SOUND_MIXER_MIC] &= 0xff;
+		devc->levels[SOUND_MIXER_MIC] |= lev_l << 8;
+		break;
+
+	case SOUND_MIXER_LINE1:		/* left mic only  */
+		devc->levels[SOUND_MIXER_MIC] &= 0xff00;
+		devc->levels[SOUND_MIXER_MIC] |= lev_l;
+		dev = SOUND_MIXER_MIC;
+		break;
+
+	case SOUND_MIXER_PHONEIN:	/* left aux only  */
+		devc->levels[SOUND_MIXER_LINE1] = lev_l;
+		dev = SOUND_MIXER_LINE1;
+		break;
+
+	case SOUND_MIXER_IMIX:
+	case SOUND_MIXER_PHONEOUT:
+		break;
+
+	default:
+		dev = -EINVAL;
+		break;
+	}
+	return dev;
+}
+
+static int netwinder_get_mixer(wavnc_info *devc, int dev)
+{
+	int levels;
+
+	switch (dev) {
+	case SOUND_MIXER_VOLUME:
+	case SOUND_MIXER_SYNTH:
+	case SOUND_MIXER_PCM:
+	case SOUND_MIXER_LINE:
+	case SOUND_MIXER_IGAIN:
+		levels = devc->levels[dev];
+		break;
+
+	case SOUND_MIXER_MIC:		/* builtin mic: right mic only */
+		levels = devc->levels[SOUND_MIXER_MIC] >> 8;
+		levels |= levels << 8;
+		break;
+
+	case SOUND_MIXER_LINE1:		/* handset mic: left mic only */
+		levels = devc->levels[SOUND_MIXER_MIC] & 0xff;
+		levels |= levels << 8;
+		break;
+
+	case SOUND_MIXER_PHONEIN:	/* phone mic: left aux1 only */
+		levels = devc->levels[SOUND_MIXER_LINE1] & 0xff;
+		levels |= levels << 8;
+		break;
+
+	default:
+		levels = 0;
+	}
+
+	return levels;
+}
+
+/*
+ * Waveartist specific mixer information.
+ */
+static const struct waveartist_mixer_info netwinder_mixer = {
+	supported_devs:	SOUND_MASK_VOLUME  | SOUND_MASK_SYNTH   |
+			SOUND_MASK_PCM     | SOUND_MASK_SPEAKER |
+			SOUND_MASK_LINE    | SOUND_MASK_MIC     |
+			SOUND_MASK_IMIX    | SOUND_MASK_LINE1   |
+			SOUND_MASK_PHONEIN | SOUND_MASK_PHONEOUT|
+			SOUND_MASK_IGAIN,
+
+	recording_devs:	SOUND_MASK_LINE    | SOUND_MASK_MIC     |
+			SOUND_MASK_IMIX    | SOUND_MASK_LINE1   |
+			SOUND_MASK_PHONEIN,
+
+	stereo_devs:	SOUND_MASK_VOLUME  | SOUND_MASK_SYNTH   |
+			SOUND_MASK_PCM     | SOUND_MASK_LINE    |
+			SOUND_MASK_IMIX    | SOUND_MASK_IGAIN,
+
+	select_input:	netwinder_select_input,
+	decode_mixer:	netwinder_decode_mixer,
+	get_mixer:	netwinder_get_mixer,
+};
+
+static void
+vnc_configure_mixer(wavnc_info *devc, unsigned int recmask)
+{
 	if (!devc->no_autoselect) {
 		if (devc->handset_detect) {
-			devc->recmask = SOUND_MASK_LINE1;
+			recmask = SOUND_MASK_LINE1;
 			devc->spkr_mute_state = devc->line_mute_state = 1;
 		} else if (devc->telephone_detect) {
-			devc->recmask = SOUND_MASK_PHONEIN;
+			recmask = SOUND_MASK_PHONEIN;
 			devc->spkr_mute_state = devc->line_mute_state = 1;
 		} else {
 			/* unless someone has asked for LINE-IN,
@@ -1511,47 +1729,12 @@ vnc_configure_mixer(wavnc_info *devc)
 				devc->recmask = SOUND_MASK_MIC;
 			devc->spkr_mute_state = devc->line_mute_state = 0;
 		}
-		vnc_update_spkr_mute(devc);
-		vnc_mute_lout(devc, devc->spkr_mute_state);
+		vnc_mute_spkr(devc);
+		vnc_mute_lout(devc);
+
+		if (recmask != devc->recmask)
+			waveartist_set_recmask(devc, recmask);
 	}
-
-	/* Ok.  At this point, we have done the autoswitch logic, or we
-	 * have had a command from an ioctl.  We have a valid devc->recmask.
-	 * Now we have to connect up the hardware to reflect the recmask.
-	 */
-	vals[1] = waveartist_cmd1_r(devc, WACMD_GET_LEVEL | 0x800);
-	vals[2] = waveartist_cmd1_r(devc, WACMD_GET_LEVEL | 0x900);
-
-	vals[1] &= ~0x3f;
-
-	switch(devc->recmask) {
-	case SOUND_MASK_MIC:		/* builtin mic */
-		waveartist_cmd1(devc, WACMD_SET_MONO | 0x100);	/* right */
-		vals[1] |= 0x28;
-		break;
-
-	case SOUND_MASK_LINE1:		/* out handset */
-		waveartist_cmd1(devc, WACMD_SET_MONO);		/* left */
-		vals[1] |= 0x05;
-		break;
-
-	case SOUND_MASK_PHONEIN:	/* our telephone mic */
-		waveartist_cmd1(devc, WACMD_SET_MONO);		/* left */
-		vals[1] |= 0x04;
-		break;
-
-	case SOUND_MASK_LINE:		/* stereo line in */
-		vals[1] |= 12;
-		break;
-
-	default:
-		return;
-	}
-
-	vals[0] = WACMD_SET_MIXER;
-	waveartist_cmd(devc, 3, vals, 0, NULL);
-
-	waveartist_mixer_update(devc, SOUND_MIXER_IMIX);
 }
 
 static int
@@ -1562,10 +1745,10 @@ vnc_slider(wavnc_info *devc)
 
 	/*
 	 * read the "buttons" state.
-	 *  Bit 4 = handset present,
-	 *  Bit 5 = offhook
+	 *  Bit 4 = 0 means handset present
+	 *  Bit 5 = 1 means phone offhook
 	 */
-	temp = inb(0x201) & 0x30;
+	temp = inb(0x201);
 
 	old_hs = devc->handset_detect;
 	old_td = devc->telephone_detect;
@@ -1576,7 +1759,7 @@ vnc_slider(wavnc_info *devc)
 	if (!devc->no_autoselect &&
 	    (old_hs != devc->handset_detect ||
 	     old_td != devc->telephone_detect))
-		vnc_configure_mixer(devc);
+		vnc_configure_mixer(devc, devc->recmask);
 
 	slider_volume = vnc_volume_slider(devc);
 
@@ -1596,7 +1779,7 @@ vnc_slider(wavnc_info *devc)
 	if (slider_volume != temp && devc->use_slider) {
 		devc->slider_vol = slider_volume;
 
-		waveartist_mixer_set(devc, SOUND_MIXER_VOLUME,
+		waveartist_set_mixer(devc, SOUND_MIXER_VOLUME,
 			slider_volume | slider_volume << 8);
 
 		return 1;
@@ -1648,13 +1831,13 @@ vnc_private_ioctl(int dev, unsigned int cmd, caddr_t arg)
 		devc->line_mute_state = (val & VNC_MUTE_LINE_OUT) ? 1 : 0;
 
 		if (prev_spkr_mute != devc->spkr_mute_state)
-			vnc_update_spkr_mute(devc);
+			vnc_mute_spkr(devc);
 
 		if (prev_line_mute != devc->line_mute_state)
-			vnc_mute_lout(devc, devc->line_mute_state);
+			vnc_mute_lout(devc);
 
 		if (prev_auto_state != devc->no_autoselect)
-			vnc_configure_mixer(devc);
+			vnc_configure_mixer(devc, devc->recmask);
 
 		return 0;
 	}
@@ -1735,31 +1918,39 @@ vnc_private_ioctl(int dev, unsigned int cmd, caddr_t arg)
 		return put_user(val, (int *)arg) ? -EFAULT : 0;
 	}
 
-	if (((cmd >> 8) & 0xff) == 'M') {
-		if (_SIOC_DIR(cmd) & _SIOC_WRITE) {
-			/*
-			 * special case for master volume: if we
-			 * received this call - switch from hw
-			 * volume control to a software volume
-			 * control, till the hw volume is modified
-			 * to signal that user wants to be back in
-			 * hardware...
-			 */
-			if ((cmd & 0xff) == SOUND_MIXER_VOLUME)
-				devc->use_slider = 0;
-		} else if ((cmd & 0xff) == SOUND_MIXER_STEREODEVS) {
-			val = devc->supported_devices &
-				~(SOUND_MASK_IMIX |
-				  SOUND_MASK_MIC |
-				  SOUND_MASK_LINE1 |
-				  SOUND_MASK_PHONEIN |
-				  SOUND_MASK_PHONEOUT);
-			return put_user(val, (int *)arg) ? -EFAULT : 0;
+	if (_SIOC_DIR(cmd) & _SIOC_WRITE) {
+		/*
+		 * special case for master volume: if we
+		 * received this call - switch from hw
+		 * volume control to a software volume
+		 * control, till the hw volume is modified
+		 * to signal that user wants to be back in
+		 * hardware...
+		 */
+		if ((cmd & 0xff) == SOUND_MIXER_VOLUME)
+			devc->use_slider = 0;
+
+		/* speaker output            */
+		if ((cmd & 0xff) == SOUND_MIXER_SPEAKER) {
+			unsigned int val, l, r;
+
+			if (get_user(val, (int *)arg))
+				return -EFAULT;
+
+			l = val & 0x7f;
+			r = (val & 0x7f00) >> 8;
+			val = (l + r) / 2;
+			devc->levels[SOUND_MIXER_SPEAKER] = val | (val << 8);
+			devc->spkr_mute_state = (val <= 50);
+			vnc_mute_spkr(devc);
+			return 0;
 		}
 	}
 
 	return -ENOIOCTLCMD;
 }
+
+#endif
 
 static struct address_info cfg;
 
@@ -1771,13 +1962,10 @@ static int __initdata dma = 0;
 static int __initdata dma2 = 0;
 
 
-MODULE_PARM(io, "i");		/* IO base */
-MODULE_PARM(irq, "i");		/* IRQ */
-MODULE_PARM(dma, "i");		/* DMA */
-MODULE_PARM(dma2, "i");		/* DMA2 */
-
 static int __init init_waveartist(void)
 {
+	const struct waveartist_mixer_info *mix;
+
 	if (!io && machine_is_netwinder()) {
 		/*
 		 * The NetWinder WaveArtist is at a fixed address.
@@ -1790,6 +1978,12 @@ static int __init init_waveartist(void)
 		dma2 = 7;
 	}
 
+	mix = &waveartist_mixer;
+#ifdef CONFIG_ARCH_NETWINDER
+	if (machine_is_netwinder())
+		mix = &netwinder_mixer;
+#endif
+
 	cfg.io_base = io;
 	cfg.irq = irq;
 	cfg.dma = dma;
@@ -1798,7 +1992,7 @@ static int __init init_waveartist(void)
 	if (!probe_waveartist(&cfg))
 		return -ENODEV;
 
-	attach_waveartist(&cfg);
+	attach_waveartist(&cfg, mix);
 	attached = 1;
 
 	return 0;
@@ -1830,3 +2024,10 @@ static int __init setup_waveartist(char *str)
 }
 __setup("waveartist=", setup_waveartist);
 #endif
+
+MODULE_DESCRIPTION("Rockwell WaveArtist RWA-010 sound driver");
+MODULE_PARM(io, "i");		/* IO base */
+MODULE_PARM(irq, "i");		/* IRQ */
+MODULE_PARM(dma, "i");		/* DMA */
+MODULE_PARM(dma2, "i");		/* DMA2 */
+MODULE_LICENSE("GPL");

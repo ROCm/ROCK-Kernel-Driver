@@ -1,7 +1,7 @@
 /*
  * linux/include/asm-arm/arch-shark/irq.h
  *
- * by Alexander Schulz <aschulz@netwinder.org>
+ * by Alexander Schulz
  *
  * derived from linux/arch/ppc/kernel/i8259.c and:
  * include/asm-arm/arch-ebsa110/irq.h

@@ -31,7 +31,6 @@
 #include <linux/fs.h>
 
 #include <asm/io.h>
-#include <asm/mtrr.h>
 
 #include <video/fbcon.h>
 #include <video/fbcon-cfb8.h>

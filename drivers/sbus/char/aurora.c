@@ -2454,7 +2454,7 @@ static void __exit aurora_cleanup(void)
 	
 #ifdef AURORA_DEBUG
 printk("cleanup_module: aurora_release_drivers\n");
-#endif;
+#endif
 
 	aurora_release_drivers();
 	for (i = 0; i < AURORA_NBOARD; i++)

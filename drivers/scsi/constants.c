@@ -74,6 +74,18 @@ static const char *group_2_commands[] = {
 };
 
 
+/* The following are 16 byte commands in group 4 */
+static const char *group_4_commands[] = {
+/* 80-84 */ unknown, unknown, unknown, unknown, unknown,
+/* 85-89 */ "Memory Export In (16)", unknown, unknown, unknown,
+            "Memory Export Out (16)",
+/* 8a-8f */ unknown, unknown, unknown, unknown, unknown, unknown,
+/* 90-94 */ unknown, unknown, unknown, unknown, unknown,
+/* 95-99 */ unknown, unknown, unknown, unknown, unknown,
+/* 9a-9f */ unknown, unknown, unknown, unknown, unknown, unknown,
+};
+
+
 /* The following are 12 byte commands in group 5 */
 static const char *group_5_commands[] = {
 /* a0-a5 */ unknown, unknown, unknown, unknown, unknown,
@@ -97,7 +109,7 @@ static const char *group_5_commands[] = {
 
 static const char **commands[] = {
     group_0_commands, group_1_commands, group_2_commands, 
-    (const char **) RESERVED_GROUP, (const char **) RESERVED_GROUP, 
+    (const char **) RESERVED_GROUP, group_4_commands, 
     group_5_commands, (const char **) VENDOR_GROUP, 
     (const char **) VENDOR_GROUP
 };

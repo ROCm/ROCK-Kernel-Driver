@@ -312,6 +312,7 @@ static char * pf_buf;                   /* buffer for request in progress */
 /* kernel glue structures */
 
 static struct block_device_operations pf_fops = {
+	owner:			THIS_MODULE,
 	open:			pf_open,
 	release:		pf_release,
 	ioctl:			pf_ioctl,
@@ -427,19 +428,13 @@ static int pf_open (struct inode *inode, struct file *file)
 
         if ((unit >= PF_UNITS) || (!PF.present)) return -ENODEV;
 
-        MOD_INC_USE_COUNT;
-
 	pf_identify(unit);
 
-	if (PF.media_status == PF_NM) {
-		MOD_DEC_USE_COUNT;
+	if (PF.media_status == PF_NM)
 		return -ENODEV;
-		}
 
-	if ((PF.media_status == PF_RO) && (file ->f_mode & 2)) {
-		MOD_DEC_USE_COUNT;
+	if ((PF.media_status == PF_RO) && (file ->f_mode & 2))
 		return -EROFS;
-		}
 
         PF.access++;
         if (PF.removable) pf_lock(unit,1);
@@ -512,8 +507,6 @@ static int pf_release (struct inode *inode, struct file *file)
 
 	if (!PF.access && PF.removable)
 		pf_lock(unit,0);
-
-        MOD_DEC_USE_COUNT;
 
 	return 0;
 

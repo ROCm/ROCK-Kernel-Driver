@@ -1910,8 +1910,6 @@ static int floppy_open( struct inode *inode, struct file *filp )
 	if (fd_ref[drive] == -1 || (fd_ref[drive] && filp->f_flags & O_EXCL))
 		return -EBUSY;
 
-	MOD_INC_USE_COUNT;
-
 	if (filp->f_flags & O_EXCL)
 		fd_ref[drive] = -1;
 	else
@@ -1950,11 +1948,11 @@ static int floppy_release( struct inode * inode, struct file * filp )
 		fd_ref[drive] = 0;
 	}
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 static struct block_device_operations floppy_fops = {
+	owner:			THIS_MODULE,
 	open:			floppy_open,
 	release:		floppy_release,
 	ioctl:			fd_ioctl,

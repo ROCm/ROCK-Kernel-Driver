@@ -51,33 +51,6 @@
 
 #ifndef NCR53c710_H
 #define NCR53c710_H
-#include <linux/version.h>
-
-/* 
- * Prevent name space pollution in hosts.c, and only provide the 
- * define we need to get the NCR53c7x0 driver into the host template
- * array.
- */
-
-#include <scsi/scsicam.h>
-
-extern int NCR53c7xx_abort(Scsi_Cmnd *);
-extern int NCR53c7xx_detect(Scsi_Host_Template *tpnt);
-extern int NCR53c7xx_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-extern int NCR53c7xx_reset(Scsi_Cmnd *, unsigned int);
-#ifdef MODULE
-extern int NCR53c7xx_release(struct Scsi_Host *);
-#else
-#define NCR53c7xx_release NULL
-#endif
-
-#define NCR53c7xx {NULL, NULL, NULL, NULL, \
-        "NCR53c{7,8}xx (rel 17)", NCR53c7xx_detect,\
-        NULL, /* info */ NULL, /* command, deprecated */ NULL,		\
-	NCR53c7xx_queue_command, NCR53c7xx_abort, NCR53c7xx_reset,	\
-	NULL /* slave attach */, scsicam_bios_param, /* can queue */ 24, \
-	/* id */ 7, 127 /* old SG_ALL */, /* cmd per lun */ 3, 		\
-	/* present */ 0, /* unchecked isa dma */ 0, DISABLE_CLUSTERING} 
 
 #ifndef HOSTS_C
 
@@ -1503,6 +1476,13 @@ struct NCR53c7x0_hostdata {
 /* These could be more efficient, given that we are always memory mapped,
  * but they don't give the same problems as the write macros, so leave
  * them. */
+#ifdef __mc68000__
+#define NCR53c7x0_read8(address) 					\
+    ((unsigned int)raw_inb((u32)NCR53c7x0_address_memory + ((u32)(address)^3)) )
+
+#define NCR53c7x0_read16(address) 					\
+    ((unsigned int)raw_inw((u32)NCR53c7x0_address_memory + ((u32)(address)^2)))
+#else
 #define NCR53c7x0_read8(address) 					\
     (NCR53c7x0_memory_mapped ? 						\
 	(unsigned int)readb((u32)NCR53c7x0_address_memory + ((u32)(address)^3)) :	\
@@ -1512,6 +1492,7 @@ struct NCR53c7x0_hostdata {
     (NCR53c7x0_memory_mapped ? 						\
 	(unsigned int)readw((u32)NCR53c7x0_address_memory + ((u32)(address)^2)) :	\
 	inw(NCR53c7x0_address_io + (address)))
+#endif /* mc68000 */
 #else
 #define NCR53c7x0_read8(address) 					\
     (NCR53c7x0_memory_mapped ? 						\
@@ -1523,10 +1504,16 @@ struct NCR53c7x0_hostdata {
 	(unsigned int)readw((u32)NCR53c7x0_address_memory + (u32)(address)) :	\
 	inw(NCR53c7x0_address_io + (address)))
 #endif
+
+#ifdef __mc68000__
+#define NCR53c7x0_read32(address) 					\
+    ((unsigned int) raw_inl((u32)NCR53c7x0_address_memory + (u32)(address)))
+#else
 #define NCR53c7x0_read32(address) 					\
     (NCR53c7x0_memory_mapped ? 						\
 	(unsigned int) readl((u32)NCR53c7x0_address_memory + (u32)(address)) : 	\
 	inl(NCR53c7x0_address_io + (address)))
+#endif /* mc68000*/
 
 #ifdef BIG_ENDIAN
 /* If we are big-endian, then we are not Intel, so probably don't have

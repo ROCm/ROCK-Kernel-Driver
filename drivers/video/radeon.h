@@ -7,7 +7,13 @@
 #define PCI_DEVICE_ID_RADEON_QE		0x5145
 #define PCI_DEVICE_ID_RADEON_QF		0x5146
 #define PCI_DEVICE_ID_RADEON_QG		0x5147
-#define PCI_DEVICE_ID_RADEON_VE		0x5159
+#define PCI_DEVICE_ID_RADEON_QY		0x5159
+#define PCI_DEVICE_ID_RADEON_QZ		0x515a
+#define PCI_DEVICE_ID_RADEON_LW		0x4c57
+#define PCI_DEVICE_ID_RADEON_LY		0x4c59
+#define PCI_DEVICE_ID_RADEON_LZ		0x4c5a
+#define PCI_DEVICE_ID_RADEON_QL		0x514c
+#define PCI_DEVICE_ID_RADEON_QW		0x5157
 
 #define RADEON_REGSIZE			0x4000
 
@@ -371,6 +377,19 @@
 #define SC_BOTTOM_RIGHT                        0x16F0  
 #define SRC_SC_BOTTOM_RIGHT                    0x16F4  
 #define RB2D_DSTCACHE_CTLSTAT		       0x342C
+#define LVDS_GEN_CNTL			       0x02d0
+#define LVDS_PLL_CNTL			       0x02d4
+#define TMDS_CRC			       0x02a0
+
+#define RADEON_BASE_CODE		       0x0f0b
+#define RADEON_BIOS_0_SCRATCH		       0x0010
+#define RADEON_BIOS_1_SCRATCH		       0x0014
+#define RADEON_BIOS_2_SCRATCH		       0x0018
+#define RADEON_BIOS_3_SCRATCH		       0x001c
+#define RADEON_BIOS_4_SCRATCH		       0x0020
+#define RADEON_BIOS_5_SCRATCH		       0x0024
+#define RADEON_BIOS_6_SCRATCH		       0x0028
+#define RADEON_BIOS_7_SCRATCH		       0x002c
 
 
 #define CLK_PIN_CNTL                               0x0001
@@ -440,6 +459,7 @@
 #define CRTC_HSYNC_DIS				   (1 << 8)
 #define CRTC_VSYNC_DIS				   (1 << 9)
 #define CRTC_DISPLAY_DIS			   (1 << 10)
+#define CRTC_CRT_ON				   (1 << 15)
 
 
 /* DSTCACHE_CTLSTAT bit constants */
@@ -451,6 +471,7 @@
 /* CRTC_GEN_CNTL bit constants */
 #define CRTC_DBL_SCAN_EN                           0x00000001
 #define CRTC_CUR_EN                                0x00010000
+#define CRTC_INTERLACE_EN			   (1 << 1)
 #define CRTC_EXT_DISP_EN      			   (1 << 24)
 #define CRTC_EN					   (1 << 25)
 
@@ -459,6 +480,81 @@
 
 /* CUR_OFFSET, CUR_HORZ_VERT_POSN, CUR_HORZ_VERT_OFF bit constants */
 #define CUR_LOCK                                   0x80000000
+
+
+/* FP bit constants */
+#define FP_CRTC_H_TOTAL_MASK			   0x000003ff
+#define FP_CRTC_H_DISP_MASK			   0x01ff0000
+#define FP_CRTC_V_TOTAL_MASK			   0x00000fff
+#define FP_CRTC_V_DISP_MASK			   0x0fff0000
+#define FP_H_SYNC_STRT_CHAR_MASK		   0x00001ff8
+#define FP_H_SYNC_WID_MASK			   0x003f0000
+#define FP_V_SYNC_STRT_MASK			   0x00000fff
+#define FP_V_SYNC_WID_MASK			   0x001f0000
+#define FP_CRTC_H_TOTAL_SHIFT			   0x00000000
+#define FP_CRTC_H_DISP_SHIFT			   0x00000010
+#define FP_CRTC_V_TOTAL_SHIFT			   0x00000000
+#define FP_CRTC_V_DISP_SHIFT			   0x00000010
+#define FP_H_SYNC_STRT_CHAR_SHIFT		   0x00000003
+#define FP_H_SYNC_WID_SHIFT			   0x00000010
+#define FP_V_SYNC_STRT_SHIFT			   0x00000000
+#define FP_V_SYNC_WID_SHIFT			   0x00000010
+
+/* FP_GEN_CNTL bit constants */
+#define FP_FPON					   (1 << 0)
+#define FP_TMDS_EN				   (1 << 2)
+#define FP_EN_TMDS				   (1 << 7)
+#define FP_DETECT_SENSE				   (1 << 8)
+#define FP_SEL_CRTC2				   (1 << 13)
+#define FP_CRTC_DONT_SHADOW_HPAR		   (1 << 15)
+#define FP_CRTC_DONT_SHADOW_VPAR		   (1 << 16)
+#define FP_CRTC_DONT_SHADOW_HEND		   (1 << 17)
+#define FP_CRTC_USE_SHADOW_VEND			   (1 << 18)
+#define FP_RMX_HVSYNC_CONTROL_EN		   (1 << 20)
+#define FP_DFP_SYNC_SEL				   (1 << 21)
+#define FP_CRTC_LOCK_8DOT			   (1 << 22)
+#define FP_CRT_SYNC_SEL				   (1 << 23)
+#define FP_USE_SHADOW_EN			   (1 << 24)
+#define FP_CRT_SYNC_ALT				   (1 << 26)
+
+/* LVDS_GEN_CNTL bit constants */
+#define LVDS_ON					   (1 << 0)
+#define LVDS_DISPLAY_DIS			   (1 << 1)
+#define LVDS_PANEL_TYPE				   (1 << 2)
+#define LVDS_PANEL_FORMAT			   (1 << 3)
+#define LVDS_EN					   (1 << 7)
+#define LVDS_DIGON				   (1 << 18)
+#define LVDS_BLON				   (1 << 19)
+#define LVDS_SEL_CRTC2				   (1 << 23)
+
+/* LVDS_PLL_CNTL bit constatns */
+#define HSYNC_DELAY_SHIFT			   0x1c
+#define HSYNC_DELAY_MASK			   (0xf << 0x1c)
+
+/* FP_HORZ_STRETCH bit constants */
+#define HORZ_STRETCH_RATIO_MASK			   0xffff
+#define HORZ_STRETCH_RATIO_MAX			   4096
+#define HORZ_PANEL_SIZE				   (0x1ff << 16)
+#define HORZ_PANEL_SHIFT			   16
+#define HORZ_STRETCH_PIXREP			   (0 << 25)
+#define HORZ_STRETCH_BLEND			   (1 << 26)
+#define HORZ_STRETCH_ENABLE			   (1 << 25)
+#define HORZ_AUTO_RATIO				   (1 << 27)
+#define HORZ_FP_LOOP_STRETCH			   (0x7 << 28)
+#define HORZ_AUTO_RATIO_INC			   (1 << 31)
+
+
+/* FP_VERT_STRETCH bit constants */
+#define VERT_STRETCH_RATIO_MASK			   0xfff
+#define VERT_STRETCH_RATIO_MAX			   4096
+#define VERT_PANEL_SIZE				   (0xfff << 12)
+#define VERT_PANEL_SHIFT			   12
+#define VERT_STRETCH_LINREP			   (0 << 26)
+#define VERT_STRETCH_BLEND			   (1 << 26)
+#define VERT_STRETCH_ENABLE			   (1 << 25)
+#define VERT_AUTO_RATIO_EN			   (1 << 27)
+#define VERT_FP_LOOP_STRETCH			   (0x7 << 28)
+#define VERT_STRETCH_RESERVED			   0xf1000000
 
 /* DAC_CNTL bit constants */   
 #define DAC_8BIT_EN                                0x00000100
@@ -497,6 +593,10 @@
 #define SOFT_RESET_RB           		   (1 <<  6)
 #define SOFT_RESET_HDP          		   (1 <<  7)
 
+/* SURFACE_CNTL bit consants */
+#define SURF_TRANSLATION_DIS			   (1 << 8)
+#define NONSURF_AP0_SWP_16BPP			   (1 << 20)
+#define NONSURF_AP0_SWP_32BPP			   (1 << 21)
 
 /* DEFAULT_SC_BOTTOM_RIGHT bit constants */
 #define DEFAULT_SC_RIGHT_MAX			   (0x1fff << 0)

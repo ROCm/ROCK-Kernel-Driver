@@ -295,8 +295,6 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 		return -ENODEV;
 	}
 	
-	MOD_INC_USE_COUNT;
-
 	spin_lock(&mtdblks_lock);
 
 	/* If it's already open, no need to piss about. */
@@ -316,7 +314,6 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 	mtdblk = kmalloc(sizeof(struct mtdblk_dev), GFP_KERNEL);
 	if (!mtdblk) {
 		put_mtd_device(mtd);
-		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
 	memset(mtdblk, 0, sizeof(*mtdblk));
@@ -332,7 +329,6 @@ static int mtdblock_open(struct inode *inode, struct file *file)
 		if (!mtdblk->cache_data) {
 			put_mtd_device(mtdblk->mtd);
 			kfree(mtdblk);
-			MOD_DEC_USE_COUNT;
 			return -ENOMEM;
 		}
 	}
@@ -400,7 +396,6 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 
 	DEBUG(MTD_DEBUG_LEVEL1, "ok\n");
 
-	MOD_DEC_USE_COUNT;
 	release_return(0);
 }  
 
@@ -574,6 +569,7 @@ static struct file_operations mtd_fops =
 #else
 static struct block_device_operations mtd_fops = 
 {
+	owner: THIS_MODULE,
 	open: mtdblock_open,
 	release: mtdblock_release,
 	ioctl: mtdblock_ioctl
