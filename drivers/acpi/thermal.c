@@ -161,6 +161,7 @@ struct acpi_thermal {
 	unsigned long		last_temperature;
 	unsigned long		polling_frequency;
 	u8			cooling_mode;
+	volatile u8		zombie;
 	struct acpi_thermal_flags flags;
 	struct acpi_thermal_state state;
 	struct acpi_thermal_trips trips;
@@ -647,7 +648,10 @@ static void
 acpi_thermal_run (
 	unsigned long		data)
 {
-	acpi_os_queue_for_execution(OSD_PRIORITY_GPE,  acpi_thermal_check, (void *) data);
+	struct acpi_thermal *tz = (struct acpi_thermal *)data;
+	if (!tz->zombie)
+		acpi_os_queue_for_execution(OSD_PRIORITY_GPE,  
+			acpi_thermal_check, (void *) data);
 }
 
 
@@ -1351,8 +1355,14 @@ acpi_thermal_remove (
 
 	tz = (struct acpi_thermal *) acpi_driver_data(device);
 
-	if (timer_pending(&(tz->timer)))
-		del_timer(&(tz->timer));
+	/* avoid timer adding new defer task */
+	tz->zombie = 1;
+	/* wait for running timer (on other CPUs) finish */
+	del_timer_sync(&(tz->timer));
+	/* synchronize deferred task */
+	acpi_os_wait_events_complete(NULL);
+	/* deferred task may reinsert timer */
+	del_timer_sync(&(tz->timer));
 
 	status = acpi_remove_notify_handler(tz->handle,
 		ACPI_DEVICE_NOTIFY, acpi_thermal_notify);
@@ -1374,6 +1384,7 @@ acpi_thermal_remove (
 
 	acpi_thermal_remove_fs(device);
 
+	kfree(tz);
 	return_VALUE(0);
 }
 

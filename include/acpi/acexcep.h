@@ -166,7 +166,7 @@
 #define AE_AML_CIRCULAR_REFERENCE       (acpi_status) (0x0020 | AE_CODE_AML)
 #define AE_AML_BAD_RESOURCE_LENGTH      (acpi_status) (0x0021 | AE_CODE_AML)
 
-#define AE_CODE_AML_MAX                 0x0020
+#define AE_CODE_AML_MAX                 0x0021
 
 /*
  * Internal exceptions used for control
