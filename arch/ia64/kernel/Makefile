@@ -2,9 +2,8 @@
 # Makefile for the linux kernel.
 #
 
-all: kernel.o head.o init_task.o
-
-O_TARGET := kernel.o
+O_TARGET	:= kernel.o
+EXTRA_TARGETS	:= head.o init_task.o
 
 export-objs := ia64_ksyms.o
 

@@ -1,17 +1,11 @@
 # $Id: Makefile,v 1.62 2000/12/15 00:41:17 davem Exp $
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now in the main makefile...
 
 SH = $(CONFIG_SHELL)
 
-all: kernel.o head.o init_task.o
-
-O_TARGET := kernel.o
+O_TARGET	:= kernel.o
+EXTRA_TARGETS	:= head.o init_task.o
 
 EXTRA_AFLAGS := -ansi
 
@@ -34,8 +28,7 @@ ifdef CONFIG_SUNOS_EMUL
 obj-y += sys_sunos.o sunos_ioctl.o
 endif
 
-head.o: head.S
-	$(CC) $(AFLAGS) -ansi -c $*.S -o $*.o
+include $(TOPDIR)/Rules.make
 
 check_asm: FORCE
 	@if [ ! -r $(HPATH)/asm/asm_offsets.h ] ; then \
@@ -126,6 +119,3 @@ check_asm: FORCE
 	else \
 	  mv -f asm_offsets.h $(HPATH)/asm/asm_offsets.h; \
 	fi
-
-
-include $(TOPDIR)/Rules.make

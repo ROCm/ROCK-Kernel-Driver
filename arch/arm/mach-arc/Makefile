@@ -1,9 +1,6 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
 
 O_TARGET		:= arc.o
 
@@ -19,8 +16,8 @@ export-objs		:= oldlatches.o
 
 obj-$(CONFIG_DEBUG_LL)	+= debug.o
 
-all: arc.o head.o
+EXTRA_TARGETS 		:= head.o
+
+AFLAGS_head.o		:= -DTEXTADDR=$(TEXTADDR)
 
 include $(TOPDIR)/Rules.make
-
-AFLAGS_head.o := -DTEXTADDR=$(TEXTADDR)

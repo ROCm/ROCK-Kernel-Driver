@@ -1,16 +1,9 @@
 #
 # Makefile for the Linux/SuperH kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
 
-all: kernel.o head.o init_task.o
-
-clean:
-
-O_TARGET := kernel.o
+O_TARGET	:= kernel.o
+EXTRA_TARGETS	:= head.o init_task.o
 
 export-objs	:= io.o io_generic.o io_hd64461.o setup_hd64461.o sh_ksyms.o
 

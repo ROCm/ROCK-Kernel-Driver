@@ -2,12 +2,8 @@
 # Makefile for the linux kernel.
 #
 
-EXTRA_AFLAGS := -traditional
-
-all: kernel.o head.o head64.o init_task.o
-
-O_TARGET := kernel.o
-
+O_TARGET	:= kernel.o
+EXTRA_TARGETS 	:= head.o head64.o init_task.o
 
 export-objs     := mtrr.o msr.o cpuid.o x8664_ksyms.o
 
@@ -30,6 +26,8 @@ obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o mpparse.o
 #obj-$(CONFIG_ACPI)             += acpi.o
 #obj-$(CONFIG_ACPI_SLEEP)       += acpi_wakeup.o
 obj-$(CONFIG_EARLY_PRINTK)    += early_printk.o
+
+EXTRA_AFLAGS := -traditional
 
 include $(TOPDIR)/Rules.make
 
