@@ -59,7 +59,7 @@ tune-$(CONFIG_CPU_XSCALE)	:=-mtune=xscale
 # do this with -msoft-float
 CFLAGS_BOOT	:=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
 CFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
-AFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -mno-fpu -msoft-float -Wa,-mno-fpu
+AFLAGS		+=$(apcs-y) $(arch-y) $(tune-y) -msoft-float -Wa,-mno-fpu
 
 #Default value
 DATAADDR	:= .
