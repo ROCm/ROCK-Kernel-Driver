@@ -1,8 +1,10 @@
 CONFIG_QUOTA
   If you say Y here, you will be able to set per user limits for disk
-  usage (also called disk quotas). Currently, it works only for the
-  ext2 file system. You need additional software in order to use quota
-  support; for details, read the Quota mini-HOWTO, available from
+  usage (also called disk quotas). Currently, it works for the
+  ext2, ext3, and reiserfs file system. You need additional software
+  in order to use quota support (you can download sources from
+  <http://www.sf.net/projects/linuxquota/>). For further details, read
+  the Quota mini-HOWTO, available from
   <http://www.linuxdoc.org/docs.html#howto>. Probably the quota
   support is only useful for multi user systems. If unsure, say N.
 
@@ -10,6 +12,11 @@ CONFIG_QFMT_V1
   This quota format was (is) used by kernels earlier than 2.4.??. If
   you have quota working and you don't want to convert to new quota
   format say Y here.
+
+CONFIG_QFMT_V2
+  This quota format allows using quotas with 32-bit UIDs/GIDs. If you
+  need this functionality say Y here. Note that you will need latest
+  quota utilities for new quota format with this kernel.
 
 CONFIG_MINIX_FS
   Minix is a simple operating system used in many classes about OS's.

@@ -136,6 +136,7 @@ struct if_dqinfo {
 
 #include <linux/xqm.h>
 #include <linux/dqblk_v1.h>
+#include <linux/dqblk_v2.h>
 
 /*
  * Data for one user/group kept in memory
@@ -163,6 +164,7 @@ struct mem_dqinfo {
 	unsigned int dqi_igrace;
 	union {
 		struct v1_mem_dqinfo v1_i;
+		struct v2_mem_dqinfo v2_i;
 	} u;
 };
 
@@ -214,6 +216,7 @@ struct dquot {
 	/* fields after this point are cleared when invalidating */
 	struct super_block *dq_sb;	/* superblock this applies to */
 	unsigned int dq_id;		/* ID this applies to (uid, gid) */
+	loff_t dq_off;			/* Offset of dquot on disk */
 	short dq_type;			/* Type of quota */
 	short dq_flags;			/* See DQ_* */
 	unsigned long dq_referenced;	/* Number of times this dquot was 
