@@ -1215,11 +1215,33 @@ static int __init esp_detect(Scsi_Host_Template *tpnt)
 
 #endif /* !CONFIG_SUN4 */
 
+/*
+ */
+static int esp_release(struct Scsi_Host *host)
+{
+	struct esp *esp = (struct esp *) host->hostdata;
+
+	ESP_INTSOFF(esp->dregs);
+#if 0
+	esp_reset_dma(esp);
+	esp_reset_esp(esp);
+#endif
+
+	free_irq(esp->ehost->irq, esp);
+	sbus_free_consistent(esp->sdev, 16,
+			     (void *) esp->esp_command, esp->esp_command_dvma);
+	sbus_iounmap(esp->eregs, ESP_REG_SIZE);
+	esp->dma->allocated = 0;
+	esp_chain_del(esp);
+
+        return 0;
+}
+
 /* The info function will return whatever useful
  * information the developer sees fit.  If not provided, then
  * the name field will be used instead.
  */
-const char *esp_info(struct Scsi_Host *host)
+static const char *esp_info(struct Scsi_Host *host)
 {
 	struct esp *esp;
 
@@ -4370,6 +4392,7 @@ static Scsi_Host_Template driver_template = {
 	.detect			= esp_detect,
 	.slave_alloc		= esp_slave_alloc,
 	.slave_destroy		= esp_slave_destroy,
+	.release		= esp_release,
 	.info			= esp_info,
 	.command		= esp_command,
 	.queuecommand		= esp_queue,

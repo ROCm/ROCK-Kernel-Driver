@@ -463,6 +463,14 @@ void handle_hw_divzero(struct pt_regs *regs, unsigned long pc, unsigned long npc
 	send_sig_info(SIGFPE, &info, current);
 }
 
+#ifdef CONFIG_DEBUG_BUGVERBOSE
+void do_BUG(const char *file, int line)
+{
+        // bust_spinlocks(1);   XXX Not in our original BUG()
+        printk("kernel BUG at %s:%d!\n", file, line);
+}
+#endif
+
 /* Since we have our mappings set up, on multiprocessors we can spin them
  * up here so that timer interrupts work during initialization.
  */
