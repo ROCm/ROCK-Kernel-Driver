@@ -4,7 +4,6 @@
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
  */
 
-#include <asm/cprefix.h>
 #include <asm/page.h>
 
 	/* Zero out 64 bytes of memory at (buf + offset).
@@ -46,9 +45,9 @@
 
 	.text
 	.align	4
-	.globl	C_LABEL(bzero_1page), C_LABEL(__copy_1page)
+	.globl	bzero_1page, __copy_1page
 
-C_LABEL(bzero_1page):
+bzero_1page:
 /* NOTE: If you change the number of insns of this routine, please check
  * arch/sparc/mm/hypersparc.S */
 	/* %o0 = buf */
@@ -67,7 +66,7 @@ C_LABEL(bzero_1page):
 	retl
 	 nop
 
-C_LABEL(__copy_1page):
+__copy_1page:
 /* NOTE: If you change the number of insns of this routine, please check
  * arch/sparc/mm/hypersparc.S */
 	/* %o0 = dst, %o1 = src */
