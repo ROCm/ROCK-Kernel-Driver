@@ -348,7 +348,7 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 	 */
 	int sum, cpu = smp_processor_id();
 
-	sum = apic_timer_irqs[cpu];
+	sum = irq_stat[cpu].apic_timer_irqs;
 
 	if (last_irq_sums[cpu] == sum) {
 		/*

@@ -1057,7 +1057,6 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
  * [ if a single-CPU system runs an SMP kernel then we call the local
  *   interrupt as well. Thus we cannot inline the local irq ... ]
  */
-unsigned int apic_timer_irqs [NR_CPUS];
 
 void smp_apic_timer_interrupt(struct pt_regs regs)
 {
@@ -1066,7 +1065,7 @@ void smp_apic_timer_interrupt(struct pt_regs regs)
 	/*
 	 * the NMI deadlock-detector uses this.
 	 */
-	apic_timer_irqs[cpu]++;
+	irq_stat[cpu].apic_timer_irqs++;
 
 	/*
 	 * NOTE! We'd better ACK the irq immediately,

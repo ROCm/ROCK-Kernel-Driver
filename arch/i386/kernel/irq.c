@@ -171,7 +171,7 @@ int show_interrupts(struct seq_file *p, void *v)
 	seq_printf(p, "LOC: ");
 	for (j = 0; j < NR_CPUS; j++)
 		if (cpu_online(j))
-			p += seq_printf(p, "%10u ", apic_timer_irqs[j]);
+			p += seq_printf(p, "%10u ", irq_stat[j].apic_timer_irqs);
 	seq_putc(p, '\n');
 #endif
 	seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
