@@ -415,6 +415,11 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 	cur_freq = get_cur_freq(policy->cpu);
 
 	for (i=0; i<p.state_count; i++) {
+		if (!p.states[i].core_frequency) {
+			centrino_model->op_points[i].frequency = CPUFREQ_ENTRY_INVALID;
+			continue;
+		}
+		
 		if (extract_clock(centrino_model->op_points[i].index) !=
 		    (centrino_model->op_points[i].frequency)) {
 			printk(KERN_DEBUG "Invalid encoded frequency\n");
@@ -424,8 +429,6 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 
 		if (cur_freq == centrino_model->op_points[i].frequency)
 			p.state = i;
-		if (!p.states[i].core_frequency)
-			centrino_model->op_points[i].frequency = CPUFREQ_ENTRY_INVALID;
 	}
 
 	return 0;
