@@ -1333,6 +1333,7 @@ dbAllocNear(struct bmap * bmp,
 	    struct dmap * dp, s64 blkno, int nblocks, int l2nb, s64 * results)
 {
 	int word, lword, rc;
+	s8 *leaf;
 
 	if (dp->tree.leafidx != cpu_to_le32(LEAFIND)) {
 		jfs_error(bmp->db_ipbmap->i_sb,
@@ -1340,7 +1341,7 @@ dbAllocNear(struct bmap * bmp,
 		return -EIO;
 	}
 
-	s8 *leaf = dp->tree.stree + le32_to_cpu(dp->tree.leafidx);
+	leaf = dp->tree.stree + le32_to_cpu(dp->tree.leafidx);
 
 	/* determine the word within the dmap that holds the hint
 	 * (i.e. blkno).  also, determine the last word in the dmap
