@@ -442,9 +442,6 @@ out:
 extern int check_legacy_ioport(unsigned long base_port);
 
 
-#define NO_PC_LEGACY_SERIAL_8250_CONSOLE 1
-extern int do_not_try_pc_legacy_8250_console;
-
 #endif /* __KERNEL__ */
 
 #endif /* _PPC64_IO_H */

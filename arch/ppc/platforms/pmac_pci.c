@@ -908,7 +908,7 @@ pmac_pcibios_fixup(void)
 #ifdef CONFIG_SERIAL_CORE_CONSOLE
 	do_not_try_pc_legacy_8250_console = 1;
 #endif
-	if (pci_find_class(PCI_CLASS_BRIDGE_CARDBUS << 8, NULL)) {
+	if (pci_get_class(PCI_CLASS_BRIDGE_CARDBUS << 8, NULL)) {
 		request_region(0x0UL, 0x2e0UL, "reserved legacy io");
 		request_region(0x300UL, 0xe0UL, "reserved legacy io");
 		request_region(0x400UL, 0x10000UL-0x400UL, "reserved legacy io");

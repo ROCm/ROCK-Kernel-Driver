@@ -21,10 +21,6 @@
  */
 #include <linux/config.h>
 
-#ifndef NO_PC_LEGACY_SERIAL_8250_CONSOLE
-#define do_not_try_pc_legacy_8250_console (0)
-#endif
-
 #if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
@@ -48,6 +44,10 @@
 #include <asm/irq.h>
 
 #include "8250.h"
+
+#ifndef NO_PC_LEGACY_SERIAL_8250_CONSOLE
+#define do_not_try_pc_legacy_8250_console (0)
+#endif
 
 /*
  * Configuration:
