@@ -14,20 +14,6 @@
 #define INFO_DESC_EXPORT  0       	/* export info itself */
 
 /*
- * Internal Error codes.
- */
-typedef enum labelcl_error_e {  LABELCL_SUCCESS,          /* 0 */
-                                LABELCL_DUP,              /* 1 */
-                                LABELCL_NOT_FOUND,        /* 2 */
-                                LABELCL_BAD_PARAM,        /* 3 */
-                                LABELCL_HIT_LIMIT,        /* 4 */
-                                LABELCL_CANNOT_ALLOC,     /* 5 */
-                                LABELCL_ILLEGAL_REQUEST,  /* 6 */
-                                LABELCL_IN_USE            /* 7 */
-                                } labelcl_error_t;
-
-
-/*
  * Description of a label entry.
  */
 typedef struct label_info_s {
