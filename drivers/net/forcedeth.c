@@ -740,90 +740,49 @@ static struct net_device_stats *nv_get_stats(struct net_device *dev)
 	return &np->stats;
 }
 
-static int nv_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void nv_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct fe_priv *np = get_nvpriv(dev);
+	strcpy(info->driver, "forcedeth");
+	strcpy(info->version, FORCEDETH_VERSION);
+	strcpy(info->bus_info, pci_name(np->pci_dev));
+}
+
+static void nv_get_wol(struct net_device *dev, struct ethtool_wolinfo *wolinfo)
+{
+	struct fe_priv *np = get_nvpriv(dev);
+	wolinfo->supported = WAKE_MAGIC;
+
+	spin_lock_irq(&np->lock);
+	if (np->wolenabled)
+		wolinfo->wolopts = WAKE_MAGIC;
+	spin_unlock_irq(&np->lock);
+}
+
+static int nv_set_wol(struct net_device *dev, struct ethtool_wolinfo *wolinfo)
 {
 	struct fe_priv *np = get_nvpriv(dev);
 	u8 *base = get_hwbase(dev);
-	u32 ethcmd;
 
-	if (copy_from_user(&ethcmd, useraddr, sizeof (ethcmd)))
-		return -EFAULT;
-
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO:
-	{
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy(info.driver, "forcedeth");
-		strcpy(info.version, FORCEDETH_VERSION);
-		strcpy(info.bus_info, pci_name(np->pci_dev));
-		if (copy_to_user(useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
+	spin_lock_irq(&np->lock);
+	if (wolinfo->wolopts == 0) {
+		writel(0, base + NvRegWakeUpFlags);
+		np->wolenabled = 0;
 	}
-	case ETHTOOL_GLINK:
-	{
-		struct ethtool_value edata = { ETHTOOL_GLINK };
-
-		edata.data = !!netif_carrier_ok(dev);
-
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
+	if (wolinfo->wolopts & WAKE_MAGIC) {
+		writel(NVREG_WAKEUPFLAGS_ENABLE, base + NvRegWakeUpFlags);
+		np->wolenabled = 1;
 	}
-	case ETHTOOL_GWOL:
-	{
-		struct ethtool_wolinfo wolinfo;
-		memset(&wolinfo, 0, sizeof(wolinfo));
-		wolinfo.supported = WAKE_MAGIC;
-
-		spin_lock_irq(&np->lock);
-		if (np->wolenabled)
-			wolinfo.wolopts = WAKE_MAGIC;
-		spin_unlock_irq(&np->lock);
-
-		if (copy_to_user(useraddr, &wolinfo, sizeof(wolinfo)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SWOL:
-	{
-		struct ethtool_wolinfo wolinfo;
-		if (copy_from_user(&wolinfo, useraddr, sizeof(wolinfo)))
-			return -EFAULT;
-
-		spin_lock_irq(&np->lock);
-		if (wolinfo.wolopts == 0) {
-			writel(0, base + NvRegWakeUpFlags);
-			np->wolenabled = 0;
-		}
-		if (wolinfo.wolopts & WAKE_MAGIC) {
-			writel(NVREG_WAKEUPFLAGS_ENABLE, base + NvRegWakeUpFlags);
-			np->wolenabled = 1;
-		}
-		spin_unlock_irq(&np->lock);
-		return 0;
-	}
-
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	spin_unlock_irq(&np->lock);
+	return 0;
 }
-/*
- * nv_ioctl: dev->do_ioctl function
- * Called with rtnl_lock held.
- */
-static int nv_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
-{
-	switch(cmd) {
-	case SIOCETHTOOL:
-		return nv_ethtool_ioctl(dev, rq->ifr_data);
 
-	default:
-		return -EOPNOTSUPP;
-	}
-}
+static struct ethtool_ops ops = {
+	.get_drvinfo = nv_get_drvinfo,
+	.get_link = ethtool_op_get_link,
+	.get_wol = nv_get_wol,
+	.set_wol = nv_set_wol,
+};
 
 /*
  * nv_alloc_rx: fill rx ring entries.
@@ -1759,7 +1718,7 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 	dev->get_stats = nv_get_stats;
 	dev->change_mtu = nv_change_mtu;
 	dev->set_multicast_list = nv_set_multicast;
-	dev->do_ioctl = nv_ioctl;
+	SET_ETHTOOL_OPS(dev, &ops);
 	dev->tx_timeout = nv_tx_timeout;
 	dev->watchdog_timeo = NV_WATCHDOG_TIMEO;
 
