@@ -397,7 +397,7 @@ retry:
 		spin_unlock(&gss_auth->lock);
 	}
 	gss_release_msg(gss_msg);
-	dprintk("RPC: %4u gss_upcall for uid %u result %d", task->tk_pid,
+	dprintk("RPC: %4u gss_upcall for uid %u result %d\n", task->tk_pid,
 			uid, res);
 	return res;
 out_sleep:
