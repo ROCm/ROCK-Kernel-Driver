@@ -17,7 +17,6 @@ extern unsigned long isa_io_base;
 extern void pci_setup_pci_controller(struct pci_controller *hose);
 extern void pci_setup_phb_io(struct pci_controller *hose, int primary);
 
-extern struct pci_controller* pci_find_hose_for_OF_device(struct device_node* node);
 extern void pci_setup_phb_io_dynamic(struct pci_controller *hose);
 
 
@@ -36,10 +35,7 @@ void *traverse_pci_devices(struct device_node *start, traverse_func pre,
 
 void pci_devs_phb_init(void);
 void pci_devs_phb_init_dynamic(struct pci_controller *phb);
-void pci_fix_bus_sysdata(void);
 struct device_node *fetch_dev_dn(struct pci_dev *dev);
-
-#define PCI_GET_PHB_PTR(dev)    (((struct device_node *)(dev)->sysdata)->phb)
 
 /* PCI address cache management routines */
 void pci_addr_cache_insert_device(struct pci_dev *dev);
