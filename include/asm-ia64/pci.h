@@ -105,6 +105,8 @@ struct pci_controller {
 #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
 #define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
 
+extern struct pci_ops pci_root_ops;
+
 static inline int pci_name_bus(char *name, struct pci_bus *bus)
 {
 	if (pci_domain_nr(bus) == 0) {

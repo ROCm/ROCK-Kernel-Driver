@@ -17,8 +17,6 @@
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/nodepda.h>
-#include <asm/sn/klconfig.h>
-        
 
 // SGI Specific Calls
 #define  SN_SAL_POD_MODE                           0x02000001
@@ -62,7 +60,19 @@
 
 #define  SN_SAL_SYSCTL_IOBRICK_PCI_OP		   0x02000042	// reentrant
 #define	 SN_SAL_IROUTER_OP			   0x02000043
+#define  SN_SAL_IOIF_INTERRUPT			   0x0200004a
 #define  SN_SAL_HWPERF_OP			   0x02000050   // lock
+#define  SN_SAL_IOIF_ERROR_INTERRUPT		   0x02000051
+
+#define  SN_SAL_IOIF_SLOT_ENABLE		   0x02000053
+#define  SN_SAL_IOIF_SLOT_DISABLE		   0x02000054
+#define  SN_SAL_IOIF_GET_HUBDEV_INFO		   0x02000055
+#define  SN_SAL_IOIF_GET_PCIBUS_INFO		   0x02000056
+#define  SN_SAL_IOIF_GET_PCIDEV_INFO		   0x02000057
+#define  SN_SAL_IOIF_GET_WIDGET_DMAFLUSH_LIST	   0x02000058
+
+#define SN_SAL_HUB_ERROR_INTERRUPT		   0x02000060
+
 
 /*
  * Service-specific constants
@@ -77,16 +87,9 @@
 #define SAL_CONSOLE_INTR_XMIT	1	/* output interrupt */
 #define SAL_CONSOLE_INTR_RECV	2	/* input interrupt */
 
-#ifdef CONFIG_HOTPLUG_PCI_SGI
-/* power up / power down / reset a PCI slot or bus */
-#define SAL_SYSCTL_PCI_POWER_UP         0
-#define SAL_SYSCTL_PCI_POWER_DOWN       1
-#define SAL_SYSCTL_PCI_RESET            2
-
-/* what type of I/O brick? */
-#define SAL_SYSCTL_IO_XTALK	0       /* connected via a compute node */
-
-#endif	/* CONFIG_HOTPLUG_PCI_SGI */
+/* interrupt handling */
+#define SAL_INTR_ALLOC		1
+#define SAL_INTR_FREE		2
 
 /*
  * IRouter (i.e. generalized system controller) operations
@@ -115,19 +118,6 @@
 #define SALRET_NOT_IMPLEMENTED	(-1)
 #define SALRET_INVALID_ARG	(-2)
 #define SALRET_ERROR		(-3)
-
-/*
- * SN_SAL_SET_ERROR_HANDLING_FEATURES bit settings
- */
-enum 
-{
-	/* if "rz always" is set, have the mca slaves call os_init_slave */
-	SN_SAL_EHF_MCA_SLV_TO_OS_INIT_SLV=0,
-	/* do not rz on tlb checks, even if "rz always" is set */
-	SN_SAL_EHF_NO_RZ_TLBC,
-	/* do not rz on PIO reads to I/O space, even if "rz always" is set */
-	SN_SAL_EHF_NO_RZ_IO_READ,
-};
 
 
 /**
@@ -164,10 +154,8 @@ sn_sal_rev_minor(void)
  * Specify the minimum PROM revsion required for this kernel.
  * Note that they're stored in hex format...
  */
-#define SN_SAL_MIN_MAJOR	0x3  /* SN2 kernels need at least PROM 3.40 */
-#define SN_SAL_MIN_MINOR	0x40
-
-u64 ia64_sn_probe_io_slot(long paddr, long size, void *data_ptr);
+#define SN_SAL_MIN_MAJOR	0x4  /* SN2 kernels need at least PROM 4.0 */
+#define SN_SAL_MIN_MINOR	0x0
 
 /*
  * Returns the master console nasid, if the call fails, return an illegal
@@ -325,7 +313,7 @@ ia64_sn_plat_specific_err_print(int (*hook)(const char*, ...), char *rec)
 	ret_stuff.v0 = 0;
 	ret_stuff.v1 = 0;
 	ret_stuff.v2 = 0;
-	SAL_CALL_REENTRANT(ret_stuff, SN_SAL_PRINT_ERROR, (uint64_t)hook, (uint64_t)rec, 0, 0, 0, 0, 0);
+	SAL_CALL_NOLOCK(ret_stuff, SN_SAL_PRINT_ERROR, (uint64_t)hook, (uint64_t)rec, 0, 0, 0, 0, 0);
 
 	return ret_stuff.status;
 }
@@ -646,12 +634,12 @@ sn_change_memprotect(u64 paddr, u64 len, u64 perms, u64 *nasid_array)
 	unsigned long irq_flags;
 
 	cnodeid = nasid_to_cnodeid(get_node_number(paddr));
-	spin_lock(&NODEPDA(cnodeid)->bist_lock);
+	// spin_lock(&NODEPDA(cnodeid)->bist_lock);
 	local_irq_save(irq_flags);
 	SAL_CALL_NOLOCK(ret_stuff, SN_SAL_MEMPROTECT, paddr, len, nasid_array,
 		 perms, 0, 0, 0);
 	local_irq_restore(irq_flags);
-	spin_unlock(&NODEPDA(cnodeid)->bist_lock);
+	// spin_unlock(&NODEPDA(cnodeid)->bist_lock);
 	return ret_stuff.status;
 }
 #define SN_MEMPROT_ACCESS_CLASS_0		0x14a080
@@ -695,7 +683,7 @@ ia64_sn_fru_capture(void)
  */
 static inline u64
 ia64_sn_sysctl_iobrick_pci_op(nasid_t n, u64 connection_type, 
-			      u64 bus, slotid_t slot, 
+			      u64 bus, char slot, 
 			      u64 action)
 {
 	struct ia64_sal_retval rv = {0, 0, 0, 0};
@@ -705,26 +693,6 @@ ia64_sn_sysctl_iobrick_pci_op(nasid_t n, u64 connection_type,
 	if (rv.status)
 	    	return rv.v0;
 	return 0;
-}
-
-/*
- * Tell the prom how the OS wants to handle specific error features.
- * It takes an array of 7 u64.
- */
-static inline u64
-ia64_sn_set_error_handling_features(const u64 *feature_bits)
-{
-	struct ia64_sal_retval rv = {0, 0, 0, 0};
-
-	SAL_CALL_REENTRANT(rv, SN_SAL_SET_ERROR_HANDLING_FEATURES,
-			feature_bits[0],
-			feature_bits[1],
-			feature_bits[2],
-			feature_bits[3],
-			feature_bits[4],
-			feature_bits[5],
-			feature_bits[6]);
-	return rv.status;
 }
 
 

@@ -366,6 +366,10 @@
 #include "sd.h"
 #endif
 
+#if defined(CONFIG_IA64_GENERIC) || defined(CONFIG_IA64_SGI_SN2)
+#include <asm/sn/io.h>
+#endif
+
 #if LINUX_VERSION_CODE < 0x020407
 #error "Kernels older than 2.4.7 are no longer supported"
 #endif
@@ -423,13 +427,6 @@
 #endif
 #if (BITS_PER_LONG == 64) || defined CONFIG_HIGHMEM
 #define QLA_64BIT_PTR	1
-#endif
-
-#if defined(CONFIG_IA64_GENERIC) || defined(CONFIG_IA64_SGI_SN2)
-#include <asm/sn/pci/pciio.h>
-/* Ugly hack needed for the virtual channel fix on SN2 */
-extern int snia_pcibr_rrb_alloc(struct pci_dev *pci_dev,
-				int *count_vchan0, int *count_vchan1);
 #endif
 
 #ifdef QLA_64BIT_PTR
@@ -1771,19 +1768,9 @@ qla1280_initialize_adapter(struct scsi_qla_host *ha)
 	ha->flags.ints_enabled = 0;
 #if defined(CONFIG_IA64_GENERIC) || defined(CONFIG_IA64_SGI_SN2)
 	if (ia64_platform_is("sn2")) {
-		int count1, count2;
-		int c;
-
-		count1 = 3;
-		count2 = 3;
 		printk(KERN_INFO "scsi(%li): Enabling SN2 PCI DMA "
 		       "dual channel lockup workaround\n", ha->host_no);
-		if ((c = snia_pcibr_rrb_alloc(ha->pdev, &count1, &count2)) < 0)
-			printk(KERN_ERR "scsi(%li): Unable to allocate SN2 "
-			       "virtual DMA channels\n", ha->host_no);
-		else
-			ha->flags.use_pci_vchannel = 1;
-
+		ha->flags.use_pci_vchannel = 1;
 		driver_setup.no_nvram = 1;
 	}
 #endif
@@ -3283,7 +3270,8 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 				dma_handle = sg_dma_address(sg);
 #if defined(CONFIG_IA64_GENERIC) || defined(CONFIG_IA64_SGI_SN2)
 				if (ha->flags.use_pci_vchannel)
-					sn_pci_set_vchan(ha->pdev, &dma_handle,
+					sn_pci_set_vchan(ha->pdev,
+							(unsigned long *)&dma_handle,
 							 SCSI_BUS_32(cmd));
 #endif
 				*dword_ptr++ =
@@ -3341,7 +3329,8 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 					dma_handle = sg_dma_address(sg);
 #if defined(CONFIG_IA64_GENERIC) || defined(CONFIG_IA64_SGI_SN2)
 				if (ha->flags.use_pci_vchannel)
-					sn_pci_set_vchan(ha->pdev, &dma_handle,
+					sn_pci_set_vchan(ha->pdev, 
+							(unsigned long *)&dma_handle,
 							 SCSI_BUS_32(cmd));
 #endif
 					*dword_ptr++ =
@@ -3375,7 +3364,8 @@ qla1280_64bit_start_scsi(struct scsi_qla_host *ha, struct srb * sp)
 			sp->saved_dma_handle = dma_handle;
 #if defined(CONFIG_IA64_GENERIC) || defined(CONFIG_IA64_SGI_SN2)
 			if (ha->flags.use_pci_vchannel)
-				sn_pci_set_vchan(ha->pdev, &dma_handle,
+				sn_pci_set_vchan(ha->pdev, 
+						(unsigned long *)&dma_handle,
 						 SCSI_BUS_32(cmd));
 #endif
 			*dword_ptr++ = cpu_to_le32(pci_dma_lo32(dma_handle));

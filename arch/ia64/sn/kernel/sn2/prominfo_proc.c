@@ -16,7 +16,7 @@
 #include <asm/io.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/sn_cpuid.h>
-#include <asm/sn/sn2/addrs.h>
+#include <asm/sn/addrs.h>
 
 MODULE_DESCRIPTION("PROM version reporting for /proc");
 MODULE_AUTHOR("Chad Talbott");
@@ -55,30 +55,29 @@ MODULE_LICENSE("GPL");
 	((unsigned) ((q) >> FIT_TYPE_SHIFT) & FIT_TYPE_MASK)
 
 struct fit_type_map_t {
-	unsigned char	type;
-	const char	*name;
+	unsigned char type;
+	const char *name;
 };
 
 static const struct fit_type_map_t fit_entry_types[] = {
-	{ FIT_ENTRY_FIT_HEADER, "FIT Header" },
-	{ FIT_ENTRY_PAL_A_GEN,  "Generic PAL_A" },
-	{ FIT_ENTRY_PAL_A_PROC, "Processor-specific PAL_A" },
-	{ FIT_ENTRY_PAL_A,      "PAL_A" },
-	{ FIT_ENTRY_PAL_B,      "PAL_B" },
-	{ FIT_ENTRY_SAL_A,      "SAL_A" },
-	{ FIT_ENTRY_SAL_B,      "SAL_B" },
-	{ FIT_ENTRY_SALRUNTIME, "SAL runtime" },
-	{ FIT_ENTRY_EFI,	"EFI" },
-	{ FIT_ENTRY_VMLINUX,    "Embedded Linux" },
-	{ FIT_ENTRY_FPSWA,      "Embedded FPSWA" },
-	{ FIT_ENTRY_UNUSED,     "Unused" },
-	{ 0xff,                 "Error" },
+	{FIT_ENTRY_FIT_HEADER, "FIT Header"},
+	{FIT_ENTRY_PAL_A_GEN, "Generic PAL_A"},
+	{FIT_ENTRY_PAL_A_PROC, "Processor-specific PAL_A"},
+	{FIT_ENTRY_PAL_A, "PAL_A"},
+	{FIT_ENTRY_PAL_B, "PAL_B"},
+	{FIT_ENTRY_SAL_A, "SAL_A"},
+	{FIT_ENTRY_SAL_B, "SAL_B"},
+	{FIT_ENTRY_SALRUNTIME, "SAL runtime"},
+	{FIT_ENTRY_EFI, "EFI"},
+	{FIT_ENTRY_VMLINUX, "Embedded Linux"},
+	{FIT_ENTRY_FPSWA, "Embedded FPSWA"},
+	{FIT_ENTRY_UNUSED, "Unused"},
+	{0xff, "Error"},
 };
 
-static const char *
-fit_type_name(unsigned char type)
+static const char *fit_type_name(unsigned char type)
 {
-	struct fit_type_map_t const*mapp;
+	struct fit_type_map_t const *mapp;
 
 	for (mapp = fit_entry_types; mapp->type != 0xff; mapp++)
 		if (type == mapp->type)
@@ -115,7 +114,7 @@ fit_type_name(unsigned char type)
 #define FIT_SIGNATURE		0x2020205f5449465ful
 
 /* Sub-regions determined by bits in Node Offset */
-#define	LB_PROM_SPACE		0x0000000700000000ul /* Local LB PROM */
+#define	LB_PROM_SPACE		0x0000000700000000ul	/* Local LB PROM */
 
 /* Offset of PROM banner pointers in SAL A and SAL B */
 #define SAL_A_BANNER_OFFSET	(1 * 16)
@@ -125,11 +124,10 @@ fit_type_name(unsigned char type)
 #define FW_BASE                 0x00000000FF000000
 #define FW_TOP                  0x0000000100000000
 
-static unsigned long
-convert_fw_addr(nasid_t nasid, unsigned long addr)
+static unsigned long convert_fw_addr(nasid_t nasid, unsigned long addr)
 {
 	/* snag just the node-relative offset */
-	addr &= ~0ul >> (63-35);
+	addr &= ~0ul >> (63 - 35);
 	/* the pointer to SAL A is relative to IA-64 compatibility
 	 * space.  However, the PROM is mapped at a different offset
 	 * in MMR space (both local and global)
@@ -138,10 +136,9 @@ convert_fw_addr(nasid_t nasid, unsigned long addr)
 	return GLOBAL_MMR_ADDR(nasid, addr);
 }
 
-static int
-valid_fw_addr(unsigned long addr)
+static int valid_fw_addr(unsigned long addr)
 {
-	addr &= ~(1ul << 63); /* Clear cached/uncached bit */
+	addr &= ~(1ul << 63);	/* Clear cached/uncached bit */
 	return (addr >= FW_BASE && addr < FW_TOP);
 }
 
@@ -216,8 +213,7 @@ get_fit_entry(unsigned long nasid, int index, unsigned long *fentry,
 /*
  * These two routines display the FIT table for each node.
  */
-static int
-dump_fit_entry(char *page, unsigned long *fentry)
+static int dump_fit_entry(char *page, unsigned long *fentry)
 {
 	unsigned type;
 
@@ -289,11 +285,14 @@ static int
 proc_calc_metrics(char *page, char **start, off_t off, int count, int *eof,
 		  int len)
 {
-	if (len <= off+count) *eof = 1;
+	if (len <= off + count)
+		*eof = 1;
 	*start = page + off;
 	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
+	if (len > count)
+		len = count;
+	if (len < 0)
+		len = 0;
 	return len;
 }
 
@@ -334,8 +333,7 @@ static struct proc_dir_entry *sgi_prominfo_entry;
 
 #define NODE_NAME_LEN 11
 
-int __init
-prominfo_init(void)
+int __init prominfo_init(void)
 {
 	struct proc_dir_entry **entp;
 	struct proc_dir_entry *p;
@@ -372,16 +370,14 @@ prominfo_init(void)
 	return 0;
 }
 
-void __exit
-prominfo_exit(void)
+void __exit prominfo_exit(void)
 {
 	struct proc_dir_entry **entp;
 	unsigned cnodeid;
 	char name[NODE_NAME_LEN];
 
 	for (cnodeid = 0, entp = proc_entries;
-	     cnodeid < numnodes;
-	     cnodeid++, entp++) {
+	     cnodeid < numnodes; cnodeid++, entp++) {
 		remove_proc_entry("fit", *entp);
 		remove_proc_entry("version", *entp);
 		sprintf(name, "node%d", cnodeid);

@@ -699,22 +699,10 @@ sgiioc4_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t * d)
 	return 0;
 }
 
-/* This ensures that we can build this for generic kernels without
- * having all the SN2 code sync'd and merged.
- */
-typedef enum pciio_endian_e {
-	PCIDMA_ENDIAN_BIG,
-	PCIDMA_ENDIAN_LITTLE
-} pciio_endian_t;
-pciio_endian_t snia_pciio_endian_set(struct pci_dev
-				     *pci_dev, pciio_endian_t device_end,
-				     pciio_endian_t desired_end);
-
 static unsigned int __init
 pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 {
 	unsigned int class_rev;
-	pciio_endian_t endian_status;
 
 	if (pci_enable_device(dev)) {
 		printk(KERN_ERR
@@ -734,17 +722,6 @@ pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 			"46 or higher\n", d->name, dev->slot_name);
 		return -ENODEV;
 	}
-
-	/* Enable Byte Swapping in the PIC... */
-	endian_status = snia_pciio_endian_set(dev, PCIDMA_ENDIAN_LITTLE,
-					      PCIDMA_ENDIAN_BIG);
-	if (endian_status != PCIDMA_ENDIAN_BIG) {
-		printk(KERN_ERR
-		       "Failed to set endianness for device %s at slot %s\n",
-		       d->name, dev->slot_name);
-		return -ENODEV;
-	}
-
 	return sgiioc4_ide_setup_pci_device(dev, d);
 }
 

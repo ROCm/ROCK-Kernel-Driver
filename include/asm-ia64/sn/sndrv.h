@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2002-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2002-2004 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 #ifndef _ASM_IA64_SN_SNDRV_H
@@ -34,18 +34,6 @@
 #define SNDRV_SYNERGY_APPEND		33
 #define SNDRV_SYNERGY_ENABLE		34
 #define SNDRV_SYNERGY_FREQ		35
-
-/* see shubstats_ioctl() */
-#define SNDRV_SHUB_INFOSIZE		40
-#define SNDRV_SHUB_CONFIGURE		41
-#define SNDRV_SHUB_RESETSTATS		42
-#define SNDRV_SHUB_GETSTATS		43
-#define SNDRV_SHUB_GETNASID		44
-#define SNDRV_SHUB_GETMMR32            45
-#define SNDRV_SHUB_GETMMR64            46
-#define SNDRV_SHUB_GETMMR64_IO         47
-#define SNDRV_SHUB_PUTMMR64            48
-#define SNDRV_SHUB_PUTMMR64_IO         49
 
 /* Devices */
 #define SNDRV_UKNOWN_DEVICE		-1

@@ -117,6 +117,6 @@ extern ia64_mv_dma_supported		sn_dma_supported;
 #define platform_dma_mapping_error		sn_dma_mapping_error
 #define platform_dma_supported		sn_dma_supported
 
-#include <asm/sn/sn2/io.h>
+#include <asm/sn/io.h>
 
 #endif /* _ASM_IA64_MACHVEC_SN2_H */
