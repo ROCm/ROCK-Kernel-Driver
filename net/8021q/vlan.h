@@ -30,8 +30,6 @@ I'll bet they might prove useful again... --Ben
 
 extern unsigned short vlan_name_type;
 
-int vlan_ioctl_handler(unsigned long arg);
-
 #define VLAN_GRP_HASH_SHIFT	5
 #define VLAN_GRP_HASH_SIZE	(1 << VLAN_GRP_HASH_SHIFT)
 #define VLAN_GRP_HASH_MASK	(VLAN_GRP_HASH_SIZE - 1)
