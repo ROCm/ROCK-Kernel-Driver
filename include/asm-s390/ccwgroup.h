@@ -17,6 +17,7 @@ struct ccwgroup_device {
 };
 
 struct ccwgroup_driver {
+	struct module *owner;
 	char *name;
 	int max_slaves;
 	unsigned long driver_id;

@@ -60,12 +60,6 @@ do { \
 #define TAPEBLOCK_HSEC_S2B	2
 #define TAPEBLOCK_RETRIES	5
 
-/* Event types for hotplug */
-#define TAPE_HOTPLUG_CHAR_ADD     1
-#define TAPE_HOTPLUG_BLOCK_ADD    2
-#define TAPE_HOTPLUG_CHAR_REMOVE  3
-#define TAPE_HOTPLUG_BLOCK_REMOVE 4
-
 enum tape_medium_state {
 	MS_UNKNOWN,
 	MS_LOADED,
@@ -205,6 +199,8 @@ struct tape_device {
 	struct list_head		node;
 
 	struct ccw_device *		cdev;
+	struct cdev *			nt;
+	struct cdev *			rt;
 
 	/* Device discipline information. */
 	struct tape_discipline *	discipline;

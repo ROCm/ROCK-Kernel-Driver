@@ -203,10 +203,11 @@ int smp_call_function_on(void (*func) (void *info), void *info,
 	put_cpu();
 	return 0;
 }
+EXPORT_SYMBOL(smp_call_function_on);
 
 static inline void do_send_stop(void)
 {
-        u32 dummy;
+        unsigned long dummy;
         int i, rc;
 
         /* stop all processors */
@@ -222,7 +223,7 @@ static inline void do_send_stop(void)
 static inline void do_store_status(void)
 {
         unsigned long low_core_addr;
-        u32 dummy;
+        unsigned long dummy;
         int i, rc;
 
         /* store status of all processors in their lowcores (real 0) */
@@ -619,7 +620,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		if (lowcore_ptr[i] == NULL || async_stack == 0ULL)
 			panic("smp_boot_cpus failed to allocate memory\n");
 
-                memcpy(lowcore_ptr[i], &S390_lowcore, sizeof(struct _lowcore));
+		*(lowcore_ptr[i]) = S390_lowcore;
 		lowcore_ptr[i]->async_stack = async_stack + (ASYNC_SIZE);
 	}
 	set_prefix((u32)(unsigned long) lowcore_ptr[smp_processor_id()]);

@@ -1161,8 +1161,7 @@ static int filldir(void * __buf, const char * name, int namlen, loff_t offset, i
 	put_user(reclen, &dirent->d_reclen);
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
-	((char *) dirent) += reclen;
-	buf->current_dir = dirent;
+	buf->current_dir = ((void *)dirent) + reclen;
 	buf->count -= reclen;
 	return 0;
 }
