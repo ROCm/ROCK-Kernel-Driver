@@ -287,11 +287,11 @@ void truncate_inode_pages(struct address_space * mapping, loff_t lstart)
 	clean_list_pages(mapping, &mapping->io_pages, start);
 	clean_list_pages(mapping, &mapping->dirty_pages, start);
 	do {
-		unlocked |= truncate_list_pages(mapping,
+		unlocked = truncate_list_pages(mapping,
 				&mapping->io_pages, start, &partial);
 		unlocked |= truncate_list_pages(mapping,
 				&mapping->dirty_pages, start, &partial);
-		unlocked = truncate_list_pages(mapping,
+		unlocked |= truncate_list_pages(mapping,
 				&mapping->clean_pages, start, &partial);
 		unlocked |= truncate_list_pages(mapping,
 				&mapping->locked_pages, start, &partial);
