@@ -65,7 +65,6 @@ static int debug;
 #define PL2303_BUF_SIZE		1024
 #define PL2303_TMP_BUF_SIZE	1024
 
-static char pl2303_tmp_buf[PL2303_TMP_BUF_SIZE];
 static DECLARE_MUTEX(pl2303_tmp_buf_sem);
 
 struct pl2303_buf {
@@ -147,7 +146,7 @@ static int pl2303_ioctl (struct usb_serial_port *port, struct file *file,
 static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs);
 static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs);
 static void pl2303_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
-static int pl2303_write (struct usb_serial_port *port, int from_user,
+static int pl2303_write (struct usb_serial_port *port,
 			 const unsigned char *buf, int count);
 static void pl2303_send (struct usb_serial_port *port);
 static int pl2303_write_room(struct usb_serial_port *port);
@@ -267,7 +266,7 @@ static int set_control_lines (struct usb_device *dev, u8 value)
 	return retval;
 }
 
-static int pl2303_write (struct usb_serial_port *port, int from_user,  const unsigned char *buf, int count)
+static int pl2303_write (struct usb_serial_port *port,  const unsigned char *buf, int count)
 {
 	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	unsigned long flags;
@@ -277,23 +276,9 @@ static int pl2303_write (struct usb_serial_port *port, int from_user,  const uns
 	if (!count)
 		return count;
 
-	if (from_user) {
-		if (count > PL2303_TMP_BUF_SIZE)
-			count = PL2303_TMP_BUF_SIZE;
-		down(&pl2303_tmp_buf_sem);
-		if (copy_from_user(pl2303_tmp_buf, buf, count)) {
-			up(&pl2303_tmp_buf_sem);
-			return -EFAULT;
-		}
-		buf = pl2303_tmp_buf;
-	}
-
 	spin_lock_irqsave(&priv->lock, flags);
 	count = pl2303_buf_put(priv->buf, buf, count);
 	spin_unlock_irqrestore(&priv->lock, flags);
-
-	if (from_user)
-		up(&pl2303_tmp_buf_sem);
 
 	pl2303_send(port);
 

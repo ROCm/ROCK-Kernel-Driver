@@ -143,7 +143,7 @@ static int  whiteheat_attach		(struct usb_serial *serial);
 static void whiteheat_shutdown		(struct usb_serial *serial);
 static int  whiteheat_open		(struct usb_serial_port *port, struct file *filp);
 static void whiteheat_close		(struct usb_serial_port *port, struct file *filp);
-static int  whiteheat_write		(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+static int  whiteheat_write		(struct usb_serial_port *port, const unsigned char *buf, int count);
 static int  whiteheat_write_room	(struct usb_serial_port *port);
 static int  whiteheat_ioctl		(struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg);
 static void whiteheat_set_termios	(struct usb_serial_port *port, struct termios * old);
@@ -702,7 +702,7 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 }
 
 
-static int whiteheat_write(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
+static int whiteheat_write(struct usb_serial_port *port, const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
 	struct whiteheat_private *info = usb_get_serial_port_data(port);
@@ -734,12 +734,7 @@ static int whiteheat_write(struct usb_serial_port *port, int from_user, const un
 		wrap = list_entry(tmp, struct whiteheat_urb_wrap, list);
 		urb = wrap->urb;
 		bytes = (count > port->bulk_out_size) ? port->bulk_out_size : count;
-		if (from_user) {
-			if (copy_from_user(urb->transfer_buffer, buf + sent, bytes))
-				return -EFAULT;
-		} else {
-			memcpy (urb->transfer_buffer, buf + sent, bytes);
-		}
+		memcpy (urb->transfer_buffer, buf + sent, bytes);
 
 		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, bytes, urb->transfer_buffer);
 

@@ -17,7 +17,7 @@
  *
  * 	This routine is called when a particular tty device is closed.
  *
- * int (*write)(struct tty_struct * tty, int from_user,
+ * int (*write)(struct tty_struct * tty,
  * 		 const unsigned char *buf, int count);
  *
  * 	This routine is called by the kernel to write a series of
@@ -124,7 +124,7 @@ struct tty_struct;
 struct tty_operations {
 	int  (*open)(struct tty_struct * tty, struct file * filp);
 	void (*close)(struct tty_struct * tty, struct file * filp);
-	int  (*write)(struct tty_struct * tty, int from_user,
+	int  (*write)(struct tty_struct * tty,
 		      const unsigned char *buf, int count);
 	void (*put_char)(struct tty_struct *tty, unsigned char ch);
 	void (*flush_chars)(struct tty_struct *tty);
@@ -186,7 +186,7 @@ struct tty_driver {
 	 */
 	int  (*open)(struct tty_struct * tty, struct file * filp);
 	void (*close)(struct tty_struct * tty, struct file * filp);
-	int  (*write)(struct tty_struct * tty, int from_user,
+	int  (*write)(struct tty_struct * tty,
 		      const unsigned char *buf, int count);
 	void (*put_char)(struct tty_struct *tty, unsigned char ch);
 	void (*flush_chars)(struct tty_struct *tty);

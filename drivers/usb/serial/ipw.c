@@ -387,13 +387,13 @@ static void ipw_write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 	schedule_work(&port->work);
 }
 
-static int ipw_write(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
+static int ipw_write(struct usb_serial_port *port, const unsigned char *buf, int count)
 {
 	struct usb_device *dev = port->serial->dev;
 	int ret;
 
-	dbg("%s: TOP: count=%d, from_user=%d, in_interrupt=%ld", __FUNCTION__,
-		count, from_user, in_interrupt() );
+	dbg("%s: TOP: count=%d, in_interrupt=%ld", __FUNCTION__,
+		count, in_interrupt() );
 
 	if (count == 0) {
 		dbg("%s - write request of 0 bytes", __FUNCTION__);
@@ -405,12 +405,7 @@ static int ipw_write(struct usb_serial_port *port, int from_user, const unsigned
 		return 0;
 
 	count = min(count, port->bulk_out_size);
-	if (from_user) {
-		if (copy_from_user(port->bulk_out_buffer, buf, count))
-			return -EFAULT;
-	} else {
-		memcpy(port->bulk_out_buffer, buf, count);
-	}
+	memcpy(port->bulk_out_buffer, buf, count);
 
 	dbg("%s count now:%d", __FUNCTION__, count);
 	

@@ -2229,7 +2229,7 @@ static struct pci_driver cx8800_pci_driver = {
         .name     = "cx8800",
         .id_table = cx8800_pci_tbl,
         .probe    = cx8800_initdev,
-        .remove   = cx8800_finidev,
+        .remove   = __devexit_p(cx8800_finidev),
 
 	.suspend  = cx8800_suspend,
 	.resume   = cx8800_resume,

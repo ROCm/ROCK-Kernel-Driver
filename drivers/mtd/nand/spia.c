@@ -8,7 +8,7 @@
  *			to controllines	(due to change in nand.c)
  *			page_cache added
  *
- * $Id: spia.c,v 1.21 2003/07/11 15:12:29 dwmw2 Exp $
+ * $Id: spia.c,v 1.23 2004/10/05 13:50:20 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -132,8 +132,8 @@ int __init spia_init (void)
 	(*(volatile unsigned char *) (spia_io_base + spia_peddr)) = 0x07;
 
 	/* Set address of NAND IO lines */
-	this->IO_ADDR_R = spia_fio_base;
-	this->IO_ADDR_W = spia_fio_base;
+	this->IO_ADDR_R = (void __iomem *) spia_fio_base;
+	this->IO_ADDR_W = (void __iomem *) spia_fio_base;
 	/* Set address of hardware control function */
 	this->hwcontrol = spia_hwcontrol;
 	/* 15 us command delay time */
@@ -143,14 +143,6 @@ int __init spia_init (void)
 	if (nand_scan (spia_mtd, 1)) {
 		kfree (spia_mtd);
 		return -ENXIO;
-	}
-
-	/* Allocate memory for internal data buffer */
-	this->data_buf = kmalloc (sizeof(u_char) * (spia_mtd->oobblock + spia_mtd->oobsize), GFP_KERNEL);
-	if (!this->data_buf) {
-		printk ("Unable to allocate NAND data buffer for SPIA.\n");
-		kfree (spia_mtd);
-		return -ENOMEM;
 	}
 
 	/* Register the partitions */
@@ -167,13 +159,8 @@ module_init(spia_init);
 #ifdef MODULE
 static void __exit spia_cleanup (void)
 {
-	struct nand_chip *this = (struct nand_chip *) &spia_mtd[1];
-
-	/* Unregister the device */
-	del_mtd_device (spia_mtd);
-
-	/* Free internal data buffer */
-	kfree (this->data_buf);
+	/* Release resources, unregister device */
+	nand_release (spia_mtd);
 
 	/* Free the MTD device structure */
 	kfree (spia_mtd);

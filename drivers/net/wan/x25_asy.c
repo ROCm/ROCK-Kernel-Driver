@@ -253,7 +253,7 @@ static void x25_asy_encaps(struct x25_asy *sl, unsigned char *icp, int len)
 	 *       14 Oct 1994  Dmitry Gorodchanin.
 	 */
 	sl->tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-	actual = sl->tty->driver->write(sl->tty, 0, sl->xbuff, count);
+	actual = sl->tty->driver->write(sl->tty, sl->xbuff, count);
 	sl->xleft = count - actual;
 	sl->xhead = sl->xbuff + actual;
 	/* VSV */
@@ -283,7 +283,7 @@ static void x25_asy_write_wakeup(struct tty_struct *tty)
 		return;
 	}
 
-	actual = tty->driver->write(tty, 0, sl->xhead, sl->xleft);
+	actual = tty->driver->write(tty, sl->xhead, sl->xleft);
 	sl->xleft -= actual;
 	sl->xhead += actual;
 }

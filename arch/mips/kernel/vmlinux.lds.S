@@ -49,7 +49,7 @@ SECTIONS
 
   /* writeable */
   .data : {			/* Data */
-    . = . + MAPPED_OFFSET;	/* for CONFIG_MAPPED_KERNEL */
+    . = . + DATAOFFSET;		/* for CONFIG_MAPPED_KERNEL */
     *(.data.init_task)
 
     *(.data)

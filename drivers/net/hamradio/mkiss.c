@@ -379,7 +379,7 @@ static void ax_encaps(struct ax_disp *ax, unsigned char *icp, int len)
 	}
 	
 	ax->tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-	actual = ax->tty->driver->write(ax->tty, 0, ax->xbuff, count);
+	actual = ax->tty->driver->write(ax->tty, ax->xbuff, count);
 	ax->tx_packets++;
 	ax->tx_bytes+=actual;
 	ax->dev->trans_start = jiffies;
@@ -411,7 +411,7 @@ static void ax25_write_wakeup(struct tty_struct *tty)
 		return;
 	}
 
-	actual = tty->driver->write(tty, 0, ax->xhead, ax->xleft);
+	actual = tty->driver->write(tty, ax->xhead, ax->xleft);
 	ax->xleft -= actual;
 	ax->xhead += actual;
 }

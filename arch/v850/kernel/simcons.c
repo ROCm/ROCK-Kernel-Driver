@@ -59,7 +59,7 @@ int simcons_tty_open (struct tty_struct *tty, struct file *filp)
 	return 0;
 }
 
-int simcons_tty_write (struct tty_struct *tty, int from_user,
+int simcons_tty_write (struct tty_struct *tty,
 		       const unsigned char *buf, int count)
 {
 	return V850_SIM_SYSCALL (write, 1, buf, count);

@@ -152,7 +152,6 @@ do {									\
 #define GS_DEFAULT_WRITE_Q_SIZE		32
 
 #define GS_DEFAULT_WRITE_BUF_SIZE	8192
-#define GS_TMP_BUF_SIZE			8192
 
 #define GS_CLOSE_TIMEOUT		15
 
@@ -238,7 +237,7 @@ static void __exit gs_module_exit(void);
 /* tty driver */
 static int gs_open(struct tty_struct *tty, struct file *file);
 static void gs_close(struct tty_struct *tty, struct file *file);
-static int gs_write(struct tty_struct *tty, int from_user,
+static int gs_write(struct tty_struct *tty,
 	const unsigned char *buf, int count);
 static void gs_put_char(struct tty_struct *tty, unsigned char ch);
 static void gs_flush_chars(struct tty_struct *tty);
@@ -310,9 +309,6 @@ static unsigned int read_q_size = GS_DEFAULT_READ_Q_SIZE;
 static unsigned int write_q_size = GS_DEFAULT_WRITE_Q_SIZE;
 
 static unsigned int write_buf_size = GS_DEFAULT_WRITE_BUF_SIZE;
-
-static unsigned char gs_tmp_buf[GS_TMP_BUF_SIZE];
-static struct semaphore	gs_tmp_buf_sem;
 
 /* tty driver struct */
 static struct tty_operations gs_tty_ops = {
@@ -502,8 +498,6 @@ static int __init gs_module_init(void)
 
 	for (i=0; i < GS_NUM_PORTS; i++)
 		sema_init(&gs_open_close_sem[i], 1);
-
-	sema_init(&gs_tmp_buf_sem, 1);
 
 	retval = tty_register_driver(gs_tty_driver);
 	if (retval) {
@@ -754,7 +748,7 @@ static void gs_close(struct tty_struct *tty, struct file *file)
 /*
  * gs_write
  */
-static int gs_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count)
+static int gs_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	unsigned long flags;
 	struct gs_port *port = tty->driver_data;
@@ -770,29 +764,12 @@ static int gs_write(struct tty_struct *tty, int from_user, const unsigned char *
 	if (count == 0)
 		return 0;
 
-	/* copy from user into tmp buffer, get tmp_buf semaphore */
-	if (from_user) {
-		if (count > GS_TMP_BUF_SIZE)
-			count = GS_TMP_BUF_SIZE;
-		down(&gs_tmp_buf_sem);
-		if (copy_from_user(gs_tmp_buf, buf, count) != 0) {
-			up(&gs_tmp_buf_sem);
-			printk(KERN_ERR
-			"gs_write: (%d,%p) cannot copy from user space\n",
-				port->port_num, tty);
-			return -EFAULT;
-		}
-		buf = gs_tmp_buf;
-	}
-
 	spin_lock_irqsave(&port->port_lock, flags);
 
 	if (port->port_dev == NULL) {
 		printk(KERN_ERR "gs_write: (%d,%p) port is not connected\n",
 			port->port_num, tty);
 		spin_unlock_irqrestore(&port->port_lock, flags);
-		if (from_user)
-			up(&gs_tmp_buf_sem);
 		return -EIO;
 	}
 
@@ -800,17 +777,12 @@ static int gs_write(struct tty_struct *tty, int from_user, const unsigned char *
 		printk(KERN_ERR "gs_write: (%d,%p) port is closed\n",
 			port->port_num, tty);
 		spin_unlock_irqrestore(&port->port_lock, flags);
-		if (from_user)
-			up(&gs_tmp_buf_sem);
 		return -EBADF;
 	}
 
 	count = gs_buf_put(port->port_write_buf, buf, count);
 
 	spin_unlock_irqrestore(&port->port_lock, flags);
-
-	if (from_user)
-		up(&gs_tmp_buf_sem);
 
 	gs_send(gs_device);
 

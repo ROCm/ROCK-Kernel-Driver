@@ -669,7 +669,7 @@ static int  ftdi_HE_TIRA1_startup	(struct usb_serial *serial);
 static void ftdi_shutdown		(struct usb_serial *serial);
 static int  ftdi_open			(struct usb_serial_port *port, struct file *filp);
 static void ftdi_close			(struct usb_serial_port *port, struct file *filp);
-static int  ftdi_write			(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+static int  ftdi_write			(struct usb_serial_port *port, const unsigned char *buf, int count);
 static int  ftdi_write_room		(struct usb_serial_port *port);
 static int  ftdi_chars_in_buffer	(struct usb_serial_port *port);
 static void ftdi_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
@@ -1504,7 +1504,7 @@ static void ftdi_close (struct usb_serial_port *port, struct file *filp)
  *
  * The new devices do not require this byte
  */
-static int ftdi_write (struct usb_serial_port *port, int from_user,
+static int ftdi_write (struct usb_serial_port *port,
 			   const unsigned char *buf, int count)
 { /* ftdi_write */
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
@@ -1561,17 +1561,8 @@ static int ftdi_write (struct usb_serial_port *port, int from_user,
 			/* Write the control byte at the front of the packet*/
 			*first_byte = 1 | ((user_pktsz) << 2); 
 			/* Copy data for packet */
-			if (from_user) {
-				if (copy_from_user (first_byte + data_offset,
-						    current_position, user_pktsz)){
-					kfree (buffer);
-					usb_free_urb (urb);
-					return -EFAULT;
-				}
-			} else {
-				memcpy (first_byte + data_offset,
-					current_position, user_pktsz);
-			}
+			memcpy (first_byte + data_offset,
+				current_position, user_pktsz);
 			first_byte += user_pktsz + data_offset;
 			current_position += user_pktsz;
 			todo -= user_pktsz;
@@ -1579,15 +1570,7 @@ static int ftdi_write (struct usb_serial_port *port, int from_user,
 	} else {
 		/* No control byte required. */
 		/* Copy in the data to send */
-		if (from_user) {
-			if (copy_from_user (buffer, buf, count)) {
-				kfree (buffer);
-				usb_free_urb (urb);
-				return -EFAULT;
-			}
-		} else {
-			memcpy (buffer, buf, count);
-		}
+		memcpy (buffer, buf, count);
 	}
 
 	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, transfer_size, buffer);

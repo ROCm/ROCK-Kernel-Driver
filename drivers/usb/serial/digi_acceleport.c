@@ -455,8 +455,7 @@ static int digi_ioctl( struct usb_serial_port *port, struct file *file,
 static int digi_tiocmget( struct usb_serial_port *port, struct file *file );
 static int digi_tiocmset( struct usb_serial_port *port, struct file *file,
 	unsigned int set, unsigned int clear );
-static int digi_write( struct usb_serial_port *port, int from_user,
-	const unsigned char *buf, int count );
+static int digi_write( struct usb_serial_port *port, const unsigned char *buf, int count );
 static void digi_write_bulk_callback( struct urb *urb, struct pt_regs *regs );
 static int digi_write_room( struct usb_serial_port *port );
 static int digi_chars_in_buffer( struct usb_serial_port *port );
@@ -1262,26 +1261,21 @@ dbg( "digi_ioctl: TOP: port=%d, cmd=0x%x", priv->dp_port_num, cmd );
 }
 
 
-static int digi_write( struct usb_serial_port *port, int from_user,
-	const unsigned char *buf, int count )
+static int digi_write( struct usb_serial_port *port, const unsigned char *buf, int count )
 {
 
 	int ret,data_len,new_len;
 	struct digi_port *priv = usb_get_serial_port_data(port);
 	unsigned char *data = port->write_urb->transfer_buffer;
-	unsigned char user_buf[64];	/* 64 bytes is max USB bulk packet */
 	unsigned long flags = 0;
 
 
-dbg( "digi_write: TOP: port=%d, count=%d, from_user=%d, in_interrupt=%ld",
-priv->dp_port_num, count, from_user, in_interrupt() );
+dbg( "digi_write: TOP: port=%d, count=%d, in_interrupt=%ld",
+priv->dp_port_num, count, in_interrupt() );
 
 	/* copy user data (which can sleep) before getting spin lock */
 	count = min( count, port->bulk_out_size-2 );
 	count = min( 64, count);
-	if( from_user && copy_from_user( user_buf, buf, count ) ) {
-		return( -EFAULT );
-	}
 
 	/* be sure only one write proceeds at a time */
 	/* there are races on the port private buffer */
@@ -1294,8 +1288,7 @@ priv->dp_port_num, count, from_user, in_interrupt() );
 
 		/* buffer data if count is 1 (probably put_char) if possible */
 		if( count == 1 && priv->dp_out_buf_len < DIGI_OUT_BUF_SIZE ) {
-			priv->dp_out_buf[priv->dp_out_buf_len++]
-				= *(from_user ? user_buf : buf);
+			priv->dp_out_buf[priv->dp_out_buf_len++] = *buf;
 			new_len = 1;
 		} else {
 			new_len = 0;
@@ -1328,7 +1321,7 @@ priv->dp_port_num, count, from_user, in_interrupt() );
 	data += priv->dp_out_buf_len;
 
 	/* copy in new data */
-	memcpy( data, from_user ? user_buf : buf, new_len );
+	memcpy( data, buf, new_len );
 
 	if( (ret=usb_submit_urb(port->write_urb, GFP_ATOMIC)) == 0 ) {
 		priv->dp_write_urb_in_use = 1;

@@ -1744,16 +1744,15 @@ static void mgslpc_flush_chars(struct tty_struct *tty)
  * Arguments:
  * 
  * tty        pointer to tty information structure
- * from_user  flag: 1 = from user process
  * buf	      pointer to buffer containing send data
  * count      size of send data in bytes
  * 	
  * Returns: number of characters written
  */
-static int mgslpc_write(struct tty_struct * tty, int from_user,
+static int mgslpc_write(struct tty_struct * tty,
 			const unsigned char *buf, int count)
 {
-	int c, ret = 0, err;
+	int c, ret = 0;
 	MGSLPC_INFO *info = (MGSLPC_INFO *)tty->driver_data;
 	unsigned long flags;
 	
@@ -1783,15 +1782,7 @@ static int mgslpc_write(struct tty_struct * tty, int from_user,
 		if (c <= 0)
 			break;
 			
-		if (from_user) {
-			COPY_FROM_USER(err, info->tx_buf + info->tx_put, buf, c);
-			if (err) {
-				if (!ret)
-					ret = -EFAULT;
-				break;
-			}
-		} else
-			memcpy(info->tx_buf + info->tx_put, buf, c);
+		memcpy(info->tx_buf + info->tx_put, buf, c);
 
 		spin_lock_irqsave(&info->lock,flags);
 		info->tx_put = (info->tx_put + c) & (TXBUFSIZE-1);

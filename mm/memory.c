@@ -974,6 +974,15 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long from, unsigned lon
 	if (from >= end)
 		BUG();
 
+	/*
+	 * Physically remapped pages are special. Tell the
+	 * rest of the world about it:
+	 *   VM_IO tells people not to look at these pages
+	 *	(accesses can have side effects).
+	 *   VM_RESERVED tells swapout not to try to touch
+	 *	this region.
+	 */
+	vma->vm_flags |= VM_IO | VM_RESERVED;
 	spin_lock(&mm->page_table_lock);
 	do {
 		pmd_t *pmd = pmd_alloc(mm, dir, from);

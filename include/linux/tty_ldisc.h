@@ -123,7 +123,7 @@ struct tty_ldisc {
 	ssize_t	(*read)(struct tty_struct * tty, struct file * file,
 			unsigned char __user * buf, size_t nr);
 	ssize_t	(*write)(struct tty_struct * tty, struct file * file,
-			 const unsigned char __user * buf, size_t nr);	
+			 const unsigned char * buf, size_t nr);	
 	int	(*ioctl)(struct tty_struct * tty, struct file * file,
 			 unsigned int cmd, unsigned long arg);
 	void	(*set_termios)(struct tty_struct *tty, struct termios * old);

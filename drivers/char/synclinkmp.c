@@ -521,7 +521,7 @@ static void close(struct tty_struct *tty, struct file * filp);
 static void hangup(struct tty_struct *tty);
 static void set_termios(struct tty_struct *tty, struct termios *old_termios);
 
-static int  write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count);
+static int  write(struct tty_struct *tty, const unsigned char *buf, int count);
 static void put_char(struct tty_struct *tty, unsigned char ch);
 static void send_xchar(struct tty_struct *tty, char ch);
 static void wait_until_sent(struct tty_struct *tty, int timeout);
@@ -971,16 +971,15 @@ static void set_termios(struct tty_struct *tty, struct termios *old_termios)
  * Arguments:
  *
  * 	tty		pointer to tty information structure
- * 	from_user	flag: 1 = from user process
  * 	buf		pointer to buffer containing send data
  * 	count		size of send data in bytes
  *
  * Return Value:	number of characters written
  */
-static int write(struct tty_struct *tty, int from_user,
+static int write(struct tty_struct *tty,
 		 const unsigned char *buf, int count)
 {
-	int	c, ret = 0, err;
+	int	c, ret = 0;
 	SLMP_INFO *info = (SLMP_INFO *)tty->driver_data;
 	unsigned long flags;
 
@@ -1007,11 +1006,9 @@ static int write(struct tty_struct *tty, int from_user,
 			tx_load_dma_buffer(info, info->tx_buf, info->tx_count);
 			goto start;
 		}
-		if (!from_user) {
-			ret = info->tx_count = count;
-			tx_load_dma_buffer(info, buf, count);
-			goto start;
-		}
+		ret = info->tx_count = count;
+		tx_load_dma_buffer(info, buf, count);
+		goto start;
 	}
 
 	for (;;) {
@@ -1021,15 +1018,7 @@ static int write(struct tty_struct *tty, int from_user,
 		if (c <= 0)
 			break;
 			
-		if (from_user) {
-			COPY_FROM_USER(err, info->tx_buf + info->tx_put, buf, c);
-			if (err) {
-				if (!ret)
-					ret = -EFAULT;
-				break;
-			}
-		} else
-			memcpy(info->tx_buf + info->tx_put, buf, c);
+		memcpy(info->tx_buf + info->tx_put, buf, c);
 
 		spin_lock_irqsave(&info->lock,flags);
 		info->tx_put += c;

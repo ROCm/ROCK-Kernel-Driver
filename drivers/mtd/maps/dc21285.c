@@ -5,7 +5,7 @@
  *
  * This code is GPL
  * 
- * $Id: dc21285.c,v 1.20 2004/07/12 22:38:29 dwmw2 Exp $
+ * $Id: dc21285.c,v 1.21 2004/09/16 23:27:13 gleixner Exp $
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -175,7 +175,7 @@ static int __init init_dc21285(void)
 		dc21285_map.bankwidth*8);
 
 	/* Let's map the flash area */
-	dc21285_map.map_priv_1 = (unsigned long)ioremap(DC21285_FLASH, 16*1024*1024);
+	dc21285_map.map_priv_1 = (void __iomem *)ioremap(DC21285_FLASH, 16*1024*1024);
 	if (!dc21285_map.map_priv_1) {
 		printk("Failed to ioremap\n");
 		return -EIO;

@@ -1,7 +1,7 @@
 /*
  * Flash memory access on Alchemy Pb1550 board
  * 
- * $Id: pb1550-flash.c,v 1.4 2004/07/14 17:45:40 dwmw2 Exp $
+ * $Id: pb1550-flash.c,v 1.5 2004/09/16 23:27:13 gleixner Exp $
  *
  * (C) 2004 Embedded Edge, LLC, based on pb1550-flash.c:
  * (C) 2003 Pete Popov <ppopov@pacbell.net>
@@ -179,7 +179,7 @@ int __init pb1550_mtd_init(void)
 	printk(KERN_NOTICE "Pb1550 flash: probing %d-bit flash bus\n", 
 			pb1550_map.bankwidth*8);
 	pb1550_map.virt = 
-		(unsigned long)ioremap(window_addr, window_size);
+		(void __iomem *)ioremap(window_addr, window_size);
 	mymtd = do_map_probe("cfi_probe", &pb1550_map);
 	if (!mymtd) return -ENXIO;
 	mymtd->owner = THIS_MODULE;

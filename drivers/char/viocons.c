@@ -721,7 +721,7 @@ static void viotty_close(struct tty_struct *tty, struct file *filp)
 /*
  * TTY Write method
  */
-static int viotty_write(struct tty_struct *tty, int from_user,
+static int viotty_write(struct tty_struct *tty,
 			const unsigned char *buf, int count)
 {
 	int ret;
@@ -754,44 +754,7 @@ static int viotty_write(struct tty_struct *tty, int from_user,
 		return count;
 	}
 
-	/*
-	 * If the viotty_write is invoked from user space we want to do the
-	 * copy_from_user() into an event buffer from the cfu buffer before
-	 * internal_write() is called because internal_write may need to buffer
-	 * data which will need to grab a spin_lock and we shouldn't
-	 * copy_from_user() while holding a spin_lock.  Should internal_write()
-	 * not need to buffer data then it'll just use the event we created here
-	 * rather than checking one out from vio_get_event_buffer().
-	 */
-	if (from_user) {
-		struct viocharlpevent *viochar;
-		int curlen;
-		const char *curbuf = buf;
-
-		viochar = viocons_get_cfu_buffer();
-		if (viochar == NULL)
-			return -EAGAIN;
-		initDataEvent(viochar, pi->lp);
-		while (count > 0) {
-			if (count > VIOCHAR_MAX_DATA)
-				curlen = VIOCHAR_MAX_DATA;
-			else
-				curlen = count;
-			viochar->len = curlen;
-			ret = copy_from_user(viochar->data, curbuf, curlen);
-			if (ret)
-				break;
-			ret = internal_write(pi, viochar->data,
-					viochar->len, viochar);
-			total += ret;
-			if (ret != curlen)
-				break;
-			count -= curlen;
-			curbuf += curlen;
-		}
-		viocons_free_cfu_buffer(viochar);
-	} else
-		total = internal_write(pi, buf, count, NULL);
+	total = internal_write(pi, buf, count, NULL);
 	return total;
 }
 

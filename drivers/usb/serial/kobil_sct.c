@@ -73,7 +73,7 @@ static int  kobil_startup (struct usb_serial *serial);
 static void kobil_shutdown (struct usb_serial *serial);
 static int  kobil_open (struct usb_serial_port *port, struct file *filp);
 static void kobil_close (struct usb_serial_port *port, struct file *filp);
-static int  kobil_write (struct usb_serial_port *port, int from_user, 
+static int  kobil_write (struct usb_serial_port *port, 
 			 const unsigned char *buf, int count);
 static int  kobil_write_room(struct usb_serial_port *port);
 static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
@@ -418,7 +418,7 @@ static void kobil_write_callback( struct urb *purb, struct pt_regs *regs )
 }
 
 
-static int kobil_write (struct usb_serial_port *port, int from_user, 
+static int kobil_write (struct usb_serial_port *port, 
 			const unsigned char *buf, int count)
 {
 	int length = 0;
@@ -439,13 +439,7 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 	}
 
 	// Copy data to buffer
-	if (from_user) {
-		if (copy_from_user(priv->buf + priv->filled, buf, count)) {
-			return -EFAULT;
-		}
-	} else {
-		memcpy (priv->buf + priv->filled, buf, count);
-	}
+	memcpy (priv->buf + priv->filled, buf, count);
 
 	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, priv->buf + priv->filled);
 
