@@ -411,7 +411,7 @@ extern int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmn
 extern int ata_scsi_error(struct Scsi_Host *host);
 extern int ata_scsi_release(struct Scsi_Host *host);
 extern int ata_scsi_slave_config(struct scsi_device *sdev);
-extern inline unsigned int ata_host_intr (struct ata_port *ap, struct ata_queued_cmd *qc);
+extern unsigned int ata_host_intr(struct ata_port *ap, struct ata_queued_cmd *qc);
 /*
  * Default driver ops implementations
  */
