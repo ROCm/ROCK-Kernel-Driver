@@ -114,11 +114,11 @@ write_src(void)
 
 	printf(".globl kallsyms_num_syms\n");
 	printf("\t.align 8\n");
+	printf("kallsyms_num_syms:\n");
 	printf("\t.long\t%d\n", valid);
 	printf("\n");
 
 	printf(".globl kallsyms_names\n");
-	printf(".data\n");
 	printf("\t.align 8\n");
 	printf("kallsyms_names:\n");
 	for (i = 0, last_addr = 0; i < cnt; i++) {
