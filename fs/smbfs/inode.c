@@ -449,10 +449,9 @@ smb_put_super(struct super_block *sb)
 {
 	struct smb_sb_info *server = SMB_SB(sb);
 
-	smbiod_unregister_server(server);
-
 	smb_lock_server(server);
 	server->state = CONN_INVALID;
+	smbiod_unregister_server(server);
 
 	smb_close_socket(server);
 

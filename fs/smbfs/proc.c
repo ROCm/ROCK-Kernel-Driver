@@ -1127,6 +1127,7 @@ smb_proc_open(struct smb_sb_info *server, struct dentry *dentry, int wish)
 			VERBOSE("%s/%s R/W failed, error=%d, retrying R/O\n",
 				DENTRY_PATH(dentry), res);
 			mode = read_only;
+			req->rq_flags = 0;
 			goto retry;
 		}
 		goto out_free;
@@ -1701,6 +1702,7 @@ smb_proc_unlink(struct dentry *dentry)
 			result = smb_set_rw(dentry,server);
 			if (result == 0) {
 				flag = 1;
+				req->rq_flags = 0;
 				goto retry;
 			}
 		}
