@@ -55,9 +55,10 @@
  *                                  smc_phy_configure
  *                                - clean up (and fix stack overrun) in PHY
  *                                  MII read/write functions
+ *   22/09/04  Nicolas Pitre      big update (see commit log for details)
  */
 static const char version[] =
-	"smc91x.c: v1.0, mar 07 2003 by Nicolas Pitre <nico@cam.org>\n";
+	"smc91x.c: v1.1, sep 22 2004 by Nicolas Pitre <nico@cam.org>\n";
 
 /* Debugging level */
 #ifndef SMC_DEBUG
@@ -175,7 +176,7 @@ struct smc_local {
 	 * packet, I will store the skbuff here, until I get the
 	 * desired memory.  Then, I'll send it out and free it.
 	 */
-	struct sk_buff *saved_skb;
+	struct sk_buff *pending_tx_skb;
 	struct tasklet_struct tx_task;
 
  	/*
@@ -382,9 +383,9 @@ static void smc_reset(struct net_device *dev)
 	SMC_WAIT_MMU_BUSY();
 
 	/* clear anything saved */
-	if (lp->saved_skb != NULL) {
-		dev_kfree_skb (lp->saved_skb);
-		lp->saved_skb = NULL;
+	if (lp->pending_tx_skb != NULL) {
+		dev_kfree_skb (lp->pending_tx_skb);
+		lp->pending_tx_skb = NULL;
 		lp->stats.tx_errors++;
 		lp->stats.tx_aborted_errors++;
 	}
@@ -573,14 +574,13 @@ done:
 
 /*
  * This is called to actually send a packet to the chip.
- * Returns non-zero when successful.
  */
 static void smc_hardware_send_pkt(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct smc_local *lp = netdev_priv(dev);
 	unsigned long ioaddr = dev->base_addr;
-	struct sk_buff *skb = lp->saved_skb;
+	struct sk_buff *skb = lp->pending_tx_skb;
 	unsigned int packet_no, len;
 	unsigned char *buf;
 
@@ -591,7 +591,7 @@ static void smc_hardware_send_pkt(unsigned long data)
 		return;
 	}
 
-	lp->saved_skb = NULL;
+	lp->pending_tx_skb = NULL;
 	packet_no = SMC_GET_AR();
 	if (unlikely(packet_no & AR_FAILED)) {
 		printk("%s: Memory allocation failed.\n", dev->name);
@@ -665,8 +665,8 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	DBG(3, "%s: %s\n", dev->name, __FUNCTION__);
 
-	BUG_ON(lp->saved_skb != NULL);
-	lp->saved_skb = skb;
+	BUG_ON(lp->pending_tx_skb != NULL);
+	lp->pending_tx_skb = skb;
 
 	/*
 	 * The MMU wants the number of pages to be the number of 256 bytes
@@ -682,7 +682,7 @@ static int smc_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	numPages = ((skb->len & ~1) + (6 - 1)) >> 8;
 	if (unlikely(numPages > 7)) {
 		printk("%s: Far too big packet error.\n", dev->name);
-		lp->saved_skb = NULL;
+		lp->pending_tx_skb = NULL;
 		lp->stats.tx_errors++;
 		lp->stats.tx_dropped++;
 		dev_kfree_skb(skb);
@@ -1524,9 +1524,9 @@ static int smc_close(struct net_device *dev)
 		smc_phy_powerdown(dev, lp->mii.phy_id);
 	}
 
-	if (lp->saved_skb) {
-		dev_kfree_skb(lp->saved_skb);
-		lp->saved_skb = NULL;
+	if (lp->pending_tx_skb) {
+		dev_kfree_skb(lp->pending_tx_skb);
+		lp->pending_tx_skb = NULL;
 	}
 
 	return 0;
