@@ -210,7 +210,7 @@ static const struct serial8250_config uart_config[] = {
 		.tx_loadsz	= 64,
 		.fcr		= UART_FCR_ENABLE_FIFO | UART_FCR_R_TRIG_10 |
 				  UART_FCR7_64BYTE,
-		.flags		= UART_CAP_FIFO | UART_CAP_SLEEP,
+		.flags		= UART_CAP_FIFO | UART_CAP_SLEEP | UART_CAP_AFE,
 	},
 	[PORT_STARTECH] = {
 		.name		= "Startech",
@@ -1584,11 +1584,14 @@ serial8250_set_termios(struct uart_port *port, struct termios *termios,
 	}
 
 	/*
-	 * TI16C750: hardware flow control and 64 byte FIFOs. When AFE is
-	 * enabled, RTS will be deasserted when the receive FIFO contains
-	 * more characters than the trigger, or the MCR RTS bit is cleared.
+	 * MCR-based auto flow control.  When AFE is enabled, RTS will be
+	 * deasserted when the receive FIFO contains more characters than
+	 * the trigger, or the MCR RTS bit is cleared.  In the case where
+	 * the remote UART is not using CTS auto flow control, we must
+	 * have sufficient FIFO entries for the latency of the remote
+	 * UART to respond.  IOW, at least 32 bytes of FIFO.
 	 */
-	if (up->port.type == PORT_16750) {
+	if (up->capabilities & UART_CAP_AFE && up->port.fifosize >= 32) {
 		up->mcr &= ~UART_MCR_AFE;
 		if (termios->c_cflag & CRTSCTS)
 			up->mcr |= UART_MCR_AFE;
