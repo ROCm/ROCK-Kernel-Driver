@@ -80,6 +80,7 @@
 #include <linux/in.h>
 #include <linux/major.h>
 #include <linux/utsname.h>
+#include <linux/inet.h>
 #include <net/ipconfig.h>
 
 /* Define this to allow debugging output */
