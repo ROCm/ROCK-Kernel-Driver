@@ -196,7 +196,7 @@ static int __init st5481_usb_init(void)
 	st5481_debug = debug;
 #endif
 
-	printk(KERN_INFO "hiax_st5481: ST5481 USB ISDN driver v0.1.0\n");
+	printk(KERN_INFO "hisax_st5481: ST5481 USB ISDN driver v0.1.0\n");
 
 	retval = st5481_d_init();
 	if (retval < 0)
@@ -217,6 +217,7 @@ static int __init st5481_usb_init(void)
 static void __exit st5481_usb_exit(void)
 {
 	usb_deregister(&st5481_usb_driver);
+	st5481_d_exit();
 }
 
 module_init(st5481_usb_init);
