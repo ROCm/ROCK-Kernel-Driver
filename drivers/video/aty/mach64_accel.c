@@ -170,11 +170,11 @@ static inline void draw_rect(s16 x, s16 y, u16 width, u16 height,
 	par->blitter_may_be_busy = 1;
 }
 
-void atyfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+void atyfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
-	
-	u32 direction = DST_LAST_PEL;
+	u32 dy = area->dy, sy = area->sy, direction = DST_LAST_PEL;
+	u32 sx = area->sx, dx = area->dx, width = area->width;	
 	u32 pitch_value;
 
 	if (!area->width || !area->height)
@@ -191,35 +191,35 @@ void atyfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 		/* In 24 bpp, the engine is in 8 bpp - this requires that all */
 		/* horizontal coordinates and widths must be adjusted */
 		pitch_value *= 3;
-		area->sx *= 3;
-		area->dx *= 3;
-		area->width *= 3;
+		sx *= 3;
+		dx *= 3;
+		width *= 3;
 	}
 
 	if (area->sy < area->dy) {
-		area->dy += area->height - 1;
-		area->sy += area->height - 1;
+		dy += area->height - 1;
+		sy += area->height - 1;
 	} else
 		direction |= DST_Y_TOP_TO_BOTTOM;
 
-	if (area->sx < area->dx) {
-		area->dx += area->width - 1;
-		area->sx += area->width - 1;
+	if (sx < dx) {
+		dx += width - 1;
+		sx += width - 1;
 	} else
 		direction |= DST_X_LEFT_TO_RIGHT;
 
 	wait_for_fifo(4, par);
 	aty_st_le32(DP_SRC, FRGD_SRC_BLIT, par);
-	aty_st_le32(SRC_Y_X, (area->sx << 16) | area->sy, par);
-	aty_st_le32(SRC_HEIGHT1_WIDTH1, (area->width << 16) | area->height,par);
+	aty_st_le32(SRC_Y_X, (sx << 16) | sy, par);
+	aty_st_le32(SRC_HEIGHT1_WIDTH1, (width << 16) | area->height, par);
 	aty_st_le32(DST_CNTL, direction, par);
-	draw_rect(area->dx, area->dy, area->width, area->height, par);
+	draw_rect(dx, dy, width, area->height, par);
 }
 
 void atyfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
-	u32 color = rect->color, dx = rect->dx, width = rect->width;
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
+	u32 color = rect->color, dx = rect->dx, width = rect->width;
 
 	if (!rect->width || !rect->height)
 		return;
@@ -230,8 +230,8 @@ void atyfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 		return;
 	}
 
-	color |= (color << 8);
-	color |= (color << 16);
+	color |= (rect->color << 8);
+	color |= (rect->color << 16);
 
 	if (info->var.bits_per_pixel == 24) {
 		/* In 24 bpp, the engine is in 8 bpp - this requires that all */
@@ -251,7 +251,7 @@ void atyfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 	draw_rect(dx, rect->dy, width, rect->height, par);
 }
 
-void atyfb_imageblit(struct fb_info *info, struct fb_image *image)
+void atyfb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
     
