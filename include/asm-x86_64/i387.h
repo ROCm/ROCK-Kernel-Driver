@@ -48,7 +48,7 @@ static inline int need_signal_i387(struct task_struct *me)
 
 #define clear_fpu(tsk) do { \
 	if ((tsk)->thread_info->status & TS_USEDFPU) {		\
-		asm volatile("fwait");				\
+		asm volatile("fnclex ; fwait");			\
 		(tsk)->thread_info->status &= ~TS_USEDFPU;	\
 		stts();						\
 	}							\
