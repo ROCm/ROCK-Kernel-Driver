@@ -675,41 +675,6 @@ int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 		HZ * USB_CTRL_GET_TIMEOUT);
 }
 
-
-// hub-only!! ... and only exported for reset/reinit path.
-// otherwise used internally, when setting up a config
-void usb_set_maxpacket(struct usb_device *dev)
-{
-	int i, b;
-
-	/* NOTE:  affects all endpoints _except_ ep0 */
-	for (i=0; i<dev->actconfig->desc.bNumInterfaces; i++) {
-		struct usb_interface *ifp = dev->actconfig->interface[i];
-		struct usb_host_interface *as = ifp->altsetting + ifp->act_altsetting;
-		struct usb_host_endpoint *ep = as->endpoint;
-		int e;
-
-		for (e=0; e<as->desc.bNumEndpoints; e++) {
-			struct usb_endpoint_descriptor	*d;
-			d = &ep [e].desc;
-			b = d->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-			if ((d->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
-				USB_ENDPOINT_XFER_CONTROL) {	/* Control => bidirectional */
-				dev->epmaxpacketout[b] = d->wMaxPacketSize;
-				dev->epmaxpacketin [b] = d->wMaxPacketSize;
-				}
-			else if (usb_endpoint_out(d->bEndpointAddress)) {
-				if (d->wMaxPacketSize > dev->epmaxpacketout[b])
-					dev->epmaxpacketout[b] = d->wMaxPacketSize;
-			}
-			else {
-				if (d->wMaxPacketSize > dev->epmaxpacketin [b])
-					dev->epmaxpacketin [b] = d->wMaxPacketSize;
-			}
-		}
-	}
-}
-
 /**
  * usb_clear_halt - tells device to clear endpoint halt/stall condition
  * @dev: device whose endpoint is halted

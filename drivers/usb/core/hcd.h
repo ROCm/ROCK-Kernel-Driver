@@ -252,7 +252,6 @@ extern void usb_disconnect(struct usb_device **);
 
 /* exported to hub driver ONLY to support usb_reset_device () */
 extern int usb_get_configuration(struct usb_device *dev);
-extern void usb_set_maxpacket(struct usb_device *dev);
 extern void usb_destroy_configuration(struct usb_device *dev);
 extern int usb_set_address(struct usb_device *dev);
 

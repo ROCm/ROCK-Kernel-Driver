@@ -1331,9 +1331,7 @@ int usb_physical_reset_device(struct usb_device *dev)
 			return 1;
 		}
 
-		dev->actconfig = dev->config;
-		usb_set_maxpacket(dev);
-
+		usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue);
 		return 1;
 	}
 
