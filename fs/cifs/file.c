@@ -1283,8 +1283,8 @@ construct_dentry(struct qstr *qstring, struct file *file,
 }
 
 static void reset_resume_key(struct file * dir_file, 
-						unsigned char * filename, 
-						unsigned int len) {
+				unsigned char * filename, 
+				unsigned int len) {
 	struct cifsFileInfo *cifsFile;
 
 	cifsFile = (struct cifsFileInfo *)dir_file->private_data;
@@ -1324,7 +1324,6 @@ cifs_filldir(struct qstr *pqstring, FILE_DIRECTORY_INFO * pfindData,
 	if(rc) {
 		/* due to readdir error we need to recalculate resume 
 		key so next readdir will restart on right entry */
-		reset_resume_key(file, pfindData->FileName, pqstring->len);
 		cFYI(1,("Error %d on filldir of %s",rc ,pfindData->FileName));
 	}
 	dput(tmp_dentry);
@@ -1351,7 +1350,6 @@ cifs_filldir_unix(struct qstr *pqstring,
 	if(rc) {
 		/* due to readdir error we need to recalculate resume 
 			key so next readdir will restart on right entry */
-		reset_resume_key(file, pUnixFindData->FileName,pqstring->len);
 		cFYI(1,("Error %d on filldir of %s",rc ,pUnixFindData->FileName));
 	}
 	dput(tmp_dentry);
@@ -1542,6 +1540,11 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 							/* do not end search if
 								kernel not ready to take
 								remaining entries yet */
+							if(Unicode == TRUE) {
+								qstring.len = cifs_strtoUCS((wchar_t *) pfindData->FileName,
+									pfindData->FileName, 2 * (qstring.len + 1), cifs_sb->local_nls);
+							}
+							reset_resume_key(file, pfindData->FileName,qstring.len);
 							findParms.EndofSearch = 0;
 							break;
 						}
@@ -1580,6 +1583,11 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 								kernel not ready to take
 								remaining entries yet */
 							findParms.EndofSearch = 0;
+							if(Unicode == TRUE) {
+								qstring.len = cifs_strtoUCS((wchar_t *) pfindDataUnix->FileName,
+									pfindDataUnix->FileName, 2 * (qstring.len + 1), cifs_sb->local_nls);
+							}
+							reset_resume_key(file, pfindDataUnix->FileName,qstring.len);
 							break;
 						}
 						file->f_pos++;
@@ -1729,6 +1737,11 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 								kernel not ready to take
 								remaining entries yet */
 								findNextParms.EndofSearch = 0;
+							 	if(Unicode == TRUE) {
+								   qstring.len = cifs_strtoUCS((wchar_t *) pfindData->FileName,
+										pfindData->FileName, 2 * (qstring.len + 1), cifs_sb->local_nls);
+								}
+								reset_resume_key(file, pfindData->FileName,qstring.len);
 								break;
 							}
 							file->f_pos++;
@@ -1769,6 +1782,11 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 								kernel not ready to take
 								remaining entries yet */
 								findNextParms.EndofSearch = 0;
+							 	if(Unicode == TRUE) {
+								   qstring.len = cifs_strtoUCS((wchar_t *) pfindDataUnix->FileName,
+										pfindDataUnix->FileName, 2 * (qstring.len + 1), cifs_sb->local_nls);
+								}
+								reset_resume_key(file, pfindDataUnix->FileName,qstring.len);
 								break;
 							}
 							file->f_pos++;

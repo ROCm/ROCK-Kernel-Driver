@@ -1,7 +1,8 @@
 Version 1.03
 ------------
-Fix problem not attempting connect to server when port number 
-override not specified.
+Connect to server when port number override not specified, and tcp port
+unitialized.  Reset search to restart at correct file when kernel routine
+filldir returns error during large directory searches (readdir). 
 
 Version 1.02
 ------------

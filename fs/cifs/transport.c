@@ -218,7 +218,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 
 	midQ->midState = MID_REQUEST_SUBMITTED;
 	rc = smb_send(ses->server->ssocket, in_buf, in_buf->smb_buf_length,
-		      (struct sockaddr *) &(ses->server->sockAddr));
+		      (struct sockaddr *) &(ses->server->addr.sockAddr));
 	up(&ses->server->tcpSem);
 	if (long_op == -1)
 		goto cifs_no_response_exit;

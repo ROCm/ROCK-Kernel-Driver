@@ -16,6 +16,7 @@
  * 
  */
 #include <linux/in.h>
+#include <linux/in6.h>
 #include "cifs_fs_sb.h"
 /*
  * The sizes of various internal tables and strings
@@ -105,7 +106,10 @@ struct TCP_Server_Info {
 	char server_Name[SERVER_NAME_LEN_WITH_NULL];	/* 15 chars + X'20'in 16th */
 	char unicode_server_Name[SERVER_NAME_LEN_WITH_NULL * 2];	/* Unicode version of server_Name */
 	struct socket *ssocket;
-	struct sockaddr_in sockAddr;
+	union {
+		struct sockaddr_in sockAddr;
+		struct sockaddr_in6 sockAddr6;
+	} addr;
 	wait_queue_head_t response_q;
 	struct list_head pending_mid_q;
 	void *Server_NlsInfo;	/* BB - placeholder for future NLS info  */
