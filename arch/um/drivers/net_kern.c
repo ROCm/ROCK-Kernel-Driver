@@ -15,6 +15,7 @@
 #include "linux/module.h"
 #include "linux/init.h"
 #include "linux/etherdevice.h"
+#include "linux/ethtool.h"
 #include "linux/list.h"
 #include "linux/inetdevice.h"
 #include "linux/ctype.h"
@@ -242,7 +243,30 @@ static int uml_net_change_mtu(struct net_device *dev, int new_mtu)
 
 static int uml_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	return(-EINVAL);
+	static const struct ethtool_drvinfo info = {
+		.cmd     = ETHTOOL_GDRVINFO,
+		.driver  = "uml virtual ethernet",
+		.version = "42",
+	};
+	void *useraddr;
+	u32 ethcmd;
+
+	switch (cmd) {
+        case SIOCETHTOOL:
+		useraddr = ifr->ifr_data;
+		if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+			return -EFAULT;
+		switch (ethcmd) {
+		case ETHTOOL_GDRVINFO:
+			if (copy_to_user(useraddr, &info, sizeof(info)))
+				return -EFAULT;
+			return 0;
+		default:
+			return -EOPNOTSUPP;
+		}
+	default:
+		return -EINVAL;
+	}
 }
 
 void uml_net_user_timer_expire(unsigned long _conn)
