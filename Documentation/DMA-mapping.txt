@@ -323,16 +323,12 @@ Create a pci_pool like this:
 
 	struct pci_pool *pool;
 
-	pool = pci_pool_create(name, dev, size, align, alloc, flags);
+	pool = pci_pool_create(name, dev, size, align, alloc);
 
 The "name" is for diagnostics (like a kmem_cache name); dev and size
 are as above.  The device's hardware alignment requirement for this
 type of data is "align" (which is expressed in bytes, and must be a
-power of two).  The flags are SLAB_ flags as you'd pass to
-kmem_cache_create.  Not all flags are understood, but SLAB_POISON may
-help you find driver bugs.  If you call this in a non- sleeping
-context (f.e. in_interrupt is true or while holding SMP locks), pass
-SLAB_ATOMIC.  If your device has no boundary crossing restrictions,
+power of two).  If your device has no boundary crossing restrictions,
 pass 0 for alloc; passing 4096 says memory allocated from this pool
 must not cross 4KByte boundaries (but at that time it may be better to
 go for pci_alloc_consistent directly instead).
