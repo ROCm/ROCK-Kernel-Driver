@@ -447,24 +447,6 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 	return;
 }
 
-static void scsi_set_name(struct scsi_device *sdev, char *inq_result)
-{
-	int i;
-	char type[72];
-
-	i = inq_result[0] & 0x1f;
-	if (i < MAX_SCSI_DEVICE_CODE)
-		strcpy(type, scsi_device_types[i]);
-	else
-		strcpy(type, "Unknown");
-
-	i = strlen(type) - 1;
-	while (i >= 0 && type[i] == ' ')
-		type[i--] = '\0';
-
-	snprintf(sdev->sdev_gendev.name, DEVICE_NAME_SIZE, "SCSI %s", type);
-}
-
 /**
  * scsi_add_lun - allocate and fully initialze a Scsi_Device
  * @sdevscan:	holds information to be stored in the new Scsi_Device
@@ -538,8 +520,6 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 	default:
 		printk(KERN_INFO "scsi: unknown device type %d\n", sdev->type);
 	}
-
-	scsi_set_name(sdev, inq_result);
 
 	print_inquiry(inq_result);
 
