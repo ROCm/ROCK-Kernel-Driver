@@ -157,7 +157,7 @@ static int ax25_rt_add(struct ax25_routes_struct *route)
 	return 0;
 }
 
-static int ax25_rt_destroy(ax25_route *ax25_rt)
+static void ax25_rt_destroy(ax25_route *ax25_rt)
 {
 	if (atomic_read(&ax25_rt->ref) == 0) {
 		if (ax25_rt->digipeat != NULL)
