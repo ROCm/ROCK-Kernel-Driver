@@ -2072,14 +2072,14 @@ retry:
  * these days. ATAPI / SCSI specific code now mainly resides in
  * mmc_ioct().
  */
-int cdrom_ioctl(struct cdrom_device_info *cdi, struct inode *ip,
-		unsigned int cmd, unsigned long arg)
+int cdrom_ioctl(struct file * file, struct cdrom_device_info *cdi,
+		struct inode *ip, unsigned int cmd, unsigned long arg)
 {
 	struct cdrom_device_ops *cdo = cdi->ops;
 	int ret;
 
 	/* Try the generic SCSI command ioctl's first.. */
-	ret = scsi_cmd_ioctl(ip->i_bdev->bd_disk, cmd, (void __user *)arg);
+	ret = scsi_cmd_ioctl(file, ip->i_bdev->bd_disk, cmd, (void __user *)arg);
 	if (ret != -ENOTTY)
 		return ret;
 

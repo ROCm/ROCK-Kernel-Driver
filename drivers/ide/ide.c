@@ -1453,8 +1453,8 @@ static int generic_ide_resume(struct device *dev)
 	return ide_do_drive_cmd(drive, &rq, ide_head_wait);
 }
 
-int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
-			unsigned long arg)
+int generic_ide_ioctl(struct file *file, struct block_device *bdev,
+			unsigned int cmd, unsigned long arg)
 {
 	ide_drive_t *drive = bdev->bd_disk->private_data;
 	ide_settings_t *setting;
@@ -1605,7 +1605,7 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 
 		case CDROMEJECT:
 		case CDROMCLOSETRAY:
-			return scsi_cmd_ioctl(bdev->bd_disk, cmd, p);
+			return scsi_cmd_ioctl(file, bdev->bd_disk, cmd, p);
 
 		case HDIO_GET_BUSSTATE:
 			if (!capable(CAP_SYS_ADMIN))
