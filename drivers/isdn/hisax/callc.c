@@ -1,4 +1,4 @@
-/* $Id: callc.c,v 2.59.2.3 2004/01/13 14:31:24 keil Exp $
+/* $Id: callc.c,v 2.59.2.4 2004/02/11 13:21:32 keil Exp $
  *
  * Author       Karsten Keil
  * Copyright    by Karsten Keil      <keil@isdn4linux.de>
@@ -21,7 +21,7 @@
 #include "hisax.h"
 #include <linux/isdn/capicmd.h>
 
-const char *lli_revision = "$Revision: 2.59.2.3 $";
+const char *lli_revision = "$Revision: 2.59.2.4 $";
 
 extern struct IsdnCard cards[];
 extern int nrcards;
@@ -1065,7 +1065,6 @@ init_d_st(struct Channel *chanp)
 	setstack_isdnl2(st, tmp);
 	setstack_l3dc(st, chanp);
 	st->lli.userdata = chanp;
-	st->lli.l2writewakeup = NULL;
 	st->l3.l3l4 = dchan_l3l4;
 
 	return 0;
@@ -1247,8 +1246,8 @@ lltrans_handler(struct PStack *st, int pr, void *arg)
 	}
 }
 
-static void
-ll_writewakeup(struct PStack *st, int len)
+void
+lli_writewakeup(struct PStack *st, int len)
 {
 	struct Channel *chanp = st->lli.userdata;
 	isdn_ctrl ic;
@@ -1312,8 +1311,8 @@ init_b_st(struct Channel *chanp, int incoming)
 			setstack_l3bc(st, chanp);
 			st->l2.l2l3 = lldata_handler;
 			st->lli.userdata = chanp;
-			st->lli.l1writewakeup = NULL;
-			st->lli.l2writewakeup = ll_writewakeup;
+			test_and_clear_bit(FLG_LLI_L1WAKEUP, &st->lli.flag);
+			test_and_set_bit(FLG_LLI_L2WAKEUP, &st->lli.flag);
 			st->l2.l2m.debug = chanp->debug & 16;
 			st->l2.debug = chanp->debug & 64;
 			break;
@@ -1324,7 +1323,8 @@ init_b_st(struct Channel *chanp, int incoming)
 		case (ISDN_PROTO_L2_FAX):
 			st->l1.l1l2 = lltrans_handler;
 			st->lli.userdata = chanp;
-			st->lli.l1writewakeup = ll_writewakeup;
+			test_and_set_bit(FLG_LLI_L1WAKEUP, &st->lli.flag);
+			test_and_clear_bit(FLG_LLI_L2WAKEUP, &st->lli.flag);
 			setstack_transl2(st);
 			setstack_l3bc(st, chanp);
 			break;

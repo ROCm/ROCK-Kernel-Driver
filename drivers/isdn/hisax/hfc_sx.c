@@ -1,4 +1,4 @@
-/* $Id: hfc_sx.c,v 1.12.2.4 2004/01/14 16:04:48 keil Exp $
+/* $Id: hfc_sx.c,v 1.12.2.5 2004/02/11 13:21:33 keil Exp $
  *
  * level driver for Cologne Chip Designs hfc-s+/sp based cards
  *
@@ -20,7 +20,7 @@
 
 extern const char *CardType[];
 
-static const char *hfcsx_revision = "$Revision: 1.12.2.4 $";
+static const char *hfcsx_revision = "$Revision: 1.12.2.5 $";
 
 /***************************************/
 /* IRQ-table for CCDs demo board       */
@@ -540,9 +540,14 @@ hfcsx_fill_fifo(struct BCState *bcs)
 		       HFCSX_BTRANS_THRESHOLD : 0)) {
 
 	  bcs->tx_cnt -= bcs->tx_skb->len;
-	  if (bcs->st->lli.l1writewakeup &&
-	      (PACKET_NOACK != bcs->tx_skb->pkt_type))
-	    bcs->st->lli.l1writewakeup(bcs->st, bcs->tx_skb->len);
+	  if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag) &&
+		(PACKET_NOACK != bcs->tx_skb->pkt_type)) {
+		u_long	flags;
+		spin_lock_irqsave(&bcs->aclock, flags);
+		bcs->ackcnt += bcs->tx_skb->len;
+		spin_unlock_irqrestore(&bcs->aclock, flags);
+		schedule_event(bcs, B_ACKPENDING);
+	  }
 	  dev_kfree_skb_any(bcs->tx_skb);
 	  bcs->tx_skb = NULL;
 	  test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);

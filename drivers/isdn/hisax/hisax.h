@@ -1,4 +1,4 @@
-/* $Id: hisax.h,v 2.64.2.3 2004/01/24 20:47:23 keil Exp $
+/* $Id: hisax.h,v 2.64.2.4 2004/02/11 13:21:33 keil Exp $
  *
  * Basic declarations, defines and prototypes
  *
@@ -280,10 +280,11 @@ struct LLInterface {
 	void (*l4l3) (struct PStack *, int, void *);
         int  (*l4l3_proto) (struct PStack *, isdn_ctrl *);
 	void *userdata;
-	void (*l1writewakeup) (struct PStack *, int);
-	void (*l2writewakeup) (struct PStack *, int);
+	u_long flag;
 };
 
+#define	FLG_LLI_L1WAKEUP	1
+#define	FLG_LLI_L2WAKEUP	2
 
 struct Management {
 	int	ri;
@@ -494,6 +495,8 @@ struct BCState {
 	struct sk_buff *tx_skb; /* B-Channel transmit Buffer */
 	struct sk_buff_head rqueue;	/* B-Channel receive Queue */
 	struct sk_buff_head squeue;	/* B-Channel send Queue */
+	int ackcnt;
+	spinlock_t aclock;
 	struct PStack *st;
 	u_char *blog;
 	u_char *conmsg;
@@ -1281,6 +1284,7 @@ void setstack_isdnl2(struct PStack *st, char *debug_id);
 void releasestack_isdnl2(struct PStack *st);
 void setstack_transl2(struct PStack *st);
 void releasestack_transl2(struct PStack *st);
+void lli_writewakeup(struct PStack *st, int len);
 
 void setstack_l3dc(struct PStack *st, struct Channel *chanp);
 void setstack_l3bc(struct PStack *st, struct Channel *chanp);

@@ -1,4 +1,4 @@
-/* $Id: isar.c,v 1.22.2.5 2004/01/14 00:49:44 keil Exp $
+/* $Id: isar.c,v 1.22.2.6 2004/02/11 13:21:34 keil Exp $
  *
  * isar.c   ISAR (Siemens PSB 7110) specific routines
  *
@@ -759,9 +759,14 @@ send_frames(struct BCState *bcs)
 			isar_fill_fifo(bcs);
 			return;
 		} else {
-			if (bcs->st->lli.l1writewakeup &&
-				(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->hw.isar.txcnt);
+			if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag) &&
+				(PACKET_NOACK != bcs->tx_skb->pkt_type)) {
+				u_long	flags;
+				spin_lock_irqsave(&bcs->aclock, flags);
+				bcs->ackcnt += bcs->hw.isar.txcnt;
+				spin_unlock_irqrestore(&bcs->aclock, flags);
+				schedule_event(bcs, B_ACKPENDING);
+			}
 			if (bcs->mode == L1_MODE_FAX) {
 				if (bcs->hw.isar.cmd == PCTRL_CMD_FTH) {
 					if (test_bit(BC_FLG_LASTDATA, &bcs->Flag)) {

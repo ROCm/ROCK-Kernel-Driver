@@ -1,4 +1,4 @@
-/* $Id: config.c,v 2.84.2.4 2004/01/24 20:47:20 keil Exp $
+/* $Id: config.c,v 2.84.2.5 2004/02/11 13:21:33 keil Exp $
  *
  * Author       Karsten Keil
  * Copyright    by Karsten Keil      <keil@isdn4linux.de>
@@ -1734,8 +1734,13 @@ static void hisax_b_l1l2(struct hisax_if *ifc, int pr, void *arg)
 		break;
 	case PH_DATA | CONFIRM:
 		bcs->tx_cnt -= (int) arg;
-		if (bcs->st->lli.l1writewakeup)
-			bcs->st->lli.l1writewakeup(bcs->st, (int) arg);
+		if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag)) {
+			u_long	flags;
+			spin_lock_irqsave(&bcs->aclock, flags);
+			bcs->ackcnt += (int) arg;
+			spin_unlock_irqrestore(&bcs->aclock, flags);
+			schedule_event(bcs, B_ACKPENDING);
+		}
 		skb = skb_dequeue(&bcs->squeue);
 		if (skb) {
 			B_L2L1(b_if, PH_DATA | REQUEST, skb);

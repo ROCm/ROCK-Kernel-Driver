@@ -733,35 +733,38 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
   
 	if (istab &0x20) {	// RFO
 		if (cs->debug &L1_DEB_WARN) 
-      debugl1(cs, "bch_int() B-%d: RFO error", hscx);
-	  cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x40);  // RRES
+			debugl1(cs, "bch_int() B-%d: RFO error", hscx);
+		cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x40);  // RRES
 	}
 
 	if (istab &0x10) {	// XPR
 		if (bcs->tx_skb) {
 			if (bcs->tx_skb->len) {
-		    bch_fill_fifo(bcs);
-        goto afterXPR;
-      }
-      else {
-				if (bcs->st->lli.l1writewakeup &&
-					  (PACKET_NOACK != bcs->tx_skb->pkt_type)) {    
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->hw.hscx.count);
-        }  
-			  dev_kfree_skb_irq(bcs->tx_skb);
-			  bcs->hw.hscx.count = 0; 
-			  bcs->tx_skb = NULL;
-      }
-    }    
-    if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-      bcs->hw.hscx.count = 0;
-      set_bit(BC_FLG_BUSY, &bcs->Flag);
-      bch_fill_fifo(bcs);
-    } else {
-      clear_bit(BC_FLG_BUSY, &bcs->Flag);
-      schedule_event(bcs, B_XMTBUFREADY);
-    }
-  }
+				bch_fill_fifo(bcs);
+				goto afterXPR;
+			} else {
+				if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag) &&
+					(PACKET_NOACK != bcs->tx_skb->pkt_type)) {
+					u_long	flags;
+					spin_lock_irqsave(&bcs->aclock, flags);
+					bcs->ackcnt += bcs->hw.hscx.count;
+					spin_unlock_irqrestore(&bcs->aclock, flags);
+					schedule_event(bcs, B_ACKPENDING);
+				}
+			}
+			dev_kfree_skb_irq(bcs->tx_skb);
+			bcs->hw.hscx.count = 0;
+			bcs->tx_skb = NULL;
+    		}
+		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
+			bcs->hw.hscx.count = 0;
+			set_bit(BC_FLG_BUSY, &bcs->Flag);
+			bch_fill_fifo(bcs);
+		} else {
+			clear_bit(BC_FLG_BUSY, &bcs->Flag);
+			schedule_event(bcs, B_XMTBUFREADY);
+		}
+	}
   afterXPR:
 
 	if (istab &0x04) {	// XDU

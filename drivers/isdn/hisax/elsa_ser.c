@@ -1,4 +1,4 @@
-/* $Id: elsa_ser.c,v 2.14.2.2 2004/01/12 22:52:26 keil Exp $
+/* $Id: elsa_ser.c,v 2.14.2.3 2004/02/11 13:21:33 keil Exp $
  *
  * stuff for the serial modem on ELSA cards
  *
@@ -283,10 +283,14 @@ modem_fill(struct BCState *bcs) {
 			write_modem(bcs);
 			return;
 		} else {
-			if (bcs->st->lli.l1writewakeup &&
-				(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st,
-						bcs->hw.hscx.count);
+			if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag) &&
+				(PACKET_NOACK != bcs->tx_skb->pkt_type)) {
+				u_long	flags;
+				spin_lock_irqsave(&bcs->aclock, flags);
+				bcs->ackcnt += bcs->hw.hscx.count;
+				spin_unlock_irqrestore(&bcs->aclock, flags);
+				schedule_event(bcs, B_ACKPENDING);
+			}
 			dev_kfree_skb_any(bcs->tx_skb);
 			bcs->tx_skb = NULL;
 		}

@@ -1,4 +1,4 @@
-/* $Id: isdnl1.h,v 2.12.2.2 2004/01/12 22:52:27 keil Exp $
+/* $Id: isdnl1.h,v 2.12.2.3 2004/02/11 13:21:34 keil Exp $
  *
  * Layer 1 defines
  *
@@ -17,8 +17,9 @@
 #define D_TX_MON1	7
 #define E_RCVBUFREADY	8
 
-#define B_RCVBUFREADY 0
-#define B_XMTBUFREADY 1
+#define B_RCVBUFREADY	0
+#define B_XMTBUFREADY	1
+#define B_ACKPENDING	2
 
 extern void debugl1(struct IsdnCardState *cs, char *fmt, ...);
 extern void DChannel_proc_xmt(struct IsdnCardState *cs);

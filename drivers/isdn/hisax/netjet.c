@@ -1,4 +1,4 @@
-/* $Id: netjet.c,v 1.29.2.3 2004/01/13 14:31:26 keil Exp $
+/* $Id: netjet.c,v 1.29.2.4 2004/02/11 13:21:34 keil Exp $
  *
  * low level stuff for Traverse Technologie NETJet ISDN cards
  *
@@ -25,7 +25,7 @@
 #include <asm/io.h>
 #include "netjet.h"
 
-const char *NETjet_revision = "$Revision: 1.29.2.3 $";
+const char *NETjet_revision = "$Revision: 1.29.2.4 $";
 
 /* Interface functions */
 
@@ -748,9 +748,14 @@ static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 			if (!bcs->tx_skb) {
 				debugl1(bcs->cs,"tiger write_raw: NULL skb s_cnt %d", s_cnt);
 			} else {
-				if (bcs->st->lli.l1writewakeup &&
-					(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->tx_skb->len);
+				if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag) &&
+					(PACKET_NOACK != bcs->tx_skb->pkt_type)) {
+					u_long	flags;
+					spin_lock_irqsave(&bcs->aclock, flags);
+					bcs->ackcnt += bcs->tx_skb->len;
+					spin_unlock_irqrestore(&bcs->aclock, flags);
+					schedule_event(bcs, B_ACKPENDING);
+				}
 				dev_kfree_skb_any(bcs->tx_skb);
 				bcs->tx_skb = NULL;
 			}

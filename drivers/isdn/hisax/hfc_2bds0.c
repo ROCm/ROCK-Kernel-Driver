@@ -1,4 +1,4 @@
-/* $Id: hfc_2bds0.c,v 1.18.2.5 2004/01/19 15:31:50 keil Exp $
+/* $Id: hfc_2bds0.c,v 1.18.2.6 2004/02/11 13:21:33 keil Exp $
  *
  * specific routines for CCD's HFC 2BDS0
  *
@@ -314,9 +314,14 @@ hfc_fill_fifo(struct BCState *bcs)
 		printk(KERN_WARNING "HFC S FIFO channel %d BUSY Error\n", bcs->channel);
 	} else {
 		bcs->tx_cnt -= bcs->tx_skb->len;
-		if (bcs->st->lli.l1writewakeup &&
-			(PACKET_NOACK != bcs->tx_skb->pkt_type))
-			bcs->st->lli.l1writewakeup(bcs->st, bcs->tx_skb->len);
+		if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag) &&
+			(PACKET_NOACK != bcs->tx_skb->pkt_type)) {
+			u_long	flags;
+			spin_lock_irqsave(&bcs->aclock, flags);
+			bcs->ackcnt += bcs->tx_skb->len;
+			spin_unlock_irqrestore(&bcs->aclock, flags);
+			schedule_event(bcs, B_ACKPENDING);
+		}
 		dev_kfree_skb_any(bcs->tx_skb);
 		bcs->tx_skb = NULL;
 	}

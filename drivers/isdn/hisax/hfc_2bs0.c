@@ -1,4 +1,4 @@
-/* $Id: hfc_2bs0.c,v 1.20.2.5 2004/01/19 15:31:50 keil Exp $
+/* $Id: hfc_2bs0.c,v 1.20.2.6 2004/02/11 13:21:33 keil Exp $
  *
  * specific routines for CCD's HFC 2BS0
  *
@@ -308,8 +308,14 @@ hfc_fill_fifo(struct BCState *bcs)
 		  WaitNoBusy(cs);
 		  cs->BC_Read_Reg(cs, HFC_DATA, HFC_CIP | HFC_F1_INC | HFC_SEND | HFC_CHANNEL(bcs->channel));
 		}
-		if (bcs->st->lli.l1writewakeup && (count >= 0))
-			bcs->st->lli.l1writewakeup(bcs->st, count);
+		if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag) &&
+			(count >= 0)) {
+			u_long	flags;
+			spin_lock_irqsave(&bcs->aclock, flags);
+			bcs->ackcnt += count;
+			spin_unlock_irqrestore(&bcs->aclock, flags);
+			schedule_event(bcs, B_ACKPENDING);
+		}
 		test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	}
 	return;

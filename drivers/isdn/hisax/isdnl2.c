@@ -1,4 +1,4 @@
-/* $Id: isdnl2.c,v 2.30.2.3 2004/01/13 14:31:25 keil Exp $
+/* $Id: isdnl2.c,v 2.30.2.4 2004/02/11 13:21:34 keil Exp $
  *
  * Author       Karsten Keil
  *              based on the teles driver from Jan den Ouden
@@ -19,7 +19,7 @@
 #include "hisax.h"
 #include "isdnl2.h"
 
-const char *l2_revision = "$Revision: 2.30.2.3 $";
+const char *l2_revision = "$Revision: 2.30.2.4 $";
 
 static void l2m_debug(struct FsmInst *fi, char *fmt, ...);
 
@@ -420,8 +420,8 @@ setva(struct PStack *st, unsigned int nr)
 		l2->windowar[l2->sow] = NULL;
 		l2->sow = (l2->sow + 1) % l2->window;
 		spin_unlock_irqrestore(&l2->lock, flags);
-		if (st->lli.l2writewakeup && (len >=0))
-			st->lli.l2writewakeup(st, len);
+		if (test_bit(FLG_LLI_L2WAKEUP, &st->lli.flag) && (len >=0))
+			lli_writewakeup(st, len);
 		spin_lock_irqsave(&l2->lock, flags);
 	}
 	spin_unlock_irqrestore(&l2->lock, flags);

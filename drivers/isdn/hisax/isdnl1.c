@@ -1,4 +1,4 @@
-/* $Id: isdnl1.c,v 2.46.2.4 2004/01/13 21:46:03 keil Exp $
+/* $Id: isdnl1.c,v 2.46.2.5 2004/02/11 13:21:34 keil Exp $
  *
  * common low level stuff for Siemens Chipsetbased isdn cards
  *
@@ -18,7 +18,7 @@
  *
  */
 
-const char *l1_revision = "$Revision: 2.46.2.4 $";
+const char *l1_revision = "$Revision: 2.46.2.5 $";
 
 #include <linux/init.h>
 #include "hisax.h"
@@ -299,6 +299,20 @@ BChannel_proc_rcv(struct BCState *bcs)
 	}
 }
 
+static void
+BChannel_proc_ack(struct BCState *bcs)
+{
+	u_long	flags;
+	int	ack;
+
+	spin_lock_irqsave(&bcs->aclock, flags);
+	ack = bcs->ackcnt;
+	bcs->ackcnt = 0;
+	spin_unlock_irqrestore(&bcs->aclock, flags);
+	if (ack)
+		lli_writewakeup(bcs->st, ack);
+}
+
 void
 BChannel_bh(struct BCState *bcs)
 {
@@ -308,6 +322,8 @@ BChannel_bh(struct BCState *bcs)
 		BChannel_proc_rcv(bcs);
 	if (test_and_clear_bit(B_XMTBUFREADY, &bcs->event))
 		BChannel_proc_xmt(bcs);
+	if (test_and_clear_bit(B_ACKPENDING, &bcs->event))
+		BChannel_proc_ack(bcs);
 }
 
 void
@@ -346,6 +362,7 @@ init_bcstate(struct IsdnCardState *cs, int bc)
 	bcs->cs = cs;
 	bcs->channel = bc;
 	INIT_WORK(&bcs->tqueue, (void *)(void *) BChannel_bh, bcs);
+	spin_lock_init(&bcs->aclock);
 	bcs->BC_SetStack = NULL;
 	bcs->BC_Close = NULL;
 	bcs->Flag = 0;

@@ -1,4 +1,4 @@
-/* $Id: jade_irq.c,v 1.7.2.3 2004/01/14 16:04:48 keil Exp $
+/* $Id: jade_irq.c,v 1.7.2.4 2004/02/11 13:21:34 keil Exp $
  *
  * Low level JADE IRQ stuff (derived from original hscx_irq.c)
  *
@@ -175,9 +175,14 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 				jade_fill_fifo(bcs);
 				return;
 			} else {
-				if (bcs->st->lli.l1writewakeup &&
-					(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->hw.hscx.count);
+				if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag) &&
+					(PACKET_NOACK != bcs->tx_skb->pkt_type)) {
+					u_long	flags;
+					spin_lock_irqsave(&bcs->aclock, flags);
+					bcs->ackcnt += bcs->hw.hscx.count;
+					spin_unlock_irqrestore(&bcs->aclock, flags);
+					schedule_event(bcs, B_ACKPENDING);
+				}
 				dev_kfree_skb_irq(bcs->tx_skb);
 				bcs->hw.hscx.count = 0;
 				bcs->tx_skb = NULL;
