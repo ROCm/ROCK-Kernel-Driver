@@ -33,18 +33,6 @@ extern void flush_dcache_page_all(struct mm_struct *mm, struct page *page);
 
 extern void __flush_dcache_range(unsigned long start, unsigned long end);
 
-extern void __flush_cache_all(void);
-
-#ifndef CONFIG_SMP
-
-#define flush_cache_all()	__flush_cache_all()
-
-#else /* CONFIG_SMP */
-
-extern void smp_flush_cache_all(void);
-
-#endif /* ! CONFIG_SMP */
-
 #define flush_icache_page(vma, pg)	do { } while(0)
 #define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
@@ -55,7 +43,7 @@ extern void smp_flush_cache_all(void);
 
 extern void flush_dcache_page(struct page *page);
 
-#define flush_cache_vmap(start, end)		flush_cache_all()
-#define flush_cache_vunmap(start, end)		flush_cache_all()
+#define flush_cache_vmap(start, end)		do { } while (0)
+#define flush_cache_vunmap(start, end)		do { } while (0)
 
 #endif /* _SPARC64_CACHEFLUSH_H */

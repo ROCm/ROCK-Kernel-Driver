@@ -118,7 +118,6 @@ void __init smp_callin(void)
 
 	inherit_locked_prom_mappings(0);
 
-	__flush_cache_all();
 	__flush_tlb_all();
 
 	smp_setup_percpu_timer();
@@ -661,7 +660,6 @@ extern unsigned long xcall_flush_tlb_range;
 extern unsigned long xcall_flush_tlb_kernel_range;
 extern unsigned long xcall_flush_tlb_all_spitfire;
 extern unsigned long xcall_flush_tlb_all_cheetah;
-extern unsigned long xcall_flush_cache_all_spitfire;
 extern unsigned long xcall_report_regs;
 extern unsigned long xcall_receive_signal;
 extern unsigned long xcall_flush_dcache_page_cheetah;
@@ -774,15 +772,6 @@ void smp_receive_signal_client(int irq, struct pt_regs *regs)
 void smp_report_regs(void)
 {
 	smp_cross_call(&xcall_report_regs, 0, 0, 0);
-}
-
-void smp_flush_cache_all(void)
-{
-	/* Cheetah need do nothing. */
-	if (tlb_type == spitfire) {
-		smp_cross_call(&xcall_flush_cache_all_spitfire, 0, 0, 0);
-		__flush_cache_all();
-	}
 }
 
 void smp_flush_tlb_all(void)
