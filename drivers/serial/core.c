@@ -1894,16 +1894,10 @@ uart_report_port(struct uart_driver *drv, struct uart_port *port)
 }
 
 static void
-__uart_register_port(struct uart_driver *drv, struct uart_state *state,
-		     struct uart_port *port)
+uart_configure_port(struct uart_driver *drv, struct uart_state *state,
+		    struct uart_port *port)
 {
 	unsigned int flags;
-
-	state->port = port;
-
-	spin_lock_init(&port->lock);
-	port->cons = drv->cons;
-	port->info = state->info;
 
 	/*
 	 * If there isn't a port here, don't do anything further.
@@ -1923,12 +1917,6 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 		port->ops->config_port(port, flags);
 	}
 
-	/*
-	 * Register the port whether it's detected or not.  This allows
-	 * setserial to be used to alter this ports parameters.
-	 */
-	tty_register_device(drv->tty_driver, drv->minor + port->line);
-
 	if (port->type != PORT_UNKNOWN) {
 		unsigned long flags;
 
@@ -1945,11 +1933,11 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 }
 
 /*
- * This reverses the affects of __uart_register_port, hanging up the
+ * This reverses the affects of uart_configure_port, hanging up the
  * port before removal.
  */
 static void
-__uart_unregister_port(struct uart_driver *drv, struct uart_state *state)
+uart_unconfigure_port(struct uart_driver *drv, struct uart_state *state)
 {
 	struct uart_port *port = state->port;
 	struct uart_info *info = state->info;
@@ -1960,11 +1948,6 @@ __uart_unregister_port(struct uart_driver *drv, struct uart_state *state)
 	down(&state->sem);
 
 	state->info = NULL;
-
-	/*
-	 * Remove the devices from devfs
-	 */
-	tty_unregister_device(drv->tty_driver, drv->minor + port->line);
 
 	/*
 	 * Free the port IO and memory resources, if any.
@@ -2132,6 +2115,7 @@ void uart_unregister_driver(struct uart_driver *drv)
 int uart_add_one_port(struct uart_driver *drv, struct uart_port *port)
 {
 	struct uart_state *state;
+	int ret = 0;
 
 	BUG_ON(in_interrupt());
 
@@ -2141,10 +2125,29 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *port)
 	state = drv->state + port->line;
 
 	down(&port_sem);
-	__uart_register_port(drv, state, port);
+	if (state->port) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	state->port = port;
+
+	spin_lock_init(&port->lock);
+	port->cons = drv->cons;
+	port->info = state->info;
+
+	uart_configure_port(drv, state, port);
+
+	/*
+	 * Register the port whether it's detected or not.  This allows
+	 * setserial to be used to alter this ports parameters.
+	 */
+	tty_register_device(drv->tty_driver, drv->minor + port->line);
+
+ out:
 	up(&port_sem);
 
-	return 0;
+	return ret;
 }
 
 /**
@@ -2167,7 +2170,13 @@ int uart_remove_one_port(struct uart_driver *drv, struct uart_port *port)
 			state->port, port);
 
 	down(&port_sem);
-	__uart_unregister_port(drv, state);
+
+	/*
+	 * Remove the devices from devfs
+	 */
+	tty_unregister_device(drv->tty_driver, drv->minor + port->line);
+
+	uart_unconfigure_port(drv, state);
 	state->port = NULL;
 	up(&port_sem);
 
@@ -2287,7 +2296,7 @@ int uart_register_port(struct uart_driver *drv, struct uart_port *port)
 			state->port->line     = state - drv->state;
 			state->port->mapbase  = port->mapbase;
 
-			__uart_register_port(drv, state, state->port);
+			uart_configure_port(drv, state, state->port);
 		}
 
 		ret = state->port->line;
@@ -2320,7 +2329,7 @@ void uart_unregister_port(struct uart_driver *drv, int line)
 	state = drv->state + line;
 
 	down(&port_sem);
-	__uart_unregister_port(drv, state);
+	uart_unconfigure_port(drv, state);
 	up(&port_sem);
 }
 
