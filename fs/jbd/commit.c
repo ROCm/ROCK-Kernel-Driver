@@ -169,10 +169,23 @@ void journal_commit_transaction(journal_t *journal)
 	 * that multiple journal_get_write_access() calls to the same
 	 * buffer are perfectly permissable.
 	 */
-	while (commit_transaction->t_reserved_list) {
-		jh = commit_transaction->t_reserved_list;
-		JBUFFER_TRACE(jh, "reserved, unused: refile");
-		journal_refile_buffer(journal, jh);
+	{
+		int nr = 0;
+		while (commit_transaction->t_reserved_list) {
+			jh = commit_transaction->t_reserved_list;
+			JBUFFER_TRACE(jh, "reserved, unused: refile");
+			journal_refile_buffer(journal, jh);
+			nr++;
+		}
+		if (nr) {
+			static int noisy;
+
+			if (noisy < 10) {
+				noisy++;
+				printk("%s: freed %d reserved buffers\n",
+					__FUNCTION__, nr);
+			}
+		}
 	}
 
 	/*

@@ -20,7 +20,9 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/rmap-locking.h>
+#include <linux/security.h>
 
 #include <asm/pgtable.h>
 #include <linux/swapops.h>
@@ -29,6 +31,8 @@ spinlock_t swaplock = SPIN_LOCK_UNLOCKED;
 unsigned int nr_swapfiles;
 int total_swap_pages;
 static int swap_overflow;
+
+EXPORT_SYMBOL(total_swap_pages);
 
 static const char Bad_file[] = "Bad swap file entry ";
 static const char Unused_file[] = "Unused swap file entry ";
@@ -1042,7 +1046,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 		swap_list_unlock();
 		goto out_dput;
 	}
-	if (vm_enough_memory(p->pages))
+	if (!security_vm_enough_memory(p->pages))
 		vm_unacct_memory(p->pages);
 	else {
 		err = -ENOMEM;

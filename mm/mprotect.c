@@ -175,7 +175,7 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 	if (newflags & VM_WRITE) {
 		if (!(vma->vm_flags & (VM_ACCOUNT|VM_WRITE|VM_SHARED))) {
 			charged = (end - start) >> PAGE_SHIFT;
-			if (!vm_enough_memory(charged))
+			if (security_vm_enough_memory(charged))
 				return -ENOMEM;
 			newflags |= VM_ACCOUNT;
 		}

@@ -184,11 +184,16 @@ typedef struct pglist_data {
 	unsigned long *valid_addr_bitmap;
 	struct bootmem_data *bdata;
 	unsigned long node_start_pfn;
-	unsigned long node_size;
+	unsigned long node_present_pages; /* total number of physical pages */
+	unsigned long node_spanned_pages; /* total size of physical page
+					     range, including holes */
 	int node_id;
 	struct pglist_data *pgdat_next;
 	wait_queue_head_t       kswapd_wait;
 } pg_data_t;
+
+#define node_present_pages(nid)	(NODE_DATA(nid)->node_present_pages)
+#define node_spanned_pages(nid)	(NODE_DATA(nid)->node_spanned_pages)
 
 extern int numnodes;
 extern struct pglist_data *pgdat_list;

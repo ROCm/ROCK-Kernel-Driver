@@ -430,6 +430,14 @@ void __init early_cpu_init(void)
 	rise_init_cpu();
 	nexgen_init_cpu();
 	umc_init_cpu();
+
+#ifdef CONFIG_DEBUG_PAGEALLOC
+	/* pse is not compatible with on-the-fly unmapping,
+	 * disable it even if the cpus claim to support it.
+	 */
+	clear_bit(X86_FEATURE_PSE, boot_cpu_data.x86_capability);
+	disable_pse = 1;
+#endif
 }
 /*
  * cpu_init() initializes state that is per-CPU. Some data is already

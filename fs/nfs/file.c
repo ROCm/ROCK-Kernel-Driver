@@ -104,11 +104,13 @@ nfs_file_flush(struct file *file)
 
 	dfprintk(VFS, "nfs: flush(%s/%ld)\n", inode->i_sb->s_id, inode->i_ino);
 
+	lock_kernel();
 	status = nfs_wb_file(inode, file);
 	if (!status) {
 		status = file->f_error;
 		file->f_error = 0;
 	}
+	unlock_kernel();
 	return status;
 }
 

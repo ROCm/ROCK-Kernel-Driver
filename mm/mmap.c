@@ -18,6 +18,7 @@
 #include <linux/security.h>
 #include <linux/hugetlb.h>
 #include <linux/profile.h>
+#include <linux/module.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -53,65 +54,9 @@ int sysctl_overcommit_memory = 0;	/* default is heuristic overcommit */
 int sysctl_overcommit_ratio = 50;	/* default is 50% */
 atomic_t vm_committed_space = ATOMIC_INIT(0);
 
-/*
- * Check that a process has enough memory to allocate a new virtual
- * mapping. 1 means there is enough memory for the allocation to
- * succeed and 0 implies there is not.
- *
- * We currently support three overcommit policies, which are set via the
- * vm.overcommit_memory sysctl.  See Documentation/vm/overcommit-acounting
- *
- * Strict overcommit modes added 2002 Feb 26 by Alan Cox.
- * Additional code 2002 Jul 20 by Robert Love.
- */
-extern atomic_t slab_reclaim_pages;
-int vm_enough_memory(long pages)
-{
-	unsigned long free, allowed;
-
-	vm_acct_memory(pages);
-
-        /*
-	 * Sometimes we want to use more memory than we have
-	 */
-	if (sysctl_overcommit_memory == 1)
-		return 1;
-
-	if (sysctl_overcommit_memory == 0) {
-		free = get_page_cache_size();
-		free += nr_free_pages();
-		free += nr_swap_pages;
-
-		/*
-		 * Any slabs which are created with the
-		 * SLAB_RECLAIM_ACCOUNT flag claim to have contents
-		 * which are reclaimable, under pressure.  The dentry
-		 * cache and most inode caches should fall into this
-		 */
-		free += atomic_read(&slab_reclaim_pages);
-
-		/*
-		 * Leave the last 3% for root
-		 */
-		if (!capable(CAP_SYS_ADMIN))
-			free -= free / 32;
-		
-		if (free > pages)
-			return 1;
-		vm_unacct_memory(pages);
-		return 0;
-	}
-
-	allowed = totalram_pages * sysctl_overcommit_ratio / 100;
-	allowed += total_swap_pages;
-
-	if (atomic_read(&vm_committed_space) < allowed)
-		return 1;
-
-	vm_unacct_memory(pages);
-
-	return 0;
-}
+EXPORT_SYMBOL(sysctl_overcommit_memory);
+EXPORT_SYMBOL(sysctl_overcommit_ratio);
+EXPORT_SYMBOL(vm_committed_space);
 
 /*
  * Requires inode->i_mapping->i_shared_sem
@@ -646,7 +591,7 @@ munmap_back:
 			 * Private writable mapping: check memory availability
 			 */
 			charged = len >> PAGE_SHIFT;
-			if (!vm_enough_memory(charged))
+			if (security_vm_enough_memory(charged))
 				return -ENOMEM;
 			vm_flags |= VM_ACCOUNT;
 		}
@@ -950,7 +895,7 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 	grow = (address - vma->vm_end) >> PAGE_SHIFT;
 
 	/* Overcommit.. */
-	if (!vm_enough_memory(grow)) {
+	if (security_vm_enough_memory(grow)) {
 		spin_unlock(&vma->vm_mm->page_table_lock);
 		return -ENOMEM;
 	}
@@ -1004,7 +949,7 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	grow = (vma->vm_start - address) >> PAGE_SHIFT;
 
 	/* Overcommit.. */
-	if (!vm_enough_memory(grow)) {
+	if (security_vm_enough_memory(grow)) {
 		spin_unlock(&vma->vm_mm->page_table_lock);
 		return -ENOMEM;
 	}
@@ -1376,7 +1321,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	if (mm->map_count > MAX_MAP_COUNT)
 		return -ENOMEM;
 
-	if (!vm_enough_memory(len >> PAGE_SHIFT))
+	if (security_vm_enough_memory(len >> PAGE_SHIFT))
 		return -ENOMEM;
 
 	flags = VM_DATA_DEFAULT_FLAGS | VM_ACCOUNT | mm->def_flags;

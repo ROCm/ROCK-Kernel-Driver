@@ -88,7 +88,7 @@ static void mark_offset_cyclone(void)
 	 * between cyclone and pit reads (as noted when 
 	 * usec delta is > 90% # of usecs/tick)
 	 */
-	if (abs(delay - delay_at_last_interrupt) > (900000/HZ)) 
+	if (lost && abs(delay - delay_at_last_interrupt) > (900000/HZ))
 		jiffies++;
 }
 

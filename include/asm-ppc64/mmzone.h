@@ -54,7 +54,6 @@ static inline int pa_to_nid(unsigned long pa)
  */
 #define NODE_DATA(nid)		(&node_data[nid])
 
-#define node_size(nid)		(NODE_DATA(nid)->node_size)
 #define node_localnr(pfn, nid)	((pfn) - NODE_DATA(nid)->node_start_pfn)
 
 /*

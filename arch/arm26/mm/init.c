@@ -68,7 +68,7 @@ void show_mem(void)
 
 
 	page = NODE_MEM_MAP(0);
-	end  = page + NODE_DATA(0)->node_size;
+	end  = page + NODE_DATA(0)->node_spanned_pages;
 
 	do {
 		total++;
@@ -353,7 +353,7 @@ void __init mem_init(void)
 	max_mapnr   = virt_to_page(high_memory) - mem_map;
 
 	/* this will put all unused low memory onto the freelists */
-	if (pgdat->node_size != 0)
+	if (pgdat->node_spanned_pages != 0)
 		totalram_pages += free_all_bootmem_node(pgdat);
 
 	printk(KERN_INFO "Memory:");

@@ -3,12 +3,6 @@
 #include <linux/string.h>
 #include <asm/timer.h>
 
-/* list of externed timers */
-extern struct timer_opts timer_pit;
-extern struct timer_opts timer_tsc;
-#ifdef CONFIG_X86_CYCLONE_TIMER
-extern struct timer_opts timer_cyclone;
-#endif
 /* list of timers, ordered by preference, NULL terminated */
 static struct timer_opts* timers[] = {
 #ifdef CONFIG_X86_CYCLONE_TIMER
@@ -28,6 +22,15 @@ static int __init clock_setup(char* str)
 	return 1;
 }
 __setup("clock=", clock_setup);
+
+
+/* The chosen timesource has been found to be bad.
+ * Fall back to a known good timesource (the PIT)
+ */
+void clock_fallback(void)
+{
+	cur_timer = &timer_pit;
+}
 
 /* iterates through the list of timers, returning the first 
  * one that initializes successfully.

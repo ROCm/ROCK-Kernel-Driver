@@ -109,7 +109,7 @@ void show_mem(void)
 	show_free_areas();
 	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
 	for_each_pgdat(pgdat) {
-		for (i = 0; i < pgdat->node_size; i++) {
+		for (i = 0; i < pgdat->node_spanned_pages; i++) {
 			page = pgdat->node_mem_map + i;
 			total++;
 			if (PageReserved(page))
@@ -564,7 +564,7 @@ void __init mem_init(void)
 	int nid;
 
         for (nid = 0; nid < numnodes; nid++) {
-		if (node_data[nid].node_size != 0) {
+		if (node_data[nid].node_spanned_pages != 0) {
 			printk("freeing bootmem node %x\n", nid);
 			totalram_pages +=
 				free_all_bootmem_node(NODE_DATA(nid));

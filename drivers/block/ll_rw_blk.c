@@ -1072,8 +1072,8 @@ static void blk_unplug_timeout(unsigned long data)
  **/
 void blk_start_queue(request_queue_t *q)
 {
-	if (test_and_clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags))
-		schedule_work(&q->unplug_work);
+	clear_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
+	schedule_work(&q->unplug_work);
 }
 
 /**
