@@ -127,20 +127,20 @@ extern __inline__ unsigned long ffz (unsigned long word)
 #define test_and_change_bit(nr, addr)	__tns_atomic_bit_op ("not1", nr, addr)
 
 
-#define __const_test_bit(nr, addr)					\
-  ({ int __test_bit_res;						\
-     __asm__ ("tst1 (%1 - 0x123), %2; setf nz, %0"			\
-	      : "=r" (__test_bit_res)					\
-	      : "g" (((nr) & 0x7) + 0x123),				\
-                "m" (*((const char *)(addr) + ((nr) >> 3))));		\
-     __test_bit_res;							\
+#define __const_test_bit(nr, addr)					      \
+  ({ int __test_bit_res;						      \
+     __asm__ __volatile__ ("tst1 (%1 - 0x123), %2; setf nz, %0"		      \
+			   : "=r" (__test_bit_res)			      \
+			   : "g" (((nr) & 0x7) + 0x123),		      \
+			     "m" (*((const char *)(addr) + ((nr) >> 3))));    \
+     __test_bit_res;							      \
   })
 extern __inline__ int __test_bit (int nr, const void *addr)
 {
 	int res;
-	__asm__ ("tst1 %1, [%2]; setf nz, %0"
-		 : "=r" (res)
-		 : "r" (nr & 0x7), "r" (addr + (nr >> 3)));
+	__asm__ __volatile__ ("tst1 %1, [%2]; setf nz, %0"
+			      : "=r" (res)
+			      : "r" (nr & 0x7), "r" (addr + (nr >> 3)));
 	return res;
 }
 #define test_bit(nr,addr)						\
