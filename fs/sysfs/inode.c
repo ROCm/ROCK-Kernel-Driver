@@ -96,7 +96,12 @@ void sysfs_hash_and_remove(struct dentry * dir, const char * name)
 			pr_debug("sysfs: Removing %s (%d)\n", victim->d_name.name,
 				 atomic_read(&victim->d_count));
 
-			d_delete(victim);
+			d_drop(victim);
+			/* release the target kobject in case of 
+			 * a symlink
+			 */
+			if (S_ISLNK(victim->d_inode->i_mode))
+				kobject_put(victim->d_fsdata);
 			simple_unlink(dir->d_inode,victim);
 		}
 		/*
