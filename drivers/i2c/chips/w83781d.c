@@ -28,6 +28,7 @@
     asb100 "bach" (type_name = as99127f)	0x30	0x0694	yes	no
     w83781d	7	3	0	3	0x10	0x5ca3	yes	yes
     w83627hf	9	3	2	3	0x20	0x5ca3	yes	yes(LPC)
+    w83627thf	9	3	2	3	0x90	0x5ca3	no	yes(LPC)
     w83782d	9	3	2-4	3	0x30	0x5ca3	yes	yes
     w83783s	5-6	3	2	1-2	0x40	0x5ca3	yes	no
     w83697hf	8	2	2	2	0x60	0x5ca3	no	yes(LPC)
@@ -299,8 +300,8 @@ struct w83781d_data {
 	char valid;		/* !=0 if following fields are valid */
 	unsigned long last_updated;	/* In jiffies */
 
-	struct i2c_client *lm75;	/* for secondary I2C addresses */
-	/* pointer to array of 2 subclients */
+	struct i2c_client *lm75[2];	/* for secondary I2C addresses */
+	/* array of 2 pointers to subclients */
 
 	u8 in[9];		/* Register value - 8 & 9 for 782D only */
 	u8 in_max[9];		/* Register value - 8 & 9 for 782D only */
@@ -1043,12 +1044,12 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 	const char *client_name;
 	struct w83781d_data *data = i2c_get_clientdata(new_client);
 
-	if (!(data->lm75 = kmalloc(2 * sizeof (struct i2c_client),
-			GFP_KERNEL))) {
+	data->lm75[0] = kmalloc(sizeof(struct i2c_client), GFP_KERNEL);
+	if (!(data->lm75[0])) {
 		err = -ENOMEM;
 		goto ERROR_SC_0;
 	}
-	memset(data->lm75, 0x00, 2 * sizeof (struct i2c_client));
+	memset(data->lm75[0], 0x00, sizeof (struct i2c_client));
 
 	id = i2c_adapter_id(adapter);
 
@@ -1066,25 +1067,33 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 		w83781d_write_value(new_client, W83781D_REG_I2C_SUBADDR,
 				(force_subclients[2] & 0x07) |
 				((force_subclients[3] & 0x07) << 4));
-		data->lm75[0].addr = force_subclients[2];
+		data->lm75[0]->addr = force_subclients[2];
 	} else {
 		val1 = w83781d_read_value(new_client, W83781D_REG_I2C_SUBADDR);
-		data->lm75[0].addr = 0x48 + (val1 & 0x07);
+		data->lm75[0]->addr = 0x48 + (val1 & 0x07);
 	}
 
 	if (kind != w83783s) {
+
+		data->lm75[1] = kmalloc(sizeof(struct i2c_client), GFP_KERNEL);
+		if (!(data->lm75[1])) {
+			err = -ENOMEM;
+			goto ERROR_SC_1;
+		}
+		memset(data->lm75[1], 0x0, sizeof(struct i2c_client));
+
 		if (force_subclients[0] == id &&
 		    force_subclients[1] == address) {
-			data->lm75[1].addr = force_subclients[3];
+			data->lm75[1]->addr = force_subclients[3];
 		} else {
-			data->lm75[1].addr = 0x48 + ((val1 >> 4) & 0x07);
+			data->lm75[1]->addr = 0x48 + ((val1 >> 4) & 0x07);
 		}
-		if (data->lm75[0].addr == data->lm75[1].addr) {
+		if (data->lm75[0]->addr == data->lm75[1]->addr) {
 			dev_err(&new_client->dev,
 			       "Duplicate addresses 0x%x for subclients.\n",
-			       data->lm75[0].addr);
+			       data->lm75[0]->addr);
 			err = -EBUSY;
-			goto ERROR_SC_1;
+			goto ERROR_SC_2;
 		}
 	}
 
@@ -1103,19 +1112,19 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 
 	for (i = 0; i <= 1; i++) {
 		/* store all data in w83781d */
-		i2c_set_clientdata(&data->lm75[i], NULL);
-		data->lm75[i].adapter = adapter;
-		data->lm75[i].driver = &w83781d_driver;
-		data->lm75[i].flags = 0;
-		strlcpy(data->lm75[i].dev.name, client_name,
+		i2c_set_clientdata(data->lm75[i], NULL);
+		data->lm75[i]->adapter = adapter;
+		data->lm75[i]->driver = &w83781d_driver;
+		data->lm75[i]->flags = 0;
+		strlcpy(data->lm75[i]->dev.name, client_name,
 			DEVICE_NAME_SIZE);
-		if ((err = i2c_attach_client(&(data->lm75[i])))) {
+		if ((err = i2c_attach_client(data->lm75[i]))) {
 			dev_err(&new_client->dev, "Subclient %d "
 				"registration at address 0x%x "
-				"failed.\n", i, data->lm75[i].addr);
+				"failed.\n", i, data->lm75[i]->addr);
 			if (i == 1)
-				goto ERROR_SC_2;
-			goto ERROR_SC_1;
+				goto ERROR_SC_3;
+			goto ERROR_SC_2;
 		}
 		if (kind == w83783s)
 			break;
@@ -1124,10 +1133,14 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 	return 0;
 
 /* Undo inits in case of errors */
+ERROR_SC_3:
+	i2c_detach_client(data->lm75[0]);
 ERROR_SC_2:
-	i2c_detach_client(&(data->lm75[0]));
+	if (NULL != data->lm75[1])
+		kfree(data->lm75[1]);
 ERROR_SC_1:
-	kfree(data->lm75);
+	if (NULL != data->lm75[0])
+		kfree(data->lm75[0]);
 ERROR_SC_0:
 	return err;
 }
@@ -1273,7 +1286,7 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 			kind = w83782d;
 		else if (val1 == 0x40 && vendid == winbond && !is_isa)
 			kind = w83783s;
-		else if (val1 == 0x20 && vendid == winbond)
+		else if ((val1 == 0x20 || val1 == 0x90) && vendid == winbond)
 			kind = w83627hf;
 		else if (val1 == 0x30 && vendid == asus && !is_isa)
 			kind = as99127f;
@@ -1297,7 +1310,10 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	} else if (kind == w83783s) {
 		client_name = "W83783S chip";
 	} else if (kind == w83627hf) {
-		client_name = "W83627HF chip";
+		if (val1 == 0x90)
+			client_name = "W83627THF chip";
+		else
+			client_name = "W83627HF chip";
 	} else if (kind == as99127f) {
 		client_name = "AS99127F chip";
 	} else if (kind == w83697hf) {
@@ -1326,7 +1342,8 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 				kind, new_client)))
 			goto ERROR3;
 	} else {
-		data->lm75 = NULL;
+		data->lm75[0] = NULL;
+		data->lm75[1] = NULL;
 	}
 
 	device_create_file_in(new_client, 0);
@@ -1409,20 +1426,11 @@ ERROR0:
 static int
 w83781d_detach_client(struct i2c_client *client)
 {
-	struct w83781d_data *data = i2c_get_clientdata(client);
 	int err;
 
-	/* release ISA region or I2C subclients first */
-	if (i2c_is_isa_client(client)) {
+	if (i2c_is_isa_client(client))
 		release_region(client->addr, W83781D_EXTENT);
-	} else {
-		i2c_detach_client(&data->lm75[0]);
-		if (data->type != w83783s)
-			i2c_detach_client(&data->lm75[1]);
-		kfree(data->lm75);
-	}
 
-	/* now it's safe to scrap the rest */
 	if ((err = i2c_detach_client(client))) {
 		dev_err(&client->dev,
 		       "Client deregistration failed, client not detached.\n");
@@ -1484,7 +1492,7 @@ w83781d_read_value(struct i2c_client *client, u16 reg)
 			res = i2c_smbus_read_byte_data(client, reg & 0xff);
 		} else {
 			/* switch to subclient */
-			cl = &data->lm75[bank - 1];
+			cl = data->lm75[bank - 1];
 			/* convert from ISA to LM75 I2C addresses */
 			switch (reg & 0xff) {
 			case 0x50:	/* TEMP */
@@ -1555,7 +1563,7 @@ w83781d_write_value(struct i2c_client *client, u16 reg, u16 value)
 						  value & 0xff);
 		} else {
 			/* switch to subclient */
-			cl = &data->lm75[bank - 1];
+			cl = data->lm75[bank - 1];
 			/* convert from ISA to LM75 I2C addresses */
 			switch (reg & 0xff) {
 			case 0x52:	/* CONFIG */
