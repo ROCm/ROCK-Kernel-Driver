@@ -1158,7 +1158,7 @@ static irqreturn_t shpc_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 					hp_slot, php_ctlr->callback_instance_id);
 			
 			/* Clear all slot events */
-			temp_dword = 0xe01fffff;
+			temp_dword = 0xe01f3fff;
 			dbg("%s: Clearing slot events, temp_dword = %x\n",
 				__FUNCTION__, temp_dword); 
 			writel(temp_dword, php_ctlr->creg + SLOT1 + (4*hp_slot));
