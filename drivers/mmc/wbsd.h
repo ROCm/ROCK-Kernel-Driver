@@ -1,7 +1,7 @@
 /*
- *  linux/drivers/mmc/wbsd.h
+ *  linux/drivers/mmc/wbsd.h - Winbond W83L51xD SD/MMC driver
  *
- *  Copyright (C) 2004 Pierre Ossman, All Rights Reserved.
+ *  Copyright (C) 2004-2005 Pierre Ossman, All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -119,6 +119,8 @@ const int valid_ids[] = {
 #define WBSD_FIFOEN_FULL	0x10
 #define WBSD_FIFO_THREMASK	0x0F
 
+#define WBSD_BLOCK_READ		0x80
+#define WBSD_BLOCK_WRITE	0x40
 #define WBSD_BUSY		0x20
 #define WBSD_CARDTRAFFIC	0x04
 #define WBSD_SENDCMD		0x02
@@ -132,9 +134,6 @@ const int valid_ids[] = {
 #define WBSD_CRC_FAIL		0x0B /* S101E (01011) */
 
 
-/* 64kB / 512 */
-#define NR_SG			128
-
 struct wbsd_host
 {
 	struct mmc_host*	mmc;		/* MMC structure */
@@ -143,9 +142,11 @@ struct wbsd_host
 
 	struct mmc_request*	mrq;		/* Current request */
 	
-	struct scatterlist	sg[NR_SG];	/* SG list */
+	u8			isr;		/* Accumulated ISR */
+	
 	struct scatterlist*	cur_sg;		/* Current SG entry */
 	unsigned int		num_sg;		/* Number of entries left */
+	void*			mapped_sg;	/* vaddr of mapped sg */
 	
 	unsigned int		offset;		/* Offset into current entry */
 	unsigned int		remain;		/* Data left in curren entry */
