@@ -191,15 +191,16 @@ static fastcall int __detach_pid(task_t *task, enum pid_type type)
 
 void fastcall detach_pid(task_t *task, enum pid_type type)
 {
-	int nr;
+	int tmp, nr;
 
 	nr = __detach_pid(task, type);
 	if (!nr)
 		return;
 
-	for (type = 0; type < PIDTYPE_MAX; ++type)
-		if (find_pid(type, nr))
+	for (tmp = PIDTYPE_MAX; --tmp >= 0; )
+		if (tmp != type && find_pid(tmp, nr))
 			return;
+
 	free_pidmap(nr);
 }
 
