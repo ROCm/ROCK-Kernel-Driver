@@ -811,6 +811,9 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 			goto error;
 		svsk->sk_tcplen += len;
 
+		if (len < want)
+			return 0;
+
 		svsk->sk_reclen = ntohl(svsk->sk_reclen);
 		if (!(svsk->sk_reclen & 0x80000000)) {
 			/* FIXME: technically, a record can be fragmented,
