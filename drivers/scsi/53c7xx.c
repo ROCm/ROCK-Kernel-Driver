@@ -5794,7 +5794,7 @@ hard_reset (struct Scsi_Host *host) {
  *	so we don't perturb hostdata.  We don't use a field of the 
  *	NCR53c7x0_cmd structure since we may not have allocated one 
  *	for the command causing the reset.) of Scsi_Cmnd structures that 
- *  	had propogated below the Linux issue queue level.  If free is set, 
+ *  	had propagated below the Linux issue queue level.  If free is set, 
  *	free the NCR53c7x0_cmd structures which are associated with 
  *	the Scsi_Cmnd structures, and clean up any internal 
  *	NCR lists that the commands were on.  If issue is set,

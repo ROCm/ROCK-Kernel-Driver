@@ -17,25 +17,37 @@
 
 /* high-level ISO interface */
 
-/* per-packet data embedded in the ringbuffer */
-struct hpsb_iso_packet_info {
-	unsigned short len;
-	unsigned short cycle;
-	unsigned char channel; /* recv only */
-	unsigned char tag;
-	unsigned char sy;
-};
+/* This API sends and receives isochronous packets on a large,
+   virtually-contiguous kernel memory buffer. The buffer may be mapped
+   into a user-space process for zero-copy transmission and reception.
 
-/*
- * each packet in the ringbuffer consists of three things:
- * 1. the packet's data payload (no isochronous header)
- * 2. a struct hpsb_iso_packet_info
- * 3. some empty space before the next packet
- *
- * packets are separated by hpsb_iso.buf_stride bytes
- * an even number of packets fit on one page
- * no packet can be larger than one page
- */
+   There are no explicit boundaries between packets in the buffer. A
+   packet may be transmitted or received at any location. However,
+   low-level drivers may impose certain restrictions on alignment or
+   size of packets. (e.g. in OHCI no packet may cross a page boundary,
+   and packets should be quadlet-aligned)
+*/
+
+/* Packet descriptor - the API maintains a ring buffer of these packet
+   descriptors in kernel memory (hpsb_iso.infos[]).  */
+
+struct hpsb_iso_packet_info {
+	/* offset of data payload relative to the first byte of the buffer */
+	__u32 offset;
+
+	/* length of the data payload, in bytes (not including the isochronous header) */
+	__u16 len;
+
+	/* (recv only) the cycle number (mod 8000) on which the packet was received */
+	__u16 cycle;
+
+	/* (recv only) channel on which the packet was received */
+	__u8 channel;
+
+	/* 2-bit 'tag' and 4-bit 'sy' fields of the isochronous header */
+	__u8 tag;
+	__u8 sy;
+};
 
 enum hpsb_iso_type { HPSB_ISO_RECV = 0, HPSB_ISO_XMIT = 1 };
 
@@ -45,48 +57,49 @@ struct hpsb_iso {
 	/* pointer to low-level driver and its private data */
 	struct hpsb_host *host;
 	void *hostdata;
-	
-	/* function to be called (from interrupt context) when the iso status changes */
+
+	/* a function to be called (from interrupt context) after
+           outgoing packets have been sent, or incoming packets have
+           arrived */
 	void (*callback)(struct hpsb_iso*);
 
+	/* wait for buffer space */
+	wait_queue_head_t waitq;
+
 	int speed; /* SPEED_100, 200, or 400 */
-	int channel;
+	int channel; /* -1 if multichannel */
 
 	/* greatest # of packets between interrupts - controls
 	   the maximum latency of the buffer */
 	int irq_interval;
-	
-	/* the packet ringbuffer */
-	struct dma_region buf;
+
+	/* the buffer for packet data payloads */
+	struct dma_region data_buf;
+
+	/* size of data_buf, in bytes (always a multiple of PAGE_SIZE) */
+	unsigned int buf_size;
+
+	/* ringbuffer of packet descriptors in regular kernel memory */
+	struct hpsb_iso_packet_info *infos;
 
 	/* # of packets in the ringbuffer */
 	unsigned int buf_packets;
 
-	/* offset between successive packets, in bytes -
-	   you can assume that this is a power of 2,
-	   and less than or equal to the page size */	
-	int buf_stride;
-	
-	/* largest possible packet size, in bytes */
-	unsigned int max_packet_size;
-
-	/* offset relative to (buf.kvirt + N*buf_stride) at which
-	   the data payload begins for packet N */
-	int packet_data_offset;
-	
-	/* offset relative to (buf.kvirt + N*buf_stride) at which the
-	   struct hpsb_iso_packet_info is stored for packet N */
-	int packet_info_offset;
+	/* protects packet cursors */
+	spinlock_t lock;
 
 	/* the index of the next packet that will be produced
 	   or consumed by the user */
 	int first_packet;
 
-	/* number of packets owned by the low-level driver and
-	   queued for transmission or reception.
-	   this is related to the number of packets available
-	   to the user process: n_ready = buf_packets - n_dma_packets */	
-	atomic_t n_dma_packets;
+	/* the index of the next packet that will be transmitted
+	   or received by the 1394 hardware */
+	int pkt_dma;
+
+	/* how many packets, starting at first_packet:
+	   (transmit) are ready to be filled with data
+	   (receive)  contain received data */
+	int n_ready_packets;
 
 	/* how many times the buffer has overflowed or underflowed */
 	atomic_t overflows;
@@ -99,8 +112,12 @@ struct hpsb_iso {
 	/* # of packets left to prebuffer (xmit only) */
 	int prebuffer;
 
-	/* starting cycle (xmit only) */
+	/* starting cycle for DMA (xmit only) */
 	int start_cycle;
+
+	/* cycle at which next packet will be transmitted,
+	   -1 if not known */
+	int xmit_cycle;
 };
 
 /* functions available to high-level drivers (e.g. raw1394) */
@@ -108,30 +125,40 @@ struct hpsb_iso {
 /* allocate the buffer and DMA context */
 
 struct hpsb_iso* hpsb_iso_xmit_init(struct hpsb_host *host,
+				    unsigned int data_buf_size,
 				    unsigned int buf_packets,
-				    unsigned int max_packet_size,
 				    int channel,
 				    int speed,
 				    int irq_interval,
 				    void (*callback)(struct hpsb_iso*));
 
+/* note: if channel = -1, multi-channel receive is enabled */
 struct hpsb_iso* hpsb_iso_recv_init(struct hpsb_host *host,
+				    unsigned int data_buf_size,
 				    unsigned int buf_packets,
-				    unsigned int max_packet_size,
 				    int channel,
 				    int irq_interval,
 				    void (*callback)(struct hpsb_iso*));
 
+/* multi-channel only */
+int hpsb_iso_recv_listen_channel(struct hpsb_iso *iso, unsigned char channel);
+int hpsb_iso_recv_unlisten_channel(struct hpsb_iso *iso, unsigned char channel);
+int hpsb_iso_recv_set_channel_mask(struct hpsb_iso *iso, u64 mask);
+
 /* start/stop DMA */
 int hpsb_iso_xmit_start(struct hpsb_iso *iso, int start_on_cycle, int prebuffer);
-int hpsb_iso_recv_start(struct hpsb_iso *iso, int start_on_cycle);
+int hpsb_iso_recv_start(struct hpsb_iso *iso, int start_on_cycle, int tag_mask, int sync);
 void hpsb_iso_stop(struct hpsb_iso *iso);
 
 /* deallocate buffer and DMA context */
 void hpsb_iso_shutdown(struct hpsb_iso *iso);
 
-/* N packets have been written to the buffer; queue them for transmission */
-int  hpsb_iso_xmit_queue_packets(struct hpsb_iso *xmit, unsigned int n_packets);
+/* queue a packet for transmission. 'offset' is relative to the beginning of the
+   DMA buffer, where the packet's data payload should already have been placed */
+int hpsb_iso_xmit_queue_packet(struct hpsb_iso *iso, u32 offset, u16 len, u8 tag, u8 sy);
+
+/* wait until all queued packets have been transmitted to the bus */
+int hpsb_iso_xmit_sync(struct hpsb_iso *iso);
 
 /* N packets have been read out of the buffer, re-use the buffer space */
 int  hpsb_iso_recv_release_packets(struct hpsb_iso *recv, unsigned int n_packets);
@@ -139,10 +166,19 @@ int  hpsb_iso_recv_release_packets(struct hpsb_iso *recv, unsigned int n_packets
 /* returns # of packets ready to send or receive */
 int hpsb_iso_n_ready(struct hpsb_iso *iso);
 
-/* returns a pointer to the payload of packet 'pkt' */
-unsigned char* hpsb_iso_packet_data(struct hpsb_iso *iso, unsigned int pkt);
+/* the following are callbacks available to low-level drivers */
 
-/* returns a pointer to the info struct of packet 'pkt' */
-struct hpsb_iso_packet_info* hpsb_iso_packet_info(struct hpsb_iso *iso, unsigned int pkt);
+/* call after a packet has been transmitted to the bus (interrupt context is OK)
+   'cycle' is the _exact_ cycle the packet was sent on
+   'error' should be non-zero if some sort of error occurred when sending the packet
+*/
+void hpsb_iso_packet_sent(struct hpsb_iso *iso, int cycle, int error);
+
+/* call after a packet has been received (interrupt context OK) */
+void hpsb_iso_packet_received(struct hpsb_iso *iso, u32 offset, u16 len,
+			      u16 cycle, u8 channel, u8 tag, u8 sy);
+
+/* call to wake waiting processes after buffer space has opened up. */
+void hpsb_iso_wake(struct hpsb_iso *iso);
 
 #endif /* IEEE1394_ISO_H */

@@ -438,7 +438,6 @@ struct arraycache_init initarray_generic __initdata = { { 0, BOOT_CPUCACHE_ENTRI
 /* internal cache of cache description objs */
 static kmem_cache_t cache_cache = {
 	.lists		= LIST3_INIT(cache_cache.lists),
-	/* Allow for boot cpu != 0 */
 	.batchcount	= 1,
 	.limit		= BOOT_CPUCACHE_ENTRIES,
 	.objsize	= sizeof(kmem_cache_t),

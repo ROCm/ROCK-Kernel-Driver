@@ -71,6 +71,13 @@ void cmd640_dump_regs (void);
 #endif
 
 /*
+ * Used to indicate "no IRQ", should be a value that cannot be an IRQ
+ * number.
+ */
+ 
+#define IDE_NO_IRQ		(-1)
+
+/*
  * IDE_DRIVE_CMD is used to implement many features of the hdparm utility
  */
 #define IDE_DRIVE_CMD			99	/* (magic) undef to reduce kernel size*/
@@ -106,6 +113,7 @@ typedef unsigned char	byte;	/* used everywhere */
 /*
  * state flags
  */
+
 #define DMA_PIO_RETRY	1	/* retrying in PIO */
 
 /*
@@ -297,36 +305,18 @@ typedef enum {	ide_unknown,	ide_generic,	ide_pci,
 		ide_pmac,	ide_etrax100,	ide_acorn
 } hwif_chipset_t;
 
-typedef struct ide_io_ops_s {
-	/* insert io operations here! */
-	void (*OUTB)(u8 value, ide_ioreg_t port);
-	void (*OUTW)(u16 value, ide_ioreg_t port);
-	void (*OUTL)(u32 value, ide_ioreg_t port);
-	void (*OUTSW)(ide_ioreg_t port, void *addr, u32 count);
-	void (*OUTSL)(ide_ioreg_t port, void *addr, u32 count);
-
-	u8  (*INB)(ide_ioreg_t port);
-	u16 (*INW)(ide_ioreg_t port);
-	u32 (*INL)(ide_ioreg_t port);
-	void (*INSW)(ide_ioreg_t port, void *addr, u32 count);
-	void (*INSL)(ide_ioreg_t port, void *addr, u32 count);
-} ide_io_ops_t;
-
 /*
  * Structure to hold all information about the location of this port
  */
 typedef struct hw_regs_s {
-	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
+	unsigned long	io_ports[IDE_NR_PORTS];	/* task file registers */
 	int		irq;			/* our irq number */
 	int		dma;			/* our dma entry */
 	ide_ack_intr_t	*ack_intr;		/* acknowledge interrupt */
 	void		*priv;			/* interface specific data */
 	hwif_chipset_t  chipset;
-#if 0
-	ide_io_ops_t	*iops;			/* */
-#endif
-	sata_ioreg_t	sata_scr[SATA_NR_PORTS];
-	sata_ioreg_t	sata_misc[SATA_NR_PORTS];
+	unsigned long	sata_scr[SATA_NR_PORTS];
+	unsigned long	sata_misc[SATA_NR_PORTS];
 } hw_regs_t;
 
 /*
@@ -338,10 +328,10 @@ int ide_register_hw(hw_regs_t *hw, struct hwif_s **hwifp);
  * Set up hw_regs_t structure before calling ide_register_hw (optional)
  */
 void ide_setup_ports(	hw_regs_t *hw,
-			ide_ioreg_t base,
+			unsigned long base,
 			int *offsets,
-			ide_ioreg_t ctrl,
-			ide_ioreg_t intr,
+			unsigned long ctrl,
+			unsigned long intr,
 			ide_ack_intr_t *ack_intr,
 #if 0
 			ide_io_ops_t *iops,
@@ -770,6 +760,7 @@ typedef struct ide_drive_s {
         u8	quirk_list;	/* considered quirky, set for a specific host */
         u8	suspend_reset;	/* drive suspend mode flag, soft-reset recovers */
         u8	init_speed;	/* transfer rate set at boot */
+        u8	pio_speed;      /* unused by core, used by some drivers for fallback from DMA */
         u8	current_speed;	/* current transfer rate set */
         u8	dn;		/* now wide spread use */
         u8	wcache;		/* status of write cache */
@@ -894,9 +885,9 @@ typedef struct hwif_s {
 	char name[6];			/* name of interface, eg. "ide0" */
 
 		/* task file registers for pata and sata */
-	ide_ioreg_t	io_ports[IDE_NR_PORTS];
-	sata_ioreg_t	sata_scr[SATA_NR_PORTS];
-	sata_ioreg_t	sata_misc[SATA_NR_PORTS];
+	unsigned long	io_ports[IDE_NR_PORTS];
+	unsigned long	sata_scr[SATA_NR_PORTS];
+	unsigned long	sata_misc[SATA_NR_PORTS];
 
 	hw_regs_t	hw;		/* Hardware info */
 	ide_drive_t	drives[MAX_DRIVES];	/* drive info */
@@ -960,9 +951,6 @@ typedef struct hwif_s {
 	void (*atapi_output_bytes)(ide_drive_t *, void *, u32);
 #endif
 
-#if 0
-	ide_dma_ops_t	*dmaops;
-#else
 	int (*ide_dma_read)(ide_drive_t *drive);
 	int (*ide_dma_write)(ide_drive_t *drive);
 	int (*ide_dma_begin)(ide_drive_t *drive);
@@ -988,23 +976,19 @@ typedef struct hwif_s {
 	ide_startstop_t (*ide_dma_queued_read)(ide_drive_t *drive);
 	ide_startstop_t (*ide_dma_queued_write)(ide_drive_t *drive);
 	ide_startstop_t (*ide_dma_queued_start)(ide_drive_t *drive);
-#endif
 
-#if 0
-	ide_io_ops_t	*iops;
-#else
-	void (*OUTB)(u8 addr, ide_ioreg_t port);
-	void (*OUTW)(u16 addr, ide_ioreg_t port);
-	void (*OUTL)(u32 addr, ide_ioreg_t port);
-	void (*OUTSW)(ide_ioreg_t port, void *addr, u32 count);
-	void (*OUTSL)(ide_ioreg_t port, void *addr, u32 count);
+	void (*OUTB)(u8 addr, unsigned long port);
+	void (*OUTBSYNC)(u8 addr, unsigned long port);
+	void (*OUTW)(u16 addr, unsigned long port);
+	void (*OUTL)(u32 addr, unsigned long port);
+	void (*OUTSW)(unsigned long port, void *addr, u32 count);
+	void (*OUTSL)(unsigned long port, void *addr, u32 count);
 
-	u8  (*INB)(ide_ioreg_t port);
-	u16 (*INW)(ide_ioreg_t port);
-	u32 (*INL)(ide_ioreg_t port);
-	void (*INSW)(ide_ioreg_t port, void *addr, u32 count);
-	void (*INSL)(ide_ioreg_t port, void *addr, u32 count);
-#endif
+	u8  (*INB)(unsigned long port);
+	u16 (*INW)(unsigned long port);
+	u32 (*INL)(unsigned long port);
+	void (*INSW)(unsigned long port, void *addr, u32 count);
+	void (*INSL)(unsigned long port, void *addr, u32 count);
 
 	/* dma physical region descriptor table (cpu view) */
 	unsigned int	*dmatable_cpu;
@@ -1131,12 +1115,13 @@ typedef struct ide_settings_s {
 	struct ide_settings_s	*next;
 } ide_settings_t;
 
-void ide_add_setting(ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set);
-void ide_remove_setting(ide_drive_t *drive, char *name);
-ide_settings_t *ide_find_setting_by_name(ide_drive_t *drive, char *name);
-int ide_read_setting(ide_drive_t *t, ide_settings_t *setting);
-int ide_write_setting(ide_drive_t *drive, ide_settings_t *setting, int val);
-void ide_add_generic_settings(ide_drive_t *drive);
+extern struct semaphore ide_setting_sem;
+extern int ide_add_setting(ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set);
+extern void ide_remove_setting(ide_drive_t *drive, char *name);
+extern ide_settings_t *ide_find_setting_by_name(ide_drive_t *drive, char *name);
+extern int ide_read_setting(ide_drive_t *t, ide_settings_t *setting);
+extern int ide_write_setting(ide_drive_t *drive, ide_settings_t *setting, int val);
+extern void ide_add_generic_settings(ide_drive_t *drive);
 
 /*
  * /proc/ide interface
@@ -1270,10 +1255,17 @@ extern int noautodma;
 extern int ide_end_request (ide_drive_t *drive, int uptodate, int nrsecs);
 
 /*
- * This is used on exit from the driver, to designate the next irq handler
+ * This is used on exit from the driver to designate the next irq handler
  * and also to start the safety timer.
  */
 extern void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler, unsigned int timeout, ide_expiry_t *expiry);
+
+/*
+ * This is used on exit from the driver to designate the next irq handler
+ * and start the safety time safely and atomically from the IRQ handler
+ * with respect to the command issue (which it also does)
+ */
+extern void ide_execute_command(ide_drive_t *, task_ioreg_t cmd, ide_handler_t *, unsigned int, ide_expiry_t *);
 
 /*
  * Error reporting, in human readable form (luxurious, but a memory hog).
@@ -1576,14 +1568,6 @@ extern int ide_system_bus_speed(void);
  * to the hwgroup by sleeping for timeout jiffies.
  */
 extern void ide_stall_queue(ide_drive_t *drive, unsigned long timeout);
-
-/*
- * CompactFlash cards and their brethern pretend to be removable hard disks,
- * but they never have a slave unit, and they don't have doorlock mechanisms.
- * This test catches them, and is invoked elsewhere when setting appropriate
- * config bits.
- */
-extern int drive_is_flashcard (ide_drive_t *drive);
 
 extern int ide_spin_wait_hwgroup(ide_drive_t *);
 extern void ide_timer_expiry(unsigned long);

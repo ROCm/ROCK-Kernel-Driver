@@ -128,7 +128,7 @@ struct kcs_info
 	/* The driver will disable interrupts when it gets into a
 	   situation where it cannot handle messages due to lack of
 	   memory.  Once that situation clears up, it will re-enable
-	   interupts. */
+	   interrupts. */
 	int                 interrupt_disabled;
 };
 

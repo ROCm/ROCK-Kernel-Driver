@@ -50,7 +50,7 @@
 #include "iso.h"
 #include "ieee1394_transactions.h"
 #include "raw1394.h"
-
+#include "raw1394-private.h"
 
 #if BITS_PER_LONG == 64
 #define int2ptr(x) ((void *)x)
@@ -238,7 +238,7 @@ static void remove_host(struct hpsb_host *host)
                 list_del(&hi->list);
                 host_count--;
                 /* 
-                   FIXME: adressranges should be removed 
+                   FIXME: addressranges should be removed 
                    and fileinfo states should be initialized
                    (including setting generation to 
                    internal-generation ...)
@@ -558,7 +558,7 @@ static int state_initialized(struct file_info *fi, struct pending_request *req)
                                 lh = lh->next;
                         }
                         hi = list_entry(lh, struct host_info, list);
-                        hpsb_ref_host(hi->host);
+                        hpsb_ref_host(hi->host); // XXX Need to handle failure case
                         list_add_tail(&fi->list, &hi->file_info_list);
                         fi->host = hi->host;
                         fi->state = connected;
@@ -603,10 +603,13 @@ static void handle_iso_listen(struct file_info *fi, struct pending_request *req)
                 if (fi->listen_channels & (1ULL << channel)) {
                         req->req.error = RAW1394_ERROR_ALREADY;
                 } else {
-                        fi->listen_channels |= 1ULL << channel;
-                        hpsb_listen_channel(hl_handle, fi->host, channel);
-                        fi->iso_buffer = int2ptr(req->req.recvb);
-                        fi->iso_buffer_length = req->req.length;
+                        if(hpsb_listen_channel(hl_handle, fi->host, channel)) {
+				req->req.error = RAW1394_ERROR_ALREADY;
+			} else {
+				fi->listen_channels |= 1ULL << channel;
+				fi->iso_buffer = int2ptr(req->req.recvb);
+				fi->iso_buffer_length = req->req.length;
+			}
                 }
         } else {
                 /* deallocate channel (one's complement neg) req.misc */
@@ -2004,7 +2007,7 @@ static inline int __rawiso_event_in_queue(struct file_info *fi)
 {
 	struct list_head *lh;
 	struct pending_request *req;
-	
+
 	list_for_each(lh, &fi->req_complete) {
 		req = list_entry(lh, struct pending_request, list);
 		if(req->req.type == RAW1394_REQ_RAWISO_ACTIVITY) {
@@ -2015,59 +2018,63 @@ static inline int __rawiso_event_in_queue(struct file_info *fi)
 	return 0;
 }
 
+/* put a RAWISO_ACTIVITY event in the queue, if one isn't there already */
+static void queue_rawiso_event(struct file_info *fi)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&fi->reqlists_lock, flags);
+
+	/* only one ISO activity event may be in the queue */
+	if(!__rawiso_event_in_queue(fi)) {
+		struct pending_request *req = __alloc_pending_request(SLAB_ATOMIC);
+
+		if(req) {
+			req->file_info = fi;
+			req->req.type = RAW1394_REQ_RAWISO_ACTIVITY;
+			req->req.generation = get_hpsb_generation(fi->host);
+			__queue_complete_req(req);
+		} else {
+			/* on allocation failure, signal an overflow */
+			if(fi->iso_handle) {
+				atomic_inc(&fi->iso_handle->overflows);
+			}
+		}
+	}
+	spin_unlock_irqrestore(&fi->reqlists_lock, flags);
+}
+
 static void rawiso_activity_cb(struct hpsb_iso *iso)
 {
-	unsigned long host_flags;
+	unsigned long flags;
         struct list_head *lh;
         struct host_info *hi;
 
-        spin_lock_irqsave(&host_info_lock, host_flags);
+        spin_lock_irqsave(&host_info_lock, flags);
         hi = find_host_info(iso->host);
-	
+
 	if (hi != NULL) {
 		list_for_each(lh, &hi->file_info_list) {
-			unsigned long reqlist_flags;
 			struct file_info *fi = list_entry(lh, struct file_info, list);
-			
-			spin_lock_irqsave(&fi->reqlists_lock, reqlist_flags);
-
-			/* only one ISO activity event may be in the queue */
-			if(!__rawiso_event_in_queue(fi)) {
-				struct pending_request *req = __alloc_pending_request(SLAB_ATOMIC);
-
-				if(req) {
-					req->file_info = fi;
-					req->req.type = RAW1394_REQ_RAWISO_ACTIVITY;
-					req->req.generation = get_hpsb_generation(iso->host);
-					__queue_complete_req(req);
-				} else {
-					/* on allocation failure, signal an overflow */
-					if(fi->iso_handle) {
-						atomic_inc(&fi->iso_handle->overflows);
-					}
-				}
-			}
-			spin_unlock_irqrestore(&fi->reqlists_lock, reqlist_flags);
+			if(fi->iso_handle == iso)
+				queue_rawiso_event(fi);
 		}
 	}
-	
-	spin_unlock_irqrestore(&host_info_lock, host_flags);
+
+	spin_unlock_irqrestore(&host_info_lock, flags);
 }
 
 /* helper function - gather all the kernel iso status bits for returning to user-space */
 static void raw1394_iso_fill_status(struct hpsb_iso *iso, struct raw1394_iso_status *stat)
 {
+	stat->config.data_buf_size = iso->buf_size;
 	stat->config.buf_packets = iso->buf_packets;
-	stat->config.max_packet_size = iso->max_packet_size;
 	stat->config.channel = iso->channel;
 	stat->config.speed = iso->speed;
 	stat->config.irq_interval = iso->irq_interval;
-	stat->buf_stride = iso->buf_stride;
-	stat->packet_data_offset = iso->packet_data_offset;
-	stat->packet_info_offset = iso->packet_info_offset;
-	stat->first_packet = iso->first_packet;
 	stat->n_packets = hpsb_iso_n_ready(iso);
 	stat->overflows = atomic_read(&iso->overflows);
+	stat->xmit_cycle = iso->xmit_cycle;
 }
 
 static int raw1394_iso_xmit_init(struct file_info *fi, void *uaddr)
@@ -2076,10 +2083,10 @@ static int raw1394_iso_xmit_init(struct file_info *fi, void *uaddr)
 
 	if(copy_from_user(&stat, uaddr, sizeof(stat)))
 		return -EFAULT;
-	
+
 	fi->iso_handle = hpsb_iso_xmit_init(fi->host,
+					    stat.config.data_buf_size,
 					    stat.config.buf_packets,
-					    stat.config.max_packet_size,
 					    stat.config.channel,
 					    stat.config.speed,
 					    stat.config.irq_interval,
@@ -2088,14 +2095,14 @@ static int raw1394_iso_xmit_init(struct file_info *fi, void *uaddr)
 		return -ENOMEM;
 
 	fi->iso_state = RAW1394_ISO_XMIT;
-	
+
 	raw1394_iso_fill_status(fi->iso_handle, &stat);
 	if(copy_to_user(uaddr, &stat, sizeof(stat)))
 		return -EFAULT;
 
 	/* queue an event to get things started */
 	rawiso_activity_cb(fi->iso_handle);
-	
+
 	return 0;
 }
 
@@ -2105,10 +2112,10 @@ static int raw1394_iso_recv_init(struct file_info *fi, void *uaddr)
 
 	if(copy_from_user(&stat, uaddr, sizeof(stat)))
 		return -EFAULT;
-	
+
 	fi->iso_handle = hpsb_iso_recv_init(fi->host,
+					    stat.config.data_buf_size,
 					    stat.config.buf_packets,
-					    stat.config.max_packet_size,
 					    stat.config.channel,
 					    stat.config.irq_interval,
 					    rawiso_activity_cb);
@@ -2116,7 +2123,7 @@ static int raw1394_iso_recv_init(struct file_info *fi, void *uaddr)
 		return -ENOMEM;
 
 	fi->iso_state = RAW1394_ISO_RECV;
-	
+
 	raw1394_iso_fill_status(fi->iso_handle, &stat);
 	if(copy_to_user(uaddr, &stat, sizeof(stat)))
 		return -EFAULT;
@@ -2134,7 +2141,72 @@ static int raw1394_iso_get_status(struct file_info *fi, void *uaddr)
 
 	/* reset overflow counter */
 	atomic_set(&iso->overflows, 0);
-	
+
+	return 0;
+}
+
+/* copy N packet_infos out of the ringbuffer into user-supplied array */
+static int raw1394_iso_recv_packets(struct file_info *fi, void *uaddr)
+{
+	struct raw1394_iso_packets upackets;
+	unsigned int packet = fi->iso_handle->first_packet;
+	int i;
+
+	if(copy_from_user(&upackets, uaddr, sizeof(upackets)))
+		return -EFAULT;
+
+	if(upackets.n_packets > hpsb_iso_n_ready(fi->iso_handle))
+		return -EINVAL;
+
+	/* ensure user-supplied buffer is accessible and big enough */
+	if(verify_area(VERIFY_WRITE, upackets.infos,
+		       upackets.n_packets * sizeof(struct raw1394_iso_packet_info)))
+		return -EFAULT;
+
+	/* copy the packet_infos out */
+	for(i = 0; i < upackets.n_packets; i++) {
+		if(__copy_to_user(&upackets.infos[i],
+				  &fi->iso_handle->infos[packet],
+				  sizeof(struct raw1394_iso_packet_info)))
+			return -EFAULT;
+		
+		packet = (packet + 1) % fi->iso_handle->buf_packets;
+	}
+
+	return 0;
+}
+
+/* copy N packet_infos from user to ringbuffer, and queue them for transmission */
+static int raw1394_iso_send_packets(struct file_info *fi, void *uaddr)
+{
+	struct raw1394_iso_packets upackets;
+	int i, rv;
+
+	if(copy_from_user(&upackets, uaddr, sizeof(upackets)))
+		return -EFAULT;
+
+	if(upackets.n_packets > hpsb_iso_n_ready(fi->iso_handle))
+		return -EINVAL;
+
+	/* ensure user-supplied buffer is accessible and big enough */
+	if(verify_area(VERIFY_READ, upackets.infos,
+		       upackets.n_packets * sizeof(struct raw1394_iso_packet_info)))
+		return -EFAULT;
+
+	/* copy the infos structs in and queue the packets */
+	for(i = 0; i < upackets.n_packets; i++) {
+		struct raw1394_iso_packet_info info;
+
+		if(__copy_from_user(&info, &upackets.infos[i],
+				    sizeof(struct raw1394_iso_packet_info)))
+			return -EFAULT;
+
+		rv = hpsb_iso_xmit_queue_packet(fi->iso_handle, info.offset,
+						info.len, info.tag, info.sy);
+		if(rv)
+			return rv;
+	}
+
 	return 0;
 }
 
@@ -2142,7 +2214,7 @@ static void raw1394_iso_shutdown(struct file_info *fi)
 {
 	if(fi->iso_handle)
 		hpsb_iso_shutdown(fi->iso_handle);
-	
+
 	fi->iso_handle = NULL;
 	fi->iso_state = RAW1394_ISO_INACTIVE;
 }
@@ -2155,20 +2227,20 @@ static int raw1394_mmap(struct file *file, struct vm_area_struct *vma)
 	if(fi->iso_state == RAW1394_ISO_INACTIVE)
 		return -EINVAL;
 
-	return dma_region_mmap(&fi->iso_handle->buf, file, vma);
+	return dma_region_mmap(&fi->iso_handle->data_buf, file, vma);
 }
 
 /* ioctl is only used for rawiso operations */
 static int raw1394_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct file_info *fi = file->private_data;
-	
+
 	switch(fi->iso_state) {
 	case RAW1394_ISO_INACTIVE:
 		switch(cmd) {
-		case RAW1394_ISO_XMIT_INIT:
+		case RAW1394_IOC_ISO_XMIT_INIT:
 			return raw1394_iso_xmit_init(fi, (void*) arg);
-		case RAW1394_ISO_RECV_INIT:
+		case RAW1394_IOC_ISO_RECV_INIT:
 			return raw1394_iso_recv_init(fi, (void*) arg);
 		default:
 			break;
@@ -2176,51 +2248,71 @@ static int raw1394_ioctl(struct inode *inode, struct file *file, unsigned int cm
 		break;
 	case RAW1394_ISO_RECV:
 		switch(cmd) {
-		case RAW1394_ISO_RECV_START:
-			return hpsb_iso_recv_start(fi->iso_handle, arg);
-		case RAW1394_ISO_STOP:
+		case RAW1394_IOC_ISO_RECV_START: {
+			/* copy args from user-space */
+			int args[3];
+			if(copy_from_user(&args[0], (void*) arg, sizeof(args)))
+				return -EFAULT;
+			return hpsb_iso_recv_start(fi->iso_handle, args[0], args[1], args[2]);
+		}
+		case RAW1394_IOC_ISO_XMIT_RECV_STOP:
 			hpsb_iso_stop(fi->iso_handle);
 			return 0;
-
-		case RAW1394_ISO_GET_STATUS:
+		case RAW1394_IOC_ISO_RECV_LISTEN_CHANNEL:
+			return hpsb_iso_recv_listen_channel(fi->iso_handle, arg);
+		case RAW1394_IOC_ISO_RECV_UNLISTEN_CHANNEL:
+			return hpsb_iso_recv_unlisten_channel(fi->iso_handle, arg);
+		case RAW1394_IOC_ISO_RECV_SET_CHANNEL_MASK: {
+			/* copy the u64 from user-space */
+			u64 mask;
+			if(copy_from_user(&mask, (void*) arg, sizeof(mask)))
+				return -EFAULT;
+			return hpsb_iso_recv_set_channel_mask(fi->iso_handle, mask);
+		}
+		case RAW1394_IOC_ISO_GET_STATUS:
 			return raw1394_iso_get_status(fi, (void*) arg);
-			
-		case RAW1394_ISO_PRODUCE_CONSUME:
+		case RAW1394_IOC_ISO_RECV_PACKETS:
+			return raw1394_iso_recv_packets(fi, (void*) arg);
+		case RAW1394_IOC_ISO_RECV_RELEASE_PACKETS:
 			return hpsb_iso_recv_release_packets(fi->iso_handle, arg);
-			
-		case RAW1394_ISO_SHUTDOWN:
+		case RAW1394_IOC_ISO_SHUTDOWN:
 			raw1394_iso_shutdown(fi);
+			return 0;
+		case RAW1394_IOC_ISO_QUEUE_ACTIVITY:
+			queue_rawiso_event(fi);
 			return 0;
 		}
 		break;
 	case RAW1394_ISO_XMIT:
 		switch(cmd) {
-		case RAW1394_ISO_XMIT_START: {
+		case RAW1394_IOC_ISO_XMIT_START: {
 			/* copy two ints from user-space */
 			int args[2];
 			if(copy_from_user(&args[0], (void*) arg, sizeof(args)))
 				return -EFAULT;
 			return hpsb_iso_xmit_start(fi->iso_handle, args[0], args[1]);
 		}
-		case RAW1394_ISO_STOP:
+		case RAW1394_IOC_ISO_XMIT_SYNC:
+			return hpsb_iso_xmit_sync(fi->iso_handle);
+		case RAW1394_IOC_ISO_XMIT_RECV_STOP:
 			hpsb_iso_stop(fi->iso_handle);
 			return 0;
-			
-		case RAW1394_ISO_GET_STATUS:
+		case RAW1394_IOC_ISO_GET_STATUS:
 			return raw1394_iso_get_status(fi, (void*) arg);
-			
-		case RAW1394_ISO_PRODUCE_CONSUME:
-			return hpsb_iso_xmit_queue_packets(fi->iso_handle, arg);
-			
-		case RAW1394_ISO_SHUTDOWN:
+		case RAW1394_IOC_ISO_XMIT_PACKETS:
+			return raw1394_iso_send_packets(fi, (void*) arg);
+		case RAW1394_IOC_ISO_SHUTDOWN:
 			raw1394_iso_shutdown(fi);
+			return 0;
+		case RAW1394_IOC_ISO_QUEUE_ACTIVITY:
+			queue_rawiso_event(fi);
 			return 0;
 		}
 		break;
 	default:
 		break;
 	}
-	
+
 	return -EINVAL;
 }
 
@@ -2236,7 +2328,7 @@ static unsigned int raw1394_poll(struct file *file, poll_table *pt)
                 mask |= POLLIN | POLLRDNORM;
         }
         spin_unlock_irq(&fi->reqlists_lock);
-	
+
         return mask;
 }
 
@@ -2286,7 +2378,7 @@ static int raw1394_release(struct inode *inode, struct file *file)
 
 	if(fi->iso_state != RAW1394_ISO_INACTIVE)
 		raw1394_iso_shutdown(fi);
-	
+
         for (i = 0; i < 64; i++) {
                 if (fi->listen_channels & (1ULL << i)) {
                         hpsb_unlisten_channel(hl_handle, fi->host, i);

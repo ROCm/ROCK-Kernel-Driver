@@ -59,6 +59,7 @@
 #include <linux/aio_abi.h>
 #include <linux/compat.h>
 #include <linux/vfs.h>
+#include <linux/ptrace.h>
 #include <asm/mman.h>
 #include <asm/types.h>
 #include <asm/uaccess.h>
@@ -1572,7 +1573,7 @@ asmlinkage long sys32_modify_ldt(int func, void *ptr, unsigned long bytecount)
 	return ret;
 }
 
-/* Handle adjtimex compatability. */
+/* Handle adjtimex compatibility. */
 
 struct timex32 {
 	u32 modes;
@@ -2197,26 +2198,6 @@ long sys32_sched_getaffinity(pid_t pid, unsigned int len,
 	if (err > 0) 
 		err = put_user((u32)mask, new_mask_ptr); 
 	return err;
-}
-
-extern int sys_futex(unsigned long uaddr, int op, int val, struct timespec *t); 
-
-asmlinkage long
-sys32_futex(unsigned long uaddr, int op, int val, struct compat_timespec *utime32)
-{
-	struct timespec t;
-	mm_segment_t oldfs = get_fs(); 
-	int err;
-
-	if (utime32 && get_compat_timespec(&t, utime32))
-		return -EFAULT;
-
-	/* the set_fs is safe because futex doesn't use the seg limit 
-	   for valid page checking of uaddr. */ 
-	set_fs(KERNEL_DS); 
-	err = sys_futex(uaddr, op, val, utime32 ? &t : NULL);
-	set_fs(oldfs); 
-	return err; 
 }
 
 extern long sys_io_setup(unsigned nr_reqs, aio_context_t *ctx);

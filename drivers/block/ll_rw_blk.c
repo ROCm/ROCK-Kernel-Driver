@@ -1358,11 +1358,19 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 
 	generic_unplug_device(q);
 	do {
+		int block = 0;
+
 		prepare_to_wait_exclusive(&rl->wait, &wait,
 					TASK_UNINTERRUPTIBLE);
+		spin_lock_irq(q->queue_lock);
 		if (!rl->count)
+			block = 1;
+		spin_unlock_irq(q->queue_lock);
+
+		if (block)
 			io_schedule();
 		finish_wait(&rl->wait, &wait);
+
 		spin_lock_irq(q->queue_lock);
 		rq = get_request(q, rw);
 		spin_unlock_irq(q->queue_lock);
@@ -1596,13 +1604,9 @@ void blk_congestion_wait(int rw, long timeout)
 	DEFINE_WAIT(wait);
 	struct congestion_state *cs = &congestion_states[rw];
 
-	if (!atomic_read(&cs->nr_active_queues))
-		return;
-
 	blk_run_queues();
 	prepare_to_wait(&cs->wqh, &wait, TASK_UNINTERRUPTIBLE);
-	if (atomic_read(&cs->nr_active_queues))
-		io_schedule_timeout(timeout);
+	io_schedule_timeout(timeout);
 	finish_wait(&cs->wqh, &wait);
 }
 

@@ -108,7 +108,7 @@ typedef struct
 typedef struct
 	{
 	UCHAR		irq;			// interrupt request channel number
-	UCHAR		numDrives;		// Number of accessable drives
+	UCHAR		numDrives;		// Number of accessible drives
 	UCHAR		fastFormat;	 	// Boolean for fast format enable
 	}	CHIP_CONFIG_N;
 

@@ -98,6 +98,10 @@ int __devinit com20020_check(struct net_device *dev)
 	lp->setup = lp->clockm ? 0 : (lp->clockp << 1);
 	lp->setup2 = (lp->clockm << 4) | 8;
 
+	/* CHECK: should we do this for SOHARD cards ? */
+	/* Enable P1Mode for backplane mode */
+	lp->setup = lp->setup | P1MODE;
+
 	SET_SUBADR(SUB_SETUP1);
 	outb(lp->setup, _XREG);
 
@@ -202,7 +206,7 @@ int __devinit com20020_found(struct net_device *dev, int shared)
 		return -ENODEV;
 	}
 	/* reserve the I/O region */
-	if (request_region(ioaddr, ARCNET_TOTAL_SIZE, "arcnet (COM20020)")) {
+	if (!request_region(ioaddr, ARCNET_TOTAL_SIZE, "arcnet (COM20020)")) {
 		free_irq(dev->irq, dev);
 		return -EBUSY;
 	}
@@ -300,8 +304,9 @@ static void com20020_openclose(struct net_device *dev, bool open)
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
 	int ioaddr = dev->base_addr;
 
-	if (open)
+	if (open) {
 		MOD_INC_USE_COUNT;
+	}
 	else {
 		/* disable transmitter */
 		lp->config &= ~TXENcfg;

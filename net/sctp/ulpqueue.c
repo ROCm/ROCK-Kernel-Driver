@@ -154,7 +154,7 @@ int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, sctp_chunk_t *chunk,
 	return 0;
 }
 
-/* Add a new event for propogation to the ULP.  */
+/* Add a new event for propagation to the ULP.  */
 int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 {
 	struct sock *sk = ulpq->asoc->base.sk;

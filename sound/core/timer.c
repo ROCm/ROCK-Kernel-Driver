@@ -1298,7 +1298,7 @@ static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count
 {
 	snd_timer_user_t *tu;
 	long result = 0;
-	int  err = 0;
+	int err = 0;
 	
 	tu = snd_magic_cast(snd_timer_user_t, file->private_data, return -ENXIO);
 	spin_lock_irq(&tu->qlock);
@@ -1307,7 +1307,6 @@ static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count
 			wait_queue_t wait;
 
 			if ((file->f_flags & O_NONBLOCK) != 0 || result > 0) {
-				spin_unlock_irq(&tu->qlock);
 				err = -EAGAIN;
 				break;
 			}

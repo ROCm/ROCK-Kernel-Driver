@@ -110,9 +110,18 @@ static int linear_run (mddev_t *mddev)
 		goto out;
 	}
 
+	/*
+	 * This code was restructured to work around a gcc-2.95.3 internal
+	 * compiler error.  Alter it with care.
+	 */
 	{
-		sector_t sz = md_size[mdidx(mddev)];
-		unsigned round = sector_div(sz, conf->smallest->size);
+		sector_t sz;
+		unsigned round;
+		unsigned long base;
+
+		sz = md_size[mdidx(mddev)];
+		base = conf->smallest->size;
+		round = sector_div(sz, base);
 		nb_zone = conf->nr_zones = sz + (round ? 1 : 0);
 	}
 			

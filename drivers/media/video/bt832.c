@@ -1,5 +1,5 @@
 /* Driver for Bt832 CMOS Camera Video Processor
-    i2c-adresses: 0x88 or 0x8a
+    i2c-addresses: 0x88 or 0x8a
 
   The BT832 interfaces to a Quartzsight Digital Camera (352x288, 25 or 30 fps)
   via a 9 pin connector ( 4-wire SDATA, 2-wire i2c, SCLK, VCC, GND).

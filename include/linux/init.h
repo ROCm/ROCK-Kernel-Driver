@@ -71,7 +71,7 @@ typedef void (*exitcall_t)(void);
 /* initcalls are now grouped by functionality into separate 
  * subsections. Ordering inside the subsections is determined
  * by link order. 
- * For backwards compatability, initcall() puts the call in 
+ * For backwards compatibility, initcall() puts the call in 
  * the device init subsection.
  */
 

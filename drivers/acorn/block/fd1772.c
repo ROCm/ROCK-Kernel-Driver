@@ -99,7 +99,7 @@
  *                Removed the busy wait loop in do_fd_request and replaced
  *                by a routine on tq_immediate; only 11% cpu on a dd off the
  *                raw disc - but the speed is the same.
- *	1/ 9/96 - Idea (failed!) - set the 'disable spin-up seqeunce'
+ *	1/ 9/96 - Idea (failed!) - set the 'disable spin-up sequence'
  *		  when we read the track if we know the motor is on; didn't
  *		  help - perhaps we have to do it in stepping as well.
  *		  Nope. Still doesn't help.
@@ -336,7 +336,7 @@ DECLARE_WORK(fd1772_tq, (void *)fd1772_checkint, NULL);
  */
 static int Probing = 0;
 
-/* This flag is set when a dummy seek is necesary to make the WP
+/* This flag is set when a dummy seek is necessary to make the WP
  * status bit accessible.
  */
 static int NeedSeek = 0;

@@ -4791,9 +4791,8 @@ advansys_detect(Scsi_Host_Template *tpnt)
             if (shp == NULL) {
                 continue;
             }
-#ifdef CONFIG_PCI
-	    scsi_set_pci_device(shp, pci_devp);
-#endif
+
+	    scsi_set_device(shp, &pci_devp->dev);
 
             /* Save a pointer to the Scsi_host of each board found. */
             asc_host[asc_board_count++] = shp;

@@ -96,5 +96,5 @@ unsigned int snd_dma_pointer(unsigned long dma, unsigned int size)
 	if (result > size)
 		snd_printk(KERN_ERR "pointer (0x%x) for DMA #%ld is greater than transfer size (0x%x)\n", result, dma, size);
 #endif
-	return result >= size ? 0 : result;
+	return result >= size ? 0 : size - result;
 }

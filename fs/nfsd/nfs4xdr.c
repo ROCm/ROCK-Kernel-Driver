@@ -1735,6 +1735,7 @@ nfsd4_encode_read(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_read 
 	svc_take_page(resp->rqstp);
 	resp->xbuf->tail[0].iov_base = 
 		page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
+	resp->rqstp->rq_restailpage = resp->rqstp->rq_resused-1;
 	resp->xbuf->tail[0].iov_len = 0;
 	resp->p = resp->xbuf->tail[0].iov_base;
 	resp->end = resp->p + PAGE_SIZE/4;
@@ -1782,6 +1783,7 @@ nfsd4_encode_readlink(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_r
 	svc_take_page(resp->rqstp);
 	resp->xbuf->tail[0].iov_base = 
 		page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
+	resp->rqstp->rq_restailpage = resp->rqstp->rq_resused-1;
 	resp->xbuf->tail[0].iov_len = 0;
 	resp->p = resp->xbuf->tail[0].iov_base;
 	resp->end = resp->p + PAGE_SIZE/4;
@@ -1859,6 +1861,7 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	svc_take_page(resp->rqstp);
 	resp->xbuf->tail[0].iov_base = 
 		page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
+	resp->rqstp->rq_restailpage = resp->rqstp->rq_resused-1;
 	resp->xbuf->tail[0].iov_len = 0;
 	resp->p = resp->xbuf->tail[0].iov_base;
 	resp->end = resp->p + PAGE_SIZE/4;

@@ -534,7 +534,7 @@ pcm_req (PISDN_ADAPTER IoAdapter, ENTITY *e)
   goto Trapped ;
  }
 /*
- * memory based shared ram is accessable from different
+ * memory based shared ram is accessible from different
  * processors without disturbing concurrent processes.
  */
  a->ram_out (a, &IoAdapter->pcm->rc, 0) ;

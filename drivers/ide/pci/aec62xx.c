@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/aec62xx.c		Version 0.11	March 27, 2002
+ * linux/drivers/ide/pci/aec62xx.c		Version 0.11	March 27, 2002
  *
  * Copyright (C) 1999-2002	Andre Hedrick <andre@linux-ide.org>
  *
@@ -409,7 +409,7 @@ static unsigned int __init init_chipset_aec62xx (struct pci_dev *dev, const char
 
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_dword(dev, PCI_ROM_ADDRESS, dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk("%s: ROM enabled at 0x%08lx\n", name, dev->resource[PCI_ROM_RESOURCE].start);
+		printk(KERN_INFO "%s: ROM enabled at 0x%08lx\n", name, dev->resource[PCI_ROM_RESOURCE].start);
 	}
 
 #if defined(DISPLAY_AEC62XX_TIMINGS) && defined(CONFIG_PROC_FS)

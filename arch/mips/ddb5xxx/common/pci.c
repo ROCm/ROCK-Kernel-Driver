@@ -148,7 +148,7 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
                 }
                 bus->resource[0]->flags |= pci_bridge_check_io(dev);
                 bus->resource[1]->flags |= IORESOURCE_MEM;
-                /* For now, propogate hose limits to the bus;
+                /* For now, propagate hose limits to the bus;
                    we'll adjust them later. */
                 bus->resource[0]->end = hose->io_resource->end;
                 bus->resource[1]->end = hose->mem_resource->end;

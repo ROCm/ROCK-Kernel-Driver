@@ -54,7 +54,7 @@
  *      allocation/registration for linux-2.3.22+.
  *    - Adopted David Brownell's <david-b@pacbell.net> technique for 
  *      assigning bulk endpoints.
- *    - Removed unnessesary #include's
+ *    - Removed unnecessary #include's
  *    - Scanner model now reported via syslog INFO after being detected 
  *      *and* configured.
  *    - Added user specified vendor:product USB ID's which can be passed 

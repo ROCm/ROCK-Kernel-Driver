@@ -2175,7 +2175,7 @@ int __devinit snd_trident_pcm(trident_t * trident, int device, snd_pcm_t ** rpcm
 	trident->pcm = pcm;
 
 	if (trident->tlb.entries)
-		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, pcm);
+		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, pcm, 64*1024, 128*1024);
 	else
 		snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, pcm, 64*1024, 128*1024);
 
@@ -2230,7 +2230,7 @@ int __devinit snd_trident_foldback_pcm(trident_t * trident, int device, snd_pcm_
 	trident->foldback = foldback;
 
 	if (trident->tlb.entries)
-		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, foldback);
+		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, foldback, 0, 128*1024);
 	else
 		snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, foldback, 64*1024, 128*1024);
 
@@ -2274,7 +2274,7 @@ int __devinit snd_trident_spdif_pcm(trident_t * trident, int device, snd_pcm_t *
 	trident->spdif = spdif;
 
 	if (trident->tlb.entries)
-		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, spdif);
+		snd_pcm_lib_preallocate_sg_pages_for_all(trident->pci, spdif, 64*1024, 128*1024);
 	else
 		snd_pcm_lib_preallocate_pci_pages_for_all(trident->pci, spdif, 64*1024, 128*1024);
 

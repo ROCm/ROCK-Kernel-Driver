@@ -41,7 +41,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/sys.h>
 #include <linux/linkage.h>
 #include <asm/thread_info.h>
 #include <asm/errno.h>
@@ -252,7 +251,7 @@ ENTRY(sysenter_entry)
 	pushl %eax
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
-	cmpl $(NR_syscalls), %eax
+	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
 
 	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebp)
@@ -276,7 +275,7 @@ ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
-	cmpl $(NR_syscalls), %eax
+	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
 					# system call tracing in operation
 	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebp)
@@ -339,7 +338,7 @@ syscall_trace_entry:
 	xorl %edx,%edx
 	call do_syscall_trace
 	movl ORIG_EAX(%esp), %eax
-	cmpl $(NR_syscalls), %eax
+	cmpl $(nr_syscalls), %eax
 	jnae syscall_call
 	jmp syscall_exit
 
@@ -801,8 +800,15 @@ ENTRY(sys_call_table)
 	.long sys_epoll_wait
  	.long sys_remap_file_pages
  	.long sys_set_tid_address
-
-
-	.rept NR_syscalls-(.-sys_call_table)/4
-		.long sys_ni_syscall
-	.endr
+ 	.long sys_timer_create
+ 	.long sys_timer_settime		/* 260 */
+ 	.long sys_timer_gettime
+ 	.long sys_timer_getoverrun
+ 	.long sys_timer_delete
+ 	.long sys_clock_settime
+ 	.long sys_clock_gettime		/* 265 */
+ 	.long sys_clock_getres
+ 	.long sys_clock_nanosleep
+ 
+ 
+nr_syscalls=(.-sys_call_table)/4

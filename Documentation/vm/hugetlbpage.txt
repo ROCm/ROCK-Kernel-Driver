@@ -66,7 +66,7 @@ either freed those hugepages or have exited.
 
 /proc/sys/vm_nr_hugepages indicates the current number of configured hugetlb
 pages in the kernel.  Super user privileges are required for modification of
-this value.  The allocation of hugetlb pages is posible only if there are
+this value.  The allocation of hugetlb pages is possible only if there are
 enough physically contiguous free pages in system OR if there are enough
 hugetlb pages free that can be transfered back to regular memory pool.
 

@@ -21,6 +21,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/compiler.h>
 
 #ifdef CONFIG_KMOD
 extern int request_module(const char * name);
@@ -29,8 +30,7 @@ static inline int request_module(const char * name) { return -ENOSYS; }
 #endif
 
 #define try_then_request_module(x, mod) ((x) ?: request_module(mod), (x))
-extern int exec_usermodehelper(char *program_path, char *argv[], char *envp[]);
-extern int call_usermodehelper(char *path, char *argv[], char *envp[]);
+extern int call_usermodehelper(char *path, char *argv[], char *envp[], int wait);
 
 #ifdef CONFIG_HOTPLUG
 extern char hotplug_path [];

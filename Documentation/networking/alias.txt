@@ -2,7 +2,7 @@
 IP-Aliasing:
 ============
 
-IP-aliases are additional IP-adresses/masks hooked up to a base 
+IP-aliases are additional IP-addresses/masks hooked up to a base 
 interface by adding a colon and a string when running ifconfig. 
 This string is usually numeric, but this is not a must.
 

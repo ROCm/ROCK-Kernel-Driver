@@ -1,5 +1,5 @@
 /*
- *	linux/arch/i386/kernel/visws_apic.c
+ *	linux/arch/i386/mach_visws/visws_apic.c
  *
  *	Copyright (C) 1999 Bent Hagemark, Ingo Molnar
  *
@@ -10,38 +10,137 @@
  *  hardware in the system uses this controller directly.  Legacy devices
  *  are connected to the PIIX4 which in turn has its 8259(s) connected to
  *  a of the Cobalt APIC entry.
+ *
+ *  09/02/2000 - Updated for 2.4 by jbarnes@sgi.com
+ *
+ *  25/11/2002 - Updated for 2.5 by Andrey Panin <pazke@orbita1.ru>
  */
 
-#include <linux/ptrace.h>
-#include <linux/errno.h>
+#include <linux/config.h>
 #include <linux/kernel_stat.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/ioport.h>
 #include <linux/interrupt.h>
-#include <linux/timex.h>
-#include <linux/slab.h>
-#include <linux/random.h>
-#include <linux/smp.h>
+#include <linux/irq.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 
-#include <asm/system.h>
 #include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/bitops.h>
-#include <asm/smp.h>
-#include <asm/pgtable.h>
-#include <asm/delay.h>
-#include <asm/desc.h>
+#include <asm/apic.h>
+#include <asm/i8259.h>
 
-#include <asm/cobalt.h>
+#include "cobalt.h"
+#include "irq_vectors.h"
 
-#include <linux/irq.h>
+
+int irq_vector[NR_IRQS] = { FIRST_EXTERNAL_VECTOR, 0 };
+
+
+static spinlock_t cobalt_lock = SPIN_LOCK_UNLOCKED;
+
+/*
+ * Set the given Cobalt APIC Redirection Table entry to point
+ * to the given IDT vector/index.
+ */
+static inline void co_apic_set(int entry, int irq)
+{
+	co_apic_write(CO_APIC_LO(entry), CO_APIC_LEVEL | irq_vector[irq]);
+	co_apic_write(CO_APIC_HI(entry), 0);
+}
+
+/*
+ * Cobalt (IO)-APIC functions to handle PCI devices.
+ */
+static inline int co_apic_ide0_hack(void)
+{
+	extern char visws_board_type;
+	extern char visws_board_rev;
+
+	if (visws_board_type == VISWS_320 && visws_board_rev == 5)
+		return 5;
+	return CO_APIC_IDE0;
+}
+
+static int is_co_apic(unsigned int irq)
+{
+	if (IS_CO_APIC(irq))
+		return CO_APIC(irq);
+
+	switch (irq) {
+		case 0: return CO_APIC_CPU;
+		case CO_IRQ_IDE0: return co_apic_ide0_hack();
+		case CO_IRQ_IDE1: return CO_APIC_IDE1;
+		default: return -1;
+	}
+}
+
+
+/*
+ * This is the SGI Cobalt (IO-)APIC:
+ */
+
+static void enable_cobalt_irq(unsigned int irq)
+{
+	co_apic_set(is_co_apic(irq), irq);
+}
+
+static void disable_cobalt_irq(unsigned int irq)
+{
+	int entry = is_co_apic(irq);
+
+	co_apic_write(CO_APIC_LO(entry), CO_APIC_MASK);
+	co_apic_read(CO_APIC_LO(entry));
+}
+
+/*
+ * "irq" really just serves to identify the device.  Here is where we
+ * map this to the Cobalt APIC entry where it's physically wired.
+ * This is called via request_irq -> setup_irq -> irq_desc->startup()
+ */
+static unsigned int startup_cobalt_irq(unsigned int irq)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&cobalt_lock, flags);
+	if ((irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS | IRQ_WAITING)))
+		irq_desc[irq].status &= ~(IRQ_DISABLED | IRQ_INPROGRESS | IRQ_WAITING);
+	enable_cobalt_irq(irq);
+	spin_unlock_irqrestore(&cobalt_lock, flags);
+	return 0;
+}
+
+static void ack_cobalt_irq(unsigned int irq)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&cobalt_lock, flags);
+	disable_cobalt_irq(irq);
+	apic_write(APIC_EOI, APIC_EIO_ACK);
+	spin_unlock_irqrestore(&cobalt_lock, flags);
+}
+
+static void end_cobalt_irq(unsigned int irq)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&cobalt_lock, flags);
+	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS)))
+		enable_cobalt_irq(irq);
+	spin_unlock_irqrestore(&cobalt_lock, flags);
+}
+
+static struct hw_interrupt_type cobalt_irq_type = {
+	.typename =	"Cobalt-APIC",
+	.startup =	startup_cobalt_irq,
+	.shutdown =	disable_cobalt_irq,
+	.enable =	enable_cobalt_irq,
+	.disable =	disable_cobalt_irq,
+	.ack =		ack_cobalt_irq,
+	.end =		end_cobalt_irq,
+};
+
 
 /*
  * This is the PIIX4-based 8259 that is wired up indirectly to Cobalt
- * -- not the manner expected by the normal 8259 code in irq.c.
+ * -- not the manner expected by the code in i8259.c.
  *
  * there is a 'master' physical interrupt source that gets sent to
  * the CPU. But in the chipset there are various 'virtual' interrupts
@@ -49,195 +148,42 @@
  * interrupt controller type, and through a special virtual interrupt-
  * controller. Device drivers only see the virtual interrupt sources.
  */
+static unsigned int startup_piix4_master_irq(unsigned int irq)
+{
+	init_8259A(0);
 
-#define	CO_IRQ_BASE	0x20	/* This is the 0x20 in init_IRQ()! */
+	return startup_cobalt_irq(irq);
+}
 
-static void startup_piix4_master_irq(unsigned int irq);
-static void shutdown_piix4_master_irq(unsigned int irq);
-static void do_piix4_master_IRQ(unsigned int irq, struct pt_regs * regs);
-#define enable_piix4_master_irq startup_piix4_master_irq
-#define disable_piix4_master_irq shutdown_piix4_master_irq
+static void end_piix4_master_irq(unsigned int irq)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&cobalt_lock, flags);
+	enable_cobalt_irq(irq);
+	spin_unlock_irqrestore(&cobalt_lock, flags);
+}
 
 static struct hw_interrupt_type piix4_master_irq_type = {
-	"PIIX4-master",
-	startup_piix4_master_irq,
-	shutdown_piix4_master_irq,
-	do_piix4_master_IRQ,
-	enable_piix4_master_irq,
-	disable_piix4_master_irq
+	.typename =	"PIIX4-master",
+	.startup =	startup_piix4_master_irq,
+	.ack =		ack_cobalt_irq,
+	.end =		end_piix4_master_irq,
 };
 
-static void enable_piix4_virtual_irq(unsigned int irq);
-static void disable_piix4_virtual_irq(unsigned int irq);
-#define startup_piix4_virtual_irq enable_piix4_virtual_irq
-#define shutdown_piix4_virtual_irq disable_piix4_virtual_irq
 
 static struct hw_interrupt_type piix4_virtual_irq_type = {
-	"PIIX4-virtual",
-	startup_piix4_virtual_irq,
-	shutdown_piix4_virtual_irq,
-	0, /* no handler, it's never called physically */
-	enable_piix4_virtual_irq,
-	disable_piix4_virtual_irq
-};
-
-/*
- * This is the SGI Cobalt (IO-)APIC:
- */
-
-static void do_cobalt_IRQ(unsigned int irq, struct pt_regs * regs);
-static void enable_cobalt_irq(unsigned int irq);
-static void disable_cobalt_irq(unsigned int irq);
-static void startup_cobalt_irq(unsigned int irq);
-#define shutdown_cobalt_irq disable_cobalt_irq
-
-static spinlock_t irq_controller_lock = SPIN_LOCK_UNLOCKED;
-
-static struct hw_interrupt_type cobalt_irq_type = {
-	"Cobalt-APIC",
-	startup_cobalt_irq,
-	shutdown_cobalt_irq,
-	do_cobalt_IRQ,
-	enable_cobalt_irq,
-	disable_cobalt_irq
+	.typename =	"PIIX4-virtual",
+	.startup =	startup_8259A_irq,
+	.shutdown =	disable_8259A_irq,
+	.enable =	enable_8259A_irq,
+	.disable =	disable_8259A_irq,
 };
 
 
 /*
- * Not an __init, needed by the reboot code
- */
-void disable_IO_APIC(void)
-{
-	/* Nop on Cobalt */
-} 
-
-/*
- * Cobalt (IO)-APIC functions to handle PCI devices.
- */
-
-static void disable_cobalt_irq(unsigned int irq)
-{
-	/* XXX undo the APIC entry here? */
-
-	/*
-	 * definitely, we do not want to have IRQ storms from
-	 * unused devices --mingo
-	 */
-}
-
-static void enable_cobalt_irq(unsigned int irq)
-{
-}
-
-/*
- * Set the given Cobalt APIC Redirection Table entry to point
- * to the given IDT vector/index.
- */
-static void co_apic_set(int entry, int idtvec)
-{
-	co_apic_write(CO_APIC_LO(entry), CO_APIC_LEVEL | (CO_IRQ_BASE+idtvec));
-	co_apic_write(CO_APIC_HI(entry), 0);
-
-	printk("Cobalt APIC Entry %d IDT Vector %d\n", entry, idtvec);
-}
-
-/*
- * "irq" really just serves to identify the device.  Here is where we
- * map this to the Cobalt APIC entry where it's physically wired.
- * This is called via request_irq -> setup_x86_irq -> irq_desc->startup()
- */
-static void startup_cobalt_irq(unsigned int irq)
-{
-	/*
-	 * These "irq"'s are wired to the same Cobalt APIC entries
-	 * for all (known) motherboard types/revs
-	 */
-	switch (irq) {
-	case CO_IRQ_TIMER:	co_apic_set(CO_APIC_CPU, CO_IRQ_TIMER);
-				return;
-
-	case CO_IRQ_ENET:	co_apic_set(CO_APIC_ENET, CO_IRQ_ENET);
-				return;
-
-	case CO_IRQ_SERIAL:	return; /* XXX move to piix4-8259 "virtual" */
-
-	case CO_IRQ_8259:	co_apic_set(CO_APIC_8259, CO_IRQ_8259);
-				return;
-
-	case CO_IRQ_IDE:
-		switch (visws_board_type) {
-		case VISWS_320:
-			switch (visws_board_rev) {
-			case 5:
-				co_apic_set(CO_APIC_0_5_IDE0, CO_IRQ_IDE);
-				co_apic_set(CO_APIC_0_5_IDE1, CO_IRQ_IDE);
-					return;
-			case 6:
-				co_apic_set(CO_APIC_0_6_IDE0, CO_IRQ_IDE);
-				co_apic_set(CO_APIC_0_6_IDE1, CO_IRQ_IDE);
-					return;
-			}
-		case VISWS_540:
-			switch (visws_board_rev) {
-			case 2:
-				co_apic_set(CO_APIC_1_2_IDE0, CO_IRQ_IDE);
-					return;
-			}
-		}
-		break;
-	default:
-		panic("huh?");
-	}
-}
-
-/*
- * This is the handle() op in do_IRQ()
- */
-static void do_cobalt_IRQ(unsigned int irq, struct pt_regs * regs)
-{
-	struct irqaction * action;
-	irq_desc_t *desc = irq_desc + irq;
-
-	spin_lock(&irq_controller_lock);
-	{
-		unsigned int status;
-		/* XXX APIC EOI? */
-		status = desc->status & ~(IRQ_REPLAY | IRQ_WAITING);
-		action = NULL;
-		if (!(status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
-			action = desc->action;
-			status |= IRQ_INPROGRESS;
-		}
-		desc->status = status;
-	}
-	spin_unlock(&irq_controller_lock);
-
-	/* Exit early if we had no action or it was disabled */
-	if (!action)
-		return;
-
-	handle_IRQ_event(irq, regs, action);
-
-	(void)co_cpu_read(CO_CPU_REV); /* Sync driver ack to its h/w */
-	apic_write(APIC_EOI, APIC_EIO_ACK); /* Send EOI to Cobalt APIC */
-
-	spin_lock(&irq_controller_lock);
-	{
-		unsigned int status = desc->status & ~IRQ_INPROGRESS;
-		desc->status = status;
-		if (!(status & IRQ_DISABLED))
-			enable_cobalt_irq(irq);
-	}
-	spin_unlock(&irq_controller_lock);
-}
-
-/*
- * PIIX4-8259 master/virtual functions to handle:
- *
- *	floppy
- *	parallel
- *	serial
- *	audio (?)
+ * PIIX4-8259 master/virtual functions to handle interrupt requests
+ * from legacy devices: floppy, parallel, serial, rtc.
  *
  * None of these get Cobalt APIC entries, neither do they have IDT
  * entries. These interrupts are purely virtual and distributed from
@@ -250,161 +196,112 @@ static void do_cobalt_IRQ(unsigned int irq, struct pt_regs * regs)
  * enable_irq gets the right irq. This 'master' irq is never directly
  * manipulated by any driver.
  */
-
-static void startup_piix4_master_irq(unsigned int irq)
+static void piix4_master_intr(int irq, void *dev_id, struct pt_regs * regs)
 {
-	/* ICW1 */
-	outb(0x11, 0x20);
-	outb(0x11, 0xa0);
+	int realirq;
+	irq_desc_t *desc;
+	unsigned long flags;
 
-	/* ICW2 */
-	outb(0x08, 0x21);
-	outb(0x70, 0xa1);
+	spin_lock_irqsave(&i8259A_lock, flags);
 
-	/* ICW3 */
-	outb(0x04, 0x21);
-	outb(0x02, 0xa1);
-
-	/* ICW4 */
-	outb(0x01, 0x21);
-	outb(0x01, 0xa1);
-
-	/* OCW1 - disable all interrupts in both 8259's */
-	outb(0xff, 0x21);
-	outb(0xff, 0xa1);
-
-	startup_cobalt_irq(irq);
-}
-
-static void shutdown_piix4_master_irq(unsigned int irq)
-{
-	/*
-	 * [we skip the 8259 magic here, not strictly necessary]
-	 */
-
-	shutdown_cobalt_irq(irq);
-}
-
-static void do_piix4_master_IRQ(unsigned int irq, struct pt_regs * regs)
-{
-	int realirq, mask;
-
-	/* Find out what's interrupting in the PIIX4 8259 */
-
-	spin_lock(&irq_controller_lock);
+	/* Find out what's interrupting in the PIIX4 master 8259 */
 	outb(0x0c, 0x20);		/* OCW3 Poll command */
 	realirq = inb(0x20);
 
-	if (!(realirq & 0x80)) {
-		/*
-		 * Bit 7 == 0 means invalid/spurious
-		 */
+	/*
+	 * Bit 7 == 0 means invalid/spurious
+	 */
+	if (unlikely(!(realirq & 0x80)))
 		goto out_unlock;
+
+	realirq &= 7;
+
+	if (unlikely(realirq == 2)) {
+		outb(0x0c, 0xa0);
+		realirq = inb(0xa0);
+
+		if (unlikely(!(realirq & 0x80)))
+			goto out_unlock;
+
+		realirq = (realirq & 7) + 8;
 	}
-	realirq &= 0x7f;
 
-	/*
-	 * mask and ack the 8259
-	 */
-	mask = inb(0x21);
-	if ((mask >> realirq) & 0x01)
-		/*
-		 * This IRQ is masked... ignore
-		 */
-		goto out_unlock;
+	/* mask and ack interrupt */
+	cached_irq_mask |= 1 << realirq;
+	if (unlikely(realirq > 7)) {
+		inb(0xa1);
+		outb(cached_A1, 0xa1);
+		outb(0x60 + (realirq & 7), 0xa0);
+		outb(0x60 + 2, 0x20);
+	} else {
+		inb(0x21);
+		outb(cached_21, 0x21);
+		outb(0x60 + realirq, 0x20);
+	}
 
-	outb(mask | (1<<realirq), 0x21);
-	/*
-	 * OCW2 - non-specific EOI
-	 */
-	outb(0x20, 0x20);
+	spin_unlock_irqrestore(&i8259A_lock, flags);
 
-	spin_unlock(&irq_controller_lock);
+	desc = irq_desc + realirq;
 
 	/*
 	 * handle this 'virtual interrupt' as a Cobalt one now.
 	 */
-	kstat_cpu(smp_processor_id()).irqs[irq]++;
-	do_cobalt_IRQ(realirq, regs);
+	kstat_cpu(smp_processor_id()).irqs[realirq]++;
 
-	spin_lock(&irq_controller_lock);
-	{
-		irq_desc_t *desc = irq_desc + realirq;
+	if (likely(desc->action != NULL))
+		handle_IRQ_event(realirq, regs, desc->action);
 
-		if (!(desc->status & IRQ_DISABLED))
-			enable_piix4_virtual_irq(realirq);
-	}
-	spin_unlock(&irq_controller_lock);
+	if (!(desc->status & IRQ_DISABLED))
+		enable_8259A_irq(realirq);
+
 	return;
 
 out_unlock:
-	spin_unlock(&irq_controller_lock);
+	spin_unlock_irqrestore(&i8259A_lock, flags);
 	return;
 }
 
-static void enable_piix4_virtual_irq(unsigned int irq)
-{
-	/*
-	 * assumes this irq is one of the legacy devices
-	 */
+static struct irqaction master_action = {
+	.handler =	piix4_master_intr,
+	.name =		"PIIX4-8259",
+};
 
-	unsigned int mask = inb(0x21);
- 	mask &= ~(1 << irq);
-	outb(mask, 0x21);
-	enable_cobalt_irq(irq);
-}
+static struct irqaction cascade_action = {
+	.handler = 	no_action,
+	.name =		"cascade",
+};
 
-/*
- * assumes this irq is one of the legacy devices
- */
-static void disable_piix4_virtual_irq(unsigned int irq)
-{
-	unsigned int mask;
-
-	disable_cobalt_irq(irq);
-
-	mask = inb(0x21);
- 	mask &= ~(1 << irq);
-	outb(mask, 0x21);
-}
-
-static struct irqaction master_action =
-		{ no_action, 0, 0, "PIIX4-8259", NULL, NULL };
 
 void init_VISWS_APIC_irqs(void)
 {
 	int i;
 
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < CO_IRQ_APIC0 + CO_APIC_LAST + 1; i++) {
 		irq_desc[i].status = IRQ_DISABLED;
 		irq_desc[i].action = 0;
 		irq_desc[i].depth = 1;
 
-		/*
-		 * Cobalt IRQs are mapped to standard ISA
-		 * interrupt vectors:
-		 */
-		switch (i) {
-			/*
-			 * Only CO_IRQ_8259 will be raised
-			 * externally.
-			 */
-		case CO_IRQ_8259:
-			irq_desc[i].handler = &piix4_master_irq_type;
-			break;
-		case CO_IRQ_FLOPPY:
-		case CO_IRQ_PARLL:
-			irq_desc[i].handler = &piix4_virtual_irq_type;
-			break;
-		default:
+		if (i == 0) {
 			irq_desc[i].handler = &cobalt_irq_type;
-			break;
 		}
+		else if (i == CO_IRQ_IDE0) {
+			irq_desc[i].handler = &cobalt_irq_type;
+		}
+		else if (i == CO_IRQ_IDE1) {
+			irq_desc[i].handler = &cobalt_irq_type;
+		}
+		else if (i == CO_IRQ_8259) {
+			irq_desc[i].handler = &piix4_master_irq_type;
+		}
+		else if (i < CO_IRQ_APIC0) {
+			irq_desc[i].handler = &piix4_virtual_irq_type;
+		}
+		else if (IS_CO_APIC(i)) {
+			irq_desc[i].handler = &cobalt_irq_type;
+		}
+		irq_vector[i] = i + FIRST_EXTERNAL_VECTOR;
 	}
 
-	/*
-	 * The master interrupt is always present:
-	 */
-	setup_x86_irq(CO_IRQ_8259, &master_action);
+	setup_irq(CO_IRQ_8259, &master_action);
+	setup_irq(2, &cascade_action);
 }
-

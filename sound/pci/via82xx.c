@@ -683,7 +683,7 @@ static inline unsigned int calc_linear_pos(viadev_t *viadev, unsigned int idx, u
 			}
 		}
 	}
-	viadev->lastpos = res; /* remember the last positiion */
+	viadev->lastpos = res; /* remember the last position */
 	if (res >= viadev->bufsize)
 		res -= viadev->bufsize;
 	return res;
@@ -1193,7 +1193,7 @@ static int __devinit snd_via8233_pcm_new(via82xx_t *chip)
 	/* capture */
 	init_viadev(chip, chip->capture_devno, VIA_REG_CAPTURE_8233_STATUS, 1);
 
-	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm)) < 0)
+	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm, 64*1024, 128*1024)) < 0)
 		return err;
 
 	/* PCM #1:  multi-channel playback and 2nd capture */
@@ -1209,7 +1209,7 @@ static int __devinit snd_via8233_pcm_new(via82xx_t *chip)
 	/* set up capture */
 	init_viadev(chip, chip->capture_devno + 1, VIA_REG_CAPTURE_8233_STATUS + 0x10, 1);
 
-	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm)) < 0)
+	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm, 64*1024, 128*1024)) < 0)
 		return err;
 
 	return 0;
@@ -1242,7 +1242,7 @@ static int __devinit snd_via8233a_pcm_new(via82xx_t *chip)
 	/* capture */
 	init_viadev(chip, chip->capture_devno, VIA_REG_CAPTURE_8233_STATUS, 1);
 
-	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm)) < 0)
+	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm, 64*1024, 128*1024)) < 0)
 		return err;
 
 	/* PCM #1:  DXS3 playback (for spdif) */
@@ -1255,7 +1255,7 @@ static int __devinit snd_via8233a_pcm_new(via82xx_t *chip)
 	/* set up playback */
 	init_viadev(chip, chip->playback_devno, 0x30, 0);
 
-	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm)) < 0)
+	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm, 64*1024, 128*1024)) < 0)
 		return err;
 
 	return 0;
@@ -1284,7 +1284,7 @@ static int __devinit snd_via686_pcm_new(via82xx_t *chip)
 	init_viadev(chip, 0, VIA_REG_PLAYBACK_STATUS, 0);
 	init_viadev(chip, 1, VIA_REG_CAPTURE_STATUS, 1);
 
-	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm)) < 0)
+	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm, 64*1024, 128*1024)) < 0)
 		return err;
 
 	return 0;
@@ -1437,6 +1437,11 @@ static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 	chip->ac97 = NULL;
 }
 
+static struct ac97_quirk ac97_quirks[] = {
+	{ 0x1106, 0x4161, AC97_TUNE_HP_ONLY }, /* ASRock K7VT2 */
+	{ } /* terminator */
+};
+
 static int __devinit snd_via82xx_mixer_new(via82xx_t *chip)
 {
 	ac97_t ac97;
@@ -1451,6 +1456,8 @@ static int __devinit snd_via82xx_mixer_new(via82xx_t *chip)
 	ac97.clock = chip->ac97_clock;
 	if ((err = snd_ac97_mixer(chip->card, &ac97, &chip->ac97)) < 0)
 		return err;
+
+	snd_ac97_tune_hardware(&chip->ac97, chip->pci, ac97_quirks);
 
 	if (chip->chip_type != TYPE_VIA686) {
 		/* use slot 10/11 */
@@ -1862,7 +1869,7 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 				break;
 			}
 		}
-		if (chip_type == VIA_REV_8233A)
+		if (chip_type == TYPE_VIA8233A)
 			strcpy(card->driver, "VIA8233A");
 		else
 			strcpy(card->driver, "VIA8233");
@@ -1884,7 +1891,7 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 		    (err = snd_via686_init_misc(chip, dev)) < 0)
 			goto __error;
 	} else {
-		if (chip_type == VIA_REV_8233A) {
+		if (chip_type == TYPE_VIA8233A) {
 			if ((err = snd_via8233a_pcm_new(chip)) < 0)
 				goto __error;
 		} else {

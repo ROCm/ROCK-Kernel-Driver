@@ -452,9 +452,11 @@ static void flush_tlb_all_ipi(void* info)
 
 void flush_tlb_all(void)
 {
+	preempt_disable();
 	smp_call_function (flush_tlb_all_ipi,0,1,1);
 
 	do_flush_tlb_all_local();
+	preempt_enable();
 }
 
 /*

@@ -60,7 +60,7 @@ unsigned int csum_partial_copy_from_user(const char *src, char *dst,
 
 /*
  * These are the old (and unsafe) way of doing checksums, a warning message 
- * will be printed if they are used and an exeption occurs.
+ * will be printed if they are used and an exception occurs.
  *
  * these functions should go away after some time.
  */

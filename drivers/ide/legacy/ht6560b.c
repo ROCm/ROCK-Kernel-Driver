@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/ht6560b.c		Version 0.07	Feb  1, 2000
+ *  linux/drivers/ide/legacy/ht6560b.c		Version 0.07	Feb  1, 2000
  *
  *  Copyright (C) 1995-2000  Linus Torvalds & author (see below)
  */

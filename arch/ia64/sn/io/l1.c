@@ -2734,7 +2734,7 @@ sc_recv_intr( l1sc_t *sc, int ch, char *msg, int *len, uint64_t block )
  * bigger.
  *
  * Be careful using the same buffer for both cmd and resp; it could get
- * hairy if there were ever an L1 command reqeuest that spanned multiple
+ * hairy if there were ever an L1 command request that spanned multiple
  * packets.  (On the other hand, that would require some additional
  * rewriting of the L1 command interface anyway.)
  */

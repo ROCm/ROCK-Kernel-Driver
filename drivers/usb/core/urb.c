@@ -195,7 +195,7 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 
 	if (!urb || urb->hcpriv || !urb->complete)
 		return -EINVAL;
-	if (!(dev = urb->dev) || !dev->bus || dev->devnum <= 0)
+	if (!(dev = urb->dev) || !dev->present || !dev->bus || dev->devnum <= 0)
 		return -ENODEV;
 	if (!(op = dev->bus->op) || !op->submit_urb)
 		return -ENODEV;
@@ -376,7 +376,7 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
  */
 int usb_unlink_urb(struct urb *urb)
 {
-	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
+	if (urb && urb->dev && urb->dev->present && urb->dev->bus && urb->dev->bus->op)
 		return urb->dev->bus->op->unlink_urb(urb);
 	else
 		return -ENODEV;

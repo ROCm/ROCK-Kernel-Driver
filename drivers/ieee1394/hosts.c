@@ -38,9 +38,15 @@ static int dummy_devctl(struct hpsb_host *h, enum devctl_cmd c, int arg)
         return -1;
 }
 
+static int dummy_isoctl(struct hpsb_iso *iso, enum isoctl_cmd command, unsigned long arg)
+{
+	return -1;
+}
+
 static struct hpsb_host_driver dummy_driver = {
         .transmit_packet = dummy_transmit_packet,
-        .devctl =          dummy_devctl
+        .devctl =          dummy_devctl,
+	.isoctl =          dummy_isoctl
 };
 
 /**
@@ -63,9 +69,11 @@ int hpsb_ref_host(struct hpsb_host *host)
         spin_lock_irqsave(&hosts_lock, flags);
         list_for_each(lh, &hosts) {
                 if (host == list_entry(lh, struct hpsb_host, host_list)) {
-                        host->driver->devctl(host, MODIFY_USAGE, 1);
-			host->refcount++;
-                        retval = 1;
+			if (host->driver->devctl(host, MODIFY_USAGE, 1)) {
+				host->driver->devctl(host, MODIFY_USAGE, 1);
+				host->refcount++;
+				retval = 1;
+			}
 			break;
         	}
         }

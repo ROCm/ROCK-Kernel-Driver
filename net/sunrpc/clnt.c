@@ -67,7 +67,6 @@ static int
 rpc_setup_pipedir(struct rpc_clnt *clnt, char *dir_name)
 {
 	static uint32_t clntid;
-	int maxlen = sizeof(clnt->cl_pathname);
 	int error;
 
 	if (dir_name == NULL)

@@ -58,6 +58,7 @@
 #include <linux/dnotify.h>
 #include <linux/security.h>
 #include <linux/compat.h>
+#include <linux/ptrace.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
@@ -607,10 +608,6 @@ asmlinkage long sys32_getdents(unsigned int fd, struct linux_dirent32 *dirent, u
 }
 /* end of readdir & getdents */
 
-
-
-/* 32-bit timeval and related flotsam.  */
-
 /*
  * Ooo, nasty.  We need here to frob 32-bit unsigned longs to
  * 64-bit unsigned longs.
@@ -768,13 +765,9 @@ out_nofds:
 	return ret;
 }
 
-/* Note: it is necessary to treat n as an unsigned int, 
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage int ppc32_select(u32 n, u32* inp, u32* outp, u32* exp, u32 tvp_x)
+int ppc32_select(u32 n, u32* inp, u32* outp, u32* exp, u32 tvp_x)
 {
+	/* sign extend n */
 	return sys32_select((int)n, inp, outp, exp, tvp_x);
 }
 
@@ -819,46 +812,7 @@ asmlinkage long sys32_sysfs(u32 option, u32 arg1, u32 arg2)
 	return sys_sysfs((int)option, arg1, arg2);
 }
 
-
-
-
-extern unsigned long do_mremap(unsigned long addr,
-	unsigned long old_len, unsigned long new_len,
-	unsigned long flags, unsigned long new_addr);
-                
-asmlinkage unsigned long sys32_mremap(unsigned long addr, unsigned long old_len, unsigned long new_len,
-                                    	unsigned long flags, u32 __new_addr)
-{
-	unsigned long ret = -EINVAL;
-	unsigned long new_addr = AA(__new_addr);
-	
-	if (old_len > 0xf0000000UL || new_len > 0xf0000000UL)
-		goto out;
-	if (addr > 0xf0000000UL - old_len)
-		goto out;
-	down_write(&current->mm->mmap_sem);
-	if (flags & MREMAP_FIXED) {
-		if (new_addr > 0xf0000000UL - new_len)
-			goto out_sem;
-	} else if (addr > 0xf0000000UL - new_len) {
-		ret = -ENOMEM;
-		if (!(flags & MREMAP_MAYMOVE))
-			goto out_sem;
-		new_addr = get_unmapped_area (NULL, addr, new_len, 0, 0);
-		if (!new_addr)
-			goto out_sem;
-		flags |= MREMAP_FIXED;
-	}
-	ret = do_mremap(addr, old_len, new_len, flags, new_addr);
-out_sem:
-	up_write(&current->mm->mmap_sem);
-out:
-	return ret;       
-}
-
-
-
-/* Handle adjtimex compatability. */
+/* Handle adjtimex compatibility. */
 struct timex32 {
 	u32 modes;
 	s32 offset, freq, maxerror, esterror;
@@ -933,38 +887,6 @@ asmlinkage long sys32_adjtimex(struct timex32 *utp)
 
 	return ret;
 }
-
-#ifdef CONFIG_MODULES
-
-extern asmlinkage long sys_init_module(void *, unsigned long, const char *);
-
-asmlinkage int sys32_init_module(void *umod, u32 len, const char *uargs)
-{
-	return sys_init_module(umod, len, uargs);
-}
-
-extern asmlinkage long sys_delete_module(const char *, unsigned int);
-
-asmlinkage int sys32_delete_module(const char *name_user, unsigned int flags)
-{
-	return sys_delete_module(name_user, flags);
-}
-
-#else /* CONFIG_MODULES */
-
-asmlinkage int
-sys32_init_module(const char *name_user, struct module *mod_user)
-{
-	return -ENOSYS;
-}
-
-asmlinkage int
-sys32_delete_module(const char *name_user)
-{
-	return -ENOSYS;
-}
-
-#endif  /* CONFIG_MODULES */
 
 /* Stuff for NFS server syscalls... */
 struct nfsctl_svc32 {
@@ -3097,9 +3019,9 @@ out_file:
 	return retval;
 }
 
-asmlinkage long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a2,
-			                       unsigned long a3, unsigned long a4, unsigned long a5,
-			                       struct pt_regs *regs)
+long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a2,
+		  unsigned long a3, unsigned long a4, unsigned long a5,
+		  struct pt_regs *regs)
 {
 	int error;
 	char * filename;
@@ -3348,9 +3270,6 @@ asmlinkage long sys32_getsid(u32 pid)
 	return sys_getsid((int)pid);
 }
 
-
-
-
 extern asmlinkage long sys_kill(int pid, int sig);
 
 /* Note: it is necessary to treat pid and sig as unsigned ints,
@@ -3402,16 +3321,11 @@ asmlinkage long sys32_msync(unsigned long start, size_t len, u32 flags)
 	return sys_msync(start, len, (int)flags);
 }
 
-
 extern asmlinkage long sys_nice(int increment);
 
-/* Note: it is necessary to treat increment as an unsigned int,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_nice(u32 increment)
+long sys32_nice(u32 increment)
 {
+	/* sign extend increment */
 	return sys_nice((int)increment);
 }
 
@@ -3564,13 +3478,9 @@ asmlinkage long sys32_setgroups(u32 gidsetsize, gid_t *grouplist)
 
 extern asmlinkage long sys_sethostname(char *name, int len);
 
-/* Note: it is necessary to treat len as an unsigned int,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
 asmlinkage long sys32_sethostname(char *name, u32 len)
 {
+	/* sign extend len */
 	return sys_sethostname(name, (int)len);
 }
 
@@ -3590,16 +3500,11 @@ asmlinkage long sys32_setpgid(u32 pid, u32 pgid)
 
 extern asmlinkage long sys_setpriority(int which, int who, int niceval);
 
-/* Note: it is necessary to treat which, who, and niceval as unsigned ints,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_setpriority(u32 which, u32 who, u32 niceval)
+long sys32_setpriority(u32 which, u32 who, u32 niceval)
 {
+	/* sign extend which, who and niceval */
 	return sys_setpriority((int)which, (int)who, (int)niceval);
 }
-
 
 extern asmlinkage long sys_ssetmask(int newmask);
 
@@ -3613,17 +3518,12 @@ asmlinkage long sys32_ssetmask(u32 newmask)
 	return sys_ssetmask((int) newmask);
 }
 
-
 extern asmlinkage long sys_syslog(int type, char * buf, int len);
 
-/* Note: it is necessary to treat type and len as an unsigned int,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_syslog(u32 type, char * buf, u32 len)
+long sys32_syslog(u32 type, char * buf, u32 len)
 {
-	return sys_syslog((int)type, buf, (int)len);
+	/* sign extend len */
+	return sys_syslog(type, buf, (int)len);
 }
 
 
@@ -3650,51 +3550,6 @@ extern asmlinkage long sys_umount(char * name, int flags);
 asmlinkage long sys32_umount(char * name, u32 flags)
 {
 	return sys_umount(name, (int)flags);
-}
-
-
-extern ssize_t sys_pread64(unsigned int fd, char *buf, size_t count,
-			   loff_t pos);
-
-extern ssize_t sys_pwrite64(unsigned int fd, const char *buf, size_t count,
-			    loff_t pos);
-
-compat_ssize_t sys32_pread64(unsigned int fd, char *ubuf, compat_size_t count,
-			u32 reg6, u32 poshi, u32 poslo)
-{
-	return sys_pread64(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
-}
-
-compat_ssize_t sys32_pwrite64(unsigned int fd, char *ubuf, compat_size_t count,
-			 u32 reg6, u32 poshi, u32 poslo)
-{
-	return sys_pwrite64(fd, ubuf, count, ((loff_t)AA(poshi) << 32) | AA(poslo));
-}
-
-extern ssize_t sys_readahead(int fd, loff_t offset, size_t count);
-
-compat_ssize_t sys32_readahead(int fd, u32 r4, u32 offhi, u32 offlo, u32 count)
-{
-        return sys_readahead(fd, ((loff_t)offhi << 32) | offlo, AA(count));
-}
-
-extern asmlinkage long sys_truncate(const char * path, unsigned long length);
-extern asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length);
-
-asmlinkage int sys32_truncate64(const char * path, u32 reg4, unsigned long high, unsigned long low)
-{
-     	if ((int)high < 0)
-		return -EINVAL;
-	else
-		return sys_truncate(path, (high << 32) | low);
-}
-
-asmlinkage int sys32_ftruncate64(unsigned int fd, u32 reg4, unsigned long high, unsigned long low)
-{
-     	if ((int)high < 0)
-		return -EINVAL;
-	else
-		return sys_ftruncate(fd, (high << 32) | low);
 }
 
 asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg)
@@ -3845,6 +3700,7 @@ int sys32_olduname(struct oldold_utsname * name)
 	
 	return error;
 }
+
 extern unsigned long sys_mmap(unsigned long addr, size_t len,
 			      unsigned long prot, unsigned long flags,
 			      unsigned long fd, off_t offset);
@@ -3857,11 +3713,65 @@ unsigned long sys32_mmap2(unsigned long addr, size_t len,
 	return sys_mmap(addr, len, prot, flags, fd, pgoff << 12);
 }
 
+/* 
+ * long long munging:
+ * The 32 bit ABI passes long longs in an odd even register pair.
+ */
+extern ssize_t sys_pread64(unsigned int fd, char *buf, size_t count,
+			   loff_t pos);
+
+extern ssize_t sys_pwrite64(unsigned int fd, const char *buf, size_t count,
+			    loff_t pos);
+
+compat_ssize_t sys32_pread64(unsigned int fd, char *ubuf, compat_size_t count,
+			     u32 reg6, u32 poshi, u32 poslo)
+{
+	return sys_pread64(fd, ubuf, count, ((loff_t)poshi << 32) | poslo);
+}
+
+compat_ssize_t sys32_pwrite64(unsigned int fd, char *ubuf, compat_size_t count,
+			      u32 reg6, u32 poshi, u32 poslo)
+{
+	return sys_pwrite64(fd, ubuf, count, ((loff_t)poshi << 32) | poslo);
+}
+
+extern ssize_t sys_readahead(int fd, loff_t offset, size_t count);
+
+compat_ssize_t sys32_readahead(int fd, u32 r4, u32 offhi, u32 offlo, u32 count)
+{
+	return sys_readahead(fd, ((loff_t)offhi << 32) | offlo, count);
+}
+
+extern asmlinkage long sys_truncate(const char * path, unsigned long length);
+extern asmlinkage long sys_ftruncate(unsigned int fd, unsigned long length);
+
+asmlinkage int sys32_truncate64(const char * path, u32 reg4,
+				unsigned long high, unsigned long low)
+{
+	return sys_truncate(path, (high << 32) | low);
+}
+
+asmlinkage int sys32_ftruncate64(unsigned int fd, u32 reg4, unsigned long high,
+				 unsigned long low)
+{
+	return sys_ftruncate(fd, (high << 32) | low);
+}
+
 extern int sys_lookup_dcookie(u64 cookie64, char *buf, size_t len);
 
-long sys32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf,
+long ppc32_lookup_dcookie(u32 cookie_high, u32 cookie_low, char *buf,
 			  size_t len)
 {
 	return sys_lookup_dcookie((u64)cookie_high << 32 | cookie_low,
 				  buf, len);
 }
+
+extern int sys_fadvise64(int fd, loff_t offset, size_t len, int advice);
+
+long ppc32_fadvise64(int fd, u32 unused, u32 offset_high, u32 offset_low,
+		     size_t len, int advice)
+{
+	return sys_fadvise64(fd, (u64)offset_high << 32 | offset_low, len,
+			     advice);
+}
+

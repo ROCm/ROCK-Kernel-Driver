@@ -2741,8 +2741,7 @@ void txLazyCommit(struct tblock * tblk)
 	if (tblk->flag & tblkGC_READY)
 		log->gcrtc--;
 
-	if (tblk->flag & tblkGC_READY)
-		wake_up(&tblk->gcwait);	// LOGGC_WAKEUP
+	wake_up_all(&tblk->gcwait);	// LOGGC_WAKEUP
 
 	/*
 	 * Can't release log->gclock until we've tested tblk->flag

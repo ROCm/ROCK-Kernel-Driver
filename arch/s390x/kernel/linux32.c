@@ -58,6 +58,7 @@
 #include <linux/binfmts.h>
 #include <linux/compat.h>
 #include <linux/vfs.h>
+#include <linux/ptrace.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
@@ -3577,7 +3578,7 @@ asmlinkage int sys32_sendfile64(int out_fd, int in_fd,
 	return ret;
 }
 
-/* Handle adjtimex compatability. */
+/* Handle adjtimex compatibility. */
 
 struct timex32 {
 	u32 modes;
@@ -4045,28 +4046,6 @@ asmlinkage int sys32_sched_getaffinity(compat_pid_t pid, unsigned int len,
 		if (put_user(kernel_mask, user_mask_ptr))
 			ret = -EFAULT;
 	}
-
-	return ret;
-}
-
-asmlinkage int 
-sys_futex(void *uaddr, int op, int val, struct timespec *utime);
-
-asmlinkage int
-sys32_futex(void *uaddr, int op, int val, 
-		 struct compat_timespec *timeout32)
-{
-	struct timespec tmp;
-	mm_segment_t old_fs;
-	int ret;
-
-	if (timeout32 && get_compat_timespec(&tmp, timeout32))
-		return -EINVAL;
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_futex(uaddr, op, val, timeout32 ? &tmp : NULL);
-	set_fs(old_fs);
 
 	return ret;
 }

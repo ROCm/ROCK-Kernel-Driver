@@ -472,7 +472,8 @@ nb85e_uart_set_termios (struct uart_port *port, struct termios *termios,
 	/* Restrict flags to legal values.  */
 	if ((cflags & CSIZE) != CS7 && (cflags & CSIZE) != CS8)
 		/* The new value of CSIZE is invalid, use the old value.  */
-		cflags = (cflags & ~CSIZE) | (old->c_cflag & CSIZE);
+		cflags = (cflags & ~CSIZE)
+			| (old ? (old->c_cflag & CSIZE) : CS8);
 
 	termios->c_cflag = cflags;
 

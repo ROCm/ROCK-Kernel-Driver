@@ -22,8 +22,6 @@ obj-$(CONFIG_EARLY_PRINTK)    += early_printk.o
 obj-$(CONFIG_GART_IOMMU) += pci-gart.o aperture.o
 obj-$(CONFIG_DUMMY_IOMMU) += pci-nommu.o
 obj-$(CONFIG_MODULES) += module.o
-obj-$(CONFIG_PROFILING)         += profile.o
-
 
 $(obj)/bootflag.c: 
 	@ln -sf ../../i386/kernel/bootflag.c $(obj)/bootflag.c

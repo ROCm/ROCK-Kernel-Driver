@@ -1,7 +1,7 @@
 /*
  * mcfserial.c -- serial driver for ColdFire internal UARTS.
  *
- * Copyright (C) 1999-2002 Greg Ungerer <gerg@snapgear.com>
+ * Copyright (C) 1999-2003 Greg Ungerer <gerg@snapgear.com>
  * Copyright (c) 2000-2001 Lineo, Inc. <www.lineo.com> 
  * Copyright (C) 2001-2002 SnapGear Inc. <www.snapgear.com> 
  *
@@ -49,12 +49,6 @@
 #include <asm/nettel.h>
 #include <asm/uaccess.h>
 #include "mcfserial.h"
-
-/*
- *	the only event we use
- */
-#undef RS_EVENT_WRITE_WAKEUP
-#define RS_EVENT_WRITE_WAKEUP 0
 
 struct timer_list mcfrs_timer_struct;
 
@@ -443,12 +437,10 @@ static void mcfrs_offintr(void *private)
 	if (!tty)
 		return;
 
-	if (test_and_clear_bit(RS_EVENT_WRITE_WAKEUP, &info->event)) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
-		wake_up_interruptible(&tty->write_wait);
-	}
+	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
+	    tty->ldisc.write_wakeup)
+		(tty->ldisc.write_wakeup)(tty);
+	wake_up_interruptible(&tty->write_wait);
 }
 
 

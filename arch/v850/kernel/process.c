@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/process.c -- Arch-dependent process handling
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -75,7 +75,9 @@ int kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 
 	set_fs (KERNEL_DS);
 
-	/* Clone this thread.  */
+	/* Clone this thread.  Note that we don't pass the clone syscall's
+	   second argument -- it's ignored for calls from kernel mode (the
+	   child's SP is always set to the top of the kernel stack).  */
 	arg0 = flags | CLONE_VM;
 	syscall = __NR_clone;
 	asm volatile ("trap " SYSCALL_SHORT_TRAP
@@ -109,7 +111,8 @@ int copy_thread (int nr, unsigned long clone_flags,
 		 struct task_struct *p, struct pt_regs *regs)
 {
 	/* Start pushing stuff from the top of the child's kernel stack.  */
-	unsigned long ksp = (unsigned long)p->thread_info + THREAD_SIZE;
+	unsigned long orig_ksp = (unsigned long)p->thread_info + THREAD_SIZE;
+	unsigned long ksp = orig_ksp;
 	/* We push two `state save' stack fames (see entry.S) on the new
 	   kernel stack:
 	     1) The innermost one is what switch_thread would have
@@ -137,6 +140,19 @@ int copy_thread (int nr, unsigned long clone_flags,
 	   register (r31), so we make that the place where we want to
 	   jump when the child thread begins running.  */
 	child_switch_regs->gpr[GPR_LP] = (v850_reg_t)ret_from_fork;
+
+	if (regs->kernel_mode)
+		/* Since we're returning to kernel-mode, make sure the child's
+		   stored kernel stack pointer agrees with what the actual
+		   stack pointer will be at that point (the trap return code
+		   always restores the SP, even when returning to
+		   kernel-mode).  */
+		child_trap_regs->gpr[GPR_SP] = orig_ksp;
+	else
+		/* Set the child's user-mode stack-pointer (the name
+		   `stack_start' is a misnomer, it's just the initial SP
+		   value).  */
+		child_trap_regs->gpr[GPR_SP] = stack_start;
 
 	/* Thread state for the child (everything else is on the stack).  */
 	p->thread.ksp = ksp;

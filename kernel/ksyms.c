@@ -31,6 +31,7 @@
 #include <linux/genhd.h>
 #include <linux/blkpg.h>
 #include <linux/swap.h>
+#include <linux/pagevec.h>
 #include <linux/ctype.h>
 #include <linux/file.h>
 #include <linux/console.h>
@@ -80,6 +81,7 @@ EXPORT_SYMBOL(__alloc_pages);
 EXPORT_SYMBOL(__get_free_pages);
 EXPORT_SYMBOL(get_zeroed_page);
 EXPORT_SYMBOL(__page_cache_release);
+EXPORT_SYMBOL(__pagevec_lru_add);
 EXPORT_SYMBOL(__free_pages);
 EXPORT_SYMBOL(free_pages);
 EXPORT_SYMBOL(num_physpages);

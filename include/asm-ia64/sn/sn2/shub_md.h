@@ -133,7 +133,7 @@
 #define MD_DIMM_SIZE_MBYTES(_size, _2bk) (				 \
 	 	( (_size) == 7 ? 0 : ( 0x40L << (_size) ) << (_2bk)))  	 \
 
-/* The top 1/32 of each bank is directory memory, and not accessable
+/* The top 1/32 of each bank is directory memory, and not accessible
  * via normal reads and writes */
 #define MD_DIMM_USER_SIZE(_size)	((_size) * 31 / 32)
 

@@ -87,7 +87,7 @@ MODULE_PARM_SYNTAX(dual_codec, SNDRV_ENABLED ",allows:{{0,3}}");
 #define BA0_HISR_MIDI		(1<<22)	/* MIDI port interrupt */
 #define BA0_HISR_FIFOI		(1<<20)	/* FIFO polled interrupt */
 #define BA0_HISR_DMAI		(1<<18)	/* DMA interrupt (half or end) */
-#define BA0_HISR_FIFO(c)	(1<<(12+(c))) /* FIFO channel interupt */
+#define BA0_HISR_FIFO(c)	(1<<(12+(c))) /* FIFO channel interrupt */
 #define BA0_HISR_DMA(c)		(1<<(8+(c)))  /* DMA channel interrupt */
 #define BA0_HISR_GPPI		(1<<5)	/* General Purpose Input (Primary chip) */
 #define BA0_HISR_GPSI		(1<<4)	/* General Purpose Input (Secondary chip) */

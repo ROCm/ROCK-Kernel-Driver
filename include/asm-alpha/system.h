@@ -206,6 +206,7 @@ enum implver_enum {
 enum amask_enum {
 	AMASK_BWX = (1UL << 0),
 	AMASK_FIX = (1UL << 1),
+	AMASK_CIX = (1UL << 2),
 	AMASK_MAX = (1UL << 8),
 	AMASK_PRECISE_TRAP = (1UL << 9),
 };

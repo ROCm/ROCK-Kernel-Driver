@@ -3505,7 +3505,7 @@ pcibr_dmamap_addr(pcibr_dmamap_t pcibr_dmamap,
     } else
 	xio_port = pcibr_dmamap->bd_xio_port;
 
-    /* If this DMA is to an addres that
+    /* If this DMA is to an address that
      * refers back to this Bridge chip,
      * reduce it back to the correct
      * PCI MEM address.

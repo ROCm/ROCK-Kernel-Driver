@@ -135,11 +135,9 @@ static inline void x86_do_profile (struct pt_regs *regs)
 	unsigned long rip;
 	extern unsigned long prof_cpu_mask;
 	extern char _stext;
-#ifdef CONFIG_PROFILING
-	extern void x86_profile_hook(struct pt_regs *);
  
-	x86_profile_hook(regs);
-#endif
+	profile_hook(regs);
+
 	if (user_mode(regs))
 		return;
 	if (!prof_buffer)
@@ -166,26 +164,6 @@ static inline void x86_do_profile (struct pt_regs *regs)
 	atomic_inc((atomic_t *)&prof_buffer[rip]);
 }
 
-struct notifier_block;
- 
-#ifdef CONFIG_PROFILING
-
-int register_profile_notifier(struct notifier_block * nb);
-int unregister_profile_notifier(struct notifier_block * nb);
-
-#else
-
-static inline int register_profile_notifier(struct notifier_block * nb)
-{
-	return -ENOSYS;
-}
-
-static inline int unregister_profile_notifier(struct notifier_block * nb)
-{
-	return -ENOSYS;
-}
-
-#endif /* CONFIG_PROFILING */
 #ifdef CONFIG_SMP /*more of this file should probably be ifdefed SMP */
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
 	if (IO_APIC_IRQ(i))

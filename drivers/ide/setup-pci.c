@@ -662,7 +662,7 @@ bypass_legacy_dma:
 		 *	This is in the wrong place. The driver may
 		 *	do set up based on the autotune value and this
 		 *	will then trash it. Torben please move it and
-		 *	propogate the fixes into the drivers
+		 *	propagate the fixes into the drivers
 		 */		
 		if (drive0_tune == IDE_TUNE_BIOS) /* biostimings */
 			hwif->drives[0].autotune = IDE_TUNE_BIOS;

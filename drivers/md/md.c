@@ -83,21 +83,45 @@ static int sysctl_speed_limit_max = 200000;
 static struct ctl_table_header *raid_table_header;
 
 static ctl_table raid_table[] = {
-	{DEV_RAID_SPEED_LIMIT_MIN, "speed_limit_min",
-	 &sysctl_speed_limit_min, sizeof(int), 0644, NULL, &proc_dointvec},
-	{DEV_RAID_SPEED_LIMIT_MAX, "speed_limit_max",
-	 &sysctl_speed_limit_max, sizeof(int), 0644, NULL, &proc_dointvec},
-	{0}
+	{
+		.ctl_name	= DEV_RAID_SPEED_LIMIT_MIN,
+		.procname	= "speed_limit_min",
+		.data		= &sysctl_speed_limit_min,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= DEV_RAID_SPEED_LIMIT_MAX,
+		.procname	= "speed_limit_max",
+		.data		= &sysctl_speed_limit_max,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table raid_dir_table[] = {
-	{DEV_RAID, "raid", NULL, 0, 0555, raid_table},
-	{0}
+	{
+		.ctl_name	= DEV_RAID,
+		.procname	= "raid",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= raid_table,
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table raid_root_table[] = {
-	{CTL_DEV, "dev", NULL, 0, 0555, raid_dir_table},
-	{0}
+	{
+		.ctl_name	= CTL_DEV,
+		.procname	= "dev",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.proc_handler	= raid_dir_table,
+	},
+	{ .ctl_name = 0 }
 };
 
 static void md_recover_arrays(void);
@@ -207,6 +231,11 @@ static mddev_t * mddev_find(int unit)
 static inline int mddev_lock(mddev_t * mddev)
 {
 	return down_interruptible(&mddev->reconfig_sem);
+}
+
+static inline void mddev_lock_uninterruptible(mddev_t * mddev)
+{
+	down(&mddev->reconfig_sem);
 }
 
 static inline int mddev_trylock(mddev_t * mddev)
@@ -700,7 +729,7 @@ static void super_90_sync(mddev_t *mddev, mdk_rdev_t *rdev)
 		if (rdev2->raid_disk >= 0)
 			d->raid_disk = rdev2->raid_disk;
 		else
-			d->raid_disk = rdev2->desc_nr; /* compatability */
+			d->raid_disk = rdev2->desc_nr; /* compatibility */
 		if (rdev2->faulty) {
 			d->state = (1<<MD_DISK_FAULTY);
 			failed++;
@@ -1050,8 +1079,8 @@ repeat:
 	if (!mddev->persistent)
 		return;
 
-	printk(KERN_INFO "md: updating md%d RAID superblock on device\n",
-					mdidx(mddev));
+	printk(KERN_INFO "md: updating md%d RAID superblock on device (in sync %d)\n",
+					mdidx(mddev),mddev->in_sync);
 
 	err = 0;
 	ITERATE_RDEV(mddev,rdev,tmp) {
@@ -1490,6 +1519,8 @@ static int do_md_run(mddev_t * mddev)
 		mddev->pers = NULL;
 		return -EINVAL;
 	}
+ 	atomic_set(&mddev->writes_pending,0);
+	mddev->safemode = 0;
 	if (mddev->pers->sync_request)
 		mddev->in_sync = 0;
 	else
@@ -1521,6 +1552,7 @@ static int restart_array(mddev_t *mddev)
 		if (!mddev->ro)
 			goto out;
 
+		mddev->safemode = 0;
 		mddev->in_sync = 0;
 		md_update_sb(mddev);
 		mddev->ro = 0;
@@ -1925,7 +1957,7 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 		if (!list_empty(&mddev->disks)) {
 			mdk_rdev_t *rdev0 = list_entry(mddev->disks.next,
 							mdk_rdev_t, same_set);
-			int err = super_90_load(rdev, NULL);
+			int err = super_90_load(rdev, rdev0);
 			if (err < 0) {
 				printk(KERN_WARNING "md: %s has different UUID to %s\n",
 				       bdev_partition_name(rdev->bdev), bdev_partition_name(rdev0->bdev));
@@ -2794,6 +2826,48 @@ void md_done_sync(mddev_t *mddev, int blocks, int ok)
 }
 
 
+void md_write_start(mddev_t *mddev)
+{
+	if (mddev->safemode && !atomic_read(&mddev->writes_pending)) {
+		mddev_lock_uninterruptible(mddev);
+		atomic_inc(&mddev->writes_pending);
+		if (mddev->in_sync) {
+			mddev->in_sync = 0;
+			md_update_sb(mddev);
+		}
+		mddev_unlock(mddev);
+	} else
+		atomic_inc(&mddev->writes_pending);
+}
+
+void md_write_end(mddev_t *mddev, mdk_thread_t *thread)
+{
+	if (atomic_dec_and_test(&mddev->writes_pending) && mddev->safemode)
+		md_wakeup_thread(thread);
+}
+static inline void md_enter_safemode(mddev_t *mddev)
+{
+
+	mddev_lock_uninterruptible(mddev);
+	if (mddev->safemode && !atomic_read(&mddev->writes_pending) && !mddev->in_sync && !mddev->recovery_running) {
+		mddev->in_sync = 1;
+		md_update_sb(mddev);
+	}
+	mddev_unlock(mddev);
+}
+
+void md_handle_safemode(mddev_t *mddev)
+{
+	if (signal_pending(current)) {
+		printk(KERN_INFO "md: md%d in safe mode\n",mdidx(mddev));
+		mddev->safemode= 1;
+		flush_curr_signals();
+	}
+	if (mddev->safemode)
+		md_enter_safemode(mddev);
+}
+
+
 DECLARE_WAIT_QUEUE_HEAD(resync_wait);
 
 #define SYNC_MARKS	10
@@ -2971,6 +3045,8 @@ static void md_do_sync(void *data)
 		mddev->recovery_running = 0;
 	if (mddev->recovery_running == 0)
 		mddev->recovery_cp = MaxSector;
+	if (mddev->safemode)
+		md_enter_safemode(mddev);
 	md_recover_arrays();
 }
 
@@ -3246,6 +3322,9 @@ EXPORT_SYMBOL(unregister_md_personality);
 EXPORT_SYMBOL(md_error);
 EXPORT_SYMBOL(md_sync_acct);
 EXPORT_SYMBOL(md_done_sync);
+EXPORT_SYMBOL(md_write_start);
+EXPORT_SYMBOL(md_write_end);
+EXPORT_SYMBOL(md_handle_safemode);
 EXPORT_SYMBOL(md_register_thread);
 EXPORT_SYMBOL(md_unregister_thread);
 EXPORT_SYMBOL(md_wakeup_thread);

@@ -83,15 +83,13 @@ void __init mtrr_state_warn(void)
 	if (!mask)
 		return;
 	if (mask & MTRR_CHANGE_MASK_FIXED)
-		printk
-		    ("mtrr: your CPUs had inconsistent fixed MTRR settings\n");
+		printk(KERN_WARNING "mtrr: your CPUs had inconsistent fixed MTRR settings\n");
 	if (mask & MTRR_CHANGE_MASK_VARIABLE)
-		printk
-		    ("mtrr: your CPUs had inconsistent variable MTRR settings\n");
+		printk(KERN_WARNING "mtrr: your CPUs had inconsistent variable MTRR settings\n");
 	if (mask & MTRR_CHANGE_MASK_DEFTYPE)
-		printk
-		    ("mtrr: your CPUs had inconsistent MTRRdefType settings\n");
-	printk("mtrr: probably your BIOS does not setup all CPUs\n");
+		printk(KERN_WARNING "mtrr: your CPUs had inconsistent MTRRdefType settings\n");
+	printk(KERN_INFO "mtrr: probably your BIOS does not setup all CPUs.\n");
+	printk(KERN_INFO "mtrr: corrected configuration.\n");
 }
 
 
@@ -338,23 +336,19 @@ int generic_validate_add_page(unsigned long base, unsigned long size, unsigned i
 	    boot_cpu_data.x86_model == 1 &&
 	    boot_cpu_data.x86_mask <= 7) {
 		if (base & ((1 << (22 - PAGE_SHIFT)) - 1)) {
-			printk(KERN_WARNING
-			       "mtrr: base(0x%lx000) is not 4 MiB aligned\n",
-			       base);
+			printk(KERN_WARNING "mtrr: base(0x%lx000) is not 4 MiB aligned\n", base);
 			return -EINVAL;
 		}
 		if (!(base + size < 0x70000000 || base > 0x7003FFFF) &&
 		    (type == MTRR_TYPE_WRCOMB
 		     || type == MTRR_TYPE_WRBACK)) {
-			printk(KERN_WARNING
-			       "mtrr: writable mtrr between 0x70000000 and 0x7003FFFF may hang the CPU.\n");
+			printk(KERN_WARNING "mtrr: writable mtrr between 0x70000000 and 0x7003FFFF may hang the CPU.\n");
 			return -EINVAL;
 		}
 	}
 
 	if (base + size < 0x100) {
-		printk(KERN_WARNING
-		       "mtrr: cannot set region below 1 MiB (0x%lx000,0x%lx000)\n",
+		printk(KERN_WARNING "mtrr: cannot set region below 1 MiB (0x%lx000,0x%lx000)\n",
 		       base, size);
 		return -EINVAL;
 	}
@@ -364,8 +358,7 @@ int generic_validate_add_page(unsigned long base, unsigned long size, unsigned i
 	for (lbase = base; !(lbase & 1) && (last & 1);
 	     lbase = lbase >> 1, last = last >> 1) ;
 	if (lbase != last) {
-		printk(KERN_WARNING
-		       "mtrr: base(0x%lx000) is not aligned on a size(0x%lx000) boundary\n",
+		printk(KERN_WARNING "mtrr: base(0x%lx000) is not aligned on a size(0x%lx000) boundary\n",
 		       base, size);
 		return -EINVAL;
 	}

@@ -9,6 +9,7 @@
 #include <linux/file.h>
 #include <linux/smp_lock.h>
 #include <linux/slab.h>
+#include <linux/ptrace.h>
 #include <asm/errno.h>
 #include <asm/uaccess.h>
 

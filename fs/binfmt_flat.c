@@ -80,8 +80,10 @@ static unsigned long create_flat_tables(
 	envp = sp;
 	sp -= argc+1;
 	argv = sp;
-	put_user((unsigned long) envp, --sp);
-	put_user((unsigned long) argv, --sp);
+	if (flat_argvp_envp_on_stack()) {
+		put_user((unsigned long) envp, --sp);
+		put_user((unsigned long) argv, --sp);
+	}
 	put_user(argc,--sp);
 	current->mm->arg_start = (unsigned long) p;
 	while (argc-->0) {
@@ -178,15 +180,28 @@ static int decompress_exec(
 	}
 
 	ret = 10;
-	if (buf[3] & EXTRA_FIELD)
+	if (buf[3] & EXTRA_FIELD) {
 		ret += 2 + buf[10] + (buf[11] << 8);
+		if (unlikely(LBUFSIZE == ret)) {
+			DBG_FLAT("binfmt_flat: buffer overflow (EXTRA)?\n");
+			return -ENOEXEC;
+		}
+	}
 	if (buf[3] & ORIG_NAME) {
-		for (; (buf[ret] != 0); ret++)
+		for (; ret < LBUFSIZE && (buf[ret] != 0); ret++)
 			;
+		if (unlikely(LBUFSIZE == ret)) {
+			DBG_FLAT("binfmt_flat: buffer overflow (ORIG_NAME)?\n");
+			return -ENOEXEC;
+		}
 	}
 	if (buf[3] & COMMENT) {
-		for (; (buf[ret] != 0); ret++)
+		for (;  ret < LBUFSIZE && (buf[ret] != 0); ret++)
 			;
+		if (unlikely(LBUFSIZE == ret)) {
+			DBG_FLAT("binfmt_flat: buffer overflow (COMMENT)?\n");
+			return -ENOEXEC;
+		}
 	}
 
 	strm.next_in += ret;
@@ -203,7 +218,7 @@ static int decompress_exec(
 
 	while ((ret = zlib_inflate(&strm, Z_NO_FLUSH)) == Z_OK) {
 		ret = bprm->file->f_op->read(bprm->file, buf, LBUFSIZE, &fpos);
-		if (ret == 0)
+		if (ret <= 0)
 			break;
 		if (ret >= (unsigned long) -4096)
 			break;
@@ -361,7 +376,8 @@ static int load_flat_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		/*
 		 * because a lot of people do not manage to produce good
 		 * flat binaries,  we leave this printk to help them realise
-		 * the problem.  We only print the error if its * not a script file
+		 * the problem.  We only print the error if it's 
+		 * not a script file.
 		 */
 		if (strncmp(hdr->magic, "#!", 2))
 			printk("BINFMT_FLAT: bad magic/rev (0x%x, need 0x%x)\n",

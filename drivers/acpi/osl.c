@@ -203,6 +203,26 @@ acpi_os_get_physical_address(void *virt, acpi_physical_address *phys)
 	return AE_OK;
 }
 
+#define ACPI_MAX_OVERRIDE_LEN 100
+
+static char acpi_os_name[ACPI_MAX_OVERRIDE_LEN];
+
+acpi_status
+acpi_os_predefined_override (const struct acpi_predefined_names *init_val,
+		             acpi_string *new_val)
+{
+	if (!init_val || !new_val)
+		return AE_BAD_PARAMETER;
+
+	*new_val = NULL;
+	if (!memcmp (init_val->name, "_OS_", 4) && strlen(acpi_os_name)) {
+		printk(KERN_INFO PREFIX "Overriding _OS definition\n");
+		*new_val = acpi_os_name;
+	}
+
+	return AE_OK;
+}
+
 acpi_status
 acpi_os_table_override (struct acpi_table_header *existing_table,
 			struct acpi_table_header **new_table)
@@ -223,6 +243,13 @@ acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 acpi_status
 acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
 {
+	/*
+	 * Ignore the irq from the core, and use the value in our copy of the
+	 * FADT. It may not be the same if an interrupt source override exists
+	 * for the SCI.
+	 */
+	irq = acpi_fadt.sci_int;
+
 #ifdef CONFIG_IA64
 	irq = gsi_to_vector(irq);
 #endif
@@ -847,3 +874,28 @@ acpi_os_signal (
 
 	return AE_OK;
 }
+
+int __init
+acpi_os_name_setup(char *str)
+{
+	char *p = acpi_os_name;
+	int count = ACPI_MAX_OVERRIDE_LEN-1;
+
+	if (!str || !*str)
+		return 0;
+
+	for (; count-- && str && *str; str++) {
+		if (isalnum(*str) || *str == ' ')
+			*p++ = *str;
+		else if (*str == '\'' || *str == '"')
+			continue;
+		else
+			break;
+	}
+	*p = 0;
+
+	return 1;
+		
+}
+
+__setup("acpi_os_name=", acpi_os_name_setup);

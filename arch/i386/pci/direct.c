@@ -83,7 +83,7 @@ static int pci_conf1_write(struct pci_bus *bus, unsigned int devfn, int where, i
 		PCI_FUNC(devfn), where, size, value);
 }
 
-static struct pci_ops pci_direct_conf1 = {
+struct pci_ops pci_direct_conf1 = {
 	.read =		pci_conf1_read,
 	.write =	pci_conf1_write,
 };

@@ -1,7 +1,7 @@
 /*
  * OmniVision OV511 Camera-to-USB Bridge Driver
  *
- * Copyright (c) 1999-2002 Mark W. McClelland
+ * Copyright (c) 1999-2003 Mark W. McClelland
  * Original decompression code Copyright 1998-2000 OmniVision Technologies
  * Many improvements by Bret Wallach <bwallac1@san.rr.com>
  * Color fixes by by Orion Sky Lawlor <olawlor@acm.org> (2/26/2000)
@@ -60,7 +60,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.63 for Linux 2.5"
+#define DRIVER_VERSION "v1.64 for Linux 2.5"
 #define EMAIL "mark@alpha.dyndns.org"
 #define DRIVER_AUTHOR "Mark McClelland <mark@alpha.dyndns.org> & Bret Wallach \
 	& Orion Sky Lawlor <olawlor@acm.org> & Kevin Moore & Charl P. Botha \
@@ -137,7 +137,7 @@ MODULE_PARM_DESC(snapshot, "Enable snapshot mode");
 MODULE_PARM(cams, "i");
 MODULE_PARM_DESC(cams, "Number of simultaneous cameras");
 MODULE_PARM(compress, "i");
-MODULE_PARM_DESC(compress, "Turn on compression (not reliable yet)");
+MODULE_PARM_DESC(compress, "Turn on compression");
 MODULE_PARM(testpat, "i");
 MODULE_PARM_DESC(testpat,
   "Replace image with vertical bar testpattern (only partially working)");
@@ -1349,6 +1349,13 @@ ov51x_restart(struct usb_ov511 *ov)
 	return 0;
 }
 
+/* Sleeps until no frames are active. Returns !0 if got signal */
+static int
+ov51x_wait_frames_inactive(struct usb_ov511 *ov)
+{
+	return wait_event_interruptible(ov->wq, ov->curframe < 0);
+}
+
 /* Resets the hardware snapshot button */
 static void
 ov51x_clear_snapshot(struct usb_ov511 *ov)
@@ -2121,7 +2128,7 @@ sensor_get_exposure(struct usb_ov511 *ov, unsigned char *val)
 
 	return 0;
 }
-#endif /* CONFIG_PROC_FS && CONFIG_VIDEO_PROC_FS */
+#endif /* CONFIG_VIDEO_PROC_FS */
 
 /* Turns on or off the LED. Only has an effect with OV511+/OV518(+) */
 static void
@@ -2485,8 +2492,6 @@ mode_init_ov_sensor_regs(struct usb_ov511 *ov, int width, int height,
 	}
 
 	/******** Clock programming ********/
-
-	// FIXME: Test this with OV6630
 
 	/* The OV6620 needs special handling. This prevents the 
 	 * severe banding that normally occurs */
@@ -2995,6 +3000,7 @@ ov51x_set_default_params(struct usb_ov511 *ov)
 			ov->frame[i].format = force_palette;
 		else
 			ov->frame[i].format = VIDEO_PALETTE_YUV420;
+
 		ov->frame[i].depth = get_depth(ov->frame[i].format);
 	}
 
@@ -3577,12 +3583,8 @@ ov511_move_data(struct usb_ov511 *ov, unsigned char *in, int n)
 		if (frame->scanstate == STATE_LINES) {
 	    		int nextf;
 
-			frame->grabstate = FRAME_DONE;	// FIXME: Is this right?
-
-			if (waitqueue_active(&frame->wq)) {
-				frame->grabstate = FRAME_DONE;
-				wake_up_interruptible(&frame->wq);
-			}
+			frame->grabstate = FRAME_DONE;
+			wake_up_interruptible(&frame->wq);
 
 			/* If next frame is ready or grabbing,
 			 * point to it */
@@ -3747,12 +3749,8 @@ eof:
 	if (frame->scanstate == STATE_LINES) {
     		int nextf;
 
-		frame->grabstate = FRAME_DONE;	// FIXME: Is this right?
-
-		if (waitqueue_active(&frame->wq)) {
-			frame->grabstate = FRAME_DONE;
-			wake_up_interruptible(&frame->wq);
-		}
+		frame->grabstate = FRAME_DONE;
+		wake_up_interruptible(&frame->wq);
 
 		/* If next frame is ready or grabbing,
 		 * point to it */
@@ -4228,7 +4226,7 @@ error:
 }
 
 static void
-ov51x_dealloc(struct usb_ov511 *ov, int now)
+ov51x_dealloc(struct usb_ov511 *ov)
 {
 	PDEBUG(4, "entered");
 	down(&ov->buf_lock);
@@ -4258,10 +4256,6 @@ ov51x_v4l1_open(struct inode *inode, struct file *file)
 	if (ov->user)
 		goto out;
 
-	err = ov51x_alloc(ov);
-	if (err < 0)
-		goto out;
-
 	ov->sub_flag = 0;
 
 	/* In case app doesn't set them... */
@@ -4283,9 +4277,13 @@ ov51x_v4l1_open(struct inode *inode, struct file *file)
 			goto out;
 	}
 
+	err = ov51x_alloc(ov);
+	if (err < 0)
+		goto out;
+
 	err = ov51x_init_isoc(ov);
 	if (err) {
-		ov51x_dealloc(ov, 0);
+		ov51x_dealloc(ov);
 		goto out;
 	}
 
@@ -4319,7 +4317,7 @@ ov51x_v4l1_close(struct inode *inode, struct file *file)
 		ov51x_led_control(ov, 0);
 
 	if (ov->dev)
-		ov51x_dealloc(ov, 0);
+		ov51x_dealloc(ov);
 
 	up(&ov->lock);
 
@@ -4331,7 +4329,7 @@ ov51x_v4l1_close(struct inode *inode, struct file *file)
 		ov->cbuf = NULL;
 		up(&ov->cbuf_lock);
 
-		ov51x_dealloc(ov, 1);
+		ov51x_dealloc(ov);
 		kfree(ov);
 		ov = NULL;
 	}
@@ -4449,7 +4447,7 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 	case VIDIOCSPICT:
 	{
 		struct video_picture *p = arg;
-		int i;
+		int i, rc;
 
 		PDEBUG(4, "VIDIOCSPICT");
 
@@ -4469,10 +4467,9 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 		if (p->palette != ov->frame[0].format) {
 			PDEBUG(4, "Detected format change");
 
-			/* If we're collecting previous frame wait
-			   before changing modes */
-			interruptible_sleep_on(&ov->wq);
-			if (signal_pending(current)) return -EINTR;
+			rc = ov51x_wait_frames_inactive(ov);
+			if (rc)
+				return rc;
 
 			mode_init_regs(ov, ov->frame[0].width,
 				ov->frame[0].height, p->palette, ov->sub_flag);
@@ -4530,7 +4527,7 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 	case VIDIOCSWIN:
 	{
 		struct video_window *vw = arg;
-		int i, result;
+		int i, rc;
 
 		PDEBUG(4, "VIDIOCSWIN: %dx%d", vw->width, vw->height);
 
@@ -4545,15 +4542,14 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 			return -EINVAL;
 #endif
 
-		/* If we're collecting previous frame wait
-		   before changing modes */
-		interruptible_sleep_on(&ov->wq);
-		if (signal_pending(current)) return -EINTR;
+		rc = ov51x_wait_frames_inactive(ov);
+		if (rc)
+			return rc;
 
-		result = mode_init_regs(ov, vw->width, vw->height,
+		rc = mode_init_regs(ov, vw->width, vw->height,
 			ov->frame[0].format, ov->sub_flag);
-		if (result < 0)
-			return result;
+		if (rc < 0)
+			return rc;
 
 		for (i = 0; i < OV511_NUMFRAMES; i++) {
 			ov->frame[i].width = vw->width;
@@ -4600,7 +4596,7 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 	case VIDIOCMCAPTURE:
 	{
 		struct video_mmap *vm = arg;
-		int ret, depth;
+		int rc, depth;
 		unsigned int f = vm->frame;
 
 		PDEBUG(4, "VIDIOCMCAPTURE: frame: %d, %dx%d, %s", f, vm->width,
@@ -4642,14 +4638,14 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 		    (ov->frame[f].depth != depth)) {
 			PDEBUG(4, "VIDIOCMCAPTURE: change in image parameters");
 
-			/* If we're collecting previous frame wait
-			   before changing modes */
-			interruptible_sleep_on(&ov->wq);
-			if (signal_pending(current)) return -EINTR;
-			ret = mode_init_regs(ov, vm->width, vm->height,
+			rc = ov51x_wait_frames_inactive(ov);
+			if (rc)
+				return rc;
+
+			rc = mode_init_regs(ov, vm->width, vm->height,
 				vm->format, ov->sub_flag);
 #if 0
-			if (ret < 0) {
+			if (rc < 0) {
 				PDEBUG(1, "Got error while initializing regs ");
 				return ret;
 			}
@@ -4702,18 +4698,15 @@ redo:
 				return rc;
 
 			if (frame->grabstate == FRAME_ERROR) {
-				int ret;
-
-				if ((ret = ov51x_new_frame(ov, fnum)) < 0)
-					return ret;
+				if ((rc = ov51x_new_frame(ov, fnum)) < 0)
+					return rc;
 				goto redo;
 			}
 			/* Fall through */
 		case FRAME_DONE:
 			if (ov->snap_enabled && !frame->snapshot) {
-				int ret;
-				if ((ret = ov51x_new_frame(ov, fnum)) < 0)
-					return ret;
+				if ((rc = ov51x_new_frame(ov, fnum)) < 0)
+					return rc;
 				goto redo;
 			}
 
@@ -6089,7 +6082,6 @@ error:
 	return -EBUSY;
 }
 
-
 /****************************************************************************
  *
  *  USB routines
@@ -6097,11 +6089,10 @@ error:
  ***************************************************************************/
 
 static int
-ov51x_probe(struct usb_interface *intf, 
-	    const struct usb_device_id *id)
+ov51x_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
-	struct usb_interface_descriptor *interface;
+	struct usb_interface_descriptor *idesc;
 	struct usb_ov511 *ov;
 	int i;
 	int registered = 0;
@@ -6112,12 +6103,11 @@ ov51x_probe(struct usb_interface *intf,
 	if (dev->descriptor.bNumConfigurations != 1)
 		return -ENODEV;
 
-	interface = &intf->altsetting[0].desc;
+	idesc = &intf->altsetting[0].desc;
 
-	/* Checking vendor/product should be enough, but what the hell */
-	if (interface->bInterfaceClass != 0xFF)
+	if (idesc->bInterfaceClass != 0xFF)
 		return -ENODEV;
-	if (interface->bInterfaceSubClass != 0x00)
+	if (idesc->bInterfaceSubClass != 0x00)
 		return -ENODEV;
 
 	if ((ov = kmalloc(sizeof(*ov), GFP_KERNEL)) == NULL) {
@@ -6128,7 +6118,7 @@ ov51x_probe(struct usb_interface *intf,
 	memset(ov, 0, sizeof(*ov));
 
 	ov->dev = dev;
-	ov->iface = interface->bInterfaceNumber;
+	ov->iface = idesc->bInterfaceNumber;
 	ov->led_policy = led;
 	ov->compress = compress;
 	ov->lightfreq = lightfreq;
@@ -6272,7 +6262,7 @@ error_dealloc:
 
 error_out:
 	err("Camera initialization failed");
-	return -ENOMEM;
+	return -EIO;
 }
 
 static void
@@ -6284,6 +6274,7 @@ ov51x_disconnect(struct usb_interface *intf)
 	PDEBUG(3, "");
 
 	usb_set_intfdata (intf, NULL);
+
 	if (!ov)
 		return;
 
@@ -6298,10 +6289,9 @@ ov51x_disconnect(struct usb_interface *intf)
 
 	/* This will cause the process to request another frame */
 	for (n = 0; n < OV511_NUMFRAMES; n++)
-		if (waitqueue_active(&ov->frame[n].wq))
-			wake_up_interruptible(&ov->frame[n].wq);
-	if (waitqueue_active(&ov->wq))
-		wake_up_interruptible(&ov->wq);
+		wake_up_interruptible(&ov->frame[n].wq);
+
+	wake_up_interruptible(&ov->wq);
 
 	ov->streaming = 0;
 	ov51x_unlink_isoc(ov);
@@ -6317,7 +6307,7 @@ ov51x_disconnect(struct usb_interface *intf)
 		ov->cbuf = NULL;
 		up(&ov->cbuf_lock);
 
-		ov51x_dealloc(ov, 1);
+		ov51x_dealloc(ov);
 		kfree(ov);
 		ov = NULL;
 	}
@@ -6332,7 +6322,6 @@ static struct usb_driver ov511_driver = {
 	.probe =	ov51x_probe,
 	.disconnect =	ov51x_disconnect
 };
-
 
 /****************************************************************************
  *

@@ -90,7 +90,7 @@ void m360_cpm_reset()
 	while (pquicc->cp_cr & CMD_FLAG);
 
 	/* On the recommendation of the 68360 manual, p. 7-60
-	 * - Set sdma interupt service mask to 7
+	 * - Set sdma interrupt service mask to 7
 	 * - Set sdma arbitration ID to 4
 	 */
 	pquicc->sdma_sdcr = 0x0740;

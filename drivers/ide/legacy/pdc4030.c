@@ -1,5 +1,5 @@
 /*  -*- linux-c -*-
- *  linux/drivers/ide/pdc4030.c		Version 0.90  May 27, 1999
+ *  linux/drivers/ide/legacy/pdc4030.c		Version 0.90  May 27, 1999
  *
  *  Copyright (C) 1995-2002  Linus Torvalds & authors (see below)
  */

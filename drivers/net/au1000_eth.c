@@ -110,7 +110,7 @@ extern char * __init prom_getcmdline(void);
 
 
 /*
- * Base address and interupt of the Au1xxx ethernet macs
+ * Base address and interrupt of the Au1xxx ethernet macs
  */
 static struct {
 	unsigned int port;
@@ -465,7 +465,7 @@ static int __init mii_probe (struct net_device * dev)
 
 		mii_status = mdio_read(dev, phy_addr, MII_STATUS);
 		if (mii_status == 0xffff || mii_status == 0x0000)
-			/* the mii is not accessable, try next one */
+			/* the mii is not accessible, try next one */
 			continue;
 
 		phy_id0 = mdio_read(dev, phy_addr, MII_PHY_ID0);

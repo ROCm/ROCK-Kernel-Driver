@@ -289,7 +289,7 @@
  *	  which are used as the dev->open, dev->stop, priv->reset
  *	  callbacks if none are specified when alloc_orinocodev() is
  *	  called.
- *	o Removed orinoco_plx_interupt() and orinoco_pci_interrupt().
+ *	o Removed orinoco_plx_interrupt() and orinoco_pci_interrupt().
  *	  They didn't do anything.
  *
  * v0.12 -> v0.12a - 4 Jul 2002 - David Gibson

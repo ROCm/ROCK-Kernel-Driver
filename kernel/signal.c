@@ -19,6 +19,7 @@
 #include <linux/tty.h>
 #include <linux/binfmts.h>
 #include <linux/security.h>
+#include <linux/ptrace.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/siginfo.h>
@@ -471,8 +472,6 @@ static int __dequeue_signal(struct sigpending *pending, sigset_t *mask,
 		if (!collect_signal(sig, pending, info))
 			sig = 0;
 				
-		/* XXX: Once POSIX.1b timers are in, if si_code == SI_TIMER,
-		   we need to xchg out the timer overrun values.  */
 	}
 	recalc_sigpending();
 
@@ -491,6 +490,11 @@ int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
 	if (!signr)
 		signr = __dequeue_signal(&tsk->signal->shared_pending,
 					 mask, info);
+	if ( signr &&
+	     ((info->si_code & __SI_MASK) == __SI_TIMER) &&
+	     info->si_sys_private){
+		do_schedule_next_timer(info);
+	}
 	return signr;
 }
 
@@ -676,6 +680,7 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 static int send_signal(int sig, struct siginfo *info, struct sigpending *signals)
 {
 	struct sigqueue * q = NULL;
+	int ret = 0;
 
 	/*
 	 * fast-pathed signals for kernel-internal things like SIGSTOP
@@ -719,17 +724,25 @@ static int send_signal(int sig, struct siginfo *info, struct sigpending *signals
 			copy_siginfo(&q->info, info);
 			break;
 		}
-	} else if (sig >= SIGRTMIN && info && (unsigned long)info != 1
+	} else {
+		if (sig >= SIGRTMIN && info && (unsigned long)info != 1
 		   && info->si_code != SI_USER)
 		/*
 		 * Queue overflow, abort.  We may abort if the signal was rt
 		 * and sent by user using something other than kill().
 		 */
-		return -EAGAIN;
+			return -EAGAIN;
+		if (((unsigned long)info > 1) && (info->si_code == SI_TIMER))
+			/*
+			 * Set up a return to indicate that we dropped 
+			 * the signal.
+			 */
+			ret = info->si_sys_private;
+	}
 
 out_set:
 	sigaddset(&signals->signal, sig);
-	return 0;
+	return ret;
 }
 
 #define LEGACY_QUEUE(sigptr, sig) \
@@ -739,7 +752,7 @@ out_set:
 static int
 specific_send_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 {
-	int ret;
+	int ret = 0;
 
 	if (!irqs_disabled())
 		BUG();
@@ -748,20 +761,26 @@ specific_send_sig_info(int sig, struct siginfo *info, struct task_struct *t)
 		BUG();
 #endif
 
+	if (((unsigned long)info > 2) && (info->si_code == SI_TIMER))
+		/*
+		 * Set up a return to indicate that we dropped the signal.
+		 */
+		ret = info->si_sys_private;
+
 	/* Short-circuit ignored signals.  */
 	if (sig_ignored(t, sig))
-		return 0;
+		goto out;
 
 	/* Support queueing exactly one non-rt signal, so that we
 	   can get more detailed information about the cause of
 	   the signal. */
 	if (LEGACY_QUEUE(&t->pending, sig))
-		return 0;
+		goto out;
 
 	ret = send_signal(sig, info, &t->pending);
 	if (!ret && !sigismember(&t->blocked, sig))
 		signal_wake_up(t, sig == SIGKILL);
-
+out:
 	return ret;
 }
 
@@ -820,7 +839,7 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	struct task_struct *t;
 	unsigned int mask;
-	int ret;
+	int ret = 0;
 
 #if CONFIG_SMP
 	if (!spin_is_locked(&p->sighand->siglock))
@@ -828,13 +847,19 @@ __group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 #endif
 	handle_stop_signal(sig, p);
 
+	if (((unsigned long)info > 2) && (info->si_code == SI_TIMER))
+		/*
+		 * Set up a return to indicate that we dropped the signal.
+		 */
+		ret = info->si_sys_private;
+
 	/* Short-circuit ignored signals.  */
 	if (sig_ignored(p, sig))
-		return 0;
+		return ret;
 
 	if (LEGACY_QUEUE(&p->signal->shared_pending, sig))
 		/* This is a non-RT signal and we already have one queued.  */
-		return 0;
+		return ret;
 
 	/*
 	 * Don't bother zombies and stopped tasks (but
@@ -1108,21 +1133,31 @@ static int kill_something_info(int sig, struct siginfo *info, int pid)
  * These are for backward compatibility with the rest of the kernel source.
  */
 
+/*
+ * XXX should probably nix these interfaces and update the kernel
+ * to specify explicitly whether the signal is a group signal or
+ * specific to a thread.
+ */
 int
 send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 {
 	int ret;
 
-	/* XXX should nix these interfaces and update the kernel */
+	/*
+	 * We need the tasklist lock even for the specific
+	 * thread case (when we don't need to follow the group
+	 * lists) in order to avoid races with "p->sighand"
+	 * going away or changing from under us.
+	 */
+	read_lock(&tasklist_lock);  
 	if (T(sig, SIG_KERNEL_BROADCAST_MASK)) {
-		read_lock(&tasklist_lock);
 		ret = group_send_sig_info(sig, info, p);
-		read_unlock(&tasklist_lock);
 	} else {
 		spin_lock_irq(&p->sighand->siglock);
 		ret = specific_send_sig_info(sig, info, p);
 		spin_unlock_irq(&p->sighand->siglock);
 	}
+	read_unlock(&tasklist_lock);
 	return ret;
 }
 
@@ -1742,8 +1777,9 @@ int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
 		err |= __put_user(from->si_uid, &to->si_uid);
 		break;
 	case __SI_TIMER:
-		err |= __put_user(from->si_timer1, &to->si_timer1);
-		err |= __put_user(from->si_timer2, &to->si_timer2);
+		 err |= __put_user(from->si_tid, &to->si_tid);
+		 err |= __put_user(from->si_overrun, &to->si_overrun);
+		 err |= __put_user(from->si_ptr, &to->si_ptr);
 		break;
 	case __SI_POLL:
 		err |= __put_user(from->si_band, &to->si_band);

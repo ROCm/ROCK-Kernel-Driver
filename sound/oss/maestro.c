@@ -1830,7 +1830,7 @@ ess_update_ptr(struct ess_state *s)
 	if (s->dma_adc.ready) {
 		/* oh boy should this all be re-written.  everything in the current code paths think
 		that the various counters/pointers are expressed in bytes to the user but we have
-		two apus doing stereo stuff so we fix it up here.. it propogates to all the various
+		two apus doing stereo stuff so we fix it up here.. it propagates to all the various
 		counters from here.  */
 		if ( s->fmt & (ESS_FMT_STEREO << ESS_ADC_SHIFT)) {
 			hwptr = (get_dmac(s)*2) % s->dma_adc.dmasize;

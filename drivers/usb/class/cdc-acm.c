@@ -606,6 +606,7 @@ static int acm_probe (struct usb_interface *intf,
 		if (!acm->ctrlurb) {
 			err("out of memory");
 			kfree(acm);
+			kfree(buf);
 			return -ENOMEM;
 		}
 		acm->readurb = usb_alloc_urb(0, GFP_KERNEL);
@@ -613,6 +614,7 @@ static int acm_probe (struct usb_interface *intf,
 			err("out of memory");
 			usb_free_urb(acm->ctrlurb);
 			kfree(acm);
+			kfree(buf);
 			return -ENOMEM;
 		}
 		acm->writeurb = usb_alloc_urb(0, GFP_KERNEL);
@@ -621,6 +623,7 @@ static int acm_probe (struct usb_interface *intf,
 			usb_free_urb(acm->readurb);
 			usb_free_urb(acm->ctrlurb);
 			kfree(acm);
+			kfree(buf);
 			return -ENOMEM;
 		}
 

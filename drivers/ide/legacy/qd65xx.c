@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/qd65xx.c		Version 0.07	Sep 30, 2001
+ *  linux/drivers/ide/legacy/qd65xx.c		Version 0.07	Sep 30, 2001
  *
  *  Copyright (C) 1996-2001  Linus Torvalds & author (see below)
  */

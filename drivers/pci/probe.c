@@ -36,11 +36,22 @@ static inline unsigned int pci_calc_resource_flags(unsigned int flags)
 /*
  * Find the extent of a PCI decode..
  */
-static u32 pci_size(u32 base, unsigned long mask)
+static u32 pci_size(u32 base, u32 maxbase, unsigned long mask)
 {
-	u32 size = mask & base;		/* Find the significant bits */
-	size = size & ~(size-1);	/* Get the lowest of them to find the decode size */
-	return size-1;			/* extent = size - 1 */
+	u32 size = mask & maxbase;	/* Find the significant bits */
+	if (!size)
+		return 0;
+
+	/* Get the lowest of them to find the decode size, and
+	   from that the extent.  */
+	size = (size & ~(size-1)) - 1;
+
+	/* base == maxbase can be valid only if the BAR has
+	   already been programmed with all 1s.  */
+	if (base == maxbase && ((base | size) & mask) != mask)
+		return 0;
+
+	return size;
 }
 
 static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
@@ -63,13 +74,17 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 		if (l == 0xffffffff)
 			l = 0;
 		if ((l & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_MEMORY) {
+			sz = pci_size(l, sz, PCI_BASE_ADDRESS_MEM_MASK);
+			if (!sz)
+				continue;
 			res->start = l & PCI_BASE_ADDRESS_MEM_MASK;
 			res->flags |= l & ~PCI_BASE_ADDRESS_MEM_MASK;
-			sz = pci_size(sz, PCI_BASE_ADDRESS_MEM_MASK);
 		} else {
+			sz = pci_size(l, sz, PCI_BASE_ADDRESS_IO_MASK & 0xffff);
+			if (!sz)
+				continue;
 			res->start = l & PCI_BASE_ADDRESS_IO_MASK;
 			res->flags |= l & ~PCI_BASE_ADDRESS_IO_MASK;
-			sz = pci_size(sz, PCI_BASE_ADDRESS_IO_MASK & 0xffff);
 		}
 		res->end = res->start + (unsigned long) sz;
 		res->flags |= pci_calc_resource_flags(l);
@@ -99,6 +114,7 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 	if (rom) {
 		dev->rom_base_reg = rom;
 		res = &dev->resource[PCI_ROM_RESOURCE];
+		res->name = dev->dev.name;
 		pci_read_config_dword(dev, rom, &l);
 		pci_write_config_dword(dev, rom, ~PCI_ROM_ADDRESS_ENABLE);
 		pci_read_config_dword(dev, rom, &sz);
@@ -106,13 +122,15 @@ static void pci_read_bases(struct pci_dev *dev, unsigned int howmany, int rom)
 		if (l == 0xffffffff)
 			l = 0;
 		if (sz && sz != 0xffffffff) {
-			res->flags = (l & PCI_ROM_ADDRESS_ENABLE) |
-			  IORESOURCE_MEM | IORESOURCE_PREFETCH | IORESOURCE_READONLY | IORESOURCE_CACHEABLE;
-			res->start = l & PCI_ROM_ADDRESS_MASK;
-			sz = pci_size(sz, PCI_ROM_ADDRESS_MASK);
-			res->end = res->start + (unsigned long) sz;
+			sz = pci_size(l, sz, PCI_ROM_ADDRESS_MASK);
+			if (sz) {
+				res->flags = (l & PCI_ROM_ADDRESS_ENABLE) |
+				  IORESOURCE_MEM | IORESOURCE_PREFETCH |
+				  IORESOURCE_READONLY | IORESOURCE_CACHEABLE;
+				res->start = l & PCI_ROM_ADDRESS_MASK;
+				res->end = res->start + (unsigned long) sz;
+			}
 		}
-		res->name = dev->dev.name;
 	}
 }
 

@@ -97,7 +97,7 @@ DECLARE_WAIT_QUEUE_HEAD(jfs_IO_thread_wait);
 #define LOGGC_LOCK_INIT(log)	spin_lock_init(&(log)->gclock)
 #define LOGGC_LOCK(log)		spin_lock_irq(&(log)->gclock)
 #define LOGGC_UNLOCK(log)	spin_unlock_irq(&(log)->gclock)
-#define LOGGC_WAKEUP(tblk)	wake_up(&(tblk)->gcwait)
+#define LOGGC_WAKEUP(tblk)	wake_up_all(&(tblk)->gcwait)
 
 /*
  *	log sync serialization (per log)
@@ -511,7 +511,6 @@ lmWriteRecord(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 			tblk->bp = log->bp;
 			tblk->pn = log->page;
 			tblk->eor = log->eor;
-			init_waitqueue_head(&tblk->gcwait);
 
 			/* enqueue transaction to commit queue */
 			tblk->cqnext = NULL;
@@ -831,6 +830,12 @@ void lmPostGC(struct lbuf * bp)
 		tblk->flag &= ~tblkGC_QUEUE;
 		tblk->cqnext = 0;
 
+		if (tblk == log->flush_tblk) {
+			/* we can stop flushing the log now */
+			clear_bit(log_FLUSH, &log->flag);
+			log->flush_tblk = NULL;
+		}
+
 		jfs_info("lmPostGC: tblk = 0x%p, flag = 0x%x", tblk,
 			 tblk->flag);
 
@@ -843,10 +848,10 @@ void lmPostGC(struct lbuf * bp)
 			/* state transition: COMMIT -> COMMITTED */
 			tblk->flag |= tblkGC_COMMITTED;
 
-			if (tblk->flag & tblkGC_READY) {
+			if (tblk->flag & tblkGC_READY)
 				log->gcrtc--;
-				LOGGC_WAKEUP(tblk);
-			}
+
+			LOGGC_WAKEUP(tblk);
 		}
 
 		/* was page full before pageout ?
@@ -892,6 +897,7 @@ void lmPostGC(struct lbuf * bp)
 	else {
 		log->cflag &= ~logGC_PAGEOUT;
 		clear_bit(log_FLUSH, &log->flag);
+		WARN_ON(log->flush_tblk);
 	}
 
 	//LOGGC_UNLOCK(log);
@@ -1307,7 +1313,8 @@ int lmLogInit(struct jfs_log * log)
 
 	INIT_LIST_HEAD(&log->synclist);
 
-	log->cqueue.head = log->cqueue.tail = 0;
+	log->cqueue.head = log->cqueue.tail = NULL;
+	log->flush_tblk = NULL;
 
 	log->count = 0;
 
@@ -1395,38 +1402,78 @@ int lmLogClose(struct super_block *sb, struct jfs_log * log)
  *
  * FUNCTION:	initiate write of any outstanding transactions to the journal
  *		and optionally wait until they are all written to disk
+ *
+ *		wait == 0  flush until latest txn is committed, don't wait
+ *		wait == 1  flush until latest txn is committed, wait
+ *		wait > 1   flush until all txn's are complete, wait
  */
 void jfs_flush_journal(struct jfs_log *log, int wait)
 {
 	int i;
+	struct tblock *target;
 
 	jfs_info("jfs_flush_journal: log:0x%p wait=%d", log, wait);
 
-	/*
-	 * This ensures that we will keep writing to the journal as long
-	 * as there are unwritten commit records
-	 */
-	set_bit(log_FLUSH, &log->flag);
-
-	/*
-	 * Initiate I/O on outstanding transactions
-	 */
 	LOGGC_LOCK(log);
-	if (log->cqueue.head && !(log->cflag & logGC_PAGEOUT)) {
-		log->cflag |= logGC_PAGEOUT;
-		lmGCwrite(log, 0);
+
+	target = log->cqueue.head;
+
+	if (target) {
+		/*
+		 * This ensures that we will keep writing to the journal as long
+		 * as there are unwritten commit records
+		 */
+
+		if (test_bit(log_FLUSH, &log->flag)) {
+			/*
+			 * We're already flushing.
+			 * if flush_tblk is NULL, we are flushing everything,
+			 * so leave it that way.  Otherwise, update it to the
+			 * latest transaction
+			 */
+			if (log->flush_tblk)
+				log->flush_tblk = target;
+		} else {
+			/* Only flush until latest transaction is committed */
+			log->flush_tblk = target;
+			set_bit(log_FLUSH, &log->flag);
+
+			/*
+			 * Initiate I/O on outstanding transactions
+			 */
+			if (!(log->cflag & logGC_PAGEOUT)) {
+				log->cflag |= logGC_PAGEOUT;
+				lmGCwrite(log, 0);
+			}
+		}
+	}
+	if ((wait > 1) || test_bit(log_SYNCBARRIER, &log->flag)) {
+		/* Flush until all activity complete */
+		set_bit(log_FLUSH, &log->flag);
+		log->flush_tblk = NULL;
+	}
+
+	if (wait && target && !(target->flag & tblkGC_COMMITTED)) {
+		DECLARE_WAITQUEUE(__wait, current);
+
+		add_wait_queue(&target->gcwait, &__wait);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		LOGGC_UNLOCK(log);
+		schedule();
+		current->state = TASK_RUNNING;
+		LOGGC_LOCK(log);
+		remove_wait_queue(&target->gcwait, &__wait);
 	}
 	LOGGC_UNLOCK(log);
 
-	if (!wait)
+	if (wait < 2)
 		return;
 
+	/*
+	 * If there was recent activity, we may need to wait
+	 * for the lazycommit thread to catch up
+	 */
 	if (log->cqueue.head || !list_empty(&log->synclist)) {
-		/*
-		 * If there was very recent activity, we may need to wait
-		 * for the lazycommit thread to catch up
-		 */
-
 		for (i = 0; i < 800; i++) {	/* Too much? */
 			current->state = TASK_INTERRUPTIBLE;
 			schedule_timeout(HZ / 4);
@@ -1437,7 +1484,6 @@ void jfs_flush_journal(struct jfs_log *log, int wait)
 	}
 	assert(log->cqueue.head == NULL);
 	assert(list_empty(&log->synclist));
-
 	clear_bit(log_FLUSH, &log->flag);
 }
 
@@ -1467,7 +1513,7 @@ int lmLogShutdown(struct jfs_log * log)
 
 	jfs_info("lmLogShutdown: log:0x%p", log);
 
-	jfs_flush_journal(log, 1);
+	jfs_flush_journal(log, 2);
 
 	/*
 	 * We need to make sure all of the "written" metapages

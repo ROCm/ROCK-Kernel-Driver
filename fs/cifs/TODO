@@ -1,4 +1,4 @@
-version 0.5.3 October 8th, 2002
+version 0.6.5 February 15, 2003
 
 A Partial List of Known Problems and Missing Features
 =====================================================
@@ -7,7 +7,8 @@ Contributions are welcome.  There are plenty of opportunities
 for visible, important contributions to this module.  Here
 is a partial list of the known problems and missing features:
 
-a) Support for SecurityDescriptors for chmod/chgrp/chown
+a) Support for SecurityDescriptors for chmod/chgrp/chown so
+these can be supported for Windows servers
 
 b) Better pam/winbind integration
 
@@ -16,9 +17,9 @@ c) multi-user mounts - multiplexed sessionsetups over single vc
 
 d) Kerberos/SPNEGO session setup support - (started)
 
-e)NTLMv2 authentication and MD5-HMAC signing of SMB PDUs - (mostly implemented)
+e) NTLMv2 authentication and MD5-HMAC signing SMB PDUs - (mostly implemented)
 
-f) oplock support (ie safe CIFS distributed file caching) is not complete.
+f) oplock support (ie safe CIFS distributed file caching) is not quite complete.
 In addition Directory entry caching relies on a 1 second timer, rather than 
 using FindNotify or equivalent.  - (started)
 
@@ -28,27 +29,34 @@ of recent 2.5 kernel improvements in byte-range locking
 h) quota support
 
 i) support for the Linux 2.5 kernel new feature get_xattr and set_xattr
+which will allow us to expose dos attributes as well as real
+ACLs
 
 j) finish off the mount helper, mount.cifs - (started)
 
-KNOWN BUGS (updated October 8nd, 2002)
+k) finish writepages support (multi-page write behind for improved
+performance) and syncpage
+
+l) hook lower into the sockets api (as NFS/SunRPC does) to avoid the
+extra copy in/out of the socket buffers in some cases.
+
+m) finish support for IPv6
+
+KNOWN BUGS (updated February 15, 2003)
 ====================================
-1) symbolic links (Windows reparse points) are recognized but
+1) existing symbolic links (Windows reparse points) are recognized but
 can not be created remotely. They are implemented for Samba and those that
 support the CIFS Unix extensions but Samba has a bug currently handling
 symlink text beginning with slash
 2) delete of file with read-only attribute set will fail (may be ok)
-3) autoreconnection logic is only partially complete.
-4) there may be a problem with truncating a memmapped file to smaller than 4k with
-the size being reported as exactly 4k.
 
 Misc testing to do
 =================
 1) check out max path names and max path name components against various server
 types.
 
-2) Run POSIX bencharks against cifs
+2) Run dbench
 
-3) Run dbench
+3) Finish FSX testing on SMP now that we workaround the Samba bug
 
-4) Finish FSX testing on SMP now that we workaround the Samba bug
+4) Additional performance testing and optimization

@@ -337,8 +337,8 @@ label##_common:					\
  * Start of pSeries system interrupt routines
  */
 	. = 0x100
-	.globl __start_interupts
-__start_interupts:
+	.globl __start_interrupts
+__start_interrupts:
 
 	STD_EXCEPTION_PSERIES( 0x100, SystemReset )
 	STD_EXCEPTION_PSERIES( 0x200, MachineCheck )
@@ -367,7 +367,7 @@ __start_interupts:
 	. = 0x4000
 	.globl __end_interrupts
 	.globl __start_naca
-__end_interupts:
+__end_interrupts:
 __start_naca:
 #ifdef CONFIG_PPC_ISERIES
 	.llong itVpdAreas

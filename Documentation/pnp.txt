@@ -233,7 +233,7 @@ static int __init serial8250_pnp_init(void)
 The Old Way
 ...........
 
-a series of compatability functions have been created to make it easy to convert 
+a series of compatibility functions have been created to make it easy to convert 
 
 ISAPNP drivers.  They should serve as a temporary solution only.
 

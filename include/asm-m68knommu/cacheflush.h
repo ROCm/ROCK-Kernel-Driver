@@ -4,14 +4,19 @@
 /*
  * (C) Copyright 2000-2002, Greg Ungerer <gerg@snapgear.com>
  */
+#include <linux/mm.h>
 
-#include <asm/io.h>
+#define flush_cache_all()			__flush_cache_all()
+#define flush_cache_mm(mm)			do { } while (0)
+#define flush_cache_range(vma, start, end)	do { } while (0)
+#define flush_cache_page(vma, vmaddr)		do { } while (0)
+#define flush_page_to_ram(page)			do { } while (0)
+#define flush_dcache_range(start,len)		do { } while (0)
+#define flush_dcache_page(page)			do { } while (0)
+#define flush_icache_range(start,len)		__flush_cache_all()
+#define flush_icache_page(vma,pg)		do { } while (0)
+#define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
-/*
- * Cache handling functions
- */
-
-#define flush_cache_all() __flush_cache_all()
 
 extern inline void __flush_cache_all(void)
 {
@@ -57,26 +62,5 @@ extern inline void __flush_cache_all(void)
 		: : : "d0" );
 #endif /* CONFIG_M5249 */
 }
-
-/*
- *	FIXME: we could do better than an entire flush in most cases.
- *	But this will always work :-)
- */
-#define	flush_cache_all()		__flush_cache_all()
-#define	flush_cache_mm(mm)		__flush_cache_all()
-#define	flush_cache_range(vma,a,b)	__flush_cache_all()
-#define	flush_cache_page(vma,p)		__flush_cache_all()
-#define	flush_page_to_ram(page)		__flush_cache_all()
-#define	flush_dcache_page(page)		__flush_cache_all()
-#define	flush_icache()			__flush_cache_all()
-#define	flush_icache_page(page)		__flush_cache_all()
-#define	flush_icache_range(start,len)	__flush_cache_all()
-#define	cache_push_v(vaddr,len)		__flush_cache_all()
-#define	cache_push(paddr,len)		__flush_cache_all()
-#define	cache_clear(paddr,len)		__flush_cache_all()
-
-#define	flush_dcache_range(a,b)
-
-#define	flush_icache_user_range(vma,page,addr,len)	__flush_cache_all()
 
 #endif /* _M68KNOMMU_CACHEFLUSH_H */

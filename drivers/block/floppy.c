@@ -822,7 +822,7 @@ static int set_dor(int fdc, char mask, char data)
 		}
 	}
 	/*
-	 *	We should propogate failures to grab the resources back
+	 *	We should propagate failures to grab the resources back
 	 *	nicely from here. Actually we ought to rewrite the fd
 	 *	driver some day too.
 	 */

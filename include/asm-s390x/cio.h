@@ -111,7 +111,7 @@ struct scsw {
 
 struct ccw1 {
 	__u8  cmd_code;		/* command code */
-	__u8  flags;   		/* flags, like IDA adressing, etc. */
+	__u8  flags;   		/* flags, like IDA addressing, etc. */
 	__u16 count;   		/* byte count */
 	__u32 cda;     		/* data address */
 } __attribute__ ((packed,aligned(8)));

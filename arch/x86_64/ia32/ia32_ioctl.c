@@ -3593,7 +3593,7 @@ struct ioctl_trans {
 
 IOCTL_TABLE_START
 /* List here explicitly which ioctl's are known to have
- * compatable types passed or none at all...
+ * compatible types passed or none at all...
  */
 /* Big T */
 COMPATIBLE_IOCTL(TCGETA)

@@ -494,7 +494,7 @@ int configure_saa7146 (struct saa7146 *saa)
 
 	saa->revision = (rev & 0xf);
 
-	/* remap the memory from virtual to physical adress */
+	/* remap the memory from virtual to physical address */
 	saa->mem = ioremap ((saa->device->resource[0].start)
 			    &PCI_BASE_ADDRESS_MEM_MASK, 0x1000);
 

@@ -1,0 +1,81 @@
+# ===========================================================================
+# Module versions
+# ===========================================================================
+
+.PHONY: __modversions
+__modversions:
+
+include .config
+include scripts/Makefile.lib
+
+#
+
+__modules := $(shell cat /dev/null $(wildcard $(MODVERDIR)/*.mod))
+modules := $(patsubst %.o,%.ko,$(wildcard $(__modules:.ko=.o)))
+
+ifneq ($(filter-out $(modules),$(__modules)),)
+  $(warning *** Uh-oh, you have stale module entries. You messed with SUBDIRS,)
+  $(warning     do not complain if something goes wrong.)
+endif
+
+__modversions: $(modules)
+	@:
+
+# The final module link
+
+quiet_cmd_ld_ko_o = LD [M]  $@
+      cmd_ld_ko_o = $(LD) $(LDFLAGS) $(LDFLAGS_MODULE) -o $@ 		\
+			  $(filter-out FORCE,$^)
+
+$(modules): %.ko :%.o %.mod.o FORCE
+	$(call if_changed,ld_ko_o)
+
+targets += $(modules)
+
+# Compile version info for unresolved symbols
+
+quiet_cmd_cc_o_c = CC      $@
+      cmd_cc_o_c = $(CC) $(CFLAGS) $(CFLAGS_MODULE) -c -o $@ $<
+
+#	We have a fake dependency on compile.h to make sure that we
+#	notice if the compiler version changes under us.
+
+$(modules:.ko=.mod.o): %.mod.o: %.mod.c include/linux/compile.h FORCE
+	$(call if_changed,cc_o_c)
+
+targets += $(modules:.ko=.mod.o)
+
+# All the .mod.c files are generated using the helper "modpost"
+
+.PHONY: __modpost
+
+$(modules:.ko=.mod.c): __modpost ;
+
+# Extract all checksums for all exported symbols
+
+quiet_cmd_modpost = MODPOST
+      cmd_modpost = scripts/modpost $^
+
+__modpost: $(wildcard vmlinux) $(modules:.ko=.o)
+	$(call if_changed,modpost)
+
+targets += __modpost
+
+# Add FORCE to the prequisites of a target to force it to be always rebuilt.
+# ---------------------------------------------------------------------------
+
+.PHONY: FORCE
+
+FORCE:
+
+# Read all saved command lines and dependencies for the $(targets) we
+# may be building above, using $(if_changed{,_dep}). As an
+# optimization, we don't need to read them if the target does not
+# exist, we will rebuild anyway in that case.
+
+targets := $(wildcard $(sort $(targets)))
+cmd_files := $(wildcard $(foreach f,$(targets),$(dir $(f)).$(notdir $(f)).cmd))
+
+ifneq ($(cmd_files),)
+  include $(cmd_files)
+endif

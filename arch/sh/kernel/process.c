@@ -15,6 +15,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/a.out.h>
+#include <linux/ptrace.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>

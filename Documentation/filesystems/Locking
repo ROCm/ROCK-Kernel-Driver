@@ -21,7 +21,7 @@ locking rules:
 		dcache_lock	may block
 d_revalidate:	no		yes
 d_hash		no		yes
-d_compare:	yes		no
+d_compare:	no		no 
 d_delete:	yes		no
 d_release:	no		yes
 d_iput:		no		yes

@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/signal.c -- Signal handling
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *  Copyright (C) 1999,2000,2002  Niibe Yutaka & Kaz Kojima
  *  Copyright (C) 1991,1992  Linus Torvalds
  *
@@ -434,7 +434,7 @@ static void
 handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	struct pt_regs * regs)
 {
-	struct k_sigaction *ka = &current->sig->action[sig-1];
+	struct k_sigaction *ka = &current->sighand->action[sig-1];
 
 	/* Are we from a system call? */
 	if (PT_REGS_SYSCALL (regs)) {

@@ -1,6 +1,6 @@
 /*
  *   I use these routines just to decide when I have to fake a 
- *   volume-table to preserve compatability to original ftape.
+ *   volume-table to preserve compatibility to original ftape.
  */
 /*
  *      Copyright (C) 1994-1995 Bas Laarhoven.

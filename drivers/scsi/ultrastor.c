@@ -504,7 +504,7 @@ static int ultrastor_14f_detect(Scsi_Host_Template * tpnt)
      * Brrr, &config.mscp[0].SCint->host) it is something magical....
      * XXX and FIXME
      */
-    if (request_irq(config.interrupt, do_ultrastor_interrupt, 0, "Ultrastor", &config.mscp[0].SCint->host)) {
+    if (request_irq(config.interrupt, do_ultrastor_interrupt, 0, "Ultrastor", &config.mscp[0].SCint->device->host)) {
 	printk("Unable to allocate IRQ%u for UltraStor controller.\n",
 	       config.interrupt);
 	goto out_release_port;
@@ -714,9 +714,9 @@ static int ultrastor_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 
        ???  Which other device types should never use the cache?   */
     my_mscp->ca = SCpnt->device->type != TYPE_TAPE;
-    my_mscp->target_id = SCpnt->target;
+    my_mscp->target_id = SCpnt->device->id;
     my_mscp->ch_no = 0;
-    my_mscp->lun = SCpnt->lun;
+    my_mscp->lun = SCpnt->device->lun;
     if (SCpnt->use_sg) {
 	/* Set scatter/gather flag in SCSI command packet */
 	my_mscp->sg = TRUE;
@@ -832,7 +832,7 @@ static int ultrastor_abort(Scsi_Cmnd *SCpnt)
     unsigned char old_aborted;
     unsigned long flags;
     void (*done)(Scsi_Cmnd *);
-    struct Scsi_Host *host = SCpnt->host;
+    struct Scsi_Host *host = SCpnt->device->host;
 
     if(config.slot) 
       return FAILED;  /* Do not attempt an abort for the 24f */
@@ -954,7 +954,7 @@ static int ultrastor_host_reset(Scsi_Cmnd * SCpnt)
 {
     unsigned long flags;
     int i;
-    struct Scsi_Host *host = SCpnt->host;
+    struct Scsi_Host *host = SCpnt->device->host;
     
 #if (ULTRASTOR_DEBUG & UD_RESET)
     printk("US14F: reset: called\n");

@@ -256,7 +256,7 @@ static int choose_rate(snd_pcm_substream_t *substream,
 {
 	snd_interval_t *it;
 	snd_pcm_hw_params_t *save;
-	unsigned int rate;
+	unsigned int rate, prev;
 
 	save = kmalloc(sizeof(*save), GFP_KERNEL);
 	if (save == NULL)
@@ -280,7 +280,10 @@ static int choose_rate(snd_pcm_substream_t *substream,
 			}
 			*params = *save;
 		}
+		prev = rate;
 		rate += best_rate;
+		if (rate <= prev)
+			break;
 	}
 
 	/* not found, use the nearest rate */

@@ -155,6 +155,9 @@ extern void tub3270_init(void);
 extern void uart_console_init(void);
 extern void sgi_serial_console_init(void);
 extern void sci_console_init(void);
+extern void m68328_console_init(void);
+extern void mcfrs_console_init(void);
+extern void rs_360_init(void);
 extern void tx3912_console_init(void);
 extern void tx3912_rs_init(void);
 extern void hvc_console_init(void);
@@ -286,6 +289,10 @@ static int tty_set_ldisc(struct tty_struct *tty, int ldisc)
 
 	if (tty->ldisc.num == ldisc)
 		return 0;	/* We are already in the desired discipline */
+
+	if (!try_module_get(ldiscs[ldisc].owner))
+	       	return -EINVAL;
+	
 	o_ldisc = tty->ldisc;
 
 	tty_wait_until_sent(tty, 0);
@@ -300,9 +307,13 @@ static int tty_set_ldisc(struct tty_struct *tty, int ldisc)
 	if (tty->ldisc.open)
 		retval = (tty->ldisc.open)(tty);
 	if (retval < 0) {
+		module_put(tty->ldisc.owner);
+		
 		tty->ldisc = o_ldisc;
 		tty->termios->c_line = tty->ldisc.num;
 		if (tty->ldisc.open && (tty->ldisc.open(tty) < 0)) {
+			module_put(tty->ldisc.owner);
+
 			tty->ldisc = ldiscs[N_TTY];
 			tty->termios->c_line = N_TTY;
 			if (tty->ldisc.open) {
@@ -314,7 +325,10 @@ static int tty_set_ldisc(struct tty_struct *tty, int ldisc)
 					      tty_name(tty, buf), r);
 			}
 		}
+	} else {
+		module_put(o_ldisc.owner);
 	}
+	
 	if (tty->ldisc.num != o_ldisc.num && tty->driver.set_ldisc)
 		tty->driver.set_ldisc(tty);
 	return retval;
@@ -490,6 +504,8 @@ void do_tty_hangup(void *data)
 	if (tty->ldisc.num != ldiscs[N_TTY].num) {
 		if (tty->ldisc.close)
 			(tty->ldisc.close)(tty);
+		module_put(tty->ldisc.owner);
+		
 		tty->ldisc = ldiscs[N_TTY];
 		tty->termios->c_line = N_TTY;
 		if (tty->ldisc.open) {
@@ -1268,11 +1284,14 @@ static void release_dev(struct file * filp)
 	 */
 	if (tty->ldisc.close)
 		(tty->ldisc.close)(tty);
+	module_put(tty->ldisc.owner);
+	
 	tty->ldisc = ldiscs[N_TTY];
 	tty->termios->c_line = N_TTY;
 	if (o_tty) {
 		if (o_tty->ldisc.close)
 			(o_tty->ldisc.close)(o_tty);
+		module_put(o_tty->ldisc.owner);
 		o_tty->ldisc = ldiscs[N_TTY];
 	}
 	
@@ -2043,7 +2062,7 @@ static void initialize_tty_struct(struct tty_struct *tty)
 /*
  * The default put_char routine if the driver did not define one.
  */
-void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
+static void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	tty->driver.write(tty, 0, &ch, 1);
 }
@@ -2263,6 +2282,15 @@ void __init console_init(void)
 #endif
 #ifdef CONFIG_ARC_CONSOLE
 	arc_console_init();
+#endif
+#ifdef CONFIG_SERIAL_68328
+	m68328_console_init();
+#endif
+#ifdef CONFIG_SERIAL_COLDFIRE
+	mcfrs_console_init();
+#endif
+#ifdef CONFIG_SERIAL_68360
+	rs_360_init();
 #endif
 #ifdef CONFIG_SERIAL_TX3912_CONSOLE
 	tx3912_console_init();

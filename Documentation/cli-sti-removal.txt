@@ -121,9 +121,8 @@ local_irq_restore can restore into both irqs on and irqs off state.)
 
 another related change is that synchronize_irq() now takes a parameter:
 synchronize_irq(irq). This change too has the purpose of making SMP
-to make the transition easier, we've still kept the cli(), sti(),
-save_flags() and restore_flags() macros defined on UP systems - but
-their usage will be phased out until the 2.6 kernel is released.
+synchronization more lightweight - this way you can wait for your own
+interrupt handler to finish, no need to wait for other IRQ sources.
 
 
 why were these changes done? The main reason was the architectural burden

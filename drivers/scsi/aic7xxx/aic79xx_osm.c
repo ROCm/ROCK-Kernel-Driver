@@ -1826,7 +1826,7 @@ ahd_dmamem_alloc(struct ahd_softc *ahd, bus_dma_tag_t dmat, void** vaddr,
 	 * At least in 2.2.14, malloc is a slab allocator so all
 	 * allocations are aligned.  We assume for these kernel versions
 	 * that all allocations will be bellow 4Gig, physically contiguous,
-	 * and accessable via DMA by the controller.
+	 * and accessible via DMA by the controller.
 	 */
 	map = NULL; /* No additional information to store */
 	*vaddr = malloc(dmat->maxsize, M_DEVBUF, M_NOWAIT);
@@ -2381,7 +2381,9 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 		ahd_set_name(ahd, new_name);
 	}
 	host->unique_id = ahd->unit;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+	scsi_set_device(host, &ahd->dev_softc->dev);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)
 	scsi_set_pci_device(host, ahd->dev_softc);
 #endif
 	ahd_linux_initialize_scsi_bus(ahd);
@@ -4268,6 +4270,7 @@ ahd_linux_run_device_queue(struct ahd_softc *ahd, struct ahd_linux_device *dev)
 		 */
 		hscb->control = 0;
 		hscb->scsiid = BUILD_SCSIID(ahd, cmd);
+		hscb->lun = cmd->device->lun;
 		scb->hscb->task_management = 0;
 		mask = SCB_GET_TARGET_MASK(ahd, scb);
 

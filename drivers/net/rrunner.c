@@ -255,6 +255,7 @@ static void __devexit rr_remove_one (struct pci_dev *pdev)
 		iounmap(rr->regs);
 		kfree(dev);
 		pci_release_regions(pdev);
+		pci_disable_device(pdev);
 		pci_set_drvdata(pdev, NULL);
 	}
 }
@@ -1128,14 +1129,12 @@ static void rr_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 	spin_unlock(&rrpriv->lock);
 }
 
-
 static void rr_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct rr_private *rrpriv = (struct rr_private *)dev->priv;
 	struct rr_regs *regs = rrpriv->regs;
 	unsigned long flags;
-	int i;
 
 	if (readl(&regs->HostCtrl) & NIC_HALTED){
 		printk("%s: Restarting nic\n", dev->name);
@@ -1143,23 +1142,8 @@ static void rr_timer(unsigned long data)
 		memset(rrpriv->info, 0, sizeof(struct rr_info));
 		wmb();
 
-		for (i = 0; i < TX_RING_ENTRIES; i++) {
-			if (rrpriv->tx_skbuff[i]) {
-				rrpriv->tx_ring[i].size = 0;
-				set_rraddr(&rrpriv->tx_ring[i].addr, 0);
-				dev_kfree_skb(rrpriv->tx_skbuff[i]);
-				rrpriv->tx_skbuff[i] = NULL;
-			}
-		}
-
-		for (i = 0; i < RX_RING_ENTRIES; i++) {
-			if (rrpriv->rx_skbuff[i]) {
-				rrpriv->rx_ring[i].size = 0;
-				set_rraddr(&rrpriv->rx_ring[i].addr, 0);
-				dev_kfree_skb(rrpriv->rx_skbuff[i]);
-				rrpriv->rx_skbuff[i] = NULL;
-			}
-		}
+		rr_raz_tx(rrpriv, dev);
+		rr_raz_rx(rrpriv, dev);
 
 		if (rr_init1(dev)) {
 			spin_lock_irqsave(&rrpriv->lock, flags);
@@ -1246,11 +1230,13 @@ static int rr_open(struct net_device *dev)
 	spin_unlock_irqrestore(&rrpriv->lock, flags);
 
 	if (rrpriv->info) {
-		kfree(rrpriv->info);
+		pci_free_consistent(pdev, sizeof(struct rr_info), rrpriv->info,
+				    rrpriv->info_dma);
 		rrpriv->info = NULL;
 	}
 	if (rrpriv->rx_ctrl) {
-		kfree(rrpriv->rx_ctrl);
+		pci_free_consistent(pdev, sizeof(struct ring_ctrl),
+				    rrpriv->rx_ctrl, rrpriv->rx_ctrl_dma);
 		rrpriv->rx_ctrl = NULL;
 	}
 
@@ -1413,23 +1399,8 @@ static int rr_close(struct net_device *dev)
 	rrpriv->info->evt_ctrl.pi = 0;
 	rrpriv->rx_ctrl[4].entries = 0;
 
-	for (i = 0; i < TX_RING_ENTRIES; i++) {
-		if (rrpriv->tx_skbuff[i]) {
-			rrpriv->tx_ring[i].size = 0;
-			set_rraddr(&rrpriv->tx_ring[i].addr, 0);
-			dev_kfree_skb(rrpriv->tx_skbuff[i]);
-			rrpriv->tx_skbuff[i] = NULL;
-		}
-	}
-
-	for (i = 0; i < RX_RING_ENTRIES; i++) {
-		if (rrpriv->rx_skbuff[i]) {
-			rrpriv->rx_ring[i].size = 0;
-			set_rraddr(&rrpriv->rx_ring[i].addr, 0);
-			dev_kfree_skb(rrpriv->rx_skbuff[i]);
-			rrpriv->rx_skbuff[i] = NULL;
-		}
-	}
+	rr_raz_tx(rrpriv, dev);
+	rr_raz_rx(rrpriv, dev);
 
 	pci_free_consistent(rrpriv->pci_dev, 256 * sizeof(struct ring_ctrl),
 			    rrpriv->rx_ctrl, rrpriv->rx_ctrl_dma);

@@ -149,7 +149,7 @@ netdev_connect(int irq)
 static inline int
 netdev_attach(int fd, int irq, unsigned int ipaddr)
 {
-	/* this puts the host interface in the right mode (start interupting) */
+	/* this puts the host interface in the right mode (start interrupting) */
 	return ia64_ssc(fd, ipaddr, 0,0, SSC_NETDEV_ATTACH);
 }
 

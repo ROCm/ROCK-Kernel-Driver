@@ -108,19 +108,22 @@ enum devctl_cmd {
 enum isoctl_cmd {
 	/* rawiso API - see iso.h for the meanings of these commands
 	 * INIT = allocate resources
-	 * START = begin transmission/reception (arg: cycle to start on)
+	 * START = begin transmission/reception
 	 * STOP = halt transmission/reception
-	 * QUEUE/RELEASE = produce/consume packets (arg: # of packets)
+	 * QUEUE/RELEASE = produce/consume packets
 	 * SHUTDOWN = deallocate resources
 	 */
-	
+
 	XMIT_INIT,
 	XMIT_START,
 	XMIT_STOP,
 	XMIT_QUEUE,
 	XMIT_SHUTDOWN,
-	
+
 	RECV_INIT,
+	RECV_LISTEN_CHANNEL,   /* multi-channel only */
+	RECV_UNLISTEN_CHANNEL, /* multi-channel only */
+	RECV_SET_CHANNEL_MASK, /* multi-channel only; arg is a *u64 */
 	RECV_START,
 	RECV_STOP,
 	RECV_RELEASE,
@@ -170,11 +173,12 @@ struct hpsb_host_driver {
          */
         int (*devctl) (struct hpsb_host *host, enum devctl_cmd command, int arg);
 
-	 /* ISO transmission/reception functions. Return 0 on success, -1 on failure.
-	  * If the low-level driver does not support the new ISO API, set isoctl to NULL.
+	 /* ISO transmission/reception functions. Return 0 on success, -1
+	  * (or -EXXX errno code) on failure. If the low-level driver does not
+	  * support the new ISO API, set isoctl to NULL.
 	  */
-	int (*isoctl) (struct hpsb_iso *iso, enum isoctl_cmd command, int arg);
-	
+	int (*isoctl) (struct hpsb_iso *iso, enum isoctl_cmd command, unsigned long arg);
+
         /* This function is mainly to redirect local CSR reads/locks to the iso
          * management registers (bus manager id, bandwidth available, channels
          * available) to the hardware registers in OHCI.  reg is 0,1,2,3 for bus

@@ -8,7 +8,7 @@
 
    Copyright (C) 1999-2002 3ware Inc.
 
-   Kernel compatablity By: 	Andre Hedrick <andre@suse.com>
+   Kernel compatiblity By: 	Andre Hedrick <andre@suse.com>
    Non-Copyright (C) 2000	Andre Hedrick <andre@suse.com>
    
    Further tiny build fixes and trivial hoovering    Alan Cox
@@ -960,7 +960,9 @@ int tw_findcards(Scsi_Host_Template *tw_host)
 			host->max_sectors = TW_MAX_SECTORS;
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+			scsi_set_device(host, &tw_pci_dev->dev);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)
 			scsi_set_pci_device(host, tw_pci_dev);
 #endif
 

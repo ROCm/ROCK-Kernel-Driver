@@ -446,7 +446,7 @@ void ptrace_set_bpt(struct task_struct *child)
  * Ensure no single-step breakpoint is pending.  Returns non-zero
  * value if child was being single-stepped.
  */
-void __ptrace_cancel_bpt(struct task_struct *child)
+void ptrace_cancel_bpt(struct task_struct *child)
 {
 	int i, nsaved = child->thread.debug.nsaved;
 
@@ -468,7 +468,8 @@ void __ptrace_cancel_bpt(struct task_struct *child)
  */
 void ptrace_disable(struct task_struct *child)
 {
-	__ptrace_cancel_bpt(child);
+	child->ptrace &= ~PT_SINGLESTEP;
+	ptrace_cancel_bpt(child);
 }
 
 /*
@@ -486,7 +487,7 @@ void ptrace_break(struct task_struct *tsk, struct pt_regs *regs)
 	if (tsk->thread.debug.nsaved == 0)
 		printk(KERN_ERR "ptrace: bogus breakpoint trap\n");
 
-	__ptrace_cancel_bpt(tsk);
+	ptrace_cancel_bpt(tsk);
 
 	info.si_signo = SIGTRAP;
 	info.si_errno = 0;
@@ -637,7 +638,8 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 				clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 			child->exit_code = data;
 			/* make sure single-step breakpoint is gone. */
-			__ptrace_cancel_bpt(child);
+			child->ptrace &= ~PT_SINGLESTEP;
+			ptrace_cancel_bpt(child);
 			wake_up_process(child);
 			ret = 0;
 			break;
@@ -649,7 +651,8 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 		 */
 		case PTRACE_KILL:
 			/* make sure single-step breakpoint is gone. */
-			__ptrace_cancel_bpt(child);
+			child->ptrace &= ~PT_SINGLESTEP;
+			ptrace_cancel_bpt(child);
 			if (child->state != TASK_ZOMBIE) {
 				child->exit_code = SIGKILL;
 				wake_up_process(child);
@@ -664,7 +667,7 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 			ret = -EIO;
 			if ((unsigned long) data > _NSIG)
 				break;
-			child->thread.debug.nsaved = -1;
+			child->ptrace |= PT_SINGLESTEP;
 			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 			child->exit_code = data;
 			/* give it a chance to run. */

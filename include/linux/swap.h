@@ -242,6 +242,8 @@ extern spinlock_t swaplock;
 	page_cache_release(page)
 #define free_pages_and_swap_cache(pages, nr) \
 	release_pages((pages), (nr), 0);
+#define page_referenced(page) \
+	TestClearPageReferenced(page)
 
 #define show_swap_cache_info()			/*NOTHING*/
 #define free_swap_and_cache(swp)		/*NOTHING*/

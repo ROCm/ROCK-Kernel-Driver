@@ -24,6 +24,7 @@
 #include <linux/interrupt.h>
 #include <linux/highmem.h>
 #include <linux/kallsyms.h>
+#include <linux/ptrace.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>

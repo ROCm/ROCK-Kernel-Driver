@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/cmd640.c		Version 1.02  Sep 01, 1996
+ *  linux/drivers/ide/pci/cmd640.c		Version 1.02  Sep 01, 1996
  *
  *  Copyright (C) 1995-1996  Linus Torvalds & authors (see below)
  */

@@ -39,7 +39,7 @@
 /*
  * These are used to make use of C type-checking..
  */
-#if CONFIG_X86_PAE
+#ifdef CONFIG_X86_PAE
 typedef struct { unsigned long pte_low, pte_high; } pte_t;
 typedef struct { unsigned long long pmd; } pmd_t;
 typedef struct { unsigned long long pgd; } pgd_t;

@@ -1,5 +1,6 @@
 
 #include <linux/mm.h>
+#include <linux/file.h>
 
 /*
  * Logic: we've got two memory sums for each process, "shared", and
@@ -44,10 +45,10 @@ char *task_mem(struct mm_struct *mm, char *buffer)
 	else
 		bytes += kobjsize(current->files);
 
-	if (current->sig && atomic_read(&current->sig->count) > 1)
-		sbytes += kobjsize(current->sig);
+	if (current->sighand && atomic_read(&current->sighand->count) > 1)
+		sbytes += kobjsize(current->sighand);
 	else
-		bytes += kobjsize(current->sig);
+		bytes += kobjsize(current->sighand);
 
 	bytes += kobjsize(current); /* includes kernel stack */
 
@@ -64,7 +65,7 @@ char *task_mem(struct mm_struct *mm, char *buffer)
 unsigned long task_vsize(struct mm_struct *mm)
 {
 	struct mm_tblock_struct *tbp;
-	unsigned long vsize;
+	unsigned long vsize = 0;
 
 	for (tbp = &mm->context.tblock; tbp; tbp = tbp->next) {
 		if (tbp->rblock)
@@ -89,8 +90,8 @@ int task_statm(struct mm_struct *mm, int *shared, int *text,
 		}
 	}
 
-	size += (text = mm->end_code - mm->start_code);
-	size += (data = mm->start_stack - mm->start_data);
+	size += (*text = mm->end_code - mm->start_code);
+	size += (*data = mm->start_stack - mm->start_data);
 
 	*resident = size;
 	return size;

@@ -120,7 +120,7 @@ struct mp_load {
 #define MQ_CACHED_ADDR(x)               (((x) & 0x1fffffffL) | 0x80000000L)
 #define MQ_UNCACHED_ADDR(x)             (((x) & 0x1fffffffL) | 0xa0000000L)
 /*--------------------------------------------------------------------------------------------*/
-/* Additional definitions reflecting the different adress map of the  SERVER 4BRI V2          */
+/* Additional definitions reflecting the different address map of the  SERVER 4BRI V2          */
 #define MQ2_BREG_RISC                   0x0200      /* RISC Reset ect                         */
 #define MQ2_BREG_IRQ_TEST               0x0400      /* Interrupt request, no CPU interaction  */
 #define MQ2_BOARD_DSP_OFFSET            0x800000    /* PC relative On board DSP regs offset   */

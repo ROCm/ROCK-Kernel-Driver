@@ -1769,7 +1769,7 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 
 				/* Set the pci device pointer in Scsi_Host structure.
 				 */
-				scsi_set_pci_device(sh, this->pcidev);
+				scsi_set_device(sh, &this->pcidev->dev);
 
 				spin_unlock_irqrestore(&this->FreeQlock, flags);
 

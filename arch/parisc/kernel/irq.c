@@ -447,7 +447,7 @@ void do_cpu_irq_mask(struct pt_regs *regs)
 
 	/* 1) only process IRQs that are enabled/unmasked (cpu_eiem)
 	 * 2) We loop here on EIRR contents in order to avoid
-	 *    nested interrupts or having to take another interupt
+	 *    nested interrupts or having to take another interrupt
 	 *    when we could have just handled it right away.
 	 * 3) Limit the number of times we loop to make sure other
 	 *    processing can occur.

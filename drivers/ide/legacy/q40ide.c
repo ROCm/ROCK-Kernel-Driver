@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/ide/q40ide.c -- Q40 I/O port IDE Driver
+ *  linux/drivers/ide/legacy/q40ide.c -- Q40 I/O port IDE Driver
  *
  *     (c) Richard Zidlicky
  *
@@ -82,7 +82,7 @@ void q40ide_init(void)
     for (i = 0; i < Q40IDE_NUM_HWIFS; i++) {
 	hw_regs_t hw;
 
-	ide_setup_ports(&hw,(ide_ioreg_t) pcide_bases[i], (int *)pcide_offsets, 
+	ide_setup_ports(&hw,(unsigned long) pcide_bases[i], (int *)pcide_offsets, 
 			pcide_bases[i]+0x206, 
 			0, NULL,
 //			pcide_iops,

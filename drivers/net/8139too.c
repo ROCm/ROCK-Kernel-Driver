@@ -1589,7 +1589,7 @@ static int rtl8139_thread (void *data)
 	unsigned long timeout;
 
 	daemonize("%s", dev->name);
-	allow_signal(SIGKILL);
+	allow_signal(SIGTERM);
 
 	while (1) {
 		timeout = next_tick;

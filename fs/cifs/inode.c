@@ -19,6 +19,7 @@
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 #include <linux/fs.h>
+#include <linux/buffer_head.h>
 #include <linux/stat.h>
 #include <asm/div64.h>
 #include "cifsfs.h"
@@ -44,7 +45,7 @@ cifs_get_inode_info_unix(struct inode **pinode,
 	xid = GetXid();
 
 	pTcon = cifs_sb->tcon;
-	cFYI(1, ("\nGetting info on %s ", search_path));
+	cFYI(1, (" Getting info on %s ", search_path));
 	/* we could have done a find first instead but this returns more info */
 	rc = CIFSSMBUnixQPathInfo(xid, pTcon, search_path, &findData,
 				  cifs_sb->local_nls);
@@ -85,7 +86,7 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		/* get new inode */
 		if (*pinode == NULL) {
 			*pinode = new_inode(sb);
-			cFYI(1, ("\nAlloc new inode %p ", *pinode));
+			cFYI(1, (" Alloc new inode %p ", *pinode));
 		}
 		inode = *pinode;
 /*        new_inode = iget(parent_dir_inode->i_sb, findData.IndexNumber); */
@@ -93,7 +94,7 @@ cifs_get_inode_info_unix(struct inode **pinode,
 
 		cifsInfo = CIFS_I(inode);
 
-		cFYI(1, ("\nOld time %ld ", cifsInfo->time));
+		cFYI(1, (" Old time %ld ", cifsInfo->time));
 		cifsInfo->time = jiffies;
 		cFYI(1, (" New time %ld ", cifsInfo->time));
 		atomic_inc(&cifsInfo->inUse);	/* inc on every refresh of inode */
@@ -129,12 +130,12 @@ cifs_get_inode_info_unix(struct inode **pinode,
 		findData.EndOfFile = le64_to_cpu(findData.EndOfFile);
 		inode->i_size = findData.EndOfFile;
 		inode->i_blksize =
-		    (pTcon->ses->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
+		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
 		inode->i_blocks = do_div(findData.NumOfBytes, inode->i_blksize);
 		if (findData.NumOfBytes < findData.EndOfFile)
-			cFYI(1, ("\nServer inconsistency Error: it says allocation size less than end of file "));
+			cFYI(1, ("Server inconsistency Error: it says allocation size less than end of file "));
 		cFYI(1,
-		     ("\nCIFS FFIRST: Size %ld and blocks %ld ",
+		     ("Size %ld and blocks %ld ",
 		      (unsigned long) inode->i_size, inode->i_blocks));
 		if (S_ISREG(inode->i_mode)) {
 			cFYI(1, (" File inode "));
@@ -150,7 +151,7 @@ cifs_get_inode_info_unix(struct inode **pinode,
 			inode->i_op = &cifs_symlink_inode_ops;
 /* tmp_inode->i_fop = *//* do not need to set to anything */
 		} else {
-			cFYI(1, ("\nInit special inode "));
+			cFYI(1, (" Init special inode "));
 			init_special_inode(inode, inode->i_mode,
 					   kdev_t_to_nr(inode->i_rdev));
 		}
@@ -174,7 +175,7 @@ cifs_get_inode_info(struct inode **pinode,
 	xid = GetXid();
 
 	pTcon = cifs_sb->tcon;
-	cFYI(1, ("\nGetting info on %s ", search_path));
+	cFYI(1, (" Getting info on %s ", search_path));
 	/* we could have done a find first instead but this returns more info */
 	rc = CIFSSMBQPathInfo(xid, pTcon, search_path, &findData,
 			      cifs_sb->local_nls);
@@ -214,20 +215,20 @@ cifs_get_inode_info(struct inode **pinode,
 		/* get new inode */
 		if (*pinode == NULL) {
 			*pinode = new_inode(sb);
-			cFYI(1, ("\nAlloc new inode %p ", *pinode));
+			cFYI(1, (" Alloc new inode %p ", *pinode));
 		}
 
 		inode = *pinode;
 		cifsInfo = CIFS_I(inode);
 		findData.Attributes = le32_to_cpu(findData.Attributes);
 		cifsInfo->cifsAttrs = findData.Attributes;
-		cFYI(1, ("\nOld time %ld ", cifsInfo->time));
+		cFYI(1, (" Old time %ld ", cifsInfo->time));
 		cifsInfo->time = jiffies;
 		cFYI(1, (" New time %ld ", cifsInfo->time));
 		atomic_inc(&cifsInfo->inUse);	/* inc on every refresh of inode */
 
 		inode->i_blksize =
-		    (pTcon->ses->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
+		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;
 		/* Linux can not store file creation time unfortunately so we ignore it */
 		inode->i_atime =
 		    cifs_NTtimeToUnix(le64_to_cpu(findData.LastAccessTime));
@@ -239,7 +240,7 @@ cifs_get_inode_info(struct inode **pinode,
 		/* should we treat the dos attribute of read-only as read-only mode bit e.g. 555 */
 		inode->i_mode = S_IALLUGO & ~(S_ISUID | S_IXGRP);	/* 2767 perms indicate mandatory locking - will override for dirs later */
 		cFYI(0,
-		     ("\nAttributes came in as 0x%x\n", findData.Attributes));
+		     (" Attributes came in as 0x%x ", findData.Attributes));
 		if (findData.Attributes & ATTR_REPARSE) {	
    /* Can IFLNK be set as it basically is on windows with IFREG or IFDIR? */
 			inode->i_mode |= S_IFLNK;
@@ -256,7 +257,7 @@ cifs_get_inode_info(struct inode **pinode,
 		inode->i_blocks =
 		    do_div(findData.AllocationSize, inode->i_blksize);
 		cFYI(1,
-		     ("\n Size %ld and blocks %ld ",
+		     (" Size %ld and blocks %ld ",
 		      (unsigned long) inode->i_size, inode->i_blocks));
 		inode->i_nlink = le32_to_cpu(findData.NumberOfLinks);
 
@@ -307,7 +308,7 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 	char *full_path = NULL;
 	struct cifsInodeInfo *cifsInode;
 
-	cFYI(1, ("\n cifs_unlink, inode = 0x%p with ", inode));
+	cFYI(1, (" cifs_unlink, inode = 0x%p with ", inode));
 
 	xid = GetXid();
 
@@ -356,7 +357,7 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 	char *full_path = NULL;
 	struct inode *newinode = NULL;
 
-	cFYI(1, ("In cifs_mkdir, mode = 0x%x inode = 0x%p\n", mode, inode));
+	cFYI(1, ("In cifs_mkdir, mode = 0x%x inode = 0x%p ", mode, inode));
 
 	xid = GetXid();
 
@@ -367,7 +368,7 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 	/* BB add setting the equivalent of mode via CreateX w/ACLs */
 	rc = CIFSSMBMkDir(xid, pTcon, full_path, cifs_sb->local_nls);
 	if (rc) {
-		cFYI(1, ("\ncifs_mkdir returned 0x%x ", rc));
+		cFYI(1, ("cifs_mkdir returned 0x%x ", rc));
 	} else {
 		inode->i_nlink++;
 		if (pTcon->ses->capabilities & CAP_UNIX)
@@ -407,7 +408,7 @@ cifs_rmdir(struct inode *inode, struct dentry *direntry)
 	char *full_path = NULL;
 	struct cifsInodeInfo *cifsInode;
 
-	cFYI(1, ("\nn cifs_rmdir, inode = 0x%p with ", inode));
+	cFYI(1, (" cifs_rmdir, inode = 0x%p with ", inode));
 
 	xid = GetXid();
 
@@ -493,7 +494,7 @@ cifs_revalidate(struct dentry *direntry)
 
 	full_path = build_path_from_dentry(direntry);
 	cFYI(1,
-	     (" full path: %s for inode 0x%p with count %d dentry: 0x%p d_time %ld at time %ld \n",
+	     (" full path: %s for inode 0x%p with count %d dentry: 0x%p d_time %ld at time %ld ",
 	      full_path, direntry->d_inode,
 	      direntry->d_inode->i_count.counter, direntry,
 	      direntry->d_time, jiffies));
@@ -562,7 +563,7 @@ cifs_truncate_file(struct inode *inode)
 		full_path = build_path_from_dentry(dirent);
 		rc = CIFSSMBSetEOF(xid, pTcon, full_path, inode->i_size,FALSE,
 				   cifs_sb->local_nls);
-		cFYI(1,("\nSetEOF (truncate) rc = %d",rc));
+		cFYI(1,(" SetEOF (truncate) rc = %d",rc));
 		if(rc == -ETXTBSY) {        
 			cifsInode = CIFS_I(inode);
 			if(!list_empty(&(cifsInode->openFileList))) {            
@@ -572,7 +573,7 @@ cifs_truncate_file(struct inode *inode)
 				 rc = CIFSSMBSetFileSize(xid, pTcon, inode->i_size,
 					open_file->netfid,open_file->pid,FALSE);
 			} else {
-				  cFYI(1,("\nNo open files to get file handle from"));
+				  cFYI(1,(" No open files to get file handle from"));
 			}
 		}
 		if (!rc)
@@ -604,7 +605,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	xid = GetXid();
 
 	cFYI(1,
-	     ("\nIn cifs_setattr, name = %s attrs->iavalid 0x%x\n",
+	     (" In cifs_setattr, name = %s attrs->iavalid 0x%x ",
 	      direntry->d_name.name, attrs->ia_valid));
 	cifs_sb = CIFS_SB(direntry->d_inode->i_sb);
 	pTcon = cifs_sb->tcon;
@@ -614,12 +615,12 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 
 	/* BB check if we need to refresh inode from server now ? BB */
 
-	cFYI(1, ("\nChanging attributes 0x%x", attrs->ia_valid));
+	cFYI(1, (" Changing attributes 0x%x", attrs->ia_valid));
 
 	if (attrs->ia_valid & ATTR_SIZE) {
 		rc = CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size,FALSE,
 				   cifs_sb->local_nls);
-		cFYI(1,("\nSetEOF (setattrs) rc = %d",rc));
+		cFYI(1,(" SetEOF (setattrs) rc = %d",rc));
 
 		if(rc == -ETXTBSY) {
 			if(!list_empty(&(cifsInode->openFileList))) {            
@@ -629,29 +630,30 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 				rc = CIFSSMBSetFileSize(xid, pTcon, attrs->ia_size,
 					   open_file->netfid,open_file->pid,FALSE);           
 			} else {
-				cFYI(1,("\nNo open files to get file handle from"));
+				cFYI(1,(" No open files to get file handle from"));
 			}
 		}
-        /*  Set Allocation Size of file - might not even need to call the
-            following but might as well and it does not hurt if it fails */
-		CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size, TRUE, cifs_sb->local_nls);
-		if (rc == 0)
-			vmtruncate(direntry->d_inode, attrs->ia_size);
-		/* BB add special case to handle sharing violation (due to Samba bug)
-		   by calling SetFileInfo to set the sizes */
+        /*  For Allocation Size - do not need to call the following
+            it did not hurt if it fails but why bother */
+	/*	CIFSSMBSetEOF(xid, pTcon, full_path, attrs->ia_size, TRUE, cifs_sb->local_nls);*/
+		if (rc == 0) {
+			rc = vmtruncate(direntry->d_inode, attrs->ia_size);
+			nobh_truncate_page(direntry->d_inode->i_mapping, direntry->d_inode->i_size);
+/*          cFYI(1,("truncate_page to 0x%lx \n",direntry->d_inode->i_size)); */
+		}
 	}
 	if (attrs->ia_valid & ATTR_UID) {
-		cFYI(1, ("\nCIFS - UID changed to %d", attrs->ia_uid));
+		cFYI(1, (" CIFS - UID changed to %d", attrs->ia_uid));
 		uid = attrs->ia_uid;
 		/*        entry->uid = cpu_to_le16(attr->ia_uid); */
 	}
 	if (attrs->ia_valid & ATTR_GID) {
-		cFYI(1, ("\nCIFS - GID changed to %d", attrs->ia_gid));
+		cFYI(1, (" CIFS - GID changed to %d", attrs->ia_gid));
 		gid = attrs->ia_gid;
 		/*      entry->gid = cpu_to_le16(attr->ia_gid); */
 	}
 	if (attrs->ia_valid & ATTR_MODE) {
-		cFYI(1, ("\nCIFS - Mode changed to 0x%x", attrs->ia_mode));
+		cFYI(1, (" CIFS - Mode changed to 0x%x", attrs->ia_mode));
 		mode = attrs->ia_mode;
 		/*      entry->mode = cpu_to_le16(attr->ia_mode); */
 	}
@@ -680,7 +682,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 
 	if (attrs->ia_valid & ATTR_CTIME) {
 		set_time = TRUE;
-		cFYI(1, ("\nCIFS - CTIME changed ")); /* BB probably do not need */
+		cFYI(1, (" CIFS - CTIME changed ")); /* BB probably do not need */
 		time_buf.ChangeTime =
 		    cpu_to_le64(cifs_UnixTimeToNT(attrs->ia_ctime));
 	} else
@@ -695,7 +697,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 		rc = CIFSSMBSetTimes(xid, pTcon, full_path, &time_buf,
 				     cifs_sb->local_nls);
 	}
-	cifsInode->time = 0; /* force revalidate to get attributes when needed */
+/*	cifsInode->time = 0; */ /* force revalidate to get attributes when needed */
 
 	if (full_path)
 		kfree(full_path);
@@ -707,7 +709,7 @@ void
 cifs_delete_inode(struct inode *inode)
 {
 	/* Note: called without the big kernel filelock - remember spinlocks! */
-	cFYI(1, ("In cifs_delete_inode, inode = 0x%p\n", inode));
+	cFYI(1, ("In cifs_delete_inode, inode = 0x%p ", inode));
 	/* may have to add back in when safe distributed caching of
              directories via e.g. FindNotify added */
 }

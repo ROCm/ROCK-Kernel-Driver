@@ -993,7 +993,7 @@ int __devinit snd_emu10k1_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
 	emu->pcm = pcm;
 
 	for (substream = pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream; substream; substream = substream->next)
-		if ((err = snd_pcm_lib_preallocate_sg_pages(emu->pci, substream)) < 0)
+		if ((err = snd_pcm_lib_preallocate_sg_pages(emu->pci, substream, 64*1024, 64*1024)) < 0)
 			return err;
 
 	for (substream = pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream; substream; substream = substream->next)

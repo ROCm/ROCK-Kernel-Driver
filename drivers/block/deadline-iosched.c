@@ -98,6 +98,8 @@ struct deadline_rq {
 	unsigned long expires;
 };
 
+static inline void deadline_move_to_dispatch(struct deadline_data *dd, struct deadline_rq *drq);
+
 static kmem_cache_t *drq_pool;
 
 #define RQ_DATA(rq)	((struct deadline_rq *) (rq)->elevator_private)
@@ -189,26 +191,22 @@ __deadline_add_drq_rb(struct deadline_data *dd, struct deadline_rq *drq)
 	return 0;
 }
 
-static int
+static void
 deadline_add_drq_rb(struct deadline_data *dd, struct deadline_rq *drq)
 {
 	struct deadline_rq *__alias;
 
 	drq->rb_key = rq_rb_key(drq->request);
 
+retry:
 	__alias = __deadline_add_drq_rb(dd, drq);
 	if (!__alias) {
 		rb_insert_color(&drq->rb_node, DRQ_RB_ROOT(dd, drq));
-		return 0;
+		return;
 	}
 
-	/*
-	 * this should not typically happen, but if it does simply chain
-	 * the two requests. then they will be moved to the dispatch list
-	 * at the same time
-	 */
-	list_add(&drq->request->queuelist, &__alias->request->queuelist);
-	return 1;
+	deadline_move_to_dispatch(dd, __alias);
+	goto retry;
 }
 
 static inline void
@@ -276,13 +274,12 @@ deadline_add_request(struct deadline_data *dd, struct deadline_rq *drq)
 {
 	const int data_dir = rq_data_dir(drq->request);
 
-	if (!deadline_add_drq_rb(dd, drq)) {
-		/*
-		 * set expire time (only used for reads) and add to fifo list
-		 */
-		drq->expires = jiffies + dd->fifo_expire[data_dir];
-		list_add_tail(&drq->fifo, &dd->fifo_list[data_dir]);
-	}
+	deadline_add_drq_rb(dd, drq);
+	/*
+	 * set expire time (only used for reads) and add to fifo list
+	 */
+	drq->expires = jiffies + dd->fifo_expire[data_dir];
+	list_add_tail(&drq->fifo, &dd->fifo_list[data_dir]);
 }
 
 /*
@@ -299,6 +296,9 @@ static void deadline_remove_request(request_queue_t *q, struct request *rq)
 		deadline_del_drq_hash(drq);
 		deadline_del_drq_rb(dd, drq);
 	}
+
+	if (q->last_merge == &rq->queuelist)
+		q->last_merge = NULL;
 
 	list_del_init(&rq->queuelist);
 }
@@ -425,8 +425,9 @@ deadline_merged_requests(request_queue_t *q, struct request *req,
 static inline void
 deadline_move_to_dispatch(struct deadline_data *dd, struct deadline_rq *drq)
 {
-	deadline_del_drq_rb(dd, drq);
-	list_del_init(&drq->fifo);
+	request_queue_t *q = drq->request->q;
+
+	deadline_remove_request(q, drq->request);
 	list_add_tail(&drq->request->queuelist, dd->dispatch);
 }
 

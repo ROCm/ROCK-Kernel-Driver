@@ -2805,7 +2805,7 @@ static void epcaparam(struct tty_struct *tty, struct channel *ch)
 		ch->fepstopc = ch->stopc;
 
 		/* ------------------------------------------------------------
-			The XON / XOFF characters have changed; propogate these
+			The XON / XOFF characters have changed; propagate these
 			changes to the card.	
 		--------------------------------------------------------------- */
 
@@ -2819,7 +2819,7 @@ static void epcaparam(struct tty_struct *tty, struct channel *ch)
 
 		/* ---------------------------------------------------------------
 			Similar to the above, this time the auxilarly XON / XOFF 
-			characters have changed; propogate these changes to the card.
+			characters have changed; propagate these changes to the card.
 		------------------------------------------------------------------ */
 
 		fepcmd(ch, SAUXONOFFC, ch->fepstartca, ch->fepstopca, 0, 1);

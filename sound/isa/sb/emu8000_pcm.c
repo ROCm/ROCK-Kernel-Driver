@@ -592,7 +592,7 @@ static int emu8k_pcm_hw_params(snd_pcm_substream_t *subs,
 		return -ENOMEM;
 	rec->offset = EMU8000_DRAM_OFFSET + (rec->block->offset >> 1); /* in word */
 	/* at least dma_bytes must be set for non-interleaved mode */
-	subs->dma_bytes = params_buffer_bytes(hw_params);
+	subs->dma_buffer.bytes = params_buffer_bytes(hw_params);
 
 	return 0;
 }

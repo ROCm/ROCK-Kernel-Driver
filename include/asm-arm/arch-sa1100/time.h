@@ -67,7 +67,7 @@ static unsigned long sa1100_gettimeoffset (void)
  * We will be entered with IRQs enabled.
  *
  * Loop until we get ahead of the free running timer.
- * This ensures an exact clock tick count and time acuracy.
+ * This ensures an exact clock tick count and time accuracy.
  * IRQs are disabled inside the loop to ensure coherence between
  * lost_ticks (updated in do_timer()) and the match reg value, so we
  * can use do_gettimeofday() from interrupt handlers.

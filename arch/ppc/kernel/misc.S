@@ -1273,8 +1273,8 @@ _GLOBAL(sys_call_table)
 	.long sys_io_getevents
 	.long sys_io_submit	/* 230 */
 	.long sys_io_cancel
-	.long sys_ni_syscall	/* reserved for alloc_hugepages */
-	.long sys_ni_syscall	/* reserved for free_hugepages */
+	.long sys_set_tid_address
+	.long sys_fadvise64
 	.long sys_exit_group
 	.long sys_lookup_dcookie /* 235 */
 	.long sys_epoll_create

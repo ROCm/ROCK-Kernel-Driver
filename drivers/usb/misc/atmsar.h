@@ -58,7 +58,6 @@ struct atmsar_vcc_data {
 	int type;
 
 	/* connection specific non-atmsar data */
-	struct sk_buff *(*alloc_tx) (struct atm_vcc * vcc, unsigned int size);
 	struct atm_vcc *vcc;
 	struct k_atm_aal_stats *stats;
 	unsigned short mtu;	/* max is actually  65k for AAL5... */
@@ -81,15 +80,8 @@ extern struct atmsar_vcc_data *atmsar_open (struct atmsar_vcc_data **list, struc
 					    unchar gfc, uint flags);
 extern void atmsar_close (struct atmsar_vcc_data **list, struct atmsar_vcc_data *vcc);
 
-extern struct sk_buff *atmsar_encode_rawcell (struct atmsar_vcc_data *ctx, struct sk_buff *skb);
-extern struct sk_buff *atmsar_encode_aal5 (struct atmsar_vcc_data *ctx, struct sk_buff *skb);
-
 struct sk_buff *atmsar_decode_rawcell (struct atmsar_vcc_data *list, struct sk_buff *skb,
 				       struct atmsar_vcc_data **ctx);
 struct sk_buff *atmsar_decode_aal5 (struct atmsar_vcc_data *ctx, struct sk_buff *skb);
-
-struct sk_buff *atmsar_alloc_tx (struct atmsar_vcc_data *vcc, unsigned int size);
-
-unsigned int atmsar_encode (struct atmsar_vcc_data *ctx, char *source, char *target, unsigned int pdu_length);
 
 #endif				/* _ATMSAR_H_ */

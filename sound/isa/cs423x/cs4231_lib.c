@@ -392,26 +392,34 @@ void snd_cs4231_mce_down(cs4231_t *chip)
 #if 0
 	printk("(2) timeout = %i, jiffies = %li\n", timeout, jiffies);
 #endif
-	time = HZ / 4;
+	timeout = HZ / 4 / 2;
+	time = 2;
 	while (snd_cs4231_in(chip, CS4231_TEST_INIT) & CS4231_CALIB_IN_PROGRESS) {
-		if (time <= 0) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		time = schedule_timeout(time);
+		if (time > 0)
+			continue;
+		time = 2;
+		if (--timeout < 0) {
 			snd_printk("mce_down - auto calibration time out (2)\n");
 			return;
 		}
-		set_current_state(TASK_INTERRUPTIBLE);
-		time = schedule_timeout(time);
 	}
 #if 0
 	printk("(3) jiffies = %li\n", jiffies);
 #endif
-	time = HZ / 10;
+	timeout = HZ / 10 / 2;
+	time = 2;
 	while (cs4231_inb(chip, CS4231P(REGSEL)) & CS4231_INIT) {
-		if (time <= 0) {
+		set_current_state(TASK_INTERRUPTIBLE);		
+		time = schedule_timeout(time);
+		if (time > 0)
+			continue;
+		time = 2;
+		if (--timeout < 0) {
 			snd_printk(KERN_ERR "mce_down - auto calibration time out (3)\n");
 			return;
 		}
-		set_current_state(TASK_INTERRUPTIBLE);		
-		time = schedule_timeout(time);
 	}
 #if 0
 	printk("(4) jiffies = %li\n", jiffies);
@@ -575,6 +583,7 @@ static void snd_cs4231_playback_format(cs4231_t *chip,
 			snd_cs4231_out(chip, CS4231_ALT_FEATURE_1, chip->image[CS4231_ALT_FEATURE_1] | 0x10);
 			snd_cs4231_out(chip, CS4231_PLAYBK_FORMAT, chip->image[CS4231_PLAYBK_FORMAT] = pdfr);
 			snd_cs4231_out(chip, CS4231_ALT_FEATURE_1, chip->image[CS4231_ALT_FEATURE_1] &= ~0x10);
+			udelay(100); /* Fixes audible clicks at least on GUS MAX */
 			full_calib = 0;
 		}
 		spin_unlock_irqrestore(&chip->reg_lock, flags);
@@ -1455,6 +1464,7 @@ const char *snd_cs4231_chip_id(cs4231_t *chip)
 	case CS4231_HW_CS4232:	return "CS4232";
 	case CS4231_HW_CS4232A:	return "CS4232A";
 	case CS4231_HW_CS4235:	return "CS4235";
+	case CS4231_HW_CS4236:  return "CS4236";
 	case CS4231_HW_CS4236B: return "CS4236B";
 	case CS4231_HW_CS4237B: return "CS4237B";
 	case CS4231_HW_CS4238B: return "CS4238B";

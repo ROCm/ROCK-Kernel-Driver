@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/intv.S -- Interrupt vectors
  *
- *  Copyright (C) 2001,02  NEC Corporation
- *  Copyright (C) 2001,02  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -40,22 +40,19 @@
 	/* Generic interrupt vectors.  */
 	.section	.intv.common, "ax"
 	.balign	0x10
-	JUMP_TO_HANDLER (nmi, NMI_ENTRY_SP)	// NMI0
+	JUMP_TO_HANDLER (nmi, NMI_ENTRY_SP)	// 0x10 - NMI0
 	.balign	0x10
-	JUMP_TO_HANDLER (nmi, NMI_ENTRY_SP)	// NMI1
+	JUMP_TO_HANDLER (nmi, NMI_ENTRY_SP)	// 0x20 - NMI1
 	.balign	0x10
-	JUMP_TO_HANDLER (nmi, NMI_ENTRY_SP)	// NMI2
+	JUMP_TO_HANDLER (nmi, NMI_ENTRY_SP)	// 0x30 - NMI2
 	
 	.balign	0x10
-	JUMP_TO_HANDLER (trap, ENTRY_SP)	// TRAP0n
+	JUMP_TO_HANDLER (trap, ENTRY_SP)	// 0x40 - TRAP0n
 	.balign	0x10
-	JUMP_TO_HANDLER (trap, ENTRY_SP)	// TRAP1n
+	JUMP_TO_HANDLER (trap, ENTRY_SP)	// 0x50 - TRAP1n
 
 	.balign	0x10
-	JUMP_TO_HANDLER (irq, ENTRY_SP)		// illegal insn trap
-
-	.balign	0x10
-	JUMP_TO_HANDLER (irq, ENTRY_SP)		// DBTRAP insn
+	JUMP_TO_HANDLER (dbtrap, ENTRY_SP)	// 0x60 - Illegal op / DBTRAP insn
 
 
 	/* Hardware interrupt vectors.  */

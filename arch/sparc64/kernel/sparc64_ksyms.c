@@ -374,8 +374,3 @@ EXPORT_SYMBOL(do_BUG);
 
 /* for ns8703 */
 EXPORT_SYMBOL(ns87303_lock);
-
-#ifdef CONFIG_PROFILING
-EXPORT_SYMBOL_GPL(register_profile_notifier);
-EXPORT_SYMBOL_GPL(unregister_profile_notifier);
-#endif

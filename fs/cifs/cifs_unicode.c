@@ -69,7 +69,6 @@ cifs_strfromUCS_le(char *to, const wchar_t * from,	/* LITTLE ENDIAN */
 		}
 	}
 	to[outlen] = 0;
-	cEVENT(0, ("cifs_strfromUCS returning %d - '%s'\n", outlen, to));
 	return outlen;
 }
 
@@ -86,15 +85,13 @@ cifs_strtoUCS(wchar_t * to, const char *from, int len,
 	int charlen;
 	int i;
 
-	cEVENT(0, ("cifs_strtoUCS - '%s'\n", from));
-
 	for (i = 0; len && *from; i++, from += charlen, len -= charlen) {
 
 		/* works for 2.4.0 kernel or later */
 		charlen = codepage->char2uni(from, len, &to[i]);
 		if (charlen < 1) {
 			cERROR(1,
-			       ("cifs_strtoUCS: char2uni returned %d.\n",
+			       ("cifs_strtoUCS: char2uni returned %d",
 				charlen));
 			to[i] = cpu_to_le16(0x003f);	/* a question mark */
 			charlen = 1;
@@ -102,8 +99,6 @@ cifs_strtoUCS(wchar_t * to, const char *from, int len,
 		to[i] = cpu_to_le16(to[i]);
 
 	}
-
-	cEVENT(0, (" returning %d\n", i));
 
 	to[i] = 0;
 	return i;

@@ -119,6 +119,39 @@ int profile_event_unregister(enum profile_type type, struct notifier_block * n)
 	return err;
 }
 
+static struct notifier_block * profile_listeners;
+static rwlock_t profile_lock = RW_LOCK_UNLOCKED;
+ 
+int register_profile_notifier(struct notifier_block * nb)
+{
+	int err;
+	write_lock_irq(&profile_lock);
+	err = notifier_chain_register(&profile_listeners, nb);
+	write_unlock_irq(&profile_lock);
+	return err;
+}
+
+
+int unregister_profile_notifier(struct notifier_block * nb)
+{
+	int err;
+	write_lock_irq(&profile_lock);
+	err = notifier_chain_unregister(&profile_listeners, nb);
+	write_unlock_irq(&profile_lock);
+	return err;
+}
+
+
+void profile_hook(struct pt_regs * regs)
+{
+	read_lock(&profile_lock);
+	notifier_call_chain(&profile_listeners, 0, regs);
+	read_unlock(&profile_lock);
+}
+
+EXPORT_SYMBOL_GPL(register_profile_notifier);
+EXPORT_SYMBOL_GPL(unregister_profile_notifier);
+
 #endif /* CONFIG_PROFILING */
 
 EXPORT_SYMBOL_GPL(profile_event_register);

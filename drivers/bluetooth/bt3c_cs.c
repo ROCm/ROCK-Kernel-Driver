@@ -24,18 +24,14 @@
 #include <linux/config.h>
 #include <linux/module.h>
 
-#define __KERNEL_SYSCALLS__
-
 #include <linux/kernel.h>
 #include <linux/kmod.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/sched.h>
-#include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/errno.h>
-#include <linux/unistd.h>
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
@@ -405,7 +401,6 @@ void bt3c_interrupt(int irq, void *dev_inst, struct pt_regs *regs)
 
 
 
-
 /* ======================== HCI interface ======================== */
 
 
@@ -489,65 +484,23 @@ static int bt3c_hci_ioctl(struct hci_dev *hdev, unsigned int cmd, unsigned long 
 
 
 #define FW_LOADER  "/sbin/bluefw"
-static int errno;
-
-
-static int bt3c_fw_loader_exec(void *dev)
-{
-	char *argv[] = { FW_LOADER, "pccard", dev, NULL };
-	char *envp[] = { "HOME=/", "TERM=linux", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
-	int err;
-
-	err = exec_usermodehelper(FW_LOADER, argv, envp);
-	if (err)
-		printk(KERN_WARNING "bt3c_cs: Failed to exec \"%s pccard %s\".\n", FW_LOADER, (char *)dev);
-
-	return err;
-}
 
 
 static int bt3c_firmware_load(bt3c_info_t *info)
 {
-	sigset_t tmpsig;
 	char dev[16];
-	pid_t pid;
-	int result;
+	int err;
 
-	/* Check if root fs is mounted */
-	if (!current->fs->root) {
-		printk(KERN_WARNING "bt3c_cs: Root filesystem is not mounted.\n");
-		return -EPERM;
-	}
+	char *argv[] = { FW_LOADER, "pccard", dev, NULL };
+	char *envp[] = { "HOME=/", "TERM=linux", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
 
 	sprintf(dev, "%04x", info->link.io.BasePort1);
 
-	pid = kernel_thread(bt3c_fw_loader_exec, (void *)dev, 0);
-	if (pid < 0) {
-		printk(KERN_WARNING "bt3c_cs: Forking of kernel thread failed (errno=%d).\n", -pid);
-		return pid;
-	}
+	err = call_usermodehelper(FW_LOADER, argv, envp, 1);
+	if (err)
+		printk(KERN_WARNING "bt3c_cs: Failed to run \"%s pccard %s\" (errno=%d).\n", FW_LOADER, dev, err);
 
-	/* Block signals, everything but SIGKILL/SIGSTOP */
-	spin_lock_irq(&current->sighand->siglock);
-	tmpsig = current->blocked;
-	siginitsetinv(&current->blocked, sigmask(SIGKILL) | sigmask(SIGSTOP));
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	result = waitpid(pid, NULL, __WCLONE);
-
-	/* Allow signals again */
-	spin_lock_irq(&current->sighand->siglock);
-	current->blocked = tmpsig;
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	if (result != pid) {
-		printk(KERN_WARNING "bt3c_cs: Waiting for pid %d failed (errno=%d).\n", pid, -result);
-		return -result;
-	}
-
-	return 0;
+	return err;
 }
 
 

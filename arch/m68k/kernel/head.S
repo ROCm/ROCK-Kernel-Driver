@@ -92,7 +92,7 @@
  *	mmu_map was written for two key reasons.  First, it was clear
  * that it was very difficult to read the previous code for mapping
  * regions of memory.  Second, the Macintosh required such extensive
- * memory allocations that it didn't make sense to propogate the
+ * memory allocations that it didn't make sense to propagate the
  * existing code any further.
  *	mmu_map requires some parameters:
  *

@@ -797,7 +797,7 @@ cbq_update(struct cbq_sched_data *q)
 			   That is not all.
 			   To maintain the rate allocated to the class,
 			   we add to undertime virtual clock,
-			   necesary to complete transmitted packet.
+			   necessary to complete transmitted packet.
 			   (len/phys_bandwidth has been already passed
 			   to the moment of cbq_update)
 			 */

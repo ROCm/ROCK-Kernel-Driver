@@ -1,5 +1,5 @@
 /* 
- * sys32.S: I-cache tricks for 32-bit compatability layer simple
+ * sys32.S: I-cache tricks for 32-bit compatibility layer simple
  *          conversions.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -289,8 +289,7 @@ _STATIC(do_efault)
 	li	r3,-EFAULT
 	blr
 
-	.data
-	.align	8
+	.balign	8
 _GLOBAL(socketcall_table_begin)
 	.llong		.do_sys_socket
 	.llong		.do_sys_bind

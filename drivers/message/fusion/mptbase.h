@@ -603,7 +603,7 @@ typedef struct _MPT_ADAPTER
 	dma_addr_t		 sense_buf_pool_dma;
 	u32			 sense_buf_low_dma;
 	int			 mtrr_reg;
-	void			*pcidev;	/* struct pci_dev pointer */
+	struct pci_dev		*pcidev;
 	u8			*memmap;	/* mmap address */
 	struct Scsi_Host	*sh;		/* Scsi Host pointer */
 	ScsiCfgData		spi_data;	/* Scsi config. data */

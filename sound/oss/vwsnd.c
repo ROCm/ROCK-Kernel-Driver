@@ -144,14 +144,12 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#include <linux/sched.h>
-#include <linux/semaphore.h>
-#include <linux/stddef.h>
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
-#include <asm/fixmap.h>
-#include <asm/cobalt.h>
+#include <linux/wait.h>
+#include <linux/interrupt.h>
 #include <asm/semaphore.h>
+#include <asm/mach-visws/cobalt.h>
 
 #include "sound_config.h"
 
@@ -256,7 +254,7 @@ typedef struct lithium {
  * Returns 0 on success, -errno on failure.
  */
 
-static int li_create(lithium_t *lith, unsigned long baseaddr)
+static int __init li_create(lithium_t *lith, unsigned long baseaddr)
 {
 	static void li_destroy(lithium_t *);
 
@@ -3040,15 +3038,15 @@ static int vwsnd_audio_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations vwsnd_audio_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		vwsnd_audio_read,
-	write:		vwsnd_audio_write,
-	poll:		vwsnd_audio_poll,
-	ioctl:		vwsnd_audio_ioctl,
-	mmap:		vwsnd_audio_mmap,
-	open:		vwsnd_audio_open,
-	release:	vwsnd_audio_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.read =		vwsnd_audio_read,
+	.write =	vwsnd_audio_write,
+	.poll =		vwsnd_audio_poll,
+	.ioctl =	vwsnd_audio_ioctl,
+	.mmap =		vwsnd_audio_mmap,
+	.open =		vwsnd_audio_open,
+	.release =	vwsnd_audio_release,
 };
 
 /*****************************************************************************/
@@ -3230,11 +3228,11 @@ static int vwsnd_mixer_ioctl(struct inode *ioctl,
 }
 
 static struct file_operations vwsnd_mixer_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	ioctl:		vwsnd_mixer_ioctl,
-	open:		vwsnd_mixer_open,
-	release:	vwsnd_mixer_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.ioctl =	vwsnd_mixer_ioctl,
+	.open =		vwsnd_mixer_open,
+	.release =	vwsnd_mixer_release,
 };
 
 /*****************************************************************************/
@@ -3281,7 +3279,8 @@ static int __init probe_vwsnd(struct address_info *hw_config)
 		return 0;
 	}
 
-	printk(KERN_INFO "probe_vwsnd: lithium audio found\n");
+	printk(KERN_INFO "vwsnd: lithium audio at mmio %#x irq %d\n",
+		hw_config->io_base, hw_config->irq);
 
 	return 1;
 }
@@ -3309,7 +3308,7 @@ static int __init attach_vwsnd(struct address_info *hw_config)
 	if (err)
 		goto fail1;
 
-	init_waitqueue(&devc->open_wait);
+	init_waitqueue_head(&devc->open_wait);
 
 	devc->rport.hwbuf_size = HWBUF_SIZE;
 	devc->rport.hwbuf_vaddr = __get_free_pages(GFP_KERNEL, HWBUF_ORDER);
@@ -3378,18 +3377,18 @@ static int __init attach_vwsnd(struct address_info *hw_config)
 
 	/* Initialize as much of *devc as possible */
 
-	devc->open_sema = MUTEX;
-	devc->io_sema = MUTEX;
-	devc->mix_sema = MUTEX;
+	init_MUTEX(&devc->open_sema);
+	init_MUTEX(&devc->io_sema);
+	init_MUTEX(&devc->mix_sema);
 	devc->open_mode = 0;
 	devc->rport.lock = SPIN_LOCK_UNLOCKED;
-	init_waitqueue(&devc->rport.queue);
+	init_waitqueue_head(&devc->rport.queue);
 	devc->rport.swstate = SW_OFF;
 	devc->rport.hwstate = HW_STOPPED;
 	devc->rport.flags = 0;
 	devc->rport.swbuf = NULL;
 	devc->wport.lock = SPIN_LOCK_UNLOCKED;
-	init_waitqueue(&devc->wport.queue);
+	init_waitqueue_head(&devc->wport.queue);
 	devc->wport.swstate = SW_OFF;
 	devc->wport.hwstate = HW_STOPPED;
 	devc->wport.flags = 0;
@@ -3468,8 +3467,9 @@ static int __init init_vwsnd(void)
 	DBGXV("\n");
 	DBGXV("sound::vwsnd::init_module()\n");
 
-	if(!probe_vwsnd(&the_hw_config))
+	if (!probe_vwsnd(&the_hw_config))
 		return -ENODEV;
+
 	err = attach_vwsnd(&the_hw_config);
 	if (err < 0)
 		return err;

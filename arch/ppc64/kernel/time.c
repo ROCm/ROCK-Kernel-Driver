@@ -110,11 +110,8 @@ static inline void ppc64_do_profile(struct pt_regs *regs)
 	unsigned long nip;
 	extern unsigned long prof_cpu_mask;
 	extern char _stext;
-#ifdef CONFIG_PROFILING
-	extern void ppc64_profile_hook(struct pt_regs *);
 
-	ppc64_profile_hook(regs);
-#endif
+	profile_hook(regs);
 
 	if (user_mode(regs))
 		return;
@@ -267,7 +264,6 @@ int timer_interrupt(struct pt_regs * regs)
 	unsigned long cur_tb;
 	struct paca_struct *lpaca = get_paca();
 	unsigned long cpu = lpaca->xPacaIndex;
-	struct ItLpQueue * lpq;
 
 	irq_enter();
 
@@ -301,9 +297,11 @@ int timer_interrupt(struct pt_regs * regs)
 	set_dec(next_dec);
 
 #ifdef CONFIG_PPC_ISERIES
-	lpq = lpaca->lpQueuePtr;
-	if (lpq && ItLpQueue_isLpIntPending(lpq))
-		lpEvent_count += ItLpQueue_process(lpq, regs); 
+	{
+		struct ItLpQueue *lpq = lpaca->lpQueuePtr;
+		if (lpq && ItLpQueue_isLpIntPending(lpq))
+			lpEvent_count += ItLpQueue_process(lpq, regs);
+	}
 #endif
 
 	irq_exit();

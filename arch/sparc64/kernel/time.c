@@ -88,11 +88,8 @@ void sparc64_do_profile(struct pt_regs *regs)
 {
 	unsigned long pc = regs->tpc;
 	unsigned long o7 = regs->u_regs[UREG_RETPC];
-#ifdef CONFIG_PROFILING
-	extern void sparc64_profile_hook(struct pt_regs *);
 
-	sparc64_profile_hook(regs);
-#endif
+	profile_hook(regs);
 
 	if (user_mode(regs))
 		return;

@@ -440,7 +440,7 @@ ia32_sys_call_table:
 	.quad sys_fremovexattr
 	.quad sys_tkill		/* 238 */ 
 	.quad sys_sendfile64 
-	.quad sys32_futex		/* 240 */
+	.quad compat_sys_futex		/* 240 */
         .quad sys32_sched_setaffinity
         .quad sys32_sched_getaffinity
 	.quad sys_set_thread_area

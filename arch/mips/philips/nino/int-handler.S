@@ -72,7 +72,7 @@ high_priority:
 		nop
 
 /*
- * Ok, we've got one of over a hundred other interupts.
+ * Ok, we've got one of over a hundred other interrupts.
  */
 low_priority:
 		lui	t0, %hi(IntStatus1)

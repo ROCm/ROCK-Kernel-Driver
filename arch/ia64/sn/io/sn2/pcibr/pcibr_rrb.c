@@ -272,7 +272,7 @@ do_pcibr_rrb_free(bridge_t *bridge,
 	    * the old do_pcibr_rrb_free() code only clears the enable bit
 	    * but I say we should clear the whole rrb (ie):
 	    *	  reg = reg & ~(RRB_MASK << (RRB_SIZE * rrb_index));
-	    * But to be compatable with old code we'll only clear enable.
+	    * But to be compatible with old code we'll only clear enable.
 	    */
 	    reg = reg & ~(RRB_ENABLE_BIT(bridge) << (RRB_SIZE * rrb_index));
 	    clr = clr | (enable_bit << (RRB_SIZE * rrb_index));

@@ -11,11 +11,10 @@
  * Copyright (C) 1998  D. Jeff Dionne <jeff@uclinux.org>,
  *
  */
-#define ASSEMBLY
 #include <linux/config.h>
 
 .global _stext
-.global __bss_start
+.global _sbss
 .global _start
 
 .global _rambase
@@ -26,7 +25,6 @@
 
 .global _quicc_base
 .global _periph_base
-.global _dprbase
 
 #define REGB                        0x1000
 #define PEPAR                       (_dprbase + REGB + 0x0016)
@@ -78,7 +76,6 @@
 #define SIM_OR0_MASK                0x20000000
 #define SIM_BR0_MASK                0x00000001
 
-
 /* Defines for chip select one - the RAM */
 #define SIM_OR1_MASK                0x10000000
 #define SIM_BR1_MASK                0x00000001
@@ -107,66 +104,66 @@
 #include <asm/m68360_regs.h>
 
 	
-/* By the time this RAM specific code begins to execute, DPRAM
- * and DRAM should already be mapped and accessible. */
+/*
+ * By the time this RAM specific code begins to execute, DPRAM
+ * and DRAM should already be mapped and accessible.
+ */
 
 	.text
 _start:
 _stext:
-    nop
-    ori.w   #MCU_DISABLE_INTRPTS,   %sr     /* disable interrupts: */
-    /* We should not need to setup the boot stack the reset should do it. */
-    movea.l	#_boot_stack,           %sp     /*set up stack at the end of DRAM:*/
+	nop
+	ori.w	#MCU_DISABLE_INTRPTS, %sr	/* disable interrupts: */
+	/* We should not need to setup the boot stack the reset should do it. */
+	movea.l	#__ramend, %sp		/* set up stack at the end of DRAM:*/
 
 
 set_mbar_register:
-    moveq.l #0x07,                  %d1     /* Setup MBAR */
-    movec	%d1,                    %dfc
+	moveq.l	#0x07, %d1			/* Setup MBAR */
+	movec	%d1, %dfc
 
-    lea.l   MCU_SIM_MBAR_ADRS,      %a0
-    move.l  #_dprbase,              %d0
-    andi.l  #MCU_SIM_MBAR_BA_MASK,  %d0
-    ori.l   #MCU_SIM_MBAR_AS_MASK,  %d0
-    moves.l %d0,                    %a0@
+	lea.l	MCU_SIM_MBAR_ADRS, %a0
+	move.l	#_dprbase, %d0
+	andi.l	#MCU_SIM_MBAR_BA_MASK, %d0
+	ori.l	#MCU_SIM_MBAR_AS_MASK, %d0
+	moves.l	%d0, %a0@
 
-    moveq.l #0x05,                  %d1
-    movec.l %d1,                    %dfc
+	moveq.l	#0x05, %d1
+	movec.l	%d1, %dfc
 
-/* Now we can begin to access registers in DPRAM */
+	/* Now we can begin to access registers in DPRAM */
 
 set_sim_mcr:
-    /* Set Module Configuration Register */
-    move.l  #MCU_SIM_MCR,           MCR
+	/* Set Module Configuration Register */
+	move.l	#MCU_SIM_MCR, MCR
 
-/* to do:	Determine cause of reset */
+	/* to do:	Determine cause of reset */
 
-
-    /*
-    *       configure system clock MC68360 p. 6-40
-    *       (value +1)*osc/128 = system clock
-    *                    or
-    *       (value + 1)*osc = system clock
-    *       You do not need to divide the oscillator by 128 unless you want to.
-    */
+	/*
+	 *	configure system clock MC68360 p. 6-40
+	 *	(value +1)*osc/128 = system clock
+	 *                    or
+	 *	(value + 1)*osc = system clock
+	 *	You do not need to divide the oscillator by 128 unless you want to.
+	 */
 set_sim_clock:
-    move.w  #MCU_SIM_PLLCR,         PLLCR
-    move.b  #MCU_SIM_CLKOCR,        CLKOCR
-    move.w  #MCU_SIM_CDVCR,         CDVCR
+	move.w	#MCU_SIM_PLLCR, PLLCR
+	move.b	#MCU_SIM_CLKOCR, CLKOCR
+	move.w	#MCU_SIM_CDVCR, CDVCR
 
-    // Wait for the PLL to settle
-    move.w      #16384, %d0
+	/* Wait for the PLL to settle */
+	move.w	#16384, %d0
 pll_settle_wait:
-    subi.w       #1, %d0
-    bne	pll_settle_wait
+	subi.w	#1, %d0
+	bne	pll_settle_wait
 
-    /* Setup the system protection register, and watchdog timer register */
+	/* Setup the system protection register, and watchdog timer register */
+	move.b	#MCU_SIM_SWIV, SWIV
+	move.w	#MCU_SIM_PICR, PICR
+	move.w	#MCU_SIM_PITR, PITR
+	move.w	#MCU_SIM_SYPCR, SYPCR
 
-    move.b      #MCU_SIM_SWIV,      SWIV
-    move.w      #MCU_SIM_PICR,      PICR
-    move.w      #MCU_SIM_PITR,      PITR
-    move.w      #MCU_SIM_SYPCR,     SYPCR
-
-/* Clear DPRAM - system + parameter */
+	/* Clear DPRAM - system + parameter */
 	movea.l	#_dprbase, %a0
 	movea.l	#_dprbase+0x2000, %a1
 
@@ -177,65 +174,63 @@ clear_dpram:
 	bhi	clear_dpram
 
 configure_memory_controller:    
-    /*
-    *   Set up Global Memory Register (GMR)
-    */
-    move.l      #MCU_SIM_GMR,   %d0
-    move.l      %d0, GMR
+	/* Set up Global Memory Register (GMR) */
+	move.l	#MCU_SIM_GMR, %d0
+	move.l	%d0, GMR
 
 configure_chip_select_0:
-    move.l      #0x00400000,    %d0
-    subq.l      #0x01,          %d0
-    eori.l      #SIM_OR_MASK,   %d0
-    ori.l       #SIM_OR0_MASK,  %d0
-    move.l      %d0,            OR0
+	move.l	#0x00400000, %d0
+	subq.l	#0x01, %d0
+	eori.l	#SIM_OR_MASK, %d0
+	ori.l	#SIM_OR0_MASK, %d0
+	move.l	%d0, OR0
 
-    move.l      #__flashstart,  %d0
-    ori.l       #SIM_BR0_MASK,  %d0
-    move.l      %d0,            BR0
+	move.l	#__rom_start, %d0
+	ori.l	#SIM_BR0_MASK, %d0
+	move.l	%d0, BR0
 
-    move.l      #0x0,           BR1
-    move.l      #0x0,           BR2
-    move.l      #0x0,           BR3
-    move.l      #0x0,           BR4
-    move.l      #0x0,           BR5
-    move.l      #0x0,           BR6
-    move.l      #0x0,           BR7
+	move.l	#0x0, BR1
+	move.l	#0x0, BR2
+	move.l	#0x0, BR3
+	move.l	#0x0, BR4
+	move.l	#0x0, BR5
+	move.l	#0x0, BR6
+	move.l	#0x0, BR7
 
-    move.w      #MCU_SIM_PEPAR, PEPAR 
+	move.w	#MCU_SIM_PEPAR, PEPAR 
 
-/* point to vector table: */
-    move.l  #_romvec,   %a0
-    move.l	#_ramvec,   %a1
+	/* point to vector table: */
+	move.l	#_romvec, %a0
+	move.l	#_ramvec, %a1
 copy_vectors:
-    move.l  %a0@,       %d0
-    move.l  %d0,        %a1@
-    move.l  %a0@,       %a1@
-    addq.l  #0x04,      %a0
-    addq.l  #0x04,      %a1
-    cmp.l   #_start,    %a0
-    blt     copy_vectors
+	move.l	%a0@, %d0
+	move.l	%d0, %a1@
+	move.l	%a0@, %a1@
+	addq.l	#0x04, %a0
+	addq.l	#0x04, %a1
+	cmp.l	#_start, %a0
+	blt	copy_vectors
 
-    move.l	#_ramvec, %a1
-    movec	%a1, %vbr
+	move.l	#_ramvec, %a1
+	movec	%a1, %vbr
 
 
 	/* Copy data segment from ROM to RAM */
-	moveal	#__data_rom_start, %a0
-	moveal	#__data_start, %a1
-	moveal	#__data_end, %a2
+	moveal	#_etext, %a0
+	moveal	#_sdata, %a1
+	moveal	#_edata, %a2
 
 	/* Copy %a0 to %a1 until %a1 == %a2 */
 LD1:
-    move.l  %a0@,   %d0
-    addq.l  #0x04,  %a0
-    move.l  %d0,    %a1@
-    addq.l  #0x04,  %a1
-    cmp.l   #__data_end,    %a1
-    blt     LD1
+	move.l	%a0@, %d0
+	addq.l	#0x04, %a0
+	move.l	%d0, %a1@
+	addq.l	#0x04, %a1
+	cmp.l	#_edata, %a1
+	blt	LD1
 
-	moveal	#__bss_start, %a0
-	moveal	#end, %a1
+	moveal	#_sbss, %a0
+	moveal	#_ebss, %a1
 
 	/* Copy 0 to %a0 until %a0 == %a1 */
 L1:
@@ -244,21 +239,21 @@ L1:
 	bhi	L1
 
 load_quicc:
-    move.l  #_dprbase,  _quicc_base
+	move.l	#_dprbase, _quicc_base
 
 store_ram_size:
-    /* Set ram size information */
-    move.l  #_sdata,    _rambase
-    move.l  #end,       _ramstart
-    move.l  #__ramend,  %d0
-    sub.l   #0x1000,    %d0     /* Reserve 4K for stack space.*/
-    move.l  %d0,        _ramend /* Different from __ramend.*/
+	/* Set ram size information */
+	move.l	#_sdata, _rambase
+	move.l	#_ebss, _ramstart
+	move.l	#__ramend, %d0
+	sub.l	#0x1000, %d0			/* Reserve 4K for stack space.*/
+	move.l	%d0, _ramend			/* Different from __ramend.*/
 
 store_flash_size:
-    /* Set rom size information */
-    move.l  #__flashend,    %d0
-    sub.l   #__flashstart,  %d0
-    move.l  %d0,            rom_length
+	/* Set rom size information */
+	move.l	#__rom_end, %d0
+	sub.l	#__rom_start, %d0
+	move.l	%d0, rom_length
     
 	pea	0
 	pea	env
@@ -269,17 +264,14 @@ store_flash_size:
 	lea	0x2000(%a2), %sp
 
 lp:
-    jsr	start_kernel
- /*   jmp lp */
+	jsr	start_kernel
 
 _exit:
-
 	jmp	_exit
 
 
-
 	.data
-    .align 4
+	.align 4
 env:
 	.long	0
 _quicc_base:
@@ -287,13 +279,17 @@ _quicc_base:
 _periph_base:
 	.long	0
 _ramvec:
-    .long   0
+	.long   0
 _rambase:
-    .long   0
+	.long   0
 _ramstart:
-    .long   0
+	.long   0
 _ramend:
-    .long   0
+	.long   0
+_dprbase:
+	.long	0xffffe000
+
+
 	.text
 
     /*
@@ -302,7 +298,7 @@ _ramend:
      */
  
 .section ".data.initvect","awx"
-    .long   _boot_stack /* Reset: Initial Stack Pointer                 - 0.  */
+    .long   __ramend	/* Reset: Initial Stack Pointer                 - 0.  */
     .long   _start      /* Reset: Initial Program Counter               - 1.  */
     .long   buserr      /* Bus Error                                    - 2.  */
     .long   trap        /* Address Error                                - 3.  */
