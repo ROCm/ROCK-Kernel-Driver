@@ -979,19 +979,26 @@ irqreturn_t snd_cs4231_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}		
 	if (chip->single_dma && chip->hardware != CS4231_HW_INTERWAVE) {
 		if (status & CS4231_PLAYBACK_IRQ) {
-			if (chip->mode & CS4231_MODE_PLAY)
-				snd_pcm_period_elapsed(chip->playback_substream);
+			if (chip->mode & CS4231_MODE_PLAY) {
+				if (chip->playback_substream)
+					snd_pcm_period_elapsed(chip->playback_substream);
+			}
 			if (chip->mode & CS4231_MODE_RECORD) {
-				snd_cs4231_overrange(chip);
-				snd_pcm_period_elapsed(chip->capture_substream);
+				if (chip->capture_substream) {
+					snd_cs4231_overrange(chip);
+					snd_pcm_period_elapsed(chip->capture_substream);
+				}
 			}
 		}
 	} else {
-		if (status & CS4231_PLAYBACK_IRQ)
-			snd_pcm_period_elapsed(chip->playback_substream);
+		if (status & CS4231_PLAYBACK_IRQ) {
+			if (chip->playback_substream)
+				snd_pcm_period_elapsed(chip->playback_substream);
 		if (status & CS4231_RECORD_IRQ) {
-			snd_cs4231_overrange(chip);
-			snd_pcm_period_elapsed(chip->capture_substream);
+			if (chip->capture_substream) {
+				snd_cs4231_overrange(chip);
+				snd_pcm_period_elapsed(chip->capture_substream);
+			}
 		}
 	}
 
