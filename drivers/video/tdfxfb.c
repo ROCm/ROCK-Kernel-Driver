@@ -168,7 +168,6 @@ static int banshee_wait_idle(struct fb_info *info);
 static void tdfxfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect);
 static void tdfxfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);  
 static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image); 
-static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor);
 #endif /* CONFIG_FB_3DFX_ACCEL */
 
 static struct fb_ops tdfxfb_ops = {
@@ -183,13 +182,12 @@ static struct fb_ops tdfxfb_ops = {
 	.fb_fillrect	= tdfxfb_fillrect,
 	.fb_copyarea	= tdfxfb_copyarea,
 	.fb_imageblit	= tdfxfb_imageblit,
-	.fb_cursor	= tdfxfb_cursor,
 #else
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
-	.fb_cursor	= soft_cursor,
 #endif
+	.fb_cursor	= soft_cursor,
 };
 
 /*
@@ -502,15 +500,11 @@ static int tdfxfb_check_var(struct fb_var_screeninfo *var,struct fb_info *info)
 		return -EINVAL;
 	}
 
-	if (var->xres != var->xres_virtual) {
-		DPRINTK("virtual x resolution != physical x resolution not supported\n");
-		return -EINVAL;
-	}
+	if (var->xres != var->xres_virtual)
+		var->xres_virtual = var->xres;
 
-	if (var->yres > var->yres_virtual) {
-		DPRINTK("virtual y resolution < physical y resolution not possible\n");
-		return -EINVAL;
-	}
+	if (var->yres > var->yres_virtual)
+		var->yres_virtual = var->yres;
 
 	if (var->xoffset) {
 		DPRINTK("xoffset not supported\n");
@@ -539,9 +533,12 @@ static int tdfxfb_check_var(struct fb_var_screeninfo *var,struct fb_info *info)
 	}
   
 	if (lpitch * var->yres_virtual > info->fix.smem_len) {
-		DPRINTK("no memory for screen (%ux%ux%u)\n",
-		var->xres, var->yres_virtual, var->bits_per_pixel);
-		return -EINVAL;
+		var->yres_virtual = info->fix.smem_len/lpitch;
+		if (var->yres_virtual < var->yres) {
+			DPRINTK("no memory for screen (%ux%ux%u)\n",
+			var->xres, var->yres_virtual, var->bits_per_pixel);
+			return -EINVAL;
+		}
 	}
   
 	if (PICOS2KHZ(var->pixclock) > par->max_pixclock) {
@@ -1030,7 +1027,9 @@ static void tdfxfb_imageblit(struct fb_info *info, const struct fb_image *image)
 	}
 	banshee_wait_idle(info);
 }
+#endif /* CONFIG_FB_3DFX_ACCEL */
 
+#ifdef TDFX_HARDWARE_CURSOR
 static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
 	struct tdfx_par *par = (struct tdfx_par *) info->par;
@@ -1167,7 +1166,7 @@ static int tdfxfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	spin_unlock_irqrestore(&par->DAClock, flags);
 	return 0;
 }
-#endif /* CONFIG_FB_3DFX_ACCEL */
+#endif
 
 /**
  *      tdfxfb_probe - Device Initializiation
@@ -1183,7 +1182,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 {
 	struct tdfx_par *default_par;
 	struct fb_info *info;
-	int size, err;
+	int size, err, lpitch;
 
 	if ((err = pci_enable_device(pdev))) {
 		printk(KERN_WARNING "tdfxfb: Can't enable pdev: %d\n", err);
@@ -1287,6 +1286,22 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	err = fb_find_mode(&info->var, info, mode_option, NULL, 0, NULL, 8); 
 	if (!err || err == 4)
 		info->var = tdfx_var;
+
+	/* maximize virtual vertical length */
+	lpitch = info->var.xres_virtual * ((info->var.bits_per_pixel + 7) >> 3);
+	info->var.yres_virtual = info->fix.smem_len/lpitch;
+	if (info->var.yres_virtual < info->var.yres)
+		goto out_err;
+
+#ifdef CONFIG_FB_3DFX_ACCEL
+	/*
+	 * FIXME: Limit var->yres_virtual to 4096 because of screen artifacts
+	 * during scrolling. This is only present if 2D acceleration is
+	 * enabled.
+	 */
+	if (info->var.yres_virtual > 4096)
+		info->var.yres_virtual = 4096;
+#endif /* CONFIG_FB_3DFX_ACCEL */
 
 	if (fb_alloc_cmap(&info->cmap, 256, 0) < 0) {
 		printk(KERN_WARNING "tdfxfb: Can't allocate color map\n");
