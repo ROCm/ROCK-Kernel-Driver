@@ -323,22 +323,23 @@ balance_classzone(zone_t * classzone, unsigned int gfp_mask,
 struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_t *zonelist)
 {
 	unsigned long min;
-	zone_t **zone, * classzone;
+	zone_t **zones, *classzone;
 	struct page * page;
-	int freed;
+	int freed, i;
 
 	KERNEL_STAT_ADD(pgalloc, 1<<order);
 
-	zone = zonelist->zones;
-	classzone = *zone;
-	if (classzone == NULL)
+	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
+	classzone = zones[0]; 
+	if (classzone == NULL)    /* no zones in the zonelist */
 		return NULL;
-	min = 1UL << order;
-	for (;;) {
-		zone_t *z = *(zone++);
-		if (!z)
-			break;
 
+	/* Go through the zonelist once, looking for a zone with enough free */
+	min = 1UL << order;
+	for (i = 0; zones[i] != NULL; i++) {
+		zone_t *z = zones[i];
+
+		/* the incremental min is allegedly to discourage fallback */
 		min += z->pages_low;
 		if (z->free_pages > min) {
 			page = rmqueue(z, order);
@@ -349,16 +350,15 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 
 	classzone->need_balance = 1;
 	mb();
+	/* we're somewhat low on memory, failed to find what we needed */
 	if (waitqueue_active(&kswapd_wait))
 		wake_up_interruptible(&kswapd_wait);
 
-	zone = zonelist->zones;
+	/* Go through the zonelist again, taking __GFP_HIGH into account */
 	min = 1UL << order;
-	for (;;) {
+	for (i = 0; zones[i] != NULL; i++) {
 		unsigned long local_min;
-		zone_t *z = *(zone++);
-		if (!z)
-			break;
+		zone_t *z = zones[i];
 
 		local_min = z->pages_min;
 		if (gfp_mask & __GFP_HIGH)
@@ -375,11 +375,9 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 
 rebalance:
 	if (current->flags & (PF_MEMALLOC | PF_MEMDIE)) {
-		zone = zonelist->zones;
-		for (;;) {
-			zone_t *z = *(zone++);
-			if (!z)
-				break;
+		/* go through the zonelist yet again, ignoring mins */
+		for (i = 0; zones[i] != NULL; i++) {
+			zone_t *z = zones[i];
 
 			page = rmqueue(z, order);
 			if (page)
@@ -403,12 +401,10 @@ nopage:
 	if (page)
 		return page;
 
-	zone = zonelist->zones;
+	/* go through the zonelist yet one more time */
 	min = 1UL << order;
-	for (;;) {
-		zone_t *z = *(zone++);
-		if (!z)
-			break;
+	for (i = 0; zones[i] != NULL; i++) {
+		zone_t *z = zones[i];
 
 		min += z->pages_min;
 		if (z->free_pages > min) {
