@@ -325,7 +325,7 @@ static inline int exec_permission_lite(struct inode *inode)
 
 	return -EACCES;
 ok:
-	return security_inode_permission_lite(inode, MAY_EXEC);
+	return security_inode_permission(inode, MAY_EXEC);
 }
 
 /*

@@ -2289,16 +2289,15 @@ static void ir_tasklet_func(unsigned long data)
 			/* get the descriptor based on packet_buffer cursor */
 			f = video->frames[video->current_packet / MAX_PACKETS];
 			block = &(f->descriptor_pool[video->current_packet % MAX_PACKETS]);
-			xferstatus = le16_to_cpu(block->u.in.il.q[3] >> 16);
+			xferstatus = le32_to_cpu(block->u.in.il.q[3]) >> 16;
 			xferstatus &= 0x1F;
+			irq_printk("ir_tasklet_func: xferStatus/resCount [%d] = 0x%08x\n", i, le32_to_cpu(block->u.in.il.q[3]) );
 
 			/* get the current frame */
 			f = video->frames[video->active_frame];
 		
 			/* exclude empty packet */
 			if (packet_length > 8 && xferstatus == 0x11) {
-				irq_printk("ir_tasklet_func: xferStatus/resCount [%d] = 0x%08x\n", i, le32_to_cpu(block->u.in.il.q[3]) );
-			
 				/* check for start of frame */
 				/* DRD> Changed to check section type ([0]>>5==0) 
 				   and dif sequence ([1]>>4==0) */
@@ -2380,7 +2379,7 @@ static void ir_tasklet_func(unsigned long data)
 			} else {
 				prev->u.in.il.q[0] |= 3 << 20; /* enable interrupt */
 			}
-			prev->u.in.il.q[2] =  (cpu_to_le32(next_dma) | 1); /* set Z=1 */
+			prev->u.in.il.q[2] = cpu_to_le32(next_dma | 1); /* set Z=1 */
 			wmb();
 
 			/* wake up DMA in case it fell asleep */
