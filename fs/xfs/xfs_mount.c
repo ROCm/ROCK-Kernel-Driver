@@ -561,6 +561,7 @@ xfs_mountfs(
 	extern xfs_ioops_t xfs_iocore_xfs;	/* from xfs_iocore.c */
 	__uint64_t	ret64;
 	uint		quotaflags, quotaondisk, rootqcheck, needquotacheck;
+	uint		uquotaondisk = 0, gquotaondisk = 0;
 	boolean_t	needquotamount;
 	__int64_t	update_flags;
 	int		agno, noio;
@@ -913,6 +914,11 @@ xfs_mountfs(
 	quotaondisk = XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
 		mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT);
 
+	if (quotaondisk) {
+		uquotaondisk = mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT;
+		gquotaondisk = mp->m_sb.sb_qflags & XFS_GQUOTA_ACCT;
+	}
+
 	/*
 	 * If the device itself is read-only, we can't allow
 	 * the user to change the state of quota on the mount -
@@ -920,13 +926,16 @@ xfs_mountfs(
 	 * which would lead to an I/O error and shutdown
 	 */
 
-	if (((quotaondisk && !XFS_IS_QUOTA_ON(mp)) ||
-	      (!quotaondisk && XFS_IS_QUOTA_ON(mp))) &&
-	      xfs_dev_is_read_only(mp, "changing quota state")) {
+	if (((uquotaondisk && !XFS_IS_UQUOTA_ON(mp)) ||
+	    (!uquotaondisk &&  XFS_IS_UQUOTA_ON(mp)) ||
+	     (gquotaondisk && !XFS_IS_GQUOTA_ON(mp)) ||
+	    (!gquotaondisk &&  XFS_IS_GQUOTA_ON(mp)))  &&
+	    xfs_dev_is_read_only(mp, "changing quota state")) {
 		cmn_err(CE_WARN,
-			"XFS: device %s is read-only, cannot change "
-			"quota state.  Please mount with%s quota option.",
-			mp->m_fsname, quotaondisk ? "" : "out");
+			"XFS: please mount with%s%s%s.",
+			(!quotaondisk ? "out quota" : ""),
+			(uquotaondisk ? " usrquota" : ""),
+			(gquotaondisk ? " grpquota" : ""));
 		rvp->v_flag |= VPURGE;
 		VN_RELE(rvp);
 		vn_remove(rvp);
