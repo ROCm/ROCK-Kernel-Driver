@@ -7,6 +7,7 @@
 #include <linux/config.h>
 #include <linux/netfilter_ipv4/ip_conntrack_tuple.h>
 #include <linux/bitops.h>
+#include <linux/compiler.h>
 #include <asm/atomic.h>
 
 enum ip_conntrack_info
@@ -266,5 +267,16 @@ static inline int is_confirmed(struct ip_conntrack *ct)
 }
 
 extern unsigned int ip_conntrack_htable_size;
+
+/* eg. PROVIDES_CONNTRACK(ftp); */
+#define PROVIDES_CONNTRACK(name)                        \
+        int needs_ip_conntrack_##name;                  \
+        EXPORT_SYMBOL(needs_ip_conntrack_##name)
+
+/*. eg. NEEDS_CONNTRACK(ftp); */
+#define NEEDS_CONNTRACK(name)                                           \
+        extern int needs_ip_conntrack_##name;                           \
+        static int *need_ip_conntrack_##name __attribute_used__ = &needs_ip_conntrack_##name
+
 #endif /* __KERNEL__ */
 #endif /* _IP_CONNTRACK_H */
