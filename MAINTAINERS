@@ -486,7 +486,7 @@ ETHERNET BRIDGE
 P:	Lennert Buytenhek
 M:	buytenh@gnu.org
 L:	bridge@math.leidenuniv.nl
-W:	http://www.math.leidenuniv.nl/~buytenh/bridge
+W:	http://bridge.sourceforge.net/
 S:	Maintained
 
 ETHERTEAM 16I DRIVER

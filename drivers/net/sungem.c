@@ -1,4 +1,4 @@
-/* $Id: sungem.c,v 1.17 2001/06/17 09:22:46 jgarzik Exp $
+/* $Id: sungem.c,v 1.18 2001/08/06 13:34:47 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
  * Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com)
@@ -1576,8 +1576,10 @@ static int __devinit gem_check_invariants(struct gem *gp)
 
 static int __devinit gem_get_device_address(struct gem *gp)
 {
+#if defined(__sparc__) || defined(__powerpc__)
 	struct net_device *dev = gp->dev;
 	struct pci_dev *pdev = gp->pdev;
+#endif
 
 #ifdef __sparc__
 	struct pcidev_cookie *pcp = pdev->sysdata;

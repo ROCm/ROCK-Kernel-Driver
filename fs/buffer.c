@@ -219,9 +219,9 @@ static int write_some_buffers(kdev_t dev)
 			continue;
 		if (test_and_set_bit(BH_Lock, &bh->b_state))
 			continue;
-		get_bh(bh);
 		if (atomic_set_buffer_clean(bh)) {
 			__refile_buffer(bh);
+			get_bh(bh);
 			array[count++] = bh;
 			if (count < NRSYNC)
 				continue;
@@ -231,7 +231,6 @@ static int write_some_buffers(kdev_t dev)
 			return -EAGAIN;
 		}
 		unlock_buffer(bh);
-		put_bh(bh);
 	}
 	spin_unlock(&lru_list_lock);
 
@@ -251,13 +250,17 @@ static void write_unlocked_buffers(kdev_t dev)
 	run_task_queue(&tq_disk);
 }
 
-static int wait_for_locked_buffers(kdev_t dev, int index, int refile)
+/*
+ * Wait for a buffer on the proper list.
+ *
+ * This must be called with the LRU lock held, and
+ * will return with it released.
+ */
+static int wait_for_buffers(kdev_t dev, int index, int refile)
 {
 	struct buffer_head * next;
 	int nr;
 
-repeat:
-	spin_lock(&lru_list_lock);
 	next = lru_list[index];
 	nr = nr_buffers_type[index] * 2;
 	while (next && --nr >= 0) {
@@ -276,9 +279,23 @@ repeat:
 		spin_unlock(&lru_list_lock);
 		wait_on_buffer (bh);
 		put_bh(bh);
-		goto repeat;
+		return -EAGAIN;
 	}
 	spin_unlock(&lru_list_lock);
+	return 0;
+}
+
+static inline void wait_for_some_buffers(kdev_t dev)
+{
+	spin_lock(&lru_list_lock);
+	wait_for_buffers(dev, BUF_LOCKED, 1);
+}
+
+static int wait_for_locked_buffers(kdev_t dev, int index, int refile)
+{
+	do {
+		spin_lock(&lru_list_lock);
+	} while (wait_for_buffers(dev, index, refile));
 	return 0;
 }
 
@@ -775,15 +792,16 @@ void set_blocksize(kdev_t dev, int size)
 /*
  * We used to try various strange things. Let's not.
  * We'll just try to balance dirty buffers, and possibly
- * launder some pages.
+ * launder some pages and do our best to make more memory
+ * available.
  */
 static void refill_freelist(int size)
 {
-	balance_dirty(NODEV);
-	if (free_shortage())
-		page_launder(GFP_NOFS, 0);
 	if (!grow_buffers(size)) {
+		balance_dirty(NODEV);
+		page_launder(GFP_NOFS, 0);		
 		wakeup_bdflush();
+		wakeup_kswapd();
 		current->policy |= SCHED_YIELD;
 		__set_current_state(TASK_RUNNING);
 		schedule();
@@ -1094,19 +1112,19 @@ void balance_dirty(kdev_t dev)
 
 	if (state < 0)
 		return;
+
+	/* If we're getting into imbalance, start write-out */
+	spin_lock(&lru_list_lock);
+	write_some_buffers(dev);
 	wakeup_bdflush();
 
 	/*
-	 * If we're getting a lot out of balance, start some IO ourselves.
-	 *
-	 * This only queues it, and does not actually start it - we'll let
-	 * bdflush do that, or let it happen as a result of a lot of calls
-	 * to balance_dirty() filling up the request queues.
+	 * And if we're _really_ out of balance, wait for
+	 * some of the dirty/locked buffers ourselves.
+	 * This will throttle heavy writers.
 	 */
-	if (state > 0) {
-		spin_lock(&lru_list_lock);
-		write_some_buffers(dev);
-	}
+	if (state > 0)
+		wait_for_some_buffers(dev);
 }
 
 static __inline__ void __mark_dirty(struct buffer_head *bh)
@@ -2581,7 +2599,7 @@ static int sync_old_buffers(void)
 
 			spin_lock(&lru_list_lock);
 			bh = lru_list[BUF_DIRTY];
-			if (!time_before(jiffies, bh->b_flushtime))
+			if (bh && !time_before(jiffies, bh->b_flushtime))
 				continue;
 			spin_unlock(&lru_list_lock);
 		}
@@ -2682,7 +2700,7 @@ int bdflush(void *startup)
 
 		spin_lock(&lru_list_lock);
 		if (!write_some_buffers(NODEV) || balance_dirty_state(NODEV) < 0) {
-			run_task_queue(&tq_disk);
+			wait_for_some_buffers(NODEV);
 			interruptible_sleep_on(&bdflush_wait);
 		}
 	}
@@ -2713,6 +2731,8 @@ int kupdate(void *startup)
 	complete((struct completion *)startup);
 
 	for (;;) {
+		wait_for_some_buffers(NODEV);
+
 		/* update interval */
 		interval = bdf_prm.b_un.interval;
 		if (interval) {

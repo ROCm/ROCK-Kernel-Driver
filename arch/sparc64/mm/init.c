@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.176 2001/05/16 15:07:11 davem Exp $
+/*  $Id: init.c,v 1.178 2001/08/06 13:09:00 davem Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -833,6 +833,7 @@ void __flush_tlb_all(void)
 }
 
 /* Caller does TLB context flushing on local CPU if necessary.
+ * The caller also ensures that CTX_VALID(mm->context) is false.
  *
  * We must be careful about boundary cases so that we never
  * let the user have CTX 0 (nucleus) or we ever use a CTX
@@ -845,12 +846,6 @@ void get_new_mmu_context(struct mm_struct *mm)
 	
 	spin_lock(&ctx_alloc_lock);
 	ctx = CTX_HWBITS(tlb_context_cache + 1);
-	if (ctx == 0)
-		ctx = 1;
-	if (CTX_VALID(mm->context)) {
-		unsigned long nr = CTX_HWBITS(mm->context);
-		mmu_context_bmap[nr>>6] &= ~(1UL << (nr & 63));
-	}
 	new_ctx = find_next_zero_bit(mmu_context_bmap, 1UL << CTX_VERSION_SHIFT, ctx);
 	if (new_ctx >= (1UL << CTX_VERSION_SHIFT)) {
 		new_ctx = find_next_zero_bit(mmu_context_bmap, ctx, 1);

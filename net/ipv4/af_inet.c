@@ -5,7 +5,7 @@
  *
  *		PF_INET protocol family socket handler.
  *
- * Version:	$Id: af_inet.c,v 1.131 2001/06/13 16:25:03 davem Exp $
+ * Version:	$Id: af_inet.c,v 1.133 2001/08/06 13:21:16 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -116,8 +116,6 @@
 #if defined(CONFIG_NET_RADIO) || defined(CONFIG_NET_PCMCIA_RADIO)
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
 #endif	/* CONFIG_NET_RADIO || CONFIG_NET_PCMCIA_RADIO */
-
-#define min(a,b)	((a)<(b)?(a):(b))
 
 struct linux_mib net_statistics[NR_CPUS*2];
 
@@ -882,14 +880,15 @@ static int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			if (br_ioctl_hook != NULL)
 				return br_ioctl_hook(arg);
 #endif
+			return -ENOPKG;
+
 		case SIOCGIFDIVERT:
 		case SIOCSIFDIVERT:
 #ifdef CONFIG_NET_DIVERT
-			return(divert_ioctl(cmd, (struct divert_cf *) arg));
+			return divert_ioctl(cmd, (struct divert_cf *) arg);
 #else
 			return -ENOPKG;
 #endif	/* CONFIG_NET_DIVERT */
-			return -ENOPKG;
 			
 		case SIOCADDDLCI:
 		case SIOCDELDLCI:

@@ -6,7 +6,7 @@
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *	Alexey Kuznetsov	<kuznet@ms2.inr.ac.ru>
  *
- *	$Id: addrconf.c,v 1.66 2001/06/11 00:39:29 davem Exp $
+ *	$Id: addrconf.c,v 1.67 2001/08/03 09:32:17 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -45,6 +45,7 @@
 #include <linux/sysctl.h>
 #endif
 #include <linux/delay.h>
+#include <linux/notifier.h>
 
 #include <linux/proc_fs.h>
 #include <net/sock.h>
@@ -98,6 +99,8 @@ static void addrconf_dad_timer(unsigned long data);
 static void addrconf_dad_completed(struct inet6_ifaddr *ifp);
 static void addrconf_rs_timer(unsigned long data);
 static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifa);
+
+static struct notifier_block *inet6addr_chain;
 
 struct ipv6_devconf ipv6_devconf =
 {
@@ -392,6 +395,8 @@ ipv6_add_addr(struct inet6_dev *idev, struct in6_addr *addr, int pfxlen,
 	write_unlock_bh(&idev->lock);
 	read_unlock(&addrconf_lock);
 
+	notifier_call_chain(&inet6addr_chain,NETDEV_UP,ifa);
+
 	return ifa;
 }
 
@@ -433,6 +438,7 @@ static void ipv6_del_addr(struct inet6_ifaddr *ifp)
 
 	ipv6_ifa_notify(RTM_DELADDR, ifp);
 
+	notifier_call_chain(&inet6addr_chain,NETDEV_DOWN,ifp);
 
 	addrconf_del_timer(ifp);
 
@@ -1958,6 +1964,20 @@ static void addrconf_sysctl_unregister(struct ipv6_devconf *p)
 
 
 #endif
+
+/*
+ *      Device notifier
+ */
+
+int register_inet6addr_notifier(struct notifier_block *nb)
+{
+        return notifier_chain_register(&inet6addr_chain, nb);
+}
+
+int unregister_inet6addr_notifier(struct notifier_block *nb)
+{
+        return notifier_chain_unregister(&inet6addr_chain,nb);
+}
 
 /*
  *	Init / cleanup code

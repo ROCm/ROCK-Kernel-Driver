@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.106 2000/11/08 04:49:24 davem Exp $ */
+/* $Id: pgtable.h,v 1.107 2001/08/06 13:16:37 davem Exp $ */
 #ifndef _SPARC_PGTABLE_H
 #define _SPARC_PGTABLE_H
 
@@ -27,6 +27,7 @@
 #ifndef __ASSEMBLY__
 
 extern void load_mmu(void);
+extern unsigned long calc_highpages(void);
 			       
 BTFIXUPDEF_CALL(void, quick_kernel_fault, unsigned long)
 

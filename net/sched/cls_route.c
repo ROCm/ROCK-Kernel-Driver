@@ -316,13 +316,14 @@ static int route4_delete(struct tcf_proto *tp, unsigned long arg)
 {
 	struct route4_head *head = (struct route4_head*)tp->root;
 	struct route4_filter **fp, *f = (struct route4_filter*)arg;
-	unsigned h = f->handle;
+	unsigned h = 0;
 	struct route4_bucket *b;
 	int i;
 
 	if (!head || !f)
 		return -EINVAL;
 
+	h = f->handle;
 	b = f->bkt;
 
 	for (fp = &b->ht[from_hash(h>>16)]; *fp; fp = &(*fp)->next) {

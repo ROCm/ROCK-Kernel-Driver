@@ -1245,8 +1245,10 @@ static int cbq_drop(struct Qdisc* sch)
 
 		cl = cl_head;
 		do {
-			if (cl->q->ops->drop && cl->q->ops->drop(cl->q))
+			if (cl->q->ops->drop && cl->q->ops->drop(cl->q)) {
+				sch->q.qlen--;
 				return 1;
+			}
 		} while ((cl = cl->next_alive) != cl_head);
 	}
 	return 0;

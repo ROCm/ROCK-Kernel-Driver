@@ -5,7 +5,7 @@
  *
  *		The Internet Protocol (IP) output module.
  *
- * Version:	$Id: ip_output.c,v 1.94 2001/07/10 00:40:13 davem Exp $
+ * Version:	$Id: ip_output.c,v 1.96 2001/08/03 22:20:39 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -211,7 +211,8 @@ int ip_mc_output(struct sk_buff *skb)
 	 *	Multicasts are looped back for other local users
 	 */
 
-	if (rt->rt_flags&RTCF_MULTICAST && (!sk || sk->protinfo.af_inet.mc_loop)) {
+	if (rt->rt_flags&RTCF_MULTICAST) {
+		if ((!sk || sk->protinfo.af_inet.mc_loop)
 #ifdef CONFIG_IP_MROUTE
 		/* Small optimization: do not loopback not local frames,
 		   which returned after forwarding; they will be  dropped
@@ -221,9 +222,9 @@ int ip_mc_output(struct sk_buff *skb)
 
 		   This check is duplicated in ip_mr_input at the moment.
 		 */
-		if ((rt->rt_flags&RTCF_LOCAL) || !(IPCB(skb)->flags&IPSKB_FORWARDED))
+		    && ((rt->rt_flags&RTCF_LOCAL) || !(IPCB(skb)->flags&IPSKB_FORWARDED))
 #endif
-		{
+		) {
 			struct sk_buff *newskb = skb_clone(skb, GFP_ATOMIC);
 			if (newskb)
 				NF_HOOK(PF_INET, NF_IP_POST_ROUTING, newskb, NULL,
@@ -342,6 +343,13 @@ int ip_queue_xmit(struct sk_buff *skb)
 	struct rtable *rt;
 	struct iphdr *iph;
 
+	/* Skip all of this if the packet is already routed,
+	 * f.e. by something like SCTP.
+	 */
+	rt = (struct rtable *) skb->dst;
+	if (rt != NULL)
+		goto packet_routed;
+
 	/* Make sure we can route this packet. */
 	rt = (struct rtable *)__sk_dst_check(sk, 0);
 	if (rt == NULL) {
@@ -365,6 +373,7 @@ int ip_queue_xmit(struct sk_buff *skb)
 	}
 	skb->dst = dst_clone(&rt->u.dst);
 
+packet_routed:
 	if (opt && opt->is_strictroute && rt->rt_dst != rt->rt_gateway)
 		goto no_route;
 

@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.119 2001/07/21 00:28:25 davem Exp $
+/* $Id: ioctl32.c,v 1.121 2001/08/03 14:27:21 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -51,9 +51,6 @@
 #include <linux/rtc.h>
 #include <linux/pci.h>
 #if defined(CONFIG_BLK_DEV_LVM) || defined(CONFIG_BLK_DEV_LVM_MODULE)
-/* Ugh. This header really is not clean */
-#define min min
-#define max max
 #include <linux/lvm.h>
 #endif /* LVM */
 
@@ -73,6 +70,7 @@
 #include <asm/envctrl.h>
 #include <asm/audioio.h>
 #include <linux/ethtool.h>
+#include <linux/mii.h>
 #include <asm/display7seg.h>
 #include <asm/watchdog.h>
 #include <asm/module.h>
@@ -544,7 +542,7 @@ static inline int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long ar
 	return err;
 }
 
-static inline int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct ifreq ifr;
 	mm_segment_t old_fs;
@@ -590,6 +588,44 @@ static inline int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long
 
 out:
 	free_page((unsigned long)ifr.ifr_data);
+	return err;
+}
+
+static int mii_ioctl(unsigned long fd, unsigned int cmd, unsigned long arg)
+{
+	struct ifreq ifr;
+	mm_segment_t old_fs;
+	int err;
+	u32 data;
+
+	if (copy_from_user(&ifr, (struct ifreq32 *)arg, sizeof(struct ifreq32)))
+		return -EFAULT;
+	ifr.ifr_data = (__kernel_caddr_t) kmalloc(sizeof(struct mii_ioctl_data),
+						  GFP_KERNEL);
+	if (!ifr.ifr_data)
+		return -EAGAIN;
+
+	__get_user(data, &(((struct ifreq32 *)arg)->ifr_ifru.ifru_data));
+	if (copy_from_user(ifr.ifr_data, (char *)A(data),
+			   sizeof(struct mii_ioctl_data))) {
+		err = -EFAULT;
+		goto out;
+	}
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd, cmd, (unsigned long)&ifr);
+	set_fs(old_fs);
+
+	if (!err) {
+		if (copy_to_user((char *)A(data),
+				 ifr.ifr_data,
+				 sizeof(struct mii_ioctl_data)))
+			err = -EFAULT;
+	}
+
+out:
+	kfree(ifr.ifr_data);
 	return err;
 }
 
@@ -4250,6 +4286,9 @@ HANDLE_IOCTL(SIOCGPPPVER, dev_ifsioc)
 HANDLE_IOCTL(SIOCGIFTXQLEN, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFTXQLEN, dev_ifsioc)
 HANDLE_IOCTL(SIOCETHTOOL, ethtool_ioctl)
+HANDLE_IOCTL(SIOCGMIIPHY, mii_ioctl)
+HANDLE_IOCTL(SIOCGMIIREG, mii_ioctl)
+HANDLE_IOCTL(SIOCSMIIREG, mii_ioctl)
 HANDLE_IOCTL(SIOCADDRT, routing_ioctl)
 HANDLE_IOCTL(SIOCDELRT, routing_ioctl)
 /* Note SIOCRTMSG is no longer, so this is safe and * the user would have seen just an -EINVAL anyways. */

@@ -537,6 +537,30 @@ struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
 	return inode;
 }
 
+static int shmem_set_size(struct shmem_sb_info *info,
+			  unsigned long max_blocks, unsigned long max_inodes)
+{
+	int error;
+	unsigned long blocks, inodes;
+
+	spin_lock(&info->stat_lock);
+	blocks = info->max_blocks - info->free_blocks;
+	inodes = info->max_inodes - info->free_inodes;
+	error = -EINVAL;
+	if (max_blocks < blocks)
+		goto out;
+	if (max_inodes < inodes)
+		goto out;
+	error = 0;
+	info->max_blocks  = max_blocks;
+	info->free_blocks = max_blocks - blocks;
+	info->max_inodes  = max_inodes;
+	info->free_inodes = max_inodes - inodes;
+out:
+	spin_unlock(&info->stat_lock);
+	return error;
+}
+
 #ifdef CONFIG_TMPFS
 static ssize_t
 shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
@@ -1001,30 +1025,6 @@ static int shmem_parse_options(char *options, int *mode, unsigned long * blocks,
 			return 1;
 	}
 	return 0;
-}
-
-static int shmem_set_size(struct shmem_sb_info *info,
-			  unsigned long max_blocks, unsigned long max_inodes)
-{
-	int error;
-	unsigned long blocks, inodes;
-
-	spin_lock(&info->stat_lock);
-	blocks = info->max_blocks - info->free_blocks;
-	inodes = info->max_inodes - info->free_inodes;
-	error = -EINVAL;
-	if (max_blocks < blocks)
-		goto out;
-	if (max_inodes < inodes)
-		goto out;
-	error = 0;
-	info->max_blocks  = max_blocks;
-	info->free_blocks = max_blocks - blocks;
-	info->max_inodes  = max_inodes;
-	info->free_inodes = max_inodes - inodes;
-out:
-	spin_unlock(&info->stat_lock);
-	return error;
 }
 
 static int shmem_remount_fs (struct super_block *sb, int *flags, char *data)

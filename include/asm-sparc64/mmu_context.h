@@ -1,4 +1,4 @@
-/* $Id: mmu_context.h,v 1.47 2001/03/22 07:26:04 davem Exp $ */
+/* $Id: mmu_context.h,v 1.48 2001/08/03 06:18:52 davem Exp $ */
 #ifndef __SPARC64_MMU_CONTEXT_H
 #define __SPARC64_MMU_CONTEXT_H
 
@@ -23,6 +23,7 @@ extern unsigned long mmu_context_bmap[];
 #define CTX_FIRST_VERSION	((1UL << CTX_VERSION_SHIFT) + 1UL)
 #define CTX_VALID(__ctx)	\
 	 (!(((__ctx) ^ tlb_context_cache) & CTX_VERSION_MASK))
+#define CTX_NEVER_WAS_VALID(__ctx) ((__ctx) == 0UL)
 #define CTX_HWBITS(__ctx)	((__ctx) & ~CTX_VERSION_MASK)
 
 extern void get_new_mmu_context(struct mm_struct *mm);

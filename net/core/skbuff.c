@@ -4,7 +4,7 @@
  *	Authors:	Alan Cox <iiitac@pyr.swan.ac.uk>
  *			Florian La Roche <rzsfl@rz.uni-sb.de>
  *
- *	Version:	$Id: skbuff.c,v 1.88 2001/07/09 23:19:14 davem Exp $
+ *	Version:	$Id: skbuff.c,v 1.89 2001/08/06 13:25:02 davem Exp $
  *
  *	Fixes:	
  *		Alan Cox	:	Fixed the worst of the load balancer bugs.
@@ -180,7 +180,7 @@ struct sk_buff *alloc_skb(unsigned int size,int gfp_mask)
 	/* Get the HEAD */
 	skb = skb_head_from_pool();
 	if (skb == NULL) {
-		skb = kmem_cache_alloc(skbuff_head_cache, gfp_mask);
+		skb = kmem_cache_alloc(skbuff_head_cache, gfp_mask & ~__GFP_DMA);
 		if (skb == NULL)
 			goto nohead;
 	}

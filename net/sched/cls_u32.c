@@ -162,7 +162,7 @@ check_terminal:
 		if (!(n->sel.flags&(TC_U32_VAROFFSET|TC_U32_OFFSET|TC_U32_EAT)))
 			goto next_ht;
 
-		if (n->sel.flags&(TC_U32_EAT|TC_U32_VAROFFSET)) {
+		if (n->sel.flags&(TC_U32_OFFSET|TC_U32_VAROFFSET)) {
 			off2 = n->sel.off + 3;
 			if (n->sel.flags&TC_U32_VAROFFSET)
 				off2 += ntohs(n->sel.offmask & *(u16*)(ptr+n->sel.offoff)) >>n->sel.offshift;

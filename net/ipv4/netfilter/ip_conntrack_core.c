@@ -356,7 +356,7 @@ icmp_error_track(struct sk_buff *skb,
 	inner = (struct iphdr *)(hdr + 1);
 	datalen = skb->len - iph->ihl*4 - sizeof(*hdr);
 
-	if (skb->len < iph->ihl * 4 + sizeof(struct icmphdr)) {
+	if (skb->len < iph->ihl * 4 + sizeof(*hdr) + sizeof(*iph)) {
 		DEBUGP("icmp_error_track: too short\n");
 		return NULL;
 	}

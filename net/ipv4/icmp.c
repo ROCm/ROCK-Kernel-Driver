@@ -3,7 +3,7 @@
  *	
  *		Alan Cox, <alan@redhat.com>
  *
- *	Version: $Id: icmp.c,v 1.77 2001/06/14 13:40:46 davem Exp $
+ *	Version: $Id: icmp.c,v 1.79 2001/08/03 22:20:39 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -87,8 +87,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <net/checksum.h>
-
-#define min(a,b)	((a)<(b)?(a):(b))
 
 /*
  *	Build xmit assembly blocks
@@ -240,12 +238,15 @@ static __inline__ void icmp_xmit_unlock(void)
 int xrlim_allow(struct dst_entry *dst, int timeout)
 {
 	unsigned long now;
+	static int burst = HZ;
 
 	now = jiffies;
 	dst->rate_tokens += now - dst->rate_last;
 	dst->rate_last = now;
-	if (dst->rate_tokens > XRLIM_BURST_FACTOR*timeout)
-		dst->rate_tokens = XRLIM_BURST_FACTOR*timeout;
+	if (burst < XRLIM_BURST_FACTOR*timeout)
+		burst = XRLIM_BURST_FACTOR*timeout;
+	if (dst->rate_tokens > burst)
+		dst->rate_tokens = burst;
 	if (dst->rate_tokens >= timeout) {
 		dst->rate_tokens -= timeout;
 		return 1;
@@ -635,8 +636,8 @@ static void icmp_unreach(struct sk_buff *skb)
 	read_lock(&raw_v4_lock);
 	if ((raw_sk = raw_v4_htable[hash]) != NULL) 
 	{
-		while ((raw_sk = __raw_v4_lookup(raw_sk, protocol, iph->saddr,
-						 iph->daddr, skb->dev->ifindex)) != NULL) {
+		while ((raw_sk = __raw_v4_lookup(raw_sk, protocol, iph->daddr,
+						 iph->saddr, skb->dev->ifindex)) != NULL) {
 			raw_err(raw_sk, skb, info);
 			raw_sk = raw_sk->next;
 			iph = (struct iphdr *)skb->data;

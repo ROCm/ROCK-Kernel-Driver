@@ -1,4 +1,4 @@
-/* $Id: ebus.c,v 1.16 2001/02/13 01:16:43 davem Exp $
+/* $Id: ebus.c,v 1.17 2001/08/06 13:12:57 davem Exp $
  * ebus.c: PCI to EBus bridge device.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -27,6 +27,7 @@ struct linux_ebus *ebus_chain = 0;
 #ifdef CONFIG_SUN_AUXIO
 extern void auxio_probe(void);
 #endif
+extern void rs_init(void);
 
 /* We are together with pcic.c under CONFIG_PCI. */
 extern unsigned int pcic_pin_to_irq(unsigned int, char *name);
@@ -358,6 +359,7 @@ void __init ebus_init(void)
 		++num_ebus;
 	}
 
+	rs_init();
 #ifdef CONFIG_SUN_AUXIO
 	auxio_probe();
 #endif

@@ -218,7 +218,7 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, const char *buf, 
 	if (tun->flags & TUN_NOCHECKSUM)
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
  
-	netif_rx(skb);
+	netif_rx_ni(skb);
    
 	tun->stats.rx_packets++;
 	tun->stats.rx_bytes += len;

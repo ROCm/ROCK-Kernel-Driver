@@ -88,6 +88,10 @@ extern int			ipv6_chk_mcast_addr(struct net_device *dev,
 extern void			addrconf_prefix_rcv(struct net_device *dev,
 						    u8 *opt, int len);
 
+/* Device notifier */
+extern int register_inet6addr_notifier(struct notifier_block *nb);
+extern int unregister_inet6addr_notifier(struct notifier_block *nb);
+
 static inline struct inet6_dev *
 __in6_dev_get(struct net_device *dev)
 {

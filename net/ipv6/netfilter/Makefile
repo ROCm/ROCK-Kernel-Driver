@@ -9,7 +9,7 @@
 
 O_TARGET := netfilter.o
 
-export-objs :=
+export-objs := ip6_tables.o
 
 # Link order matters here.
 obj-$(CONFIG_IP6_NF_IPTABLES) += ip6_tables.o

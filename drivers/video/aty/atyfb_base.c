@@ -61,6 +61,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/vt_kern.h>
+#include <linux/kd.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>

@@ -61,6 +61,7 @@ extern struct net_proto_family inet_family_ops;
 #include <net/ipv6.h>
 #include <net/ndisc.h>
 #include <net/transp_v6.h>
+#include <net/addrconf.h>
 
 extern int sysctl_local_port_range[2];
 extern int tcp_port_rover;
@@ -280,6 +281,9 @@ EXPORT_SYMBOL(dlci_ioctl_hook);
 #ifdef CONFIG_IPV6
 EXPORT_SYMBOL(ipv6_addr_type);
 EXPORT_SYMBOL(icmpv6_send);
+EXPORT_SYMBOL(ndisc_mc_map);
+EXPORT_SYMBOL(register_inet6addr_notifier);
+EXPORT_SYMBOL(unregister_inet6addr_notifier);
 #endif
 #if defined (CONFIG_IPV6_MODULE) || defined (CONFIG_KHTTPD) || defined (CONFIG_KHTTPD_MODULE)
 /* inet functions common to v4 and v6 */

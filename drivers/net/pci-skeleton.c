@@ -94,6 +94,7 @@ IVc. Errata
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
+#include <linux/ethtool.h>
 #include <linux/mii.h>
 #include <asm/io.h>
 

@@ -604,9 +604,6 @@ void smp_flush_tlb_all(void)
  * are flush_tlb_*() routines, and these run after flush_cache_*()
  * which performs the flushw.
  *
- * XXX I diked out the fancy flush avoidance code for the
- * XXX swapping cases for now until the new MM code stabilizes. -DaveM
- *
  * The SMP TLB coherency scheme we use works as follows:
  *
  * 1) mm->cpu_vm_mask is a bit mask of which cpus an address
@@ -642,10 +639,20 @@ void smp_flush_tlb_all(void)
  *    call won't even show up on the performance radar.  But in any case we do get
  *    rid of the cross-call when the task has a dead context or the task has only
  *    ever run on the local cpu.
+ *
+ * 4) If the mm never had a valid context yet, there is nothing to
+ *    flush.  CTX_NEVER_WAS_VALID checks this.
+ *
+ *    This check used to be done with CTX_VALID(), but Kanoj Sarcar has
+ *    pointed out that this is an invalid optimization.  It can cause
+ *    stale translations to be left in the TLB.
  */
 void smp_flush_tlb_mm(struct mm_struct *mm)
 {
-	if (CTX_VALID(mm->context)) {
+	if (CTX_NEVER_WAS_VALID(mm->context))
+		return;
+
+	{
 		u32 ctx = CTX_HWBITS(mm->context);
 		int cpu = smp_processor_id();
 
@@ -665,7 +672,10 @@ void smp_flush_tlb_mm(struct mm_struct *mm)
 void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 			 unsigned long end)
 {
-	if (CTX_VALID(mm->context)) {
+	if (CTX_NEVER_WAS_VALID(mm->context))
+		return;
+
+	{
 		u32 ctx = CTX_HWBITS(mm->context);
 		int cpu = smp_processor_id();
 
@@ -686,7 +696,10 @@ void smp_flush_tlb_range(struct mm_struct *mm, unsigned long start,
 
 void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page)
 {
-	if (CTX_VALID(mm->context)) {
+	if (CTX_NEVER_WAS_VALID(mm->context))
+		return;
+
+	{
 		u32 ctx = CTX_HWBITS(mm->context);
 		int cpu = smp_processor_id();
 

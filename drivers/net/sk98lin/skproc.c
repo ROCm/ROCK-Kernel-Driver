@@ -65,7 +65,7 @@ int proc_read(char *buffer,
 				void *data);
 
 static const char SK_Root_Dir_entry[] = "sk98lin";
-extern struct net_device *root_dev;
+extern struct net_device *sk98lin_root_dev;
 
 
 struct proc_dir_entry pSkRootDir = { 
@@ -106,7 +106,7 @@ void *data)
 	unsigned long			Flags;		
 	unsigned int			Size;
 	struct net_device 		*next;
-	struct net_device 		*SkgeProcDev = root_dev;
+	struct net_device 		*SkgeProcDev = sk98lin_root_dev;
 
 	SK_PNMI_STRUCT_DATA 	*pPnmiStruct;
 	SK_PNMI_STAT		*pPnmiStat;

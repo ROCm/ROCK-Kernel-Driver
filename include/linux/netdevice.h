@@ -562,6 +562,17 @@ extern void		dev_init(void);
 
 extern int		netdev_nit;
 
+/* Post buffer to the network code from _non interrupt_ context.
+ * see net/core/dev.c for netif_rx description.
+ */
+static inline int netif_rx_ni(struct sk_buff *skb)
+{
+       int err = netif_rx(skb);
+       if (softirq_pending(smp_processor_id()))
+               do_softirq();
+       return err;
+}
+
 static inline void dev_init_buffers(struct net_device *dev)
 {
 	/* WILL BE REMOVED IN 2.5.0 */

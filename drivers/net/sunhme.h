@@ -1,4 +1,4 @@
-/* $Id: sunhme.h,v 1.32 2000/12/13 18:31:47 davem Exp $
+/* $Id: sunhme.h,v 1.33 2001/08/03 06:23:04 davem Exp $
  * sunhme.h: Definitions for Sparc HME/BigMac 10/100baseT ethernet driver.
  *           Also known as the "Happy Meal".
  *
@@ -276,92 +276,10 @@
  * Debugging eeprom burnt code is more fun than programming this chip!
  */
 
-/* First, the DP83840 register numbers. */
-#define DP83840_BMCR            0x00        /* Basic mode control register */
-#define DP83840_BMSR            0x01        /* Basic mode status register  */
-#define DP83840_PHYSID1         0x02        /* PHYS ID 1                   */
-#define DP83840_PHYSID2         0x03        /* PHYS ID 2                   */
-#define DP83840_ADVERTISE       0x04        /* Advertisement control reg   */
-#define DP83840_LPA             0x05        /* Link partner ability reg    */
-#define DP83840_EXPANSION       0x06        /* Expansion register          */
-#define DP83840_DCOUNTER        0x12        /* Disconnect counter          */
-#define DP83840_FCSCOUNTER      0x13        /* False carrier counter       */
-#define DP83840_NWAYTEST        0x14        /* N-way auto-neg test reg     */
-#define DP83840_RERRCOUNTER     0x15        /* Receive error counter       */
-#define DP83840_SREVISION       0x16        /* Silicon revision            */
+/* Generic MII registers defined in linux/mii.h, these below
+ * are DP83840 specific.
+ */
 #define DP83840_CSCONFIG        0x17        /* CS configuration            */
-#define DP83840_LBRERROR        0x18        /* Lpback, rx, bypass error    */
-#define DP83840_PHYADDR         0x19        /* PHY address                 */
-#define DP83840_RESERVED        0x1a        /* Unused...                   */
-#define DP83840_TPISTATUS       0x1b        /* TPI status for 10mbps       */
-#define DP83840_NCONFIG         0x1c        /* Network interface config    */
-
-/* Basic mode control register. */
-#define BMCR_RESV               0x007f  /* Unused...                   */
-#define BMCR_CTST               0x0080  /* Collision test              */
-#define BMCR_FULLDPLX           0x0100  /* Full duplex                 */
-#define BMCR_ANRESTART          0x0200  /* Auto negotiation restart    */
-#define BMCR_ISOLATE            0x0400  /* Disconnect DP83840 from MII */
-#define BMCR_PDOWN              0x0800  /* Powerdown the DP83840       */
-#define BMCR_ANENABLE           0x1000  /* Enable auto negotiation     */
-#define BMCR_SPEED100           0x2000  /* Select 100Mbps              */
-#define BMCR_LOOPBACK           0x4000  /* TXD loopback bits           */
-#define BMCR_RESET              0x8000  /* Reset the DP83840           */
-
-/* Basic mode status register. */
-#define BMSR_ERCAP              0x0001  /* Ext-reg capability          */
-#define BMSR_JCD                0x0002  /* Jabber detected             */
-#define BMSR_LSTATUS            0x0004  /* Link status                 */
-#define BMSR_ANEGCAPABLE        0x0008  /* Able to do auto-negotiation */
-#define BMSR_RFAULT             0x0010  /* Remote fault detected       */
-#define BMSR_ANEGCOMPLETE       0x0020  /* Auto-negotiation complete   */
-#define BMSR_RESV               0x07c0  /* Unused...                   */
-#define BMSR_10HALF             0x0800  /* Can do 10mbps, half-duplex  */
-#define BMSR_10FULL             0x1000  /* Can do 10mbps, full-duplex  */
-#define BMSR_100HALF            0x2000  /* Can do 100mbps, half-duplex */
-#define BMSR_100FULL            0x4000  /* Can do 100mbps, full-duplex */
-#define BMSR_100BASE4           0x8000  /* Can do 100mbps, 4k packets  */
-
-/* Advertisement control register. */
-#define ADVERTISE_SLCT          0x001f  /* Selector bits               */
-#define ADVERTISE_CSMA          0x0001  /* Only selector supported     */
-#define ADVERTISE_10HALF        0x0020  /* Try for 10mbps half-duplex  */
-#define ADVERTISE_10FULL        0x0040  /* Try for 10mbps full-duplex  */
-#define ADVERTISE_100HALF       0x0080  /* Try for 100mbps half-duplex */
-#define ADVERTISE_100FULL       0x0100  /* Try for 100mbps full-duplex */
-#define ADVERTISE_100BASE4      0x0200  /* Try for 100mbps 4k packets  */
-#define ADVERTISE_RESV          0x1c00  /* Unused...                   */
-#define ADVERTISE_RFAULT        0x2000  /* Say we can detect faults    */
-#define ADVERTISE_LPACK         0x4000  /* Ack link partners response  */
-#define ADVERTISE_NPAGE         0x8000  /* Next page bit               */
-
-#define ADVERTISE_ALL (ADVERTISE_10HALF | ADVERTISE_10FULL | \
-                       ADVERTISE_100HALF | ADVERTISE_100FULL)
-
-/* Link partner ability register. */
-#define LPA_SLCT                0x001f  /* Same as advertise selector  */
-#define LPA_10HALF              0x0020  /* Can do 10mbps half-duplex   */
-#define LPA_10FULL              0x0040  /* Can do 10mbps full-duplex   */
-#define LPA_100HALF             0x0080  /* Can do 100mbps half-duplex  */
-#define LPA_100FULL             0x0100  /* Can do 100mbps full-duplex  */
-#define LPA_100BASE4            0x0200  /* Can do 100mbps 4k packets   */
-#define LPA_RESV                0x1c00  /* Unused...                   */
-#define LPA_RFAULT              0x2000  /* Link partner faulted        */
-#define LPA_LPACK               0x4000  /* Link partner acked us       */
-#define LPA_NPAGE               0x8000  /* Next page bit               */
-
-/* Expansion register for auto-negotiation. */
-#define EXPANSION_NWAY          0x0001  /* Can do N-way auto-nego      */
-#define EXPANSION_LCWP          0x0002  /* Got new RX page code word   */
-#define EXPANSION_ENABLENPAGE   0x0004  /* This enables npage words    */
-#define EXPANSION_NPCAPABLE     0x0008  /* Link partner supports npage */
-#define EXPANSION_MFAULTS       0x0010  /* Multiple faults detected    */
-#define EXPANSION_RESV          0xffe0  /* Unused...                   */
-
-/* N-way test register. */
-#define NWAYTEST_RESV1          0x00ff  /* Unused...                   */
-#define NWAYTEST_LOOPBACK       0x0100  /* Enable loopback for N-way   */
-#define NWAYTEST_RESV2          0xfe00  /* Unused...                   */
 
 /* The Carrier Sense config register. */
 #define CSCONFIG_RESV1          0x0001  /* Unused...                   */
@@ -378,41 +296,6 @@
 #define CSCONFIG_TCDISABLE      0x2000  /* Disable timeout counter     */
 #define CSCONFIG_RESV4          0x4000  /* Unused...                   */
 #define CSCONFIG_NDISABLE       0x8000  /* Disable NRZI                */
-
-/* Loopback, receive, bypass error register. */
-#define LBRERROR_EBUFFER        0x0001  /* Show elasticity buf errors  */
-#define LBRERROR_PACKET         0x0002  /* Show packet errors          */
-#define LBRERROR_LINK           0x0004  /* Show link errors            */
-#define LBRERROR_END            0x0008  /* Show premature end errors   */
-#define LBRERROR_CODE           0x0010  /* Show code errors            */
-#define LBRERROR_RESV1          0x00e0  /* Unused...                   */
-#define LBRERROR_LBACK          0x0300  /* Remote and twister loopback */
-#define LBRERROR_10TX           0x0400  /* Transceiver loopback 10mbps */
-#define LBRERROR_ENDEC          0x0800  /* ENDEC loopback 10mbps       */
-#define LBRERROR_ALIGN          0x1000  /* Bypass symbol alignment     */
-#define LBRERROR_SCRAMBLER      0x2000  /* Bypass (de)scrambler        */
-#define LBRERROR_ENCODER        0x4000  /* Bypass 4B5B/5B4B encoders   */
-#define LBRERROR_BEBUF          0x8000  /* Bypass elasticity buffers   */
-
-/* Physical address register. */
-#define PHYADDR_ADDRESS         0x001f  /* The address itself          */
-#define PHYADDR_DISCONNECT      0x0020  /* Disconnect status           */
-#define PHYADDR_10MBPS          0x0040  /* 1=10mbps, 0=100mbps         */
-#define PHYADDR_RESV            0xff80  /* Unused...                   */
-
-/* TPI status register for 10mbps. */
-#define TPISTATUS_RESV1         0x01ff  /* Unused...                   */
-#define TPISTATUS_SERIAL        0x0200  /* Enable 10mbps serial mode   */
-#define TPISTATUS_RESV2         0xfc00  /* Unused...                   */
-
-/* Network interface config register. */
-#define NCONFIG_JENABLE         0x0001  /* Jabber enable               */
-#define NCONFIG_RESV1           0x0002  /* Unused...                   */
-#define NCONFIG_SQUELCH         0x0004  /* Use low squelch             */
-#define NCONFIG_UTP             0x0008  /* 1=UTP, 0=STP                */
-#define NCONFIG_HBEAT           0x0010  /* Heart-beat enable           */
-#define NCONFIG_LDISABLE        0x0020  /* Disable the link            */
-#define NCONFIG_RESV2           0xffc0  /* Unused...                   */
 
 /* Happy Meal descriptor rings and such.
  * All descriptor rings must be aligned on a 2K boundry.

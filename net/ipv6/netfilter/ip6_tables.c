@@ -1791,5 +1791,13 @@ static void __exit fini(void)
 #endif
 }
 
+EXPORT_SYMBOL(ip6t_register_table);
+EXPORT_SYMBOL(ip6t_unregister_table);
+EXPORT_SYMBOL(ip6t_do_table);
+EXPORT_SYMBOL(ip6t_register_match);
+EXPORT_SYMBOL(ip6t_unregister_match);
+EXPORT_SYMBOL(ip6t_register_target);
+EXPORT_SYMBOL(ip6t_unregister_target);
+
 module_init(init);
 module_exit(fini);

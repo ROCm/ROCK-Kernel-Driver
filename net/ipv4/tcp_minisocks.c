@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_minisocks.c,v 1.9 2001/03/06 22:42:56 davem Exp $
+ * Version:	$Id: tcp_minisocks.c,v 1.11 2001/08/03 14:27:25 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -371,7 +371,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		tw->family	= sk->family;
 		tw->reuse	= sk->reuse;
 		tw->rcv_wscale	= tp->rcv_wscale;
-		atomic_set(&tw->refcnt, 0);
+		atomic_set(&tw->refcnt, 1);
 
 		tw->hashent	= sk->hashent;
 		tw->rcv_nxt	= tp->rcv_nxt;
@@ -407,6 +407,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 		}
 
 		tcp_tw_schedule(tw, timeo);
+		tcp_tw_put(tw);
 	} else {
 		/* Sorry, if we're out of memory, just CLOSE this
 		 * socket up.  We've got bigger problems than

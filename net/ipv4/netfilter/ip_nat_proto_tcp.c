@@ -92,10 +92,17 @@ tcp_manip_pkt(struct iphdr *iph, size_t len,
 		oldip = iph->daddr;
 		portptr = &hdr->dest;
 	}
-	hdr->check = ip_nat_cheat_check(~oldip, manip->ip,
+
+	/* this could be a inner header returned in icmp packet; in such
+	   cases we cannot update the checksum field since it is outside of
+	   the 8 bytes of transport layer headers we are guaranteed */
+	if(((void *)&hdr->check + sizeof(hdr->check) - (void *)iph) <= len) {
+		hdr->check = ip_nat_cheat_check(~oldip, manip->ip,
 					ip_nat_cheat_check(*portptr ^ 0xFFFF,
 							   manip->u.tcp.port,
 							   hdr->check));
+	}
+
 	*portptr = manip->u.tcp.port;
 }
 

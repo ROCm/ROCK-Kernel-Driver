@@ -1420,6 +1420,10 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	if (chip_idx == LC82C168)
 		csr0 &= ~0xfff10000; /* zero reserved bits 31:20, 16 */
 
+	/* DM9102A has troubles with MRM, clear bit 24 too. */
+	if (pdev->vendor == 0x1282 && pdev->device == 0x9102)
+		csr0 &= ~0x01200000;
+
 	/*
 	 *	And back to business
 	 */
@@ -1762,9 +1766,9 @@ err_out_mtable:
 		kfree (tp->mtable);
 #ifndef USE_IO_OPS
 	iounmap((void *)ioaddr);
-#endif
 
 err_out_free_res:
+#endif
 	pci_release_regions (pdev);
 
 err_out_free_netdev:

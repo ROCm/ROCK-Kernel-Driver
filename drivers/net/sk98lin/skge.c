@@ -368,7 +368,7 @@ static void	DumpLong(char*, int);
 
 /* global variables *********************************************************/
 static const char *BootString = BOOT_STRING;
-static struct net_device *root_dev = NULL;
+struct net_device *sk98lin_root_dev = NULL;
 static int probed __initdata = 0;
 struct inode_operations SkInodeOps;
 //static struct file_operations SkFileOps;  /* with open/relase */
@@ -685,7 +685,7 @@ static int options[SK_MAX_CARD_PARAM] = {0, }; /* not used */
 static int __init skge_init_module(void)
 {
 	int cards;
-	root_dev = NULL;
+	sk98lin_root_dev = NULL;
 	
 	/* just to avoid warnings ... */
 	debug = 0;
@@ -717,12 +717,12 @@ struct net_device *next;
 unsigned long Flags;
 SK_EVPARA EvPara;
 
-	while (root_dev) {
-		pNet = (DEV_NET*) root_dev->priv;
+	while (sk98lin_root_dev) {
+		pNet = (DEV_NET*) sk98lin_root_dev->priv;
 		pAC = pNet->pAC;
 		next = pAC->Next;
 
-		netif_stop_queue(root_dev);
+		netif_stop_queue(sk98lin_root_dev);
 		SkGeYellowLED(pAC, pAC->IoBase, 0);
 
 		if(pAC->BoardLevel == 2) {
@@ -754,17 +754,17 @@ SK_EVPARA EvPara;
 			kfree(pAC->dev[1]);
 		}
 
-		FreeResources(root_dev);
+		FreeResources(sk98lin_root_dev);
 
-		root_dev->get_stats = NULL;
+		sk98lin_root_dev->get_stats = NULL;
 		/* 
 		 * otherwise unregister_netdev calls get_stats with
 		 * invalid IO ...  :-(
 		 */
-		unregister_netdev(root_dev);
-		kfree(root_dev);
+		unregister_netdev(sk98lin_root_dev);
+		kfree(sk98lin_root_dev);
 		kfree(pAC);
-		root_dev = next;
+		sk98lin_root_dev = next;
 	}
 
 	/* clear proc-dir */
@@ -911,8 +911,8 @@ int	Ret;			/* return code of request_irq */
 	/*
 	 * Register the device here
 	 */
-	pAC->Next = root_dev;
-	root_dev = dev;
+	pAC->Next = sk98lin_root_dev;
+	sk98lin_root_dev = dev;
 
 	return (0);
 } /* SkGeBoardInit */
