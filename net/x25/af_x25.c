@@ -438,7 +438,7 @@ static struct sock *x25_alloc_socket(void)
 	if (!sk)
 		goto out;
 
-	x25 = x25_sk(sk) = kmalloc(sizeof(*x25), GFP_ATOMIC);
+	x25 = sk->sk_protinfo = kmalloc(sizeof(*x25), GFP_ATOMIC);
 	if (!x25)
 		goto frees;
 
