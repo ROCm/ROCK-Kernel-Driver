@@ -549,8 +549,11 @@ int ide_start_dma(struct ata_channel *hwif, ide_drive_t *drive, ide_dma_action_t
 	/* This can happen with drivers abusing the special request field.
 	 */
 
-	if (!ar)
+	if (!ar) {
+		printk(KERN_ERR "DMA without ATA request\n");
+
 		return 1;
+	}
 
 	if (rq_data_dir(ar->ar_rq) == READ)
 		reading = 1 << 3;

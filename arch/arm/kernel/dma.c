@@ -17,6 +17,7 @@
 #include <linux/mman.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/errno.h>
 
 #include <asm/dma.h>
 

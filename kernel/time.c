@@ -216,6 +216,11 @@ int do_adjtimex(struct timex *txc)
 		
 	/* Now we validate the data before disabling interrupts */
 
+	if ((txc->modes & ADJ_OFFSET_SINGLESHOT) == ADJ_OFFSET_SINGLESHOT)
+	  /* singleshot must not be used with any other mode bits */
+		if (txc->modes != ADJ_OFFSET_SINGLESHOT)
+			return -EINVAL;
+
 	if (txc->modes != ADJ_OFFSET_SINGLESHOT && (txc->modes & ADJ_OFFSET))
 	  /* adjustment Offset limited to +- .512 seconds */
 		if (txc->offset <= - MAXPHASE || txc->offset >= MAXPHASE )

@@ -1,0 +1,8 @@
+CONFIG_ISDN_DRV_SC
+  This enables support for the Spellcaster BRI ISDN boards.  This
+  driver currently builds only in a modularized version ( = code which
+  can be inserted in and removed from the running kernel whenever you
+  want, details in <file:Documentation/modules.txt>); the module will
+  be called sc.o.  See <file:Documentation/isdn/README.sc> and
+  <http://www.spellcast.com/> for more information.
+

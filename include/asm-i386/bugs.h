@@ -179,14 +179,6 @@ static void __init check_config(void)
 #endif
 
 /*
- * If we configured ourselves for PGE, we'd better have it.
- */
-#ifdef CONFIG_X86_PGE
-	if (!cpu_has_pge)
-		panic("Kernel compiled for PPro+, requires PGE feature!");
-#endif
-
-/*
  * If we were told we had a good local APIC, check for buggy Pentia,
  * i.e. all B steppings and the C2 stepping of P54C when using their
  * integrated APIC (see 11AP erratum in "Pentium Processor

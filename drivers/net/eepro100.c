@@ -632,7 +632,7 @@ err_out_none:
 	return -ENODEV;
 }
 
-static int speedo_found1(struct pci_dev *pdev,
+static int __devinit speedo_found1(struct pci_dev *pdev,
 		long ioaddr, int card_idx, int acpi_idle_state)
 {
 	struct net_device *dev;
@@ -866,7 +866,7 @@ static int speedo_found1(struct pci_dev *pdev,
    interval for serial EEPROM.  However, it looks like that there is an
    additional requirement dictating larger udelay's in the code below.
    2000/05/24  SAW */
-static int do_eeprom_cmd(long ioaddr, int cmd, int cmd_len)
+static int __devinit do_eeprom_cmd(long ioaddr, int cmd, int cmd_len)
 {
 	unsigned retval = 0;
 	long ee_addr = ioaddr + SCBeeprom;

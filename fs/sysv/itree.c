@@ -108,6 +108,7 @@ static Indirect *get_branch(struct inode *inode,
 	return NULL;
 
 changed:
+	brelse(bh);
 	*err = -EAGAIN;
 	goto no_block;
 failure:

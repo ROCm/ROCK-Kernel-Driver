@@ -1,0 +1,6 @@
+#
+# Config.in for HYSDN ISDN driver
+#
+
+dep_tristate '  Hypercope HYSDN cards (Champ, Ergo, Metro) support (module only)' CONFIG_HYSDN m $CONFIG_PROC_FS
+dep_mbool    '    HYSDN CAPI 2.0 support' CONFIG_HYSDN_CAPI $CONFIG_HYSDN $CONFIG_ISDN_CAPI

@@ -1,0 +1,33 @@
+#
+# Config.in for the CAPI subsystem
+#
+
+tristate           'CAPI2.0 support' CONFIG_ISDN_CAPI
+if [ "$CONFIG_ISDN_CAPI" != "n" ]; then
+   bool            '  Verbose reason code reporting (kernel size +=7K)' CONFIG_ISDN_DRV_AVMB1_VERBOSE_REASON
+   dep_bool        '  CAPI2.0 Middleware support (EXPERIMENTAL)' CONFIG_ISDN_CAPI_MIDDLEWARE $CONFIG_EXPERIMENTAL
+   dep_tristate    '  CAPI2.0 /dev/capi support' CONFIG_ISDN_CAPI_CAPI20 $CONFIG_ISDN_CAPI
+   if [ "$CONFIG_ISDN_CAPI_MIDDLEWARE" = "y" ]; then
+      dep_mbool    '    CAPI2.0 filesystem support' CONFIG_ISDN_CAPI_CAPIFS_BOOL $CONFIG_ISDN_CAPI_CAPI20
+      if [ "$CONFIG_ISDN_CAPI_CAPIFS_BOOL" = "y" ]; then
+	 define_tristate CONFIG_ISDN_CAPI_CAPIFS $CONFIG_ISDN_CAPI_CAPI20
+      else
+	 define_tristate CONFIG_ISDN_CAPI_CAPIFS n
+      fi
+   fi
+   dep_tristate    '  CAPI2.0 capidrv interface support' CONFIG_ISDN_CAPI_CAPIDRV $CONFIG_ISDN_CAPI $CONFIG_ISDN
+fi
+
+# CAPI drivers
+
+if [ "$CONFIG_ISDN_CAPI" != "n" ]; then
+   dep_tristate '  AVM B1 ISA support' CONFIG_ISDN_DRV_AVMB1_B1ISA $CONFIG_ISDN_CAPI
+   dep_tristate '  AVM B1 PCI support' CONFIG_ISDN_DRV_AVMB1_B1PCI $CONFIG_ISDN_CAPI $CONFIG_PCI
+   dep_mbool    '    AVM B1 PCI V4 support' CONFIG_ISDN_DRV_AVMB1_B1PCIV4 $CONFIG_ISDN_DRV_AVMB1_B1PCI
+   dep_tristate '  AVM T1/T1-B ISA support' CONFIG_ISDN_DRV_AVMB1_T1ISA $CONFIG_ISDN_CAPI
+   dep_tristate '  AVM B1/M1/M2 PCMCIA support' CONFIG_ISDN_DRV_AVMB1_B1PCMCIA $CONFIG_ISDN_CAPI
+   dep_tristate '  AVM B1/M1/M2 PCMCIA cs module' CONFIG_ISDN_DRV_AVMB1_AVM_CS $CONFIG_ISDN_DRV_AVMB1_B1PCMCIA $CONFIG_PCMCIA
+   dep_tristate '  AVM T1/T1-B PCI support' CONFIG_ISDN_DRV_AVMB1_T1PCI $CONFIG_ISDN_CAPI $CONFIG_PCI
+   dep_tristate '  AVM C4/C2 support' CONFIG_ISDN_DRV_AVMB1_C4 $CONFIG_ISDN_CAPI $CONFIG_PCI
+fi
+

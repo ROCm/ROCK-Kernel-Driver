@@ -1,0 +1,20 @@
+#
+# Config.in for Eicon active ISDN support
+#
+
+bool               'Eicon active card support' CONFIG_ISDN_DRV_EICON
+if [ "$CONFIG_ISDN_DRV_EICON" != "n" ]; then
+
+   if [ "$CONFIG_ISDN_DRV_EICON_OLD" != "y" ]; then
+      dep_tristate '  Build Eicon driver type standalone' CONFIG_ISDN_DRV_EICON_DIVAS $CONFIG_ISDN $CONFIG_PCI
+   fi
+   if [ "$CONFIG_ISDN_DRV_EICON_DIVAS" != "y" ]; then
+      dep_tristate '  Legacy Eicon driver' CONFIG_ISDN_DRV_EICON_OLD $CONFIG_ISDN
+      if [ "$CONFIG_ISDN_DRV_EICON_OLD" != "n" ]; then
+         dep_bool  '    Eicon PCI DIVA Server BRI/PRI/4BRI support' CONFIG_ISDN_DRV_EICON_PCI $CONFIG_PCI
+         bool      '    Eicon S,SX,SCOM,Quadro,S2M support' CONFIG_ISDN_DRV_EICON_ISA
+      fi
+
+   fi
+fi
+

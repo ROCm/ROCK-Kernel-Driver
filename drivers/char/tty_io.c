@@ -1835,6 +1835,9 @@ static void __do_SAK(void *arg)
 	for_each_task(p) {
 		if ((p->tty == tty) ||
 		    ((session > 0) && (p->session == session))) {
+			printk(KERN_NOTICE "SAK: killed process %d"
+			    " (%s): p->session==tty->session\n",
+			    p->pid, p->comm);
 			send_sig(SIGKILL, p, 1);
 			continue;
 		}
@@ -1845,6 +1848,9 @@ static void __do_SAK(void *arg)
 				filp = fcheck_files(p->files, i);
 				if (filp && (filp->f_op == &tty_fops) &&
 				    (filp->private_data == tty)) {
+					printk(KERN_NOTICE "SAK: killed process %d"
+					    " (%s): fd#%d opened to the tty\n",
+					    p->pid, p->comm, i);
 					send_sig(SIGKILL, p, 1);
 					break;
 				}

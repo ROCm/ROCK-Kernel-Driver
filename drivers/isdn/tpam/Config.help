@@ -1,0 +1,8 @@
+CONFIG_ISDN_DRV_TPAM
+  This enables support for the Auvertech TurboPAM ISDN-card.
+  For running this card, additional firmware is necessary, which has
+  to be downloaded into the card using a utility which is distributed
+  separately from the Auvertech's web site: <http://www.auvertech.fr/>.
+
+  Please redirect all support questions to support@auvertech.fr.
+
