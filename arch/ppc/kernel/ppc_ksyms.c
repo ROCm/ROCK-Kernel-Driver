@@ -352,3 +352,7 @@ EXPORT_SYMBOL(cur_cpu_spec);
 extern unsigned long agp_special_page;
 EXPORT_SYMBOL(agp_special_page);
 #endif
+#if defined(CONFIG_40x) || defined(CONFIG_BOOKE)
+EXPORT_SYMBOL(__mtdcr);
+EXPORT_SYMBOL(__mfdcr);
+#endif
