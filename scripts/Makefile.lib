@@ -43,7 +43,7 @@ __obj-m = $(filter-out export.o,$(obj-m))
 multi-used-y := $(sort $(foreach m,$(__obj-y), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))), $(m))))
 multi-used-m := $(sort $(foreach m,$(__obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))), $(m))))
 multi-used   := $(multi-used-y) $(multi-used-m)
-single-used-m := $(filter-out $(multi-used-m),$(obj-m))
+single-used-m := $(sort $(filter-out $(multi-used-m),$(obj-m)))
 
 # Build list of the parts of our composite objects, our composite
 # objects depend on those (obviously)
