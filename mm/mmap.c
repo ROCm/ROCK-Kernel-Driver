@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/mount.h>
 #include <linux/objrmap.h>
+#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -123,6 +124,8 @@ asmlinkage unsigned long sys_brk(unsigned long brk)
 	unsigned long newbrk, oldbrk;
 	struct mm_struct *mm = current->mm;
 
+	audit_intercept(AUDIT_brk, brk);
+
 	down_write(&mm->mmap_sem);
 
 	if (brk < mm->end_code)
@@ -156,7 +159,7 @@ set_brk:
 out:
 	retval = mm->brk;
 	up_write(&mm->mmap_sem);
-	return retval;
+	return audit_lresult(retval);
 }
 
 #ifdef DEBUG_MM_RB

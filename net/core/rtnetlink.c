@@ -36,6 +36,7 @@
 #include <linux/skbuff.h>
 #include <linux/init.h>
 #include <linux/security.h>
+#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -468,6 +469,7 @@ static inline int rtnetlink_rcv_skb(struct sk_buff *skb)
 		rlen = NLMSG_ALIGN(nlh->nlmsg_len);
 		if (rlen > skb->len)
 			rlen = skb->len;
+		err = 0;
 		if (rtnetlink_rcv_msg(skb, nlh, &err)) {
 			/* Not error, but we must interrupt processing here:
 			 *   Note, that in this case we do not pull message
@@ -478,6 +480,11 @@ static inline int rtnetlink_rcv_skb(struct sk_buff *skb)
 			netlink_ack(skb, nlh, err);
 		} else if (nlh->nlmsg_flags&NLM_F_ACK)
 			netlink_ack(skb, nlh, 0);
+
+#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
+		audit_netlink_msg(skb, err);
+#endif
+
 		skb_pull(skb, rlen);
 	}
 

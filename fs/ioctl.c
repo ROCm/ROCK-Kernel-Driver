@@ -8,6 +8,7 @@
 #include <linux/smp_lock.h>
 #include <linux/file.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/security.h>
 
 #include <asm/uaccess.h>
@@ -52,8 +53,11 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {	
 	struct file * filp;
 	unsigned int flag;
-	int on, error = -EBADF;
+	int on, error;
 
+	FSHOOK_BEGIN(ioctl, error, .fd = fd, .cmd = cmd, .arg.value = arg)
+
+	error = -EBADF;
 	filp = fget(fd);
 	if (!filp)
 		goto out;
@@ -130,5 +134,8 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	fput(filp);
 
 out:
+
+	FSHOOK_END(ioctl, error)
+
 	return error;
 }

@@ -24,6 +24,7 @@
 #include <linux/dcookies.h>
 #include <linux/suspend.h>
 #include <linux/ckrm.h>
+#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -303,6 +304,8 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 	struct list_head *l;
 	int error = -EINVAL;
 
+	audit_intercept(AUDIT_setpriority, which, who, niceval);
+
 	if (which > 2 || which < 0)
 		goto out;
 
@@ -346,7 +349,8 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 out_unlock:
 	read_unlock(&tasklist_lock);
 out:
-	return error;
+
+	return audit_result(error);
 }
 
 /*
@@ -424,9 +428,11 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 {
 	char buffer[256];
 
+	audit_intercept(AUDIT_reboot, magic1, magic2, cmd, arg);
+
 	/* We only trust the superuser with rebooting the system. */
 	if (!capable(CAP_SYS_BOOT))
-		return -EPERM;
+		return audit_result(-EPERM);
 
 	/* For safety, we require "magic" arguments. */
 	if (magic1 != LINUX_REBOOT_MAGIC1 ||
@@ -434,7 +440,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 	                magic2 != LINUX_REBOOT_MAGIC2A &&
 			magic2 != LINUX_REBOOT_MAGIC2B &&
 	                magic2 != LINUX_REBOOT_MAGIC2C))
-		return -EINVAL;
+		return audit_result(-EINVAL);
 
 	lock_kernel();
 	switch (cmd) {
@@ -477,7 +483,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 	case LINUX_REBOOT_CMD_RESTART2:
 		if (strncpy_from_user(&buffer[0], arg, sizeof(buffer) - 1) < 0) {
 			unlock_kernel();
-			return -EFAULT;
+			return audit_result(-EFAULT);
 		}
 		buffer[sizeof(buffer) - 1] = '\0';
 
@@ -493,16 +499,16 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 		{
 			int ret = software_suspend();
 			unlock_kernel();
-			return ret;
+			return audit_result(ret);
 		}
 #endif
 
 	default:
 		unlock_kernel();
-		return -EINVAL;
+		return audit_result(-EINVAL);
 	}
 	unlock_kernel();
-	return 0;
+	return audit_result(0);
 }
 
 static void deferred_cad(void *dummy)
@@ -553,9 +559,11 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
 	int new_egid = old_egid;
 	int retval;
 
+	audit_intercept(AUDIT_setregid, rgid, egid);
+
 	retval = security_task_setgid(rgid, egid, (gid_t)-1, LSM_SETID_RE);
 	if (retval)
-		return retval;
+		return audit_result(retval);
 
 	if (rgid != (gid_t) -1) {
 		if ((old_rgid == rgid) ||
@@ -563,7 +571,7 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
 		    capable(CAP_SETGID))
 			new_rgid = rgid;
 		else
-			return -EPERM;
+			return audit_result(-EPERM);
 	}
 	if (egid != (gid_t) -1) {
 		if ((old_rgid == egid) ||
@@ -572,7 +580,7 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
 		    capable(CAP_SETGID))
 			new_egid = egid;
 		else {
-			return -EPERM;
+			return audit_result(-EPERM);
 		}
 	}
 	if (new_egid != old_egid)
@@ -589,7 +597,7 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
 
 	ckrm_cb_gid();
 
-	return 0;
+	return audit_result(0);
 }
 
 /*
@@ -602,9 +610,11 @@ asmlinkage long sys_setgid(gid_t gid)
 	int old_egid = current->egid;
 	int retval;
 
+	audit_intercept(AUDIT_setgid, gid);
+
 	retval = security_task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_ID);
 	if (retval)
-		return retval;
+		return audit_result(retval);
 
 	if (capable(CAP_SETGID))
 	{
@@ -625,11 +635,11 @@ asmlinkage long sys_setgid(gid_t gid)
 		current->egid = current->fsgid = gid;
 	}
 	else
-		return -EPERM;
+		return audit_result(-EPERM);
 
 	ckrm_cb_gid();
 
-	return 0;
+	return audit_result(0);
 }
   
 static int set_user(uid_t new_ruid, int dumpclear)
@@ -678,9 +688,11 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 	int old_ruid, old_euid, old_suid, new_ruid, new_euid;
 	int retval;
 
+	audit_intercept(AUDIT_setreuid, ruid, euid);
+
 	retval = security_task_setuid(ruid, euid, (uid_t)-1, LSM_SETID_RE);
 	if (retval)
-		return retval;
+		return audit_result(retval);
 
 	new_ruid = old_ruid = current->uid;
 	new_euid = old_euid = current->euid;
@@ -691,7 +703,7 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 		if ((old_ruid != ruid) &&
 		    (current->euid != ruid) &&
 		    !capable(CAP_SETUID))
-			return -EPERM;
+			return audit_result(-EPERM);
 	}
 
 	if (euid != (uid_t) -1) {
@@ -700,11 +712,11 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 		    (current->euid != euid) &&
 		    (current->suid != euid) &&
 		    !capable(CAP_SETUID))
-			return -EPERM;
+			return audit_result(-EPERM);
 	}
 
 	if (new_ruid != old_ruid && set_user(new_ruid, new_euid != old_euid) < 0)
-		return -EAGAIN;
+		return audit_result(-EAGAIN);
 
 	if (new_euid != old_euid)
 	{
@@ -719,7 +731,7 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 
 	ckrm_cb_uid();
 
-	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RE);
+	return audit_result(security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RE));
 }
 
 
@@ -741,9 +753,11 @@ asmlinkage long sys_setuid(uid_t uid)
 	int old_ruid, old_suid, new_ruid, new_suid;
 	int retval;
 
+	audit_intercept(AUDIT_setuid, uid);
+
 	retval = security_task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_ID);
 	if (retval)
-		return retval;
+		return audit_result(retval);
 
 	old_ruid = new_ruid = current->uid;
 	old_suid = current->suid;
@@ -751,10 +765,10 @@ asmlinkage long sys_setuid(uid_t uid)
 	
 	if (capable(CAP_SETUID)) {
 		if (uid != old_ruid && set_user(uid, old_euid != uid) < 0)
-			return -EAGAIN;
+			return audit_result(-EAGAIN);
 		new_suid = uid;
 	} else if ((uid != current->uid) && (uid != new_suid))
-		return -EPERM;
+		return audit_result(-EPERM);
 
 	if (old_euid != uid)
 	{
@@ -766,7 +780,7 @@ asmlinkage long sys_setuid(uid_t uid)
 
 	ckrm_cb_uid();
 
-	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_ID);
+	return audit_result(security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_ID));
 }
 
 
@@ -781,24 +795,26 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	int old_suid = current->suid;
 	int retval;
 
+	audit_intercept(AUDIT_setresuid, ruid, euid, suid);
+
 	retval = security_task_setuid(ruid, euid, suid, LSM_SETID_RES);
 	if (retval)
-		return retval;
+		return audit_result(retval);
 
 	if (!capable(CAP_SETUID)) {
 		if ((ruid != (uid_t) -1) && (ruid != current->uid) &&
 		    (ruid != current->euid) && (ruid != current->suid))
-			return -EPERM;
+			return audit_result(-EPERM);
 		if ((euid != (uid_t) -1) && (euid != current->uid) &&
 		    (euid != current->euid) && (euid != current->suid))
-			return -EPERM;
+			return audit_result(-EPERM);
 		if ((suid != (uid_t) -1) && (suid != current->uid) &&
 		    (suid != current->euid) && (suid != current->suid))
-			return -EPERM;
+			return audit_result(-EPERM);
 	}
 	if (ruid != (uid_t) -1) {
 		if (ruid != current->uid && set_user(ruid, euid != current->euid) < 0)
-			return -EAGAIN;
+			return audit_result(-EAGAIN);
 	}
 	if (euid != (uid_t) -1) {
 		if (euid != current->euid)
@@ -814,7 +830,7 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 
 	ckrm_cb_uid();
 
-	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RES);
+	return audit_result(security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RES));
 }
 
 asmlinkage long sys_getresuid(uid_t *ruid, uid_t *euid, uid_t *suid)
@@ -835,20 +851,22 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 {
 	int retval;
 
+	audit_intercept(AUDIT_setresgid, rgid, egid, sgid);
+
 	retval = security_task_setgid(rgid, egid, sgid, LSM_SETID_RES);
 	if (retval)
-		return retval;
+		return audit_result(retval);
 
 	if (!capable(CAP_SETGID)) {
 		if ((rgid != (gid_t) -1) && (rgid != current->gid) &&
 		    (rgid != current->egid) && (rgid != current->sgid))
-			return -EPERM;
+			return audit_result(-EPERM);
 		if ((egid != (gid_t) -1) && (egid != current->gid) &&
 		    (egid != current->egid) && (egid != current->sgid))
-			return -EPERM;
+			return audit_result(-EPERM);
 		if ((sgid != (gid_t) -1) && (sgid != current->gid) &&
 		    (sgid != current->egid) && (sgid != current->sgid))
-			return -EPERM;
+			return audit_result(-EPERM);
 	}
 	if (egid != (gid_t) -1) {
 		if (egid != current->egid)
@@ -866,7 +884,7 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 
 	ckrm_cb_gid();
 
-	return 0;
+	return audit_result(0);
 }
 
 asmlinkage long sys_getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid)
@@ -891,9 +909,11 @@ asmlinkage long sys_setfsuid(uid_t uid)
 {
 	int old_fsuid;
 
+	audit_intercept(AUDIT_setfsuid, uid);
+
 	old_fsuid = current->fsuid;
 	if (security_task_setuid(uid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS))
-		return old_fsuid;
+		return audit_result(-EPERM), old_fsuid;
 
 	if (uid == current->uid || uid == current->euid ||
 	    uid == current->suid || uid == current->fsuid || 
@@ -909,6 +929,8 @@ asmlinkage long sys_setfsuid(uid_t uid)
 
 	security_task_post_setuid(old_fsuid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS);
 
+	(void)audit_result(current->fsuid == uid ? 0 : -EPERM);
+
 	return old_fsuid;
 }
 
@@ -919,9 +941,11 @@ asmlinkage long sys_setfsgid(gid_t gid)
 {
 	int old_fsgid;
 
+	audit_intercept(AUDIT_setfsgid, gid);
+
 	old_fsgid = current->fsgid;
 	if (security_task_setgid(gid, (gid_t)-1, (gid_t)-1, LSM_SETID_FS))
-		return old_fsgid;
+		return audit_result(-EPERM), old_fsgid;
 
 	if (gid == current->gid || gid == current->egid ||
 	    gid == current->sgid || gid == current->fsgid || 
@@ -934,6 +958,9 @@ asmlinkage long sys_setfsgid(gid_t gid)
 		}
 		current->fsgid = gid;
 	}
+
+	(void)audit_result(current->fsgid == gid ? 0 : -EPERM);
+
 	return old_fsgid;
 }
 
@@ -975,12 +1002,14 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 	struct task_struct *p;
 	int err = -EINVAL;
 
+	audit_intercept(AUDIT_setpgid, pid, pgid);
+
 	if (!pid)
 		pid = current->pid;
 	if (!pgid)
 		pgid = pid;
 	if (pgid < 0)
-		return -EINVAL;
+		return audit_result(-EINVAL);
 
 	/* From this point forward we keep holding onto the tasklist lock
 	 * so that our parent does not change from under us. -DaveM
@@ -1039,7 +1068,7 @@ ok_pgid:
 out:
 	/* All paths lead to here, thus we are safe. -DaveM */
 	write_unlock_irq(&tasklist_lock);
-	return err;
+	return audit_result(err);
 }
 
 asmlinkage long sys_getpgid(pid_t pid)
@@ -1097,8 +1126,10 @@ asmlinkage long sys_setsid(void)
 	struct pid *pid;
 	int err = -EPERM;
 
+	audit_intercept(AUDIT_setsid);
+
 	if (!thread_group_leader(current))
-		return -EINVAL;
+		return audit_result(-EINVAL);
 
 	write_lock_irq(&tasklist_lock);
 
@@ -1113,7 +1144,7 @@ asmlinkage long sys_setsid(void)
 	err = process_group(current);
 out:
 	write_unlock_irq(&tasklist_lock);
-	return err;
+	return audit_result(err);
 }
 
 /*
@@ -1327,20 +1358,23 @@ asmlinkage long sys_setgroups(int gidsetsize, gid_t __user *grouplist)
 	int retval;
 
 	if (!capable(CAP_SETGID))
-		return -EPERM;
+		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-EPERM);
 	if ((unsigned)gidsetsize > NGROUPS_MAX)
-		return -EINVAL;
+		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-EINVAL);
 
 	group_info = groups_alloc(gidsetsize);
 	if (!group_info)
-		return -ENOMEM;
+		return audit_intercept(AUDIT_setgroups, NULL), audit_result(-ENOMEM);
 	retval = groups_from_user(group_info, grouplist);
 	if (retval) {
 		put_group_info(group_info);
-		return retval;
+		audit_intercept(AUDIT_setgroups, NULL);
+		return audit_result(retval);
 	}
 
-	retval = set_current_groups(group_info);
+	audit_intercept(AUDIT_setgroups, group_info);
+
+	(void)audit_result(retval = set_current_groups(group_info));
 	put_group_info(group_info);
 
 	return retval;
@@ -1396,18 +1430,21 @@ asmlinkage long sys_sethostname(char __user *name, int len)
 	char tmp[__NEW_UTS_LEN];
 
 	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-	if (len < 0 || len > __NEW_UTS_LEN)
-		return -EINVAL;
-	down_write(&uts_sem);
-	errno = -EFAULT;
-	if (!copy_from_user(tmp, name, len)) {
-		memcpy(system_utsname.nodename, tmp, len);
-		system_utsname.nodename[len] = 0;
-		errno = 0;
+		errno = -EPERM;
+	else if (len < 0 || len > __NEW_UTS_LEN)
+		errno = -EINVAL;
+	else {
+		down_write(&uts_sem);
+		errno = -EFAULT;
+		if (!copy_from_user(tmp, name, len)) {
+			memcpy(system_utsname.nodename, tmp, len);
+			system_utsname.nodename[len] = 0;
+			errno = 0;
+		}
+		up_write(&uts_sem);
 	}
-	up_write(&uts_sem);
-	return errno;
+	audit_intercept(AUDIT_sethostname, errno ? NULL : tmp, len);
+	return audit_result(errno);
 }
 
 asmlinkage long sys_gethostname(char __user *name, int len)
@@ -1437,19 +1474,21 @@ asmlinkage long sys_setdomainname(char __user *name, int len)
 	char tmp[__NEW_UTS_LEN];
 
 	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-	if (len < 0 || len > __NEW_UTS_LEN)
-		return -EINVAL;
-
-	down_write(&uts_sem);
-	errno = -EFAULT;
-	if (!copy_from_user(tmp, name, len)) {
-		memcpy(system_utsname.domainname, tmp, len);
-		system_utsname.domainname[len] = 0;
-		errno = 0;
+		errno = -EPERM;
+	else if (len < 0 || len > __NEW_UTS_LEN)
+		errno = -EINVAL;
+	else {
+		down_write(&uts_sem);
+		errno = -EFAULT;
+		if (!copy_from_user(tmp, name, len)) {
+			memcpy(system_utsname.domainname, tmp, len);
+			system_utsname.domainname[len] = 0;
+			errno = 0;
+		}
+		up_write(&uts_sem);
 	}
-	up_write(&uts_sem);
-	return errno;
+	audit_intercept(AUDIT_setdomainname, errno ? NULL : tmp, len);
+	return audit_result(errno);
 }
 
 asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
@@ -1489,27 +1528,28 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
 	int retval;
 
 	if (resource >= RLIM_NLIMITS)
-		return -EINVAL;
+		return audit_intercept(AUDIT_setrlimit, resource, NULL), audit_result(-EINVAL);
 	if(copy_from_user(&new_rlim, rlim, sizeof(*rlim)))
 		return -EFAULT;
-       if (new_rlim.rlim_cur > new_rlim.rlim_max)
-               return -EINVAL;
+
+	audit_intercept(AUDIT_setrlimit, resource, &new_rlim);
+
+	if (new_rlim.rlim_cur > new_rlim.rlim_max)
+		return audit_result(-EINVAL);
 	old_rlim = current->rlim + resource;
 	if (((new_rlim.rlim_cur > old_rlim->rlim_max) ||
 	     (new_rlim.rlim_max > old_rlim->rlim_max)) &&
 	    !capable(CAP_SYS_RESOURCE))
-		return -EPERM;
+		return audit_result(-EPERM);
 	if (resource == RLIMIT_NOFILE) {
 		if (new_rlim.rlim_cur > NR_OPEN || new_rlim.rlim_max > NR_OPEN)
-			return -EPERM;
+			return audit_result(-EPERM);
 	}
 
 	retval = security_task_setrlimit(resource, &new_rlim);
-	if (retval)
-		return retval;
-
-	*old_rlim = new_rlim;
-	return 0;
+	if (!retval)
+		*old_rlim = new_rlim;
+	return audit_result(retval);
 }
 
 /*
@@ -1573,8 +1613,9 @@ asmlinkage long sys_getrusage(int who, struct rusage __user *ru)
 
 asmlinkage long sys_umask(int mask)
 {
+	audit_intercept(AUDIT_umask, mask);
 	mask = xchg(&current->fs->umask, mask & S_IRWXUGO);
-	return mask;
+	return audit_result(mask);
 }
     
 asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,

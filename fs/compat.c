@@ -20,6 +20,7 @@
 #include <linux/errno.h>
 #include <linux/time.h>
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/fcntl.h>
 #include <linux/namei.h>
 #include <linux/file.h>
@@ -34,6 +35,7 @@
 #include <linux/syscalls.h>
 #include <linux/ctype.h>
 #include <linux/module.h>
+#include <linux/audit.h>
 #include <net/sock.h>		/* siocdevprivate_ioctl */
 
 #include <asm/uaccess.h>
@@ -149,14 +151,16 @@ asmlinkage long compat_sys_statfs(const char *path, struct compat_statfs *buf)
 	struct nameidata nd;
 	int error;
 
-	error = user_path_walk(path, &nd);
-	if (!error) {
+	FSHOOK_BEGIN_USER_PATH_WALK(statfs, error, path, nd, path)
+
 		struct kstatfs tmp;
 		error = vfs_statfs(nd.dentry->d_inode->i_sb, &tmp);
 		if (!error && put_compat_statfs(buf, &tmp))
 			error = -EFAULT;
 		path_release(&nd);
-	}
+
+	FSHOOK_END_USER_WALK(statfs, error, path)
+
 	return error;
 }
 
@@ -165,6 +169,8 @@ asmlinkage long compat_sys_fstatfs(unsigned int fd, struct compat_statfs *buf)
 	struct file * file;
 	struct kstatfs tmp;
 	int error;
+
+	FSHOOK_BEGIN(fstatfs, error, .fd = fd)
 
 	error = -EBADF;
 	file = fget(fd);
@@ -175,6 +181,9 @@ asmlinkage long compat_sys_fstatfs(unsigned int fd, struct compat_statfs *buf)
 		error = -EFAULT;
 	fput(file);
 out:
+
+	FSHOOK_END(fstatfs, error)
+
 	return error;
 }
 
@@ -217,14 +226,16 @@ asmlinkage long compat_statfs64(const char *path, compat_size_t sz, struct compa
 	if (sz != sizeof(*buf))
 		return -EINVAL;
 
-	error = user_path_walk(path, &nd);
-	if (!error) {
+	FSHOOK_BEGIN_USER_PATH_WALK(statfs, error, path, nd, path)
+
 		struct kstatfs tmp;
 		error = vfs_statfs(nd.dentry->d_inode->i_sb, &tmp);
 		if (!error && put_compat_statfs64(buf, &tmp))
 			error = -EFAULT;
 		path_release(&nd);
-	}
+
+	FSHOOK_END_USER_WALK(statfs, error, path)
+
 	return error;
 }
 
@@ -237,6 +248,8 @@ asmlinkage long compat_fstatfs64(unsigned int fd, compat_size_t sz, struct compa
 	if (sz != sizeof(*buf))
 		return -EINVAL;
 
+	FSHOOK_BEGIN(fstatfs, error, .fd = fd)
+
 	error = -EBADF;
 	file = fget(fd);
 	if (!file)
@@ -246,6 +259,9 @@ asmlinkage long compat_fstatfs64(unsigned int fd, compat_size_t sz, struct compa
 		error = -EFAULT;
 	fput(file);
 out:
+
+	FSHOOK_END(fstatfs, error)
+
 	return error;
 }
 
@@ -410,8 +426,11 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd, unsigned lon
 	struct ioctl_trans *t;
 
 	filp = fget(fd);
-	if(!filp)
+	if(!filp) {
+		audit_intercept(AUDIT_ioctl, fd, cmd, arg);
+		(void)audit_result(error);
 		goto out2;
+	}
 
 	if (!filp->f_op || !filp->f_op->ioctl) {
 		error = sys_ioctl (fd, cmd, arg);
@@ -433,6 +452,7 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd, unsigned lon
 		error = siocdevprivate_ioctl(fd, cmd, arg);
 	} else {
 		static int count;
+		audit_intercept(AUDIT_ioctl, fd, cmd, arg);
 		if (++count <= 50) { 
 			char buf[10];
 			char *path = (char *)__get_free_page(GFP_KERNEL), *fn = "?"; 
@@ -454,7 +474,7 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd, unsigned lon
 			if (path) 
 				free_page((unsigned long)path); 
 		}
-		error = -EINVAL;
+		error = audit_result(-EINVAL);
 	}
 out:
 	fput(filp);
@@ -792,10 +812,20 @@ asmlinkage int compat_sys_mount(char __user * dev_name, char __user * dir_name,
 		}
 	}
 
+	FSHOOK_BEGIN(mount,
+		retval,
+		.devname = (char *)dev_page,
+		.dirname = dir_page,
+		.type = (char *)type_page,
+		.flags = flags,
+		.data = (void *)data_page)
+
 	lock_kernel();
 	retval = do_mount((char*)dev_page, dir_page, (char*)type_page,
 			flags, (void*)data_page);
 	unlock_kernel();
+
+	FSHOOK_END(mount, retval)
 
 	free_page(data_page);
  out3:

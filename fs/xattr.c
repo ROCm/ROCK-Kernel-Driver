@@ -7,6 +7,7 @@
   Copyright (C) 2001 SGI - Silicon Graphics, Inc <linux-xfs@oss.sgi.com>
  */
 #include <linux/fs.h>
+#include <linux/fshooks.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/file.h>
@@ -71,11 +72,22 @@ sys_setxattr(char __user *path, char __user *name, void __user *value,
 	struct nameidata nd;
 	int error;
 
-	error = user_path_walk(path, &nd);
-	if (error)
-		return error;
+	FSHOOK_BEGIN_USER_PATH_WALK(setxattr,
+		error,
+		path,
+		nd,
+		path,
+		.name = name,
+		.value = value,
+		.size = size,
+		.flags = flags,
+		.link = false)
+
 	error = setxattr(nd.dentry, name, value, size, flags);
 	path_release(&nd);
+
+	FSHOOK_END_USER_WALK(setxattr, error, path)
+
 	return error;
 }
 
@@ -86,11 +98,22 @@ sys_lsetxattr(char __user *path, char __user *name, void __user *value,
 	struct nameidata nd;
 	int error;
 
-	error = user_path_walk_link(path, &nd);
-	if (error)
-		return error;
+	FSHOOK_BEGIN_USER_PATH_WALK_LINK(setxattr,
+		error,
+		path,
+		nd,
+		path,
+		.name = name,
+		.value = value,
+		.size = size,
+		.flags = flags,
+		.link = true)
+
 	error = setxattr(nd.dentry, name, value, size, flags);
 	path_release(&nd);
+
+	FSHOOK_END_USER_WALK(setxattr, error, path)
+
 	return error;
 }
 
@@ -99,13 +122,26 @@ sys_fsetxattr(int fd, char __user *name, void __user *value,
 	      size_t size, int flags)
 {
 	struct file *f;
-	int error = -EBADF;
+	int error;
+
+	FSHOOK_BEGIN(fsetxattr,
+		error,
+		.fd = fd,
+		.name = name,
+		.value = value,
+		.size = size,
+		.flags = flags)
 
 	f = fget(fd);
-	if (!f)
-		return error;
-	error = setxattr(f->f_dentry, name, value, size, flags);
-	fput(f);
+	if (f) {
+		error = setxattr(f->f_dentry, name, value, size, flags);
+		fput(f);
+	}
+	else
+		error = -EBADF;
+
+	FSHOOK_END(fsetxattr, error)
+
 	return error;
 }
 
@@ -161,11 +197,19 @@ sys_getxattr(char __user *path, char __user *name, void __user *value,
 	struct nameidata nd;
 	ssize_t error;
 
-	error = user_path_walk(path, &nd);
-	if (error)
-		return error;
+	FSHOOK_BEGIN_USER_PATH_WALK(getxattr,
+		error,
+		path,
+		nd,
+		path,
+		.name = name,
+		.link = false)
+
 	error = getxattr(nd.dentry, name, value, size);
 	path_release(&nd);
+
+	FSHOOK_END_USER_WALK(getxattr, error, path)
+
 	return error;
 }
 
@@ -176,11 +220,19 @@ sys_lgetxattr(char __user *path, char __user *name, void __user *value,
 	struct nameidata nd;
 	ssize_t error;
 
-	error = user_path_walk_link(path, &nd);
-	if (error)
-		return error;
+	FSHOOK_BEGIN_USER_PATH_WALK_LINK(getxattr,
+		error,
+		path,
+		nd,
+		path,
+		.name = name,
+		.link = true)
+
 	error = getxattr(nd.dentry, name, value, size);
 	path_release(&nd);
+
+	FSHOOK_END_USER_WALK(getxattr, error, path)
+
 	return error;
 }
 
@@ -188,13 +240,20 @@ asmlinkage ssize_t
 sys_fgetxattr(int fd, char __user *name, void __user *value, size_t size)
 {
 	struct file *f;
-	ssize_t error = -EBADF;
+	ssize_t error;
+
+	FSHOOK_BEGIN(fgetxattr, error, .fd = fd, .name = name)
 
 	f = fget(fd);
-	if (!f)
-		return error;
-	error = getxattr(f->f_dentry, name, value, size);
-	fput(f);
+	if (f) {
+		error = getxattr(f->f_dentry, name, value, size);
+		fput(f);
+	}
+	else
+		error = -EBADF;
+
+	FSHOOK_END(fgetxattr, error)
+
 	return error;
 }
 
@@ -242,11 +301,18 @@ sys_listxattr(char __user *path, char __user *list, size_t size)
 	struct nameidata nd;
 	ssize_t error;
 
-	error = user_path_walk(path, &nd);
-	if (error)
-		return error;
+	FSHOOK_BEGIN_USER_PATH_WALK(listxattr,
+		error,
+		path,
+		nd,
+		path,
+		.link = false)
+
 	error = listxattr(nd.dentry, list, size);
 	path_release(&nd);
+
+	FSHOOK_END_USER_WALK(listxattr, error, path)
+
 	return error;
 }
 
@@ -256,11 +322,18 @@ sys_llistxattr(char __user *path, char __user *list, size_t size)
 	struct nameidata nd;
 	ssize_t error;
 
-	error = user_path_walk_link(path, &nd);
-	if (error)
-		return error;
+	FSHOOK_BEGIN_USER_PATH_WALK_LINK(listxattr,
+		error,
+		path,
+		nd,
+		path,
+		.link = true)
+
 	error = listxattr(nd.dentry, list, size);
 	path_release(&nd);
+
+	FSHOOK_END_USER_WALK(listxattr, error, path)
+
 	return error;
 }
 
@@ -268,13 +341,20 @@ asmlinkage ssize_t
 sys_flistxattr(int fd, char __user *list, size_t size)
 {
 	struct file *f;
-	ssize_t error = -EBADF;
+	ssize_t error;
+
+	FSHOOK_BEGIN(flistxattr, error, .fd = fd)
 
 	f = fget(fd);
-	if (!f)
-		return error;
-	error = listxattr(f->f_dentry, list, size);
-	fput(f);
+	if (f) {
+		error = listxattr(f->f_dentry, list, size);
+		fput(f);
+	}
+	else
+		error = -EBADF;
+
+	FSHOOK_END(flistxattr, error)
+
 	return error;
 }
 
@@ -312,11 +392,19 @@ sys_removexattr(char __user *path, char __user *name)
 	struct nameidata nd;
 	int error;
 
-	error = user_path_walk(path, &nd);
-	if (error)
-		return error;
+	FSHOOK_BEGIN_USER_PATH_WALK(rmxattr,
+		error,
+		path,
+		nd,
+		path,
+		.name = name,
+		.link = false)
+
 	error = removexattr(nd.dentry, name);
 	path_release(&nd);
+
+	FSHOOK_END_USER_WALK(rmxattr, error, path)
+
 	return error;
 }
 
@@ -326,11 +414,19 @@ sys_lremovexattr(char __user *path, char __user *name)
 	struct nameidata nd;
 	int error;
 
-	error = user_path_walk_link(path, &nd);
-	if (error)
-		return error;
+	FSHOOK_BEGIN_USER_PATH_WALK_LINK(rmxattr,
+		error,
+		path,
+		nd,
+		path,
+		.name = name,
+		.link = true)
+
 	error = removexattr(nd.dentry, name);
 	path_release(&nd);
+
+	FSHOOK_END_USER_WALK(rmxattr, error, path)
+
 	return error;
 }
 
@@ -338,12 +434,19 @@ asmlinkage long
 sys_fremovexattr(int fd, char __user *name)
 {
 	struct file *f;
-	int error = -EBADF;
+	int error;
+
+	FSHOOK_BEGIN(frmxattr, error, .fd = fd, .name = name)
 
 	f = fget(fd);
-	if (!f)
-		return error;
-	error = removexattr(f->f_dentry, name);
-	fput(f);
+	if (f) {
+		error = removexattr(f->f_dentry, name);
+		fput(f);
+	}
+	else
+		error = -EBADF;
+
+	FSHOOK_END(frmxattr, error)
+
 	return error;
 }

@@ -21,6 +21,7 @@
 #include <linux/namei.h>
 #include <linux/security.h>
 #include <linux/mount.h>
+#include <linux/fshooks.h>
 #include <asm/uaccess.h>
 
 extern int __init init_rootfs(void);
@@ -378,9 +379,8 @@ asmlinkage long sys_umount(char __user * name, int flags)
 	struct nameidata nd;
 	int retval;
 
-	retval = __user_walk(name, LOOKUP_FOLLOW, &nd);
-	if (retval)
-		goto out;
+	FSHOOK_BEGIN_USER_PATH_WALK(umount, retval, name, nd, dirname, .flags = flags)
+
 	retval = -EINVAL;
 	if (nd.dentry != nd.mnt->mnt_root)
 		goto dput_and_out;
@@ -394,7 +394,9 @@ asmlinkage long sys_umount(char __user * name, int flags)
 	retval = do_umount(nd.mnt, flags);
 dput_and_out:
 	path_release(&nd);
-out:
+
+	FSHOOK_END_USER_WALK(umount, retval, dirname)
+
 	return retval;
 }
 
@@ -906,10 +908,21 @@ asmlinkage long sys_mount(char __user * dev_name, char __user * dir_name,
 	if (retval < 0)
 		goto out3;
 
+	FSHOOK_BEGIN(mount,
+		retval,
+		.devname = (char *)dev_page,
+		.dirname = dir_page,
+		.type = (char *)type_page,
+		.flags = flags,
+		.data = (void *)data_page)
+
 	lock_kernel();
 	retval = do_mount((char*)dev_page, dir_page, (char*)type_page,
 			  flags, (void*)data_page);
 	unlock_kernel();
+
+	FSHOOK_END(mount, retval)
+
 	free_page(data_page);
 
 out3:
@@ -1016,14 +1029,14 @@ asmlinkage long sys_pivot_root(const char __user *new_root, const char __user *p
 
 	lock_kernel();
 
-	error = __user_walk(new_root, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &new_nd);
+	error = __user_walk(new_root, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &new_nd, 0);
 	if (error)
 		goto out0;
 	error = -EINVAL;
 	if (!check_mnt(new_nd.mnt))
 		goto out1;
 
-	error = __user_walk(put_old, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &old_nd);
+	error = __user_walk(put_old, LOOKUP_FOLLOW|LOOKUP_DIRECTORY, &old_nd, 0);
 	if (error)
 		goto out1;
 

@@ -20,6 +20,7 @@
 #include <linux/futex.h>	/* for FUTEX_WAIT */
 #include <linux/syscalls.h>
 #include <linux/unistd.h>
+#include <linux/audit.h>
 
 #include <asm/uaccess.h>
 
@@ -234,7 +235,7 @@ asmlinkage long compat_sys_setrlimit(unsigned int resource, struct compat_rlimit
 	mm_segment_t old_fs = get_fs ();
 
 	if (resource >= RLIM_NLIMITS) 
-		return -EINVAL;	
+		return audit_intercept(AUDIT_setrlimit, resource, NULL), audit_result(-EINVAL);
 
 	if (!access_ok(VERIFY_READ, rlim, sizeof(*rlim)) ||
 	    __get_user(r.rlim_cur, &rlim->rlim_cur) ||

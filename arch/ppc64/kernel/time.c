@@ -48,6 +48,7 @@
 #include <linux/time.h>
 #include <linux/init.h>
 #include <linux/profile.h>
+#include <linux/audit.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>
@@ -436,7 +437,7 @@ long ppc64_sys32_stime(int* tptr)
 	struct timespec myTimeval;
 
 	if (!capable(CAP_SYS_TIME))
-		return -EPERM;
+		return audit_intercept(AUDIT_settimeofday, NULL, NULL), audit_result(-EPERM);
 
 	if (get_user(value, tptr))
 		return -EFAULT;
@@ -444,9 +445,10 @@ long ppc64_sys32_stime(int* tptr)
 	myTimeval.tv_sec = value;
 	myTimeval.tv_nsec = 0;
 
+	audit_intercept(AUDIT_settimeofday, &myTimeval, NULL);
 	do_settimeofday(&myTimeval);
 
-	return 0;
+	return audit_result(0);
 }
 
 /*
@@ -461,7 +463,7 @@ long ppc64_sys_stime(long* tptr)
 	struct timespec myTimeval;
 
 	if (!capable(CAP_SYS_TIME))
-		return -EPERM;
+		return audit_intercept(AUDIT_settimeofday, NULL, NULL), audit_result(-EPERM);
 
 	if (get_user(value, tptr))
 		return -EFAULT;
@@ -469,9 +471,10 @@ long ppc64_sys_stime(long* tptr)
 	myTimeval.tv_sec = value;
 	myTimeval.tv_nsec = 0;
 
+	audit_intercept(AUDIT_settimeofday, &myTimeval, NULL);
 	do_settimeofday(&myTimeval);
 
-	return 0;
+	return audit_result(0);
 }
 
 void __init time_init(void)

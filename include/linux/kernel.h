@@ -200,6 +200,15 @@ extern void dump_stack(void);
 
 
 /**
+ * member_type - get the type of a member of a structure
+ *
+ * @type:	the type of the struct.
+ * @member:	the name of the member within the struct.
+ *
+ */
+#define member_type(type, member) __typeof__( ((type *)0)->member )
+
+/**
  * container_of - cast a member of a structure out to the containing structure
  *
  * @ptr:	the pointer to the member.
@@ -208,7 +217,7 @@ extern void dump_stack(void);
  *
  */
 #define container_of(ptr, type, member) ({			\
-        const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+        const member_type(type, member) *__mptr = (ptr);	\
         (type *)( (char *)__mptr - offsetof(type,member) );})
 
 /*

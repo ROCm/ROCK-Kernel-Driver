@@ -32,6 +32,7 @@
 #include <linux/ptrace.h>
 #include <linux/mount.h>
 #include <linux/objrmap.h>
+#include <linux/audit.h>
 
 #include <linux/ckrm.h>
 #include <asm/pgtable.h>
@@ -473,6 +474,8 @@ void mmput(struct mm_struct *mm)
 	}
 }
 
+EXPORT_SYMBOL(mmput);
+
 /*
  * Checks if the use count of an mm is non-zero and if so
  * returns a reference to it after bumping up the use count.
@@ -902,6 +905,16 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	if (!p)
 		goto fork_out;
 
+#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
+	if (AUDITING(current)) {
+		p->audit = audit_alloc();
+		if (!p->audit)
+			goto bad_fork_free_task;
+	}
+	else
+		p->audit = NULL;
+#endif
+
 	retval = -EAGAIN;
 	if (atomic_read(&p->user->processes) >=
 			p->rlim[RLIMIT_NPROC].rlim_cur) {
@@ -1133,6 +1146,10 @@ bad_fork_cleanup_count:
 	atomic_dec(&p->user->processes);
 	free_uid(p->user);
 bad_fork_free:
+#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
+	audit_free(p->audit);
+bad_fork_free_task:
+#endif
 	free_task(p);
 	goto fork_out;
 }
@@ -1170,6 +1187,8 @@ long do_fork(unsigned long clone_flags,
 	int trace = 0;
 	long pid;
 
+	audit_intercept(AUDIT_clone, clone_flags);
+
 	if (unlikely(current->ptrace)) {
 		trace = fork_traceflag (clone_flags);
 		if (trace)
@@ -1182,6 +1201,8 @@ long do_fork(unsigned long clone_flags,
 	 * might get invalid after that point, if the thread exits quickly.
 	 */
 	pid = IS_ERR(p) ? PTR_ERR(p) : p->pid;
+
+	audit_lresult(pid);
 
 	if (!IS_ERR(p)) {
 		struct completion vfork;
@@ -1200,6 +1221,11 @@ long do_fork(unsigned long clone_flags,
 			sigaddset(&p->pending.signal, SIGSTOP);
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
+
+#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
+	        if (AUDITING(current))
+        	      audit_fork(current, p);
+#endif
 
 		if (!(clone_flags & CLONE_STOPPED))
 			wake_up_forked_process(p);	/* do this last */

@@ -364,6 +364,9 @@ int set_current_groups(struct group_info *group_info);
 #define GROUP_AT(gi, i) \
     ((gi)->blocks[(i)/NGROUPS_PER_BLOCK][(i)%NGROUPS_PER_BLOCK])
 
+#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
+struct aud_process;
+#endif
 
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
@@ -520,6 +523,9 @@ struct task_struct {
 
 	struct mempolicy *mempolicy;
 	short il_next;		/* could be shared with used_math */
+#if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
+	struct aud_process *audit;
+#endif
 };
 
 static inline pid_t process_group(struct task_struct *tsk)
