@@ -2168,20 +2168,6 @@ static int default_cleanup (ide_drive_t *drive)
 	return ide_unregister_subdriver(drive);
 }
 
-/*
- *	Default function to use for the cache flush operation. This
- *	must be replaced for disk devices (see ATA specification
- *	documents on cache flush and drive suspend rules)
- *
- *	If we have no device attached or the device is not writable
- *	this handler is sufficient.
- */
- 
-static int default_flushcache (ide_drive_t *drive)
-{
-	return 0;
-}
-
 static ide_startstop_t default_do_request (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	ide_end_request(drive, 0, 0);
@@ -2244,7 +2230,6 @@ static ide_startstop_t default_start_power_step(ide_drive_t *drive,
 static void setup_driver_defaults (ide_driver_t *d)
 {
 	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
-	if (d->flushcache == NULL)	d->flushcache = default_flushcache;
 	if (d->do_request == NULL)	d->do_request = default_do_request;
 	if (d->end_request == NULL)	d->end_request = default_end_request;
 	if (d->sense == NULL)		d->sense = default_sense;

@@ -1700,7 +1700,6 @@ static ide_driver_t idedisk_driver = {
 	.busy			= 0,
 	.supports_dsc_overlap	= 0,
 	.cleanup		= idedisk_cleanup,
-	.flushcache		= do_idedisk_flushcache,
 	.do_request		= ide_do_rw_disk,
 	.sense			= idedisk_dump_status,
 	.error			= idedisk_error,
