@@ -1,7 +1,5 @@
 /* drivers/net/eepro100.c: An Intel i82557-559 Ethernet driver for Linux. */
 /*
-   NOTICE: For use with late 2.3 kernels only.
-   May not compile for kernels 2.3.43-47.
 	Written 1996-1999 by Donald Becker.
 
 	The driver also contains updates by different kernel developers
@@ -25,8 +23,8 @@
 		Disabled FC and ER, to avoid lockups when when we get FCP interrupts.
 	2000 Jul 17 Goutham Rao <goutham.rao@intel.com>
 		PCI DMA API fixes, adding pci_dma_sync_single calls where neccesary
-    2000 Aug 31 David Mosberger <davidm@hpl.hp.com>
-	    RX_ALIGN support: enables rx DMA without causing unaligned accesses.
+	2000 Aug 31 David Mosberger <davidm@hpl.hp.com>
+		rx_align support: enables rx DMA without causing unaligned accesses.
 */
 
 static const char *version =
@@ -46,9 +44,10 @@ static int rxdmacount /* = 0 */;
 #if defined(__ia64__) || defined(__alpha__) || defined(__sparc__) || defined(__mips__) || \
 	defined(__arm__)
   /* align rx buffers to 2 bytes so that IP header is aligned */
-# define RX_ALIGN
+# define rx_align(skb)		skb_reserve((skb), 2)
 # define RxFD_ALIGNMENT		__attribute__ ((aligned (2), packed))
 #else
+# define rx_align(skb)
 # define RxFD_ALIGNMENT
 #endif
 
@@ -531,10 +530,6 @@ static int eepro100_init_one(struct pci_dev *pdev,
 		const struct pci_device_id *ent);
 
 static void eepro100_remove_one (struct pci_dev *pdev);
-#ifdef CONFIG_PM
-static int eepro100_suspend (struct pci_dev *pdev, u32 state);
-static int eepro100_resume (struct pci_dev *pdev);
-#endif
 
 static int do_eeprom_cmd(long ioaddr, int cmd, int cmd_len);
 static int mdio_read(long ioaddr, int phy_id, int location);
@@ -1240,9 +1235,8 @@ speedo_init_rx_ring(struct net_device *dev)
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		struct sk_buff *skb;
 		skb = dev_alloc_skb(PKT_BUF_SZ + sizeof(struct RxFD));
-#ifdef RX_ALIGN
-		skb_reserve(skb, 2);	/* Align IP on 16 byte boundary */
-#endif
+		/* XXX: do we really want to call this before the NULL check? --hch */
+		rx_align(skb);			/* Align IP on 16 byte boundary */
 		sp->rx_skbuff[i] = skb;
 		if (skb == NULL)
 			break;			/* OK.  Just initially short of Rx bufs. */
@@ -1634,9 +1628,8 @@ static inline struct RxFD *speedo_rx_alloc(struct net_device *dev, int entry)
 	struct sk_buff *skb;
 	/* Get a fresh skbuff to replace the consumed one. */
 	skb = dev_alloc_skb(PKT_BUF_SZ + sizeof(struct RxFD));
-#ifdef RX_ALIGN
-	skb_reserve(skb, 2);	/* Align IP on 16 byte boundary */
-#endif
+	/* XXX: do we really want to call this before the NULL check? --hch */
+	rx_align(skb);				/* Align IP on 16 byte boundary */
 	sp->rx_skbuff[entry] = skb;
 	if (skb == NULL) {
 		sp->rx_ringp[entry] = NULL;
@@ -2320,12 +2313,10 @@ static struct pci_driver eepro100_driver = {
 	.name		= "eepro100",
 	.id_table	= eepro100_pci_tbl,
 	.probe		= eepro100_init_one,
-# if defined(MODULE) || defined(CONFIG_HOTPLUG)
 	.remove		= __devexit_p(eepro100_remove_one),
-# endif
 #ifdef CONFIG_PM
 	.suspend	= eepro100_suspend,
-	.resume	= eepro100_resume,
+	.resume		= eepro100_resume,
 #endif /* CONFIG_PM */
 };
 
