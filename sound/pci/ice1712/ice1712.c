@@ -1047,6 +1047,8 @@ static void snd_ice1712_set_pro_rate(ice1712_t *ice, unsigned int rate, int forc
 
 	spin_unlock_irqrestore(&ice->reg_lock, flags);
 
+	if (ice->gpio.set_pro_rate)
+		ice->gpio.set_pro_rate(ice, rate);
 	for (i = 0; i < ice->akm_codecs; i++) {
 		if (ice->akm[i].ops.set_rate_val)
 			ice->akm[i].ops.set_rate_val(&ice->akm[i], rate);
