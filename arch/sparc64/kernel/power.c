@@ -70,9 +70,9 @@ static int powerd(void *__unused)
 
 again:
 	while (button_pressed == 0) {
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current->sighand->siglock);
 		flush_signals(current);
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current->sighand->siglock);
 		interruptible_sleep_on(&powerd_wait);
 	}
 

@@ -120,6 +120,9 @@ int max_queued_signals = 1024;
 #define SIG_KERNEL_STOP_MASK (\
 	M(SIGSTOP)   |  M(SIGTSTP)   |  M(SIGTTIN)   |  M(SIGTTOU)   )
 
+#define SIG_KERNEL_CONT_MASK (\
+	M(SIGCONT)   |  M(SIGKILL)   )
+
 #define SIG_KERNEL_COREDUMP_MASK (\
         M(SIGQUIT)   |  M(SIGILL)    |  M(SIGTRAP)   |  M(SIGABRT)   | \
         M(SIGFPE)    |  M(SIGSEGV)   |  M(SIGBUS)    |  M(SIGSYS)    | \
@@ -136,6 +139,8 @@ int max_queued_signals = 1024;
 		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_IGNORE_MASK))
 #define sig_kernel_stop(sig) \
 		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_STOP_MASK))
+#define sig_kernel_cont(sig) \
+		(((sig) < SIGRTMIN)  && T(sig, SIG_KERNEL_CONT_MASK))
 
 #define sig_user_defined(t, signr) \
 	(((t)->sighand->action[(signr)-1].sa.sa_handler != SIG_DFL) &&	\
@@ -587,7 +592,7 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 			t = next_thread(t);
 		} while (t != p);
 	}
-	else if (sig == SIGCONT) {
+	else if (sig_kernel_cont(sig)) {
 		/*
 		 * Remove all stop signals from all queues,
 		 * and wake all threads.
@@ -617,23 +622,32 @@ static void handle_stop_signal(int sig, struct task_struct *p)
 		t = p;
 		do {
 			rm_from_queue(SIG_KERNEL_STOP_MASK, &t->pending);
-			if (t->state == TASK_STOPPED) {
-				/*
-				 * If there is a handler for SIGCONT, we
-				 * must make sure that no thread returns to
-				 * user mode before we post the signal, in
-				 * case it was the only thread eligible to
-				 * run the signal handler--then it must not
-				 * do anything between resuming and running
-				 * the handler.  With the TIF_SIGPENDING flag
-				 * set, the thread will pause and acquire the
-				 * siglock that we hold now and until we've
-				 * queued the pending signal.
-				 */
-				if (sig_user_defined(p, SIGCONT))
-					set_tsk_thread_flag(t, TIF_SIGPENDING);
-				wake_up_process(t);
-			}
+			/*
+			 * This wakeup is only need if in TASK_STOPPED,
+			 * but there can be SMP races with testing for that.
+			 * In the normal SIGCONT case, all will be stopped.
+			 * A spuriously sent SIGCONT will interrupt all running
+			 * threads to check signals even if it's ignored.
+			 *
+			 * If there is a handler for SIGCONT, we must make
+			 * sure that no thread returns to user mode before
+			 * we post the signal, in case it was the only
+			 * thread eligible to run the signal handler--then
+			 * it must not do anything between resuming and
+			 * running the handler.  With the TIF_SIGPENDING
+			 * flag set, the thread will pause and acquire the
+			 * siglock that we hold now and until we've queued
+			 * the pending signal.  For SIGKILL, we likewise
+			 * don't want anybody doing anything but taking the
+			 * SIGKILL.  The only case in which a thread would
+			 * not already be in the signal dequeuing loop is
+			 * non-signal (e.g. syscall) ptrace tracing, so we
+			 * don't worry about an unnecessary trip through
+			 * the signal code and just keep this code path
+			 * simpler by unconditionally setting the flag.
+			 */
+			set_tsk_thread_flag(t, TIF_SIGPENDING);
+			wake_up_process(t);
 			t = next_thread(t);
 		} while (t != p);
 	}
@@ -1427,9 +1441,12 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 
 			/* Let the debugger run.  */
 			current->exit_code = signr;
+			current->last_siginfo = info;
 			set_current_state(TASK_STOPPED);
 			notify_parent(current, SIGCHLD);
 			schedule();
+
+			current->last_siginfo = NULL;
 
 			/* We're back.  Did the debugger cancel the sig?  */
 			signr = current->exit_code;
@@ -1437,7 +1454,10 @@ int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs)
 				continue;
 			current->exit_code = 0;
 
-			/* Update the siginfo structure.  Is this good?  */
+			/* Update the siginfo structure if the signal has
+			   changed.  If the debugger wanted something
+			   specific in the siginfo structure then it should
+			   have updated *info via PTRACE_SETSIGINFO.  */
 			if (signr != info->si_signo) {
 				info->si_signo = signr;
 				info->si_errno = 0;

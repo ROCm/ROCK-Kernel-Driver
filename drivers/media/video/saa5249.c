@@ -280,17 +280,17 @@ static void jdelay(unsigned long delay)
 {
 	sigset_t oldblocked = current->blocked;
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	current->state = TASK_INTERRUPTIBLE;
 	schedule_timeout(delay);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = oldblocked;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 }
 
 

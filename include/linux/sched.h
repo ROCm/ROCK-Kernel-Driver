@@ -417,6 +417,7 @@ struct task_struct {
 	struct backing_dev_info *backing_dev_info;
 
 	unsigned long ptrace_message;
+	siginfo_t *last_siginfo; /* For ptrace use.  */
 };
 
 extern void __put_task_struct(struct task_struct *tsk);
@@ -457,6 +458,8 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PT_TRACE_VFORK	0x00000020
 #define PT_TRACE_CLONE	0x00000040
 #define PT_TRACE_EXEC	0x00000080
+#define PT_TRACE_VFORK_DONE	0x00000100
+#define PT_TRACE_EXIT	0x00000200
 
 #if CONFIG_SMP
 extern void set_cpus_allowed(task_t *p, unsigned long new_mask);
@@ -775,7 +778,7 @@ static inline void cond_resched_lock(spinlock_t * lock)
 
 /* Reevaluate whether the task has signals pending delivery.
    This is required every time the blocked sigset_t changes.
-   callers must hold sig->siglock.  */
+   callers must hold sighand->siglock.  */
 
 extern FASTCALL(void recalc_sigpending_tsk(struct task_struct *t));
 extern void recalc_sigpending(void);

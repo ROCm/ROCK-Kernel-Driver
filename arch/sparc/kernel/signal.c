@@ -104,11 +104,11 @@ asmlinkage void _sigpause_common(old_sigset_t set, struct pt_regs *regs)
 	sigset_t saveset;
 
 	set &= _BLOCKABLE;
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, set);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->pc = regs->npc;
 	regs->npc += 4;
@@ -161,11 +161,11 @@ asmlinkage void do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize,
 	}
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	oldset = current->blocked;
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->pc = regs->npc;
 	regs->npc += 4;
@@ -267,10 +267,10 @@ static inline void do_new_sigreturn (struct pt_regs *regs)
 		goto segv_and_exit;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	return;
 
 segv_and_exit:
@@ -314,10 +314,10 @@ asmlinkage void do_sigreturn(struct pt_regs *regs)
 		goto segv_and_exit;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	regs->pc = pc;
 	regs->npc = npc;
@@ -384,10 +384,10 @@ asmlinkage void do_rt_sigreturn(struct pt_regs *regs)
 	do_sigaltstack(&st, NULL, (unsigned long)sf);
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	return;
 segv:
 	send_sig(SIGSEGV, current, 1);
@@ -967,10 +967,10 @@ asmlinkage int svr4_setcontext (svr4_ucontext_t *c, struct pt_regs *regs)
 		set.sig[3] = setv.sigbits[3];
 	}
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 	regs->pc = pc;
 	regs->npc = npc | 1;
 	err |= __get_user(regs->y, &((*gr) [SVR4_Y]));
@@ -1007,11 +1007,11 @@ handle_signal(unsigned long signr, struct k_sigaction *ka,
 	if(ka->sa.sa_flags & SA_ONESHOT)
 		ka->sa.sa_handler = SIG_DFL;
 	if(!(ka->sa.sa_flags & SA_NOMASK)) {
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked, signr);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current->sighand->siglock);
 	}
 }
 
@@ -1066,9 +1066,9 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 		sigset_t *mask = &current->blocked;
 		unsigned long signr = 0;
 
-		spin_lock_irq(&current->sig->siglock);
+		spin_lock_irq(&current->sighand->siglock);
 		signr = dequeue_signal(mask, &info);
-		spin_unlock_irq(&current->sig->siglock);
+		spin_unlock_irq(&current->sighand->siglock);
 
 		if (!signr)
 			break;
