@@ -2725,8 +2725,8 @@ static void netdev_wait_allrefs(struct net_device *dev)
  *
  *	rtnl_lock();
  *	...
- *	register_netdevyce(x1);
- *	register_netdevyce(x2);
+ *	register_netdevice(x1);
+ *	register_netdevice(x2);
  *	...
  *	unregister_netdevice(y1);
  *	unregister_netdevice(y2);
