@@ -27,6 +27,14 @@ extern int usb_disabled(void);
 
 /*-------------------------------------------------------------------------*/
 
+struct ohci_hcd *dev_to_ohci(struct device *dev) {
+	struct usb_hcd *hcd = dev->driver_data;
+
+	return hcd_to_ohci(hcd);
+}
+
+/*-------------------------------------------------------------------------*/
+
 static void sa1111_start_hc(struct sa1111_dev *dev)
 {
 	unsigned int usb_rst = 0;
@@ -120,7 +128,7 @@ static void usb_hcd_sa1111_hcim_irq (int irq, void *__hcd, struct pt_regs * r)
 	}
 #endif
 
-	usb_hcd_irq(irq, __hcd, r);
+	usb_hcd_irq(irq, hcd, r);
 }
 
 /*-------------------------------------------------------------------------*/

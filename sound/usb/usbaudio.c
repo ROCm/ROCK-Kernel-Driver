@@ -1879,7 +1879,7 @@ static int snd_usb_create_streams(snd_usb_audio_t *chip, int ctrlif,
 		}
 		if (iface->altsetting[0].desc.bInterfaceClass != USB_CLASS_AUDIO ||
 		    iface->altsetting[0].desc.bInterfaceSubClass != USB_SUBCLASS_AUDIO_STREAMING) {
-			snd_printdd(KERN_ERR "%d:%u:%d: skipping non-supported interface %d\n", dev->devnum, ctrlif, j, iface->altsetting[0].bInterfaceClass);
+			snd_printdd(KERN_ERR "%d:%u:%d: skipping non-supported interface %d\n", dev->devnum, ctrlif, j, iface->altsetting[0].desc.bInterfaceClass);
 			/* skip non-supported classes */
 			continue;
 		}

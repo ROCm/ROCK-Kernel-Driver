@@ -840,7 +840,7 @@ probe_scanner(struct usb_interface *intf,
 	struct usb_device *dev = interface_to_usbdev (intf);
 	struct scn_usb_data *scn;
 	struct usb_host_interface *interface;
-	struct usb_endpoint_descriptor *endpoint;
+	struct usb_host_endpoint *endpoint;
 
 	int ep_cnt;
 	int ix;
@@ -911,7 +911,7 @@ probe_scanner(struct usb_interface *intf,
 	}
 
 	interface = intf->altsetting;
-	endpoint = &interface->endpoint[0].desc;
+	endpoint = &interface->endpoint[0];
 
 /*
  * Start checking for two bulk endpoints OR two bulk endpoints *and* one
