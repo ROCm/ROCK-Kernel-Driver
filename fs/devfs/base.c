@@ -2336,6 +2336,8 @@ struct devfs_lookup_struct
     wait_queue_head_t wait_queue;
 };
 
+/* XXX: this doesn't handle the case where we got a negative dentry
+        but a devfs entry has been registered in the meanwhile */
 static int devfs_d_revalidate_wait (struct dentry *dentry, int flags)
 {
     struct inode *dir = dentry->d_parent->d_inode;
@@ -2380,6 +2382,7 @@ static int devfs_d_revalidate_wait (struct dentry *dentry, int flags)
 	add_wait_queue (&lookup_info->wait_queue, &wait);
 	read_unlock (&parent->u.dir.lock);
 	schedule ();
+	remove_wait_queue (&lookup_info->wait_queue, &wait);
     }
     else read_unlock (&parent->u.dir.lock);
     return 1;
