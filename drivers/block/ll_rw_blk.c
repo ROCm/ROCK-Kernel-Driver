@@ -2040,15 +2040,17 @@ EXPORT_SYMBOL(blk_put_request);
  * If no queues are congested then just wait for the next request to be
  * returned.
  */
-void blk_congestion_wait(int rw, long timeout)
+long blk_congestion_wait(int rw, long timeout)
 {
+	long ret;
 	DEFINE_WAIT(wait);
 	wait_queue_head_t *wqh = &congestion_wqh[rw];
 
 	blk_run_queues();
 	prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
-	io_schedule_timeout(timeout);
+	ret = io_schedule_timeout(timeout);
 	finish_wait(wqh, &wait);
+	return ret;
 }
 
 EXPORT_SYMBOL(blk_congestion_wait);
