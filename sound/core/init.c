@@ -442,7 +442,6 @@ int snd_card_register(snd_card_t * card)
 		snd_printd("unable to create card entry\n");
 		goto __skip_info;
 	}
-	entry->content = SNDRV_INFO_CONTENT_TEXT;
 	entry->c.text.read_size = PAGE_SIZE;
 	entry->c.text.read = snd_card_id_read;
 	if (snd_info_register(entry) < 0) {
@@ -527,7 +526,6 @@ int __init snd_card_info_init(void)
 
 	entry = snd_info_create_module_entry(THIS_MODULE, "cards", NULL);
 	snd_runtime_check(entry != NULL, return -ENOMEM);
-	entry->content = SNDRV_INFO_CONTENT_TEXT;
 	entry->c.text.read_size = PAGE_SIZE;
 	entry->c.text.read = snd_card_info_read;
 	if (snd_info_register(entry) < 0) {
@@ -539,7 +537,6 @@ int __init snd_card_info_init(void)
 #ifdef MODULE
 	entry = snd_info_create_module_entry(THIS_MODULE, "modules", NULL);
 	if (entry) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->c.text.read_size = PAGE_SIZE;
 		entry->c.text.read = snd_card_module_info_read;
 		if (snd_info_register(entry) < 0)
@@ -682,6 +679,7 @@ int snd_card_file_remove(snd_card_t *card, struct file *file)
 int snd_power_wait(snd_card_t *card, unsigned int power_state, struct file *file)
 {
 	wait_queue_t wait;
+	int result = 0;
 
 	/* fastpath */
 	if (snd_power_get_state(card) == power_state)
@@ -689,18 +687,24 @@ int snd_power_wait(snd_card_t *card, unsigned int power_state, struct file *file
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&card->power_sleep, &wait);
 	while (1) {
-		if (card->shutdown)
-			return -ENODEV;
-		if (snd_power_get_state(card) == power_state) {
-			remove_wait_queue(&card->power_sleep, &wait);
-			return 0;
+		if (card->shutdown) {
+			result = -ENODEV;
+			break;
 		}
-		if (file && (file->f_flags & O_NONBLOCK))
-			return -EAGAIN;
+		if (snd_power_get_state(card) == power_state)
+			break;
+#if 0 /* block all devices */
+		if (file && (file->f_flags & O_NONBLOCK)) {
+			result = -EAGAIN;
+			break;
+		}
+#endif
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		snd_power_unlock(card);
 		schedule_timeout(30 * HZ);
 		snd_power_lock(card);
 	}
+	remove_wait_queue(&card->power_sleep, &wait);
+	return result;
 }
 #endif /* CONFIG_PM */

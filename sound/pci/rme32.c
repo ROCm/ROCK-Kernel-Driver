@@ -1191,18 +1191,18 @@ snd_rme32_playback_pointer(snd_pcm_substream_t * substream)
 		}
 		bytes = diff << rme32->playback_frlog;
 		if (bytes > RME32_BUFFER_SIZE - rme32->playback_ptr) {
-			memcpy_toio(rme32->iobase + RME32_IO_DATA_BUFFER + rme32->playback_ptr,
+			memcpy_toio((void *)(rme32->iobase + RME32_IO_DATA_BUFFER + rme32->playback_ptr),
 				    runtime->dma_area + rme32->playback_ptr,
 				    RME32_BUFFER_SIZE - rme32->playback_ptr);
 			bytes -= RME32_BUFFER_SIZE - rme32->playback_ptr;
 			if (bytes > RME32_BUFFER_SIZE) {
 				bytes = RME32_BUFFER_SIZE;
 			}
-			memcpy_toio(rme32->iobase + RME32_IO_DATA_BUFFER,
+			memcpy_toio((void *)(rme32->iobase + RME32_IO_DATA_BUFFER),
 				    runtime->dma_area, bytes);
 			rme32->playback_ptr = bytes;
 		} else if (bytes != 0) {
-			memcpy_toio(rme32->iobase + RME32_IO_DATA_BUFFER + rme32->playback_ptr,
+			memcpy_toio((void *)(rme32->iobase + RME32_IO_DATA_BUFFER + rme32->playback_ptr),
 				    runtime->dma_area + rme32->playback_ptr, bytes);
 			rme32->playback_ptr += bytes;
 		}
@@ -1223,17 +1223,17 @@ snd_rme32_capture_pointer(snd_pcm_substream_t * substream)
 		ptr = frameptr << rme32->capture_frlog;
 		if (ptr > rme32->capture_ptr) {
 			memcpy_fromio(runtime->dma_area + rme32->capture_ptr,
-				      rme32->iobase + RME32_IO_DATA_BUFFER +
-				      rme32->capture_ptr,
+				      (void *)(rme32->iobase + RME32_IO_DATA_BUFFER +
+					       rme32->capture_ptr),
 				      ptr - rme32->capture_ptr);
 			rme32->capture_ptr += ptr - rme32->capture_ptr;
 		} else if (ptr < rme32->capture_ptr) {
 			memcpy_fromio(runtime->dma_area + rme32->capture_ptr,
-				      rme32->iobase + RME32_IO_DATA_BUFFER +
-				      rme32->capture_ptr,
+				      (void *)(rme32->iobase + RME32_IO_DATA_BUFFER +
+					       rme32->capture_ptr),
 				      RME32_BUFFER_SIZE - rme32->capture_ptr);
 			memcpy_fromio(runtime->dma_area,
-				      rme32->iobase + RME32_IO_DATA_BUFFER,
+				      (void *)(rme32->iobase + RME32_IO_DATA_BUFFER),
 				      ptr);
 			rme32->capture_ptr = ptr;
 		}
@@ -1545,7 +1545,7 @@ static void __devinit snd_rme32_proc_init(rme32_t * rme32)
 	snd_info_entry_t *entry;
 
 	if (! snd_card_proc_new(rme32->card, "rme32", &entry))
-		snd_info_set_text_ops(entry, rme32, snd_rme32_proc_read);
+		snd_info_set_text_ops(entry, rme32, 1024, snd_rme32_proc_read);
 }
 
 /*
@@ -1948,6 +1948,7 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 	rme32 = (rme32_t *) card->private_data;
 	rme32->card = card;
 	rme32->pci = pci;
+	snd_card_set_dev(card, &pci->dev);
 	if ((err = snd_rme32_create(rme32)) < 0) {
 		snd_card_free(card);
 		return err;

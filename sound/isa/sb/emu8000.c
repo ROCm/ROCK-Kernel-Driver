@@ -655,7 +655,7 @@ static soundfont_chorus_fx_t chorus_parm[SNDRV_EMU8000_CHORUS_NUMBERS] = {
 };
 
 /*exported*/ int
-snd_emu8000_load_chorus_fx(emu8000_t *emu, int mode, const void *buf, long len)
+snd_emu8000_load_chorus_fx(emu8000_t *emu, int mode, const void __user *buf, long len)
 {
 	soundfont_chorus_fx_t rec;
 	if (mode < SNDRV_EMU8000_CHORUS_PREDEFINED || mode >= SNDRV_EMU8000_CHORUS_NUMBERS) {
@@ -782,7 +782,7 @@ static struct reverb_cmd_pair {
 };
 
 /*exported*/ int
-snd_emu8000_load_reverb_fx(emu8000_t *emu, int mode, const void *buf, long len)
+snd_emu8000_load_reverb_fx(emu8000_t *emu, int mode, const void __user *buf, long len)
 {
 	soundfont_reverb_fx_t rec;
 
@@ -1044,8 +1044,10 @@ snd_emu8000_create_mixer(snd_card_t *card, emu8000_t *emu)
 
 __error:
 	for (i = 0; i < EMU8000_NUM_CONTROLS; i++) {
+		down_write(&card->controls_rwsem);
 		if (emu->controls[i])
 			snd_ctl_remove(card, emu->controls[i]);
+		up_write(&card->controls_rwsem);
 	}
 	return err;
 }
@@ -1110,6 +1112,7 @@ snd_emu8000_new(snd_card_t *card, int index, long port, int seq_ports, snd_seq_d
 	if (!(hw->res_port1 = request_region(hw->port1, 4, "Emu8000-1")) ||
 	    !(hw->res_port2 = request_region(hw->port2, 4, "Emu8000-2")) ||
 	    !(hw->res_port3 = request_region(hw->port3, 4, "Emu8000-3"))) {
+		snd_printk(KERN_ERR "sbawe: can't grab ports 0x%lx, 0x%lx, 0x%lx\n", hw->port1, hw->port2, hw->port3);
 		snd_emu8000_free(hw);
 		return -EBUSY;
 	}

@@ -97,6 +97,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/gameport.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -112,6 +113,10 @@ MODULE_DESCRIPTION("Aztech AZF3328 (PCI168)");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");
 MODULE_DEVICES("{{Aztech,AZF3328}}");
+
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
+#define SUPPORT_JOYSTICK 1
+#endif
 
 #define DEBUG_MISC	0
 #define DEBUG_CALLS	0
@@ -158,8 +163,9 @@ MODULE_DEVICES("{{Aztech,AZF3328}}");
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int joystick[SNDRV_CARDS] =
-	{-1};	/* "unset" as default */
+#ifdef SUPPORT_JOYSTICK
+static int joystick[SNDRV_CARDS];
+#endif
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for AZF3328 soundcard.");
@@ -170,9 +176,11 @@ MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable AZF3328 soundcard.");
 MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
+#ifdef SUPPORT_JOYSTICK
 MODULE_PARM(joystick, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
-MODULE_PARM_DESC(joystick, "Forced joystick port enable for AZF3328 soundcard. (0 = force disable)");
-MODULE_PARM_SYNTAX(joystick, SNDRV_ENABLED);
+MODULE_PARM_DESC(joystick, "Enable joystick for AZF3328 soundcard.");
+MODULE_PARM_SYNTAX(joystick, SNDRV_BOOLEAN_FALSE_DESC);
+#endif
 
 typedef struct _snd_azf3328 azf3328_t;
 #define chip_t azf3328_t
@@ -190,7 +198,11 @@ struct _snd_azf3328 {
 	struct resource *res_synth_port;
 	unsigned long mixer_port;
 	struct resource *res_mixer_port;
-	unsigned long game_port;
+
+#ifdef SUPPORT_JOYSTICK
+	struct gameport gameport;
+	struct resource *res_joystick;
+#endif
 
 	struct pci_dev *pci;
 	snd_card_t *card;
@@ -1259,6 +1271,16 @@ static int snd_azf3328_free(azf3328_t *chip)
 
         synchronize_irq(chip->irq);
       __end_hw:
+#ifdef SUPPORT_JOYSTICK
+	if (chip->res_joystick) {
+		gameport_unregister_port(&chip->gameport);
+		/* disable gameport */
+		snd_azf3328_io2_write(chip, IDX_IO2_LEGACY_ADDR,
+				      snd_azf3328_io2_read(chip, IDX_IO2_LEGACY_ADDR) & ~LEGACY_JOY);
+		release_resource(chip->res_joystick);
+		kfree_nocheck(chip->res_joystick);
+	}
+#endif
         if (chip->res_codec_port) {
 		release_resource(chip->res_codec_port);
 		kfree_nocheck(chip->res_codec_port);
@@ -1339,11 +1361,11 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 	chip->irq = -1;
 
 	/* check if we can restrict PCI DMA transfers to 24 bits */
-	if (!pci_dma_supported(pci, 0x00ffffff)) {
+	if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
+	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
 		snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x00ffffff);
 
 	chip->codec_port = pci_resource_start(pci, 0);
 	if ((chip->res_codec_port = request_region(chip->codec_port, 0x80, "Aztech AZF3328 I/O")) == NULL) {
@@ -1415,57 +1437,33 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 
+	snd_card_set_dev(card, &pci->dev);
+
 	*rchip = chip;
 	return 0;
 }
 
+#ifdef SUPPORT_JOYSTICK
 static void __devinit snd_azf3328_config_joystick(azf3328_t *chip, int joystick)
 {
-	int i, detected = 0, activate = 0;
-	char *msg = NULL;
 	unsigned char val;
 
-	if (joystick == -1) /* auto detection/activation */
-	{
-		for (i=0x200; i <= 0x207; i++)
-			if (inb(i) != 0xff)
-				detected = 1; /* other joy found, don't activate */
+	if (joystick == 1) {
+		if ((chip->res_joystick = request_region(0x200, 8, "AZF3328 gameport")) != NULL)
+			chip->gameport.io = 0x200;
 	}
 
-	if ((joystick == -1) && (detected == 1))
-	{
-		activate = 0;
-		msg = "DISABLED (address occupied by another joystick port)";
-	}
-	else
-	if ((joystick == -1) && (detected == 0))
-	{
-		activate = 1;
-		msg = "ENABLED (via autodetect)";
-	}
-	else
-	if (joystick == 0)
-	{
-		activate = 0;
-		msg = "DISABLED (forced)";
-	}
-	else
-	if (joystick == 1)
-	{
-		activate = 1;
-		msg = "ENABLED (Warning: forced!)";
-	}
 	val = inb(chip->io2_port + IDX_IO2_LEGACY_ADDR);
-	if (activate)
-	    val |= LEGACY_JOY;
+	if (chip->res_joystick)
+		val |= LEGACY_JOY;
 	else
-	    val &= ~LEGACY_JOY;
+		val &= ~LEGACY_JOY;
 
 	outb(val, chip->io2_port + IDX_IO2_LEGACY_ADDR);
-#ifdef MODULE
-	printk("azt3328: Joystick port: %s.\n", msg);
-#endif
+	if (chip->res_joystick)
+		gameport_register_port(&chip->gameport);
 }
+#endif
 
 static int __devinit snd_azf3328_probe(struct pci_dev *pci,
 					  const struct pci_device_id *pci_id)
@@ -1537,7 +1535,9 @@ static int __devinit snd_azf3328_probe(struct pci_dev *pci,
 "azt3328: Feel free to contact hw7oshyuv3001@sneakemail.com for bug reports etc.!\n");
 #endif
 
+#ifdef SUPPORT_JOYSTICK
 	snd_azf3328_config_joystick(chip, joystick[dev]);
+#endif
 
 	pci_set_drvdata(pci, chip);
 	dev++;
@@ -1598,7 +1598,7 @@ module_exit(alsa_card_azf3328_exit)
 
 #ifndef MODULE
 
-/* format is: snd-azf3328=enable,index,id */
+/* format is: snd-azf3328=enable,index,id,joystick */
 
 static int __init alsa_card_azf3328_setup(char *str)
 {
@@ -1610,12 +1610,16 @@ static int __init alsa_card_azf3328_setup(char *str)
 		return 0;
 	(void)(get_option(&str,&enable[nr_dev]) == 2 &&
 	       get_option(&str,&index[nr_dev]) == 2 &&
-	       get_id(&str,&id[nr_dev]) == 2);
+	       get_id(&str,&id[nr_dev]) == 2
+#ifdef SUPPORT_JOYSTICK
+	       && get_option(&str,&joystick[nr_dev]) == 2
+#endif
+	       );
 	nr_dev++;
 	snd_azf3328_dbgcallleave();
 	return 1;
 }
 
-__setup("snd-azf3328=", alsa_card_azf3328_setup);
+__setup("snd-azt3328=", alsa_card_azf3328_setup);
 
 #endif /* ifndef MODULE */

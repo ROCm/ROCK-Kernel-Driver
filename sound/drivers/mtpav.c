@@ -813,7 +813,7 @@ static int __init alsa_card_mtpav_setup(char *str)
 	(void)(get_option(&str,&enable) == 2 &&
 	       get_option(&str,&index) == 2 &&
 	       get_id(&str,&id) == 2 &&
-	       get_option(&str,(int *)&port) == 2 &&
+	       get_option_long(&str,&port) == 2 &&
 	       get_option(&str,&irq) == 2 &&
 	       get_option(&str,&hwports) == 2);
 	return 1;

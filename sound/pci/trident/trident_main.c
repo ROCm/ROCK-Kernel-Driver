@@ -2955,6 +2955,7 @@ static int snd_trident_pcm_mixer_free(trident_t *trident, snd_trident_voice_t *v
 
 static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device)
 {
+	ac97_bus_t _bus;
 	ac97_t _ac97;
 	snd_card_t * card = trident->card;
 	snd_kcontrol_t *kctl;
@@ -2965,14 +2966,18 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 	if (!uctl)
 		return -ENOMEM;
 
+	memset(&_bus, 0, sizeof(_bus));
+	_bus.write = snd_trident_codec_write;
+	_bus.read = snd_trident_codec_read;
+	if ((err = snd_ac97_bus(trident->card, &_bus, &trident->ac97_bus)) < 0)
+		goto __out;
+
 	memset(&_ac97, 0, sizeof(_ac97));
-	_ac97.write = snd_trident_codec_write;
-	_ac97.read = snd_trident_codec_read;
 	_ac97.private_data = trident;
 	trident->ac97_detect = 1;
 
       __again:
-	if ((err = snd_ac97_mixer(trident->card, &_ac97, &trident->ac97)) < 0) {
+	if ((err = snd_ac97_mixer(trident->ac97_bus, &_ac97, &trident->ac97)) < 0) {
 		if (trident->device == TRIDENT_DEVICE_ID_SI7018) {
 			if ((err = snd_trident_sis_reset(trident)) < 0)
 				goto __out;
@@ -2987,7 +2992,7 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 	if (trident->device == TRIDENT_DEVICE_ID_SI7018 &&
 	    (inl(TRID_REG(trident, SI_SERIAL_INTF_CTRL)) & SI_AC97_PRIMARY_READY) != 0) {
 		_ac97.num = 1;
-		err = snd_ac97_mixer(trident->card, &_ac97, &trident->ac97_sec);
+		err = snd_ac97_mixer(trident->ac97_bus, &_ac97, &trident->ac97_sec);
 		if (err < 0)
 			snd_printk("SI7018: the secondary codec - invalid access\n");
 #if 0	// only for my testing purpose --jk
@@ -3295,7 +3300,7 @@ static void __devinit snd_trident_proc_init(trident_t * trident)
 	if (trident->device == TRIDENT_DEVICE_ID_SI7018)
 		s = "sis7018";
 	if (! snd_card_proc_new(trident->card, s, &entry))
-		snd_info_set_text_ops(entry, trident, snd_trident_proc_read);
+		snd_info_set_text_ops(entry, trident, 1024, snd_trident_proc_read);
 }
 
 static int snd_trident_dev_free(snd_device_t *device)
@@ -3518,11 +3523,11 @@ int __devinit snd_trident_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 	/* check, if we can restrict PCI DMA transfers to 30 bits */
-	if (!pci_dma_supported(pci, 0x3fffffff)) {
+	if (pci_set_dma_mask(pci, 0x3fffffff) < 0 ||
+	    pci_set_consistent_dma_mask(pci, 0x3fffffff) < 0) {
 		snd_printk("architecture does not support 30bit PCI busmaster DMA\n");
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0x3fffffff);
 	
 	trident = snd_magic_kcalloc(trident_t, 0, GFP_KERNEL);
 	if (trident == NULL)
@@ -3624,6 +3629,7 @@ int __devinit snd_trident_create(snd_card_t * card,
 		snd_trident_free(trident);
 		return err;
 	}
+	snd_card_set_dev(card, &pci->dev);
 	*rtrident = trident;
 	return 0;
 }
@@ -3947,7 +3953,9 @@ void snd_trident_resume(trident_t *trident)
 		return;
 
 	pci_enable_device(trident->pci);
-	pci_set_dma_mask(trident->pci, 0x3fffffff); /* to be sure */
+	if (pci_set_dma_mask(trident->pci, 0x3fffffff) < 0 ||
+	    pci_set_consistent_dma_mask(trident->pci, 0x3fffffff) < 0)
+		snd_printk(KERN_WARNING "trident: can't set the proper DMA mask\n");
 	pci_set_master(trident->pci); /* to be sure */
 
 	switch (trident->device) {

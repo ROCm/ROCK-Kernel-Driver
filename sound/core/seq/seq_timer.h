@@ -1,6 +1,6 @@
 /*
  *  ALSA sequencer Timer
- *  Copyright (c) 1998-1999 by Frank van de Pol <fvdpol@home.nl>
+ *  Copyright (c) 1998-1999 by Frank van de Pol <fvdpol@coil.demon.nl>
  *
  *
  *   This program is free software; you can redistribute it and/or modify
@@ -47,7 +47,7 @@ typedef struct {
 	snd_timer_id_t		alsa_id;	/* ALSA's timer ID */
 	snd_timer_instance_t	*timeri;	/* timer instance */
 	unsigned int		ticks;
-	unsigned long		preferred_resolution; /* timer resolution */
+	unsigned long		preferred_resolution; /* timer resolution, ticks/sec */
 
 	unsigned int skew;
 	unsigned int skew_base;

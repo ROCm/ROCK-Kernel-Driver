@@ -36,7 +36,7 @@
  */
 int
 snd_emu10k1_sample_new(snd_emux_t *rec, snd_sf_sample_t *sp,
-		       snd_util_memhdr_t *hdr, const void *data, long count)
+		       snd_util_memhdr_t *hdr, const void __user *data, long count)
 {
 	int offset;
 	int truesize, size, loopsize, blocksize;
