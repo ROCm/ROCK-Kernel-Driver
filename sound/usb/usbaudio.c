@@ -28,9 +28,8 @@
  *  NOTES:
  *
  *   - async unlink should be used for avoiding the sleep inside lock.
- *     however, it causes oops by unknown reason on usb-uhci, and
- *     disabled as default.  the feature is enabled by async_unlink=1
- *     option (especially when preempt is used).
+ *     2.4.22 usb-uhci seems buggy for async unlinking and results in
+ *     oops.  in such a cse, pass async_unlink=0 option.
  *   - the linked URBs would be preferred but not used so far because of
  *     the instability of unlinking.
  *   - type II is not supported properly.  there is no device which supports
@@ -69,7 +68,7 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 static int vid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Vendor ID for this card */
 static int pid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Product ID for this card */
 static int nrpacks = 4;		/* max. number of packets per urb */
-static int async_unlink = 0;
+static int async_unlink = 1;
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for the USB audio adapter.");
@@ -804,8 +803,7 @@ static void release_substream_urbs(snd_usb_substream_t *subs, int force)
 	int i;
 
 	/* stop urbs (to be sure) */
-	deactivate_urbs(subs, force, 1);
-	if (async_unlink)
+	if (deactivate_urbs(subs, force, 1) > 0)
 		wait_clear_urbs(subs);
 
 	for (i = 0; i < MAX_URBS; i++)
@@ -833,12 +831,6 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 	subs->freqn = subs->freqm = get_usb_rate(rate);
 	subs->freqmax = subs->freqn + (subs->freqn >> 2); /* max. allowed frequency */
 	subs->phase = 0;
-
-	/* reset the pointer */
-	subs->hwptr = 0;
-	subs->hwptr_done = 0;
-	subs->transfer_sched = 0;
-	subs->transfer_done = 0;
 
 	/* calculate the max. size of packet */
 	maxsize = ((subs->freqmax + 0x3fff) * (frame_bits >> 3)) >> 14;
@@ -1276,6 +1268,17 @@ static int snd_usb_pcm_prepare(snd_pcm_substream_t *substream)
 	/* some unit conversions in runtime */
 	subs->maxframesize = bytes_to_frames(runtime, subs->maxpacksize);
 	subs->curframesize = bytes_to_frames(runtime, subs->curpacksize);
+
+	/* reset the pointer */
+	subs->hwptr = 0;
+	subs->hwptr_done = 0;
+	subs->transfer_sched = 0;
+	subs->transfer_done = 0;
+	subs->phase = 0;
+
+	/* clear urbs (to be sure) */
+	if (deactivate_urbs(subs, 0, 0) > 0)
+		wait_clear_urbs(subs);
 
 	return 0;
 }
@@ -2002,7 +2005,7 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 	as->pcm = pcm;
 	pcm->private_data = as;
 	pcm->private_free = snd_usb_audio_pcm_free;
-	pcm->info_flags = 0;
+	pcm->info_flags = SNDRV_PCM_INFO_NONATOMIC_OPS;
 	if (chip->pcm_devs > 0)
 		sprintf(pcm->name, "USB Audio #%d", chip->pcm_devs);
 	else
