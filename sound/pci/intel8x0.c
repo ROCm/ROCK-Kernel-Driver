@@ -892,8 +892,10 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 	if (err < 0)
 		return err;
-	if (ichdev->pcm_open_flag)
+	if (ichdev->pcm_open_flag) {
 		snd_ac97_pcm_close(ichdev->pcm);
+		ichdev->pcm_open_flag = 0;
+	}
 	err = snd_ac97_pcm_open(ichdev->pcm, params_rate(hw_params),
 				params_channels(hw_params),
 				ichdev->pcm->r[0].slots);
@@ -906,8 +908,10 @@ static int snd_intel8x0_hw_free(snd_pcm_substream_t * substream)
 {
 	ichdev_t *ichdev = get_ichdev(substream);
 
-	if (ichdev->pcm_open_flag)
+	if (ichdev->pcm_open_flag) {
 		snd_ac97_pcm_close(ichdev->pcm);
+		ichdev->pcm_open_flag = 0;
+	}
 	return snd_pcm_lib_free_pages(substream);
 }
 
@@ -1765,14 +1769,16 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		goto __err;
 	chip->ac97_bus = pbus;
 	ac97.pci = chip->pci;
-	if ((err = snd_ac97_mixer(pbus, &ac97, &x97)) < 0) {
-	      __err:
-		/* clear the cold-reset bit for the next chance */
-		if (chip->device_type != DEVICE_ALI)
-			iputdword(chip, ICHREG(GLOB_CNT), igetdword(chip, ICHREG(GLOB_CNT)) & ~ICH_AC97COLD);
-		return err;
+	for (i = 0; i < codecs; i++) {
+		ac97.num = i;
+		if ((err = snd_ac97_mixer(pbus, &ac97, &x97)) < 0) {
+			snd_printk(KERN_ERR "Unable to initialize codec #%d\n", i);
+			if (i == 0)
+				goto __err;
+			continue;
+		}
+		chip->ac97[i] = x97;
 	}
-	chip->ac97[0] = x97;
 	/* tune up the primary codec */
 	snd_ac97_tune_hardware(chip->ac97[0], ac97_quirks);
 	/* enable separate SDINs for ICH4 */
@@ -1784,7 +1790,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 		i -= 2;		/* do not allocate PCM2IN and MIC2 */
 	if (spdif_idx < 0)
 		i--;		/* do not allocate S/PDIF */
-	err = snd_ac97_pcm_assign(pbus, ARRAY_SIZE(ac97_pcm_defs), ac97_pcm_defs);
+	err = snd_ac97_pcm_assign(pbus, i, ac97_pcm_defs);
 	if (err < 0)
 		goto __err;
 	chip->ichd[ICHD_PCMOUT].pcm = &pbus->pcms[0];
@@ -1826,6 +1832,12 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock)
 	}
 	chip->in_ac97_init = 0;
 	return 0;
+
+ __err:
+	/* clear the cold-reset bit for the next chance */
+	if (chip->device_type != DEVICE_ALI)
+		iputdword(chip, ICHREG(GLOB_CNT), igetdword(chip, ICHREG(GLOB_CNT)) & ~ICH_AC97COLD);
+	return err;
 }
 
 

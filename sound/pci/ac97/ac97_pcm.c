@@ -260,7 +260,7 @@ static unsigned short get_pslots(ac97_t *ac97, unsigned char *rate_table)
 		unsigned short slots = 0;
 		if (ac97_is_rev22(ac97)) {
 			/* Note: it's simply emulation of AMAP behaviour */
-			u8 es;
+			u16 es;
 			es = ac97->regs[AC97_EXTENDED_STATUS] &= ~AC97_EI_DACS_SLOT_MASK;
 			switch (ac97->addr) {
 			case 1:
@@ -357,11 +357,7 @@ static unsigned int get_rates(struct ac97_pcm *pcm, unsigned int cidx, unsigned 
 		case AC97_PCM_MIC_ADC_RATE:	idx = AC97_RATES_MIC_ADC; break;
 		default:			idx = AC97_RATES_SPDIF; break;
 		}
-		if (rates == ~0) {
-			rates = pcm->r[dbl].codec[cidx]->rates[idx];
-		} else {
-			rates &= pcm->r[dbl].codec[cidx]->rates[idx];
-		}
+		rates &= pcm->r[dbl].codec[cidx]->rates[idx];
 	}
 	return rates;
 }
@@ -378,7 +374,7 @@ static unsigned int get_rates(struct ac97_pcm *pcm, unsigned int cidx, unsigned 
  */
 int snd_ac97_pcm_assign(ac97_bus_t *bus,
 			unsigned short pcms_count,
-			struct ac97_pcm *pcms)
+			const struct ac97_pcm *pcms)
 {
 	int i, j, k;
 	struct ac97_pcm *pcm, *rpcms, *rpcm;
@@ -389,7 +385,7 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 	unsigned int rates;
 	ac97_t *codec;
 
-	rpcms = snd_kcalloc(sizeof(struct ac97_pcm), GFP_KERNEL);
+	rpcms = snd_kcalloc(sizeof(struct ac97_pcm) * pcms_count, GFP_KERNEL);
 	if (rpcms == NULL)
 		return -ENOMEM;
 	memset(avail_slots, 0, sizeof(avail_slots));
@@ -421,6 +417,7 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 		rpcm->exclusive = pcm->exclusive;
 		rpcm->private_value = pcm->private_value;
 		rpcm->bus = bus;
+		rpcm->rates = ~0;
 		slots = pcm->r[0].slots;
 		for (j = 0; j < 4 && slots; j++) {
 			rates = ~0;
@@ -448,11 +445,7 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 			}
 			slots &= ~tmp;
 			rpcm->r[0].slots |= tmp;
-			if (j == 0) {
-				pcm->rates = rates;
-			} else {
-				pcm->rates &= rates;
-			}
+			rpcm->rates &= rates;
 		}
 	}
 	bus->pcms_count = pcms_count;

@@ -479,7 +479,7 @@ int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate);
 
 int snd_ac97_pcm_assign(ac97_bus_t *ac97,
 			unsigned short pcms_count,
-			struct ac97_pcm *pcms);
+			const struct ac97_pcm *pcms);
 int snd_ac97_pcm_open(struct ac97_pcm *pcm, unsigned int rate,
 		      enum ac97_pcm_cfg cfg, unsigned short slots);
 int snd_ac97_pcm_close(struct ac97_pcm *pcm);
