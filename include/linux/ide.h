@@ -1415,42 +1415,32 @@ extern void atapi_output_bytes(ide_drive_t *, void *, u32);
 extern void taskfile_input_data(ide_drive_t *, void *, u32);
 extern void taskfile_output_data(ide_drive_t *, void *, u32);
 
-#ifdef CONFIG_IDE_TASKFILE_IO
-
 #define IDE_PIO_IN	0
 #define IDE_PIO_OUT	1
 
-static inline void task_sectors(ide_drive_t *drive, struct request *rq,
-				unsigned nsect, int rw)
+static inline void __task_sectors(ide_drive_t *drive, char *buf,
+				  unsigned nsect, unsigned rw)
 {
-	unsigned long flags;
-	unsigned int bio_rq;
-	char *buf;
-
-	/*
-	 * bio_rq flag is needed because we can call
-	 * rq_unmap_buffer() with rq->cbio == NULL
-	 */
-	bio_rq = rq->cbio ? 1 : 0;
-
-	if (bio_rq)
-		buf = rq_map_buffer(rq, &flags);	/* fs request */
-	else
-		buf = rq->buffer + blk_rq_offset(rq);	/* task request */
-
 	/*
 	 * IRQ can happen instantly after reading/writing
 	 * last sector of the datablock.
 	 */
-	process_that_request_first(rq, nsect);
-
 	if (rw == IDE_PIO_OUT)
 		taskfile_output_data(drive, buf, nsect * SECTOR_WORDS);
 	else
 		taskfile_input_data(drive, buf, nsect * SECTOR_WORDS);
+}
 
-	if (bio_rq)
-		rq_unmap_buffer(buf, &flags);
+#ifdef CONFIG_IDE_TASKFILE_IO
+static inline void task_bio_sectors(ide_drive_t *drive, struct request *rq,
+				    unsigned nsect, unsigned rw)
+{
+	unsigned long flags;
+	char *buf = rq_map_buffer(rq, &flags);
+
+	process_that_request_first(rq, nsect);
+	__task_sectors(drive, buf, nsect, rw);
+	rq_unmap_buffer(buf, &flags);
 }
 #endif /* CONFIG_IDE_TASKFILE_IO */
 

@@ -288,6 +288,27 @@ ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 
 EXPORT_SYMBOL(task_no_data_intr);
 
+static inline void task_buffer_sectors(ide_drive_t *drive, struct request *rq,
+				       unsigned nsect, unsigned rw)
+{
+	char *buf = rq->buffer + blk_rq_offset(rq);
+
+	process_that_request_first(rq, nsect);
+	__task_sectors(drive, buf, nsect, rw);
+}
+
+static inline void task_buffer_multi_sectors(ide_drive_t *drive,
+					     struct request *rq, unsigned rw)
+{
+	unsigned int msect = drive->mult_count, nsect;
+
+	nsect = rq->current_nr_sectors;
+	if (nsect > msect)
+		nsect = msect;
+
+	task_buffer_sectors(drive, rq, nsect, rw);
+}
+
 /*
  * old taskfile PIO handlers, to be killed as soon as possible.
  */
@@ -512,8 +533,17 @@ EXPORT_SYMBOL(task_mulout_intr);
 
 #else /* !CONFIG_IDE_TASKFILE_IO */
 
-static inline void task_multi_sectors(ide_drive_t *drive,
-				      struct request *rq, int rw)
+static void task_sectors(ide_drive_t *drive, struct request *rq,
+			 unsigned nsect, unsigned rw)
+{
+	if (rq->cbio)	/* fs request */
+		task_bio_sectors(drive, rq, nsect, rw);
+	else		/* task request */
+		task_buffer_sectors(drive, rq, nsect, rw);
+}
+
+static inline void task_bio_multi_sectors(ide_drive_t *drive,
+					  struct request *rq, unsigned rw)
 {
 	unsigned int nsect, msect = drive->mult_count;
 
@@ -523,13 +553,22 @@ static inline void task_multi_sectors(ide_drive_t *drive,
 		if (nsect > msect)
 			nsect = msect;
 
-		task_sectors(drive, rq, nsect, rw);
+		task_bio_sectors(drive, rq, nsect, rw);
 
 		if (!rq->nr_sectors)
 			msect = 0;
 		else
 			msect -= nsect;
 	} while (msect);
+}
+
+static void task_multi_sectors(ide_drive_t *drive,
+			       struct request *rq, unsigned rw)
+{
+	if (rq->cbio)	/* fs request */
+		task_bio_multi_sectors(drive, rq, rw);
+	else		/* task request */
+		task_buffer_multi_sectors(drive, rq, rw);
 }
 
 static u8 wait_drive_not_busy(ide_drive_t *drive)
