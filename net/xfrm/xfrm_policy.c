@@ -692,6 +692,8 @@ static inline int policy_to_flow_dir(int dir)
 	};
 }
 
+static int stale_bundle(struct dst_entry *dst);
+
 /* Main function: finds/creates a bundle for given flow.
  *
  * At the moment we eat a raw IP route. Mostly to speed up lookups
@@ -816,10 +818,11 @@ restart:
 		}
 
 		write_lock_bh(&policy->lock);
-		if (unlikely(policy->dead)) {
+		if (unlikely(policy->dead || stale_bundle(dst))) {
 			/* Wow! While we worked on resolving, this
 			 * policy has gone. Retry. It is not paranoia,
 			 * we just cannot enlist new bundle to dead object.
+			 * We can't enlist stable bundles either.
 			 */
 			write_unlock_bh(&policy->lock);
 
@@ -987,18 +990,27 @@ int __xfrm_route_forward(struct sk_buff *skb, unsigned short family)
 
 static struct dst_entry *xfrm_dst_check(struct dst_entry *dst, u32 cookie)
 {
+	if (!stale_bundle(dst))
+		return dst;
+
+	dst_release(dst);
+	return NULL;
+}
+
+static int stale_bundle(struct dst_entry *dst)
+{
 	struct dst_entry *child = dst;
 
 	while (child) {
 		if (child->obsolete > 0 ||
+		    (child->dev && !netif_running(child->dev)) ||
 		    (child->xfrm && child->xfrm->km.state != XFRM_STATE_VALID)) {
-			dst_release(dst);
-			return NULL;
+			return 1;
 		}
 		child = child->child;
 	}
 
-	return dst;
+	return 0;
 }
 
 static void xfrm_dst_destroy(struct dst_entry *dst)
@@ -1024,8 +1036,7 @@ static struct dst_entry *xfrm_negative_advice(struct dst_entry *dst)
 	return dst;
 }
 
-static void xfrm_prune_bundles(int (*func)(struct dst_entry *, void *),
-			      void *data)
+static void xfrm_prune_bundles(int (*func)(struct dst_entry *))
 {
 	int i;
 	struct xfrm_policy *pol;
@@ -1037,7 +1048,7 @@ static void xfrm_prune_bundles(int (*func)(struct dst_entry *, void *),
 			write_lock(&pol->lock);
 			dstp = &pol->bundles;
 			while ((dst=*dstp) != NULL) {
-				if (func(dst, data)) {
+				if (func(dst)) {
 					*dstp = dst->next;
 					dst->next = gc_list;
 					gc_list = dst;
@@ -1057,30 +1068,19 @@ static void xfrm_prune_bundles(int (*func)(struct dst_entry *, void *),
 	}
 }
 
-static int unused_dst(struct dst_entry *dst, void *data)
+static int unused_bundle(struct dst_entry *dst)
 {
 	return !atomic_read(&dst->__refcnt);
 }
 
 static void __xfrm_garbage_collect(void)
 {
-	xfrm_prune_bundles(unused_dst, NULL);
+	xfrm_prune_bundles(unused_bundle);
 }
 
-static int bundle_depends_on(struct dst_entry *dst, void *data)
+int xfrm_flush_bundles(void)
 {
-	struct xfrm_state *x = data;
-
-	do {
-		if (dst->xfrm == x)
-			return 1;
-	} while ((dst = dst->child) != NULL);
-	return 0;
-}
-
-int xfrm_flush_bundles(struct xfrm_state *x)
-{
-	xfrm_prune_bundles(bundle_depends_on, x);
+	xfrm_prune_bundles(stale_bundle);
 	return 0;
 }
 
@@ -1203,25 +1203,11 @@ void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo)
 	read_unlock(&afinfo->lock);
 }
 
-static int bundle_has_dev(struct dst_entry *dst, void *data)
-{
-	struct net_device *dev = data;
-
-	do {
-		if (dst->dev == dev)
-			return 1;
-	} while ((dst = dst->child) != NULL);
-	return 0;
-}
-
 static int xfrm_dev_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
-	struct net_device *dev = ptr;
-
 	switch (event) {
-	case NETDEV_UNREGISTER:
 	case NETDEV_DOWN:
-		xfrm_prune_bundles(bundle_has_dev, dev);
+		xfrm_flush_bundles();
 	}
 	return NOTIFY_DONE;
 }

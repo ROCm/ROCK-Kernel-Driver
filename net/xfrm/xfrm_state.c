@@ -219,7 +219,7 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 		 * there are DSTs attached to this xfrm_state.
 		 */
 		if (atomic_read(&x->refcnt) > 2)
-			xfrm_flush_bundles(x);
+			xfrm_flush_bundles();
 
 		/* All xfrm_state objects are created by one of two possible
 		 * paths:
