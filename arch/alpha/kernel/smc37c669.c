@@ -1104,7 +1104,7 @@ static int SMC37c669_xlate_drq(
     int drq 
 );
 
-static spinlock_t smc_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+static  __cacheline_aligned DEFINE_SPINLOCK(smc_lock);
 
 /*
 **++
