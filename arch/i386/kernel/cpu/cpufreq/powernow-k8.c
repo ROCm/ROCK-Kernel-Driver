@@ -286,7 +286,7 @@ static int core_voltage_pre_transition(struct powernow_k8_data *data, u32 reqvid
 			return 1;
 	}
 
-	while (rvosteps > 0) {
+	while ((rvosteps > 0)  && ((data->rvo + data->currvid) > reqvid)) {
 		if (data->currvid == 0) {
 			rvosteps = 0;
 		} else {
