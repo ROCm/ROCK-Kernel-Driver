@@ -51,6 +51,7 @@ DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " tsbogend@alpha.franken.de\n";
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/irq.h>
 
 /*
  * PCI device identifiers for "new style" Linux PCI Device Drivers
