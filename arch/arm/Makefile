@@ -61,7 +61,7 @@ DATAADDR	:= .
 
 ifeq ($(CONFIG_CPU_26),y)
 PROCESSOR	:= armo
-HEAD		:= arch/arm/mach-arc/head.o arch/arm/kernel/init_task.o
+head-y		:= arch/arm/mach-arc/head.o arch/arm/kernel/init_task.o
 LDFLAGS_BLOB	+= --oformat elf26-littlearm
   ifeq ($(CONFIG_ROM_KERNEL),y)
     DATAADDR	 := 0x02080000
@@ -73,7 +73,7 @@ endif
 
 ifeq ($(CONFIG_CPU_32),y)
 PROCESSOR	:= armv
-HEAD		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
+head-y		:= arch/arm/kernel/head.o arch/arm/kernel/init_task.o
 LDFLAGS_BLOB	+= --oformat elf32-littlearm
 textaddr-y	:= 0xC0008000
 endif
@@ -181,7 +181,6 @@ MRPROPER_FILES	+= \
 	include/asm-arm/mach-types.h
 
 # We use MRPROPER_FILES and CLEAN_FILES now
-archmrproper:
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 

@@ -299,12 +299,12 @@ export MODLIB
 #       normal descending-into-subdirs phase, since at that time
 #       we cannot yet know if we will need to relink vmlinux.
 #	So we descend into init/ inside the rule for vmlinux again.
-
-vmlinux-objs := $(HEAD) $(init-y) $(core-y) $(libs-y) $(drivers-y) $(net-y)
+head-y += $(HEAD)
+vmlinux-objs := $(head-y) $(init-y) $(core-y) $(libs-y) $(drivers-y) $(net-y)
 
 quiet_cmd_vmlinux__ = LD      $@
 define cmd_vmlinux__
-	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) $(HEAD) $(init-y) \
+	$(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) $(head-y) $(init-y) \
 	--start-group \
 	$(core-y) \
 	$(libs-y) \
@@ -444,6 +444,8 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %.o: %.c scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
+%/:      scripts prepare FORCE
+	$(Q)$(MAKE) $(build)=$(@D)
 %.ko: scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %.lst: %.c scripts FORCE
@@ -705,14 +707,14 @@ MRPROPER_DIRS += \
 
 # clean - Delete all intermediate files
 #
-clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
-
-$(addprefix _clean_,$(clean-dirs)):
+clean-dirs += $(addprefix, _clean_,$(ALL_SUBDIRS) Documentation/DocBook scripts)
+.PHONY: $(clean-dirs) clean archclean mrproper archmrproper distclean
+$(clean-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)
-clean: archclean $(addprefix _clean_,$(clean-dirs))
+clean: archclean $(clean-dirs)
 	$(call cmd,rmclean)
 	@find . $(RCS_FIND_IGNORE) \
 	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \

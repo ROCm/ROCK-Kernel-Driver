@@ -128,7 +128,7 @@ endif
 
 LDFLAGS_vmlinux += -Ttext $(LOADADDR)
 
-HEAD := arch/mips64/kernel/head.o arch/mips64/kernel/init_task.o
+head-y := arch/mips64/kernel/head.o arch/mips64/kernel/init_task.o
 
 SUBDIRS		:= arch/mips64/tools $(SUBDIRS)
 core-y		+= arch/mips64/kernel/ arch/mips64/mm/
