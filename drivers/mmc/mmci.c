@@ -63,6 +63,7 @@ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 {
 	unsigned int datactrl, timeout, irqmask;
+	void *base;
 
 	DBG(host, "blksz %04x blks %04x flags %08x\n",
 	    1 << data->blksz_bits, data->blocks, data->flags);
@@ -76,8 +77,9 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 		  ((unsigned long long)data->timeout_ns * host->cclk) /
 		   1000000000ULL;
 
-	writel(timeout, host->base + MMCIDATATIMER);
-	writel(host->size, host->base + MMCIDATALENGTH);
+	base = host->base;
+	writel(timeout, base + MMCIDATATIMER);
+	writel(host->size, base + MMCIDATALENGTH);
 
 	datactrl = MCI_DPSM_ENABLE | data->blksz_bits << 4;
 	if (data->flags & MMC_DATA_READ) {
@@ -91,18 +93,20 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 		irqmask = MCI_TXFIFOHALFEMPTYMASK;
 	}
 
-	writel(datactrl, host->base + MMCIDATACTRL);
-	writel(irqmask, host->base + MMCIMASK1);
+	writel(datactrl, base + MMCIDATACTRL);
+	writel(irqmask, base + MMCIMASK1);
 }
 
 static void
 mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c)
 {
+	void *base = host->base;
+
 	DBG(host, "op %02x arg %08x flags %08x\n",
 	    cmd->opcode, cmd->arg, cmd->flags);
 
-	if (readl(host->base + MMCICOMMAND) & MCI_CPSM_ENABLE) {
-		writel(0, host->base + MMCICOMMAND);
+	if (readl(base + MMCICOMMAND) & MCI_CPSM_ENABLE) {
+		writel(0, base + MMCICOMMAND);
 		udelay(1);
 	}
 
@@ -122,8 +126,8 @@ mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c)
 
 	host->cmd = cmd;
 
-	writel(cmd->arg, host->base + MMCIARGUMENT);
-	writel(c, host->base + MMCICOMMAND);
+	writel(cmd->arg, base + MMCIARGUMENT);
+	writel(c, base + MMCICOMMAND);
 }
 
 static void
@@ -146,7 +150,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 		host->data = NULL;
 		if (!data->stop) {
 			mmci_request_end(host, data->mrq);
-		} else /*if (readl(host->base + MMCIDATACNT) > 6)*/ {
+		} else {
 			mmci_start_command(host, data->stop, 0);
 		}
 	}
@@ -156,12 +160,14 @@ static void
 mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 	     unsigned int status)
 {
+	void *base = host->base;
+
 	host->cmd = NULL;
 
-	cmd->resp[0] = readl(host->base + MMCIRESPONSE0);
-	cmd->resp[1] = readl(host->base + MMCIRESPONSE1);
-	cmd->resp[2] = readl(host->base + MMCIRESPONSE2);
-	cmd->resp[3] = readl(host->base + MMCIRESPONSE3);
+	cmd->resp[0] = readl(base + MMCIRESPONSE0);
+	cmd->resp[1] = readl(base + MMCIRESPONSE1);
+	cmd->resp[2] = readl(base + MMCIRESPONSE2);
+	cmd->resp[3] = readl(base + MMCIRESPONSE3);
 
 	if (status & MCI_CMDTIMEOUT) {
 		cmd->error = MMC_ERR_TIMEOUT;
@@ -176,27 +182,31 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 	}
 }
 
+/*
+ * PIO data transfer IRQ handler.
+ */
 static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct mmci_host *host = dev_id;
+	void *base = host->base;
 	u32 status;
 	int ret = 0;
 
 	do {
-		status = readl(host->base + MMCISTATUS);
+		status = readl(base + MMCISTATUS);
 
 		if (!(status & (MCI_RXDATAAVLBL|MCI_RXFIFOHALFFULL|
-				MCI_TXFIFOEMPTY|MCI_TXFIFOHALFEMPTY)))
+				MCI_TXFIFOHALFEMPTY)))
 			break;
 
 		DBG(host, "irq1 %08x\n", status);
 
 		if (status & (MCI_RXDATAAVLBL|MCI_RXFIFOHALFFULL)) {
-			int count = host->size - (readl(host->base + MMCIFIFOCNT) << 2);
+			unsigned int count = host->size - (readl(base + MMCIFIFOCNT) << 2);
 			if (count < 0)
 				count = 0;
 			if (count && host->buffer) {
-				readsl(host->base + MMCIFIFO, host->buffer, count >> 2);
+				readsl(base + MMCIFIFO, host->buffer, count >> 2);
 				host->buffer += count;
 				host->size -= count;
 				if (host->size == 0)
@@ -207,7 +217,7 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
 					first = 0;
 					printk(KERN_ERR "MMCI: sinking excessive data\n");
 				}
-				readl(host->base + MMCIFIFO);
+				readl(base + MMCIFIFO);
 			}
 		}
 
@@ -221,7 +231,7 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
 					      MCI_FIFOSIZE : MCI_FIFOHALFSIZE;
 			unsigned int count = min(host->size, maxcnt);
 
-			writesl(host->base + MMCIFIFO, host->buffer, count >> 2);
+			writesl(base + MMCIFIFO, host->buffer, count >> 2);
 
 			host->buffer += count;
 			host->size -= count;
@@ -242,6 +252,9 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_RETVAL(ret);
 }
 
+/*
+ * Handle completion of command and data transfers.
+ */
 static irqreturn_t mmci_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct mmci_host *host = dev_id;
@@ -411,7 +424,7 @@ static int mmci_probe(struct amba_device *dev, void *id)
 
 	mmc->ops = &mmci_ops;
 	mmc->f_min = (host->mclk + 511) / 512;
-	mmc->f_max = min(host->mclk / 2, fmax);
+	mmc->f_max = min(host->mclk, fmax);
 	mmc->ocr_avail = plat->ocr_mask;
 
 	spin_lock_init(&host->lock);
