@@ -117,19 +117,14 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			case 0: break;
 			default: goto out;
 			}
-
-			switch (fh->fh_fsid_type) {
-			case 0:
-				len = 2;
-				break;
-			case 1:
-				len = 1;
-				break;
-			case 2:
+			len = key_len(fh->fh_fsid_type) / 4;
+			if (len == 0) goto out;
+			if  (fh->fh_fsid_type == 2) {
+				/* deprecated, convert to type 3 */
 				len = 3;
-				break;
-			default:
-				goto out;
+				fh->fh_fsid_type = 3;
+				fh->fh_fsid[0] = new_encode_dev(MKDEV(ntohl(fh->fh_fsid[0]), ntohl(fh->fh_fsid[1])));
+				fh->fh_fsid[1] = fh->fh_fsid[2];
 			}
 			if ((data_left -= len)<0) goto out;
 			exp = exp_find(rqstp->rq_client, fh->fh_fsid_type, datap, &rqstp->rq_chandle);
@@ -336,19 +331,31 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		parent->d_name.name, dentry->d_name.name,
 		(inode ? inode->i_ino : 0));
 
-	/* for large devnums rules are simple */
-	if (!old_valid_dev(ex_dev)) {
-		ref_fh_version = 1;
-		if (exp->ex_flags & NFSEXP_FSID)
-			ref_fh_fsid_type = 1;
-		else
-			ref_fh_fsid_type = 2;
-	} else if (ref_fh) {
+	if (ref_fh) {
 		ref_fh_version = ref_fh->fh_handle.fh_version;
-		ref_fh_fsid_type = ref_fh->fh_handle.fh_fsid_type;
-		if (!(exp->ex_flags & NFSEXP_FSID) || ref_fh_fsid_type == 2)
+		if (ref_fh_version == 0xca)
+			ref_fh_fsid_type = 0;
+		else
+			ref_fh_fsid_type = ref_fh->fh_handle.fh_fsid_type;
+		if (ref_fh_fsid_type > 3)
 			ref_fh_fsid_type = 0;
 	}
+	/* make sure ref_fh type works for given export */
+	if (ref_fh_fsid_type == 1 &&
+	    !(exp->ex_flags & NFSEXP_FSID)) {
+		/* if we don't have an fsid, we cannot provide one... */
+		ref_fh_fsid_type = 0;
+	}
+	if (!old_valid_dev(ex_dev) && ref_fh_fsid_type == 0) {
+		/* for newer device numbers, we must use a newer fsid format */
+		ref_fh_version = 1;
+		ref_fh_fsid_type = 3;
+	}
+	if (old_valid_dev(ex_dev) &&
+	    (ref_fh_fsid_type == 2 || ref_fh_fsid_type == 3))
+		/* must use type1 for smaller device numbers */
+		ref_fh_fsid_type = 0;
+
 	if (ref_fh == fhp)
 		fh_put(ref_fh);
 
@@ -376,16 +383,22 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		if (inode)
 			_fh_update_old(dentry, exp, &fhp->fh_handle);
 	} else {
+		int len;
 		fhp->fh_handle.fh_version = 1;
 		fhp->fh_handle.fh_auth_type = 0;
 		datap = fhp->fh_handle.fh_auth+0;
 		fhp->fh_handle.fh_fsid_type = ref_fh_fsid_type;
 		switch (ref_fh_fsid_type) {
+			case 0:
+				/*
+				 * fsid_type 0:
+				 * 2byte major, 2byte minor, 4byte inode
+				 */
+				mk_fsid_v0(datap, ex_dev,
+					exp->ex_dentry->d_inode->i_ino);
 			case 1:
 				/* fsid_type 1 == 4 bytes filesystem id */
 				mk_fsid_v1(datap, exp->ex_fsid);
-				datap += 1;
-				fhp->fh_handle.fh_size = 2*4;
 				break;
 			case 2:
 				/*
@@ -394,21 +407,22 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 				 */
 				mk_fsid_v2(datap, ex_dev,
 					exp->ex_dentry->d_inode->i_ino);
-				datap += 3;
-				fhp->fh_handle.fh_size = 4*4;
 				break;
-			default:
+			case 3:
 				/*
-				 * fsid_type 0:
-				 * 2byte major, 2byte minor, 4byte inode
+				 * fsid_type 3:
+				 * 4byte devicenumber, 4byte inode
 				 */
-				mk_fsid_v0(datap, ex_dev,
+				mk_fsid_v3(datap, ex_dev,
 					exp->ex_dentry->d_inode->i_ino);
-				datap += 2;
-				fhp->fh_handle.fh_size = 3*4;
+				break;
 		}
+		len = key_len(ref_fh_fsid_type);
+		datap += len/4;
+		fhp->fh_handle.fh_size = 4 + len;
+
 		if (inode) {
-			int size = fhp->fh_maxsize/4 - 3;
+			int size = (fhp->fh_maxsize-len-4)/4;
 			fhp->fh_handle.fh_fileid_type =
 				_fh_update(dentry, exp, datap, &size);
 			fhp->fh_handle.fh_size += size*4;
