@@ -2039,16 +2039,8 @@ xfs_qm_init_quotainos(
 	/*
 	 * Create the two inodes, if they don't exist already. The changes
 	 * made above will get added to a transaction and logged in one of
-	 * the qino_alloc calls below.  If the device is readonly,
-	 * temporarily switch to read-write to do this.
+	 * the qino_alloc calls below.
 	 */
-
-	if (readonly &&
-	    ((XFS_IS_UQUOTA_ON(mp) && uip == NULL) || 
-	     (XFS_IS_GQUOTA_ON(mp) && gip == NULL))) {
-		if ((error = xfs_quotaino_create_read_only(mp)))
-			goto error;
-	}
 
 	if (XFS_IS_UQUOTA_ON(mp) && uip == NULL) {
 		if ((error = xfs_qm_qino_alloc(mp, &uip,

@@ -873,9 +873,19 @@ xlog_find_tail(xlog_t  *log,
 	 * overwrite the unmount record after a clean unmount.
 	 *
 	 * Do this only if we are going to recover the filesystem
+	 *
+	 * NOTE: This used to say "if (!readonly)"
+	 * However on Linux, we can & do recover a read-only filesystem.
+	 * We only skip recovery if NORECOVERY is specified on mount,
+	 * in which case we would not be here.
+	 *
+	 * But... if the -device- itself is readonly, just skip this.
+	 * We can't recover this device anyway, so it won't matter.
 	 */
-	if (!readonly)
+
+	if (!bdev_read_only(log->l_mp->m_logdev_targp->pbr_bdev)) {
 		error = xlog_clear_stale_blocks(log, tail_lsn);
+	}
 #endif
 
 bread_err:
@@ -3521,17 +3531,20 @@ xlog_recover(xlog_t *log, int readonly)
 		 * error message.
 		 * ...but this is no longer true.  Now, unless you specify
 		 * NORECOVERY (in which case this function would never be
-		 * called), it enables read-write access long enough to do
-		 * recovery.
+		 * called), we just go ahead and recover.  We do this all
+		 * under the vfs layer, so we can get away with it unless
+		 * the device itself is read-only, in which case we fail.
 		 */
-		if (readonly) {
 #ifdef __KERNEL__
-			if ((error = xfs_recover_read_only(log)))
-				return error;
-#else
-			return ENOSPC;
-#endif
+		if ((error = xfs_dev_is_read_only(log->l_mp,
+						"recovery required"))) {
+			return error;
 		}
+#else
+		if (readonly) {
+			return ENOSPC;
+		}
+#endif
 
 #ifdef __KERNEL__
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
@@ -3548,8 +3561,6 @@ xlog_recover(xlog_t *log, int readonly)
 #endif
 		error = xlog_do_recover(log, head_blk, tail_blk);
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
-		if (readonly)
-			XFS_MTOVFS(log->l_mp)->vfs_flag |= VFS_RDONLY;
 	}
 	return error;
 }	/* xlog_recover */

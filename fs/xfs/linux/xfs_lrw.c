@@ -1836,45 +1836,21 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 }
 
 /*
- * In these two situations we disregard the readonly mount flag and
- * temporarily enable writes (we must, to ensure metadata integrity).
+ * If the underlying (log or data) device is readonly, there are some
+ * operations that cannot proceed.
  */
-STATIC int
-xfs_is_read_only(xfs_mount_t *mp)
+int
+xfs_dev_is_read_only(xfs_mount_t *mp, char *message)
 {
 	if (bdev_read_only(mp->m_ddev_targp->pbr_bdev) ||
 	    bdev_read_only(mp->m_logdev_targp->pbr_bdev)) {
 		cmn_err(CE_NOTE,
+			"XFS: %s required on read-only device.", message);
+		cmn_err(CE_NOTE,
 			"XFS: write access unavailable, cannot proceed.");
 		return EROFS;
 	}
-	cmn_err(CE_NOTE,
-		"XFS: write access will be enabled during mount.");
-	XFS_MTOVFS(mp)->vfs_flag &= ~VFS_RDONLY;
+
 	return 0;
-}
-
-int
-xfs_recover_read_only(xlog_t *log)
-{
-	cmn_err(CE_NOTE, "XFS: WARNING: "
-		"recovery required on readonly filesystem.");
-	return xfs_is_read_only(log->l_mp);
-}
-
-int
-xfs_quotacheck_read_only(xfs_mount_t *mp)
-{
-	cmn_err(CE_NOTE, "XFS: WARNING: "
-		"quotacheck required on readonly filesystem.");
-	return xfs_is_read_only(mp);
-}
-
-int
-xfs_quotaino_create_read_only(xfs_mount_t *mp)
-{
-        cmn_err(CE_NOTE, "XFS: WARNING: "
-                "Quota inode creation required on readonly filesystem.");
-        return xfs_is_read_only(mp);
 }
 
