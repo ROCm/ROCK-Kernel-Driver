@@ -139,7 +139,7 @@ static int huft_build(
   } while (--i);
   if (c[0] == n)                /* null input--all zero length codes */
   {
-    *t = (inflate_huft *)NULL;
+    *t = NULL;
     *m = 0;
     return Z_OK;
   }
@@ -193,8 +193,8 @@ static int huft_build(
   p = v;                        /* grab values in bit order */
   h = -1;                       /* no tables yet--level -1 */
   w = -l;                       /* bits decoded == (l * h) */
-  u[0] = (inflate_huft *)NULL;        /* just to keep compilers happy */
-  q = (inflate_huft *)NULL;     /* ditto */
+  u[0] = NULL;                  /* just to keep compilers happy */
+  q = NULL;                     /* ditto */
   z = 0;                        /* ditto */
 
   /* go through the bit lengths (k already is bits in shortest code) */
@@ -302,8 +302,7 @@ int zlib_inflate_trees_bits(
   uInt *v;              /* work area for huft_build */
   
   v = WS(z)->tree_work_area_1;
-  r = huft_build(c, 19, 19, (uInt*)NULL, (uInt*)NULL,
-                 tb, bb, hp, &hn, v);
+  r = huft_build(c, 19, 19, NULL, NULL, tb, bb, hp, &hn, v);
   if (r == Z_DATA_ERROR)
     z->msg = (char*)"oversubscribed dynamic bit lengths tree";
   else if (r == Z_BUF_ERROR || *bb == 0)

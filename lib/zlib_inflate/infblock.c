@@ -80,7 +80,7 @@ void zlib_inflate_blocks_reset(
   s->bitb = 0;
   s->read = s->write = s->window;
   if (s->checkfn != NULL)
-    z->adler = s->check = (*s->checkfn)(0L, (const Byte *)NULL, 0);
+    z->adler = s->check = (*s->checkfn)(0L, NULL, 0);
 }
 
 inflate_blocks_statef *zlib_inflate_blocks_new(
