@@ -70,7 +70,7 @@ static int sg_version_num = 30529;	/* 2 digits for each component */
 
 #include "scsi_logging.h"
 
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_SCSI_PROC_FS
 #include <linux/proc_fs.h>
 static int sg_proc_init(void);
 static void sg_proc_cleanup(void);
@@ -222,7 +222,7 @@ static int sg_build_direct(Sg_request * srp, Sg_fd * sfp, int dxfer_len);
 // static void sg_unmap_and(Sg_scatter_hold * schp, int free_also);
 static Sg_device *sg_get_dev(int dev);
 static inline unsigned char *sg_scatg2virt(const struct scatterlist *sclp);
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_SCSI_PROC_FS
 static int sg_last_dev(void);
 #endif
 
@@ -1516,18 +1516,18 @@ init_sg(void)
 	rc = scsi_register_interface(&sg_interface);
 	if (rc)
 		return rc;
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_SCSI_PROC_FS
 	sg_proc_init();
-#endif				/* CONFIG_PROC_FS */
+#endif				/* CONFIG_SCSI_PROC_FS */
 	return 0;
 }
 
 static void __exit
 exit_sg(void)
 {
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_SCSI_PROC_FS
 	sg_proc_cleanup();
-#endif				/* CONFIG_PROC_FS */
+#endif				/* CONFIG_SCSI_PROC_FS */
 	scsi_unregister_interface(&sg_interface);
 	unregister_chrdev(SCSI_GENERIC_MAJOR, "sg");
 	if (sg_dev_arr != NULL) {
@@ -2225,7 +2225,7 @@ sg_get_rq_mark(Sg_fd * sfp, int pack_id)
 	return resp;
 }
 
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_SCSI_PROC_FS
 static Sg_request *
 sg_get_nth_request(Sg_fd * sfp, int nth)
 {
@@ -2317,7 +2317,7 @@ sg_remove_request(Sg_fd * sfp, Sg_request * srp)
 	return res;
 }
 
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_SCSI_PROC_FS
 static Sg_fd *
 sg_get_nth_sfp(Sg_device * sdp, int nth)
 {
@@ -2548,7 +2548,7 @@ sg_allow_access(unsigned char opcode, char dev_type)
 	return 0;
 }
 
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_SCSI_PROC_FS
 static int
 sg_last_dev(void)
 {
@@ -2579,7 +2579,7 @@ sg_get_dev(int dev)
 	return sdp;
 }
 
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_SCSI_PROC_FS
 
 static struct proc_dir_entry *sg_proc_sgp = NULL;
 
@@ -2971,7 +2971,7 @@ sg_proc_version_info(char *buffer, int *len, off_t * begin,
 	PRINT_PROC("%d\t%s\n", sg_version_num, sg_version_str);
 	return 1;
 }
-#endif				/* CONFIG_PROC_FS */
+#endif				/* CONFIG_SCSI_PROC_FS */
 
 module_init(init_sg);
 module_exit(exit_sg);

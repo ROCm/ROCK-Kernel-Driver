@@ -109,7 +109,7 @@ extern int scsi_init_queue(void);
 extern void scsi_exit_queue(void);
 
 /* scsi_proc.c */
-#ifdef CONFIG_PROC_FS
+#ifdef CONFIG_SCSI_PROC_FS
 extern void scsi_proc_hostdir_add(struct scsi_host_template *);
 extern void scsi_proc_hostdir_rm(struct scsi_host_template *);
 extern void scsi_proc_host_add(struct Scsi_Host *);
