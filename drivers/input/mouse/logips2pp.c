@@ -306,7 +306,7 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 	ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO);
 
 	if (!param[1])
-		return 0;
+		return -1;
 
 	model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
 	buttons = param[1];
@@ -355,6 +355,7 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 
 		if (use_ps2pp) {
 			psmouse->protocol_handler = ps2pp_process_byte;
+			psmouse->pktsize = 3;
 
 			if (model_info->kind != PS2PP_KIND_TP3) {
 				psmouse->set_resolution = ps2pp_set_resolution;
@@ -373,6 +374,6 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 			ps2pp_set_model_properties(psmouse, model_info);
 	}
 
-	return use_ps2pp;
+	return use_ps2pp ? 0 : -1;
 }
 

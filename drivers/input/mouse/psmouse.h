@@ -42,6 +42,7 @@ struct psmouse {
 	char *name;
 	unsigned char packet[8];
 	unsigned char pktcnt;
+	unsigned char pktsize;
 	unsigned char type;
 	unsigned char model;
 	unsigned long last;

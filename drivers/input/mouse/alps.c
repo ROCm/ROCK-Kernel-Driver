@@ -405,12 +405,20 @@ int alps_init(struct psmouse *psmouse)
 	psmouse->protocol_handler = alps_process_byte;
 	psmouse->disconnect = alps_disconnect;
 	psmouse->reconnect = alps_reconnect;
+	psmouse->pktsize = 6;
 
 	return 0;
 }
 
-int alps_detect(struct psmouse *psmouse)
+int alps_detect(struct psmouse *psmouse, int set_properties)
 {
-	return alps_get_model(psmouse) < 0 ? 0 : 1;
+	if (alps_get_model(psmouse) < 0)
+		return -1;
+
+	if (set_properties) {
+		psmouse->vendor = "ALPS";
+		psmouse->name = "TouchPad";
+	}
+	return 0;
 }
 

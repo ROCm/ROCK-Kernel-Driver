@@ -558,7 +558,7 @@ static int synaptics_reconnect(struct psmouse *psmouse)
 	struct synaptics_data *priv = psmouse->private;
 	struct synaptics_data old_priv = *priv;
 
-	if (!synaptics_detect(psmouse))
+	if (synaptics_detect(psmouse, 0))
 		return -1;
 
 	if (synaptics_query_hardware(psmouse)) {
@@ -580,7 +580,7 @@ static int synaptics_reconnect(struct psmouse *psmouse)
 	return 0;
 }
 
-int synaptics_detect(struct psmouse *psmouse)
+int synaptics_detect(struct psmouse *psmouse, int set_properties)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[4];
@@ -593,7 +593,15 @@ int synaptics_detect(struct psmouse *psmouse)
 	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
 	ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO);
 
-	return param[1] == 0x47;
+	if (param[1] != 0x47)
+		return -1;
+
+	if (set_properties) {
+		psmouse->vendor = "Synaptics";
+		psmouse->name = "TouchPad";
+	}
+
+	return 0;
 }
 
 int synaptics_init(struct psmouse *psmouse)
@@ -627,6 +635,7 @@ int synaptics_init(struct psmouse *psmouse)
 	psmouse->set_rate = synaptics_set_rate;
 	psmouse->disconnect = synaptics_disconnect;
 	psmouse->reconnect = synaptics_reconnect;
+	psmouse->pktsize = 6;
 
 	return 0;
 

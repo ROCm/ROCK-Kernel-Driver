@@ -74,7 +74,7 @@ static psmouse_ret_t psmouse_process_byte(struct psmouse *psmouse, struct pt_reg
 	struct input_dev *dev = &psmouse->dev;
 	unsigned char *packet = psmouse->packet;
 
-	if (psmouse->pktcnt < 3 + (psmouse->type >= PSMOUSE_GENPS))
+	if (psmouse->pktcnt < psmouse->pktsize)
 		return PSMOUSE_GOOD_DATA;
 
 /*
@@ -274,7 +274,7 @@ int psmouse_reset(struct psmouse *psmouse)
 /*
  * Genius NetMouse magic init.
  */
-static int genius_detect(struct psmouse *psmouse)
+static int genius_detect(struct psmouse *psmouse, int set_properties)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[4];
@@ -286,13 +286,26 @@ static int genius_detect(struct psmouse *psmouse)
 	ps2_command(ps2dev,  NULL, PSMOUSE_CMD_SETSCALE11);
 	ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO);
 
-	return param[0] == 0x00 && param[1] == 0x33 && param[2] == 0x55;
+	if (param[0] != 0x00 || param[1] != 0x33 || param[2] != 0x55)
+		return -1;
+
+	if (set_properties) {
+		set_bit(BTN_EXTRA, psmouse->dev.keybit);
+		set_bit(BTN_SIDE, psmouse->dev.keybit);
+		set_bit(REL_WHEEL, psmouse->dev.relbit);
+
+		psmouse->vendor = "Genius";
+		psmouse->name = "Wheel Mouse";
+		psmouse->pktsize = 4;
+	}
+
+	return 0;
 }
 
 /*
  * IntelliMouse magic init.
  */
-static int intellimouse_detect(struct psmouse *psmouse)
+static int intellimouse_detect(struct psmouse *psmouse, int set_properties)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[2];
@@ -305,18 +318,29 @@ static int intellimouse_detect(struct psmouse *psmouse)
 	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRATE);
 	ps2_command(ps2dev, param, PSMOUSE_CMD_GETID);
 
-	return param[0] == 3;
+	if (param[0] != 3)
+		return -1;
+
+	if (set_properties) {
+		set_bit(REL_WHEEL, psmouse->dev.relbit);
+
+		if (!psmouse->vendor) psmouse->vendor = "Generic";
+		if (!psmouse->name) psmouse->name = "Wheel Mouse";
+		psmouse->pktsize = 4;
+	}
+
+	return 0;
 }
 
 /*
  * Try IntelliMouse/Explorer magic init.
  */
-static int im_explorer_detect(struct psmouse *psmouse)
+static int im_explorer_detect(struct psmouse *psmouse, int set_properties)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[2];
 
-	intellimouse_detect(psmouse);
+	intellimouse_detect(psmouse, 0);
 
 	param[0] = 200;
 	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRATE);
@@ -326,13 +350,26 @@ static int im_explorer_detect(struct psmouse *psmouse)
 	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRATE);
 	ps2_command(ps2dev, param, PSMOUSE_CMD_GETID);
 
-	return param[0] == 4;
+	if (param[0] != 4)
+		return -1;
+
+	if (set_properties) {
+		set_bit(REL_WHEEL, psmouse->dev.relbit);
+		set_bit(BTN_SIDE, psmouse->dev.keybit);
+		set_bit(BTN_EXTRA, psmouse->dev.keybit);
+
+		if (!psmouse->vendor) psmouse->vendor = "Generic";
+		if (!psmouse->name) psmouse->name = "Explorer Mouse";
+		psmouse->pktsize = 4;
+	}
+
+	return 0;
 }
 
 /*
  * Kensington ThinkingMouse / ExpertMouse magic init.
  */
-static int thinking_detect(struct psmouse *psmouse)
+static int thinking_detect(struct psmouse *psmouse, int set_properties)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[2];
@@ -347,7 +384,28 @@ static int thinking_detect(struct psmouse *psmouse)
 		ps2_command(ps2dev, seq + i, PSMOUSE_CMD_SETRATE);
 	ps2_command(ps2dev, param, PSMOUSE_CMD_GETID);
 
-	return param[0] == 2;
+	if (param[0] != 2)
+		return -1;
+
+	if (set_properties) {
+		set_bit(BTN_EXTRA, psmouse->dev.keybit);
+
+		psmouse->vendor = "Kensington";
+		psmouse->name = "ThinkingMouse";
+	}
+
+	return 0;
+}
+
+/*
+ * Bare PS/2 protocol "detection". Always succeeds.
+ */
+static int ps2bare_detect(struct psmouse *psmouse, int set_properties)
+{
+	if (!psmouse->vendor) psmouse->vendor = "Generic";
+	if (!psmouse->name) psmouse->name = "Mouse";
+
+	return 0;
 }
 
 /*
@@ -365,27 +423,14 @@ static int psmouse_extensions(struct psmouse *psmouse,
  * upsets the thinkingmouse).
  */
 
-	if (max_proto > PSMOUSE_PS2 && thinking_detect(psmouse)) {
-
-		if (set_properties) {
-			set_bit(BTN_EXTRA, psmouse->dev.keybit);
-			psmouse->vendor = "Kensington";
-			psmouse->name = "ThinkingMouse";
-		}
-
+	if (max_proto > PSMOUSE_PS2 && thinking_detect(psmouse, set_properties) == 0)
 		return PSMOUSE_THINKPS;
-	}
 
 /*
  * Try Synaptics TouchPad
  */
-	if (max_proto > PSMOUSE_PS2 && synaptics_detect(psmouse)) {
+	if (max_proto > PSMOUSE_PS2 && synaptics_detect(psmouse, set_properties) == 0) {
 		synaptics_hardware = 1;
-
-		if (set_properties) {
-			psmouse->vendor = "Synaptics";
-			psmouse->name = "TouchPad";
-		}
 
 		if (max_proto > PSMOUSE_IMEX) {
 			if (!set_properties || synaptics_init(psmouse) == 0)
@@ -406,13 +451,7 @@ static int psmouse_extensions(struct psmouse *psmouse,
 /*
  * Try ALPS TouchPad
  */
-	if (max_proto > PSMOUSE_IMEX && alps_detect(psmouse)) {
-
-		if (set_properties) {
-			psmouse->vendor = "ALPS";
-			psmouse->name = "TouchPad";
-		}
-
+	if (max_proto > PSMOUSE_IMEX && alps_detect(psmouse, set_properties) == 0) {
 		if (!set_properties || alps_init(psmouse) == 0)
 			return PSMOUSE_ALPS;
 
@@ -422,20 +461,10 @@ static int psmouse_extensions(struct psmouse *psmouse,
 		max_proto = PSMOUSE_IMEX;
 	}
 
-	if (max_proto > PSMOUSE_IMEX && genius_detect(psmouse)) {
-
-		if (set_properties) {
-			set_bit(BTN_EXTRA, psmouse->dev.keybit);
-			set_bit(BTN_SIDE, psmouse->dev.keybit);
-			set_bit(REL_WHEEL, psmouse->dev.relbit);
-			psmouse->vendor = "Genius";
-			psmouse->name = "Wheel Mouse";
-		}
-
+	if (max_proto > PSMOUSE_IMEX && genius_detect(psmouse, set_properties) == 0)
 		return PSMOUSE_GENPS;
-	}
 
-	if (max_proto > PSMOUSE_IMEX && ps2pp_init(psmouse, set_properties))
+	if (max_proto > PSMOUSE_IMEX && ps2pp_init(psmouse, set_properties) == 0)
 		return PSMOUSE_PS2PP;
 
 /*
@@ -444,34 +473,18 @@ static int psmouse_extensions(struct psmouse *psmouse,
  */
 	ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_RESET_DIS);
 
-	if (max_proto >= PSMOUSE_IMEX && im_explorer_detect(psmouse)) {
-
-		if (set_properties) {
-			set_bit(REL_WHEEL, psmouse->dev.relbit);
-			set_bit(BTN_SIDE, psmouse->dev.keybit);
-			set_bit(BTN_EXTRA, psmouse->dev.keybit);
-			if (!psmouse->name)
-				psmouse->name = "Explorer Mouse";
-		}
-
+	if (max_proto >= PSMOUSE_IMEX && im_explorer_detect(psmouse, set_properties) == 0)
 		return PSMOUSE_IMEX;
-	}
 
-	if (max_proto >= PSMOUSE_IMPS && intellimouse_detect(psmouse)) {
-
-		if (set_properties) {
-			set_bit(REL_WHEEL, psmouse->dev.relbit);
-			if (!psmouse->name)
-				psmouse->name = "Wheel Mouse";
-		}
-
+	if (max_proto >= PSMOUSE_IMPS && intellimouse_detect(psmouse, set_properties) == 0)
 		return PSMOUSE_IMPS;
-	}
 
 /*
  * Okay, all failed, we have a standard mouse here. The number of the buttons
  * is still a question, though. We assume 3.
  */
+	ps2bare_detect(psmouse, set_properties);
+
 	if (synaptics_hardware) {
 /*
  * We detected Synaptics hardware but it did not respond to IMPS/2 probes.
@@ -706,17 +719,12 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 	psmouse->resolution = psmouse_resolution;
 	psmouse->resetafter = psmouse_resetafter;
 	psmouse->smartscroll = psmouse_smartscroll;
+	psmouse->set_rate = psmouse_set_rate;
+	psmouse->set_resolution = psmouse_set_resolution;
+	psmouse->protocol_handler = psmouse_process_byte;
+	psmouse->pktsize = 3;
+
 	psmouse->type = psmouse_extensions(psmouse, psmouse_max_proto, 1);
-	if (!psmouse->vendor)
-		psmouse->vendor = "Generic";
-	if (!psmouse->name)
-		psmouse->name = "Mouse";
-	if (!psmouse->protocol_handler)
-		psmouse->protocol_handler = psmouse_process_byte;
-	if (!psmouse->set_rate)
-		psmouse->set_rate = psmouse_set_rate;
-	if (!psmouse->set_resolution)
-		psmouse->set_resolution = psmouse_set_resolution;
 
 	sprintf(psmouse->devname, "%s %s %s",
 		psmouse_protocols[psmouse->type], psmouse->vendor, psmouse->name);

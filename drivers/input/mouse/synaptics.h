@@ -9,7 +9,7 @@
 #ifndef _SYNAPTICS_H
 #define _SYNAPTICS_H
 
-extern int synaptics_detect(struct psmouse *psmouse);
+extern int synaptics_detect(struct psmouse *psmouse, int set_properties);
 extern int synaptics_init(struct psmouse *psmouse);
 extern void synaptics_reset(struct psmouse *psmouse);
 

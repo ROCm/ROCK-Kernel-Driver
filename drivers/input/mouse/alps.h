@@ -11,7 +11,7 @@
 #ifndef _ALPS_H
 #define _ALPS_H
 
-int alps_detect(struct psmouse *psmouse);
+int alps_detect(struct psmouse *psmouse, int set_properties);
 int alps_init(struct psmouse *psmouse);
 
 #endif
