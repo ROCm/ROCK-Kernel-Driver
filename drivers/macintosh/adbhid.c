@@ -37,7 +37,6 @@
 #include <linux/init.h>
 #include <linux/notifier.h>
 #include <linux/input.h>
-#include <linux/kbd_ll.h>
 
 #include <linux/adb.h>
 #include <linux/cuda.h>
@@ -51,6 +50,8 @@ MODULE_AUTHOR("Franz Sirl <Franz.Sirl-kernel@lauterbach.com>");
 #define KEYB_KEYREG	0	/* register # for key up/down data */
 #define KEYB_LEDREG	2	/* register # for leds on ADB keyboard */
 #define MOUSE_DATAREG	0	/* reg# for movement/button codes from mouse */
+
+extern struct pt_regs *kbd_pt_regs;
 
 static int adb_message_handler(struct notifier_block *, unsigned long, void *);
 static struct notifier_block adbhid_adb_notifier = {
