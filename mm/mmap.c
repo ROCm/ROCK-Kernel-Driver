@@ -535,7 +535,7 @@ munmap_back:
 		return -ENOMEM;
 
 	if (sysctl_overcommit_memory > 1)
-		vm_flags &= ~MAP_NORESERVE;
+		flags &= ~MAP_NORESERVE;
 
 	/* Private writable mapping? Check memory availability.. */
 	if ((((vm_flags & (VM_SHARED | VM_WRITE)) == VM_WRITE) ||
