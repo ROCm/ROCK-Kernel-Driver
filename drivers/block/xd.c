@@ -171,7 +171,6 @@ int __init xd_init (void)
 	}
 	devfs_handle = devfs_mk_dir (NULL, xd_gendisk.major_name, NULL);
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &xd_lock);
-	read_ahead[MAJOR_NR] = 8;	/* 8 sector (4kB) read ahead */
 	add_gendisk(&xd_gendisk);
 	xd_geninit();
 
@@ -355,8 +354,6 @@ static int xd_ioctl (struct inode *inode,struct file *file,u_int cmd,u_long arg)
 		case BLKFLSBUF:
 		case BLKROSET:
 		case BLKROGET:
-		case BLKRASET:
-		case BLKRAGET:
 		case BLKPG:
 			return blk_ioctl(inode->i_rdev, cmd, arg);
 

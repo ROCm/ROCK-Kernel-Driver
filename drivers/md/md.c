@@ -1737,7 +1737,6 @@ static int do_md_run(mddev_t * mddev)
 	register_disk(&md_gendisk, mk_kdev(MAJOR_NR,mdidx(mddev)),
 			1, &md_fops, md_size[mdidx(mddev)]<<1);
 
-	read_ahead[MD_MAJOR] = 1024;
 	return (0);
 }
 
@@ -2622,8 +2621,6 @@ static int md_ioctl(struct inode *inode, struct file *file,
 						(u64 *) arg);
 			goto done;
 
-		case BLKRAGET:
-		case BLKRASET:
 		case BLKFLSBUF:
 		case BLKBSZGET:
 		case BLKBSZSET:
@@ -3176,13 +3173,6 @@ static int md_status_read_proc(char *page, char **start, off_t off,
 
 	sz += sprintf(page+sz, "\n");
 
-
-	sz += sprintf(page+sz, "read_ahead ");
-	if (read_ahead[MD_MAJOR] == INT_MAX)
-		sz += sprintf(page+sz, "not set\n");
-	else
-		sz += sprintf(page+sz, "%d sectors\n", read_ahead[MD_MAJOR]);
-
 	ITERATE_MDDEV(mddev,tmp) {
 		sz += sprintf(page + sz, "md%d : %sactive", mdidx(mddev),
 						mddev->pers ? "" : "in");
@@ -3622,7 +3612,6 @@ static void md_geninit(void)
 	}
 	blksize_size[MAJOR_NR] = md_blocksizes;
 	blk_size[MAJOR_NR] = md_size;
-	max_readahead[MAJOR_NR] = md_maxreadahead;
 
 	dprintk("md: sizeof(mdp_super_t) = %d\n", (int)sizeof(mdp_super_t));
 
@@ -3657,9 +3646,6 @@ int __init md_init(void)
 
 	/* forward all md request to md_make_request */
 	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), md_make_request);
-
-
-	read_ahead[MAJOR_NR] = INT_MAX;
 
 	add_gendisk(&md_gendisk);
 

@@ -1208,15 +1208,6 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 			return -EFAULT;
 		return 0;
 
-	case BLKFRASET:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EACCES;
-		max_readahead[major][minor] = arg;
-		return 0;
-
-	case BLKFRAGET:
-		return put_user(max_readahead[major][minor], (long *) arg);
-
 	case BLKSECTGET:
 		return put_user(max_sectors[major][minor], (long *) arg);
 
@@ -1230,8 +1221,6 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 	case BLKFLSBUF:
 	case BLKROSET:
 	case BLKROGET:
-	case BLKRASET:
-	case BLKRAGET:
 	case BLKPG:
 		return blk_ioctl(dev, cmd, arg);
 
@@ -1442,7 +1431,6 @@ int mfm_init (void)
 	hdc63463_irqpollmask	= irqmask;
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
-	read_ahead[MAJOR_NR] = 8;	/* 8 sector (4kB?) read ahread */
 
 	add_gendisk(&mfm_gendisk);
 

@@ -226,10 +226,6 @@
 
 #include "lvm-internal.h"
 
-#define	LVM_CORRECT_READ_AHEAD( a) \
-   if      ( a < LVM_MIN_READ_AHEAD || \
-             a > LVM_MAX_READ_AHEAD) a = LVM_MAX_READ_AHEAD;
-
 #ifndef WRITEA
 #  define WRITEA WRITE
 #endif
@@ -882,29 +878,6 @@ static int lvm_blk_ioctl(struct inode *inode, struct file *file,
 		fsync_dev(inode->i_rdev);
 		invalidate_buffers(inode->i_rdev);
 		break;
-
-
-	case BLKRASET:
-		/* set read ahead for block device */
-		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-
-		P_IOCTL("BLKRASET: %ld sectors for %s\n",
-			(long) arg, kdevname(inode->i_rdev));
-
-		if ((long) arg < LVM_MIN_READ_AHEAD ||
-		    (long) arg > LVM_MAX_READ_AHEAD)
-			return -EINVAL;
-		lv_ptr->lv_read_ahead = (long) arg;
-		break;
-
-
-	case BLKRAGET:
-		/* get current read ahead setting */
-		P_IOCTL("BLKRAGET %d\n", lv_ptr->lv_read_ahead);
-		if (put_user(lv_ptr->lv_read_ahead, (long *)arg))
-			return -EFAULT;
-		break;
-
 
 	case HDIO_GETGEO:
 		/* get disk geometry */
@@ -2035,7 +2008,6 @@ static int lvm_do_lv_create(int minor, char *lv_name, lv_t *lv)
 	lvm_size[minor(lv_ptr->lv_dev)] = lv_ptr->lv_size >> 1;
 	vg_lv_map[minor(lv_ptr->lv_dev)].vg_number = vg_ptr->vg_number;
 	vg_lv_map[minor(lv_ptr->lv_dev)].lv_number = lv_ptr->lv_number;
-	LVM_CORRECT_READ_AHEAD(lv_ptr->lv_read_ahead);
 	vg_ptr->lv_cur++;
 	lv_ptr->lv_status = lv_status_save;
 

@@ -2659,11 +2659,6 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 
 static void ide_cdrom_add_settings(ide_drive_t *drive)
 {
-	int major = HWIF(drive)->major;
-	int minor = drive->select.b.unit << PARTN_BITS;
-
-	ide_add_setting(drive,	"breada_readahead",	SETTING_RW, BLKRAGET, BLKRASET, TYPE_INT, 0, 255, 1, 2, &read_ahead[major], NULL);
-	ide_add_setting(drive,	"file_readahead",	SETTING_RW, BLKFRAGET, BLKFRASET, TYPE_INTA, 0, INT_MAX, 1, 1024, &max_readahead[major][minor],	NULL);
 	ide_add_setting(drive,	"dsc_overlap",		SETTING_RW, -1, -1, TYPE_BYTE, 0, 1, 1,	1, &drive->dsc_overlap, NULL);
 }
 

@@ -314,10 +314,7 @@ extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(void *);
 
 extern int * blk_size[MAX_BLKDEV];
-
 extern int * blksize_size[MAX_BLKDEV];
-
-extern int * max_readahead[MAX_BLKDEV];
 
 #define MAX_PHYS_SEGMENTS 128
 #define MAX_HW_SEGMENTS 128
@@ -340,8 +337,6 @@ extern inline void blk_clear(int major)
 	blk_size_in_bytes[major] = NULL;
 #endif
 	blksize_size[major] = NULL;
-	max_readahead[major] = NULL;
-	read_ahead[major] = 0;
 }
 
 extern inline int get_hardsect_size(kdev_t dev)

@@ -1075,7 +1075,6 @@ int __init mcd_init(void)
 	blksize_size[MAJOR_NR] = mcd_blocksizes;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
 		       &mcd_spinlock);
-	read_ahead[MAJOR_NR] = 4;
 
 	/* check for card */
 

@@ -652,8 +652,6 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 		case BLKGETSIZE64:
 		case BLKROSET:
 		case BLKROGET:
-		case BLKRASET:
-		case BLKRAGET:
 		case BLKFLSBUF:
 		case BLKPG:
 			return blk_ioctl(inode->i_rdev, cmd, arg);
@@ -837,7 +835,6 @@ int __init hd_init(void)
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &hd_lock);
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 255);
-	read_ahead[MAJOR_NR] = 8;		/* 8 sector (4kB) read-ahead */
 	add_gendisk(&hd_gendisk);
 	init_timer(&device_timer);
 	device_timer.function = hd_times_out;

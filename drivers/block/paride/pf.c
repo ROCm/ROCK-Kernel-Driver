@@ -363,7 +363,6 @@ int pf_init (void)      /* preliminary initialisation */
 	blk_init_queue(q, DEVICE_REQUEST, &pf_spin_lock);
 	blk_queue_max_phys_segments(q, cluster);
 	blk_queue_max_hw_segments(q, cluster);
-        read_ahead[MAJOR_NR] = 8;       /* 8 sector (4kB) read ahead */
         
 	for (i=0;i<PF_UNITS;i++) pf_blocksizes[i] = 1024;
 	blksize_size[MAJOR_NR] = pf_blocksizes;
@@ -433,8 +432,6 @@ static int pf_ioctl(struct inode *inode,struct file *file,
                 return put_user((u64)PF.capacity << 9,(u64 *)arg);
 	    case BLKROSET:
 	    case BLKROGET:
-	    case BLKRASET:
-	    case BLKRAGET:
 	    case BLKFLSBUF:
 		return blk_ioctl(inode->i_rdev, cmd, arg);
             default:

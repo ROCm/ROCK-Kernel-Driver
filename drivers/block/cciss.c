@@ -468,8 +468,6 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case BLKBSZGET:
 	case BLKROSET:
 	case BLKROGET:
-	case BLKRASET:
-	case BLKRAGET:
 	case BLKPG:
 		return blk_ioctl(inode->i_rdev, cmd, arg);
 	case CCISS_GETPCIINFO:
@@ -2543,7 +2541,6 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	/* fill in the other Kernel structs */
 	blksize_size[MAJOR_NR+i] = hba[i]->blocksizes;
-        read_ahead[MAJOR_NR+i] = READ_AHEAD;
 
 	/* Fill in the gendisk data */ 	
 	hba[i]->gendisk.major = MAJOR_NR + i;

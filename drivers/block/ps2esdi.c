@@ -177,7 +177,6 @@ int __init ps2esdi_init(void)
 	}
 	/* set up some global information - indicating device specific info */
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &ps2esdi_lock);
-	read_ahead[MAJOR_NR] = 8;	/* 8 sector (4kB) read ahead */
 
 	/* some minor housekeeping - setup the global gendisk structure */
 	add_gendisk(&ps2esdi_gendisk);
@@ -1108,8 +1107,6 @@ static int ps2esdi_ioctl(struct inode *inode,
 		case BLKGETSIZE64:
 		case BLKROSET:
 		case BLKROGET:
-		case BLKRASET:
-		case BLKRAGET:
 		case BLKFLSBUF:
 		case BLKBSZGET:
 		case BLKBSZSET:

@@ -2489,8 +2489,6 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 	case BLKSSZGET:
 	case BLKROSET:
 	case BLKROGET:
-	case BLKRASET:
-	case BLKRAGET:
 	case BLKFLSBUF:
 	case BLKPG:
 	case BLKELVGET:

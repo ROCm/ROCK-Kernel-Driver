@@ -1964,10 +1964,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   Controller->GenericDiskInfo.sizes = Controller->PartitionSizes;
   blksize_size[MajorNumber] = Controller->BlockSizes;
   /*
-    Initialize Read Ahead to 128 sectors.
-  */
-  read_ahead[MajorNumber] = 128;
-  /*
     Complete initialization of the Generic Disk Information structure.
   */
   Controller->GenericDiskInfo.major = MajorNumber;
@@ -5399,8 +5395,6 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 			   sizeof(DiskGeometry_T)) ? -EFAULT : 0);
     case BLKGETSIZE:
     case BLKGETSIZE64:
-    case BLKRAGET:
-    case BLKRASET:
     case BLKFLSBUF:
     case BLKBSZGET:
     case BLKBSZSET:

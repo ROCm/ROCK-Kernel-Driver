@@ -4531,12 +4531,6 @@ static int sbpcd_dev_ioctl(struct cdrom_device_info *cdi, u_int cmd,
 		RETURN_UP(0);
 	} /* end of CDROMREADAUDIO */
 		
-	case BLKRASET:
-		if(!capable(CAP_SYS_ADMIN)) RETURN_UP(-EACCES);
-		if(kdev_none(cdi->dev)) RETURN_UP(-EINVAL);
-		if(arg > 0xff) RETURN_UP(-EINVAL);
-		read_ahead[major(cdi->dev)] = arg;
-		RETURN_UP(0);
 	default:
 		msg(DBG_IOC,"ioctl: unknown function request %04X\n", cmd);
 		RETURN_UP(-EINVAL);

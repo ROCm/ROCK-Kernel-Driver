@@ -3448,8 +3448,6 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 	switch (cmd) {
 		case BLKROSET:
 		case BLKROGET:
-		case BLKRASET:
-		case BLKRAGET:
 		case BLKFLSBUF:
 			return blk_ioctl(device, cmd, param);
 	}

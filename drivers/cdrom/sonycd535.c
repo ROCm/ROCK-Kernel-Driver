@@ -1598,7 +1598,6 @@ sony535_init(void)
 				}
 				blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &sonycd535_lock);
 				blksize_size[MAJOR_NR] = &sonycd535_block_size;
-				read_ahead[MAJOR_NR] = 8;	/* 8 sector (4kB) read-ahead */
 
 				sony_toc = (struct s535_sony_toc *)
 					kmalloc(sizeof *sony_toc, GFP_KERNEL);
