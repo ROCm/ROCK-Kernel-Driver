@@ -1,6 +1,4 @@
-/* $Id$
- *
- * pmc - Driver implementation for power management functions
+/* pmc - Driver implementation for power management functions
  * of Power Management Controller (PMC) on SPARCstation-Voyager.
  *
  * Copyright (c) 2002 Eric Brower (ebrower@usa.net)

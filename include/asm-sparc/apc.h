@@ -1,6 +1,4 @@
-/* $Id$
- *
- * apc - Driver definitions for power management functions
+/* apc - Driver definitions for power management functions
  * of Aurora Personality Chip (APC) on SPARCstation-4/5 and 
  * derivatives
  *
