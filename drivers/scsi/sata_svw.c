@@ -335,7 +335,7 @@ static int k2_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *e
 	 * if we don't fill these
 	 */
 	probe_ent->pio_mask = 0x1f;
-	probe_ent->udma_mask = 0x3f;
+	probe_ent->udma_mask = 0x7f;
 
 	/* We have 4 ports per PCI function */
 	k2_sata_setup_port(&probe_ent->port[0], base + 0 * K2_SATA_PORT_OFFSET);
