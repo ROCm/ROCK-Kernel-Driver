@@ -68,20 +68,27 @@ do {						\
  */
 #define MAP_NR_DENSE(addr)	(((unsigned long) (addr) - PAGE_OFFSET) >> PAGE_SHIFT)
 
+#define page_to_pfn(page)	((unsigned long)((page) - mem_map))
+#define pfn_valid(pfn)		((pfn) < max_mapnr)
+#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+#define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
+
 #ifdef CONFIG_IA64_GENERIC
 # include <asm/machvec.h>
 # define virt_to_page(kaddr)	(mem_map + platform_map_nr(kaddr))
-# define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
+# define page_to_pfn(page)	((unsigned long) (page - mem_map))
+# define pfn_to_page(pfn)	(mem_map + (pfn))
 #elif defined (CONFIG_IA64_SGI_SN1)
 # ifndef CONFIG_DISCONTIGMEM
 #  define virt_to_page(kaddr)	(mem_map + MAP_NR_DENSE(kaddr))
-#  define page_to_phys(page)	XXX fix me
+#  define page_to_pfn(page)	XXX fix me
+#  define pfn_to_page(pfn)	XXX fix me
 # endif
 #else
 # define virt_to_page(kaddr)	(mem_map + MAP_NR_DENSE(kaddr))
-# define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
+# define page_to_pfn(page)	((unsigned long) (page - mem_map))
+# define pfn_to_page(pfn)	(mem_map + (pfn))
 #endif
-#define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
 
 typedef union ia64_va {
 	struct {
@@ -105,7 +112,7 @@ typedef union ia64_va {
 #define REGION_OFFSET(x)	({ia64_va _v; _v.l = (long) (x); _v.f.off;})
 
 #define REGION_SIZE		REGION_NUMBER(1)
-#define REGION_KERNEL	7
+#define REGION_KERNEL		7
 
 #define BUG() do { printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); *(int *)0=0; } while (0)
 #define PAGE_BUG(page) do { BUG(); } while (0)
