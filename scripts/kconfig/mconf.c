@@ -18,6 +18,7 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <regex.h>
 
 #define LKC_DIRECT_LINK
 #include "lkc.h"
@@ -28,7 +29,7 @@ static const char menu_instructions[] =
 	"<Enter> selects submenus --->.  "
 	"Highlighted letters are hotkeys.  "
 	"Pressing <Y> includes, <N> excludes, <M> modularizes features.  "
-	"Press <Esc><Esc> to exit, <?> for Help.  "
+	"Press <Esc><Esc> to exit, <?> for Help, </> for Search.  "
 	"Legend: [*] built-in  [ ] excluded  <M> module  < > module capable",
 radiolist_instructions[] =
 	"Use the arrow keys to navigate this window or "
@@ -102,6 +103,10 @@ static void show_textbox(const char *title, const char *text, int r, int c);
 static void show_helptext(const char *title, const char *text);
 static void show_help(struct menu *menu);
 static void show_readme(void);
+static void show_file(const char *filename, const char *title, int r, int c);
+static void show_expr(struct menu *menu, FILE *fp);
+static void search_conf(char *pattern);
+static int regex_match(const char *string, regex_t *re);
 
 static void cprint_init(void);
 static int cprint1(const char *fmt, ...);
@@ -272,6 +277,114 @@ static int exec_conf(void)
 	sigprocmask(SIG_SETMASK, &osset, NULL);
 
 	return WEXITSTATUS(stat);
+}
+
+static int regex_match(const char *string, regex_t *re)
+{
+	int rc;
+
+	rc = regexec(re, string, (size_t) 0, NULL, 0);
+	if (rc)
+		return 0;
+	return 1;
+}
+
+static void show_expr(struct menu *menu, FILE *fp)
+{
+	bool hit = false;
+	fprintf(fp, "Depends:\n ");
+	if (menu->prompt->visible.expr) {
+		if (!hit)
+			hit = true;
+		expr_fprint(menu->prompt->visible.expr, fp);
+	}
+	if (!hit)
+		fprintf(fp, "None");
+	if (menu->sym) {
+		struct property *prop;
+		hit = false;
+		fprintf(fp, "\nSelects:\n ");
+		for_all_properties(menu->sym, prop, P_SELECT) {
+			if (!hit)
+				hit = true;
+			expr_fprint(prop->expr, fp);
+		}
+		if (!hit)
+			fprintf(fp, "None");
+		hit = false;
+		fprintf(fp, "\nSelected by:\n ");
+		if (menu->sym->rev_dep.expr) {
+			hit = true;
+			expr_fprint(menu->sym->rev_dep.expr, fp);
+		}
+		if (!hit)
+			fprintf(fp, "None");
+	}
+}
+
+static void search_conf(char *pattern)
+{
+	struct symbol *sym = NULL;
+	struct menu *menu[32] = { 0 };
+	struct property *prop = NULL;
+	FILE *fp = NULL;
+	bool hit = false;
+	int i, j, k, l;
+	regex_t re;
+
+	if (regcomp(&re, pattern, REG_EXTENDED|REG_NOSUB))
+		return;
+
+	fp = fopen(".search.tmp", "w");
+	if (fp == NULL) {
+		perror("fopen");
+		return;
+	}
+	for_all_symbols(i, sym) {
+		if (!sym->name)
+			continue;
+		if (!regex_match(sym->name, &re))
+			continue;
+		for_all_prompts(sym, prop) {
+			struct menu *submenu = prop->menu;
+			if (!submenu)
+				continue;
+			j = 0;
+			hit = false;
+			while (submenu) {
+				menu[j++] = submenu;
+				submenu = submenu->parent;
+			}
+			if (j > 0) {
+				if (!hit)
+					hit = true;
+				fprintf(fp, "%s (%s)\n", prop->text, sym->name);
+				fprintf(fp, "Location:\n");
+			}
+			for (k = j-2, l=1; k > 0; k--, l++) {
+				const char *prompt = menu_get_prompt(menu[k]);
+				if (menu[k]->sym)
+					fprintf(fp, "%*c-> %s (%s)\n",
+								l, ' ',
+								prompt,
+								menu[k]->sym->name);
+				else
+					fprintf(fp, "%*c-> %s\n",
+								l, ' ',
+								prompt);
+			}
+			if (hit) {
+				show_expr(menu[0], fp);
+				fprintf(fp, "\n\n\n");
+			}
+		}
+	}
+	if (!hit)
+		fprintf(fp, "No matches found.");
+	regfree(&re);
+	fclose(fp);
+	show_file(".search.tmp", "Search Results", rows, cols);
+	unlink(".search.tmp");
 }
 
 static void build_conf(struct menu *menu)
@@ -463,6 +576,23 @@ static void conf(struct menu *menu)
 			cprint("    Save Configuration to an Alternate File");
 		}
 		stat = exec_conf();
+		if (stat == 26) {
+			char *pattern;
+
+			if (!strlen(input_buf))
+				continue;
+			pattern = malloc(sizeof(char)*sizeof(input_buf));
+			if (pattern == NULL) {
+				perror("malloc");
+				continue;
+			}
+			for (i = 0; input_buf[i]; i++)
+				pattern[i] = toupper(input_buf[i]);
+			pattern[i] = '\0';
+			search_conf(pattern);
+			free(pattern);
+			continue;
+		}
 		if (stat < 0)
 			continue;
 
@@ -550,17 +680,7 @@ static void show_textbox(const char *title, const char *text, int r, int c)
 	fd = creat(".help.tmp", 0777);
 	write(fd, text, strlen(text));
 	close(fd);
-	do {
-		cprint_init();
-		if (title) {
-			cprint("--title");
-			cprint("%s", title);
-		}
-		cprint("--textbox");
-		cprint(".help.tmp");
-		cprint("%d", r);
-		cprint("%d", c);
-	} while (exec_conf() < 0);
+	show_file(".help.tmp", title, r, c);
 	unlink(".help.tmp");
 }
 
@@ -589,13 +709,22 @@ static void show_help(struct menu *menu)
 
 static void show_readme(void)
 {
+	show_file("scripts/README.Menuconfig", NULL, rows, cols);
+}
+
+static void show_file(const char *filename, const char *title, int r, int c)
+{
 	do {
 		cprint_init();
+		if (title) {
+			cprint("--title");
+			cprint("%s", title);
+		}
 		cprint("--textbox");
-		cprint("scripts/README.Menuconfig");
-		cprint("%d", rows);
-		cprint("%d", cols);
-	} while (exec_conf() == -1);
+		cprint("%s", filename);
+		cprint("%d", r);
+		cprint("%d", c);
+	} while (exec_conf() < 0);
 }
 
 static void conf_choice(struct menu *menu)
