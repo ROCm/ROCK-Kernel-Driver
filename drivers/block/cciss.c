@@ -243,7 +243,7 @@ cciss_proc_write(struct file *file, const char *buffer,
  * Get us a file in /proc/cciss that says something about each controller.
  * Create /proc/cciss if it doesn't exist yet.
  */
-static void __init cciss_procinit(int i)
+static void __devinit cciss_procinit(int i)
 {
 	struct proc_dir_entry *pde;
 
@@ -2427,7 +2427,7 @@ static void free_hba(int i)
  *  stealing all these major device numbers.
  *  returns the number of block devices registered.
  */
-static int __init cciss_init_one(struct pci_dev *pdev,
+static int __devinit cciss_init_one(struct pci_dev *pdev,
 	const struct pci_device_id *ent)
 {
 	request_queue_t *q;

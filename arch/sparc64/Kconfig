@@ -29,7 +29,8 @@ config BBC_I2C
 	  smartcard reader, if present.  Say Y to enable support for these.
 
 config VT
-	bool
+	bool "Virtual terminal" if EMBEDDED
+	select INPUT
 	default y
 	---help---
 	  If you say Y here, you will get support for terminal devices with
@@ -59,7 +60,8 @@ config VT
 	  shiny Linux system :-)
 
 config VT_CONSOLE
-	bool
+	bool "Support for console on virtual terminal" if EMBEDDED
+	depends on VT
 	default y
 	---help---
 	  The system console is the device which receives all kernel messages

@@ -278,7 +278,7 @@
  *	  bonding round-robin mode ignoring links after failover/recovery
  *
  * 2003/03/17 - Jay Vosburgh <fubar at us dot ibm dot com>
- *	- kmalloc fix (GPF_KERNEL to GPF_ATOMIC) reported by
+ *	- kmalloc fix (GFP_KERNEL to GFP_ATOMIC) reported by
  *	  Shmulik dot Hen at intel.com.
  *	- Based on discussion on mailing list, changed use of
  *	  update_slave_cnt(), created wrapper functions for adding/removing
@@ -323,22 +323,22 @@
  * 2003/03/18 - Amir Noam <amir.noam at intel dot com>,
  *		Tsippy Mendelson <tsippy.mendelson at intel dot com> and
  *		Shmulik Hen <shmulik.hen at intel dot com>
- *    - Added support for IEEE 802.3ad Dynamic link aggregation mode.
+ *	- Added support for IEEE 802.3ad Dynamic link aggregation mode.
  *
  * 2003/05/01 - Amir Noam <amir.noam at intel dot com>
- *    - Added ABI version control to restore compatibility between
- *      new/old ifenslave and new/old bonding.
+ *	- Added ABI version control to restore compatibility between
+ *	  new/old ifenslave and new/old bonding.
  *
  * 2003/05/01 - Shmulik Hen <shmulik.hen at intel dot com>
- *    - Fixed bug in bond_release_all(): save old value of current_slave
- *      before setting it to NULL.
- *    - Changed driver versioning scheme to include version number instead
- *      of release date (that is already in another field). There are 3
- *      fields X.Y.Z where:
- *            X - Major version - big behavior changes
- *            Y - Minor version - addition of features
- *            Z - Extra version - minor changes and bug fixes
- *      The current version is 1.0.0 as a base line.
+ *	- Fixed bug in bond_release_all(): save old value of current_slave
+ *	  before setting it to NULL.
+ *	- Changed driver versioning scheme to include version number instead
+ *	  of release date (that is already in another field). There are 3
+ *	  fields X.Y.Z where:
+ *		X - Major version - big behavior changes
+ *		Y - Minor version - addition of features
+ *		Z - Extra version - minor changes and bug fixes
+ *	  The current version is 1.0.0 as a base line.
  *
  * 2003/05/01 - Tsippy Mendelson <tsippy.mendelson at intel dot com> and
  *		Amir Noam <amir.noam at intel dot com>
@@ -371,6 +371,43 @@
  *	- Added support for Adaptive load balancing mode which is
  *	  equivalent to Transmit load balancing + Receive load balancing.
  *	  new version - 2.2.0
+ *
+ * 2003/05/15 - Jay Vosburgh <fubar at us dot ibm dot com>
+ *	- Applied fix to activebackup_arp_monitor posted to bonding-devel
+ *	  by Tony Cureington <tony.cureington * hp_com>.  Fixes ARP
+ *	  monitor endless failover bug.  Version to 2.2.10
+ *
+ * 2003/05/20 - Amir Noam <amir.noam at intel dot com>
+ *	- Fixed bug in ABI version control - Don't commit to a specific
+ *	  ABI version if receiving unsupported ioctl commands.
+ *
+ * 2003/05/22 - Jay Vosburgh <fubar at us dot ibm dot com>
+ *	- Fix ifenslave -c causing bond to loose existing routes;
+ *	  added bond_set_mac_address() that doesn't require the
+ *	  bond to be down.
+ *	- In conjunction with fix for ifenslave -c, in
+ *	  bond_change_active(), changing to the already active slave
+ *	  is no longer an error (it successfully does nothing).
+ *
+ * 2003/06/30 - Amir Noam <amir.noam at intel dot com>
+ * 	- Fixed bond_change_active() for ALB/TLB modes.
+ *	  Version to 2.2.14.
+ *
+ * 2003/07/29 - Amir Noam <amir.noam at intel dot com>
+ * 	- Fixed ARP monitoring bug.
+ *	  Version to 2.2.15.
+ *
+ * 2003/07/31 - Willy Tarreau <willy at ods dot org>
+ * 	- Fixed kernel panic when using ARP monitoring without
+ *	  setting bond's IP address.
+ *	  Version to 2.2.16.
+ *
+ * 2003/08/06 - Amir Noam <amir.noam at intel dot com>
+ * 	- Back port from 2.6: use alloc_netdev(); fix /proc handling;
+ *	  made stats a part of bond struct so no need to allocate
+ *	  and free it separately; use standard list operations instead
+ *	  of pre-allocated array of bonds.
+ *	  Version to 2.3.0.
  */
 
 #include <linux/config.h>
@@ -415,10 +452,10 @@
 #include "bond_3ad.h"
 #include "bond_alb.h"
 
-#define DRV_VERSION		"2.2.0"
-#define DRV_RELDATE		"April 15, 2003"
-#define DRV_NAME		"bonding"
-#define DRV_DESCRIPTION		"Ethernet Channel Bonding Driver"
+#define DRV_VERSION	"2.3.0"
+#define DRV_RELDATE	"August 6, 2003"
+#define DRV_NAME	"bonding"
+#define DRV_DESCRIPTION	"Ethernet Channel Bonding Driver"
 
 static const char *version =
 DRV_NAME ".c:v" DRV_VERSION " (" DRV_RELDATE ")\n";
@@ -443,7 +480,7 @@ struct bond_parm_tbl {
 
 static int arp_interval = BOND_LINK_ARP_INTERV;
 static char *arp_ip_target[MAX_ARP_IP_TARGETS] = { NULL, };
-static unsigned long arp_target[MAX_ARP_IP_TARGETS] = { 0, } ;
+static u32 arp_target[MAX_ARP_IP_TARGETS] = { 0, } ;
 static int arp_ip_count = 0;
 static u32 my_ip = 0;
 char *arp_target_hw_addr = NULL;
@@ -474,8 +511,8 @@ static struct bond_parm_tbl bond_mode_tbl[] = {
 {	"balance-xor",		BOND_MODE_XOR},
 {	"broadcast",		BOND_MODE_BROADCAST},
 {	"802.3ad",		BOND_MODE_8023AD},
-{	"tlb",			BOND_MODE_TLB},
-{	"alb",			BOND_MODE_ALB},
+{	"balance-tlb",		BOND_MODE_TLB},
+{	"balance-alb",		BOND_MODE_ALB},
 {	NULL,			-1},
 };
 
@@ -505,7 +542,7 @@ MODULE_PARM_DESC(max_bonds, "Max number of bonded devices");
 MODULE_PARM(miimon, "i");
 MODULE_PARM_DESC(miimon, "Link check interval in milliseconds");
 MODULE_PARM(use_carrier, "i");
-MODULE_PARM_DESC(use_carrier, "Use netif_carrier_ok (vs MII ioctls) in miimon; 09 for off, 1 for on (default)");
+MODULE_PARM_DESC(use_carrier, "Use netif_carrier_ok (vs MII ioctls) in miimon; 0 for off, 1 for on (default)");
 MODULE_PARM(mode, "s");
 MODULE_PARM_DESC(mode, "Mode of operation : 0 for round robin, 1 for active-backup, 2 for xor");
 MODULE_PARM(arp_interval, "i");
@@ -544,14 +581,6 @@ static int bond_enslave(struct net_device *master, struct net_device *slave);
 static int bond_release(struct net_device *master, struct net_device *slave);
 static int bond_release_all(struct net_device *master);
 static int bond_sethwaddr(struct net_device *master, struct net_device *slave);
-
-/*
- * bond_get_info is the interface into the /proc filesystem.  This is
- * a different interface than the BOND_INFO_QUERY ioctl.  That is done
- * through the generic networking ioctl interface, and bond_info_query
- * is the internal function which provides that information.
- */
-static int bond_get_info(char *buf, char **start, off_t offset, int length);
 
 /* Caller must hold bond->ptrlock for write */
 static inline struct slave*
@@ -1559,11 +1588,14 @@ static int bond_enslave(struct net_device *master_dev,
 #endif
 			bond_set_slave_inactive_flags(new_slave);
 		}
-		read_lock_irqsave(&(((struct in_device *)slave_dev->ip_ptr)->lock), rflags);
-		ifap= &(((struct in_device *)slave_dev->ip_ptr)->ifa_list);
-		ifa = *ifap;
-		my_ip = ifa->ifa_address;
-		read_unlock_irqrestore(&(((struct in_device *)slave_dev->ip_ptr)->lock), rflags);
+		if (((struct in_device *)slave_dev->ip_ptr) != NULL) {
+			read_lock_irqsave(&(((struct in_device *)slave_dev->ip_ptr)->lock), rflags);
+			ifap= &(((struct in_device *)slave_dev->ip_ptr)->ifa_list);
+			ifa = *ifap;
+			if (ifa != NULL)
+				my_ip = ifa->ifa_address;
+			read_unlock_irqrestore(&(((struct in_device *)slave_dev->ip_ptr)->lock), rflags);
+		}
 
 		/* if there is a primary slave, remember it */
 		if (primary != NULL) {
@@ -1717,20 +1749,29 @@ static int bond_change_active(struct net_device *master_dev, struct net_device *
 		}
 	}
 
+	/*
+	 * Changing to the current active: do nothing; return success.
+	 */
+	if (newactive && (newactive == oldactive)) {
+		write_unlock_bh(&bond->lock);
+		return 0;
+	}
+
 	if ((newactive != NULL)&&
 	    (oldactive != NULL)&&
-	    (newactive != oldactive)&&
 	    (newactive->link == BOND_LINK_UP)&&
 	    IS_UP(newactive->dev)) {
-		bond_set_slave_inactive_flags(oldactive);
-		bond_set_slave_active_flags(newactive);
+		if (bond_mode == BOND_MODE_ACTIVEBACKUP) {
+			bond_set_slave_inactive_flags(oldactive);
+			bond_set_slave_active_flags(newactive);
+		}
+
 		bond_mc_update(bond, newactive, oldactive);
 		bond_assign_current_slave(bond, newactive);
 		printk("%s : activate %s(old : %s)\n",
 			master_dev->name, newactive->dev->name, 
 			oldactive->dev->name);
-	}
-	else {
+	} else {
 		ret = -EINVAL;
 	}
 	write_unlock_bh(&bond->lock);
@@ -1929,6 +1970,10 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 			/* release the slave from its bond */
 			bond_detach_slave(bond, our_slave);
 
+			if (bond->primary_slave == our_slave) {
+				bond->primary_slave = NULL;
+			}
+
 			printk (KERN_INFO "%s: releasing %s interface %s",
 				master->name,
 				(our_slave->state == BOND_STATE_ACTIVE) ? "active" : "backup",
@@ -1945,10 +1990,6 @@ static int bond_release(struct net_device *master, struct net_device *slave)
 				printk(KERN_INFO
 					"%s: now running without any active interface !\n",
 					master->name);
-			}
-
-			if (bond->primary_slave == our_slave) {
-				bond->primary_slave = NULL;
 			}
 
 			if ((bond_mode == BOND_MODE_TLB) ||
@@ -2730,10 +2771,8 @@ static void activebackup_arp_monitor(struct net_device *master)
 		/* the current slave must tx an arp to ensure backup slaves
 		 * rx traffic
 		 */
-		if ((slave != NULL) &&
-		    (((jiffies - slave->dev->last_rx) >= the_delta_in_ticks) &&
-		     (my_ip != 0))) {
-		  arp_send_all(slave);
+		if ((slave != NULL) && (my_ip != 0)) {
+			arp_send_all(slave);
 		}
 	}
 
@@ -2986,7 +3025,7 @@ static int bond_ioctl(struct net_device *master_dev, struct ifreq *ifr, int cmd)
 	} else if (orig_app_abi_ver != app_abi_ver) {
 		printk(KERN_ERR
 		       "bonding: Error: already using ifenslave ABI "
-		       "version %d; to upgrade ifenslave to version %d,"
+		       "version %d; to upgrade ifenslave to version %d, "
 		       "you must first reload bonding.\n",
 		       orig_app_abi_ver, app_abi_ver);
 		return -EINVAL;
@@ -3285,10 +3324,10 @@ static int bond_xmit_activebackup(struct sk_buff *skb, struct net_device *dev)
 static struct net_device_stats *bond_get_stats(struct net_device *dev)
 {
 	bonding_t *bond = dev->priv;
-	struct net_device_stats *stats = bond->stats, *sstats;
+	struct net_device_stats *stats = &(bond->stats), *sstats;
 	slave_t *slave;
 
-	memset(bond->stats, 0, sizeof(struct net_device_stats));
+	memset(stats, 0, sizeof(struct net_device_stats));
 
 	read_lock_bh(&bond->lock);
 
@@ -3327,132 +3366,136 @@ static struct net_device_stats *bond_get_stats(struct net_device *dev)
 	return stats;
 }
 
-static int bond_get_info(char *buf, char **start, off_t offset, int length)
+#ifdef CONFIG_PROC_FS
+static int bond_read_proc(char *buf, char **start, off_t off, int count, int *eof, void *data)
 {
-	bonding_t *bond;
+	struct bonding *bond = (struct bonding *) data;
 	int len = 0;
-	off_t begin = 0;
 	u16 link;
 	slave_t *slave = NULL;
 
+	/* make sure the bond won't be taken away */
+	read_lock(&dev_base_lock);
+
 	len += sprintf(buf + len, "%s\n", version);
 
-	read_lock(&dev_base_lock);
-	list_for_each_entry(bond, &bond_dev_list, bond_list) {
-		/*
-		 * This function locks the mutex, so we can't lock it until 
-		 * afterwards
-		 */
-		link = bond_check_mii_link(bond);
+	/*
+	 * This function locks the mutex, so we can't lock it until
+	 * afterwards
+	 */
+	link = bond_check_mii_link(bond);
 
-		len += sprintf(buf + len, "Bonding Mode: %s\n",
-			       bond_mode_name());
+	len += sprintf(buf + len, "Bonding Mode: %s\n",
+		       bond_mode_name());
 
-		if ((bond_mode == BOND_MODE_ACTIVEBACKUP) ||
-		    (bond_mode == BOND_MODE_TLB) ||
-		    (bond_mode == BOND_MODE_ALB)) {
-			read_lock_bh(&bond->lock);
-			read_lock(&bond->ptrlock);
-			if (bond->current_slave != NULL) {
-				len += sprintf(buf + len, 
-					"Currently Active Slave: %s\n", 
-					bond->current_slave->dev->name);
-			}
-			read_unlock(&bond->ptrlock);
-			read_unlock_bh(&bond->lock);
+	if ((bond_mode == BOND_MODE_ACTIVEBACKUP) ||
+	    (bond_mode == BOND_MODE_TLB) ||
+	    (bond_mode == BOND_MODE_ALB)) {
+		read_lock_bh(&bond->lock);
+		read_lock(&bond->ptrlock);
+		if (bond->current_slave != NULL) {
+			len += sprintf(buf + len,
+				"Currently Active Slave: %s\n",
+				bond->current_slave->dev->name);
 		}
+		read_unlock(&bond->ptrlock);
+		read_unlock_bh(&bond->lock);
+	}
+
+	len += sprintf(buf + len, "MII Status: ");
+	len += sprintf(buf + len,
+			link == BMSR_LSTATUS ? "up\n" : "down\n");
+	len += sprintf(buf + len, "MII Polling Interval (ms): %d\n",
+			miimon);
+	len += sprintf(buf + len, "Up Delay (ms): %d\n",
+			updelay * miimon);
+	len += sprintf(buf + len, "Down Delay (ms): %d\n",
+			downdelay * miimon);
+	len += sprintf(buf + len, "Multicast Mode: %s\n",
+		       multicast_mode_name());
+
+	read_lock_bh(&bond->lock);
+
+	if (bond_mode == BOND_MODE_8023AD) {
+		struct ad_info ad_info;
+
+		len += sprintf(buf + len, "\n802.3ad info\n");
+
+		if (bond_3ad_get_active_agg_info(bond, &ad_info)) {
+			len += sprintf(buf + len, "bond %s has no active aggregator\n", bond->device->name);
+		} else {
+			len += sprintf(buf + len, "Active Aggregator Info:\n");
+
+			len += sprintf(buf + len, "\tAggregator ID: %d\n", ad_info.aggregator_id);
+			len += sprintf(buf + len, "\tNumber of ports: %d\n", ad_info.ports);
+			len += sprintf(buf + len, "\tActor Key: %d\n", ad_info.actor_key);
+			len += sprintf(buf + len, "\tPartner Key: %d\n", ad_info.partner_key);
+			len += sprintf(buf + len, "\tPartner Mac Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
+				       ad_info.partner_system[0],
+				       ad_info.partner_system[1],
+				       ad_info.partner_system[2],
+				       ad_info.partner_system[3],
+				       ad_info.partner_system[4],
+				       ad_info.partner_system[5]);
+		}
+	}
+
+	for (slave = bond->prev; slave != (slave_t *)bond;
+	     slave = slave->prev) {
+		len += sprintf(buf + len, "\nSlave Interface: %s\n", slave->dev->name);
 
 		len += sprintf(buf + len, "MII Status: ");
-		len += sprintf(buf + len, 
-				link == BMSR_LSTATUS ? "up\n" : "down\n");
-		len += sprintf(buf + len, "MII Polling Interval (ms): %d\n", 
-				miimon);
-		len += sprintf(buf + len, "Up Delay (ms): %d\n", 
-				updelay * miimon);
-		len += sprintf(buf + len, "Down Delay (ms): %d\n", 
-				downdelay * miimon);
-		len += sprintf(buf + len, "Multicast Mode: %s\n",
-			       multicast_mode_name());
 
-		read_lock_bh(&bond->lock);
+		len += sprintf(buf + len,
+			slave->link == BOND_LINK_UP ?
+			"up\n" : "down\n");
+		len += sprintf(buf + len, "Link Failure Count: %d\n",
+			slave->link_failure_count);
+
+		if (app_abi_ver >= 1) {
+			len += sprintf(buf + len,
+				       "Permanent HW addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
+				       slave->perm_hwaddr[0],
+				       slave->perm_hwaddr[1],
+				       slave->perm_hwaddr[2],
+				       slave->perm_hwaddr[3],
+				       slave->perm_hwaddr[4],
+				       slave->perm_hwaddr[5]);
+		}
 
 		if (bond_mode == BOND_MODE_8023AD) {
-			struct ad_info ad_info;
+			struct aggregator *agg = SLAVE_AD_INFO(slave).port.aggregator;
 
-			len += sprintf(buf + len, "\n802.3ad info\n");
-
-			if (bond_3ad_get_active_agg_info(bond, &ad_info)) {
-				len += sprintf(buf + len, "bond %s has no active aggregator\n", bond->device->name);
+			if (agg) {
+				len += sprintf(buf + len, "Aggregator ID: %d\n",
+					       agg->aggregator_identifier);
 			} else {
-				len += sprintf(buf + len, "Active Aggregator Info:\n");
-
-				len += sprintf(buf + len, "\tAggregator ID: %d\n", ad_info.aggregator_id);
-				len += sprintf(buf + len, "\tNumber of ports: %d\n", ad_info.ports);
-				len += sprintf(buf + len, "\tActor Key: %d\n", ad_info.actor_key);
-				len += sprintf(buf + len, "\tPartner Key: %d\n", ad_info.partner_key);
-				len += sprintf(buf + len, "\tPartner Mac Address: %02x:%02x:%02x:%02x:%02x:%02x\n",
-					       ad_info.partner_system[0],
-					       ad_info.partner_system[1],
-					       ad_info.partner_system[2],
-					       ad_info.partner_system[3],
-					       ad_info.partner_system[4],
-					       ad_info.partner_system[5]);
+				len += sprintf(buf + len, "Aggregator ID: N/A\n");
 			}
 		}
-
-		for (slave = bond->prev; slave != (slave_t *)bond; 
-		     slave = slave->prev) {
-			len += sprintf(buf + len, "\nSlave Interface: %s\n", slave->dev->name);
-
-			len += sprintf(buf + len, "MII Status: ");
-
-			len += sprintf(buf + len, 
-				slave->link == BOND_LINK_UP ? 
-				"up\n" : "down\n");
-			len += sprintf(buf + len, "Link Failure Count: %d\n", 
-				slave->link_failure_count);
-
-			if (app_abi_ver >= 1) {
-				len += sprintf(buf + len,
-					       "Permanent HW addr: %02x:%02x:%02x:%02x:%02x:%02x\n",
-					       slave->perm_hwaddr[0],
-					       slave->perm_hwaddr[1],
-					       slave->perm_hwaddr[2],
-					       slave->perm_hwaddr[3],
-					       slave->perm_hwaddr[4],
-					       slave->perm_hwaddr[5]);
-			}
-
-			if (bond_mode == BOND_MODE_8023AD) {
-				struct aggregator *agg = SLAVE_AD_INFO(slave).port.aggregator;
-
-				if (agg) {
-					len += sprintf(buf + len, "Aggregator ID: %d\n",
-						       agg->aggregator_identifier);
-				} else {
-					len += sprintf(buf + len, "Aggregator ID: N/A\n");
-				}
-			}
-		}
-		read_unlock_bh(&bond->lock);
-
-		/*
-		 * Figure out the calcs for the /proc/net interface
-		 */
-		*start = buf + (offset - begin);
-		len -= (offset - begin);
-		if (len > length) {
-			len = length;
-		}
-		if (len < 0) {
-			len = 0;
-		}
-
 	}
+	read_unlock_bh(&bond->lock);
+
+	/*
+	 * Figure out the calcs for the /proc/net interface
+	 */
+	if (len <= off + count) {
+		*eof = 1;
+	}
+	*start = buf + off;
+	len -= off;
+	if (len > count) {
+		len = count;
+	}
+	if (len < 0) {
+		len = 0;
+	}
+
 	read_unlock(&dev_base_lock);
 
 	return len;
 }
+#endif /* CONFIG_PROC_FS */
 
 static int bond_event(struct notifier_block *this, unsigned long event, 
 			void *ptr)
@@ -3460,8 +3503,9 @@ static int bond_event(struct notifier_block *this, unsigned long event,
 	struct net_device *event_dev = (struct net_device *)ptr;
 	struct net_device *master = event_dev->master;
 
-	if (event == NETDEV_UNREGISTER && master != NULL) 
+	if ((event == NETDEV_UNREGISTER) && (master != NULL)) {
 		bond_release(master, event_dev);
+	}
 
 	return NOTIFY_DONE;
 }
@@ -3470,9 +3514,34 @@ static struct notifier_block bond_netdev_notifier = {
 	.notifier_call = bond_event,
 };
 
+static void bond_deinit(struct net_device *dev)
+{
+	struct bonding *bond = dev->priv;
+
+	list_del(&bond->bond_list);
+
+#ifdef CONFIG_PROC_FS
+	remove_proc_entry("info", bond->bond_proc_dir);
+	remove_proc_entry(dev->name, proc_net);
+#endif
+}
+
+static void bond_free_all(void)
+{
+	struct bonding *bond, *nxt;
+
+	list_for_each_entry_safe(bond, nxt, &bond_dev_list, bond_list) {
+		struct net_device *dev = bond->device;
+
+		unregister_netdev(dev);
+		bond_deinit(dev);
+		kfree(dev);
+	}
+}
+
 static int __init bond_init(struct net_device *dev)
 {
-	bonding_t *bond;
+	struct bonding *bond;
 	int count;
 
 #ifdef BONDING_DEBUG
@@ -3483,9 +3552,7 @@ static int __init bond_init(struct net_device *dev)
 	/* initialize rwlocks */
 	rwlock_init(&bond->lock);
 	rwlock_init(&bond->ptrlock);
-	
-	/* space is reserved for stats in alloc_netdev call. */
-	bond->stats = (struct net_device_stats *)(bond + 1);
+
 	bond->next = bond->prev = (slave_t *)bond;
 	bond->current_slave = NULL;
 	bond->current_arp_slave = NULL;
@@ -3560,8 +3627,8 @@ static int __init bond_init(struct net_device *dev)
 	bond->bond_proc_dir->owner = THIS_MODULE;
 
 	bond->bond_proc_info_file = 
-		create_proc_info_entry("info", 0, bond->bond_proc_dir, 
-					bond_get_info);
+		create_proc_read_entry("info", 0, bond->bond_proc_dir,
+					bond_read_proc, bond);
 	if (bond->bond_proc_info_file == NULL) {
 		printk(KERN_ERR "%s: Cannot init /proc/net/%s/info\n", 
 			dev->name, dev->name);
@@ -3571,8 +3638,8 @@ static int __init bond_init(struct net_device *dev)
 	bond->bond_proc_info_file->owner = THIS_MODULE;
 #endif /* CONFIG_PROC_FS */
 
-
 	list_add_tail(&bond->bond_list, &bond_dev_list);
+
 	return 0;
 }
 
@@ -3604,6 +3671,7 @@ bond_parse_parm(char *mode_arg, struct bond_parm_tbl *tbl)
 
 	return -1;
 }
+
 
 static int __init bonding_init(void)
 {
@@ -3811,7 +3879,7 @@ static int __init bonding_init(void)
                         arp_interval = 0;
 		} else { 
 			u32 ip = in_aton(arp_ip_target[arp_ip_count]); 
-			*(u32 *)(arp_ip_target[arp_ip_count]) = ip;
+			arp_target[arp_ip_count] = ip;
 		}
         }
 
@@ -3850,50 +3918,62 @@ static int __init bonding_init(void)
 		primary = NULL;
 	}
 
-	register_netdevice_notifier(&bond_netdev_notifier);
+	rtnl_lock();
 
+	err = 0;
 	for (no = 0; no < max_bonds; no++) {
 		struct net_device *dev;
-		char name[IFNAMSIZ];
 
-		snprintf(name, IFNAMSIZ, "bond%d", no);
+		dev = alloc_netdev(sizeof(struct bonding), "", ether_setup);
+		if (!dev) {
+			err = -ENOMEM;
+			goto out_err;
+		}
 
-		dev = alloc_netdev(sizeof(bonding_t) 
-				   + sizeof(struct net_device_stats),
-				   name, ether_setup);
-		if (!dev)
-			return -ENOMEM;
+		err = dev_alloc_name(dev, "bond%d");
+		if (err < 0) {
+			kfree(dev);
+			goto out_err;
+		}
 
-		dev->init = bond_init;
+		/* bond_init() must be called after dev_alloc_name() (for the
+		 * /proc files), but before register_netdevice(), because we
+		 * need to set function pointers.
+		 */
+		err = bond_init(dev);
+		if (err < 0) {
+			kfree(dev);
+			goto out_err;
+		}
+
 		SET_MODULE_OWNER(dev);
 
-		if ( (err = register_netdev(dev)) ) {
-#ifdef BONDING_DEBUG
-			printk(KERN_INFO "%s: register_netdev failed %d\n",
-			       dev->name, err);
-#endif
+		err = register_netdevice(dev);
+		if (err < 0) {
+			bond_deinit(dev);
 			kfree(dev);
-			return err;
-		}	
+			goto out_err;
+		}
 	}
+
+	rtnl_unlock();
+	register_netdevice_notifier(&bond_netdev_notifier);
+
 	return 0;
+
+out_err:
+	rtnl_unlock();
+
+	/* free and unregister all bonds that were successfully added */
+	bond_free_all();
+
+	return err;
 }
 
 static void __exit bonding_exit(void)
 {
-	struct bonding *bond, *nxt;
-
 	unregister_netdevice_notifier(&bond_netdev_notifier);
-		 
-	list_for_each_entry_safe(bond, nxt, &bond_dev_list, bond_list) {
-		struct net_device *dev = bond->device;
-#ifdef CONFIG_PROC_FS
-		remove_proc_entry("info", bond->bond_proc_dir);
-		remove_proc_entry(dev->name, proc_net);
-#endif
-		unregister_netdev(dev);
-		free_netdev(dev);
-	}
+	bond_free_all();
 }
 
 module_init(bonding_init);

@@ -73,19 +73,19 @@ struct cosa_download {
 #define COSAIORSET	_IO('C',0xf0)
 
 /* Start microcode at given address */
-#define COSAIOSTRT	_IOW('C',0xf1,sizeof(int))
+#define COSAIOSTRT	_IOW('C',0xf1, int)
 
 /* Read the block from the device memory */
-#define COSAIORMEM	_IOR('C',0xf2,sizeof(struct cosa_download *))
+#define COSAIORMEM	_IOWR('C',0xf2, struct cosa_download)
 
 /* Write the block to the device memory (i.e. download the microcode) */
-#define COSAIODOWNLD	_IOW('C',0xf2,sizeof(struct cosa_download *))
+#define COSAIODOWNLD	_IOW('C',0xf2, struct cosa_download)
 
 /* Read the device type (one of "srp", "cosa", and "cosa8" for now) */
-#define COSAIORTYPE	_IOR('C',0xf3,sizeof(char *))
+#define COSAIORTYPE	_IOR('C',0xf3, char *)
 
 /* Read the device identification string */
-#define COSAIORIDSTR	_IOR('C',0xf4,sizeof(char *))
+#define COSAIORIDSTR	_IOR('C',0xf4, char *)
 /* Maximum length of the identification string. */
 #define COSA_MAX_ID_STRING 128
 
@@ -100,7 +100,7 @@ struct cosa_download {
 #define COSAIONRCHANS	_IO('C',0xf8)
 
 /* Set the driver for the bus-master operations */
-#define COSAIOBMSET	_IOW('C', 0xf9, sizeof(unsigned short))
+#define COSAIOBMSET	_IOW('C', 0xf9, unsigned short)
 
 #define COSA_BM_OFF	0	/* Bus-mastering off - use ISA DMA (default) */
 #define COSA_BM_ON	1	/* Bus-mastering on - faster but untested */

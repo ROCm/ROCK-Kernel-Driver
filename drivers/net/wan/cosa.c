@@ -326,11 +326,11 @@ static struct file_operations cosa_fops = {
 /* Ioctls */
 static int cosa_start(struct cosa_data *cosa, int address);
 static int cosa_reset(struct cosa_data *cosa);
-static int cosa_download(struct cosa_data *cosa, struct cosa_download *d);
-static int cosa_readmem(struct cosa_data *cosa, struct cosa_download *d);
+static int cosa_download(struct cosa_data *cosa, unsigned long a);
+static int cosa_readmem(struct cosa_data *cosa, unsigned long a);
 
 /* COSA/SRP ROM monitor */
-static int download(struct cosa_data *cosa, char *data, int addr, int len);
+static int download(struct cosa_data *cosa, const char *data, int addr, int len);
 static int startmicrocode(struct cosa_data *cosa, int address);
 static int readmem(struct cosa_data *cosa, char *data, int addr, int len);
 static int cosa_reset_and_read_id(struct cosa_data *cosa, char *id);
@@ -1033,11 +1033,10 @@ static inline int cosa_reset(struct cosa_data *cosa)
 }
 
 /* High-level function to download data into COSA memory. Calls download() */
-static inline int cosa_download(struct cosa_data *cosa, struct cosa_download *d)
+static inline int cosa_download(struct cosa_data *cosa, unsigned long arg)
 {
+	struct cosa_download d;
 	int i;
-	int addr, len;
-	char *code;
 
 	if (cosa->usage > 1)
 		printk(KERN_INFO "%s: WARNING: download of microcode requested with cosa->usage > 1 (%d). Odd things may happen.\n",
@@ -1047,38 +1046,36 @@ static inline int cosa_download(struct cosa_data *cosa, struct cosa_download *d)
 			cosa->name, cosa->firmware_status);
 		return -EPERM;
 	}
-
-	if (verify_area(VERIFY_READ, d, sizeof(*d)) ||
-	    __get_user(addr, &(d->addr)) ||
-	    __get_user(len, &(d->len)) ||
-	    __get_user(code, &(d->code)))
+	
+	if (copy_from_user(&d, (void __user *) arg, sizeof(d)))
 		return -EFAULT;
 
-	if (addr < 0 || addr > COSA_MAX_FIRMWARE_SIZE)
+	if (d.addr < 0 || d.addr > COSA_MAX_FIRMWARE_SIZE)
 		return -EINVAL;
-	if (len < 0 || len > COSA_MAX_FIRMWARE_SIZE)
+	if (d.len < 0 || d.len > COSA_MAX_FIRMWARE_SIZE)
 		return -EINVAL;
+
 
 	/* If something fails, force the user to reset the card */
 	cosa->firmware_status &= ~(COSA_FW_RESET|COSA_FW_DOWNLOAD);
 
-	if ((i=download(cosa, code, len, addr)) < 0) {
+	i = download(cosa, d.code, d.len, d.addr);
+	if (i < 0) {
 		printk(KERN_NOTICE "cosa%d: microcode download failed: %d\n",
 			cosa->num, i);
 		return -EIO;
 	}
 	printk(KERN_INFO "cosa%d: downloading microcode - 0x%04x bytes at 0x%04x\n",
-		cosa->num, len, addr);
+		cosa->num, d.len, d.addr);
 	cosa->firmware_status |= COSA_FW_RESET|COSA_FW_DOWNLOAD;
 	return 0;
 }
 
 /* High-level function to read COSA memory. Calls readmem() */
-static inline int cosa_readmem(struct cosa_data *cosa, struct cosa_download *d)
+static inline int cosa_readmem(struct cosa_data *cosa, unsigned long arg)
 {
+	struct cosa_download d;
 	int i;
-	int addr, len;
-	char *code;
 
 	if (cosa->usage > 1)
 		printk(KERN_INFO "cosa%d: WARNING: readmem requested with "
@@ -1090,22 +1087,20 @@ static inline int cosa_readmem(struct cosa_data *cosa, struct cosa_download *d)
 		return -EPERM;
 	}
 
-	if (verify_area(VERIFY_READ, d, sizeof(*d)) ||
-	    __get_user(addr, &(d->addr)) ||
-	    __get_user(len, &(d->len)) ||
-	    __get_user(code, &(d->code)))
+	if (copy_from_user(&d, (void __user *) arg, sizeof(d)))
 		return -EFAULT;
 
 	/* If something fails, force the user to reset the card */
 	cosa->firmware_status &= ~COSA_FW_RESET;
 
-	if ((i=readmem(cosa, code, len, addr)) < 0) {
+	i = readmem(cosa, d.code, d.len, d.addr);
+	if (i < 0) {
 		printk(KERN_NOTICE "cosa%d: reading memory failed: %d\n",
 			cosa->num, i);
 		return -EIO;
 	}
 	printk(KERN_INFO "cosa%d: reading card memory - 0x%04x bytes at 0x%04x\n",
-		cosa->num, len, addr);
+		cosa->num, d.len, d.addr);
 	cosa->firmware_status |= COSA_FW_RESET;
 	return 0;
 }
@@ -1171,11 +1166,12 @@ static int cosa_ioctl_common(struct cosa_data *cosa,
 	case COSAIODOWNLD:	/* Download the firmware */
 		if (!capable(CAP_SYS_RAWIO))
 			return -EACCES;
-		return cosa_download(cosa, (struct cosa_download *)arg);
+		
+		return cosa_download(cosa, arg);
 	case COSAIORMEM:
 		if (!capable(CAP_SYS_RAWIO))
 			return -EACCES;
-		return cosa_readmem(cosa, (struct cosa_download *)arg);
+		return cosa_readmem(cosa, arg);
 	case COSAIORTYPE:
 		return cosa_gettype(cosa, (char *)arg);
 	case COSAIORIDSTR:
@@ -1405,7 +1401,7 @@ static int cosa_dma_able(struct channel_data *chan, char *buf, int len)
  * by a single space. Monitor has to reply with a space. Now the download
  * begins. After the download monitor replies with "\r\n." (CR LF dot).
  */
-static int download(struct cosa_data *cosa, char *microcode, int length, int address)
+static int download(struct cosa_data *cosa, const char *microcode, int length, int address)
 {
 	int i;
 

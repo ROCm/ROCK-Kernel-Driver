@@ -2119,7 +2119,7 @@ static struct ifmcaddr6 *igmp6_mc_get_idx(struct seq_file *seq, loff_t pos)
 static void *igmp6_mc_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? igmp6_mc_get_idx(seq, *pos) : igmp6_mc_get_first(seq);
+	return igmp6_mc_get_idx(seq, *pos);
 }
 
 static void *igmp6_mc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -2278,7 +2278,7 @@ static struct ip6_sf_list *igmp6_mcf_get_idx(struct seq_file *seq, loff_t pos)
 static void *igmp6_mcf_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? igmp6_mcf_get_idx(seq, *pos) : SEQ_START_TOKEN;
+	return *pos ? igmp6_mcf_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *igmp6_mcf_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -2378,9 +2378,6 @@ int __init igmp6_init(struct net_proto_family *ops)
 	struct ipv6_pinfo *np;
 	struct sock *sk;
 	int err;
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *p;
-#endif
 
 	err = sock_create(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6, &igmp6_socket);
 	if (err < 0) {
@@ -2399,12 +2396,8 @@ int __init igmp6_init(struct net_proto_family *ops)
 	np->hop_limit = 1;
 
 #ifdef CONFIG_PROC_FS
-	p = create_proc_entry("igmp6", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &igmp6_mc_seq_fops;
-	p = create_proc_entry("mcfilter6", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &igmp6_mcf_seq_fops;
+	proc_net_fops_create("igmp6", S_IRUGO, &igmp6_mc_seq_fops);
+	proc_net_fops_create("mcfilter6", S_IRUGO, &igmp6_mcf_seq_fops);
 #endif
 
 	return 0;
@@ -2414,6 +2407,7 @@ void igmp6_cleanup(void)
 {
 	sock_release(igmp6_socket);
 	igmp6_socket = NULL; /* for safety */
+
 #ifdef CONFIG_PROC_FS
 	proc_net_remove("mcfilter6");
 	proc_net_remove("igmp6");

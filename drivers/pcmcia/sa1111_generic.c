@@ -171,12 +171,12 @@ static int __devexit pcmcia_remove(struct sa1111_dev *dev)
 
 static int pcmcia_suspend(struct sa1111_dev *dev, u32 state)
 {
-	return pcmcia_socket_dev_suspend(&dev->dev, state, SUSPEND_SAVE_STATE);
+	return pcmcia_socket_dev_suspend(&dev->dev, state);
 }
 
 static int pcmcia_resume(struct sa1111_dev *dev)
 {
-	return pcmcia_socket_dev_resume(&dev->dev, RESUME_RESTORE_STATE);
+	return pcmcia_socket_dev_resume(&dev->dev);
 }
 
 static struct sa1111_driver pcmcia_driver = {

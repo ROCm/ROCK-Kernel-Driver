@@ -1994,26 +1994,21 @@ extern int wireless_proc_init(void);
 
 static int __init dev_proc_init(void)
 {
-	struct proc_dir_entry *p;
 	int rc = -ENOMEM;
 
-	p = create_proc_entry("dev", S_IRUGO, proc_net);
-	if (!p)
+	if (!proc_net_fops_create("dev", S_IRUGO, &dev_seq_fops))
 		goto out;
-	p->proc_fops = &dev_seq_fops;
-	p = create_proc_entry("softnet_stat", S_IRUGO, proc_net);
-	if (!p)
+	if (!proc_net_fops_create("softnet_stat", S_IRUGO, &softnet_seq_fops))
 		goto out_dev;
-	p->proc_fops = &softnet_seq_fops;
 	if (wireless_proc_init())
 		goto out_softnet;
 	rc = 0;
 out:
 	return rc;
 out_softnet:
-	remove_proc_entry("softnet_stat", proc_net);
+	proc_net_remove("softnet_stat");
 out_dev:
-	remove_proc_entry("dev", proc_net);
+	proc_net_remove("dev");
 	goto out;
 }
 #else
@@ -2759,7 +2754,6 @@ static void netdev_wait_allrefs(struct net_device *dev)
 
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(HZ / 4);
-		current->state = TASK_RUNNING;
 
 		if (time_after(jiffies, warning_time + 10 * HZ)) {
 			printk(KERN_EMERG "unregister_netdevice: "

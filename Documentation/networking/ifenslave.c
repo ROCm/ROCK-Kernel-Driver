@@ -140,6 +140,7 @@ static const char *howto_msg =
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <linux/if.h>
 #include <net/if_arp.h>
 #include <linux/if_ether.h>
 #include <linux/if_bonding.h>

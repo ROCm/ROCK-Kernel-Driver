@@ -238,28 +238,21 @@ static struct file_operations netstat_seq_fops = {
 int __init ip_misc_proc_init(void)
 {
 	int rc = 0;
-	struct proc_dir_entry *p;
 
-	p = create_proc_entry("netstat", S_IRUGO, proc_net);
-	if (!p)
+	if (!proc_net_fops_create("netstat", S_IRUGO, &netstat_seq_fops))
 		goto out_netstat;
-	p->proc_fops = &netstat_seq_fops;
 
-	p = create_proc_entry("snmp", S_IRUGO, proc_net);
-	if (!p)
+	if (!proc_net_fops_create("snmp", S_IRUGO, &snmp_seq_fops))
 		goto out_snmp;
-	p->proc_fops = &snmp_seq_fops;
 
-	p = create_proc_entry("sockstat", S_IRUGO, proc_net);
-	if (!p)
+	if (!proc_net_fops_create("sockstat", S_IRUGO, &sockstat_seq_fops))
 		goto out_sockstat;
-	p->proc_fops = &sockstat_seq_fops;
 out:
 	return rc;
 out_sockstat:
-	remove_proc_entry("snmp", proc_net);
+	proc_net_remove("snmp");
 out_snmp:
-	remove_proc_entry("netstat", proc_net);
+	proc_net_remove("netstat");
 out_netstat:
 	rc = -ENOMEM;
 	goto out;

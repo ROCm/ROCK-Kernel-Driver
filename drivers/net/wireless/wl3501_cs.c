@@ -1581,7 +1581,6 @@ static void wl3501_detach(dev_link_t *link)
 		printk(KERN_DEBUG "wl3501_cs: detach postponed, '%s' "
 		       "still locked\n", link->dev->dev_name);
 #endif
-		link->state |= DEV_STALE_LINK;
 		goto out;
 	}
 
@@ -1597,22 +1596,6 @@ static void wl3501_detach(dev_link_t *link)
 	kfree(link);
 out:
 	return;
-}
-
-/**
- * wl3501_flush_stale_links - Remove zombie instances
- *
- * Remove zombie instances (card removed, detach pending)
- */
-static void wl3501_flush_stale_links(void)
-{
-	dev_link_t *link, *next;
-
-	for (link = wl3501_dev_list; link; link = next) {
-		next = link->next;
-		if (link->state & DEV_STALE_LINK)
-			wl3501_detach(link);
-	}
 }
 
 static int wl3501_get_name(struct net_device *dev, struct iw_request_info *info,
@@ -2043,8 +2026,6 @@ static dev_link_t *wl3501_attach(void)
 	struct net_device *dev;
 	int ret, i;
 
-	wl3501_flush_stale_links();
-
 	/* Initialize the dev_link_t structure */
 	link = kmalloc(sizeof(*link), GFP_KERNEL);
 	if (!link)
@@ -2273,7 +2254,7 @@ static void wl3501_release(dev_link_t *link)
 	CardServices(ReleaseIRQ, link->handle, &link->irq);
 	link->state &= ~DEV_CONFIG;
 
-	if (link->state & DEV_STALE_LINK)
+	if (link->state & DEV_STALE_CONFIG)
 		wl3501_detach(link);
 out:
 	return;

@@ -1096,19 +1096,13 @@ static struct file_operations fib_seq_fops = {
 
 int __init fib_proc_init(void)
 {
-	struct proc_dir_entry *p;
-	int rc = 0;
-
-	p = create_proc_entry("route", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &fib_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	if (!proc_net_fops_create("route", S_IRUGO, &fib_seq_fops))
+		return -ENOMEM;
+	return 0;
 }
 
 void __init fib_proc_exit(void)
 {
-	remove_proc_entry("route", proc_net);
+	proc_net_remove("route");
 }
 #endif /* CONFIG_PROC_FS */

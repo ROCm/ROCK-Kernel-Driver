@@ -390,17 +390,6 @@ static void do_powerdown(struct net_device *dev);
 static int do_stop(struct net_device *dev);
 
 /*=============== Helper functions =========================*/
-static void
-flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    xirc2ps_detach(link);
-    }
-}
-
 static int
 get_tuple_data(int fn, client_handle_t handle, tuple_t *tuple)
 {
@@ -602,7 +591,6 @@ xirc2ps_attach(void)
     int err;
 
     DEBUG(0, "attach()\n");
-    flush_stale_links();
 
     /* Allocate the device structure */
     dev = alloc_etherdev(sizeof(local_info_t));
@@ -687,13 +675,8 @@ xirc2ps_detach(dev_link_t * link)
      * the release() function is called, that will trigger a proper
      * detach().
      */
-    if (link->state & DEV_CONFIG) {
+    if (link->state & DEV_CONFIG)
 	xirc2ps_release(link);
-	if (link->state & DEV_STALE_CONFIG) {
-		link->state |= DEV_STALE_LINK;
-		return;
-	}
-    }
 
     /* Break the link with Card Services */
     if (link->handle)
@@ -1182,19 +1165,6 @@ xirc2ps_release(dev_link_t *link)
 {
 
     DEBUG(0, "release(0x%p)\n", link);
-
-#if 0
-    /*
-     * If the device is currently in use, we won't release until it
-     * is actually closed.
-     */
-    if (link->open) {
-	DEBUG(0, "release postponed, '%s' "
-	      "still open\n", link->dev->dev_name);
-	link->state |= DEV_STALE_CONFIG;
-	return;
-    }
-#endif
 
     if (link->win) {
 	struct net_device *dev = link->priv;
@@ -2030,9 +2000,6 @@ do_stop(struct net_device *dev)
     SelectPage(0);
 
     link->open--;
-    if (link->state & DEV_STALE_CONFIG)
-	    xirc2ps_release(link);
-
     return 0;
 }
 
