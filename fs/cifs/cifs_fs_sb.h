@@ -18,8 +18,9 @@
 #ifndef _CIFS_FS_SB_H
 #define _CIFS_FS_SB_H
 
-#define CIFS_MOUNT_NO_PERM	1 /* do not do client vfs_perm check */
+#define CIFS_MOUNT_NO_PERM      1 /* do not do client vfs_perm check */
 #define CIFS_MOUNT_SET_UID      2 /* set current->euid in create etc. */
+#define CIFS_MOUNT_SERVER_INUM  4 /* inode numbers from uniqueid from server */
 
 struct cifs_sb_info {
 	struct cifsTconInfo *tcon;	/* primary mount */

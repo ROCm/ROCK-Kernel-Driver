@@ -1376,23 +1376,22 @@ fill_in_inode(struct inode *tmp_inode,
 	cFYI(0,
 	     ("CIFS FFIRST: Attributes came in as 0x%x",
 	      attr));
-	if (attr & ATTR_REPARSE) {
-		*pobject_type = DT_LNK;
-		/* BB can this and S_IFREG or S_IFDIR be set as in Windows? */
-		tmp_inode->i_mode |= S_IFLNK;
-	} else if (attr & ATTR_DIRECTORY) {
+	if (attr & ATTR_DIRECTORY) {
 		*pobject_type = DT_DIR;
 		/* override default perms since we do not lock dirs */
 		if(atomic_read(&cifsInfo->inUse) == 0) {
 			tmp_inode->i_mode = cifs_sb->mnt_dir_mode;
 		}
 		tmp_inode->i_mode |= S_IFDIR;
+/* we no longer mark these because we could not follow them */
+/*        } else if (attr & ATTR_REPARSE) {
+                *pobject_type = DT_LNK;
+                tmp_inode->i_mode |= S_IFLNK;*/
 	} else {
 		*pobject_type = DT_REG;
 		tmp_inode->i_mode |= S_IFREG;
 		if(attr & ATTR_READONLY)
 			tmp_inode->i_mode &= ~(S_IWUGO);
-
 	}/* could add code here - to validate if device or weird share type? */
 
 	/* can not fill in nlink here as in qpathinfo version and Unx search */
@@ -1516,13 +1515,16 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	}
 }
 
-static void
+/* Returns one if new inode created (which therefore needs to be hashed) */
+/* Might check in the future if inode number changed so we can rehash inode */
+static int
 construct_dentry(struct qstr *qstring, struct file *file,
 		 struct inode **ptmp_inode, struct dentry **pnew_dentry)
 {
 	struct dentry *tmp_dentry;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
+	int rc = 0;
 
 	cFYI(1, ("For %s ", qstring->name));
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
@@ -1537,29 +1539,30 @@ construct_dentry(struct qstr *qstring, struct file *file,
 		if(*ptmp_inode == NULL) {
 	                *ptmp_inode = new_inode(file->f_dentry->d_sb);
 			if(*ptmp_inode == NULL)
-				return;
+				return rc;
+			rc = 1;
 			d_instantiate(tmp_dentry, *ptmp_inode);
-			insert_inode_hash(*ptmp_inode);
 		}
 	} else {
 		tmp_dentry = d_alloc(file->f_dentry, qstring);
 		if(tmp_dentry == NULL) {
 			cERROR(1,("Failed allocating dentry"));
 			*ptmp_inode = NULL;
-			return;
+			return rc;
 		}
 			
 		*ptmp_inode = new_inode(file->f_dentry->d_sb);
 		tmp_dentry->d_op = &cifs_dentry_ops;
 		if(*ptmp_inode == NULL)
-			return;
+			return rc;
+		rc = 1;
 		d_instantiate(tmp_dentry, *ptmp_inode);
 		d_rehash(tmp_dentry);
-		insert_inode_hash(*ptmp_inode);
 	}
 
 	tmp_dentry->d_time = jiffies;
 	*pnew_dentry = tmp_dentry;
+	return rc; 
 }
 
 static void reset_resume_key(struct file * dir_file, 
@@ -1609,11 +1612,19 @@ cifs_filldir(struct qstr *pqstring, FILE_DIRECTORY_INFO * pfindData,
 	pqstring->name = pfindData->FileName;
 	/* pqstring->len is already set by caller */
 
-	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
+	rc = construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
 	if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
 		return -ENOMEM;
 	}
 	fill_in_inode(tmp_inode, pfindData, &object_type);
+	if(rc) {
+		/* We have no reliable way to get inode numbers
+		from servers w/o Unix extensions yet so we can not set
+		i_ino from pfindData yet */
+
+		/* new inode created, let us hash it */
+		insert_inode_hash(tmp_inode);
+	} /* else if inode number changed do we rehash it? */
 	rc = filldir(direntry, pfindData->FileName, pqstring->len, file->f_pos,
 		tmp_inode->i_ino, object_type);
 	if(rc) {
@@ -1637,11 +1648,19 @@ cifs_filldir_unix(struct qstr *pqstring,
 	pqstring->name = pUnixFindData->FileName;
 	pqstring->len = strnlen(pUnixFindData->FileName, MAX_PATHCONF);
 
-	construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
+	rc = construct_dentry(pqstring, file, &tmp_inode, &tmp_dentry);
 	if((tmp_inode == NULL) || (tmp_dentry == NULL)) {
 		return -ENOMEM;
-	}
+	} 
+	if(rc) {
+		struct cifs_sb_info *cifs_sb = CIFS_SB(tmp_inode->i_sb);
 
+		if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SERVER_INUM) {
+			tmp_inode->i_ino = 
+				(unsigned long)pUnixFindData->UniqueId;
+		}
+		insert_inode_hash(tmp_inode);
+	} /* else if i_ino has changed should we rehash it? */
 	unix_fill_in_inode(tmp_inode, pUnixFindData, &object_type);
 	rc = filldir(direntry, pUnixFindData->FileName, pqstring->len,
 		file->f_pos, tmp_inode->i_ino, object_type);

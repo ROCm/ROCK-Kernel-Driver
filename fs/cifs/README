@@ -266,6 +266,10 @@ A partial list of the supported mount options follows:
 		If you do not trust the servers in your network (your mount
 		targets) it is recommended that you specify this option for
 		greater security.
+  exec		Permit execution of binaries on the mount.
+  noexec	Do not permit execution of binaries on the mount.
+  dev		Recognize block devices on the remote mount.
+  nodev		Do not recognize devices on the remote mount.
   suid          Allow remote files on this mountpoint with suid enabled to 
 		be executed (default for mounts when executed as root,
 		nosuid is default for user mounts).
@@ -292,6 +296,22 @@ A partial list of the supported mount options follows:
 		Note that this does not affect the normal ACL check on the
 		target machine done by the server software (of the server
 		ACL against the user name provided at mount time).
+  serverino	Use servers inode numbers instead of generating automatically
+		incrementing inode numbers on the client.  Although this will
+		make it easier to spot hardlinked files (as they will have
+		the same inode numbers) and inode numbers may be persistent,
+		note that the server does not guarantee that the inode numbers
+		are unique if multiple server side mounts are exported under a
+		single share (since inode numbers on the servers might not
+		be unique if multiple filesystems are mounted under the same
+		shared higher level directory).  Note that this requires that
+		the server support the CIFS Unix Extensions as other servers
+		do not return a unique IndexNumber on SMB FindFirst (most
+		servers return zero as the IndexNumber).  Parameter has no
+		effect to Windows servers and others which do not support the
+		CIFS Unix Extensions.
+  noserverino   Client generates inode numbers (rather than using the actual one
+		from the server) by default.
   setuids       If the CIFS Unix extensions are negotiated with the server
 		the client will attempt to set the effective uid and gid of
 		the local process on newly created files, directories, and
