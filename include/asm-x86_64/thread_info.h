@@ -11,6 +11,7 @@
 
 #include <asm/page.h>
 #include <asm/types.h>
+#include <asm/pda.h>
 
 /*
  * low level task data that entry.S needs immediate access to
@@ -58,7 +59,15 @@ struct thread_info {
 static inline struct thread_info *current_thread_info(void)
 { 
 	struct thread_info *ti;
-	asm("andq %%rsp,%0; ":"=r" (ti) : "0" (CURRENT_MASK));
+	ti = (void *)read_pda(kernelstack) + PDA_STACKOFFSET - THREAD_SIZE;
+	return ti; 
+}
+
+/* do not use in interrupt context */
+static inline struct thread_info *stack_thread_info(void)
+{
+	struct thread_info *ti;
+	__asm__("andq %%rsp,%0; ":"=r" (ti) : "0" (~8191UL));
 	return ti;
 }
 
@@ -74,8 +83,8 @@ static inline struct thread_info *current_thread_info(void)
 /* how to get the thread information struct from ASM */
 /* only works on the process stack. otherwise get it via the PDA. */
 #define GET_THREAD_INFO(reg) \
-	movq $CURRENT_MASK, reg; \
-	andq %rsp, reg
+	movq %gs:pda_kernelstack,reg ; \
+	subq $(THREAD_SIZE-PDA_STACKOFFSET),reg
 
 #endif
 

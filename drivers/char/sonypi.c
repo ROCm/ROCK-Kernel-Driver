@@ -1,7 +1,7 @@
 /*
  * Sony Programmable I/O Control Device driver for VAIO
  *
- * Copyright (C) 2001-2002 Stelian Pop <stelian@popies.net>
+ * Copyright (C) 2001-2003 Stelian Pop <stelian@popies.net>
  *
  * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
@@ -33,6 +33,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/input.h>
 #include <linux/pci.h>
 #include <linux/sched.h>
 #include <linux/init.h>
@@ -56,6 +57,7 @@ static int verbose; /* = 0 */
 static int fnkeyinit; /* = 0 */
 static int camera; /* = 0 */
 static int compat; /* = 0 */
+static int useinput = 1;
 static unsigned long mask = 0xffffffff;
 
 /* Inits the queue */
@@ -335,6 +337,22 @@ void sonypi_irq(int irq, void *dev_id, struct pt_regs *regs) {
 	return;
 
 found:
+#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
+	if (useinput) {
+		struct input_dev *jog_dev = &sonypi_device.jog_dev;
+		if (event == SONYPI_EVENT_JOGDIAL_PRESSED)
+			input_report_key(jog_dev, BTN_MIDDLE, 1);
+		else if (event == SONYPI_EVENT_ANYBUTTON_RELEASED)
+			input_report_key(jog_dev, BTN_MIDDLE, 0);
+		else if ((event == SONYPI_EVENT_JOGDIAL_UP) ||
+			 (event == SONYPI_EVENT_JOGDIAL_UP_PRESSED))
+			input_report_rel(jog_dev, REL_WHEEL, 1);
+		else if ((event == SONYPI_EVENT_JOGDIAL_DOWN) ||
+			 (event == SONYPI_EVENT_JOGDIAL_DOWN_PRESSED))
+			input_report_rel(jog_dev, REL_WHEEL, -1);
+		input_sync(jog_dev);
+	}
+#endif /* CONFIG_INPUT || CONFIG_INPUT_MODULE */
 	sonypi_pushq(event);
 }
 
@@ -579,7 +597,7 @@ struct miscdevice sonypi_misc_device = {
 	-1, "sonypi", &sonypi_misc_fops
 };
 
-#if CONFIG_PM
+#ifdef CONFIG_PM
 static int sonypi_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data) {
 	static int old_camera_power;
 
@@ -594,14 +612,14 @@ static int sonypi_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 			sonypi_type2_dis();
 		else
 			sonypi_type1_dis();
-#if !defined(CONFIG_ACPI)
+#ifndef CONFIG_ACPI
 		/* disable ACPI mode */
 		if (fnkeyinit)
 			outb(0xf1, 0xb2);
 #endif
 		break;
 	case PM_RESUME:
-#if !defined(CONFIG_ACPI)
+#ifndef CONFIG_ACPI
 		/* Enable ACPI mode to get Fn key events */
 		if (fnkeyinit)
 			outb(0xf0, 0xb2);
@@ -692,7 +710,7 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		goto out3;
 	}
 
-#if !defined(CONFIG_ACPI)
+#ifndef CONFIG_ACPI
 	/* Enable ACPI mode to get Fn key events */
 	if (fnkeyinit)
 		outb(0xf0, 0xb2);
@@ -715,14 +733,15 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	       SONYPI_DRIVER_MINORVERSION);
 	printk(KERN_INFO "sonypi: detected %s model, "
 	       "verbose = %d, fnkeyinit = %s, camera = %s, "
-	       "compat = %s, mask = 0x%08lx\n",
+	       "compat = %s, mask = 0x%08lx, useinput = %s\n",
 	       (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE1) ?
 			"type1" : "type2",
 	       verbose,
 	       fnkeyinit ? "on" : "off",
 	       camera ? "on" : "off",
 	       compat ? "on" : "off",
-	       mask);
+	       mask,
+	       useinput ? "on" : "off");
 	printk(KERN_INFO "sonypi: enabled at irq=%d, port1=0x%x, port2=0x%x\n",
 	       sonypi_device.irq, 
 	       sonypi_device.ioport1, sonypi_device.ioport2);
@@ -730,7 +749,24 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		printk(KERN_INFO "sonypi: device allocated minor is %d\n",
 		       sonypi_misc_device.minor);
 
-#if CONFIG_PM
+#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
+	if (useinput) {
+		/* Initialize the Input Drivers: */
+		sonypi_device.jog_dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REL);
+		sonypi_device.jog_dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_MIDDLE);
+		sonypi_device.jog_dev.relbit[0] = BIT(REL_WHEEL);
+		sonypi_device.jog_dev.name = (char *) kmalloc(
+			sizeof(SONYPI_INPUTNAME), GFP_KERNEL);
+		sprintf(sonypi_device.jog_dev.name, SONYPI_INPUTNAME);
+		sonypi_device.jog_dev.id.bustype = BUS_ISA;
+		sonypi_device.jog_dev.id.vendor = PCI_VENDOR_ID_SONY;
+	  
+		input_register_device(&sonypi_device.jog_dev);
+		printk(KERN_INFO "%s installed.\n", sonypi_device.jog_dev.name);
+	}
+#endif /* CONFIG_INPUT || CONFIG_INPUT_MODULE */
+
+#ifdef CONFIG_PM
 	sonypi_device.pm = pm_register(PM_PCI_DEV, 0, sonypi_pm_callback);
 #endif
 
@@ -746,18 +782,26 @@ out1:
 
 static void __devexit sonypi_remove(void) {
 
-#if CONFIG_PM
+#ifdef CONFIG_PM
 	pm_unregister(sonypi_device.pm);
 #endif
 
 	sonypi_call2(0x81, 0); /* make sure we don't get any more events */
+	
+#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
+	if (useinput) {
+		input_unregister_device(&sonypi_device.jog_dev);
+		kfree(sonypi_device.jog_dev.name);
+	}
+#endif /* CONFIG_INPUT || CONFIG_INPUT_MODULE */
+
 	if (camera)
 		sonypi_camera_off();
 	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
 		sonypi_type2_dis();
 	else
 		sonypi_type1_dis();
-#if !defined(CONFIG_ACPI)
+#ifndef CONFIG_ACPI
 	/* disable ACPI mode */
 	if (fnkeyinit)
 		outb(0xf1, 0xb2);
@@ -787,7 +831,7 @@ static void __exit sonypi_cleanup_module(void) {
 
 #ifndef MODULE
 static int __init sonypi_setup(char *str)  {
-	int ints[7];
+	int ints[8];
 
 	str = get_options(str, ARRAY_SIZE(ints), ints);
 	if (ints[0] <= 0) 
@@ -808,6 +852,9 @@ static int __init sonypi_setup(char *str)  {
 	if (ints[0] == 5)
 		goto out;
 	mask = ints[6];
+	if (ints[0] == 6)
+		goto out;
+	useinput = ints[7];
 out:
 	return 1;
 }
@@ -836,5 +883,7 @@ MODULE_PARM(compat,"i");
 MODULE_PARM_DESC(compat, "set this if you want to enable backward compatibility mode");
 MODULE_PARM(mask, "i");
 MODULE_PARM_DESC(mask, "set this to the mask of event you want to enable (see doc)");
+MODULE_PARM(useinput, "i");
+MODULE_PARM_DESC(useinput, "if you have a jogdial, set this if you would like it to use the modern Linux Input Driver system");
 
 EXPORT_SYMBOL(sonypi_camera_command);

@@ -53,7 +53,7 @@ static void __init reserve_resources_of_dev( struct pnp_dev *dev )
 {
 	int i;
 
-	for (i=0;i<DEVICE_COUNT_IO;i++) {
+	for (i=0;i<PNP_MAX_PORT;i++) {
 		if (pnp_port_valid(dev, i))
 			/* end of resources */
 			continue;
@@ -93,6 +93,7 @@ static int system_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *de
 
 static struct pnp_driver system_pnp_driver = {
 	.name		= "system",
+	.flags		= PNP_DRIVER_DO_NOT_ACTIVATE, 
 	.id_table	= pnp_dev_table,
 	.probe		= system_pnp_probe,
 	.remove		= NULL,

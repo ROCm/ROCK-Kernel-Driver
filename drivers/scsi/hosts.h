@@ -384,6 +384,7 @@ struct Scsi_Host
     spinlock_t		  default_lock;
     spinlock_t		  *host_lock;
 
+    struct list_head	eh_cmd_q;
     struct task_struct    * ehandler;  /* Error recovery thread. */
     struct semaphore      * eh_wait;   /* The error recovery thread waits on
                                           this. */
@@ -514,8 +515,6 @@ extern Scsi_Device * scsi_get_host_dev(struct Scsi_Host *);
 extern void scsi_unblock_requests(struct Scsi_Host *);
 extern void scsi_block_requests(struct Scsi_Host *);
 extern void scsi_report_bus_reset(struct Scsi_Host *, int);
-extern void scsi_register_blocked_host(struct Scsi_Host *);
-extern void scsi_deregister_blocked_host(struct Scsi_Host *);
 
 static inline void scsi_assign_lock(struct Scsi_Host *shost, spinlock_t *lock)
 {
@@ -587,7 +586,6 @@ extern void scsi_host_init(void);
  */
 extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
 extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
-extern void scsi_host_failed_inc_and_test(struct Scsi_Host *);
 
 /**
  * scsi_find_device - find a device given the host

@@ -197,10 +197,12 @@ dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs)
 	return 1;
 }
 
-void __switch_to(struct task_struct *prev, struct task_struct *new)
+struct task_struct *__switch_to(struct task_struct *prev,
+	struct task_struct *new)
 {
 	struct thread_struct *new_thread, *old_thread;
 	unsigned long s;
+	struct task_struct *last;
 	
 	local_irq_save(s);
 #if CHECK_STACK
@@ -244,8 +246,9 @@ void __switch_to(struct task_struct *prev, struct task_struct *new)
 		new->thread.regs->msr |= MSR_VEC;
 	new_thread = &new->thread;
 	old_thread = &current->thread;
-	_switch(old_thread, new_thread);
+	last = _switch(old_thread, new_thread);
 	local_irq_restore(s);
+	return last;
 }
 
 void show_regs(struct pt_regs * regs)

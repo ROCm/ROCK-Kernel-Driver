@@ -105,20 +105,11 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return;
 
-	printk("Processor #%d %d:%d APIC version %d\n",
+	printk(KERN_INFO "Processor #%d %d:%d APIC version %d\n",
 		m->mpc_apicid,
 	       (m->mpc_cpufeature & CPU_FAMILY_MASK)>>8,
 	       (m->mpc_cpufeature & CPU_MODEL_MASK)>>4,
 		m->mpc_apicver);
-
-	if (m->mpc_featureflag&(1<<0))
-		Dprintk("    Floating point unit present.\n");
-	if (m->mpc_featureflag&(1<<7))
-		Dprintk("    Machine Exception supported.\n");
-	if (m->mpc_featureflag&(1<<8))
-		Dprintk("    64 bit compare & exchange supported.\n");
-	if (m->mpc_featureflag&(1<<9))
-		Dprintk("    Internal APIC present.\n");
 
 	if (m->mpc_cpuflag & CPU_BOOTPROCESSOR) {
 		Dprintk("    Bootup CPU\n");
@@ -127,7 +118,7 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 	num_processors++;
 
 	if (m->mpc_apicid > MAX_APICS) {
-		printk("Processor #%d INVALID. (Max ID: %d).\n",
+		printk(KERN_ERR "Processor #%d INVALID. (Max ID: %d).\n",
 			m->mpc_apicid, MAX_APICS);
 		return;
 	}
@@ -138,7 +129,7 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 	 * Validate version
 	 */
 	if (ver == 0x0) {
-		printk("BIOS bug, APIC version is 0 for CPU#%d! fixing up to 0x10. (tell your hw vendor)\n", m->mpc_apicid);
+		printk(KERN_ERR "BIOS bug, APIC version is 0 for CPU#%d! fixing up to 0x10. (tell your hw vendor)\n", m->mpc_apicid);
 		ver = 0x10;
 	}
 	apic_version[m->mpc_apicid] = ver;
@@ -163,8 +154,7 @@ static void __init MP_bus_info (struct mpc_config_bus *m)
 	} else if (strncmp(str, "MCA", 3) == 0) {
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_MCA;
 	} else {
-		printk("Unknown bustype %s\n", str);
-		panic("cannot handle bus - mail to linux-smp@vger.kernel.org");
+		printk(KERN_ERR "Unknown bustype %s\n", str);
 	}
 }
 
@@ -176,7 +166,7 @@ static void __init MP_ioapic_info (struct mpc_config_ioapic *m)
 	printk("I/O APIC #%d Version %d at 0x%X.\n",
 		m->mpc_apicid, m->mpc_apicver, m->mpc_apicaddr);
 	if (nr_ioapics >= MAX_IO_APICS) {
-		printk("Max # of I/O APICs (%d) exceeded (found %d).\n",
+		printk(KERN_ERR "Max # of I/O APICs (%d) exceeded (found %d).\n",
 			MAX_IO_APICS, nr_ioapics);
 		panic("Recompile kernel with bigger MAX_IO_APICS!.\n");
 	}
@@ -256,13 +246,13 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	}
 	memcpy(str,mpc->mpc_oem,8);
 	str[8]=0;
-	printk("OEM ID: %s ",str);
+	printk(KERN_INFO "OEM ID: %s ",str);
 
 	memcpy(str,mpc->mpc_productid,12);
 	str[12]=0;
-	printk("Product ID: %s ",str);
+	printk(KERN_INFO "Product ID: %s ",str);
 
-	printk("APIC at: 0x%X\n",mpc->mpc_lapic);
+	printk(KERN_INFO "APIC at: 0x%X\n",mpc->mpc_lapic);
 
 	/* save the local APIC address, it might be non-default */
 	if (!acpi_lapic)
@@ -357,12 +347,12 @@ static void __init construct_default_ioirq_mptable(int mpc_default_type)
 	 *  If it does, we assume it's valid.
 	 */
 	if (mpc_default_type == 5) {
-		printk("ISA/PCI bus type with no IRQ information... falling back to ELCR\n");
+		printk(KERN_INFO "ISA/PCI bus type with no IRQ information... falling back to ELCR\n");
 
 		if (ELCR_trigger(0) || ELCR_trigger(1) || ELCR_trigger(2) || ELCR_trigger(13))
-			printk("ELCR contains invalid data... not using ELCR\n");
+			printk(KERN_ERR "ELCR contains invalid data... not using ELCR\n");
 		else {
-			printk("Using ELCR to identify PCI interrupts\n");
+			printk(KERN_INFO "Using ELCR to identify PCI interrupts\n");
 			ELCR_fallback = 1;
 		}
 	}
@@ -437,7 +427,7 @@ static inline void __init construct_default_ISA_mptable(int mpc_default_type)
 	bus.mpc_busid = 0;
 	switch (mpc_default_type) {
 		default:
-			printk("???\nUnknown standard configuration %d\n",
+			printk(KERN_ERR "???\nUnknown standard configuration %d\n",
 				mpc_default_type);
 			/* fall through */
 		case 1:
@@ -508,10 +498,10 @@ void __init get_smp_config (void)
 
 	printk("Intel MultiProcessor Specification v1.%d\n", mpf->mpf_specification);
 	if (mpf->mpf_feature2 & (1<<7)) {
-		printk("    IMCR and PIC compatibility mode.\n");
+		printk(KERN_INFO "    IMCR and PIC compatibility mode.\n");
 		pic_mode = 1;
 	} else {
-		printk("    Virtual Wire compatibility mode.\n");
+		printk(KERN_INFO "    Virtual Wire compatibility mode.\n");
 		pic_mode = 0;
 	}
 
@@ -520,7 +510,7 @@ void __init get_smp_config (void)
 	 */
 	if (mpf->mpf_feature1 != 0) {
 
-		printk("Default MP configuration #%d\n", mpf->mpf_feature1);
+		printk(KERN_INFO "Default MP configuration #%d\n", mpf->mpf_feature1);
 		construct_default_ISA_mptable(mpf->mpf_feature1);
 
 	} else if (mpf->mpf_physptr) {
@@ -543,7 +533,7 @@ void __init get_smp_config (void)
 		if (!mp_irq_entries) {
 			struct mpc_config_bus bus;
 
-			printk("BIOS bug, no explicit IRQ entries, using default mptable. (tell your hw vendor)\n");
+			printk(KERN_ERR "BIOS bug, no explicit IRQ entries, using default mptable. (tell your hw vendor)\n");
 
 			bus.mpc_type = MP_BUS;
 			bus.mpc_busid = 0;
@@ -556,7 +546,7 @@ void __init get_smp_config (void)
 	} else
 		BUG();
 
-	printk("Processors: %d\n", num_processors);
+	printk(KERN_INFO "Processors: %d\n", num_processors);
 	/*
 	 * Only use the first configuration found.
 	 */
@@ -564,12 +554,13 @@ void __init get_smp_config (void)
 
 static int __init smp_scan_config (unsigned long base, unsigned long length)
 {
+	extern void __bad_mpf_size(void); 
 	unsigned int *bp = phys_to_virt(base);
 	struct intel_mp_floating *mpf;
 
 	Dprintk("Scan SMP from %p for %ld bytes.\n", bp,length);
 	if (sizeof(*mpf) != 16)
-		printk("Error: MPF size\n");
+		__bad_mpf_size();
 
 	while (length > 0) {
 		mpf = (struct intel_mp_floating *)bp;
@@ -580,7 +571,7 @@ static int __init smp_scan_config (unsigned long base, unsigned long length)
 				|| (mpf->mpf_specification == 4)) ) {
 
 			smp_found_config = 1;
-			printk("found SMP MP-table at %08lx\n",
+			printk(KERN_INFO "found SMP MP-table at %08lx\n",
 						virt_to_phys(mpf));
 			reserve_bootmem_generic(virt_to_phys(mpf), PAGE_SIZE);
 			if (mpf->mpf_physptr)
@@ -628,8 +619,6 @@ void __init find_intel_smp (void)
 	address = *(unsigned short *)phys_to_virt(0x40E);
 	address <<= 4;
 	smp_scan_config(address, 0x1000);
-	if (smp_found_config)
-		printk(KERN_WARNING "WARNING: MP table in the EBDA can be UNSAFE, contact linux-smp@vger.kernel.org if you experience SMP problems!\n");
 }
 
 /*
@@ -761,7 +750,7 @@ void __init mp_register_ioapic (
 	mp_ioapic_routing[idx].irq_end = irq_base + 
 		io_apic_get_redir_entries(idx);
 
-	printk("IOAPIC[%d]: apic_id %d, version %d, address 0x%x, "
+	printk(KERN_INFO "IOAPIC[%d]: apic_id %d, version %d, address 0x%x, "
 		"IRQ %d-%d\n", idx, mp_ioapics[idx].mpc_apicid, 
 		mp_ioapics[idx].mpc_apicver, mp_ioapics[idx].mpc_apicaddr,
 		mp_ioapic_routing[idx].irq_start,

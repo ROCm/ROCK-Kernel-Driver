@@ -38,7 +38,6 @@
  */
 
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
@@ -438,8 +437,6 @@ gss_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 	struct rpc_auth * auth;
 
 	dprintk("RPC: creating GSS authenticator for client %p\n",clnt);
-	if (!try_module_get(THIS_MODULE))
-		return NULL;
 	if (!(gss_auth = kmalloc(sizeof(*gss_auth), GFP_KERNEL)))
 		goto out_dec;
 	gss_auth->mech = gss_pseudoflavor_to_mech(flavor);
@@ -470,7 +467,6 @@ gss_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 err_free:
 	kfree(gss_auth);
 out_dec:
-	module_put(THIS_MODULE);
 	return NULL;
 }
 
@@ -485,9 +481,6 @@ gss_destroy(struct rpc_auth *auth)
 	rpc_unlink(gss_auth->path);
 
 	rpcauth_free_credcache(auth);
-
-	kfree(auth);
-	module_put(THIS_MODULE);
 }
 
 /* gss_destroy_cred (and gss_destroy_ctx) are used to clean up after failure
@@ -691,6 +684,7 @@ gss_validate(struct rpc_task *task, u32 *p)
 }
 
 static struct rpc_authops authgss_ops = {
+	.owner		= THIS_MODULE,
 	.au_flavor	= RPC_AUTH_GSS,
 #ifdef RPC_DEBUG
 	.au_name	= "RPCSEC_GSS",

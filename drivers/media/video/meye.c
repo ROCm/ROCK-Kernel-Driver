@@ -1,7 +1,7 @@
 /* 
  * Motion Eye video4linux driver for Sony Vaio PictureBook
  *
- * Copyright (C) 2001-2002 Stelian Pop <stelian@popies.net>
+ * Copyright (C) 2001-2003 Stelian Pop <stelian@popies.net>
  *
  * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
@@ -1225,6 +1225,42 @@ static struct video_device meye_template = {
 	.fops		= &meye_fops,
 };
 
+#ifdef CONFIG_PM
+static int meye_suspend(struct pci_dev *pdev, u32 state)
+{
+	pci_save_state(pdev, meye.pm_state);
+	meye.pm_mchip_mode = meye.mchip_mode;
+	mchip_hic_stop();
+	mchip_set(MCHIP_MM_INTA, 0x0);
+	return 0;
+}
+
+static int meye_resume(struct pci_dev *pdev)
+{
+	pci_restore_state(pdev, meye.pm_state);
+	pci_write_config_word(meye.mchip_dev, MCHIP_PCI_SOFTRESET_SET, 1);
+
+	mchip_delay(MCHIP_HIC_CMD, 0);
+	mchip_delay(MCHIP_HIC_STATUS, MCHIP_HIC_STATUS_IDLE);
+	wait_ms(1);
+	mchip_set(MCHIP_VRJ_SOFT_RESET, 1);
+	wait_ms(1);
+	mchip_set(MCHIP_MM_PCI_MODE, 5);
+	wait_ms(1);
+	mchip_set(MCHIP_MM_INTA, MCHIP_MM_INTA_HIC_1_MASK);
+
+	switch (meye.pm_mchip_mode) {
+	case MCHIP_HIC_MODE_CONT_OUT:
+		mchip_continuous_start();
+		break;
+	case MCHIP_HIC_MODE_CONT_COMP:
+		mchip_cont_compression_start();
+		break;
+	}
+	return 0;
+}
+#endif
+
 static int __devinit meye_probe(struct pci_dev *pcidev, 
 		                const struct pci_device_id *ent) {
 	int ret;
@@ -1391,6 +1427,10 @@ static struct pci_driver meye_driver = {
 	.id_table	= meye_pci_tbl,
 	.probe		= meye_probe,
 	.remove		= __devexit_p(meye_remove),
+#ifdef CONFIG_PM
+	.suspend	= meye_suspend,
+	.resume		= meye_resume,
+#endif
 };
 
 static int __init meye_init_module(void) {

@@ -257,7 +257,7 @@ static inline void rfcomm_set_owner_w(struct sk_buff *skb, struct rfcomm_dev *de
 
 static struct sk_buff *rfcomm_wmalloc(struct rfcomm_dev *dev, unsigned long size, int priority)
 {
-	if (size || atomic_read(&dev->wmem_alloc) < dev->sndbuf) {
+	if (atomic_read(&dev->wmem_alloc) < dev->sndbuf) {
 		struct sk_buff *skb = alloc_skb(size, priority);
 		if (skb) {
 			rfcomm_set_owner_w(skb, dev);
@@ -442,7 +442,7 @@ static void rfcomm_dev_data_ready(struct rfcomm_dlc *dlc, struct sk_buff *skb)
 	struct tty_struct *tty;
        
 	if (!dev || !(tty = dev->tty)) {
-		kfree(skb);
+		kfree_skb(skb);
 		return;
 	}
 
@@ -669,12 +669,12 @@ static int rfcomm_tty_set_modem_status(uint cmd, struct rfcomm_dlc *dlc, uint st
 	else
 		rfcomm_dlc_get_modem_status(dlc, &v24_sig);
 
-	mask =  (status & TIOCM_DSR) ? RFCOMM_V24_RTC : 0 |
-		(status & TIOCM_DTR) ? RFCOMM_V24_RTC : 0 |
-		(status & TIOCM_RTS) ? RFCOMM_V24_RTR : 0 |
-		(status & TIOCM_CTS) ? RFCOMM_V24_RTR : 0 |
-		(status & TIOCM_RI)  ? RFCOMM_V24_IC  : 0 |
-		(status & TIOCM_CD)  ? RFCOMM_V24_DV  : 0;
+	mask =  ((status & TIOCM_DSR) ? RFCOMM_V24_RTC : 0) |
+		((status & TIOCM_DTR) ? RFCOMM_V24_RTC : 0) |
+		((status & TIOCM_RTS) ? RFCOMM_V24_RTR : 0) |
+		((status & TIOCM_CTS) ? RFCOMM_V24_RTR : 0) |
+		((status & TIOCM_RI)  ? RFCOMM_V24_IC  : 0) |
+		((status & TIOCM_CD)  ? RFCOMM_V24_DV  : 0);
 
 	if (cmd == TIOCMBIC)
 		v24_sig &= ~mask;
@@ -854,7 +854,7 @@ static struct tty_driver rfcomm_tty_driver = {
 #ifdef CONFIG_DEVFS_FS
 	.name			= "bluetooth/rfcomm/%d",
 #else
-	.name			= "rfcomm%d",
+	.name			= "rfcomm",
 #endif
 	.major			= RFCOMM_TTY_MAJOR,
 	.minor_start		= RFCOMM_TTY_MINOR,

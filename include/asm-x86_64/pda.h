@@ -1,6 +1,7 @@
 #ifndef X86_64_PDA_H
 #define X86_64_PDA_H
 
+#ifndef __ASSEMBLY__
 #include <linux/stddef.h>
 #include <linux/types.h>
 #include <linux/cache.h>
@@ -25,7 +26,6 @@ struct x8664_pda {
 	unsigned apic_timer_irqs;
 } ____cacheline_aligned;
 
-#define PDA_STACKOFFSET (5*8)
 
 #define IRQSTACK_ORDER 2
 #define IRQSTACKSIZE (PAGE_SIZE << IRQSTACK_ORDER) 
@@ -77,5 +77,9 @@ asm volatile(op "q %%gs:%c1,%0":"=r" (ret__):"i"(pda_offset(field)):"memory"); b
 #define write_pda(field,val) pda_to_op("mov",field,val)
 #define add_pda(field,val) pda_to_op("add",field,val)
 #define sub_pda(field,val) pda_to_op("sub",field,val)
+
+#endif
+
+#define PDA_STACKOFFSET (5*8)
 
 #endif

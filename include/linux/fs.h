@@ -1183,6 +1183,7 @@ static inline void insert_inode_hash(struct inode *inode) {
 
 extern struct file * get_empty_filp(void);
 extern void file_move(struct file *f, struct list_head *list);
+extern void file_kill(struct file *f);
 struct bio;
 extern int submit_bio(int, struct bio *);
 extern int bdev_read_only(struct block_device *);

@@ -151,13 +151,13 @@ void hci_dev_proc_cleanup(struct hci_dev *hdev)
 	remove_proc_entry(id, proc_bt_hci);
 }
 
-int __init hci_proc_init(void)
+int  __init hci_proc_init(void)
 {
 	proc_bt_hci = proc_mkdir("hci", proc_bt);
         return 0;
 }
 
-void __init hci_proc_cleanup(void)
+void __exit hci_proc_cleanup(void)
 {
 	remove_proc_entry("hci", proc_bt);
 }
@@ -179,7 +179,7 @@ int  __init hci_proc_init(void)
         return 0;
 }
 
-void __init hci_proc_cleanup(void)
+void __exit hci_proc_cleanup(void)
 {
         return;
 }

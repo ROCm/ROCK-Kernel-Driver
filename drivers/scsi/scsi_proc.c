@@ -586,7 +586,7 @@ err1:
 	return -ENOMEM;
 }
 
-void __exit scsi_exit_procfs(void)
+void scsi_exit_procfs(void)
 {
 	remove_proc_entry("scsi/device_info", 0);
 	remove_proc_entry("scsi/scsi", 0);

@@ -29,7 +29,7 @@
 static void quirk_awe32_resources(struct pnp_dev *dev)
 {
 	struct pnp_port *port, *port2, *port3;
-	struct pnp_resources *res = dev->res->dep;
+	struct pnp_resources *res = dev->possible->dep;
 
 	/*
 	 * Unfortunately the isapnp_add_port_resource is too tightly bound
@@ -57,7 +57,7 @@ static void quirk_awe32_resources(struct pnp_dev *dev)
 
 static void quirk_cmi8330_resources(struct pnp_dev *dev)
 {
-	struct pnp_resources *res = dev->res->dep;
+	struct pnp_resources *res = dev->possible->dep;
 
 	for ( ; res ; res = res->dep ) {
 
@@ -77,7 +77,7 @@ static void quirk_cmi8330_resources(struct pnp_dev *dev)
 static void quirk_sb16audio_resources(struct pnp_dev *dev)
 {
 	struct pnp_port *port;
-	struct pnp_resources *res = dev->res->dep;
+	struct pnp_resources *res = dev->possible->dep;
 	int    changed = 0;
 
 	/*
@@ -115,7 +115,7 @@ static void quirk_opl3sax_resources(struct pnp_dev *dev)
 	 */
 	struct pnp_resources *res;
 	int max;
-	res = dev->res;
+	res = dev->possible;
 	max = 0;
 	for (res = res->dep; res; res = res->dep) {
 		if (res->dma->map > max)

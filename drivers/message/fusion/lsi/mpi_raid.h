@@ -184,7 +184,7 @@ typedef struct _MSG_SCSI_IO_RAID_PT_REPLY
 
 
 /****************************************************************************/
-/* Mailbox request structure */
+/* Mailbox reqeust structure */
 /****************************************************************************/
 
 typedef struct _MSG_MAILBOX_REQUEST

@@ -8,6 +8,7 @@
 
 #include <linux/types.h>
 #include <linux/socket.h>
+#include <linux/module.h>
 #include <linux/in.h>
 #include <linux/utsname.h>
 #include <linux/sunrpc/clnt.h>
@@ -41,7 +42,6 @@ nul_destroy(struct rpc_auth *auth)
 {
 	dprintk("RPC: destroying NULL authenticator %p\n", auth);
 	rpcauth_free_credcache(auth);
-	kfree(auth);
 }
 
 /*
@@ -125,6 +125,7 @@ nul_validate(struct rpc_task *task, u32 *p)
 }
 
 struct rpc_authops	authnull_ops = {
+	.owner		= THIS_MODULE,
 	.au_flavor	= RPC_AUTH_NULL,
 #ifdef RPC_DEBUG
 	.au_name	= "NULL",

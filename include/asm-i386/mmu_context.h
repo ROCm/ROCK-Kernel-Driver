@@ -13,18 +13,14 @@
 int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
 void destroy_context(struct mm_struct *mm);
 
-#ifdef CONFIG_SMP
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 {
+#ifdef CONFIG_SMP
 	if (cpu_tlbstate[cpu].state == TLBSTATE_OK)
 		cpu_tlbstate[cpu].state = TLBSTATE_LAZY;	
-}
-#else
-static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
-{
-}
 #endif
+}
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk, unsigned cpu)
 {

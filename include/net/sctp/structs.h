@@ -61,38 +61,6 @@
 #include <linux/workqueue.h>	/* We need tq_struct.    */
 #include <linux/sctp.h>         /* We need sctp* header structs.  */
 
-/*
- * This is (almost) a direct quote from RFC 2553.
- */
-
-/*
- * Desired design of maximum size and alignment
- */
-#define _SS_MAXSIZE    128		/* Implementation specific max size */
-#define _SS_ALIGNSIZE  (sizeof (__s64))
-				/* Implementation specific desired alignment */
-/*
- * Definitions used for sockaddr_storage structure paddings design.
- */
-#define _SS_PAD1SIZE   (_SS_ALIGNSIZE - sizeof (sa_family_t))
-#define _SS_PAD2SIZE   (_SS_MAXSIZE - (sizeof (sa_family_t)+ \
-                              _SS_PAD1SIZE + _SS_ALIGNSIZE))
-
-struct sockaddr_storage {
-	sa_family_t  __ss_family;		/* address family */
-	/* Following fields are implementation specific */
-	char      __ss_pad1[_SS_PAD1SIZE];
-				/* 6 byte pad, to make implementation */
-				/* specific pad up to alignment field that */
-				/* follows explicit in the data structure */
-	__s64   __ss_align;	/* field to force desired structure */
-				/* storage alignment */
-	char      __ss_pad2[_SS_PAD2SIZE];
-				/* 112 byte pad to achieve desired size, */
-				/* _SS_MAXSIZE value minus size of ss_family */
-				/* __ss_pad1, __ss_align fields is 112 */
-};
-
 /* A convenience structure for handling sockaddr structures.
  * We should wean ourselves off this.
  */

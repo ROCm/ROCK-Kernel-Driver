@@ -287,10 +287,10 @@ static void hci_encrypt_req(struct hci_dev *hdev, unsigned long opt)
 }
 
 /* Get HCI device by index. 
- * Device is locked on return. */
+ * Device is held on return. */
 struct hci_dev *hci_dev_get(int index)
 {
-	struct hci_dev *hdev;
+	struct hci_dev *hdev = NULL;
 	struct list_head *p;
 
 	BT_DBG("%d", index);
@@ -300,14 +300,12 @@ struct hci_dev *hci_dev_get(int index)
 
 	read_lock(&hci_dev_list_lock);
 	list_for_each(p, &hci_dev_list) {
-		hdev = list_entry(p, struct hci_dev, list);
-		if (hdev->id == index) {
-			hci_dev_hold(hdev);
-			goto done;
+		struct hci_dev *d = list_entry(p, struct hci_dev, list);
+		if (d->id == index) {
+			hdev = hci_dev_hold(d);
+			break;
 		}
 	}
-	hdev = NULL;
-done:
 	read_unlock(&hci_dev_list_lock);
 	return hdev;
 }
@@ -483,6 +481,7 @@ int hci_dev_open(__u16 dev)
 	}
 
 	if (!ret) {
+		hci_dev_hold(hdev);
 		set_bit(HCI_UP, &hdev->flags);
 		hci_notify(hdev, HCI_DEV_UP);
 	} else {	
@@ -567,6 +566,8 @@ static int hci_dev_do_close(struct hci_dev *hdev)
 	hdev->flags = 0;
 
 	hci_req_unlock(hdev);
+
+	hci_dev_put(hdev);
 	return 0;
 }
 
@@ -718,7 +719,7 @@ int hci_get_dev_list(unsigned long arg)
 	if (!dev_num)
 		return -EINVAL;
 	
-	size = dev_num * sizeof(struct hci_dev_req) + sizeof(__u16);
+	size = dev_num * sizeof(*dr) + sizeof(*dl);
 
 	if (verify_area(VERIFY_WRITE, (void *) arg, size))
 		return -EFAULT;
@@ -739,7 +740,7 @@ int hci_get_dev_list(unsigned long arg)
 	read_unlock_bh(&hci_dev_list_lock);
 
 	dl->dev_num = n;
-	size = n * sizeof(struct hci_dev_req) + sizeof(__u16);
+	size = n * sizeof(*dr) + sizeof(*dl);
 
 	copy_to_user((void *) arg, dl, size);
 	kfree(dl);
@@ -790,7 +791,7 @@ int hci_register_dev(struct hci_dev *hdev)
 	struct list_head *head = &hci_dev_list, *p;
 	int id = 0;
 
-	BT_DBG("%p name %s type %d", hdev, hdev->name, hdev->type);
+	BT_DBG("%p name %s type %d owner %p", hdev, hdev->name, hdev->type, hdev->owner);
 
 	if (!hdev->open || !hdev->close || !hdev->destruct)
 		return -EINVAL;
@@ -834,8 +835,6 @@ int hci_register_dev(struct hci_dev *hdev)
 
 	atomic_set(&hdev->promisc, 0);
 		
-	MOD_INC_USE_COUNT;
-
 	write_unlock_bh(&hci_dev_list_lock);
 
 	hci_dev_proc_init(hdev);
@@ -862,9 +861,7 @@ int hci_unregister_dev(struct hci_dev *hdev)
 	hci_notify(hdev, HCI_DEV_UNREG);
 	hci_run_hotplug(hdev->name, "unregister");
 	
-	hci_dev_put(hdev);
-
-	MOD_DEC_USE_COUNT;
+	__hci_dev_put(hdev);
 	return 0;
 }
 
@@ -954,40 +951,6 @@ static int hci_send_frame(struct sk_buff *skb)
 	return hdev->send(skb);
 }
 
-/* Send raw HCI frame */
-int hci_send_raw(struct sk_buff *skb)
-{
-	struct hci_dev *hdev = (struct hci_dev *) skb->dev;
-
-	if (!hdev) {
-		kfree_skb(skb);
-		return -ENODEV;
-	}
-
-	BT_DBG("%s type %d len %d", hdev->name, skb->pkt_type, skb->len);
-
-	if (!test_bit(HCI_RAW, &hdev->flags)) {
-		/* Queue frame according it's type */
-		switch (skb->pkt_type) {
-		case HCI_COMMAND_PKT:
-			skb_queue_tail(&hdev->cmd_q, skb);
-			hci_sched_cmd(hdev);
-			return 0;
-
-		case HCI_ACLDATA_PKT:
-		case HCI_SCODATA_PKT:
-			/* FIXME:
-		 	 * Check header here and queue to apropriate connection.
-		 	 */
-			break;
-		}
-	}
-
-	skb_queue_tail(&hdev->raw_q, skb);
-	hci_sched_tx(hdev);
-	return 0;
-}
-
 /* Send HCI command */
 int hci_send_cmd(struct hci_dev *hdev, __u16 ogf, __u16 ocf, __u32 plen, void *param)
 {
@@ -1002,7 +965,7 @@ int hci_send_cmd(struct hci_dev *hdev, __u16 ogf, __u16 ocf, __u32 plen, void *p
 		BT_ERR("%s Can't allocate memory for HCI command", hdev->name);
 		return -ENOMEM;
 	}
-	
+
 	hdr = (struct hci_command_hdr *) skb_put(skb, HCI_COMMAND_HDR_SIZE);
 	hdr->opcode = __cpu_to_le16(hci_opcode_pack(ogf, ocf));
 	hdr->plen   = plen;

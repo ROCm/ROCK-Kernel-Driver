@@ -14,7 +14,6 @@
 #include <linux/ctype.h>
 #include <linux/fs.h>
 #include <linux/sysctl.h>
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <asm/uaccess.h>

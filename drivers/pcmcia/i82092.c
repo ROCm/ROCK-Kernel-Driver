@@ -55,6 +55,7 @@ static struct pci_driver i82092aa_pci_drv = {
 
 /* the pccard structure and its functions */
 static struct pccard_operations i82092aa_operations = {
+	.owner			= THIS_MODULE,
 	.init 		 	= i82092aa_init,
 	.suspend	   	= i82092aa_suspend,
 	.register_callback 	= i82092aa_register_callback,
@@ -465,11 +466,6 @@ static int i82092aa_register_callback(unsigned int sock, void (*handler)(void *,
 	enter("i82092aa_register_callback");
 	sockets[sock].handler = handler;
         sockets[sock].info = info;
-        if (handler == NULL) {   
-        	MOD_DEC_USE_COUNT;   
- 	} else {
-		MOD_INC_USE_COUNT;
-	}
 	leave("i82092aa_register_callback");
 	return 0;
 } /* i82092aa_register_callback */

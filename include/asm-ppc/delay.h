@@ -31,21 +31,36 @@ extern void __delay(unsigned int loops);
  *  -- paulus
  */
 #define __MAX_UDELAY	(226050910/HZ)	/* maximum udelay argument */
+#define __MAX_NDELAY	(4294967295/HZ)	/* maximum ndelay argument */
 
-extern __inline__ void __udelay(unsigned int usecs)
+extern __inline__ void __udelay(unsigned int x)
 {
 	unsigned int loops;
 
 	__asm__("mulhwu %0,%1,%2" : "=r" (loops) :
-		"r" (usecs * (19 * HZ)), "r" (loops_per_jiffy * 226));
+		"r" (x), "r" (loops_per_jiffy * 226));
+	__delay(loops);
+}
+
+extern __inline__ void __ndelay(unsigned int x)
+{
+	unsigned int loops;
+
+	__asm__("mulhwu %0,%1,%2" : "=r" (loops) :
+		"r" (x), "r" (loops_per_jiffy * 5));
 	__delay(loops);
 }
 
 extern void __bad_udelay(void);		/* deliberately undefined */
+extern void __bad_ndelay(void);		/* deliberately undefined */
 
 #define udelay(n) (__builtin_constant_p(n)? \
-		   ((n) > __MAX_UDELAY? __bad_udelay(): __udelay((n))) : \
-		   __udelay(n))
+	((n) > __MAX_UDELAY? __bad_udelay(): __udelay((n) * (19 * HZ))) : \
+	__udelay((n) * (19 * HZ)))
+
+#define ndelay(n) (__builtin_constant_p(n)? \
+	((n) > __MAX_NDELAY? __bad_ndelay(): __ndelay((n) * HZ)) : \
+	__ndelay((n) * HZ))
 
 #endif /* defined(_PPC_DELAY_H) */
 #endif /* __KERNEL__ */

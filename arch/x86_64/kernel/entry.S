@@ -98,9 +98,8 @@
  * A newly forked process directly context switches into this.
  */ 	
 ENTRY(ret_from_fork)
-#if CONFIG_SMP || CONFIG_PREEMPT
+	movq %rax,%rdi		/* prev task, returned by __switch_to -> arg1 */
 	call schedule_tail
-#endif		
 	GET_THREAD_INFO(%rcx)
 	bt $TIF_SYSCALL_TRACE,threadinfo_flags(%rcx)
 	jc rff_trace
@@ -115,6 +114,7 @@ rff_action:
 rff_trace:
 	movq %rsp,%rdi
 	call syscall_trace
+	GET_THREAD_INFO(%rcx)	
 	jmp rff_action
 
 /*
@@ -569,7 +569,7 @@ ENTRY(load_gs_index)
         swapgs
 gs_change:     
         movl %edi,%gs   
-2:	sfence		/* workaround */
+2:	mfence		/* workaround */
 	swapgs
         popf
         ret

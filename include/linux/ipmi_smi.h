@@ -78,6 +78,8 @@ struct ipmi_smi_msg
 
 struct ipmi_smi_handlers
 {
+	struct module *owner;
+
 	/* Called to enqueue an SMI message to be sent.  This
 	   operation is not allowed to fail.  If an error occurs, it
 	   should report back the error in a received message.  It may
@@ -92,15 +94,6 @@ struct ipmi_smi_handlers
 	/* Called by the upper layer to request that we try to get
 	   events from the BMC we are attached to. */
 	void (*request_events)(void *send_info);
-
-	/* Called when someone is using the interface, so the module can
-	   adjust it's use count.  Return zero if successful, or an
-	   errno if not. */
-	int (*new_user)(void *send_info);
-
-	/* Called when someone is no longer using the interface, so the
-	   module can adjust it's use count. */
-	void (*user_left)(void *send_info);
 
 	/* Called when the interface should go into "run to
 	   completion" mode.  If this call sets the value to true, the

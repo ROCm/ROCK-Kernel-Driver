@@ -74,12 +74,11 @@ EXPORT_SYMBOL(scsi_sleep);
 
 EXPORT_SYMBOL(scsi_io_completion);
 
-EXPORT_SYMBOL(scsi_register_blocked_host);
-EXPORT_SYMBOL(scsi_deregister_blocked_host);
 EXPORT_SYMBOL(scsi_slave_attach);
 EXPORT_SYMBOL(scsi_slave_detach);
 EXPORT_SYMBOL(scsi_device_get);
 EXPORT_SYMBOL(scsi_device_put);
+EXPORT_SYMBOL(scsi_set_device_offline);
 
 /*
  * This symbol is for the highlevel drivers (e.g. sg) only.

@@ -1745,25 +1745,25 @@ static void mask_and_ack_level_ioapic_irq (unsigned int irq) { /* nothing */ }
  */
 
 static struct hw_interrupt_type ioapic_edge_irq_type = {
-	"IO-APIC-edge",
-	startup_edge_ioapic_irq,
-	shutdown_edge_ioapic_irq,
-	enable_edge_ioapic_irq,
-	disable_edge_ioapic_irq,
-	ack_edge_ioapic_irq,
-	end_edge_ioapic_irq,
-	set_ioapic_affinity,
+	.typename 	= "IO-APIC-edge",
+	.startup 	= startup_edge_ioapic_irq,
+	.shutdown 	= shutdown_edge_ioapic_irq,
+	.enable 	= enable_edge_ioapic_irq,
+	.disable 	= disable_edge_ioapic_irq,
+	.ack 		= ack_edge_ioapic_irq,
+	.end 		= end_edge_ioapic_irq,
+	.set_affinity 	= set_ioapic_affinity,
 };
 
 static struct hw_interrupt_type ioapic_level_irq_type = {
-	"IO-APIC-level",
-	startup_level_ioapic_irq,
-	shutdown_level_ioapic_irq,
-	enable_level_ioapic_irq,
-	disable_level_ioapic_irq,
-	mask_and_ack_level_ioapic_irq,
-	end_level_ioapic_irq,
-	set_ioapic_affinity,
+	.typename 	= "IO-APIC-level",
+	.startup 	= startup_level_ioapic_irq,
+	.shutdown 	= shutdown_level_ioapic_irq,
+	.enable 	= enable_level_ioapic_irq,
+	.disable 	= disable_level_ioapic_irq,
+	.ack 		= mask_and_ack_level_ioapic_irq,
+	.end 		= end_level_ioapic_irq,
+	.set_affinity 	= set_ioapic_affinity,
 };
 
 static inline void init_IO_APIC_traps(void)
@@ -1821,13 +1821,13 @@ static void ack_lapic_irq (unsigned int irq)
 static void end_lapic_irq (unsigned int i) { /* nothing */ }
 
 static struct hw_interrupt_type lapic_irq_type = {
-	"local-APIC-edge",
-	NULL, /* startup_irq() not used for IRQ0 */
-	NULL, /* shutdown_irq() not used for IRQ0 */
-	enable_lapic_irq,
-	disable_lapic_irq,
-	ack_lapic_irq,
-	end_lapic_irq
+	.typename 	= "local-APIC-edge",
+	.startup 	= NULL, /* startup_irq() not used for IRQ0 */
+	.shutdown 	= NULL, /* shutdown_irq() not used for IRQ0 */
+	.enable 	= enable_lapic_irq,
+	.disable 	= disable_lapic_irq,
+	.ack 		= ack_lapic_irq,
+	.end 		= end_lapic_irq
 };
 
 static void setup_nmi (void)

@@ -327,7 +327,7 @@ static void read_cis_cache(socket_info_t *s, int attr, u_int addr,
     }
 #ifdef CONFIG_CARDBUS
     if (s->state & SOCKET_CARDBUS)
-	ret = read_cb_mem(s, 0, attr, addr, len, ptr);
+	ret = read_cb_mem(s, attr, addr, len, ptr);
     else
 #endif
 	ret = read_cis_mem(s, attr, addr, len, ptr);
@@ -358,7 +358,7 @@ int verify_cis_cache(socket_info_t *s)
     for (i = 0; i < s->cis_used; i++) {
 #ifdef CONFIG_CARDBUS
 	if (s->state & SOCKET_CARDBUS)
-	    read_cb_mem(s, 0, s->cis_table[i].attr, s->cis_table[i].addr,
+	    read_cb_mem(s, s->cis_table[i].attr, s->cis_table[i].addr,
 			s->cis_table[i].len, buf);
 	else
 #endif

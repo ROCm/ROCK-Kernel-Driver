@@ -27,7 +27,7 @@ static inline int need_signal_i387(struct task_struct *me)
 	if (!me->used_math)
 		return 0;
 	me->used_math = 0; 
-	if (!test_thread_flag(TIF_USEDFPU))
+	if (me->thread_info->flags & _TIF_USEDFPU)
 		return 0;
 	return 1;
 } 
@@ -39,14 +39,14 @@ static inline int need_signal_i387(struct task_struct *me)
 #define kernel_fpu_end() stts()
 
 #define unlazy_fpu(tsk) do { \
-	if ((tsk)->thread_info->flags & TIF_USEDFPU) \
+	if ((tsk)->thread_info->flags & _TIF_USEDFPU) \
 		save_init_fpu(tsk); \
 } while (0)
 
 #define clear_fpu(tsk) do { \
-	if (test_tsk_thread_flag(tsk, TIF_USEDFPU)) {		\
+	if ((tsk)->thread_info->flags & _TIF_USEDFPU) {		\
 		asm volatile("fwait");				\
-		clear_tsk_thread_flag(tsk,TIF_USEDFPU); 	\
+		(tsk)->thread_info->flags &= ~_TIF_USEDFPU;	\
 		stts();						\
 	}							\
 } while (0)

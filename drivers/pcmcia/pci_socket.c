@@ -66,10 +66,6 @@ static int pci_register_callback(unsigned int sock, void (*handler)(void *, unsi
 
 	socket->handler = handler;
 	socket->info = info;
-	if (handler)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -154,18 +150,19 @@ static void pci_proc_setup(unsigned int sock, struct proc_dir_entry *base)
 }
 
 static struct pccard_operations pci_socket_operations = {
-	pci_init_socket,
-	pci_suspend_socket,
-	pci_register_callback,
-	pci_inquire_socket,
-	pci_get_status,
-	pci_get_socket,
-	pci_set_socket,
-	pci_get_io_map,
-	pci_set_io_map,
-	pci_get_mem_map,
-	pci_set_mem_map,
-	pci_proc_setup
+	.owner			= THIS_MODULE,
+	.init			= pci_init_socket,
+	.suspend		= pci_suspend_socket,
+	.register_callback	= pci_register_callback,
+	.inquire_socket		= pci_inquire_socket,
+	.get_status		= pci_get_status,
+	.get_socket		= pci_get_socket,
+	.set_socket		= pci_set_socket,
+	.get_io_map		= pci_get_io_map,
+	.set_io_map		= pci_set_io_map,
+	.get_mem_map		= pci_get_mem_map,
+	.set_mem_map		= pci_set_mem_map,
+	.proc_setup		= pci_proc_setup,
 };
 
 static int __devinit add_pci_socket(int nr, struct pci_dev *dev, struct pci_socket_ops *ops)
@@ -174,6 +171,16 @@ static int __devinit add_pci_socket(int nr, struct pci_dev *dev, struct pci_sock
 	int err;
 	
 	memset(socket, 0, sizeof(*socket));
+
+	/* prepare class_data */
+	socket->cls_d.sock_offset = nr;
+	socket->cls_d.nsock = 1; /* yenta is 1, no other low-level driver uses
+			     this yet */
+	socket->cls_d.ops = &pci_socket_operations;
+	socket->cls_d.use_bus_pm = 1;
+	dev->dev.class_data = &socket->cls_d;
+
+	/* prepare pci_socket_t */
 	socket->dev = dev;
 	socket->op = ops;
 	pci_set_drvdata(dev, socket);
@@ -189,18 +196,6 @@ static int __devinit add_pci_socket(int nr, struct pci_dev *dev, struct pci_sock
 
 int cardbus_register(struct pci_dev *p_dev)
 {
-	pci_socket_t *socket = pci_get_drvdata(p_dev);
-	struct pcmcia_socket_class_data *cls_d;
-
-	if (!socket)
-		return -EINVAL;
-
-	cls_d = &socket->cls_d;
-	cls_d->nsock = 1; /* yenta is 1, no other low-level driver uses
-			     this yet */
-	cls_d->ops = &pci_socket_operations;
-	cls_d->use_bus_pm = 1;
-	p_dev->dev.class_data = cls_d;
 	return 0;
 }
 
@@ -230,14 +225,16 @@ static void __devexit cardbus_remove (struct pci_dev *dev)
 static int cardbus_suspend (struct pci_dev *dev, u32 state)
 {
 	pci_socket_t *socket = pci_get_drvdata(dev);
-	pcmcia_suspend_socket (socket->pcmcia_socket);
+	if (socket && socket->cls_d.s_info)
+		pcmcia_suspend_socket (socket->cls_d.s_info);
 	return 0;
 }
 
 static int cardbus_resume (struct pci_dev *dev)
 {
 	pci_socket_t *socket = pci_get_drvdata(dev);
-	pcmcia_resume_socket (socket->pcmcia_socket);
+	if (socket && socket->cls_d.s_info)
+		pcmcia_resume_socket (socket->cls_d.s_info);
 	return 0;
 }
 

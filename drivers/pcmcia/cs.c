@@ -244,7 +244,14 @@ static const lookup_t service_table[] = {
 
 static int register_callback(socket_info_t *s, void (*handler)(void *, unsigned int), void * info)
 {
-	return s->ss_entry->register_callback(s->sock, handler, info);
+	int error;
+
+	if (handler && !try_module_get(s->ss_entry->owner))
+		return -ENODEV;
+	error = s->ss_entry->register_callback(s->sock, handler, info);
+	if (!handler)
+		module_put(s->ss_entry->owner);
+	return error;
 }
 
 static int get_socket_status(socket_info_t *s, int *val)
@@ -330,13 +337,14 @@ int pcmcia_register_socket(struct device *dev)
 		return -ENOMEM;
 	memset(s_info, 0, cls_d->nsock * sizeof(socket_info_t));
 
+	cls_d->s_info = s_info;
+
 	/* socket initialization */
 	for (i = 0; i < cls_d->nsock; i++) {
 		socket_info_t *s = &s_info[i];
 
-		cls_d->s_info[i] = s;
 		s->ss_entry = cls_d->ops;
-		s->sock = i;
+		s->sock = i + cls_d->sock_offset;
 
 		/* base address = 0, map = 0 */
 		s->cis_mem.flags = 0;
@@ -352,7 +360,7 @@ int pcmcia_register_socket(struct device *dev)
 		if (j == sockets) sockets++;
 
 		init_socket(s);
-		s->ss_entry->inquire_socket(i, &s->cap);
+		s->ss_entry->inquire_socket(s->sock, &s->cap);
 #ifdef CONFIG_PROC_FS
 		if (proc_pccard) {
 			char name[3];
@@ -1562,7 +1570,6 @@ int pcmcia_release_io(client_handle_t handle, io_req_t *req)
     
 #ifdef CONFIG_CARDBUS
     if (handle->state & CLIENT_CARDBUS) {
-	cb_release(s);
 	return CS_SUCCESS;
     }
 #endif
@@ -1804,10 +1811,8 @@ int pcmcia_request_io(client_handle_t handle, io_req_t *req)
 
     if (handle->state & CLIENT_CARDBUS) {
 #ifdef CONFIG_CARDBUS
-	int ret = cb_config(s);
-	if (ret == CS_SUCCESS)
-	    handle->state |= CLIENT_IO_REQ;
-	return ret;
+	handle->state |= CLIENT_IO_REQ;
+	return CS_SUCCESS;
 #else
 	return CS_UNSUPPORTED_FUNCTION;
 #endif

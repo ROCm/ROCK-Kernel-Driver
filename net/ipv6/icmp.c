@@ -28,7 +28,6 @@
  *	YOSHIFUJI Hideaki @USAGI:	added sysctl for icmp rate limit.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -68,10 +67,12 @@
 DEFINE_SNMP_STAT(struct icmpv6_mib, icmpv6_statistics);
 
 /*
- *	ICMP socket for flow control.
+ *	ICMP socket(s) for flow control.
  */
 
-struct socket *icmpv6_socket;
+/* XXX We can't use per_cpu because this can be modular... */
+static struct socket *__icmpv6_socket[NR_CPUS];
+#define icmpv6_socket	__icmpv6_socket[smp_processor_id()]
 
 static int icmpv6_rcv(struct sk_buff *skb);
 
@@ -88,40 +89,16 @@ struct icmpv6_msg {
 	__u32			csum;
 };
 
-
-static int icmpv6_xmit_holder = -1;
-
-static int icmpv6_xmit_lock_bh(void)
+static __inline__ void icmpv6_xmit_lock(void)
 {
-	if (!spin_trylock(&icmpv6_socket->sk->lock.slock)) {
-		if (icmpv6_xmit_holder == smp_processor_id())
-			return -EAGAIN;
-		spin_lock(&icmpv6_socket->sk->lock.slock);
-	}
-	icmpv6_xmit_holder = smp_processor_id();
-	return 0;
-}
-
-static __inline__ int icmpv6_xmit_lock(void)
-{
-	int ret;
 	local_bh_disable();
-	ret = icmpv6_xmit_lock_bh();
-	if (ret)
-		local_bh_enable();
-	return ret;
-}
-
-static void icmpv6_xmit_unlock_bh(void)
-{
-	icmpv6_xmit_holder = -1;
-	spin_unlock(&icmpv6_socket->sk->lock.slock);
+	if (unlikely(!spin_trylock(&icmpv6_socket->sk->lock.slock)))
+		BUG();
 }
 
 static __inline__ void icmpv6_xmit_unlock(void)
 {
-	icmpv6_xmit_unlock_bh();
-	local_bh_enable();
+	spin_unlock_bh(&icmpv6_socket->sk->lock.slock);
 }
 
 
@@ -342,8 +319,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	fl.uli_u.icmpt.type = type;
 	fl.uli_u.icmpt.code = code;
 
-	if (icmpv6_xmit_lock())
-		return;
+	icmpv6_xmit_lock();
 
 	if (!icmpv6_xrlim_allow(sk, type, &fl))
 		goto out;
@@ -416,15 +392,14 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 	fl.uli_u.icmpt.type = ICMPV6_ECHO_REPLY;
 	fl.uli_u.icmpt.code = 0;
 
-	if (icmpv6_xmit_lock_bh())
-		return;
+	icmpv6_xmit_lock();
 
 	ip6_build_xmit(sk, icmpv6_getfrag, &msg, &fl, msg.len, NULL, -1,
 		       MSG_DONTWAIT);
 	ICMP6_INC_STATS_BH(Icmp6OutEchoReplies);
 	ICMP6_INC_STATS_BH(Icmp6OutMsgs);
 
-	icmpv6_xmit_unlock_bh();
+	icmpv6_xmit_unlock();
 }
 
 static void icmpv6_notify(struct sk_buff *skb, int type, int code, u32 info)
@@ -627,26 +602,47 @@ discard_it:
 int __init icmpv6_init(struct net_proto_family *ops)
 {
 	struct sock *sk;
-	int err;
+	int i;
 
-	err = sock_create(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6, &icmpv6_socket);
-	if (err < 0) {
-		printk(KERN_ERR
-		       "Failed to initialize the ICMP6 control socket (err %d).\n",
-		       err);
-		icmpv6_socket = NULL; /* for safety */
-		return err;
+	for (i = 0; i < NR_CPUS; i++) {
+		int err;
+
+		if (!cpu_possible(i))
+			continue;
+
+		err = sock_create(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6,
+				  &__icmpv6_socket[i]);
+		if (err < 0) {
+			int j;
+
+			printk(KERN_ERR
+			       "Failed to initialize the ICMP6 control socket "
+			       "(err %d).\n",
+			       err);
+			for (j = 0; j < i; j++) {
+				if (!cpu_possible(j))
+					continue;
+				sock_release(__icmpv6_socket[j]);
+				__icmpv6_socket[j] = NULL; /* for safety */
+			}
+			return err;
+		}
+
+		sk = __icmpv6_socket[i]->sk;
+		sk->allocation = GFP_ATOMIC;
+		sk->sndbuf = SK_WMEM_MAX*2;
+		sk->prot->unhash(sk);
 	}
 
-	sk = icmpv6_socket->sk;
-	sk->allocation = GFP_ATOMIC;
-	sk->sndbuf = SK_WMEM_MAX*2;
-	sk->prot->unhash(sk);
 
 	if (inet6_add_protocol(&icmpv6_protocol, IPPROTO_ICMPV6) < 0) {
 		printk(KERN_ERR "Failed to register ICMP6 protocol\n");
-		sock_release(icmpv6_socket);
-		icmpv6_socket = NULL;
+		for (i = 0; i < NR_CPUS; i++) {
+			if (!cpu_possible(i))
+				continue;
+			sock_release(__icmpv6_socket[i]);
+			__icmpv6_socket[i] = NULL;
+		}
 		return -EAGAIN;
 	}
 
@@ -655,8 +651,14 @@ int __init icmpv6_init(struct net_proto_family *ops)
 
 void icmpv6_cleanup(void)
 {
-	sock_release(icmpv6_socket);
-	icmpv6_socket = NULL; /* For safety. */
+	int i;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_possible(i))
+			continue;
+		sock_release(__icmpv6_socket[i]);
+		__icmpv6_socket[i] = NULL; /* For safety. */
+	}
 	inet6_del_protocol(&icmpv6_protocol, IPPROTO_ICMPV6);
 }
 
@@ -705,9 +707,15 @@ int icmpv6_err_convert(int type, int code, int *err)
 
 #ifdef CONFIG_SYSCTL
 ctl_table ipv6_icmp_table[] = {
-	{NET_IPV6_ICMP_RATELIMIT, "ratelimit",
-	&sysctl_icmpv6_time, sizeof(int), 0644, NULL, &proc_dointvec},
-	{0},
+	{
+		.ctl_name	= NET_IPV6_ICMP_RATELIMIT,
+		.procname	= "ratelimit",
+		.data		= &sysctl_icmpv6_time,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{ .ctl_name = 0 },
 };
 #endif
 

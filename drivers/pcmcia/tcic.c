@@ -638,11 +638,6 @@ static int tcic_register_callback(unsigned int lsock, void (*handler)(void *, un
 {
     socket_table[lsock].handler = handler;
     socket_table[lsock].info = info;
-    if (handler == NULL) {
-	MOD_DEC_USE_COUNT;
-    } else {
-	MOD_INC_USE_COUNT;
-    }
     return 0;
 } /* tcic_register_callback */
 
@@ -1003,6 +998,7 @@ static int tcic_suspend(unsigned int sock)
 }
 
 static struct pccard_operations tcic_operations = {
+	.owner		   = THIS_MODULE,
 	.init		   = tcic_init,
 	.suspend	   = tcic_suspend,
 	.register_callback = tcic_register_callback,

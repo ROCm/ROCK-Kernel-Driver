@@ -1,7 +1,7 @@
 /*
- *  $Id: longrun.c,v 1.14 2002/10/31 21:17:40 db Exp $
+ *  $Id: longrun.c,v 1.22 2003/02/10 17:31:50 db Exp $
  *
- * (C) 2002  Dominik Brodowski <linux@brodo.de>
+ * (C) 2002 - 2003  Dominik Brodowski <linux@brodo.de>
  *
  *  Licensed under the terms of the GNU GPL License version 2.
  *
@@ -18,7 +18,7 @@
 #include <asm/processor.h>
 #include <asm/timex.h>
 
-static struct cpufreq_driver	*longrun_driver;
+static struct cpufreq_driver	longrun_driver;
 
 /**
  * longrun_{low,high}_freq is needed for the conversion of cpufreq kHz 
@@ -38,9 +38,6 @@ static unsigned int longrun_low_freq, longrun_high_freq;
 static void longrun_get_policy(struct cpufreq_policy *policy)
 {
 	u32 msr_lo, msr_hi;
-
-	if (!longrun_driver)
-		return;
 
 	rdmsr(MSR_TMTA_LONGRUN_FLAGS, msr_lo, msr_hi);
 	if (msr_lo & 0x01)
@@ -72,7 +69,7 @@ static int longrun_set_policy(struct cpufreq_policy *policy)
 	u32 msr_lo, msr_hi;
 	u32 pctg_lo, pctg_hi;
 
-	if (!longrun_driver || !policy)
+	if (!policy)
 		return -EINVAL;
 
 	pctg_lo = (policy->min - longrun_low_freq) / 
@@ -117,13 +114,16 @@ static int longrun_set_policy(struct cpufreq_policy *policy)
  */
 static int longrun_verify_policy(struct cpufreq_policy *policy)
 {
-	if (!policy || !longrun_driver)
+	if (!policy)
 		return -EINVAL;
 
 	policy->cpu = 0;
 	cpufreq_verify_within_limits(policy, 
-		longrun_driver->policy[0].cpuinfo.min_freq, 
-		longrun_driver->policy[0].cpuinfo.max_freq);
+		policy->cpuinfo.min_freq, 
+		policy->cpuinfo.max_freq);
+
+	if (policy->policy == CPUFREQ_POLICY_GOVERNOR)
+		policy->policy = longrun_driver.policy[0].policy;
 
 	return 0;
 }
@@ -221,6 +221,45 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 }
 
 
+static int longrun_cpu_init(struct cpufreq_policy *policy)
+{
+	int                     result = 0;
+	struct cpuinfo_x86 *c = cpu_data;
+
+	/* capability check */
+	if (policy->cpu != 0)
+		return -ENODEV;
+	if (c->x86_vendor != X86_VENDOR_TRANSMETA || 
+	    !cpu_has(c, X86_FEATURE_LONGRUN))
+		return -ENODEV;
+
+	/* detect low and high frequency */
+	result = longrun_determine_freqs(&longrun_low_freq, &longrun_high_freq);
+	if (result)
+		return result;
+
+	/* cpuinfo and default policy values */
+	policy->cpuinfo.min_freq = longrun_low_freq;
+	policy->cpuinfo.max_freq = longrun_high_freq;
+	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+	longrun_get_policy(policy);
+	
+#ifdef CONFIG_CPU_FREQ_24_API
+	longrun_driver.cpu_cur_freq[policy->cpu] = longrun_low_freq; /* dummy value */
+#endif
+
+	return 0;
+}
+
+
+static struct cpufreq_driver longrun_driver = {
+	.verify 	= longrun_verify_policy,
+	.setpolicy 	= longrun_set_policy,
+	.init		= longrun_cpu_init,
+	.name		= "longrun",
+};
+
+
 /**
  * longrun_init - initializes the Transmeta Crusoe LongRun CPUFreq driver
  *
@@ -228,52 +267,13 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
  */
 static int __init longrun_init(void)
 {
-	int                     result;
-	struct cpufreq_driver   *driver;
 	struct cpuinfo_x86 *c = cpu_data;
 
 	if (c->x86_vendor != X86_VENDOR_TRANSMETA || 
 	    !cpu_has(c, X86_FEATURE_LONGRUN))
-		return 0;
+		return -ENODEV;
 
-	/* initialization of main "cpufreq" code*/
-	driver = kmalloc(sizeof(struct cpufreq_driver) + 
-			 NR_CPUS * sizeof(struct cpufreq_policy), GFP_KERNEL);
-	if (!driver)
-		return -ENOMEM;
-	memset(driver, 0, sizeof(struct cpufreq_driver) +
-			NR_CPUS * sizeof(struct cpufreq_policy));
-
-	driver->policy = (struct cpufreq_policy *) (driver + 1);
-
-	if (longrun_determine_freqs(&longrun_low_freq, &longrun_high_freq)) {
-		kfree(driver);
-		return -EIO;
-	}
-	driver->policy[0].cpuinfo.min_freq = longrun_low_freq;
-	driver->policy[0].cpuinfo.max_freq = longrun_high_freq;
-	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
-
-	strncpy(driver->name, "longrun", CPUFREQ_NAME_LEN);
-
-	longrun_get_policy(&driver->policy[0]);
-
-#ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_cur_freq[0] = longrun_high_freq; /* dummy value */
-#endif
-
-	driver->verify         = &longrun_verify_policy;
-	driver->setpolicy      = &longrun_set_policy;
-
-	longrun_driver = driver;
-
-	result = cpufreq_register(driver);
-	if (result) {
-		longrun_driver = NULL;
-		kfree(driver);
-	}
-
-	return result;
+	return cpufreq_register_driver(&longrun_driver);
 }
 
 
@@ -282,15 +282,13 @@ static int __init longrun_init(void)
  */
 static void __exit longrun_exit(void)
 {
-	if (longrun_driver) {
-		cpufreq_unregister();
-		kfree(longrun_driver);
-	}
+	cpufreq_unregister_driver(&longrun_driver);
 }
 
 
 MODULE_AUTHOR ("Dominik Brodowski <linux@brodo.de>");
 MODULE_DESCRIPTION ("LongRun driver for Transmeta Crusoe processors.");
 MODULE_LICENSE ("GPL");
+
 module_init(longrun_init);
 module_exit(longrun_exit);

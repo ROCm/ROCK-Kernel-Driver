@@ -104,31 +104,29 @@ static void pnp_free_ids(struct pnp_dev *dev)
 static void pnp_release_device(struct device *dmdev)
 {
 	struct pnp_dev * dev = to_pnp_dev(dmdev);
-	if (dev->res)
-		pnp_free_resources(dev->res);
+	if (dev->possible)
+		pnp_free_resources(dev->possible);
 	pnp_free_ids(dev);
 	kfree(dev);
 }
 
 int __pnp_add_device(struct pnp_dev *dev)
 {
-	int error = 0;
+	int ret;
 	pnp_name_device(dev);
 	pnp_fixup_device(dev);
-	strncpy(dev->dev.name,dev->name,DEVICE_NAME_SIZE-1);
-	dev->dev.name[DEVICE_NAME_SIZE-1] = '\0';
 	dev->dev.bus = &pnp_bus_type;
 	dev->dev.release = &pnp_release_device;
 	dev->status = PNP_READY;
-	error = device_register(&dev->dev);
-	if (error == 0){
-		spin_lock(&pnp_lock);
-		list_add_tail(&dev->global_list, &pnp_global);
-		list_add_tail(&dev->protocol_list, &dev->protocol->devices);
-		spin_unlock(&pnp_lock);
+	spin_lock(&pnp_lock);
+	list_add_tail(&dev->global_list, &pnp_global);
+	list_add_tail(&dev->protocol_list, &dev->protocol->devices);
+	spin_unlock(&pnp_lock);
+	pnp_auto_config_dev(dev);
+	ret = device_register(&dev->dev);
+	if (ret == 0)
 		pnp_interface_attach_device(dev);
-	}
-	return error;
+	return ret;
 }
 
 /*
@@ -172,7 +170,7 @@ void pnp_remove_device(struct pnp_dev *dev)
 
 static int __init pnp_init(void)
 {
-	printk(KERN_INFO "Linux Plug and Play Support v0.94 (c) Adam Belay\n");
+	printk(KERN_INFO "Linux Plug and Play Support v0.95 (c) Adam Belay\n");
 	return bus_register(&pnp_bus_type);
 }
 
