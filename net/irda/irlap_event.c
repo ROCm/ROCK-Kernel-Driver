@@ -1215,34 +1215,30 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 		 *  Check for expected I(nformation) frame
 		 */
 		if ((ns_status == NS_EXPECTED) && (nr_status == NR_EXPECTED)) {
+
+			/* Update Vr (next frame for us to receive) */
+			self->vr = (self->vr + 1) % 8;
+
+			/* Update Nr received, cleanup our retry queue */
+			irlap_update_nr_received(self, info->nr);
+
+			/*
+			 *  Got expected NR, so reset the
+			 *  retry_count. This is not done by IrLAP spec,
+			 *  which is strange!
+			 */
+			self->retry_count = 0;
+			self->ack_required = TRUE;
+
 			/*  poll bit cleared?  */
 			if (!info->pf) {
-				self->vr = (self->vr + 1) % 8;
-
-				/* Update Nr received */
-				irlap_update_nr_received( self, info->nr);
-
-				self->ack_required = TRUE;
-
 				/* Keep state, do not move this line */
 				irlap_next_state(self, LAP_NRM_P);
 
 				irlap_data_indication(self, skb, FALSE);
 			} else {
+				/* No longer waiting for pf */
 				del_timer(&self->final_timer);
-
-				self->vr = (self->vr + 1) % 8;
-
-				/* Update Nr received */
-				irlap_update_nr_received(self, info->nr);
-
-				/*
-				 *  Got expected NR, so reset the
-				 *  retry_count. This is not done by IrLAP,
-				 *  which is strange!
-				 */
-				self->retry_count = 0;
-				self->ack_required = TRUE;
 
 				irlap_wait_min_turn_around(self, &self->qos_tx);
 
@@ -1869,14 +1865,17 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 		 *  Check for expected I(nformation) frame
 		 */
 		if ((ns_status == NS_EXPECTED) && (nr_status == NR_EXPECTED)) {
+
+			/* Update Vr (next frame for us to receive) */
+			self->vr = (self->vr + 1) % 8;
+
+			/* Update Nr received */
+			irlap_update_nr_received(self, info->nr);
+
 			/*
 			 *  poll bit cleared?
 			 */
 			if (!info->pf) {
-				self->vr = (self->vr + 1) % 8;
-
-				/* Update Nr received */
-				irlap_update_nr_received(self, info->nr);
 
 				self->ack_required = TRUE;
 
@@ -1893,11 +1892,6 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 				irlap_data_indication(self, skb, FALSE);
 				break;
 			} else {
-				self->vr = (self->vr + 1) % 8;
-
-				/* Update Nr received */
-				irlap_update_nr_received(self, info->nr);
-
 				/*
 				 *  We should wait before sending RR, and
 				 *  also before changing to XMIT_S
