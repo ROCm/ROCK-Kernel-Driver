@@ -3,6 +3,7 @@
 #
 config PCI_LEGACY_PROC
 	bool "Legacy /proc/pci interface"
+	depends on PCI
 	---help---
 	  This feature enables a procfs file -- /proc/pci -- that provides a 
 	  summary of PCI devices in the system. 

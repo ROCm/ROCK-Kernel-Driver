@@ -17,8 +17,8 @@ struct attribute {
 };
 
 struct sysfs_ops {
-	ssize_t	(*show)(struct kobject *, struct attribute *,char *, size_t, loff_t);
-	ssize_t	(*store)(struct kobject *,struct attribute *,const char *, size_t, loff_t);
+	ssize_t	(*show)(struct kobject *, struct attribute *,char *);
+	ssize_t	(*store)(struct kobject *,struct attribute *,const char *);
 };
 
 extern int
