@@ -1265,8 +1265,21 @@ static irqreturn_t smc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void smc_timeout(struct net_device *dev)
 {
 	struct smc_local *lp = netdev_priv(dev);
+	unsigned long ioaddr = dev->base_addr;
+	int status, mask, meminfo, fifo;
 
 	DBG(2, "%s: %s\n", dev->name, __FUNCTION__);
+
+	spin_lock_irq(&lp->lock);
+	status = SMC_GET_INT();
+	mask = SMC_GET_INT_MASK();
+	fifo = SMC_GET_FIFO();
+	SMC_SELECT_BANK(0);
+	meminfo = SMC_GET_MIR();
+	SMC_SELECT_BANK(2);
+	spin_unlock_irq(&lp->lock);
+	PRINTK( "%s: INT 0x%02x MASK 0x%02x MEM 0x%04x FIFO 0x%04x\n",
+		dev->name, status, mask, meminfo, fifo );
 
 	smc_reset(dev);
 	smc_enable(dev);
