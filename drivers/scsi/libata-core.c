@@ -2029,6 +2029,7 @@ static void ata_pio_sector(struct ata_port *ap)
 {
 	struct ata_queued_cmd *qc;
 	struct scatterlist *sg;
+	struct page *page;
 	unsigned char *buf;
 	u8 status;
 
@@ -2065,7 +2066,8 @@ static void ata_pio_sector(struct ata_port *ap)
 	if (qc->cursect == (qc->nsect - 1))
 		ap->pio_task_state = PIO_ST_LAST;
 
-	buf = kmap(sg[qc->cursg].page) +
+	page = sg[qc->cursg].page;
+	buf = kmap(page) +
 	      sg[qc->cursg].offset + (qc->cursg_ofs * ATA_SECT_SIZE);
 
 	qc->cursect++;
@@ -2088,7 +2090,7 @@ static void ata_pio_sector(struct ata_port *ap)
 	else
 		insl(ap->ioaddr.data_addr, buf, ATA_SECT_DWORDS);
 
-	kunmap(sg[qc->cursg].page);
+	kunmap(page);
 }
 
 static void ata_pio_task(void *_data)

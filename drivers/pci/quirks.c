@@ -817,6 +817,7 @@ static void __init quirk_alder_ioapic(struct pci_dev *pdev)
 static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 {
 	u8 prog, comb, tmp;
+	int ich = 0;
 
 	/*
 	 * Narrow down to Intel SATA PCI devices.
@@ -827,8 +828,12 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 	case 0x24df:
 	case 0x25a3:
 	case 0x25b0:
+		ich = 5;
+		break;
 	case 0x2651:
 	case 0x2652:
+	case 0x2653:
+		ich = 6;
 		break;
 	default:
 		/* we do not handle this PCI device */
@@ -839,13 +844,25 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 	 * Read combined mode register.
 	 */
 	pci_read_config_byte(pdev, 0x90, &tmp);	/* combined mode reg */
-	tmp &= 0x6;     /* interesting bits 2:1, PATA primary/secondary */
-	if (tmp == 0x4)		/* bits 10x */
-		comb = (1 << 0);		/* SATA port 0, PATA port 1 */
-	else if (tmp == 0x6)	/* bits 11x */
-		comb = (1 << 2);		/* PATA port 0, SATA port 1 */
-	else
-		return;				/* not in combined mode */
+
+	if (ich == 5) {
+		tmp &= 0x6;  /* interesting bits 2:1, PATA primary/secondary */
+		if (tmp == 0x4)		/* bits 10x */
+			comb = (1 << 0);	/* SATA port 0, PATA port 1 */
+		else if (tmp == 0x6)	/* bits 11x */
+			comb = (1 << 2);	/* PATA port 0, SATA port 1 */
+		else
+			return;			/* not in combined mode */
+	} else {
+		WARN_ON(ich != 6);
+		tmp &= 0x3;  /* interesting bits 1:0 */
+		if (tmp & (1 << 0))
+			comb = (1 << 2);	/* PATA port 0, SATA port 1 */
+		else if (tmp & (1 << 1))
+			comb = (1 << 0);	/* SATA port 0, PATA port 1 */
+		else
+			return;			/* not in combined mode */
+	}
 
 	/*
 	 * Read programming interface register.
