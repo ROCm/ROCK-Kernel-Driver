@@ -2511,7 +2511,15 @@ static int __init aty_init(struct fb_info *info, const char *name)
 		}
 	} else
 #endif /* !CONFIG_PPC */
-	if (!fb_find_mode(&var, info, mode, NULL, 0, &defmode, 8))
+	if (
+#if defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64)
+	   /* On Sparc, unless the user gave a specific mode
+	    * specification, use the PROM probed values in
+	    * default_var.
+	    */
+	    !mode ||
+#endif
+	    !fb_find_mode(&var, info, mode, NULL, 0, &defmode, 8))
 		var = default_var;
 
 	if (noaccel)

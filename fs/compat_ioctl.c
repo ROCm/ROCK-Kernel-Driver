@@ -687,6 +687,11 @@ static int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long arg)
 	set_fs (old_fs);
 	if (!err) {
 		switch (cmd) {
+		/* TUNSETIFF is defined as _IOW, it should be _IORW
+		 * as the data is copied back to user space, but that
+		 * cannot be fixed without breaking all existing apps.
+		 */
+		case TUNSETIFF:
 		case SIOCGIFFLAGS:
 		case SIOCGIFMETRIC:
 		case SIOCGIFMTU:

@@ -443,6 +443,9 @@ unsigned int ipmi_addr_length(int addr_type)
 		return sizeof(struct ipmi_ipmb_addr);
 	}
 
+	if (addr_type == IPMI_LAN_ADDR_TYPE)
+		return sizeof(struct ipmi_lan_addr);
+
 	return 0;
 }
 

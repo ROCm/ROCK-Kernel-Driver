@@ -1960,8 +1960,6 @@ static int __devinit de_init_one (struct pci_dev *pdev,
 	dev->tx_timeout = de_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
-	dev->irq = pdev->irq;
-
 	de = dev->priv;
 	de->de21040 = ent->driver_data == 0 ? 1 : 0;
 	de->pdev = pdev;
@@ -1996,6 +1994,8 @@ static int __devinit de_init_one (struct pci_dev *pdev,
 		       pdev->irq, pci_name(pdev));
 		goto err_out_res;
 	}
+
+	dev->irq = pdev->irq;
 
 	/* obtain and check validity of PCI I/O address */
 	pciaddr = pci_resource_start(pdev, 1);

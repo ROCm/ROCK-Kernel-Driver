@@ -862,7 +862,6 @@ extern void fb_destroy_modedb(struct fb_videomode *modedb);
 
 /* drivers/video/modedb.c */
 #define VESA_MODEDB_SIZE 34
-extern const struct fb_videomode vesa_modes[];
 extern void fb_var_to_videomode(struct fb_videomode *mode,
 				struct fb_var_screeninfo *var);
 extern void fb_videomode_to_var(struct fb_var_screeninfo *var,
@@ -906,6 +905,8 @@ struct fb_videomode {
 	u32 vmode;
 	u32 flag;
 };
+
+extern const struct fb_videomode vesa_modes[];
 
 struct fb_modelist {
 	struct list_head list;

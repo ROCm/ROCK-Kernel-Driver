@@ -475,8 +475,9 @@ void emac_phy_write(struct net_device *dev, int mii_id, int reg, int data)
 
 	out_be32(&emacp->em0stacr, stacr);
 
-	while (((stacr = in_be32(&emacp->em0stacr) & EMAC_STACR_OC) == 0)
-					&& (count++ < 5000))
+	count = 0;
+	while ((((stacr = in_be32(&emacp->em0stacr)) & EMAC_STACR_OC) == 0)
+					&& (count++ < MDIO_DELAY))
 		udelay(1);
 	MDIO_DEBUG((" (count was %d)\n", count));
 
@@ -912,7 +913,6 @@ static int emac_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		PKT_DEBUG(("emac_start_xmit() stopping queue\n"));
 		netif_stop_queue(dev);
 		spin_unlock_irqrestore(&fep->lock, flags);
-		restore_flags(flags);
 		return -EBUSY;
 	}
 
@@ -1281,7 +1281,7 @@ static void emac_init_rings(struct net_device *dev)
 	/* Format the receive descriptor ring. */
 	ep->rx_slot = 0;
 	/* Default is MTU=1500 + Ethernet overhead */
-	ep->rx_buffer_size = ENET_DEF_BUF_SIZE;
+	ep->rx_buffer_size = dev->mtu + ENET_HEADER_SIZE + ENET_FCS_SIZE;
 	emac_rx_fill(dev, 0);
 	if (ep->rx_slot != 0) {
 		printk(KERN_ERR

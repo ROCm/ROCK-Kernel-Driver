@@ -217,13 +217,18 @@ void __init sun4c_init_IRQ(void)
 			panic("Cannot find /interrupt-enable node");
 
 		/* Depending on the "address" property is bad news... */
-		prom_getproperty(ie_node, "reg", (char *) int_regs, sizeof(int_regs));
-		memset(&phyres, 0, sizeof(struct resource));
-		phyres.flags = int_regs[0].which_io;
-		phyres.start = int_regs[0].phys_addr;
-		interrupt_enable = (char *) sbus_ioremap(&phyres, 0,
-		    int_regs[0].reg_size, "sun4c_intr");
+		interrupt_enable = NULL;
+		if (prom_getproperty(ie_node, "reg", (char *) int_regs,
+				     sizeof(int_regs)) != -1) {
+			memset(&phyres, 0, sizeof(struct resource));
+			phyres.flags = int_regs[0].which_io;
+			phyres.start = int_regs[0].phys_addr;
+			interrupt_enable = (char *) sbus_ioremap(&phyres, 0,
+			    int_regs[0].reg_size, "sun4c_intr");
+		}
 	}
+	if (!interrupt_enable)
+		panic("Cannot map interrupt_enable");
 
 	BTFIXUPSET_CALL(sbint_to_irq, sun4c_sbint_to_irq, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(enable_irq, sun4c_enable_irq, BTFIXUPCALL_NORM);

@@ -28,7 +28,7 @@
 struct ps2if {
 	struct serio		*io;
 	struct sa1111_dev	*dev;
-	unsigned long		base;
+	void __iomem		*base;
 	unsigned int		open;
 	spinlock_t		lock;
 	unsigned int		head;
@@ -272,7 +272,7 @@ static int ps2_probe(struct sa1111_dev *dev)
 	/*
 	 * Our parent device has already mapped the region.
 	 */
-	ps2if->base = (unsigned long)dev->mapbase;
+	ps2if->base = dev->mapbase;
 
 	sa1111_enable_device(ps2if->dev);
 

@@ -3681,27 +3681,27 @@ xfs_inode_flush(
 {
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
+	xfs_inode_log_item_t *iip;
 	int		error = 0;
 
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
+	iip = ip->i_itemp;
 
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	/* Bypass inodes which have already been cleaned by
+	/*
+	 * Bypass inodes which have already been cleaned by
 	 * the inode flush clustering code inside xfs_iflush
 	 */
 	if ((ip->i_update_core == 0) &&
-	    ((ip->i_itemp == NULL) ||
-	     !(ip->i_itemp->ili_format.ilf_fields & XFS_ILOG_ALL)))
+	    ((iip == NULL) || !(iip->ili_format.ilf_fields & XFS_ILOG_ALL)))
 		return 0;
 
 	if (flags & FLUSH_LOG) {
-		xfs_inode_log_item_t *iip = ip->i_itemp;
-
 		if (iip && iip->ili_last_lsn) {
-			xlog_t	*log = mp->m_log;
+			xlog_t		*log = mp->m_log;
 			xfs_lsn_t	sync_lsn;
 			int		s, log_flags = XFS_LOG_FORCE;
 
@@ -3714,12 +3714,12 @@ xfs_inode_flush(
 
 			if (flags & FLUSH_SYNC)
 				log_flags |= XFS_LOG_SYNC;
-			return xfs_log_force(mp, iip->ili_last_lsn,
-						log_flags);
+			return xfs_log_force(mp, iip->ili_last_lsn, log_flags);
 		}
 	}
 
-	/* We make this non-blocking if the inode is contended,
+	/*
+	 * We make this non-blocking if the inode is contended,
 	 * return EAGAIN to indicate to the caller that they
 	 * did not succeed. This prevents the flush path from
 	 * blocking on inodes inside another operation right

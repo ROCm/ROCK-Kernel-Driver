@@ -2361,13 +2361,6 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 
 	pci_set_drvdata(pdev, info);
 
-	/* Setup Power Management capabilities */
-	if (default_dynclk < -1) {
-		/* -2 is special: means  ON on mobility chips and do not change on others */
-		radeonfb_pm_init(rinfo, rinfo->is_mobility ? 1 : -1);
-	} else
-		radeonfb_pm_init(rinfo, default_dynclk);
-
 	/* Register with fbdev layer */
 	ret = register_framebuffer(info);
 	if (ret < 0) {
@@ -2375,6 +2368,13 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 			pci_name(rinfo->pdev));
 		goto err_unmap_fb;
 	}
+
+	/* Setup Power Management capabilities */
+	if (default_dynclk < -1) {
+		/* -2 is special: means  ON on mobility chips and do not change on others */
+		radeonfb_pm_init(rinfo, rinfo->is_mobility ? 1 : -1);
+	} else
+		radeonfb_pm_init(rinfo, default_dynclk);
 
 #ifdef CONFIG_MTRR
 	rinfo->mtrr_hdl = nomtrr ? -1 : mtrr_add(rinfo->fb_base_phys,
