@@ -22,8 +22,6 @@
 
 #define SEL_TIMEOUT		153	/* 250 ms selection timeout (@ 40 MHz) */
 
-#define END_SCAN		2
-
 #define pci_dma_lo32(a)			(a & 0xffffffff)
 
 typedef u8		UCHAR;	/*  8 bits */

@@ -174,6 +174,9 @@
  *	2.1b2 04/02/01	CH	(applied 05.04) Fix error-handling	*
  *	2.1c  04/05/23  GL	Update to use the new pci_driver API,	*
  *				some scsi EH updates, more cleanup.	*
+ *	2.1d  04/05/27	GL	Moved setting of scan_devices to	*
+ *				slave_alloc/_configure/_destroy, as	*
+ *				suggested by CH.			*
  ***********************************************************************/
 
 /* Uncomment SA_INTERRUPT, if the driver refuses to share its IRQ with other devices */
@@ -1031,8 +1034,8 @@ static void dc390_BuildSRB (Scsi_Cmnd* pcmd, PDCB pDCB, PSRB pSRB)
  * 2.0.x: always return 0
  * 2.1.x: old model: (use_new_eh_code == 0): like 2.0.x
  *	  TO BE DONE:
- *	  new model: return 0 if successful
- *	  	     return 1 if command cannot be queued (queue full)
+ *	  new model: return 0 if successful, or must not be re-queued
+ *		     return 1 if command cannot be queued (queue full)
  *		     command will be inserted in midlevel queue then ...
  *
  ***********************************************************************/
@@ -1050,16 +1053,7 @@ static int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     /* TODO: Change the policy: Always accept TEST_UNIT_READY or INQUIRY 
      * commands and alloc a DCB for the device if not yet there. DCB will
      * be removed in dc390_SRBdone if SEL_TIMEOUT */
-
-    if (((pACB->scan_devices == END_SCAN) && (cmd->cmnd[0] != INQUIRY)) ||
-	((pACB->scan_devices) && (cmd->cmnd[0] == READ_6)))
-	pACB->scan_devices = 0;
-
-    if ((pACB->scan_devices || cmd->cmnd[0] == TEST_UNIT_READY || cmd->cmnd[0] == INQUIRY) && 
-	!(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun))) {
-	pACB->scan_devices = 1;
-	DCBDEBUG(printk("Scanning target %02x lun %02x\n", cmd->device->id, cmd->device->lun));
-    } else if (!(pACB->scan_devices) && !(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun))) {
+    if (!(pACB->scan_devices) && !(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun))) {
 	printk(KERN_INFO "DC390: Ignore target %02x lun %02x\n",
 		cmd->device->id, cmd->device->lun); 
 	goto fail;
@@ -1914,8 +1908,10 @@ static int dc390_slave_alloc(struct scsi_device *scsi_device)
 	PDCB pDCB;
 	PACB pACB = (PACB) scsi_device->host->hostdata;
 	dc390_initDCB(pACB, &pDCB, scsi_device->id, scsi_device->lun);
-	if (pDCB != NULL)
+	if (pDCB != NULL) {
+		pACB->scan_devices = 1;
 		return 0;
+	}
 	return -ENOMEM;
 }
 
@@ -1929,18 +1925,27 @@ static void dc390_slave_destroy(struct scsi_device *scsi_device)
 {
 	PACB pACB = (PACB) scsi_device->host->hostdata;
 	PDCB pDCB = dc390_findDCB (pACB, scsi_device->id, scsi_device->lun);;
+	pACB->scan_devices = 0;
 	if (pDCB != NULL)
 		dc390_remove_dev(pACB, pDCB);
 	else
 		printk(KERN_ERR"%s() called for non-existing device!\n", __FUNCTION__);
 }
-	
+
+static int dc390_slave_configure(struct scsi_device *scsi_device)
+{
+	PACB pACB = (PACB) scsi_device->host->hostdata;
+	pACB->scan_devices = 0;
+	return 0;
+}
+
 static Scsi_Host_Template driver_template = {
 	.module			= THIS_MODULE,
 	.proc_name		= "tmscsim", 
 	.proc_info		= DC390_proc_info,
 	.name			= DC390_BANNER " V" DC390_VERSION,
 	.slave_alloc		= dc390_slave_alloc,
+	.slave_configure	= dc390_slave_configure,
 	.slave_destroy		= dc390_slave_destroy,
 	.queuecommand		= DC390_queue_command,
 	.eh_abort_handler	= DC390_abort,
