@@ -94,7 +94,7 @@ int ata_scsi_ioctl(struct scsi_device *scsidev, int cmd, void __user *arg)
 		return 0;
 
 	case ATA_IOC_SET_IO32:
-		val = (long) arg;
+		val = (unsigned long) arg;
 		if (val != 0)
 			return -EINVAL;
 		return 0;

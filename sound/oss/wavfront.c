@@ -2961,8 +2961,8 @@ wffx_memset (int page,
 		if (i != cnt) {
 			printk (KERN_WARNING LOGNAME
 				"FX memset "
-				"(0x%x, 0x%x, 0x%x, %d) incomplete\n",
-				page, addr, (int) data, cnt);
+				"(0x%x, 0x%x, %p, %d) incomplete\n",
+				page, addr, data, cnt);
 			return -(EIO);
 		}
 	}
