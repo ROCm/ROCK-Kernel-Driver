@@ -582,6 +582,7 @@ static unsigned short snd_via82xx_codec_read(ac97_t *ac97, unsigned short reg)
 		      	return 0xffff;
 		}
 		snd_via82xx_codec_xwrite(chip, xval);
+		udelay (20);
 		if (snd_via82xx_codec_valid(chip, ac97->num) >= 0) {
 			udelay(25);
 			val = snd_via82xx_codec_xread(chip);
@@ -1979,7 +1980,7 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1019, .device = 0x0996, .action = VIA_DXS_48K },
 		{ .vendor = 0x1043, .device = 0x8095, .action = VIA_DXS_ENABLE }, /* ASUS A7V8X */
 		{ .vendor = 0x1043, .device = 0x80a1, .action = VIA_DXS_NO_VRA }, /* ASUS A7V8-X */
-		{ .vendor = 0x1043, .device = 0x80b0, .action = VIA_DXS_ENABLE }, /* ASUS A7V600 */
+		{ .vendor = 0x1043, .device = 0x80b0, .action = VIA_DXS_NO_VRA }, /* ASUS A7V600 & K8V*/ 
 		{ .vendor = 0x10cf, .device = 0x118e, .action = VIA_DXS_ENABLE }, /* FSC laptop */
 		{ .vendor = 0x1106, .device = 0x4161, .action = VIA_DXS_NO_VRA }, /* ASRock K7VT2 */
 		{ .vendor = 0x1297, .device = 0xa232, .action = VIA_DXS_ENABLE }, /* Shuttle ?? */
