@@ -1737,7 +1737,6 @@ static int __initdata is_chipset_set[MAX_HWIFS];
  * "hdx=cyl,head,sect"	: disk drive is present, with specified geometry
  * "hdx=remap63"	: add 63 to all sector numbers (for OnTrack DM)
  * "hdx=remap"		: remap 0->1 (for EZDrive)
- * "hdx=noremap"	: do not remap 0->1 even though EZD was detected
  * "hdx=autotune"	: driver will attempt to tune interface speed
  *				to the fastest PIO mode supported,
  *				if possible for this drive only.
@@ -1859,8 +1858,8 @@ int __init ide_setup (char *s)
 		const char *hd_words[] = {
 			"none", "noprobe", "nowerr", "cdrom", "serialize",
 			"autotune", "noautotune", "slow", "swapdata", "bswap",
-			"flash", "remap", "noremap", "scsi", "biostimings",
-			"remap63", NULL };
+			"flash", "remap", "remap63", "scsi", "biostimings",
+			NULL };
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
@@ -1920,17 +1919,14 @@ int __init ide_setup (char *s)
 			case -12: /* "remap" */
 				drive->remap_0_to_1 = 1;
 				goto done;
-			case -13: /* "noremap" */
-				drive->remap_0_to_1 = 2;
+			case -13: /* "remap63" */
+				drive->sect0 = 63;
 				goto done;
 			case -14: /* "scsi" */
 				drive->scsi = 1;
 				goto done;
 			case -15: /* "biostimings" */
 				drive->autotune = IDE_TUNE_BIOS;
-				goto done;
-			case -16: /* "remap63" */
-				drive->sect0 = 63;
 				goto done;
 			case 3: /* cyl,head,sect */
 				drive->media	= ide_disk;
