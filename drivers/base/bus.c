@@ -451,7 +451,11 @@ int bus_add_driver(struct device_driver * drv)
 
 	if (bus) {
 		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
-		kobject_set_name(&drv->kobj,drv->name);
+		error = kobject_set_name(&drv->kobj,drv->name);
+		if (error) {
+			put_bus(bus);
+			return error;
+		}
 		drv->kobj.kset = &bus->drivers;
 		if ((error = kobject_register(&drv->kobj))) {
 			put_bus(bus);
@@ -557,7 +561,10 @@ int bus_register(struct bus_type * bus)
 {
 	int retval;
 
-	kobject_set_name(&bus->subsys.kset.kobj,bus->name);
+	retval = kobject_set_name(&bus->subsys.kset.kobj,bus->name);
+	if (retval)
+		goto out;
+
 	subsys_set_kset(bus,bus_subsys);
 	retval = subsystem_register(&bus->subsys);
 	if (retval) 
