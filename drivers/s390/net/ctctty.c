@@ -1,5 +1,5 @@
 /*
- * $Id: ctctty.c,v 1.24 2004/07/15 16:03:08 ptiedem Exp $
+ * $Id: ctctty.c,v 1.26 2004/08/04 11:06:55 mschwide Exp $
  *
  * CTC / ESCON network driver, tty interface.
  *
@@ -27,6 +27,7 @@
 #include <linux/tty.h>
 #include <linux/serial_reg.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 #include <asm/uaccess.h>
 #include <linux/devfs_fs_kernel.h>
 #include "ctctty.h"
@@ -1053,9 +1054,8 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		 */
 		timeout = jiffies + HZ;
 		while (!(info->lsr & UART_LSR_TEMT)) {
-			set_current_state(TASK_INTERRUPTIBLE);
 			spin_unlock_irqrestore(&ctc_tty_lock, flags);
-			schedule_timeout(HZ/2);
+			msleep(500);
 			spin_lock_irqsave(&ctc_tty_lock, flags);
 			if (time_after(jiffies,timeout))
 				break;

@@ -180,8 +180,7 @@ zfcp_fsf_req_dismiss_all(struct zfcp_adapter *adapter)
 		ZFCP_LOG_DEBUG("fsf req list of adapter %s not yet empty\n",
 			       zfcp_get_busid_by_adapter(adapter));
 		/* wait for woken intiators to clean up their requests */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(ZFCP_FSFREQ_CLEANUP_TIMEOUT);
+		msleep(jiffies_to_msecs(ZFCP_FSFREQ_CLEANUP_TIMEOUT));
 	}
 
 	/* consistency check */
