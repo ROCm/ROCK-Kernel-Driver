@@ -31,22 +31,24 @@ pci_do_find_bus(struct pci_bus* bus, unsigned char busnr)
 }
 
 /**
- * pci_find_bus - locate PCI bus from a given bus number
+ * pci_find_bus - locate PCI bus from a given domain and bus number
+ * @domain: number of PCI domain to search
  * @busnr: number of desired PCI bus
  *
- * Given a PCI bus number, the desired PCI bus is located in system
- * global list of PCI buses.  If the bus is found, a pointer to its
+ * Given a PCI bus number and domain number, the desired PCI bus is located
+ * in the global list of PCI buses.  If the bus is found, a pointer to its
  * data structure is returned.  If no bus is found, %NULL is returned.
  */
-struct pci_bus *
-pci_find_bus(unsigned char busnr)
+struct pci_bus * pci_find_bus(int domain, int busnr)
 {
-	struct pci_bus* bus = NULL;
-	struct pci_bus* tmp_bus;
+	struct pci_bus *bus = NULL;
+	struct pci_bus *tmp_bus;
 
 	while ((bus = pci_find_next_bus(bus)) != NULL)  {
+		if (pci_domain_nr(bus) != domain)
+			continue;
 		tmp_bus = pci_do_find_bus(bus, busnr);
-		if(tmp_bus)
+		if (tmp_bus)
 			return tmp_bus;
 	}
 	return NULL;
