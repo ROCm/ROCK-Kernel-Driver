@@ -34,6 +34,7 @@ SECTIONS
   . = ALIGN(16);
   .rodata : { *(.rodata) *(.rodata.*) }
   .kstrtab : { *(.kstrtab) }
+  __vermagic : { *(__vermagic) }
 
   .data BLOCK(8192) : {			/* Data without special */
 	data_start = .;

@@ -394,6 +394,17 @@ $(SUBDIRS): .hdepend prepare
 prepare: include/linux/version.h include/asm include/config/MARKER
 	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
 
+#	We need to build init/vermagic.o before descending since all modules
+#	(*.ko) need it already
+
+ifdef CONFIG_MODULES
+
+prepare: init/vermagic.o
+
+init/vermagic.o: include/linux/version.h
+
+endif
+
 #	This can be used by arch/$ARCH/Makefile to preprocess
 #	their vmlinux.lds.S file
 

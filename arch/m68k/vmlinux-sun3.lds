@@ -14,7 +14,7 @@ SECTIONS
 	*(.gnu.warning)
 	} = 0x4e75
   .kstrtab : { *(.kstrtab) }
-
+  __vermagic : { *(__vermagic) }
 
   _etext = .;			/* End of text section */
 

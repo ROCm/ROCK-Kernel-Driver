@@ -33,6 +33,7 @@ SECTIONS
 
 	.rodata : { *(.rodata) *(.rodata.__*) }
 	.kstrtab : { *(.kstrtab) }
+	__vermagic : { *(__vermagic) }
 
 	. = ALIGN(4);                /* Exception table */
   	__start___ex_table = .;

@@ -67,6 +67,7 @@ SECTIONS
 	}
 
 	.kstrtab : { *(.kstrtab) }
+	__vermagic : { *(__vermagic) }
 
 	. = ALIGN(16);
 	__ex_table : {			/* Exception table		*/
