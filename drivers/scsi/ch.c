@@ -19,7 +19,7 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
-#include <linux/blk.h>
+#include <linux/blkdev.h>
 #include <linux/completion.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/ioctl32.h>
@@ -34,6 +34,7 @@
 #define CH_DT_MAX       16
 #define CH_TYPES        8
 
+#include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_ioctl.h>
 
@@ -275,7 +276,7 @@ ch_do_scsi(scsi_changer *ch, unsigned char *cmd,
 	DECLARE_COMPLETION(wait);
 	Scsi_Request *sr;
 	
-	sr = scsi_allocate_request(ch->device);
+	sr = scsi_allocate_request(ch->device, GFP_ATOMIC);
 	if (NULL == sr)
 		return -ENOMEM;
 
@@ -694,7 +695,7 @@ ch_open(struct inode *inode, struct file *file)
 {
 	struct list_head *item;
 	scsi_changer *tmp, *ch;
-	int minor = minor(inode->i_rdev);
+	int minor = iminor(inode);
 
 	spin_lock(&ch_devlist_lock);
 	ch = NULL;
