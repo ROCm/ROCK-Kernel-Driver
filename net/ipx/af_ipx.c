@@ -2221,6 +2221,7 @@ static struct net_proto_family ipx_family_ops = {
 
 static struct proto_ops SOCKOPS_WRAPPED(ipx_dgram_ops) = {
 	.family		= PF_IPX,
+	.owner		= THIS_MODULE,
 	.release	= ipx_release,
 	.bind		= ipx_bind,
 	.connect	= ipx_connect,
