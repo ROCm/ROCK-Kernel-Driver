@@ -2110,6 +2110,7 @@ struct tty_dev {
 #define to_tty_dev(d) container_of(d, struct tty_dev, class_dev)
 
 static LIST_HEAD(tty_dev_list);
+static spinlock_t tty_dev_list_lock = SPIN_LOCK_UNLOCKED;
 
 static ssize_t show_dev(struct class_device *class_dev, char *buf)
 {
@@ -2130,7 +2131,7 @@ static void tty_add_class_device(char *name, dev_t dev, struct device *device)
 	memset(tty_dev, 0x00, sizeof(*tty_dev));
 
 	/* stupid '/' in tty name strings... */
-	temp = strchr(name, '/');
+	temp = strrchr(name, '/');
 	if (temp && (temp[1] != 0x00))
 		++temp;
 	else
@@ -2144,7 +2145,9 @@ static void tty_add_class_device(char *name, dev_t dev, struct device *device)
 		goto error;
 	class_device_create_file (&tty_dev->class_dev, &class_device_attr_dev);
 	tty_dev->dev = dev;
+	spin_lock(&tty_dev_list_lock);
 	list_add(&tty_dev->node, &tty_dev_list);
+	spin_unlock(&tty_dev_list_lock);
 	return;
 error:
 	kfree(tty_dev);
@@ -2156,6 +2159,7 @@ void tty_remove_class_device(dev_t dev)
 	struct list_head *tmp;
 	int found = 0;
 
+	spin_lock(&tty_dev_list_lock);
 	list_for_each (tmp, &tty_dev_list) {
 		tty_dev = list_entry(tmp, struct tty_dev, node);
 		if ((MAJOR(tty_dev->dev) == MAJOR(dev)) &&
@@ -2166,8 +2170,11 @@ void tty_remove_class_device(dev_t dev)
 	}
 	if (found) {
 		list_del(&tty_dev->node);
+		spin_unlock(&tty_dev_list_lock);
 		class_device_unregister(&tty_dev->class_dev);
 		kfree(tty_dev);
+	} else {
+		spin_unlock(&tty_dev_list_lock);
 	}
 }
 
