@@ -148,12 +148,13 @@ struct pcmcia_socket_class_data {
 	 * returned to driver) = sock_offset + (0, 1, .. , (nsock-1) */
 	struct pccard_operations *ops;		/* see above */
 	void *s_info;				/* socket_info_t */
+	struct class_device class_dev;		/* generic class structure */
 };
 
-extern struct device_class pcmcia_socket_class;
+extern struct class pcmcia_socket_class;
 
 /* socket drivers are expected to use these callbacks in their .drv struct */
-int pcmcia_socket_dev_suspend(struct device * dev, u32 state, u32 level);
-int pcmcia_socket_dev_resume(struct device * dev, u32 level);
+extern int pcmcia_socket_dev_suspend(struct pcmcia_socket_class_data *cls_d, u32 state, u32 level);
+extern int pcmcia_socket_dev_resume(struct pcmcia_socket_class_data *cls_d, u32 level);
 
 #endif /* _LINUX_SS_H */

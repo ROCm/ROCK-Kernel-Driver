@@ -1509,9 +1509,8 @@ static struct pcmcia_socket_class_data i82365_data = {
 static struct device_driver i82365_driver = {
 	.name = "i82365",
 	.bus = &platform_bus_type,
-	.devclass = &pcmcia_socket_class,
-	.suspend = pcmcia_socket_dev_suspend,
-	.resume = pcmcia_socket_dev_resume,
+/*	.suspend = pcmcia_socket_dev_suspend,	FIXME?	*/
+/*	.resume = pcmcia_socket_dev_resume,	FIXME?	*/
 };
 
 static struct platform_device i82365_device = {
@@ -1520,6 +1519,10 @@ static struct platform_device i82365_device = {
 	.dev = {
 		.name = "i82365",
 	},
+};
+
+static struct class_device i82365_class_data = {
+	.class = &pcmcia_socket_class,
 };
 
 static int __init init_i82365(void)
@@ -1555,9 +1558,12 @@ static int __init init_i82365(void)
 #endif
     
     i82365_data.nsock = sockets;
-    i82365_device.dev.class_data = &i82365_data;
+    i82365_class_data.dev = &i82365_device.dev;
+    i82365_class_data.class_data = &i82365_data;
+    strncpy(i82365_class_data.class_id, "i82365", BUS_ID_SIZE);
     
     platform_device_register(&i82365_device);
+    class_device_register(&i82365_class_data);
 
     /* Finally, schedule a polling interrupt */
     if (poll_interval != 0) {
@@ -1578,6 +1584,7 @@ static void __exit exit_i82365(void)
 #ifdef CONFIG_PROC_FS
     for (i = 0; i < sockets; i++) pcic_proc_remove(i);
 #endif
+    class_device_unregister(&i82365_class_data);
     platform_device_unregister(&i82365_device);
     if (poll_interval != 0)
 	del_timer_sync(&poll_timer);

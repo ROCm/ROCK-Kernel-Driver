@@ -313,9 +313,9 @@ static void parse_events(void *info, u_int events);
 /**
  * pcmcia_register_socket - add a new pcmcia socket device
  */
-int pcmcia_register_socket(struct device *dev)
+int pcmcia_register_socket(struct class_device *class_dev)
 {
-	struct pcmcia_socket_class_data *cls_d = to_class_data(dev);
+	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
 	socket_info_t *s_info;
 	unsigned int i, j;
 
@@ -375,9 +375,9 @@ int pcmcia_register_socket(struct device *dev)
 /**
  * pcmcia_unregister_socket - remove a pcmcia socket device
  */
-void pcmcia_unregister_socket(struct device *dev)
+void pcmcia_unregister_socket(struct class_device *class_dev)
 {
-	struct pcmcia_socket_class_data *cls_d = to_class_data(dev);
+	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
 	unsigned int i;
 	int j, socket = -1;
 	client_t *client;
@@ -751,9 +751,8 @@ void pcmcia_resume_socket (socket_info_t *s)
 }
 
 
-int pcmcia_socket_dev_suspend(struct device * dev, u32 state, u32 level)
+int pcmcia_socket_dev_suspend(struct pcmcia_socket_class_data *cls_d, u32 state, u32 level)
 {
-	struct pcmcia_socket_class_data *cls_d = to_class_data(dev);
 	socket_info_t *s;
 	int i;
 
@@ -771,9 +770,8 @@ int pcmcia_socket_dev_suspend(struct device * dev, u32 state, u32 level)
 }
 EXPORT_SYMBOL(pcmcia_socket_dev_suspend);
 
-int pcmcia_socket_dev_resume(struct device * dev, u32 level)
+int pcmcia_socket_dev_resume(struct pcmcia_socket_class_data *cls_d, u32 level)
 {
-	struct pcmcia_socket_class_data *cls_d = to_class_data(dev);
 	socket_info_t *s;
 	int i;
 
@@ -2423,12 +2421,16 @@ EXPORT_SYMBOL(pcmcia_unregister_socket);
 EXPORT_SYMBOL(pcmcia_suspend_socket);
 EXPORT_SYMBOL(pcmcia_resume_socket);
 
-struct device_class pcmcia_socket_class = {
+struct class pcmcia_socket_class = {
 	.name = "pcmcia_socket",
-	.add_device = &pcmcia_register_socket,
-	.remove_device = &pcmcia_unregister_socket,
 };
 EXPORT_SYMBOL(pcmcia_socket_class);
+
+static struct class_interface pcmcia_socket = {
+	.class = &pcmcia_socket_class,
+	.add = &pcmcia_register_socket,
+	.remove = &pcmcia_unregister_socket,
+};
 
 
 static int __init init_pcmcia_cs(void)
@@ -2436,7 +2438,8 @@ static int __init init_pcmcia_cs(void)
     printk(KERN_INFO "%s\n", release);
     printk(KERN_INFO "  %s\n", options);
     DEBUG(0, "%s\n", version);
-    devclass_register(&pcmcia_socket_class);
+    class_register(&pcmcia_socket_class);
+    class_interface_register(&pcmcia_socket);
 #ifdef CONFIG_PROC_FS
     proc_pccard = proc_mkdir("pccard", proc_bus);
 #endif
@@ -2453,7 +2456,8 @@ static void __exit exit_pcmcia_cs(void)
     }
 #endif
     release_resource_db();
-    devclass_unregister(&pcmcia_socket_class);
+    class_interface_unregister(&pcmcia_socket);
+    class_unregister(&pcmcia_socket_class);
 }
 
 subsys_initcall(init_pcmcia_cs);
