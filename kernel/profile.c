@@ -22,14 +22,14 @@ static int __init profile_setup(char * str)
 	int par;
 
 	if (!strncmp(str, "schedule", 8)) {
-		prof_on = 2;
+		prof_on = SCHED_PROFILING;
 		printk(KERN_INFO "kernel schedule profiling enabled\n");
 		if (str[7] == ',')
 			str += 8;
 	}
 	if (get_option(&str,&par)) {
 		prof_shift = par;
-		prof_on = 1;
+		prof_on = CPU_PROFILING;
 		printk(KERN_INFO "kernel profiling enabled (shift: %ld)\n",
 			prof_shift);
 	}

@@ -2647,6 +2647,7 @@ asmlinkage void __sched schedule(void)
 			dump_stack();
 		}
 	}
+	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
 
 need_resched:
 	preempt_disable();
@@ -3223,7 +3224,6 @@ static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 				policy != SCHED_NORMAL)
 			goto out_unlock;
 	}
-	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
 
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are
