@@ -348,7 +348,7 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 	set_bit(usage->type, input->evbit);
 
 	while (usage->code <= max && test_and_set_bit(usage->code, bit)) {
-		usage->code = find_next_zero_bit(bit, max + 1, usage->code);
+		usage->code = find_next_zero_bit(bit, usage->code, max + 1);
 	}
 
 	if (usage->code > max) return;
