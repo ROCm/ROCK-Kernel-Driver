@@ -789,7 +789,7 @@ static void prom_initialize_dart_table(void)
 	/* 16MB (1 << 24) alignment. We allocate a full 16Mb chuck since we
 	 * will blow up an entire large page anyway in the kernel mapping
 	 */
-	RELOC(dart_tablebase) =
+	RELOC(dart_tablebase) = (unsigned long)
 		abs_to_virt(lmb_alloc_base(1UL<<24, 1UL<<24, 0x80000000L));
 
 	prom_print(RELOC("Dart at: "));
@@ -2202,10 +2202,12 @@ interpret_dbdma_props(struct device_node *np, unsigned long mem_start,
 	struct device_node *db;
 
 	base_address = 0;
-	for (db = np->parent; db != NULL; db = db->parent) {
-		if (!strcmp(db->type, "dbdma") && db->n_addrs != 0) {
-			base_address = db->addrs[0].address;
-			break;
+	if (!measure_only) {
+		for (db = np->parent; db != NULL; db = db->parent) {
+			if (!strcmp(db->type, "dbdma") && db->n_addrs != 0) {
+				base_address = db->addrs[0].address;
+				break;
+			}
 		}
 	}
 
@@ -2240,10 +2242,12 @@ interpret_macio_props(struct device_node *np, unsigned long mem_start,
 	struct device_node *db;
 
 	base_address = 0;
-	for (db = np->parent; db != NULL; db = db->parent) {
-		if (!strcmp(db->type, "mac-io") && db->n_addrs != 0) {
-			base_address = db->addrs[0].address;
-			break;
+	if (!measure_only) {
+		for (db = np->parent; db != NULL; db = db->parent) {
+			if (!strcmp(db->type, "mac-io") && db->n_addrs != 0) {
+				base_address = db->addrs[0].address;
+				break;
+			}
 		}
 	}
 
