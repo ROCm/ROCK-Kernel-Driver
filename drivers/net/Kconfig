@@ -883,7 +883,7 @@ source "drivers/net/tulip/Kconfig"
 
 config AT1700
 	tristate "AT1700/1720/RE1000Plus(C-Bus) support (EXPERIMENTAL)"
-	depends on NET_ETHERNET && (ISA || MCA) && EXPERIMENTAL
+	depends on NET_ETHERNET && (ISA || MCA_LEGACY) && EXPERIMENTAL
 	select CRC32
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read
