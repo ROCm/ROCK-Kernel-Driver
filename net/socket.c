@@ -726,9 +726,11 @@ int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	unlock_kernel();
 	sock = SOCKET_I(inode);
+#ifdef CONFIG_NET
 	if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
 		err = dev_ioctl(cmd, (void *)arg);
 	} else
+#endif  /* CONFIG_NET */
 #ifdef WIRELESS_EXT
 	if (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST) {
 		err = dev_ioctl(cmd, (void *)arg);
