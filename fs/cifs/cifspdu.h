@@ -768,8 +768,8 @@ typedef struct smb_com_lock_rsp {
 
 typedef struct smb_com_rename_req {
 	struct smb_hdr hdr;	/* wct = 1 */
-	__u16 SearchAttributes;	/* target file attributes */
-	__u16 ByteCount;
+	__le16 SearchAttributes;	/* target file attributes */
+	__le16 ByteCount;
 	__u8 BufferFormat;	/* 4 = ASCII or Unicode */
 	unsigned char OldFileName[1];
 	/* followed by __u8 BufferFormat2 */

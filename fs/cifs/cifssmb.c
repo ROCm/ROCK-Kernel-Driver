@@ -899,6 +899,7 @@ CIFSSMBRename(const int xid, struct cifsTconInfo *tcon,
 	RENAME_RSP *pSMBr = NULL;
 	int bytes_returned;
 	int name_len, name_len2;
+	__u16 count;
 
 	cFYI(1, ("In CIFSSMBRename"));
 renameRetry:
@@ -940,9 +941,9 @@ renameRetry:
 		name_len2++;	/* signature byte */
 	}
 
-	pSMB->ByteCount = 1 /* 1st signature byte */  + name_len + name_len2;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	count = 1 /* 1st signature byte */  + name_len + name_len2;
+	pSMB->hdr.smb_buf_length += count;
+	pSMB->ByteCount = cpu_to_le16(count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
