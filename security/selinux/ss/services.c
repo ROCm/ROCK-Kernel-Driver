@@ -1341,8 +1341,6 @@ int security_get_user_sids(u32 fromsid,
 			if (!ebitmap_get_bit(&role->types, j))
 				continue;
 			usercon.type = j+1;
-			if (usercon.type == fromcon->type)
-				continue;
 			mls_for_user_ranges(user,usercon) {
 				rc = context_struct_compute_av(fromcon, &usercon,
 							       SECCLASS_PROCESS,
