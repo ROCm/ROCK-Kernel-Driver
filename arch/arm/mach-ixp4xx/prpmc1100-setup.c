@@ -84,6 +84,7 @@ MACHINE_START(PRPMC1100, "Motorola PrPMC1100")
                 IXP4XX_PERIPHERAL_BASE_VIRT)
         MAPIO(prpmc1100_map_io)
         INITIRQ(ixp4xx_init_irq)
+	INITTIME(ixp4xx_init_time)
         BOOT_PARAMS(0x0100)
 	INIT_MACHINE(prpmc1100_init)
 MACHINE_END

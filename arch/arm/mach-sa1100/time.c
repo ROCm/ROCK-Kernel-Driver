@@ -78,19 +78,21 @@ sa1100_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned int next_match;
 
 	do {
-		do_leds();
-		do_timer(regs);
+		timer_tick(regs);
 		OSSR = OSSR_M0;  /* Clear match on timer 0 */
 		next_match = (OSMR0 += LATCH);
-		do_set_rtc();
 	} while ((signed long)(next_match - OSCR) <= 0);
-
-	do_profile(regs);
 
 	return IRQ_HANDLED;
 }
 
-void __init time_init(void)
+static struct irqaction sa1100_timer_irq = {
+	.name		= "SA11xx Timer Tick",
+	.flags		= SA_INTERRUPT,
+	.handler	= sa1100_timer_interrupt
+};
+
+void __init sa1100_init_time(void)
 {
 	struct timespec tv;
 
@@ -101,10 +103,9 @@ void __init time_init(void)
 	tv.tv_sec = sa1100_get_rtc_time();
 	do_settimeofday(&tv);
 
-	timer_irq.handler = sa1100_timer_interrupt;
 	OSMR0 = 0;		/* set initial match at 0 */
 	OSSR = 0xf;		/* clear status on all timers */
-	setup_irq(IRQ_OST0, &timer_irq);
+	setup_irq(IRQ_OST0, &sa1100_timer_irq);
 	OIER |= OIER_E0;	/* enable match on timer 0 to cause interrupts */
 	OSCR = 0;		/* initialize free-running timer, force first match */
 }
