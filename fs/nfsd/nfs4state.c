@@ -1750,6 +1750,8 @@ nfsd4_open_confirm(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfs
 	status = nfs_ok;
 	first_state(sop->so_client);
 out:
+	if (oc->oc_stateowner)
+		nfs4_get_stateowner(oc->oc_stateowner);
 	return status;
 }
 
@@ -1827,6 +1829,8 @@ nfsd4_open_downgrade(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct n
 	memcpy(&od->od_stateid, &stp->st_stateid, sizeof(stateid_t));
 	status = nfs_ok;
 out:
+	if (od->od_stateowner)
+		nfs4_get_stateowner(od->od_stateowner);
 	return status;
 }
 
@@ -1861,6 +1865,8 @@ nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_clos
 	/* release_state_owner() calls nfsd_close() if needed */
 	release_state_owner(stp, &close->cl_stateowner, OPEN_STATE);
 out:
+	if (close->cl_stateowner)
+		nfs4_get_stateowner(close->cl_stateowner);
 	return status;
 }
 
@@ -2161,6 +2167,7 @@ nfsd4_lock(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock 
 		if ((lock_stp = alloc_init_lock_stateid(lock->lk_stateowner, 
 						fp, open_stp)) == NULL) {
 			release_stateowner(lock->lk_stateowner);
+			lock->lk_stateowner = NULL;
 			goto out;
 		}
 		/* bump the open seqid used to create the lock */
@@ -2259,6 +2266,8 @@ out_destroy_new_stateid:
 		release_state_owner(lock_stp, &lock->lk_stateowner, LOCK_STATE);
 	}
 out:
+	if (lock->lk_stateowner)
+		nfs4_get_stateowner(lock->lk_stateowner);
 	return status;
 }
 
@@ -2410,6 +2419,8 @@ nfsd4_locku(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_lock
 	memcpy(&locku->lu_stateid, &stp->st_stateid, sizeof(stateid_t));
 
 out:
+	if (locku->lu_stateowner)
+		nfs4_get_stateowner(locku->lu_stateowner);
 	return status;
 
 out_nfserr:

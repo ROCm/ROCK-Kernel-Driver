@@ -201,7 +201,7 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 			status = NFSERR_REPLAY_ME;
 	}
 	if (status)
-		return status;
+		goto out;
 	if (open->op_claim_type == NFS4_OPEN_CLAIM_NULL) {
 	/*
 	 * This block of code will (1) set CURRENT_FH to the file being opened,
@@ -211,7 +211,7 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	 */
 		status = do_open_lookup(rqstp, current_fh, open);
 		if (status)
-			return status;
+			goto out;
 	} else if (open->op_claim_type == NFS4_OPEN_CLAIM_PREVIOUS) {
 	/*
 	* The CURRENT_FH is already set to the file being opened. This
@@ -221,10 +221,11 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	*/
 		status = do_open_fhandle(rqstp, current_fh, open);
 		if (status)
-			return status;
+			goto out;
 	} else {
 		printk("NFSD: unsupported OPEN claim type\n");
-		return nfserr_inval;
+		status = nfserr_inval;
+		goto out;
 	}
 	/*
 	 * nfsd4_process_open2() does the actual opening of the file.  If
@@ -232,9 +233,10 @@ nfsd4_open(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_open 
 	 * set, (2) sets open->op_stateid, (3) sets open->op_delegation.
 	 */
 	status = nfsd4_process_open2(rqstp, current_fh, open);
-	if (status)
-		return status;
-	return 0;
+out:
+	if (open->op_stateowner)
+		nfs4_get_stateowner(open->op_stateowner);
+	return status;
 }
 
 /*
@@ -785,6 +787,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	struct nfsd4_op	*op;
 	struct svc_fh	*current_fh = NULL;
 	struct svc_fh	*save_fh = NULL;
+	struct nfs4_stateowner *replay_owner = NULL;
 	int		slack_space;    /* in words, not bytes! */
 	int		status;
 
@@ -864,9 +867,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_CLOSE:
 			op->status = nfsd4_close(rqstp, current_fh, &op->u.close);
-			if (op->u.close.cl_stateowner)
-				op->replay =
-					&op->u.close.cl_stateowner->so_replay;
+			replay_owner = op->u.close.cl_stateowner;
 			break;
 		case OP_COMMIT:
 			op->status = nfsd4_commit(rqstp, current_fh, &op->u.commit);
@@ -885,18 +886,14 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_LOCK:
 			op->status = nfsd4_lock(rqstp, current_fh, &op->u.lock);
-			if (op->u.lock.lk_stateowner)
-				op->replay =
-					&op->u.lock.lk_stateowner->so_replay;
+			replay_owner = op->u.lock.lk_stateowner;
 			break;
 		case OP_LOCKT:
 			op->status = nfsd4_lockt(rqstp, current_fh, &op->u.lockt);
 			break;
 		case OP_LOCKU:
 			op->status = nfsd4_locku(rqstp, current_fh, &op->u.locku);
-			if (op->u.locku.lu_stateowner)
-				op->replay =
-					&op->u.locku.lu_stateowner->so_replay;
+			replay_owner = op->u.locku.lu_stateowner;
 			break;
 		case OP_LOOKUP:
 			op->status = nfsd4_lookup(rqstp, current_fh, &op->u.lookup);
@@ -911,21 +908,15 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_OPEN:
 			op->status = nfsd4_open(rqstp, current_fh, &op->u.open);
-			if (op->u.open.op_stateowner)
-				op->replay =
-					&op->u.open.op_stateowner->so_replay;
+			replay_owner = op->u.open.op_stateowner;
 			break;
 		case OP_OPEN_CONFIRM:
 			op->status = nfsd4_open_confirm(rqstp, current_fh, &op->u.open_confirm);
-			if (op->u.open_confirm.oc_stateowner)
-				op->replay =
-					&op->u.open_confirm.oc_stateowner->so_replay;
+			replay_owner = op->u.open_confirm.oc_stateowner;
 			break;
 		case OP_OPEN_DOWNGRADE:
 			op->status = nfsd4_open_downgrade(rqstp, current_fh, &op->u.open_downgrade);
-			if (op->u.open_downgrade.od_stateowner)
-				op->replay =
-					&op->u.open_downgrade.od_stateowner->so_replay;
+			replay_owner = op->u.open_downgrade.od_stateowner;
 			break;
 		case OP_PUTFH:
 			op->status = nfsd4_putfh(rqstp, current_fh, &op->u.putfh);
@@ -984,11 +975,16 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 
 encode_op:
 		if (op->status == NFSERR_REPLAY_ME) {
+			op->replay = &replay_owner->so_replay;
 			nfsd4_encode_replay(resp, op);
 			status = op->status = op->replay->rp_status;
 		} else {
 			nfsd4_encode_operation(resp, op);
 			status = op->status;
+		}
+		if (replay_owner && (replay_owner != (void *)(-1))) {
+			nfs4_put_stateowner(replay_owner);
+			replay_owner = NULL;
 		}
 	}
 
