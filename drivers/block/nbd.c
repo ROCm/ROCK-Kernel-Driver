@@ -65,10 +65,8 @@ static spinlock_t nbd_lock = SPIN_LOCK_UNLOCKED;
 /* #define DEBUG( s ) printk( s ) 
  */
 
-#ifdef PARANOIA
 static int requests_in;
 static int requests_out;
-#endif
 
 static int nbd_open(struct inode *inode, struct file *file)
 {
@@ -261,18 +259,8 @@ void nbd_do_it(struct nbd_device *lo)
 			printk(KERN_ALERT "req should never be null\n" );
 			goto out;
 		}
-#ifdef PARANOIA
-		if (lo != req->rq_disk->private_data) {
-			printk(KERN_ALERT "NBD: request corrupted!\n");
-			continue;
-		}
-		if (lo->magic != LO_MAGIC) {
-			printk(KERN_ALERT "NBD: nbd_dev[] corrupted: Not enough magic\n");
-			goto out;
-		}
-#endif
+		BUG_ON(lo->magic != LO_MAGIC);
 		nbd_end_request(req);
-
 	}
  out:
 	return;
@@ -282,12 +270,7 @@ void nbd_clear_que(struct nbd_device *lo)
 {
 	struct request *req;
 
-#ifdef PARANOIA
-	if (lo->magic != LO_MAGIC) {
-		printk(KERN_ERR "NBD: nbd_dev[] corrupted: Not enough magic when clearing!\n");
-		return;
-	}
-#endif
+	BUG_ON(lo->magic != LO_MAGIC);
 
 	do {
 		req = NULL;
@@ -333,11 +316,9 @@ static void do_nbd_request(request_queue_t * q)
 			if (lo->flags & NBD_READ_ONLY)
 				FAIL("Write on read-only");
 		}
-#ifdef PARANOIA
-		if (lo->magic != LO_MAGIC)
-			FAIL("nbd[] is not magical!");
+		BUG_ON(lo->magic != LO_MAGIC);
 		requests_in++;
-#endif
+
 		req->errors = 0;
 		blkdev_dequeue_request(req);
 		spin_unlock_irq(q->queue_lock);
