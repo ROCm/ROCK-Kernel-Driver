@@ -122,6 +122,7 @@
 	version 1.0.17:
 		* only do cable_magic on 83815 and early 83816 (Tim Hockin)
 		* create a function for rx refill (Manfred Spraul)
+		* combine drain_ring and init_ring (Manfred Spraul)
 
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
@@ -680,8 +681,10 @@ static void tx_timeout(struct net_device *dev);
 static int alloc_ring(struct net_device *dev);
 static void refill_rx(struct net_device *dev);
 static void init_ring(struct net_device *dev);
+static void drain_tx(struct net_device *dev);
 static void drain_ring(struct net_device *dev);
 static void free_ring(struct net_device *dev);
+static void reinit_ring(struct net_device *dev);
 static void init_registers(struct net_device *dev);
 static int start_tx(struct sk_buff *skb, struct net_device *dev);
 static void intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
@@ -1389,8 +1392,7 @@ static void tx_timeout(struct net_device *dev)
 		dump_ring(dev);
 
 		natsemi_reset(dev);
-		drain_ring(dev);
-		init_ring(dev);
+		reinit_ring(dev);
 		init_registers(dev);
 	} else {
 		printk(KERN_WARNING 
@@ -1480,6 +1482,23 @@ static void init_ring(struct net_device *dev)
 	dump_ring(dev);
 }
 
+static void drain_tx(struct net_device *dev)
+{
+	struct netdev_private *np = dev->priv;
+	int i;
+ 
+	for (i = 0; i < TX_RING_SIZE; i++) {
+		if (np->tx_skbuff[i]) {
+			pci_unmap_single(np->pci_dev,
+				np->rx_dma[i], np->rx_skbuff[i]->len,
+				PCI_DMA_TODEVICE);
+			dev_kfree_skb(np->tx_skbuff[i]);
+			np->stats.tx_dropped++;
+		}
+		np->tx_skbuff[i] = NULL;
+	}
+}
+
 static void drain_ring(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
@@ -1498,16 +1517,7 @@ static void drain_ring(struct net_device *dev)
 		}
 		np->rx_skbuff[i] = NULL;
 	}
-	for (i = 0; i < TX_RING_SIZE; i++) {
-		if (np->tx_skbuff[i]) {
-			pci_unmap_single(np->pci_dev,
-						np->rx_dma[i],
-						np->rx_skbuff[i]->len,
-						PCI_DMA_TODEVICE);
-			dev_kfree_skb(np->tx_skbuff[i]);
-		}
-		np->tx_skbuff[i] = NULL;
-	}
+	drain_tx(dev);
 }
 
 static void free_ring(struct net_device *dev)
@@ -1516,6 +1526,28 @@ static void free_ring(struct net_device *dev)
 	pci_free_consistent(np->pci_dev,
 				sizeof(struct netdev_desc) * (RX_RING_SIZE+TX_RING_SIZE),
 				np->rx_ring, np->ring_dma);
+}
+
+static void reinit_ring(struct net_device *dev)
+{
+	struct netdev_private *np = dev->priv;
+	int i;
+
+	/* drain TX ring */
+	drain_tx(dev);
+	np->dirty_tx = np->cur_tx = 0;
+	for (i=0;i<TX_RING_SIZE;i++)
+		np->tx_ring[i].cmd_status = 0;
+
+	/* RX Ring */
+	np->dirty_rx = 0;
+	np->cur_rx = RX_RING_SIZE;
+	np->rx_head_desc = &np->rx_ring[0];
+	/* Initialize all Rx descriptors. */
+	for (i = 0; i < RX_RING_SIZE; i++)
+		np->rx_ring[i].cmd_status = cpu_to_le32(DescOwn);
+
+	refill_rx(dev);
 }
 
 static int start_tx(struct sk_buff *skb, struct net_device *dev)
