@@ -770,6 +770,8 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount;
 	}
 	percpu_counter_init(&sbi->s_freeblocks_counter);
+	percpu_counter_init(&sbi->s_freeinodes_counter);
+	percpu_counter_init(&sbi->s_dirs_counter);
 	bgl_lock_init(&sbi->s_blockgroup_lock);
 	sbi->s_debts = kmalloc(sbi->s_groups_count * sizeof(*sbi->s_debts),
 			       GFP_KERNEL);
@@ -794,7 +796,6 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount2;
 	}
 	sbi->s_gdb_count = db_count;
-	sbi->s_dir_count = ext2_count_dirs(sb);
 	get_random_bytes(&sbi->s_next_generation, sizeof(u32));
 	/*
 	 * set up enough so that it can read an inode
@@ -818,6 +819,10 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	ext2_setup_super (sb, es, sb->s_flags & MS_RDONLY);
 	percpu_counter_mod(&sbi->s_freeblocks_counter,
 				ext2_count_free_blocks(sb));
+	percpu_counter_mod(&sbi->s_freeinodes_counter,
+				ext2_count_free_inodes(sb));
+	percpu_counter_mod(&sbi->s_dirs_counter,
+				ext2_count_dirs(sb));
 	return 0;
 failed_mount2:
 	for (i = 0; i < db_count; i++)
@@ -845,6 +850,7 @@ static void ext2_commit_super (struct super_block * sb,
 static void ext2_sync_super(struct super_block *sb, struct ext2_super_block *es)
 {
 	es->s_free_blocks_count = cpu_to_le32(ext2_count_free_blocks(sb));
+	es->s_free_inodes_count = cpu_to_le32(ext2_count_free_inodes(sb));
 	es->s_wtime = cpu_to_le32(get_seconds());
 	mark_buffer_dirty(EXT2_SB(sb)->s_sbh);
 	sync_dirty_buffer(EXT2_SB(sb)->s_sbh);
@@ -874,6 +880,7 @@ void ext2_write_super (struct super_block * sb)
 			es->s_state = cpu_to_le16(le16_to_cpu(es->s_state) &
 						  ~EXT2_VALID_FS);
 			es->s_free_blocks_count = cpu_to_le32(ext2_count_free_blocks(sb));
+			es->s_free_inodes_count = cpu_to_le32(ext2_count_free_inodes(sb));
 			es->s_mtime = cpu_to_le32(get_seconds());
 			ext2_sync_super(sb, es);
 		} else

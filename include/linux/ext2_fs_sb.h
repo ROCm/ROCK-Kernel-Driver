@@ -49,6 +49,8 @@ struct ext2_sb_info {
 	unsigned long s_dir_count;
 	u8 *s_debts;
 	struct percpu_counter s_freeblocks_counter;
+	struct percpu_counter s_freeinodes_counter;
+	struct percpu_counter s_dirs_counter;
 	struct blockgroup_lock s_blockgroup_lock;
 };
 
