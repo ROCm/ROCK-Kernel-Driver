@@ -101,7 +101,7 @@ static void mce_panic(char *msg, struct mce *backup, unsigned long start)
 		if (time_before(tsc, start))
 			continue;
 		print_mce(&mcelog.entry[i]); 
-		if (mcelog.entry[i].tsc == backup->tsc)
+		if (backup && mcelog.entry[i].tsc == backup->tsc)
 			backup = NULL;
 	}
 	if (backup)
