@@ -3512,8 +3512,10 @@ EXPORT_SYMBOL(kdb_register_repeat);
 EXPORT_SYMBOL(kdb_unregister);
 EXPORT_SYMBOL(kdb_getarea_size);
 EXPORT_SYMBOL(kdb_putarea_size);
+#if defined(__i386__) || defined(__ia64__)
 EXPORT_SYMBOL(kdb_getuserarea_size);
 EXPORT_SYMBOL(kdb_putuserarea_size);
+#endif
 EXPORT_SYMBOL(kdb_getword);
 EXPORT_SYMBOL(kdb_putword);
 EXPORT_SYMBOL(kdbgetularg);

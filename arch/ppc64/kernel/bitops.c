@@ -3,6 +3,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 
@@ -136,3 +137,4 @@ found_first:
 found_middle:
         return result + ext2_ffz(tmp);
 }
+EXPORT_SYMBOL(find_next_bit);

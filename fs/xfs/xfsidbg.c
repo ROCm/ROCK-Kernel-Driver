@@ -2510,11 +2510,11 @@ print_pagebuf(
 	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
 		pb->pb_page_count, pb->pb_offset,
 		pb->pb_pages);
-	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
+/*	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
 		   pb->pb_iodonesema.count.counter,
 		   pb->pb_iodonesema.sleepers,
 		   pb->pb_sema.count.counter, pb->pb_sema.sleepers,
-		   pb->pb_pin_count.counter);
+		   pb->pb_pin_count.counter);*/
 #ifdef PAGEBUF_LOCK_TRACKING
 	kdb_printf("  last holder %d\n", pb->pb_last_holder);
 #endif
@@ -6438,8 +6438,8 @@ xfsidbg_xlog(xlog_t *log)
 	kdb_printf("iclog_bak: 0x%p  iclog_size: 0x%x (%d)  num iclogs: %d\n",
 		log->l_iclog_bak, log->l_iclog_size, log->l_iclog_size,
 		log->l_iclog_bufs);
-	kdb_printf("l_stripemask %d l_iclog_hsize %d l_iclog_heads %d\n",
-		log->l_stripemask, log->l_iclog_hsize, log->l_iclog_heads);
+/*	kdb_printf("l_stripemask %d l_iclog_hsize %d l_iclog_heads %d\n",
+		log->l_stripemask, log->l_iclog_hsize, log->l_iclog_heads);*/
 	kdb_printf("l_sectbb_log %u l_sectbb_mask %u\n",
 		log->l_sectbb_log, log->l_sectbb_mask);
 	kdb_printf("&grant_lock: 0x%p  resHeadQ: 0x%p  wrHeadQ: 0x%p\n",
