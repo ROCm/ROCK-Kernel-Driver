@@ -130,8 +130,8 @@ c_flags        = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 	         $(basename_flags) $(modname_flags) $(export_flags) 
 
 # Finds the multi-part object the current object will be linked into
-modname-multi = $(subst $(space),_,$(strip $(foreach m,$(multi-used),\
-		$(if $(filter $(*F).o,$($(m:.o=-objs))),$(m:.o=)))))
+modname-multi = $(subst $(space),_,$(sort $(foreach m,$(multi-used),\
+		$(if $(filter $(subst $(obj)/,,$*.o), $($(m:.o=-objs)) $($(m:.o=-y))),$(m:.o=)))))
 
 # Shipped files
 # ===========================================================================
