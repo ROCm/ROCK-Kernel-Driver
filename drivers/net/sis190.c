@@ -536,6 +536,7 @@ SiS190_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	static int printed_version = 0;
 	int i, rc;
 	u16 reg31;
+	int val;
 
 	assert(pdev != NULL);
 	assert(ent != NULL);
@@ -620,7 +621,7 @@ SiS190_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	       dev->dev_addr[2], dev->dev_addr[3],
 	       dev->dev_addr[4], dev->dev_addr[5], dev->irq);
 
-	int val = smdio_read(ioaddr, PHY_AUTO_NEGO_REG);
+	val = smdio_read(ioaddr, PHY_AUTO_NEGO_REG);
 
 	printk(KERN_INFO "%s: Auto-negotiation Enabled.\n", dev->name);
 
