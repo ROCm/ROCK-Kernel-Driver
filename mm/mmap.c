@@ -369,6 +369,8 @@ static inline int is_mergeable_vma(struct vm_area_struct *vma,
 		return 0;
 	if (vma->vm_flags != vm_flags)
 		return 0;
+	if (vma->vm_private_data)
+		return 0;
 	return 1;
 }
 
