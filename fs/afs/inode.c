@@ -93,9 +93,10 @@ static int afs_inode_map_status(struct afs_vnode *vnode)
 
 /*****************************************************************************/
 /*
- * attempt to fetch the status of an inode, coelescing multiple simultaneous fetches
+ * attempt to fetch the status of an inode, coelescing multiple simultaneous
+ * fetches
  */
-int afs_inode_fetch_status(struct inode *inode)
+static int afs_inode_fetch_status(struct inode *inode)
 {
 	struct afs_vnode *vnode;
 	int ret;
