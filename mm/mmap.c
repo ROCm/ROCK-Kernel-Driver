@@ -1484,6 +1484,9 @@ static void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
 	unsigned long last = end + PGDIR_SIZE - 1;
 	struct mm_struct *mm = tlb->mm;
 
+	if (last > TASK_SIZE || last < end)
+		last = TASK_SIZE;
+
 	if (!prev) {
 		prev = mm->mmap;
 		if (!prev)
