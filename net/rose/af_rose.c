@@ -1434,7 +1434,7 @@ static struct proto_ops rose_proto_ops = {
 	.family		=	PF_ROSE,
 
 	.release	=	rose_release,
-	.bind		=		rose_bind,
+	.bind		=	rose_bind,
 	.connect	=	rose_connect,
 	.socketpair	=	sock_no_socketpair,
 	.accept		=	rose_accept,

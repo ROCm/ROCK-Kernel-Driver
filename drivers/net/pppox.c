@@ -127,17 +127,13 @@ static int pppox_create(struct socket *sock, int protocol)
 }
 
 static struct net_proto_family pppox_proto_family = {
-	PF_PPPOX,
-	pppox_create
+	.family	= PF_PPPOX,
+	.create	= pppox_create,
 };
 
 static int __init pppox_init(void)
 {
-	int err = 0;
-
-	err = sock_register(&pppox_proto_family);
-
-	return err;
+	return sock_register(&pppox_proto_family);
 }
 
 static void __exit pppox_exit(void)

@@ -2103,7 +2103,7 @@ static struct proto_ops l2cap_sock_ops = {
 
 static struct net_proto_family l2cap_sock_family_ops = {
 	.family =       PF_BLUETOOTH,
-	.create	=       l2cap_sock_create
+	.create	=       l2cap_sock_create,
 };
 
 static struct hci_proto l2cap_hci_proto = {
