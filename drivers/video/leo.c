@@ -626,6 +626,9 @@ int __init leo_init(void)
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev;
 
+	if (fb_get_options("leofb", NULL))
+		return -ENODEV;
+
 	for_all_sbusdev(sdev, sbus) {
 		if (!strcmp(sdev->prom_name, "leo"))
 			leo_init_one(sdev);

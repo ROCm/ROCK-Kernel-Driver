@@ -1989,7 +1989,11 @@ static void __exit i810fb_remove_pci(struct pci_dev *dev)
 #ifndef MODULE
 int __init i810fb_init(void)
 {
-	i810fb_setup(fb_get_options("i810fb"));
+	char *option = NULL;
+
+	if (fb_get_options("i810fb", &option))
+		return -ENODEV;
+	i810fb_setup(option);
 
 	if (agp_intel_init()) {
 		printk("i810fb_init: cannot initialize intel agpgart\n");

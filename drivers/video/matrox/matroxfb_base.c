@@ -2415,9 +2415,13 @@ static int __initdata initialized = 0;
 
 int __init matroxfb_init(void)
 {
+	char *option = NULL;
+
 	DBG(__FUNCTION__)
 
-	matroxfb_setup(fb_get_options("matroxfb"));
+	if (fb_get_options("matroxfb", &option))
+		return -ENODEV;
+	matroxfb_setup(option);
 
 	if (disabled)
 		return -ENXIO;

@@ -247,10 +247,15 @@ int __init offb_init(void)
 {
 	struct device_node *dp;
 	unsigned int dpy;
+	char *option = NULL;
 #if defined(CONFIG_BOOTX_TEXT) && defined(CONFIG_PPC32)
 	struct device_node *displays = find_type_devices("display");
 	struct device_node *macos_display = NULL;
+#endif
+	if (fb_get_options("offb", NULL))
+		return -ENODEV;
 
+#if defined(CONFIG_BOOTX_TEXT) && defined(CONFIG_PPC32)
 	/* If we're booted from BootX... */
 	if (prom_num_displays == 0 && boot_infos != 0) {
 		unsigned long addr =

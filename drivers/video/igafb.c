@@ -381,6 +381,9 @@ int __init igafb_init(void)
 	unsigned long addr;
 	int size, iga2000 = 0;
 
+	if (fb_get_options("igafb", NULL))
+		return -ENODEV;
+
         /* Do not attach when we have a serial console. */
         if (!con_is_present())
                 return -ENXIO;

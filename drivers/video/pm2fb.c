@@ -1220,7 +1220,11 @@ int __init pm2fb_setup(char *options);
 int __init pm2fb_init(void)
 {
 #ifndef MODULE
-	pm2fb_setup(fb_get_options("pm2fb"));
+	char *option = NULL;
+
+	if (fb_get_options("pm2fb", &option))
+		return -ENODEV;
+	pm2fb_setup(option);
 #endif
 
 	return pci_module_init(&pm2fb_driver);

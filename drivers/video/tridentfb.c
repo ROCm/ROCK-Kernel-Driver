@@ -1223,7 +1223,11 @@ int tridentfb_setup(char *options);
 int __init tridentfb_init(void)
 {
 #ifndef MODULE
-	tridentfb_setup(fb_get_options("tridentfb"));
+	char *option = NULL;
+
+	if (fb_get_options("tridentfb", &option))
+		return -ENODEV;
+	tridentfb_setup(option);
 #endif
 	output("Trident framebuffer %s initializing\n", VERSION);
 	return pci_module_init(&tridentfb_pci_driver);

@@ -584,6 +584,9 @@ int __init cg14_init(void)
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev;
 
+	if (fb_get_options("cg14fb", NULL))
+		return -ENODEV;
+
 #ifdef CONFIG_SPARC32
 	{
 		int root, node;

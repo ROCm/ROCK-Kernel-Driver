@@ -2268,7 +2268,11 @@ int __init neofb_setup(char *options)
 int __init neofb_init(void)
 {
 #ifndef MODULE
-	neofb_setup(fb_get_options("neofb"));
+	char *option = NULL;
+
+	if (fb_get_options("neofb", &option))
+		return -ENODEV;
+	neofb_setup(option);
 #endif
 	return pci_register_driver(&neofb_driver);
 }

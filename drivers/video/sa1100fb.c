@@ -1804,6 +1804,9 @@ static struct device_driver sa1100fb_driver = {
 
 int __init sa1100fb_init(void)
 {
+	if (fb_get_options("sa1100fb", NULL))
+		return -ENODEV;
+
 	return driver_register(&sa1100fb_driver);
 }
 

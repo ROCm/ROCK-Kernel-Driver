@@ -2141,7 +2141,11 @@ static struct pci_driver rivafb_driver = {
 int __devinit rivafb_init(void)
 {
 #ifndef MODULE
-	rivafb_setup(fb_get_options("rivafb"));
+	char *option = NULL;
+
+	if (fb_get_options("rivafb", &option))
+		return -ENODEV;
+	rivafb_setup(option);
 #endif
 	if (pci_register_driver(&rivafb_driver) > 0)
 		return 0;

@@ -668,7 +668,11 @@ static struct of_platform_driver platinum_driver =
 int __init platinumfb_init(void)
 {
 #ifndef MODULE
-	platinumfb_setup(fb_get_options("platinumfb"));
+	char *option = NULL;
+
+	if (fb_get_options("platinumfb", &option))
+		return -ENODEV;
+	platinumfb_setup(option);
 #endif
 	of_register_driver(&platinum_driver);
 

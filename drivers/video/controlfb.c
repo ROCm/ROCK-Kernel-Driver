@@ -556,8 +556,11 @@ static void control_set_hardware(struct fb_info_control *p, struct fb_par_contro
 int __init control_init(void)
 {
 	struct device_node *dp;
+	char *option = NULL;
 
-	control_setup(fb_get_options("controlfb"));
+	if (fb_get_options("controlfb", &option))
+		return -ENODEV;
+	control_setup(option);
 
 	dp = find_devices("control");
 	if (dp != 0 && !control_of_init(dp))

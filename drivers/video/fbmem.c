@@ -1296,6 +1296,7 @@ module_init(fbmem_init);
 
 #define NR_FB_DRIVERS 64
 static char *video_options[NR_FB_DRIVERS];
+static int ofonly;
 
 /**
  * fb_get_options - get kernel boot parameters
@@ -1305,30 +1306,35 @@ static char *video_options[NR_FB_DRIVERS];
  *
  * NOTE: Needed to maintain backwards compatibility
  */
-char* fb_get_options(char *name)
+int fb_get_options(char *name, char **option)
 {
-	char *option = NULL;
-	char *opt;
-	int opt_len;
+	char *opt, *options = NULL;
+	int opt_len, retval = 0;
 	int name_len = strlen(name), i;
 
-	if (!name_len)
-		return option;
+	if (name_len && ofonly && strncmp(name, "offb", 4))
+		retval = 1;
 
-	for (i = 0; i < NR_FB_DRIVERS; i++) {
-		if (video_options[i] == NULL)
-			continue;
-		opt_len = strlen(video_options[i]);
-		if (!opt_len)
-			continue;
-		opt = video_options[i];
-		if (!strncmp(name, opt, name_len) &&
-		    opt[name_len] == ':') {
-			option = opt + name_len + 1;
-			break;
+	if (name_len && !retval) {
+		for (i = 0; i < NR_FB_DRIVERS; i++) {
+			if (video_options[i] == NULL)
+				continue;
+			opt_len = strlen(video_options[i]);
+			if (!opt_len)
+				continue;
+			opt = video_options[i];
+			if (!strncmp(name, opt, name_len) &&
+			    opt[name_len] == ':')
+				options = opt + name_len + 1;
 		}
 	}
-	return option;
+	if (options && !strncmp(options, "off", 3))
+		retval = 1;
+
+	if (option)
+		*option = options;
+
+	return retval;
 }
 
 /**
@@ -1353,6 +1359,8 @@ int __init video_setup(char *options)
 		return 0;
 
 	for (i = 0; i < NR_FB_DRIVERS; i++) {
+		if (!strncmp(options, "ofonly", 6))
+			ofonly = 1;
 		if (video_options[i] == NULL) {
 			video_options[i] = options;
 			break;

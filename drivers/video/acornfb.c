@@ -1291,8 +1291,12 @@ acornfb_init(void)
 	unsigned long size;
 	u_int h_sync, v_sync;
 	int rc, i;
+	char *option = NULL;
 
-	acornfb_setup(fb_get_options("acornfb"));
+	if (fb_get_options("acornfb", &option))
+		return -ENODEV;
+	acornfb_setup(option);
+
 	acornfb_init_fbinfo();
 
 	current_par.dev = &acornfb_device;

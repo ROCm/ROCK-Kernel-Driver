@@ -2607,7 +2607,11 @@ int __init cirrusfb_init(void)
 	int error = 0;
 
 #ifndef MODULE
-	cirrusfb_setup(fb_get_options("cirrusfb"));
+	char *option = NULL;
+
+	if (fb_get_options("cirrusfb", &option))
+		return -ENODEV;
+	cirrusfb_setup(option);
 #endif
 
 #ifdef CONFIG_ZORRO

@@ -1386,7 +1386,11 @@ stifb_init(void)
 	int i;
 	
 #ifndef MODULE
-	stifb_setup(fb_get_options("stifb"));
+	char *option = NULL;
+
+	if (fb_get_options("stifb", &option))
+		return -ENODEV;
+	stifb_setup(option);
 #endif
 	if (stifb_disabled) {
 		printk(KERN_INFO "stifb: disabled by \"stifb=off\" kernel parameter\n");

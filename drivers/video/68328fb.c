@@ -440,7 +440,11 @@ int __init mc68x328fb_setup(char *options)
 int __init mc68x328fb_init(void)
 {
 #ifndef MODULE
-	mc68x328fb_setup(fb_get_options("68328fb"));
+	char *option = NULL;
+
+	if (fb_get_options("68328fb", &option))
+		return -ENODEV;
+	mc68x328fb_setup(option);
 #endif
 	/*
 	 *  initialize the default mode from the LCD controller registers
