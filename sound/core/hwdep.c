@@ -214,7 +214,7 @@ static int snd_hwdep_dsp_load(snd_hwdep_t *hw, snd_hwdep_dsp_image_t *_info)
 	snd_hwdep_dsp_image_t info;
 	int err;
 	
-	if (! hw->ops.dsp_load || ! hw->ops.dsp_status)
+	if (! hw->ops.dsp_load)
 		return -ENXIO;
 	memset(&info, 0, sizeof(info));
 	if (copy_from_user(&info, _info, sizeof(info)))
