@@ -1,24 +1,24 @@
-/* 
+/*
  * Cryptographic API.
  *
  * Function for checking keys for the DES and Tripple DES Encryption
  * algorithms.
  *
- * Originally released as descore by Dana L. How <how@xxxxxxxxxxxxxxxx>.
- * Modified by Raimar Falke <rf13@xxxxxxxxxxxxxxxxx> for the Linux-Kernel.
+ * Originally released as descore by Dana L. How <how@isl.stanford.edu>.
+ * Modified by Raimar Falke <rf13@inf.tu-dresden.de> for the Linux-Kernel.
  * Derived from Cryptoapi and Nettle implementations, adapted for in-place
  * scatterlist interface.  Changed LGPL to GPL per section 3 of the LGPL.
  *
  * s390 Version:
  *   Copyright (C) 2003 IBM Deutschland GmbH, IBM Corporation
- *   Author(s): Thomas Spatzier (tspat@xxxxxxxxxx)
+ *   Author(s): Thomas Spatzier (tspat@de.ibm.com)
  *
  * Derived from "crypto/des.c"
  *   Copyright (c) 1992 Dana L. How.
- *   Copyright (c) Raimar Falke <rf13@xxxxxxxxxxxxxxxxx> 
- *   Copyright (c) Gisle S&#230;lensminde <gisle@xxxxxxxxx>
- *   Copyright (C) 2001 Niels Möller.
- *   Copyright (c) 2002 James Morris <jmorris@xxxxxxxxxxxxxxxx>
+ *   Copyright (c) Raimar Falke <rf13@inf.tu-dresden.de>
+ *   Copyright (c) Gisle Sflensminde <gisle@ii.uib.no>
+ *   Copyright (C) 2001 Niels Mvller.
+ *   Copyright (c) 2002 James Morris <jmorris@intercode.com.au>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -61,7 +61,7 @@ crypto_des_check_key(const u8 *key, unsigned int keylen, u32 *flags)
 	n |= parity[key[6]]; n <<= 4;
 	n |= parity[key[7]];
 	w = 0x88888888L;
-	
+
 	if ((*flags & CRYPTO_TFM_REQ_WEAK_KEY)
 	    && !((n - (w >> 3)) & w)) {  /* 1 in 10^10 keys passes this test */
 		if (n < 0x41415151) {

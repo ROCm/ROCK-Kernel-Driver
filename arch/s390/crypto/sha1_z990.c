@@ -9,16 +9,16 @@
  *
  * s390 Version:
  *   Copyright (C) 2003 IBM Deutschland GmbH, IBM Corporation
- *   Author(s): Thomas Spatzier (tspat@xxxxxxxxxx)
+ *   Author(s): Thomas Spatzier (tspat@de.ibm.com)
  *
  * Derived from "crypto/sha1.c"
  *   Copyright (c) Alan Smithee.
- *   Copyright (c) Andrew McDonald <andrew@xxxxxxxxxxxxxxx>
- *   Copyright (c) Jean-Francois Dive <jef@xxxxxxxxxxx>
+ *   Copyright (c) Andrew McDonald <andrew@mcdonald.org.uk>
+ *   Copyright (c) Jean-Francois Dive <jef@linuxbe.org>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option) 
+ * Software Foundation; either version 2 of the License, or (at your option)
  * any later version.
  *
  */
@@ -60,7 +60,7 @@ sha1_update(void *ctx, const u8 *data, unsigned int len)
 {
 	struct crypt_z990_sha1_ctx *sctx;
 	long imd_len;
-	
+
 	sctx = ctx;
 	sctx->count += len * 8; //message bit length
 
@@ -89,13 +89,13 @@ sha1_update(void *ctx, const u8 *data, unsigned int len)
 		sctx->buf_len += len;
 	}
 }
-	
-	
+
+
 static void
 pad_message(struct crypt_z990_sha1_ctx* sctx)
 {
 	int index;
-	
+
 	index = sctx->buf_len;
 	sctx->buf_len = (sctx->buf_len < 56)?
 		SHA1_BLOCK_SIZE:2 * SHA1_BLOCK_SIZE;
@@ -114,7 +114,7 @@ static void
 sha1_final(void* ctx, u8 *out)
 {
 	struct crypt_z990_sha1_ctx *sctx = ctx;
-	
+
 	//must perform manual padding
 	pad_message(sctx);
 	crypt_z990_kimd(KIMD_SHA_1, sctx->state, sctx->buffer, sctx->buf_len);
@@ -142,7 +142,7 @@ static int
 init(void)
 {
 	int ret = -ENOSYS;
-	
+
 	if (crypt_z990_func_available(KIMD_SHA_1)){
 		ret = crypto_register_alg(&alg);
 		if (ret == 0){

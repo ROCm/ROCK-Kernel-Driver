@@ -39,7 +39,7 @@ config CRYPTO_SHA1
 	depends on CRYPTO
 	help
 	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2).
-	  
+
 config CRYPTO_SHA1_Z990
 	tristate "SHA1 digest algorithm for IBM zSeries z990"
 	depends on CRYPTO && ARCH_S390

@@ -1,11 +1,11 @@
-/* 
+/*
  * Cryptographic API.
  *
  * z990 implementation of the DES Cipher Algorithm.
  *
  * Copyright (c) 2003 IBM Deutschland Entwicklung GmbH, IBM Corporation
- * Author(s): Thomas Spatzier (tspat@xxxxxxxxxx)
- * 
+ * Author(s): Thomas Spatzier (tspat@de.ibm.com)
+ *
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,7 +51,7 @@ des_setkey(void *ctx, const u8 *key, unsigned int keylen, u32 *flags)
 {
 	struct crypt_z990_des_ctx *dctx;
 	int ret;
-	
+
 	dctx = ctx;
 	//test if key is valid (not a weak key)
 	ret = crypto_des_check_key(key, keylen, flags);
@@ -66,7 +66,7 @@ static void
 des_encrypt(void *ctx, u8 *dst, const u8 *src)
 {
 	struct crypt_z990_des_ctx *dctx;
-	
+
 	dctx = ctx;
 	crypt_z990_km(KM_DEA_ENCRYPT, dctx->key, dst, src, DES_BLOCK_SIZE);
 }
@@ -75,7 +75,7 @@ static void
 des_decrypt(void *ctx, u8 *dst, const u8 *src)
 {
 	struct crypt_z990_des_ctx *dctx;
-	
+
 	dctx = ctx;
 	crypt_z990_km(KM_DEA_DECRYPT, dctx->key, dst, src, DES_BLOCK_SIZE);
 }
@@ -95,7 +95,7 @@ static struct crypto_alg des_alg = {
 	.cia_decrypt		=	des_decrypt } }
 };
 
-/* 
+/*
  * RFC2451:
  *
  *   For DES-EDE3, there is no known need to reject weak or
@@ -113,7 +113,7 @@ des3_128_setkey(void *ctx, const u8 *key, unsigned int keylen, u32 *flags)
 	int i, ret;
 	struct crypt_z990_des3_128_ctx *dctx;
 	const u8* temp_key = key;
-	
+
 	dctx = ctx;
 	if (!(memcmp(key, &key[DES_KEY_SIZE], DES_KEY_SIZE))) {
 
@@ -133,7 +133,7 @@ static void
 des3_128_encrypt(void *ctx, u8 *dst, const u8 *src)
 {
 	struct crypt_z990_des3_128_ctx *dctx;
-	
+
 	dctx = ctx;
 	crypt_z990_km(KM_TDEA_128_ENCRYPT, dctx->key, dst, (void*)src,
 			DES3_128_BLOCK_SIZE);
@@ -143,7 +143,7 @@ static void
 des3_128_decrypt(void *ctx, u8 *dst, const u8 *src)
 {
 	struct crypt_z990_des3_128_ctx *dctx;
-	
+
 	dctx = ctx;
 	crypt_z990_km(KM_TDEA_128_DECRYPT, dctx->key, dst, (void*)src,
 			DES3_128_BLOCK_SIZE);
@@ -164,7 +164,7 @@ static struct crypto_alg des3_128_alg = {
 	.cia_decrypt		=	des3_128_decrypt } }
 };
 
-/* 
+/*
  * RFC2451:
  *
  *   For DES-EDE3, there is no known need to reject weak or
@@ -183,16 +183,16 @@ des3_192_setkey(void *ctx, const u8 *key, unsigned int keylen, u32 *flags)
 	int i, ret;
 	struct crypt_z990_des3_192_ctx *dctx;
 	const u8* temp_key;
-	
+
 	dctx = ctx;
 	temp_key = key;
-	if (!(memcmp(key, &key[DES_KEY_SIZE], DES_KEY_SIZE) && 
+	if (!(memcmp(key, &key[DES_KEY_SIZE], DES_KEY_SIZE) &&
 	    memcmp(&key[DES_KEY_SIZE], &key[DES_KEY_SIZE * 2],
 	    					DES_KEY_SIZE))) {
 
 		*flags |= CRYPTO_TFM_RES_BAD_KEY_SCHED;
 		return -EINVAL;
-	}	
+	}
 	for (i = 0; i < 3; i++, temp_key += DES_KEY_SIZE) {
 		ret = crypto_des_check_key(temp_key, DES_KEY_SIZE, flags);
 		if (ret < 0){
@@ -207,7 +207,7 @@ static void
 des3_192_encrypt(void *ctx, u8 *dst, const u8 *src)
 {
 	struct crypt_z990_des3_192_ctx *dctx;
-	
+
 	dctx = ctx;
 	crypt_z990_km(KM_TDEA_192_ENCRYPT, dctx->key, dst, (void*)src,
 			DES3_192_BLOCK_SIZE);
@@ -217,7 +217,7 @@ static void
 des3_192_decrypt(void *ctx, u8 *dst, const u8 *src)
 {
 	struct crypt_z990_des3_192_ctx *dctx;
-	
+
 	dctx = ctx;
 	crypt_z990_km(KM_TDEA_192_DECRYPT, dctx->key, dst, (void*)src,
 			DES3_192_BLOCK_SIZE);
@@ -244,13 +244,13 @@ static int
 init(void)
 {
 	int ret;
-	
+
 	if (!crypt_z990_func_available(KM_DEA_ENCRYPT) ||
 	    !crypt_z990_func_available(KM_TDEA_128_ENCRYPT) ||
 	    !crypt_z990_func_available(KM_TDEA_192_ENCRYPT)){
 		return -ENOSYS;
 	}
-	
+
 	ret = 0;
 	ret |= (crypto_register_alg(&des_alg) == 0)? 0:1;
 	ret |= (crypto_register_alg(&des3_128_alg) == 0)? 0:2;
@@ -261,7 +261,7 @@ init(void)
 		crypto_unregister_alg(&des_alg);
 		return -EEXIST;
 	}
-	
+
 	printk(KERN_INFO "crypt_z990: des_z990 loaded.\n");
 	return 0;
 }

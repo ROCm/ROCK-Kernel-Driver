@@ -2,13 +2,13 @@
  * Cryptographic API.
  *
  * Support for z990 cryptographic instructions.
- * 
+ *
  *   Copyright (C) 2003 IBM Deutschland GmbH, IBM Corporation
- *   Author(s): Thomas Spatzier (tspat@xxxxxxxxxx)
+ *   Author(s): Thomas Spatzier (tspat@de.ibm.com)
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option) 
+ * Software Foundation; either version 2 of the License, or (at your option)
  * any later version.
  *
  */
@@ -72,7 +72,7 @@ enum crypt_z990_kmac_func {
 	KMAC_TDEA_192 = CRYPT_Z990_KMAC | 3
 };
 
-/*status word for z990 crypto instructions' QUERY functions*/ 
+/*status word for z990 crypto instructions' QUERY functions*/
 struct crypt_z990_query_status {
 	u64 high;
 	u64 low;
@@ -153,7 +153,7 @@ crypt_z990_km(long func, void* param, u8* dest, const u8* src, long src_len)
 	register const u8* __src asm("2") = src;
 	register long __src_len asm("3") = src_len;
 	int ret;
-	
+
 	ret = 0;
 	__asm__ __volatile__ (
 		"0:	.insn	rre,0xB92E0000,%1,%2 \n" //KM opcode
@@ -192,7 +192,7 @@ crypt_z990_kmc(long func, void* param, u8* dest, const u8* src, long src_len)
 	register const u8* __src asm("2") = src;
 	register long __src_len asm("3") = src_len;
 	int ret;
-	
+
 	ret = 0;
 	__asm__ __volatile__ (
 		"0:	.insn	rre,0xB92F0000,%1,%2 \n" //KMC opcode
@@ -230,7 +230,7 @@ crypt_z990_kimd(long func, void* param, const u8* src, long src_len)
 	register const u8* __src asm("2") = src;
 	register long __src_len asm("3") = src_len;
 	int ret;
-	
+
 	ret = 0;
 	__asm__ __volatile__ (
 		"0:	.insn	rre,0xB93E0000,%1,%1 \n" //KIMD opcode
@@ -266,7 +266,7 @@ crypt_z990_klmd(long func, void* param, const u8* src, long src_len)
 	register const u8* __src asm("2") = src;
 	register long __src_len asm("3") = src_len;
 	int ret;
-	
+
 	ret = 0;
 	__asm__ __volatile__ (
 		"0:	.insn	rre,0xB93F0000,%1,%1 \n" //KLMD opcode
@@ -303,7 +303,7 @@ crypt_z990_kmac(long func, void* param, const u8* src, long src_len)
 	register const u8* __src asm("2") = src;
 	register long __src_len asm("3") = src_len;
 	int ret;
-	
+
 	ret = 0;
 	__asm__ __volatile__ (
 		"0:	.insn	rre,0xB91E0000,%5,%5 \n" //KMAC opcode
@@ -313,7 +313,7 @@ crypt_z990_kmac(long func, void* param, const u8* src, long src_len)
 		__crypt_z990_fixup
 		: "+d" (ret), "+a" (__src), [result] "+d" (__src_len)
 		: [e1] "K" (-EFAULT), [e2] "K" (-ENOSYS), "d" (__func),
-		  "a" (__param)	  
+		  "a" (__param)
 		: "cc", "memory"
 	);
 	if (ret >= 0 && func & CRYPT_Z990_FUNC_MASK){
@@ -331,7 +331,7 @@ static inline int
 crypt_z990_func_available(int func)
 {
 	int ret;
-	
+
 	struct crypt_z990_query_status status = {
 		.high = 0,
 		.low = 0

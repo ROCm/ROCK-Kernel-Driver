@@ -1,4 +1,4 @@
-/* 
+/*
  * Cryptographic API.
  *
  * Function for checking keys for the DES and Tripple DES Encryption

@@ -1,7 +1,7 @@
 crypto-API support for z990 Message Security Assist (MSA) instructions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-AUTHOR:	Thomas Spatzier (tspat@xxxxxxxxxx)
+AUTHOR:	Thomas Spatzier (tspat@de.ibm.com)
 
 
 1. Introduction crypto-API
