@@ -228,7 +228,6 @@ EXPORT_SYMBOL(pagebuf_offset);
 EXPORT_SYMBOL(pagebuf_rele);
 EXPORT_SYMBOL(pagebuf_readahead);
 EXPORT_SYMBOL(pagebuf_unlock);
-EXPORT_SYMBOL(qsort);
 #if ((defined(DEBUG) || defined(INDUCE_IO_ERROR)) && !defined(NO_WANT_RANDOM))
 EXPORT_SYMBOL(random);
 #endif
