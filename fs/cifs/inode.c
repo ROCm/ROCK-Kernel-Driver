@@ -627,7 +627,7 @@ cifs_revalidate(struct dentry *direntry)
 
 	if(timespec_equal(&local_mtime,&direntry->d_inode->i_mtime) && 
 		(local_size == direntry->d_inode->i_size)) {
-		cFYI(1,("inode unchanged on server"));
+		cFYI(1,("cifs_revalidate - inode unchanged"));
 	} else {
 		/* file may have changed on server */
 		if(cifsInode->clientCanCacheRead) {
@@ -648,7 +648,12 @@ cifs_revalidate(struct dentry *direntry)
 	}
 	if(invalidate_inode) {
 		filemap_fdatawait(direntry->d_inode->i_mapping);
-		/* invalidate_remote_inode(direntry->d_inode); */ /* BB fixme */
+		/* may eventually have to do this for open files too */
+		if(list_empty(&(cifsInode->openFileList))) {
+			/* Has changed on server - flush read ahead pages */
+			cFYI(1,("Invalidating read ahead data on closed file"));
+			invalidate_remote_inode(direntry->d_inode);
+		}
 	}
 
 

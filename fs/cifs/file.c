@@ -171,8 +171,27 @@ cifs_open(struct inode *inode, struct file *file)
 				list_add(&pCifsFile->flist,&pCifsInode->openFileList);
 				write_unlock(&GlobalSMBSeslock);
 				write_unlock(&file->f_owner.lock);
+				if(pCifsInode->clientCanCacheRead) {
+					/* we have the inode open somewhere else
+					   no need to discard cache data */
+				} else {
+					if(buf) {
+					/* BB need same check in cifs_create too? */
 
-		                if (pTcon->ses->capabilities & CAP_UNIX)
+					/* if not oplocked, invalidate inode pages if mtime 
+					   or file size changed */
+						struct timespec temp;
+						temp = cifs_NTtimeToUnix(le64_to_cpu(buf->LastWriteTime));
+						if(timespec_equal(&file->f_dentry->d_inode->i_mtime,&temp) && 
+							(file->f_dentry->d_inode->i_size == le64_to_cpu(buf->EndOfFile))) {
+							cFYI(1,("inode unchanged on server"));
+						} else {
+							cFYI(1,("invalidating remote inode since open detected it changed"));
+							invalidate_remote_inode(file->f_dentry->d_inode);
+						}
+					}
+				}
+				if (pTcon->ses->capabilities & CAP_UNIX)
 					rc = cifs_get_inode_info_unix(&file->f_dentry->d_inode,
 						full_path, inode->i_sb);
 				else
