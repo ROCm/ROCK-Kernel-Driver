@@ -330,6 +330,11 @@ acpi_table_get_sdt (
 			return -ENODEV;
 		}
 
+		if (acpi_table_compute_checksum(header, header->length)) {
+			printk(KERN_WARNING PREFIX "Invalid XSDT checksum\n");
+			return -ENODEV;
+		}
+
 		sdt.count = (header->length - sizeof(struct acpi_table_header)) >> 3;
 		if (sdt.count > ACPI_MAX_TABLES) {
 			printk(KERN_WARNING PREFIX "Truncated %lu XSDT entries\n",
@@ -367,6 +372,11 @@ acpi_table_get_sdt (
 
 		if (strncmp(header->signature, "RSDT", 4)) {
 			printk(KERN_WARNING PREFIX "RSDT signature incorrect\n");
+			return -ENODEV;
+		}
+
+		if (acpi_table_compute_checksum(header, header->length)) {
+			printk(KERN_WARNING PREFIX "Invalid RSDT checksum\n");
 			return -ENODEV;
 		}
 

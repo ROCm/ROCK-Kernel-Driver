@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 140 $
+ *              $Revision: 141 $
  *
  *****************************************************************************/
 
@@ -804,16 +804,7 @@ acpi_ex_opcode_1A_0T_1R (
 				switch (operand[0]->reference.target_type) {
 				case ACPI_TYPE_BUFFER_FIELD:
 
-					/* Ensure that the Buffer arguments are evaluated */
-
 					temp_desc = operand[0]->reference.object;
-#if 0
-
-					status = acpi_ds_get_buffer_arguments (temp_desc);
-					if (ACPI_FAILURE (status)) {
-						goto cleanup;
-					}
-#endif
 
 					/*
 					 * Create a new object that contains one element of the
@@ -841,14 +832,6 @@ acpi_ex_opcode_1A_0T_1R (
 
 				case ACPI_TYPE_PACKAGE:
 
-#if 0
-					/* Ensure that the Package arguments are evaluated */
-
-					status = acpi_ds_get_package_arguments (operand[0]->reference.object);
-					if (ACPI_FAILURE (status)) {
-						goto cleanup;
-					}
-#endif
 					/*
 					 * Return the referenced element of the package.  We must add
 					 * another reference to the referenced object, however.
@@ -883,6 +866,11 @@ acpi_ex_opcode_1A_0T_1R (
 			case AML_REF_OF_OP:
 
 				return_desc = operand[0]->reference.object;
+
+				if (ACPI_GET_DESCRIPTOR_TYPE (return_desc) == ACPI_DESC_TYPE_NAMED) {
+
+					return_desc = acpi_ns_get_attached_object ((acpi_namespace_node *) return_desc);
+				}
 
 				/* Add another reference to the object! */
 

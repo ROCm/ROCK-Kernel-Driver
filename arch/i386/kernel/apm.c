@@ -1924,35 +1924,38 @@ static int __init apm_init(void)
 	 * that extends up to the end of page zero (that we have reserved).
 	 * This is for buggy BIOS's that refer to (real mode) segment 0x40
 	 * even though they are called in protected mode.
+	 *
+	 * NOTE: on SMP we call into the APM BIOS only on CPU#0, so it's
+	 * enough to modify CPU#0's GDT.
 	 */
-	set_base(gdt[APM_40 >> 3],
+	set_base(cpu_gdt_table[0][APM_40 >> 3],
 		 __va((unsigned long)0x40 << 4));
-	_set_limit((char *)&gdt[APM_40 >> 3], 4095 - (0x40 << 4));
+	_set_limit((char *)&cpu_gdt_table[0][APM_40 >> 3], 4095 - (0x40 << 4));
 
 	apm_bios_entry.offset = apm_info.bios.offset;
 	apm_bios_entry.segment = APM_CS;
-	set_base(gdt[APM_CS >> 3],
+	set_base(cpu_gdt_table[0][APM_CS >> 3],
 		 __va((unsigned long)apm_info.bios.cseg << 4));
-	set_base(gdt[APM_CS_16 >> 3],
+	set_base(cpu_gdt_table[0][APM_CS_16 >> 3],
 		 __va((unsigned long)apm_info.bios.cseg_16 << 4));
-	set_base(gdt[APM_DS >> 3],
+	set_base(cpu_gdt_table[0][APM_DS >> 3],
 		 __va((unsigned long)apm_info.bios.dseg << 4));
 #ifndef APM_RELAX_SEGMENTS
 	if (apm_info.bios.version == 0x100) {
 #endif
 		/* For ASUS motherboard, Award BIOS rev 110 (and others?) */
-		_set_limit((char *)&gdt[APM_CS >> 3], 64 * 1024 - 1);
+		_set_limit((char *)&cpu_gdt_table[0][APM_CS >> 3], 64 * 1024 - 1);
 		/* For some unknown machine. */
-		_set_limit((char *)&gdt[APM_CS_16 >> 3], 64 * 1024 - 1);
+		_set_limit((char *)&cpu_gdt_table[0][APM_CS_16 >> 3], 64 * 1024 - 1);
 		/* For the DEC Hinote Ultra CT475 (and others?) */
-		_set_limit((char *)&gdt[APM_DS >> 3], 64 * 1024 - 1);
+		_set_limit((char *)&cpu_gdt_table[0][APM_DS >> 3], 64 * 1024 - 1);
 #ifndef APM_RELAX_SEGMENTS
 	} else {
-		_set_limit((char *)&gdt[APM_CS >> 3],
+		_set_limit((char *)&cpu_gdt_table[0][APM_CS >> 3],
 			(apm_info.bios.cseg_len - 1) & 0xffff);
-		_set_limit((char *)&gdt[APM_CS_16 >> 3],
+		_set_limit((char *)&cpu_gdt_table[0][APM_CS_16 >> 3],
 			(apm_info.bios.cseg_16_len - 1) & 0xffff);
-		_set_limit((char *)&gdt[APM_DS >> 3],
+		_set_limit((char *)&cpu_gdt_table[0][APM_DS >> 3],
 			(apm_info.bios.dseg_len - 1) & 0xffff);
 	}
 #endif

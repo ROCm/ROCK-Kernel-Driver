@@ -63,9 +63,14 @@ idt_48:
 	.word	0			# idt limit = 0
 	.word	0, 0			# idt base = 0L
 
+#
+# NOTE: here we actually use CPU#0's GDT - but that is OK, we reload
+# the proper GDT shortly after booting up the secondary CPUs.
+#
+
 gdt_48:
 	.word	0x0800			# gdt limit = 2048, 256 GDT entries
-	.long	gdt_table-__PAGE_OFFSET	# gdt base = gdt (first SMP CPU)
+	.long	cpu_gdt_table-__PAGE_OFFSET	# gdt base = gdt (first SMP CPU)
 
 .globl trampoline_end
 trampoline_end:

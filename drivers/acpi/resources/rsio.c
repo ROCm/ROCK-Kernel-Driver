@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsio - IO and DMA resource descriptors
- *              $Revision: 21 $
+ *              $Revision: 22 $
  *
  ******************************************************************************/
 
@@ -399,7 +399,7 @@ acpi_rs_dma_resource (
 	buffer += 1;
 	temp8 = *buffer;
 
-	/* Decode the IRQ bits */
+	/* Decode the DMA channel bits */
 
 	for (i = 0, index = 0; index < 8; index++) {
 		if ((temp8 >> index) & 0x01) {
@@ -407,19 +407,16 @@ acpi_rs_dma_resource (
 			i++;
 		}
 	}
-	if (i == 0) {
-		/* Zero channels is invalid! */
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Found Zero DMA channels in resource list\n"));
-		return_ACPI_STATUS (AE_BAD_DATA);
-	}
+	/* Zero DMA channels is valid */
+
 	output_struct->data.dma.number_of_channels = i;
-
-
-	/*
-	 * Calculate the structure size based upon the number of interrupts
-	 */
-	struct_size += ((ACPI_SIZE) output_struct->data.dma.number_of_channels - 1) * 4;
+	if (i > 0) {
+		/*
+		 * Calculate the structure size based upon the number of interrupts
+		 */
+		struct_size += ((ACPI_SIZE) i - 1) * 4;
+	}
 
 	/*
 	 * Point to Byte 2

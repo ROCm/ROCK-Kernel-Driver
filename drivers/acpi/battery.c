@@ -1,5 +1,5 @@
 /*
- *  acpi_battery.c - ACPI Battery Driver ($Revision: 36 $)
+ *  acpi_battery.c - ACPI Battery Driver ($Revision: 37 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -52,13 +52,13 @@ static int acpi_battery_add (struct acpi_device *device);
 static int acpi_battery_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_battery_driver = {
-	name:			ACPI_BATTERY_DRIVER_NAME,
-	class:			ACPI_BATTERY_CLASS,
-	ids:			ACPI_BATTERY_HID,
-	ops:			{
-					add:	acpi_battery_add,
-					remove:	acpi_battery_remove,
-				},
+	.name =		ACPI_BATTERY_DRIVER_NAME,
+	.class =	ACPI_BATTERY_CLASS,
+	.ids =		ACPI_BATTERY_HID,
+	.ops =		{
+				.add =		acpi_battery_add,
+				.remove =	acpi_battery_remove,
+			},
 };
 
 struct acpi_battery_status {

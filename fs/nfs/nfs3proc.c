@@ -133,16 +133,22 @@ nfs3_proc_lookup(struct inode *dir, struct qstr *name,
 }
 
 static int
-nfs3_proc_access(struct inode *inode, int mode, int ruid)
+nfs3_proc_access(struct inode *inode, struct rpc_cred *cred, int mode)
 {
 	struct nfs_fattr	fattr;
 	struct nfs3_accessargs	arg = {
-		fh:		NFS_FH(inode),
+		.fh		= NFS_FH(inode),
 	};
 	struct nfs3_accessres	res = {
-		fattr:		&fattr,
+		.fattr		= &fattr,
 	};
-	int	status, flags;
+	struct rpc_message msg = {
+		.rpc_proc	= NFS3PROC_ACCESS,
+		.rpc_argp	= &arg,
+		.rpc_resp	= &res,
+		.rpc_cred	= cred
+	};
+	int	status;
 
 	dprintk("NFS call  access\n");
 	fattr.valid = 0;
@@ -160,8 +166,7 @@ nfs3_proc_access(struct inode *inode, int mode, int ruid)
 		if (mode & MAY_EXEC)
 			arg.access |= NFS3_ACCESS_EXECUTE;
 	}
-	flags = (ruid) ? RPC_CALL_REALUID : 0;
-	status = rpc_call(NFS_CLIENT(inode), NFS3PROC_ACCESS, &arg, &res, flags);
+	status = rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
 	nfs_refresh_inode(inode, &fattr);
 	dprintk("NFS reply access\n");
 

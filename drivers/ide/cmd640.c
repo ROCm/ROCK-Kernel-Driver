@@ -214,17 +214,19 @@ static unsigned int cmd640_chip_version;
  * Therefore, we must use direct IO instead.
  */
 
+/* This is broken, but no more so than the old code.. */
+static spinlock_t cmd640_lock = SPIN_LOCK_UNLOCKED;
+
 /* PCI method 1 access */
 
 static void put_cmd640_reg_pci1 (unsigned short reg, byte val)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&cmd640_lock, flags);
 	outl_p((reg & 0xfc) | cmd640_key, 0xcf8);
 	outb_p(val, (reg & 3) | 0xcfc);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&cmd640_lock, flags);
 }
 
 static u8 get_cmd640_reg_pci1 (unsigned short reg)
@@ -232,11 +234,10 @@ static u8 get_cmd640_reg_pci1 (unsigned short reg)
 	u8 b;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&cmd640_lock, flags);
 	outl_p((reg & 0xfc) | cmd640_key, 0xcf8);
 	b = inb_p((reg & 3) | 0xcfc);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&cmd640_lock, flags);
 	return b;
 }
 
@@ -246,12 +247,11 @@ static void put_cmd640_reg_pci2 (unsigned short reg, u8 val)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&cmd640_lock, flags);
 	outb_p(0x10, 0xcf8);
 	outb_p(val, cmd640_key + reg);
 	outb_p(0, 0xcf8);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&cmd640_lock, flags);
 }
 
 static u8 get_cmd640_reg_pci2 (unsigned short reg)
@@ -259,12 +259,11 @@ static u8 get_cmd640_reg_pci2 (unsigned short reg)
 	u8 b;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&cmd640_lock, flags);
 	outb_p(0x10, 0xcf8);
 	b = inb_p(cmd640_key + reg);
 	outb_p(0, 0xcf8);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&cmd640_lock, flags);
 	return b;
 }
 
@@ -274,11 +273,10 @@ static void put_cmd640_reg_vlb (unsigned short reg, u8 val)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&cmd640_lock, flags);
 	outb_p(reg, cmd640_key);
 	outb_p(val, cmd640_key + 4);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&cmd640_lock, flags);
 }
 
 static u8 get_cmd640_reg_vlb (unsigned short reg)
@@ -286,11 +284,10 @@ static u8 get_cmd640_reg_vlb (unsigned short reg)
 	u8 b;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&cmd640_lock, flags);
 	outb_p(reg, cmd640_key);
 	b = inb_p(cmd640_key + 4);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&cmd640_lock, flags);
 	return b;
 }
 
@@ -367,8 +364,7 @@ static int __init secondary_port_responding (void)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&cmd640_lock, flags);
 
 	outb_p(0x0a, 0x170 + IDE_SELECT_OFFSET);	/* select drive0 */
 	udelay(100);
@@ -376,11 +372,11 @@ static int __init secondary_port_responding (void)
 		outb_p(0x1a, 0x170 + IDE_SELECT_OFFSET); /* select drive1 */
 		udelay(100);
 		if ((inb_p(0x170 + IDE_SELECT_OFFSET) & 0x1f) != 0x1a) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&cmd640_lock, flags);
 			return 0; /* nothing responded */
 		}
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&cmd640_lock, flags);
 	return 1; /* success */
 }
 
@@ -461,8 +457,7 @@ static void set_prefetch_mode (unsigned int index, int mode)
 	u8 b;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&cmd640_lock, flags);
 	b = get_cmd640_reg(reg);
 	if (mode) {	/* want prefetch on? */
 # if CMD640_PREFETCH_MASKS
@@ -478,7 +473,7 @@ static void set_prefetch_mode (unsigned int index, int mode)
 		b |= prefetch_masks[index];	/* disable prefetch */
 	}
 	put_cmd640_reg(reg, b);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&cmd640_lock, flags);
 }
 
 /*
@@ -579,8 +574,7 @@ static void program_drive_counts (unsigned int index)
 	/*
 	 * Now that everything is ready, program the new timings
 	 */
-	save_flags (flags);
-	cli();
+	spin_lock(&cmd640_lock, flags);
 	/*
 	 * Program the address_setup clocks into ARTTIM reg,
 	 * and then the active/recovery counts into the DRWTIM reg
@@ -589,7 +583,7 @@ static void program_drive_counts (unsigned int index)
 	setup_count |= get_cmd640_reg(arttim_regs[index]) & 0x3f;
 	put_cmd640_reg(arttim_regs[index], setup_count);
 	put_cmd640_reg(drwtim_regs[index], pack_nibbles(active_count, recovery_count));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&cmd640_lock, flags);
 }
 
 /*

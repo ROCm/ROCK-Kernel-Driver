@@ -300,7 +300,7 @@ struct nfs_rpc_ops {
 			    struct iattr *);
 	int	(*lookup)  (struct inode *, struct qstr *,
 			    struct nfs_fh *, struct nfs_fattr *);
-	int	(*access)  (struct inode *, int , int);
+	int	(*access)  (struct inode *, struct rpc_cred *, int);
 	int	(*readlink)(struct inode *, struct page *);
 	int	(*read)    (struct inode *, struct rpc_cred *,
 			    struct nfs_fattr *,

@@ -2058,7 +2058,6 @@ static int __devinit irq_probe_ECP(struct parport *pb)
 	int i;
 	unsigned long irqs;
 
-	sti();
 	irqs = probe_irq_on();
 		
 	ECR_WRITE (pb, ECR_SPP << 5); /* Reset FIFO */
@@ -2093,7 +2092,6 @@ static int __devinit irq_probe_EPP(struct parport *pb)
 	if (pb->modes & PARPORT_MODE_PCECR)
 		oecr = inb (ECONTROL (pb));
 
-	sti();
 	irqs = probe_irq_on();
 
 	if (pb->modes & PARPORT_MODE_PCECR)
