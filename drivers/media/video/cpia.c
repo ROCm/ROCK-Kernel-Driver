@@ -2396,53 +2396,46 @@ static int reset_camera(struct cam_data *cam)
 }
 
 /* ------------------------- V4L interface --------------------- */
-static int cpia_open(struct video_device *dev, int flags)
+static int cpia_open(struct inode *inode, struct file *file)
 {
-	int i;
+	struct video_device *dev = video_devdata(file);
 	struct cam_data *cam = dev->priv;
+	int err;
 
 	if (!cam) {
 		DBG("Internal error, cam_data not found!\n");
-		return -EBUSY;
+		return -ENODEV;
 	}
 	    
+	down(&cam->busy_lock);
+	err = -EBUSY;
 	if (cam->open_count > 0) {
 		DBG("Camera already open\n");
-		return -EBUSY;
+		goto oops;
 	}
 	
+	err = -ENOMEM;
 	if (!cam->raw_image) {
 		cam->raw_image = rvmalloc(CPIA_MAX_IMAGE_SIZE);
 		if (!cam->raw_image)
-			return -ENOMEM;
+			goto oops;
 	}
 
 	if (!cam->decompressed_frame.data) {
 		cam->decompressed_frame.data = rvmalloc(CPIA_MAX_FRAME_SIZE);
-		if (!cam->decompressed_frame.data) {
-			rvfree(cam->raw_image, CPIA_MAX_IMAGE_SIZE);
-			cam->raw_image = NULL;
-			return -ENOMEM;
-		}
+		if (!cam->decompressed_frame.data)
+			goto oops;
 	}
 	
 	/* open cpia */
-	if (cam->ops->open(cam->lowlevel_data)) {
-		rvfree(cam->decompressed_frame.data, CPIA_MAX_FRAME_SIZE);
-		cam->decompressed_frame.data = NULL;
-		rvfree(cam->raw_image, CPIA_MAX_IMAGE_SIZE);
-		cam->raw_image = NULL;
-		return -ENODEV;
-	}
+	err = -ENODEV;
+	if (cam->ops->open(cam->lowlevel_data))
+		goto oops;
 	
 	/* reset the camera */
-	if ((i = reset_camera(cam)) != 0) {
+	if ((err = reset_camera(cam)) != 0) {
 		cam->ops->close(cam->lowlevel_data);
-		rvfree(cam->decompressed_frame.data, CPIA_MAX_FRAME_SIZE);
-		cam->decompressed_frame.data = NULL;
-		rvfree(cam->raw_image, CPIA_MAX_IMAGE_SIZE);
-		cam->raw_image = NULL;
-		return i;
+		goto oops;
 	}
 	
 	/* Set ownership of /proc/cpia/videoX to current user */
@@ -2456,14 +2449,26 @@ static int cpia_open(struct video_device *dev, int flags)
 	cam->mmap_kludge = 0;
 	
 	++cam->open_count;
+	file->private_data = dev;
 	return 0;
+
+ oops:
+	if (cam->decompressed_frame.data) {
+		rvfree(cam->decompressed_frame.data, CPIA_MAX_FRAME_SIZE);
+		cam->decompressed_frame.data = NULL;
+	}
+	if (cam->raw_image) {
+		rvfree(cam->raw_image, CPIA_MAX_IMAGE_SIZE);
+		cam->raw_image = NULL;
+	}
+	up(&cam->busy_lock);
+	return err;
 }
 
-static void cpia_close(struct video_device *dev)
+static int cpia_close(struct inode *inode, struct file *file)
 {
-	struct cam_data *cam;
-
-	cam = dev->priv;
+	struct  video_device *dev = file->private_data;
+	struct cam_data *cam = dev->priv;
 
 	if (cam->ops) {
 	        /* Return ownership of /proc/cpia/videoX to root */
@@ -2501,19 +2506,18 @@ static void cpia_close(struct video_device *dev)
 		if (cam->frame_buf)
 			free_frame_buf(cam);
 
-		if (!cam->ops) {
-			video_unregister_device(dev);
+		if (!cam->ops)
 			kfree(cam);
-		}
 	}
-	
+	file->private_data = NULL;
 
-	return;
+	return 0;
 }
 
-static long cpia_read(struct video_device *dev, char *buf,
-                      unsigned long count, int noblock)
+static int cpia_read(struct file *file, char *buf,
+		     size_t count, loff_t *ppos)
 {
+	struct video_device *dev = file->private_data;
 	struct cam_data *cam = dev->priv;
 
 	/* make this _really_ smp and multithredi-safe */
@@ -2568,8 +2572,10 @@ static long cpia_read(struct video_device *dev, char *buf,
 	return cam->decompressed_frame.count;
 }
 
-static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
+static int cpia_ioctl(struct inode *inode, struct file *file,
+		      unsigned int ioctlnr, void *arg)
 {
+	struct video_device *dev = file->private_data;
 	struct cam_data *cam = dev->priv;
 	int retval = 0;
 
@@ -2586,99 +2592,80 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 	/* query capabilites */
 	case VIDIOCGCAP:
 	{
-		struct video_capability b;
+		struct video_capability *b = arg;
 
 		DBG("VIDIOCGCAP\n");
-		strcpy(b.name, "CPiA Camera");
-		b.type = VID_TYPE_CAPTURE;
-		b.channels = 1;
-		b.audios = 0;
-		b.maxwidth = 352;	/* VIDEOSIZE_CIF */
-		b.maxheight = 288;
-		b.minwidth = 48;	/* VIDEOSIZE_48_48 */
-		b.minheight = 48;
-
-		if (copy_to_user(arg, &b, sizeof(b)))
-			retval = -EFAULT;
-
+		strcpy(b->name, "CPiA Camera");
+		b->type = VID_TYPE_CAPTURE;
+		b->channels = 1;
+		b->audios = 0;
+		b->maxwidth = 352;	/* VIDEOSIZE_CIF */
+		b->maxheight = 288;
+		b->minwidth = 48;	/* VIDEOSIZE_48_48 */
+		b->minheight = 48;
 		break;
 	}
 
 	/* get/set video source - we are a camera and nothing else */
 	case VIDIOCGCHAN:
 	{
-		struct video_channel v;
+		struct video_channel *v = arg;
 
 		DBG("VIDIOCGCHAN\n");
-		if (copy_from_user(&v, arg, sizeof(v))) {
-			retval = -EFAULT;
-			break;
-		}
-		if (v.channel != 0) {
+		if (v->channel != 0) {
 			retval = -EINVAL;
 			break;
 		}
 
-		v.channel = 0;
-		strcpy(v.name, "Camera");
-		v.tuners = 0;
-		v.flags = 0;
-		v.type = VIDEO_TYPE_CAMERA;
-		v.norm = 0;
-
-		if (copy_to_user(arg, &v, sizeof(v)))
-			retval = -EFAULT;
+		v->channel = 0;
+		strcpy(v->name, "Camera");
+		v->tuners = 0;
+		v->flags = 0;
+		v->type = VIDEO_TYPE_CAMERA;
+		v->norm = 0;
 		break;
 	}
 	
 	case VIDIOCSCHAN:
 	{
-		int v;
+		struct video_channel *v = arg;
 
 		DBG("VIDIOCSCHAN\n");
-		if (copy_from_user(&v, arg, sizeof(v)))
-			retval = -EFAULT;
-
-		if (retval == 0 && v != 0)
+		if (v->channel != 0)
 			retval = -EINVAL;
-
 		break;
 	}
 
 	/* image properties */
 	case VIDIOCGPICT:
+	{
+		struct video_picture *pic = arg;
 		DBG("VIDIOCGPICT\n");
-		if (copy_to_user(arg, &cam->vp, sizeof(struct video_picture)))
-			retval = -EFAULT;
+		*pic = cam->vp;
 		break;
+	}
 	
 	case VIDIOCSPICT:
 	{
-		struct video_picture vp;
+		struct video_picture *vp = arg;
 
 		DBG("VIDIOCSPICT\n");
-
-		/* copy_from_user */
-		if (copy_from_user(&vp, arg, sizeof(vp))) {
-			retval = -EFAULT;
-			break;
-		}
 
 		/* check validity */
 		DBG("palette: %d\n", vp.palette);
 		DBG("depth: %d\n", vp.depth);
-		if (!valid_mode(vp.palette, vp.depth)) {
+		if (!valid_mode(vp->palette, vp->depth)) {
 			retval = -EINVAL;
 			break;
 		}
 
 		down(&cam->param_lock);
 		/* brightness, colour, contrast need no check 0-65535 */
-		memcpy( &cam->vp, &vp, sizeof(vp) );
+		cam->vp = *vp;
 		/* update cam->params.colourParams */
-		cam->params.colourParams.brightness = vp.brightness*100/65535;
-		cam->params.colourParams.contrast = vp.contrast*100/65535;
-		cam->params.colourParams.saturation = vp.colour*100/65535;
+		cam->params.colourParams.brightness = vp->brightness*100/65535;
+		cam->params.colourParams.contrast = vp->contrast*100/65535;
+		cam->params.colourParams.saturation = vp->colour*100/65535;
 		/* contrast is in steps of 8, so round */
 		cam->params.colourParams.contrast =
 			((cam->params.colourParams.contrast + 3) / 8) * 8;
@@ -2693,34 +2680,32 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 		cam->cmd_queue |= COMMAND_SETCOLOURPARAMS;
 		up(&cam->param_lock);
 		DBG("VIDIOCSPICT: %d / %d // %d / %d / %d / %d\n",
-		    vp.depth, vp.palette, vp.brightness, vp.hue, vp.colour,
-		    vp.contrast);
+		    vp->depth, vp->palette, vp->brightness, vp->hue, vp->colour,
+		    vp->contrast);
 		break;
 	}
 
 	/* get/set capture window */
 	case VIDIOCGWIN:
+	{
+		struct video_window *vw = arg;
 		DBG("VIDIOCGWIN\n");
 
-		if (copy_to_user(arg, &cam->vw, sizeof(struct video_window)))
-			retval = -EFAULT;
+		*vw = cam->vw;
 		break;
+	}
 	
 	case VIDIOCSWIN:
 	{
 		/* copy_from_user, check validity, copy to internal structure */
-		struct video_window vw;
+		struct video_window *vw = arg;
 		DBG("VIDIOCSWIN\n");
-		if (copy_from_user(&vw, arg, sizeof(vw))) {
-			retval = -EFAULT;
-			break;
-		}
 
-		if (vw.clipcount != 0) {    /* clipping not supported */
+		if (vw->clipcount != 0) {    /* clipping not supported */
 			retval = -EINVAL;
 			break;
 		}
-		if (vw.clips != NULL) {     /* clipping not supported */
+		if (vw->clips != NULL) {     /* clipping not supported */
 			retval = -EINVAL;
 			break;
 		}
@@ -2729,8 +2714,8 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 		* is requested by the user???
 		*/
 		down(&cam->param_lock);
-		if (vw.width != cam->vw.width || vw.height != cam->vw.height) {
-			int video_size = match_videosize(vw.width, vw.height);
+		if (vw->width != cam->vw.width || vw->height != cam->vw.height) {
+			int video_size = match_videosize(vw->width, vw->height);
 
 			if (video_size < 0) {
 				retval = -EINVAL;
@@ -2760,43 +2745,35 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 	/* mmap interface */
 	case VIDIOCGMBUF:
 	{
-		struct video_mbuf vm;
+		struct video_mbuf *vm = arg;
 		int i;
 
 		DBG("VIDIOCGMBUF\n");
-		memset(&vm, 0, sizeof(vm));
-		vm.size = CPIA_MAX_FRAME_SIZE*FRAME_NUM;
-		vm.frames = FRAME_NUM;
+		memset(vm, 0, sizeof(*vm));
+		vm->size = CPIA_MAX_FRAME_SIZE*FRAME_NUM;
+		vm->frames = FRAME_NUM;
 		for (i = 0; i < FRAME_NUM; i++)
-			vm.offsets[i] = CPIA_MAX_FRAME_SIZE * i;
-
-		if (copy_to_user((void *)arg, (void *)&vm, sizeof(vm)))
-			retval = -EFAULT;
-
+			vm->offsets[i] = CPIA_MAX_FRAME_SIZE * i;
 		break;
 	}
 	
 	case VIDIOCMCAPTURE:
 	{
-		struct video_mmap vm;
+		struct video_mmap *vm = arg;
 		int video_size;
 
-		if (copy_from_user((void *)&vm, (void *)arg, sizeof(vm))) {
-			retval = -EFAULT;
-			break;
-		}
 #if 1
-		DBG("VIDIOCMCAPTURE: %d / %d / %dx%d\n", vm.format, vm.frame,
-		    vm.width, vm.height);
+		DBG("VIDIOCMCAPTURE: %d / %d / %dx%d\n", vm->format, vm->frame,
+		    vm->width, vm->height);
 #endif
-		if (vm.frame<0||vm.frame>=FRAME_NUM) {
+		if (vm->frame<0||vm->frame>=FRAME_NUM) {
 			retval = -EINVAL;
 			break;
 		}
 
 		/* set video format */
-		cam->vp.palette = vm.format;
-		switch(vm.format) {
+		cam->vp.palette = vm->format;
+		switch(vm->format) {
 		case VIDEO_PALETTE_GREY:
 		case VIDEO_PALETTE_RGB555:
 		case VIDEO_PALETTE_RGB565:
@@ -2819,7 +2796,7 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 			break;
 
 		/* set video size */
-		video_size = match_videosize(vm.width, vm.height);
+		video_size = match_videosize(vm->width, vm->height);
 		if (video_size < 0) {
 			retval = -EINVAL;
 			break;
@@ -2836,37 +2813,33 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 #endif
 		/* according to v4l-spec we must start streaming here */
 		cam->mmap_kludge = 1;
-		retval = capture_frame(cam, &vm);
+		retval = capture_frame(cam, vm);
 
 		break;
 	}
 	
 	case VIDIOCSYNC:
 	{
-		int frame;
+		int *frame = arg;
 
-		if (copy_from_user((void *)&frame, arg, sizeof(int))) {
-			retval = -EFAULT;
-			break;
-		}
 		//DBG("VIDIOCSYNC: %d\n", frame);
 
-		if (frame<0 || frame >= FRAME_NUM) {
+		if (*frame<0 || *frame >= FRAME_NUM) {
 			retval = -EINVAL;
 			break;
 		}
 
-		switch (cam->frame[frame].state) {
+		switch (cam->frame[*frame].state) {
 		case FRAME_UNUSED:
 		case FRAME_READY:
 		case FRAME_GRABBING:
-			DBG("sync to unused frame %d\n", frame);
+			DBG("sync to unused frame %d\n", *frame);
 			retval = -EINVAL;
 			break;
 
 		case FRAME_DONE:
-			cam->frame[frame].state = FRAME_UNUSED;
-			//DBG("VIDIOCSYNC: %d synced\n", frame);
+			cam->frame[*frame].state = FRAME_UNUSED;
+			//DBG("VIDIOCSYNC: %d synced\n", *frame);
 			break;
 		}
 		if (retval == -EINTR) {
@@ -2878,36 +2851,16 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 
 	/* pointless to implement overlay with this camera */
 	case VIDIOCCAPTURE:
-		retval = -EINVAL;
-		break;
 	case VIDIOCGFBUF:
-		retval = -EINVAL;
-		break;
 	case VIDIOCSFBUF:
-		retval = -EINVAL;
-		break;
 	case VIDIOCKEY:
-		retval = -EINVAL;
-		break;
-
 	/* tuner interface - we have none */
 	case VIDIOCGTUNER:
-		retval = -EINVAL;
-		break;
 	case VIDIOCSTUNER:
-		retval = -EINVAL;
-		break;
 	case VIDIOCGFREQ:
-		retval = -EINVAL;
-		break;
 	case VIDIOCSFREQ:
-		retval = -EINVAL;
-		break;
-
 	/* audio interface - we have none */
 	case VIDIOCGAUDIO:
-		retval = -EINVAL;
-		break;
 	case VIDIOCSAUDIO:
 		retval = -EINVAL;
 		break;
@@ -2922,10 +2875,11 @@ static int cpia_ioctl(struct video_device *dev, unsigned int ioctlnr, void *arg)
 } 
 
 /* FIXME */
-static int cpia_mmap(struct vm_area_struct *vma, struct video_device *dev, const char *adr,
-                     unsigned long size)
+static int cpia_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	unsigned long start = (unsigned long)adr;
+	struct video_device *dev = file->private_data;
+	unsigned long start = vma->vm_start;
+	unsigned long size  = vma->vm_end-vma->vm_start;
 	unsigned long page, pos;
 	struct cam_data *cam = dev->priv;
 	int retval;
@@ -2973,26 +2927,23 @@ static int cpia_mmap(struct vm_area_struct *vma, struct video_device *dev, const
 	return 0;
 }
 
-int cpia_video_init(struct video_device *vdev)
-{
-#ifdef CONFIG_PROC_FS
-	create_proc_cpia_cam(vdev->priv);
-#endif
-	return 0;
-}
+static struct file_operations cpia_fops = {
+	owner:		THIS_MODULE,
+	open:		cpia_open,
+	release:       	cpia_close,
+	read:		cpia_read,
+	mmap:		cpia_mmap,
+	ioctl:          video_generic_ioctl,
+	llseek:         no_llseek,
+};
 
 static struct video_device cpia_template = {
 	owner:		THIS_MODULE,
 	name:		"CPiA Camera",
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_CPIA,      /* FIXME */
-	open:		cpia_open,
-	close:		cpia_close,
-	read:		cpia_read,
-	ioctl:		cpia_ioctl,
-	mmap:		cpia_mmap,
-	initialize:	cpia_video_init,
-	minor:		-1,
+	fops:           &cpia_fops,
+	kernel_ioctl:	cpia_ioctl,
 };
 
 /* initialise cam_data structure  */
@@ -3143,6 +3094,9 @@ struct cam_data *cpia_register_camera(struct cpia_camera_ops *ops, void *lowleve
 		printk(KERN_DEBUG "video_register_device failed\n");
 		return NULL;
 	}
+#ifdef CONFIG_PROC_FS
+	create_proc_cpia_cam(camera);
+#endif
 
 	/* get version information from camera: open/reset/close */
 
@@ -3184,12 +3138,9 @@ struct cam_data *cpia_register_camera(struct cpia_camera_ops *ops, void *lowleve
 
 void cpia_unregister_camera(struct cam_data *cam)
 {
-	if (!cam->open_count) {
-		DBG("unregistering video\n");
-		video_unregister_device(&cam->vdev);
-	} else {
-		LOG("/dev/video%d removed while open, "
-		    "deferring video_unregister_device\n", cam->vdev.minor);
+	DBG("unregistering video\n");
+	video_unregister_device(&cam->vdev);
+	if (cam->open_count) {
 		DBG("camera open -- setting ops to NULL\n");
 		cam->ops = NULL;
 	}
