@@ -72,6 +72,7 @@
 #include <linux/smp_lock.h>
 #include <linux/security.h>
 #include <linux/audit.h>
+#include <linux/trigevent_hooks.h>
 #include <asm/uaccess.h>
 #include "util.h"
 
@@ -241,6 +242,7 @@ asmlinkage long sys_semget (key_t key, int nsems, int semflg)
 	}
 
 	up(&sem_ids.sem);
+	TRIG_EVENT(ipc_sem_create_hook, err, semflg);
 	return audit_result(err);
 }
 

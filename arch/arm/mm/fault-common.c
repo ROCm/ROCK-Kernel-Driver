@@ -17,6 +17,7 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -247,6 +248,7 @@ int do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	if (in_interrupt() || !mm)
 		goto no_context;
 
+	TRIG_EVENT(trap_entry_hook, 14, instruction_pointer(regs));
 	down_read(&mm->mmap_sem);
 	fault = __do_page_fault(mm, addr, fsr, tsk);
 	up_read(&mm->mmap_sem);
@@ -254,8 +256,10 @@ int do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	/*
 	 * Handle the "normal" case first
 	 */
-	if (fault > 0)
+	if (fault > 0) {
+		TRIG_EVENT(trap_exit_hook);
 		return 0;
+	}
 
 	/*
 	 * We had some memory, but were unable to
@@ -281,6 +285,7 @@ int do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	} else
 		__do_user_fault(tsk, addr, fsr, fault == -1 ?
 				SEGV_ACCERR : SEGV_MAPERR, regs);
+	TRIG_EVENT(trap_exit_hook);
 	return 0;
 
 
@@ -305,11 +310,14 @@ do_sigbus:
 #endif
 
 	/* Kernel mode? Handle exceptions or die */
-	if (user_mode(regs))
+	if (user_mode(regs)) {
+		TRIG_EVENT(trap_exit_hook);
 		return 0;
+	}
 
 no_context:
 	__do_kernel_fault(mm, addr, fsr, regs);
+	TRIG_EVENT(trap_exit_hook);
 	return 0;
 }
 

@@ -461,6 +461,14 @@ The remaining parameters for relay_open() are as follows:
 	    RELAY_FILE_UNMAP- a relayfs file is being unmapped.  The return
 			      value is ignored.
 
+	  - void ioctl(rchan_id, cmd, arg)
+
+  	    called when an ioctl call is made using a relayfs file
+	    descriptor.  The cmd and arg are passed along to this
+	    callback unmodified for it to do as it wishes with.  The
+	    return value from this callback is used as the return value
+	    of the ioctl call.
+
   If the callbacks param passed to relay_open() is NULL, a set of
   default do-nothing callbacks will be defined for the channel.
   Likewise, any NULL rchan_callback function contained in a non-NULL

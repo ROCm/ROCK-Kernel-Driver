@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/seq_file.h>
 #include <linux/kallsyms.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -139,6 +140,11 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 	int status = 1;	/* Force the "do bottom halves" bit */
 	int retval = 0;
 
+#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
+	if (irq != TIMER_IRQ) { /* avoid double-reporting the timer IRQ */
+		TRIG_EVENT(irq_entry_hook, irq, regs, !(user_mode(regs)));
+	}
+#endif
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
 
@@ -152,6 +158,11 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 		add_interrupt_randomness(irq);
 
 	local_irq_disable();
+#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
+	if (irq != TIMER_IRQ) { /* avoid double-reporting the timer IRQ */
+		TRIG_EVENT(irq_exit_hook, irq, regs);
+	}
+#endif
 	return retval;
 }
 

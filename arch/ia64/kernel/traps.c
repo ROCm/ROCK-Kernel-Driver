@@ -16,6 +16,7 @@
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>
 #endif	/* CONFIG_KDB */
+#include <linux/kprobes.h>
 
 #include <asm/fpswa.h>
 #include <asm/hardirq.h>
@@ -138,6 +139,8 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 	siginfo_t siginfo;
 	int sig, code;
 
+	if (kprobe_handler(regs, break_num))
+		return;
 	/* SIGILL, SIGFPE, SIGSEGV, and SIGBUS want these field initialized: */
 	siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 	siginfo.si_imm = break_num;
@@ -402,6 +405,8 @@ ia64_illegal_op_fault (unsigned long ec, unsigned long arg1, unsigned long arg2,
 	struct siginfo si;
 	char buf[128];
 
+	if (kprobe_running() && kprobe_fault_handler(regs, ILL_ILLOPC))
+		return rv;
 #ifdef CONFIG_IA64_BRL_EMU
 	{
 		extern struct illegal_op_return ia64_emulate_brl (struct pt_regs *, unsigned long);
@@ -445,6 +450,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		"Unknown fault 13", "Unknown fault 14", "Unknown fault 15"
 	};
 
+	if (post_kprobe_handler(regs, vector)) 
+		return;
 	if ((isr & IA64_ISR_NA) && ((isr & IA64_ISR_CODE_MASK) == IA64_ISR_CODE_LFETCH)) {
 		/*
 		 * This fault was due to lfetch.fault, set "ed" bit in the psr to cancel

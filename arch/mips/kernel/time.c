@@ -24,6 +24,7 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
@@ -551,6 +552,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 asmlinkage void ll_timer_interrupt(int irq, struct pt_regs *regs)
 {
+	TRIG_EVENT(irq_entry_hook, irq, regs, CAUSE_EPC(regs));
 	irq_enter();
 	kstat_this_cpu.irqs[irq]++;
 
@@ -558,6 +560,7 @@ asmlinkage void ll_timer_interrupt(int irq, struct pt_regs *regs)
 	timer_interrupt(irq, NULL, regs);
 
 	irq_exit();
+	TRIG_EVENT(irq_exit_hook, irq, regs);	
 }
 
 asmlinkage void ll_local_timer_interrupt(int irq, struct pt_regs *regs)

@@ -32,6 +32,7 @@
 #include <linux/errno.h>
 #include <linux/list.h>
 #include <linux/kallsyms.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/irq.h>
 #include <asm/system.h>
@@ -447,6 +448,7 @@ asmlinkage void asm_do_IRQ(int irq, struct pt_regs *regs)
 {
 	struct irqdesc *desc = irq_desc + irq;
 
+	TRIG_EVENT(irq_entry_hook, irq, regs, !(user_mode(regs)));
 	/*
 	 * Some hardware gives randomly wrong interrupts.  Rather
 	 * than crashing, do something sensible.
@@ -466,6 +468,7 @@ asmlinkage void asm_do_IRQ(int irq, struct pt_regs *regs)
 
 	spin_unlock(&irq_controller_lock);
 	irq_exit();
+	TRIG_EVENT(irq_exit_hook, irq, regs);
 }
 
 void __set_irq_handler(unsigned int irq, irq_handler_t handle, int is_chained)

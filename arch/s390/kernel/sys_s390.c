@@ -29,6 +29,7 @@
 #include <linux/personality.h>
 #endif /* CONFIG_ARCH_S390X */
 #include <linux/fshooks.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
@@ -196,6 +197,7 @@ asmlinkage long sys_ipc (uint call, int first, int second,
         struct ipc_kludge tmp;
 	int ret;
 
+        TRIG_EVENT(ipc_call_hook, call, first);
         switch (call) {
         case SEMOP:
 		return sys_semtimedop (first, (struct sembuf *) ptr, second,

@@ -55,7 +55,8 @@
 static int                                                             \
 FUNC ## _show(struct seq_file *s, void *v)			       \
 {								       \
-	int rc=0;						       \
+	int rc=0;                                                      \
+        ssize_t precnt;                                                \
 	ckrm_core_class_t *core ;				       \
 								       \
 	core = (ckrm_core_class_t *)                                   \
@@ -64,10 +65,12 @@ FUNC ## _show(struct seq_file *s, void *v)			       \
 	if (!ckrm_is_core_valid(core)) {			       \
 		return -EINVAL;					       \
         }                                                              \
-                                                                       \
+        precnt = s->count ;                                            \
 	if (core->classtype->show_ ## FUNC)			       \
 		rc = (* core->classtype->show_ ## FUNC)(core, s);      \
-								       \
+                                                                       \
+        if (s->count == precnt)                                        \
+		seq_printf(s, "No data to display\n");                 \
 	return rc;						       \
 };                                                                      
  

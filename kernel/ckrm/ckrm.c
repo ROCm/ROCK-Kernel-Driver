@@ -58,6 +58,7 @@ rwlock_t ckrm_class_lock = RW_LOCK_UNLOCKED;  // protect classlists
 struct rcfs_functions rcfs_fn ;
 EXPORT_SYMBOL(rcfs_fn);
 
+
 /**************************************************************************
  *                   Helper Functions                                     *
  **************************************************************************/
@@ -246,7 +247,7 @@ ckrm_add_child(struct ckrm_core_class *parent, struct ckrm_core_class *child)
 		return;
 	}
 	
-	spin_lock(&child->ckrm_lock);
+	class_lock(child);
 	INIT_LIST_HEAD(&cnode->children);
 	INIT_LIST_HEAD(&cnode->siblings);
 
@@ -265,7 +266,7 @@ ckrm_add_child(struct ckrm_core_class *parent, struct ckrm_core_class *child)
 		}
 	}
 	cnode->parent = parent;
-	spin_unlock(&child->ckrm_lock);
+	class_unlock(child);
 	return;
 }
 
@@ -291,17 +292,17 @@ ckrm_remove_child(struct ckrm_core_class *child)
 
 	pnode = &parent->hnode;
 
-	spin_lock(&child->ckrm_lock);
+	class_lock(child);
 	/* ensure that the node does not have children */
 	if (!list_empty(&cnode->children)) {
-		spin_unlock(&child->ckrm_lock);
+		class_unlock(child);
 		return 0;
 	}
 	write_lock(&parent->hnode_rwlock);
 	list_del(&cnode->siblings);
 	write_unlock(&parent->hnode_rwlock);
 	cnode->parent = NULL;
-	spin_unlock(&child->ckrm_lock);
+	class_unlock(child);
 	return 1;
 }
 
@@ -413,6 +414,9 @@ ckrm_alloc_res_class(struct ckrm_core_class *core,
  *
  */
 
+#define CLS_DEBUG(fmt, args...) do { /* printk("%s: " fmt, __FUNCTION__ , ## args); */ } while (0)
+
+
 int
 ckrm_init_core_class(struct ckrm_classtype  *clstype,
 		     struct ckrm_core_class *dcore,
@@ -424,7 +428,7 @@ ckrm_init_core_class(struct ckrm_classtype  *clstype,
 
 	// Hubertus .. how is this used in initialization 
 
-	printk("ckrm_init_core_class: name %s => %p\n", name?name:"default",dcore);
+	CLS_DEBUG("name %s => %p\n", name?name:"default",dcore);
 	
 	if ((dcore != clstype->default_class) && ( !ckrm_is_core_valid(parent))) {
 		printk("error not a valid parent %p\n", parent);
@@ -444,8 +448,9 @@ ckrm_init_core_class(struct ckrm_classtype  *clstype,
 	dcore->classtype    = clstype;
 	dcore->magic        = CKRM_CORE_MAGIC;
 	dcore->name         = name;
-	dcore->ckrm_lock    = SPIN_LOCK_UNLOCKED;
+	dcore->class_lock   = SPIN_LOCK_UNLOCKED;
 	dcore->hnode_rwlock = RW_LOCK_UNLOCKED;
+	dcore->delayed      = 0;
 
 	atomic_set(&dcore->refcnt, 0);
 	write_lock(&ckrm_class_lock);
@@ -510,8 +515,8 @@ ckrm_free_core_class(struct ckrm_core_class *core)
 	struct ckrm_classtype *clstype = core->classtype;
 	struct ckrm_core_class *parent = core->hnode.parent;
 	
-	printk("%s: core=%p:%s parent=%p:%s\n",__FUNCTION__,core,core->name,parent,parent->name);
-	if (core->magic == 0) {
+	CLS_DEBUG("core=%p:%s parent=%p:%s\n",core,core->name,parent,parent->name);
+	if (core->delayed) {
 		/* this core was marked as late */
 		printk("class <%s> finally deleted %lu\n",core->name,jiffies);
 	}
@@ -556,9 +561,9 @@ ckrm_release_core_class(struct ckrm_core_class *core)
 
 	/* need to make sure that the classgot really dropped */
 	if (atomic_read(&core->refcnt) != 1) {
-		printk("class <%s> deletion delayed refcnt=%d jif=%ld\n",
-		       core->name,atomic_read(&core->refcnt),jiffies);
-		core->magic = 0;  /* just so we have a ref point */
+		CLS_DEBUG("class <%s> deletion delayed refcnt=%d jif=%ld\n",
+				core->name,atomic_read(&core->refcnt),jiffies);
+		core->delayed = 1;  /* just so we have a ref point */
 	}
 	ckrm_core_drop(core);
 	return 0;
@@ -967,7 +972,6 @@ ckrm_init(void)
 	ckrm_cb_newtask(&init_task);
 	printk("CKRM Initialization done\n");
 }
-
 
 EXPORT_SYMBOL(ckrm_register_engine);
 EXPORT_SYMBOL(ckrm_unregister_engine);

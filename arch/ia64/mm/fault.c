@@ -9,6 +9,7 @@
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
+#include <linux/kprobes.h>
 
 #include <asm/pgtable.h>
 #include <asm/processor.h>
@@ -79,6 +80,8 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	struct siginfo si;
 	unsigned long mask;
 
+ 	if (kprobe_running() && kprobe_fault_handler(regs, isr))
+ 		return;
 	/*
 	 * If we're in an interrupt or have no user context, we must not take the fault..
 	 */

@@ -270,6 +270,18 @@ int deny_write_access(struct file * file)
 	return 0;
 }
 
+int deny_write_access_to_inode(struct inode * inode)
+{
+	spin_lock(&inode->i_lock);
+	if (atomic_read(&inode->i_writecount) > 0) {
+		spin_unlock(&inode->i_lock);
+		return -ETXTBSY;
+	}
+	atomic_dec(&inode->i_writecount);
+	spin_unlock(&inode->i_lock);
+	return 0;
+}
+
 void path_release(struct nameidata *nd)
 {
 	dput(nd->dentry);
@@ -2355,3 +2367,7 @@ EXPORT_SYMBOL(vfs_rename);
 EXPORT_SYMBOL(vfs_rmdir);
 EXPORT_SYMBOL(vfs_symlink);
 EXPORT_SYMBOL(vfs_unlink);
+#ifdef CONFIG_DPROBES_MODULE
+extern int deny_write_access_to_inode(struct inode *);
+EXPORT_SYMBOL(deny_write_access_to_inode);
+#endif

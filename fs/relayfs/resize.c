@@ -131,20 +131,6 @@ alloc_rchan_buf(unsigned long size, struct page ***page_array, int *page_count)
 }
 
 /**
- *	free_rchan_buf - free a channel buffer
- *	@buf: pointer to the buffer to free
- *	@page_array: pointer to the buffer's page array
- *	@page_count: number of pages in page array
- */
-void
-free_rchan_buf(void *buf, struct page **page_array, int page_count)
-{
-	vunmap(buf);
-	depopulate_page_array(page_array, page_count);
-	free_page_array(page_array);
-}
-
-/**
  *	expand_check - check whether the channel needs expanding
  *	@rchan: the channel
  *
@@ -929,6 +915,31 @@ add_free_page_array(struct free_rchan_buf *free_rchan_buf,
 	
 	free_rchan_buf->page_array[cur].array = page_array;
 	free_rchan_buf->page_array[cur].count = page_count;
+}
+
+/**
+ *	free_rchan_buf - free a channel buffer
+ *	@buf: pointer to the buffer to free
+ *	@page_array: pointer to the buffer's page array
+ *	@page_count: number of pages in page array
+ */
+int
+free_rchan_buf(void *buf, struct page **page_array, int page_count)
+{
+	struct free_rchan_buf *free_buf;
+
+	free_buf = kmalloc(sizeof(struct free_rchan_buf), GFP_ATOMIC);
+	if (!free_buf)
+		return -ENOMEM;
+	memset(free_buf, 0, sizeof(struct free_rchan_buf));
+
+	free_buf->unmap_buf = buf;
+	add_free_page_array(free_buf, page_array, page_count);
+
+	INIT_WORK(&free_buf->work, relaybuf_free, free_buf);
+	schedule_delayed_work(&free_buf->work, 1);
+
+	return 0;
 }
 
 /**

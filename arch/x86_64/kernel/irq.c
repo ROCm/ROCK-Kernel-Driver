@@ -33,6 +33,7 @@
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/atomic.h>
 #include <asm/io.h>
@@ -214,6 +215,7 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 {
 	int status = 1; /* Force the "do bottom halves" bit */
 
+	TRIG_EVENT(irq_entry_hook, irq, regs, !(user_mode(regs)));
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
 
@@ -226,6 +228,7 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 		add_interrupt_randomness(irq);
 	local_irq_disable();
 
+	TRIG_EVENT(irq_exit_hook, irq, regs);
 	return status;
 }
 

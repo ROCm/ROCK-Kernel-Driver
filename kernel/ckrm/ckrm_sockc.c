@@ -117,7 +117,6 @@ ckrm_ns_put(struct ckrm_net_struct *ns)
 {
         if (atomic_dec_and_test(&ns->ns_refcnt))
                 kfree(ns);
-
         return;
 }
 /*
@@ -169,12 +168,12 @@ sock_add_resctrl(struct ckrm_core_class *core, int resid)
 	if ((resid < 0) || (resid >= CKRM_MAX_RES_CTLRS) || ((rcbs = core->classtype->res_ctlrs[resid]) == NULL)) 
 		return;
 
-	spin_lock(&core->ckrm_lock);
+	class_lock(core);
 	list_for_each_entry(ns, &core->objlist, ckrm_link) {
 		if (rcbs->change_resclass)
 			(*rcbs->change_resclass)(ns, NULL, core->res_class[resid]);
 	}
-	spin_unlock(&core->ckrm_lock);
+	class_unlock(core);
 }
 
 
@@ -201,8 +200,9 @@ cb_sockclass_listen_start(struct sock *sk)
 	if (!ns)
 		return;
 
-	memset(ns,0, sizeof(ns));
+	memset(ns,0, sizeof(*ns));
 	INIT_LIST_HEAD(&ns->ckrm_link);
+	ckrm_ns_hold(ns);
 
 	ns->ns_family = sk->sk_family;
 	if (ns->ns_family == IPPROTO_IPV6)	// IPv6 not supported yet.
@@ -213,7 +213,6 @@ cb_sockclass_listen_start(struct sock *sk)
 		
 	ns->ns_pid = current->pid;
 	ns->ns_tgid = current->tgid;
-
 	ce_protect(&CT_sockclass);
 	CE_CLASSIFY_RET(newcls,&CT_sockclass,CKRM_EVENT_LISTEN_START,ns,current);
 	ce_release(&CT_sockclass);
@@ -225,7 +224,6 @@ cb_sockclass_listen_start(struct sock *sk)
 
 	class_lock(class_core(newcls));
 	list_add(&ns->ckrm_link, &class_core(newcls)->objlist);
-	ckrm_ns_put(ns);
 	ns->core = newcls;
 	class_unlock(class_core(newcls));
 	
@@ -269,8 +267,8 @@ cb_sockclass_listen_stop(struct sock *sk)
 		class_lock(class_core(newcls));
 		list_del(&ns->ckrm_link);
 		INIT_LIST_HEAD(&ns->ckrm_link);
-		ckrm_core_drop(class_core(newcls));
 		class_unlock(class_core(newcls));
+		ckrm_core_drop(class_core(newcls));
 	}
 
 	// the socket is already locked
@@ -469,9 +467,10 @@ sock_forced_reclassify(struct ckrm_core_class *target,const char *options)
 			p2 = v4toi(p2, '\\',&(v4addr));
 			ns.ns_daddrv4 = htonl(v4addr);
 			ns.ns_family = 4; //IPPROTO_IPV4
-			p2 = v4toi(++p2, ':',&tmp); ns.ns_dport = (__u16)tmp;
-			p2 = v4toi(++p2,'\0',&ns.ns_pid);
-			
+			p2 = v4toi(++p2, ':',&tmp); 
+			ns.ns_dport = (__u16)tmp;
+			if (*p2) 
+				p2 = v4toi(++p2,'\0',&ns.ns_pid);
 			sock_forced_reclassify_ns(&ns,target);
 			break;
 

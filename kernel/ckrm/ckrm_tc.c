@@ -50,6 +50,11 @@
 
 #include <linux/ckrm_tc.h>
 
+
+
+#define TC_DEBUG(fmt, args...) do { /* printk("%s: " fmt, __FUNCTION__ , ## args); */ } while (0)
+
+
 static struct ckrm_task_class  taskclass_dflt_class = {
 };
 
@@ -155,8 +160,8 @@ ckrm_set_taskclass(struct task_struct *tsk, ckrm_task_class_t *newcls,
 		ckrm_task_unlock(tsk);
 		if (newcls) {
 			/* compensate for previous grab */
-			printk("ckrm_set_taskclass(%s:%d): Race-condition caught <%s> %d\n",
-				tsk->comm,tsk->pid,class_core(newcls)->name,event);
+			TC_DEBUG("(%s:%d): Race-condition caught <%s> %d\n",
+				 tsk->comm,tsk->pid,class_core(newcls)->name,event);
 			ckrm_core_drop(class_core(newcls));
 		}
 		return;
@@ -201,14 +206,18 @@ ckrm_set_taskclass(struct task_struct *tsk, ckrm_task_class_t *newcls,
 	ckrm_task_unlock(tsk);
 
 	clstype = class_isa(newcls);                      // Hubertus .. can hardcode ckrm_CT_taskclass
-	for (i = 0; i < clstype->max_resid; i++) {
-		atomic_inc(&clstype->nr_resusers[i]);
-		old_res_class = curcls ? class_core(curcls)->res_class[i] : NULL;
-		new_res_class = newcls ? class_core(newcls)->res_class[i] : NULL;
-		rcbs = clstype->res_ctlrs[i];
-		if (rcbs && rcbs->change_resclass && (old_res_class != new_res_class)) 
-			(*rcbs->change_resclass)(tsk, old_res_class, new_res_class);
-		atomic_dec(&clstype->nr_resusers[i]);
+	if (clstype->bit_res_ctlrs) {   // avoid running through the entire list if non is registered
+		for (i = 0; i < clstype->max_resid; i++) {
+			if (clstype->res_ctlrs[i] == NULL) 
+				continue;
+			atomic_inc(&clstype->nr_resusers[i]);
+			old_res_class = curcls ? class_core(curcls)->res_class[i] : NULL;
+			new_res_class = newcls ? class_core(newcls)->res_class[i] : NULL;
+			rcbs = clstype->res_ctlrs[i];
+			if (rcbs && rcbs->change_resclass && (old_res_class != new_res_class)) 
+				(*rcbs->change_resclass)(tsk, old_res_class, new_res_class);
+			atomic_dec(&clstype->nr_resusers[i]);
+		}
 	}
 
  out:
@@ -229,12 +238,12 @@ tc_add_resctrl(struct ckrm_core_class *core, int resid)
 	if ((resid < 0) || (resid >= CKRM_MAX_RES_CTLRS) || ((rcbs = core->classtype->res_ctlrs[resid]) == NULL)) 
 		return;
 
-	spin_lock(&core->ckrm_lock);
+	class_lock(core);
 	list_for_each_entry(tsk, &core->objlist, taskclass_link) {
 		if (rcbs->change_resclass)
 			(*rcbs->change_resclass)(tsk, (void *) -1, core->res_class[resid]);
 	}
-	spin_unlock(&core->ckrm_lock);
+	class_unlock(core);
 }
 
 
@@ -522,14 +531,14 @@ ckrm_reclassify_class_tasks(struct ckrm_task_class *cls)
 	int ce_regd;
 	struct ckrm_hnode *cnode;
 	struct ckrm_task_class *parcls;
+	int num = 0;
 
 	if (!ckrm_validate_and_grab_core(&cls->core))
 		return;
 
 	down(&async_serializer);   // protect again race condition
-
-
-	printk("\t%s: start %p:%s:%d\n",__FUNCTION__,cls,cls->core.name, atomic_read(&cls->core.refcnt));
+	TC_DEBUG("start %p:%s:%d:%d\n",cls,cls->core.name,
+		atomic_read(&cls->core.refcnt),atomic_read(&cls->core.hnode.parent->refcnt));
 	// If no CE registered for this classtype, following will be needed repeatedly;
 	ce_regd =  class_core(cls)->classtype->ce_regd;
 	cnode = &(class_core(cls)->hnode);
@@ -547,25 +556,27 @@ next_task:
 		class_unlock(class_core(cls));
 
 		if (ce_regd) {
-			CE_CLASSIFY_RET(newcls,&CT_taskclass,CKRM_EVENT_RECLASSIFY,tsk); 
-		} else {
+			CE_CLASSIFY_RET(newcls,&CT_taskclass,CKRM_EVENT_RECLASSIFY,tsk);
+			if (cls == newcls) {
+				// don't allow reclassifying to the same class
+				// as we are in the process of cleaning up this class
+				ckrm_core_drop(class_core(newcls)); // to compensate CE's grab
+				newcls = NULL;
+			}
+		}
+		if (newcls == NULL) {
 			newcls = parcls;
 			ckrm_core_grab(class_core(newcls));
 		}
-
-		if (cls == newcls) {
-			// don't allow reclassifying to the same class
-			// as we are in the process of cleaning up this class
-			ckrm_core_drop(class_core(newcls)); // to compensate CE's grab
-			newcls = NULL;
-		}
 		ckrm_set_taskclass(tsk, newcls, cls, CKRM_EVENT_RECLASSIFY);
 		put_task_struct(tsk);
+		num++;
 		goto next_task;
 	}
-	printk("\t%s: stop  %p:%s:%d\n",__FUNCTION__,cls,cls->core.name, atomic_read(&cls->core.refcnt));
-	ckrm_core_drop(class_core(cls));
+	TC_DEBUG("stop  %p:%s:%d:%d   %d\n",cls,cls->core.name,
+		atomic_read(&cls->core.refcnt),atomic_read(&cls->core.hnode.parent->refcnt),num);
 	class_unlock(class_core(cls));
+	ckrm_core_drop(class_core(cls));
 
 	up(&async_serializer);
 
@@ -587,6 +598,7 @@ ckrm_forced_reclassify_pid(pid_t pid, struct ckrm_task_class *cls)
 	read_lock(&tasklist_lock);
 	if ((tsk = find_task_by_pid(pid)) == NULL) {
 		read_unlock(&tasklist_lock);
+		ckrm_core_drop(class_core(cls));
 		return -EINVAL;
 	}
 	get_task_struct(tsk);
@@ -636,8 +648,9 @@ ckrm_free_task_class(struct ckrm_core_class *core)
 		core->name = dflt_taskclass_name;
  		return 0;
 	}
-
-	printk("%s: stop  %p:%s:%d\n",__FUNCTION__,core,core->name, atomic_read(&core->refcnt));
+	
+	TC_DEBUG("%p:%s:%d\n",core,core->name,atomic_read(&core->refcnt));
+	 
 	taskcls = class_type(struct ckrm_task_class, core);
 
 	ce_protect(&CT_taskclass);
@@ -677,12 +690,12 @@ tc_show_members(struct ckrm_core_class *core, struct seq_file *seq)
 	struct list_head *lh;
 	struct task_struct *tsk;
 
-	spin_lock(&core->ckrm_lock);
+	class_lock(core);
 	list_for_each(lh, &core->objlist) {	
 		tsk = container_of(lh, struct task_struct, taskclass_link);
 		seq_printf(seq,"%ld\n", (long)tsk->pid);
 	}
-	spin_unlock(&core->ckrm_lock);
+	class_unlock(core);
 
 	return 0;
 }

@@ -21,6 +21,7 @@
 #include <linux/utsname.h>
 #include <linux/kernel_stat.h>
 #include <linux/dump.h>
+#include <linux/ltt.h>
 
 #ifdef LINUX_COMPILE_VERSION_ID_TYPE
 /* Define version type for version validation of dump and kerntypes */

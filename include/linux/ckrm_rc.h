@@ -194,7 +194,7 @@ typedef struct ckrm_hnode {
 typedef struct ckrm_core_class {
 	struct ckrm_classtype *classtype; // what type does this core class belong to
         void* res_class[CKRM_MAX_RES_CTLRS];                 // pointer to array of resource classes
-  	spinlock_t ckrm_lock;             // to protect the list and the array above
+  	spinlock_t class_lock;             // to protect the list and the array above
 	struct list_head objlist;         // generic list for any object list to be maintained by class
 	struct list_head clslist;         // to link up all classes in a single list type wrt to type
 	struct dentry  *dentry;           // dentry of inode in the RCFS
@@ -203,14 +203,15 @@ typedef struct ckrm_core_class {
 	rwlock_t hnode_rwlock; // rw_clock protecting the hnode above.
 	atomic_t refcnt;
 	const char *name;
+	int delayed;                      // core deletion delayed because of race conditions
 } ckrm_core_class_t;
 
 /* type coerce between derived class types and ckrm core class type */
 #define class_type(type,coreptr)   container_of(coreptr,type,core)
 #define class_core(clsptr)         (&(clsptr)->core)
 /* locking classes */
-#define class_lock(coreptr)        spin_lock(&(coreptr)->ckrm_lock)
-#define class_unlock(coreptr)      spin_unlock(&(coreptr)->ckrm_lock)
+#define class_lock(coreptr)        spin_lock(&(coreptr)->class_lock)
+#define class_unlock(coreptr)      spin_unlock(&(coreptr)->class_lock)
 /* what type is a class of ISA */
 #define class_isa(clsptr)          (class_core(clsptr)->classtype)
 
