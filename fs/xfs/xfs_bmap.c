@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -5579,7 +5579,7 @@ xfs_getbmap(
 	if (whichfork == XFS_DATA_FORK) {
 		if (ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) {
 			prealloced = 1;
-			fixlen = XFS_MAX_FILE_OFFSET;
+			fixlen = XFS_MAXIOFFSET(mp);
 		} else {
 			prealloced = 0;
 			fixlen = ip->i_d.di_size;

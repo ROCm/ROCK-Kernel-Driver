@@ -352,6 +352,7 @@ typedef struct xfs_mount {
 	uint			m_qflags;	/* quota status flags */
 	xfs_trans_reservations_t m_reservations;/* precomputed res values */
 	__uint64_t		m_maxicount;	/* maximum inode count */
+	__uint64_t		m_maxioffset;	/* maximum inode offset */
 	__uint64_t		m_resblks;	/* total reserved blocks */
 	__uint64_t		m_resblks_avail;/* available reserved blocks */
 #if XFS_BIG_FILESYSTEMS
@@ -418,8 +419,6 @@ typedef struct xfs_mount {
 						 * 32 bits in size */
 #define XFS_MOUNT_NOLOGFLUSH	0x00010000
 
-#define XFS_FORCED_SHUTDOWN(mp)	((mp)->m_flags & XFS_MOUNT_FS_SHUTDOWN)
-
 /*
  * Default minimum read and write sizes.
  */
@@ -444,6 +443,9 @@ typedef struct xfs_mount {
 #define	XFS_WSYNC_READIO_LOG	15	/* 32K */
 #define	XFS_WSYNC_WRITEIO_LOG	14	/* 16K */
 
+#define XFS_MAXIOFFSET(mp)	((mp)->m_maxioffset)
+
+#define XFS_FORCED_SHUTDOWN(mp)	((mp)->m_flags & XFS_MOUNT_FS_SHUTDOWN)
 #define xfs_force_shutdown(m,f)	\
 	VFS_FORCE_SHUTDOWN((XFS_MTOVFS(m)), f, __FILE__, __LINE__)
 
