@@ -557,6 +557,7 @@ asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds *buf)
 	switch (cmd) {
 	case IPC_SET:
 	{
+		err = -EPERM;
 		if (setbuf.qbytes > msg_ctlmnb && !capable(CAP_SYS_RESOURCE))
 			goto out_unlock_up;
 
