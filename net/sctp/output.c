@@ -62,17 +62,16 @@
 #include <net/sctp/sm.h>
 
 /* Forward declarations for private helpers. */
-static void sctp_packet_reset(sctp_packet_t *packet);
-static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet,
-					   sctp_chunk_t *chunk);
+static void sctp_packet_reset(struct sctp_packet *packet);
+static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
+					   struct sctp_chunk *chunk);
 
 /* Config a packet.
  * This appears to be a followup set of initializations.)
  */
-sctp_packet_t *sctp_packet_config(sctp_packet_t *packet,
-				  __u32 vtag,
-				  int ecn_capable,
-				  sctp_packet_phandler_t *prepend_handler)
+struct sctp_packet *sctp_packet_config(struct sctp_packet *packet,
+				       __u32 vtag, int ecn_capable,
+				       sctp_packet_phandler_t *prepend_handler)
 {
 	int packet_empty = (packet->size == SCTP_IP_OVERHEAD);
 
@@ -89,10 +88,9 @@ sctp_packet_t *sctp_packet_config(sctp_packet_t *packet,
 }
 
 /* Initialize the packet structure. */
-sctp_packet_t *sctp_packet_init(sctp_packet_t *packet,
-				struct sctp_transport *transport,
-				__u16 sport,
-				__u16 dport)
+struct sctp_packet *sctp_packet_init(struct sctp_packet *packet,
+				     struct sctp_transport *transport,
+				     __u16 sport, __u16 dport)
 {
 	packet->transport = transport;
 	packet->source_port = sport;
@@ -109,14 +107,12 @@ sctp_packet_t *sctp_packet_init(sctp_packet_t *packet,
 }
 
 /* Free a packet.  */
-void sctp_packet_free(sctp_packet_t *packet)
+void sctp_packet_free(struct sctp_packet *packet)
 {
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 
-        while (NULL != 
-	       (chunk = (sctp_chunk_t *)skb_dequeue(&packet->chunks))) {
+        while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks)))
 		sctp_free_chunk(chunk);
-	}
 
 	if (packet->malloced)
 		kfree(packet);
@@ -129,8 +125,8 @@ void sctp_packet_free(sctp_packet_t *packet)
  * as it can fit in the packet, but any more data that does not fit in this
  * packet can be sent only after receiving the COOKIE_ACK.
  */
-sctp_xmit_t sctp_packet_transmit_chunk(sctp_packet_t *packet,
-				       sctp_chunk_t *chunk)
+sctp_xmit_t sctp_packet_transmit_chunk(struct sctp_packet *packet,
+				       struct sctp_chunk *chunk)
 {
 	sctp_xmit_t retval;
 	int error = 0;
@@ -152,6 +148,7 @@ sctp_xmit_t sctp_packet_transmit_chunk(sctp_packet_t *packet,
 	case SCTP_XMIT_MUST_FRAG:
 	case SCTP_XMIT_RWND_FULL:
 	case SCTP_XMIT_OK:
+	case SCTP_XMIT_NAGLE_DELAY:
 		break;
 	};
 
@@ -161,7 +158,8 @@ sctp_xmit_t sctp_packet_transmit_chunk(sctp_packet_t *packet,
 /* Append a chunk to the offered packet reporting back any inability to do
  * so.
  */
-sctp_xmit_t sctp_packet_append_chunk(sctp_packet_t *packet, sctp_chunk_t *chunk)
+sctp_xmit_t sctp_packet_append_chunk(struct sctp_packet *packet,
+				     struct sctp_chunk *chunk)
 {
 	sctp_xmit_t retval = SCTP_XMIT_OK;
 	__u16 chunk_len = WORD_ROUND(ntohs(chunk->chunk_hdr->length));
@@ -182,7 +180,7 @@ sctp_xmit_t sctp_packet_append_chunk(sctp_packet_t *packet, sctp_chunk_t *chunk)
 		/* Both control chunks and data chunks with TSNs are
 		 * non-fragmentable.
 		 */
-		int fragmentable = sctp_chunk_is_data(chunk) && 
+		int fragmentable = sctp_chunk_is_data(chunk) &&
 			(!chunk->has_tsn);
 		if (packet_empty) {
 			if (fragmentable) {
@@ -223,7 +221,7 @@ append:
 	}
 
 	/* It is OK to send this chunk.  */
-	skb_queue_tail(&packet->chunks, (struct sk_buff *)chunk);
+	__skb_queue_tail(&packet->chunks, (struct sk_buff *)chunk);
 	packet->size += chunk_len;
 finish:
 	return retval;
@@ -234,18 +232,18 @@ finish:
  *
  * The return value is a normal kernel error return value.
  */
-int sctp_packet_transmit(sctp_packet_t *packet)
+int sctp_packet_transmit(struct sctp_packet *packet)
 {
 	struct sctp_transport *transport = packet->transport;
-	sctp_association_t *asoc = transport->asoc;
+	struct sctp_association *asoc = transport->asoc;
 	struct sctphdr *sh;
 	__u32 crc32;
 	struct sk_buff *nskb;
-	sctp_chunk_t *chunk;
+	struct sctp_chunk *chunk;
 	struct sock *sk;
 	int err = 0;
 	int padding;		/* How much padding do we need?  */
-	__u8 packet_has_data = 0;
+	__u8 has_data = 0;
 	struct dst_entry *dst;
 
 	/* Do NOT generate a chunkless packet... */
@@ -253,7 +251,7 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 		return err;
 
 	/* Set up convenience variables... */
-	chunk = (sctp_chunk_t *) (packet->chunks.next);
+	chunk = (struct sctp_chunk *) (packet->chunks.next);
 	sk = chunk->skb->sk;
 
 	/* Allocate the new skb.  */
@@ -291,8 +289,7 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	 * [This whole comment explains WORD_ROUND() below.]
 	 */
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet***\n");
-	while (NULL != (chunk = (sctp_chunk_t *)
-			skb_dequeue(&packet->chunks))) {
+	while ((chunk = (struct sctp_chunk *)__skb_dequeue(&packet->chunks))) {
 		chunk->num_times_sent++;
 		chunk->sent_at = jiffies;
 		if (sctp_chunk_is_data(chunk)) {
@@ -309,7 +306,7 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 				chunk->rtt_in_progress = 1;
 				transport->rto_pending = 1;
 			}
-			packet_has_data = 1;
+			has_data = 1;
 		}
 		memcpy(skb_put(nskb, chunk->skb->len),
 		       chunk->skb->data, chunk->skb->len);
@@ -399,7 +396,7 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 		asoc->peer.last_sent_to = transport;
 	}
 
-	if (packet_has_data) {
+	if (has_data) {
 		struct timer_list *timer;
 		unsigned long timeout;
 
@@ -456,9 +453,9 @@ no_route:
 /*
  * This private function resets the packet to a fresh state.
  */
-static void sctp_packet_reset(sctp_packet_t *packet)
+static void sctp_packet_reset(struct sctp_packet *packet)
 {
-	sctp_chunk_t *chunk = NULL;
+	struct sctp_chunk *chunk = NULL;
 
 	packet->size = SCTP_IP_OVERHEAD;
 
@@ -473,13 +470,16 @@ static void sctp_packet_reset(sctp_packet_t *packet)
 }
 
 /* This private function handles the specifics of appending DATA chunks.  */
-static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet, 
-					   sctp_chunk_t *chunk)
+static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
+					   struct sctp_chunk *chunk)
 {
 	sctp_xmit_t retval = SCTP_XMIT_OK;
 	size_t datasize, rwnd, inflight;
 	struct sctp_transport *transport = packet->transport;
 	__u32 max_burst_bytes;
+	struct sctp_association *asoc = transport->asoc;
+	struct sctp_opt *sp = sctp_sk(asoc->base.sk);
+	struct sctp_outq *q = &asoc->outqueue;
 
 	/* RFC 2960 6.1  Transmission of DATA Chunks
 	 *
@@ -494,8 +494,8 @@ static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet,
 	 * receiver to the data sender.
 	 */
 
-	rwnd = transport->asoc->peer.rwnd;
-	inflight = transport->asoc->outqueue.outstanding_bytes;
+	rwnd = asoc->peer.rwnd;
+	inflight = asoc->outqueue.outstanding_bytes;
 
 	datasize = sctp_data_size(chunk);
 
@@ -517,7 +517,7 @@ static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet,
 	 * 	if ((flightsize + Max.Burst * MTU) < cwnd)
 	 *		cwnd = flightsize + Max.Burst * MTU
 	 */
-	max_burst_bytes = transport->asoc->max_burst * transport->asoc->pmtu;
+	max_burst_bytes = asoc->max_burst * asoc->pmtu;
 	if ((transport->flight_size + max_burst_bytes) < transport->cwnd) {
 		transport->cwnd = transport->flight_size + max_burst_bytes;
 		SCTP_DEBUG_PRINTK("%s: cwnd limited by max_burst: "
@@ -543,9 +543,27 @@ static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet,
 	 *    When a Fast Retransmit is being performed the sender SHOULD
 	 *    ignore the value of cwnd and SHOULD NOT delay retransmission.
 	 */
-	if (!chunk->fast_retransmit) {
+	if (!chunk->fast_retransmit)
 		if (transport->flight_size >= transport->cwnd) {
 			retval = SCTP_XMIT_RWND_FULL;
+			goto finish;
+		}
+
+	/* Nagle's algorithm to solve small-packet problem:
+	 * Inhibit the sending of new chunks when new outgoing data arrives
+	 * if any previously transmitted data on the connection remains
+	 * unacknowledged.
+	 */
+	if (!sp->nodelay && SCTP_IP_OVERHEAD == packet->size && 
+	    q->outstanding_bytes && SCTP_STATE_ESTABLISHED == asoc->state) {
+		unsigned len = datasize + q->out_qlen;
+
+		/* Check whether this chunk and all the rest of pending
+		 * data will fit or delay in hopes of bundling a full
+		 * sized packet.
+		 */
+		if (len < asoc->pmtu - SCTP_IP_OVERHEAD) {
+			retval = SCTP_XMIT_NAGLE_DELAY;
 			goto finish;
 		}
 	}
@@ -554,16 +572,15 @@ static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet,
 	transport->flight_size += datasize;
 
 	/* Keep track of how many bytes are in flight to the receiver. */
-	transport->asoc->outqueue.outstanding_bytes += datasize;
+	asoc->outqueue.outstanding_bytes += datasize;
 
 	/* Update our view of the receiver's rwnd. */
-	if (datasize < rwnd) {
+	if (datasize < rwnd)
 		rwnd -= datasize;
-	} else {
+	else
 		rwnd = 0;
-	}
 
-	transport->asoc->peer.rwnd = rwnd;
+	asoc->peer.rwnd = rwnd;
 
 finish:
 	return retval;

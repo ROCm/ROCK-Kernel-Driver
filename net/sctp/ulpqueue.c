@@ -220,7 +220,7 @@ int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 	if (sctp_event2skb(event)->list)
 		sctp_skb_list_tail(sctp_event2skb(event)->list, queue);
 	else
-		skb_queue_tail(queue, sctp_event2skb(event));
+		__skb_queue_tail(queue, sctp_event2skb(event));
 
 	/* Did we just complete partial delivery and need to get
 	 * rolling again?  Move pending data to the receive
@@ -230,7 +230,7 @@ int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 		sctp_ulpq_clear_pd(ulpq);
 
 	if (queue == &sk->receive_queue)
-		wake_up_interruptible(sk->sleep);
+		sk->data_ready(sk, 0);
 	return 1;
 
 out_free:
@@ -247,14 +247,14 @@ out_free:
 static inline void sctp_ulpq_store_reasm(struct sctp_ulpq *ulpq,
 					 struct sctp_ulpevent *event)
 {
-	struct sk_buff *pos, *tmp;
+	struct sk_buff *pos;
 	struct sctp_ulpevent *cevent;
 	__u32 tsn, ctsn;
 
 	tsn = event->sndrcvinfo.sinfo_tsn;
 
 	/* Find the right place in this list. We store them by TSN.  */
-	sctp_skb_for_each(pos, &ulpq->reasm, tmp) {
+	skb_queue_walk(&ulpq->reasm, pos) {
 		cevent = sctp_skb2event(pos);
 		ctsn = cevent->sndrcvinfo.sinfo_tsn;
 
@@ -334,7 +334,7 @@ static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *
  */
 static inline struct sctp_ulpevent *sctp_ulpq_retrieve_reassembled(struct sctp_ulpq *ulpq)
 {
-	struct sk_buff *pos, *tmp;
+	struct sk_buff *pos;
 	struct sctp_ulpevent *cevent;
 	struct sk_buff *first_frag = NULL;
 	__u32 ctsn, next_tsn;
@@ -355,7 +355,7 @@ static inline struct sctp_ulpevent *sctp_ulpq_retrieve_reassembled(struct sctp_u
 	 * fragment in order. If not, first_frag is reset to NULL and we
 	 * start the next pass when we find another first fragment.
 	 */
-	sctp_skb_for_each(pos, &ulpq->reasm, tmp) {
+	skb_queue_walk(&ulpq->reasm, pos) {
 		cevent = sctp_skb2event(pos);
 		ctsn = cevent->sndrcvinfo.sinfo_tsn;
 
@@ -374,29 +374,26 @@ static inline struct sctp_ulpevent *sctp_ulpq_retrieve_reassembled(struct sctp_u
 
 		case SCTP_DATA_LAST_FRAG:
 			if (first_frag && (ctsn == next_tsn))
-				retval = sctp_make_reassembled_event(
-						first_frag, pos);
+				goto found;
 			else
 				first_frag = NULL;
 			break;
 		};
 
-		/* We have the reassembled event. There is no need to look
-		 * further.
-		 */
-		if (retval) {
-			retval->msg_flags |= MSG_EOR;
-			break;
-		}
 	}
-
+done:
 	return retval;
+found:
+	retval = sctp_make_reassembled_event(first_frag, pos);
+	if (retval)
+		retval->msg_flags |= MSG_EOR;
+	goto done;
 }
 
 /* Retrieve the next set of fragments of a partial message. */
 static inline struct sctp_ulpevent *sctp_ulpq_retrieve_partial(struct sctp_ulpq *ulpq)
 {
-	struct sk_buff *pos, *tmp, *last_frag, *first_frag;
+	struct sk_buff *pos, *last_frag, *first_frag;
 	struct sctp_ulpevent *cevent;
 	__u32 ctsn, next_tsn;
 	int is_last;
@@ -415,7 +412,7 @@ static inline struct sctp_ulpevent *sctp_ulpq_retrieve_partial(struct sctp_ulpq 
 	next_tsn = 0;
 	is_last = 0;
 
-	sctp_skb_for_each(pos, &ulpq->reasm, tmp) {
+	skb_queue_walk(&ulpq->reasm, pos) {
 		cevent = sctp_skb2event(pos);
 		ctsn = cevent->sndrcvinfo.sinfo_tsn;
 
@@ -448,7 +445,7 @@ static inline struct sctp_ulpevent *sctp_ulpq_retrieve_partial(struct sctp_ulpq 
 	 */
 done:
 	retval = sctp_make_reassembled_event(first_frag, last_frag);
-	if (is_last)
+	if (retval && is_last)
 		retval->msg_flags |= MSG_EOR;
 
 	return retval;
@@ -490,7 +487,7 @@ static inline struct sctp_ulpevent *sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
 /* Retrieve the first part (sequential fragments) for partial delivery.  */
 static inline struct sctp_ulpevent *sctp_ulpq_retrieve_first(struct sctp_ulpq *ulpq)
 {
-	struct sk_buff *pos, *tmp, *last_frag, *first_frag;
+	struct sk_buff *pos, *last_frag, *first_frag;
 	struct sctp_ulpevent *cevent;
 	__u32 ctsn, next_tsn;
 	struct sctp_ulpevent *retval;
@@ -507,7 +504,7 @@ static inline struct sctp_ulpevent *sctp_ulpq_retrieve_first(struct sctp_ulpq *u
 	retval = NULL;
 	next_tsn = 0;
 
-	sctp_skb_for_each(pos, &ulpq->reasm, tmp) {
+	skb_queue_walk(&ulpq->reasm, pos) {
 		cevent = sctp_skb2event(pos);
 		ctsn = cevent->sndrcvinfo.sinfo_tsn;
 
@@ -590,7 +587,7 @@ static inline void sctp_ulpq_retrieve_ordered(struct sctp_ulpq *ulpq,
 static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
 					   struct sctp_ulpevent *event)
 {
-	struct sk_buff *pos, *tmp;
+	struct sk_buff *pos;
 	struct sctp_ulpevent *cevent;
 	__u16 sid, csid;
 	__u16 ssn, cssn;
@@ -601,7 +598,7 @@ static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
 	/* Find the right place in this list.  We store them by
 	 * stream ID and then by SSN.
 	 */
-	sctp_skb_for_each(pos, &ulpq->lobby, tmp) {
+	skb_queue_walk(&ulpq->lobby, pos) {
 		cevent = (struct sctp_ulpevent *) pos->cb;
 		csid = cevent->sndrcvinfo.sinfo_stream;
 		cssn = cevent->sndrcvinfo.sinfo_ssn;
@@ -786,9 +783,9 @@ void sctp_ulpq_abort_pd(struct sctp_ulpq *ulpq, int priority)
 					      SCTP_PARTIAL_DELIVERY_ABORTED,
 					      priority);
 	if (ev)
-		skb_queue_tail(&sk->receive_queue, sctp_event2skb(ev));
+		__skb_queue_tail(&sk->receive_queue, sctp_event2skb(ev));
 
 	/* If there is data waiting, send it up the socket now. */
 	if (sctp_ulpq_clear_pd(ulpq) || ev)
-		wake_up_interruptible(sk->sleep);
+		sk->data_ready(sk, 0);
 }

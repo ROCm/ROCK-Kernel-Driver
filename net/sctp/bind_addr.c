@@ -302,7 +302,7 @@ int sctp_bind_addr_match(sctp_bind_addr_t *bp, const union sctp_addr *addr,
 static int sctp_copy_one_addr(sctp_bind_addr_t *dest, union sctp_addr *addr,
 			      sctp_scope_t scope, int priority, int flags)
 {
-	sctp_protocol_t *proto = sctp_get_protocol();
+	struct sctp_protocol *proto = sctp_get_protocol();
 	int error = 0;
 
 	if (sctp_is_any(addr)) {

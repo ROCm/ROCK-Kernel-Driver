@@ -250,7 +250,7 @@ int sctp_tsnmap_next_gap_ack(const struct sctp_tsnmap *map,
 	/* The Gap Ack Block happens to end at the end of the
 	 * overflow map.
 	 */
-	if (started & !ended) {
+	if (started && !ended) {
 		ended++;
 		_end = map->len + map->len - 1;
 	}
@@ -395,7 +395,7 @@ void sctp_tsnmap_renege(struct sctp_tsnmap *map, __u32 tsn)
 		return;
 	if (!TSN_lt(tsn, map->base_tsn + map->len + map->len))
 		return;
-	
+
 	/* Assert: TSN is in range.  */
 	gap = tsn - map->base_tsn;
 

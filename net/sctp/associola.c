@@ -181,7 +181,7 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	else
 		asoc->rwnd = sk->rcvbuf;
 
-	asoc->a_rwnd = 0;
+	asoc->a_rwnd = asoc->rwnd;
 
 	asoc->rwnd_over = 0;
 
@@ -360,9 +360,25 @@ static void sctp_association_destroy(sctp_association_t *asoc)
 	}
 }
 
+/* Change the primary destination address for the peer. */
+void sctp_assoc_set_primary(struct sctp_association *asoc,
+			    struct sctp_transport *transport)
+{
+	asoc->peer.primary_path = transport;
+
+	/* Set a default msg_name for events. */
+	memcpy(&asoc->peer.primary_addr, &transport->ipaddr,
+	       sizeof(union sctp_addr));
+
+	/* If the primary path is changing, assume that the
+	 * user wants to use this new path.
+	 */
+	if (transport->active)
+		asoc->peer.active_path = transport;
+}
 
 /* Add a transport address to an association.  */
-struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *asoc,
+struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 					   const union sctp_addr *addr,
 					   int priority)
 {
@@ -397,17 +413,16 @@ struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *asoc,
 	 * If not and the current association PMTU is higher than the new
 	 * peer's PMTU, reset the association PMTU to the new peer's PMTU.
 	 */
-	if (asoc->pmtu) {
+	if (asoc->pmtu)
 		asoc->pmtu = min_t(int, peer->pmtu, asoc->pmtu);
-	} else {
+	else
 		asoc->pmtu = peer->pmtu;
-	}
 
 	SCTP_DEBUG_PRINTK("sctp_assoc_add_peer:association %p PMTU set to "
 			  "%d\n", asoc, asoc->pmtu);
 
-	asoc->frag_point = asoc->pmtu -
-		(SCTP_IP_OVERHEAD + sizeof(sctp_data_chunk_t));
+	asoc->frag_point = asoc->pmtu;
+	asoc->frag_point -= SCTP_IP_OVERHEAD + sizeof(struct sctp_data_chunk);
 
 	/* The asoc->peer.port might not be meaningful yet, but
 	 * initialize the packet structure anyway.
@@ -460,11 +475,7 @@ struct sctp_transport *sctp_assoc_add_peer(sctp_association_t *asoc,
 
 	/* If we do not yet have a primary path, set one.  */
 	if (NULL == asoc->peer.primary_path) {
-		asoc->peer.primary_path = peer;
-		/* Set a default msg_name for events. */
-		memcpy(&asoc->peer.primary_addr, &peer->ipaddr,
-		       sizeof(union sctp_addr));
-		asoc->peer.active_path = peer;
+		sctp_assoc_set_primary(asoc, peer);
 		asoc->peer.retran_path = peer;
 	}
 
@@ -603,7 +614,7 @@ void sctp_association_put(sctp_association_t *asoc)
 /* Allocate the next TSN, Transmission Sequence Number, for the given
  * association.
  */
-__u32 __sctp_association_get_next_tsn(sctp_association_t *asoc)
+__u32 sctp_association_get_next_tsn(sctp_association_t *asoc)
 {
 	/* From Section 1.6 Serial Number Arithmetic:
 	 * Transmission Sequence Numbers wrap around when they reach
@@ -618,7 +629,7 @@ __u32 __sctp_association_get_next_tsn(sctp_association_t *asoc)
 }
 
 /* Allocate 'num' TSNs by incrementing the association's TSN by num. */
-__u32 __sctp_association_get_tsn_block(sctp_association_t *asoc, int num)
+__u32 sctp_association_get_tsn_block(sctp_association_t *asoc, int num)
 {
 	__u32 retval = asoc->next_tsn;
 
@@ -942,7 +953,7 @@ struct sctp_transport *sctp_assoc_choose_shutdown_transport(sctp_association_t *
 {
 	/* If this is the first time SHUTDOWN is sent, use the active path,
 	 * else use the retran path. If the last SHUTDOWN was sent over the
-	 * retran path, update the retran path and use it. 
+	 * retran path, update the retran path and use it.
 	 */
 	if (!asoc->shutdown_last_sent_to)
 		return asoc->peer.active_path;
@@ -983,6 +994,24 @@ void sctp_assoc_sync_pmtu(sctp_association_t *asoc)
 			  __FUNCTION__, asoc, asoc->pmtu, asoc->frag_point);
 }
 
+/* Should we send a SACK to update our peer? */
+static inline int sctp_peer_needs_update(struct sctp_association *asoc)
+{
+	switch (asoc->state) {
+	case SCTP_STATE_ESTABLISHED:
+	case SCTP_STATE_SHUTDOWN_PENDING:
+	case SCTP_STATE_SHUTDOWN_RECEIVED:
+		if ((asoc->rwnd > asoc->a_rwnd) && 
+		    ((asoc->rwnd - asoc->a_rwnd) >=
+		     min_t(__u32, (asoc->base.sk->rcvbuf >> 1), asoc->pmtu))) 
+			return 1;
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
 /* Increase asoc's rwnd by len and send any window update SACK if needed. */
 void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 {
@@ -1009,19 +1038,14 @@ void sctp_assoc_rwnd_increase(sctp_association_t *asoc, int len)
 	 * The algorithm used is similar to the one described in
 	 * Section 4.2.3.3 of RFC 1122.
 	 */
-	if ((asoc->state == SCTP_STATE_ESTABLISHED) &&
-	    (asoc->rwnd > asoc->a_rwnd) &&
-	    ((asoc->rwnd - asoc->a_rwnd) >=
-		     min_t(__u32, (asoc->base.sk->rcvbuf >> 1), asoc->pmtu))) {
+	if (sctp_peer_needs_update(asoc)) {
+		asoc->a_rwnd = asoc->rwnd;
 		SCTP_DEBUG_PRINTK("%s: Sending window update SACK- asoc: %p "
 				  "rwnd: %u a_rwnd: %u\n", __FUNCTION__,
 				  asoc, asoc->rwnd, asoc->a_rwnd);
 		sack = sctp_make_sack(asoc);
 		if (!sack)
 			return;
-
-		/* Update the last advertised rwnd value. */
-		asoc->a_rwnd = asoc->rwnd;
 
 		asoc->peer.sack_needed = 0;
 
@@ -1046,7 +1070,8 @@ void sctp_assoc_rwnd_decrease(sctp_association_t *asoc, int len)
 		asoc->rwnd = 0;
 	}
 	SCTP_DEBUG_PRINTK("%s: asoc %p rwnd decreased by %d to (%u, %u)\n",
-			  __FUNCTION__, asoc, len, asoc->rwnd, asoc->rwnd_over);
+			  __FUNCTION__, asoc, len, asoc->rwnd, 
+			  asoc->rwnd_over);
 }
 
 /* Build the bind address list for the association based on info from the
