@@ -2097,7 +2097,7 @@ done:
 /*-------------------------------------------------------------------------*/
 
 static inline int
-usbnet_ethtool_ioctl (struct net_device *net, void *useraddr)
+usbnet_ethtool_ioctl (struct net_device *net, void __user *useraddr)
 {
 	struct usbnet	*dev = (struct usbnet *) net->priv;
 	u32		cmd;
@@ -2161,7 +2161,7 @@ static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 {
 	switch (cmd) {
 	case SIOCETHTOOL:
-		return usbnet_ethtool_ioctl (net, (void *)rq->ifr_data);
+		return usbnet_ethtool_ioctl (net, (void __user *)rq->ifr_data);
 	default:
 		return -EOPNOTSUPP;
 	}

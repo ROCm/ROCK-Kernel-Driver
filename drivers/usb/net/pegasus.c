@@ -945,7 +945,7 @@ static int pegasus_close(struct net_device *net)
 	return 0;
 }
 #ifdef	CONFIG_MII
-static int pegasus_ethtool_ioctl(struct net_device *dev, void *useraddr)
+static int pegasus_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
 
 	u32 ethcmd;
@@ -1024,7 +1024,7 @@ static int pegasus_ethtool_ioctl(struct net_device *dev, void *useraddr)
 
 }
 #else
-static int pegasus_ethtool_ioctl(struct net_device *net, void *uaddr)
+static int pegasus_ethtool_ioctl(struct net_device *net, void __user *uaddr)
 {
 	pegasus_t *pegasus;
 	int cmd;
@@ -1113,7 +1113,7 @@ static int pegasus_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 
 	switch (cmd) {
 	case SIOCETHTOOL:
-		res = pegasus_ethtool_ioctl(net, rq->ifr_data);
+		res = pegasus_ethtool_ioctl(net, (void __user *)rq->ifr_data);
 		break;
 	case SIOCDEVPRIVATE:
 		data[0] = pegasus->phy;
