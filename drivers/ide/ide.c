@@ -878,13 +878,12 @@ ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 {
 	ide_startstop_t startstop;
 	unsigned long block;
-	ide_hwif_t *hwif = HWIF(drive);
 
 	BUG_ON(!(rq->flags & REQ_STARTED));
 
 #ifdef DEBUG
 	printk("%s: start_request: current=0x%08lx\n",
-		hwif->name, (unsigned long) rq);
+		HWIF(drive)->name, (unsigned long) rq);
 #endif
 
 	/* bail early if we've exceeded max_failures */
@@ -910,7 +909,7 @@ ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 		block = 1;  /* redirect MBR access to EZ-Drive partn table */
 
 #if (DISK_RECOVERY_TIME > 0)
-	while ((read_timer() - hwif->last_time) < DISK_RECOVERY_TIME);
+	while ((read_timer() - HWIF(drive)->last_time) < DISK_RECOVERY_TIME);
 #endif
 
 	SELECT_DRIVE(drive);
@@ -1128,9 +1127,15 @@ queue_next:
 			break;
 		}
 
+		/*
+		 * we know that the queue isn't empty, but this can happen
+		 * if the q->prep_rq_fn() decides to kill a request
+		 */
 		rq = elv_next_request(&drive->queue);
-		if (!rq)
+		if (!rq) {
+			hwgroup->busy = !!ata_pending_commands(drive);
 			break;
+		}
 
 		if (!rq->bio && ata_pending_commands(drive))
 			break;
@@ -1515,10 +1520,8 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 {
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	unsigned int major = HWIF(drive)->major;
-	request_queue_t *q = &drive->queue;
-	struct list_head *queue_head = &q->queue_head;
 	DECLARE_COMPLETION(wait);
+	int insert_end = 1, err;
 
 #ifdef CONFIG_BLK_DEV_PDC4030
 	if (HWIF(drive)->chipset == ide_pdc4030 && rq->buffer != NULL)
@@ -1540,29 +1543,35 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	}
 
 	rq->rq_disk = drive->disk;
-	if (action == ide_wait)
+
+	/*
+	 * we need to hold an extra reference to request for safe inspection
+	 * after completion
+	 */
+	if (action == ide_wait) {
+		rq->ref_count++;
 		rq->waiting = &wait;
-	spin_lock_irqsave(&ide_lock, flags);
-	if (blk_queue_empty(q) || action == ide_preempt) {
-		if (action == ide_preempt)
-			hwgroup->rq = NULL;
-	} else {
-		if (action == ide_wait || action == ide_end) {
-			queue_head = queue_head->prev;
-		} else
-			queue_head = queue_head->next;
 	}
-	q->elevator.elevator_add_req_fn(q, rq, queue_head);
+
+	spin_lock_irqsave(&ide_lock, flags);
+	if (action == ide_preempt) {
+		hwgroup->rq = NULL;
+		insert_end = 0;
+	}
+	__elv_add_request(&drive->queue, rq, insert_end, 0);
 	ide_do_request(hwgroup, 0);
 	spin_unlock_irqrestore(&ide_lock, flags);
-	if (action == ide_wait) {
-		/* wait for it to be serviced */
-		wait_for_completion(&wait);
-		/* return -EIO if errors */
-		return rq->errors ? -EIO : 0;
-	}
-	return 0;
 
+	err = 0;
+	if (action == ide_wait) {
+		wait_for_completion(&wait);
+		if (rq->errors)
+			err = -EIO;
+
+		blk_put_request(rq);
+	}
+
+	return err;
 }
 
 EXPORT_SYMBOL(ide_do_drive_cmd);
@@ -3369,7 +3378,7 @@ int ide_register_driver(ide_driver_t *driver)
 		list_del_init(&drive->list);
 		ata_attach(drive);
 	}
-	driver->gen_driver.name = driver->name;
+	driver->gen_driver.name = (char *) driver->name;
 	driver->gen_driver.bus = &ide_bus_type;
 	driver->gen_driver.remove = ide_drive_remove;
 	return driver_register(&driver->gen_driver);

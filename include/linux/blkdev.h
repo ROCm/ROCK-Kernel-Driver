@@ -26,6 +26,8 @@ struct request {
 	struct list_head queuelist; /* looking for ->queue? you must _not_
 				     * access it directly, use
 				     * blkdev_dequeue_request! */
+	int ref_count;
+
 	void *elevator_private;
 
 	unsigned char cmd[16];
@@ -64,7 +66,10 @@ struct request {
 
 	/* For packet commands */
 	unsigned int data_len;
-	void *data, *sense;
+	void *data;
+
+	unsigned int sense_len;
+	void *sense;
 
 	unsigned int timeout;
 	struct completion *waiting;
@@ -150,12 +155,6 @@ struct blk_queue_tag {
 	int max_depth;
 };
 
-/*
- * Default nr free requests per queue, ll_rw_blk will scale it down
- * according to available RAM at init time
- */
-#define QUEUE_NR_REQUESTS	8192
-
 struct request_queue
 {
 	/*
@@ -220,6 +219,12 @@ struct request_queue
 	wait_queue_head_t	queue_wait;
 
 	struct blk_queue_tag	*queue_tags;
+
+	/*
+	 * sg stuff
+	 */
+	unsigned int		sg_timeout;
+	unsigned int		sg_reserved_size;
 };
 
 #define RQ_INACTIVE		(-1)
