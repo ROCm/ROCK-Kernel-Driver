@@ -417,6 +417,8 @@ static int __devinit bt878_probe(struct pci_dev *dev,
 
 	printk(KERN_INFO "bt878: Bt878 AUDIO function found (%d).\n",
 	       bt878_num);
+	if (pci_enable_device(dev))
+		return -EIO;
 
 	bt = &bt878[bt878_num];
 	bt->dev = dev;
@@ -426,11 +428,10 @@ static int __devinit bt878_probe(struct pci_dev *dev,
 	bt->id = dev->device;
 	bt->irq = dev->irq;
 	bt->bt878_adr = pci_resource_start(dev, 0);
-	if (pci_enable_device(dev))
-		return -EIO;
 	if (!request_mem_region(pci_resource_start(dev, 0),
 				pci_resource_len(dev, 0), "bt878")) {
-		return -EBUSY;
+		result = -EBUSY;
+		goto fail0;
 	}
 
 	pci_read_config_byte(dev, PCI_CLASS_REVISION, &bt->revision);
@@ -501,6 +502,8 @@ static int __devinit bt878_probe(struct pci_dev *dev,
       fail1:
 	release_mem_region(pci_resource_start(bt->dev, 0),
 			   pci_resource_len(bt->dev, 0));
+      fail0:
+	pci_disable_device(dev);
 	return result;
 }
 
@@ -540,6 +543,7 @@ static void __devexit bt878_remove(struct pci_dev *pci_dev)
 	bt878_mem_free(bt);
 
 	pci_set_drvdata(pci_dev, NULL);
+	pci_disable_device(pci_dev);
 	return;
 }
 
