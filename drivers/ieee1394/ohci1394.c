@@ -620,6 +620,39 @@ static void ohci_initialize(struct ti_ohci *ohci)
 		if (status & 0x20)
 			set_phy_reg(ohci, 8, status & ~1);
 	}
+
+        /* Serial EEPROM Sanity check. */
+        if ((ohci->max_packet_size < 512) ||
+	    (ohci->max_packet_size > 4096)) {
+		/* Serial EEPROM contents are suspect, set a sane max packet
+		 * size and print the raw contents for bug reports if verbose
+		 * debug is enabled. */
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+		int i;
+#endif
+
+		PRINT(KERN_DEBUG, "Serial EEPROM has suspicious values, "
+                      "attempting to setting max_packet_size to 512 bytes");
+		reg_write(ohci, OHCI1394_BusOptions,
+			  (reg_read(ohci, OHCI1394_BusOptions) & 0xf007) | 0x8002);
+		ohci->max_packet_size = 512;
+#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
+		PRINT(KERN_DEBUG, "    EEPROM Present: %d",
+		      (reg_read(ohci, OHCI1394_Version) >> 24) & 0x1);
+		reg_write(ohci, OHCI1394_GUID_ROM, 0x80000000);
+
+		for (i = 0; 
+		     ((i < 1000) &&
+		      (reg_read(ohci, OHCI1394_GUID_ROM) & 0x80000000)); i++)
+			udelay(10);
+
+		for (i = 0; i < 0x20; i++) {
+			reg_write(ohci, OHCI1394_GUID_ROM, 0x02000000);
+			PRINT(KERN_DEBUG, "    EEPROM %02x: %02x", i,
+			      (reg_read(ohci, OHCI1394_GUID_ROM) >> 16) & 0xff);
+		}
+#endif
+	}
 }
 
 /* 
