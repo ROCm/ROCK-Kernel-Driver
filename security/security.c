@@ -38,21 +38,21 @@
  * - Unfortunately, we can't get rid of dummy, as we don't want to
  *   change the default behaviour if a security module is loaded and
  *   some stubs are not implemented in which case these default to
- *   dummy (which behaves differently to capability for some stubs). 
+ *   dummy (which behaves differently to capability fori a few stubs).
  * - If no security module is loaded, we set security_ops to point
- *   to dummy_security_ops; it will not normally be used except for 
+ *   to capability_security_ops; it will not normally be used except for 
  *   one situation: When a security module is unloaded; the value of 
  *   security_enabled may still be evaluated to 1 when the security_ops 
  *   is already changed. The behaviour is consistent here, as we do
- *   change security_ops back to point to dummy_security_ops.
+ *   change security_ops back to point to capability_security_ops.
  * - commoncaps needs to be compiled in unconditionally.
  */ 
 
 /* things that live in dummy.c */
 extern void security_fixup_ops (struct security_operations *ops);
 /* default security ops */
-extern struct security_operations dummy_security_ops;
-  
+extern struct security_operations capability_security_ops;
+
 struct security_operations *security_ops;	/* Initialized to NULL */
 int security_enabled;				/* ditto */
 EXPORT_SYMBOL(security_enabled);
@@ -86,14 +86,14 @@ int __init security_init(void)
 	printk(KERN_INFO "Security Framework v" SECURITY_FRAMEWORK_VERSION
 	       " initialized\n");
 
-	if (verify(&dummy_security_ops)) {
+	if (verify(&capability_security_ops)) {
 		printk(KERN_ERR "%s could not verify "
-		       "dummy_security_ops structure.\n", __FUNCTION__);
+		       "capability_security_ops structure.\n", __FUNCTION__);
 		return -EIO;
 	}
 
 	security_enabled = 0;
-	security_ops = &dummy_security_ops;
+	security_ops = &capability_security_ops;
 
 	/* Initialize compiled-in security modules */
 	do_security_initcalls();
@@ -121,7 +121,7 @@ int register_security(struct security_operations *ops)
 		return -EINVAL;
 	}
 
-	if (security_ops != &dummy_security_ops)
+	if (security_ops != &capability_security_ops)
 		return -EAGAIN;
 
 	security_ops = ops;
@@ -139,19 +139,19 @@ int register_security(struct security_operations *ops)
  *
  * If @ops does not match the valued previously passed to register_security()
  * an error is returned.  Otherwise the default security options is set to the
- * the dummy_security_ops structure, and 0 is returned.
+ * the capability_security_ops structure, and 0 is returned.
  */
 int unregister_security(struct security_operations *ops)
 {
 	if (ops != security_ops) {
 		printk(KERN_INFO "%s: trying to unregister "
-		       "a security_opts structure that is not "
+		       "a security_ops structure that is not "
 		       "registered, failing.\n", __FUNCTION__);
 		return -EINVAL;
 	}
 
 	security_enabled = 0;
-	security_ops = &dummy_security_ops;
+	security_ops = &capability_security_ops;
 
 	return 0;
 }
