@@ -784,11 +784,10 @@ void __init trap_init_f00f_bug(void)
 	__set_fixmap(FIX_F00F_IDT, __pa(&idt_table), PAGE_KERNEL_RO);
 
 	/*
-	 * "idt" is magic - it overlaps the idt_descr
-	 * variable so that updating idt will automatically
-	 * update the idt descriptor..
+	 * Update the IDT descriptor and reload the IDT so that
+	 * it uses the read-only mapped virtual address.
 	 */
-	idt = (struct desc_struct *) fix_to_virt(FIX_F00F_IDT);
+	idt_descr.address = fix_to_virt(FIX_F00F_IDT);
 	__asm__ __volatile__("lidt %0": "=m" (idt_descr));
 }
 #endif

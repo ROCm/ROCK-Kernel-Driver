@@ -348,6 +348,7 @@ ignore_int:
 .globl cpu_gdt_descr
 
 	ALIGN
+	.word 0				# 32-bit align idt_desc.address
 idt_descr:
 	.word IDT_ENTRIES*8-1		# idt contains 256 entries
 	.long idt_table
