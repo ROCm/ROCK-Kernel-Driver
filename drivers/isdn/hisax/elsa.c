@@ -864,7 +864,7 @@ setup_elsa(struct IsdnCard *card)
 							printk(KERN_ERR "Elsa PnP: attach failed\n");
 							return 0;
 						}
-						if (pnp_activate_dev(pd, NULL) < 0) {
+						if (pnp_activate_dev(pd) < 0) {
 							pnp_device_detach(pd);
 							printk(KERN_ERR "Elsa PnP: activate failed\n");
 							return 0;

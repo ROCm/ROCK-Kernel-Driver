@@ -262,7 +262,7 @@ static int isapnp_fmi_probe(void)
 		return -ENODEV;
 	if (pnp_device_attach(dev) < 0)
 		return -EAGAIN;
-	if (pnp_activate_dev(dev, NULL) < 0) {
+	if (pnp_activate_dev(dev) < 0) {
 		printk ("radio-sf16fmi: PnP configure failed (out of resources?)\n");
 		pnp_device_detach(dev);
 		return -ENOMEM;

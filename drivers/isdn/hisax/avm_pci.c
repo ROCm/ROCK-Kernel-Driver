@@ -632,7 +632,7 @@ setup_avm_pcipnp(struct IsdnCard *card)
 						printk(KERN_ERR "FritzPnP: attach failed\n");
 						return 0;
 					}
-					if (pnp_activate_dev(pnp_avm, NULL) < 0) {
+					if (pnp_activate_dev(pnp_avm) < 0) {
 						printk(KERN_ERR "FritzPnP: activate failed\n");
 						pnp_device_detach(pnp_avm);
 						return 0;

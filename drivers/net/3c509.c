@@ -385,7 +385,7 @@ static int __init el3_probe(int card_idx)
 					    idev))) {
 			if (pnp_device_attach(idev) < 0)
 				continue;
-			if (pnp_activate_dev(idev, NULL) < 0) {
+			if (pnp_activate_dev(idev) < 0) {
 			      __again:
 			      	pnp_device_detach(idev);
 			      	continue;

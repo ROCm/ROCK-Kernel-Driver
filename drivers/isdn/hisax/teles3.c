@@ -227,7 +227,7 @@ setup_teles3(struct IsdnCard *card)
 						printk(KERN_ERR "Teles PnP: attach failed\n");
 						return 0;
 					}
-					if (pnp_activate_dev(pnp_dev, NULL) < 0) {
+					if (pnp_activate_dev(pnp_dev) < 0) {
 						printk(KERN_ERR "Teles PnP: activate failed\n");
 						pnp_device_detach(pnp_dev);
 						return 0;
