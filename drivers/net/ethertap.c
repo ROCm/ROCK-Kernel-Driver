@@ -292,19 +292,19 @@ static __inline__ int ethertap_rx_skb(struct sk_buff *skb, struct net_device *de
 
 static void ethertap_rx(struct sock *sk, int len)
 {
-	struct net_device *dev = tap_map[sk->protocol];
+	struct net_device *dev = tap_map[sk->sk_protocol];
 	struct sk_buff *skb;
 
 	if (dev==NULL) {
 		printk(KERN_CRIT "ethertap: bad unit!\n");
-		skb_queue_purge(&sk->receive_queue);
+		skb_queue_purge(&sk->sk_receive_queue);
 		return;
 	}
 
 	if (ethertap_debug > 3)
 		printk("%s: ethertap_rx()\n", dev->name);
 
-	while ((skb = skb_dequeue(&sk->receive_queue)) != NULL)
+	while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL)
 		ethertap_rx_skb(skb, dev);
 }
 
@@ -320,7 +320,7 @@ static int ethertap_close(struct net_device *dev)
 
 	if (sk) {
 		lp->nl = NULL;
-		sock_release(sk->socket);
+		sock_release(sk->sk_socket);
 	}
 
 	return 0;
