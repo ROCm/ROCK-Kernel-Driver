@@ -946,7 +946,7 @@ pcnet32_purge_tx_ring(struct net_device *dev)
     for (i = 0; i < TX_RING_SIZE; i++) {
 	if (lp->tx_skbuff[i]) {
             pci_unmap_single(lp->pci_dev, lp->tx_dma_addr[i], lp->tx_skbuff[i]->len, PCI_DMA_TODEVICE);
-	    dev_kfree_skb(lp->tx_skbuff[i]); 
+	    dev_kfree_skb_any(lp->tx_skbuff[i]); 
 	    lp->tx_skbuff[i] = NULL;
             lp->tx_dma_addr[i] = 0;
 	}
