@@ -86,15 +86,11 @@ static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
  *  - it's marked as being swap-cache
  *  - it's associated with the swap inode
  */
-extern long suspend_device;
 void rw_swap_page(int rw, struct page *page)
 {
 	swp_entry_t entry;
 
 	entry.val = page->index;
-
-	if (suspend_device)
-		panic("I refuse to corrupt memory/swap.");
 
 	if (!PageLocked(page))
 		PAGE_BUG(page);
