@@ -583,7 +583,7 @@ void fb_var_to_videomode(struct fb_videomode *mode,
 {
 	u32 pixclock, hfreq, htotal, vtotal;
 
-	(char *) mode->name = NULL;
+	mode->name = NULL;
 	mode->xres = var->xres;
 	mode->yres = var->yres;
 	mode->pixclock = var->pixclock;
