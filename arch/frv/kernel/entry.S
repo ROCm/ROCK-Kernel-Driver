@@ -1031,6 +1031,7 @@ __entry_preempt_need_resched:
 # perform work that needs to be done immediately before resumption
 #
 ###############################################################################
+	.globl		__entry_return_from_user_exception
 	.balign		L1_CACHE_BYTES
 __entry_return_from_user_exception:
 	LEDS		0x6501
@@ -1420,9 +1421,8 @@ sys_call_table:
 	.long sys_add_key
 	.long sys_request_key
 	.long sys_keyctl
-	.long sys_perfctr_info
-	.long sys_vperfctr_open		/* 290 */
-	.long sys_vperfctr_control
+	.long sys_vperfctr_open
+	.long sys_vperfctr_control	/* 290 */
 	.long sys_vperfctr_unlink
 	.long sys_vperfctr_iresume
 	.long sys_vperfctr_read

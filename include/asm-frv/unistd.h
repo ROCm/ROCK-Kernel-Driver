@@ -295,14 +295,13 @@
 #define __NR_add_key		286
 #define __NR_request_key	287
 #define __NR_keyctl		288
-#define __NR_perfctr_info	289
-#define __NR_vperfctr_open	(__NR_perfctr_info+1)
-#define __NR_vperfctr_control	(__NR_perfctr_info+2)
-#define __NR_vperfctr_unlink	(__NR_perfctr_info+3)
-#define __NR_vperfctr_iresume	(__NR_perfctr_info+4)
-#define __NR_vperfctr_read	(__NR_perfctr_info+5)
+#define __NR_vperfctr_open	289
+#define __NR_vperfctr_control	(__NR_perfctr_info+1)
+#define __NR_vperfctr_unlink	(__NR_perfctr_info+2)
+#define __NR_vperfctr_iresume	(__NR_perfctr_info+3)
+#define __NR_vperfctr_read	(__NR_perfctr_info+4)
 
-#define NR_syscalls 295
+#define NR_syscalls 294
 
 /*
  * process the return value of a syscall, consigning it to one of two possible fates
