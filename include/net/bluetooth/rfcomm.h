@@ -181,6 +181,8 @@ struct rfcomm_dlc {
 	u8            v24_sig;
 	u8            mscex;
 
+	u32           link_mode;
+
 	uint          mtu;
 	uint          cfc;
 	uint          rx_credits;
@@ -267,16 +269,31 @@ extern u8 rfcomm_crc_table[];
 
 /* ---- RFCOMM sockets ---- */
 struct sockaddr_rc {
-	sa_family_t rc_family;
-	bdaddr_t    rc_bdaddr;
-	u8          rc_channel;
+	sa_family_t	rc_family;
+	bdaddr_t	rc_bdaddr;
+	u8		rc_channel;
 };
+
+#define RFCOMM_CONNINFO	0x02
+struct rfcomm_conninfo {
+	__u16 hci_handle;
+	__u8  dev_class[3];
+};
+
+#define RFCOMM_LM	0x03
+#define RFCOMM_LM_MASTER	0x0001
+#define RFCOMM_LM_AUTH		0x0002
+#define RFCOMM_LM_ENCRYPT	0x0004
+#define RFCOMM_LM_TRUSTED	0x0008
+#define RFCOMM_LM_RELIABLE	0x0010
+#define RFCOMM_LM_SECURE	0x0020
 
 #define rfcomm_pi(sk)   ((struct rfcomm_pinfo *)sk->sk_protinfo)
 
 struct rfcomm_pinfo {
 	struct rfcomm_dlc   *dlc;
 	u8     channel;
+	u32    link_mode;
 };
 
 int  rfcomm_init_sockets(void);

@@ -56,7 +56,7 @@
 #define BT_DBG(D...)
 #endif
 
-#define VERSION "0.3"
+#define VERSION "0.4"
 
 static struct proto_ops sco_sock_ops;
 
@@ -705,6 +705,7 @@ static int sco_sock_getsockopt(struct socket *sock, int level, int optname, char
 		}
 
 		cinfo.hci_handle = sco_pi(sk)->conn->hcon->handle;
+		memcpy(cinfo.dev_class, sco_pi(sk)->conn->hcon->dev_class, 3);
 
 		len = min_t(unsigned int, len, sizeof(cinfo));
 		if (copy_to_user(optval, (char *)&cinfo, len))
@@ -1045,7 +1046,7 @@ static void __exit sco_exit(void)
 module_init(sco_init);
 module_exit(sco_exit);
 
-MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
+MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth SCO ver " VERSION);
 MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");

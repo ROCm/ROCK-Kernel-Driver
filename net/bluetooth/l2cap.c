@@ -57,7 +57,7 @@
 #define BT_DBG(D...)
 #endif
 
-#define VERSION "2.6"
+#define VERSION "2.7"
 
 static struct proto_ops l2cap_sock_ops;
 
@@ -798,7 +798,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
 	switch (optname) {
 	case L2CAP_OPTIONS:
 		len = min_t(unsigned int, sizeof(opts), optlen);
-		if (copy_from_user((char *)&opts, optval, len)) {
+		if (copy_from_user((char *) &opts, optval, len)) {
 			err = -EFAULT;
 			break;
 		}
@@ -807,7 +807,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
 		break;
 
 	case L2CAP_LM:
-		if (get_user(opt, (u32 __user *)optval)) {
+		if (get_user(opt, (u32 __user *) optval)) {
 			err = -EFAULT;
 			break;
 		}
@@ -829,7 +829,9 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
 	struct sock *sk = sock->sk;
 	struct l2cap_options opts;
 	struct l2cap_conninfo cinfo;
-	int len, err = 0; 
+	int len, err = 0;
+
+	BT_DBG("sk %p", sk);
 
 	if (get_user(len, optlen))
 		return -EFAULT;
@@ -841,15 +843,16 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
 		opts.imtu     = l2cap_pi(sk)->imtu;
 		opts.omtu     = l2cap_pi(sk)->omtu;
 		opts.flush_to = l2cap_pi(sk)->flush_to;
+		opts.mode     = 0x00;
 
 		len = min_t(unsigned int, len, sizeof(opts));
-		if (copy_to_user(optval, (char *)&opts, len))
+		if (copy_to_user(optval, (char *) &opts, len))
 			err = -EFAULT;
 
 		break;
 
 	case L2CAP_LM:
-		if (put_user(l2cap_pi(sk)->link_mode, (u32 __user *)optval))
+		if (put_user(l2cap_pi(sk)->link_mode, (u32 __user *) optval))
 			err = -EFAULT;
 		break;
 
@@ -860,9 +863,10 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
 		}
 
 		cinfo.hci_handle = l2cap_pi(sk)->conn->hcon->handle;
+		memcpy(cinfo.dev_class, l2cap_pi(sk)->conn->hcon->dev_class, 3);
 
 		len = min_t(unsigned int, len, sizeof(cinfo));
-		if (copy_to_user(optval, (char *)&cinfo, len))
+		if (copy_to_user(optval, (char *) &cinfo, len))
 			err = -EFAULT;
 
 		break;
