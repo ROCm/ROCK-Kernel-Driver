@@ -402,8 +402,6 @@ static int sr_open(struct cdrom_device_info *cdi, int purpose)
 {
 	Scsi_CD *SCp = cdi->handle;
 
-	check_disk_change(cdi->dev);
-
 	if (minor(cdi->dev) >= sr_template.dev_max || !SCp->device) {
 		return -ENXIO;	/* No such device */
 	}

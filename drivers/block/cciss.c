@@ -106,7 +106,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 static int revalidate_allvol(kdev_t dev);
 static int revalidate_logvol(kdev_t dev, int maxusage);
-static int frevalidate_logvol(kdev_t dev);
+static int cciss_revalidate(kdev_t dev);
 static int deregister_disk(int ctlr, int logvol);
 static int register_new_disk(kdev_t dev, int cltr);
 
@@ -130,7 +130,7 @@ static struct block_device_operations cciss_fops  = {
 	open:			cciss_open, 
 	release:        	cciss_release,
         ioctl:			cciss_ioctl,
-	revalidate:		frevalidate_logvol,
+	revalidate:		cciss_revalidate,
 };
 
 #include "cciss_scsi.c"		/* For SCSI tape support */
@@ -437,8 +437,6 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
                 return(0);
 	}
 
-	case BLKRRPART:
-		return revalidate_logvol(inode->i_rdev, 1);
 	case CCISS_GETPCIINFO:
 	{
 		cciss_pci_info_struct pciinfo;
@@ -724,6 +722,15 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	
 }
 
+static int cciss_revalidate(kdev_t dev)
+{
+        int ctlr = major(dev) - MAJOR_NR;
+	int target = minor(dev) >> NWD_SHIFT;
+        struct gendisk *gdev = &(hba[ctlr]->gendisk);
+	gdev->part[minor(dev)].nr_sects = hba[ctlr]->drv[target].nr_blocks;
+	return 0;
+}
+
 /* Borrowed and adapted from sd.c */
 /*
  * FIXME: we are missing the exclusion with ->open() here - it can happen
@@ -760,14 +767,6 @@ static int revalidate_logvol(kdev_t dev, int maxusage)
 leave:
         hba[ctlr]->drv[target].usage_count--;
         return res;
-}
-
-static int frevalidate_logvol(kdev_t dev)
-{
-#ifdef CCISS_DEBUG
-	printk(KERN_DEBUG "cciss: frevalidate has been called\n");
-#endif /* CCISS_DEBUG */ 
-	return revalidate_logvol(dev, 0);
 }
 
 /*

@@ -38,34 +38,6 @@
 #include "i830_drm.h"
 #include "i830_drv.h"
 
-#define DRIVER_AUTHOR		"VA Linux Systems Inc."
-
-#define DRIVER_NAME		"i830"
-#define DRIVER_DESC		"Intel 830M"
-#define DRIVER_DATE		"20011004"
-
-#define DRIVER_MAJOR		1
-#define DRIVER_MINOR		2
-#define DRIVER_PATCHLEVEL	0
-
-#define DRIVER_IOCTLS							    \
-	[DRM_IOCTL_NR(DRM_IOCTL_I830_INIT)]   = { i830_dma_init,    1, 1 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_VERTEX)] = { i830_dma_vertex,  1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_CLEAR)]  = { i830_clear_bufs,  1, 0 }, \
-      	[DRM_IOCTL_NR(DRM_IOCTL_I830_FLUSH)]  = { i830_flush_ioctl, 1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_GETAGE)] = { i830_getage,      1, 0 }, \
-	[DRM_IOCTL_NR(DRM_IOCTL_I830_GETBUF)] = { i830_getbuf,      1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_SWAP)]   = { i830_swap_bufs,   1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_COPY)]   = { i830_copybuf,     1, 0 }, \
-   	[DRM_IOCTL_NR(DRM_IOCTL_I830_DOCOPY)] = { i830_docopy,      1, 0 },
-
-#define __HAVE_COUNTERS         4
-#define __HAVE_COUNTER6         _DRM_STAT_IRQ
-#define __HAVE_COUNTER7         _DRM_STAT_PRIMARY
-#define __HAVE_COUNTER8         _DRM_STAT_SECONDARY
-#define __HAVE_COUNTER9         _DRM_STAT_DMA
-
-
 #include "drm_agpsupport.h"
 #include "drm_auth.h"
 #include "drm_bufs.h"
@@ -73,25 +45,6 @@
 #include "drm_dma.h"
 #include "drm_drawable.h"
 #include "drm_drv.h"
-
-#ifndef MODULE
-/* DRM(options) is called by the kernel to parse command-line options
- * passed via the boot-loader (e.g., LILO).  It calls the insmod option
- * routine, drm_parse_drm.
- */
-
-/* JH- We have to hand expand the string ourselves because of the cpp.  If
- * anyone can think of a way that we can fit into the __setup macro without
- * changing it, then please send the solution my way.
- */
-static int __init i830_options( char *str )
-{
-   DRM(parse_options)( str );
-   return 1;
-}
-
-__setup( DRIVER_NAME "=", i830_options );
-#endif
 
 #include "drm_fops.h"
 #include "drm_init.h"

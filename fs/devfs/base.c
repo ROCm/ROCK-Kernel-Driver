@@ -2377,23 +2377,20 @@ static int check_disc_changed (struct devfs_entry *de)
     int tmp;
     int retval = 0;
     kdev_t dev = mk_kdev (de->u.fcb.u.device.major, de->u.fcb.u.device.minor);
+    struct block_device *bdev;
     struct block_device_operations *bdops;
     extern int warn_no_part;
 
     if ( !S_ISBLK (de->mode) ) return 0;
+    bdev = bdget(kdev_t_to_nr(dev));
+    if (!bdev) return 0;
     bdops = devfs_get_ops (de);
     if (!bdops) return 0;
-    if (bdops->check_media_change == NULL) goto out;
-    if ( !bdops->check_media_change (dev) ) goto out;
-    retval = 1;
-    printk (KERN_DEBUG "VFS: Disk change detected on device %s\n",
-	     kdevname (dev) );
-    if ( invalidate_device (dev, 0) )
-	printk (KERN_WARNING "VFS: busy inodes on changed media..\n");
+    bdev->bd_op = bdops;
     /*  Ugly hack to disable messages about unable to read partition table  */
     tmp = warn_no_part;
     warn_no_part = 0;
-    if (bdops->revalidate) bdops->revalidate (dev);
+    retval = full_check_disk_change(bdev);
     warn_no_part = tmp;
 out:
     devfs_put_ops (de);

@@ -1048,6 +1048,7 @@ static void channel_init(struct ata_channel *ch)
 	char *flags;
 	unsigned int unit;
 	extern devfs_handle_t ide_devfs_handle;
+	char *names;
 
 	if (!ch->present)
 		return;
@@ -1127,6 +1128,11 @@ static void channel_init(struct ata_channel *ch)
 		goto err_kmalloc_gd_flags;
 	memset(flags, 0, sizeof(char) * MAX_DRIVES);
 
+	names = kmalloc (4 * MAX_DRIVES, GFP_KERNEL);
+	if (!names)
+		goto err_kmalloc_gd_names;
+	memset(names, 0, 4 * MAX_DRIVES);
+
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		gd[unit].part = part + (unit << PARTN_BITS);
 		gd[unit].de_arr = de_arr + unit;
@@ -1134,8 +1140,8 @@ static void channel_init(struct ata_channel *ch)
 		ch->drives[unit].part = gd[unit].part;
 		gd[unit].major	= ch->major;
 		gd[unit].first_minor = unit << PARTN_BITS;
-		/* treated special in genhd.c */
-		gd[unit].major_name = IDE_MAJOR_NAME;
+		sprintf(names + 4*unit, "hd%c", 'a'+ch->index*MAX_DRIVES+unit);
+		gd[unit].major_name = names + 4*unit;
 		gd[unit].minor_shift = PARTN_BITS;
 		gd[unit].nr_real = 1;
 		gd[unit].fops = ide_fops;
@@ -1161,6 +1167,8 @@ static void channel_init(struct ata_channel *ch)
 
 	return;
 
+err_kmalloc_gd_names:
+	kfree(names);
 err_kmalloc_gd_flags:
 	kfree(de_arr);
 err_kmalloc_gd_de_arr:

@@ -296,7 +296,7 @@ static int reiserfs_find_entry (struct inode * dir, const char * name, int namel
     while (1) {
 	retval = search_by_entry_key (dir->i_sb, &key_to_search, path_to_entry, de);
 	if (retval == IO_ERROR) {
-	    reiserfs_warning ("zam-7001: io error in " __FUNCTION__ "\n");
+	    reiserfs_warning ("zam-7001: io error in %s\n", __FUNCTION__);
 	    return IO_ERROR;
 	}
 
@@ -468,8 +468,8 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
 	}
 
         if (retval != NAME_FOUND) {
-	    reiserfs_warning ("zam-7002:" __FUNCTION__ ": \"reiserfs_find_entry\" has returned"
-                              " unexpected value (%d)\n", retval);
+	    reiserfs_warning ("zam-7002:%s: \"reiserfs_find_entry\" has returned"
+                              " unexpected value (%d)\n", __FUNCTION__, retval);
        }
 
 	return -EEXIST;

@@ -95,8 +95,6 @@ static int ps2esdi_open(struct inode *inode, struct file *file);
 static int ps2esdi_ioctl(struct inode *inode, struct file *file,
 			 u_int cmd, u_long arg);
 
-static int ps2esdi_reread_partitions(kdev_t dev);
-
 static int ps2esdi_read_status_words(int num_words, int max_words, u_short * buffer);
 
 static void dump_cmd_complete_status(u_int int_ret_code);
@@ -148,13 +146,24 @@ static struct block_device_operations ps2esdi_fops =
 	ioctl:		ps2esdi_ioctl,
 };
 
-static struct gendisk ps2esdi_gendisk =
+static struct gendisk ps2esdi_gendisk[2] = {
 {
 	major:		MAJOR_NR,
-	major_name:	"ed",
+	major_name:	"eda",
+	first_minor:	0,
 	minor_shift:	6,
 	part:		ps2esdi,
 	fops:		&ps2esdi_fops,
+	nr_real:	1
+},{
+	major:		MAJOR_NR,
+	first_minor:	64
+	major_name:	"edb",
+	minor_shift:	6,
+	part:		ps2esdi+64,
+	fops:		&ps2esdi_fops,
+	nr_real:	1
+}
 };
 
 /* initialization routine called by ll_rw_blk.c   */
@@ -174,14 +183,12 @@ int __init ps2esdi_init(void)
 			&ps2esdi_lock);
 
 	/* some minor housekeeping - setup the global gendisk structure */
-	add_gendisk(&ps2esdi_gendisk);
 	error = ps2esdi_geninit();
 	if (error) {
 		printk(KERN_WARNING "PS2ESDI: error initialising"
 			" device, releasing resources\n");
 		unregister_blkdev(MAJOR_NR, "ed");
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		del_gendisk(&ps2esdi_gendisk);
 		blk_clear(MAJOR_NR);
 		return error;
 	}
@@ -232,7 +239,8 @@ cleanup_module(void) {
 	free_irq(PS2ESDI_IRQ, &ps2esdi_gendisk);
 	unregister_blkdev(MAJOR_NR, "ed");
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	del_gendisk(&ps2esdi_gendisk);
+	for (i = 0; i < ps2esdi_drives; i++)
+		del_gendisk(ps2esdi_gendisk + i);
 	blk_clear(MAJOR_NR);
 }
 #endif /* MODULE */
@@ -422,8 +430,6 @@ static int __init ps2esdi_geninit(void)
 
 	current_int_handler = ps2esdi_normal_interrupt_handler;
 
-	ps2esdi_gendisk.nr_real = ps2esdi_drives;
-
 	if (request_dma(dma_arb_level, "ed") !=0) {
 		printk(KERN_WARNING "PS2ESDI: Can't request dma-channel %d\n"
 			,(int) dma_arb_level);
@@ -432,11 +438,14 @@ static int __init ps2esdi_geninit(void)
 	}
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 128);
 
-	for (i = 0; i < ps2esdi_drives; i++)
-		register_disk(&ps2esdi_gendisk,mk_kdev(MAJOR_NR,i<<6),1<<6,
-				&ps2esdi_fops,
+	for (i = 0; i < ps2esdi_drives; i++) {
+		struct gendisk *disk = ps2esdi_gendisk + i;
+		add_gendisk(disk);
+		register_disk(disk, mk_kdev(disk->major,disk->first_minor),
+				1<<disk->minor_shift, disk->fops,
 				ps2esdi_info[i].head * ps2esdi_info[i].sect *
 				ps2esdi_info[i].cyl);
+	}
 	return 0;
 
 err_out3:
@@ -1080,53 +1089,18 @@ static int ps2esdi_open(struct inode *inode, struct file *file)
 static int ps2esdi_ioctl(struct inode *inode,
 			 struct file *file, u_int cmd, u_long arg)
 {
-
 	struct ps2esdi_geometry *geometry = (struct ps2esdi_geometry *) arg;
 	int dev = DEVICE_NR(inode->i_rdev), err;
 
-	if (inode && (dev < ps2esdi_drives))
-		switch (cmd) {
-		case HDIO_GETGEO:
-			if (arg) {
-				if ((err = verify_area(VERIFY_WRITE, geometry, sizeof(*geometry))))
-					return (err);
-				put_user(ps2esdi_info[dev].head, (char *) &geometry->heads);
-				put_user(ps2esdi_info[dev].sect, (char *) &geometry->sectors);
-				put_user(ps2esdi_info[dev].cyl, (short *) &geometry->cylinders);
-				put_user(get_start_sect(inode->b_rdev),
-					    (long *) &geometry->start);
-
-				return 0;
-			}
-			break;
-
-		case BLKRRPART:
-                        if (!capable(CAP_SYS_ADMIN)) 
-				return -EACCES;
-			return (ps2esdi_reread_partitions(inode->i_rdev));
-		}
-	return (-EINVAL);
-}
-
-
-
-static int ps2esdi_reread_partitions(kdev_t dev)
-{
-	int target = DEVICE_NR(dev);
-	kdev_t device = mk_kdev(MAJOR_NR, target << 6);
-	int res = dev_lock_part(device);
-
-	if (res < 0)
-		return res;
-
-	res = wipe_partitions(device);
-	if (res == 0)
-		grok_partitions(device, ps2esdi_info[target].head
-				* ps2esdi_info[target].cyl
-				* ps2esdi_info[target].sect);
- 
-	dev_unlock_part(device);
-	return res;
+	if (cmd != HDIO_GETGEO)
+		return -EINVAL;
+	if ((err = verify_area(VERIFY_WRITE, geometry, sizeof(*geometry))))
+		return (err);
+	put_user(ps2esdi_info[dev].head, (char *) &geometry->heads);
+	put_user(ps2esdi_info[dev].sect, (char *) &geometry->sectors);
+	put_user(ps2esdi_info[dev].cyl, (short *) &geometry->cylinders);
+	put_user(get_start_sect(inode->b_rdev), (long *) &geometry->start);
+	return 0;
 }
 
 static void ps2esdi_reset_timer(unsigned long unused)

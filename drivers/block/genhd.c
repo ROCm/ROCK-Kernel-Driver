@@ -166,7 +166,7 @@ static int show_partition(struct seq_file *part, void *v)
 			continue;
 		seq_printf(part, "%4d  %4d %10ld %s\n",
 			sgp->major, n + sgp->first_minor,
-			sgp->part[n].nr_sects << 1,
+			sgp->part[n].nr_sects >> 1 ,
 			disk_name(sgp, n + sgp->first_minor, buf));
 	}
 

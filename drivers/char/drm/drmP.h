@@ -71,6 +71,8 @@
 #include <asm/pgalloc.h>
 #include "drm.h"
 
+#include "drm_os_linux.h"
+
 /* DRM template customization defaults
  */
 #ifndef __HAVE_AGP
@@ -101,7 +103,7 @@
 #define __REALLY_HAVE_AGP	(__HAVE_AGP && (defined(CONFIG_AGP) || \
 						defined(CONFIG_AGP_MODULE)))
 #define __REALLY_HAVE_MTRR	(__HAVE_MTRR && defined(CONFIG_MTRR))
-
+#define __REALLY_HAVE_SG	(__HAVE_SG)
 
 /* Begin the DRM...
  */

@@ -30,7 +30,6 @@ struct cpuinfo_alpha {
 	int need_new_asn;
 	int asn_lock;
 	unsigned long ipi_count;
-	unsigned long irq_attempt[NR_IRQS];
 	unsigned long prof_multiplier;
 	unsigned long prof_counter;
 	unsigned char mcheck_expected;
@@ -42,20 +41,16 @@ extern struct cpuinfo_alpha cpu_data[NR_CPUS];
 
 #define PROC_CHANGE_PENALTY     20
 
-/* Map from cpu id to sequential logical cpu number.  This will only
-   not be idempotent when cpus failed to come on-line.  */
-extern int __cpu_number_map[NR_CPUS];
-#define cpu_number_map(cpu)  __cpu_number_map[cpu]
-
-/* The reverse map from sequential logical cpu number to cpu id.  */
-extern int __cpu_logical_map[NR_CPUS];
-#define cpu_logical_map(cpu)  __cpu_logical_map[cpu]
-
 #define hard_smp_processor_id()	__hard_smp_processor_id()
 #define smp_processor_id()	(current_thread_info()->cpu)
 
 extern unsigned long cpu_present_mask;
-#define cpu_online_map cpu_present_mask
+extern int smp_num_cpus;
+
+#define cpu_online_map		cpu_present_mask
+#define num_online_cpus()	(smp_num_cpus)
+#define cpu_online(cpu)		(cpu_present_mask & (1<<(cpu)))
+#define cpu_possible(cpu)	cpu_online(cpu)
 
 extern int smp_call_function_on_cpu(void (*func) (void *info), void *info,int retry, int wait, unsigned long cpu);
 

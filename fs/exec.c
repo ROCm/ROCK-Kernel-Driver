@@ -185,25 +185,39 @@ static int count(char ** argv, int max)
  */
 int copy_strings(int argc,char ** argv, struct linux_binprm *bprm) 
 {
+	struct page *kmapped_page = NULL;
+	char *kaddr = NULL;
+	int ret;
+
 	while (argc-- > 0) {
 		char *str;
 		int len;
 		unsigned long pos;
 
-		if (get_user(str, argv+argc) || !(len = strnlen_user(str, bprm->p)))
-			return -EFAULT;
-		if (bprm->p < len) 
-			return -E2BIG; 
+		if (get_user(str, argv+argc) ||
+				!(len = strnlen_user(str, bprm->p))) {
+			ret = -EFAULT;
+			goto out;
+		}
+
+		if (bprm->p < len)  {
+			ret = -E2BIG;
+			goto out;
+		}
 
 		bprm->p -= len;
 		/* XXX: add architecture specific overflow check here. */ 
-
 		pos = bprm->p;
+
+		/*
+		 * The only sleeping function which we are allowed to call in
+		 * this loop is copy_from_user().  Otherwise, copy_user_state
+		 * could get trashed.
+		 */
 		while (len > 0) {
-			char *kaddr;
 			int i, new, err;
-			struct page *page;
 			int offset, bytes_to_copy;
+			struct page *page;
 
 			offset = pos % PAGE_SIZE;
 			i = pos/PAGE_SIZE;
@@ -212,32 +226,44 @@ int copy_strings(int argc,char ** argv, struct linux_binprm *bprm)
 			if (!page) {
 				page = alloc_page(GFP_HIGHUSER);
 				bprm->page[i] = page;
-				if (!page)
-					return -ENOMEM;
+				if (!page) {
+					ret = -ENOMEM;
+					goto out;
+				}
 				new = 1;
 			}
-			kaddr = kmap(page);
 
+			if (page != kmapped_page) {
+				if (kmapped_page)
+					kunmap(kmapped_page);
+				kmapped_page = page;
+				kaddr = kmap(kmapped_page);
+			}
 			if (new && offset)
 				memset(kaddr, 0, offset);
 			bytes_to_copy = PAGE_SIZE - offset;
 			if (bytes_to_copy > len) {
 				bytes_to_copy = len;
 				if (new)
-					memset(kaddr+offset+len, 0, PAGE_SIZE-offset-len);
+					memset(kaddr+offset+len, 0,
+						PAGE_SIZE-offset-len);
 			}
-			err = copy_from_user(kaddr + offset, str, bytes_to_copy);
-			kunmap(page);
-
-			if (err)
-				return -EFAULT; 
+			err = copy_from_user(kaddr+offset, str, bytes_to_copy);
+			if (err) {
+				ret = -EFAULT;
+				goto out;
+			}
 
 			pos += bytes_to_copy;
 			str += bytes_to_copy;
 			len -= bytes_to_copy;
 		}
 	}
-	return 0;
+	ret = 0;
+out:
+	if (kmapped_page)
+		kunmap(kmapped_page);
+	return ret;
 }
 
 /*

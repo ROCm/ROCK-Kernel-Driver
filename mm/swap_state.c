@@ -95,7 +95,7 @@ void __delete_from_swap_cache(struct page *page)
 	BUG_ON(!PageSwapCache(page));
 	BUG_ON(PageWriteback(page));
 	ClearPageDirty(page);
-	__remove_inode_page(page);
+	__remove_from_page_cache(page);
 	INC_CACHE_INFO(del_total);
 }
 
@@ -206,7 +206,7 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 	err = radix_tree_reserve(&swapper_space.page_tree, entry.val, &pslot);
 	if (!err) {
 		/* Remove it from the page cache */
-		__remove_inode_page (page);
+		__remove_from_page_cache(page);
 
 		/* Add it to the swap cache */
 		*pslot = page;

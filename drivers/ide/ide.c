@@ -251,7 +251,7 @@ static struct ata_bit_messages ata_status_msgs[] = {
 
 static struct ata_bit_messages ata_error_msgs[] = {
 	{ ICRC_ERR|ABRT_ERR,	ABRT_ERR,		"drive status error"	},
-	{ ICRC_ERR|ABRT_ERR,	ICRC_ERR,		"bad sectorr"		},
+	{ ICRC_ERR|ABRT_ERR,	ICRC_ERR,		"bad sector"		},
 	{ ICRC_ERR|ABRT_ERR,	ICRC_ERR|ABRT_ERR,	"invalid checksum"	},
 	{ ECC_ERR,		ECC_ERR,		"uncorrectable error"	},
 	{ ID_ERR,		ID_ERR,			"sector id not found"   },
@@ -1106,7 +1106,7 @@ struct block_device_operations ide_fops[] = {{
 	.release =		ide_release,
 	.ioctl =		ata_ioctl,
 	.check_media_change =	ide_check_media_change,
-	.revalidate =		ata_revalidate
+	.revalidate =		ide_revalidate
 }};
 
 EXPORT_SYMBOL(ide_fops);

@@ -3308,12 +3308,12 @@ static int raw_cmd_ioctl(int cmd, void *param)
 	return ret;
 }
 
-static int invalidate_drive(kdev_t rdev)
+static int invalidate_drive(struct block_device *bdev)
 {
 	/* invalidate the buffer track to force a reread */
-	set_bit(DRIVE(rdev), &fake_change);
+	set_bit(DRIVE(to_kdev_t(bdev->bd_dev)), &fake_change);
 	process_fd_request();
-	check_disk_change(rdev);
+	check_disk_change(bdev);
 	return 0;
 }
 
@@ -3324,7 +3324,7 @@ static inline void clear_write_error(int drive)
 }
 
 static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
-			       int drive, int type, kdev_t device)
+			       int drive, int type, struct block_device *bdev)
 {
 	int cnt;
 
@@ -3354,8 +3354,8 @@ static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
 		for (cnt = 0; cnt < N_DRIVE; cnt++){
 			if (ITYPE(drive_state[cnt].fd_device) == type &&
 			    drive_state[cnt].fd_ref)
-				check_disk_change(
-					mk_kdev(FLOPPY_MAJOR,
+				__check_disk_change(
+					MKDEV(FLOPPY_MAJOR,
 					      drive_state[cnt].fd_device));
 		}
 	} else {
@@ -3379,7 +3379,7 @@ static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
 		 * mtools often changes the geometry of the disk after
 		 * looking at the boot block */
 		if (DRS->maxblock > user_params[drive].sect || DRS->maxtrack)
-			invalidate_drive(device);
+			invalidate_drive(bdev);
 		else
 			process_fd_request();
 	}
@@ -3544,11 +3544,11 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			current_type[drive] = NULL;
 			floppy_sizes[drive] = MAX_DISK_SIZE;
 			UDRS->keep_data = 0;
-			return invalidate_drive(device);
+			return invalidate_drive(inode->i_bdev);
 		case FDSETPRM:
 		case FDDEFPRM:
 			return set_geometry(cmd, & inparam.g,
-					    drive, type, device);
+					    drive, type, inode->i_bdev);
 		case FDGETPRM:
 			ECALL(get_floppy_geometry(drive, type, 
 						  (struct floppy_struct**)
@@ -3579,7 +3579,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		case FDFMTEND:
 		case FDFLUSH:
 			LOCK_FDC(drive,1);
-			return invalidate_drive(device);
+			return invalidate_drive(inode->i_bdev);
 
 		case FDSETEMSGTRESH:
 			UDP->max_errors.reporting =
@@ -3805,7 +3805,7 @@ static int floppy_open(struct inode * inode, struct file * filp)
 		return 0;
 	if (filp->f_mode & 3) {
 		UDRS->last_checked = 0;
-		check_disk_change(inode->i_rdev);
+		check_disk_change(inode->i_bdev);
 		if (UTESTF(FD_DISK_CHANGED))
 			RETERR(ENXIO);
 	}

@@ -15,6 +15,8 @@
 # endif
 #endif
 
+#define USER_HZ		HZ
+
 #define EXEC_PAGESIZE	8192
 
 #ifndef NGROUPS

@@ -106,8 +106,6 @@ static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	if (!NInoMstProtected(ni)) {
 		if (likely(page_uptodate && !PageError(page)))
 			SetPageUptodate(page);
-		unlock_page(page);
-		return;
 	} else {
 		char *addr;
 		unsigned int i, recs, nr_err;
@@ -332,6 +330,8 @@ handle_zblock:
  * for it to be read in before we can do the copy.
  *
  * Return 0 on success and -errno on error.
+ *
+ * WARNING: Do not make this function static! It is used by mft.c!
  */
 int ntfs_readpage(struct file *file, struct page *page)
 {
@@ -372,8 +372,8 @@ int ntfs_readpage(struct file *file, struct page *page)
 	else
 		base_ni = ni->_INE(base_ntfs_ino);
 
-	/* Map, pin and lock the mft record for reading. */
-	mrec = map_mft_record(READ, base_ni);
+	/* Map, pin and lock the mft record. */
+	mrec = map_mft_record(base_ni);
 	if (unlikely(IS_ERR(mrec))) {
 		err = PTR_ERR(mrec);
 		goto err_out;
@@ -416,7 +416,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 put_unm_err_out:
 	put_attr_search_ctx(ctx);
 unm_err_out:
-	unmap_mft_record(READ, base_ni);
+	unmap_mft_record(base_ni);
 err_out:
 	unlock_page(page);
 	return err;

@@ -433,8 +433,10 @@ int __set_page_dirty_buffers(struct page *page)
 
 	if (!TestSetPageDirty(page)) {
 		write_lock(&mapping->page_lock);
-		list_del(&page->list);
-		list_add(&page->list, &mapping->dirty_pages);
+		if (page->mapping) {	/* Race with truncate? */
+			list_del(&page->list);
+			list_add(&page->list, &mapping->dirty_pages);
+		}
 		write_unlock(&mapping->page_lock);
 		__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
 	}
@@ -467,8 +469,10 @@ int __set_page_dirty_nobuffers(struct page *page)
 
 		if (mapping) {
 			write_lock(&mapping->page_lock);
-			list_del(&page->list);
-			list_add(&page->list, &mapping->dirty_pages);
+			if (page->mapping) {	/* Race with truncate? */
+				list_del(&page->list);
+				list_add(&page->list, &mapping->dirty_pages);
+			}
 			write_unlock(&mapping->page_lock);
 			__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
 		}
