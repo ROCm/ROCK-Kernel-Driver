@@ -103,16 +103,16 @@ int eth_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
 	if (dev->flags & (IFF_LOOPBACK|IFF_NOARP)) 
 	{
 		memset(eth->h_dest, 0, dev->addr_len);
-		return(dev->hard_header_len);
+		return ETH_HLEN;
 	}
 	
 	if(daddr)
 	{
 		memcpy(eth->h_dest,daddr,dev->addr_len);
-		return dev->hard_header_len;
+		return ETH_HLEN;
 	}
 	
-	return -dev->hard_header_len;
+	return -ETH_HLEN;
 }
 
 
