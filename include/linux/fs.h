@@ -1230,8 +1230,8 @@ static inline int fsync_inode_data_buffers(struct inode *inode)
 	return fsync_buffers_list(&inode->i_dirty_data_buffers);
 }
 extern int inode_has_buffers(struct inode *);
-extern void filemap_fdatasync(struct address_space *);
-extern void filemap_fdatawait(struct address_space *);
+extern int filemap_fdatasync(struct address_space *);
+extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(kdev_t);
 extern int bmap(struct inode *, int);
 extern int notify_change(struct dentry *, struct iattr *);

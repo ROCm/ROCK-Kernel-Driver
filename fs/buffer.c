@@ -410,9 +410,9 @@ asmlinkage long sys_fsync(unsigned int fd)
 	struct file * file;
 	struct dentry * dentry;
 	struct inode * inode;
-	int err;
+	int ret, err;
 
-	err = -EBADF;
+	ret = -EBADF;
 	file = fget(fd);
 	if (!file)
 		goto out;
@@ -420,21 +420,27 @@ asmlinkage long sys_fsync(unsigned int fd)
 	dentry = file->f_dentry;
 	inode = dentry->d_inode;
 
-	err = -EINVAL;
-	if (!file->f_op || !file->f_op->fsync)
+	ret = -EINVAL;
+	if (!file->f_op || !file->f_op->fsync) {
+		/* Why?  We can still call filemap_fdatasync */
 		goto out_putf;
+	}
 
 	/* We need to protect against concurrent writers.. */
 	down(&inode->i_sem);
-	filemap_fdatasync(inode->i_mapping);
+	ret = filemap_fdatasync(inode->i_mapping);
 	err = file->f_op->fsync(file, dentry, 0);
-	filemap_fdatawait(inode->i_mapping);
+	if (err && !ret)
+		ret = err;
+	err = filemap_fdatawait(inode->i_mapping);
+	if (err && !ret)
+		ret = err;
 	up(&inode->i_sem);
 
 out_putf:
 	fput(file);
 out:
-	return err;
+	return ret;
 }
 
 asmlinkage long sys_fdatasync(unsigned int fd)
@@ -442,9 +448,9 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 	struct file * file;
 	struct dentry * dentry;
 	struct inode * inode;
-	int err;
+	int ret, err;
 
-	err = -EBADF;
+	ret = -EBADF;
 	file = fget(fd);
 	if (!file)
 		goto out;
@@ -452,20 +458,24 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 	dentry = file->f_dentry;
 	inode = dentry->d_inode;
 
-	err = -EINVAL;
+	ret = -EINVAL;
 	if (!file->f_op || !file->f_op->fsync)
 		goto out_putf;
 
 	down(&inode->i_sem);
-	filemap_fdatasync(inode->i_mapping);
+	ret = filemap_fdatasync(inode->i_mapping);
 	err = file->f_op->fsync(file, dentry, 1);
-	filemap_fdatawait(inode->i_mapping);
+	if (err && !ret)
+		ret = err;
+	err = filemap_fdatawait(inode->i_mapping);
+	if (err && !ret)
+		ret = err;
 	up(&inode->i_sem);
 
 out_putf:
 	fput(file);
 out:
-	return err;
+	return ret;
 }
 
 /* After several hours of tedious analysis, the following hash

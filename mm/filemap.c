@@ -542,8 +542,9 @@ EXPORT_SYMBOL(fail_writepage);
  *      @mapping: address space structure to write
  *
  */
-void filemap_fdatasync(struct address_space * mapping)
+int filemap_fdatasync(struct address_space * mapping)
 {
+	int ret = 0;
 	int (*writepage)(struct page *) = mapping->a_ops->writepage;
 
 	spin_lock(&pagecache_lock);
@@ -563,8 +564,11 @@ void filemap_fdatasync(struct address_space * mapping)
 		lock_page(page);
 
 		if (PageDirty(page)) {
+			int err;
 			ClearPageDirty(page);
-			writepage(page);
+			err = writepage(page);
+			if (err && !ret)
+				ret = err;
 		} else
 			UnlockPage(page);
 
@@ -572,6 +576,7 @@ void filemap_fdatasync(struct address_space * mapping)
 		spin_lock(&pagecache_lock);
 	}
 	spin_unlock(&pagecache_lock);
+	return ret;
 }
 
 /**
@@ -581,8 +586,10 @@ void filemap_fdatasync(struct address_space * mapping)
  *      @mapping: address space structure to wait for
  *
  */
-void filemap_fdatawait(struct address_space * mapping)
+int filemap_fdatawait(struct address_space * mapping)
 {
+	int ret = 0;
+
 	spin_lock(&pagecache_lock);
 
         while (!list_empty(&mapping->locked_pages)) {
@@ -598,11 +605,14 @@ void filemap_fdatawait(struct address_space * mapping)
 		spin_unlock(&pagecache_lock);
 
 		___wait_on_page(page);
+		if (PageError(page))
+			ret = -EIO;
 
 		page_cache_release(page);
 		spin_lock(&pagecache_lock);
 	}
 	spin_unlock(&pagecache_lock);
+	return ret;
 }
 
 /*
@@ -1479,12 +1489,14 @@ static ssize_t generic_file_direct_IO(int rw, struct file * filp, char * buf, si
 		goto out_free;
 
 	/*
-	 * Flush to disk exlusively the _data_, metadata must remains
+	 * Flush to disk exclusively the _data_, metadata must remain
 	 * completly asynchronous or performance will go to /dev/null.
 	 */
-	filemap_fdatasync(mapping);
-	retval = fsync_inode_data_buffers(inode);
-	filemap_fdatawait(mapping);
+	retval = filemap_fdatasync(mapping);
+	if (retval == 0)
+		retval = fsync_inode_data_buffers(inode);
+	if (retval == 0)
+		retval = filemap_fdatawait(mapping);
 	if (retval < 0)
 		goto out_free;
 
@@ -2101,26 +2113,45 @@ int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
  * The msync() system call.
  */
 
+/*
+ * MS_SYNC syncs the entire file - including mappings.
+ *
+ * MS_ASYNC initiates writeout of just the dirty mapped data.
+ * This provides no guarantee of file integrity - things like indirect
+ * blocks may not have started writeout.  MS_ASYNC is primarily useful
+ * where the application knows that it has finished with the data and
+ * wishes to intelligently schedule its own I/O traffic.
+ */
 static int msync_interval(struct vm_area_struct * vma,
 	unsigned long start, unsigned long end, int flags)
 {
+	int ret = 0;
 	struct file * file = vma->vm_file;
-	if (file && (vma->vm_flags & VM_SHARED)) {
-		int error;
-		error = filemap_sync(vma, start, end-start, flags);
 
-		if (!error && (flags & MS_SYNC)) {
+	if (file && (vma->vm_flags & VM_SHARED)) {
+		ret = filemap_sync(vma, start, end-start, flags);
+
+		if (!ret && (flags & (MS_SYNC|MS_ASYNC))) {
 			struct inode * inode = file->f_dentry->d_inode;
+
 			down(&inode->i_sem);
-			filemap_fdatasync(inode->i_mapping);
-			if (file->f_op && file->f_op->fsync)
-				error = file->f_op->fsync(file, file->f_dentry, 1);
-			filemap_fdatawait(inode->i_mapping);
+			ret = filemap_fdatasync(inode->i_mapping);
+			if (flags & MS_SYNC) {
+				int err;
+
+				if (file->f_op && file->f_op->fsync) {
+					err = file->f_op->fsync(file, file->f_dentry, 1);
+					if (err && !ret)
+						ret = err;
+				}
+				err = filemap_fdatawait(inode->i_mapping);
+				if (err && !ret)
+					ret = err;
+			}
 			up(&inode->i_sem);
 		}
-		return error;
 	}
-	return 0;
+	return ret;
 }
 
 asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
