@@ -1068,7 +1068,7 @@ static void blk_unplug_timeout(unsigned long data)
 {
 	request_queue_t *q = (request_queue_t *)data;
 
-	schedule_work(&q->unplug_work);
+	kblockd_schedule_work(&q->unplug_work);
 }
 
 /**
@@ -1176,7 +1176,7 @@ void blk_cleanup_queue(request_queue_t * q)
 	elevator_exit(q);
 
 	del_timer_sync(&q->unplug_timer);
-	flush_scheduled_work();
+	kblockd_flush();
 
 	mempool_destroy(rl->rq_pool);
 
