@@ -196,7 +196,6 @@ static struct tagtable __tagtable_##fn __tag = { tag, fn }
 
 struct meminfo {
 	int nr_banks;
-	unsigned long end;
 	struct {
 		unsigned long start;
 		unsigned long size;

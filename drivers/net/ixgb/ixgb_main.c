@@ -1610,7 +1610,7 @@ static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs)
 		 */
 
 		atomic_inc(&adapter->irq_sem);
-		IXGB_WRITE_REG(&adapter->hw, IMC, ~0);
+		IXGB_WRITE_REG(hw, IMC, ~0);
 		__netif_rx_schedule(netdev);
 	}
 #else

@@ -225,6 +225,8 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 		bootmem_pages += np[i].bootmap_pages;
 	}
 
+	high_memory = __va(memend_pfn << PAGE_SHIFT);
+
 	/*
 	 * This doesn't seem to be used by the Linux memory
 	 * manager any more.  If we can get rid of it, we
@@ -232,7 +234,6 @@ find_memend_and_nodes(struct meminfo *mi, struct node_info *np)
 	 */
 	max_low_pfn = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
 	max_pfn = memend_pfn - O_PFN_DOWN(PHYS_OFFSET);
-	mi->end = memend_pfn << PAGE_SHIFT;
 
 	return bootmem_pages;
 }
@@ -546,7 +547,6 @@ void __init mem_init(void)
 	datapages = &_end - &_etext;
 	initpages = &__init_end - &__init_begin;
 
-	high_memory = (void *)__va(meminfo.end);
 #ifndef CONFIG_DISCONTIGMEM
 	max_mapnr   = virt_to_page(high_memory) - mem_map;
 #endif

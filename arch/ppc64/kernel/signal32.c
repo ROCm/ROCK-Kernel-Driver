@@ -165,7 +165,7 @@ static int save_user_regs(struct pt_regs *regs, struct mcontext32 __user *frame,
 	 * significant bits of a vector, we "cheat" and stuff VRSAVE in the
 	 * most significant bits of that same vector. --BenH
 	 */
-	if (__put_user(current->thread.vrsave, (u32 *)&frame->mc_vregs[32]))
+	if (__put_user(current->thread.vrsave, (u32 __user *)&frame->mc_vregs[32]))
 		return 1;
 #endif /* CONFIG_ALTIVEC */
 
@@ -232,7 +232,7 @@ static long restore_user_regs(struct pt_regs *regs,
 		memset(&current->thread.vr, 0, ELF_NVRREG32 * sizeof(vector128));
 
 	/* Always get VRSAVE back */
-	if (__get_user(current->thread.vrsave, (u32 *)&sr->mc_vregs[32]))
+	if (__get_user(current->thread.vrsave, (u32 __user *)&sr->mc_vregs[32]))
 		return 1;
 #endif /* CONFIG_ALTIVEC */
 
@@ -289,8 +289,8 @@ long sys32_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6, int p7,
 	}
 }
 
-long sys32_sigaction(int sig, struct old_sigaction32 *act,
-		struct old_sigaction32 *oact)
+long sys32_sigaction(int sig, struct old_sigaction32 __user *act,
+		struct old_sigaction32 __user *oact)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -589,9 +589,11 @@ int sys32_rt_sigsuspend(compat_sigset_t __user * unewset, size_t sigsetsize, int
  *       sigaltatck               sys32_sigaltstack
  */
 
-int sys32_sigaltstack(u32 newstack, u32 oldstack, int r5,
+int sys32_sigaltstack(u32 __new, u32 __old, int r5,
 		      int r6, int r7, int r8, struct pt_regs *regs)
 {
+	stack_32_t __user * newstack = (stack_32_t __user *)(long) __new;
+	stack_32_t __user * oldstack = (stack_32_t __user *)(long) __old;
 	stack_t uss, uoss;
 	int ret;
 	mm_segment_t old_fs;
@@ -605,12 +607,9 @@ int sys32_sigaltstack(u32 newstack, u32 oldstack, int r5,
 
 	/* Put new stack info in local 64 bit stack struct */
 	if (newstack &&
-		(get_user((long)uss.ss_sp,
-			  &((stack_32_t *)(long)newstack)->ss_sp) ||
-		 __get_user(uss.ss_flags,
-			 &((stack_32_t *)(long)newstack)->ss_flags) ||
-		 __get_user(uss.ss_size,
-			 &((stack_32_t *)(long)newstack)->ss_size)))
+		(get_user((long)uss.ss_sp, &newstack->ss_sp) ||
+		 __get_user(uss.ss_flags, &newstack->ss_flags) ||
+		 __get_user(uss.ss_size, &newstack->ss_size)))
 		return -EFAULT; 
 
 	old_fs = get_fs();
@@ -623,12 +622,9 @@ int sys32_sigaltstack(u32 newstack, u32 oldstack, int r5,
 	set_fs(old_fs);
 	/* Copy the stack information to the user output buffer */
 	if (!ret && oldstack  &&
-		(put_user((long)uoss.ss_sp,
-			  &((stack_32_t *)(long)oldstack)->ss_sp) ||
-		 __put_user(uoss.ss_flags,
-			 &((stack_32_t *)(long)oldstack)->ss_flags) ||
-		 __put_user(uoss.ss_size,
-			 &((stack_32_t *)(long)oldstack)->ss_size)))
+		(put_user((long)uoss.ss_sp, &oldstack->ss_sp) ||
+		 __put_user(uoss.ss_flags, &oldstack->ss_flags) ||
+		 __put_user(uoss.ss_size, &oldstack->ss_size)))
 		return -EFAULT;
 	return ret;
 }
@@ -746,8 +742,8 @@ long sys32_swapcontext(struct ucontext32 __user *old_ctx,
 	if (new_ctx == NULL)
 		return 0;
 	if (verify_area(VERIFY_READ, new_ctx, sizeof(*new_ctx))
-	    || __get_user(tmp, (u8 *) new_ctx)
-	    || __get_user(tmp, (u8 *) (new_ctx + 1) - 1))
+	    || __get_user(tmp, (u8 __user *) new_ctx)
+	    || __get_user(tmp, (u8 __user *) (new_ctx + 1) - 1))
 		return -EFAULT;
 
 	/*

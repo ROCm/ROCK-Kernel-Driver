@@ -213,12 +213,12 @@ struct hiddev_usage_ref_multi {
  * In-kernel definitions.
  */
 
-#ifdef CONFIG_USB_HIDDEV
 struct hid_device;
 struct hid_usage;
 struct hid_field;
 struct hid_report;
 
+#ifdef CONFIG_USB_HIDDEV
 int hiddev_connect(struct hid_device *);
 void hiddev_disconnect(struct hid_device *);
 void hiddev_hid_event(struct hid_device *hid, struct hid_field *field,

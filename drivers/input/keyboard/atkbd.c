@@ -252,6 +252,11 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		switch (code) {
 			case ATKBD_RET_ACK:
 				atkbd->nak = 0;
+				if (atkbd->cmdcnt) {
+					set_bit(ATKBD_FLAG_CMD, &atkbd->flags);
+					set_bit(ATKBD_FLAG_CMD1, &atkbd->flags);
+					set_bit(ATKBD_FLAG_ID, &atkbd->flags);
+				}
 				clear_bit(ATKBD_FLAG_ACK, &atkbd->flags);
 				goto out;
 			case ATKBD_RET_NAK:
@@ -414,6 +419,7 @@ static int atkbd_sendbyte(struct atkbd *atkbd, unsigned char byte)
 #endif
 
 	set_bit(ATKBD_FLAG_ACK, &atkbd->flags);
+	clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
 	if (serio_write(atkbd->serio, byte))
 		return -1;
 	while (test_bit(ATKBD_FLAG_ACK, &atkbd->flags) && timeout--) udelay(1);
@@ -443,23 +449,13 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 		for (i = 0; i < receive; i++)
 			atkbd->cmdbuf[(receive - 1) - i] = param[i];
 
-	if (receive) {
-		set_bit(ATKBD_FLAG_CMD, &atkbd->flags);
-		set_bit(ATKBD_FLAG_CMD1, &atkbd->flags);
-		set_bit(ATKBD_FLAG_ID, &atkbd->flags);
-	}
-
 	if (command & 0xff)
-		if (atkbd_sendbyte(atkbd, command & 0xff)) {
-			clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
+		if (atkbd_sendbyte(atkbd, command & 0xff))
 			return -1;
-		}
 
 	for (i = 0; i < send; i++)
-		if (atkbd_sendbyte(atkbd, param[i])) {
-			clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
+		if (atkbd_sendbyte(atkbd, param[i]))
 			return -1;
-		}
 
 	while (test_bit(ATKBD_FLAG_CMD, &atkbd->flags) && timeout--) {
 

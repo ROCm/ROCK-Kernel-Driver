@@ -212,7 +212,7 @@ struct __new_sigaction32 {
 
 struct k_sigaction {
 	struct __new_sigaction 	sa;
-	void			*ka_restorer;
+	void __user		*ka_restorer;
 };
 #endif
 

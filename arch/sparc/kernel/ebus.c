@@ -238,7 +238,7 @@ void __init fill_ebus_device(int node, struct linux_ebus_device *dev)
 		child->bus = dev->bus;
 		fill_ebus_child(node, &regs[0], child);
 
-		while ((node = prom_getsibling(node))) {
+		while ((node = prom_getsibling(node)) != 0) {
 			child->next = (struct linux_ebus_child *)
 				ebus_alloc(sizeof(struct linux_ebus_child));
 
@@ -330,7 +330,7 @@ void __init ebus_init(void)
 		dev->bus = ebus;
 		fill_ebus_device(nd, dev);
 
-		while ((nd = prom_getsibling(nd))) {
+		while ((nd = prom_getsibling(nd)) != 0) {
 			dev->next = (struct linux_ebus_device *)
 				ebus_alloc(sizeof(struct linux_ebus_device));
 

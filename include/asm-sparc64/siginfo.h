@@ -99,7 +99,7 @@ typedef struct sigevent32 {
 	} _sigev_un;
 } sigevent_t32;
 
-extern int copy_siginfo_to_user32(siginfo_t32 *to, siginfo_t *from);
+extern int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from);
 
 #endif /* __KERNEL__ */
 

@@ -4,12 +4,8 @@ config BT_BNEP
 	select CRC32
 	help
 	  BNEP (Bluetooth Network Encapsulation Protocol) is Ethernet
-	  emulation layer on top of Bluetooth. BNEP is required for Bluetooth
-	  PAN (Personal Area Network).
-
-	  To use BNEP, you will need user-space utilities provided in the 
-	  BlueZ-PAN package.
-	  For more information, see <http://bluez.sourceforge.net>.
+	  emulation layer on top of Bluetooth.  BNEP is required for
+	  Bluetooth PAN (Personal Area Network).
 
 	  Say Y here to compile BNEP support into the kernel or say M to
 	  compile it as module (bnep).

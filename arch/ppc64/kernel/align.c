@@ -217,7 +217,7 @@ fix_alignment(struct pt_regs *regs)
 	unsigned dsisr;
 	unsigned char __user *addr;
 	unsigned char __user *p;
-	unsigned long *lp;
+	unsigned long __user *lp;
 	union {
 		long ll;
 		double dd;
@@ -242,9 +242,9 @@ fix_alignment(struct pt_regs *regs)
 
 	if (cur_cpu_spec->cpu_features & CPU_FTR_NODSISRALIGN) {
 	    unsigned int real_instr;
-	    if (__get_user(real_instr, (unsigned int *)regs->nip))
+	    if (__get_user(real_instr, (unsigned int __user *)regs->nip))
 		return 0;
-	    dsisr = make_dsisr(*((unsigned *)regs->nip));
+	    dsisr = make_dsisr(real_instr);
 	}
 
 	/* extract the operation and registers from the dsisr */
@@ -361,7 +361,7 @@ fix_alignment(struct pt_regs *regs)
 		p = addr;
 		switch (nb) {
 		case 128:	/* Special case - must be dcbz */
-			lp = (unsigned long *)p;
+			lp = (unsigned long __user *)p;
 			for (i = 0; i < L1_CACHE_BYTES / sizeof(long); ++i)
 				ret |= __put_user(0, lp++);
 			break;

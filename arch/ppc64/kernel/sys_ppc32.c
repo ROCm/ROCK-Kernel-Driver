@@ -173,7 +173,7 @@ static int filldir(void * __buf, const char * name, int namlen, off_t offset,
 		goto efault;
 	if (__put_user(0, dirent->d_name + namlen))
 		goto efault;
-	if (__put_user(d_type, (char *) dirent + reclen - 1))
+	if (__put_user(d_type, (char __user *) dirent + reclen - 1))
 		goto efault;
 	buf->previous = dirent;
 	dirent = (void __user *)dirent + reclen;
@@ -1105,7 +1105,7 @@ extern asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
 	int error;
 	size_t oldlen;
 	size_t __user *oldlenp = NULL;
-	unsigned long addr = (((long)&args->__unused[0]) + 7) & ~7;
+	unsigned long addr = (((unsigned long)&args->__unused[0]) + 7) & ~7;
 
 	if (copy_from_user(&tmp, args, sizeof(tmp)))
 		return -EFAULT;
@@ -1118,7 +1118,7 @@ extern asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
 		   glibc's __sysctl uses rw memory for the structure
 		   anyway.  */
 		oldlenp = (size_t __user *)addr;
-		if (get_user(oldlen, (u32 *)A(tmp.oldlenp)) ||
+		if (get_user(oldlen, (u32 __user *)A(tmp.oldlenp)) ||
 		    put_user(oldlen, oldlenp))
 			return -EFAULT;
 	}

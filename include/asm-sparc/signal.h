@@ -199,7 +199,7 @@ struct __new_sigaction {
 #ifdef __KERNEL__
 struct k_sigaction {
 	struct __new_sigaction	sa;
-	void			*ka_restorer;
+	void			__user *ka_restorer;
 };
 #endif
 
@@ -211,7 +211,7 @@ struct __old_sigaction {
 };
 
 typedef struct sigaltstack {
-	void		*ss_sp;
+	void		__user *ss_sp;
 	int		ss_flags;
 	size_t		ss_size;
 } stack_t;

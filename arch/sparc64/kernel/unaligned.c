@@ -128,12 +128,12 @@ static unsigned long fetch_reg(unsigned int reg, struct pt_regs *regs)
 		win = (struct reg_window *)(regs->u_regs[UREG_FP] + STACK_BIAS);
 		value = win->locals[reg - 16];
 	} else if (test_thread_flag(TIF_32BIT)) {
-		struct reg_window32 *win32;
-		win32 = (struct reg_window32 *)((unsigned long)((u32)regs->u_regs[UREG_FP]));
+		struct reg_window32 __user *win32;
+		win32 = (struct reg_window32 __user *)((unsigned long)((u32)regs->u_regs[UREG_FP]));
 		get_user(value, &win32->locals[reg - 16]);
 	} else {
-		struct reg_window *win;
-		win = (struct reg_window *)(regs->u_regs[UREG_FP] + STACK_BIAS);
+		struct reg_window __user *win;
+		win = (struct reg_window __user *)(regs->u_regs[UREG_FP] + STACK_BIAS);
 		get_user(value, &win->locals[reg - 16]);
 	}
 	return value;
@@ -477,12 +477,12 @@ int handle_popc(u32 insn, struct pt_regs *regs)
 			regs->u_regs[rd] = ret;
 	} else {
 		if (test_thread_flag(TIF_32BIT)) {
-			struct reg_window32 *win32;
-			win32 = (struct reg_window32 *)((unsigned long)((u32)regs->u_regs[UREG_FP]));
+			struct reg_window32 __user *win32;
+			win32 = (struct reg_window32 __user *)((unsigned long)((u32)regs->u_regs[UREG_FP]));
 			put_user(ret, &win32->locals[rd - 16]);
 		} else {
-			struct reg_window *win;
-			win = (struct reg_window *)(regs->u_regs[UREG_FP] + STACK_BIAS);
+			struct reg_window __user *win;
+			win = (struct reg_window __user *)(regs->u_regs[UREG_FP] + STACK_BIAS);
 			put_user(ret, &win->locals[rd - 16]);
 		}
 	}
@@ -540,10 +540,10 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 			data_access_exception(regs, 0, addr);
 			return 1;
 		}
-		if (put_user (first >> 32, (u32 *)addr) ||
-		    __put_user ((u32)first, (u32 *)(addr + 4)) ||
-		    __put_user (second >> 32, (u32 *)(addr + 8)) ||
-		    __put_user ((u32)second, (u32 *)(addr + 12))) {
+		if (put_user (first >> 32, (u32 __user *)addr) ||
+		    __put_user ((u32)first, (u32 __user *)(addr + 4)) ||
+		    __put_user (second >> 32, (u32 __user *)(addr + 8)) ||
+		    __put_user ((u32)second, (u32 __user *)(addr + 12))) {
 		    	data_access_exception(regs, 0, addr);
 		    	return 1;
 		}
@@ -568,10 +568,10 @@ int handle_ldf_stq(u32 insn, struct pt_regs *regs)
 		for (i = 0; i < size; i++)
 			data[i] = 0;
 		
-		err = get_user (data[0], (u32 *)addr);
+		err = get_user (data[0], (u32 __user *) addr);
 		if (!err) {
 			for (i = 1; i < size; i++)
-				err |= __get_user (data[i], (u32 *)(addr + 4*i));
+				err |= __get_user (data[i], (u32 __user *)(addr + 4*i));
 		}
 		if (err && !(asi & 0x2 /* NF */)) {
 			data_access_exception(regs, 0, addr);
@@ -620,13 +620,13 @@ void handle_ld_nf(u32 insn, struct pt_regs *regs)
 		if ((insn & 0x780000) == 0x180000)
 			reg[1] = 0;
 	} else if (test_thread_flag(TIF_32BIT)) {
-		put_user(0, (int *)reg);
+		put_user(0, (int __user *) reg);
 		if ((insn & 0x780000) == 0x180000)
-			put_user(0, ((int *)reg) + 1);
+			put_user(0, ((int __user *) reg) + 1);
 	} else {
-		put_user(0, reg);
+		put_user(0, (unsigned long __user *) reg);
 		if ((insn & 0x780000) == 0x180000)
-			put_user(0, reg + 1);
+			put_user(0, (unsigned long __user *) reg + 1);
 	}
 	advance(regs);
 }
@@ -646,13 +646,13 @@ void handle_lddfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 		die_if_kernel("lddfmna from kernel", regs);
 	if (test_thread_flag(TIF_32BIT))
 		pc = (u32)pc;
-	if (get_user(insn, (u32 *)pc) != -EFAULT) {
+	if (get_user(insn, (u32 __user *) pc) != -EFAULT) {
 		asi = sfsr >> 16;
 		if ((asi > ASI_SNFL) ||
 		    (asi < ASI_P))
 			goto daex;
-		if (get_user(first, (u32 *)sfar) ||
-		     get_user(second, (u32 *)(sfar + 4))) {
+		if (get_user(first, (u32 __user *)sfar) ||
+		     get_user(second, (u32 __user *)(sfar + 4))) {
 			if (asi & 0x2) /* NF */ {
 				first = 0; second = 0;
 			} else
@@ -698,7 +698,7 @@ void handle_stdfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 		die_if_kernel("stdfmna from kernel", regs);
 	if (test_thread_flag(TIF_32BIT))
 		pc = (u32)pc;
-	if (get_user(insn, (u32 *)pc) != -EFAULT) {
+	if (get_user(insn, (u32 __user *) pc) != -EFAULT) {
 		freg = ((insn >> 25) & 0x1e) | ((insn >> 20) & 0x20);
 		asi = sfsr >> 16;
 		value = 0;
@@ -717,8 +717,8 @@ void handle_stdfmna(struct pt_regs *regs, unsigned long sfar, unsigned long sfsr
 			value = __swab64p(&value); break;
 		default: goto daex;
 		}
-		if (put_user (value >> 32, (u32 *)sfar) ||
-		    __put_user ((u32)value, (u32 *)(sfar + 4)))
+		if (put_user (value >> 32, (u32 __user *) sfar) ||
+		    __put_user ((u32)value, (u32 __user *)(sfar + 4)))
 			goto daex;
 	} else {
 daex:		data_access_exception(regs, sfsr, sfar);

@@ -297,30 +297,7 @@ e1000_set_tx_csum(struct net_device *netdev, uint32_t data)
 	return 0;
 }
 
-static uint32_t
-e1000_get_sg(struct net_device *netdev)
-{
-	return (netdev->features & NETIF_F_SG) != 0;
-}
-
-static int
-e1000_set_sg(struct net_device *netdev, uint32_t data)
-{
-	if (data)
-		netdev->features |= NETIF_F_SG;
-	else
-		netdev->features &= ~NETIF_F_SG;
-
-	return 0;
-}
-
 #ifdef NETIF_F_TSO
-static uint32_t
-e1000_get_tso(struct net_device *netdev)
-{
-	return (netdev->features & NETIF_F_TSO) != 0;
-} 
-
 static int
 e1000_set_tso(struct net_device *netdev, uint32_t data)
 {
@@ -1577,12 +1554,6 @@ e1000_nway_reset(struct net_device *netdev)
 	return 0;
 }
 
-static uint32_t
-e1000_get_link(struct net_device *netdev)
-{
-	return netif_carrier_ok(netdev);
-}
-
 static int 
 e1000_get_stats_count(struct net_device *netdev)
 {
@@ -1635,7 +1606,7 @@ struct ethtool_ops e1000_ethtool_ops = {
 	.get_msglevel	        = e1000_get_msglevel,
 	.set_msglevel	        = e1000_set_msglevel,
 	.nway_reset             = e1000_nway_reset,
-	.get_link               = e1000_get_link,
+	.get_link               = ethtool_op_get_link,
 	.get_eeprom_len         = e1000_get_eeprom_len,
 	.get_eeprom             = e1000_get_eeprom,
 	.set_eeprom             = e1000_set_eeprom,
@@ -1647,10 +1618,10 @@ struct ethtool_ops e1000_ethtool_ops = {
 	.set_rx_csum		= e1000_set_rx_csum,
 	.get_tx_csum		= e1000_get_tx_csum,
 	.set_tx_csum		= e1000_set_tx_csum,
-	.get_sg			= e1000_get_sg,
-	.set_sg			= e1000_set_sg,
+	.get_sg			= ethtool_op_get_sg,
+	.set_sg			= ethtool_op_set_sg,
 #ifdef NETIF_F_TSO
-	.get_tso		= e1000_get_tso,
+	.get_tso		= ethtool_op_get_tso,
 	.set_tso		= e1000_set_tso,
 #endif
 	.self_test_count        = e1000_diag_test_count,

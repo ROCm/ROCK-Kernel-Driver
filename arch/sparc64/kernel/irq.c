@@ -1164,7 +1164,7 @@ static struct proc_dir_entry * irq_dir [NUM_IVECS];
 
 #define HEX_DIGITS 16
 
-static unsigned int parse_hex_value (const char *buffer,
+static unsigned int parse_hex_value (const char __user *buffer,
 		unsigned long count, unsigned long *ret)
 {
 	unsigned char hexnum [HEX_DIGITS];
@@ -1233,7 +1233,7 @@ static inline void set_intr_affinity(int irq, unsigned long hw_aff)
 	 */
 }
 
-static int irq_affinity_write_proc (struct file *file, const char *buffer,
+static int irq_affinity_write_proc (struct file *file, const char __user *buffer,
 					unsigned long count, void *data)
 {
 	int irq = (long) data, full_count = count, err;
