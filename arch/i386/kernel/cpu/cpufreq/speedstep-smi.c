@@ -85,6 +85,9 @@ static int speedstep_smi_ownership (void)
 
 /**
  * speedstep_smi_get_freqs - get SpeedStep preferred & current freq.
+ * Only available on later SpeedStep-enabled systems, returns false results or
+ * even hangs [cf. bugme.osdl.org # 1422] on earlier systems. Empirical testing
+ * shows that the latter occurs if !(ist_info.event & 0xFFFF).
  *
  */
 static int speedstep_smi_get_freqs (unsigned int *low, unsigned int *high)
@@ -92,6 +95,9 @@ static int speedstep_smi_get_freqs (unsigned int *low, unsigned int *high)
 	u32 command, result, edi, high_mhz, low_mhz;
 	u32 state=0;
 	u32 function = GET_SPEEDSTEP_FREQS;
+
+	if (!(ist_info.event & 0xFFFF))
+		return -ENODEV;
 
 	command = (smi_sig & 0xffffff00) | (smi_cmd & 0xff);
 
