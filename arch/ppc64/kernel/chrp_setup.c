@@ -148,7 +148,7 @@ chrp_setup_arch(void)
 		ROOT_DEV = Root_RAM0;
 	else
 #endif
-	ROOT_DEV = Root_SDA2;
+	; ROOT_DEV = Root_SDA3;
 
 	printk("Boot arguments: %s\n", cmd_line);
 
