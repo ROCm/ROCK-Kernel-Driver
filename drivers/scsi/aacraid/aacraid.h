@@ -639,7 +639,7 @@ struct fsa_scsi_hba {
 	u8		ro[MAXIMUM_NUM_CONTAINERS];
 	u8		locked[MAXIMUM_NUM_CONTAINERS];
 	u8		deleted[MAXIMUM_NUM_CONTAINERS];
-	u32		devno[MAXIMUM_NUM_CONTAINERS];
+	char		devname[MAXIMUM_NUM_CONTAINERS][8];
 };
 
 struct fib {
