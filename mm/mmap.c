@@ -528,7 +528,10 @@ munmap_back:
 		return -ENOMEM;
 
 	if (!(flags & MAP_NORESERVE) || sysctl_overcommit_memory > 1) {
-		if ((vm_flags & (VM_SHARED|VM_WRITE)) == VM_WRITE) {
+		if (vm_flags & VM_SHARED) {
+			/* Check memory availability in shmem_file_setup? */
+			vm_flags |= VM_ACCOUNT;
+		} else if (vm_flags & VM_WRITE) {
 			/* Private writable mapping: check memory availability */
 			charged = len >> PAGE_SHIFT;
 			if (!vm_enough_memory(charged))
@@ -582,6 +585,14 @@ munmap_back:
 		if (error)
 			goto free_vma;
 	}
+
+	/* We set VM_ACCOUNT in a shared mapping's vm_flags, to inform
+	 * shmem_zero_setup (perhaps called through /dev/zero's ->mmap)
+	 * that memory reservation must be checked; but that reservation
+	 * belongs to shared memory object, not to vma: so now clear it.
+	 */
+	if ((vm_flags & (VM_SHARED|VM_ACCOUNT)) == (VM_SHARED|VM_ACCOUNT))
+		vma->vm_flags &= ~VM_ACCOUNT;
 
 	/* Can addr have changed??
 	 *
