@@ -238,7 +238,7 @@ static void matroxfb_remove(WPMINFO int dummy) {
 
 static int matroxfb_open(struct fb_info *info, int user)
 {
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 	DBG_LOOP("matroxfb_open")
 
 	if (ACCESS_FBINFO(dead)) {
@@ -251,7 +251,7 @@ static int matroxfb_open(struct fb_info *info, int user)
 
 static int matroxfb_release(struct fb_info *info, int user)
 {
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 	DBG_LOOP("matroxfb_release")
 
 	if (!(--ACCESS_FBINFO(usecount)) && ACCESS_FBINFO(dead)) {
@@ -263,7 +263,7 @@ static int matroxfb_release(struct fb_info *info, int user)
 
 static int matroxfb_pan_display(struct fb_var_screeninfo *var, int con,
 		struct fb_info* info) {
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 
 	DBG("matroxfb_pan_display")
 
@@ -289,7 +289,7 @@ static int matroxfb_pan_display(struct fb_var_screeninfo *var, int con,
 
 static int matroxfb_updatevar(int con, struct fb_info *info)
 {
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 	DBG("matroxfb_updatevar");
 
 	matrox_pan_var(PMINFO &fb_display[con].var);
@@ -566,7 +566,7 @@ static int matroxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 {
 	struct display* p;
 #ifdef CONFIG_FB_MATROX_MULTIHEAD
-	struct matrox_fb_info* minfo = (struct matrox_fb_info*)fb_info;
+	struct matrox_fb_info* minfo = container_of(fb_info, struct matrox_fb_info, fbcon);
 #endif
 
 	DBG("matroxfb_setcolreg")
@@ -650,7 +650,7 @@ static int matroxfb_get_fix(struct fb_fix_screeninfo *fix, int con,
 	struct display* p;
 	DBG("matroxfb_get_fix")
 
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 
 	if (ACCESS_FBINFO(dead)) {
 		return -ENXIO;
@@ -683,7 +683,7 @@ static int matroxfb_get_fix(struct fb_fix_screeninfo *fix, int con,
 static int matroxfb_get_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info)
 {
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 	DBG("matroxfb_get_var")
 
 	if(con < 0)
@@ -697,7 +697,7 @@ static int matroxfb_get_var(struct fb_var_screeninfo *var, int con,
 static int matroxfb_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info)
 {
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 	int err;
 	int visual;
 	int cmap_len;
@@ -864,7 +864,7 @@ static int matrox_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 
 	DBG("matrox_getcolreg")
 
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 	/*
 	 *  Read a single color register and split it into colors/transparent.
 	 *  Return != 0 for invalid regno.
@@ -884,7 +884,7 @@ static int matrox_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 static int matroxfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			     struct fb_info *info)
 {
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 	struct display* dsp = (con < 0) ? ACCESS_FBINFO(fbcon.disp)
 					: fb_display + con;
 
@@ -910,7 +910,7 @@ static int matroxfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 {
 	unsigned int cmap_len;
 	struct display* dsp = (con < 0) ? info->disp : (fb_display + con);
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 
 	DBG("matroxfb_set_cmap")
 
@@ -965,7 +965,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long arg, int con,
 			  struct fb_info *info)
 {
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 	DBG("matroxfb_ioctl")
 
 	if (ACCESS_FBINFO(dead)) {
@@ -1173,7 +1173,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 
 static int matroxfb_blank(int blank, struct fb_info *info)
 {
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 	int seq;
 	int crtc;
 	CRITFLAGS
@@ -1220,7 +1220,7 @@ static struct fb_ops matroxfb_ops = {
 
 int matroxfb_switch(int con, struct fb_info *info)
 {
-#define minfo ((struct matrox_fb_info*)info)
+#define minfo (container_of(info, struct matrox_fb_info, fbcon))
 	struct fb_cmap* cmap;
 	struct display *p;
 

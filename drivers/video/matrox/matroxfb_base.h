@@ -426,7 +426,6 @@ struct matroxfb_driver;
 struct matroxfb_dh_fb_info;
 
 struct matrox_fb_info {
-	/* fb_info must be first */
 	struct fb_info		fbcon;
 
 	struct list_head	next_fb;
@@ -622,7 +621,7 @@ struct matrox_fb_info {
 #define PMINFO   PMINFO2 ,
 
 static inline struct matrox_fb_info* mxinfo(const struct display* p) {
-	return (struct matrox_fb_info*)p->fb_info;
+	return container_of(p->fb_info, struct matrox_fb_info, fbcon);
 }
 
 #define PMXINFO(p)	   mxinfo(p),

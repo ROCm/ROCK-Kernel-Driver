@@ -28,7 +28,7 @@ MODULE_PARM_DESC(mem, "Memory size reserved for dualhead (default=8MB)");
 
 static int matroxfb_dh_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 		unsigned *blue, unsigned *transp, struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	if (regno >= 16)
 		return 1;
 	*red = m2info->palette[regno].red;
@@ -41,7 +41,7 @@ static int matroxfb_dh_getcolreg(unsigned regno, unsigned *red, unsigned *green,
 
 static int matroxfb_dh_setcolreg(unsigned regno, unsigned red, unsigned green,
 		unsigned blue, unsigned transp, struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	struct display* p;
 
 	if (regno >= 16)
@@ -185,8 +185,8 @@ static void matroxfb_dh_pan_var(struct matroxfb_dh_fb_info* m2info,
 	unsigned int pos;
 	unsigned int linelen;
 	unsigned int pixelsize;
+	MINFO_FROM(m2info->primary_dev);
 
-#define minfo (m2info->primary_dev)
 	pixelsize = var->bits_per_pixel >> 3;
 	linelen = var->xres_virtual * pixelsize;
 	pos = var->yoffset * linelen + var->xoffset * pixelsize;
@@ -197,7 +197,6 @@ static void matroxfb_dh_pan_var(struct matroxfb_dh_fb_info* m2info,
 	} else {
 		mga_outl(0x3C28, pos);
 	}
-#undef minfo
 }
 
 static int matroxfb_dh_decode_var(struct matroxfb_dh_fb_info* m2info,
@@ -301,7 +300,7 @@ static void initMatroxDH(struct matroxfb_dh_fb_info* m2info, struct display* p) 
 }
 
 static int matroxfb_dh_open(struct fb_info* info, int user) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	MINFO_FROM(m2info->primary_dev);
 
 	if (MINFO) {
@@ -314,7 +313,7 @@ static int matroxfb_dh_open(struct fb_info* info, int user) {
 }
 
 static int matroxfb_dh_release(struct fb_info* info, int user) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	MINFO_FROM(m2info->primary_dev);
 
 	if (MINFO) {
@@ -325,7 +324,7 @@ static int matroxfb_dh_release(struct fb_info* info, int user) {
 
 static int matroxfb_dh_get_fix(struct fb_fix_screeninfo* fix, int con,
 		struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	struct display* p;
 
 	if (con >= 0)
@@ -354,7 +353,7 @@ static int matroxfb_dh_get_fix(struct fb_fix_screeninfo* fix, int con,
 
 static int matroxfb_dh_get_var(struct fb_var_screeninfo* var, int con,
 		struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	if (con < 0)
 		*var = m2info->fbcon.disp->var;
 	else
@@ -365,7 +364,7 @@ static int matroxfb_dh_get_var(struct fb_var_screeninfo* var, int con,
 
 static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 		struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	struct display* p;
 	int chgvar;
 	int visual;
@@ -464,7 +463,7 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 
 static int matroxfb_dh_get_cmap(struct fb_cmap* cmap, int kspc, int con,
 		struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	struct display* dsp;
 
 	if (con < 0)
@@ -483,7 +482,7 @@ static int matroxfb_dh_get_cmap(struct fb_cmap* cmap, int kspc, int con,
 
 static int matroxfb_dh_set_cmap(struct fb_cmap* cmap, int kspc, int con,
 		struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	struct display* dsp;
 
 	if (con < 0)
@@ -507,7 +506,7 @@ static int matroxfb_dh_set_cmap(struct fb_cmap* cmap, int kspc, int con,
 
 static int matroxfb_dh_pan_display(struct fb_var_screeninfo* var, int con,
 		struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	if (var->xoffset + fb_display[con].var.xres > fb_display[con].var.xres_virtual ||
 	    var->yoffset + fb_display[con].var.yres > fb_display[con].var.yres_virtual)
 		return -EINVAL;
@@ -540,7 +539,7 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 		unsigned long arg,
 		int con,
 		struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	MINFO_FROM(m2info->primary_dev);
 
 	DBG("matroxfb_crtc2_ioctl")
@@ -655,7 +654,7 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 }
 
 static int matroxfb_dh_blank(int blank, struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	switch (blank) {
 		case 1:
 		case 2:
@@ -684,7 +683,7 @@ static struct fb_ops matroxfb_dh_ops = {
 };
 
 static int matroxfb_dh_switch(int con, struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	struct fb_cmap* cmap;
 	struct display* p;
 
@@ -707,7 +706,7 @@ static int matroxfb_dh_switch(int con, struct fb_info* info) {
 }
 
 static int matroxfb_dh_updatevar(int con, struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
+#define m2info (container_of(info, struct matroxfb_dh_fb_info, fbcon))
 	matroxfb_dh_pan_var(m2info, &fb_display[con].var);
 	return 0;
 #undef m2info
