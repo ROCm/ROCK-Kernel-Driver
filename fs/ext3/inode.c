@@ -1130,52 +1130,79 @@ static int commit_write_fn(handle_t *handle, struct buffer_head *bh)
  * buffers are managed internally.
  */
 
-static int ext3_commit_write(struct file *file, struct page *page,
+static int ext3_ordered_commit_write(struct file *file, struct page *page,
 			     unsigned from, unsigned to)
 {
 	handle_t *handle = ext3_journal_current_handle();
 	struct inode *inode = page->mapping->host;
 	int ret = 0, ret2;
 
-	if (ext3_should_journal_data(inode)) {
-		/*
-		 * Here we duplicate the generic_commit_write() functionality
-		 */
-		int partial = 0;
-		loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
+	ret = walk_page_buffers(handle, page_buffers(page),
+		from, to, NULL, ext3_journal_dirty_data);
 
-		ret = walk_page_buffers(handle, page_buffers(page),
-			from, to, &partial, commit_write_fn);
-		if (!partial)
-			SetPageUptodate(page);
-		if (pos > inode->i_size)
-			inode->i_size = pos;
-		EXT3_I(inode)->i_state |= EXT3_STATE_JDATA;
-		if (inode->i_size > EXT3_I(inode)->i_disksize) {
-			EXT3_I(inode)->i_disksize = inode->i_size;
-			ret2 = ext3_mark_inode_dirty(handle, inode);
-			if (!ret) 
-				ret = ret2;
-		}
-	} else {
-		if (ext3_should_order_data(inode)) {
-			ret = walk_page_buffers(handle, page_buffers(page),
-				from, to, NULL, ext3_journal_dirty_data);
-		}
-		/* Be careful here if generic_commit_write becomes a
-		 * required invocation after block_prepare_write. */
-		if (ret == 0) {
-			/*
-			 * generic_commit_write() will run mark_inode_dirty()
-			 * if i_size changes.  So let's piggyback the
-			 * i_disksize mark_inode_dirty into that.
-			 */
-			loff_t new_i_size =
-				((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
-			if (new_i_size > EXT3_I(inode)->i_disksize)
-				EXT3_I(inode)->i_disksize = new_i_size;
-			ret = generic_commit_write(file, page, from, to);
-		}
+	if (ret == 0) {
+		/*
+		 * generic_commit_write() will run mark_inode_dirty() if i_size
+		 * changes.  So let's piggyback the i_disksize mark_inode_dirty
+		 * into that.
+		 */
+		loff_t new_i_size;
+
+		new_i_size = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
+		if (new_i_size > EXT3_I(inode)->i_disksize)
+			EXT3_I(inode)->i_disksize = new_i_size;
+		ret = generic_commit_write(file, page, from, to);
+	}
+	ret2 = ext3_journal_stop(handle);
+	if (!ret)
+		ret = ret2;
+	return ret;
+}
+
+static int ext3_writeback_commit_write(struct file *file, struct page *page,
+			     unsigned from, unsigned to)
+{
+	handle_t *handle = ext3_journal_current_handle();
+	struct inode *inode = page->mapping->host;
+	int ret = 0, ret2;
+	loff_t new_i_size;
+
+	new_i_size = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
+	if (new_i_size > EXT3_I(inode)->i_disksize)
+		EXT3_I(inode)->i_disksize = new_i_size;
+	ret = generic_commit_write(file, page, from, to);
+	ret2 = ext3_journal_stop(handle);
+	if (!ret)
+		ret = ret2;
+	return ret;
+}
+
+static int ext3_journalled_commit_write(struct file *file,
+			struct page *page, unsigned from, unsigned to)
+{
+	handle_t *handle = ext3_journal_current_handle();
+	struct inode *inode = page->mapping->host;
+	int ret = 0, ret2;
+	int partial = 0;
+	loff_t pos;
+
+	/*
+	 * Here we duplicate the generic_commit_write() functionality
+	 */
+	pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
+
+	ret = walk_page_buffers(handle, page_buffers(page), from,
+				to, &partial, commit_write_fn);
+	if (!partial)
+		SetPageUptodate(page);
+	if (pos > inode->i_size)
+		inode->i_size = pos;
+	EXT3_I(inode)->i_state |= EXT3_STATE_JDATA;
+	if (inode->i_size > EXT3_I(inode)->i_disksize) {
+		EXT3_I(inode)->i_disksize = inode->i_size;
+		ret2 = ext3_mark_inode_dirty(handle, inode);
+		if (!ret) 
+			ret = ret2;
 	}
 	ret2 = ext3_journal_stop(handle);
 	if (!ret)
@@ -1302,52 +1329,44 @@ static int journal_dirty_data_fn(handle_t *handle, struct buffer_head *bh)
  * We don't honour synchronous mounts for writepage().  That would be
  * disastrous.  Any write() or metadata operation will sync the fs for
  * us.
+ *
+ * AKPM2: if all the page's buffers are mapped to disk and !data=journal,
+ * we don't need to open a transaction here.
  */
-static int ext3_writepage(struct page *page, struct writeback_control *wbc)
+static int ext3_ordered_writepage(struct page *page,
+			struct writeback_control *wbc)
 {
 	struct inode *inode = page->mapping->host;
 	struct buffer_head *page_bufs;
 	handle_t *handle = NULL;
-	int ret = 0, err;
-	int needed;
-	int order_data;
+	int ret = 0;
+	int err;
 
 	J_ASSERT(PageLocked(page));
 	
 	/*
-	 * We give up here if we're reentered, because it might be
-	 * for a different filesystem.  One *could* look for a
-	 * nested transaction opportunity.
+	 * We give up here if we're reentered, because it might be for a
+	 * different filesystem.
 	 */
 	if (ext3_journal_current_handle())
 		goto out_fail;
 
-	needed = ext3_writepage_trans_blocks(inode);
-	handle = ext3_journal_start(inode, needed);
+	handle = ext3_journal_start(inode, ext3_writepage_trans_blocks(inode));
 				
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
 		goto out_fail;
 	}
 
-	order_data = ext3_should_order_data(inode) ||
-			ext3_should_journal_data(inode);
-
-	page_bufs = NULL;	/* Purely to prevent compiler warning */
-
-	/* bget() all the buffers */
-	if (order_data) {
-		if (!page_has_buffers(page)) {
-			if (!PageUptodate(page))
-				buffer_error();
-			create_empty_buffers(page,
-				inode->i_sb->s_blocksize,
+	if (!page_has_buffers(page)) {
+		if (!PageUptodate(page))
+			buffer_error();
+		create_empty_buffers(page, inode->i_sb->s_blocksize,
 				(1 << BH_Dirty)|(1 << BH_Uptodate));
-		}
-		page_bufs = page_buffers(page);
-		walk_page_buffers(handle, page_bufs, 0,
-				PAGE_CACHE_SIZE, NULL, bget_one);
 	}
+	page_bufs = page_buffers(page);
+	walk_page_buffers(handle, page_bufs, 0,
+			PAGE_CACHE_SIZE, NULL, bget_one);
 
 	ret = block_write_full_page(page, ext3_get_block, wbc);
 
@@ -1358,40 +1377,114 @@ static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 	 * safe due to elevated refcount.
 	 */
 
-	handle = ext3_journal_current_handle();
-
 	/*
 	 * And attach them to the current transaction.  But only if 
 	 * block_write_full_page() succeeded.  Otherwise they are unmapped,
 	 * and generally junk.
 	 */
-	if (order_data) {
-		if (ret == 0) {
-			err = walk_page_buffers(handle, page_bufs,
-				0, PAGE_CACHE_SIZE, NULL,
-				journal_dirty_data_fn);
-			if (!ret)
-				ret = err;
-		}
-		walk_page_buffers(handle, page_bufs, 0,
-				PAGE_CACHE_SIZE, NULL, bput_one);
+	if (ret == 0) {
+		err = walk_page_buffers(handle, page_bufs, 0, PAGE_CACHE_SIZE,
+					NULL, journal_dirty_data_fn);
+		if (!ret)
+			ret = err;
 	}
-
+	walk_page_buffers(handle, page_bufs, 0,
+			PAGE_CACHE_SIZE, NULL, bput_one);
 	err = ext3_journal_stop(handle);
 	if (!ret)
 		ret = err;
 	return ret;
 
 out_fail:
-	
-	/*
-	 * We have to fail this writepage to avoid cross-fs transactions.
-	 * Put the page back on mapping->dirty_pages.  The page's buffers'
-	 * dirty state will be left as-is.
-	 */
 	__set_page_dirty_nobuffers(page);
 	unlock_page(page);
 	return ret;
+}
+
+static int ext3_writeback_writepage(struct page *page,
+				struct writeback_control *wbc)
+{
+	struct inode *inode = page->mapping->host;
+	handle_t *handle = NULL;
+	int ret = 0;
+	int err;
+
+	if (ext3_journal_current_handle())
+		goto out_fail;
+
+	handle = ext3_journal_start(inode, ext3_writepage_trans_blocks(inode));
+	if (IS_ERR(handle)) {
+		ret = PTR_ERR(handle);
+		goto out_fail;
+	}
+
+	ret = block_write_full_page(page, ext3_get_block, wbc);
+	err = ext3_journal_stop(handle);
+	if (!ret)
+		ret = err;
+	return ret;
+
+out_fail:
+	__set_page_dirty_nobuffers(page);
+	unlock_page(page);
+	return ret;
+}
+
+static int ext3_journalled_writepage(struct page *page,
+				struct writeback_control *wbc)
+{
+	struct inode *inode = page->mapping->host;
+	handle_t *handle = NULL;
+	int ret = 0;
+	int err;
+
+	if (ext3_journal_current_handle())
+		goto no_write;
+
+	handle = ext3_journal_start(inode, ext3_writepage_trans_blocks(inode));
+	if (IS_ERR(handle)) {
+		ret = PTR_ERR(handle);
+		goto no_write;
+	}
+
+	if (!page_has_buffers(page) || PageChecked(page)) {
+		/*
+		 * It's mmapped pagecache.  Add buffers and journal it.  There
+		 * doesn't seem much point in redirtying the page here.
+		 */
+		ClearPageChecked(page);
+		ret = block_prepare_write(page, 0, PAGE_CACHE_SIZE,
+					ext3_get_block);
+		if (ret != 0)
+			goto out_unlock;
+		ret = walk_page_buffers(handle, page_buffers(page), 0,
+			PAGE_CACHE_SIZE, NULL, do_journal_get_write_access);
+
+		err = walk_page_buffers(handle, page_buffers(page), 0,
+				PAGE_CACHE_SIZE, NULL, commit_write_fn);
+		if (ret == 0)
+			ret = err;
+		EXT3_I(inode)->i_state |= EXT3_STATE_JDATA;
+		unlock_page(page);
+	} else {
+		/*
+		 * It may be a page full of checkpoint-mode buffers.  We don't
+		 * really know unless we go poke around in the buffer_heads.
+		 * But block_write_full_page will do the right thing.
+		 */
+		ret = block_write_full_page(page, ext3_get_block, wbc);
+	}
+	err = ext3_journal_stop(handle);
+	if (!ret)
+		ret = err;
+out:
+	return ret;
+
+no_write:
+	__set_page_dirty_nobuffers(page);
+out_unlock:
+	unlock_page(page);
+	goto out;
 }
 
 static int ext3_readpage(struct file *file, struct page *page)
@@ -1409,12 +1502,21 @@ ext3_readpages(struct file *file, struct address_space *mapping,
 static int ext3_invalidatepage(struct page *page, unsigned long offset)
 {
 	journal_t *journal = EXT3_JOURNAL(page->mapping->host);
+
+	/*
+	 * If it's a full truncate we just forget about the pending dirtying
+	 */
+	if (offset == 0)
+		ClearPageChecked(page);
+
 	return journal_invalidatepage(journal, page, offset);
 }
 
 static int ext3_releasepage(struct page *page, int wait)
 {
 	journal_t *journal = EXT3_JOURNAL(page->mapping->host);
+
+	WARN_ON(PageChecked(page));
 	return journal_try_to_free_buffers(journal, page, wait);
 }
 
@@ -1482,40 +1584,74 @@ out:
 	return ret;
 }
 
-struct address_space_operations ext3_aops = {
-	.readpage	= ext3_readpage,	/* BKL not held.  Don't need */
-	.readpages	= ext3_readpages,	/* BKL not held.  Don't need */
-	.writepage	= ext3_writepage,	/* BKL not held.  We take it */
-	.sync_page	= block_sync_page,
-	.prepare_write	= ext3_prepare_write,	/* BKL not held.  We take it */
-	.commit_write	= ext3_commit_write,	/* BKL not held.  We take it */
-	.bmap		= ext3_bmap,		/* BKL held */
-	.invalidatepage	= ext3_invalidatepage,	/* BKL not held.  Don't need */
-	.releasepage	= ext3_releasepage,	/* BKL not held.  Don't need */
-	.direct_IO	= ext3_direct_IO,	/* BKL not held.  Don't need */
-};
-
-/* For writeback mode, we can use mpage_writepages() */
-#if 0	/* Doesn't work for shared mappings */
-static int
-ext3_writepages(struct address_space *mapping, struct writeback_control *wbc)
+/*
+ * Pages can be marked dirty completely asynchronously from ext3's journalling
+ * activity.  By filemap_sync_pte(), try_to_unmap_one(), etc.  We cannot do
+ * much here because ->set_page_dirty is called under VFS locks.  The page is
+ * not necessarily locked.
+ *
+ * We cannot just dirty the page and leave attached buffers clean, because the
+ * buffers' dirty state is "definitive".  We cannot just set the buffers dirty
+ * or jbddirty because all the journalling code will explode.
+ *
+ * So what we do is to mark the page "pending dirty" and next time writepage
+ * is called, propagate that into the buffers appropriately.
+ */
+static int ext3_journalled_set_page_dirty(struct page *page)
 {
-	return mpage_writepages(mapping, wbc, ext3_get_block);
+	SetPageChecked(page);
+	return __set_page_dirty_nobuffers(page);
 }
-#endif
 
-struct address_space_operations ext3_writeback_aops = {
-	.readpage	= ext3_readpage,	/* BKL not held.  Don't need */
-	.readpages	= ext3_readpages,	/* BKL not held.  Don't need */
-	.writepage	= ext3_writepage,	/* BKL not held.  We take it */
+static struct address_space_operations ext3_ordered_aops = {
+	.readpage	= ext3_readpage,
+	.readpages	= ext3_readpages,
+	.writepage	= ext3_ordered_writepage,
 	.sync_page	= block_sync_page,
-	.prepare_write	= ext3_prepare_write,	/* BKL not held.  We take it */
-	.commit_write	= ext3_commit_write,	/* BKL not held.  We take it */
-	.bmap		= ext3_bmap,		/* BKL held */
-	.invalidatepage	= ext3_invalidatepage,	/* BKL not held.  Don't need */
-	.releasepage	= ext3_releasepage,	/* BKL not held.  Don't need */
-	.direct_IO	= ext3_direct_IO,	/* BKL not held.  Don't need */
+	.prepare_write	= ext3_prepare_write,
+	.commit_write	= ext3_ordered_commit_write,
+	.bmap		= ext3_bmap,
+	.invalidatepage	= ext3_invalidatepage,
+	.releasepage	= ext3_releasepage,
+	.direct_IO	= ext3_direct_IO,
 };
+
+static struct address_space_operations ext3_writeback_aops = {
+	.readpage	= ext3_readpage,
+	.readpages	= ext3_readpages,
+	.writepage	= ext3_writeback_writepage,
+	.sync_page	= block_sync_page,
+	.prepare_write	= ext3_prepare_write,
+	.commit_write	= ext3_writeback_commit_write,
+	.bmap		= ext3_bmap,
+	.invalidatepage	= ext3_invalidatepage,
+	.releasepage	= ext3_releasepage,
+	.direct_IO	= ext3_direct_IO,
+};
+
+static struct address_space_operations ext3_journalled_aops = {
+	.readpage	= ext3_readpage,
+	.readpages	= ext3_readpages,
+	.writepage	= ext3_journalled_writepage,
+	.sync_page	= block_sync_page,
+	.prepare_write	= ext3_prepare_write,
+	.commit_write	= ext3_journalled_commit_write,
+	.set_page_dirty	= ext3_journalled_set_page_dirty,
+	.bmap		= ext3_bmap,
+	.invalidatepage	= ext3_invalidatepage,
+	.releasepage	= ext3_releasepage,
+	.direct_IO	= ext3_direct_IO,
+};
+
+void ext3_set_aops(struct inode *inode)
+{
+	if (ext3_should_order_data(inode))
+		inode->i_mapping->a_ops = &ext3_ordered_aops;
+	else if (ext3_should_writeback_data(inode))
+		inode->i_mapping->a_ops = &ext3_writeback_aops;
+	else
+		inode->i_mapping->a_ops = &ext3_journalled_aops;
+}
 
 /*
  * ext3_block_truncate_page() zeroes out a mapping from file offset `from'
@@ -2307,10 +2443,7 @@ void ext3_read_inode(struct inode * inode)
 	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &ext3_file_inode_operations;
 		inode->i_fop = &ext3_file_operations;
-		if (ext3_should_writeback_data(inode))
-			inode->i_mapping->a_ops = &ext3_writeback_aops;
-		else
-			inode->i_mapping->a_ops = &ext3_aops;
+		ext3_set_aops(inode);
 	} else if (S_ISDIR(inode->i_mode)) {
 		inode->i_op = &ext3_dir_inode_operations;
 		inode->i_fop = &ext3_dir_operations;
@@ -2319,10 +2452,7 @@ void ext3_read_inode(struct inode * inode)
 			inode->i_op = &ext3_fast_symlink_inode_operations;
 		else {
 			inode->i_op = &ext3_symlink_inode_operations;
-			if (ext3_should_writeback_data(inode))
-				inode->i_mapping->a_ops = &ext3_writeback_aops;
-			else
-				inode->i_mapping->a_ops = &ext3_aops;
+			ext3_set_aops(inode);
 		}
 	} else {
 		inode->i_op = &ext3_special_inode_operations;
@@ -2804,61 +2934,3 @@ int ext3_change_inode_journal_flag(struct inode *inode, int val)
 	
 	return err;
 }
-
-
-/*
- * ext3_aops_journal_start().
- *
- * <This function died, but the comment lives on>
- *
- * We need to take the inode semaphore *outside* the
- * journal_start/journal_stop.  Otherwise, a different task could do a
- * wait_for_commit() while holding ->i_sem, which deadlocks.  The rule
- * is: transaction open/closes are considered to be a locking operation
- * and they nest *inside* ->i_sem.
- * ----------------------------------------------------------------------------
- * Possible problem:
- *	ext3_file_write()
- *	-> generic_file_write()
- *	   -> __alloc_pages()
- *	      -> page_launder()
- *		 -> ext3_writepage()
- *
- * And the writepage can be on a different fs while we have a
- * transaction open against this one!  Bad.
- *
- * I tried making the task PF_MEMALLOC here, but that simply results in
- * 0-order allocation failures passed back to generic_file_write().
- * Instead, we rely on the reentrancy protection in ext3_writepage().
- * ----------------------------------------------------------------------------
- * When we do the journal_start() here we don't really need to reserve
- * any blocks - we won't need any until we hit ext3_prepare_write(),
- * which does all the needed journal extending.  However!  There is a
- * problem with quotas:
- *
- * Thread 1:
- * sys_sync
- * ->sync_dquots
- *   ->commit_dquot
- *     ->lock_dquot
- *     ->write_dquot
- *       ->ext3_file_write
- *         ->journal_start
- *         ->ext3_prepare_write
- *           ->journal_extend
- *           ->journal_start
- * Thread 2:
- * ext3_create		(for example)
- * ->ext3_new_inode
- *   ->dquot_initialize
- *     ->lock_dquot
- *
- * Deadlock.  Thread 1's journal_start blocks because thread 2 has a
- * transaction open.  Thread 2's transaction will never close because
- * thread 2 is stuck waiting for the dquot lock.
- *
- * So.  We must ensure that thread 1 *never* needs to extend the journal
- * for quota writes.  We do that by reserving enough journal blocks
- * here, in ext3_aops_journal_start() to ensure that the forthcoming "see if we
- * need to extend" test in ext3_prepare_write() succeeds.  
- */

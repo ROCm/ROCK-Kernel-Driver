@@ -1644,10 +1644,7 @@ static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
 	if (!IS_ERR(inode)) {
 		inode->i_op = &ext3_file_inode_operations;
 		inode->i_fop = &ext3_file_operations;
-		if (ext3_should_writeback_data(inode))
-			inode->i_mapping->a_ops = &ext3_writeback_aops;
-		else
-			inode->i_mapping->a_ops = &ext3_aops;
+		ext3_set_aops(inode);
 		err = ext3_add_nondir(handle, dentry, inode);
 	}
 	ext3_journal_stop(handle);
@@ -2100,10 +2097,7 @@ static int ext3_symlink (struct inode * dir,
 
 	if (l > sizeof (EXT3_I(inode)->i_data)) {
 		inode->i_op = &ext3_symlink_inode_operations;
-		if (ext3_should_writeback_data(inode))
-			inode->i_mapping->a_ops = &ext3_writeback_aops;
-		else
-			inode->i_mapping->a_ops = &ext3_aops;
+		ext3_set_aops(inode);
 		/*
 		 * page_symlink() calls into ext3_prepare/commit_write.
 		 * We have a transaction open.  All is sweetness.  It also sets

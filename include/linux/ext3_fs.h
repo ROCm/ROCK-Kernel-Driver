@@ -735,6 +735,7 @@ extern void ext3_dirty_inode(struct inode *);
 extern int ext3_change_inode_journal_flag(struct inode *, int);
 extern void ext3_truncate (struct inode *);
 extern void ext3_set_inode_flags(struct inode *);
+extern void ext3_set_aops(struct inode *inode);
 
 /* ioctl.c */
 extern int ext3_ioctl (struct inode *, struct file *, unsigned int,
@@ -782,10 +783,6 @@ extern struct file_operations ext3_dir_operations;
 /* file.c */
 extern struct inode_operations ext3_file_inode_operations;
 extern struct file_operations ext3_file_operations;
-
-/* inode.c */
-extern struct address_space_operations ext3_aops;
-extern struct address_space_operations ext3_writeback_aops;
 
 /* namei.c */
 extern struct inode_operations ext3_dir_inode_operations;

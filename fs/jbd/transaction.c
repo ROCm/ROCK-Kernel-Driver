@@ -1120,7 +1120,6 @@ int journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 		/* And this case is illegal: we can't reuse another
 		 * transaction's data buffer, ever. */
 		/* FIXME: writepage() should be journalled */
-		J_ASSERT_JH(jh, jh->b_jlist != BJ_SyncData);
 		goto done_locked;
 	}
 
