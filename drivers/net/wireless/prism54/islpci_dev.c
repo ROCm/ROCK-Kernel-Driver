@@ -58,7 +58,7 @@ static int
 isl_upload_firmware(islpci_private *priv)
 {
 	u32 reg, rc;
-	void *device_base = priv->device_base;
+	void __iomem *device_base = priv->device_base;
 
 	/* clear the RAMBoot and the Reset bit */
 	reg = readl(device_base + ISL38XX_CTRL_STAT_REG);
@@ -113,7 +113,7 @@ isl_upload_firmware(islpci_private *priv)
 			    (fw_len >
 			     ISL38XX_MEMORY_WINDOW_SIZE) ?
 			    ISL38XX_MEMORY_WINDOW_SIZE : fw_len;
-			u32 *dev_fw_ptr = device_base + ISL38XX_DIRECT_MEM_WIN;
+			u32 __iomem *dev_fw_ptr = device_base + ISL38XX_DIRECT_MEM_WIN;
 
 			/* set the cards base address for writting the data */
 			isl38xx_w32_flush(device_base, reg,
@@ -183,7 +183,7 @@ islpci_interrupt(int irq, void *config, struct pt_regs *regs)
 	u32 reg;
 	islpci_private *priv = config;
 	struct net_device *ndev = priv->ndev;
-	void *device = priv->device_base;
+	void __iomem *device = priv->device_base;
 	int powerstate = ISL38XX_PSM_POWERSAVE_STATE;
 
 	/* lock the interrupt handler */
@@ -405,7 +405,7 @@ islpci_close(struct net_device *ndev)
 static int
 prism54_bring_down(islpci_private *priv)
 {
-	void *device_base = priv->device_base;
+	void __iomem *device_base = priv->device_base;
 	u32 reg;
 	/* we are going to shutdown the device */
 	islpci_set_state(priv, PRV_STATE_PREBOOT);

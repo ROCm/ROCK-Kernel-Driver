@@ -109,7 +109,7 @@ typedef struct {
 	u32 pci_state[16];	/* used for suspend/resume */
 	char firmware[33];
 
-	void *device_base;	/* ioremapped device base address */
+	void __iomem *device_base;	/* ioremapped device base address */
 
 	/* consistent DMA region */
 	void *driver_mem_address;	/* base DMA address */
