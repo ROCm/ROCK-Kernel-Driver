@@ -172,6 +172,12 @@ static int enter_state(u32 state)
 	if (down_trylock(&pm_sem))
 		return -EBUSY;
 
+	/* Suspend is hard to get right on SMP. */
+	if (num_online_cpus() != 1) {
+		error = -EPERM;
+		goto Unlock;
+	}
+
 	if ((error = suspend_prepare(state)))
 		goto Unlock;
 
