@@ -15,14 +15,13 @@
  * If you add an action here, you must also add the proper string to the
  * lib/kobject_uevent.c file.
  */
-
+typedef int __bitwise kobject_action_t;
 enum kobject_action {
-	KOBJ_ADD	= 0x00,	/* add event, for hotplug */
-	KOBJ_REMOVE	= 0x01,	/* remove event, for hotplug */
-	KOBJ_CHANGE	= 0x02,	/* a sysfs attribute file has changed */
-	KOBJ_MOUNT	= 0x03,	/* mount event for block devices */
-	KOBJ_UMOUNT	= 0x04,	/* umount event for block devices */
-	KOBJ_MAX_ACTION,	/* must be last action listed */
+	KOBJ_ADD	= (__force kobject_action_t) 0x01,	/* add event, for hotplug */
+	KOBJ_REMOVE	= (__force kobject_action_t) 0x02,	/* remove event, for hotplug */
+	KOBJ_CHANGE	= (__force kobject_action_t) 0x03,	/* a sysfs attribute file has changed */
+	KOBJ_MOUNT	= (__force kobject_action_t) 0x04,	/* mount event for block devices */
+	KOBJ_UMOUNT	= (__force kobject_action_t) 0x05,	/* umount event for block devices */
 };
 
 

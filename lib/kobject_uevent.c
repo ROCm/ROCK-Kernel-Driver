@@ -23,24 +23,22 @@
 #include <linux/kobject.h>
 #include <net/sock.h>
 
-/* 
- * These must match up with the values for enum kobject_action
- * as found in include/linux/kobject_uevent.h
- */
-static char *actions[] = {
-	"add",		/* 0x00 */
-	"remove",	/* 0x01 */
-	"change",	/* 0x02 */
-	"mount",	/* 0x03 */
-	"umount",	/* 0x04 */
-};
-
 static char *action_to_string(enum kobject_action action)
 {
-	if (action >= KOBJ_MAX_ACTION)
+	switch (action) {
+	case KOBJ_ADD:
+		return "add";
+	case KOBJ_REMOVE:
+		return "remove";
+	case KOBJ_CHANGE:
+		return "change";
+	case KOBJ_MOUNT:
+		return "mount";
+	case KOBJ_UMOUNT:
+		return "umount";
+	default:
 		return NULL;
-	else
-		return actions[action];
+	}
 }
 
 #ifdef CONFIG_KOBJECT_UEVENT
