@@ -133,7 +133,7 @@ void __ntfs_debug (const char *file, int line, const char *function,
 }
 
 /* Dump a run list. Caller has to provide synchronisation for @rl. */
-void ntfs_debug_dump_runlist(const run_list_element *rl)
+void ntfs_debug_dump_runlist(const runlist_element *rl)
 {
 	int i;
 	const char *lcn_str[5] = { "LCN_HOLE         ", "LCN_RL_NOT_MAPPED",

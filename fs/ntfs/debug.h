@@ -51,7 +51,7 @@ extern void __ntfs_debug (const char *file, int line, const char *function,
 #define ntfs_debug(f, a...)						\
 	__ntfs_debug(__FILE__, __LINE__, __FUNCTION__, f, ##a)
 
-extern void ntfs_debug_dump_runlist(const run_list_element *rl);
+extern void ntfs_debug_dump_runlist(const runlist_element *rl);
 
 #else	/* !DEBUG */
 

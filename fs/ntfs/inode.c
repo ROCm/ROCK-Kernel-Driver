@@ -372,13 +372,13 @@ static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 	ni->seq_no = 0;
 	atomic_set(&ni->count, 1);
 	ni->vol = NTFS_SB(sb);
-	init_run_list(&ni->run_list);
+	init_runlist(&ni->runlist);
 	init_MUTEX(&ni->mrec_lock);
 	ni->page = NULL;
 	ni->page_ofs = 0;
 	ni->attr_list_size = 0;
 	ni->attr_list = NULL;
-	init_run_list(&ni->attr_list_rl);
+	init_runlist(&ni->attr_list_rl);
 	ni->itype.index.bmp_ino = NULL;
 	ni->itype.index.block_size = 0;
 	ni->itype.index.vcn_size = 0;
@@ -1628,7 +1628,7 @@ err_out:
  * We solve these problems by starting with the $DATA attribute before anything
  * else and iterating using lookup_attr($DATA) over all extents. As each extent
  * is found, we decompress_mapping_pairs() including the implied
- * merge_run_lists(). Each step of the iteration necessarily provides
+ * merge_runlists(). Each step of the iteration necessarily provides
  * sufficient information for the next step to complete.
  *
  * This should work but there are two possible pit falls (see inline comments
@@ -1861,7 +1861,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 	attr = NULL;
 	next_vcn = last_vcn = highest_vcn = 0;
 	while (lookup_attr(AT_DATA, NULL, 0, 0, next_vcn, NULL, 0, ctx)) {
-		run_list_element *nrl;
+		runlist_element *nrl;
 
 		/* Cache the current attribute. */
 		attr = ctx->attr;
@@ -1889,14 +1889,14 @@ int ntfs_read_inode_mount(struct inode *vi)
 		 * as we have exclusive access to the inode at this time and we
 		 * are a mount in progress task, too.
 		 */
-		nrl = decompress_mapping_pairs(vol, attr, ni->run_list.rl);
+		nrl = decompress_mapping_pairs(vol, attr, ni->runlist.rl);
 		if (IS_ERR(nrl)) {
 			ntfs_error(sb, "decompress_mapping_pairs() failed with "
 					"error code %ld. $MFT is corrupt.",
 					PTR_ERR(nrl));
 			goto put_err_out;
 		}
-		ni->run_list.rl = nrl;
+		ni->runlist.rl = nrl;
 
 		/* Are we in the first extent? */
 		if (!next_vcn) {
@@ -1932,7 +1932,7 @@ int ntfs_read_inode_mount(struct inode *vi)
 			}
 			vol->nr_mft_records = ll;
 			/*
-			 * We have got the first extent of the run_list for
+			 * We have got the first extent of the runlist for
 			 * $MFT which means it is now relatively safe to call
 			 * the normal ntfs_read_inode() function.
 			 * Complete reading the inode, this will actually
@@ -2073,12 +2073,12 @@ void ntfs_put_inode(struct inode *vi)
 void __ntfs_clear_inode(ntfs_inode *ni)
 {
 	/* Free all alocated memory. */
-	down_write(&ni->run_list.lock);
-	if (ni->run_list.rl) {
-		ntfs_free(ni->run_list.rl);
-		ni->run_list.rl = NULL;
+	down_write(&ni->runlist.lock);
+	if (ni->runlist.rl) {
+		ntfs_free(ni->runlist.rl);
+		ni->runlist.rl = NULL;
 	}
-	up_write(&ni->run_list.lock);
+	up_write(&ni->runlist.lock);
 
 	if (ni->attr_list) {
 		ntfs_free(ni->attr_list);

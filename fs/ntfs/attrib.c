@@ -27,11 +27,11 @@
 /* Temporary helper functions -- might become macros */
 
 /**
- * ntfs_rl_mm - run_list memmove
+ * ntfs_rl_mm - runlist memmove
  *
  * It is up to the caller to serialize access to the run list @base.
  */
-static inline void ntfs_rl_mm(run_list_element *base, int dst, int src,
+static inline void ntfs_rl_mm(runlist_element *base, int dst, int src,
 		int size)
 {
 	if (likely((dst != src) && (size > 0)))
@@ -39,25 +39,25 @@ static inline void ntfs_rl_mm(run_list_element *base, int dst, int src,
 }
 
 /**
- * ntfs_rl_mc - run_list memory copy
+ * ntfs_rl_mc - runlist memory copy
  *
  * It is up to the caller to serialize access to the run lists @dstbase and
  * @srcbase.
  */
-static inline void ntfs_rl_mc(run_list_element *dstbase, int dst,
-		run_list_element *srcbase, int src, int size)
+static inline void ntfs_rl_mc(runlist_element *dstbase, int dst,
+		runlist_element *srcbase, int src, int size)
 {
 	if (likely(size > 0))
 		memcpy(dstbase + dst, srcbase + src, size * sizeof(*dstbase));
 }
 
 /**
- * ntfs_rl_realloc - Reallocate memory for run_lists
+ * ntfs_rl_realloc - Reallocate memory for runlists
  * @rl:		original run list
  * @old_size:	number of run list elements in the original run list @rl
  * @new_size:	number of run list elements we need space for
  *
- * As the run_lists grow, more memory will be required.  To prevent the
+ * As the runlists grow, more memory will be required.  To prevent the
  * kernel having to allocate and reallocate large numbers of small bits of
  * memory, this function returns and entire page of memory.
  *
@@ -71,10 +71,10 @@ static inline void ntfs_rl_mc(run_list_element *dstbase, int dst,
  *	-ENOMEM	- Not enough memory to allocate run list array.
  *	-EINVAL	- Invalid parameters were passed in.
  */
-static inline run_list_element *ntfs_rl_realloc(run_list_element *rl,
+static inline runlist_element *ntfs_rl_realloc(runlist_element *rl,
 		int old_size, int new_size)
 {
-	run_list_element *new_rl;
+	runlist_element *new_rl;
 
 	old_size = PAGE_ALIGN(old_size * sizeof(*rl));
 	new_size = PAGE_ALIGN(new_size * sizeof(*rl));
@@ -107,8 +107,8 @@ static inline run_list_element *ntfs_rl_realloc(run_list_element *rl,
  * Return: TRUE   Success, the run lists can be merged.
  *	   FALSE  Failure, the run lists cannot be merged.
  */
-static inline BOOL ntfs_are_rl_mergeable(run_list_element *dst,
-		run_list_element *src)
+static inline BOOL ntfs_are_rl_mergeable(runlist_element *dst,
+		runlist_element *src)
 {
 	BUG_ON(!dst);
 	BUG_ON(!src);
@@ -134,7 +134,7 @@ static inline BOOL ntfs_are_rl_mergeable(run_list_element *dst,
  *
  * It is up to the caller to serialize access to the run lists @dst and @src.
  */
-static inline void __ntfs_rl_merge(run_list_element *dst, run_list_element *src)
+static inline void __ntfs_rl_merge(runlist_element *dst, runlist_element *src)
 {
 	dst->length += src->length;
 }
@@ -154,7 +154,7 @@ static inline void __ntfs_rl_merge(run_list_element *dst, run_list_element *src)
  *	   FALSE  Failure, the run lists cannot be merged and have not been
  *		  modified.
  */
-static inline BOOL ntfs_rl_merge(run_list_element *dst, run_list_element *src)
+static inline BOOL ntfs_rl_merge(runlist_element *dst, runlist_element *src)
 {
 	BOOL merge = ntfs_are_rl_mergeable(dst, src);
 
@@ -187,8 +187,8 @@ static inline BOOL ntfs_rl_merge(run_list_element *dst, run_list_element *src)
  *	-ENOMEM	- Not enough memory to allocate run list array.
  *	-EINVAL	- Invalid parameters were passed in.
  */
-static inline run_list_element *ntfs_rl_append(run_list_element *dst,
-		int dsize, run_list_element *src, int ssize, int loc)
+static inline runlist_element *ntfs_rl_append(runlist_element *dst,
+		int dsize, runlist_element *src, int ssize, int loc)
 {
 	BOOL right;
 	int magic;
@@ -252,8 +252,8 @@ static inline run_list_element *ntfs_rl_append(run_list_element *dst,
  *	-ENOMEM	- Not enough memory to allocate run list array.
  *	-EINVAL	- Invalid parameters were passed in.
  */
-static inline run_list_element *ntfs_rl_insert(run_list_element *dst,
-		int dsize, run_list_element *src, int ssize, int loc)
+static inline runlist_element *ntfs_rl_insert(runlist_element *dst,
+		int dsize, runlist_element *src, int ssize, int loc)
 {
 	BOOL left = FALSE;
 	BOOL disc = FALSE;	/* Discontinuity */
@@ -336,7 +336,7 @@ static inline run_list_element *ntfs_rl_insert(run_list_element *dst,
 }
 
 /**
- * ntfs_rl_replace - overwrite a run_list element with another run list
+ * ntfs_rl_replace - overwrite a runlist element with another run list
  * @dst:	original run list to be worked on
  * @dsize:	number of elements in @dst (including end marker)
  * @src:	new run list to be inserted
@@ -358,8 +358,8 @@ static inline run_list_element *ntfs_rl_insert(run_list_element *dst,
  *	-ENOMEM	- Not enough memory to allocate run list array.
  *	-EINVAL	- Invalid parameters were passed in.
  */
-static inline run_list_element *ntfs_rl_replace(run_list_element *dst,
-		int dsize, run_list_element *src, int ssize, int loc)
+static inline runlist_element *ntfs_rl_replace(runlist_element *dst,
+		int dsize, runlist_element *src, int ssize, int loc)
 {
 	BOOL left = FALSE;
 	BOOL right;
@@ -424,8 +424,8 @@ static inline run_list_element *ntfs_rl_replace(run_list_element *dst,
  *	-ENOMEM	- Not enough memory to allocate run list array.
  *	-EINVAL	- Invalid parameters were passed in.
  */
-static inline run_list_element *ntfs_rl_split(run_list_element *dst, int dsize,
-		run_list_element *src, int ssize, int loc)
+static inline runlist_element *ntfs_rl_split(runlist_element *dst, int dsize,
+		runlist_element *src, int ssize, int loc)
 {
 	BUG_ON(!dst);
 	BUG_ON(!src);
@@ -452,7 +452,7 @@ static inline run_list_element *ntfs_rl_split(run_list_element *dst, int dsize,
 }
 
 /**
- * ntfs_merge_run_lists - merge two run_lists into one
+ * ntfs_merge_runlists - merge two runlists into one
  * @drl:	original run list to be worked on
  * @srl:	new run list to be merged into @drl
  *
@@ -485,8 +485,8 @@ static inline run_list_element *ntfs_rl_split(run_list_element *dst, int dsize,
  *	-EINVAL	- Invalid parameters were passed in.
  *	-ERANGE	- The run lists overlap and cannot be merged.
  */
-run_list_element *ntfs_merge_run_lists(run_list_element *drl,
-		run_list_element *srl)
+runlist_element *ntfs_merge_runlists(runlist_element *drl,
+		runlist_element *srl)
 {
 	int di, si;		/* Current index into @[ds]rl. */
 	int sstart;		/* First index with lcn > LCN_RL_NOT_MAPPED. */
@@ -532,7 +532,7 @@ run_list_element *ntfs_merge_run_lists(run_list_element *drl,
 
 	si = di = 0;
 
-	/* Skip any unmapped start element(s) in the source run_list. */
+	/* Skip any unmapped start element(s) in the source runlist. */
 	while (srl[si].length && srl[si].lcn < (LCN)LCN_HOLE)
 		si++;
 
@@ -715,18 +715,18 @@ critical_error:
  * two into one, if that is possible (we check for overlap and discard the new
  * run list if overlap present before returning ERR_PTR(-ERANGE)).
  */
-run_list_element *decompress_mapping_pairs(const ntfs_volume *vol,
-		const ATTR_RECORD *attr, run_list_element *old_rl)
+runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
+		const ATTR_RECORD *attr, runlist_element *old_rl)
 {
 	VCN vcn;		/* Current vcn. */
 	LCN lcn;		/* Current lcn. */
 	s64 deltaxcn;		/* Change in [vl]cn. */
-	run_list_element *rl;	/* The output run list. */
+	runlist_element *rl;	/* The output run list. */
 	u8 *buf;		/* Current position in mapping pairs array. */
 	u8 *attr_end;		/* End of attribute. */
 	int rlsize;		/* Size of run list buffer. */
 	u16 rlpos;		/* Current run list position in units of
-				   run_list_elements. */
+				   runlist_elements. */
 	u8 b;			/* Current byte offset in buf. */
 
 #ifdef DEBUG
@@ -768,7 +768,7 @@ run_list_element *decompress_mapping_pairs(const ntfs_volume *vol,
 		 * operates on whole pages only.
 		 */
 		if (((rlpos + 3) * sizeof(*old_rl)) > rlsize) {
-			run_list_element *rl2;
+			runlist_element *rl2;
 
 			rl2 = ntfs_malloc_nofs(rlsize + (int)PAGE_SIZE);
 			if (unlikely(!rl2)) {
@@ -780,7 +780,7 @@ run_list_element *decompress_mapping_pairs(const ntfs_volume *vol,
 			rl = rl2;
 			rlsize += PAGE_SIZE;
 		}
-		/* Enter the current vcn into the current run_list element. */
+		/* Enter the current vcn into the current runlist element. */
 		rl[rlpos].vcn = vcn;
 		/*
 		 * Get the change in vcn, i.e. the run length in clusters.
@@ -854,10 +854,10 @@ run_list_element *decompress_mapping_pairs(const ntfs_volume *vol,
 						"mapping pairs array.");
 				goto err_out;
 			}
-			/* Enter the current lcn into the run_list element. */
+			/* Enter the current lcn into the runlist element. */
 			rl[rlpos].lcn = lcn;
 		}
-		/* Get to the next run_list element. */
+		/* Get to the next runlist element. */
 		rlpos++;
 		/* Increment the buffer position to the next mapping pair. */
 		buf += (*buf & 0xf) + ((*buf >> 4) & 0xf) + 1;
@@ -908,7 +908,7 @@ mpa_err:
 	} else /* Not the base extent. There may be more extents to follow. */
 		rl[rlpos].lcn = (LCN)LCN_RL_NOT_MAPPED;
 
-	/* Setup terminating run_list element. */
+	/* Setup terminating runlist element. */
 	rl[rlpos].vcn = vcn;
 	rl[rlpos].length = (s64)0;
 	/* If no existing run list was specified, we are done. */
@@ -918,7 +918,7 @@ mpa_err:
 		return rl;
 	}
 	/* Now combine the new and old run lists checking for overlaps. */
-	old_rl = ntfs_merge_run_lists(old_rl, rl);
+	old_rl = ntfs_merge_runlists(old_rl, rl);
 	if (likely(!IS_ERR(old_rl)))
 		return old_rl;
 	ntfs_free(rl);
@@ -932,15 +932,15 @@ err_out:
 }
 
 /**
- * map_run_list - map (a part of) a run list of an ntfs inode
+ * map_runlist - map (a part of) a run list of an ntfs inode
  * @ni:		ntfs inode for which to map (part of) a run list
  * @vcn:	map run list part containing this vcn
  *
- * Map the part of a run list containing the @vcn of an the ntfs inode @ni.
+ * Map the part of a run list containing the @vcn of the ntfs inode @ni.
  *
  * Return 0 on success and -errno on error.
  */
-int map_run_list(ntfs_inode *ni, VCN vcn)
+int map_runlist(ntfs_inode *ni, VCN vcn)
 {
 	ntfs_inode *base_ni;
 	attr_search_context *ctx;
@@ -970,19 +970,19 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 		goto err_out;
 	}
 
-	down_write(&ni->run_list.lock);
+	down_write(&ni->runlist.lock);
 	/* Make sure someone else didn't do the work while we were sleeping. */
-	if (likely(vcn_to_lcn(ni->run_list.rl, vcn) <= LCN_RL_NOT_MAPPED)) {
-		run_list_element *rl;
+	if (likely(vcn_to_lcn(ni->runlist.rl, vcn) <= LCN_RL_NOT_MAPPED)) {
+		runlist_element *rl;
 
 		rl = decompress_mapping_pairs(ni->vol, ctx->attr,
-				ni->run_list.rl);
+				ni->runlist.rl);
 		if (unlikely(IS_ERR(rl)))
 			err = PTR_ERR(rl);
 		else
-			ni->run_list.rl = rl;
+			ni->runlist.rl = rl;
 	}
-	up_write(&ni->run_list.lock);
+	up_write(&ni->runlist.lock);
 
 	put_attr_search_ctx(ctx);
 err_out:
@@ -1011,14 +1011,11 @@ err_out:
  *  -3 = LCN_ENOENT		There is no such vcn in the attribute.
  *  -4 = LCN_EINVAL		Input parameter error (if debug enabled).
  */
-LCN vcn_to_lcn(const run_list_element *rl, const VCN vcn)
+LCN vcn_to_lcn(const runlist_element *rl, const VCN vcn)
 {
 	int i;
 
-#ifdef DEBUG
-	if (vcn < (VCN)0)
-		return (LCN)LCN_EINVAL;
-#endif
+	BUG_ON(vcn < 0);
 	/*
 	 * If rl is NULL, assume that we have found an unmapped run list. The
 	 * caller can then attempt to map it and fail appropriately if
@@ -1214,12 +1211,12 @@ BOOL find_attr(const ATTR_TYPES type, const ntfschar *name, const u32 name_len,
 /**
  * load_attribute_list - load an attribute list into memory
  * @vol:		ntfs volume from which to read
- * @run_list:		run list of the attribute list
+ * @runlist:		run list of the attribute list
  * @al_start:		destination buffer
  * @size:		size of the destination buffer in bytes
  * @initialized_size:	initialized size of the attribute list
  *
- * Walk the run list @run_list and load all clusters from it copying them into
+ * Walk the run list @runlist and load all clusters from it copying them into
  * the linear buffer @al. The maximum number of bytes copied to @al is @size
  * bytes. Note, @size does not need to be a multiple of the cluster size. If
  * @initialized_size is less than @size, the region in @al between
@@ -1227,13 +1224,13 @@ BOOL find_attr(const ATTR_TYPES type, const ntfschar *name, const u32 name_len,
  *
  * Return 0 on success or -errno on error.
  */
-int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al_start,
+int load_attribute_list(ntfs_volume *vol, runlist *runlist, u8 *al_start,
 		const s64 size, const s64 initialized_size)
 {
 	LCN lcn;
 	u8 *al = al_start;
 	u8 *al_end = al + initialized_size;
-	run_list_element *rl;
+	runlist_element *rl;
 	struct buffer_head *bh;
 	struct super_block *sb;
 	unsigned long block_size;
@@ -1242,7 +1239,7 @@ int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al_start,
 	unsigned char block_size_bits;
 
 	ntfs_debug("Entering.");
-	if (!vol || !run_list || !al || size <= 0 || initialized_size < 0 ||
+	if (!vol || !runlist || !al || size <= 0 || initialized_size < 0 ||
 			initialized_size > size)
 		return -EINVAL;
 	if (!initialized_size) {
@@ -1252,8 +1249,8 @@ int load_attribute_list(ntfs_volume *vol, run_list *run_list, u8 *al_start,
 	sb = vol->sb;
 	block_size = sb->s_blocksize;
 	block_size_bits = sb->s_blocksize_bits;
-	down_read(&run_list->lock);
-	rl = run_list->rl;
+	down_read(&runlist->lock);
+	rl = runlist->rl;
 	/* Read all clusters specified by the run list one run at a time. */
 	while (rl->length) {
 		lcn = vcn_to_lcn(rl, rl->vcn);
@@ -1292,7 +1289,7 @@ initialize:
 		memset(al_start + initialized_size, 0, size - initialized_size);
 	}
 done:
-	up_read(&run_list->lock);
+	up_read(&runlist->lock);
 	return err;
 do_final:
 	if (al < al_end) {

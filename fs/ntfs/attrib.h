@@ -30,7 +30,7 @@
 #include "types.h"
 #include "layout.h"
 
-static inline void init_run_list(run_list *rl)
+static inline void init_runlist(runlist *rl)
 {
 	rl->rl = NULL;
 	init_rwsem(&rl->lock);
@@ -72,12 +72,12 @@ typedef struct {
 	ATTR_RECORD *base_attr;
 } attr_search_context;
 
-extern run_list_element *decompress_mapping_pairs(const ntfs_volume *vol,
-		const ATTR_RECORD *attr, run_list_element *old_rl);
+extern runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
+		const ATTR_RECORD *attr, runlist_element *old_rl);
 
-extern int map_run_list(ntfs_inode *ni, VCN vcn);
+extern int map_runlist(ntfs_inode *ni, VCN vcn);
 
-extern LCN vcn_to_lcn(const run_list_element *rl, const VCN vcn);
+extern LCN vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 
 extern BOOL find_attr(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic, const u8 *val,
@@ -88,7 +88,7 @@ BOOL lookup_attr(const ATTR_TYPES type, const ntfschar *name,
 		const VCN lowest_vcn, const u8 *val, const u32 val_len,
 		attr_search_context *ctx);
 
-extern int load_attribute_list(ntfs_volume *vol, run_list *rl, u8 *al_start,
+extern int load_attribute_list(ntfs_volume *vol, runlist *rl, u8 *al_start,
 		const s64 size, const s64 initialized_size);
 
 static inline s64 attribute_value_length(const ATTR_RECORD *a)

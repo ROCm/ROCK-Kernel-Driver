@@ -913,7 +913,7 @@ static BOOL check_mft_mirror(ntfs_volume *vol)
 	ntfs_inode *mirr_ni;
 	struct page *mft_page, *mirr_page;
 	u8 *kmft, *kmirr;
-	run_list_element *rl, rl2[2];
+	runlist_element *rl, rl2[2];
 	int mrecs_per_page, i;
 
 	ntfs_debug("Entering.");
@@ -999,8 +999,8 @@ mft_unmap_out:
 	 * mapped the full run list for it.
 	 */
 	mirr_ni = NTFS_I(vol->mftmirr_ino);
-	down_read(&mirr_ni->run_list.lock);
-	rl = mirr_ni->run_list.rl;
+	down_read(&mirr_ni->runlist.lock);
+	rl = mirr_ni->runlist.rl;
 	/* Compare the two run lists.  They must be identical. */
 	i = 0;
 	do {
@@ -1008,11 +1008,11 @@ mft_unmap_out:
 				rl2[i].length != rl[i].length) {
 			ntfs_error(sb, "$MFTMirr location mismatch.  "
 					"Run chkdsk.");
-			up_read(&mirr_ni->run_list.lock);
+			up_read(&mirr_ni->runlist.lock);
 			return FALSE;
 		}
 	} while (rl2[i++].length);
-	up_read(&mirr_ni->run_list.lock);
+	up_read(&mirr_ni->runlist.lock);
 	ntfs_debug("Done.");
 	return TRUE;
 }

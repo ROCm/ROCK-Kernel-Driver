@@ -170,7 +170,7 @@ static int ntfs_read_block(struct page *page)
 	LCN lcn;
 	ntfs_inode *ni;
 	ntfs_volume *vol;
-	run_list_element *rl;
+	runlist_element *rl;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
 	sector_t iblock, lblock, zblock;
 	unsigned int blocksize, vcn_ofs;
@@ -196,7 +196,7 @@ static int ntfs_read_block(struct page *page)
 	zblock = (ni->initialized_size + blocksize - 1) >> blocksize_bits;
 
 #ifdef DEBUG
-	if (unlikely(!ni->run_list.rl && !ni->mft_no && !NInoAttr(ni)))
+	if (unlikely(!ni->runlist.rl && !ni->mft_no && !NInoAttr(ni)))
 		panic("NTFS: $MFT/$DATA run list has been unmapped! This is a "
 				"very serious bug! Cannot continue...");
 #endif
@@ -225,8 +225,8 @@ static int ntfs_read_block(struct page *page)
 					vol->cluster_size_mask;
 			if (!rl) {
 lock_retry_remap:
-				down_read(&ni->run_list.lock);
-				rl = ni->run_list.rl;
+				down_read(&ni->runlist.lock);
+				rl = ni->runlist.rl;
 			}
 			if (likely(rl != NULL)) {
 				/* Seek to element containing target vcn. */
@@ -259,8 +259,8 @@ lock_retry_remap:
 				 * Attempt to map run list, dropping lock for
 				 * the duration.
 				 */
-				up_read(&ni->run_list.lock);
-				if (!map_run_list(ni, vcn))
+				up_read(&ni->runlist.lock);
+				if (!map_runlist(ni, vcn))
 					goto lock_retry_remap;
 				rl = NULL;
 			}
@@ -291,7 +291,7 @@ handle_zblock:
 
 	/* Release the lock if we took it. */
 	if (rl)
-		up_read(&ni->run_list.lock);
+		up_read(&ni->runlist.lock);
 
 	/* Check we have at least one buffer ready for i/o. */
 	if (nr) {
@@ -473,7 +473,7 @@ static int ntfs_write_block(struct writeback_control *wbc, struct page *page)
 	struct inode *vi;
 	ntfs_inode *ni;
 	ntfs_volume *vol;
-	run_list_element *rl;
+	runlist_element *rl;
 	struct buffer_head *bh, *head;
 	unsigned int blocksize, vcn_ofs;
 	int err;
@@ -631,8 +631,8 @@ static int ntfs_write_block(struct writeback_control *wbc, struct page *page)
 				vol->cluster_size_mask;
 		if (!rl) {
 lock_retry_remap:
-			down_read(&ni->run_list.lock);
-			rl = ni->run_list.rl;
+			down_read(&ni->runlist.lock);
+			rl = ni->runlist.rl;
 		}
 		if (likely(rl != NULL)) {
 			/* Seek to element containing target vcn. */
@@ -666,8 +666,8 @@ lock_retry_remap:
 			 * Attempt to map run list, dropping lock for
 			 * the duration.
 			 */
-			up_read(&ni->run_list.lock);
-			err = map_run_list(ni, vcn);
+			up_read(&ni->runlist.lock);
+			err = map_runlist(ni, vcn);
 			if (likely(!err))
 				goto lock_retry_remap;
 			rl = NULL;
@@ -687,7 +687,7 @@ lock_retry_remap:
 
 	/* Release the lock if we took it. */
 	if (rl)
-		up_read(&ni->run_list.lock);
+		up_read(&ni->runlist.lock);
 
 	/* For the error case, need to reset bh to the beginning. */
 	bh = head;
@@ -1240,7 +1240,7 @@ static int ntfs_prepare_nonresident_write(struct page *page,
 	struct inode *vi;
 	ntfs_inode *ni;
 	ntfs_volume *vol;
-	run_list_element *rl;
+	runlist_element *rl;
 	struct buffer_head *bh, *head, *wait[2], **wait_bh = wait;
 	unsigned int vcn_ofs, block_start, block_end, blocksize;
 	int err;
@@ -1397,8 +1397,8 @@ static int ntfs_prepare_nonresident_write(struct page *page,
 			is_retry = FALSE;
 			if (!rl) {
 lock_retry_remap:
-				down_read(&ni->run_list.lock);
-				rl = ni->run_list.rl;
+				down_read(&ni->runlist.lock);
+				rl = ni->runlist.rl;
 			}
 			if (likely(rl != NULL)) {
 				/* Seek to element containing target vcn. */
@@ -1442,8 +1442,8 @@ lock_retry_remap:
 					 * Attempt to map run list, dropping
 					 * lock for the duration.
 					 */
-					up_read(&ni->run_list.lock);
-					err = map_run_list(ni, vcn);
+					up_read(&ni->runlist.lock);
+					err = map_runlist(ni, vcn);
 					if (likely(!err))
 						goto lock_retry_remap;
 					rl = NULL;
@@ -1530,7 +1530,7 @@ lock_retry_remap:
 
 	/* Release the lock if we took it. */
 	if (rl) {
-		up_read(&ni->run_list.lock);
+		up_read(&ni->runlist.lock);
 		rl = NULL;
 	}
 
@@ -1576,7 +1576,7 @@ err_out:
 	if (is_retry)
 		flush_dcache_page(page);
 	if (rl)
-		up_read(&ni->run_list.lock);
+		up_read(&ni->runlist.lock);
 	return err;
 }
 

@@ -42,7 +42,7 @@ typedef s64 LCN;
 typedef s64 LSN;
 
 /**
- * run_list_element - in memory vcn to lcn mapping array element
+ * runlist_element - in memory vcn to lcn mapping array element
  * @vcn:	starting vcn of the current array element
  * @lcn:	starting lcn of the current array element
  * @length:	length in clusters of the current array element
@@ -56,18 +56,18 @@ typedef struct {	/* In memory vcn to lcn mapping structure element. */
 	VCN vcn;	/* vcn = Starting virtual cluster number. */
 	LCN lcn;	/* lcn = Starting logical cluster number. */
 	s64 length;	/* Run length in clusters. */
-} run_list_element;
+} runlist_element;
 
 /**
- * run_list - in memory vcn to lcn mapping array including a read/write lock
+ * runlist - in memory vcn to lcn mapping array including a read/write lock
  * @rl:		pointer to an array of run list elements
  * @lock:	read/write spinlock for serializing access to @rl
  *
  */
 typedef struct {
-	run_list_element *rl;
+	runlist_element *rl;
 	struct rw_semaphore lock;
-} run_list;
+} runlist;
 
 typedef enum {
 	FALSE = 0,

@@ -56,18 +56,18 @@ struct _ntfs_inode {
 	ATTR_TYPES type;	/* Attribute type of this fake inode. */
 	ntfschar *name;		/* Attribute name of this fake inode. */
 	u32 name_len;		/* Attribute name length of this fake inode. */
-	run_list run_list;	/* If state has the NI_NonResident bit set,
+	runlist runlist;	/* If state has the NI_NonResident bit set,
 				   the run list of the unnamed data attribute
 				   (if a file) or of the index allocation
 				   attribute (directory) or of the attribute
 				   described by the fake inode (if NInoAttr()).
-				   If run_list.rl is NULL, the run list has not
+				   If runlist.rl is NULL, the run list has not
 				   been read in yet or has been unmapped. If
 				   NI_NonResident is clear, the attribute is
 				   resident (file and fake inode) or there is
 				   no $I30 index allocation attribute
 				   (small directory). In the latter case
-				   run_list.rl is always NULL.*/
+				   runlist.rl is always NULL.*/
 	/*
 	 * The following fields are only valid for real inodes and extent
 	 * inodes.
@@ -88,7 +88,7 @@ struct _ntfs_inode {
 	 */
 	u32 attr_list_size;	/* Length of attribute list value in bytes. */
 	u8 *attr_list;		/* Attribute list value itself. */
-	run_list attr_list_rl;	/* Run list for the attribute list value. */
+	runlist attr_list_rl;	/* Run list for the attribute list value. */
 	union {
 		struct { /* It is a directory, $MFT, or an index inode. */
 			struct inode *bmp_ino;	/* Attribute inode for the
