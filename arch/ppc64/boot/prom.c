@@ -21,6 +21,7 @@ void *stderr;
 void exit(void);
 void *finddevice(const char *name);
 int getprop(void *phandle, const char *name, void *buf, int buflen);
+int setprop(void *phandle, const char *name, void *buf, int buflen);
 void chrpboot(int a1, int a2, void *prom);	/* in main.c */
 
 void printk(char *fmt, ...);
@@ -167,6 +168,32 @@ getprop(void *phandle, const char *name, void *buf, int buflen)
 	args.size = -1;
 	(*prom)(&args);
 	return args.size;
+}
+
+int
+setprop(void *node, const char *name, void *buf, int buflen)
+{
+    struct prom_args {
+	char *service;
+	int nargs;
+	int nret;
+	void *node;
+	const char *name;
+	void *buf;
+	int buflen;
+	int size;
+    } args;
+
+    args.service = "setprop";
+    args.nargs = 4;
+    args.nret = 1;
+    args.node = node;
+    args.name = name;
+    args.buf = buf;
+    args.buflen = buflen;
+    args.size = -1;
+    (*prom)(&args);
+    return args.size;
 }
 
 int

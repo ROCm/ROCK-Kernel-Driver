@@ -16,6 +16,15 @@
 #include <asm-m68k/bootinfo.h>
 #else
 
+#define cmdline_start_string   "cmd_line_start"
+#define cmdline_end_string     "cmd_line_end"
+struct _builtin_cmd_line {
+	unsigned char prefer;
+	unsigned char cmdling_start_flag[sizeof(cmdline_start_string)-1]; /* without trailing zero */
+	unsigned char string[COMMAND_LINE_SIZE];
+	unsigned char cmdline_end_flag[sizeof(cmdline_end_string)]; /* with trailing zero */
+} __attribute__ ((__packed__));
+
 struct bi_record {
 	unsigned long tag;		/* tag ID */
 	unsigned long size;		/* size of record (in bytes) */

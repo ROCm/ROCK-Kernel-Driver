@@ -22,6 +22,7 @@
 
 #include <asm/page.h>
 #include <asm/mmu.h>
+#include <asm/setup.h>
 #include <asm/bootinfo.h>
 #ifdef CONFIG_44x
 #include <asm/ibm4xx.h>
@@ -32,11 +33,19 @@
 #include "zlib.h"
 
 /* Default cmdline */
-#ifdef CONFIG_CMDLINE
-#define CMDLINE CONFIG_CMDLINE
+#ifndef CONFIG_CMDLINE
+#define CONFIG_CMDLINE ""
+#define CONFIG_CMDLINE_PREFER '0'
 #else
-#define CMDLINE ""
+#define CONFIG_CMDLINE_PREFER '1'
 #endif
+
+struct _builtin_cmd_line  __attribute__ ((__section__ (".kernel:cmdline"))) _builtin_cmd_line = {
+	.prefer = CONFIG_CMDLINE_PREFER,
+	.cmdling_start_flag = cmdline_start_string,
+	.string = CONFIG_CMDLINE,
+	.cmdline_end_flag = cmdline_end_string,
+};
 
 /* Keyboard (and VGA console)? */
 #ifdef CONFIG_VGA_CONSOLE
@@ -57,9 +66,7 @@
 char *avail_ram;
 char *end_avail;
 char *zimage_start;
-char cmd_preset[] = CMDLINE;
-char cmd_buf[256];
-char *cmd_line = cmd_buf;
+char *cmd_line = _builtin_cmd_line.string;
 int keyb_present = HAS_KEYB;
 int zimage_size;
 
@@ -170,21 +177,10 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 
 	if (keyb_present)
 		CRT_tstc();  /* Forces keyboard to be initialized */
-#ifdef CONFIG_GEMINI
-	/*
-	 * If cmd_line is empty and cmd_preset is not, copy cmd_preset
-	 * to cmd_line.  This way we can override cmd_preset with the
-	 * command line from Smon.
-	 */
-
-	if ( (cmd_line[0] == '\0') && (cmd_preset[0] != '\0'))
-		memcpy (cmd_line, cmd_preset, sizeof(cmd_preset));
-#endif
 
 	/* Display standard Linux/PPC boot prompt for kernel args */
 	puts("\nLinux/PPC load: ");
 	cp = cmd_line;
-	memcpy (cmd_line, cmd_preset, sizeof(cmd_preset));
 	while ( *cp ) putc(*cp++);
 
 #ifdef INTERACTIVE_CONSOLE

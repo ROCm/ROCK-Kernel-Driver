@@ -23,7 +23,7 @@ subdir-$(CONFIG_PPC_OF)		+= of1275
 # for cleaning
 subdir-				+= simple openfirmware
 
-host-progs := $(addprefix utils/, addnote mknote hack-coff mkprep mkbugboot mktree)
+host-progs := $(addprefix utils/, addnote mknote hack-coff mkprep mkbugboot mktree mkzimage_cmdline)
 
 .PHONY: $(BOOT_TARGETS) $(bootdir-y)
 

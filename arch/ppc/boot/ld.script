@@ -31,6 +31,9 @@ SECTIONS
     __relocate_start = .;
     *(.relocate_code)
     __relocate_end = .;
+    
+    *(.kernel:cmdline)
+
   }
   _etext = .;
   PROVIDE (etext = .);

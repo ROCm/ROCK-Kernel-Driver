@@ -14,10 +14,12 @@
 #include <linux/string.h>
 #include <asm/processor.h>
 #include <asm/page.h>
+#include <asm/setup.h>
 #include <asm/bootinfo.h>
 
 extern void *finddevice(const char *);
 extern int getprop(void *, const char *, void *, int);
+extern int setprop(void *, const char *, void *, int);
 extern void printk(char *fmt, ...);
 extern void printf(const char *fmt, ...);
 extern int sprintf(char *buf, const char *fmt, ...);
@@ -79,6 +81,28 @@ void *chosen_handle;
 void *stdin;
 void *stdout;
 void *stderr;
+
+#ifndef CONFIG_CMDLINE
+#define CONFIG_CMDLINE ""
+#define CONFIG_CMDLINE_PREFER '0'
+#else
+#define CONFIG_CMDLINE_PREFER '1'
+#endif
+#define cmdline_start_string   "cmd_line_start"
+#define cmdline_end_string     "cmd_line_end"
+struct _builtin_cmd_line {
+	unsigned char prefer;
+	unsigned char cmdling_start_flag[sizeof(cmdline_start_string)-1]; /* without trailing zero */
+	unsigned char string[COMMAND_LINE_SIZE];
+	unsigned char cmdline_end_flag[sizeof(cmdline_end_string)]; /* with trailing zero */
+} __attribute__ ((__packed__));
+
+struct _builtin_cmd_line  __attribute__ ((__section__ (".kernel:cmdline"))) _builtin_cmd_line = {
+	.prefer = CONFIG_CMDLINE_PREFER,
+	.cmdling_start_flag = cmdline_start_string,
+	.string = CONFIG_CMDLINE,
+	.cmdline_end_flag = cmdline_end_string,
+};
 
 
 void
@@ -240,6 +264,13 @@ make_bi_recs(unsigned long addr)
 		rec->tag = BI_INITRD;
 		rec->data[0] = initrd.addr;
 		rec->data[1] = initrd.size;
+	}
+
+	if ( _builtin_cmd_line.prefer && _builtin_cmd_line.prefer != '0' ) {
+		int l = strlen (_builtin_cmd_line.string)+1;
+		printf("copy built-in cmdline(%d) %s\n\r",l,_builtin_cmd_line.string);
+		l = (int)setprop( chosen_handle, "bootargs", _builtin_cmd_line.string, l);
+		printf ("setprop bootargs: %d\n\r",l);
 	}
 
 	if ( sysmap.size > 0 ) {

@@ -32,6 +32,7 @@ SECTIONS
     *(.text)
     *(.fixup)
     *(.got1)
+    *(.kernel:cmdline)
   }
   . = ALIGN(4096);
   _etext = .;

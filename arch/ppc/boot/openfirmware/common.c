@@ -11,8 +11,23 @@
 #include "nonstdio.h"
 #include "of1275.h"
 #include <linux/string.h>
+#include <asm/setup.h>
 #include <asm/bootinfo.h>
 #include <asm/page.h>
+
+#ifndef CONFIG_CMDLINE
+#define CONFIG_CMDLINE ""
+#define CONFIG_CMDLINE_PREFER '0'
+#else
+#define CONFIG_CMDLINE_PREFER '1'
+#endif
+
+struct _builtin_cmd_line  __attribute__ ((__section__ (".kernel:cmdline"))) _builtin_cmd_line = {
+	.prefer = CONFIG_CMDLINE_PREFER,
+	.cmdling_start_flag = cmdline_start_string,
+	.string = CONFIG_CMDLINE,
+	.cmdline_end_flag = cmdline_end_string,
+};
 
 /* Information from the linker */
 extern char __sysmap_begin, __sysmap_end;
@@ -165,6 +180,12 @@ void make_bi_recs(unsigned long addr, char *name, unsigned int mach,
 	rec->size = sizeof(struct bi_record) + 2 * sizeof(unsigned long);
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);
 
+	if ( _builtin_cmd_line.prefer && _builtin_cmd_line.prefer != '0' ) {
+		int l = strlen (_builtin_cmd_line.string)+1;
+		printf("copy built-in cmdline(%d) %s\n\r",l,_builtin_cmd_line.string);
+		l = (int)setprop( chosen_handle, "bootargs", _builtin_cmd_line.string, l);
+		printf ("setprop bootargs: %d\n\r",l);
+	}
 	if (sysmap_size) {
 		rec->tag = BI_SYSMAP;
 		rec->data[0] = (unsigned long)(&__sysmap_begin);
