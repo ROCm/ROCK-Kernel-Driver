@@ -416,7 +416,7 @@ static void intel_i830_init_gtt_entries(void)
 		case I915_GMCH_GMS_STOLEN_48M:
 			/* Check it's really I915G */
 			if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915G_HB ||
-			    agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915G_HB)
+			    agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915GM_HB)
 				gtt_entries = MB(48) - KB(size);
 			else
 				gtt_entries = 0;
@@ -424,7 +424,7 @@ static void intel_i830_init_gtt_entries(void)
 		case I915_GMCH_GMS_STOLEN_64M:
 			/* Check it's really I915G */
 			if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915G_HB ||
-			    agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915G_HB)
+			    agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_82915GM_HB)
 				gtt_entries = MB(64) - KB(size);
 			else
 				gtt_entries = 0;
