@@ -10,28 +10,12 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 
-LD_SCRIPT=$(TOPDIR)/arch/cris/cris.ld
-
 # A bug in ld prevents us from having a (constant-value) symbol in a
-# "ORIGIN =" or "LENGTH =" expression.  We fix that by generating a
-# linker file with the symbolic part of those expressions evaluated.
-#  Unfortunately, there is trouble making vmlinux depend on anything we
-# generate here, so we *always* regenerate the final linker script and
-# replace the LD macro to get what we want.  Thankfully(?) vmlinux is
-# always rebuilt (due to calling make recursively and not knowing if
-# anything was rebuilt).
-#  The shell script to build in some kind of dependency is really not
-# necessary for reasons of speed.  It's there because always
-# regenerating stuff (even for incremental linking of subsystems!) is
-# even more nauseating.
-LD = if [ ! -e $(LD_SCRIPT).tmp -o $(LD_SCRIPT) -nt $(LD_SCRIPT).tmp ]; then \
-          sed -e s/@CONFIG_ETRAX_DRAM_VIRTUAL_BASE@/0x$(CONFIG_ETRAX_DRAM_VIRTUAL_BASE)/ \
-              -e s/@CONFIG_ETRAX_DRAM_SIZE_M@/$(CONFIG_ETRAX_DRAM_SIZE)/ \
-              < $(LD_SCRIPT) > $(LD_SCRIPT).tmp; \
-     else true; \
-     fi && $(CROSS_COMPILE)ld -mcrislinux
+# "ORIGIN =" or "LENGTH =" expression.
 
-LDFLAGS_vmlinux = -T $(LD_SCRIPT).tmp
+LD = $(CROSS_COMPILE)ld -mcrislinux
+
+LDFLAGS_vmlinux = -T arch/$(ARCH)/vmlinux.lds.s
 
 # objcopy is used to make binary images from the resulting linked file
 
@@ -62,6 +46,8 @@ LIBGCC = $(shell $(CC) $(CFLAGS) -print-file-name=libgcc.a)
 LIBS := $(TOPDIR)/arch/cris/lib/lib.a $(LIBS) $(TOPDIR)/arch/cris/lib/lib.a $(LIBGCC)
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
+
+vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 vmlinux.bin: vmlinux
 	$(OBJCOPY) $(OBJCOPYFLAGS) vmlinux vmlinux.bin

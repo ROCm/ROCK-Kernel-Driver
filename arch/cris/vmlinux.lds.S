@@ -8,10 +8,12 @@
  * the kernel has booted. 
  */	
 
+#include <linux/config.h>
+	
 jiffies = jiffies_64;
 SECTIONS
 {
-	. = @CONFIG_ETRAX_DRAM_VIRTUAL_BASE@;
+	. = 0x ## CONFIG_ETRAX_DRAM_VIRTUAL_BASE;
 	dram_start = .;
 	ibr_start = .;
 	. = . + 0x4000; /* see head.S and pages reserved at the start */
@@ -99,5 +101,5 @@ SECTIONS
 		*(.exitcall.exit)
         }
 
-	dram_end = dram_start + @CONFIG_ETRAX_DRAM_SIZE_M@*1024*1024;
+	dram_end = dram_start + CONFIG_ETRAX_DRAM_SIZE*1024*1024;
 }
