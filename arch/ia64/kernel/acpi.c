@@ -521,9 +521,14 @@ acpi_numa_arch_fixup (void)
 #endif /* CONFIG_ACPI_NUMA */
 
 unsigned int
-acpi_register_gsi (u32 gsi, int polarity, int trigger)
+acpi_register_gsi (u32 gsi, int edge_level, int active_high_low)
 {
-	return acpi_register_irq(gsi, polarity, trigger);
+	if (has_8259 && gsi < 16)
+		return isa_irq_to_vector(gsi);
+
+	return iosapic_register_intr(gsi,
+			(active_high_low == ACPI_ACTIVE_HIGH) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
+			(edge_level == ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
 }
 EXPORT_SYMBOL(acpi_register_gsi);
 
@@ -548,7 +553,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (fadt->iapc_boot_arch & BAF_LEGACY_DEVICES)
 		acpi_legacy_devices = 1;
 
-	acpi_register_gsi(fadt->sci_int, ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
+	acpi_register_gsi(fadt->sci_int, ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_LOW);
 	return 0;
 }
 
@@ -661,17 +666,5 @@ acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 	}
 	return 0;
 }
-
-int
-acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
-{
-	if (has_8259 && gsi < 16)
-		return isa_irq_to_vector(gsi);
-
-	return iosapic_register_intr(gsi,
-			(polarity == ACPI_ACTIVE_HIGH) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
-			(trigger == ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
-}
-EXPORT_SYMBOL(acpi_register_irq);
 
 #endif /* CONFIG_ACPI_BOOT */
