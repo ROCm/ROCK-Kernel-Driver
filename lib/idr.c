@@ -39,8 +39,10 @@ static struct idr_layer *alloc_layer(struct idr *idp)
 	struct idr_layer *p;
 
 	spin_lock(&idp->lock);
-	if (!(p = idp->id_free))
+	if (!(p = idp->id_free)) {
+		spin_unlock(&idp->lock);
 		return NULL;
+	}
 	idp->id_free = p->ary[0];
 	idp->id_free_cnt--;
 	p->ary[0] = NULL;
