@@ -91,6 +91,7 @@
 #include <linux/slab.h>	/* kmalloc(), kfree() */
 #include <linux/wanrouter.h>	/* WAN router definitions */
 #include <linux/wanpipe.h>	/* WANPIPE common user API definitions */
+#include <linux/workqueue.h>
 #include <asm/byteorder.h>	/* htons(), etc. */
 #include <asm/atomic.h>
 #include <linux/delay.h>	/* Experimental delay */
@@ -790,9 +791,7 @@ int wpx_init (sdla_t* card, wandev_conf_t* conf)
 	
 	init_global_statistics(card);	
 
-	card->u.x.x25_poll_task.sync=0;
-	card->u.x.x25_poll_task.routine = (void*)(void*)wpx_poll;
-	card->u.x.x25_poll_task.data = card;
+	INIT_WORK(&card->u.x.x25_poll_work, (void *)wpx_poll, card);
 
 	init_timer(&card->u.x.x25_timer);
 	card->u.x.x25_timer.data = (unsigned long)card;
@@ -1175,7 +1174,7 @@ static int if_init(struct net_device* dev)
  * Warnings:	None
  *
  * Return: 	0 	Ok
- * 		<0 	Failur: Interface will not come up.
+ * 		<0 	Failure: Interface will not come up.
  */
 
 static int if_open(struct net_device* dev)
@@ -1190,10 +1189,8 @@ static int if_open(struct net_device* dev)
 
 	chan->tq_working = 0;
 
-	/* Initialize the task queue */
-	chan->common.wanpipe_task.sync = 0;
-	chan->common.wanpipe_task.routine = (void *)(void *)x25api_bh;
-	chan->common.wanpipe_task.data = dev;
+	/* Initialize the workqueue */
+	INIT_WORK(&chan->common.wanpipe_work, (void *)x25api_bh, dev);
 
 	/* Allocate and initialize BH circular buffer */
 	/* Add 1 to MAX_BH_BUFF so we don't have test with (MAX_BH_BUFF-1) */
@@ -1732,8 +1729,7 @@ static void rx_intr (sdla_t* card)
 
 		chan->rx_skb = NULL;
 		if (!test_and_set_bit(0, &chan->tq_working)){
-			wanpipe_queue_tq(&chan->common.wanpipe_task);
-			wanpipe_mark_bh();
+			wanpipe_queue_work(&chan->common.wanpipe_work);
 		}
 		return;
 	}
@@ -2227,7 +2223,7 @@ static void spur_intr (sdla_t* card)
 
 /*====================================================================
  * 	Main polling routine.
- * 	This routine is repeatedly called by the WANPIPE 'thead' to allow for
+ * 	This routine is repeatedly called by the WANPIPE 'thread' to allow for
  * 	time-dependent housekeeping work.
  *
  * 	Notes:
@@ -2274,7 +2270,7 @@ wpx_poll_exit:
 
 static void trigger_x25_poll(sdla_t *card)
 {
-	schedule_task(&card->u.x.x25_poll_task);
+	schedule_work(&card->u.x.x25_poll_work);
 }
 
 /*====================================================================
