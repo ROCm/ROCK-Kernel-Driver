@@ -454,30 +454,6 @@ do_idmap_lookup(struct ent *(*lookup_fn)(struct ent *, int), struct ent *key,
 	return cache_check(detail, &(*item)->h, &mdr->req);
 }
 
-static int threads_waiting = 0;
-
-static inline int
-idmap_lookup_wait(struct idmap_defer_req *mdr, struct svc_rqst *rqstp,
-		struct ent *item))
-{
-	DEFINE_WAIT(wait);
-
-	prepare_to_wait(&mdr->waitq, &wait, TASK_INTERRUPTIBLE);
-	/* XXX: Does it matter that threads_waiting isn't per-server? */
-	/* Note: BKL prevents races with nfsd_svc and other lookups */
-	lock_kernel();
-	if (!test_bit(CACHE_VALID, &item->h.flags)) {
-		if (2 * threads_waiting > rqstp->rq_server->sv_nrthreads)
-			goto out;
-		threads_waiting++;
-		schedule_timeout(1 * HZ);
-		threads_waiting--;
-	}
-out:
-	unlock_kernel();
-	finish_wait(&mdr->waitq, &wait);
-}
-
 static inline int
 do_idmap_lookup_nowait(struct ent *(*lookup_fn)(struct ent *, int),
 			struct ent *key, struct cache_detail *detail,
@@ -521,7 +497,8 @@ idmap_lookup(struct svc_rqst *rqstp,
 	mdr->req.defer = idmap_defer;
 	ret = do_idmap_lookup(lookup_fn, key, detail, item, mdr);
 	if (ret == -EAGAIN) {
-		idmap_wait(mdr, rqstp, *item);
+		wait_event_interruptible_timeout(mdr->waitq,
+			test_bit(CACHE_VALID, &(*item)->h.flags), 1 * HZ);
 		ret = do_idmap_lookup_nowait(lookup_fn, key, detail, item);
 	}
 	put_mdr(mdr);
