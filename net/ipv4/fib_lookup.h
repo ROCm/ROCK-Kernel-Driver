@@ -33,5 +33,7 @@ extern int fib_dump_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
 extern void rtmsg_fib(int event, u32 key, struct fib_alias *fa,
 		      int z, int tb_id,
 		      struct nlmsghdr *n, struct netlink_skb_parms *req);
+extern struct fib_alias *fib_find_alias(struct list_head *fah,
+					u8 tos, u32 prio);
 
 #endif /* _FIB_LOOKUP_H */

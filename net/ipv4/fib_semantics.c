@@ -297,6 +297,24 @@ void rtmsg_fib(int event, u32 key, struct fib_alias *fa,
 		netlink_unicast(rtnl, skb, pid, MSG_DONTWAIT);
 }
 
+/* Return the first fib alias matching TOS with
+ * priority less than or equal to PRIO.
+ */
+struct fib_alias *fib_find_alias(struct list_head *fah, u8 tos, u32 prio)
+{
+	if (fah) {
+		struct fib_alias *fa;
+		list_for_each_entry(fa, fah, fa_list) {
+			if (fa->fa_tos > tos)
+				continue;
+			if (fa->fa_info->fib_priority >= prio ||
+			    fa->fa_tos < tos)
+				return fa;
+		}
+	}
+	return NULL;
+}
+
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 
 static u32 fib_get_attr32(struct rtattr *attr, int attrlen, int type)

@@ -399,26 +399,6 @@ static struct fib_node *fib_find_node(struct fn_zone *fz, u32 key)
 	return NULL;
 }
 
-/* Return the first fib alias matching TOS with
- * priority less than or equal to PRIO.
- */
-static struct fib_alias *fib_find_alias(struct fib_node *fn, u8 tos, u32 prio)
-{
-	if (fn) {
-		struct list_head *head = &fn->fn_alias;
-		struct fib_alias *fa;
-
-		list_for_each_entry(fa, head, fa_list) {
-			if (fa->fa_tos > tos)
-				continue;
-			if (fa->fa_info->fib_priority >= prio ||
-			    fa->fa_tos < tos)
-				return fa;
-		}
-	}
-	return NULL;
-}
-
 static int
 fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	       struct nlmsghdr *n, struct netlink_skb_parms *req)
@@ -458,7 +438,11 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		fn_rehash_zone(fz);
 
 	f = fib_find_node(fz, key);
-	fa = fib_find_alias(f, tos, fi->fib_priority);
+
+	if (!f)
+		fa = NULL;
+	else
+		fa = fib_find_alias(&f->fn_alias, tos, fi->fib_priority);
 
 	/* Now fa, if non-NULL, points to the first fib alias
 	 * with the same keys [prefix,tos,priority], if such key already
@@ -598,7 +582,11 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	}
 
 	f = fib_find_node(fz, key);
-	fa = fib_find_alias(f, tos, 0);
+
+	if (!f)
+		fa = NULL;
+	else
+		fa = fib_find_alias(&f->fn_alias, tos, 0);
 	if (!fa)
 		return -ESRCH;
 
