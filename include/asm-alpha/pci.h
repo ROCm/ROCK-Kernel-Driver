@@ -197,7 +197,8 @@ pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 /* Bus number == domain number until we get above 256 busses */
 static inline int pci_name_bus(char *name, struct pci_bus *bus)
 {
-	int domain = pci_domain_nr(bus)
+	int domain = pci_domain_nr(bus);
+
 	if (domain < 256) {
 		sprintf(name, "%02x", domain);
 	} else {
