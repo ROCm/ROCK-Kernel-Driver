@@ -614,7 +614,6 @@ mpage_writepages(struct address_space *mapping,
 	sector_t last_block_in_bio = 0;
 	int ret = 0;
 	int done = 0;
-	struct pagevec pvec;
 	int (*writepage)(struct page *page, struct writeback_control *wbc);
 
 	if (wbc->nonblocking && bdi_write_congested(bdi)) {
@@ -626,7 +625,6 @@ mpage_writepages(struct address_space *mapping,
 	if (get_block == NULL)
 		writepage = mapping->a_ops->writepage;
 
-	pagevec_init(&pvec, 0);
 	spin_lock(&mapping->page_lock);
 	while (!list_empty(&mapping->io_pages) && !done) {
 		struct page *page = list_entry(mapping->io_pages.prev,

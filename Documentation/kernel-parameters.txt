@@ -772,7 +772,7 @@ running once the system is up.
 			Ranges are in pairs (memory base and size).
 
 	profile=	[KNL] Enable kernel profiling via /proc/profile
-			Format: <log_level>
+			(param: profile step/bucket size as a power of 2)
 
 	prompt_ramdisk=	[RAM] List of RAM disks to prompt for floppy disk
 			before loading.
