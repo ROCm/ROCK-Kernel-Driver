@@ -144,6 +144,7 @@ static const char *const ep_name [] = {
 #define FIFO_SIZE		64
 
 struct dummy {
+	struct usb_hcd			hcd;		/* must come first! */
 	spinlock_t			lock;
 
 	/*
@@ -160,7 +161,6 @@ struct dummy {
 	/*
 	 * MASTER/HOST side support
 	 */
-	struct usb_hcd			hcd;
 	struct timer_list		timer;
 	u32				port_status;
 	unsigned			started:1;
@@ -1568,16 +1568,6 @@ static struct usb_hcd *dummy_alloc (void)
 	return &dum->hcd;
 }
 
-static void dummy_free (struct usb_hcd *hcd)
-{
-	struct dummy		*dum;
-
-	dum = hcd_to_dummy (hcd);
-	WARN_ON (dum->driver != 0);
-	kfree (dum);
-	the_controller = NULL;
-}
-
 /*-------------------------------------------------------------------------*/
 
 static inline ssize_t
@@ -1715,7 +1705,6 @@ static const struct hc_driver dummy_hcd = {
 	.stop =			dummy_stop,
 
 	.hcd_alloc = 		dummy_alloc,
-	.hcd_free = 		dummy_free,
 
 	.urb_enqueue = 		dummy_urb_enqueue,
 	.urb_dequeue = 		dummy_urb_dequeue,
@@ -1761,6 +1750,7 @@ static int dummy_probe (struct device *dev)
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
+	hcd->self.release = &usb_hcd_release;
 	hcd->self.hcpriv = hcd;
 	hcd->self.bus_name = dev->bus_id;
 	hcd->product_desc = "Dummy host controller";
@@ -1774,7 +1764,7 @@ static int dummy_probe (struct device *dev)
 	return retval;
 
 err1:
-	hcd->driver->hcd_free (hcd);
+	kfree (hcd);
 	dev_set_drvdata (dev, NULL);
 	return retval;
 }
@@ -1799,8 +1789,7 @@ static void dummy_remove (struct device *dev)
 
 	dev_set_drvdata (dev, NULL);
 	usb_deregister_bus (&hcd->self);
-
-	hcd->driver->hcd_free (hcd);
+	the_controller = NULL;
 }
 
 /*-------------------------------------------------------------------------*/
