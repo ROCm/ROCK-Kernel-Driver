@@ -8,6 +8,10 @@
  *     Universidad Politecnica de Alcala de Henares - Alcala de H. (Madrid) - Spain
  *     email: fanton@it.uc3m.es
  *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
  * 2001-11-06: First try. Working with ip_queue.c for IPv4 and trying
  *             to adapt it to IPv6
  *             HEAVILY based in ipqueue.c by James Morris. It's just

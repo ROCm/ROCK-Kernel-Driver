@@ -203,6 +203,7 @@ typedef long		psched_tdiff_t;
 
 #define PSCHED_GET_TIME(stamp) do_gettimeofday(&(stamp))
 #define PSCHED_US2JIFFIE(usecs) (((usecs)+(1000000/HZ-1))/(1000000/HZ))
+#define PSCHED_JIFFIE2US(delay) ((delay)*(1000000/HZ))
 
 #define PSCHED_EXPORTLIST EXPORT_SYMBOL(psched_tod_diff);
 
@@ -251,6 +252,7 @@ extern PSCHED_WATCHER psched_time_mark;
 #endif
 
 #define PSCHED_US2JIFFIE(delay) (((delay)+(1<<PSCHED_JSCALE)-1)>>PSCHED_JSCALE)
+#define PSCHED_JIFFIE2US(delay) ((delay)<<PSCHED_JSCALE)
 
 #elif PSCHED_CLOCK_SOURCE == PSCHED_CPU
 
@@ -261,6 +263,7 @@ extern int psched_clock_scale;
                             EXPORT_SYMBOL(psched_clock_scale);
 
 #define PSCHED_US2JIFFIE(delay) (((delay)+psched_clock_per_hz-1)/psched_clock_per_hz)
+#define PSCHED_JIFFIE2US(delay) ((delay)*psched_clock_per_hz)
 
 #ifdef CONFIG_X86_TSC
 
