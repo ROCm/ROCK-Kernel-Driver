@@ -79,11 +79,7 @@ static int longhaul_get_cpu_mult (void)
 
 	rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 	invalue = (lo & (1<<22|1<<23|1<<24|1<<25)) >>22;
-	if (longhaul_version==2) {
-		if (lo & (1<<27))
-			invalue+=16;
-	}
-	if (longhaul_version==4) {
+	if (longhaul_version==2 || longhaul_version==4) {
 		if (lo & (1<<27))
 			invalue+=16;
 	}
