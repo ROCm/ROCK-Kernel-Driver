@@ -251,13 +251,14 @@ static int tosh_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 	unsigned long arg)
 {
 	SMMRegisters regs;
+	SMMRegisters __user *argp = (SMMRegisters __user *)arg;
 	unsigned short ax,bx;
 	int err;
 
-	if (!arg)
+	if (!argp)
 		return -EINVAL;
 
-	if (copy_from_user(&regs, (SMMRegisters *) arg, sizeof(SMMRegisters)))
+	if (copy_from_user(&regs, argp, sizeof(SMMRegisters)))
 		return -EFAULT;
 
 	switch (cmd) {
@@ -281,7 +282,7 @@ static int tosh_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 			return -EINVAL;
 	}
 
-        if (copy_to_user((SMMRegisters *) arg, &regs, sizeof(SMMRegisters)))
+        if (copy_to_user(argp, &regs, sizeof(SMMRegisters)))
         	return -EFAULT;
 
 	return (err==0) ? 0:-EINVAL;

@@ -35,11 +35,11 @@ smb_ioctl(struct inode *inode, struct file *filp,
 		uid_t uid32;
 	case SMB_IOC_GETMOUNTUID:
 		SET_UID(uid16, server->mnt->mounted_uid);
-		result = put_user(uid16, (uid16_t *) arg);
+		result = put_user(uid16, (uid16_t __user *) arg);
 		break;
 	case SMB_IOC_GETMOUNTUID32:
 		SET_UID(uid32, server->mnt->mounted_uid);
-		result = put_user(uid32, (uid_t *) arg);
+		result = put_user(uid32, (uid_t __user *) arg);
 		break;
 
 	case SMB_IOC_NEWCONN:
@@ -56,7 +56,7 @@ smb_ioctl(struct inode *inode, struct file *filp,
 		}
 
 		result = -EFAULT;
-		if (!copy_from_user(&opt, (void *)arg, sizeof(opt)))
+		if (!copy_from_user(&opt, (void __user *)arg, sizeof(opt)))
 			result = smb_newconn(server, &opt);
 		break;
 	default:

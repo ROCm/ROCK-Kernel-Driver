@@ -79,7 +79,7 @@ MODULE_PARM_DESC(force, "Force loading without checking for supported models");
 MODULE_PARM_DESC(restricted, "Allow fan control if SYS_ADMIN capability set");
 MODULE_PARM_DESC(power_status, "Report power status in /proc/i8k");
 
-static ssize_t i8k_read(struct file *, char *, size_t, loff_t *);
+static ssize_t i8k_read(struct file *, char __user *, size_t, loff_t *);
 static int i8k_ioctl(struct inode *, struct file *, unsigned int,
 		     unsigned long);
 
@@ -330,10 +330,10 @@ static int i8k_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
     int val;
     int speed;
     unsigned char buff[16];
+    int __user *argp = (int __user *)arg;
 
-    if (!arg) {
+    if (!argp)
 	return -EINVAL;
-    }
 
     switch (cmd) {
     case I8K_BIOS_VERSION:
@@ -358,14 +358,14 @@ static int i8k_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 	break;
 
     case I8K_GET_SPEED:
-	if (copy_from_user(&val, (int *)arg, sizeof(int))) {
+	if (copy_from_user(&val, argp, sizeof(int))) {
 	    return -EFAULT;
 	}
 	val = i8k_get_fan_speed(val);
 	break;
 
     case I8K_GET_FAN:
-	if (copy_from_user(&val, (int *)arg, sizeof(int))) {
+	if (copy_from_user(&val, argp, sizeof(int))) {
 	    return -EFAULT;
 	}
 	val = i8k_get_fan_status(val);
@@ -375,10 +375,10 @@ static int i8k_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 	if (restricted && !capable(CAP_SYS_ADMIN)) {
 	    return -EPERM;
 	}
-	if (copy_from_user(&val, (int *)arg, sizeof(int))) {
+	if (copy_from_user(&val, argp, sizeof(int))) {
 	    return -EFAULT;
 	}
-	if (copy_from_user(&speed, (int *)arg+1, sizeof(int))) {
+	if (copy_from_user(&speed, argp+1, sizeof(int))) {
 	    return -EFAULT;
 	}
 	val = i8k_set_fan(val, speed);
@@ -394,17 +394,17 @@ static int i8k_ioctl(struct inode *ip, struct file *fp, unsigned int cmd,
 
     switch (cmd) {
     case I8K_BIOS_VERSION:
-	if (copy_to_user((int *)arg, &val, 4)) {
+	if (copy_to_user(argp, &val, 4)) {
 	    return -EFAULT;
 	}
 	break;
     case I8K_MACHINE_ID:
-	if (copy_to_user((int *)arg, buff, 16)) {
+	if (copy_to_user(argp, buff, 16)) {
 	    return -EFAULT;
 	}
 	break;
     default:
-	if (copy_to_user((int *)arg, &val, sizeof(int))) {
+	if (copy_to_user(argp, &val, sizeof(int))) {
 	    return -EFAULT;
 	}
 	break;
@@ -462,7 +462,7 @@ static int i8k_get_info(char *buffer, char **start, off_t fpos, int length)
     return n;
 }
 
-static ssize_t i8k_read(struct file *f, char *buffer, size_t len, loff_t *fpos)
+static ssize_t i8k_read(struct file *f, char __user *buffer, size_t len, loff_t *fpos)
 {
     int n;
     char info[128];

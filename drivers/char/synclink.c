@@ -853,15 +853,15 @@ static int tiocmget(struct tty_struct *tty, struct file *file);
 static int tiocmset(struct tty_struct *tty, struct file *file,
 		    unsigned int set, unsigned int clear);
 static int mgsl_get_stats(struct mgsl_struct * info, struct mgsl_icount
-	*user_icount);
-static int mgsl_get_params(struct mgsl_struct * info, MGSL_PARAMS *user_params);
-static int mgsl_set_params(struct mgsl_struct * info, MGSL_PARAMS *new_params);
-static int mgsl_get_txidle(struct mgsl_struct * info, int*idle_mode);
+	__user *user_icount);
+static int mgsl_get_params(struct mgsl_struct * info, MGSL_PARAMS  __user *user_params);
+static int mgsl_set_params(struct mgsl_struct * info, MGSL_PARAMS  __user *new_params);
+static int mgsl_get_txidle(struct mgsl_struct * info, int __user *idle_mode);
 static int mgsl_set_txidle(struct mgsl_struct * info, int idle_mode);
 static int mgsl_txenable(struct mgsl_struct * info, int enable);
 static int mgsl_txabort(struct mgsl_struct * info);
 static int mgsl_rxenable(struct mgsl_struct * info, int enable);
-static int mgsl_wait_event(struct mgsl_struct * info, int * mask);
+static int mgsl_wait_event(struct mgsl_struct * info, int __user *mask);
 static int mgsl_loopmode_send_done( struct mgsl_struct * info );
 
 #define jiffies_from_ms(a) ((((a) * HZ)/1000)+1)
@@ -950,8 +950,10 @@ static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout);
  * (gdb) to get the .text address for the add-symbol-file command.
  * This allows remote debugging of dynamically loadable modules.
  */
-void* mgsl_get_text_ptr(void);
-void* mgsl_get_text_ptr() {return mgsl_get_text_ptr;}
+void* mgsl_get_text_ptr(void)
+{
+	return mgsl_get_text_ptr;
+}
 
 /*
  * tmp_buf is used as a temporary buffer by mgsl_write.  We need to
@@ -2521,7 +2523,7 @@ static void mgsl_unthrottle(struct tty_struct * tty)
  * 	
  * Return Value:	0 if success, otherwise error code
  */
-static int mgsl_get_stats(struct mgsl_struct * info, struct mgsl_icount *user_icount)
+static int mgsl_get_stats(struct mgsl_struct * info, struct mgsl_icount __user *user_icount)
 {
 	int err;
 	
@@ -2550,7 +2552,7 @@ static int mgsl_get_stats(struct mgsl_struct * info, struct mgsl_icount *user_ic
  * 	
  * Return Value:	0 if success, otherwise error code
  */
-static int mgsl_get_params(struct mgsl_struct * info, MGSL_PARAMS *user_params)
+static int mgsl_get_params(struct mgsl_struct * info, MGSL_PARAMS __user *user_params)
 {
 	int err;
 	if (debug_level >= DEBUG_LEVEL_INFO)
@@ -2580,7 +2582,7 @@ static int mgsl_get_params(struct mgsl_struct * info, MGSL_PARAMS *user_params)
  *
  * Return Value:	0 if success, otherwise error code
  */
-static int mgsl_set_params(struct mgsl_struct * info, MGSL_PARAMS *new_params)
+static int mgsl_set_params(struct mgsl_struct * info, MGSL_PARAMS __user *new_params)
 {
  	unsigned long flags;
 	MGSL_PARAMS tmp_params;
@@ -2616,7 +2618,7 @@ static int mgsl_set_params(struct mgsl_struct * info, MGSL_PARAMS *new_params)
  * 	
  * Return Value:	0 if success, otherwise error code
  */
-static int mgsl_get_txidle(struct mgsl_struct * info, int*idle_mode)
+static int mgsl_get_txidle(struct mgsl_struct * info, int __user *idle_mode)
 {
 	int err;
 	
@@ -2763,7 +2765,7 @@ static int mgsl_rxenable(struct mgsl_struct * info, int enable)
  *				of events triggerred,
  * 			otherwise error code
  */
-static int mgsl_wait_event(struct mgsl_struct * info, int * mask_ptr)
+static int mgsl_wait_event(struct mgsl_struct * info, int __user * mask_ptr)
 {
  	unsigned long flags;
 	int s;
@@ -3051,16 +3053,17 @@ int mgsl_ioctl_common(struct mgsl_struct *info, unsigned int cmd, unsigned long 
 {
 	int error;
 	struct mgsl_icount cnow;	/* kernel counter temps */
-	struct serial_icounter_struct *p_cuser;	/* user space */
+	void __user *argp = (void __user *)arg;
+	struct serial_icounter_struct __user *p_cuser;	/* user space */
 	unsigned long flags;
 	
 	switch (cmd) {
 		case MGSL_IOCGPARAMS:
-			return mgsl_get_params(info,(MGSL_PARAMS *)arg);
+			return mgsl_get_params(info, argp);
 		case MGSL_IOCSPARAMS:
-			return mgsl_set_params(info,(MGSL_PARAMS *)arg);
+			return mgsl_set_params(info, argp);
 		case MGSL_IOCGTXIDLE:
-			return mgsl_get_txidle(info,(int*)arg);
+			return mgsl_get_txidle(info, argp);
 		case MGSL_IOCSTXIDLE:
 			return mgsl_set_txidle(info,(int)arg);
 		case MGSL_IOCTXENABLE:
@@ -3070,9 +3073,9 @@ int mgsl_ioctl_common(struct mgsl_struct *info, unsigned int cmd, unsigned long 
 		case MGSL_IOCTXABORT:
 			return mgsl_txabort(info);
 		case MGSL_IOCGSTATS:
-			return mgsl_get_stats(info,(struct mgsl_icount*)arg);
+			return mgsl_get_stats(info, argp);
 		case MGSL_IOCWAITEVENT:
-			return mgsl_wait_event(info,(int*)arg);
+			return mgsl_wait_event(info, argp);
 		case MGSL_IOCLOOPTXDONE:
 			return mgsl_loopmode_send_done(info);
 		/* Wait for modem input (DCD,RI,DSR,CTS) change
@@ -3091,7 +3094,7 @@ int mgsl_ioctl_common(struct mgsl_struct *info, unsigned int cmd, unsigned long 
 			spin_lock_irqsave(&info->irq_spinlock,flags);
 			cnow = info->icount;
 			spin_unlock_irqrestore(&info->irq_spinlock,flags);
-			p_cuser = (struct serial_icounter_struct *) arg;
+			p_cuser = argp;
 			PUT_USER(error,cnow.cts, &p_cuser->cts);
 			if (error) return error;
 			PUT_USER(error,cnow.dsr, &p_cuser->dsr);
@@ -4425,7 +4428,7 @@ void mgsl_add_device( struct mgsl_struct *info )
  * Arguments:		none
  * Return Value:	pointer to mgsl_struct if success, otherwise NULL
  */
-struct mgsl_struct* mgsl_allocate_device()
+struct mgsl_struct* mgsl_allocate_device(void)
 {
 	struct mgsl_struct *info;
 	
@@ -4484,8 +4487,7 @@ static struct tty_operations mgsl_ops = {
 /*
  * perform tty device initialization
  */
-int mgsl_init_tty(void);
-int mgsl_init_tty()
+int mgsl_init_tty(void)
 {
 	serial_driver = alloc_tty_driver(mgsl_device_count);
 	if (!serial_driver)
@@ -4515,7 +4517,7 @@ int mgsl_init_tty()
 
 /* enumerate user specified ISA adapters
  */
-int mgsl_enum_isa_devices()
+int mgsl_enum_isa_devices(void)
 {
 	struct mgsl_struct *info;
 	int i;

@@ -196,7 +196,7 @@ static int unquote(char *from)
  * ':name:type:offset:magic:mask:interpreter:'
  * where the ':' is the IFS, that can be chosen with the first char
  */
-static Node *create_entry(const char *buffer, size_t count)
+static Node *create_entry(const char __user *buffer, size_t count)
 {
 	Node *e;
 	int memsize, err;
@@ -319,7 +319,7 @@ Einval:
  * Set status of entry/binfmt_misc:
  * '1' enables, '0' disables and '-1' clears entry/binfmt_misc
  */
-static int parse_command(const char *buffer, size_t count)
+static int parse_command(const char __user *buffer, size_t count)
 {
 	char s[4];
 
@@ -424,7 +424,7 @@ static void kill_node(Node *e)
 /* /<entry> */
 
 static ssize_t
-bm_entry_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
+bm_entry_read(struct file * file, char __user * buf, size_t nbytes, loff_t *ppos)
 {
 	Node *e = file->f_dentry->d_inode->u.generic_ip;
 	loff_t pos = *ppos;
@@ -456,7 +456,7 @@ out:
 	return res;
 }
 
-static ssize_t bm_entry_write(struct file *file, const char *buffer,
+static ssize_t bm_entry_write(struct file *file, const char __user *buffer,
 				size_t count, loff_t *ppos)
 {
 	struct dentry *root;
@@ -488,7 +488,7 @@ static struct file_operations bm_entry_operations = {
 
 /* /register */
 
-static ssize_t bm_register_write(struct file *file, const char *buffer,
+static ssize_t bm_register_write(struct file *file, const char __user *buffer,
 			       size_t count, loff_t *ppos)
 {
 	Node *e;
@@ -556,7 +556,7 @@ static struct file_operations bm_register_operations = {
 /* /status */
 
 static ssize_t
-bm_status_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
+bm_status_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
 	char *s = enabled ? "enabled" : "disabled";
 	int len = strlen(s);
@@ -574,7 +574,7 @@ bm_status_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
 	return nbytes;
 }
 
-static ssize_t bm_status_write(struct file * file, const char * buffer,
+static ssize_t bm_status_write(struct file * file, const char __user * buffer,
 		size_t count, loff_t *ppos)
 {
 	int res = parse_command(buffer, count);
