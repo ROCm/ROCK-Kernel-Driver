@@ -66,6 +66,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
 #include <asm/ppc32.h>
+#include <asm/mmu_context.h>
 
 extern unsigned long wall_jiffies;
 #define USEC_PER_SEC (1000000)
@@ -3800,63 +3801,76 @@ static int do_execve32(char * filename, u32 * argv, u32 * envp, struct pt_regs *
 	int retval;
 	int i;
 
-	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
-	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
-
 	file = open_exec(filename);
 
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
 		return retval;
 
+	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
+	memset(bprm.page, 0, MAX_ARG_PAGES * sizeof(bprm.page[0]));
+
 	bprm.file = file;
 	bprm.filename = filename;
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
-	if ((bprm.argc = count32(argv, bprm.p / sizeof(u32))) < 0) {
-		allow_write_access(file);
-		fput(file);
-		return bprm.argc;
-	}
-	if ((bprm.envc = count32(envp, bprm.p / sizeof(u32))) < 0) {
-		allow_write_access(file);
-		fput(file);
-		return bprm.argc;
-	}
-  
+
+	bprm.mm = mm_alloc();
+	retval = -ENOMEM;
+	if (!bprm.mm)
+		goto out_file;
+
+	retval = init_new_context(current, bprm.mm);
+	if (retval < 0)
+		goto out_mm;
+
+	bprm.argc = count32(argv, bprm.p / sizeof(u32));
+	if ((retval = bprm.argc) < 0)
+		goto out_mm;
+
+	bprm.envc = count32(envp, bprm.p / sizeof(u32));
+	if ((retval = bprm.envc) < 0)
+		goto out_mm;
+
 	retval = prepare_binprm(&bprm);
-	if (retval < 0)
-		goto out;
-	
+	if (retval < 0) 
+		goto out; 
+
 	retval = copy_strings_kernel(1, &bprm.filename, &bprm);
-	if (retval < 0)
-		goto out;
+	if (retval < 0) 
+		goto out; 
 
 	bprm.exec = bprm.p;
 	retval = copy_strings32(bprm.envc, envp, &bprm);
-	if (retval < 0)
-		goto out;
+	if (retval < 0) 
+		goto out; 
 
 	retval = copy_strings32(bprm.argc, argv, &bprm);
-	if (retval < 0)
-		goto out;
+	if (retval < 0) 
+		goto out; 
 
-	retval = search_binary_handler(&bprm, regs);
+	retval = search_binary_handler(&bprm,regs);
 	if (retval >= 0)
 		/* execve success */
 		return retval;
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
-	allow_write_access(bprm.file);
-	if (bprm.file)
+	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
+		struct page * page = bprm.page[i];
+		if (page)
+			__free_page(page);
+	}
+
+out_mm:
+	mmdrop(bprm.mm);
+
+out_file:
+	if (bprm.file) {
+		allow_write_access(bprm.file);
 		fput(bprm.file);
-
-	for (i=0 ; i<MAX_ARG_PAGES ; i++)
-		if (bprm.page[i])
-			__free_page(bprm.page[i]);
-
+	}
 	return retval;
 }
 
@@ -3867,11 +3881,6 @@ asmlinkage long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a
 	int error;
 	char * filename;
 	
-	ifppcdebug(PPCDBG_SYS32) {
-		udbg_printf("sys32_execve - entered - pid=%ld, comm=%s \n", current->pid, current->comm);
-		//PPCDBG(PPCDBG_SYS32NI, "               a0=%lx, a1=%lx, a2=%lx, a3=%lx, a4=%lx, a5=%lx, regs=%p \n", a0, a1, a2, a3, a4, a5, regs);
-	}
-
 	filename = getname((char *) a0);
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
@@ -3886,10 +3895,6 @@ asmlinkage long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a
 	putname(filename);
 
 out:
-	ifppcdebug(PPCDBG_SYS32) {
-		udbg_printf("sys32_execve - exited - returning %x - pid=%ld \n", error, current->pid);
-		//udbg_printf("sys32_execve - at exit - regs->gpr[1]=%lx, gpr[3]=%lx, gpr[4]=%lx, gpr[5]=%lx, gpr[6]=%lx \n", regs->gpr[1], regs->gpr[3], regs->gpr[4], regs->gpr[5], regs->gpr[6]);
-	}
 	return error;
 }
 
