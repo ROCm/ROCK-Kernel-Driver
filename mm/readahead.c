@@ -349,7 +349,6 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 			struct file *filp, unsigned long offset)
 {
 	unsigned max;
-	unsigned min;
 	unsigned orig_next_size;
 	unsigned actual;
 	int first_access=0;
@@ -374,7 +373,6 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	if (max == 0)
 		goto out;	/* No readahead */
 
-	min = get_min_readahead(ra);
 	orig_next_size = ra->next_size;
 
 	if (ra->next_size == 0) {
