@@ -17,4 +17,7 @@ static inline unsigned long calculate_ldr(unsigned long old)
  #define TARGET_CPUS 0x01
 #endif
 
+#define APIC_BROADCAST_ID      0x0F
+#define check_apicid_used(bitmap, apicid) (bitmap & (1 << apicid))
+
 #endif /* __ASM_MACH_APIC_H */
