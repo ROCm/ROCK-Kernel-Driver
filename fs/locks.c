@@ -167,6 +167,13 @@ static inline void locks_free_lock(struct file_lock *fl)
 	if (!list_empty(&fl->fl_link))
 		panic("Attempting to free lock on active lock list");
 
+	if (fl->fl_ops) {
+		if (fl->fl_ops->fl_release_private)
+			fl->fl_ops->fl_release_private(fl);
+		fl->fl_ops = NULL;
+	}
+	fl->fl_lmops = NULL;
+
 	kmem_cache_free(filelock_cache, fl);
 }
 
@@ -186,6 +193,8 @@ void locks_init_lock(struct file_lock *fl)
 	fl->fl_notify = NULL;
 	fl->fl_insert = NULL;
 	fl->fl_remove = NULL;
+	fl->fl_ops = NULL;
+	fl->fl_lmops = NULL;
 }
 
 EXPORT_SYMBOL(locks_init_lock);
@@ -220,7 +229,10 @@ void locks_copy_lock(struct file_lock *new, struct file_lock *fl)
 	new->fl_notify = fl->fl_notify;
 	new->fl_insert = fl->fl_insert;
 	new->fl_remove = fl->fl_remove;
-	new->fl_u = fl->fl_u;
+	new->fl_ops = fl->fl_ops;
+	new->fl_lmops = fl->fl_lmops;
+	if (fl->fl_ops && fl->fl_ops->fl_copy_lock)
+		fl->fl_ops->fl_copy_lock(new, fl);
 }
 
 EXPORT_SYMBOL(locks_copy_lock);
@@ -324,6 +336,8 @@ static int flock_to_posix_lock(struct file *filp, struct file_lock *fl,
 	fl->fl_notify = NULL;
 	fl->fl_insert = NULL;
 	fl->fl_remove = NULL;
+	fl->fl_ops = NULL;
+	fl->fl_lmops = NULL;
 
 	return assign_type(fl, l->l_type);
 }
@@ -364,6 +378,8 @@ static int flock64_to_posix_lock(struct file *filp, struct file_lock *fl,
 	fl->fl_notify = NULL;
 	fl->fl_insert = NULL;
 	fl->fl_remove = NULL;
+	fl->fl_ops = NULL;
+	fl->fl_lmops = NULL;
 
 	switch (l->l_type) {
 	case F_RDLCK:
@@ -400,6 +416,8 @@ static int lease_alloc(struct file *filp, int type, struct file_lock **flp)
 	fl->fl_notify = NULL;
 	fl->fl_insert = NULL;
 	fl->fl_remove = NULL;
+	fl->fl_ops = NULL;
+	fl->fl_lmops = NULL;
 
 	*flp = fl;
 	return 0;
@@ -419,10 +437,9 @@ static inline int locks_overlap(struct file_lock *fl1, struct file_lock *fl2)
 static inline int
 posix_same_owner(struct file_lock *fl1, struct file_lock *fl2)
 {
-	/* FIXME: Replace this sort of thing with struct file_lock_operations */
-	if ((fl1->fl_type | fl2->fl_type) & FL_LOCKD)
-		return fl1->fl_owner == fl2->fl_owner &&
-			fl1->fl_pid == fl2->fl_pid;
+	if (fl1->fl_lmops && fl1->fl_lmops->fl_compare_owner)
+		return fl2->fl_lmops == fl1->fl_lmops &&
+			fl1->fl_lmops->fl_compare_owner(fl1, fl2);
 	return fl1->fl_owner == fl2->fl_owner;
 }
 
@@ -1415,7 +1432,6 @@ int fcntl_getlk(struct file *filp, struct flock __user *l)
 	error = -EFAULT;
 	if (!copy_to_user(l, &flock, sizeof(flock)))
 		error = 0;
-  
 out:
 	return error;
 }
@@ -1665,6 +1681,8 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 	lock.fl_owner = owner;
 	lock.fl_pid = current->tgid;
 	lock.fl_file = filp;
+	lock.fl_ops = NULL;
+	lock.fl_lmops = NULL;
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		filp->f_op->lock(filp, F_SETLK, &lock);
@@ -1684,6 +1702,8 @@ void locks_remove_posix(struct file *filp, fl_owner_t owner)
 		before = &fl->fl_next;
 	}
 	unlock_kernel();
+	if (lock.fl_ops && lock.fl_ops->fl_release_private)
+		lock.fl_ops->fl_release_private(&lock);
 }
 
 EXPORT_SYMBOL(locks_remove_posix);
