@@ -119,8 +119,10 @@ static int __devinit snd_emu10k1_init(emu10k1_t * emu, int enable_ir)
 	snd_emu10k1_ptr_write(emu, SOLEH, 0, 0);
 
 	if (emu->audigy){
-		snd_emu10k1_ptr_write(emu, 0x5e, 0, 0xf00); /* ?? */
-		snd_emu10k1_ptr_write(emu, 0x5f, 0, 0x3); /* ?? */
+		/* set SPDIF bypass mode */
+		snd_emu10k1_ptr_write(emu, SPBYPASS, 0, SPBYPASS_FORMAT);
+		/* enable rear left + rear right AC97 slots */
+		snd_emu10k1_ptr_write(emu, AC97SLOT, 0, AC97SLOT_REAR_RIGHT | AC97SLOT_REAR_LEFT);
 	}
 
 	/* init envelope engine */
@@ -329,7 +331,7 @@ static int snd_emu10k1_done(emu10k1_t * emu)
 	if (emu->audigy)
 		snd_emu10k1_ptr_write(emu, A_DBG, 0, A_DBG_SINGLE_STEP);
 	else
-		snd_emu10k1_ptr_write(emu, DBG, 0, 0x8000);
+		snd_emu10k1_ptr_write(emu, DBG, 0, EMU10K1_DBG_SINGLE_STEP);
 
 	/* disable channel interrupt */
 	snd_emu10k1_ptr_write(emu, CLIEL, 0, 0);
@@ -682,12 +684,13 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 		/* Audigy 2 EX has apparently no effective AC97 controls
 		 * (for both input and output), so we skip the AC97 detections
 		 */
-		snd_printdd(KERN_INFO "Audigy2 EX is detected. skpping ac97.\n");
+		snd_printdd(KERN_INFO "Audigy2 EX is detected. skipping ac97.\n");
 		emu->no_ac97 = 1;	
 	}
 	
-	if (emu->revision == 4) {
-		/*  FIXME - Audigy 2 ZS detection */
+	if (emu->revision == 4 && emu->model == 0x2002) {
+		/* Audigy 2 ZS */
+		snd_printdd(KERN_INFO "Audigy2 ZS is detected. setting 7.1 mode.\n");
 		emu->spk71 = 1;
 	}
 	
