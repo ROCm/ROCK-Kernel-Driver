@@ -261,7 +261,6 @@ static int __init pci_direct_init(void)
 	}
 
 	local_irq_restore(flags);
-	pci_root_ops = NULL;
 	return 0;
 }
 
