@@ -305,6 +305,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 					case EV_KEY: bits = dev->keybit; len = KEY_MAX; break;
 					case EV_REL: bits = dev->relbit; len = REL_MAX; break;
 					case EV_ABS: bits = dev->absbit; len = ABS_MAX; break;
+					case EV_MSC: bits = dev->mscbit; len = MSC_MAX; break;
 					case EV_LED: bits = dev->ledbit; len = LED_MAX; break;
 					case EV_SND: bits = dev->sndbit; len = SND_MAX; break;
 					case EV_FF:  bits = dev->ffbit;  len = FF_MAX;  break;
