@@ -2429,77 +2429,32 @@ int submit_bh(int rw, struct buffer_head * bh)
  * All of the buffers must be for the same device, and must also be a
  * multiple of the current approved size for the device.
  */
-void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
+void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
 {
-	unsigned int major;
-	int correct_size;
 	int i;
 
-	if (!nr)
-		return;
-
-	major = major(to_kdev_t(bhs[0]->b_bdev->bd_dev));
-
-	/* Determine correct block size for this device. */
-	correct_size = bdev_hardsect_size(bhs[0]->b_bdev);
-
-	/* Verify requested block sizes. */
-	for (i = 0; i < nr; i++) {
-		struct buffer_head *bh = bhs[i];
-		if (bh->b_size & (correct_size - 1)) {
-			printk(KERN_NOTICE "ll_rw_block: device %s: "
-			       "only %d-char blocks implemented (%u)\n",
-			       bdevname(bhs[0]->b_bdev),
-			       correct_size, bh->b_size);
-			goto sorry;
-		}
-	}
-
-	if ((rw & WRITE) && bdev_read_only(bhs[0]->b_bdev)) {
-		printk(KERN_NOTICE "Can't write to read-only device %s\n",
-		       bdevname(bhs[0]->b_bdev));
-		goto sorry;
-	}
-
 	for (i = 0; i < nr; i++) {
 		struct buffer_head *bh = bhs[i];
 
-		/* Only one thread can actually submit the I/O. */
 		if (test_set_buffer_locked(bh))
 			continue;
 
-		/* We have the buffer lock */
-		atomic_inc(&bh->b_count);
+		get_bh(bh);
 		bh->b_end_io = end_buffer_io_sync;
-
-		switch(rw) {
-		case WRITE:
-			if (!test_clear_buffer_dirty(bh))
-				/* Hmmph! Nothing to write */
-				goto end_io;
-			break;
-
-		case READA:
-		case READ:
-			if (buffer_uptodate(bh))
-				/* Hmmph! Already have it */
-				goto end_io;
-			break;
-		default:
-			BUG();
-	end_io:
-			bh->b_end_io(bh, buffer_uptodate(bh));
-			continue;
+		if (rw == WRITE) {
+			if (test_clear_buffer_dirty(bh)) {
+				submit_bh(WRITE, bh);
+				continue;
+			}
+		} else {
+			if (!buffer_uptodate(bh)) {
+				submit_bh(READ, bh);
+				continue;
+			}
 		}
-
-		submit_bh(rw, bh);
+		unlock_buffer(bh);
+		put_bh(bh);
 	}
-	return;
-
-sorry:
-	/* Make sure we don't get infinite dirty retries.. */
-	for (i = 0; i < nr; i++)
-		clear_buffer_dirty(bhs[i]);
 }
 
 /*
