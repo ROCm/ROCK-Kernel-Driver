@@ -155,7 +155,7 @@ static void sbc_gxx_copy_from(struct map_info *map, void *to, unsigned long from
 		sbc_gxx_page(map, from);
 		memcpy_fromio(to, iomapadr + (from & WINDOW_MASK), thislen);
 		spin_unlock(&sbc_gxx_spin);
-		(__u8*)to += thislen;
+		to += thislen;
 		from += thislen;
 		len -= thislen;
 	}

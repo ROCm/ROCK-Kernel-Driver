@@ -1003,13 +1003,25 @@ static inline int do_write_buffer(struct map_info *map, struct flchip *chip,
 	z = 0;
 	while(z < words * CFIDEV_BUSWIDTH) {
 		if (cfi_buswidth_is_1()) {
-			map_write8 (map, *((__u8*)buf)++, adr+z);
+			u8 *b = (u8 *)buf;
+
+			map_write8 (map, *b++, adr+z);
+			buf = (const u_char *)b;
 		} else if (cfi_buswidth_is_2()) {
-			map_write16 (map, *((__u16*)buf)++, adr+z);
+			u16 *b = (u16 *)buf;
+
+			map_write16 (map, *b++, adr+z);
+			buf = (const u_char *)b;
 		} else if (cfi_buswidth_is_4()) {
-			map_write32 (map, *((__u32*)buf)++, adr+z);
+			u32 *b = (u32 *)buf;
+
+			map_write32 (map, *b++, adr+z);
+			buf = (const u_char *)b;
 		} else if (cfi_buswidth_is_8()) {
-			map_write64 (map, *((__u64*)buf)++, adr+z);
+			u64 *b = (u64 *)buf;
+
+			map_write64 (map, *b++, adr+z);
+			buf = (const u_char *)b;
 		} else {
 			ret = -EINVAL;
 			goto out;
@@ -1025,11 +1037,20 @@ static inline int do_write_buffer(struct map_info *map, struct flchip *chip,
 		while (i < CFIDEV_BUSWIDTH)
 			tmp_buf[i++] = 0xff;
 		if (cfi_buswidth_is_2()) {
-			map_write16 (map, *((__u16*)tmp_p)++, adr+z);
+			u16 *b = (u16 *)tmp_p;
+
+			map_write16 (map, *b++, adr+z);
+			tmp_p = (u_char *)b;
 		} else if (cfi_buswidth_is_4()) {
-			map_write32 (map, *((__u32*)tmp_p)++, adr+z);
+			u32 *b = (u32 *)tmp_p;
+
+			map_write32 (map, *b++, adr+z);
+			tmp_p = (u_char *)b;
 		} else if (cfi_buswidth_is_8()) {
-			map_write64 (map, *((__u64*)tmp_p)++, adr+z);
+			u64 *b = (u64 *)tmp_p;
+
+			map_write64 (map, *b++, adr+z);
+			tmp_p = (u_char *)b;
 		} else {
 			ret = -EINVAL;
 			goto out;
