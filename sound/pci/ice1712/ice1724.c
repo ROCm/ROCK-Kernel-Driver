@@ -448,15 +448,6 @@ static void snd_vt1724_set_pro_rate(ice1712_t *ice, unsigned int rate, int force
 		if (ice->akm[i].ops.set_rate_val)
 			ice->akm[i].ops.set_rate_val(&ice->akm[i], rate);
 	}
-
-	/* set up AC97 registers if needed */
-	if (! (ice->eeprom.data[ICE_EEP2_ACLINK] & VT1724_CFG_PRO_I2S) && ice->ac97) {
-		snd_ac97_set_rate(ice->ac97, AC97_PCM_FRONT_DAC_RATE, rate);
-		snd_ac97_set_rate(ice->ac97, AC97_PCM_SURR_DAC_RATE, rate);
-		snd_ac97_set_rate(ice->ac97, AC97_PCM_LFE_DAC_RATE, rate);
-		snd_ac97_set_rate(ice->ac97, AC97_SPDIF, rate);
-		snd_ac97_set_rate(ice->ac97, AC97_PCM_LR_ADC_RATE, rate);
-	}
 }
 
 static int snd_vt1724_pcm_hw_params(snd_pcm_substream_t * substream,
@@ -716,15 +707,9 @@ static int set_rate_constraints(ice1712_t *ice, snd_pcm_substream_t *substream)
 			ratec = AC97_RATES_FRONT_DAC;
 		else
 			ratec = AC97_RATES_ADC;
-		runtime->hw.rates = ice->ac97->rates[ratec];
 		runtime->hw.rate_max = 48000;
-		if (runtime->hw.rates == SNDRV_PCM_RATE_48000) {
-			runtime->hw.rate_min = 48000;
-			return 0;
-		} else {
-			runtime->hw.rates = SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000;
-			return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_48);
-		}
+		runtime->hw.rates = SNDRV_PCM_RATE_KNOT | SNDRV_PCM_RATE_8000_48000;
+		return snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &hw_constraints_rates_48);
 	}
 	return 0;
 }
