@@ -69,7 +69,12 @@ struct pt_regs32 {
 #define __SIGNAL_FRAMESIZE32	64
 
 #define instruction_pointer(regs) ((regs)->nip)
+#ifdef CONFIG_SMP
+extern unsigned long profile_pc(struct pt_regs *regs);
+#else
 #define profile_pc(regs) instruction_pointer(regs)
+#endif
+
 #define user_mode(regs) ((((regs)->msr) >> MSR_PR_LG) & 0x1)
 
 #define force_successful_syscall_return()   \
