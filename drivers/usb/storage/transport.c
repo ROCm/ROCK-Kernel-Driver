@@ -1257,8 +1257,10 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* DATA STAGE */
 	/* send/receive data payload, if there is any */
 	if (transfer_length) {
-		result = usb_stor_bulk_transfer_srb(us, us->send_bulk_pipe,
-				srb, transfer_length);
+		unsigned int pipe = srb->sc_data_direction == SCSI_DATA_READ ? 
+				us->recv_bulk_pipe : us->send_bulk_pipe;
+		result = usb_stor_bulk_transfer_srb(us, pipe, srb,
+					transfer_length);
 		US_DEBUGP("Bulk data transfer result 0x%x\n", result);
 
 		/* if it was aborted, we need to indicate that */
