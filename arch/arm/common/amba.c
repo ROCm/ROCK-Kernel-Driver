@@ -199,7 +199,11 @@ int amba_device_register(struct amba_device *dev, struct resource *parent)
 
 	dev->dev.release = amba_device_release;
 	dev->dev.bus = &amba_bustype;
+	dev->dev.dma_mask = &dev->dma_mask;
 	dev->res.name = dev->dev.bus_id;
+
+	if (!dev->dev.coherent_dma_mask && dev->dma_mask)
+		dev_warn(&dev->dev, "coherent dma mask is unset\n");
 
 	ret = request_resource(parent, &dev->res);
 	if (ret == 0) {
