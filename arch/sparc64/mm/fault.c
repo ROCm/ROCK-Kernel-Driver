@@ -222,7 +222,7 @@ static void do_fault_siginfo(int code, int sig, unsigned long address)
 extern int handle_ldf_stq(u32, struct pt_regs *);
 extern int handle_ld_nf(u32, struct pt_regs *);
 
-static inline unsigned int get_fault_insn(struct pt_regs *regs, unsigned int insn)
+static unsigned int get_fault_insn(struct pt_regs *regs, unsigned int insn)
 {
 	if (!insn) {
 		if (!regs->tpc || (regs->tpc & 0x3))

@@ -93,7 +93,7 @@ extern unsigned char dma_sync_reg_table_entry;
 #define IBF_MULTI	0x08	/* On PCI, indicates shared bucket.		 */
 #define IBF_INPROGRESS	0x10	/* IRQ is being serviced.			 */
 
-#define NUM_IVECS	8192
+#define NUM_IVECS	(IMAP_INR + 1)
 extern struct ino_bucket ivector_table[NUM_IVECS];
 
 #define __irq_ino(irq) \
