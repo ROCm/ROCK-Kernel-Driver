@@ -378,7 +378,7 @@ static void dma_drain(struct NCR_ESP *esp)
 
 static int dma_can_transfer(struct NCR_ESP *esp, Scsi_Cmnd * sp)
 {
-	return sp->SCp.this_residual;;
+	return sp->SCp.this_residual;
 }
 
 static void dma_dump_state(struct NCR_ESP *esp)

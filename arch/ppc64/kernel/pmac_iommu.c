@@ -154,7 +154,7 @@ static void dart_build_pmac(struct iommu_table *tbl, long index,
 	 * out of the loop.
 	 */
 	while (npages--) {
-		rpn = (virt_to_absolute(uaddr)) >> PAGE_SHIFT;
+		rpn = virt_to_abs(uaddr) >> PAGE_SHIFT;
 
 		*(dp++) = DARTMAP_VALID | (rpn & DARTMAP_RPNMASK);
 
@@ -210,7 +210,7 @@ static int dart_init(struct device_node *dart_node)
 	if (tmp == 0)
 		panic("U3-DART: Cannot allocate spare page !");
 	dart_emptyval = DARTMAP_VALID |
-		((virt_to_absolute(tmp) >> PAGE_SHIFT) & DARTMAP_RPNMASK);
+		((virt_to_abs(tmp) >> PAGE_SHIFT) & DARTMAP_RPNMASK);
 
 	/* Map in DART registers. FIXME: Use device node to get base address */
 	dart = ioremap(DART_BASE, 0x7000);
@@ -225,7 +225,7 @@ static int dart_init(struct device_node *dart_node)
 		(((dart_tablesize >> PAGE_SHIFT) & DARTCNTL_SIZE_MASK)
 				 << DARTCNTL_SIZE_SHIFT);
 	p = virt_to_page(dart_tablebase);
-	dart_vbase = ioremap(virt_to_absolute(dart_tablebase), dart_tablesize);
+	dart_vbase = ioremap(virt_to_abs(dart_tablebase), dart_tablesize);
 
 	/* Fill initial table */
 	for (i = 0; i < dart_tablesize/4; i++)

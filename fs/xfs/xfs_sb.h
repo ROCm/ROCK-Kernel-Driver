@@ -60,6 +60,7 @@ struct xfs_mount;
 #define XFS_SB_VERSION_SECTORBIT	0x0800
 #define	XFS_SB_VERSION_EXTFLGBIT	0x1000
 #define	XFS_SB_VERSION_DIRV2BIT		0x2000
+#define	XFS_SB_VERSION_MOREBITSBIT	0x8000
 #define	XFS_SB_VERSION_OKSASHFBITS	\
 	(XFS_SB_VERSION_EXTFLGBIT | \
 	 XFS_SB_VERSION_DIRV2BIT)
@@ -80,16 +81,45 @@ struct xfs_mount;
 	(XFS_SB_VERSION_NUMBITS | \
 	 XFS_SB_VERSION_OKREALFBITS | \
 	 XFS_SB_VERSION_OKSASHFBITS)
-#define XFS_SB_VERSION_MKFS(ia,dia,extflag,dirv2,na,sflag)	\
-	(((ia) || (dia) || (extflag) || (dirv2) || (na) || (sflag)) ? \
+#define XFS_SB_VERSION_MKFS(ia,dia,extflag,dirv2,na,sflag,morebits)	\
+	(((ia) || (dia) || (extflag) || (dirv2) || (na) || (sflag) || \
+	  (morebits)) ? \
 		(XFS_SB_VERSION_4 | \
 		 ((ia) ? XFS_SB_VERSION_ALIGNBIT : 0) | \
 		 ((dia) ? XFS_SB_VERSION_DALIGNBIT : 0) | \
 		 ((extflag) ? XFS_SB_VERSION_EXTFLGBIT : 0) | \
 		 ((dirv2) ? XFS_SB_VERSION_DIRV2BIT : 0) | \
 		 ((na) ? XFS_SB_VERSION_LOGV2BIT : 0) | \
-		 ((sflag) ? XFS_SB_VERSION_SECTORBIT : 0)) : \
+		 ((sflag) ? XFS_SB_VERSION_SECTORBIT : 0) | \
+		 ((morebits) ? XFS_SB_VERSION_MOREBITSBIT : 0)) : \
 		XFS_SB_VERSION_1)
+
+/*
+ * There are two words to hold XFS "feature" bits: the original
+ * word, sb_versionnum, and sb_features2.  Whenever a bit is set in
+ * sb_features2, the feature bit XFS_SB_VERSION_MOREBITSBIT must be set.
+ *
+ * These defines represent bits in sb_features2.
+ */
+#define XFS_SB_VERSION2_REALFBITS	0x00ffffff	/* Mask: features */
+#define XFS_SB_VERSION2_RESERVED1BIT	0x00000001
+#define XFS_SB_VERSION2_SASHFBITS	0xff000000	/* Mask: features that
+							   require changing
+							   PROM and SASH */
+
+#define	XFS_SB_VERSION2_OKREALFBITS	\
+	(0)
+#define	XFS_SB_VERSION2_OKSASHFBITS	\
+	(0)
+#define XFS_SB_VERSION2_OKREALBITS	\
+	(XFS_SB_VERSION2_OKREALFBITS |	\
+	 XFS_SB_VERSION2_OKSASHFBITS )
+
+/*
+ * mkfs macro to set up sb_features2 word
+ */
+#define	XFS_SB_VERSION2_MKFS(xyz)	\
+	((xyz) ? 0 : 0)
 
 typedef struct xfs_sb
 {
@@ -146,6 +176,7 @@ typedef struct xfs_sb
 	__uint8_t	sb_logsectlog;	/* log2 of the log sector size */
 	__uint16_t	sb_logsectsize;	/* sector size for the log, bytes */
 	__uint32_t	sb_logsunit;	/* stripe unit size for the log */
+	__uint32_t	sb_features2;	/* additonal feature bits */
 } xfs_sb_t;
 
 /*
@@ -164,6 +195,7 @@ typedef enum {
 	XFS_SBS_GQUOTINO, XFS_SBS_QFLAGS, XFS_SBS_FLAGS, XFS_SBS_SHARED_VN,
 	XFS_SBS_INOALIGNMT, XFS_SBS_UNIT, XFS_SBS_WIDTH, XFS_SBS_DIRBLKLOG,
 	XFS_SBS_LOGSECTLOG, XFS_SBS_LOGSECTSIZE, XFS_SBS_LOGSUNIT,
+	XFS_SBS_FEATURES2,
 	XFS_SBS_FIELDCOUNT
 } xfs_sb_field_t;
 
@@ -217,8 +249,11 @@ int xfs_sb_good_version(xfs_sb_t *sbp);
 #define	XFS_SB_GOOD_VERSION_INT(sbp)	\
 	((((sbp)->sb_versionnum >= XFS_SB_VERSION_1) && \
 	  ((sbp)->sb_versionnum <= XFS_SB_VERSION_3)) || \
-	 ((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
-	  !((sbp)->sb_versionnum & ~XFS_SB_VERSION_OKREALBITS)
+	   ((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
+	    !(((sbp)->sb_versionnum & ~XFS_SB_VERSION_OKREALBITS) && \
+	      ((sbp)->sb_versionnum & XFS_SB_VERSION_MOREBITSBIT) && \
+	      ((sbp)->sb_features2 & ~XFS_SB_VERSION2_OKREALBITS))
+
 #ifdef __KERNEL__
 #define	XFS_SB_GOOD_VERSION(sbp)	\
 	(XFS_SB_GOOD_VERSION_INT(sbp) && \
@@ -452,6 +487,25 @@ int xfs_sb_version_hassector(xfs_sb_t *sbp);
 	((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
 	((sbp)->sb_versionnum & XFS_SB_VERSION_SECTORBIT))
 #endif
+
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_VERSION_HASMOREBITSBIT)
+int xfs_sb_version_hasmorebits(xfs_sb_t *sbp);
+#define XFS_SB_VERSION_HASMOREBITS(sbp)	xfs_sb_version_hasmorebits(sbp)
+#else
+#define XFS_SB_VERSION_HASMOREBITS(sbp)	\
+	((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
+	 ((sbp)->sb_versionnum & XFS_SB_VERSION_MOREBITSBIT))
+#endif
+
+/*
+ * sb_features2 bit version macros.
+ *
+ * For example, for a bit defined as XFS_SB_VERSION2_YBIT, has a macro:
+ *
+ * SB_VERSION_HASYBIT(xfs_sb_t *sbp)
+ *	((XFS_SB_VERSION_HASMOREBITS(sbp) &&
+ *	 ((sbp)->sb_versionnum & XFS_SB_VERSION2_YBIT)
+ */
 
 /*
  * end of superblock version macros

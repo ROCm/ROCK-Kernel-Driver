@@ -369,7 +369,7 @@ static void se401_video_irq(struct urb *urb, struct pt_regs *regs)
 				se401->scratch_overflow=0;
 				se401->scratch_next++;
 				if (se401->scratch_next>=SE401_NUMSCRATCH)
-					se401->scratch_next=0;;
+					se401->scratch_next=0;
 				break;
 			}
 		}

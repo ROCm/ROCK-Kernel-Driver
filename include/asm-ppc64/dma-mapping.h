@@ -15,6 +15,8 @@
 #include <asm/scatterlist.h>
 #include <asm/bug.h>
 
+#define DMA_ERROR_CODE		(~(dma_addr_t)0x0)
+
 extern int dma_supported(struct device *dev, u64 mask);
 extern int dma_set_mask(struct device *dev, u64 dma_mask);
 extern void *dma_alloc_coherent(struct device *dev, size_t size,
@@ -70,6 +72,11 @@ dma_cache_sync(void *vaddr, size_t size,
 	 * but if you get this on a platform, you should convert the platform
 	 * to using the generic device DMA API */
 	BUG();
+}
+
+static inline int dma_mapping_error(dma_addr_t dma_addr)
+{
+	return (dma_addr == DMA_ERROR_CODE);
 }
 
 #endif	/* _ASM_DMA_MAPPING_H */

@@ -24,6 +24,9 @@
 #include <net/route.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_REJECT.h>
+#ifdef CONFIG_BRIDGE_NETFILTER
+#include <linux/netfilter_bridge.h>
+#endif
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
@@ -56,7 +59,13 @@ static inline struct rtable *route_reverse(struct sk_buff *skb, int hook)
 	struct flowi fl = {};
 	struct rtable *rt;
 
-	if (hook != NF_IP_FORWARD) {
+	/* We don't require ip forwarding to be enabled to be able to
+	 * send a RST reply for bridged traffic. */
+	if (hook != NF_IP_FORWARD
+#ifdef CONFIG_BRIDGE_NETFILTER
+	    || (skb->nf_bridge && skb->nf_bridge->mask & BRNF_BRIDGED)
+#endif
+	   ) {
 		fl.nl_u.ip4_u.daddr = iph->saddr;
 		if (hook == NF_IP_LOCAL_IN)
 			fl.nl_u.ip4_u.saddr = iph->daddr;

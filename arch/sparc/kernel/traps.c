@@ -131,23 +131,23 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 	do_exit(SIGSEGV);
 }
 
-void do_hw_interrupt(unsigned long type, unsigned long psr, unsigned long pc)
+void do_hw_interrupt(struct pt_regs *regs, unsigned long type)
 {
 	siginfo_t info;
 
 	if(type < 0x80) {
 		/* Sun OS's puke from bad traps, Linux survives! */
 		printk("Unimplemented Sparc TRAP, type = %02lx\n", type);
-		die_if_kernel("Whee... Hello Mr. Penguin", current->thread.kregs);
+		die_if_kernel("Whee... Hello Mr. Penguin", regs);
 	}	
 
-	if(psr & PSR_PS)
-		die_if_kernel("Kernel bad trap", current->thread.kregs);
+	if(regs->psr & PSR_PS)
+		die_if_kernel("Kernel bad trap", regs);
 
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLTRP;
-	info.si_addr = (void *)pc;
+	info.si_addr = (void *)regs->pc;
 	info.si_trapno = type - 0x80;
 	force_sig_info(SIGILL, &info, current);
 }

@@ -658,8 +658,7 @@ static void __init iSeries_bolt_kernel(unsigned long saddr, unsigned long eaddr)
 			HvCallHpt_setPp(slot, PP_RWXX);
 		} else
 			/* No HPTE exists, so create a new bolted one */
-			iSeries_make_pte(va, (unsigned long)__v2a(ea),
-					mode_rw);
+			iSeries_make_pte(va, phys_to_abs(pa), mode_rw);
 	}
 }
 

@@ -501,7 +501,7 @@ struct Scsi_Host *__qlogicfas_detect(Scsi_Host_Template *host, int qbase,
 			release_region(qbase, 0x10);
 		}
 		if (qbase == 0x430)
-			return NULL;;
+			return NULL;
 	} else
 		printk(KERN_INFO "Ql: Using preset base address of %03x\n", qbase);
 

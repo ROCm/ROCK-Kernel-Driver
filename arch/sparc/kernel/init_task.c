@@ -21,5 +21,7 @@ EXPORT_SYMBOL(init_task);
  * If this is not aligned on a 8k boundry, then you should change code
  * in etrap.S which assumes it.
  */
-__asm__(".section \".text\",#alloc\n");
-union thread_union init_thread_union = { INIT_THREAD_INFO(init_task) };
+union thread_union init_thread_union
+	__attribute__((section (".text")))
+	__attribute__((aligned (THREAD_SIZE)))
+	= { INIT_THREAD_INFO(init_task) };

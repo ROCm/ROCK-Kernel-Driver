@@ -114,18 +114,22 @@ static inline u8 xram_get_8 (xram_p x)
 static inline void xram_copy_from (void *p, xram_p x, int len)
 {
 	for (len >>= 2; len > 0; len--, x += sizeof(u32)) {
-		u32 val;
+		u32 val, *p32 = p;
 
 		val = ((sbus_readw(x + 0x00UL) << 16) |
 		       (sbus_readw(x + 0x02UL)));
-		*((u32 *)p)++ = val;
+		*p32++ = val;
+		p = p32;
 	}
 }
 
 static inline void xram_copy_to (xram_p x, void *p, int len)
 {
 	for (len >>= 2; len > 0; len--, x += sizeof(u32)) {
-		u32 tmp = *((u32 *)p)++;
+		u32 tmp, *p32 = p;
+
+		tmp = *p32++;
+		p = p32;
 		sbus_writew(tmp >> 16, x + 0x00UL);
 		sbus_writew(tmp, x + 0x02UL);
 	}

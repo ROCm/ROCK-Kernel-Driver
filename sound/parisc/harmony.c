@@ -544,7 +544,7 @@ static int snd_card_harmony_capture_trigger(snd_pcm_substream_t * substream,
 		case SNDRV_PCM_TRIGGER_STOP:
 			if (harmony->cap_stopped) 
 				return -EBUSY;
-			harmony->cap_stopped = 1;;
+			harmony->cap_stopped = 1;
 			snd_harmony_disable_interrupts(harmony);
 			break;
 		case SNDRV_PCM_TRIGGER_START:

@@ -1562,7 +1562,7 @@ hfsc_change_qdisc(struct Qdisc *sch, struct rtattr *opt)
 	struct tc_hfsc_qopt *qopt;
 
 	if (opt == NULL || RTA_PAYLOAD(opt) < sizeof(*qopt))
-		return -EINVAL;;
+		return -EINVAL;
 	qopt = RTA_DATA(opt);
 
 	sch_tree_lock(sch);

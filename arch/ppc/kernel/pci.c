@@ -159,7 +159,6 @@ pcibios_fixup_resources(struct pci_dev *dev)
 		ppc_md.pcibios_fixup_resources(dev);
 }
 
-
 void
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 			struct resource *res)
@@ -1522,51 +1521,43 @@ __pci_mmap_make_offset(struct pci_dev *dev, struct vm_area_struct *vma,
 {
 	struct pci_controller *hose = (struct pci_controller *) dev->sysdata;
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-	unsigned long io_offset = 0;
-	int i, res_bit;
+	unsigned long size = vma->vm_end - vma->vm_start;
+	unsigned long base;
+	struct resource *res;
+	int i;
+	int ret = -EINVAL;
 
 	if (hose == 0)
 		return -EINVAL;		/* should never happen */
+	if (offset + size <= offset)
+		return -EINVAL;
 
-	/* If memory, add on the PCI bridge address offset */
 	if (mmap_state == pci_mmap_mem) {
+		/* PCI memory space */
+		base = hose->pci_mem_offset;
+		for (i = 0; i < 3; ++i) {
+			res = &hose->mem_resources[i];
+			if (res->flags == 0)
+				continue;
+			if (offset >= res->start - base
+			    && offset + size - 1 <= res->end - base) {
+				ret = 0;
+				break;
+			}
+		}
 		offset += hose->pci_mem_offset;
-		res_bit = IORESOURCE_MEM;
 	} else {
-		io_offset = (unsigned long)hose->io_base_virt - isa_io_base;
-		offset += io_offset;
-		res_bit = IORESOURCE_IO;
+		/* PCI I/O space */
+		base = (unsigned long)hose->io_base_virt - isa_io_base;
+		res = &hose->io_resource;
+		if (offset >= res->start - base
+		    && offset + size - 1 <= res->end - base)
+			ret = 0;
+		offset += hose->io_base_phys;
 	}
 
-	/*
-	 * Check that the offset requested corresponds to one of the
-	 * resources of the device.
-	 */
-	for (i = 0; i <= PCI_ROM_RESOURCE; i++) {
-		struct resource *rp = &dev->resource[i];
-		int flags = rp->flags;
-
-		/* treat ROM as memory (should be already) */
-		if (i == PCI_ROM_RESOURCE)
-			flags |= IORESOURCE_MEM;
-
-		/* Active and same type? */
-		if ((flags & res_bit) == 0)
-			continue;
-
-		/* In the range of this resource? */
-		if (offset < (rp->start & PAGE_MASK) || offset > rp->end)
-			continue;
-
-		/* found it! construct the final physical address */
-		if (mmap_state == pci_mmap_io)
-			offset += hose->io_base_phys - io_offset;
-
-		vma->vm_pgoff = offset >> PAGE_SHIFT;
-		return 0;
-	}
-
-	return -EINVAL;
+	vma->vm_pgoff = offset >> PAGE_SHIFT;
+	return ret;
 }
 
 /*

@@ -1230,7 +1230,7 @@ int isp1020_reset(Scsi_Cmnd *Cmnd, unsigned int reset_flags)
 
 	LEAVE("isp1020_reset");
 
-	return return_status;;
+	return return_status;
 }
 
 

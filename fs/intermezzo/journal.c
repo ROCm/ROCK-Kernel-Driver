@@ -1470,7 +1470,7 @@ int presto_clear_lml_close(struct presto_file_set *fset, loff_t lml_offset)
                 return 0;
         }
 
-        CDEBUG(D_JOURNAL, "reading prefix: off %ld, size %d\n", 
+        CDEBUG(D_JOURNAL, "reading prefix: off %ld, size %Zd\n", 
                (long)lml_offset, sizeof(record));
         rc = presto_fread(fset->fset_lml.fd_file, (char *)&record,
                           sizeof(record), &offset);
@@ -1621,7 +1621,7 @@ int presto_get_fileid(int minor, struct presto_file_set *fset,
         /* journal_log_suffix expects journal_log to set this */
         suffix->recno = 0;
 
-        CDEBUG(D_FILE, "actual kml size: %d\n", logrecord - record);
+        CDEBUG(D_FILE, "actual kml size: %Zd\n", logrecord - record);
         CDEBUG(D_FILE, "get fileid: uid %d, gid %d, path: %s\n", uid, gid,path);
 
         error = izo_upc_get_fileid(minor, size, record, 

@@ -1271,7 +1271,7 @@ void irttp_connect_indication(void *instance, void *sap, struct qos_info *qos,
 
 	lsap = (struct lsap_cb *) sap;
 
-	self->max_seg_size = max_seg_size - TTP_HEADER;;
+	self->max_seg_size = max_seg_size - TTP_HEADER;
 	self->max_header_size = max_header_size+TTP_HEADER;
 
 	IRDA_DEBUG(4, "%s(), TSAP sel=%02x\n", __FUNCTION__, self->stsap_sel);

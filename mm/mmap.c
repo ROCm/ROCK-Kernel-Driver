@@ -54,10 +54,12 @@ pgprot_t protection_map[16] = {
 
 int sysctl_overcommit_memory = 0;	/* default is heuristic overcommit */
 int sysctl_overcommit_ratio = 50;	/* default is 50% */
+int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
 
 EXPORT_SYMBOL(sysctl_overcommit_memory);
 EXPORT_SYMBOL(sysctl_overcommit_ratio);
+EXPORT_SYMBOL(sysctl_max_map_count);
 EXPORT_SYMBOL(vm_committed_space);
 
 /*
@@ -489,9 +491,13 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	int correct_wcount = 0;
 	int error;
 	struct rb_node ** rb_link, * rb_parent;
+	int accountable = 1;
 	unsigned long charged = 0;
 
 	if (file) {
+		if (is_file_hugepages(file))
+			accountable = 0;
+
 		if (!file->f_op || !file->f_op->mmap)
 			return -ENODEV;
 
@@ -512,7 +518,7 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 		return -EINVAL;
 
 	/* Too many mappings? */
-	if (mm->map_count > MAX_MAP_COUNT)
+	if (mm->map_count > sysctl_max_map_count)
 		return -ENOMEM;
 
 	/* Obtain the address to map to. we verify (or select) it and ensure
@@ -608,7 +614,8 @@ munmap_back:
 	    > current->rlim[RLIMIT_AS].rlim_cur)
 		return -ENOMEM;
 
-	if (!(flags & MAP_NORESERVE) || sysctl_overcommit_memory > 1) {
+	if (accountable && (!(flags & MAP_NORESERVE) ||
+			sysctl_overcommit_memory > 1)) {
 		if (vm_flags & VM_SHARED) {
 			/* Check memory availability in shmem_file_setup? */
 			vm_flags |= VM_ACCOUNT;
@@ -807,9 +814,10 @@ get_unmapped_area(struct file *file, unsigned long addr, unsigned long len,
 			return -EINVAL;
 		if (file && is_file_hugepages(file))  {
 			/*
-			 * Make sure that addr and length are properly aligned.
+			 * Check if the given range is hugepage aligned, and
+			 * can be made suitable for hugepages.
 			 */
-			ret = is_aligned_hugepage_range(addr, len);
+			ret = prepare_hugepage_range(addr, len);
 		} else {
 			/*
 			 * Ensure that a normal request is not falling in a
@@ -1197,7 +1205,7 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	struct vm_area_struct *new;
 	struct address_space *mapping = NULL;
 
-	if (mm->map_count >= MAX_MAP_COUNT)
+	if (mm->map_count >= sysctl_max_map_count)
 		return -ENOMEM;
 
 	new = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
@@ -1375,7 +1383,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	    > current->rlim[RLIMIT_AS].rlim_cur)
 		return -ENOMEM;
 
-	if (mm->map_count > MAX_MAP_COUNT)
+	if (mm->map_count > sysctl_max_map_count)
 		return -ENOMEM;
 
 	if (security_vm_enough_memory(len >> PAGE_SHIFT))

@@ -55,15 +55,23 @@
 
 typedef unsigned long xfs_pflags_t;
 
-#define PFLAGS_TEST_FSTRANS()		(current->flags & PF_FSTRANS)
+#define PFLAGS_TEST_FSTRANS()           (current->flags & PF_FSTRANS)
 
+/* these could be nested, so we save state */
 #define PFLAGS_SET_FSTRANS(STATEP) do {	\
 	*(STATEP) = current->flags;	\
 	current->flags |= PF_FSTRANS;	\
 } while (0)
 
-#define PFLAGS_RESTORE(STATEP) do {	\
-	current->flags = *(STATEP);	\
+#define PFLAGS_CLEAR_FSTRANS(STATEP) do { \
+	*(STATEP) = current->flags;	\
+	current->flags &= ~PF_FSTRANS;	\
+} while (0)
+
+/* Restore the PF_FSTRANS state to what was saved in STATEP */
+#define PFLAGS_RESTORE_FSTRANS(STATEP) do {     		\
+	current->flags = ((current->flags & ~PF_FSTRANS) |	\
+			  (*(STATEP) & PF_FSTRANS));		\
 } while (0)
 
 #define PFLAGS_DUP(OSTATEP, NSTATEP) do { \

@@ -447,7 +447,7 @@ int smapi_set_DSP_cfg(void)
 	if (bRC) goto exit_smapi_request_error;
 
 	if (mwave_3780i_io) {
-		usDI = dspio_index;;
+		usDI = dspio_index;
 	}
 	if (mwave_3780i_irq) {
 		usSI = (usSI & 0xff00) | mwave_3780i_irq;

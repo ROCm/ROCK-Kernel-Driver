@@ -496,6 +496,9 @@ __end_systemcfg:
 	.globl SystemReset_Iseries
 SystemReset_Iseries:
 	mfspr	r13,SPRG3		/* Get paca address */
+	mfmsr	r24
+	ori	r24,r24,MSR_RI
+	mtmsrd	r24			/* RI on */
 	lhz	r24,PACAPACAINDEX(r13)	/* Get processor # */
 	cmpi	0,r24,0			/* Are we processor 0? */
 	beq	.__start_initialization_iSeries	/* Start up the first processor */

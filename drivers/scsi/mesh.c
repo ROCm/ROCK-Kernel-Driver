@@ -44,8 +44,11 @@
 #include <asm/pci-bridge.h>
 #include <asm/macio.h>
 
-#include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_host.h>
+
 #include "mesh.h"
 
 #if 1
@@ -131,7 +134,7 @@ struct mesh_target {
 	enum sdtr_phase sdtr_state;
 	int	sync_params;
 	int	data_goes_out;		/* guess as to data direction */
-	Scsi_Cmnd *current_req;
+	struct scsi_cmnd *current_req;
 	u32	saved_ptr;
 #ifdef MESH_DBG
 	int	log_ix;
@@ -147,12 +150,12 @@ struct mesh_state {
 	int	dmaintr;
 	struct	Scsi_Host *host;
 	struct	mesh_state *next;
-	Scsi_Cmnd *request_q;
-	Scsi_Cmnd *request_qtail;
+	struct scsi_cmnd *request_q;
+	struct scsi_cmnd *request_qtail;
 	enum mesh_phase phase;		/* what we're currently trying to do */
 	enum msg_phase msgphase;
 	int	conn_tgt;		/* target we're connected to */
-	Scsi_Cmnd *current_req;		/* req we're currently working on */
+	struct scsi_cmnd *current_req;		/* req we're currently working on */
 	int	data_ptr;
 	int	dma_started;
 	int	dma_count;
@@ -185,7 +188,7 @@ struct mesh_state {
 static void mesh_done(struct mesh_state *ms, int start_next);
 static void mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs);
 static void cmd_complete(struct mesh_state *ms);
-static void set_dma_cmds(struct mesh_state *ms, Scsi_Cmnd *cmd);
+static void set_dma_cmds(struct mesh_state *ms, struct scsi_cmnd *cmd);
 static void halt_dma(struct mesh_state *ms);
 static void phase_mismatch(struct mesh_state *ms);
 
@@ -344,7 +347,7 @@ static inline void mesh_flush_io(volatile struct mesh_regs *mr)
 /*
  * Complete a SCSI command
  */
-static void mesh_completed(struct mesh_state *ms, Scsi_Cmnd *cmd)
+static void mesh_completed(struct mesh_state *ms, struct scsi_cmnd *cmd)
 {
 	(*cmd->scsi_done)(cmd);
 }
@@ -402,14 +405,14 @@ static void mesh_init(struct mesh_state *ms)
 }
 
 
-static void mesh_start_cmd(struct mesh_state *ms, Scsi_Cmnd *cmd)
+static void mesh_start_cmd(struct mesh_state *ms, struct scsi_cmnd *cmd)
 {
 	volatile struct mesh_regs *mr = ms->mesh;
 	int t, id;
 
 	id = cmd->device->id;
 	ms->current_req = cmd;
-	ms->tgts[id].data_goes_out = cmd->sc_data_direction == SCSI_DATA_WRITE;
+	ms->tgts[id].data_goes_out = cmd->sc_data_direction == DMA_TO_DEVICE;
 	ms->tgts[id].current_req = cmd;
 
 #if 1
@@ -558,7 +561,7 @@ static void mesh_start_cmd(struct mesh_state *ms, Scsi_Cmnd *cmd)
  */
 static void mesh_start(struct mesh_state *ms)
 {
-	Scsi_Cmnd *cmd, *prev, *next;
+	struct scsi_cmnd *cmd, *prev, *next;
 
 	if (ms->phase != idle || ms->current_req != NULL) {
 		printk(KERN_ERR "inappropriate mesh_start (phase=%d, ms=%p)",
@@ -568,14 +571,14 @@ static void mesh_start(struct mesh_state *ms)
 
 	while (ms->phase == idle) {
 		prev = NULL;
-		for (cmd = ms->request_q; ; cmd = (Scsi_Cmnd *) cmd->host_scribble) {
+		for (cmd = ms->request_q; ; cmd = (struct scsi_cmnd *) cmd->host_scribble) {
 			if (cmd == NULL)
 				return;
 			if (ms->tgts[cmd->device->id].current_req == NULL)
 				break;
 			prev = cmd;
 		}
-		next = (Scsi_Cmnd *) cmd->host_scribble;
+		next = (struct scsi_cmnd *) cmd->host_scribble;
 		if (prev == NULL)
 			ms->request_q = next;
 		else
@@ -589,7 +592,7 @@ static void mesh_start(struct mesh_state *ms)
 
 static void mesh_done(struct mesh_state *ms, int start_next)
 {
-	Scsi_Cmnd *cmd;
+	struct scsi_cmnd *cmd;
 	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
 
 	cmd = ms->current_req;
@@ -679,7 +682,7 @@ static void start_phase(struct mesh_state *ms)
 	int i, seq, nb;
 	volatile struct mesh_regs *mr = ms->mesh;
 	volatile struct dbdma_regs *md = ms->dma;
-	Scsi_Cmnd *cmd = ms->current_req;
+	struct scsi_cmnd *cmd = ms->current_req;
 	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
 
 	dlog(ms, "start_phase nmo/exc/fc/seq = %.8x",
@@ -854,7 +857,7 @@ static inline int msgin_length(struct mesh_state *ms)
 static void reselected(struct mesh_state *ms)
 {
 	volatile struct mesh_regs *mr = ms->mesh;
-	Scsi_Cmnd *cmd;
+	struct scsi_cmnd *cmd;
 	struct mesh_target *tp;
 	int b, t, prev;
 
@@ -985,7 +988,7 @@ static void handle_reset(struct mesh_state *ms)
 {
 	int tgt;
 	struct mesh_target *tp;
-	Scsi_Cmnd *cmd;
+	struct scsi_cmnd *cmd;
 	volatile struct mesh_regs *mr = ms->mesh;
 
 	for (tgt = 0; tgt < 8; ++tgt) {
@@ -1000,7 +1003,7 @@ static void handle_reset(struct mesh_state *ms)
 	}
 	ms->current_req = NULL;
 	while ((cmd = ms->request_q) != NULL) {
-		ms->request_q = (Scsi_Cmnd *) cmd->host_scribble;
+		ms->request_q = (struct scsi_cmnd *) cmd->host_scribble;
 		cmd->result = DID_RESET << 16;
 		mesh_completed(ms, cmd);
 	}
@@ -1154,7 +1157,7 @@ static void handle_exception(struct mesh_state *ms)
 static void handle_msgin(struct mesh_state *ms)
 {
 	int i, code;
-	Scsi_Cmnd *cmd = ms->current_req;
+	struct scsi_cmnd *cmd = ms->current_req;
 	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
 
 	if (ms->n_msgin == 0)
@@ -1252,7 +1255,7 @@ static void handle_msgin(struct mesh_state *ms)
 /*
  * Set up DMA commands for transferring data.
  */
-static void set_dma_cmds(struct mesh_state *ms, Scsi_Cmnd *cmd)
+static void set_dma_cmds(struct mesh_state *ms, struct scsi_cmnd *cmd)
 {
 	int i, dma_cmd, total, off, dtot;
 	struct scatterlist *scl;
@@ -1270,7 +1273,7 @@ static void set_dma_cmds(struct mesh_state *ms, Scsi_Cmnd *cmd)
 			scl = (struct scatterlist *) cmd->buffer;
 			off = ms->data_ptr;
 			nseg = pci_map_sg(ms->pdev, scl, cmd->use_sg,
-				 scsi_to_pci_dma_dir(cmd ->sc_data_direction));
+					  cmd->sc_data_direction);
 			for (i = 0; i <nseg; ++i, ++scl) {
 				u32 dma_addr = sg_dma_address(scl);
 				u32 dma_len = sg_dma_len(scl);
@@ -1324,7 +1327,7 @@ static void halt_dma(struct mesh_state *ms)
 {
 	volatile struct dbdma_regs *md = ms->dma;
 	volatile struct mesh_regs *mr = ms->mesh;
-	Scsi_Cmnd *cmd = ms->current_req;
+	struct scsi_cmnd *cmd = ms->current_req;
 	int t, nb;
 
 	if (!ms->tgts[ms->conn_tgt].data_goes_out) {
@@ -1364,8 +1367,7 @@ static void halt_dma(struct mesh_state *ms)
 	if (cmd->use_sg != 0) {
 		struct scatterlist *sg;
 		sg = (struct scatterlist *)cmd->request_buffer;
-		pci_unmap_sg(ms->pdev, sg, cmd->use_sg,
-			     scsi_to_pci_dma_dir(cmd->sc_data_direction));
+		pci_unmap_sg(ms->pdev, sg, cmd->use_sg, cmd->sc_data_direction);
 	}
 	ms->dma_started = 0;
 }
@@ -1452,7 +1454,7 @@ static void phase_mismatch(struct mesh_state *ms)
 static void cmd_complete(struct mesh_state *ms)
 {
 	volatile struct mesh_regs *mr = ms->mesh;
-	Scsi_Cmnd *cmd = ms->current_req;
+	struct scsi_cmnd *cmd = ms->current_req;
 	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
 	int seq, n, t;
 
@@ -1635,7 +1637,7 @@ static void cmd_complete(struct mesh_state *ms)
  * Called by midlayer with host locked to queue a new
  * request
  */
-static int mesh_queue(Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
+static int mesh_queue(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 {
 	struct mesh_state *ms;
 
@@ -1692,7 +1694,7 @@ static void mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
  * queue if it isn't connected yet, and for pending command, assert
  * ATN until the bus gets freed.
  */
-static int mesh_abort(Scsi_Cmnd *cmd)
+static int mesh_abort(struct scsi_cmnd *cmd)
 {
 	struct mesh_state *ms = (struct mesh_state *) cmd->device->host->hostdata;
 
@@ -1700,7 +1702,7 @@ static int mesh_abort(Scsi_Cmnd *cmd)
 	mesh_dump_regs(ms);
 	dumplog(ms, cmd->device->id);
 	dumpslog(ms);
-	return SCSI_ABORT_SNOOZE;
+	return FAILED;
 }
 
 /*
@@ -1709,7 +1711,7 @@ static int mesh_abort(Scsi_Cmnd *cmd)
  * The midlayer will wait for devices to come back, we don't need
  * to do that ourselves
  */
-static int mesh_host_reset(Scsi_Cmnd *cmd)
+static int mesh_host_reset(struct scsi_cmnd *cmd)
 {
 	struct mesh_state *ms = (struct mesh_state *) cmd->device->host->hostdata;
 	volatile struct mesh_regs *mr = ms->mesh;
@@ -1832,7 +1834,7 @@ static int mesh_shutdown(struct macio_dev *mdev)
 	return 0;
 }
 
-static Scsi_Host_Template mesh_template = {
+static struct scsi_host_template mesh_template = {
 	.proc_name			= "mesh",
 	.name				= "MESH",
 	.queuecommand			= mesh_queue,

@@ -293,7 +293,7 @@ static u16 rdcodec(struct ac97_codec *codec, u8 addr)
 
 	spin_unlock_irqrestore(&s->lock, flags);
 
-	return result & 0xffff;;
+	return result & 0xffff;
 }
 
 

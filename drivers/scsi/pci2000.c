@@ -320,7 +320,7 @@ static irqreturn_t Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 
 	outb_p (0xFF, padapter->tag);												// clear the op interrupt
 	outb_p (CMD_DONE, padapter->cmd);											// complete the op
-	goto irq_return;;															// done, but, with what?
+	goto irq_return;															// done, but, with what?
 
 unmapProceed:;
 	if ( !bus )

@@ -2161,7 +2161,7 @@ static s32 adpt_scsi_register(adpt_hba* pHba,Scsi_Host_Template * sht)
 	(adpt_hba*)(host->hostdata[0]) = pHba;
 	pHba->host = host;
 
-	host->irq = pHba->pDev->irq;;
+	host->irq = pHba->pDev->irq;
 	/* no IO ports, so don't have to set host->io_port and 
 	 * host->n_io_port
 	 */

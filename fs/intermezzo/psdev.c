@@ -227,7 +227,7 @@ static ssize_t presto_psdev_write(struct file *file, const char *buf,
 
         /* move data into response buffer. */
         if (req->rq_bufsize < count) {
-                CERROR("psdev_write: too much cnt: %d, cnt: %d, "
+                CERROR("psdev_write: too much cnt: %d, cnt: %Zd, "
                        "opc: %d, uniq: %d.\n",
                        req->rq_bufsize, count, hdr.opcode, hdr.unique);
                 count = req->rq_bufsize; /* don't have more space! */
@@ -281,7 +281,7 @@ static ssize_t presto_psdev_read(struct file * file, char * buf,
         }
 
         if (count < req->rq_bufsize) {
-                CERROR ("psdev_read: buffer too small, read %d of %d bytes\n",
+                CERROR ("psdev_read: buffer too small, read %Zd of %d bytes\n",
                         count, req->rq_bufsize);
         }
 
@@ -592,8 +592,8 @@ int izo_upc_upcall(int minor, int *size, struct izo_upcall_hdr *buffer,
                req->rq_opcode, jiffies - req->rq_posttime,
                req->rq_unique, req->rq_rep_size);
         CDEBUG(D_UPCALL,
-               "..process %d woken up by Lento for req at 0x%x, data at %x\n",
-               current->pid, (int)req, (int)req->rq_data);
+               "..process %d woken up by Lento for req at 0x%p, data at %p\n",
+               current->pid, req, req->rq_data);
 
         if (channel->uc_pid) {      /* i.e. Lento is still alive */
           /* Op went through, interrupt or not we go on */

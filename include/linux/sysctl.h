@@ -158,6 +158,7 @@ enum
 	VM_SWAPPINESS=19,	/* Tendency to steal mapped memory */
 	VM_LOWER_ZONE_PROTECTION=20,/* Amount of protection of lower zones */
 	VM_MIN_FREE_KBYTES=21,	/* Minimum free kilobytes to maintain */
+	VM_MAX_MAP_COUNT=22,	/* int: Maximum number of mmaps/address-space */
 };
 
 

@@ -277,7 +277,7 @@ static void iSeries_Scan_PHBs_Slots(struct pci_controller *Phb)
 	 */
 	for (IdSel = 1; IdSel < MaxAgents; ++IdSel) {
     		HvRc = HvCallPci_getDeviceInfo(bus, SubBus, IdSel,
-				REALADDR(DevInfo),
+				ISERIES_HV_ADDR(DevInfo),
 				sizeof(struct HvCallPci_DeviceInfo));
 		if (HvRc == 0) {
 			if (DevInfo->deviceType == HvCallPci_NodeDevice)
@@ -318,7 +318,7 @@ static void iSeries_Scan_EADs_Bridge(HvBusNumber bus, HvSubBusNumber SubBus,
 					"PCI:Connect EADs: 0x%02X.%02X.%02X\n",
 					bus, SubBus, AgentId);
 	    		HvRc = HvCallPci_getBusUnitInfo(bus, SubBus, AgentId,
-					REALADDR(BridgeInfo),
+					ISERIES_HV_ADDR(BridgeInfo),
 					sizeof(struct HvCallPci_BridgeInfo));
 	 		if (HvRc == 0) {
 				printk("bridge info: type %x subbus %x maxAgents %x maxsubbus %x logslot %x\n",

@@ -346,6 +346,7 @@ struct _snd_ice1712 {
 	snd_i2c_bus_t *i2c;		/* I2C bus */
 	snd_i2c_device_t *cs8404;	/* CS8404A I2C device */
 	snd_i2c_device_t *cs8427;	/* CS8427 I2C device */
+	unsigned int cs8427_timeout;	/* CS8427 reset timeout in HZ/100 */
 	snd_i2c_device_t *i2cdevs[2];	/* additional i2c devices */
 	
 	struct ice1712_gpio {

@@ -143,7 +143,7 @@ ioremap64(unsigned long long addr, unsigned long size)
 void *
 ioremap(phys_addr_t addr, unsigned long size)
 {
-	phys_addr_t addr64 = fixup_bigphys_addr(addr, size);;
+	phys_addr_t addr64 = fixup_bigphys_addr(addr, size);
 
 	return ioremap64(addr64, size);
 }

@@ -535,6 +535,8 @@ typedef struct xfs_trans {
  *    the super block to reflect the freed blocks: sector size
  *    worst case split in allocation btrees per extent assuming 4 extents:
  *		4 exts * 2 trees * (2 * max depth - 1) * block size
+ *    the inode btree: max depth * blocksize
+ *    the allocation btrees: 2 trees * (max depth - 1) * block size
  */
 #define	XFS_CALC_ITRUNCATE_LOG_RES(mp) \
 	(MAX( \
@@ -545,7 +547,11 @@ typedef struct xfs_trans {
 	  (4 * (mp)->m_sb.sb_sectsize) + \
 	  (mp)->m_sb.sb_sectsize + \
 	  XFS_ALLOCFREE_LOG_RES(mp, 4) + \
-	  (128 * (9 + XFS_ALLOCFREE_LOG_COUNT(mp, 4))))))
+	  (128 * (9 + XFS_ALLOCFREE_LOG_COUNT(mp, 4))) + \
+	  (128 * 5) + \
+	  XFS_ALLOCFREE_LOG_RES(mp, 1) + \
+	   (128 * (2 + XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + \
+	    XFS_ALLOCFREE_LOG_COUNT(mp, 1))))))
 
 #define	XFS_ITRUNCATE_LOG_RES(mp)   ((mp)->m_reservations.tr_itruncate)
 
@@ -713,6 +719,7 @@ typedef struct xfs_trans {
 	 XFS_FSB_TO_B((mp), 1) + \
 	 MAX((__uint16_t)XFS_FSB_TO_B((mp), 1), XFS_INODE_CLUSTER_SIZE(mp)) + \
 	 (128 * 5) + \
+	  XFS_ALLOCFREE_LOG_RES(mp, 1) + \
 	  (128 * (2 + XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + \
 	   XFS_ALLOCFREE_LOG_COUNT(mp, 1))))
 

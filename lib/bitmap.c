@@ -47,7 +47,7 @@ EXPORT_SYMBOL(bitmap_full);
 int bitmap_equal(const unsigned long *bitmap1,
 		unsigned long *bitmap2, int bits)
 {
-	int k, lim = bits/BITS_PER_LONG;;
+	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
 		if (bitmap1[k] != bitmap2[k])
 			return 0;

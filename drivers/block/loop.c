@@ -677,7 +677,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	lo->transfer = NULL;
 	lo->ioctl = NULL;
 	lo->lo_sizelimit = 0;
-	bd_set_size(bdev,(loff_t)get_capacity(disks[lo->lo_number])<<9);
 	lo->old_gfp_mask = mapping_gfp_mask(mapping);
 	mapping_set_gfp_mask(mapping, lo->old_gfp_mask & ~(__GFP_IO|__GFP_FS));
 
@@ -691,6 +690,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	lo->lo_queue->queuedata = lo;
 
 	set_capacity(disks[lo->lo_number], size);
+	bd_set_size(bdev, size << 9);
 
 	set_blocksize(bdev, lo_blocksize);
 

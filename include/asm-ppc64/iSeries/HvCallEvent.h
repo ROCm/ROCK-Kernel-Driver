@@ -100,7 +100,7 @@ static inline void HvCallEvent_setLpEventStack(u8 queueIndex,
 {
 	u64 abs_addr;
 
-	abs_addr = virt_to_absolute((unsigned long)eventStackAddr);
+	abs_addr = virt_to_abs(eventStackAddr);
 	HvCall3(HvCallEventSetLpEventStack, queueIndex, abs_addr,
 			eventStackSize);
 	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
@@ -123,7 +123,7 @@ static inline HvLpEvent_Rc HvCallEvent_signalLpEvent(struct HvLpEvent *event)
 	printk("HvCallEvent_signalLpEvent: *event = %016lx\n ",
 			(unsigned long)event);
 #endif
-	abs_addr = virt_to_absolute((unsigned long)event);
+	abs_addr = virt_to_abs(event);
 	retVal = (HvLpEvent_Rc)HvCall1(HvCallEventSignalLpEvent, abs_addr);
 	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 	return retVal;
@@ -164,7 +164,7 @@ static inline HvLpEvent_Rc HvCallEvent_ackLpEvent(struct HvLpEvent *event)
 	u64 abs_addr;
 	HvLpEvent_Rc retVal;
 
-	abs_addr = virt_to_absolute((unsigned long)event);
+	abs_addr = virt_to_abs(event);
 	retVal = (HvLpEvent_Rc)HvCall1(HvCallEventAckLpEvent, abs_addr);
 	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 	return retVal;
@@ -175,7 +175,7 @@ static inline HvLpEvent_Rc HvCallEvent_cancelLpEvent(struct HvLpEvent *event)
 	u64 abs_addr;
 	HvLpEvent_Rc retVal;
 
-	abs_addr = virt_to_absolute((unsigned long)event);
+	abs_addr = virt_to_abs(event);
 	retVal = (HvLpEvent_Rc)HvCall1(HvCallEventCancelLpEvent, abs_addr);
 	// getPaca()->adjustHmtForNoOfSpinLocksHeld();
 	return retVal;
@@ -286,7 +286,7 @@ static inline HvLpDma_Rc HvCallEvent_dmaToSp(void* local, u32 remote,
 	u64 abs_addr;
 	HvLpDma_Rc retVal;
 
-	abs_addr = virt_to_absolute((unsigned long)local);
+	abs_addr = virt_to_abs(local);
 	retVal = (HvLpDma_Rc)HvCall4(HvCallEventDmaToSp, abs_addr, remote,
 			length, dir);
 	// getPaca()->adjustHmtForNoOfSpinLocksHeld();

@@ -101,7 +101,7 @@ asmlinkage int old_mmap(struct mmap_arg_struct *arg)
 	struct mmap_arg_struct a;
 
 	if (copy_from_user(&a, arg, sizeof(a)))
-		goto out;;
+		goto out;
 
 	error = -EINVAL;
 	if (a.offset & ~PAGE_MASK)

@@ -210,10 +210,14 @@ struct request *elv_next_request(request_queue_t *q)
 			rq = NULL;
 			break;
 		} else if (ret == BLKPREP_KILL) {
+			int nr_bytes = rq->hard_nr_sectors << 9;
+
+			if (!nr_bytes)
+				nr_bytes = rq->data_len;
+
 			blkdev_dequeue_request(rq);
 			rq->flags |= REQ_QUIET;
-			while (end_that_request_first(rq, 0, rq->nr_sectors))
-				;
+			end_that_request_chunk(rq, 0, nr_bytes);
 			end_that_request_last(rq);
 		} else {
 			printk("%s: bad return=%d\n", __FUNCTION__, ret);

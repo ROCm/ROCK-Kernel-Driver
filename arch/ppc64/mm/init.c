@@ -60,6 +60,7 @@
 #include <asm/sections.h>
 #include <asm/system.h>
 #include <asm/iommu.h>
+#include <asm/abs_addr.h>
 
 
 struct mmu_context_queue_t mmu_context_queue;
@@ -153,7 +154,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 		pmdp = pmd_alloc(&ioremap_mm, pgdp, ea);
 		ptep = pte_alloc_kernel(&ioremap_mm, pmdp, ea);
 
-		pa = absolute_to_phys(pa);
+		pa = abs_to_phys(pa);
 		set_pte(ptep, pfn_pte(pa >> PAGE_SHIFT, __pgprot(flags)));
 		spin_unlock(&ioremap_mm.page_table_lock);
 	} else {
@@ -539,7 +540,7 @@ void __init do_init_bootmem(void)
 	 */
 	bootmap_pages = bootmem_bootmap_pages(total_pages);
 
-	start = (unsigned long)__a2p(lmb_alloc(bootmap_pages<<PAGE_SHIFT, PAGE_SIZE));
+	start = abs_to_phys(lmb_alloc(bootmap_pages<<PAGE_SHIFT, PAGE_SIZE));
 	BUG_ON(!start);
 
 	boot_mapsize = init_bootmem(start >> PAGE_SHIFT, total_pages);

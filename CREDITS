@@ -3511,9 +3511,9 @@ E: yoshfuji@linux-ipv6.org
 W: http://www.yoshifuji.org/~hideaki/
 P: 1024D/E0620EEA 9022 65EB 1ECF 3AD1 0BDF  80D8 4807 F894 E062 0EEA
 D: IPv6 and other networking related stuff
-D: USAGI/WIDE Project, The University of Tokyo
-S: Green House #102, 1-15-5, Nishikata, 
-S: Bunkyo, Tokyo 113-0024
+D: USAGI/WIDE Project, Keio University
+S: Jeunet Palace Kawasaki #1-201, 10-2, Furukawa-cho, Saiwai-ku
+S: Kawasaki, Kanagawa 212-0025
 S: Japan
 
 N: Eric Youngdale

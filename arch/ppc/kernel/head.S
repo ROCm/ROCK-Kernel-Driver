@@ -1436,11 +1436,8 @@ _GLOBAL(set_context)
 	stw	r4, 0x4(r5)
 #endif
 	li	r4,0
-BEGIN_FTR_SECTION
-	dssall
-	sync
-END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
-3:	isync
+	isync
+3:
 #ifdef CONFIG_PPC64BRIDGE
 	slbie	r4
 #endif /* CONFIG_PPC64BRIDGE */

@@ -714,7 +714,6 @@ void snd_usbmidi_disconnect(struct list_head* p, struct usb_driver *driver)
 		if (ep->in && ep->in->urb)
 			usb_unlink_urb(ep->in->urb);
 	}
-	usb_driver_release_interface(driver, umidi->iface);
 }
 
 static void snd_usbmidi_rawmidi_free(snd_rawmidi_t* rmidi)
