@@ -582,7 +582,7 @@ static void exit_notify(void)
 	while (!list_empty(&current->children))
 		zap_thread(list_entry(current->children.next,struct task_struct,sibling), current, 0);
 	while (!list_empty(&current->ptrace_children))
-		zap_thread(list_entry(current->ptrace_children.next,struct task_struct,sibling), current, 1);
+		zap_thread(list_entry(current->ptrace_children.next,struct task_struct,ptrace_list), current, 1);
 	BUG_ON(!list_empty(&current->children));
 	/*
 	 * No need to unlock IRQs, we'll schedule() immediately
