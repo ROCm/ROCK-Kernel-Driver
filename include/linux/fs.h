@@ -964,16 +964,13 @@ struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int));
 
-#define DECLARE_FSTYPE(var,type,read,flags) \
+#define DECLARE_FSTYPE_DEV(var,type,read) \
 struct file_system_type var = { \
 	name:		type, \
 	read_super:	read, \
-	fs_flags:	flags, \
+	fs_flags:	FS_REQUIRES_DEV, \
 	owner:		THIS_MODULE, \
 }
-
-#define DECLARE_FSTYPE_DEV(var,type,read) \
-	DECLARE_FSTYPE(var,type,read,FS_REQUIRES_DEV)
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
 #define fops_get(fops) \
