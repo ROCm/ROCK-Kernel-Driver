@@ -5,7 +5,7 @@
 #define __PPC_SYSTEM_H
 
 #include <linux/config.h>
-#include <linux/kdev_t.h>
+#include <linux/kernel.h>
 
 #include <asm/processor.h>
 #include <asm/atomic.h>
@@ -43,9 +43,9 @@
 #define smp_wmb()	wmb()
 #define smp_read_barrier_depends()	read_barrier_depends()
 #else
-#define smp_mb()	__asm__ __volatile__("": : :"memory")
-#define smp_rmb()	__asm__ __volatile__("": : :"memory")
-#define smp_wmb()	__asm__ __volatile__("": : :"memory")
+#define smp_mb()	barrier()
+#define smp_rmb()	barrier()
+#define smp_wmb()	barrier()
 #define smp_read_barrier_depends()	do { } while(0)
 #endif /* CONFIG_SMP */
 
