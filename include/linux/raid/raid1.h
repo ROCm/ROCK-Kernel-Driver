@@ -15,8 +15,6 @@ struct mirror_info {
 	int		operational;
 	int		write_only;
 	int		spare;
-
-	int		used_slot;
 };
 
 typedef struct r1bio_s r1bio_t;

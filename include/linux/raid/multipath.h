@@ -11,8 +11,6 @@ struct multipath_info {
 	 * State bits:
 	 */
 	int		operational;
-
-	int		used_slot;
 };
 
 struct multipath_private_data {

@@ -196,7 +196,6 @@ struct disk_info {
 	int		operational;
 	int		write_only;
 	int		spare;
-	int		used_slot;
 };
 
 struct raid5_private_data {

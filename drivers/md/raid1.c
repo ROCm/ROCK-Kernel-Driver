@@ -652,10 +652,10 @@ static void print_conf(conf_t *conf)
 
 	for (i = 0; i < MD_SB_DISKS; i++) {
 		tmp = conf->mirrors + i;
-		printk(" disk %d, s:%d, o:%d, us:%d dev:%s\n",
-			i, tmp->spare, tmp->operational,
-			tmp->used_slot,
-			bdev_partition_name(tmp->rdev->bdev));
+		if (tmp->rdev)
+			printk(" disk %d, s:%d, o:%d, dev:%s\n",
+			       i, tmp->spare, tmp->operational,
+			       bdev_partition_name(tmp->rdev->bdev));
 	}
 }
 
@@ -690,7 +690,7 @@ static int raid1_spare_active(mddev_t *mddev)
 	for (i = 0; i < conf->raid_disks; i++) {
 		tmp = conf->mirrors + i;
 		if ((!tmp->operational && !tmp->spare) ||
-				!tmp->used_slot) {
+				!tmp->rdev) {
 			failed_disk = i;
 			break;
 		}
@@ -740,8 +740,6 @@ static int raid1_spare_active(mddev_t *mddev)
 	 * disk. (this means we switch back these values)
 	 */
 
-	if (!sdisk->rdev)
-		sdisk->used_slot = 0;
 	/*
 	 * this really activates the spare.
 	 */
@@ -813,12 +811,11 @@ static int raid1_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 
 	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	if (!p->used_slot) {
+	if (!p->rdev) {
 		p->rdev = rdev;
 		p->operational = 0;
 		p->write_only = 0;
 		p->spare = 1;
-		p->used_slot = 1;
 		p->head_position = 0;
 		err = 0;
 	}
@@ -838,14 +835,13 @@ static int raid1_remove_disk(mddev_t *mddev, int number)
 
 	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	if (p->used_slot) {
+	if (p->rdev) {
 		if (p->operational ||
 			(p->rdev && atomic_read(&p->rdev->nr_pending))) {
 			err = -EBUSY;
 			goto abort;
 		}
 		p->rdev = NULL;
-		p->used_slot = 0;
 		err = 0;
 	}
 	if (err)
@@ -1265,7 +1261,6 @@ static int run(mddev_t *mddev)
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 0;
-			disk->used_slot = 1;
 			disk->head_position = 0;
 			continue;
 		}
@@ -1282,7 +1277,6 @@ static int run(mddev_t *mddev)
 			disk->operational = 1;
 			disk->write_only = 0;
 			disk->spare = 0;
-			disk->used_slot = 1;
 			disk->head_position = 0;
 			conf->working_disks++;
 		} else {
@@ -1294,7 +1288,6 @@ static int run(mddev_t *mddev)
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 1;
-			disk->used_slot = 1;
 			disk->head_position = 0;
 		}
 	}
@@ -1316,16 +1309,13 @@ static int run(mddev_t *mddev)
 
 		disk = conf->mirrors + i;
 
-		if (!disk->used_slot) {
-			disk->rdev = NULL;
+		if (!disk->rdev) {
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 0;
-			disk->used_slot = 1;
 			disk->head_position = 0;
-		}
-		if (!disk->used_slot)
 			mddev->degraded++;
+		}
 	}
 
 	/*

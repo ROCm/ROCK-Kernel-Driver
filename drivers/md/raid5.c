@@ -1423,7 +1423,6 @@ static int run (mddev_t *mddev)
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 0;
-			disk->used_slot = 1;
 			continue;
 		}
 		if (rdev->in_sync) {
@@ -1435,7 +1434,6 @@ static int run (mddev_t *mddev)
 	
 			disk->rdev = rdev;
 			disk->operational = 1;
-			disk->used_slot = 1;
 
 			conf->working_disks++;
 		} else {
@@ -1448,20 +1446,16 @@ static int run (mddev_t *mddev)
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 1;
-			disk->used_slot = 1;
 		}
 	}
 
 	for (i = 0; i < conf->raid_disks; i++) {
 		disk = conf->disks + i;
 
-		if (!disk->used_slot) {
-			disk->rdev = NULL;
-
+		if (!disk->rdev) {
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 0;
-			disk->used_slot = 1;
 		}
 	}
 
@@ -1476,14 +1470,6 @@ static int run (mddev_t *mddev)
 	conf->algorithm = mddev->layout;
 	conf->max_nr_stripes = NR_STRIPES;
 
-#if 0
-	for (i = 0; i < conf->raid_disks; i++) {
-		if (!conf->disks[i].used_slot) {
-			MD_BUG();
-			goto abort;
-		}
-	}
-#endif
 	if (!conf->chunk_size || conf->chunk_size % 4) {
 		printk(KERN_ERR "raid5: invalid chunk size %d for md%d\n", conf->chunk_size, mdidx(mddev));
 		goto abort;
@@ -1634,9 +1620,9 @@ static void print_raid5_conf (raid5_conf_t *conf)
 	for (i = 0; i < conf->working_disks+conf->failed_disks; i++) {
 #endif
 		tmp = conf->disks + i;
-		printk(" disk %d, s:%d, o:%d, us:%d dev:%s\n",
+		if (tmp->rdev)
+		printk(" disk %d, s:%d, o:%d, dev:%s\n",
 			i, tmp->spare,tmp->operational,
-			tmp->used_slot,
 			bdev_partition_name(tmp->rdev->bdev));
 	}
 }
@@ -1654,7 +1640,7 @@ static int raid5_spare_active(mddev_t *mddev)
 	for (i = 0; i < conf->raid_disks; i++) {
 		tmp = conf->disks + i;
 		if ((!tmp->operational && !tmp->spare) ||
-				!tmp->used_slot) {
+				!tmp->rdev) {
 			failed_disk = i;
 			break;
 		}
@@ -1703,9 +1689,6 @@ static int raid5_spare_active(mddev_t *mddev)
 	 * give the proper raid_disk number to the now activated
 	 * disk. (this means we switch back these values)
 	 */
-
-	if (!sdisk->rdev)
-		sdisk->used_slot = 0;
 
 	/*
 	 * this really activates the spare.
@@ -1782,14 +1765,13 @@ static int raid5_remove_disk(mddev_t *mddev, int number)
 	print_raid5_conf(conf);
 	spin_lock_irq(&conf->device_lock);
 
-	if (p->used_slot) {
+	if (p->rdev) {
 		if (p->operational || 
 		    atomic_read(&p->rdev->nr_pending)) {
 			err = -EBUSY;
 			goto abort;
 		}
 		p->rdev = NULL;
-		p->used_slot = 0;
 		err = 0;
 	}
 	if (err)
@@ -1812,13 +1794,12 @@ static int raid5_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	 * find the disk ...
 	 */
 
-	if (!p->used_slot) {
+	if (!p->rdev) {
 		/* it will be held open by rdev */
 		p->rdev = rdev;
 		p->operational = 0;
 		p->write_only = 0;
 		p->spare = 1;
-		p->used_slot = 1;
 		err = 0;
 	}
 	if (err)

@@ -288,11 +288,10 @@ static void print_multipath_conf (multipath_conf_t *conf)
 
 	for (i = 0; i < MD_SB_DISKS; i++) {
 		tmp = conf->multipaths + i;
-		if (tmp->operational || tmp->used_slot)
-			printk(" disk%d, o:%d, us:%d dev:%s\n",
+		if (tmp->rdev)
+			printk(" disk%d, o:%d, dev:%s\n",
 				i,tmp->operational,
-				tmp->used_slot,
-				bdev_partition_name(tmp->rdev->bdev));
+			       bdev_partition_name(tmp->rdev->bdev));
 	}
 }
 
@@ -305,10 +304,9 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 
 	print_multipath_conf(conf);
 	spin_lock_irq(&conf->device_lock);
-	if (!p->used_slot) {
+	if (!p->rdev) {
 		p->rdev = rdev;
 		p->operational = 1;
-		p->used_slot = 1;
 		conf->working_disks++;
 		err = 0;
 	}
@@ -329,7 +327,7 @@ static int multipath_remove_disk(mddev_t *mddev, int number)
 	print_multipath_conf(conf);
 	spin_lock_irq(&conf->device_lock);
 
-	if (p->used_slot) {
+	if (p->rdev) {
 		if (p->operational ||
 		    (p->rdev && atomic_read(&p->rdev->nr_pending))) {
 			printk(KERN_ERR "hot-remove-disk, slot %d is identified but is still operational!\n", number);
@@ -337,7 +335,6 @@ static int multipath_remove_disk(mddev_t *mddev, int number)
 			goto abort;
 		}
 		p->rdev = NULL;
-		p->used_slot = 0;
 		err = 0;
 	}
 	if (err)
@@ -497,7 +494,6 @@ static int multipath_run (mddev_t *mddev)
 		 */
 		disk->rdev = rdev;
 		disk->operational = 1;
-		disk->used_slot = 1;
 		num_rdevs++;
 	}
 
