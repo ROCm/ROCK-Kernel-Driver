@@ -99,6 +99,10 @@ MODULE_DEVICE_TABLE(pci, b44_pci_tbl);
 static void b44_halt(struct b44 *);
 static void b44_init_rings(struct b44 *);
 static void b44_init_hw(struct b44 *);
+static int b44_poll(struct net_device *dev, int *budget);
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void b44_poll_controller(struct net_device *dev);
+#endif
 
 static inline unsigned long br32(const struct b44 *bp, unsigned long reg)
 {
@@ -1302,6 +1306,19 @@ err_out_free:
 }
 #endif
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/*
+ * Polling receive - used by netconsole and other diagnostic tools
+ * to allow network i/o with interrupts disabled.
+ */
+static void b44_poll_controller(struct net_device *dev)
+{
+	disable_irq(dev->irq);
+	b44_interrupt (dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
+
 static int b44_close(struct net_device *dev)
 {
 	struct b44 *bp = netdev_priv(dev);
@@ -1807,6 +1824,9 @@ static int __devinit b44_init_one(struct pci_dev *pdev,
 	dev->poll = b44_poll;
 	dev->weight = 64;
 	dev->watchdog_timeo = B44_TX_TIMEOUT;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = b44_poll_controller;
+#endif
 	dev->change_mtu = b44_change_mtu;
 	dev->irq = pdev->irq;
 	SET_ETHTOOL_OPS(dev, &b44_ethtool_ops);
