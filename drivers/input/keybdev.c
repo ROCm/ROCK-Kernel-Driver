@@ -49,7 +49,6 @@ char keybdev_name[] = "keyboard";
 static int x86_sysrq_alt = 0;
 #ifdef CONFIG_SPARC64
 static int sparc_l1_a_state = 0;
-extern void batten_down_hatches(void);
 #endif
 
 static unsigned short x86_keycodes[256] =
@@ -99,7 +98,7 @@ static int emulate_raw(unsigned int keycode, int down)
 #ifdef CONFIG_SPARC64
 	if (keycode == KEY_A && sparc_l1_a_state) {
 		sparc_l1_a_state = 0;
-		batten_down_hatches();
+		sun_do_break();
 	}
 #endif
 

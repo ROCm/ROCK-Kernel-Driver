@@ -29,6 +29,7 @@
 #include <linux/inet.h>
 #include <linux/console.h>
 #include <linux/root_dev.h>
+#include <linux/interrupt.h>
 
 #include <asm/segment.h>
 #include <asm/system.h>
@@ -65,9 +66,7 @@ struct screen_info screen_info = {
  * prints out pretty messages and returns.
  */
 
-#if CONFIG_SUN_CONSOLE
 void (*prom_palette)(int);
-#endif
 void (*prom_keyboard)(void);
 asmlinkage void sys_sync(void);	/* it's really int */
 
@@ -78,10 +77,10 @@ prom_console_write(struct console *con, const char *s, unsigned n)
 }
 
 static struct console prom_console = {
-	name:		"prom",
-	write:		prom_console_write,
-	flags:		CON_CONSDEV | CON_ENABLED,
-	index:		-1,
+	.name =		"prom",
+	.write =	prom_console_write,
+	.flags =	CON_CONSDEV | CON_ENABLED,
+	.index =	-1,
 };
 
 #define PROM_TRUE	-1
@@ -107,8 +106,13 @@ int prom_callback(long *args)
 	 * administrator has done a switch-cpu inside obp. In either 
 	 * case, the cpu is marked as in-interrupt. Drop IRQ locks.
 	 */
-	irq_exit(smp_processor_id(), 0);
-	save_and_cli(flags);
+	irq_exit();
+
+	/* XXX Revisit the locking here someday.  This is a debugging
+	 * XXX feature so it isnt all that critical.  -DaveM
+	 */
+	local_irq_save(flags);
+
 	spin_unlock(&prom_entry_lock);
 	cons = console_drivers;
 	while (cons) {
@@ -122,10 +126,10 @@ int prom_callback(long *args)
 	if (!strcmp(cmd, "sync")) {
 		prom_printf("PROM `%s' command...\n", cmd);
 		show_free_areas();
-		if(current->pid != 0) {
-			sti();
+		if (current->pid != 0) {
+			local_irq_enable();
 			sys_sync();
-			cli();
+			local_irq_disable();
 		}
 		args[2] = 0;
 		args[args[1] + 3] = -1;
@@ -301,11 +305,12 @@ int prom_callback(long *args)
 		register_console(cons);
 	}
 	spin_lock(&prom_entry_lock);
-	restore_flags(flags);
+	local_irq_restore(flags);
+
 	/*
 	 * Restore in-interrupt status for a resume from obp.
 	 */
-	irq_enter(smp_processor_id(), 0);
+	irq_enter();
 	return 0;
 }
 
@@ -316,18 +321,16 @@ unsigned int boot_flags = 0;
 #define BOOTME_SINGLE 0x2
 #define BOOTME_KGDB   0x4
 
-#ifdef CONFIG_SUN_CONSOLE
 static int console_fb __initdata = 0;
-#endif
 
 /* Exported for mm/init.c:paging_init. */
 unsigned long cmdline_memory_size = 0;
 
 static struct console prom_debug_console = {
-	name:		"debug",
-	write:		prom_console_write,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"debug",
+	.write =	prom_console_write,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 /* XXX Implement this at some point... */
@@ -407,7 +410,6 @@ static void __init boot_flags_init(char *commands)
 			}
 			commands += 9;
 		} else {
-#if CONFIG_SUN_CONSOLE
 			if (!strncmp(commands, "console=", 8)) {
 				commands += 8;
 				if (!strncmp (commands, "ttya", 4)) {
@@ -428,9 +430,7 @@ static void __init boot_flags_init(char *commands)
 				} else {
 					console_fb = 1;
 				}
-			} else
-#endif
-			if (!strncmp(commands, "mem=", 4)) {
+			} else if (!strncmp(commands, "mem=", 4)) {
 				/*
 				 * "mem=XXX[kKmM]" overrides the PROM-reported
 				 * memory size.
@@ -686,8 +686,38 @@ static void c_stop(struct seq_file *m, void *v)
 }
 
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start =c_start,
+	.next =	c_next,
+	.stop =	c_stop,
+	.show =	show_cpuinfo,
 };
+
+extern int stop_a_enabled;
+
+void sun_do_break(void)
+{
+	if (!stop_a_enabled)
+		return;
+
+	printk("\n");
+	flush_user_windows();
+
+	prom_cmdline();
+}
+
+#ifdef CONFIG_MAGIC_SYSRQ
+/* Because we use the generic input layer keyboard drivers for
+ * everything, this PC sysrq translation table is all we need.
+ */
+unsigned char kbd_sysrq_xlate[128] =
+	"\000\0331234567890-=\177\t"			/* 0x00 - 0x0f */
+	"qwertyuiop[]\r\000as"				/* 0x10 - 0x1f */
+	"dfghjkl;'`\000\\zxcv"				/* 0x20 - 0x2f */
+	"bnm,./\000*\000 \000\201\202\203\204\205"	/* 0x30 - 0x3f */
+	"\206\207\210\211\212\000\000789-456+1"		/* 0x40 - 0x4f */
+	"230\177\000\000\213\214\000\000\000\000\000\000\000\000\000\000" /* 0x50 - 0x5f */
+	"\r\000/";					/* 0x60 - 0x6f */
+#endif
+
+int serial_console;
+int stop_a_enabled = 1;

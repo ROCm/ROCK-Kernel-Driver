@@ -1609,8 +1609,8 @@ static void packet_mm_close(struct vm_area_struct *vma)
 }
 
 static struct vm_operations_struct packet_mmap_ops = {
-	open:	packet_mm_open,
-	close:	packet_mm_close,
+	.open =	packet_mm_open,
+	.close =packet_mm_close,
 };
 
 static void free_pg_vec(unsigned long *pg_vec, unsigned order, unsigned len)
@@ -1796,55 +1796,55 @@ out:
 
 #ifdef CONFIG_SOCK_PACKET
 struct proto_ops packet_ops_spkt = {
-	family:		PF_PACKET,
+	.family =	PF_PACKET,
 
-	release:	packet_release,
-	bind:		packet_bind_spkt,
-	connect:	sock_no_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		sock_no_accept,
-	getname:	packet_getname_spkt,
-	poll:		datagram_poll,
-	ioctl:		packet_ioctl,
-	listen:		sock_no_listen,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	sock_no_setsockopt,
-	getsockopt:	sock_no_getsockopt,
-	sendmsg:	packet_sendmsg_spkt,
-	recvmsg:	packet_recvmsg,
-	mmap:		sock_no_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	packet_release,
+	.bind =		packet_bind_spkt,
+	.connect =	sock_no_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	sock_no_accept,
+	.getname =	packet_getname_spkt,
+	.poll =		datagram_poll,
+	.ioctl =	packet_ioctl,
+	.listen =	sock_no_listen,
+	.shutdown =	sock_no_shutdown,
+	.setsockopt =	sock_no_setsockopt,
+	.getsockopt =	sock_no_getsockopt,
+	.sendmsg =	packet_sendmsg_spkt,
+	.recvmsg =	packet_recvmsg,
+	.mmap =		sock_no_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 #endif
 
 struct proto_ops packet_ops = {
-	family:		PF_PACKET,
+	.family =	PF_PACKET,
 
-	release:	packet_release,
-	bind:		packet_bind,
-	connect:	sock_no_connect,
-	socketpair:	sock_no_socketpair,
-	accept:		sock_no_accept,
-	getname:	packet_getname, 
-	poll:		packet_poll,
-	ioctl:		packet_ioctl,
-	listen:		sock_no_listen,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	packet_setsockopt,
-	getsockopt:	packet_getsockopt,
-	sendmsg:	packet_sendmsg,
-	recvmsg:	packet_recvmsg,
-	mmap:		packet_mmap,
-	sendpage:	sock_no_sendpage,
+	.release =	packet_release,
+	.bind =		packet_bind,
+	.connect =	sock_no_connect,
+	.socketpair =	sock_no_socketpair,
+	.accept =	sock_no_accept,
+	.getname =	packet_getname, 
+	.poll =		packet_poll,
+	.ioctl =	packet_ioctl,
+	.listen =	sock_no_listen,
+	.shutdown =	sock_no_shutdown,
+	.setsockopt =	packet_setsockopt,
+	.getsockopt =	packet_getsockopt,
+	.sendmsg =	packet_sendmsg,
+	.recvmsg =	packet_recvmsg,
+	.mmap =		packet_mmap,
+	.sendpage =	sock_no_sendpage,
 };
 
 static struct net_proto_family packet_family_ops = {
-	family:		PF_PACKET,
-	create:		packet_create,
+	.family =	PF_PACKET,
+	.create =	packet_create,
 };
 
 static struct notifier_block packet_netdev_notifier = {
-	notifier_call:	packet_notifier,
+	.notifier_call =packet_notifier,
 };
 
 #ifdef CONFIG_PROC_FS

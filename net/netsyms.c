@@ -320,6 +320,7 @@ EXPORT_SYMBOL(udp_ioctl);
 EXPORT_SYMBOL(udp_connect);
 EXPORT_SYMBOL(udp_disconnect);
 EXPORT_SYMBOL(udp_sendmsg);
+EXPORT_SYMBOL(tcp_bind_hash);
 EXPORT_SYMBOL(tcp_close);
 EXPORT_SYMBOL(tcp_disconnect);
 EXPORT_SYMBOL(tcp_accept);

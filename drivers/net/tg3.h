@@ -1701,7 +1701,21 @@ struct tg3_bufmgr_config {
 };
 
 struct tg3 {
+	/* SMP locking strategy:
+	 *
+	 * lock: Held during all operations except TX packet
+	 *       processing.
+	 *
+	 * tx_lock: Held during tg3_start_xmit{,_4gbug} and tg3_tx
+	 *
+	 * If you want to shut up all asynchronous processing you must
+	 * acquire both locks, 'lock' taken before 'tx_lock'.  IRQs must
+	 * be disabled to take 'lock' but only softirq disabling is
+	 * necessary for acquisition of 'tx_lock'.
+	 */
 	spinlock_t			lock;
+	spinlock_t			tx_lock;
+
 	u32				tx_prod;
 	u32				tx_cons;
 	u32				rx_rcb_ptr;
@@ -1716,11 +1730,6 @@ struct tg3 {
 	struct net_device_stats		net_stats_prev;
 	unsigned long			phy_crc_errors;
 
-	/* Adaptive coalescing engine. */
-	unsigned long			last_rate_sample;
-	u32				last_rx_count;
-	u32				last_tx_count;
-
 	u32				rx_offset;
 	u32				tg3_flags;
 #define TG3_FLAG_HOST_TXDS		0x00000001
@@ -1728,8 +1737,6 @@ struct tg3 {
 #define TG3_FLAG_RX_CHECKSUMS		0x00000004
 #define TG3_FLAG_USE_LINKCHG_REG	0x00000008
 #define TG3_FLAG_USE_MI_INTERRUPT	0x00000010
-#define TG3_FLAG_ADAPTIVE_RX		0x00000020
-#define TG3_FLAG_ADAPTIVE_TX		0x00000040
 #define TG3_FLAG_POLL_SERDES		0x00000080
 #define TG3_FLAG_PHY_RESET_ON_INIT	0x00000100
 #define TG3_FLAG_PCIX_TARGET_HWBUG	0x00000200

@@ -669,18 +669,18 @@ asmlinkage int solaris_facl(unsigned int fd, int cmd, int nentries, u32 aclbufp)
 
 asmlinkage int solaris_pread(unsigned int fd, char *buf, u32 count, u32 pos)
 {
-	ssize_t (*sys_pread)(unsigned int, char *, size_t, loff_t) =
-		(ssize_t (*)(unsigned int, char *, size_t, loff_t))SYS(pread);
-		
-	return sys_pread(fd, buf, count, (loff_t)pos);
+	ssize_t (*sys_pread64)(unsigned int, char *, size_t, loff_t) =
+		(ssize_t (*)(unsigned int, char *, size_t, loff_t))SYS(pread64);
+
+	return sys_pread64(fd, buf, count, (loff_t)pos);
 }
 
 asmlinkage int solaris_pwrite(unsigned int fd, char *buf, u32 count, u32 pos)
 {
-	ssize_t (*sys_pwrite)(unsigned int, char *, size_t, loff_t) =
-		(ssize_t (*)(unsigned int, char *, size_t, loff_t))SYS(pwrite);
-		
-	return sys_pwrite(fd, buf, count, (loff_t)pos);
+	ssize_t (*sys_pwrite64)(unsigned int, char *, size_t, loff_t) =
+		(ssize_t (*)(unsigned int, char *, size_t, loff_t))SYS(pwrite64);
+
+	return sys_pwrite64(fd, buf, count, (loff_t)pos);
 }
 
 /* POSIX.1 names */

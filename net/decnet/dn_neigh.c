@@ -54,66 +54,66 @@ static int dn_phase3_output(struct sk_buff *);
  * For talking to broadcast devices: Ethernet & PPP
  */
 static struct neigh_ops dn_long_ops = {
-	family:			AF_DECnet,
-	error_report:		dn_long_error_report,
-	output:			dn_long_output,
-	connected_output:	dn_long_output,
-	hh_output:		dev_queue_xmit,
-	queue_xmit:		dev_queue_xmit,
+	.family =		AF_DECnet,
+	.error_report =		dn_long_error_report,
+	.output =		dn_long_output,
+	.connected_output =	dn_long_output,
+	.hh_output =		dev_queue_xmit,
+	.queue_xmit =		dev_queue_xmit,
 };
 
 /*
  * For talking to pointopoint and multidrop devices: DDCMP and X.25
  */
 static struct neigh_ops dn_short_ops = {
-	family:			AF_DECnet,
-	error_report:		dn_short_error_report,
-	output:			dn_short_output,
-	connected_output:	dn_short_output,
-	hh_output:		dev_queue_xmit,
-	queue_xmit:		dev_queue_xmit,
+	.family =		AF_DECnet,
+	.error_report =		dn_short_error_report,
+	.output =		dn_short_output,
+	.connected_output =	dn_short_output,
+	.hh_output =		dev_queue_xmit,
+	.queue_xmit =		dev_queue_xmit,
 };
 
 /*
  * For talking to DECnet phase III nodes
  */
 static struct neigh_ops dn_phase3_ops = {
-	family:			AF_DECnet,
-	error_report:		dn_short_error_report, /* Can use short version here */
-	output:			dn_phase3_output,
-	connected_output:	dn_phase3_output,
-	hh_output:		dev_queue_xmit,
-	queue_xmit:		dev_queue_xmit
+	.family =		AF_DECnet,
+	.error_report =		dn_short_error_report, /* Can use short version here */
+	.output =		dn_phase3_output,
+	.connected_output =	dn_phase3_output,
+	.hh_output =		dev_queue_xmit,
+	.queue_xmit =		dev_queue_xmit
 };
 
 struct neigh_table dn_neigh_table = {
-	family:				PF_DECnet,
-	entry_size:			sizeof(struct dn_neigh),
-	key_len:			sizeof(dn_address),
-	hash:				dn_neigh_hash,
-	constructor:			dn_neigh_construct,
-	id:				"dn_neigh_cache",
-	parms:	{
-		tbl:			&dn_neigh_table,
-		entries:		0,
-		base_reachable_time:	30 * HZ,
-		retrans_time:		1 * HZ,
-		gc_staletime:		60 * HZ,
-		reachable_time:		30 * HZ,
-		delay_probe_time:	5 * HZ,
-		queue_len:		3,
-		ucast_probes:		0,
-		app_probes:		0,
-		mcast_probes:		0,
-		anycast_delay:		0,
-		proxy_delay:		0,
-		proxy_qlen:		0,
-		locktime:		1 * HZ,
+	.family =			PF_DECnet,
+	.entry_size =			sizeof(struct dn_neigh),
+	.key_len =			sizeof(dn_address),
+	.hash =				dn_neigh_hash,
+	.constructor =			dn_neigh_construct,
+	.id =				"dn_neigh_cache",
+	.parms ={
+		.tbl =			&dn_neigh_table,
+		.entries =		0,
+		.base_reachable_time =	30 * HZ,
+		.retrans_time =	1 * HZ,
+		.gc_staletime =	60 * HZ,
+		.reachable_time =		30 * HZ,
+		.delay_probe_time =	5 * HZ,
+		.queue_len =		3,
+		.ucast_probes =	0,
+		.app_probes =		0,
+		.mcast_probes =	0,
+		.anycast_delay =	0,
+		.proxy_delay =		0,
+		.proxy_qlen =		0,
+		.locktime =		1 * HZ,
 	},
-	gc_interval:			30 * HZ,
-	gc_thresh1:			128,
-	gc_thresh2:			512,
-	gc_thresh3:			1024,
+	.gc_interval =			30 * HZ,
+	.gc_thresh1 =			128,
+	.gc_thresh2 =			512,
+	.gc_thresh3 =			1024,
 };
 
 static u32 dn_neigh_hash(const void *pkey, const struct net_device *dev)

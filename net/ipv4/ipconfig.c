@@ -382,8 +382,8 @@ static int __init ic_defaults(void)
 static int ic_rarp_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt);
 
 static struct packet_type rarp_packet_type __initdata = {
-	type:	__constant_htons(ETH_P_RARP),
-	func:	ic_rarp_recv,
+	.type =	__constant_htons(ETH_P_RARP),
+	.func =	ic_rarp_recv,
 };
 
 static inline void ic_rarp_init(void)
@@ -522,8 +522,8 @@ struct bootp_pkt {		/* BOOTP packet format */
 static int ic_bootp_recv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt);
 
 static struct packet_type bootp_packet_type __initdata = {
-	type:	__constant_htons(ETH_P_IP),
-	func:	ic_bootp_recv,
+	.type =	__constant_htons(ETH_P_IP),
+	.func =	ic_bootp_recv,
 };
 
 

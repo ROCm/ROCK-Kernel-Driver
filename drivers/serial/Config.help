@@ -223,3 +223,16 @@ CONFIG_SERIAL_SA1100_CONSOLE
 #  you can make the first serial port the console by answering Y to
 #  this option.
 
+CONFIG_SERIAL_SUNZILOG
+  This driver supports the Zilog8530 serial ports found on many Sparc
+  systems.  Say Y or M if you want to be able to these serial ports.
+
+CONFIG_SERIAL_SUNSU
+  This driver supports the 8250 serial ports that run the keyboard and
+  mouse on (PCI) UltraSPARC systems.  Say Y or M if you want to be able
+  to these serial ports.
+
+CONFIG_SERIAL_SUNSAB
+  This driver supports the Siemens SAB82532 DUSCC serial ports on newer
+  (PCI) UltraSPARC systems.  Say Y or M if you want to be able to these
+  serial ports.

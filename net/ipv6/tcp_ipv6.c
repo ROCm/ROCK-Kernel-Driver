@@ -85,6 +85,37 @@ static __inline__ int tcp_v6_sk_hashfn(struct sock *sk)
 	return tcp_v6_hashfn(laddr, lport, faddr, fport);
 }
 
+static inline int ipv6_rcv_saddr_equal(struct sock *sk, struct sock *sk2)
+{
+	struct ipv6_pinfo *np = inet6_sk(sk);
+	int addr_type = ipv6_addr_type(&np->rcv_saddr);
+
+	return !inet_sk(sk2)->rcv_saddr || addr_type == IPV6_ADDR_ANY ||
+	       (sk2->family == AF_INET6 &&
+	        !ipv6_addr_cmp(&np->rcv_saddr,
+			       sk2->state != TCP_TIME_WAIT ?
+			       &inet6_sk(sk2)->rcv_saddr :
+			       &((struct tcp_tw_bucket *)sk)->v6_rcv_saddr)) ||
+	       (addr_type == IPV6_ADDR_MAPPED && sk2->family == AF_INET &&
+		inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr);
+}
+
+static inline int tcp_v6_bind_conflict(struct sock *sk,
+				       struct tcp_bind_bucket *tb)
+{
+	struct sock *sk2 = tb->owners;
+
+	/* We must walk the whole port owner list in this case. -DaveM */
+	for (; sk2; sk2 = sk2->bind_next)
+		if (sk != sk2 && sk->bound_dev_if == sk2->bound_dev_if &&
+		    (!sk->reuse || !sk2->reuse ||
+		     sk2->state == TCP_LISTEN) &&
+		     ipv6_rcv_saddr_equal(sk, sk2))
+			break;
+
+	return sk2 != NULL;
+}
+
 /* Grrr, addr_type already calculated by caller, but I don't want
  * to add some silly "cookie" argument to this method just for that.
  * But it doesn't matter, the recalculation is in the rarest path
@@ -139,44 +170,15 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 		if (tb->fastreuse > 0 && sk->reuse != 0 && sk->state != TCP_LISTEN) {
 			goto success;
 		} else {
-			struct ipv6_pinfo *np = inet6_sk(sk);
-			struct sock *sk2 = tb->owners;
-			int sk_reuse = sk->reuse;
-			int addr_type = ipv6_addr_type(&np->rcv_saddr);
-
-			/* We must walk the whole port owner list in this case. -DaveM */
-			for( ; sk2 != NULL; sk2 = sk2->bind_next) {
-				struct ipv6_pinfo *np2 = inet6_sk(sk2);
-
-				if (sk != sk2 &&
-				    sk->bound_dev_if == sk2->bound_dev_if) {
-					if (!sk_reuse	||
-					    !sk2->reuse	||
-					    sk2->state == TCP_LISTEN) {
-						/* NOTE: IPv6 tw bucket have different format */
-						if (!inet_sk(sk2)->rcv_saddr ||
-						    addr_type == IPV6_ADDR_ANY ||
-						    !ipv6_addr_cmp(&np->rcv_saddr,
-								   sk2->state != TCP_TIME_WAIT ?
-								   &np2->rcv_saddr :
-								   &((struct tcp_tw_bucket*)sk)->v6_rcv_saddr) ||
-						    (addr_type==IPV6_ADDR_MAPPED && sk2->family==AF_INET &&
-						     inet_sk(sk)->rcv_saddr ==
-						     inet_sk(sk2)->rcv_saddr))
-							break;
-					}
-				}
-			}
-			/* If we found a conflict, fail. */
 			ret = 1;
-			if (sk2 != NULL)
+			if (tcp_v6_bind_conflict(sk, tb))
 				goto fail_unlock;
 		}
 	}
 	ret = 1;
 	if (tb == NULL &&
 	    (tb = tcp_bucket_create(head, snum)) == NULL)
-			goto fail_unlock;
+		goto fail_unlock;
 	if (tb->owners == NULL) {
 		if (sk->reuse && sk->state != TCP_LISTEN)
 			tb->fastreuse = 1;
@@ -187,16 +189,9 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 		tb->fastreuse = 0;
 
 success:
-	inet_sk(sk)->num = snum;
-	if (sk->prev == NULL) {
-		if ((sk->bind_next = tb->owners) != NULL)
-			tb->owners->bind_pprev = &sk->bind_next;
-		tb->owners = sk;
-		sk->bind_pprev = &tb->owners;
-		sk->prev = (struct sock *) tb;
-	} else {
-		BUG_TRAP(sk->prev == (struct sock *) tb);
-	}
+	if (!sk->prev)
+		tcp_bind_hash(sk, tb, snum);
+	BUG_TRAP(sk->prev == (struct sock *)tb);
 	ret = 0;
 
 fail_unlock:
@@ -413,7 +408,7 @@ static __inline__ u16 tcp_v6_check(struct tcphdr *th, int len,
 
 static __u32 tcp_v6_init_sequence(struct sock *sk, struct sk_buff *skb)
 {
-	if (skb->protocol == __constant_htons(ETH_P_IPV6)) {
+	if (skb->protocol == htons(ETH_P_IPV6)) {
 		return secure_tcpv6_sequence_number(skb->nh.ipv6h->daddr.s6_addr32,
 						    skb->nh.ipv6h->saddr.s6_addr32,
 						    skb->h.th->dest,
@@ -1051,10 +1046,8 @@ static void tcp_v6_send_ack(struct sk_buff *skb, u32 seq, u32 ack, u32 win, u32 
 	
 	if (ts) {
 		u32 *ptr = (u32*)(t1 + 1);
-		*ptr++ = __constant_htonl((TCPOPT_NOP << 24) |
-					  (TCPOPT_NOP << 16) |
-					  (TCPOPT_TIMESTAMP << 8) |
-					  TCPOLEN_TIMESTAMP);
+		*ptr++ = htonl((TCPOPT_NOP << 24) | (TCPOPT_NOP << 16) |
+			       (TCPOPT_TIMESTAMP << 8) | TCPOLEN_TIMESTAMP);
 		*ptr++ = htonl(tcp_time_stamp);
 		*ptr = htonl(ts);
 	}
@@ -1166,7 +1159,7 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	struct open_request *req = NULL;
 	__u32 isn = TCP_SKB_CB(skb)->when;
 
-	if (skb->protocol == __constant_htons(ETH_P_IP))
+	if (skb->protocol == htons(ETH_P_IP))
 		return tcp_v4_conn_request(sk, skb);
 
 	/* FIXME: do the same check for anycast */
@@ -1247,7 +1240,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	struct sock *newsk;
 	struct ipv6_txoptions *opt;
 
-	if (skb->protocol == __constant_htons(ETH_P_IP)) {
+	if (skb->protocol == htons(ETH_P_IP)) {
 		/*
 		 *	v6 mapped
 		 */
@@ -1463,7 +1456,7 @@ static int tcp_v6_do_rcv(struct sock *sk, struct sk_buff *skb)
 	   tcp_v6_hnd_req and tcp_v6_send_reset().   --ANK
 	 */
 
-	if (skb->protocol == __constant_htons(ETH_P_IP))
+	if (skb->protocol == htons(ETH_P_IP))
 		return tcp_v4_do_rcv(sk, skb);
 
 #ifdef CONFIG_FILTER
@@ -1784,7 +1777,7 @@ static void v6_addr2sockaddr(struct sock *sk, struct sockaddr * uaddr)
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *) uaddr;
 
 	sin6->sin6_family = AF_INET6;
-	memcpy(&sin6->sin6_addr, &np->daddr, sizeof(struct in6_addr));
+	ipv6_addr_copy(&sin6->sin6_addr, &np->daddr);
 	sin6->sin6_port	= inet_sk(sk)->dport;
 	/* We do not store received flowlabel for TCP */
 	sin6->sin6_flowinfo = 0;
@@ -2144,43 +2137,43 @@ out_no_bh:
 }
 
 struct proto tcpv6_prot = {
-	name:		"TCPv6",
-	close:		tcp_close,
-	connect:	tcp_v6_connect,
-	disconnect:	tcp_disconnect,
-	accept:		tcp_accept,
-	ioctl:		tcp_ioctl,
-	init:		tcp_v6_init_sock,
-	destroy:	tcp_v6_destroy_sock,
-	shutdown:	tcp_shutdown,
-	setsockopt:	tcp_setsockopt,
-	getsockopt:	tcp_getsockopt,
-	sendmsg:	tcp_sendmsg,
-	recvmsg:	tcp_recvmsg,
-	backlog_rcv:	tcp_v6_do_rcv,
-	hash:		tcp_v6_hash,
-	unhash:		tcp_unhash,
-	get_port:	tcp_v6_get_port,
+	.name =		"TCPv6",
+	.close =	tcp_close,
+	.connect =	tcp_v6_connect,
+	.disconnect =	tcp_disconnect,
+	.accept =	tcp_accept,
+	.ioctl =	tcp_ioctl,
+	.init =		tcp_v6_init_sock,
+	.destroy =	tcp_v6_destroy_sock,
+	.shutdown =	tcp_shutdown,
+	.setsockopt =	tcp_setsockopt,
+	.getsockopt =	tcp_getsockopt,
+	.sendmsg =	tcp_sendmsg,
+	.recvmsg =	tcp_recvmsg,
+	.backlog_rcv =	tcp_v6_do_rcv,
+	.hash =		tcp_v6_hash,
+	.unhash =	tcp_unhash,
+	.get_port =	tcp_v6_get_port,
 };
 
 static struct inet6_protocol tcpv6_protocol =
 {
-	handler:	tcp_v6_rcv,
-	err_handler:	tcp_v6_err,
-	protocol:	IPPROTO_TCP,
-	name:		"TCPv6",
+	.handler =	tcp_v6_rcv,
+	.err_handler =	tcp_v6_err,
+	.protocol =	IPPROTO_TCP,
+	.name =		"TCPv6",
 };
 
 extern struct proto_ops inet6_stream_ops;
 
 static struct inet_protosw tcpv6_protosw = {
-	type:        SOCK_STREAM,
-	protocol:    IPPROTO_TCP,
-	prot:        &tcpv6_prot,
-	ops:         &inet6_stream_ops,
-	capability:  -1,
-	no_check:    0,
-	flags:       INET_PROTOSW_PERMANENT,
+	.type =      SOCK_STREAM,
+	.protocol =  IPPROTO_TCP,
+	.prot =      &tcpv6_prot,
+	.ops =       &inet6_stream_ops,
+	.capability =-1,
+	.no_check =  0,
+	.flags =     INET_PROTOSW_PERMANENT,
 };
 
 void __init tcpv6_init(void)

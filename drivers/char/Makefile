@@ -108,14 +108,18 @@ ifeq ($(CONFIG_QTRONIX_KEYBOARD),y)
   KEYMAP   = qtronixmap.o
 endif
 
+ifeq ($(CONFIG_SPARC32),y)
+  KEYBD    =
+endif
+
+ifeq ($(CONFIG_SPARC64),y)
+  KEYBD    =
+endif
+
 obj-$(CONFIG_VT) += vt.o vc_screen.o consolemap.o consolemap_deftbl.o $(CONSOLE) selection.o
 #obj-$(CONFIG_SERIAL) += $(SERIAL) # Fix for decserial.o
 
-ifndef CONFIG_SUN_KEYBOARD
-  obj-$(CONFIG_VT) += keyboard.o $(KEYMAP) $(KEYBD)
-else
-  obj-$(CONFIG_PCI) += keyboard.o $(KEYMAP)
-endif
+obj-$(CONFIG_VT) += keyboard.o $(KEYMAP) $(KEYBD)
 
 obj-$(CONFIG_MAGIC_SYSRQ) += sysrq.o
 obj-$(CONFIG_ATARI_DSP56K) += dsp56k.o

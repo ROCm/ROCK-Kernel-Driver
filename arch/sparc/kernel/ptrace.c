@@ -92,16 +92,16 @@ static inline void read_sunos_user(struct pt_regs *regs, unsigned long offset,
 	}
 	switch(offset) {
 	case 0:
-		v = t->ksp;
+		v = tsk->thread_info->ksp;
 		break;
 	case 4:
-		v = t->kpc;
+		v = tsk->thread_info->kpc;
 		break;
 	case 8:
-		v = t->kpsr;
+		v = tsk->thread_info->kpsr;
 		break;
 	case 12:
-		v = t->uwinmask;
+		v = tsk->thread_info->uwinmask;
 		break;
 	case 832:
 		v = t->w_saved;
@@ -530,9 +530,9 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 		}
 
 		if (request == PTRACE_SYSCALL)
-			child->ptrace |= PT_TRACESYS;
+			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		else
-			child->ptrace &= ~PT_TRACESYS;
+			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 
 		child->exit_code = data;
 #ifdef DEBUG_PTRACE
@@ -581,7 +581,7 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 	}
 out_tsk:
 	if (child)
-		free_task_struct(child);
+		put_task_struct(child);
 out:
 	unlock_kernel();
 }
@@ -591,8 +591,9 @@ asmlinkage void syscall_trace(void)
 #ifdef DEBUG_PTRACE
 	printk("%s [%d]: syscall_trace\n", current->comm, current->pid);
 #endif
-	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS))
-			!= (PT_PTRACED|PT_TRACESYS))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+		return;
+	if (!(current->ptrace & PT_PTRACED))
 		return;
 	current->exit_code = SIGTRAP;
 	current->state = TASK_STOPPED;

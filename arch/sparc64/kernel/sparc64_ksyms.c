@@ -130,14 +130,9 @@ EXPORT_SYMBOL(__write_unlock);
 EXPORT_SYMBOL(kernel_flag);
 
 /* Hard IRQ locking */
-EXPORT_SYMBOL(global_irq_holder);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(synchronize_irq);
 #endif
-EXPORT_SYMBOL(__global_cli);
-EXPORT_SYMBOL(__global_sti);
-EXPORT_SYMBOL(__global_save_flags);
-EXPORT_SYMBOL(__global_restore_flags);
 
 #if defined(CONFIG_MCOUNT)
 extern void mcount(void);
@@ -150,6 +145,8 @@ EXPORT_SYMBOL(cpu_data);
 /* CPU online map and active count.  */
 EXPORT_SYMBOL(cpu_online_map);
 EXPORT_SYMBOL(sparc64_num_cpus_online);
+EXPORT_SYMBOL(phys_cpu_present_map);
+EXPORT_SYMBOL(sparc64_num_cpus_possible);
 
 /* Spinlock debugging library, optional. */
 #ifdef CONFIG_DEBUG_SPINLOCK
@@ -367,9 +364,11 @@ void VISenter(void);
 /* RAID code needs this */
 EXPORT_SYMBOL_NOVERS(VISenter);
 
-extern void batten_down_hatches(void);
 /* for input/keybdev */
-EXPORT_SYMBOL(batten_down_hatches);
+EXPORT_SYMBOL(sun_do_break);
+EXPORT_SYMBOL(serial_console);
+EXPORT_SYMBOL(stop_a_enabled);
+EXPORT_SYMBOL(kbd_pt_regs);
 
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 EXPORT_SYMBOL(do_BUG);

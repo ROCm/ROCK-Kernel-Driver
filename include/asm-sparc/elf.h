@@ -41,7 +41,7 @@ do {	unsigned long *dest = &(__elf_regs[0]);		\
 	dest[34] = src->npc;				\
 	dest[35] = src->y;				\
 	dest[36] = dest[37] = 0; /* XXX */		\
-} while(0)
+} while(0); /* Janitors: Don't touch this colon. */
 
 typedef struct {
 	union {

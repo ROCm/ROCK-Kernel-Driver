@@ -16,6 +16,7 @@
 
 static inline void forget_pte(pte_t page)
 {
+#if 0 /* old 2.4 code */
 	if (pte_none(page))
 		return;
 	if (pte_present(page)) {
@@ -30,6 +31,12 @@ static inline void forget_pte(pte_t page)
 		return;
 	}
 	swap_free(pte_to_swp_entry(page));
+#else
+	if (!pte_none(page)) {
+		printk("forget_pte: old mapping existed!\n");
+		BUG();
+	}
+#endif
 }
 
 /* Remap IO memory, the same way as remap_page_range(), but use
@@ -69,7 +76,7 @@ static inline int io_remap_pmd_range(pmd_t * pmd, unsigned long address, unsigne
 		end = PGDIR_SIZE;
 	offset -= address;
 	do {
-		pte_t * pte = pte_alloc(current->mm, pmd, address);
+		pte_t * pte = pte_alloc_map(current->mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		io_remap_pte_range(pte, address, end - address, address + offset, prot, space);

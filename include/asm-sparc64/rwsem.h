@@ -21,6 +21,7 @@ struct rwsem_waiter;
 extern struct rw_semaphore *FASTCALL(rwsem_down_read_failed(struct rw_semaphore *sem));
 extern struct rw_semaphore *FASTCALL(rwsem_down_write_failed(struct rw_semaphore *sem));
 extern struct rw_semaphore *FASTCALL(rwsem_wake(struct rw_semaphore *));
+extern struct rw_semaphore *FASTCALL(rwsem_downgrade_wake(struct rw_semaphore *));
 
 struct rw_semaphore {
 	signed int count;
@@ -40,14 +41,14 @@ struct rw_semaphore {
 #define DECLARE_RWSEM(name) \
 	struct rw_semaphore name = __RWSEM_INITIALIZER(name)
 
-static inline void init_rwsem(struct rw_semaphore *sem)
+static __inline__ void init_rwsem(struct rw_semaphore *sem)
 {
 	sem->count = RWSEM_UNLOCKED_VALUE;
 	spin_lock_init(&sem->wait_lock);
 	INIT_LIST_HEAD(&sem->wait_list);
 }
 
-static inline void __down_read(struct rw_semaphore *sem)
+static __inline__ void __down_read(struct rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"! beginning __down_read\n"
@@ -79,7 +80,32 @@ static inline void __down_read(struct rw_semaphore *sem)
 		: "g5", "g7", "memory", "cc");
 }
 
-static inline void __down_write(struct rw_semaphore *sem)
+static __inline__ int __down_read_trylock(struct rw_semaphore *sem)
+{
+	int result;
+
+	__asm__ __volatile__(
+		"! beginning __down_read_trylock\n"
+		"1:\tlduw	[%1], %%g5\n\t"
+		"add		%%g5, 1, %%g7\n\t"
+		"cmp		%%g7, 0\n\t"
+		"bl,pn		%%icc, 2f\n\t"
+		" mov		0, %0\n\t"
+		"cas		[%1], %%g5, %%g7\n\t"
+		"cmp		%%g5, %%g7\n\t"
+		"bne,pn		%%icc, 1b\n\t"
+		" mov		1, %0\n\t"
+		"membar		#StoreLoad | #StoreStore\n"
+		"2:\n\t"
+		"! ending __down_read_trylock"
+		: "=&r" (result)
+                : "r" (sem)
+		: "g5", "g7", "memory", "cc");
+
+	return result;
+}
+
+static __inline__ void __down_write(struct rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"! beginning __down_write\n\t"
@@ -111,7 +137,34 @@ static inline void __down_write(struct rw_semaphore *sem)
 		: "g1", "g5", "g7", "memory", "cc");
 }
 
-static inline void __up_read(struct rw_semaphore *sem)
+static __inline__ int __down_write_trylock(struct rw_semaphore *sem)
+{
+	int result;
+
+	__asm__ __volatile__(
+		"! beginning __down_write_trylock\n\t"
+		"sethi		%%hi(%2), %%g1\n\t"
+		"or		%%g1, %%lo(%2), %%g1\n"
+		"1:\tlduw	[%1], %%g5\n\t"
+		"cmp		%%g5, 0\n\t"
+		"bne,pn		%%icc, 2f\n\t"
+		" mov		0, %0\n\t"
+		"add		%%g5, %%g1, %%g7\n\t"
+		"cas		[%1], %%g5, %%g7\n\t"
+		"cmp		%%g5, %%g7\n\t"
+		"bne,pn		%%icc, 1b\n\t"
+		" mov		1, %0\n\t"
+		"membar		#StoreLoad | #StoreStore\n"
+		"2:\n\t"
+		"! ending __down_write_trylock"
+		: "=&r" (result)
+		: "r" (sem), "i" (RWSEM_ACTIVE_WRITE_BIAS)
+		: "g1", "g5", "g7", "memory", "cc");
+
+	return result;
+}
+
+static __inline__ void __up_read(struct rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"! beginning __up_read\n\t"
@@ -146,7 +199,7 @@ static inline void __up_read(struct rw_semaphore *sem)
 		: "g1", "g5", "g7", "memory", "cc");
 }
 
-static inline void __up_write(struct rw_semaphore *sem)
+static __inline__ void __up_write(struct rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"! beginning __up_write\n\t"
@@ -179,7 +232,40 @@ static inline void __up_write(struct rw_semaphore *sem)
 		: "g1", "g5", "g7", "memory", "cc");
 }
 
-static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
+static __inline__ void __downgrade_write(struct rw_semaphore *sem)
+{
+	__asm__ __volatile__(
+		"! beginning __up_write\n\t"
+		"sethi		%%hi(%2), %%g1\n\t"
+		"or		%%g1, %%lo(%2), %%g1\n"
+		"1:\tlduw	[%0], %%g5\n\t"
+		"sub		%%g5, %%g1, %%g7\n\t"
+		"cas		[%0], %%g5, %%g7\n\t"
+		"cmp		%%g5, %%g7\n\t"
+		"bne,pn		%%icc, 1b\n\t"
+		" sub		%%g7, %%g1, %%g7\n\t"
+		"cmp		%%g7, 0\n\t"
+		"bl,pn		%%icc, 3f\n\t"
+		" membar	#StoreLoad | #StoreStore\n"
+		"2:\n\t"
+		".subsection 2\n"
+		"3:\tmov	%0, %%g5\n\t"
+		"save		%%sp, -160, %%sp\n\t"
+		"mov		%%g2, %%l2\n\t"
+		"mov		%%g3, %%l3\n\t"
+		"call		%1\n\t"
+		" mov		%%g5, %%o0\n\t"
+		"mov		%%l2, %%g2\n\t"
+		"ba,pt		%%xcc, 2b\n\t"
+		" restore	%%l3, %%g0, %%g3\n\t"
+		".previous\n\t"
+		"! ending __up_write"
+		: : "r" (sem), "i" (rwsem_downgrade_wake),
+		    "i" (RWSEM_WAITING_BIAS)
+		: "g1", "g5", "g7", "memory", "cc");
+}
+
+static __inline__ int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
 {
 	int tmp = delta;
 
@@ -200,7 +286,7 @@ static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
 
 #define rwsem_atomic_add rwsem_atomic_update
 
-static inline __u16 rwsem_cmpxchgw(struct rw_semaphore *sem, __u16 __old, __u16 __new)
+static __inline__ __u16 rwsem_cmpxchgw(struct rw_semaphore *sem, __u16 __old, __u16 __new)
 {
 	u32 old = (sem->count & 0xffff0000) | (u32) __old;
 	u32 new = (old & 0xffff0000) | (u32) __new;
@@ -223,7 +309,7 @@ again:
 	return prev & 0xffff;
 }
 
-static inline signed long rwsem_cmpxchg(struct rw_semaphore *sem, signed long old, signed long new)
+static __inline__ signed long rwsem_cmpxchg(struct rw_semaphore *sem, signed long old, signed long new)
 {
 	return cmpxchg(&sem->count,old,new);
 }

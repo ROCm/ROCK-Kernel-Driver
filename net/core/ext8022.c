@@ -25,12 +25,12 @@ static func_type llc_sap_table[128];
 static int llc_users;
 
 static struct packet_type llc_packet_type = {
-	type:	__constant_htons(ETH_P_802_2),
-	func:	llc_rcv,
+	.type =	__constant_htons(ETH_P_802_2),
+	.func =	llc_rcv,
 };
 static struct packet_type llc_tr_packet_type = {
-	type:	__constant_htons(ETH_P_TR_802_2),
-	func:	llc_rcv,
+	.type =	__constant_htons(ETH_P_TR_802_2),
+	.func =	llc_rcv,
 };
 
 static int llc_rcv(struct sk_buff *skb, struct net_device *dev,

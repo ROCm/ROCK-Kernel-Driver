@@ -64,7 +64,7 @@
 static struct proto_ops sco_sock_ops;
 
 static struct bluez_sock_list sco_sk_list = {
-	lock: RW_LOCK_UNLOCKED
+	.lock = RW_LOCK_UNLOCKED
 };
 
 static inline int sco_chan_add(struct sco_conn *conn, struct sock *sk, struct sock *parent);
@@ -936,36 +936,36 @@ static int sco_read_proc(char *buf, char **start, off_t offset, int count, int *
 }
 
 static struct proto_ops sco_sock_ops = {
-	family:		PF_BLUETOOTH,
-	release:	sco_sock_release,
-	bind:		sco_sock_bind,
-	connect:	sco_sock_connect,
-	listen:		sco_sock_listen,
-	accept:		sco_sock_accept,
-	getname:	sco_sock_getname,
-	sendmsg:	sco_sock_sendmsg,
-	recvmsg:	bluez_sock_recvmsg,
-	poll:		bluez_sock_poll,
-	socketpair:	sock_no_socketpair,
-	ioctl:		sock_no_ioctl,
-	shutdown:	sock_no_shutdown,
-	setsockopt:	sco_sock_setsockopt,
-	getsockopt:	sco_sock_getsockopt,
-	mmap:		sock_no_mmap
+	.family =	PF_BLUETOOTH,
+	.release =	sco_sock_release,
+	.bind =		sco_sock_bind,
+	.connect =	sco_sock_connect,
+	.listen =	sco_sock_listen,
+	.accept =	sco_sock_accept,
+	.getname =	sco_sock_getname,
+	.sendmsg =	sco_sock_sendmsg,
+	.recvmsg =	bluez_sock_recvmsg,
+	.poll =		bluez_sock_poll,
+	.socketpair =	sock_no_socketpair,
+	.ioctl =	sock_no_ioctl,
+	.shutdown =	sock_no_shutdown,
+	.setsockopt =	sco_sock_setsockopt,
+	.getsockopt =	sco_sock_getsockopt,
+	.mmap =		sock_no_mmap
 };
 
 static struct net_proto_family sco_sock_family_ops = {
-	family:		PF_BLUETOOTH,
-	create:		sco_sock_create
+	.family =	PF_BLUETOOTH,
+	.create =	sco_sock_create
 };
 
 static struct hci_proto sco_hci_proto = {
-	name:		"SCO",
-	id:		HCI_PROTO_SCO,
-	connect_ind:	sco_connect_ind,
-	connect_cfm:	sco_connect_cfm,
-	disconn_ind:	sco_disconn_ind,
-	recv_scodata:	sco_recv_scodata,
+	.name =		"SCO",
+	.id =		HCI_PROTO_SCO,
+	.connect_ind =	sco_connect_ind,
+	.connect_cfm =	sco_connect_cfm,
+	.disconn_ind =	sco_disconn_ind,
+	.recv_scodata =	sco_recv_scodata,
 };
 
 int __init sco_init(void)

@@ -69,9 +69,7 @@ struct screen_info screen_info = {
 extern unsigned long trapbase;
 extern int serial_console;
 extern void breakpoint(void);
-#if CONFIG_SUN_CONSOLE
 void (*prom_palette)(int);
-#endif
 asmlinkage void sys_sync(void);	/* it's really int */
 
 /* Pretty sick eh? */
@@ -87,10 +85,8 @@ void prom_sync_me(void)
 			     "nop\n\t"
 			     "nop\n\t" : : "r" (&trapbase));
 
-#ifdef CONFIG_SUN_CONSOLE
 	if (prom_palette)
 		prom_palette(1);
-#endif
 	prom_printf("PROM SYNC COMMAND...\n");
 	show_free_areas();
 	if(current->pid != 0) {
@@ -118,9 +114,7 @@ unsigned int boot_flags __initdata = 0;
 #define BOOTME_KGDBB  0x8
 #define BOOTME_KGDB   0xc
 
-#ifdef CONFIG_SUN_CONSOLE
 static int console_fb __initdata = 0;
-#endif
 
 /* Exported for mm/init.c:paging_init. */
 unsigned long cmdline_memory_size __initdata = 0;
@@ -140,10 +134,10 @@ prom_console_write(struct console *con, const char *s, unsigned n)
 }
 
 static struct console prom_debug_console = {
-	name:		"debug",
-	write:		prom_console_write,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"debug",
+	.write =	prom_console_write,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 int obp_system_intr(void)
@@ -221,7 +215,6 @@ static void __init boot_flags_init(char *commands)
 			}
 			commands += 9;
 		} else {
-#if CONFIG_SUN_CONSOLE
 			if (!strncmp(commands, "console=", 8)) {
 				commands += 8;
 				if (!strncmp (commands, "ttya", 4)) {
@@ -242,9 +235,7 @@ static void __init boot_flags_init(char *commands)
 				} else {
 					console_fb = 1;
 				}
-			} else
-#endif
-			if (!strncmp(commands, "mem=", 4)) {
+			} else if (!strncmp(commands, "mem=", 4)) {
 				/*
 				 * "mem=XXX[kKmM] overrides the PROM-reported
 				 * memory size.
@@ -481,7 +472,7 @@ static int show_cpuinfo(struct seq_file *m, void *__unused)
 		   (short) romvec->pv_printrev,
 		   &cputypval,
 		   linux_num_cpus,
-		   smp_num_cpus
+		   num_online_cpus()
 #ifndef CONFIG_SMP
 		   , loops_per_jiffy/(500000/HZ),
 		   (loops_per_jiffy/(5000/HZ)) % 100
@@ -518,8 +509,8 @@ static void c_stop(struct seq_file *m, void *v)
 }
 
 struct seq_operations cpuinfo_op = {
-	start:	c_start,
-	next:	c_next,
-	stop:	c_stop,
-	show:	show_cpuinfo,
+	.start =c_start,
+	.next =	c_next,
+	.stop =	c_stop,
+	.show =	show_cpuinfo,
 };

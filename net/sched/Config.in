@@ -2,6 +2,7 @@
 # Traffic control configuration.
 # 
 tristate '  CBQ packet scheduler' CONFIG_NET_SCH_CBQ
+tristate '  HTB packet scheduler' CONFIG_NET_SCH_HTB
 tristate '  CSZ packet scheduler' CONFIG_NET_SCH_CSZ
 #tristate '  H-PFQ packet scheduler' CONFIG_NET_SCH_HPFQ
 #tristate '  H-FSC packet scheduler' CONFIG_NET_SCH_HFCS

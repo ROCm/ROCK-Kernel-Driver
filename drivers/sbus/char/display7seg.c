@@ -164,10 +164,10 @@ static int d7s_ioctl(struct inode *inode, struct file *f,
 }
 
 static struct file_operations d7s_fops = {
-	owner:		THIS_MODULE,
-	ioctl:		d7s_ioctl,
-	open:		d7s_open,
-	release:	d7s_release,
+	.owner =	THIS_MODULE,
+	.ioctl =	d7s_ioctl,
+	.open =		d7s_open,
+	.release =	d7s_release,
 };
 
 static struct miscdevice d7s_miscdev = { D7S_MINOR, D7S_DEVNAME, &d7s_fops };

@@ -153,6 +153,9 @@ static __inline__ int tcp_bhashfn(__u16 lport)
 	return (lport & (tcp_bhash_size - 1));
 }
 
+extern void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
+			  unsigned short snum);
+
 /* This is a TIME_WAIT bucket.  It works around the memory consumption
  * problems of sockets in such a state on heavily loaded servers, but
  * without violating the protocol specification.

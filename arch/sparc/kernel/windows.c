@@ -32,7 +32,7 @@ void flush_user_windows(void)
 		" restore %%g0, %%g0, %%g0\n"
 	: "=&r" (ctr)
 	: "0" (ctr),
-	  "i" ((const unsigned long)(&(((struct task_struct *)0)->thread.uwinmask)))
+	  "i" ((const unsigned long)TI_UWINMASK)
 	: "g4", "cc");
 }
 

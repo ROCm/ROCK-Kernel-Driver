@@ -6,7 +6,7 @@
  *
  *  Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
  *  Copyright (C) 1995 Miguel de Icaza (miguel@nuclecu.unam.mx)
- *  Copyright (C) 1995 Pete A. Zaitcev (zaitcev@yahoo.com)
+ *  Copyright (C) 1995,2002 Pete A. Zaitcev (zaitcev@yahoo.com)
  *  Copyright (C) 1996 Dave Redman (djhr@tadpole.co.uk)
  *  Copyright (C) 1998-2000 Anton Blanchard (anton@samba.org)
  */
@@ -46,6 +46,7 @@
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
 #include <asm/pcic.h>
+#include <asm/cacheflush.h>
 
 /*
  * Dave Redman (djhr@tadpole.co.uk)
@@ -119,9 +120,11 @@ int show_interrupts(struct seq_file *p, void *v)
 #ifndef CONFIG_SMP
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
-		for (j = 0; j < smp_num_cpus; j++)
-			seq_printf(p, "%10u ",
-				kstat.irqs[cpu_logical_map(j)][i]);
+		for (j = 0; j < NR_CPUS; j++) {
+			if (cpu_online(j))
+				seq_printf(p, "%10u ",
+				    kstat.irqs[cpu_logical_map(j)][i]);
+		}
 #endif
 		seq_printf(p, " %c %s",
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
@@ -214,12 +217,16 @@ static void show(char * str)
 
 	printk("\n%s, CPU %d:\n", str, cpu);
 	printk("irq:  %d [ ", irqs_running());
-	for (i = 0; i < smp_num_cpus; i++)
-		printk("%u ", __brlock_array[i][BR_GLOBALIRQ_LOCK]);
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_online(i))
+			printk("%u ", __brlock_array[i][BR_GLOBALIRQ_LOCK]);
+	}
 	printk("]\nbh:   %d [ ",
 	       (spin_is_locked(&global_bh_lock) ? 1 : 0));
-	for (i = 0; i < smp_num_cpus; i++)
-		printk("%u ", local_bh_count(i));
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_online(i))
+			printk("%u ", local_bh_count(i));
+	}
 	printk("]\n");
 
 #ifdef VERBOSE_DEBUG_IRQLOCK

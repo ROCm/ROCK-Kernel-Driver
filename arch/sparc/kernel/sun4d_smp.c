@@ -43,7 +43,6 @@ extern int linux_num_cpus;
 
 extern void calibrate_delay(void);
 
-extern struct task_struct *current_set[NR_CPUS];
 extern volatile int smp_processors_ready;
 extern unsigned long cpu_present_map;
 extern int smp_num_cpus;

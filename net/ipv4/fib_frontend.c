@@ -634,11 +634,11 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 }
 
 struct notifier_block fib_inetaddr_notifier = {
-	notifier_call:	fib_inetaddr_event,
+	.notifier_call =fib_inetaddr_event,
 };
 
 struct notifier_block fib_netdev_notifier = {
-	notifier_call:	fib_netdev_event,
+	.notifier_call =fib_netdev_event,
 };
 
 void __init ip_fib_init(void)

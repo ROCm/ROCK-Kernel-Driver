@@ -25,6 +25,8 @@
 #include <asm/vaddrs.h>
 #include <asm/kmap_types.h>
 #include <asm/pgtable.h>
+#include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
 
 /* undef for production */
 #define HIGHMEM_DEBUG 1
