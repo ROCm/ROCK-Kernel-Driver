@@ -100,7 +100,7 @@ module_param(pc_debug, int, 0);
 /* Parameters that can be set with 'insmod' */
 /* Bit map of interrupts to choose from */
 /* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static unsigned long wl3501_irq_mask = 0xdeb8;
+static unsigned int wl3501_irq_mask = 0xdeb8;
 static int wl3501_irq_list[4] = { -1 };
 
 /*
@@ -2279,7 +2279,7 @@ static void __exit wl3501_exit_module(void)
 module_init(wl3501_init_module);
 module_exit(wl3501_exit_module);
 
-module_param(wl3501_irq_mask, int, 0);
+module_param(wl3501_irq_mask, uint, 0);
 module_param_array(wl3501_irq_list, int, NULL, 0);
 MODULE_AUTHOR("Fox Chen <mhchen@golf.ccl.itri.org.tw>, "
 	      "Arnaldo Carvalho de Melo <acme@conectiva.com.br>,"
