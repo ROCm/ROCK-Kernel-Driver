@@ -420,6 +420,7 @@ static void __exit slvl_shutdown(struct slvl_board *b)
 	/* DMA off on the card, drop DTR */
 	outb(0, b->iobase);
 	release_region(b->iobase, 8);
+	kfree(b);
 }
 
 
