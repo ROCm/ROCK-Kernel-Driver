@@ -12,6 +12,18 @@ CONFIG_SERIO
   The module will be called serio.o. If you want to compile it
   as a module, say M here and read <file:Documentation/modules.txt>.
 
+CONFIG_SERIO_I8042
+  i8042 is the chip over which the standard AT keyboard and PS/2
+  mouse are connected to the computer. If you use these devices,
+  you'll need to say Y here.
+
+  If unsure, say Y.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called i8042.o. If you want to compile it
+  as a module, say M here and read <file:Documentation/modules.txt>.
+
 CONFIG_SERIO_SERPORT
   Say Y here if you plan to use an input device (mouse, joystick,
   tablet, 6dof) that communicates over the RS232 serial (COM) port.
@@ -24,3 +36,38 @@ CONFIG_SERIO_SERPORT
   inserted in and removed from the running kernel whenever you want).
   The module will be called serport.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SERIO_CT82C710
+  Say Y here if you have a Texas Instruments TravelMate notebook
+  equipped with the ct82c710 chip and want to use a mouse connected
+  to the "QuickPort".
+
+  If unsure, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ct82c710.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SERIO_PARKBD
+  Say Y here if you built a simple parallel port adapter to attach
+  an additional AT keyboard, XT keyboard or PS/2 mouse.
+
+  More information is available: <file:Documentation/input/input.txt>
+
+  If unsure, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called parkbd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_SERIO_ACORN
+  Say Y here if you have the Acorn RiscPC and want to use an AT
+  keyboard connected to its keyboard controller.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called rpckbd.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+

@@ -372,7 +372,7 @@ static void usblp_cleanup (struct usblp *usblp)
 {
 	devfs_unregister (usblp->devfs);
 	usblp_table [usblp->minor] = NULL;
-	usb_deregister_dev (&usblp_driver, 1, usblp->minor);
+	usb_deregister_dev (1, usblp->minor);
 	info("usblp%d: removed", usblp->minor);
 
 	kfree (usblp->writeurb->transfer_buffer);
@@ -812,20 +812,10 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	init_waitqueue_head(&usblp->wait);
 	usblp->ifnum = ifnum;
 
-	retval = usb_register_dev(&usblp_driver, 1, &usblp->minor);
+	retval = usb_register_dev(&usblp_fops, USBLP_MINOR_BASE, 1, &usblp->minor);
 	if (retval) {
-		if (retval != -ENODEV) {
-			err("Not able to get a minor for this device.");
-			goto abort;
-		}
-		/* Look for a free usblp_table entry on our own. */
-		while (usblp_table[usblp->minor]) {
-			usblp->minor++;
-			if (usblp->minor >= USBLP_MINORS) {
-				err("no more free usblp devices");
-				goto abort;
-			}
-		}
+		err("Not able to get a minor for this device.");
+		goto abort;
 	}
 
 	usblp->writeurb = usb_alloc_urb(0, GFP_KERNEL);
@@ -901,7 +891,7 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	return usblp;
 
 abort_minor:
-	usb_deregister_dev (&usblp_driver, 1, usblp->minor);
+	usb_deregister_dev (1, usblp->minor);
 abort:
 	if (usblp) {
 		usb_free_urb(usblp->writeurb);
@@ -1111,9 +1101,6 @@ static struct usb_driver usblp_driver = {
 	name:		"usblp",
 	probe:		usblp_probe,
 	disconnect:	usblp_disconnect,
-	fops:		&usblp_fops,
-	minor:		USBLP_MINOR_BASE,
-	num_minors:	USBLP_MINORS,
 	id_table:	usblp_ids,
 };
 

@@ -221,11 +221,9 @@ static void capifs_put_super(struct super_block *sb)
 	kfree(sbi);
 }
 
-static int capifs_statfs(struct super_block *sb, struct statfs *buf);
-
 static struct super_operations capifs_sops = {
 	put_super:	capifs_put_super,
-	statfs:		capifs_statfs,
+	statfs:		simple_statfs,
 };
 
 static int capifs_parse_options(char *options, struct capifs_sb_info *sbi)
@@ -352,19 +350,6 @@ static int capifs_fill_super(struct super_block *s, void *data, int silent)
 	return 0;
 fail:
 	return -EINVAL;
-}
-
-static int capifs_statfs(struct super_block *sb, struct statfs *buf)
-{
-	buf->f_type = CAPIFS_SUPER_MAGIC;
-	buf->f_bsize = 1024;
-	buf->f_blocks = 0;
-	buf->f_bfree = 0;
-	buf->f_bavail = 0;
-	buf->f_files = 0;
-	buf->f_ffree = 0;
-	buf->f_namelen = NAME_MAX;
-	return 0;
 }
 
 static struct inode *capifs_new_inode(struct super_block *sb)

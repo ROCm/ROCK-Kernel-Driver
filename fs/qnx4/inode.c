@@ -281,12 +281,16 @@ unsigned long qnx4_block_map( struct inode *inode, long iblock )
 
 static int qnx4_statfs(struct super_block *sb, struct statfs *buf)
 {
+	lock_kernel();
+
 	buf->f_type    = sb->s_magic;
 	buf->f_bsize   = sb->s_blocksize;
 	buf->f_blocks  = le32_to_cpu(qnx4_sb(sb)->BitMap->di_size) * 8;
 	buf->f_bfree   = qnx4_count_free_blocks(sb);
 	buf->f_bavail  = buf->f_bfree;
 	buf->f_namelen = QNX4_NAME_MAX;
+
+	unlock_kernel();
 
 	return 0;
 }

@@ -18,16 +18,16 @@ COMPILE_ARCH = $(shell uname -m)
 
 # override top level makefile
 AS += -m68020
-LD += -m m68kelf
+LDFLAGS := -m m68kelf
 ifneq ($(COMPILE_ARCH),$(ARCH))
 	# prefix for cross-compiling binaries
 	CROSS_COMPILE = m68k-linux-
 endif
 
 ifndef CONFIG_SUN3
-LINKFLAGS = -T $(TOPDIR)/arch/m68k/vmlinux.lds
+LDFLAGS_vmlinux = -T $(TOPDIR)/arch/m68k/vmlinux.lds
 else
-LINKFLAGS = -T $(TOPDIR)/arch/m68k/vmlinux-sun3.lds -N
+LDFLAGS_vmlinux = -T $(TOPDIR)/arch/m68k/vmlinux-sun3.lds -N
 endif
 
 # without -fno-strength-reduce the 53c7xx.c driver fails ;-(

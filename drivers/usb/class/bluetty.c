@@ -1151,7 +1151,8 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 
 	endpoint = bulk_out_endpoint[0];
 	bluetooth->bulk_out_endpointAddress = endpoint->bEndpointAddress;
-	
+	bluetooth->bulk_out_buffer_size = endpoint->wMaxPacketSize * 2;
+
 	/* create our write urb pool */ 
 	for (i = 0; i < NUM_BULK_URBS; ++i) {
 		struct urb  *urb = usb_alloc_urb(0, GFP_KERNEL);
@@ -1166,8 +1167,6 @@ static void * usb_bluetooth_probe(struct usb_device *dev, unsigned int ifnum,
 		}
 		bluetooth->write_urb_pool[i] = urb;
 	}
-	
-	bluetooth->bulk_out_buffer_size = endpoint->wMaxPacketSize * 2;
 
 	endpoint = interrupt_in_endpoint[0];
 	bluetooth->interrupt_in_urb = usb_alloc_urb(0, GFP_KERNEL);

@@ -474,6 +474,8 @@ nfs_statfs(struct super_block *sb, struct statfs *buf)
 	struct nfs_fsinfo res;
 	int error;
 
+	lock_kernel();
+
 	error = server->rpc_ops->statfs(server, NFS_FH(sb->s_root->d_inode), &res);
 	buf->f_type = NFS_SUPER_MAGIC;
 	if (error < 0)
@@ -491,11 +493,17 @@ nfs_statfs(struct super_block *sb, struct statfs *buf)
 	if (res.namelen == 0 || res.namelen > server->namelen)
 		res.namelen = server->namelen;
 	buf->f_namelen = res.namelen;
+
+ out:
+	unlock_kernel();
+
 	return 0;
+
  out_err:
-	printk("nfs_statfs: statfs error = %d\n", -error);
+	printk(KERN_WARNING "nfs_statfs: statfs error = %d\n", -error);
 	buf->f_bsize = buf->f_blocks = buf->f_bfree = buf->f_bavail = -1;
-	return 0;
+	goto out;
+
 }
 
 static int nfs_show_options(struct seq_file *m, struct vfsmount *mnt)

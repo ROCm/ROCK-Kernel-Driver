@@ -48,7 +48,6 @@ static spinlock_t mount_lock = SPIN_LOCK_UNLOCKED;
 static int mount_count;	/* = 0 */
 
 static struct dentry *devices_dentry;
-static struct dentry *drivers_dentry;
 static int num_buses;	/* = 0 */
 
 static uid_t devuid;	/* = 0 */
@@ -548,16 +547,6 @@ static int create_special_files (void)
 		return -ENODEV;
 	}
 
-	drivers_dentry = fs_create_file ("drivers",
-					 listmode | S_IFREG,
-					 NULL, NULL,
-					 &usbdevfs_drivers_fops,
-					 listuid, listgid);
-	if (drivers_dentry == NULL) {
-		err ("Unable to create drivers usbfs file");
-		return -ENODEV;
-	}
-
 	return 0;
 }
 
@@ -565,10 +554,7 @@ static void remove_special_files (void)
 {
 	if (devices_dentry)
 		fs_remove_file (devices_dentry);
-	if (drivers_dentry)
-		fs_remove_file (drivers_dentry);
 	devices_dentry = NULL;
-	drivers_dentry = NULL;
 	remove_mount();
 }
 
@@ -577,11 +563,6 @@ void usbfs_update_special (void)
 	struct inode *inode;
 
 	if (devices_dentry) {
-		inode = devices_dentry->d_inode;
-		if (inode)
-			inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-	}
-	if (drivers_dentry) {
 		inode = devices_dentry->d_inode;
 		if (inode)
 			inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
