@@ -715,8 +715,8 @@ static int mts_usb_probe(struct usb_interface *intf,
 	MTS_DEBUG( "usb-device descriptor at %x\n", (int)dev );
 
 	MTS_DEBUG( "product id = 0x%x, vendor id = 0x%x\n",
-		   (int)dev->descriptor.idProduct,
-		   (int)dev->descriptor.idVendor );
+		   le16_to_cpu(dev->descriptor.idProduct),
+		   le16_to_cpu(dev->descriptor.idVendor) );
 
 	MTS_DEBUG_GOT_HERE();
 

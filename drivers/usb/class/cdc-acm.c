@@ -657,9 +657,9 @@ next_desc:
 	}
 	memset(acm, 0, sizeof(struct acm));
 
-	ctrlsize = epctrl->wMaxPacketSize;
-	readsize = epread->wMaxPacketSize;
-	acm->writesize = epwrite->wMaxPacketSize;
+	ctrlsize = le16_to_cpu(epctrl->wMaxPacketSize);
+	readsize = le16_to_cpu(epread->wMaxPacketSize);
+	acm->writesize = le16_to_cpu(epwrite->wMaxPacketSize);
 	acm->control = control_interface;
 	acm->data = data_interface;
 	acm->minor = minor;

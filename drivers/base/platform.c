@@ -58,6 +58,41 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
 }
 
 /**
+ *	platform_get_resource_byname - get a resource for a device by name
+ *	@dev: platform device
+ *	@type: resource type
+ *	@name: resource name
+ */
+struct resource *
+platform_get_resource_byname(struct platform_device *dev, unsigned int type,
+		      char *name)
+{
+	int i;
+
+	for (i = 0; i < dev->num_resources; i++) {
+		struct resource *r = &dev->resource[i];
+
+		if ((r->flags & (IORESOURCE_IO|IORESOURCE_MEM|
+				 IORESOURCE_IRQ|IORESOURCE_DMA)) == type)
+			if (!strcmp(r->name, name))
+				return r;
+	}
+	return NULL;
+}
+
+/**
+ *	platform_get_irq - get an IRQ for a device
+ *	@dev: platform device
+ *	@name: IRQ name
+ */
+int platform_get_irq_byname(struct platform_device *dev, char *name)
+{
+	struct resource *r = platform_get_resource_byname(dev, IORESOURCE_IRQ, name);
+
+	return r ? r->start : 0;
+}
+
+/**
  *	platform_add_devices - add a numbers of platform devices
  *	@devs: array of platform devices to add
  *	@num: number of platform devices in array
@@ -103,7 +138,8 @@ int platform_device_register(struct platform_device * pdev)
 	for (i = 0; i < pdev->num_resources; i++) {
 		struct resource *p, *r = &pdev->resource[i];
 
-		r->name = pdev->dev.bus_id;
+		if (r->name == NULL)
+			r->name = pdev->dev.bus_id;
 
 		p = NULL;
 		if (r->flags & IORESOURCE_MEM)
@@ -308,3 +344,5 @@ EXPORT_SYMBOL_GPL(platform_device_register_simple);
 EXPORT_SYMBOL_GPL(platform_device_unregister);
 EXPORT_SYMBOL_GPL(platform_get_irq);
 EXPORT_SYMBOL_GPL(platform_get_resource);
+EXPORT_SYMBOL_GPL(platform_get_irq_byname);
+EXPORT_SYMBOL_GPL(platform_get_resource_byname);

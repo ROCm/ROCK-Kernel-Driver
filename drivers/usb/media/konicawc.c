@@ -390,7 +390,7 @@ static int konicawc_start_data(struct uvd *uvd)
 				spd_to_iface[cam->speed]);
 	if (!interface)
 		return -ENXIO;
-	pktsz = interface->endpoint[1].desc.wMaxPacketSize;
+	pktsz = le16_to_cpu(interface->endpoint[1].desc.wMaxPacketSize);
 	DEBUG(1, "pktsz = %d", pktsz);
 	if (!CAMERA_IS_OPERATIONAL(uvd)) {
 		err("Camera is not operational");
@@ -732,7 +732,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 	if (dev->descriptor.bNumConfigurations != 1)
 		return -ENODEV;
 
-	info("Konica Webcam (rev. 0x%04x)", dev->descriptor.bcdDevice);
+	info("Konica Webcam (rev. 0x%04x)", le16_to_cpu(dev->descriptor.bcdDevice));
 	RESTRICT_TO_RANGE(speed, 0, MAX_SPEED);
 
 	/* Validate found interface: must have one ISO endpoint */
@@ -756,7 +756,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 		}
 		endpoint = &interface->endpoint[1].desc;
 		DEBUG(1, "found endpoint: addr: 0x%2.2x maxps = 0x%4.4x",
-		    endpoint->bEndpointAddress, endpoint->wMaxPacketSize);
+		    endpoint->bEndpointAddress, le16_to_cpu(endpoint->wMaxPacketSize));
 		if (video_ep == 0)
 			video_ep = endpoint->bEndpointAddress;
 		else if (video_ep != endpoint->bEndpointAddress) {
@@ -773,7 +773,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 			    interface->desc.bInterfaceNumber);
 			return -ENODEV;
 		}
-		if (endpoint->wMaxPacketSize == 0) {
+		if (le16_to_cpu(endpoint->wMaxPacketSize) == 0) {
 			if (inactInterface < 0)
 				inactInterface = i;
 			else {
@@ -786,8 +786,8 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 				actInterface = i;
 			}
 		}
-		if(endpoint->wMaxPacketSize > maxPS)
-			maxPS = endpoint->wMaxPacketSize;
+		if (le16_to_cpu(endpoint->wMaxPacketSize) > maxPS)
+			maxPS = le16_to_cpu(endpoint->wMaxPacketSize);
 	}
 	if(actInterface == -1) {
 		err("Cant find required endpoint");
@@ -846,9 +846,9 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 		cam->input.evbit[0] = BIT(EV_KEY);
 		cam->input.keybit[LONG(BTN_0)] = BIT(BTN_0);
 		cam->input.id.bustype = BUS_USB;
-		cam->input.id.vendor = dev->descriptor.idVendor;
-		cam->input.id.product = dev->descriptor.idProduct;
-		cam->input.id.version = dev->descriptor.bcdDevice;
+		cam->input.id.vendor = le16_to_cpu(dev->descriptor.idVendor);
+		cam->input.id.product = le16_to_cpu(dev->descriptor.idProduct);
+		cam->input.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 		input_register_device(&cam->input);
 		
 		usb_make_path(dev, cam->input_physname, 56);

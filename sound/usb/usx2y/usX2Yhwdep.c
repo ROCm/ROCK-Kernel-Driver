@@ -133,7 +133,7 @@ static int snd_usX2Y_hwdep_dsp_status(snd_hwdep_t *hw, snd_hwdep_dsp_status_t *i
 	};
 	int id = -1;
 
-	switch (((usX2Ydev_t*)hw->private_data)->chip.dev->descriptor.idProduct) {
+	switch (le16_to_cpu(((usX2Ydev_t*)hw->private_data)->chip.dev->descriptor.idProduct)) {
 	case USB_ID_US122:
 		id = USX2Y_TYPE_122;
 		break;
@@ -185,7 +185,7 @@ static int usX2Y_create_usbmidi(snd_card_t* card )
 	};
 	struct usb_device *dev = usX2Y(card)->chip.dev;
 	struct usb_interface *iface = usb_ifnum_to_if(dev, 0);
-	snd_usb_audio_quirk_t *quirk = dev->descriptor.idProduct == USB_ID_US428 ? &quirk_2 : &quirk_1;
+	snd_usb_audio_quirk_t *quirk = le16_to_cpu(dev->descriptor.idProduct) == USB_ID_US428 ? &quirk_2 : &quirk_1;
 
 	snd_printdd("usX2Y_create_usbmidi \n");
 	return snd_usb_create_midi_interface(&usX2Y(card)->chip, iface, quirk);

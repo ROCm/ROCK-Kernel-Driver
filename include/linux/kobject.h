@@ -167,6 +167,8 @@ struct subsystem _varname##_subsys = { \
 	} \
 }
 
+/* The global /sys/kernel/ subsystem for people to chain off of */
+extern struct subsystem kernel_subsys;
 
 /**
  * Helpers for setting the kset of registered objects.

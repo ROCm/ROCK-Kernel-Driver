@@ -449,12 +449,16 @@ static int usX2Y_urbs_allocate(snd_usX2Y_substream_t *subs)
 	int i;
 	int is_playback = subs == subs->usX2Y->substream[SNDRV_PCM_STREAM_PLAYBACK];
 	struct usb_device *dev = subs->usX2Y->chip.dev;
+	struct usb_host_endpoint *ep;
 
 	snd_assert(!subs->prepared, return 0);
 
 	if (is_playback) {	/* allocate a temporary buffer for playback */
 		subs->datapipe = usb_sndisocpipe(dev, subs->endpoint);
-		subs->maxpacksize = dev->epmaxpacketout[subs->endpoint];
+		ep = dev->ep_out[subs->endpoint];
+		if (!ep)
+			return -EINVAL;
+		subs->maxpacksize = le16_to_cpu(ep->desc.wMaxPacketSize);
 		if (NULL == subs->tmpbuf) {
 			subs->tmpbuf = kcalloc(NRPACKS, subs->maxpacksize, GFP_KERNEL);
 			if (NULL == subs->tmpbuf) {
@@ -464,7 +468,10 @@ static int usX2Y_urbs_allocate(snd_usX2Y_substream_t *subs)
 		}
 	} else {
 		subs->datapipe = usb_rcvisocpipe(dev, subs->endpoint);
-		subs->maxpacksize = dev->epmaxpacketin[subs->endpoint];
+		ep = dev->ep_in[subs->endpoint];
+		if (!ep)
+			return -EINVAL;
+		subs->maxpacksize = le16_to_cpu(ep->desc.wMaxPacketSize);
 	}
 
 	/* allocate and initialize data urbs */
@@ -1016,10 +1023,10 @@ int usX2Y_audio_create(snd_card_t* card)
 
 	if (0 > (err = usX2Y_audio_stream_new(card, 0xA, 0x8)))
 		return err;
-	if (usX2Y(card)->chip.dev->descriptor.idProduct == USB_ID_US428)
+	if (le16_to_cpu(usX2Y(card)->chip.dev->descriptor.idProduct) == USB_ID_US428)
 	     if (0 > (err = usX2Y_audio_stream_new(card, 0, 0xA)))
 		     return err;
-	if (usX2Y(card)->chip.dev->descriptor.idProduct != USB_ID_US122)
+	if (le16_to_cpu(usX2Y(card)->chip.dev->descriptor.idProduct) != USB_ID_US122)
 		err = usX2Y_rate_set(usX2Y(card), 44100);	// Lets us428 recognize output-volume settings, disturbs us122.
 	return err;
 }

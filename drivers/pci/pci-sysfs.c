@@ -20,6 +20,7 @@
 #include <linux/pci.h>
 #include <linux/stat.h>
 #include <linux/topology.h>
+#include <linux/mm.h>
 
 #include "pci.h"
 
@@ -178,6 +179,163 @@ pci_write_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
 	return count;
 }
 
+#ifdef HAVE_PCI_LEGACY
+/**
+ * pci_read_legacy_io - read byte(s) from legacy I/O port space
+ * @kobj: kobject corresponding to file to read from
+ * @buf: buffer to store results
+ * @off: offset into legacy I/O port space
+ * @count: number of bytes to read
+ *
+ * Reads 1, 2, or 4 bytes from legacy I/O port space using an arch specific
+ * callback routine (pci_legacy_read).
+ */
+ssize_t
+pci_read_legacy_io(struct kobject *kobj, char *buf, loff_t off, size_t count)
+{
+        struct pci_bus *bus = to_pci_bus(container_of(kobj,
+                                                      struct class_device,
+						      kobj));
+
+        /* Only support 1, 2 or 4 byte accesses */
+        if (count != 1 && count != 2 && count != 4)
+                return -EINVAL;
+
+        return pci_legacy_read(bus, off, (u32 *)buf, count);
+}
+
+/**
+ * pci_write_legacy_io - write byte(s) to legacy I/O port space
+ * @kobj: kobject corresponding to file to read from
+ * @buf: buffer containing value to be written
+ * @off: offset into legacy I/O port space
+ * @count: number of bytes to write
+ *
+ * Writes 1, 2, or 4 bytes from legacy I/O port space using an arch specific
+ * callback routine (pci_legacy_write).
+ */
+ssize_t
+pci_write_legacy_io(struct kobject *kobj, char *buf, loff_t off, size_t count)
+{
+        struct pci_bus *bus = to_pci_bus(container_of(kobj,
+						      struct class_device,
+						      kobj));
+        /* Only support 1, 2 or 4 byte accesses */
+        if (count != 1 && count != 2 && count != 4)
+                return -EINVAL;
+
+        return pci_legacy_write(bus, off, *(u32 *)buf, count);
+}
+
+/**
+ * pci_mmap_legacy_mem - map legacy PCI memory into user memory space
+ * @kobj: kobject corresponding to device to be mapped
+ * @attr: struct bin_attribute for this file
+ * @vma: struct vm_area_struct passed to mmap
+ *
+ * Uses an arch specific callback, pci_mmap_legacy_page_range, to mmap
+ * legacy memory space (first meg of bus space) into application virtual
+ * memory space.
+ */
+int
+pci_mmap_legacy_mem(struct kobject *kobj, struct bin_attribute *attr,
+                    struct vm_area_struct *vma)
+{
+        struct pci_bus *bus = to_pci_bus(container_of(kobj,
+                                                      struct class_device,
+						      kobj));
+
+        return pci_mmap_legacy_page_range(bus, vma);
+}
+#endif /* HAVE_PCI_LEGACY */
+
+#ifdef HAVE_PCI_MMAP
+/**
+ * pci_mmap_resource - map a PCI resource into user memory space
+ * @kobj: kobject for mapping
+ * @attr: struct bin_attribute for the file being mapped
+ * @vma: struct vm_area_struct passed into the mmap
+ *
+ * Use the regular PCI mapping routines to map a PCI resource into userspace.
+ * FIXME: write combining?  maybe automatic for prefetchable regions?
+ */
+static int
+pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
+		  struct vm_area_struct *vma)
+{
+	struct pci_dev *pdev = to_pci_dev(container_of(kobj,
+						       struct device, kobj));
+	struct resource *res = (struct resource *)attr->private;
+	enum pci_mmap_state mmap_type;
+
+	vma->vm_pgoff += res->start >> PAGE_SHIFT;
+	mmap_type = res->flags & IORESOURCE_MEM ? pci_mmap_mem : pci_mmap_io;
+
+	return pci_mmap_page_range(pdev, vma, mmap_type, 0);
+}
+
+/**
+ * pci_create_resource_files - create resource files in sysfs for @dev
+ * @dev: dev in question
+ *
+ * Walk the resources in @dev creating files for each resource available.
+ */
+static void
+pci_create_resource_files(struct pci_dev *pdev)
+{
+	int i;
+
+	/* Expose the PCI resources from this device as files */
+	for (i = 0; i < PCI_ROM_RESOURCE; i++) {
+		struct bin_attribute *res_attr;
+
+		/* skip empty resources */
+		if (!pci_resource_len(pdev, i))
+			continue;
+
+		res_attr = kmalloc(sizeof(*res_attr) + 10, GFP_ATOMIC);
+		if (res_attr) {
+			pdev->res_attr[i] = res_attr;
+			/* Allocated above after the res_attr struct */
+			res_attr->attr.name = (char *)(res_attr + 1);
+			sprintf(res_attr->attr.name, "resource%d", i);
+			res_attr->size = pci_resource_len(pdev, i);
+			res_attr->attr.mode = S_IRUSR | S_IWUSR;
+			res_attr->attr.owner = THIS_MODULE;
+			res_attr->mmap = pci_mmap_resource;
+			res_attr->private = &pdev->resource[i];
+			sysfs_create_bin_file(&pdev->dev.kobj, res_attr);
+		}
+	}
+}
+
+/**
+ * pci_remove_resource_files - cleanup resource files
+ * @dev: dev to cleanup
+ *
+ * If we created resource files for @dev, remove them from sysfs and
+ * free their resources.
+ */
+static void
+pci_remove_resource_files(struct pci_dev *pdev)
+{
+	int i;
+
+	for (i = 0; i < PCI_ROM_RESOURCE; i++) {
+		struct bin_attribute *res_attr;
+
+		res_attr = pdev->res_attr[i];
+		if (res_attr) {
+			sysfs_remove_bin_file(&pdev->dev.kobj, res_attr);
+			kfree(res_attr);
+		}
+	}
+}
+#else /* !HAVE_PCI_MMAP */
+static inline void pci_create_resource_files(struct pci_dev *dev) { return; }
+static inline void pci_remove_resource_files(struct pci_dev *dev) { return; }
+#endif /* HAVE_PCI_MMAP */
+
 /**
  * pci_write_rom - used to enable access to the PCI ROM display
  * @kobj: kernel object handle
@@ -269,6 +427,8 @@ int pci_create_sysfs_dev_files (struct pci_dev *pdev)
 	else
 		sysfs_create_bin_file(&pdev->dev.kobj, &pcie_config_attr);
 
+	pci_create_resource_files(pdev);
+
 	/* If the device has a ROM, try to expose it in sysfs. */
 	if (pci_resource_len(pdev, PCI_ROM_RESOURCE)) {
 		struct bin_attribute *rom_attr;
@@ -303,6 +463,8 @@ void pci_remove_sysfs_dev_files(struct pci_dev *pdev)
 		sysfs_remove_bin_file(&pdev->dev.kobj, &pci_config_attr);
 	else
 		sysfs_remove_bin_file(&pdev->dev.kobj, &pcie_config_attr);
+
+	pci_remove_resource_files(pdev);
 
 	if (pci_resource_len(pdev, PCI_ROM_RESOURCE)) {
 		if (pdev->rom_attr) {
