@@ -1815,8 +1815,6 @@ static struct fb_info *__devinit neo_alloc_fb_info(struct pci_dev *dev, const st
 	info->var.width = -1;
 	info->var.accel_flags = 0;
 
-	strcpy(info->modename, info->fix.id);
-
 	info->fbops = &neofb_ops;
 	info->updatevar = gen_update_var;
 	info->flags = FBINFO_FLAG_DEFAULT;

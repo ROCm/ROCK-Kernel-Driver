@@ -291,7 +291,6 @@ int __init tx3912fb_init(void)
 	if ((tx3912fb_fix.line_length * tx3912fb_var.yres_virtual) > tx3912fb_fix.smem_len)
 		return -ENOMEM;
 
-	strcpy(fb_info.modename, tx3912fb_fix.id);
 	fb_info.node = NODEV;
 	fb_info.currcon = -1;
 	fb_info.fbops = &tx3912fb_ops;

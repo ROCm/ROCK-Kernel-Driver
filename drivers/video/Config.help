@@ -672,32 +672,6 @@ CONFIG_FBCON_MFB
   This is the low level frame buffer console driver for monochrome
   (2 colors) packed pixels.
 
-CONFIG_FBCON_CFB2
-  This is the low level frame buffer console driver for 2 bits per
-  pixel (4 colors) packed pixels.
-
-CONFIG_FBCON_CFB4
-  This is the low level frame buffer console driver for 4 bits per
-  pixel (16 colors) packed pixels.
-
-CONFIG_FBCON_CFB8
-  This is the low level frame buffer console driver for 8 bits per
-  pixel (256 colors) packed pixels.
-
-CONFIG_FBCON_CFB16
-  This is the low level frame buffer console driver for 15 or 16 bits
-  per pixel (32K or 64K colors, also known as `hicolor') packed
-  pixels.
-
-CONFIG_FBCON_CFB24
-  This is the low level frame buffer console driver for 24 bits per
-  pixel (16M colors, also known as `truecolor') packed pixels. It is
-  NOT for `sparse' 32 bits per pixel mode.
-
-CONFIG_FBCON_CFB32
-  This is the low level frame buffer console driver for 32 bits per
-  pixel (16M colors, also known as `truecolor') sparse packed pixels.
-
 CONFIG_FBCON_AFB
   This is the low level frame buffer console driver for 1 to 8
   bitplanes (2 to 256 colors) on Amiga.

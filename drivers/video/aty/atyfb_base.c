@@ -689,6 +689,13 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 	    (v_sync_pol ? 0 : FB_SYNC_VERT_HIGH_ACT) |
 	    (c_sync ? FB_SYNC_COMP_HIGH_ACT : 0);
 
+	var->red.msb_right = 0;
+	var->green.msb_right = 0;
+	var->blue.offset = 0;
+	var->blue.msb_right = 0;
+	var->transp.offset = 0;
+	var->transp.length = 0;
+	var->transp.msb_right = 0;
 	switch (pix_width) {
 #if 0
 	case CRTC_PIX_WIDTH_4BPP:
@@ -697,10 +704,7 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 		var->red.length = 8;
 		var->green.offset = 0;
 		var->green.length = 8;
-		var->blue.offset = 0;
 		var->blue.length = 8;
-		var->transp.offset = 0;
-		var->transp.length = 0;
 		break;
 #endif
 	case CRTC_PIX_WIDTH_8BPP:
@@ -709,10 +713,7 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 		var->red.length = 8;
 		var->green.offset = 0;
 		var->green.length = 8;
-		var->blue.offset = 0;
 		var->blue.length = 8;
-		var->transp.offset = 0;
-		var->transp.length = 0;
 		break;
 	case CRTC_PIX_WIDTH_15BPP:	/* RGB 555 */
 		bpp = 16;
@@ -720,10 +721,7 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 		var->red.length = 5;
 		var->green.offset = 5;
 		var->green.length = 5;
-		var->blue.offset = 0;
 		var->blue.length = 5;
-		var->transp.offset = 0;
-		var->transp.length = 0;
 		break;
 #if 0
 	case CRTC_PIX_WIDTH_16BPP:	/* RGB 565 */
@@ -732,10 +730,7 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 		var->red.length = 5;
 		var->green.offset = 5;
 		var->green.length = 6;
-		var->blue.offset = 0;
 		var->blue.length = 5;
-		var->transp.offset = 0;
-		var->transp.length = 0;
 		break;
 #endif
 	case CRTC_PIX_WIDTH_24BPP:	/* RGB 888 */
@@ -744,10 +739,7 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 		var->red.length = 8;
 		var->green.offset = 8;
 		var->green.length = 8;
-		var->blue.offset = 0;
 		var->blue.length = 8;
-		var->transp.offset = 0;
-		var->transp.length = 0;
 		break;
 	case CRTC_PIX_WIDTH_32BPP:	/* ARGB 8888 */
 		bpp = 32;
@@ -755,7 +747,6 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 		var->red.length = 8;
 		var->green.offset = 8;
 		var->green.length = 8;
-		var->blue.offset = 0;
 		var->blue.length = 8;
 		var->transp.offset = 24;
 		var->transp.length = 8;
@@ -865,8 +856,7 @@ static int atyfb_set_par(struct fb_info *info)
 
 #ifdef CONFIG_BOOTX_TEXT
 	btext_update_display(info->fix.smem_start,
-			     (((par->crtc.h_tot_disp >> 16) & 0xff) +
-			      1) * 8,
+			     (((par->crtc.h_tot_disp >> 16) & 0xff) + 1) * 8,
 			     ((par->crtc.v_tot_disp >> 16) & 0x7ff) + 1,
 			     info->var.bits_per_pixel,
 			     par->crtc.vxres * info->var.bits_per_pixel / 8);
@@ -900,14 +890,13 @@ static int atyfb_encode_var(struct fb_var_screeninfo *var,
 {
 	int err;
 
-	memset(var, 0, sizeof(struct fb_var_screeninfo));
-
 	if ((err = aty_crtc_to_var(&par->crtc, var)))
 		return err;
 	var->pixclock = par->pll_ops->pll_to_var(info, &par->pll);
 
 	var->height = -1;
 	var->width = -1;
+	var->nonstd = 0;
 	return 0;
 }
 
@@ -1437,15 +1426,15 @@ static int aty_power_mgmt(int sleep, struct atyfb_par *par)
 static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 {
 	struct fb_info *info;
-	struct atyfb_par *par = (struct atyfb_par *) info->fb.par;
+	struct atyfb_par *par;
 	int result;
 
 	result = PBOOK_SLEEP_OK;
 
 	for (info = first_display; info != NULL; info = par->next) {
-		struct fb_fix_screeninfo fix;
 		int nb;
 
+		par = (struct atyfb_par *) info->par;
 		nb = fb_display[fg_console].var.yres * info->fix.line_length;
 
 		switch (when) {
@@ -1464,7 +1453,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 			if (par->blitter_may_be_busy)
 				wait_for_idle(par);
 			/* Stop accel engine (stop bus mastering) */
-			if (par->accel_flags & FB_ACCELF_TEXT)
+			if (info->var.accel_flags & FB_ACCELF_TEXT)
 				aty_reset_engine(par);
 
 			/* Backup fb content */
@@ -1557,7 +1546,6 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	const char *chipname = NULL, *ramname = NULL, *xtal;
 	int j, pll, mclk, gtb_memsize;
 	struct fb_var_screeninfo var;
-	struct display *disp;
 	u32 chip_id, i;
 	u16 type;
 	u8 rev;
@@ -1838,7 +1826,6 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	fb_memset((void *) info->screen_base, 0,
 		  info->fix.smem_len);
 
-	strcpy(info->modename, info->fix.id);
 	info->node = NODEV;
 	info->fbops = &atyfb_ops;
 	info->pseudo_palette = pseudo_palette;
@@ -1969,6 +1956,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
+	var.activate = FB_ACTIVATE_NOW;
 	gen_set_var(&var, -1, info);
 
 	if (register_framebuffer(info) < 0)
@@ -2030,15 +2018,6 @@ int __init atyfb_init(void)
 
 			default_par = (struct atyfb_par *) (info + 1);
 
-			if (!default_par) {
-				printk
-				    ("atyfb_init: can't alloc atyfb_par\n");
-				kfree(info);
-				return -ENXIO;
-			}
-			memset(default_par, 0, sizeof(struct atyfb_par));
-
-			info->disp = (struct display *) (info + 1);
 			info->fix = atyfb_fix;
 			info->par = default_par;
 
@@ -2372,7 +2351,6 @@ int __init atyfb_init(void)
 			if (first_display == NULL)
 				pmu_register_sleep_notifier
 				    (&aty_sleep_notifier);
-			/* FIXME info->next = first_display; */
 			default_par->next = first_display;
 #endif
 		}
@@ -2399,7 +2377,7 @@ int __init atyfb_init(void)
 			return -ENOMEM;
 		}
 		memset(info, 0, sizeof(struct fb_info));
-		info->fix = atyfb_fix;		
+		info->fix = atyfb_fix;
 
 		/*
 		 *  Map the video memory (physical address given) to somewhere in the
@@ -2410,7 +2388,7 @@ int __init atyfb_init(void)
 		info->fix.smem_start = info->screen_base;	/* Fake! */
 		default_par->ati_regbase = (unsigned long)ioremap(phys_guiregbase[m64_num],
 							  0x10000) + 0xFC00ul;
-		info->fix.mmio_start = par->ati_regbase; /* Fake! */
+		info->fix.mmio_start = default_par->ati_regbase; /* Fake! */
 
 		aty_st_le32(CLOCK_CNTL, 0x12345678, default_par);
 		clock_r = aty_ld_le32(CLOCK_CNTL, default_par);

@@ -138,7 +138,6 @@ int __init pmagbbfb_init_one(int slot)
 	/*
 	 *      Let there be consoles..
 	 */
-	strcpy(info->modename, pmagbbfb_fix.id);
 	info->node = NODEV;
 	info->fbops = &pmagbbfb_ops;
 	info->var = pmagbbfb_defined;

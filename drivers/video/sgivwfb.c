@@ -713,7 +713,6 @@ int __init sgivwfb_init(void)
 	sgivwfb_fix.ywrapstep = ywrap;
 	sgivwfb_fix.ypanstep = ypan;
 
-	strcpy(fb_info.modename, sgivwfb_fix.id);
 	fb_info.node = NODEV;
 	fb_info.fix = sgivwfb_fix;
 	fb_info.var = sgivwfb_var;

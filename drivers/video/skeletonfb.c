@@ -125,9 +125,6 @@ static struct fb_info info;
      */
 static struct xxx_par __initdata current_par;
 
-    /* To go away in the near future */ 
-static struct display disp;
-
 int xxxfb_init(void);
 int xxxfb_setup(char*);
 

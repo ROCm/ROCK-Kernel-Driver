@@ -265,10 +265,10 @@ struct fb_vblank {
 struct fb_copyarea {
 	__u32 sx;	/* screen-relative */
 	__u32 sy;
-	__u32 width;
-	__u32 height;
 	__u32 dx;
 	__u32 dy;
+	__u32 width;
+	__u32 height;
 };
 
 struct fb_fillrect {
@@ -281,10 +281,10 @@ struct fb_fillrect {
 };
 
 struct fb_image {
+	__u32 dx;	/* Where to place image */
+	__u32 dy;
 	__u32 width;	/* Size of image */
 	__u32 height;
-	__u16 dx;	/* Where to place image */
-	__u16 dy;
 	__u32 fg_color;	/* Only used when a mono bitmap */
 	__u32 bg_color;
 	__u8  depth;	/* Dpeth of the image */
@@ -349,7 +349,6 @@ struct fb_ops {
 };
 
 struct fb_info {
-   char modename[40];			/* default video mode */
    kdev_t node;
    int flags;
    int open;                            /* Has this been open already ? */

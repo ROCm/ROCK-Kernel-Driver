@@ -94,8 +94,6 @@ static int vfb_mmap(struct fb_info *info, struct file *file,
 
 static struct fb_ops vfb_ops = {
 	.fb_set_var	gen_set_var,
-	.fb_get_cmap	gen_set_cmap,
-	.fb_set_cmap	gen_set_cmap,
 	.fb_check_var	vfb_check_var,
 	.fb_set_par	vfb_set_par,
 	.fb_setcolreg	vfb_setcolreg,
@@ -441,7 +439,6 @@ int __init vfb_init(void)
 	fb_info.pseudo_palette = &vfb_pseudo_palette;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
-	strcpy(fb_info.modename, vfb_fix.id);
 	fb_info.currcon = -1;
 	fb_info.updatevar = gen_update_var;
 

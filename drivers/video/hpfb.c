@@ -160,7 +160,6 @@ int __init hpfb_init_one(unsigned long base)
 
 	/* The below feilds will go away !!!! */
 	fb_info.currcon		= -1;
-        strcpy(fb_info.modename, fb_info.fix.id);
         fb_info.updatevar	= gen_update_var;
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 

@@ -344,7 +344,6 @@ int __init vesafb_init(void)
 		}
 	}
 	
-	strcpy(fb_info.modename, vesafb_fix.id);
 	fb_info.node = NODEV;
 	fb_info.fbops = &vesafb_ops;
 	fb_info.var = vesafb_defined;

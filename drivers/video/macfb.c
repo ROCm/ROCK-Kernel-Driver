@@ -947,7 +947,6 @@ void __init macfb_init(void)
 			break;
 		}
 
-	strcpy(fb_info.modename, macfb_fix.id);	
 	fb_info.node		= NODEV;
 	fb_info.fbops		= &macfb_ops;
 	fb_info.var		= macfb_defined;

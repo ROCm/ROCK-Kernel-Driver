@@ -137,7 +137,6 @@ int __init pmagbafb_init_one(int slot)
 	/*
 	 *      Let there be consoles..
 	 */
-	strcpy(info->modename, pmagbafb_fix.id);
 	info->node = NODEV;
 	info->fbops = &pmagbafb_ops;
 	info->var = pmagbafb_defined;

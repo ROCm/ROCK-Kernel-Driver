@@ -234,7 +234,6 @@ unsigned long __init dnfb_init(unsigned long mem_start)
 {
 	int err;
 
-	strcpy(fb_info.modename, dnfb_fix.id);
 	fb_info.fontname[0] = 0;
 	fb_info.updatevar = gen_update_var;
 	fb_info.node = NODEV;

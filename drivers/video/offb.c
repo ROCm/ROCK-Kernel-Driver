@@ -525,7 +525,6 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 
 	strcpy(fix->id, "OFfb ");
 	strncat(fix->id, full_name, sizeof(fix->id));
-	strcpy(info->modename, fix->id);
 	info->node = NODEV;
 	info->fbops = &offb_ops;
 	info->screen_base = ioremap(address, fix->smem_len);

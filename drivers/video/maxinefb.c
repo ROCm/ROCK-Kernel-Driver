@@ -153,9 +153,6 @@ int __init maxinefb_init(void)
 		 */
 	}
 
-	/* Let there be consoles... */
-
-	strcpy(fb_info.modename, "Maxine onboard graphics 1024x768x8");
 	fb_info.node = NODEV;
 	fb_info.fbops = &maxinefb_ops;
 	fb_info.screen_base = (char *) maxinefb_fix.smem_start;

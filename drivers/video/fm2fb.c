@@ -259,7 +259,6 @@ int __init fm2fb_init(void)
 		if (fm2fb_mode == -1)
 			fm2fb_mode = FM2FB_MODE_PAL;
 
-		strcpy(fb_info.modename, fb_fix.id);
 		fb_info.node = NODEV;
 		fb_info.fbops = &fm2fb_ops;
 		fb_info.var = fb_var_modes[fm2fb_mode];
@@ -270,7 +269,6 @@ int __init fm2fb_init(void)
 
 		/* The below feilds will go away !!!! */
 		fb_info.currcon		= -1;
-		strcpy(fb_info.modename, fb_info.fix.id);
 		fb_info.updatevar	= gen_update_var;
 		fb_alloc_cmap(&fb_info.cmap, 16, 0);
 
