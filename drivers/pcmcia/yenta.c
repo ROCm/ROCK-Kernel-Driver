@@ -2,6 +2,11 @@
  * Regular lowlevel cardbus driver ("yenta")
  *
  * (C) Copyright 1999, 2000 Linus Torvalds
+ *
+ * Changelog:
+ * Aug 2002: Manfred Spraul <manfred@colorfullife.com>
+ * 	Dynamically adjust the size of the bridge resource
+ * 	
  */
 #include <linux/init.h>
 #include <linux/pci.h>
@@ -702,12 +707,24 @@ static int yenta_suspend(pci_socket_t *socket)
 	return 0;
 }
 
+/*
+ * Use an adaptive allocation for the memory resource,
+ * sometimes the memory behind pci bridges is limited:
+ * 1/8 of the size of the io window of the parent.
+ * max 4 MB, min 16 kB.
+ */
+#define BRIDGE_MEM_MAX 4*1024*1024
+#define BRIDGE_MEM_MIN 16*1024
+
+#define BRIDGE_IO_MAX 256
+#define BRIDGE_IO_MIN 32
+
 static void yenta_allocate_res(pci_socket_t *socket, int nr, unsigned type)
 {
 	struct pci_bus *bus;
 	struct resource *root, *res;
 	u32 start, end;
-	u32 align, size, min, max;
+	u32 align, size, min;
 	unsigned offset;
 	unsigned mask;
 
@@ -733,24 +750,51 @@ static void yenta_allocate_res(pci_socket_t *socket, int nr, unsigned type)
 	if (start && end > start) {
 		res->start = start;
 		res->end = end;
-		request_resource(root, res);
-		return;
+		if (request_resource(root, res) == 0)
+			return;
+		printk(KERN_INFO "yenta %s: Preassigned resource %d busy, reconfiguring...\n",
+				socket->dev->slot_name, nr);
+		res->start = res->end = 0;
 	}
 
-	align = size = 4*1024*1024;
-	min = PCIBIOS_MIN_MEM; max = ~0U;
 	if (type & IORESOURCE_IO) {
 		align = 1024;
-		size = 256;
-		min = 0x4000;
-		max = 0xffff;
+		size = BRIDGE_IO_MAX;
+		min = BRIDGE_IO_MIN;
+		start = PCIBIOS_MIN_IO;
+		end = ~0U;
+	} else {
+		unsigned long avail = root->end - root->start;
+		int i;
+		size = BRIDGE_MEM_MAX;
+		if (size > avail/8) {
+			size=(avail+1)/8;
+			/* round size down to next power of 2 */
+			i = 0;
+			while ((size /= 2) != 0)
+				i++;
+			size = 1 << i;
+		}
+		if (size < BRIDGE_MEM_MIN)
+			size = BRIDGE_MEM_MIN;
+		min = BRIDGE_MEM_MIN;
+		align = size;
+		start = PCIBIOS_MIN_MEM;
+		end = ~0U;
 	}
-		
-	if (allocate_resource(root, res, size, min, max, align, NULL, NULL) < 0)
-		return;
-
-	config_writel(socket, offset, res->start);
-	config_writel(socket, offset+4, res->end);
+	
+	do {
+		if (allocate_resource(root, res, size, start, end, align, NULL, NULL)==0) {
+			config_writel(socket, offset, res->start);
+			config_writel(socket, offset+4, res->end);
+			return;
+		}
+		size = size/2;
+		align = size;
+	} while (size >= min);
+	printk(KERN_INFO "yenta %s: no resource of type %x available, trying to continue...\n",
+			socket->dev->slot_name, type);
+	res->start = res->end = 0;
 }
 
 /*
@@ -764,6 +808,20 @@ static void yenta_allocate_resources(pci_socket_t *socket)
 	yenta_allocate_res(socket, 3, IORESOURCE_IO);	/* PCI isn't clever enough to use this one yet */
 }
 
+/*
+ * Free the bridge mappings for the device..
+ */
+static void yenta_free_resources(pci_socket_t *socket)
+{
+	int i;
+	for (i=0;i<4;i++) {
+		struct resource *res;
+		res = socket->dev->resource + PCI_BRIDGE_RESOURCES + i;
+		if (res->start != 0 && res->end != 0)
+			release_resource(res);
+		res->start = res->end = 0;
+	}
+}
 /*
  * Close it down - release our resources and go home..
  */
@@ -780,6 +838,7 @@ static void yenta_close(pci_socket_t *sock)
 
 	if (sock->base)
 		iounmap(sock->base);
+	yenta_free_resources(sock);
 }
 
 #include "ti113x.h"
