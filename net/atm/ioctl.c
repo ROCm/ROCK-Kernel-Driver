@@ -53,14 +53,6 @@ EXPORT_SYMBOL(atm_lane_ops_set);
 #endif
 #endif
 
-#if defined(CONFIG_ATM_TCP) || defined(CONFIG_ATM_TCP_MODULE)
-#include <linux/atm_tcp.h>
-#ifdef CONFIG_ATM_TCP_MODULE
-struct atm_tcp_ops atm_tcp_ops;
-EXPORT_SYMBOL(atm_tcp_ops);
-#endif
-#endif
-
 static DECLARE_MUTEX(ioctl_mutex);
 static LIST_HEAD(ioctl_list);
 
@@ -184,49 +176,6 @@ int vcc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 				module_put(atm_lane_ops->owner);
 			} else
 				error = -ENOSYS;
-			goto done;
-#endif
-#if defined(CONFIG_ATM_TCP) || defined(CONFIG_ATM_TCP_MODULE)
-		case SIOCSIFATMTCP:
-			if (!capable(CAP_NET_ADMIN)) {
-				error = -EPERM;
-				goto done;
-			}
-			if (!atm_tcp_ops.attach) {
-				error = -ENOPKG;
-				goto done;
-			}
-			fops_get(&atm_tcp_ops);
-			error = atm_tcp_ops.attach(vcc, (int) arg);
-			if (error >= 0)
-				sock->state = SS_CONNECTED;
-			else
-				fops_put (&atm_tcp_ops);
-			goto done;
-		case ATMTCP_CREATE:
-			if (!capable(CAP_NET_ADMIN)) {
-				error = -EPERM;
-				goto done;
-			}
-			if (!atm_tcp_ops.create_persistent) {
-				error = -ENOPKG;
-				goto done;
-			}
-			error = atm_tcp_ops.create_persistent((int) arg);
-			if (error < 0)
-				fops_put (&atm_tcp_ops);
-			goto done;
-		case ATMTCP_REMOVE:
-			if (!capable(CAP_NET_ADMIN)) {
-				error = -EPERM;
-				goto done;
-			}
-			if (!atm_tcp_ops.remove_persistent) {
-				error = -ENOPKG;
-				goto done;
-			}
-			error = atm_tcp_ops.remove_persistent((int) arg);
-			fops_put(&atm_tcp_ops);
 			goto done;
 #endif
 		default:
