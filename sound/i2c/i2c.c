@@ -93,7 +93,7 @@ int snd_i2c_bus_create(snd_card_t *card, const char *name, snd_i2c_bus_t *master
 		list_add_tail(&bus->buses, &master->buses);
 		bus->master = master;
 	}
-	strncpy(bus->name, name, sizeof(bus->name) - 1);
+	strlcpy(bus->name, name, sizeof(bus->name));
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, bus, &ops)) < 0) {
 		snd_i2c_bus_free(bus);
 		return err;
@@ -112,7 +112,7 @@ int snd_i2c_device_create(snd_i2c_bus_t *bus, const char *name, unsigned char ad
 	if (device == NULL)
 		return -ENOMEM;
 	device->addr = addr;
-	strncpy(device->name, name, sizeof(device->name)-1);
+	strlcpy(device->name, name, sizeof(device->name));
 	list_add_tail(&device->list, &bus->devices);
 	device->bus = bus;
 	*rdevice = device;

@@ -42,6 +42,10 @@
 #include <linux/adb.h>
 #include <linux/cuda.h>
 #include <linux/pmu.h>
+
+#include <asm/machdep.h>
+#include <asm/pmac_feature.h>
+
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
@@ -65,7 +69,7 @@ unsigned char adb_to_linux_keycodes[128] = {
 	  0, 83,  0, 55,  0, 78,  0, 69,  0,  0,  0, 98, 96,  0, 74,  0,
 	  0,117, 82, 79, 80, 81, 75, 76, 77, 71,  0, 72, 73,183,181,124,
 	 63, 64, 65, 61, 66, 67,191, 87,190, 99,  0, 70,  0, 68,101, 88,
-	  0,119,110,102,104,111, 62,107, 60,109, 59, 54,100, 97,116,116
+	  0,119,110,102,104,111, 62,107, 60,109, 59, 54,100, 97,126,116
 };
 
 struct adbhid {
@@ -84,7 +88,7 @@ static struct adbhid *adbhid[16] = { 0 };
 
 static void adbhid_probe(void);
 
-static void adbhid_input_keycode(int, int, int);
+static void adbhid_input_keycode(int, int, int, struct pt_regs *);
 static void leds_done(struct adb_request *);
 
 static void init_trackpad(int id);
@@ -140,7 +144,7 @@ adbhid_keyboard_input(unsigned char *data, int nb, struct pt_regs *regs, int apo
 }
 
 static void
-adbhid_input_keycode(int id, int keycode, int repeat, pt_regs *regs)
+adbhid_input_keycode(int id, int keycode, int repeat, struct pt_regs *regs)
 {
 	int up_flag;
 
@@ -156,6 +160,15 @@ adbhid_input_keycode(int id, int keycode, int repeat, pt_regs *regs)
 		return;
 	case 0x3f: /* ignore Powerbook Fn key */
 		return;
+	case 0x7e: /* Power key on PBook 3400 needs remapping */
+		switch(pmac_call_feature(PMAC_FTR_GET_MB_INFO,
+			NULL, PMAC_MB_INFO_MODEL, 0)) {
+		case PMAC_TYPE_COMET:
+		case PMAC_TYPE_HOOPER:
+		case PMAC_TYPE_KANGA:
+			keycode = 0x7f;
+		}
+		break;
 	}
 
 	if (adbhid[id]->keycode[keycode]) {
@@ -343,13 +356,12 @@ adbhid_buttons_input(unsigned char *data, int nb, struct pt_regs *regs, int auto
 		case 0xa:	/* brightness decrease */
 #ifdef CONFIG_PMAC_BACKLIGHT
 			if (!disable_kernel_backlight) {
-				if (!down || backlight < 0)
-					break;
-				if (backlight > BACKLIGHT_OFF)
-					set_backlight_level(backlight-1);
-				else
-					set_backlight_level(BACKLIGHT_OFF);
-				break;
+				if (down && backlight >= 0) {
+					if (backlight > BACKLIGHT_OFF)
+						set_backlight_level(backlight-1);
+					else
+						set_backlight_level(BACKLIGHT_OFF);
+				}
 			}
 #endif /* CONFIG_PMAC_BACKLIGHT */
 			input_report_key(&adbhid[id]->input, KEY_BRIGHTNESSDOWN, down);
@@ -358,13 +370,12 @@ adbhid_buttons_input(unsigned char *data, int nb, struct pt_regs *regs, int auto
 		case 0x9:	/* brightness increase */
 #ifdef CONFIG_PMAC_BACKLIGHT
 			if (!disable_kernel_backlight) {
-				if (!down || backlight < 0)
-					break;
-				if (backlight < BACKLIGHT_MAX)
-					set_backlight_level(backlight+1);
-				else 
-					set_backlight_level(BACKLIGHT_MAX);
-				break;
+				if (down && backlight >= 0) {
+					if (backlight < BACKLIGHT_MAX)
+						set_backlight_level(backlight+1);
+					else 
+						set_backlight_level(BACKLIGHT_MAX);
+				}
 			}
 #endif /* CONFIG_PMAC_BACKLIGHT */
 			input_report_key(&adbhid[id]->input, KEY_BRIGHTNESSUP, down);

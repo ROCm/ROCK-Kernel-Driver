@@ -325,7 +325,7 @@ static struct super_operations sockfs_ops = {
 };
 
 static struct super_block *sockfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_pseudo(fs_type, "socket:", &sockfs_ops, SOCKFS_MAGIC);
 }

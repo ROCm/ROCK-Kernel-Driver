@@ -386,11 +386,11 @@ parse_options(struct smb_mount_data_kernel *mnt, char *options)
 			mnt->dir_mode = (value & S_IRWXUGO) | S_IFDIR;
 			break;
 		case 'i':
-			strncpy(mnt->codepage.local_name, optarg, 
+			strlcpy(mnt->codepage.local_name, optarg, 
 				SMB_NLS_MAXNAMELEN);
 			break;
 		case 'c':
-			strncpy(mnt->codepage.remote_name, optarg,
+			strlcpy(mnt->codepage.remote_name, optarg,
 				SMB_NLS_MAXNAMELEN);
 			break;
 		case 't':
@@ -535,9 +535,9 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	mnt = server->mnt;
 
 	memset(mnt, 0, sizeof(struct smb_mount_data_kernel));
-	strncpy(mnt->codepage.local_name, CONFIG_NLS_DEFAULT,
+	strlcpy(mnt->codepage.local_name, CONFIG_NLS_DEFAULT,
 		SMB_NLS_MAXNAMELEN);
-	strncpy(mnt->codepage.remote_name, SMB_NLS_REMOTE,
+	strlcpy(mnt->codepage.remote_name, SMB_NLS_REMOTE,
 		SMB_NLS_MAXNAMELEN);
 
 	mnt->ttl = SMB_TTL_DEFAULT;
@@ -759,7 +759,7 @@ int smb_current_vmalloced;
 #endif
 
 static struct super_block *smb_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_nodev(fs_type, flags, data, smb_fill_super);
 }

@@ -342,7 +342,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 }
 
 int
-parse_mount_options(char *options, char *devname, struct smb_vol *vol)
+parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 {
 	char *value;
 	char *data;
@@ -795,7 +795,7 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 
 int
 cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
-	   char *mount_data, char *devname)
+	   char *mount_data, const char *devname)
 {
 	int rc = 0;
 	int xid;
@@ -811,7 +811,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	xid = GetXid();
 	cFYI(1, ("Entering cifs_mount. Xid: %d with: %s", xid, mount_data));
 
-	if(parse_mount_options(mount_data, devname, &volume_info)) {
+	if (parse_mount_options(mount_data, devname, &volume_info)) {
 		FreeXid(xid);
 		return -EINVAL;
 	}

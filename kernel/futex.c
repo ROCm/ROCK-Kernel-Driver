@@ -545,7 +545,7 @@ asmlinkage long sys_futex(u32 __user *uaddr, int op, int val,
 
 static struct super_block *
 futexfs_get_sb(struct file_system_type *fs_type,
-	       int flags, char *dev_name, void *data)
+	       int flags, const char *dev_name, void *data)
 {
 	return get_sb_pseudo(fs_type, "futex", NULL, 0xBAD1DEA);
 }

@@ -260,17 +260,20 @@ static int ep_remove(struct eventpoll *ep, struct epitem *epi);
 static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync);
 static int ep_eventpoll_close(struct inode *inode, struct file *file);
 static unsigned int ep_eventpoll_poll(struct file *file, poll_table *wait);
-static int ep_collect_ready_items(struct eventpoll *ep, struct list_head *txlist, int maxevents);
+static int ep_collect_ready_items(struct eventpoll *ep,
+				  struct list_head *txlist, int maxevents);
 static int ep_send_events(struct eventpoll *ep, struct list_head *txlist,
 			  struct epoll_event *events);
 static void ep_reinject_items(struct eventpoll *ep, struct list_head *txlist);
-static int ep_events_transfer(struct eventpoll *ep, struct epoll_event *events, int maxevents);
-static int ep_poll(struct eventpoll *ep, struct epoll_event *events, int maxevents,
-		   long timeout);
+static int ep_events_transfer(struct eventpoll *ep,
+			      struct epoll_event *events, int maxevents);
+static int ep_poll(struct eventpoll *ep, struct epoll_event *events,
+		   int maxevents, long timeout);
 static int eventpollfs_delete_dentry(struct dentry *dentry);
 static struct inode *ep_eventpoll_inode(void);
 static struct super_block *eventpollfs_get_sb(struct file_system_type *fs_type,
-					      int flags, char *dev_name, void *data);
+					      int flags, const char *dev_name,
+					      void *data);
 
 
 /* Safe wake up implementation */
@@ -1637,10 +1640,10 @@ eexit_1:
 }
 
 
-static struct super_block *eventpollfs_get_sb(struct file_system_type *fs_type,
-					      int flags, char *dev_name, void *data)
+static struct super_block *
+eventpollfs_get_sb(struct file_system_type *fs_type, int flags,
+		   const char *dev_name, void *data)
 {
-
 	return get_sb_pseudo(fs_type, "eventpoll:", NULL, EVENTPOLLFS_MAGIC);
 }
 

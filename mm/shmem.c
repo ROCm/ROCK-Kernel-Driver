@@ -1647,7 +1647,8 @@ static int shmem_remount_fs(struct super_block *sb, int *flags, char *data)
 }
 #endif
 
-static int shmem_fill_super(struct super_block *sb, void *data, int silent)
+static int shmem_fill_super(struct super_block *sb,
+			    void *data, int silent)
 {
 	struct inode *inode;
 	struct dentry *root;
@@ -1814,7 +1815,7 @@ static struct vm_operations_struct shmem_vm_ops = {
 };
 
 static struct super_block *shmem_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_nodev(fs_type, flags, data, shmem_fill_super);
 }

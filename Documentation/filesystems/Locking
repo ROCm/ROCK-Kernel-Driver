@@ -120,7 +120,7 @@ by better scheme anyway.
 
 --------------------------- file_system_type ---------------------------
 prototypes:
-	struct super_block *(*get_sb) (struct file_system_type *, int, char *, void *);
+	struct super_block *(*get_sb) (struct file_system_type *, int, const char *, void *);
 	void (*kill_sb) (struct super_block *);
 locking rules:
 		may block	BKL

@@ -2851,7 +2851,7 @@ void __init gus_wave_init(struct address_info *hw_config)
 	unsigned long flags;
 	unsigned char val;
 	char *model_num = "2.4";
-	char tmp[64], tmp2[64];
+	char tmp[64];
 	int gus_type = 0x24;	/* 2.4 */
 
 	int irq = hw_config->irq, dma = hw_config->dma, dma2 = hw_config->dma2;
@@ -2998,19 +2998,14 @@ void __init gus_wave_init(struct address_info *hw_config)
 	}
 
 	if (hw_config->name)
-	{
-		strncpy(tmp, hw_config->name, 45);
-		tmp[45] = 0;
-		sprintf(tmp2, "%s (%dk)", tmp, (int) gus_mem_size / 1024);
-		tmp2[sizeof(tmp2) - 1] = 0;
-	}
+		snprintf(tmp, sizeof(tmp), "%s (%dk)", hw_config->name,
+			 (int) gus_mem_size / 1024);
 	else if (gus_pnp_flag)
-	{
-		sprintf(tmp2, "Gravis UltraSound PnP (%dk)",
-			(int) gus_mem_size / 1024);
-	}
+		snprintf(tmp, sizeof(tmp), "Gravis UltraSound PnP (%dk)",
+			 (int) gus_mem_size / 1024);
 	else
-		sprintf(tmp2, "Gravis UltraSound %s (%dk)", model_num, (int) gus_mem_size / 1024);
+		snprintf(tmp, sizeof(tmp), "Gravis UltraSound %s (%dk)", model_num,
+			 (int) gus_mem_size / 1024);
 
 
 	samples = (struct patch_info *)vmalloc((MAX_SAMPLE + 1) * sizeof(*samples));
@@ -3019,9 +3014,8 @@ void __init gus_wave_init(struct address_info *hw_config)
 		printk(KERN_WARNING "gus_init: Cant allocate memory for instrument tables\n");
 		return;
 	}
-	conf_printf(tmp2, hw_config);
-	tmp2[sizeof(gus_info.name) - 1] = 0;
-	strcpy(gus_info.name, tmp2);
+	conf_printf(tmp, hw_config);
+	strlcpy(gus_info.name, tmp, sizeof(gus_info.name));
 
 	if ((sdev = sound_alloc_synthdev()) == -1)
 		printk(KERN_WARNING "gus_init: Too many synthesizers\n");

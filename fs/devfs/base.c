@@ -2554,8 +2554,9 @@ out_no_root:
     return -EINVAL;
 }   /*  End Function devfs_fill_super  */
 
-static struct super_block *devfs_get_sb (struct file_system_type *fs_type,
-					 int flags, char *dev_name, void *data)
+static struct super_block *
+devfs_get_sb (struct file_system_type *fs_type, int flags,
+	      const char *dev_name, void *data)
 {
     return get_sb_single (fs_type, flags, data, devfs_fill_super);
 }

@@ -92,13 +92,13 @@ int snd_pcm_info(snd_pcm_substream_t * substream, snd_pcm_info_t *info)
 	info->device = pcm->device;
 	info->stream = substream->stream;
 	info->subdevice = substream->number;
-	strncpy(info->id, pcm->id, sizeof(info->id)-1);
-	strncpy(info->name, pcm->name, sizeof(info->name)-1);
+	strlcpy(info->id, pcm->id, sizeof(info->id));
+	strlcpy(info->name, pcm->name, sizeof(info->name));
 	info->dev_class = pcm->dev_class;
 	info->dev_subclass = pcm->dev_subclass;
 	info->subdevices_count = pstr->substream_count;
 	info->subdevices_avail = pstr->substream_count - pstr->substream_opened;
-	strncpy(info->subname, substream->name, sizeof(info->subname)-1);
+	strlcpy(info->subname, substream->name, sizeof(info->subname));
 	runtime = substream->runtime;
 	/* AB: FIXME!!! This is definitely nonsense */
 	if (runtime) {

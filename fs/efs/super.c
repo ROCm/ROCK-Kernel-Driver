@@ -16,7 +16,7 @@
 #include <linux/vfs.h>
 
 static struct super_block *efs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
+	int flags, const char *dev_name, void *data)
 {
 	return get_sb_bdev(fs_type, flags, dev_name, data, efs_fill_super);
 }
