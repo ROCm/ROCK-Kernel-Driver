@@ -1111,7 +1111,11 @@ struct scsi_qla_host {
 /*
  *  Linux - SCSI Driver Interface Function Prototypes.
  */
+#if LINUX_VERSION_CODE < 0x020600
 int qla1280_proc_info(char *, char **, off_t, int, int, int);
+#else
+int qla1280_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
+#endif
 const char *qla1280_info(struct Scsi_Host *host);
 int qla1280_detect(Scsi_Host_Template *);
 int qla1280_release(struct Scsi_Host *);
@@ -1147,8 +1151,6 @@ int qla1280_eh_adapter_reset(struct scsi_cmnd *cmd);
 	.detect = qla1280_detect,				\
 	.release = qla1280_release,				\
 	.info = qla1280_info,					\
-	.ioctl = NULL,						\
-	.command = NULL,					\
 	.queuecommand = qla1280_queuecommand,			\
 	.eh_strategy_handler = NULL,				\
 	.eh_abort_handler = qla1280_eh_abort,			\
