@@ -225,7 +225,7 @@ static struct isapnp_device_id teles_ids[] __initdata = {
 };
 
 static struct isapnp_device_id *tdev = &teles_ids[0];
-static struct pci_bus *pnp_c __devinitdata = NULL;
+static struct pnp_card *pnp_c __devinitdata = NULL;
 #endif
 
 int __devinit
@@ -243,31 +243,41 @@ setup_teles3(struct IsdnCard *card)
 
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
-		struct pci_bus *pb;
-		struct pci_dev *pd;
+		struct pnp_card *pnp_card;
+		struct pnp_dev *pnp_dev;
 
 		while(tdev->card_vendor) {
-			if ((pb = isapnp_find_card(tdev->card_vendor,
-				tdev->card_device, pnp_c))) {
-				pnp_c = pb;
-				pd = NULL;
-				if ((pd = isapnp_find_dev(pnp_c,
-					tdev->vendor, tdev->function, pd))) {
+			if ((pnp_card = pnp_find_card(tdev->card_vendor,
+						      tdev->card_device, pnp_c))) {
+				pnp_c = pnp_card;
+				pnp_dev = NULL;
+				if ((pnp_dev = pnp_find_dev(pnp_card,
+							    tdev->vendor,
+							    tdev->function,
+							    pnp_dev))) {
 					printk(KERN_INFO "HiSax: %s detected\n",
 						(char *)tdev->driver_data);
-					pd->prepare(pd);
-					pd->deactivate(pd);
-					pd->activate(pd);
-					card->para[3] = pd->resource[2].start;
-					card->para[2] = pd->resource[1].start;
-					card->para[1] = pd->resource[0].start;
-					card->para[0] = pd->irq_resource[0].start;
-					if (!card->para[0] || !card->para[1] || !card->para[2]) {
-						printk(KERN_ERR "Teles PnP:some resources are missing %ld/%lx/%lx\n",
-						card->para[0], card->para[1], card->para[2]);
-						pd->deactivate(pd);
-						return(0);
+					if (pnp_device_attach(pnp_dev) < 0) {
+						printk(KERN_ERR "Teles PnP: attach failed\n");
+						return 0;
 					}
+					if (pnp_activate_dev(pnp_dev, NULL) < 0) {
+						printk(KERN_ERR "Teles PnP: activate failed\n");
+						pnp_device_detach(pnp_dev);
+						return 0;
+					}
+					if (!pnp_irq_valid(pnp_dev, 0) ||
+					    !pnp_port_valid(pnp_dev, 0) ||
+					    !pnp_port_valid(pnp_dev, 1)) {
+						printk(KERN_ERR "Teles PnP: some resources are missing %ld/%lx/%lx\n",
+							pnp_irq(pnp_dev, 0), pnp_port_start(pnp_dev, 0), pnp_port_start(pnp_dev, 1));
+						pnp_device_detach(pnp_dev);
+						return 0;
+					}
+					card->para[3] = pnp_port_start(pnp_dev, 2);
+					card->para[2] = pnp_port_start(pnp_dev, 1);
+					card->para[1] = pnp_port_start(pnp_dev, 0);
+					card->para[0] = pnp_irq(pnp_dev, 0);
 					break;
 				} else {
 					printk(KERN_ERR "Teles PnP: PnP error card found, no device\n");

@@ -1172,6 +1172,7 @@ static struct neighbour *neigh_get_next(struct seq_file *seq,
 		n = n->next;
 		/* Don't confuse "arp -a" w/ magic entries */
 try_again:
+		;
 	} while (n && !(n->nud_state & ~NUD_NOARP));
 
 	if (n)

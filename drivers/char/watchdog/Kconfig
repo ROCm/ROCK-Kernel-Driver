@@ -168,6 +168,19 @@ config 977_WATCHDOG
 
 	  Not sure? It's safe to say N.
 
+config SA1100_WATCHDOG
+	tristate "SA1100 watchdog"
+	depends on WATCHDOG && ARCH_SA1100
+	help
+	  Watchdog timer embedded into SA11x0 chips. This will reboot your
+	  system when timeout is reached.
+	  NOTE, that once enabled, this timer cannot be disabled.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt. The module will be called sa1100_wdt.o.
+
 config EUROTECH_WDT
 	tristate "Eurotech CPU-1220/1410 Watchdog Timer"
 	depends on WATCHDOG

@@ -453,6 +453,13 @@ config BLK_DEV_CMD64X
 	  Say Y here if you have an IDE controller which uses any of these
 	  chipsets: CMD643, CMD646, or CMD648.
 
+config BLK_DEV_TRIFLEX
+	tristate "Compaq Triflex IDE support"
+	depends on BLK_DEV_IDEDMA_PCI
+	help
+	  Say Y here if you have a Compaq Triflex IDE controller, such
+	  as those commonly found on Compaq Pentium-Pro systems
+
 config BLK_DEV_CY82C693
 	tristate "CY82C693 chipset support"
 	depends on BLK_DEV_IDEDMA_PCI

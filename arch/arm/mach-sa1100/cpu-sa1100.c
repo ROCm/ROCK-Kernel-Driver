@@ -183,7 +183,7 @@ static int sa1100_setspeed(struct cpufreq_policy *policy)
 
 	freqs.old = cur;
 	freqs.new = policy->max;
-	freqs.cpu = CPUFREQ_ALL_CPUS;
+	freqs.cpu = 0;
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 

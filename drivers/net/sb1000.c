@@ -145,7 +145,7 @@ sb1000_probe(struct net_device *dev)
 {
 
 	unsigned short ioaddr[2], irq;
-	struct pci_dev *idev=NULL;
+	struct pnp_dev *idev=NULL;
 	unsigned int serial_number;
 	
 	while(1)
@@ -154,55 +154,58 @@ sb1000_probe(struct net_device *dev)
 		 *	Find the card
 		 */
 		 
-		idev=isapnp_find_dev(NULL, ISAPNP_VENDOR('G','I','C'),
+		idev=pnp_find_dev(NULL, ISAPNP_VENDOR('G','I','C'),
 			ISAPNP_FUNCTION(0x1000), idev);
 			
 		/*
 		 *	No card
 		 */
 		 
-		if(idev==NULL)
+		if(idev==NULL || idev->card == NULL)
 			return -ENODEV;
 			
 		/*
 		 *	Bring it online
 		 */
 		 
-		idev->prepare(idev);
-		idev->activate(idev);
+		if (pnp_device_attach(idev) < 0)
+			continue;
+		if (pnp_activate_dev(idev, NULL) < 0) {
+		      __again:
+			pnp_device_detach(idev);
+			continue;
+		}
 		
 		/*
 		 *	Ports free ?
 		 */
 		 
-		if(!idev->resource[0].start || check_region(idev->resource[0].start, 16))
-			continue;
-		if(!idev->resource[1].start || check_region(idev->resource[1].start, 16))
-			continue;
+		if(!pnp_port_valid(idev, 0) || !pnp_port_valid(idev, 1) || !pnp_irq_valid(idev, 0))
+			goto __again;
 		
-		serial_number = idev->bus->serial;
+		serial_number = idev->card->serial;
 		
-		ioaddr[0]=idev->resource[0].start;
-		ioaddr[1]=idev->resource[1].start;
+		ioaddr[0]=pnp_port_start(idev, 0);
+		ioaddr[1]=pnp_port_start(idev, 0);
 		
-		irq = idev->irq_resource[0].start;
+		irq = pnp_irq(idev, 0);
 
 		/* check I/O base and IRQ */
 		if (dev->base_addr != 0 && dev->base_addr != ioaddr[0])
-			continue;
+			goto __again;
 		if (dev->mem_start != 0 && dev->mem_start != ioaddr[1])
-			continue;
+			goto __again;
 		if (dev->irq != 0 && dev->irq != irq)
-			continue;
+			goto __again;
 			
 		/*
 		 *	Ok set it up.
 		 */
 		if (!request_region(ioaddr[0], 16, dev->name))
-			continue;
+			goto __again;
 		if (!request_region(ioaddr[1], 16, dev->name)) {
 			release_region(ioaddr[0], 16);
-			continue;
+			goto __again;
 		}
 		 
 		dev->base_addr = ioaddr[0];
@@ -216,8 +219,12 @@ sb1000_probe(struct net_device *dev)
 				dev->mem_start, serial_number, dev->irq);
 
 		dev = init_etherdev(dev, 0);
-		if (!dev)
+		if (!dev) {
+			pnp_device_detach(idev);
+			release_region(ioaddr[1], 16);
+			release_region(ioaddr[0], 16);
 			return -ENOMEM;
+		}
 		SET_MODULE_OWNER(dev);
 
 		/* Make up a SB1000-specific-data structure. */

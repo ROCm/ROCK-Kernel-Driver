@@ -419,8 +419,6 @@ ENTRY(cpu_arm920_set_pte)
 	mov	pc, lr
 
 
-cpu_manu_name:
-	.asciz	"ARM/CIRRUS"
 ENTRY(cpu_arm920_name)
 	.ascii	"Arm920T"
 #ifndef CONFIG_CPU_ICACHE_DISABLE
@@ -506,15 +504,9 @@ arm920_processor_functions:
 
 	.size	arm920_processor_functions, . - arm920_processor_functions
 
-	.type	cpu_arm920_info, #object
-cpu_arm920_info:
-	.long	cpu_manu_name
-	.long	cpu_arm920_name
-	.size	cpu_arm920_info, . - cpu_arm920_info
-
 	.type	cpu_arch_name, #object
 cpu_arch_name:
-	.asciz	"armv4"
+	.asciz	"armv4t"
 	.size	cpu_arch_name, . - cpu_arch_name
 
 	.type	cpu_elf_name, #object
@@ -534,7 +526,7 @@ __arm920_proc_info:
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB
-	.long	cpu_arm920_info
+	.long	cpu_arm920_name
 	.long	arm920_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	v4wb_user_fns

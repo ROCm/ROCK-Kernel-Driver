@@ -97,10 +97,18 @@ static int integrator_verify_speed(struct cpufreq_policy *policy)
 	return 0;
 }
 
-static void do_set_policy(int cpu, struct cpufreq_policy *policy)
+static int integrator_set_policy(struct cpufreq_policy *policy)
 {
-	struct vco vco = freq_to_vco(policy->max, 1);
+	unsigned long cpus_allowed;
+	int cpu = policy->cpu;
+	struct vco vco;
+	struct cpufreq_freqs freqs;
 	u_int cm_osc;
+
+	/*
+	 * Save this threads cpus_allowed mask.
+	 */
+	cpus_allowed = current->cpus_allowed;
 
 	/*
 	 * Bind to the specified CPU.  When this call returns,
@@ -109,6 +117,23 @@ static void do_set_policy(int cpu, struct cpufreq_policy *policy)
 	set_cpus_allowed(current, 1 << cpu);
 	BUG_ON(cpu != smp_processor_id());
 
+	/* get current setting */
+	cm_osc = __raw_readl(CM_OSC);
+	vco.od = (cm_osc >> 8) & 7;
+	vco.vdw = cm_osc & 255;
+
+	freqs.old = vco_to_freq(vco, 1);
+	freqs.new = target_freq;
+	freqs.cpu = policy->cpu;
+
+	if (freqs.old == freqs.new) {
+		set_cpus_allowed(current, cpus_allowed);
+		return 0;
+	}
+
+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	vco = freq_to_vco(policy->max, 1);
+
 	cm_osc = __raw_readl(CM_OSC);
 	cm_osc &= 0xfffff800;
 	cm_osc |= vco.vdw | vco.od << 8;
@@ -116,31 +141,13 @@ static void do_set_policy(int cpu, struct cpufreq_policy *policy)
 	__raw_writel(0xa05f, CM_LOCK);
 	__raw_writel(cm_osc, CM_OSC);
 	__raw_writel(0, CM_LOCK);
-}
-
-static int integrator_set_policy(struct cpufreq_policy *policy)
-{
-	unsigned long cpus_allowed;
-	int cpu;
-
-	/*
-	 * Save this threads cpus_allowed mask.
-	 */
-	cpus_allowed = current->cpus_allowed;
-
-	if (policy->cpu == CPUFREQ_ALL_CPUS) {
-		for (cpu = 0; cpu < NR_CPUS; cpu++) {
-			if (!cpu_online(cpu))
-				continue;
-			do_set_policy(cpu, policy);
-		}
-	} else
-		do_set_policy(policy->cpu, policy);
 
 	/*
 	 * Restore the CPUs allowed mask.
 	 */
 	set_cpus_allowed(current, cpus_allowed);
+
+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
 	return 0;
 }
@@ -149,8 +156,8 @@ static struct cpufreq_policy integrator_policy = {
 	.cpu		= 0,
 	.policy		= CPUFREQ_POLICY_POWERSAVE,
 	.cpuinfo	= {
-		.max_cpu_freq		= 160000,
-		.min_cpu_freq		= 12000,
+		.max_freq		= 160000,
+		.min_freq		= 12000,
 		.transition_latency	= CPUFREQ_ETERNAL,
 	},
 };
@@ -168,7 +175,7 @@ static int __init integrator_cpu_init(void)
 	unsigned long cpus_allowed;
 	int cpu;
 
-	policies = kmalloc(sizeof(struct cpufreq_freqs) * NR_CPUS,
+	policies = kmalloc(sizeof(struct cpufreq_policy) * NR_CPUS,
 			   GFP_KERNEL);
 	if (!policies) {
 		printk(KERN_ERR "CPU: unable to allocate policies structure\n");

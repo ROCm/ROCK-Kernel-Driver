@@ -61,6 +61,8 @@ extern const struct gtype##_id __mod_##gtype##_table		\
   __attribute__ ((unused, alias(__stringify(name))))
 
 #define THIS_MODULE (&__this_module)
+#define MOD_INC_USE_COUNT _MOD_INC_USE_COUNT(THIS_MODULE)
+#define MOD_DEC_USE_COUNT __MOD_DEC_USE_COUNT(THIS_MODULE)
 
 /*
  * The following license idents are currently accepted as indicating free
@@ -96,6 +98,8 @@ extern const struct gtype##_id __mod_##gtype##_table		\
 
 #define MODULE_GENERIC_TABLE(gtype,name)
 #define THIS_MODULE ((struct module *)0)
+#define MOD_INC_USE_COUNT	do { } while (0)
+#define MOD_DEC_USE_COUNT	do { } while (0)
 #define MODULE_LICENSE(license)
 #endif
 
@@ -426,10 +430,6 @@ static inline void __deprecated _MOD_INC_USE_COUNT(struct module *module)
 	try_module_get(module);
 #endif
 }
-#define MOD_INC_USE_COUNT \
-	_MOD_INC_USE_COUNT(THIS_MODULE)
-#define MOD_DEC_USE_COUNT \
-	__MOD_DEC_USE_COUNT(THIS_MODULE)
 #define EXPORT_NO_SYMBOLS
 extern int module_dummy_usage;
 #define GET_USE_COUNT(module) (module_dummy_usage)

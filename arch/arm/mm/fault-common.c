@@ -9,6 +9,7 @@
  * published by the Free Software Foundation.
  */
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -102,23 +103,25 @@ static void
 __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 		  struct pt_regs *regs)
 {
-	unsigned long fixup;
+	const struct exception_table_entry *fixup;
 
 	/*
 	 * Are we prepared to handle this kernel fault?
 	 */
-	if ((fixup = search_exception_table(instruction_pointer(regs))) != 0) {
+	fixup = search_exception_tables(instruction_pointer(regs));
+	if (fixup) {
 #ifdef DEBUG
 		printk(KERN_DEBUG "%s: Exception at [<%lx>] addr=%lx (fixup: %lx)\n",
-			current->comm, regs->ARM_pc, addr, fixup);
+			current->comm, regs->ARM_pc, addr, fixup->fixup);
 #endif
-		regs->ARM_pc = fixup;
+		regs->ARM_pc = fixup->fixup;
 		return;
 	}
 
 	/*
 	 * No handler, we'll have to terminate things with extreme prejudice.
 	 */
+	bust_spinlocks(1);
 	printk(KERN_ALERT
 		"Unable to handle kernel %s at virtual address %08lx\n",
 		(addr < PAGE_SIZE) ? "NULL pointer dereference" :
@@ -126,6 +129,7 @@ __do_kernel_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 
 	show_pte(mm, addr);
 	die("Oops", regs, fsr);
+	bust_spinlocks(0);
 	do_exit(SIGKILL);
 }
 

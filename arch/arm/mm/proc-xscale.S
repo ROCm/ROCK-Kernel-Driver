@@ -651,9 +651,6 @@ ENTRY(cpu_xscale_set_pte)
 
 	.ltorg
 
-cpu_manu_name:
-	.asciz	"Intel"
-
 cpu_80200_name:
 	.asciz	"XScale-80200"
 
@@ -723,24 +720,6 @@ ENTRY(xscale_processor_functions)
 	.word	cpu_xscale_set_pte
 	.size	xscale_processor_functions, . - xscale_processor_functions
 
-	.type	cpu_80200_info, #object
-cpu_80200_info:
-	.long	cpu_manu_name
-	.long	cpu_80200_name
-	.size	cpu_80200_info, . - cpu_80200_info
-
-	.type	cpu_pxa250_info, #object
-cpu_pxa250_info:
-	.long	cpu_manu_name
-	.long	cpu_pxa250_name
-	.size	cpu_pxa250_info, . - cpu_pxa250_info
-
-	.type	cpu_pxa210_info, #object
-cpu_pxa210_info:
-	.long	cpu_manu_name
-	.long	cpu_pxa210_name
-	.size	cpu_pxa210_info, . - cpu_pxa210_info
-
 	.type	cpu_arch_name, #object
 cpu_arch_name:
 	.asciz	"armv5te"
@@ -763,7 +742,7 @@ __80200_proc_info:
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-	.long	cpu_80200_info
+	.long	cpu_80200_name
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	xscale_mc_user_fns
@@ -778,7 +757,7 @@ __pxa250_proc_info:
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-	.long	cpu_pxa250_info
+	.long	cpu_pxa250_name
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	xscale_mc_user_fns
@@ -793,7 +772,7 @@ __pxa210_proc_info:
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
-	.long	cpu_pxa210_info
+	.long	cpu_pxa210_name
 	.long	xscale_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	xscale_mc_user_fns

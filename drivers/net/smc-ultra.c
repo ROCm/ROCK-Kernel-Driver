@@ -284,29 +284,33 @@ static int __init ultra_probe_isapnp(struct net_device *dev)
         int i;
 
         for (i = 0; ultra_device_ids[i].vendor != 0; i++) {
-                struct pci_dev *idev = NULL;
+		struct pnp_dev *idev = NULL;
 
-                while ((idev = isapnp_find_dev(NULL,
-                                               ultra_device_ids[i].vendor,
-                                               ultra_device_ids[i].function,
-                                               idev))) {
+                while ((idev = pnp_find_dev(NULL,
+                                            ultra_device_ids[i].vendor,
+                                            ultra_device_ids[i].function,
+                                            idev))) {
                         /* Avoid already found cards from previous calls */
-                        if (idev->prepare(idev))
-                                continue;
-                        if (idev->activate(idev))
-                                continue;
-                        /* if no irq, search for next */
-                        if (idev->irq_resource[0].start == 0)
-                                continue;
+                        if (pnp_device_attach(idev) < 0)
+                        	continue;
+                        if (pnp_activate_dev(idev, NULL) < 0) {
+                              __again:
+                        	pnp_device_detach(idev);
+                        	continue;
+                        }
+			/* if no io and irq, search for next */
+			if (!pnp_port_valid(idev, 0) || !pnp_irq_valid(idev, 0))
+				goto __again;
                         /* found it */
-                        dev->base_addr = idev->resource[0].start;
-                        dev->irq = idev->irq_resource[0].start;
+			dev->base_addr = pnp_port_start(idev, 0);
+			dev->irq = pnp_irq(idev, 0);
                         printk(KERN_INFO "smc-ultra.c: ISAPnP reports %s at i/o %#lx, irq %d.\n",
                                 (char *) ultra_device_ids[i].driver_data,
-
                                 dev->base_addr, dev->irq);
                         if (ultra_probe1(dev, dev->base_addr) != 0) {      /* Shouldn't happen. */
-                                printk(KERN_ERR "smc-ultra.c: Probe of ISAPnP card at %#lx failed.\n", dev->base_addr);                                return -ENXIO;
+                                printk(KERN_ERR "smc-ultra.c: Probe of ISAPnP card at %#lx failed.\n", dev->base_addr);
+                                pnp_device_detach(idev);
+				return -ENXIO;
                         }
                         ei_status.priv = (unsigned long)idev;
                         break;

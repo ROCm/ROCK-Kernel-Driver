@@ -14,7 +14,7 @@
  * devices.  This is the "generic" version.  The PCI specific version
  * is in pci.h
  */
-extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle);
+extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle, unsigned long flags);
 extern void consistent_free(void *vaddr, size_t size, dma_addr_t handle);
 extern void consistent_sync(void *kaddr, size_t size, int rw);
 
@@ -84,12 +84,12 @@ static inline int dma_is_consistent(dma_addr_t handle)
 static inline void *
 dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle)
 {
-	int gfp = GFP_KERNEL;
+	int gfp = GFP_ATOMIC;
 
 	if (dev == NULL || dmadev_is_sa1111(dev) || *dev->dma_mask != 0xffffffff)
 		gfp |= GFP_DMA;
 
-	return consistent_alloc(gfp, size, handle);
+	return consistent_alloc(gfp, size, handle, 0);
 }
 
 /**

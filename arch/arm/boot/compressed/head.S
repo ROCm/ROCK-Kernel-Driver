@@ -366,9 +366,12 @@ __armv4_cache_on:
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
 		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
-		orr	r0, r0, #0x1000		@ I-cache enable
+		orr	r0, r0, #0x5000		@ I-cache enable, RR cache replacement
 		orr	r0, r0, #0x0030
-		b	__common_cache_on
+		bl	__common_cache_on
+		mov	r0, #0
+		mcr	p15, 0, r0, c8, c7, 0	@ flush I,D TLBs
+		mov	pc, r12
 
 __arm6_cache_on:
 		mov	r12, lr
@@ -377,6 +380,11 @@ __arm6_cache_on:
 		mcr	p15, 0, r0, c7, c0, 0	@ invalidate whole cache v3
 		mcr	p15, 0, r0, c5, c0, 0	@ invalidate whole TLB v3
 		mov	r0, #0x30
+		bl	__common_cache_on
+		mov	r0, #0
+		mcr	p15, 0, r0, c5, c0, 0	@ invalidate whole TLB v3
+		mov	pc, r12
+
 __common_cache_on:
 #ifndef DEBUG
 		orr	r0, r0, #0x000d		@ Write buffer, mmu
@@ -385,7 +393,7 @@ __common_cache_on:
 		mcr	p15, 0, r3, c2, c0, 0	@ load page table pointer
 		mcr	p15, 0, r1, c3, c0, 0	@ load domain access control
 		mcr	p15, 0, r0, c1, c0, 0	@ load control register
-		mov	pc, r12
+		mov	pc, lr
 
 /*
  * All code following this line is relocatable.  It is relocated by
@@ -567,11 +575,12 @@ cache_clean_flush:
 __armv4_cache_flush:
 		bic	r1, pc, #31
 		add	r2, r1, #65536		@ 2x the largest dcache size
-1:		ldr	r12, [r1], #32		@ s/w flush D cache
+1:		ldr	r3, [r1], #32		@ s/w flush D cache
 		teq	r1, r2
 		bne	1b
 
-		mcr	p15, 0, r1, c7, c7, 0	@ flush I cache
+		mcr	p15, 0, r1, c7, c5, 0	@ flush I cache
+		mcr	p15, 0, r1, c7, c6, 0	@ flush D cache
 		mcr	p15, 0, r1, c7, c10, 4	@ drain WB
 		mov	pc, lr
 
