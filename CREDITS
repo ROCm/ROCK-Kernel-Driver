@@ -805,6 +805,21 @@ S: One Dell Way
 S: Round Rock, TX  78682
 S: USA
 
+N: Ben Dooks
+E: ben-linux@fluff.org
+E: ben@simtec.co.uk
+W: http://www.fluff.org/ben/
+W: http://www.simtec.co.uk/
+D: Samsung S3C2410/S3C2440 support, general ARM support
+D: Maintaining Simtec Electronics development boards
+S: Simtec Electronics
+S: Avondale Drive
+S: Tarleton
+S: Preston
+S: Lancs
+S: PR4 6AX
+S: United Kingdom
+
 N: John G Dorsey
 E: john+@cs.cmu.edu
 D: ARM Linux ports to Assabet/Neponset, Spot
