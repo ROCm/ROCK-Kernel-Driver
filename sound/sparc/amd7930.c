@@ -992,10 +992,10 @@ static int __init snd_amd7930_create(snd_card_t *card,
 
 	if (request_irq(irq_prop->pri, snd_amd7930_interrupt,
 			SA_INTERRUPT | SA_SHIRQ, "amd7930", amd)) {
-		snd_amd7930_free(amd);
 		snd_printk("amd7930-%d: Unable to grab IRQ %s\n",
 			   dev,
 			   __irq_itoa(irq_prop->pri));
+		snd_amd7930_free(amd);
 		return -EBUSY;
 	}
 	amd->irq = irq_prop->pri;

@@ -4125,6 +4125,7 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 	switch (hdsp->firmware_rev & 0xff) {
 	case 0xa:
 	case 0xb:
+	case 0x32:
 		hdsp->card_name = "RME Hammerfall DSP";
 		break;
 

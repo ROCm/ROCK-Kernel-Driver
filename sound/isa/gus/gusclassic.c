@@ -189,8 +189,8 @@ static int __init snd_gusclassic_probe(int dev)
 		return err;
 	}
 	if (gus->max_flag || gus->ess_flag) {
-		snd_card_free(card);
 		snd_printdd("GUS Classic or ACE soundcard was not detected at 0x%lx\n", gus->gf1.port);
+		snd_card_free(card);
 		return -ENODEV;
 	}
 	if ((err = snd_gf1_new_mixer(gus)) < 0) {
