@@ -1731,7 +1731,7 @@ static void autorun_devices(void)
 			mddev_unlock(mddev);
 		}
 		/* on success, candidates will be empty, on error
-		 * it wont...
+		 * it won't...
 		 */
 		ITERATE_RDEV_GENERIC(candidates,rdev,tmp)
 			export_rdev(rdev);

@@ -2872,7 +2872,7 @@ void reset_palette(int currcons)
  *  this is done in order to maintain compatibility with the EGA/VGA fonts. It 
  *  is upto the actual low-level console-driver convert data into its favorite
  *  format (maybe we should add a `fontoffset' field to the `display'
- *  structure so we wont have to convert the fontdata all the time.
+ *  structure so we won't have to convert the fontdata all the time.
  *  /Jes
  */
 

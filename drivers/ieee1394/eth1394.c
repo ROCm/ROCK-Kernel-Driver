@@ -663,7 +663,7 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	 * call to schedule our writes.  */
 
 	/* XXX: Right now we accept that we don't exactly follow RFC. When
-	 * we do, we will send ARP requests via GASP format, and so we wont
+	 * we do, we will send ARP requests via GASP format, and so we won't
 	 * need this hack.  */
 
 	spin_lock_irqsave (&priv->lock, flags);

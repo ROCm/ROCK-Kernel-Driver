@@ -172,7 +172,7 @@ early_sn_setup(void)
 
 	/*
 	 * Parse enough of the SAL tables to locate the SAL entry point. Since, console
-	 * IO on SN2 is done via SAL calls, early_printk wont work without this.
+	 * IO on SN2 is done via SAL calls, early_printk won't work without this.
 	 *
 	 * This code duplicates some of the ACPI table parsing that is in efi.c & sal.c.
 	 * Any changes to those file may have to be made hereas well.

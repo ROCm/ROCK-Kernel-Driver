@@ -2584,7 +2584,7 @@ int submit_bh(int rw, struct buffer_head * bh)
  * BH_Lock state bit), any buffer that appears to be clean when doing a
  * write request, and any buffer that appears to be up-to-date when doing
  * read request.  Further it marks as clean buffers that are processed for
- * writing (the buffer cache wont assume that they are actually clean until
+ * writing (the buffer cache won't assume that they are actually clean until
  * the buffer gets unlocked).
  *
  * ll_rw_block sets b_end_io to simple completion handler that marks

@@ -2266,7 +2266,7 @@ static void ohci_irq_handler(int irq, void *dev_id,
 	if (event & OHCI1394_cycleInconsistent) {
 		/* We subscribe to the cycleInconsistent event only to
 		 * clear the corresponding event bit... otherwise,
-		 * isochronous cycleMatch DMA wont work. */
+		 * isochronous cycleMatch DMA won't work. */
 		DBGMSG(ohci->id, "OHCI1394_cycleInconsistent");
 		event &= ~OHCI1394_cycleInconsistent;
 	}

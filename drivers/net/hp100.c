@@ -2811,7 +2811,7 @@ static int hp100_login_to_vg_hub(struct net_device *dev, u_short force_relogin)
 			printk("hp100: %s: Problem logging into the HUB.\n", dev->name);
 			if (lp->chip == HP100_CHIPID_LASSEN) {
 				/* Check allowed Register to find out why there is a problem. */
-				val = hp100_inw(TRAIN_ALLOW);	/* wont work on non-ETR card */
+				val = hp100_inw(TRAIN_ALLOW);	/* won't work on non-ETR card */
 #ifdef HP100_DEBUG_TRAINING
 				printk("hp100: %s: MAC Configuration requested: 0x%04x, HUB allowed: 0x%04x\n", dev->name, hp100_inw(TRAIN_REQUEST), val);
 #endif
