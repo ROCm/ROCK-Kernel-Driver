@@ -191,7 +191,6 @@ EXPORT_SYMBOL(flush_dcache_range);
 EXPORT_SYMBOL(flush_icache_user_range);
 EXPORT_SYMBOL(flush_icache_page);
 EXPORT_SYMBOL(flush_dcache_page);
-EXPORT_SYMBOL(xchg_u32);
 #ifdef CONFIG_ALTIVEC
 EXPORT_SYMBOL(last_task_used_altivec);
 EXPORT_SYMBOL(giveup_altivec);
