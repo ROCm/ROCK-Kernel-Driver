@@ -169,8 +169,9 @@ struct mdk_rdev_s
 
 	struct block_device *bdev;	/* block device handle */
 
-	mdp_super_t *sb;
-	unsigned long sb_offset;
+	struct page	*sb_page;
+	mdp_super_t	*sb;
+	unsigned long	sb_offset;
 
 	int alias_device;		/* device alias to the same disk */
 	int faulty;			/* if faulty do not issue IO requests */
