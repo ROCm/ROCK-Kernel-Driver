@@ -556,10 +556,9 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 
 int __devinit pci_bus_exists(const struct list_head *list, int nr)
 {
-	const struct list_head *l;
+	const struct pci_bus *b;
 
-	for(l=list->next; l != list; l = l->next) {
-		const struct pci_bus *b = pci_bus_b(l);
+	list_for_each_entry(b, list, node) {
 		if (b->number == nr || pci_bus_exists(&b->children, nr))
 			return 1;
 	}
