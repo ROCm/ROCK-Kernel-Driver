@@ -128,10 +128,6 @@ const struct consw *conswitchp;
 extern void vcs_make_devfs (unsigned int index, int unregister);
 extern void console_map_init(void);
 
-#ifndef MIN
-#define MIN(a,b)	((a) < (b) ? (a) : (b))
-#endif
-
 static struct tty_struct *console_table[MAX_NR_CONSOLES];
 static struct termios *console_termios[MAX_NR_CONSOLES];
 static struct termios *console_termios_locked[MAX_NR_CONSOLES];
@@ -748,7 +744,7 @@ int vc_resize(unsigned int lines, unsigned int cols,
 		video_size_row = sr;
 		screenbuf_size = ss;
 
-		rlth = MIN(osr, sr);
+		rlth = min(osr, sr);
 		rrem = sr - rlth;
 		ol = origin;
 		nl = (long) newscreens[currcons];
@@ -3028,9 +3024,7 @@ EXPORT_SYMBOL(video_scan_lines);
 EXPORT_SYMBOL(vc_resize);
 EXPORT_SYMBOL(fg_console);
 EXPORT_SYMBOL(console_blank_hook);
-#ifdef CONFIG_VT
 EXPORT_SYMBOL(vt_cons);
-#endif
 #ifndef VT_SINGLE_DRIVER
 EXPORT_SYMBOL(take_over_console);
 EXPORT_SYMBOL(give_up_console);

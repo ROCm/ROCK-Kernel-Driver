@@ -179,7 +179,7 @@ void iforce_usb_delete(struct iforce* iforce)
 static void iforce_usb_disconnect(struct usb_device *dev, void *ptr)
 {
 	struct iforce *iforce = ptr;
-	int open = iforce->dev.handle->open;
+	int open = 0; /* FIXME! iforce->dev.handle->open; */
 
 	iforce->usbdev = NULL;
 	input_unregister_device(&iforce->dev);

@@ -40,6 +40,7 @@
 #include <linux/smp_lock.h>
 #include <linux/random.h>
 #include <linux/time.h>
+#include <linux/device.h>
 
 #ifndef CONFIG_INPUT_TSDEV_SCREEN_X
 #define CONFIG_INPUT_TSDEV_SCREEN_X	240
@@ -420,8 +421,14 @@ static struct input_handler tsdev_handler = {
 	.id_table =	tsdev_ids,
 };
 
+static struct device_interface tsdev_intf = {
+	.name		= "touchscreen",
+	.devclass	= &input_devclass,
+};
+
 static int __init tsdev_init(void)
 {
+	interface_register(&tsdev_intf);
 	input_register_handler(&tsdev_handler);
 	printk(KERN_INFO "ts: Compaq touchscreen protocol output\n");
 	return 0;
@@ -430,6 +437,7 @@ static int __init tsdev_init(void)
 static void __exit tsdev_exit(void)
 {
 	input_unregister_handler(&tsdev_handler);
+	interface_unregister(&tsdev_intf);
 }
 
 module_init(tsdev_init);

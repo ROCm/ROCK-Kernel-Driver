@@ -879,7 +879,7 @@ static int hid_input_report(int type, struct urb *urb)
 	{
 		int i;
 		printk(KERN_DEBUG __FILE__ ": report %d (size %u) = ", n, len);
-		for (i = 0; i < n; i++)
+		for (i = 0; i < len; i++)
 			printk(" %02x", data[i]);
 		printk("\n");
 	}
@@ -1073,7 +1073,7 @@ static int hid_submit_ctrl(struct hid_device *hid)
 
 	hid->cr.bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE | dir;
 	hid->cr.bRequest = (dir == USB_DIR_OUT) ? HID_REQ_SET_REPORT : HID_REQ_GET_REPORT;
-	hid->cr.wValue = ((report->type + 1) << 8) | report->id;
+	hid->cr.wValue = cpu_to_le16(((report->type + 1) << 8) | report->id);
 	hid->cr.wIndex = cpu_to_le16(hid->ifnum);
 	hid->cr.wLength = cpu_to_le16(hid->urbctrl->transfer_buffer_length);
 
@@ -1384,7 +1384,7 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 #ifdef DEBUG_DATA
 	printk(KERN_DEBUG __FILE__ ": report descriptor (size %u, read %d) = ", rsize, n);
 	for (n = 0; n < rsize; n++)
-		printk(" %02x", (unsigned) rdesc[n]);
+		printk(" %02x", (unsigned char) rdesc[n]);
 	printk("\n");
 #endif
 
@@ -1432,7 +1432,7 @@ static struct hid_device *usb_hid_configure(struct usb_device *dev, int ifnum)
 	hid->outlock = SPIN_LOCK_UNLOCKED;
 	hid->ctrllock = SPIN_LOCK_UNLOCKED;
 
-	hid->version = hdesc->bcdHID;
+	hid->version = le16_to_cpu(hdesc->bcdHID);
 	hid->country = hdesc->bCountryCode;
 	hid->dev = dev;
 	hid->ifnum = interface->bInterfaceNumber;
