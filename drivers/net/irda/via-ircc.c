@@ -377,9 +377,6 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 	self->qos.min_turn_time.bits = qos_mtt_bits;
 	irda_qos_bits_to_value(&self->qos);
 
-	self->flags =
-	    IFF_FIR | IFF_MIR | IFF_SIR | IFF_DMA | IFF_PIO | IFF_DONGLE;
-
 	/* Max DMA buffer size needed = (data_size + 6) * (window_size) + 6; */
 	self->rx_buff.truesize = 14384 + 2048;
 	self->tx_buff.truesize = 14384 + 2048;

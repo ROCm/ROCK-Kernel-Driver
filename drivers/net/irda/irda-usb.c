@@ -1136,14 +1136,6 @@ static inline void irda_usb_init_qos(struct irda_usb_cb *self)
 	 * the transmit path will be set differently - Jean II 
 	 */
 	irda_qos_bits_to_value(&self->qos);
-
-	self->flags |= IFF_SIR;
-	if (self->qos.baud_rate.value > 115200)
-		self->flags |= IFF_MIR;
-	if (self->qos.baud_rate.value > 1152000)
-		self->flags |= IFF_FIR;
-	if (self->qos.baud_rate.value > 4000000)
-		self->flags |= IFF_VFIR;
 }
 
 /*------------------------------------------------------------------*/

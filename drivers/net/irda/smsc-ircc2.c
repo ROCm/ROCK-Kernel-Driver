@@ -441,8 +441,6 @@ static int __init smsc_ircc_open(unsigned int fir_base, unsigned int sir_base, u
 
 	smsc_ircc_setup_qos(self);
 
-	self->flags = IFF_FIR|IFF_MIR|IFF_SIR|IFF_DMA|IFF_PIO;
-		
 	smsc_ircc_init_chip(self);
 	
 	if(ircc_transceiver > 0  && 
