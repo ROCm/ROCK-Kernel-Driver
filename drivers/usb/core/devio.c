@@ -763,7 +763,6 @@ static int proc_setconfig(struct dev_state *ps, void __user *arg)
 	if (get_user(u, (unsigned int __user *)arg))
 		return -EFAULT;
 
-	down(&ps->dev->serialize);
  	actconfig = ps->dev->actconfig;
  
  	/* Don't touch the device if any interfaces are claimed.
@@ -799,7 +798,6 @@ static int proc_setconfig(struct dev_state *ps, void __user *arg)
 		else
 			status = usb_set_configuration(ps->dev, u);
 	}
-	up(&ps->dev->serialize);
 
 	return status;
 }
