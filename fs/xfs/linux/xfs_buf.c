@@ -386,7 +386,7 @@ _pagebuf_lookup_pages(
 
 			XFS_STATS_INC(pb_page_retries);
 			pagebuf_daemon_wakeup();
-			current->state = TASK_UNINTERRUPTIBLE;
+			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(10);
 			goto retry;
 		}
@@ -1061,7 +1061,7 @@ _pagebuf_wait_unpin(
 
 	add_wait_queue(&pb->pb_waiters, &wait);
 	for (;;) {
-		current->state = TASK_UNINTERRUPTIBLE;
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		if (atomic_read(&pb->pb_pin_count) == 0)
 			break;
 		if (atomic_read(&pb->pb_io_remaining))
@@ -1069,7 +1069,7 @@ _pagebuf_wait_unpin(
 		schedule();
 	}
 	remove_wait_queue(&pb->pb_waiters, &wait);
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 }
 
 /*
