@@ -438,9 +438,6 @@ struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
 	dev_hold(dev);
 	sch->stats_lock = &dev->queue_lock;
 	atomic_set(&sch->refcnt, 1);
-	/* enqueue is accessed locklessly - make sure it's visible
-	 * before we set a netdevice's qdisc pointer to sch */
-	smp_wmb();
 	if (!ops->init || ops->init(sch, NULL) == 0)
 		return sch;
 
@@ -521,7 +518,8 @@ void dev_activate(struct net_device *dev)
 	}
 
 	spin_lock_bh(&dev->queue_lock);
-	if ((dev->qdisc = dev->qdisc_sleeping) != &noqueue_qdisc) {
+	rcu_assign_pointer(dev->qdisc, dev->qdisc_sleeping);
+	if (dev->qdisc != &noqueue_qdisc) {
 		dev->trans_start = jiffies;
 		dev_watchdog_up(dev);
 	}
