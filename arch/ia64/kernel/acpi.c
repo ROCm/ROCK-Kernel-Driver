@@ -55,6 +55,7 @@ asm (".weak iosapic_register_intr");
 asm (".weak iosapic_override_isa_irq");
 asm (".weak iosapic_register_platform_intr");
 asm (".weak iosapic_init");
+asm (".weak iosapic_system_init");
 asm (".weak iosapic_version");
 
 void (*pm_idle) (void);
@@ -335,16 +336,9 @@ acpi_parse_iosapic (acpi_table_entry_header *header)
 
 	acpi_table_print_madt_entry(header);
 
-	if (iosapic_init) {
-#ifndef CONFIG_ITANIUM
-		/* PCAT_COMPAT flag indicates dual-8259 setup */
-		iosapic_init(iosapic->address, iosapic->global_irq_base,
-			     acpi_madt->flags.pcat_compat);
-#else
-		/* Firmware on old Itanium systems is broken */
-		iosapic_init(iosapic->address, iosapic->global_irq_base, 1);
-#endif
-	}
+	if (iosapic_init)
+		iosapic_init(iosapic->address, iosapic->global_irq_base);
+
 	return 0;
 }
 
@@ -439,7 +433,13 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 	acpi_madt = (struct acpi_table_madt *) __va(phys_addr);
 
 	/* remember the value for reference after free_initmem() */
+#ifdef CONFIG_ITANIUM
+	has_8259 = 1; /* Firmware on old Itanium systems is broken */
+#else
 	has_8259 = acpi_madt->flags.pcat_compat;
+#endif
+	if (iosapic_system_init)
+		iosapic_system_init(has_8259);
 
 	/* Get base address of IPI Message Block */
 

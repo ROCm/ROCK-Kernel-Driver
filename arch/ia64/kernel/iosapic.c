@@ -111,10 +111,11 @@ static struct iosapic {
 	char		*addr;		/* base address of IOSAPIC */
 	unsigned int 	gsi_base;	/* first GSI assigned to this IOSAPIC */
 	unsigned short 	num_rte;	/* number of RTE in this IOSAPIC */
-	unsigned char	pcat_compat;	/* 8259 compatibility flag */
 } iosapic_lists[256] __devinitdata;
 
 static int num_iosapic = 0;
+
+static unsigned char pcat_compat;	/* 8259 compatibility flag */
 
 
 /*
@@ -615,19 +616,14 @@ iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 }
 
 void __devinit
-iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
+iosapic_system_init (int system_pcat_compat)
 {
-	int num_rte, vector;
-	unsigned int isa_irq, ver;
-	char *addr;
-	static int first_time = 1;
+	int vector;
 
-	if (first_time) {
-		first_time = 0;
-		for (vector = 0; vector < IA64_NUM_VECTORS; ++vector)
-			iosapic_intr_info[vector].rte_index = -1;	/* mark as unused */
-	}
+	for (vector = 0; vector < IA64_NUM_VECTORS; ++vector)
+		iosapic_intr_info[vector].rte_index = -1;	/* mark as unused */
 
+	pcat_compat = system_pcat_compat;
 	if (pcat_compat) {
 		/*
 		 * Disable the compatibility mode interrupts (8259 style), needs IN/OUT support
@@ -637,6 +633,14 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
 		outb(0xff, 0xA1);
 		outb(0xff, 0x21);
 	}
+}
+
+void __devinit
+iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
+{
+	int num_rte, vector;
+	unsigned int isa_irq, ver;
+	char *addr;
 
 	addr = ioremap(phys_addr, 0);
 	ver = iosapic_version(addr);
@@ -649,7 +653,6 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base, int pcat_compat)
 	num_rte = ((ver >> 16) & 0xff) + 1;
 
 	iosapic_lists[num_iosapic].addr = addr;
-	iosapic_lists[num_iosapic].pcat_compat = pcat_compat;
 	iosapic_lists[num_iosapic].gsi_base = gsi_base;
 	iosapic_lists[num_iosapic].num_rte = num_rte;
 	num_iosapic++;
@@ -732,7 +735,7 @@ iosapic_parse_prt (void)
 	struct acpi_prt_entry *entry;
 	struct list_head *node;
 	unsigned int gsi, gsi_base;
-	int index, vector, pcat_compat;
+	int index, vector;
 	char pci_id[16];
 	char *addr;
 
@@ -756,7 +759,6 @@ iosapic_parse_prt (void)
 			}
 			addr = iosapic_lists[index].addr;
 			gsi_base = iosapic_lists[index].gsi_base;
-			pcat_compat = iosapic_lists[index].pcat_compat;
 
 			if (pcat_compat && (gsi < 16))
 				vector = isa_irq_to_vector(gsi);

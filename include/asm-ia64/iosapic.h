@@ -51,9 +51,9 @@
 
 #ifndef __ASSEMBLY__
 
+extern void __devinit iosapic_system_init (int pcat_compat);
 extern void __devinit iosapic_init (unsigned long address,
-				    unsigned int gsi_base,
-				    int pcat_compat);
+				    unsigned int gsi_base);
 extern int gsi_to_vector (unsigned int gsi);
 extern int gsi_to_irq (unsigned int gsi);
 extern void iosapic_parse_prt (void);
