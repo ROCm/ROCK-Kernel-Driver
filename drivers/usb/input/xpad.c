@@ -163,7 +163,7 @@ static void xpad_process_packet(struct usb_xpad *xpad, u16 cmd, unsigned char *d
 	input_sync(dev);
 }
 
-static void xpad_irq_in(struct urb *urb)
+static void xpad_irq_in(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_xpad *xpad = urb->context;
 	int retval;

@@ -170,8 +170,8 @@ static int  ftdi_sio_open		(struct usb_serial_port *port, struct file *filp);
 static void ftdi_sio_close		(struct usb_serial_port *port, struct file *filp);
 static int  ftdi_sio_write		(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
 static int  ftdi_sio_write_room		(struct usb_serial_port *port);
-static void ftdi_sio_write_bulk_callback (struct urb *urb);
-static void ftdi_sio_read_bulk_callback	(struct urb *urb);
+static void ftdi_sio_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
+static void ftdi_sio_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static void ftdi_sio_set_termios	(struct usb_serial_port *port, struct termios * old);
 static int  ftdi_sio_ioctl		(struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg);
 static void ftdi_sio_break_ctl		(struct usb_serial_port *port, int break_state );
@@ -464,7 +464,7 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 	return (count - data_offset);
 } /* ftdi_sio_write */
 
-static void ftdi_sio_write_bulk_callback (struct urb *urb)
+static void ftdi_sio_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial;
@@ -504,7 +504,7 @@ static int ftdi_sio_write_room( struct usb_serial_port *port )
 } /* ftdi_sio_write_room */
 
 
-static void ftdi_sio_read_bulk_callback (struct urb *urb)
+static void ftdi_sio_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 { /* ftdi_sio_serial_buld_callback */
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial;

@@ -150,8 +150,8 @@ static void whiteheat_break_ctl		(struct usb_serial_port *port, int break_state)
 static int  whiteheat_chars_in_buffer	(struct usb_serial_port *port);
 static void whiteheat_throttle		(struct usb_serial_port *port);
 static void whiteheat_unthrottle	(struct usb_serial_port *port);
-static void whiteheat_read_callback	(struct urb *urb);
-static void whiteheat_write_callback	(struct urb *urb);
+static void whiteheat_read_callback	(struct urb *urb, struct pt_regs *regs);
+static void whiteheat_write_callback	(struct urb *urb, struct pt_regs *regs);
 
 static struct usb_serial_device_type whiteheat_fake_device = {
 	.owner =		THIS_MODULE,
@@ -225,8 +225,8 @@ struct whiteheat_private {
 /* local function prototypes */
 static int start_command_port(struct usb_serial *serial);
 static void stop_command_port(struct usb_serial *serial);
-static void command_port_write_callback(struct urb *urb);
-static void command_port_read_callback(struct urb *urb);
+static void command_port_write_callback(struct urb *urb, struct pt_regs *regs);
+static void command_port_read_callback(struct urb *urb, struct pt_regs *regs);
 
 static int start_port_read(struct usb_serial_port *port);
 static struct whiteheat_urb_wrap *urb_to_wrap(struct urb *urb, struct list_head *head);
@@ -957,7 +957,7 @@ static void whiteheat_unthrottle (struct usb_serial_port *port)
 /*****************************************************************************
  * Connect Tech's White Heat callback routines
  *****************************************************************************/
-static void command_port_write_callback (struct urb *urb)
+static void command_port_write_callback (struct urb *urb, struct pt_regs *regs)
 {
 	dbg("%s", __FUNCTION__);
 
@@ -972,7 +972,7 @@ static void command_port_write_callback (struct urb *urb)
 }
 
 
-static void command_port_read_callback (struct urb *urb)
+static void command_port_read_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *command_port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = get_usb_serial (command_port, __FUNCTION__);
@@ -1028,7 +1028,7 @@ static void command_port_read_callback (struct urb *urb)
 }
 
 
-static void whiteheat_read_callback(struct urb *urb)
+static void whiteheat_read_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
@@ -1079,7 +1079,7 @@ static void whiteheat_read_callback(struct urb *urb)
 }
 
 
-static void whiteheat_write_callback(struct urb *urb)
+static void whiteheat_write_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);

@@ -425,7 +425,7 @@ static void se401_auto_resetlevel(struct usb_se401 *se401)
 }
 
 /* irq handler for snapshot button */
-static void se401_button_irq(struct urb *urb)
+static void se401_button_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_se401 *se401 = urb->context;
 	int status;
@@ -461,7 +461,7 @@ exit:
 		     __FUNCTION__, status);
 }
 
-static void se401_video_irq(struct urb *urb)
+static void se401_video_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_se401 *se401 = urb->context;
 	int length = urb->actual_length;

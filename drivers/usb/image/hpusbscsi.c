@@ -275,7 +275,7 @@ hpusbscsi_scsi_detect (struct SHT *sht)
 static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 {
 	struct hpusbscsi* hpusbscsi = (struct hpusbscsi*)(srb->host->hostdata[0]);
-	usb_urb_callback usb_callback;
+	usb_complete_t usb_callback;
 	int res;
 
 	/* we don't answer for anything but our single device on any faked host controller */
@@ -382,7 +382,7 @@ static void handle_usb_error (struct hpusbscsi *hpusbscsi)
 	hpusbscsi->state = HP_STATE_FREE;
 }
 
-static void  control_interrupt_callback (struct urb *u)
+static void  control_interrupt_callback (struct urb *u, struct pt_regs *regs)
 {
 	struct hpusbscsi * hpusbscsi = (struct hpusbscsi *)u->context;
 	u8 scsi_state;
@@ -435,7 +435,7 @@ DEBUG("Getting status byte %d \n",hpusbscsi->scsi_state_byte);
 	}
 }
 
-static void simple_command_callback(struct urb *u)
+static void simple_command_callback(struct urb *u, struct pt_regs *regs)
 {
 	struct hpusbscsi * hpusbscsi = (struct hpusbscsi *)u->context;
 	if (unlikely(u->status<0)) {
@@ -454,11 +454,11 @@ static void simple_command_callback(struct urb *u)
 	}
 }
 
-static void scatter_gather_callback(struct urb *u)
+static void scatter_gather_callback(struct urb *u, struct pt_regs *regs)
 {
 	struct hpusbscsi * hpusbscsi = (struct hpusbscsi *)u->context;
         struct scatterlist *sg = hpusbscsi->srb->buffer;
-        usb_urb_callback callback;
+        usb_complete_t callback;
         int res;
 
         DEBUG("Going through scatter/gather\n");
@@ -494,7 +494,7 @@ static void scatter_gather_callback(struct urb *u)
 	TRACE_STATE;
 }
 
-static void simple_done (struct urb *u)
+static void simple_done (struct urb *u, struct pt_regs *regs)
 {
 	struct hpusbscsi * hpusbscsi = (struct hpusbscsi *)u->context;
 
@@ -521,7 +521,7 @@ static void simple_done (struct urb *u)
 	}
 }
 
-static void simple_payload_callback (struct urb *u)
+static void simple_payload_callback (struct urb *u, struct pt_regs *regs)
 {
 	struct hpusbscsi * hpusbscsi = (struct hpusbscsi *)u->context;
 	int res;
@@ -553,7 +553,7 @@ static void simple_payload_callback (struct urb *u)
 	} 
 }
 
-static void request_sense_callback (struct urb *u)
+static void request_sense_callback (struct urb *u, struct pt_regs *regs)
 {
 	struct hpusbscsi * hpusbscsi = (struct hpusbscsi *)u->context;
 

@@ -181,7 +181,7 @@ static int acm_ctrl_msg(struct acm *acm, int request, int value, void *buf, int 
  * Interrupt handler for various ACM control events
  */
 
-static void acm_ctrl_irq(struct urb *urb)
+static void acm_ctrl_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct acm *acm = urb->context;
 	struct usb_ctrlrequest *dr = urb->transfer_buffer;
@@ -245,7 +245,7 @@ exit:
 		     __FUNCTION__, status);
 }
 
-static void acm_read_bulk(struct urb *urb)
+static void acm_read_bulk(struct urb *urb, struct pt_regs *regs)
 {
 	struct acm *acm = urb->context;
 	struct tty_struct *tty = acm->tty;
@@ -282,7 +282,7 @@ static void acm_read_bulk(struct urb *urb)
 		dbg("failed resubmitting read urb");
 }
 
-static void acm_write_bulk(struct urb *urb)
+static void acm_write_bulk(struct urb *urb, struct pt_regs *regs)
 {
 	struct acm *acm = (struct acm *)urb->context;
 
@@ -424,7 +424,7 @@ static void acm_tty_unthrottle(struct tty_struct *tty)
 	if (!ACM_READY(acm)) return;
 	acm->throttle = 0;
 	if (acm->readurb->status != -EINPROGRESS)
-		acm_read_bulk(acm->readurb);
+		acm_read_bulk(acm->readurb, NULL);
 }
 
 static void acm_tty_break_ctl(struct tty_struct *tty, int state)

@@ -462,13 +462,13 @@ static int kaweth_reset(struct kaweth_device *kaweth)
 	return result;
 }
 
-static void kaweth_usb_receive(struct urb *);
+static void kaweth_usb_receive(struct urb *, struct pt_regs *regs);
 static int kaweth_resubmit_rx_urb(struct kaweth_device *, int);
 
 /****************************************************************
 	int_callback
 *****************************************************************/
-static void int_callback(struct urb *u)
+static void int_callback(struct urb *u, struct pt_regs *regs)
 {
 	struct kaweth_device *kaweth = u->context;
 	int act_state, status;
@@ -538,7 +538,7 @@ static void kaweth_async_set_rx_mode(struct kaweth_device *kaweth);
 /****************************************************************
  *     kaweth_usb_receive
  ****************************************************************/
-static void kaweth_usb_receive(struct urb *urb)
+static void kaweth_usb_receive(struct urb *urb, struct pt_regs *regs)
 {
 	struct kaweth_device *kaweth = urb->context;
 	struct net_device *net = kaweth->net;
@@ -699,7 +699,7 @@ static int kaweth_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 /****************************************************************
  *     kaweth_usb_transmit_complete
  ****************************************************************/
-static void kaweth_usb_transmit_complete(struct urb *urb)
+static void kaweth_usb_transmit_complete(struct urb *urb, struct pt_regs *regs)
 {
 	struct kaweth_device *kaweth = urb->context;
 	struct sk_buff *skb = kaweth->tx_skb;
@@ -1135,7 +1135,7 @@ struct usb_api_data {
 /*-------------------------------------------------------------------*
  * completion handler for compatibility wrappers (sync control/bulk) *
  *-------------------------------------------------------------------*/
-static void usb_api_blocking_completion(struct urb *urb)
+static void usb_api_blocking_completion(struct urb *urb, struct pt_regs *regs)
 {
         struct usb_api_data *awd = (struct usb_api_data *)urb->context;
 
@@ -1208,7 +1208,7 @@ int kaweth_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
                 return -ENOMEM;
 
         usb_fill_control_urb(urb, usb_dev, pipe, (unsigned char*)cmd, data,
-			 len, (usb_complete_t)usb_api_blocking_completion,0);
+			 len, usb_api_blocking_completion,0);
 
         retv = usb_start_wait_urb(urb, timeout, &length);
         if (retv < 0) {

@@ -137,7 +137,7 @@ static int skel_release		(struct inode *inode, struct file *file);
 static int skel_probe		(struct usb_interface *intf, const struct usb_device_id *id);
 static void skel_disconnect	(struct usb_interface *intf);
 
-static void skel_write_bulk_callback	(struct urb *urb);
+static void skel_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 
 
 /* array of pointers to our devices that are currently connected */
@@ -487,7 +487,7 @@ static int skel_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 /**
  *	skel_write_bulk_callback
  */
-static void skel_write_bulk_callback (struct urb *urb)
+static void skel_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_skel *dev = (struct usb_skel *)urb->context;
 
