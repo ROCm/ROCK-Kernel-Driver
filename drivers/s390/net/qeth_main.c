@@ -2148,7 +2148,7 @@ qeth_type_trans(struct sk_buff *skb, struct net_device *dev)
 
 	skb->mac.raw = skb->data;
 	skb_pull(skb, ETH_ALEN * 2 + sizeof (short));
-	eth = skb->mac.ethernet;
+	eth = eth_hdr(skb);
 
 	if (*eth->h_dest & 1) {
 		if (memcmp(eth->h_dest, dev->broadcast, ETH_ALEN) == 0)

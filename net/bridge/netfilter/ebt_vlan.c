@@ -104,7 +104,7 @@ ebt_check_vlan(const char *tablename,
 	}
 
 	/* Is it 802.1Q frame checked? */
-	if (e->ethproto != __constant_htons(ETH_P_8021Q)) {
+	if (e->ethproto != htons(ETH_P_8021Q)) {
 		DEBUG_MSG
 		    ("passed entry proto %2.4X is not 802.1Q (8100)\n",
 		     (unsigned short) ntohs(e->ethproto));
