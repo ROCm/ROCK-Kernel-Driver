@@ -384,3 +384,7 @@ int module_finalize(const Elf_Ehdr *hdr,
 				me->num_exentries);
 	return 0;
 }
+
+void module_arch_cleanup(struct module *mod)
+{
+}

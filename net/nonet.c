@@ -8,6 +8,7 @@
  * Copyright (c) Matthew Wilcox 2003
  */
 
+#include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/init.h>

@@ -497,6 +497,7 @@ static void do_emergency_remount(unsigned long foo)
 		spin_lock(&sb_lock);
 	}
 	spin_unlock(&sb_lock);
+	printk("Emergency Remount complete\n");
 }
 
 void emergency_remount(void)

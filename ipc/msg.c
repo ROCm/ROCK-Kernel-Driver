@@ -74,7 +74,7 @@ static struct ipc_ids msg_ids;
 #define msg_buildid(id, seq) \
 	ipc_buildid(&msg_ids, id, seq)
 
-static void freeque (int id);
+static void freeque (struct msg_queue *msq, int id);
 static int newque (key_t key, int msgflg);
 #ifdef CONFIG_PROC_FS
 static int sysvipc_msg_read_proc(char *buffer, char **start, off_t offset, int length, int *eof, void *data);
@@ -272,16 +272,21 @@ static void expunge_all(struct msg_queue* msq, int res)
 		wake_up_process(msr->r_tsk);
 	}
 }
-
-static void freeque (int id)
+/* 
+ * freeque() wakes up waiters on the sender and receiver waiting queue, 
+ * removes the message queue from message queue ID 
+ * array, and cleans up all the messages associated with this queue.
+ *
+ * msg_ids.sem and the spinlock for this message queue is hold
+ * before freeque() is called. msg_ids.sem remains locked on exit.
+ */
+static void freeque (struct msg_queue *msq, int id)
 {
-	struct msg_queue *msq;
 	struct list_head *tmp;
-
-	msq = msg_rmid(id);
 
 	expunge_all(msq,-EIDRM);
 	ss_wakeup(&msq->q_senders,1);
+	msq = msg_rmid(id);
 	msg_unlock(msq);
 		
 	tmp = msq->q_messages.next;
@@ -574,7 +579,7 @@ asmlinkage long sys_msgctl (int msqid, int cmd, struct msqid_ds *buf)
 		break;
 	}
 	case IPC_RMID:
-		freeque (msqid); 
+		freeque (msq, msqid); 
 		break;
 	}
 	err = 0;

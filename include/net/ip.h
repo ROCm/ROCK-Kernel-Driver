@@ -230,6 +230,23 @@ static inline void ip_eth_mc_map(u32 addr, char *buf)
 	buf[3]=addr&0x7F;
 }
 
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+#include <linux/ipv6.h>
+#endif
+
+static __inline__ void inet_reset_saddr(struct sock *sk)
+{
+	inet_sk(sk)->rcv_saddr = inet_sk(sk)->saddr = 0;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	if (sk->family == PF_INET6) {
+		struct ipv6_pinfo *np = inet6_sk(sk);
+
+		memset(&np->saddr, 0, sizeof(np->saddr));
+		memset(&np->rcv_saddr, 0, sizeof(np->rcv_saddr));
+	}
+#endif
+}
+
 #endif
 
 extern int	ip_call_ra_chain(struct sk_buff *skb);

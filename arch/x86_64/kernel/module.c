@@ -48,7 +48,6 @@ void module_free(struct module *mod, void *module_region)
 	for (prevp = &mod_vmlist ; (map = *prevp) ; prevp = &map->next) {
 		if ((unsigned long)map->addr == addr) {
 			*prevp = map->next;
-			write_unlock(&vmlist_lock); 
 			goto found;
 		}
 	}
@@ -57,6 +56,7 @@ void module_free(struct module *mod, void *module_region)
 	return;
  found:
 	unmap_vm_area(map);
+	write_unlock(&vmlist_lock); 
 	if (map->pages) {
 		for (i = 0; i < map->nr_pages; i++)
 			if (map->pages[i])
@@ -230,4 +230,8 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    struct module *me)
 {
 	return 0;
+}
+
+void module_arch_cleanup(struct module *mod)
+{
 }

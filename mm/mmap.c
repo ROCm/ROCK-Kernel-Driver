@@ -471,6 +471,8 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
 			spin_unlock(lock);
 			if (need_up)
 				up(&inode->i_mapping->i_shared_sem);
+			if (file)
+				fput(file);
 
 			mm->map_count--;
 			kmem_cache_free(vm_area_cachep, next);
@@ -1440,7 +1442,7 @@ void exit_mmap(struct mm_struct *mm)
 	vm_unacct_memory(nr_accounted);
 	BUG_ON(mm->map_count);	/* This is just debugging */
 	clear_page_tables(tlb, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
-	tlb_finish_mmu(tlb, 0, TASK_SIZE);
+	tlb_finish_mmu(tlb, 0, MM_VM_SIZE(mm));
 
 	vma = mm->mmap;
 	mm->mmap = mm->mmap_cache = NULL;

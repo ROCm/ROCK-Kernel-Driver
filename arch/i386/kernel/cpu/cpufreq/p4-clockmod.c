@@ -104,18 +104,20 @@ static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 	}
 
 	rdmsr(MSR_IA32_THERM_STATUS, l, h);
+#if 0
 	if (l & 0x01)
-//		printk(KERN_DEBUG PFX "CPU#%d currently thermal throttled\n", cpu);
-
+		printk(KERN_DEBUG PFX "CPU#%d currently thermal throttled\n", cpu);
+#endif
 	if (has_N44_O17_errata[cpu] && (newstate == DC_25PT || newstate == DC_DFLT))
 		newstate = DC_38PT;
 
 	rdmsr(MSR_IA32_THERM_CONTROL, l, h);
 	if (newstate == DC_DISABLE) {
-//		printk(KERN_INFO PFX "CPU#%d disabling modulation\n", cpu);
+		/* printk(KERN_INFO PFX "CPU#%d disabling modulation\n", cpu); */
 		wrmsr(MSR_IA32_THERM_CONTROL, l & ~(1<<4), h);
 	} else {
-//		printk(KERN_INFO PFX "CPU#%d setting duty cycle to %d%%\n", cpu, ((125 * newstate) / 10));
+		/* printk(KERN_INFO PFX "CPU#%d setting duty cycle to %d%%\n",
+			cpu, ((125 * newstate) / 10)); */
 		/* bits 63 - 5	: reserved 
 		 * bit  4	: enable/disable
 		 * bits 3-1	: duty cycle

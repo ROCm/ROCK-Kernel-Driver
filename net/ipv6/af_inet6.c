@@ -355,10 +355,7 @@ int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 	/* Make sure we are allowed to bind here. */
 	if (sk->prot->get_port(sk, snum) != 0) {
-		inet->rcv_saddr = inet->saddr = 0;
-		memset(&np->rcv_saddr, 0, sizeof(struct in6_addr));
-		memset(&np->saddr, 0, sizeof(struct in6_addr));
-
+		inet_reset_saddr(sk);
 		release_sock(sk);
 		return -EADDRINUSE;
 	}

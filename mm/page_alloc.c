@@ -336,21 +336,17 @@ static void prep_new_page(struct page *page, int order)
 static struct page *__rmqueue(struct zone *zone, unsigned int order)
 {
 	struct free_area * area;
-	unsigned int current_order = order;
-	struct list_head *head, *curr;
+	unsigned int current_order;
 	struct page *page;
 	unsigned int index;
 
-	for (current_order=order; current_order < MAX_ORDER; ++current_order) {
+	for (current_order = order; current_order < MAX_ORDER; ++current_order) {
 		area = zone->free_area + current_order;
-		head = &area->free_list;
-		curr = head->next;
-
 		if (list_empty(&area->free_list))
 			continue;
 
-		page = list_entry(curr, struct page, list);
-		list_del(curr);
+		page = list_entry(area->free_list.next, struct page, list);
+		list_del(&page->list);
 		index = page - zone->zone_mem_map;
 		if (current_order != MAX_ORDER-1)
 			MARK_USED(index, current_order, area);

@@ -920,17 +920,9 @@ int udp_disconnect(struct sock *sk, int flags)
 	inet->daddr = 0;
 	inet->dport = 0;
 	sk->bound_dev_if = 0;
-	if (!(sk->userlocks&SOCK_BINDADDR_LOCK)) {
-		inet->rcv_saddr = inet->saddr = 0;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-		if (sk->family == PF_INET6) {
-			struct ipv6_pinfo *np = inet6_sk(sk);
+	if (!(sk->userlocks & SOCK_BINDADDR_LOCK))
+		inet_reset_saddr(sk);
 
-			memset(&np->saddr, 0, 16);
-			memset(&np->rcv_saddr, 0, 16);
-		}
-#endif
-	}
 	if (!(sk->userlocks&SOCK_BINDPORT_LOCK)) {
 		sk->prot->unhash(sk);
 		inet->sport = 0;

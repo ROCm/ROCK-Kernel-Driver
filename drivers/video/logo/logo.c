@@ -79,8 +79,10 @@ const struct linux_logo *fb_find_logo(int depth)
 		logo = &logo_parisc_clut224;
 #endif
 #ifdef CONFIG_LOGO_SGI_CLUT224
-		/* SGI Linux logo on MIPS/MIPS64 */
+		/* SGI Linux logo on MIPS/MIPS64 and VISWS */
+#ifndef CONFIG_X86_VISWS
 		if (mips_machgroup == MACH_GROUP_SGI)
+#endif
 			logo = &logo_sgi_clut224;
 #endif
 #ifdef CONFIG_LOGO_SUN_CLUT224
