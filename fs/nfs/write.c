@@ -1197,7 +1197,8 @@ void nfs_writeback_done(struct rpc_task *task)
 		}
 		if (time_before(complain, jiffies)) {
 			printk(KERN_WARNING
-			       "NFS: Server wrote less than requested.\n");
+			       "NFS: Server wrote zero bytes, expected %u.\n",
+					argp->count);
 			complain = jiffies + 300 * HZ;
 		}
 		/* Can't do anything about it except throw an error. */
