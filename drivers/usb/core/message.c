@@ -577,8 +577,13 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
 				USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 				(type << 8) + index, 0, buf, size,
 				HZ * USB_CTRL_GET_TIMEOUT);
-		if (!(result == 0 || result == -EPIPE))
-			break;
+		if (result == 0 || result == -EPIPE)
+			continue;
+		if (result > 1 && ((u8 *)buf)[1] != type) {
+			retval = -EPROTO;
+			continue;
+		}
+		break;
 	}
 	return result;
 }
