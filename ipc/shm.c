@@ -78,7 +78,7 @@ static inline struct shmid_kernel *shm_rmid(int id)
 
 static inline int shm_addid(struct shmid_kernel *shp)
 {
-	return ipc_addid(&shm_ids, &shp->shm_perm, shm_ctlmni+1);
+	return ipc_addid(&shm_ids, &shp->shm_perm, shm_ctlmni);
 }
 
 
