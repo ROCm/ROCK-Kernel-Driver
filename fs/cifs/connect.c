@@ -84,7 +84,9 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	struct list_head *tmp;
 	struct cifsSesInfo *ses;
 	struct cifsTconInfo *tcon;
-
+	
+	if(server->tcpStatus == CifsExiting)
+		return rc;
 	server->tcpStatus = CifsNeedReconnect;
 	server->maxBuf = 0;
 
@@ -180,17 +182,15 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		smb_msg.msg_control = NULL;
 		smb_msg.msg_controllen = 0;
 
-cFYI(1,("about to rcv csocket %p tcpStatus %d",csocket,server->tcpStatus)); /* BB removeme BB */
-
 		length =
 		    sock_recvmsg(csocket, &smb_msg,
 				 sizeof (struct smb_hdr) -
 				 1 /* RFC1001 header and SMB header */ ,
 				 MSG_PEEK /* flags see socket.h */ );
 
-cFYI(1,("rcv csocket %p with rc 0x%x smb len of 0x%x tcpStatus %d",csocket,length,ntohl(smb_buffer->smb_buf_length),server->tcpStatus)); /* BB removeme BB */
-
-		if (server->tcpStatus == CifsNeedReconnect) {
+		if(server->tcpStatus == CifsExiting) {
+			break;
+		} else if (server->tcpStatus == CifsNeedReconnect) {
 			cFYI(1,("Reconnecting after server stopped responding"));
 			cifs_reconnect(server);
 			csocket = server->ssocket;
@@ -271,12 +271,8 @@ cFYI(1,("rcv csocket %p with rc 0x%x smb len of 0x%x tcpStatus %d",csocket,lengt
 					iov.iov_len = pdu_length;
 					for (total_read = 0; total_read < pdu_length; total_read += length) {	
              /* Should improve check for buffer overflow with bad pdu_length */
-						/*  iov.iov_base = smb_buffer+total_read;
-						   iov.iov_len =  pdu_length-total_read; */
 						length = sock_recvmsg(csocket, &smb_msg, 
 							pdu_length - total_read, 0);
-         /* cERROR(1,("For iovlen %d Length received: %d with total read %d",
-						   iov.iov_len, length,total_read));       */
 						if (length == 0) {
 							cERROR(1,
 							       ("Zero length receive when expecting %d ",
@@ -1067,6 +1063,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 
 /* on error free sesinfo and tcon struct if needed */
 	if (rc) {
+		if(atomic_read(&srvTcp->socketUseCount) == 0)
+                	srvTcp->tcpStatus = CifsExiting;
 		           /* If find_unc succeeded then rc == 0 so we can not end */
 		if (tcon)  /* up here accidently freeing someone elses tcon struct */
 			tconInfoFree(tcon);
