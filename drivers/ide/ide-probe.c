@@ -1147,6 +1147,8 @@ static int ata_lock(dev_t dev, void *data)
 	return 0;
 }
 
+extern ide_driver_t idedefault_driver;
+
 struct kobject *ata_probe(dev_t dev, int *part, void *data)
 {
 	ide_hwif_t *hwif = data;
@@ -1154,7 +1156,7 @@ struct kobject *ata_probe(dev_t dev, int *part, void *data)
 	ide_drive_t *drive = &hwif->drives[unit];
 	if (!drive->present)
 		return NULL;
-	if (!drive->driver) {
+	if (drive->driver == &idedefault_driver) {
 		if (drive->media == ide_disk)
 			(void) request_module("ide-disk");
 		if (drive->scsi)
@@ -1166,7 +1168,7 @@ struct kobject *ata_probe(dev_t dev, int *part, void *data)
 		if (drive->media == ide_floppy)
 			(void) request_module("ide-floppy");
 	}
-	if (!drive->driver)
+	if (drive->driver == &idedefault_driver)
 		return NULL;
 	*part &= (1 << PARTN_BITS) - 1;
 	return get_disk(drive->disk);
