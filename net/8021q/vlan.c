@@ -537,7 +537,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 
 out_free_unregister:
 	unregister_netdev(new_dev);
-	goto out_put_dev;
+	goto out_unlock;
 
 out_free_newdev:
 	free_netdev(new_dev);

@@ -246,7 +246,6 @@ static struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int c
 	nt = dev->priv;
 	SET_MODULE_OWNER(dev);
 	dev->init = ipip_tunnel_init;
-	dev->destructor = free_netdev;
 	nt->parms = *parms;
 
 	if (register_netdevice(dev) < 0) {
@@ -784,6 +783,7 @@ static void ipip_tunnel_setup(struct net_device *dev)
 	dev->get_stats		= ipip_tunnel_get_stats;
 	dev->do_ioctl		= ipip_tunnel_ioctl;
 	dev->change_mtu		= ipip_tunnel_change_mtu;
+	dev->destructor		= free_netdev;
 
 	dev->type		= ARPHRD_TUNNEL;
 	dev->hard_header_len 	= LL_MAX_HEADER + sizeof(struct iphdr);
@@ -876,18 +876,19 @@ static int __init ipip_init(void)
 					   ipip_tunnel_setup);
 	if (!ipip_fb_tunnel_dev) {
 		err = -ENOMEM;
-		goto fail;
+		goto err1;
 	}
 
 	ipip_fb_tunnel_dev->init = ipip_fb_tunnel_init;
 
 	if ((err = register_netdev(ipip_fb_tunnel_dev)))
-	    goto fail;
+		goto err2;
  out:
 	return err;
- fail:
-	xfrm4_tunnel_deregister(&ipip_handler);
+ err2:
 	free_netdev(ipip_fb_tunnel_dev);
+ err1:
+	xfrm4_tunnel_deregister(&ipip_handler);
 	goto out;
 }
 
