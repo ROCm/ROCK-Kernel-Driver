@@ -65,7 +65,7 @@ CONFIG_KMOD=y
 # CONFIG_APOLLO is not set
 # CONFIG_VME is not set
 CONFIG_HP300=y
-# CONFIG_DIO is not set
+CONFIG_DIO=y
 # CONFIG_SUN3X is not set
 # CONFIG_Q40 is not set
 
@@ -404,7 +404,7 @@ CONFIG_EQUALIZER=m
 #
 CONFIG_NET_ETHERNET=y
 CONFIG_MII=m
-# CONFIG_HPLANCE is not set
+CONFIG_HPLANCE=y
 
 #
 # Ethernet (1000 Mbit)
