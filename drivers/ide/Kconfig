@@ -559,6 +559,16 @@ config BLK_DEV_AMD74XX
 	  change PIO, DMA and UDMA speeds and to configure the chip to
 	  optimum performance.
 
+config BLK_DEV_ATIIXP
+	tristate "ATI IXP chipset IDE support"
+	depends on X86
+	help
+	  This driver adds explicit support for ATI IXP chipset.
+	  This allows the kernel to change PIO, DMA and UDMA speeds
+	  and to configure the chip to optimum performance.
+
+	  Say Y here if you have an ATI IXP chipset IDE controller.
+
 config BLK_DEV_CMD64X
 	tristate "CMD64{3|6|8|9} chipset support"
 	help
