@@ -2258,6 +2258,10 @@ static void setup_format_params(int track)
 			}
 		}
 	}
+	if(_floppy->stretch & FD_ZEROBASED) {
+	    for(count = 0; count < F_SECT_PER_TRACK; count++)
+		here[count].sect--;
+	}
 }
 
 static void redo_format(void)
@@ -2679,7 +2683,8 @@ static int make_raw_rw_request(void)
 	}
 	HEAD = fsector_t / _floppy->sect;
 
-	if (((_floppy->stretch & FD_SWAPSIDES) || TESTF(FD_NEED_TWADDLE)) &&
+	if (((_floppy->stretch & (FD_SWAPSIDES | FD_ZEROBASED)) ||
+	     TESTF(FD_NEED_TWADDLE)) &&
 	    fsector_t < _floppy->sect)
 		max_sector = _floppy->sect;
 
@@ -2709,7 +2714,8 @@ static int make_raw_rw_request(void)
 	GAP = _floppy->gap;
 	CODE2SIZE;
 	SECT_PER_TRACK = _floppy->sect << 2 >> SIZECODE;
-	SECTOR = ((fsector_t % _floppy->sect) << 2 >> SIZECODE) + 1;
+	SECTOR = ((fsector_t % _floppy->sect) << 2 >> SIZECODE) +
+	    ((_floppy->stretch & FD_ZEROBASED) ? 0 : 1);
 
 	/* tracksize describes the size which can be filled up with sectors
 	 * of size ssize.
@@ -3346,7 +3352,7 @@ static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
 	    g->track <= 0 ||
 	    g->track > UDP->tracks>>STRETCH(g) ||
 	    /* check if reserved bits are set */
-	    (g->stretch&~(FD_STRETCH|FD_SWAPSIDES)) != 0)
+	    (g->stretch&~(FD_STRETCH|FD_SWAPSIDES|FD_ZEROBASED)) != 0)
 		return -EINVAL;
 	if (type){
 		if (!capable(CAP_SYS_ADMIN))
@@ -3367,11 +3373,13 @@ static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
 		}
 		up(&open_lock);
 	} else {
+		int oldStretch;
 		LOCK_FDC(drive,1);
 		if (cmd != FDDEFPRM)
 			/* notice a disk change immediately, else
 			 * we lose our settings immediately*/
 			CALL(poll_drive(1, FD_RAW_NEED_DISK));
+		oldStretch = g->stretch;
 		user_params[drive] = *g;
 		if (buffer_drive == drive)
 			SUPBOUND(buffer_max, user_params[drive].sect);
@@ -3386,7 +3394,10 @@ static inline int set_geometry(unsigned int cmd, struct floppy_struct *g,
 		 * whose number will change. This is useful, because
 		 * mtools often changes the geometry of the disk after
 		 * looking at the boot block */
-		if (DRS->maxblock > user_params[drive].sect || DRS->maxtrack)
+		if (DRS->maxblock > user_params[drive].sect ||
+		    DRS->maxtrack ||
+		    ((user_params[drive].sect ^ oldStretch) &
+		     (FD_SWAPSIDES | FD_ZEROBASED)))
 			invalidate_drive(bdev);
 		else
 			process_fd_request();
