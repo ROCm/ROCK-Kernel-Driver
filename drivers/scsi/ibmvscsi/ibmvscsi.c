@@ -87,7 +87,7 @@ static int max_channel = 3;
 static int init_timeout = 5;
 static int max_requests = 50;
 
-#define IBMVSCSI_VERSION "1.5.2"
+#define IBMVSCSI_VERSION "1.5.3"
 
 MODULE_DESCRIPTION("IBM Virtual SCSI");
 MODULE_AUTHOR("Dave Boutcher");
@@ -1332,7 +1332,7 @@ static int ibmvscsi_probe(struct vio_dev *vdev, const struct vio_device_id *id)
 		 */
 		for (wait_switch = jiffies + (init_timeout * HZ);
 		     time_before(jiffies, wait_switch) &&
-		     atomic_read(&hostdata->request_limit) < 0;) {
+		     atomic_read(&hostdata->request_limit) < 2;) {
 
 			msleep(10);
 		}
