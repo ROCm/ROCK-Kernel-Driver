@@ -138,7 +138,7 @@ static void set_port_led(
 static void led_work (void *__hub)
 {
 	struct usb_hub		*hub = __hub;
-	struct usb_device	*hdev = interface_to_usbdev (hub->intf);
+	struct usb_device	*hdev = hub->hdev;
 	unsigned		i;
 	unsigned		changed = 0;
 	int			cursor = -1;
@@ -298,7 +298,7 @@ static void hub_tt_kevent (void *arg)
 	while (!list_empty (&hub->tt.clear_list)) {
 		struct list_head	*temp;
 		struct usb_tt_clear	*clear;
-		struct usb_device	*hdev;
+		struct usb_device	*hdev = hub->hdev;
 		int			status;
 
 		temp = hub->tt.clear_list.next;
@@ -307,7 +307,6 @@ static void hub_tt_kevent (void *arg)
 
 		/* drop lock so HCD can concurrently report other TT errors */
 		spin_unlock_irqrestore (&hub->tt.lock, flags);
-		hdev = interface_to_usbdev (hub->intf);
 		status = hub_clear_tt_buffer (hdev, clear->devinfo, clear->tt);
 		spin_lock_irqsave (&hub->tt.lock, flags);
 
@@ -368,15 +367,14 @@ void usb_hub_tt_clear_buffer (struct usb_device *udev, int pipe)
 
 static void hub_power_on(struct usb_hub *hub)
 {
-	struct usb_device *hdev;
 	int i;
 
 	/* if hub supports power switching, enable power on each port */
 	if ((hub->descriptor->wHubCharacteristics & HUB_CHAR_LPSM) < 2) {
 		dev_dbg(&hub->intf->dev, "enabling power on all ports\n");
-		hdev = interface_to_usbdev(hub->intf);
 		for (i = 0; i < hub->descriptor->bNbrPorts; i++)
-			set_port_feature(hdev, i + 1, USB_PORT_FEAT_POWER);
+			set_port_feature(hub->hdev, i + 1,
+					USB_PORT_FEAT_POWER);
 	}
 
 	/* Wait for power to be enabled */
@@ -386,10 +384,9 @@ static void hub_power_on(struct usb_hub *hub)
 static int hub_hub_status(struct usb_hub *hub,
 		u16 *status, u16 *change)
 {
-	struct usb_device *hdev = interface_to_usbdev (hub->intf);
 	int ret;
 
-	ret = get_hub_status(hdev, &hub->status->hub);
+	ret = get_hub_status(hub->hdev, &hub->status->hub);
 	if (ret < 0)
 		dev_err (&hub->intf->dev,
 			"%s failed (err = %d)\n", __FUNCTION__, ret);
@@ -404,7 +401,7 @@ static int hub_hub_status(struct usb_hub *hub,
 static int hub_configure(struct usb_hub *hub,
 	struct usb_endpoint_descriptor *endpoint)
 {
-	struct usb_device *hdev = interface_to_usbdev (hub->intf);
+	struct usb_device *hdev = hub->hdev;
 	struct device *hub_dev = &hub->intf->dev;
 	u16 hubstatus, hubchange;
 	unsigned int pipe;
@@ -629,11 +626,13 @@ static unsigned highspeed_hubs;
 static void hub_disconnect(struct usb_interface *intf)
 {
 	struct usb_hub *hub = usb_get_intfdata (intf);
+	struct usb_device *hdev;
 
 	if (!hub)
 		return;
+	hdev = hub->hdev;
 
-	if (interface_to_usbdev(intf)->speed == USB_SPEED_HIGH)
+	if (hdev->speed == USB_SPEED_HIGH)
 		highspeed_hubs--;
 
 	usb_set_intfdata (intf, NULL);
@@ -644,7 +643,6 @@ static void hub_disconnect(struct usb_interface *intf)
 		hub->urb = NULL;
 	}
 
-	/* Delete it and then reset it */
 	spin_lock_irq(&hub_event_lock);
 	list_del_init(&hub->event_list);
 	spin_unlock_irq(&hub_event_lock);
@@ -666,8 +664,7 @@ static void hub_disconnect(struct usb_interface *intf)
 	}
 
 	if (hub->buffer) {
-		usb_buffer_free(interface_to_usbdev(intf),
-				sizeof(*hub->buffer), hub->buffer,
+		usb_buffer_free(hdev, sizeof(*hub->buffer), hub->buffer,
 				hub->buffer_dma);
 		hub->buffer = NULL;
 	}
@@ -725,6 +722,7 @@ descriptor_error:
 
 	INIT_LIST_HEAD(&hub->event_list);
 	hub->intf = intf;
+	hub->hdev = hdev;
 	INIT_WORK(&hub->leds, led_work, hub);
 
 	usb_set_intfdata (intf, hub);
@@ -776,7 +774,7 @@ hub_ioctl(struct usb_interface *intf, unsigned int code, void *user_data)
 
 static int hub_reset(struct usb_hub *hub)
 {
-	struct usb_device *hdev = interface_to_usbdev(hub->intf);
+	struct usb_device *hdev = hub->hdev;
 	int i;
 
 	/* Disconnect any attached devices */
@@ -1498,8 +1496,9 @@ check_highspeed (struct usb_hub *hub, struct usb_device *udev, int port)
 }
 
 static unsigned
-hub_power_remaining (struct usb_hub *hub, struct usb_device *hdev)
+hub_power_remaining (struct usb_hub *hub)
 {
+	struct usb_device *hdev = hub->hdev;
 	int remaining;
 	unsigned i;
 
@@ -1540,7 +1539,7 @@ hub_power_remaining (struct usb_hub *hub, struct usb_device *hdev)
 static void hub_port_connect_change(struct usb_hub *hub, int port,
 					u16 portstatus, u16 portchange)
 {
-	struct usb_device *hdev = interface_to_usbdev(hub->intf);
+	struct usb_device *hdev = hub->hdev;
 	struct device *hub_dev = &hub->intf->dev;
 	int status, i;
  
@@ -1685,7 +1684,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port,
 		if (status)
 			goto loop;
 
-		status = hub_power_remaining(hub, hdev);
+		status = hub_power_remaining(hub);
 		if (status)
 			dev_dbg(hub_dev,
 				"%dmA power budget left\n",
@@ -1739,7 +1738,7 @@ static void hub_events(void)
 		list_del_init(tmp);
 
 		hub = list_entry(tmp, struct usb_hub, event_list);
-		hdev = interface_to_usbdev(hub->intf);
+		hdev = hub->hdev;
 		hub_dev = &hub->intf->dev;
 
 		usb_get_dev(hdev);

@@ -187,6 +187,7 @@ extern void usb_hub_tt_clear_buffer (struct usb_device *dev, int pipe);
 
 struct usb_hub {
 	struct usb_interface	*intf;		/* the "real" device */
+	struct usb_device	*hdev;
 	struct urb		*urb;		/* for interrupt polling pipe */
 
 	/* buffer for urb ... 1 bit each for hub and children, rounded up */
