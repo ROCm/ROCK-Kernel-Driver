@@ -6,7 +6,7 @@
               IT8712F  Super I/O chip w/LPC interface & SMbus
               Sis950   A clone of the IT8705F
 
-    Copyright (c) 2001 Chris Gauthron <chrisg@0-in.com> 
+    Copyright (C) 2001 Chris Gauthron <chrisg@0-in.com> 
     Largely inspired by lm78.c of the same package
 
     This program is free software; you can redistribute it and/or modify
@@ -56,12 +56,6 @@ SENSORS_INSMOD_4(it87, it8705, it8712, sis950);
 
 /* Update battery voltage after every reading if true */
 static int update_vbat = 0;
-
-
-/* Enable Temp1 as thermal resistor */
-/* Enable Temp2 as thermal diode */
-/* Enable Temp3 as thermal resistor */
-static int temp_type = 0x2a;
 
 /* Many IT87 constants specified below */
 
@@ -422,10 +416,10 @@ static ssize_t show_sensor(struct device *dev, char *buf, int nr)
 	struct it87_data *data = i2c_get_clientdata(client);
 	it87_update_client(client);
 	if (data->sensor & (1 << nr))
-	    return sprintf(buf, "1\n");
+		return sprintf(buf, "3\n");  /* thermal diode */
 	if (data->sensor & (8 << nr))
-	    return sprintf(buf, "2\n");
-	return sprintf(buf, "0\n");
+		return sprintf(buf, "2\n");  /* thermistor */
+	return sprintf(buf, "0\n");      /* disabled */
 }
 static ssize_t set_sensor(struct device *dev, const char *buf, 
 		size_t count, int nr)
@@ -436,10 +430,13 @@ static ssize_t set_sensor(struct device *dev, const char *buf,
 
 	data->sensor &= ~(1 << nr);
 	data->sensor &= ~(8 << nr);
-	if (val == 1)
+	/* 3 = thermal diode; 2 = thermistor; 0 = disabled */
+	if (val == 3)
 	    data->sensor |= 1 << nr;
 	else if (val == 2)
 	    data->sensor |= 8 << nr;
+	else if (val != 0)
+		return -1;
 	it87_write_value(client, IT87_REG_TEMP_ENABLE, data->sensor);
 	return count;
 }
@@ -888,7 +885,7 @@ static void it87_init_client(struct i2c_client *client, struct it87_data *data)
 
 	/* Enable Temp1-Temp3 */
 	data->sensor = (it87_read_value(client, IT87_REG_TEMP_ENABLE) & 0xc0);
-	data->sensor |= temp_type & 0x3f;
+	data->sensor |= 0x2a; /* Temp1,Temp3=thermistor; Temp2=thermal diode */
 	it87_write_value(client, IT87_REG_TEMP_ENABLE, data->sensor);
 
 	/* Enable fans */
@@ -967,6 +964,8 @@ static void it87_update_client(struct i2c_client *client)
 			(it87_read_value(client, IT87_REG_ALARM2) << 8) |
 			(it87_read_value(client, IT87_REG_ALARM3) << 16);
 
+		data->sensor = it87_read_value(client, IT87_REG_TEMP_ENABLE);
+
 		data->last_updated = jiffies;
 		data->valid = 1;
 	}
@@ -989,8 +988,6 @@ MODULE_AUTHOR("Chris Gauthron <chrisg@0-in.com>");
 MODULE_DESCRIPTION("IT8705F, IT8712F, Sis950 driver");
 MODULE_PARM(update_vbat, "i");
 MODULE_PARM_DESC(update_vbat, "Update vbat if set else return powerup value");
-MODULE_PARM(temp_type, "i");
-MODULE_PARM_DESC(temp_type, "Temperature sensor type, normally leave unset");
 MODULE_LICENSE("GPL");
 
 module_init(sm_it87_init);
