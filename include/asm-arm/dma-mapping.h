@@ -124,7 +124,7 @@ dma_map_single(struct device *dev, void *cpu_addr, size_t size,
 	       enum dma_data_direction dir)
 {
 	consistent_sync(cpu_addr, size, dir);
-	return __virt_to_bus((unsigned long)cpu_addr);
+	return virt_to_dma(dev, (unsigned long)cpu_addr);
 }
 #else
 extern dma_addr_t dma_map_single(struct device *,void *, size_t, enum dma_data_direction);
@@ -231,7 +231,7 @@ dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 	for (i = 0; i < nents; i++, sg++) {
 		char *virt;
 
-		sg->dma_address = page_to_bus(sg->page) + sg->offset;
+		sg->dma_address = page_to_dma(dev, sg->page) + sg->offset;
 		virt = page_address(sg->page) + sg->offset;
 		consistent_sync(virt, sg->length, dir);
 	}
@@ -288,14 +288,14 @@ static inline void
 dma_sync_single_for_cpu(struct device *dev, dma_addr_t handle, size_t size,
 			enum dma_data_direction dir)
 {
-	consistent_sync((void *)__bus_to_virt(handle), size, dir);
+	consistent_sync((void *)dma_to_virt(dev, handle), size, dir);
 }
 
 static inline void
 dma_sync_single_for_device(struct device *dev, dma_addr_t handle, size_t size,
 			   enum dma_data_direction dir)
 {
-	consistent_sync((void *)__bus_to_virt(handle), size, dir);
+	consistent_sync((void *)dma_to_virt(dev, handle), size, dir);
 }
 #else
 extern void dma_sync_single_for_cpu(struct device*, dma_addr_t, size_t, enum dma_data_direction);

@@ -257,7 +257,7 @@ config DISCONTIGMEM
 # Now handle the bus types
 config PCI
 	bool "PCI support" if ARCH_INTEGRATOR_AP
-	default y if ARCH_FTVPCI || ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX || ARCH_IXP4XX
+	default y if ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX || ARCH_IXP4XX
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -270,11 +270,6 @@ config PCI
 	  doesn't.
 
 # Select the host bridge type
-config PCI_HOST_PLX90X0
-	bool
-	depends on PCI && ARCH_FTVPCI
-	default y
-
 config PCI_HOST_VIA82C505
 	bool
 	depends on PCI && ARCH_SHARK
@@ -550,7 +545,7 @@ config CMDLINE
 
 config LEDS
 	bool "Timer and CPU usage LEDs"
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_FTVPCI || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE_PB
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE_PB
 	help
 	  If you say Y here, the LEDs on your machine will be used
 	  to provide useful information about your current system status.
@@ -564,7 +559,7 @@ config LEDS
 
 config LEDS_TIMER
 	bool "Timer LED" if LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || MACH_MAINSTONE || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE_PB)
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_FTVPCI || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE_PB
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE_PB
 	default y if ARCH_EBSA110
 	help
 	  If you say Y here, one of the system LEDs (the green one on the
@@ -620,7 +615,7 @@ source "drivers/acorn/block/Kconfig"
 
 source "net/Kconfig"
 
-if ARCH_CLPS7500 || ARCH_IOP3XX || ARCH_IXP4XX || ARCH_L7200 || ARCH_LH7A40X || ARCH_FTVPCI || ARCH_PXA || ARCH_RPC || ARCH_S3C2410 || ARCH_SA1100 || ARCH_SHARK || FOOTBRIDGE
+if ARCH_CLPS7500 || ARCH_IOP3XX || ARCH_IXP4XX || ARCH_L7200 || ARCH_LH7A40X || ARCH_PXA || ARCH_RPC || ARCH_S3C2410 || ARCH_SA1100 || ARCH_SHARK || FOOTBRIDGE
 source "drivers/ide/Kconfig"
 endif
 

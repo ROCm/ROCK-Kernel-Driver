@@ -57,12 +57,28 @@
 
 /*
  * OMAP-1510 bus address is translated into a Local Bus address if the
- * OMAP bus type is lbus. See dmadev_uses_omap_lbus().
+ * OMAP bus type is lbus. We do the address translation based on the
+ * device overriding the defaults used in the dma-mapping API.
  */
 #ifdef CONFIG_ARCH_OMAP1510
-#define bus_to_lbus(x)	((x) + (OMAP1510_LB_OFFSET - PHYS_OFFSET))
-#define lbus_to_bus(x)	((x) - (OMAP1510_LB_OFFSET - PHYS_OFFSET))
-#endif
+
+#define virt_to_lbus(x)		((x) - PAGE_OFFSET + OMAP1510_LB_OFFSET)
+#define lbus_to_virt(x)		((x) - OMAP1510_LB_OFFSET + PAGE_OFFSET)
+#define is_lbus_device(dev)	(cpu_is_omap1510() && dev->coherent_dma_mask == 0x0fffffff)
+
+#define __arch_page_to_dma(dev, page)	({is_lbus_device(dev) ? \
+					(dma_addr_t)virt_to_lbus(page_address(page)) : \
+					(dma_addr_t)__virt_to_bus(page_address(page));})
+
+#define __arch_dma_to_virt(dev, addr)	({is_lbus_device(dev) ? \
+					lbus_to_virt(addr) : \
+					__bus_to_virt(addr);})
+
+#define __arch_virt_to_dma(dev, addr)	({is_lbus_device(dev) ? \
+					virt_to_lbus(addr) : \
+					__virt_to_bus(addr);})
+
+#endif	/* CONFIG_ARCH_OMAP1510 */
 
 #define PHYS_TO_NID(addr) (0)
 #endif

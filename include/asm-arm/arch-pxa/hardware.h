@@ -83,6 +83,11 @@ typedef struct { volatile u32 offset[4096]; } __regbase;
 extern void pxa_gpio_mode( int gpio_mode );
 
 /*
+ * Routine to enable or disable CKEN
+ */
+extern void pxa_set_cken(int clock, int enable);
+
+/*
  * return current memory and LCD clock frequency in units of 10kHz
  */
 extern unsigned int get_memclk_frequency_10khz(void);
