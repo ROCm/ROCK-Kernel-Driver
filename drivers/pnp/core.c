@@ -81,7 +81,7 @@ int pnp_register_protocol(struct pnp_protocol *protocol)
 void pnp_unregister_protocol(struct pnp_protocol *protocol)
 {
 	spin_lock(&pnp_lock);
-	list_del_init(&protocol->protocol_list);
+	list_del(&protocol->protocol_list);
 	spin_unlock(&pnp_lock);
 	device_unregister(&protocol->dev);
 }
@@ -119,6 +119,7 @@ int __pnp_add_device(struct pnp_dev *dev)
 	dev->dev.name[DEVICE_NAME_SIZE-1] = '\0';
 	dev->dev.bus = &pnp_bus_type;
 	dev->dev.release = &pnp_release_device;
+	dev->status = PNP_READY;
 	error = device_register(&dev->dev);
 	if (error == 0){
 		spin_lock(&pnp_lock);
@@ -149,8 +150,8 @@ int pnp_add_device(struct pnp_dev *dev)
 void __pnp_remove_device(struct pnp_dev *dev)
 {
 	spin_lock(&pnp_lock);
-	list_del_init(&dev->global_list);
-	list_del_init(&dev->protocol_list);
+	list_del(&dev->global_list);
+	list_del(&dev->protocol_list);
 	spin_unlock(&pnp_lock);
 	device_unregister(&dev->dev);
 }
@@ -171,7 +172,7 @@ void pnp_remove_device(struct pnp_dev *dev)
 
 static int __init pnp_init(void)
 {
-	printk(KERN_INFO "Linux Plug and Play Support v0.93 (c) Adam Belay\n");
+	printk(KERN_INFO "Linux Plug and Play Support v0.94 (c) Adam Belay\n");
 	return bus_register(&pnp_bus_type);
 }
 

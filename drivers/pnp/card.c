@@ -62,6 +62,7 @@ int pnpc_add_id(struct pnp_id *id, struct pnp_card *card)
 		return -EINVAL;
 	if (!card)
 		return -EINVAL;
+	id->next = NULL;
 	ptr = card->id;
 	while (ptr && ptr->next)
 		ptr = ptr->next;
@@ -131,16 +132,17 @@ int pnpc_add_card(struct pnp_card *card)
 
 void pnpc_remove_card(struct pnp_card *card)
 {
-	struct list_head *pos;
+	struct list_head *pos, *temp;
 	if (!card)
 		return;
 	device_unregister(&card->dev);
 	spin_lock(&pnp_lock);
-	list_del_init(&card->global_list);
-	list_del_init(&card->protocol_list);
+	list_del(&card->global_list);
+	list_del(&card->protocol_list);
 	spin_unlock(&pnp_lock);
-	list_for_each(pos,&card->devices){
+	list_for_each_safe(pos,temp,&card->devices){
 		struct pnp_dev *dev = card_to_pnp_dev(pos);
+		pnpc_remove_device(dev);
 		__pnp_remove_device(dev);
 	}
 }
@@ -174,7 +176,7 @@ void pnpc_remove_device(struct pnp_dev *dev)
 {
 	spin_lock(&pnp_lock);
 	dev->card = NULL;
-	list_del_init(&dev->card_list);
+	list_del(&dev->card_list);
 	spin_unlock(&pnp_lock);
 	__pnp_remove_device(dev);
 }
@@ -213,6 +215,13 @@ done:
 	return NULL;
 
 found:
+	spin_lock(&pnp_lock);
+	if(dev->status != PNP_READY){
+		spin_unlock(&pnp_lock);
+		return NULL;
+	}
+	dev->status = PNP_ATTACHED;
+	spin_unlock(&pnp_lock);
 	cdrv = to_pnpc_driver(card->dev.driver);
 	if (dev->active == 0) {
 		if (!(cdrv->flags & PNPC_DRIVER_DO_NOT_ACTIVATE)) {
@@ -239,15 +248,17 @@ found:
 void pnp_release_card_device(struct pnp_dev *dev)
 {
 	spin_lock(&pnp_lock);
-	list_del_init(&dev->rdev_list);
+	list_del(&dev->rdev_list);
+	if (dev->status == PNP_ATTACHED)
+		dev->status = PNP_READY;
 	spin_unlock(&pnp_lock);
 	pnp_disable_dev(dev);
 }
 
 static void pnpc_recover_devices(struct pnp_card *card)
 {
-	struct list_head *pos;
-	list_for_each(pos,&card->rdevs){
+	struct list_head *pos, *temp;
+	list_for_each_safe(pos,temp,&card->rdevs){
 		struct pnp_dev *dev = list_entry(pos, struct pnp_dev, rdev_list);
 		pnp_release_card_device(dev);
 	}

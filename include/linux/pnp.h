@@ -84,6 +84,9 @@ static inline void pnpc_set_protodata (struct pnp_card *pcard, void *data)
 struct pnp_dev {
 	char name[80];			/* device name */
 	int active;			/* status of the device */
+	int capabilities;
+	int status;
+
 	struct list_head global_list;	/* node in global list of devices */
 	struct list_head protocol_list;	/* node in list of device's protocol */
 	struct list_head card_list;	/* node in card's list of devices */
@@ -116,13 +119,10 @@ struct pnp_dev {
 	for(dev = global_to_pnp_dev(pnp_global.next); \
 	dev != global_to_pnp_dev(&pnp_global); \
 	dev = global_to_pnp_dev(dev->global_list.next))
-
-static inline int pnp_dev_has_driver(struct pnp_dev *pdev)
-{
-	if (pdev->driver || (pdev->card && pdev->card->driver))
-		return 1;
-	return 0;
-} 
+#define card_for_each_dev(card,dev) \
+	for((dev) = card_to_pnp_dev((card)->devices.next); \
+	(dev) != card_to_pnp_dev(&(card)->devices); \
+	(dev) = card_to_pnp_dev((dev)->card_list.next))
 
 static inline void *pnp_get_drvdata (struct pnp_dev *pdev)
 {
@@ -148,6 +148,28 @@ struct pnp_fixup {
 	char id[7];
 	void (*quirk_function)(struct pnp_dev *dev);	/* fixup function */
 };
+
+/* capabilities */
+#define PNP_READ		0x0001
+#define PNP_WRITE		0x0002
+#define PNP_DISABLE		0x0004
+#define PNP_CONFIGURABLE	0x0008
+#define PNP_REMOVABLE		0x0010
+
+#define pnp_can_read(dev)	(((dev)->protocol) && ((dev)->protocol->get) && \
+				 ((dev)->capabilities & PNP_READ))
+#define pnp_can_write(dev)	(((dev)->protocol) && ((dev)->protocol->set) && \
+				 ((dev)->capabilities & PNP_WRITE))
+#define pnp_can_disable(dev)	(((dev)->protocol) && ((dev)->protocol->disable) && \
+				 ((dev)->capabilities & PNP_DISABLE))
+#define pnp_can_configure(dev)	((!(dev)->active) && ((dev)->capabilities & PNP_CONFIGURABLE))
+
+/* status */
+#define PNP_INIT		0x0000
+#define PNP_READY		0x0001
+#define PNP_ATTACHED		0x0002
+#define PNP_BUSY		0x0004
+#define PNP_FAULTY		0x0008
 
 
 /*
@@ -303,9 +325,6 @@ struct pnp_res_cfg {
 	struct resource irq_resource[DEVICE_COUNT_IRQ];
 };
 
-#define PNP_DYNAMIC		0	/* get or set current resource */
-#define PNP_STATIC		1	/* get or set resource for next boot */
-
 struct pnp_cfg {
 	struct pnp_port *port[8];
 	struct pnp_irq *irq[2];
@@ -325,7 +344,7 @@ struct pnp_protocol {
 
 	/* functions */
 	int (*get)(struct pnp_dev *dev);
-	int (*set)(struct pnp_dev *dev, struct pnp_cfg *config, char flags);
+	int (*set)(struct pnp_dev *dev, struct pnp_cfg *config);
 	int (*disable)(struct pnp_dev *dev);
 
 	/* used by pnp layer only (look but don't touch) */
@@ -367,7 +386,7 @@ int pnp_add_mem32_resource(struct pnp_dev *dev, int depnum, struct pnp_mem32 *da
 int pnp_init_res_cfg(struct pnp_res_cfg *template);
 int pnp_activate_dev(struct pnp_dev *dev, struct pnp_res_cfg *template);
 int pnp_disable_dev(struct pnp_dev *dev);
-int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, struct pnp_res_cfg *template, int mode);
+int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, struct pnp_res_cfg *template);
 void pnp_resource_change(struct resource *resource, unsigned long start, unsigned long size);
 
 /* driver */
@@ -395,7 +414,7 @@ static inline int pnp_add_mem32_resource(struct pnp_dev *dev, int depnum, struct
 static inline int pnp_init_res_cfg(struct pnp_res_cfg *template) { return -ENODEV; }
 static inline int pnp_activate_dev(struct pnp_dev *dev, struct pnp_res_cfg *template) { return -ENODEV; }
 static inline int pnp_disable_dev(struct pnp_dev *dev) { return -ENODEV; }
-static inline int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, struct pnp_res_cfg *template, int mode) { return -ENODEV; }
+static inline int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, struct pnp_res_cfg *template) { return -ENODEV; }
 static inline int compare_pnp_id(struct list_head * id_list, const char * id) { return -ENODEV; }
 static inline int pnp_add_id(struct pnp_id *id, struct pnp_dev *dev) { return -ENODEV; }
 static inline int pnp_register_driver(struct pnp_driver *drv) { return -ENODEV; }

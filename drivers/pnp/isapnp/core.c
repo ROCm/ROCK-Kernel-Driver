@@ -454,6 +454,10 @@ static struct pnp_dev * __init isapnp_parse_device(struct pnp_card *card, int si
 	if (size > 5)
 		dev->regs |= tmp[5] << 8;
 	dev->protocol = &isapnp_protocol;
+	dev->capabilities |= PNP_CONFIGURABLE;
+	dev->capabilities |= PNP_READ;
+	dev->capabilities |= PNP_WRITE;
+	dev->capabilities |= PNP_DISABLE;
 	return dev;
 }
 
@@ -889,7 +893,7 @@ static int __init isapnp_build_device_list(void)
 		if (isapnp_checksum_value != 0x00)
 			printk(KERN_ERR "isapnp: checksum for device %i is not valid (0x%x)\n", csn, isapnp_checksum_value);
 		card->checksum = isapnp_checksum_value;
-		card->protocol = &isapnp_card_protocol;
+		card->protocol = &isapnp_protocol;
 		pnpc_add_card(card);
 	}
 	return 0;
@@ -903,7 +907,7 @@ int isapnp_present(void)
 {
 	struct pnp_card *card;
 	pnp_for_each_card(card) {
-		if (card->protocol == &isapnp_card_protocol)
+		if (card->protocol == &isapnp_protocol)
 			return 1;
 	}
 	return 0;
@@ -1002,7 +1006,7 @@ static int isapnp_get_resources(struct pnp_dev *dev)
 	return 0;
 }
 
-static int isapnp_set_resources(struct pnp_dev *dev, struct pnp_cfg *cfg, char flags)
+static int isapnp_set_resources(struct pnp_dev *dev, struct pnp_cfg *cfg)
 {
 	int tmp;
       	isapnp_cfg_begin(dev->card->number, dev->number);
@@ -1042,15 +1046,8 @@ static int isapnp_disable_resources(struct pnp_dev *dev)
 	return 0;
 }
 
-struct pnp_protocol isapnp_card_protocol = {
-	.name	= "ISA Plug and Play - card",
-	.get	= NULL,
-	.set	= NULL,
-	.disable = NULL,
-};
-
 struct pnp_protocol isapnp_protocol = {
-	.name	= "ISA Plug and Play - device",
+	.name	= "ISA Plug and Play",
 	.get	= isapnp_get_resources,
 	.set	= isapnp_set_resources,
 	.disable = isapnp_disable_resources,
@@ -1080,9 +1077,6 @@ int __init isapnp_init(void)
 #endif
 		return -EBUSY;
 	}
-
-	if(pnp_register_protocol(&isapnp_card_protocol)<0)
-		return -EBUSY;
 
 	if(pnp_register_protocol(&isapnp_protocol)<0)
 		return -EBUSY;

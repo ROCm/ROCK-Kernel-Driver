@@ -19,6 +19,7 @@
 #endif
 
 #include <linux/pnp.h>
+#include "base.h"
 
 static int compare_func(const char *ida, const char *idb)
 {
@@ -75,6 +76,14 @@ static int pnp_device_probe(struct device *dev)
 
 	pnp_dbg("pnp: match found with the PnP device '%s' and the driver '%s'", dev->bus_id,pnp_drv->name);
 
+	spin_lock(&pnp_lock);
+	if(pnp_dev->status != PNP_READY){
+		spin_unlock(&pnp_lock);
+		return -EBUSY;
+	}
+	pnp_dev->status = PNP_ATTACHED;
+	spin_unlock(&pnp_lock);
+
 	if (pnp_dev->active == 0) {
 		if (!(pnp_drv->flags & PNP_DRIVER_DO_NOT_ACTIVATE)) {
 			error = pnp_activate_dev(pnp_dev, NULL);
@@ -95,6 +104,13 @@ static int pnp_device_probe(struct device *dev)
 		pnp_dev->driver = pnp_drv;
 		error = 0;
 	}
+	else
+	goto fail;
+	return error;
+
+fail:
+	pnp_dev->status = PNP_READY;
+	pnp_disable_dev(pnp_dev);
 	return error;
 }
 
@@ -108,6 +124,10 @@ static int pnp_device_remove(struct device *dev)
 			drv->remove(pnp_dev);
 		pnp_dev->driver = NULL;
 	}
+	spin_lock(&pnp_lock);
+	if (pnp_dev->status == PNP_ATTACHED)
+		pnp_dev->status = PNP_READY;
+	spin_unlock(&pnp_lock);
 	pnp_disable_dev(pnp_dev);
 	return 0;
 }
@@ -172,6 +192,7 @@ int pnp_add_id(struct pnp_id *id, struct pnp_dev *dev)
 		return -EINVAL;
 	if (!dev)
 		return -EINVAL;
+	id->next = NULL;
 	ptr = dev->id;
 	while (ptr && ptr->next)
 		ptr = ptr->next;
