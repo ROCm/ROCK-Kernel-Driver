@@ -1736,8 +1736,17 @@ config WD33C93_PIO
 #      bool 'Cyberstorm Mk III SCSI support (EXPERIMENTAL)' CONFIG_CYBERSTORMIII_SCSI
 
 config ZFCP
-	tristate "IBM z900 OpenFCP/SCSI support"
+	tristate "FCP host bus adapter driver for IBM eServer zSeries"
 	depends on ARCH_S390 && SCSI
+	help
+          If you want to access SCSI devices attached to your IBM eServer
+          zSeries by means of Fibre Channel interfaces say Y.
+          For details please refer to the documentation provided by IBM at
+          <http://oss.software.ibm.com/developerworks/opensource/linux390>
+
+          This driver is also available as a module. This module will be
+          called zfcp. If you want to compile it as a module, say M here
+          and read Documentation/modules.txt.
 
 endmenu
 

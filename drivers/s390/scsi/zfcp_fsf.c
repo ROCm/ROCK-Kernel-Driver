@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.45 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.46 $"
 
 #include "zfcp_ext.h"
 
@@ -412,7 +412,7 @@ zfcp_fsf_protstatus_eval(struct zfcp_fsf_req *fsf_req)
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 		atomic_set_mask(ZFCP_STATUS_ADAPTER_HOST_CON_INIT,
 				&(adapter->status));
-		debug_text_event(adapter->erp_dbf, 4, "prot_con_init");
+		debug_text_event(adapter->erp_dbf, 3, "prot_con_init");
 		break;
 
 	case FSF_PROT_DUPLICATE_REQUEST_ID:

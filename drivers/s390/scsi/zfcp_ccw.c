@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_CCW_C_REVISION "$Revision: 1.52 $"
+#define ZFCP_CCW_C_REVISION "$Revision: 1.54 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -232,14 +232,19 @@ zfcp_ccw_notify(struct ccw_device *ccw_device, int event)
 	case CIO_GONE:
 		ZFCP_LOG_NORMAL("adapter %s: device gone\n",
 				zfcp_get_busid_by_adapter(adapter));
+		debug_text_event(adapter->erp_dbf,1,"dev_gone");
+		zfcp_erp_adapter_shutdown(adapter, 0);
 		break;
 	case CIO_NO_PATH:
 		ZFCP_LOG_NORMAL("adapter %s: no path\n",
 				zfcp_get_busid_by_adapter(adapter));
+		debug_text_event(adapter->erp_dbf,1,"no_path");
+		zfcp_erp_adapter_shutdown(adapter, 0);
 		break;
 	case CIO_OPER:
 		ZFCP_LOG_NORMAL("adapter %s: operational again\n",
 				zfcp_get_busid_by_adapter(adapter));
+		debug_text_event(adapter->erp_dbf,1,"dev_oper");
 		zfcp_erp_modify_adapter_status(adapter,
 					       ZFCP_STATUS_COMMON_RUNNING,
 					       ZFCP_SET);
@@ -247,6 +252,7 @@ zfcp_ccw_notify(struct ccw_device *ccw_device, int event)
 					ZFCP_STATUS_COMMON_ERP_FAILED);
 		break;
 	}
+	zfcp_erp_wait(adapter);
 	up(&zfcp_data.config_sema);
 	return 1;
 }
