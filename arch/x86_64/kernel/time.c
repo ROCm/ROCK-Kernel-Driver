@@ -1029,7 +1029,6 @@ device_initcall(time_init_device);
  * For (3), we use interrupts at 64Hz or user specified periodic
  * frequency, whichever is higher.
  */
-#include <linux/mc146818rtc.h>
 #include <linux/rtc.h>
 
 extern irqreturn_t rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
