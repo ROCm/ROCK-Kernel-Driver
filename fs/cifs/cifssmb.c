@@ -1732,6 +1732,7 @@ CIFSFindSingle(const int xid, struct cifsTconInfo *tcon,
 	int rc = 0;
 	int bytes_returned;
 	int name_len;
+	__u16 params, byte_count;
 
 	cFYI(1, ("In FindUnique"));
 findUniqueRetry:
@@ -1753,7 +1754,7 @@ findUniqueRetry:
 		strncpy(pSMB->FileName, searchName, name_len);
 	}
 
-	pSMB->TotalParameterCount = 12 + name_len /* includes null */ ;
+	params = 12 + name_len /* includes null */ ;
 	pSMB->TotalDataCount = 0;	/* no EAs */
 	pSMB->MaxParameterCount = cpu_to_le16(2);
 	pSMB->MaxDataCount = cpu_to_le16(4000);	/* BB find exact max SMB PDU from sess structure BB */
@@ -1769,8 +1770,8 @@ findUniqueRetry:
 	pSMB->SetupCount = 1;	/* one byte, no need to le convert */
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_FIND_FIRST);
-	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
-	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalDataCount);
+	byte_count = params + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(params);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
 	pSMB->SearchAttributes =
 	    cpu_to_le16(ATTR_READONLY | ATTR_HIDDEN | ATTR_SYSTEM |
@@ -1779,8 +1780,8 @@ findUniqueRetry:
 	pSMB->SearchFlags = cpu_to_le16(1);
 	pSMB->InformationLevel = cpu_to_le16(SMB_FIND_FILE_DIRECTORY_INFO);
 	pSMB->SearchStorageType = 0;	/* BB what should we set this to? BB */
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
@@ -1813,6 +1814,7 @@ CIFSFindFirst(const int xid, struct cifsTconInfo *tcon,
 	int rc = 0;
 	int bytes_returned;
 	int name_len;
+	__u16 params, byte_count;
 
 	cFYI(1, ("In FindFirst"));
 findFirstRetry:
@@ -1834,7 +1836,7 @@ findFirstRetry:
 		strncpy(pSMB->FileName, searchName, name_len);
 	}
 
-	pSMB->TotalParameterCount = 12 + name_len /* includes null */ ;
+	params = 12 + name_len /* includes null */ ;
 	pSMB->TotalDataCount = 0;	/* no EAs */
 	pSMB->MaxParameterCount = cpu_to_le16(10);
 	pSMB->MaxDataCount = cpu_to_le16((tcon->ses->server->maxBuf -
@@ -1844,8 +1846,8 @@ findFirstRetry:
 	pSMB->Flags = 0;
 	pSMB->Timeout = 0;
 	pSMB->Reserved2 = 0;
-	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
-	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
+	byte_count = params + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(params);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
 	pSMB->ParameterOffset = cpu_to_le16(offsetof(struct 
         smb_com_transaction2_ffirst_req, SearchAttributes) - 4);
@@ -1870,8 +1872,8 @@ findFirstRetry:
 		*pUnixFlag = FALSE;
 	}
 	pSMB->SearchStorageType = 0;	/* BB what should we set this to? It is not clear if it matters BB */
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
