@@ -213,31 +213,6 @@ extern int cifs_verify_signature(const struct smb_hdr *, const char * mac_key,
 extern int cifs_calculate_mac_key(char * key,const char * rn,const char * pass);
 extern void CalcNTLMv2_partial_mac_key(struct cifsSesInfo *, struct nls_table *);
 extern void CalcNTLMv2_response(const struct cifsSesInfo *,char * );
-
-extern int CIFSBuildServerList(int xid, char *serverBufferList,
-			int recordlength, int *entries,
-			int *totalEntries, int *topoChangedFlag);
-extern int CIFSSMBQueryShares(int xid, struct cifsTconInfo *tcon,
-			struct shareInfo *shareList, int bufferLen,
-			int *entries, int *totalEntries);
-extern int CIFSSMBQueryAlias(int xid, struct cifsTconInfo *tcon,
-			struct aliasInfo *aliasList, int bufferLen,
-			int *entries, int *totalEntries);
-extern int CIFSSMBAliasInfo(int xid, struct cifsTconInfo *tcon,
-			char *aliasName, char *serverName,
-			char *shareName, char *comment);
-extern int CIFSSMBGetShareInfo(int xid, struct cifsTconInfo *tcon,
-			char *share, char *comment);
-extern int CIFSSMBGetUserPerms(int xid, struct cifsTconInfo *tcon,
-			char *userName, char *searchName, int *perms);
-extern int CIFSSMBSync(int xid, struct cifsTconInfo *tcon, int netfid, int pid);
-
-extern int CIFSSMBSeek(int xid,
-			struct cifsTconInfo *tcon,
-			int netfid,
-			int pid,
-			int whence, unsigned long offset, long long *newoffset);
-
 extern int CIFSSMBCopy(int xid,
 			struct cifsTconInfo *source_tcon,
 			const char *fromName,
