@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.53 $
+ * $Revision: 1.54 $
  */
 
 #ifndef DASD_INT_H
@@ -161,6 +161,7 @@ struct dasd_ccw_req {
 	short retries;			/* A retry counter */
 
 	/* ... and how */
+	unsigned long starttime;	/* jiffies time of request start */
 	int expires;			/* expiration period in jiffies */
 	char lpm;               	/* logical path mask */
 	void *data;			/* pointer to data area */
@@ -170,6 +171,7 @@ struct dasd_ccw_req {
 	struct dasd_ccw_req *refers;	/* ERP-chain queueing. */
 	void *function; 		/* originating ERP action */
 
+	/* these are for statistics only */
 	unsigned long long buildclk;	/* TOD-clock of request generation */
 	unsigned long long startclk;	/* TOD-clock of request start */
 	unsigned long long stopclk;	/* TOD-clock of request interrupt */

@@ -250,6 +250,98 @@ config SHARED_KERNEL
 	  You should only select this option if you know what you are
 	  doing and want to exploit this feature.
 
+config CMM
+	tristate "Cooperative memory management"
+	help
+	  Select this option, if you want to enable the kernel interface
+	  to reduce the memory size of the system. This is accomplished
+	  by allocating pages of memory and put them "on hold". This only
+	  makes sense for a system running under VM where the unused pages
+	  will be reused by VM for other guest systems. The interface
+	  allows an external monitor to balance memory of many systems.
+	  Everybody who wants to run Linux under VM should select this
+	  option.
+
+config CMM_PROC
+	bool "/proc interface to cooperative memory management"
+	depends on CMM
+	help
+	  Select this option to enable the /proc interface to the
+	  cooperative memory management.
+
+config CMM_IUCV
+	bool "IUCV special message interface to cooperative memory management"
+	depends on CMM && (SMSGIUCV=y || CMM=SMSGIUCV)
+	help
+	  Select this option to enable the special message interface to
+	  the cooperative memory management.
+
+config VIRT_TIMER
+	bool "Virtual CPU timer support"
+	help
+	  This provides a kernel interface for virtual CPU timers.
+	  Default is disabled.
+
+config APPLDATA_BASE
+	bool "Linux - VM Monitor Stream, base infrastructure"
+	depends on PROC_FS && VIRT_TIMER=y
+	help
+	  This provides a kernel interface for creating and updating z/VM APPLDATA
+	  monitor records. The monitor records are updated at certain time
+	  intervals, once the timer is started.
+	  Writing 1 or 0 to /proc/appldata/timer starts(1) or stops(0) the timer,
+	  i.e. enables or disables monitoring on the Linux side.
+	  A custom interval value (in seconds) can be written to
+	  /proc/appldata/interval.
+
+	  Defaults are 60 seconds interval and timer off.
+	  The /proc entries can also be read from, showing the current settings.
+
+config APPLDATA_MEM
+	tristate "Monitor memory management statistics"
+	depends on APPLDATA_BASE
+	help
+	  This provides memory management related data to the Linux - VM Monitor
+	  Stream, like paging/swapping rate, memory utilisation, etc.
+	  Writing 1 or 0 to /proc/appldata/memory creates(1) or removes(0) a z/VM
+	  APPLDATA monitor record, i.e. enables or disables monitoring this record
+	  on the z/VM side.
+
+	  Default is disabled.
+	  The /proc entry can also be read from, showing the current settings.
+
+	  This can also be compiled as a module, which will be called
+	  appldata_mem.o.
+
+config APPLDATA_OS
+	tristate "Monitor OS statistics"
+	depends on APPLDATA_BASE
+	help
+	  This provides OS related data to the Linux - VM Monitor Stream, like
+	  CPU utilisation, etc.
+	  Writing 1 or 0 to /proc/appldata/os creates(1) or removes(0) a z/VM
+	  APPLDATA monitor record, i.e. enables or disables monitoring this record
+	  on the z/VM side.
+
+	  Default is disabled.
+	  This can also be compiled as a module, which will be called
+	  appldata_os.o.
+
+config APPLDATA_NET_SUM
+	tristate "Monitor overall network statistics"
+	depends on APPLDATA_BASE
+	help
+	  This provides network related data to the Linux - VM Monitor Stream,
+	  currently there is only a total sum of network I/O statistics, no
+	  per-interface data.
+	  Writing 1 or 0 to /proc/appldata/net_sum creates(1) or removes(0) a z/VM
+	  APPLDATA monitor record, i.e. enables or disables monitoring this record
+	  on the z/VM side.
+
+	  Default is disabled.
+	  This can also be compiled as a module, which will be called
+	  appldata_net_sum.o.
+
 endmenu
 
 config PCMCIA

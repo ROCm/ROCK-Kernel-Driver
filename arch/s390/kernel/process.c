@@ -40,6 +40,9 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/irq.h>
+#ifdef CONFIG_VIRT_TIMER
+#include <asm/timer.h>
+#endif
 
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
@@ -76,6 +79,14 @@ void default_idle(void)
                 schedule();
                 return;
         }
+
+#ifdef CONFIG_VIRT_TIMER
+	/*
+	 * hook to stop timers that should not tick while CPU is idle
+	 */
+	if (stop_timers())
+		return;
+#endif
 
 	/* 
 	 * Wait for external, I/O or machine check interrupt and

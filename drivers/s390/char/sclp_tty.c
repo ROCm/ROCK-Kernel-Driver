@@ -529,8 +529,8 @@ sclp_tty_input(unsigned char* buf, unsigned int count)
 		/* send (normal) input to line discipline */
 		memcpy(sclp_tty->flip.char_buf_ptr, buf, count);
 		if (count < 2 ||
-		    strncmp ((const char *) buf + count - 2, "^n", 2) ||
-		    strncmp ((const char *) buf + count - 2, "\0252n", 2)) {
+		    (strncmp ((const char *) buf + count - 2, "^n", 2) &&
+		     strncmp ((const char *) buf + count - 2, "\0252n", 2))) {
 			sclp_tty->flip.char_buf_ptr[count] = '\n';
 			count++;
 		} else
@@ -636,7 +636,7 @@ find_gds_vector(struct gds_vector *start, struct gds_vector *end, u16 id)
 {
 	struct gds_vector *vec;
 
-	for (vec = start; vec < end; (void *) vec += vec->length)
+	for (vec = start; vec < end; vec = (void *) vec + vec->length)
 		if (vec->gds_id == id)
 			return vec;
 	return NULL;
@@ -648,7 +648,8 @@ find_gds_subvector(struct gds_subvector *start,
 {
 	struct gds_subvector *subvec;
 
-	for (subvec = start; subvec < end; (void *) subvec += subvec->length)
+	for (subvec = start; subvec < end;
+	     subvec = (void *) subvec + subvec->length)
 		if (subvec->key == key)
 			return subvec;
 	return NULL;
@@ -667,7 +668,7 @@ sclp_eval_selfdeftextmsg(struct gds_subvector *start,
 			break;
 		sclp_get_input((unsigned char *)(subvec + 1),
 			       (unsigned char *) subvec + subvec->length);
-		(void *) subvec += subvec->length;
+		subvec = (void *) subvec + subvec->length;
 	}
 }
 
@@ -685,7 +686,7 @@ sclp_eval_textcmd(struct gds_subvector *start,
 			break;
 		sclp_eval_selfdeftextmsg((struct gds_subvector *)(subvec + 1),
 					 (void *)subvec + subvec->length);
-		(void *) subvec += subvec->length;
+		subvec = (void *) subvec + subvec->length;
 	}
 }
 
@@ -701,7 +702,7 @@ sclp_eval_cpmsu(struct gds_vector *start, struct gds_vector *end)
 			break;
 		sclp_eval_textcmd((struct gds_subvector *)(vec + 1),
 				  (void *) vec + vec->length);
-		(void *) vec += vec->length;
+		vec = (void *) vec + vec->length;
 	}
 }
 

@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.50 2003/12/02 15:18:50 cohuck Exp $
+ * $Id: ctcmain.c,v 1.54 2004/02/18 12:35:59 ptiedem Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.50 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.54 $
  *
  */
 
@@ -204,14 +204,59 @@ struct channel {
 	struct ctc_profile prof;
 
 	unsigned char *trans_skb_data;
+
+	__u16 logflags;
 };
 
 #define CHANNEL_FLAGS_READ            0
 #define CHANNEL_FLAGS_WRITE           1
 #define CHANNEL_FLAGS_INUSE           2
 #define CHANNEL_FLAGS_BUFSIZE_CHANGED 4
+#define CHANNEL_FLAGS_FAILED          8
+#define CHANNEL_FLAGS_WAITIRQ        16
 #define CHANNEL_FLAGS_RWMASK 1
 #define CHANNEL_DIRECTION(f) (f & CHANNEL_FLAGS_RWMASK)
+
+#define LOG_FLAG_ILLEGALPKT  1
+#define LOG_FLAG_ILLEGALSIZE 2
+#define LOG_FLAG_OVERRUN     4
+#define LOG_FLAG_NOMEM       8
+
+#define CTC_LOGLEVEL_INFO     1
+#define CTC_LOGLEVEL_NOTICE   2
+#define CTC_LOGLEVEL_WARN     4
+#define CTC_LOGLEVEL_EMERG    8
+#define CTC_LOGLEVEL_ERR     16
+#define CTC_LOGLEVEL_DEBUG   32
+#define CTC_LOGLEVEL_CRIT    64
+
+#define CTC_LOGLEVEL_DEFAULT \
+(CTC_LOGLEVEL_INFO | CTC_LOGLEVEL_NOTICE | CTC_LOGLEVEL_WARN | CTC_LOGLEVEL_CRIT)
+
+#define CTC_LOGLEVEL_MAX     ((CTC_LOGLEVEL_CRIT<<1)-1)
+
+static int loglevel = CTC_LOGLEVEL_DEFAULT;
+
+#define ctc_pr_debug(fmt, arg...) \
+do { if (loglevel & CTC_LOGLEVEL_DEBUG) printk(KERN_DEBUG fmt,##arg); } while (0)
+
+#define ctc_pr_info(fmt, arg...) \
+do { if (loglevel & CTC_LOGLEVEL_INFO) printk(KERN_INFO fmt,##arg); } while (0)
+
+#define ctc_pr_notice(fmt, arg...) \
+do { if (loglevel & CTC_LOGLEVEL_NOTICE) printk(KERN_NOTICE fmt,##arg); } while (0)
+
+#define ctc_pr_warn(fmt, arg...) \
+do { if (loglevel & CTC_LOGLEVEL_WARN) printk(KERN_WARNING fmt,##arg); } while (0)
+
+#define ctc_pr_emerg(fmt, arg...) \
+do { if (loglevel & CTC_LOGLEVEL_EMERG) printk(KERN_EMERG fmt,##arg); } while (0)
+
+#define ctc_pr_err(fmt, arg...) \
+do { if (loglevel & CTC_LOGLEVEL_ERR) printk(KERN_ERR fmt,##arg); } while (0)
+
+#define ctc_pr_crit(fmt, arg...) \
+do { if (loglevel & CTC_LOGLEVEL_CRIT) printk(KERN_CRIT fmt,##arg); } while (0)
 
 /**
  * Linked list of all detected channels.
@@ -255,13 +300,15 @@ static __inline__ void
 ctc_clear_busy(struct net_device * dev)
 {
 	clear_bit(0, &(((struct ctc_priv *) dev->priv)->tbusy));
-	netif_wake_queue(dev);
+	if (((struct ctc_priv *)dev->priv)->protocol != CTC_PROTO_LINUX_TTY)
+		netif_wake_queue(dev);
 }
 
 static __inline__ int
 ctc_test_and_set_busy(struct net_device * dev)
 {
-	netif_stop_queue(dev);
+	if (((struct ctc_priv *)dev->priv)->protocol != CTC_PROTO_LINUX_TTY)
+		netif_stop_queue(dev);
 	return test_and_set_bit(0, &((struct ctc_priv *) dev->priv)->tbusy);
 }
 
@@ -272,7 +319,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.50 $";
+	char vbuf[] = "$Revision: 1.54 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -285,9 +332,9 @@ print_banner(void)
 		version = " ??? ";
 	printk(KERN_INFO "CTC driver Version%s"
 #ifdef DEBUG
-	       " (DEBUG-VERSION, " __DATE__ __TIME__ ")"
+		    " (DEBUG-VERSION, " __DATE__ __TIME__ ")"
 #endif
-	       " initialized\n", version);
+		    " initialized\n", version);
 	printed = 1;
 }
 
@@ -426,11 +473,11 @@ enum ch_events {
 };
 
 static const char *ch_event_names[] = {
-	"do_IO success",
-	"do_IO busy",
-	"do_IO enodev",
-	"do_IO ioerr",
-	"do_IO unknown",
+	"ccw_device success",
+	"ccw_device busy",
+	"ccw_device enodev",
+	"ccw_device ioerr",
+	"ccw_device unknown",
 
 	"Status ATTN & BUSY",
 	"Status ATTN",
@@ -528,6 +575,8 @@ ctc_dump_skb(struct sk_buff *skb, int offset)
 	struct ll_header *header;
 	int i;
 
+	if (!(loglevel & CTC_LOGLEVEL_DEBUG))
+		return;
 	p += offset;
 	bl = *((__u16 *) p);
 	p += 2;
@@ -580,53 +629,88 @@ ctc_unpack_skb(struct channel *ch, struct sk_buff *pskb)
 		skb_pull(pskb, LL_HEADER_LENGTH);
 		if ((ch->protocol == CTC_PROTO_S390) &&
 		    (header->type != ETH_P_IP)) {
-			/**
-			 * Check packet type only if we stick strictly
-			 * to S/390's protocol of OS390. This only
-			 * supports IP. Otherwise allow any packet
-			 * type.
-			 */
-			printk(KERN_WARNING
-			       "%s Illegal packet type 0x%04x "
-			       "received, dropping\n", dev->name, header->type);
+
+#ifndef DEBUG
+		        if (!(ch->logflags & LOG_FLAG_ILLEGALPKT)) {
+#endif
+				/**
+				 * Check packet type only if we stick strictly
+				 * to S/390's protocol of OS390. This only
+				 * supports IP. Otherwise allow any packet
+				 * type.
+				 */
+				ctc_pr_warn(
+					"%s Illegal packet type 0x%04x received, dropping\n",
+					dev->name, header->type);
+				ch->logflags |= LOG_FLAG_ILLEGALPKT;
+#ifndef DEBUG
+			}
+#endif
+#ifdef DEBUG
 			ctc_dump_skb(pskb, -6);
+#endif
 			privptr->stats.rx_dropped++;
 			privptr->stats.rx_frame_errors++;
 			return;
 		}
 		pskb->protocol = ntohs(header->type);
-		header->length -= LL_HEADER_LENGTH;
-		if ((header->length == 0) ||
-		    (header->length > skb_tailroom(pskb)) ||
-		    (header->length > len)) {
-			printk(KERN_WARNING
-			       "%s Illegal packet size %d "
-			       "received (MTU=%d blocklen=%d), "
-			       "dropping\n", dev->name, header->length,
-			       dev->mtu, len);
+		if (header->length <= LL_HEADER_LENGTH) {
+#ifndef DEBUG
+		        if (!(ch->logflags & LOG_FLAG_ILLEGALSIZE)) {
+#endif
+				ctc_pr_warn(
+				       "%s Illegal packet size %d "
+				       "received (MTU=%d blocklen=%d), "
+				       "dropping\n", dev->name, header->length,
+				       dev->mtu, len);
+				ch->logflags |= LOG_FLAG_ILLEGALSIZE;
+#ifndef DEBUG
+			}
+#endif
+#ifdef DEBUG
 			ctc_dump_skb(pskb, -6);
+#endif
 			privptr->stats.rx_dropped++;
 			privptr->stats.rx_length_errors++;
 			return;
 		}
-		if (header->length > skb_tailroom(pskb)) {
-			printk(KERN_WARNING
-			       "%s Illegal packet size %d "
-			       "(beyond the end of received data), "
-			       "dropping\n", dev->name, header->length);
+		header->length -= LL_HEADER_LENGTH;
+		len -= LL_HEADER_LENGTH;
+		if ((header->length > skb_tailroom(pskb)) ||
+		    (header->length > len)) {
+#ifndef DEBUG
+		        if (!(ch->logflags & LOG_FLAG_OVERRUN)) {
+#endif
+				ctc_pr_warn(
+					"%s Illegal packet size %d "
+					"(beyond the end of received data), "
+					"dropping\n", dev->name, header->length);
+				ch->logflags |= LOG_FLAG_OVERRUN;
+#ifndef DEBUG
+			}
+#endif
+#ifdef DEBUG
 			ctc_dump_skb(pskb, -6);
+#endif
 			privptr->stats.rx_dropped++;
 			privptr->stats.rx_length_errors++;
 			return;
 		}
 		skb_put(pskb, header->length);
 		pskb->mac.raw = pskb->data;
-		len -= (LL_HEADER_LENGTH + header->length);
+		len -= header->length;
 		skb = dev_alloc_skb(pskb->len);
 		if (!skb) {
-			printk(KERN_WARNING
-			       "%s Out of memory in ctc_unpack_skb\n",
-			       dev->name);
+#ifndef DEBUG
+		        if (!(ch->logflags & LOG_FLAG_NOMEM)) {
+#endif
+				ctc_pr_warn(
+					"%s Out of memory in ctc_unpack_skb\n",
+					dev->name);
+				ch->logflags |= LOG_FLAG_NOMEM;
+#ifndef DEBUG
+			}
+#endif
 			privptr->stats.rx_dropped++;
 			return;
 		}
@@ -639,47 +723,64 @@ ctc_unpack_skb(struct channel *ch, struct sk_buff *pskb)
 			ctc_tty_netif_rx(skb);
 		else
 			netif_rx(skb);
+		/**
+		 * Successful rx; reset logflags
+		 */
+		ch->logflags = 0;
 		dev->last_rx = jiffies;
 		privptr->stats.rx_packets++;
 		privptr->stats.rx_bytes += skb->len;
 		if (len > 0) {
 			skb_pull(pskb, header->length);
+			if (skb_tailroom(pskb) < LL_HEADER_LENGTH) {
+#ifndef DEBUG
+				if (!(ch->logflags & LOG_FLAG_OVERRUN)) {
+#endif
+					ctc_pr_warn(
+						"%s Overrun in ctc_unpack_skb\n",
+						dev->name);
+					ch->logflags |= LOG_FLAG_OVERRUN;
+#ifndef DEBUG
+				}
+#endif
+				return;
+			}
 			skb_put(pskb, LL_HEADER_LENGTH);
 		}
 	}
 }
 
 /**
- * Check return code of a preceeding do_IO, halt_IO etc...
+ * Check return code of a preceeding ccw_device call, halt_IO etc...
  *
  * @param ch          The channel, the error belongs to.
  * @param return_code The error code to inspect.
  */
 static void inline
-ccw_check_return_code(struct channel *ch, int return_code)
+ccw_check_return_code(struct channel *ch, int return_code, char *msg)
 {
 	switch (return_code) {
-	case 0:
-		fsm_event(ch->fsm, CH_EVENT_IO_SUCCESS, ch);
-		break;
-	case -EBUSY:
-		printk(KERN_INFO "%s: Busy !\n", ch->id);
-		fsm_event(ch->fsm, CH_EVENT_IO_EBUSY, ch);
-		break;
-	case -ENODEV:
-		printk(KERN_EMERG
-		       "%s: Invalid device called for IO\n", ch->id);
-		fsm_event(ch->fsm, CH_EVENT_IO_ENODEV, ch);
-		break;
-	case -EIO:
-		printk(KERN_EMERG "%s: Status pending... \n", ch->id);
-		fsm_event(ch->fsm, CH_EVENT_IO_EIO, ch);
-		break;
-	default:
-		printk(KERN_EMERG
-		       "%s: Unknown error in do_IO %04x\n",
-		       ch->id, return_code);
-		fsm_event(ch->fsm, CH_EVENT_IO_UNKNOWN, ch);
+		case 0:
+			fsm_event(ch->fsm, CH_EVENT_IO_SUCCESS, ch);
+			break;
+		case -EBUSY:
+			ctc_pr_warn("%s (%s): Busy !\n", ch->id, msg);
+			fsm_event(ch->fsm, CH_EVENT_IO_EBUSY, ch);
+			break;
+		case -ENODEV:
+			ctc_pr_emerg("%s (%s): Invalid device called for IO\n",
+				     ch->id, msg);
+			fsm_event(ch->fsm, CH_EVENT_IO_ENODEV, ch);
+			break;
+		case -EIO:
+			ctc_pr_emerg("%s (%s): Status pending... \n",
+				     ch->id, msg);
+			fsm_event(ch->fsm, CH_EVENT_IO_EIO, ch);
+			break;
+		default:
+			ctc_pr_emerg("%s (%s): Unknown error in do_IO %04x\n",
+				     ch->id, msg, return_code);
+			fsm_event(ch->fsm, CH_EVENT_IO_UNKNOWN, ch);
 	}
 }
 
@@ -695,47 +796,39 @@ ccw_unit_check(struct channel *ch, unsigned char sense)
 	if (sense & SNS0_INTERVENTION_REQ) {
 		if (sense & 0x01) {
 			if (ch->protocol != CTC_PROTO_LINUX_TTY)
-				printk(KERN_DEBUG
-				       "%s: Interface disc. or Sel. reset "
-				       "(remote)\n", ch->id);
+				ctc_pr_debug("%s: Interface disc. or Sel. reset "
+					"(remote)\n", ch->id);
 			fsm_event(ch->fsm, CH_EVENT_UC_RCRESET, ch);
 		} else {
-			printk(KERN_DEBUG "%s: System reset (remote)\n",
-			       ch->id);
+			ctc_pr_debug("%s: System reset (remote)\n", ch->id);
 			fsm_event(ch->fsm, CH_EVENT_UC_RSRESET, ch);
 		}
 	} else if (sense & SNS0_EQUIPMENT_CHECK) {
 		if (sense & SNS0_BUS_OUT_CHECK) {
-			printk(KERN_WARNING
-			       "%s: Hardware malfunction (remote)\n",
-			       ch->id);
+			ctc_pr_warn("%s: Hardware malfunction (remote)\n",
+				    ch->id);
 			fsm_event(ch->fsm, CH_EVENT_UC_HWFAIL, ch);
 		} else {
-			printk(KERN_WARNING
-			       "%s: Read-data parity error (remote)\n",
-			       ch->id);
+			ctc_pr_warn("%s: Read-data parity error (remote)\n",
+				    ch->id);
 			fsm_event(ch->fsm, CH_EVENT_UC_RXPARITY, ch);
 		}
 	} else if (sense & SNS0_BUS_OUT_CHECK) {
 		if (sense & 0x04) {
-			printk(KERN_WARNING
-			       "%s: Data-streaming timeout)\n", ch->id);
+			ctc_pr_warn("%s: Data-streaming timeout)\n", ch->id);
 			fsm_event(ch->fsm, CH_EVENT_UC_TXTIMEOUT, ch);
 		} else {
-			printk(KERN_WARNING
-			       "%s: Data-transfer parity error\n",
-			       ch->id);
+			ctc_pr_warn("%s: Data-transfer parity error\n", ch->id);
 			fsm_event(ch->fsm, CH_EVENT_UC_TXPARITY, ch);
 		}
 	} else if (sense & SNS0_CMD_REJECT) {
-		printk(KERN_WARNING "%s: Command reject\n", ch->id);
+		ctc_pr_warn("%s: Command reject\n", ch->id);
 	} else if (sense == 0) {
-		printk(KERN_DEBUG "%s: Unit check ZERO\n", ch->id);
+		ctc_pr_debug("%s: Unit check ZERO\n", ch->id);
 		fsm_event(ch->fsm, CH_EVENT_UC_ZERO, ch);
 	} else {
-		printk(KERN_WARNING
-		       "%s: Unit Check with sense code: %02x\n",
-		       ch->id, sense);
+		ctc_pr_warn("%s: Unit Check with sense code: %02x\n",
+			    ch->id, sense);
 		fsm_event(ch->fsm, CH_EVENT_UC_UNKNOWN, ch);
 	}
 }
@@ -763,11 +856,11 @@ ctc_checkalloc_buffer(struct channel *ch, int warn)
 						GFP_ATOMIC | GFP_DMA);
 		if (ch->trans_skb == NULL) {
 			if (warn)
-				printk(KERN_WARNING
-				       "%s: Couldn't alloc %s trans_skb\n",
-				       ch->id,
-				       (CHANNEL_DIRECTION(ch->flags) == READ) ?
-				       "RX" : "TX");
+				ctc_pr_warn(
+					"%s: Couldn't alloc %s trans_skb\n",
+					ch->id,
+					(CHANNEL_DIRECTION(ch->flags) == READ) ?
+					"RX" : "TX");
 			return -ENOMEM;
 		}
 		ch->ccw[1].count = ch->max_bufsize;
@@ -775,12 +868,12 @@ ctc_checkalloc_buffer(struct channel *ch, int warn)
 			dev_kfree_skb(ch->trans_skb);
 			ch->trans_skb = NULL;
 			if (warn)
-				printk(KERN_WARNING
-				       "%s: set_normalized_cda for %s "
-				       "trans_skb failed, dropping packets\n",
-				       ch->id,
-				       (CHANNEL_DIRECTION(ch->flags) == READ) ?
-				       "RX" : "TX");
+				ctc_pr_warn(
+					"%s: set_normalized_cda for %s "
+					"trans_skb failed, dropping packets\n",
+					ch->id,
+					(CHANNEL_DIRECTION(ch->flags) == READ) ?
+					"RX" : "TX");
 			return -ENOMEM;
 		}
 		ch->ccw[1].count = 0;
@@ -829,9 +922,8 @@ ch_action_txdone(fsm_instance * fi, int event, void *arg)
 		ch->prof.tx_time = duration;
 
 	if (ch->irb->scsw.count != 0)
-		printk(KERN_DEBUG "%s: TX not complete, remaining %d bytes\n",
-		       dev->name, ch->irb->scsw.count);
-
+		ctc_pr_debug("%s: TX not complete, remaining %d bytes\n",
+			     dev->name, ch->irb->scsw.count);
 	fsm_deltimer(&ch->timer);
 	while ((skb = skb_dequeue(&ch->io_queue))) {
 		privptr->stats.tx_packets++;
@@ -881,7 +973,7 @@ ch_action_txdone(fsm_instance * fi, int event, void *arg)
 			privptr->stats.tx_dropped += i;
 			privptr->stats.tx_errors += i;
 			fsm_deltimer(&ch->timer);
-			ccw_check_return_code(ch, rc);
+			ccw_check_return_code(ch, rc, "chained TX");
 		}
 	} else {
 		spin_unlock(&ch->collect_lock);
@@ -932,15 +1024,15 @@ ch_action_rx(fsm_instance * fi, int event, void *arg)
 
 	fsm_deltimer(&ch->timer);
 	if (len < 8) {
-		printk(KERN_DEBUG "%s: got packet with length %d < 8\n",
-		       dev->name, len);
+		ctc_pr_debug("%s: got packet with length %d < 8\n",
+			     dev->name, len);
 		privptr->stats.rx_dropped++;
 		privptr->stats.rx_length_errors++;
 		goto again;
 	}
 	if (len > ch->max_bufsize) {
-		printk(KERN_DEBUG "%s: got packet with length %d > %d\n",
-		       dev->name, len, ch->max_bufsize);
+		ctc_pr_debug("%s: got packet with length %d > %d\n",
+			     dev->name, len, ch->max_bufsize);
 		privptr->stats.rx_dropped++;
 		privptr->stats.rx_length_errors++;
 		goto again;
@@ -950,18 +1042,20 @@ ch_action_rx(fsm_instance * fi, int event, void *arg)
 	 * VM TCP seems to have a bug sending 2 trailing bytes of garbage.
 	 */
 	switch (ch->protocol) {
-	case CTC_PROTO_S390:
-	case CTC_PROTO_OS390:
-		check_len = block_len + 2;
-		break;
-	default:
-		check_len = block_len;
-		break;
+		case CTC_PROTO_S390:
+		case CTC_PROTO_OS390:
+			check_len = block_len + 2;
+			break;
+		default:
+			check_len = block_len;
+			break;
 	}
 	if ((len < block_len) || (len > check_len)) {
-		printk(KERN_DEBUG "%s: got block length %d != rx length %d\n",
-		       dev->name, block_len, len);
+		ctc_pr_debug("%s: got block length %d != rx length %d\n",
+			     dev->name, block_len, len);
+#ifdef DEBUG
 		ctc_dump_skb(skb, 0);
+#endif
 		*((__u16 *) skb->data) = len;
 		privptr->stats.rx_dropped++;
 		privptr->stats.rx_length_errors++;
@@ -972,7 +1066,7 @@ ch_action_rx(fsm_instance * fi, int event, void *arg)
 		*((__u16 *) skb->data) = block_len;
 		ctc_unpack_skb(ch, skb);
 	}
-      again:
+ again:
 	skb->data = skb->tail = ch->trans_skb_data;
 	skb->len = 0;
 	if (ctc_checkalloc_buffer(ch, 1))
@@ -980,7 +1074,7 @@ ch_action_rx(fsm_instance * fi, int event, void *arg)
 	ch->ccw[1].count = ch->max_bufsize;
 	rc = ccw_device_start(ch->cdev, &ch->ccw[0], (unsigned long) ch, 0xff, 0);
 	if (rc != 0)
-		ccw_check_return_code(ch, rc);
+		ccw_check_return_code(ch, rc, "normal RX");
 }
 
 static void ch_action_rxidle(fsm_instance * fi, int event, void *arg);
@@ -999,8 +1093,7 @@ ch_action_firstio(fsm_instance * fi, int event, void *arg)
 	int rc;
 
 	if (fsm_getstate(fi) == CH_STATE_TXIDLE)
-		printk(KERN_DEBUG "%s: remote side issued READ?, "
-		       "init ...\n", ch->id);
+		ctc_pr_debug("%s: remote side issued READ?, init ...\n", ch->id);
 	fsm_deltimer(&ch->timer);
 	if (ctc_checkalloc_buffer(ch, 1))
 		return;
@@ -1039,7 +1132,7 @@ ch_action_firstio(fsm_instance * fi, int event, void *arg)
 	if (rc != 0) {
 		fsm_deltimer(&ch->timer);
 		fsm_newstate(fi, CH_STATE_SETUPWAIT);
-		ccw_check_return_code(ch, rc);
+		ccw_check_return_code(ch, rc, "init IO");
 	}
 	/**
 	 * If in compatibility mode since we don´t setup a timer, we
@@ -1075,7 +1168,9 @@ ch_action_rxidle(fsm_instance * fi, int event, void *arg)
 
 	fsm_deltimer(&ch->timer);
 	buflen = *((__u16 *) ch->trans_skb->data);
-	pr_debug("%s: Initial RX count %d\n", dev->name, buflen);
+#ifdef DEBUG
+	ctc_pr_debug("%s: Initial RX count %d\n", dev->name, buflen);
+#endif
 	if (buflen >= CTC_INITIAL_BLOCKLEN) {
 		if (ctc_checkalloc_buffer(ch, 1))
 			return;
@@ -1085,13 +1180,13 @@ ch_action_rxidle(fsm_instance * fi, int event, void *arg)
 				      (unsigned long) ch, 0xff, 0);
 		if (rc != 0) {
 			fsm_newstate(fi, CH_STATE_RXINIT);
-			ccw_check_return_code(ch, rc);
+			ccw_check_return_code(ch, rc, "initial RX");
 		} else
 			fsm_event(((struct ctc_priv *) dev->priv)->fsm,
 				  DEV_EVENT_RXUP, dev);
 	} else {
-		printk(KERN_DEBUG "%s: Initial RX count %d not %d\n",
-		       dev->name, buflen, CTC_INITIAL_BLOCKLEN);
+		ctc_pr_debug("%s: Initial RX count %d not %d\n",
+			     dev->name, buflen, CTC_INITIAL_BLOCKLEN);
 		ch_action_firstio(fi, event, arg);
 	}
 }
@@ -1121,7 +1216,7 @@ ch_action_setmode(fsm_instance * fi, int event, void *arg)
 	if (rc != 0) {
 		fsm_deltimer(&ch->timer);
 		fsm_newstate(fi, CH_STATE_STARTWAIT);
-		ccw_check_return_code(ch, rc);
+		ccw_check_return_code(ch, rc, "set Mode");
 	} else
 		ch->retry = 0;
 }
@@ -1142,18 +1237,19 @@ ch_action_start(fsm_instance * fi, int event, void *arg)
 	struct net_device *dev;
 
 	if (ch == NULL) {
-		printk(KERN_WARNING "ch_action_start ch=NULL\n");
+		ctc_pr_warn("ch_action_start ch=NULL\n");
 		return;
 	}
 	if (ch->netdev == NULL) {
-		printk(KERN_WARNING "ch_action_start dev=NULL, id=%s\n",
-		       ch->id);
+		ctc_pr_warn("ch_action_start dev=NULL, id=%s\n", ch->id);
 		return;
 	}
 	dev = ch->netdev;
 
-	pr_debug("%s: %s channel start\n", dev->name,
-		 (CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX");
+#ifdef DEBUG
+	ctc_pr_debug("%s: %s channel start\n", dev->name,
+		     (CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX");
+#endif
 
 	if (ch->trans_skb != NULL) {
 		clear_normalized_cda(&ch->ccw[1]);
@@ -1169,12 +1265,13 @@ ch_action_start(fsm_instance * fi, int event, void *arg)
 		ch->ccw[1].flags = CCW_FLAG_SLI | CCW_FLAG_CC;
 		ch->ccw[1].count = 0;
 	}
-	if (ctc_checkalloc_buffer(ch, 0))
-		printk(KERN_NOTICE
-		       "%s: Could not allocate %s trans_skb, delaying "
-		       "allocation until first transfer\n",
-		       dev->name,
-		       (CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX");
+	if (ctc_checkalloc_buffer(ch, 0)) {
+		ctc_pr_notice(
+			"%s: Could not allocate %s trans_skb, delaying "
+			"allocation until first transfer\n",
+			dev->name,
+			(CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX");
+	}
 
 	ch->ccw[0].cmd_code = CCW_CMD_PREPARE;
 	ch->ccw[0].flags = CCW_FLAG_SLI | CCW_FLAG_CC;
@@ -1194,10 +1291,13 @@ ch_action_start(fsm_instance * fi, int event, void *arg)
 	rc = ccw_device_halt(ch->cdev, (unsigned long) ch);
 	spin_unlock_irqrestore(get_ccwdev_lock(ch->cdev), saveflags);
 	if (rc != 0) {
-		fsm_deltimer(&ch->timer);
-		ccw_check_return_code(ch, rc);
+		if (rc != -EBUSY)
+		    fsm_deltimer(&ch->timer);
+		ccw_check_return_code(ch, rc, "initial HaltIO");
 	}
-	pr_debug("ctc: %s(): leaving\n", __FUNCTION__);
+#ifdef DEBUG
+	ctc_pr_debug("ctc: %s(): leaving\n", __func__);
+#endif
 }
 
 /**
@@ -1225,9 +1325,11 @@ ch_action_haltio(fsm_instance * fi, int event, void *arg)
 	if (event == CH_EVENT_STOP)
 		spin_unlock_irqrestore(get_ccwdev_lock(ch->cdev), saveflags);
 	if (rc != 0) {
-		fsm_deltimer(&ch->timer);
-		fsm_newstate(fi, oldstate);
-		ccw_check_return_code(ch, rc);
+		if (rc != -EBUSY) {
+		    fsm_deltimer(&ch->timer);
+		    fsm_newstate(fi, oldstate);
+		}
+		ccw_check_return_code(ch, rc, "HaltIO in ch_action_haltio");
 	}
 }
 
@@ -1340,15 +1442,16 @@ ch_action_setuperr(fsm_instance * fi, int event, void *arg)
 		if (CHANNEL_DIRECTION(ch->flags) == READ) {
 			int rc = ccw_device_halt(ch->cdev, (unsigned long) ch);
 			if (rc != 0)
-				ccw_check_return_code(ch, rc);
+				ccw_check_return_code(
+					ch, rc, "HaltIO in ch_action_setuperr");
 		}
 		return;
 	}
 
-	printk(KERN_DEBUG "%s: Error %s during %s channel setup state=%s\n",
-	       dev->name, ch_event_names[event],
-	       (CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX",
-	       fsm_getstate_str(fi));
+	ctc_pr_debug("%s: Error %s during %s channel setup state=%s\n",
+		     dev->name, ch_event_names[event],
+		     (CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX",
+		     fsm_getstate_str(fi));
 	if (CHANNEL_DIRECTION(ch->flags) == READ) {
 		fsm_newstate(fi, CH_STATE_RXERR);
 		fsm_event(((struct ctc_priv *) dev->priv)->fsm,
@@ -1378,8 +1481,8 @@ ch_action_restart(fsm_instance * fi, int event, void *arg)
 	struct net_device *dev = ch->netdev;
 
 	fsm_deltimer(&ch->timer);
-	printk(KERN_DEBUG "%s: %s channel restart\n", dev->name,
-	       (CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX");
+	ctc_pr_debug("%s: %s channel restart\n", dev->name,
+		     (CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX");
 	fsm_addtimer(&ch->timer, CTC_TIMEOUT_5SEC, CH_EVENT_TIMER, ch);
 	oldstate = fsm_getstate(fi);
 	fsm_newstate(fi, CH_STATE_STARTWAIT);
@@ -1389,9 +1492,11 @@ ch_action_restart(fsm_instance * fi, int event, void *arg)
 	if (event == CH_EVENT_TIMER)
 		spin_unlock_irqrestore(get_ccwdev_lock(ch->cdev), saveflags);
 	if (rc != 0) {
-		fsm_deltimer(&ch->timer);
-		fsm_newstate(fi, oldstate);
-		ccw_check_return_code(ch, rc);
+		if (rc != -EBUSY) {
+		    fsm_deltimer(&ch->timer);
+		    fsm_newstate(fi, oldstate);
+		}
+		ccw_check_return_code(ch, rc, "HaltIO in ch_action_restart");
 	}
 }
 
@@ -1411,8 +1516,7 @@ ch_action_rxiniterr(fsm_instance * fi, int event, void *arg)
 
 	if (event == CH_EVENT_TIMER) {
 		fsm_deltimer(&ch->timer);
-		printk(KERN_DEBUG "%s: Timeout during RX init handshake\n",
-		       dev->name);
+		ctc_pr_debug("%s: Timeout during RX init handshake\n", dev->name);
 		if (ch->retry++ < 3)
 			ch_action_restart(fi, event, arg);
 		else {
@@ -1421,8 +1525,7 @@ ch_action_rxiniterr(fsm_instance * fi, int event, void *arg)
 				  DEV_EVENT_RXDOWN, dev);
 		}
 	} else
-		printk(KERN_WARNING "%s: Error during RX init handshake\n",
-		       dev->name);
+		ctc_pr_warn("%s: Error during RX init handshake\n", dev->name);
 }
 
 /**
@@ -1440,8 +1543,8 @@ ch_action_rxinitfail(fsm_instance * fi, int event, void *arg)
 	struct net_device *dev = ch->netdev;
 
 	fsm_newstate(fi, CH_STATE_RXERR);
-	printk(KERN_WARNING "%s: RX initialization failed\n", dev->name);
-	printk(KERN_WARNING "%s: RX <-> RX connection detected\n", dev->name);
+	ctc_pr_warn("%s: RX initialization failed\n", dev->name);
+	ctc_pr_warn("%s: RX <-> RX connection detected\n", dev->name);
 	fsm_event(((struct ctc_priv *) dev->priv)->fsm, DEV_EVENT_RXDOWN, dev);
 }
 
@@ -1460,8 +1563,8 @@ ch_action_rxdisc(fsm_instance * fi, int event, void *arg)
 	struct net_device *dev = ch->netdev;
 
 	fsm_deltimer(&ch->timer);
-	printk(KERN_DEBUG "%s: Got remote disconnect, re-initializing ...\n",
-	       dev->name);
+	ctc_pr_debug("%s: Got remote disconnect, re-initializing ...\n",
+		     dev->name);
 
 	/**
 	 * Notify device statemachine
@@ -1492,8 +1595,7 @@ ch_action_txiniterr(fsm_instance * fi, int event, void *arg)
 
 	if (event == CH_EVENT_TIMER) {
 		fsm_deltimer(&ch->timer);
-		printk(KERN_DEBUG "%s: Timeout during TX init handshake\n",
-		       dev->name);
+		ctc_pr_debug("%s: Timeout during TX init handshake\n", dev->name);
 		if (ch->retry++ < 3)
 			ch_action_restart(fi, event, arg);
 		else {
@@ -1502,8 +1604,7 @@ ch_action_txiniterr(fsm_instance * fi, int event, void *arg)
 				  DEV_EVENT_TXDOWN, dev);
 		}
 	} else
-		printk(KERN_WARNING "%s: Error during TX init handshake\n",
-		       dev->name);
+		ctc_pr_warn("%s: Error during TX init handshake\n", dev->name);
 }
 
 /**
@@ -1522,23 +1623,24 @@ ch_action_txretry(fsm_instance * fi, int event, void *arg)
 
 	fsm_deltimer(&ch->timer);
 	if (ch->retry++ > 3) {
-		printk(KERN_DEBUG "%s: TX retry failed, restarting channel\n",
-		       dev->name);
+		ctc_pr_debug("%s: TX retry failed, restarting channel\n",
+			     dev->name);
 		fsm_event(((struct ctc_priv *) dev->priv)->fsm,
 			  DEV_EVENT_TXDOWN, dev);
 		ch_action_restart(fi, event, arg);
 	} else {
 		struct sk_buff *skb;
 
-		printk(KERN_DEBUG "%s: TX retry %d\n", dev->name, ch->retry);
+		ctc_pr_debug("%s: TX retry %d\n", dev->name, ch->retry);
 		if ((skb = skb_peek(&ch->io_queue))) {
 			int rc = 0;
 
 			clear_normalized_cda(&ch->ccw[4]);
 			ch->ccw[4].count = skb->len;
 			if (set_normalized_cda(&ch->ccw[4], skb->data)) {
-				printk(KERN_DEBUG "%s: IDAL alloc failed, "
-				       "restarting channel\n", dev->name);
+				ctc_pr_debug(
+					"%s: IDAL alloc failed, chan restart\n",
+					dev->name);
 				fsm_event(((struct ctc_priv *) dev->priv)->fsm,
 					  DEV_EVENT_TXDOWN, dev);
 				ch_action_restart(fi, event, arg);
@@ -1555,7 +1657,7 @@ ch_action_txretry(fsm_instance * fi, int event, void *arg)
 						       saveflags);
 			if (rc != 0) {
 				fsm_deltimer(&ch->timer);
-				ccw_check_return_code(ch, rc);
+				ccw_check_return_code(ch, rc, "TX in ch_action_txretry");
 				ctc_purge_skb_queue(&ch->io_queue);
 			}
 		}
@@ -1578,12 +1680,12 @@ ch_action_iofatal(fsm_instance * fi, int event, void *arg)
 
 	fsm_deltimer(&ch->timer);
 	if (CHANNEL_DIRECTION(ch->flags) == READ) {
-		printk(KERN_DEBUG "%s: RX I/O error\n", dev->name);
+		ctc_pr_debug("%s: RX I/O error\n", dev->name);
 		fsm_newstate(fi, CH_STATE_RXERR);
 		fsm_event(((struct ctc_priv *) dev->priv)->fsm,
 			  DEV_EVENT_RXDOWN, dev);
 	} else {
-		printk(KERN_DEBUG "%s: TX I/O error\n", dev->name);
+		ctc_pr_debug("%s: TX I/O error\n", dev->name);
 		fsm_newstate(fi, CH_STATE_TXERR);
 		fsm_event(((struct ctc_priv *) dev->priv)->fsm,
 			  DEV_EVENT_TXDOWN, dev);
@@ -1606,109 +1708,109 @@ ch_action_reinit(fsm_instance *fi, int event, void *arg)
  * The statemachine for a channel.
  */
 static const fsm_node ch_fsm[] = {
-	{CH_STATE_STOPPED, CH_EVENT_STOP, fsm_action_nop},
-	{CH_STATE_STOPPED, CH_EVENT_START, ch_action_start},
-	{CH_STATE_STOPPED, CH_EVENT_FINSTAT, fsm_action_nop},
-	{CH_STATE_STOPPED, CH_EVENT_MC_FAIL, fsm_action_nop},
+	{CH_STATE_STOPPED,    CH_EVENT_STOP,       fsm_action_nop       },
+	{CH_STATE_STOPPED,    CH_EVENT_START,      ch_action_start      },
+	{CH_STATE_STOPPED,    CH_EVENT_FINSTAT,    fsm_action_nop       },
+	{CH_STATE_STOPPED,    CH_EVENT_MC_FAIL,    fsm_action_nop       },
 
-	{CH_STATE_NOTOP, CH_EVENT_STOP, ch_action_stop},
-	{CH_STATE_NOTOP, CH_EVENT_START, fsm_action_nop},
-	{CH_STATE_NOTOP, CH_EVENT_FINSTAT, fsm_action_nop},
-	{CH_STATE_NOTOP, CH_EVENT_MC_FAIL, fsm_action_nop},
-	{CH_STATE_NOTOP, CH_EVENT_MC_GOOD, ch_action_start},
+	{CH_STATE_NOTOP,      CH_EVENT_STOP,       ch_action_stop       },
+	{CH_STATE_NOTOP,      CH_EVENT_START,      fsm_action_nop       },
+	{CH_STATE_NOTOP,      CH_EVENT_FINSTAT,    fsm_action_nop       },
+	{CH_STATE_NOTOP,      CH_EVENT_MC_FAIL,    fsm_action_nop       },
+	{CH_STATE_NOTOP,      CH_EVENT_MC_GOOD,    ch_action_start      },
 
-	{CH_STATE_STARTWAIT, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_STARTWAIT, CH_EVENT_START, fsm_action_nop},
-	{CH_STATE_STARTWAIT, CH_EVENT_FINSTAT, ch_action_setmode},
-	{CH_STATE_STARTWAIT, CH_EVENT_TIMER, ch_action_setuperr},
-	{CH_STATE_STARTWAIT, CH_EVENT_IO_ENODEV, ch_action_iofatal},
-	{CH_STATE_STARTWAIT, CH_EVENT_IO_EIO, ch_action_reinit},
-	{CH_STATE_STARTWAIT, CH_EVENT_MC_FAIL, ch_action_fail},
+	{CH_STATE_STARTWAIT,  CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_STARTWAIT,  CH_EVENT_START,      fsm_action_nop       },
+	{CH_STATE_STARTWAIT,  CH_EVENT_FINSTAT,    ch_action_setmode    },
+	{CH_STATE_STARTWAIT,  CH_EVENT_TIMER,      ch_action_setuperr   },
+	{CH_STATE_STARTWAIT,  CH_EVENT_IO_ENODEV,  ch_action_iofatal    },
+	{CH_STATE_STARTWAIT,  CH_EVENT_IO_EIO,     ch_action_reinit     },
+	{CH_STATE_STARTWAIT,  CH_EVENT_MC_FAIL,    ch_action_fail       },
 
-	{CH_STATE_STARTRETRY, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_STARTRETRY, CH_EVENT_TIMER, ch_action_setmode},
-	{CH_STATE_STARTRETRY, CH_EVENT_FINSTAT, fsm_action_nop},
-	{CH_STATE_STARTRETRY, CH_EVENT_MC_FAIL, ch_action_fail},
+	{CH_STATE_STARTRETRY, CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_STARTRETRY, CH_EVENT_TIMER,      ch_action_setmode    },
+	{CH_STATE_STARTRETRY, CH_EVENT_FINSTAT,    fsm_action_nop       },
+	{CH_STATE_STARTRETRY, CH_EVENT_MC_FAIL,    ch_action_fail       },
 
-	{CH_STATE_SETUPWAIT, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_SETUPWAIT, CH_EVENT_START, fsm_action_nop},
-	{CH_STATE_SETUPWAIT, CH_EVENT_FINSTAT, ch_action_firstio},
-	{CH_STATE_SETUPWAIT, CH_EVENT_UC_RCRESET, ch_action_setuperr},
-	{CH_STATE_SETUPWAIT, CH_EVENT_UC_RSRESET, ch_action_setuperr},
-	{CH_STATE_SETUPWAIT, CH_EVENT_TIMER, ch_action_setmode},
-	{CH_STATE_SETUPWAIT, CH_EVENT_IO_ENODEV, ch_action_iofatal},
-	{CH_STATE_SETUPWAIT, CH_EVENT_IO_EIO, ch_action_reinit},
-	{CH_STATE_SETUPWAIT, CH_EVENT_MC_FAIL, ch_action_fail},
+	{CH_STATE_SETUPWAIT,  CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_SETUPWAIT,  CH_EVENT_START,      fsm_action_nop       },
+	{CH_STATE_SETUPWAIT,  CH_EVENT_FINSTAT,    ch_action_firstio    },
+	{CH_STATE_SETUPWAIT,  CH_EVENT_UC_RCRESET, ch_action_setuperr   },
+	{CH_STATE_SETUPWAIT,  CH_EVENT_UC_RSRESET, ch_action_setuperr   },
+	{CH_STATE_SETUPWAIT,  CH_EVENT_TIMER,      ch_action_setmode    },
+	{CH_STATE_SETUPWAIT,  CH_EVENT_IO_ENODEV,  ch_action_iofatal    },
+	{CH_STATE_SETUPWAIT,  CH_EVENT_IO_EIO,     ch_action_reinit     },
+	{CH_STATE_SETUPWAIT,  CH_EVENT_MC_FAIL,    ch_action_fail       },
 
-	{CH_STATE_RXINIT, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_RXINIT, CH_EVENT_START, fsm_action_nop},
-	{CH_STATE_RXINIT, CH_EVENT_FINSTAT, ch_action_rxidle},
-	{CH_STATE_RXINIT, CH_EVENT_UC_RCRESET, ch_action_rxiniterr},
-	{CH_STATE_RXINIT, CH_EVENT_UC_RSRESET, ch_action_rxiniterr},
-	{CH_STATE_RXINIT, CH_EVENT_TIMER, ch_action_rxiniterr},
-	{CH_STATE_RXINIT, CH_EVENT_ATTNBUSY, ch_action_rxinitfail},
-	{CH_STATE_RXINIT, CH_EVENT_IO_ENODEV, ch_action_iofatal},
-	{CH_STATE_RXINIT, CH_EVENT_IO_EIO, ch_action_reinit},
-	{CH_STATE_RXINIT, CH_EVENT_UC_ZERO, ch_action_firstio},
-	{CH_STATE_RXINIT, CH_EVENT_MC_FAIL, ch_action_fail},
+	{CH_STATE_RXINIT,     CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_RXINIT,     CH_EVENT_START,      fsm_action_nop       },
+	{CH_STATE_RXINIT,     CH_EVENT_FINSTAT,    ch_action_rxidle     },
+	{CH_STATE_RXINIT,     CH_EVENT_UC_RCRESET, ch_action_rxiniterr  },
+	{CH_STATE_RXINIT,     CH_EVENT_UC_RSRESET, ch_action_rxiniterr  },
+	{CH_STATE_RXINIT,     CH_EVENT_TIMER,      ch_action_rxiniterr  },
+	{CH_STATE_RXINIT,     CH_EVENT_ATTNBUSY,   ch_action_rxinitfail },
+	{CH_STATE_RXINIT,     CH_EVENT_IO_ENODEV,  ch_action_iofatal    },
+	{CH_STATE_RXINIT,     CH_EVENT_IO_EIO,     ch_action_reinit     },
+	{CH_STATE_RXINIT,     CH_EVENT_UC_ZERO,    ch_action_firstio    },
+	{CH_STATE_RXINIT,     CH_EVENT_MC_FAIL,    ch_action_fail       },
 
-	{CH_STATE_RXIDLE, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_RXIDLE, CH_EVENT_START, fsm_action_nop},
-	{CH_STATE_RXIDLE, CH_EVENT_FINSTAT, ch_action_rx},
-	{CH_STATE_RXIDLE, CH_EVENT_UC_RCRESET, ch_action_rxdisc},
-//      { CH_STATE_RXIDLE,     CH_EVENT_UC_RSRESET, ch_action_rxretry    },
-	{CH_STATE_RXIDLE, CH_EVENT_IO_ENODEV, ch_action_iofatal},
-	{CH_STATE_RXIDLE, CH_EVENT_IO_EIO, ch_action_reinit},
-	{CH_STATE_RXIDLE, CH_EVENT_MC_FAIL, ch_action_fail},
-	{CH_STATE_RXIDLE, CH_EVENT_UC_ZERO, ch_action_rx},
+	{CH_STATE_RXIDLE,     CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_RXIDLE,     CH_EVENT_START,      fsm_action_nop       },
+	{CH_STATE_RXIDLE,     CH_EVENT_FINSTAT,    ch_action_rx         },
+	{CH_STATE_RXIDLE,     CH_EVENT_UC_RCRESET, ch_action_rxdisc     },
+//      {CH_STATE_RXIDLE,     CH_EVENT_UC_RSRESET, ch_action_rxretry    },
+	{CH_STATE_RXIDLE,     CH_EVENT_IO_ENODEV,  ch_action_iofatal    },
+	{CH_STATE_RXIDLE,     CH_EVENT_IO_EIO,     ch_action_reinit     },
+	{CH_STATE_RXIDLE,     CH_EVENT_MC_FAIL,    ch_action_fail       },
+	{CH_STATE_RXIDLE,     CH_EVENT_UC_ZERO,    ch_action_rx         },
 
-	{CH_STATE_TXINIT, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_TXINIT, CH_EVENT_START, fsm_action_nop},
-	{CH_STATE_TXINIT, CH_EVENT_FINSTAT, ch_action_txidle},
-	{CH_STATE_TXINIT, CH_EVENT_UC_RCRESET, ch_action_txiniterr},
-	{CH_STATE_TXINIT, CH_EVENT_UC_RSRESET, ch_action_txiniterr},
-	{CH_STATE_TXINIT, CH_EVENT_TIMER, ch_action_txiniterr},
-	{CH_STATE_TXINIT, CH_EVENT_IO_ENODEV, ch_action_iofatal},
-	{CH_STATE_TXINIT, CH_EVENT_IO_EIO, ch_action_reinit},
-	{CH_STATE_TXINIT, CH_EVENT_MC_FAIL, ch_action_fail},
+	{CH_STATE_TXINIT,     CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_TXINIT,     CH_EVENT_START,      fsm_action_nop       },
+	{CH_STATE_TXINIT,     CH_EVENT_FINSTAT,    ch_action_txidle     },
+	{CH_STATE_TXINIT,     CH_EVENT_UC_RCRESET, ch_action_txiniterr  },
+	{CH_STATE_TXINIT,     CH_EVENT_UC_RSRESET, ch_action_txiniterr  },
+	{CH_STATE_TXINIT,     CH_EVENT_TIMER,      ch_action_txiniterr  },
+	{CH_STATE_TXINIT,     CH_EVENT_IO_ENODEV,  ch_action_iofatal    },
+	{CH_STATE_TXINIT,     CH_EVENT_IO_EIO,     ch_action_reinit     },
+	{CH_STATE_TXINIT,     CH_EVENT_MC_FAIL,    ch_action_fail       },
 
-	{CH_STATE_TXIDLE, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_TXIDLE, CH_EVENT_START, fsm_action_nop},
-	{CH_STATE_TXIDLE, CH_EVENT_FINSTAT, ch_action_firstio},
-	{CH_STATE_TXIDLE, CH_EVENT_UC_RCRESET, fsm_action_nop},
-	{CH_STATE_TXIDLE, CH_EVENT_UC_RSRESET, fsm_action_nop},
-	{CH_STATE_TXIDLE, CH_EVENT_IO_ENODEV, ch_action_iofatal},
-	{CH_STATE_TXIDLE, CH_EVENT_IO_EIO, ch_action_reinit},
-	{CH_STATE_TXIDLE, CH_EVENT_MC_FAIL, ch_action_fail},
+	{CH_STATE_TXIDLE,     CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_TXIDLE,     CH_EVENT_START,      fsm_action_nop       },
+	{CH_STATE_TXIDLE,     CH_EVENT_FINSTAT,    ch_action_firstio    },
+	{CH_STATE_TXIDLE,     CH_EVENT_UC_RCRESET, fsm_action_nop       },
+	{CH_STATE_TXIDLE,     CH_EVENT_UC_RSRESET, fsm_action_nop       },
+	{CH_STATE_TXIDLE,     CH_EVENT_IO_ENODEV,  ch_action_iofatal    },
+	{CH_STATE_TXIDLE,     CH_EVENT_IO_EIO,     ch_action_reinit     },
+	{CH_STATE_TXIDLE,     CH_EVENT_MC_FAIL,    ch_action_fail       },
 
-	{CH_STATE_TERM, CH_EVENT_STOP, fsm_action_nop},
-	{CH_STATE_TERM, CH_EVENT_START, ch_action_restart},
-	{CH_STATE_TERM, CH_EVENT_FINSTAT, ch_action_stopped},
-	{CH_STATE_TERM, CH_EVENT_UC_RCRESET, fsm_action_nop},
-	{CH_STATE_TERM, CH_EVENT_UC_RSRESET, fsm_action_nop},
-	{CH_STATE_TERM, CH_EVENT_MC_FAIL, ch_action_fail},
+	{CH_STATE_TERM,       CH_EVENT_STOP,       fsm_action_nop       },
+	{CH_STATE_TERM,       CH_EVENT_START,      ch_action_restart    },
+	{CH_STATE_TERM,       CH_EVENT_FINSTAT,    ch_action_stopped    },
+	{CH_STATE_TERM,       CH_EVENT_UC_RCRESET, fsm_action_nop       },
+	{CH_STATE_TERM,       CH_EVENT_UC_RSRESET, fsm_action_nop       },
+	{CH_STATE_TERM,       CH_EVENT_MC_FAIL,    ch_action_fail       },
 
-	{CH_STATE_DTERM, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_DTERM, CH_EVENT_START, ch_action_restart},
-	{CH_STATE_DTERM, CH_EVENT_FINSTAT, ch_action_setmode},
-	{CH_STATE_DTERM, CH_EVENT_UC_RCRESET, fsm_action_nop},
-	{CH_STATE_DTERM, CH_EVENT_UC_RSRESET, fsm_action_nop},
-	{CH_STATE_DTERM, CH_EVENT_MC_FAIL, ch_action_fail},
+	{CH_STATE_DTERM,      CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_DTERM,      CH_EVENT_START,      ch_action_restart    },
+	{CH_STATE_DTERM,      CH_EVENT_FINSTAT,    ch_action_setmode    },
+	{CH_STATE_DTERM,      CH_EVENT_UC_RCRESET, fsm_action_nop       },
+	{CH_STATE_DTERM,      CH_EVENT_UC_RSRESET, fsm_action_nop       },
+	{CH_STATE_DTERM,      CH_EVENT_MC_FAIL,    ch_action_fail       },
 
-	{CH_STATE_TX, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_TX, CH_EVENT_START, fsm_action_nop},
-	{CH_STATE_TX, CH_EVENT_FINSTAT, ch_action_txdone},
-	{CH_STATE_TX, CH_EVENT_UC_RCRESET, ch_action_txretry},
-	{CH_STATE_TX, CH_EVENT_UC_RSRESET, ch_action_txretry},
-	{CH_STATE_TX, CH_EVENT_TIMER, ch_action_txretry},
-	{CH_STATE_TX, CH_EVENT_IO_ENODEV, ch_action_iofatal},
-	{CH_STATE_TX, CH_EVENT_IO_EIO, ch_action_reinit},
-	{CH_STATE_TX, CH_EVENT_MC_FAIL, ch_action_fail},
+	{CH_STATE_TX,         CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_TX,         CH_EVENT_START,      fsm_action_nop       },
+	{CH_STATE_TX,         CH_EVENT_FINSTAT,    ch_action_txdone     },
+	{CH_STATE_TX,         CH_EVENT_UC_RCRESET, ch_action_txretry    },
+	{CH_STATE_TX,         CH_EVENT_UC_RSRESET, ch_action_txretry    },
+	{CH_STATE_TX,         CH_EVENT_TIMER,      ch_action_txretry    },
+	{CH_STATE_TX,         CH_EVENT_IO_ENODEV,  ch_action_iofatal    },
+	{CH_STATE_TX,         CH_EVENT_IO_EIO,     ch_action_reinit     },
+	{CH_STATE_TX,         CH_EVENT_MC_FAIL,    ch_action_fail       },
 
-	{CH_STATE_RXERR, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_TXERR, CH_EVENT_STOP, ch_action_haltio},
-	{CH_STATE_TXERR, CH_EVENT_MC_FAIL, ch_action_fail},
-	{CH_STATE_RXERR, CH_EVENT_MC_FAIL, ch_action_fail},
+	{CH_STATE_RXERR,      CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_TXERR,      CH_EVENT_STOP,       ch_action_haltio     },
+	{CH_STATE_TXERR,      CH_EVENT_MC_FAIL,    ch_action_fail       },
+	{CH_STATE_RXERR,      CH_EVENT_MC_FAIL,    ch_action_fail       },
 };
 
 static const int CH_FSM_LEN = sizeof (ch_fsm) / sizeof (fsm_node);
@@ -1720,16 +1822,16 @@ static const int CH_FSM_LEN = sizeof (ch_fsm) / sizeof (fsm_node);
 static inline int
 less_than(char *id1, char *id2)
 {
-	int dev1,dev2,i;
+	int dev1, dev2, i;
 
-	for (i=0;i<5;i++) {
+	for (i = 0; i < 5; i++) {
 		id1++;
 		id2++;
 	}
 	dev1 = simple_strtoul(id1, &id1, 16);
 	dev2 = simple_strtoul(id2, &id2, 16);
 	
-	return (dev1<dev2);
+	return (dev1 < dev2);
 }
 
 /**
@@ -1750,14 +1852,14 @@ add_channel(struct ccw_device *cdev, enum channel_types type)
 	if ((ch =
 	     (struct channel *) kmalloc(sizeof (struct channel),
 					GFP_KERNEL)) == NULL) {
-		printk(KERN_WARNING "ctc: Out of memory in add_channel\n");
+		ctc_pr_warn("ctc: Out of memory in add_channel\n");
 		return -1;
 	}
 	memset(ch, 0, sizeof (struct channel));
 	if ((ch->ccw = (struct ccw1 *) kmalloc(sizeof (struct ccw1) * 8,
 					       GFP_KERNEL | GFP_DMA)) == NULL) {
 		kfree(ch);
-		printk(KERN_WARNING "ctc: Out of memory in add_channel\n");
+		ctc_pr_warn("ctc: Out of memory in add_channel\n");
 		return -1;
 	}
 
@@ -1793,19 +1895,19 @@ add_channel(struct ccw_device *cdev, enum channel_types type)
 	ch->cdev = cdev;
 	snprintf(ch->id, CTC_ID_SIZE, "ch-%s", cdev->dev.bus_id);
 	ch->type = type;
+	loglevel = CTC_LOGLEVEL_DEFAULT;
 	ch->fsm = init_fsm(ch->id, ch_state_names,
 			   ch_event_names, NR_CH_STATES, NR_CH_EVENTS,
 			   ch_fsm, CH_FSM_LEN, GFP_KERNEL);
 	if (ch->fsm == NULL) {
-		printk(KERN_WARNING
-		       "ctc: Could not create FSM in add_channel\n");
+		ctc_pr_warn("ctc: Could not create FSM in add_channel\n");
 		kfree(ch);
 		return -1;
 	}
 	fsm_newstate(ch->fsm, CH_STATE_IDLE);
 	if ((ch->irb = (struct irb *) kmalloc(sizeof (struct irb),
 					      GFP_KERNEL)) == NULL) {
-		printk(KERN_WARNING "ctc: Out of memory in add_channel\n");
+		ctc_pr_warn("ctc: Out of memory in add_channel\n");
 		kfree_fsm(ch->fsm);
 		kfree(ch);
 		return -1;
@@ -1814,9 +1916,9 @@ add_channel(struct ccw_device *cdev, enum channel_types type)
 	while (*c && less_than((*c)->id, ch->id))
 		c = &(*c)->next;
 	if (!strncmp((*c)->id, ch->id, CTC_ID_SIZE)) {
-		printk(KERN_DEBUG
-		       "ctc: add_channel: device %s already in list, "
-		       "using old entry\n", (*c)->id);
+		ctc_pr_debug(
+			"ctc: add_channel: device %s already in list, "
+			"using old entry\n", (*c)->id);
 		kfree(ch->irb);
 		kfree_fsm(ch->fsm);
 		kfree(ch);
@@ -1888,20 +1990,26 @@ channel_get(enum channel_types type, char *id, int direction)
 {
 	struct channel *ch = channels;
 
-	pr_debug("ctc: %s(): searching for ch with id %d and type %d\n",
-		 __FUNCTION__, id, type);
+#ifdef DEBUG
+	ctc_pr_debug("ctc: %s(): searching for ch with id %s and type %d\n",
+		     __func__, id, type);
+#endif
 
 	while (ch && ((strncmp(ch->id, id, CTC_ID_SIZE)) || (ch->type != type))) {
-		pr_debug("ctc: %s(): ch=0x%p (id=%s, type=%d\n",
-			 __FUNCTION__, ch, ch->id, ch->type);
+#ifdef DEBUG
+		ctc_pr_debug("ctc: %s(): ch=0x%p (id=%s, type=%d\n",
+			     __func__, ch, ch->id, ch->type);
+#endif
 		ch = ch->next;
 	}
-	pr_debug("ctc: %s(): ch=0x%pq (id=%s, type=%d\n",
-		 __FUNCTION__, ch, ch->id, ch->type);
+#ifdef DEBUG
+	ctc_pr_debug("ctc: %s(): ch=0x%pq (id=%s, type=%d\n",
+		     __func__, ch, ch->id, ch->type);
+#endif
 	if (!ch) {
-		printk(KERN_WARNING "ctc: %s(): channel with id %s "
-		       "and type %d not found in channel list\n",
-		       __FUNCTION__, id, type);
+		ctc_pr_warn("ctc: %s(): channel with id %s "
+			    "and type %d not found in channel list\n",
+			    __func__, id, type);
 	} else {
 		if (ch->flags & CHANNEL_FLAGS_INUSE)
 			ch = NULL;
@@ -1953,10 +2061,9 @@ ctc_irq_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 
 	/* Check for unsolicited interrupts. */
 	if (!cdev->dev.driver_data) {
-		printk(KERN_WARNING
-		       "ctc: Got unsolicited irq: %s c-%02x d-%02x\n",
-		       cdev->dev.bus_id, irb->scsw.cstat,
-		       irb->scsw.dstat);
+		ctc_pr_warn("ctc: Got unsolicited irq: %s c-%02x d-%02x\n",
+			    cdev->dev.bus_id, irb->scsw.cstat,
+			    irb->scsw.dstat);
 		return;
 	}
 	
@@ -1968,22 +2075,22 @@ ctc_irq_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	else if (priv->channel[WRITE]->cdev == cdev)
 		ch = priv->channel[WRITE];
 	else {
-		printk(KERN_ERR
-		       "ctc: Can't determine channel for interrupt, "
-		       "device %s\n", cdev->dev.bus_id);
+		ctc_pr_err("ctc: Can't determine channel for interrupt, "
+			   "device %s\n", cdev->dev.bus_id);
 		return;
 	}
 	
 	dev = (struct net_device *) (ch->netdev);
 	if (dev == NULL) {
-		printk(KERN_CRIT
-		       "ctc: ctc_irq_handler dev = NULL bus_id=%s, ch=0x%p\n",
-		       cdev->dev.bus_id, ch);
+		ctc_pr_crit("ctc: ctc_irq_handler dev=NULL bus_id=%s, ch=0x%p\n",
+			    cdev->dev.bus_id, ch);
 		return;
 	}
 
-	pr_debug("%s: interrupt for device: %s received c-%02x d-%02x\n"
-		 dev->name, ch->id, irb->scsw.cstat, irb->scsw.dstat);
+#ifdef DEBUG
+	ctc_pr_debug("%s: interrupt for device: %s received c-%02x d-%02x\n",
+		     dev->name, ch->id, irb->scsw.cstat, irb->scsw.dstat);
+#endif
 
 	/* Copy interruption response block. */
 	memcpy(ch->irb, irb, sizeof(struct irb));
@@ -1991,10 +2098,9 @@ ctc_irq_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 	/* Check for good subchannel return code, otherwise error message */
 	if (ch->irb->scsw.cstat) {
 		fsm_event(ch->fsm, CH_EVENT_SC_UNKNOWN, ch);
-		printk(KERN_WARNING
-		       "%s: subchannel check for device: %s - %02x %02x\n",
-		       dev->name, ch->id, ch->irb->scsw.cstat,
-		       ch->irb->scsw.dstat);
+		ctc_pr_warn("%s: subchannel check for device: %s - %02x %02x\n",
+			    dev->name, ch->id, ch->irb->scsw.cstat,
+			    ch->irb->scsw.dstat);
 		return;
 	}
 
@@ -2076,7 +2182,7 @@ dev_action_restart(fsm_instance *fi, int event, void *arg)
 	struct net_device *dev = (struct net_device *)arg;
 	struct ctc_priv *privptr = dev->priv;
 	
-	printk(KERN_DEBUG "%s: Restarting\n", dev->name);
+	ctc_pr_debug("%s: Restarting\n", dev->name);
 	dev_action_stop(fi, event, arg);
 	fsm_event(privptr->fsm, DEV_EVENT_STOP, dev);
 	fsm_addtimer(&privptr->restart_timer, CTC_TIMEOUT_5SEC,
@@ -2098,40 +2204,40 @@ dev_action_chup(fsm_instance * fi, int event, void *arg)
 	struct ctc_priv *privptr = dev->priv;
 
 	switch (fsm_getstate(fi)) {
-	case DEV_STATE_STARTWAIT_RXTX:
-		if (event == DEV_EVENT_RXUP)
-			fsm_newstate(fi, DEV_STATE_STARTWAIT_TX);
-		else
-			fsm_newstate(fi, DEV_STATE_STARTWAIT_RX);
-		break;
-	case DEV_STATE_STARTWAIT_RX:
-		if (event == DEV_EVENT_RXUP) {
-			fsm_newstate(fi, DEV_STATE_RUNNING);
-			printk(KERN_INFO
-			       "%s: connected with remote side\n", dev->name);
-			if (privptr->protocol == CTC_PROTO_LINUX_TTY)
-				ctc_tty_setcarrier(dev, 1);
-			ctc_clear_busy(dev);
-		}
-		break;
-	case DEV_STATE_STARTWAIT_TX:
-		if (event == DEV_EVENT_TXUP) {
-			fsm_newstate(fi, DEV_STATE_RUNNING);
-			printk(KERN_INFO
-			       "%s: connected with remote side\n", dev->name);
-			if (privptr->protocol == CTC_PROTO_LINUX_TTY)
-				ctc_tty_setcarrier(dev, 1);
-			ctc_clear_busy(dev);
-		}
-		break;
-	case DEV_STATE_STOPWAIT_TX:
-		if (event == DEV_EVENT_RXUP)
-			fsm_newstate(fi, DEV_STATE_STOPWAIT_RXTX);
-		break;
-	case DEV_STATE_STOPWAIT_RX:
-		if (event == DEV_EVENT_TXUP)
-			fsm_newstate(fi, DEV_STATE_STOPWAIT_RXTX);
-		break;
+		case DEV_STATE_STARTWAIT_RXTX:
+			if (event == DEV_EVENT_RXUP)
+				fsm_newstate(fi, DEV_STATE_STARTWAIT_TX);
+			else
+				fsm_newstate(fi, DEV_STATE_STARTWAIT_RX);
+			break;
+		case DEV_STATE_STARTWAIT_RX:
+			if (event == DEV_EVENT_RXUP) {
+				fsm_newstate(fi, DEV_STATE_RUNNING);
+				ctc_pr_info("%s: connected with remote side\n",
+					    dev->name);
+				if (privptr->protocol == CTC_PROTO_LINUX_TTY)
+					ctc_tty_setcarrier(dev, 1);
+				ctc_clear_busy(dev);
+			}
+			break;
+		case DEV_STATE_STARTWAIT_TX:
+			if (event == DEV_EVENT_TXUP) {
+				fsm_newstate(fi, DEV_STATE_RUNNING);
+				ctc_pr_info("%s: connected with remote side\n",
+					    dev->name);
+				if (privptr->protocol == CTC_PROTO_LINUX_TTY)
+					ctc_tty_setcarrier(dev, 1);
+				ctc_clear_busy(dev);
+			}
+			break;
+		case DEV_STATE_STOPWAIT_TX:
+			if (event == DEV_EVENT_RXUP)
+				fsm_newstate(fi, DEV_STATE_STOPWAIT_RXTX);
+			break;
+		case DEV_STATE_STOPWAIT_RX:
+			if (event == DEV_EVENT_TXUP)
+				fsm_newstate(fi, DEV_STATE_STOPWAIT_RXTX);
+			break;
 	}
 }
 
@@ -2150,84 +2256,84 @@ dev_action_chdown(fsm_instance * fi, int event, void *arg)
 	struct ctc_priv *privptr = dev->priv;
 
 	switch (fsm_getstate(fi)) {
-	case DEV_STATE_RUNNING:
-		if (privptr->protocol == CTC_PROTO_LINUX_TTY)
-			ctc_tty_setcarrier(dev, 0);
-		if (event == DEV_EVENT_TXDOWN)
-			fsm_newstate(fi, DEV_STATE_STARTWAIT_TX);
-		else
-			fsm_newstate(fi, DEV_STATE_STARTWAIT_RX);
-		break;
-	case DEV_STATE_STARTWAIT_RX:
-		if (event == DEV_EVENT_TXDOWN)
-			fsm_newstate(fi, DEV_STATE_STARTWAIT_RXTX);
-		break;
-	case DEV_STATE_STARTWAIT_TX:
-		if (event == DEV_EVENT_RXDOWN)
-			fsm_newstate(fi, DEV_STATE_STARTWAIT_RXTX);
-		break;
-	case DEV_STATE_STOPWAIT_RXTX:
-		if (event == DEV_EVENT_TXDOWN)
-			fsm_newstate(fi, DEV_STATE_STOPWAIT_RX);
-		else
-			fsm_newstate(fi, DEV_STATE_STOPWAIT_TX);
-		break;
-	case DEV_STATE_STOPWAIT_RX:
-		if (event == DEV_EVENT_RXDOWN)
-			fsm_newstate(fi, DEV_STATE_STOPPED);
-		break;
-	case DEV_STATE_STOPWAIT_TX:
-		if (event == DEV_EVENT_TXDOWN)
-			fsm_newstate(fi, DEV_STATE_STOPPED);
-		break;
+		case DEV_STATE_RUNNING:
+			if (privptr->protocol == CTC_PROTO_LINUX_TTY)
+				ctc_tty_setcarrier(dev, 0);
+			if (event == DEV_EVENT_TXDOWN)
+				fsm_newstate(fi, DEV_STATE_STARTWAIT_TX);
+			else
+				fsm_newstate(fi, DEV_STATE_STARTWAIT_RX);
+			break;
+		case DEV_STATE_STARTWAIT_RX:
+			if (event == DEV_EVENT_TXDOWN)
+				fsm_newstate(fi, DEV_STATE_STARTWAIT_RXTX);
+			break;
+		case DEV_STATE_STARTWAIT_TX:
+			if (event == DEV_EVENT_RXDOWN)
+				fsm_newstate(fi, DEV_STATE_STARTWAIT_RXTX);
+			break;
+		case DEV_STATE_STOPWAIT_RXTX:
+			if (event == DEV_EVENT_TXDOWN)
+				fsm_newstate(fi, DEV_STATE_STOPWAIT_RX);
+			else
+				fsm_newstate(fi, DEV_STATE_STOPWAIT_TX);
+			break;
+		case DEV_STATE_STOPWAIT_RX:
+			if (event == DEV_EVENT_RXDOWN)
+				fsm_newstate(fi, DEV_STATE_STOPPED);
+			break;
+		case DEV_STATE_STOPWAIT_TX:
+			if (event == DEV_EVENT_TXDOWN)
+				fsm_newstate(fi, DEV_STATE_STOPPED);
+			break;
 	}
 }
 
 static const fsm_node dev_fsm[] = {
 	{DEV_STATE_STOPPED, DEV_EVENT_START, dev_action_start},
 
-	{DEV_STATE_STOPWAIT_RXTX, DEV_EVENT_START, dev_action_start},
-	{DEV_STATE_STOPWAIT_RXTX, DEV_EVENT_RXDOWN, dev_action_chdown},
-	{DEV_STATE_STOPWAIT_RXTX, DEV_EVENT_TXDOWN, dev_action_chdown},
- 	{DEV_STATE_STOPWAIT_RXTX, DEV_EVENT_RESTART, dev_action_restart },
+	{DEV_STATE_STOPWAIT_RXTX,  DEV_EVENT_START,   dev_action_start   },
+	{DEV_STATE_STOPWAIT_RXTX,  DEV_EVENT_RXDOWN,  dev_action_chdown  },
+	{DEV_STATE_STOPWAIT_RXTX,  DEV_EVENT_TXDOWN,  dev_action_chdown  },
+ 	{DEV_STATE_STOPWAIT_RXTX,  DEV_EVENT_RESTART, dev_action_restart },
 
-	{DEV_STATE_STOPWAIT_RX, DEV_EVENT_START, dev_action_start},
-	{DEV_STATE_STOPWAIT_RX, DEV_EVENT_RXUP, dev_action_chup},
-	{DEV_STATE_STOPWAIT_RX, DEV_EVENT_TXUP, dev_action_chup},
-	{DEV_STATE_STOPWAIT_RX, DEV_EVENT_RXDOWN, dev_action_chdown},
- 	{DEV_STATE_STOPWAIT_RX, DEV_EVENT_RESTART, dev_action_restart },
+	{DEV_STATE_STOPWAIT_RX,    DEV_EVENT_START,   dev_action_start   },
+	{DEV_STATE_STOPWAIT_RX,    DEV_EVENT_RXUP,    dev_action_chup    },
+	{DEV_STATE_STOPWAIT_RX,    DEV_EVENT_TXUP,    dev_action_chup    },
+	{DEV_STATE_STOPWAIT_RX,    DEV_EVENT_RXDOWN,  dev_action_chdown  },
+ 	{DEV_STATE_STOPWAIT_RX,    DEV_EVENT_RESTART, dev_action_restart },
 
-	{DEV_STATE_STOPWAIT_TX, DEV_EVENT_START, dev_action_start},
-	{DEV_STATE_STOPWAIT_TX, DEV_EVENT_RXUP, dev_action_chup},
-	{DEV_STATE_STOPWAIT_TX, DEV_EVENT_TXUP, dev_action_chup},
-	{DEV_STATE_STOPWAIT_TX, DEV_EVENT_TXDOWN, dev_action_chdown},
- 	{DEV_STATE_STOPWAIT_TX, DEV_EVENT_RESTART, dev_action_restart },
+	{DEV_STATE_STOPWAIT_TX,    DEV_EVENT_START,   dev_action_start   },
+	{DEV_STATE_STOPWAIT_TX,    DEV_EVENT_RXUP,    dev_action_chup    },
+	{DEV_STATE_STOPWAIT_TX,    DEV_EVENT_TXUP,    dev_action_chup    },
+	{DEV_STATE_STOPWAIT_TX,    DEV_EVENT_TXDOWN,  dev_action_chdown  },
+ 	{DEV_STATE_STOPWAIT_TX,    DEV_EVENT_RESTART, dev_action_restart },
 
-	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_STOP, dev_action_stop},
-	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_RXUP, dev_action_chup},
-	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_TXUP, dev_action_chup},
-	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_RXDOWN, dev_action_chdown},
-	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_TXDOWN, dev_action_chdown},
+	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_STOP,    dev_action_stop    },
+	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_RXUP,    dev_action_chup    },
+	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_TXUP,    dev_action_chup    },
+	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_RXDOWN,  dev_action_chdown  },
+	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_TXDOWN,  dev_action_chdown  },
  	{DEV_STATE_STARTWAIT_RXTX, DEV_EVENT_RESTART, dev_action_restart },
 
-	{DEV_STATE_STARTWAIT_TX, DEV_EVENT_STOP, dev_action_stop},
-	{DEV_STATE_STARTWAIT_TX, DEV_EVENT_RXUP, dev_action_chup},
-	{DEV_STATE_STARTWAIT_TX, DEV_EVENT_TXUP, dev_action_chup},
-	{DEV_STATE_STARTWAIT_TX, DEV_EVENT_RXDOWN, dev_action_chdown},
- 	{DEV_STATE_STARTWAIT_TX, DEV_EVENT_RESTART, dev_action_restart },
+	{DEV_STATE_STARTWAIT_TX,   DEV_EVENT_STOP,    dev_action_stop    },
+	{DEV_STATE_STARTWAIT_TX,   DEV_EVENT_RXUP,    dev_action_chup    },
+	{DEV_STATE_STARTWAIT_TX,   DEV_EVENT_TXUP,    dev_action_chup    },
+	{DEV_STATE_STARTWAIT_TX,   DEV_EVENT_RXDOWN,  dev_action_chdown  },
+ 	{DEV_STATE_STARTWAIT_TX,   DEV_EVENT_RESTART, dev_action_restart },
 
-	{DEV_STATE_STARTWAIT_RX, DEV_EVENT_STOP, dev_action_stop},
-	{DEV_STATE_STARTWAIT_RX, DEV_EVENT_RXUP, dev_action_chup},
-	{DEV_STATE_STARTWAIT_RX, DEV_EVENT_TXUP, dev_action_chup},
-	{DEV_STATE_STARTWAIT_RX, DEV_EVENT_TXDOWN, dev_action_chdown},
- 	{DEV_STATE_STARTWAIT_RX, DEV_EVENT_RESTART, dev_action_restart },
+	{DEV_STATE_STARTWAIT_RX,   DEV_EVENT_STOP,    dev_action_stop    },
+	{DEV_STATE_STARTWAIT_RX,   DEV_EVENT_RXUP,    dev_action_chup    },
+	{DEV_STATE_STARTWAIT_RX,   DEV_EVENT_TXUP,    dev_action_chup    },
+	{DEV_STATE_STARTWAIT_RX,   DEV_EVENT_TXDOWN,  dev_action_chdown  },
+ 	{DEV_STATE_STARTWAIT_RX,   DEV_EVENT_RESTART, dev_action_restart },
 
-	{DEV_STATE_RUNNING, DEV_EVENT_STOP, dev_action_stop},
-	{DEV_STATE_RUNNING, DEV_EVENT_RXDOWN, dev_action_chdown},
-	{DEV_STATE_RUNNING, DEV_EVENT_TXDOWN, dev_action_chdown},
-	{DEV_STATE_RUNNING, DEV_EVENT_TXUP, fsm_action_nop},
-	{DEV_STATE_RUNNING, DEV_EVENT_RXUP, fsm_action_nop},
- 	{DEV_STATE_RUNNING, DEV_EVENT_RESTART, dev_action_restart },
+	{DEV_STATE_RUNNING,        DEV_EVENT_STOP,    dev_action_stop    },
+	{DEV_STATE_RUNNING,        DEV_EVENT_RXDOWN,  dev_action_chdown  },
+	{DEV_STATE_RUNNING,        DEV_EVENT_TXDOWN,  dev_action_chdown  },
+	{DEV_STATE_RUNNING,        DEV_EVENT_TXUP,    fsm_action_nop     },
+	{DEV_STATE_RUNNING,        DEV_EVENT_RXUP,    fsm_action_nop     },
+ 	{DEV_STATE_RUNNING,        DEV_EVENT_RESTART, dev_action_restart },
 };
 
 static const int DEV_FSM_LEN = sizeof (dev_fsm) / sizeof (fsm_node);
@@ -2349,7 +2455,7 @@ transmit_skb(struct channel *ch, struct sk_buff *skb)
 			ch->prof.doios_single++;
 		if (rc != 0) {
 			fsm_deltimer(&ch->timer);
-			ccw_check_return_code(ch, rc);
+			ccw_check_return_code(ch, rc, "single skb TX");
 			if (ccw_idx == 3)
 				skb_dequeue_tail(&ch->io_queue);
 			/**
@@ -2426,14 +2532,13 @@ ctc_tx(struct sk_buff *skb, struct net_device * dev)
 	 * Some sanity checks ...
 	 */
 	if (skb == NULL) {
-		printk(KERN_WARNING "%s: NULL sk_buff passed\n", dev->name);
+		ctc_pr_warn("%s: NULL sk_buff passed\n", dev->name);
 		privptr->stats.tx_dropped++;
 		return 0;
 	}
 	if (skb_headroom(skb) < (LL_HEADER_LENGTH + 2)) {
-		printk(KERN_WARNING
-		       "%s: Got sk_buff with head room < %ld bytes\n",
-		       dev->name, LL_HEADER_LENGTH + 2);
+		ctc_pr_warn("%s: Got sk_buff with head room < %ld bytes\n",
+			    dev->name, LL_HEADER_LENGTH + 2);
 		dev_kfree_skb(skb);
 		privptr->stats.tx_dropped++;
 		return 0;
@@ -2505,8 +2610,6 @@ ctc_stats(struct net_device * dev)
 /*
  * sysfs attributes
  */
-#define CTRL_BUFSIZE 40
-
 static ssize_t
 buffer_show(struct device *dev, char *buf)
 {
@@ -2553,120 +2656,115 @@ buffer_write(struct device *dev, const char *buf, size_t count)
 
 }
 
+static ssize_t
+loglevel_show(struct device *dev, char *buf)
+{
+	struct ctc_priv *priv;
+
+	priv = dev->driver_data;
+	if (!priv)
+		return -ENODEV;
+	return sprintf(buf, "%d\n", loglevel);
+}
+
+static ssize_t
+loglevel_write(struct device *dev, const char *buf, size_t count)
+{
+	struct ctc_priv *priv;
+	int ll1;
+
+	priv = dev->driver_data;
+	if (!priv)
+		return -ENODEV;
+	sscanf(buf, "%i", &ll1);
+
+	if ((ll1 > CTC_LOGLEVEL_MAX) || (ll1 < 0))
+		return -EINVAL;
+	loglevel = ll1;
+	return count;
+}
+
+static void
+ctc_print_statistics(struct ctc_priv *priv)
+{
+	char *sbuf;
+	char *p;
+
+	if (!priv)
+		return;
+	sbuf = (char *)kmalloc(2048, GFP_KERNEL);
+	if (sbuf == NULL)
+		return;
+	p = sbuf;
+
+	p += sprintf(p, "  Device FSM state: %s\n",
+		     fsm_getstate_str(priv->fsm));
+	p += sprintf(p, "  RX channel FSM state: %s\n",
+		     fsm_getstate_str(priv->channel[READ]->fsm));
+	p += sprintf(p, "  TX channel FSM state: %s\n",
+		     fsm_getstate_str(priv->channel[WRITE]->fsm));
+	p += sprintf(p, "  Max. TX buffer used: %ld\n",
+		     priv->channel[WRITE]->prof.maxmulti);
+	p += sprintf(p, "  Max. chained SKBs: %ld\n",
+		     priv->channel[WRITE]->prof.maxcqueue);
+	p += sprintf(p, "  TX single write ops: %ld\n",
+		     priv->channel[WRITE]->prof.doios_single);
+	p += sprintf(p, "  TX multi write ops: %ld\n",
+		     priv->channel[WRITE]->prof.doios_multi);
+	p += sprintf(p, "  Netto bytes written: %ld\n",
+		     priv->channel[WRITE]->prof.txlen);
+	p += sprintf(p, "  Max. TX IO-time: %ld\n",
+		     priv->channel[WRITE]->prof.tx_time);
+
+	ctc_pr_debug("Statistics for %s:\n%s",
+		     priv->channel[WRITE]->netdev->name, sbuf);
+	kfree(sbuf);
+	return;
+}
+
+static ssize_t
+stats_show(struct device *dev, char *buf)
+{
+	struct ctc_priv *priv = dev->driver_data;
+	if (!priv)
+		return -ENODEV;
+	ctc_print_statistics(priv);
+	return sprintf(buf, "0\n");
+}
+
+static ssize_t
+stats_write(struct device *dev, const char *buf, size_t count)
+{
+	struct ctc_priv *priv = dev->driver_data;
+	if (!priv)
+		return -ENODEV;
+	/* Reset statistics */
+	memset(&priv->channel[WRITE]->prof, 0,
+			sizeof(priv->channel[WRITE]->prof));
+	return count;
+}
+
 static DEVICE_ATTR(buffer, 0644, buffer_show, buffer_write);
+static DEVICE_ATTR(loglevel, 0644, loglevel_show, loglevel_write);
+static DEVICE_ATTR(stats, 0644, stats_show, stats_write);
 
 static int
 ctc_add_attributes(struct device *dev)
 {
-	return device_create_file(dev, &dev_attr_buffer);
-
+	device_create_file(dev, &dev_attr_buffer);
+	device_create_file(dev, &dev_attr_loglevel);
+	device_create_file(dev, &dev_attr_stats);
+	return 0;
 }
 
 static void
 ctc_remove_attributes(struct device *dev)
 {
+	device_remove_file(dev, &dev_attr_stats);
+	device_remove_file(dev, &dev_attr_loglevel);
 	device_remove_file(dev, &dev_attr_buffer);
-
 }
 
-#if 0
-/* FIXME: This has to be converted to another interface, as we can only have one
- *        value per file and can't have atomicity then */
-#define STATS_BUFSIZE 2048
-
-static int
-ctc_stat_open(struct inode *inode, struct file *file)
-{
-	file->private_data = kmalloc(STATS_BUFSIZE, GFP_KERNEL);
-	if (file->private_data == NULL)
-		return -ENOMEM;
-	return 0;
-}
-
-static int
-ctc_stat_close(struct inode *inode, struct file *file)
-{
-	kfree(file->private_data);
-	return 0;
-}
-
-static ssize_t
-ctc_stat_write(struct file *file, const char *buf, size_t count, loff_t * off)
-{
-	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
-	struct net_device *dev;
-	struct ctc_priv *privptr;
-
-	if (!(dev = find_netdev_by_ino(pde)))
-		return -ENODEV;
-	privptr = (struct ctc_priv *) dev->priv;
-	privptr->channel[WRITE]->prof.maxmulti = 0;
-	privptr->channel[WRITE]->prof.maxcqueue = 0;
-	privptr->channel[WRITE]->prof.doios_single = 0;
-	privptr->channel[WRITE]->prof.doios_multi = 0;
-	privptr->channel[WRITE]->prof.txlen = 0;
-	privptr->channel[WRITE]->prof.tx_time = 0;
-	return count;
-}
-
-static ssize_t
-ctc_stat_read(struct file *file, char *buf, size_t count, loff_t * off)
-{
-	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
-	char *sbuf = (char *) file->private_data;
-	struct net_device *dev;
-	struct ctc_priv *privptr;
-	ssize_t ret = 0;
-	char *p = sbuf;
-	int l;
-
-	if (!(dev = find_netdev_by_ino(pde)))
-		return -ENODEV;
-	if (off != &file->f_pos)
-		return -ESPIPE;
-
-	privptr = (struct ctc_priv *) dev->priv;
-
-	if (file->f_pos == 0) {
-		p += sprintf(p, "Device FSM state: %s\n",
-			     fsm_getstate_str(privptr->fsm));
-		p += sprintf(p, "RX channel FSM state: %s\n",
-			     fsm_getstate_str(privptr->channel[READ]->fsm));
-		p += sprintf(p, "TX channel FSM state: %s\n",
-			     fsm_getstate_str(privptr->channel[WRITE]->fsm));
-		p += sprintf(p, "Max. TX buffer used: %ld\n",
-			     privptr->channel[WRITE]->prof.maxmulti);
-		p += sprintf(p, "Max. chained SKBs: %ld\n",
-			     privptr->channel[WRITE]->prof.maxcqueue);
-		p += sprintf(p, "TX single write ops: %ld\n",
-			     privptr->channel[WRITE]->prof.doios_single);
-		p += sprintf(p, "TX multi write ops: %ld\n",
-			     privptr->channel[WRITE]->prof.doios_multi);
-		p += sprintf(p, "Netto bytes written: %ld\n",
-			     privptr->channel[WRITE]->prof.txlen);
-		p += sprintf(p, "Max. TX IO-time: %ld\n",
-			     privptr->channel[WRITE]->prof.tx_time);
-	}
-	l = strlen(sbuf);
-	p = sbuf;
-	if (file->f_pos < l) {
-		p += file->f_pos;
-		l = strlen(p);
-		ret = (count > l) ? l : count;
-		if (copy_to_user(buf, p, ret))
-			return -EFAULT;
-	}
-	file->f_pos += ret;
-	return ret;
-}
-
-static struct file_operations ctc_stat_fops = {
-	.read    = ctc_stat_read,
-	.write   = ctc_stat_write,
-	.open    = ctc_stat_open,
-	.release = ctc_stat_close,
-};
-#endif
 
 static void
 ctc_netdev_unregister(struct net_device * dev)
@@ -2772,11 +2870,14 @@ ctc_proto_store(struct device *dev, const char *buf, size_t count)
 	struct ctc_priv *priv;
 	int value;
 
+	pr_debug("%s() called\n", __FUNCTION__);
+
 	priv = dev->driver_data;
 	if (!priv)
 		return -ENODEV;
 	sscanf(buf, "%u", &value);
-	/* TODO: sanity checks */
+	if ((value < 0) || (value > CTC_PROTO_MAX))
+		return -EINVAL;
 	priv->protocol = value;
 
 	return count;
@@ -2811,12 +2912,16 @@ static struct attribute_group ctc_attr_group = {
 static int
 ctc_add_files(struct device *dev)
 {
+	pr_debug("%s() called\n", __FUNCTION__);
+
 	return sysfs_create_group(&dev->kobj, &ctc_attr_group);
 }
 
 static void
 ctc_remove_files(struct device *dev)
 {
+	pr_debug("%s() called\n", __FUNCTION__);
+
 	sysfs_remove_group(&dev->kobj, &ctc_attr_group);
 }
 
@@ -2835,12 +2940,14 @@ ctc_probe_device(struct ccwgroup_device *cgdev)
 	struct ctc_priv *priv;
 	int rc;
 
+	pr_debug("%s() called\n", __FUNCTION__);
+
 	if (!get_device(&cgdev->dev))
 		return -ENODEV;
 
 	priv = kmalloc(sizeof (struct ctc_priv), GFP_KERNEL);
 	if (!priv) {
-		printk(KERN_ERR "%s: Out of memory\n", __func__);
+		ctc_pr_err("%s: Out of memory\n", __func__);
 		put_device(&cgdev->dev);
 		return -ENOMEM;
 	}
@@ -2879,6 +2986,9 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 	enum channel_types type;
 	struct ctc_priv *privptr;
 	struct net_device *dev;
+	int ret;
+
+	pr_debug("%s() called\n", __FUNCTION__);
 
 	privptr = cgdev->dev.driver_data;
 	if (!privptr)
@@ -2894,13 +3004,22 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 	if (add_channel(cgdev->cdev[1], type))
 		return -ENOMEM;
 
-	ccw_device_set_online(cgdev->cdev[0]);
-	ccw_device_set_online(cgdev->cdev[1]);	
+	ret = ccw_device_set_online(cgdev->cdev[0]);
+	if (ret != 0) {
+			printk(KERN_WARNING
+		 	"ccw_device_set_online (cdev[0]) failed with ret = %d\n", ret);
+	}
+
+	ret = ccw_device_set_online(cgdev->cdev[1]);
+	if (ret != 0) {
+			printk(KERN_WARNING
+		 	"ccw_device_set_online (cdev[1]) failed with ret = %d\n", ret);
+	}
 
 	dev = ctc_init_netdevice(NULL, 1, privptr);
 
 	if (!dev) {
-		printk(KERN_WARNING "ctc_init_netdevice failed\n");
+		ctc_pr_warn("ctc_init_netdevice failed\n");
 		goto out;
 	}
 
@@ -2928,6 +3047,22 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 		ctc_free_netdevice(dev, 1);
 		goto out;
 	}
+	/* Create symlinks. */
+	if (sysfs_create_link(&cgdev->dev.kobj, &dev->class_dev.kobj,
+			      dev->name)) {
+		ctc_netdev_unregister(dev);
+		dev->priv = 0;
+		ctc_free_netdevice(dev, 1);
+		goto out;
+	}
+	if (sysfs_create_link(&dev->class_dev.kobj, &cgdev->dev.kobj,
+			      cgdev->dev.bus_id)) {
+		sysfs_remove_link(&cgdev->dev.kobj, dev->name);
+		ctc_netdev_unregister(dev);
+		dev->priv = 0;
+		ctc_free_netdevice(dev, 1);
+		goto out;
+	}
 
 	ctc_add_attributes(&cgdev->dev);
 
@@ -2935,10 +3070,9 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 
 	print_banner();
 
-	printk(KERN_INFO
-	       "%s: read: %s, write: %s, proto: %d\n",
-	       dev->name, privptr->channel[READ]->id,
-	       privptr->channel[WRITE]->id, privptr->protocol);
+	ctc_pr_info("%s: read: %s, write: %s, proto: %d\n",
+		    dev->name, privptr->channel[READ]->id,
+		    privptr->channel[WRITE]->id, privptr->protocol);
 
 	return 0;
 out:
@@ -2962,32 +3096,48 @@ ctc_shutdown_device(struct ccwgroup_device *cgdev)
 	struct net_device *ndev;
 		
 
+	pr_debug("%s() called\n", __FUNCTION__);
+
 	priv = cgdev->dev.driver_data;
+	ndev = NULL;
 	if (!priv)
 		return -ENODEV;
-	ndev = priv->channel[READ]->netdev;
 
-	/* Close the device */
-	ctc_close(ndev);
-	ndev->flags &=~IFF_RUNNING;
+	if (priv->channel[READ]) {
+		ndev = priv->channel[READ]->netdev;
 
-	ctc_remove_attributes(&cgdev->dev);
+		/* Close the device */
+		ctc_close(ndev);
+		ndev->flags &=~IFF_RUNNING;
 
-	channel_free(priv->channel[READ]);
-	channel_free(priv->channel[WRITE]);
+		ctc_remove_attributes(&cgdev->dev);
 
-	ctc_netdev_unregister(ndev);
-	ndev->priv = NULL;
-	ctc_free_netdevice(ndev, 1);
+		channel_free(priv->channel[READ]);
+	}
+	if (priv->channel[WRITE])
+		channel_free(priv->channel[WRITE]);
 
-	kfree_fsm(priv->fsm);
+	if (ndev) {
+		sysfs_remove_link(&ndev->class_dev.kobj, cgdev->dev.bus_id);
+		sysfs_remove_link(&cgdev->dev.kobj, ndev->name);
+		ctc_netdev_unregister(ndev);
+		ndev->priv = NULL;
+		ctc_free_netdevice(ndev, 1);
+	}
+
+	if (priv->fsm)
+		kfree_fsm(priv->fsm);
 
 	ccw_device_set_offline(cgdev->cdev[1]);
 	ccw_device_set_offline(cgdev->cdev[0]);
 
-	channel_remove(priv->channel[READ]);
-	channel_remove(priv->channel[WRITE]);
+	if (priv->channel[READ])
+		channel_remove(priv->channel[READ]);
+	if (priv->channel[WRITE])
+		channel_remove(priv->channel[WRITE]);
 	
+	priv->channel[READ] = priv->channel[WRITE] = NULL;
+
 	return 0;
 
 }
@@ -2996,6 +3146,8 @@ static void
 ctc_remove_device(struct ccwgroup_device *cgdev)
 {
 	struct ctc_priv *priv;
+
+	pr_debug("%s() called\n", __FUNCTION__);
 
 	priv = cgdev->dev.driver_data;
 	if (!priv)
@@ -3033,7 +3185,7 @@ ctc_exit(void)
 {
 	unregister_cu3088_discipline(&ctc_group_driver);
 	ctc_tty_cleanup();
-	printk(KERN_INFO "CTC driver unloaded\n");
+	ctc_pr_info("CTC driver unloaded\n");
 }
 
 /**

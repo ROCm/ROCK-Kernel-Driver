@@ -147,6 +147,7 @@ dasd_ioctl_enable(struct block_device *bdev, int no, long args)
 
 /*
  * Disable device.
+ * Used by dasdfmt. Disable I/O operations but allow ioctls.
  */
 static int
 dasd_ioctl_disable(struct block_device *bdev, int no, long args)
@@ -167,6 +168,13 @@ dasd_ioctl_disable(struct block_device *bdev, int no, long args)
 	 * device is DASD_STATE_BASIC that allows to do basic i/o.
 	 */
 	dasd_set_target_state(device, DASD_STATE_BASIC);
+	/*
+	 * Set i_size to zero, since read, write, etc. check against this
+	 * value.
+	 */
+	down(&bdev->bd_sem);
+	i_size_write(bdev->bd_inode, 0);
+	up(&bdev->bd_sem);
 	return 0;
 }
 
@@ -237,9 +245,9 @@ dasd_format(struct dasd_device * device, struct format_data_t * fdata)
 	if (device->discipline->format_device == NULL)
 		return -EPERM;
 
-	if (atomic_read(&device->open_count) > 1) {
+	if (device->state != DASD_STATE_BASIC) {
 		DEV_MESSAGE(KERN_WARNING, device, "%s",
-			    "dasd_format: device is open! ");
+			    "dasd_format: device is not disabled! ");
 		return -EBUSY;
 	}
 

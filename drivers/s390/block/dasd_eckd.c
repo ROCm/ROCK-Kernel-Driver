@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.49 $
+ * $Revision: 1.50 $
  */
 
 #include <linux/config.h>
@@ -1420,6 +1420,9 @@ dasd_eckd_dump_sense(struct dasd_device *device, struct dasd_ccw_req * req,
 				       "Exception class %x\n",
 				       irb->ecw[6] & 0x0f, irb->ecw[22] >> 4);
 		}
+	} else {
+	        len += sprintf(page + len, KERN_ERR PRINTK_HEADER
+			       "SORRY - NO VALID SENSE AVAILABLE\n");
 	}
 
 	MESSAGE(KERN_ERR, "Sense data:\n%s", page);

@@ -4,11 +4,12 @@
  * 
  * FCP adapter driver for IBM eServer zSeries 
  * 
- * Copyright 2002 IBM Corporation 
+ * (C) Copyright IBM Corp. 2002, 2004
+ *
  * Author(s): Martin Peschke <mpeschke@de.ibm.com> 
  *            Raimund Schroeder <raimund.schroeder@de.ibm.com> 
- *            Aron Zeh <arzeh@de.ibm.com> 
- *            Wolfgang Taphorn <taphorn@de.ibm.com> 
+ *            Aron Zeh
+ *            Wolfgang Taphorn
  *            Stefan Bader <stefan.bader@de.ibm.com> 
  *            Heiko Carstens <heiko.carstens@de.ibm.com> 
  * 
@@ -28,11 +29,14 @@
  */
 
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
-#define ZFCP_LOG_AREA_PREFIX		ZFCP_LOG_AREA_PREFIX_ERP
+
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.39 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.44 $"
 
 #include "zfcp_ext.h"
+
+static int zfcp_els(struct zfcp_port *, u8);
+static int zfcp_els_handler(unsigned long);
 
 static int zfcp_erp_adapter_reopen_internal(struct zfcp_adapter *, int);
 static int zfcp_erp_port_forced_reopen_internal(struct zfcp_port *, int);
@@ -325,6 +329,375 @@ zfcp_erp_unit_shutdown(struct zfcp_unit *unit, int clear_mask)
 
 	return retval;
 }
+
+
+/*
+ * function:    zfcp_els
+ *
+ * purpose:     Originator of the ELS commands
+ *
+ * returns:     0       - Operation completed successfuly
+ *              -EINVAL - Unknown IOCTL command or invalid sense data record
+ *              -ENOMEM - Insufficient memory
+ *              -EPERM  - Cannot create or queue FSF request
+ */
+int
+zfcp_els(struct zfcp_port *port, u8 ls_code)
+{
+	struct zfcp_send_els *send_els;
+	struct zfcp_ls_rls *rls;
+	struct zfcp_ls_pdisc *pdisc;
+	struct zfcp_ls_adisc *adisc;
+	struct page *page = NULL;
+	void *req;
+	int retval = 0;
+
+	send_els = kmalloc(sizeof(struct zfcp_send_els), GFP_ATOMIC);
+	if (send_els == NULL)
+		goto nomem;
+
+	send_els->req = kmalloc(sizeof(struct scatterlist), GFP_ATOMIC);
+	if (send_els->req == NULL)
+		goto nomem;
+	send_els->req_count = 1;
+
+	send_els->resp = kmalloc(sizeof(struct scatterlist), GFP_ATOMIC);
+	if (send_els->resp == NULL)
+		goto nomem;
+	send_els->resp_count = 1;
+
+	page = alloc_pages(GFP_ATOMIC, 0);
+	if (page == NULL)
+		goto nomem;
+	send_els->req->page = page;
+	send_els->resp->page = page;
+	send_els->req->offset = 0;
+	send_els->resp->offset = PAGE_SIZE >> 1;
+
+	send_els->port = port;
+	send_els->ls_code = ls_code;
+	send_els->handler = zfcp_els_handler;
+	send_els->handler_data = (unsigned long)send_els;
+	send_els->completion = NULL;
+
+	req = zfcp_sg_to_address(send_els->req);
+
+	*(u32*)req = 0;
+	*(u8*)req = ls_code;
+
+	switch (ls_code) {
+
+	case ZFCP_LS_RTV:
+		send_els->req->length = sizeof(struct zfcp_ls_rtv);
+		send_els->resp->length = sizeof(struct zfcp_ls_rtv_acc);
+		ZFCP_LOG_NORMAL(
+			"RTV request from sid 0x%06x to did 0x%06x\n",
+			port->adapter->s_id, port->d_id);
+		break;
+
+	case ZFCP_LS_RLS:
+		send_els->req->length = sizeof(struct zfcp_ls_rls);
+		send_els->resp->length = sizeof(struct zfcp_ls_rls_acc);
+		rls = (struct zfcp_ls_rls*)req;
+		rls->port_id = port->adapter->s_id;
+		ZFCP_LOG_NORMAL(
+			"RLS request from sid 0x%06x to did 0x%06x "
+			"with payload(port_id=0x%06x)\n",
+			port->adapter->s_id, port->d_id, rls->port_id);
+		break;
+
+	case ZFCP_LS_PDISC:
+		send_els->req->length = sizeof(struct zfcp_ls_pdisc);
+		send_els->resp->length = sizeof(struct zfcp_ls_pdisc_acc);
+		pdisc = (struct zfcp_ls_pdisc*)req;
+		pdisc->wwpn = port->adapter->wwpn;
+		pdisc->wwnn = port->adapter->wwnn;
+		ZFCP_LOG_NORMAL(
+			"PDISC request from sid 0x%06x to did 0x%06x "
+			"with payload(wwpn=0x%016Lx wwnn=0x%016Lx)\n",
+			port->adapter->s_id, port->d_id,
+			pdisc->wwpn, pdisc->wwnn);
+		break;
+
+	case ZFCP_LS_ADISC:
+		send_els->req->length = sizeof(struct zfcp_ls_adisc);
+		send_els->resp->length = sizeof(struct zfcp_ls_adisc_acc);
+		adisc = (struct zfcp_ls_adisc*)req;
+		adisc->hard_nport_id = port->adapter->s_id;
+		adisc->wwpn = port->adapter->wwpn;
+		adisc->wwnn = port->adapter->wwnn;
+		adisc->nport_id = port->adapter->s_id;
+		ZFCP_LOG_NORMAL(
+			"ADISC request from sid 0x%06x to did 0x%06x "
+			"with payload(wwpn=0x%016Lx wwnn=0x%016Lx "
+			"hard_nport_id=0x%06x nport_id=0x%06x)\n",
+			port->adapter->s_id, port->d_id,
+			adisc->wwpn, adisc->wwnn,
+			adisc->hard_nport_id, adisc->nport_id);
+		break;
+
+	default:
+		ZFCP_LOG_NORMAL(
+			"ELS command code 0x%02x is not supported\n", ls_code);
+		retval = -EINVAL;
+		goto invalid_ls_code;
+	}
+
+	retval = zfcp_fsf_send_els(send_els);
+	if (retval != 0) {
+		ZFCP_LOG_NORMAL(
+			"ELS request could not be processed "
+			"(sid=0x%06x did=0x%06x)\n",
+			port->adapter->s_id, port->d_id);
+		retval = -EPERM;
+	}
+
+	goto out;
+
+nomem:
+	ZFCP_LOG_INFO("Out of memory!\n");
+	retval = -ENOMEM;
+
+invalid_ls_code:
+	if (page != NULL)
+		__free_pages(page, 0);
+	if (send_els != NULL) {
+		if (send_els->req != NULL)
+			kfree(send_els->req);
+		if (send_els->resp != NULL)
+			kfree(send_els->resp);
+		kfree(send_els);
+	}
+
+out:
+	return retval;
+}
+
+
+/*
+ * function:    zfcp_els_handler
+ *
+ * purpose:     Handler for all kind of ELSs
+ *
+ * returns:     0       - Operation completed successfuly
+ *              -ENXIO  - ELS has been rejected
+ *              -EPERM  - Port forced reopen failed
+ */
+int
+zfcp_els_handler(unsigned long data)
+{
+	struct zfcp_send_els *send_els = (struct zfcp_send_els*)data;
+	struct zfcp_port *port = send_els->port;
+	struct zfcp_ls_rjt *rjt;
+	struct zfcp_ls_rtv_acc *rtv;
+	struct zfcp_ls_rls_acc *rls;
+	struct zfcp_ls_pdisc_acc *pdisc;
+	struct zfcp_ls_adisc_acc *adisc;
+	void *req, *resp;
+	u8 req_code, resp_code;
+	int retval = 0;
+
+	if (send_els->status != 0)
+		goto skip_fsfstatus;
+
+	req = (void*)((page_to_pfn(send_els->req->page) << PAGE_SHIFT) + send_els->req->offset);
+	resp = (void*)((page_to_pfn(send_els->resp->page) << PAGE_SHIFT) + send_els->resp->offset);
+	req_code = *(u8*)req;
+	resp_code = *(u8*)resp;
+
+	switch (resp_code) {
+
+	case ZFCP_LS_RJT:
+		rjt = (struct zfcp_ls_rjt*)resp;
+
+		switch (rjt->reason_code) {
+
+		case ZFCP_LS_RJT_INVALID_COMMAND_CODE:
+			ZFCP_LOG_NORMAL(
+				"Invalid command code "
+				"(wwpn=0x%016Lx command=0x%02x)\n",
+				(unsigned long long)port->wwpn,
+				req_code);
+			break;
+
+		case ZFCP_LS_RJT_LOGICAL_ERROR:
+			ZFCP_LOG_NORMAL(
+				"Logical error "
+				"(wwpn=0x%016Lx reason_explanation=0x%02x)\n",
+				(unsigned long long)port->wwpn,
+				rjt->reason_expl);
+			break;
+
+		case ZFCP_LS_RJT_LOGICAL_BUSY:
+			ZFCP_LOG_NORMAL(
+				"Logical busy "
+				"(wwpn=0x%016Lx reason_explanation=0x%02x)\n",
+				(unsigned long long)port->wwpn,
+				rjt->reason_expl);
+			break;
+
+		case ZFCP_LS_RJT_PROTOCOL_ERROR:
+			ZFCP_LOG_NORMAL(
+				"Protocol error "
+				"(wwpn=0x%016Lx reason_explanation=0x%02x)\n",
+				(unsigned long long)port->wwpn,
+				rjt->reason_expl);
+			break;
+
+		case ZFCP_LS_RJT_UNABLE_TO_PERFORM:
+			ZFCP_LOG_NORMAL(
+				"Unable to perform command requested "
+				"(wwpn=0x%016Lx reason_explanation=0x%02x)\n",
+				(unsigned long long)port->wwpn,
+				rjt->reason_expl);
+			break;
+
+		case ZFCP_LS_RJT_COMMAND_NOT_SUPPORTED:
+			ZFCP_LOG_NORMAL(
+				"Command not supported "
+				"(wwpn=0x%016Lx command=0x%02x)\n",
+				(unsigned long long)port->wwpn,
+				req_code);
+			break;
+
+		case ZFCP_LS_RJT_VENDOR_UNIQUE_ERROR:
+			ZFCP_LOG_NORMAL(
+				"Vendor unique error "
+				"(wwpn=0x%016Lx vendor_unique=0x%02x)\n",
+				(unsigned long long)port->wwpn,
+				rjt->vendor_unique);
+			break;
+
+		default:
+			ZFCP_LOG_NORMAL(
+				"ELS has been rejected by remote port "
+				"with WWPN 0x%Lx on the adapter %s "
+				"with the reason code 0x%02x\n",
+				port->wwpn, zfcp_get_busid_by_port(port),
+				rjt->reason_code);
+		}
+		retval = -ENXIO;
+		break;
+
+	case ZFCP_LS_ACC:
+		switch (req_code) {
+
+		case ZFCP_LS_RTV:
+			rtv = (struct zfcp_ls_rtv_acc*)resp;
+			ZFCP_LOG_NORMAL(
+				"RTV response from did 0x%06x to sid 0x%06x "
+				"with payload(R_A_TOV=%ds E_D_TOV=%d%cs)\n",
+				port->d_id, port->adapter->s_id,
+				rtv->r_a_tov, rtv->e_d_tov,
+				rtv->qualifier & ZFCP_LS_RTV_E_D_TOV_FLAG ?
+					'n' : 'm');
+			break;
+
+		case ZFCP_LS_RLS:
+			rls = (struct zfcp_ls_rls_acc*)resp;
+			ZFCP_LOG_NORMAL(
+				"RLS response from did 0x%06x to sid 0x%06x "
+				"with payload(link_failure_count=%u "
+				"loss_of_sync_count=%u "
+				"loss_of_signal_count=%u "
+				"primitive_sequence_protocol_error=%u "
+				"invalid_transmition_word=%u "
+				"invalid_crc_count=%u)\n",
+				port->d_id, port->adapter->s_id,
+				rls->link_failure_count,
+				rls->loss_of_sync_count,
+				rls->loss_of_signal_count,
+				rls->prim_seq_prot_error,
+				rls->invalid_transmition_word,
+				rls->invalid_crc_count);
+			break;
+
+		case ZFCP_LS_PDISC:
+			pdisc = (struct zfcp_ls_pdisc_acc*)resp;
+			ZFCP_LOG_NORMAL(
+				"PDISC response from did 0x%06x to sid 0x%06x "
+				"with payload(wwpn=0x%016Lx wwnn=0x%016Lx "
+				"vendor='%-16s')\n",
+				port->d_id, port->adapter->s_id,
+				(unsigned long long)pdisc->wwpn,
+				(unsigned long long)pdisc->wwnn,
+				pdisc->vendor_version);
+			break;
+
+		case ZFCP_LS_ADISC:
+			adisc = (struct zfcp_ls_adisc_acc*)resp;
+			ZFCP_LOG_NORMAL(
+				"ADISC response from did 0x%06x to sid 0x%06x "
+				"with payload(wwpn=0x%016Lx wwnn=0x%016Lx "
+				"hard_nport_id=0x%06x nport_id=0x%06x)\n",
+				port->d_id, port->adapter->s_id,
+				(unsigned long long)adisc->wwpn,
+				(unsigned long long)adisc->wwnn,
+				adisc->hard_nport_id, adisc->nport_id);
+			/* FIXME: missing wwnn value in port struct */
+			if (port->wwnn == 0)
+				port->wwnn = adisc->wwnn;
+			break;
+		}
+		break;
+
+	default:
+		ZFCP_LOG_NORMAL(
+			"Unknown payload code 0x%02x received on a request "
+			"0x%02x from sid 0x%06x to did 0x%06x, "
+			"port needs to be reopened\n",
+			req_code, resp_code, port->adapter->s_id, port->d_id);
+		retval = zfcp_erp_port_forced_reopen(port, 0);
+		if (retval != 0) {
+			ZFCP_LOG_NORMAL(
+				"Cannot reopen a remote port "
+				"with WWPN 0x%Lx on the adapter %s\n",
+				port->wwpn, zfcp_get_busid_by_port(port));
+			retval = -EPERM;
+		}
+	}
+
+skip_fsfstatus:
+	__free_pages(send_els->req->page, 0);
+	kfree(send_els->req);
+	kfree(send_els->resp);
+
+	return retval;
+}
+
+
+/*
+ * function:    zfcp_test_link
+ *
+ * purpose:     Test a status of a link to a remote port using the ELS command ADISC
+ *
+ * returns:     0       - Link is OK
+ *              -EPERM  - Port forced reopen failed
+ */
+int
+zfcp_test_link(struct zfcp_port *port)
+{
+	int retval;
+
+	retval = zfcp_els(port, ZFCP_LS_ADISC);
+	if (retval != 0) {
+		ZFCP_LOG_NORMAL(
+			"Port with WWPN 0x%Lx on the adapter %s "
+			"needs to be reopened\n",
+			port->wwpn, zfcp_get_busid_by_port(port));
+		retval = zfcp_erp_port_forced_reopen(port, 0);
+		if (retval != 0) {
+			ZFCP_LOG_NORMAL(
+				"Cannot reopen a remote port "
+				"with WWPN 0x%Lx on the adapter %s\n",
+				port->wwpn, zfcp_get_busid_by_port(port));
+			retval = -EPERM;
+		}
+	}
+
+	return retval;
+}
+
 
 /*
  * function:	
@@ -741,37 +1114,27 @@ zfcp_erp_strategy_check_fsfreq(struct zfcp_erp_action *erp_action)
 						 "a_ca_disreq");
 				fsf_req->status |= ZFCP_STATUS_FSFREQ_DISMISSED;
 			}
+			if (erp_action->status & ZFCP_STATUS_ERP_TIMEDOUT) {
+				ZFCP_LOG_NORMAL
+					("error: Error Recovery Procedure "
+					 "step timed out. The action flag "
+					 "is 0x%x. The FSF request "
+					 "is at 0x%lx\n",
+					 erp_action->action,
+					 (unsigned long)
+					 erp_action->fsf_req);
+			}
 			/*
 			 * If fsf_req is neither dismissed nor completed
-			 * then keep it running asynchronously and don't mess with
-			 * the association of erp_action and fsf_req.
+			 * then keep it running asynchronously and don't mess
+			 * with the association of erp_action and fsf_req.
 			 */
 			if (fsf_req->status & (ZFCP_STATUS_FSFREQ_COMPLETED |
 					       ZFCP_STATUS_FSFREQ_DISMISSED)) {
-				/* forget about association between fsf_req and erp_action */
+				/* forget about association between fsf_req
+				   and erp_action */
 				fsf_req->erp_action = NULL;
 				erp_action->fsf_req = NULL;
-				/* some special things for time out conditions */
-				if (erp_action-> status & ZFCP_STATUS_ERP_TIMEDOUT) {
-					ZFCP_LOG_NORMAL
-					    ("error: Error Recovery Procedure step timed out. "
-					     "The action flag is 0x%x. The FSF request "
-					     "is at 0x%lx\n", erp_action->action,
-					     (unsigned long) erp_action->fsf_req);
-					/* fight for low memory buffer, if required */
-					if (fsf_req->
-					    status & ZFCP_STATUS_FSFREQ_POOL) {
-						debug_text_event(adapter->erp_dbf, 3,
-								 "a_ca_lowmem");
-						ZFCP_LOG_NORMAL
-						    ("error: The error recovery action using the "
-						     "low memory pool timed out. Restarting IO on "
-						     "the adapter %s to free it.\n",
-						     zfcp_get_busid_by_adapter
-						     (adapter));
-						zfcp_erp_adapter_reopen_internal(adapter, 0);
-					}
-				}
 			}
 		} else {
 			debug_text_event(adapter->erp_dbf, 3, "a_ca_gonereq");
@@ -1122,12 +1485,36 @@ zfcp_erp_strategy(struct zfcp_erp_action *erp_action)
 		goto unlock;
 	case ZFCP_ERP_NOMEM:
 		/* no memory to continue immediately, let it sleep */
+		if (!(erp_action->status & ZFCP_STATUS_ERP_LOWMEM)) {
+			++adapter->erp_low_mem_count;
+			erp_action->status |= ZFCP_STATUS_ERP_LOWMEM;
+		}
+		/* This condition is true if there is no memory available
+		   for any erp_action on this adapter. This implies that there
+		   are no elements in the memory pool(s) left for erp_actions.
+		   This might happen if an erp_action that used a memory pool
+		   element was timed out.
+		 */
+		if (adapter->erp_total_count == adapter->erp_low_mem_count) {
+			debug_text_event(adapter->erp_dbf, 3, "a_st_lowmem");
+			ZFCP_LOG_NORMAL
+				("error: Out of memory. No mempool elements "
+				 "available. Restarting IO on the adapter %s "
+				 "to free mempool.\n",
+				 zfcp_get_busid_by_adapter(adapter));
+			zfcp_erp_adapter_reopen_internal(adapter, 0);
+		} else {
 		debug_text_event(adapter->erp_dbf, 2, "a_st_memw");
 		retval = zfcp_erp_strategy_memwait(erp_action);
-		/* fall through, waiting for memory means action continues */
+		}
+		goto unlock;
 	case ZFCP_ERP_CONTINUES:
 		/* leave since this action runs asynchronously */
 		debug_text_event(adapter->erp_dbf, 6, "a_st_cont");
+		if (erp_action->status & ZFCP_STATUS_ERP_LOWMEM) {
+			--adapter->erp_low_mem_count;
+			erp_action->status &= ~ZFCP_STATUS_ERP_LOWMEM;
+		}
 		goto unlock;
 	}
 	/* ok, finished action (whatever its result is) */
@@ -1531,16 +1918,24 @@ zfcp_erp_strategy_check_unit(struct zfcp_unit *unit, int result)
 	debug_event(unit->port->adapter->erp_dbf, 5, &unit->fcp_lun,
 		    sizeof (fcp_lun_t));
 
-	if (result == ZFCP_ERP_SUCCEEDED) {
+	switch (result) {
+	case ZFCP_ERP_SUCCEEDED :
 		atomic_set(&unit->erp_counter, 0);
 		zfcp_erp_unit_unblock(unit);
-	} else {
-		/* ZFCP_ERP_FAILED or ZFCP_ERP_EXIT */
+		break;
+	case ZFCP_ERP_FAILED :
 		atomic_inc(&unit->erp_counter);
-		if (atomic_read(&unit->erp_counter) > ZFCP_MAX_ERPS) {
+		if (atomic_read(&unit->erp_counter) > ZFCP_MAX_ERPS)
 			zfcp_erp_unit_failed(unit);
-			result = ZFCP_ERP_EXIT;
-		}
+		break;
+	case ZFCP_ERP_EXIT :
+		/* nothing */
+		break;
+	}
+
+	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &unit->status)) {
+		zfcp_erp_unit_block(unit, 0); /* for ZFCP_ERP_SUCCEEDED */
+		result = ZFCP_ERP_EXIT;
 	}
 
 	return result;
@@ -1559,16 +1954,24 @@ zfcp_erp_strategy_check_port(struct zfcp_port *port, int result)
 	debug_text_event(port->adapter->erp_dbf, 5, "p_stct");
 	debug_event(port->adapter->erp_dbf, 5, &port->wwpn, sizeof (wwn_t));
 
-	if (result == ZFCP_ERP_SUCCEEDED) {
+	switch (result) {
+	case ZFCP_ERP_SUCCEEDED :
 		atomic_set(&port->erp_counter, 0);
 		zfcp_erp_port_unblock(port);
-	} else {
-		/* ZFCP_ERP_FAILED or ZFCP_ERP_EXIT */
+		break;
+	case ZFCP_ERP_FAILED :
 		atomic_inc(&port->erp_counter);
-		if (atomic_read(&port->erp_counter) > ZFCP_MAX_ERPS) {
+		if (atomic_read(&port->erp_counter) > ZFCP_MAX_ERPS)
+		break;
+	case ZFCP_ERP_EXIT :
+		/* nothing */
+		break;
+	}
+
+	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &port->status)) {
+		zfcp_erp_port_block(port, 0); /* for ZFCP_ERP_SUCCEEDED */
+		result = ZFCP_ERP_EXIT;
 			zfcp_erp_port_failed(port);
-			result = ZFCP_ERP_EXIT;
-		}
 	}
 
 	return result;
@@ -1586,16 +1989,24 @@ zfcp_erp_strategy_check_adapter(struct zfcp_adapter *adapter, int result)
 {
 	debug_text_event(adapter->erp_dbf, 5, "a_stct");
 
-	if (result == ZFCP_ERP_SUCCEEDED) {
+	switch (result) {
+	case ZFCP_ERP_SUCCEEDED :
 		atomic_set(&adapter->erp_counter, 0);
 		zfcp_erp_adapter_unblock(adapter);
-	} else {
-		/* ZFCP_ERP_FAILED or ZFCP_ERP_EXIT */
+		break;
+	case ZFCP_ERP_FAILED :
 		atomic_inc(&adapter->erp_counter);
-		if (atomic_read(&adapter->erp_counter) > ZFCP_MAX_ERPS) {
+		if (atomic_read(&adapter->erp_counter) > ZFCP_MAX_ERPS)
 			zfcp_erp_adapter_failed(adapter);
-			result = ZFCP_ERP_EXIT;
-		}
+		break;
+	case ZFCP_ERP_EXIT :
+		/* nothing */
+		break;
+	}
+
+	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &adapter->status)) {
+		zfcp_erp_adapter_block(adapter, 0); /* for ZFCP_ERP_SUCCEEDED */
+		result = ZFCP_ERP_EXIT;
 	}
 
 	return result;
@@ -1999,10 +2410,10 @@ zfcp_erp_adapter_strategy_generic(struct zfcp_erp_action *erp_action, int close)
 int
 zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 {
-	int retval = 0;
-	struct zfcp_adapter *adapter = erp_action->adapter;
+	int retval;
 	int i;
-	volatile struct qdio_buffer_element *buffere;
+	volatile struct qdio_buffer_element *sbale;
+	struct zfcp_adapter *adapter = erp_action->adapter;
 	int retval_cleanup = 0;
 
 	if (atomic_test_mask(ZFCP_STATUS_ADAPTER_QDIOUP, &adapter->status)) {
@@ -2034,10 +2445,10 @@ zfcp_erp_adapter_strategy_open_qdio(struct zfcp_erp_action *erp_action)
 	 * put buffers into response queue,
 	 */
 	for (i = 0; i < QDIO_MAX_BUFFERS_PER_Q; i++) {
-		buffere = &(adapter->response_queue.buffer[i]->element[0]);
-		buffere->length = 0;
-		buffere->flags = SBAL_FLAGS_LAST_ENTRY;
-		buffere->addr = 0;
+		sbale = &(adapter->response_queue.buffer[i]->element[0]);
+		sbale->length = 0;
+		sbale->flags = SBAL_FLAGS_LAST_ENTRY;
+		sbale->addr = 0;
 	}
 
 	ZFCP_LOG_TRACE("Calling do QDIO busid=%s, flags=0x%x, queue_no=%i, "
@@ -2591,7 +3002,7 @@ zfcp_erp_port_strategy_open_common(struct zfcp_erp_action *erp_action)
 		if (atomic_test_mask((ZFCP_STATUS_COMMON_OPEN |
 				      ZFCP_STATUS_PORT_DID_DID),
 				     &port->status)) {
-			ZFCP_LOG_DEBUG("port wwpn=0x%Lx is open ", port->wwpn);
+			ZFCP_LOG_DEBUG("port wwpn=0x%Lx is open\n", port->wwpn);
 			retval = ZFCP_ERP_SUCCEEDED;
 		} else {
 			ZFCP_LOG_DEBUG("failed to open port wwpn=0x%Lx\n",
@@ -2845,7 +3256,7 @@ zfcp_erp_port_strategy_open_common_lookup(struct zfcp_erp_action *erp_action)
 	struct zfcp_port *port = erp_action->port;
 
 	zfcp_erp_timeout_init(erp_action);
-	retval = zfcp_nameserver_request(erp_action);
+	retval = zfcp_ns_gid_pn_request(erp_action);
 	if (retval == -ENOMEM) {
 		debug_text_event(adapter->erp_dbf, 5, "p_pstn_nomem");
 		debug_event(adapter->erp_dbf, 5, &port->wwpn, sizeof (wwn_t));
@@ -3087,6 +3498,10 @@ zfcp_erp_action_enqueue(int action,
 	 * efficient.
 	 */
 
+	if (!atomic_test_mask(ZFCP_STATUS_ADAPTER_ERP_THREAD_UP,
+			      &adapter->status))
+		goto out;
+
 	debug_event(adapter->erp_dbf, 4, &action, sizeof (int));
 	/* check whether we really need this */
 	switch (action) {
@@ -3222,6 +3637,8 @@ zfcp_erp_action_enqueue(int action,
 	erp_action->action = action;
 	erp_action->status = status;
 
+	++adapter->erp_total_count;
+
 	/* finally put it into 'ready' queue and kick erp thread */
 	list_add(&erp_action->list, &adapter->erp_ready_head);
 	up(&adapter->erp_ready_sem);
@@ -3242,6 +3659,12 @@ zfcp_erp_action_dequeue(struct zfcp_erp_action *erp_action)
 {
 	int retval = 0;
 	struct zfcp_adapter *adapter = erp_action->adapter;
+
+	--adapter->erp_total_count;
+	if (erp_action->status & ZFCP_STATUS_ERP_LOWMEM) {
+		--adapter->erp_low_mem_count;
+		erp_action->status &= ~ZFCP_STATUS_ERP_LOWMEM;
+	}
 
 	debug_text_event(adapter->erp_dbf, 4, "a_actdeq");
 	debug_event(adapter->erp_dbf, 4, &erp_action->action, sizeof (int));
@@ -3404,4 +3827,3 @@ zfcp_erp_action_to_ready(struct zfcp_erp_action *erp_action)
 }
 
 #undef ZFCP_LOG_AREA
-#undef ZFCP_LOG_AREA_PREFIX
