@@ -392,14 +392,15 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		memcpy (clock_ratio, ezrat_clock_ratio, sizeof(ezrat_clock_ratio));
 		memcpy (eblcr_table, ezrat_eblcr, sizeof(ezrat_eblcr));
 		break;
-	/*
+
 	case 9:
 		cpuname = "C3 'Nehemiah' [C5N]";
 		longhaul_version=2;
 		numscales=32;
 		memcpy (clock_ratio, nehemiah_clock_ratio, sizeof(nehemiah_clock_ratio));
 		memcpy (eblcr_table, nehemiah_eblcr, sizeof(nehemiah_eblcr));
-	*/
+		break;
+
 	default:
 		cpuname = "Unknown";
 		break;
