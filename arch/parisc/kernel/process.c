@@ -325,7 +325,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 
 		/* Use same stack depth as parent */
 		cregs->ksp = ((unsigned long)(ti))
-			+ (pregs->gr[21] & (INIT_THREAD_SIZE - 1));
+			+ (pregs->gr[21] & (THREAD_SIZE - 1));
 		cregs->gr[30] = usp;
 		if (p->personality == PER_HPUX) {
 #ifdef CONFIG_HPUX

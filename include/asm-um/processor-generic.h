@@ -94,8 +94,6 @@ struct thread_struct {
 	.request		= { 0 } \
 }
 
-#define INIT_THREAD_SIZE ((1 << CONFIG_KERNEL_STACK_ORDER) * PAGE_SIZE)
-
 typedef struct {
 	unsigned long seg;
 } mm_segment_t;
