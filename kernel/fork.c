@@ -224,7 +224,7 @@ void __init fork_init(unsigned long mempages)
 	/* create a slab on which task_structs can be allocated */
 	task_struct_cachep =
 		kmem_cache_create("task_struct",
-				  sizeof(struct task_struct),0,
+				  sizeof(struct task_struct), 16,
 				  SLAB_MUST_HWCACHE_ALIGN, NULL, NULL);
 	if (!task_struct_cachep)
 		panic("fork_init(): cannot create task_struct SLAB cache");
