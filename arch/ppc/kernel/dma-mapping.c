@@ -381,6 +381,7 @@ void __dma_sync(void *vaddr, size_t size, int direction)
 		break;
 	}
 }
+EXPORT_SYMBOL(__dma_sync);
 
 #ifdef CONFIG_HIGHMEM
 /*
@@ -438,3 +439,4 @@ void __dma_sync_page(struct page *page, unsigned long offset,
 	__dma_sync((void *)start, size, direction);
 #endif
 }
+EXPORT_SYMBOL(__dma_sync_page);
