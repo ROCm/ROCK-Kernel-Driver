@@ -392,6 +392,17 @@ static int usb_stor_control_thread(void * __us)
 			us->srb->result = GOOD << 1;
 		}
 
+		/* handle requests for EVPD, which most USB devices do
+		 * not support */
+		else if((us->srb->cmnd[0] == INQUIRY) &&
+				(us->srb->cmnd[1] & 0x1)) {
+				US_DEBUGP("Faking INQUIRY command for EVPD\n");
+				memcpy(us->srb->sense_buffer, 
+				       usb_stor_sense_invalidCDB, 
+				       sizeof(usb_stor_sense_invalidCDB));
+				us->srb->result = CHECK_CONDITION << 1;
+		}
+
 		/* our device has gone - pretend not ready */
 		else if (!(us->flags & US_FL_DEV_ATTACHED)) {
 			US_DEBUGP("Request is for removed device\n");

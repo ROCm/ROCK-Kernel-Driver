@@ -46,6 +46,7 @@
 #include "hosts.h"
 
 extern unsigned char usb_stor_sense_notready[18];
+extern unsigned char usb_stor_sense_invalidCDB[18];
 extern Scsi_Host_Template usb_stor_host_template;
 extern int usb_stor_scsiSense10to6(Scsi_Cmnd*);
 extern int usb_stor_scsiSense6to10(Scsi_Cmnd*);
