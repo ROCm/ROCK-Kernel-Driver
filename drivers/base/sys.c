@@ -384,7 +384,7 @@ int sysdev_resume(void)
 }
 
 
-int __init sys_bus_init(void)
+int __init system_bus_init(void)
 {
 	system_subsys.kset.kobj.parent = &devices_subsys.kset.kobj;
 	return subsystem_register(&system_subsys);
