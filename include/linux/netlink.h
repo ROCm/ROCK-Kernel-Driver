@@ -110,6 +110,8 @@ extern int netlink_unicast(struct sock *ssk, struct sk_buff *skb, __u32 pid, int
 extern void netlink_broadcast(struct sock *ssk, struct sk_buff *skb, __u32 pid,
 			      __u32 group, int allocation);
 extern void netlink_set_err(struct sock *ssk, __u32 pid, __u32 group, int code);
+extern int netlink_register_notifier(struct notifier_block *nb);
+extern int netlink_unregister_notifier(struct notifier_block *nb);
 
 /*
  *	skb should fit one page. This choice is good for headerless malloc.
@@ -127,6 +129,12 @@ struct netlink_callback
 	int		(*done)(struct netlink_callback *cb);
 	int		family;
 	long		args[4];
+};
+
+struct netlink_notify
+{
+	int pid;
+	int protocol;
 };
 
 static __inline__ struct nlmsghdr *
