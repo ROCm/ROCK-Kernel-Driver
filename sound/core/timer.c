@@ -1733,9 +1733,7 @@ static unsigned int snd_timer_user_poll(struct file *file, poll_table * wait)
 
 static struct file_operations snd_timer_f_ops =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.read =		snd_timer_user_read,
 	.open =		snd_timer_user_open,
 	.release =	snd_timer_user_release,

@@ -44,7 +44,7 @@ struct xfrm_selector
 	uid_t	user;
 };
 
-#define XFRM_INF (~(u64)0)
+#define XFRM_INF (~(__u64)0)
 
 struct xfrm_lifetime_cfg
 {
@@ -164,7 +164,7 @@ struct xfrm_usersa_info {
 };
 
 struct xfrm_usersa_id {
-	xfrm_address_t			saddr;
+	xfrm_address_t			daddr;
 	__u32				spi;
 	__u16				family;
 	__u8				proto;

@@ -1316,9 +1316,7 @@ static void snd_rawmidi_proc_info_read(snd_info_entry_t *entry,
 
 static struct file_operations snd_rawmidi_f_ops =
 {
-#ifndef LINUX_2_2
 	.owner =	THIS_MODULE,
-#endif
 	.read =		snd_rawmidi_read,
 	.write =	snd_rawmidi_write,
 	.open =		snd_rawmidi_open,

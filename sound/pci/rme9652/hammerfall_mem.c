@@ -25,7 +25,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 
-    $Id: hammerfall_mem.c,v 1.8 2003/02/25 13:35:44 perex Exp $
+    $Id: hammerfall_mem.c,v 1.9 2003/05/31 11:33:57 perex Exp $
 
 
     Tue Oct 17 2000  Jaroslav Kysela <perex@suse.cz>
@@ -98,15 +98,7 @@ static void *hammerfall_malloc_pages(struct pci_dev *pci,
 {
 	void *res;
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 3, 0)
 	res = (void *) pci_alloc_consistent(pci, size, dmaaddr);
-#else
-	int pg;
-	for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
-	res = (void *)__get_free_pages(GFP_KERNEL, pg);
-	if (res != NULL)
-		*dmaaddr = virt_to_bus(res);
-#endif
 	if (res != NULL) {
 		struct page *page = virt_to_page(res);
 		struct page *last_page = page + (size + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -127,19 +119,7 @@ static void hammerfall_free_pages(struct pci_dev *pci, unsigned long size,
 	last_page = virt_to_page(ptr) + (size + PAGE_SIZE - 1) / PAGE_SIZE;
 	while (page < last_page)
 		clear_bit(PG_reserved, &(page++)->flags);
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 3, 0)
 	pci_free_consistent(pci, size, ptr, dmaaddr);
-#else
-	{
-		int pg;
-		for (pg = 0; PAGE_SIZE * (1 << pg) < size; pg++);
-		if (bus_to_virt(dmaaddr) != ptr) {
-			printk(KERN_ERR "hammerfall_free_pages: dmaaddr != ptr\n");
-			return;
-		}
-		free_pages((unsigned long)ptr, pg);
-	}
-#endif
 }
 
 void *snd_hammerfall_get_buffer (struct pci_dev *pcidev, dma_addr_t *dmaaddr)

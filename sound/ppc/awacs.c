@@ -32,7 +32,7 @@
 #define chip_t pmac_t
 
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) || defined(CONFIG_ADB_CUDA)
+#ifdef CONFIG_ADB_CUDA
 #define PMAC_AMP_AVAIL
 #endif
 
@@ -43,11 +43,7 @@ typedef struct awacs_amp {
 	unsigned char amp_tone[2];
 } awacs_amp_t;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-#define CHECK_CUDA_AMP() (adb_hardware == ADB_VIACUDA)
-#else
 #define CHECK_CUDA_AMP() (sys_ctrler == SYS_CTRLER_CUDA)
-#endif
 
 #endif /* PMAC_AMP_AVAIL */
 
@@ -649,8 +645,22 @@ static void awacs_restore_all_regs(pmac_t *chip, int can_schedule)
 }
 
 #ifdef CONFIG_PMAC_PBOOK
+static void snd_pmac_awacs_suspend(pmac_t *chip)
+{
+	snd_pmac_awacs_write_noreg(chip, 1, (chip->awacs_reg[1]
+					     | MASK_AMUTE | MASK_CMUTE));
+}
+
 static void snd_pmac_awacs_resume(pmac_t *chip)
 {
+	if (machine_is_compatible("PowerBook3,1")
+	    || machine_is_compatible("PowerBook3,2")) {
+		do_mdelay(100, 0);
+		snd_pmac_awacs_write_reg(chip, 1,
+			chip->awacs_reg[1] & ~MASK_PAROUT);
+		do_mdelay(300, 0);
+	}
+
 	awacs_restore_all_regs(chip, 0);
 	if (chip->model == PMAC_SCREAMER) {
 		/* reset power bits in reg 6 */
@@ -868,6 +878,7 @@ snd_pmac_awacs_init(pmac_t *chip)
 	 */
 	chip->set_format = snd_pmac_awacs_set_format;
 #ifdef CONFIG_PMAC_PBOOK
+	chip->suspend = snd_pmac_awacs_suspend;
 	chip->resume = snd_pmac_awacs_resume;
 #endif
 #ifdef PMAC_SUPPORT_AUTOMUTE

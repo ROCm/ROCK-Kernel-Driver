@@ -53,14 +53,9 @@ Module parameters
 		  for soundcards which are not installed in your system
     device_mode
 		- specifies permission mask for dynamic sound device filesystem
+		  (available only when DEVFS is enabled)
 		- default value = 0666
 		- for example 'device_mode=0660'
-    device_gid
-		- specifies GID number for dynamic sound device filesystem
-		- default value = 0 (root)
-    device_uid
-		- specifies UID number for dynamic sound device filesystem
-		- default value = 0 (root)
 
   
   Module snd-pcm-oss
@@ -144,6 +139,7 @@ Module parameters
     Module for ALi M5451 PCI chip.
 
     pcm_channels    - Number of hardware channels assigned for PCM
+    spdif           - Support SPDIF I/O (disabled by default)
 
     Module supports autoprobe and multiple chips (max 8).
 
@@ -846,6 +842,20 @@ Module parameters
 
     Module supports up to 8 cards.
 
+  Module snd-sscape
+  -----------------
+
+    Module for ENSONIQ SoundScape PnP cards.
+
+    port	- Port # (PnP setup)
+    irq		- IRQ # (PnP setup)
+    mpu_irq	- MPU-401 IRQ # (PnP setup)
+    dma		- DMA # (PnP setup)
+
+    Module supports up to 8 cards.  ISA PnP must be enabled.
+    You need sscape_ctl tool in alsa-tools package for loading
+    the microcode.
+
   Module snd-sun-amd7930 (on sparc only)
   --------------------------------------
 
@@ -945,19 +955,34 @@ Module parameters
   Module snd-via82xx
   ------------------
 
-    Module for AC'97 motherboards based on VIA 82C686A/686B, 8233
-    (south) bridge.
+    Module for AC'97 motherboards based on VIA 82C686A/686B, 8233,
+    8233A, 8233C, 8235 (south) bridge.
 
     mpu_port	- 0x300,0x310,0x320,0x330, otherwise obtain BIOS setup
+		  [VIA686A/686B only]
     ac97_clock	- AC'97 codec clock base (default 48000Hz)
+    dxs_support	- support DXS channels,
+		  0 = auto (default), 1 = enable, 2 = disable,
+		  3 = 48k only
+		  [VIA8233/C,8235 only]
 
     Module supports autoprobe and multiple bus-master chips (max 8).
+
     Note: on some SMP motherboards like MSI 694D the interrupts might
           not be generated properly.  In such a case, please try to
           set the SMP (or MPS) version on BIOS to 1.1 instead of
           default value 1.4.  Then the interrupt number will be
           assigned under 15. You might also upgrade your BIOS.
     
+    Note: VIA8233/5 (not VIA8233A) can support DXS (direct sound)
+	  channels as the first PCM.  With this device, up to 4
+	  streams can be played at the same time.  If the playback on
+	  this PCM is noisy, try to specify dxs_channels option to 2
+	  or 3.
+
+    Note: for the MPU401 on VIA823x, use snd-mpu401 driver
+	  additonally.
+
   Module snd-virmidi
   ------------------
 
@@ -968,6 +993,53 @@ Module parameters
     midi_devs	- MIDI devices # (1-8, default=4)
     
     Module supports up to 8 cards.
+
+  Module snd-vx222
+  ----------------
+
+    Module for Digigram VX-Pocket VX222, V222 v2 and Mic cards.
+
+    mic		- Enable Microphone on V222 Mic (NYI)
+
+    Module supports up to 8 cards.
+
+    For loading the firmware, use vxloader utility in alsa-tools
+    package.  You can load the firmware automatically by adding
+    the following to /etc/modules.conf
+
+	post-install snd-vx222 "/usr/bin/vxload"
+
+  Module snd-vxpocket
+  -------------------
+
+    Module for Digigram VX-Pocket VX2 PCMCIA card.
+
+    irq_mask - IRQ bitmask, specifies the available IRQs as bits
+
+    Module supports up to 8 cards.  The module is compiled only when
+    PCMCIA is supported on kernel.
+
+    To activate the driver via the card manager, you'll need to set
+    up /etc/pcmcia/vxpocket.conf.  See the sound/pcmcia/vx/vxpocket.c.
+
+    For loading the firmware, use vxloader utility in alsa-tools
+    package.
+
+  Module snd-vxp440
+  -----------------
+
+    Module for Digigram VX-Pocket 440 PCMCIA card.
+
+    irq_mask - IRQ bitmask, specifies the available IRQs as bits
+
+    Module supports up to 8 cards.  The module is compiled only when
+    PCMCIA is supported on kernel.
+
+    To activate the driver via the card manager, you'll need to set
+    up /etc/pcmcia/vxp440.conf.  See the sound/pcmcia/vx/vxp440.c.
+
+    For loading the firmware, use vxloader utility in alsa-tools
+    package.
 
   Module snd-ymfpci
   -----------------

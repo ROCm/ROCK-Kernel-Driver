@@ -150,8 +150,7 @@ enum {
 #define   VT1724_AC97_WRITE	0x20	/* W: write, R: write in progress */
 #define   VT1724_AC97_READ	0x10	/* W: read, R: read in progress */
 #define   VT1724_AC97_READY	0x08	/* codec ready status bit */
-#define   VT1724_AC97_PBK_VSR	0x02	/* playback VSR */
-#define   VT1724_AC97_CAP_VSR	0x01	/* capture VSR */
+#define   VT1724_AC97_ID_MASK	0x03	/* codec id mask */
 #define VT1724_MT_AC97_DATA		0x06	/* word - AC'97 data */
 #define VT1724_MT_PLAYBACK_ADDR		0x10	/* dword - playback address */
 #define VT1724_MT_PLAYBACK_SIZE		0x14	/* dword - playback size */

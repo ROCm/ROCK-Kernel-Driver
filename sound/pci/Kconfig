@@ -177,5 +177,11 @@ config SND_VIA82XX
 	help
 	  Say 'Y' or 'M' to include support for VIA VT82C686A/B, VT8233 South Bridge.
 
+config SND_VX222
+	tristate "Digigram VX222"
+	depends on SND
+	help
+	  Say 'Y' or 'M' to include support for Digigram VX222 soundcards
+
 endmenu
 

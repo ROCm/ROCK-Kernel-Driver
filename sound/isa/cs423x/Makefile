@@ -21,6 +21,7 @@ obj-$(CONFIG_SND_INTERWAVE) += snd-cs4231-lib.o
 obj-$(CONFIG_SND_INTERWAVE_STB) += snd-cs4231-lib.o
 obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-cs4231-lib.o
 obj-$(CONFIG_SND_WAVEFRONT) += snd-cs4231-lib.o
+obj-$(CONFIG_SND_SSCAPE) += snd-cs4231-lib.o
 obj-$(CONFIG_SND_PC98_CS4232) += snd-pc98-cs4232.o snd-cs4231-lib.o
 
 obj-m := $(sort $(obj-m))
