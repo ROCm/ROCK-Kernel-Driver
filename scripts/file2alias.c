@@ -52,6 +52,13 @@ static int do_usb_entry(const char *filename,
 	id->bcdDevice_lo = TO_NATIVE(id->bcdDevice_lo);
 	id->bcdDevice_hi = TO_NATIVE(id->bcdDevice_hi);
 
+	/*
+	 * Some modules (visor) have empty slots as placeholder for
+	 * run-time specification that results in catch-all alias
+	 */
+	if (!(id->idVendor | id->bDeviceClass | id->bInterfaceClass))
+		return 1;
+
 	strcpy(alias, "usb:");
 	ADD(alias, "v", id->match_flags&USB_DEVICE_ID_MATCH_VENDOR,
 	    id->idVendor);
