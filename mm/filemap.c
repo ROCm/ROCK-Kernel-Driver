@@ -2503,18 +2503,19 @@ repeat:
 	return page;
 }
 
-inline void remove_suid(struct inode *inode)
+inline void remove_suid(struct dentry *dentry)
 {
-	unsigned int mode;
+	struct iattr newattrs;
+	struct inode *inode = dentry->d_inode;
+	unsigned int mode = inode->i_mode & (S_ISUID|S_ISGID|S_IXGRP);
 
-	/* set S_IGID if S_IXGRP is set, and always set S_ISUID */
-	mode = (inode->i_mode & S_IXGRP)*(S_ISGID/S_IXGRP) | S_ISUID;
+	if (!(mode & S_IXGRP))
+		mode &= S_ISUID;
 
 	/* was any of the uid bits set? */
-	mode &= inode->i_mode;
 	if (mode && !capable(CAP_FSETID)) {
-		inode->i_mode &= ~mode;
-		mark_inode_dirty(inode);
+		newattrs.ia_valid = ATTR_KILL_SUID | ATTR_KILL_SGID;
+		notify_change(dentry, &newattrs);
 	}
 }
 
@@ -2646,7 +2647,7 @@ generic_file_write(struct file *file,const char *buf,size_t count, loff_t *ppos)
 	if (count == 0)
 		goto out;
 
-	remove_suid(inode);
+	remove_suid(file->f_dentry);
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 	mark_inode_dirty_sync(inode);
 

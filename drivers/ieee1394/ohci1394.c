@@ -96,7 +96,6 @@
 #include <linux/poll.h>
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
-#include <asm/io.h>
 #include <asm/uaccess.h>
 #include <linux/tqueue.h>
 #include <linux/delay.h>
@@ -161,7 +160,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Revision: 1.91 $ Ben Collins <bcollins@debian.org>";
+	"$Revision: 1.101 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 MODULE_PARM(attempt_root,"i");
@@ -487,7 +486,6 @@ static void ohci_init_config_rom(struct ti_ohci *ohci);
 /* Global initialization */
 static void ohci_initialize(struct ti_ohci *ohci)
 {
-	int i;
 	quadlet_t buf;
 
 	spin_lock_init(&ohci->phy_reg_lock);
@@ -535,14 +533,6 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	/* Don't accept phy packets into AR request context */ 
 	reg_write(ohci, OHCI1394_LinkControlClear, 0x00000400);
 
-	/* Initialize IR dma */
-	for (i=0;i<ohci->nb_iso_rcv_ctx;i++) {
-		reg_write(ohci, OHCI1394_IsoRcvContextControlClear+32*i,
-			  0xffffffff);
-		reg_write(ohci, OHCI1394_IsoRcvContextMatch+32*i, 0);
-		reg_write(ohci, OHCI1394_IsoRcvCommandPtr+32*i, 0);
-	}
-
 	/* Set bufferFill, isochHeader, multichannel for IR context */
 	reg_write(ohci, OHCI1394_IsoRcvContextControlSet, 0xd0000000);
 			
@@ -553,13 +543,6 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	reg_write(ohci, OHCI1394_IsoRecvIntMaskClear, 0xffffffff);
 	reg_write(ohci, OHCI1394_IsoRecvIntEventClear, 0xffffffff);
 
-	/* Initialize IT dma */
-	for (i=0;i<ohci->nb_iso_xmit_ctx;i++) {
-		reg_write(ohci, OHCI1394_IsoXmitContextControlClear+32*i,
-			  0xffffffff);
-		reg_write(ohci, OHCI1394_IsoXmitCommandPtr+32*i, 0);
-	}
-	
 	/* Clear the interrupt mask */
 	reg_write(ohci, OHCI1394_IsoXmitIntMaskClear, 0xffffffff);
 	reg_write(ohci, OHCI1394_IsoXmitIntEventClear, 0xffffffff);
@@ -615,7 +598,8 @@ static void ohci_initialize(struct ti_ohci *ohci)
 		  OHCI1394_respTxComplete |
 		  OHCI1394_reqTxComplete |
 		  OHCI1394_isochRx |
-		  OHCI1394_isochTx);
+		  OHCI1394_isochTx |
+		  OHCI1394_cycleInconsistent);
 
 	/* Enable link */
 	reg_write(ohci, OHCI1394_HCControlSet, 0x00020000);
@@ -936,6 +920,7 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
                 } else {
                         MOD_DEC_USE_COUNT;
                 }
+		retval = 1;
                 break;
 
 	case ISO_LISTEN_CHANNEL:
@@ -1096,6 +1081,14 @@ static void ohci_irq_handler(int irq, void *dev_id,
 	if (event & OHCI1394_unrecoverableError) {
 		PRINT(KERN_ERR, ohci->id, "Unrecoverable error, shutting down card!");
 		return;
+	}
+
+	if (event & OHCI1394_cycleInconsistent) {
+		/* We subscribe to the cycleInconsistent event only to
+		 * clear the corresponding event bit... otherwise,
+		 * isochronous cycleMatch DMA wont work. */
+		DBGMSG(ohci->id, "OHCI1394_cycleInconsistent");
+		event &= ~OHCI1394_cycleInconsistent;
 	}
 
 	if (event & OHCI1394_busReset) {
@@ -1265,8 +1258,8 @@ static void ohci_irq_handler(int irq, void *dev_id,
 		/* Finally, we clear the busReset event and reenable
 		 * the busReset interrupt. */
 		spin_lock_irqsave(&ohci->event_lock, flags);
-		reg_write(ohci, OHCI1394_IntMaskSet, OHCI1394_busReset); 
 		reg_write(ohci, OHCI1394_IntEventClear, OHCI1394_busReset);
+		reg_write(ohci, OHCI1394_IntMaskSet, OHCI1394_busReset); 
 		spin_unlock_irqrestore(&ohci->event_lock, flags);
 		event &= ~OHCI1394_selfIDComplete;	
 	}
@@ -1508,6 +1501,15 @@ static void dma_trm_tasklet (unsigned long data)
 		if (ack == 0) 
 			/* this packet hasn't been sent yet*/
 			break;
+
+		if (!(ack & 0x10)) {
+			/* XXX: This is an OHCI evt_* code. We need to handle
+			 * this specially! For right now, we just fake an
+			 * ackx_send_error. */
+			PRINT(KERN_DEBUG, ohci->id, "Received OHCI evt_* error 0x%x",
+			       ack & 0xf);
+			ack = (ack & 0xffe0) | ACK_BUSY_A;
+		}
 
 #ifdef OHCI1394_DEBUG
 		if (datasize)
@@ -1942,7 +1944,8 @@ static void ohci_init_config_rom(struct ti_ohci *ohci)
 
 	/* Root directory */
 	cf_unit_begin(&cr, 1);
-	cf_put_keyval(&cr, 0x03, 0x00005e);	/* Vendor ID */
+	/* Vendor ID */
+	cf_put_keyval(&cr, 0x03, reg_read(ohci,OHCI1394_VendorID) & 0xFFFFFF);
 	cf_put_refer(&cr, 0x81, 2);		/* Textual description unit */
 	cf_put_keyval(&cr, 0x0c, 0x0083c0);	/* Node capabilities */
 	/* NOTE: Add other unit referers here, and append at bottom */
@@ -2287,7 +2290,7 @@ static void __devexit ohci1394_pci_remove(struct pci_dev *pdev)
 #endif /* CONFIG_ALL_PPC */
 
 	pci_set_drvdata(ohci->dev, NULL);
-	kfree(ohci);
+	hpsb_unref_host(ohci->host);
 }
 
 #define PCI_CLASS_FIREWIRE_OHCI     ((PCI_CLASS_SERIAL_FIREWIRE << 8) | 0x10)

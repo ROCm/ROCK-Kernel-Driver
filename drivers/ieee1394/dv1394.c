@@ -46,8 +46,6 @@
 /*
   TODO:
 
-  - expose xmit and recv as separate devices
-
   - tunable frame-drop behavior: either loop last frame, or halt transmission
   
   - use a scatter/gather buffer for DMA programs (f->descriptor_pool)
@@ -73,6 +71,9 @@
   - keep all video_cards in a list (for open() via chardev), set file->private_data = video
   - dv1394_poll should indicate POLLIN when receiving buffers are available
   - add proc fs interface to set cip_n, cip_d, syt_offset, and video signal
+  - expose xmit and recv as separate devices (not exclusive)
+  - expose NTSC and PAL as separate devices (can be overridden)
+  - read/edit channel in procfs
 
 */
      
@@ -169,7 +170,14 @@ static spinlock_t dv1394_cards_lock = SPIN_LOCK_UNLOCKED;
 
 static struct hpsb_highlevel *hl_handle; /* = NULL; */
 
-static devfs_handle_t dv1394_devfs_handle;
+static LIST_HEAD(dv1394_devfs);
+struct dv1394_devfs_entry {
+	struct list_head list;
+    devfs_handle_t devfs;
+	char name[32];
+	struct dv1394_devfs_entry *parent;
+};
+static spinlock_t dv1394_devfs_lock = SPIN_LOCK_UNLOCKED;
 
 /* translate from a struct file* to the corresponding struct video_card* */
 
@@ -184,19 +192,71 @@ static inline struct video_card* file_to_video_card(struct file *file)
 /* Memory management functions */
 /*******************************/
 
+#define MDEBUG(x)	do { } while(0)		/* Debug memory management */
+
+/* [DaveM] I've recoded most of this so that:
+ * 1) It's easier to tell what is happening
+ * 2) It's more portable, especially for translating things
+ *    out of vmalloc mapped areas in the kernel.
+ * 3) Less unnecessary translations happen.
+ *
+ * The code used to assume that the kernel vmalloc mappings
+ * existed in the page tables of every process, this is simply
+ * not guarenteed.  We now use pgd_offset_k which is the
+ * defined way to get at the kernel page tables.
+ */
+
+/* Given PGD from the address space's page table, return the kernel
+ * virtual mapping of the physical memory mapped at ADR.
+ */
+static inline struct page *uvirt_to_page(pgd_t *pgd, unsigned long adr)
+{
+	pmd_t *pmd;
+	pte_t *ptep, pte;
+	struct page *ret = NULL;
+	
+	if (!pgd_none(*pgd)) {
+                pmd = pmd_offset(pgd, adr);
+                if (!pmd_none(*pmd)) {
+                        ptep = pte_offset_kernel(pmd, adr);
+                        pte = *ptep;
+                        if(pte_present(pte))
+				ret = pte_page(pte);
+                }
+        }
+	return ret;
+}
+
+/* Here we want the physical address of the memory.
+ * This is used when initializing the contents of the
+ * area and marking the pages as reserved, and for
+ * handling page faults on the rvmalloc()ed buffer
+ */
+static inline unsigned long kvirt_to_pa(unsigned long adr) 
+{
+        unsigned long va, kva, ret;
+
+        va = VMALLOC_VMADDR(adr);
+	kva = (unsigned long) page_address(uvirt_to_page(pgd_offset_k(va), va));
+	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
+	ret = __pa(kva);
+        MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
+        return ret;
+}
+
 static void * rvmalloc(unsigned long size)
 {
 	void * mem;
-	unsigned long adr;
-
-	size=PAGE_ALIGN(size);
+	unsigned long adr, page;
+        
 	mem=vmalloc_32(size);
 	if (mem) {
 		memset(mem, 0, size); /* Clear the ram out, 
 					 no junk to the user */
 	        adr=(unsigned long) mem;
 		while (size > 0) {
-			mem_map_reserve(vmalloc_to_page((void *)adr));
+	                page = kvirt_to_pa(adr);
+			mem_map_reserve(virt_to_page(__va(page)));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -206,12 +266,13 @@ static void * rvmalloc(unsigned long size)
 
 static void rvfree(void * mem, unsigned long size)
 {
-        unsigned long adr;
-
+        unsigned long adr, page;
+        
 	if (mem) {
 	        adr=(unsigned long) mem;
-		while ((long) size > 0) {
-			mem_map_unreserve(vmalloc_to_page((void *)adr));
+		while (size > 0) {
+	                page = kvirt_to_pa(adr);
+			mem_map_unreserve(virt_to_page(__va(page)));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -1105,9 +1166,9 @@ static int do_dv1394_init(struct video_card *video, struct dv1394_init *init)
 		
 		/* fill the sglist with the kernel addresses of pages in the non-contiguous buffer */
 		for(i = 0; i < video->user_dma.n_pages; i++) {
-			unsigned long va = (unsigned long) video->user_buf + i * PAGE_SIZE;
+			unsigned long va = VMALLOC_VMADDR( (unsigned long) video->user_buf + i * PAGE_SIZE );
 			
-			video->user_dma.sglist[i].page = vmalloc_to_page((void *)va);
+			video->user_dma.sglist[i].page = uvirt_to_page(pgd_offset_k(va), va);
 			video->user_dma.sglist[i].length = PAGE_SIZE;
 		}
 		
@@ -1238,9 +1299,9 @@ static int do_dv1394_init_default(struct video_card *video)
 	struct dv1394_init init;
 
 	init.api_version = DV1394_API_VERSION;
-	init.channel = 63;
 	init.n_frames = 2;
-	/* the following are now set via proc_fs */
+	/* the following are now set via proc_fs or devfs */
+	init.channel = video->channel;
 	init.format = video->pal_or_ntsc;
 	init.cip_n = video->cip_n; 
 	init.cip_d = video->cip_d;
@@ -1431,7 +1492,7 @@ static int do_dv1394_shutdown(struct video_card *video, int free_user_buf)
 static struct page * dv1394_nopage(struct vm_area_struct * area, unsigned long address, int write_access)
 {
 	unsigned long offset;
-	unsigned long kernel_virt_addr;
+	unsigned long page, kernel_virt_addr;
 	struct page *ret = NOPAGE_SIGBUS;
 
 	struct video_card *video = (struct video_card*) area->vm_private_data;
@@ -1449,7 +1510,10 @@ static struct page * dv1394_nopage(struct vm_area_struct * area, unsigned long a
 
 	offset = address - area->vm_start;
 	kernel_virt_addr = (unsigned long) video->user_buf + offset;
-	ret = vmalloc_to_page((void *)kernel_virt_addr);
+
+	page = kvirt_to_pa(kernel_virt_addr);
+	
+	ret = virt_to_page(__va(page));
 	get_page(ret);
 
  out:
@@ -2021,7 +2085,7 @@ static int dv1394_open(struct inode *inode, struct file *file)
 			struct video_card *p;
 			list_for_each(lh, &dv1394_cards) {
 				p = list_entry(lh, struct video_card, list);
-				if(p->id == ieee1394_file_to_instance(file)) {
+				if((p->id >> 2) == ieee1394_file_to_instance(file)) {
 					video = p;
 					break;
 				}
@@ -2046,7 +2110,6 @@ static int dv1394_open(struct inode *inode, struct file *file)
 
 #endif
 
-	V22_COMPAT_MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -2064,36 +2127,38 @@ static int dv1394_release(struct inode *inode, struct file *file)
 	/* give someone else a turn */
 	clear_bit(0, &video->open);
 
-	V22_COMPAT_MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 
 /*** PROC_FS INTERFACE ******************************************************/
 #ifdef CONFIG_PROC_FS
-static struct proc_dir_entry *dv1394_procfs_entry;
+static LIST_HEAD(dv1394_procfs);
+struct dv1394_procfs_entry {
+	struct list_head list;
+    struct proc_dir_entry *procfs;
+	char name[32];
+	struct dv1394_procfs_entry *parent;
+};
+static spinlock_t dv1394_procfs_lock = SPIN_LOCK_UNLOCKED;
 
 static int dv1394_procfs_read( char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
 	struct video_card *video = (struct video_card*) data;
 
-	V22_COMPAT_MOD_INC_USE_COUNT;
 	snprintf( page, count, 
 		"\
-dv1394 settings for host %d:\n\
-----------------------------\n\
 format=%s\n\
+channel=%d\n\
 cip_n=%lu\n\
 cip_d=%lu\n\
 syt_offset=%u\n",
-		video->id,
 		(video->pal_or_ntsc == DV1394_NTSC ? "NTSC" : "PAL"),
+		video->channel,
 		video->cip_n, video->cip_d, video->syt_offset );
-	V22_COMPAT_MOD_DEC_USE_COUNT;
 	return strlen(page);
 }
-#endif /* CONFIG_PROC_FS */
 
 /* lifted from the stallion.c driver */
 #undef  TOLOWER
@@ -2128,7 +2193,6 @@ static unsigned long atol(char *str)
 	return(val);
 }
 
-#ifdef CONFIG_PROC_FS
 static int dv1394_procfs_write( struct file *file,
 			const char *buffer, unsigned long count, void *data)
 {
@@ -2137,17 +2201,13 @@ static int dv1394_procfs_write( struct file *file,
 	char *pos;
 	struct video_card *video = (struct video_card*) data;
 	
-	V22_COMPAT_MOD_INC_USE_COUNT;
-	
 	if (count > 64)
 		len = 64;
 	else
 		len = count;
 				
-	if (copy_from_user( new_value, buffer, len)) {
-		V22_COMPAT_MOD_DEC_USE_COUNT;
+	if (copy_from_user( new_value, buffer, len))
 		return -EFAULT;
-	}
 	
 	pos = strchr(new_value, '=');
 	if (pos != NULL) {
@@ -2169,31 +2229,142 @@ static int dv1394_procfs_write( struct file *file,
 			video->cip_d = atol(buf);
 		} else if (strnicmp( new_value, "syt_offset", (pos-new_value)) == 0) {
 			video->syt_offset = atol(buf);
+		} else if (strnicmp( new_value, "channel", (pos-new_value)) == 0) {
+			video->channel = atol(buf);
 		}
 	}
 	
-	V22_COMPAT_MOD_DEC_USE_COUNT;
 	return len;
+}
+
+struct dv1394_procfs_entry *
+dv1394_procfs_find( char *name)
+{
+	struct list_head *lh;
+	struct dv1394_procfs_entry *p;
+		
+	spin_lock( &dv1394_procfs_lock);
+	if(!list_empty(&dv1394_procfs)) {
+		list_for_each(lh, &dv1394_procfs) {
+			p = list_entry(lh, struct dv1394_procfs_entry, list);
+			if(!strncmp(p->name, name, sizeof(p->name))) {
+				spin_unlock( &dv1394_procfs_lock);
+				return p;
+			}
+		}
+	}
+	spin_unlock( &dv1394_procfs_lock);
+	return NULL;
 }
 
 static int dv1394_procfs_add_entry(struct video_card *video)
 {
-	struct proc_dir_entry *procfs_entry = NULL;
-	char buf[16];
-	
-	snprintf(buf, sizeof(buf), "%d", video->id);
+	char buf[32];
+	struct dv1394_procfs_entry *p;
+	struct dv1394_procfs_entry *parent;
 
-	procfs_entry = create_proc_entry( buf, 0666, dv1394_procfs_entry);
-	if (procfs_entry == NULL) {
-		printk(KERN_ERR "dv1394: unable to create /proc/bus/ieee1394/dv/X\n");
-		return -ENOMEM;
+	p = kmalloc(sizeof(struct dv1394_procfs_entry), GFP_KERNEL);
+	if(!p) {
+		printk(KERN_ERR "dv1394: cannot allocate dv1394_procfs_entry\n");
+		goto err;
 	}
-	procfs_entry->owner = THIS_MODULE;
-	procfs_entry->data = video;
-	procfs_entry->read_proc = dv1394_procfs_read;
-	procfs_entry->write_proc = dv1394_procfs_write;
+	memset(p, 0, sizeof(struct dv1394_procfs_entry));
+	
+	snprintf(buf, sizeof(buf), "dv/host%d/%s", (video->id>>2),
+						(video->pal_or_ntsc == DV1394_NTSC ? "NTSC" : "PAL"));
+		
+	parent = dv1394_procfs_find(buf);
+	if (parent == NULL) {
+		printk(KERN_ERR "dv1394: unable to locate parent procfs of %s\n", buf);
+		goto err_free;
+	}
+	
+	p->procfs = create_proc_entry( 
+						(video->mode == MODE_RECEIVE ? "in" : "out"),
+						0666, parent->procfs);
+
+	if (p->procfs == NULL) {
+		printk(KERN_ERR "dv1394: unable to create /proc/bus/ieee1394/%s/%s\n",
+			parent->name,
+			(video->mode == MODE_RECEIVE ? "in" : "out"));
+		goto err_free;
+	}
+	
+	p->procfs->owner = THIS_MODULE;
+	p->procfs->data = video;
+	p->procfs->read_proc = dv1394_procfs_read;
+	p->procfs->write_proc = dv1394_procfs_write;
+
+	spin_lock( &dv1394_procfs_lock);
+	INIT_LIST_HEAD(&p->list);
+	list_add_tail(&p->list, &dv1394_procfs);
+	spin_unlock( &dv1394_procfs_lock);
 	
 	return 0;
+	
+ err_free:
+	kfree(p);
+ err:
+	return -ENOMEM;
+}
+
+static int
+dv1394_procfs_add_dir( char *name,
+					struct dv1394_procfs_entry *parent, 
+					struct dv1394_procfs_entry **out)
+{
+	struct dv1394_procfs_entry *p;
+
+	p = kmalloc(sizeof(struct dv1394_procfs_entry), GFP_KERNEL);
+	if(!p) {
+		printk(KERN_ERR "dv1394: cannot allocate dv1394_procfs_entry\n");
+		goto err;
+	}
+	memset(p, 0, sizeof(struct dv1394_procfs_entry));
+	
+	if (parent == NULL) {
+		snprintf(p->name, sizeof(p->name), "%s", name);
+		p->procfs = proc_mkdir( name, ieee1394_procfs_entry);
+	} else {
+		snprintf(p->name, sizeof(p->name), "%s/%s", parent->name, name);
+		p->procfs = proc_mkdir( name, parent->procfs);
+	}
+	if (p->procfs == NULL) {
+		printk(KERN_ERR "dv1394: unable to create /proc/bus/ieee1394/%s\n", p->name);
+		goto err_free;
+	}
+
+	p->procfs->owner = THIS_MODULE;
+	p->parent = parent;
+	if (out != NULL) *out = p;
+
+	spin_lock( &dv1394_procfs_lock);
+	INIT_LIST_HEAD(&p->list);
+	list_add_tail(&p->list, &dv1394_procfs);
+	spin_unlock( &dv1394_procfs_lock);
+
+	return 0;
+	
+ err_free:
+	kfree(p);
+ err:
+	return -ENOMEM;
+}
+
+void dv1394_procfs_del( char *name)
+{
+	struct dv1394_procfs_entry *p = dv1394_procfs_find(name);
+	if (p != NULL) {
+		if (p->parent == NULL)
+			remove_proc_entry(p->name, ieee1394_procfs_entry);
+		else
+			remove_proc_entry(p->name, p->parent->procfs);
+		
+		spin_lock( &dv1394_procfs_lock);
+		list_del(&p->list);
+		spin_unlock( &dv1394_procfs_lock);
+		kfree(p);
+	}
 }
 #endif /* CONFIG_PROC_FS */
 
@@ -2431,7 +2602,7 @@ static void irq_handler(int card, quadlet_t isoRecvIntEvent,
 
 static struct file_operations dv1394_fops=
 {
-        OWNER_THIS_MODULE
+	owner:		THIS_MODULE,
 	poll:           dv1394_poll,
 	ioctl:		dv1394_ioctl,
 	mmap:		dv1394_mmap,
@@ -2443,11 +2614,141 @@ static struct file_operations dv1394_fops=
 };
 
 
-static int dv1394_init(struct ti_ohci *ohci)
+/*** DEVFS HELPERS *********************************************************/
+
+struct dv1394_devfs_entry *
+dv1394_devfs_find( char *name)
+{
+	struct list_head *lh;
+	struct dv1394_devfs_entry *p;
+
+	spin_lock( &dv1394_devfs_lock);
+	if(!list_empty(&dv1394_devfs)) {
+		list_for_each(lh, &dv1394_devfs) {
+			p = list_entry(lh, struct dv1394_devfs_entry, list);
+			if(!strncmp(p->name, name, sizeof(p->name))) {
+				spin_unlock( &dv1394_devfs_lock);
+				return p;
+			}
+		}
+	}
+	return NULL;
+}
+
+static int dv1394_devfs_add_entry(struct video_card *video)
+{
+	char buf[32];
+	struct dv1394_devfs_entry *p;
+	struct dv1394_devfs_entry *parent;
+
+	p = kmalloc(sizeof(struct dv1394_devfs_entry), GFP_KERNEL);
+	if(!p) {
+		printk(KERN_ERR "dv1394: cannot allocate dv1394_devfs_entry\n");
+		goto err;
+	}
+	memset(p, 0, sizeof(struct dv1394_devfs_entry));
+	
+	snprintf(buf, sizeof(buf), "dv/host%d/%s", (video->id>>2),
+						(video->pal_or_ntsc == DV1394_NTSC ? "NTSC" : "PAL"));
+		
+	parent = dv1394_devfs_find(buf);
+	if (parent == NULL) {
+		printk(KERN_ERR "dv1394: unable to locate parent devfs of %s\n", buf);
+		goto err_free;
+	}
+	
+	video->devfs_handle = devfs_register(
+						 parent->devfs,
+					     (video->mode == MODE_RECEIVE ? "in" : "out"),
+						 DEVFS_FL_NONE,
+					     IEEE1394_MAJOR,
+					     IEEE1394_MINOR_BLOCK_DV1394*16 + video->id,
+					     S_IFCHR | S_IRUGO | S_IWUGO,
+					     &dv1394_fops,
+					     (void*) video);
+	p->devfs = video->devfs_handle;
+
+	if (p->devfs == NULL) {
+		printk(KERN_ERR "dv1394: unable to create /dev/ieee1394/%s/%s\n",
+			parent->name,
+			(video->mode == MODE_RECEIVE ? "in" : "out"));
+		goto err_free;
+	}
+	
+	spin_lock( &dv1394_devfs_lock);
+	INIT_LIST_HEAD(&p->list);
+	list_add_tail(&p->list, &dv1394_devfs);
+	spin_unlock( &dv1394_devfs_lock);
+	
+	return 0;
+	
+ err_free:
+	kfree(p);
+ err:
+	return -ENOMEM;
+}
+
+static int
+dv1394_devfs_add_dir( char *name,
+					struct dv1394_devfs_entry *parent, 
+					struct dv1394_devfs_entry **out)
+{
+	struct dv1394_devfs_entry *p;
+
+	p = kmalloc(sizeof(struct dv1394_devfs_entry), GFP_KERNEL);
+	if(!p) {
+		printk(KERN_ERR "dv1394: cannot allocate dv1394_devfs_entry\n");
+		goto err;
+	}
+	memset(p, 0, sizeof(struct dv1394_devfs_entry));
+	
+	if (parent == NULL) {
+		snprintf(p->name, sizeof(p->name), "%s", name);
+		p->devfs = devfs_mk_dir(ieee1394_devfs_handle, name, NULL);
+	} else {
+		snprintf(p->name, sizeof(p->name), "%s/%s", parent->name, name);
+		p->devfs = devfs_mk_dir(parent->devfs, name, NULL);
+	}
+	if (p->devfs == NULL) {
+		printk(KERN_ERR "dv1394: unable to create /dev/ieee1394/%s\n", p->name);
+		goto err_free;
+	}
+
+	p->parent = parent;
+	if (out != NULL) *out = p;
+
+	spin_lock( &dv1394_devfs_lock);
+	INIT_LIST_HEAD(&p->list);
+	list_add_tail(&p->list, &dv1394_devfs);
+	spin_unlock( &dv1394_devfs_lock);
+
+	return 0;
+	
+ err_free:
+	kfree(p);
+ err:
+	return -ENOMEM;
+}
+
+void dv1394_devfs_del( char *name)
+{
+	struct dv1394_devfs_entry *p = dv1394_devfs_find(name);
+	if (p != NULL) {
+		devfs_unregister(p->devfs);
+		
+		spin_lock( &dv1394_devfs_lock);
+		list_del(&p->list);
+		spin_unlock( &dv1394_devfs_lock);
+		kfree(p);
+	}
+}
+
+/*** IEEE1394 HPSB CALLBACKS ***********************************************/
+
+static int dv1394_init(struct ti_ohci *ohci, enum pal_or_ntsc format, enum modes mode)
 {
 	struct video_card *video;
 	unsigned long flags;
-	char buf[16];
 	int i;
 
 	video = kmalloc(sizeof(struct video_card), GFP_KERNEL);
@@ -2465,10 +2766,9 @@ static int dv1394_init(struct ti_ohci *ohci)
 
 	
 	video->ohci = ohci;
-	video->id = ohci->id;
-
-	if ( dv1394_procfs_add_entry(video) < 0 )
-		goto err_free;
+	/* lower 2 bits of id indicate which of four "plugs"
+	   per host */
+	video->id = ohci->id << 2; 
 
 	video->ohci_it_ctx = -1;
 	video->ohci_ir_ctx = -1;
@@ -2483,14 +2783,20 @@ static int dv1394_init(struct ti_ohci *ohci)
 	video->ohci_IsoRcvContextMatch = 0;
 		
 	video->n_frames = 0; /* flag that video is not initialized */
-	video->channel = -1;
+	video->channel = 63; /* default to broadcast channel */
 	video->active_frame = -1;
 	
 	/* initialize the following for proc_fs */
-	video->pal_or_ntsc = DV1394_NTSC;
+	video->pal_or_ntsc = format;
 	video->cip_n = 0; /* 0 = use builtin default */
 	video->cip_d = 0;
 	video->syt_offset = 0;
+	video->mode = mode;
+
+#ifdef CONFIG_PROC_FS
+	if ( dv1394_procfs_add_entry(video) < 0 )
+		goto err_free;
+#endif
 
 	for(i = 0; i < DV1394_MAX_FRAMES; i++)
 		video->frames[i] = NULL;
@@ -2509,17 +2815,14 @@ static int dv1394_init(struct ti_ohci *ohci)
 	list_add_tail(&video->list, &dv1394_cards);
 	spin_unlock_irqrestore(&dv1394_cards_lock, flags);
 	
-	snprintf(buf, sizeof(buf), "%d", video->id);
+	if (format == DV1394_NTSC)
+		video->id |= mode;
+	else video->id |= 2 + mode;
 	
-	video->devfs_handle = devfs_register(dv1394_devfs_handle,
-					     buf, DEVFS_FL_NONE,
-					     IEEE1394_MAJOR,
-					     IEEE1394_MINOR_BLOCK_DV1394*16 + video->id,
-					     S_IFCHR | S_IRUGO | S_IWUGO,
-					     &dv1394_fops,
-					     (void*) video);
+	if (dv1394_devfs_add_entry(video) < 0)
+			goto err_free;
 
-	debug_printk("dv1394: dv1394_init() OK on ID %d\n", ohci->id);
+	debug_printk("dv1394: dv1394_init() OK on ID %d\n", video->id);
 	
 	return 0;
 
@@ -2531,18 +2834,20 @@ static int dv1394_init(struct ti_ohci *ohci)
 
 static void dv1394_un_init(struct video_card *video)
 {
-	unsigned long flags;
+	char buf[32];
 	
 	/* obviously nobody has the driver open at this point */
 	do_dv1394_shutdown(video, 1);
 	ohci1394_unhook_irq(video->ohci, irq_handler, (void*) video);
-	if(video->devfs_handle)
-		devfs_unregister(video->devfs_handle);
-
-	spin_lock_irqsave(&dv1394_cards_lock, flags);
+	snprintf(buf, sizeof(buf), "dv/host%d/%s/%s", (video->id >> 2),
+		(video->pal_or_ntsc == DV1394_NTSC ? "NTSC" : "PAL"),
+		(video->mode == MODE_RECEIVE ? "in" : "out")
+		);
+	dv1394_devfs_del(buf);
+#ifdef CONFIG_PROC_FS
+	dv1394_procfs_del(buf);
+#endif
 	list_del(&video->list);
-	spin_unlock_irqrestore(&dv1394_cards_lock, flags);
-	
 	kfree(video);
 }
 
@@ -2553,6 +2858,8 @@ static void dv1394_remove_host (struct hpsb_host *host)
 	struct video_card *video = NULL;
 	unsigned long flags;
 	struct list_head *lh;
+	char buf[32];
+	int	n;
 	
 	/* We only work with the OHCI-1394 driver */
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
@@ -2561,33 +2868,40 @@ static void dv1394_remove_host (struct hpsb_host *host)
 	ohci = (struct ti_ohci *)host->hostdata;
 
 
-	/* find the corresponding video_card */
+	/* find the corresponding video_cards */
 	spin_lock_irqsave(&dv1394_cards_lock, flags);
 	if(!list_empty(&dv1394_cards)) {
-		struct video_card *p;
 		list_for_each(lh, &dv1394_cards) {
-			p = list_entry(lh, struct video_card, list);
-			if(p->id == ohci->id) {
-				video = p;
-				break;
-			}
+			video = list_entry(lh, struct video_card, list);
+			if((video->id >> 2) == ohci->id)
+				dv1394_un_init(video);
 		}
 	}
 	spin_unlock_irqrestore(&dv1394_cards_lock, flags);
 
-	if(video) {
-		char buf[16];
-		dv1394_un_init(video);
-		snprintf( buf, sizeof(buf), "%i", video->id);
+	n = (video->id >> 2);
+	snprintf(buf, sizeof(buf), "dv/host%d/NTSC", n);
+	dv1394_devfs_del(buf);
+	snprintf(buf, sizeof(buf), "dv/host%d/PAL", n);
+	dv1394_devfs_del(buf);
+	snprintf(buf, sizeof(buf), "dv/host%d", n);
+	dv1394_devfs_del(buf);
+
 #ifdef CONFIG_PROC_FS
-		remove_proc_entry( buf, dv1394_procfs_entry);
-#endif
-	}
+	snprintf(buf, sizeof(buf), "dv/host%d/NTSC", n);
+	dv1394_procfs_del(buf);
+	snprintf(buf, sizeof(buf), "dv/host%d/PAL", n);
+	dv1394_procfs_del(buf);
+	snprintf(buf, sizeof(buf), "dv/host%d", n);
+	dv1394_procfs_del(buf);
+#endif	
 }
 
 static void dv1394_add_host (struct hpsb_host *host)
 {
 	struct ti_ohci *ohci;
+	char buf[16];
+	struct dv1394_devfs_entry *devfs_entry;
 
 	/* We only work with the OHCI-1394 driver */
 	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
@@ -2595,7 +2909,31 @@ static void dv1394_add_host (struct hpsb_host *host)
 
 	ohci = (struct ti_ohci *)host->hostdata;
 
-	dv1394_init(ohci);
+#ifdef CONFIG_PROC_FS
+{
+	struct dv1394_procfs_entry *p;
+	p = dv1394_procfs_find("dv");
+	if (p != NULL) {
+		snprintf(buf, sizeof(buf), "host%d", ohci->id);
+		dv1394_procfs_add_dir(buf, p, &p);
+		dv1394_procfs_add_dir("NTSC", p, NULL);
+		dv1394_procfs_add_dir("PAL", p, NULL);
+	}
+}
+#endif
+
+	devfs_entry = dv1394_devfs_find("dv");
+	if (devfs_entry != NULL) {
+		snprintf(buf, sizeof(buf), "host%d", ohci->id);
+		dv1394_devfs_add_dir(buf, devfs_entry, &devfs_entry);
+		dv1394_devfs_add_dir("NTSC", devfs_entry, NULL);
+		dv1394_devfs_add_dir("PAL", devfs_entry, NULL);
+	}
+	
+	dv1394_init(ohci, DV1394_NTSC, MODE_RECEIVE);
+	dv1394_init(ohci, DV1394_NTSC, MODE_TRANSMIT);
+	dv1394_init(ohci, DV1394_PAL, MODE_RECEIVE);
+	dv1394_init(ohci, DV1394_PAL, MODE_TRANSMIT);
 }
 
 static struct hpsb_highlevel_ops hl_ops = {
@@ -2615,9 +2953,9 @@ static void __exit dv1394_exit_module(void)
 {
 	hpsb_unregister_highlevel (hl_handle);
 	ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
-	devfs_unregister(dv1394_devfs_handle);
+	dv1394_devfs_del("dv");
 #ifdef CONFIG_PROC_FS
-	remove_proc_entry( "dv", ieee1394_procfs_entry);
+	dv1394_procfs_del("dv");
 #endif
 }
 
@@ -2629,26 +2967,28 @@ static int __init dv1394_init_module(void)
 		return -EIO;
 	}
 
-	dv1394_devfs_handle = devfs_mk_dir(ieee1394_devfs_handle, "dv", NULL);
-
-#ifdef CONFIG_PROC_FS
-	dv1394_procfs_entry = proc_mkdir( "dv", ieee1394_procfs_entry);
-	if (dv1394_procfs_entry == NULL) {
-		printk(KERN_ERR "dv1394: unable to create /proc/ieee1394/dv\n");
+	if (dv1394_devfs_add_dir("dv", NULL, NULL) < 0) {
+		printk(KERN_ERR "dv1394: unable to create /dev/ieee1394/dv\n");
 		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
-		devfs_unregister(dv1394_devfs_handle);
 		return -ENOMEM;
 	}
-	dv1394_procfs_entry->owner = THIS_MODULE;
+
+#ifdef CONFIG_PROC_FS
+	if (dv1394_procfs_add_dir("dv",NULL,NULL) < 0) {
+		printk(KERN_ERR "dv1394: unable to create /proc/bus/ieee1394/dv\n");
+		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
+		dv1394_devfs_del("dv");
+		return -ENOMEM;
+	}
 #endif
 
 	hl_handle = hpsb_register_highlevel ("dv1394", &hl_ops);
 	if (hl_handle == NULL) {
 		printk(KERN_ERR "dv1394: hpsb_register_highlevel failed\n");
 		ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
-		devfs_unregister(dv1394_devfs_handle);
+		dv1394_devfs_del("dv");
 #ifdef CONFIG_PROC_FS
-		remove_proc_entry( "dv", ieee1394_procfs_entry);
+		dv1394_procfs_del("dv");
 #endif
 		return -ENOMEM;
 	}

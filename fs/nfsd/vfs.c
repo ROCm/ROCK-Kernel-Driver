@@ -264,6 +264,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 		if (err)
 			goto out_nfserr;
 
+		size_change = 1;
 		err = locks_verify_truncate(inode, NULL, iap->ia_size);
 		if (err) {
 			put_write_access(inode);
@@ -279,35 +280,24 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 	}
 
 	/* Revoke setuid/setgid bit on chown/chgrp */
-	if ((iap->ia_valid & ATTR_UID) && (imode & S_ISUID)
-	 && iap->ia_uid != inode->i_uid) {
-		iap->ia_valid |= ATTR_MODE;
-		iap->ia_mode = imode &= ~S_ISUID;
-	}
-	if ((iap->ia_valid & ATTR_GID) && (imode & S_ISGID)
-	 && iap->ia_gid != inode->i_gid) {
-		iap->ia_valid |= ATTR_MODE;
-		iap->ia_mode = imode &= ~S_ISGID;
-	}
+	if ((iap->ia_valid & ATTR_UID) && iap->ia_uid != inode->i_uid)
+		iap->ia_valid |= ATTR_KILL_SUID;
+	if ((iap->ia_valid & ATTR_GID) && iap->ia_gid != inode->i_gid)
+		iap->ia_valid |= ATTR_KILL_SGID;
 
 	/* Change the attributes. */
 
-
 	iap->ia_valid |= ATTR_CTIME;
 
-	if (iap->ia_valid & ATTR_SIZE) {
-		fh_lock(fhp);
-		size_change = 1;
-	}
 	err = nfserr_notsync;
 	if (!check_guard || guardtime == inode->i_ctime) {
+		fh_lock(fhp);
 		err = notify_change(dentry, iap);
 		err = nfserrno(err);
-	}
-	if (size_change) {
 		fh_unlock(fhp);
-		put_write_access(inode);
 	}
+	if (size_change)
+		put_write_access(inode);
 	if (!err)
 		if (EX_ISSYNC(fhp->fh_export))
 			write_inode_now(inode, 1);
@@ -725,10 +715,11 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 	/* clear setuid/setgid flag after write */
 	if (err >= 0 && (inode->i_mode & (S_ISUID | S_ISGID))) {
 		struct iattr	ia;
+		ia.ia_valid = ATTR_KILL_SUID | ATTR_KILL_SGID;
 
-		ia.ia_valid = ATTR_MODE;
-		ia.ia_mode  = inode->i_mode & ~(S_ISUID | S_ISGID);
+		down(&inode->i_sem);
 		notify_change(dentry, &ia);
+		up(&inode->i_sem);
 	}
 
 	if (err >= 0 && stable) {
@@ -1157,7 +1148,9 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 				iap->ia_valid |= ATTR_CTIME;
 				iap->ia_mode = (iap->ia_mode&S_IALLUGO)
 					| S_IFLNK;
+				down(&dentry->d_inode->i_sem);
 				err = notify_change(dnew, iap);
+				up(&dentry->d_inode->i_sem);
 				if (!err && EX_ISSYNC(fhp->fh_export))
 					write_inode_now(dentry->d_inode, 1);
 		       }

@@ -415,8 +415,8 @@ struct hpsb_packet *hpsb_make_phypacket(struct hpsb_host *host,
  * avoid in kernel buffers for user space callers
  */
 
-int hpsb_read(struct hpsb_host *host, nodeid_t node, u64 addr,
-              quadlet_t *buffer, size_t length)
+int hpsb_read(struct hpsb_host *host, nodeid_t node, unsigned int generation,
+	      u64 addr, quadlet_t *buffer, size_t length)
 {
         struct hpsb_packet *packet;
         int retval = 0;
@@ -447,7 +447,7 @@ int hpsb_read(struct hpsb_host *host, nodeid_t node, u64 addr,
                 return -ENOMEM;
         }
 
-	packet->generation = get_hpsb_generation(host);
+	packet->generation = generation;
         if (!hpsb_send_packet(packet)) {
 		retval = -EINVAL;
 		goto hpsb_read_fail;
@@ -496,8 +496,8 @@ struct hpsb_packet *hpsb_make_packet (struct hpsb_host *host, nodeid_t node,
 	return packet;
 }
 
-int hpsb_write(struct hpsb_host *host, nodeid_t node, u64 addr,
-	       quadlet_t *buffer, size_t length)
+int hpsb_write(struct hpsb_host *host, nodeid_t node, unsigned int generation,
+	       u64 addr, quadlet_t *buffer, size_t length)
 {
 	struct hpsb_packet *packet;
 	int retval;
@@ -522,7 +522,7 @@ int hpsb_write(struct hpsb_host *host, nodeid_t node, u64 addr,
 	if (!packet)
 		return -ENOMEM;
 
-	packet->generation = get_hpsb_generation(host);
+	packet->generation = generation;
         if (!hpsb_send_packet(packet)) {
 		retval = -EINVAL;
 		goto hpsb_write_fail;
@@ -541,8 +541,8 @@ hpsb_write_fail:
 
 
 /* We need a hpsb_lock64 function for the 64 bit equivalent.  Probably. */
-int hpsb_lock(struct hpsb_host *host, nodeid_t node, u64 addr, int extcode,
-              quadlet_t *data, quadlet_t arg)
+int hpsb_lock(struct hpsb_host *host, nodeid_t node, unsigned int generation,
+	      u64 addr, int extcode, quadlet_t *data, quadlet_t arg)
 {
         struct hpsb_packet *packet;
         int retval = 0, length;
@@ -588,7 +588,7 @@ int hpsb_lock(struct hpsb_host *host, nodeid_t node, u64 addr, int extcode,
         }
         fill_async_lock(packet, addr, extcode, length);
 
-	packet->generation = get_hpsb_generation(host);
+	packet->generation = generation;
         if (!hpsb_send_packet(packet)) {
 		retval = -EINVAL;
 		goto hpsb_lock_fail;

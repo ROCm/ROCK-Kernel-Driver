@@ -119,6 +119,7 @@ static int setattr_mask(unsigned int ia_valid)
 int notify_change(struct dentry * dentry, struct iattr * attr)
 {
 	struct inode *inode = dentry->d_inode;
+	mode_t mode = inode->i_mode;
 	int error;
 	time_t now = CURRENT_TIME;
 	unsigned int ia_valid = attr->ia_valid;
@@ -131,8 +132,25 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 		attr->ia_atime = now;
 	if (!(ia_valid & ATTR_MTIME_SET))
 		attr->ia_mtime = now;
+	if (ia_valid & ATTR_KILL_SUID) {
+		if (mode & S_ISUID) {
+			if (!ia_valid & ATTR_MODE) {
+				ia_valid = attr->ia_valid |= ATTR_MODE;
+				attr->ia_mode = inode->i_mode;
+			}
+			attr->ia_mode &= ~S_ISUID;
+		}
+	}
+	if (ia_valid & ATTR_KILL_SGID) {
+		if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
+			if (!ia_valid & ATTR_MODE) {
+				ia_valid = attr->ia_valid |= ATTR_MODE;
+				attr->ia_mode = inode->i_mode;
+			}
+			attr->ia_mode &= ~S_ISGID;
+		}
+	}
 
-	down(&inode->i_sem);
 	if (inode->i_op && inode->i_op->setattr) 
 		error = inode->i_op->setattr(dentry, attr);
 	else {
@@ -145,7 +163,6 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 				error = inode_setattr(inode, attr);
 		}
 	}
-	up(&inode->i_sem);
 	if (!error) {
 		unsigned long dn_mask = setattr_mask(ia_valid);
 		if (dn_mask)

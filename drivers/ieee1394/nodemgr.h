@@ -125,7 +125,7 @@ struct node_entry {
 	struct hpsb_host *host;		/* Host this node is attached to */
 	nodeid_t nodeid;		/* NodeID */
 	struct bus_options busopt;	/* Bus Options */
-	atomic_t generation;		/* Synced with hpsb generation */
+	unsigned int generation;	/* Synced with hpsb generation */
 
 	/* The following is read from the config rom */
 	u32 vendor_id;
@@ -138,7 +138,7 @@ struct node_entry {
 
 static inline int hpsb_node_entry_valid(struct node_entry *ne)
 {
-	return atomic_read(&ne->generation) == get_hpsb_generation(ne->host);
+	return ne->generation == get_hpsb_generation(ne->host);
 }
 
 /*
@@ -170,10 +170,17 @@ struct hpsb_host *hpsb_get_host_by_ne(struct node_entry *ne);
  * number).  It will at least reliably fail so that you don't accidentally and
  * unknowingly send your packet to the wrong node.
  */
-int hpsb_guid_fill_packet(struct node_entry *ne, struct hpsb_packet *pkt);
+void hpsb_node_fill_packet(struct node_entry *ne, struct hpsb_packet *pkt);
+
+int hpsb_node_read(struct node_entry *ne, u64 addr,
+		   quadlet_t *buffer, size_t length);
+int hpsb_node_write(struct node_entry *ne, u64 addr, 
+		    quadlet_t *buffer, size_t length);
+int hpsb_node_lock(struct node_entry *ne, u64 addr, 
+		   int extcode, quadlet_t *data, quadlet_t arg);
 
 
-void init_ieee1394_nodemgr(void);
+void init_ieee1394_nodemgr(int disable_hotplug);
 void cleanup_ieee1394_nodemgr(void);
 
 #endif /* _IEEE1394_NODEMGR_H */
