@@ -387,7 +387,7 @@ void *__vmalloc(unsigned long size, int gfp_mask, pgprot_t prot)
 	if (!area)
 		return NULL;
 
-	nr_pages = (size+PAGE_SIZE) >> PAGE_SHIFT;
+	nr_pages = size >> PAGE_SHIFT;
 	array_size = (nr_pages * sizeof(struct page *));
 
 	area->nr_pages = nr_pages;

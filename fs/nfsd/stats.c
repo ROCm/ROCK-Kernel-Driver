@@ -27,7 +27,6 @@
 #include <linux/time.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/sunrpc/svc.h>

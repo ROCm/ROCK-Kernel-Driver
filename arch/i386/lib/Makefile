@@ -4,7 +4,7 @@
 
 L_TARGET = lib.a
 
-obj-y = checksum.o old-checksum.o delay.o \
+obj-y = checksum.o delay.o \
 	usercopy.o getuser.o \
 	memcpy.o strstr.o
 

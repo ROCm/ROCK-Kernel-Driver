@@ -1,15 +1,13 @@
 #ifndef _SPARC64_SIGINFO_H
 #define _SPARC64_SIGINFO_H
 
-#define SI_PAD_SIZE	((SI_MAX_SIZE/sizeof(int)) - 4)
 #define SI_PAD_SIZE32	((SI_MAX_SIZE/sizeof(int)) - 3)
 
 #define SIGEV_PAD_SIZE	((SIGEV_MAX_SIZE/sizeof(int)) - 4)
 #define SIGEV_PAD_SIZE32 ((SIGEV_MAX_SIZE/sizeof(int)) - 3)
 
-#define HAVE_ARCH_SIGINFO_T
-#define HAVE_ARCH_COPY_SIGINFO
-#define HAVE_ARCH_COPY_SIGINFO_TO_USER
+#define __ARCH_SI_PREAMBLE_SIZE	(4 * sizeof(int))
+#define __ARCH_SI_TRAPNO
 
 #include <asm-generic/siginfo.h>
 
@@ -19,60 +17,6 @@ typedef union sigval32 {
 	int sival_int;
 	u32 sival_ptr;
 } sigval_t32;
-
-#endif /* __KERNEL__ */
-
-typedef struct siginfo {
-	int si_signo;
-	int si_errno;
-	int si_code;
-
-	union {
-		int _pad[SI_PAD_SIZE];
-
-		/* kill() */
-		struct {
-			pid_t _pid;		/* sender's pid */
-			uid_t _uid;		/* sender's uid */
-		} _kill;
-
-		/* POSIX.1b timers */
-		struct {
-			unsigned int _timer1;
-			unsigned int _timer2;
-		} _timer;
-
-		/* POSIX.1b signals */
-		struct {
-			pid_t _pid;		/* sender's pid */
-			uid_t _uid;		/* sender's uid */
-			sigval_t _sigval;
-		} _rt;
-
-		/* SIGCHLD */
-		struct {
-			pid_t _pid;		/* which child */
-			uid_t _uid;		/* sender's uid */
-			int _status;		/* exit code */
-			clock_t _utime;
-			clock_t _stime;
-		} _sigchld;
-
-		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS, SIGEMT */
-		struct {
-			void *_addr; /* faulting insn/memory ref. */
-			int  _trapno; /* TRAP # which caused the signal */
-		} _sigfault;
-
-		/* SIGPOLL */
-		struct {
-			long _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
-			int _fd;
-		} _sigpoll;
-	} _sifields;
-} siginfo_t;
-
-#ifdef __KERNEL__
 
 typedef struct siginfo32 {
 	int si_signo;
@@ -126,8 +70,6 @@ typedef struct siginfo32 {
 
 #endif /* __KERNEL__ */
 
-#define si_trapno	_sifields._sigfault._trapno
-
 #define SI_NOINFO	32767		/* no information in siginfo_t */
 
 /*
@@ -151,17 +93,6 @@ typedef struct sigevent32 {
 		} _sigev_thread;
 	} _sigev_un;
 } sigevent_t32;
-
-#include <linux/string.h>
-
-static inline void copy_siginfo(siginfo_t *to, siginfo_t *from)
-{
-	if (from->si_code < 0)
-		*to = *from;
-	else
-		/* _sigchld is currently the largest know union member */
-		memcpy(to, from, 4*sizeof(int) + sizeof(from->_sifields._sigchld));
-}
 
 extern int copy_siginfo_to_user32(siginfo_t32 *to, siginfo_t *from);
 

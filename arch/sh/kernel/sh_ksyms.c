@@ -36,9 +36,6 @@ EXPORT_SYMBOL(disable_irq_nosync);
 EXPORT_SYMBOL(irq_desc);
 EXPORT_SYMBOL(no_irq_type);
 
-/* Networking helper routines. */
-EXPORT_SYMBOL(csum_partial_copy);
-
 EXPORT_SYMBOL(strpbrk);
 EXPORT_SYMBOL(strstr);
 EXPORT_SYMBOL(strlen);

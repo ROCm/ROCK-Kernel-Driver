@@ -94,7 +94,7 @@ static inline int filemap_sync_pmd_range(pgd_t * pgd,
 	return error;
 }
 
-int filemap_sync(struct vm_area_struct * vma, unsigned long address,
+static int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 	size_t size, unsigned int flags)
 {
 	pgd_t * dir;

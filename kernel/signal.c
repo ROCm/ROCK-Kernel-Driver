@@ -1427,6 +1427,9 @@ int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
 		break;
 	case __SI_FAULT:
 		err |= __put_user(from->si_addr, &to->si_addr);
+#ifdef __ARCH_SI_TRAPNO
+		err |= __put_user(from->si_trapno, &to->si_trapno);
+#endif
 		break;
 	case __SI_CHLD:
 		err |= __put_user(from->si_pid, &to->si_pid);

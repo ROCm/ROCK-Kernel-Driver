@@ -902,13 +902,13 @@ struct sock *tcp_check_req(struct sock *sk,struct sk_buff *skb,
 	 *                  and the incoming segment acknowledges something not yet
 	 *                  sent (the segment carries an unaccaptable ACK) ...
 	 *                  a reset is sent."
+	 *
+	 * Invalid ACK: reset will be sent by listening socket
 	 */
-	if (!(flg & TCP_FLAG_ACK))
-		return NULL;
-
-	/* Invalid ACK: reset will be sent by listening socket */
-	if (TCP_SKB_CB(skb)->ack_seq != req->snt_isn+1)
+	if ((flg & TCP_FLAG_ACK) &&
+	    (TCP_SKB_CB(skb)->ack_seq != req->snt_isn+1))
 		return sk;
+
 	/* Also, it would be not so bad idea to check rcv_tsecr, which
 	 * is essentially ACK extension and too early or too late values
 	 * should cause reset in unsynchronized states.

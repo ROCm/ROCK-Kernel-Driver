@@ -2896,13 +2896,6 @@ __inline__ struct cmsghdr32 *cmsg32_nxthdr (struct msghdr *__msg,
 			       __cmsg, __cmsg_len);
 }
 
-extern struct socket *sockfd_lookup(int fd, int *err);
-
-extern __inline__ void sockfd_put(struct socket *sock)
-{
-	fput(sock->file);
-}
-
 static inline int msghdr_from_user32_to_kern(struct msghdr *kmsg, struct msghdr32 *umsg)
 {
 	u32 tmp1, tmp2, tmp3;

@@ -285,8 +285,6 @@ struct tcp_opt {
 
 	struct tcp_func		*af_specific;	/* Operations which are AF_INET{4,6} specific	*/
 	struct sk_buff		*send_head;	/* Front of stuff to transmit			*/
-	struct page		*sndmsg_page;	/* Cached page for sendmsg			*/
-	u32			sndmsg_off;	/* Cached offset for sendmsg			*/
 
  	__u32	rcv_wnd;	/* Current receiver window		*/
 	__u32	rcv_wup;	/* rcv_nxt on last window update sent	*/

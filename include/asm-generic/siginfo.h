@@ -8,9 +8,21 @@ typedef union sigval {
 	void *sival_ptr;
 } sigval_t;
 
+/*
+ * This is the size (including padding) of the part of the
+ * struct siginfo that is before the union.
+ */
+#ifndef __ARCH_SI_PREAMBLE_SIZE
+#define __ARCH_SI_PREAMBLE_SIZE	(3 * sizeof(int))
+#endif
+
 #define SI_MAX_SIZE	128
 #ifndef SI_PAD_SIZE
-#define SI_PAD_SIZE	((SI_MAX_SIZE/sizeof(int)) - 3)
+#define SI_PAD_SIZE	((SI_MAX_SIZE - __ARCH_SI_PREAMBLE_SIZE) / sizeof(int))
+#endif
+
+#ifndef __ARCH_SI_UID_T
+#define __ARCH_SI_UID_T	uid_t
 #endif
 
 #ifndef HAVE_ARCH_SIGINFO_T
@@ -26,7 +38,7 @@ typedef struct siginfo {
 		/* kill() */
 		struct {
 			pid_t _pid;		/* sender's pid */
-			uid_t _uid;		/* sender's uid */
+			__ARCH_SI_UID_T _uid;	/* sender's uid */
 		} _kill;
 
 		/* POSIX.1b timers */
@@ -38,14 +50,14 @@ typedef struct siginfo {
 		/* POSIX.1b signals */
 		struct {
 			pid_t _pid;		/* sender's pid */
-			uid_t _uid;		/* sender's uid */
+			__ARCH_SI_UID_T _uid;	/* sender's uid */
 			sigval_t _sigval;
 		} _rt;
 
 		/* SIGCHLD */
 		struct {
 			pid_t _pid;		/* which child */
-			uid_t _uid;		/* sender's uid */
+			__ARCH_SI_UID_T _uid;	/* sender's uid */
 			int _status;		/* exit code */
 			clock_t _utime;
 			clock_t _stime;
@@ -54,6 +66,9 @@ typedef struct siginfo {
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
 		struct {
 			void *_addr; /* faulting insn/memory ref. */
+#ifdef __ARCH_SI_TRAPNO
+			int _trapno;	/* TRAP # which caused the signal */
+#endif
 		} _sigfault;
 
 		/* SIGPOLL */
@@ -80,6 +95,9 @@ typedef struct siginfo {
 #define si_int		_sifields._rt._sigval.sival_int
 #define si_ptr		_sifields._rt._sigval.sival_ptr
 #define si_addr		_sifields._sigfault._addr
+#ifdef __ARCH_SI_TRAPNO
+#define si_trapno	_sifields._sigfault._trapno
+#endif
 #define si_band		_sifields._sigpoll._band
 #define si_fd		_sifields._sigpoll._fd
 
@@ -244,7 +262,7 @@ static inline void copy_siginfo(struct siginfo *to, struct siginfo *from)
 		memcpy(to, from, sizeof(*to));
 	else
 		/* _sigchld is currently the largest know union member */
-		memcpy(to, from, 3*sizeof(int) + sizeof(from->_sifields._sigchld));
+		memcpy(to, from, __ARCH_SI_PREAMBLE_SIZE + sizeof(from->_sifields._sigchld));
 }
 
 #endif

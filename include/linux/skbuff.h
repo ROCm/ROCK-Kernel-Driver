@@ -765,6 +765,15 @@ static inline int skb_headlen(const struct sk_buff *skb)
 	return skb->len - skb->data_len;
 }
 
+static inline int skb_pagelen(const struct sk_buff *skb)
+{
+	int i, len = 0;
+
+	for (i = (int)skb_shinfo(skb)->nr_frags - 1; i >= 0; i--)
+		len += skb_shinfo(skb)->frags[i].size;
+	return len + skb_headlen(skb);
+}
+
 #define SKB_PAGE_ASSERT(skb) do { if (skb_shinfo(skb)->nr_frags) \
 					BUG(); } while (0)
 #define SKB_FRAG_ASSERT(skb) do { if (skb_shinfo(skb)->frag_list) \

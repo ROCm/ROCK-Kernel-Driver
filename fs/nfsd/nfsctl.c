@@ -8,7 +8,6 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/version.h>
 
 #include <linux/linkage.h>
 #include <linux/time.h>

@@ -774,6 +774,21 @@ int inet_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 	return sk->prot->sendmsg(iocb, sk, msg, size);
 }
 
+
+ssize_t inet_sendpage(struct socket *sock, struct page *page, int offset, size_t size, int flags)
+{
+	struct sock *sk = sock->sk;
+
+	/* We may need to bind the socket. */
+	if (!inet_sk(sk)->num && inet_autobind(sk))
+		return -EAGAIN;
+
+	if (sk->prot->sendpage)
+		return sk->prot->sendpage(sk, page, offset, size, flags);
+	return sock_no_sendpage(sock, page, offset, size, flags);
+}
+
+
 int inet_shutdown(struct socket *sock, int how)
 {
 	struct sock *sk = sock->sk;
@@ -977,7 +992,7 @@ struct proto_ops inet_dgram_ops = {
 	.sendmsg =	inet_sendmsg,
 	.recvmsg =	inet_recvmsg,
 	.mmap =		sock_no_mmap,
-	.sendpage =	sock_no_sendpage,
+	.sendpage =	inet_sendpage,
 };
 
 struct net_proto_family inet_family_ops = {

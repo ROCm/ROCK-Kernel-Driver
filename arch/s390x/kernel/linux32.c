@@ -2129,14 +2129,6 @@ asmlinkage int sys32_getrusage(int who, struct rusage32 *ru)
 					   24 for IPv6,
 					   about 80 for AX.25 */
 
-extern struct socket *sockfd_lookup(int fd, int *err);
-
-/* XXX This as well... */
-extern __inline__ void sockfd_put(struct socket *sock)
-{
-	fput(sock->file);
-}
-
 struct msghdr32 {
         u32               msg_name;
         int               msg_namelen;

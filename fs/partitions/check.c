@@ -522,9 +522,8 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 			continue;
 		add_partition(disk, p, from, size);
 #if CONFIG_BLK_DEV_MD
-		if (!state->parts[j].flags)
-			continue;
-		md_autodetect_dev(bdev->bd_dev+p);
+		if (state->parts[p].flags)
+			md_autodetect_dev(bdev->bd_dev+p);
 #endif
 	}
 	kfree(state);

@@ -29,12 +29,15 @@ struct dst_entry
 	struct dst_entry        *next;
 	atomic_t		__refcnt;	/* client references	*/
 	int			__use;
+	struct dst_entry	*child;
 	struct net_device       *dev;
 	int			obsolete;
 	int			flags;
 #define DST_HOST		1
 	unsigned long		lastuse;
 	unsigned long		expires;
+
+	unsigned		header_len;	/* more space at head required */
 
 	unsigned		mxlock;
 	unsigned		pmtu;
@@ -108,18 +111,30 @@ void dst_release(struct dst_entry * dst)
 		atomic_dec(&dst->__refcnt);
 }
 
+/* Children define the path of the packet through the
+ * Linux networking.  Thus, destinations are stackable.
+ */
+
+static inline struct dst_entry *dst_pop(struct dst_entry *dst)
+{
+	struct dst_entry *child = dst_clone(dst->child);
+
+	dst_release(dst);
+	return child;
+}
+
 extern void * dst_alloc(struct dst_ops * ops);
 extern void __dst_free(struct dst_entry * dst);
-extern void dst_destroy(struct dst_entry * dst);
+extern struct dst_entry *dst_destroy(struct dst_entry * dst);
 
-static inline
-void dst_free(struct dst_entry * dst)
+static inline void dst_free(struct dst_entry * dst)
 {
 	if (dst->obsolete > 1)
 		return;
 	if (!atomic_read(&dst->__refcnt)) {
-		dst_destroy(dst);
-		return;
+		dst = dst_destroy(dst);
+		if (!dst)
+			return;
 	}
 	__dst_free(dst);
 }
@@ -153,6 +168,37 @@ static inline void dst_set_expires(struct dst_entry *dst, int timeout)
 
 	if (dst->expires == 0 || (long)(dst->expires - expires) > 0)
 		dst->expires = expires;
+}
+
+/* Output packet to network from transport.  */
+static inline int dst_output(struct sk_buff *skb)
+{
+	int err;
+
+	for (;;) {
+		err = skb->dst->output(skb);
+
+		if (likely(err == 0))
+			return err;
+		if (unlikely(err != NET_XMIT_BYPASS))
+			return err;
+	}
+}
+
+/* Input packet from network to transport.  */
+static inline int dst_input(struct sk_buff *skb)
+{
+	int err;
+
+	for (;;) {
+		err = skb->dst->input(skb);
+
+		if (likely(err == 0))
+			return err;
+		/* Oh, Jamal... Seems, I will not forgive you this mess. :-) */
+		if (unlikely(err != NET_XMIT_BYPASS))
+			return err;
+	}
 }
 
 extern void		dst_init(void);

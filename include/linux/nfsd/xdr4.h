@@ -224,6 +224,12 @@ struct nfsd4_setclientid {
 	char *		se_callback_addr_val;   /* request */
 	u32		se_callback_ident;  /* request */
 	clientid_t	se_clientid;        /* response */
+	nfs4_verifier	se_confirm;         /* response */
+};
+
+struct nfsd4_setclientid_confirm {
+	clientid_t	sc_clientid;
+	nfs4_verifier	sc_confirm;
 };
 
 /* also used for NVERIFY */
@@ -267,7 +273,7 @@ struct nfsd4_op {
 		clientid_t			renew;
 		struct nfsd4_setattr		setattr;
 		struct nfsd4_setclientid	setclientid;
-		clientid_t			setclientid_confirm;
+		struct nfsd4_setclientid_confirm setclientid_confirm;
 		struct nfsd4_verify		verify;
 		struct nfsd4_write		write;
 	} u;
@@ -298,7 +304,6 @@ struct nfsd4_compoundres {
 
 #define NFS4_SVC_XDRSIZE		sizeof(struct nfsd4_compoundargs)
 
-#if CONFIG_NFSD_V3
 static inline void
 set_change_info(struct nfsd4_change_info *cinfo, struct svc_fh *fhp)
 {
@@ -309,7 +314,6 @@ set_change_info(struct nfsd4_change_info *cinfo, struct svc_fh *fhp)
 	cinfo->after_size = fhp->fh_post_size;
 	cinfo->after_ctime = fhp->fh_post_ctime;
 }
-#endif
 
 int nfs4svc_encode_voidres(struct svc_rqst *, u32 *, void *);
 int nfs4svc_decode_compoundargs(struct svc_rqst *, u32 *, struct nfsd4_compoundargs *);

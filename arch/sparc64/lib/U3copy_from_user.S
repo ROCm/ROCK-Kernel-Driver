@@ -7,6 +7,8 @@
 #ifdef __KERNEL__
 #include <asm/visasm.h>
 #include <asm/asi.h>
+#include <asm/dcu.h>
+#include <asm/spitfire.h>
 #undef SMALL_COPY_USES_FPU
 #define EXNV(x,y,a,b)			\
 98:	x,y;				\
@@ -181,6 +183,16 @@ U3copy_from_user_enter:
 
 	.align		64
 U3copy_from_user_begin:
+#ifdef __KERNEL__
+	.globl		U3copy_from_user_nop_1_6
+U3copy_from_user_nop_1_6:
+	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g3
+	sethi		%uhi(DCU_PE), %o3
+	sllx		%o3, 32, %o3
+	or		%g3, %o3, %o3
+	stxa		%o3, [%g0] ASI_DCU_CONTROL_REG	! Enable P-cache
+	membar		#Sync
+#endif
 	prefetcha	[%o1 + 0x000] %asi, #one_read	! MS	Group1
 	prefetcha	[%o1 + 0x040] %asi, #one_read	! MS	Group2
 	andn		%o2, (0x40 - 1), %o4		! A0
@@ -321,6 +333,13 @@ U3copy_from_user_loopfini:
 	stda		%f16, [%o0] ASI_BLK_P		! MS
 	add		%o0, 0x40, %o0			! A0
 	add		%o1, 0x40, %o1			! A1
+#ifdef __KERNEL__
+	.globl		U3copy_from_user_nop_2_3
+U3copy_from_user_nop_2_3:
+	mov		PRIMARY_CONTEXT, %o3
+	stxa		%g0, [%o3] ASI_DMMU		! Flush P-cache
+	stxa		%g3, [%g0] ASI_DCU_CONTROL_REG	! Disable P-cache
+#endif
 	membar		#Sync				! MS	Group26 (7-cycle stall)
 
 	/* Now we copy the (len modulo 64) bytes at the end.

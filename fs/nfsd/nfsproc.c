@@ -16,7 +16,6 @@
 #include <linux/net.h>
 #include <linux/in.h>
 #include <linux/namei.h>
-#include <linux/version.h>
 #include <linux/unistd.h>
 #include <linux/slab.h>
 
@@ -539,7 +538,7 @@ struct nfsd_void { int dummy; };
 #define FH 8		/* filehandle */
 #define	AT 18		/* attributes */
 
-struct svc_procedure		nfsd_procedures2[18] = {
+static struct svc_procedure		nfsd_procedures2[18] = {
   PROC(null,	 void,		void,		none,		RC_NOCACHE, ST),
   PROC(getattr,	 fhandle,	attrstat,	fhandle,	RC_NOCACHE, ST+AT),
   PROC(setattr,  sattrargs,	attrstat,	fhandle,	RC_REPLBUFF, ST+AT),
@@ -560,6 +559,14 @@ struct svc_procedure		nfsd_procedures2[18] = {
   PROC(statfs,	 fhandle,	statfsres,	none,		RC_NOCACHE, ST+5),
 };
 
+
+struct svc_version	nfsd_version2 = {
+		.vs_vers	= 2,
+		.vs_nproc	= 18,
+		.vs_proc	= nfsd_procedures2,
+		.vs_dispatch	= nfsd_dispatch,
+		.vs_xdrsize	= NFS2_SVC_XDRSIZE,
+};
 
 /*
  * Map errnos to NFS errnos.

@@ -243,6 +243,7 @@ EXPORT_SYMBOL(__prom_getsibling);
 
 /* sparc library symbols */
 EXPORT_SYMBOL(bcopy);
+EXPORT_SYMBOL(memchr);
 EXPORT_SYMBOL_NOVERS(memscan);
 EXPORT_SYMBOL_NOVERS(strlen);
 EXPORT_SYMBOL(strnlen);

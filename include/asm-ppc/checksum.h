@@ -38,14 +38,6 @@ extern unsigned int csum_partial_copy_generic(const char *src, char *dst,
 /* FIXME: this needs to be written to really do no check -- Cort */
 #define csum_partial_copy_nocheck(src, dst, len, sum)	\
 	csum_partial_copy_generic((src), (dst), (len), (sum), 0, 0)     
-/*
- * Old versions which ignore errors.
- */
-#define csum_partial_copy(src, dst, len, sum)	\
-	csum_partial_copy_generic((src), (dst), (len), (sum), 0, 0)
-#define csum_partial_copy_fromuser(src, dst, len, sum)	\
-	csum_partial_copy_generic((src), (dst), (len), (sum), 0, 0)
-
 
 /*
  * turns a 32-bit partial checksum (e.g. from csum_partial) into a

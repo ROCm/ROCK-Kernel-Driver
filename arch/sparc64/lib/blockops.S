@@ -9,6 +9,8 @@
 #include <asm/visasm.h>
 #include <asm/thread_info.h>
 #include <asm/page.h>
+#include <asm/dcu.h>
+#include <asm/spitfire.h>
 #include <asm/pgtable.h>
 
 #define TOUCH(reg0, reg1, reg2, reg3, reg4, reg5, reg6, reg7)	\
@@ -111,6 +113,15 @@ cheetah_patch_1:
 	 nop
 
 cheetah_copy_user_page:
+	.globl		cheetah_copy_user_page_nop_1_6
+cheetah_copy_user_page_nop_1_6:
+	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g3
+	sethi		%uhi(DCU_PE), %o2
+	sllx		%o2, 32, %o2
+	or		%g3, %o2, %o2
+	stxa		%o2, [%g0] ASI_DCU_CONTROL_REG	! Enable P-cache
+	membar		#Sync
+
 	sethi		%hi((PAGE_SIZE/64)-7), %o2	! A0 Group
 	prefetch	[%o1 + 0x000], #one_read	! MS
 	or		%o2, %lo((PAGE_SIZE/64)-7), %o2	! A1 Group
@@ -202,6 +213,11 @@ cheetah_copy_user_page:
 	fmovd		%f12, %f44			! FGA Group
 	fmovd		%f14, %f46			! FGA Group
 	stda		%f32, [%o0] ASI_BLK_P		! MS
+	.globl		cheetah_copy_user_page_nop_2_3
+cheetah_copy_user_page_nop_2_3:
+	mov		PRIMARY_CONTEXT, %o2
+	stxa		%g0, [%o2] ASI_DMMU		! Flush P-cache
+	stxa		%g3, [%g0] ASI_DCU_CONTROL_REG	! Disable P-cache
 	ba,a,pt		%xcc, copy_user_page_continue
 
 spitfire_copy_user_page:

@@ -36,7 +36,7 @@
 #include <linux/nfs.h>
 
 #define NLMDBG_FACILITY		NLMDBG_SVC
-#define LOCKD_BUFSIZE		(1024 + NLMSSVC_XDRSIZE)
+#define LOCKD_BUFSIZE		(1024 + NLMSVC_XDRSIZE)
 #define ALLOWED_SIGS		(sigmask(SIGKILL))
 
 extern struct svc_program	nlmsvc_program;
@@ -223,7 +223,7 @@ lockd_up(void)
 			"lockd_up: no pid, %d users??\n", nlmsvc_users);
 
 	error = -ENOMEM;
-	serv = svc_create(&nlmsvc_program, 0, NLMSVC_XDRSIZE);
+	serv = svc_create(&nlmsvc_program, LOCKD_BUFSIZE);
 	if (!serv) {
 		printk(KERN_WARNING "lockd_up: create service failed\n");
 		goto out;
@@ -358,17 +358,20 @@ static struct svc_version	nlmsvc_version1 = {
 		.vs_vers	= 1,
 		.vs_nproc	= 17,
 		.vs_proc	= nlmsvc_procedures,
+		.vs_xdrsize	= NLMSVC_XDRSIZE,
 };
 static struct svc_version	nlmsvc_version3 = {
 		.vs_vers	= 3,
 		.vs_nproc	= 24,
 		.vs_proc	= nlmsvc_procedures,
+		.vs_xdrsize	= NLMSVC_XDRSIZE,
 };
 #ifdef CONFIG_LOCKD_V4
 static struct svc_version	nlmsvc_version4 = {
 		.vs_vers	= 4,
 		.vs_nproc	= 24,
 		.vs_proc	= nlmsvc_procedures4,
+		.vs_xdrsize	= NLMSVC_XDRSIZE,
 };
 #endif
 static struct svc_version *	nlmsvc_version[] = {
@@ -384,8 +387,6 @@ static struct svc_stat		nlmsvc_stats;
 #define NLM_NRVERS	(sizeof(nlmsvc_version)/sizeof(nlmsvc_version[0]))
 struct svc_program	nlmsvc_program = {
 	.pg_prog	= NLM_PROGRAM,		/* program number */
-	.pg_lovers	= 1,			/* version */
-	.pg_hivers	= NLM_NRVERS-1,		/* range */
 	.pg_nvers	= NLM_NRVERS,		/* number of entries in nlmsvc_version */
 	.pg_vers	= nlmsvc_version,	/* version table */
 	.pg_name	= "lockd",		/* service name */
