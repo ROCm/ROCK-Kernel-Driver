@@ -949,7 +949,7 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 	int len;
 	DECODE_HEAD;
 
-	READ_BUF(sizeof(stateid_t) + 16);
+	READ_BUF(sizeof(stateid_opaque_t) + 20);
 	READ32(write->wr_stateid.si_generation);
 	COPYMEM(&write->wr_stateid.si_opaque, sizeof(stateid_opaque_t));
 	READ64(write->wr_offset);
