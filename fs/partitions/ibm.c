@@ -88,8 +88,7 @@ ibm_ioctl_unopened(struct block_device *bdev, unsigned cmd, unsigned long arg)
 /*
  */
 int 
-ibm_partition(struct gendisk *hd, struct block_device *bdev,
-	      unsigned long first_sector, int first_part_minor)
+ibm_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
 	int blocksize, offset, size;
 	dasd_information_t *info;
@@ -99,9 +98,6 @@ ibm_partition(struct gendisk *hd, struct block_device *bdev,
 	volume_label_t *vlabel;
 	unsigned char *data;
 	Sector sect;
-
-	if ( first_sector != 0 )
-		BUG();
 
 	if ((info = kmalloc(sizeof(dasd_information_t), GFP_KERNEL)) == NULL)
 		goto out_noinfo;
@@ -155,9 +151,7 @@ ibm_partition(struct gendisk *hd, struct block_device *bdev,
 			offset = (info->label_block + 1);
 			size = bdev->bd_inode->i_size >> 9;
 		}
-		// add_gd_partition(hd, first_part_minor - 1, 0, size);
-		add_gd_partition(hd, first_part_minor,
-				 offset*(blocksize >> 9),
+		put_partition(state, 1, offset*(blocksize >> 9),
 				 size-offset*(blocksize >> 9));
 	} else if (strncmp(type, "VOL1", 4) == 0) {
 		/*
@@ -194,9 +188,9 @@ ibm_partition(struct gendisk *hd, struct block_device *bdev,
 		        offset = cchh2blk(&f1.DS1EXT1.llimit, geo);
 			size  = cchh2blk(&f1.DS1EXT1.ulimit, geo) - 
 				offset + geo->sectors;
-			if (counter >= (1 << hd->minor_shift))
+			if (counter >= state->limit)
 				break;
-			add_gd_partition(hd, first_part_minor + counter, 
+			put_partition(state, counter + 1, 
 					 offset * (blocksize >> 9),
 					 size * (blocksize >> 9));
 			counter++;
@@ -212,9 +206,7 @@ ibm_partition(struct gendisk *hd, struct block_device *bdev,
 			printk("(nonl)/%8s:", name);
 		offset = (info->label_block + 1);
 		size = (bdev->bd_inode->i_size >> 9);
-		// add_gd_partition(hd, first_part_minor - 1, 0, size);
-		add_gd_partition(hd, first_part_minor,
-				 offset*(blocksize >> 9),
+		put_partition(state, 1, offset*(blocksize >> 9),
 				 size-offset*(blocksize >> 9));
 	}
 

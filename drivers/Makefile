@@ -8,7 +8,7 @@
 obj-$(CONFIG_PCI)		+= pci/
 obj-$(CONFIG_ACPI)		+= acpi/
 obj-$(CONFIG_PARPORT)		+= parport/
-obj-y 				+= base/ char/ block/ misc/ net/ media/
+obj-y				+= base/ serial/ char/ block/ misc/ net/ media/
 obj-$(CONFIG_NUBUS)		+= nubus/
 obj-$(CONFIG_ATM)		+= atm/
 obj-$(CONFIG_IDE)		+= ide/

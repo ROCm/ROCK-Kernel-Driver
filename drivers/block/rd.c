@@ -303,12 +303,6 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			}
 			up(&inode->i_bdev->bd_sem);
 			break;
-         	case BLKGETSIZE:
-         	case BLKGETSIZE64:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKSSZGET:
-			error = blk_ioctl(inode->i_bdev, cmd, arg);
 	}
 out:
 	return error;

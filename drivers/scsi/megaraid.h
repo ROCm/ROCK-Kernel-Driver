@@ -950,7 +950,7 @@ int megaraid_command (Scsi_Cmnd *);
 int megaraid_abort (Scsi_Cmnd *);
 int megaraid_reset (Scsi_Cmnd *, unsigned int);
 int megaraid_queue (Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-int megaraid_biosparam (Disk *, kdev_t, int *);
+int megaraid_biosparam (Disk *, struct block_device *, int *);
 int megaraid_proc_info (char *buffer, char **start, off_t offset,
 			int length, int hostno, int inout);
 
@@ -998,7 +998,7 @@ static mega_passthru* mega_prepare_passthru(mega_host_config *, mega_scb *,
 static mega_ext_passthru* mega_prepare_extpassthru(mega_host_config *,
 		mega_scb *, Scsi_Cmnd *);
 static void mega_enum_raid_scsi(mega_host_config *);
-static int mega_partsize(Disk *, kdev_t, int *);
+static int mega_partsize(Disk *, struct block_device *, int *);
 static void mega_get_boot_ldrv(mega_host_config *);
 static int mega_get_lun(mega_host_config *, Scsi_Cmnd *);
 static int mega_support_random_del(mega_host_config *);

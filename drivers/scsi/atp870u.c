@@ -2835,7 +2835,7 @@ stop_output:
 
 #include "sd.h"
 
-int atp870u_biosparam(Scsi_Disk * disk, kdev_t dev, int *ip)
+int atp870u_biosparam(Scsi_Disk * disk, struct block_device *dev, int *ip)
 {
 	int heads, sectors, cylinders;
 

@@ -486,7 +486,7 @@ int __init pas16_detect(Scsi_Host_Template * tpnt)
 }
 
 /*
- * Function : int pas16_biosparam(Disk *disk, kdev_t dev, int *ip)
+ * Function : int pas16_biosparam(Disk *disk, struct block_device *dev, int *ip)
  *
  * Purpose : Generates a BIOS / DOS compatible H-C-S mapping for 
  *	the specified device / size.
@@ -505,7 +505,7 @@ int __init pas16_detect(Scsi_Host_Template * tpnt)
  * and matching the H_C_S coordinates to what DOS uses.
  */
 
-int pas16_biosparam(Disk * disk, kdev_t dev, int * ip)
+int pas16_biosparam(Disk * disk, struct block_device *dev, int * ip)
 {
   int size = disk->capacity;
   ip[0] = 64;

@@ -29,6 +29,7 @@
 #include <linux/tty.h>
 #include <linux/percpu.h>
 #include <linux/kernel_stat.h>
+#include <linux/security.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -372,7 +373,7 @@ asmlinkage void __init start_kernel(void)
 	}
 
 	kmem_cache_init();
-	sti();
+	__sti();
 	calibrate_delay();
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start && !initrd_below_start_ok &&
@@ -390,6 +391,7 @@ asmlinkage void __init start_kernel(void)
 
 	fork_init(mempages);
 	proc_caches_init();
+	security_scaffolding_startup();
 	buffer_init();
 	vfs_caches_init(mempages);
 	radix_tree_init();

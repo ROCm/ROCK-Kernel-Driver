@@ -11,7 +11,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/kdev_t.h>
 
 /* I/O Port */
 
@@ -23,7 +22,7 @@ int atp870u_command(Scsi_Cmnd *);
 int atp870u_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 int atp870u_abort(Scsi_Cmnd *);
 int atp870u_reset(Scsi_Cmnd *, unsigned int);
-int atp870u_biosparam(Disk *, kdev_t, int *);
+int atp870u_biosparam(Disk *, struct block_device *, int *);
 int atp870u_release(struct Scsi_Host *);
 void send_s870(unsigned char);
 

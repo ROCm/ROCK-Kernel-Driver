@@ -7,16 +7,7 @@
  */
 
 #include <linux/config.h>
-#include <linux/fs.h>
-#include <linux/genhd.h>
-#include <linux/kernel.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/blk.h>
 #include <linux/ctype.h>
-
-#include <asm/system.h>
-
 #include "check.h"
 #include "mac.h"
 
@@ -36,9 +27,9 @@ static inline void mac_fix_string(char *stg, int len)
 		stg[i] = 0;
 }
 
-int mac_partition(struct gendisk *hd, struct block_device *bdev,
-		unsigned long fsec, int first_part_minor)
+int mac_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
+	int slot = 1;
 	Sector sect;
 	unsigned char *data;
 	int blk, blocks_in_map;
@@ -79,8 +70,8 @@ int mac_partition(struct gendisk *hd, struct block_device *bdev,
 		part = (struct mac_partition *) (data + pos%512);
 		if (be16_to_cpu(part->signature) != MAC_PARTITION_MAGIC)
 			break;
-		add_gd_partition(hd, first_part_minor,
-			fsec + be32_to_cpu(part->start_block) * (secsize/512),
+		put_partition(state, slot,
+			be32_to_cpu(part->start_block) * (secsize/512),
 			be32_to_cpu(part->block_count) * (secsize/512));
 
 #ifdef CONFIG_ALL_PPC
@@ -126,7 +117,7 @@ int mac_partition(struct gendisk *hd, struct block_device *bdev,
 		}
 #endif /* CONFIG_ALL_PPC */
 
-		++first_part_minor;
+		++slot;
 	}
 #ifdef CONFIG_ALL_PPC
 	if (found_root_goodness)
@@ -138,4 +129,3 @@ int mac_partition(struct gendisk *hd, struct block_device *bdev,
 	printk("\n");
 	return 1;
 }
-

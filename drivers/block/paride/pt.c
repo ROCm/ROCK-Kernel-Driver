@@ -141,15 +141,12 @@ static int pt_drive_count;
 
 
 #include <linux/module.h>
-#include <linux/errno.h>
+#include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/devfs_fs_kernel.h>
-#include <linux/kernel.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/mtio.h>
-#include <linux/wait.h>
-#include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
 
@@ -208,11 +205,6 @@ MODULE_PARM(drive3,"1-6i");
 #define ATAPI_IDENTIFY		0x12
 #define ATAPI_MODE_SENSE	0x1a
 #define ATAPI_LOG_SENSE		0x4d
-
-int pt_init(void);
-#ifdef MODULE
-void cleanup_module( void );
-#endif
 
 static int pt_open(struct inode *inode, struct file *file);
 static int pt_ioctl(struct inode *inode,struct file *file,
@@ -291,71 +283,9 @@ void pt_init_units( void )
                 PT.name[j] = 0;
                 if (DU[D_PRT]) pt_drive_count++;
         }
-} 
+}
 
 static devfs_handle_t devfs_handle;
-
-int pt_init (void)      /* preliminary initialisation */
-
-{       int unit;
-
-	if (disable) return -1;
-
-	pt_init_units();
-
-	if (pt_detect()) return -1;
-
-	if (devfs_register_chrdev(major,name,&pt_fops)) {
-                printk("pt_init: unable to get major number %d\n",
-                        major);
-	        for (unit=0;unit<PT_UNITS;unit++)
-        	  if (PT.present) pi_release(PI);
-                return -1;
-        }
-
-	devfs_handle = devfs_mk_dir (NULL, "pt", NULL);
-	devfs_register_series (devfs_handle, "%u", 4, DEVFS_FL_DEFAULT,
-			       major, 0, S_IFCHR | S_IRUSR | S_IWUSR,
-			       &pt_fops, NULL);
-	devfs_register_series (devfs_handle, "%un", 4, DEVFS_FL_DEFAULT,
-			       major, 128, S_IFCHR | S_IRUSR | S_IWUSR,
-			       &pt_fops, NULL);
-        return 0;
-}
-
-#ifdef MODULE
-
-/* Glue for modules ... */
-
-void    cleanup_module(void);
-
-int     init_module(void)
-
-{       int     err;
-
-#ifdef PARIDE_JUMBO
-       { extern paride_init();
-         paride_init();
-       } 
-#endif
-
-        err = pt_init();
-
-        return err;
-}
-
-void    cleanup_module(void)
-
-{	int unit;
-
-	devfs_unregister (devfs_handle);
-	devfs_unregister_chrdev(major,name);
-
-	for (unit=0;unit<PT_UNITS;unit++)
-	  if (PT.present) pi_release(PI);
-}
-
-#endif
 
 #define	WR(c,r,v)	pi_write_regr(PI,c,r,v)
 #define	RR(c,r)		(pi_read_regr(PI,c,r))
@@ -965,6 +895,46 @@ static ssize_t pt_write(struct file * filp, const char * buf,
 	return t;
 }
 
-/* end of pt.c */
+static int __init pt_init(void)
+{
+	int unit;
+
+	if (disable)
+		return -1;
+
+	pt_init_units();
+
+	if (pt_detect())
+		return -1;
+
+	if (devfs_register_chrdev(major,name,&pt_fops)) {
+		printk("pt_init: unable to get major number %d\n",
+			major);
+		for (unit=0;unit<PT_UNITS;unit++)
+			if (PT.present) pi_release(PI);
+		return -1;
+	}
+
+	devfs_handle = devfs_mk_dir (NULL, "pt", NULL);
+	devfs_register_series (devfs_handle, "%u", 4, DEVFS_FL_DEFAULT,
+			       major, 0, S_IFCHR | S_IRUSR | S_IWUSR,
+			       &pt_fops, NULL);
+	devfs_register_series (devfs_handle, "%un", 4, DEVFS_FL_DEFAULT,
+			       major, 128, S_IFCHR | S_IRUSR | S_IWUSR,
+			       &pt_fops, NULL);
+	return 0;
+}
+
+static void __exit pt_exit(void)
+{
+	int unit;
+	devfs_unregister (devfs_handle);
+	devfs_unregister_chrdev(major,name);
+	for (unit=0;unit<PT_UNITS;unit++)
+		if (PT.present)
+			pi_release(PI);
+}
 
 MODULE_LICENSE("GPL");
+module_init(pt_init)
+module_exit(pt_exit)

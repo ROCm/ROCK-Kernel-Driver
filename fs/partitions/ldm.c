@@ -23,12 +23,6 @@
  *
  * 28/10/2001 - Added sorting of ldm partitions. (AIA)
  */
-#include <linux/types.h>
-#include <asm/unaligned.h>
-#include <asm/byteorder.h>
-#include <linux/pagemap.h>
-#include <linux/genhd.h>
-#include <linux/blkdev.h>
 #include <linux/slab.h>
 #include "check.h"
 #include "ldm.h"
@@ -57,7 +51,6 @@ static void ldm_debug(const char *f, ...);
 #endif	/* !CONFIG_LDM_DEBUG */
 
 /* Necessary forward declarations. */
-static int create_partition(struct gendisk *, int, int, int);
 static int parse_privhead(const u8 *, struct privhead *);
 static u64 get_vnum(const u8 *, int *);
 static int get_vstr(const u8 *, u8 *, const int);
@@ -161,8 +154,7 @@ static int parse_vblk(const u8 *buffer, const int buf_size, struct vblk *vb)
 /**
  * add_partition_to_list - insert partition into a partition list
  * @pl:		sorted list of partitions
- * @hd:		gendisk structure to which the data partition belongs
- * @disk_minor:	minor number of the disk device
+ * @disk_size:	number of sectors on the disk device
  * @start:	first sector within the disk device
  * @size:	number of sectors on the partition device
  *
@@ -174,16 +166,15 @@ static int parse_vblk(const u8 *buffer, const int buf_size, struct vblk *vb)
  *
  * TODO: Add sanity check for overlapping partitions. (AIA)
  */ 
-static int add_partition_to_list(struct list_head *pl, const struct gendisk *hd,
-		const int disk_minor, const unsigned long start,
+static int add_partition_to_list(struct list_head *pl,
+		const unsigned long disk_size,
+		const unsigned long start,
 		const unsigned long size)
 {
 	struct ldm_part *lp, *lptmp;
 	struct list_head *tmp;
 
-	if (!hd->part)
-		return -1;
-	if ((start < 1) || ((start + size) > hd->part[disk_minor].nr_sects)) {
+	if (start < 1 || start + size > disk_size) {
 		printk(LDM_CRIT "LDM partition exceeds physical disk. "
 				"Skipping.\n");
 		return -1;
@@ -215,7 +206,6 @@ static int add_partition_to_list(struct list_head *pl, const struct gendisk *hd,
 /**
  * create_data_partitions - create the data partition devices
  * @hd:			gendisk structure in which to create the data partitions
- * @first_sector:	first sector within the disk device
  * @first_part_minor:	first minor number of data partition devices
  * @dev:		partition device holding the LDM database
  * @vm:			in memory vmdb structure of @dev
@@ -234,9 +224,8 @@ static int add_partition_to_list(struct list_head *pl, const struct gendisk *hd,
  *
  * Return 1 on success and -1 on error.
  */
-static int create_data_partitions(struct gendisk *hd,
-		const unsigned long first_sector, int first_part_minor,
-		struct block_device *bdev, const struct vmdb *vm,
+static int create_data_partitions(struct parsed_partitions *state,
+		int slot, struct block_device *bdev, const struct vmdb *vm,
 		const struct privhead *ph, const struct ldmdisk *dk,
 		unsigned long base)
 {
@@ -249,7 +238,7 @@ static int create_data_partitions(struct gendisk *hd,
 	int vblk;
 	int vsize;		/* VBLK size. */
 	int perbuf;		/* VBLKs per buffer. */
-	int buffer, lastbuf, lastofs, err, disk_minor;
+	int buffer, lastbuf, lastofs, err;
 
 	vb = (struct vblk*)kmalloc(sizeof(struct vblk), GFP_KERNEL);
 	if (!vb)
@@ -268,11 +257,6 @@ static int create_data_partitions(struct gendisk *hd,
 	if (OFF_VBLK * LDM_BLOCKSIZE + vm->last_vblk_seq * vsize >
 			ph->config_size * 512)
 		goto err_out;
-	/*
-	 * Get the minor number of the parent device so we can check we don't
-	 * go beyond the end of the device.
-	 */
-	disk_minor = (first_part_minor >> hd->minor_shift) << hd->minor_shift;
 	for (buffer = 0; buffer < lastbuf; buffer++) {
 		data = read_dev_sector(bdev, base + 2*OFF_VBLK + buffer, &sect);
 		if (!data)
@@ -292,8 +276,9 @@ static int create_data_partitions(struct gendisk *hd,
 			if (dk->obj_id != vb->disk_id)
 				continue;
 			/* Ignore invalid partition errors. */
-			if (add_partition_to_list(&pl, hd, disk_minor,
-					first_sector + vb->start_sector +
+			if (add_partition_to_list(&pl,
+					bdev->bd_inode->i_size>>9,
+					vb->start_sector +
 					ph->logical_disk_start,
 					vb->num_sectors) < -1)
 				goto brelse_out;
@@ -306,7 +291,7 @@ out:
 	printk(" <");
 	list_for_each(tmp, &pl) {
 		lp = list_entry(tmp, struct ldm_part, part_list);
-		add_gd_partition(hd, first_part_minor++, lp->start, lp->size);
+		put_partition(state, slot++, lp->start, lp->size);
 	}
 	printk(" >\n");
 	if (!list_empty(&pl)) {
@@ -820,42 +805,6 @@ err_out:
 }
 
 /**
- * create_partition - validate input and create a kernel partition device
- * @hd:		gendisk structure in which to create partition
- * @minor:	minor number for device to create
- * @start:	starting offset of the partition into the parent device
- * @size:	size of the partition
- *
- * This validates the range, then puts an entry into the kernel's partition
- * table.
- *
- * @start and @size are numbers of sectors.
- *
- * Return 1 on succes and -1 on error.
- */
-static int create_partition(struct gendisk *hd, const int minor,
-		const int start, const int size)
-{
-	int disk_minor;
-
-	if (!hd->part)
-		return -1;
-	/*
-	 * Get the minor number of the parent device so we can check we don't
-	 * go beyond the end of the device.
-	 */
-	disk_minor = (minor >> hd->minor_shift) << hd->minor_shift;
-	if ((start < 1) || ((start + size) > hd->part[disk_minor].nr_sects)) {
-		printk(LDM_CRIT "LDM Partition exceeds physical disk. "
-				"Aborting.\n");
-		return -1;
-	}
-	add_gd_partition(hd, minor, start, size);
-	ldm_debug("Created partition successfully.\n");
-	return 1;
-}
-
-/**
  * parse_privhead - parse the LDM database PRIVHEAD structure
  * @buffer:	LDM database privhead structure loaded from the device
  * @ph:		in memory privhead structure to return parsed information in
@@ -901,19 +850,16 @@ static int parse_privhead(const u8 *buffer, struct privhead *ph)
 }
 
 /**
- * create_db_partition - create a dedicated partition for our database
- * @hd:		gendisk structure in which to create partition
+ * find_db_partition - find our database
  * @dev:	device of which to create partition
  * @ph:		@dev's LDM database private header
  *
- * Find the primary private header, locate the LDM database, then create a
+ * Find the primary private header and the LDM database
  * partition to wrap it.
  *
  * Return 1 on succes, 0 if device is not a dynamic disk and -1 on error.
  */
-static int create_db_partition(struct gendisk *hd, struct block_device *bdev,
-		const unsigned long first_sector, const int first_part_minor,
-		struct privhead *ph)
+static int find_db_partition(struct block_device *bdev, struct privhead *ph)
 {
 	Sector sect;
 	unsigned char *data;
@@ -930,10 +876,15 @@ static int create_db_partition(struct gendisk *hd, struct block_device *bdev,
 		return 0;
 	}
 	err = parse_privhead(data, ph);
-	if (err == 1)
-		err = create_partition(hd, first_part_minor, first_sector +
-				ph->config_start, ph->config_size);
 	put_dev_sector(sect);
+	if (err <= 0)
+		return err;
+	if (ph->config_start < 1 ||
+	    ph->config_start + ph->config_size > bdev->bd_inode->i_size >> 9) {
+		printk(LDM_CRIT "LDM Partition exceeds physical disk. "
+				"Aborting.\n");
+		err = -1;
+	}
 	return err;
 }
 
@@ -990,8 +941,6 @@ no_msdos_partition:
  * ldm_partition - find out whether a device is a dynamic disk and handle it
  * @hd:			gendisk structure in which to return the handled disk
  * @dev:		device we need to look at
- * @first_sector:	first sector within the device
- * @first_part_minor:	first minor number of partitions for the device
  *
  * Description:
  *
@@ -1010,8 +959,7 @@ no_msdos_partition:
  *	 0 if @dev is not a dynamic disk,
  *	-1 if an error occured.
  */
-int ldm_partition(struct gendisk *hd, struct block_device *bdev,
-		unsigned long first_sector, int first_part_minor)
+int ldm_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
 	struct privhead *ph  = NULL;
 	struct tocblock *toc = NULL;
@@ -1020,8 +968,6 @@ int ldm_partition(struct gendisk *hd, struct block_device *bdev,
 	unsigned long db_first;
 	int err;
 
-	if (!hd)
-		return 0;
 	/* Check the partition table. */
 	err = validate_partition_table(bdev);
 	if (err != 1)
@@ -1029,10 +975,11 @@ int ldm_partition(struct gendisk *hd, struct block_device *bdev,
 	if (!(ph = (struct privhead*)kmalloc(sizeof(*ph), GFP_KERNEL)))
 		goto no_mem;
 	/* Create the LDM database device. */
-	err = create_db_partition(hd, bdev, first_sector, first_part_minor, ph);
+	err = find_db_partition(bdev, ph);
 	if (err != 1)
 		goto out;
-	db_first = hd->part[first_part_minor].start_sect;
+	db_first = ph->config_start;
+	put_partition(state, 1, db_first, ph->config_size);
 	/* Check the backup privheads. */
 	err = validate_privheads(bdev, ph, db_first);
 	if (err != 1)
@@ -1056,8 +1003,8 @@ int ldm_partition(struct gendisk *hd, struct block_device *bdev,
 	if (err != 1)
 		goto out;
 	/* Finally, create the data partition devices. */
-	err = create_data_partitions(hd, first_sector, first_part_minor +
-			LDM_FIRST_PART_OFFSET, bdev, vm, ph, dk, db_first);
+	err = create_data_partitions(state, 1 + LDM_FIRST_PART_OFFSET,
+					bdev, vm, ph, dk, db_first);
 	if (err == 1)
 		ldm_debug("Parsed LDM database successfully.\n");
 out:
@@ -1071,4 +1018,3 @@ no_mem:
 	err = -1;
 	goto out;
 }
-

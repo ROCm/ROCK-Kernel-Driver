@@ -90,8 +90,10 @@ struct gendisk {
 extern void add_gendisk(struct gendisk *gp);
 extern void del_gendisk(struct gendisk *gp);
 extern struct gendisk *get_gendisk(kdev_t dev);
-extern unsigned long get_start_sect(kdev_t dev);
-extern unsigned long get_nr_sects(kdev_t dev);
+static inline unsigned long get_start_sect(struct block_device *bdev)
+{
+	return bdev->bd_offset;
+}
 
 #endif  /*  __KERNEL__  */
 

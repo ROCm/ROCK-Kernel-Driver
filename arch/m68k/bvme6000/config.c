@@ -49,7 +49,6 @@ extern int  bvme6000_kbdrate (struct kbd_repeat *);
 extern unsigned long bvme6000_gettimeoffset (void);
 extern int bvme6000_hwclk (int, struct rtc_time *);
 extern int bvme6000_set_clock_mmss (unsigned long);
-extern void bvme6000_check_partition (struct gendisk *hd, unsigned int dev);
 extern void bvme6000_mksound( unsigned int count, unsigned int ticks );
 extern void bvme6000_reset (void);
 extern void bvme6000_waitbut(void);

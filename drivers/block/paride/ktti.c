@@ -12,6 +12,7 @@
 #define KTTI_VERSION      "1.0"
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -106,35 +107,33 @@ static void ktti_release_proto( PIA *pi)
 {       MOD_DEC_USE_COUNT;
 }
 
-struct pi_protocol ktti = {"ktti",0,1,2,1,1,
-                           ktti_write_regr,
-                           ktti_read_regr,
-                           ktti_write_block,
-                           ktti_read_block,
-                           ktti_connect,
-                           ktti_disconnect,
-                           0,
-                           0,
-                           0,
-                           ktti_log_adapter,
-                           ktti_init_proto,
-                           ktti_release_proto
-                          };
+static struct pi_protocol ktti = {
+	.name		= "ktti",
+	.max_mode	= 1,
+	.epp_first	= 2,
+	.default_delay	= 1,
+	.max_units	= 1,
+	.write_regr	= ktti_write_regr,
+	.read_regr	= ktti_read_regr,
+	.write_block	= ktti_write_block,
+	.read_block	= ktti_read_block,
+	.connect	= ktti_connect,
+	.disconnect	= ktti_disconnect,
+	.log_adapter	= ktti_log_adapter,
+	.init_proto	= ktti_init_proto,
+	.release_proto	= ktti_release_proto,
+};
 
-
-#ifdef MODULE
-
-int     init_module(void)
-
-{       return pi_register( &ktti ) - 1;
+static int __init ktti_init(void)
+{
+	return pi_register(&ktti)-1;
 }
 
-void    cleanup_module(void)
-
-{       pi_unregister( &ktti );
+static void __exit ktti_exit(void)
+{
+	pi_unregister(&ktti);
 }
 
-#endif
-
-/* end of ktti.c */
 MODULE_LICENSE("GPL");
+module_init(ktti_init)
+module_exit(ktti_exit)

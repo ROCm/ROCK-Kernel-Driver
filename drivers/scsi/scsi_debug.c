@@ -1008,7 +1008,7 @@ static int scsi_debug_abort(Scsi_Cmnd * SCpnt)
 #endif
 }
 
-static int scsi_debug_biosparam(Disk * disk, kdev_t dev, int *info)
+static int scsi_debug_biosparam(Disk * disk, struct block_device *dev, int *info)
 {
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
 		printk(KERN_INFO "scsi_debug: biosparam\n");

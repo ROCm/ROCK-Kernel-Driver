@@ -343,19 +343,6 @@ int ata_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned
 		case BLKRRPART: /* Re-read partition tables */
 			return ata_revalidate(inode->i_rdev);
 
-		case BLKGETSIZE:
-		case BLKGETSIZE64:
-		case BLKROSET:
-		case BLKROGET:
-		case BLKFLSBUF:
-		case BLKSSZGET:
-		case BLKPG:
-		case BLKELVGET:
-		case BLKELVSET:
-		case BLKBSZGET:
-		case BLKBSZSET:
-			return blk_ioctl(inode->i_bdev, cmd, arg);
-
 		/* Now check whatever this particular ioctl has a device type
 		 * specific implementation.
 		 */

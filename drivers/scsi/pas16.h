@@ -115,7 +115,7 @@
 
 #ifndef ASM
 int pas16_abort(Scsi_Cmnd *);
-int pas16_biosparam(Disk *, kdev_t, int*);
+int pas16_biosparam(Disk *, struct block_device *, int*);
 int pas16_detect(Scsi_Host_Template *);
 int pas16_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int pas16_reset(Scsi_Cmnd *, unsigned int);

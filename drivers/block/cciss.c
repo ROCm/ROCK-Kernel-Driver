@@ -440,15 +440,6 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 	case BLKRRPART:
 		return revalidate_logvol(inode->i_rdev, 1);
-	case BLKGETSIZE:
-	case BLKGETSIZE64:
-	case BLKFLSBUF:
-	case BLKBSZSET:
-	case BLKBSZGET:
-	case BLKROSET:
-	case BLKROGET:
-	case BLKPG:
-		return blk_ioctl(inode->i_bdev, cmd, arg);
 	case CCISS_GETPCIINFO:
 	{
 		cciss_pci_info_struct pciinfo;
@@ -735,6 +726,10 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 }
 
 /* Borrowed and adapted from sd.c */
+/*
+ * FIXME: we are missing the exclusion with ->open() here - it can happen
+ * just as we are rereading partition tables.
+ */
 static int revalidate_logvol(kdev_t dev, int maxusage)
 {
         int ctlr, target;
@@ -860,18 +855,9 @@ static int deregister_disk(int ctlr, int logvol)
 	/* invalidate the devices and deregister the disk */ 
 	max_p = 1 << gdev->minor_shift;
 	start = logvol << gdev->minor_shift;
+	wipe_partitions(mk_kdev(MAJOR_NR+ctlr, start));
 	for (i=max_p-1; i>=0; i--)
-	{
-		int minor = start+i;
-		kdev_t kdev = mk_kdev(MAJOR_NR+ctlr, minor);
-		// printk("invalidating( %d %d)\n", ctlr, minor);
-		invalidate_device(kdev, 1);
-		/* so open will now fail */
-		h->sizes[minor] = 0;
-		/* so it will no longer appear in /proc/partitions */ 
-		gdev->part[minor].start_sect = 0;
-		gdev->part[minor].nr_sects = 0;	
-	}
+		h->sizes[start + i] = 0;
 	/* check to see if it was the last disk */
 	if (logvol == h->highest_lun)
 	{
@@ -1313,19 +1299,12 @@ static int register_new_disk(kdev_t dev, int ctlr)
 	hba[ctlr]->drv[logvol].usage_count = 0;
 	max_p = 1 << gdev->minor_shift;
         start = logvol<< gdev->minor_shift;
+	kdev = mk_kdev(MAJOR_NR + ctlr, logvol<< gdev->minor_shift);
 
-        for(i=max_p-1; i>=0; i--) {
-                int minor = start+i;
-		kdev = mk_kdev(MAJOR_NR + ctlr, minor);
-                invalidate_device(kdev, 1);
-                gdev->part[minor].start_sect = 0;
-                gdev->part[minor].nr_sects = 0;
-        }
-
+	wipe_partitions(kdev);
 	++hba[ctlr]->num_luns;
 	gdev->nr_real = hba[ctlr]->highest_lun + 1;
 	/* setup partitions per disk */
-	kdev = mk_kdev(MAJOR_NR + ctlr, logvol<< gdev->minor_shift);
 	grok_partitions(kdev, hba[ctlr]->drv[logvol].nr_blocks);
 	
 	kfree(ld_buff);

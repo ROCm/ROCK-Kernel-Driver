@@ -453,7 +453,7 @@ static int adpt_queue(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 	return adpt_scsi_to_i2o(pHba, cmd, pDev);
 }
 
-static int adpt_bios_param(Disk* disk, kdev_t dev, int geom[])
+static int adpt_bios_param(Disk* disk, struct block_device *dev, int geom[])
 {
 	int heads=-1;
 	int sectors=-1;

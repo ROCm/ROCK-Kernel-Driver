@@ -1783,7 +1783,7 @@ fail:
 
 #include "sd.h"
 
-static int aha1542_biosparam(Scsi_Disk * disk, kdev_t dev, int *ip)
+static int aha1542_biosparam(Scsi_Disk * disk, struct block_device *dev, int *ip)
 {
 	int translation_algorithm;
 	int size = disk->capacity;
