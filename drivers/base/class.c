@@ -255,6 +255,7 @@ static decl_subsys(class_obj, &ktype_class_device, &class_hotplug_ops);
 
 void class_device_initialize(struct class_device *class_dev)
 {
+	kobj_set_kset_s(class_dev, class_obj_subsys);
 	kobject_init(&class_dev->kobj);
 	INIT_LIST_HEAD(&class_dev->node);
 }
@@ -277,7 +278,6 @@ int class_device_add(struct class_device *class_dev)
 
 	/* first, register with generic layer. */
 	kobject_set_name(&class_dev->kobj, class_dev->class_id);
-	kobj_set_kset_s(class_dev, class_obj_subsys);
 	if (parent)
 		class_dev->kobj.parent = &parent->subsys.kset.kobj;
 
