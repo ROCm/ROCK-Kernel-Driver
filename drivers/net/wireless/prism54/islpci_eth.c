@@ -156,6 +156,12 @@ islpci_eth_transmit(struct sk_buff *skb, struct net_device *ndev)
 		} else {
 			newskb =
 			    dev_alloc_skb(init_wds ? skb->len + 6 : skb->len);
+			if (unlikely(newskb == NULL)) {
+				printk(KERN_ERR "%s: Cannot allocate skb\n",
+				       ndev->name);
+				err = -ENOMEM;
+				goto drop_free;
+			}
 			newskb_offset = (4 - (long) newskb->data) & 0x03;
 
 			/* Check if newskb->data is aligned */
