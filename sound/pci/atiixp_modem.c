@@ -241,7 +241,7 @@ struct snd_atiixp {
 
 	struct resource *res;		/* memory i/o */
 	unsigned long addr;
-	unsigned long remap_addr;
+	void __iomem *remap_addr;
 	int irq;
 	
 	ac97_bus_t *ac97_bus;
@@ -284,7 +284,7 @@ MODULE_DEVICE_TABLE(pci, snd_atiixp_ids);
 static int snd_atiixp_update_bits(atiixp_t *chip, unsigned int reg,
 				 unsigned int mask, unsigned int value)
 {
-	unsigned long addr = chip->remap_addr + reg;
+	void __iomem *addr = chip->remap_addr + reg;
 	unsigned int data, old_data;
 	old_data = data = readl(addr);
 	data &= ~mask;
@@ -1194,7 +1194,7 @@ static int snd_atiixp_free(atiixp_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	if (chip->remap_addr)
-		iounmap((void *) chip->remap_addr);
+		iounmap(chip->remap_addr);
 	pci_release_regions(chip->pci);
 	kfree(chip);
 	return 0;
@@ -1237,7 +1237,7 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 		return err;
 	}
 	chip->addr = pci_resource_start(pci, 0);
-	chip->remap_addr = (unsigned long) ioremap_nocache(chip->addr, pci_resource_len(pci, 0));
+	chip->remap_addr = ioremap_nocache(chip->addr, pci_resource_len(pci, 0));
 	if (chip->remap_addr == 0) {
 		snd_printk(KERN_ERR "AC'97 space ioremap problem\n");
 		snd_atiixp_free(chip);
