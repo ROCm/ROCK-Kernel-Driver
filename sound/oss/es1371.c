@@ -3035,10 +3035,10 @@ static struct pci_device_id id_table[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, id_table);
 
 static struct pci_driver es1371_driver = {
-	name: "es1371",
-	id_table: id_table,
-	probe: es1371_probe,
-	remove: es1371_remove
+	.name		= "es1371",
+	.id_table	= id_table,
+	.probe		= es1371_probe,
+	.remove		= es1371_remove,
 };
 
 static int __init init_es1371(void)
