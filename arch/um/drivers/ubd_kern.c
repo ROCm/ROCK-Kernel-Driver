@@ -700,7 +700,8 @@ static int ubd_open(struct inode *inode, struct file *filp)
 {
 	int n = DEVICE_NR(inode->i_rdev);
 	struct ubd *dev = &ubd_dev[n];
-	int err;
+	int err = 0;
+
 	if(dev->is_dir == 1)
 		goto out;
 

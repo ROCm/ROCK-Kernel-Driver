@@ -1,5 +1,8 @@
+#include "linux/config.h"
 #include "linux/module.h"
 #include "linux/string.h"
+#include "linux/smp_lock.h"
+#include "linux/spinlock.h"
 #include "asm/current.h"
 #include "asm/delay.h"
 #include "asm/processor.h"
@@ -58,3 +61,14 @@ EXPORT_SYMBOL(sys_lseek);
 EXPORT_SYMBOL(sys_read);
 EXPORT_SYMBOL(sys_wait4);
 
+#ifdef CONFIG_SMP
+
+/* required for SMP */
+
+extern void FASTCALL( __write_lock_failed(rwlock_t *rw));
+EXPORT_SYMBOL_NOVERS(__write_lock_failed);
+
+extern void FASTCALL( __read_lock_failed(rwlock_t *rw));
+EXPORT_SYMBOL_NOVERS(__read_lock_failed);
+
+#endif

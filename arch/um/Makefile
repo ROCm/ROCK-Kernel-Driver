@@ -1,9 +1,6 @@
 ARCH_DIR = arch/um
 OS := $(shell uname -s)
 
-include $(ARCH_DIR)/Makefile-$(SUBARCH)
-include $(ARCH_DIR)/Makefile-os-$(OS)
-
 EXTRAVERSION := $(EXTRAVERSION)-1um
 include/linux/version.h: arch/$(ARCH)/Makefile
 
@@ -59,6 +56,9 @@ ARCH_SYMLINKS = include/asm-um/arch arch/um/include/sysdep arch/um/os \
 
 GEN_HEADERS = $(ARCH_DIR)/include/task.h
 
+include $(ARCH_DIR)/Makefile-$(SUBARCH)
+include $(ARCH_DIR)/Makefile-os-$(OS)
+
 $(ARCH_DIR)/vmlinux.lds.S :
 	touch $@
 
@@ -69,8 +69,7 @@ LDFLAGS_vmlinux = -r $(ARCH_DIR)/main.o
 
 vmlinux: $(ARCH_DIR)/main.o 
 
-
-$(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S
+$(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S scripts
 	$(call if_changed_dep,as_s_S)
 
 AFLAGS_uml.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \
