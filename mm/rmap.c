@@ -193,7 +193,7 @@ vma_address(struct page *page, struct vm_area_struct *vma)
  * repeatedly from either page_referenced_anon or page_referenced_file.
  */
 static int page_referenced_one(struct page *page,
-	struct vm_area_struct *vma, unsigned int *mapcount, int *failed)
+	struct vm_area_struct *vma, unsigned int *mapcount)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long address;
@@ -208,14 +208,8 @@ static int page_referenced_one(struct page *page,
 	if (address == -EFAULT)
 		goto out;
 
-	if (!spin_trylock(&mm->page_table_lock)) {
-		/*
-		 * For debug we're currently warning if not all found,
-		 * but in this case that's expected: suppress warning.
-		 */
-		(*failed)++;
+	if (!spin_trylock(&mm->page_table_lock))
 		goto out;
-	}
 
 	pgd = pgd_offset(mm, address);
 	if (!pgd_present(*pgd))
@@ -251,18 +245,14 @@ static inline int page_referenced_anon(struct page *page)
 	struct anon_vma *anon_vma = (struct anon_vma *) page->mapping;
 	struct vm_area_struct *vma;
 	int referenced = 0;
-	int failed = 0;
 
 	spin_lock(&anon_vma->lock);
 	BUG_ON(list_empty(&anon_vma->head));
 	list_for_each_entry(vma, &anon_vma->head, anon_vma_node) {
-		referenced += page_referenced_one(page, vma,
-						  &mapcount, &failed);
+		referenced += page_referenced_one(page, vma, &mapcount);
 		if (!mapcount)
-			goto out;
+			break;
 	}
-	WARN_ON(!failed);
-out:
 	spin_unlock(&anon_vma->lock);
 	return referenced;
 }
@@ -289,7 +279,6 @@ static inline int page_referenced_file(struct page *page)
 	struct vm_area_struct *vma = NULL;
 	struct prio_tree_iter iter;
 	int referenced = 0;
-	int failed = 0;
 
 	if (!spin_trylock(&mapping->i_mmap_lock))
 		return 0;
@@ -299,17 +288,13 @@ static inline int page_referenced_file(struct page *page)
 		if ((vma->vm_flags & (VM_LOCKED|VM_MAYSHARE))
 				  == (VM_LOCKED|VM_MAYSHARE)) {
 			referenced++;
-			goto out;
+			break;
 		}
-		referenced += page_referenced_one(page, vma,
-						  &mapcount, &failed);
+		referenced += page_referenced_one(page, vma, &mapcount);
 		if (!mapcount)
-			goto out;
+			break;
 	}
 
-	if (list_empty(&mapping->i_mmap_nonlinear))
-		WARN_ON(!failed);
-out:
 	spin_unlock(&mapping->i_mmap_lock);
 	return referenced;
 }
