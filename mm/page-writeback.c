@@ -133,16 +133,28 @@ static void get_writeback_state(struct writeback_state *wbs)
  * clamping level.
  */
 static void
-get_dirty_limits(struct writeback_state *wbs, long *pbackground, long *pdirty)
+get_dirty_limits(struct writeback_state *wbs, long *pbackground, long *pdirty,
+		struct address_space *mapping)
 {
 	int background_ratio;		/* Percentages */
 	int dirty_ratio;
 	int unmapped_ratio;
 	long background;
 	long dirty;
+	unsigned long available_memory = total_pages;
 	struct task_struct *tsk;
 
 	get_writeback_state(wbs);
+
+#ifdef CONFIG_HIGHMEM
+	/*
+	 * If this mapping can only allocate from low memory,
+	 * we exclude high memory from our count.
+	 */
+	if (mapping && !(mapping_gfp_mask(mapping) & __GFP_HIGHMEM))
+		available_memory -= totalhigh_pages;
+#endif
+
 
 	unmapped_ratio = 100 - (wbs->nr_mapped * 100) / total_pages;
 
@@ -157,8 +169,8 @@ get_dirty_limits(struct writeback_state *wbs, long *pbackground, long *pdirty)
 	if (background_ratio >= dirty_ratio)
 		background_ratio = dirty_ratio / 2;
 
-	background = (background_ratio * total_pages) / 100;
-	dirty = (dirty_ratio * total_pages) / 100;
+	background = (background_ratio * available_memory) / 100;
+	dirty = (dirty_ratio * available_memory) / 100;
 	tsk = current;
 	if (tsk->flags & PF_LESS_THROTTLE || rt_task(tsk)) {
 		background += background / 4;
@@ -194,7 +206,8 @@ static void balance_dirty_pages(struct address_space *mapping)
 			.nr_to_write	= write_chunk,
 		};
 
-		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh);
+		get_dirty_limits(&wbs, &background_thresh,
+					&dirty_thresh, mapping);
 		nr_reclaimable = wbs.nr_dirty + wbs.nr_unstable;
 		if (nr_reclaimable + wbs.nr_writeback <= dirty_thresh)
 			break;
@@ -210,7 +223,7 @@ static void balance_dirty_pages(struct address_space *mapping)
 		if (nr_reclaimable) {
 			writeback_inodes(&wbc);
 			get_dirty_limits(&wbs, &background_thresh,
-					&dirty_thresh);
+					&dirty_thresh, mapping);
 			nr_reclaimable = wbs.nr_dirty + wbs.nr_unstable;
 			if (nr_reclaimable + wbs.nr_writeback <= dirty_thresh)
 				break;
@@ -296,7 +309,7 @@ static void background_writeout(unsigned long _min_pages)
 		long background_thresh;
 		long dirty_thresh;
 
-		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh);
+		get_dirty_limits(&wbs, &background_thresh, &dirty_thresh, NULL);
 		if (wbs.nr_dirty + wbs.nr_unstable < background_thresh
 				&& min_pages <= 0)
 			break;
