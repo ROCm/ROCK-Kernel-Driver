@@ -709,7 +709,7 @@ static int __init usb_skel_init(void)
 	/* register this driver with the USB subsystem */
 	result = usb_register(&skel_driver);
 	if (result < 0) {
-		err("usb_register failed for the "__FILE__" driver. Error number %d",
+		err("usb_register failed. Error number %d",
 		    result);
 		return -1;
 	}
