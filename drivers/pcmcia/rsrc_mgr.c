@@ -321,7 +321,7 @@ static int checksum(struct pcmcia_socket *s, struct resource *res)
 {
 	pccard_mem_map map;
 	int i, a = 0, b = -1, d;
-	void *virt;
+	void __iomem *virt;
 
 	virt = ioremap(res->start, s->map_size);
 	if (virt) {

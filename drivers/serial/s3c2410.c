@@ -26,8 +26,6 @@
 #include <asm/hardware.h>
 #include <asm/arch/regs-serial.h>
 
-#include <asm/mach-types.h>
-
 #if 0
 #include <asm/debug-ll.h>
 #define dbg(x...) llprintk(x)

@@ -75,7 +75,7 @@
  *  from the %ISL38XX_PCI_POSTING_FLUSH offset.
  */
 static inline void
-isl38xx_w32_flush(void *base, u32 val, unsigned long offset)
+isl38xx_w32_flush(void __iomem *base, u32 val, unsigned long offset)
 {
 	writel(val, base + offset);
 	(void) readl(base + ISL38XX_PCI_POSTING_FLUSH);
@@ -157,13 +157,13 @@ typedef struct isl38xx_cb isl38xx_control_block;
 /* determine number of entries currently in queue */
 int isl38xx_in_queue(isl38xx_control_block *cb, int queue);
 
-void isl38xx_disable_interrupts(void *);
-void isl38xx_enable_common_interrupts(void *);
+void isl38xx_disable_interrupts(void __iomem *);
+void isl38xx_enable_common_interrupts(void __iomem *);
 
 void isl38xx_handle_sleep_request(isl38xx_control_block *, int *,
-				  void *);
-void isl38xx_handle_wakeup(isl38xx_control_block *, int *, void *);
-void isl38xx_trigger_device(int, void *);
-void isl38xx_interface_reset(void *, dma_addr_t);
+				  void __iomem *);
+void isl38xx_handle_wakeup(isl38xx_control_block *, int *, void __iomem *);
+void isl38xx_trigger_device(int, void __iomem *);
+void isl38xx_interface_reset(void __iomem *, dma_addr_t);
 
 #endif				/* _ISL_38XX_H */

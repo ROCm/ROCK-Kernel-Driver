@@ -85,7 +85,7 @@
     
 =====================================================================*/
 
-static u_int xlate_rom_addr(u_char * b, u_int addr)
+static u_int xlate_rom_addr(void __iomem *b, u_int addr)
 {
 	u_int img = 0, ofs = 0, sz;
 	u_short data;
