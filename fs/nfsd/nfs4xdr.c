@@ -880,7 +880,7 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 		v++;
 		write->wr_vec[v].iov_base = page_address(argp->pagelist[0]);
 		argp->pagelist++;
-		if (len >= PAGE_SIZE) {
+		if (argp->pagelen >= PAGE_SIZE) {
 			write->wr_vec[v].iov_len = PAGE_SIZE;
 			argp->pagelen -= PAGE_SIZE;
 		} else {
@@ -934,16 +934,35 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 		op = &argp->ops[i];
 
 		/*
-		 * Before reading the opcode, we test for the 4-byte buffer
-		 * overrun explicitly, instead of using READ_BUF().  This is
-		 * because we want a missing opcode to be treated as opcode
-		 * OP_WRITE+1, instead of a failed XDR.
+		 * We can't use READ_BUF() here because we need to handle
+		 * a missing opcode as an OP_WRITE + 1. So we need to check
+		 * to see if we're truly at the end of our buffer or if there
+		 * is another page we need to flip to.
 		 */
+
 		if (argp->p == argp->end) {
-			op->opnum = OP_WRITE + 1;
-			op->status = nfserr_bad_xdr;
-			argp->opcnt = i+1;
-			break;
+			if (argp->pagelen < 4) {
+				/* There isn't an opcode still on the wire */
+				op->opnum = OP_WRITE + 1;
+				op->status = nfserr_bad_xdr;
+				argp->opcnt = i+1;
+				break;
+			}
+
+			/*
+			 * False alarm. We just hit a page boundary, but there
+			 * is still data available.  Move pointer across page
+			 * boundary.  *snip from READ_BUF*
+			 */
+			argp->p = page_address(argp->pagelist[0]);
+			argp->pagelist++;
+			if (argp->pagelen < PAGE_SIZE) {
+				argp->end = p + (argp->pagelen>>2);
+				argp->pagelen = 0;
+			} else {
+				argp->end = p + (PAGE_SIZE>>2);
+				argp->pagelen -= PAGE_SIZE;
+			}
 		}
 		op->opnum = ntohl(*argp->p++);
 

@@ -54,6 +54,8 @@ struct irqdesc {
 	struct irqchip	*chip;
 	struct irqaction *action;
 	struct list_head pend;
+	void		*chipdata;
+	void		*data;
 	unsigned int	disable_depth;
 
 	unsigned int	triggered: 1;		/* IRQ has occurred	      */
@@ -88,6 +90,9 @@ void __set_irq_handler(unsigned int irq, irq_handler_t, int);
  */
 #define set_irq_handler(irq,handler)		__set_irq_handler(irq,handler,0)
 #define set_irq_chained_handler(irq,handler)	__set_irq_handler(irq,handler,1)
+#define set_irq_data(irq,d)			do { irq_desc[irq].data = d; } while (0)
+#define set_irq_chipdata(irq,d)			do { irq_desc[irq].chipdata = d; } while (0)
+#define get_irq_chipdata(irq)			(irq_desc[irq].chipdata)
 
 void set_irq_chip(unsigned int irq, struct irqchip *);
 void set_irq_flags(unsigned int irq, unsigned int flags);

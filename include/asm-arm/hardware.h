@@ -19,7 +19,7 @@
 
 struct platform_device;
 
-extern int platform_add_devices(struct platform_device *, int);
+extern int platform_add_devices(struct platform_device **, int);
 extern int platform_add_device(struct platform_device *);
 
 #endif

@@ -738,19 +738,22 @@ cache_ioctl(struct inode *ino, struct file *filp,
 static int
 cache_open(struct inode *inode, struct file *filp)
 {
-	struct cache_reader *rp;
-	struct cache_detail *cd = PDE(inode)->data;
+	struct cache_reader *rp = NULL;
 
-	rp = kmalloc(sizeof(*rp), GFP_KERNEL);
-	if (!rp)
-		return -ENOMEM;
-	rp->page = NULL;
-	rp->offset = 0;
-	rp->q.reader = 1;
-	atomic_inc(&cd->readers);
-	spin_lock(&queue_lock);
-	list_add(&rp->q.list, &cd->queue);
-	spin_unlock(&queue_lock);
+	if (filp->f_mode & FMODE_READ) {
+		struct cache_detail *cd = PDE(inode)->data;
+
+		rp = kmalloc(sizeof(*rp), GFP_KERNEL);
+		if (!rp)
+			return -ENOMEM;
+		rp->page = NULL;
+		rp->offset = 0;
+		rp->q.reader = 1;
+		atomic_inc(&cd->readers);
+		spin_lock(&queue_lock);
+		list_add(&rp->q.list, &cd->queue);
+		spin_unlock(&queue_lock);
+	}
 	filp->private_data = rp;
 	return 0;
 }
@@ -761,29 +764,31 @@ cache_release(struct inode *inode, struct file *filp)
 	struct cache_reader *rp = filp->private_data;
 	struct cache_detail *cd = PDE(inode)->data;
 
-	spin_lock(&queue_lock);
-	if (rp->offset) {
-		struct cache_queue *cq;
-		for (cq= &rp->q; &cq->list != &cd->queue;
-		     cq = list_entry(cq->list.next, struct cache_queue, list))
-			if (!cq->reader) {
-				container_of(cq, struct cache_request, q)
-					->readers--;
-				break;
-			}
-		rp->offset = 0;
+	if (rp) {
+		spin_lock(&queue_lock);
+		if (rp->offset) {
+			struct cache_queue *cq;
+			for (cq= &rp->q; &cq->list != &cd->queue;
+			     cq = list_entry(cq->list.next, struct cache_queue, list))
+				if (!cq->reader) {
+					container_of(cq, struct cache_request, q)
+						->readers--;
+					break;
+				}
+			rp->offset = 0;
+		}
+		list_del(&rp->q.list);
+		spin_unlock(&queue_lock);
+
+		if (rp->page)
+			kfree(rp->page);
+
+		filp->private_data = NULL;
+		kfree(rp);
+
+		cd->last_close = get_seconds();
+		atomic_dec(&cd->readers);
 	}
-	list_del(&rp->q.list);
-	spin_unlock(&queue_lock);
-
-	if (rp->page)
-		kfree(rp->page);
-
-	filp->private_data = NULL;
-	kfree(rp);
-
-	cd->last_close = get_seconds();
-	atomic_dec(&cd->readers);
 	return 0;
 }
 

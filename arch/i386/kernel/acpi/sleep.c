@@ -15,6 +15,8 @@ unsigned long acpi_wakeup_address = 0;
 unsigned long acpi_video_flags;
 extern char wakeup_start, wakeup_end;
 
+extern void zap_low_mappings(void);
+
 extern unsigned long FASTCALL(acpi_copy_wakeup_routine(unsigned long));
 
 static void init_low_mapping(pgd_t *pgd, int pgd_limit)
