@@ -20,27 +20,29 @@ spinlock_t pci_lock = SPIN_LOCK_UNLOCKED;
 #define PCI_dword_BAD (pos & 3)
 
 #define PCI_OP_READ(size,type,len) \
-int pci_read_config_##size (struct pci_dev *dev, int pos, type *value) \
+int pci_bus_read_config_##size \
+	(struct pci_bus *bus, unsigned int devfn, int pos, type *value)	\
 {									\
 	int res;							\
 	unsigned long flags;						\
 	u32 data = 0;							\
 	if (PCI_##size##_BAD) return PCIBIOS_BAD_REGISTER_NUMBER;	\
 	spin_lock_irqsave(&pci_lock, flags);				\
-	res = dev->bus->ops->read(dev, pos, len, &data);		\
+	res = bus->ops->read(bus, devfn, pos, len, &data);		\
 	*value = (type)data;						\
 	spin_unlock_irqrestore(&pci_lock, flags);			\
 	return res;							\
 }
 
 #define PCI_OP_WRITE(size,type,len) \
-int pci_write_config_##size (struct pci_dev *dev, int pos, type value) \
+int pci_bus_write_config_##size \
+	(struct pci_bus *bus, unsigned int devfn, int pos, type value)	\
 {									\
 	int res;							\
 	unsigned long flags;						\
 	if (PCI_##size##_BAD) return PCIBIOS_BAD_REGISTER_NUMBER;	\
 	spin_lock_irqsave(&pci_lock, flags);				\
-	res = dev->bus->ops->write(dev, pos, len, value);		\
+	res = bus->ops->write(bus, devfn, pos, len, value);		\
 	spin_unlock_irqrestore(&pci_lock, flags);			\
 	return res;							\
 }
@@ -52,10 +54,10 @@ PCI_OP_WRITE(byte, u8, 1)
 PCI_OP_WRITE(word, u16, 2)
 PCI_OP_WRITE(dword, u32, 4)
 
-EXPORT_SYMBOL(pci_read_config_byte);
-EXPORT_SYMBOL(pci_read_config_word);
-EXPORT_SYMBOL(pci_read_config_dword);
-EXPORT_SYMBOL(pci_write_config_byte);
-EXPORT_SYMBOL(pci_write_config_word);
-EXPORT_SYMBOL(pci_write_config_dword);
+EXPORT_SYMBOL(pci_bus_read_config_byte);
+EXPORT_SYMBOL(pci_bus_read_config_word);
+EXPORT_SYMBOL(pci_bus_read_config_dword);
+EXPORT_SYMBOL(pci_bus_write_config_byte);
+EXPORT_SYMBOL(pci_bus_write_config_word);
+EXPORT_SYMBOL(pci_bus_write_config_dword);
 EXPORT_SYMBOL(pci_lock);

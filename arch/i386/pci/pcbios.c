@@ -295,16 +295,16 @@ static int __pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len
 	return (int)((result & 0xff00) >> 8);
 }
 
-static int pci_bios_read(struct pci_dev *dev, int where, int size, u32 *value)
+static int pci_bios_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
-	return __pci_bios_read(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, size, value);
+	return __pci_bios_read(0, bus->number, PCI_SLOT(devfn), 
+		PCI_FUNC(devfn), where, size, value);
 }
 
-static int pci_bios_write(struct pci_dev *dev, int where, int size, u32 value)
+static int pci_bios_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
 {
-	return __pci_bios_write(0, dev->bus->number, PCI_SLOT(dev->devfn),
-		PCI_FUNC(dev->devfn), where, size, value);
+	return __pci_bios_write(0, bus->number, PCI_SLOT(devfn),
+		PCI_FUNC(devfn), where, size, value);
 }
 
 

@@ -71,16 +71,16 @@ static int __pci_conf1_write (int seg, int bus, int dev, int fn, int reg, int le
 
 #undef PCI_CONF1_ADDRESS
 
-static int pci_conf1_read(struct pci_dev *dev, int where, int size, u32 *value)
+static int pci_conf1_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
-	return __pci_conf1_read(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, size, value);
+	return __pci_conf1_read(0, bus->number, PCI_SLOT(devfn), 
+		PCI_FUNC(devfn), where, size, value);
 }
 
-static int pci_conf1_write(struct pci_dev *dev, int where, int size, u32 value)
+static int pci_conf1_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
 {
-	return __pci_conf1_write(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, size, value);
+	return __pci_conf1_write(0, bus->number, PCI_SLOT(devfn), 
+		PCI_FUNC(devfn), where, size, value);
 }
 
 static struct pci_ops pci_direct_conf1 = {
@@ -165,16 +165,16 @@ static int __pci_conf2_write (int seg, int bus, int dev, int fn, int reg, int le
 
 #undef PCI_CONF2_ADDRESS
 
-static int pci_conf2_read(struct pci_dev *dev, int where, int size, u32 *value)
+static int pci_conf2_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
-	return __pci_conf2_read(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, size, value);
+	return __pci_conf2_read(0, bus->number, PCI_SLOT(devfn), 
+		PCI_FUNC(devfn), where, size, value);
 }
 
-static int pci_conf2_write(struct pci_dev *dev, int where, int size, u32 value)
+static int pci_conf2_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
 {
-	return __pci_conf2_write(0, dev->bus->number, PCI_SLOT(dev->devfn), 
-		PCI_FUNC(dev->devfn), where, size, value);
+	return __pci_conf2_write(0, bus->number, PCI_SLOT(devfn), 
+		PCI_FUNC(devfn), where, size, value);
 }
 
 static struct pci_ops pci_direct_conf2 = {
@@ -204,9 +204,9 @@ static int __devinit pci_sanity_check(struct pci_ops *o)
 	bus.number = 0;
 	dev.bus = &bus;
 	for(dev.devfn=0; dev.devfn < 0x100; dev.devfn++)
-		if ((!o->read(&dev, PCI_CLASS_DEVICE, 2, &x) &&
+		if ((!o->read(&bus, dev.devfn, PCI_CLASS_DEVICE, 2, &x) &&
 		     (x == PCI_CLASS_BRIDGE_HOST || x == PCI_CLASS_DISPLAY_VGA)) ||
-		    (!o->read(&dev, PCI_VENDOR_ID, 2, &x) &&
+		    (!o->read(&bus, dev.devfn, PCI_VENDOR_ID, 2, &x) &&
 		     (x == PCI_VENDOR_ID_INTEL || x == PCI_VENDOR_ID_COMPAQ)))
 			return 1;
 	DBG("PCI: Sanity check failed\n");

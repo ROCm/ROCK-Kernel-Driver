@@ -456,8 +456,8 @@ extern struct bus_type pci_bus_type;
 /* Low-level architecture-dependent routines */
 
 struct pci_ops {
-	int (*read)(struct pci_dev *, int where, int size, u32 *val);
-	int (*write)(struct pci_dev *, int where, int size, u32 val);
+	int (*read)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val);
+	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
 };
 
 struct pbus_set_ranges_data
@@ -556,12 +556,37 @@ struct pci_dev *pci_find_class (unsigned int class, const struct pci_dev *from);
 struct pci_dev *pci_find_slot (unsigned int bus, unsigned int devfn);
 int pci_find_capability (struct pci_dev *dev, int cap);
 
-int pci_read_config_byte(struct pci_dev *dev, int where, u8 *val);
-int pci_read_config_word(struct pci_dev *dev, int where, u16 *val);
-int pci_read_config_dword(struct pci_dev *dev, int where, u32 *val);
-int pci_write_config_byte(struct pci_dev *dev, int where, u8 val);
-int pci_write_config_word(struct pci_dev *dev, int where, u16 val);
-int pci_write_config_dword(struct pci_dev *dev, int where, u32 val);
+int pci_bus_read_config_byte (struct pci_bus *bus, unsigned int devfn, int where, u8 *val);
+int pci_bus_read_config_word (struct pci_bus *bus, unsigned int devfn, int where, u16 *val);
+int pci_bus_read_config_dword (struct pci_bus *bus, unsigned int devfn, int where, u32 *val);
+int pci_bus_write_config_byte (struct pci_bus *bus, unsigned int devfn, int where, u8 val);
+int pci_bus_write_config_word (struct pci_bus *bus, unsigned int devfn, int where, u16 val);
+int pci_bus_write_config_dword (struct pci_bus *bus, unsigned int devfn, int where, u32 val);
+
+static inline int pci_read_config_byte(struct pci_dev *dev, int where, u8 *val)
+{
+	return pci_bus_read_config_byte (dev->bus, dev->devfn, where, val);
+}
+static int inline pci_read_config_word(struct pci_dev *dev, int where, u16 *val)
+{
+	return pci_bus_read_config_word (dev->bus, dev->devfn, where, val);
+}
+static int inline pci_read_config_dword(struct pci_dev *dev, int where, u32 *val)
+{
+	return pci_bus_read_config_dword (dev->bus, dev->devfn, where, val);
+}
+static int inline pci_write_config_byte(struct pci_dev *dev, int where, u8 val)
+{
+	return pci_bus_write_config_byte (dev->bus, dev->devfn, where, val);
+}
+static int inline pci_write_config_word(struct pci_dev *dev, int where, u16 val)
+{
+	return pci_bus_write_config_word (dev->bus, dev->devfn, where, val);
+}
+static int inline pci_write_config_dword(struct pci_dev *dev, int where, u32 val)
+{
+	return pci_bus_write_config_dword (dev->bus, dev->devfn, where, val);
+}
 
 extern spinlock_t pci_lock;
 
