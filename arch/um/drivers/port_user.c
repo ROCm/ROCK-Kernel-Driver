@@ -47,14 +47,28 @@ void *port_init(char *str, int device, struct chan_opts *opts)
 		return(NULL);
 	}
 
-	if((kern_data = port_data(port)) == NULL) return(NULL);
+	if((kern_data = port_data(port)) == NULL) 
+		return(NULL);
 
-	if((data = um_kmalloc(sizeof(*data))) == NULL) return(NULL);
-	*data = ((struct port_chan) { raw : 		opts->raw,
-				      kernel_data :	kern_data });
+	if((data = um_kmalloc(sizeof(*data))) == NULL) 
+		goto err;
+
+	*data = ((struct port_chan) { .raw  		= opts->raw,
+				      .kernel_data 	= kern_data });
 	sprintf(data->dev, "%d", port);
-	
+
 	return(data);
+ err:
+	port_kern_free(kern_data);
+	return(NULL);
+}
+
+void port_free(void *d)
+{
+	struct port_chan *data = d;
+
+	port_kern_free(data->kernel_data);
+	kfree(data);
 }
 
 int port_open(int input, int output, int primary, void *d, char **dev_out)
@@ -86,25 +100,17 @@ int port_console_write(int fd, const char *buf, int n, void *d)
 	return(generic_console_write(fd, buf, n, &data->tt));
 }
 
-void port_free(void *d)
-{
-	struct port_chan *data = d;
-
-	port_kern_free(data->kernel_data);
-	kfree(data);
-}
-
 struct chan_ops port_ops = {
-	type:		"port",
-	init:		port_init,
-	open:		port_open,
-	close:		port_close,
-	read:	        generic_read,
-	write:		generic_write,
-	console_write:	port_console_write,
-	window_size:	generic_window_size,
-	free:		port_free,
-	winch:		1,
+	.type		= "port",
+	.init		= port_init,
+	.open		= port_open,
+	.close		= port_close,
+	.read	        = generic_read,
+	.write		= generic_write,
+	.console_write	= port_console_write,
+	.window_size	= generic_window_size,
+	.free		= port_free,
+	.winch		= 1,
 };
 
 int port_listen_fd(int port)
@@ -113,7 +119,8 @@ int port_listen_fd(int port)
 	int fd, err;
 
 	fd = socket(PF_INET, SOCK_STREAM, 0);
-	if(fd == -1) return(-errno);
+	if(fd == -1) 
+		return(-errno);
 
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(port);
@@ -163,14 +170,16 @@ int port_connection(int fd, int *socket, int *pid_out)
 		return(-errno);
 
 	err = os_pipe(socket, 0, 0);
-	if(err) goto out_close;
+	if(err) 
+		goto out_close;
 
 	data = ((struct port_pre_exec_data)
-		{ sock_fd : 		new,
-		  pipe_fd :		socket[1] });
+		{ .sock_fd  		= new,
+		  .pipe_fd 		= socket[1] });
 
 	err = run_helper(port_pre_exec, &data, argv, NULL);
-	if(err < 0) goto out_shutdown;
+	if(err < 0) 
+		goto out_shutdown;
 
 	*pid_out = err;
 	return(new);
