@@ -1023,6 +1023,8 @@ int pcmcia_get_card_services_info(servinfo_t *info)
     return CS_SUCCESS;
 } /* get_card_services_info */
 
+#ifdef CONFIG_PCMCIA_OBSOLETE
+
 /*======================================================================
 
     Note that get_first_client() *does* recognize the Socket field
@@ -1046,6 +1048,7 @@ int pcmcia_get_first_client(client_handle_t *handle, client_req_t *req)
     *handle = socket->clients;
     return CS_SUCCESS;
 } /* get_first_client */
+EXPORT_SYMBOL(pcmcia_get_first_client);
 
 /*====================================================================*/
 
@@ -1065,10 +1068,12 @@ int pcmcia_get_next_client(client_handle_t *handle, client_req_t *req)
 	*handle = (*handle)->next;
     return CS_SUCCESS;
 } /* get_next_client */
+EXPORT_SYMBOL(pcmcia_get_next_client);
+#endif /* CONFIG_PCMCIA_OBSOLETE */
 
 /*====================================================================*/
 
-int pcmcia_get_window(window_handle_t *handle, int idx, win_req_t *req)
+static int pcmcia_get_window(window_handle_t *handle, int idx, win_req_t *req)
 {
     struct pcmcia_socket *s;
     window_t *win;
@@ -1287,6 +1292,8 @@ int pcmcia_modify_configuration(client_handle_t handle,
     return CS_SUCCESS;
 } /* modify_configuration */
 
+#ifdef CONFIG_PCMCIA_OBSOLETE
+
 /*======================================================================
 
     Modify the attributes of a window returned by RequestWindow.
@@ -1312,6 +1319,10 @@ int pcmcia_modify_window(window_handle_t win, modwin_t *req)
     
     return CS_SUCCESS;
 } /* modify_window */
+EXPORT_SYMBOL(pcmcia_modify_window);
+
+#endif /* CONFIG_PCMCIA_OBSOLETE */
+
 
 /*======================================================================
 
@@ -2063,6 +2074,7 @@ int pcmcia_insert_card(struct pcmcia_socket *skt)
     
 ======================================================================*/
 
+#ifdef CONFIG_PCMCIA_OBSOLETE
 int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask)
 {
     u_int events, bit;
@@ -2080,6 +2092,9 @@ int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask)
     }
     return CS_SUCCESS;
 } /* set_event_mask */
+EXPORT_SYMBOL(pcmcia_set_event_mask);
+
+#endif /* CONFIG_PCMCIA_OBSOLETE */
 
 /*======================================================================
 
@@ -2091,11 +2106,9 @@ EXPORT_SYMBOL(pcmcia_access_configuration_register);
 EXPORT_SYMBOL(pcmcia_adjust_resource_info);
 EXPORT_SYMBOL(pcmcia_deregister_client);
 EXPORT_SYMBOL(pcmcia_eject_card);
-EXPORT_SYMBOL(pcmcia_get_first_client);
 EXPORT_SYMBOL(pcmcia_get_card_services_info);
 EXPORT_SYMBOL(pcmcia_get_configuration_info);
 EXPORT_SYMBOL(pcmcia_get_mem_page);
-EXPORT_SYMBOL(pcmcia_get_next_client);
 EXPORT_SYMBOL(pcmcia_get_first_tuple);
 EXPORT_SYMBOL(pcmcia_get_first_window);
 EXPORT_SYMBOL(pcmcia_get_next_tuple);
@@ -2105,7 +2118,6 @@ EXPORT_SYMBOL(pcmcia_get_tuple_data);
 EXPORT_SYMBOL(pcmcia_insert_card);
 EXPORT_SYMBOL(pcmcia_map_mem_page);
 EXPORT_SYMBOL(pcmcia_modify_configuration);
-EXPORT_SYMBOL(pcmcia_modify_window);
 EXPORT_SYMBOL(pcmcia_parse_tuple);
 EXPORT_SYMBOL(pcmcia_register_client);
 EXPORT_SYMBOL(pcmcia_release_configuration);
@@ -2119,7 +2131,6 @@ EXPORT_SYMBOL(pcmcia_request_irq);
 EXPORT_SYMBOL(pcmcia_request_window);
 EXPORT_SYMBOL(pcmcia_reset_card);
 EXPORT_SYMBOL(pcmcia_resume_card);
-EXPORT_SYMBOL(pcmcia_set_event_mask);
 EXPORT_SYMBOL(pcmcia_suspend_card);
 EXPORT_SYMBOL(pcmcia_validate_cis);
 
