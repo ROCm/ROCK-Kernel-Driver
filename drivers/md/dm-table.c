@@ -12,6 +12,7 @@
 #include <linux/namei.h>
 #include <linux/ctype.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 #include <asm/atomic.h>
 
 #define MAX_DEPTH 16
@@ -746,22 +747,28 @@ int dm_table_complete(struct dm_table *t)
 	return r;
 }
 
-static spinlock_t _event_lock = SPIN_LOCK_UNLOCKED;
+static DECLARE_MUTEX(_event_lock);
 void dm_table_event_callback(struct dm_table *t,
 			     void (*fn)(void *), void *context)
 {
-	spin_lock_irq(&_event_lock);
+	down(&_event_lock);
 	t->event_fn = fn;
 	t->event_context = context;
-	spin_unlock_irq(&_event_lock);
+	up(&_event_lock);
 }
 
 void dm_table_event(struct dm_table *t)
 {
-	spin_lock(&_event_lock);
+	/*
+	 * You can no longer call dm_table_event() from interrupt
+	 * context, use a bottom half instead.
+	 */
+	BUG_ON(in_interrupt());
+
+	down(&_event_lock);
 	if (t->event_fn)
 		t->event_fn(t->event_context);
-	spin_unlock(&_event_lock);
+	up(&_event_lock);
 }
 
 sector_t dm_table_get_size(struct dm_table *t)
