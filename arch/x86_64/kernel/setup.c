@@ -775,6 +775,19 @@ static void __init detect_ht(struct cpuinfo_x86 *c)
 	}
 #endif
 }
+
+static void __init sched_cmp_hack(struct cpuinfo_x86 *c)
+{
+#ifdef CONFIG_SMP
+	/* AMD dual core looks like HT but isn't really. Hide it from the
+	   scheduler. This works around problems with the domain scheduler.
+	   Also probably gives slightly better scheduling and disables
+	   SMT nice which is harmful on dual core.
+	   TBD tune the domain scheduler for dual core. */
+	if (c->x86_vendor == X86_VENDOR_AMD && cpu_has(c, X86_FEATURE_CMP_LEGACY))
+		smp_num_siblings = 1;
+#endif
+}
 	
 static void __init init_intel(struct cpuinfo_x86 *c)
 {
@@ -918,7 +931,8 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	select_idle_routine(c);
 	detect_ht(c); 
-		
+	sched_cmp_hack(c);
+
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between
 	 * all CPUs; so make sure that we indicate which features are
@@ -1043,11 +1057,9 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (c->x86_cache_size >= 0) 
 		seq_printf(m, "cache size\t: %d KB\n", c->x86_cache_size);
 	
-#ifdef CONFIG_X86_HT
-	if (smp_num_siblings > 1) {
-		seq_printf(m, "physical id\t: %d\n", phys_proc_id[c - cpu_data]);
-		seq_printf(m, "siblings\t: %d\n", smp_num_siblings);
-	}
+#ifdef CONFIG_SMP
+	seq_printf(m, "physical id\t: %d\n", phys_proc_id[c - cpu_data]);
+	seq_printf(m, "siblings\t: %d\n", c->x86_num_cores * smp_num_siblings);
 #endif	
 
 	seq_printf(m,
