@@ -115,6 +115,7 @@ static __inline__ struct sk_buff *skb_head_from_pool(void)
 	unsigned long flags;
 
 	local_irq_save(flags);
+
 	list = &skb_head_pool[smp_processor_id()].list;
 
 	if (skb_queue_len(list))
@@ -130,13 +131,18 @@ static __inline__ void skb_head_to_pool(struct sk_buff *skb)
 	unsigned long flags;
 
 	local_irq_save(flags);
+
 	list = &skb_head_pool[smp_processor_id()].list;
 
 	if (skb_queue_len(list) < sysctl_hot_list_len) {
 		__skb_queue_head(list, skb);
 		local_irq_restore(flags);
 
+		return;
+	}
+
 	local_irq_restore(flags);
+	kmem_cache_free(skbuff_head_cache, skb);
 }
 
 
