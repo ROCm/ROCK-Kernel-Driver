@@ -857,9 +857,13 @@ static int ioctl_passthru(unsigned long arg)
 	int sg_index = 0;
 	u32 i = 0;
 	ulong p = 0;
+	unsigned int iop;
 
-	c = i2o_find_controller(cmd->iop);
-	if(!c)
+	if (get_user(iop, &cmd->iop) || get_user(user_msg, &cmd->msg))
+		return -EFAULT;
+
+	c = i2o_find_controller(iop);
+	if (!c)
                 return -ENXIO;
 
 	memset(&msg, 0, MSG_FRAME_SIZE*4);
