@@ -20,8 +20,6 @@
 #ifndef	_IO_HBA_QLA1280_H	/* wrapper symbol for kernel use */
 #define	_IO_HBA_QLA1280_H	/* subject to change without notice */
 
-#ifndef HOSTS_C			/* included in hosts.c */
-
 /*
  * Data bit definitions.
  */
@@ -1105,68 +1103,5 @@ struct scsi_qla_host {
  */
 #define SUBDEV(b, t, l)		((b << (MAX_T_BITS + MAX_L_BITS)) | (t << MAX_L_BITS) | l)
 #define LU_Q(ha, b, t, l)	(ha->dev[SUBDEV(b, t, l)])
-
-#endif				/* HOSTS_C */
-
-/*
- *  Linux - SCSI Driver Interface Function Prototypes.
- */
-#if LINUX_VERSION_CODE < 0x020600
-int qla1280_proc_info(char *, char **, off_t, int, int, int);
-#else
-int qla1280_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
-#endif
-const char *qla1280_info(struct Scsi_Host *host);
-int qla1280_detect(Scsi_Host_Template *);
-int qla1280_release(struct Scsi_Host *);
-int qla1280_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-#if LINUX_VERSION_CODE < 0x020545
-int qla1280_biosparam(Disk *, kdev_t, int[]);
-#else
-int qla1280_biosparam(struct scsi_device *, struct block_device *,
-		      sector_t, int *);
-#endif
-int __init qla1280_setup(char *s);
-int qla1280_eh_abort(struct scsi_cmnd * cmd);
-int qla1280_eh_device_reset(struct scsi_cmnd *cmd);
-int qla1280_eh_bus_reset(struct scsi_cmnd *cmd);
-int qla1280_eh_adapter_reset(struct scsi_cmnd *cmd);
-
-#if LINUX_VERSION_CODE < 0x020545
-#define USE_NEW_EH	.use_new_eh_code= 1
-#else
-#define USE_NEW_EH
-#endif
-
-/*
- * Scsi_Host_template (see hosts.h)
- * Device driver Interfaces to mid-level SCSI driver.
- */
-
-#define QLA1280_LINUX_TEMPLATE {				\
-	.module = NULL,						\
-	.proc_dir = NULL,					\
-	.proc_info = qla1280_proc_info,				\
-	.name = "Qlogic ISP 1280/12160",			\
-	.detect = qla1280_detect,				\
-	.release = qla1280_release,				\
-	.info = qla1280_info,					\
-	.queuecommand = qla1280_queuecommand,			\
-	.eh_strategy_handler = NULL,				\
-	.eh_abort_handler = qla1280_eh_abort,			\
-	.eh_device_reset_handler = qla1280_eh_device_reset,	\
-	.eh_bus_reset_handler = qla1280_eh_bus_reset,		\
-	.eh_host_reset_handler = qla1280_eh_adapter_reset,	\
-	.bios_param = qla1280_biosparam,			\
-	.can_queue = 255,	/* max simultaneous cmds      */\
-	.this_id = -1,		/* scsi id of host adapter    */\
-	.sg_tablesize = SG_ALL,	/* max scatter-gather cmds    */\
-	.cmd_per_lun = 3,	/* cmds per lun (linked cmds) */\
-	.present = 0,		/* number of 1280's present   */\
-	.unchecked_isa_dma = 0,	/* no memory DMA restrictions */\
-	.use_clustering = ENABLE_CLUSTERING,			\
-	.emulated = 0,						\
-	USE_NEW_EH						\
-}
 
 #endif				/* _IO_HBA_QLA1280_H */
