@@ -18,5 +18,3 @@ obj-$(CONFIG_FB_MATROX_MAVEN)     += matroxfb_maven.o matroxfb_crtc2.o
 
 include $(TOPDIR)/Rules.make
 
-clean:
-	rm -f core *.o *.a *.s
