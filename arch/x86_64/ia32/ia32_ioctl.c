@@ -673,12 +673,10 @@ static int mtrr_ioctl32(unsigned int fd, unsigned int cmd, unsigned long arg)
 	return err;
 } 
 
-#define HANDLE_IOCTL(cmd,handler) { (cmd), (ioctl_trans_handler_t)(handler), NULL },
+#define HANDLE_IOCTL(cmd,handler) { (cmd), (ioctl_trans_handler_t)(handler) }, 
 #define COMPATIBLE_IOCTL(cmd) HANDLE_IOCTL(cmd,sys_ioctl)
-#define IOCTL_TABLE_START struct ioctl_trans ioctl_start[] = {
-#define IOCTL_TABLE_END  };
 
-IOCTL_TABLE_START
+struct ioctl_trans ioctl_start[] = { 
 #include <linux/compat_ioctl.h>
 #define DECLARES
 #include "compat_ioctl.c"
@@ -761,6 +759,7 @@ HANDLE_IOCTL(MTRRIOC32_SET_PAGE_ENTRY, mtrr_ioctl32)
 HANDLE_IOCTL(MTRRIOC32_DEL_PAGE_ENTRY, mtrr_ioctl32)
 HANDLE_IOCTL(MTRRIOC32_GET_PAGE_ENTRY, mtrr_ioctl32)
 HANDLE_IOCTL(MTRRIOC32_KILL_PAGE_ENTRY, mtrr_ioctl32)
-IOCTL_TABLE_END
+}; 
 
 int ioctl_table_size = ARRAY_SIZE(ioctl_start);
+

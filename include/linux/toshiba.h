@@ -22,7 +22,7 @@
 
 #define TOSH_PROC "/proc/toshiba"
 #define TOSH_DEVICE "/dev/toshiba"
-#define TOSH_SMM _IOWR('t', 0x90, 24)
+#define TOSH_SMM _IOWR('t', 0x90, int)	/* broken: meant 24 bytes */
 
 typedef struct {
 	unsigned int eax;

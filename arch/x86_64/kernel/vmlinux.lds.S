@@ -106,6 +106,15 @@ SECTIONS
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;
   SECURITY_INIT
+  . = ALIGN(8);
+  __alt_instructions = .;
+  .altinstructions : { *(.altinstructions) } 
+  __alt_instructions_end = .; 
+ .altinstr_replacement : { *(.altinstr_replacement) }
+  /* .exit.text is discard at runtime, not link time, to deal with references
+     from .altinstructions and .eh_frame */
+  .exit.text : { *(.exit.text) }
+  .exit.data : { *(.exit.data) }	
   . = ALIGN(4096);
   __initramfs_start = .;
   .init.ramfs : { *(.init.ramfs) }
@@ -127,8 +136,6 @@ SECTIONS
 
   /* Sections to be discarded */
   /DISCARD/ : {
-	*(.exit.data)
-	/* *(.exit.text) */
 	*(.exitcall.exit)
 	*(.eh_frame)
 	}

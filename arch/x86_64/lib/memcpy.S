@@ -1,5 +1,6 @@
 /* Copyright 2002 Andi Kleen */
 	
+	#include <asm/cpufeature.h>		
 /*
  * memcpy - Copy a memory block.
  *
@@ -86,4 +87,35 @@ memcpy:
 .Lende: 	
 	popq %rbx
 	ret
+.Lfinal:
 	
+	/* C stepping K8 run faster using the string copy instructions.
+	   It is also a lot simpler. Use this when possible */
+	
+	.section .altinstructions,"a"
+	.align 8
+	.quad  memcpy
+	.quad  memcpy_c
+	.byte  X86_FEATURE_K8_C
+	.byte  .Lfinal-memcpy
+	.byte  memcpy_c_end-memcpy_c	
+	.previous
+
+	.section .altinstr_replacement,"ax"
+ /* rdi	destination
+  * rsi source
+  * rdx count
+  */			
+memcpy_c:
+	movq %rdi,%rax
+	movl %edx,%ecx
+	shrl $3,%ecx
+	andl $7,%edx	
+	rep 
+	movsq 
+	movl %edx,%ecx
+	rep
+	movsb
+	ret
+memcpy_c_end:
+	.previous

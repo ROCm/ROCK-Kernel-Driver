@@ -380,4 +380,25 @@ static inline void prefetchw(void *x)
 	ti->task;					\
 })
 
+#define ASM_NOP1 K8_NOP1
+#define ASM_NOP2 K8_NOP2
+#define ASM_NOP3 K8_NOP3
+#define ASM_NOP4 K8_NOP4
+#define ASM_NOP5 K8_NOP5
+#define ASM_NOP6 K8_NOP6
+#define ASM_NOP7 K8_NOP7
+#define ASM_NOP8 K8_NOP8
+
+/* Opteron nops */
+#define K8_NOP1 ".byte 0x90\n"
+#define K8_NOP2	".byte 0x66,0x90\n" 
+#define K8_NOP3	".byte 0x66,0x66,0x90\n" 
+#define K8_NOP4	".byte 0x66,0x66,0x66,0x90\n" 
+#define K8_NOP5	K8_NOP3 K8_NOP2 
+#define K8_NOP6	K8_NOP3 K8_NOP3
+#define K8_NOP7	K8_NOP4 K8_NOP3
+#define K8_NOP8	K8_NOP4 K8_NOP4
+
+#define ASM_NOP_MAX 8
+
 #endif /* __ASM_X86_64_PROCESSOR_H */

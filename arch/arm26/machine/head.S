@@ -24,12 +24,13 @@
 ENTRY(stext)
 __entry:	cmp	pc, #0x02000000
 		ldrlt	pc, LC0			@ if 0x01800000, call at 0x02080000
-		teq	r0, #0			@ Check for old calling method
+		teq	r0, #0                  @ Check for old calling method
 		blne	oldparams		@ Move page if old
 		adr	r0, LC0
-		ldmib	r0, {r2-r5, sp}		@ Setup stack
-		mov	r0, #0
-1:		cmp	r2, r3			@ Clear BSS
+		ldmib	r0, {r2-r5, sp}		@ Setup stack (and fetch other values)
+
+		mov	r0, #0			@ Clear BSS
+1:		cmp	r2, r3
 		strcc	r0, [r2], #4
 		bcc	1b
 
@@ -37,6 +38,17 @@ __entry:	cmp	pc, #0x02000000
 		str	r0, [r4]
 		bl	detect_arch_type
 		str	r0, [r5]
+
+#ifdef CONFIG_XIP_KERNEL
+               ldr     r3, ETEXT                       @ data section copy
+               ldr     r4, SDATA
+               ldr     r5, EDATA
+1:
+               ldr     r6, [r3], #4
+               str     r6, [r4], #4
+               cmp     r4, r5
+               blt     1b
+#endif
 
 		mov	fp, #0
 		b	start_kernel
@@ -47,8 +59,14 @@ LC0:		.word	_stext
 		.word	processor_id		@ r4
 		.word	__machine_arch_type	@ r5
 		.word	init_thread_union+8192	@ sp
-arm2_id:	.long	0x41560200
-arm250_id:	.long	0x41560250
+#ifdef CONFIG_XIP_KERNEL
+ETEXT:		.word   _endtext
+SDATA:		.word   _sdata
+EDATA:		.word   __bss_start
+#endif
+
+arm2_id:	.long	0x41560200  @ ARM2 and 250 dont have a CPUID
+arm250_id:	.long	0x41560250  @ So we create some after probing for them
 		.align
 
 oldparams:	mov	r4, #0x02000000

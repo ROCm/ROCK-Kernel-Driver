@@ -68,7 +68,7 @@ unsigned long __clear_user(void *addr, unsigned long size)
 	asm volatile(
 		"	testq  %[size8],%[size8]\n"
 		"	jz     4f\n"
-		"0:	movnti %[zero],(%[dst])\n"
+		"0:	movq %[zero],(%[dst])\n"
 		"	addq   %[eight],%[dst]\n"
 		"	decl %%ecx ; jnz   0b\n"
 		"4:	movq  %[size1],%%rcx\n"
@@ -77,7 +77,7 @@ unsigned long __clear_user(void *addr, unsigned long size)
 		"1:	movb   %b[zero],(%[dst])\n"
 		"	incq   %[dst]\n"
 		"	decl %%ecx ; jnz  1b\n"
-		"2:	sfence\n"
+		"2:\n"
 		".section .fixup,\"ax\"\n"
 		"3:	lea 0(%[size1],%[size8],8),%[size8]\n"
 		"	jmp 2b\n"

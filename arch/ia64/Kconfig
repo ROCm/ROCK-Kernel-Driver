@@ -18,6 +18,9 @@ config IA64
 	  page at <http://www.linuxia64.org/> and a mailing list at
 	  linux-ia64@linuxia64.org.
 
+config 64BIT
+	def_bool y
+
 config MMU
 	bool
 	default y

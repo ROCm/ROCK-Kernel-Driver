@@ -12,8 +12,6 @@ LDFLAGS_BLOB	:=--format binary
 AFLAGS_vmlinux.lds.o = -DTEXTADDR=$(TEXTADDR) -DDATAADDR=$(DATAADDR)
 OBJCOPYFLAGS	:=-O binary -R .note -R .comment -S
 GZFLAGS		:=-9
-#CFLAGS		+=-pipe
-CFLAGS		:=$(CFLAGS:-O2=-Os)
 
 ifeq ($(CONFIG_FRAME_POINTER),y)
 CFLAGS		+=-fno-omit-frame-pointer -mno-sched-prolog
@@ -29,21 +27,17 @@ CFLAGS_BOOT	:=-mapcs-26 -mcpu=arm3 -mshort-load-bytes -msoft-float -Wa,-mno-fpu 
 CFLAGS		+=-mapcs-26 -mcpu=arm3 -mshort-load-bytes -msoft-float -Wa,-mno-fpu -Uarm
 AFLAGS		+=-mapcs-26 -mcpu=arm3 -mno-fpu -msoft-float -Wa,-mno-fpu
 
-#Default value
-DATAADDR	:= .
-
-ifeq ($(CONFIG_CPU_26),y)
 head-y		:= arch/arm26/machine/head.o arch/arm26/kernel/init_task.o
 LDFLAGS_BLOB	+= --oformat elf32-littlearm
-  ifeq ($(CONFIG_ROM_KERNEL),y)
-    DATAADDR	 := 0x02080000
-    textaddr-y	 := 0x03800000
-  else
-    textaddr-y	 := 0x02080000
-  endif
+
+ifeq ($(CONFIG_XIP_KERNEL),y)
+  TEXTADDR	 := 0x03880000
+  DATAADDR	 := 0x02080000
+else
+  TEXTADDR	 := 0x02080000
+  DATAADDR       := .
 endif
 
-TEXTADDR := $(textaddr-y)
 ifeq ($(incdir-y),)
 incdir-y :=
 endif
@@ -74,7 +68,7 @@ maketools: FORCE
 bzImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/zImage
 
-zImage Image bootpImage: vmlinux
+zImage Image bootpImage xipImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 zinstall install: vmlinux

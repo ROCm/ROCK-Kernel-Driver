@@ -580,7 +580,7 @@ static void ecard_proc_init(void)
 
 #define ec_set_resource(ec,nr,st,sz,flg)			\
 	do {							\
-		(ec)->resource[nr].name = ec->dev.name;		\
+		(ec)->resource[nr].name = ec->dev.bus_id;	\
 		(ec)->resource[nr].start = st;			\
 		(ec)->resource[nr].end = (st) + (sz) - 1;	\
 		(ec)->resource[nr].flags = flg;			\
@@ -621,15 +621,23 @@ static ssize_t ecard_show_irq(struct device *dev, char *buf)
 	return sprintf(buf, "%u\n", ec->irq);
 }
 
-static DEVICE_ATTR(irq, S_IRUGO, ecard_show_irq, NULL);
+static ssize_t ecard_show_vendor(struct device *dev, char *buf)
+{
+	struct expansion_card *ec = ECARD_DEV(dev);
+	return sprintf(buf, "%u\n", ec->cid.manufacturer);
+}
+
+static ssize_t ecard_show_device(struct device *dev, char *buf)
+{
+	struct expansion_card *ec = ECARD_DEV(dev);
+	return sprintf(buf, "%u\n", ec->cid.product);
+}
 
 static ssize_t ecard_show_dma(struct device *dev, char *buf)
 {
 	struct expansion_card *ec = ECARD_DEV(dev);
 	return sprintf(buf, "%u\n", ec->dma);
 }
-
-static DEVICE_ATTR(dma, S_IRUGO, ecard_show_dma, NULL);
 
 static ssize_t ecard_show_resources(struct device *dev, char *buf)
 {
@@ -646,6 +654,10 @@ static ssize_t ecard_show_resources(struct device *dev, char *buf)
 	return str - buf;
 }
 
+static DEVICE_ATTR(irq, S_IRUGO, ecard_show_irq, NULL);
+static DEVICE_ATTR(vendor, S_IRUGO, ecard_show_vendor, NULL);
+static DEVICE_ATTR(device, S_IRUGO, ecard_show_device, NULL);
+static DEVICE_ATTR(dma, S_IRUGO, ecard_show_dma, NULL);
 static DEVICE_ATTR(resource, S_IRUGO, ecard_show_resources, NULL);
 
 /*
@@ -717,8 +729,6 @@ ecard_probe(int slot, card_type_t type)
 		}
 
 	snprintf(ec->dev.bus_id, sizeof(ec->dev.bus_id), "ecard%d", slot);
-	snprintf(ec->dev.name, sizeof(ec->dev.name), "ecard %04x:%04x",
-		 ec->cid.manufacturer, ec->cid.product);
 	ec->dev.parent = NULL;
 	ec->dev.bus    = &ecard_bus_type;
 	ec->dev.dma_mask = &ec->dma_mask;
@@ -745,6 +755,8 @@ ecard_probe(int slot, card_type_t type)
 	device_create_file(&ec->dev, &dev_attr_dma);
 	device_create_file(&ec->dev, &dev_attr_irq);
 	device_create_file(&ec->dev, &dev_attr_resource);
+	device_create_file(&ec->dev, &dev_attr_vendor);
+	device_create_file(&ec->dev, &dev_attr_device); 
 
 	return 0;
 

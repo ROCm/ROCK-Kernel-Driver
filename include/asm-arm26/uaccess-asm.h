@@ -19,8 +19,10 @@
 
 /*
  * These are the values used to represent the user `fs' and the kernel `ds'
+ * FIXME - the KERNEL_DS should end at 0x03000000 but we want to access ROM at
+ * 0x03400000. ideally we want to forbid access to the IO space inbetween.
  */
-#define KERNEL_DS	0x03000000
+#define KERNEL_DS	0x03FFFFFF
 #define USER_DS   	0x02000000
 
 extern uaccess_t uaccess_user, uaccess_kernel;
@@ -28,7 +30,7 @@ extern uaccess_t uaccess_user, uaccess_kernel;
 static inline void set_fs (mm_segment_t fs)
 {
 	current_thread_info()->addr_limit = fs;
-	current->thread.uaccess = fs == USER_DS ? &uaccess_user : &uaccess_kernel;
+	current->thread.uaccess = (fs == USER_DS ? &uaccess_user : &uaccess_kernel);
 }
 
 #define __range_ok(addr,size) ({					\

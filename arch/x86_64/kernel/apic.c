@@ -38,8 +38,6 @@ int disable_apic_timer __initdata;
 /* Using APIC to generate smp_local_timer_interrupt? */
 int using_apic_timer = 0;
 
-int dont_enable_local_apic __initdata = 0;
-
 static DEFINE_PER_CPU(int, prof_multiplier) = 1;
 static DEFINE_PER_CPU(int, prof_old_multiplier) = 1;
 static DEFINE_PER_CPU(int, prof_counter) = 1;
@@ -464,7 +462,6 @@ static struct {
 
 static int lapic_suspend(struct sys_device *dev, u32 state)
 {
-	unsigned int l, h;
 	unsigned long flags;
 
 	if (!apic_pm_state.active)
@@ -486,9 +483,6 @@ static int lapic_suspend(struct sys_device *dev, u32 state)
 	local_save_flags(flags);
 	local_irq_disable();
 	disable_local_APIC();
-	rdmsr(MSR_IA32_APICBASE, l, h);
-	l &= ~MSR_IA32_APICBASE_ENABLE;
-	wrmsr(MSR_IA32_APICBASE, l, h);
 	local_irq_restore(flags);
 	return 0;
 }
@@ -1017,6 +1011,12 @@ static __init int setup_disableapic(char *str)
 	return 0;
 } 
 
+static __init int setup_nolapic(char *str) 
+{ 
+	disable_apic = 1;
+	return 0;
+} 
+
 static __init int setup_noapictimer(char *str) 
 { 
 	disable_apic_timer = 1;
@@ -1024,5 +1024,7 @@ static __init int setup_noapictimer(char *str)
 } 
 
 __setup("disableapic", setup_disableapic); 
+__setup("nolapic", setup_nolapic);  /* same as disableapic, for compatibility */
 __setup("noapictimer", setup_noapictimer); 
 
+/* no "lapic" flag - we only use the lapic when the BIOS tells us so. */
