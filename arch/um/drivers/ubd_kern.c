@@ -968,8 +968,8 @@ static int ubd_revalidate(kdev_t rdev)
 			set_capacity(fake_gendisk[n], size / 512);
 		dev->size = size;
 	}
-	spin_unlock(&ubd_lock);
  out:
+	spin_unlock(&ubd_lock);
 	return err;
 }
 

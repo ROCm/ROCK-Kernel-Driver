@@ -157,7 +157,7 @@ int activate_fd(int irq, int fd, int type, void *dev_id)
 			printk("Registering fd %d twice\n", fd);
 			printk("Irqs : %d, %d\n", irq_fd->irq, irq);
 			printk("Ids : 0x%x, 0x%x\n", irq_fd->id, dev_id);
-			goto out_free;
+			goto out_unlock;
 		}
 	}
 
@@ -334,8 +334,10 @@ void reactivate_fd(int fd, int irqnum)
 
 	flags = irq_lock();
 	irq = find_irq_by_fd(fd, irqnum, &i);
-	if(irq == NULL) 
-		goto out;
+	if(irq == NULL){
+		irq_unlock(flags);
+		return;
+	}
 	pollfds[i].fd = irq->fd;
 
 	irq_unlock(flags);
@@ -344,8 +346,6 @@ void reactivate_fd(int fd, int irqnum)
 	 * section.
 	 */
 	maybe_sigio_broken(fd, irq->type);
- out:
-	irq_unlock(flags);
 }
 
 void deactivate_fd(int fd, int irqnum)
