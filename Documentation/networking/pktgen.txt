@@ -11,13 +11,13 @@ How to use the Linux packet generator module.
 5. After this two commands are defined:
    A. "pg" to start generator and to get results.
    B. "pgset" to change generator parameters. F.e.
-      pgset "clone_skb 100"   sets the number of coppies of the same packet 
+      pgset "clone_skb 100"   sets the number of copies of the same packet 
                               will be sent before a new packet is allocated
       pgset "clone_skb 0"     use multiple SKBs for packet generation
       pgset "pkt_size 9014"   sets packet size to 9014
       pgset "frags 5"         packet will consist of 5 fragments
       pgset "count 200000"    sets number of packets to send, set to zero
-                              for continious sends untill explicitly
+                              for continuous sends until explicitly
                               stopped.
       pgset "ipg 5000"        sets artificial gap inserted between packets
                               to 5000 nanoseconds
