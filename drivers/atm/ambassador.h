@@ -627,7 +627,7 @@ typedef struct {
 
 struct amb_dev {
   u8               irq;
-  u8               flags;
+  long		   flags;
   u32              iobase;
   u32 *            membase;
 

@@ -1155,8 +1155,8 @@ static void netdev_timer(unsigned long data)
 	unsigned int old_linkok = np->linkok;
 
 	if (debug)
-		printk(KERN_DEBUG "%s: Media selection timer tick, status %8.8lx "
-		       "config %8.8lx.\n", dev->name, readl(ioaddr + ISR),
+		printk(KERN_DEBUG "%s: Media selection timer tick, status %8.8x "
+		       "config %8.8x.\n", dev->name, readl(ioaddr + ISR),
 		       readl(ioaddr + TCRRCR));
 
 	if (np->flags == HAS_MII_XCVR) {
@@ -1184,7 +1184,7 @@ static void tx_timeout(struct net_device *dev)
 	long ioaddr = dev->base_addr;
 	int i;
 
-	printk(KERN_WARNING "%s: Transmit timed out, status %8.8lx,"
+	printk(KERN_WARNING "%s: Transmit timed out, status %8.8x,"
 	       " resetting...\n", dev->name, readl(ioaddr + ISR));
 
 	{
@@ -1554,7 +1554,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	np->stats.rx_crc_errors += (readl(ioaddr + TALLY) & 0x7fff0000) >> 16;
 
 	if (debug)
-		printk(KERN_DEBUG "%s: exiting interrupt, status=%#4.4lx.\n",
+		printk(KERN_DEBUG "%s: exiting interrupt, status=%#4.4x.\n",
 		       dev->name, readl(ioaddr + ISR));
 
 	writel(np->imrvalue, ioaddr + IMR);

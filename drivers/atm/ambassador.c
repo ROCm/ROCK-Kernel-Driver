@@ -795,7 +795,6 @@ static inline void drain_rx_pool (amb_dev * dev, unsigned char pool) {
   return;
 }
 
-#ifdef MODULE
 static void drain_rx_pools (amb_dev * dev) {
   unsigned char pool;
   
@@ -803,10 +802,7 @@ static void drain_rx_pools (amb_dev * dev) {
   
   for (pool = 0; pool < NUM_RX_POOLS; ++pool)
     drain_rx_pool (dev, pool);
-  
-  return;
 }
-#endif
 
 static inline void fill_rx_pool (amb_dev * dev, unsigned char pool, int priority) {
   rx_in rx;

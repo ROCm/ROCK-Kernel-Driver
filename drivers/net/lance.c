@@ -390,7 +390,7 @@ int __init lance_probe(struct net_device *dev)
 static int __init lance_probe1(struct net_device *dev, int ioaddr, int irq, int options)
 {
 	struct lance_private *lp;
-	short dma_channels;					/* Mark spuriously-busy DMA channels */
+	long dma_channels;			/* Mark spuriously-busy DMA channels */
 	int i, reset_val, lance_version;
 	const char *chipname;
 	/* Flags for specific chips or boards. */

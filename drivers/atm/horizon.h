@@ -429,7 +429,7 @@ struct hrz_dev {
 #endif
 
   u8                  irq;
-  u8                  flags;
+  long		      flags;
   u8                  tx_last;
   u8                  tx_idle;
 
