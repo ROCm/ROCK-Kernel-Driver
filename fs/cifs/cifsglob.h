@@ -105,7 +105,7 @@ struct TCP_Server_Info {
 	char versionMinor;
 	int svlocal:1;		/* local server or remote */
 	atomic_t socketUseCount;	/* indicates if the server has any open cifs sessions */
-	enum statusEnum tcpStatus;	/* what we think the status is */
+	enum statusEnum tcpStatus; /* what we think the status is */
 	struct semaphore tcpSem;
 	struct task_struct *tsk;
 	char server_GUID[16];
@@ -170,7 +170,7 @@ struct cifsTconInfo {
 	struct list_head openFileList;
 	struct semaphore tconSem;
 	struct cifsSesInfo *ses;	/* pointer to session associated with */
-	char treeName[MAX_TREE_SIZE + 1];	/* The ascii or unicode name of this resource depending on the ses->capabilities *//* BB fill in this field */
+	char treeName[MAX_TREE_SIZE + 1]; /* UNC name of resource (in ASCII not UTF) */
 	char *nativeFileSystem;
 	__u16 tid;		/* The 2 byte transaction id */
 	__u16 Flags;		/* optional support bits */

@@ -76,21 +76,31 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	int rc = 0;
 	struct list_head *tmp;
 	struct cifsSesInfo *ses;
+    struct cifsTconInfo *tcon;
 
 	server->tcpStatus = CifsNeedReconnect;
 	server->maxBuf = 0;
 
 	cFYI(1, ("Reconnecting tcp session "));
 
+	/* before reconnecting the tcp session, mark the smb session (uid)
+		and the tid bad so they are not used until reconnected */
 	read_lock(&GlobalSMBSeslock);
 	list_for_each(tmp, &GlobalSMBSessionList) {
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		if (ses->server) {
 			if (ses->server == server) {
 				ses->status = CifsNeedReconnect;
+				ses->ipc_tid = 0;
 			}
 		}
 		/* else tcp and smb sessions need reconnection */
+	}
+	list_for_each(tmp, &GlobalTreeConnectionList) {
+		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
+		if(tcon->ses->server == server) {
+			tcon->tidStatus = CifsNeedReconnect;
+		}
 	}
 	read_unlock(&GlobalSMBSeslock);
 
@@ -112,6 +122,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 			schedule_timeout(3 * HZ);
 		} else {
 			server->tcpStatus = CifsGood;
+			wake_up(&server->response_q);
 		}
 	}
 
@@ -174,15 +185,12 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				csocket = server->ssocket;
 				continue;
 			} else { /* find define for the -512 returned at unmount time */
-				cFYI(1,
-				       ("Received error on sock_recvmsg( peek) with length = %d",
+				cFYI(1,("Error on sock_recvmsg(peek) length = %d",
 					length)); 
 			}
 			break;
-		}
-		if (length == 0) {
-			cFYI(1,
-			     ("Zero length peek received - dead session?"));
+		} else if (length == 0) {
+			cFYI(1,("Zero length peek received - dead session?"));
 			cifs_reconnect(server);
 			csocket = server->ssocket;
 			continue;
@@ -507,8 +515,7 @@ find_unc(__u32 new_target_ip_addr, char *uncName, char *userName)
 	/* BB lock tcon and server and tcp session and increment use count here? */
 					/* found a match on the TCP session */
 					/* BB check if reconnection needed */
-					cFYI(1,
-					     ("Matched ip, old UNC: %s == new: %s ?",
+					cFYI(1,("Matched ip, old UNC: %s == new: %s ?",
 					      tcon->treeName, uncName));
 					if (strncmp
 					    (tcon->treeName, uncName,
@@ -855,9 +862,9 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 					FreeXid(xid);
 					return -ENODEV;
 				} else {
-					rc = CIFSTCon(xid, pSesInfo,
-						      volume_info.UNC,
-						      tcon, cifs_sb->local_nls);
+					rc = CIFSTCon(xid, pSesInfo, 
+						volume_info.UNC,
+						tcon, cifs_sb->local_nls);
 					cFYI(1, ("CIFS Tcon rc = %d", rc));
 				}
 				if (!rc)
@@ -2196,6 +2203,7 @@ CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 	/* if (rc) rc = map_smb_to_linux_error(smb_buffer_response); */
 	/* above now done in SendReceive */
 	if ((rc == 0) && (tcon != NULL)) {
+        tcon->tidStatus = CifsGood;
 		tcon->tid = smb_buffer_response->Tid;
 		bcc_ptr = pByteArea(smb_buffer_response);
 		length = strnlen(bcc_ptr, BCC(smb_buffer_response) - 2);
