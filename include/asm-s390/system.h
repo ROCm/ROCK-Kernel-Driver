@@ -83,12 +83,31 @@ static inline void restore_fp_regs(s390_fp_regs *fpregs)
 		: : "a" (fpregs), "m" (*fpregs) );
 }
 
+static inline void save_access_regs(unsigned int *acrs)
+{
+	asm volatile ("stam 0,15,0(%0)" : : "a" (acrs) : "memory" );
+}
+
+static inline void restore_access_regs(unsigned int *acrs)
+{
+	asm volatile ("lam 0,15,0(%0)" : : "a" (acrs) );
+}
+
 #define switch_to(prev,next,last) do {					     \
 	if (prev == next)						     \
 		break;							     \
 	save_fp_regs(&prev->thread.fp_regs);				     \
 	restore_fp_regs(&next->thread.fp_regs);				     \
+	save_access_regs(&prev->thread.acrs[0]);			     \
+	restore_access_regs(&next->thread.acrs[0]);			     \
 	prev = __switch_to(prev,next);					     \
+} while (0)
+
+#define prepare_arch_switch(rq, next)	do { } while(0)
+#define task_running(rq, p)		((rq)->curr == (p))
+#define finish_arch_switch(rq, prev) do {				     \
+	set_fs(current->thread.mm_segment);				     \
+	spin_unlock_irq(&(rq)->lock);					     \
 } while (0)
 
 #define nop() __asm__ __volatile__ ("nop")
