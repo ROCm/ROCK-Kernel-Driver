@@ -170,7 +170,7 @@ int sctp_add_bind_addr(struct sctp_bind_addr *bp, union sctp_addr *new,
 	if (!addr)
 		return -ENOMEM;
 
-	addr->a = *new;
+	memcpy(&addr->a, new, sizeof(*new));
 
 	/* Fix up the port if it has not yet been set.
 	 * Both v4 and v6 have the port at the same offset.
