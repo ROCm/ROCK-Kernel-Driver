@@ -7,6 +7,8 @@
  *
  * History:
  *
+ * - Revision 0.1.8 (23 Oct 2002): Ported to new framebuffer api.
+ * 
  * - Revision 0.1.7 (23 Jan 2001): fix crash resulting from MDA only cards 
  *				   being detected as Hercules.	 (Paul G.)
  * - Revision 0.1.6 (17 Aug 2000): new style structs
@@ -44,8 +46,6 @@
 #include <linux/ioport.h>
 #include <asm/io.h>
 #include <asm/vga.h>
-#include <video/fbcon.h>
-#include <video/fbcon-hga.h>
 
 #ifdef MODULE
 
@@ -71,8 +71,14 @@
 static unsigned long hga_vram_base;		/* Base of video memory */
 static unsigned long hga_vram_len;		/* Size of video memory */
 
+#define HGA_ROWADDR(row) ((row%4)*8192 + (row>>2)*90)
 #define HGA_TXT			0
 #define HGA_GFX			1
+
+static inline u8* rowaddr(struct fb_info *info, u_int row)
+{
+        return info->screen_base + HGA_ROWADDR(row);
+}
 
 static int hga_mode = -1;			/* 0 = txt, 1 = gfx mode */
 
@@ -111,49 +117,30 @@ static spinlock_t hga_reg_lock = SPIN_LOCK_UNLOCKED;
 /* Framebuffer driver structures */
 
 static struct fb_var_screeninfo hga_default_var = {
-	.xres =		720,
-	.yres =		348,
-	.xres_virtual =	720,
-	.yres_virtual =	348,
-	.xoffset =	0,
-	.yoffset =	0,
-	.bits_per_pixel =1,
-	.grayscale =	0,
-	.red =		{0, 1, 0},
-	.green =	{0, 1, 0},
-	.blue =		{0, 1, 0},
-	.transp =	{0, 0, 0},
-	.nonstd =	0,			/* (FB_NONSTD_HGA ?) */
-	.activate =	0,
-	.height =	-1,
-	.width =	-1,
-	.accel_flags =	0,
-	/* pixclock */
-	/* left_margin, right_margin */
-	/* upper_margin, lower_margin */
-	/* hsync_len, vsync_len */
-	/* sync */
-	/* vmode */
+	.xres		= 720,
+	.yres 		= 348,
+	.xres_virtual 	= 720,
+	.yres_virtual	= 348,
+	.bits_per_pixel = 1,
+	.red 		= {0, 1, 0},
+	.green 		= {0, 1, 0},
+	.blue 		= {0, 1, 0},
+	.transp 	= {0, 0, 0},
+	.height 	= -1,
+	.width 		= -1,
 };
 
 static struct fb_fix_screeninfo hga_fix = {
-	.id =		"HGA",
-	.smem_start =	(unsigned long) NULL,
-	.smem_len =	0,
-	.type =		FB_TYPE_PACKED_PIXELS,	/* (not sure) */
-	.type_aux =	0,			/* (not sure) */
-	.visual =	FB_VISUAL_MONO10,
-	.xpanstep =	8,
-	.ypanstep =	8,
-	.ywrapstep =	0,
-	.line_length =	90,
-	.mmio_start =	0,
-	.mmio_len =	0,
-	.accel =	FB_ACCEL_NONE
+	.id 		= "HGA",
+	.type 		= FB_TYPE_PACKED_PIXELS,	/* (not sure) */
+	.visual 	= FB_VISUAL_MONO10,
+	.xpanstep 	= 8,
+	.ypanstep 	= 8,
+	.line_length 	= 90,
+	.accel 		= FB_ACCEL_NONE
 };
 
 static struct fb_info fb_info;
-static struct display disp;
 
 /* Don't assume that tty1 will be the initial current console. */
 static int release_io_port = 0;
@@ -204,7 +191,6 @@ static void hga_clear_screen(void)
 	if (fillchar != 0xbf)
 		isa_memset_io(hga_vram_base, fillchar, hga_vram_len);
 }
-
 
 #ifdef MODULE
 static void hga_txt_mode(void)
@@ -271,15 +257,13 @@ static void hga_gfx_mode(void)
 }
 
 #ifdef MODULE
-static void hga_show_logo(void)
+static void hga_show_logo(struct fb_info *info)
 {
 	int x, y;
-	unsigned long dest = hga_vram_base;
 	char *logo = linux_logo_bw;
 	for (y = 134; y < 134 + 80 ; y++) /* this needs some cleanup */
 		for (x = 0; x < 10 ; x++)
-			isa_writeb(~*(logo++),
-				   (dest + (y%4)*8192 + (y>>2)*90 + x + 40));
+			isa_writeb(~*(logo++),(dest + HGA_ROWADDR(y) + x + 40));
 }
 #endif /* MODULE */	
 
@@ -380,97 +364,6 @@ static int __init hga_card_detect(void)
 	return 1;
 }
 
-/* ------------------------------------------------------------------------- *
- *
- * dispsw functions
- *
- * ------------------------------------------------------------------------- */
-
-/**
- *	hga_set_var - set the user defined part of the display
- *	@var:new video mode
- *	@con:unused
- *	@info:pointer to fb_info object containing info for current hga board
- *	
- *	This function is called for changing video modes. Since HGA cards have
- *	only one fixed mode we have not much to do. After checking input 
- *	parameters @var is copied to @info->var and @info->changevar is called.
- *	A zero is returned on success and %-EINVAL for failure.
- *	
- *	FIXME:
- *	This is the most mystical function (at least for me).
- *	What is the exact specification of xxx_set_var()?
- *	Should it handle xoffset, yoffset? Should it do panning?
- *	What does vmode mean?
- */
-
-int hga_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hga_set_var: con:%d, activate:%x, info:0x%x, fb_info:%x\n", con, var->activate, (unsigned)info, (unsigned)&fb_info);
-	
-	if (var->xres != 720 ||	var->yres != 348 ||
-	    var->xres_virtual != 720 ||
-	    var->yres_virtual < 348 || var->yres_virtual > 348 + 16 ||
-	    var->bits_per_pixel != 1 || var->grayscale != 0) {
-		return -EINVAL;
-	}
-	if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
-		info->var = *var;
-		if (info->changevar) 
-			(*info->changevar)(con);
-	}
-	return 0;
-}
-
-/**
- *	hga_getcolreg - read color registers
- *	@regno:register index to read out
- *	@red:red value
- *	@green:green value
- *	@blue:blue value
- *	@transp:transparency value
- *	@info:unused
- *
- *	This callback function is used to read the color registers of a HGA
- *	board. Since we have only two fixed colors, RGB values are 0x0000 
- *	for register0 and 0xaaaa for register1.
- *	A zero is returned on success and 1 for failure.
- */
-
-static int hga_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
-			 u_int *transp, struct fb_info *info)
-{
-	if (regno == 0) {
-		*red = *green = *blue = 0x0000;
-		*transp = 0;
-	} else if (regno == 1) {
-		*red = *green = *blue = 0xaaaa;
-		*transp = 0;
-	} else
-		return 1;
-	return 0;
-}
-
-/**
- *	hga_get_cmap - get the colormap
- *	@cmap:struct fb_cmap to fill in
- *	@kspc:called from kernel space?
- *	@con:unused
- *	@info:pointer to fb_info object containing info for current hga board
- *
- *	This wrapper function passes it's input parameters to fb_get_cmap().
- *	Callback function hga_getcolreg() is used to read the color registers.
- */
-
-int hga_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-                 struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hga_get_cmap: con:%d\n", con);
-	return fb_get_cmap(cmap, kspc, hga_getcolreg, info);
-}
-	
 /**
  *	hgafb_setcolreg - set color registers
  *	@regno:register index to set
@@ -496,7 +389,6 @@ static int hgafb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 /**
  *	hga_pan_display - pan or wrap the display
  *	@var:contains new xoffset, yoffset and vmode values
- *	@con:unused
  *	@info:pointer to fb_info object containing info for current hga board
  *
  *	This function looks only at xoffset, yoffset and the %FB_VMODE_YWRAP
@@ -505,12 +397,8 @@ static int hgafb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
  *	A zero is returned on success and %-EINVAL for failure.
  */
 
-int hga_pan_display(struct fb_var_screeninfo *var, int con,
-                    struct fb_info *info)
+int hgafb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	CHKINFO(-EINVAL);
-	DPRINTK("pan_disp: con:%d, wrap:%d, xoff:%d, yoff:%d\n", con, var->vmode & FB_VMODE_YWRAP, var->xoffset, var->yoffset);
-
 	if (var->vmode & FB_VMODE_YWRAP) {
 		if (var->yoffset < 0 || 
 		    var->yoffset >= info->var.yres_virtual ||
@@ -549,92 +437,89 @@ int hga_pan_display(struct fb_var_screeninfo *var, int con,
 
 static int hgafb_blank(int blank_mode, struct fb_info *info)
 {
-	CHKINFO( );
-	DPRINTK("hgafb_blank: blank_mode:%d, info:%x, fb_info:%x\n", blank_mode, (unsigned)info, (unsigned)&fb_info);
-
 	hga_blank(blank_mode);
 	return 0;
 }
 
+static void hgafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+{
+	u_int rows, y;
+	u8 *dest;
+
+	y = rect->dy;
+
+	for (rows = rect->height; rows--; y++) {
+		dest = rowaddr(info, y) + (rect->dx >> 3);
+		switch (rect->rop) {
+		case ROP_COPY:
+			fb_memset(dest, rect->color, (rect->width >> 3));
+			break;
+		case ROP_XOR:
+			*dest = ~*dest;
+			break;
+		}
+	}
+}
+
+static void hgafb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+{
+	u_int rows, y1, y2;
+	u8 *src, *dest;
+
+	if (area->dy <= area->sy) {
+		y1 = area->sy;
+		y2 = area->dy;
+
+		for (rows = area->height; rows--; ) {
+			src = rowaddr(info, y1) + (area->sx >> 3);
+			dest = rowaddr(info, y2) + (area->dx >> 3);
+			fb_memmove(dest, src, (area->width >> 3));
+			y1++;
+			y2++;
+		}
+	} else {
+		y1 = area->sy + area->height - 1;
+		y2 = area->dy + area->height - 1;
+
+		for (rows = area->height; rows--;) {
+			src = rowaddr(info, y1) + (area->sx >> 3);
+			dest = rowaddr(info, y2) + (area->dx >> 3);
+			fb_memmove(dest, src, (area->width >> 3));
+			y1--;
+			y2--;
+		}
+	}
+}
+
+static void hgafb_imageblit(struct fb_info *info, struct fb_image *image)
+{
+	u8 *dest, *cdat = image->data;
+	u_int rows, y = image->dy;
+	u8 d;
+
+	for (rows = image->height; rows--; y++) {
+		d = *cdat++;
+		dest = rowaddr(info, y) + (image->dx >> 3);
+		*dest = d;
+	}
+}
+
+
 static struct fb_ops hgafb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= hga_set_var,
-	.fb_get_cmap	= hga_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= hgafb_setcolreg,
-	.fb_pan_display	= hga_pan_display,
+	.fb_pan_display	= hgafb_pan_display,
 	.fb_blank	= hgafb_blank,
+	.fb_fillrect	= hgafb_fillrect,
+	.fb_copyarea	= hgafb_copyarea,
+	.fb_imageblit	= hgafb_imageblit,
 };
 		
-
 /* ------------------------------------------------------------------------- *
  *
  * Functions in fb_info
  * 
  * ------------------------------------------------------------------------- */
-
-/**
- *	hgafbcon_switch - switch console
- *	@con:new console to switch to
- *	@info:pointer to fb_info object containing info for current hga board
- *
- *	This function should install a new colormap and change the video mode.
- *	Since we have fixed colors and only one video mode we have nothing to 
- *	do.
- *	Only console administration is done but it should go to fbcon.c IMHO.
- *	A zero is returned on success and %-EINVAL for failure.
- */
-
-static int hgafbcon_switch(int con, struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hgafbcon_switch: currcon:%d, con:%d, info:%x, fb_info:%x\n", info->currcon, con, (unsigned)info, (unsigned)&fb_info);
-
-	/* Save the colormap and video mode */
-#if 0	/* Not necessary in hgafb, we use fixed colormap */
-	fb_copy_cmap(&info->cmap, &fb_display[info->currcon].cmap, 0);
-#endif
-
-	if (info->currcon != -1) /* this check is absolute necessary! */
-		memcpy(&fb_display[info->currcon].var, &info->var,
-				sizeof(struct fb_var_screeninfo));
-
-	/* Install a new colormap and change the video mode. By default fbcon
-	 * sets all the colormaps and video modes to the default values at
-	 * bootup.
-	 */
-#if 0
-	fb_copy_cmap(&fb_display[con].cmap, &info->cmap, 0);
-	fb_set_cmap(&info->cmap, 1, info);
-#endif
-
-	memcpy(&info->var, &fb_display[con].var,
-			sizeof(struct fb_var_screeninfo));
-	/* hga_set_var(&info->var, con, &fb_info); is it necessary? */
-	info->currcon = con;
-
-	/* Hack to work correctly with XF86_Mono */
-	hga_gfx_mode();
-	return 0;
-}
-
-/**
- *	hgafbcon_updatevar - update the user defined part of the display
- *	@con:console to update or -1 when no consoles defined on this fb
- *	@info:pointer to fb_info object containing info for current hga board
- *
- *	This function is called when @var is changed by fbcon.c without calling 
- *	hga_set_var(). It usually means scrolling.  hga_pan_display() is called
- *	to update the hardware and @info->var.
- *	A zero is returned on success and %-EINVAL for failure.
- */
-
-static int hgafbcon_updatevar(int con, struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hga_update_var: con:%d, info:%x, fb_info:%x\n", con, (unsigned)info, (unsigned)&fb_info);
-	return (con < 0) ? -EINVAL : hga_pan_display(&fb_display[con].var, con, info);
-}
 
 /* ------------------------------------------------------------------------- */
     
@@ -654,33 +539,10 @@ int __init hgafb_init(void)
 
 	hga_gfx_mode();
 	hga_clear_screen();
-#ifdef MODULE
-	if (!nologo) hga_show_logo();
-#endif /* MODULE */
 
 	hga_fix.smem_start = VGA_MAP_MEM(hga_vram_base);
 	hga_fix.smem_len = hga_vram_len;
 
-	disp.var = hga_default_var;
-	disp.visual = hga_fix.visual;
-	disp.type = hga_fix.type;
-	disp.type_aux = hga_fix.type_aux;
-	disp.ypanstep = hga_fix.ypanstep;
-	disp.ywrapstep = hga_fix.ywrapstep;
-	disp.line_length = hga_fix.line_length;
-	disp.can_soft_blank = 1;
-	disp.inverse = 0;
-#ifdef FBCON_HAS_HGA
-	disp.dispsw = &fbcon_hga;
-#else
-#warning HGAFB will not work as a console!
-	disp.dispsw = &fbcon_dummy;
-#endif
-	disp.dispsw_data = NULL;
-
-	disp.scrollmode = SCROLL_YREDRAW;
-	
-	strcpy (fb_info.modename, hga_fix.id);
 	fb_info.node = NODEV;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.var = hga_default_var;
@@ -692,20 +554,16 @@ int __init hgafb_init(void)
 	fb_info.monspecs.dpms = 0;
 	fb_info.fbops = &hgafb_ops;
 	fb_info.screen_base = (char *)hga_fix.smem_start;
-	fb_info.disp = &disp;
-	fb_info.currcon = 1;
-	fb_info.changevar = NULL;
-	fb_info.switch_con = hgafbcon_switch;
-	fb_info.updatevar = hgafbcon_updatevar;
-	fb_info.pseudo_palette = NULL; /* ??? */
-	fb_info.par = NULL;
 
         if (register_framebuffer(&fb_info) < 0)
                 return -EINVAL;
 
+#ifdef MODULE
+	if (!nologo) hga_show_logo(&fb_info);
+#endif /* MODULE */
+
         printk(KERN_INFO "fb%d: %s frame buffer device\n",
-               GET_FB_IDX(fb_info.node), fb_info.modename);
-	
+               minor(fb_info.node), fb_info.fix.id);
 	return 0;
 }
 
@@ -713,49 +571,21 @@ int __init hgafb_init(void)
 	 *  Setup
 	 */
 
-#ifndef MODULE
 int __init hgafb_setup(char *options)
 {
-	/* 
-	 * Parse user speficied options
-	 * `video=hga:font:VGA8x16' or
-	 * `video=hga:font:SUN8x16' recommended
-	 * Other supported fonts: VGA8x8, Acorn8x8, PEARL8x8
-	 * More different fonts can be used with the `setfont' utility.
-	 */
-
-	char *this_opt;
-
-	fb_info.fontname[0] = '\0';
-
-	if (!options || !*options)
-		return 0;
-
-	while ((this_opt = strsep(&options, ","))) {
-		if (!strncmp(this_opt, "font:", 5))
-			strcpy(fb_info.fontname, this_opt+5);
-	}
 	return 0;
 }
-#endif /* !MODULE */
-
-
-	/*
-	 * Cleanup
-	 */
 
 #ifdef MODULE
-static void hgafb_cleanup(struct fb_info *info)
+static void __exit hgafb_exit(void)
 {
 	hga_txt_mode();
 	hga_clear_screen();
-	unregister_framebuffer(info);
+	unregister_framebuffer(&fb_info);
 	if (release_io_ports) release_region(0x3b0, 12);
 	if (release_io_port) release_region(0x3bf, 1);
 }
-#endif /* MODULE */
-
-
+#endif
 
 /* -------------------------------------------------------------------------
  *
@@ -763,29 +593,14 @@ static void hgafb_cleanup(struct fb_info *info)
  *
  * ------------------------------------------------------------------------- */
 
-#ifdef MODULE
-int init_module(void)
-{
-	if (font)
-		strncpy(fb_info.fontname, font, sizeof(fb_info.fontname)-1);
-	else
-		fb_info.fontname[0] = '\0';
-
-	return hgafb_init();
-}
-
-void cleanup_module(void)
-{
-	hgafb_cleanup(&fb_info);
-}
-
 MODULE_AUTHOR("Ferenc Bakonyi (fero@drama.obuda.kando.hu)");
 MODULE_DESCRIPTION("FBDev driver for Hercules Graphics Adaptor");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(font, "s");
-MODULE_PARM_DESC(font, "Specifies one of the compiled-in fonts (VGA8x8, VGA8x16, SUN8x16, Acorn8x8, PEARL8x8) (default=none)");
 MODULE_PARM(nologo, "i");
 MODULE_PARM_DESC(nologo, "Disables startup logo if != 0 (default=0)");
 
-#endif /* MODULE */
+#ifdef MODULE
+module_init(hgafb_init);
+module_exit(hgafb_exit);
+#endif
