@@ -237,6 +237,13 @@ Module parameters
     
     Module supports up to 8 cards, PnP and autoprobe.
     
+  Module snd-audigyls
+  -------------------
+
+    Module for Creative Audigy LS
+
+    Module supports up to 8 cards.
+
   Module snd-azt3328
   ------------------
 
@@ -426,6 +433,13 @@ Module parameters
 	* Creative Card 5.1 (c) 2003			[0x3fc3/0x7cff]
         * Creative Card all ins and outs		[0x3fff/0x7fff]
     
+  Module snd-emu10k1x
+  -------------------
+
+    Module for Creative Emu10k1X (SB Live Dell OEM version)
+
+    Module supports up to 8 cards.
+
   Module snd-ens1370
   ------------------
 
@@ -1175,6 +1189,16 @@ Module parameters
 
     Note: for the MPU401 on VIA823x, use snd-mpu401 driver
 	  additonally.  The mpu_port option is for VIA686 chips only.
+
+  Module snd-via82xx-modem
+  ------------------------
+
+    Module for VIA82xx AC97 modem
+
+    ac97_clock	- AC'97 codec clock base (default 48000Hz)
+    ac97_quirk  - AC'97 workaround for strange hardware
+
+    Module supports up to 8 cards.
 
   Module snd-virmidi
   ------------------

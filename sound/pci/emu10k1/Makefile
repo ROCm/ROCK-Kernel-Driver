@@ -7,6 +7,8 @@ snd-emu10k1-objs := emu10k1.o emu10k1_main.o \
 		    irq.o memory.o voice.o emumpu401.o emupcm.o io.o \
 		    emuproc.o emumixer.o emufx.o
 snd-emu10k1-synth-objs := emu10k1_synth.o emu10k1_callback.o emu10k1_patch.o
+snd-emu10k1x-objs := emu10k1x.o
+snd-audigyls-objs := audigyls.o
 
 #
 # this function returns:
@@ -19,3 +21,5 @@ sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_EMU10K1) += snd-emu10k1.o
 obj-$(call sequencer,$(CONFIG_SND_EMU10K1)) += snd-emu10k1-synth.o
+obj-$(CONFIG_SND_EMU10K1X) += snd-emu10k1x.o
+obj-$(CONFIG_SND_AUDIGYLS) += snd-audigyls.o
