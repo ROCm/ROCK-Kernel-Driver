@@ -69,6 +69,30 @@ static DEFINE_PER_CPU(tvec_base_t, tvec_bases) = { SPIN_LOCK_UNLOCKED };
 /* Fake initialization needed to avoid compiler breakage */
 static DEFINE_PER_CPU(struct tasklet_struct, timer_tasklet) = { NULL };
 
+static void check_timer_failed(timer_t *timer)
+{
+	static int whine_count;
+	if (whine_count < 16) {
+		whine_count++;
+		printk("Uninitialised timer!\n");
+		printk("This is just a warning.  Your computer is OK\n");
+		printk("function=0x%p, data=0x%lx\n",
+			timer->function, timer->data);
+		dump_stack();
+	}
+	/*
+	 * Now fix it up
+	 */
+	spin_lock_init(&timer->lock);
+	timer->magic = TIMER_MAGIC;
+}
+
+static inline void check_timer(timer_t *timer)
+{
+	if (timer->magic != TIMER_MAGIC)
+		check_timer_failed(timer);
+}
+
 static inline void internal_add_timer(tvec_base_t *base, timer_t *timer)
 {
 	unsigned long expires = timer->expires;
@@ -129,6 +153,8 @@ void add_timer(timer_t *timer)
   
   	BUG_ON(timer_pending(timer) || !timer->function);
 
+	check_timer(timer);
+
 	spin_lock_irqsave(&base->lock, flags);
 	internal_add_timer(base, timer);
 	timer->base = base;
@@ -149,6 +175,8 @@ void add_timer_on(struct timer_list *timer, int cpu)
   	unsigned long flags;
   
   	BUG_ON(timer_pending(timer) || !timer->function);
+
+	check_timer(timer);
 
 	spin_lock_irqsave(&base->lock, flags);
 	internal_add_timer(base, timer);
@@ -182,6 +210,9 @@ int mod_timer(timer_t *timer, unsigned long expires)
 	int ret = 0;
 
 	BUG_ON(!timer->function);
+
+	check_timer(timer);
+
 	/*
 	 * This is a common optimization triggered by the
 	 * networking code - if the timer is re-modified
@@ -190,7 +221,7 @@ int mod_timer(timer_t *timer, unsigned long expires)
 	if (timer->expires == expires && timer_pending(timer))
 		return 1;
 
-	local_irq_save(flags);
+	spin_lock_irqsave(&timer->lock, flags);
 	new_base = &per_cpu(tvec_bases, smp_processor_id());
 repeat:
 	old_base = timer->base;
@@ -207,7 +238,7 @@ repeat:
 			spin_lock(&new_base->lock);
 		}
 		/*
-		 * The timer base might have changed while we were
+		 * The timer base might have been cancelled while we were
 		 * trying to take the lock(s):
 		 */
 		if (timer->base != old_base) {
@@ -232,7 +263,8 @@ repeat:
 
 	if (old_base && (new_base != old_base))
 		spin_unlock(&old_base->lock);
-	spin_unlock_irqrestore(&new_base->lock, flags);
+	spin_unlock(&new_base->lock);
+	spin_unlock_irqrestore(&timer->lock, flags);
 
 	return ret;
 }
@@ -252,6 +284,8 @@ int del_timer(timer_t *timer)
 {
 	unsigned long flags;
 	tvec_base_t *base;
+
+	check_timer(timer);
 
 repeat:
  	base = timer->base;
@@ -289,6 +323,8 @@ int del_timer_sync(timer_t *timer)
 {
 	tvec_base_t *base;
 	int i, ret = 0;
+
+	check_timer(timer);
 
 del_again:
 	ret += del_timer(timer);
