@@ -1,5 +1,7 @@
 /* defines for inline arch setup functions */
 
+#include <asm/apic.h>
+
 /**
  * do_timer_interrupt_hook - hook into timer tick
  * @regs:	standard registers from interrupt
