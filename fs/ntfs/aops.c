@@ -171,7 +171,7 @@ static int ntfs_read_block(struct page *page)
 	run_list_element *rl;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
 	sector_t iblock, lblock, zblock;
-	unsigned int blocksize, blocks, vcn_ofs;
+	unsigned int blocksize, vcn_ofs;
 	int i, nr;
 	unsigned char blocksize_bits;
 
@@ -187,7 +187,6 @@ static int ntfs_read_block(struct page *page)
 	if (unlikely(!bh))
 		return -ENOMEM;
 
-	blocks = PAGE_CACHE_SIZE >> blocksize_bits;
 	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
 	lblock = (ni->allocated_size + blocksize - 1) >> blocksize_bits;
 	zblock = (ni->initialized_size + blocksize - 1) >> blocksize_bits;
@@ -427,11 +426,8 @@ err_out:
  * ntfs_aops - general address space operations for inodes and attributes
  */
 struct address_space_operations ntfs_aops = {
-	writepage:	NULL,			/* Write dirty page to disk. */
-	readpage:	ntfs_readpage,		/* Fill page with data. */
-	sync_page:	block_sync_page,	/* Currently, just unplugs the
+	.readpage	= ntfs_readpage,	/* Fill page with data. */
+	.sync_page	= block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
-	prepare_write:	NULL,			/* . */
-	commit_write:	NULL,			/* . */
 };
 

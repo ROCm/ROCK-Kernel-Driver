@@ -223,7 +223,7 @@ static inline ntfs_inode *NTFS_I(struct inode *inode)
 
 static inline struct inode *VFS_I(ntfs_inode *ni)
 {
-	return &((big_ntfs_inode*)ni)->vfs_inode;
+	return &((big_ntfs_inode *)ni)->vfs_inode;
 }
 
 extern struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no);

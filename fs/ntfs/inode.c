@@ -282,11 +282,12 @@ void ntfs_destroy_big_inode(struct inode *inode)
 	kmem_cache_free(ntfs_big_inode_cache, NTFS_I(inode));
 }
 
-static ntfs_inode *ntfs_alloc_extent_inode(void)
+static inline ntfs_inode *ntfs_alloc_extent_inode(void)
 {
-	ntfs_inode *ni = (ntfs_inode *)kmem_cache_alloc(ntfs_inode_cache,
-			SLAB_NOFS);
+	ntfs_inode *ni;
+
 	ntfs_debug("Entering.");
+	ni = (ntfs_inode *)kmem_cache_alloc(ntfs_inode_cache, SLAB_NOFS);
 	if (likely(ni != NULL)) {
 		ni->state = 0;
 		return ni;
@@ -340,7 +341,7 @@ static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 	return;
 }
 
-static void ntfs_init_big_inode(struct inode *vi)
+static inline void ntfs_init_big_inode(struct inode *vi)
 {
 	ntfs_inode *ni = NTFS_I(vi);
 
@@ -350,7 +351,8 @@ static void ntfs_init_big_inode(struct inode *vi)
 	return;
 }
 
-ntfs_inode *ntfs_new_extent_inode(struct super_block *sb, unsigned long mft_no)
+inline ntfs_inode *ntfs_new_extent_inode(struct super_block *sb,
+		unsigned long mft_no)
 {
 	ntfs_inode *ni = ntfs_alloc_extent_inode();
 
@@ -445,7 +447,7 @@ err_corrupt_attr:
  * ntfs_read_locked_inode - read an inode from its device
  * @vi:		inode to read
  *
- * ntfs_read_locked_inode() is called from the ntfs_iget() to read the inode
+ * ntfs_read_locked_inode() is called from ntfs_iget() to read the inode
  * described by @vi into memory from the device.
  *
  * The only fields in @vi that we need to/can look at when the function is

@@ -247,6 +247,8 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.22:
+	- Small internal cleanups.
 2.0.21:
 	These only affect 32-bit architectures:
 	- Check for, and refuse to mount too large volumes (maximum is 2TiB).

@@ -1260,38 +1260,38 @@ static int ntfs_statfs(struct super_block *sb, struct statfs *sfs)
  * proper functions.
  */
 struct super_operations ntfs_mount_sops = {
-	alloc_inode:	ntfs_alloc_big_inode,	/* VFS: Allocate a new inode. */
-	destroy_inode:	ntfs_destroy_big_inode,	/* VFS: Deallocate an inode. */
-	read_inode:	ntfs_read_inode_mount,	/* VFS: Load inode from disk,
-						   called from iget(). */
-	clear_inode:	ntfs_clear_big_inode,	/* VFS: Called when an inode is
-						   removed from memory. */
+	.alloc_inode	= ntfs_alloc_big_inode,	  /* VFS: Allocate new inode. */
+	.destroy_inode	= ntfs_destroy_big_inode, /* VFS: Deallocate inode. */
+	.read_inode	= ntfs_read_inode_mount,  /* VFS: Load inode from disk,
+						     called from iget(). */
+	.clear_inode	= ntfs_clear_big_inode,	  /* VFS: Called when inode is
+						     removed from memory. */
 };
 
 /**
  * The complete super operations.
  */
 struct super_operations ntfs_sops = {
-	alloc_inode:	ntfs_alloc_big_inode,	/* VFS: Allocate a new inode. */
-	destroy_inode:	ntfs_destroy_big_inode,	/* VFS: Deallocate an inode. */
-	dirty_inode:	ntfs_dirty_inode,	/* VFS: Called from
-						   __mark_inode_dirty(). */
-	//write_inode:	NULL,		/* VFS: Write dirty inode to disk. */
-	put_inode:	ntfs_put_inode,	/* VFS: Called just before the inode
-					   reference count is decreased. */
-	//delete_inode:	NULL,		/* VFS: Delete inode from disk. Called
-	//				   when i_count becomes 0 and i_nlink is
-	//				   also 0. */
-	put_super:	ntfs_put_super,	/* Syscall: umount. */
-	//write_super:	NULL,		/* Flush dirty super block to disk. */
-	//write_super_lockfs:	NULL,	/* ? */
-	//unlockfs:	NULL,		/* ? */
-	statfs:		ntfs_statfs,	/* Syscall: statfs */
-	remount_fs:	ntfs_remount,	/* Syscall: mount -o remount. */
-	clear_inode:	ntfs_clear_big_inode,	/* VFS: Called when an inode is
+	.alloc_inode	= ntfs_alloc_big_inode,	  /* VFS: Allocate new inode. */
+	.destroy_inode	= ntfs_destroy_big_inode, /* VFS: Deallocate inode. */
+	//.dirty_inode	= ntfs_dirty_inode,	  /* VFS: Called from
+	//					     __mark_inode_dirty(). */
+	//.write_inode	= NULL,		  /* VFS: Write dirty inode to disk. */
+	.put_inode	= ntfs_put_inode, /* VFS: Called just before the inode
+					     reference count is decreased. */
+	//.delete_inode	= NULL,		  /* VFS: Delete inode from disk. Called
+	//				     when i_count becomes 0 and i_nlink
+	//				     is also 0. */
+	.put_super	= ntfs_put_super, /* Syscall: umount. */
+	//write_super	= NULL,		  /* Flush dirty super block to disk. */
+	//write_super_lockfs	= NULL,	  /* ? */
+	//unlockfs	= NULL,		  /* ? */
+	.statfs		= ntfs_statfs,	  /* Syscall: statfs */
+	.remount_fs	= ntfs_remount,	  /* Syscall: mount -o remount. */
+	.clear_inode	= ntfs_clear_big_inode,	/* VFS: Called when an inode is
 						   removed from memory. */
-	//umount_begin:	NULL,		/* Forced umount. */
-	show_options:	ntfs_show_options, /* Show mount options in proc. */
+	//.umount_begin	= NULL,		     /* Forced umount. */
+	.show_options	= ntfs_show_options, /* Show mount options in proc. */
 };
 
 /**
@@ -1562,7 +1562,7 @@ cond_iput_mft_ino_err_out_now:
 		ntfs_error(sb, "Busy inodes left. This is most likely a NTFS "
 				"driver bug.");
 		/* Copied from fs/super.c. I just love this message. (-; */
-		printk("VFS: Busy inodes after umount. Self-destruct in 5 "
+		printk("NTFS: Busy inodes after umount. Self-destruct in 5 "
 				"seconds.  Have a nice day...\n");
 	}
 	/* Errors at this stage are irrelevant. */
@@ -1618,11 +1618,11 @@ static struct super_block *ntfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type ntfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"ntfs",
-	get_sb:		ntfs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "ntfs",
+	.get_sb		= ntfs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 /* Stable names for the slab caches. */
