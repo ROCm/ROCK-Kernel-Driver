@@ -130,6 +130,7 @@ static void idescsi_output_zeros (ide_drive_t *drive, unsigned int bcount)
 static void idescsi_input_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsigned int bcount)
 {
 	int count;
+	char *buf;
 
 	while (bcount) {
 		if (pc->sg - (struct scatterlist *) pc->scsi_cmd->request_buffer > pc->scsi_cmd->use_sg) {
@@ -138,7 +139,8 @@ static void idescsi_input_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsigne
 			return;
 		}
 		count = IDE_MIN (pc->sg->length - pc->b_count, bcount);
-		atapi_input_bytes (drive, pc->sg->address + pc->b_count, count);
+		buf = page_address(pc->sg->page) + pc->sg->offset;
+		atapi_input_bytes (drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
 		if (pc->b_count == pc->sg->length) {
 			pc->sg++;
@@ -150,6 +152,7 @@ static void idescsi_input_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsigne
 static void idescsi_output_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsigned int bcount)
 {
 	int count;
+	char *buf;
 
 	while (bcount) {
 		if (pc->sg - (struct scatterlist *) pc->scsi_cmd->request_buffer > pc->scsi_cmd->use_sg) {
@@ -158,7 +161,8 @@ static void idescsi_output_buffers (ide_drive_t *drive, idescsi_pc_t *pc, unsign
 			return;
 		}
 		count = IDE_MIN (pc->sg->length - pc->b_count, bcount);
-		atapi_output_bytes (drive, pc->sg->address + pc->b_count, count);
+		buf = page_address(pc->sg->page) + pc->sg->offset;
+		atapi_output_bytes (drive, buf + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
 		if (pc->b_count == pc->sg->length) {
 			pc->sg++;
@@ -750,25 +754,11 @@ static inline struct bio *idescsi_dma_bio(ide_drive_t *drive, idescsi_pc_t *pc)
 		printk ("ide-scsi: %s: building DMA table, %d segments, %dkB total\n", drive->name, segments, pc->request_transfer >> 10);
 #endif /* IDESCSI_DEBUG_LOG */
 		while (segments--) {
-			struct page *page = sg->page;
-			int offset = sg->offset;
-
-			if (!page) {
-				BUG_ON(!sg->address);
-				page = virt_to_page(sg->address);
-				offset = (unsigned long) sg->address & ~PAGE_MASK;
-			}
-				
-			bh->bi_io_vec[0].bv_page = page;
+			bh->bi_io_vec[0].bv_page = sg->page;
 			bh->bi_io_vec[0].bv_len = sg->length;
-			bh->bi_io_vec[0].bv_offset = offset;
+			bh->bi_io_vec[0].bv_offset = sg->offset;
 			bh->bi_size = sg->length;
 			bh = bh->bi_next;
-			/*
-			 * just until scsi_merge is fixed up...
-			 */
-			BUG_ON(PageHighMem(page));
-			sg->address = page_address(page) + offset;
 			sg++;
 		}
 	} else {

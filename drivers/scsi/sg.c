@@ -76,8 +76,6 @@ static void sg_proc_cleanup(void);
 #include <linux/version.h>
 #endif /* LINUX_VERSION_CODE */
 
-#define SG_STILL_HAVE_ADDRESS_IN_SCATTERLIST
-
 #define SG_ALLOW_DIO_DEF 0
 #define SG_ALLOW_DIO_CODE	/* compile out be commenting this define */
 #ifdef SG_ALLOW_DIO_CODE
@@ -1714,9 +1712,6 @@ static int sg_build_dir(Sg_request * srp, Sg_fd * sfp, int dxfer_len)
 						rem_sz;
 	sclp->page = kp->maplist[k];
 	sclp->offset = offset;
-#ifdef SG_STILL_HAVE_ADDRESS_IN_SCATTERLIST
-	sclp->address = page_address(kp->maplist[k]) + offset;
-#endif
 	sclp->length = num;
 	mem_src_arr[k] = SG_USER_MEM;
 	rem_sz -= num;
@@ -1804,9 +1799,6 @@ static int sg_build_indi(Sg_scatter_hold * schp, Sg_fd * sfp, int buff_size)
             }
             sclp->page = virt_to_page(p);
             sclp->offset = (unsigned long)p & ~PAGE_MASK;
-#ifdef SG_STILL_HAVE_ADDRESS_IN_SCATTERLIST
-            sclp->address = p;
-#endif
             sclp->length = ret_sz;
 	    mem_src_arr[k] = mem_src;
 
@@ -1967,9 +1959,6 @@ static void sg_remove_scat(Sg_scatter_hold * schp)
             sg_free(sg_scatg2virt(sclp), sclp->length, mem_src);
 	    sclp->page = NULL;
             sclp->offset = 0;
-#ifdef SG_STILL_HAVE_ADDRESS_IN_SCATTERLIST
-	    sclp->address = 0;
-#endif
             sclp->length = 0;
         }
 	sg_free(schp->buffer, schp->sglist_len, schp->buffer_mem_src);
