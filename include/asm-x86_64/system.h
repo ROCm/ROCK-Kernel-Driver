@@ -276,13 +276,6 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),\
 					(unsigned long)(n),sizeof(*(ptr))))
 
-static inline __u32 cmpxchg4_locked(__u32 *ptr, __u32 old, __u32 new) 
-{
-	asm volatile("lock ; cmpxchgl %k1,%2" :
-		     "=r" (new) : "0" (old), "m" (*(__u32 *)ptr) : "memory");
-	return new; 
-}
-
 #ifdef CONFIG_SMP
 #define smp_mb()	mb()
 #define smp_rmb()	rmb()
