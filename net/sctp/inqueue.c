@@ -47,8 +47,8 @@
 #include <net/sctp/sm.h>
 #include <linux/interrupt.h>
 
-/* Initialize an SCTP_inqueue.  */
-void sctp_inqueue_init(sctp_inqueue_t *queue)
+/* Initialize an SCTP inqueue.  */
+void sctp_inq_init(struct sctp_inq *queue)
 {
 	skb_queue_head_init(&queue->in);
 	queue->in_progress = NULL;
@@ -59,21 +59,21 @@ void sctp_inqueue_init(sctp_inqueue_t *queue)
 	queue->malloced = 0;
 }
 
-/* Create an initialized SCTP_inqueue.  */
-sctp_inqueue_t *sctp_inqueue_new(void)
+/* Create an initialized sctp_inq.  */
+struct sctp_inq *sctp_inq_new(void)
 {
-	sctp_inqueue_t *retval;
+	struct sctp_inq *retval;
 
-	retval = t_new(sctp_inqueue_t, GFP_ATOMIC);
+	retval = t_new(struct sctp_inq, GFP_ATOMIC);
 	if (retval) {
-		sctp_inqueue_init(retval);
+		sctp_inq_init(retval);
 		retval->malloced = 1;
 	}
         return retval;
 }
 
 /* Release the memory associated with an SCTP inqueue.  */
-void sctp_inqueue_free(sctp_inqueue_t *queue)
+void sctp_inq_free(struct sctp_inq *queue)
 {
 	sctp_chunk_t *chunk;
 
@@ -96,7 +96,7 @@ void sctp_inqueue_free(sctp_inqueue_t *queue)
 /* Put a new packet in an SCTP inqueue.
  * We assume that packet->sctp_hdr is set and in host byte order.
  */
-void sctp_push_inqueue(sctp_inqueue_t *q, sctp_chunk_t *packet)
+void sctp_inq_push(struct sctp_inq *q, sctp_chunk_t *packet)
 {
 	/* Directly call the packet handling routine. */
 
@@ -114,7 +114,7 @@ void sctp_push_inqueue(sctp_inqueue_t *q, sctp_chunk_t *packet)
  * WARNING:  If you need to put the chunk on another queue, you need to
  * make a shallow copy (clone) of it.
  */
-sctp_chunk_t *sctp_pop_inqueue(sctp_inqueue_t *queue)
+sctp_chunk_t *sctp_inq_pop(struct sctp_inq *queue)
 {
 	sctp_chunk_t *chunk;
 	sctp_chunkhdr_t *ch = NULL;
@@ -172,7 +172,7 @@ sctp_chunk_t *sctp_pop_inqueue(sctp_inqueue_t *queue)
 		chunk->end_of_packet = 1;
 	}
 
-	SCTP_DEBUG_PRINTK("+++sctp_pop_inqueue+++ chunk %p[%s],"
+	SCTP_DEBUG_PRINTK("+++sctp_inq_pop+++ chunk %p[%s],"
 			  " length %d, skb->len %d\n",chunk,
 			  sctp_cname(SCTP_ST_CHUNK(chunk->chunk_hdr->type)),
 			  ntohs(chunk->chunk_hdr->length), chunk->skb->len);
@@ -182,12 +182,12 @@ sctp_chunk_t *sctp_pop_inqueue(sctp_inqueue_t *queue)
 /* Set a top-half handler.
  *
  * Originally, we the top-half handler was scheduled as a BH.  We now
- * call the handler directly in sctp_push_inqueue() at a time that
+ * call the handler directly in sctp_inq_push() at a time that
  * we know we are lock safe.
  * The intent is that this routine will pull stuff out of the
  * inqueue and process it.
  */
-void sctp_inqueue_set_th_handler(sctp_inqueue_t *q,
+void sctp_inq_set_th_handler(struct sctp_inq *q,
 				 void (*callback)(void *), void *arg)
 {
 	INIT_WORK(&q->immediate, callback, arg);

@@ -131,6 +131,8 @@ static inline int sctp_v6_xmit(struct sk_buff *skb,
 			  __FUNCTION__, skb, skb->len, NIP6(fl.fl6_src),
 			  NIP6(fl.fl6_dst));
 
+	SCTP_INC_STATS(SctpOutSCTPPacks);
+
 	return ip6_xmit(sk, skb, &fl, np->opt);
 }
 
@@ -443,7 +445,7 @@ static void sctp_inet6_msgname(char *msgname, int *addr_len)
 }
 
 /* Initialize a PF_INET msgname from a ulpevent. */
-static void sctp_inet6_event_msgname(sctp_ulpevent_t *event, char *msgname,
+static void sctp_inet6_event_msgname(struct sctp_ulpevent *event, char *msgname,
 				     int *addrlen)
 {
 	struct sockaddr_in6 *sin6, *sin6from;

@@ -90,6 +90,7 @@ static inline int sctp_rcv_checksum(struct sk_buff *skb)
 
 	if (val != cmp) {
 		/* CRC failure, dump it. */
+		SCTP_INC_STATS_BH(SctpChecksumErrors);
 		return -1;
 	}
 	return 0;
@@ -114,6 +115,8 @@ int sctp_rcv(struct sk_buff *skb)
 
 	if (skb->pkt_type!=PACKET_HOST)
 		goto discard_it;
+
+	SCTP_INC_STATS_BH(SctpInSCTPPacks);
 
 	sh = (struct sctphdr *) skb->h.raw;
 
@@ -160,8 +163,10 @@ int sctp_rcv(struct sk_buff *skb)
 	 */
 	if (!asoc) {
 		ep = __sctp_rcv_lookup_endpoint(&dest);
-		if (sctp_rcv_ootb(skb))
+		if (sctp_rcv_ootb(skb)) {
+			SCTP_INC_STATS_BH(SctpOutOfBlues);
 			goto discard_release;
+		}
 	}
 
 	/* Retrieve the common input handling substructure. */
@@ -248,7 +253,7 @@ discard_release:
 int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	sctp_chunk_t *chunk;
-	sctp_inqueue_t *inqueue;
+	struct sctp_inq *inqueue;
 
 	/* One day chunk will live inside the skb, but for
 	 * now this works.
@@ -256,7 +261,7 @@ int sctp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 	chunk = (sctp_chunk_t *) skb;
 	inqueue = &chunk->rcvr->inqueue;
 
-	sctp_push_inqueue(inqueue, chunk);
+	sctp_inq_push(inqueue, chunk);
         return 0;
 }
 
