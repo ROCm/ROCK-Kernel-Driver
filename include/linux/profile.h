@@ -53,13 +53,13 @@ int task_handoff_unregister(struct notifier_block * n);
 int profile_event_register(enum profile_type, struct notifier_block * n);
 int profile_event_unregister(enum profile_type, struct notifier_block * n);
 
-int register_profile_notifier(struct notifier_block * nb);
-int unregister_profile_notifier(struct notifier_block * nb);
+int register_timer_hook(int (*hook)(struct pt_regs *));
+void unregister_timer_hook(int (*hook)(struct pt_regs *));
+
+/* Timer based profiling hook */
+extern int (*timer_hook)(struct pt_regs *);
 
 struct pt_regs;
-
-/* profiling hook activated on each timer interrupt */
-void profile_hook(struct pt_regs * regs);
 
 #else
 
@@ -87,17 +87,15 @@ static inline int profile_event_unregister(enum profile_type t, struct notifier_
 #define profile_handoff_task(a) (0)
 #define profile_munmap(a) do { } while (0)
 
-static inline int register_profile_notifier(struct notifier_block * nb)
+static inline int register_timer_hook(int (*hook)(struct pt_regs *))
 {
 	return -ENOSYS;
 }
 
-static inline int unregister_profile_notifier(struct notifier_block * nb)
+static inline void unregister_timer_hook(int (*hook)(struct pt_regs *))
 {
-	return -ENOSYS;
+	return;
 }
-
-#define profile_hook(regs) do { } while (0)
 
 #endif /* CONFIG_PROFILING */
 
