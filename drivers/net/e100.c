@@ -1437,6 +1437,8 @@ static inline int e100_rx_indicate(struct nic *nic, struct rx *rx,
 	if(unlikely(!(rfd_status & cb_complete)))
        		return -EAGAIN;
 
+	rmb();
+
 	/* Get actual data size */
 	actual_size = le16_to_cpu(rfd->actual_size) & 0x3FFF;
 	if(unlikely(actual_size > RFD_BUF_LEN - sizeof(struct rfd)))
