@@ -877,7 +877,6 @@ static int pm2fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		green = CNVT_TOHW(green, info->var.green.length);
 		blue = CNVT_TOHW(blue, info->var.blue.length);
 		transp = CNVT_TOHW(transp, info->var.transp.length);
-		set_color(par, regno, red, green, blue);
 		break;
 	case FB_VISUAL_DIRECTCOLOR:
 		/* example here assumes 8 bit DAC. Might be different 
@@ -904,12 +903,8 @@ static int pm2fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 		switch (info->var.bits_per_pixel) {
 		case 8:
-			/* Yes some hand held devices have this. */ 
-           		((u8*)(info->pseudo_palette))[regno] = v;
 			break;	
    		case 16:
-           		((u16*)(info->pseudo_palette))[regno] = v;
-			break;
 		case 24:
 		case 32:	
            		((u32*)(info->pseudo_palette))[regno] = v;
@@ -917,7 +912,9 @@ static int pm2fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		}
 		return 0;
 	}
-	/* ... */
+	else if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR)
+		set_color(par, regno, red, green, blue);
+
 	return 0;
 }
 
