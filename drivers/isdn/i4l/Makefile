@@ -2,7 +2,7 @@
 
 # The target object and module list name.
 
-O_TARGET	:= vmlinux-obj.o
+O_TARGET	:= built-in.o
 
 # Objects that export symbols.
 
@@ -20,8 +20,6 @@ isdn-objs-$(CONFIG_ISDN_AUDIO)		+= isdn_audio.o
 isdn-objs-$(CONFIG_ISDN_TTY_FAX)	+= isdn_ttyfax.o
 
 isdn-objs				+= $(isdn-objs-y)
-
-# Ordering constraints: isdn.o first, rest doesn't matter
 
 # Each configuration option enables a list of files.
 

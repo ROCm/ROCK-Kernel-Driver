@@ -2,7 +2,7 @@
 
 # The target object and module list name.
 
-O_TARGET	:= vmlinux-obj.o
+O_TARGET	:= built-in.o
 
 # Each configuration option enables a list of files.
 
