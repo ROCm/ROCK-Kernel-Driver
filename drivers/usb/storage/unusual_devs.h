@@ -739,15 +739,6 @@ UNUSUAL_DEV(  0x084d, 0x0011, 0x0110, 0x0110,
 		US_FL_BULK32),
 
 
-/* Aiptek PocketCAM 3Mega
- * Nicolas DUPEUX <nicolas@dupeux.net> 
- */
-UNUSUAL_DEV(  0x08ca, 0x2011, 0x0000, 0x9999,
-		"AIPTEK",
-		"PocketCAM 3Mega",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		0 ),
-
 /* Entry needed for flags. Moreover, all devices with this ID use
  * bulk-only transport, but _some_ falsely report Control/Bulk instead.
  * One example is "Trumpion Digital Research MYMP3".
@@ -772,12 +763,6 @@ UNUSUAL_DEV( 0x090c, 0x1132, 0x0000, 0xffff,
 		"5-in-1 Card Reader",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
-
-UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
-		"Minds@Work",
-		"Digital Wallet",
- 		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		0 ),
 
 /* This Pentax still camera is not conformant
  * to the USB storage specification: -
@@ -881,17 +866,6 @@ UNUSUAL_DEV(  0x1019, 0x0c55, 0x0000, 0x9999,
 		"Desknote",
 		"UCR-61S2B",
 		US_SC_DEVICE, US_PR_DEVICE, usb_stor_ucr61s2b_init,
-		0 ),
-
-/* Reported by Dan Pilone <pilone@slac.com>
- * The device needs the flags only.
- * Also reported by Brian Hall <brihall@pcisys.net>, again for flags.
- * I also suspect this device may have a broken serial number.
- */
-UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x9999,
-		"CCYU TECHNOLOGY",
-		"EasyDisk Portable Device",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		0 ),
 
 /* Reported by Kotrla Vitezslav <kotrla@ceb.cz> */
