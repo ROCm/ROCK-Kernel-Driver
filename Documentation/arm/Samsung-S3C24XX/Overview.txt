@@ -1,0 +1,51 @@
+			S3C24XX ARM Linux Overview
+			==========================
+
+
+
+Introduction
+------------
+
+  The Samsung S3C24XX range of ARM9 System-on-Chip CPUs are supported
+  by the 's3c2410' architecture of ARM Linux. Currently the S3C2410 is
+  the only supported CPU in this range.
+
+
+Configuration
+-------------
+
+  A generic S3C2410 configuration is provided, and can be used as the
+  default by `make s3c2410_defconfig`. This configuration has support
+  for all the machines, and the commonly used features on them.
+
+
+Machines
+--------
+
+  The currently supported machines are as follows:
+
+  Simtec Electronics EB2410ITX (BAST)
+
+    A general purpose development board, see EB2410ITX.txt for further
+    details
+
+  Samsung SMDK2410
+
+    Samsung's own development board, geared for PDA work.
+
+  Thorcom VR1000
+
+    Custom embedded board
+
+  HP IPAQ 1940
+
+    Handheld (IPAQ), available in several varieties
+
+
+Contributors
+------------
+
+  Ben Dooks
+  Vincent Sanders
+  Herbert Potzl
+  Arnaud Patard

@@ -104,7 +104,7 @@ static struct map_desc omap1510_io_desc[] __initdata = {
 };
 #endif
 
-#ifdef CONFIG_ARCH_OMAP1610
+#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710)
 static struct map_desc omap1610_io_desc[] __initdata = {
  { OMAP1610_DSP_BASE,    OMAP1610_DSP_START,    OMAP1610_DSP_SIZE,    MT_DEVICE },
  { OMAP1610_DSPREG_BASE, OMAP1610_DSPREG_START, OMAP1610_DSPREG_SIZE, MT_DEVICE },
@@ -147,8 +147,8 @@ static void __init _omap_map_io(void)
 		iotable_init(omap1510_io_desc, ARRAY_SIZE(omap1510_io_desc));
 	}
 #endif
-#ifdef CONFIG_ARCH_OMAP1610
-	if (cpu_is_omap1610()) {
+#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710)
+	if (cpu_is_omap1610() || cpu_is_omap1710()) {
 		iotable_init(omap1610_io_desc, ARRAY_SIZE(omap1610_io_desc));
 	}
 #endif
@@ -181,13 +181,18 @@ void omap_map_io(void)
 extern int omap_bootloader_tag_len;
 extern u8 omap_bootloader_tag[];
 
-const void *__omap_get_per_info(u16 tag, size_t len)
+struct omap_board_config_kernel *omap_board_config;
+int omap_board_config_size = 0;
+
+const void *__omap_get_config(u16 tag, size_t len)
 {
-	struct omap_board_info_entry *info = NULL;
+	struct omap_board_config_entry *info = NULL;
+	struct omap_board_config_kernel *kinfo = NULL;
+	int i;
 
 #ifdef CONFIG_OMAP_BOOT_TAG
 	if (omap_bootloader_tag_len > 4)
-		info = (struct omap_board_info_entry *) omap_bootloader_tag;
+		info = (struct omap_board_config_entry *) omap_bootloader_tag;
 	while (info != NULL) {
 		u8 *next;
 
@@ -198,26 +203,38 @@ const void *__omap_get_per_info(u16 tag, size_t len)
 		if (next >= omap_bootloader_tag + omap_bootloader_tag_len)
 			info = NULL;
 		else
-			info = (struct omap_board_info_entry *) next;
+			info = (struct omap_board_config_entry *) next;
+	}
+	if (info != NULL) {
+		/* Check the length as a lame attempt to check for
+		 * binary inconsistancy. */
+		if (info->len != len) {
+			printk(KERN_ERR "OMAP peripheral config: Length mismatch with tag %x (want %d, got %d)\n",
+			       tag, len, info->len);
+			return NULL;
+		}
+		return info->data;
 	}
 #endif
-	if (info == NULL)
-		return NULL;
-	if (info->len != len) {
-		printk(KERN_ERR "OMAP per_info: Length mismatch with tag %x (want %d, got %d)\n",
-		       tag, len, info->len);
-		return NULL;
+	/* Try to find the config from the board-specific structures
+	 * in the kernel. */
+	for (i = 0; i < omap_board_config_size; i++) {
+		if (omap_board_config[i].tag == tag) {
+			kinfo = &omap_board_config[i];
+			break;
+		}
 	}
-
-	return info->data;
+	if (kinfo == NULL)
+		return NULL;
+	return kinfo->data;
 }
-EXPORT_SYMBOL(__omap_get_per_info);
+EXPORT_SYMBOL(__omap_get_config);
 
 static int __init omap_add_serial_console(void)
 {
-	const struct omap_uart_info *info;
+	const struct omap_uart_config *info;
 
-	info = omap_get_per_info(OMAP_TAG_UART, struct omap_uart_info);
+	info = omap_get_config(OMAP_TAG_UART, struct omap_uart_config);
 	if (info != NULL && info->console_uart) {
 		static char speed[11], *opt = NULL;
 

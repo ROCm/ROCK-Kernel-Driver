@@ -207,7 +207,7 @@ void __init ixp4xx_init_irq(void)
 
 static unsigned volatile last_jiffy_time;
 
-#define CLOCK_TICKS_PER_USEC	(CLOCK_TICK_RATE / USEC_PER_SEC)
+#define CLOCK_TICKS_PER_USEC	((CLOCK_TICK_RATE + USEC_PER_SEC/2) / USEC_PER_SEC)
 
 /* IRQs are disabled before entering here from do_gettimeofday() */
 static unsigned long ixp4xx_gettimeoffset(void)

@@ -79,7 +79,7 @@ static int integrator_set_target(struct cpufreq_policy *policy,
 				 unsigned int target_freq,
 				 unsigned int relation)
 {
-	unsigned long cpus_allowed;
+	cpumask_t cpus_allowed;
 	int cpu = policy->cpu;
 	struct icst525_vco vco;
 	struct cpufreq_freqs freqs;
@@ -94,7 +94,7 @@ static int integrator_set_target(struct cpufreq_policy *policy,
 	 * Bind to the specified CPU.  When this call returns,
 	 * we should be running on the right CPU.
 	 */
-	set_cpus_allowed(current, 1 << cpu);
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 	BUG_ON(cpu != smp_processor_id());
 
 	/* get current setting */
@@ -154,14 +154,14 @@ static int integrator_set_target(struct cpufreq_policy *policy,
 
 static unsigned int integrator_get(unsigned int cpu)
 {
-	unsigned long cpus_allowed;
+	cpumask_t cpus_allowed;
 	unsigned int current_freq;
 	u_int cm_osc;
 	struct icst525_vco vco;
 
 	cpus_allowed = current->cpus_allowed;
 
-	set_cpus_allowed(current, 1 << cpu);
+	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 	BUG_ON(cpu != smp_processor_id());
 
 	/* detect memory etc. */

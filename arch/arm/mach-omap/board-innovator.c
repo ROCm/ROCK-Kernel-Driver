@@ -29,8 +29,11 @@
 #include <asm/arch/clocks.h>
 #include <asm/arch/gpio.h>
 #include <asm/arch/fpga.h>
+#include <asm/arch/usb.h>
 
 #include "common.h"
+
+extern void __init omap_init_time(void);
 
 #ifdef CONFIG_ARCH_OMAP1510
 
@@ -49,8 +52,8 @@ static struct resource innovator1510_smc91x_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= INT_ETHER,
-		.end	= INT_ETHER,
+		.start	= OMAP1510_INT_ETHER,
+		.end	= OMAP1510_INT_ETHER,
 		.flags	= IORESOURCE_IRQ,
 	},
 };
@@ -108,10 +111,42 @@ void innovator_init_irq(void)
 #ifdef CONFIG_ARCH_OMAP1510
 	if (cpu_is_omap1510()) {
 		omap_gpio_init();
-		fpga_init_irq();
+		omap1510_fpga_init_irq();
 	}
 #endif
 }
+
+#ifdef CONFIG_ARCH_OMAP1510
+static struct omap_usb_config innovator1510_usb_config __initdata = {
+	/* has usb host and device, but no Mini-AB port */
+	.register_host	= 1,
+	.register_dev	= 1,
+	/* Assume bad Innovator wiring; Use internal host only with custom cable */
+	.hmc_mode	= 16,
+	.pins[0]	= 2,
+};
+#endif
+
+#ifdef CONFIG_ARCH_OMAP1610
+static struct omap_usb_config h2_usb_config __initdata = {
+	/* usb1 has a Mini-AB port and external isp1301 transceiver */
+	.otg		= 2,
+
+#ifdef	CONFIG_USB_GADGET_OMAP
+	.hmc_mode	= 19,	// 0:host(off) 1:dev|otg 2:disabled
+	// .hmc_mode	= 21,	// 0:host(off) 1:dev(loopback) 2:host(loopback)
+#elif	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+	/* NONSTANDARD CABLE NEEDED (B-to-Mini-B) */
+	.hmc_mode	= 20,	// 1:dev|otg(off) 1:host 2:disabled
+#endif
+
+	.pins[1]	= 3,
+};
+#endif
+
+static struct omap_board_config_kernel innovator_config[] = {
+	{ OMAP_TAG_USB,         NULL },
+};
 
 static void __init innovator_init(void)
 {
@@ -121,10 +156,21 @@ static void __init innovator_init(void)
 	}
 #endif
 #ifdef CONFIG_ARCH_OMAP1610
-	if (cpu_is_omap1610()) {
+	if (!cpu_is_omap1510()) {
 		platform_add_devices(innovator1610_devices, ARRAY_SIZE(innovator1610_devices));
 	}
 #endif
+
+#ifdef CONFIG_ARCH_OMAP1510
+	if (cpu_is_omap1510())
+		innovator_config[0].data = &innovator1510_usb_config;
+#endif
+#ifdef CONFIG_ARCH_OMAP1610
+	if (cpu_is_omap1610())
+		innovator_config[0].data = &h2_usb_config;
+#endif
+	omap_board_config = innovator_config;
+	omap_board_config_size = ARRAY_SIZE(innovator_config);
 }
 
 static void __init innovator_map_io(void)
@@ -144,7 +190,7 @@ static void __init innovator_map_io(void)
 	}
 #endif
 #ifdef CONFIG_ARCH_OMAP1610
-	if (cpu_is_omap1610()) {
+	if (!cpu_is_omap1510()) {
 		iotable_init(innovator1610_io_desc, ARRAY_SIZE(innovator1610_io_desc));
 	}
 #endif
@@ -156,6 +202,6 @@ MACHINE_START(OMAP_INNOVATOR, "TI-Innovator")
 	BOOT_PARAMS(0x10000100)
 	MAPIO(innovator_map_io)
 	INITIRQ(innovator_init_irq)
-	INITTIME(omap_init_time)
 	INIT_MACHINE(innovator_init)
+	INITTIME(omap_init_time)
 MACHINE_END

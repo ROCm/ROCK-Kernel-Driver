@@ -22,7 +22,7 @@
  * Note: this structure must always be aligned to a 16-byte boundary.
  */
 
-typedef struct {
+typedef struct pxa_dma_desc {
 	volatile u32 ddadr;	/* Points to the next descriptor + flags */
 	volatile u32 dsadr;	/* DSADR value for the current transfer */
 	volatile u32 dtadr;	/* DTADR value for the current transfer */

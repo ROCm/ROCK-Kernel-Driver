@@ -344,7 +344,7 @@ static inline void free_bootmem_node_bank(int node, struct meminfo *mi)
  * Initialise the bootmem allocator for all nodes.  This is called
  * early during the architecture specific initialisation.
  */
-void __init bootmem_init(struct meminfo *mi)
+static void __init bootmem_init(struct meminfo *mi)
 {
 	struct node_info node_info[MAX_NUMNODES], *np = node_info;
 	unsigned int bootmap_pages, bootmap_pfn, map_pg;
@@ -412,9 +412,7 @@ void __init bootmem_init(struct meminfo *mi)
 	}
 #endif
 
-	if (map_pg != bootmap_pfn + bootmap_pages)
-		BUG();
-
+	BUG_ON(map_pg != bootmap_pfn + bootmap_pages);
 }
 
 /*
@@ -425,6 +423,8 @@ void __init paging_init(struct meminfo *mi, struct machine_desc *mdesc)
 {
 	void *zero_page;
 	int node;
+
+	bootmem_init(mi);
 
 	memcpy(&meminfo, mi, sizeof(meminfo));
 

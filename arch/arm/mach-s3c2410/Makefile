@@ -4,10 +4,12 @@
 
 # Object file lists.
 
-obj-y			:= s3c2410.o irq.o time.o gpio.o
+obj-y			:= s3c2410.o irq.o time.o gpio.o clock.o devs.o
 obj-m			:=
 obj-n			:=
 obj-			:=
+
+obj-$(CONFIG_S3C2410_DMA)  += dma.o
 
 obj-$(CONFIG_ARCH_BAST)    += mach-bast.o
 obj-$(CONFIG_MACH_H1940)   += mach-h1940.o

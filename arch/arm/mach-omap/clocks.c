@@ -36,6 +36,8 @@
 #include <asm/arch/clocks.h>
 #include <asm/arch/board.h>
 
+extern void start_mputimer1(unsigned long load_val);
+
 /* Input clock in MHz */
 static unsigned int source_clock = 12;
 
@@ -239,7 +241,7 @@ int ck_auto_unclock = 1;
 int ck_debug = 0;
 
 #define CK_MAX_PLL_FREQ		OMAP_CK_MAX_RATE
-static __u8 ck_valid_table[CK_MAX_PLL_FREQ / 8 + 1];
+static __u32 ck_valid_table[CK_MAX_PLL_FREQ / 32 + 1];
 static __u8 ck_lookup_table[CK_MAX_PLL_FREQ];
 
 int
@@ -615,11 +617,11 @@ __ck_make_lookup_table(void)
 int __init
 init_ck(void)
 {
-	const struct omap_clock_info *info;
+	const struct omap_clock_config *info;
 	int crystal_type = 0; /* Default 12 MHz */
 
 	__ck_make_lookup_table();
-	info = omap_get_per_info(OMAP_TAG_CLOCK, struct omap_clock_info);
+	info = omap_get_config(OMAP_TAG_CLOCK, struct omap_clock_config);
 	if (info != NULL) {
 		if (!cpu_is_omap1510())
 			crystal_type = info->system_clock_type;
@@ -645,7 +647,8 @@ init_ck(void)
 #elif defined(CONFIG_OMAP_ARM_182MHZ) && defined(CONFIG_ARCH_OMAP730)
 	omap_writew(0x250E, ARM_CKCTL);
 	omap_writew(0x2710, DPLL_CTL);
-#elif defined(CONFIG_OMAP_ARM_192MHZ) && (defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912))
+#elif defined(CONFIG_OMAP_ARM_192MHZ) && (defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912) \
+					  || defined(CONFIG_ARCH_OMAP1710))
 	omap_writew(0x150f, ARM_CKCTL);
 	if (crystal_type == 2) {
 		source_clock = 13;	/* MHz */

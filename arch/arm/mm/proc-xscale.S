@@ -585,7 +585,12 @@ __xscale_setup:
 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
 	mov	r0, #0x1f			@ Domains 0, 1 = client
 	mcr	p15, 0, r0, c3, c0, 0		@ load domain access register
-	mov	r0, #1				@ Allow access to CP0 and CP13
+#ifdef CONFIG_IWMMXT
+	mov	r0, #0				@ initially disallow access to CP0/CP1
+#else
+	mov	r0, #1				@ Allow access to CP0
+#endif
+	orr     r0, r0, #1 << 6			@ cp6 for IOP3xx and Bulverde
 	orr	r0, r0, #1 << 13		@ Its undefined whether this
 	mcr	p15, 0, r0, c15, c1, 0		@ affects USR or SVC modes
 	mrc	p15, 0, r0, c1, c0, 0		@ get control register
