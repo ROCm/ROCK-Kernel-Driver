@@ -670,27 +670,12 @@ defconfig:
 # make distclean Remove editor backup files, patch leftover files and the like
 
 # Files removed with 'make clean'
-CLEAN_FILES += \
-	include/linux/compile.h \
-	vmlinux System.map \
-	drivers/char/drm/*-mod.c \
-	sound/oss/bin2hex sound/oss/hex2hex \
-	net/802/cl2llc.c net/802/transit/pdutr.h net/802/transit/timertr.h \
-	net/802/pseudo/pseudocode.h \
-	net/khttpd/make_times_h net/khttpd/times.h \
-	submenu*
+CLEAN_FILES += vmlinux System.map MC*
 
 # Files removed with 'make mrproper'
 MRPROPER_FILES += \
 	include/linux/autoconf.h include/linux/version.h \
-	sound/oss/*_boot.h sound/oss/.*.boot \
-	sound/oss/msndinit.c \
-	sound/oss/msndperm.c \
-	sound/oss/pndsperm.c \
-	sound/oss/pndspini.c \
-	.version .config* config.in config.old \
-	scripts/tkparse scripts/kconfig.tk scripts/kconfig.tmp \
-	scripts/lxdialog/*.o scripts/lxdialog/lxdialog \
+	.version .config .config.old config.in config.old \
 	.menuconfig.log \
 	include/asm \
 	.hdepend include/linux/modversions.h \
