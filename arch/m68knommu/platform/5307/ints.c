@@ -43,12 +43,13 @@ volatile unsigned int num_spurious;
 unsigned int local_bh_count[NR_CPUS];
 unsigned int local_irq_count[NR_CPUS];
 
-static void default_irq_handler(int irq, void *ptr, struct pt_regs *regs)
+static irqreturn_t default_irq_handler(int irq, void *ptr, struct pt_regs *regs)
 {
 #if 1
 	printk("%s(%d): default irq handler vec=%d [0x%x]\n",
 		__FILE__, __LINE__, irq, irq);
 #endif
+	return(IRQ_HANDLED);
 }
 
 /*
@@ -96,8 +97,12 @@ irq_node_t *new_irq_node(void)
 	return NULL;
 }
 
-int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
-                unsigned long flags, const char *devname, void *dev_id)
+int request_irq(
+	unsigned int irq,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long flags,
+	const char *devname,
+	void *dev_id)
 {
 	if (irq < 0 || irq >= NR_IRQS) {
 		printk("%s: Incorrect IRQ %d from %s\n", __FUNCTION__,
@@ -159,7 +164,7 @@ void free_irq(unsigned int irq, void *dev_id)
 
 
 int sys_request_irq(unsigned int irq, 
-                    void (*handler)(int, void *, struct pt_regs *), 
+                    irqreturn_t (*handler)(int, void *, struct pt_regs *), 
                     unsigned long flags, const char *devname, void *dev_id)
 {
 	if (irq > IRQ7) {
