@@ -531,10 +531,12 @@ static int __devinit ali15x3_probe(struct pci_dev *dev, const struct pci_device_
 		return -ENODEV;
 	}
 
+	/* set up the driverfs linkage to our parent device */
+	ali15x3_adapter.dev.parent = &dev->dev;
+
 	sprintf(ali15x3_adapter.name, "SMBus ALI15X3 adapter at %04x",
 		ali15x3_smba);
-	i2c_add_adapter(&ali15x3_adapter);
-	return 0;
+	return i2c_add_adapter(&ali15x3_adapter);
 }
 
 static void __devexit ali15x3_remove(struct pci_dev *dev)

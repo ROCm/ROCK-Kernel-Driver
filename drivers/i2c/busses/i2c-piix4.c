@@ -473,6 +473,9 @@ static int __devinit piix4_probe(struct pci_dev *dev, const struct pci_device_id
 	if (retval)
 		return retval;
 
+	/* set up the driverfs linkage to our parent device */
+	piix4_adapter.dev.parent = &dev->dev;
+
 	sprintf(piix4_adapter.name, "SMBus PIIX4 adapter at %04x",
 		piix4_smba);
 

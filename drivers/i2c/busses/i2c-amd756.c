@@ -375,6 +375,9 @@ static int __devinit amd756_probe(struct pci_dev *pdev,
 	printk(KERN_DEBUG DRV_NAME ": AMD756_smba = 0x%X\n", amd756_ioport);
 #endif
 
+	/* set up the driverfs linkage to our parent device */
+	amd756_adapter.dev.parent = &pdev->dev;
+
 	sprintf(amd756_adapter.name,
 		"SMBus AMD75x adapter at %04x", amd756_ioport);
 

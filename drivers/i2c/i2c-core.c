@@ -87,6 +87,16 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 	init_MUTEX(&adap->bus);
 	init_MUTEX(&adap->list);
 
+	/* Add the adapter to the driver core.
+	 * If the parent pointer is not set up,
+	 * we add this adapter to the legacy bus.
+	 */
+	if (adap->dev.parent == NULL)
+		adap->dev.parent = &legacy_bus;
+	sprintf(adap->dev.bus_id, "i2c-%d", i);
+	strcpy(adap->dev.name, "i2c controller");
+	device_register(&adap->dev);
+
 	/* inform drivers of new adapters */
 	for (j=0;j<I2C_DRIVER_MAX;j++)
 		if (drivers[j]!=NULL && 
@@ -153,6 +163,9 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 	}
 
 	i2cproc_remove(i);
+
+	/* clean up the sysfs representation */
+	device_unregister(&adap->dev);
 
 	adapters[i] = NULL;
 

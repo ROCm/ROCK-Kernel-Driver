@@ -231,12 +231,14 @@ struct i2c_adapter {
 
 	int timeout;
 	int retries;
+	struct device dev;	/* the adapter device */
 
 #ifdef CONFIG_PROC_FS 
 	/* No need to set this when you initialize the adapter          */
 	int inode;
 #endif /* def CONFIG_PROC_FS */
 };
+#define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
 
 /*flags for the driver struct: */
 #define I2C_DF_NOTIFY	0x01		/* notify on bus (de/a)ttaches 	*/

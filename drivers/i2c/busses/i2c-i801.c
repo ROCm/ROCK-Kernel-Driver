@@ -672,9 +672,12 @@ static int __devinit i801_probe(struct pci_dev *dev, const struct pci_device_id 
 		return -ENODEV;
 	}
 
+	/* set up the driverfs linkage to our parent device */
+	i801_adapter.dev.parent = &dev->dev;
+
 	sprintf(i801_adapter.name, "SMBus I801 adapter at %04x",
 		i801_smba);
-	i2c_add_adapter(&i801_adapter);
+	return i2c_add_adapter(&i801_adapter);
 }
 
 static void __devexit i801_remove(struct pci_dev *dev)
