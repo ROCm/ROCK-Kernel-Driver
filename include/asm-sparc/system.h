@@ -169,7 +169,7 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	"nop\n\t"									\
 	"nop\n\t"									\
 	"jmpl	%%o7 + 0x8, %%g0\n\t"							\
-	" ld	[%%g3 + %5], %0\n\t"								\
+	" ld	[%%g3 + %5], %0\n\t"							\
         : "=&r" (last)									\
         : "r" (&(current_set[hard_smp_processor_id()])),	\
 	  "r" ((next)->thread_info),				\
@@ -177,9 +177,10 @@ extern void fpsave(unsigned long *fpregs, unsigned long *fsr,
 	  "i" (TI_KSP),						\
 	  "i" (TI_TASK),					\
 	  "r" (task_pc)									\
-	: "g1", "g2", "g3", "g4", "g5", "g7", "l0", "l1",				\
-	"l4", "l5", "l6", "l7", "i0", "i1", "i2", "i3", "i4", "i5", "o0", "o1", "o2",	\
-	"o3");										\
+	:       "g1", "g2", "g3", "g4", "g5",       "g7",	\
+	  "l0", "l1",       "l3", "l4", "l5", "l6", "l7",	\
+	  "i0", "i1", "i2", "i3", "i4", "i5",			\
+	  "o0", "o1", "o2", "o3");				\
 here:;  } while(0)
 
 /*

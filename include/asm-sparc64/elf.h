@@ -42,13 +42,11 @@ do {	unsigned long *dest = &(__elf_regs[0]);		\
 	for(i = 0; i < 16; i++)				\
 		dest[i] = src->u_regs[i];		\
 	/* Don't try this at home kids... */		\
-	set_fs(USER_DS);				\
 	sp = (unsigned long *)				\
 	 ((src->u_regs[14] + STACK_BIAS)		\
 	  & 0xfffffffffffffff8UL);			\
 	for(i = 0; i < 16; i++)				\
 		__get_user(dest[i+16], &sp[i]);		\
-	set_fs(KERNEL_DS);				\
 	dest[32] = src->tstate;				\
 	dest[33] = src->tpc;				\
 	dest[34] = src->tnpc;				\
@@ -62,6 +60,9 @@ typedef struct {
 	unsigned long	pr_fprs;
 } elf_fpregset_t;
 #endif
+
+#define ELF_CORE_COPY_TASK_REGS(__tsk, __elf_regs)	\
+	({ ELF_CORE_COPY_REGS((*(__elf_regs)), (__tsk)->thread_info->kregs); 1; })
 
 /*
  * This is used to ensure we don't load something for the wrong architecture.
