@@ -46,6 +46,7 @@ EXPORT_SYMBOL(ip_fast_csum);
 EXPORT_SYMBOL(__ia64_memcpy_fromio);
 EXPORT_SYMBOL(__ia64_memcpy_toio);
 EXPORT_SYMBOL(__ia64_memset_c_io);
+EXPORT_SYMBOL(io_space);
 
 #include <asm/semaphore.h>
 EXPORT_SYMBOL_NOVERS(__down);
@@ -55,6 +56,12 @@ EXPORT_SYMBOL_NOVERS(__up);
 
 #include <asm/page.h>
 EXPORT_SYMBOL(clear_page);
+
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+#include <asm/pgtable.h>
+EXPORT_SYMBOL(vmalloc_end);
+EXPORT_SYMBOL(ia64_pfn_valid);
+#endif
 
 #include <asm/processor.h>
 EXPORT_SYMBOL(cpu_info__per_cpu);
@@ -161,3 +168,11 @@ EXPORT_SYMBOL(unw_access_br);
 EXPORT_SYMBOL(unw_access_fr);
 EXPORT_SYMBOL(unw_access_ar);
 EXPORT_SYMBOL(unw_access_pr);
+
+#if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
+extern void ia64_spinlock_contention_pre3_4 (void);
+EXPORT_SYMBOL(ia64_spinlock_contention_pre3_4);
+#else
+extern void ia64_spinlock_contention (void);
+EXPORT_SYMBOL(ia64_spinlock_contention);
+#endif

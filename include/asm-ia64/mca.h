@@ -11,7 +11,10 @@
 #define _ASM_IA64_MCA_H
 
 #if !defined(__ASSEMBLY__)
+
+#include <linux/interrupt.h>
 #include <linux/types.h>
+
 #include <asm/param.h>
 #include <asm/sal.h>
 #include <asm/processor.h>
@@ -129,10 +132,10 @@ extern void ia64_os_mca_dispatch_end(void);
 extern void ia64_mca_ucmc_handler(void);
 extern void ia64_monarch_init_handler(void);
 extern void ia64_slave_init_handler(void);
-extern void ia64_mca_rendez_int_handler(int,void *,struct pt_regs *);
-extern void ia64_mca_wakeup_int_handler(int,void *,struct pt_regs *);
-extern void ia64_mca_cmc_int_handler(int,void *,struct pt_regs *);
-extern void ia64_mca_cpe_int_handler(int,void *,struct pt_regs *);
+extern irqreturn_t ia64_mca_rendez_int_handler(int,void *,struct pt_regs *);
+extern irqreturn_t ia64_mca_wakeup_int_handler(int,void *,struct pt_regs *);
+extern irqreturn_t ia64_mca_cmc_int_handler(int,void *,struct pt_regs *);
+extern irqreturn_t ia64_mca_cpe_int_handler(int,void *,struct pt_regs *);
 extern int  ia64_log_print(int,prfunc_t);
 extern void ia64_mca_cmc_vector_setup(void);
 extern int  ia64_mca_check_errors(void);

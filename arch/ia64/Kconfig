@@ -381,6 +381,10 @@ config HUGETLB_PAGE_SIZE_4GB
 	depends on MCKINLEY
 	bool "4GB"
 
+config HUGETLB_PAGE_SIZE_1GB
+	depends on MCKINLEY
+	bool "1GB"
+
 config HUGETLB_PAGE_SIZE_256MB
 	bool "256MB"
 

@@ -59,7 +59,10 @@ unsigned long ia64_cycles_per_usec;
 struct ia64_boot_param *ia64_boot_param;
 struct screen_info screen_info;
 
+unsigned long ia64_max_cacheline_size;
 unsigned long ia64_iobase;	/* virtual address for I/O accesses */
+struct io_space io_space[MAX_IO_SPACES];
+unsigned int num_io_spaces;
 
 unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
 
@@ -412,6 +415,11 @@ setup_arch (char **cmdline_p)
 	}
 	ia64_iobase = (unsigned long) ioremap(phys_iobase, 0);
 
+	/* setup legacy IO port space */
+	io_space[0].mmio_base = ia64_iobase;
+	io_space[0].sparse = 1;
+	num_io_spaces = 1;
+
 #ifdef CONFIG_SMP
 	cpu_physical_id(0) = hard_smp_processor_id();
 #endif
@@ -421,7 +429,7 @@ setup_arch (char **cmdline_p)
 #ifdef CONFIG_ACPI_BOOT
 	acpi_boot_init();
 #endif
-#ifdef CONFIG_SERIAL_HCDP
+#ifdef CONFIG_SERIAL_8250_HCDP
 	if (efi.hcdp) {
 		void setup_serial_hcdp(void *);
 
@@ -494,7 +502,7 @@ show_cpuinfo (struct seq_file *m, void *v)
 	memcpy(features, " standard", 10);
 	cp = features;
 	sep = 0;
-	for (i = 0; i < sizeof(feature_bits)/sizeof(feature_bits[0]); ++i) {
+	for (i = 0; i < (int) ARRAY_SIZE(feature_bits); ++i) {
 		if (mask & feature_bits[i].mask) {
 			if (sep)
 				*cp++ = sep;
@@ -625,6 +633,39 @@ setup_per_cpu_areas (void)
 	/* start_kernel() requires this... */
 }
 
+static void
+get_max_cacheline_size (void)
+{
+	unsigned long line_size, max = 1;
+	u64 l, levels, unique_caches;
+        pal_cache_config_info_t cci;
+        s64 status;
+
+        status = ia64_pal_cache_summary(&levels, &unique_caches);
+        if (status != 0) {
+                printk(KERN_ERR "%s: ia64_pal_cache_summary() failed (status=%ld)\n",
+                       __FUNCTION__, status);
+                max = SMP_CACHE_BYTES;
+		goto out;
+        }
+
+	for (l = 0; l < levels; ++l) {
+		status = ia64_pal_cache_config_info(l, /* cache_type (data_or_unified)= */ 2,
+						    &cci);
+		if (status != 0) {
+			printk(KERN_ERR
+			       "%s: ia64_pal_cache_config_info(l=%lu) failed (status=%ld)\n",
+			       __FUNCTION__, l, status);
+			max = SMP_CACHE_BYTES;
+		}
+		line_size = 1 << cci.pcci_line_size;
+		if (line_size > max)
+			max = line_size;
+        }
+  out:
+	if (max > ia64_max_cacheline_size)
+		ia64_max_cacheline_size = max;
+}
 
 /*
  * cpu_init() initializes state that is per-CPU.  This function acts
@@ -667,6 +708,8 @@ cpu_init (void)
 #ifdef CONFIG_NUMA
 	cpu_info->node_data = get_node_data_ptr();
 #endif
+
+	get_max_cacheline_size();
 
 	/*
 	 * We can't pass "local_cpu_data" to identify_cpu() because we haven't called

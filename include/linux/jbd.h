@@ -279,9 +279,9 @@ void buffer_assertion_failure(struct buffer_head *bh);
 			printk(KERN_ERR why);				     \
 		}							     \
 	} while (0)
-#define J_EXPECT(expr, why...)		__journal_expect(expr, ## why)
-#define J_EXPECT_BH(bh, expr, why...)	__journal_expect(expr, ## why)
-#define J_EXPECT_JH(jh, expr, why...)	__journal_expect(expr, ## why)
+#define J_EXPECT(expr, why...)		__journal_expect(expr, why)
+#define J_EXPECT_BH(bh, expr, why...)	__journal_expect(expr, why)
+#define J_EXPECT_JH(jh, expr, why...)	__journal_expect(expr, why)
 #endif
 
 enum jbd_state_bits {

@@ -25,8 +25,8 @@ static pfm_reg_desc_t pfm_mck_pmc_desc[PMU_MAX_PMCS]={
 /* pmc5  */ { PFM_REG_COUNTING, 6, 0x0UL, 0xfffff7fUL, NULL,  pfm_mck_reserved, {RDEP(5),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc6  */ { PFM_REG_COUNTING, 6, 0x0UL, 0xfffff7fUL, NULL,  pfm_mck_reserved, {RDEP(6),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc7  */ { PFM_REG_COUNTING, 6, 0x0UL, 0xfffff7fUL, NULL,  pfm_mck_reserved, {RDEP(7),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc8  */ { PFM_REG_CONFIG  , 0, 0xffffffff3fffffffUL, 0xffffffff9fffffffUL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
-/* pmc9  */ { PFM_REG_CONFIG  , 0, 0xffffffff3ffffffcUL, 0xffffffff9fffffffUL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc8  */ { PFM_REG_CONFIG  , 0, 0xffffffff3fffffffUL, 0xffffffff3fffffffUL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
+/* pmc9  */ { PFM_REG_CONFIG  , 0, 0xffffffff3ffffffcUL, 0xffffffff3fffffffUL, NULL, pfm_mck_pmc_check, {0UL,0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc10 */ { PFM_REG_MONITOR , 4, 0x0UL, 0xffffUL, NULL, pfm_mck_reserved, {RDEP(0)|RDEP(1),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc11 */ { PFM_REG_MONITOR , 6, 0x0UL, 0x30f01cf, NULL,  pfm_mck_reserved, {RDEP(2)|RDEP(3)|RDEP(17),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
 /* pmc12 */ { PFM_REG_MONITOR , 6, 0x0UL, 0xffffUL, NULL,  pfm_mck_reserved, {RDEP(8)|RDEP(9)|RDEP(10)|RDEP(11)|RDEP(12)|RDEP(13)|RDEP(14)|RDEP(15)|RDEP(16),0UL, 0UL, 0UL}, {0UL,0UL, 0UL, 0UL}},
@@ -143,10 +143,7 @@ pfm_mck_pmc_check(struct task_struct *task, unsigned int cnum, unsigned long *va
 		case  8: val8 = *val;
 			 val13 = th->pmc[13];
 			 val14 = th->pmc[14];
-			 *val |= 1UL << 2; /* bit 2 must always be 1 */
 			 check_case1 = 1;
-			 break;
-		case  9: *val |= 1UL << 2; /* bit 2 must always be 1 */
 			 break;
 		case 13: val8  = th->pmc[8];
 			 val13 = *val;

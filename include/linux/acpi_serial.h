@@ -9,6 +9,8 @@
  *
  */
 
+#include <linux/serial.h>
+
 extern void setup_serial_acpi(void *);
 
 #define ACPI_SIG_LEN		4

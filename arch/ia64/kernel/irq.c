@@ -18,7 +18,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
@@ -33,6 +32,7 @@
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/kallsyms.h>
 
 #include <asm/atomic.h>
 #include <asm/io.h>
@@ -50,7 +50,7 @@
  * Linux has a controller-independent x86 interrupt architecture.
  * every controller has a 'controller-template', that is used
  * by the main code to do the right thing. Each driver-visible
- * interrupt source is transparently wired to the apropriate
+ * interrupt source is transparently wired to the appropriate
  * controller. Thus drivers need not be aware of the
  * interrupt-controller.
  *
@@ -91,7 +91,8 @@ static void register_irq_proc (unsigned int irq);
  * Special irq handlers.
  */
 
-void no_action(int cpl, void *dev_id, struct pt_regs *regs) { }
+irqreturn_t no_action(int cpl, void *dev_id, struct pt_regs *regs)
+{ return IRQ_NONE; }
 
 /*
  * Generic no controller code
@@ -141,8 +142,10 @@ struct hw_interrupt_type no_irq_type = {
 };
 
 atomic_t irq_err_count;
-#if defined(CONFIG_X86) && defined(CONFIG_X86_IO_APIC) && defined(APIC_MISMATCH_DEBUG)
+#ifdef CONFIG_X86_IO_APIC
+#ifdef APIC_MISMATCH_DEBUG
 atomic_t irq_mis_count;
+#endif
 #endif
 
 /*
@@ -178,9 +181,10 @@ int show_interrupts(struct seq_file *p, void *v)
 #endif
 		seq_printf(p, " %14s", idesc->handler->typename);
 		seq_printf(p, "  %s", action->name);
+
 		for (action=action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);
-		
+
 		seq_putc(p, '\n');
 skip:
 		spin_unlock_irqrestore(&idesc->lock, flags);
@@ -190,16 +194,18 @@ skip:
 		if (cpu_online(j))
 			seq_printf(p, "%10u ", nmi_count(j));
 	seq_putc(p, '\n');
-#if defined(CONFIG_SMP) && defined(CONFIG_X86)
+#if CONFIG_X86_LOCAL_APIC
 	seq_puts(p, "LOC: ");
 	for (j = 0; j < NR_CPUS; j++)
 		if (cpu_online(j))
-			seq_printf(p, "%10u ", apic_timer_irqs[j]);
+			seq_printf(p, "%10u ", irq_stat[j].apic_timer_irqs);
 	seq_putc(p, '\n');
 #endif
 	seq_printf(p, "ERR: %10u\n", atomic_read(&irq_err_count));
-#if defined(CONFIG_X86) && defined(CONFIG_X86_IO_APIC) && defined(APIC_MISMATCH_DEBUG)
+#ifdef CONFIG_X86_IO_APIC
+#ifdef APIC_MISMATCH_DEBUG
 	seq_printf(p, "MIS: %10u\n", atomic_read(&irq_mis_count));
+#endif
 #endif
 	return 0;
 }
@@ -219,21 +225,46 @@ inline void synchronize_irq(unsigned int irq)
  * waste of time and is not what some drivers would
  * prefer.
  */
-int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction * action)
+int handle_IRQ_event(unsigned int irq,
+		struct pt_regs *regs, struct irqaction *action)
 {
 	int status = 1;	/* Force the "do bottom halves" bit */
+	int retval = 0;
+	struct irqaction *first_action = action;
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
 
 	do {
 		status |= action->flags;
-		action->handler(irq, action->dev_id, regs);
+		retval |= action->handler(irq, action->dev_id, regs);
 		action = action->next;
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
 		add_interrupt_randomness(irq);
 	local_irq_disable();
+	if (retval != 1) {
+		static int count = 100;
+		if (count) {
+			count--;
+			if (retval) {
+				printk("irq event %d: bogus retval mask %x\n",
+					irq, retval);
+			} else {
+				printk("irq %d: nobody cared!\n", irq);
+			}
+			dump_stack();
+			printk("handlers:\n");
+			action = first_action;
+			do {
+				printk("[<%p>]", action->handler);
+				print_symbol(" (%s)",
+					(unsigned long)action->handler);
+				printk("\n");
+				action = action->next;
+			} while (action);
+		}
+	}
 
 	return status;
 }
@@ -455,7 +486,7 @@ unsigned int do_IRQ(unsigned long irq, struct pt_regs *regs)
  */
 
 int request_irq(unsigned int irq,
-		void (*handler)(int, void *, struct pt_regs *),
+		irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		unsigned long irqflags,
 		const char * devname,
 		void *dev_id)
@@ -482,7 +513,7 @@ int request_irq(unsigned int irq,
 		return -EINVAL;
 
 	action = (struct irqaction *)
-			kmalloc(sizeof(struct irqaction), GFP_KERNEL);
+			kmalloc(sizeof(struct irqaction), GFP_ATOMIC);
 	if (!action)
 		return -ENOMEM;
 
@@ -511,10 +542,7 @@ int request_irq(unsigned int irq,
  *	does not return until any executing interrupts for this IRQ
  *	have completed.
  *
- *	This function may be called from interrupt context. 
- *
- *	Bugs: Attempting to free an irq in a handler for the same irq hangs
- *	      the machine.
+ *	This function must not be called from interrupt context.
  */
 
 void free_irq(unsigned int irq, void *dev_id)
@@ -545,11 +573,8 @@ void free_irq(unsigned int irq, void *dev_id)
 			}
 			spin_unlock_irqrestore(&desc->lock,flags);
 
-#ifdef CONFIG_SMP
 			/* Wait to make sure it's not being used on another CPU */
-			while (desc->status & IRQ_INPROGRESS)
-				synchronize_irq(irq);
-#endif
+			synchronize_irq(irq);
 			kfree(action);
 			return;
 		}
@@ -664,7 +689,6 @@ unsigned long probe_irq_on(void)
  *	only return ISA irq numbers - just so that we reset them
  *	all to a known state.
  */
-
 unsigned int probe_irq_mask(unsigned long val)
 {
 	int i;
@@ -705,7 +729,7 @@ unsigned int probe_irq_mask(unsigned long val)
  *	The interrupt probe logic state is returned to its previous
  *	value.
  *
- *	BUGS: When used in a module (which arguably shouldnt happen)
+ *	BUGS: When used in a module (which arguably shouldn't happen)
  *	nothing prevents two IRQ probe callers from overlapping. The
  *	results of this are non-optimal.
  */
@@ -748,6 +772,8 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	struct irqaction *old, **p;
 	irq_desc_t *desc = irq_desc(irq);
 
+	if (desc->handler == &no_irq_type)
+		return -ENOSYS;
 	/*
 	 * Some drivers like serial.c use request_irq() heavily,
 	 * so we have to be careful not to interfere with a
@@ -808,11 +834,11 @@ static struct proc_dir_entry * irq_dir [NR_IRQS];
 
 #define HEX_DIGITS 8
 
-static int parse_hex_value (const char *buffer, unsigned long count, unsigned long *ret)
+static unsigned int parse_hex_value (const char *buffer,
+		unsigned long count, unsigned long *ret)
 {
 	unsigned char hexnum [HEX_DIGITS];
-	unsigned long value;
-	int i;
+	unsigned long value, i;
 
 	if (!count)
 		return -EINVAL;
@@ -950,12 +976,13 @@ static void register_irq_proc (unsigned int irq)
 #if CONFIG_SMP
 	{
 		struct proc_dir_entry *entry;
+
 		/* create /proc/irq/1234/smp_affinity */
 		entry = create_proc_entry("smp_affinity", 0600, irq_dir[irq]);
 
 		if (entry) {
 			entry->nlink = 1;
-			entry->data = (void *)(unsigned long)irq;
+			entry->data = (void *)(long)irq;
 			entry->read_proc = irq_affinity_read_proc;
 			entry->write_proc = irq_affinity_write_proc;
 		}

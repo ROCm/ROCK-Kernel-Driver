@@ -56,11 +56,16 @@ ia64_atomic_sub (int i, atomic_t *v)
 }
 
 #define atomic_add_return(i,v)						\
-	((__builtin_constant_p(i) &&					\
-	  (   (i ==  1) || (i ==  4) || (i ==  8) || (i ==  16)		\
-	   || (i == -1) || (i == -4) || (i == -8) || (i == -16)))	\
-	 ? ia64_fetch_and_add(i, &(v)->counter)				\
-	 : ia64_atomic_add(i, v))
+({									\
+	int __ia64_aar_i = (i);						\
+	(__builtin_constant_p(i)					\
+	 && (   (__ia64_aar_i ==  1) || (__ia64_aar_i ==   4)		\
+	     || (__ia64_aar_i ==  8) || (__ia64_aar_i ==  16)		\
+	     || (__ia64_aar_i == -1) || (__ia64_aar_i ==  -4)		\
+	     || (__ia64_aar_i == -8) || (__ia64_aar_i == -16)))		\
+		? ia64_fetch_and_add(__ia64_aar_i, &(v)->counter)	\
+		: ia64_atomic_add(__ia64_aar_i, v);			\
+})
 
 /*
  * Atomically add I to V and return TRUE if the resulting value is
@@ -72,13 +77,17 @@ atomic_add_negative (int i, atomic_t *v)
 	return atomic_add_return(i, v) < 0;
 }
 
-
 #define atomic_sub_return(i,v)						\
-	((__builtin_constant_p(i) &&					\
-	  (   (i ==  1) || (i ==  4) || (i ==  8) || (i ==  16)		\
-	   || (i == -1) || (i == -4) || (i == -8) || (i == -16)))	\
-	 ? ia64_fetch_and_add(-(i), &(v)->counter)			\
-	 : ia64_atomic_sub(i, v))
+({									\
+	int __ia64_asr_i = (i);						\
+	(__builtin_constant_p(i)					\
+	 && (   (__ia64_asr_i ==   1) || (__ia64_asr_i ==   4)		\
+	     || (__ia64_asr_i ==   8) || (__ia64_asr_i ==  16)		\
+	     || (__ia64_asr_i ==  -1) || (__ia64_asr_i ==  -4)		\
+	     || (__ia64_asr_i ==  -8) || (__ia64_asr_i == -16)))	\
+		? ia64_fetch_and_add(-__ia64_asr_i, &(v)->counter)	\
+		: ia64_atomic_sub(__ia64_asr_i, v);			\
+})
 
 #define atomic_dec_return(v)		atomic_sub_return(1, (v))
 #define atomic_inc_return(v)		atomic_add_return(1, (v))

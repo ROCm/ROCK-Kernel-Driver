@@ -203,16 +203,16 @@ STUB_GET_NEXT_HIGH_MONO_COUNT(virt, )
 STUB_RESET_SYSTEM(virt, )
 
 void
-efi_gettimeofday (struct timeval *tv)
+efi_gettimeofday (struct timespec *ts)
 {
 	efi_time_t tm;
 
-	memset(tv, 0, sizeof(tv));
+	memset(ts, 0, sizeof(ts));
 	if ((*efi.get_time)(&tm, 0) != EFI_SUCCESS)
 		return;
 
-	tv->tv_sec = mktime(tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second);
-	tv->tv_usec = tm.nanosecond / 1000;
+	ts->tv_sec = mktime(tm.year, tm.month, tm.day, tm.hour, tm.minute, tm.second);
+	ts->tv_nsec = tm.nanosecond;
 }
 
 static int
@@ -512,7 +512,7 @@ efi_init (void)
 	/* Show what we know for posterity */
 	c16 = __va(efi.systab->fw_vendor);
 	if (c16) {
-		for (i = 0;i < sizeof(vendor) && *c16; ++i)
+		for (i = 0;i < (int) sizeof(vendor) && *c16; ++i)
 			vendor[i] = *c16++;
 		vendor[i] = '\0';
 	}
@@ -520,7 +520,7 @@ efi_init (void)
 	printk(KERN_INFO "EFI v%u.%.02u by %s:",
 	       efi.systab->hdr.revision >> 16, efi.systab->hdr.revision & 0xffff, vendor);
 
-	for (i = 0; i < efi.systab->nr_tables; i++) {
+	for (i = 0; i < (int) efi.systab->nr_tables; i++) {
 		if (efi_guidcmp(config_tables[i].guid, MPS_TABLE_GUID) == 0) {
 			efi.mps = __va(config_tables[i].table);
 			printk(" MPS=0x%lx", config_tables[i].table);

@@ -55,7 +55,7 @@ static int simeth_close(struct net_device *dev);
 static int simeth_tx(struct sk_buff *skb, struct net_device *dev);
 static int simeth_rx(struct net_device *dev);
 static struct net_device_stats *simeth_get_stats(struct net_device *dev);
-static void simeth_interrupt(int irq, void *dev_id, struct pt_regs * regs);
+static irqreturn_t simeth_interrupt(int irq, void *dev_id, struct pt_regs * regs);
 static void set_multicast_list(struct net_device *dev);
 static int simeth_device_event(struct notifier_block *this,unsigned long event, void *ptr);
 
@@ -494,20 +494,21 @@ simeth_rx(struct net_device *dev)
 /*
  * Interrupt handler (Yes, we can do it too !!!)
  */
-static void
+static irqreturn_t
 simeth_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev = dev_id;
 
 	if ( dev == NULL ) {
 		printk(KERN_WARNING "simeth: irq %d for unknown device\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	/*
-	 * very simple loop because we get interrupts only when receving
+	 * very simple loop because we get interrupts only when receiving
 	 */
 	while (simeth_rx(dev));
+	return IRQ_HANDLED;
 }
 
 static struct net_device_stats *

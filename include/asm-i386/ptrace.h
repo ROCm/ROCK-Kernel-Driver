@@ -57,6 +57,7 @@ struct pt_regs {
 #ifdef __KERNEL__
 #define user_mode(regs) ((VM_MASK & (regs)->eflags) || (3 & (regs)->xcs))
 #define instruction_pointer(regs) ((regs)->eip)
+#define force_successful_syscall_return()	do { } while (0)
 #endif
 
 #endif

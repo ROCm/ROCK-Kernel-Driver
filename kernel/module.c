@@ -910,6 +910,9 @@ static void free_module(struct module *mod)
 	list_del(&mod->list);
 	spin_unlock_irq(&modlist_lock);
 
+	/* Arch-specific cleanup. */
+	module_arch_cleanup(mod);
+
 	/* Module unload stuff */
 	module_unload_free(mod);
 
@@ -1276,6 +1279,7 @@ static struct module *load_module(void __user *umod,
 	mod->module_init = ptr;
 
 	/* Transfer each section which specifies SHF_ALLOC */
+	DEBUGP("final section addresses:\n");
 	for (i = 0; i < hdr->e_shnum; i++) {
 		void *dest;
 
@@ -1293,6 +1297,7 @@ static struct module *load_module(void __user *umod,
 			       sechdrs[i].sh_size);
 		/* Update sh_addr to point to copy in image. */
 		sechdrs[i].sh_addr = (unsigned long)dest;
+		DEBUGP("\t0x%lx %s\n", sechdrs[i].sh_addr, secstrings + sechdrs[i].sh_name);
 	}
 	/* Module has been moved. */
 	mod = (void *)sechdrs[modindex].sh_addr;

@@ -71,7 +71,8 @@ static ssize_t read_mem(struct file * file, char * buf,
 	unsigned long p = *ppos;
 	unsigned long end_mem;
 	ssize_t read;
-	
+	void *addr;
+
 	end_mem = __pa(high_memory);
 	if (p >= end_mem)
 		return 0;
@@ -94,8 +95,14 @@ static ssize_t read_mem(struct file * file, char * buf,
 		}
 	}
 #endif
-	if (copy_to_user(buf, __va(p), count))
+	if (file->f_flags & O_SYNC)
+		addr = ioremap(p, count);
+	else
+		addr = __va(p);
+	if (copy_to_user(buf, addr, count))
 		return -EFAULT;
+	if (file->f_flags & O_SYNC)
+		iounmap(addr);
 	read += count;
 	*ppos += read;
 	return read;
@@ -106,13 +113,22 @@ static ssize_t write_mem(struct file * file, const char * buf,
 {
 	unsigned long p = *ppos;
 	unsigned long end_mem;
+	ssize_t ret;
+	void *addr;
 
 	end_mem = __pa(high_memory);
 	if (p >= end_mem)
 		return 0;
 	if (count > end_mem - p)
 		count = end_mem - p;
-	return do_write_mem(file, __va(p), p, buf, count, ppos);
+	if (file->f_flags & O_SYNC)
+		addr = ioremap(p, count);
+	else
+		addr = __va(p);
+	ret = do_write_mem(file, addr, p, buf, count, ppos);
+	if (file->f_flags & O_SYNC)
+		iounmap(addr);
+	return ret;
 }
 
 #ifndef pgprot_noncached
@@ -522,17 +538,19 @@ static loff_t null_lseek(struct file * file, loff_t offset, int orig)
  */
 static loff_t memory_lseek(struct file * file, loff_t offset, int orig)
 {
-	int ret;
+	loff_t ret;
 
 	lock_kernel();
 	switch (orig) {
 		case 0:
 			file->f_pos = offset;
 			ret = file->f_pos;
+			force_successful_syscall_return();
 			break;
 		case 1:
 			file->f_pos += offset;
 			ret = file->f_pos;
+			force_successful_syscall_return();
 			break;
 		default:
 			ret = -EINVAL;

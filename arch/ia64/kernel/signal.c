@@ -142,8 +142,13 @@ restore_sigcontext (struct sigcontext *sc, struct sigscratch *scr)
 
 		__copy_from_user(current->thread.fph, &sc->sc_fr[32], 96*16);
 		psr->mfh = 0;	/* drop signal handler's fph contents... */
-		if (!psr->dfh)
+		if (psr->dfh)
+			current->thread.last_fph_cpu = -1;
+		else {
 			__ia64_load_fpu(current->thread.fph);
+			ia64_set_fpu_owner(current);
+			current->thread.last_fph_cpu = smp_processor_id();
+		}
 	}
 	return err;
 }
@@ -523,7 +528,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 			else
 				errno = -errno;
 		}
-	} else if (scr->pt.r10 != -1)
+	} else if ((long) scr->pt.r10 != -1)
 		/*
 		 * A system calls has to be restarted only if one of the error codes
 		 * ERESTARTNOHAND, ERESTARTSYS, or ERESTARTNOINTR is returned.  If r10

@@ -38,8 +38,6 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-static kmem_cache_t *task_struct_cachep;
-
 extern int copy_semundo(unsigned long clone_flags, struct task_struct *tsk);
 extern void exit_semundo(struct task_struct *tsk);
 
@@ -55,13 +53,6 @@ DEFINE_PER_CPU(unsigned long, process_counts) = 0;
 
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;  /* outer */
 
-/*
- * A per-CPU task cache - this relies on the fact that
- * the very last portion of sys_exit() is executed with
- * preemption turned off.
- */
-static task_t *task_cache[NR_CPUS] __cacheline_aligned;
-
 int nr_processes(void)
 {
 	int cpu;
@@ -73,6 +64,22 @@ int nr_processes(void)
 	}
 	return total;
 }
+
+#ifdef CONFIG_IA64
+# define HAVE_ARCH_DUP_TASK_STRUCT
+#endif
+
+#ifdef HAVE_ARCH_DUP_TASK_STRUCT
+extern void free_task_struct (struct task_struct *tsk);
+#else
+static kmem_cache_t *task_struct_cachep;
+
+/*
+ * A per-CPU task cache - this relies on the fact that
+ * the very last portion of sys_exit() is executed with
+ * preemption turned off.
+ */
+static task_t *task_cache[NR_CPUS] __cacheline_aligned;
 
 static void free_task_struct(struct task_struct *tsk)
 {
@@ -97,6 +104,7 @@ static void free_task_struct(struct task_struct *tsk)
 		put_cpu();
 	}
 }
+#endif /* HAVE_ARCH_DUP_TASK_STRUCT */
 
 void __put_task_struct(struct task_struct *tsk)
 {
@@ -186,6 +194,7 @@ int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync)
 
 void __init fork_init(unsigned long mempages)
 {
+#ifndef HAVE_ARCH_DUP_TASK_STRUCT
 	/* create a slab on which task_structs can be allocated */
 	task_struct_cachep =
 		kmem_cache_create("task_struct",
@@ -193,6 +202,7 @@ void __init fork_init(unsigned long mempages)
 				  SLAB_MUST_HWCACHE_ALIGN, NULL, NULL);
 	if (!task_struct_cachep)
 		panic("fork_init(): cannot create task_struct SLAB cache");
+#endif
 
 	/*
 	 * The default maximum number of threads is set to a safe
@@ -210,7 +220,11 @@ void __init fork_init(unsigned long mempages)
 	init_task.rlim[RLIMIT_NPROC].rlim_max = max_threads/2;
 }
 
-static struct task_struct *dup_task_struct(struct task_struct *orig)
+#ifdef HAVE_ARCH_DUP_TASK_STRUCT
+extern struct task_struct *dup_task_struct (struct task_struct *orig);
+#else /* !HAVE_ARCH_DUP_TASK_STRUCT */
+
+struct task_struct *dup_task_struct(struct task_struct *orig)
 {
 	struct task_struct *tsk;
 	struct thread_info *ti;
@@ -243,6 +257,8 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	atomic_set(&tsk->usage,2);
 	return tsk;
 }
+
+#endif /* !HAVE_ARCH_DUP_TASK_STRUCT */
 
 #ifdef CONFIG_MMU
 static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
@@ -884,11 +900,15 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 
 	if (clone_flags & CLONE_CHILD_SETTID)
 		p->set_child_tid = child_tidptr;
+	else
+		p->set_child_tid = NULL;
 	/*
 	 * Clear TID on mm_release()?
 	 */
 	if (clone_flags & CLONE_CHILD_CLEARTID)
 		p->clear_child_tid = child_tidptr;
+	else
+		p->clear_child_tid = NULL;
 
 	/*
 	 * Syscall tracing should be turned off in the child regardless
