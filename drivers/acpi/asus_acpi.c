@@ -123,14 +123,16 @@ struct asus_hotk {
 		L3C,      //L3800C
 		L3D,      //L3400D
 		L3H,      //L3H, but also L2000E
+		L4R,      //L4500R
 		L5x,      //L5800C 
 		L8L,      //L8400L
 		M1A,      //M1300A
 		M2E,      //M2400E, L4400L
+		M6N,      //M6800N
 		P30,	  //Samsung P30
 		S1x,      //S1300A, but also L1400B and M2400A (L84F)
 		S2x,      //S200 (J1 reported), Victor MP-XP7210
-		xxN,      //M2400N, M3700N, M6800N, S1300N, S5200N (Centrino)
+		xxN,      //M2400N, M3700N, M5200N, S1300N, S5200N (Centrino)
 		END_MODEL
 	} model;              //Models currently supported
 	u16 event_count[128]; //count for each event TODO make this better
@@ -247,6 +249,19 @@ static struct model_data model_conf[END_MODEL] = {
 	},
 
 	{
+		.name              = "L4R",
+		.mt_mled           = "MLED",
+		.mt_wled           = "WLED",
+		.wled_status       = "\\_SB.PCI0.SBRG.SG13",
+		.mt_lcd_switch     = xxN_PREFIX "_Q10",
+		.lcd_status        = "\\_SB.PCI0.SBSM.SEO4",
+		.brightness_set    = "SPLV",
+		.brightness_get    = "GPLV", 
+		.display_set       = "SDSP",
+		.display_get       = "\\_SB.PCI0.P0P1.VGA.GETD"
+	},
+
+	{
 		.name              = "L5x",
 		.mt_mled           = "MLED",
 /* WLED present, but not controlled by ACPI */
@@ -286,6 +301,19 @@ static struct model_data model_conf[END_MODEL] = {
 		.brightness_get    = "GPLV",
 		.display_set       = "SDSP",
 		.display_get       = "\\INFB"
+	},
+
+	{
+		.name              = "M6N",
+		.mt_mled           = "MLED",
+		.mt_wled           = "WLED",
+		.wled_status       = "\\_SB.PCI0.SBRG.SG13",
+		.mt_lcd_switch     = xxN_PREFIX "_Q10",
+		.lcd_status        = "\\_SB.BKLT",
+		.brightness_set    = "SPLV",
+		.brightness_get    = "GPLV",
+		.display_set       = "SDSP",
+		.display_get       = "\\SSTE"
 	},
 
 	{
@@ -428,7 +456,7 @@ proc_read_info(char *page, char **start, off_t off, int count, int *eof,
 		len += sprintf(page + len, "SFUN value         : 0x%04x\n", temp);
 	/*
 	 * Another value for userspace: the ASYM method returns 0x02 for
-	 * battery low and 0x04 for battery critical, it's readings tend to be
+	 * battery low and 0x04 for battery critical, its readings tend to be
 	 * more accurate than those provided by _BST. 
 	 * Note: since not all the laptops provide this method, errors are
 	 * silently ignored.
@@ -578,7 +606,6 @@ proc_write_tled(struct file *file, const char __user *buffer,
 	struct asus_hotk *hotk = (struct asus_hotk *) data;
 	return write_led(buffer, count, hotk, hotk->methods->mt_tled, TLED_ON, 0);
 }
-
 
 
 static int get_lcd_state(struct asus_hotk *hotk)
@@ -764,6 +791,7 @@ proc_read_disp(char *page, char **start, off_t off, int count, int *eof,
 	
 	if (!read_acpi_int(hotk->handle, hotk->methods->display_get, &value))
 		printk(KERN_WARNING "Asus ACPI: Error reading display status\n");
+	value &= 0x07; /* needed for some models, shouldn't hurt others */
 	return sprintf(page, "%d\n", value);
 }
 
@@ -869,13 +897,12 @@ static int __init asus_hotk_add_fs(struct acpi_device *device)
 	}
 	
 	if ((hotk->methods->brightness_up && hotk->methods->brightness_down) ||
-	    (hotk->methods->brightness_get && hotk->methods->brightness_get)) {
+	    (hotk->methods->brightness_get && hotk->methods->brightness_set)) {
 		asus_proc_add(PROC_BRN, &proc_write_brn, &proc_read_brn, mode, device);
 	}
 
 	if (hotk->methods->display_set) {
 		asus_proc_add(PROC_DISP, &proc_write_disp, &proc_read_disp, mode, device);
-
 	}
 
 	return 0;
@@ -886,7 +913,7 @@ static int asus_hotk_remove_fs(struct acpi_device* device)
 	struct asus_hotk* hotk = acpi_driver_data(device);
 
 
-	if(acpi_device_dir(device)){
+	if(acpi_device_dir(device)) {
 		remove_proc_entry(PROC_INFO,acpi_device_dir(device));
 		if (hotk->methods->mt_wled)
 			remove_proc_entry(PROC_WLED,acpi_device_dir(device));
@@ -894,11 +921,12 @@ static int asus_hotk_remove_fs(struct acpi_device* device)
 			remove_proc_entry(PROC_MLED,acpi_device_dir(device));
 		if (hotk->methods->mt_tled)
 			remove_proc_entry(PROC_TLED,acpi_device_dir(device));
-		if (hotk->methods->mt_lcd_switch && hotk->methods->lcd_status) 
+		if (hotk->methods->mt_lcd_switch && hotk->methods->lcd_status)
 			remove_proc_entry(PROC_LCD, acpi_device_dir(device));
-		if ((hotk->methods->brightness_up && hotk->methods->brightness_down) || (hotk->methods->brightness_get && hotk->methods->brightness_get)) 
+		if ((hotk->methods->brightness_up && hotk->methods->brightness_down) ||
+		    (hotk->methods->brightness_get && hotk->methods->brightness_set))
 			remove_proc_entry(PROC_BRN, acpi_device_dir(device));
-		if (hotk->methods->display_set) 
+		if (hotk->methods->display_set)
 			remove_proc_entry(PROC_DISP, acpi_device_dir(device));
 	}
 	return 0;
@@ -998,8 +1026,13 @@ static int __init asus_hotk_get_info(struct asus_hotk *hotk)
 		hotk->model = L3C;
 	else if (strncmp(model->string.pointer, "L8L", 3) == 0)
 		hotk->model = L8L;
+	else if (strncmp(model->string.pointer, "L4R", 3) == 0)
+		hotk->model = L4R;
+	else if (strncmp(model->string.pointer, "M6N", 3) == 0)
+		hotk->model = M6N;
 	else if (strncmp(model->string.pointer, "M2N", 3) == 0 ||
 		 strncmp(model->string.pointer, "M3N", 3) == 0 ||
+		 strncmp(model->string.pointer, "M5N", 3) == 0 ||
 		 strncmp(model->string.pointer, "M6N", 3) == 0 ||
 		 strncmp(model->string.pointer, "S1N", 3) == 0 ||
 		 strncmp(model->string.pointer, "S5N", 3) == 0)
@@ -1025,7 +1058,6 @@ static int __init asus_hotk_get_info(struct asus_hotk *hotk)
 		hotk->model = L5x;
 
 	if (hotk->model == END_MODEL) {
-		/* By default use the same values, as I don't know others */
 		printk("unsupported, trying default values, supply the "
 		       "developers with your DSDT\n");
 		hotk->model = M2E;
@@ -1043,13 +1075,9 @@ static int __init asus_hotk_get_info(struct asus_hotk *hotk)
 	else if (strncmp(model->string.pointer, "S5N", 3) == 0)
 		hotk->methods->mt_mled = NULL; 
 	/* S5N has no MLED */
-	else if (strncmp(model->string.pointer, "M6N", 3) == 0) {
-		hotk->methods->display_get = NULL; //TODO
-		hotk->methods->lcd_status = "\\_SB.BKLT";
-		hotk->methods->mt_wled = "WLED";
-		hotk->methods->wled_status = "\\_SB.PCI0.SBRG.SG13";
-	/* M6N differs slightly and has a usable WLED */
-	}
+	else if (strncmp(model->string.pointer, "M2N", 3) == 0)
+		hotk->methods->mt_wled = "WLED"; 
+	/* M2N has a usable WLED */
 	else if (asus_info) {
 		if (strncmp(asus_info->oem_table_id, "L1", 2) == 0)
 			hotk->methods->mled_status = NULL;
@@ -1060,7 +1088,6 @@ static int __init asus_hotk_get_info(struct asus_hotk *hotk)
 
 	return AE_OK;
 }
-
 
 
 static int __init asus_hotk_check(struct asus_hotk *hotk)
@@ -1083,7 +1110,6 @@ static int __init asus_hotk_check(struct asus_hotk *hotk)
 
 	return(result);
 }
-
 
 
 static int __init asus_hotk_add(struct acpi_device *device)
@@ -1151,6 +1177,7 @@ static int __init asus_hotk_add(struct acpi_device *device)
 
 	return(result);
 }
+
 
 static int asus_hotk_remove(struct acpi_device *device, int type)
 {
