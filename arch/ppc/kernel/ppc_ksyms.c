@@ -72,7 +72,7 @@ int abs(int);
 
 extern unsigned long mm_ptov (unsigned long paddr);
 
-EXPORT_SYMBOL(clear_page);
+EXPORT_SYMBOL(clear_pages);
 EXPORT_SYMBOL(clear_user_page);
 EXPORT_SYMBOL(do_signal);
 EXPORT_SYMBOL(do_syscall_trace);
