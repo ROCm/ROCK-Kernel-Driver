@@ -76,6 +76,9 @@
  *			   for registers, link status and other minor fixes.
  *	0.28: 21 Jun 2004: Big cleanup, making driver mostly endian safe
  *	0.29: 31 Aug 2004: Add backup timer for link change notification.
+ *	0.30: 25 Sep 2004: rx checksum support for nf 250 Gb. Add rx reset
+ *			   into nv_close, otherwise reenabling for wol can
+ *			   cause DMA to kfree'd memory.
  *
  * Known bugs:
  * We suspect that on some hardware no TX done interrupts are generated.
@@ -87,7 +90,7 @@
  * DEV_NEED_TIMERIRQ will not harm you on sane hardware, only generating a few
  * superfluous timer interrupts from the nic.
  */
-#define FORCEDETH_VERSION		"0.29"
+#define FORCEDETH_VERSION		"0.30"
 #define DRV_NAME			"forcedeth"
 
 #include <linux/module.h>
@@ -217,6 +220,7 @@ enum {
 #define NVREG_TXRXCTL_BIT2	0x0004
 #define NVREG_TXRXCTL_IDLE	0x0008
 #define NVREG_TXRXCTL_RESET	0x0010
+#define NVREG_TXRXCTL_RXCHECK	0x0400
 	NvRegMIIStatus = 0x180,
 #define NVREG_MIISTAT_ERROR		0x0001
 #define NVREG_MIISTAT_LINKCHANGE	0x0008
@@ -313,6 +317,10 @@ struct ring_desc {
 #define NV_RX_ERROR		(1<<30)
 #define NV_RX_AVAIL		(1<<31)
 
+#define NV_RX2_CHECKSUMMASK	(0x1C000000)
+#define NV_RX2_CHECKSUMOK1	(0x10000000)
+#define NV_RX2_CHECKSUMOK2	(0x14000000)
+#define NV_RX2_CHECKSUMOK3	(0x18000000)
 #define NV_RX2_DESCRIPTORVALID	(1<<29)
 #define NV_RX2_SUBSTRACT1	(1<<25)
 #define NV_RX2_ERROR1		(1<<18)
@@ -371,8 +379,15 @@ struct ring_desc {
 #define POLL_WAIT	(1+HZ/100)
 #define LINK_TIMEOUT	(3*HZ)
 
+/* 
+ * desc_ver values:
+ * This field has two purposes:
+ * - Newer nics uses a different ring layout. The layout is selected by
+ *   comparing np->desc_ver with DESC_VER_xy.
+ * - It contains bits that are forced on when writing to NvRegTxRxControl.
+ */
 #define DESC_VER_1	0x0
-#define DESC_VER_2	0x02100
+#define DESC_VER_2	(0x02100|NVREG_TXRXCTL_RXCHECK)
 
 /* PHY defines */
 #define PHY_OUI_MARVELL	0x5043
@@ -1181,6 +1196,15 @@ static void nv_rx_process(struct net_device *dev)
 					goto next_pkt;
 				}
 			}
+			Flags &= NV_RX2_CHECKSUMMASK;
+			if (Flags == NV_RX2_CHECKSUMOK1 ||
+					Flags == NV_RX2_CHECKSUMOK2 ||
+					Flags == NV_RX2_CHECKSUMOK3) {
+				dprintk(KERN_DEBUG "%s: hw checksum hit!.\n", dev->name);
+				np->rx_skbuff[i]->ip_summed = CHECKSUM_UNNECESSARY;
+			} else {
+				dprintk(KERN_DEBUG "%s: hwchecksum miss!.\n", dev->name);
+			}
 		}
 		/* got a valid packet - forward it to the network core */
 		skb = np->rx_skbuff[i];
@@ -1673,9 +1697,10 @@ static int nv_close(struct net_device *dev)
 	spin_lock_irq(&np->lock);
 	nv_stop_tx(dev);
 	nv_stop_rx(dev);
-	base = get_hwbase(dev);
+	nv_txrx_reset(dev);
 
 	/* disable interrupts on the nic or we will lock up */
+	base = get_hwbase(dev);
 	writel(0, base + NvRegIrqMask);
 	pci_push(base);
 	dprintk(KERN_INFO "%s: Irqmask is zero again\n", dev->name);
