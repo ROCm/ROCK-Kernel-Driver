@@ -25,27 +25,27 @@
 
 
 #define FO_CC_GET_PARAMS_OS             \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 200, sizeof(EXT_IOCTL))	/* 0xc8 */
+    _IOWR(QLMULTIPATH_MAGIC, 200, EXT_IOCTL)	/* 0xc8 */
 #define FO_CC_SET_PARAMS_OS             \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 201, sizeof(EXT_IOCTL))	/* 0xc9 */
+    _IOWR(QLMULTIPATH_MAGIC, 201, EXT_IOCTL)	/* 0xc9 */
 #define FO_CC_GET_PATHS_OS              \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 202, sizeof(EXT_IOCTL))	/* 0xca */
+    _IOWR(QLMULTIPATH_MAGIC, 202, EXT_IOCTL)	/* 0xca */
 #define FO_CC_SET_CURRENT_PATH_OS       \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 203, sizeof(EXT_IOCTL))	/* 0xcb */
+    _IOWR(QLMULTIPATH_MAGIC, 203, EXT_IOCTL)	/* 0xcb */
 #define FO_CC_GET_HBA_STAT_OS           \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 204, sizeof(EXT_IOCTL))	/* 0xcc */
+    _IOWR(QLMULTIPATH_MAGIC, 204, EXT_IOCTL)	/* 0xcc */
 #define FO_CC_RESET_HBA_STAT_OS         \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 205, sizeof(EXT_IOCTL))	/* 0xcd */
+    _IOWR(QLMULTIPATH_MAGIC, 205, EXT_IOCTL)	/* 0xcd */
 #define FO_CC_GET_LUN_DATA_OS           \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 206, sizeof(EXT_IOCTL))	/* 0xce */
+    _IOWR(QLMULTIPATH_MAGIC, 206, EXT_IOCTL)	/* 0xce */
 #define FO_CC_SET_LUN_DATA_OS           \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 207, sizeof(EXT_IOCTL))	/* 0xcf */
+    _IOWR(QLMULTIPATH_MAGIC, 207, EXT_IOCTL)	/* 0xcf */
 #define FO_CC_GET_TARGET_DATA_OS        \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 208, sizeof(EXT_IOCTL))	/* 0xd0 */
+    _IOWR(QLMULTIPATH_MAGIC, 208, EXT_IOCTL)	/* 0xd0 */
 #define FO_CC_SET_TARGET_DATA_OS        \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 209, sizeof(EXT_IOCTL))	/* 0xd1 */
+    _IOWR(QLMULTIPATH_MAGIC, 209, EXT_IOCTL)	/* 0xd1 */
 #define FO_CC_GET_FO_DRIVER_VERSION_OS  \
-    _IOWR_BAD(QLMULTIPATH_MAGIC, 210, sizeof(EXT_IOCTL))	/* 0xd2 */
+    _IOWR(QLMULTIPATH_MAGIC, 210, EXT_IOCTL)	/* 0xd2 */
 
 
 #define BOOLEAN uint8_t
