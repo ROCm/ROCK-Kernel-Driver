@@ -99,7 +99,7 @@ static volatile int		tx_fifo_in;
 static volatile int		tx_fifo_out;
 static volatile int		free_tx_pages = TX_PAGES;
 static int			was_down;
-static spinlock_t		de600_lock;
+static spinlock_t		de600_lock = SPIN_LOCK_UNLOCKED;
 
 static inline u8 de600_read_status(struct net_device *dev)
 {
@@ -398,13 +398,23 @@ static void de600_rx_intr(struct net_device *dev)
 	 */
 }
 
-int __init de600_probe(struct net_device *dev)
+static struct net_device * __init de600_probe(void)
 {
 	int	i;
-	static struct net_device_stats de600_netstats;
-	/*dev->priv = kmalloc(sizeof(struct net_device_stats), GFP_KERNEL);*/
+	struct net_device *dev;
+	int err;
+
+	dev = alloc_etherdev(sizeof(struct net_device_stats));
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
 
 	SET_MODULE_OWNER(dev);
+
+	if (!request_region(DE600_IO, 3, "de600")) {
+		printk(KERN_WARNING "DE600: port 0x%x busy\n", DE600_IO);
+		err = -EBUSY;
+		goto out;
+	}
 
 	printk(KERN_INFO "%s: D-Link DE-600 pocket adapter", dev->name);
 	/* Alpha testers must have the version number to report bugs. */
@@ -412,6 +422,7 @@ int __init de600_probe(struct net_device *dev)
 		printk(version);
 
 	/* probe for adapter */
+	err = -ENODEV;
 	rx_page = 0;
 	select_nic();
 	(void)de600_read_status(dev);
@@ -419,7 +430,7 @@ int __init de600_probe(struct net_device *dev)
 	de600_put_command(STOP_RESET);
 	if (de600_read_status(dev) & 0xf0) {
 		printk(": not at I/O %#3x.\n", DATA_PORT);
-		return -ENODEV;
+		goto out1;
 	}
 
 	/*
@@ -444,12 +455,7 @@ int __init de600_probe(struct net_device *dev)
 		dev->dev_addr[3] |= 0x70;
 	} else {
 		printk(" not identified in the printer port\n");
-		return -ENODEV;
-	}
-
-	if (!request_region(DE600_IO, 3, "de600")) {
-		printk(KERN_WARNING "DE600: port 0x%x busy\n", DE600_IO);
-		return -EBUSY;
+		goto out1;
 	}
 
 	printk(", Ethernet Address: %02X", dev->dev_addr[0]);
@@ -457,22 +463,27 @@ int __init de600_probe(struct net_device *dev)
 		printk(":%02X",dev->dev_addr[i]);
 	printk("\n");
 
-	/* Initialize the device structure. */
-	dev->priv = &de600_netstats;
-
-	memset(dev->priv, 0, sizeof(struct net_device_stats));
 	dev->get_stats = get_stats;
 
 	dev->open = de600_open;
 	dev->stop = de600_close;
 	dev->hard_start_xmit = &de600_start_xmit;
 
-	ether_setup(dev);
-
 	dev->flags&=~IFF_MULTICAST;
 
 	select_prn();
-	return 0;
+
+	err = register_netdev(dev);
+	if (err)
+		goto out1;
+
+	return dev;
+
+out1:
+	release_region(DE600_IO, 3);
+out:
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 static int adapter_init(struct net_device *dev)
@@ -527,21 +538,21 @@ static int adapter_init(struct net_device *dev)
 	return 0; /* OK */
 }
 
-static struct net_device de600_dev;
+static struct net_device *de600_dev;
 
 static int __init de600_init(void)
 {
-	spin_lock_init(&de600_lock);
-	de600_dev.init = de600_probe;
-	if (register_netdev(&de600_dev) != 0)
-		return -EIO;
+	de600_dev = de600_probe();
+	if (IS_ERR(de600_dev))
+		return PTR_ERR(de600_dev);
 	return 0;
 }
 
 static void __exit de600_exit(void)
 {
-	unregister_netdev(&de600_dev);
+	unregister_netdev(de600_dev);
 	release_region(DE600_IO, 3);
+	free_netdev(de600_dev);
 }
 
 module_init(de600_init);

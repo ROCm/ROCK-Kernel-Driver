@@ -131,7 +131,6 @@ static void	de600_rx_intr(struct net_device *dev);
 
 /* Initialization */
 static void	trigger_interrupt(struct net_device *dev);
-int		de600_probe(struct net_device *dev);
 static int	adapter_init(struct net_device *dev);
 
 /*
