@@ -48,8 +48,6 @@ struct rpc_task {
 	__u8			tk_garb_retry,
 				tk_cred_retry,
 				tk_suid_retry;
-	u32			tk_gss_seqno;	/* rpcsec_gss sequence number
-						   used on this request */
 
 	/*
 	 * timeout_fn   to be executed by timer bottom half
@@ -110,6 +108,7 @@ typedef void			(*rpc_action)(struct rpc_task *);
 #define RPC_TASK_ROOTCREDS	0x0040		/* force root creds */
 #define RPC_TASK_DYNAMIC	0x0080		/* task was kmalloc'ed */
 #define RPC_TASK_KILLED		0x0100		/* task was killed */
+#define RPC_TASK_SOFT		0x0200		/* Use soft timeouts */
 
 #define RPC_IS_ASYNC(t)		((t)->tk_flags & RPC_TASK_ASYNC)
 #define RPC_IS_SETUID(t)	((t)->tk_flags & RPC_TASK_SETUID)
@@ -119,6 +118,7 @@ typedef void			(*rpc_action)(struct rpc_task *);
 #define RPC_ASSASSINATED(t)	((t)->tk_flags & RPC_TASK_KILLED)
 #define RPC_IS_ACTIVATED(t)	((t)->tk_active)
 #define RPC_DO_CALLBACK(t)	((t)->tk_callback != NULL)
+#define RPC_IS_SOFT(t)		((t)->tk_flags & RPC_TASK_SOFT)
 
 #define RPC_TASK_SLEEPING	0
 #define RPC_TASK_RUNNING	1
