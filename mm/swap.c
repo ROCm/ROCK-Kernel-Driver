@@ -28,6 +28,47 @@
 int page_cluster;
 
 /*
+ * Writeback is about to end against a page whic has been marked for immediate
+ * reclaim.  If it still appears to be reclaimable, move it to the tail of the
+ * inactive list.  The page still has PageWriteback set, which will pin it.
+ *
+ * We don't expect many pages to come through here, so don't bother batching
+ * things up.
+ *
+ * To avoid placing the page at the tail of the LRU while PG_writeback is still
+ * set, this function will clear PG_writeback before performing the page
+ * motion.  Do that inside the lru lock because once PG_writeback is cleared
+ * we may not touch the page.
+ *
+ * Returns zero if it cleared PG_writeback.
+ */
+int rotate_reclaimable_page(struct page *page)
+{
+	struct zone *zone;
+	unsigned long flags;
+
+	if (PageLocked(page))
+		return 1;
+	if (PageDirty(page))
+		return 1;
+	if (PageActive(page))
+		return 1;
+	if (!PageLRU(page))
+		return 1;
+
+	zone = page_zone(page);
+	spin_lock_irqsave(&zone->lru_lock, flags);
+	if (PageLRU(page) && !PageActive(page)) {
+		list_del(&page->lru);
+		list_add_tail(&page->lru, &zone->inactive_list);
+	}
+	if (!TestClearPageWriteback(page))
+		BUG();
+	spin_unlock_irqrestore(&zone->lru_lock, flags);
+	return 0;
+}
+
+/*
  * FIXME: speed this up?
  */
 void activate_page(struct page *page)
@@ -170,8 +211,19 @@ void release_pages(struct page **pages, int nr, int cold)
 	pagevec_free(&pages_to_free);
 }
 
+/*
+ * The pages which we're about to release may be in the deferred lru-addition
+ * queues.  That would prevent them from really being freed right now.  That's
+ * OK from a correctness point of view but is inefficient - those pages may be
+ * cache-warm and we want to give them back to the page allocator ASAP.
+ *
+ * So __pagevec_release() will drain those queues here.  __pagevec_lru_add()
+ * and __pagevec_lru_add_active() call release_pages() directly to avoid
+ * mutual recursion.
+ */
 void __pagevec_release(struct pagevec *pvec)
 {
+	lru_add_drain();
 	release_pages(pvec->pages, pagevec_count(pvec), pvec->cold);
 	pagevec_reinit(pvec);
 }
@@ -224,7 +276,8 @@ void __pagevec_lru_add(struct pagevec *pvec)
 	}
 	if (zone)
 		spin_unlock_irq(&zone->lru_lock);
-	pagevec_release(pvec);
+	release_pages(pvec->pages, pvec->nr, pvec->cold);
+	pagevec_reinit(pvec);
 }
 
 void __pagevec_lru_add_active(struct pagevec *pvec)
@@ -250,7 +303,8 @@ void __pagevec_lru_add_active(struct pagevec *pvec)
 	}
 	if (zone)
 		spin_unlock_irq(&zone->lru_lock);
-	pagevec_release(pvec);
+	release_pages(pvec->pages, pvec->nr, pvec->cold);
+	pagevec_reinit(pvec);
 }
 
 /*

@@ -115,6 +115,9 @@ void truncate_inode_pages(struct address_space *mapping, loff_t lstart)
 	pgoff_t next;
 	int i;
 
+	if (mapping->nrpages == 0)
+		return;
+
 	pagevec_init(&pvec, 0);
 	next = start;
 	while (pagevec_lookup(&pvec, mapping, next, PAGEVEC_SIZE)) {

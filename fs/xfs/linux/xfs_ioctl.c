@@ -75,17 +75,9 @@ xfs_find_handle(
 	case XFS_IOC_PATH_TO_FSHANDLE:
 	case XFS_IOC_PATH_TO_HANDLE: {
 		struct nameidata	nd;
-		char			*path;
 		int			error;
 
-		/* we need the path */
-		path = getname(hreq.path);
-		if (IS_ERR(path))
-			return PTR_ERR(path);
-
-		/* traverse the path */
-		error = path_lookup(path, 0, &nd);
-		putname(path);
+		error = user_path_walk_link(hreq.path, &nd);
 		if (error)
 			return error;
 
@@ -107,7 +99,6 @@ xfs_find_handle(
 		ASSERT(file->f_dentry->d_inode);
 		inode = igrab(file->f_dentry->d_inode);
 		fput(file);
-
 		break;
 	}
 
@@ -521,39 +512,46 @@ xfs_attrmulti_by_handle(
  * their own functions.  Functions are defined after their use
  * so gcc doesn't get fancy and inline them with -03 */
 
-int xfs_ioc_space(
+STATIC int
+xfs_ioc_space(
 	bhv_desc_t		*bdp,
 	vnode_t			*vp,
 	struct file		*filp,
 	unsigned int		cmd,
 	unsigned long		arg);
 
-int xfs_ioc_bulkstat(
+STATIC int
+xfs_ioc_bulkstat(
 	xfs_mount_t		*mp,
 	unsigned int		cmd,
 	unsigned long		arg);
 
-int xfs_ioc_fsgeometry_v1(
+STATIC int
+xfs_ioc_fsgeometry_v1(
 	xfs_mount_t		*mp,
 	unsigned long		arg);
 
-int xfs_ioc_fsgeometry(
+STATIC int
+xfs_ioc_fsgeometry(
 	xfs_mount_t		*mp,
 	unsigned long		arg);
 
-int xfs_ioc_xattr(
+STATIC int
+xfs_ioc_xattr(
 	vnode_t			*vp,
 	struct file		*filp,
 	unsigned int		cmd,
 	unsigned long		arg);
 
-int xfs_ioc_getbmap(
+STATIC int
+xfs_ioc_getbmap(
 	bhv_desc_t		*bdp,
 	struct file		*filp,
 	unsigned int		cmd,
 	unsigned long		arg);
 
-int xfs_ioc_getbmapx(
+STATIC int
+xfs_ioc_getbmapx(
 	bhv_desc_t		*bdp,
 	unsigned long		arg);
 
@@ -800,16 +798,17 @@ xfs_ioctl(
 	}
 }
 
-int xfs_ioc_space(
+STATIC int
+xfs_ioc_space(
 	bhv_desc_t		*bdp,
 	vnode_t			*vp,
 	struct file		*filp,
 	unsigned int		cmd,
 	unsigned long		arg)
 {
-	xfs_flock64_t	bf;
-	int		attr_flags = 0;
-	int		error;
+	xfs_flock64_t		bf;
+	int			attr_flags = 0;
+	int			error;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -XFS_ERROR(EPERM);
@@ -833,16 +832,18 @@ int xfs_ioc_space(
 	return -error;
 }
 
-int xfs_ioc_bulkstat(
+STATIC int
+xfs_ioc_bulkstat(
 	xfs_mount_t		*mp,
 	unsigned int		cmd,
 	unsigned long		arg)
 {
-	xfs_fsop_bulkreq_t bulkreq;
-	int		count;		/* # of records returned */
-	xfs_ino_t	inlast;		/* last inode number */
-	int		done;
-	int		error;
+	xfs_fsop_bulkreq_t	bulkreq;
+	int			count;	/* # of records returned */
+	xfs_ino_t		inlast;	/* last inode number */
+	int			done;
+	int			error;
+
 	/* done = 1 if there are more stats to get and if bulkstat */
 	/* should be called again (unused here, but used in dmapi) */
 
@@ -901,7 +902,8 @@ int xfs_ioc_bulkstat(
 	return 0;
 }
 
-int xfs_ioc_fsgeometry_v1(
+STATIC int
+xfs_ioc_fsgeometry_v1(
 	xfs_mount_t		*mp,
 	unsigned long		arg)
 {
@@ -917,12 +919,13 @@ int xfs_ioc_fsgeometry_v1(
 	return 0;
 }
 
-int xfs_ioc_fsgeometry(
+STATIC int
+xfs_ioc_fsgeometry(
 	xfs_mount_t		*mp,
 	unsigned long		arg)
 {
-	xfs_fsop_geom_t fsgeo;
-	int		error;
+	xfs_fsop_geom_t		fsgeo;
+	int			error;
 
 	error = xfs_fs_geometry(mp, &fsgeo, 4);
 	if (error)
@@ -933,15 +936,16 @@ int xfs_ioc_fsgeometry(
 	return 0;
 }
 
-int xfs_ioc_xattr(
+STATIC int
+xfs_ioc_xattr(
 	vnode_t			*vp,
 	struct file		*filp,
 	unsigned int		cmd,
 	unsigned long		arg)
 {
-	struct fsxattr	fa;
-	vattr_t		va;
-	int		error;
+	struct fsxattr		fa;
+	vattr_t			va;
+	int			error;
 
 	switch (cmd) {
 	case XFS_IOC_FSGETXATTR: {
@@ -998,15 +1002,16 @@ int xfs_ioc_xattr(
 	}
 }
 
-int xfs_ioc_getbmap(
+STATIC int
+xfs_ioc_getbmap(
 	bhv_desc_t		*bdp,
 	struct file		*filp,
 	unsigned int		cmd,
 	unsigned long		arg)
 {
-	struct getbmap	bm;
-	int		iflags;
-	int		error;
+	struct getbmap		bm;
+	int			iflags;
+	int			error;
 
 	if (copy_from_user(&bm, (struct getbmap *)arg, sizeof(bm)))
 		return -XFS_ERROR(EFAULT);
@@ -1027,14 +1032,15 @@ int xfs_ioc_getbmap(
 	return 0;
 }
 
-int xfs_ioc_getbmapx(
+STATIC int
+xfs_ioc_getbmapx(
 	bhv_desc_t		*bdp,
 	unsigned long		arg)
 {
-	struct getbmapx bmx;
-	struct getbmap	bm;
-	int		iflags;
-	int		error;
+	struct getbmapx		bmx;
+	struct getbmap		bm;
+	int			iflags;
+	int			error;
 
 	if (copy_from_user(&bmx, (struct getbmapx *)arg, sizeof(bmx)))
 		return -XFS_ERROR(EFAULT);

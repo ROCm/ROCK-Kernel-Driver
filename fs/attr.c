@@ -66,14 +66,21 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 {
 	unsigned int ia_valid = attr->ia_valid;
 	int error = 0;
-	
-	lock_kernel();
+
 	if (ia_valid & ATTR_SIZE) {
-		error = vmtruncate(inode, attr->ia_size);
-		if (error)
-			goto out;
+		if (attr->ia_size == inode->i_size) {
+			if (ia_valid == ATTR_SIZE)
+				goto out;	/* we can skip lock_kernel() */
+		} else {
+			lock_kernel();
+			error = vmtruncate(inode, attr->ia_size);
+			unlock_kernel();
+			if (error)
+				goto out;
+		}
 	}
 
+	lock_kernel();
 	if (ia_valid & ATTR_UID)
 		inode->i_uid = attr->ia_uid;
 	if (ia_valid & ATTR_GID)
@@ -90,8 +97,8 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 			inode->i_mode &= ~S_ISGID;
 	}
 	mark_inode_dirty(inode);
-out:
 	unlock_kernel();
+out:
 	return error;
 }
 

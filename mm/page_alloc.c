@@ -157,6 +157,7 @@ static inline void free_pages_check(const char *function, struct page *page)
 			1 << PG_private |
 			1 << PG_locked	|
 			1 << PG_active	|
+			1 << PG_reclaim	|
 			1 << PG_writeback )))
 		bad_page(function, page);
 	if (PageDirty(page))
@@ -260,6 +261,7 @@ static void prep_new_page(struct page *page, int order)
 			1 << PG_lru	|
 			1 << PG_active	|
 			1 << PG_dirty	|
+			1 << PG_reclaim	|
 			1 << PG_writeback )))
 		bad_page(__FUNCTION__, page);
 
@@ -441,7 +443,6 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	unsigned long min;
 	struct zone **zones, *classzone;
 	struct page *page;
-	int cflags;
 	int i;
 	int cold;
 
@@ -512,10 +513,9 @@ rebalance:
 		goto nopage;
 
 	inc_page_state(allocstall);
-	cflags = current->flags;
 	current->flags |= PF_MEMALLOC;
 	try_to_free_pages(classzone, gfp_mask, order);
-	current->flags = cflags;
+	current->flags &= ~PF_MEMALLOC;
 
 	/* go through the zonelist yet one more time */
 	min = 1UL << order;

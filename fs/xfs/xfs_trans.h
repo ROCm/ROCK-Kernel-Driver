@@ -1027,11 +1027,6 @@ xfs_log_busy_slot_t *xfs_trans_add_busy(xfs_trans_t *tp,
 					xfs_agnumber_t ag,
 					xfs_extlen_t idx);
 
-/*
- * Not necessarily exported, but used outside a single file.
- */
-int		xfs_trans_lsn_danger(struct xfs_mount *, xfs_lsn_t);
-
 #endif	/* __KERNEL__ */
 
 #endif	/* __XFS_TRANS_H__ */

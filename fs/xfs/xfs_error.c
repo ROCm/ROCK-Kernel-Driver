@@ -224,11 +224,15 @@ xfs_cmn_err(uint64_t panic_tag, int level, xfs_mount_t *mp, char *fmt, ...)
 {
 	va_list ap;
 
+#ifdef DEBUG
+	xfs_panic_mask |= XFS_PTAG_SHUTDOWN_CORRUPT;
+#endif
+
 	if (xfs_panic_mask && (xfs_panic_mask & panic_tag)
 	    && (level & CE_ALERT)) {
 		level &= ~CE_ALERT;
 		level |= CE_PANIC;
-		cmn_err(CE_ALERT, "Transforming an alert into a panic.");
+		cmn_err(CE_ALERT, "XFS: Transforming an alert into a BUG.");
 	}
 	va_start(ap, fmt);
 	xfs_fs_vcmn_err(level, mp, fmt, ap);

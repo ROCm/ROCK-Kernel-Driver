@@ -107,8 +107,8 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 #define XFS_BUF_UNWRITE(x)	((x)->pb_flags &= ~PBF_WRITE)
 #define XFS_BUF_ISWRITE(x)	((x)->pb_flags & PBF_WRITE)
 
-#define XFS_BUF_ISUNINITIAL(x)	 ((x)->pb_flags & PBF_UNINITIAL)
-#define XFS_BUF_UNUNINITIAL(x)	 ((x)->pb_flags &= ~PBF_UNINITIAL)
+#define XFS_BUF_ISUNINITIAL(x)	 (0)
+#define XFS_BUF_UNUNINITIAL(x)	 (0)
 
 #define XFS_BUF_BP_ISMAPPED(bp)	 1
 
@@ -182,6 +182,7 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
 #define XFS_BUF_SET_TARGET(bp, target)	\
 	(bp)->pb_target = (target)
 
+#define XFS_BUF_TARGET(bp)	((bp)->pb_target)
 #define XFS_BUF_TARGET_DEV(bp)	((bp)->pb_target->pbr_dev)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)
 #define XFS_BUF_SET_VTYPE(bp, type)
@@ -209,7 +210,7 @@ static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 	bp->pb_strat = xfs_bdstrat_cb;
 	xfs_buf_undelay(bp);
 	if ((ret = pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)) == 0)
-		blk_run_queues();
+		pagebuf_run_queues(bp);
 	return ret;
 }
 
@@ -235,7 +236,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 
 
 #define xfs_biodone(pb)		    \
-	    pagebuf_iodone(pb)
+	    pagebuf_iodone(pb, 0)
 
 #define xfs_incore(buftarg,blkno,len,lockit) \
 	    pagebuf_find(buftarg, blkno ,len, lockit)
@@ -264,7 +265,7 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 		error = pagebuf_iowait(pb);
 		xfs_buf_relse(pb);
 	} else {
-		blk_run_queues();
+		pagebuf_run_queues(pb);
 		error = 0;
 	}
 
@@ -299,8 +300,7 @@ extern void XFS_bflush(xfs_buftarg_t *);
 #define xfs_binval(buftarg) XFS_bflush(buftarg)
 
 #define xfs_incore_relse(buftarg,delwri_only,wait)	\
-       pagebuf_target_clear(buftarg)
-
+	xfs_relse_buftarg(buftarg)
 
 #define xfs_baread(target, rablkno, ralen)  \
 	pagebuf_readahead((target), (rablkno), \

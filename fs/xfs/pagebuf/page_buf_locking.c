@@ -113,20 +113,11 @@ pagebuf_lock(
 	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 
 	PB_TRACE(pb, PB_TRACE_REC(lock), 0);
-	if (atomic_read(&PBP(pb)->pb_io_remaining))
-		blk_run_queues();
+	pagebuf_run_queues(pb);
 	down(&PBP(pb)->pb_sema);
 	PB_SET_OWNER(pb);
 	PB_TRACE(pb, PB_TRACE_REC(locked), 0);
 	return 0;
-}
-
-void
-pagebuf_target_clear(
-	pb_target_t		*target)
-{
-	invalidate_bdev(target->pbr_bdev, 1);
-	truncate_inode_pages(target->pbr_mapping, 0LL);
 }
 
 /*

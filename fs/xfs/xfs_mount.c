@@ -215,11 +215,6 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-	if (!sbp->sb_logsectlog)
-		sbp->sb_logsectlog = sbp->sb_sectlog;
-	if (!sbp->sb_logsectsize)
-		sbp->sb_logsectsize = sbp->sb_sectsize;
-
 	/*
 	 * More sanity checking. These were stolen directly from
 	 * xfs_repair.
@@ -229,10 +224,6 @@ xfs_mount_validate_sb(
 	    sbp->sb_sectsize > XFS_MAX_SECTORSIZE			||
 	    sbp->sb_sectlog < XFS_MIN_SECTORSIZE_LOG			||
 	    sbp->sb_sectlog > XFS_MAX_SECTORSIZE_LOG			||
-	    sbp->sb_logsectsize < XFS_MIN_SECTORSIZE			||
-	    sbp->sb_logsectsize > XFS_MAX_SECTORSIZE			||
-	    sbp->sb_logsectlog < XFS_MIN_SECTORSIZE_LOG			||
-	    sbp->sb_logsectlog > XFS_MAX_SECTORSIZE_LOG			||
 	    sbp->sb_blocksize < XFS_MIN_BLOCKSIZE			||
 	    sbp->sb_blocksize > XFS_MAX_BLOCKSIZE			||
 	    sbp->sb_blocklog < XFS_MIN_BLOCKSIZE_LOG			||
@@ -276,10 +267,10 @@ xfs_mount_validate_sb(
 	 */
 	if (sbp->sb_blocksize > PAGE_SIZE) {
 		cmn_err(CE_WARN,
-		"XFS: Trying to mount file system with blocksize %d bytes",
+		"XFS: Attempted to mount file system with blocksize %d bytes",
 			sbp->sb_blocksize);
 		cmn_err(CE_WARN,
-		"XFS: Only page-sized (%d bytes) or less blocksizes currently work.",
+		"XFS: Only page-sized (%d) or less blocksizes currently work.",
 			PAGE_SIZE);
 		return XFS_ERROR(EWRONGFS);
 	}
@@ -795,8 +786,8 @@ xfs_mountfs(
 			goto error1;
 		}
 		error = xfs_read_buf(mp, mp->m_logdev_targp,
-				     d - XFS_LOGS_TO_BB(mp, 1),
-				     XFS_LOGS_TO_BB(mp, 1), 0, &bp);
+				     d - XFS_FSB_TO_BB(mp, 1),
+				     XFS_FSB_TO_BB(mp, 1), 0, &bp);
 		if (!error) {
 			xfs_buf_relse(bp);
 		} else {
@@ -1199,7 +1190,7 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 		XFS_BUF_UNDELAYWRITE(sbp);
 		XFS_BUF_WRITE(sbp);
 		XFS_BUF_UNASYNC(sbp);
-		ASSERT(XFS_BUF_TARGET_DEV(sbp) == mp->m_dev);
+		ASSERT(XFS_BUF_TARGET(sbp) == mp->m_ddev_targp);
 		xfsbdstrat(mp, sbp);
 		/* Nevermind errors we might get here. */
 		error = xfs_iowait(sbp);

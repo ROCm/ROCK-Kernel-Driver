@@ -1824,7 +1824,8 @@ kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		   bp.pb_common.pb_bn,
 		   (unsigned long) bp.pb_common.pb_count_desired);
 	kdb_printf("  pb_io_remaining %d pb_error %u\n",
-		   bp.pb_io_remaining.counter, bp.pb_common.pb_error);
+		   bp.pb_common.pb_io_remaining.counter,
+		   bp.pb_common.pb_error);
 	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
 		bp.pb_common.pb_page_count, bp.pb_common.pb_offset,
 		bp.pb_common.pb_pages);
@@ -4207,8 +4208,9 @@ xfsidbg_xlog(xlog_t *log)
 	};
 
 	kdb_printf("xlog at 0x%p\n", log);
-	kdb_printf("&flushsm: 0x%p  tic_cnt: %d	 tic_tcnt: %d  \n",
-		&log->l_flushsema, log->l_ticket_cnt, log->l_ticket_tcnt);
+	kdb_printf("&flushsm: 0x%p  flushcnt: %d tic_cnt: %d	 tic_tcnt: %d  \n",
+		&log->l_flushsema, log->l_flushcnt,
+		log->l_ticket_cnt, log->l_ticket_tcnt);
 	kdb_printf("freelist: 0x%p  tail: 0x%p	ICLOG: 0x%p  \n",
 		log->l_freelist, log->l_tail, log->l_iclog);
 	kdb_printf("&icloglock: 0x%p  tail_lsn: %s  last_sync_lsn: %s \n",
@@ -4660,9 +4662,10 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	kdb_printf("dalign %d swidth %d sinoalign %d attr_magicpct %d dir_magicpct %d\n",
 		mp->m_dalign, mp->m_swidth, mp->m_sinoalign,
 		mp->m_attr_magicpct, mp->m_dir_magicpct);
-	kdb_printf("mk_sharedro %d dirversion %d dirblkfsbs %d &dirops 0x%p\n",
-		mp->m_mk_sharedro, mp->m_dirversion, mp->m_dirblkfsbs,
-		&mp->m_dirops);
+	kdb_printf("mk_sharedro %d inode_quiesce %d sectbb_log %d\n",
+		mp->m_mk_sharedro, mp->m_inode_quiesce, mp->m_sectbb_log);
+	kdb_printf("dirversion %d dirblkfsbs %d &dirops 0x%p\n",
+		mp->m_dirversion, mp->m_dirblkfsbs, &mp->m_dirops);
 	kdb_printf("dirblksize %d dirdatablk 0x%Lx dirleafblk 0x%Lx dirfreeblk 0x%Lx\n",
 		mp->m_dirblksize,
 		(xfs_dfiloff_t)mp->m_dirdatablk,

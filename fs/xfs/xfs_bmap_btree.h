@@ -167,7 +167,7 @@ xfs_exntfmt_t xfs_extfmt_inode(struct xfs_inode *ip);
   (XFS_SB_VERSION_HASEXTFLGBIT(&((x)->i_mount->m_sb)) ? \
 	XFS_EXTFMT_HASSTATE : XFS_EXTFMT_NOSTATE)
 #endif
-#define ISUNWRITTEN(x)		((x) == XFS_EXT_UNWRITTEN)
+#define ISUNWRITTEN(x)	((x)->br_state == XFS_EXT_UNWRITTEN)
 
 /*
  * Incore version of above.
