@@ -1067,7 +1067,7 @@ static struct miscdevice agp_miscdev =
 	.fops	= &agp_fops
 };
 
-int __init agp_frontend_initialize(void)
+int agp_frontend_initialize(void)
 {
 	memset(&agp_fe, 0, sizeof(struct agp_front_data));
 	AGP_LOCK_INIT();

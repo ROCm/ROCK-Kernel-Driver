@@ -695,7 +695,7 @@ sg_common_write(Sg_fd * sfp, Sg_request * srp,
 	}
 
 	srp->my_cmdp = SRpnt;
-	q = &SRpnt->sr_device->request_queue;
+	q = SRpnt->sr_device->request_queue;
 	SRpnt->sr_request->rq_disk = sdp->disk;
 	SRpnt->sr_sense_buffer[0] = 0;
 	SRpnt->sr_cmd_len = hp->cmd_len;

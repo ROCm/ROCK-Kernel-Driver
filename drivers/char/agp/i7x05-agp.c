@@ -87,6 +87,11 @@ static aper_size_info_16 intel_7505_sizes[7] =
 	{4, 1024, 0, 0xf3f}
 };
 
+static void i7505_setup (u32 mode)
+{
+	if ((agp_generic_agp_3_0_enable)==FALSE)
+		agp_generic_agp_enable(mode);
+}
 
 static int __init intel_7505_setup (struct pci_dev *pdev)
 {
@@ -102,7 +107,7 @@ static int __init intel_7505_setup (struct pci_dev *pdev)
 	agp_bridge.cleanup = intel_7505_cleanup;
 	agp_bridge.tlb_flush = intel_7505_tlbflush;
 	agp_bridge.mask_memory = intel_mask_memory;
-	agp_bridge.agp_enable = agp_generic_agp_3_0_enable;
+	agp_bridge.agp_enable = i7505_enable;
 	agp_bridge.cache_flush = global_cache_flush;
 	agp_bridge.create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge.free_gatt_table = agp_generic_free_gatt_table;
@@ -161,26 +166,25 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 }
 
 
-static int __init agp_find_supported_device(struct pci_dev *dev)
+static int __init agp_i7x05_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
-	agp_bridge.dev = dev;
+	u8 cap_ptr = 0;
 
-	if (pci_find_capability(dev, PCI_CAP_ID_AGP)==0)
+	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
+	if (cap_ptr == 0)
 		return -ENODEV;
 
-	/* probe for known chipsets */
-	return agp_lookup_host_bridge(dev);
-}
-
-
-static int agp_i7x05_probe (struct pci_dev *dev, const struct pci_device_id *ent)
-{
-	if (agp_find_supported_device(dev) == 0) {
+	if (agp_lookup_host_bridge(dev) != -ENODEV) {
+		agp_bridge.dev = dev;
+		agp_bridge.capndx = cap_ptr;
+		/* Fill in the mode register */
+		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode)
 		agp_register_driver(dev);
 		return 0;
 	}
-	return -ENODEV;	
+	return -ENODEV;
 }
+
 
 static struct pci_device_id agp_i7x05_pci_table[] __initdata = {
 	{
@@ -196,7 +200,7 @@ static struct pci_device_id agp_i7x05_pci_table[] __initdata = {
 
 MODULE_DEVICE_TABLE(pci, agp_i7x05_pci_table);
 
-static struct pci_driver agp_i7x05_pci_driver = {
+static struct __initdata pci_driver agp_i7x05_pci_driver = {
 	.name		= "agpgart-i7x05",
 	.id_table	= agp_i7x05_pci_table,
 	.probe		= agp_i7x05_probe,
