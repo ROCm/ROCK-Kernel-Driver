@@ -40,6 +40,8 @@
 
 #else
 
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
+
 #if !defined(CONFIG_PREEMPT) && !defined(CONFIG_DEBUG_SPINLOCK)
 # define atomic_dec_and_lock(atomic,lock) atomic_dec_and_test(atomic)
 # define ATOMIC_DEC_AND_LOCK
@@ -257,7 +259,7 @@ do { \
 do { \
 	local_irq_save(flags); \
 	preempt_disable(); \
-	_raw_spin_lock(lock); \
+	_raw_spin_lock_flags(lock, flags); \
 } while (0)
 
 #define spin_lock_irq(lock) \

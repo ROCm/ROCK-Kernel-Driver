@@ -232,12 +232,12 @@
 	ENTRY_DIFF(getdents)
 	/* it is POSSIBLE that select will be OK because even though fd_set
 	 * contains longs, the macros and sizes are clever. */
-	ENTRY_DIFF(select)
+	ENTRY_COMP(select)
 	ENTRY_SAME(flock)
 	ENTRY_SAME(msync)
 	/* struct iovec contains pointers */
-	ENTRY_DIFF(readv)		/* 145 */
-	ENTRY_DIFF(writev)
+	ENTRY_COMP(readv)		/* 145 */
+	ENTRY_COMP(writev)
 	ENTRY_SAME(getsid)
 	ENTRY_SAME(fdatasync)
 	/* struct __sysctl_args is a mess */
@@ -266,7 +266,7 @@
 	ENTRY_SAME(ni_syscall)		/* query_module */
 	ENTRY_SAME(poll)
 	/* structs contain pointers and an in_addr... */
-	ENTRY_DIFF(nfsservctl)
+	ENTRY_COMP(nfsservctl)
 	ENTRY_SAME(setresgid)		/* 170 */
 	ENTRY_SAME(getresgid)
 	ENTRY_SAME(prctl)

@@ -266,6 +266,7 @@ retry:
 		return ERR_PTR(err);
 	}
 	s->s_type = type;
+	strlcpy(s->s_id, type->name, sizeof(s->s_id));
 	list_add(&s->s_list, super_blocks.prev);
 	list_add(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);

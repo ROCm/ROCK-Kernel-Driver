@@ -1065,7 +1065,6 @@ int __init cyberfb_init(void)
 		   fb_info.node, fb_info.modename, CyberSize>>10);
 
 	    /* TODO: This driver cannot be unloaded yet */
-	    MOD_INC_USE_COUNT;
 	    DPRINTK("EXIT\n");
 	    return 0;
 	}
@@ -1205,14 +1204,6 @@ MODULE_LICENSE("GPL");
 int init_module(void)
 {
 	return cyberfb_init();
-}
-
-void cleanup_module(void)
-{
-	/* Not reached because the usecount will never be
-	   decremented to zero */
-	unregister_framebuffer(&fb_info);
-	/* TODO: clean up ... */
 }
 #endif /* MODULE */
 

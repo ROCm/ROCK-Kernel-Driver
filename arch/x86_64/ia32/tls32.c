@@ -94,7 +94,7 @@ asmlinkage long sys32_set_thread_area(struct user_desc *u_info)
 	((desc)->a & 0x0ffff) | \
 	 ((desc)->b & 0xf0000) )
 	
-#define GET_32BIT(desc)		(((desc)->b >> 23) & 1)
+#define GET_32BIT(desc)		(((desc)->b >> 22) & 1)
 #define GET_CONTENTS(desc)	(((desc)->b >> 10) & 3)
 #define GET_WRITABLE(desc)	(((desc)->b >>  9) & 1)
 #define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)

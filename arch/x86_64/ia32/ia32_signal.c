@@ -98,6 +98,7 @@ int ia32_copy_siginfo_to_user(siginfo_t32 __user *to, siginfo_t *from)
 int ia32_copy_siginfo_from_user(siginfo_t *to, siginfo_t32 __user *from)
 {
 	int err;
+	u32 ptr32;
 	if (!access_ok (VERIFY_READ, from, sizeof(siginfo_t32)))
 		return -EFAULT;
 
@@ -107,7 +108,8 @@ int ia32_copy_siginfo_from_user(siginfo_t *to, siginfo_t32 __user *from)
 
 	err |= __get_user(to->si_pid, &from->si_pid);
 	err |= __get_user(to->si_uid, &from->si_uid);
-	err |= __get_user((u32)(u64)to->si_ptr, &from->si_ptr);
+	err |= __get_user(ptr32, &from->si_ptr);
+	to->si_ptr = (void*)(u64)ptr32;
 
 	return err;
 }

@@ -5,12 +5,15 @@
 
 #include <linux/time.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/reiserfs_acl.h>
+#include <linux/reiserfs_xattr.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 #include <linux/pagemap.h>
 #include <linux/writeback.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
+#include <linux/quotaops.h>
 
 /*
 ** We pack the tails of files on file close, not at the time they are written.
@@ -95,51 +98,6 @@ static int reiserfs_sync_file(
   reiserfs_commit_for_inode(p_s_inode) ;
   reiserfs_write_unlock(p_s_inode->i_sb);
   return ( n_err < 0 ) ? -EIO : 0;
-}
-
-static int reiserfs_setattr(struct dentry *dentry, struct iattr *attr) {
-    struct inode *inode = dentry->d_inode ;
-    int error ;
-    reiserfs_write_lock(inode->i_sb);
-    if (attr->ia_valid & ATTR_SIZE) {
-	/* version 2 items will be caught by the s_maxbytes check
-	** done for us in vmtruncate
-	*/
-	if (get_inode_item_key_version(inode) == KEY_FORMAT_3_5 &&
-	    attr->ia_size > MAX_NON_LFS) {
-	    error = -EFBIG ;
-	    goto out;
-	}
-	/* fill in hole pointers in the expanding truncate case. */
-        if (attr->ia_size > inode->i_size) {
-	    error = generic_cont_expand(inode, attr->ia_size) ;
-	    if (REISERFS_I(inode)->i_prealloc_count > 0) {
-		struct reiserfs_transaction_handle th ;
-		/* we're changing at most 2 bitmaps, inode + super */
-		journal_begin(&th, inode->i_sb, 4) ;
-		reiserfs_discard_prealloc (&th, inode);
-		journal_end(&th, inode->i_sb, 4) ;
-	    }
-	    if (error)
-	        goto out;
-	}
-    }
-
-    if ((((attr->ia_valid & ATTR_UID) && (attr->ia_uid & ~0xffff)) ||
-	 ((attr->ia_valid & ATTR_GID) && (attr->ia_gid & ~0xffff))) &&
-	(get_inode_sd_version (inode) == STAT_DATA_V1)) {
-		/* stat data of format v3.5 has 16 bit uid and gid */
-	    error = -EINVAL;
-	    goto out;	
-	}
-
-    error = inode_change_ok(inode, attr) ;
-    if (!error)
-        inode_setattr(inode, attr) ;
-
-out:
-    reiserfs_write_unlock(inode->i_sb);
-    return error ;
 }
 
 /* I really do not want to play with memory shortage right now, so
@@ -317,7 +275,7 @@ int reiserfs_allocate_blocks_for_region(
 		    /* Ok, there is existing indirect item already. Need to append it */
 		    /* Calculate position past inserted item */
 		    make_cpu_key( &key, inode, le_key_k_offset( get_inode_item_key_version(inode), &(ih->ih_key)) + op_bytes_number(ih, inode->i_sb->s_blocksize), TYPE_INDIRECT, 3);
-		    res = reiserfs_paste_into_item( th, &path, &key, (char *)zeros, UNFM_P_SIZE*to_paste);
+		    res = reiserfs_paste_into_item( th, &path, &key, inode, (char *)zeros, UNFM_P_SIZE*to_paste);
 		    if ( res ) {
 			kfree(zeros);
 			goto error_exit_free_blocks;
@@ -340,14 +298,15 @@ int reiserfs_allocate_blocks_for_region(
 		    if ( res != ITEM_NOT_FOUND ) {
 			/* item should not exist, otherwise we have error */
 			if ( res != -ENOSPC ) {
-			    reiserfs_warning ("green-9008: search_by_key (%K) returned %d\n",
-					       &key, res);
+			    reiserfs_warning (inode->i_sb,
+				"green-9008: search_by_key (%K) returned %d",
+					      &key, res);
 			}
 			res = -EIO;
 		        kfree(zeros);
 			goto error_exit_free_blocks;
 		    }
-		    res = reiserfs_insert_item( th, &path, &key, &ins_ih, (char *)zeros);
+		    res = reiserfs_insert_item( th, &path, &key, &ins_ih, inode, (char *)zeros);
 		} else {
 		    reiserfs_panic(inode->i_sb, "green-9011: Unexpected key type %K\n", &key);
 		}
@@ -464,7 +423,7 @@ retry:
 	    // position. We do not need to recalculate path as it should
 	    // already point to correct place.
 	    make_cpu_key( &key, inode, le_key_k_offset( get_inode_item_key_version(inode), &(ih->ih_key)) + op_bytes_number(ih, inode->i_sb->s_blocksize), TYPE_INDIRECT, 3);
-	    res = reiserfs_paste_into_item( th, &path, &key, (char *)(allocated_blocks+curr_block), UNFM_P_SIZE*(blocks_to_allocate-curr_block));
+	    res = reiserfs_paste_into_item( th, &path, &key, inode, (char *)(allocated_blocks+curr_block), UNFM_P_SIZE*(blocks_to_allocate-curr_block));
 	    if ( res ) {
 		goto error_exit_free_blocks;
 	    }
@@ -488,14 +447,15 @@ retry:
 		/* Well, if we have found such item already, or some error
 		   occured, we need to warn user and return error */
 		if ( res != -ENOSPC ) {
-		    reiserfs_warning ("green-9009: search_by_key (%K) returned %d\n",
-			              &key, res);
+		    reiserfs_warning (inode->i_sb,
+				      "green-9009: search_by_key (%K) "
+				      "returned %d", &key, res);
 		}
 		res = -EIO;
 		goto error_exit_free_blocks;
 	    }
 	    /* Insert item into the tree with the data as its body */
-	    res = reiserfs_insert_item( th, &path, &key, &ins_ih, (char *)(allocated_blocks+curr_block));
+	    res = reiserfs_insert_item( th, &path, &key, &ins_ih, inode, (char *)(allocated_blocks+curr_block));
 	} else {
 	    reiserfs_panic(inode->i_sb, "green-9010: unexpected item type for key %K\n",&key);
 	}
@@ -505,7 +465,6 @@ retry:
     // unless we return an error, they are also responsible for logging
     // the inode.
     //
-    inode->i_blocks += blocks_to_allocate << (inode->i_blkbits - 9);
     pathrelse(&path);
     reiserfs_write_unlock(inode->i_sb);
 
@@ -551,7 +510,7 @@ error_exit_free_blocks:
     pathrelse(&path);
     // free blocks
     for( i = 0; i < blocks_to_allocate; i++ )
-	reiserfs_free_block(th, le32_to_cpu(allocated_blocks[i]));
+	reiserfs_free_block(th, inode, le32_to_cpu(allocated_blocks[i]), 1);
 
 error_exit:
     reiserfs_update_sd(th, inode); // update any changes we made to blk count
@@ -842,7 +801,9 @@ int reiserfs_prepare_file_region_for_write(
 
 
     if ( num_pages < 1 ) {
-	reiserfs_warning("green-9001: reiserfs_prepare_file_region_for_write called with zero number of pages to process\n");
+	reiserfs_warning (inode->i_sb,
+			  "green-9001: reiserfs_prepare_file_region_for_write "
+			  "called with zero number of pages to process");
 	return -EFAULT;
     }
 
@@ -1321,6 +1282,11 @@ struct file_operations reiserfs_file_operations = {
 struct  inode_operations reiserfs_file_inode_operations = {
     .truncate	= reiserfs_vfs_truncate_file,
     .setattr    = reiserfs_setattr,
+    .setxattr   = reiserfs_setxattr,
+    .getxattr   = reiserfs_getxattr,
+    .listxattr  = reiserfs_listxattr,
+    .removexattr = reiserfs_removexattr,
+    .permission = reiserfs_permission,
 };
 
 

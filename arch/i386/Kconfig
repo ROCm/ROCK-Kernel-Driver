@@ -102,10 +102,10 @@ config X86_VISWS
 	  and vice versa. See <file:Documentation/sgi-visws.txt> for details.
 
 config X86_GENERICARCH
-       bool "Generic architecture (Summit, bigsmp, default)"
+       bool "Generic architecture (Summit, bigsmp, ES7000, default)"
        depends on SMP
        help
-          This option compiles in the Summit, bigsmp, default subarchitectures.
+          This option compiles in the Summit, bigsmp, ES7000, default subarchitectures.
 	  It is intended for a generic binary kernel.
 
 config X86_ES7000
@@ -479,6 +479,16 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
 
+config SCHED_SMT
+	bool "SMT (Hyperthreading) scheduler support"
+	depends on SMP
+	default off
+	help
+	  SMT scheduler support improves the CPU scheduler's decision making
+	  when dealing with Intel Pentium 4 chips with HyperThreading at a
+	  cost of slightly increased overhead in some places. If unsure say
+	  N here.
+
 config PREEMPT
 	bool "Preemptible Kernel"
 	help
@@ -709,7 +719,7 @@ config X86_PAE
 
 # Common NUMA Features
 config NUMA
-	bool "Numa Memory Allocation Support"
+	bool "Numa Memory Allocation and Scheduler Support"
 	depends on SMP && HIGHMEM64G && (X86_NUMAQ || X86_GENERICARCH || (X86_SUMMIT && ACPI))
 	default n if X86_PC
 	default y if (X86_NUMAQ || X86_SUMMIT)

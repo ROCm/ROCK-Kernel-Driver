@@ -872,6 +872,8 @@ restart:
 		wait_on_buffer(bh);
 		if (!buffer_uptodate(bh)) {
 			/* read error, skip block & hope for the best */
+			ext3_error(sb, __FUNCTION__, "reading directory #%lu "
+				   "offset %lu\n", dir->i_ino, block);
 			brelse(bh);
 			goto next;
 		}
@@ -1763,14 +1765,19 @@ static int empty_dir (struct inode * inode)
 	struct buffer_head * bh;
 	struct ext3_dir_entry_2 * de, * de1;
 	struct super_block * sb;
-	int err;
+	int err = 0;
 
 	sb = inode->i_sb;
 	if (inode->i_size < EXT3_DIR_REC_LEN(1) + EXT3_DIR_REC_LEN(2) ||
 	    !(bh = ext3_bread (NULL, inode, 0, 0, &err))) {
-	    	ext3_warning (inode->i_sb, "empty_dir",
-			      "bad directory (dir #%lu) - no data block",
-			      inode->i_ino);
+		if (err)
+			ext3_error(inode->i_sb, __FUNCTION__,
+				   "error %d reading directory #%lu offset 0",
+				   err, inode->i_ino);
+		else
+			ext3_warning(inode->i_sb, __FUNCTION__,
+				     "bad directory (dir #%lu) - no data block",
+				     inode->i_ino);
 		return 1;
 	}
 	de = (struct ext3_dir_entry_2 *) bh->b_data;
@@ -1792,24 +1799,26 @@ static int empty_dir (struct inode * inode)
 	while (offset < inode->i_size ) {
 		if (!bh ||
 			(void *) de >= (void *) (bh->b_data+sb->s_blocksize)) {
+			err = 0;
 			brelse (bh);
 			bh = ext3_bread (NULL, inode,
 				offset >> EXT3_BLOCK_SIZE_BITS(sb), 0, &err);
 			if (!bh) {
-#if 0
-				ext3_error (sb, "empty_dir",
-				"directory #%lu contains a hole at offset %lu",
-					inode->i_ino, offset);
-#endif
+				if (err)
+					ext3_error(sb, __FUNCTION__,
+						   "error %d reading directory"
+						   " #%lu offset %lu",
+						   err, inode->i_ino, offset);
 				offset += sb->s_blocksize;
 				continue;
 			}
 			de = (struct ext3_dir_entry_2 *) bh->b_data;
 		}
-		if (!ext3_check_dir_entry ("empty_dir", inode, de, bh,
-					   offset)) {
-			brelse (bh);
-			return 1;
+		if (!ext3_check_dir_entry("empty_dir", inode, de, bh, offset)) {
+			de = (struct ext3_dir_entry_2 *)(bh->b_data +
+							 sb->s_blocksize);
+			offset = (offset | (sb->s_blocksize - 1)) + 1;
+			continue;
 		}
 		if (le32_to_cpu(de->inode)) {
 			brelse (bh);

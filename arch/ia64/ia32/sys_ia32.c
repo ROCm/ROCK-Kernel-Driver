@@ -90,58 +90,17 @@ extern unsigned long arch_get_unmapped_area (struct file *, unsigned long, unsig
 /* XXX make per-mm: */
 static DECLARE_MUTEX(ia32_mmap_sem);
 
-static int
-nargs (unsigned int arg, char **ap)
-{
-	unsigned int addr;
-	int n, err;
-
-	if (!arg)
-		return 0;
-
-	n = 0;
-	do {
-		err = get_user(addr, (unsigned int *)A(arg));
-		if (err)
-			return err;
-		if (ap)
-			*ap++ = (char *) A(addr);
-		arg += sizeof(unsigned int);
-		n++;
-	} while (addr);
-	return n - 1;
-}
-
 asmlinkage long
-sys32_execve (char *filename, unsigned int argv, unsigned int envp,
-	      struct pt_regs *regs)
+sys32_execve (char *name, compat_uptr_t __user *argv, compat_uptr_t __user *envp, struct pt_regs *regs)
 {
+	long error;
+	char *filename;
 	unsigned long old_map_base, old_task_size, tssd;
-	char **av, **ae;
-	int na, ne, len;
-	long r;
 
-	na = nargs(argv, NULL);
-	if (na < 0)
-		return na;
-	ne = nargs(envp, NULL);
-	if (ne < 0)
-		return ne;
-	len = (na + ne + 2) * sizeof(*av);
-	av = kmalloc(len, GFP_KERNEL);
-	if (!av)
-		return -ENOMEM;
-
-	ae = av + na + 1;
-	av[na] = NULL;
-	ae[ne] = NULL;
-
-	r = nargs(argv, av);
-	if (r < 0)
-		goto out;
-	r = nargs(envp, ae);
-	if (r < 0)
-		goto out;
+	filename = getname(name);
+	error = PTR_ERR(filename);
+	if (IS_ERR(filename))
+		return error;
 
 	old_map_base  = current->thread.map_base;
 	old_task_size = current->thread.task_size;
@@ -153,19 +112,18 @@ sys32_execve (char *filename, unsigned int argv, unsigned int envp,
 	ia64_set_kr(IA64_KR_IO_BASE, current->thread.old_iob);
 	ia64_set_kr(IA64_KR_TSSD, current->thread.old_k1);
 
-	set_fs(KERNEL_DS);
-	r = sys_execve(filename, av, ae, regs);
-	if (r < 0) {
+	error = compat_do_execve(filename, argv, envp, regs);
+	putname(filename);
+
+	if (error < 0) {
 		/* oops, execve failed, switch back to old values... */
 		ia64_set_kr(IA64_KR_IO_BASE, IA32_IOBASE);
 		ia64_set_kr(IA64_KR_TSSD, tssd);
 		current->thread.map_base  = old_map_base;
 		current->thread.task_size = old_task_size;
-		set_fs(USER_DS);	/* establish new task-size as the address-limit */
 	}
-  out:
-	kfree(av);
-	return r;
+
+	return error;
 }
 
 int cp_compat_stat(struct kstat *stat, struct compat_stat *ubuf)
@@ -818,110 +776,6 @@ out:
 	return error;
 }
 
-/*
- * We can actually return ERESTARTSYS instead of EINTR, but I'd
- * like to be certain this leads to no problems. So I return
- * EINTR just for safety.
- *
- * Update: ERESTARTSYS breaks at least the xview clock binary, so
- * I'm trying ERESTARTNOHAND which restart only when you want to.
- */
-#define MAX_SELECT_SECONDS \
-	((unsigned long) (MAX_SCHEDULE_TIMEOUT / HZ)-1)
-#define ROUND_UP_TIME(x,y) (((x)+(y)-1)/(y))
-
-asmlinkage long
-sys32_select (int n, fd_set *inp, fd_set *outp, fd_set *exp, struct compat_timeval *tvp32)
-{
-	fd_set_bits fds;
-	char *bits;
-	long timeout;
-	int ret, size;
-
-	timeout = MAX_SCHEDULE_TIMEOUT;
-	if (tvp32) {
-		time_t sec, usec;
-
-		ret = -EFAULT;
-		if (get_user(sec, &tvp32->tv_sec) || get_user(usec, &tvp32->tv_usec))
-			goto out_nofds;
-
-		ret = -EINVAL;
-		if (sec < 0 || usec < 0)
-			goto out_nofds;
-
-		if ((unsigned long) sec < MAX_SELECT_SECONDS) {
-			timeout = ROUND_UP_TIME(usec, 1000000/HZ);
-			timeout += sec * (unsigned long) HZ;
-		}
-	}
-
-	ret = -EINVAL;
-	if (n < 0)
-		goto out_nofds;
-
-	if (n > current->files->max_fdset)
-		n = current->files->max_fdset;
-
-	/*
-	 * We need 6 bitmaps (in/out/ex for both incoming and outgoing),
-	 * since we used fdset we need to allocate memory in units of
-	 * long-words.
-	 */
-	ret = -ENOMEM;
-	size = FDS_BYTES(n);
-	bits = kmalloc(6 * size, GFP_KERNEL);
-	if (!bits)
-		goto out_nofds;
-	fds.in      = (unsigned long *)  bits;
-	fds.out     = (unsigned long *) (bits +   size);
-	fds.ex      = (unsigned long *) (bits + 2*size);
-	fds.res_in  = (unsigned long *) (bits + 3*size);
-	fds.res_out = (unsigned long *) (bits + 4*size);
-	fds.res_ex  = (unsigned long *) (bits + 5*size);
-
-	if ((ret = get_fd_set(n, inp, fds.in)) ||
-	    (ret = get_fd_set(n, outp, fds.out)) ||
-	    (ret = get_fd_set(n, exp, fds.ex)))
-		goto out;
-	zero_fd_set(n, fds.res_in);
-	zero_fd_set(n, fds.res_out);
-	zero_fd_set(n, fds.res_ex);
-
-	ret = do_select(n, &fds, &timeout);
-
-	if (tvp32 && !(current->personality & STICKY_TIMEOUTS)) {
-		time_t sec = 0, usec = 0;
-		if (timeout) {
-			sec = timeout / HZ;
-			usec = timeout % HZ;
-			usec *= (1000000/HZ);
-		}
-		if (put_user(sec, &tvp32->tv_sec) || put_user(usec, &tvp32->tv_usec)) {
-			ret = -EFAULT;
-			goto out;
-		}
-	}
-
-	if (ret < 0)
-		goto out;
-	if (!ret) {
-		ret = -ERESTARTNOHAND;
-		if (signal_pending(current))
-			goto out;
-		ret = 0;
-	}
-
-	set_fd_set(n, inp, fds.res_in);
-	set_fd_set(n, outp, fds.res_out);
-	set_fd_set(n, exp, fds.res_ex);
-
-out:
-	kfree(bits);
-out_nofds:
-	return ret;
-}
-
 struct sel_arg_struct {
 	unsigned int n;
 	unsigned int inp;
@@ -937,87 +791,8 @@ sys32_old_select (struct sel_arg_struct *arg)
 
 	if (copy_from_user(&a, arg, sizeof(a)))
 		return -EFAULT;
-	return sys32_select(a.n, (fd_set *) A(a.inp), (fd_set *) A(a.outp), (fd_set *) A(a.exp),
-			    (struct compat_timeval *) A(a.tvp));
-}
-
-static struct iovec *
-get_compat_iovec (struct compat_iovec *iov32, struct iovec *iov_buf, u32 count, int type)
-{
-	u32 i, buf, len;
-	struct iovec *ivp, *iov;
-
-	/* Get the "struct iovec" from user memory */
-
-	if (!count)
-		return 0;
-	if (verify_area(VERIFY_READ, iov32, sizeof(struct compat_iovec)*count))
-		return NULL;
-	if (count > UIO_MAXIOV)
-		return NULL;
-	if (count > UIO_FASTIOV) {
-		iov = kmalloc(count*sizeof(struct iovec), GFP_KERNEL);
-		if (!iov)
-			return NULL;
-	} else
-		iov = iov_buf;
-
-	ivp = iov;
-	for (i = 0; i < count; i++) {
-		if (__get_user(len, &iov32->iov_len) || __get_user(buf, &iov32->iov_base)) {
-			if (iov != iov_buf)
-				kfree(iov);
-			return NULL;
-		}
-		if (verify_area(type, (void *)A(buf), len)) {
-			if (iov != iov_buf)
-				kfree(iov);
-			return((struct iovec *)0);
-		}
-		ivp->iov_base = (void *)A(buf);
-		ivp->iov_len = (__kernel_size_t) len;
-		iov32++;
-		ivp++;
-	}
-	return iov;
-}
-
-asmlinkage long
-sys32_readv (int fd, struct compat_iovec *vector, u32 count)
-{
-	struct iovec iovstack[UIO_FASTIOV];
-	struct iovec *iov;
-	long ret;
-	mm_segment_t old_fs = get_fs();
-
-	iov = get_compat_iovec(vector, iovstack, count, VERIFY_WRITE);
-	if (!iov)
-		return -EFAULT;
-	set_fs(KERNEL_DS);
-	ret = sys_readv(fd, iov, count);
-	set_fs(old_fs);
-	if (iov != iovstack)
-		kfree(iov);
-	return ret;
-}
-
-asmlinkage long
-sys32_writev (int fd, struct compat_iovec *vector, u32 count)
-{
-	struct iovec iovstack[UIO_FASTIOV];
-	struct iovec *iov;
-	long ret;
-	mm_segment_t old_fs = get_fs();
-
-	iov = get_compat_iovec(vector, iovstack, count, VERIFY_READ);
-	if (!iov)
-		return -EFAULT;
-	set_fs(KERNEL_DS);
-	ret = sys_writev(fd, iov, count);
-	set_fs(old_fs);
-	if (iov != iovstack)
-		kfree(iov);
-	return ret;
+	return compat_sys_select(a.n, compat_ptr(a.inp), compat_ptr(a.outp),
+				 compat_ptr(a.exp), compat_ptr(a.tvp));
 }
 
 #define SEMOP		 1
@@ -2298,7 +2073,7 @@ sys32_set_thread_area (struct ia32_user_desc *u_info)
 	((desc)->a & 0x0ffff) |			\
 	 ((desc)->b & 0xf0000) )
 
-#define GET_32BIT(desc)		(((desc)->b >> 23) & 1)
+#define GET_32BIT(desc)		(((desc)->b >> 22) & 1)
 #define GET_CONTENTS(desc)	(((desc)->b >> 10) & 3)
 #define GET_WRITABLE(desc)	(((desc)->b >>  9) & 1)
 #define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)
@@ -2423,176 +2198,6 @@ sys32_setresgid(compat_gid_t rgid, compat_gid_t egid,
 	segid = (egid == (compat_gid_t)-1) ? ((gid_t)-1) : ((gid_t)egid);
 	ssgid = (sgid == (compat_gid_t)-1) ? ((gid_t)-1) : ((gid_t)sgid);
 	return sys_setresgid(srgid, segid, ssgid);
-}
-
-/* Stuff for NFS server syscalls... */
-struct nfsctl_svc32 {
-	u16			svc32_port;
-	s32			svc32_nthreads;
-};
-
-struct nfsctl_client32 {
-	s8			cl32_ident[NFSCLNT_IDMAX+1];
-	s32			cl32_naddr;
-	struct in_addr		cl32_addrlist[NFSCLNT_ADDRMAX];
-	s32			cl32_fhkeytype;
-	s32			cl32_fhkeylen;
-	u8			cl32_fhkey[NFSCLNT_KEYMAX];
-};
-
-struct nfsctl_export32 {
-	s8			ex32_client[NFSCLNT_IDMAX+1];
-	s8			ex32_path[NFS_MAXPATHLEN+1];
-	compat_dev_t	ex32_dev;
-	compat_ino_t	ex32_ino;
-	s32			ex32_flags;
-	compat_uid_t	ex32_anon_uid;
-	compat_gid_t	ex32_anon_gid;
-};
-
-struct nfsctl_arg32 {
-	s32			ca32_version;	/* safeguard */
-	union {
-		struct nfsctl_svc32	u32_svc;
-		struct nfsctl_client32	u32_client;
-		struct nfsctl_export32	u32_export;
-		u32			u32_debug;
-	} u;
-#define ca32_svc	u.u32_svc
-#define ca32_client	u.u32_client
-#define ca32_export	u.u32_export
-#define ca32_debug	u.u32_debug
-};
-
-union nfsctl_res32 {
-	struct knfs_fh		cr32_getfh;
-	u32			cr32_debug;
-};
-
-static int
-nfs_svc32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
-{
-	int err;
-
-	err = __get_user(karg->ca_version, &arg32->ca32_version);
-	err |= __get_user(karg->ca_svc.svc_port, &arg32->ca32_svc.svc32_port);
-	err |= __get_user(karg->ca_svc.svc_nthreads,
-			  &arg32->ca32_svc.svc32_nthreads);
-	return err;
-}
-
-static int
-nfs_clnt32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
-{
-	int err;
-
-	err = __get_user(karg->ca_version, &arg32->ca32_version);
-	err |= copy_from_user(&karg->ca_client.cl_ident[0],
-			  &arg32->ca32_client.cl32_ident[0],
-			  NFSCLNT_IDMAX);
-	err |= __get_user(karg->ca_client.cl_naddr,
-			  &arg32->ca32_client.cl32_naddr);
-	err |= copy_from_user(&karg->ca_client.cl_addrlist[0],
-			  &arg32->ca32_client.cl32_addrlist[0],
-			  (sizeof(struct in_addr) * NFSCLNT_ADDRMAX));
-	err |= __get_user(karg->ca_client.cl_fhkeytype,
-		      &arg32->ca32_client.cl32_fhkeytype);
-	err |= __get_user(karg->ca_client.cl_fhkeylen,
-		      &arg32->ca32_client.cl32_fhkeylen);
-	err |= copy_from_user(&karg->ca_client.cl_fhkey[0],
-			  &arg32->ca32_client.cl32_fhkey[0],
-			  NFSCLNT_KEYMAX);
-	return err;
-}
-
-static int
-nfs_exp32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
-{
-	int err;
-
-	err = __get_user(karg->ca_version, &arg32->ca32_version);
-	err |= copy_from_user(&karg->ca_export.ex_client[0],
-			  &arg32->ca32_export.ex32_client[0],
-			  NFSCLNT_IDMAX);
-	err |= copy_from_user(&karg->ca_export.ex_path[0],
-			  &arg32->ca32_export.ex32_path[0],
-			  NFS_MAXPATHLEN);
-	err |= __get_user(karg->ca_export.ex_dev,
-		      &arg32->ca32_export.ex32_dev);
-	err |= __get_user(karg->ca_export.ex_ino,
-		      &arg32->ca32_export.ex32_ino);
-	err |= __get_user(karg->ca_export.ex_flags,
-		      &arg32->ca32_export.ex32_flags);
-	err |= __get_user(karg->ca_export.ex_anon_uid,
-		      &arg32->ca32_export.ex32_anon_uid);
-	err |= __get_user(karg->ca_export.ex_anon_gid,
-		      &arg32->ca32_export.ex32_anon_gid);
-	return err;
-}
-
-static int
-nfs_getfh32_res_trans(union nfsctl_res *kres, union nfsctl_res32 *res32)
-{
-	int err;
-
-	err = copy_to_user(&res32->cr32_getfh,
-			&kres->cr_getfh,
-			sizeof(res32->cr32_getfh));
-	err |= __put_user(kres->cr_debug, &res32->cr32_debug);
-	return err;
-}
-
-int asmlinkage
-sys32_nfsservctl(int cmd, struct nfsctl_arg32 *arg32, union nfsctl_res32 *res32)
-{
-	struct nfsctl_arg *karg = NULL;
-	union nfsctl_res *kres = NULL;
-	mm_segment_t oldfs;
-	int err;
-
-	karg = kmalloc(sizeof(*karg), GFP_USER);
-	if(!karg)
-		return -ENOMEM;
-	if(res32) {
-		kres = kmalloc(sizeof(*kres), GFP_USER);
-		if(!kres) {
-			kfree(karg);
-			return -ENOMEM;
-		}
-	}
-	switch(cmd) {
-	case NFSCTL_SVC:
-		err = nfs_svc32_trans(karg, arg32);
-		break;
-	case NFSCTL_ADDCLIENT:
-		err = nfs_clnt32_trans(karg, arg32);
-		break;
-	case NFSCTL_DELCLIENT:
-		err = nfs_clnt32_trans(karg, arg32);
-		break;
-	case NFSCTL_EXPORT:
-		err = nfs_exp32_trans(karg, arg32);
-		break;
-	default:
-		err = -EINVAL;
-		break;
-	}
-	if(err)
-		goto done;
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-	err = sys_nfsservctl(cmd, karg, kres);
-	set_fs(oldfs);
-
-	if(!err && cmd == NFSCTL_GETFS)
-		err = nfs_getfh32_res_trans(kres, res32);
-
-done:
-	if(karg)
-		kfree(karg);
-	if(kres)
-		kfree(kres);
-	return err;
 }
 
 /* Handle adjtimex compatibility. */

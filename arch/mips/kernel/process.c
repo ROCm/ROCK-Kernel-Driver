@@ -280,12 +280,6 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
 	return ((unsigned long *)t->reg29)[schedule_frame.pc_offset];
 }
 
-/*
- * These bracket the sleeping functions..
- */
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
-
 /* get_wchan - a maintenance nightmare^W^Wpain in the ass ...  */
 unsigned long get_wchan(struct task_struct *p)
 {
@@ -297,7 +291,7 @@ unsigned long get_wchan(struct task_struct *p)
 	if (!mips_frame_info_initialized)
 		return 0;
 	pc = thread_saved_pc(p);
-	if (pc < first_sched || pc >= last_sched)
+	if (!in_sched_functions(pc))
 		goto out;
 
 	if (pc >= (unsigned long) sleep_on_timeout)
@@ -331,7 +325,7 @@ schedule_timeout_caller:
 	 */
 	pc    = ((unsigned long *)frame)[schedule_timeout_frame.pc_offset];
 
-	if (pc >= first_sched && pc < last_sched) {
+	if (in_sched_functions(pc)) {
 		/* schedule_timeout called by [interruptible_]sleep_on_timeout */
 		frame = ((unsigned long *)frame)[schedule_timeout_frame.frame_offset];
 		pc    = ((unsigned long *)frame)[sleep_on_timeout_frame.pc_offset];

@@ -1,7 +1,7 @@
 # ALSA soundcard-configuration
 config SND_BIT32_EMUL
 	tristate "Emulation for 32-bit applications"
-	depends on SND && SND_PCM && (SPARC64 || PPC64 || X86_64 && IA32_EMULATION)
+	depends on SND && SND_PCM && (MIPS64 || SPARC64 || PPC64 || X86_64 && IA32_EMULATION)
 
 config SND_TIMER
 	tristate

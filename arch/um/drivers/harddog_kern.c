@@ -71,7 +71,7 @@ static int harddog_open(struct inode *inode, struct file *file)
 	if(timer_alive)
 		return -EBUSY;
 #ifdef CONFIG_HARDDOG_NOWAYOUT	 
-	MOD_INC_USE_COUNT;
+	__module_get(THIS_MODULE);
 #endif
 
 #ifdef CONFIG_MCONSOLE

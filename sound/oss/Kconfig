@@ -34,101 +34,30 @@ config SOUND_CMPCI
 
 config SOUND_CMPCI_FM
 	bool "Enable legacy FM"
-	depends on SOUND_CMPCI
+	depends on SOUND_CMPCI && X86
 	help
-	  Say Y here to enable the legacy FM (frequency-modulation) synthesis
-	  support on a card using the CMI8338 or CMI8378 chipset.
+	  Say Y here to enable the legacy FM (frequency-modulation) synthesizer
+	  support on a card using the CMI8338 or CMI8378 chipset. Even it is
+	  enabled, you need to set fmio as proper value to enable it.
 	  Say N here if you don't need this.
-
-config SOUND_CMPCI_FMIO
-	hex "FM I/O 388, 3C8, 3E0, 3E8"
-	depends on SOUND_CMPCI_FM
-	default "388"
-	help
-	  Set the base I/O address for FM synthesis control on a card using
-	  the CMI8338 or CMI8378 chipset.
-	  The default is 388; other choices are 3c8, 3e0, or 3e8.
 
 config SOUND_CMPCI_MIDI
 	bool "Enable legacy MPU-401"
-	depends on SOUND_CMPCI
+	depends on SOUND_CMPCI && X86
 	help
-	  Say Y here to enable the legacy MP401 MIDI synthesis support on a
-	  card using the CMI8338 or CMI8378 chipset.
+	  Say Y here to enable the legacy MPU401 MIDI synthesizer support on a
+	  card using the CMI8338 or CMI8378 chipset. Even it is enabled,
+	  you need to set mpuio as proper value to enable it.
 	  Say N here if you don't need this.
-
-config SOUND_CMPCI_MPUIO
-	hex "MPU-401 I/O 330, 320, 310, 300"
-	depends on SOUND_CMPCI_MIDI
-	default "330"
-	help
-	  Set the base I/O address for MP401 MIDI synthesis control on a card
-	  using the CMI8338 or CMI8378 chipset.
-	  The default is 330; other choices are 320, 310, or 300.
 
 config SOUND_CMPCI_JOYSTICK
 	bool "Enable joystick"
-	depends on SOUND_CMPCI
+	depends on SOUND_CMPCI && X86
 	help
-	  Say here in order to enable the joystick port on a sound crd using
-	  the CMI8338 or the CMI8738 chipset.  Data on these chips are
-	  available at <http://www.cmedia.com.tw/>.
-
-config SOUND_CMPCI_CM8738
-	bool "Support CMI8738 based audio cards"
-	depends on SOUND_CMPCI
-	help
-	  Say Y or M if you have a PCI sound card using the CMI8338
-	  or the CMI8378 chipset.  Data on this chip is available at
-	  <http://www.cmedia.com.tw/doc8738.htm>.
-
-	  A userspace utility to control some internal registers of these
-	  chips is available at
-	  <http://member.nifty.ne.jp/Breeze/softwares/unix/cmictl-e.html>.
-
-config SOUND_CMPCI_SPDIFINVERSE
-	bool "Inverse S/PDIF in for CMI8738"
-	depends on SOUND_CMPCI_CM8738
-	help
-	  Say Y here to have the driver invert the signal presented on SPDIF IN
-	  of a card using the CMI8338 or CMI8378 chipset.
+	  Say Y here in order to enable the joystick port on a sound card using
+	  the CMI8338 or the CMI8738 chipset.  You need to config the
+	  gameport support and set joystick parameter as 1 to use it.
 	  Say N here if you don't need this.
-
-config SOUND_CMPCI_SPDIFLOOP
-	bool "Enable S/PDIF loop for CMI8738"
-	depends on SOUND_CMPCI_CM8738
-	help
-	  Enable loopback from SPDIF in to SPDIF out.  For discussion, see
-	  "The 8738 Audio SPDIF In/Out Technical Data" on the technical
-	  support page at <http://www.cmedia.com.tw/>.
-
-	  A userspace utility to control even more internal registers of these
-	  chips is available at
-	  <http://member.nifty.ne.jp/Breeze/softwares/unix/cmictl-e.html>.
-	  This package will among other things help you enable SPDIF 
-	  out/in/loop/monitor.
-
-config SOUND_CMPCI_SPEAKERS
-	int "Number of speakers 2, 4, 5, 6"
-	depends on SOUND_CMPCI_CM8738
-	default "2"
-	help
-	  Specify the number of speaker channels you want the card to drive,
-	  as an integer.
-
-config SOUND_CMPCI_LINE_REAR
-	bool "Use Line-in as Read-out"
-	depends on SOUND_CMPCI_CM8738 && SOUND_CMPCI_SPEAKERS!=2
-	help
-	  Say Y here to enable using line-in jack as an output jack for a rear
-	  speaker.  Say N here if you don't need this.
-
-config SOUND_CMPCI_LINE_BASS
-	bool "Use Line-in as Bass"
-	depends on SOUND_CMPCI_CM8738 && SOUND_CMPCI_SPEAKERS!=2
-	help
-	  Say Y here to enable using line-in jack as an output jack for a bass
-	  speaker.  Say N here if you don't need this.
 
 config SOUND_EMU10K1
 	tristate "Creative SBLive! (EMU10K1)"

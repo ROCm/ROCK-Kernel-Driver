@@ -1,7 +1,7 @@
 /*
  * Written by: Garry Forsgren, Unisys Corporation
  *             Natalie Protasevich, Unisys Corporation
- * This file contains the code to configure and interface 
+ * This file contains the code to configure and interface
  * with Unisys ES7000 series hardware system manager.
  *
  * Copyright (c) 2003 Unisys Corporation.  All Rights Reserved.
@@ -18,7 +18,7 @@
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *
- * Contact information: Unisys Corporation, Township Line & Union Meeting 
+ * Contact information: Unisys Corporation, Township Line & Union Meeting
  * Roads-A, Unisys Way, Blue Bell, Pennsylvania, 19424, or:
  *
  * http://www.unisys.com
@@ -46,7 +46,7 @@
  */
 
 volatile unsigned long	*psai = NULL;
-struct mip_reg		*mip_reg;  
+struct mip_reg		*mip_reg;
 struct mip_reg		*host_reg;
 int 			mip_port;
 unsigned long		mip_addr, host_addr;
@@ -55,14 +55,14 @@ unsigned long		mip_addr, host_addr;
  * Parse the OEM Table
  */
 
-void __init
+int __init
 parse_unisys_oem (char *oemptr, int oem_entries)
 {
 	int                     i;
 	int 			success = 0;
 	unsigned char           type, size;
 	unsigned long           val;
-	char                    *tp = NULL;  
+	char                    *tp = NULL;
 	struct psai             *psaip = NULL;
 	struct mip_reg_info 	*mi;
 	struct mip_reg		*host, *mip;
@@ -83,12 +83,13 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 			host = (struct mip_reg *)val;
 			host_reg = __va(host);
 			val = MIP_RD_LO(mi->mip_reg);
+			mip_port = MIP_PORT(mi->mip_info);
 			mip_addr = val;
 			mip = (struct mip_reg *)val;
 			mip_reg = __va(mip);
-			Dprintk("es7000_mipcfg: host_reg = 0x%lx \n", 
+			Dprintk("es7000_mipcfg: host_reg = 0x%lx \n",
 				(unsigned long)host_reg);
-			Dprintk("es7000_mipcfg: mip_reg = 0x%lx \n", 
+			Dprintk("es7000_mipcfg: mip_reg = 0x%lx \n",
 				(unsigned long)mip_reg);
 			success++;
 			break;
@@ -116,11 +117,11 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 		printk("\nEnabling ES7000 specific features...\n");
 		es7000_plat = 1;
 	}
-	return;
+	return es7000_plat;
 }
 
-int __init 
-find_unisys_acpi_oem_table(unsigned long *oem_addr, int *length) 
+int __init
+find_unisys_acpi_oem_table(unsigned long *oem_addr, int *length)
 {
 	struct acpi_table_rsdp		*rsdp = NULL;
 	unsigned long			rsdp_phys = 0;
@@ -179,7 +180,7 @@ es7000_spin(int n)
 {
 	int i = 0;
 
-	while (i++ < n) 
+	while (i++ < n)
 		rep_nop();
 }
 
@@ -220,7 +221,7 @@ es7000_mip_write(struct mip_reg *mip_reg)
 	return status;
 }
 
-int 
+int
 es7000_start_cpu(int cpu, unsigned long eip)
 {
 	unsigned long vect = 0, psaival = 0;
@@ -240,7 +241,7 @@ es7000_start_cpu(int cpu, unsigned long eip)
 
 }
 
-int 
+int
 es7000_stop_cpu(int cpu)
 {
 	int startup;
@@ -272,7 +273,7 @@ es7000_sw_apic()
         	es7000_mip_reg.off_0 = MIP_SW_APIC;
         	es7000_mip_reg.off_38 = (MIP_VALID);
         	while ((mip_status = es7000_mip_write(&es7000_mip_reg)) != 0)
-              		printk("es7000_sw_apic: command failed, status = %x\n", 
+              		printk("es7000_sw_apic: command failed, status = %x\n",
 				mip_status);
 		return;
 	}

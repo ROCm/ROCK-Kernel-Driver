@@ -2339,9 +2339,6 @@ static irqreturn_t s2io_isr(int irq, void *dev_id, struct pt_regs *regs)
 	struct net_device *dev = (struct net_device *) dev_id;
 	nic_t *sp = dev->priv;
 	XENA_dev_config_t *bar0 = (XENA_dev_config_t *) sp->bar0;
-#ifndef CONFIG_S2IO_NAPI
-	int i, ret;
-#endif
 	u64 reason = 0, general_mask = 0;
 	mac_info_t *mac_control;
 	struct config_param *config;

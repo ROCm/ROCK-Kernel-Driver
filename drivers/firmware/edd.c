@@ -15,9 +15,8 @@
  * made in setup.S, copied to safe structures in setup.c,
  * and presents it in sysfs.
  *
- * Please see http://domsch.com/linux/edd30/results.html for
+ * Please see http://linux.dell.com/edd30/results.html for
  * the list of BIOSs which have been reported to implement EDD.
- * If you don't see yours listed, please send a report as described there.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License v2.0 as published by
@@ -28,15 +27,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- */
-
-/*
- * Known issues:
- * - refcounting of struct device objects could be improved.
- *
- * TODO:
- * - Add IDE and USB disk device support
- * - move edd.[ch] to better locations if/when one is decided
  */
 
 #include <linux/module.h>
@@ -57,13 +47,13 @@
 #include <../drivers/scsi/scsi.h>
 #include <../drivers/scsi/hosts.h>
 
+#define EDD_VERSION "0.14"
+#define EDD_DATE    "2004-Apr-28"
+
 MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("sysfs interface to BIOS EDD information");
 MODULE_LICENSE("GPL");
-
-#define EDD_VERSION "0.13 2004-Mar-09"
-#define EDD_DEVICE_NAME_SIZE 16
-#define REPORT_URL "http://linux.dell.com/edd/results.html"
+MODULE_VERSION(EDD_VERSION);
 
 #define left (PAGE_SIZE - (p - buf) - 1)
 
@@ -690,103 +680,6 @@ edd_create_symlink_to_pcidev(struct edd_device *edev)
 	return sysfs_create_link(&edev->kobj,&pci_dev->dev.kobj,"pci_dev");
 }
 
-/*
- * FIXME - as of 15-Jan-2003, there are some non-"scsi_device"s on the
- * scsi_bus list.  The following functions could possibly mis-access
- * memory in that case.  This is actually a problem with the SCSI
- * layer, which is being addressed there.  Until then, don't use the
- * SCSI functions.
- */
-
-#undef CONFIG_SCSI
-#undef CONFIG_SCSI_MODULE
-#if defined(CONFIG_SCSI) || defined(CONFIG_SCSI_MODULE)
-
-struct edd_match_data {
-	struct edd_device	* edev;
-	struct scsi_device	* sd;
-};
-
-/**
- * edd_match_scsidev()
- * @edev - EDD device is a known SCSI device
- * @sd - scsi_device with host who's parent is a PCI controller
- *
- * returns 1 if a match is found, 0 if not.
- */
-static int edd_match_scsidev(struct device * dev, void * d)
-{
-	struct edd_match_data * data = (struct edd_match_data *)d;
-	struct edd_info *info = edd_dev_get_info(data->edev);
-	struct scsi_device * sd = to_scsi_device(dev);
-
-	if (info) {
-		if ((sd->channel == info->params.interface_path.pci.channel) &&
-		    (sd->id == info->params.device_path.scsi.id) &&
-		    (sd->lun == info->params.device_path.scsi.lun)) {
-			data->sd = sd;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-/**
- * edd_find_matching_device()
- * @edev - edd_device to match
- *
- * Search the SCSI devices for a drive that matches the EDD
- * device descriptor we have. If we find a match, return it,
- * otherwise, return NULL.
- */
-
-static struct scsi_device *
-edd_find_matching_scsi_device(struct edd_device *edev)
-{
-	struct edd_match_data data;
-	struct bus_type * scsi_bus = find_bus("scsi");
-
-	if (!scsi_bus) {
-		return NULL;
-	}
-
-	data.edev = edev;
-
-	if (edd_dev_is_type(edev, "SCSI")) {
-		if (bus_for_each_dev(scsi_bus,NULL,&data,edd_match_scsidev))
-			return data.sd;
-	}
-	return NULL;
-}
-
-static int
-edd_create_symlink_to_scsidev(struct edd_device *edev)
-{
-	struct pci_dev *pci_dev;
-	int rc = -EINVAL;
-
-	pci_dev = edd_get_pci_dev(edev);
-	if (pci_dev) {
-		struct scsi_device * sdev = edd_find_matching_scsi_device(edev);
-		if (sdev && get_device(&sdev->sdev_driverfs_dev)) {
-			rc = sysfs_create_link(&edev->kobj,
-					       &sdev->sdev_driverfs_dev.kobj,
-					       "disc");
-			put_device(&sdev->sdev_driverfs_dev);
-		}
-	}
-	return rc;
-}
-
-#else
-static int
-edd_create_symlink_to_scsidev(struct edd_device *edev)
-{
-	return -ENOSYS;
-}
-#endif
-
-
 static inline void
 edd_device_unregister(struct edd_device *edev)
 {
@@ -807,7 +700,6 @@ static void edd_populate_dir(struct edd_device * edev)
 
 	if (!error) {
 		edd_create_symlink_to_pcidev(edev);
-		edd_create_symlink_to_scsidev(edev);
 	}
 }
 
@@ -820,8 +712,8 @@ edd_device_register(struct edd_device *edev, int i)
 		return 1;
 	memset(edev, 0, sizeof (*edev));
 	edd_dev_set_info(edev, &edd[i]);
-	snprintf(edev->kobj.name, EDD_DEVICE_NAME_SIZE, "int13_dev%02x",
-		 edd[i].device);
+	kobject_set_name(&edev->kobj, "int13_dev%02x",
+			 edd[i].device);
 	kobj_set_kset_s(edev,edd_subsys);
 	error = kobject_register(&edev->kobj);
 	if (!error)
@@ -842,9 +734,8 @@ edd_init(void)
 	int rc=0;
 	struct edd_device *edev;
 
-	printk(KERN_INFO "BIOS EDD facility v%s, %d devices found\n",
-	       EDD_VERSION, eddnr);
-	printk(KERN_INFO "Please report your BIOS at %s\n", REPORT_URL);
+	printk(KERN_INFO "BIOS EDD facility v%s %s, %d devices found\n",
+	       EDD_VERSION, EDD_DATE, eddnr);
 
 	if (!eddnr) {
 		printk(KERN_INFO "EDD information not available.\n");

@@ -121,6 +121,8 @@ extern int sun3fb_init(void);
 extern int sun3fb_setup(char *);
 extern int sgivwfb_init(void);
 extern int sgivwfb_setup(char*);
+extern int gbefb_init(void);
+extern int gbefb_setup(char*);
 extern int rivafb_init(void);
 extern int rivafb_setup(char*);
 extern int tdfxfb_init(void);
@@ -306,6 +308,9 @@ static struct {
 
 #ifdef CONFIG_FB_SGIVW
 	{ "sgivwfb", sgivwfb_init, sgivwfb_setup },
+#endif
+#ifdef CONFIG_FB_GBE
+	{ "gbefb", gbefb_init, gbefb_setup },
 #endif
 #ifdef CONFIG_FB_ACORN
 	{ "acornfb", acornfb_init, acornfb_setup },
@@ -1178,8 +1183,7 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	if (boot_cpu_data.x86 > 3)
 		pgprot_val(vma->vm_page_prot) |= _PAGE_PCD;
 #elif defined(__mips__)
-	pgprot_val(vma->vm_page_prot) &= ~_CACHE_MASK;
-	pgprot_val(vma->vm_page_prot) |= _CACHE_UNCACHED;
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 #elif defined(__hppa__)
 	pgprot_val(vma->vm_page_prot) |= _PAGE_NO_CACHE;
 #elif defined(__ia64__) || defined(__arm__) || defined(__sh__)

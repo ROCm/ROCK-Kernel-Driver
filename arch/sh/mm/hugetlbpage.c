@@ -248,8 +248,9 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 				goto out;
 			}
 			ret = add_to_page_cache(page, mapping, idx, GFP_ATOMIC);
-			unlock_page(page);
-			if (ret) {
+			if (! ret) {
+				unlock_page(page);
+			} else {
 				hugetlb_put_quota(mapping);
 				free_huge_page(page);
 				goto out;

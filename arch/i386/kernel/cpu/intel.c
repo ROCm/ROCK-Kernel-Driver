@@ -28,6 +28,15 @@ extern int trap_init_f00f_bug(void);
 struct movsl_mask movsl_mask;
 #endif
 
+void __init early_intel_workaround(struct cpuinfo_x86 *c)
+{
+	if (c->x86_vendor != X86_VENDOR_INTEL)
+		return;
+	/* Netburst reports 64 bytes clflush size, but does IO in 128 bytes */
+	if (c->x86 == 15 && c->x86_cache_alignment == 64)
+		c->x86_cache_alignment = 128;
+}
+
 /*
  *	Early probe support logic for ppro memory erratum #50
  *
@@ -36,42 +45,14 @@ struct movsl_mask movsl_mask;
  
 int __init ppro_with_ram_bug(void)
 {
-	char vendor_id[16];
-	int ident;
-
-	/* Must have CPUID */
-	if(!have_cpuid_p())
-		return 0;
-	if(cpuid_eax(0)<1)
-		return 0;
-	
-	/* Must be Intel */
-	cpuid(0, &ident, 
-		(int *)&vendor_id[0],
-		(int *)&vendor_id[8],
-		(int *)&vendor_id[4]);
-	
-	if(memcmp(vendor_id, "IntelInside", 12))
-		return 0;
-	
-	ident = cpuid_eax(1);
-
-	/* Model 6 */
-
-	if(((ident>>8)&15)!=6)
-		return 0;
-	
-	/* Pentium Pro */
-
-	if(((ident>>4)&15)!=1)
-		return 0;
-	
-	if((ident&15) < 8)
-	{
+	/* Uses data from early_cpu_detect now */
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL &&
+	    boot_cpu_data.x86 == 6 &&
+	    boot_cpu_data.x86_model == 1 &&
+	    boot_cpu_data.x86_mask < 8) {
 		printk(KERN_INFO "Pentium Pro with Errata#50 detected. Taking evasive action.\n");
 		return 1;
 	}
-	printk(KERN_INFO "Your Pentium Pro seems ok.\n");
 	return 0;
 }
 	

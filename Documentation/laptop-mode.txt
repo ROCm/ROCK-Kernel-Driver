@@ -76,6 +76,11 @@ Caveats
   variables in centisecs (like most other subsystems do) but in "jiffies",
   which is an internal kernel measure. Once this is fixed things will get better.
 
+* It has been reported that some versions of the mutt mail client use file access
+  times to determine whether a folder contains new mail. If you use mutt and
+  experience this, you must disable the noatime remounting in the control script
+  by setting DO_REMOUNT_NOATIME=0.
+
 
 The details
 -----------
@@ -295,6 +300,9 @@ esac
 # Shall we remount journaled fs. with appropiate commit interval? (1=yes)
 DO_REMOUNTS=1
 
+# And shall we add the "noatime" option to that as well? (1=yes)
+DO_REMOUNT_NOATIME=1
+
 # age time, in seconds. should be put into a sysconfig file
 MAX_AGE=600
 
@@ -333,6 +341,10 @@ fi
 if [ ! -w /proc/sys/vm/laptop_mode ]; then
 	echo "You do not have enough privileges to enable laptop_mode."
 	exit 1
+fi
+
+if [ $DO_REMOUNT_NOATIME -eq 1 ]; then
+	NOATIME_OPT=",noatime"
 fi
 
 case "$1" in
@@ -376,10 +388,10 @@ case "$1" in
 				case "$FST" in
 					"ext3"|"reiserfs")
 						PARSEDOPTS="$(parse_mount_opts commit "$OPTS")"
-						mount $DEV -t $FST $MP -o remount,$PARSEDOPTS,commit=$MAX_AGE,noatime
+						mount $DEV -t $FST $MP -o remount,$PARSEDOPTS,commit=$MAX_AGE$NOATIME_OPT
 						;;
 					"xfs")
-						mount $DEV -t $FST $MP -o remount,$OPTS,noatime
+						mount $DEV -t $FST $MP -o remount,$OPTS$NOATIME_OPT
 						;;
 				esac
 				if [ -b $DEV ] ; then

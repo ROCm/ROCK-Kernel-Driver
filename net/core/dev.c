@@ -785,7 +785,7 @@ int dev_alloc_name(struct net_device *dev, const char *name)
 /**
  *	dev_change_name - change name of a device
  *	@dev: device
- *	@name: name (or format string) must be at least IFNAMSIZ
+ *	@newname: name (or format string) must be at least IFNAMSIZ
  *
  *	Change name of a device, can pass format strings "eth%d".
  *	for wildcarding.

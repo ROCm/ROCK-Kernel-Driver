@@ -55,6 +55,12 @@ obj-$(CONFIG_SOUND_NM256)	+= nm256_audio.o ac97.o
 obj-$(CONFIG_SOUND_ICH)		+= i810_audio.o ac97_codec.o
 obj-$(CONFIG_SOUND_SONICVIBES)	+= sonicvibes.o
 obj-$(CONFIG_SOUND_CMPCI)	+= cmpci.o
+ifeq ($(CONFIG_SOUND_CMPCI_FM),y)
+  obj-$(CONFIG_SOUND_CMPCI)     += sound.o opl3.o
+endif
+ifeq ($(CONFIG_SOUND_CMPCI_MIDI),y)
+  obj-$(CONFIG_SOUND_CMPCI)     += sound.o mpu401.o
+endif
 obj-$(CONFIG_SOUND_ES1370)	+= es1370.o
 obj-$(CONFIG_SOUND_ES1371)	+= es1371.o ac97_codec.o
 obj-$(CONFIG_SOUND_VRC5477)	+= nec_vrc5477.o ac97_codec.o

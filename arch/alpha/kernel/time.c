@@ -45,6 +45,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/hwrpb.h>
+#include <asm/8253pit.h>
 
 #include <linux/mc146818rtc.h>
 #include <linux/time.h>
@@ -254,12 +255,11 @@ validate_cc_value(unsigned long cc)
  * arch/i386/time.c.
  */
 
-#define PIC_TICK_RATE	1193180UL
 #define CALIBRATE_LATCH	0xffff
 #define TIMEOUT_COUNT	0x100000
 
 static unsigned long __init
-calibrate_cc_with_pic(void)
+calibrate_cc_with_pit(void)
 {
 	int cc, count = 0;
 
@@ -287,7 +287,7 @@ calibrate_cc_with_pic(void)
 	if (count <= 1 || count == TIMEOUT_COUNT)
 		return 0;
 
-	return ((long)cc * PIC_TICK_RATE) / (CALIBRATE_LATCH + 1);
+	return ((long)cc * PIT_TICK_RATE) / (CALIBRATE_LATCH + 1);
 }
 
 /* The Linux interpretation of the CMOS clock register contents:
@@ -313,7 +313,7 @@ time_init(void)
 
 	/* Calibrate CPU clock -- attempt #1.  */
 	if (!est_cycle_freq)
-		est_cycle_freq = validate_cc_value(calibrate_cc_with_pic());
+		est_cycle_freq = validate_cc_value(calibrate_cc_with_pit());
 
 	cc1 = rpcc_after_update_in_progress();
 

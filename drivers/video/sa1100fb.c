@@ -1765,8 +1765,6 @@ static int __init sa1100fb_probe(struct device *dev)
 #endif
 
 	/* This driver cannot be unloaded at the moment */
-	MOD_INC_USE_COUNT;
-
 	return 0;
 
 failed:

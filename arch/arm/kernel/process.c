@@ -411,12 +411,6 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 	return do_fork(flags|CLONE_VM|CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }
 
-/*
- * These bracket the sleeping functions..
- */
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
-
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long fp, lr;
@@ -431,7 +425,7 @@ unsigned long get_wchan(struct task_struct *p)
 		if (fp < stack_page || fp > 4092+stack_page)
 			return 0;
 		lr = pc_pointer (((unsigned long *)fp)[-1]);
-		if (lr < first_sched || lr > last_sched)
+		if (!in_sched_functions(lr))
 			return lr;
 		fp = *(unsigned long *) (fp - 12);
 	} while (count ++ < 16);

@@ -35,7 +35,8 @@ static int ibm_workpad_setup(void)
 	ioport_resource.end = IO_PORT_RESOURCE_END;
 
 #ifdef CONFIG_SERIAL_8250
-	vr41xx_siu_init(SIU_RS232C, 0);
+	vr41xx_select_siu_interface(SIU_RS232C, IRDA_NONE);
+	vr41xx_siu_init();
 #endif
 
 	return 0;

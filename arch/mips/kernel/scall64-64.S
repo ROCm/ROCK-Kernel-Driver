@@ -36,14 +36,16 @@ NESTED(handle_sys64, PT_SIZE, sp)
 	STI
 	.set	at
 #endif
-	ld	t1, PT_EPC(sp)		# skip syscall on return
 
 FEXPORT(__handle_sys64)
 	subu	t0, v0, __NR_64_Linux	# check syscall number
 	sltiu	t0, t0,	__NR_64_Linux_syscalls + 1
+#if !defined(CONFIG_MIPS32_O32) && !defined(CONFIG_MIPS32_N32)
+	ld	t1, PT_EPC(sp)		# skip syscall on return
 	daddiu	t1, 4			# skip to next instruction
-	beqz	t0, illegal_syscall
 	sd	t1, PT_EPC(sp)
+#endif
+	beqz	t0, illegal_syscall
 
 	dsll	t0, v0, 3		# offset into table
 	ld	t2, (sys_call_table - (__NR_64_Linux * 8))(t0)
@@ -85,6 +87,8 @@ n64_syscall_exit_work:
 syscall_trace_entry:
 	SAVE_STATIC
 	sd	t2,PT_R1(sp)
+	move	a0, sp
+	li	a1, 0
 	jal	do_syscall_trace
 	ld	t2,PT_R1(sp)
 
@@ -165,13 +169,15 @@ illegal_syscall:
 
 	/* Success, so skip usual error handling garbage.  */
 	LONG_L	a2, TI_FLAGS($28)	# syscall tracing enabled?
-	li	t0, _TIF_SYSCALL_TRACE
+	li	t0, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
 	and	t0, a2, t0
 	bnez	t0, 1f
 
 	b	syscall_exit
 
 1:	SAVE_STATIC
+	move	a0, sp
+	li	a1, 1
 	jal	do_syscall_trace
 	j	syscall_exit
 
@@ -432,3 +438,12 @@ sys_call_table:
 	PTR	sys_clock_nanosleep
 	PTR	sys_tgkill			/* 5225 */
 	PTR	sys_utimes
+	PTR	sys_ni_syscall			/* sys_mbind */
+	PTR	sys_ni_syscall			/* sys_get_mempolicy */
+	PTR	sys_ni_syscall			/* sys_set_mempolicy */
+	PTR	sys_mq_open			/* 5230 */
+	PTR	sys_mq_unlink
+	PTR	sys_mq_timedsend
+	PTR	sys_mq_timedreceive
+	PTR	sys_mq_notify
+	PTR	sys_mq_getsetattr		/* 5235 */

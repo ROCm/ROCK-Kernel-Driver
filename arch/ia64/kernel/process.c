@@ -657,11 +657,6 @@ get_wchan (struct task_struct *p)
 	struct unw_frame_info info;
 	unsigned long ip;
 	int count = 0;
-	/*
-	 * These bracket the sleeping functions..
-	 */
-#	define first_sched	((unsigned long) scheduling_functions_start_here)
-#	define last_sched	((unsigned long) scheduling_functions_end_here)
 
 	/*
 	 * Note: p may not be a blocked task (it could be current or
@@ -676,12 +671,10 @@ get_wchan (struct task_struct *p)
 		if (unw_unwind(&info) < 0)
 			return 0;
 		unw_get_ip(&info, &ip);
-		if (ip < first_sched || ip >= last_sched)
+		if (!in_sched_functions(ip))
 			return ip;
 	} while (count++ < 16);
 	return 0;
-#	undef first_sched
-#	undef last_sched
 }
 
 void

@@ -780,8 +780,8 @@ static struct mtd_info *amd_flash_probe(struct map_info *map)
 	map->fldrv_priv = private;
 
 	map->fldrv = &amd_flash_chipdrv;
-	MOD_INC_USE_COUNT;
 
+	__module_get(THIS_MODULE);
 	return mtd;
 }
 

@@ -327,6 +327,9 @@ smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 	struct smp_call_struct data;
 	unsigned long timeout;
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+
+	/* Can deadlock when called with interrupts disabled */
+	WARN_ON(irqs_disabled());
 	
 	data.func = func;
 	data.info = info;

@@ -33,89 +33,170 @@
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/vmalloc.h>
 
 #include <asm/mach-au1x00/au1000.h>
+
+#undef DEBUG
+#ifdef DEBUG
+#define DBG(x...) printk(x)
+#else
+#define DBG(x...)
+#endif
 
 #define PCI_ACCESS_READ  0
 #define PCI_ACCESS_WRITE 1
 
 
+int (*board_pci_idsel)(unsigned int devsel, int assert);
+
+/* CP0 hazard avoidance. */
+#define BARRIER __asm__ __volatile__(".set noreorder\n\t" \
+				     "nop; nop; nop; nop;\t" \
+				     ".set reorder\n\t")
+
+void mod_wired_entry(int entry, unsigned long entrylo0,
+		unsigned long entrylo1, unsigned long entryhi,
+		unsigned long pagemask)
+{
+	unsigned long old_pagemask;
+	unsigned long old_ctx;
+
+	/* Save old context and create impossible VPN2 value */
+	old_ctx = read_c0_entryhi() & 0xff;
+	old_pagemask = read_c0_pagemask();
+	write_c0_index(entry);
+	BARRIER;
+	write_c0_pagemask(pagemask);
+	write_c0_entryhi(entryhi);
+	write_c0_entrylo0(entrylo0);
+	write_c0_entrylo1(entrylo1);
+	BARRIER;
+	tlb_write_indexed();
+	BARRIER;
+	write_c0_entryhi(old_ctx);
+	BARRIER;
+	write_c0_pagemask(old_pagemask);
+}
+
+struct vm_struct *pci_cfg_vm;
+static int pci_cfg_wired_entry;
+static int first_cfg = 1;
+unsigned long last_entryLo0, last_entryLo1;
+
 static int config_access(unsigned char access_type, struct pci_bus *bus,
-			 unsigned int devfn, unsigned char where,
+			 unsigned int dev_fn, unsigned char where,
 			 u32 * data)
 {
-	unsigned int device = PCI_SLOT(devfn);
-	unsigned int function = PCI_FUNC(devfn);
-	unsigned long config, status;
-	unsigned long cfg_addr;
+#if defined( CONFIG_SOC_AU1500 ) || defined( CONFIG_SOC_AU1550 )
+	unsigned int device = PCI_SLOT(dev_fn);
+	unsigned int function = PCI_FUNC(dev_fn);
+	unsigned long offset, status;
+	unsigned long cfg_base;
+	unsigned long flags;
+	int error = PCIBIOS_SUCCESSFUL;
+	unsigned long entryLo0, entryLo1;
 
 	if (device > 19) {
 		*data = 0xffffffff;
 		return -1;
 	}
 
-	au_writel(((0x2000 << 16) |
-		   (au_readl(Au1500_PCI_STATCMD) & 0xffff)),
-		  Au1500_PCI_STATCMD);
-	//au_writel(au_readl(Au1500_PCI_CFG) & ~PCI_ERROR, Au1500_PCI_CFG);
+	local_irq_save(flags);
+	au_writel(((0x2000 << 16) | (au_readl(Au1500_PCI_STATCMD) & 0xffff)),
+			Au1500_PCI_STATCMD);
 	au_sync_udelay(1);
 
-	/* setup the config window */
-	if (bus->number == 0) {
-		cfg_addr = (unsigned long) ioremap(Au1500_EXT_CFG |
-						   ((1 << device) << 11),
-						   0x00100000);
-	} else {
-		cfg_addr = (unsigned long) ioremap(Au1500_EXT_CFG_TYPE1 |
-						   (bus->
-						    number << 16) | (device
-								     <<
-								     11),
-						   0x00100000);
+	/*
+	 * We can't ioremap the entire pci config space because it's
+	 * too large. Nor can we call ioremap dynamically because some
+	 * device drivers use the pci config routines from within
+	 * interrupt handlers and that becomes a problem in get_vm_area().
+	 * We use one wired tlb to handle all config accesses for all
+	 * busses. To improve performance, if the current device
+	 * is the same as the last device accessed, we don't touch the
+	 * tlb.
+	 */
+	if (first_cfg) {
+		/* reserve a wired entry for pci config accesses */
+		first_cfg = 0;
+		pci_cfg_vm = get_vm_area(0x2000, 0);
+		if (!pci_cfg_vm)
+			panic (KERN_ERR "PCI unable to get vm area\n");
+		pci_cfg_wired_entry = read_c0_wired();
+		add_wired_entry(0, 0, (unsigned long)pci_cfg_vm->addr, PM_4K);
+		last_entryLo0  = last_entryLo1 = 0xffffffff;
 	}
 
-	if (!cfg_addr)
-		panic(KERN_ERR "PCI unable to ioremap cfg space\n");
-
-	/* setup the lower bits of the 36 bit address */
-	config = cfg_addr | (function << 8) | (where & ~0x3);
-
-#if 1
-	if (access_type == PCI_ACCESS_WRITE) {
-		printk("cfg write:  ");
-	} else {
-		printk("cfg read:  ");
+	/* Since the Au1xxx doesn't do the idsel timing exactly to spec,
+	 * many board vendors implement their own off-chip idsel, so call
+	 * it now.  If it doesn't succeed, may as well bail out at this point.
+	 */
+	if (board_pci_idsel) {
+		if (board_pci_idsel(device, 1) == 0) {
+			*data = 0xffffffff;
+			local_irq_restore(flags);
+			return -1;
+		}
 	}
-	printk("devfn %x, device %x func %x  \n", devfn, device, function);
-	if (access_type == PCI_ACCESS_WRITE) {
-		printk("data %x\n", *data);
+
+        /* setup the config window */
+        if (bus->number == 0) {
+                cfg_base = ((1<<device)<<11);
+        } else {
+                cfg_base = 0x80000000 | (bus->number<<16) | (device<<11);
+        }
+
+        /* setup the lower bits of the 36 bit address */
+        offset = (function << 8) | (where & ~0x3);
+	/* pick up any address that falls below the page mask */
+	offset |= cfg_base & ~PAGE_MASK;
+
+	/* page boundary */
+	cfg_base = cfg_base & PAGE_MASK;
+
+	entryLo0 = (6 << 26)  | (cfg_base >> 6) | (2 << 3) | 7;
+	entryLo1 = (6 << 26)  | (cfg_base >> 6) | (0x1000 >> 6) | (2 << 3) | 7;
+
+	if ((entryLo0 != last_entryLo0) || (entryLo1 != last_entryLo1)) {
+		mod_wired_entry(pci_cfg_wired_entry, entryLo0, entryLo1,
+				(unsigned long)pci_cfg_vm->addr, PM_4K);
+		last_entryLo0 = entryLo0;
+		last_entryLo1 = entryLo1;
 	}
-#endif
 
 	if (access_type == PCI_ACCESS_WRITE) {
-		au_writel(*data, config);
+		au_writel(*data, (int)(pci_cfg_vm->addr + offset));
 	} else {
-		*data = au_readl(config);
+		*data = au_readl((int)(pci_cfg_vm->addr + offset));
 	}
 	au_sync_udelay(2);
 
-	/* unmap io space */
-	iounmap((void *) cfg_addr);
+	DBG("cfg_access %d bus->number %d dev %d at %x *data %x conf %x\n",
+			access_type, bus->number, device, where, *data, offset);
 
 	/* check master abort */
 	status = au_readl(Au1500_PCI_STATCMD);
-	if (status & (1 << 29)) {
-		printk("master abort\n");
+
+	if (status & (1<<29)) {
 		*data = 0xffffffff;
-		return -1;
+		error = -1;
+		DBG("Au1x Master Abort\n");
 	} else if ((status >> 28) & 0xf) {
-		printk("PCI ERR detected: status %x\n", status);
+		DBG("PCI ERR detected: status %x\n", status);
 		*data = 0xffffffff;
-		return -1;
-	} else {
-		printk("bios_successful: %x\n", *data);
-		return PCIBIOS_SUCCESSFUL;
+		error = -1;
 	}
+
+	/* Take away the idsel.
+	*/
+	if (board_pci_idsel) {
+		(void)board_pci_idsel(device, 0);
+	}
+
+	local_irq_restore(flags);
+	return error;
+#endif
 }
 
 static int read_config_byte(struct pci_bus *bus, unsigned int devfn,

@@ -166,18 +166,18 @@ static void hub_set_piomode(nasid_t nasid)
 	REMOTE_HUB_S(nasid, IIO_OUTWIDGET_ACCESS, ii_iowa);
 }
 
-/**
+/*
  * hub_pio_init  -  PIO-related hub initalization
  *
  * @hub:	hubinfo structure for our hub
- **/
+ */
 void hub_pio_init(cnodeid_t cnode)
 {
 	nasid_t nasid = COMPACT_TO_NASID_NODEID(cnode);
 	unsigned i;
 
 	/* initialize big window piomaps for this hub */
-	CLEAR_BITMAP(HUB_DATA(cnode)->h_bigwin_used, HUB_NUM_BIG_WINDOW);
+	bitmap_zero(HUB_DATA(cnode)->h_bigwin_used, HUB_NUM_BIG_WINDOW);
 	for (i = 0; i < HUB_NUM_BIG_WINDOW; i++)
 		IIO_ITTE_DISABLE(nasid, i);
 

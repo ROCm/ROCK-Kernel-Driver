@@ -65,7 +65,8 @@
 #define SECINITSID_KMOD                                 24
 #define SECINITSID_POLICY                               25
 #define SECINITSID_SCMP_PACKET                          26
+#define SECINITSID_DEVNULL                              27
 
-#define SECINITSID_NUM                                  26
+#define SECINITSID_NUM                                  27
 
 #endif

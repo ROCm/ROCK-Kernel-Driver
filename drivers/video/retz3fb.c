@@ -1432,8 +1432,6 @@ int __init retz3fb_init(void)
 		       fb_info->modename, zinfo->fbsize>>10);
 
 		/* FIXME: This driver cannot be unloaded yet */
-		MOD_INC_USE_COUNT;
-
 		res = 0;
 	}
 	return res;
@@ -1490,16 +1488,6 @@ MODULE_LICENSE("GPL");
 int init_module(void)
 {
 	return retz3fb_init();
-}
-
-void cleanup_module(void)
-{
-	/*
-	 * Not reached because the usecount will never
-	 * be decremented to zero
-	 *
-	 * FIXME: clean up ... *
-	 */
 }
 #endif
 

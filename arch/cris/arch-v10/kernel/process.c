@@ -217,8 +217,8 @@ asmlinkage int sys_execve(const char *fname, char **argv, char **envp,
  * These bracket the sleeping functions..
  */
 
-#define first_sched     ((unsigned long) scheduling_functions_start_here)
-#define last_sched      ((unsigned long) scheduling_functions_end_here)
+#define first_sched	((unsigned long)__sched_text_start)
+#define last_sched	((unsigned long)__sched_text_end)
 
 unsigned long get_wchan(struct task_struct *p)
 {

@@ -136,6 +136,9 @@ extern void vr41xx_mask_clock(vr41xx_clock_t clock);
 extern int vr41xx_set_intassign(unsigned int irq, unsigned char intassign);
 extern int vr41xx_cascade_irq(unsigned int irq, int (*get_irq_number)(int irq));
 
+extern void vr41xx_enable_dsiuint(void);
+extern void vr41xx_disable_dsiuint(void);
+
 /*
  * Power Management Unit
  */
@@ -189,22 +192,25 @@ enum {
 /*
  * Serial Interface Unit
  */
-extern void vr41xx_siu_init(int interface, int module);
-extern void vr41xx_siu_ifselect(int interface, int module);
+extern void vr41xx_siu_init(void);
 extern int vr41xx_serial_ports;
 
 /* SIU interfaces */
-enum {
+typedef enum {
 	SIU_RS232C,
 	SIU_IRDA
-};
+} siu_interface_t;
 
 /* IrDA interfaces */
-enum {
-	IRDA_SHARP = 1,
+typedef enum {
+	IRDA_NONE,
+	IRDA_SHARP,
 	IRDA_TEMIC,
 	IRDA_HP
-};
+} irda_module_t;
+
+extern void vr41xx_select_siu_interface(siu_interface_t interface,
+                                        irda_module_t module);
 
 /*
  * Debug Serial Interface Unit

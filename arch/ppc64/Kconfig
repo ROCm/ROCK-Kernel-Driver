@@ -49,6 +49,10 @@ config FORCE_MAX_ZONEORDER
 
 source "init/Kconfig"
 
+config SYSVIPC_COMPAT
+	bool
+	depends on COMPAT && SYSVIPC
+	default y
 
 menu "Platform support"
 
@@ -172,6 +176,15 @@ config DISCONTIGMEM
 config NUMA
 	bool "NUMA support"
 	depends on DISCONTIGMEM
+
+config SCHED_SMT
+	bool "SMT (Hyperthreading) scheduler support"
+	depends on SMP
+	default off
+	help
+	  SMT scheduler support improves the CPU scheduler's decision making
+	  when dealing with POWER5 cpus at a cost of slightly increased
+	  overhead in some places. If unsure say N here.
 
 config PREEMPT
 	bool "Preemptible Kernel"

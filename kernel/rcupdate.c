@@ -223,13 +223,13 @@ static void rcu_process_callbacks(unsigned long unused)
 
 	if (!list_empty(&RCU_curlist(cpu)) &&
 	    rcu_batch_after(rcu_ctrlblk.curbatch, RCU_batch(cpu))) {
-		list_splice(&RCU_curlist(cpu), &list);
+		__list_splice(&RCU_curlist(cpu), &list);
 		INIT_LIST_HEAD(&RCU_curlist(cpu));
 	}
 
 	local_irq_disable();
 	if (!list_empty(&RCU_nxtlist(cpu)) && list_empty(&RCU_curlist(cpu))) {
-		list_splice(&RCU_nxtlist(cpu), &RCU_curlist(cpu));
+		__list_splice(&RCU_nxtlist(cpu), &RCU_curlist(cpu));
 		INIT_LIST_HEAD(&RCU_nxtlist(cpu));
 		local_irq_enable();
 

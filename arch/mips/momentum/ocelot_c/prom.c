@@ -23,19 +23,9 @@
 #include <asm/addrspace.h>
 #include <asm/bootinfo.h>
 #include <asm/mv64340.h>
+#include <asm/pmon.h>
 
 #include "ocelot_c_fpga.h"
-
-struct callvectors {
-	int	(*open) (char*, int, int);
-	int	(*close) (int);
-	int	(*read) (int, void*, int);
-	int	(*write) (int, void*, int);
-	off_t	(*lseek) (int, off_t, int);
-	int	(*printf) (const char*, ...);
-	void	(*cacheflush) (void);
-	char*	(*gets) (char*);
-};
 
 struct callvectors* debug_vectors;
 

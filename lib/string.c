@@ -445,8 +445,8 @@ void * memset(void * s,int c,size_t count)
 #ifndef __HAVE_ARCH_BCOPY
 /**
  * bcopy - Copy one area of memory to another
- * @src: Where to copy from
- * @dest: Where to copy to
+ * @srcp: Where to copy from
+ * @destp: Where to copy to
  * @count: The size of the area.
  *
  * Note that this is the same as memcpy(), with the arguments reversed.

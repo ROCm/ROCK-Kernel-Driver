@@ -319,6 +319,21 @@ config FB_SGIVW
 	help
 	  SGI Visual Workstation support for framebuffer graphics.
 
+config FB_GBE
+	bool "SGI Graphics Backend frame buffer support"
+	depends on FB && (SGI_IP32 || X86_VISWS)
+ 	help
+	  This is the frame buffer device driver for SGI Graphics Backend.
+	  This chip is used in SGI O2 and Visual Workstation 320/540.
+
+config FB_GBE_MEM
+	int "Video memory size in MB"
+	depends on FB_GBE
+	default 8
+	help
+	  This is the amount of memory reserved for the framebuffer,
+	  which can be any value between 1MB and 8MB.
+
 config BUS_I2C
 	bool
 	depends on FB && VISWS

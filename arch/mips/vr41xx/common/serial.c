@@ -40,14 +40,8 @@
 #include <asm/io.h>
 #include <asm/vr41xx/vr41xx.h>
 
-/* VR4111 and VR4121 SIU Registers */
-#define SIURB_TYPE1		KSEG1ADDR(0x0c000000)
 #define SIUIRSEL_TYPE1		KSEG1ADDR(0x0c000008)
-
-/* VR4122, VR4131 and VR4133 SIU Registers */
-#define SIURB_TYPE2		KSEG1ADDR(0x0f000800)
 #define SIUIRSEL_TYPE2		KSEG1ADDR(0x0f000808)
-
  #define USE_RS232C		0x00
  #define USE_IRDA		0x01
  #define SIU_USES_IRDA		0x00
@@ -58,21 +52,24 @@
  #define TMICTX			0x10
  #define TMICMODE		0x20
 
+#define SIU_BASE_TYPE1		0x0c000000UL	/* VR4111 and VR4121 */
+#define SIU_BASE_TYPE2		0x0f000800UL	/* VR4122, VR4131 and VR4133 */
+#define SIU_SIZE		0x8UL
+
 #define SIU_BASE_BAUD		1152000
 
-/* VR4122 and VR4131 DSIU Registers */
-#define DSIURB			KSEG1ADDR(0x0f000820)
-
-#define MDSIUINTREG		KSEG1ADDR(0x0f000096)
- #define INTDSIU		0x0800
+/* VR4122, VR4131 and VR4133 DSIU Registers */
+#define DSIU_BASE		0x0f000820UL
+#define DSIU_SIZE		0x8UL
 
 #define DSIU_BASE_BAUD		1152000
 
 int vr41xx_serial_ports = 0;
 
-void vr41xx_siu_ifselect(int interface, int module)
+void vr41xx_select_siu_interface(siu_interface_t interface,
+                                 irda_module_t module)
 {
-	u16 val = USE_RS232C;	/* Select RS-232C */
+	uint16_t val = USE_RS232C;	/* Select RS-232C */
 
 	/* Select IrDA */
 	if (interface == SIU_IRDA) {
@@ -86,6 +83,9 @@ void vr41xx_siu_ifselect(int interface, int module)
 		case IRDA_HP:
 			val = IRDA_MODULE_HP;
 			break;
+		default:
+			printk(KERN_ERR "SIU: unknown IrDA module\n");
+			return;
 		}
 		val |= USE_IRDA | SIU_USES_IRDA;
 	}
@@ -101,45 +101,47 @@ void vr41xx_siu_ifselect(int interface, int module)
 		writew(val, SIUIRSEL_TYPE2);
 		break;
 	default:
-		printk(KERN_INFO "Unexpected CPU of NEC VR4100 series\n");
+		printk(KERN_ERR "SIU: unsupported CPU of NEC VR4100 series\n");
 		break;
 	}
 }
 
-void __init vr41xx_siu_init(int interface, int module)
+void __init vr41xx_siu_init(void)
 {
 	struct uart_port port;
-
-	vr41xx_siu_ifselect(interface, module);
 
 	memset(&port, 0, sizeof(port));
 
 	port.line = vr41xx_serial_ports;
-	port.uartclk = SIU_BASE_BAUD;
+	port.uartclk = SIU_BASE_BAUD * 16;
 	port.irq = SIU_IRQ;
-	port.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST;
+	port.flags = UPF_RESOURCES | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST;
 	switch (current_cpu_data.cputype) {
 	case CPU_VR4111:
 	case CPU_VR4121:
-		port.membase = (char *)SIURB_TYPE1;
+		port.mapbase = SIU_BASE_TYPE1;
 		break;
 	case CPU_VR4122:
 	case CPU_VR4131:
 	case CPU_VR4133:
-		port.membase = (char *)SIURB_TYPE2;
+		port.mapbase = SIU_BASE_TYPE2;
 		break;
 	default:
-		panic("Unexpected CPU of NEC VR4100 series");
-		break;
+		printk(KERN_ERR "SIU: unsupported CPU of NEC VR4100 series\n");
+		return;
 	}
 	port.regshift = 0;
 	port.iotype = UPIO_MEM;
-	if (early_serial_setup(&port) != 0)
-		printk(KERN_ERR "SIU setup failed!\n");
+	port.membase = ioremap(port.mapbase, SIU_SIZE);
+	if (port.membase != NULL) {
+		if (early_serial_setup(&port) == 0) {
+			vr41xx_supply_clock(SIU_CLOCK);
+			vr41xx_serial_ports++;
+			return;
+		}
+	}
 
-	vr41xx_supply_clock(SIU_CLOCK);
-
-	vr41xx_serial_ports++;
+	printk(KERN_ERR "SIU: setup failed!\n");
 }
 
 void __init vr41xx_dsiu_init(void)
@@ -148,24 +150,29 @@ void __init vr41xx_dsiu_init(void)
 
 	if (current_cpu_data.cputype != CPU_VR4122 &&
 	    current_cpu_data.cputype != CPU_VR4131 &&
-	    current_cpu_data.cputype != CPU_VR4133)
+	    current_cpu_data.cputype != CPU_VR4133) {
+		printk(KERN_ERR "DSIU: unsupported CPU of NEC VR4100 series\n");
 		return;
+	}
 
 	memset(&port, 0, sizeof(port));
 
 	port.line = vr41xx_serial_ports;
-	port.uartclk = DSIU_BASE_BAUD;
+	port.uartclk = DSIU_BASE_BAUD * 16;
 	port.irq = DSIU_IRQ;
-	port.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST;
-	port.membase = (char *)DSIURB;
+	port.flags = UPF_RESOURCES | UPF_BOOT_AUTOCONF | UPF_SKIP_TEST;
+	port.mapbase = DSIU_BASE;
 	port.regshift = 0;
 	port.iotype = UPIO_MEM;
-	if (early_serial_setup(&port) != 0)
-		printk(KERN_ERR "DSIU setup failed!\n");
+	port.membase = ioremap(port.mapbase, DSIU_SIZE);
+	if (port.membase != NULL) {
+		if (early_serial_setup(&port) == 0) {
+			vr41xx_supply_clock(DSIU_CLOCK);
+			vr41xx_enable_dsiuint();
+			vr41xx_serial_ports++;
+			return;
+		}
+	}
 
-	vr41xx_supply_clock(DSIU_CLOCK);
-
-	writew(INTDSIU, MDSIUINTREG);
-
-	vr41xx_serial_ports++;
+	printk(KERN_ERR "DSIU: setup failed!\n");
 }

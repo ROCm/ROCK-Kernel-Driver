@@ -244,6 +244,40 @@ config REISERFS_PROC_INFO
 	  Almost everyone but ReiserFS developers and people fine-tuning
 	  reiserfs or tracing problems should say N.
 
+config REISERFS_FS_XATTR
+	bool "ReiserFS extended attributes"
+	depends on REISERFS_FS
+	help
+	  Extended attributes are name:value pairs associated with inodes by
+	  the kernel or by users (see the attr(5) manual page, or visit
+	  <http://acl.bestbits.at/> for details).
+
+	  If unsure, say N.
+
+config REISERFS_FS_POSIX_ACL
+	bool "ReiserFS POSIX Access Control Lists"
+	depends on REISERFS_FS_XATTR
+	help
+	  Posix Access Control Lists (ACLs) support permissions for users and
+	  groups beyond the owner/group/world scheme.
+
+	  To learn more about Access Control Lists, visit the Posix ACLs for
+	  Linux website <http://acl.bestbits.at/>.
+
+	  If you don't know what Access Control Lists are, say N
+
+config REISERFS_FS_SECURITY
+	bool "ReiserFS Security Labels"
+	depends on REISERFS_FS_XATTR
+	help
+	  Security labels support alternative access control models
+	  implemented by security modules like SELinux.  This option
+	  enables an extended attribute handler for file security
+	  labels in the ReiserFS filesystem.
+
+	  If you are not using a security module that requires using
+	  extended attributes for file security labels, say N.
+
 config JFS_FS
 	tristate "JFS filesystem support"
 	select NLS
@@ -282,13 +316,13 @@ config JFS_STATISTICS
 	  to be made available to the user in the /proc/fs/jfs/ directory.
 
 config FS_POSIX_ACL
-# Posix ACL utility routines (for now, only ext2/ext3/jfs)
+# Posix ACL utility routines (for now, only ext2/ext3/jfs/reiserfs)
 #
 # NOTE: you can implement Posix ACLs without these helpers (XFS does).
 # 	Never use this symbol for ifdefs.
 #
 	bool
-	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL || JFS_POSIX_ACL
+	depends on EXT2_FS_POSIX_ACL || EXT3_FS_POSIX_ACL || JFS_POSIX_ACL || REISERFS_FS_POSIX_ACL
 	default y
 
 config XFS_FS
@@ -1608,22 +1642,6 @@ config CODA_FS_OLD_API
 	  cache manager then say Y.
 	  
 	  For most cases you probably want to say N.
-
-#
-# Intermezzo broke when we added the expanded NGROUPS patches
-#
-config INTERMEZZO_FS
-	tristate "InterMezzo file system support (replicating fs) (EXPERIMENTAL)"
-	depends on INET && EXPERIMENTAL 
-	help
-	  InterMezzo is a networked file system with disconnected operation
-	  and kernel level write back caching.  It is most often used for
-	  replicating potentially large trees or keeping laptop/desktop copies
-	  in sync.
-
-	  If you say Y or M your kernel or module will provide InterMezzo
-	  support.  You will also need a file server daemon, which you can get
-	  from <http://www.inter-mezzo.org/>.
 
 config AFS_FS
 # for fs/nls/Config.in

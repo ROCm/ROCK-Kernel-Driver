@@ -656,6 +656,6 @@ static void __exit exit_misc_binfmt(void)
 	unregister_filesystem(&bm_fs_type);
 }
 
-module_init(init_misc_binfmt);
+core_initcall(init_misc_binfmt);
 module_exit(exit_misc_binfmt);
 MODULE_LICENSE("GPL");

@@ -625,6 +625,11 @@ static inline void prefetchw(const void *x)
 
 #define spin_lock_prefetch(x)	prefetchw(x)
 
+#ifdef CONFIG_SCHED_SMT
+#define ARCH_HAS_SCHED_DOMAIN
+#define ARCH_HAS_SCHED_WAKE_IDLE
+#endif
+
 #endif /* ASSEMBLY */
 
 #endif /* __ASM_PPC64_PROCESSOR_H */

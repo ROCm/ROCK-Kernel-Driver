@@ -27,6 +27,7 @@
 #include <linux/sysdev.h>
 #include <linux/bcd.h>
 #include <linux/kallsyms.h>
+#include <asm/8253pit.h>
 #include <asm/pgtable.h>
 #include <asm/vsyscall.h>
 #include <asm/timex.h>
@@ -54,7 +55,7 @@ static int nohpet __initdata = 0;
 unsigned int cpu_khz;					/* TSC clocks / usec, not used here */
 unsigned long hpet_period;				/* fsecs / HPET clock */
 unsigned long hpet_tick;				/* HPET clocks / interrupt */
-unsigned long vxtime_hz = 1193182;
+unsigned long vxtime_hz = PIT_TICK_RATE;
 int report_lost_ticks;				/* command line option */
 unsigned long long monotonic_base;
 
@@ -600,8 +601,8 @@ static unsigned int __init pit_calibrate_tsc(void)
 	outb((inb(0x61) & ~0x02) | 0x01, 0x61);
 
 	outb(0xb0, 0x43);
-	outb((1193182 / (1000 / 50)) & 0xff, 0x42);
-	outb((1193182 / (1000 / 50)) >> 8, 0x42);
+	outb((PIT_TICK_RATE / (1000 / 50)) & 0xff, 0x42);
+	outb((PIT_TICK_RATE / (1000 / 50)) >> 8, 0x42);
 	rdtscll(start);
 	sync_core();
 	while ((inb(0x61) & 0x20) == 0);

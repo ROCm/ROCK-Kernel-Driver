@@ -53,14 +53,10 @@ static const unsigned char days_in_month[] =
 	{ 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
 int pcf8563_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
-int pcf8563_open(struct inode *, struct file *);
-int pcf8563_release(struct inode *, struct file *);
 
 static struct file_operations pcf8563_fops = {
 	.owner = THIS_MODULE,
 	.ioctl = pcf8563_ioctl,
-	.open = pcf8563_open,
-	.release = pcf8563_release,
 };
 
 unsigned char
@@ -266,20 +262,6 @@ pcf8563_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned
 				return -ENOTTY;
 	}
 
-	return 0;
-}
-
-int 
-pcf8563_open(struct inode *inode, struct file *filp)
-{
-	MOD_INC_USE_COUNT;
-	return 0;
-}
-
-int
-pcf8563_release(struct inode *inode, struct file *filp)
-{
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

@@ -866,12 +866,14 @@ SET_REG(b5);
 	 * Inputs:
 	 *   ar.pfs - saved CFM of caller
 	 *   ar.ccv - 0 (and available for use)
+	 *   r27    - flags from spin_lock_irqsave or 0.  Must be preserved.
 	 *   r28    - available for use.
 	 *   r29    - available for use.
 	 *   r30    - available for use.
 	 *   r31    - address of lock, available for use.
 	 *   b6     - return address
 	 *   p14    - available for use.
+	 *   p15    - used to track flag status.
 	 *
 	 * If you patch this code to use more registers, do not forget to update
 	 * the clobber lists for spin_lock() in include/asm-ia64/spinlock.h.
@@ -885,22 +887,26 @@ GLOBAL_ENTRY(ia64_spinlock_contention_pre3_4)
 	.save rp, r28
 	.body
 	nop 0
-	nop 0
+	tbit.nz p15,p0=r27,IA64_PSR_I_BIT
 	.restore sp		// pop existing prologue after next insn
 	mov b6 = r28
 	.prologue
 	.save ar.pfs, r0
 	.altrp b6
 	.body
+	;;
+(p15)	ssm psr.i		// reenable interrupts if they were on
+				// DavidM says that srlz.d is slow and is not required in this case
 .wait:
 	// exponential backoff, kdb, lockmeter etc. go in here
 	hint @pause
 	ld4 r30=[r31]		// don't use ld4.bias; if it's contended, we won't write the word
 	nop 0
 	;;
-	cmp4.eq p14,p0=r30,r0
-(p14)	br.cond.sptk.few b6	// lock is now free, try to acquire
-	br.cond.sptk.few .wait
+	cmp4.ne p14,p0=r30,r0
+(p14)	br.cond.sptk.few .wait
+(p15)	rsm psr.i		// disable interrupts if we reenabled them
+	br.cond.sptk.few b6	// lock is now free, try to acquire
 END(ia64_spinlock_contention_pre3_4)
 
 #else
@@ -909,14 +915,20 @@ GLOBAL_ENTRY(ia64_spinlock_contention)
 	.prologue
 	.altrp b6
 	.body
+	tbit.nz p15,p0=r27,IA64_PSR_I_BIT
+	;;
 .wait:
+(p15)	ssm psr.i		// reenable interrupts if they were on
+				// DavidM says that srlz.d is slow and is not required in this case
+.wait2:
 	// exponential backoff, kdb, lockmeter etc. go in here
 	hint @pause
 	ld4 r30=[r31]		// don't use ld4.bias; if it's contended, we won't write the word
 	;;
 	cmp4.ne p14,p0=r30,r0
 	mov r30 = 1
-(p14)	br.cond.sptk.few .wait
+(p14)	br.cond.sptk.few .wait2
+(p15)	rsm psr.i		// disable interrupts if we reenabled them
 	;;
 	cmpxchg4.acq r30=[r31], r30, ar.ccv
 	;;

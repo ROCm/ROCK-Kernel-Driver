@@ -1001,6 +1001,8 @@ define all-sources
 	       -name '*.[chS]' -print; \
 	  find arch/$(ARCH) $(RCS_FIND_IGNORE) \
 	       -name '*.[chS]' -print; \
+	  find security/selinux/include $(RCS_FIND_IGNORE) \
+	       -name '*.[chS]' -print; \
 	  find include $(RCS_FIND_IGNORE) \
 	       \( -name config -o -name 'asm-*' \) -prune \
 	       -o -name '*.[chS]' -print; \

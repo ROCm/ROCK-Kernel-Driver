@@ -24,6 +24,7 @@ typedef struct {
 #define spin_lock_init(x)	do { *(x) = SPIN_LOCK_UNLOCKED; } while (0)
 #define spin_is_locked(x)	((x)->lock != 0)
 #define spin_unlock_wait(x)	do { barrier(); } while (spin_is_locked(x))
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 static inline void _raw_spin_lock(spinlock_t *lock)
 {

@@ -308,6 +308,9 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 	if (!cpus)
 		return 0;
 
+	/* Can deadlock when called with interrupts disabled */
+	WARN_ON(irqs_disabled());
+
 	data.func = func;
 	data.info = info;
 	atomic_set(&data.started, 0);

@@ -154,7 +154,7 @@ struct mtd_info *sharp_probe(struct map_info *map)
 	map->fldrv = &sharp_chipdrv;
 	map->fldrv_priv = sharp;
 
-	MOD_INC_USE_COUNT;
+	__module_get(THIS_MODULE);
 	return mtd;
 }
 

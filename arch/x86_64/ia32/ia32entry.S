@@ -447,11 +447,11 @@ ia32_sys_call_table:
 	.quad sys_setfsgid16
 	.quad sys_llseek		/* 140 */
 	.quad sys32_getdents
-	.quad sys32_select
+	.quad compat_sys_select
 	.quad sys_flock
 	.quad sys_msync
-	.quad sys32_readv		/* 145 */
-	.quad sys32_writev
+	.quad compat_sys_readv		/* 145 */
+	.quad compat_sys_writev
 	.quad sys_getsid
 	.quad sys_fdatasync
 	.quad sys32_sysctl	/* sysctl */
@@ -474,7 +474,7 @@ ia32_sys_call_table:
 	.quad sys32_vm86_warning	/* vm86 */ 
 	.quad quiet_ni_syscall	/* query_module */
 	.quad sys_poll
-	.quad sys32_nfsservctl
+	.quad compat_sys_nfsservctl
 	.quad sys_setresgid16	/* 170 */
 	.quad sys_getresgid16
 	.quad sys_prctl

@@ -42,6 +42,7 @@ typedef struct {
 #define spin_lock_init(lp) do { (lp)->lock = 0; } while(0)
 #define spin_unlock_wait(lp)	do { barrier(); } while(((volatile spinlock_t *)(lp))->lock)
 #define spin_is_locked(x) ((x)->lock != 0)
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 extern inline void _raw_spin_lock(spinlock_t *lp)
 {

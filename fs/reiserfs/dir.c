@@ -54,7 +54,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 
     reiserfs_write_lock(inode->i_sb);
 
-    reiserfs_check_lock_depth("readdir") ;
+    reiserfs_check_lock_depth(inode->i_sb, "readdir") ;
 
     /* form key for search the next directory entry using f_pos field of
        file structure */
@@ -62,7 +62,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		  TYPE_DIRENTRY, 3);
     next_pos = cpu_key_k_offset (&pos_key);
 
-    /*  reiserfs_warning ("reiserfs_readdir 1: f_pos = %Ld\n", filp->f_pos);*/
+    /*  reiserfs_warning (inode->i_sb, "reiserfs_readdir 1: f_pos = %Ld", filp->f_pos);*/
 
     while (1) {
     research:
@@ -115,6 +115,17 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		    /* too big to send back to VFS */
 		    continue ;
 		}
+
+                /* Ignore the .reiserfs_priv entry */
+                if (reiserfs_xattrs (inode->i_sb) &&
+                    !old_format_only(inode->i_sb) &&
+                    filp->f_dentry == inode->i_sb->s_root &&
+                    REISERFS_SB(inode->i_sb)->priv_root &&
+                    REISERFS_SB(inode->i_sb)->priv_root->d_inode &&
+                    deh_objectid(deh) == le32_to_cpu (INODE_PKEY(REISERFS_SB(inode->i_sb)->priv_root->d_inode)->k_objectid)) {
+                  continue;
+                }
+
 		d_off = deh_offset (deh);
 		filp->f_pos = d_off ;
 		d_ino = deh_objectid (deh);

@@ -417,6 +417,13 @@ asmlinkage void __init start_kernel(void)
 	 */
 	smp_prepare_boot_cpu();
 
+	/*
+	 * Set up the scheduler prior starting any interrupts (such as the
+	 * timer interrupt). Full topology setup happens at smp_init()
+	 * time - but meanwhile we still have a functioning scheduler.
+	 */
+	sched_init();
+
 	build_all_zonelists();
 	page_alloc_init();
 	printk("Kernel command line: %s\n", saved_command_line);
@@ -428,7 +435,7 @@ asmlinkage void __init start_kernel(void)
 	rcu_init();
 	init_IRQ();
 	pidhash_init();
-	sched_init();
+	init_timers();
 	softirq_init();
 	time_init();
 
@@ -567,7 +574,6 @@ static void do_pre_smp_initcalls(void)
 
 	migration_init();
 #endif
-	node_nr_running_init();
 	spawn_ksoftirqd();
 }
 
@@ -596,6 +602,7 @@ static int init(void * unused)
 	do_pre_smp_initcalls();
 
 	smp_init();
+	sched_init_smp();
 
 	/*
 	 * Do this before initcalls, because some drivers want to access

@@ -237,6 +237,7 @@ void __init check_ioapic(void)
 			for (func = 0; func < 8; func++) { 
 				u32 class;
 				u32 vendor;
+				u8 type;
 				class = read_pci_config(num,slot,func,
 							PCI_CLASS_REVISION);
 				if (class == 0xffffffff)
@@ -270,8 +271,8 @@ void __init check_ioapic(void)
 				} 
 
 				/* No multi-function device? */
-				u8 type = read_pci_config_byte(num,slot,func,
-							       PCI_HEADER_TYPE);
+				type = read_pci_config_byte(num,slot,func,
+							    PCI_HEADER_TYPE);
 				if (!(type & 0x80))
 					break;
 			} 

@@ -43,15 +43,16 @@ void unregister_cpu_notifier(struct notifier_block *nb)
 EXPORT_SYMBOL(unregister_cpu_notifier);
 
 #ifdef CONFIG_HOTPLUG_CPU
-static inline void check_for_tasks(int cpu, struct task_struct *k)
+static inline void check_for_tasks(int cpu)
 {
 	struct task_struct *p;
 
 	write_lock_irq(&tasklist_lock);
 	for_each_process(p) {
-		if (task_cpu(p) == cpu && p != k)
-			printk(KERN_WARNING "Task %s is on cpu %d\n",
-				p->comm, cpu);
+		if (task_cpu(p) == cpu && (p->utime != 0 || p->stime != 0))
+			printk(KERN_WARNING "Task %s (pid = %d) is on cpu %d\
+				(state = %ld, flags = %lx) \n",
+				 p->comm, p->pid, cpu, p->state, p->flags);
 	}
 	write_unlock_irq(&tasklist_lock);
 }
@@ -96,8 +97,9 @@ static int take_cpu_down(void *unused)
 	if (err < 0)
 		cpu_set(smp_processor_id(), cpu_online_map);
 	else
-		/* Everyone else gets kicked off. */
-		migrate_all_tasks();
+		/* Force idle task to run as soon as we yield: it should
+		   immediately notice cpu is offline and die quickly. */
+		sched_idle_next();
 
 	return err;
 }
@@ -106,6 +108,7 @@ int cpu_down(unsigned int cpu)
 {
 	int err;
 	struct task_struct *p;
+	cpumask_t old_allowed, tmp;
 
 	if ((err = lock_cpu_hotplug_interruptible()) != 0)
 		return err;
@@ -120,16 +123,20 @@ int cpu_down(unsigned int cpu)
 		goto out;
 	}
 
+	/* Ensure that we are not runnable on dying cpu */
+	old_allowed = current->cpus_allowed;
+	tmp = CPU_MASK_ALL;
+	cpu_clear(cpu, tmp);
+	set_cpus_allowed(current, tmp);
+
 	p = __stop_machine_run(take_cpu_down, NULL, cpu);
 	if (IS_ERR(p)) {
 		err = PTR_ERR(p);
-		goto out;
+		goto out_allowed;
 	}
 
 	if (cpu_online(cpu))
 		goto out_thread;
-
-	check_for_tasks(cpu, p);
 
 	/* Wait for it to sleep (leaving idle task). */
 	while (!idle_cpu(cpu))
@@ -146,10 +153,14 @@ int cpu_down(unsigned int cpu)
 	    == NOTIFY_BAD)
 		BUG();
 
+	check_for_tasks(cpu);
+
 	cpu_run_sbin_hotplug(cpu, "offline");
 
 out_thread:
 	err = kthread_stop(p);
+out_allowed:
+	set_cpus_allowed(current, old_allowed);
 out:
 	unlock_cpu_hotplug();
 	return err;

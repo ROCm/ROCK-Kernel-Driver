@@ -896,7 +896,7 @@ static void __exit exit_flat_binfmt(void)
 
 /****************************************************************************/
 
-module_init(init_flat_binfmt);
+core_initcall(init_flat_binfmt);
 module_exit(exit_flat_binfmt);
 
 /****************************************************************************/

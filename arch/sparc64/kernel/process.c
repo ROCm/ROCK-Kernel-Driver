@@ -847,8 +847,7 @@ unsigned long get_wchan(struct task_struct *task)
 			break;
 		rw = (struct reg_window *) fp;
 		pc = rw->ins[7];
-		if (pc < ((unsigned long) scheduling_functions_start_here) ||
-		    pc >= ((unsigned long) scheduling_functions_end_here)) {
+		if (!in_sched_functions(pc)) {
 			ret = pc;
 			goto out;
 		}

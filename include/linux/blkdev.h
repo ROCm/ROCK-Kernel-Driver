@@ -334,6 +334,8 @@ struct request_queue
 	 * queue settings
 	 */
 	unsigned long		nr_requests;	/* Max # of requests */
+	unsigned int		nr_congestion_on;
+	unsigned int		nr_congestion_off;
 
 	unsigned short		max_sectors;
 	unsigned short		max_phys_segments;

@@ -59,6 +59,7 @@ struct cpuinfo_x86 {
 	char	x86_model_id[64];
 	int 	x86_cache_size;  /* in KB - valid for CPUS which support this
 				    call  */
+	int 	x86_cache_alignment;	/* In bytes */
 	int	fdiv_bug;
 	int	f00f_bug;
 	int	coma_bug;
@@ -647,5 +648,10 @@ extern inline void prefetchw(const void *x)
 #define spin_lock_prefetch(x)	prefetchw(x)
 
 extern void select_idle_routine(const struct cpuinfo_x86 *c);
+
+#ifdef CONFIG_SCHED_SMT
+#define ARCH_HAS_SCHED_DOMAIN
+#define ARCH_HAS_SCHED_WAKE_IDLE
+#endif
 
 #endif /* __ASM_I386_PROCESSOR_H */

@@ -75,8 +75,23 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	if ((inode->i_state & flags) == flags)
 		return;
 
-	if (unlikely(block_dump))
-		printk("%s(%d): dirtied file\n", current->comm, current->pid);
+	if (unlikely(block_dump)) {
+		struct dentry *dentry = NULL;
+		const char *name = "?";
+
+		if (!list_empty(&inode->i_dentry)) {
+			dentry = list_entry(inode->i_dentry.next,
+					    struct dentry, d_alias);
+			if (dentry && dentry->d_name.name)
+				name = (const char *) dentry->d_name.name;
+		}
+
+		if (inode->i_ino || strcmp(inode->i_sb->s_id, "bdev"))
+			printk(KERN_DEBUG
+			       "%s(%d): dirtied inode %lu (%s) on %s\n",
+			       current->comm, current->pid, inode->i_ino,
+			       name, inode->i_sb->s_id);
+	}
 
 	spin_lock(&inode_lock);
 	if ((inode->i_state & flags) != flags) {

@@ -33,6 +33,7 @@
 #include <asm/pgtable.h>
 #include <asm/8xx_immap.h>
 #include <asm/commproc.h>
+#include <asm/io.h>
 
 extern int get_pteptr(struct mm_struct *mm, unsigned long addr, pte_t **ptep);
 
@@ -55,11 +56,10 @@ static	void	alloc_host_memory(void);
 
 #if 1
 void
-m8xx_cpm_reset()
+m8xx_cpm_reset(void)
 {
 	volatile immap_t	 *imp;
 	volatile cpm8xx_t	*commproc;
-	pte_t			*pte;
 
 	imp = (immap_t *)IMAP_ADDR;
 	commproc = (cpm8xx_t *)&imp->im_cpm;

@@ -30,6 +30,7 @@ void free_huge_page(struct page *);
 
 extern unsigned long max_huge_pages;
 extern const unsigned long hugetlb_zero, hugetlb_infinity;
+extern int sysctl_hugetlb_shm_group;
 
 static inline void
 mark_mm_hugetlb(struct mm_struct *mm, struct vm_area_struct *vma)

@@ -33,7 +33,8 @@
 
 unsigned int nmi_watchdog = NMI_NONE;
 static unsigned int nmi_hz = HZ;
-unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
+static unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
+static unsigned int nmi_p4_cccr_val;
 extern void show_registers(struct pt_regs *regs);
 
 /*
@@ -80,7 +81,8 @@ int nmi_active;
 #define P4_ESCR_EVENT_SELECT(N)	((N)<<25)
 #define P4_ESCR_OS		(1<<3)
 #define P4_ESCR_USR		(1<<2)
-#define P4_CCCR_OVF_PMI		(1<<26)
+#define P4_CCCR_OVF_PMI0	(1<<26)
+#define P4_CCCR_OVF_PMI1	(1<<27)
 #define P4_CCCR_THRESHOLD(N)	((N)<<20)
 #define P4_CCCR_COMPLEMENT	(1<<19)
 #define P4_CCCR_COMPARE		(1<<18)
@@ -93,7 +95,7 @@ int nmi_active;
 #define MSR_P4_IQ_COUNTER0	0x30C
 #define P4_NMI_CRU_ESCR0	(P4_ESCR_EVENT_SELECT(0x3F)|P4_ESCR_OS|P4_ESCR_USR)
 #define P4_NMI_IQ_CCCR0	\
-	(P4_CCCR_OVF_PMI|P4_CCCR_THRESHOLD(15)|P4_CCCR_COMPLEMENT|	\
+	(P4_CCCR_OVF_PMI0|P4_CCCR_THRESHOLD(15)|P4_CCCR_COMPLEMENT|	\
 	 P4_CCCR_COMPARE|P4_CCCR_REQUIRED|P4_CCCR_ESCR_SELECT(4)|P4_CCCR_ENABLE)
 
 int __init check_nmi_watchdog (void)
@@ -364,6 +366,11 @@ static int setup_p4_watchdog(void)
 		return 0;
 
 	nmi_perfctr_msr = MSR_P4_IQ_COUNTER0;
+	nmi_p4_cccr_val = P4_NMI_IQ_CCCR0;
+#ifdef CONFIG_SMP
+	if (smp_num_siblings == 2)
+		nmi_p4_cccr_val |= P4_CCCR_OVF_PMI1;
+#endif
 
 	if (!(misc_enable & MSR_P4_MISC_ENABLE_PEBS_UNAVAIL))
 		clear_msr_range(0x3F1, 2);
@@ -381,7 +388,7 @@ static int setup_p4_watchdog(void)
 	Dprintk("setting P4_IQ_COUNTER0 to 0x%08lx\n", -(cpu_khz/nmi_hz*1000));
 	wrmsr(MSR_P4_IQ_COUNTER0, -(cpu_khz/nmi_hz*1000), -1);
 	apic_write(APIC_LVTPC, APIC_DM_NMI);
-	wrmsr(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0, 0);
+	wrmsr(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val, 0);
 	return 1;
 }
 
@@ -498,7 +505,7 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 			 * - LVTPC is masked on interrupt and must be
 			 *   unmasked by the LVTPC handler.
 			 */
-			wrmsr(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0, 0);
+			wrmsr(MSR_P4_IQ_CCCR0, nmi_p4_cccr_val, 0);
 			apic_write(APIC_LVTPC, APIC_DM_NMI);
 		}
 		else if (nmi_perfctr_msr == MSR_P6_PERFCTR0) {

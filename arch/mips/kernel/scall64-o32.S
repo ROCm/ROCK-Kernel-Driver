@@ -34,8 +34,8 @@ NESTED(handle_sys, PT_SIZE, sp)
 	subu	t0, v0, __NR_O32_Linux	# check syscall number
 	sltiu	t0, t0, __NR_O32_Linux_syscalls + 1
 	daddiu	t1, 4			# skip to next instruction
-	beqz	t0, not_o32_scall
 	sd	t1, PT_EPC(sp)
+	beqz	t0, not_o32_scall
 #if 0
  SAVE_ALL
  move a1, v0
@@ -58,8 +58,9 @@ NESTED(handle_sys, PT_SIZE, sp)
 	bgez	t0, stackargs
 
 stack_done:
-	LONG_L	t0, TI_FLAGS($28)
-					# syscall tracing enabled?
+	li	t1, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
+	LONG_L	t0, TI_FLAGS($28)	# syscall tracing enabled?
+	and	t0, t1, t0
 	bnez	t0, trace_a_syscall
 
 	jalr	t2			# Do The Real Thing (TM)
@@ -97,6 +98,8 @@ trace_a_syscall:
 	sd	a7, PT_R11(sp)
 
 	sd	t2,PT_R1(sp)
+	move	a0, sp
+	li	a1, 0
 	jal	do_syscall_trace
 	ld	t2,PT_R1(sp)
 
@@ -397,11 +400,11 @@ out:	jr	ra
 	sys	sys_setfsgid	1
 	sys	sys32_llseek	5			/* 4140 */
 	sys	sys32_getdents	3
-	sys	sys32_select	5
+	sys	compat_sys_select	5
 	sys	sys_flock	2
 	sys	sys_msync	3
-	sys	sys32_readv	3			/* 4145 */
-	sys	sys32_writev	3
+	sys	compat_sys_readv	3		/* 4145 */
+	sys	compat_sys_writev	3
 	sys	sys_cacheflush	3
 	sys	sys_cachectl	3
 	sys	sys_sysmips	4
@@ -523,6 +526,15 @@ out:	jr	ra
 	sys	sys_clock_nanosleep	4		/* 4265 */
 	sys	sys_tgkill		3
 	sys	compat_sys_utimes	2
+	sys	sys_ni_syscall		0	/* sys_mbind */
+	sys	sys_ni_syscall		0	/* sys_get_mempolicy */
+	sys	sys_ni_syscall		0	/* 4270 sys_set_mempolicy */
+	sys	compat_sys_mq_open	4
+	sys	sys_mq_unlink		1
+	sys	compat_sys_mq_timedsend	5
+	sys	compat_sys_mq_timedreceive 5
+	sys	compat_sys_mq_notify	2	/* 4275 */
+	sys	compat_sys_mq_getsetattr 3
 
 	.endm
 

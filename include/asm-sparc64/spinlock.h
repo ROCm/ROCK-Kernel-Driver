@@ -106,6 +106,8 @@ extern int _spin_trylock (spinlock_t *lock);
 
 #endif /* CONFIG_DEBUG_SPINLOCK */
 
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
+
 /* Multi-reader locks, these are much saner than the 32-bit Sparc ones... */
 
 #ifndef CONFIG_DEBUG_SPINLOCK

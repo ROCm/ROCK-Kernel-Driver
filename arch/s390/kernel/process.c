@@ -385,12 +385,6 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 	dump->regs.per_info = current->thread.per_info;
 }
 
-/*
- * These bracket the sleeping functions..
- */
-#define first_sched	((unsigned long) scheduling_functions_start_here)
-#define last_sched	((unsigned long) scheduling_functions_end_here)
-
 unsigned long get_wchan(struct task_struct *p)
 {
 	unsigned long r14, r15, bc;
@@ -413,12 +407,10 @@ unsigned long get_wchan(struct task_struct *p)
 #else
 		r14 = *(unsigned long *) (bc+112);
 #endif
-		if (r14 < first_sched || r14 >= last_sched)
+		if (!in_sched_functions(r14))
 			return r14;
 		bc = (*(unsigned long *) bc) & PSW_ADDR_INSN;
 	} while (count++ < 16);
 	return 0;
 }
-#undef last_sched
-#undef first_sched
 

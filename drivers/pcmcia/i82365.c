@@ -68,7 +68,7 @@
 #include "o2micro.h"
 
 #ifdef DEBUG
-static const char *version =
+static const char version[] =
 "i82365.c 1.265 1999/11/10 18:36:21 (David Hinds)";
 
 static int pc_debug;

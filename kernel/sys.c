@@ -348,6 +348,8 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 				if (p->uid == who)
 					error = set_one_prio(p, niceval, error);
 			while_each_thread(g, p);
+			if (who)
+				free_uid(user);		/* For find_user() */
 			break;
 	}
 out_unlock:
@@ -410,6 +412,8 @@ asmlinkage long sys_getpriority(int which, int who)
 						retval = niceval;
 				}
 			while_each_thread(g, p);
+			if (who)
+				free_uid(user);		/* for find_user() */
 			break;
 	}
 out_unlock:
