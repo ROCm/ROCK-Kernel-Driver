@@ -638,8 +638,10 @@ static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 		.sig_id		  = WL3501_SIG_JOIN_REQ,
 		.timeout	  = 10,
 		.ds_pset = {
-			.el.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
-			.el.len = 1,
+			.el = {
+				.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+				.len = 1,
+			},
 			.chan	= this->chan,
 		},
 	};
@@ -655,13 +657,17 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 		.beacon_period		= 400,
 		.dtim_period		= 1,
 		.ds_pset = {
-			.el.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
-			.el.len = 1,
+			.el = {
+				.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+				.len = 1,
+			},
 			.chan	= this->chan,
 		},
 		.bss_basic_rset	= {
-			.el.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
-			.el.len = 2,
+			.el = {
+				.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
+				.len = 2,
+			},
 			.data_rate_labels = {
 				[0] = IW_MGMT_RATE_LABEL_MANDATORY |
 				      IW_MGMT_RATE_LABEL_1MBIT,
@@ -670,8 +676,10 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 			},
 		},
 		.operational_rset	= {
-			.el.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
-			.el.len = 2,
+			.el = {
+				.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
+				.len = 2,
+			},
 			.data_rate_labels = {
 				[0] = IW_MGMT_RATE_LABEL_MANDATORY |
 				      IW_MGMT_RATE_LABEL_1MBIT,
@@ -680,8 +688,10 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 			},
 		},
 		.ibss_pset		= {
-			.el.id	     = IW_MGMT_INFO_ELEMENT_IBSS_PARAMETER_SET,
-			.el.len	     = 2,
+			.el = {
+				.id	 = IW_MGMT_INFO_ELEMENT_IBSS_PARAMETER_SET,
+				.len     = 2,
+			},
 			.atim_window = 10,
 		},
 		.bss_type		= wl3501_fw_bss_type(this),
