@@ -130,7 +130,7 @@ _GLOBAL(__copy_tofrom_user)
 6:	cmpwi	cr1,r5,8
 	addi	r3,r3,32
 	sld	r9,r9,r10
-	blt	cr1,.Ldo_tail
+	ble	cr1,.Ldo_tail
 34:	ld	r0,8(r4)
 	srd	r7,r0,r11
 	or	r9,r7,r9
