@@ -501,11 +501,15 @@ static int jffs2_do_link (struct dentry *old_dentry, struct inode *dir_i, struct
 
 static int jffs2_link (struct dentry *old_dentry, struct inode *dir_i, struct dentry *dentry)
 {
-	int ret = jffs2_do_link(old_dentry, dir_i, dentry, 0);
+	int ret;
+
+	lock_kernel();
+	ret = jffs2_do_link(old_dentry, dir_i, dentry, 0);
 	if (!ret) {
 		d_instantiate(dentry, old_dentry->d_inode);
 		atomic_inc(&old_dentry->d_inode->i_count);
 	}
+	unlock_kernel();
 	return ret;
 }
 

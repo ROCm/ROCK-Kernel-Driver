@@ -1109,14 +1109,16 @@ static int udf_link(struct dentry * old_dentry, struct inode * dir,
 	int err;
 	struct FileIdentDesc cfi, *fi;
 
-	if (S_ISDIR(inode->i_mode))
-		return -EPERM;
-
-	if (inode->i_nlink >= (256<<sizeof(inode->i_nlink))-1)
+	lock_kernel();
+	if (inode->i_nlink >= (256<<sizeof(inode->i_nlink))-1) {
+		unlock_kernel();
 		return -EMLINK;
+	}
 
-	if (!(fi = udf_add_entry(dir, dentry, &fibh, &cfi, &err)))
+	if (!(fi = udf_add_entry(dir, dentry, &fibh, &cfi, &err))) {
+		unlock_kernel();
 		return err;
+	}
 	cfi.icb.extLength = cpu_to_le32(inode->i_sb->s_blocksize);
 	cfi.icb.extLocation = cpu_to_lelb(UDF_I_LOCATION(inode));
 	if (UDF_SB_LVIDBH(inode->i_sb))
@@ -1146,6 +1148,7 @@ static int udf_link(struct dentry * old_dentry, struct inode * dir,
 	mark_inode_dirty(inode);
 	atomic_inc(&inode->i_count);
 	d_instantiate(dentry, inode);
+	unlock_kernel();
 	return 0;
 }
 

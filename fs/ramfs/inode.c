@@ -166,10 +166,9 @@ static int ramfs_link(struct dentry *old_dentry, struct inode * dir, struct dent
 {
 	struct inode *inode = old_dentry->d_inode;
 
-	if (S_ISDIR(inode->i_mode))
-		return -EPERM;
-
+	lock_kernel();
 	inode->i_nlink++;
+	unlock_kernel();
 	atomic_inc(&inode->i_count);	/* New dentry reference */
 	dget(dentry);		/* Extra pinning count for the created dentry */
 	d_instantiate(dentry, inode);

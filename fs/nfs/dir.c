@@ -951,10 +951,12 @@ nfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentry)
 	 * Since nfs_proc_link doesn't return a file handle,
 	 * we can't use the existing dentry.
 	 */
+	lock_kernel();
 	d_drop(dentry);
 	nfs_zap_caches(dir);
 	NFS_CACHEINV(inode);
 	error = NFS_PROTO(dir)->link(inode, dir, &dentry->d_name);
+	unlock_kernel();
 	return error;
 }
 

@@ -166,18 +166,21 @@ static int ufs_link (struct dentry * old_dentry, struct inode * dir,
 	struct dentry *dentry)
 {
 	struct inode *inode = old_dentry->d_inode;
+	int error;
 
-	if (S_ISDIR(inode->i_mode))
-		return -EPERM;
-
-	if (inode->i_nlink >= UFS_LINK_MAX)
+	lock_kernel();
+	if (inode->i_nlink >= UFS_LINK_MAX) {
+		unlock_kernel();
 		return -EMLINK;
+	}
 
 	inode->i_ctime = CURRENT_TIME;
 	ufs_inc_count(inode);
 	atomic_inc(&inode->i_count);
 
-	return ufs_add_nondir(dentry, inode);
+	error = ufs_add_nondir(dentry, inode);
+	unlock_kernel();
+	return error;
 }
 
 static int ufs_mkdir(struct inode * dir, struct dentry * dentry, int mode)

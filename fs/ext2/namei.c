@@ -168,14 +168,15 @@ static int ext2_link (struct dentry * old_dentry, struct inode * dir,
 {
 	struct inode *inode = old_dentry->d_inode;
 
-	if (S_ISDIR(inode->i_mode))
-		return -EPERM;
-
-	if (inode->i_nlink >= EXT2_LINK_MAX)
+	lock_kernel();
+	if (inode->i_nlink >= EXT2_LINK_MAX) {
+		unlock_kernel();
 		return -EMLINK;
+	}
 
 	inode->i_ctime = CURRENT_TIME;
 	ext2_inc_count(inode);
+	unlock_kernel();
 	atomic_inc(&inode->i_count);
 
 	return ext2_add_nondir(dentry, inode);

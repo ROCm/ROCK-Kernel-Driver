@@ -978,12 +978,10 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
 
-
-    if (S_ISDIR(inode->i_mode))
-	return -EPERM;
-  
+    lock_kernel();
     if (inode->i_nlink >= REISERFS_LINK_MAX) {
 	//FIXME: sd_nlink is 32 bit for new files
+	unlock_kernel();
 	return -EMLINK;
     }
 
@@ -1000,6 +998,7 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
     if (retval) {
 	pop_journal_writer(windex) ;
 	journal_end(&th, dir->i_sb, jbegin_count) ;
+	unlock_kernel();
 	return retval;
     }
 
@@ -1011,6 +1010,7 @@ static int reiserfs_link (struct dentry * old_dentry, struct inode * dir, struct
     d_instantiate(dentry, inode);
     pop_journal_writer(windex) ;
     journal_end(&th, dir->i_sb, jbegin_count) ;
+    unlock_kernel();
     return 0;
 }
 

@@ -55,7 +55,7 @@ locking rules:
 		BKL	i_sem(inode)
 lookup:		no	yes
 create:		no	yes
-link:		yes	yes
+link:		no	yes
 mknod:		no	yes
 mkdir:		no	yes
 unlink:		no	yes (both)

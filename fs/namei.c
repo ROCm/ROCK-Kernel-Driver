@@ -1613,11 +1613,11 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 		return -EPERM;
 	if (!dir->i_op || !dir->i_op->link)
 		return -EPERM;
+	if (S_ISDIR(old_dentry->d_inode->i_mode))
+		return -EPERM;
 
 	DQUOT_INIT(dir);
-	lock_kernel();
 	error = dir->i_op->link(old_dentry, dir, new_dentry);
-	unlock_kernel();
 	if (!error)
 		inode_dir_notify(dir, DN_CREATE);
 	return error;

@@ -159,10 +159,9 @@ static int pcihpfs_link (struct dentry *old_dentry, struct inode *dir,
 {
 	struct inode *inode = old_dentry->d_inode;
 
-	if(S_ISDIR(inode->i_mode))
-		return -EPERM;
-
+	lock_kernel();
 	inode->i_nlink++;
+	unlock_kernel();
 	atomic_inc(&inode->i_count);
  	dget(dentry);
 	d_instantiate(dentry, inode);

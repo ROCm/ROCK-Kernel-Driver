@@ -151,17 +151,18 @@ static int bfs_link(struct dentry * old, struct inode * dir, struct dentry * new
 	struct inode * inode = old->d_inode;
 	int err;
 
-	if (S_ISDIR(inode->i_mode))
-		return -EPERM;
-
+	lock_kernel();
 	err = bfs_add_entry(dir, new->d_name.name, new->d_name.len, inode->i_ino);
-	if (err)
+	if (err) {
+		unlock_kernel();
 		return err;
+	}
 	inode->i_nlink++;
 	inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
 	atomic_inc(&inode->i_count);
 	d_instantiate(new, inode);
+	unlock_kernel();
 	return 0;
 }
 

@@ -435,16 +435,17 @@ affs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentry)
 	pr_debug("AFFS: link(%u, %u, \"%.*s\")\n", (u32)inode->i_ino, (u32)dir->i_ino,
 		 (int)dentry->d_name.len,dentry->d_name.name);
 
-	if (S_ISDIR(inode->i_mode))
-		return -EPERM;
-
-	error = affs_add_entry(dir, inode, dentry, S_ISDIR(inode->i_mode) ? ST_LINKDIR : ST_LINKFILE);
+	lock_kernel();
+	error = affs_add_entry(dir, inode, dentry, ST_LINKFILE);
 	if (error) {
+		/* WTF??? */
 		inode->i_nlink = 0;
 		mark_inode_dirty(inode);
 		iput(inode);
+		unlock_kernel();
 		return error;
 	}
+	unlock_kernel();
 	return 0;
 }
 

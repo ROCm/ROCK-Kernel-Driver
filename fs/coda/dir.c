@@ -362,10 +362,13 @@ static int coda_link(struct dentry *source_de, struct inode *dir_inode,
 	int len = de->d_name.len;
 	int error;
 
+	lock_kernel();
 	coda_vfs_stat.link++;
 
-	if (coda_isroot(dir_inode) && coda_iscontrol(name, len))
+	if (coda_isroot(dir_inode) && coda_iscontrol(name, len)) {
+		unlock_kernel();
 		return -EPERM;
+	}
 
 	CDEBUG(D_INODE, "old: fid: %s\n", coda_i2s(inode));
 	CDEBUG(D_INODE, "directory: %s\n", coda_i2s(dir_inode));
@@ -385,6 +388,7 @@ static int coda_link(struct dentry *source_de, struct inode *dir_inode,
         
 out:
 	CDEBUG(D_INODE, "link result %d\n",error);
+	unlock_kernel();
 	return(error);
 }
 

@@ -142,14 +142,15 @@ static int sysv_link(struct dentry * old_dentry, struct inode * dir,
 {
 	struct inode *inode = old_dentry->d_inode;
 
-	if (S_ISDIR(inode->i_mode))
-		return -EPERM;
-
-	if (inode->i_nlink >= inode->i_sb->sv_link_max)
+	lock_kernel();
+	if (inode->i_nlink >= inode->i_sb->sv_link_max) {
+		unlock_kernel();
 		return -EMLINK;
+	}
 
 	inode->i_ctime = CURRENT_TIME;
 	inc_count(inode);
+	unlock_kernel();
 	atomic_inc(&inode->i_count);
 
 	return add_nondir(dentry, inode);

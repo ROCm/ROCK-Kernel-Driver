@@ -978,15 +978,17 @@ static int ext3_link (struct dentry * old_dentry,
 	struct inode *inode = old_dentry->d_inode;
 	int err;
 
-	if (S_ISDIR(inode->i_mode))
-		return -EPERM;
-
-	if (inode->i_nlink >= EXT3_LINK_MAX)
+	lock_kernel();
+	if (inode->i_nlink >= EXT3_LINK_MAX) {
+		unlock_kernel();
 		return -EMLINK;
+	}
 
 	handle = ext3_journal_start(dir, EXT3_DATA_TRANS_BLOCKS);
-	if (IS_ERR(handle))
+	if (IS_ERR(handle)) {
+		unlock_kernel();
 		return PTR_ERR(handle);
+	}
 
 	if (IS_SYNC(dir))
 		handle->h_sync = 1;
@@ -998,6 +1000,7 @@ static int ext3_link (struct dentry * old_dentry,
 	ext3_mark_inode_dirty(handle, inode);
 	err = ext3_add_nondir(handle, dentry, inode);
 	ext3_journal_stop(handle, dir);
+	unlock_kernel();
 	return err;
 }
 
