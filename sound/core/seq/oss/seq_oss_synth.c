@@ -83,12 +83,6 @@ static spinlock_t register_lock = SPIN_LOCK_UNLOCKED;
 static seq_oss_synth_t *get_synthdev(seq_oss_devinfo_t *dp, int dev);
 static void reset_channels(seq_oss_synthinfo_t *info);
 
-static inline void dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 /*
  * global initialization
  */
@@ -240,12 +234,12 @@ snd_seq_oss_synth_setup(seq_oss_devinfo_t *dp)
 		else
 			info->arg.event_passing = SNDRV_SEQ_OSS_PASS_EVENTS;
 		info->opened = 0;
-		if (!try_inc_mod_count(rec->oper.owner)) {
+		if (!try_module_get(rec->oper.owner)) {
 			snd_use_lock_free(&rec->use_lock);
 			continue;
 		}
 		if (rec->oper.open(&info->arg, rec->private_data) < 0) {
-			dec_mod_count(rec->oper.owner);
+			module_put(rec->oper.owner);
 			snd_use_lock_free(&rec->use_lock);
 			continue;
 		}
@@ -322,7 +316,7 @@ snd_seq_oss_synth_cleanup(seq_oss_devinfo_t *dp)
 			if (rec->opened) {
 				debug_printk(("synth %d closed\n", i));
 				rec->oper.close(&info->arg);
-				dec_mod_count(rec->oper.owner);
+				module_put(rec->oper.owner);
 				rec->opened--;
 			}
 			snd_use_lock_free(&rec->use_lock);

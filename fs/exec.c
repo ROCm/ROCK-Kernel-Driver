@@ -102,8 +102,7 @@ int unregister_binfmt(struct linux_binfmt * fmt)
 
 static inline void put_binfmt(struct linux_binfmt * fmt)
 {
-	if (fmt->module)
-		__MOD_DEC_USE_COUNT(fmt->module);
+	module_put(fmt->module);
 }
 
 /*
@@ -143,7 +142,7 @@ asmlinkage long sys_uselib(const char * library)
 		for (fmt = formats ; fmt ; fmt = fmt->next) {
 			if (!fmt->load_shlib)
 				continue;
-			if (!try_inc_mod_count(fmt->module))
+			if (!try_module_get(fmt->module))
 				continue;
 			read_unlock(&binfmt_lock);
 			error = fmt->load_shlib(file);
@@ -972,7 +971,7 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 			int (*fn)(struct linux_binprm *, struct pt_regs *) = fmt->load_binary;
 			if (!fn)
 				continue;
-			if (!try_inc_mod_count(fmt->module))
+			if (!try_module_get(fmt->module))
 				continue;
 			read_unlock(&binfmt_lock);
 			retval = fn(bprm, regs);
@@ -1108,14 +1107,18 @@ out_file:
 	return retval;
 }
 
-void set_binfmt(struct linux_binfmt *new)
+int set_binfmt(struct linux_binfmt *new)
 {
 	struct linux_binfmt *old = current->binfmt;
-	if (new && new->module)
-		__MOD_INC_USE_COUNT(new->module);
+
+	if (new) {
+		if (!try_module_get(new->module))
+			return -1;
+	}
 	current->binfmt = new;
-	if (old && old->module)
-		__MOD_DEC_USE_COUNT(old->module);
+	if (old)
+		module_put(old->module);
+	return 0;
 }
 
 #define CORENAME_MAX_SIZE 64

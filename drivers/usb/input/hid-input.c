@@ -357,6 +357,11 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 		int a = field->logical_minimum;
 		int b = field->logical_maximum;
 
+		if ((device->quirks & HID_QUIRK_BADPAD) && (usage->code == ABS_X || usage->code == ABS_Y)) {
+			a = field->logical_minimum = 0;
+			b = field->logical_maximum = 255;
+		}
+		
 		input->absmin[usage->code] = a;
 		input->absmax[usage->code] = b;
 		input->absfuzz[usage->code] = (b - a) >> 8;

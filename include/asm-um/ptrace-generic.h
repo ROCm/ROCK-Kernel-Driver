@@ -8,6 +8,8 @@
 
 #ifndef __ASSEMBLY__
 
+#include "linux/config.h"
+#include "skas_ptrace.h"
 #include "asm/current.h"
 
 #define pt_regs pt_regs_subarch

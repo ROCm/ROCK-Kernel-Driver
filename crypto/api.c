@@ -24,13 +24,12 @@ DECLARE_RWSEM(crypto_alg_sem);
 
 static inline int crypto_alg_get(struct crypto_alg *alg)
 {
-	return try_inc_mod_count(alg->cra_module);
+	return try_module_get(alg->cra_module);
 }
 
 static inline void crypto_alg_put(struct crypto_alg *alg)
 {
-	if (alg->cra_module)
-		__MOD_DEC_USE_COUNT(alg->cra_module);
+	module_put(alg->cra_module);
 }
 
 struct crypto_alg *crypto_alg_lookup(const char *name)

@@ -1317,6 +1317,9 @@ void hid_init_reports(struct hid_device *hid)
 #define USB_DEVICE_ID_ATEN_2PORTKVM    0x2204
 #define USB_DEVICE_ID_ATEN_4PORTKVM    0x2205
 
+#define USB_VENDOR_ID_TOPMAX           0x0663
+#define USB_DEVICE_ID_TOPMAX_COBRAPAD  0x0103
+
 #define USB_VENDOR_ID_MGE              0x0463
 #define USB_DEVICE_ID_MGE_UPS          0xffff
 #define USB_DEVICE_ID_MGE_UPS1         0x0001
@@ -1355,6 +1358,7 @@ struct hid_blacklist {
 	{ USB_VENDOR_ID_ATEN, USB_DEVICE_ID_ATEN_4PORTKVM, HID_QUIRK_NOGET },
 	{ USB_VENDOR_ID_MGE, USB_DEVICE_ID_MGE_UPS, HID_QUIRK_HIDDEV },
 	{ USB_VENDOR_ID_MGE, USB_DEVICE_ID_MGE_UPS1, HID_QUIRK_HIDDEV },
+	{ USB_VENDOR_ID_TOPMAX, USB_DEVICE_ID_TOPMAX_COBRAPAD, HID_QUIRK_BADPAD },
 	{ 0, 0 }
 };
 
@@ -1541,12 +1545,12 @@ fail:
 
 static void hid_disconnect(struct usb_interface *intf)
 {
-	struct hid_device *hid = dev_get_drvdata(&intf->dev);
+	struct hid_device *hid = usb_get_intfdata (intf);
 
 	if (!hid)
 		return;
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	usb_unlink_urb(hid->urbin);
 	usb_unlink_urb(hid->urbout);
 	usb_unlink_urb(hid->urbctrl);
@@ -1588,7 +1592,7 @@ static int hid_probe (struct usb_interface *intf, const struct usb_device_id *id
 	if (!hiddev_connect(hid))
 		hid->claimed |= HID_CLAIMED_HIDDEV;
 
-	dev_set_drvdata(&intf->dev, hid);
+	usb_set_intfdata(intf, hid);
 
 	if (!hid->claimed) {
 		printk ("HID device not claimed by input or hiddev\n");

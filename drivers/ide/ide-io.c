@@ -743,7 +743,7 @@ void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 	ide_startstop_t	startstop;
 
 	/* for atari only: POSSIBLY BROKEN HERE(?) */
-	ide_get_lock(&ide_intr_lock, ide_intr, hwgroup);
+	ide_get_lock(ide_intr, hwgroup);
 
 	/* necessary paranoia: ensure IRQs are masked on local CPU */
 	local_irq_disable();
@@ -783,7 +783,7 @@ void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 				 */
 
 				/* for atari only */
-				ide_release_lock(&ide_intr_lock);
+				ide_release_lock();
 				hwgroup->busy = 0;
 			}
 

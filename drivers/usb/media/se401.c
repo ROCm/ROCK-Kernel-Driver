@@ -1521,15 +1521,15 @@ static int se401_probe(struct usb_interface *intf,
 #endif
 	info("registered new video device: video%d", se401->vdev.minor);
 
-	dev_set_drvdata (&intf->dev, se401);
+	usb_set_intfdata (intf, se401);
         return 0;
 }
 
 static void se401_disconnect(struct usb_interface *intf)
 {
-	struct usb_se401 *se401 = dev_get_drvdata (&intf->dev);
+	struct usb_se401 *se401 = usb_get_intfdata (intf);
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 	if (se401) {
 		video_unregister_device(&se401->vdev);
 		if (!se401->user){

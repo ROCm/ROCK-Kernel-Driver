@@ -90,9 +90,6 @@
  * @work: work queue entry for the line discipline waking up.
  * @open_count: number of times this port has been opened.
  * @sem: struct semaphore used to lock this structure.
- * @private: place to put any driver specific information that is needed.  The
- *	usb-serial driver is required to manage this data, the usb-serial core
- *	will not touch this.
  *
  * This structure is used by the usb-serial core and drivers for the specific
  * ports of a device.
@@ -120,10 +117,20 @@ struct usb_serial_port {
 	struct work_struct	work;
 	int			open_count;
 	struct semaphore	sem;
-	void *			private;
 	struct device		dev;
 };
 #define to_usb_serial_port(d) container_of(d, struct usb_serial_port, dev)
+
+/* get and set the port private data pointer helper functions */
+static inline void *usb_get_serial_port_data (struct usb_serial_port *port)
+{
+	return dev_get_drvdata(&port->dev);
+}
+
+static inline void usb_set_serial_port_data (struct usb_serial_port *port, void *data)
+{
+	dev_set_drvdata(&port->dev, data);
+}
 
 /**
  * usb_serial - structure used by the usb-serial core for a device
@@ -141,7 +148,8 @@ struct usb_serial_port {
  * @port: array of struct usb_serial_port structures for the different ports.
  * @private: place to put any driver specific information that is needed.  The
  *	usb-serial driver is required to manage this data, the usb-serial core
- *	will not touch this.
+ *	will not touch this.  Use usb_get_serial_data() and
+ *	usb_set_serial_data() to access this.
  */
 struct usb_serial {
 	int				magic;
@@ -159,9 +167,18 @@ struct usb_serial {
 	void *				private;
 };
 
-
 #define NUM_DONT_CARE	(-1)
 
+/* get and set the serial private data pointer helper functions */
+static inline void *usb_get_serial_data (struct usb_serial *serial)
+{
+	return serial->private;
+}
+
+static inline void usb_set_serial_data (struct usb_serial *serial, void *data)
+{
+	serial->private = data;
+}
 
 /**
  * usb_serial_device_type - a structure that defines a usb serial device

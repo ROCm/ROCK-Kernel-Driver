@@ -583,16 +583,16 @@ static int wacom_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	printk(KERN_INFO "input: %s on %s\n", wacom->features->name, path);
 
-	dev_set_drvdata(&intf->dev, wacom);
+	usb_set_intfdata(intf, wacom);
 
 	return 0;
 }
 
 static void wacom_disconnect(struct usb_interface *intf)
 {
-	struct wacom *wacom = dev_get_drvdata(&intf->dev);
+	struct wacom *wacom = usb_get_intfdata (intf);
 
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (wacom) {
 		usb_unlink_urb(wacom->irq);
 		input_unregister_device(&wacom->dev);

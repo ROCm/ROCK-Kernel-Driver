@@ -571,11 +571,10 @@ static int lance_start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 	skblen = skb->len;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	if (!TX_BUFFS_AVAIL){
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return -1;
 	}
 
@@ -616,7 +615,7 @@ static int lance_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	dev->trans_start = jiffies;
 	dev_kfree_skb (skb);
     
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return status;
 }

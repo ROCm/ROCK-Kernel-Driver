@@ -32,7 +32,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include "NCR53C9x.h"
-#include "oktagon_esp.h"
 
 #include <linux/zorro.h>
 #include <asm/irq.h>
@@ -45,6 +44,13 @@
 #endif
 
 #include <linux/unistd.h>
+
+/* The controller registers can be found in the Z2 config area at these
+ * offsets:
+ */
+#define OKTAGON_ESP_ADDR 0x03000
+#define OKTAGON_DMA_ADDR 0x01000
+
 
 static int  dma_bytes_sent(struct NCR_ESP *esp, int fifo_count);
 static int  dma_can_transfer(struct NCR_ESP *esp, Scsi_Cmnd *sp);
@@ -571,12 +577,6 @@ void dma_advance_sg(Scsi_Cmnd *sp)
 
 #define HOSTS_C
 
-#include "oktagon_esp.h"
-
-static Scsi_Host_Template driver_template = SCSI_OKTAGON_ESP;
-
-#include "scsi_module.c"
-
 int oktagon_esp_release(struct Scsi_Host *instance)
 {
 #ifdef MODULE
@@ -588,5 +588,25 @@ int oktagon_esp_release(struct Scsi_Host *instance)
 #endif
 	return 1;
 }
+
+
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "esp-oktagon",
+	.proc_info		= &esp_proc_info,
+	.name			= "BSC Oktagon SCSI",
+	.detect			= oktagon_esp_detect,
+	.release		= oktagon_esp_release,
+	.queuecommand		= esp_queue,
+	.eh_abort_handler	= esp_abort,
+	.eh_bus_reset_handler	= esp_reset,
+	.can_queue		= 7,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING
+};
+
+
+#include "scsi_module.c"
 
 MODULE_LICENSE("GPL");

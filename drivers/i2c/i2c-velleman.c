@@ -89,47 +89,13 @@ static int bit_velle_getsda(void *data)
 
 static int bit_velle_init(void)
 {
-	if (check_region(base,(base == 0x3bc)? 3 : 8) < 0 ) {
-		DEBE(printk(KERN_DEBUG "i2c-velleman.o: Port %#x already in use.\n",
-		     base));
+	if (!request_region(base, (base == 0x3bc) ? 3 : 8, 
+			"i2c (Vellemann adapter)"))
 		return -ENODEV;
-	} else {
-		request_region(base, (base == 0x3bc)? 3 : 8, 
-			"i2c (Vellemann adapter)");
-		bit_velle_setsda((void*)base,1);
-		bit_velle_setscl((void*)base,1);
-	}
+
+	bit_velle_setsda((void*)base,1);
+	bit_velle_setscl((void*)base,1);
 	return 0;
-}
-
-static void __exit bit_velle_exit(void)
-{	
-	release_region( base , (base == 0x3bc)? 3 : 8 );
-}
-
-
-static int bit_velle_reg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static int bit_velle_unreg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static void bit_velle_inc_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-static void bit_velle_dec_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
 }
 
 /* ------------------------------------------------------------------------
@@ -147,17 +113,13 @@ static struct i2c_algo_bit_data bit_velle_data = {
 };
 
 static struct i2c_adapter bit_velle_ops = {
-	"Velleman K8000",
-	I2C_HW_B_VELLE,
-	NULL,
-	&bit_velle_data,
-	bit_velle_inc_use,
-	bit_velle_dec_use,
-	bit_velle_reg,
-	bit_velle_unreg,
+	.owner		= THIS_MODULE,
+	.name		= "Velleman K8000",
+	.id		= I2C_HW_B_VELLE,
+	.algo_data	= &bit_velle_data,
 };
 
-int __init  i2c_bitvelle_init(void)
+static int __init i2c_bitvelle_init(void)
 {
 	printk(KERN_INFO "i2c-velleman.o: i2c Velleman K8000 adapter module version %s (%s)\n", I2C_VERSION, I2C_DATE);
 	if (base==0) {
@@ -183,22 +145,17 @@ int __init  i2c_bitvelle_init(void)
 	return 0;
 }
 
-#ifdef MODULE
+static void __exit i2c_bitvelle_exit(void)
+{	
+	i2c_bit_del_bus(&bit_velle_ops);
+	release_region(base, (base == 0x3bc) ? 3 : 8);
+}
+
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for Velleman K8000 adapter");
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(base, "i");
 
-int init_module(void) 
-{
-	return i2c_bitvelle_init();
-}
-
-void cleanup_module(void) 
-{
-	i2c_bit_del_bus(&bit_velle_ops);
-	bit_velle_exit();
-}
-
-#endif
+module_init(i2c_bitvelle_init);
+module_exit(i2c_bitvelle_exit);

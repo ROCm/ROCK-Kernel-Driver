@@ -1971,9 +1971,9 @@ int __init zs_init(void)
 		printk("ttyS%02d at 0x%08x (irq = %d)", info->line, 
 		       info->port, info->irq);
 		printk(" is a Z85C30 SCC\n");
-		tty_register_devfs(&serial_driver, 0,
+		tty_register_device(&serial_driver,
 				   serial_driver.minor_start + info->line);
-		tty_register_devfs(&callout_driver, 0,
+		tty_register_device(&callout_driver,
 				   callout_driver.minor_start + info->line);
 
 	}

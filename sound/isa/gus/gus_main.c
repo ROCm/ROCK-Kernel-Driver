@@ -39,16 +39,10 @@ MODULE_LICENSE("GPL");
 
 static int snd_gus_init_dma_irq(snd_gus_card_t * gus, int latches);
 
-static inline void dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 int snd_gus_use_inc(snd_gus_card_t * gus)
 {
 	MOD_INC_USE_COUNT;
-	if (!try_inc_mod_count(gus->card->module)) {
+	if (!try_module_get(gus->card->module)) {
 		MOD_DEC_USE_COUNT;
 		return 0;
 	}
@@ -57,7 +51,7 @@ int snd_gus_use_inc(snd_gus_card_t * gus)
 
 void snd_gus_use_dec(snd_gus_card_t * gus)
 {
-	dec_mod_count(gus->card->module);
+	module_put(gus->card->module);
 	MOD_DEC_USE_COUNT;
 }
 

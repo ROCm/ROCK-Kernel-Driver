@@ -1244,7 +1244,7 @@ static int pegasus_probe(struct usb_interface *intf,
 exit:
 	up(&pegasus->sem);
 	if (pegasus) {
-		dev_set_drvdata(&intf->dev, pegasus);
+		usb_set_intfdata(intf, pegasus);
 		return 0;
 	}
 	return -EIO;
@@ -1252,9 +1252,9 @@ exit:
 
 static void pegasus_disconnect(struct usb_interface *intf)
 {
-	struct pegasus *pegasus = dev_get_drvdata(&intf->dev);
+	struct pegasus *pegasus = usb_get_intfdata(intf);
 
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (!pegasus) {
 		warn("unregistering non-existant device");
 		return;

@@ -504,7 +504,6 @@ extern void voyager_setup_irqs(void);
 extern int voyager_memory_detect(int region, __u32 *addr, __u32 *length);
 extern void voyager_smp_intr_init(void);
 extern __u8 voyager_extended_cmos_read(__u16 cmos_address);
-extern void voyager_dump(void);
 extern void voyager_smp_dump(void);
 extern void voyager_timer_interrupt(struct pt_regs *regs);
 extern void smp_local_timer_interrupt(struct pt_regs * regs);

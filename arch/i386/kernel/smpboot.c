@@ -596,12 +596,14 @@ static inline void inquire_remote_apic(int apicid)
 }
 #endif
 
-static int __init wakeup_secondary_via_NMI(int logical_apicid)
+#ifdef WAKE_SECONDARY_VIA_NMI
 /* 
- * Poke the other CPU in the eye to wake it up. Remember that the normal
+ * Poke the other CPU in the eye via NMI to wake it up. Remember that the normal
  * INIT, INIT, STARTUP sequence will reset the chip hard for us, and this
  * won't ... remember to clear down the APIC, etc later.
  */
+static int __init
+wakeup_secondary_cpu(int logical_apicid, unsigned long start_eip)
 {
 	unsigned long send_status = 0, accept_status = 0;
 	int timeout, maxlvt;
@@ -643,8 +645,11 @@ static int __init wakeup_secondary_via_NMI(int logical_apicid)
 
 	return (send_status | accept_status);
 }
+#endif	/* WAKE_SECONDARY_VIA_NMI */
 
-static int __init wakeup_secondary_via_INIT(int phys_apicid, unsigned long start_eip)
+#ifdef WAKE_SECONDARY_VIA_INIT
+static int __init
+wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
 	unsigned long send_status = 0, accept_status = 0;
 	int maxlvt, timeout, num_starts, j;
@@ -766,6 +771,7 @@ static int __init wakeup_secondary_via_INIT(int phys_apicid, unsigned long start
 
 	return (send_status | accept_status);
 }
+#endif	/* WAKE_SECONDARY_VIA_INIT */
 
 extern unsigned long cpu_initialized;
 
@@ -989,11 +995,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	printk("CPU%d: ", 0);
 	print_cpu_info(&cpu_data[0]);
 
-	/*
-	 * We have the boot CPU online for sure.
-	 */
-	set_bit(0, &cpu_online_map);
-	set_bit(0, &cpu_callout_map);
 	boot_cpu_logical_apicid = logical_smp_processor_id();
 	map_cpu_to_boot_apicid(0, boot_cpu_apicid);
 
@@ -1164,6 +1165,12 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
 	smp_boot_cpus(max_cpus);
+}
+
+void __devinit smp_prepare_boot_cpu(void)
+{
+	set_bit(smp_processor_id(), &cpu_online_map);
+	set_bit(smp_processor_id(), &cpu_callout_map);
 }
 
 int __devinit __cpu_up(unsigned int cpu)

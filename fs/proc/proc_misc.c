@@ -158,7 +158,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	len = sprintf(page,
 		"MemTotal:     %8lu kB\n"
 		"MemFree:      %8lu kB\n"
-		"MemShared:    %8lu kB\n"
 		"Buffers:      %8lu kB\n"
 		"Cached:       %8lu kB\n"
 		"SwapCached:   %8lu kB\n"
@@ -179,7 +178,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"ReverseMaps:  %8lu\n",
 		K(i.totalram),
 		K(i.freeram),
-		K(i.sharedram),
 		K(i.bufferram),
 		K(ps.nr_pagecache-total_swapcache_pages-i.bufferram),
 		K(total_swapcache_pages),

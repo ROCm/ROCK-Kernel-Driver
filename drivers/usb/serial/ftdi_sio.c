@@ -267,7 +267,7 @@ static int ftdi_sio_startup (struct usb_serial *serial)
 	struct ftdi_private *priv;
 	
 	
-	priv = serial->port->private = kmalloc(sizeof(struct ftdi_private), GFP_KERNEL);
+	priv = kmalloc(sizeof(struct ftdi_private), GFP_KERNEL);
 	if (!priv){
 		err("%s- kmalloc(%Zd) failed.", __FUNCTION__, sizeof(struct ftdi_private));
 		return -ENOMEM;
@@ -275,7 +275,8 @@ static int ftdi_sio_startup (struct usb_serial *serial)
 
 	priv->ftdi_type = sio;
 	priv->write_offset = 1;
-	
+	usb_set_serial_port_data(serial->port, priv);
+
 	return (0);
 }
 
@@ -285,7 +286,7 @@ static int ftdi_8U232AM_startup (struct usb_serial *serial)
 	struct ftdi_private *priv;
  
 
-	priv = serial->port->private = kmalloc(sizeof(struct ftdi_private), GFP_KERNEL);
+	priv = kmalloc(sizeof(struct ftdi_private), GFP_KERNEL);
 	if (!priv){
 		err("%s- kmalloc(%Zd) failed.", __FUNCTION__, sizeof(struct ftdi_private));
 		return -ENOMEM;
@@ -293,17 +294,21 @@ static int ftdi_8U232AM_startup (struct usb_serial *serial)
 
 	priv->ftdi_type = F8U232AM;
 	priv->write_offset = 0;
-	
+	usb_set_serial_port_data(serial->port, priv);
+
 	return (0);
 }
 
 static void ftdi_sio_shutdown (struct usb_serial *serial)
 {
+	void *priv;
+
 	dbg("%s", __FUNCTION__);
 
-	if (serial->port[0].private){
-		kfree(serial->port[0].private);
-		serial->port[0].private = NULL;
+	priv = usb_get_serial_port_data(&serial->port[0]);
+	if (priv){
+		kfree(priv);
+		usb_set_serial_port_data(&serial->port[0], NULL);
 	}
 }
 
@@ -405,7 +410,7 @@ static int ftdi_sio_write (struct usb_serial_port *port, int from_user,
 			   const unsigned char *buf, int count)
 { /* ftdi_sio_write */
 	struct usb_serial *serial = port->serial;
-	struct ftdi_private *priv = (struct ftdi_private *)port->private;
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	unsigned char *first_byte = port->write_urb->transfer_buffer;
 	int data_offset ;
 	int result;
@@ -491,7 +496,7 @@ static void ftdi_sio_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 static int ftdi_sio_write_room( struct usb_serial_port *port )
 {
-	struct ftdi_private *priv = (struct ftdi_private *)port->private;
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	int room;
 
 	if ( port->write_urb->status == -EINPROGRESS) {
@@ -670,7 +675,7 @@ static __u16 translate_baudrate_to_ftdi(unsigned int cflag, enum ftdi_type ftdi_
 static void ftdi_sio_break_ctl( struct usb_serial_port *port, int break_state )
 {
 	struct usb_serial *serial = port->serial;
-	struct ftdi_private *priv = (struct ftdi_private *)port->private;
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	__u16 urb_value = 0; 
 	char buf[1];
 	
@@ -709,7 +714,7 @@ static void ftdi_sio_set_termios (struct usb_serial_port *port, struct termios *
 { /* ftdi_sio_set_termios */
 	struct usb_serial *serial = port->serial;
 	unsigned int cflag = port->tty->termios->c_cflag;
-	struct ftdi_private *priv = (struct ftdi_private *)port->private;	
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	__u16 urb_value; /* will hold the new flags */
 	char buf[1]; /* Perhaps I should dynamically alloc this? */
 	
@@ -819,7 +824,7 @@ static void ftdi_sio_set_termios (struct usb_serial_port *port, struct termios *
 static int ftdi_sio_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
 {
 	struct usb_serial *serial = port->serial;
-	struct ftdi_private *priv = (struct ftdi_private *)port->private;
+	struct ftdi_private *priv = usb_get_serial_port_data(port);
 	__u16 urb_value=0; /* Will hold the new flags */
 	char buf[2];
 	int  ret, mask;

@@ -2489,8 +2489,9 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance) {
 						    hostdata->issue_queue;
 						hostdata->issue_queue = (Scsi_Cmnd *) cmd;
 						dprintk(NDEBUG_QUEUES, ("scsi%d : REQUEST SENSE added to head of issue queue\n", instance->host_no));
-					} else {
+					} else
 #endif				/* def AUTOSENSE */
+					{
 						collect_stats(hostdata, cmd);
 						cmd->scsi_done(cmd);
 					}

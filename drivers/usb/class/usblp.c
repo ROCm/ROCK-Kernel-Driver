@@ -338,7 +338,7 @@ static int usblp_open(struct inode *inode, struct file *file)
 	if (!intf) {
 		goto out;
 	}
-	usblp = dev_get_drvdata (&intf->dev);
+	usblp = usb_get_intfdata (intf);
 	if (!usblp || !usblp->dev)
 		goto out;
 
@@ -923,7 +923,7 @@ static int usblp_probe(struct usb_interface *intf,
 		usblp->current_protocol, usblp->dev->descriptor.idVendor,
 		usblp->dev->descriptor.idProduct);
 
-	dev_set_drvdata (&intf->dev, usblp);
+	usb_set_intfdata (intf, usblp);
 
 	/* add device id so the device works when advertised */
 	intf->kdev = mk_kdev(USB_MAJOR,usblp->minor);
@@ -1110,7 +1110,7 @@ static int usblp_cache_device_id_string(struct usblp *usblp)
 
 static void usblp_disconnect(struct usb_interface *intf)
 {
-	struct usblp *usblp = dev_get_drvdata (&intf->dev);
+	struct usblp *usblp = usb_get_intfdata (intf);
 
 	/* remove device id to disable open() */
 	intf->kdev = NODEV;
@@ -1123,7 +1123,7 @@ static void usblp_disconnect(struct usb_interface *intf)
 	down (&usblp->sem);
 	lock_kernel();
 	usblp->dev = NULL;
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 
 	usblp_unlink_urbs(usblp);
 

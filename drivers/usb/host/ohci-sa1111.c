@@ -176,7 +176,8 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
 	hcd->irq = dev->irq[1];
 	hcd->regs = dev->mapbase;
 	hcd->pdev = SA1111_FAKE_PCIDEV;
-	hcd->controller = &dev->dev;
+	hcd->self.controller = &dev->dev;
+	hcd->controller = hcd->self.controller;
 
 	retval = hcd_buffer_create (hcd);
 	if (retval != 0) {

@@ -66,44 +66,15 @@ static int rpx_install_isr(int irq, void (*func)(void *, void *), void *data)
 	return 0;
 }
 
-static int rpx_reg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static int rpx_unreg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static void rpx_inc_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-static void rpx_dec_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-}
-
 static struct i2c_algo_8xx_data rpx_data = {
 	.setisr = rpx_install_isr
 };
 
-
 static struct i2c_adapter rpx_ops = {
-	"m8xx",
-	I2C_HW_MPC8XX_EPON,
-	NULL,
-	&rpx_data,
-	rpx_inc_use,
-	rpx_dec_use,
-	rpx_reg,
-	rpx_unreg,
+	.owner		= THIS_MODULE,
+	.name		= "m8xx",
+	.id		= I2C_HW_MPC8XX_EPON,
+	.algo_data	= &rpx_data,
 };
 
 int __init i2c_rpx_init(void)
@@ -126,11 +97,8 @@ void __exit i2c_rpx_exit(void)
 	i2c_8xx_del_bus(&rpx_ops);
 }
 
-#ifdef MODULE
 MODULE_AUTHOR("Dan Malek <dmalek@jlc.net>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for MPC8xx boards");
 
 module_init(i2c_rpx_init);
 module_exit(i2c_rpx_exit);
-#endif
-

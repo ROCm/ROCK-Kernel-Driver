@@ -311,15 +311,15 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 	
 	printk(KERN_INFO "input: %s on %s", xpad->dev.name, path);
 	
-	dev_set_drvdata(&intf->dev, xpad);
+	usb_set_intfdata(intf, xpad);
 	return 0;
 }
 
 static void xpad_disconnect(struct usb_interface *intf)
 {
-	struct usb_xpad *xpad = dev_get_drvdata(&intf->dev);
+	struct usb_xpad *xpad = usb_get_intfdata (intf);
 	
-	dev_set_drvdata(&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (xpad) {
 		usb_unlink_urb(xpad->irq_in);
 		input_unregister_device(&xpad->dev);

@@ -743,10 +743,11 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	if (nr_threads >= max_threads)
 		goto bad_fork_cleanup_count;
 	
-	get_exec_domain(p->thread_info->exec_domain);
+	if (!try_module_get(p->thread_info->exec_domain->module))
+		goto bad_fork_cleanup_count;
 
-	if (p->binfmt && p->binfmt->module)
-		__MOD_INC_USE_COUNT(p->binfmt->module);
+	if (p->binfmt && !try_module_get(p->binfmt->module))
+		goto bad_fork_cleanup_put_domain;
 
 #ifdef CONFIG_PREEMPT
 	/*
@@ -756,7 +757,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->thread_info->preempt_count = 1;
 #endif
 	p->did_exec = 0;
-	p->swappable = 0;
 	p->state = TASK_UNINTERRUPTIBLE;
 
 	copy_flags(clone_flags, p);
@@ -840,7 +840,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->parent_exec_id = p->self_exec_id;
 
 	/* ok, now we should be set up.. */
-	p->swappable = 1;
 	if (clone_flags & CLONE_DETACHED)
 		p->exit_signal = -1;
 	else
@@ -958,9 +957,10 @@ bad_fork_cleanup_security:
 bad_fork_cleanup:
 	if (p->pid > 0)
 		free_pidmap(p->pid);
-	put_exec_domain(p->thread_info->exec_domain);
-	if (p->binfmt && p->binfmt->module)
-		__MOD_DEC_USE_COUNT(p->binfmt->module);
+	if (p->binfmt)
+		module_put(p->binfmt->module);
+bad_fork_cleanup_put_domain:
+	module_put(p->thread_info->exec_domain->module);
 bad_fork_cleanup_count:
 	atomic_dec(&p->user->processes);
 	free_uid(p->user);
@@ -1076,7 +1076,7 @@ void __init proc_caches_init(void)
  
 	vm_area_cachep = kmem_cache_create("vm_area_struct",
 			sizeof(struct vm_area_struct), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
+			0, NULL, NULL);
 	if(!vm_area_cachep)
 		panic("vma_init: Cannot alloc vm_area_struct SLAB cache");
 

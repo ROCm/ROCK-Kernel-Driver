@@ -19,8 +19,8 @@
  
 #ifdef CONFIG_MODULES
 
-extern struct module *module_list;
-extern struct module kernel_module;
+/* FIXME: Accessed without a lock --RR */
+extern struct list_head modules;
 
 static inline int kernel_text_address(unsigned long addr)
 {
@@ -31,11 +31,11 @@ static inline int kernel_text_address(unsigned long addr)
 	    addr <= (unsigned long) &_etext)
 		return 1;
 
-	for (mod = module_list; mod != &kernel_module; mod = mod->next) {
+	list_for_each_entry(mod, &modules, list) {
 		/* mod_bound tests for addr being inside the vmalloc'ed
 		 * module area. Of course it'd be better to test only
 		 * for the .text subset... */
-		if (mod_bound(addr, 0, mod)) {
+		if (mod_bound((void *) addr, 0, mod)) {
 			retval = 1;
 			break;
 		}

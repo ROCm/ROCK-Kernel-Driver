@@ -32,6 +32,7 @@
 #include <linux/interrupt.h>
 #include <linux/time.h>
 #include <linux/delay.h>
+#include <linux/bcd.h>
 
 #include <asm/segment.h>
 #include <asm/io.h>

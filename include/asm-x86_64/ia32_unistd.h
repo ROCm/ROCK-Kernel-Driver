@@ -257,8 +257,6 @@
 #define __NR_ia32_io_getevents	247
 #define __NR_ia32_io_submit		248
 #define __NR_ia32_io_cancel		249
-#define __NR_ia32_alloc_hugepages		250
-#define __NR_ia32_free_hugepages		251
 #define __NR_ia32_exit_group		252
 #define __NR_ia32_lookup_dcookie	253
 #define __NR_ia32_sys_epoll_create	254

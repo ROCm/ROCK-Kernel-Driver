@@ -466,13 +466,9 @@ static int sirdev_open(struct net_device *ndev)
 	if (!drv)
 		return -ENODEV;
 
-	lock_kernel();		/* serialize with rmmod */
 	/* increase the reference count of the driver module before doing serious stuff */
-	if (drv->owner  &&  !try_inc_mod_count(drv->owner)) {
-		unlock_kernel();
+	if (!try_module_get(drv->owner))
 		return -ESTALE;
-	}
-	unlock_kernel();
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
@@ -502,8 +498,7 @@ errout_stop:
 errout_free:
 	sirdev_free_buffers(dev);
 errout_dec:
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
+	module_put(drv->owner);
 	return -EAGAIN;
 }
 
@@ -533,11 +528,7 @@ static int sirdev_close(struct net_device *ndev)
 		drv->stop_dev(dev);
 
 	sirdev_free_buffers(dev);
-
-	lock_kernel();
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
-	unlock_kernel();
+	module_put(drv->owner);
 
 out:
 	dev->speed = 0;

@@ -82,7 +82,7 @@ lookup_exec_domain(u_long personality)
 	read_lock(&exec_domains_lock);
 	for (ep = exec_domains; ep; ep = ep->next) {
 		if (pers >= ep->pers_low && pers <= ep->pers_high)
-			if (try_inc_mod_count(ep->module))
+			if (try_module_get(ep->module))
 				goto out;
 	}
 
@@ -97,7 +97,7 @@ lookup_exec_domain(u_long personality)
 
 	for (ep = exec_domains; ep; ep = ep->next) {
 		if (pers >= ep->pers_low && pers <= ep->pers_high)
-			if (try_inc_mod_count(ep->module))
+			if (try_module_get(ep->module))
 				goto out;
 	}
 #endif
@@ -172,7 +172,7 @@ __set_personality(u_long personality)
 
 		fsp = copy_fs_struct(current->fs);
 		if (fsp == NULL) {
-			put_exec_domain(ep);
+			module_put(ep->module);
 			return -ENOMEM;;
 		}
 
@@ -194,10 +194,7 @@ __set_personality(u_long personality)
 	current_thread_info()->exec_domain = ep;
 	set_fs_altroot();
 
-	put_exec_domain(oep);
-
-	printk(KERN_DEBUG "[%s:%d]: set personality to %lx\n",
-			current->comm, current->pid, personality);
+	module_put(oep->module);
 	return 0;
 }
 

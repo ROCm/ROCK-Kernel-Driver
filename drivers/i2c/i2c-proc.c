@@ -40,10 +40,6 @@
 #define THIS_MODULE NULL
 #endif
 
-int __init sensors_init(void);
-void __exit i2c_proc_exit(void);
-static int proc_cleanup(void);
-
 static int i2c_create_name(char **name, const char *prefix,
 			       struct i2c_adapter *adapter, int addr);
 static int i2c_parse_reals(int *nrels, void *buffer, int bufsize,
@@ -92,7 +88,6 @@ static ctl_table i2c_proc[] = {
 
 
 static struct ctl_table_header *i2c_proc_header;
-static int i2c_initialized;
 
 /* This returns a nice name for a new directory; for example lm78-isa-0310
    (for a LM78 chip on the ISA bus at port 0x310), or lm75-i2c-3-4e (for
@@ -102,10 +97,21 @@ int i2c_create_name(char **name, const char *prefix,
 			struct i2c_adapter *adapter, int addr)
 {
 	char name_buffer[50];
-	int id;
+	int id, i, end;
 	if (i2c_is_isa_adapter(adapter))
 		sprintf(name_buffer, "%s-isa-%04x", prefix, addr);
-	else {
+	else if (!adapter->algo->smbus_xfer && !adapter->algo->master_xfer) {
+		/* dummy adapter, generate prefix */
+		sprintf(name_buffer, "%s-", prefix);
+		end = strlen(name_buffer);
+		for(i = 0; i < 32; i++) {
+			if(adapter->algo->name[i] == ' ')
+				break;
+			name_buffer[end++] = tolower(adapter->algo->name[i]);
+		}
+		name_buffer[end] = 0;
+		sprintf(name_buffer + end, "-%04x", addr);
+	} else {
 		if ((id = i2c_adapter_id(adapter)) < 0)
 			return -ENOENT;
 		sprintf(name_buffer, "%s-i2c-%d-%02x", prefix, id, addr);
@@ -213,49 +219,6 @@ void i2c_deregister_entry(int id)
 		i2c_entries[id] = NULL;
 		i2c_clients[id] = NULL;
 	}
-}
-
-/* Monitor access for /proc/sys/dev/sensors; make unloading i2c-proc.o 
-   impossible if some process still uses it or some file in it */
-void i2c_fill_inode(struct inode *inode, int fill)
-{
-	if (fill)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
-}
-
-/* Monitor access for /proc/sys/dev/sensors/ directories; make unloading
-   the corresponding module impossible if some process still uses it or
-   some file in it */
-void i2c_dir_fill_inode(struct inode *inode, int fill)
-{
-	int i;
-	struct i2c_client *client;
-
-#ifdef DEBUG
-	if (!inode) {
-		printk(KERN_ERR "i2c-proc.o: Warning: inode NULL in fill_inode()\n");
-		return;
-	}
-#endif				/* def DEBUG */
-
-	for (i = 0; i < SENSORS_ENTRY_MAX; i++)
-		if (i2c_clients[i]
-		    && (i2c_inodes[i] == inode->i_ino)) break;
-#ifdef DEBUG
-	if (i == SENSORS_ENTRY_MAX) {
-		printk
-		    (KERN_ERR "i2c-proc.o: Warning: inode (%ld) not found in fill_inode()\n",
-		     inode->i_ino);
-		return;
-	}
-#endif				/* def DEBUG */
-	client = i2c_clients[i];
-	if (fill)
-		client->driver->inc_use(client);
-	else
-		client->driver->dec_use(client);
 }
 
 int i2c_proc_chips(ctl_table * ctl, int write, struct file *filp,
@@ -648,6 +611,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 					I2C_FUNC_SMBUS_QUICK)) return -1;
 
 	for (addr = 0x00; addr <= (is_isa ? 0xffff : 0x7f); addr++) {
+		/* XXX: WTF is going on here??? */
 		if ((is_isa && check_region(addr, 1)) ||
 		    (!is_isa && i2c_check_addr(adapter, addr)))
 			continue;
@@ -848,10 +812,9 @@ int i2c_detect(struct i2c_adapter *adapter,
 	return 0;
 }
 
-int __init sensors_init(void)
+static int __init i2c_proc_init(void)
 {
 	printk(KERN_INFO "i2c-proc.o version %s (%s)\n", I2C_VERSION, I2C_DATE);
-	i2c_initialized = 0;
 	if (!
 	    (i2c_proc_header =
 	     register_sysctl_table(i2c_proc, 0))) {
@@ -859,22 +822,12 @@ int __init sensors_init(void)
 		return -EPERM;
 	}
 	i2c_proc_header->ctl_table->child->de->owner = THIS_MODULE;
-	i2c_initialized++;
 	return 0;
 }
 
-void __exit i2c_proc_exit(void)
+static void __exit i2c_proc_exit(void)
 {
-	proc_cleanup();
-}
-
-static int proc_cleanup(void)
-{
-	if (i2c_initialized >= 1) {
-		unregister_sysctl_table(i2c_proc_header);
-		i2c_initialized--;
-	}
-	return 0;
+	unregister_sysctl_table(i2c_proc_header);
 }
 
 EXPORT_SYMBOL(i2c_deregister_entry);
@@ -887,5 +840,5 @@ MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>");
 MODULE_DESCRIPTION("i2c-proc driver");
 MODULE_LICENSE("GPL");
 
-module_init(sensors_init);
+module_init(i2c_proc_init);
 module_exit(i2c_proc_exit);

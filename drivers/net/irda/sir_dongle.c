@@ -95,13 +95,13 @@ int sirdev_get_dongle(struct sir_dev *dev, IRDA_DONGLE type)
 	 * 1) dongle driver was already unregistered - then we haven't found the
 	 *	requested dongle above and are already out here
 	 * 2) the module is already marked deleted but the driver is still
-	 *	registered - then the try_inc_mod_count() below will fail
-	 * 3) the try_inc_mod_count() below succeeds before the module is marked
+	 *	registered - then the try_module_get() below will fail
+	 * 3) the try_module_get() below succeeds before the module is marked
 	 *	deleted - then sys_delete_module() fails and prevents the removal
 	 *	because the module is in use.
 	 */
 
-	if (drv->owner && !try_inc_mod_count(drv->owner)) {
+	if (!try_module_get(drv->owner)) {
 		err = -ESTALE;
 		goto out_unlock;	/* rmmod already pending */
 	}
@@ -121,8 +121,7 @@ int sirdev_get_dongle(struct sir_dev *dev, IRDA_DONGLE type)
 
 out_reject:
 	dev->dongle_drv = NULL;
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
+	module_put(drv->owner);
 out_unlock:
 	up(&dongle_list_lock);
 	return err;
@@ -137,9 +136,7 @@ int sirdev_put_dongle(struct sir_dev *dev)
 			drv->close(dev);		/* close this dongle instance */
 
 		dev->dongle_drv = NULL;			/* unlink the dongle driver */
-
-		if (drv->owner)
-			__MOD_DEC_USE_COUNT(drv->owner);/* decrement driver's module refcount */
+		module_put(drv->owner);/* decrement driver's module refcount */
 	}
 
 	return 0;

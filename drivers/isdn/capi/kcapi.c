@@ -77,22 +77,15 @@ static struct work_struct tq_recv_notify;
 static inline struct capi_ctr *
 capi_ctr_get(struct capi_ctr *card)
 {
-	if (card->owner) {
-		if (try_inc_mod_count(card->owner)) {
-			DBG("MOD_COUNT INC");
-			return card;
-		} else
-			return NULL;
-	}
-	DBG("MOD_COUNT INC");
-	return card;
+	if (try_module_get(card->owner))
+		return card;
+	return NULL;
 }
 
 static inline void
 capi_ctr_put(struct capi_ctr *card)
 {
-	if (card->owner)
-		__MOD_DEC_USE_COUNT(card->owner);
+	module_put(card->owner);
 	DBG("MOD_COUNT DEC");
 }
 

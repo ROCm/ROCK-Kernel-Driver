@@ -48,10 +48,6 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 
-int __init i2c_dev_init(void);
-void __exit i2c_dev_exit(void);
-static int dev_cleanup(void);
-
 /* struct file_operations changed too often in the 2.1 series for nice code */
 
 static ssize_t i2cdev_read (struct file *file, char *buf, size_t count, 
@@ -142,9 +138,9 @@ static ssize_t i2cdev_write (struct file *file, const char *buf, size_t count,
 	struct inode *inode = file->f_dentry->d_inode;
 #endif /* DEBUG */
 
-	if(count > 8192)
+	if (count > 8192)
 		count = 8192;
-		
+
 	/* copy user space data to kernel space. */
 	tmp = kmalloc(count,GFP_KERNEL);
 	if (tmp==NULL)
@@ -368,8 +364,10 @@ int i2cdev_open (struct inode *inode, struct file *file)
 	client->adapter = i2cdev_adaps[minor];
 	file->private_data = client;
 
-	if (i2cdev_adaps[minor]->inc_use)
-		i2cdev_adaps[minor]->inc_use(i2cdev_adaps[minor]);
+	if (!try_module_get(i2cdev_adaps[minor]->owner)) {
+		kfree(client);
+		return -ENODEV;
+	}
 
 #ifdef DEBUG
 	printk(KERN_DEBUG "i2c-dev.o: opened i2c-%d\n",minor);
@@ -385,10 +383,7 @@ static int i2cdev_release (struct inode *inode, struct file *file)
 #ifdef DEBUG
 	printk(KERN_DEBUG "i2c-dev.o: Closed: i2c-%d\n", minor);
 #endif
-	lock_kernel();
-	if (i2cdev_adaps[minor]->dec_use)
-		i2cdev_adaps[minor]->dec_use(i2cdev_adaps[minor]);
-	unlock_kernel();
+	module_put(i2cdev_adaps[minor]->owner);
 	return 0;
 }
 
@@ -437,19 +432,6 @@ static int i2cdev_command(struct i2c_client *client, unsigned int cmd,
 	return -1;
 }
 
-static int dev_cleanup(void)
-{
-	int res;
-
-	if ((res = i2c_del_driver(&i2cdev_driver))) {
-		printk(KERN_ERR "i2c-dev.o: Driver deregistration failed, "
-		       "module not removed.\n");
-	}
-
-	devfs_remove("i2c");
-	unregister_chrdev(I2C_MAJOR,"i2c");
-}
-
 int __init i2c_dev_init(void)
 {
 	int res;
@@ -471,12 +453,12 @@ int __init i2c_dev_init(void)
 	return 0;
 }
 
-void __exit i2c_dev_exit(void)
+static void __exit i2c_dev_exit(void)
 {
-	dev_cleanup();
+	i2c_del_driver(&i2cdev_driver);
+	devfs_remove("i2c");
+	unregister_chrdev(I2C_MAJOR,"i2c");
 }
-
-EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl> and Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C /dev entries driver");

@@ -877,7 +877,7 @@ static struct i2c_algorithm iic_algo = {
 //
 // Description: Register bus structure
 //
-int i2c_iic_add_bus(struct i2c_adapter *adap)
+int i2c_ocp_add_bus(struct i2c_adapter *adap)
 {
 	struct i2c_algo_iic_data *iic_adap = adap->algo_data;
 
@@ -912,7 +912,7 @@ int i2c_iic_add_bus(struct i2c_adapter *adap)
 //
 // Done
 //
-int i2c_iic_del_bus(struct i2c_adapter *adap)
+int i2c_ocp_del_bus(struct i2c_adapter *adap)
 {
 	int res;
 	if ((res = i2c_del_adapter(adap)) < 0)
@@ -942,8 +942,8 @@ void i2c_algo_iic_exit(void)
 }
 
 
-EXPORT_SYMBOL(i2c_iic_add_bus);
-EXPORT_SYMBOL(i2c_iic_del_bus);
+EXPORT_SYMBOL(i2c_ocp_add_bus);
+EXPORT_SYMBOL(i2c_ocp_del_bus);
 
 //
 // The MODULE_* macros resolve to nothing if MODULES is not defined

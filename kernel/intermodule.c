@@ -123,7 +123,7 @@ const void *inter_module_get(const char *im_name)
 	list_for_each(tmp, &ime_list) {
 		ime = list_entry(tmp, struct inter_module_entry, list);
 		if (strcmp(ime->im_name, im_name) == 0) {
-			if (try_inc_mod_count(ime->owner))
+			if (try_module_get(ime->owner))
 				result = ime->userdata;
 			break;
 		}
@@ -166,7 +166,7 @@ void inter_module_put(const char *im_name)
 		ime = list_entry(tmp, struct inter_module_entry, list);
 		if (strcmp(ime->im_name, im_name) == 0) {
 			if (ime->owner)
-				__MOD_DEC_USE_COUNT(ime->owner);
+				module_put(ime->owner);
 			spin_unlock(&ime_lock);
 			return;
 		}

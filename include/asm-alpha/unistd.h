@@ -340,8 +340,6 @@
 #define __NR_io_getevents		400
 #define __NR_io_submit			401
 #define __NR_io_cancel			402
-#define __NR_alloc_hugepages		403
-#define __NR_free_hugepages		404
 #define __NR_exit_group			405
 #define __NR_lookup_dcookie		406
 #define __NR_sys_epoll_create		407

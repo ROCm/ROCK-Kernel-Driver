@@ -396,7 +396,7 @@ uart_get_divisor(struct uart_port *port, struct termios *termios,
 		baud = uart_get_baud_rate(port, termios);
 		quot = uart_calculate_quot(port, baud);
 		if (quot)
-			break;
+			return quot;
 
 		/*
 		 * Oops, the quotient was zero.  Try again with
@@ -1294,8 +1294,7 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	wake_up_interruptible(&info->open_wait);
 
  done:
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
+	module_put(drv->owner);
 }
 
 static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
@@ -1585,7 +1584,7 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	 * is about to be unloaded).  Therefore, it is safe to set
 	 * tty->driver_data to be NULL, so uart_close() doesn't bite us.
 	 */
-	if (!try_inc_mod_count(drv->owner)) {
+	if (!try_module_get(drv->owner)) {
 		tty->driver_data = NULL;
 		goto fail;
 	}
@@ -1665,8 +1664,7 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	return retval;
 
  out:
-	if (drv->owner)
-		__MOD_DEC_USE_COUNT(drv->owner);
+	module_put(drv->owner);
  fail:
 	return retval;
 }
@@ -2098,7 +2096,7 @@ __uart_register_port(struct uart_driver *drv, struct uart_state *state,
 	 * Register the port whether it's detected or not.  This allows
 	 * setserial to be used to alter this ports parameters.
 	 */
-	tty_register_devfs(drv->tty_driver, 0, drv->minor + port->line);
+	tty_register_device(drv->tty_driver, drv->minor + port->line);
 
 	if (port->type != PORT_UNKNOWN) {
 		unsigned long flags;
@@ -2155,7 +2153,7 @@ __uart_unregister_port(struct uart_driver *drv, struct uart_state *state)
 	/*
 	 * Remove the devices from devfs
 	 */
-	tty_unregister_devfs(drv->tty_driver, drv->minor + port->line);
+	tty_unregister_device(drv->tty_driver, drv->minor + port->line);
 
 	/*
 	 * Free the port IO and memory resources, if any.

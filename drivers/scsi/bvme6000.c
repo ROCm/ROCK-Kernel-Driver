@@ -51,5 +51,18 @@ int bvme6000_scsi_detect(Scsi_Host_Template *tpnt)
     return 1;
 }
 
-static Scsi_Host_Template driver_template = BVME6000_SCSI;
+static Scsi_Host_Template driver_template = {
+	.name			= "BVME6000 NCR53c710 SCSI",
+	.detect			= bvme6000_scsi_detect,
+	.queuecommand		= NCR53c7xx_queue_command,
+	.abort			= NCR53c7xx_abort,
+	.reset			= NCR53c7xx_reset,
+	.can_queue		= 24,
+	.this_id		= 7,
+	.sg_tablesize		= 63,
+	.cmd_per_lun		= 3,
+	.use_clustering		= DISABLE_CLUSTERING
+};
+
+
 #include "scsi_module.c"

@@ -38,6 +38,7 @@ cflags-$(CONFIG_MPENTIUMIII)	+= $(call check_gcc,-march=pentium3,-march=i686)
 cflags-$(CONFIG_MPENTIUM4)	+= $(call check_gcc,-march=pentium4,-march=i686)
 cflags-$(CONFIG_MK6)		+= $(call check_gcc,-march=k6,-march=i586)
 cflags-$(CONFIG_MK7)		+= $(call check_gcc,-march=athlon,-march=i686 -malign-functions=4)
+cflags-$(CONFIG_MK8)		+= $(call check_gcc,-march=k8,$(call check_gcc,-march=athlon,-march=i686 -malign-functions=4))
 cflags-$(CONFIG_MCRUSOE)	+= -march=i686 -malign-functions=0 -malign-jumps=0 -malign-loops=0
 cflags-$(CONFIG_MWINCHIPC6)	+= $(call check_gcc,-march=winchip-c6,-march=i586)
 cflags-$(CONFIG_MWINCHIP2)	+= $(call check_gcc,-march=winchip2,-march=i586)
@@ -48,20 +49,22 @@ cflags-$(CONFIG_MCYRIXIII)	+= $(call check_gcc,-falign-functions=0 -falign-jumps
 
 CFLAGS += $(cflags-y)
 
-#default subarch .c files
+# Default subarch .c files
 mcore-y  := mach-default
 
-#VISWS subarch support
-mflags-$(CONFIG_VISWS) := -Iinclude/asm-i386/mach-visws
-mcore-$(CONFIG_VISWS)  := mach-visws
+# Voyager subarch support
+mflags-$(CONFIG_X86_VOYAGER)	:= -Iinclude/asm-i386/mach-voyager
+mcore-$(CONFIG_X86_VOYAGER)	:= mach-voyager
 
-#NUMAQ subarch support
-mflags-$(CONFIG_X86_NUMAQ) := -Iinclude/asm-i386/mach-numaq
-mcore-$(CONFIG_X86_NUMAQ)  := mach-default
+# VISWS subarch support
+mflags-$(CONFIG_X86_VISWS)	:= -Iinclude/asm-i386/mach-visws
+mcore-$(CONFIG_X86_VISWS)	:= mach-visws
 
-#add other subarch support here
+# NUMAQ subarch support
+mflags-$(CONFIG_X86_NUMAQ)	:= -Iinclude/asm-i386/mach-numaq
+mcore-$(CONFIG_X86_NUMAQ)	:= mach-default
 
-#default subarch .h files
+# default subarch .h files
 mflags-y += -Iinclude/asm-i386/mach-default
 
 HEAD := arch/i386/kernel/head.o arch/i386/kernel/init_task.o

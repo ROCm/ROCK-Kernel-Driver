@@ -33,11 +33,11 @@
 #include <linux/blk.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
+#include <linux/interrupt.h>
 
 #include "scsi.h"
 #include "hosts.h"
 #include "NCR53C9x.h"
-#include "fastlane.h"
 
 #include <linux/zorro.h>
 #include <asm/irq.h>
@@ -52,6 +52,36 @@
 /* Let this defined unless you really need to enable DMA IRQ one day */
 #define NODMAIRQ
 #endif
+
+/* The controller registers can be found in the Z2 config area at these
+ * offsets:
+ */
+#define FASTLANE_ESP_ADDR 0x1000001
+#define FASTLANE_DMA_ADDR 0x1000041
+
+
+/* The Fastlane DMA interface */
+struct fastlane_dma_registers {
+	volatile unsigned char cond_reg;	/* DMA status  (ro) [0x0000] */
+#define ctrl_reg  cond_reg			/* DMA control (wo) [0x0000] */
+	unsigned char dmapad1[0x3f];
+	volatile unsigned char clear_strobe;    /* DMA clear   (wo) [0x0040] */
+};
+
+
+/* DMA status bits */
+#define FASTLANE_DMA_MINT  0x80
+#define FASTLANE_DMA_IACT  0x40
+#define FASTLANE_DMA_CREQ  0x20
+
+/* DMA control bits */
+#define FASTLANE_DMA_FCODE 0xa0
+#define FASTLANE_DMA_MASK  0xf3
+#define FASTLANE_DMA_LED   0x10	/* HD led control 1 = on */
+#define FASTLANE_DMA_WRITE 0x08 /* 1 = write */
+#define FASTLANE_DMA_ENABLE 0x04 /* Enable DMA */
+#define FASTLANE_DMA_EDI   0x02	/* Enable DMA IRQ ? */
+#define FASTLANE_DMA_ESI   0x01	/* Enable SCSI IRQ */
 
 static int  dma_bytes_sent(struct NCR_ESP *esp, int fifo_count);
 static int  dma_can_transfer(struct NCR_ESP *esp, Scsi_Cmnd *sp);
@@ -140,7 +170,7 @@ int __init fastlane_esp_detect(Scsi_Host_Template *tpnt)
 
 		/* Map the physical address space into virtual kernel space */
 		address = (unsigned long)
-			ioremap_nocache(board, z->resource.end-board+1);
+			z_ioremap(board, z->resource.end-board+1);
 
 		if(!address){
 			printk("Could not remap Fastlane controller memory!");
@@ -189,7 +219,7 @@ int __init fastlane_esp_detect(Scsi_Host_Template *tpnt)
 	return 0;
 
  err_unmap:
-	iounmap((void *)address);
+	z_iounmap((void *)address);
  err_unregister:
 	scsi_unregister (esp->ehost);
  err_release:
@@ -356,11 +386,6 @@ static void dma_setup(struct NCR_ESP *esp, __u32 addr, int count, int write)
 
 #define HOSTS_C
 
-#include "fastlane.h"
-
-static Scsi_Host_Template driver_template = SCSI_FASTLANE;
-#include "scsi_module.c"
-
 int fastlane_esp_release(struct Scsi_Host *instance)
 {
 #ifdef MODULE
@@ -372,5 +397,24 @@ int fastlane_esp_release(struct Scsi_Host *instance)
 #endif
 	return 1;
 }
+
+
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "esp-fastlane",
+	.proc_info		= esp_proc_info,
+	.name			= "Fastlane SCSI",
+	.detect			= fastlane_esp_detect,
+	.release		= fastlane_esp_release,
+	.queuecommand		= esp_queue,
+	.eh_abort_handler	= esp_abort,
+	.eh_bus_reset_handler	= esp_reset,
+	.can_queue		= 7,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= ENABLE_CLUSTERING
+};
+
+#include "scsi_module.c"
 
 MODULE_LICENSE("GPL");

@@ -50,11 +50,6 @@ int smp_threads_ready = 0;
  * indexed physically */
 struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 
-/* Per CPU interrupt stacks */
-extern union thread_union init_irq_union;
-union thread_union *irq_stacks[NR_CPUS] __cacheline_aligned =
-	{ &init_irq_union, };
-
 /* physical ID of the CPU used to boot the system */
 unsigned char boot_cpu_id;
 
@@ -450,6 +445,7 @@ smp_store_cpu_info(int id)
 	struct cpuinfo_x86 *c=&cpu_data[id];
 
 	*c = boot_cpu_data;
+
 	identify_cpu(c);
 }
 
@@ -512,6 +508,11 @@ start_secondary(void *unused)
 	/* if we're a quad, we may need to bootstrap other CPUs */
 	do_quad_bootstrap();
 
+	/* FIXME: this is rather a poor hack to prevent the CPU
+	 * activating softirqs while it's supposed to be waiting for
+	 * permission to proceed.  Without this, the new per CPU stuff
+	 * in the softirqs will fail */
+	local_irq_disable();
 	set_bit(cpuid, &cpu_callin_map);
 
 	/* signal that we're done */
@@ -519,6 +520,7 @@ start_secondary(void *unused)
 
 	while (!test_bit(cpuid, &smp_commenced_mask))
 		rep_nop();
+	local_irq_enable();
 
 	local_flush_tlb();
 
@@ -533,29 +535,7 @@ fork_by_hand(void)
 	struct pt_regs regs;
 	/* don't care about the eip and regs settings since we'll
 	 * never reschedule the forked task. */
-	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL);
-}
-
-
-static void __init setup_irq_stack(struct task_struct *p, int cpu)
-{
-	unsigned long stk;
-
-	stk = __get_free_pages(GFP_KERNEL, THREAD_ORDER+1);
-	if (!stk)
-		panic("I can't seem to allocate my irq stack.  Oh well, giving up.");
-
-	irq_stacks[cpu] = (void *)stk;
-	memset(irq_stacks[cpu], 0, THREAD_SIZE);
-	irq_stacks[cpu]->thread_info.cpu = cpu;
-	irq_stacks[cpu]->thread_info.preempt_count = 1;
-					/* interrupts are not preemptable */
-	p->thread_info->irq_stack = irq_stacks[cpu];
-
-	/* If we want to make the irq stack more than one unit
-	 * deep, we can chain then off of the irq_stack pointer
-	 * here.
-	 */
+	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
 
@@ -617,20 +597,17 @@ do_boot_cpu(__u8 cpu)
 	if(IS_ERR(idle))
 		panic("failed fork for CPU%d", cpu);
 
-	setup_irq_stack(idle, cpu);
-
 	init_idle(idle, cpu);
 
 	idle->thread.eip = (unsigned long) start_secondary;
 	unhash_process(idle);
-
-	/* The -4 is to correct for the fact that the stack pointer
-	 * is used to find the location of the thread_info structure
-	 * by masking off several of the LSBs.  Without the -4, esp
-	 * is pointing to the page after the one the stack is on.
-	 */
-	stack_start.esp = (void *)(THREAD_SIZE - 4 + (char *)idle->thread_info);
-
+	/* init_tasks (in sched.c) is indexed logically */
+#if 0
+	// for AC kernels
+	stack_start.esp = (THREAD_SIZE + (__u8 *)TSK_TO_KSTACK(idle));
+#else
+	stack_start.esp = (void *) (1024 + PAGE_SIZE + (char *)idle->thread_info);
+#endif
 	/* Note: Don't modify initial ss override */
 	VDEBUG(("VOYAGER SMP: Booting CPU%d at 0x%lx[%x:%x], stack %p\n", cpu, 
 		(unsigned long)hijack_source.val, hijack_source.idt.Segment,
@@ -764,6 +741,9 @@ smp_boot_cpus(void)
 
 	/* enable our own CPIs */
 	vic_enable_cpi();
+
+	set_bit(boot_cpu_id, &cpu_online_map);
+	set_bit(boot_cpu_id, &cpu_callout_map);
 	
 	/* loop over all the extended VIC CPUs and boot them.  The 
 	 * Quad CPUs must be bootstrapped by their extended VIC cpu */
@@ -1312,12 +1292,9 @@ smp_vic_timer_interrupt(struct pt_regs *regs)
 static inline void
 wrapper_smp_local_timer_interrupt(struct pt_regs *regs)
 {
-	__u8 cpu = smp_processor_id();
-
 	irq_enter();
 	smp_local_timer_interrupt(regs);
 	irq_exit();
-	
 }
 
 /* local (per CPU) timer interrupt.  It does both profiling and
@@ -1963,6 +1940,12 @@ smp_prepare_cpus(unsigned int max_cpus)
 {
 	/* FIXME: ignore max_cpus for now */
 	smp_boot_cpus();
+}
+
+void __devinit smp_prepare_boot_cpu(void)
+{
+	set_bit(smp_processor_id(), &cpu_online_map);
+	set_bit(smp_processor_id(), &cpu_callout_map);
 }
 
 int __devinit

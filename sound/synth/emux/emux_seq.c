@@ -61,12 +61,6 @@ static snd_midi_op_t emux_ops = {
 /*
  */
 
-static inline void dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 /*
  * Initialise the EMUX Synth by creating a client and registering
  * a series of ports.
@@ -280,10 +274,10 @@ int
 snd_emux_inc_count(snd_emux_t *emu)
 {
 	emu->used++;
-	if (!try_inc_mod_count(emu->ops.owner))
+	if (!try_module_get(emu->ops.owner))
 		goto __error;
-	if (!try_inc_mod_count(emu->card->module)) {
-		dec_mod_count(emu->ops.owner);
+	if (!try_module_get(emu->card->module)) {
+		module_put(emu->ops.owner);
 	      __error:
 		emu->used--;
 		return 0;
@@ -298,11 +292,11 @@ snd_emux_inc_count(snd_emux_t *emu)
 void
 snd_emux_dec_count(snd_emux_t *emu)
 {
-	dec_mod_count(emu->ops.owner);
+	module_put(emu->ops.owner);
 	emu->used--;
 	if (emu->used <= 0)
 		snd_emux_terminate_all(emu);
-	dec_mod_count(emu->card->module);
+	module_put(emu->card->module);
 }
 
 

@@ -18,6 +18,7 @@
 #define RTC_ALWAYS_BCD		0
 
 #include <linux/mc146818rtc.h>
+#include <linux/bcd.h>
 
 #include <asm/hardware/dec21285.h>
 #include <asm/leds.h>

@@ -523,7 +523,7 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 
 	up (&mdc800->io_lock);
 	
-	dev_set_drvdata(&intf->dev, mdc800);
+	usb_set_intfdata(intf, mdc800);
 	return 0;
 }
 
@@ -533,7 +533,7 @@ static int mdc800_usb_probe (struct usb_interface *intf,
  */
 static void mdc800_usb_disconnect (struct usb_interface *intf)
 {
-	struct mdc800_data* mdc800 = dev_get_drvdata(&intf->dev);
+	struct mdc800_data* mdc800 = usb_get_intfdata(intf);
 
 	dbg ("(mdc800_usb_disconnect) called");
 
@@ -552,7 +552,7 @@ static void mdc800_usb_disconnect (struct usb_interface *intf)
 		usb_driver_release_interface (&mdc800_usb_driver, intf);
 
 		mdc800->dev=0;
-		dev_set_drvdata(&intf->dev, NULL);
+		usb_set_intfdata(intf, NULL);
 	}
 	info ("Mustek MDC800 disconnected from USB.");
 }

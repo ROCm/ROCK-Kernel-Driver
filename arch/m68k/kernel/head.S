@@ -21,7 +21,7 @@
 ** 96/04/26 Guenther Kelleter: fixed identity mapping for Falcon with
 ** 			      Magnum- and FX-alternate ram
 ** 98/04/25 Phil Blundell: added HP300 support
-** 1998/08/30 David Kilzer: Added support for fbcon_font_desc structures
+** 1998/08/30 David Kilzer: Added support for font_desc structures
 **            for linux-2.1.115
 ** 9/02/11  Richard Zidlicky: added Q40 support (initial vesion 99/01/01) 
 **
@@ -130,7 +130,7 @@
  *
  * mmu_engage
  * ----------
- *	Thanks to a small helping routine enabling the mmu got quiet simple
+ *	Thanks to a small helping routine enabling the mmu got quite simple
  * and there is only one way left. mmu_engage makes a complete a new mapping
  * that only includes the absolute necessary to be able to jump to the final
  * postion and to restore the original mapping.
@@ -238,7 +238,7 @@
  *		In theory these could be determined at run time or handed
  *		over by the booter.  But, let's be real, it's a fine hard
  *		coded value.  (But, you will notice the code is run-time
- *		flexible!)  A pointer to the font's struct fbcon_font_desc
+ *		flexible!)  A pointer to the font's struct font_desc
  *		is kept locally in Lconsole_font.  It is used to determine
  *		font size information dynamically.
  *
@@ -1202,7 +1202,7 @@ L(not6000):
  *
  * Map the kernel (that's already done),
  * Map the I/O (on most machines that's the
- * 0x5000.0000 ... 0x5200.0000 range,
+ * 0x5000.0000 ... 0x5300.0000 range,
  * Map the video frame buffer using as few pages
  * as absolutely (this requirement mostly stems from
  * the fact that when the frame buffer is at
@@ -1246,10 +1246,11 @@ L(mmu_init_mac):
 	andl	L(mac_videobase),%d0
 
 	mmu_map		#VIDEOMEMBASE,%d0,#VIDEOMEMSIZE,%d3
-	mmu_map_eq	#0x40800000,#0x02000000,%d3	/* rom ? */
-	mmu_map_eq	#0x50000000,#0x02000000,%d3
-	mmu_map_eq	#0x60000000,#0x00400000,%d3
-	mmu_map_eq	#0x9c000000,#0x00400000,%d3
+	/* The ROM starts at 4000 0000		    	*/
+	mmu_map_eq	#0x40000000,#0x02000000,%d3
+	/* IO devices                               	*/
+	mmu_map_eq	#0x50000000,#0x03000000,%d3
+	/* NuBus slot space				*/
 	mmu_map_tt	#1,#0xf8000000,#0x08000000,%d3
 
 	jbra	L(mmu_init_done)
@@ -1461,6 +1462,9 @@ L(mmu_fixup_done):
 	andl	L(mac_videobase),%d0
 	addl	#VIDEOMEMBASE,%d0
 	movel	%d0,L(mac_videobase)
+#ifdef MAC_SERIAL_DEBUG
+	orl	#0x50000000,L(mac_sccbase)
+#endif		
 1:
 #endif
 
@@ -3032,10 +3036,6 @@ func_start	serial_putc,%d0/%d1/%a0/%a1
 #ifdef CONFIG_MAC
 	is_not_mac(5f)
 
-#ifdef CONSOLE
-	console_putc	%d0
-#endif /* CONSOLE */
-
 #ifdef MAC_SERIAL_DEBUG
 
 #ifdef MAC_USE_SCC_A
@@ -3371,7 +3371,7 @@ console_clear_loop:
 	 *	a1 = address of Lconsole_font pointer
 	 */
 	lea	%pc@(L(console_font)),%a1
-	movel	%a0,%a1@	/* store pointer to struct fbcon_font_desc in Lconsole_font */
+	movel	%a0,%a1@	/* store pointer to struct font_desc in Lconsole_font */
 	tstl	%a0
 	jeq	1f
 
@@ -3383,10 +3383,10 @@ console_clear_loop:
 	 */
 		/* ASSERT: a0 = contents of Lconsole_font */
 	movel	%d3,%d0			/* screen width in pixels */
-	divul	%a0@(FBCON_FONT_DESC_WIDTH),%d0		/* d0 = max num chars per row */
+	divul	%a0@(FONT_DESC_WIDTH),%d0		/* d0 = max num chars per row */
 
 	movel	%d4,%d1			 /* screen height in pixels */
-	divul	%a0@(FBCON_FONT_DESC_HEIGHT),%d1	 /* d1 = max num rows */
+	divul	%a0@(FONT_DESC_HEIGHT),%d1	 /* d1 = max num rows */
 
 	movel	%d0,%a2@(Lconsole_struct_num_columns)
 	movel	%d1,%a2@(Lconsole_struct_num_rows)
@@ -3430,6 +3430,10 @@ L(console_put_stats):
 	putn	%pc@(L(cputype))
 	putc	'\n'
 
+#ifdef MAC_SERIAL_DEBUG
+	putn	%pc@(L(mac_sccbase))
+	putc	'\n'
+#endif	
 #  if defined(MMU_PRINT)
 	jbsr	mmu_print_machine_cpu_types
 #  endif /* MMU_PRINT */
@@ -3489,7 +3493,7 @@ console_scroll:
 	movel	%pc@(L(console_font)),%a0
 	tstl	%a0
 	jeq	1f
-	mulul	%a0@(FBCON_FONT_DESC_HEIGHT),%d5	/* account for # scan lines per character */
+	mulul	%a0@(FONT_DESC_HEIGHT),%d5	/* account for # scan lines per character */
 	addal	%d5,%a2
 
 	/*
@@ -3508,7 +3512,7 @@ console_scroll:
 	lea	%pc@(L(mac_rowbytes)),%a0
 	movel	%a0@,%d6
 	movel	%pc@(L(console_font)),%a0
-	subl	%a0@(FBCON_FONT_DESC_HEIGHT),%d4	/* we're not scrolling the top row! */
+	subl	%a0@(FONT_DESC_HEIGHT),%d4	/* we're not scrolling the top row! */
 	mulul	%d4,%d6		/* scan line bytes x num scan lines */
 	divul	#32,%d6		/* we'll move 8 longs at a time */
 	subq	#1,%d6
@@ -3527,7 +3531,7 @@ console_scroll_loop:
 	lea	%pc@(L(mac_rowbytes)),%a0
 	movel	%a0@,%d6
 	movel	%pc@(L(console_font)),%a0
-	mulul	%a0@(FBCON_FONT_DESC_HEIGHT),%d6	/* scan line bytes x font height */
+	mulul	%a0@(FONT_DESC_HEIGHT),%d6	/* scan line bytes x font height */
 	divul	#32,%d6			/* we'll move 8 words at a time */
 	subq	#1,%d6
 
@@ -3606,19 +3610,19 @@ console_not_home:
 	movel	%a0@(Lconsole_struct_num_columns),%d1
 	cmpl	%d1,%d0
 	jcs	1f
-	putc	'\n'	/* recursion is OK! */
+	console_putc	#'\n'	/* recursion is OK! */
 1:
 	movel	%a0@(Lconsole_struct_cur_row),%d1
 
 	/*
 	 *	At this point we make a shift in register usage
-	 *	a0 = address of pointer to font data (fbcon_font_desc)
+	 *	a0 = address of pointer to font data (font_desc)
 	 */
 	movel	%pc@(L(console_font)),%a0
-	movel	%a0@(FBCON_FONT_DESC_DATA),%a1	/* Load fbcon_font_desc.data into a1 */
+	movel	%a0@(FONT_DESC_DATA),%a1	/* Load font_desc.data into a1 */
 	andl	#0x000000ff,%d7
 		/* ASSERT: a0 = contents of Lconsole_font */
-	mulul	%a0@(FBCON_FONT_DESC_HEIGHT),%d7	/* d7 = index into font data */
+	mulul	%a0@(FONT_DESC_HEIGHT),%d7	/* d7 = index into font data */
 	addl	%d7,%a1			/* a1 = points to char image */
 
 	/*
@@ -3631,15 +3635,15 @@ console_not_home:
 	 *	d7 = count down for the font's pixel count in height
 	 */
 		/* ASSERT: a0 = contents of Lconsole_font */
-	mulul	%a0@(FBCON_FONT_DESC_WIDTH),%d0
-	mulul	%a0@(FBCON_FONT_DESC_HEIGHT),%d1
-	movel	%a0@(FBCON_FONT_DESC_HEIGHT),%d7	/* Load fbcon_font_desc.height into d7 */
+	mulul	%a0@(FONT_DESC_WIDTH),%d0
+	mulul	%a0@(FONT_DESC_HEIGHT),%d1
+	movel	%a0@(FONT_DESC_HEIGHT),%d7	/* Load font_desc.height into d7 */
 	subq	#1,%d7
 console_read_char_scanline:
 	moveb	%a1@+,%d3
 
 		/* ASSERT: a0 = contents of Lconsole_font */
-	movel	%a0@(FBCON_FONT_DESC_WIDTH),%d6	/* Load fbcon_font_desc.width into d6 */
+	movel	%a0@(FONT_DESC_WIDTH),%d6	/* Load font_desc.width into d6 */
 	subql	#1,%d6
 
 console_do_font_scanline:
@@ -3650,7 +3654,7 @@ console_do_font_scanline:
 	dbra	%d6,console_do_font_scanline
 
 		/* ASSERT: a0 = contents of Lconsole_font */
-	subl	%a0@(FBCON_FONT_DESC_WIDTH),%d0
+	subl	%a0@(FONT_DESC_WIDTH),%d0
 	addq	#1,%d1
 	dbra	%d7,console_read_char_scanline
 
@@ -3848,7 +3852,7 @@ L(console_globals):
 	.long	0		/* left edge */
 	.long	0		/* mac putc */
 L(console_font):
-	.long	0		/* pointer to console font (struct fbcon_font_desc) */
+	.long	0		/* pointer to console font (struct font_desc) */
 #endif /* CONSOLE */
 
 #if defined(MMU_PRINT)

@@ -576,8 +576,10 @@ int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 			     (hinfo.minor_hash < start_minor_hash)))
 				continue;
 			if ((err = ext3_htree_store_dirent(dir_file,
-				   hinfo.hash, hinfo.minor_hash, de)) != 0)
+				   hinfo.hash, hinfo.minor_hash, de)) != 0) {
+				brelse(bh);
 				goto errout;
+			}
 			count++;
 		}
 		brelse (bh);

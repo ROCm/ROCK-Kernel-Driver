@@ -702,11 +702,10 @@ pamsnet_send_packet(struct sk_buff *skb, struct net_device *dev) {
 	/* Block a timer-based transmit from overlapping.  This could better be
 	 * done with atomic_swap(1, dev->tbusy), but set_bit() works as well.
 	 */
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	if (stdma_islocked()) {
-		restore_flags(flags);
+		local_irq_restore(flags);
 		lp->stats.tx_errors++;
 	}
 	else {
@@ -717,7 +716,7 @@ pamsnet_send_packet(struct sk_buff *skb, struct net_device *dev) {
 		stdma_lock(pamsnet_intr, NULL);
 		DISABLE_IRQ();
 
-		restore_flags(flags);
+		local_irq_restore(flags);
 		if( !STRAM_ADDR(buf+length-1) ) {
 			memcpy(nic_packet->buffer, skb->data, length);
 			buf = (unsigned long)phys_nic_packet;
@@ -749,20 +748,19 @@ pamsnet_poll_rx(struct net_device *dev) {
 	struct sk_buff *skb;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	/* ++roman: Take care at locking the ST-DMA... This must be done with ints
 	 * off, since otherwise an int could slip in between the question and the
 	 * locking itself, and then we'd go to sleep... And locking itself is
 	 * necessary to keep the floppy_change timer from working with ST-DMA
 	 * registers. */
 	if (stdma_islocked()) {
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return;
 	}
 	stdma_lock(pamsnet_intr, NULL);
 	DISABLE_IRQ();
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	boguscount = testpkt(lance_target);
 	if( lp->poll_time < MAX_POLL_TIME ) lp->poll_time++;

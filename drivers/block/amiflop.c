@@ -72,6 +72,7 @@
 #include <linux/amifd.h>
 #include <linux/ioport.h>
 #include <linux/buffer_head.h>
+#include <linux/interrupt.h>
 
 #include <asm/setup.h>
 #include <asm/uaccess.h>
@@ -228,12 +229,11 @@ static void ms_delay(int ms)
 	unsigned long flags;
 	int ticks;
 	if (ms > 0) {
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		while (ms_busy == 0)
 			sleep_on(&ms_wait);
 		ms_busy = 0;
-		restore_flags(flags);
+		local_irq_restore(flags);
 		ticks = MS_TICKS*ms-1;
 		ciaa.tblo=ticks%256;
 		ciaa.tbhi=ticks/256;
@@ -259,13 +259,12 @@ static void get_fdc(int drive)
 #ifdef DEBUG
 	printk("get_fdc: drive %d  fdc_busy %d  fdc_nested %d\n",drive,fdc_busy,fdc_nested);
 #endif
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	while (!try_fdc(drive))
 		sleep_on(&fdc_wait);
 	fdc_busy = drive;
 	fdc_nested++;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static inline void rel_fdc(void)
@@ -321,8 +320,7 @@ static void fd_deselect (int drive)
 	}
 
 	get_fdc(drive);
-	save_flags (flags);
-	sti();
+	local_irq_save(flags);
 
 	selected = -1;
 
@@ -330,7 +328,7 @@ static void fd_deselect (int drive)
 	prb |= (SELMASK(0)|SELMASK(1)|SELMASK(2)|SELMASK(3));
 	ciab.prb = prb;
 
-	restore_flags (flags);
+	local_irq_restore (flags);
 	rel_fdc();
 
 }
@@ -1305,10 +1303,9 @@ static int non_int_flush_track (unsigned long nr)
 		rel_fdc();
 		return 0;
 	}
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	if (writepending != 2) {
-		restore_flags(flags);
+		local_irq_restore(flags);
 		(*unit[nr].dtype->write_fkt)(nr);
 		if (!raw_write(nr)) {
 			printk (KERN_NOTICE "floppy disk write protected "
@@ -1320,7 +1317,7 @@ static int non_int_flush_track (unsigned long nr)
 			sleep_on (&wait_fd_block);
 	}
 	else {
-		restore_flags(flags);
+		local_irq_restore(flags);
 		ms_delay(2); /* 2 ms post_write delay */
 		post_write(nr);
 	}
@@ -1428,8 +1425,7 @@ static void redo_fd_request(void)
 			 * setup a callback to write the track buffer
 			 * after a short (1 tick) delay.
 			 */
-			save_flags (flags);
-			cli();
+			local_irq_save(flags);
 
 			floppy->dirty = 1;
 		        /* reset the timer */
@@ -1437,7 +1433,7 @@ static void redo_fd_request(void)
 			    
 			flush_track_timer[drive].expires = jiffies + 1;
 			add_timer (flush_track_timer + drive);
-			restore_flags (flags);
+			local_irq_restore(flags);
 			break;
 		}
 	}
@@ -1606,15 +1602,14 @@ static int floppy_open(struct inode *inode, struct file *filp)
 		}
 	}
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	fd_ref[drive]++;
 	fd_device[drive] = system;
 #ifdef MODULE
 	if (unit[drive].motor == 0)
 		MOD_INC_USE_COUNT;
 #endif
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	if (old_dev != system)
 		invalidate_buffers(mk_kdev(FLOPPY_MAJOR, drive + (system << 2)));

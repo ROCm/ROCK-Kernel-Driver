@@ -1734,7 +1734,7 @@ dasd_open(struct inode *inp, struct file *filp)
 	rc = 0;
 
 	if (atomic_inc_return(&device->open_count) == 1) {
-		if (!try_inc_mod_count(device->discipline->owner)) {
+		if (!try_module_get(device->discipline->owner)) {
 			/* Discipline is currently unloaded! */
 			atomic_dec(&device->open_count);
 			rc = -ENODEV;
@@ -1757,8 +1757,7 @@ dasd_release(struct inode *inp, struct file *filp)
 	}
 	if (atomic_dec_return(&device->open_count) == 0) {
 		invalidate_buffers(inp->i_rdev);
-		if (device->discipline->owner)
-			__MOD_DEC_USE_COUNT(device->discipline->owner);
+		module_put(device->discipline->owner);
 	}
 	return 0;
 }

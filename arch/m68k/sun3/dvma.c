@@ -1,5 +1,11 @@
-
-/* dvma support routines */
+/*
+ * linux/arch/m68k/sun3/dvma.c
+ *
+ * Written by Sam Creasey
+ *
+ * Sun3 IOMMU routines used for dvma accesses.
+ *
+ */
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -22,7 +28,7 @@ inline unsigned long dvma_page(unsigned long kaddr, unsigned long vaddr)
 	j = *(volatile unsigned long *)kaddr;
 	*(volatile unsigned long *)kaddr = j;
 
-	ptep = __mk_pte(kaddr, PAGE_KERNEL);
+	ptep = pfn_pte(virt_to_pfn(kaddr), PAGE_KERNEL);
 	pte = pte_val(ptep);
 //		printk("dvma_remap: addr %lx -> %lx pte %08lx len %x\n", 
 //		       kaddr, vaddr, pte, len);

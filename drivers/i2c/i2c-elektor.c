@@ -38,7 +38,6 @@
 
 #include <linux/i2c.h>
 #include <linux/i2c-algo-pcf.h>
-#include <linux/i2c-elektor.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -142,11 +141,11 @@ static void pcf_isa_handler(int this_irq, void *dev_id, struct pt_regs *regs) {
 static int pcf_isa_init(void)
 {
 	if (!mmapped) {
-		if (check_region(base, 2) < 0 ) {
-			printk(KERN_ERR "i2c-elektor.o: requested I/O region (0x%X:2) is in use.\n", base);
+		if (!request_region(base, 2, "i2c (isa bus adapter)")) {
+			printk(KERN_ERR
+			       "i2c-elektor.o: requested I/O region (0x%X:2) "
+			       "is in use.\n", base);
 			return -ENODEV;
-		} else {
-			request_region(base, 2, "i2c (isa bus adapter)");
 		}
 	}
 	if (irq > 0) {
@@ -158,45 +157,6 @@ static int pcf_isa_init(void)
 	}
 	return 0;
 }
-
-
-static void pcf_isa_exit(void)
-{
-	if (irq > 0) {
-		disable_irq(irq);
-		free_irq(irq, 0);
-	}
-	if (!mmapped) {
-		release_region(base , 2);
-	}
-}
-
-
-static int pcf_isa_reg(struct i2c_client *client)
-{
-	return 0;
-}
-
-
-static int pcf_isa_unreg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static void pcf_isa_inc_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-static void pcf_isa_dec_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-}
-
 
 /* ------------------------------------------------------------------------
  * Encapsulate the above functions in the correct operations structure.
@@ -214,16 +174,13 @@ static struct i2c_algo_pcf_data pcf_isa_data = {
 };
 
 static struct i2c_adapter pcf_isa_ops = {
+	.owner		   = THIS_MODULE,
 	.name		   = "PCF8584 ISA adapter",
 	.id		   = I2C_HW_P_ELEK,
 	.algo_data	   = &pcf_isa_data,
-	.inc_use	   = pcf_isa_inc_use,
-	.dec_use	   = pcf_isa_dec_use,
-	.client_register   = pcf_isa_reg,
-	.client_unregister = pcf_isa_unreg,
 };
 
-int __init i2c_pcfisa_init(void) 
+static int __init i2c_pcfisa_init(void) 
 {
 #ifdef __alpha__
 	/* check to see we have memory mapped PCF8584 connected to the 
@@ -281,23 +238,39 @@ int __init i2c_pcfisa_init(void)
 	}
 
 	init_waitqueue_head(&pcf_wait);
-	if (pcf_isa_init() == 0) {
-		if (i2c_pcf_add_bus(&pcf_isa_ops) < 0) {
-			pcf_isa_exit();
-			return -ENODEV;
-		}
-	} else {
+	if (pcf_isa_init())
 		return -ENODEV;
-	}
+	if (i2c_pcf_add_bus(&pcf_isa_ops) < 0)
+		goto fail;
 	
 	printk(KERN_ERR "i2c-elektor.o: found device at %#x.\n", base);
 
 	return 0;
+
+ fail:
+	if (irq > 0) {
+		disable_irq(irq);
+		free_irq(irq, 0);
+	}
+
+	if (!mmapped)
+		release_region(base , 2);
+	return -ENODEV;
 }
 
-EXPORT_NO_SYMBOLS;
+static void i2c_pcfisa_exit(void)
+{
+	i2c_pcf_del_bus(&pcf_isa_ops);
 
-#ifdef MODULE
+	if (irq > 0) {
+		disable_irq(irq);
+		free_irq(irq, 0);
+	}
+
+	if (!mmapped)
+		release_region(base , 2);
+}
+
 MODULE_AUTHOR("Hans Berglund <hb@spacetec.no>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for PCF8584 ISA bus adapter");
 MODULE_LICENSE("GPL");
@@ -309,15 +282,5 @@ MODULE_PARM(own, "i");
 MODULE_PARM(mmapped, "i");
 MODULE_PARM(i2c_debug, "i");
 
-int init_module(void) 
-{
-	return i2c_pcfisa_init();
-}
-
-void cleanup_module(void) 
-{
-	i2c_pcf_del_bus(&pcf_isa_ops);
-	pcf_isa_exit();
-}
-
-#endif
+module_init(i2c_pcfisa_init);
+module_exit(i2c_pcfisa_exit);

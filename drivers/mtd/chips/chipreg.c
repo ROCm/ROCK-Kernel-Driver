@@ -44,7 +44,7 @@ static struct mtd_chip_driver *get_mtd_chip_driver (char *name)
 			break;
 		}
 	}
-	if (ret && !try_inc_mod_count(ret->module)) {
+	if (ret && !try_module_get(ret->module)) {
 		/* Eep. Failed. */
 		ret = NULL;
 	}
@@ -71,15 +71,13 @@ struct mtd_info *do_map_probe(char *name, struct map_info *map)
 		return NULL;
 
 	ret = drv->probe(map);
-#ifdef CONFIG_MODULES
+
 	/* We decrease the use count here. It may have been a 
 	   probe-only module, which is no longer required from this
 	   point, having given us a handle on (and increased the use
 	   count of) the actual driver code.
 	*/
-	if(drv->module)
-		__MOD_DEC_USE_COUNT(drv->module);
-#endif
+	module_put(drv->module);
 
 	if (ret)
 		return ret;

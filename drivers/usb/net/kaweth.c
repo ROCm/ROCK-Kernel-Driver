@@ -612,8 +612,6 @@ static int kaweth_open(struct net_device *net)
 	struct kaweth_device *kaweth = (struct kaweth_device *)net->priv;
 	int res;
 
-	kaweth_dbg("Dev usage: %d", kaweth->dev->refcnt.counter);
-
 	kaweth_dbg("Opening network device.");
 
 	res = kaweth_resubmit_rx_urb(kaweth, GFP_KERNEL);
@@ -657,9 +655,6 @@ static int kaweth_close(struct net_device *net)
 	usb_unlink_urb(kaweth->rx_urb);
 
 	kaweth->status &= ~KAWETH_STATUS_CLOSING;
-
-
-	printk("Dev usage: %d", kaweth->dev->refcnt.counter);
 
 	return 0;
 }
@@ -1066,7 +1061,7 @@ static int kaweth_probe(
 
 	kaweth_dbg("Kaweth probe returning.");
 
-	dev_set_drvdata (&intf->dev, kaweth);
+	usb_set_intfdata(intf, kaweth);
 	return 0;
 
 err_tx_and_rx:
@@ -1085,11 +1080,11 @@ err_no_netdev:
  ****************************************************************/
 static void kaweth_disconnect(struct usb_interface *intf)
 {
-	struct kaweth_device *kaweth = dev_get_drvdata (&intf->dev);
+	struct kaweth_device *kaweth = usb_get_intfdata(intf);
 
 	kaweth_info("Unregistering");
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata(intf, NULL);
 	if (!kaweth) {
 		kaweth_warn("unregistering non-existant device");
 		return;

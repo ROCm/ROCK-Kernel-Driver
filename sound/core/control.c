@@ -40,12 +40,6 @@ typedef struct _snd_kctl_ioctl {
 static DECLARE_RWSEM(snd_ioctl_rwsem);
 static LIST_HEAD(snd_control_ioctls);
 
-static inline void dec_mod_count(struct module *module)
-{
-	if (module)
-		__MOD_DEC_USE_COUNT(module);
-}
-
 static int snd_ctl_open(struct inode *inode, struct file *file)
 {
 	int cardnum = SNDRV_MINOR_CARD(minor(inode->i_rdev));
@@ -67,7 +61,7 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 		err = -ENODEV;
 		goto __error1;
 	}
-	if (!try_inc_mod_count(card->module)) {
+	if (!try_module_get(card->module)) {
 		err = -EFAULT;
 		goto __error2;
 	}
@@ -88,7 +82,7 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 	return 0;
 
       __error:
-      	dec_mod_count(card->module);
+      	module_put(card->module);
       __error2:
 	snd_card_file_remove(card, file);
       __error1:
@@ -135,7 +129,7 @@ static int snd_ctl_release(struct inode *inode, struct file *file)
 	up_write(&card->controls_rwsem);
 	snd_ctl_empty_read_queue(ctl);
 	snd_magic_kfree(ctl);
-	dec_mod_count(card->module);
+	module_put(card->module);
 	snd_card_file_remove(card, file);
 #ifdef LINUX_2_2
 	MOD_DEC_USE_COUNT;

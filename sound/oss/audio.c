@@ -88,19 +88,20 @@ int audio_open(int dev, struct file *file)
 		return -ENXIO;
 
 	driver = audio_devs[dev]->d;
-	if (driver->owner)
-		__MOD_INC_USE_COUNT(driver->owner);
+
+	if (!try_module_get(driver->owner))
+		return -ENODEV;
 
 	if ((ret = DMAbuf_open(dev, mode)) < 0)
 		goto error_1;
 
 	if ( (coprocessor = audio_devs[dev]->coproc) != NULL ) {
-		if (coprocessor->owner)
-			__MOD_INC_USE_COUNT(coprocessor->owner);
+		if (!try_module_get(coprocessor->owner))
+			goto error_2;
 
 		if ((ret = coprocessor->open(coprocessor->devc, COPR_PCM)) < 0) {
 			printk(KERN_WARNING "Sound: Can't access coprocessor device\n");
-			goto error_2;
+			goto error_3;
 		}
 	}
 	
@@ -119,14 +120,14 @@ int audio_open(int dev, struct file *file)
 	 * Clean-up stack: this is what needs (un)doing if
 	 * we can't open the audio device ...
 	 */
+	error_3:
+	module_put(coprocessor->owner);
+
 	error_2:
-	if (coprocessor->owner)
-		__MOD_DEC_USE_COUNT(coprocessor->owner);
 	DMAbuf_release(dev, mode);
 
 	error_1:
-	if (driver->owner)
-		__MOD_DEC_USE_COUNT(driver->owner);
+	module_put(driver->owner);
 
 	return ret;
 }
@@ -200,14 +201,11 @@ void audio_release(int dev, struct file *file)
 
 	if ( (coprocessor = audio_devs[dev]->coproc) != NULL ) {
 		coprocessor->close(coprocessor->devc, COPR_PCM);
-
-		if (coprocessor->owner)
-			__MOD_DEC_USE_COUNT(coprocessor->owner);
+		module_put(coprocessor->owner);
 	}
 	DMAbuf_release(dev, mode);
 
-	if (audio_devs[dev]->d->owner)
-		__MOD_DEC_USE_COUNT (audio_devs[dev]->d->owner);
+	module_put(audio_devs[dev]->d->owner);
 }
 
 static void translate_bytes(const unsigned char *table, unsigned char *buff, int n)

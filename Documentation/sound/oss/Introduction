@@ -119,9 +119,9 @@ the README takes precedence.
 
 6.  Make the modules and install them (make modules; make modules_install).
 
-Note, for 2.4.x kernels, make sure you have the newer modutils 
-loaded or modules will not be loaded properly.  2.4.x changed the 
-layout of /lib/modules/2.4.x and requires an updated modutils.
+Note, for 2.5.x kernels, make sure you have the newer module-init-tools 
+installed or modules will not be loaded properly.  2.5.x requires an
+updated module-init-tools.
 
 
 Plug and Play (PnP:

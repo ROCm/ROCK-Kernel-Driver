@@ -35,6 +35,7 @@
 #include <linux/init.h>
 #include <linux/input.h>
 #include <linux/delay.h>
+#include <linux/interrupt.h>
 
 #include <asm/amigaints.h>
 #include <asm/amigahw.h>

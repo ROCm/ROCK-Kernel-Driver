@@ -29,6 +29,9 @@ void __init intr_init_hook(void)
 
 void __init pre_setup_arch_hook(void)
 {
+	/* Voyagers run their CPUs from independent clocks, so disable
+	 * the TSC code because we can't sync them */
+	tsc_disable = 1;
 }
 
 void __init trap_init_hook(void)

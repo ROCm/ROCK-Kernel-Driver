@@ -1307,7 +1307,7 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 
 	printk(KERN_INFO "ViCam webcam driver now controlling video device %d\n",cam->vdev.minor);
 
-	dev_set_drvdata(&intf->dev, cam);
+	usb_set_intfdata (intf, cam);
 	
 	return 0;
 }
@@ -1316,8 +1316,8 @@ static void
 vicam_disconnect(struct usb_interface *intf)
 {
 	int open_count;
-	struct vicam_camera *cam = dev_get_drvdata(&intf->dev);
-	dev_set_drvdata ( &intf->dev, NULL );
+	struct vicam_camera *cam = usb_get_intfdata (intf);
+	usb_set_intfdata (intf, NULL);
 
 	/* we must unregister the device before taking its
 	 * cam_lock. This is because the video open call

@@ -49,7 +49,7 @@ struct i2c_algo_iic_data {
 #define I2C_IIC_ADAP_MAX	16
 
 
-int i2c_iic_add_bus(struct i2c_adapter *);
-int i2c_iic_del_bus(struct i2c_adapter *);
+int i2c_ocp_add_bus(struct i2c_adapter *);
+int i2c_ocp_del_bus(struct i2c_adapter *);
 
 #endif /* I2C_ALGO_IIC_H */

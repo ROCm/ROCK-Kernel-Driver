@@ -24,6 +24,7 @@
 #include <linux/irq.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
+#include <linux/bcd.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>

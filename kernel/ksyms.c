@@ -98,6 +98,10 @@ EXPORT_SYMBOL(set_shrinker);
 EXPORT_SYMBOL(remove_shrinker);
 EXPORT_SYMBOL(kmalloc);
 EXPORT_SYMBOL(kfree);
+#ifdef CONFIG_SMP
+EXPORT_SYMBOL(kmalloc_percpu);
+EXPORT_SYMBOL(kfree_percpu);
+#endif
 EXPORT_SYMBOL(vfree);
 EXPORT_SYMBOL(__vmalloc);
 EXPORT_SYMBOL(vmalloc);
@@ -299,6 +303,7 @@ EXPORT_SYMBOL(dcache_dir_open);
 EXPORT_SYMBOL(dcache_dir_close);
 EXPORT_SYMBOL(dcache_dir_lseek);
 EXPORT_SYMBOL(dcache_readdir);
+EXPORT_SYMBOL(simple_getattr);
 EXPORT_SYMBOL(simple_statfs);
 EXPORT_SYMBOL(simple_lookup);
 EXPORT_SYMBOL(simple_dir_operations);

@@ -40,10 +40,6 @@ static char *DRIVERRELEASE = "2.0";
 static char *eicon_revision = "$Revision: 1.1.2.2 $";
 extern char *eicon_idi_revision;
 
-#ifdef MODULE
-#define MOD_USE_COUNT (GET_USE_COUNT (&__this_module))
-#endif
-
 #define EICON_CTRL_VERSION 2
 
 ulong DebugVar;
@@ -507,12 +503,6 @@ eicon_command(eicon_card * card, isdn_ctrl * c)
 					DebugVar = a;
 					eicon_log(card, 1, "%s: Debug Value set to %ld\n", DRIVERLNAME, DebugVar);
 					return 0;
-#ifdef MODULE
-				case EICON_IOCTL_FREEIT:
-					while (MOD_USE_COUNT > 0) MOD_DEC_USE_COUNT;
-					MOD_INC_USE_COUNT;
-					return 0;
-#endif
 				case EICON_IOCTL_LOADPCI:
 					eicon_log(card, 1, "%s: Wrong version of load-utility,\n", DRIVERLNAME);
 					eicon_log(card, 1, "%s: re-compile eiconctrl !\n", DRIVERLNAME);

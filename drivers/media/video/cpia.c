@@ -3158,8 +3158,7 @@ static int reset_camera(struct cam_data *cam)
 
 static void put_cam(struct cpia_camera_ops* ops)
 {
-	if (ops->owner)
-		__MOD_DEC_USE_COUNT(ops->owner);
+	module_put(ops->owner);
 }
 
 /* ------------------------- V4L interface --------------------- */
@@ -3174,7 +3173,7 @@ static int cpia_open(struct inode *inode, struct file *file)
 		return -ENODEV;
 	}
 
-	if (!try_inc_mod_count(cam->ops->owner))
+	if (!try_module_get(cam->ops->owner))
 		return -ENODEV;
 
 	down(&cam->busy_lock);

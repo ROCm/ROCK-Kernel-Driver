@@ -103,7 +103,7 @@ static struct quota_format_type *find_quota_format(int id)
 
 	lock_kernel();
 	for (actqf = quota_formats; actqf && actqf->qf_fmt_id != id; actqf = actqf->qf_next);
-	if (actqf && !try_inc_mod_count(actqf->qf_owner))
+	if (actqf && !try_module_get:(actqf->qf_owner))
 		actqf = NULL;
 	unlock_kernel();
 	return actqf;
@@ -111,8 +111,7 @@ static struct quota_format_type *find_quota_format(int id)
 
 static void put_quota_format(struct quota_format_type *fmt)
 {
-	if (fmt->qf_owner)
-		__MOD_DEC_USE_COUNT(fmt->qf_owner);
+	module_put(fmt->qf_owner);
 }
 
 /*

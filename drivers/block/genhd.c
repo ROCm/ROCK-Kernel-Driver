@@ -160,7 +160,7 @@ retry:
 			read_unlock(&gendisk_lock);
 			return NULL;
 		}
-		if (!try_inc_mod_count(p->owner))
+		if (!try_module_get(p->owner))
 			continue;
 		owner = p->owner;
 		data = p->data;
@@ -168,15 +168,13 @@ retry:
 		best = p->range;
 		*part = dev - p->dev;
 		if (p->lock && p->lock(dev, data) < 0) {
-			if (owner)
-				__MOD_DEC_USE_COUNT(owner);
+			module_put(owner);
 			continue;
 		}
 		read_unlock(&gendisk_lock);
 		disk = probe(dev, part, data);
 		/* Currently ->owner protects _only_ ->probe() itself. */
-		if (owner)
-			__MOD_DEC_USE_COUNT(owner);
+		module_put(owner);
 		if (disk)
 			return disk;
 		goto retry;
@@ -424,7 +422,7 @@ struct gendisk *get_disk(struct gendisk *disk)
 	if (!disk->fops)
 		return NULL;
 	owner = disk->fops->owner;
-	if (owner && !try_inc_mod_count(owner))
+	if (owner && !try_module_get(owner))
 		return NULL;
 	return to_disk(kobject_get(&disk->kobj));
 }

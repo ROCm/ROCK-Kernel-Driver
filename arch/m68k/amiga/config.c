@@ -21,6 +21,7 @@
 #include <linux/rtc.h>
 #include <linux/init.h>
 #include <linux/vt_kern.h>
+#include <linux/interrupt.h>
 #ifdef CONFIG_ZORRO
 #include <linux/zorro.h>
 #endif

@@ -243,7 +243,7 @@ static int ir_startup (struct usb_serial *serial)
 
 	irda_desc = irda_usb_find_class_desc (serial->dev, 0);
 	if (irda_desc == NULL) {
-		err ("IRDA class descriptor not found, device not bound");
+		dev_err (serial->dev->dev, "IRDA class descriptor not found, device not bound\n");
 		return -ENODEV;
 	}
 
@@ -291,7 +291,7 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 		/* override the default buffer sizes */
 		buffer = kmalloc (buffer_size, GFP_KERNEL);
 		if (!buffer) {
-			err ("%s - out of memory.", __FUNCTION__);
+			dev_err (port->dev, "%s - out of memory.\n", __FUNCTION__);
 			return -ENOMEM;
 		}
 		kfree (port->read_urb->transfer_buffer);
@@ -300,7 +300,7 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 
 		buffer = kmalloc (buffer_size, GFP_KERNEL);
 		if (!buffer) {
-			err ("%s - out of memory.", __FUNCTION__);
+			dev_err (port->dev, "%s - out of memory.\n", __FUNCTION__);
 			return -ENOMEM;
 		}
 		kfree (port->write_urb->transfer_buffer);
@@ -320,7 +320,7 @@ static int ir_open (struct usb_serial_port *port, struct file *filp)
 		port);
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (result)
-		err("%s - failed submitting read urb, error %d", __FUNCTION__, result);
+		dev_err(port->dev, "%s - failed submitting read urb, error %d\n", __FUNCTION__, result);
 
 	return result;
 }
@@ -353,7 +353,7 @@ static int ir_write (struct usb_serial_port *port, int from_user, const unsigned
 	dbg("%s - port = %d, count = %d", __FUNCTION__, port->number, count);
 
 	if (!port->tty) {
-		err ("%s - no tty???", __FUNCTION__);
+		dev_err (port->dev, "%s - no tty???\n", __FUNCTION__);
 		return 0;
 	}
 
@@ -399,7 +399,7 @@ static int ir_write (struct usb_serial_port *port, int from_user, const unsigned
 
 	result = usb_submit_urb (port->write_urb, GFP_ATOMIC);
 	if (result)
-		err("%s - failed submitting write urb, error %d", __FUNCTION__, result);
+		dev_err(port->dev, "%s - failed submitting write urb, error %d\n", __FUNCTION__, result);
 	else
 		result = transfer_size;
 
@@ -503,11 +503,9 @@ static void ir_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 				port);
 
 			result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
-
 			if (result)
-				err("%s - failed resubmitting read urb, error %d",
-					__FUNCTION__, 
-					result);
+				dev_err(port->dev, "%s - failed resubmitting read urb, error %d\n",
+					__FUNCTION__, result);
 
 			break ;
 
@@ -601,7 +599,7 @@ static void ir_set_termios (struct usb_serial_port *port, struct termios *old_te
 
 		result = usb_submit_urb (port->write_urb, GFP_KERNEL);
 		if (result)
-			err("%s - failed submitting write urb, error %d", __FUNCTION__, result);
+			dev_err(port->dev, "%s - failed submitting write urb, error %d\n", __FUNCTION__, result);
 	}
 	return;
 }
