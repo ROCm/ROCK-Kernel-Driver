@@ -965,5 +965,5 @@ __setup("lp=", lp_setup);
 module_init(lp_init_module);
 module_exit(lp_cleanup_module);
 
-MODULE_ALIAS("char-major-" __stringify(LP_MAJOR));
+MODULE_ALIAS_CHARDEV_MAJOR(LP_MAJOR);
 MODULE_LICENSE("GPL");
