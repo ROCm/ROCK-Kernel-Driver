@@ -791,24 +791,24 @@ struct deadline_fs_entry {
 };
 
 static ssize_t
-deadline_var_show(unsigned int var, char *page)
+deadline_var_show(int var, char *page)
 {
 	return sprintf(page, "%d\n", var);
 }
 
 static ssize_t
-deadline_var_store(unsigned int *var, const char *page, size_t count)
+deadline_var_store(int *var, const char *page, size_t count)
 {
 	char *p = (char *) page;
 
-	*var = simple_strtoul(p, &p, 10);
+	*var = simple_strtol(p, &p, 10);
 	return count;
 }
 
 #define SHOW_FUNCTION(__FUNC, __VAR, __CONV)				\
 static ssize_t __FUNC(struct deadline_data *dd, char *page)		\
 {									\
-	unsigned int __data = __VAR;					\
+	int __data = __VAR;					\
 	if (__CONV)							\
 		__data = jiffies_to_msecs(__data);			\
 	return deadline_var_show(__data, (page));			\
@@ -823,7 +823,7 @@ SHOW_FUNCTION(deadline_fifobatch_show, dd->fifo_batch, 0);
 #define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX, __CONV)			\
 static ssize_t __FUNC(struct deadline_data *dd, const char *page, size_t count)	\
 {									\
-	unsigned int __data;						\
+	int __data;							\
 	int ret = deadline_var_store(&__data, (page), count);		\
 	if (__data < (MIN))						\
 		__data = (MIN);						\

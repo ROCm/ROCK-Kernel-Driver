@@ -57,10 +57,9 @@
 
 extern int dn_cache_dump(struct sk_buff *skb, struct netlink_callback *cb);
 
-static spinlock_t dn_fib_multipath_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dn_fib_multipath_lock);
 static struct dn_fib_info *dn_fib_info_list;
-static rwlock_t dn_fib_info_lock = RW_LOCK_UNLOCKED;
-int dn_fib_info_cnt;
+static DEFINE_RWLOCK(dn_fib_info_lock);
 
 static struct
 {
@@ -93,7 +92,6 @@ void dn_fib_free_info(struct dn_fib_info *fi)
 			dev_put(nh->nh_dev);
 		nh->nh_dev = NULL;
 	} endfor_nexthops(fi);
-	dn_fib_info_cnt--;
 	kfree(fi);
 }
 
@@ -388,7 +386,6 @@ link_it:
 	if (dn_fib_info_list)
 		dn_fib_info_list->fib_prev = fi;
 	dn_fib_info_list = fi;
-	dn_fib_info_cnt++;
 	write_unlock(&dn_fib_info_lock);
 	return fi;
 
@@ -483,18 +480,6 @@ void dn_fib_select_multipath(const struct flowi *fl, struct dn_fib_res *res)
 	} endfor_nexthops(fi);
 	res->nh_sel = 0;
 	spin_unlock_bh(&dn_fib_multipath_lock);
-}
-
-
-/*
- * Punt to user via netlink for example, but for now
- * we just drop it.
- */
-int dn_fib_rt_message(struct sk_buff *skb)
-{
-	kfree_skb(skb);
-
-	return 0;
 }
 
 

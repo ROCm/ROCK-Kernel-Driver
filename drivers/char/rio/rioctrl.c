@@ -130,7 +130,6 @@ static int
 
 #define drv_makedev(maj, min) ((((uint) maj & 0xff) << 8) | ((uint) min & 0xff))
 
-#ifdef linux
 int copyin (int arg, caddr_t dp, int siz)
 {
   int rv;
@@ -141,8 +140,7 @@ int copyin (int arg, caddr_t dp, int siz)
   else return rv;
 }
 
-
-int copyout (caddr_t dp, int arg, int siz)
+static int copyout (caddr_t dp, int arg, int siz)
 {
   int rv;
 
@@ -151,35 +149,6 @@ int copyout (caddr_t dp, int arg, int siz)
   if (rv) return COPYFAIL;
   else return rv;
 }
-
-#else
-
-int
-copyin(arg, dp, siz)
-int arg;
-caddr_t dp;
-int siz; 
-{
-	if (rbounds ((unsigned long) arg) >= siz) {
-		bcopy ( arg, dp, siz );
-		return OK;
-	} else
-		return ( COPYFAIL );
-}
-
-int
-copyout (dp, arg, siz)
-caddr_t dp;
-int arg;
-int siz;
-{
-	if (wbounds ((unsigned long) arg) >=  siz ) {
-		bcopy ( dp, arg, siz );
-		return OK;
-	} else
-		return ( COPYFAIL );
-}
-#endif
 
 int
 riocontrol(p, dev, cmd, arg, su)
@@ -1203,7 +1172,7 @@ RIO_DEBUG_CTRL, 				if (su)
 					p->RIOPortp[loop]->TtyP = &p->channel[loop];
 #endif
 					
-					p->RIOPortp[loop]->portSem = SPIN_LOCK_UNLOCKED;
+					spin_lock_init(&p->RIOPortp[loop]->portSem);
 					p->RIOPortp[loop]->InUse = NOT_INUSE;
 				}
 

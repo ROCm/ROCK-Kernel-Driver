@@ -461,12 +461,12 @@ MODULE_LICENSE("Dual MPL/GPL");
 /* Level of debugging. Used in the macros in orinoco.h */
 #ifdef ORINOCO_DEBUG
 int orinoco_debug = ORINOCO_DEBUG;
-MODULE_PARM(orinoco_debug, "i");
+module_param(orinoco_debug, int, 0);
 EXPORT_SYMBOL(orinoco_debug);
 #endif
 
 static int suppress_linkstatus; /* = 0 */
-MODULE_PARM(suppress_linkstatus, "i");
+module_param(suppress_linkstatus, bool, 0);
 
 /********************************************************************/
 /* Compile time configuration and compatibility stuff               */
@@ -617,9 +617,8 @@ static int orinoco_open(struct net_device *dev)
 	unsigned long flags;
 	int err;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	err = __orinoco_up(dev);
 
@@ -671,10 +670,9 @@ static struct iw_statistics *orinoco_get_wireless_stats(struct net_device *dev)
 		return NULL; /* FIXME: Can we do better than this? */
 	}
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return NULL; /* FIXME: Erg, we've been signalled, how
-			      * do we propagate this back up? */
+	if (orinoco_lock(priv, &flags) != 0)
+		return NULL;  /* FIXME: Erg, we've been signalled, how
+			       * do we propagate this back up? */
 
 	if (priv->iw_mode == IW_MODE_ADHOC) {
 		memset(&wstats->qual, 0, sizeof(wstats->qual));
@@ -1819,10 +1817,8 @@ static int orinoco_reconfigure(struct net_device *dev)
 		return 0;
 	}
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
-
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 		
 	err = hermes_disable_port(hw, 0);
 	if (err) {
@@ -1864,11 +1860,10 @@ static void orinoco_reset(struct net_device *dev)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	struct hermes *hw = &priv->hw;
-	int err;
+	int err = 0;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
+	if (orinoco_lock(priv, &flags) != 0)
 		/* When the hardware becomes available again, whatever
 		 * detects that is responsible for re-initializing
 		 * it. So no need for anything further */
@@ -2411,9 +2406,8 @@ static int orinoco_hw_get_bssid(struct orinoco_private *priv,
 	int err = 0;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	err = hermes_read_ltv(hw, USER_BAP, HERMES_RID_CURRENTBSSID,
 			      ETH_ALEN, NULL, buf);
@@ -2433,9 +2427,8 @@ static int orinoco_hw_get_essid(struct orinoco_private *priv, int *active,
 	int len;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	if (strlen(priv->desired_essid) > 0) {
 		/* We read the desired SSID from the hardware rather
@@ -2486,9 +2479,8 @@ static long orinoco_hw_get_freq(struct orinoco_private *priv)
 	long freq = 0;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 	
 	err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_CURRENTCHANNEL, &channel);
 	if (err)
@@ -2528,9 +2520,8 @@ static int orinoco_hw_get_bitratelist(struct orinoco_private *priv,
 	int i;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	err = hermes_read_ltv(hw, USER_BAP, HERMES_RID_SUPPORTEDDATARATES,
 			      sizeof(list), NULL, &list);
@@ -2568,9 +2559,8 @@ static int orinoco_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq
 
 	rrq->length = sizeof(range);
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	mode = priv->iw_mode;
 	orinoco_unlock(priv, &flags);
@@ -2639,9 +2629,8 @@ static int orinoco_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq
 	range.min_frag = 256;
 	range.max_frag = 2346;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 	if (priv->has_wep) {
 		range.max_encoding_tokens = ORINOCO_MAX_KEYS;
 
@@ -2706,10 +2695,9 @@ static int orinoco_ioctl_setiwencode(struct net_device *dev, struct iw_point *er
 		if (copy_from_user(keybuf, erq->pointer, erq->length))
 			return -EFAULT;
 	}
-	
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 	
 	if (erq->pointer) {
 		if (erq->length > ORINOCO_MAX_KEY_SIZE) {
@@ -2788,12 +2776,10 @@ static int orinoco_ioctl_getiwencode(struct net_device *dev, struct iw_point *er
 	int index = (erq->flags & IW_ENCODE_INDEX) - 1;
 	u16 xlen = 0;
 	char keybuf[ORINOCO_MAX_KEY_SIZE];
-	int err;
 	unsigned long flags;
-	
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	if ((index < 0) || (index >= ORINOCO_MAX_KEYS))
 		index = priv->tx_key;
@@ -2833,7 +2819,6 @@ static int orinoco_ioctl_setessid(struct net_device *dev, struct iw_point *erq)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	char essidbuf[IW_ESSID_MAX_SIZE+1];
-	int err;
 	unsigned long flags;
 
 	/* Note : ESSID is ignored in Ad-Hoc demo mode, but we can set it
@@ -2851,9 +2836,8 @@ static int orinoco_ioctl_setessid(struct net_device *dev, struct iw_point *erq)
 		essidbuf[erq->length] = '\0';
 	}
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	memcpy(priv->desired_essid, essidbuf, sizeof(priv->desired_essid));
 
@@ -2877,9 +2861,8 @@ static int orinoco_ioctl_getessid(struct net_device *dev, struct iw_point *erq)
 		if (err)
 			return err;
 	} else {
-		err = orinoco_lock(priv, &flags);
-		if (err)
-			return err;
+		if (orinoco_lock(priv, &flags) != 0)
+			return -EBUSY;
 		memcpy(essidbuf, priv->desired_essid, sizeof(essidbuf));
 		orinoco_unlock(priv, &flags);
 	}
@@ -2899,7 +2882,6 @@ static int orinoco_ioctl_setnick(struct net_device *dev, struct iw_point *nrq)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	char nickbuf[IW_ESSID_MAX_SIZE+1];
-	int err;
 	unsigned long flags;
 
 	if (nrq->length > IW_ESSID_MAX_SIZE)
@@ -2912,9 +2894,8 @@ static int orinoco_ioctl_setnick(struct net_device *dev, struct iw_point *nrq)
 
 	nickbuf[nrq->length] = '\0';
 	
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	memcpy(priv->nick, nickbuf, sizeof(priv->nick));
 
@@ -2927,12 +2908,10 @@ static int orinoco_ioctl_getnick(struct net_device *dev, struct iw_point *nrq)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	char nickbuf[IW_ESSID_MAX_SIZE+1];
-	int err;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	memcpy(nickbuf, priv->nick, IW_ESSID_MAX_SIZE+1);
 	orinoco_unlock(priv, &flags);
@@ -2949,7 +2928,6 @@ static int orinoco_ioctl_setfreq(struct net_device *dev, struct iw_freq *frq)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	int chan = -1;
-	int err;
 	unsigned long flags;
 
 	/* We can only use this in Ad-Hoc demo mode to set the operating
@@ -2978,9 +2956,8 @@ static int orinoco_ioctl_setfreq(struct net_device *dev, struct iw_freq *frq)
 	     ! (priv->channel_mask & (1 << (chan-1)) ) )
 		return -EINVAL;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 	priv->channel = chan;
 	orinoco_unlock(priv, &flags);
 
@@ -2998,9 +2975,8 @@ static int orinoco_ioctl_getsens(struct net_device *dev, struct iw_param *srq)
 	if (!priv->has_sensitivity)
 		return -EOPNOTSUPP;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 	err = hermes_read_wordrec(hw, USER_BAP,
 				  HERMES_RID_CNFSYSTEMSCALE, &val);
 	orinoco_unlock(priv, &flags);
@@ -3018,7 +2994,6 @@ static int orinoco_ioctl_setsens(struct net_device *dev, struct iw_param *srq)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	int val = srq->value;
-	int err;
 	unsigned long flags;
 
 	if (!priv->has_sensitivity)
@@ -3027,9 +3002,8 @@ static int orinoco_ioctl_setsens(struct net_device *dev, struct iw_param *srq)
 	if ((val < 1) || (val > 3))
 		return -EINVAL;
 	
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 	priv->ap_density = val;
 	orinoco_unlock(priv, &flags);
 
@@ -3040,7 +3014,6 @@ static int orinoco_ioctl_setrts(struct net_device *dev, struct iw_param *rrq)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	int val = rrq->value;
-	int err;
 	unsigned long flags;
 
 	if (rrq->disabled)
@@ -3049,9 +3022,8 @@ static int orinoco_ioctl_setrts(struct net_device *dev, struct iw_param *rrq)
 	if ( (val < 0) || (val > 2347) )
 		return -EINVAL;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	priv->rts_thresh = val;
 	orinoco_unlock(priv, &flags);
@@ -3065,9 +3037,8 @@ static int orinoco_ioctl_setfrag(struct net_device *dev, struct iw_param *frq)
 	int err = 0;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	if (priv->has_mwo) {
 		if (frq->disabled)
@@ -3102,9 +3073,8 @@ static int orinoco_ioctl_getfrag(struct net_device *dev, struct iw_param *frq)
 	u16 val;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 	
 	if (priv->has_mwo) {
 		err = hermes_read_wordrec(hw, USER_BAP,
@@ -3166,9 +3136,8 @@ static int orinoco_ioctl_setrate(struct net_device *dev, struct iw_param *rrq)
 	if (ratemode == -1)
 		return -EINVAL;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 	priv->bitratemode = ratemode;
 	orinoco_unlock(priv, &flags);
 
@@ -3185,9 +3154,8 @@ static int orinoco_ioctl_getrate(struct net_device *dev, struct iw_param *rrq)
 	u16 val;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	ratemode = priv->bitratemode;
 
@@ -3247,9 +3215,8 @@ static int orinoco_ioctl_setpower(struct net_device *dev, struct iw_param *prq)
 	int err = 0;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	if (prq->disabled) {
 		priv->pm_on = 0;
@@ -3302,9 +3269,8 @@ static int orinoco_ioctl_getpower(struct net_device *dev, struct iw_param *prq)
 	u16 enable, period, timeout, mcast;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 	
 	err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_CNFPMENABLED, &enable);
 	if (err)
@@ -3351,9 +3317,8 @@ static int orinoco_ioctl_getretry(struct net_device *dev, struct iw_param *rrq)
 	u16 short_limit, long_limit, lifetime;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 	
 	err = hermes_read_wordrec(hw, USER_BAP, HERMES_RID_SHORTRETRYLIMIT,
 				  &short_limit);
@@ -3399,12 +3364,10 @@ static int orinoco_ioctl_setibssport(struct net_device *dev, struct iwreq *wrq)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	int val = *( (int *) wrq->u.name );
-	int err;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	priv->ibss_port = val ;
 
@@ -3419,12 +3382,10 @@ static int orinoco_ioctl_getibssport(struct net_device *dev, struct iwreq *wrq)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	int *val = (int *)wrq->u.name;
-	int err;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	*val = priv->ibss_port;
 	orinoco_unlock(priv, &flags);
@@ -3439,9 +3400,8 @@ static int orinoco_ioctl_setport3(struct net_device *dev, struct iwreq *wrq)
 	int err = 0;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	switch (val) {
 	case 0: /* Try to do IEEE ad-hoc mode */
@@ -3478,12 +3438,10 @@ static int orinoco_ioctl_getport3(struct net_device *dev, struct iwreq *wrq)
 {
 	struct orinoco_private *priv = netdev_priv(dev);
 	int *val = (int *)wrq->u.name;
-	int err;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	*val = priv->prefer_port3;
 	orinoco_unlock(priv, &flags);
@@ -3513,9 +3471,8 @@ static int orinoco_ioctl_setspy(struct net_device *dev, struct iw_point *srq)
 	}
 
 	/* Make sure nobody mess with the structure while we do */
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	/* orinoco_lock() doesn't disable interrupts, so make sure the
 	 * interrupt rx path don't get confused while we copy */
@@ -3546,12 +3503,10 @@ static int orinoco_ioctl_getspy(struct net_device *dev, struct iw_point *srq)
 	struct iw_quality spy_stat[IW_MAX_SPY];
 	int number;
 	int i;
-	int err;
 	unsigned long flags;
 
-	err = orinoco_lock(priv, &flags);
-	if (err)
-		return err;
+	if (orinoco_lock(priv, &flags) != 0)
+		return -EBUSY;
 
 	number = priv->spy_number;
 	if ((number > 0) && (srq->pointer)) {
@@ -3621,9 +3576,8 @@ orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		break;
 
 	case SIOCSIWMODE:
-		err = orinoco_lock(priv, &flags);
-		if (err)
-			return err;
+		if (orinoco_lock(priv, &flags) != 0)
+			return -EBUSY;
 		switch (wrq->u.mode) {
 		case IW_MODE_ADHOC:
 			if (! (priv->has_ibss || priv->has_port3) )
@@ -3648,9 +3602,8 @@ orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		break;
 
 	case SIOCGIWMODE:
-		err = orinoco_lock(priv, &flags);
-		if (err)
-			return err;
+		if (orinoco_lock(priv, &flags) != 0)
+			return -EBUSY;
 		wrq->u.mode = priv->iw_mode;
 		orinoco_unlock(priv, &flags);
 		break;
@@ -3865,9 +3818,8 @@ orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		if(priv->has_preamble) {
 			int val = *( (int *) wrq->u.name );
 
-			err = orinoco_lock(priv, &flags);
-			if (err)
-				return err;
+			if (orinoco_lock(priv, &flags) != 0)
+				return -EBUSY;
 			if (val)
 				priv->preamble = 1;
 			else
@@ -3882,9 +3834,8 @@ orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		if(priv->has_preamble) {
 			int *val = (int *)wrq->u.name;
 
-			err = orinoco_lock(priv, &flags);
-			if (err)
-				return err;
+			if (orinoco_lock(priv, &flags) != 0)
+				return -EBUSY;
 			*val = priv->preamble;
 			orinoco_unlock(priv, &flags);
 		} else

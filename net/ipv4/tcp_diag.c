@@ -56,7 +56,7 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 			int ext, u32 pid, u32 seq, u16 nlmsg_flags)
 {
 	struct inet_sock *inet = inet_sk(sk);
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcpdiagmsg *r;
 	struct nlmsghdr  *nlh;
 	struct tcp_info  *info = NULL;
@@ -512,7 +512,7 @@ static int tcpdiag_dump_reqs(struct sk_buff *skb, struct sock *sk,
 {
 	struct tcpdiag_entry entry;
 	struct tcpdiagreq *r = NLMSG_DATA(cb->nlh);
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_listen_opt *lopt;
 	struct rtattr *bc = NULL;
 	struct inet_sock *inet = inet_sk(sk);

@@ -71,7 +71,7 @@ MODULE_AUTHOR("B. Huisman <bhuism@cs.utwente.nl> & Peter Pregler <Peter_Pregler@
 MODULE_DESCRIPTION("Parallel port driver for Vision CPiA based cameras");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(parport, "1-" __MODULE_STRING(PARPORT_MAX) "s");
+module_param_array(parport, charp, NULL, 0);
 MODULE_PARM_DESC(parport, "'auto' or a list of parallel port numbers. Just like lp.");
 #else
 static int parport_nr[PARPORT_MAX] __initdata =

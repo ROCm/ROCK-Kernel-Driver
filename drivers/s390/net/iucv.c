@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.41 2004/08/11 14:54:14 geraldsc Exp $
+ * $Id: iucv.c,v 1.42 2005/01/07 10:49:54 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.41 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.42 $
  *
  */
 
@@ -355,7 +355,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.41 $";
+	char vbuf[] = "$Revision: 1.42 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -2285,7 +2285,6 @@ iucv_irq_handler(struct pt_regs *regs, __u16 code)
 	irqdata = kmalloc(sizeof(iucv_irqdata), GFP_ATOMIC);
 	if (!irqdata) {
 		printk(KERN_WARNING "%s: out of memory\n", __FUNCTION__);
-		irq_exit();
 		return;
 	}
 

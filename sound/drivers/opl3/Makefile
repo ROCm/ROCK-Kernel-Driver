@@ -18,4 +18,5 @@ endif
 sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_SND_SEQUENCER),$(1)))
 
 obj-$(CONFIG_SND_OPL3_LIB) += snd-opl3-lib.o
+obj-$(CONFIG_SND_OPL4_LIB) += snd-opl3-lib.o
 obj-$(call sequencer,$(CONFIG_SND_OPL3_LIB)) += snd-opl3-synth.o

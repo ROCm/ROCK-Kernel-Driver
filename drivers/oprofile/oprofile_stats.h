@@ -15,6 +15,7 @@
 struct oprofile_stat_struct {
 	atomic_t sample_lost_no_mm;
 	atomic_t sample_lost_no_mapping;
+	atomic_t bt_lost_no_mapping;
 	atomic_t event_lost_overflow;
 };
 

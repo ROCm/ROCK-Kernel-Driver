@@ -2605,7 +2605,8 @@ mft_rec_already_initialized:
 			vi->i_mode &= ~S_IWUGO;
 
 		/* Set the inode times to the current time. */
-		vi->i_atime = vi->i_mtime = vi->i_ctime = current_kernel_time();
+		vi->i_atime = vi->i_mtime = vi->i_ctime =
+			current_fs_time(vi->i_sb);
 		/*
 		 * Set the file size to 0, the ntfs inode sizes are set to 0 by
 		 * the call to ntfs_init_big_inode() below.

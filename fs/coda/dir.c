@@ -29,7 +29,6 @@
 
 /* dir inode-ops */
 static int coda_create(struct inode *dir, struct dentry *new, int mode, struct nameidata *nd);
-static int coda_mknod(struct inode *dir, struct dentry *new, int mode, dev_t rdev);
 static struct dentry *coda_lookup(struct inode *dir, struct dentry *target, struct nameidata *nd);
 static int coda_link(struct dentry *old_dentry, struct inode *dir_inode, 
 		     struct dentry *entry);
@@ -53,9 +52,14 @@ static int coda_venus_readdir(struct file *filp, filldir_t filldir,
 			      void *dirent, struct dentry *dir);
 int coda_fsync(struct file *, struct dentry *dentry, int datasync);
 
-int coda_hasmknod;
+/* same as fs/bad_inode.c */
+static int coda_return_EIO(void)
+{
+	return -EIO;
+}
+#define CODA_EIO_ERROR ((void *) (coda_return_EIO))
 
-struct dentry_operations coda_dentry_operations =
+static struct dentry_operations coda_dentry_operations =
 {
 	.d_revalidate	= coda_dentry_revalidate,
 	.d_delete	= coda_dentry_delete,
@@ -70,7 +74,7 @@ struct inode_operations coda_dir_inode_operations =
 	.symlink	= coda_symlink,
 	.mkdir		= coda_mkdir,
 	.rmdir		= coda_rmdir,
-	.mknod		= coda_mknod,
+	.mknod		= CODA_EIO_ERROR,
 	.rename		= coda_rename,
 	.permission	= coda_permission,
 	.getattr	= coda_getattr,
@@ -183,7 +187,7 @@ static inline void coda_dir_changed(struct inode *dir, int link)
 	/* optimistically we can also act as if our nose bleeds. The
          * granularity of the mtime is coarse anyways so we might actually be
          * right most of the time. Note: we only do this for directories. */
-	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+	dir->i_mtime = dir->i_ctime = CURRENT_TIME_SEC;
 #endif
 	if (link)
 		dir->i_nlink += link;
@@ -208,7 +212,7 @@ static int coda_create(struct inode *dir, struct dentry *de, int mode, struct na
 	}
 
 	error = venus_create(dir->i_sb, coda_i2f(dir), name, length, 
-				0, mode, 0, &newfid, &attrs);
+				0, mode, &newfid, &attrs);
 
         if ( error ) {
 		unlock_kernel();
@@ -229,52 +233,6 @@ static int coda_create(struct inode *dir, struct dentry *de, int mode, struct na
 	d_instantiate(de, inode);
         return 0;
 }
-
-static int coda_mknod(struct inode *dir, struct dentry *de, int mode, dev_t rdev)
-{
-        int error=0;
-	const char *name=de->d_name.name;
-	int length=de->d_name.len;
-	struct inode *inode;
-	struct CodaFid newfid;
-	struct coda_vattr attrs;
-
-	if ( coda_hasmknod == 0 )
-		return -EIO;
-
-	if (!old_valid_dev(rdev))
-		return -EINVAL;
-
-	lock_kernel();
-	coda_vfs_stat.create++;
-
-	if (coda_isroot(dir) && coda_iscontrol(name, length)) {
-		unlock_kernel();
-		return -EPERM;
-	}
-
-	error = venus_create(dir->i_sb, coda_i2f(dir), name, length, 
-				0, mode, rdev, &newfid, &attrs);
-
-        if ( error ) {
-		unlock_kernel();
-		d_drop(de);
-		return error;
-	}
-
-	inode = coda_iget(dir->i_sb, &newfid, &attrs);
-	if ( IS_ERR(inode) ) {
-		unlock_kernel();
-		d_drop(de);
-		return PTR_ERR(inode);
-	}
-
-	/* invalidate the directory cnode's attributes */
-	coda_dir_changed(dir, 0);
-	unlock_kernel();
-	d_instantiate(de, inode);
-        return 0;
-}			     
 
 static int coda_mkdir(struct inode *dir, struct dentry *de, int mode)
 {

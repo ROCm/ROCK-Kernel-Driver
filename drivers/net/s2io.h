@@ -61,7 +61,7 @@ typedef enum xena_max_outstanding_splits {
 #define	INTR_DBG	4
 
 /* Global variable that defines the present debug level of the driver. */
-int debug_level = ERR_DBG;	/* Default level. */
+static int debug_level = ERR_DBG;	/* Default level. */
 
 /* DEBUG message print. */
 #define DBG_PRINT(dbg_level, args...)  if(!(debug_level<dbg_level)) printk(args)
@@ -740,8 +740,8 @@ static inline u64 readq(void *addr)
 {
 	u64 ret = 0;
 	ret = readl(addr + 4);
-	(u64) ret <<= 32;
-	(u64) ret |= readl(addr);
+	ret <<= 32;
+	ret |= readl(addr);
 
 	return ret;
 }

@@ -227,7 +227,7 @@ hpux_call_table:
 	ENTRY_NAME(hpux_unimplemented_wrapper)
 	ENTRY_NAME(hpux_unimplemented_wrapper)      /* 195 */
 	ENTRY_NAME(hpux_statfs)
-	ENTRY_NAME(hpux_unimplemented_wrapper)
+	ENTRY_NAME(hpux_fstatfs)
 	ENTRY_NAME(hpux_unimplemented_wrapper)
 	ENTRY_NAME(hpux_unimplemented_wrapper)
 	ENTRY_NAME(sys_waitpid)	/* 200 */

@@ -19,6 +19,7 @@
 #include <linux/mmzone.h>
 #include <linux/module.h>
 #include <linux/bitops.h>
+#include <linux/nodemask.h>
 
 #include <asm/processor.h>
 #include <asm/irq.h>
@@ -92,16 +93,15 @@ sn2_global_tlb_purge(unsigned long start, unsigned long end,
 	volatile unsigned long *ptc0, *ptc1;
 	unsigned long flags = 0, data0 = 0, data1 = 0;
 	struct mm_struct *mm = current->active_mm;
-	short nasids[NR_NODES], nix;
-	DECLARE_BITMAP(nodes_flushed, NR_NODES);
+	short nasids[MAX_NUMNODES], nix;
+	nodemask_t nodes_flushed;
 
-	bitmap_zero(nodes_flushed, NR_NODES);
-
+	nodes_clear(nodes_flushed);
 	i = 0;
 
 	for_each_cpu_mask(cpu, mm->cpu_vm_mask) {
 		cnode = cpu_to_node(cpu);
-		__set_bit(cnode, nodes_flushed);
+		node_set(cnode, nodes_flushed);
 		lcpu = cpu;
 		i++;
 	}
@@ -125,8 +125,7 @@ sn2_global_tlb_purge(unsigned long start, unsigned long end,
 	}
 
 	nix = 0;
-	for (cnode = find_first_bit(&nodes_flushed, NR_NODES); cnode < NR_NODES;
-	     cnode = find_next_bit(&nodes_flushed, NR_NODES, ++cnode))
+	for_each_node_mask(cnode, nodes_flushed)
 		nasids[nix++] = cnodeid_to_nasid(cnode);
 
 	shub1 = is_shub1();
@@ -209,7 +208,7 @@ void sn2_ptc_deadlock_recovery(volatile unsigned long *ptc0, unsigned long data0
 
 	mycnode = numa_node_id();
 
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for_each_online_node(cnode) {
 		if (is_headless_node(cnode) || cnode == mycnode)
 			continue;
 		nasid = cnodeid_to_nasid(cnode);

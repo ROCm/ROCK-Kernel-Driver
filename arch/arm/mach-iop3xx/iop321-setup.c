@@ -3,6 +3,7 @@
  *
  * Author: Nicolas Pitre <nico@cam.org>
  * Copyright (C) 2001 MontaVista Software, Inc.
+ * Copyright (C) 2004 Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -40,10 +41,10 @@ static struct map_desc iop321_std_desc[] __initdata = {
  /* virtual     physical      length      type */
 
  /* mem mapped registers */
- { IOP321_VIRT_MEM_BASE,  IOP321_PHY_MEM_BASE,   0x00002000,  MT_DEVICE },
+ { IOP321_VIRT_MEM_BASE,  IOP321_PHYS_MEM_BASE,   0x00002000,  MT_DEVICE },
 
  /* PCI IO space */
- { 0xfe000000,  0x90000000,   0x00020000,  MT_DEVICE }
+ { IOP321_PCI_LOWER_IO_VA,  IOP321_PCI_LOWER_IO_PA,   IOP321_PCI_IO_WINDOW_SIZE,  MT_DEVICE }
 };
 
 #ifdef CONFIG_ARCH_IQ80321
@@ -71,6 +72,60 @@ static struct uart_port iop321_serial_ports[] = {
 	}
 };
 
+static struct resource iop32x_i2c_0_resources[] = {
+	[0] = {
+		.start = 0xfffff680,
+		.end = 0xfffff698,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = IRQ_IOP321_I2C_0,
+		.end = IRQ_IOP321_I2C_0,
+		.flags = IORESOURCE_IRQ
+	}
+};
+
+static struct resource iop32x_i2c_1_resources[] = {
+	[0] = {
+		.start = 0xfffff6a0,
+		.end = 0xfffff6b8,
+		.flags = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start = IRQ_IOP321_I2C_1,
+		.end = IRQ_IOP321_I2C_1,
+		.flags = IORESOURCE_IRQ
+	}
+};
+
+static struct platform_device iop32x_i2c_0_controller = {
+	.name = "IOP3xx-I2C",
+	.id = 0,
+	.num_resources = 2,
+	.resource = iop32x_i2c_0_resources
+};
+
+static struct platform_device iop32x_i2c_1_controller = {
+	.name = "IOP3xx-I2C",
+	.id = 1,
+	.num_resources = 2,
+	.resource = iop32x_i2c_1_resources
+};
+
+static struct platform_device *iop32x_devices[] __initdata = {
+	&iop32x_i2c_0_controller,
+	&iop32x_i2c_1_controller
+};
+
+void __init iop32x_init(void)
+{
+	if(iop_is_321())
+	{
+		platform_add_devices(iop32x_devices,
+				ARRAY_SIZE(iop32x_devices));
+	}
+}
+
 void __init iop321_map_io(void)
 {
 	iotable_init(iop321_std_desc, ARRAY_SIZE(iop321_std_desc));
@@ -97,6 +152,7 @@ MACHINE_START(IQ80321, "Intel IQ80321")
 	INITIRQ(iop321_init_irq)
 	.timer		= &iop321_timer,
     BOOT_PARAMS(0xa0000100)
+	INIT_MACHINE(iop32x_init)
 MACHINE_END
 #elif defined(CONFIG_ARCH_IQ31244)
 MACHINE_START(IQ31244, "Intel IQ31244")
@@ -106,6 +162,7 @@ MACHINE_START(IQ31244, "Intel IQ31244")
     INITIRQ(iop321_init_irq)
 	.timer		= &iop321_timer,
     BOOT_PARAMS(0xa0000100)
+	INIT_MACHINE(iop32x_init)
 MACHINE_END
 #else
 #error No machine descriptor defined for this IOP3XX implementation

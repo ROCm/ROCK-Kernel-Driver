@@ -272,11 +272,6 @@
 #define DCMD_WIDTH4	(3 << 14)	/* 4 byte width (Word) */
 #define DCMD_LENGTH	0x01fff		/* length mask (max = 8K - 1) */
 
-/* default combinations */
-#define DCMD_RXPCDR	(DCMD_INCTRGADDR|DCMD_FLOWSRC|DCMD_BURST32|DCMD_WIDTH4)
-#define DCMD_RXMCDR	(DCMD_INCTRGADDR|DCMD_FLOWSRC|DCMD_BURST32|DCMD_WIDTH4)
-#define DCMD_TXPCDR	(DCMD_INCSRCADDR|DCMD_FLOWTRG|DCMD_BURST32|DCMD_WIDTH4)
-
 
 /*
  * UARTs
@@ -1580,6 +1575,7 @@
 #define SSCR0_EDSS		(1 << 20)	/* Extended Data Size Select */
 
 /* extra bits in PXA255, PXA26x and PXA27x SSP ports */
+#define SSCR0_PSP		(3 << 4)	/* PSP - Programmable Serial Protocol */
 #define SSCR1_TTELP		(1 << 31)	/* TXD Tristate Enable Last Phase */
 #define SSCR1_TTE		(1 << 30)	/* TXD Tristate Enable */
 #define SSCR1_EBCEI		(1 << 29)	/* Enable Bit Count Error interrupt */

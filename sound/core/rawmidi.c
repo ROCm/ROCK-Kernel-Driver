@@ -54,7 +54,7 @@ static int snd_rawmidi_dev_register(snd_device_t *device);
 static int snd_rawmidi_dev_disconnect(snd_device_t *device);
 static int snd_rawmidi_dev_unregister(snd_device_t *device);
 
-snd_rawmidi_t *snd_rawmidi_devices[SNDRV_CARDS * SNDRV_RAWMIDI_DEVICES];
+static snd_rawmidi_t *snd_rawmidi_devices[SNDRV_CARDS * SNDRV_RAWMIDI_DEVICES];
 
 static DECLARE_MUTEX(register_mutex);
 
@@ -747,7 +747,7 @@ static inline int _snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 	case SNDRV_RAWMIDI_IOCTL_DROP:
 	{
 		int val;
-		if (get_user(val, (long __user *) argp))
+		if (get_user(val, (int __user *) argp))
 			return -EFAULT;
 		switch (val) {
 		case SNDRV_RAWMIDI_STREAM_OUTPUT:
@@ -761,7 +761,7 @@ static inline int _snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 	case SNDRV_RAWMIDI_IOCTL_DRAIN:
 	{
 		int val;
-		if (get_user(val, (long __user *) argp))
+		if (get_user(val, (int __user *) argp))
 			return -EFAULT;
 		switch (val) {
 		case SNDRV_RAWMIDI_STREAM_OUTPUT:
@@ -795,8 +795,10 @@ static int snd_rawmidi_ioctl(struct inode *inode, struct file *file,
 	return err;
 }
 
-int snd_rawmidi_control_ioctl(snd_card_t * card, snd_ctl_file_t * control,
-			      unsigned int cmd, unsigned long arg)
+static int snd_rawmidi_control_ioctl(snd_card_t * card,
+				     snd_ctl_file_t * control,
+				     unsigned int cmd,
+				     unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	unsigned int tmp;

@@ -277,7 +277,7 @@ ipi_send(int cpu, enum ipi_message_type op)
 
 	spin_lock_irqsave(&(p->lock),flags);
 	p->pending_ipi |= 1 << op;
-	__raw_writel(IRQ_OFFSET(IPI_IRQ), cpu_data[cpu].hpa);
+	gsc_writel(IPI_IRQ - CPU_IRQ_BASE, cpu_data[cpu].hpa);
 	spin_unlock_irqrestore(&(p->lock),flags);
 }
 
@@ -459,7 +459,6 @@ smp_cpu_init(int cpunum)
  */
 void __init smp_callin(void)
 {
-	extern void cpu_idle(void);	/* arch/parisc/kernel/process.c */
 	int slave_id = cpu_now_booting;
 #if 0
 	void *istack;
@@ -534,7 +533,7 @@ int __init smp_boot_one_cpu(int cpuid)
 	** EIR{0}). MEM_RENDEZ is valid only when it is nonzero and the 
 	** contents of memory are valid."
 	*/
-	__raw_writel(IRQ_OFFSET(TIMER_IRQ), cpu_data[cpuid].hpa);
+	gsc_writel(TIMER_IRQ - CPU_IRQ_BASE, cpu_data[cpuid].hpa);
 	mb();
 
 	/* 

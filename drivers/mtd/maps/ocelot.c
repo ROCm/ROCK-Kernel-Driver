@@ -1,5 +1,5 @@
 /*
- * $Id: ocelot.c,v 1.15 2004/11/04 13:24:15 gleixner Exp $
+ * $Id: ocelot.c,v 1.16 2005/01/05 18:05:13 dwmw2 Exp $
  *
  * Flash on Momenco Ocelot
  */
@@ -28,7 +28,7 @@ static struct mtd_info *nvram_mtd;
 
 static void ocelot_ram_write(struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf)
 {
-        struct map_info *map = (struct map_info *)mtd->priv;
+        struct map_info *map = mtd->priv;
 	size_t done = 0;
 
 	/* If we use memcpy, it does word-wide writes. Even though we told the 

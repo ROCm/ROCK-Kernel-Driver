@@ -190,7 +190,7 @@ static int ufs_link (struct dentry * old_dentry, struct inode * dir,
 		return -EMLINK;
 	}
 
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	ufs_inc_count(inode);
 	atomic_inc(&inode->i_count);
 
@@ -321,7 +321,7 @@ static int ufs_rename (struct inode * old_dir, struct dentry * old_dentry,
 			goto out_dir;
 		ufs_inc_count(old_inode);
 		ufs_set_link(new_dir, new_de, new_bh, old_inode);
-		new_inode->i_ctime = CURRENT_TIME;
+		new_inode->i_ctime = CURRENT_TIME_SEC;
 		if (dir_de)
 			new_inode->i_nlink--;
 		ufs_dec_count(new_inode);

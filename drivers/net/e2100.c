@@ -72,7 +72,7 @@ static int e21_probe_list[] = {0x300, 0x280, 0x380, 0x220, 0};
 #define E21_SAPROM		0x10	/* Offset to station address data. */
 #define E21_IO_EXTENT	 0x20
 
-static inline void mem_on(short port, volatile char *mem_base,
+static inline void mem_on(short port, volatile char __iomem *mem_base,
 						  unsigned char start_page )
 {
 	/* This is a little weird: set the shared memory window by doing a
@@ -143,6 +143,7 @@ static int  __init do_e2100_probe(struct net_device *dev)
 static void cleanup_card(struct net_device *dev)
 {
 	/* NB: e21_close() handles free_irq */
+	iounmap(ei_status.mem);
 	release_region(dev->base_addr, E21_IO_EXTENT);
 }
 
@@ -257,6 +258,13 @@ static int __init e21_probe1(struct net_device *dev, int ioaddr)
 	if (dev->mem_start == 0)
 		dev->mem_start = 0xd0000;
 
+	ei_status.mem = ioremap(dev->mem_start, 2*1024);
+	if (!ei_status.mem) {
+		printk("unable to remap memory\n");
+		retval = -EAGAIN;
+		goto out;
+	}
+
 #ifdef notdef
 	/* These values are unused.  The E2100 has a 2K window into the packet
 	   buffer.  The window can be set to start on any page boundary. */
@@ -329,7 +337,7 @@ e21_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_pag
 {
 
 	short ioaddr = dev->base_addr;
-	char *shared_mem = (char *)dev->mem_start;
+	char __iomem *shared_mem = ei_status.mem;
 
 	mem_on(ioaddr, shared_mem, ring_page);
 
@@ -352,12 +360,12 @@ static void
 e21_block_input(struct net_device *dev, int count, struct sk_buff *skb, int ring_offset)
 {
 	short ioaddr = dev->base_addr;
-	char *shared_mem = (char *)dev->mem_start;
+	char __iomem *shared_mem = ei_status.mem;
 
 	mem_on(ioaddr, shared_mem, (ring_offset>>8));
 
 	/* Packet is always in one chunk -- we can copy + cksum. */
-	eth_io_copy_and_sum(skb, dev->mem_start + (ring_offset & 0xff), count, 0);
+	eth_io_copy_and_sum(skb, ei_status.mem + (ring_offset & 0xff), count, 0);
 
 	mem_off(ioaddr);
 }
@@ -367,7 +375,7 @@ e21_block_output(struct net_device *dev, int count, const unsigned char *buf,
 				 int start_page)
 {
 	short ioaddr = dev->base_addr;
-	volatile char *shared_mem = (char *)dev->mem_start;
+	volatile char __iomem *shared_mem = ei_status.mem;
 
 	/* Set the shared memory window start by doing a read, with the low address
 	   bits specifying the starting page. */
@@ -413,10 +421,10 @@ static int irq[MAX_E21_CARDS];
 static int mem[MAX_E21_CARDS];
 static int xcvr[MAX_E21_CARDS];		/* choose int. or ext. xcvr */
 
-MODULE_PARM(io, "1-" __MODULE_STRING(MAX_E21_CARDS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_E21_CARDS) "i");
-MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_E21_CARDS) "i");
-MODULE_PARM(xcvr, "1-" __MODULE_STRING(MAX_E21_CARDS) "i");
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(mem, int, NULL, 0);
+module_param_array(xcvr, int, NULL, 0);
 MODULE_PARM_DESC(io, "I/O base address(es)");
 MODULE_PARM_DESC(irq, "IRQ number(s)");
 MODULE_PARM_DESC(mem, " memory base address(es)");

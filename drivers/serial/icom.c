@@ -1656,7 +1656,6 @@ static int __init icom_init(void)
 	int ret;
 
 	spin_lock_init(&icom_lock);
-	icom_lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
 
 	ret = uart_register_driver(&icom_uart_driver);
 	if (ret)

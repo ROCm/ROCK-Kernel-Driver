@@ -83,18 +83,18 @@ static struct semaphore aci_sem;
 
 #ifdef MODULE
 static int reset;
-MODULE_PARM(reset,"i");
+module_param(reset, bool, 0);
 MODULE_PARM_DESC(reset,"When set to 1, reset aci mixer.");
 #else
 static int reset = 1;
 #endif
 
 static int ide=-1;
-MODULE_PARM(ide,"i");
+module_param(ide, int, 0);
 MODULE_PARM_DESC(ide,"1 enable, 0 disable ide-port - untested"
 		 " default: do nothing");
 static int wss=-1;
-MODULE_PARM(wss,"i");
+module_param(wss, int, 0);
 MODULE_PARM_DESC(wss,"change between ACI/WSS-mixer; use 0 and 1 - untested"
 		 " default: do nothing; for PCM1-pro only");
 

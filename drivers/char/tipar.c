@@ -40,10 +40,10 @@
  * the minor number.
  *
  */
-
+#undef DEBUG				/* change to #define to get debugging
+					 * output - for pr_debug() */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -57,7 +57,7 @@
 #include <asm/io.h>
 #include <linux/bitops.h>
 #include <linux/devfs_fs_kernel.h>	/* DevFs support */
-#include <linux/parport.h>	/* Our code depend on parport */
+#include <linux/parport.h>		/* Our code depend on parport */
 #include <linux/device.h>
 
 /*
@@ -74,9 +74,6 @@
 #define DRIVER_LICENSE "GPL"
 
 #define VERSION(ver,rel,seq) (((ver)<<16) | ((rel)<<8) | (seq))
-#if LINUX_VERSION_CODE < VERSION(2,5,0)
-# define need_resched() (current->need_resched)
-#endif
 
 /* ----- global variables --------------------------------------------- */
 
@@ -143,7 +140,7 @@ White:  ________            |        ______      |          _______
 static int
 put_ti_parallel(int minor, unsigned char data)
 {
-	int bit;
+	unsigned int bit;
 	unsigned long max;
 
 	for (bit = 0; bit < 8; bit++) {
@@ -187,7 +184,7 @@ put_ti_parallel(int minor, unsigned char data)
 static int
 get_ti_parallel(int minor)
 {
-	int bit;
+	unsigned int bit;
 	unsigned char v, data = 0;
 	unsigned long max;
 
@@ -234,7 +231,8 @@ probe_ti_parallel(int minor)
 		outbyte(3, minor);
 		outbyte(i, minor);
 		udelay(delay);
-		/*printk(KERN_DEBUG "Probing -> %i: 0x%02x 0x%02x\n", i, data & 0x30, seq[i]); */
+		pr_debug("tipar: Probing -> %i: 0x%02x 0x%02x\n", i,
+			data & 0x30, seq[i]);
 		if ((inbyte(minor) & 0x30) != seq[i]) {
 			outbyte(3, minor);
 			return -1;
@@ -279,7 +277,8 @@ tipar_close(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-tipar_write(struct file *file, const char __user *buf, size_t count, loff_t * ppos)
+tipar_write (struct file *file, const char __user *buf, size_t count,
+		loff_t * ppos)
 {
 	unsigned int minor = iminor(file->f_dentry->d_inode) - TIPAR_MINOR;
 	ssize_t n;
@@ -405,7 +404,8 @@ tipar_setup(char *str)
 		if (ints[1] != 0)
                         timeout = ints[1];
                 else
-                        printk("tipar: wrong timeout value (0), using default value instead.");
+                        printk(KERN_WARNING "tipar: bad timeout value (0), "
+				"using default value instead");
 		if (ints[0] > 1) {
 			delay = ints[2];
 		}
@@ -436,8 +436,8 @@ tipar_register(int nr, struct parport *port)
 		goto out;
 	}
 
-	class_simple_device_add(tipar_class, MKDEV(TIPAR_MAJOR, TIPAR_MINOR + nr),
-			NULL, "par%d", nr);
+	class_simple_device_add(tipar_class, MKDEV(TIPAR_MAJOR,
+			TIPAR_MINOR + nr), NULL, "par%d", nr);
 	/* Use devfs, tree: /dev/ticables/par/[0..2] */
 	err = devfs_mk_cdev(MKDEV(TIPAR_MAJOR, TIPAR_MINOR + nr),
 			S_IFCHR | S_IRUGO | S_IWUGO,
@@ -446,14 +446,13 @@ tipar_register(int nr, struct parport *port)
 		goto out_class;
 
 	/* Display informations */
-	printk(KERN_INFO "tipar%d: using %s (%s).\n", nr, port->name,
-	       (port->irq ==
+	pr_info("tipar%d: using %s (%s)\n", nr, port->name, (port->irq ==
 		PARPORT_IRQ_NONE) ? "polling" : "interrupt-driven");
 
 	if (probe_ti_parallel(nr) != -1)
-		printk("tipar%d: link cable found !\n", nr);
+		pr_info("tipar%d: link cable found\n", nr);
 	else
-		printk("tipar%d: link cable not found.\n", nr);
+		pr_info("tipar%d: link cable not found\n", nr);
 
 	err = 0;
 	goto out;
@@ -469,7 +468,7 @@ static void
 tipar_attach(struct parport *port)
 {
 	if (tp_count == PP_NO) {
-		printk("tipar: ignoring parallel port (max. %d)\n", PP_NO);
+		pr_info("tipar: ignoring parallel port (max. %d)\n", PP_NO);
 		return;
 	}
 
@@ -489,16 +488,16 @@ static struct parport_driver tipar_driver = {
 	.detach = tipar_detach,
 };
 
-int __init
+static int __init
 tipar_init_module(void)
 {
 	int err = 0;
 
-	printk("tipar: parallel link cable driver, version %s\n",
-	       DRIVER_VERSION);
+	pr_info("tipar: parallel link cable driver, version %s\n",
+		DRIVER_VERSION);
 
 	if (register_chrdev(TIPAR_MAJOR, "tipar", &tipar_fops)) {
-		printk("tipar: unable to get major %d\n", TIPAR_MAJOR);
+		printk(KERN_ERR "tipar: unable to get major %d\n", TIPAR_MAJOR);
 		err = -EIO;
 		goto out;
 	}
@@ -512,7 +511,7 @@ tipar_init_module(void)
 		goto out_chrdev;
 	}
 	if (parport_register_driver(&tipar_driver)) {
-		printk("tipar: unable to register with parport\n");
+		printk(KERN_ERR "tipar: unable to register with parport\n");
 		err = -EIO;
 		goto out;
 	}
@@ -526,7 +525,7 @@ out:
 	return err;	
 }
 
-void __exit
+static void __exit
 tipar_cleanup_module(void)
 {
 	unsigned int i;
@@ -546,7 +545,7 @@ tipar_cleanup_module(void)
 	class_simple_destroy(tipar_class);
 	devfs_remove("ticables/par");
 
-	printk("tipar: module unloaded !\n");
+	pr_info("tipar: module unloaded\n");
 }
 
 /* --------------------------------------------------------------------- */
@@ -559,7 +558,7 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE(DRIVER_LICENSE);
 
-MODULE_PARM(timeout, "i");
+module_param(timeout, int, 0);
 MODULE_PARM_DESC(timeout, "Timeout (default=1.5 seconds)");
-MODULE_PARM(delay, "i");
+module_param(delay, int, 0);
 MODULE_PARM_DESC(delay, "Inter-bit delay (default=10 microseconds)");

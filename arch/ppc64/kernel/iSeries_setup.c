@@ -44,6 +44,7 @@
 #include "iSeries_setup.h"
 #include <asm/naca.h>
 #include <asm/paca.h>
+#include <asm/cache.h>
 #include <asm/sections.h>
 #include <asm/iSeries/LparData.h>
 #include <asm/iSeries/HvCallHpt.h>
@@ -67,7 +68,6 @@ extern void hvlog(char *fmt, ...);
 
 /* Function Prototypes */
 extern void ppcdbg_initialize(void);
-extern void tce_init_iSeries(void);
 
 static void build_iSeries_Memory_Map(void);
 static void setup_iSeries_cache_sizes(void);
@@ -313,13 +313,13 @@ static void __init iSeries_parse_cmdline(void)
 	 * If the init RAM disk has been configured and there is
 	 * a non-zero starting address for it, set it up
 	 */
-	if (naca->xRamDisk) {
-		initrd_start = (unsigned long)__va(naca->xRamDisk);
-		initrd_end = initrd_start + naca->xRamDiskSize * PAGE_SIZE;
+	if (naca.xRamDisk) {
+		initrd_start = (unsigned long)__va(naca.xRamDisk);
+		initrd_end = initrd_start + naca.xRamDiskSize * PAGE_SIZE;
 		initrd_below_start_ok = 1;	// ramdisk in kernel space
 		ROOT_DEV = Root_RAM0;
-		if (((rd_size * 1024) / PAGE_SIZE) < naca->xRamDiskSize)
-			rd_size = (naca->xRamDiskSize * PAGE_SIZE) / 1024;
+		if (((rd_size * 1024) / PAGE_SIZE) < naca.xRamDiskSize)
+			rd_size = (naca.xRamDiskSize * PAGE_SIZE) / 1024;
 	} else
 #endif /* CONFIG_BLK_DEV_INITRD */
 	{
@@ -343,7 +343,7 @@ static void __init iSeries_parse_cmdline(void)
 	/*
 	 * Initialize the DMA/TCE management
 	 */
-	tce_init_iSeries();
+	iommu_init_early_iSeries();
 
 	/*
 	 * Initialize the table which translate Linux physical addresses to
@@ -471,18 +471,16 @@ static void __init build_iSeries_Memory_Map(void)
 	printk("HPT absolute addr = %016lx, size = %dK\n",
 			chunk_to_addr(hptFirstChunk), hptSizeChunks * 256);
 
-	/* Fill in the htab_data structure */
-	/* Fill in size of hashed page table */
+	/* Fill in the hashed page table hash mask */
 	num_ptegs = hptSizePages *
 		(PAGE_SIZE / (sizeof(HPTE) * HPTES_PER_GROUP));
-	htab_data.htab_num_ptegs = num_ptegs;
-	htab_data.htab_hash_mask = num_ptegs - 1;
+	htab_hash_mask = num_ptegs - 1;
 	
 	/*
 	 * The actual hashed page table is in the hypervisor,
 	 * we have no direct access
 	 */
-	htab_data.htab = NULL;
+	htab_address = NULL;
 
 	/*
 	 * Determine if absolute memory has any
@@ -558,35 +556,38 @@ static void __init build_iSeries_Memory_Map(void)
 static void __init setup_iSeries_cache_sizes(void)
 {
 	unsigned int i, n;
-	unsigned int procIx = get_paca()->lppaca.xDynHvPhysicalProcIndex;
+	unsigned int procIx = get_paca()->lppaca.dyn_hv_phys_proc_index;
 
-	systemcfg->iCacheL1Size =
-		xIoHriProcessorVpd[procIx].xInstCacheSize * 1024;
-	systemcfg->iCacheL1LineSize =
+	systemcfg->icache_size =
+	ppc64_caches.isize = xIoHriProcessorVpd[procIx].xInstCacheSize * 1024;
+	systemcfg->icache_line_size =
+	ppc64_caches.iline_size =
 		xIoHriProcessorVpd[procIx].xInstCacheOperandSize;
-	systemcfg->dCacheL1Size =
+	systemcfg->dcache_size =
+	ppc64_caches.dsize =
 		xIoHriProcessorVpd[procIx].xDataL1CacheSizeKB * 1024;
-	systemcfg->dCacheL1LineSize =
+	systemcfg->dcache_line_size =
+	ppc64_caches.dline_size =
 		xIoHriProcessorVpd[procIx].xDataCacheOperandSize;
-	naca->iCacheL1LinesPerPage = PAGE_SIZE / systemcfg->iCacheL1LineSize;
-	naca->dCacheL1LinesPerPage = PAGE_SIZE / systemcfg->dCacheL1LineSize;
+	ppc64_caches.ilines_per_page = PAGE_SIZE / ppc64_caches.iline_size;
+	ppc64_caches.dlines_per_page = PAGE_SIZE / ppc64_caches.dline_size;
 
-	i = systemcfg->iCacheL1LineSize;
+	i = ppc64_caches.iline_size;
 	n = 0;
 	while ((i = (i / 2)))
 		++n;
-	naca->iCacheL1LogLineSize = n;
+	ppc64_caches.log_iline_size = n;
 
-	i = systemcfg->dCacheL1LineSize;
+	i = ppc64_caches.dline_size;
 	n = 0;
 	while ((i = (i / 2)))
 		++n;
-	naca->dCacheL1LogLineSize = n;
+	ppc64_caches.log_dline_size = n;
 
 	printk("D-cache line size = %d\n",
-			(unsigned int)systemcfg->dCacheL1LineSize);
+			(unsigned int)ppc64_caches.dline_size);
 	printk("I-cache line size = %d\n",
-			(unsigned int)systemcfg->iCacheL1LineSize);
+			(unsigned int)ppc64_caches.iline_size);
 }
 
 /*
@@ -652,7 +653,7 @@ extern unsigned long ppc_tb_freq;
 void __init iSeries_setup_arch(void)
 {
 	void *eventStack;
-	unsigned procIx = get_paca()->lppaca.xDynHvPhysicalProcIndex;
+	unsigned procIx = get_paca()->lppaca.dyn_hv_phys_proc_index;
 
 	/* Add an eye catcher and the systemcfg layout version number */
 	strcpy(systemcfg->eye_catcher, "SYSTEMCFG:PPC64");
@@ -809,9 +810,9 @@ static void __init iSeries_fixup_klimit(void)
 	 * Change klimit to take into account any ram disk
 	 * that may be included
 	 */
-	if (naca->xRamDisk)
-		klimit = KERNELBASE + (u64)naca->xRamDisk +
-			(naca->xRamDiskSize * PAGE_SIZE);
+	if (naca.xRamDisk)
+		klimit = KERNELBASE + (u64)naca.xRamDisk +
+			(naca.xRamDiskSize * PAGE_SIZE);
 	else {
 		/*
 		 * No ram disk was included - check and see if there

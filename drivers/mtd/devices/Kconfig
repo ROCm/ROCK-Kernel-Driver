@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.13 2004/10/01 21:47:13 gleixner Exp $
+# $Id: Kconfig,v 1.15 2004/12/22 17:51:15 joern Exp $
 
 menu "Self-contained MTD device drivers"
 	depends on MTD!=n
@@ -125,11 +125,22 @@ config MTD_BLKMTD
 	  Testing MTD users (eg JFFS2) on large media and media that might
 	  be removed during a write (using the floppy drive).
 
+config MTD_BLOCK2MTD
+	tristate "MTD using block device (rewrite)"
+	depends on MTD && EXPERIMENTAL
+	help
+	  This driver is basically the same at MTD_BLKMTD above, but
+	  experienced some interface changes plus serious speedups.  In
+	  the long term, it should replace MTD_BLKMTD.  Right now, you
+	  shouldn't entrust important data to it yet.
+
 comment "Disk-On-Chip Device Drivers"
 
 config MTD_DOC2000
 	tristate "M-Systems Disk-On-Chip 2000 and Millennium (DEPRECATED)"
 	depends on MTD
+	select MTD_DOCPROBE
+	select MTD_NAND_IDS
 	---help---
 	  This provides an MTD device driver for the M-Systems DiskOnChip
 	  2000 and Millennium devices.  Originally designed for the DiskOnChip
@@ -151,6 +162,8 @@ config MTD_DOC2000
 config MTD_DOC2001
 	tristate "M-Systems Disk-On-Chip Millennium-only alternative driver (DEPRECATED)"
 	depends on MTD
+	select MTD_DOCPROBE
+	select MTD_NAND_IDS
 	---help---
 	  This provides an alternative MTD device driver for the M-Systems 
 	  DiskOnChip Millennium devices.  Use this if you have problems with
@@ -171,6 +184,8 @@ config MTD_DOC2001
 config MTD_DOC2001PLUS
 	tristate "M-Systems Disk-On-Chip Millennium Plus"
 	depends on MTD
+	select MTD_DOCPROBE
+	select MTD_NAND_IDS
 	---help---
 	  This provides an MTD device driver for the M-Systems DiskOnChip
 	  Millennium Plus devices.
@@ -186,17 +201,10 @@ config MTD_DOC2001PLUS
 
 config MTD_DOCPROBE
 	tristate
-	default m if MTD_DOC2001!=y && MTD_DOC2000!=y && MTD_DOC2001PLUS!=y && (MTD_DOC2001=m || MTD_DOC2000=m || MTD_DOC2001PLUS=m)
-	default y if MTD_DOC2001=y || MTD_DOC2000=y || MTD_DOC2001PLUS=y
-	help
-	  This isn't a real config option; it's derived.
+	select MTD_DOCECC
 
 config MTD_DOCECC
 	tristate
-	default m if MTD_DOCPROBE=m
-	default y if MTD_DOCPROBE=y
-	help
-	  This isn't a real config option; it's derived.
 
 config MTD_DOCPROBE_ADVANCED
 	bool "Advanced detection options for DiskOnChip"

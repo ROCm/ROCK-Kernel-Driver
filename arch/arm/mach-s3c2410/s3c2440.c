@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/s3c2440.c
  *
- * Copyright (c) 2004 Simtec Electronics
+ * Copyright (c) 2004-2005 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * Samsung S3C2440 Mobile CPU support
@@ -16,6 +16,8 @@
  *	09-Nov-2004 BJD  Added sysdev for power management
  *	04-Nov-2004 BJD  New serial registration
  *	15-Nov-2004 BJD  Rename the i2c device for the s3c2440
+ *	14-Jan-2005 BJD  Moved clock init code into seperate function
+ *	14-Jan-2005 BJD  Removed un-used clock bits
 */
 
 #include <linux/kernel.h>
@@ -48,10 +50,6 @@
 #include "cpu.h"
 #include "pm.h"
 
-int s3c2440_clock_tick_rate = 12*1000*1000;  /* current timers at 12MHz */
-
-/* clock info */
-unsigned long s3c2440_hdiv;
 
 static struct map_desc s3c2440_iodesc[] __initdata = {
 	IODESC_ENT(USBHOST),
@@ -59,6 +57,7 @@ static struct map_desc s3c2440_iodesc[] __initdata = {
 	IODESC_ENT(LCD),
 	IODESC_ENT(TIMER),
 	IODESC_ENT(ADC),
+	IODESC_ENT(WATCHDOG),
 };
 
 static struct resource s3c_uart0_resource[] = {
@@ -154,13 +153,13 @@ void __init s3c2440_init_uarts(struct s3c2410_uartcfg *cfg, int no)
 
 static struct clk s3c2440_clk_cam = {
 	.name		= "camera",
-	.enable		= s3c2410_clkcon_enable,
+	.enable		= s3c24xx_clkcon_enable,
 	.ctrlbit	= S3C2440_CLKCON_CAMERA
 };
 
 static struct clk s3c2440_clk_ac97 = {
 	.name		= "ac97",
-	.enable		= s3c2410_clkcon_enable,
+	.enable		= s3c24xx_clkcon_enable,
 	.ctrlbit	= S3C2440_CLKCON_CAMERA
 };
 
@@ -203,13 +202,20 @@ static struct sys_device s3c2440_sysdev = {
 
 void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 {
-	unsigned long clkdiv;
-	unsigned long camdiv;
-
 	/* register our io-tables */
 
 	iotable_init(s3c2440_iodesc, ARRAY_SIZE(s3c2440_iodesc));
 	iotable_init(mach_desc, size);
+	/* rename any peripherals used differing from the s3c2410 */
+
+	s3c_device_i2c.name = "s3c2440-i2c";
+}
+
+void __init s3c2440_init_clocks(int xtal)
+{
+	unsigned long clkdiv;
+	unsigned long camdiv;
+	int s3c2440_hdiv = 1;
 
 	/* now we've got our machine bits initialised, work out what
 	 * clocks we've got */
@@ -243,7 +249,7 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 	s3c24xx_hclk = s3c24xx_fclk / s3c2440_hdiv;
 	s3c24xx_pclk = s3c24xx_hclk / ((clkdiv & S3C2440_CLKDIVN_PDIVN)? 2:1);
 
-	/* print brieft summary of clocks, etc */
+	/* print brief summary of clocks, etc */
 
 	printk("S3C2440: core %ld.%03ld MHz, memory %ld.%03ld MHz, peripheral %ld.%03ld MHz\n",
 	       print_mhz(s3c24xx_fclk), print_mhz(s3c24xx_hclk),
@@ -253,22 +259,18 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 	 * console to use them, and to add new ones after the initialisation
 	 */
 
-	s3c2410_init_clocks();
+	s3c24xx_setup_clocks();
 
 	/* add s3c2440 specific clocks */
 
 	s3c2440_clk_cam.parent = clk_get(NULL, "hclk");
 	s3c2440_clk_ac97.parent = clk_get(NULL, "pclk");
 
-	s3c2410_register_clock(&s3c2440_clk_ac97);
-	s3c2410_register_clock(&s3c2440_clk_cam);
+	s3c24xx_register_clock(&s3c2440_clk_ac97);
+	s3c24xx_register_clock(&s3c2440_clk_cam);
 
 	clk_disable(&s3c2440_clk_ac97);
 	clk_disable(&s3c2440_clk_cam);
-
-	/* rename any peripherals used differing from the s3c2410 */
-
-	s3c_device_i2c.name = "s3c2440-i2c";
 }
 
 int __init s3c2440_init(void)

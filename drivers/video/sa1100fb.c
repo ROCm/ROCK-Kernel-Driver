@@ -393,7 +393,7 @@ static struct sa1100fb_mach_info shannon_info __initdata = {
 	.left_margin	= 2,		.upper_margin	= 0,
 	.right_margin	= 1,		.lower_margin	= 0,
 
-	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT, 
+	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 
 	.lccr0		= LCCR0_Color | LCCR0_Dual | LCCR0_Pas,
 	.lccr3		= LCCR3_ACBsDiv(512),
@@ -814,6 +814,33 @@ static int sa1100fb_blank(int blank, struct fb_info *info)
 	return 0;
 }
 
+static int sa1100fb_mmap(struct fb_info *info, struct file *file,
+			 struct vm_area_struct *vma)
+{
+	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
+	unsigned long start, len, off = vma->vm_pgoff << PAGE_SHIFT;
+
+	if (off < info->fix.smem_len) {
+		vma->vm_pgoff += 1; /* skip over the palette */
+		return dma_mmap_writecombine(fbi->dev, vma, fbi->map_cpu,
+					     fbi->map_dma, fbi->map_size);
+	}
+
+	start = info->fix.mmio_start;
+	len = PAGE_ALIGN((start & ~PAGE_MASK) + info->fix.mmio_len);
+
+	if ((vma->vm_end - vma->vm_start + off) > len)
+		return -EINVAL;
+
+	off += start & PAGE_MASK;
+	vma->vm_pgoff = off >> PAGE_SHIFT;
+	vma->vm_flags |= VM_IO;
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	return io_remap_page_range(vma, vma->vm_start, off,
+				   vma->vm_end - vma->vm_start,
+				   vma->vm_page_prot);
+}
+
 static struct fb_ops sa1100fb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_check_var	= sa1100fb_check_var,
@@ -825,6 +852,7 @@ static struct fb_ops sa1100fb_ops = {
 	.fb_imageblit	= cfb_imageblit,
 	.fb_blank	= sa1100fb_blank,
 	.fb_cursor	= soft_cursor,
+	.fb_mmap	= sa1100fb_mmap,
 };
 
 /*
@@ -1024,7 +1052,7 @@ static void sa1100fb_enable_controller(struct sa1100fb_info *fbi)
 	if (machine_is_shannon()) {
 		GPDR |= SHANNON_GPIO_DISP_EN;
 		GPSR |= SHANNON_GPIO_DISP_EN;
-	}	
+	}
 
 	DPRINTK("DBAR1 = 0x%08x\n", DBAR1);
 	DPRINTK("DBAR2 = 0x%08x\n", DBAR2);
@@ -1044,8 +1072,8 @@ static void sa1100fb_disable_controller(struct sa1100fb_info *fbi)
 		GPCR |= SHANNON_GPIO_DISP_EN;
 	}	
 
-	add_wait_queue(&fbi->ctrlr_wait, &wait);
 	set_current_state(TASK_UNINTERRUPTIBLE);
+	add_wait_queue(&fbi->ctrlr_wait, &wait);
 
 	LCSR = 0xffffffff;	/* Clear LCD Status Register */
 	LCCR0 &= ~LCCR0_LDM;	/* Enable LCD Disable Done Interrupt */

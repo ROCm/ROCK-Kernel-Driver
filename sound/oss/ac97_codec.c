@@ -52,6 +52,7 @@
 #include <linux/errno.h>
 #include <linux/bitops.h>
 #include <linux/delay.h>
+#include <linux/pci.h>
 #include <linux/ac97_codec.h>
 #include <asm/uaccess.h>
 
@@ -128,6 +129,9 @@ static const struct {
 	{0x41445348, "Analog Devices AD1881A",	&null_ops},
 	{0x41445360, "Analog Devices AD1885",	&default_ops},
 	{0x41445361, "Analog Devices AD1886",	&ad1886_ops},
+	{0x41445370, "Analog Devices AD1981",	&null_ops},
+	{0x41445372, "Analog Devices AD1981A",	&null_ops},
+	{0x41445374, "Analog Devices AD1981B",	&null_ops},
 	{0x41445460, "Analog Devices AD1885",	&default_ops},
 	{0x41445461, "Analog Devices AD1886",	&ad1886_ops},
 	{0x414B4D00, "Asahi Kasei AK4540",	&null_ops},
@@ -1453,5 +1457,92 @@ void ac97_unregister_driver(struct ac97_driver *driver)
 }
 
 EXPORT_SYMBOL_GPL(ac97_unregister_driver);
+
+static int swap_headphone(int remove_master)
+{
+	struct list_head *l;
+	struct ac97_codec *c;
 	
+	if (remove_master) {
+		down(&codec_sem);
+		list_for_each(l, &codecs)
+		{
+			c = list_entry(l, struct ac97_codec, list);
+			if (supported_mixer(c, SOUND_MIXER_PHONEOUT))
+				c->supported_mixers &= ~SOUND_MASK_PHONEOUT;
+		}
+		up(&codec_sem);
+	} else
+		ac97_hw[SOUND_MIXER_PHONEOUT].offset = AC97_MASTER_VOL_STEREO;
+
+	/* Scale values already match */
+	ac97_hw[SOUND_MIXER_VOLUME].offset = AC97_MASTER_VOL_MONO;
+	return 0;
+}
+
+static int apply_quirk(int quirk)
+{
+	switch (quirk) {
+	case AC97_TUNE_NONE:
+		return 0;
+	case AC97_TUNE_HP_ONLY:
+		return swap_headphone(1);
+	case AC97_TUNE_SWAP_HP:
+		return swap_headphone(0);
+	case AC97_TUNE_SWAP_SURROUND:
+		return -ENOSYS; /* not yet implemented */
+	case AC97_TUNE_AD_SHARING:
+		return -ENOSYS; /* not yet implemented */
+	case AC97_TUNE_ALC_JACK:
+		return -ENOSYS; /* not yet implemented */
+	}
+	return -EINVAL;
+}
+
+/**
+ *	ac97_tune_hardware - tune up the hardware
+ *	@pdev: pci_dev pointer
+ *	@quirk: quirk list
+ *	@override: explicit quirk value (overrides if not AC97_TUNE_DEFAULT)
+ *
+ *	Do some workaround for each pci device, such as renaming of the
+ *	headphone (true line-out) control as "Master".
+ *	The quirk-list must be terminated with a zero-filled entry.
+ *
+ *	Returns zero if successful, or a negative error code on failure.
+ */
+
+int ac97_tune_hardware(struct pci_dev *pdev, struct ac97_quirk *quirk, int override)
+{
+	int result;
+
+	if (!quirk)
+		return -EINVAL;
+
+	if (override != AC97_TUNE_DEFAULT) {
+		result = apply_quirk(override);
+		if (result < 0)
+			printk(KERN_ERR "applying quirk type %d failed (%d)\n", override, result);
+		return result;
+	}
+
+	for (; quirk->vendor; quirk++) {
+		if (quirk->vendor != pdev->subsystem_vendor)
+			continue;
+		if ((! quirk->mask && quirk->device == pdev->subsystem_device) ||
+		    quirk->device == (quirk->mask & pdev->subsystem_device)) {
+#ifdef DEBUG
+			printk("ac97 quirk for %s (%04x:%04x)\n", quirk->name, ac97->subsystem_vendor, pdev->subsystem_device);
+#endif
+			result = apply_quirk(quirk->type);
+			if (result < 0)
+				printk(KERN_ERR "applying quirk type %d for %s failed (%d)\n", quirk->type, quirk->name, result);
+			return result;
+		}
+	}
+	return 0;
+}
+
+EXPORT_SYMBOL_GPL(ac97_tune_hardware);
+
 MODULE_LICENSE("GPL");

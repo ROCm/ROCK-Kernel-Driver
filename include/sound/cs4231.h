@@ -309,7 +309,6 @@ struct _snd_cs4231 {
 
 void snd_cs4231_out(cs4231_t *chip, unsigned char reg, unsigned char val);
 unsigned char snd_cs4231_in(cs4231_t *chip, unsigned char reg);
-void snd_cs4231_outm(cs4231_t *chip, unsigned char reg, unsigned char mask, unsigned char val);
 void snd_cs4236_ext_out(cs4231_t *chip, unsigned char reg, unsigned char val);
 unsigned char snd_cs4236_ext_in(cs4231_t *chip, unsigned char reg);
 void snd_cs4231_mce_up(cs4231_t *chip);
@@ -363,9 +362,5 @@ int snd_cs4231_put_single(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucon
 int snd_cs4231_info_double(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo);
 int snd_cs4231_get_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);
 int snd_cs4231_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol);
-
-#ifdef CONFIG_SND_DEBUG
-void snd_cs4231_debug(cs4231_t *chip);
-#endif
 
 #endif /* __SOUND_CS4231_H */

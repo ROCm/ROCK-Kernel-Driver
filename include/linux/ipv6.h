@@ -262,14 +262,12 @@ struct raw6_sock {
 };
 
 struct udp6_sock {
-	struct inet_sock  inet;
-	struct udp_opt	  udp;
+	struct udp_sock	  udp;
 	struct ipv6_pinfo inet6;
 };
 
 struct tcp6_sock {
-	struct inet_sock  inet;
-	struct tcp_opt	  tcp;
+	struct tcp_sock	  tcp;
 	struct ipv6_pinfo inet6;
 };
 

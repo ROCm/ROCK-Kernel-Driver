@@ -26,7 +26,7 @@
       destination/tunnel endpoint. (output)
  */
 
-static spinlock_t xfrm_state_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(xfrm_state_lock);
 
 /* Hash table to find appropriate SA towards given target (endpoint
  * of tunnel or destination of transport mode) allowed by selector.
@@ -39,12 +39,12 @@ static struct list_head xfrm_state_byspi[XFRM_DST_HSIZE];
 
 DECLARE_WAIT_QUEUE_HEAD(km_waitq);
 
-static rwlock_t xfrm_state_afinfo_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(xfrm_state_afinfo_lock);
 static struct xfrm_state_afinfo *xfrm_state_afinfo[NPROTO];
 
 static struct work_struct xfrm_state_gc_work;
 static struct list_head xfrm_state_gc_list = LIST_HEAD_INIT(xfrm_state_gc_list);
-static spinlock_t xfrm_state_gc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(xfrm_state_gc_lock);
 
 static void __xfrm_state_delete(struct xfrm_state *x);
 
@@ -619,7 +619,7 @@ u32 xfrm_get_acqseq(void)
 {
 	u32 res;
 	static u32 acqseq;
-	static spinlock_t acqseq_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(acqseq_lock);
 
 	spin_lock_bh(&acqseq_lock);
 	res = (++acqseq ? : ++acqseq);
@@ -747,7 +747,7 @@ void xfrm_replay_advance(struct xfrm_state *x, u32 seq)
 }
 
 static struct list_head xfrm_km_list = LIST_HEAD_INIT(xfrm_km_list);
-static rwlock_t		xfrm_km_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(xfrm_km_lock);
 
 static void km_state_expired(struct xfrm_state *x, int hard)
 {

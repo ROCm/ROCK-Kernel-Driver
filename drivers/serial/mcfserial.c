@@ -58,9 +58,14 @@ struct timer_list mcfrs_timer_struct;
  *	keep going.  Perhaps one day the cflag settings for the
  *	console can be used instead.
  */
-#if defined(CONFIG_ARNEWSH) || defined(CONFIG_MOTOROLA) || defined(CONFIG_senTec)
+#if defined(CONFIG_ARNEWSH) || defined(CONFIG_MOTOROLA) || defined(CONFIG_senTec) || defined(CONFIG_SNEHA)
 #define	CONSOLE_BAUD_RATE	19200
 #define	DEFAULT_CBAUD		B19200
+#endif
+
+#if defined(CONFIG_HW_FEITH)
+  #define	CONSOLE_BAUD_RATE	38400
+  #define	DEFAULT_CBAUD		B38400
 #endif
 
 #ifndef CONSOLE_BAUD_RATE
@@ -86,8 +91,8 @@ static struct tty_driver *mcfrs_serial_driver;
 #undef SERIAL_DEBUG_OPEN
 #undef SERIAL_DEBUG_FLOW
 
-#ifdef CONFIG_M5282
-#define	IRQBASE	77
+#if defined(CONFIG_M527x) || defined(CONFIG_M528x)
+#define	IRQBASE	(MCFINT_VECBASE+MCFINT_UART0)
 #else
 #define	IRQBASE	73
 #endif
@@ -337,20 +342,24 @@ static inline void receive_chars(struct mcf_serial *info)
 #endif
 
 		tty->flip.count++;
-		if (status & MCFUART_USR_RXERR)
+		if (status & MCFUART_USR_RXERR) {
 			uartp[MCFUART_UCR] = MCFUART_UCR_CMDRESETERR;
-		if (status & MCFUART_USR_RXBREAK) {
-			info->stats.rxbreak++;
-			*tty->flip.flag_buf_ptr++ = TTY_BREAK;
-		} else if (status & MCFUART_USR_RXPARITY) {
-			info->stats.rxparity++;
-			*tty->flip.flag_buf_ptr++ = TTY_PARITY;
-		} else if (status & MCFUART_USR_RXOVERRUN) {
-			info->stats.rxoverrun++;
-			*tty->flip.flag_buf_ptr++ = TTY_OVERRUN;
-		} else if (status & MCFUART_USR_RXFRAMING) {
-			info->stats.rxframing++;
-			*tty->flip.flag_buf_ptr++ = TTY_FRAME;
+			if (status & MCFUART_USR_RXBREAK) {
+				info->stats.rxbreak++;
+				*tty->flip.flag_buf_ptr++ = TTY_BREAK;
+			} else if (status & MCFUART_USR_RXPARITY) {
+				info->stats.rxparity++;
+				*tty->flip.flag_buf_ptr++ = TTY_PARITY;
+			} else if (status & MCFUART_USR_RXOVERRUN) {
+				info->stats.rxoverrun++;
+				*tty->flip.flag_buf_ptr++ = TTY_OVERRUN;
+			} else if (status & MCFUART_USR_RXFRAMING) {
+				info->stats.rxframing++;
+				*tty->flip.flag_buf_ptr++ = TTY_FRAME;
+			} else {
+				/* This should never happen... */
+				*tty->flip.flag_buf_ptr++ = 0;
+			}
 		} else {
 			*tty->flip.flag_buf_ptr++ = 0;
 		}
@@ -724,13 +733,25 @@ static void mcfrs_flush_chars(struct tty_struct *tty)
 	if (serial_paranoia_check(info, tty->name, "mcfrs_flush_chars"))
 		return;
 
+	uartp = (volatile unsigned char *) info->addr;
+
+	/*
+	 * re-enable receiver interrupt
+	 */
+	local_irq_save(flags);
+	if ((!(info->imr & MCFUART_UIR_RXREADY)) &&
+	    (info->flags & ASYNC_INITIALIZED) ) {
+		info->imr |= MCFUART_UIR_RXREADY;
+		uartp[MCFUART_UIMR] = info->imr;
+	}
+	local_irq_restore(flags);
+
 	if (info->xmit_cnt <= 0 || tty->stopped || tty->hw_stopped ||
 	    !info->xmit_buf)
 		return;
 
 	/* Enable transmitter */
 	local_irq_save(flags);
-	uartp = info->addr;
 	info->imr |= MCFUART_UIR_TXREADY;
 	uartp[MCFUART_UIMR] = info->imr;
 	local_irq_restore(flags);
@@ -984,7 +1005,7 @@ static void send_break(	struct mcf_serial * info, int duration)
 
 	local_irq_save(flags);
 	uartp[MCFUART_UCR] = MCFUART_UCR_CMDBREAKSTART;
-	schedule_timeout(jiffies + duration);
+	schedule_timeout(duration);
 	uartp[MCFUART_UCR] = MCFUART_UCR_CMDBREAKSTOP;
 	local_irq_restore(flags);
 }
@@ -1506,7 +1527,7 @@ static void mcfrs_irqinit(struct mcf_serial *info)
 	*portp = (*portp & ~0x000000ff) | 0x00000055;
 	portp = (volatile unsigned long *) (MCF_MBAR + MCFSIM_PDCNT);
 	*portp = (*portp & ~0x000003fc) | 0x000002a8;
-#elif defined(CONFIG_M5282)
+#elif defined(CONFIG_M527x) || defined(CONFIG_M528x)
 	volatile unsigned char *icrp, *uartp;
 	volatile unsigned long *imrp;
 
@@ -1518,7 +1539,7 @@ static void mcfrs_irqinit(struct mcf_serial *info)
 
 	imrp = (volatile unsigned long *) (MCF_MBAR + MCFICM_INTC0 +
 		MCFINTC_IMRL);
-	*imrp &= ~((1 << (info->irq - 64)) | 1);
+	*imrp &= ~((1 << (info->irq - MCFINT_VECBASE)) | 1);
 #else
 	volatile unsigned char	*icrp, *uartp;
 

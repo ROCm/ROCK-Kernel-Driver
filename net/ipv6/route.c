@@ -133,7 +133,7 @@ struct fib6_node ip6_routing_table = {
 
 /* Protects all the ip6 fib */
 
-rwlock_t rt6_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(rt6_lock);
 
 
 /* allocate dst with ip6_dst_ops */
@@ -208,8 +208,8 @@ static __inline__ struct rt6_info *rt6_device_match(struct rt6_info *rt,
 /*
  *	pointer to the last default router chosen. BH is disabled locally.
  */
-struct rt6_info *rt6_dflt_pointer;
-spinlock_t rt6_dflt_lock = SPIN_LOCK_UNLOCKED;
+static struct rt6_info *rt6_dflt_pointer;
+static DEFINE_SPINLOCK(rt6_dflt_lock);
 
 void rt6_reset_dflt_pointer(struct rt6_info *rt)
 {

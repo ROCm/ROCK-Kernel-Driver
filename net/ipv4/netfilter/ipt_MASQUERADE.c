@@ -43,7 +43,7 @@ masquerade_check(const char *tablename,
 		 unsigned int targinfosize,
 		 unsigned int hook_mask)
 {
-	const struct ip_nat_multi_range *mr = targinfo;
+	const struct ip_nat_multi_range_compat *mr = targinfo;
 
 	if (strcmp(tablename, "nat") != 0) {
 		DEBUGP("masquerade_check: bad table `%s'.\n", tablename);
@@ -79,8 +79,8 @@ masquerade_target(struct sk_buff **pskb,
 {
 	struct ip_conntrack *ct;
 	enum ip_conntrack_info ctinfo;
-	const struct ip_nat_multi_range *mr;
-	struct ip_nat_multi_range newrange;
+	const struct ip_nat_multi_range_compat *mr;
+	struct ip_nat_range newrange;
 	struct rtable *rt;
 	u_int32_t newsrc;
 
@@ -108,10 +108,10 @@ masquerade_target(struct sk_buff **pskb,
 	WRITE_UNLOCK(&masq_lock);
 
 	/* Transfer from original range. */
-	newrange = ((struct ip_nat_multi_range)
-		{ 1, { { mr->range[0].flags | IP_NAT_RANGE_MAP_IPS,
-			 newsrc, newsrc,
-			 mr->range[0].min, mr->range[0].max } } });
+	newrange = ((struct ip_nat_range)
+		{ mr->range[0].flags | IP_NAT_RANGE_MAP_IPS,
+		  newsrc, newsrc,
+		  mr->range[0].min, mr->range[0].max });
 
 	/* Hand modified range to generic setup. */
 	return ip_nat_setup_info(ct, &newrange, hooknum);

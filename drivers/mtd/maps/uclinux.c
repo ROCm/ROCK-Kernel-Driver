@@ -5,7 +5,7 @@
  *
  *	(C) Copyright 2002, Greg Ungerer (gerg@snapgear.com)
  *
- * 	$Id: uclinux.c,v 1.9 2004/11/04 13:24:15 gleixner Exp $
+ * 	$Id: uclinux.c,v 1.10 2005/01/05 18:05:13 dwmw2 Exp $
  */
 
 /****************************************************************************/
@@ -47,7 +47,7 @@ struct mtd_partition uclinux_romfs[] = {
 int uclinux_point(struct mtd_info *mtd, loff_t from, size_t len,
 	size_t *retlen, u_char **mtdbuf)
 {
-	struct map_info *map = (struct map_info *) mtd->priv;
+	struct map_info *map = mtd->priv;
 	*mtdbuf = (u_char *) (map->virt + ((int) from));
 	*retlen = len;
 	return(0);
@@ -81,7 +81,7 @@ int __init uclinux_mtd_init(void)
 	mtd = do_map_probe("map_ram", mapp);
 	if (!mtd) {
 		printk("uclinux[mtd]: failed to find a mapping?\n");
-		iounmap((void *) mapp->virt);
+		iounmap(mapp->virt);
 		return(-ENXIO);
 	}
 		

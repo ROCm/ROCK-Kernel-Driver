@@ -451,7 +451,7 @@ cifs_unlink(struct inode *inode, struct dentry *direntry)
 	cifsInode = CIFS_I(direntry->d_inode);
 	cifsInode->time = 0;	/* will force revalidate to get info when needed */
 	direntry->d_inode->i_ctime = inode->i_ctime = inode->i_mtime =
-	    CURRENT_TIME;
+	    current_fs_time(inode->i_sb);
 	cifsInode = CIFS_I(inode);
 	cifsInode->time = 0;	/* force revalidate of dir as well */
 
@@ -564,7 +564,7 @@ cifs_rmdir(struct inode *inode, struct dentry *direntry)
 	cifsInode = CIFS_I(direntry->d_inode);
 	cifsInode->time = 0;	/* force revalidate to go get info when needed */
 	direntry->d_inode->i_ctime = inode->i_ctime = inode->i_mtime =
-	    CURRENT_TIME;
+	    current_fs_time(inode->i_sb);
 
 	if (full_path)
 		kfree(full_path);

@@ -6,6 +6,7 @@
  * Copyright (C) 2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Bjorn Helgaas <bjorn_helgaas@hp.com>
+ * Copyright (C) 2004 Silicon Graphics, Inc.
  *
  * Note: Above list of copyright holders is incomplete...
  */
@@ -131,6 +132,19 @@ struct pci_ops pci_root_ops = {
 	.write = pci_write,
 };
 
+#ifdef CONFIG_NUMA
+extern acpi_status acpi_map_iosapic(acpi_handle, u32, void *, void **);
+static void acpi_map_iosapics(void)
+{
+	acpi_get_devices(NULL, acpi_map_iosapic, NULL, NULL);
+}
+#else
+static void acpi_map_iosapics(void)
+{
+	return;
+}
+#endif /* CONFIG_NUMA */
+
 static int __init
 pci_acpi_init (void)
 {
@@ -138,11 +152,7 @@ pci_acpi_init (void)
 
 	printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
 
-#ifdef CONFIG_NUMA
-extern acpi_status acpi_map_iosapic (acpi_handle, u32, void*, void**);
-
-	acpi_get_devices(NULL, acpi_map_iosapic, NULL, NULL);
-#endif
+	acpi_map_iosapics();
 
 	if (pci_routeirq) {
 		/*
@@ -154,7 +164,7 @@ extern acpi_status acpi_map_iosapic (acpi_handle, u32, void*, void**);
 		printk(KERN_INFO "** was specified.  If this was required to make a driver work,\n");
 		printk(KERN_INFO "** please email the output of \"lspci\" to bjorn.helgaas@hp.com\n");
 		printk(KERN_INFO "** so I can fix the driver.\n");
-		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
+		for_each_pci_dev(dev)
 			acpi_pci_irq_enable(dev);
 	} else {
 		printk(KERN_INFO "** PCI interrupts are no longer routed automatically.  If this\n");
@@ -367,6 +377,7 @@ void pcibios_resource_to_bus(struct pci_dev *dev,
 	region->start = res->start - offset;
 	region->end = res->end - offset;
 }
+EXPORT_SYMBOL(pcibios_resource_to_bus);
 
 void pcibios_bus_to_resource(struct pci_dev *dev,
 		struct resource *res, struct pci_bus_region *region)
@@ -480,6 +491,14 @@ pcibios_enable_device (struct pci_dev *dev, int mask)
 	return acpi_pci_irq_enable(dev);
 }
 
+#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
+void
+pcibios_disable_device (struct pci_dev *dev)
+{
+	acpi_pci_irq_disable(dev);
+}
+#endif /* CONFIG_ACPI_DEALLOCATE_IRQ */
+
 void
 pcibios_align_resource (void *data, struct resource *res,
 		        unsigned long size, unsigned long align)
@@ -518,7 +537,7 @@ pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 	 * Leave vm_pgoff as-is, the PCI space address is the physical
 	 * address on this platform.
 	 */
-	vma->vm_flags |= (VM_SHM | VM_LOCKED | VM_IO);
+	vma->vm_flags |= (VM_SHM | VM_RESERVED | VM_IO);
 
 	if (write_combine)
 		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
@@ -530,6 +549,117 @@ pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 		return -EAGAIN;
 
 	return 0;
+}
+
+/**
+ * ia64_pci_get_legacy_mem - generic legacy mem routine
+ * @bus: bus to get legacy memory base address for
+ *
+ * Find the base of legacy memory for @bus.  This is typically the first
+ * megabyte of bus address space for @bus or is simply 0 on platforms whose
+ * chipsets support legacy I/O and memory routing.  Returns the base address
+ * or an error pointer if an error occurred.
+ *
+ * This is the ia64 generic version of this routine.  Other platforms
+ * are free to override it with a machine vector.
+ */
+char *ia64_pci_get_legacy_mem(struct pci_bus *bus)
+{
+	return (char *)__IA64_UNCACHED_OFFSET;
+}
+
+/**
+ * pci_mmap_legacy_page_range - map legacy memory space to userland
+ * @bus: bus whose legacy space we're mapping
+ * @vma: vma passed in by mmap
+ *
+ * Map legacy memory space for this device back to userspace using a machine
+ * vector to get the base address.
+ */
+int
+pci_mmap_legacy_page_range(struct pci_bus *bus, struct vm_area_struct *vma)
+{
+	char *addr;
+
+	addr = pci_get_legacy_mem(bus);
+	if (IS_ERR(addr))
+		return PTR_ERR(addr);
+
+	vma->vm_pgoff += (unsigned long)addr >> PAGE_SHIFT;
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	vma->vm_flags |= (VM_SHM | VM_RESERVED | VM_IO);
+
+	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+			    vma->vm_end - vma->vm_start, vma->vm_page_prot))
+		return -EAGAIN;
+
+	return 0;
+}
+
+/**
+ * ia64_pci_legacy_read - read from legacy I/O space
+ * @bus: bus to read
+ * @port: legacy port value
+ * @val: caller allocated storage for returned value
+ * @size: number of bytes to read
+ *
+ * Simply reads @size bytes from @port and puts the result in @val.
+ *
+ * Again, this (and the write routine) are generic versions that can be
+ * overridden by the platform.  This is necessary on platforms that don't
+ * support legacy I/O routing or that hard fail on legacy I/O timeouts.
+ */
+int ia64_pci_legacy_read(struct pci_bus *bus, u16 port, u32 *val, u8 size)
+{
+	int ret = size;
+
+	switch (size) {
+	case 1:
+		*val = inb(port);
+		break;
+	case 2:
+		*val = inw(port);
+		break;
+	case 4:
+		*val = inl(port);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
+/**
+ * ia64_pci_legacy_write - perform a legacy I/O write
+ * @bus: bus pointer
+ * @port: port to write
+ * @val: value to write
+ * @size: number of bytes to write from @val
+ *
+ * Simply writes @size bytes of @val to @port.
+ */
+int ia64_pci_legacy_write(struct pci_dev *bus, u16 port, u32 val, u8 size)
+{
+	int ret = 0;
+
+	switch (size) {
+	case 1:
+		outb(val, port);
+		break;
+	case 2:
+		outw(val, port);
+		break;
+	case 4:
+		outl(val, port);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
 }
 
 /**

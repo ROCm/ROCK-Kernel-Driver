@@ -46,7 +46,7 @@ static int curtuner=0;
 static int tunestat=0;
 static int sigstrength=0;
 static wait_queue_head_t read_queue;
-struct timer_list tunertimer,rdstimer,readtimer;
+static struct timer_list readtimer;
 static __u8 rdsin=0,rdsout=0,rdsstat=0;
 static unsigned char rdsbuf[RDS_BUFFER];
 static spinlock_t cadet_io_lock;
@@ -280,7 +280,7 @@ static void cadet_setvol(int vol)
 	spin_unlock(&cadet_io_lock);
 }  
 
-void cadet_handler(unsigned long data)
+static void cadet_handler(unsigned long data)
 {
 	/*
 	 * Service the RDS fifo
@@ -604,9 +604,9 @@ MODULE_AUTHOR("Fred Gleason, Russell Kroll, Quay Lu, Donald Song, Jason Lewis, S
 MODULE_DESCRIPTION("A driver for the ADS Cadet AM/FM/RDS radio card.");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "I/O address of Cadet card (0x330,0x332,0x334,0x336,0x338,0x33a,0x33c,0x33e)");
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 static void __exit cadet_cleanup_module(void)
 {

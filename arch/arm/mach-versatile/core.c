@@ -597,6 +597,14 @@ static int versatile_clcd_setup(struct clcd_fb *fb)
 	return 0;
 }
 
+static int versatile_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
+{
+	return dma_mmap_writecombine(&fb->dev->dev, vma,
+				     fb->fb.screen_base,
+				     fb->fb.fix.smem_start,
+				     fb->fb.fix.smem_len);
+}
+
 static void versatile_clcd_remove(struct clcd_fb *fb)
 {
 	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
@@ -610,6 +618,7 @@ static struct clcd_board clcd_plat_data = {
 	.disable	= versatile_clcd_disable,
 	.enable		= versatile_clcd_enable,
 	.setup		= versatile_clcd_setup,
+	.mmap		= versatile_clcd_mmap,
 	.remove		= versatile_clcd_remove,
 };
 

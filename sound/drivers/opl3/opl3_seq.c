@@ -96,7 +96,7 @@ void snd_opl3_synth_cleanup(opl3_t * opl3)
 	up(&opl3->access_mutex);
 }
 
-int snd_opl3_synth_use(void *private_data, snd_seq_port_subscribe_t * info)
+static int snd_opl3_synth_use(void *private_data, snd_seq_port_subscribe_t * info)
 {
 	opl3_t *opl3 = private_data;
 	int err;
@@ -123,7 +123,7 @@ int snd_opl3_synth_use(void *private_data, snd_seq_port_subscribe_t * info)
 	return 0;
 }
 
-int snd_opl3_synth_unuse(void *private_data, snd_seq_port_subscribe_t * info)
+static int snd_opl3_synth_unuse(void *private_data, snd_seq_port_subscribe_t * info)
 {
 	opl3_t *opl3 = private_data;
 

@@ -51,6 +51,7 @@
 #include <linux/swapops.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/acct.h>
 #include <linux/rmap.h>
 #include <linux/rcupdate.h>
 
@@ -120,14 +121,7 @@ int anon_vma_prepare(struct vm_area_struct *vma)
 
 void __anon_vma_merge(struct vm_area_struct *vma, struct vm_area_struct *next)
 {
-	if (!vma->anon_vma) {
-		BUG_ON(!next->anon_vma);
-		vma->anon_vma = next->anon_vma;
-		list_add(&vma->anon_vma_node, &next->anon_vma_node);
-	} else {
-		/* if they're both non-null they must be the same */
-		BUG_ON(vma->anon_vma != next->anon_vma);
-	}
+	BUG_ON(vma->anon_vma != next->anon_vma);
 	list_del(&next->anon_vma_node);
 }
 
@@ -606,6 +600,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 	}
 
 	mm->rss--;
+	acct_update_integrals();
 	page_remove_rmap(page);
 	page_cache_release(page);
 
@@ -710,6 +705,7 @@ static void try_to_unmap_cluster(unsigned long cursor,
 
 		page_remove_rmap(page);
 		page_cache_release(page);
+		acct_update_integrals();
 		mm->rss--;
 		(*mapcount)--;
 	}

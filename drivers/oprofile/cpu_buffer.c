@@ -18,9 +18,11 @@
  */
 
 #include <linux/sched.h>
+#include <linux/oprofile.h>
 #include <linux/vmalloc.h>
 #include <linux/errno.h>
  
+#include "event_buffer.h"
 #include "cpu_buffer.h"
 #include "buffer_sync.h"
 #include "oprof.h"
@@ -32,13 +34,12 @@ static void wq_sync_buffer(void *);
 #define DEFAULT_TIMER_EXPIRE (HZ / 10)
 int work_enabled;
 
-static void __free_cpu_buffers(int num)
+void free_cpu_buffers(void)
 {
 	int i;
  
 	for_each_online_cpu(i) {
-		if (cpu_buffer[i].buffer)
-			vfree(cpu_buffer[i].buffer);
+		vfree(cpu_buffer[i].buffer);
 	}
 }
  
@@ -58,6 +59,7 @@ int alloc_cpu_buffers(void)
  
 		b->last_task = NULL;
 		b->last_is_kernel = -1;
+		b->tracing = 0;
 		b->buffer_size = buffer_size;
 		b->tail_pos = 0;
 		b->head_pos = 0;
@@ -69,16 +71,10 @@ int alloc_cpu_buffers(void)
 	return 0;
 
 fail:
-	__free_cpu_buffers(i);
+	free_cpu_buffers();
 	return -ENOMEM;
 }
  
-
-void free_cpu_buffers(void)
-{
-	__free_cpu_buffers(NR_CPUS);
-}
-
 
 void start_cpu_work(void)
 {
@@ -114,6 +110,18 @@ void end_cpu_work(void)
 }
 
 
+/* Resets the cpu buffer to a sane state. */
+void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf)
+{
+	/* reset these to invalid values; the next sample
+	 * collected will populate the buffer with proper
+	 * values to initialize the buffer
+	 */
+	cpu_buf->last_is_kernel = -1;
+	cpu_buf->last_task = NULL;
+}
+
+
 /* compute number of available slots in cpu_buffer queue */
 static unsigned long nr_available_slots(struct oprofile_cpu_buffer const * b)
 {
@@ -135,10 +143,30 @@ static void increment_head(struct oprofile_cpu_buffer * b)
 	 * increment is visible */
 	wmb();
 
-	if (new_head < (b->buffer_size))
+	if (new_head < b->buffer_size)
 		b->head_pos = new_head;
 	else
 		b->head_pos = 0;
+}
+
+
+
+
+inline static void
+add_sample(struct oprofile_cpu_buffer * cpu_buf,
+           unsigned long pc, unsigned long event)
+{
+	struct op_sample * entry = &cpu_buf->buffer[cpu_buf->head_pos];
+	entry->eip = pc;
+	entry->event = event;
+	increment_head(cpu_buf);
+}
+
+
+inline static void
+add_code(struct oprofile_cpu_buffer * buffer, unsigned long value)
+{
+	add_sample(buffer, ESCAPE_CODE, value);
 }
 
 
@@ -148,59 +176,113 @@ static void increment_head(struct oprofile_cpu_buffer * b)
  *
  * is_kernel is needed because on some architectures you cannot
  * tell if you are in kernel or user space simply by looking at
- * eip. We tag this in the buffer by generating kernel enter/exit
+ * pc. We tag this in the buffer by generating kernel enter/exit
  * events whenever is_kernel changes
  */
-void oprofile_add_sample(unsigned long eip, unsigned int is_kernel, 
-	unsigned long event, int cpu)
+static int log_sample(struct oprofile_cpu_buffer * cpu_buf, unsigned long pc,
+		      int is_kernel, unsigned long event)
 {
-	struct oprofile_cpu_buffer * cpu_buf = &cpu_buffer[cpu];
 	struct task_struct * task;
 
-	is_kernel = !!is_kernel;
-
 	cpu_buf->sample_received++;
- 
 
 	if (nr_available_slots(cpu_buf) < 3) {
 		cpu_buf->sample_lost_overflow++;
-		return;
+		return 0;
 	}
+
+	is_kernel = !!is_kernel;
 
 	task = current;
 
 	/* notice a switch from user->kernel or vice versa */
 	if (cpu_buf->last_is_kernel != is_kernel) {
 		cpu_buf->last_is_kernel = is_kernel;
-		cpu_buf->buffer[cpu_buf->head_pos].eip = ~0UL;
-		cpu_buf->buffer[cpu_buf->head_pos].event = is_kernel;
-		increment_head(cpu_buf);
+		add_code(cpu_buf, is_kernel);
 	}
 
 	/* notice a task switch */
 	if (cpu_buf->last_task != task) {
 		cpu_buf->last_task = task;
-		cpu_buf->buffer[cpu_buf->head_pos].eip = ~0UL;
-		cpu_buf->buffer[cpu_buf->head_pos].event = (unsigned long)task;
-		increment_head(cpu_buf);
+		add_code(cpu_buf, (unsigned long)task);
 	}
  
-	cpu_buf->buffer[cpu_buf->head_pos].eip = eip;
-	cpu_buf->buffer[cpu_buf->head_pos].event = event;
-	increment_head(cpu_buf);
+	add_sample(cpu_buf, pc, event);
+	return 1;
 }
 
-
-/* Resets the cpu buffer to a sane state. */
-void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf)
+static int oprofile_begin_trace(struct oprofile_cpu_buffer * cpu_buf)
 {
-	/* reset these to invalid values; the next sample
-	 * collected will populate the buffer with proper
-	 * values to initialize the buffer
-	 */
-	cpu_buf->last_is_kernel = -1;
-	cpu_buf->last_task = NULL;
+	if (nr_available_slots(cpu_buf) < 4) {
+		cpu_buf->sample_lost_overflow++;
+		return 0;
+	}
+
+	add_code(cpu_buf, CPU_TRACE_BEGIN);
+	cpu_buf->tracing = 1;
+	return 1;
 }
+
+
+static void oprofile_end_trace(struct oprofile_cpu_buffer * cpu_buf)
+{
+	cpu_buf->tracing = 0;
+}
+
+
+void oprofile_add_sample(struct pt_regs * const regs, unsigned long event)
+{
+	struct oprofile_cpu_buffer * cpu_buf = &cpu_buffer[smp_processor_id()];
+	unsigned long pc = instruction_pointer(regs);
+	int is_kernel = !user_mode(regs);
+
+	if (!backtrace_depth) {
+		log_sample(cpu_buf, pc, is_kernel, event);
+		return;
+	}
+
+	if (!oprofile_begin_trace(cpu_buf))
+		return;
+
+	/* if log_sample() fail we can't backtrace since we lost the source
+	 * of this event */
+	if (log_sample(cpu_buf, pc, is_kernel, event))
+		oprofile_ops.backtrace(regs, backtrace_depth);
+	oprofile_end_trace(cpu_buf);
+}
+
+
+void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event)
+{
+	struct oprofile_cpu_buffer * cpu_buf = &cpu_buffer[smp_processor_id()];
+	log_sample(cpu_buf, pc, is_kernel, event);
+}
+
+
+void oprofile_add_trace(unsigned long pc)
+{
+	struct oprofile_cpu_buffer * cpu_buf = &cpu_buffer[smp_processor_id()];
+
+	if (!cpu_buf->tracing)
+		return;
+
+	if (nr_available_slots(cpu_buf) < 1) {
+		cpu_buf->tracing = 0;
+		cpu_buf->sample_lost_overflow++;
+		return;
+	}
+
+	/* broken frame can give an eip with the same value as an escape code,
+	 * abort the trace if we get it */
+	if (pc == ESCAPE_CODE) {
+		cpu_buf->tracing = 0;
+		cpu_buf->backtrace_aborted++;
+		return;
+	}
+
+	add_sample(cpu_buf, pc, 0);
+}
+
 
 
 /*
@@ -212,7 +294,7 @@ void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf)
  */
 static void wq_sync_buffer(void * data)
 {
-	struct oprofile_cpu_buffer * b = (struct oprofile_cpu_buffer *)data;
+	struct oprofile_cpu_buffer * b = data;
 	if (b->cpu != smp_processor_id()) {
 		printk("WQ on CPU%d, prefer CPU%d\n",
 		       smp_processor_id(), b->cpu);

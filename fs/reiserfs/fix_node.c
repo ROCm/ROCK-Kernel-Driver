@@ -510,9 +510,10 @@ static int get_num_ver (int mode, struct tree_balance * tb, int h,
 	// s2bytes
 	snum012[4] = op_unit_num (&vn->vn_vi[split_item_num]) - snum012[4] - bytes_to_r - bytes_to_l - bytes_to_S1new;
 
-	if (vn->vn_vi[split_item_num].vi_index != TYPE_DIRENTRY)
+	if (vn->vn_vi[split_item_num].vi_index != TYPE_DIRENTRY &&
+	    vn->vn_vi[split_item_num].vi_index != TYPE_INDIRECT)
 	    reiserfs_warning (tb->tb_sb, "vs-8115: get_num_ver: not "
-			      "directory item");
+			      "directory or indirect item");
     }
 
     /* now we know S2bytes, calculate S1bytes */
@@ -724,7 +725,7 @@ else \
 }
 
 
-void free_buffers_in_tb (
+static void free_buffers_in_tb (
 		       struct tree_balance * p_s_tb
 		       ) {
   int n_counter;

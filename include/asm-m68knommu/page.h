@@ -14,9 +14,9 @@
 #include <asm/setup.h>
 
 #if !defined(CONFIG_SMALL_TASKS) && PAGE_SHIFT < 13
-#define KTHREAD_SIZE (8192)
+#define THREAD_SIZE (8192)
 #else
-#define KTHREAD_SIZE PAGE_SIZE
+#define THREAD_SIZE PAGE_SIZE
 #endif
  
 #ifndef __ASSEMBLY__
@@ -79,14 +79,11 @@ extern unsigned long memory_end;
 #define __pa(vaddr)		virt_to_phys((void *)vaddr)
 #define __va(paddr)		phys_to_virt((unsigned long)paddr)
 
-#define MAP_NR(addr)		(((unsigned long)(addr)-PAGE_OFFSET) >> PAGE_SHIFT)
-
 #define virt_to_pfn(kaddr)	(__pa(kaddr) >> PAGE_SHIFT)
 #define pfn_to_virt(pfn)	__va((pfn) << PAGE_SHIFT)
 
 #define virt_to_page(addr)	(mem_map + (((unsigned long)(addr)-PAGE_OFFSET) >> PAGE_SHIFT))
 #define page_to_virt(page)	((((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
-#define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
 
 #define pfn_to_page(pfn)	virt_to_page(pfn_to_virt(pfn))
 #define page_to_pfn(page)	virt_to_pfn(page_to_virt(page))

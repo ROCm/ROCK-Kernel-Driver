@@ -31,7 +31,6 @@
 #include <linux/tty_flip.h>
 #include <linux/mm.h>
 #include <linux/string.h>
-#include <linux/random.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 
@@ -330,7 +329,7 @@ static void applkey(struct vc_data *vc, int key, char mode)
  * in utf-8 already. UTF-8 is defined for words of up to 31 bits,
  * but we need only 16 bits here
  */
-void to_utf8(struct vc_data *vc, ushort c) 
+static void to_utf8(struct vc_data *vc, ushort c)
 {
 	if (c < 0x80)
 		/*  0******* */
@@ -392,7 +391,7 @@ void compute_shiftstate(void)
  * Otherwise, conclude that DIACR was not combining after all,
  * queue it and return CH.
  */
-unsigned char handle_diacr(struct vc_data *vc, unsigned char ch)
+static unsigned char handle_diacr(struct vc_data *vc, unsigned char ch)
 {
 	int d = diacr;
 	int i;
@@ -853,18 +852,6 @@ void setledstate(struct kbd_struct *kbd, unsigned int led)
 	set_leds();
 }
 
-void register_leds(struct kbd_struct *kbd, unsigned int led,
-		   unsigned int *addr, unsigned int mask)
-{
-	if (led < 3) {
-		ledptrs[led].addr = addr;
-		ledptrs[led].mask = mask;
-		ledptrs[led].valid = 1;
-		kbd->ledmode = LED_SHOW_MEM;
-	} else
-		kbd->ledmode = LED_SHOW_FLAGS;
-}
-
 static inline unsigned char getleds(void)
 {
 	struct kbd_struct *kbd = kbd_table + fg_console;
@@ -925,7 +912,7 @@ DECLARE_TASKLET_DISABLED(keyboard_tasklet, kbd_bh, 0);
 /*
  * This allows a newly plugged keyboard to pick the LED state.
  */
-void kbd_refresh_leds(struct input_handle *handle)
+static void kbd_refresh_leds(struct input_handle *handle)
 {
 	unsigned char leds = ledstate;
 
@@ -1027,7 +1014,7 @@ static int emulate_raw(struct vc_data *vc, unsigned int keycode, unsigned char u
 }
 #endif
 
-void kbd_rawcode(unsigned char data)
+static void kbd_rawcode(unsigned char data)
 {
 	struct vc_data *vc = vc_cons[fg_console].d;
 	kbd = kbd_table + fg_console;
@@ -1042,9 +1029,6 @@ void kbd_keycode(unsigned int keycode, int down, int hw_raw, struct pt_regs *reg
 	unsigned char type, raw_mode;
 	struct tty_struct *tty;
 	int shift_final;
-
-	if (down != 2)
-		add_keyboard_randomness((keycode << 1) ^ down);
 
 	tty = vc->vc_tty;
 

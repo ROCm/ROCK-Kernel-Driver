@@ -89,7 +89,7 @@ static int coda_remount(struct super_block *sb, int *flags, char *data)
 }
 
 /* exported operations */
-struct super_operations coda_super_operations =
+static struct super_operations coda_super_operations =
 {
 	.alloc_inode	= coda_alloc_inode,
 	.destroy_inode	= coda_destroy_inode,
@@ -253,7 +253,7 @@ int coda_setattr(struct dentry *de, struct iattr *iattr)
 	
 	memset(&vattr, 0, sizeof(vattr)); 
 
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	coda_iattr_to_vattr(iattr, &vattr);
 	vattr.va_type = C_VNON; /* cannot set type */
 

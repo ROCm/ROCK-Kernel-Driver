@@ -2264,11 +2264,11 @@ MODULE_DESCRIPTION("ALi FIR Controller Driver");
 MODULE_LICENSE("GPL");
 
 
-MODULE_PARM(io,  "1-4i");
+module_param_array(io, int, NULL, 0);
 MODULE_PARM_DESC(io, "Base I/O addresses");
-MODULE_PARM(irq, "1-4i");
+module_param_array(irq, int, NULL, 0);
 MODULE_PARM_DESC(irq, "IRQ lines");
-MODULE_PARM(dma, "1-4i");
+module_param_array(dma, int, NULL, 0);
 MODULE_PARM_DESC(dma, "DMA channels");
 
 module_init(ali_ircc_init);

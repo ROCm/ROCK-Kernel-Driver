@@ -39,7 +39,7 @@ struct errormsg {
 	struct sockaddr_in		icmp_src;	/* ICMP packet source address */
 };
 
-static spinlock_t rxrpc_transports_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rxrpc_transports_lock);
 static struct list_head rxrpc_transports = LIST_HEAD_INIT(rxrpc_transports);
 
 __RXACCT_DECL(atomic_t rxrpc_transport_count);

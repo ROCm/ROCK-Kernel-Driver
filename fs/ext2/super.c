@@ -604,7 +604,6 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	es = (struct ext2_super_block *) (((char *)bh->b_data) + offset);
 	sbi->s_es = es;
 	sb->s_magic = le16_to_cpu(es->s_magic);
-	sb->s_flags |= MS_ONE_SECOND;
 
 	if (sb->s_magic != EXT2_SUPER_MAGIC)
 		goto cantfind_ext2;

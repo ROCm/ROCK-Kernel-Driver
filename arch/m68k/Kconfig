@@ -21,6 +21,10 @@ config RWSEM_GENERIC_SPINLOCK
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 mainmenu "Linux/68k Kernel Configuration"
 
 source "init/Kconfig"
@@ -381,8 +385,8 @@ config STRAM_SWAP
 	bool "Support for ST-RAM as swap space"
 	depends on ATARI && BROKEN
 	---help---
-	  Some Atari 68k macines (including the 520STF and 1020STE) divide
-	  their addressible memory into ST and TT sections.  The TT section
+	  Some Atari 68k machines (including the 520STF and 1020STE) divide
+	  their addressable memory into ST and TT sections.  The TT section
 	  (up to 512MB) is the main memory; the ST section (up to 4MB) is
 	  accessible to the built-in graphics board, runs slower, and is
 	  present mainly for backward compatibility with older machines.

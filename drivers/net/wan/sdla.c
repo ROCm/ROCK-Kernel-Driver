@@ -1306,6 +1306,8 @@ NOTE:  This is rather a useless action right now, as the
 
 		case SDLA_WRITEMEM:
 		case SDLA_READMEM:
+			if(!capable(CAP_SYS_RAWIO))
+				return -EPERM;
 			return(sdla_xfer(dev, ifr->ifr_data, cmd == SDLA_READMEM));
 
 		case SDLA_START:

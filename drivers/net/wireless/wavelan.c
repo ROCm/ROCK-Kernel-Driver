@@ -4344,7 +4344,8 @@ int init_module(void)
 		struct net_device *dev = alloc_etherdev(sizeof(net_local));
 		if (!dev)
 			break;
-		memcpy(dev->name, name[i], IFNAMSIZ);	/* Copy name */
+		if (name[i])
+			strcpy(dev->name, name[i]);	/* Copy name */
 		dev->base_addr = io[i];
 		dev->irq = irq[i];
 

@@ -100,6 +100,9 @@
 /* Motorola i.MX SoC */
 #define PORT_IMX	62
 
+/* Marvell MPSC */
+#define PORT_MPSC	63
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>

@@ -121,7 +121,6 @@ void __init smp4m_callin(void)
 	local_irq_enable();
 }
 
-extern int cpu_idle(void *unused);
 extern void init_IRQ(void);
 extern void cpu_panic(void);
 

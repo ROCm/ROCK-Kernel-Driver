@@ -72,7 +72,7 @@ struct sigregs32 {
  *
  */
 struct rt_sigframe32 {
-	struct compat_siginfo	info;
+	compat_siginfo_t	info;
 	struct ucontext32	uc;
 	/*
 	 * Programs using the rs6000/xcoff abi can save up to 19 gp
@@ -341,7 +341,6 @@ long sys32_sigaction(int sig, struct old_sigaction32 __user *act,
  *       sigpending               sys32_rt_sigpending
  *       sigprocmask              sys32_rt_sigprocmask
  *       sigreturn                sys32_rt_sigreturn
- *       sigtimedwait             sys32_rt_sigtimedwait
  *       sigqueueinfo             sys32_rt_sigqueueinfo
  *       sigsuspend               sys32_rt_sigsuspend
  *
@@ -445,9 +444,9 @@ long sys32_rt_sigpending(compat_sigset_t __user *set, compat_size_t sigsetsize)
 }
 
 
-static long copy_siginfo_to_user32(compat_siginfo_t __user *d, siginfo_t *s)
+int copy_siginfo_to_user32(struct compat_siginfo __user *d, siginfo_t *s)
 {
-	long err;
+	int err;
 
 	if (!access_ok (VERIFY_WRITE, d, sizeof(*d)))
 		return -EFAULT;
@@ -498,35 +497,6 @@ static long copy_siginfo_to_user32(compat_siginfo_t __user *d, siginfo_t *s)
 		break;
 	}
 	return err;
-}
-
-long sys32_rt_sigtimedwait(compat_sigset_t __user *uthese, compat_siginfo_t __user *uinfo,
-		struct compat_timespec __user *uts, compat_size_t sigsetsize)
-{
-	sigset_t s;
-	compat_sigset_t s32;
-	struct timespec t;
-	int ret;
-	mm_segment_t old_fs = get_fs();
-	siginfo_t info;
-
-	if (copy_from_user(&s32, uthese, sizeof(compat_sigset_t)))
-		return -EFAULT;
-	sigset_from_compat(&s, &s32);
-	if (uts && get_compat_timespec(&t, uts))
-		return -EFAULT;
-	set_fs(KERNEL_DS);
-	/* The __user pointer casts are valid because of the set_fs() */
-	ret = sys_rt_sigtimedwait((sigset_t __user *) &s,
-			uinfo ? (siginfo_t __user *) &info : NULL,
-			uts ? (struct timespec __user *) &t : NULL,
-			sigsetsize);
-	set_fs(old_fs);
-	if (ret >= 0 && uinfo) {
-		if (copy_siginfo_to_user32(uinfo, &info))
-			return -EFAULT;
-	}
-	return ret;
 }
 
 /*

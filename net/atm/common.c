@@ -39,7 +39,7 @@
 #endif
 
 struct hlist_head vcc_hash[VCC_HTABLE_SIZE];
-rwlock_t vcc_sklist_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(vcc_sklist_lock);
 
 void __vcc_insert_socket(struct sock *sk)
 {

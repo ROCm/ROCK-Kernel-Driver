@@ -11,7 +11,7 @@
  *	28-Sep-2004  BJD  Fixed ECC placement for Hardware mode
  *	12-Oct-2004  BJD  Fixed errors in use of platform data
  *
- * $Id: s3c2410.c,v 1.5 2004/10/12 10:10:15 bjd Exp $
+ * $Id: s3c2410.c,v 1.7 2005/01/05 18:05:14 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -117,12 +117,12 @@ static struct s3c2410_nand_info *s3c2410_nand_mtd_toinfo(struct mtd_info *mtd)
 
 static struct s3c2410_nand_info *to_nand_info(struct device *dev)
 {
-	return (struct s3c2410_nand_info *)dev_get_drvdata(dev);
+	return dev_get_drvdata(dev);
 }
 
 static struct s3c2410_platform_nand *to_nand_plat(struct device *dev)
 {
-	return (struct s3c2410_platform_nand *)dev->platform_data;
+	return dev->platform_data;
 }
 
 /* timing calculations */
@@ -167,7 +167,7 @@ static int s3c2410_nand_inithw(struct s3c2410_nand_info *info,
 	if (plat != NULL) {
 		tacls = s3c2410_nand_calc_rate(plat->tacls, clkrate, 8);
 		twrph0 = s3c2410_nand_calc_rate(plat->twrph0, clkrate, 8);
-		twrph1 = s3c2410_nand_calc_rate(plat->twrph0, clkrate, 8);
+		twrph1 = s3c2410_nand_calc_rate(plat->twrph1, clkrate, 8);
 	} else {
 		/* default timings */
 		tacls = 8;
@@ -205,7 +205,7 @@ static void s3c2410_nand_select_chip(struct mtd_info *mtd, int chip)
 	struct nand_chip *this = mtd->priv;
 	unsigned long cur;
 
-	nmtd = (struct s3c2410_nand_mtd *)this->priv;
+	nmtd = this->priv;
 	info = nmtd->info;
 
 	cur = readl(info->regs + S3C2410_NFCONF);
@@ -424,14 +424,14 @@ static int s3c2410_nand_calculate_ecc(struct mtd_info *mtd,
 
 static void s3c2410_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
 {
-	struct nand_chip *this = (struct nand_chip *)mtd->priv;
+	struct nand_chip *this = mtd->priv;
 	readsb(this->IO_ADDR_R, buf, len);
 }
 
 static void s3c2410_nand_write_buf(struct mtd_info *mtd,
 				   const u_char *buf, int len)
 {
-	struct nand_chip *this = (struct nand_chip *)mtd->priv;
+	struct nand_chip *this = mtd->priv;
 	writesb(this->IO_ADDR_W, buf, len);
 }
 

@@ -181,6 +181,8 @@ struct rfcomm_dlc {
 	u8            v24_sig;
 	u8            mscex;
 
+	u32           link_mode;
+
 	uint          mtu;
 	uint          cfc;
 	uint          rx_credits;
@@ -215,22 +217,6 @@ struct rfcomm_dlc {
 #define RFCOMM_CFC_UNKNOWN  -1
 #define RFCOMM_CFC_DISABLED 0
 #define RFCOMM_CFC_ENABLED  RFCOMM_MAX_CREDITS
-
-extern struct task_struct *rfcomm_thread;
-extern unsigned long rfcomm_event;
-
-static inline void rfcomm_schedule(uint event)
-{
-	if (!rfcomm_thread)
-		return;
-	//set_bit(event, &rfcomm_event);
-	set_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event);
-	wake_up_process(rfcomm_thread);
-}
-
-extern struct semaphore rfcomm_sem;
-#define rfcomm_lock()	down(&rfcomm_sem);
-#define rfcomm_unlock()	up(&rfcomm_sem);
 
 /* ---- RFCOMM DLCs (channels) ---- */
 struct rfcomm_dlc *rfcomm_dlc_alloc(int prio);
@@ -271,11 +257,6 @@ static inline void rfcomm_dlc_unthrottle(struct rfcomm_dlc *d)
 }
 
 /* ---- RFCOMM sessions ---- */
-struct rfcomm_session *rfcomm_session_add(struct socket *sock, int state);
-struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst);
-struct rfcomm_session *rfcomm_session_create(bdaddr_t *src, bdaddr_t *dst, int *err);
-void   rfcomm_session_del(struct rfcomm_session *s);
-void   rfcomm_session_close(struct rfcomm_session *s, int err);
 void   rfcomm_session_getaddr(struct rfcomm_session *s, bdaddr_t *src, bdaddr_t *dst);
 
 static inline void rfcomm_session_hold(struct rfcomm_session *s)
@@ -283,27 +264,36 @@ static inline void rfcomm_session_hold(struct rfcomm_session *s)
 	atomic_inc(&s->refcnt);
 }
 
-static inline void rfcomm_session_put(struct rfcomm_session *s)
-{
-	if (atomic_dec_and_test(&s->refcnt))
-		rfcomm_session_del(s);
-}
-
 /* ---- RFCOMM chechsum ---- */
 extern u8 rfcomm_crc_table[];
 
 /* ---- RFCOMM sockets ---- */
 struct sockaddr_rc {
-	sa_family_t rc_family;
-	bdaddr_t    rc_bdaddr;
-	u8          rc_channel;
+	sa_family_t	rc_family;
+	bdaddr_t	rc_bdaddr;
+	u8		rc_channel;
 };
+
+#define RFCOMM_CONNINFO	0x02
+struct rfcomm_conninfo {
+	__u16 hci_handle;
+	__u8  dev_class[3];
+};
+
+#define RFCOMM_LM	0x03
+#define RFCOMM_LM_MASTER	0x0001
+#define RFCOMM_LM_AUTH		0x0002
+#define RFCOMM_LM_ENCRYPT	0x0004
+#define RFCOMM_LM_TRUSTED	0x0008
+#define RFCOMM_LM_RELIABLE	0x0010
+#define RFCOMM_LM_SECURE	0x0020
 
 #define rfcomm_pi(sk)   ((struct rfcomm_pinfo *)sk->sk_protinfo)
 
 struct rfcomm_pinfo {
 	struct rfcomm_dlc   *dlc;
 	u8     channel;
+	u32    link_mode;
 };
 
 int  rfcomm_init_sockets(void);

@@ -1,5 +1,5 @@
 /*
- * $Id: pmc551.c,v 1.29 2004/11/16 18:29:01 dwmw2 Exp $
+ * $Id: pmc551.c,v 1.30 2005/01/05 18:05:13 dwmw2 Exp $
  *
  * PMC551 PCI Mezzanine Ram Device
  *
@@ -113,7 +113,7 @@ static struct mtd_info *pmc551list;
 
 static int pmc551_erase (struct mtd_info *mtd, struct erase_info *instr)
 {
-        struct mypriv *priv = (struct mypriv *)mtd->priv;
+        struct mypriv *priv = mtd->priv;
         u32 soff_hi, soff_lo; /* start address offset hi/lo */
         u32 eoff_hi, eoff_lo; /* end address offset hi/lo */
         unsigned long end;
@@ -176,7 +176,7 @@ out:
 
 static int pmc551_point (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char **mtdbuf)
 {
-        struct mypriv *priv = (struct mypriv *)mtd->priv;
+        struct mypriv *priv = mtd->priv;
         u32 soff_hi;
         u32 soff_lo;
 
@@ -217,7 +217,7 @@ static void pmc551_unpoint (struct mtd_info *mtd, u_char *addr, loff_t from, siz
 
 static int pmc551_read (struct mtd_info *mtd, loff_t from, size_t len, size_t *retlen, u_char *buf)
 {
-        struct mypriv *priv = (struct mypriv *)mtd->priv;
+        struct mypriv *priv = mtd->priv;
         u32 soff_hi, soff_lo; /* start address offset hi/lo */
         u32 eoff_hi, eoff_lo; /* end address offset hi/lo */
         unsigned long end;
@@ -279,7 +279,7 @@ out:
 
 static int pmc551_write (struct mtd_info *mtd, loff_t to, size_t len, size_t *retlen, const u_char *buf)
 {
-        struct mypriv *priv = (struct mypriv *)mtd->priv;
+        struct mypriv *priv = mtd->priv;
         u32 soff_hi, soff_lo; /* start address offset hi/lo */
         u32 eoff_hi, eoff_lo; /* end address offset hi/lo */
         unsigned long end;
@@ -630,10 +630,6 @@ static u32 fixup_pmc551 (struct pci_dev *dev)
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mark Ferrell <mferrell@mvista.com>");
 MODULE_DESCRIPTION(PMC551_VERSION);
-MODULE_PARM(msize, "i");
-MODULE_PARM_DESC(msize, "memory size in Megabytes [1 - 1024]");
-MODULE_PARM(asize, "i");
-MODULE_PARM_DESC(asize, "aperture size, must be <= memsize [1-1024]");
 
 /*
  * Stuff these outside the ifdef so as to not bust compiled in driver support
@@ -644,6 +640,11 @@ static int asize=CONFIG_MTD_PMC551_APERTURE_SIZE
 #else
 static int asize=0;
 #endif
+
+module_param(msize, int, 0);
+MODULE_PARM_DESC(msize, "memory size in Megabytes [1 - 1024]");
+module_param(asize, int, 0);
+MODULE_PARM_DESC(asize, "aperture size, must be <= memsize [1-1024]");
 
 /*
  * PMC551 Card Initialization
@@ -820,7 +821,7 @@ static void __exit cleanup_pmc551(void)
 	struct mypriv *priv;
 
 	while((mtd=pmc551list)) {
-		priv = (struct mypriv *)mtd->priv;
+		priv = mtd->priv;
 		pmc551list = priv->nextpmc551;
 		
 		if(priv->start) {

@@ -1,5 +1,5 @@
 /*
- * SiS 300/630/730/540/315/550/650/651/M650/661FX/M661FX/740/741/330/760
+ * SiS 300/630/730/540/315/550/[M]650/651/[M]661[FM]X/740/[M]741[GX]/330/[M]760[GX]
  * frame buffer driver for Linux kernels >=2.4.14 and >=2.6.3
  *
  * Copyright (C) 2001-2004 Thomas Winischhofer, Vienna, Austria.
@@ -37,7 +37,7 @@
 
 #define VER_MAJOR                 1
 #define VER_MINOR                 7
-#define VER_LEVEL                 12
+#define VER_LEVEL                 17
 
 #undef SIS_CONFIG_COMPAT
 
@@ -53,6 +53,16 @@
 #include <asm/ioctl32.h>
 #define SIS_CONFIG_COMPAT
 #endif
+#endif
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,8)
+#define SIS_IOTYPE1 void __iomem
+#define SIS_IOTYPE2 __iomem
+#define SISINITSTATIC static
+#else
+#define SIS_IOTYPE1 unsigned char
+#define SIS_IOTYPE2
+#define SISINITSTATIC
 #endif
 
 #undef SISFBDEBUG
@@ -180,6 +190,7 @@
 #define SIS_CRT2_WENABLE_315 	  0x2F
 
 #define SIS_PASSWORD              0x86  /* SR05 */
+
 #define SIS_INTERLACED_MODE       0x20  /* SR06 */
 #define SIS_8BPP_COLOR_MODE       0x0
 #define SIS_15BPP_COLOR_MODE      0x1
@@ -238,41 +249,58 @@
 #define HW_DEVICE_EXTENSION	  SIS_HW_INFO
 #define PHW_DEVICE_EXTENSION      PSIS_HW_INFO
 
-/* Useful macros */
+/* I/O port access macros */
 #define inSISREG(base)          inb(base)
+
 #define outSISREG(base,val)     outb(val,base)
-#define orSISREG(base,val)      do { \
-                                  u8 __Temp = inb(base); \
-                                  outSISREG(base, __Temp | (val)); \
-                                } while (0)
-#define andSISREG(base,val)     do { \
-                                  u8 __Temp = inb(base); \
-                                  outSISREG(base, __Temp & (val)); \
-                                } while (0)
-#define inSISIDXREG(base,idx,var)   do { \
-                                      outb(idx,base); var=inb((base)+1); \
-                                    } while (0)
-#define outSISIDXREG(base,idx,val)  do { \
-                                      outb(idx,base); outb((val),(base)+1); \
-                                    } while (0)
-#define orSISIDXREG(base,idx,val)   do { \
-                                      u8 __Temp; \
-                                      outb(idx,base);   \
-                                      __Temp = inb((base)+1)|(val); \
-                                      outSISIDXREG(base,idx,__Temp); \
-                                    } while (0)
-#define andSISIDXREG(base,idx,and)  do { \
-                                      u8 __Temp; \
-                                      outb(idx,base);   \
-                                      __Temp = inb((base)+1)&(and); \
-                                      outSISIDXREG(base,idx,__Temp); \
-                                    } while (0)
-#define setSISIDXREG(base,idx,and,or)   do { \
-                                          u8 __Temp; \
-                                          outb(idx,base);   \
-                                          __Temp = (inb((base)+1)&(and))|(or); \
-                                          outSISIDXREG(base,idx,__Temp); \
-                                        } while (0)
+
+#define orSISREG(base,val)      			\
+		    do { 				\
+                      u8 __Temp = inSISREG(base); 	\
+                      outSISREG(base, __Temp | (val)); 	\
+                    } while (0)
+
+#define andSISREG(base,val)     			\
+		    do { 				\
+                      u8 __Temp = inSISREG(base); 	\
+                      outSISREG(base, __Temp & (val)); 	\
+                    } while (0)
+
+#define inSISIDXREG(base,idx,var)   		\
+		    do { 			\
+                      outSISREG(base, idx); 	\
+		      var = inSISREG((base)+1);	\
+                    } while (0)
+
+#define outSISIDXREG(base,idx,val)  		\
+		    do { 			\
+                      outSISREG(base, idx); 	\
+		      outSISREG((base)+1, val); \
+                    } while (0)
+
+#define orSISIDXREG(base,idx,val)   				\
+		    do { 					\
+                      u8 __Temp; 				\
+                      outSISREG(base, idx);   			\
+                      __Temp = inSISREG((base)+1) | (val); 	\
+		      outSISREG((base)+1, __Temp);		\
+                    } while (0)
+
+#define andSISIDXREG(base,idx,and)  				\
+		    do { 					\
+                      u8 __Temp; 				\
+                      outSISREG(base, idx);   			\
+                      __Temp = inSISREG((base)+1) & (and); 	\
+		      outSISREG((base)+1, __Temp);		\
+                    } while (0)
+
+#define setSISIDXREG(base,idx,and,or)   		   		\
+		    do { 				   		\
+                      u8 __Temp; 		   			\
+                      outSISREG(base, idx);   		   		\
+                      __Temp = (inSISREG((base)+1) & (and)) | (or); 	\
+		      outSISREG((base)+1, __Temp);			\
+                    } while (0)
 
 /* MMIO access macros */
 #define MMIO_IN8(base, offset)  readb((base+offset))
@@ -293,10 +321,52 @@
 #define MMIO_QUEUE_WRITEPORT    Q_WRITE_PTR
 #define MMIO_QUEUE_READPORT     Q_READ_PTR
 
+#ifndef FB_BLANK_UNBLANK
+#define FB_BLANK_UNBLANK 	0
+#endif
+#ifndef FB_BLANK_NORMAL
+#define FB_BLANK_NORMAL  	1
+#endif
+#ifndef FB_BLANK_VSYNC_SUSPEND
+#define FB_BLANK_VSYNC_SUSPEND 	2
+#endif
+#ifndef FB_BLANK_HSYNC_SUSPEND
+#define FB_BLANK_HSYNC_SUSPEND 	3
+#endif
+#ifndef FB_BLANK_POWERDOWN
+#define FB_BLANK_POWERDOWN 	4
+#endif
+
+enum _SIS_LCD_TYPE {
+    LCD_INVALID = 0,
+    LCD_800x600,
+    LCD_1024x768,
+    LCD_1280x1024,
+    LCD_1280x960,
+    LCD_640x480,
+    LCD_1600x1200,
+    LCD_1920x1440,
+    LCD_2048x1536,
+    LCD_320x480,       /* FSTN */
+    LCD_1400x1050,
+    LCD_1152x864,
+    LCD_1152x768,
+    LCD_1280x768,
+    LCD_1024x600,
+    LCD_640x480_2,     /* DSTN */
+    LCD_640x480_3,     /* DSTN */
+    LCD_848x480,
+    LCD_1280x800,
+    LCD_1680x1050,
+    LCD_1280x720,
+    LCD_CUSTOM,
+    LCD_UNKNOWN
+};
+
 enum _SIS_CMDTYPE {
-	MMIO_CMD = 0,
-	AGP_CMD_QUEUE,
-	VM_CMD_QUEUE,
+    MMIO_CMD = 0,
+    AGP_CMD_QUEUE,
+    VM_CMD_QUEUE,
 };
 typedef unsigned int SIS_CMDTYPE;
 
@@ -360,10 +430,10 @@ struct sis_video_info {
 	unsigned long 	mmio_base;
 	unsigned long 	vga_base;
 
-	void __iomem *	video_vbase;
-	void __iomem *	mmio_vbase;
-	void __iomem * 	bios_vbase;
-	void *		bios_abase;
+	SIS_IOTYPE1  	*video_vbase;
+	SIS_IOTYPE1 	*mmio_vbase;
+
+	unsigned char   *bios_abase;
 
 	int 		mtrr;
 
@@ -391,9 +461,9 @@ struct sis_video_info {
 	int		sisfb_inverse;
 #endif
 
-	u32 		heapstart;        /* offset  */
-	void __iomem * 	sisfb_heap_start; /* address */
-	void __iomem * 	sisfb_heap_end;   /* address */
+	u32 		heapstart;        	/* offset  */
+	SIS_IOTYPE1  	*sisfb_heap_start; 	/* address */
+	SIS_IOTYPE1  	*sisfb_heap_end;   	/* address */
 	u32 	      	sisfb_heap_size;
 	int		havenoheap;
 #if 0
@@ -434,6 +504,7 @@ struct sis_video_info {
 
 	int		lcdxres, lcdyres;
 	int		lcddefmodeidx, tvdefmodeidx, defmodeidx;
+	u32  		CRT2LCDType;        	/* defined in "SIS_LCD_TYPE" */
 
 	int    		current_bpp;
 	int    		current_width;
@@ -455,6 +526,7 @@ struct sis_video_info {
 
 	int  		newrom;
 	int  		registered;
+	int		warncount;
 #ifdef SIS_CONFIG_COMPAT
 	int		ioctl32registered;
 	int		ioctl32vblankregistered;
@@ -469,7 +541,7 @@ struct sis_video_info {
 	u8 		detectedpdca;
 	u8 		detectedlcda;
 
-	void __iomem * 	hwcursor_vbase;
+	SIS_IOTYPE1 	*hwcursor_vbase;
 
 	int 		chronteltype;
 	int    		tvxpos, tvypos;

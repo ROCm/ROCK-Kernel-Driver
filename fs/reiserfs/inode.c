@@ -22,6 +22,8 @@ extern int reiserfs_default_io_size; /* default io size devuned in super.c */
 
 static int reiserfs_commit_write(struct file *f, struct page *page,
                                  unsigned from, unsigned to);
+static int reiserfs_prepare_write(struct file *f, struct page *page,
+				  unsigned from, unsigned to);
 
 void reiserfs_delete_inode (struct inode * inode)
 {
@@ -403,8 +405,8 @@ finished:
 
 // this is called to create file map. So, _get_block_create_0 will not
 // read direct item
-int reiserfs_bmap (struct inode * inode, sector_t block,
-		   struct buffer_head * bh_result, int create)
+static int reiserfs_bmap (struct inode * inode, sector_t block,
+			  struct buffer_head * bh_result, int create)
 {
     if (!file_capable (inode, block))
 	return -EFBIG;
@@ -1565,16 +1567,6 @@ int reiserfs_write_inode (struct inode * inode, int do_sync) {
     return 0;
 }
 
-/* FIXME: no need any more. right? */
-int reiserfs_sync_inode (struct reiserfs_transaction_handle *th, struct inode * inode)
-{
-  int err = 0;
-
-  reiserfs_update_sd (th, inode);
-  return err;
-}
-
-
 /* stat data of new object is inserted already, this inserts the item
    containing "." and ".." entries */
 static int reiserfs_new_directory (struct reiserfs_transaction_handle *th, 
@@ -1736,7 +1728,8 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     if( S_ISLNK( inode -> i_mode ) )
 	    inode -> i_flags &= ~ ( S_IMMUTABLE | S_APPEND );
 
-    inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+    inode->i_mtime = inode->i_atime = inode->i_ctime =
+	    CURRENT_TIME_SEC;
     inode->i_size = i_size;
     inode->i_blocks = 0;
     inode->i_bytes = 0;
@@ -2419,7 +2412,7 @@ static int reiserfs_writepage (struct page * page, struct writeback_control *wbc
     return reiserfs_write_full_page(page, wbc) ;
 }
 
-int reiserfs_prepare_write(struct file *f, struct page *page, 
+static int reiserfs_prepare_write(struct file *f, struct page *page,
 			   unsigned from, unsigned to) {
     struct inode *inode = page->mapping->host ;
     int ret;

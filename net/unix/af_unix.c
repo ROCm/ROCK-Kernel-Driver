@@ -124,7 +124,7 @@ int sysctl_unix_max_dgram_qlen = 10;
 static kmem_cache_t *unix_sk_cachep;
 
 struct hlist_head unix_socket_table[UNIX_HASH_SIZE + 1];
-rwlock_t unix_table_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(unix_table_lock);
 static atomic_t unix_nr_socks = ATOMIC_INIT(0);
 
 #define unix_sockets_unbound	(&unix_socket_table[UNIX_HASH_SIZE])

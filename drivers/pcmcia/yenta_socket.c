@@ -28,6 +28,9 @@
 #include "yenta_socket.h"
 #include "i82365.h"
 
+static int disable_clkrun;
+module_param(disable_clkrun, bool, 0444);
+MODULE_PARM_DESC(disable_clkrun, "If PC card doesn't function properly, please try this option");
 
 #if 0
 #define debug(x,args...) printk(KERN_DEBUG "%s: " x, __func__ , ##args)
@@ -41,6 +44,10 @@
 
 static int yenta_probe_cb_irq(struct yenta_socket *socket);
 
+
+static unsigned int override_bios;
+module_param(override_bios, uint, 0000);
+MODULE_PARM_DESC (override_bios, "yenta ignore bios resource allocation");
 
 /*
  * Generate easy-to-use ways of reading a cardbus sockets
@@ -551,7 +558,7 @@ static void yenta_allocate_res(struct yenta_socket *socket, int nr, unsigned typ
 
 	start = config_readl(socket, offset) & mask;
 	end = config_readl(socket, offset+4) | ~mask;
-	if (start && end > start) {
+	if (start && end > start && !override_bios) {
 		res->start = start;
 		res->end = end;
 		if (request_resource(root, res) == 0)
@@ -914,6 +921,7 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 
 	/* prepare pcmcia_socket */
 	socket->socket.ops = &yenta_socket_operations;
+	socket->socket.resource_ops = &pccard_nonstatic_ops;
 	socket->socket.dev.dev = &dev->dev;
 	socket->socket.driver_data = socket;
 	socket->socket.owner = THIS_MODULE;

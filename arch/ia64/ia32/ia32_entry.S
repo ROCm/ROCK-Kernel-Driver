@@ -223,7 +223,7 @@ ia32_syscall_table:
 	data8 sys_unlink	  /* 10 */
 	data8 ia32_execve
 	data8 sys_chdir
-	data8 sys32_time
+	data8 compat_sys_time
 	data8 sys_mknod
 	data8 sys_chmod		  /* 15 */
 	data8 sys_lchown	/* 16-bit version */
@@ -235,7 +235,7 @@ ia32_syscall_table:
 	data8 sys_oldumount
 	data8 sys_setuid	/* 16-bit version */
 	data8 sys_getuid	/* 16-bit version */
-	data8 sys_ni_syscall	/* sys_stime is not supported on IA64 */  /* 25 */
+	data8 compat_sys_stime    /* 25 */
 	data8 sys32_ptrace
 	data8 sys32_alarm
 	data8 sys_ni_syscall
@@ -387,7 +387,7 @@ ia32_syscall_table:
 	data8 sys32_rt_sigaction
 	data8 sys32_rt_sigprocmask /* 175 */
 	data8 sys_rt_sigpending
-	data8 sys32_rt_sigtimedwait
+	data8 compat_sys_rt_sigtimedwait
 	data8 sys32_rt_sigqueueinfo
 	data8 sys32_rt_sigsuspend
 	data8 sys32_pread	  /* 180 */

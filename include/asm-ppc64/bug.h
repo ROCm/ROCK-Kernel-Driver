@@ -18,6 +18,8 @@ struct bug_entry {
 	const char	*function;
 };
 
+struct bug_entry *find_bug(unsigned long bugaddr);
+
 /*
  * If this bit is set in the line number it means that the trap
  * is for WARN_ON rather than BUG or BUG_ON.

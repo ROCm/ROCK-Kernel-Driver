@@ -35,7 +35,7 @@
  * * 3) The name of the author may not be used to endorse or promote products
  * *    derived from this software without specific prior written permission.
  * *
- * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESSED OR
+ * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
  * * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
@@ -51,9 +51,12 @@
  *
  */
 
+#ifndef _SIS_OSDEF_H_
+#define _SIS_OSDEF_H_
+
 /* The choices are: */
-#define LINUX_KERNEL	   /* Kernel framebuffer */
-/* #define LINUX_XF86 */   /* XFree86 */
+#define LINUX_KERNEL	   /* Linux kernel framebuffer */
+/* #define LINUX_XF86 */   /* XFree86/X.org */
 
 #ifdef OutPortByte
 #undef OutPortByte
@@ -109,20 +112,20 @@
 #endif
 
 /**********************************************************************/
-/*  XFree86, X.org                                                    */
+/*  XFree86/X.org                                                    */
 /**********************************************************************/
 
 #ifdef LINUX_XF86
 #define SIS300
 #define SIS315H
 
-#define OutPortByte(p,v) outb((IOADDRESS)(p),(CARD8)(v))
-#define OutPortWord(p,v) outw((IOADDRESS)(p),(CARD16)(v))
-#define OutPortLong(p,v) outl((IOADDRESS)(p),(CARD32)(v))
-#define InPortByte(p)    inb((IOADDRESS)(p))
-#define InPortWord(p)    inw((IOADDRESS)(p))
-#define InPortLong(p)    inl((IOADDRESS)(p))
+#define OutPortByte(p,v) outSISREG((IOADDRESS)(p),(CARD8)(v))
+#define OutPortWord(p,v) outSISREGW((IOADDRESS)(p),(CARD16)(v))
+#define OutPortLong(p,v) outSISREGL((IOADDRESS)(p),(CARD32)(v))
+#define InPortByte(p)    inSISREG((IOADDRESS)(p))
+#define InPortWord(p)    inSISREGW((IOADDRESS)(p))
+#define InPortLong(p)    inSISREGL((IOADDRESS)(p))
 #define SiS_SetMemory(MemoryAddress,MemorySize,value) memset(MemoryAddress, value, MemorySize)
 #endif
 
-
+#endif  /* _OSDEF_H_ */

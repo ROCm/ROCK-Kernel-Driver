@@ -37,6 +37,7 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/idr.h>
+#include <linux/nodemask.h>
 
 #include <asm/pgalloc.h>
 #include <asm/page.h>
@@ -52,7 +53,6 @@
 #include <asm/smp.h>
 #include <asm/machdep.h>
 #include <asm/tlb.h>
-#include <asm/naca.h>
 #include <asm/eeh.h>
 #include <asm/processor.h>
 #include <asm/mmzone.h>
@@ -169,7 +169,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 
 		hash = hpt_hash(vpn, 0);
 
-		hpteg = ((hash & htab_data.htab_hash_mask)*HPTES_PER_GROUP);
+		hpteg = ((hash & htab_hash_mask) * HPTES_PER_GROUP);
 
 		/* Panic if a pte grpup is full */
 		if (ppc_md.hpte_insert(hpteg, va, pa >> PAGE_SHIFT, 0,
@@ -703,7 +703,7 @@ void __init mem_init(void)
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
 
 #ifdef CONFIG_DISCONTIGMEM
-        for (nid = 0; nid < numnodes; nid++) {
+        for_each_online_node(nid) {
 		if (NODE_DATA(nid)->node_spanned_pages != 0) {
 			printk("freeing bootmem node %x\n", nid);
 			totalram_pages +=

@@ -74,7 +74,7 @@
 	ENTRY_DIFF(execve_wrapper)
 	ENTRY_SAME(chdir)
 	/* See comments in kernel/time.c!!! Maybe we don't need this? */
-	ENTRY_DIFF(time)
+	ENTRY_COMP(time)
 	ENTRY_SAME(mknod)
 	ENTRY_SAME(chmod)		/* 15 */
 	ENTRY_SAME(lchown)
@@ -91,7 +91,7 @@
 	ENTRY_SAME(bind)
 	ENTRY_SAME(setuid)
 	ENTRY_SAME(getuid)
-	ENTRY_SAME(stime)		/* 25 */
+	ENTRY_COMP(stime)		/* 25 */
 	ENTRY_SAME(ptrace)
 	ENTRY_SAME(alarm)
 	/* see stat comment */
@@ -275,7 +275,7 @@
 	ENTRY_DIFF(rt_sigaction)
 	ENTRY_DIFF(rt_sigprocmask)	/* 175 */
 	ENTRY_DIFF(rt_sigpending)
-	ENTRY_UHOH(rt_sigtimedwait)
+	ENTRY_COMP(rt_sigtimedwait)
 	/* even though the struct siginfo_t is different, it appears like
 	 * all the paths use values which should be same wide and narrow.
 	 * Also the struct is padded to 128 bytes which means we don't have

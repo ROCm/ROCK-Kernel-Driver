@@ -276,15 +276,6 @@ dialog_menu (const char *title, const char *prompt, int height, int width,
 
     while (key != ESC) {
 	key = wgetch(menu);
-	if ( key == '/' ) {
-		int ret = dialog_inputbox("Search Configuration Parameter",
-					"Enter Keyword", height, width,
-					(char *) NULL);
-		if (ret == 0) {
-			fprintf(stderr, "%s", dialog_input_result);
-			return 26;
-		}
-	}
 
 	if (key < 256 && isalpha(key)) key = tolower(key);
 
@@ -408,6 +399,7 @@ dialog_menu (const char *title, const char *prompt, int height, int width,
 	case 'y':
 	case 'n':
 	case 'm':
+	case '/':
 	    /* save scroll info */
 	    if ( (f=fopen("lxdialog.scrltmp","w")) != NULL ) {
 		fprintf(f,"%d\n",scroll);
@@ -421,6 +413,7 @@ dialog_menu (const char *title, const char *prompt, int height, int width,
             case 'n': return 4;
             case 'm': return 5;
             case ' ': return 6;
+            case '/': return 7;
             }
 	    return 0;
 	case 'h':

@@ -62,7 +62,7 @@ static zft_volinfo  tape_vtbl;
 static zft_volinfo  eot_vtbl;
 static zft_volinfo *cur_vtbl;
 
-inline void zft_new_vtbl_entry(void)
+static inline void zft_new_vtbl_entry(void)
 {
 	struct list_head *tmp = &zft_last_vtbl->node;
 	zft_volinfo *new = zft_kmalloc(sizeof(zft_volinfo));
@@ -248,7 +248,7 @@ static void create_zft_volume(__u8 *entry, zft_volinfo *vtbl)
  * that buffer already contains the old volume-table, so that vtbl
  * entries without the zft_volume flag set can savely be ignored.
  */
-void zft_create_volume_headers(__u8 *buffer)
+static void zft_create_volume_headers(__u8 *buffer)
 {   
 	__u8 *entry;
 	struct list_head *tmp;

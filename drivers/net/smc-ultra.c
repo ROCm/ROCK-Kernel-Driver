@@ -156,8 +156,6 @@ static int __init do_ultra_probe(struct net_device *dev)
 	/* Look for any installed ISAPnP cards */
 	if (isapnp_present() && (ultra_probe_isapnp(dev) == 0))
 		return 0;
-
-	printk(KERN_NOTICE "smc-ultra.c: No ISAPnP cards found, trying standard ones...\n");
 #endif
 
 	for (i = 0; ultra_portlist[i]; i++) {
@@ -553,8 +551,8 @@ static struct net_device *dev_ultra[MAX_ULTRA_CARDS];
 static int io[MAX_ULTRA_CARDS];
 static int irq[MAX_ULTRA_CARDS];
 
-MODULE_PARM(io, "1-" __MODULE_STRING(MAX_ULTRA_CARDS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_ULTRA_CARDS) "i");
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
 MODULE_PARM_DESC(io, "I/O base address(es)");
 MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
 MODULE_DESCRIPTION("SMC Ultra/EtherEZ ISA/PnP Ethernet driver");

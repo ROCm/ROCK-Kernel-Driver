@@ -1378,7 +1378,7 @@ video_mmap(struct file *file, struct vm_area_struct * vma)
 
 /* ------------------------------------------------------------------ */
 
-void saa7134_vbi_fmt(struct saa7134_dev *dev, struct v4l2_format *f)
+static void saa7134_vbi_fmt(struct saa7134_dev *dev, struct v4l2_format *f)
 {
 	struct saa7134_tvnorm *norm = dev->tvnorm;
 
@@ -1401,8 +1401,8 @@ void saa7134_vbi_fmt(struct saa7134_dev *dev, struct v4l2_format *f)
 #endif
 }
 
-int saa7134_g_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
-		  struct v4l2_format *f)
+static int saa7134_g_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
+			 struct v4l2_format *f)
 {
 	switch (f->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
@@ -1427,8 +1427,8 @@ int saa7134_g_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
 	}
 }
 
-int saa7134_try_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
-		    struct v4l2_format *f)
+static int saa7134_try_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
+			   struct v4l2_format *f)
 {
 	int err;
 
@@ -1492,8 +1492,8 @@ int saa7134_try_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
 	}
 }
 
-int saa7134_s_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
-		  struct v4l2_format *f)
+static int saa7134_s_fmt(struct saa7134_dev *dev, struct saa7134_fh *fh,
+			 struct v4l2_format *f)
 {
 	unsigned long flags;
 	int err;

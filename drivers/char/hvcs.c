@@ -257,7 +257,7 @@ static struct task_struct *hvcs_task;
 static unsigned long *hvcs_pi_buff;
 
 /* Only allow one hvcs_struct to use the hvcs_pi_buff at a time. */
-static spinlock_t hvcs_pi_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hvcs_pi_lock);
 
 /* One vty-server per hvcs_struct */
 struct hvcs_struct {
@@ -308,7 +308,7 @@ struct hvcs_struct {
 #define from_kobj(kobj) container_of(kobj, struct hvcs_struct, kobj)
 
 static struct list_head hvcs_structs = LIST_HEAD_INIT(hvcs_structs);
-static spinlock_t hvcs_structs_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hvcs_structs_lock);
 
 static void hvcs_unthrottle(struct tty_struct *tty);
 static void hvcs_throttle(struct tty_struct *tty);
@@ -631,7 +631,7 @@ static int __devinit hvcs_probe(
 	/* hvcsd->tty is zeroed out with the memset */
 	memset(hvcsd, 0x00, sizeof(*hvcsd));
 
-	hvcsd->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&hvcsd->lock);
 	/* Automatically incs the refcount the first time */
 	kobject_init(&hvcsd->kobj);
 	/* Set up the callback for terminating the hvcs_struct's life */

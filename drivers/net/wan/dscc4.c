@@ -125,9 +125,9 @@ static u32 dscc4_pci_config_store[16];
 MODULE_AUTHOR("Maintainer: Francois Romieu <romieu@cogenit.fr>");
 MODULE_DESCRIPTION("Siemens PEB20534 PCI Controler");
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug,"i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug,"Enable/disable extra messages");
-MODULE_PARM(quartz,"i");
+module_param(quartz, int, 0);
 MODULE_PARM_DESC(quartz,"If present, on-board quartz frequency (Hz)");
 
 /* Structures */

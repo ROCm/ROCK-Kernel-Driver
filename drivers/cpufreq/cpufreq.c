@@ -63,7 +63,7 @@ static DECLARE_RWSEM		(cpufreq_notifier_rwsem);
 static LIST_HEAD(cpufreq_governor_list);
 static DECLARE_MUTEX		(cpufreq_governor_sem);
 
-static struct cpufreq_policy * cpufreq_cpu_get(unsigned int cpu)
+struct cpufreq_policy * cpufreq_cpu_get(unsigned int cpu)
 {
 	struct cpufreq_policy *data;
 	unsigned long flags;
@@ -102,12 +102,14 @@ static struct cpufreq_policy * cpufreq_cpu_get(unsigned int cpu)
  err_out:
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(cpufreq_cpu_get);
 
-static void cpufreq_cpu_put(struct cpufreq_policy *data)
+void cpufreq_cpu_put(struct cpufreq_policy *data)
 {
 	kobject_put(&data->kobj);
 	module_put(cpufreq_driver->owner);
 }
+EXPORT_SYMBOL_GPL(cpufreq_cpu_put);
 
 
 /*********************************************************************
@@ -285,7 +287,7 @@ EXPORT_SYMBOL_GPL(cpufreq_notify_transition);
 /**
  * cpufreq_parse_governor - parse a governor string
  */
-int cpufreq_parse_governor (char *str_governor, unsigned int *policy,
+static int cpufreq_parse_governor (char *str_governor, unsigned int *policy,
 				struct cpufreq_governor **governor)
 {
 	if (!cpufreq_driver)
@@ -763,8 +765,11 @@ static int cpufreq_remove_dev (struct sys_device * sys_dev)
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 #endif
 
+	down(&data->lock);
 	if (cpufreq_driver->target)
 		__cpufreq_governor(data, CPUFREQ_GOV_STOP);
+	cpufreq_driver->target = NULL;
+	up(&data->lock);
 
 	kobject_unregister(&data->kobj);
 
@@ -893,6 +898,13 @@ static int cpufreq_resume(struct sys_device * sysdev)
 		return 0;
 	}
 
+	if (cpufreq_driver->resume) {
+		ret = cpufreq_driver->resume(cpu_policy);
+		printk(KERN_ERR "cpufreq: resume failed in ->resume step on CPU %u\n", cpu_policy->cpu);
+		cpufreq_cpu_put(cpu_policy);
+		return (ret);
+	}
+
 	if (!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
 		unsigned int cur_freq = 0;
 
@@ -1018,7 +1030,7 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 	lock_cpu_hotplug();
 	dprintk("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
 		target_freq, relation);
-	if (cpu_online(policy->cpu))
+	if (cpu_online(policy->cpu) && cpufreq_driver->target)
 		retval = cpufreq_driver->target(policy, target_freq, relation);
 	unlock_cpu_hotplug();
 	return retval;

@@ -89,7 +89,7 @@ void snd_memory_done(void)
 	}
 }
 
-void *__snd_kmalloc(size_t size, int flags, void *caller)
+static void *__snd_kmalloc(size_t size, int flags, void *caller)
 {
 	unsigned long cpu_flags;
 	struct snd_alloc_track *t;
@@ -131,10 +131,8 @@ void snd_hidden_kfree(const void *obj)
 {
 	unsigned long flags;
 	struct snd_alloc_track *t;
-	if (obj == NULL) {
-		snd_printk(KERN_WARNING "null kfree (called from %p)\n", __builtin_return_address(0));
+	if (obj == NULL)
 		return;
-	}
 	t = snd_alloc_track_entry(obj);
 	if (t->magic != KMALLOC_MAGIC) {
 		snd_printk(KERN_WARNING "bad kfree (called from %p)\n", __builtin_return_address(0));
@@ -170,10 +168,8 @@ void *snd_hidden_vmalloc(unsigned long size)
 void snd_hidden_vfree(void *obj)
 {
 	struct snd_alloc_track *t;
-	if (obj == NULL) {
-		snd_printk(KERN_WARNING "null vfree (called from %p)\n", __builtin_return_address(0));
+	if (obj == NULL)
 		return;
-	}
 	t = snd_alloc_track_entry(obj);
 	if (t->magic != VMALLOC_MAGIC) {
 		snd_printk(KERN_ERR "bad vfree (called from %p)\n", __builtin_return_address(0));
@@ -257,7 +253,7 @@ char *snd_kmalloc_strdup(const char *string, int flags)
  *
  * Returns zero if successful, or non-zero on failure.
  */
-int copy_to_user_fromio(void __user *dst, const void __iomem *src, size_t count)
+int copy_to_user_fromio(void __user *dst, const volatile void __iomem *src, size_t count)
 {
 #if defined(__i386__) || defined(CONFIG_SPARC32)
 	return copy_to_user(dst, (const void*)src, count) ? -EFAULT : 0;
@@ -267,7 +263,7 @@ int copy_to_user_fromio(void __user *dst, const void __iomem *src, size_t count)
 		size_t c = count;
 		if (c > sizeof(buf))
 			c = sizeof(buf);
-		memcpy_fromio(buf, src, c);
+		memcpy_fromio(buf, (void __iomem *)src, c);
 		if (copy_to_user(dst, buf, c))
 			return -EFAULT;
 		count -= c;
@@ -288,7 +284,7 @@ int copy_to_user_fromio(void __user *dst, const void __iomem *src, size_t count)
  *
  * Returns zero if successful, or non-zero on failure.
  */
-int copy_from_user_toio(void __iomem *dst, const void __user *src, size_t count)
+int copy_from_user_toio(volatile void __iomem *dst, const void __user *src, size_t count)
 {
 #if defined(__i386__) || defined(CONFIG_SPARC32)
 	return copy_from_user((void*)dst, src, count) ? -EFAULT : 0;

@@ -75,8 +75,6 @@
 #error Sorry, your GCC is too old. It builds incorrect kernels.
 #endif
 
-extern char *linux_banner;
-
 static int init(void *);
 
 extern void init_IRQ(void);
@@ -157,12 +155,13 @@ static char * argv_init[MAX_INIT_ARGS+2] = { "init", NULL, };
 char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
 
+extern struct obs_kernel_param __setup_start[], __setup_end[];
+
 static int __init obsolete_checksetup(char *line)
 {
 	struct obs_kernel_param *p;
-	extern struct obs_kernel_param __setup_start, __setup_end;
 
-	p = &__setup_start;
+	p = __setup_start;
 	do {
 		int n = strlen(p->str);
 		if (!strncmp(line, p->str, n)) {
@@ -179,18 +178,9 @@ static int __init obsolete_checksetup(char *line)
 				return 1;
 		}
 		p++;
-	} while (p < &__setup_end);
+	} while (p < __setup_end);
 	return 0;
 }
-
-static unsigned long preset_lpj;
-static int __init lpj_setup(char *str)
-{
-	preset_lpj = simple_strtoul(str,NULL,0);
-	return 1;
-}
-
-__setup("lpj=", lpj_setup);
 
 /*
  * This should be approx 2 Bo*oMips to start (note initial shift), and will
@@ -199,67 +189,6 @@ __setup("lpj=", lpj_setup);
 unsigned long loops_per_jiffy = (1<<12);
 
 EXPORT_SYMBOL(loops_per_jiffy);
-
-/*
- * This is the number of bits of precision for the loops_per_jiffy.  Each
- * bit takes on average 1.5/HZ seconds.  This (like the original) is a little
- * better than 1%
- */
-#define LPS_PREC 8
-
-void __devinit calibrate_delay(void)
-{
-	unsigned long ticks, loopbit;
-	int lps_precision = LPS_PREC;
-
-	if (preset_lpj) {
-		loops_per_jiffy = preset_lpj;
-		printk("Calibrating delay loop (skipped)... "
-			"%lu.%02lu BogoMIPS preset\n",
-			loops_per_jiffy/(500000/HZ),
-			(loops_per_jiffy/(5000/HZ)) % 100);
-	} else {
-		loops_per_jiffy = (1<<12);
-
-		printk(KERN_DEBUG "Calibrating delay loop... ");
-		while ((loops_per_jiffy <<= 1) != 0) {
-			/* wait for "start of" clock tick */
-			ticks = jiffies;
-			while (ticks == jiffies)
-				/* nothing */;
-			/* Go .. */
-			ticks = jiffies;
-			__delay(loops_per_jiffy);
-			ticks = jiffies - ticks;
-			if (ticks)
-				break;
-		}
-
-		/*
-		 * Do a binary approximation to get loops_per_jiffy set to
-		 * equal one clock (up to lps_precision bits)
-		 */
-		loops_per_jiffy >>= 1;
-		loopbit = loops_per_jiffy;
-		while (lps_precision-- && (loopbit >>= 1)) {
-			loops_per_jiffy |= loopbit;
-			ticks = jiffies;
-			while (ticks == jiffies)
-				/* nothing */;
-			ticks = jiffies;
-			__delay(loops_per_jiffy);
-			if (jiffies != ticks)	/* longer than 1 tick */
-				loops_per_jiffy &= ~loopbit;
-		}
-
-		/* Round the value and print it */
-		printk("%lu.%02lu BogoMIPS (lpj=%lu)\n",
-			loops_per_jiffy/(500000/HZ),
-			(loops_per_jiffy/(5000/HZ)) % 100,
-			loops_per_jiffy);
-	}
-
-}
 
 static int __init debug_kernel(char *str)
 {
@@ -359,7 +288,6 @@ static int __init init_setup(char *str)
 __setup("init=", init_setup);
 
 extern void setup_arch(char **);
-extern void cpu_idle(void);
 
 #ifndef CONFIG_SMP
 
@@ -445,6 +373,12 @@ static void noinline rest_init(void)
 {
 	kernel_thread(init, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
+	/*
+	 * Re-enable preemption but disable interrupts to make sure
+	 * we dont get preempted until we schedule() in cpu_idle().
+	 */
+	local_irq_disable();
+	preempt_enable_no_resched();
 	unlock_kernel();
  	cpu_idle();
 } 
@@ -453,9 +387,8 @@ static void noinline rest_init(void)
 static int __init do_early_param(char *param, char *val)
 {
 	struct obs_kernel_param *p;
-	extern struct obs_kernel_param __setup_start, __setup_end;
 
-	for (p = &__setup_start; p < &__setup_end; p++) {
+	for (p = __setup_start; p < __setup_end; p++) {
 		if (p->early && strcmp(param, p->str) == 0) {
 			if (p->setup_func(val) != 0)
 				printk(KERN_WARNING
@@ -511,6 +444,11 @@ asmlinkage void __init start_kernel(void)
 	 * time - but meanwhile we still have a functioning scheduler.
 	 */
 	sched_init();
+	/*
+	 * Disable preemption - early bootup scheduling is extremely
+	 * fragile until we cpu_idle() for the first time.
+	 */
+	preempt_disable();
 	build_all_zonelists();
 	page_alloc_init();
 	printk("Kernel command line: %s\n", saved_command_line);
@@ -592,14 +530,14 @@ __setup("initcall_debug", initcall_debug_setup);
 
 struct task_struct *child_reaper = &init_task;
 
-extern initcall_t __initcall_start, __initcall_end;
+extern initcall_t __initcall_start[], __initcall_end[];
 
 static void __init do_initcalls(void)
 {
 	initcall_t *call;
 	int count = preempt_count();
 
-	for (call = &__initcall_start; call < &__initcall_end; call++) {
+	for (call = __initcall_start; call < __initcall_end; call++) {
 		char *msg;
 
 		if (initcall_debug) {
@@ -761,16 +699,3 @@ static int init(void * unused)
 
 	panic("No init found.  Try passing init= option to kernel.");
 }
-
-static int early_param_test(char *rest)
-{
-	printk("early_parm_test: %s\n", rest ?: "(null)");
-	return rest ? 0 : -EINVAL;
-}
-early_param("testsetup", early_param_test);
-static int early_setup_test(char *rest)
-{
-	printk("early_setup_test: %s\n", rest ?: "(null)");
-	return 0;
-}
-__setup("testsetup_long", early_setup_test);

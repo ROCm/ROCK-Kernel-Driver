@@ -76,7 +76,7 @@ for( ; ((f) = *(fp)) != NULL && dn_key_eq((f)->fn_key, (key)); (fp) = &(f)->fn_n
 
 #define RT_TABLE_MIN 1
 
-static rwlock_t dn_fib_tables_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(dn_fib_tables_lock);
 struct dn_fib_table *dn_fib_tables[RT_TABLE_MAX + 1];
 
 static kmem_cache_t *dn_hash_kmem;

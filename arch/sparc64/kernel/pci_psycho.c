@@ -453,9 +453,9 @@ static void __psycho_check_one_stc(struct pci_controller_info *p,
 		tag_base = regbase + PSYCHO_STC_TAG_A;
 		line_base = regbase + PSYCHO_STC_LINE_A;
 	} else {
-		err_base = regbase + PSYCHO_STC_ERR_A;
-		tag_base = regbase + PSYCHO_STC_TAG_A;
-		line_base = regbase + PSYCHO_STC_LINE_A;
+		err_base = regbase + PSYCHO_STC_ERR_B;
+		tag_base = regbase + PSYCHO_STC_TAG_B;
+		line_base = regbase + PSYCHO_STC_LINE_B;
 	}
 
 	spin_lock(&stc_buf_lock);

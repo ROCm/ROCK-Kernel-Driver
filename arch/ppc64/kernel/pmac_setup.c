@@ -166,11 +166,6 @@ void __init pmac_setup_arch(void)
 	pmac_setup_smp();
 #endif
 
-	/* Setup the PCI DMA to "direct" by default. May be overriden
-	 * by iommu later on
-	 */
-	pci_dma_init_direct();
-
 	/* Lookup PCI hosts */
        	pmac_pci_init();
 
@@ -315,7 +310,9 @@ void __init pmac_init_early(void)
 	}
 
 	/* Setup interrupt mapping options */
-	naca->interrupt_controller = IC_OPEN_PIC;
+	ppc64_interrupt_controller = IC_OPEN_PIC;
+
+	iommu_init_early_u3();
 
 	DBG(" <- pmac_init_early\n");
 }

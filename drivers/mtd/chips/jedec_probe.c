@@ -1,7 +1,7 @@
 /* 
    Common Flash Interface probe code.
    (C) 2000 Red Hat. GPL'd.
-   $Id: jedec_probe.c,v 1.58 2004/11/16 18:29:00 dwmw2 Exp $
+   $Id: jedec_probe.c,v 1.61 2004/11/19 20:52:16 thayne Exp $
    See JEDEC (http://www.jedec.org/) standard JESD21C (section 3.5)
    for the standard this probe goes back to.
 
@@ -32,6 +32,7 @@
 #define MANUFACTURER_HYUNDAI	0x00AD
 #define MANUFACTURER_INTEL	0x0089
 #define MANUFACTURER_MACRONIX	0x00C2
+#define MANUFACTURER_NEC	0x0010
 #define MANUFACTURER_PMC	0x009D
 #define MANUFACTURER_SST	0x00BF
 #define MANUFACTURER_ST		0x0020
@@ -114,6 +115,9 @@
 #define MX29F002T	0x00B0
 #define MX29F004T	0x0045
 #define MX29F004B	0x0046
+
+/* NEC */
+#define UPD29F064115	0x221C
 
 /* PMC */
 #define PM49FL002	0x006D
@@ -227,6 +231,11 @@ static const struct unlock_addr  unlock_addrs[] = {
 	[MTD_UADDR_DONT_CARE] = {
 		.addr1 = 0x0000,      /* Doesn't matter which address */
 		.addr2 = 0x0000       /* is used - must be last entry */
+	},
+
+	[MTD_UADDR_UNNECESSARY] = {
+		.addr1 = 0x0000,
+		.addr2 = 0x0000
 	}
 };
 
@@ -514,15 +523,20 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x10000,8),
 		}
 	}, {
-		mfr_id: MANUFACTURER_AMD,
-		dev_id: AM29F002T,
-		name: "AMD AM29F002T",
-		DevSize: SIZE_256KiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,3),
-			  ERASEINFO(0x08000,1),
-			  ERASEINFO(0x02000,2),
-			  ERASEINFO(0x04000,1)
+		.mfr_id		= MANUFACTURER_AMD,
+		.dev_id		= AM29F002T,
+		.name		= "AMD AM29F002T",
+		.uaddr		= {
+			[0] = MTD_UADDR_0x0555_0x02AA /* x8 */
+		},
+		.DevSize	= SIZE_256KiB,
+		.CmdSet		= P_ID_AMD_STD,
+		.NumEraseRegions= 4,
+		.regions	= {
+			ERASEINFO(0x10000,3),
+			ERASEINFO(0x08000,1),
+			ERASEINFO(0x02000,2),
+			ERASEINFO(0x04000,1),
 		}
 	}, {
 		.mfr_id		= MANUFACTURER_ATMEL,
@@ -770,15 +784,20 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_HYUNDAI,
-		dev_id: HY29F002T,
-		name: "Hyundai HY29F002T",
-		DevSize: SIZE_256KiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,3),
-			  ERASEINFO(0x08000,1),
-			  ERASEINFO(0x02000,2),
-			  ERASEINFO(0x04000,1)
+		.mfr_id		= MANUFACTURER_HYUNDAI,
+		.dev_id		= HY29F002T,
+		.name		= "Hyundai HY29F002T",
+		.uaddr		= {
+			[0] = MTD_UADDR_0x0555_0x02AA /* x8 */
+		},
+		.DevSize	= SIZE_256KiB,
+		.CmdSet		= P_ID_AMD_STD,
+		.NumEraseRegions= 4,
+		.regions	= {
+			ERASEINFO(0x10000,3),
+			ERASEINFO(0x08000,1),
+			ERASEINFO(0x02000,2),
+			ERASEINFO(0x04000,1),
 		}
 	}, {
 		.mfr_id		= MANUFACTURER_INTEL,
@@ -1115,6 +1134,22 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x04000,1)
 		}
 	}, {
+		.mfr_id		= MANUFACTURER_NEC,
+		.dev_id		= UPD29F064115,
+		.name		= "NEC uPD29F064115",
+		.uaddr		= {
+			[0] = MTD_UADDR_0x0555_0x02AA,  /* x8 */
+			[1] = MTD_UADDR_0x0555_0x02AA,  /* x16 */
+		},
+		.DevSize	= SIZE_8MiB,
+		.CmdSet		= P_ID_AMD_STD,
+		.NumEraseRegions= 3,
+		.regions	= {
+			ERASEINFO(0x2000,8),
+			ERASEINFO(0x10000,126),
+			ERASEINFO(0x2000,8),
+		}
+	}, {
 		.mfr_id		= MANUFACTURER_MACRONIX,
 		.dev_id		= MX29LV160B,
 		.name		= "MXIC MX29LV160B",
@@ -1177,15 +1212,20 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x10000,7),
 		}
 	}, {
-		mfr_id: MANUFACTURER_MACRONIX,
-		dev_id: MX29F002T,
-		name: "Macronix MX29F002T",
-		DevSize: SIZE_256KiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,3),
-			  ERASEINFO(0x08000,1),
-			  ERASEINFO(0x02000,2),
-			  ERASEINFO(0x04000,1)
+		.mfr_id		= MANUFACTURER_MACRONIX,
+		.dev_id		= MX29F002T,
+		.name		= "Macronix MX29F002T",
+		.uaddr		= {
+			[0] = MTD_UADDR_0x0555_0x02AA /* x8 */
+		},
+		.DevSize	= SIZE_256KiB,
+		.CmdSet		= P_ID_AMD_STD,
+		.NumEraseRegions= 4,
+		.regions	= {
+			ERASEINFO(0x10000,3),
+			ERASEINFO(0x08000,1),
+			ERASEINFO(0x02000,2),
+			ERASEINFO(0x04000,1),
 		}
 	}, {
 		.mfr_id		= MANUFACTURER_PMC,
@@ -1780,7 +1820,6 @@ static int cfi_jedec_setup(struct cfi_private *p_cfi, int index)
 		return 0;
 	}
 
-	/* Mask out address bits which are smaller than the device type */
 	p_cfi->addr_unlock1 = unlock_addrs[uaddr].addr1;
 	p_cfi->addr_unlock2 = unlock_addrs[uaddr].addr2;
 
@@ -1923,7 +1962,6 @@ static int jedec_probe_chip(struct map_info *map, __u32 base,
 		if (MTD_UADDR_UNNECESSARY == uaddr_idx)
 			return 0;
 
-		/* Mask out address bits which are smaller than the device type */
 		cfi->addr_unlock1 = unlock_addrs[uaddr_idx].addr1;
 		cfi->addr_unlock2 = unlock_addrs[uaddr_idx].addr2;
 	}

@@ -8,6 +8,7 @@
  * Author: Deepak Saxena <dsaxena@plexity.net>
  */
 
+#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/device.h>
 #include <linux/serial.h>
@@ -108,6 +109,8 @@ static struct platform_device *ixdp425_devices[] __initdata = {
 
 static void __init ixdp425_init(void)
 {
+	ixp4xx_sys_init();
+
 	/*
 	 * IXP465 has 32MB window
 	 */
@@ -115,7 +118,7 @@ static void __init ixdp425_init(void)
 		ixdp425_flash_resource.end += IXDP425_FLASH_SIZE;
 	}
 
-	platform_add_devices(&ixdp425_devices, ARRAY_SIZE(ixdp425_devices));
+	platform_add_devices(ixdp425_devices, ARRAY_SIZE(ixdp425_devices));
 }
 
 MACHINE_START(IXDP425, "Intel IXDP425 Development Platform")

@@ -149,8 +149,7 @@ static void cleanup_card(struct net_device *dev)
 {
 	free_irq(dev->irq, dev);
 	release_region(dev->base_addr, LNE390_IO_EXTENT);
-	if (ei_status.reg0)
-		iounmap((void *)dev->mem_start);
+	iounmap(ei_status.mem);
 }
 
 #ifndef MODULE
@@ -257,32 +256,22 @@ static int __init lne390_probe1(struct net_device *dev, int ioaddr)
 	/*
 	   BEWARE!! Some dain-bramaged EISA SCUs will allow you to put
 	   the card mem within the region covered by `normal' RAM  !!!
-	*/
-	if (dev->mem_start > 1024*1024) {	/* phys addr > 1MB */
-		if (dev->mem_start < virt_to_phys(high_memory)) {
-			printk(KERN_CRIT "lne390.c: Card RAM overlaps with normal memory!!!\n");
-			printk(KERN_CRIT "lne390.c: Use EISA SCU to set card memory below 1MB,\n");
-			printk(KERN_CRIT "lne390.c: or to an address above 0x%lx.\n", virt_to_phys(high_memory));
-			printk(KERN_CRIT "lne390.c: Driver NOT installed.\n");
-			ret = -EINVAL;
-			goto cleanup;
-		}
-		dev->mem_start = (unsigned long)ioremap(dev->mem_start, LNE390_STOP_PG*0x100);
-		if (dev->mem_start == 0) {
-			printk(KERN_ERR "lne390.c: Unable to remap card memory above 1MB !!\n");
-			printk(KERN_ERR "lne390.c: Try using EISA SCU to set memory below 1MB.\n");
-			printk(KERN_ERR "lne390.c: Driver NOT installed.\n");
-			ret = -EAGAIN;
-			goto cleanup;
-		}
-		ei_status.reg0 = 1;	/* Use as remap flag */
-		printk("lne390.c: remapped %dkB card memory to virtual address %#lx\n",
-				LNE390_STOP_PG/4, dev->mem_start);
-	}
 
-	dev->mem_end = ei_status.rmem_end = dev->mem_start
-		+ (LNE390_STOP_PG - LNE390_START_PG)*256;
-	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
+	   ioremap() will fail in that case.
+	*/
+	ei_status.mem = ioremap(dev->mem_start, LNE390_STOP_PG*0x100);
+	if (!ei_status.mem) {
+		printk(KERN_ERR "lne390.c: Unable to remap card memory above 1MB !!\n");
+		printk(KERN_ERR "lne390.c: Try using EISA SCU to set memory below 1MB.\n");
+		printk(KERN_ERR "lne390.c: Driver NOT installed.\n");
+		ret = -EAGAIN;
+		goto cleanup;
+	}
+	printk("lne390.c: remapped %dkB card memory to virtual address %p\n",
+			LNE390_STOP_PG/4, ei_status.mem);
+
+	dev->mem_start = (unsigned long)ei_status.mem;
+	dev->mem_end = dev->mem_start + (LNE390_STOP_PG - LNE390_START_PG)*256;
 
 	/* The 8390 offset is zero for the LNE390 */
 	dev->base_addr = ioaddr;
@@ -352,8 +341,8 @@ static void lne390_reset_8390(struct net_device *dev)
 static void
 lne390_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page)
 {
-	unsigned long hdr_start = dev->mem_start + ((ring_page - LNE390_START_PG)<<8);
-	isa_memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
+	void __iomem *hdr_start = ei_status.mem + ((ring_page - LNE390_START_PG)<<8);
+	memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
 	hdr->count = (hdr->count + 3) & ~3;     /* Round up allocation. */
 }
 
@@ -366,27 +355,28 @@ lne390_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_
 static void lne390_block_input(struct net_device *dev, int count, struct sk_buff *skb,
 						  int ring_offset)
 {
-	unsigned long xfer_start = dev->mem_start + ring_offset - (LNE390_START_PG<<8);
+	void __iomem *xfer_start = ei_status.mem + ring_offset - (LNE390_START_PG<<8);
 
-	if (xfer_start + count > ei_status.rmem_end) {
+	if (ring_offset + count > (LNE390_STOP_PG<<8)) {
 		/* Packet wraps over end of ring buffer. */
-		int semi_count = ei_status.rmem_end - xfer_start;
-		isa_memcpy_fromio(skb->data, xfer_start, semi_count);
+		int semi_count = (LNE390_STOP_PG<<8) - ring_offset;
+		memcpy_fromio(skb->data, xfer_start, semi_count);
 		count -= semi_count;
-		isa_memcpy_fromio(skb->data + semi_count, ei_status.rmem_start, count);
+		memcpy_fromio(skb->data + semi_count,
+			ei_status.mem + (TX_PAGES<<8), count);
 	} else {
 		/* Packet is in one chunk. */
-		isa_memcpy_fromio(skb->data, xfer_start, count);
+		memcpy_fromio(skb->data, xfer_start, count);
 	}
 }
 
 static void lne390_block_output(struct net_device *dev, int count,
 				const unsigned char *buf, int start_page)
 {
-	unsigned long shmem = dev->mem_start + ((start_page - LNE390_START_PG)<<8);
+	void __iomem *shmem = ei_status.mem + ((start_page - LNE390_START_PG)<<8);
 
 	count = (count + 3) & ~3;     /* Round up to doubleword */
-	isa_memcpy_toio(shmem, buf, count);
+	memcpy_toio(shmem, buf, count);
 }
 
 static int lne390_open(struct net_device *dev)
@@ -412,9 +402,9 @@ static int io[MAX_LNE_CARDS];
 static int irq[MAX_LNE_CARDS];
 static int mem[MAX_LNE_CARDS];
 
-MODULE_PARM(io, "1-" __MODULE_STRING(MAX_LNE_CARDS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_LNE_CARDS) "i");
-MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_LNE_CARDS) "i");
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(mem, int, NULL, 0);
 MODULE_PARM_DESC(io, "I/O base address(es)");
 MODULE_PARM_DESC(irq, "IRQ number(s)");
 MODULE_PARM_DESC(mem, "memory base address(es)");

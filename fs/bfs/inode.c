@@ -149,7 +149,7 @@ static void bfs_delete_inode(struct inode * inode)
 	}
 	
 	inode->i_size = 0;
-	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
 	lock_kernel();
 	mark_inode_dirty(inode);
 	block = (ino - BFS_ROOT_INO)/BFS_INODES_PER_BLOCK + 1;

@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodemgmt.c,v 1.109 2004/10/07 15:08:47 havasi Exp $
+ * $Id: nodemgmt.c,v 1.115 2004/11/22 11:07:21 dwmw2 Exp $
  *
  */
 
@@ -399,6 +399,17 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 	}
 	jeb = &c->blocks[blocknr];
 
+	if (jffs2_can_mark_obsolete(c) && !jffs2_is_readonly(c) &&
+	    !(c->flags & JFFS2_SB_FLAG_MOUNTING)) {
+		/* Hm. This may confuse static lock analysis. If any of the above 
+		   three conditions is false, we're going to return from this 
+		   function without actually obliterating any nodes or freeing
+		   any jffs2_raw_node_refs. So we don't need to stop erases from
+		   happening, or protect against people holding an obsolete
+		   jffs2_raw_node_ref without the erase_completion_lock. */
+		down(&c->erase_free_sem);
+	}
+
 	spin_lock(&c->erase_completion_lock);
 
 	if (ref_flags(ref) == REF_UNCHECKED) {
@@ -463,6 +474,7 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 		   marked obsolete on the flash at the time they _became_
 		   obsolete, there was probably a reason for that. */
 		spin_unlock(&c->erase_completion_lock);
+		/* We didn't lock the erase_free_sem */
 		return;
 	}
 
@@ -515,46 +527,61 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 
 	spin_unlock(&c->erase_completion_lock);
 
-	if (!jffs2_can_mark_obsolete(c))
+	if (!jffs2_can_mark_obsolete(c) || jffs2_is_readonly(c)) {
+		/* We didn't lock the erase_free_sem */
 		return;
-	if (jffs2_is_readonly(c))
-		return;
+	}
+
+	/* The erase_free_sem is locked, and has been since before we marked the node obsolete
+	   and potentially put its eraseblock onto the erase_pending_list. Thus, we know that
+	   the block hasn't _already_ been erased, and that 'ref' itself hasn't been freed yet
+	   by jffs2_free_all_node_refs() in erase.c. Which is nice. */
 
 	D1(printk(KERN_DEBUG "obliterating obsoleted node at 0x%08x\n", ref_offset(ref)));
 	ret = jffs2_flash_read(c, ref_offset(ref), sizeof(n), &retlen, (char *)&n);
 	if (ret) {
 		printk(KERN_WARNING "Read error reading from obsoleted node at 0x%08x: %d\n", ref_offset(ref), ret);
-		return;
+		goto out_erase_sem;
 	}
 	if (retlen != sizeof(n)) {
 		printk(KERN_WARNING "Short read from obsoleted node at 0x%08x: %zd\n", ref_offset(ref), retlen);
-		return;
+		goto out_erase_sem;
 	}
 	if (PAD(je32_to_cpu(n.totlen)) != PAD(ref_totlen(c, jeb, ref))) {
 		printk(KERN_WARNING "Node totlen on flash (0x%08x) != totlen from node ref (0x%08x)\n", je32_to_cpu(n.totlen), ref_totlen(c, jeb, ref));
-		return;
+		goto out_erase_sem;
 	}
 	if (!(je16_to_cpu(n.nodetype) & JFFS2_NODE_ACCURATE)) {
 		D1(printk(KERN_DEBUG "Node at 0x%08x was already marked obsolete (nodetype 0x%04x)\n", ref_offset(ref), je16_to_cpu(n.nodetype)));
-		return;
+		goto out_erase_sem;
 	}
 	/* XXX FIXME: This is ugly now */
 	n.nodetype = cpu_to_je16(je16_to_cpu(n.nodetype) & ~JFFS2_NODE_ACCURATE);
 	ret = jffs2_flash_write(c, ref_offset(ref), sizeof(n), &retlen, (char *)&n);
 	if (ret) {
 		printk(KERN_WARNING "Write error in obliterating obsoleted node at 0x%08x: %d\n", ref_offset(ref), ret);
-		return;
+		goto out_erase_sem;
 	}
 	if (retlen != sizeof(n)) {
 		printk(KERN_WARNING "Short write in obliterating obsoleted node at 0x%08x: %zd\n", ref_offset(ref), retlen);
-		return;
+		goto out_erase_sem;
 	}
 
 	/* Nodes which have been marked obsolete no longer need to be
-	   associated with any inode. Remove them from the per-inode list */
+	   associated with any inode. Remove them from the per-inode list.
+	   
+	   Note we can't do this for NAND at the moment because we need 
+	   obsolete dirent nodes to stay on the lists, because of the
+	   horridness in jffs2_garbage_collect_deletion_dirent(). Also
+	   because we delete the inocache, and on NAND we need that to 
+	   stay around until all the nodes are actually erased, in order
+	   to stop us from giving the same inode number to another newly
+	   created inode. */
 	if (ref->next_in_ino) {
 		struct jffs2_inode_cache *ic;
 		struct jffs2_raw_node_ref **p;
+
+		spin_lock(&c->erase_completion_lock);
 
 		ic = jffs2_raw_ref_to_ic(ref);
 		for (p = &ic->nodes; (*p) != ref; p = &((*p)->next_in_ino))
@@ -562,14 +589,25 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 
 		*p = ref->next_in_ino;
 		ref->next_in_ino = NULL;
+
+		if (ic->nodes == (void *)ic) {
+			D1(printk(KERN_DEBUG "inocache for ino #%u is all gone now. Freeing\n", ic->ino));
+			jffs2_del_ino_cache(c, ic);
+			jffs2_free_inode_cache(ic);
+		}
+
+		spin_unlock(&c->erase_completion_lock);
 	}
 
 
 	/* Merge with the next node in the physical list, if there is one
-	   and if it's also obsolete. */
-	if (ref->next_phys && ref_obsolete(ref->next_phys) ) {
+	   and if it's also obsolete and if it doesn't belong to any inode */
+	if (ref->next_phys && ref_obsolete(ref->next_phys) &&
+	    !ref->next_phys->next_in_ino) {
 		struct jffs2_raw_node_ref *n = ref->next_phys;
 		
+		spin_lock(&c->erase_completion_lock);
+
 		ref->__totlen += n->__totlen;
 		ref->next_phys = n->next_phys;
                 if (jeb->last_node == n) jeb->last_node = ref;
@@ -577,7 +615,8 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 			/* gc will be happy continuing gc on this node */
 			jeb->gc_node=ref;
 		}
-		BUG_ON(n->next_in_ino);
+		spin_unlock(&c->erase_completion_lock);
+
 		jffs2_free_raw_node_ref(n);
 	}
 	
@@ -585,11 +624,13 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 	   and that one is obsolete */
 	if (ref != jeb->first_node ) {
 		struct jffs2_raw_node_ref *p = jeb->first_node;
-		
+
+		spin_lock(&c->erase_completion_lock);
+
 		while (p->next_phys != ref)
 			p = p->next_phys;
 		
-		if (ref_obsolete(p) ) {
+		if (ref_obsolete(p) && !ref->next_in_ino) {
 			p->__totlen += ref->__totlen;
 			if (jeb->last_node == ref) {
 				jeb->last_node = p;
@@ -601,10 +642,13 @@ void jffs2_mark_node_obsolete(struct jffs2_sb_info *c, struct jffs2_raw_node_ref
 			p->next_phys = ref->next_phys;
 			jffs2_free_raw_node_ref(ref);
 		}
+		spin_unlock(&c->erase_completion_lock);
 	}
+ out_erase_sem:
+	up(&c->erase_free_sem);
 }
 
-#if CONFIG_JFFS2_FS_DEBUG > 0
+#if CONFIG_JFFS2_FS_DEBUG >= 2
 void jffs2_dump_block_lists(struct jffs2_sb_info *c)
 {
 

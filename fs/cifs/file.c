@@ -709,8 +709,9 @@ cifs_user_write(struct file * file, const char __user * write_data,
 	/* since the write may have blocked check these pointers again */
 	if(file->f_dentry) {
 		if(file->f_dentry->d_inode) {
-			file->f_dentry->d_inode->i_ctime = file->f_dentry->d_inode->i_mtime =
-				CURRENT_TIME;
+			struct inode *inode = file->f_dentry->d_inode;
+			inode->i_ctime = inode->i_mtime =
+				current_fs_time(inode->i_sb);
 			if (total_written > 0) {
 				if (*poffset > file->f_dentry->d_inode->i_size)
 					i_size_write(file->f_dentry->d_inode, *poffset);
@@ -903,7 +904,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 					to-from, &offset);
 			read_lock(&GlobalSMBSeslock);
 		/* Does mm or vfs already set times? */
-			inode->i_atime = inode->i_mtime = CURRENT_TIME;
+			inode->i_atime = inode->i_mtime = current_fs_time(inode->i_sb);
 			if ((bytes_written > 0) && (offset)) {
 				rc = 0;
 			} else if(bytes_written < 0) {
@@ -1493,7 +1494,8 @@ static int cifs_readpage_worker(struct file *file, struct page *page, loff_t * p
 		cFYI(1,("Bytes read %d ",rc));
 	}
                                                                                                                            
-	file->f_dentry->d_inode->i_atime = CURRENT_TIME;
+	file->f_dentry->d_inode->i_atime =
+		current_fs_time(file->f_dentry->d_inode->i_sb);
                                                                                                                            
 	if(PAGE_CACHE_SIZE > rc) {
 		memset(read_data+rc, 0, PAGE_CACHE_SIZE - rc);

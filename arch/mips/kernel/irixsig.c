@@ -13,7 +13,6 @@
 #include <linux/smp_lock.h>
 #include <linux/time.h>
 #include <linux/ptrace.h>
-#include <linux/suspend.h>
 
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
@@ -179,10 +178,8 @@ asmlinkage int do_irix_signal(sigset_t *oldset, struct pt_regs *regs)
 	if (!user_mode(regs))
 		return 1;
 
-	if (current->flags & PF_FREEZE) {
-		refrigerator(0);
+	if (try_to_freeze(0))
 		goto no_signal;
-	}
 
 	if (!oldset)
 		oldset = &current->blocked;
@@ -583,7 +580,7 @@ asmlinkage int irix_waitsys(int type, int pid, struct irix5_siginfo *info,
 		retval = -EINVAL;
 		goto out;
 	}
-	add_wait_queue(&current->wait_chldexit, &wait);
+	add_wait_queue(&current->signal->wait_chldexit, &wait);
 repeat:
 	flag = 0;
 	current->state = TASK_INTERRUPTIBLE;
@@ -672,7 +669,7 @@ repeat:
 	retval = -ECHILD;
 end_waitsys:
 	current->state = TASK_RUNNING;
-	remove_wait_queue(&current->wait_chldexit, &wait);
+	remove_wait_queue(&current->signal->wait_chldexit, &wait);
 
 out:
 	return retval;

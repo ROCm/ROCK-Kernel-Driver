@@ -33,7 +33,6 @@
 #include <asm/mmu_context.h>
 #include <asm/ppcdebug.h>
 #include <asm/iommu.h>
-#include <asm/naca.h>
 #include <asm/tlbflush.h>
 #include <asm/tlb.h>
 #include <asm/prom.h>
@@ -368,7 +367,7 @@ static long pSeries_lpar_hpte_remove(unsigned long hpte_group)
 
 static void pSeries_lpar_hptab_clear(void)
 {
-	unsigned long size_bytes = 1UL << naca->pftSize;
+	unsigned long size_bytes = 1UL << ppc64_pft_size;
 	unsigned long hpte_count = size_bytes >> 4;
 	unsigned long dummy1, dummy2;
 	int i;
@@ -437,7 +436,7 @@ static long pSeries_lpar_hpte_find(unsigned long vpn)
 	hash = hpt_hash(vpn, 0);
 
 	for (j = 0; j < 2; j++) {
-		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
+		slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
 		for (i = 0; i < HPTES_PER_GROUP; i++) {
 			hpte_dw0.dword0 = pSeries_lpar_hpte_getword0(slot);
 			dw0 = hpte_dw0.dw0;
@@ -504,7 +503,7 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 				   int local)
 {
 	int i;
-	unsigned long flags;
+	unsigned long flags = 0;
 	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
 	int lock_tlbie = !(cur_cpu_spec->cpu_features & CPU_FTR_LOCKLESS_TLBIE);
 

@@ -28,7 +28,7 @@
 
 char x86_boot_params[2048] __initdata = {0,};
 
-unsigned long cpu_initialized __initdata = 0;
+cpumask_t cpu_initialized __initdata = CPU_MASK_NONE;
 
 struct x8664_pda cpu_pda[NR_CPUS] __cacheline_aligned; 
 
@@ -82,7 +82,8 @@ void __init setup_per_cpu_areas(void)
 		unsigned char *ptr;
 
 		if (!NODE_DATA(cpu_to_node(i))) {
-			printk("cpu with no node %d, numnodes %d\n", i, numnodes);
+			printk("cpu with no node %d, num_online_nodes %d\n",
+			       i, num_online_nodes());
 			ptr = alloc_bootmem(size);
 		} else { 
 			ptr = alloc_bootmem_node(NODE_DATA(cpu_to_node(i)), size);
@@ -186,7 +187,7 @@ void __init cpu_init (void)
 
 	me = current;
 
-	if (test_and_set_bit(cpu, &cpu_initialized))
+	if (cpu_test_and_set(cpu, cpu_initialized))
 		panic("CPU#%d already initialized!\n", cpu);
 
 	printk("Initializing CPU#%d\n", cpu);
@@ -213,9 +214,6 @@ void __init cpu_init (void)
 	 */
 
 	asm volatile("pushfq ; popq %%rax ; btr $14,%%rax ; pushq %%rax ; popfq" ::: "eax");
-
-	if (cpu == 0) 
-		early_identify_cpu(&boot_cpu_data);
 
 	syscall_init();
 

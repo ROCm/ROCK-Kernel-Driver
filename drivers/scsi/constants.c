@@ -1156,17 +1156,14 @@ scsi_show_extd_sense(unsigned char asc, unsigned char ascq)
 }
 
 /* Print sense information */
-static void
-print_sense_internal(const char *devclass, 
-		     const unsigned char *sense_buffer,
-		     int sense_len,
-		     struct request *req)
+void
+__scsi_print_sense(const char *name, const unsigned char *sense_buffer,
+		   int sense_len)
 {
 	int k, num, res;
 	unsigned int info;
 	const char *error;
 	const char *sense_txt;
-	const char *name = req->rq_disk ? req->rq_disk->disk_name : devclass;
 	struct scsi_sense_hdr ssh;
     
 	res = scsi_normalize_sense(sense_buffer, sense_len, &ssh);
@@ -1254,18 +1251,25 @@ print_sense_internal(const char *devclass,
 		printk("\n");
 	}
 }
+EXPORT_SYMBOL(__scsi_print_sense);
 
 void scsi_print_sense(const char *devclass, struct scsi_cmnd *cmd)
 {
-	print_sense_internal(devclass, cmd->sense_buffer,
-			     SCSI_SENSE_BUFFERSIZE, cmd->request);
+	const char *name = devclass;
+
+	if (cmd->request->rq_disk)
+		name = cmd->request->rq_disk->disk_name;
+	__scsi_print_sense(name, cmd->sense_buffer, SCSI_SENSE_BUFFERSIZE);
 }
 EXPORT_SYMBOL(scsi_print_sense);
 
 void scsi_print_req_sense(const char *devclass, struct scsi_request *sreq)
 {
-	print_sense_internal(devclass, sreq->sr_sense_buffer,
-			     SCSI_SENSE_BUFFERSIZE, sreq->sr_request);
+	const char *name = devclass;
+
+	if (sreq->sr_request->rq_disk)
+		name = sreq->sr_request->rq_disk->disk_name;
+	__scsi_print_sense(name, sreq->sr_sense_buffer, SCSI_SENSE_BUFFERSIZE);
 }
 EXPORT_SYMBOL(scsi_print_req_sense);
 

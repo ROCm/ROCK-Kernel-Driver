@@ -159,11 +159,10 @@ void default_idle(void)
 #endif /* CONFIG_ARCH_S390X */
 }
 
-int cpu_idle(void)
+void cpu_idle(void)
 {
 	for (;;)
 		default_idle();
-	return 0;
 }
 
 void show_regs(struct pt_regs *regs)

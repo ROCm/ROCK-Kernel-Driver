@@ -152,7 +152,7 @@ static struct ip_tunnel *tunnels[4][HASH_SIZE];
 #define tunnels_l	(tunnels[1])
 #define tunnels_wc	(tunnels[0])
 
-static rwlock_t ipgre_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ipgre_lock);
 
 /* Given src, dst and key, find appropriate for input tunnel. */
 

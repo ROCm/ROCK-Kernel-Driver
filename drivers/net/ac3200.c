@@ -128,8 +128,7 @@ static void cleanup_card(struct net_device *dev)
 	/* Someday free_irq may be in ac_close_card() */
 	free_irq(dev->irq, dev);
 	release_region(dev->base_addr, AC_IO_EXTENT);
-	if (ei_status.reg0)
-		iounmap((void *)dev->mem_start);
+	iounmap(ei_status.mem);
 }
 
 #ifndef MODULE
@@ -237,32 +236,22 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 	/*
 	 *  BEWARE!! Some dain-bramaged EISA SCUs will allow you to put
 	 *  the card mem within the region covered by `normal' RAM  !!!
+	 *
+	 *  ioremap() will fail in that case.
 	 */
-	if (dev->mem_start > 1024*1024) {	/* phys addr > 1MB */
-		if (dev->mem_start < virt_to_phys(high_memory)) {
-			printk(KERN_CRIT "ac3200.c: Card RAM overlaps with normal memory!!!\n");
-			printk(KERN_CRIT "ac3200.c: Use EISA SCU to set card memory below 1MB,\n");
-			printk(KERN_CRIT "ac3200.c: or to an address above 0x%lx.\n", virt_to_phys(high_memory));
-			printk(KERN_CRIT "ac3200.c: Driver NOT installed.\n");
-			retval = -EINVAL;
-			goto out1;
-		}
-		dev->mem_start = (unsigned long)ioremap(dev->mem_start, AC_STOP_PG*0x100);
-		if (dev->mem_start == 0) {
-			printk(KERN_ERR "ac3200.c: Unable to remap card memory above 1MB !!\n");
-			printk(KERN_ERR "ac3200.c: Try using EISA SCU to set memory below 1MB.\n");
-			printk(KERN_ERR "ac3200.c: Driver NOT installed.\n");
-			retval = -EINVAL;
-			goto out1;
-		}
-		ei_status.reg0 = 1;	/* Use as remap flag */
-		printk("ac3200.c: remapped %dkB card memory to virtual address %#lx\n",
-				AC_STOP_PG/4, dev->mem_start);
+	ei_status.mem = ioremap(dev->mem_start, AC_STOP_PG*0x100);
+	if (!ei_status.mem) {
+		printk(KERN_ERR "ac3200.c: Unable to remap card memory above 1MB !!\n");
+		printk(KERN_ERR "ac3200.c: Try using EISA SCU to set memory below 1MB.\n");
+		printk(KERN_ERR "ac3200.c: Driver NOT installed.\n");
+		retval = -EINVAL;
+		goto out1;
 	}
+	printk("ac3200.c: remapped %dkB card memory to virtual address %p\n",
+			AC_STOP_PG/4, ei_status.mem);
 
-	ei_status.rmem_start = dev->mem_start + TX_PAGES*256;
-	dev->mem_end = ei_status.rmem_end = dev->mem_start
-		+ (AC_STOP_PG - AC_START_PG)*256;
+	dev->mem_start = (unsigned long)ei_status.mem;
+	dev->mem_end = dev->mem_start + (AC_STOP_PG - AC_START_PG)*256;
 
 	ei_status.name = "AC3200";
 	ei_status.tx_start_page = AC_START_PG;
@@ -324,8 +313,8 @@ static void ac_reset_8390(struct net_device *dev)
 static void
 ac_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page)
 {
-	unsigned long hdr_start = dev->mem_start + ((ring_page - AC_START_PG)<<8);
-	isa_memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
+	void __iomem *hdr_start = ei_status.mem + ((ring_page - AC_START_PG)<<8);
+	memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
 }
 
 /*  Block input and output are easy on shared memory ethercards, the only
@@ -334,26 +323,27 @@ ac_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page
 static void ac_block_input(struct net_device *dev, int count, struct sk_buff *skb,
 						  int ring_offset)
 {
-	unsigned long xfer_start = dev->mem_start + ring_offset - (AC_START_PG<<8);
+	void __iomem *start = ei_status.mem + ring_offset - AC_START_PG*256;
 
-	if (xfer_start + count > ei_status.rmem_end) {
+	if (ring_offset + count > AC_STOP_PG*256) {
 		/* We must wrap the input move. */
-		int semi_count = ei_status.rmem_end - xfer_start;
-		isa_memcpy_fromio(skb->data, xfer_start, semi_count);
+		int semi_count = AC_STOP_PG*256 - ring_offset;
+		memcpy_fromio(skb->data, start, semi_count);
 		count -= semi_count;
-		isa_memcpy_fromio(skb->data + semi_count, ei_status.rmem_start, count);
+		memcpy_fromio(skb->data + semi_count,
+				ei_status.mem + TX_PAGES*256, count);
 	} else {
 		/* Packet is in one chunk -- we can copy + cksum. */
-		isa_eth_io_copy_and_sum(skb, xfer_start, count, 0);
+		eth_io_copy_and_sum(skb, start, count, 0);
 	}
 }
 
 static void ac_block_output(struct net_device *dev, int count,
 							const unsigned char *buf, int start_page)
 {
-	unsigned long shmem = dev->mem_start + ((start_page - AC_START_PG)<<8);
+	void __iomem *shmem = ei_status.mem + ((start_page - AC_START_PG)<<8);
 
-	isa_memcpy_toio(shmem, buf, count);
+	memcpy_toio(shmem, buf, count);
 }
 
 static int ac_close_card(struct net_device *dev)
@@ -377,9 +367,9 @@ static struct net_device *dev_ac32[MAX_AC32_CARDS];
 static int io[MAX_AC32_CARDS];
 static int irq[MAX_AC32_CARDS];
 static int mem[MAX_AC32_CARDS];
-MODULE_PARM(io, "1-" __MODULE_STRING(MAX_AC32_CARDS) "i");
-MODULE_PARM(irq, "1-" __MODULE_STRING(MAX_AC32_CARDS) "i");
-MODULE_PARM(mem, "1-" __MODULE_STRING(MAX_AC32_CARDS) "i");
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param_array(mem, int, NULL, 0);
 MODULE_PARM_DESC(io, "I/O base address(es)");
 MODULE_PARM_DESC(irq, "IRQ number(s)");
 MODULE_PARM_DESC(mem, "Memory base address(es)");

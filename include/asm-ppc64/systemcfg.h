@@ -15,14 +15,6 @@
  * End Change Activity 
  */
 
-
-#ifndef __KERNEL__
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <linux/types.h>
-#endif
-
 /*
  * If the major version changes we are incompatible.
  * Minor version changes are a hint.
@@ -50,10 +42,11 @@ struct systemcfg {
 	__u64 tb_update_count;		/* Timebase atomicity ctr	0x50 */
 	__u32 tz_minuteswest;		/* Minutes west of Greenwich	0x58 */
 	__u32 tz_dsttime;		/* Type of dst correction	0x5C */
-	__u32 dCacheL1Size;		/* L1 d-cache size		0x60 */
-	__u32 dCacheL1LineSize;		/* L1 d-cache line size		0x64 */
-	__u32 iCacheL1Size;		/* L1 i-cache size		0x68 */
-	__u32 iCacheL1LineSize;		/* L1 i-cache line size		0x6C */
+	/* next four are no longer used except to be exported to /proc */
+	__u32 dcache_size;		/* L1 d-cache size		0x60 */
+	__u32 dcache_line_size;		/* L1 d-cache line size		0x64 */
+	__u32 icache_size;		/* L1 i-cache size		0x68 */
+	__u32 icache_line_size;		/* L1 i-cache line size		0x6C */
 	__u8  reserved0[3984];		/* Reserve rest of page		0x70 */
 };
 

@@ -24,6 +24,7 @@
 #include <linux/cpu.h>
 #include <linux/interrupt.h>
 
+#include <asm/cpu.h>
 #include <asm/elf.h>
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -107,6 +108,8 @@ static char command_line[COMMAND_LINE_SIZE];
 static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
 static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
 #define ENDIANNESS ((char)endian_test.l)
+
+DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
 
 /*
  * Standard memory resources
@@ -739,11 +742,15 @@ void __init setup_arch(char **cmdline_p)
 #endif
 }
 
-static struct cpu cpu[1];
 
 static int __init topology_init(void)
 {
-	return register_cpu(cpu, 0, NULL);
+	int cpu;
+
+	for_each_cpu(cpu)
+		register_cpu(&per_cpu(cpu_data, cpu).cpu, cpu, NULL);
+
+	return 0;
 }
 
 subsys_initcall(topology_init);
@@ -784,9 +791,18 @@ static int c_show(struct seq_file *m, void *v)
 	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
 		   cpu_name, (int)processor_id & 15, elf_platform);
 
+#if defined(CONFIG_SMP)
+	for_each_online_cpu(i) {
+		seq_printf(m, "Processor\t: %d\n", i);
+		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n\n",
+			   per_cpu(cpu_data, i).loops_per_jiffy / (500000UL/HZ),
+			   (per_cpu(cpu_data, i).loops_per_jiffy / (5000UL/HZ)) % 100);
+	}
+#else /* CONFIG_SMP */
 	seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
 		   loops_per_jiffy / (500000/HZ),
 		   (loops_per_jiffy / (5000/HZ)) % 100);
+#endif
 
 	/* dump out the processor features */
 	seq_puts(m, "Features\t: ");

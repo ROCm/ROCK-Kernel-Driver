@@ -21,20 +21,12 @@
  */
 #include <linux/kernel.h>
 #include <linux/pci.h>
-#include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/init.h>
-#include <linux/bootmem.h>
 
 #include <asm/io.h>
-#include <asm/pgtable.h>
-#include <asm/irq.h>
 #include <asm/prom.h>
-#include <asm/machdep.h>
 #include <asm/pci-bridge.h>
-#include <asm/ppcdebug.h>
-#include <asm/naca.h>
-#include <asm/iommu.h>
 
 #include "pci.h"
 
@@ -178,30 +170,4 @@ void __init pci_devs_phb_init(void)
 	/* This must be done first so the device nodes have valid pci info! */
 	list_for_each_entry_safe(phb, tmp, &hose_list, list_node)
 		pci_devs_phb_init_dynamic(phb);
-}
-
-
-static void __init pci_fixup_bus_sysdata_list(struct list_head *bus_list)
-{
-	struct pci_bus *bus;
-
-	list_for_each_entry(bus, bus_list, node) {
-		if (bus->self)
-			bus->sysdata = bus->self->sysdata;
-		pci_fixup_bus_sysdata_list(&bus->children);
-	}
-}
-
-/*
- * Fixup the bus->sysdata ptrs to point to the bus' device_node.
- * This is done late in pcibios_init().  We do this mostly for
- * sanity, but pci_dma.c uses these at DMA time so they must be
- * correct.
- * To do this we recurse down the bus hierarchy.  Note that PHB's
- * have bus->self == NULL, but fortunately bus->sysdata is already
- * correct in this case.
- */
-void __init pci_fix_bus_sysdata(void)
-{
-	pci_fixup_bus_sysdata_list(&pci_root_buses);
 }

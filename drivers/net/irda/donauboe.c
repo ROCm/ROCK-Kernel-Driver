@@ -1493,11 +1493,11 @@ MODULE_DESCRIPTION("Toshiba OBOE IrDA Device Driver");
 MODULE_AUTHOR("James McKenzie <james@fishsoup.dhs.org>");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM (max_baud, "i");
+module_param (max_baud, int, 0);
 MODULE_PARM_DESC(max_baud, "Maximum baud rate");
 
 #ifdef USE_PROBE
-MODULE_PARM (do_probe, "i");
+module_param (do_probe, bool, 0);
 MODULE_PARM_DESC(do_probe, "Enable/disable chip probing and self-test");
 #endif
 

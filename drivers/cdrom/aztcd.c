@@ -288,7 +288,7 @@ static volatile int azt_read_count = 1;
 
 static int azt_port = AZT_BASE_ADDR;
 
-MODULE_PARM(azt_port, "i");
+module_param(azt_port, int, 0);
 
 static int azt_port_auto[16] = AZT_BASE_AUTO;
 

@@ -426,8 +426,8 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 	pci_set_drvdata(pci,dev);
 
         init_MUTEX(&dev->lock);
-	dev->int_slock = SPIN_LOCK_UNLOCKED;
-	dev->slock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dev->int_slock);
+	spin_lock_init(&dev->slock);
 
 	init_MUTEX(&dev->i2c_lock);
 

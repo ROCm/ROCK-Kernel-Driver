@@ -17,6 +17,7 @@
 #include <linux/string.h>
 #include <linux/sched.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/reboot.h>
 #include <linux/delay.h>
 #include <linux/initrd.h>
@@ -41,7 +42,6 @@
 #include <asm/elf.h>
 #include <asm/machdep.h>
 #include <asm/iSeries/LparData.h>
-#include <asm/naca.h>
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
@@ -54,6 +54,9 @@
 #include <asm/rtas.h>
 #include <asm/iommu.h>
 #include <asm/serial.h>
+#include <asm/cache.h>
+#include <asm/page.h>
+#include <asm/mmu.h>
 
 #ifdef DEBUG
 #define DBG(fmt...) udbg_printf(fmt)
@@ -89,7 +92,6 @@ extern void udbg_init_maple_realmode(void);
 #endif
 
 /* extern void *stab; */
-extern HTAB htab_data;
 extern unsigned long klimit;
 
 extern void mm_init_ppc64(void);
@@ -110,6 +112,11 @@ int have_of = 1;
 int boot_cpuid = 0;
 int boot_cpuid_phys = 0;
 dev_t boot_dev;
+u64 ppc64_pft_size;
+u64 ppc64_debug_switch;
+
+struct ppc64_caches ppc64_caches;
+EXPORT_SYMBOL_GPL(ppc64_caches);
 
 /*
  * These are used in binfmt_elf.c to put aux entries on the stack
@@ -156,7 +163,7 @@ struct screen_info screen_info = {
  */
 void __init ppcdbg_initialize(void)
 {
-	naca->debug_switch = PPC_DEBUG_DEFAULT; /* | PPCDBG_BUSWALK | */
+	ppc64_debug_switch = PPC_DEBUG_DEFAULT; /* | PPCDBG_BUSWALK | */
 	/* PPCDBG_PHBINIT | PPCDBG_MM | PPCDBG_MMINIT | PPCDBG_TCEINIT | PPCDBG_TCE */;
 }
 
@@ -394,7 +401,7 @@ void __init early_setup(unsigned long dt_ptr)
 	DBG(" -> early_setup()\n");
 
 	/*
-	 * Fill the default DBG level in naca (do we want to keep
+	 * Fill the default DBG level (do we want to keep
 	 * that old mecanism around forever ?)
 	 */
 	ppcdbg_initialize();
@@ -448,17 +455,17 @@ void __init early_setup(unsigned long dt_ptr)
 
 
 /*
- * Initialize some remaining members of the naca and systemcfg structures
+ * Initialize some remaining members of the ppc64_caches and systemcfg structures
  * (at least until we get rid of them completely). This is mostly some
  * cache informations about the CPU that will be used by cache flush
  * routines and/or provided to userland
  */
-static void __init initialize_naca(void)
+static void __init initialize_cache_info(void)
 {
 	struct device_node *np;
 	unsigned long num_cpus = 0;
 
-	DBG(" -> initialize_naca()\n");
+	DBG(" -> initialize_cache_info()\n");
 
 	for (np = NULL; (np = of_find_node_by_type(np, "cpu"));) {
 		num_cpus += 1;
@@ -489,15 +496,15 @@ static void __init initialize_naca(void)
 			lsizep = (u32 *) get_property(np, dc, NULL);
 			if (lsizep != NULL)
 				lsize = *lsizep;
-
 			if (sizep == 0 || lsizep == 0)
 				DBG("Argh, can't find dcache properties ! "
 				    "sizep: %p, lsizep: %p\n", sizep, lsizep);
 
-			systemcfg->dCacheL1Size = size;
-			systemcfg->dCacheL1LineSize = lsize;
-			naca->dCacheL1LogLineSize = __ilog2(lsize);
-			naca->dCacheL1LinesPerPage = PAGE_SIZE/(lsize);
+			systemcfg->dcache_size = ppc64_caches.dsize = size;
+			systemcfg->dcache_line_size =
+				ppc64_caches.dline_size = lsize;
+			ppc64_caches.log_dline_size = __ilog2(lsize);
+			ppc64_caches.dlines_per_page = PAGE_SIZE / lsize;
 
 			size = 0;
 			lsize = cur_cpu_spec->icache_bsize;
@@ -511,11 +518,11 @@ static void __init initialize_naca(void)
 				DBG("Argh, can't find icache properties ! "
 				    "sizep: %p, lsizep: %p\n", sizep, lsizep);
 
-			systemcfg->iCacheL1Size = size;
-			systemcfg->iCacheL1LineSize = lsize;
-			naca->iCacheL1LogLineSize = __ilog2(lsize);
-			naca->iCacheL1LinesPerPage = PAGE_SIZE/(lsize);
-
+			systemcfg->icache_size = ppc64_caches.isize = size;
+			systemcfg->icache_line_size =
+				ppc64_caches.iline_size = lsize;
+			ppc64_caches.log_iline_size = __ilog2(lsize);
+			ppc64_caches.ilines_per_page = PAGE_SIZE / lsize;
 		}
 	}
 
@@ -525,7 +532,7 @@ static void __init initialize_naca(void)
 	systemcfg->version.minor = SYSTEMCFG_MINOR;
 	systemcfg->processor = mfspr(SPRN_PVR);
 
-	DBG(" <- initialize_naca()\n");
+	DBG(" <- initialize_cache_info()\n");
 }
 
 static void __init check_for_initrd(void)
@@ -586,7 +593,7 @@ void __init setup_system(void)
 	unflatten_device_tree();
 
 	/*
-	 * Fill the naca & systemcfg structures with informations
+	 * Fill the ppc64_caches & systemcfg structures with informations
 	 * retreived from the device-tree. Need to be called before
 	 * finish_device_tree() since the later requires some of the
 	 * informations filled up here to properly parse the interrupt
@@ -595,7 +602,7 @@ void __init setup_system(void)
 	 * routines like flush_icache_range (used by the hash init
 	 * later on).
 	 */
-	initialize_naca();
+	initialize_cache_info();
 
 #ifdef CONFIG_PPC_PSERIES
 	/*
@@ -656,18 +663,19 @@ void __init setup_system(void)
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
 
 	printk("-----------------------------------------------------\n");
-	printk("naca                          = 0x%p\n", naca);
-	printk("naca->pftSize                 = 0x%lx\n", naca->pftSize);
-	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
-	printk("naca->interrupt_controller    = 0x%ld\n", naca->interrupt_controller);
+	printk("ppc64_pft_size                = 0x%lx\n", ppc64_pft_size);
+	printk("ppc64_debug_switch            = 0x%lx\n", ppc64_debug_switch);
+	printk("ppc64_interrupt_controller    = 0x%ld\n", ppc64_interrupt_controller);
 	printk("systemcfg                     = 0x%p\n", systemcfg);
 	printk("systemcfg->platform           = 0x%x\n", systemcfg->platform);
 	printk("systemcfg->processorCount     = 0x%lx\n", systemcfg->processorCount);
 	printk("systemcfg->physicalMemorySize = 0x%lx\n", systemcfg->physicalMemorySize);
-	printk("systemcfg->dCacheL1LineSize   = 0x%x\n", systemcfg->dCacheL1LineSize);
-	printk("systemcfg->iCacheL1LineSize   = 0x%x\n", systemcfg->iCacheL1LineSize);
-	printk("htab_data.htab                = 0x%p\n", htab_data.htab);
-	printk("htab_data.num_ptegs           = 0x%lx\n", htab_data.htab_num_ptegs);
+	printk("ppc64_caches.dcache_line_size = 0x%x\n",
+			ppc64_caches.dline_size);
+	printk("ppc64_caches.icache_line_size = 0x%x\n",
+			ppc64_caches.iline_size);
+	printk("htab_address                  = 0x%p\n", htab_address);
+	printk("htab_hash_mask                = 0x%lx\n", htab_hash_mask);
 	printk("-----------------------------------------------------\n");
 
 	mm_init_ppc64();
@@ -988,7 +996,6 @@ static void __init emergency_stack_init(void)
  */
 void __init setup_arch(char **cmdline_p)
 {
-	extern int panic_timeout;
 	extern void do_init_bootmem(void);
 
 	ppc64_boot_msg(0x12, "Setup Arch");
@@ -1000,8 +1007,8 @@ void __init setup_arch(char **cmdline_p)
 	 * Systems with OF can look in the properties on the cpu node(s)
 	 * for a possibly more accurate value.
 	 */
-	dcache_bsize = systemcfg->dCacheL1LineSize; 
-	icache_bsize = systemcfg->iCacheL1LineSize; 
+	dcache_bsize = ppc64_caches.dline_size;
+	icache_bsize = ppc64_caches.iline_size;
 
 	/* reboot on panic */
 	panic_timeout = 180;
@@ -1147,7 +1154,8 @@ __setup("decr_overclock=", set_decr_overclock );
 static struct plat_serial8250_port serial_ports[MAX_LEGACY_SERIAL_PORTS+1];
 static unsigned int old_serial_count;
 
-void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
+void __init generic_find_legacy_serial_ports(u64 *physport,
+		unsigned int *default_speed)
 {
 	struct device_node *np;
 	u32 *sizeprop;
@@ -1165,7 +1173,7 @@ void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
 
 	DBG(" -> generic_find_legacy_serial_port()\n");
 
-	naca->serialPortAddr = 0;
+	*physport = 0;
 	if (default_speed)
 		*default_speed = 0;
 
@@ -1287,7 +1295,7 @@ void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
 				io_base = (io_base << 32) | rangesp[4];
 		}
 		if (io_base != 0) {
-			naca->serialPortAddr = io_base + reg->address;
+			*physport = io_base + reg->address;
 			if (default_speed && spd)
 				*default_speed = *spd;
 		}
@@ -1337,6 +1345,7 @@ early_param("xmon", early_xmon);
 
 void cpu_die(void)
 {
+	idle_task_exit();
 	if (ppc_md.cpu_die)
 		ppc_md.cpu_die();
 	local_irq_disable();

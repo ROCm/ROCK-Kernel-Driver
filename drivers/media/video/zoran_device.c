@@ -32,6 +32,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/vmalloc.h>
+#include <linux/byteorder/generic.h>
 
 #include <linux/interrupt.h>
 #include <linux/proc_fs.h>
@@ -57,7 +58,6 @@
 		   ZR36057_ISR_JPEGRepIRQ )
 
 extern const struct zoran_format zoran_formats[];
-extern const int zoran_num_formats;
 
 extern int *zr_debug;
 
@@ -76,9 +76,12 @@ static int lml33dpath = 0;	/* 1 will use digital path in capture
 				 * load on Bt819 input, there will be
 				 * some image imperfections */
 
-MODULE_PARM(lml33dpath, "i");
+module_param(lml33dpath, bool, 0);
 MODULE_PARM_DESC(lml33dpath,
 		 "Use digital path capture mode (on LML33 cards)");
+
+static void
+zr36057_init_vfe (struct zoran *zr);
 
 /*
  * General Purpose I/O and Guest bus access
@@ -758,7 +761,7 @@ init_jpeg_queue (struct zoran *zr)
 		zr->jpg_buffers.buffer[i].state = BUZ_STATE_USER;	/* nothing going on */
 	}
 	for (i = 0; i < BUZ_NUM_STAT_COM; i++) {
-		zr->stat_com[i] = 1;	/* mark as unavailable to zr36057 */
+		zr->stat_com[i] = cpu_to_le32(1);	/* mark as unavailable to zr36057 */
 	}
 }
 
@@ -1033,7 +1036,10 @@ zr36057_enable_jpg (struct zoran          *zr,
 
 	switch (mode) {
 
-	case BUZ_MODE_MOTION_COMPRESS:
+	case BUZ_MODE_MOTION_COMPRESS: {
+		struct jpeg_app_marker app;
+		struct jpeg_com_marker com;
+
 		/* In motion compress mode, the decoder output must be enabled, and
 		 * the video bus direction set to input.
 		 */
@@ -1043,6 +1049,19 @@ zr36057_enable_jpg (struct zoran          *zr,
 
 		/* Take the JPEG codec and the VFE out of sleep */
 		jpeg_codec_sleep(zr, 0);
+
+		/* set JPEG app/com marker */
+		app.appn = zr->jpg_settings.jpg_comp.APPn;
+		app.len = zr->jpg_settings.jpg_comp.APP_len;
+		memcpy(app.data, zr->jpg_settings.jpg_comp.APP_data, 60);
+		zr->codec->control(zr->codec, CODEC_S_JPEG_APP_DATA,
+				   sizeof(struct jpeg_app_marker), &app);
+
+		com.len = zr->jpg_settings.jpg_comp.COM_len;
+		memcpy(com.data, zr->jpg_settings.jpg_comp.COM_data, 60);
+		zr->codec->control(zr->codec, CODEC_S_JPEG_COM_DATA,
+				   sizeof(struct jpeg_com_marker), &com);
+
 		/* Setup the JPEG codec */
 		zr->codec->control(zr->codec, CODEC_S_JPEG_TDS_BYTE,
 				   sizeof(int), &field_size);
@@ -1066,6 +1085,7 @@ zr36057_enable_jpg (struct zoran          *zr,
 		dprintk(2, KERN_INFO "%s: enable_jpg(MOTION_COMPRESS)\n",
 			ZR_DEVNAME(zr));
 		break;
+	}
 
 	case BUZ_MODE_MOTION_DECOMPRESS:
 		/* In motion decompression mode, the decoder output must be disabled, and
@@ -1146,20 +1166,20 @@ zoran_feed_stat_com (struct zoran *zr)
 			/* fill 1 stat_com entry */
 			i = (zr->jpg_dma_head -
 			     zr->jpg_err_shift) & BUZ_MASK_STAT_COM;
-			if (!(zr->stat_com[i] & 1))
+			if (!(zr->stat_com[i] & cpu_to_le32(1)))
 				break;
 			zr->stat_com[i] =
-			    zr->jpg_buffers.buffer[frame].frag_tab_bus;
+			    cpu_to_le32(zr->jpg_buffers.buffer[frame].frag_tab_bus);
 		} else {
 			/* fill 2 stat_com entries */
 			i = ((zr->jpg_dma_head -
 			      zr->jpg_err_shift) & 1) * 2;
-			if (!(zr->stat_com[i] & 1))
+			if (!(zr->stat_com[i] & cpu_to_le32(1)))
 				break;
 			zr->stat_com[i] =
-			    zr->jpg_buffers.buffer[frame].frag_tab_bus;
+			    cpu_to_le32(zr->jpg_buffers.buffer[frame].frag_tab_bus);
 			zr->stat_com[i + 1] =
-			    zr->jpg_buffers.buffer[frame].frag_tab_bus;
+			    cpu_to_le32(zr->jpg_buffers.buffer[frame].frag_tab_bus);
 		}
 		zr->jpg_buffers.buffer[frame].state = BUZ_STATE_DMA;
 		zr->jpg_dma_head++;
@@ -1196,7 +1216,7 @@ zoran_reap_stat_com (struct zoran *zr)
 			i = ((zr->jpg_dma_tail -
 			      zr->jpg_err_shift) & 1) * 2 + 1;
 
-		stat_com = zr->stat_com[i];
+		stat_com = le32_to_cpu(zr->stat_com[i]);
 
 		if ((stat_com & 1) == 0) {
 			return;
@@ -1292,7 +1312,7 @@ error_handler (struct zoran *zr,
 					for (i = 0;
 					     i < zr->jpg_buffers.num_buffers;
 					     i++) {
-						if (zr->stat_com[j] ==
+						if (le32_to_cpu(zr->stat_com[j]) ==
 						    zr->jpg_buffers.
 						    buffer[i].
 						    frag_tab_bus) {
@@ -1304,7 +1324,6 @@ error_handler (struct zoran *zr,
 				printk("\n");
 			}
 		}
-
 		/* Find an entry in stat_com and rotate contents */
 		{
 			int i;
@@ -1317,9 +1336,9 @@ error_handler (struct zoran *zr,
 				      zr->jpg_err_shift) & 1) * 2;
 			if (zr->codec_mode == BUZ_MODE_MOTION_DECOMPRESS) {
 				/* Mimic zr36067 operation */
-				zr->stat_com[i] |= 1;
+				zr->stat_com[i] |= cpu_to_le32(1);
 				if (zr->jpg_settings.TmpDcm != 1)
-					zr->stat_com[i + 1] |= 1;
+					zr->stat_com[i + 1] |= cpu_to_le32(1);
 				/* Refill */
 				zoran_reap_stat_com(zr);
 				zoran_feed_stat_com(zr);
@@ -1338,12 +1357,17 @@ error_handler (struct zoran *zr,
 				int j;
 				u32 bus_addr[BUZ_NUM_STAT_COM];
 
+				/* Here we are copying the stat_com array, which
+				 * is already in little endian format, so
+				 * no endian conversions here
+				 */
 				memcpy(bus_addr, zr->stat_com,
 				       sizeof(bus_addr));
 				for (j = 0; j < BUZ_NUM_STAT_COM; j++) {
 					zr->stat_com[j] =
 					    bus_addr[(i + j) &
 						     BUZ_MASK_STAT_COM];
+
 				}
 				zr->jpg_err_shift += i;
 				zr->jpg_err_shift &= BUZ_MASK_STAT_COM;
@@ -1547,7 +1571,7 @@ zoran_irq (int             irq,
 						int i;
 						strcpy(sv, sc);
 						for (i = 0; i < 4; i++) {
-							if (zr->stat_com[i] & 1)
+							if (le32_to_cpu(zr->stat_com[i]) & 1)
 								sv[i] = '1';
 						}
 						sv[4] = 0;
@@ -1575,7 +1599,7 @@ zoran_irq (int             irq,
 					       ZR_DEVNAME(zr), zr->jpg_seq_num);
 					for (i = 0; i < 4; i++) {
 						printk(" %08x",
-						       zr->stat_com[i]);
+						       le32_to_cpu(zr->stat_com[i]));
 					}
 					printk("\n");
 				}
@@ -1701,7 +1725,7 @@ zr36057_restart (struct zoran *zr)
  * initialize video front end
  */
 
-void
+static void
 zr36057_init_vfe (struct zoran *zr)
 {
 	u32 reg;

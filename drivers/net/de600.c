@@ -75,15 +75,15 @@ static const char version[] = "de600.c: $Revision: 1.41-2.5 $,  Bjorn Ekwall (bj
 #include "de600.h"
 
 static unsigned int de600_debug = DE600_DEBUG;
-MODULE_PARM(de600_debug, "i");
+module_param(de600_debug, int, 0);
 MODULE_PARM_DESC(de600_debug, "DE-600 debug level (0-2)");
 
 static unsigned int check_lost = 1;
-MODULE_PARM(check_lost, "i");
+module_param(check_lost, bool, 0);
 MODULE_PARM_DESC(check_lost, "If set then check for unplugged de600");
 
 static unsigned int delay_time = 10;
-MODULE_PARM(delay_time, "i");
+module_param(delay_time, int, 0);
 MODULE_PARM_DESC(delay_time, "DE-600 deley on I/O in microseconds");
 
 

@@ -75,7 +75,8 @@ extern void maple_calibrate_decr(void);
 extern void maple_pci_init(void);
 extern void maple_pcibios_fixup(void);
 extern int maple_pci_get_legacy_ide_irq(struct pci_dev *dev, int channel);
-extern void generic_find_legacy_serial_ports(unsigned int *default_speed);
+extern void generic_find_legacy_serial_ports(u64 *physport,
+		unsigned int *default_speed);
 
 
 static void maple_restart(char *cmd)
@@ -110,11 +111,6 @@ void __init maple_setup_arch(void)
 #ifdef CONFIG_SMP
 	smp_ops = &maple_smp_ops;
 #endif
-	/* Setup the PCI DMA to "direct" by default. May be overriden
-	 * by iommu later on
-	 */
-	pci_dma_init_direct();
-
 	/* Lookup PCI hosts */
        	maple_pci_init();
 
@@ -129,6 +125,7 @@ void __init maple_setup_arch(void)
 static void __init maple_init_early(void)
 {
 	unsigned int default_speed;
+	u64 physport;
 
 	DBG(" -> maple_init_early\n");
 
@@ -138,14 +135,14 @@ static void __init maple_init_early(void)
 	hpte_init_native();
 
 	/* Find the serial port */
-       	generic_find_legacy_serial_ports(&default_speed);
+	generic_find_legacy_serial_ports(&physport, &default_speed);
 
-	DBG("naca->serialPortAddr: %lx\n", (long)naca->serialPortAddr);
+	DBG("phys port addr: %lx\n", (long)physport);
 
-	if (naca->serialPortAddr) {
+	if (physport) {
 		void *comport;
 		/* Map the uart for udbg. */
-		comport = (void *)__ioremap(naca->serialPortAddr, 16, _PAGE_NO_CACHE);
+		comport = (void *)__ioremap(physport, 16, _PAGE_NO_CACHE);
 		udbg_init_uart(comport, default_speed);
 
 		ppc_md.udbg_putc = udbg_putc;
@@ -155,7 +152,9 @@ static void __init maple_init_early(void)
 	}
 
 	/* Setup interrupt mapping options */
-	naca->interrupt_controller = IC_OPEN_PIC;
+	ppc64_interrupt_controller = IC_OPEN_PIC;
+
+	iommu_init_early_u3();
 
 	DBG(" <- maple_init_early\n");
 }

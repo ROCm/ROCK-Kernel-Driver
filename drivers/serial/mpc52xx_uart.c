@@ -640,7 +640,7 @@ mpc52xx_console_setup(struct console *co, char *options)
 	
 	/* Basic port init. Needed since we use some uart_??? func before
 	 * real init for early access */
-	port->lock	= SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&port->lock);
 	port->uartclk	= __res.bi_ipbfreq / 2; /* Look at CTLR doc */
 	port->ops	= &mpc52xx_uart_ops;
 	port->mapbase	= MPC52xx_PSCx(co->index);
@@ -724,7 +724,7 @@ mpc52xx_uart_probe(struct ocp_device *ocp)
 	port = &mpc52xx_uart_ports[idx];
 
 	/* Init the port structure */
-	port->lock	= SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&port->lock);
 	port->mapbase	= ocp->def->paddr;
 	port->irq	= ocp->def->irq;
 	port->uartclk	= __res.bi_ipbfreq / 2; /* Look at CTLR doc */

@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/rmap.h>
 #include <linux/security.h>
+#include <linux/acct.h>
 #include <linux/backing-dev.h>
 #include <linux/syscalls.h>
 
@@ -31,7 +32,7 @@
 #include <asm/tlbflush.h>
 #include <linux/swapops.h>
 
-spinlock_t swaplock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(swaplock);
 unsigned int nr_swapfiles;
 long total_swap_pages;
 static int swap_overflow;
@@ -436,15 +437,16 @@ unuse_pte(struct vm_area_struct *vma, unsigned long address, pte_t *dir,
 	set_pte(dir, pte_mkold(mk_pte(page, vma->vm_page_prot)));
 	page_add_anon_rmap(page, vma, address);
 	swap_free(entry);
+	acct_update_integrals();
+	update_mem_hiwater();
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static unsigned long unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
-	unsigned long address, unsigned long size, unsigned long offset,
+static unsigned long unuse_pmd(struct vm_area_struct *vma, pmd_t *dir,
+	unsigned long address, unsigned long end,
 	swp_entry_t entry, struct page *page)
 {
-	pte_t * pte;
-	unsigned long end;
+	pte_t *pte;
 	pte_t swp_pte = swp_entry_to_pte(entry);
 
 	if (pmd_none(*dir))
@@ -455,18 +457,13 @@ static unsigned long unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 		return 0;
 	}
 	pte = pte_offset_map(dir, address);
-	offset += address & PMD_MASK;
-	address &= ~PMD_MASK;
-	end = address + size;
-	if (end > PMD_SIZE)
-		end = PMD_SIZE;
 	do {
 		/*
 		 * swapoff spends a _lot_ of time in this loop!
 		 * Test inline before going to call unuse_pte.
 		 */
 		if (unlikely(pte_same(*pte, swp_pte))) {
-			unuse_pte(vma, offset + address, pte, entry, page);
+			unuse_pte(vma, address, pte, entry, page);
 			pte_unmap(pte);
 
 			/*
@@ -476,22 +473,22 @@ static unsigned long unuse_pmd(struct vm_area_struct * vma, pmd_t *dir,
 			activate_page(page);
 
 			/* add 1 since address may be 0 */
-			return 1 + offset + address;
+			return 1 + address;
 		}
 		address += PAGE_SIZE;
 		pte++;
-	} while (address && (address < end));
+	} while (address < end);
 	pte_unmap(pte - 1);
 	return 0;
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static unsigned long unuse_pud(struct vm_area_struct * vma, pud_t *pud,
-        unsigned long address, unsigned long size, unsigned long offset,
+static unsigned long unuse_pud(struct vm_area_struct *vma, pud_t *pud,
+        unsigned long address, unsigned long end,
 	swp_entry_t entry, struct page *page)
 {
-	pmd_t * pmd;
-	unsigned long end;
+	pmd_t *pmd;
+	unsigned long next;
 	unsigned long foundaddr;
 
 	if (pud_none(*pud))
@@ -502,33 +499,27 @@ static unsigned long unuse_pud(struct vm_area_struct * vma, pud_t *pud,
 		return 0;
 	}
 	pmd = pmd_offset(pud, address);
-	offset += address & PUD_MASK;
-	address &= ~PUD_MASK;
-	end = address + size;
-	if (end > PUD_SIZE)
-		end = PUD_SIZE;
-	if (address >= end)
-		BUG();
 	do {
-		foundaddr = unuse_pmd(vma, pmd, address, end - address,
-						offset, entry, page);
+		next = (address + PMD_SIZE) & PMD_MASK;
+		if (next > end || !next)
+			next = end;
+		foundaddr = unuse_pmd(vma, pmd, address, next, entry, page);
 		if (foundaddr)
 			return foundaddr;
-		address = (address + PMD_SIZE) & PMD_MASK;
+		address = next;
 		pmd++;
-	} while (address && (address < end));
+	} while (address < end);
 	return 0;
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static unsigned long unuse_pgd(struct vm_area_struct * vma, pgd_t *pgd,
-	unsigned long address, unsigned long size,
+static unsigned long unuse_pgd(struct vm_area_struct *vma, pgd_t *pgd,
+	unsigned long address, unsigned long end,
 	swp_entry_t entry, struct page *page)
 {
-	pud_t * pud;
-	unsigned long offset;
+	pud_t *pud;
+	unsigned long next;
 	unsigned long foundaddr;
-	unsigned long end;
 
 	if (pgd_none(*pgd))
 		return 0;
@@ -538,54 +529,48 @@ static unsigned long unuse_pgd(struct vm_area_struct * vma, pgd_t *pgd,
 		return 0;
 	}
 	pud = pud_offset(pgd, address);
-	offset = address & PGDIR_MASK;
-	address &= ~PGDIR_MASK;
-	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
-	BUG_ON (address >= end);
 	do {
-		foundaddr = unuse_pud(vma, pud, address, end - address,
-					        offset, entry, page);
+		next = (address + PUD_SIZE) & PUD_MASK;
+		if (next > end || !next)
+			next = end;
+		foundaddr = unuse_pud(vma, pud, address, next, entry, page);
 		if (foundaddr)
 			return foundaddr;
-		address = (address + PUD_SIZE) & PUD_MASK;
+		address = next;
 		pud++;
-	} while (address && (address < end));
+	} while (address < end);
 	return 0;
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static unsigned long unuse_vma(struct vm_area_struct * vma,
+static unsigned long unuse_vma(struct vm_area_struct *vma,
 	swp_entry_t entry, struct page *page)
 {
 	pgd_t *pgd;
-	unsigned long start, end, next;
+	unsigned long address, next, end;
 	unsigned long foundaddr;
-	int i;
 
 	if (page->mapping) {
-		start = page_address_in_vma(page, vma);
-		if (start == -EFAULT)
+		address = page_address_in_vma(page, vma);
+		if (address == -EFAULT)
 			return 0;
 		else
-			end = start + PAGE_SIZE;
+			end = address + PAGE_SIZE;
 	} else {
-		start = vma->vm_start;
+		address = vma->vm_start;
 		end = vma->vm_end;
 	}
-	pgd = pgd_offset(vma->vm_mm, start);
-	for (i = pgd_index(start); i <= pgd_index(end-1); i++) {
-		next = (start + PGDIR_SIZE) & PGDIR_MASK;
-		if (next > end || next <= start)
+	pgd = pgd_offset(vma->vm_mm, address);
+	do {
+		next = (address + PGDIR_SIZE) & PGDIR_MASK;
+		if (next > end || !next)
 			next = end;
-		foundaddr = unuse_pgd(vma, pgd, start, next - start, entry, page);
+		foundaddr = unuse_pgd(vma, pgd, address, next, entry, page);
 		if (foundaddr)
 			return foundaddr;
-		start = next;
-		i++;
+		address = next;
 		pgd++;
-	}
+	} while (address < end);
 	return 0;
 }
 
@@ -1631,8 +1616,7 @@ bad_swap_2:
 		++least_priority;
 	swap_list_unlock();
 	destroy_swap_extents(p);
-	if (swap_map)
-		vfree(swap_map);
+	vfree(swap_map);
 	if (swap_file)
 		filp_close(swap_file, NULL);
 out:

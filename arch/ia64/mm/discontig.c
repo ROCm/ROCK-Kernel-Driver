@@ -44,7 +44,7 @@ struct early_node_data {
 	unsigned long max_pfn;
 };
 
-static struct early_node_data mem_data[NR_NODES] __initdata;
+static struct early_node_data mem_data[MAX_NUMNODES] __initdata;
 
 /**
  * reassign_cpu_only_nodes - called from find_memory to move CPU-only nodes to a memory node
@@ -61,9 +61,9 @@ static void __init reassign_cpu_only_nodes(void)
 	struct node_memblk_s *p;
 	int i, j, k, nnode, nid, cpu, cpunid, pxm;
 	u8 cslit, slit;
-	static DECLARE_BITMAP(nodes_with_mem, NR_NODES) __initdata;
+	static DECLARE_BITMAP(nodes_with_mem, MAX_NUMNODES) __initdata;
 	static u8 numa_slit_fix[MAX_NUMNODES * MAX_NUMNODES] __initdata;
-	static int node_flip[NR_NODES] __initdata;
+	static int node_flip[MAX_NUMNODES] __initdata;
 	static int old_nid_map[NR_CPUS] __initdata;
 
 	for (nnode = 0, p = &node_memblk[0]; p < &node_memblk[num_node_memblks]; p++)
@@ -75,7 +75,7 @@ static void __init reassign_cpu_only_nodes(void)
 	/*
 	 * All nids with memory.
 	 */
-	if (nnode == numnodes)
+	if (nnode == num_online_nodes())
 		return;
 
 	/*
@@ -84,10 +84,17 @@ static void __init reassign_cpu_only_nodes(void)
 	 * For reassigned CPU nodes a nid can't be arrived at
 	 * until after this loop because the target nid's new
 	 * identity might not have been established yet. So
-	 * new nid values are fabricated above numnodes and
+	 * new nid values are fabricated above num_online_nodes() and
 	 * mapped back later to their true value.
 	 */
-	for (nid = 0, i = 0; i < numnodes; i++)  {
+	/* MCD - This code is a bit complicated, but may be unnecessary now.
+	 * We can now handle much more interesting node-numbering.
+	 * The old requirement that 0 <= nid <= numnodes <= MAX_NUMNODES
+	 * and that there be no holes in the numbering 0..numnodes
+	 * has become simply 0 <= nid <= MAX_NUMNODES.
+	 */
+	nid = 0;
+	for_each_online_node(i)  {
 		if (test_bit(i, (void *) nodes_with_mem)) {
 			/*
 			 * Save original nid value for numa_slit
@@ -107,7 +114,7 @@ static void __init reassign_cpu_only_nodes(void)
 			cpunid = nid;
 			nid++;
 		} else
-			cpunid = numnodes;
+			cpunid = MAX_NUMNODES;
 
 		for (cpu = 0; cpu < NR_CPUS; cpu++)
 			if (node_cpuid[cpu].nid == i) {
@@ -115,7 +122,7 @@ static void __init reassign_cpu_only_nodes(void)
 				 * For nodes not being reassigned just
 				 * fix the cpu's nid and reverse pxm map
 				 */
-				if (cpunid < numnodes) {
+				if (cpunid < MAX_NUMNODES) {
 					pxm = nid_to_pxm_map[i];
 					pxm_to_nid_map[pxm] =
 					          node_cpuid[cpu].nid = cpunid;
@@ -125,18 +132,21 @@ static void __init reassign_cpu_only_nodes(void)
 				/*
 				 * For nodes being reassigned, find best node by
 				 * numa_slit information and then make a temporary
-				 * nid value based on current nid and numnodes.
+				 * nid value based on current nid and num_online_nodes().
 				 */
-				for (slit = 0xff, k = numnodes + numnodes, j = 0; j < numnodes; j++)
+				slit = 0xff;
+				k = 2*num_online_nodes();
+				for_each_online_node(j) {
 					if (i == j)
 						continue;
 					else if (test_bit(j, (void *) nodes_with_mem)) {
-						cslit = numa_slit[i * numnodes + j];
+						cslit = numa_slit[i * num_online_nodes() + j];
 						if (cslit < slit) {
-							k = numnodes + j;
+							k = num_online_nodes() + j;
 							slit = cslit;
 						}
 					}
+				}
 
 				/* save old nid map so we can update the pxm */
 				old_nid_map[cpu] = node_cpuid[cpu].nid;
@@ -148,12 +158,12 @@ static void __init reassign_cpu_only_nodes(void)
 	 * Fixup temporary nid values for CPU-only nodes.
 	 */
 	for (cpu = 0; cpu < NR_CPUS; cpu++)
-		if (node_cpuid[cpu].nid == (numnodes + numnodes)) {
+		if (node_cpuid[cpu].nid == (2*num_online_nodes())) {
 			pxm = nid_to_pxm_map[old_nid_map[cpu]];
 			pxm_to_nid_map[pxm] = node_cpuid[cpu].nid = nnode - 1;
 		} else {
 			for (i = 0; i < nnode; i++) {
-				if (node_flip[i] != (node_cpuid[cpu].nid - numnodes))
+				if (node_flip[i] != (node_cpuid[cpu].nid - num_online_nodes()))
 					continue;
 
 				pxm = nid_to_pxm_map[old_nid_map[cpu]];
@@ -169,14 +179,13 @@ static void __init reassign_cpu_only_nodes(void)
 	for (i = 0; i < nnode; i++)
 		for (j = 0; j < nnode; j++)
 			numa_slit_fix[i * nnode + j] =
-				numa_slit[node_flip[i] * numnodes + node_flip[j]];
+				numa_slit[node_flip[i] * num_online_nodes() + node_flip[j]];
 
 	memcpy(numa_slit, numa_slit_fix, sizeof (numa_slit));
 
-	for (i = nnode; i < numnodes; i++)
-		node_set_offline(i);
-
-	numnodes = nnode;
+	nodes_clear(node_online_map);
+	for (i = 0; i < nnode; i++)
+		node_set_online(i);
 
 	return;
 }
@@ -419,7 +428,7 @@ static void __init reserve_pernode_space(void)
 	struct bootmem_data *bdp;
 	int node;
 
-	for (node = 0; node < numnodes; node++) {
+	for_each_online_node(node) {
 		pg_data_t *pdp = mem_data[node].pgdat;
 
 		bdp = pdp->bdata;
@@ -448,13 +457,13 @@ static void __init reserve_pernode_space(void)
 static void __init initialize_pernode_data(void)
 {
 	int cpu, node;
-	pg_data_t *pgdat_list[NR_NODES];
+	pg_data_t *pgdat_list[MAX_NUMNODES];
 
-	for (node = 0; node < numnodes; node++)
+	for_each_online_node(node)
 		pgdat_list[node] = mem_data[node].pgdat;
 
 	/* Copy the pg_data_t list to each node and init the node field */
-	for (node = 0; node < numnodes; node++) {
+	for_each_online_node(node) {
 		memcpy(mem_data[node].node_data->pg_data_ptrs, pgdat_list,
 		       sizeof(pgdat_list));
 	}
@@ -478,15 +487,15 @@ void __init find_memory(void)
 
 	reserve_memory();
 
-	if (numnodes == 0) {
+	if (num_online_nodes() == 0) {
 		printk(KERN_ERR "node info missing!\n");
-		numnodes = 1;
+		node_set_online(0);
 	}
 
 	min_low_pfn = -1;
 	max_low_pfn = 0;
 
-	if (numnodes > 1)
+	if (num_online_nodes() > 1)
 		reassign_cpu_only_nodes();
 
 	/* These actually end up getting called by call_pernode_memory() */
@@ -497,9 +506,12 @@ void __init find_memory(void)
 	 * Initialize the boot memory maps in reverse order since that's
 	 * what the bootmem allocator expects
 	 */
-	for (node = numnodes - 1; node >= 0; node--) {
+	for (node = MAX_NUMNODES - 1; node >= 0; node--) {
 		unsigned long pernode, pernodesize, map;
 		struct bootmem_data *bdp;
+
+		if (!node_online(node))
+			continue;
 
 		bdp = &mem_data[node].bootmem_data;
 		pernode = mem_data[node].pernode_addr;
@@ -687,12 +699,12 @@ void __init paging_init(void)
 	max_dma = virt_to_phys((void *) MAX_DMA_ADDRESS) >> PAGE_SHIFT;
 
 	/* so min() will work in count_node_pages */
-	for (node = 0; node < numnodes; node++)
+	for_each_online_node(node)
 		mem_data[node].min_pfn = ~0UL;
 
 	efi_memmap_walk(filter_rsvd_memory, count_node_pages);
 
-	for (node = 0; node < numnodes; node++) {
+	for_each_online_node(node) {
 		memset(zones_size, 0, sizeof(zones_size));
 		memset(zholes_size, 0, sizeof(zholes_size));
 

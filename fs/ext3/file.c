@@ -43,20 +43,6 @@ static int ext3_release_file (struct inode * inode, struct file * filp)
 	return 0;
 }
 
-/*
- * Called when an inode is about to be opened.
- * We use this to disallow opening RW large files on 32bit systems if
- * the caller didn't specify O_LARGEFILE.  On 64bit systems we force
- * on this flag in sys_open.
- */
-static int ext3_open_file (struct inode *inode, struct file *filp)
-{
-	if (!(filp->f_flags & O_LARGEFILE) &&
-	    inode->i_size > 0x7FFFFFFFLL)
-		return -EFBIG;
-	return 0;
-}
-
 static ssize_t
 ext3_file_write(struct kiocb *iocb, const char __user *buf, size_t count, loff_t pos)
 {
@@ -125,7 +111,7 @@ struct file_operations ext3_file_operations = {
 	.writev		= generic_file_writev,
 	.ioctl		= ext3_ioctl,
 	.mmap		= generic_file_mmap,
-	.open		= ext3_open_file,
+	.open		= generic_file_open,
 	.release	= ext3_release_file,
 	.fsync		= ext3_sync_file,
 	.sendfile	= generic_file_sendfile,

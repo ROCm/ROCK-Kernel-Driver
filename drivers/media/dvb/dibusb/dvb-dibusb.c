@@ -602,8 +602,8 @@ static void frontend_init(struct usb_dibusb* dib)
 
 	if (dib->fe == NULL) {
 		printk("dvb-dibusb: A frontend driver was not found for device %04x/%04x\n",
-		       dib->udev->descriptor.idVendor,
-		       dib->udev->descriptor.idProduct);
+		       le16_to_cpu(dib->udev->descriptor.idVendor),
+		       le16_to_cpu(dib->udev->descriptor.idProduct));
 	} else {
 		if (dvb_register_frontend(dib->adapter, dib->fe)) {
 			printk("dvb-dibusb: Frontend registration failed!\n");
@@ -917,11 +917,11 @@ static int dibusb_probe(struct usb_interface *intf,
 	int ret = -ENOMEM,i,cold=0;
 
 	for (i = 0; i < DIBUSB_SUPPORTED_DEVICES; i++)
-		if (dibusb_devices[i].cold_product_id == udev->descriptor.idProduct ||
-			dibusb_devices[i].warm_product_id == udev->descriptor.idProduct) {
+		if (dibusb_devices[i].cold_product_id == le16_to_cpu(udev->descriptor.idProduct) ||
+			dibusb_devices[i].warm_product_id == le16_to_cpu(udev->descriptor.idProduct)) {
 			dibdev = &dibusb_devices[i];
 
-			cold = dibdev->cold_product_id == udev->descriptor.idProduct;
+			cold = dibdev->cold_product_id == le16_to_cpu(udev->descriptor.idProduct);
 
 			if (cold)
 				info("found a '%s' in cold state, will try to load a firmware",dibdev->name);
@@ -931,7 +931,7 @@ static int dibusb_probe(struct usb_interface *intf,
 
 	if (dibdev == NULL) {
 		err("something went very wrong, "
-				"unknown product ID: %.4x",udev->descriptor.idProduct);
+				"unknown product ID: %.4x",le16_to_cpu(udev->descriptor.idProduct));
 		return -ENODEV;
 	}
 

@@ -9,8 +9,10 @@
 
 #ifdef CONFIG_ARCH_IOP321
 #define UTYPE unsigned char *
-#else
+#elif defined(CONFIG_ARCH_IOP331)
 #define UTYPE u32 *
+#else
+#error "Missing IOP3xx arch type def"
 #endif
 
 static volatile UTYPE uart_base;
@@ -42,8 +44,8 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
 			uart_base = (volatile UTYPE)IQ80321_UART;
 		else if(machine_is_iq31244())
 			uart_base = (volatile UTYPE)IQ31244_UART;
-		else if(machine_is_iq80331())
-			uart_base = (volatile UTYPE)IQ80331_UART0_PHYS;
+		else if(machine_is_iq80331() || machine_is_iq80332())
+			uart_base = (volatile UTYPE)IOP331_UART0_PHYS;
 		else
 			uart_base = (volatile UTYPE)0xfe800000;
 }

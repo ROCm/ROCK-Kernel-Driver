@@ -29,6 +29,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default n
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 source "init/Kconfig"
 
 menu "Processor type and features"
@@ -328,12 +332,6 @@ config COBRA5272
 	help
 	  Support for the senTec COBRA5272 board.
 
-config M5275EVB
-	bool "Freescale (Motorola) M5275EVB board support"
-	depends on M527x
-	help
-	  Support for the Freescale (Motorola) M5275EVB board.
-
 config M5282EVB
 	bool "Motorola M5282EVB board support"
 	depends on M528x
@@ -448,7 +446,7 @@ config SNEHA
         bool
 	default y
 	depends on CPU16B
-	
+
 config LARGE_ALLOCS
 	bool "Allow allocating large blocks (> 1MB) of memory"
 	help
@@ -531,11 +529,6 @@ config ROMKERNEL
 	bool "ROM"
 	help
 	  The kernel will be resident in FLASH/ROM when running.
-
-config HIMEMKERNEL
-	bool "HIMEM"
-	help
-	  The kernel will be resident in high memory when running.
 
 endchoice
 

@@ -4,7 +4,7 @@
  * PCI support for the Intel IOP331 chipset
  *
  * Author: Dave Jiang (dave.jiang@intel.com)
- * Copyright (C) 2003 Intel Corp.
+ * Copyright (C) 2003, 2004 Intel Corp.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -26,12 +26,19 @@
 
 #include <asm/arch/iop331.h>
 
-//#define DEBUG
+#undef DEBUG
+#undef DEBUG1
 
 #ifdef DEBUG
 #define  DBG(x...) printk(x)
 #else
 #define  DBG(x...) do { } while (0)
+#endif
+
+#ifdef DEBUG1
+#define  DBG1(x...) printk(x)
+#else
+#define  DBG1(x...) do { } while (0)
 #endif
 
 /*
@@ -197,21 +204,19 @@ struct pci_bus *iop331_scan_bus(int nr, struct pci_sys_data *sys)
 
 void iop331_init(void)
 {
-	DBG("PCI:  Intel 80331 PCI init code.\n");
-	DBG("\tATU: IOP331_ATUCMD=0x%04x\n", *IOP331_ATUCMD);
-	DBG("\tATU: IOP331_OMWTVR0=0x%04x, IOP331_OIOWTVR=0x%04x\n",
+	DBG1("PCI:  Intel 80331 PCI init code.\n");
+	DBG1("\tATU: IOP331_ATUCMD=0x%04x\n", *IOP331_ATUCMD);
+	DBG1("\tATU: IOP331_OMWTVR0=0x%04x, IOP331_OIOWTVR=0x%04x\n",
 			*IOP331_OMWTVR0,
 			*IOP331_OIOWTVR);
-	DBG("\tATU: IOP331_ATUCR=0x%08x\n", *IOP331_ATUCR);
-	DBG("\tATU: IOP331_IABAR0=0x%08x IOP331_IALR0=0x%08x IOP331_IATVR0=%08x\n", *IOP331_IABAR0, *IOP331_IALR0, *IOP331_IATVR0);
-	DBG("\tATU: IOP331_ERBAR=0x%08x IOP331_ERLR=0x%08x IOP331_ERTVR=%08x\n", *IOP331_ERBAR, *IOP331_ERLR, *IOP331_ERTVR);
-	DBG("\tATU: IOP331_IABAR2=0x%08x IOP331_IALR2=0x%08x IOP331_IATVR2=%08x\n", *IOP331_IABAR2, *IOP331_IALR2, *IOP331_IATVR2);
-	DBG("\tATU: IOP331_IABAR3=0x%08x IOP331_IALR3=0x%08x IOP331_IATVR3=%08x\n", *IOP331_IABAR3, *IOP331_IALR3, *IOP331_IATVR3);
+	DBG1("\tATU: IOP331_OMWTVR1=0x%04x\n", *IOP331_OMWTVR1);
+	DBG1("\tATU: IOP331_ATUCR=0x%08x\n", *IOP331_ATUCR);
+	DBG1("\tATU: IOP331_IABAR0=0x%08x IOP331_IALR0=0x%08x IOP331_IATVR0=%08x\n", *IOP331_IABAR0, *IOP331_IALR0, *IOP331_IATVR0);
+	DBG1("\tATU: IOP31_IABAR1=0x%08x IOP331_IALR1=0x%08x\n", *IOP331_IABAR1, *IOP331_IALR1);
+	DBG1("\tATU: IOP331_ERBAR=0x%08x IOP331_ERLR=0x%08x IOP331_ERTVR=%08x\n", *IOP331_ERBAR, *IOP331_ERLR, *IOP331_ERTVR);
+	DBG1("\tATU: IOP331_IABAR2=0x%08x IOP331_IALR2=0x%08x IOP331_IATVR2=%08x\n", *IOP331_IABAR2, *IOP331_IALR2, *IOP331_IATVR2);
+	DBG1("\tATU: IOP331_IABAR3=0x%08x IOP331_IALR3=0x%08x IOP331_IATVR3=%08x\n", *IOP331_IABAR3, *IOP331_IALR3, *IOP331_IATVR3);
 
-	/* redboot changed, reset IABAR0 to something sane */
-	/* fixes master aborts in plugged in cards */
-	/* will clean up later and work nicely with redboot */
-	*IOP331_IABAR0 = 0x00000004;
 	hook_fault_code(16+6, iop331_pci_abort, SIGBUS, "imprecise external abort");
 }
 

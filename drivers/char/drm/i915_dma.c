@@ -12,24 +12,6 @@
 #include "i915_drm.h"
 #include "i915_drv.h"
 
-static inline void i915_print_status_page(drm_device_t * dev)
-{
-	drm_i915_private_t *dev_priv = dev->dev_private;
-	u32 *temp = dev_priv->hw_status_page;
-
-	if (!temp) {
-		DRM_DEBUG("no status page\n");
-		return;
-	}
-
-	DRM_DEBUG("hw_status: Interrupt Status : %x\n", temp[0]);
-	DRM_DEBUG("hw_status: LpRing Head ptr : %x\n", temp[1]);
-	DRM_DEBUG("hw_status: IRing Head ptr : %x\n", temp[2]);
-	DRM_DEBUG("hw_status: Reserved : %x\n", temp[3]);
-	DRM_DEBUG("hw_status: Driver Counter : %d\n", temp[5]);
-
-}
-
 /* Really want an OS-independent resettable timer.  Would like to have
  * this loop run for (eg) 3 sec, but have the timer reset every time
  * the head pointer changes, so that EBUSY only happens if the ring

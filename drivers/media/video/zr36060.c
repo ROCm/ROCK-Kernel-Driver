@@ -56,12 +56,12 @@
 static int zr36060_codecs = 0;
 
 static int low_bitrate = 0;
-MODULE_PARM(low_bitrate, "i");
+module_param(low_bitrate, bool, 0);
 MODULE_PARM_DESC(low_bitrate, "Buz compatibility option, halves bitrate");
 
 /* debugging is available via module parameter */
 static int debug = 0;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0-4)");
 
 #define dprintk(num, format, args...) \
@@ -315,32 +315,6 @@ static const char zr36060_dht[0x1a4] = {
 	0xF9, 0xFA
 };
 
-static const char zr36060_app[0x40] = {
-	0xff, 0xe0,		//Marker: APP0
-	0x00, 0x07,		//Length: 7
-	' ', 'A', 'V', 'I', '1', 0, 0, 0,	// 'AVI' field
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0
-};
-
-static const char zr36060_com[0x40] = {
-	0xff, 0xfe,		//Marker: COM
-	0x00, 0x06,		//Length: 6
-	' ', 'C', 'O', 'M', 0, 0, 0, 0,	// 'COM' field
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0
-};
-
 /* jpeg baseline setup, this is just fixed in this driver (YUV pictures) */
 #define NO_OF_COMPONENTS          0x3	//Y,U,V
 #define BASELINE_PRECISION        0x8	//MCU size (?)
@@ -498,12 +472,18 @@ zr36060_init (struct zr36060 *ptr)
 		sum +=
 		    zr36060_pushit(ptr, ZR060_DHT_IDX, sizeof(zr36060_dht),
 				   zr36060_dht);
-		sum +=
-		    zr36060_pushit(ptr, ZR060_APP_IDX, sizeof(zr36060_app),
-				   zr36060_app);
-		sum +=
-		    zr36060_pushit(ptr, ZR060_COM_IDX, sizeof(zr36060_com),
-				   zr36060_com);
+		zr36060_write(ptr, ZR060_APP_IDX, 0xff);
+		zr36060_write(ptr, ZR060_APP_IDX + 1, 0xe0 + ptr->app.appn);
+		zr36060_write(ptr, ZR060_APP_IDX + 2, 0x00);
+		zr36060_write(ptr, ZR060_APP_IDX + 3, ptr->app.len + 2);
+		sum += zr36060_pushit(ptr, ZR060_APP_IDX + 4, 60,
+				      ptr->app.data) + 4;
+		zr36060_write(ptr, ZR060_COM_IDX, 0xff);
+		zr36060_write(ptr, ZR060_COM_IDX + 1, 0xfe);
+		zr36060_write(ptr, ZR060_COM_IDX + 2, 0x00);
+		zr36060_write(ptr, ZR060_COM_IDX + 3, ptr->com.len + 2);
+		sum += zr36060_pushit(ptr, ZR060_COM_IDX + 4, 60,
+				      ptr->com.data) + 4;
 
 		/* setup misc. data for compression (target code sizes) */
 
@@ -535,8 +515,9 @@ zr36060_init (struct zr36060 *ptr)
 
 		/* JPEG markers to be included in the compressed stream */
 		zr36060_write(ptr, ZR060_MER,
-			      ZR060_MER_App | ZR060_MER_Com | ZR060_MER_DQT
-			      | ZR060_MER_DHT);
+			      ZR060_MER_DQT | ZR060_MER_DHT |
+			      ((ptr->com.len > 0) ? ZR060_MER_Com : 0) |
+			      ((ptr->app.len > 0) ? ZR060_MER_App : 0));
 
 		/* Setup the Video Frontend */
 		/* Limit pixel range to 16..235 as per CCIR-601 */
@@ -841,6 +822,47 @@ zr36060_control (struct videocodec *codec,
 			return -EFAULT;
 		ptr->scalefact = *ival;
 		break;
+
+	case CODEC_G_JPEG_APP_DATA: {	/* get appn marker data */
+		struct jpeg_app_marker *app = data;
+
+		if (size != sizeof(struct jpeg_app_marker))
+			return -EFAULT;
+
+		*app = ptr->app;
+		break;
+	}
+
+	case CODEC_S_JPEG_APP_DATA: {	/* set appn marker data */
+		struct jpeg_app_marker *app = data;
+
+		if (size != sizeof(struct jpeg_app_marker))
+			return -EFAULT;
+
+		ptr->app = *app;
+		break;
+	}
+
+	case CODEC_G_JPEG_COM_DATA: {	/* get comment marker data */
+		struct jpeg_com_marker *com = data;
+
+		if (size != sizeof(struct jpeg_com_marker))
+			return -EFAULT;
+
+		*com = ptr->com;
+		break;
+	}
+
+	case CODEC_S_JPEG_COM_DATA: {	/* set comment marker data */
+		struct jpeg_com_marker *com = data;
+
+		if (size != sizeof(struct jpeg_com_marker))
+			return -EFAULT;
+
+		ptr->com = *com;
+		break;
+	}
+
 	default:
 		return -EINVAL;
 	}
@@ -930,6 +952,12 @@ zr36060_setup (struct videocodec *codec)
 	ptr->max_block_vol = 240;	/* CHECKME, was 120 is 240 */
 	ptr->scalefact = 0x100;
 	ptr->dri = 1;		/* CHECKME, was 8 is 1 */
+
+	/* by default, no COM or APP markers - app should set those */
+	ptr->com.len = 0;
+	ptr->app.appn = 0;
+	ptr->app.len = 0;
+
 	zr36060_init(ptr);
 
 	dprintk(1, KERN_INFO "%s: codec attached and running\n",

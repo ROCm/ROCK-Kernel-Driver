@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: ioctl.c,v 1.8 2003/10/28 16:16:28 dwmw2 Exp $
+ * $Id: ioctl.c,v 1.9 2004/11/16 20:36:11 dwmw2 Exp $
  *
  */
 

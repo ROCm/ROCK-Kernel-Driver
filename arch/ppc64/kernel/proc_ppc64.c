@@ -25,8 +25,6 @@
 #include <linux/slab.h>
 #include <linux/kernel.h>
 
-#include <asm/naca.h>
-#include <asm/paca.h>
 #include <asm/systemcfg.h>
 #include <asm/rtas.h>
 #include <asm/uaccess.h>
@@ -58,26 +56,6 @@ static struct file_operations ofdt_fops = {
 #endif
 
 /*
- * NOTE: since paca data is always in flux the values will never be a
- * consistant set.
- */
-static void __init proc_create_paca(struct proc_dir_entry *dir, int num)
-{
-	struct proc_dir_entry *ent;
-	struct paca_struct *lpaca = paca + num;
-	char buf[16];
-
-	sprintf(buf, "%02x", num);
-	ent = create_proc_entry(buf, S_IRUSR, dir);
-	if (ent) {
-		ent->nlink = 1;
-		ent->data = lpaca;
-		ent->size = 4096;
-		ent->proc_fops = &page_map_fops;
-	}
-}
-
-/*
  * Create the ppc64 and ppc64/rtas directories early. This allows us to
  * assume that they have been previously created in drivers.
  */
@@ -104,16 +82,7 @@ core_initcall(proc_ppc64_create);
 
 static int __init proc_ppc64_init(void)
 {
-	unsigned long i;
 	struct proc_dir_entry *pde;
-
-	pde = create_proc_entry("ppc64/naca", S_IRUSR, NULL);
-	if (!pde)
-		return 1;
-	pde->nlink = 1;
-	pde->data = naca;
-	pde->size = 4096;
-	pde->proc_fops = &page_map_fops;
 
 	pde = create_proc_entry("ppc64/systemcfg", S_IFREG|S_IRUGO, NULL);
 	if (!pde)
@@ -122,13 +91,6 @@ static int __init proc_ppc64_init(void)
 	pde->data = systemcfg;
 	pde->size = 4096;
 	pde->proc_fops = &page_map_fops;
-
-	/* /proc/ppc64/paca/XX -- raw paca contents.  Only readable to root */
-	pde = proc_mkdir("ppc64/paca", NULL);
-	if (!pde)
-		return 1;
-	for_each_cpu(i)
-		proc_create_paca(pde, i);
 
 #ifdef CONFIG_PPC_PSERIES
 	if ((systemcfg->platform & PLATFORM_PSERIES))

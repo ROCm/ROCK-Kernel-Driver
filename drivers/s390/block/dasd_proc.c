@@ -9,7 +9,7 @@
  *
  * /proc interface for the dasd driver.
  *
- * $Revision: 1.29 $
+ * $Revision: 1.30 $
  */
 
 #include <linux/config.h>
@@ -250,7 +250,7 @@ dasd_statistics_write(struct file *file, const char __user *user_buf,
 	buffer = dasd_get_user_string(user_buf, user_len);
 	if (IS_ERR(buffer))
 		return PTR_ERR(buffer);
-	MESSAGE(KERN_INFO, "/proc/dasd/statictics: '%s'", buffer);
+	MESSAGE_LOG(KERN_INFO, "/proc/dasd/statictics: '%s'", buffer);
 
 	/* check for valid verbs */
 	for (str = buffer; isspace(*str); str++);

@@ -43,16 +43,6 @@ MODULE_LICENSE("GPL");
 
 /*====================================================================*/
 
-/* Parameters that can be set with 'insmod' */
-
-/* This means pick from 15, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static int default_irq_list[10] = { 15, 12, 11, 10, 9, 7, 5, 4, 3, -1 };
-static int irq_list[10] = { -1 };
-
-MODULE_PARM(irq_list, "1-10i");
-
-/*====================================================================*/
-
 /*
    The event() function is this driver's Card Services event handler.
    It will be called by Card Services when an appropriate card status
@@ -134,7 +124,7 @@ static dev_link_t *avmcs_attach(void)
     client_reg_t client_reg;
     dev_link_t *link;
     local_info_t *local;
-    int ret, i;
+    int ret;
     
     /* Initialize the dev_link_t structure */
     link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
@@ -151,14 +141,7 @@ static dev_link_t *avmcs_attach(void)
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
     link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING|IRQ_FIRST_SHARED;
 
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] != -1) {
-	    for (i = 0; i < 10 && irq_list[i] > 0; i++)
-	       link->irq.IRQInfo2 |= 1 << irq_list[i];
-    } else {
-	    for (i = 0; i < 10 && default_irq_list[i] > 0; i++)
-	       link->irq.IRQInfo2 |= 1 << default_irq_list[i];
-    }
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     
     /* General socket configuration */
     link->conf.Attributes = CONF_ENABLE_IRQ;
@@ -178,7 +161,6 @@ static dev_link_t *avmcs_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
 	CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -521,13 +503,7 @@ static int __init avmcs_init(void)
 static void __exit avmcs_exit(void)
 {
 	pcmcia_unregister_driver(&avmcs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			avmcs_release(dev_list);
-		avmcs_detach(dev_list);
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(avmcs_init);

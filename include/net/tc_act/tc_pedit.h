@@ -8,7 +8,7 @@ struct tcf_pedit
 	tca_gen(pedit);
 	unsigned char           nkeys;
 	unsigned char           flags;
-	struct tc_pedit_key     keys[0];
+	struct tc_pedit_key     *keys;
 };
 
 #endif

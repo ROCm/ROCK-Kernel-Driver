@@ -246,9 +246,9 @@ MODULE_AUTHOR("Ben Pfaff");
 MODULE_DESCRIPTION("A driver for the RadioTrack II radio card.");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "I/O address of the RadioTrack card (0x20c or 0x30c)");
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 static void __exit rtrack2_cleanup_module(void)
 {

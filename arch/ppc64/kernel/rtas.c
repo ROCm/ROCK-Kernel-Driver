@@ -29,6 +29,7 @@
 #include <asm/udbg.h>
 #include <asm/delay.h>
 #include <asm/uaccess.h>
+#include <asm/systemcfg.h>
 
 struct flash_block_list_header rtas_firmware_flash_list = {0, NULL};
 

@@ -4,6 +4,7 @@
 #include <linux/config.h>
 #include <linux/smp_lock.h>
 #include <asm/hardirq.h>
+#include <asm/system.h>
 
 /*
  * We put the hardirq and softirq counter into the preemption
@@ -61,12 +62,16 @@
 #define in_softirq()		(softirq_count())
 #define in_interrupt()		(irq_count())
 
-#ifdef CONFIG_PREEMPT
+#if defined(CONFIG_PREEMPT) && !defined(CONFIG_PREEMPT_BKL)
 # define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
+#else
+# define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != 0)
+#endif
+
+#ifdef CONFIG_PREEMPT
 # define preemptible()	(preempt_count() == 0 && !irqs_disabled())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else
-# define in_atomic()	(preempt_count() != 0)
 # define preemptible()	0
 # define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
 #endif
@@ -77,12 +82,25 @@ extern void synchronize_irq(unsigned int irq);
 # define synchronize_irq(irq)	barrier()
 #endif
 
-#ifdef CONFIG_GENERIC_HARDIRQS
-#define nmi_enter()		(preempt_count() += HARDIRQ_OFFSET)
-#define nmi_exit()		(preempt_count() -= HARDIRQ_OFFSET)
+#define nmi_enter()		irq_enter()
+#define nmi_exit()		sub_preempt_count(HARDIRQ_OFFSET)
 
-#define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
-extern void irq_exit(void);
+#ifndef CONFIG_VIRT_CPU_ACCOUNTING
+static inline void account_user_vtime(struct task_struct *tsk)
+{
+}
+
+static inline void account_system_vtime(struct task_struct *tsk)
+{
+}
 #endif
+
+#define irq_enter()					\
+	do {						\
+		account_system_vtime(current);		\
+		add_preempt_count(HARDIRQ_OFFSET);	\
+	} while (0)
+
+extern void irq_exit(void);
 
 #endif /* LINUX_HARDIRQ_H */

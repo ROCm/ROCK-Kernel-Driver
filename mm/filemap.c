@@ -693,6 +693,7 @@ void do_generic_mapping_read(struct address_space *mapping,
 	unsigned long offset;
 	unsigned long req_size;
 	unsigned long next_index;
+	unsigned long prev_index;
 	loff_t isize;
 	struct page *cached_page;
 	int error;
@@ -701,6 +702,7 @@ void do_generic_mapping_read(struct address_space *mapping,
 	cached_page = NULL;
 	index = *ppos >> PAGE_CACHE_SHIFT;
 	next_index = index;
+	prev_index = ra.prev_page;
 	req_size = (desc->count + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	offset = *ppos & ~PAGE_CACHE_MASK;
 
@@ -754,8 +756,9 @@ page_ok:
 		 * When (part of) the same page is read multiple times
 		 * in succession, only mark it as accessed the first time.
 		 */
-		if (ra.prev_page != index)
+		if (prev_index != index)
 			mark_page_accessed(page);
+		prev_index = index;
 
 		/*
 		 * Ok, we have the page, and it's up-to-date, so
@@ -802,11 +805,21 @@ readpage:
 			goto readpage_error;
 
 		if (!PageUptodate(page)) {
-			wait_on_page_locked(page);
+			lock_page(page);
 			if (!PageUptodate(page)) {
+				if (page->mapping == NULL) {
+					/*
+					 * invalidate_inode_pages got it
+					 */
+					unlock_page(page);
+					page_cache_release(page);
+					goto find_page;
+				}
+				unlock_page(page);
 				error = -EIO;
 				goto readpage_error;
 			}
+			unlock_page(page);
 		}
 
 		/*
@@ -2161,7 +2174,7 @@ ssize_t generic_file_aio_write(struct kiocb *iocb, const char __user *buf,
 	BUG_ON(iocb->ki_pos != pos);
 
 	down(&inode->i_sem);
-	ret = generic_file_aio_write_nolock(iocb, &local_iov, 1,
+	ret = __generic_file_aio_write_nolock(iocb, &local_iov, 1,
 						&iocb->ki_pos);
 	up(&inode->i_sem);
 
@@ -2237,7 +2250,8 @@ ssize_t generic_file_writev(struct file *file, const struct iovec *iov,
 EXPORT_SYMBOL(generic_file_writev);
 
 /*
- * Called under i_sem for writes to S_ISREG files
+ * Called under i_sem for writes to S_ISREG files.   Returns -EIO if something
+ * went wrong during pagecache shootdown.
  */
 ssize_t
 generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
@@ -2247,12 +2261,23 @@ generic_file_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	struct address_space *mapping = file->f_mapping;
 	ssize_t retval;
 
+	/*
+	 * If it's a write, unmap all mmappings of the file up-front.  This
+	 * will cause any pte dirty bits to be propagated into the pageframes
+	 * for the subsequent filemap_write_and_wait().
+	 */
+	if (rw == WRITE && mapping_mapped(mapping))
+		unmap_mapping_range(mapping, 0, -1, 0);
+
 	retval = filemap_write_and_wait(mapping);
 	if (retval == 0) {
 		retval = mapping->a_ops->direct_IO(rw, iocb, iov,
 						offset, nr_segs);
-		if (rw == WRITE && mapping->nrpages)
-			invalidate_inode_pages2(mapping);
+		if (rw == WRITE && mapping->nrpages) {
+			int err = invalidate_inode_pages2(mapping);
+			if (err)
+				retval = err;
+		}
 	}
 	return retval;
 }

@@ -1,7 +1,7 @@
 #
 # linux/drivers/devices/Makefile
 #
-# $Id: Makefile.common,v 1.6 2004/07/12 16:07:30 dwmw2 Exp $
+# $Id: Makefile.common,v 1.7 2004/12/22 17:51:15 joern Exp $
 
 #                       *** BIG UGLY NOTE ***
 #
@@ -22,3 +22,4 @@ obj-$(CONFIG_MTD_MS02NV)	+= ms02-nv.o
 obj-$(CONFIG_MTD_MTDRAM)	+= mtdram.o
 obj-$(CONFIG_MTD_LART)		+= lart.o
 obj-$(CONFIG_MTD_BLKMTD)	+= blkmtd.o
+obj-$(CONFIG_MTD_BLOCK2MTD)	+= block2mtd.o

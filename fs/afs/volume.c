@@ -24,7 +24,9 @@
 #include "vlclient.h"
 #include "internal.h"
 
-const char *afs_voltypes[] = { "R/W", "R/O", "BAK" };
+#ifdef __KDEBUG
+static const char *afs_voltypes[] = { "R/W", "R/O", "BAK" };
+#endif
 
 #ifdef AFS_CACHING_SUPPORT
 static cachefs_match_val_t afs_volume_cache_match(void *target,

@@ -38,10 +38,11 @@ extern unsigned int csum_partial(const unsigned char * buff, int len, unsigned i
  * here even more important to align src and dst on a 32-bit (or even
  * better 64-bit) boundary
  */
-extern unsigned int csum_partial_copy_sparc64(const char *src, char *dst, int len, unsigned int sum);
+extern unsigned int csum_partial_copy_sparc64(const unsigned char *src, unsigned char *dst,
+					      int len, unsigned int sum);
 			
 static inline unsigned int 
-csum_partial_copy_nocheck (const char *src, char *dst, int len, 
+csum_partial_copy_nocheck (const unsigned char *src, unsigned char *dst, int len,
 			   unsigned int sum)
 {
 	int ret;
@@ -53,7 +54,7 @@ csum_partial_copy_nocheck (const char *src, char *dst, int len,
 }
 
 static inline unsigned int 
-csum_partial_copy_from_user(const char __user *src, char *dst, int len, 
+csum_partial_copy_from_user(const unsigned char __user *src, unsigned char *dst, int len,
 			    unsigned int sum, int *err)
 {
 	__asm__ __volatile__ ("stx	%0, [%%sp + 0x7ff + 128]"
@@ -66,10 +67,11 @@ csum_partial_copy_from_user(const char __user *src, char *dst, int len,
  *	Copy and checksum to user
  */
 #define HAVE_CSUM_COPY_USER
-extern unsigned int csum_partial_copy_user_sparc64(const char *src, char __user *dst, int len, unsigned int sum);
+extern unsigned int csum_partial_copy_user_sparc64(const unsigned char *src, unsigned char __user *dst,
+						   int len, unsigned int sum);
 
 static inline unsigned int 
-csum_and_copy_to_user(const char *src, char __user *dst, int len, 
+csum_and_copy_to_user(const unsigned char *src, unsigned char __user *dst, int len,
 		      unsigned int sum, int *err)
 {
 	__asm__ __volatile__ ("stx	%0, [%%sp + 0x7ff + 128]"

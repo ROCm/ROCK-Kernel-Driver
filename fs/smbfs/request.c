@@ -27,6 +27,8 @@
 /* cache for request structures */
 static kmem_cache_t *req_cachep;
 
+static int smb_request_send_req(struct smb_request *req);
+
 /*
   /proc/slabinfo:
   name, active, num, objsize, active_slabs, num_slaps, #pages
@@ -132,7 +134,7 @@ static void smb_free_request(struct smb_request *req)
  * What prevents a rget to race with a rput? The count must never drop to zero
  * while it is in use. Only rput if it is ok that it is free'd.
  */
-void smb_rget(struct smb_request *req)
+static void smb_rget(struct smb_request *req)
 {
 	atomic_inc(&req->rq_count);
 }
@@ -379,7 +381,7 @@ int smb_add_request(struct smb_request *req)
  * Send a request and place it on the recvq if successfully sent.
  * Must be called with the server lock held.
  */
-int smb_request_send_req(struct smb_request *req)
+static int smb_request_send_req(struct smb_request *req)
 {
 	struct smb_sb_info *server = req->rq_server;
 	int result;
@@ -588,8 +590,18 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 	data_count  = WVAL(inbuf, smb_drcnt);
 
 	/* Modify offset for the split header/buffer we use */
-	data_offset -= hdrlen;
-	parm_offset -= hdrlen;
+	if (data_count || data_offset) {
+		if (unlikely(data_offset < hdrlen))
+			goto out_bad_data;
+		else
+			data_offset -= hdrlen;
+	}
+	if (parm_count || parm_offset) {
+		if (unlikely(parm_offset < hdrlen))
+			goto out_bad_parm;
+		else
+			parm_offset -= hdrlen;
+	}
 
 	if (parm_count == parm_tot && data_count == data_tot) {
 		/*
@@ -600,18 +612,22 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 		 * response that fits.
 		 */
 		VERBOSE("single trans2 response  "
-			"dcnt=%d, pcnt=%d, doff=%d, poff=%d\n",
+			"dcnt=%u, pcnt=%u, doff=%u, poff=%u\n",
 			data_count, parm_count,
 			data_offset, parm_offset);
 		req->rq_ldata = data_count;
 		req->rq_lparm = parm_count;
 		req->rq_data = req->rq_buffer + data_offset;
 		req->rq_parm = req->rq_buffer + parm_offset;
+		if (unlikely(parm_offset + parm_count > req->rq_rlen))
+			goto out_bad_parm;
+		if (unlikely(data_offset + data_count > req->rq_rlen))
+			goto out_bad_data;
 		return 0;
 	}
 
 	VERBOSE("multi trans2 response  "
-		"frag=%d, dcnt=%d, pcnt=%d, doff=%d, poff=%d\n",
+		"frag=%d, dcnt=%u, pcnt=%u, doff=%u, poff=%u\n",
 		req->rq_fragment,
 		data_count, parm_count,
 		data_offset, parm_offset);
@@ -638,13 +654,15 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 
 		req->rq_parm = req->rq_trans2buffer;
 		req->rq_data = req->rq_trans2buffer + parm_tot;
-	} else if (req->rq_total_data < data_tot ||
-		   req->rq_total_parm < parm_tot)
+	} else if (unlikely(req->rq_total_data < data_tot ||
+			    req->rq_total_parm < parm_tot))
 		goto out_data_grew;
 
-	if (parm_disp + parm_count > req->rq_total_parm)
+	if (unlikely(parm_disp + parm_count > req->rq_total_parm ||
+		     parm_offset + parm_count > req->rq_rlen))
 		goto out_bad_parm;
-	if (data_disp + data_count > req->rq_total_data)
+	if (unlikely(data_disp + data_count > req->rq_total_data ||
+		     data_offset + data_count > req->rq_rlen))
 		goto out_bad_data;
 
 	inbuf = req->rq_buffer;
@@ -666,10 +684,9 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 	return 1;
 
 out_too_long:
-	printk(KERN_ERR "smb_trans2: data/param too long, data=%d, parm=%d\n",
+	printk(KERN_ERR "smb_trans2: data/param too long, data=%u, parm=%u\n",
 		data_tot, parm_tot);
-	req->rq_errno = -EIO;
-	goto out;
+	goto out_EIO;
 out_no_mem:
 	printk(KERN_ERR "smb_trans2: couldn't allocate data area of %d bytes\n",
 	       req->rq_trans2bufsize);
@@ -677,16 +694,15 @@ out_no_mem:
 	goto out;
 out_data_grew:
 	printk(KERN_ERR "smb_trans2: data/params grew!\n");
-	req->rq_errno = -EIO;
-	goto out;
+	goto out_EIO;
 out_bad_parm:
-	printk(KERN_ERR "smb_trans2: invalid parms, disp=%d, cnt=%d, tot=%d\n",
-	       parm_disp, parm_count, parm_tot);
-	req->rq_errno = -EIO;
-	goto out;
+	printk(KERN_ERR "smb_trans2: invalid parms, disp=%u, cnt=%u, tot=%u, ofs=%u\n",
+	       parm_disp, parm_count, parm_tot, parm_offset);
+	goto out_EIO;
 out_bad_data:
-	printk(KERN_ERR "smb_trans2: invalid data, disp=%d, cnt=%d, tot=%d\n",
-	       data_disp, data_count, data_tot);
+	printk(KERN_ERR "smb_trans2: invalid data, disp=%u, cnt=%u, tot=%u, ofs=%u\n",
+	       data_disp, data_count, data_tot, data_offset);
+out_EIO:
 	req->rq_errno = -EIO;
 out:
 	return req->rq_errno;

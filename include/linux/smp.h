@@ -8,6 +8,8 @@
 
 #include <linux/config.h>
 
+extern void cpu_idle(void);
+
 #ifdef CONFIG_SMP
 
 #include <linux/preempt.h>
@@ -95,8 +97,10 @@ void smp_prepare_boot_cpu(void);
 /*
  *	These macros fold the SMP functionality into a single CPU system
  */
- 
-#define smp_processor_id()			0
+
+#if !defined(__smp_processor_id) || !defined(CONFIG_PREEMPT)
+# define smp_processor_id()			0
+#endif
 #define hard_smp_processor_id()			0
 #define smp_threads_ready			1
 #define smp_call_function(func,info,retry,wait)	({ 0; })
@@ -106,6 +110,33 @@ static inline void smp_send_reschedule(int cpu) { }
 #define smp_prepare_boot_cpu()			do {} while (0)
 
 #endif /* !SMP */
+
+/*
+ * DEBUG_PREEMPT support: check whether smp_processor_id() is being
+ * used in a preemption-safe way.
+ *
+ * An architecture has to enable this debugging code explicitly.
+ * It can do so by renaming the smp_processor_id() macro to
+ * __smp_processor_id().  This should only be done after some minimal
+ * testing, because usually there are a number of false positives
+ * that an architecture will trigger.
+ *
+ * To fix a false positive (i.e. smp_processor_id() use that the
+ * debugging code reports but which use for some reason is legal),
+ * change the smp_processor_id() reference to _smp_processor_id(),
+ * which is the nondebug variant.  NOTE: don't use this to hack around
+ * real bugs.
+ */
+#ifdef __smp_processor_id
+# if defined(CONFIG_PREEMPT) && defined(CONFIG_DEBUG_PREEMPT)
+   extern unsigned int smp_processor_id(void);
+# else
+#  define smp_processor_id() __smp_processor_id()
+# endif
+# define _smp_processor_id() __smp_processor_id()
+#else
+# define _smp_processor_id() smp_processor_id()
+#endif
 
 #define get_cpu()		({ preempt_disable(); smp_processor_id(); })
 #define put_cpu()		preempt_enable()

@@ -1,7 +1,6 @@
 #ifndef _LINUX_BITOPS_H
 #define _LINUX_BITOPS_H
 #include <asm/types.h>
-#include <asm/bitops.h>
 
 /*
  * ffs: find first bit set. This is defined the same way as
@@ -70,6 +69,12 @@ static __inline__ int generic_fls(int x)
 	}
 	return r;
 }
+
+/*
+ * Include this here because some architectures need generic_ffs/fls in
+ * scope
+ */
+#include <asm/bitops.h>
 
 static __inline__ int get_bitmask_order(unsigned int count)
 {

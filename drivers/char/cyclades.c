@@ -758,7 +758,6 @@ static int cy_next_channel; /* next minor available */
  * allocated when the first cy_open occurs.
  */
 static unsigned char *tmp_buf;
-DECLARE_MUTEX(tmp_buf_sem);
 
 /*
  * This is used to look up the divisor speeds and the timeouts
@@ -5537,25 +5536,5 @@ cy_cleanup_module(void)
 
 module_init(cy_init);
 module_exit(cy_cleanup_module);
-
-#ifndef MODULE
-/* called by linux/init/main.c to parse command line options */
-void
-cy_setup(char *str, int *ints)
-{
-#ifdef CONFIG_ISA
-  int i, j;
-
-    for (i = 0 ; i < NR_ISA_ADDRS ; i++) {
-        if (cy_isa_addresses[i] == 0) break;
-    }
-    for (j = 1; j <= ints[0]; j++){
-        if ( i < NR_ISA_ADDRS ){
-            cy_isa_addresses[i++] = ints[j];
-        }
-    }
-#endif /* CONFIG_ISA */
-} /* cy_setup */
-#endif /* MODULE */
 
 MODULE_LICENSE("GPL");

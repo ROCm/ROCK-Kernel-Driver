@@ -304,7 +304,7 @@ static const int standard_event_num = (sizeof(standard_event) /
 				       sizeof(struct iw_ioctl_description));
 
 /* Size (in bytes) of the various private data types */
-const char iw_priv_type_size[] = {
+static const char iw_priv_type_size[] = {
 	0,				/* IW_PRIV_TYPE_NONE */
 	1,				/* IW_PRIV_TYPE_BYTE */
 	1,				/* IW_PRIV_TYPE_CHAR */

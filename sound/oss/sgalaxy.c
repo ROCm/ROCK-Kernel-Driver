@@ -153,11 +153,11 @@ static int __initdata dma	= -1;
 static int __initdata dma2	= -1;
 static int __initdata sgbase	= -1;
 
-MODULE_PARM(io,"i");
-MODULE_PARM(irq,"i");
-MODULE_PARM(dma,"i");
-MODULE_PARM(dma2,"i");
-MODULE_PARM(sgbase,"i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(dma, int, 0);
+module_param(dma2, int, 0);
+module_param(sgbase, int, 0);
 
 static int __init init_sgalaxy(void)
 {

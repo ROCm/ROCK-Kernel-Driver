@@ -235,7 +235,7 @@ config ATMEL
         one of these, you will need to provide a firmware image
         to be loaded into the card by the driver. The Atmel
         firmware package can be downloaded from
-        http://www.thekelleys.org.uk/atmel
+        <http://www.thekelleys.org.uk/atmel>
 
 config PCI_ATMEL
       tristate "Atmel at76c506 PCI cards"
@@ -311,7 +311,7 @@ comment "Prism GT/Duette 802.11(a/b/g) PCI/Cardbus support"
 	depends on NET_RADIO && PCI
 config PRISM54
 	tristate 'Intersil Prism GT/Duette/Indigo PCI/Cardbus' 
-	depends on PCI && NET_RADIO && EXPERIMENTAL && HOTPLUG
+	depends on PCI && NET_RADIO && EXPERIMENTAL
 	select FW_LOADER
 	---help---
 	  Enable PCI and Cardbus support for the following chipset based cards:

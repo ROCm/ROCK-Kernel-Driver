@@ -35,8 +35,6 @@ struct snd_vxp_entry {
 	int *index_table;
 	char **id_table;
 	int *enable_table;
-	unsigned int *irq_mask_p;
-	int *irq_list;
 	int *ibl;
 
 	/* h/w config */
@@ -77,7 +75,6 @@ void vx_set_mic_level(vx_core_t *chip, int level);
  */
 dev_link_t *snd_vxpocket_attach(struct snd_vxp_entry *hw);
 void snd_vxpocket_detach(struct snd_vxp_entry *hw, dev_link_t *link);
-void snd_vxpocket_detach_all(struct snd_vxp_entry *hw);
 
 int vxp_add_mic_controls(vx_core_t *chip);
 

@@ -34,7 +34,7 @@ typedef union sigval32 {
         __u32   sival_ptr;
 } sigval_t32;
                  
-typedef struct siginfo32 {
+typedef struct compat_siginfo {
 	int	si_signo;
 	int	si_errno;
 	int	si_code;
@@ -82,7 +82,7 @@ typedef struct siginfo32 {
 			int	_fd;
 		} _sigpoll;
 	} _sifields;
-} siginfo_t32;  
+} compat_siginfo_t;
 
 /*
  * How these fields are to be accessed.
@@ -213,8 +213,5 @@ struct sigevent32 {
 		} _sigev_thread;
 	} _sigev_un;
 };
-
-extern int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from);
-extern int copy_siginfo_from_user32(siginfo_t *to, siginfo_t32 __user *from);
 
 #endif /* _ASM_S390X_S390_H */

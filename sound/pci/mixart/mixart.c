@@ -526,11 +526,11 @@ static int mixart_set_format(mixart_stream_t *stream, snd_pcm_format_t format)
 		stream_param.sample_type = ST_INTEGER_24BE;
 		stream_param.sample_size = 24;
 		break;
-	case SNDRV_PCM_FMTBIT_FLOAT_LE:
+	case SNDRV_PCM_FORMAT_FLOAT_LE:
 		stream_param.sample_type = ST_FLOATING_POINT_32LE;
 		stream_param.sample_size = 32;
 		break;
-	case  SNDRV_PCM_FMTBIT_FLOAT_BE:
+	case  SNDRV_PCM_FORMAT_FLOAT_BE:
 		stream_param.sample_type = ST_FLOATING_POINT_32BE;
 		stream_param.sample_size = 32;
 		break;
@@ -1019,13 +1019,6 @@ static int __devinit snd_mixart_create(mixart_mgr_t *mgr, snd_card_t *card, int 
 		return err;
 	}
 
-	if (idx == 0) {
-		/* create a DSP loader only on first cardX*/
-		err = snd_mixart_hwdep_new(mgr);
-		if (err < 0)
-			return err;
-	}
-
 	snd_card_set_dev(card, &mgr->pci->dev);
 
 	return 0;
@@ -1359,7 +1352,7 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 			idx = index[dev];
 		else
 			idx = index[dev] + i;
-		snprintf(tmpid, sizeof(tmpid), "%s-%d", id[dev], i);
+		snprintf(tmpid, sizeof(tmpid), "%s-%d", id[dev] ? id[dev] : "MIXART", i);
 		card = snd_card_new(idx, tmpid, THIS_MODULE, 0);
 
 		if (! card) {
@@ -1410,6 +1403,13 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	}
 	/* init bufferinfo_array */
 	memset(mgr->bufferinfo.area, 0, size);
+
+	/* set up firmware */
+	err = snd_mixart_setup_firmware(mgr);
+	if (err < 0) {
+		snd_mixart_free(mgr);
+		return err;
+	}
 
 	pci_set_drvdata(pci, mgr);
 	dev++;

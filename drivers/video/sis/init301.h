@@ -35,7 +35,7 @@
  * * 3) The name of the author may not be used to endorse or promote products
  * *    derived from this software without specific prior written permission.
  * *
- * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESSED OR
+ * * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
  * * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
@@ -54,20 +54,16 @@
 #define  _INIT301_
 
 #include "osdef.h"
-
 #include "initdef.h"
-#include "vgatypes.h"
-#include "vstruct.h"
 
 #ifdef LINUX_XF86
-#include "xf86.h"
-#include "xf86Pci.h"
-#include "xf86PciInfo.h"
 #include "sis.h"
 #include "sis_regs.h"
 #endif
 
 #ifdef LINUX_KERNEL
+#include "vgatypes.h"
+#include "vstruct.h"
 #ifdef SIS_CP
 #undef SIS_CP
 #endif
@@ -82,7 +78,7 @@
 #endif
 #endif
 
-const UCHAR SiS_YPbPrTable[3][64] = {
+static const UCHAR SiS_YPbPrTable[3][64] = {
   {
     0x17,0x1d,0x03,0x09,0x05,0x06,0x0c,0x0c,
     0x94,0x49,0x01,0x0a,0x06,0x0d,0x04,0x0a,
@@ -127,7 +123,7 @@ const UCHAR SiS_YPbPrTable[3][64] = {
   }
 };
 
-const UCHAR SiS_HiTVGroup3_1[] = {
+static const UCHAR SiS_HiTVGroup3_1[] = {
     0x00, 0x14, 0x15, 0x25, 0x55, 0x15, 0x0b, 0x13,
     0xb1, 0x41, 0x62, 0x62, 0xff, 0xf4, 0x45, 0xa6,
     0x25, 0x2f, 0x67, 0xf6, 0xbf, 0xff, 0x8e, 0x20,
@@ -138,7 +134,7 @@ const UCHAR SiS_HiTVGroup3_1[] = {
     0x1a, 0x1f, 0x25, 0x2a, 0x4c, 0xaa, 0x01
 };
 
-const UCHAR SiS_HiTVGroup3_2[] = {
+static const UCHAR SiS_HiTVGroup3_2[] = {
     0x00, 0x14, 0x15, 0x25, 0x55, 0x15, 0x0b, 0x7a,
     0x54, 0x41, 0xe7, 0xe7, 0xff, 0xf4, 0x45, 0xa6,
     0x25, 0x2f, 0x67, 0xf6, 0xbf, 0xff, 0x8e, 0x20,
@@ -149,7 +145,7 @@ const UCHAR SiS_HiTVGroup3_2[] = {
     0x18, 0x1d, 0x23, 0x28, 0x4c, 0xaa, 0x01
 };
 
-/* 301C / 302ELV extended Part2 TV registers */
+/* 301C / 302ELV extended Part2 TV registers (4 tap scaler) */
 
 static const UCHAR SiS_Part2CLVX_1[] = {
     0x00,0x00,
@@ -224,13 +220,13 @@ static const UCHAR SiS_Part2CLVX_6[] = {   /* 1080i */
 };
 
 #ifdef SIS315H
-/* 661 et al LCD data structure (0.94.0) */
+/* 661 et al LCD data structure (2.03.00) */
 static const UCHAR SiS_LCDStruct661[] = {
     /* 1024x768 */
 /*  type|CR37|   HDE   |   VDE   |    HT   |    VT   |   hss    | hse   */
     0x02,0xC0,0x00,0x04,0x00,0x03,0x40,0x05,0x26,0x03,0x10,0x00,0x88,
     0x00,0x02,0x00,0x06,0x00,0x41,0x5A,0x64,0x00,0x00,0x00,0x00,0x04,
-    /*  | vss      |   vse  |clck|  clock  |CRT2DataP|CRT2DataP|idx     */
+    /*  | vss     |    vse  |clck|  clock  |CRT2DataP|CRT2DataP|idx     */
     /*					      VESA    non-VESA  noscale */
     /* 1280x1024 */
     0x03,0xC0,0x00,0x05,0x00,0x04,0x98,0x06,0x2A,0x04,0x30,0x00,0x70,
@@ -239,23 +235,20 @@ static const UCHAR SiS_LCDStruct661[] = {
     0x09,0x20,0x78,0x05,0x1A,0x04,0x98,0x06,0x2A,0x04,0x18,0x00,0x38,
     0x00,0x01,0x00,0x03,0x00,0x6C,0xF8,0x2F,0x00,0x00,0x00,0x00,0x09,
     /* 1600x1200 */
-    0x0B,0xC0,0x40,0x06,0xB0,0x04,0x70,0x08,0xE2,0x04,0x40,0x00,0xC0,
-    0x00,0x01,0x00,0x03,0x00,0xA2,0x70,0x24,0x00,0x00,0x00,0x00,0x0B,
-    /* 1280x768 */
-    0x0A,0xC0,0x00,0x05,0x00,0x03,0x80,0x05,0x26,0x03,0x10,0x00,0x40,
-    0x00,0x03,0x00,0x06,0x00,0x44,0x63,0x46,0x00,0x00,0x00,0x00,0x06,
+    0x0B,0xE0,0x40,0x06,0xB0,0x04,0x70,0x08,0xE2,0x04,0x40,0x00,0xC0,
+    0x00,0x01,0x00,0x03,0x00,0xA2,0x70,0x24,0x00,0x00,0x00,0x00,0x0A,
+    /* 1280x768 (_2) */
+    0x0A,0xE0,0x00,0x05,0x00,0x03,0x7C,0x06,0x26,0x03,0x30,0x00,0x70,
+    0x00,0x03,0x00,0x06,0x00,0x4D,0xC8,0x48,0x00,0x00,0x00,0x00,0x06,
     /* 1280x720 */
-    0x0E,0xE0,0x00,0x05,0xD0,0x02,0x80,0x05,0x26,0x03,0x10,0x00,0x02,
+    0x0E,0xE0,0x00,0x05,0xD0,0x02,0x80,0x05,0x26,0x03,0x10,0x00,0x20,
     0x00,0x01,0x00,0x06,0x00,0x45,0x9C,0x62,0x00,0x00,0x00,0x00,0x05,
-    /* 1280x800 */
-    0x0C,0xE0,0x00,0x05,0x20,0x03,0x80,0x05,0x30,0x03,0x10,0x00,0x40,
-    0x00,0x04,0x00,0x03,0x00,0x45,0x9C,0x62,0x00,0x00,0x00,0x00,0x07,
+    /* 1280x800 (_2) */
+    0x0C,0xE0,0x00,0x05,0x20,0x03,0x10,0x06,0x2C,0x03,0x30,0x00,0x70,
+    0x00,0x04,0x00,0x03,0x00,0x49,0xCE,0x1E,0x00,0x00,0x00,0x00,0x09,
     /* 1680x1050 */
     0x0D,0xE0,0x90,0x06,0x1A,0x04,0x6C,0x07,0x2A,0x04,0x1A,0x00,0x4C,
     0x00,0x03,0x00,0x06,0x00,0x79,0xBE,0x44,0x00,0x00,0x00,0x00,0x06,
-    /* 1280x768 (not in 0.93) */
-    0x0A,0xC0,0x00,0x05,0x00,0x03,0x80,0x06,0x1E,0x03,0x40,0x00,0x80,
-    0x00,0x03,0x00,0x07,0x00,0x4F,0x00,0x00,0x00,0x00,0x00,0x00,0x06
 };
 #endif
 
@@ -308,8 +301,8 @@ BOOLEAN	SiS_IsDualEdge(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
 BOOLEAN	SiS_IsVAMode(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
 void	SiS_SetChrontelGPIO(SiS_Private *SiS_Pr, USHORT myvbinfo);
 void	SiS_GetVBInfo(SiS_Private *SiS_Pr, USHORT ModeNo,
-              USHORT ModeIdIndex,PSIS_HW_INFO HwInfo,
-	      int checkcrt2mode);
+              	USHORT ModeIdIndex, PSIS_HW_INFO HwInfo,
+	      	int checkcrt2mode);
 void	SiS_SetYPbPr(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
 void    SiS_SetTVMode(SiS_Private *SiS_Pr, USHORT ModeNo, USHORT ModeIdIndex, PSIS_HW_INFO HwInfo);
 void	SiS_GetLCDResInfo(SiS_Private *SiS_Pr, USHORT ModeNo, USHORT ModeIdIndex, PSIS_HW_INFO HwInfo);
@@ -330,58 +323,61 @@ void   	SiS_SetCH70xx(SiS_Private *SiS_Pr, USHORT tempax);
 USHORT 	SiS_GetCH70xx(SiS_Private *SiS_Pr, USHORT tempax);
 void   	SiS_SetCH70xxANDOR(SiS_Private *SiS_Pr, USHORT tempax,USHORT tempbh);
 #ifdef SIS315H
-void   	SiS_Chrontel701xOn(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
-void   	SiS_Chrontel701xOff(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
-void   	SiS_ChrontelInitTVVSync(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
-void   	SiS_ChrontelDoSomething1(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
+static void   	SiS_Chrontel701xOn(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
+static void   	SiS_Chrontel701xOff(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
+static void   	SiS_ChrontelInitTVVSync(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
+static void  	SiS_ChrontelDoSomething1(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
 void   	SiS_Chrontel701xBLOn(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo);
 void   	SiS_Chrontel701xBLOff(SiS_Private *SiS_Pr);
 #endif /* 315 */
+
 #ifdef SIS300
-void    SiS_SetTrumpReg(SiS_Private *SiS_Pr, USHORT tempbx);
-USHORT  SiS_GetTrumpReg(SiS_Private *SiS_Pr, USHORT tempbx);
-static  BOOLEAN SiS_SetTrumpionBlock(SiS_Private *SiS_Pr, UCHAR *dataptr);
+#if 0
+static  void    SiS_SetTrumpReg(SiS_Private *SiS_Pr, USHORT tempbx);
+static  USHORT  SiS_GetTrumpReg(SiS_Private *SiS_Pr, USHORT tempbx);
+#endif
+static  BOOLEAN	SiS_SetTrumpionBlock(SiS_Private *SiS_Pr, UCHAR *dataptr);
 #endif
 
-USHORT  SiS_ReadDDC1Bit(SiS_Private *SiS_Pr);
-void    SiS_SetSwitchDDC2(SiS_Private *SiS_Pr);
-USHORT  SiS_SetStart(SiS_Private *SiS_Pr);
-USHORT  SiS_SetStop(SiS_Private *SiS_Pr);
 void    SiS_DDC2Delay(SiS_Private *SiS_Pr, USHORT delaytime);
-USHORT  SiS_SetSCLKLow(SiS_Private *SiS_Pr);
-USHORT  SiS_SetSCLKHigh(SiS_Private *SiS_Pr);
-USHORT  SiS_ReadDDC2Data(SiS_Private *SiS_Pr, USHORT tempax);
-USHORT  SiS_WriteDDC2Data(SiS_Private *SiS_Pr, USHORT tempax);
-USHORT  SiS_CheckACK(SiS_Private *SiS_Pr);
-
-USHORT  SiS_InitDDCRegs(SiS_Private *SiS_Pr, unsigned long VBFlags, int VGAEngine,
-                        USHORT adaptnum, USHORT DDCdatatype, BOOLEAN checkcr32);
-USHORT  SiS_WriteDABDDC(SiS_Private *SiS_Pr);
-USHORT  SiS_PrepareReadDDC(SiS_Private *SiS_Pr);
-USHORT  SiS_PrepareDDC(SiS_Private *SiS_Pr);
-void    SiS_SendACK(SiS_Private *SiS_Pr, USHORT yesno);
-USHORT  SiS_DoProbeDDC(SiS_Private *SiS_Pr);
-USHORT  SiS_ProbeDDC(SiS_Private *SiS_Pr);
-USHORT  SiS_ReadDDC(SiS_Private *SiS_Pr, USHORT DDCdatatype, unsigned char *buffer);
-USHORT  SiS_HandleDDC(SiS_Private *SiS_Pr, unsigned long VBFlags, int VGAEngine,
-		      USHORT adaptnum, USHORT DDCdatatype, unsigned char *buffer);
+USHORT  SiS_ReadDDC1Bit(SiS_Private *SiS_Pr);
+USHORT  SiS_HandleDDC(SiS_Private *SiS_Pr, ULONG VBFlags, int VGAEngine,
+		      USHORT adaptnum, USHORT DDCdatatype, UCHAR *buffer);
 #ifdef LINUX_XF86
 USHORT  SiS_SenseLCDDDC(SiS_Private *SiS_Pr, SISPtr pSiS);
 USHORT  SiS_SenseVGA2DDC(SiS_Private *SiS_Pr, SISPtr pSiS);
 #endif
 
+static void    	SiS_SetSwitchDDC2(SiS_Private *SiS_Pr);
+static USHORT  	SiS_SetStart(SiS_Private *SiS_Pr);
+static USHORT  	SiS_SetStop(SiS_Private *SiS_Pr);
+static USHORT  	SiS_SetSCLKLow(SiS_Private *SiS_Pr);
+static USHORT  	SiS_SetSCLKHigh(SiS_Private *SiS_Pr);
+static USHORT  	SiS_ReadDDC2Data(SiS_Private *SiS_Pr, USHORT tempax);
+static USHORT  	SiS_WriteDDC2Data(SiS_Private *SiS_Pr, USHORT tempax);
+static USHORT  	SiS_CheckACK(SiS_Private *SiS_Pr);
+static USHORT  	SiS_InitDDCRegs(SiS_Private *SiS_Pr, ULONG VBFlags, int VGAEngine,
+                        USHORT adaptnum, USHORT DDCdatatype, BOOLEAN checkcr32);
+static USHORT  	SiS_WriteDABDDC(SiS_Private *SiS_Pr);
+static USHORT  	SiS_PrepareReadDDC(SiS_Private *SiS_Pr);
+static USHORT  	SiS_PrepareDDC(SiS_Private *SiS_Pr);
+static void    	SiS_SendACK(SiS_Private *SiS_Pr, USHORT yesno);
+static USHORT  	SiS_DoProbeDDC(SiS_Private *SiS_Pr);
+static USHORT  	SiS_ProbeDDC(SiS_Private *SiS_Pr);
+static USHORT  	SiS_ReadDDC(SiS_Private *SiS_Pr, USHORT DDCdatatype, UCHAR *buffer);
+
 #ifdef SIS315H
-void    SiS_OEM310Setting(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo,
-                          USHORT ModeNo,USHORT ModeIdIndex);
-void    SiS_OEM661Setting(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo,
-                          USHORT ModeNo,USHORT ModeIdIndex, USHORT RRTI);
-void    SiS_FinalizeLCD(SiS_Private *, USHORT, USHORT, PSIS_HW_INFO);
+static void    	SiS_OEM310Setting(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo,
+                        USHORT ModeNo,USHORT ModeIdIndex, USHORT RRTI);
+static void    	SiS_OEM661Setting(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo,
+                        USHORT ModeNo,USHORT ModeIdIndex, USHORT RRTI);
+static void    	SiS_FinalizeLCD(SiS_Private *, USHORT, USHORT, PSIS_HW_INFO);
 #endif
 #ifdef SIS300
-void    SiS_OEM300Setting(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo,
-                          USHORT ModeNo, USHORT ModeIdIndex, USHORT RefTabindex);
-void    SetOEMLCDData2(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo,
-		       USHORT ModeNo, USHORT ModeIdIndex,USHORT RefTableIndex);
+static void    	SiS_OEM300Setting(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo,
+                        USHORT ModeNo, USHORT ModeIdIndex, USHORT RefTabindex);
+static void    	SetOEMLCDData2(SiS_Private *SiS_Pr, PSIS_HW_INFO HwInfo,
+		        USHORT ModeNo, USHORT ModeIdIndex,USHORT RefTableIndex);
 #endif
 
 extern void     SiS_SetReg(SISIOADDRESS, USHORT, USHORT);
@@ -392,23 +388,23 @@ extern UCHAR    SiS_GetReg(SISIOADDRESS, USHORT);
 extern UCHAR    SiS_GetRegByte(SISIOADDRESS);
 extern USHORT   SiS_GetRegShort(SISIOADDRESS);
 extern ULONG    SiS_GetRegLong(SISIOADDRESS);
-extern void     SiS_SetRegANDOR(SISIOADDRESS Port,USHORT Index,USHORT DataAND,USHORT DataOR);
-extern void     SiS_SetRegOR(SISIOADDRESS Port,USHORT Index,USHORT DataOR);
-extern void     SiS_SetRegAND(SISIOADDRESS Port,USHORT Index,USHORT DataAND);
-
+extern void     SiS_SetRegANDOR(SISIOADDRESS, USHORT, USHORT, USHORT);
+extern void     SiS_SetRegOR(SISIOADDRESS, USHORT, USHORT);
+extern void     SiS_SetRegAND(SISIOADDRESS, USHORT, USHORT);
 extern void     SiS_DisplayOff(SiS_Private *SiS_Pr);
 extern void     SiS_DisplayOn(SiS_Private *SiS_Pr);
-
 extern BOOLEAN  SiS_SearchModeID(SiS_Private *, USHORT *, USHORT *);
-extern UCHAR    SiS_GetModePtr(SiS_Private *SiS_Pr, USHORT ModeNo,USHORT ModeIdIndex);
-
-extern USHORT   SiS_GetColorDepth(SiS_Private *SiS_Pr,USHORT ModeNo,USHORT ModeIdIndex);
-extern USHORT   SiS_GetOffset(SiS_Private *SiS_Pr,USHORT ModeNo,USHORT ModeIdIndex,
-                              USHORT RefreshRateTableIndex,PSIS_HW_INFO HwInfo);
-
-extern void     SiS_LoadDAC(SiS_Private *SiS_Pr, PSIS_HW_INFO,USHORT ModeNo,
-                            USHORT ModeIdIndex);
-
-extern void	SiS_CalcLCDACRT1Timing(SiS_Private *SiS_Pr,USHORT ModeNo,USHORT ModeIdIndex);
+extern UCHAR    SiS_GetModePtr(SiS_Private *SiS_Pr, USHORT ModeNo, USHORT ModeIdIndex);
+extern USHORT   SiS_GetColorDepth(SiS_Private *SiS_Pr, USHORT ModeNo, USHORT ModeIdIndex);
+extern USHORT   SiS_GetOffset(SiS_Private *SiS_Pr, USHORT ModeNo, USHORT ModeIdIndex,
+                      	USHORT RefreshRateTableIndex, PSIS_HW_INFO HwInfo);
+extern void     SiS_LoadDAC(SiS_Private *SiS_Pr, PSIS_HW_INFO, USHORT ModeNo,
+                        USHORT ModeIdIndex);
+extern void	SiS_CalcLCDACRT1Timing(SiS_Private *SiS_Pr, USHORT ModeNo, USHORT ModeIdIndex);
+#ifdef LINUX_XF86
+extern void     SiS_MakeClockRegs(ScrnInfoPtr pScrn, int clock, UCHAR *p2b, UCHAR *p2c);
+extern int 	SiS_FindPanelFromDB(SISPtr pSiS, USHORT panelvendor, USHORT panelproduct,
+			int *maxx, int *maxy, int *prefx, int *prefy);
+#endif
 
 #endif

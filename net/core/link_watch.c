@@ -38,7 +38,7 @@ static void linkwatch_event(void *dummy);
 static DECLARE_WORK(linkwatch_work, linkwatch_event, NULL);
 
 static LIST_HEAD(lweventlist);
-static spinlock_t lweventlist_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lweventlist_lock);
 
 struct lw_event {
 	struct list_head list;

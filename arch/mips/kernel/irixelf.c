@@ -127,7 +127,9 @@ static void set_brk(unsigned long start, unsigned long end)
 	end = PAGE_ALIGN(end);
 	if (end <= start)
 		return;
+	down_write(&current->mm->mmap_sem);
 	do_brk(start, end - start);
+	up_write(&current->mm->mmap_sem);
 }
 
 
@@ -375,7 +377,9 @@ static unsigned int load_irix_interp(struct elfhdr * interp_elf_ex,
 
 	/* Map the last of the bss segment */
 	if (last_bss > len) {
+		down_write(&current->mm->mmap_sem);
 		do_brk(len, (last_bss - len));
+		up_write(&current->mm->mmap_sem);
 	}
 	kfree(elf_phdata);
 
@@ -562,7 +566,9 @@ void irix_map_prda_page (void)
 	unsigned long v;
 	struct prda *pp;
 
+	down_write(&current->mm->mmap_sem);
 	v =  do_brk (PRDA_ADDRESS, PAGE_SIZE);
+	up_write(&current->mm->mmap_sem);
 
 	if (v < 0)
 		return;
@@ -685,7 +691,7 @@ static int load_irix_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	 * change some of these later.
 	 */
 	current->mm->rss = 0;
-	setup_arg_pages(bprm, EXSTACK_DEFAULT);
+	setup_arg_pages(bprm, STACK_TOP, EXSTACK_DEFAULT);
 	current->mm->start_stack = bprm->p;
 
 	/* At this point, we assume that the image should be loaded at
@@ -852,8 +858,11 @@ static int load_irix_library(struct file *file)
 
 	len = (elf_phdata->p_filesz + elf_phdata->p_vaddr+ 0xfff) & 0xfffff000;
 	bss = elf_phdata->p_memsz + elf_phdata->p_vaddr;
-	if (bss > len)
+	if (bss > len) {
+	  down_write(&current->mm->mmap_sem);
 	  do_brk(len, bss-len);
+	  up_write(&current->mm->mmap_sem);
+	}
 	kfree(elf_phdata);
 	return 0;
 }

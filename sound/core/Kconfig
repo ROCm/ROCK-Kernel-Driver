@@ -83,7 +83,7 @@ config SND_SEQUENCER_OSS
 
 config SND_BIT32_EMUL
 	tristate "Emulation for 32-bit applications"
-	depends on SND && (MIPS64 || SPARC64 || PPC64 || X86_64 && IA32_EMULATION)
+	depends on SND && COMPAT
 	select SND_PCM
 	select SND_RAWMIDI
 	select SND_TIMER

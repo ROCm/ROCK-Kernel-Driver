@@ -63,15 +63,13 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	struct usb_bus		self;		/* hcd is-a bus */
 
 	const char		*product_desc;	/* product/vendor string */
-	const char		*description;	/* "ehci-hcd" etc */
 
 	struct timer_list	rh_timer;	/* drives root hub */
-	struct list_head	dev_list;	/* devices on this bus */
 
 	/*
 	 * hardware info/state
 	 */
-	struct hc_driver	*driver;	/* hw-specific hooks */
+	const struct hc_driver	*driver;	/* hw-specific hooks */
 	unsigned		saw_irq : 1;
 	unsigned		can_wakeup:1;	/* hw supports wakeup? */
 	unsigned		remote_wakeup:1;/* sw should use wakeup? */
@@ -104,6 +102,12 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	 * input size of periodic table to an interrupt scheduler. 
 	 * (ohci 32, uhci 1024, ehci 256/512/1024).
 	 */
+
+	/* The HC driver's private data is stored at the end of
+	 * this structure.
+	 */
+	unsigned long hcd_priv[0]
+			__attribute__ ((aligned (sizeof(unsigned long))));
 };
 
 /* 2.4 does this a bit differently ... */
@@ -112,14 +116,6 @@ static inline struct usb_bus *hcd_to_bus (struct usb_hcd *hcd)
 	return &hcd->self;
 }
 
-
-struct hcd_dev {	/* usb_device.hcpriv points to this */
-	struct list_head	dev_list;	/* on this hcd */
-	struct list_head	urb_list;	/* pending on this dev */
-
-	/* per-configuration HC/HCD state, such as QH or ED */
-	void			*ep[32];
-};
 
 // urb.hcpriv is really hardware-specific
 
@@ -136,8 +132,6 @@ struct hcd_timeout {	/* timeouts we allocate */
  */
 
 struct usb_operations {
-	int (*allocate)(struct usb_device *);
-	int (*deallocate)(struct usb_device *);
 	int (*get_frame_number) (struct usb_device *usb_dev);
 	int (*submit_urb) (struct urb *urb, int mem_flags);
 	int (*unlink_urb) (struct urb *urb, int status);
@@ -149,7 +143,8 @@ struct usb_operations {
 	void (*buffer_free)(struct usb_bus *bus, size_t size,
 			void *addr, dma_addr_t dma);
 
-	void (*disable)(struct usb_device *udev, int bEndpointAddress);
+	void (*disable)(struct usb_device *udev,
+			struct usb_host_endpoint *ep);
 
 	/* global suspend/resume of bus */
 	int (*hub_suspend)(struct usb_bus *);
@@ -162,6 +157,8 @@ struct pt_regs;
 
 struct hc_driver {
 	const char	*description;	/* "ehci-hcd" etc */
+	const char	*product_desc;	/* product/vendor string */
+	size_t		hcd_priv_size;	/* size of private data */
 
 	/* irq handler */
 	irqreturn_t	(*irq) (struct usb_hcd *hcd, struct pt_regs *regs);
@@ -190,23 +187,16 @@ struct hc_driver {
 	/* return current frame number */
 	int	(*get_frame_number) (struct usb_hcd *hcd);
 
-	/* memory lifecycle */
-	/* Note: The absence of hcd_free reflects a temporary situation;
-	 * in the near future hcd_alloc will disappear as well and all
-	 * allocations/deallocations will be handled by usbcore.  For the
-	 * moment, drivers are required to return a pointer that the core
-	 * can pass to kfree, i.e., the struct usb_hcd must be the _first_
-	 * member of a larger driver-specific structure. */
-	struct usb_hcd	*(*hcd_alloc) (void);
-
 	/* manage i/o requests, device state */
-	int	(*urb_enqueue) (struct usb_hcd *hcd, struct urb *urb,
+	int	(*urb_enqueue) (struct usb_hcd *hcd,
+					struct usb_host_endpoint *ep,
+					struct urb *urb,
 					int mem_flags);
 	int	(*urb_dequeue) (struct usb_hcd *hcd, struct urb *urb);
 
 	/* hw synch, freeing endpoint resources that urb_dequeue can't */
 	void 	(*endpoint_disable)(struct usb_hcd *hcd,
-			struct hcd_dev *dev, int bEndpointAddress);
+			struct usb_host_endpoint *ep);
 
 	/* root hub support */
 	int		(*hub_status_data) (struct usb_hcd *hcd, char *buf);
@@ -220,6 +210,10 @@ struct hc_driver {
 
 extern void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs);
 extern void usb_bus_init (struct usb_bus *bus);
+
+extern struct usb_hcd *usb_create_hcd (const struct hc_driver *driver);
+extern void usb_put_hcd (struct usb_hcd *hcd);
+
 
 #ifdef CONFIG_PCI
 struct pci_dev;
@@ -245,7 +239,6 @@ void hcd_buffer_free (struct usb_bus *bus, size_t size,
 	void *addr, dma_addr_t dma);
 
 /* generic bus glue, needed for host controllers that don't use PCI */
-extern struct usb_operations usb_hcd_operations;
 extern irqreturn_t usb_hcd_irq (int irq, void *__hcd, struct pt_regs *r);
 extern void usb_hc_died (struct usb_hcd *hcd);
 
@@ -364,8 +357,6 @@ static inline int hcd_register_root (struct usb_device *usb_dev,
 
 	return usb_register_root_hub (usb_dev, hcd->self.controller);
 }
-
-extern void usb_hcd_release (struct usb_bus *);
 
 extern void usb_set_device_state(struct usb_device *udev,
 		enum usb_device_state new_state);

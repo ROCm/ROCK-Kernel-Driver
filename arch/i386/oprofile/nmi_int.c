@@ -84,7 +84,7 @@ static void __exit exit_driverfs(void)
 
 static int nmi_callback(struct pt_regs * regs, int cpu)
 {
-	return model->check_ctrs(cpu, &cpu_msrs[cpu], regs);
+	return model->check_ctrs(regs, &cpu_msrs[cpu]);
 }
  
  
@@ -300,35 +300,26 @@ static int nmi_create_files(struct super_block * sb, struct dentry * root)
 }
  
  
-struct oprofile_operations nmi_ops = {
-	.create_files 	= nmi_create_files,
-	.setup 		= nmi_setup,
-	.shutdown	= nmi_shutdown,
-	.start		= nmi_start,
-	.stop		= nmi_stop
-};
- 
-
-static int __init p4_init(void)
+static int __init p4_init(char ** cpu_type)
 {
-	__u8 cpu_model = current_cpu_data.x86_model;
+	__u8 cpu_model = boot_cpu_data.x86_model;
 
 	if (cpu_model > 3)
 		return 0;
 
 #ifndef CONFIG_SMP
-	nmi_ops.cpu_type = "i386/p4";
+	*cpu_type = "i386/p4";
 	model = &op_p4_spec;
 	return 1;
 #else
 	switch (smp_num_siblings) {
 		case 1:
-			nmi_ops.cpu_type = "i386/p4";
+			*cpu_type = "i386/p4";
 			model = &op_p4_spec;
 			return 1;
 
 		case 2:
-			nmi_ops.cpu_type = "i386/p4-ht";
+			*cpu_type = "i386/p4-ht";
 			model = &op_p4_ht2_spec;
 			return 1;
 	}
@@ -340,21 +331,21 @@ static int __init p4_init(void)
 }
 
 
-static int __init ppro_init(void)
+static int __init ppro_init(char ** cpu_type)
 {
-	__u8 cpu_model = current_cpu_data.x86_model;
+	__u8 cpu_model = boot_cpu_data.x86_model;
 
 	if (cpu_model > 0xd)
 		return 0;
 
 	if (cpu_model == 9) {
-		nmi_ops.cpu_type = "i386/p6_mobile";
+		*cpu_type = "i386/p6_mobile";
 	} else if (cpu_model > 5) {
-		nmi_ops.cpu_type = "i386/piii";
+		*cpu_type = "i386/piii";
 	} else if (cpu_model > 2) {
-		nmi_ops.cpu_type = "i386/pii";
+		*cpu_type = "i386/pii";
 	} else {
-		nmi_ops.cpu_type = "i386/ppro";
+		*cpu_type = "i386/ppro";
 	}
 
 	model = &op_ppro_spec;
@@ -364,11 +355,12 @@ static int __init ppro_init(void)
 /* in order to get driverfs right */
 static int using_nmi;
 
-int __init nmi_init(struct oprofile_operations ** ops)
+int __init nmi_init(struct oprofile_operations *ops)
 {
-	__u8 vendor = current_cpu_data.x86_vendor;
-	__u8 family = current_cpu_data.x86;
- 
+	__u8 vendor = boot_cpu_data.x86_vendor;
+	__u8 family = boot_cpu_data.x86;
+	char *cpu_type;
+
 	if (!cpu_has_apic)
 		return -ENODEV;
  
@@ -381,13 +373,13 @@ int __init nmi_init(struct oprofile_operations ** ops)
 				return -ENODEV;
 			case 6:
 				model = &op_athlon_spec;
-				nmi_ops.cpu_type = "i386/athlon";
+				cpu_type = "i386/athlon";
 				break;
 			case 0xf:
 				model = &op_athlon_spec;
 				/* Actually it could be i386/hammer too, but give
 				   user space an consistent name. */
-				nmi_ops.cpu_type = "x86-64/hammer";
+				cpu_type = "x86-64/hammer";
 				break;
 			}
 			break;
@@ -396,13 +388,13 @@ int __init nmi_init(struct oprofile_operations ** ops)
 			switch (family) {
 				/* Pentium IV */
 				case 0xf:
-					if (!p4_init())
+					if (!p4_init(&cpu_type))
 						return -ENODEV;
 					break;
 
 				/* A P6-class processor */
 				case 6:
-					if (!ppro_init())
+					if (!ppro_init(&cpu_type))
 						return -ENODEV;
 					break;
 
@@ -417,7 +409,12 @@ int __init nmi_init(struct oprofile_operations ** ops)
 
 	init_driverfs();
 	using_nmi = 1;
-	*ops = &nmi_ops;
+	ops->create_files = nmi_create_files;
+	ops->setup = nmi_setup;
+	ops->shutdown = nmi_shutdown;
+	ops->start = nmi_start;
+	ops->stop = nmi_stop;
+	ops->cpu_type = cpu_type;
 	printk(KERN_INFO "oprofile: using NMI interrupt.\n");
 	return 0;
 }

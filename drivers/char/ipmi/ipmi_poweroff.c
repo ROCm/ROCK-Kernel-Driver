@@ -45,9 +45,9 @@
 extern void (*pm_power_off)(void);
 
 /* Stuff from the get device id command. */
-unsigned int mfg_id;
-unsigned int prod_id;
-unsigned char capabilities;
+static unsigned int mfg_id;
+static unsigned int prod_id;
+static unsigned char capabilities;
 
 /* We use our own messages for this operation, we don't let the system
    allocate them, since we may be in a panic situation.  The whole
@@ -381,11 +381,17 @@ struct poweroff_function {
 };
 
 static struct poweroff_function poweroff_functions[] = {
-	{ "ATCA",    ipmi_atca_detect, ipmi_poweroff_atca },
-	{ "CPI1",    ipmi_cpi1_detect, ipmi_poweroff_cpi1 },
+	{ .platform_type	= "ATCA",
+	  .detect		= ipmi_atca_detect,
+	  .poweroff_func	= ipmi_poweroff_atca },
+	{ .platform_type	= "CPI1",
+	  .detect		= ipmi_cpi1_detect,
+	  .poweroff_func	= ipmi_poweroff_cpi1 },
 	/* Chassis should generally be last, other things should override
 	   it. */
-	{ "chassis", ipmi_chassis_detect, ipmi_poweroff_chassis },
+	{ .platform_type	= "chassis",
+	  .detect		= ipmi_chassis_detect,
+	  .poweroff_func	= ipmi_poweroff_chassis },
 };
 #define NUM_PO_FUNCS (sizeof(poweroff_functions) \
 		      / sizeof(struct poweroff_function))

@@ -10,7 +10,6 @@ terms and conditions.
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/ptrace.h>
-#include <asm/ptrace.h>
 
 #include "ptproxy.h"
 #include "sysdep.h"

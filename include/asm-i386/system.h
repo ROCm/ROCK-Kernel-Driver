@@ -466,5 +466,6 @@ void disable_hlt(void);
 void enable_hlt(void);
 
 extern int es7000_plat;
+void cpu_idle_wait(void);
 
 #endif

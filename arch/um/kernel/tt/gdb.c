@@ -162,7 +162,7 @@ int gdb_remove(char *unused)
 void signal_usr1(int sig)
 {
 	if(debugger_pid != -1){
-		printk(UM_KERN_ERR "The debugger is already running\n");
+		printf("The debugger is already running\n");
 		return;
 	}
 	debugger_pid = start_debugger(linux_prog, 0, 0, &debugger_fd);
@@ -228,19 +228,19 @@ int debugger_signal(int status, pid_t pid){ return(0); }
 void child_signal(pid_t pid, int status){ }
 int init_ptrace_proxy(int idle_pid, int startup, int stop)
 {
-	printk(UM_KERN_ERR "debug requested when CONFIG_PT_PROXY is off\n");
+	printf("debug requested when CONFIG_PT_PROXY is off\n");
 	kill_child_dead(idle_pid);
 	exit(1);
 }
 
 void signal_usr1(int sig)
 {
-	printk(UM_KERN_ERR "debug requested when CONFIG_PT_PROXY is off\n");
+	printf("debug requested when CONFIG_PT_PROXY is off\n");
 }
 
 int attach_debugger(int idle_pid, int pid, int stop)
 {
-	printk(UM_KERN_ERR "attach_debugger called when CONFIG_PT_PROXY "
+	printf("attach_debugger called when CONFIG_PT_PROXY "
 	       "is off\n");
 	return(-1);
 }

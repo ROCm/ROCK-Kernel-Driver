@@ -23,6 +23,7 @@
 #include <linux/security.h>
 #include <linux/dcookies.h>
 #include <linux/suspend.h>
+#include <linux/tty.h>
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>
@@ -88,7 +89,7 @@ int cad_pid = 1;
  */
 
 static struct notifier_block *reboot_notifier_list;
-rwlock_t notifier_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(notifier_lock);
 
 /**
  *	notifier_chain_register	- Add notifier to a notifier chain
@@ -892,15 +893,15 @@ asmlinkage long sys_times(struct tms __user * tbuf)
 		struct tms tmp;
 		struct task_struct *tsk = current;
 		struct task_struct *t;
-		unsigned long utime, stime, cutime, cstime;
+		cputime_t utime, stime, cutime, cstime;
 
 		read_lock(&tasklist_lock);
 		utime = tsk->signal->utime;
 		stime = tsk->signal->stime;
 		t = tsk;
 		do {
-			utime += t->utime;
-			stime += t->stime;
+			utime = cputime_add(utime, t->utime);
+			stime = cputime_add(stime, t->stime);
 			t = next_thread(t);
 		} while (t != tsk);
 
@@ -919,10 +920,10 @@ asmlinkage long sys_times(struct tms __user * tbuf)
 		spin_unlock_irq(&tsk->sighand->siglock);
 		read_unlock(&tasklist_lock);
 
-		tmp.tms_utime = jiffies_to_clock_t(utime);
-		tmp.tms_stime = jiffies_to_clock_t(stime);
-		tmp.tms_cutime = jiffies_to_clock_t(cutime);
-		tmp.tms_cstime = jiffies_to_clock_t(cstime);
+		tmp.tms_utime = cputime_to_clock_t(utime);
+		tmp.tms_stime = cputime_to_clock_t(stime);
+		tmp.tms_cutime = cputime_to_clock_t(cutime);
+		tmp.tms_cstime = cputime_to_clock_t(cstime);
 		if (copy_to_user(tbuf, &tmp, sizeof(struct tms)))
 			return -EFAULT;
 	}
@@ -1075,6 +1076,7 @@ asmlinkage long sys_setsid(void)
 	if (!thread_group_leader(current))
 		return -EINVAL;
 
+	down(&tty_sem);
 	write_lock_irq(&tasklist_lock);
 
 	pid = find_pid(PIDTYPE_PGID, current->pid);
@@ -1088,6 +1090,7 @@ asmlinkage long sys_setsid(void)
 	err = process_group(current);
 out:
 	write_unlock_irq(&tasklist_lock);
+	up(&tty_sem);
 	return err;
 }
 
@@ -1525,7 +1528,7 @@ void k_getrusage(struct task_struct *p, int who, struct rusage *r)
 {
 	struct task_struct *t;
 	unsigned long flags;
-	unsigned long utime, stime;
+	cputime_t utime, stime;
 
 	memset((char *) r, 0, sizeof *r);
 
@@ -1542,12 +1545,12 @@ void k_getrusage(struct task_struct *p, int who, struct rusage *r)
 			r->ru_minflt = p->signal->cmin_flt;
 			r->ru_majflt = p->signal->cmaj_flt;
 			spin_unlock_irqrestore(&p->sighand->siglock, flags);
-			jiffies_to_timeval(utime, &r->ru_utime);
-			jiffies_to_timeval(stime, &r->ru_stime);
+			cputime_to_timeval(utime, &r->ru_utime);
+			cputime_to_timeval(stime, &r->ru_stime);
 			break;
 		case RUSAGE_SELF:
 			spin_lock_irqsave(&p->sighand->siglock, flags);
-			utime = stime = 0;
+			utime = stime = cputime_zero;
 			goto sum_group;
 		case RUSAGE_BOTH:
 			spin_lock_irqsave(&p->sighand->siglock, flags);
@@ -1558,16 +1561,16 @@ void k_getrusage(struct task_struct *p, int who, struct rusage *r)
 			r->ru_minflt = p->signal->cmin_flt;
 			r->ru_majflt = p->signal->cmaj_flt;
 		sum_group:
-			utime += p->signal->utime;
-			stime += p->signal->stime;
+			utime = cputime_add(utime, p->signal->utime);
+			stime = cputime_add(stime, p->signal->stime);
 			r->ru_nvcsw += p->signal->nvcsw;
 			r->ru_nivcsw += p->signal->nivcsw;
 			r->ru_minflt += p->signal->min_flt;
 			r->ru_majflt += p->signal->maj_flt;
 			t = p;
 			do {
-				utime += t->utime;
-				stime += t->stime;
+				utime = cputime_add(utime, t->utime);
+				stime = cputime_add(stime, t->stime);
 				r->ru_nvcsw += t->nvcsw;
 				r->ru_nivcsw += t->nivcsw;
 				r->ru_minflt += t->min_flt;
@@ -1575,8 +1578,8 @@ void k_getrusage(struct task_struct *p, int who, struct rusage *r)
 				t = next_thread(t);
 			} while (t != p);
 			spin_unlock_irqrestore(&p->sighand->siglock, flags);
-			jiffies_to_timeval(utime, &r->ru_utime);
-			jiffies_to_timeval(stime, &r->ru_stime);
+			cputime_to_timeval(utime, &r->ru_utime);
+			cputime_to_timeval(stime, &r->ru_stime);
 			break;
 		default:
 			BUG();
@@ -1687,6 +1690,15 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 						sizeof(me->comm)-1) < 0)
 				return -EFAULT;
 			set_task_comm(me, ncomm);
+			return 0;
+		}
+		case PR_GET_NAME: {
+			struct task_struct *me = current;
+			unsigned char tcomm[sizeof(me->comm)];
+
+			get_task_comm(tcomm, me);
+			if (copy_to_user((char __user *)arg2, tcomm, sizeof(tcomm)))
+				return -EFAULT;
 			return 0;
 		}
 		default:

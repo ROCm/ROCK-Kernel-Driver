@@ -373,6 +373,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	depends on !M386
 	default y
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 config X86_PPRO_FENCE
 	bool
 	depends on M686 || M586MMX || M586TSC || M586 || M486 || M386
@@ -512,6 +516,17 @@ config PREEMPT
 
 	  Say Y here if you are building a kernel for a desktop, embedded
 	  or real-time system.  Say N if you are unsure.
+
+config PREEMPT_BKL
+	bool "Preempt The Big Kernel Lock"
+	depends on PREEMPT
+	default y
+	help
+	  This option reduces the latency of the kernel by making the
+	  big kernel lock preemptible.
+
+	  Say Y here if you are building a kernel for a desktop system.
+	  Say N if you are unsure.
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors" if !SMP
@@ -827,7 +842,6 @@ config EFI
 	depends on ACPI
 	default n
 	---help---
-
 	This enables the the kernel to boot on EFI platforms using
 	system configuration information passed to it from the firmware.
 	This also enables the kernel to use any EFI runtime services that are
@@ -866,7 +880,7 @@ config REGPARM
 	depends on EXPERIMENTAL
 	default n
 	help
-	Compile the kernel with -mregparm=3. This uses an different ABI
+	Compile the kernel with -mregparm=3. This uses a different ABI
 	and passes the first three arguments of a function call in registers.
 	This will probably break binary only modules.
 

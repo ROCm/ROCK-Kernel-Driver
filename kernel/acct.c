@@ -528,3 +528,36 @@ void acct_process(long exitcode)
 	do_acct_process(exitcode, file);
 	fput(file);
 }
+
+
+/*
+ * acct_update_integrals
+ *    -  update mm integral fields in task_struct
+ */
+void acct_update_integrals(void)
+{
+	struct task_struct *tsk = current;
+
+	if (likely(tsk->mm)) {
+		long delta = tsk->stime - tsk->acct_stimexpd;
+
+		if (delta == 0)
+			return;
+		tsk->acct_stimexpd = tsk->stime;
+		tsk->acct_rss_mem1 += delta * tsk->mm->rss;
+		tsk->acct_vm_mem1 += delta * tsk->mm->total_vm;
+	}
+}
+
+/*
+ * acct_clear_integrals
+ *    - clear the mm integral fields in task_struct
+ */
+void acct_clear_integrals(struct task_struct *tsk)
+{
+	if (tsk) {
+		tsk->acct_stimexpd = 0;
+		tsk->acct_rss_mem1 = 0;
+		tsk->acct_vm_mem1 = 0;
+	}
+}

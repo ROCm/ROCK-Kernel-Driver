@@ -428,6 +428,15 @@ static inline int acpi_boot_table_init(void)
 unsigned int acpi_register_gsi (u32 gsi, int edge_level, int active_high_low);
 int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
 
+/*
+ * This function undoes the effect of one call to acpi_register_gsi().
+ * If this matches the last registration, any IRQ resources for gsi
+ * are freed.
+ */
+#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
+void acpi_unregister_gsi (u32 gsi);
+#endif
+
 #ifdef CONFIG_ACPI_PCI
 
 struct acpi_prt_entry {
@@ -452,6 +461,10 @@ struct pci_dev;
 
 int acpi_pci_irq_enable (struct pci_dev *dev);
 void acpi_penalize_isa_irq(int irq);
+
+#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
+void acpi_pci_irq_disable (struct pci_dev *dev);
+#endif
 
 struct acpi_pci_driver {
 	struct acpi_pci_driver *next;

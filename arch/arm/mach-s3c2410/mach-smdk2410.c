@@ -46,7 +46,6 @@
 
 #include <asm/arch/regs-serial.h>
 
-#include "s3c2410.h"
 #include "devs.h"
 #include "cpu.h"
 
@@ -98,13 +97,14 @@ static struct s3c24xx_board smdk2410_board __initdata = {
 void __init smdk2410_map_io(void)
 {
 	s3c24xx_init_io(smdk2410_iodesc, ARRAY_SIZE(smdk2410_iodesc));
-	s3c2410_init_uarts(smdk2410_uartcfgs, ARRAY_SIZE(smdk2410_uartcfgs));
+	s3c24xx_init_clocks(0);
+	s3c24xx_init_uarts(smdk2410_uartcfgs, ARRAY_SIZE(smdk2410_uartcfgs));
 	s3c24xx_set_board(&smdk2410_board);
 }
 
 void __init smdk2410_init_irq(void)
 {
-	s3c2410_init_irq();
+	s3c24xx_init_irq();
 }
 
 MACHINE_START(SMDK2410, "SMDK2410") /* @TODO: request a new identifier and switch
@@ -114,7 +114,7 @@ MACHINE_START(SMDK2410, "SMDK2410") /* @TODO: request a new identifier and switc
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(smdk2410_map_io)
      INITIRQ(smdk2410_init_irq)
-     .timer		= &s3c2410_timer,
+	.timer		= &s3c24xx_timer,
 MACHINE_END
 
 

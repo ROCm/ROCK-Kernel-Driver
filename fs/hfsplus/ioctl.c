@@ -73,7 +73,7 @@ int hfsplus_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 		else
 			HFSPLUS_I(inode).userflags &= ~HFSPLUS_FLG_NODUMP;
 
-		inode->i_ctime = CURRENT_TIME;
+		inode->i_ctime = CURRENT_TIME_SEC;
 		mark_inode_dirty(inode);
 		return 0;
 	}

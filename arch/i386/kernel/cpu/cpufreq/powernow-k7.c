@@ -635,6 +635,17 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 
 static int powernow_cpu_exit (struct cpufreq_policy *policy) {
 	cpufreq_frequency_table_put_attr(policy->cpu);
+
+#ifdef CONFIG_X86_POWERNOW_K7_ACPI
+	if (acpi_processor_perf) {
+		acpi_processor_unregister_performance(acpi_processor_perf, 0);
+		kfree(acpi_processor_perf);
+	}
+#endif
+
+	if (powernow_table)
+		kfree(powernow_table);
+
 	return 0;
 }
 
@@ -664,15 +675,7 @@ static int __init powernow_init (void)
 
 static void __exit powernow_exit (void)
 {
-#ifdef CONFIG_X86_POWERNOW_K7_ACPI
-	if (acpi_processor_perf) {
-		acpi_processor_unregister_performance(acpi_processor_perf, 0);
-		kfree(acpi_processor_perf);
-	}
-#endif
 	cpufreq_unregister_driver(&powernow_driver);
-	if (powernow_table)
-		kfree(powernow_table);
 }
 
 module_param(acpi_force,  int, 0444);

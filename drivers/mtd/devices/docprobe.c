@@ -4,7 +4,7 @@
 /* (C) 1999 Machine Vision Holdings, Inc.			*/
 /* (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>		*/
 
-/* $Id: docprobe.c,v 1.43 2004/11/16 18:29:01 dwmw2 Exp $	*/
+/* $Id: docprobe.c,v 1.44 2005/01/05 12:40:36 dwmw2 Exp $	*/
 
 
 
@@ -62,7 +62,7 @@
 
 
 static unsigned long doc_config_location = CONFIG_MTD_DOCPROBE_ADDRESS;
-MODULE_PARM(doc_config_location, "l");
+module_param(doc_config_location, ulong, 0);
 MODULE_PARM_DESC(doc_config_location, "Physical memory address at which to probe for DiskOnChip");
 
 static unsigned long __initdata doc_locations[] = {

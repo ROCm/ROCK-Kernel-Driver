@@ -853,7 +853,7 @@ static int __init sn_sal_module_init(void)
 		return -ENODEV;
 	}
 
-	sal_console_port.sc_port.lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&sal_console_port.sc_port.lock);
 
 	/* Setup the port struct with the minimum needed */
 	sal_console_port.sc_port.membase = (char *)1;	/* just needs to be non-zero */

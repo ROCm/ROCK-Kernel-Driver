@@ -43,6 +43,8 @@ shall implement "true random writes with 2KB granularity", which means
 that it should be possible to put any filesystem with a block size >=
 2KB on such a disc. For example, it should be possible to do:
 
+	# dvd+rw-format /dev/hdc   (only needed if the disc has never
+	                            been formatted)
 	# mkudffs /dev/hdc
 	# mount /dev/hdc /cdrom -t udf -o rw,noatime
 
@@ -54,6 +56,7 @@ writes are not 32KB aligned.
 Both problems can be solved by using the pktcdvd driver, which always
 generates aligned writes.
 
+	# dvd+rw-format /dev/hdc
 	# pktsetup dev_name /dev/hdc
 	# mkudffs /dev/pktcdvd/dev_name
 	# mount /dev/pktcdvd/dev_name /cdrom -t udf -o rw,noatime

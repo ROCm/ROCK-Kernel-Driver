@@ -32,26 +32,6 @@ config USB_EMI26
 	  To compile this driver as a module, choose M here: the
 	  module will be called emi26.
 
-config USB_TIGL
-	tristate "Texas Instruments Graph Link USB (aka SilverLink) cable support"
-	depends on USB
-	---help---
-	  If you own a Texas Instruments graphing calculator and use a 
-	  TI-GRAPH LINK USB cable (aka SilverLink), then you might be 
-	  interested in this driver.
-
-	  If you enable this driver, you will be able to communicate with
-	  your calculator through a set of device nodes under /dev.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called tiglusb.
-
-	  If you don't know what the SilverLink cable is or what a Texas
-	  Instruments graphing calculator is, then you probably don't need this
-	  driver.
-
-	  If unsure, say N.
-
 config USB_AUERSWALD
 	tristate "USB Auerswald ISDN support (EXPERIMENTAL)"
 	depends on USB && EXPERIMENTAL
@@ -147,7 +127,6 @@ config USB_TEST
 	tristate "USB testing driver (DEVELOPMENT)"
 	depends on USB && USB_DEVICEFS && EXPERIMENTAL
 	help
-
 	  This driver is for testing host controller software.  It is used
 	  with specialized device firmware for regression and stress testing,
 	  to help prevent problems from cropping up with "real" drivers.

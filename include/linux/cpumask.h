@@ -234,29 +234,29 @@ static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 #if NR_CPUS <= BITS_PER_LONG
 
 #define CPU_MASK_ALL							\
-((cpumask_t) { {							\
+(cpumask_t) { {								\
 	[BITS_TO_LONGS(NR_CPUS)-1] = CPU_MASK_LAST_WORD			\
-} })
+} }
 
 #else
 
 #define CPU_MASK_ALL							\
-((cpumask_t) { {							\
+(cpumask_t) { {								\
 	[0 ... BITS_TO_LONGS(NR_CPUS)-2] = ~0UL,			\
 	[BITS_TO_LONGS(NR_CPUS)-1] = CPU_MASK_LAST_WORD			\
-} })
+} }
 
 #endif
 
 #define CPU_MASK_NONE							\
-((cpumask_t) { {							\
+(cpumask_t) { {								\
 	[0 ... BITS_TO_LONGS(NR_CPUS)-1] =  0UL				\
-} })
+} }
 
 #define CPU_MASK_CPU0							\
-((cpumask_t) { {							\
+(cpumask_t) { {								\
 	[0] =  1UL							\
-} })
+} }
 
 #define cpus_addr(src) ((src).bits)
 

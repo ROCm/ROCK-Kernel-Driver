@@ -33,11 +33,6 @@
  */
 MODULE_AUTHOR("R.J.Dunlop <bob.dunlop@farsite.co.uk>");
 MODULE_DESCRIPTION("FarSync T-Series WAN driver. FarSite Communications Ltd.");
-MODULE_PARM(fst_txq_low, "i");
-MODULE_PARM(fst_txq_high, "i");
-MODULE_PARM(fst_max_reads, "i");
-MODULE_PARM(fst_excluded_cards, "i");
-MODULE_PARM(fst_excluded_list, "0-32i");
 MODULE_LICENSE("GPL");
 
 /*      Driver configuration and global parameters
@@ -84,6 +79,12 @@ int fst_txq_high = FST_HIGH_WATER_MARK;
 int fst_max_reads = 7;
 int fst_excluded_cards = 0;
 int fst_excluded_list[FST_MAX_CARDS];
+
+module_param(fst_txq_low, int, 0);
+module_param(fst_txq_high, int, 0);
+module_param(fst_max_reads, int, 0);
+module_param(fst_excluded_cards, int, 0);
+module_param_array(fst_excluded_list, int, NULL, 0);
 
 /*      Card shared memory layout
  *      =========================

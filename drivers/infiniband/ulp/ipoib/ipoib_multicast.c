@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -44,7 +44,7 @@
 #include "ipoib.h"
 
 #ifdef CONFIG_INFINIBAND_IPOIB_DEBUG
-int mcast_debug_level;
+static int mcast_debug_level;
 
 module_param(mcast_debug_level, int, 0644);
 MODULE_PARM_DESC(mcast_debug_level,
@@ -213,8 +213,10 @@ static int ipoib_mcast_join_finish(struct ipoib_mcast *mcast,
 
 	/* Set the cached Q_Key before we attach if it's the broadcast group */
 	if (!memcmp(mcast->mcmember.mgid.raw, priv->dev->broadcast + 4,
-		    sizeof (union ib_gid)))
+		    sizeof (union ib_gid))) {
 		priv->qkey = be32_to_cpu(priv->broadcast->mcmember.qkey);
+		priv->tx_wr.wr.ud.remote_qkey = priv->qkey;
+	}
 
 	if (!test_bit(IPOIB_MCAST_FLAG_SENDONLY, &mcast->flags)) {
 		if (test_and_set_bit(IPOIB_MCAST_FLAG_ATTACHED, &mcast->flags)) {
@@ -238,19 +240,10 @@ static int ipoib_mcast_join_finish(struct ipoib_mcast *mcast,
 	}
 
 	{
-		/*
-		 * For now we set static_rate to 0.  This is not
-		 * really correct: we should look at the rate
-		 * component of the MC member record, compare it with
-		 * the rate of our local port (calculated from the
-		 * active link speed and link width) and set an
-		 * inter-packet delay appropriately.
-		 */
 		struct ib_ah_attr av = {
 			.dlid	       = be16_to_cpu(mcast->mcmember.mlid),
 			.port_num      = priv->port,
 			.sl	       = mcast->mcmember.sl,
-			.static_rate   = 0,
 			.ah_flags      = IB_AH_GRH,
 			.grh	       = {
 				.flow_label    = be32_to_cpu(mcast->mcmember.flow_label),
@@ -261,6 +254,15 @@ static int ipoib_mcast_join_finish(struct ipoib_mcast *mcast,
 		};
 
 		av.grh.dgid = mcast->mcmember.mgid;
+
+		if (ib_sa_rate_enum_to_int(mcast->mcmember.rate) > 0)
+			av.static_rate = (2 * priv->local_rate -
+					  ib_sa_rate_enum_to_int(mcast->mcmember.rate) - 1) /
+				(priv->local_rate ? priv->local_rate : 1);
+
+		ipoib_dbg_mcast(priv, "static_rate %d for local port %dX, mcmember %dX\n",
+				av.static_rate, priv->local_rate,
+				ib_sa_rate_enum_to_int(mcast->mcmember.rate));
 
 		mcast->ah = ipoib_create_ah(dev, priv->pd, &av);
 		if (!mcast->ah) {
@@ -506,6 +508,17 @@ void ipoib_mcast_join_task(void *dev_ptr)
 	else
 		memcpy(priv->dev->dev_addr + 4, priv->local_gid.raw, sizeof (union ib_gid));
 
+	{
+		struct ib_port_attr attr;
+
+		if (!ib_query_port(priv->ca, priv->port, &attr)) {
+			priv->local_lid  = attr.lid;
+			priv->local_rate = attr.active_speed *
+				ib_width_enum_to_int(attr.active_width);
+		} else
+			ipoib_warn(priv, "ib_query_port failed\n");
+	}
+
 	if (!priv->broadcast) {
 		priv->broadcast = ipoib_mcast_alloc(dev, 1);
 		if (!priv->broadcast) {
@@ -552,15 +565,6 @@ void ipoib_mcast_join_task(void *dev_ptr)
 
 		ipoib_mcast_join(dev, mcast, 1);
 		return;
-	}
-
-	{
-		struct ib_port_attr attr;
-
-		if (!ib_query_port(priv->ca, priv->port, &attr))
-			priv->local_lid = attr.lid;
-		else
-			ipoib_warn(priv, "ib_query_port failed\n");
 	}
 
 	priv->mcast_mtu = ib_mtu_enum_to_int(priv->broadcast->mcmember.mtu) -
@@ -621,7 +625,7 @@ int ipoib_mcast_stop_thread(struct net_device *dev)
 	return 0;
 }
 
-int ipoib_mcast_leave(struct net_device *dev, struct ipoib_mcast *mcast)
+static int ipoib_mcast_leave(struct net_device *dev, struct ipoib_mcast *mcast)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	struct ib_sa_mcmember_rec rec = {

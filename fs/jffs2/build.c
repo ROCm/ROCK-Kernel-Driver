@@ -3,17 +3,19 @@
  *
  * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: build.c,v 1.55 2003/10/28 17:02:44 dwmw2 Exp $
+ * $Id: build.c,v 1.69 2004/12/16 20:22:18 dmarlin Exp $
  *
  */
 
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
+#include <linux/mtd/mtd.h>
 #include "nodelist.h"
 
 static void jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *, struct jffs2_inode_cache *, struct jffs2_full_dirent **);
@@ -62,6 +64,7 @@ static inline void jffs2_build_inode_pass1(struct jffs2_sb_info *c, struct jffs2
 		if (!child_ic) {
 			printk(KERN_NOTICE "Eep. Child \"%s\" (ino #%u) of dir ino #%u doesn't exist!\n",
 				  fd->name, fd->ino, ic->ino);
+			jffs2_mark_node_obsolete(c, fd->raw);
 			continue;
 		}
 
@@ -88,6 +91,7 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 	int ret;
 	int i;
 	struct jffs2_inode_cache *ic;
+	struct jffs2_full_dirent *fd;
 	struct jffs2_full_dirent *dead_fds = NULL;
 
 	/* First, scan the medium and build all the inode caches with
@@ -95,13 +99,11 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 
 	c->flags |= JFFS2_SB_FLAG_MOUNTING;
 	ret = jffs2_scan_medium(c);
-	c->flags &= ~JFFS2_SB_FLAG_MOUNTING;
-
 	if (ret)
-		return ret;
+		goto exit;
 
 	D1(printk(KERN_DEBUG "Scanned flash completely\n"));
-	D1(jffs2_dump_block_lists(c));
+	D2(jffs2_dump_block_lists(c));
 
 	/* Now scan the directory tree, increasing nlink according to every dirent found. */
 	for_each_inode(i, c, ic) {
@@ -114,6 +116,8 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 			cond_resched();
 		}
 	}
+	c->flags &= ~JFFS2_SB_FLAG_MOUNTING;
+
 	D1(printk(KERN_DEBUG "Pass 1 complete\n"));
 
 	/* Next, scan for inodes with nlink == 0 and remove them. If
@@ -135,9 +139,7 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 	D1(printk(KERN_DEBUG "Pass 2a starting\n"));
 
 	while (dead_fds) {
-		struct jffs2_inode_cache *ic;
-		struct jffs2_full_dirent *fd = dead_fds;
-
+		fd = dead_fds;
 		dead_fds = fd->next;
 
 		ic = jffs2_get_ino_cache(c, fd->ino);
@@ -152,7 +154,6 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 	
 	/* Finally, we can scan again and free the dirent structs */
 	for_each_inode(i, c, ic) {
-		struct jffs2_full_dirent *fd;
 		D1(printk(KERN_DEBUG "Pass 3: ino #%u, ic %p, nodes %p\n", ic->ino, ic, ic->nodes));
 
 		while(ic->scan_dents) {
@@ -164,10 +165,23 @@ static int jffs2_build_filesystem(struct jffs2_sb_info *c)
 		cond_resched();
 	}
 	D1(printk(KERN_DEBUG "Pass 3 complete\n"));
-	D1(jffs2_dump_block_lists(c));
+	D2(jffs2_dump_block_lists(c));
 
 	/* Rotate the lists by some number to ensure wear levelling */
 	jffs2_rotate_lists(c);
+
+	ret = 0;
+
+exit:
+	if (ret) {
+		for_each_inode(i, c, ic) {
+			while(ic->scan_dents) {
+				fd = ic->scan_dents;
+				ic->scan_dents = fd->next;
+				jffs2_free_full_dirent(fd);
+			}
+		}
+	}
 
 	return ret;
 }
@@ -179,9 +193,12 @@ static void jffs2_build_remove_unlinked_inode(struct jffs2_sb_info *c, struct jf
 
 	D1(printk(KERN_DEBUG "JFFS2: Removing ino #%u with nlink == zero.\n", ic->ino));
 	
-	for (raw = ic->nodes; raw != (void *)ic; raw = raw->next_in_ino) {
+	raw = ic->nodes;
+	while (raw != (void *)ic) {
+		struct jffs2_raw_node_ref *next = raw->next_in_ino;
 		D1(printk(KERN_DEBUG "obsoleting node at 0x%08x\n", ref_offset(raw)));
 		jffs2_mark_node_obsolete(c, raw);
+		raw = next;
 	}
 
 	if (ic->scan_dents) {
@@ -297,7 +314,10 @@ int jffs2_do_mount_fs(struct jffs2_sb_info *c)
 
 	c->free_size = c->flash_size;
 	c->nr_blocks = c->flash_size / c->sector_size;
-	c->blocks = kmalloc(sizeof(struct jffs2_eraseblock) * c->nr_blocks, GFP_KERNEL);
+ 	if (c->mtd->flags & MTD_NO_VIRTBLOCKS)
+		c->blocks = vmalloc(sizeof(struct jffs2_eraseblock) * c->nr_blocks);
+	else
+		c->blocks = kmalloc(sizeof(struct jffs2_eraseblock) * c->nr_blocks, GFP_KERNEL);
 	if (!c->blocks)
 		return -ENOMEM;
 	for (i=0; i<c->nr_blocks; i++) {
@@ -310,6 +330,7 @@ int jffs2_do_mount_fs(struct jffs2_sb_info *c)
 		c->blocks[i].used_size = 0;
 		c->blocks[i].first_node = NULL;
 		c->blocks[i].last_node = NULL;
+		c->blocks[i].bad_count = 0;
 	}
 
 	init_MUTEX(&c->alloc_sem);
@@ -336,7 +357,11 @@ int jffs2_do_mount_fs(struct jffs2_sb_info *c)
 		D1(printk(KERN_DEBUG "build_fs failed\n"));
 		jffs2_free_ino_caches(c);
 		jffs2_free_raw_node_refs(c);
-		kfree(c->blocks);
+		if (c->mtd->flags & MTD_NO_VIRTBLOCKS) {
+			vfree(c->blocks);
+		} else {
+			kfree(c->blocks);
+		}
 		return -EIO;
 	}
 

@@ -39,35 +39,32 @@ static int testMemory = testMemoryUNKNOWN;
 static int irq = irqUNKNOWN;
 static int txScrambled = 1;
 static int mdebug;
-#endif
 
-MODULE_PARM(irq, "i");
-MODULE_PARM(mem, "i");
-MODULE_PARM(arlan_debug, "i");
-MODULE_PARM(testMemory, "i");
-MODULE_PARM(spreadingCode, "i");
-MODULE_PARM(channelNumber, "i");
-MODULE_PARM(channelSet, "i");
-MODULE_PARM(systemId, "i");
-MODULE_PARM(registrationMode, "i");
-MODULE_PARM(radioNodeId, "i");
-MODULE_PARM(SID, "i");
-MODULE_PARM(txScrambled, "i");
-MODULE_PARM(keyStart, "i");
-MODULE_PARM(mdebug, "i");
-MODULE_PARM(tx_delay_ms, "i");
-MODULE_PARM(retries, "i");
-MODULE_PARM(async, "i");
-MODULE_PARM(tx_queue_len, "i");
-MODULE_PARM(arlan_entry_debug, "i");
-MODULE_PARM(arlan_exit_debug, "i");
-MODULE_PARM(arlan_entry_and_exit_debug, "i");
-MODULE_PARM(arlan_EEPROM_bad, "i");
+module_param(irq, int, 0);
+module_param(mdebug, int, 0);
+module_param(testMemory, int, 0);
+module_param(arlan_entry_debug, int, 0);
+module_param(arlan_exit_debug, int, 0);
+module_param(txScrambled, int, 0);
 MODULE_PARM_DESC(irq, "(unused)");
-MODULE_PARM_DESC(mem, "Arlan memory address for single device probing");
-MODULE_PARM_DESC(arlan_debug, "Arlan debug enable (0-1)");
 MODULE_PARM_DESC(testMemory, "(unused)");
 MODULE_PARM_DESC(mdebug, "Arlan multicast debugging (0-1)");
+#endif
+
+module_param(arlan_debug, int, 0);
+module_param(spreadingCode, int, 0);
+module_param(channelNumber, int, 0);
+module_param(channelSet, int, 0);
+module_param(systemId, int, 0);
+module_param(registrationMode, int, 0);
+module_param(radioNodeId, int, 0);
+module_param(SID, int, 0);
+module_param(keyStart, int, 0);
+module_param(tx_delay_ms, int, 0);
+module_param(retries, int, 0);
+module_param(tx_queue_len, int, 0);
+module_param(arlan_EEPROM_bad, int, 0);
+MODULE_PARM_DESC(arlan_debug, "Arlan debug enable (0-1)");
 MODULE_PARM_DESC(retries, "Arlan maximum packet retransmisions");
 #ifdef ARLAN_ENTRY_EXIT_DEBUGGING
 MODULE_PARM_DESC(arlan_entry_debug, "Arlan driver function entry debugging");

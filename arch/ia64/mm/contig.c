@@ -218,8 +218,8 @@ count_dma_pages (u64 start, u64 end, void *arg)
 {
 	unsigned long *count = arg;
 
-	if (end <= MAX_DMA_ADDRESS)
-		*count += (end - start) >> PAGE_SHIFT;
+	if (start < MAX_DMA_ADDRESS)
+		*count += (min(end, MAX_DMA_ADDRESS) - start) >> PAGE_SHIFT;
 	return 0;
 }
 #endif

@@ -592,15 +592,20 @@ out:
 
 static int ti12xx_override(struct yenta_socket *socket)
 {
-	u32 val;
+	u32 val, val_orig;
 
 	/* make sure that memory burst is active */
-	val = config_readl(socket, TI113X_SYSTEM_CONTROL);
+	val_orig = val = config_readl(socket, TI113X_SYSTEM_CONTROL);
+	if (disable_clkrun && PCI_FUNC(socket->dev->devfn) == 0) {
+		printk(KERN_INFO "Yenta: Disabling CLKRUN feature\n");
+		val |= TI113X_SCR_KEEPCLK;
+	}
 	if (!(val & TI122X_SCR_MRBURSTUP)) {
 		printk(KERN_INFO "Yenta: Enabling burst memory read transactions\n");
 		val |= TI122X_SCR_MRBURSTUP;
-		config_writel(socket, TI113X_SYSTEM_CONTROL, val);
 	}
+	if (val_orig != val)
+		config_writel(socket, TI113X_SYSTEM_CONTROL, val);
 
 	/*
 	 * for EnE bridges only: clear testbit TLTEnable. this makes the

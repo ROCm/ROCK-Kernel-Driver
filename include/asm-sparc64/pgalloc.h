@@ -73,10 +73,9 @@ static __inline__ pgd_t *get_pgd_fast(void)
 		struct page *page;
 
 		preempt_enable();
-		page = alloc_page(GFP_KERNEL|__GFP_REPEAT);
+		page = alloc_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
 		if (page) {
 			ret = (struct page *)page_address(page);
-			clear_page(ret);
 			page->lru.prev = (void *) 2UL;
 
 			preempt_disable();

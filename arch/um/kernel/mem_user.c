@@ -48,8 +48,6 @@
 #include "tempfile.h"
 #include "kern_constants.h"
 
-extern struct mem_region physmem_region;
-
 #define TEMPNAME_TEMPLATE "vm_file-XXXXXX"
 
 static int create_tmp_file(unsigned long len)
@@ -135,7 +133,7 @@ static int create_anon_file(unsigned long len)
 
 	addr = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 	if(addr == MAP_FAILED){
-		os_print_error((int) addr, "mapping physmem file");
+		perror("mapping physmem file");
 		exit(1);
 	}
 	munmap(addr, len);

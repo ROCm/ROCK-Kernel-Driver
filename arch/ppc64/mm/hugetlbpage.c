@@ -745,7 +745,7 @@ void hugetlb_mm_free_pgd(struct mm_struct *mm)
 
 	pgdir = mm->context.huge_pgdir;
 	if (! pgdir)
-		return;
+		goto out;
 
 	mm->context.huge_pgdir = NULL;
 
@@ -768,6 +768,7 @@ void hugetlb_mm_free_pgd(struct mm_struct *mm)
 	BUG_ON(memcmp(pgdir, empty_zero_page, PAGE_SIZE));
 	kmem_cache_free(zero_cache, pgdir);
 
+ out:
 	spin_unlock(&mm->page_table_lock);
 }
 
@@ -832,7 +833,7 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 		hash = hpt_hash(vpn, 1);
 		if (pte_val(old_pte) & _PAGE_SECONDARY)
 			hash = ~hash;
-		slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
+		slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
 		slot += (pte_val(old_pte) & _PAGE_GROUP_IX) >> 12;
 
 		if (ppc_md.hpte_updatepp(slot, hpteflags, va, 1, local) == -1)
@@ -846,7 +847,7 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 		prpn = pte_pfn(old_pte);
 
 repeat:
-		hpte_group = ((hash & htab_data.htab_hash_mask) *
+		hpte_group = ((hash & htab_hash_mask) *
 			      HPTES_PER_GROUP) & ~0x7UL;
 
 		/* Update the linux pte with the HPTE slot */
@@ -863,13 +864,13 @@ repeat:
 		/* Primary is full, try the secondary */
 		if (unlikely(slot == -1)) {
 			pte_val(new_pte) |= _PAGE_SECONDARY;
-			hpte_group = ((~hash & htab_data.htab_hash_mask) *
+			hpte_group = ((~hash & htab_hash_mask) *
 				      HPTES_PER_GROUP) & ~0x7UL; 
 			slot = ppc_md.hpte_insert(hpte_group, va, prpn,
 						  1, hpteflags, 0, 1);
 			if (slot == -1) {
 				if (mftb() & 0x1)
-					hpte_group = ((hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP) & ~0x7UL;
+					hpte_group = ((hash & htab_hash_mask) * HPTES_PER_GROUP) & ~0x7UL;
 
 				ppc_md.hpte_remove(hpte_group);
 				goto repeat;

@@ -13,6 +13,7 @@
 #include "linux/ptrace.h"
 #include "asm/semaphore.h"
 #include "asm/pgtable.h"
+#include "asm/pgalloc.h"
 #include "asm/tlbflush.h"
 #include "asm/a.out.h"
 #include "asm/current.h"
@@ -32,6 +33,7 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 	unsigned long page;
@@ -55,7 +57,8 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 		goto out;
 	page = address & PAGE_MASK;
 	pgd = pgd_offset(mm, page);
-	pmd = pmd_offset(pgd, page);
+	pud = pud_offset(pgd, page);
+	pmd = pmd_offset(pud, page);
 	do {
  survive:
 		switch (handle_mm_fault(mm, vma, address, is_write)){
@@ -74,6 +77,9 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 		default:
 			BUG();
 		}
+		pgd = pgd_offset(mm, page);
+		pud = pud_offset(pgd, page);
+		pmd = pmd_offset(pud, page);
 		pte = pte_offset_kernel(pmd, page);
 	} while(!pte_present(*pte));
 	err = 0;

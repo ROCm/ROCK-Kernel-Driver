@@ -37,7 +37,6 @@
 int smp_threads_ready = 0;
 struct sh_cpuinfo cpu_data[NR_CPUS];
 
-extern int cpu_idle(void *unused);
 extern void per_cpu_trap_init(void);
 
 cpumask_t cpu_possible_map;
@@ -124,7 +123,8 @@ int start_secondary(void *unused)
 	
 	atomic_inc(&cpus_booted);
 
-	return cpu_idle(0);
+	cpu_idle();
+	return 0;
 }
 
 void __init smp_cpus_done(unsigned int max_cpus)

@@ -21,10 +21,6 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 #define ELF_DATA        ELFDATA2MSB
 #define ELF_ARCH	EM_PPC
 
-/********* Bits for asm-um/delay.h **********/
-
-typedef unsigned int um_udelay_t;
-
 /********* Bits for asm-um/hw_irq.h **********/
 
 struct hw_interrupt_type;

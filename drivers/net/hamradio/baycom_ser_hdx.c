@@ -638,11 +638,11 @@ static char *mode[NR_PORTS] = { "ser12*", };
 static int iobase[NR_PORTS] = { 0x3f8, };
 static int irq[NR_PORTS] = { 4, };
 
-MODULE_PARM(mode, "1-" __MODULE_STRING(NR_PORTS) "s");
+module_param_array(mode, charp, NULL, 0);
 MODULE_PARM_DESC(mode, "baycom operating mode; * for software DCD");
-MODULE_PARM(iobase, "1-" __MODULE_STRING(NR_PORTS) "i");
+module_param_array(iobase, int, NULL, 0);
 MODULE_PARM_DESC(iobase, "baycom io base address");
-MODULE_PARM(irq, "1-" __MODULE_STRING(NR_PORTS) "i");
+module_param_array(irq, int, NULL, 0);
 MODULE_PARM_DESC(irq, "baycom irq number");
 
 MODULE_AUTHOR("Thomas M. Sailer, sailer@ife.ee.ethz.ch, hb9jnx@hb9w.che.eu");

@@ -1,6 +1,6 @@
 /* linux/arch/arm/mach-s3c2410/mach-bast.c
  *
- * Copyright (c) 2003,2004 Simtec Electronics
+ * Copyright (c) 2003-2005 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * http://www.simtec.co.uk/products/EB2410ITX/
@@ -20,6 +20,8 @@
  *     18-Jan-2003 BJD  Added serial port configuration
  *     05-Oct-2004 BJD  Power management code
  *     04-Nov-2004 BJD  Updated serial port clocks
+ *     04-Jan-2006 BJD  New uart init call
+ *     10-Jan-2005 BJD  Removed include of s3c2410.h
 */
 
 #include <linux/kernel.h>
@@ -47,7 +49,6 @@
 #include <asm/arch/regs-gpio.h>
 #include <asm/arch/regs-mem.h>
 
-#include "s3c2410.h"
 #include "clock.h"
 #include "devs.h"
 #include "cpu.h"
@@ -262,14 +263,15 @@ void __init bast_map_io(void)
 	s3c24xx_uclk.parent  = &s3c24xx_clkout1;
 
 	s3c24xx_init_io(bast_iodesc, ARRAY_SIZE(bast_iodesc));
-	s3c2410_init_uarts(bast_uartcfgs, ARRAY_SIZE(bast_uartcfgs));
+	s3c24xx_init_clocks(0);
+	s3c24xx_init_uarts(bast_uartcfgs, ARRAY_SIZE(bast_uartcfgs));
 	s3c24xx_set_board(&bast_board);
 	usb_simtec_init();
 }
 
 void __init bast_init_irq(void)
 {
-	s3c2410_init_irq();
+	s3c24xx_init_irq();
 }
 
 #ifdef CONFIG_PM
@@ -306,5 +308,5 @@ MACHINE_START(BAST, "Simtec-BAST")
      MAPIO(bast_map_io)
      INITIRQ(bast_init_irq)
 	.init_machine	= bast_init_machine,
-     .timer		= &s3c2410_timer,
+	.timer		= &s3c24xx_timer,
 MACHINE_END

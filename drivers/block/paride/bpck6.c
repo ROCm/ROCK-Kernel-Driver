@@ -277,6 +277,6 @@ static void __exit bpck6_exit(void)
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Micro Solutions Inc.");
 MODULE_DESCRIPTION("BACKPACK Protocol module, compatible with PARIDE");
-MODULE_PARM(verbose,"i");
+module_param(verbose, bool, 0644);
 module_init(bpck6_init)
 module_exit(bpck6_exit)

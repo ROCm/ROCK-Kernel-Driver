@@ -61,6 +61,7 @@ static int __initdata smp_b_stepping;
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
 int phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
+EXPORT_SYMBOL(phys_proc_id);
 
 /* bitmap of online cpus */
 cpumask_t cpu_online_map;
@@ -411,12 +412,10 @@ void __init smp_callin(void)
 
 int cpucount;
 
-extern int cpu_idle(void);
-
 /*
  * Activate a secondary processor.
  */
-int __init start_secondary(void *unused)
+static void __init start_secondary(void *unused)
 {
 	/*
 	 * Dont put anything before smp_callin(), SMP
@@ -441,7 +440,7 @@ int __init start_secondary(void *unused)
 	local_flush_tlb();
 	cpu_set(smp_processor_id(), cpu_online_map);
 	wmb();
-	return cpu_idle();
+	cpu_idle();
 }
 
 /*

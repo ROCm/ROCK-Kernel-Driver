@@ -40,7 +40,7 @@
 #include <net/protocol.h>
 
 struct inet6_protocol *inet6_protos[MAX_INET_PROTOS];
-static spinlock_t inet6_proto_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(inet6_proto_lock);
 
 
 int inet6_add_protocol(struct inet6_protocol *prot, unsigned char protocol)

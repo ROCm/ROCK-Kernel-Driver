@@ -55,16 +55,7 @@ MODULE_PARM_DESC(fid, "CPU multiplier to use (11.5 = 115)");
 MODULE_PARM_DESC(min_fsb,
                  "Minimum FSB to use, if not defined: current FSB - 50");
 
-/* DEBUG
- *   Define it if you want verbose debug output, e.g. for bug reporting
- */
-//#define NFORCE2_DEBUG
-
-#ifdef NFORCE2_DEBUG
-#define dprintk(msg...) printk(msg)
-#else
-#define dprintk(msg...) do { } while(0)
-#endif
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "cpufreq-nforce2", msg)
 
 /*
  * nforce2_calc_fsb - calculate FSB

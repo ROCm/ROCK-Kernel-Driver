@@ -1044,99 +1044,14 @@ asmlinkage long sys32_rt_sigpending(compat_sigset_t __user *set,
 	return ret;
 }
 
-asmlinkage long sys32_rt_sigtimedwait(compat_sigset_t __user *uthese,
-				      struct siginfo32 __user *uinfo,
-				      struct compat_timespec __user *uts,
-				      compat_size_t sigsetsize)
-{
-	int ret, sig;
-	sigset_t these;
-	compat_sigset_t these32;
-	struct timespec ts;
-	siginfo_t info;
-	long timeout = 0;
-
-	/* XXX: Don't preclude handling different sized sigset_t's.  */
-	if (sigsetsize != sizeof(sigset_t))
-		return -EINVAL;
-
-	if (copy_from_user (&these32, uthese, sizeof(compat_sigset_t)))
-		return -EFAULT;
-
-	switch (_NSIG_WORDS) {
-	case 4: these.sig[3] = these32.sig[6] | (((long)these32.sig[7]) << 32);
-	case 3: these.sig[2] = these32.sig[4] | (((long)these32.sig[5]) << 32);
-	case 2: these.sig[1] = these32.sig[2] | (((long)these32.sig[3]) << 32);
-	case 1: these.sig[0] = these32.sig[0] | (((long)these32.sig[1]) << 32);
-	}
-		
-	/*
-	 * Invert the set of allowed signals to get those we
-	 * want to block.
-	 */
-	sigdelsetmask(&these, sigmask(SIGKILL)|sigmask(SIGSTOP));
-	signotset(&these);
-
-	if (uts) {
-		if (get_compat_timespec(&ts, uts))
-			return -EINVAL;
-		if (ts.tv_nsec >= 1000000000L || ts.tv_nsec < 0
-		    || ts.tv_sec < 0)
-			return -EINVAL;
-	}
-
-	spin_lock_irq(&current->sighand->siglock);
-	sig = dequeue_signal(current, &these, &info);
-	if (!sig) {
-		timeout = MAX_SCHEDULE_TIMEOUT;
-		if (uts)
-			timeout = (timespec_to_jiffies(&ts)
-				   + (ts.tv_sec || ts.tv_nsec));
-
-		if (timeout) {
-			/* None ready -- temporarily unblock those we're
-			 * interested while we are sleeping in so that we'll
-			 * be awakened when they arrive.  */
-			current->real_blocked = current->blocked;
-			sigandsets(&current->blocked, &current->blocked, &these);
-			recalc_sigpending();
-			spin_unlock_irq(&current->sighand->siglock);
-
-			current->state = TASK_INTERRUPTIBLE;
-			timeout = schedule_timeout(timeout);
-
-			spin_lock_irq(&current->sighand->siglock);
-			sig = dequeue_signal(current, &these, &info);
-			current->blocked = current->real_blocked;
-			siginitset(&current->real_blocked, 0);
-			recalc_sigpending();
-		}
-	}
-	spin_unlock_irq(&current->sighand->siglock);
-
-	if (sig) {
-		ret = sig;
-		if (uinfo) {
-			if (copy_siginfo_to_user32(uinfo, &info))
-				ret = -EFAULT;
-		}
-	} else {
-		ret = -EAGAIN;
-		if (timeout)
-			ret = -EINTR;
-	}
-
-	return ret;
-}
-
 asmlinkage long compat_sys_rt_sigqueueinfo(int pid, int sig,
-					   struct siginfo32 __user *uinfo)
+					   struct compat_siginfo __user *uinfo)
 {
 	siginfo_t info;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	
-	if (copy_siginfo_to_kernel32(&info, uinfo))
+	if (copy_siginfo_from_user32(&info, uinfo))
 		return -EFAULT;
 
 	set_fs (KERNEL_DS);
@@ -1683,7 +1598,8 @@ asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
 			    put_user(oldlen, (u32 __user *)(unsigned long) tmp.oldlenp))
 				error = -EFAULT;
 		}
-		copy_to_user(args->__unused, tmp.__unused, sizeof(tmp.__unused));
+		if (copy_to_user(args->__unused, tmp.__unused, sizeof(tmp.__unused)))
+			error = -EFAULT;
 	}
 	return error;
 #endif
@@ -1739,8 +1655,8 @@ sys32_timer_create(u32 clock, struct sigevent32 __user *se32,
 }
 
 asmlinkage long compat_sys_waitid(u32 which, u32 pid,
-				  struct siginfo32 __user *uinfo, u32 options,
-				  struct compat_rusage __user *uru)
+				  struct compat_siginfo __user *uinfo,
+				  u32 options, struct compat_rusage __user *uru)
 {
 	siginfo_t info;
 	struct rusage ru;

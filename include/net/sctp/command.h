@@ -189,11 +189,6 @@ typedef struct {
 } sctp_cmd_seq_t;
 
 
-/* Create a new sctp_command_sequence.
- * Return NULL if creating a new sequence fails.
- */
-sctp_cmd_seq_t *sctp_new_cmd_seq(int gfp);
-
 /* Initialize a block of memory as a command sequence.
  * Return 0 if the initialization fails.
  */
@@ -207,18 +202,10 @@ int sctp_init_cmd_seq(sctp_cmd_seq_t *seq);
  */
 int sctp_add_cmd(sctp_cmd_seq_t *seq, sctp_verb_t verb, sctp_arg_t obj);
 
-/* Rewind an sctp_cmd_seq_t to iterate from the start.
- * Return 0 if the rewind fails.
- */
-int sctp_rewind_sequence(sctp_cmd_seq_t *seq);
-
 /* Return the next command structure in an sctp_cmd_seq.
  * Return NULL at the end of the sequence.
  */
 sctp_cmd_t *sctp_next_cmd(sctp_cmd_seq_t *seq);
-
-/* Dispose of a command sequence.  */
-void sctp_free_cmd_seq(sctp_cmd_seq_t *seq);
 
 #endif /* __net_sctp_command_h__ */
 

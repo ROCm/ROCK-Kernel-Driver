@@ -90,7 +90,7 @@ static int maceps2_open(struct serio *dev)
 {
 	struct maceps2_data *data = (struct maceps2_data *)dev->port_data;
 
-	if (request_irq(data->irq, maceps2_interrupt, 0, "PS/2 port", dev)) {
+	if (request_irq(data->irq, maceps2_interrupt, 0, "PS2 port", dev)) {
 		printk(KERN_ERR "Could not allocate PS/2 IRQ\n");
 		return -EBUSY;
 	}

@@ -434,6 +434,7 @@ static int usbfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = USBDEVICE_SUPER_MAGIC;
 	sb->s_op = &usbfs_ops;
+	sb->s_time_gran = 1;
 	inode = usbfs_get_inode(sb, S_IFDIR | 0755, 0);
 
 	if (!inode) {
@@ -695,7 +696,7 @@ void usbfs_add_device(struct usb_device *dev)
 	for (i = 0; i < dev->descriptor.bNumConfigurations; ++i) {
 		struct usb_config_descriptor *config =
 			(struct usb_config_descriptor *)dev->rawdescriptors[i];
-		i_size += le16_to_cpu ((__force __le16)config->wTotalLength);
+		i_size += le16_to_cpu(config->wTotalLength);
 	}
 	if (dev->usbfs_dentry->d_inode)
 		dev->usbfs_dentry->d_inode->i_size = i_size;

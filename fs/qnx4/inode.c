@@ -189,7 +189,7 @@ struct buffer_head *qnx4_getblk(struct inode *inode, int nr,
 	}
 	tst = tmp;
 #endif
-	inode->i_ctime = CURRENT_TIME;
+	inode->i_ctime = CURRENT_TIME_SEC;
 	mark_inode_dirty(inode);
 	return result;
 }

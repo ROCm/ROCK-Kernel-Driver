@@ -2533,6 +2533,7 @@ static int devfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_blocksize_bits = 10;
 	sb->s_magic = DEVFS_SUPER_MAGIC;
 	sb->s_op = &devfs_sops;
+	sb->s_time_gran = 1;
 	if ((root_inode = _devfs_get_vfs_inode(sb, root_entry, NULL)) == NULL)
 		goto out_no_root;
 	sb->s_root = d_alloc_root(root_inode);

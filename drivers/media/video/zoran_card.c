@@ -58,18 +58,17 @@
 #define I2C_NAME(x) (x)->name
 
 extern const struct zoran_format zoran_formats[];
-extern const int zoran_num_formats;
 
 static int card[BUZ_MAX] = { -1, -1, -1, -1 };
-MODULE_PARM(card, "1-" __stringify(BUZ_MAX) "i");
+module_param_array(card, int, NULL, 0);
 MODULE_PARM_DESC(card, "The type of card");
 
 static int encoder[BUZ_MAX] = { -1, -1, -1, -1 };
-MODULE_PARM(encoder, "1-" __stringify(BUZ_MAX) "i");
+module_param_array(encoder, int, NULL, 0);
 MODULE_PARM_DESC(encoder, "i2c TV encoder");
 
 static int decoder[BUZ_MAX] = { -1, -1, -1, -1 };
-MODULE_PARM(decoder, "1-" __stringify(BUZ_MAX) "i");
+module_param_array(decoder, int, NULL, 0);
 MODULE_PARM_DESC(decoder, "i2c TV decoder");
 
 /*
@@ -81,23 +80,23 @@ MODULE_PARM_DESC(decoder, "i2c TV decoder");
  */
 
 static unsigned long vidmem = 0;	/* Video memory base address */
-MODULE_PARM(vidmem, "i");
+module_param(vidmem, ulong, 0);
 
 /*
    Default input and video norm at startup of the driver.
 */
 
 static int default_input = 0;	/* 0=Composite, 1=S-Video */
-MODULE_PARM(default_input, "i");
+module_param(default_input, int, 0);
 MODULE_PARM_DESC(default_input,
 		 "Default input (0=Composite, 1=S-Video, 2=Internal)");
 
 static int default_norm = 0;	/* 0=PAL, 1=NTSC 2=SECAM */
-MODULE_PARM(default_norm, "i");
+module_param(default_norm, int, 0);
 MODULE_PARM_DESC(default_norm, "Default norm (0=PAL, 1=NTSC, 2=SECAM)");
 
 static int video_nr = -1;	/* /dev/videoN, -1 for autodetect */
-MODULE_PARM(video_nr, "i");
+module_param(video_nr, int, 0);
 MODULE_PARM_DESC(video_nr, "video device number");
 
 /*
@@ -119,27 +118,27 @@ MODULE_PARM_DESC(video_nr, "video device number");
 
 int v4l_nbufs = 2;
 int v4l_bufsize = 128;		/* Everybody should be able to work with this setting */
-MODULE_PARM(v4l_nbufs, "i");
+module_param(v4l_nbufs, int, 0);
 MODULE_PARM_DESC(v4l_nbufs, "Maximum number of V4L buffers to use");
-MODULE_PARM(v4l_bufsize, "i");
+module_param(v4l_bufsize, int, 0);
 MODULE_PARM_DESC(v4l_bufsize, "Maximum size per V4L buffer (in kB)");
 
 int jpg_nbufs = 32;
 int jpg_bufsize = 512;		/* max size for 100% quality full-PAL frame */
-MODULE_PARM(jpg_nbufs, "i");
+module_param(jpg_nbufs, int, 0);
 MODULE_PARM_DESC(jpg_nbufs, "Maximum number of JPG buffers to use");
-MODULE_PARM(jpg_bufsize, "i");
+module_param(jpg_bufsize, int, 0);
 MODULE_PARM_DESC(jpg_bufsize, "Maximum size per JPG buffer (in kB)");
 
 int pass_through = 0;		/* 1=Pass through TV signal when device is not used */
 				/* 0=Show color bar when device is not used (LML33: only if lml33dpath=1) */
-MODULE_PARM(pass_through, "i");
+module_param(pass_through, int, 0);
 MODULE_PARM_DESC(pass_through,
 		 "Pass TV signal through to TV-out when idling");
 
 static int debug = 1;
 int *zr_debug = &debug;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0-4)");
 
 MODULE_DESCRIPTION("Zoran-36057/36067 JPEG codec driver");

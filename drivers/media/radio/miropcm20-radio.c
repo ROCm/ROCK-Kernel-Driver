@@ -26,7 +26,7 @@
 #include "miropcm20-rds-core.h"
 
 static int radio_nr = -1;
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 struct pcm20_device {
 	unsigned long freq;

@@ -2,6 +2,8 @@
  * Copyright (2004) Linus Torvalds
  *
  * Author: Zwane Mwaikambo <zwane@fsmlabs.com>
+ *
+ * Copyright (2004) Ingo Molnar
  */
 
 #include <linux/config.h>
@@ -10,6 +12,17 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+
+/*
+ * Generic declaration of the raw read_trylock() function,
+ * architectures are supposed to optimize this:
+ */
+int __lockfunc generic_raw_read_trylock(rwlock_t *lock)
+{
+	_raw_read_lock(lock);
+	return 1;
+}
+EXPORT_SYMBOL(generic_raw_read_trylock);
 
 int __lockfunc _spin_trylock(spinlock_t *lock)
 {
@@ -22,6 +35,17 @@ int __lockfunc _spin_trylock(spinlock_t *lock)
 }
 EXPORT_SYMBOL(_spin_trylock);
 
+int __lockfunc _read_trylock(rwlock_t *lock)
+{
+	preempt_disable();
+	if (_raw_read_trylock(lock))
+		return 1;
+
+	preempt_enable();
+	return 0;
+}
+EXPORT_SYMBOL(_read_trylock);
+
 int __lockfunc _write_trylock(rwlock_t *lock)
 {
 	preempt_disable();
@@ -33,75 +57,7 @@ int __lockfunc _write_trylock(rwlock_t *lock)
 }
 EXPORT_SYMBOL(_write_trylock);
 
-#ifdef CONFIG_PREEMPT
-/*
- * This could be a long-held lock.  If another CPU holds it for a long time,
- * and that CPU is not asked to reschedule then *this* CPU will spin on the
- * lock for a long time, even if *this* CPU is asked to reschedule.
- *
- * So what we do here, in the slow (contended) path is to spin on the lock by
- * hand while permitting preemption.
- *
- * Called inside preempt_disable().
- */
-static inline void __preempt_spin_lock(spinlock_t *lock)
-{
-	if (preempt_count() > 1) {
-		_raw_spin_lock(lock);
-		return;
-	}
-
-	do {
-		preempt_enable();
-		while (spin_is_locked(lock))
-			cpu_relax();
-		preempt_disable();
-	} while (!_raw_spin_trylock(lock));
-}
-
-void __lockfunc _spin_lock(spinlock_t *lock)
-{
-	preempt_disable();
-	if (unlikely(!_raw_spin_trylock(lock)))
-		__preempt_spin_lock(lock);
-}
-
-static inline void __preempt_write_lock(rwlock_t *lock)
-{
-	if (preempt_count() > 1) {
-		_raw_write_lock(lock);
-		return;
-	}
-
-	do {
-		preempt_enable();
-		while (rwlock_is_locked(lock))
-			cpu_relax();
-		preempt_disable();
-	} while (!_raw_write_trylock(lock));
-}
-
-void __lockfunc _write_lock(rwlock_t *lock)
-{
-	preempt_disable();
-	if (unlikely(!_raw_write_trylock(lock)))
-		__preempt_write_lock(lock);
-}
-#else
-void __lockfunc _spin_lock(spinlock_t *lock)
-{
-	preempt_disable();
-	_raw_spin_lock(lock);
-}
-
-void __lockfunc _write_lock(rwlock_t *lock)
-{
-	preempt_disable();
-	_raw_write_lock(lock);
-}
-#endif
-EXPORT_SYMBOL(_spin_lock);
-EXPORT_SYMBOL(_write_lock);
+#ifndef CONFIG_PREEMPT
 
 void __lockfunc _read_lock(rwlock_t *lock)
 {
@@ -109,27 +65,6 @@ void __lockfunc _read_lock(rwlock_t *lock)
 	_raw_read_lock(lock);
 }
 EXPORT_SYMBOL(_read_lock);
-
-void __lockfunc _spin_unlock(spinlock_t *lock)
-{
-	_raw_spin_unlock(lock);
-	preempt_enable();
-}
-EXPORT_SYMBOL(_spin_unlock);
-
-void __lockfunc _write_unlock(rwlock_t *lock)
-{
-	_raw_write_unlock(lock);
-	preempt_enable();
-}
-EXPORT_SYMBOL(_write_unlock);
-
-void __lockfunc _read_unlock(rwlock_t *lock)
-{
-	_raw_read_unlock(lock);
-	preempt_enable();
-}
-EXPORT_SYMBOL(_read_unlock);
 
 unsigned long __lockfunc _spin_lock_irqsave(spinlock_t *lock)
 {
@@ -211,6 +146,132 @@ void __lockfunc _write_lock_bh(rwlock_t *lock)
 	_raw_write_lock(lock);
 }
 EXPORT_SYMBOL(_write_lock_bh);
+
+void __lockfunc _spin_lock(spinlock_t *lock)
+{
+	preempt_disable();
+	_raw_spin_lock(lock);
+}
+
+EXPORT_SYMBOL(_spin_lock);
+
+void __lockfunc _write_lock(rwlock_t *lock)
+{
+	preempt_disable();
+	_raw_write_lock(lock);
+}
+
+EXPORT_SYMBOL(_write_lock);
+
+#else /* CONFIG_PREEMPT: */
+
+/*
+ * This could be a long-held lock. We both prepare to spin for a long
+ * time (making _this_ CPU preemptable if possible), and we also signal
+ * towards that other CPU that it should break the lock ASAP.
+ *
+ * (We do this in a function because inlining it would be excessive.)
+ */
+
+#define BUILD_LOCK_OPS(op, locktype, is_locked_fn)			\
+void __lockfunc _##op##_lock(locktype *lock)				\
+{									\
+	preempt_disable();						\
+	for (;;) {							\
+		if (likely(_raw_##op##_trylock(lock)))			\
+			break;						\
+		preempt_enable();					\
+		if (!(lock)->break_lock)				\
+			(lock)->break_lock = 1;				\
+		while (is_locked_fn(lock) && (lock)->break_lock)	\
+			cpu_relax();					\
+		preempt_disable();					\
+	}								\
+}									\
+									\
+EXPORT_SYMBOL(_##op##_lock);						\
+									\
+unsigned long __lockfunc _##op##_lock_irqsave(locktype *lock)		\
+{									\
+	unsigned long flags;						\
+									\
+	preempt_disable();						\
+	for (;;) {							\
+		local_irq_save(flags);					\
+		if (likely(_raw_##op##_trylock(lock)))			\
+			break;						\
+		local_irq_restore(flags);				\
+									\
+		preempt_enable();					\
+		if (!(lock)->break_lock)				\
+			(lock)->break_lock = 1;				\
+		while (is_locked_fn(lock) && (lock)->break_lock)	\
+			cpu_relax();					\
+		preempt_disable();					\
+	}								\
+	return flags;							\
+}									\
+									\
+EXPORT_SYMBOL(_##op##_lock_irqsave);					\
+									\
+void __lockfunc _##op##_lock_irq(locktype *lock)			\
+{									\
+	_##op##_lock_irqsave(lock);					\
+}									\
+									\
+EXPORT_SYMBOL(_##op##_lock_irq);					\
+									\
+void __lockfunc _##op##_lock_bh(locktype *lock)				\
+{									\
+	unsigned long flags;						\
+									\
+	/*							*/	\
+	/* Careful: we must exclude softirqs too, hence the	*/	\
+	/* irq-disabling. We use the generic preemption-aware	*/	\
+	/* function:						*/	\
+	/**/								\
+	flags = _##op##_lock_irqsave(lock);				\
+	local_bh_disable();						\
+	local_irq_restore(flags);					\
+}									\
+									\
+EXPORT_SYMBOL(_##op##_lock_bh)
+
+/*
+ * Build preemption-friendly versions of the following
+ * lock-spinning functions:
+ *
+ *         _[spin|read|write]_lock()
+ *         _[spin|read|write]_lock_irq()
+ *         _[spin|read|write]_lock_irqsave()
+ *         _[spin|read|write]_lock_bh()
+ */
+BUILD_LOCK_OPS(spin, spinlock_t, spin_is_locked);
+BUILD_LOCK_OPS(read, rwlock_t, rwlock_is_locked);
+BUILD_LOCK_OPS(write, rwlock_t, spin_is_locked);
+
+#endif /* CONFIG_PREEMPT */
+
+void __lockfunc _spin_unlock(spinlock_t *lock)
+{
+	_raw_spin_unlock(lock);
+	preempt_enable();
+}
+EXPORT_SYMBOL(_spin_unlock);
+
+void __lockfunc _write_unlock(rwlock_t *lock)
+{
+	_raw_write_unlock(lock);
+	preempt_enable();
+}
+EXPORT_SYMBOL(_write_unlock);
+
+void __lockfunc _read_unlock(rwlock_t *lock)
+{
+	_raw_read_unlock(lock);
+	preempt_enable();
+}
+EXPORT_SYMBOL(_read_unlock);
 
 void __lockfunc _spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -49,7 +49,7 @@ int ipoib_mcast_attach(struct net_device *dev, u16 mlid, union ib_gid *mgid)
 	if (!qp_attr)
 		goto out;
 
-	if (ib_cached_pkey_find(priv->ca, priv->port, priv->pkey, &pkey_index)) {
+	if (ib_find_cached_pkey(priv->ca, priv->port, priv->pkey, &pkey_index)) {
 		clear_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
 		ret = -ENXIO;
 		goto out;
@@ -104,7 +104,7 @@ int ipoib_qp_create(struct net_device *dev)
 	 * The port has to be assigned to the respective IB partition in
 	 * advance.
 	 */
-	ret = ib_cached_pkey_find(priv->ca, priv->port, priv->pkey, &pkey_index);
+	ret = ib_find_cached_pkey(priv->ca, priv->port, priv->pkey, &pkey_index);
 	if (ret) {
 		clear_bit(IPOIB_PKEY_ASSIGNED, &priv->flags);
 		return ret;
@@ -187,7 +187,7 @@ int ipoib_transport_dev_init(struct net_device *dev, struct ib_device *ca)
 
 	priv->mr = ib_get_dma_mr(priv->pd, IB_ACCESS_LOCAL_WRITE);
 	if (IS_ERR(priv->mr)) {
-		printk(KERN_WARNING "%s: ib_reg_phys_mr failed\n", ca->name);
+		printk(KERN_WARNING "%s: ib_get_dma_mr failed\n", ca->name);
 		goto out_free_cq;
 	}
 
@@ -203,6 +203,13 @@ int ipoib_transport_dev_init(struct net_device *dev, struct ib_device *ca)
 	priv->dev->dev_addr[1] = (priv->qp->qp_num >> 16) & 0xff;
 	priv->dev->dev_addr[2] = (priv->qp->qp_num >>  8) & 0xff;
 	priv->dev->dev_addr[3] = (priv->qp->qp_num      ) & 0xff;
+
+	priv->tx_sge.lkey 	= priv->mr->lkey;
+
+	priv->tx_wr.opcode 	= IB_WR_SEND;
+	priv->tx_wr.sg_list 	= &priv->tx_sge;
+	priv->tx_wr.num_sge 	= 1;
+	priv->tx_wr.send_flags 	= IB_SEND_SIGNALED;
 
 	return 0;
 

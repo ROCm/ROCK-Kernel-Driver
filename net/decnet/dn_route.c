@@ -99,9 +99,9 @@ extern struct neigh_table dn_neigh_table;
 
 static unsigned char dn_hiord_addr[6] = {0xAA,0x00,0x04,0x00,0x00,0x00};
 
-int dn_rt_min_delay = 2 * HZ;
-int dn_rt_max_delay = 10 * HZ;
-int dn_rt_mtu_expires = 10 * 60 * HZ;
+static const int dn_rt_min_delay = 2 * HZ;
+static const int dn_rt_max_delay = 10 * HZ;
+static const int dn_rt_mtu_expires = 10 * 60 * HZ;
 
 static unsigned long dn_rt_deadline;
 
@@ -336,7 +336,7 @@ nothing_to_declare:
 	}
 }
 
-static spinlock_t dn_rt_flush_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dn_rt_flush_lock);
 
 void dn_rt_cache_flush(int delay)
 {

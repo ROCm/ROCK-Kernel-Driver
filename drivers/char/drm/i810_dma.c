@@ -50,24 +50,6 @@
 #define up_write up
 #endif
 
-static inline void i810_print_status_page(drm_device_t *dev)
-{
-   	drm_device_dma_t *dma = dev->dma;
-      	drm_i810_private_t *dev_priv = dev->dev_private;
-	u32 *temp = dev_priv->hw_status_page;
-   	int i;
-
-   	DRM_DEBUG(  "hw_status: Interrupt Status : %x\n", temp[0]);
-   	DRM_DEBUG(  "hw_status: LpRing Head ptr : %x\n", temp[1]);
-   	DRM_DEBUG(  "hw_status: IRing Head ptr : %x\n", temp[2]);
-      	DRM_DEBUG(  "hw_status: Reserved : %x\n", temp[3]);
-	DRM_DEBUG(  "hw_status: Last Render: %x\n", temp[4]);
-   	DRM_DEBUG(  "hw_status: Driver Counter : %d\n", temp[5]);
-   	for(i = 6; i < dma->buf_count + 6; i++) {
-	   	DRM_DEBUG( "buffer status idx : %d used: %d\n", i - 6, temp[i]);
-	}
-}
-
 static drm_buf_t *i810_freelist_get(drm_device_t *dev)
 {
    	drm_device_dma_t *dma = dev->dma;

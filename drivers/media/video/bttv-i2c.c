@@ -51,7 +51,7 @@ MODULE_PARM_DESC(i2c_scan,"scan i2c bus at insmod time");
 /* ----------------------------------------------------------------------- */
 /* I2C functions - bitbanging adapter (software i2c)                       */
 
-void bttv_bit_setscl(void *data, int state)
+static void bttv_bit_setscl(void *data, int state)
 {
 	struct bttv *btv = (struct bttv*)data;
 
@@ -63,7 +63,7 @@ void bttv_bit_setscl(void *data, int state)
 	btread(BT848_I2C);
 }
 
-void bttv_bit_setsda(void *data, int state)
+static void bttv_bit_setsda(void *data, int state)
 {
 	struct bttv *btv = (struct bttv*)data;
 
@@ -244,7 +244,7 @@ bttv_i2c_readbytes(struct bttv *btv, const struct i2c_msg *msg, int last)
        	return retval;
 }
 
-int bttv_i2c_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg msgs[], int num)
+static int bttv_i2c_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg msgs[], int num)
 {
 	struct bttv *btv = i2c_get_adapdata(i2c_adap);
 	int retval = 0;

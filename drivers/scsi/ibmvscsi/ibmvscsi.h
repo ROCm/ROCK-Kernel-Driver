@@ -67,6 +67,7 @@ struct srp_event_struct {
 	union viosrp_iu iu;
 	void (*cmnd_done) (struct scsi_cmnd *);
 	struct completion comp;
+	union viosrp_iu *sync_srp;
 };
 
 /* a pool of event structs for use */

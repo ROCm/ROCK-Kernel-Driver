@@ -47,7 +47,7 @@
 #define E1000_PARAM(X, desc) \
 	static int __devinitdata X[E1000_MAX_NIC+1] = E1000_PARAM_INIT; \
 	static int num_##X = 0; \
-	module_param_array(X, int, &num_##X, 0); \
+	module_param_array_named(X, X, int, &num_##X, 0); \
 	MODULE_PARM_DESC(X, desc);
 
 /* Transmit Descriptor Count
@@ -470,9 +470,6 @@ e1000_check_options(struct e1000_adapter *adapter)
 		if (num_InterruptThrottleRate > bd) {
 			adapter->itr = InterruptThrottleRate[bd];
 			switch(adapter->itr) {
-			case -1:
-				adapter->itr = 1;
-				break;
 			case 0:
 				DPRINTK(PROBE, INFO, "%s turned off\n", 
 					opt.name);
@@ -481,13 +478,14 @@ e1000_check_options(struct e1000_adapter *adapter)
 				DPRINTK(PROBE, INFO, "%s set to dynamic mode\n", 
 					opt.name);
 				break;
+			case -1:
 			default:
 				e1000_validate_option(&adapter->itr, &opt, 
 					adapter);
 				break;
 			}
 		} else {
-			adapter->itr = 1;
+			adapter->itr = opt.def;
 		}
 	}
 

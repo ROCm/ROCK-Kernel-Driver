@@ -42,7 +42,7 @@
  * This function will return a valid sound format as close
  * to the requested one as possible. 
  */
-void query_format(int recsrc, struct wave_format *wave_fmt)
+static void query_format(int recsrc, struct wave_format *wave_fmt)
 {
 
 	switch (recsrc) {

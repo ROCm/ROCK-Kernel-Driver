@@ -1215,16 +1215,16 @@ static int __initdata dma2 = -1;
 /* use isapnp for configuration */
 static int isapnp	= 1;
 static int isapnpjump;
-MODULE_PARM(isapnp, "i");
-MODULE_PARM(isapnpjump, "i");
+module_param(isapnp, bool, 0);
+module_param(isapnpjump, int, 0);
 #endif
 
-MODULE_PARM(io,"i");
-MODULE_PARM(irq,"i");
-MODULE_PARM(dma,"i");
-MODULE_PARM(dma2,"i");
-MODULE_PARM(ad1816_clockfreq,"i");
-MODULE_PARM(options,"i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(dma, int, 0);
+module_param(dma2, int, 0);
+module_param(ad1816_clockfreq, int, 0);
+module_param(options, int, 0);
 
 #ifdef __ISAPNP__
 static struct {
@@ -1245,8 +1245,9 @@ static struct {
 MODULE_DEVICE_TABLE(isapnp, isapnp_ad1816_list);
 
 
-void __init ad1816_config_pnp_card(struct pnp_card *card, unsigned short vendor,
-	unsigned short function)
+static void __init ad1816_config_pnp_card(struct pnp_card *card,
+					  unsigned short vendor,
+					  unsigned short function)
 {
 	struct address_info cfg;
   	struct pnp_dev *card_dev = pnp_find_dev(card, vendor, function, NULL);
@@ -1270,7 +1271,7 @@ void __init ad1816_config_pnp_card(struct pnp_card *card, unsigned short vendor,
 	}
 }
 
-void __init ad1816_config_pnp_cards(void)
+static void __init ad1816_config_pnp_cards(void)
 {
 	int nr_pnp_cfg;
 	int i;

@@ -38,7 +38,7 @@ MODULE_PARM_DESC(nflog, "register as internal netfilter logging module");
 #endif
 
 /* Use lock to serialize, so printks don't overlap */
-static spinlock_t log_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(log_lock);
 
 /* One level of recursion won't kill us */
 static void dump_packet(const struct ipt_log_info *info,
@@ -325,6 +325,14 @@ static void dump_packet(const struct ipt_log_info *info,
 	/* Max length: 10 "PROTO 255 " */
 	default:
 		printk("PROTO=%u ", ih->protocol);
+	}
+
+	/* Max length: 15 "UID=4294967295 " */
+ 	if ((info->logflags & IPT_LOG_UID) && !iphoff && skb->sk) {
+		read_lock_bh(&skb->sk->sk_callback_lock);
+		if (skb->sk->sk_socket && skb->sk->sk_socket->file)
+ 			printk("UID=%u ", skb->sk->sk_socket->file->f_uid);
+		read_unlock_bh(&skb->sk->sk_callback_lock);
 	}
 
 	/* Proto    Max log string length */

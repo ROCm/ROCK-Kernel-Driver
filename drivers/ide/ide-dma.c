@@ -116,7 +116,6 @@ static const struct drive_list_entry drive_blacklist [] = {
 	{ "Compaq CRD-8241B"	,	"ALL"		},
 	{ "CRD-8400B"		,	"ALL"		},
 	{ "CRD-8480B",			"ALL"		},
-	{ "CRD-8480C",			"ALL"		},
 	{ "CRD-8482B",			"ALL"		},
  	{ "CRD-84"		,	"ALL"		},
 	{ "SanDisk SDP3B"	,	"ALL"		},
@@ -159,7 +158,6 @@ static int in_drive_list(struct hd_driveid *id, const struct drive_list_entry *d
 	return 0;
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 /**
  *	ide_dma_intr	-	IDE DMA interrupt handler
  *	@drive: the drive the interrupt is for
@@ -184,11 +182,12 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 		printk(KERN_ERR "%s: dma_intr: bad DMA status (dma_stat=%x)\n", 
 		       drive->name, dma_stat);
 	}
-	return DRIVER(drive)->error(drive, "dma_intr", stat);
+	return ide_error(drive, "dma_intr", stat);
 }
 
 EXPORT_SYMBOL_GPL(ide_dma_intr);
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 /**
  *	ide_build_sglist	-	map IDE scatter gather for DMA I/O
  *	@drive: the drive to build the DMA table for

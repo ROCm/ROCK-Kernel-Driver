@@ -48,17 +48,17 @@ typedef struct
 {
 	__u8 callee_used_stack[__SIGNAL_FRAMESIZE32];
 	__u8 retcode[S390_SYSCALL_SIZE];
-	struct siginfo32 info;
+	compat_siginfo_t info;
 	struct ucontext32 uc;
 } rt_sigframe32;
 
 asmlinkage int FASTCALL(do_signal(struct pt_regs *regs, sigset_t *oldset));
 
-int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from)
+int copy_siginfo_to_user32(compat_siginfo_t __user *to, siginfo_t *from)
 {
 	int err;
 
-	if (!access_ok (VERIFY_WRITE, to, sizeof(siginfo_t32)))
+	if (!access_ok (VERIFY_WRITE, to, sizeof(compat_siginfo_t)))
 		return -EFAULT;
 
 	/* If you change siginfo_t structure, please be sure
@@ -106,12 +106,12 @@ int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from)
 	return err;
 }
 
-int copy_siginfo_from_user32(siginfo_t *to, siginfo_t32 __user *from)
+int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
 {
 	int err;
 	u32 tmp;
 
-	if (!access_ok (VERIFY_READ, from, sizeof(siginfo_t32)))
+	if (!access_ok (VERIFY_READ, from, sizeof(compat_siginfo_t)))
 		return -EFAULT;
 
 	err = __get_user(to->si_signo, &from->si_signo);

@@ -78,6 +78,7 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 #include <asm/processor.h>
+#include "internal.h"
 
 /* Gcc optimizes away "strlen(x)" for constant x */
 #define ADDBUF(buffer, string) \
@@ -312,8 +313,9 @@ static int do_task_stat(struct task_struct *task, char * buffer, int whole)
 	int num_threads = 0;
 	struct mm_struct *mm;
 	unsigned long long start_time;
-	unsigned long cmin_flt = 0, cmaj_flt = 0, cutime = 0, cstime = 0;
-	unsigned long  min_flt = 0,  maj_flt = 0,  utime = 0,  stime = 0;
+	unsigned long cmin_flt = 0, cmaj_flt = 0;
+	unsigned long  min_flt = 0,  maj_flt = 0;
+	cputime_t cutime, cstime, utime, stime;
 	unsigned long rsslim = 0;
 	struct task_struct *t;
 	char tcomm[sizeof(task->comm)];
@@ -331,6 +333,7 @@ static int do_task_stat(struct task_struct *task, char * buffer, int whole)
 
 	sigemptyset(&sigign);
 	sigemptyset(&sigcatch);
+	cutime = cstime = utime = stime = cputime_zero;
 	read_lock(&tasklist_lock);
 	if (task->sighand) {
 		spin_lock_irq(&task->sighand->siglock);
@@ -343,8 +346,8 @@ static int do_task_stat(struct task_struct *task, char * buffer, int whole)
 			do {
 				min_flt += t->min_flt;
 				maj_flt += t->maj_flt;
-				utime += t->utime;
-				stime += t->stime;
+				utime = cputime_add(utime, t->utime);
+				stime = cputime_add(stime, t->stime);
 				t = next_thread(t);
 			} while (t != task);
 		}
@@ -366,8 +369,8 @@ static int do_task_stat(struct task_struct *task, char * buffer, int whole)
 		if (whole) {
 			min_flt += task->signal->min_flt;
 			maj_flt += task->signal->maj_flt;
-			utime += task->signal->utime;
-			stime += task->signal->stime;
+			utime = cputime_add(utime, task->signal->utime);
+			stime = cputime_add(stime, task->signal->stime);
 		}
 	}
 	ppid = pid_alive(task) ? task->group_leader->real_parent->tgid : 0;
@@ -410,10 +413,10 @@ static int do_task_stat(struct task_struct *task, char * buffer, int whole)
 		cmin_flt,
 		maj_flt,
 		cmaj_flt,
-		jiffies_to_clock_t(utime),
-		jiffies_to_clock_t(stime),
-		jiffies_to_clock_t(cutime),
-		jiffies_to_clock_t(cstime),
+		cputime_to_clock_t(utime),
+		cputime_to_clock_t(stime),
+		cputime_to_clock_t(cutime),
+		cputime_to_clock_t(cstime),
 		priority,
 		nice,
 		num_threads,

@@ -39,7 +39,7 @@ struct resource iomem_resource = {
 
 EXPORT_SYMBOL(iomem_resource);
 
-static rwlock_t resource_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(resource_lock);
 
 #ifdef CONFIG_PROC_FS
 

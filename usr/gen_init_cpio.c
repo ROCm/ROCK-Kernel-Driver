@@ -10,13 +10,19 @@
 #include <ctype.h>
 #include <limits.h>
 
+/*
+ * Original work by Jeff Garzik
+ *
+ * External file lists, symlink, pipe and fifo support by Thayne Harbaugh
+ */
+
 #define xstr(s) #s
 #define str(s) xstr(s)
 
 static unsigned int offset;
 static unsigned int ino = 721;
 
-struct file_type {
+struct file_handler {
 	const char *type;
 	int (*handler)(const char *line);
 };
@@ -80,7 +86,7 @@ static void cpio_trailer(void)
 		0,			/* minor */
 		0,			/* rmajor */
 		0,			/* rminor */
-		(unsigned)strlen(name) + 1, /* namesize */
+		(unsigned)strlen(name)+1, /* namesize */
 		0);			/* chksum */
 	push_hdr(s);
 	push_rest(name);
@@ -91,7 +97,55 @@ static void cpio_trailer(void)
 	}
 }
 
-static int cpio_mkdir(const char *name, unsigned int mode,
+static int cpio_mkslink(const char *name, const char *target,
+			 unsigned int mode, uid_t uid, gid_t gid)
+{
+	char s[256];
+	time_t mtime = time(NULL);
+
+	sprintf(s,"%s%08X%08X%08lX%08lX%08X%08lX"
+	       "%08X%08X%08X%08X%08X%08X%08X",
+		"070701",		/* magic */
+		ino++,			/* ino */
+		S_IFLNK | mode,		/* mode */
+		(long) uid,		/* uid */
+		(long) gid,		/* gid */
+		1,			/* nlink */
+		(long) mtime,		/* mtime */
+		(unsigned)strlen(target)+1, /* filesize */
+		3,			/* major */
+		1,			/* minor */
+		0,			/* rmajor */
+		0,			/* rminor */
+		(unsigned)strlen(name) + 1,/* namesize */
+		0);			/* chksum */
+	push_hdr(s);
+	push_string(name);
+	push_pad();
+	push_string(target);
+	push_pad();
+	return 0;
+}
+
+static int cpio_mkslink_line(const char *line)
+{
+	char name[PATH_MAX + 1];
+	char target[PATH_MAX + 1];
+	unsigned int mode;
+	int uid;
+	int gid;
+	int rc = -1;
+
+	if (5 != sscanf(line, "%" str(PATH_MAX) "s %" str(PATH_MAX) "s %o %d %d", name, target, &mode, &uid, &gid)) {
+		fprintf(stderr, "Unrecognized dir format '%s'", line);
+		goto fail;
+	}
+	rc = cpio_mkslink(name, target, mode, uid, gid);
+ fail:
+	return rc;
+}
+
+static int cpio_mkgeneric(const char *name, unsigned int mode,
 		       uid_t uid, gid_t gid)
 {
 	char s[256];
@@ -101,7 +155,7 @@ static int cpio_mkdir(const char *name, unsigned int mode,
 	       "%08X%08X%08X%08X%08X%08X%08X",
 		"070701",		/* magic */
 		ino++,			/* ino */
-		S_IFDIR | mode,		/* mode */
+		mode,			/* mode */
 		(long) uid,		/* uid */
 		(long) gid,		/* gid */
 		2,			/* nlink */
@@ -118,7 +172,33 @@ static int cpio_mkdir(const char *name, unsigned int mode,
 	return 0;
 }
 
-static int cpio_mkdir_line(const char *line)
+enum generic_types {
+	GT_DIR,
+	GT_PIPE,
+	GT_SOCK
+};
+
+struct generic_type {
+	const char *type;
+	mode_t mode;
+};
+
+static struct generic_type generic_type_table[] = {
+	[GT_DIR] = {
+		.type = "dir",
+		.mode = S_IFDIR
+	},
+	[GT_PIPE] = {
+		.type = "pipe",
+		.mode = S_IFIFO
+	},
+	[GT_SOCK] = {
+		.type = "sock",
+		.mode = S_IFSOCK
+	}
+};
+
+static int cpio_mkgeneric_line(const char *line, enum generic_types gt)
 {
 	char name[PATH_MAX + 1];
 	unsigned int mode;
@@ -127,12 +207,29 @@ static int cpio_mkdir_line(const char *line)
 	int rc = -1;
 
 	if (4 != sscanf(line, "%" str(PATH_MAX) "s %o %d %d", name, &mode, &uid, &gid)) {
-		fprintf(stderr, "Unrecognized dir format '%s'", line);
+		fprintf(stderr, "Unrecognized %s format '%s'",
+			line, generic_type_table[gt].type);
 		goto fail;
 	}
-	rc = cpio_mkdir(name, mode, uid, gid);
+	mode |= generic_type_table[gt].mode;
+	rc = cpio_mkgeneric(name, mode, uid, gid);
  fail:
 	return rc;
+}
+
+static int cpio_mkdir_line(const char *line)
+{
+	return cpio_mkgeneric_line(line, GT_DIR);
+}
+
+static int cpio_mkpipe_line(const char *line)
+{
+	return cpio_mkgeneric_line(line, GT_PIPE);
+}
+
+static int cpio_mksock_line(const char *line)
+{
+	return cpio_mkgeneric_line(line, GT_SOCK);
 }
 
 static int cpio_mknod(const char *name, unsigned int mode,
@@ -286,12 +383,16 @@ void usage(const char *prog)
 		"describe the files to be included in the initramfs archive:\n"
 		"\n"
 		"# a comment\n"
-		"file <name> <location> <mode> <uid> <gid> \n"
+		"file <name> <location> <mode> <uid> <gid>\n"
 		"dir <name> <mode> <uid> <gid>\n"
 		"nod <name> <mode> <uid> <gid> <dev_type> <maj> <min>\n"
+		"slink <name> <target> <mode> <uid> <gid>\n"
+		"pipe <name> <mode> <uid> <gid>\n"
+		"sock <name> <mode> <uid> <gid>\n"
 		"\n"
-		"<name>      name of the file/dir/nod in the archive\n"
+		"<name>      name of the file/dir/nod/etc in the archive\n"
 		"<location>  location of the file in the current filesystem\n"
+		"<target>    link target\n"
 		"<mode>      mode/permissions of the file\n"
 		"<uid>       user id (0=root)\n"
 		"<gid>       group id (0=root)\n"
@@ -309,7 +410,7 @@ void usage(const char *prog)
 		prog);
 }
 
-struct file_type file_type_table[] = {
+struct file_handler file_handler_table[] = {
 	{
 		.type    = "file",
 		.handler = cpio_mkfile_line,
@@ -319,6 +420,15 @@ struct file_type file_type_table[] = {
 	}, {
 		.type    = "dir",
 		.handler = cpio_mkdir_line,
+	}, {
+		.type    = "slink",
+		.handler = cpio_mkslink_line,
+	}, {
+		.type    = "pipe",
+		.handler = cpio_mkpipe_line,
+	}, {
+		.type    = "sock",
+		.handler = cpio_mksock_line,
 	}, {
 		.type    = NULL,
 		.handler = NULL,
@@ -382,10 +492,10 @@ int main (int argc, char *argv[])
 			ec = -1;
 		}
 
-		for (type_idx = 0; file_type_table[type_idx].type; type_idx++) {
+		for (type_idx = 0; file_handler_table[type_idx].type; type_idx++) {
 			int rc;
-			if (! strcmp(line, file_type_table[type_idx].type)) {
-				if ((rc = file_type_table[type_idx].handler(args))) {
+			if (! strcmp(line, file_handler_table[type_idx].type)) {
+				if ((rc = file_handler_table[type_idx].handler(args))) {
 					ec = rc;
 					fprintf(stderr, " line %d\n", line_nr);
 				}
@@ -393,7 +503,7 @@ int main (int argc, char *argv[])
 			}
 		}
 
-		if (NULL == file_type_table[type_idx].type) {
+		if (NULL == file_handler_table[type_idx].type) {
 			fprintf(stderr, "unknown file type line %d: '%s'\n",
 				line_nr, line);
 		}

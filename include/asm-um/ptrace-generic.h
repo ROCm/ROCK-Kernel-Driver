@@ -12,16 +12,17 @@
 
 #define pt_regs pt_regs_subarch
 #define show_regs show_regs_subarch
+#define send_sigtrap send_sigtrap_subarch
 
 #include "asm/arch/ptrace.h"
 
 #undef pt_regs
 #undef show_regs
+#undef send_sigtrap
 #undef user_mode
 #undef instruction_pointer
 
 #include "sysdep/ptrace.h"
-#include "skas_ptrace.h"
 
 struct pt_regs {
 	union uml_pt_regs regs;
@@ -55,6 +56,9 @@ extern int get_fpxregs(unsigned long buf, struct task_struct *child);
 extern int set_fpxregs(unsigned long buf, struct task_struct *tsk);
 
 extern void show_regs(struct pt_regs *regs);
+
+extern void send_sigtrap(struct task_struct *tsk, union uml_pt_regs *regs,
+			 int error_code);
 
 #endif
 

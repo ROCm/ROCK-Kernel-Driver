@@ -21,7 +21,6 @@
 #include <linux/highmem.h>
 #include <linux/file.h>
 #include <linux/writeback.h>
-#include <linux/suspend.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>	/* for try_to_release_page(),
 					buffer_heads_over_limit */
@@ -361,6 +360,8 @@ static int shrink_list(struct list_head *page_list, struct scan_control *sc)
 		int may_enter_fs;
 		int referenced;
 
+		cond_resched();
+
 		page = lru_to_page(page_list);
 		list_del(&page->lru);
 
@@ -369,13 +370,13 @@ static int shrink_list(struct list_head *page_list, struct scan_control *sc)
 
 		BUG_ON(PageActive(page));
 
-		if (PageWriteback(page))
-			goto keep_locked;
-
 		sc->nr_scanned++;
 		/* Double the slab pressure for mapped and swapcache pages */
 		if (page_mapped(page) || PageSwapCache(page))
 			sc->nr_scanned++;
+
+		if (PageWriteback(page))
+			goto keep_locked;
 
 		referenced = page_referenced(page, 1, sc->priority <= 0);
 		/* In active use or really unfreeable?  Activate it. */
@@ -710,6 +711,7 @@ refill_inactive_zone(struct zone *zone, struct scan_control *sc)
 		reclaim_mapped = 1;
 
 	while (!list_empty(&l_hold)) {
+		cond_resched();
 		page = lru_to_page(&l_hold);
 		list_del(&page->lru);
 		if (page_mapped(page)) {

@@ -69,7 +69,6 @@
 #include <linux/init.h>
 #include <linux/kbd_ll.h>
 #include <linux/delay.h>
-#include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
@@ -350,7 +349,7 @@ static int handle_data(unsigned char *p_data)
 }
 
 
-spinlock_t kbd_controller_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(kbd_controller_lock);
 static unsigned char handle_kbd_event(void);
 
 
@@ -442,7 +441,6 @@ static inline void handle_mouse_event(unsigned char scancode)
 		return;
 	}
 
-	add_mouse_randomness(scancode);
 	if (aux_count) {
 		int head = queue->head;
 
@@ -537,7 +535,8 @@ repeat:
 		i--;
 	}
 	if (count-i) {
-		file->f_dentry->d_inode->i_atime = CURRENT_TIME;
+		struct inode *inode = file->f_dentry->d_inode;
+		inode->i_atime = current_fs_time(inode->i_sb);
 		return count-i;
 	}
 	if (signal_pending(current))

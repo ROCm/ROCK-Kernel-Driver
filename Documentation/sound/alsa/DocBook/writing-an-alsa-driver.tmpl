@@ -397,12 +397,12 @@
   #include <sound/core.h>
   #include <sound/initval.h>
 
-  // module parameters (see "Module Parameters")
+  /* module parameters (see "Module Parameters") */
   static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;
   static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;
   static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;
 
-  // definition of the chip-specific record
+  /* definition of the chip-specific record */
   typedef struct snd_mychip mychip_t;
   struct snd_mychip {
           snd_card_t *card;
@@ -410,23 +410,26 @@
           // "PCI Resource Managements"
   };
 
-  // chip-specific destructor
-  // (see "PCI Resource Managements")
+  /* chip-specific destructor
+   * (see "PCI Resource Managements")
+   */
   static int snd_mychip_free(mychip_t *chip)
   {
-          // will be implemented later...
+          .... // will be implemented later...
   }
 
-  // component-destructor
-  // (see "Management of Cards and Components")
+  /* component-destructor
+   * (see "Management of Cards and Components")
+   */
   static int snd_mychip_dev_free(snd_device_t *device)
   {
           mychip_t *chip = device->device_data;
           return snd_mychip_free(chip);
   }
 
-  // chip-specific constructor
-  // (see "Management of Cards and Components")
+  /* chip-specific constructor
+   * (see "Management of Cards and Components")
+   */
   static int __devinit snd_mychip_create(snd_card_t *card,
                                          struct pci_dev *pci,
                                          mychip_t **rchip)
@@ -441,8 +444,9 @@
 
           // check PCI availability here
           // (see "PCI Resource Managements")
+          ....
 
-          // allocate a chip-specific data with zero filled
+          /* allocate a chip-specific data with zero filled */
           chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
           if (chip == NULL)
                   return -ENOMEM;
@@ -451,17 +455,21 @@
 
           // rest of initialization here; will be implemented
           // later, see "PCI Resource Managements"
+          ....
 
           if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL,
                                     chip, &ops)) < 0) {
                   snd_mychip_free(chip);
                   return err;
           }
+
+          snd_card_set_dev(card, &pci->dev);
+
           *rchip = chip;
           return 0;
   }
 
-  // constructor -- see "Constructor" sub-section
+  /* constructor -- see "Constructor" sub-section */
   static int __devinit snd_mychip_probe(struct pci_dev *pci,
                                const struct pci_device_id *pci_id)
   {
@@ -470,7 +478,7 @@
           mychip_t *chip;
           int err;
 
-          // (1)
+          /* (1) */
           if (dev >= SNDRV_CARDS)
                   return -ENODEV;
           if (!enable[dev]) {
@@ -478,39 +486,39 @@
                   return -ENOENT;
           }
 
-          // (2)
+          /* (2) */
           card = snd_card_new(index[dev], id[dev], THIS_MODULE, 0);
           if (card == NULL)
                   return -ENOMEM;
 
-          // (3)
+          /* (3) */
           if ((err = snd_mychip_create(card, pci, &chip)) < 0) {
                   snd_card_free(card);
                   return err;
           }
 
-          // (4)
+          /* (4) */
           strcpy(card->driver, "My Chip");
           strcpy(card->shortname, "My Own Chip 123");
           sprintf(card->longname, "%s at 0x%lx irq %i",
                   card->shortname, chip->ioport, chip->irq);
 
-          // (5)
-          // implemented later
+          /* (5) */
+          .... // implemented later
 
-          // (6)
+          /* (6) */
           if ((err = snd_card_register(card)) < 0) {
                   snd_card_free(card);
                   return err;
           }
 
-          // (7)
+          /* (7) */
           pci_set_drvdata(pci, card);
           dev++;
           return 0;
   }
 
-  // destructor -- see "Destructor" sub-section
+  /* destructor -- see "Destructor" sub-section */
   static void __devexit snd_mychip_remove(struct pci_dev *pci)
   {
           snd_card_free(pci_get_drvdata(pci));
@@ -743,7 +751,7 @@
           </programlisting>
         </informalexample>
 
-	where the last twos are necessary only when module options are
+	where the last one is necessary only when module options are
       defined in the source file.  If the codes are split to several
       files, the file without module options don't need them.
       </para>
@@ -1089,20 +1097,22 @@
 
   static int snd_mychip_free(mychip_t *chip)
   {
-          // disable hardware here if any
-          // (not implemented in this document)
+          /* disable hardware here if any */
+          .... // (not implemented in this document)
 
-          // release the irq
+          /* release the irq */
           if (chip->irq >= 0)
                   free_irq(chip->irq, (void *)chip);
-          // release the i/o ports
+          /* release the i/o ports */
           pci_release_regions(chip->pci);
-          // release the data
+          /* disable the PCI entry */
+          pci_disable_device(chip->pci);
+          /* release the data */
           kfree(chip);
           return 0;
   }
 
-  // chip-specific constructor
+  /* chip-specific constructor */
   static int __devinit snd_mychip_create(snd_card_t *card,
                                          struct pci_dev *pci,
                                          mychip_t **rchip)
@@ -1115,27 +1125,32 @@
 
           *rchip = NULL;
 
-          // check PCI availability (28bit DMA)
+          /* initialize the PCI entry */
           if ((err = pci_enable_device(pci)) < 0)
                   return err;
+          /* check PCI availability (28bit DMA) */
           if (pci_set_dma_mask(pci, 0x0fffffff) < 0 ||
               pci_set_consistent_dma_mask(pci, 0x0fffffff) < 0) {
                   printk(KERN_ERR "error to set 28bit mask DMA\n");
+                  pci_disable_device(pci);
                   return -ENXIO;
           }
 
           chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-          if (chip == NULL)
+          if (chip == NULL) {
+                  pci_disable_device(pci);
                   return -ENOMEM;
+          }
 
-          // initialize the stuff
+          /* initialize the stuff */
           chip->card = card;
           chip->pci = pci;
           chip->irq = -1;
 
-          // (1) PCI resource allocation
+          /* (1) PCI resource allocation */
           if ((err = pci_request_regions(pci, "My Chip")) < 0) {
                   kfree(chip);
+                  pci_disable_device(pci);
                   return err;
           }
           chip->port = pci_resource_start(pci, 0);
@@ -1148,19 +1163,22 @@
           }
           chip->irq = pci->irq;
 
-          // (2) initialization of the chip hardware
-          //     (not implemented in this document)
+          /* (2) initialization of the chip hardware */
+          .... //   (not implemented in this document)
 
           if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL,
                                     chip, &ops)) < 0) {
                   snd_mychip_free(chip);
                   return err;
           }
+
+          snd_card_set_dev(card, &pci->dev);
+
           *rchip = chip;
           return 0;
   }        
 
-  // PCI IDs
+  /* PCI IDs */
   static struct pci_device_id snd_mychip_ids[] = {
           { PCI_VENDOR_ID_FOO, PCI_DEVICE_ID_BAR,
             PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },
@@ -1169,7 +1187,7 @@
   };
   MODULE_DEVICE_TABLE(pci, snd_mychip_ids);
 
-  // pci_driver definition
+  /* pci_driver definition */
   static struct pci_driver driver = {
           .name = "My Own Chip",
           .id_table = snd_mychip_ids,
@@ -1177,13 +1195,13 @@
           .remove = __devexit_p(snd_mychip_remove),
   };
 
-  // initialization of the module
+  /* initialization of the module */
   static int __init alsa_card_mychip_init(void)
   {
           return pci_module_init(&driver);
   }
 
-  // clean up the module
+  /* clean up the module */
   static void __exit alsa_card_mychip_exit(void)
   {
           pci_unregister_driver(&driver);
@@ -1228,6 +1246,7 @@
   if (pci_set_dma_mask(pci, 0x0fffffff) < 0 ||
       pci_set_consistent_dma_mask(pci, 0x0fffffff) < 0) {
           printk(KERN_ERR "error to set 28bit mask DMA\n");
+          pci_disable_device(pci);
           return -ENXIO;
   }
   
@@ -1285,6 +1304,7 @@
 <![CDATA[
   if ((err = pci_request_regions(pci, "My Chip")) < 0) { 
           kfree(chip);
+          pci_disable_device(pci);
           return err;
   }
   chip->port = pci_resource_start(pci, 0);
@@ -1434,6 +1454,11 @@
       </para>
 
       <para>
+      Don't forget to call <function>pci_disable_device()</function>
+      before all finished.
+      </para>
+
+      <para>
         And finally, release the chip-specific record.
 
         <informalexample>
@@ -1462,7 +1487,7 @@
       When the chip-data is assigned to the card using
       <function>snd_device_new()</function> with
       <constant>SNDRV_DEV_LOWLELVEL</constant> , its destructor is 
-      called at the last.  that is, it is assured that all other
+      called at the last.  That is, it is assured that all other
       components like PCMs and controls have been already released.
       You don't have to call stopping PCMs, etc. explicitly, but just
       stop the hardware in the low-level.
@@ -1485,7 +1510,7 @@
           </programlisting>
         </informalexample>
 
-        and the allocation would be (assuming its size is 512 bytes):
+        and the allocation would be like below:
 
         <informalexample>
           <programlisting>
@@ -1520,6 +1545,30 @@
         </informalexample>
       </para>
 
+    </section>
+
+    <section id="pci-resource-device-struct">
+      <title>Registration of Device Struct</title>
+      <para>
+	At some point, typically after calling <function>snd_device_new()</function>,
+	you need to register the <structname>struct device</structname> of the chip
+	you're handling for udev and co.  ALSA provides a macro for compatibility with
+	older kernels.  Simply call like the following:
+        <informalexample>
+          <programlisting>
+<![CDATA[
+  snd_card_set_dev(card, &pci->dev);
+]]>
+          </programlisting>
+        </informalexample>
+	so that it stores the PCI's device pointer to the card.  This will be
+	referred by ALSA core functions later when the devices are registered.
+      </para>
+      <para>
+	In the case of non-PCI, pass the proper device struct pointer of the BUS
+	instead.  (In the case of legacy ISA without PnP, you don't have to do
+	anything.)
+      </para>
     </section>
 
     <section id="pci-resource-entries">
@@ -1801,8 +1850,9 @@
           mychip_t *chip = snd_pcm_substream_chip(substream);
           snd_pcm_runtime_t *runtime = substream->runtime;
 
-          // set up the hardware with the current configuration
-          // for example...
+          /* set up the hardware with the current configuration
+           * for example...
+           */
           mychip_set_sample_format(chip, runtime->format);
           mychip_set_sample_rate(chip, runtime->rate);
           mychip_set_channels(chip, runtime->channels);
@@ -1835,7 +1885,7 @@
           mychip_t *chip = snd_pcm_substream_chip(substream);
           unsigned int current_ptr;
 
-          // get the current hardware pointer
+          /* get the current hardware pointer */
           current_ptr = mychip_get_hw_pointer(chip);
           return current_ptr;
   }
@@ -2068,18 +2118,19 @@
   static void mychip_pcm_free(snd_pcm_t *pcm)
   {
           mychip_t *chip = snd_pcm_chip(pcm);
-          // free your own data
+          /* free your own data */
           kfree(chip->my_private_pcm_data);
-          // do what you like else...
+          // do what you like else
+          ....
   }
 
   static int __devinit snd_mychip_new_pcm(mychip_t *chip)
   {
           snd_pcm_t *pcm;
           ....
-          // allocate your own data
+          /* allocate your own data */
           chip->my_private_pcm_data = kmalloc(...);
-          // set the destructor
+          /* set the destructor */
           pcm->private_data = chip;
           pcm->private_free = mychip_pcm_free;
           ....
@@ -2231,7 +2282,7 @@ struct _snd_pcm_runtime {
 <![CDATA[
           snd_pcm_runtime_t *runtime = substream->runtime;
           ...
-          runtime->hw = snd_mychip_playback_hw; // common definition
+          runtime->hw = snd_mychip_playback_hw; /* common definition */
           if (chip->model == VERY_OLD_ONE)
                   runtime->hw.channels_max = 1;
 ]]>
@@ -3030,7 +3081,7 @@ struct _snd_pcm_runtime {
           spin_lock(&chip->lock);
           ....
           if (pcm_irq_invoked(chip)) {
-                  // call updater, unlock before it
+                  /* call updater, unlock before it */
                   spin_unlock(&chip->lock);
                   snd_pcm_period_elapsed(chip->substream);
                   spin_lock(&chip->lock);
@@ -3075,24 +3126,25 @@ struct _snd_pcm_runtime {
           ....
           if (pcm_irq_invoked(chip)) {
                   unsigned int last_ptr, size;
-                  // get the current hardware pointer (in frames)
+                  /* get the current hardware pointer (in frames) */
                   last_ptr = get_hw_ptr(chip);
-                  // calculate the processed frames since the
-                  // last update
+                  /* calculate the processed frames since the
+                   * last update
+                   */
                   if (last_ptr < chip->last_ptr)
                           size = runtime->buffer_size + last_ptr 
                                    - chip->last_ptr; 
                   else
                           size = last_ptr - chip->last_ptr;
-                  // remember the last updated point
+                  /* remember the last updated point */
                   chip->last_ptr = last_ptr;
-                  // accumulate the size
+                  /* accumulate the size */
                   chip->size += size;
-                  // over the period boundary?
+                  /* over the period boundary? */
                   if (chip->size >= runtime->period_size) {
-                          // reset the accumulator
+                          /* reset the accumulator */
                           chip->size %= runtime->period_size;
-                          // call updater
+                          /* call updater */
                           spin_unlock(&chip->lock);
                           snd_pcm_period_elapsed(substream);
                           spin_lock(&chip->lock);
@@ -3216,7 +3268,7 @@ struct _snd_pcm_runtime {
           snd_mask_t *f = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
           snd_mask_t fmt;
 
-          snd_mask_any(&fmt);    // Init the struct
+          snd_mask_any(&fmt);    /* Init the struct */
           if (c->min < 2) {
                   fmt.bits[0] &= SNDRV_PCM_FMTBIT_S16_LE;
                   return snd_mask_refine(f, &fmt);
@@ -5131,7 +5183,7 @@ struct _snd_pcm_runtime {
         <listitem><para>Call <function>snd_pcm_suspend_all()</function> to suspend the running PCM streams.</para></listitem>
         <listitem><para>Save the register values if necessary.</para></listitem>
         <listitem><para>Stop the hardware if necessary.</para></listitem>
-        <listitem><para>Set the power-state as D3hot by calling <function>snd_power_change_state()</function>.</para></listitem>
+        <listitem><para>Disable the PCI device by calling <function>pci_disable_device()</function>.</para></listitem>
       </orderedlist>
     </para>
 
@@ -5143,16 +5195,16 @@ struct _snd_pcm_runtime {
 <![CDATA[
   static int mychip_suspend(snd_card_t *card, unsigned int state)
   {
-          // (1)
+          /* (1) */
           mychip_t *chip = card->pm_private_data;
-          // (2)
+          /* (2) */
           snd_pcm_suspend_all(chip->pcm);
-          // (3)
+          /* (3) */
           snd_mychip_save_registers(chip);
-          // (4)
+          /* (4) */
           snd_mychip_stop_hardware(chip);
-          // (5)
-          snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+          /* (5) */
+          pci_disable_device(chip->pci);
           return 0;
   }
 ]]>
@@ -5172,8 +5224,6 @@ struct _snd_pcm_runtime {
     <listitem><para>Resume the mixer, e.g. calling
     <function>snd_ac97_resume()</function>.</para></listitem>
     <listitem><para>Restart the hardware (if any).</para></listitem>
-    <listitem><para>Set the power-state as D0 by calling
-    <function>snd_power_change_state()</function>.</para></listitem>
     </orderedlist>
     </para>
 
@@ -5185,20 +5235,18 @@ struct _snd_pcm_runtime {
 <![CDATA[
   static void mychip_resume(mychip_t *chip)
   {
-          // (1)
+          /* (1) */
           mychip_t *chip = card->pm_private_data;
-          // (2)
+          /* (2) */
           pci_enable_device(chip->pci);
-          // (3)
+          /* (3) */
           snd_mychip_reinit_chip(chip);
-          // (4)
+          /* (4) */
           snd_mychip_restore_registers(chip);
-          // (5)
+          /* (5) */
           snd_ac97_resume(chip->ac97);
-          // (6)
+          /* (6) */
           snd_mychip_restart_chip(chip);
-          // (7)
-          snd_power_change_state(card, SNDRV_CTL_POWER_D0);
           return 0;
   }
 ]]>
@@ -5314,19 +5362,15 @@ struct _snd_pcm_runtime {
 <![CDATA[
   #define CARD_NAME "My Chip"
 
-  static int boot_devs;
-  module_param_array(index, int, boot_devs, 0444);
+  module_param_array(index, int, NULL, 0444);
   MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
-  module_param_array(id, charp, boot_devs, 0444);
+  module_param_array(id, charp, NULL, 0444);
   MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
-  module_param_array(enable, bool, boot_devs, 0444);
+  module_param_array(enable, bool, NULL, 0444);
   MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
 ]]>
         </programlisting>
       </informalexample>
-
-    Here boot_devs is passed but simply ignored since we don't care
-    the number of parsed parameters.
     </para>
 
     <para>
@@ -5423,7 +5467,10 @@ struct _snd_pcm_runtime {
           depends on SND
           select SND_PCM
           help
-            Say 'Y' or 'M' to include support for Foobar XYZ soundcard.
+            Say Y here to include support for Foobar XYZ soundcard.
+
+            To compile this driver as a module, choose M here: the module
+            will be called snd-xyz.
 ]]>
         </programlisting>
       </informalexample>

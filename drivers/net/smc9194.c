@@ -1600,9 +1600,9 @@ static void smc_set_multicast_list(struct net_device *dev)
 static struct net_device *devSMC9194;
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(io, "i");
-MODULE_PARM(irq, "i");
-MODULE_PARM(ifport, "i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(ifport, int, 0);
 MODULE_PARM_DESC(io, "SMC 99194 I/O base address");
 MODULE_PARM_DESC(irq, "SMC 99194 IRQ number");
 MODULE_PARM_DESC(ifport, "SMC 99194 interface port (0-default, 1-TP, 2-AUI)");

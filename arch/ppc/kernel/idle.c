@@ -41,14 +41,17 @@ void default_idle(void)
 	if (!need_resched()) {
 		if (powersave != NULL)
 			powersave();
-#ifdef CONFIG_SMP
 		else {
+#ifdef CONFIG_SMP
 			set_thread_flag(TIF_POLLING_NRFLAG);
+			local_irq_enable();
 			while (!need_resched())
 				barrier();
 			clear_thread_flag(TIF_POLLING_NRFLAG);
-		}
+#else
+			local_irq_enable();
 #endif
+		}
 	}
 	if (need_resched())
 		schedule();
@@ -57,14 +60,13 @@ void default_idle(void)
 /*
  * The body of the idle task.
  */
-int cpu_idle(void)
+void cpu_idle(void)
 {
 	for (;;)
 		if (ppc_md.idle != NULL)
 			ppc_md.idle();
 		else
 			default_idle();
-	return 0;
 }
 
 #if defined(CONFIG_SYSCTL) && defined(CONFIG_6xx)

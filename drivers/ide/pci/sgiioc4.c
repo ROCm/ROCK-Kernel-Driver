@@ -701,17 +701,11 @@ pci_init_sgiioc4(struct pci_dev *dev, ide_pci_device_t * d)
 			"firmware is obsolete - please upgrade to revision"
 			"46 or higher\n", d->name, dev->slot_name);
 		ret = -EAGAIN;
-		goto err_disable;
+		goto out;
 	}
 	ret = sgiioc4_ide_setup_pci_device(dev, d);
-	if (ret < 0)
-		goto err_disable;
 out:
 	return ret;
-
-err_disable:
-	pci_disable_device(dev);
-	goto out;
 }
 
 static ide_pci_device_t sgiioc4_chipsets[] __devinitdata = {

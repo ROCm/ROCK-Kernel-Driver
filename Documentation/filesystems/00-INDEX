@@ -42,8 +42,6 @@ udf.txt
 	- info and mount options for the UDF filesystem.
 ufs.txt
 	- info on the ufs filesystem.
-umsdos.txt
-	- info on the umsdos extensions to the msdos filesystem.
 vfat.txt
 	- info on using the VFAT filesystem used in Windows NT and Windows 95
 vfs.txt

@@ -491,7 +491,7 @@ static int multipath_run (mddev_t *mddev)
 	conf->raid_disks = mddev->raid_disks;
 	mddev->sb_dirty = 1;
 	conf->mddev = mddev;
-	conf->device_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&conf->device_lock);
 	INIT_LIST_HEAD(&conf->retry_list);
 
 	if (!conf->working_disks) {

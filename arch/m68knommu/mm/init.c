@@ -168,7 +168,7 @@ void mem_init(void)
 	high_memory = (void *) end_mem;
 
 	start_mem = PAGE_ALIGN(start_mem);
-	max_mapnr = num_physpages = MAP_NR(high_memory);
+	max_mapnr = num_physpages = (((unsigned long) high_memory) - PAGE_OFFSET) >> PAGE_SHIFT;
 
 	/* this will put all memory onto the freelists */
 	totalram_pages = free_all_bootmem();

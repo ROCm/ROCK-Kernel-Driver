@@ -53,7 +53,7 @@
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
 
 /* Protects module list */
-static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(modlist_lock);
 
 /* List of modules, protected by module_mutex AND modlist_lock */
 static DECLARE_MUTEX(module_mutex);
@@ -379,7 +379,7 @@ static void module_unload_init(struct module *mod)
 	for (i = 0; i < NR_CPUS; i++)
 		local_set(&mod->ref[i].count, 0);
 	/* Hold reference count during initialization. */
-	local_set(&mod->ref[smp_processor_id()].count, 1);
+	local_set(&mod->ref[_smp_processor_id()].count, 1);
 	/* Backwards compatibility macros put refcount during init. */
 	mod->waiter = current;
 }
@@ -651,7 +651,8 @@ void symbol_put_addr(void *addr)
 }
 EXPORT_SYMBOL_GPL(symbol_put_addr);
 
-static ssize_t show_refcnt(struct module *mod, char *buffer)
+static ssize_t show_refcnt(struct module_attribute *mattr,
+			   struct module *mod, char *buffer)
 {
 	/* sysfs holds a reference */
 	return sprintf(buffer, "%u\n", module_refcount(mod)-1);
@@ -681,13 +682,6 @@ static inline int use_module(struct module *a, struct module *b)
 static inline void module_unload_init(struct module *mod)
 {
 }
-
-asmlinkage long
-sys_delete_module(const char __user *name_user, unsigned int flags)
-{
-	return -ENOSYS;
-}
-
 #endif /* CONFIG_MODULE_UNLOAD */
 
 #ifdef CONFIG_OBSOLETE_MODPARM
@@ -936,79 +930,71 @@ static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
  * J. Corbet <corbet@lwn.net>
  */
 #ifdef CONFIG_KALLSYMS
-static void module_sect_attrs_release(struct kobject *kobj)
-{
-	kfree(container_of(kobj, struct module_sections, kobj));
-}
-
-static ssize_t module_sect_show(struct kobject *kobj, struct attribute *attr,
-		char *buf)
+static ssize_t module_sect_show(struct module_attribute *mattr,
+				struct module *mod, char *buf)
 {
 	struct module_sect_attr *sattr =
-		container_of(attr, struct module_sect_attr, attr);
+		container_of(mattr, struct module_sect_attr, mattr);
 	return sprintf(buf, "0x%lx\n", sattr->address);
 }
-
-static struct sysfs_ops module_sect_ops = {
-	.show = module_sect_show,
-};
-
-static struct kobj_type module_sect_ktype = {
-	.sysfs_ops = &module_sect_ops,
-	.release =   module_sect_attrs_release,
-};
 
 static void add_sect_attrs(struct module *mod, unsigned int nsect,
 		char *secstrings, Elf_Shdr *sechdrs)
 {
-	unsigned int nloaded = 0, i;
+	unsigned int nloaded = 0, i, size[2];
+	struct module_sect_attrs *sect_attrs;
 	struct module_sect_attr *sattr;
-	
-	if (!mod->mkobj)
-		return;
+	struct attribute **gattr;
 	
 	/* Count loaded sections and allocate structures */
 	for (i = 0; i < nsect; i++)
 		if (sechdrs[i].sh_flags & SHF_ALLOC)
 			nloaded++;
-	mod->sect_attrs = kmalloc(sizeof(struct module_sections) +
-			nloaded*sizeof(mod->sect_attrs->attrs[0]), GFP_KERNEL);
-	if (! mod->sect_attrs)
+	size[0] = ALIGN(sizeof(*sect_attrs)
+			+ nloaded * sizeof(sect_attrs->attrs[0]),
+			sizeof(sect_attrs->grp.attrs[0]));
+	size[1] = (nloaded + 1) * sizeof(sect_attrs->grp.attrs[0]);
+	if (! (sect_attrs = kmalloc(size[0] + size[1], GFP_KERNEL)))
 		return;
 
-	/* sections entry setup */
-	memset(mod->sect_attrs, 0, sizeof(struct module_sections));
-	if (kobject_set_name(&mod->sect_attrs->kobj, "sections"))
-		goto out;
-	mod->sect_attrs->kobj.parent = &mod->mkobj->kobj;
-	mod->sect_attrs->kobj.ktype = &module_sect_ktype;
-	if (kobject_register(&mod->sect_attrs->kobj))
-		goto out;
+	/* Setup section attributes. */
+	sect_attrs->grp.name = "sections";
+	sect_attrs->grp.attrs = (void *)sect_attrs + size[0];
 
-	/* And the section attributes. */
-	sattr = &mod->sect_attrs->attrs[0];
+	sattr = &sect_attrs->attrs[0];
+	gattr = &sect_attrs->grp.attrs[0];
 	for (i = 0; i < nsect; i++) {
 		if (! (sechdrs[i].sh_flags & SHF_ALLOC))
 			continue;
 		sattr->address = sechdrs[i].sh_addr;
 		strlcpy(sattr->name, secstrings + sechdrs[i].sh_name,
-				MODULE_SECT_NAME_LEN);
-		sattr->attr.name = sattr->name;
-		sattr->attr.owner = mod;
-		sattr->attr.mode = S_IRUGO;
-		(void) sysfs_create_file(&mod->sect_attrs->kobj, &sattr->attr);
-		sattr++;
+			MODULE_SECT_NAME_LEN);
+		sattr->mattr.show = module_sect_show;
+		sattr->mattr.store = NULL;
+		sattr->mattr.attr.name = sattr->name;
+		sattr->mattr.attr.owner = mod;
+		sattr->mattr.attr.mode = S_IRUGO;
+		*(gattr++) = &(sattr++)->mattr.attr;
 	}
+	*gattr = NULL;
+
+	if (sysfs_create_group(&mod->mkobj.kobj, &sect_attrs->grp))
+		goto out;
+
+	mod->sect_attrs = sect_attrs;
 	return;
   out:
-	kfree(mod->sect_attrs);
-	mod->sect_attrs = NULL;
+	kfree(sect_attrs);
 }
 
 static void remove_sect_attrs(struct module *mod)
 {
 	if (mod->sect_attrs) {
-		kobject_unregister(&mod->sect_attrs->kobj);
+		sysfs_remove_group(&mod->mkobj.kobj,
+				   &mod->sect_attrs->grp);
+		/* We are positive that no one is using any sect attrs
+		 * at this point.  Deallocate immediately. */
+		kfree(mod->sect_attrs);
 		mod->sect_attrs = NULL;
 	}
 }
@@ -1029,11 +1015,11 @@ static inline void remove_sect_attrs(struct module *mod)
 #ifdef CONFIG_MODULE_UNLOAD
 static inline int module_add_refcnt_attr(struct module *mod)
 {
-	return sysfs_create_file(&mod->mkobj->kobj, &refcnt.attr);
+	return sysfs_create_file(&mod->mkobj.kobj, &refcnt.attr);
 }
 static void module_remove_refcnt_attr(struct module *mod)
 {
-	return sysfs_remove_file(&mod->mkobj->kobj, &refcnt.attr);
+	return sysfs_remove_file(&mod->mkobj.kobj, &refcnt.attr);
 }
 #else
 static inline int module_add_refcnt_attr(struct module *mod)
@@ -1052,17 +1038,13 @@ static int mod_sysfs_setup(struct module *mod,
 {
 	int err;
 
-	mod->mkobj = kmalloc(sizeof(struct module_kobject), GFP_KERNEL);
-	if (!mod->mkobj)
-		return -ENOMEM;
-
-	memset(&mod->mkobj->kobj, 0, sizeof(mod->mkobj->kobj));
-	err = kobject_set_name(&mod->mkobj->kobj, "%s", mod->name);
+	memset(&mod->mkobj.kobj, 0, sizeof(mod->mkobj.kobj));
+	err = kobject_set_name(&mod->mkobj.kobj, "%s", mod->name);
 	if (err)
 		goto out;
-	kobj_set_kset_s(mod->mkobj, module_subsys);
-	mod->mkobj->mod = mod;
-	err = kobject_register(&mod->mkobj->kobj);
+	kobj_set_kset_s(&mod->mkobj, module_subsys);
+	mod->mkobj.mod = mod;
+	err = kobject_register(&mod->mkobj.kobj);
 	if (err)
 		goto out;
 
@@ -1077,11 +1059,8 @@ static int mod_sysfs_setup(struct module *mod,
 	return 0;
 
 out_unreg:
-	/* Calls module_kobj_release */
-	kobject_unregister(&mod->mkobj->kobj);
-	return err;
+	kobject_unregister(&mod->mkobj.kobj);
 out:
-	kfree(mod->mkobj);
 	return err;
 }
 
@@ -1090,8 +1069,7 @@ static void mod_kobject_remove(struct module *mod)
 	module_remove_refcnt_attr(mod);
 	module_param_sysfs_remove(mod);
 
-	/* Calls module_kobj_release */
-	kobject_unregister(&mod->mkobj->kobj);
+	kobject_unregister(&mod->mkobj.kobj);
 }
 
 /* Free a module, remove from lists, etc (must hold module mutex). */
@@ -1713,6 +1691,9 @@ static struct module *load_module(void __user *umod,
 				 / sizeof(struct kernel_param),
 				 NULL);
 	}
+	if (err < 0)
+		goto arch_cleanup;
+
 	err = mod_sysfs_setup(mod, 
 			      (struct kernel_param *)
 			      sechdrs[setupindex].sh_addr,
@@ -2089,11 +2070,9 @@ void module_add_driver(struct module *mod, struct device_driver *drv)
 {
 	if (!mod || !drv)
 		return;
-	if (!mod->mkobj)
-		return;
 
 	/* Don't check return code; this call is idempotent */
-	sysfs_create_link(&drv->kobj, &mod->mkobj->kobj, "module");
+	sysfs_create_link(&drv->kobj, &mod->mkobj.kobj, "module");
 }
 EXPORT_SYMBOL(module_add_driver);
 

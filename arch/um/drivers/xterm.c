@@ -97,6 +97,13 @@ int xterm_open(int input, int output, int primary, void *d, char **dev_out)
 	if(os_access(argv[4], OS_ACC_X_OK) < 0)
 		argv[4] = "port-helper";
 
+	/* Check that DISPLAY is set, this doesn't guarantee the xterm
+	 * will work but w/o it we can be pretty sure it won't. */
+	if (!getenv("DISPLAY")) {
+		printk("xterm_open: $DISPLAY not set.\n");
+		return -ENODEV;
+	}
+
 	fd = mkstemp(file);
 	if(fd < 0){
 		printk("xterm_open : mkstemp failed, errno = %d\n", errno);

@@ -31,6 +31,7 @@
 /* Revised by Kenneth Albanowski for m68knommu. Basic problem: unaligned access kills, so most
    of the assembly has to go. */
 
+#include <linux/module.h>
 #include <net/checksum.h>
 
 static inline unsigned short from32to16(unsigned long x)
@@ -139,7 +140,8 @@ unsigned short ip_compute_csum(const unsigned char * buff, int len)
  */
 
 unsigned int
-csum_partial_copy_from_user(const char *src, char *dst, int len, int sum, int *csum_err)
+csum_partial_copy_from_user(const unsigned char *src, unsigned char *dst,
+			    int len, int sum, int *csum_err)
 {
 	if (csum_err) *csum_err = 0;
 	memcpy(dst, src, len);
@@ -151,7 +153,7 @@ csum_partial_copy_from_user(const char *src, char *dst, int len, int sum, int *c
  */
 
 unsigned int
-csum_partial_copy(const char *src, char *dst, int len, int sum)
+csum_partial_copy(const unsigned char *src, unsigned char *dst, int len, int sum)
 {
 	memcpy(dst, src, len);
 	return csum_partial(dst, len, sum);

@@ -32,7 +32,6 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
-#include <linux/suspend.h>
 
 #include "w1.h"
 #include "w1_io.h"
@@ -628,8 +627,7 @@ int w1_control(void *data)
 		timeout = w1_timeout*HZ;
 		do {
 			timeout = interruptible_sleep_on_timeout(&w1_control_wait, timeout);
-			if (current->flags & PF_FREEZE)
-				refrigerator(PF_FREEZE);
+			try_to_freeze(PF_FREEZE);
 		} while (!signal_pending(current) && (timeout > 0));
 
 		if (signal_pending(current))
@@ -701,8 +699,7 @@ int w1_process(void *data)
 		timeout = w1_timeout*HZ;
 		do {
 			timeout = interruptible_sleep_on_timeout(&dev->kwait, timeout);
-			if (current->flags & PF_FREEZE)
-				refrigerator(PF_FREEZE);
+			try_to_freeze(PF_FREEZE);
 		} while (!signal_pending(current) && (timeout > 0));
 
 		if (signal_pending(current))

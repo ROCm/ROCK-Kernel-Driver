@@ -131,28 +131,36 @@ __change_page_attr(unsigned long address, unsigned long pfn, pgprot_t prot,
 	kpte_flags = pte_val(*kpte); 
 	if (pgprot_val(prot) != pgprot_val(ref_prot)) { 
 		if ((kpte_flags & _PAGE_PSE) == 0) { 
-			pte_t old = *kpte;
-			pte_t standard = pfn_pte(pfn, ref_prot);
-
 			set_pte(kpte, pfn_pte(pfn, prot));
-			if (pte_same(old,standard))
-				get_page(kpte_page);
 		} else {
+ 			/*
+ 			 * split_large_page will take the reference for this change_page_attr
+ 			 * on the split page.
+ 			 */
 			struct page *split = split_large_page(address, prot, ref_prot); 
 			if (!split)
 				return -ENOMEM;
-			get_page(split);
 			set_pte(kpte,mk_pte(split, ref_prot));
+			kpte_page = split;
 		}	
+		get_page(kpte_page);
 	} else if ((kpte_flags & _PAGE_PSE) == 0) { 
 		set_pte(kpte, pfn_pte(pfn, ref_prot));
 		__put_page(kpte_page);
-	}
+	} else
+		BUG();
 
-	if (page_count(kpte_page) == 1) {
+	/* on x86-64 the direct mapping set at boot is not using 4k pages */
+ 	BUG_ON(PageReserved(kpte_page));
+
+	switch (page_count(kpte_page)) {
+ 	case 1:
 		save_page(address, kpte_page); 		     
 		revert_page(address, ref_prot);
-	} 
+		break;
+ 	case 0:
+ 		BUG(); /* memleak and failed 2M page regeneration */
+ 	}
 	return 0;
 } 
 

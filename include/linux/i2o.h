@@ -23,7 +23,7 @@
 #include <linux/i2o-dev.h>
 
 /* How many different OSM's are we allowing */
-#define I2O_MAX_DRIVERS		4
+#define I2O_MAX_DRIVERS		8
 
 #include <asm/io.h>
 #include <asm/semaphore.h>	/* Needed for MUTEX init macros */
@@ -631,15 +631,25 @@ static inline void i2o_dma_unmap(struct device *dev, struct i2o_dma *addr)
 extern int i2o_parm_field_get(struct i2o_device *, int, int, void *, int);
 extern int i2o_parm_table_get(struct i2o_device *, int, int, int, void *, int,
 			      void *, int);
-/* FIXME: remove
-extern int i2o_query_table(int, struct i2o_controller *, int, int, int,
-			   void *, int, void *, int);
-extern int i2o_clear_table(struct i2o_controller *, int, int);
-extern int i2o_row_add_table(struct i2o_controller *, int, int, int,
-			     void *, int);
-extern int i2o_issue_params(int, struct i2o_controller *, int, void *, int,
-			    void *, int);
-*/
+
+/* debugging and troubleshooting/diagnostic helpers. */
+#define osm_printk(level, format, arg...)  \
+	printk(level "%s: " format, OSM_NAME , ## arg)
+
+#ifdef DEBUG
+#define osm_debug(format, arg...) \
+	osm_printk(KERN_DEBUG, format , ## arg)
+#else
+#define osm_debug(format, arg...) \
+        do { } while (0)
+#endif
+
+#define osm_err(format, arg...)		\
+	osm_printk(KERN_ERR, format , ## arg)
+#define osm_info(format, arg...)		\
+	osm_printk(KERN_INFO, format , ## arg)
+#define osm_warn(format, arg...)		\
+	osm_printk(KERN_WARNING, format , ## arg)
 
 /* debugging functions */
 extern void i2o_report_status(const char *, const char *, struct i2o_message *);

@@ -715,8 +715,9 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 		if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
 			struct fb_videomode mode;
-			info->var = *var;
+			int err = 0;
 
+			info->var = *var;
 			if (info->fbops->fb_set_par)
 				info->fbops->fb_set_par(info);
 
@@ -728,15 +729,16 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 
 			if (info->modelist.prev && info->modelist.next &&
 			    !list_empty(&info->modelist))
-				fb_add_videomode(&mode, &info->modelist);
+				err = fb_add_videomode(&mode, &info->modelist);
 
-			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
+			if (!err && info->flags & FBINFO_MISC_USEREVENT) {
 				struct fb_event event;
 
-				info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
+				info->flags &= ~FBINFO_MISC_USEREVENT;
 				event.info = info;
 				notifier_call_chain(&fb_notifier_list,
-						    FB_EVENT_MODE_CHANGE, &event);
+						    FB_EVENT_MODE_CHANGE,
+						    &event);
 			}
 		}
 	}
@@ -746,15 +748,23 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 int
 fb_blank(struct fb_info *info, int blank)
 {	
-	int err = -EINVAL;
-	
+ 	int ret = -EINVAL;
+
  	if (blank > FB_BLANK_POWERDOWN)
  		blank = FB_BLANK_POWERDOWN;
 
 	if (info->fbops->fb_blank)
- 		err = info->fbops->fb_blank(blank, info);
+ 		ret = info->fbops->fb_blank(blank, info);
 
-	return err;
+ 	if (!ret) {
+		struct fb_event event;
+
+		event.info = info;
+		event.data = &blank;
+		notifier_call_chain(&fb_notifier_list, FB_EVENT_BLANK, &event);
+	}
+
+ 	return ret;
 }
 
 static int 
@@ -782,9 +792,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (copy_from_user(&var, argp, sizeof(var)))
 			return -EFAULT;
 		acquire_console_sem();
-		info->flags |= FBINFO_MISC_MODECHANGEUSER;
+		info->flags |= FBINFO_MISC_USEREVENT;
 		i = fb_set_var(info, &var);
-		info->flags &= ~FBINFO_MISC_MODECHANGEUSER;
+		info->flags &= ~FBINFO_MISC_USEREVENT;
 		release_console_sem();
 		if (i) return i;
 		if (copy_to_user(argp, &var, sizeof(var)))
@@ -846,7 +856,9 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 					   &event);
 	case FBIOBLANK:
 		acquire_console_sem();
+		info->flags |= FBINFO_MISC_USEREVENT;
 		i = fb_blank(info, arg);
+		info->flags &= ~FBINFO_MISC_USEREVENT;
 		release_console_sem();
 		return i;
 	default:
@@ -1167,7 +1179,7 @@ fbmem_init(void)
 	}
 	return 0;
 }
-module_init(fbmem_init);
+subsys_initcall(fbmem_init);
 
 static char *video_options[FB_MAX];
 static int ofonly;
@@ -1225,19 +1237,32 @@ int fb_get_options(char *name, char **option)
  *
  */
 
+extern const char *global_mode_option;
+
 int __init video_setup(char *options)
 {
-	int i;
+	int i, global = 0;
 
 	if (!options || !*options)
-		return 0;
+ 		global = 1;
 
-	for (i = 0; i < FB_MAX; i++) {
-		if (!strncmp(options, "ofonly", 6))
-			ofonly = 1;
-		if (video_options[i] == NULL) {
-			video_options[i] = options;
-			break;
+ 	if (!global && !strncmp(options, "ofonly", 6)) {
+ 		ofonly = 1;
+ 		global = 1;
+ 	}
+
+ 	if (!global && !strstr(options, "fb:")) {
+ 		global_mode_option = options;
+ 		global = 1;
+ 	}
+
+ 	if (!global) {
+ 		for (i = 0; i < FB_MAX; i++) {
+ 			if (video_options[i] == NULL) {
+ 				video_options[i] = options;
+ 				break;
+ 			}
+
 		}
 	}
 

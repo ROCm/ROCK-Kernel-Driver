@@ -520,7 +520,6 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4,    \
 #define __ARCH_WANT_SYS_GETHOSTNAME
 #define __ARCH_WANT_SYS_PAUSE
 #define __ARCH_WANT_SYS_SIGNAL
-#define __ARCH_WANT_SYS_TIME
 #define __ARCH_WANT_SYS_UTIME
 #define __ARCH_WANT_SYS_SOCKETCALL
 #define __ARCH_WANT_SYS_FADVISE64
@@ -532,9 +531,11 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4,    \
 #define __ARCH_WANT_SYS_SIGPENDING
 #define __ARCH_WANT_SYS_SIGPROCMASK
 #define __ARCH_WANT_SYS_RT_SIGACTION
-# ifndef CONFIG_ARCH_S390X
+# ifdef CONFIG_ARCH_S390_31
 #   define __ARCH_WANT_STAT64
+#   define __ARCH_WANT_SYS_TIME
 # endif
+# define __ARCH_WANT_COMPAT_SYS_TIME
 #endif
 
 #ifdef __KERNEL_SYSCALLS__

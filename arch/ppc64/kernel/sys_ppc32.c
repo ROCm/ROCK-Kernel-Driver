@@ -73,6 +73,7 @@
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
 #include <asm/mmu_context.h>
+#include <asm/systemcfg.h>
 
 #include "pci.h"
 
@@ -1151,23 +1152,6 @@ asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
 		copy_to_user(args->__unused, tmp.__unused, sizeof(tmp.__unused));
 	}
 	return error;
-}
-
-asmlinkage long sys32_time(compat_time_t __user * tloc)
-{
-	compat_time_t secs;
-
-	struct timeval tv;
-
-	do_gettimeofday( &tv );
-	secs = tv.tv_sec;
-
-	if (tloc) {
-		if (put_user(secs,tloc))
-			secs = -EFAULT;
-	}
-
-	return secs;
 }
 
 asmlinkage int sys32_olduname(struct oldold_utsname __user * name)

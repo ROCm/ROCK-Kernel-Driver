@@ -41,7 +41,6 @@
 #include <asm/types.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/naca.h>
 #include <asm/machdep.h>
 #include <asm/lmb.h>
 #include <asm/abs_addr.h>
@@ -75,7 +74,8 @@
 extern unsigned long dart_tablebase;
 #endif /* CONFIG_U3_DART */
 
-HTAB htab_data = {NULL, 0, 0, 0, 0};
+HPTE		*htab_address;
+unsigned long	htab_hash_mask;
 
 extern unsigned long _SDR1;
 
@@ -114,7 +114,7 @@ static inline void create_pte_mapping(unsigned long start, unsigned long end,
 
 		hash = hpt_hash(vpn, large);
 
-		hpteg = ((hash & htab_data.htab_hash_mask)*HPTES_PER_GROUP);
+		hpteg = ((hash & htab_hash_mask) * HPTES_PER_GROUP);
 
 #ifdef CONFIG_PPC_PSERIES
 		if (systemcfg->platform & PLATFORM_LPAR)
@@ -147,7 +147,7 @@ void __init htab_initialize(void)
 	 * Calculate the required size of the htab.  We want the number of
 	 * PTEGs to equal one half the number of real pages.
 	 */ 
-	htab_size_bytes = 1UL << naca->pftSize;
+	htab_size_bytes = 1UL << ppc64_pft_size;
 	pteg_count = htab_size_bytes >> 7;
 
 	/* For debug, make the HTAB 1/8 as big as it normally would be. */
@@ -156,12 +156,11 @@ void __init htab_initialize(void)
 		htab_size_bytes = pteg_count << 7;
 	}
 
-	htab_data.htab_num_ptegs = pteg_count;
-	htab_data.htab_hash_mask = pteg_count - 1;
+	htab_hash_mask = pteg_count - 1;
 
 	if (systemcfg->platform & PLATFORM_LPAR) {
 		/* Using a hypervisor which owns the htab */
-		htab_data.htab = NULL;
+		htab_address = NULL;
 		_SDR1 = 0; 
 	} else {
 		/* Find storage for the HPT.  Must be contiguous in
@@ -176,7 +175,7 @@ void __init htab_initialize(void)
 			ppc64_terminate_msg(0x20, "hpt space");
 			loop_forever();
 		}
-		htab_data.htab = abs_to_virt(table);
+		htab_address = abs_to_virt(table);
 
 		/* htab absolute addr + encoded htabsize */
 		_SDR1 = table + __ilog2(pteg_count) - 11;
@@ -357,7 +356,7 @@ void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte,
 	secondary = (pte_val(pte) & _PAGE_SECONDARY) >> 15;
 	if (secondary)
 		hash = ~hash;
-	slot = (hash & htab_data.htab_hash_mask) * HPTES_PER_GROUP;
+	slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
 	slot += (pte_val(pte) & _PAGE_GROUP_IX) >> 12;
 
 	ppc_md.hpte_invalidate(slot, va, huge, local);

@@ -551,6 +551,11 @@ static struct proc_dir_entry *proc_create(struct proc_dir_entry **parent,
 
 	if (!(*parent) && xlate_proc_name(name, parent, &fn) != 0)
 		goto out;
+
+	/* At this point there must not be any '/' characters beyond *fn */
+	if (strchr(fn, '/'))
+		goto out;
+
 	len = strlen(fn);
 
 	ent = kmalloc(sizeof(struct proc_dir_entry) + len + 1, GFP_KERNEL);

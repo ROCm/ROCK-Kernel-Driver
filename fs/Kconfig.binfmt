@@ -23,6 +23,19 @@ config BINFMT_ELF
 	  ld.so (check the file <file:Documentation/Changes> for location and
 	  latest version).
 
+config BINFMT_ELF_FDPIC
+	bool "Kernel support for FDPIC ELF binaries"
+	default y
+	depends on FRV
+	help
+	  ELF FDPIC binaries are based on ELF, but allow the individual load
+	  segments of a binary to be located in memory independently of each
+	  other. This makes this format ideal for use in environments where no
+	  MMU is available as it still permits text segments to be shared,
+	  even if data segments are not.
+
+	  It is also possible to run FDPIC ELF binaries on MMU linux also.
+
 config BINFMT_FLAT
 	tristate "Kernel support for flat binaries"
 	depends on !MMU || SUPERH

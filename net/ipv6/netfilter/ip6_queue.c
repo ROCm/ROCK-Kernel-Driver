@@ -60,7 +60,7 @@ typedef int (*ipq_cmpfn)(struct ipq_queue_entry *, unsigned long);
 
 static unsigned char copy_mode = IPQ_COPY_NONE;
 static unsigned int queue_maxlen = IPQ_QMAX_DEFAULT;
-static rwlock_t queue_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(queue_lock);
 static int peer_pid;
 static unsigned int copy_range;
 static unsigned int queue_total;

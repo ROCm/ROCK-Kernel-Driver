@@ -800,8 +800,9 @@ static int catc_probe(struct usb_interface *intf, const struct usb_device_id *id
 	}
 
 	/* The F5U011 has the same vendor/product as the netmate but a device version of 0x130 */
-	if (usbdev->descriptor.idVendor == 0x0423 && usbdev->descriptor.idProduct == 0xa &&
-	   catc->usbdev->descriptor.bcdDevice == 0x0130	) {
+	if (le16_to_cpu(usbdev->descriptor.idVendor) == 0x0423 && 
+	    le16_to_cpu(usbdev->descriptor.idProduct) == 0xa &&
+	    le16_to_cpu(catc->usbdev->descriptor.bcdDevice) == 0x0130) {
 		dbg("Testing for f5u011");
 		catc->is_f5u011 = 1;		
 		atomic_set(&catc->recq_sz, 0);

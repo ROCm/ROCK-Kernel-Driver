@@ -74,7 +74,7 @@ smb_proc_setattr_core(struct smb_sb_info *server, struct dentry *dentry,
 static int
 smb_proc_setattr_ext(struct smb_sb_info *server,
 		     struct inode *inode, struct smb_fattr *fattr);
-int
+static int
 smb_proc_query_cifsunix(struct smb_sb_info *server);
 static void
 install_ops(struct smb_ops *dst, struct smb_ops *src);
@@ -1427,9 +1427,9 @@ smb_proc_readX_data(struct smb_request *req)
 	 * So we must first calculate the amount of padding used by the server.
 	 */
 	data_off -= hdrlen;
-	if (data_off > SMB_READX_MAX_PAD) {
-		PARANOIA("offset is larger than max pad!\n");
-		PARANOIA("%d > %d\n", data_off, SMB_READX_MAX_PAD);
+	if (data_off > SMB_READX_MAX_PAD || data_off < 0) {
+		PARANOIA("offset is larger than SMB_READX_MAX_PAD or negative!\n");
+		PARANOIA("%d > %d || %d < 0\n", data_off, SMB_READX_MAX_PAD, data_off);
 		req->rq_rlen = req->rq_bufsize + 1;
 		return;
 	}
@@ -1852,12 +1852,13 @@ smb_finish_dirent(struct smb_sb_info *server, struct smb_fattr *fattr)
 }
 
 void
-smb_init_root_dirent(struct smb_sb_info *server, struct smb_fattr *fattr)
+smb_init_root_dirent(struct smb_sb_info *server, struct smb_fattr *fattr,
+		     struct super_block *sb)
 {
 	smb_init_dirent(server, fattr);
 	fattr->attr = aDIR;
 	fattr->f_ino = 2; /* traditional root inode number */
-	fattr->f_mtime = CURRENT_TIME;
+	fattr->f_mtime = current_fs_time(sb);
 	smb_finish_dirent(server, fattr);
 }
 
@@ -2074,7 +2075,7 @@ out:
 	return result;
 }
 
-void smb_decode_unix_basic(struct smb_fattr *fattr, struct smb_sb_info *server, char *p)
+static void smb_decode_unix_basic(struct smb_fattr *fattr, struct smb_sb_info *server, char *p)
 {
 	u64 size, disk_bytes;
 
@@ -3391,7 +3392,7 @@ out:
 	return result;
 }
 
-int
+static int
 smb_proc_query_cifsunix(struct smb_sb_info *server)
 {
 	int result;

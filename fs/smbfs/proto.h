@@ -23,8 +23,8 @@ extern int smb_proc_mkdir(struct dentry *dentry);
 extern int smb_proc_rmdir(struct dentry *dentry);
 extern int smb_proc_unlink(struct dentry *dentry);
 extern int smb_proc_flush(struct smb_sb_info *server, __u16 fileid);
-extern void smb_init_root_dirent(struct smb_sb_info *server, struct smb_fattr *fattr);
-extern void smb_decode_unix_basic(struct smb_fattr *fattr, struct smb_sb_info *server, char *p);
+extern void smb_init_root_dirent(struct smb_sb_info *server, struct smb_fattr *fattr,
+				 struct super_block *sb);
 extern int smb_proc_getattr(struct dentry *dir, struct smb_fattr *fattr);
 extern int smb_proc_setattr(struct dentry *dir, struct smb_fattr *fattr);
 extern int smb_proc_setattr_unix(struct dentry *d, struct iattr *attr, unsigned int major, unsigned int minor);
@@ -33,7 +33,6 @@ extern int smb_proc_dskattr(struct super_block *sb, struct kstatfs *attr);
 extern int smb_proc_read_link(struct smb_sb_info *server, struct dentry *d, char *buffer, int len);
 extern int smb_proc_symlink(struct smb_sb_info *server, struct dentry *d, const char *oldpath);
 extern int smb_proc_link(struct smb_sb_info *server, struct dentry *dentry, struct dentry *new_dentry);
-extern int smb_proc_query_cifsunix(struct smb_sb_info *server);
 extern void smb_install_null_ops(struct smb_ops *ops);
 /* dir.c */
 extern struct file_operations smb_dir_operations;
@@ -61,7 +60,6 @@ extern void smb_get_inode_attr(struct inode *inode, struct smb_fattr *fattr);
 extern void smb_set_inode_attr(struct inode *inode, struct smb_fattr *fattr);
 extern void smb_invalidate_inodes(struct smb_sb_info *server);
 extern int smb_revalidate_inode(struct dentry *dentry);
-extern int smb_fill_super(struct super_block *sb, void *raw_data, int silent);
 extern int smb_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat);
 extern int smb_notify_change(struct dentry *dentry, struct iattr *attr);
 /* file.c */
@@ -80,10 +78,8 @@ extern int smbiod_retry(struct smb_sb_info *server);
 extern int smb_init_request_cache(void);
 extern void smb_destroy_request_cache(void);
 extern struct smb_request *smb_alloc_request(struct smb_sb_info *server, int bufsize);
-extern void smb_rget(struct smb_request *req);
 extern void smb_rput(struct smb_request *req);
 extern int smb_add_request(struct smb_request *req);
-extern int smb_request_send_req(struct smb_request *req);
 extern int smb_request_send_server(struct smb_sb_info *server);
 extern int smb_request_recv(struct smb_sb_info *server);
 /* symlink.c */

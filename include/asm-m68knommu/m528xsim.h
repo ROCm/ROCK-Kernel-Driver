@@ -32,5 +32,14 @@
 #define	MCFINT_UART0		13		/* Interrupt number for UART0 */
 #define	MCFINT_PIT1		55		/* Interrupt number for PIT1 */
 
+/*
+ *	SDRAM configuration registers.
+ */
+#define	MCFSIM_DCR		0x44		/* SDRAM control */
+#define	MCFSIM_DACR0		0x48		/* SDRAM base address 0 */
+#define	MCFSIM_DMR0		0x4c		/* SDRAM address mask 0 */
+#define	MCFSIM_DACR1		0x50		/* SDRAM base address 1 */
+#define	MCFSIM_DMR1		0x54		/* SDRAM address mask 1 */
+
 /****************************************************************************/
 #endif	/* m528xsim_h */

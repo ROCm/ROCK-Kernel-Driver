@@ -5,6 +5,7 @@
  *
  * Author: Rory Bolt <rorybolt@pacbell.net>
  * Copyright (C) 2002 Rory Bolt
+ * Copyright (C) 2004 Intel Corp.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -77,28 +78,28 @@ static int iq31244_setup(int nr, struct pci_sys_data *sys)
 
 	memset(res, 0, sizeof(struct resource) * 2);
 
-	res[0].start = IQ31244_PCI_IO_BASE + 0x6e000000;
-	res[0].end   = IQ31244_PCI_IO_BASE + IQ31244_PCI_IO_SIZE - 1 + IQ31244_PCI_IO_OFFSET;
+	res[0].start = IOP321_PCI_LOWER_IO_BA + IOP321_PCI_IO_OFFSET;
+	res[0].end   = IOP321_PCI_UPPER_IO_BA + IOP321_PCI_IO_OFFSET;
 	res[0].name  = "IQ31244 PCI I/O Space";
 	res[0].flags = IORESOURCE_IO;
 
-	res[1].start = IQ31244_PCI_MEM_BASE;
-	res[1].end   = IQ31244_PCI_MEM_BASE + IQ31244_PCI_MEM_SIZE;
+	res[1].start = IOP321_PCI_LOWER_MEM_BA + IOP321_PCI_MEM_OFFSET;
+	res[1].end   = IOP321_PCI_UPPER_MEM_BA + IOP321_PCI_MEM_OFFSET;
 	res[1].name  = "IQ31244 PCI Memory Space";
 	res[1].flags = IORESOURCE_MEM;
 
 	request_resource(&ioport_resource, &res[0]);
 	request_resource(&iomem_resource, &res[1]);
 
+	sys->mem_offset = IOP321_PCI_MEM_OFFSET;
+	sys->io_offset  = IOP321_PCI_IO_OFFSET;
+
 	sys->resource[0] = &res[0];
 	sys->resource[1] = &res[1];
 	sys->resource[2] = NULL;
-	sys->io_offset   = IQ31244_PCI_IO_OFFSET;
-	sys->mem_offset = IQ80321_PCI_MEM_BASE -
-		(*IOP321_IABAR1 & PCI_BASE_ADDRESS_MEM_MASK);
 
-	iop3xx_pcibios_min_io = IQ31244_PCI_IO_BASE;
-	iop3xx_pcibios_min_mem = IQ31244_PCI_MEM_BASE;
+	iop3xx_pcibios_min_io = IOP321_PCI_LOWER_IO_VA;
+	iop3xx_pcibios_min_mem = IOP321_PCI_LOWER_MEM_VA;
 
 	return 1;
 }
@@ -106,9 +107,6 @@ static int iq31244_setup(int nr, struct pci_sys_data *sys)
 static void iq31244_preinit(void)
 {
 	iop321_init();
-	/* setting up the second translation window */
-	*IOP321_OMWTVR1 = IQ31244_PCI_MEM_BASE + 0x04000000;
-	*IOP321_OUMWTVR1 = 0x0;
 }
 
 static struct hw_pci iq31244_pci __initdata = {

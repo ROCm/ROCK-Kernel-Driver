@@ -218,6 +218,7 @@ static inline void free_disk_stats(struct gendisk *disk)
 extern void disk_round_stats(struct gendisk *disk);
 
 /* drivers/block/genhd.c */
+extern int get_blkdev_list(char *);
 extern void add_disk(struct gendisk *disk);
 extern void del_gendisk(struct gendisk *gp);
 extern void unlink_gendisk(struct gendisk *gp);

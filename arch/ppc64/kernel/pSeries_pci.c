@@ -36,7 +36,6 @@
 #include <asm/prom.h>
 #include <asm/machdep.h>
 #include <asm/pci-bridge.h>
-#include <asm/naca.h>
 #include <asm/iommu.h>
 #include <asm/rtas.h>
 
@@ -149,7 +148,7 @@ struct pci_ops rtas_pci_ops = {
 	rtas_pci_write_config
 };
 
-static int is_python(struct device_node *dev)
+int is_python(struct device_node *dev)
 {
 	char *model = (char *)get_property(dev, "model", NULL);
 
@@ -353,7 +352,7 @@ unsigned long __init find_and_init_phbs(void)
 	unsigned int *opprop = NULL;
 	struct device_node *root = of_find_node_by_path("/");
 
-	if (naca->interrupt_controller == IC_OPEN_PIC) {
+	if (ppc64_interrupt_controller == IC_OPEN_PIC) {
 		opprop = (unsigned int *)get_property(root,
 				"platform-open-pic", NULL);
 	}
@@ -375,7 +374,7 @@ unsigned long __init find_and_init_phbs(void)
 		pci_process_bridge_OF_ranges(phb, node);
 		pci_setup_phb_io(phb, index == 0);
 
-		if (naca->interrupt_controller == IC_OPEN_PIC && pSeries_mpic) {
+		if (ppc64_interrupt_controller == IC_OPEN_PIC && pSeries_mpic) {
 			int addr = root_size_cells * (index + 2) - 1;
 			mpic_assign_isu(pSeries_mpic, index, opprop[addr]);
 		}
@@ -553,10 +552,6 @@ void __init pSeries_final_fixup(void)
 
 	phbs_remap_io();
 	pSeries_request_regions();
-	pci_fix_bus_sysdata();
-
-	if (!of_chosen || !get_property(of_chosen, "linux,iommu-off", NULL))
-		iommu_setup_pSeries();
 
 	pci_addr_cache_build();
 }

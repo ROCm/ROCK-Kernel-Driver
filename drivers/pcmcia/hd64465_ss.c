@@ -922,6 +922,7 @@ static int __init init_hs(void)
 		hs_set_voltages(&hs_sockets[i], 0, 0);
 
 		hs_sockets[i].socket.features |=  SS_CAP_PCCARD | SS_CAP_STATIC_MAP;      /* mappings are fixed in host memory */
+		hs_sockets[i].socket.resource_ops = &pccard_static_ops;
 		hs_sockets[i].socket.irq_mask =  0xffde;/*0xffff*/	    /* IRQs mapped in s/w so can do any, really */
 		hs_sockets[i].socket.map_size = HD64465_PCC_WINDOW;     /* 16MB fixed window size */
 

@@ -151,7 +151,7 @@ static void dn_keepalive(struct sock *sk);
 
 static kmem_cache_t *dn_sk_cachep;
 static struct proto_ops dn_proto_ops;
-static rwlock_t dn_hash_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(dn_hash_lock);
 static struct hlist_head dn_sk_hash[DN_SK_HASH_SIZE];
 static struct hlist_head dn_wild_sk;
 
@@ -246,7 +246,7 @@ static void dn_unhash_sock_bh(struct sock *sk)
 	write_unlock_bh(&dn_hash_lock);
 }
 
-struct hlist_head *listen_hash(struct sockaddr_dn *addr)
+static struct hlist_head *listen_hash(struct sockaddr_dn *addr)
 {
 	int i;
 	unsigned hash = addr->sdn_objnum;
@@ -447,7 +447,7 @@ static void dn_destruct(struct sock *sk)
 	dst_release(xchg(&sk->sk_dst_cache, NULL));
 }
 
-struct sock *dn_alloc_sock(struct socket *sock, int gfp)
+static struct sock *dn_alloc_sock(struct socket *sock, int gfp)
 {
 	struct dn_scp *scp;
 	struct sock *sk = sk_alloc(PF_DECnet, gfp, sizeof(struct dn_sock),
@@ -578,7 +578,6 @@ int dn_destroy_timer(struct sock *sk)
 	if (sk->sk_socket)
 		return 0;
 
-	dn_stop_fast_timer(sk); /* unlikely, but possible that this is runninng */
 	if ((jiffies - scp->stamp) >= (HZ * decnet_time_wait)) {
 		dn_unhash_sock(sk);
 		sock_put(sk);
@@ -631,7 +630,6 @@ disc_reject:
 		default:
 			printk(KERN_DEBUG "DECnet: dn_destroy_sock passed socket in invalid state\n");
 		case DN_O:
-			dn_stop_fast_timer(sk);
 			dn_stop_slow_timer(sk);
 
 			dn_unhash_sock_bh(sk);

@@ -94,7 +94,7 @@ atomic_t inet6_sock_nr;
  * build a new socket.
  */
 static struct list_head inetsw6[SOCK_MAX];
-static spinlock_t inetsw6_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(inetsw6_lock);
 
 static void inet6_sock_destruct(struct sock *sk)
 {

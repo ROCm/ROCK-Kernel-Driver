@@ -27,7 +27,7 @@ struct pglist_data;
 struct ia64_node_data {
 	short			active_cpu_count;
 	short			node;
-	struct pglist_data	*pg_data_ptrs[NR_NODES];
+	struct pglist_data	*pg_data_ptrs[MAX_NUMNODES];
 };
 
 

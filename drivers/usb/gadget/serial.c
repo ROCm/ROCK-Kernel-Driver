@@ -2322,11 +2322,11 @@ static void gs_free_ports(struct gs_dev *dev)
 					wake_up_interruptible(&port->port_tty->read_wait);
 					wake_up_interruptible(&port->port_tty->write_wait);
 				}
+				spin_unlock_irqrestore(&port->port_lock, flags);
 			} else {
 				kfree(port);
 			}
 
-			spin_unlock_irqrestore(&port->port_lock, flags);
 		}
 	}
 }

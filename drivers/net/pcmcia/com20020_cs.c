@@ -57,7 +57,7 @@
 #ifdef PCMCIA_DEBUG
 
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 
 static void regdump(struct net_device *dev)
@@ -109,18 +109,12 @@ static int backplane;
 static int clockp;
 static int clockm;
 
-MODULE_PARM(node, "i");
-MODULE_PARM(timeout, "i");
-MODULE_PARM(backplane, "i");
-MODULE_PARM(clockp, "i");
-MODULE_PARM(clockm, "i");
+module_param(node, int, 0);
+module_param(timeout, int, 0);
+module_param(backplane, int, 0);
+module_param(clockp, int, 0);
+module_param(clockm, int, 0);
 
-/* Bit map of interrupts to choose from */
-static u_int irq_mask = 0xdeb8;
-static int irq_list[4] = { -1 };
-
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
 MODULE_LICENSE("GPL");
 
 /*====================================================================*/
@@ -158,7 +152,7 @@ static dev_link_t *com20020_attach(void)
     dev_link_t *link;
     com20020_dev_t *info;
     struct net_device *dev;
-    int i, ret;
+    int ret;
     struct arcnet_local *lp;
     
     DEBUG(0, "com20020_attach()\n");
@@ -192,12 +186,7 @@ static dev_link_t *com20020_attach(void)
     link->io.NumPorts1 = 16;
     link->io.IOAddrLines = 16;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->conf.Attributes = CONF_ENABLE_IRQ;
     link->conf.Vcc = 50;
     link->conf.IntType = INT_MEMORY_AND_IO;
@@ -211,7 +200,6 @@ static dev_link_t *com20020_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
         CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
         CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -394,6 +382,7 @@ static void com20020_config(dev_link_t *link)
 
     link->dev = &info->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     i = com20020_found(dev, 0);	/* calls register_netdev */
     
@@ -513,8 +502,7 @@ static int __init init_com20020_cs(void)
 static void __exit exit_com20020_cs(void)
 {
 	pcmcia_unregister_driver(&com20020_cs_driver);
-	while (dev_list != NULL)
-		com20020_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_com20020_cs);

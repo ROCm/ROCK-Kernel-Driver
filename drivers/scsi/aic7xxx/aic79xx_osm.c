@@ -407,18 +407,12 @@ uint32_t aic79xx_periodic_otag;
  * Module information and settable options.
  */
 static char *aic79xx = NULL;
-/*
- * Just in case someone uses commas to separate items on the insmod
- * command line, we define a dummy buffer here to avoid having insmod
- * write wild stuff into our code segment
- */
-static char dummy_buffer[60] = "Please don't trounce on me insmod!!\n";
 
 MODULE_AUTHOR("Maintainer: Justin T. Gibbs <gibbs@scsiguy.com>");
 MODULE_DESCRIPTION("Adaptec Aic790X U320 SCSI Host Bus Adapter driver");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_VERSION(AIC79XX_DRIVER_VERSION);
-MODULE_PARM(aic79xx, "s");
+module_param(aic79xx, charp, 0);
 MODULE_PARM_DESC(aic79xx,
 "period delimited, options string.\n"
 "	verbose			Enable verbose/diagnostic logging\n"
@@ -548,10 +542,6 @@ static __inline struct ahd_linux_device *
 		     ahd_linux_next_device_to_run(struct ahd_softc *ahd);
 static __inline void ahd_linux_run_device_queues(struct ahd_softc *ahd);
 static __inline void ahd_linux_unmap_scb(struct ahd_softc*, struct scb*);
-
-static __inline int ahd_linux_map_seg(struct ahd_softc *ahd, struct scb *scb,
-		 		      struct ahd_dma_seg *sg,
-				      dma_addr_t addr, bus_size_t len);
 
 static __inline void
 ahd_schedule_completeq(struct ahd_softc *ahd)
@@ -711,28 +701,6 @@ ahd_linux_unmap_scb(struct ahd_softc *ahd, struct scb *scb)
 	}
 }
 
-static __inline int
-ahd_linux_map_seg(struct ahd_softc *ahd, struct scb *scb,
-		  struct ahd_dma_seg *sg, dma_addr_t addr, bus_size_t len)
-{
-	int	 consumed;
-
-	if ((scb->sg_count + 1) > AHD_NSEG)
-		panic("Too few segs for dma mapping.  "
-		      "Increase AHD_NSEG\n");
-
-	consumed = 1;
-	sg->addr = ahd_htole32(addr & 0xFFFFFFFF);
-	scb->platform_data->xfer_len += len;
-
-	if (sizeof(dma_addr_t) > 4
-	 && (ahd->flags & AHD_39BIT_ADDRESSING) != 0)
-		len |= (addr >> 8) & AHD_SG_HIGH_ADDR_MASK;
-
-	sg->len = ahd_htole32(len);
-	return (consumed);
-}
-
 /******************************** Macros **************************************/
 #define BUILD_SCSIID(ahd, cmd)						\
 	((((cmd)->device->id << TID_SHIFT) & TID) | (ahd)->our_id)
@@ -861,12 +829,6 @@ ahd_linux_detect(Scsi_Host_Template *template)
 	 */
 	if (aic79xx)
 		aic79xx_setup(aic79xx);
-	if (dummy_buffer[0] != 'P')
-		printk(KERN_WARNING
-"aic79xx: Please read the file /usr/src/linux/drivers/scsi/README.aic79xx\n"
-"aic79xx: to see the proper way to specify options to the aic79xx module\n"
-"aic79xx: Specifically, don't use any commas when passing arguments to\n"
-"aic79xx: insmod or else it might trash certain memory areas.\n");
 #endif
 
 	template->proc_name = "aic79xx";

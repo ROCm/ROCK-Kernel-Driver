@@ -46,7 +46,6 @@
 #include <linux/time.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#include <linux/suspend.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/usb.h>
@@ -1072,8 +1071,8 @@ static int stir_probe(struct usb_interface *intf,
 
 	printk(KERN_INFO "SigmaTel STIr4200 IRDA/USB found at address %d, "
 		"Vendor: %x, Product: %x\n",
-	       dev->devnum, dev->descriptor.idVendor,
-	       dev->descriptor.idProduct);
+	       dev->devnum, le16_to_cpu(dev->descriptor.idVendor),
+	       le16_to_cpu(dev->descriptor.idProduct));
 
 	/* Initialize QoS for this device */
 	irda_init_max_qos_capabilies(&stir->qos);

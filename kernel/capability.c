@@ -23,7 +23,7 @@ EXPORT_SYMBOL(cap_bset);
  * This global lock protects task->cap_* for all tasks including current.
  * Locking rule: acquire this prior to tasklist_lock.
  */
-spinlock_t task_capability_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(task_capability_lock);
 
 /*
  * For sys_getproccap() and sys_setproccap(), any of the three
@@ -85,34 +85,60 @@ out:
  * cap_set_pg - set capabilities for all processes in a given process
  * group.  We call this holding task_capability_lock and tasklist_lock.
  */
-static inline void cap_set_pg(int pgrp, kernel_cap_t *effective,
+static inline int cap_set_pg(int pgrp, kernel_cap_t *effective,
 			      kernel_cap_t *inheritable,
 			      kernel_cap_t *permitted)
 {
 	task_t *g, *target;
+	int ret = -EPERM;
+	int found = 0;
 
 	do_each_task_pid(pgrp, PIDTYPE_PGID, g) {
 		target = g;
-		while_each_thread(g, target)
-			security_capset_set(target, effective, inheritable, permitted);
+		while_each_thread(g, target) {
+			if (!security_capset_check(target, effective,
+							inheritable,
+							permitted)) {
+				security_capset_set(target, effective,
+							inheritable,
+							permitted);
+				ret = 0;
+			}
+			found = 1;
+		}
 	} while_each_task_pid(pgrp, PIDTYPE_PGID, g);
+
+	if (!found)
+	     ret = 0;
+	return ret;
 }
 
 /*
  * cap_set_all - set capabilities for all processes other than init
  * and self.  We call this holding task_capability_lock and tasklist_lock.
  */
-static inline void cap_set_all(kernel_cap_t *effective,
+static inline int cap_set_all(kernel_cap_t *effective,
 			       kernel_cap_t *inheritable,
 			       kernel_cap_t *permitted)
 {
      task_t *g, *target;
+     int ret = -EPERM;
+     int found = 0;
 
      do_each_thread(g, target) {
              if (target == current || target->pid == 1)
                      continue;
+             found = 1;
+	     if (security_capset_check(target, effective, inheritable,
+						permitted))
+		     continue;
+	     ret = 0;
 	     security_capset_set(target, effective, inheritable, permitted);
      } while_each_thread(g, target);
+
+     if (!found)
+	     ret = 0;
+     return ret;
 }
 
 /*
@@ -147,7 +173,7 @@ asmlinkage long sys_capset(cap_user_header_t header, const cap_user_data_t data)
      if (get_user(pid, &header->pid))
 	     return -EFAULT; 
 
-     if (pid && !capable(CAP_SETPCAP))
+     if (pid && pid != current->pid && !capable(CAP_SETPCAP))
              return -EPERM;
 
      if (copy_from_user(&effective, &data->effective, sizeof(effective)) ||
@@ -167,36 +193,23 @@ asmlinkage long sys_capset(cap_user_header_t header, const cap_user_data_t data)
      } else
                target = current;
 
-     ret = -EPERM;
-
-     if (security_capset_check(target, &effective, &inheritable, &permitted))
-	     goto out;
-
-     if (!cap_issubset(inheritable, cap_combine(target->cap_inheritable,
-                       current->cap_permitted)))
-             goto out;
-
-     /* verify restrictions on target's new Permitted set */
-     if (!cap_issubset(permitted, cap_combine(target->cap_permitted,
-                       current->cap_permitted)))
-             goto out;
-
-     /* verify the _new_Effective_ is a subset of the _new_Permitted_ */
-     if (!cap_issubset(effective, permitted))
-             goto out;
-
      ret = 0;
 
      /* having verified that the proposed changes are legal,
            we now put them into effect. */
      if (pid < 0) {
              if (pid == -1)  /* all procs other than current and init */
-                     cap_set_all(&effective, &inheritable, &permitted);
+                     ret = cap_set_all(&effective, &inheritable, &permitted);
 
              else            /* all procs in process group */
-                     cap_set_pg(-pid, &effective, &inheritable, &permitted);
+                     ret = cap_set_pg(-pid, &effective, &inheritable,
+		     					&permitted);
      } else {
-	     security_capset_set(target, &effective, &inheritable, &permitted);
+	     ret = security_capset_check(target, &effective, &inheritable,
+	     						&permitted);
+	     if (!ret)
+		     security_capset_set(target, &effective, &inheritable,
+		     					&permitted);
      }
 
 out:

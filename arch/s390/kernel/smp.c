@@ -42,7 +42,6 @@
 #include <asm/tlbflush.h>
 
 /* prototypes */
-extern int cpu_idle(void * unused);
 
 extern volatile int __cpu_logical_map[];
 
@@ -487,47 +486,37 @@ void smp_ctl_clear_bit(int cr, int bit) {
  * Lets check how many CPUs we have.
  */
 
-#ifdef CONFIG_HOTPLUG_CPU
-
 void
 __init smp_check_cpus(unsigned int max_cpus)
 {
-	int cpu;
+	int cpu, num_cpus;
+	__u16 boot_cpu_addr;
 
 	/*
 	 * cpu 0 is the boot cpu. See smp_prepare_boot_cpu.
 	 */
-	for (cpu = 1; cpu < max_cpus; cpu++)
-		cpu_set(cpu, cpu_possible_map);
-}
-
-#else /* CONFIG_HOTPLUG_CPU */
-
-void
-__init smp_check_cpus(unsigned int max_cpus)
-{
-        int curr_cpu, num_cpus;
-	__u16 boot_cpu_addr;
 
 	boot_cpu_addr = S390_lowcore.cpu_data.cpu_addr;
-        current_thread_info()->cpu = 0;
-        num_cpus = 1;
-        for (curr_cpu = 0;
-             curr_cpu <= 65535 && num_cpus < max_cpus; curr_cpu++) {
-                if ((__u16) curr_cpu == boot_cpu_addr)
-                        continue;
-                __cpu_logical_map[num_cpus] = (__u16) curr_cpu;
-                if (signal_processor(num_cpus, sigp_sense) ==
-                    sigp_not_operational)
-                        continue;
-		cpu_set(num_cpus, cpu_possible_map);
-                num_cpus++;
-        }
-        printk("Detected %d CPU's\n",(int) num_cpus);
-        printk("Boot cpu address %2X\n", boot_cpu_addr);
-}
+	__cpu_logical_map[0] = boot_cpu_addr;
+	current_thread_info()->cpu = 0;
+	num_cpus = 1;
+	for (cpu = 0; cpu <= 65535 && num_cpus < max_cpus; cpu++) {
+		if ((__u16) cpu == boot_cpu_addr)
+			continue;
+		__cpu_logical_map[num_cpus] = (__u16) cpu;
+		if (signal_processor(num_cpus, sigp_sense) ==
+		    sigp_not_operational)
+			continue;
+		cpu_set(num_cpus, cpu_present_map);
+		num_cpus++;
+	}
 
-#endif /* CONFIG_HOTPLUG_CPU */
+	for (cpu = 1; cpu < max_cpus; cpu++)
+		cpu_set(cpu, cpu_possible_map);
+
+	printk("Detected %d CPU's\n",(int) num_cpus);
+	printk("Boot cpu address %2X\n", boot_cpu_addr);
+}
 
 /*
  *      Activate a secondary processor.
@@ -557,7 +546,8 @@ int __devinit start_secondary(void *cpuvoid)
         /* Print info about this processor */
         print_cpu_info(&S390_lowcore.cpu_data);
         /* cpu_idle will call schedule for us */
-        return cpu_idle(NULL);
+        cpu_idle();
+        return 0;
 }
 
 static void __init smp_create_idle(unsigned int cpu)
@@ -571,8 +561,6 @@ static void __init smp_create_idle(unsigned int cpu)
 	p = fork_idle(cpu);
 	if (IS_ERR(p))
 		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
-	atomic_inc(&init_mm.mm_count);
-	p->active_mm = &init_mm;
 	current_set[cpu] = p;
 }
 
@@ -681,7 +669,8 @@ __cpu_up(unsigned int cpu)
 	eieio();
 	signal_processor(cpu,sigp_restart);
 
-	while (!cpu_online(cpu));
+	while (!cpu_online(cpu))
+		cpu_relax();
 	return 0;
 }
 
@@ -736,13 +725,15 @@ void
 __cpu_die(unsigned int cpu)
 {
 	/* Wait until target cpu is down */
-	while (!cpu_stopped(cpu));
+	while (!cpu_stopped(cpu))
+		cpu_relax();
 	printk("Processor %d spun down\n", cpu);
 }
 
 void
 cpu_die(void)
 {
+	idle_task_exit();
 	signal_processor(smp_processor_id(), sigp_stop);
 	BUG();
 	for(;;);
@@ -806,6 +797,7 @@ void __devinit smp_prepare_boot_cpu(void)
 
 void smp_cpus_done(unsigned int max_cpus)
 {
+	cpu_present_map = cpu_possible_map;
 }
 
 /*

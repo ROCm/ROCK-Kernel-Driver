@@ -622,10 +622,17 @@ static int loop_change_fd(struct loop_device *lo, struct file *lo_file,
 	return error;
 }
 
+static inline int is_loop_device(struct file *file)
+{
+	struct inode *i = file->f_mapping->host;
+
+	return i && S_ISBLK(i->i_mode) && MAJOR(i->i_rdev) == LOOP_MAJOR;
+}
+
 static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		       struct block_device *bdev, unsigned int arg)
 {
-	struct file	*file;
+	struct file	*file, *f;
 	struct inode	*inode;
 	struct address_space *mapping;
 	unsigned lo_blocksize;
@@ -636,14 +643,30 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	/* This is safe, since we have a reference from open(). */
 	__module_get(THIS_MODULE);
 
-	error = -EBUSY;
-	if (lo->lo_state != Lo_unbound)
-		goto out;
-
 	error = -EBADF;
 	file = fget(arg);
 	if (!file)
 		goto out;
+
+	error = -EBUSY;
+	if (lo->lo_state != Lo_unbound)
+		goto out_putf;
+
+	/* Avoid recursion */
+	f = file;
+	while (is_loop_device(f)) {
+		struct loop_device *l;
+
+		if (f->f_mapping->host->i_rdev == lo_file->f_mapping->host->i_rdev)
+			goto out_putf;
+
+		l = f->f_mapping->host->i_bdev->bd_disk->private_data;
+		if (l->lo_state == Lo_unbound) {
+			error = -EINVAL;
+			goto out_putf;
+		}
+		f = l->lo_backing_file;
+	}
 
 	mapping = file->f_mapping;
 	inode = mapping->host;

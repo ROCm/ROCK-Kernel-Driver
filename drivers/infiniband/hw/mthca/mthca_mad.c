@@ -185,12 +185,14 @@ static void forward_trap(struct mthca_dev *dev,
 int mthca_process_mad(struct ib_device *ibdev,
 		      int mad_flags,
 		      u8 port_num,
-		      u16 slid,
+		      struct ib_wc *in_wc,
+		      struct ib_grh *in_grh,
 		      struct ib_mad *in_mad,
 		      struct ib_mad *out_mad)
 {
 	int err;
 	u8 status;
+	u16 slid = in_wc ? in_wc->slid : IB_LID_PERMISSIVE;
 
 	/* Forward locally generated traps to the SM */
 	if (in_mad->mad_hdr.method == IB_MGMT_METHOD_TRAP &&

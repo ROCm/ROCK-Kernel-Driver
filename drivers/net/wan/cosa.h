@@ -76,10 +76,16 @@ struct cosa_download {
 #define COSAIOSTRT	_IOW('C',0xf1, int)
 
 /* Read the block from the device memory */
-#define COSAIORMEM	_IOWR('C',0xf2, struct cosa_download)
+#define COSAIORMEM	_IOWR('C',0xf2, struct cosa_download *)
+	/* actually the struct cosa_download itself; this is to keep
+	 * the ioctl number same as in 2.4 in order to keep the user-space
+	 * utils compatible. */
 
 /* Write the block to the device memory (i.e. download the microcode) */
-#define COSAIODOWNLD	_IOW('C',0xf2, struct cosa_download)
+#define COSAIODOWNLD	_IOW('C',0xf2, struct cosa_download *)
+	/* actually the struct cosa_download itself; this is to keep
+	 * the ioctl number same as in 2.4 in order to keep the user-space
+	 * utils compatible. */
 
 /* Read the device type (one of "srp", "cosa", and "cosa8" for now) */
 #define COSAIORTYPE	_IOR('C',0xf3, char *)

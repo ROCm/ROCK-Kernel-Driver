@@ -90,20 +90,20 @@ udp_manip_pkt(struct sk_buff **pskb,
 	struct iphdr *iph = (struct iphdr *)((*pskb)->data + iphdroff);
 	struct udphdr *hdr;
 	unsigned int hdroff = iphdroff + iph->ihl*4;
-	u_int32_t oldip;
-	u_int16_t *portptr;
+	u32 oldip, oldsrc = iph->saddr, olddst = iph->daddr;
+	u16 *portptr;
 
-	if (!skb_ip_make_writable(pskb, hdroff + sizeof(hdr)))
+	if (!skb_ip_make_writable(pskb, hdroff + sizeof(*hdr)))
 		return 0;
 
 	hdr = (void *)(*pskb)->data + hdroff;
 	if (maniptype == IP_NAT_MANIP_SRC) {
 		/* Get rid of src ip and src pt */
-		oldip = iph->saddr;
+		oldip = oldsrc;
 		portptr = &hdr->source;
 	} else {
 		/* Get rid of dst ip and dst pt */
-		oldip = iph->daddr;
+		oldip = olddst;
 		portptr = &hdr->dest;
 	}
 	if (hdr->check) /* 0 is a special case meaning no checksum */

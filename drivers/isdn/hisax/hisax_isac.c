@@ -32,7 +32,7 @@
 
 #ifdef CONFIG_HISAX_DEBUG
 static int debug = 1;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 
 static char *ISACVer[] = {
   "2086/2186 V1.1", 

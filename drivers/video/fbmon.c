@@ -50,6 +50,7 @@
 #endif
 
 #define FBMON_FIX_HEADER 1
+#define FBMON_FIX_INPUT  2
 
 #ifdef CONFIG_FB_MODE_HELPERS
 struct broken_edid {
@@ -60,9 +61,16 @@ struct broken_edid {
 
 static struct broken_edid brokendb[] = {
 	/* DEC FR-PCXAV-YZ */
-	{ .manufacturer = "DEC",
-	  .model        = 0x073a,
-	  .fix          = FBMON_FIX_HEADER,
+	{
+		.manufacturer = "DEC",
+		.model        = 0x073a,
+		.fix          = FBMON_FIX_HEADER,
+	},
+	/* ViewSonic PF775a */
+	{
+		.manufacturer = "VSC",
+		.model        = 0x5a44,
+		.fix          = FBMON_FIX_INPUT,
 	},
 };
 
@@ -81,10 +89,12 @@ static void copy_string(unsigned char *c, unsigned char *s)
   while (i-- && (*--s == 0x20)) *s = 0;
 }
 
-static void fix_broken_edid(unsigned char *edid)
+static int check_edid(unsigned char *edid)
 {
 	unsigned char *block = edid + ID_MANUFACTURER_NAME, manufacturer[4];
-	u32 model, i;
+	unsigned char *b;
+	u32 model;
+	int i, fix = 0, ret = 0;
 
 	manufacturer[0] = ((block[0] & 0x7c) >> 2) + '@';
 	manufacturer[1] = ((block[0] & 0x03) << 3) +
@@ -96,23 +106,57 @@ static void fix_broken_edid(unsigned char *edid)
 	for (i = 0; i < ARRAY_SIZE(brokendb); i++) {
 		if (!strncmp(manufacturer, brokendb[i].manufacturer, 4) &&
 			brokendb[i].model == model) {
-			switch (brokendb[i].fix) {
-			case FBMON_FIX_HEADER:
-				printk("fbmon: The EDID header of "
-				       "Manufacturer: %s Model: 0x%x is "
-				       "known to be broken,\n"
-				       "fbmon: trying a header "
-				       "reconstruct\n", manufacturer, model);
-				memcpy(edid, edid_v1_header, 8);
-				break;
-			}
+			printk("fbmon: The EDID Block of "
+			       "Manufacturer: %s Model: 0x%x is known to "
+			       "be broken,\n",  manufacturer, model);
+ 			fix = brokendb[i].fix;
+ 			break;
 		}
+	}
+
+	switch (fix) {
+	case FBMON_FIX_HEADER:
+		for (i = 0; i < 8; i++) {
+			if (edid[i] != edid_v1_header[i])
+				ret = fix;
+		}
+		break;
+	case FBMON_FIX_INPUT:
+		b = edid + EDID_STRUCT_DISPLAY;
+		/* Only if display is GTF capable will
+		   the input type be reset to analog */
+		if (b[4] & 0x01 && b[0] & 0x80)
+			ret = fix;
+		break;
+	}
+
+	return ret;
+}
+
+static void fix_edid(unsigned char *edid, int fix)
+{
+	unsigned char *b;
+
+	switch (fix) {
+	case FBMON_FIX_HEADER:
+		printk("fbmon: trying a header reconstruct\n");
+		memcpy(edid, edid_v1_header, 8);
+		break;
+	case FBMON_FIX_INPUT:
+		printk("fbmon: trying to fix input type\n");
+		b = edid + EDID_STRUCT_DISPLAY;
+		b[0] &= ~0x80;
+		edid[127] += 0x80;
 	}
 }
 
 static int edid_checksum(unsigned char *edid)
 {
 	unsigned char i, csum = 0, all_null = 0;
+	int err = 0, fix = check_edid(edid);
+
+	if (fix)
+		fix_edid(edid, fix);
 
 	for (i = 0; i < EDID_LENGTH; i++) {
 		csum += edid[i];
@@ -121,38 +165,24 @@ static int edid_checksum(unsigned char *edid)
 
 	if (csum == 0x00 && all_null) {
 		/* checksum passed, everything's good */
-		return 1;
+		err = 1;
 	}
 
-	fix_broken_edid(edid);
-	csum = all_null = 0;
-	for (i = 0; i < EDID_LENGTH; i++) {
-		csum += edid[i];
-		all_null |= edid[i];
-	}
-	if (csum != 0x00 || !all_null) {
-		printk("EDID checksum failed, aborting\n");
-		return 0;
-	}
-	return 1;
+	return err;
 }
 
 static int edid_check_header(unsigned char *edid)
 {
-	int i, fix = 0;
+	int i, err = 1, fix = check_edid(edid);
+
+	if (fix)
+		fix_edid(edid, fix);
 
 	for (i = 0; i < 8; i++) {
 		if (edid[i] != edid_v1_header[i])
-			fix = 1;
+			err = 0;
 	}
-	if (!fix)
-		return 1;
 
-	fix_broken_edid(edid);
-	for (i = 0; i < 8; i++) {
-		if (edid[i] != edid_v1_header[i])
-			return 0;
-	}
 	return 1;
 }
 
@@ -632,7 +662,7 @@ static void get_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 
 	fb_get_monitor_limits(edid, specs);
 
-	c = (block[0] & 0x80) >> 7;
+	c = block[0] & 0x80;
 	specs->input = 0;
 	if (c) {
 		specs->input |= FB_DISP_DDI;
@@ -656,13 +686,10 @@ static void get_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 			DPRINTK("0.700V/0.000V");
 			specs->input |= FB_DISP_ANA_700_000;
 			break;
-		default:
-			DPRINTK("unknown");
-			specs->input |= FB_DISP_UNKNOWN;
 		}
 	}
 	DPRINTK("\n      Sync: ");
-	c = (block[0] & 0x10) >> 4;
+	c = block[0] & 0x10;
 	if (c)
 		DPRINTK("      Configurable signal level\n");
 	c = block[0] & 0x0f;

@@ -98,15 +98,8 @@ typedef struct {
 #define PP_RXRX 3	/* Supervisor read,       User read */
 
 
-typedef struct {
-	HPTE *		htab;
-	unsigned long	htab_num_ptegs;
-	unsigned long	htab_hash_mask;
-	unsigned long	next_round_robin;
-	unsigned long   last_kernel_address;
-} HTAB;
-
-extern HTAB htab_data;
+extern HPTE *		htab_address;
+extern unsigned long	htab_hash_mask;
 
 static inline unsigned long hpt_hash(unsigned long vpn, int large)
 {

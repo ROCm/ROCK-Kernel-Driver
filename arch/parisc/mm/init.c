@@ -269,8 +269,6 @@ static void __init setup_bootmem(void)
 	}
 	memset(pfnnid_map, 0xff, sizeof(pfnnid_map));
 
-	numnodes = npmem_ranges;
-
 	for (i = 0; i < npmem_ranges; i++)
 		node_set_online(i);
 #endif

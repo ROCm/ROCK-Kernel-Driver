@@ -72,16 +72,16 @@ static int tx_coalesce=16;	/* HW xmit count each TxDMAComplete */
 MODULE_AUTHOR ("Edward Peng");
 MODULE_DESCRIPTION ("D-Link DL2000-based Gigabit Ethernet Adapter");
 MODULE_LICENSE("GPL");
-MODULE_PARM (mtu, "1-" __MODULE_STRING (MAX_UNITS) "i");
-MODULE_PARM (media, "1-" __MODULE_STRING (MAX_UNITS) "s");
-MODULE_PARM (vlan, "1-" __MODULE_STRING (MAX_UNITS) "i");
-MODULE_PARM (jumbo, "1-" __MODULE_STRING (MAX_UNITS) "i");
-MODULE_PARM (tx_flow, "i");
-MODULE_PARM (rx_flow, "i");
-MODULE_PARM (copy_thresh, "i");
-MODULE_PARM (rx_coalesce, "i");	/* Rx frame count each interrupt */
-MODULE_PARM (rx_timeout, "i");	/* Rx DMA wait time in 64ns increments */
-MODULE_PARM (tx_coalesce, "i"); /* HW xmit count each TxDMAComplete */
+module_param_array(mtu, int, NULL, 0);
+module_param_array(media, charp, NULL, 0);
+module_param_array(vlan, int, NULL, 0);
+module_param_array(jumbo, int, NULL, 0);
+module_param(tx_flow, int, 0);
+module_param(rx_flow, int, 0);
+module_param(copy_thresh, int, 0);
+module_param(rx_coalesce, int, 0);	/* Rx frame count each interrupt */
+module_param(rx_timeout, int, 0);	/* Rx DMA wait time in 64ns increments */
+module_param(tx_coalesce, int, 0); /* HW xmit count each TxDMAComplete */
 
 
 /* Enable the default interrupts */

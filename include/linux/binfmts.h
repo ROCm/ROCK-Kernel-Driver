@@ -74,7 +74,9 @@ extern int flush_old_exec(struct linux_binprm * bprm);
 #define EXSTACK_DISABLE_X 1	/* Disable executable stacks */
 #define EXSTACK_ENABLE_X  2	/* Enable executable stacks */
 
-extern int setup_arg_pages(struct linux_binprm * bprm, int executable_stack);
+extern int setup_arg_pages(struct linux_binprm * bprm,
+			   unsigned long stack_top,
+			   int executable_stack);
 extern int copy_strings(int argc,char __user * __user * argv,struct linux_binprm *bprm); 
 extern int copy_strings_kernel(int argc,char ** argv,struct linux_binprm *bprm);
 extern void compute_creds(struct linux_binprm *binprm);

@@ -32,8 +32,6 @@ EXPORT_SYMBOL(inet6_getname);
 EXPORT_SYMBOL(inet6_ioctl);
 EXPORT_SYMBOL(ipv6_get_saddr);
 EXPORT_SYMBOL(ipv6_chk_addr);
-EXPORT_SYMBOL(in6addr_any);
-EXPORT_SYMBOL(in6addr_loopback);
 EXPORT_SYMBOL(in6_dev_finish_destroy);
 #ifdef CONFIG_XFRM
 EXPORT_SYMBOL(xfrm6_rcv);

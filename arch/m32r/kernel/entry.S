@@ -725,25 +725,25 @@ ENTRY(sys_call_table)
 	.long sys_time
 	.long sys_mknod
 	.long sys_chmod			/* 15 */
-	.long sys_lchown
+	.long sys_ni_syscall		/* lchown16 syscall holder */
 	.long sys_ni_syscall		/* old break syscall holder */
-	.long sys_stat
+	.long sys_ni_syscall		/* old stat syscall holder */
 	.long sys_lseek
 	.long sys_getpid		/* 20 */
 	.long sys_mount
 	.long sys_oldumount
-	.long sys_setuid
-	.long sys_getuid
+	.long sys_ni_syscall		/* setuid16 syscall holder */
+	.long sys_ni_syscall		/* getuid16 syscall holder */
 	.long sys_stime			/* 25 */
 	.long sys_ptrace
 	.long sys_alarm
-	.long sys_fstat
+	.long sys_ni_syscall		/* old fstat syscall holder */
 	.long sys_pause
 	.long sys_utime			/* 30 */
-	.long sys_cacheflush		/* for M32R */ /* old stty syscall holder */
+	.long sys_ni_syscall		/* old stty syscall holder */
 	.long sys_cachectl		/* for M32R */ /* old gtty syscall holder */
 	.long sys_access
-	.long sys_nice
+	.long sys_ni_syscall		/* nice	syscall holder */
 	.long sys_ni_syscall		/* 35  -  old ftime syscall holder */
 	.long sys_sync
 	.long sys_kill
@@ -755,17 +755,17 @@ ENTRY(sys_call_table)
 	.long sys_times
 	.long sys_ni_syscall		/* old prof syscall holder */
 	.long sys_brk			/* 45 */
-	.long sys_setgid
-	.long sys_getgid
-	.long sys_signal
-	.long sys_geteuid
-	.long sys_getegid		/* 50 */
+	.long sys_ni_syscall		/* setgid16 syscall holder */
+	.long sys_getgid		/* will be unused */
+	.long sys_ni_syscall		/* signal syscall holder */
+	.long sys_ni_syscall		/* geteuid16  syscall holder */
+	.long sys_ni_syscall		/* 50 - getegid16 syscall holder */
 	.long sys_acct
 	.long sys_umount		/* recycled never used phys() */
 	.long sys_ni_syscall		/* old lock syscall holder */
 	.long sys_ioctl
-	.long sys_fcntl			/* 55 */
-	.long sys_ni_syscall		/* old mpx syscall holder */
+	.long sys_fcntl			/* 55 - will be unused */
+	.long sys_ni_syscall		/* mpx syscall holder */
 	.long sys_setpgid
 	.long sys_ni_syscall		/* old ulimit syscall holder */
 	.long sys_ni_syscall		/* sys_olduname */
@@ -776,41 +776,41 @@ ENTRY(sys_call_table)
 	.long sys_getppid
 	.long sys_getpgrp		/* 65 */
 	.long sys_setsid
-	.long sys_sigaction
-	.long sys_sgetmask
-	.long sys_ssetmask
-	.long sys_setreuid		/* 70 */
-	.long sys_setregid
-	.long sys_sigsuspend
-	.long sys_sigpending
+	.long sys_ni_syscall		/* sigaction syscall holder */
+	.long sys_ni_syscall		/* sgetmask syscall holder */
+	.long sys_ni_syscall		/* ssetmask syscall holder */
+	.long sys_ni_syscall		/* 70 - setreuid16 syscall holder */
+	.long sys_ni_syscall		/* setregid16 syscall holder */
+	.long sys_ni_syscall		/* sigsuspend syscall holder */
+	.long sys_ni_syscall		/* sigpending syscall holder */
 	.long sys_sethostname
 	.long sys_setrlimit		/* 75 */
-	.long sys_getrlimit
+	.long sys_getrlimit/*will be unused*/
 	.long sys_getrusage
 	.long sys_gettimeofday
 	.long sys_settimeofday
-	.long sys_getgroups		/* 80 */
-	.long sys_setgroups
+	.long sys_ni_syscall		/* 80 - getgroups16 syscall holder */
+	.long sys_ni_syscall		/* setgroups16 syscall holder */
 	.long sys_ni_syscall		/* sys_oldselect */
 	.long sys_symlink
-	.long sys_lstat
+	.long sys_ni_syscall		/* old lstat syscall holder */
 	.long sys_readlink		/* 85 */
 	.long sys_uselib
 	.long sys_swapon
 	.long sys_reboot
-	.long old_readdir
+	.long sys_ni_syscall		/* readdir syscall holder */
 	.long sys_ni_syscall		/* 90 - old_mmap syscall holder */
 	.long sys_munmap
 	.long sys_truncate
 	.long sys_ftruncate
 	.long sys_fchmod
-	.long sys_fchown		/* 95 */
+	.long sys_ni_syscall		/* 95 - fchwon16  syscall holder */
 	.long sys_getpriority
 	.long sys_setpriority
 	.long sys_ni_syscall		/* old profil syscall holder */
 	.long sys_statfs
 	.long sys_fstatfs		/* 100 */
-	.long sys_ni_syscall		/* ioperm */
+	.long sys_ni_syscall		/* ioperm syscall holder */
 	.long sys_socketcall
 	.long sys_syslog
 	.long sys_setitimer
@@ -818,37 +818,37 @@ ENTRY(sys_call_table)
 	.long sys_newstat
 	.long sys_newlstat
 	.long sys_newfstat
-	.long sys_uname
-	.long sys_ni_syscall		/* 110  -  iopl */
+	.long sys_ni_syscall		/* old uname syscall holder */
+	.long sys_ni_syscall		/* 110  -  iopl syscall holder */
 	.long sys_vhangup
-	.long sys_ni_syscall		/* for idle */
-	.long sys_ni_syscall		/* for vm86old */
+	.long sys_ni_syscall		/* idle syscall holder */
+	.long sys_ni_syscall		/* vm86old syscall holder */
 	.long sys_wait4
 	.long sys_swapoff		/* 115 */
 	.long sys_sysinfo
 	.long sys_ipc
 	.long sys_fsync
-	.long sys_sigreturn
+	.long sys_ni_syscall		/* sigreturn syscall holder */
 	.long sys_clone			/* 120 */
 	.long sys_setdomainname
 	.long sys_newuname
-	.long sys_ni_syscall		/* sys_modify_ldt */
+	.long sys_ni_syscall		/* modify_ldt syscall holder */
 	.long sys_adjtimex
 	.long sys_mprotect		/* 125 */
-	.long sys_sigprocmask
-	.long sys_ni_syscall		/* sys_create_module */
+	.long sys_ni_syscall		/* sigprocmask syscall holder */
+	.long sys_ni_syscall		/* create_module syscall holder */
 	.long sys_init_module
 	.long sys_delete_module
-	.long sys_ni_syscall		/* 130 sys_get_kernel_syms */
+	.long sys_ni_syscall		/* 130 - get_kernel_syms */
 	.long sys_quotactl
 	.long sys_getpgid
 	.long sys_fchdir
 	.long sys_bdflush
 	.long sys_sysfs			/* 135 */
 	.long sys_personality
-	.long sys_ni_syscall		/* for afs_syscall */
-	.long sys_setfsuid
-	.long sys_setfsgid
+	.long sys_ni_syscall		/* afs_syscall syscall holder */
+	.long sys_ni_syscall		/* setfsuid16 syscall holder */
+	.long sys_ni_syscall		/* setfsgid16 syscall holder */
 	.long sys_llseek		/* 140 */
 	.long sys_getdents
 	.long sys_select
@@ -873,10 +873,10 @@ ENTRY(sys_call_table)
 	.long sys_sched_rr_get_interval
 	.long sys_nanosleep
 	.long sys_mremap
-	.long sys_setresuid
-	.long sys_getresuid		/* 165 */
-	.long sys_tas			/* vm86 */
-	.long sys_ni_syscall		/* sys_query_module */
+	.long sys_ni_syscall		/* setresuid16 syscall holder */
+	.long sys_ni_syscall		/* 165 - getresuid16 syscall holder */
+	.long sys_tas			/* vm86 syscall holder */
+	.long sys_ni_syscall		/* query_module syscall holder */
 	.long sys_poll
 	.long sys_nfsservctl
 	.long sys_setresgid		/* 170 */
@@ -891,7 +891,7 @@ ENTRY(sys_call_table)
 	.long sys_rt_sigsuspend
 	.long sys_pread64		/* 180 */
 	.long sys_pwrite64
-	.long sys_chown
+	.long sys_ni_syscall		/* chown16 syscall holder */
 	.long sys_getcwd
 	.long sys_capget
 	.long sys_capset		/* 185 */

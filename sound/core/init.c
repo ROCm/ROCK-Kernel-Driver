@@ -37,7 +37,6 @@ struct snd_shutdown_f_ops {
 	struct snd_shutdown_f_ops *next;
 };
 
-int snd_cards_count = 0;
 unsigned int snd_cards_lock = 0;	/* locked for registering/using */
 snd_card_t *snd_cards[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = NULL};
 rwlock_t snd_card_rwlock = RW_LOCK_UNLOCKED;
@@ -125,7 +124,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 #endif
 	/* the control interface cannot be accessed from the user space until */
 	/* snd_cards_bitmask and snd_cards are set with snd_card_register */
-	if ((err = snd_ctl_register(card)) < 0) {
+	if ((err = snd_ctl_create(card)) < 0) {
 		snd_printd("unable to register control minors\n");
 		goto __error;
 	}
@@ -138,7 +137,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	return card;
 
       __error_ctl:
-	snd_ctl_unregister(card);
+	snd_device_free_all(card, SNDRV_DEV_CMD_PRE);
       __error:
 	kfree(card);
       	return NULL;
@@ -217,8 +216,6 @@ int snd_card_disconnect(snd_card_t * card)
 	/* phase 3: notify all connected devices about disconnection */
 	/* at this point, they cannot respond to any calls except release() */
 
-	snd_ctl_disconnect(card);
-
 #if defined(CONFIG_SND_MIXER_OSS) || defined(CONFIG_SND_MIXER_OSS_MODULE)
 	if (snd_mixer_oss_notify_callback)
 		snd_mixer_oss_notify_callback(card, SND_MIXER_OSS_NOTIFY_DISCONNECT);
@@ -251,7 +248,6 @@ int snd_card_free(snd_card_t * card)
 		return -EINVAL;
 	write_lock(&snd_card_rwlock);
 	snd_cards[card->number] = NULL;
-	snd_cards_count--;
 	write_unlock(&snd_card_rwlock);
 
 #ifdef CONFIG_PM
@@ -278,10 +274,6 @@ int snd_card_free(snd_card_t * card)
 	if (snd_device_free_all(card, SNDRV_DEV_CMD_NORMAL) < 0) {
 		snd_printk(KERN_ERR "unable to free all devices (normal)\n");
 		/* Fatal, but this situation should never occur */
-	}
-	if (snd_ctl_unregister(card) < 0) {
-		snd_printk(KERN_ERR "unable to unregister control minors\n");
-		/* Not fatal error */
 	}
 	if (snd_device_free_all(card, SNDRV_DEV_CMD_POST) < 0) {
 		snd_printk(KERN_ERR "unable to free all devices (post)\n");
@@ -441,7 +433,6 @@ int snd_card_register(snd_card_t * card)
 	if (card->id[0] == '\0')
 		choose_default_id(card);
 	snd_cards[card->number] = card;
-	snd_cards_count++;
 	write_unlock(&snd_card_rwlock);
 	if ((err = snd_info_card_register(card)) < 0) {
 		snd_printd("unable to create card info\n");
@@ -665,12 +656,11 @@ int snd_card_file_remove(snd_card_t *card, struct file *file)
 	spin_unlock(&card->files_lock);
 	if (card->files == NULL)
 		wake_up(&card->shutdown_sleep);
-	if (mfile) {
-		kfree(mfile);
-	} else {
+	if (!mfile) {
 		snd_printk(KERN_ERR "ALSA card file remove problem (%p)\n", file);
 		return -ENOENT;
 	}
+	kfree(mfile);
 	return 0;
 }
 
@@ -745,12 +735,18 @@ static int snd_generic_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *
 
 	switch (rqst) {
 	case PM_SUSPEND:
+		if (card->power_state == SNDRV_CTL_POWER_D3hot)
+			break;
 		/* FIXME: the correct state value? */
 		card->pm_suspend(card, 0);
+		snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 		break;
 	case PM_RESUME:
+		if (card->power_state == SNDRV_CTL_POWER_D0)
+			break;
 		/* FIXME: the correct state value? */
 		card->pm_resume(card, 0);
+		snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 		break;
 	}
 	return 0;
@@ -793,6 +789,7 @@ int snd_card_pci_suspend(struct pci_dev *dev, u32 state)
 	/* FIXME: correct state value? */
 	err = card->pm_suspend(card, 0);
 	pci_save_state(dev);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return err;
 }
 
@@ -806,7 +803,9 @@ int snd_card_pci_resume(struct pci_dev *dev)
 	/* restore the PCI config space */
 	pci_restore_state(dev);
 	/* FIXME: correct state value? */
-	return card->pm_resume(card, 0);
+	card->pm_resume(card, 0);
+	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
+	return 0;
 }
 #endif
 

@@ -109,12 +109,19 @@ struct swap_info_struct;
  *	and the information saved in @bprm->security by the set_security hook.
  *	Since this hook function (and its caller) are void, this hook can not
  *	return an error.  However, it can leave the security attributes of the
- *	process unchanged if an access failure occurs at this point. It can
- *	also perform other state changes on the process (e.g.  closing open
- *	file descriptors to which access is no longer granted if the attributes
- *	were changed). 
+ *	process unchanged if an access failure occurs at this point.
  *	bprm_apply_creds is called under task_lock.  @unsafe indicates various
  *	reasons why it may be unsafe to change security state.
+ *	@bprm contains the linux_binprm structure.
+ * @bprm_post_apply_creds:
+ *	Runs after bprm_apply_creds with the task_lock dropped, so that
+ *	functions which cannot be called safely under the task_lock can
+ *	be used.  This hook is a good place to perform state changes on
+ *	the process such as closing open file descriptors to which access
+ *	is no longer granted if the attributes were changed.
+ *	Note that a security module might need to save state between
+ *	bprm_apply_creds and bprm_post_apply_creds to store the decision
+ *	on whether the process may proceed.
  *	@bprm contains the linux_binprm structure.
  * @bprm_set_security:
  *	Save security information in the bprm->security field, typically based
@@ -1042,6 +1049,7 @@ struct security_operations {
 	int (*bprm_alloc_security) (struct linux_binprm * bprm);
 	void (*bprm_free_security) (struct linux_binprm * bprm);
 	void (*bprm_apply_creds) (struct linux_binprm * bprm, int unsafe);
+	void (*bprm_post_apply_creds) (struct linux_binprm * bprm);
 	int (*bprm_set_security) (struct linux_binprm * bprm);
 	int (*bprm_check_security) (struct linux_binprm * bprm);
 	int (*bprm_secureexec) (struct linux_binprm * bprm);
@@ -1313,6 +1321,10 @@ static inline void security_bprm_free (struct linux_binprm *bprm)
 static inline void security_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 {
 	security_ops->bprm_apply_creds (bprm, unsafe);
+}
+static inline void security_bprm_post_apply_creds (struct linux_binprm *bprm)
+{
+	security_ops->bprm_post_apply_creds (bprm);
 }
 static inline int security_bprm_set (struct linux_binprm *bprm)
 {
@@ -1990,6 +2002,11 @@ static inline void security_bprm_free (struct linux_binprm *bprm)
 static inline void security_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 { 
 	cap_bprm_apply_creds (bprm, unsafe);
+}
+
+static inline void security_bprm_post_apply_creds (struct linux_binprm *bprm)
+{
+	return;
 }
 
 static inline int security_bprm_set (struct linux_binprm *bprm)

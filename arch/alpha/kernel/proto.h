@@ -167,9 +167,6 @@ extern void entSys(void);
 extern void entUna(void);
 extern void entDbg(void);
 
-/* process.c */
-extern void cpu_idle(void) __attribute__((noreturn));
-
 /* ptrace.c */
 extern int ptrace_set_bpt (struct task_struct *child);
 extern int ptrace_cancel_bpt (struct task_struct *child);

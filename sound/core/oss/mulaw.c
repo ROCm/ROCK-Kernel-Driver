@@ -301,6 +301,7 @@ int snd_pcm_plugin_build_mulaw(snd_pcm_plug_t *plug,
 	data = (mulaw_t*)plugin->extra_data;
 	data->func = func;
 	data->conv = getput_index(format->format);
+	snd_assert(data->conv >= 0 && data->conv < 4*2*2, return -EINVAL);
 	plugin->transfer = mulaw_transfer;
 	*r_plugin = plugin;
 	return 0;

@@ -301,7 +301,7 @@ static int check_bot_eot(int status)
 
 /*      Read Id of first sector passing tape head.
  */
-int ftape_read_id(void)
+static int ftape_read_id(void)
 {
 	int status;
 	__u8 out[2];

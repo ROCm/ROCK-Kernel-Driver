@@ -55,6 +55,24 @@
 #include <net/sctp/sctp.h>
 #include <net/sctp/sm.h>
 
+static int sctp_cmd_interpreter(sctp_event_t event_type,
+				sctp_subtype_t subtype,
+				sctp_state_t state,
+				struct sctp_endpoint *ep,
+				struct sctp_association *asoc,
+				void *event_arg,
+			 	sctp_disposition_t status,
+				sctp_cmd_seq_t *commands,
+				int gfp);
+static int sctp_side_effects(sctp_event_t event_type, sctp_subtype_t subtype,
+			     sctp_state_t state,
+			     struct sctp_endpoint *ep,
+			     struct sctp_association *asoc,
+			     void *event_arg,
+			     sctp_disposition_t status,
+			     sctp_cmd_seq_t *commands,
+			     int gfp);
+
 /********************************************************************
  * Helper functions
  ********************************************************************/
@@ -134,8 +152,8 @@ static void sctp_do_ecn_cwr_work(struct sctp_association *asoc,
 }
 
 /* Generate SACK if necessary.  We call this at the end of a packet.  */
-int sctp_gen_sack(struct sctp_association *asoc, int force,
-		  sctp_cmd_seq_t *commands)
+static int sctp_gen_sack(struct sctp_association *asoc, int force,
+			 sctp_cmd_seq_t *commands)
 {
 	__u32 ctsn, max_tsn_seen;
 	struct sctp_chunk *sack;
@@ -276,31 +294,31 @@ out_unlock:
 	sctp_association_put(asoc);
 }
 
-void sctp_generate_t1_cookie_event(unsigned long data)
+static void sctp_generate_t1_cookie_event(unsigned long data)
 {
 	struct sctp_association *asoc = (struct sctp_association *) data;
 	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_T1_COOKIE);
 }
 
-void sctp_generate_t1_init_event(unsigned long data)
+static void sctp_generate_t1_init_event(unsigned long data)
 {
 	struct sctp_association *asoc = (struct sctp_association *) data;
 	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_T1_INIT);
 }
 
-void sctp_generate_t2_shutdown_event(unsigned long data)
+static void sctp_generate_t2_shutdown_event(unsigned long data)
 {
 	struct sctp_association *asoc = (struct sctp_association *) data;
 	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_T2_SHUTDOWN);
 }
 
-void sctp_generate_t4_rto_event(unsigned long data)
+static void sctp_generate_t4_rto_event(unsigned long data)
 {
 	struct sctp_association *asoc = (struct sctp_association *) data;
 	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_T4_RTO);
 }
 
-void sctp_generate_t5_shutdown_guard_event(unsigned long data)
+static void sctp_generate_t5_shutdown_guard_event(unsigned long data)
 {
         struct sctp_association *asoc = (struct sctp_association *)data;
         sctp_generate_timeout_event(asoc,
@@ -308,7 +326,7 @@ void sctp_generate_t5_shutdown_guard_event(unsigned long data)
 
 } /* sctp_generate_t5_shutdown_guard_event() */
 
-void sctp_generate_autoclose_event(unsigned long data)
+static void sctp_generate_autoclose_event(unsigned long data)
 {
 	struct sctp_association *asoc = (struct sctp_association *) data;
 	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_AUTOCLOSE);
@@ -353,7 +371,7 @@ out_unlock:
 }
 
 /* Inject a SACK Timeout event into the state machine.  */
-void sctp_generate_sack_event(unsigned long data)
+static void sctp_generate_sack_event(unsigned long data)
 {
 	struct sctp_association *asoc = (struct sctp_association *) data;
 	sctp_generate_timeout_event(asoc, SCTP_EVENT_TIMEOUT_SACK);
@@ -397,7 +415,7 @@ static void sctp_do_8_2_transport_strike(struct sctp_association *asoc,
 	asoc->overall_error_count++;
 
 	if (transport->active &&
-	    (transport->error_count++ >= transport->error_threshold)) {
+	    (transport->error_count++ >= transport->max_retrans)) {
 		SCTP_DEBUG_PRINTK("transport_strike: transport "
 				  "IP:%d.%d.%d.%d failed.\n",
 				  NIPQUAD(transport->ipaddr.v4.sin_addr));
@@ -857,14 +875,14 @@ int sctp_do_sm(sctp_event_t event_type, sctp_subtype_t subtype,
 /*****************************************************************
  * This the master state function side effect processing function.
  *****************************************************************/
-int sctp_side_effects(sctp_event_t event_type, sctp_subtype_t subtype,
-		      sctp_state_t state,
-		      struct sctp_endpoint *ep,
-		      struct sctp_association *asoc,
-		      void *event_arg,
-		      sctp_disposition_t status,
-		      sctp_cmd_seq_t *commands,
-		      int gfp)
+static int sctp_side_effects(sctp_event_t event_type, sctp_subtype_t subtype,
+			     sctp_state_t state,
+			     struct sctp_endpoint *ep,
+			     struct sctp_association *asoc,
+			     void *event_arg,
+			     sctp_disposition_t status,
+			     sctp_cmd_seq_t *commands,
+			     int gfp)
 {
 	int error;
 
@@ -944,11 +962,15 @@ bail:
  ********************************************************************/
 
 /* This is the side-effect interpreter.  */
-int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
-			 sctp_state_t state, struct sctp_endpoint *ep,
-			 struct sctp_association *asoc, void *event_arg,
-			 sctp_disposition_t status, sctp_cmd_seq_t *commands,
-			 int gfp)
+static int sctp_cmd_interpreter(sctp_event_t event_type,
+				sctp_subtype_t subtype,
+				sctp_state_t state,
+				struct sctp_endpoint *ep,
+				struct sctp_association *asoc,
+				void *event_arg,
+			 	sctp_disposition_t status,
+				sctp_cmd_seq_t *commands,
+				int gfp)
 {
 	int error = 0;
 	int force;

@@ -151,8 +151,7 @@ void snd_ice1712_akm4xxx_free(ice1712_t *ice)
 		return;
 	for (akidx = 0; akidx < ice->akm_codecs; akidx++) {
 		akm4xxx_t *ak = &ice->akm[akidx];
-		if (ak->private_value[0])
-			kfree((void *)ak->private_value[0]);
+		kfree((void*)ak->private_value[0]);
 	}
 	kfree(ice->akm);
 }

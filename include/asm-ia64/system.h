@@ -284,6 +284,7 @@ do {						\
 
 #define ia64_platform_is(x) (strcmp(x, platform_name) == 0)
 
+void cpu_idle_wait(void);
 #endif /* __KERNEL__ */
 
 #endif /* __ASSEMBLY__ */

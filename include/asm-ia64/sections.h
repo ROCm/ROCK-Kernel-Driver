@@ -17,7 +17,6 @@ extern char __start_gate_vtop_patchlist[], __end_gate_vtop_patchlist[];
 extern char __start_gate_fsyscall_patchlist[], __end_gate_fsyscall_patchlist[];
 extern char __start_gate_brl_fsys_bubble_down_patchlist[], __end_gate_brl_fsys_bubble_down_patchlist[];
 extern char __start_unwind[], __end_unwind[];
-extern char _end[];		/* end of kernel image */
 
 #endif /* _ASM_IA64_SECTIONS_H */
 

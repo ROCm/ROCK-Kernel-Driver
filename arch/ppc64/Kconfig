@@ -20,6 +20,10 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y
 
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
 config GENERIC_ISA_DMA
 	bool
 	default y
@@ -88,7 +92,7 @@ config PPC_MAPLE
 	default n
 	help
           This option enables support for the Maple 970FX Evaluation Board.
-	  For more informations, refer to http://www.970eval.com
+	  For more informations, refer to <http://www.970eval.com>
 
 config PPC
 	bool
@@ -227,6 +231,17 @@ config PREEMPT
 	  Say Y here if you are building a kernel for a desktop, embedded
 	  or real-time system.  Say N if you are unsure.
 
+config PREEMPT_BKL
+	bool "Preempt The Big Kernel Lock"
+	depends on PREEMPT
+	default y
+	help
+	  This option reduces the latency of the kernel by making the
+	  big kernel lock preemptible.
+
+	  Say Y here if you are building a kernel for a desktop system.
+	  Say N if you are unsure.
+
 #
 # Use the generic interrupt handling code in kernel/irq/:
 #
@@ -301,7 +316,8 @@ source "drivers/pci/Kconfig"
 
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
-	depends on SMP && HOTPLUG && EXPERIMENTAL && PPC_PSERIES
+	depends on SMP && EXPERIMENTAL && PPC_PSERIES
+	select HOTPLUG
 	---help---
 	  Say Y here to be able to turn CPUs off and on.
 

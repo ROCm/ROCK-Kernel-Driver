@@ -111,6 +111,7 @@ static int ftsodell;
 static int strict_clocking;
 static unsigned int clocking;
 static int spdif_locked;
+static int ac97_quirk = AC97_TUNE_DEFAULT;
 
 //#define DEBUG
 //#define DEBUG2
@@ -480,6 +481,124 @@ struct i810_card {
 /* set LVI from CIV */
 #define CIV_TO_LVI(card, port, off) \
 	I810_IOWRITEB(MODULOP2(GET_CIV((card), (port)) + (off), SG_LEN), (card), (port) + OFF_LVI)
+
+static struct ac97_quirk ac97_quirks[] __devinitdata = {
+	{
+		.vendor = 0x0e11,
+		.device = 0x00b8,
+		.name = "Compaq Evo D510C",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1028,
+		.device = 0x00d8,
+		.name = "Dell Precision 530",   /* AD1885 */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1028,
+		.device = 0x0126,
+		.name = "Dell Optiplex GX260",  /* AD1981A */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1028,
+		.device = 0x012d,
+		.name = "Dell Precision 450",   /* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{       /* FIXME: which codec? */
+		.vendor = 0x103c,
+		.device = 0x00c3,
+		.name = "Hewlett-Packard onboard",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x12f1,
+		.name = "HP xw8200",    /* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x3008,
+		.name = "HP xw4200",    /* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x10f1,
+		.device = 0x2665,
+		.name = "Fujitsu-Siemens Celsius",      /* AD1981? */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x10f1,
+		.device = 0x2885,
+		.name = "AMD64 Mobo",   /* ALC650 */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x110a,
+		.device = 0x0056,
+		.name = "Fujitsu-Siemens Scenic",       /* AD1981? */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x11d4,
+		.device = 0x5375,
+		.name = "ADI AD1985 (discrete)",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1462,
+		.device = 0x5470,
+		.name = "MSI P4 ATX 645 Ultra",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1734,
+		.device = 0x0088,
+		.name = "Fujitsu-Siemens D1522",	/* AD1981 */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x8086,
+		.device = 0x4856,
+		.name = "Intel D845WN (82801BA)",
+		.type = AC97_TUNE_SWAP_HP
+	},
+	{
+		.vendor = 0x8086,
+		.device = 0x4d44,
+		.name = "Intel D850EMV2",       /* AD1885 */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x8086,
+		.device = 0x4d56,
+		.name = "Intel ICH/AD1885",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x1028,
+		.device = 0x012d,
+		.name = "Dell Precision 450",   /* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x3008,
+		.name = "HP xw4200",    /* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x103c,
+		.device = 0x12f1,
+		.name = "HP xw8200",    /* AD1981B*/
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{ } /* terminator */
+};
 
 static struct i810_card *devs = NULL;
 
@@ -3042,6 +3161,9 @@ static int __devinit i810_ac97_init(struct i810_card *card)
 
 		card->ac97_codec[num_ac97] = codec;
 	}
+
+	/* tune up the primary codec */
+	ac97_tune_hardware(card->pci_dev, ac97_quirks, ac97_quirk);
 
 	/* pick the minimum of channels supported by ICHx or codec(s) */
 	card->channels = (card->channels > total_channels)?total_channels:card->channels;

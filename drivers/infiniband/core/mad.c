@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004, Voltaire, Inc. All rights reserved.
+ * Copyright (c) 2004, 2005 Voltaire, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -60,6 +60,9 @@ static spinlock_t ib_mad_port_list_lock;
 static int method_in_use(struct ib_mad_mgmt_method_table **method,
 			 struct ib_mad_reg_req *mad_reg_req);
 static void remove_mad_reg_req(struct ib_mad_agent_private *priv);
+static struct ib_mad_agent_private *find_mad_agent(
+					struct ib_mad_port_private *port_priv,
+					struct ib_mad *mad, int solicited);
 static int ib_mad_post_receive_mads(struct ib_mad_qp_info *qp_info,
 				    struct ib_mad_private *mad);
 static void cancel_mads(struct ib_mad_agent_private *mad_agent_priv);
@@ -614,21 +617,41 @@ static void snoop_recv(struct ib_mad_qp_info *qp_info,
 	spin_unlock_irqrestore(&qp_info->snoop_lock, flags);
 }
 
+static void build_smp_wc(u64 wr_id, u16 slid, u16 pkey_index, u8 port_num,
+			 struct ib_wc *wc)
+{
+	memset(wc, 0, sizeof *wc);
+	wc->wr_id = wr_id;
+	wc->status = IB_WC_SUCCESS;
+	wc->opcode = IB_WC_RECV;
+	wc->pkey_index = pkey_index;
+	wc->byte_len = sizeof(struct ib_mad) + sizeof(struct ib_grh);
+	wc->src_qp = IB_QP0;
+	wc->qp_num = IB_QP0;
+	wc->slid = slid;
+	wc->sl = 0;
+	wc->dlid_path_bits = 0;
+	wc->port_num = port_num;
+}
+
 /*
  * Return 0 if SMP is to be sent
  * Return 1 if SMP was consumed locally (whether or not solicited)
  * Return < 0 if error
  */
-static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
-			       struct ib_smp *smp,
-			       struct ib_send_wr *send_wr)
+static int handle_outgoing_dr_smp(struct ib_mad_agent_private *mad_agent_priv,
+				  struct ib_smp *smp,
+				  struct ib_send_wr *send_wr)
 {
-	int ret, alloc_flags;
+	int ret, alloc_flags, solicited;
 	unsigned long flags;
 	struct ib_mad_local_private *local;
 	struct ib_mad_private *mad_priv;
+	struct ib_mad_port_private *port_priv;
+	struct ib_mad_agent_private *recv_mad_agent = NULL;
 	struct ib_device *device = mad_agent_priv->agent.device;
 	u8 port_num = mad_agent_priv->agent.port_num;
+	struct ib_wc mad_wc;
 
 	if (!smi_handle_dr_smp_send(smp, device->node_type, port_num)) {
 		ret = -EINVAL;
@@ -651,6 +674,7 @@ static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
 		goto out;
 	}
 	local->mad_priv = NULL;
+	local->recv_mad_agent = NULL;
 	mad_priv = kmem_cache_alloc(ib_mad_cache, alloc_flags);
 	if (!mad_priv) {
 		ret = -ENOMEM;
@@ -658,7 +682,12 @@ static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
 		kfree(local);
 		goto out;
 	}
-	ret = device->process_mad(device, 0, port_num, smp->dr_slid,
+
+	build_smp_wc(send_wr->wr_id, smp->dr_slid, send_wr->wr.ud.pkey_index,
+		     send_wr->wr.ud.port_num, &mad_wc);
+
+	/* No GRH for DR SMP */
+	ret = device->process_mad(device, 0, port_num, &mad_wc, NULL,
 				  (struct ib_mad *)smp,
 				  (struct ib_mad *)&mad_priv->mad);
 	switch (ret)
@@ -669,19 +698,41 @@ static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
 		 * there is a recv handler
 		 */
 		if (solicited_mad(&mad_priv->mad.mad) &&
-		    mad_agent_priv->agent.recv_handler)
+		    mad_agent_priv->agent.recv_handler) {
 			local->mad_priv = mad_priv;
-		else
+			local->recv_mad_agent = mad_agent_priv;
+			/*
+			 * Reference MAD agent until receive
+			 * side of local completion handled
+			 */
+			atomic_inc(&mad_agent_priv->refcount);
+		} else
 			kmem_cache_free(ib_mad_cache, mad_priv);
 		break;
 	case IB_MAD_RESULT_SUCCESS | IB_MAD_RESULT_CONSUMED:
 		kmem_cache_free(ib_mad_cache, mad_priv);
 		break;
 	case IB_MAD_RESULT_SUCCESS:
-		kmem_cache_free(ib_mad_cache, mad_priv);
-		kfree(local);
-		ret = 0;
-		goto out;
+		/* Treat like an incoming receive MAD */
+		solicited = solicited_mad(&mad_priv->mad.mad);
+		port_priv = ib_get_mad_port(mad_agent_priv->agent.device,
+					    mad_agent_priv->agent.port_num);
+		if (port_priv) {
+			mad_priv->mad.mad.mad_hdr.tid =
+				((struct ib_mad *)smp)->mad_hdr.tid;
+			recv_mad_agent = find_mad_agent(port_priv,
+						       &mad_priv->mad.mad,
+							solicited);
+		}
+		if (!port_priv || !recv_mad_agent) {
+			kmem_cache_free(ib_mad_cache, mad_priv);
+			kfree(local);
+			ret = 0;
+			goto out;
+		}
+		local->mad_priv = mad_priv;
+		local->recv_mad_agent = recv_mad_agent;
+		break;
 	default:
 		kmem_cache_free(ib_mad_cache, mad_priv);
 		kfree(local);
@@ -696,7 +747,7 @@ static int handle_outgoing_smp(struct ib_mad_agent_private *mad_agent_priv,
 	local->send_wr.next = NULL;
 	local->tid = send_wr->wr.ud.mad_hdr->tid;
 	local->wr_id = send_wr->wr_id;
-	/* Reference MAD agent until local completion handled */
+	/* Reference MAD agent until send side of local completion handled */
 	atomic_inc(&mad_agent_priv->refcount);
 	/* Queue local completion to local list */
 	spin_lock_irqsave(&mad_agent_priv->lock, flags);
@@ -797,7 +848,8 @@ int ib_post_send_mad(struct ib_mad_agent *mad_agent,
 
 		smp = (struct ib_smp *)send_wr->wr.ud.mad_hdr;
 		if (smp->mgmt_class == IB_MGMT_CLASS_SUBN_DIRECTED_ROUTE) {
-			ret = handle_outgoing_smp(mad_agent_priv, smp, send_wr);
+			ret = handle_outgoing_dr_smp(mad_agent_priv, smp,
+						     send_wr);
 			if (ret < 0)		/* error */
 				goto error2;
 			else if (ret == 1)	/* locally consumed */
@@ -1593,7 +1645,7 @@ local:
 
 		ret = port_priv->device->process_mad(port_priv->device, 0,
 						     port_priv->port_num,
-						     wc->slid,
+						     wc, &recv->grh,
 						     &recv->mad.mad,
 						     &response->mad.mad);
 		if (ret & IB_MAD_RESULT_SUCCESS) {
@@ -1996,6 +2048,7 @@ static void local_completions(void *data)
 {
 	struct ib_mad_agent_private *mad_agent_priv;
 	struct ib_mad_local_private *local;
+	struct ib_mad_agent_private *recv_mad_agent;
 	unsigned long flags;
 	struct ib_wc wc;
 	struct ib_mad_send_wc mad_send_wc;
@@ -2009,21 +2062,21 @@ static void local_completions(void *data)
 				   completion_list);
 		spin_unlock_irqrestore(&mad_agent_priv->lock, flags);
 		if (local->mad_priv) {
+			recv_mad_agent = local->recv_mad_agent;
+			if (!recv_mad_agent) {
+				printk(KERN_ERR PFX "No receive MAD agent for local completion\n");
+				kmem_cache_free(ib_mad_cache, local->mad_priv);
+				goto local_send_completion;
+			}
+
 			/*
 			 * Defined behavior is to complete response
 			 * before request
 			 */
-			wc.wr_id = local->wr_id;
-			wc.status = IB_WC_SUCCESS;
-			wc.opcode = IB_WC_RECV;
-			wc.vendor_err = 0;
-			wc.byte_len = sizeof(struct ib_mad);
-			wc.src_qp = IB_QP0;
-			wc.wc_flags = 0;
-			wc.pkey_index = 0;
-			wc.slid = IB_LID_PERMISSIVE;
-			wc.sl = 0;
-			wc.dlid_path_bits = 0;
+			build_smp_wc(local->wr_id, IB_LID_PERMISSIVE,
+				     0 /* pkey index */,
+				     recv_mad_agent->agent.port_num, &wc);
+
 			local->mad_priv->header.recv_wc.wc = &wc;
 			local->mad_priv->header.recv_wc.mad_len =
 						sizeof(struct ib_mad);
@@ -2031,15 +2084,19 @@ static void local_completions(void *data)
 			local->mad_priv->header.recv_wc.recv_buf.grh = NULL;
 			local->mad_priv->header.recv_wc.recv_buf.mad =
 						&local->mad_priv->mad.mad;
-			if (atomic_read(&mad_agent_priv->qp_info->snoop_count))
-				snoop_recv(mad_agent_priv->qp_info,
+			if (atomic_read(&recv_mad_agent->qp_info->snoop_count))
+				snoop_recv(recv_mad_agent->qp_info,
 					  &local->mad_priv->header.recv_wc,
 					   IB_MAD_SNOOP_RECVS);
-			mad_agent_priv->agent.recv_handler(
-						&mad_agent_priv->agent,
+			recv_mad_agent->agent.recv_handler(
+						&recv_mad_agent->agent,
 						&local->mad_priv->header.recv_wc);
+			spin_lock_irqsave(&recv_mad_agent->lock, flags);
+			atomic_dec(&recv_mad_agent->refcount);
+			spin_unlock_irqrestore(&recv_mad_agent->lock, flags);
 		}
 
+local_send_completion:
 		/* Complete send */
 		mad_send_wc.status = IB_WC_SUCCESS;
 		mad_send_wc.vendor_err = 0;

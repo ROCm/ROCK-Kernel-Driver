@@ -61,7 +61,8 @@ static unsigned long badness(struct task_struct *p, unsigned long uptime)
          * of seconds. There is no particular reason for this other than
          * that it turned out to work very well in practice.
 	 */
-	cpu_time = (p->utime + p->stime) >> (SHIFT_HZ + 3);
+	cpu_time = (cputime_to_jiffies(p->utime) + cputime_to_jiffies(p->stime))
+		>> (SHIFT_HZ + 3);
 
 	if (uptime >= p->start_time.tv_sec)
 		run_time = (uptime - p->start_time.tv_sec) >> 10;
@@ -233,7 +234,7 @@ void out_of_memory(int gfp_mask)
 	 * oom_lock protects out_of_memory()'s static variables.
 	 * It's a global lock; this is not performance-critical.
 	 */
-	static spinlock_t oom_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(oom_lock);
 	static unsigned long first, last, count, lastkill;
 	unsigned long now, since;
 

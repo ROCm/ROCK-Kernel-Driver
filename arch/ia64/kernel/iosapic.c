@@ -111,6 +111,7 @@ static struct iosapic_intr_info {
 	unsigned char	dmode	: 3;	/* delivery mode (see iosapic.h) */
 	unsigned char 	polarity: 1;	/* interrupt polarity (see iosapic.h) */
 	unsigned char	trigger	: 1;	/* trigger mode (see iosapic.h) */
+	int		refcnt;		/* reference counter */
 } iosapic_intr_info[IA64_NUM_VECTORS];
 
 static struct iosapic {
@@ -177,7 +178,7 @@ gsi_to_irq (unsigned int gsi)
 static void
 set_rte (unsigned int vector, unsigned int dest, int mask)
 {
-	unsigned long pol, trigger, dmode, flags;
+	unsigned long pol, trigger, dmode;
 	u32 low32, high32;
 	char __iomem *addr;
 	int rte_index;
@@ -218,13 +219,9 @@ set_rte (unsigned int vector, unsigned int dest, int mask)
 	/* dest contains both id and eid */
 	high32 = (dest << IOSAPIC_DEST_SHIFT);
 
-	spin_lock_irqsave(&iosapic_lock, flags);
-	{
-		iosapic_write(addr, IOSAPIC_RTE_HIGH(rte_index), high32);
-		iosapic_write(addr, IOSAPIC_RTE_LOW(rte_index), low32);
-		iosapic_intr_info[vector].low32 = low32;
-	}
-	spin_unlock_irqrestore(&iosapic_lock, flags);
+	iosapic_write(addr, IOSAPIC_RTE_HIGH(rte_index), high32);
+	iosapic_write(addr, IOSAPIC_RTE_LOW(rte_index), low32);
+	iosapic_intr_info[vector].low32 = low32;
 }
 
 static void
@@ -475,6 +472,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 	iosapic_intr_info[vector].addr     = iosapic_address;
 	iosapic_intr_info[vector].gsi_base = gsi_base;
 	iosapic_intr_info[vector].trigger  = trigger;
+	iosapic_intr_info[vector].refcnt++;
 
 	if (trigger == IOSAPIC_EDGE)
 		irq_type = &irq_type_iosapic_edge;
@@ -581,6 +579,7 @@ iosapic_register_intr (unsigned int gsi,
 	{
 		vector = gsi_to_vector(gsi);
 		if (vector > 0) {
+			iosapic_intr_info[vector].refcnt++;
 			spin_unlock_irqrestore(&iosapic_lock, flags);
 			return vector;
 		}
@@ -589,6 +588,8 @@ iosapic_register_intr (unsigned int gsi,
 		dest = get_target_cpu(gsi, vector);
 		register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY,
 			polarity, trigger);
+
+		set_rte(vector, dest, 1);
 	}
 	spin_unlock_irqrestore(&iosapic_lock, flags);
 
@@ -597,9 +598,86 @@ iosapic_register_intr (unsigned int gsi,
 	       (polarity == IOSAPIC_POL_HIGH ? "high" : "low"),
 	       cpu_logical_id(dest), dest, vector);
 
-	set_rte(vector, dest, 1);
 	return vector;
 }
+
+#ifdef CONFIG_ACPI_DEALLOCATE_IRQ
+void
+iosapic_unregister_intr (unsigned int gsi)
+{
+	unsigned long flags;
+	int irq, vector;
+	irq_desc_t *idesc;
+	int rte_index;
+	unsigned long trigger, polarity;
+
+	/*
+	 * If the irq associated with the gsi is not found,
+	 * iosapic_unregister_intr() is unbalanced. We need to check
+	 * this again after getting locks.
+	 */
+	irq = gsi_to_irq(gsi);
+	if (irq < 0) {
+		printk(KERN_ERR "iosapic_unregister_intr(%u) unbalanced\n", gsi);
+		WARN_ON(1);
+		return;
+	}
+	vector = irq_to_vector(irq);
+
+	idesc = irq_descp(irq);
+	spin_lock_irqsave(&idesc->lock, flags);
+	spin_lock(&iosapic_lock);
+	{
+		rte_index = iosapic_intr_info[vector].rte_index;
+		if (rte_index < 0) {
+			spin_unlock(&iosapic_lock);
+			spin_unlock_irqrestore(&idesc->lock, flags);
+			printk(KERN_ERR "iosapic_unregister_intr(%u) unbalanced\n", gsi);
+			WARN_ON(1);
+			return;
+		}
+
+		if (--iosapic_intr_info[vector].refcnt > 0) {
+			spin_unlock(&iosapic_lock);
+			spin_unlock_irqrestore(&idesc->lock, flags);
+			return;
+		}
+
+		/*
+		 * If interrupt handlers still exist on the irq
+		 * associated with the gsi, don't unregister the
+		 * interrupt.
+		 */
+		if (idesc->action) {
+			iosapic_intr_info[vector].refcnt++;
+			spin_unlock(&iosapic_lock);
+			spin_unlock_irqrestore(&idesc->lock, flags);
+			printk(KERN_WARNING "Cannot unregister GSI. IRQ %u is still in use.\n", irq);
+			return;
+		}
+
+		/* Clear the interrupt controller descriptor. */
+		idesc->handler = &no_irq_type;
+
+		trigger  = iosapic_intr_info[vector].trigger;
+		polarity = iosapic_intr_info[vector].polarity;
+
+		/* Clear the interrupt information. */
+		memset(&iosapic_intr_info[vector], 0, sizeof(struct iosapic_intr_info));
+		iosapic_intr_info[vector].rte_index = -1;	/* mark as unused */
+	}
+	spin_unlock(&iosapic_lock);
+	spin_unlock_irqrestore(&idesc->lock, flags);
+
+	/* Free the interrupt vector */
+	free_irq_vector(vector);
+
+	printk(KERN_INFO "GSI %u (%s, %s) -> vector %d unregisterd.\n",
+	       gsi, (trigger == IOSAPIC_EDGE ? "edge" : "level"),
+	       (polarity == IOSAPIC_POL_HIGH ? "high" : "low"),
+	       vector);
+}
+#endif /* CONFIG_ACPI_DEALLOCATE_IRQ */
 
 /*
  * ACPI calls this when it finds an entry for a platform interrupt.

@@ -394,6 +394,20 @@ static int pxafb_blank(int blank, struct fb_info *info)
 	return 0;
 }
 
+static int pxafb_mmap(struct fb_info *info, struct file *file,
+		      struct vm_area_struct *vma)
+{
+	struct pxafb_info *fbi = (struct pxafb_info *)info;
+	unsigned long off = vma->vm_pgoff << PAGE_SHIFT;
+
+	if (off < info->fix.smem_len) {
+		vma->vm_pgoff += 1;
+		return dma_mmap_writecombine(fbi->dev, vma, fbi->map_cpu,
+					     fbi->map_dma, fbi->map_size);
+	}
+	return -EINVAL;
+}
+
 static struct fb_ops pxafb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_check_var	= pxafb_check_var,
@@ -404,6 +418,7 @@ static struct fb_ops pxafb_ops = {
 	.fb_imageblit	= cfb_imageblit,
 	.fb_blank	= pxafb_blank,
 	.fb_cursor	= soft_cursor,
+	.fb_mmap	= pxafb_mmap,
 };
 
 /*
@@ -725,8 +740,8 @@ static void pxafb_disable_controller(struct pxafb_info *fbi)
 
 	DPRINTK("Disabling LCD controller\n");
 
-	add_wait_queue(&fbi->ctrlr_wait, &wait);
 	set_current_state(TASK_UNINTERRUPTIBLE);
+	add_wait_queue(&fbi->ctrlr_wait, &wait);
 
 	LCSR = 0xffffffff;	/* Clear LCD Status Register */
 	LCCR0 &= ~LCCR0_LDM;	/* Enable LCD Disable Done Interrupt */

@@ -20,18 +20,14 @@
  */
 
 #include <sound/driver.h>
-#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/time.h>
 #include <linux/smp_lock.h>
-#include <linux/utsname.h>
-#include <linux/config.h>
-
 #include <sound/core.h>
-#include <sound/version.h>
 #include <sound/minors.h>
 #include <sound/info.h>
+#include <sound/version.h>
 #include <linux/proc_fs.h>
 #include <linux/devfs_fs_kernel.h>
 #include <stdarg.h>
@@ -129,8 +125,8 @@ static inline void snd_info_entry_prepare(struct proc_dir_entry *de)
 	de->owner = THIS_MODULE;
 }
 
-void snd_remove_proc_entry(struct proc_dir_entry *parent,
-			   struct proc_dir_entry *de)
+static void snd_remove_proc_entry(struct proc_dir_entry *parent,
+				  struct proc_dir_entry *de)
 {
 	if (de)
 		remove_proc_entry(de->name, parent);
@@ -525,8 +521,8 @@ static struct file_operations snd_info_entry_operations =
  *
  * Returns the pointer of new instance or NULL on failure.
  */
-struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode,
-					     struct proc_dir_entry *parent)
+static struct proc_dir_entry *snd_create_proc_entry(const char *name, mode_t mode,
+						    struct proc_dir_entry *parent)
 {
 	struct proc_dir_entry *p;
 	p = create_proc_entry(name, mode, parent);
@@ -895,8 +891,7 @@ void snd_info_free_entry(snd_info_entry_t * entry)
 {
 	if (entry == NULL)
 		return;
-	if (entry->name)
-		kfree((char *)entry->name);
+	kfree(entry->name);
 	if (entry->private_free)
 		entry->private_free(entry);
 	kfree(entry);
@@ -962,18 +957,10 @@ static snd_info_entry_t *snd_info_version_entry = NULL;
 
 static void snd_info_version_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
-	static char *kernel_version = system_utsname.release;
-
 	snd_iprintf(buffer,
-		    "Advanced Linux Sound Architecture Driver Version " CONFIG_SND_VERSION CONFIG_SND_DATE ".\n"
-		    "Compiled on " __DATE__ " for kernel %s"
-#ifdef CONFIG_SMP
-		    " (SMP)"
-#endif
-#ifdef MODVERSIONS
-		    " with versioned symbols"
-#endif
-		    ".\n", kernel_version);
+		    "Advanced Linux Sound Architecture Driver Version "
+		    CONFIG_SND_VERSION CONFIG_SND_DATE ".\n"
+		   );
 }
 
 static int __init snd_info_version_init(void)

@@ -44,16 +44,6 @@
 #define NFSD4_MAX_TAGLEN	128
 #define XDR_LEN(n)                     (((n) + 3) & ~3)
 
-typedef u32 delegation_zero_t;
-typedef u32 delegation_boot_t;
-typedef u64 delegation_id_t;
-
-typedef struct {
-	delegation_zero_t	ds_zero;
-	delegation_boot_t	ds_boot;
-	delegation_id_t		ds_id;
-} delegation_stateid_t;
-
 struct nfsd4_change_info {
 	u32		atomic;
 	u32		before_ctime_sec;
@@ -103,6 +93,10 @@ struct nfsd4_create {
 #define cr_linkname	u.link.name
 #define cr_specdata1	u.dev.specdata1
 #define cr_specdata2	u.dev.specdata2
+
+struct nfsd4_delegreturn {
+	stateid_t	dr_stateid;
+};
 
 struct nfsd4_getattr {
 	u32		ga_bmval[2];        /* request */
@@ -202,13 +196,13 @@ struct nfsd4_open {
 	u32		op_claim_type;      /* request */
 	struct xdr_netobj op_fname;	    /* request - everything but CLAIM_PREV */
 	u32		op_delegate_type;   /* request - CLAIM_PREV only */
-	delegation_stateid_t	op_delegate_stateid; /* request - CLAIM_DELEGATE_CUR only */
+	stateid_t       op_delegate_stateid; /* request - response */
 	u32		op_create;     	    /* request */
 	u32		op_createmode;      /* request */
 	u32		op_bmval[2];        /* request */
 	union {                             /* request */
-		struct iattr	iattr;		            /* UNCHECKED4,GUARDED4 */
-		nfs4_verifier	verf;		                     /* EXCLUSIVE4 */
+		struct iattr	iattr;                      /* UNCHECKED4,GUARDED4 */
+		nfs4_verifier	verf;                                /* EXCLUSIVE4 */
 	} u;
 	clientid_t	op_clientid;        /* request */
 	struct xdr_netobj op_owner;           /* request */
@@ -345,6 +339,7 @@ struct nfsd4_op {
 		struct nfsd4_close		close;
 		struct nfsd4_commit		commit;
 		struct nfsd4_create		create;
+		struct nfsd4_delegreturn	delegreturn;
 		struct nfsd4_getattr		getattr;
 		struct svc_fh *			getfh;
 		struct nfsd4_link		link;
@@ -456,6 +451,8 @@ extern int
 nfsd4_release_lockowner(struct svc_rqst *rqstp,
 		struct nfsd4_release_lockowner *rlockowner);
 extern void nfsd4_release_compoundargs(struct nfsd4_compoundargs *);
+extern int nfsd4_delegreturn(struct svc_rqst *rqstp,
+		struct svc_fh *current_fh, struct nfsd4_delegreturn *dr);
 #endif
 
 /*

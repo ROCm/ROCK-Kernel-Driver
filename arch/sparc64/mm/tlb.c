@@ -118,11 +118,9 @@ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long start, unsigned long
 	 */
 	BUG_ON(s > e);
 
-#if 0
-	/* Currently free_pgtables guarantees this.  */
 	s &= PMD_MASK;
 	e = (e + PMD_SIZE - 1) & PMD_MASK;
-#endif
+
 	vpte_base = (tlb_type == spitfire ?
 		     VPTE_BASE_SPITFIRE :
 		     VPTE_BASE_CHEETAH);

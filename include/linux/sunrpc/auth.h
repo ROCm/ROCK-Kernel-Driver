@@ -51,7 +51,6 @@ struct rpc_cred {
 };
 #define RPCAUTH_CRED_LOCKED	0x0001
 #define RPCAUTH_CRED_UPTODATE	0x0002
-#define RPCAUTH_CRED_DEAD	0x0004
 
 #define RPCAUTH_CRED_MAGIC	0x0f4aa4f0
 
@@ -131,7 +130,6 @@ int			rpcauth_unwrap_resp(struct rpc_task *task, kxdrproc_t decode, void *rqstp,
 int			rpcauth_refreshcred(struct rpc_task *);
 void			rpcauth_invalcred(struct rpc_task *);
 int			rpcauth_uptodatecred(struct rpc_task *);
-int			rpcauth_deadcred(struct rpc_task *);
 void			rpcauth_init_credcache(struct rpc_auth *);
 void			rpcauth_free_credcache(struct rpc_auth *);
 

@@ -831,8 +831,6 @@ static inline void	ahc_linux_eisa_exit(void) {
 
 /******************************* PCI Routines *********************************/
 #ifdef CONFIG_PCI
-void			 ahc_power_state_change(struct ahc_softc *ahc,
-						ahc_power_state new_state);
 int			 ahc_linux_pci_init(void);
 void			 ahc_linux_pci_exit(void);
 int			 ahc_pci_map_registers(struct ahc_softc *ahc);

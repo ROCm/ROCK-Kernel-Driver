@@ -265,7 +265,7 @@ static struct sk_buff *bcsp_prepare_pkt(struct bcsp_struct *bcsp, u8 *data,
 /* This is a rewrite of pkt_avail in ABCSP */
 static struct sk_buff *bcsp_dequeue(struct hci_uart *hu)
 {
-	struct bcsp_struct *bcsp = (struct bcsp_struct *) hu->priv;
+	struct bcsp_struct *bcsp = hu->priv;
 	unsigned long flags;
 	struct sk_buff *skb;
 	
@@ -629,7 +629,7 @@ static int bcsp_recv(struct hci_uart *hu, void *data, int count)
 static void bcsp_timed_event(unsigned long arg)
 {
 	struct hci_uart *hu = (struct hci_uart *) arg;
-	struct bcsp_struct *bcsp = (struct bcsp_struct *) hu->priv;
+	struct bcsp_struct *bcsp = hu->priv;
 	struct sk_buff *skb;
 	unsigned long flags;
 

@@ -307,6 +307,8 @@ static int __init parisc_init(void)
 			boot_cpu_data.cpu_hz / 1000000,
 			boot_cpu_data.cpu_hz % 1000000	);
 
+	parisc_setup_cache_timing();
+
 	/* These are in a non-obvious order, will fix when we have an iotree */
 #if defined(CONFIG_IOSAPIC)
 	iosapic_init();

@@ -131,6 +131,7 @@ static int ibmasmfs_fill_super (struct super_block *sb, void *data, int silent)
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = IBMASMFS_MAGIC;
 	sb->s_op = &ibmasmfs_s_ops;
+	sb->s_time_gran = 1;
 
 	root = ibmasmfs_make_inode (sb, S_IFDIR | 0500);
 	if (!root)

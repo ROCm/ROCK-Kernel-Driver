@@ -26,6 +26,7 @@
 //   address of the OS's NACA).
 //
 #include <asm/types.h>
+#include <asm/naca.h>
 
 //=============================================================================
 //

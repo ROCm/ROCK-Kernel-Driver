@@ -39,7 +39,7 @@
 static struct net_device **x25_asy_devs;
 static int x25_asy_maxdev = SL_NRUNIT;
 
-MODULE_PARM(x25_asy_maxdev, "i");
+module_param(x25_asy_maxdev, int, 0);
 MODULE_LICENSE("GPL");
 
 static int x25_asy_esc(unsigned char *p, unsigned char *d, int len);

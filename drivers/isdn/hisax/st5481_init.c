@@ -37,14 +37,14 @@ MODULE_AUTHOR("Frode Isaksen");
 MODULE_LICENSE("GPL");
 
 static int protocol = 2;       /* EURO-ISDN Default */
-MODULE_PARM(protocol, "i");
+module_param(protocol, int, 0);
 
 static int number_of_leds = 2;       /* 2 LEDs on the adpater default */
-MODULE_PARM(number_of_leds, "i");
+module_param(number_of_leds, int, 0);
 
 #ifdef CONFIG_HISAX_DEBUG
 static int debug = 0x1;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 int st5481_debug;
 #endif
 
@@ -67,7 +67,8 @@ static int probe_st5481(struct usb_interface *intf,
 	int retval, i;
 
 	printk(KERN_INFO "st541: found adapter VendorId %04x, ProductId %04x, LEDs %d\n",
-	     dev->descriptor.idVendor, dev->descriptor.idProduct,
+	     le16_to_cpu(dev->descriptor.idVendor),
+	     le16_to_cpu(dev->descriptor.idProduct),
 	     number_of_leds);
 
 	adapter = kmalloc(sizeof(struct st5481_adapter), GFP_KERNEL);

@@ -92,7 +92,7 @@ static inline u32 fz_key(u32 dst, struct fn_zone *fz)
 	return dst & FZ_MASK(fz);
 }
 
-static rwlock_t fib_hash_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(fib_hash_lock);
 
 #define FZ_MAX_DIVISOR ((PAGE_SIZE<<MAX_ORDER) / sizeof(struct hlist_head))
 

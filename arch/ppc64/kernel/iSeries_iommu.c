@@ -132,11 +132,11 @@ static void iommu_table_getparms(struct iSeries_Device_Node* dn,
 	if (parms->itc_size == 0)
 		panic("PCI_DMA: parms->size is zero, parms is 0x%p", parms);
 
-	tbl->it_size = parms->itc_size;
+	/* itc_size is in pages worth of table, it_size is in # of entries */
+	tbl->it_size = (parms->itc_size * PAGE_SIZE) / sizeof(union tce_entry);
 	tbl->it_busno = parms->itc_busno;
 	tbl->it_offset = parms->itc_offset;
 	tbl->it_index = parms->itc_index;
-	tbl->it_entrysize = sizeof(union tce_entry);
 	tbl->it_blocksize = 1;
 	tbl->it_type = TCE_PCI;
 
@@ -160,11 +160,16 @@ void iommu_devnode_init_iSeries(struct iSeries_Device_Node *dn)
 		kfree(tbl);
 }
 
+static void iommu_dev_setup_iSeries(struct pci_dev *dev) { }
+static void iommu_bus_setup_iSeries(struct pci_bus *bus) { }
 
-void tce_init_iSeries(void)
+void iommu_init_early_iSeries(void)
 {
 	ppc_md.tce_build = tce_build_iSeries;
 	ppc_md.tce_free  = tce_free_iSeries;
+
+	ppc_md.iommu_dev_setup = iommu_dev_setup_iSeries;
+	ppc_md.iommu_bus_setup = iommu_bus_setup_iSeries;
 
 	pci_iommu_init();
 }
