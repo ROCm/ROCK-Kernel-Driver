@@ -1891,11 +1891,10 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		case IAS_STRING:
 			/* Should check charset & co */
 			/* Check length */
-			if(ias_opt->attribute.irda_attrib_string.len >
-			   IAS_MAX_STRING) {
-				kfree(ias_opt);
-				return -EINVAL;
-			}
+			/* The length is encoded in a __u8, and
+			 * IAS_MAX_STRING == 256, so there is no way
+			 * userspace can pass us a string too large.
+			 * Jean II */
 			/* NULL terminate the string (avoid troubles) */
 			ias_opt->attribute.irda_attrib_string.string[ias_opt->attribute.irda_attrib_string.len] = '\0';
 			/* Add a string attribute */
