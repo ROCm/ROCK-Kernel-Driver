@@ -56,8 +56,11 @@ salinfo_init(void)
 
 	for (i=0; i < NR_SALINFO_ENTRIES; i++) {
 		/* pass the feature bit in question as misc data */
-		*sdir++ = create_proc_read_entry (salinfo_entries[i].name, 0, salinfo_dir,
+		*sdir = create_proc_read_entry (salinfo_entries[i].name, 0, salinfo_dir,
 						  salinfo_read, (void *)salinfo_entries[i].feature);
+		if (*sdir)
+			*sdir->owner = THIS_MODULE;
+		sdir++;
 	}
 	*sdir++ = salinfo_dir;
 
@@ -84,8 +87,6 @@ salinfo_read(char *page, char **start, off_t off, int count, int *eof, void *dat
 {
 	int len = 0;
 
-	MOD_INC_USE_COUNT;
-
 	len = sprintf(page, (sal_platform_features & (unsigned long)data) ? "1\n" : "0\n");
 
 	if (len <= off+count) *eof = 1;
@@ -95,8 +96,6 @@ salinfo_read(char *page, char **start, off_t off, int count, int *eof, void *dat
 
 	if (len>count) len = count;
 	if (len<0) len = 0;
-
-	MOD_DEC_USE_COUNT;
 
 	return len;
 }

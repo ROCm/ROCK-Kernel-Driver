@@ -893,7 +893,6 @@ palinfo_read_entry(char *page, char **start, off_t off, int count, int *eof, voi
 	int len=0;
 	pal_func_cpu_u_t *f = (pal_func_cpu_u_t *)&data;
 
-	MOD_INC_USE_COUNT;
 	/*
 	 * in SMP mode, we may need to call another CPU to get correct
 	 * information. PAL, by definition, is processor specific
@@ -910,8 +909,6 @@ palinfo_read_entry(char *page, char **start, off_t off, int count, int *eof, voi
 
 	if (len>count) len = count;
 	if (len<0) len = 0;
-
-	MOD_DEC_USE_COUNT;
 
 	return len;
 }
@@ -947,8 +944,12 @@ palinfo_init(void)
 
 		for (j=0; j < NR_PALINFO_ENTRIES; j++) {
 			f.func_id = j;
-			*pdir++ = create_proc_read_entry (palinfo_entries[j].name, 0, cpu_dir,
-						palinfo_read_entry, (void *)f.value);
+			*pdir = create_proc_read_entry(
+					palinfo_entries[j].name, 0, cpu_dir,
+					palinfo_read_entry, (void *)f.value);
+			if (*pdir)
+				(*pdir)->owner = THIS_MODULE;
+			pdir++;
 		}
 		*pdir++ = cpu_dir;
 	}
