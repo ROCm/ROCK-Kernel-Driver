@@ -70,6 +70,8 @@ int device_register(struct device *dev)
 	if ((error = device_make_dir(dev)))
 		goto register_done;
 
+	bus_add_device(dev);
+
 	/* notify platform of device entry */
 	if (platform_notify)
 		platform_notify(dev);
@@ -96,14 +98,13 @@ void put_device(struct device * dev)
 	DBG("DEV: Unregistering device. ID = '%s', name = '%s'\n",
 	    dev->bus_id,dev->name);
 
-	/* remove the driverfs directory */
-	device_remove_dir(dev);
-
 	/* Notify the platform of the removal, in case they
 	 * need to do anything...
 	 */
 	if (platform_notify_remove)
 		platform_notify_remove(dev);
+
+	bus_remove_device(dev);
 
 	/* Tell the driver to clean up after itself.
 	 * Note that we likely didn't allocate the device,
@@ -111,6 +112,12 @@ void put_device(struct device * dev)
 	 */
 	if (dev->driver && dev->driver->remove)
 		dev->driver->remove(dev,REMOVE_FREE_RESOURCES);
+
+	/* remove the driverfs directory */
+	device_remove_dir(dev);
+
+	if (dev->release)
+		dev->release(dev);
 
 	put_device(dev->parent);
 }
