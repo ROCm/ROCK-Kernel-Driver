@@ -531,7 +531,7 @@ static void rtl8169_hw_phy_config(struct net_device *dev)
 	mdio_write(ioaddr, 24, 0x65c7);			//w 24 15 0 65c7
 	rtl8169_write_gmii_reg_bit(ioaddr, 4, 11, 0);	//w 4 11 11 0
 
-	for (i = ARRAY_SIZE(phy_magic); i > 0; i++, p++) {
+	for (i = 0; i < ARRAY_SIZE(phy_magic); i++, p++) {
 		int val, pos = 4;
 
 		val = (mdio_read(ioaddr, pos) & 0x0fff) | (p->regs[0] & 0xffff);
