@@ -1273,6 +1273,6 @@ void __init smp_intr_init()
 
 	/* thermal monitor LVT interrupt */
 #ifdef CONFIG_X86_MCE_P4THERMAL
-	set_intr_gate(THERMAL_APIC_VECTOR, smp_thermal_interrupt);
+	set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
 #endif
 }
