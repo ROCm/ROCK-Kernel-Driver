@@ -104,6 +104,7 @@ void __init setup_node_bootmem(int nodeid, unsigned long start, unsigned long en
 	if (nodeid + 1 > numnodes)
 		numnodes = nodeid + 1;
 	nodes_present |= (1UL << nodeid); 
+	node_set_online(nodeid);
 } 
 
 /* Initialize final allocator for a zone */

@@ -189,8 +189,7 @@ void pda_init(int cpu)
 	pda->irqstackptr += IRQSTACKSIZE-64;
 } 
 
-#define EXCEPTION_STK_ORDER 0 /* >= N_EXCEPTION_STACKS*EXCEPTION_STKSZ */
-char boot_exception_stacks[N_EXCEPTION_STACKS*EXCEPTION_STKSZ];
+char boot_exception_stacks[N_EXCEPTION_STACKS * EXCEPTION_STKSZ];
 
 void syscall_init(void)
 {
@@ -226,15 +225,12 @@ void __init cpu_init (void)
 #endif
 	struct tss_struct * t = &init_tss[cpu];
 	unsigned long v, efer; 
-	char *estacks; 
+	char *estacks = NULL; 
 	struct task_struct *me;
 
 	/* CPU 0 is initialised in head64.c */
 	if (cpu != 0) {
 		pda_init(cpu);
-		estacks = (char *)__get_free_pages(GFP_ATOMIC, 0); 
-		if (!estacks)
-			panic("Can't allocate exception stacks for CPU %d\n",cpu);
 	} else 
 		estacks = boot_exception_stacks; 
 
@@ -282,10 +278,15 @@ void __init cpu_init (void)
 	/*
 	 * set up and load the per-CPU TSS
 	 */
-	estacks += EXCEPTION_STKSZ;
 	for (v = 0; v < N_EXCEPTION_STACKS; v++) {
-		t->ist[v] = (unsigned long)estacks;
+		if (cpu) {
+			estacks = (char *)__get_free_pages(GFP_ATOMIC, 0);
+			if (!estacks)
+				panic("Cannot allocate exception stack %ld %d\n",
+				      v, cpu); 
+		}
 		estacks += EXCEPTION_STKSZ;
+		t->ist[v] = (unsigned long)estacks;
 	}
 
 	t->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;

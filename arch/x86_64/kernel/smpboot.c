@@ -54,7 +54,7 @@
 #include <asm/proto.h>
 
 /* Bitmask of currently online CPUs */
-cpumask_t cpu_online_map;
+cpumask_t cpu_online_map = { 1 };
 
 static cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;

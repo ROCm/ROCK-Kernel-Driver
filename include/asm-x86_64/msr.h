@@ -67,7 +67,7 @@
 			  : "=a" (low), "=d" (high) \
 			  : "c" (counter))
 
-extern inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
+static inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
 {
 	__asm__("cpuid"
 		: "=a" (*eax),
@@ -80,7 +80,7 @@ extern inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
 /*
  * CPUID functions returning a single datum
  */
-extern inline unsigned int cpuid_eax(unsigned int op)
+static inline unsigned int cpuid_eax(unsigned int op)
 {
 	unsigned int eax;
 
@@ -90,7 +90,7 @@ extern inline unsigned int cpuid_eax(unsigned int op)
 		: "bx", "cx", "dx");
 	return eax;
 }
-extern inline unsigned int cpuid_ebx(unsigned int op)
+static inline unsigned int cpuid_ebx(unsigned int op)
 {
 	unsigned int eax, ebx;
 
@@ -100,7 +100,7 @@ extern inline unsigned int cpuid_ebx(unsigned int op)
 		: "cx", "dx" );
 	return ebx;
 }
-extern inline unsigned int cpuid_ecx(unsigned int op)
+static inline unsigned int cpuid_ecx(unsigned int op)
 {
 	unsigned int eax, ecx;
 
@@ -110,7 +110,7 @@ extern inline unsigned int cpuid_ecx(unsigned int op)
 		: "bx", "dx" );
 	return ecx;
 }
-extern inline unsigned int cpuid_edx(unsigned int op)
+static inline unsigned int cpuid_edx(unsigned int op)
 {
 	unsigned int eax, edx;
 

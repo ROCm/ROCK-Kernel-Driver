@@ -241,6 +241,13 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	if (unlikely(in_atomic() || !mm))
 		goto bad_area_nosemaphore;
 
+	/* In some cases the CPU can report the carry bit for wrapping
+	   jumps in compatibility mode.
+	   Force the fault address to 4GB for anything in compatibility mode.
+	   Any code segment in LDT is compatibility mode. */
+	if (regs->cs == __USER32_CS || (regs->cs & (1<<2)))
+		address &= 0xffffffff;
+
  again:
 	down_read(&mm->mmap_sem);
 

@@ -487,25 +487,3 @@ asmlinkage void smp_call_function_interrupt(void)
 		atomic_inc(&call_data->finished);
 	}
 }
-
-/* Slow. Should be only used for debugging. */
-int slow_smp_processor_id(void)
-{ 
-	int stack_location;
-	unsigned long sp = (unsigned long)&stack_location; 
-	int offset = 0, cpu;
-
-	for (offset = 0; next_cpu(offset, cpu_online_map) < NR_CPUS; offset = cpu + 1) {
-		cpu = next_cpu(offset, cpu_online_map);
-
-		if (sp >= (u64)cpu_pda[cpu].irqstackptr - IRQSTACKSIZE && 
-		    sp <= (u64)cpu_pda[cpu].irqstackptr)
-			return cpu;
-
-		unsigned long estack = init_tss[cpu].ist[0] - EXCEPTION_STKSZ;
-		if (sp >= estack && sp <= estack+(1<<(PAGE_SHIFT+EXCEPTION_STK_ORDER)))
-			return cpu;			
-	}
-
-	return stack_smp_processor_id();
-} 

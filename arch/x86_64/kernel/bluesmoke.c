@@ -200,11 +200,14 @@ static char *highbits[32] = {
 static void check_k8_nb(int header)
 {
 	struct pci_dev *nb;
+	u32 statuslow, statushigh;
+	unsigned short errcode;
+	int i;
+
 	nb = find_k8_nb(); 
 	if (nb == NULL)
 		return;
 
-	u32 statuslow, statushigh;
 	pci_read_config_dword(nb, 0x48, &statuslow);
 	pci_read_config_dword(nb, 0x4c, &statushigh);
 	if (!(statushigh & (1<<31)))
@@ -215,7 +218,7 @@ static void check_k8_nb(int header)
 	printk(KERN_ERR "Northbridge status %08x%08x\n",
 	       statushigh,statuslow); 
 
-	unsigned short errcode = statuslow & 0xffff;	
+	errcode = statuslow & 0xffff;	
 	switch (errcode >> 8) { 
 	case 0: 					
 		printk(KERN_ERR "    GART TLB error %s %s\n", 
@@ -249,7 +252,6 @@ static void check_k8_nb(int header)
 	/* should only print when it was a HyperTransport related error. */
 	printk(KERN_ERR "    link number %x\n", (statushigh >> 4) & 3);
 
-	int i;
 	for (i = 0; i < 32; i++) 
 		if (highbits[i] && (statushigh & (1<<i)))
 			printk(KERN_ERR "    %s\n", highbits[i]); 

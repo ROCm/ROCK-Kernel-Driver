@@ -71,6 +71,7 @@ EXPORT_SYMBOL_NOVERS(__down_failed_trylock);
 EXPORT_SYMBOL_NOVERS(__up_wakeup);
 /* Networking helper routines. */
 EXPORT_SYMBOL(csum_partial_copy_nocheck);
+EXPORT_SYMBOL(ip_compute_csum);
 /* Delay loops */
 EXPORT_SYMBOL(__udelay);
 EXPORT_SYMBOL(__ndelay);
@@ -154,7 +155,7 @@ EXPORT_SYMBOL_GPL(unset_nmi_callback);
 
 extern void * memset(void *,int,__kernel_size_t);
 extern size_t strlen(const char *);
-extern char * bcopy(const char * src, char * dest, int count);
+extern void bcopy(const char * src, char * dest, int count);
 extern void * memmove(void * dest,const void *src,size_t count);
 extern char * strcpy(char * dest,const char *src);
 extern int strcmp(const char * cs,const char * ct);

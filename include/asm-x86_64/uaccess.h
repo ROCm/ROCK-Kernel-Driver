@@ -48,7 +48,7 @@
 
 #define access_ok(type,addr,size) (__range_not_ok(addr,size) == 0)
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+static inline int verify_area(int type, const void * addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }

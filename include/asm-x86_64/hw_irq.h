@@ -76,8 +76,8 @@ struct hw_interrupt_type;
 
 
 #ifndef __ASSEMBLY__
-extern int irq_vector[NR_IRQS];
-#define IO_APIC_VECTOR(irq)	irq_vector[irq]
+extern u8 irq_vector[NR_IRQ_VECTORS];
+#define IO_APIC_VECTOR(irq)	((int)irq_vector[irq])
 
 /*
  * Various low-level irq details needed by irq.c, process.c,

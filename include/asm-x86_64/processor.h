@@ -263,8 +263,8 @@ struct thread_struct {
 #define DOUBLEFAULT_STACK 2 
 #define NMI_STACK 3 
 #define N_EXCEPTION_STACKS 3  /* hw limit: 7 */
-#define EXCEPTION_STKSZ 1024
-#define EXCEPTION_STK_ORDER 0
+#define EXCEPTION_STKSZ (PAGE_SIZE << EXCEPTION_STACK_ORDER)
+#define EXCEPTION_STACK_ORDER 0 
 
 #define start_thread(regs,new_rip,new_rsp) do { \
 	asm volatile("movl %0,%%fs; movl %0,%%es; movl %0,%%ds": :"r" (0));	 \
@@ -304,13 +304,13 @@ extern unsigned long get_wchan(struct task_struct *p);
 #define KSTK_ESP(tsk) -1 /* sorry. doesn't work for syscall. */
 
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
-extern inline void rep_nop(void)
+static inline void rep_nop(void)
 {
 	__asm__ __volatile__("rep;nop": : :"memory");
 }
 
 /* Stop speculative execution */
-extern inline void sync_core(void)
+static inline void sync_core(void)
 { 
 	int tmp;
 	asm volatile("cpuid" : "=a" (tmp) : "0" (1) : "ebx","ecx","edx","memory");

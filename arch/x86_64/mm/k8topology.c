@@ -164,5 +164,8 @@ int __init k8_scan_nodes(unsigned long start, unsigned long end)
 		rr++; 
 	}
 
+	if (found == 1) 
+		fake_node = 1;
+
 	return 0;
 } 
