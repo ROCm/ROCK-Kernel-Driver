@@ -14,27 +14,8 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 
 	if (last >= 0) {
 		int		i;
-		struct td	*td = urb_priv->td [0];
-		int		len = td->urb->transfer_buffer_length;
-		int		dir = usb_pipeout (td->urb->pipe)
-					? PCI_DMA_TODEVICE
-					: PCI_DMA_FROMDEVICE;
+		struct td	*td;
 
-		/* unmap CTRL URB setup buffer (always td 0) */
-		if (usb_pipecontrol (td->urb->pipe)) {
-			pci_unmap_single (hc->hcd.pdev, 
-					td->data_dma, 8, PCI_DMA_TODEVICE);
-			
-			/* CTRL data buffer starts at td 1 if len > 0 */
-			if (len && last > 0)
-				td = urb_priv->td [1]; 		
-		}
-		/* else:  ISOC, BULK, INTR data buffer starts at td 0 */
-
-		/* unmap data buffer */
-		if (len && td->data_dma)
-			pci_unmap_single (hc->hcd.pdev,
-					td->data_dma, len, dir);
 		for (i = 0; i <= last; i++) {
 			td = urb_priv->td [i];
 			if (td)
@@ -85,15 +66,8 @@ static inline void intr_resub (struct ohci_hcd *hc, struct urb *urb)
 	struct urb_priv	*urb_priv = urb->hcpriv;
 	unsigned long	flags;
 
-// FIXME rewrite this resubmit path.  use pci_dma_sync_single()
-// and requeue more cheaply, and only if needed.
-// Better yet ... abolish the notion of automagic resubmission.
-	pci_unmap_single (hc->hcd.pdev,
-		urb_priv->td [0]->data_dma,
-		urb->transfer_buffer_length,
-		usb_pipeout (urb->pipe)
-			? PCI_DMA_TODEVICE
-			: PCI_DMA_FROMDEVICE);
+// FIXME going away along with the rest of interrrupt automagic...
+
 	/* FIXME: MP race.  If another CPU partially unlinks
 	 * this URB (urb->status was updated, hasn't yet told
 	 * us to dequeue) before we call complete() here, an
@@ -612,13 +586,9 @@ static void td_submit_urb (
 
 	urb_priv->td_cnt = 0;
 
-	if (data_len) {
-		data = pci_map_single (ohci->hcd.pdev,
-				       urb->transfer_buffer, data_len,
-				       is_out
-					       ? PCI_DMA_TODEVICE
-					       : PCI_DMA_FROMDEVICE);
-	} else
+	if (data_len)
+		data = urb->transfer_dma;
+	else
 		data = 0;
 
 	/* NOTE:  TD_CC is set so we can tell which TDs the HC processed by
@@ -665,11 +635,7 @@ static void td_submit_urb (
 	 */
 	case PIPE_CONTROL:
 		info = TD_CC | TD_DP_SETUP | TD_T_DATA0;
-		td_fill (info,
-			pci_map_single (ohci->hcd.pdev,
-					urb->setup_packet, 8,
-					PCI_DMA_TODEVICE),
-			 8, urb, cnt++);
+		td_fill (info, urb->setup_dma, 8, urb, cnt++);
 		if (data_len > 0) {
 			info = TD_CC | TD_R | TD_T_DATA1;
 			info |= is_out ? TD_DP_OUT : TD_DP_IN;

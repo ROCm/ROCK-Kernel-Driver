@@ -219,7 +219,6 @@ struct ehci_qtd {
 
 	/* dma same in urb's qtds, except 1st control qtd (setup buffer) */
 	struct urb		*urb;			/* qtd's urb */
-	dma_addr_t		buf_dma;		/* buffer address */
 	size_t			length;			/* length of buffer */
 } __attribute__ ((aligned (32)));
 

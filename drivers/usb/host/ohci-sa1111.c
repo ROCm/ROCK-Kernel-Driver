@@ -161,6 +161,12 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver, struct usb_hcd **hcd_o
 	hcd->regs = (void *) &USB_OHCI_OP_BASE;
 	hcd->pdev = SA1111_FAKE_PCIDEV;
 
+	retval = hcd_buffer_create (hcd);
+	if (retval != 0) {
+		dbg ("pool alloc fail");
+		goto err1;
+	}
+
 	set_irq_type(NIRQHCIM, IRQT_RISING);
 	retval = request_irq (NIRQHCIM, usb_hcd_sa1111_hcim_irq, SA_INTERRUPT,
 			      hcd->description, hcd);
@@ -193,6 +199,7 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver, struct usb_hcd **hcd_o
 	return 0;
 
  err2:
+	hcd_buffer_destroy (hcd);
 	if (hcd) driver->hcd_free(hcd);
  err1:
 	sa1111_stop_hc();
@@ -233,6 +240,7 @@ void usb_hcd_sa1111_remove (struct usb_hcd *hcd)
 	hcd->state = USB_STATE_HALT;
 
 	free_irq (hcd->irq, hcd);
+	hcd_buffer_destroy (hcd);
 
 	usb_deregister_bus (&hcd->self);
 	if (atomic_read (&hcd->self.refcnt) != 1)

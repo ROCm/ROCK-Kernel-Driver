@@ -646,23 +646,6 @@ static struct urb_priv *uhci_alloc_urb_priv(struct uhci_hcd *uhci, struct urb *u
 
 	urb->hcpriv = urbp;
 
-	if (urb->transfer_buffer_length) {
-		urbp->transfer_buffer_dma_handle = pci_map_single(uhci->dev,
-			urb->transfer_buffer, urb->transfer_buffer_length,
-			usb_pipein(urb->pipe) ? PCI_DMA_FROMDEVICE :
-			PCI_DMA_TODEVICE);
-		if (!urbp->transfer_buffer_dma_handle)
-			return NULL;
-	}
-
-	if (usb_pipetype(urb->pipe) == PIPE_CONTROL && urb->setup_packet) {
-		urbp->setup_packet_dma_handle = pci_map_single(uhci->dev,
-			urb->setup_packet, sizeof(struct usb_ctrlrequest),
-			PCI_DMA_TODEVICE);
-		if (!urbp->setup_packet_dma_handle)
-			return NULL;
-	}
-
 	return urbp;
 }
 
@@ -719,19 +702,6 @@ static void uhci_destroy_urb_priv(struct uhci_hcd *uhci, struct urb *urb)
 		uhci_remove_td_from_urb(td);
 		uhci_remove_td(uhci, td);
 		uhci_free_td(uhci, td);
-	}
-
-	if (urbp->setup_packet_dma_handle) {
-		pci_unmap_single(uhci->dev, urbp->setup_packet_dma_handle,
-			sizeof(struct usb_ctrlrequest), PCI_DMA_TODEVICE);
-		urbp->setup_packet_dma_handle = 0;
-	}
-
-	if (urbp->transfer_buffer_dma_handle) {
-		pci_unmap_single(uhci->dev, urbp->transfer_buffer_dma_handle,
-			urb->transfer_buffer_length, usb_pipein(urb->pipe) ?
-			PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
-		urbp->transfer_buffer_dma_handle = 0;
 	}
 
 	urb->hcpriv = NULL;
@@ -813,7 +783,7 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb)
 	unsigned long destination, status;
 	int maxsze = usb_maxpacket(urb->dev, urb->pipe, usb_pipeout(urb->pipe));
 	int len = urb->transfer_buffer_length;
-	dma_addr_t data = urbp->transfer_buffer_dma_handle;
+	dma_addr_t data = urb->transfer_dma;
 
 	/* The "pipe" thing contains the destination in bits 8--18 */
 	destination = (urb->pipe & PIPE_DEVEP_MASK) | USB_PID_SETUP;
@@ -832,7 +802,7 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb)
 
 	uhci_add_td_to_urb(urb, td);
 	uhci_fill_td(td, status, destination | uhci_explen(7),
-		urbp->setup_packet_dma_handle);
+		urb->setup_dma);
 
 	/*
 	 * If direction is "send", change the frame from SETUP (0x2D)
@@ -1072,7 +1042,6 @@ static int uhci_submit_interrupt(struct uhci_hcd *uhci, struct urb *urb)
 {
 	struct uhci_td *td;
 	unsigned long destination, status;
-	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
 
 	if (urb->transfer_buffer_length > usb_maxpacket(urb->dev, urb->pipe, usb_pipeout(urb->pipe)))
 		return -EINVAL;
@@ -1094,7 +1063,7 @@ static int uhci_submit_interrupt(struct uhci_hcd *uhci, struct urb *urb)
 	usb_dotoggle(urb->dev, usb_pipeendpoint(urb->pipe), usb_pipeout(urb->pipe));
 
 	uhci_add_td_to_urb(urb, td);
-	uhci_fill_td(td, status, destination, urbp->transfer_buffer_dma_handle);
+	uhci_fill_td(td, status, destination, urb->transfer_dma);
 
 	uhci_insert_td(uhci, uhci->skeltd[__interval_to_skel(urb->interval)], td);
 
@@ -1196,7 +1165,7 @@ static int uhci_submit_bulk(struct uhci_hcd *uhci, struct urb *urb, struct urb *
 	int maxsze = usb_maxpacket(urb->dev, urb->pipe, usb_pipeout(urb->pipe));
 	int len = urb->transfer_buffer_length;
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
-	dma_addr_t data = urbp->transfer_buffer_dma_handle;
+	dma_addr_t data = urb->transfer_dma;
 
 	if (len < 0)
 		return -EINVAL;
@@ -1358,7 +1327,6 @@ static int uhci_submit_isochronous(struct uhci_hcd *uhci, struct urb *urb)
 	struct uhci_td *td;
 	int i, ret, frame;
 	int status, destination;
-	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
 
 	status = TD_CTRL_ACTIVE | TD_CTRL_IOS;
 	destination = (urb->pipe & PIPE_DEVEP_MASK) | usb_packetid(urb->pipe);
@@ -1378,7 +1346,7 @@ static int uhci_submit_isochronous(struct uhci_hcd *uhci, struct urb *urb)
 
 		uhci_add_td_to_urb(urb, td);
 		uhci_fill_td(td, status, destination | uhci_explen(urb->iso_frame_desc[i].length - 1),
-			urbp->transfer_buffer_dma_handle + urb->iso_frame_desc[i].offset);
+			urb->transfer_dma + urb->iso_frame_desc[i].offset);
 
 		if (i + 1 >= urb->number_of_packets)
 			td->status |= cpu_to_le32(TD_CTRL_IOC);
@@ -1831,15 +1799,6 @@ static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb)
 			urb->status == -ECONNRESET);
 	resubmit_interrupt = (usb_pipetype(urb->pipe) == PIPE_INTERRUPT &&
 			urb->interval);
-
-	if (urbp->transfer_buffer_dma_handle)
-		pci_dma_sync_single(uhci->dev, urbp->transfer_buffer_dma_handle,
-			urb->transfer_buffer_length, usb_pipein(urb->pipe) ?
-			PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
-
-	if (urbp->setup_packet_dma_handle)
-		pci_dma_sync_single(uhci->dev, urbp->setup_packet_dma_handle,
-			sizeof(struct usb_ctrlrequest), PCI_DMA_TODEVICE);
 
 	status = urbp->status;
 	if (!resubmit_interrupt || killed)
