@@ -63,8 +63,6 @@
 extern int md_size[MAX_MD_DEVS];
 extern struct hd_struct md_hd_struct[MAX_MD_DEVS];
 
-extern void add_mddev_mapping (mddev_t *mddev, kdev_t dev, void *data);
-extern void del_mddev_mapping (mddev_t *mddev, kdev_t dev);
 extern char * partition_name (kdev_t dev);
 extern inline char * bdev_partition_name (struct block_device *bdev)
 {

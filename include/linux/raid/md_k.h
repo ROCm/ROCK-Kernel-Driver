@@ -65,24 +65,6 @@ typedef struct mdk_rdev_s mdk_rdev_t;
 #define MAX_MD_DEVS  (1<<MINORBITS)	/* Max number of md dev */
 
 /*
- * Maps a kdev to an mddev/subdev. How 'data' is handled is up to
- * the personality. (eg. HSM uses this to identify individual LVs)
- */
-typedef struct dev_mapping_s {
-	mddev_t *mddev;
-	void *data;
-} dev_mapping_t;
-
-extern dev_mapping_t mddev_map [MAX_MD_DEVS];
-
-static inline mddev_t * kdev_to_mddev (kdev_t dev)
-{
-	if (major(dev) != MD_MAJOR)
-		BUG();
-        return mddev_map[minor(dev)].mddev;
-}
-
-/*
  * options passed in raidrun:
  */
 

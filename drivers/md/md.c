@@ -130,43 +130,13 @@ static struct gendisk md_gendisk=
  */
 static LIST_HEAD(all_mddevs);
 
-/*
- * The mapping between kdev and mddev is not necessary a simple
- * one! Eg. HSM uses several sub-devices to implement Logical
- * Volumes. All these sub-devices map to the same mddev.
- */
-dev_mapping_t mddev_map[MAX_MD_DEVS];
+static mddev_t *mddev_map[MAX_MD_DEVS];
 
-void add_mddev_mapping(mddev_t * mddev, kdev_t dev, void *data)
+static inline mddev_t * kdev_to_mddev (kdev_t dev)
 {
-	unsigned int minor = minor(dev);
-
-	if (major(dev) != MD_MAJOR) {
-		MD_BUG();
-		return;
-	}
-	if (mddev_map[minor].mddev) {
-		MD_BUG();
-		return;
-	}
-	mddev_map[minor].mddev = mddev;
-	mddev_map[minor].data = data;
-}
-
-void del_mddev_mapping(mddev_t * mddev, kdev_t dev)
-{
-	unsigned int minor = minor(dev);
-
-	if (major(dev) != MD_MAJOR) {
-		MD_BUG();
-		return;
-	}
-	if (mddev_map[minor].mddev != mddev) {
-		MD_BUG();
-		return;
-	}
-	mddev_map[minor].mddev = NULL;
-	mddev_map[minor].data = NULL;
+	if (major(dev) != MD_MAJOR)
+		BUG();
+        return mddev_map[minor(dev)];
 }
 
 static int md_fail_request (request_queue_t *q, struct bio *bio)
@@ -197,12 +167,7 @@ static mddev_t * alloc_mddev(kdev_t dev)
 	INIT_LIST_HEAD(&mddev->all_mddevs);
 	atomic_set(&mddev->active, 0);
 
-	/*
-	 * The 'base' mddev is the one with data NULL.
-	 * personalities can create additional mddevs
-	 * if necessary.
-	 */
-	add_mddev_mapping(mddev, dev, 0);
+	mddev_map[mdidx(mddev)] = mddev;
 	list_add(&mddev->all_mddevs, &all_mddevs);
 
 	MOD_INC_USE_COUNT;
@@ -667,7 +632,7 @@ static void free_mddev(mddev_t *mddev)
 	while (atomic_read(&mddev->recovery_sem.count) != 1)
 		schedule();
 
-	del_mddev_mapping(mddev, mk_kdev(MD_MAJOR, mdidx(mddev)));
+ 	mddev_map[mdidx(mddev)] = NULL;
 	list_del(&mddev->all_mddevs);
 	kfree(mddev);
 	MOD_DEC_USE_COUNT;
@@ -3723,7 +3688,7 @@ void __init md_setup_drive(void)
 		if (!md_setup_args.device_set[minor])
 			continue;
 
-		if (mddev_map[minor].mddev) {
+		if (mddev_map[minor]) {
 			printk(KERN_WARNING
 			       "md: Ignoring md=%d, already autodetected. (Use raid=noautodetect)\n",
 			       minor);
@@ -3882,6 +3847,5 @@ EXPORT_SYMBOL(md_wakeup_thread);
 EXPORT_SYMBOL(md_print_devices);
 EXPORT_SYMBOL(find_rdev_nr);
 EXPORT_SYMBOL(md_interrupt_thread);
-EXPORT_SYMBOL(mddev_map);
 EXPORT_SYMBOL(get_spare);
 MODULE_LICENSE("GPL");
