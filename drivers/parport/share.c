@@ -413,22 +413,11 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 
 void parport_announce_port (struct parport *port)
 {
+	int i;
 
 #ifdef CONFIG_PARPORT_1284
 	/* Analyse the IEEE1284.3 topology of the port. */
-	if (parport_daisy_init (port) == 0) {
-		/* No devices were detected.  Perhaps they are in some
-                   funny state; let's try to reset them and see if
-                   they wake up. */
-		parport_daisy_fini (port);
-		parport_write_control (port, PARPORT_CONTROL_SELECT);
-		udelay (50);
-		parport_write_control (port,
-				       PARPORT_CONTROL_SELECT |
-				       PARPORT_CONTROL_INIT);
-		udelay (50);
-		parport_daisy_init (port);
-	}
+	parport_daisy_init(port);
 #endif
 
 	down(&registration_lock);
@@ -447,11 +436,46 @@ void parport_announce_port (struct parport *port)
 	portlist_tail = port;
 	if (!portlist)
 		portlist = port;
+	for (i = 1; i < 3; i++) {
+		struct parport *slave = port->slaves[i-1];
+		if (slave) {
+			portlist_tail->next = slave;
+			portlist_tail = slave;
+		}
+	}
 	spin_unlock_irq(&parportlist_lock);
 
-	/* Let drivers know that a new port has arrived. */
+	/* Let drivers know that new port(s) has arrived. */
 	attach_driver_chain (port);
+	for (i = 1; i < 3; i++) {
+		struct parport *slave = port->slaves[i-1];
+		if (slave)
+			attach_driver_chain(slave);
+	}
 	up(&registration_lock);
+}
+
+static void unlink_from_list(struct parport *port)
+{
+	struct parport *p;
+	spin_lock(&parportlist_lock);
+	/* We are protected from other people changing the list, but
+	 * they can still see it (using parport_enumerate).  So be
+	 * careful about the order of writes.. */
+	if (portlist == port) {
+		if ((portlist = port->next) == NULL)
+			portlist_tail = NULL;
+	} else {
+		for (p = portlist; (p != NULL) && (p->next != port); 
+		     p=p->next);
+		if (p) {
+			if ((p->next = port->next) == NULL)
+				portlist_tail = p;
+		}
+		else printk (KERN_WARNING
+			     "%s not found in port list!\n", port->name);
+	}
+	spin_unlock(&parportlist_lock);
 }
 
 /**
@@ -475,41 +499,41 @@ void parport_announce_port (struct parport *port)
 
 void parport_unregister_port(struct parport *port)
 {
-	struct parport *p;
+	int i;
 
 	down(&registration_lock);
-	port->ops = &dead_ops;
 
 	/* Spread the word. */
 	detach_driver_chain (port);
 
 #ifdef CONFIG_PARPORT_1284
 	/* Forget the IEEE1284.3 topology of the port. */
-	parport_daisy_fini (port);
+	parport_daisy_fini(port);
+	for (i = 1; i < 3; i++) {
+		struct parport *slave = port->slaves[i-1];
+		if (!slave)
+			continue;
+		detach_driver_chain(slave);
+		parport_daisy_fini(slave);
+	}
 #endif
 
-	spin_lock(&parportlist_lock);
-
-	/* We are protected from other people changing the list, but
-	 * they can still see it (using parport_enumerate).  So be
-	 * careful about the order of writes.. */
-	if (portlist == port) {
-		if ((portlist = port->next) == NULL)
-			portlist_tail = NULL;
-	} else {
-		for (p = portlist; (p != NULL) && (p->next != port); 
-		     p=p->next);
-		if (p) {
-			if ((p->next = port->next) == NULL)
-				portlist_tail = p;
-		}
-		else printk (KERN_WARNING
-			     "%s not found in port list!\n", port->name);
+	port->ops = &dead_ops;
+	unlink_from_list(port);
+	for (i = 1; i < 3; i++) {
+		struct parport *slave = port->slaves[i-1];
+		if (slave)
+			unlink_from_list(slave);
 	}
-	spin_unlock(&parportlist_lock);
+
 	up(&registration_lock);
 
 	/* Yes, parport_enumerate _is_ unsafe.  Don't use it. */
+	for (i = 1; i < 3; i++) {
+		struct parport *slave = port->slaves[i-1];
+		if (slave)
+			parport_put_port(slave);
+	}
 	parport_put_port (port);
 }
 

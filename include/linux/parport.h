@@ -313,6 +313,7 @@ struct parport {
 	atomic_t ref_count;
 
 	struct list_head full_list;
+	struct parport *slaves[3];
 };
 
 #define DEFAULT_SPIN_TIME 500 /* us */

@@ -80,6 +80,7 @@ static struct parport *clone_parport (struct parport *real, int muxport)
 		extra->portnum = real->portnum;
 		extra->physport = real;
 		extra->muxport = muxport;
+		real->slaves[muxport-1] = extra;
 	}
 
 	return extra;
@@ -94,7 +95,9 @@ int parport_daisy_init (struct parport *port)
 	static const char *th[] = { /*0*/"th", "st", "nd", "rd", "th" };
 	int num_ports;
 	int i;
+	int last_try = 0;
 
+again:
 	/* Because this is called before any other devices exist,
 	 * we don't have to claim exclusive access.  */
 
@@ -127,7 +130,7 @@ int parport_daisy_init (struct parport *port)
 			/* Analyse that port too.  We won't recurse
 			   forever because of the 'port->muxport < 0'
 			   test above. */
-			parport_announce_port (extra);
+			parport_daisy_init(extra);
 		}
 	}
 
@@ -147,6 +150,21 @@ int parport_daisy_init (struct parport *port)
 			detected++;
 
 		kfree (deviceid);
+	}
+
+	if (!detected && !last_try) {
+		/* No devices were detected.  Perhaps they are in some
+                   funny state; let's try to reset them and see if
+                   they wake up. */
+		parport_daisy_fini (port);
+		parport_write_control (port, PARPORT_CONTROL_SELECT);
+		udelay (50);
+		parport_write_control (port,
+				       PARPORT_CONTROL_SELECT |
+				       PARPORT_CONTROL_INIT);
+		udelay (50);
+		last_try = 1;
+		goto again;
 	}
 
 	return detected;
