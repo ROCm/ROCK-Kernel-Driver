@@ -40,7 +40,7 @@ struct kparam_string {
 #define __module_param_call(prefix, name, set, get, arg, perm)		\
 	static char __param_str_##name[] __initdata = prefix #name;	\
 	static struct kernel_param const __param_##name			\
-		 __attribute__ ((unused,__section__ ("__param")))	\
+    __attribute__ ((unused,__section__ ("__param"),aligned(sizeof(void *)))) \
 	= { __param_str_##name, perm, set, get, arg }
 
 #define module_param_call(name, set, get, arg, perm)			      \
