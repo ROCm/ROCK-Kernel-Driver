@@ -1511,10 +1511,10 @@ static void snd_ice1712_mixer_free_ac97(ac97_t *ac97)
 static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 {
 	int err;
+	ac97_t ac97;
+	ac97_bus_t bus, *pbus;
 
 	if (ice_has_con_ac97(ice)) {
-		ac97_bus_t bus, *pbus;
-		ac97_t ac97;
 		memset(&bus, 0, sizeof(bus));
 		bus.write = snd_ice1712_ac97_write;
 		bus.read = snd_ice1712_ac97_read;
@@ -1533,8 +1533,6 @@ static int __devinit snd_ice1712_ac97_mixer(ice1712_t * ice)
 	}
 
 	if (! (ice->eeprom.data[ICE_EEP1_ACLINK] & ICE1712_CFG_PRO_I2S)) {
-		ac97_bus_t bus, *pbus;
-		ac97_t ac97;
 		memset(&bus, 0, sizeof(bus));
 		bus.write = snd_ice1712_pro_ac97_write;
 		bus.read = snd_ice1712_pro_ac97_read;
