@@ -135,6 +135,7 @@ EXPORT_SYMBOL(__write_lock);
 EXPORT_SYMBOL(__write_unlock);
 EXPORT_SYMBOL(__write_trylock);
 /* Out of line spin-locking implementation. */
+EXPORT_SYMBOL(_raw_spin_lock);
 EXPORT_SYMBOL(_raw_spin_lock_flags);
 #endif
 
