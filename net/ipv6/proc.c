@@ -57,7 +57,7 @@ static int sockstat6_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-static struct snmp_item snmp6_ipv6_list[] = {
+static struct snmp_item snmp6_ipstats_list[] = {
 /* ipv6 mib according to RFC 2465 */
 #define SNMP6_GEN(x)	SNMP_ITEM(struct ipstats_mib, x, "Ip6" #x)
 	SNMP6_GEN(InReceives),
@@ -176,7 +176,7 @@ static int snmp6_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq, "%-32s\t%u\n", "ifIndex", idev->dev->ifindex);
 		snmp6_seq_show_item(seq, (void **)idev->stats.icmpv6, snmp6_icmp6_list);
 	} else {
-		snmp6_seq_show_item(seq, (void **)ipv6_statistics, snmp6_ipv6_list);
+		snmp6_seq_show_item(seq, (void **)ipv6_statistics, snmp6_ipstats_list);
 		snmp6_seq_show_item(seq, (void **)icmpv6_statistics, snmp6_icmp6_list);
 		snmp6_seq_show_item(seq, (void **)udp_stats_in6, snmp6_udp6_list);
 	}
