@@ -554,7 +554,7 @@ static struct pci_driver bt878_pci_driver = {
       .name 	= "bt878",
       .id_table = bt878_pci_tbl,
       .probe 	= bt878_probe,
-      .remove 	= bt878_remove,
+      .remove 	= __devexit_p(bt878_remove),
 };
 
 static int bt878_pci_driver_registered = 0;
