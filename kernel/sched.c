@@ -872,8 +872,7 @@ static int find_idlest_cpu(struct task_struct *p, int this_cpu,
 
 /*
  * Perform scheduler related setup for a newly forked process p.
- * p is forked by current. It also does runqueue balancing.
- * The cpu hotplug lock is held.
+ * p is forked by current. The cpu hotplug lock is held.
  */
 void fastcall sched_fork(task_t *p, unsigned long clone_flags)
 {
@@ -1006,10 +1005,9 @@ void fastcall wake_up_new_task(task_t * p, unsigned long clone_flags)
 				rq->nr_running++;
 			}
 			set_need_resched();
-		} else {
+		} else
 			/* Run child last */
 			__activate_task(p, rq);
-		}
 	} else {
 		runqueue_t *this_rq = cpu_rq(this_cpu);
 
@@ -3365,7 +3363,7 @@ EXPORT_SYMBOL_GPL(set_cpus_allowed);
  * Move (not current) task off this cpu, onto dest cpu.  We're doing
  * this because either it can't run here any more (set_cpus_allowed()
  * away from this CPU, or CPU going down), or because we're
- * attempting to rebalance this task on exec (sched_balance_exec).
+ * attempting to rebalance this task on exec (sched_exec).
  *
  * So we race with normal scheduler movements, but that's OK, as long
  * as the task is no longer on this CPU.
