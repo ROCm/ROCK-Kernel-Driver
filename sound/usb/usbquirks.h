@@ -502,6 +502,32 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 	}
 },
 {
+	/*
+	 * This quirk is for the "Advanced Driver" mode. If off, the UA-3FX
+	 * is standard compliant, but has only 16-bit PCM.
+	 */
+	USB_DEVICE(0x0582, 0x0050),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "EDIROL",
+		.product_name = "UA-3FX",
+		.ifnum = QUIRK_ANY_INTERFACE,
+		.type = QUIRK_COMPOSITE,
+		.data = & (const snd_usb_audio_quirk_t[]) {
+			{
+				.ifnum = 1,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = 2,
+				.type = QUIRK_AUDIO_STANDARD_INTERFACE
+			},
+			{
+				.ifnum = -1
+			}
+		}
+	}
+},
+{
 	USB_DEVICE(0x0582, 0x0052),
 	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
 		.vendor_name = "EDIROL",
@@ -686,6 +712,16 @@ YAMAHA_DEVICE(0x5008, "01V96"),
 		.ifnum = QUIRK_NO_INTERFACE
 	}
 	
+},
+
+{
+	USB_DEVICE_VENDOR_SPEC(0x0ccd, 0x0013),
+	.driver_info = (unsigned long) & (const snd_usb_audio_quirk_t) {
+		.vendor_name = "Terratec",
+		.product_name = "PHASE 26",
+		.ifnum = 3,
+		.type = QUIRK_MIDI_STANDARD_INTERFACE
+	}
 },
 
 #undef USB_DEVICE_VENDOR_SPEC

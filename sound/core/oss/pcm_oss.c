@@ -133,6 +133,15 @@ static long snd_pcm_oss_bytes(snd_pcm_substream_t *substream, long frames)
 	return (runtime->oss.buffer_bytes * frames) / buffer_size;
 }
 
+static long snd_pcm_alsa_frames(snd_pcm_substream_t *substream, long bytes)
+{
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_uframes_t buffer_size = snd_pcm_lib_buffer_bytes(substream);
+	if (buffer_size == runtime->oss.buffer_bytes)
+		return bytes_to_frames(runtime, bytes);
+	return bytes_to_frames(runtime, (buffer_size * bytes) / runtime->oss.buffer_bytes);
+}
+
 static int snd_pcm_oss_format_from(int format)
 {
 	switch (format) {
@@ -254,6 +263,7 @@ static int snd_pcm_oss_period_size(snd_pcm_substream_t *substream,
 
 	snd_assert(oss_period_size >= 16, return -EINVAL);
 	runtime->oss.period_bytes = oss_period_size;
+	runtime->oss.period_frames = 1;
 	runtime->oss.periods = oss_periods;
 	return 0;
 }
@@ -510,6 +520,8 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 	runtime->oss.buffer_used = 0;
 	if (runtime->dma_area)
 		snd_pcm_format_set_silence(runtime->format, runtime->dma_area, bytes_to_samples(runtime, runtime->dma_bytes));
+
+	runtime->oss.period_frames = snd_pcm_alsa_frames(substream, oss_period_size);
 
 	err = 0;
 failure:
@@ -2098,7 +2110,7 @@ static int snd_pcm_oss_playback_ready(snd_pcm_substream_t *substream)
 	if (atomic_read(&runtime->mmap_count))
 		return runtime->oss.prev_hw_ptr_interrupt != runtime->hw_ptr_interrupt;
 	else
-		return snd_pcm_playback_ready(substream);
+		return snd_pcm_playback_avail(runtime) >= runtime->oss.period_frames;
 }
 
 static int snd_pcm_oss_capture_ready(snd_pcm_substream_t *substream)
@@ -2107,7 +2119,7 @@ static int snd_pcm_oss_capture_ready(snd_pcm_substream_t *substream)
 	if (atomic_read(&runtime->mmap_count))
 		return runtime->oss.prev_hw_ptr_interrupt != runtime->hw_ptr_interrupt;
 	else
-		return snd_pcm_capture_ready(substream);
+		return snd_pcm_capture_avail(runtime) >= runtime->oss.period_frames;
 }
 
 static unsigned int snd_pcm_oss_poll(struct file *file, poll_table * wait)
