@@ -153,9 +153,12 @@ timer_action (struct ehci_hcd *ehci, enum ehci_timer_action action)
 
 /* Section 2.2 Host Controller Capability Registers */
 struct ehci_caps {
-	u8		length;		/* CAPLENGTH - size of this struct */
-	u8		reserved;       /* offset 0x1 */
-	u16		hci_version;    /* HCIVERSION - offset 0x2 */
+	/* these fields are specified as 8 and 16 bit registers,
+	 * but some hosts can't perform 8 or 16 bit PCI accesses.
+	 */
+	u32	hc_capbase;
+#define HC_LENGTH(p)		(((p)>>00)&0x00ff)	/* bits 7:0 */
+#define HC_VERSION(p)		(((p)>>16)&0xffff)	/* bits 31:16 */
 	u32		hcs_params;     /* HCSPARAMS - offset 0x4 */
 #define HCS_DEBUG_PORT(p)	(((p)>>20)&0xf)	/* bits 23:20, debug port? */
 #define HCS_INDICATOR(p)	((p)&(1 << 16))	/* true: has port indicators */

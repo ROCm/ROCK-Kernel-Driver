@@ -63,6 +63,7 @@ static void dbg_hcs_params (struct ehci_hcd *ehci, char *label)
 
 		buf[0] = 0;
 		for (i = 0; i < HCS_N_PORTS (params); i++) {
+			// FIXME MIPS won't readb() ...
 			byte = readb (&ehci->caps->portroute[(i>>1)]);
 			sprintf(tmp, "%d ", 
 				((i & 0x1) ? ((byte)&0xf) : ((byte>>4)&0xf)));
@@ -591,7 +592,7 @@ show_registers (struct class_device *class_dev, char *buf)
 	spin_lock_irqsave (&ehci->lock, flags);
 
 	/* Capability Registers */
-	i = readw (&ehci->caps->hci_version);
+	i = HC_VERSION(readl (&ehci->caps->hc_capbase));
 	temp = snprintf (next, size,
 		"PCI device %s\nEHCI %x.%02x, hcd state %d (driver " DRIVER_VERSION ")\n",
 		pci_name(hcd->pdev),

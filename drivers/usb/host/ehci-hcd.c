@@ -324,8 +324,8 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 	spin_lock_init (&ehci->lock);
 
 	ehci->caps = (struct ehci_caps *) hcd->regs;
-	ehci->regs = (struct ehci_regs *) (hcd->regs +
-				readb (&ehci->caps->length));
+	ehci->regs = (struct ehci_regs *) (hcd->regs + 
+				HC_LENGTH (readl (&ehci->caps->hc_capbase)));
 	dbg_hcs_params (ehci, "reset");
 	dbg_hcc_params (ehci, "reset");
 
@@ -489,7 +489,7 @@ done2:
 
         /* PCI Serial Bus Release Number is at 0x60 offset */
 	pci_read_config_byte (hcd->pdev, 0x60, &tempbyte);
-	temp = readw (&ehci->caps->hci_version);
+	temp = HC_VERSION(readl (&ehci->caps->hc_capbase));
 	ehci_info (ehci,
 		"USB %x.%x enabled, EHCI %x.%02x, driver %s\n",
 		((tempbyte & 0xf0)>>4), (tempbyte & 0x0f),
