@@ -85,14 +85,17 @@ static struct bnep_session *__bnep_get_session(u8 *dst)
 
 static void __bnep_link_session(struct bnep_session *s)
 {
-	MOD_INC_USE_COUNT;
+	/* It's safe to call __module_get() here because sessions are added
+	   by the socket layer which has to hold the refference to this module.
+	 */
+	__module_get(THIS_MODULE);
 	list_add(&s->list, &bnep_session_list);	
 }
 
 static void __bnep_unlink_session(struct bnep_session *s)
 {
 	list_del(&s->list);
-	MOD_DEC_USE_COUNT;
+	module_put(THIS_MODULE);
 }
 
 static int bnep_send(struct bnep_session *s, void *data, size_t len)
@@ -677,7 +680,9 @@ int bnep_get_conninfo(struct bnep_conninfo *ci)
 
 static int  __init bnep_init_module(void)
 {	
-	char flt[50] = "";	
+	char flt[50] = "";
+
+	l2cap_load();
 
 #ifdef CONFIG_BT_BNEP_PROTO_FILTER
 	strcat(flt, "protocol ");
