@@ -217,38 +217,32 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int
 ibwdt_open(struct inode *inode, struct file *file)
 {
-	if (iminor(inode) == WATCHDOG_MINOR) {
-		spin_lock(&ibwdt_lock);
-		if (ibwdt_is_open) {
-			spin_unlock(&ibwdt_lock);
-			return -EBUSY;
-		}
-		if (nowayout)
-			__module_get(THIS_MODULE);
-
-		/* Activate */
-		ibwdt_is_open = 1;
-		ibwdt_ping();
+	spin_lock(&ibwdt_lock);
+	if (ibwdt_is_open) {
 		spin_unlock(&ibwdt_lock);
-		return 0;
-	} else {	
-		return -ENODEV;
+		return -EBUSY;
 	}
+	if (nowayout)
+		__module_get(THIS_MODULE);
+
+	/* Activate */
+	ibwdt_is_open = 1;
+	ibwdt_ping();
+	spin_unlock(&ibwdt_lock);
+	return 0;
 }
 
 static int
 ibwdt_close(struct inode *inode, struct file *file)
 {
-	if (iminor(inode) == WATCHDOG_MINOR) {
-		spin_lock(&ibwdt_lock);
-		if (expect_close)
-			outb_p(wd_times[wd_margin], WDT_STOP);
-		else
-			printk(KERN_CRIT PFX "WDT device closed unexpectedly.  WDT will not stop!\n");
+	spin_lock(&ibwdt_lock);
+	if (expect_close)
+		outb_p(wd_times[wd_margin], WDT_STOP);
+	else
+		printk(KERN_CRIT PFX "WDT device closed unexpectedly.  WDT will not stop!\n");
 
-		ibwdt_is_open = 0;
-		spin_unlock(&ibwdt_lock);
-	}
+	ibwdt_is_open = 0;
+	spin_unlock(&ibwdt_lock);
 	return 0;
 }
 

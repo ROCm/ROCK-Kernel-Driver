@@ -376,46 +376,38 @@ static int zf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 static int zf_open(struct inode *inode, struct file *file)
 {
-	switch(iminor(inode)){
-		case WATCHDOG_MINOR:
-			spin_lock(&zf_lock);
-			if(zf_is_open){
-				spin_unlock(&zf_lock);
-				return -EBUSY;
-			}
-
-			if (nowayout)
-				__module_get(THIS_MODULE);
-
-			zf_is_open = 1;
-
-			spin_unlock(&zf_lock);
-
-			zf_timer_on();
-
-			return 0;
-		default:
-			return -ENODEV;
+	spin_lock(&zf_lock);
+	if(zf_is_open){
+		spin_unlock(&zf_lock);
+		return -EBUSY;
 	}
+
+	if (nowayout)
+		__module_get(THIS_MODULE);
+
+	zf_is_open = 1;
+
+	spin_unlock(&zf_lock);
+
+	zf_timer_on();
+
+	return 0;
 }
 
 static int zf_close(struct inode *inode, struct file *file)
 {
-	if(iminor(inode) == WATCHDOG_MINOR){
-
-		if(zf_expect_close){
-			zf_timer_off();
-		} else {
-			del_timer(&zf_timer);
-			printk(KERN_ERR PFX ": device file closed unexpectedly. Will not stop the WDT!\n");
-		}
-		
-		spin_lock(&zf_lock);
-		zf_is_open = 0;
-		spin_unlock(&zf_lock);
-
-		zf_expect_close = 0;
+	if(zf_expect_close){
+		zf_timer_off();
+	} else {
+		del_timer(&zf_timer);
+		printk(KERN_ERR PFX ": device file closed unexpectedly. Will not stop the WDT!\n");
 	}
+		
+	spin_lock(&zf_lock);
+	zf_is_open = 0;
+	spin_unlock(&zf_lock);
+
+	zf_expect_close = 0;
 	
 	return 0;
 }
