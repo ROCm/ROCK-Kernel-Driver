@@ -669,6 +669,9 @@ static int transition_frequency(struct powernow_k8_data *data, unsigned int inde
 	int res;
 	struct cpufreq_freqs freqs;
 
+	dprintk(KERN_DEBUG PFX "cpu %d transition to index %u\n",
+		smp_processor_id(), index );
+
 	/* fid are the lower 8 bits of the index we stored into
 	 * the cpufreq frequency table in find_psb_table, vid are 
 	 * the upper 8 bits.
