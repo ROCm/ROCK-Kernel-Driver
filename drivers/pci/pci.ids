@@ -5831,6 +5831,7 @@
 1737  Linksys
 173b  Altima (nee Broadcom)
 	03e8  AC1000 Gigabit Ethernet
+	03e9  AC1001 Gigabit Ethernet
 	03ea  AC9100 Gigabit Ethernet
 1743  Peppercon AG
 	8139  ROL/F-100 Fast Ethernet Adapter with ROL
