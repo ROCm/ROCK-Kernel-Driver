@@ -250,6 +250,14 @@ int elv_merge(request_queue_t *q, struct request **rq, struct bio *bio)
 	return ELEVATOR_NO_MERGE;
 }
 
+void elv_merged_request(request_queue_t *q, struct request *rq)
+{
+	elevator_t *e = &q->elevator;
+
+	if (e->elevator_merged_fn)
+		e->elevator_merged_fn(q, rq);
+}
+
 void elv_merge_requests(request_queue_t *q, struct request *rq,
 			     struct request *next)
 {
