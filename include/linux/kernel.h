@@ -12,6 +12,7 @@
 #include <linux/stddef.h>
 #include <linux/types.h>
 #include <linux/compiler.h>
+#include <linux/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/bug.h>
 
@@ -111,6 +112,10 @@ static inline int __attribute_pure__ long_log2(unsigned long x)
 	return r;
 }
 
+static inline unsigned long __attribute_const__ roundup_pow_of_two(unsigned long x)
+{
+	return (1UL << fls(x - 1));
+}
 
 extern int printk_ratelimit(void);
 extern int __printk_ratelimit(int ratelimit_jiffies, int ratelimit_burst);
