@@ -51,8 +51,6 @@
 
 DEFINE_PER_CPU(struct pda_s, pda_percpu);
 
-#define pxm_to_nasid(pxm) ((pxm)<<1)
-
 #define MAX_PHYS_MEMORY		(1UL << 49)     /* 1 TB */
 
 extern void bte_init_node (nodepda_t *, cnodeid_t);
@@ -62,6 +60,8 @@ extern unsigned long last_time_offset;
 extern void init_platform_hubinfo(nodepda_t **nodepdaindr);
 extern void (*ia64_mark_idle)(int);
 extern void snidle(int);
+extern unsigned char acpi_kbd_controller_present;
+
 
 unsigned long sn_rtc_cycles_per_second;   
 
@@ -120,6 +120,29 @@ extern char drive_info[4*16];
 char drive_info[4*16];
 #endif
 
+/*
+ * This routine can only be used during init, since
+ * smp_boot_data is an init data structure.
+ * We have to use smp_boot_data.cpu_phys_id to find
+ * the physical id of the processor because the normal
+ * cpu_physical_id() relies on data structures that
+ * may not be initialized yet.
+ */
+
+static int
+pxm_to_nasid(int pxm)
+{
+	int i;
+	int nid;
+
+	nid = pxm_to_nid_map[pxm];
+	for (i = 0; i < num_memblks; i++) {
+		if (node_memblk[i].nid == nid) {
+			return NASID_GET(node_memblk[i].start_paddr);
+		}
+	}
+	return -1;
+}
 /**
  * early_sn_setup - early setup routine for SN platforms
  *
@@ -223,6 +246,22 @@ sn_setup(char **cmdline_p)
 	extern void sn_cpu_init(void);
 	extern nasid_t snia_get_console_nasid(void);
 
+	/*
+	 * If the generic code has enabled vga console support - lets
+	 * get rid of it again. This is a kludge for the fact that ACPI
+	 * currtently has no way of informing us if legacy VGA is available
+	 * or not.
+	 */
+#if defined(CONFIG_VT) && defined(CONFIG_VGA_CONSOLE)
+	if (conswitchp == &vga_con) {
+		printk(KERN_DEBUG "SGI: Disabling VGA console\n");
+#ifdef CONFIG_DUMMY_CONSOLE
+		conswitchp = &dummy_con;
+#else
+		conswitchp = NULL;
+#endif /* CONFIG_DUMMY_CONSOLE */
+	}
+#endif /* def(CONFIG_VT) && def(CONFIG_VGA_CONSOLE) */
 
 	MAX_DMA_ADDRESS = PAGE_OFFSET + MAX_PHYS_MEMORY;
 
@@ -230,6 +269,19 @@ sn_setup(char **cmdline_p)
 	for (pxm=0; pxm<MAX_PXM_DOMAINS; pxm++)
 		if (pxm_to_nid_map[pxm] != -1)
 			physical_node_map[pxm_to_nasid(pxm)] = pxm_to_nid_map[pxm];
+
+
+	/*
+	 * Old PROMs do not provide an ACPI FADT. Disable legacy keyboard
+	 * support here so we don't have to listen to failed keyboard probe
+	 * messages.
+	 */
+	if ((major < 2 || (major == 2 && minor <= 9)) &&
+	    acpi_kbd_controller_present) {
+		printk(KERN_INFO "Disabling legacy keyboard support as prom "
+		       "is too old and doesn't provide FADT\n");
+		acpi_kbd_controller_present = 0;
+	}
 
 	printk("SGI SAL version %x.%02x\n", major, minor);
 
@@ -276,11 +328,6 @@ sn_setup(char **cmdline_p)
 	 * Create the PDAs and NODEPDAs for all the cpus.
 	 */
 	sn_init_pdas(cmdline_p);
-
-	/*
-	 * Check for WARs.
-	 */
-	sn_check_for_wars();
 
 	ia64_mark_idle = &snidle;
 
@@ -371,7 +418,8 @@ sn_cpu_init(void)
 	int	cpuphyid;
 	int	nasid;
 	int	slice;
-	int	cnode, i;
+	int	cnode;
+	static int	wars_have_been_checked;
 
 	/*
 	 * The boot cpu makes this call again after platform initialization is
@@ -393,12 +441,24 @@ sn_cpu_init(void)
 	pda->hb_count = HZ/2;
 	pda->hb_state = 0;
 	pda->idle_flag = 0;
+
+	if (cpuid != 0){
+		memcpy(pda->cnodeid_to_nasid_table, pdacpu(0)->cnodeid_to_nasid_table,
+				sizeof(pda->cnodeid_to_nasid_table));
+	}
+
+	/*
+	 * Check for WARs.
+	 * Only needs to be done once, on BSP.
+	 * Has to be done after loop above, because it uses pda.cnodeid_to_nasid_table[i].
+	 * Has to be done before assignment below.
+	 */
+	if (!wars_have_been_checked) {
+		sn_check_for_wars();
+		wars_have_been_checked = 1;
+	}
 	pda->shub_1_1_found = shub_1_1_found;
 	
-	memset(pda->cnodeid_to_nasid_table, -1, sizeof(pda->cnodeid_to_nasid_table));
-	for (i=0; i<numnodes; i++)
-		pda->cnodeid_to_nasid_table[i] = pxm_to_nasid(nid_to_pxm_map[i]);
-
 	if (local_node_data->active_cpu_count == 1)
 		nodepda->node_first_cpu = cpuid;
 
@@ -452,8 +512,11 @@ scan_for_ionodes(void)
 
 		klgraph_header = cnodeid = -1;
 		klgraph_header = ia64_sn_get_klconfig_addr(nasid);
-		if (klgraph_header <= 0)
+		if (klgraph_header <= 0) {
+			if ( IS_RUNNING_ON_SIMULATOR() )
+				continue;
 			BUG(); /* All nodes must have klconfig tables! */
+		}
 		cnodeid = nasid_to_cnodeid(nasid);
 		root_lboard[cnodeid] = (lboard_t *)
 					NODE_OFFSET_TO_LBOARD( (nasid),
