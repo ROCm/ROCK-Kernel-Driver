@@ -2952,6 +2952,8 @@ int kblockd_schedule_work(struct work_struct *work)
 	return queue_work(kblockd_workqueue, work);
 }
 
+EXPORT_SYMBOL(kblockd_schedule_work);
+
 void kblockd_flush(void)
 {
 	flush_workqueue(kblockd_workqueue);
