@@ -795,15 +795,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->tty_old_pgrp = 0;
 	p->utime = p->stime = 0;
 	p->cutime = p->cstime = 0;
-#ifdef CONFIG_SMP
-	{
-		int i;
-
-		/* ?? should we just memset this ?? */
-		for(i = 0; i < NR_CPUS; i++)
-			p->per_cpu_utime[i] = p->per_cpu_stime[i] = 0;
-	}
-#endif
 	p->array = NULL;
 	p->lock_depth = -1;		/* -1 = no lock */
 	p->start_time = jiffies;

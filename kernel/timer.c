@@ -694,8 +694,6 @@ static inline void do_it_prof(struct task_struct *p)
 void update_one_process(struct task_struct *p, unsigned long user,
 			unsigned long system, int cpu)
 {
-	p->per_cpu_utime[cpu] += user;
-	p->per_cpu_stime[cpu] += system;
 	do_process_times(p, user, system);
 	do_it_virt(p, user);
 	do_it_prof(p);
