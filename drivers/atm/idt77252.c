@@ -3681,18 +3681,25 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	struct idt77252_dev *card;
 	struct atm_dev *dev;
 	ushort revision = 0;
-	int i;
+	int i, err;
 
+
+	if (pci_enable_device(pcidev)) {
+		printk("idt77252: can't enable PCI device at %s\n", pci_name(pcidev));
+		return -ENODEV;
+	}
 
 	if (pci_read_config_word(pcidev, PCI_REVISION_ID, &revision)) {
 		printk("idt77252-%d: can't read PCI_REVISION_ID\n", index);
-		return -ENODEV;
+		err = -ENODEV;
+		goto err_out_disable_pdev;
 	}
 
 	card = kmalloc(sizeof(struct idt77252_dev), GFP_KERNEL);
 	if (!card) {
 		printk("idt77252-%d: can't allocate private data\n", index);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_out_disable_pdev;
 	}
 	memset(card, 0, sizeof(struct idt77252_dev));
 
@@ -3718,23 +3725,21 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	card->membase = (unsigned long) ioremap(membase, 1024);
 	if (!card->membase) {
 		printk("%s: can't ioremap() membase\n", card->name);
-		kfree(card);
-		return -EIO;
+		err = -EIO;
+		goto err_out_free_card;
 	}
 
 	if (idt77252_preset(card)) {
 		printk("%s: preset failed\n", card->name);
-		iounmap((void *) card->membase);
-		kfree(card);
-		return -EIO;
+		err = -EIO;
+		goto err_out_iounmap;
 	}
 
 	dev = atm_dev_register("idt77252", &idt77252_ops, -1, NULL);
 	if (!dev) {
 		printk("%s: can't register atm device\n", card->name);
-		iounmap((void *) card->membase);
-		kfree(card);
-		return -EIO;
+		err = -EIO;
+		goto err_out_iounmap;
 	}
 	dev->dev_data = card;
 	card->atmdev = dev;
@@ -3743,9 +3748,8 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	suni_init(dev);
 	if (!dev->phy) {
 		printk("%s: can't init SUNI\n", card->name);
-		deinit_card(card);
-		kfree(card);
-		return -EIO;
+		err = -EIO;
+		goto err_out_deinit_card;
 	}
 #endif	/* CONFIG_ATM_IDT77252_USE_SUNI */
 
@@ -3756,9 +3760,8 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 			    ioremap(srambase | 0x200000 | (i << 18), 4);
 		if (!card->fbq[i]) {
 			printk("%s: can't ioremap() FBQ%d\n", card->name, i);
-			deinit_card(card);
-			kfree(card);
-			return -EIO;
+			err = -EIO;
+			goto err_out_deinit_card;
 		}
 	}
 
@@ -3769,9 +3772,8 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 
 	if (init_card(dev)) {
 		printk("%s: init_card failed\n", card->name);
-		deinit_card(card);
-		kfree(card);
-		return -EIO;
+		err = -EIO;
+		goto err_out_deinit_card;
 	}
 
 	dev->ci_range.vpi_bits = card->vpibits;
@@ -3783,12 +3785,8 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 
 	if (idt77252_dev_open(card)) {
 		printk("%s: dev_open failed\n", card->name);
-
-		if (dev->phy->stop)
-			dev->phy->stop(dev);
-		deinit_card(card);
-		kfree(card);
-		return -EIO;
+		err = -EIO;
+		goto err_out_stop;
 	}
 
 	*last = card;
@@ -3796,6 +3794,23 @@ idt77252_init_one(struct pci_dev *pcidev, const struct pci_device_id *id)
 	index++;
 
 	return 0;
+
+err_out_stop:
+	if (dev->phy->stop)
+		dev->phy->stop(dev);
+
+err_out_deinit_card:
+	deinit_card(card);
+
+err_out_iounmap:
+	iounmap((void *) card->membase);
+
+err_out_free_card:
+	kfree(card);
+
+err_out_disable_pdev:
+	pci_disable_device(pcidev);
+	return err;
 }
 
 static struct pci_device_id idt77252_pci_tbl[] =
@@ -3848,6 +3863,7 @@ static void __exit idt77252_exit(void)
 		if (dev->phy->stop)
 			dev->phy->stop(dev);
 		deinit_card(card);
+		pci_disable_device(card->pcidev);
 		kfree(card);
 	}
 
