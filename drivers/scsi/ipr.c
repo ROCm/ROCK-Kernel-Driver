@@ -3081,7 +3081,7 @@ static int ipr_cancel_op(struct scsi_cmnd * scsi_cmd)
 	struct ipr_ioa_cfg *ioa_cfg;
 	struct ipr_resource_entry *res;
 	struct ipr_cmd_pkt *cmd_pkt;
-	u32 ioasc, ioarcb_addr;
+	u32 ioasc;
 	int op_found = 0;
 
 	ENTER;
@@ -3102,21 +3102,15 @@ static int ipr_cancel_op(struct scsi_cmnd * scsi_cmd)
 	if (!op_found)
 		return SUCCESS;
 
-	ioarcb_addr = be32_to_cpu(ipr_cmd->ioarcb.ioarcb_host_pci_addr);
-
 	ipr_cmd = ipr_get_free_ipr_cmnd(ioa_cfg);
 	ipr_cmd->ioarcb.res_handle = res->cfgte.res_handle;
 	cmd_pkt = &ipr_cmd->ioarcb.cmd_pkt;
 	cmd_pkt->request_type = IPR_RQTYPE_IOACMD;
-	cmd_pkt->cdb[0] = IPR_ABORT_TASK;
-	cmd_pkt->cdb[2] = (ioarcb_addr >> 24) & 0xff;
-	cmd_pkt->cdb[3] = (ioarcb_addr >> 16) & 0xff;
-	cmd_pkt->cdb[4] = (ioarcb_addr >> 8) & 0xff;
-	cmd_pkt->cdb[5] = ioarcb_addr & 0xff;
+	cmd_pkt->cdb[0] = IPR_CANCEL_ALL_REQUESTS;
 	ipr_cmd->u.sdev = scsi_cmd->device;
 
 	ipr_sdev_err(scsi_cmd->device, "Aborting command: %02X\n", scsi_cmd->cmnd[0]);
-	ipr_send_blocking_cmd(ipr_cmd, ipr_abort_timeout, IPR_ABORT_TASK_TIMEOUT);
+	ipr_send_blocking_cmd(ipr_cmd, ipr_abort_timeout, IPR_CANCEL_ALL_TIMEOUT);
 	ioasc = be32_to_cpu(ipr_cmd->ioasa.ioasc);
 
 	/*
