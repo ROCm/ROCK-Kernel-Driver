@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.133 $
+ * $Revision: 1.136 $
  */
 
 #include <linux/config.h>
@@ -224,7 +224,8 @@ dasd_state_basic_to_ready(struct dasd_device * device)
 		return rc;
 	dasd_setup_queue(device);
 	device->state = DASD_STATE_READY;
-	dasd_scan_partitions(device);
+	if (dasd_scan_partitions(device) != 0)
+		device->state = DASD_STATE_BASIC;
 	return 0;
 }
 
@@ -687,7 +688,10 @@ dasd_term_IO(struct dasd_ccw_req * cqr)
 		rc = ccw_device_clear(device->cdev, (long) cqr);
 		switch (rc) {
 		case 0:	/* termination successful */
-			cqr->status = DASD_CQR_FAILED;
+			if (cqr->retries > 0)
+				cqr->status = DASD_CQR_QUEUED;
+			else
+				cqr->status = DASD_CQR_FAILED;
 			cqr->stopclk = get_clock();
 			break;
 		case -ENODEV:
@@ -779,7 +783,7 @@ dasd_timeout_device(unsigned long ptr)
 
 	device = (struct dasd_device *) ptr;
 	spin_lock_irqsave(get_ccwdev_lock(device->cdev), flags);
-	/* re-activate first request in queue */
+	/* re-activate request queue */
         device->stopped &= ~DASD_STOPPED_PENDING;
 	spin_unlock_irqrestore(get_ccwdev_lock(device->cdev), flags);
 	dasd_schedule_bh(device);
@@ -827,12 +831,25 @@ do_state_change_pending(void *data)
 		struct dasd_device *device;
 	} *p;
 	struct dasd_device *device;
+	struct dasd_ccw_req *cqr;
+	struct list_head *l, *n;
+	unsigned long flags;
 
 	p = data;
 	device = p->device;
 	DBF_EVENT(DBF_NOTICE, "State change Interrupt for bus_id %s",
 		  device->cdev->dev.bus_id);
 	device->stopped &= ~DASD_STOPPED_PENDING;
+
+        /* restart all 'running' IO on queue */
+	spin_lock_irqsave(get_ccwdev_lock(device->cdev), flags);
+	list_for_each_safe(l, n, &device->ccw_queue) {
+		cqr = list_entry(l, struct dasd_ccw_req, list);
+                if (cqr->status == DASD_CQR_IN_IO)
+                        cqr->status = DASD_CQR_QUEUED;
+        }
+	spin_unlock_irqrestore(get_ccwdev_lock(device->cdev), flags);
+	dasd_set_timer (device, 0);
 	dasd_schedule_bh(device);
 	dasd_put_device(device);
 	kfree(p);
@@ -847,7 +864,8 @@ dasd_handle_killed_request(struct ccw_device *cdev, unsigned long intparm)
 	cqr = (struct dasd_ccw_req *) intparm;
 	if (cqr->status != DASD_CQR_IN_IO) {
 		MESSAGE(KERN_DEBUG,
-			"invalid status: bus_id %s, status %02x",
+			"invalid status in handle_killed_request: "
+			"bus_id %s, status %02x",
 			cdev->dev.bus_id, cqr->status);
 		return;
 	}
@@ -1142,7 +1160,8 @@ __dasd_process_blk_queue(struct dasd_device * device)
 	       elv_next_request(queue) &&
 		nr_queued < DASD_CHANQ_MAX_SIZE) {
 		req = elv_next_request(queue);
-		if (device->ro_flag && rq_data_dir(req) == WRITE) {
+		if (test_bit(DASD_FLAG_RO, &device->flags) &&
+		    rq_data_dir(req) == WRITE) {
 			DBF_EVENT(DBF_ERR,
 				  "(%s) Rejecting write request %p",
 				  device->cdev->dev.bus_id,
@@ -1186,13 +1205,11 @@ static inline void
 __dasd_check_expire(struct dasd_device * device)
 {
 	struct dasd_ccw_req *cqr;
-	unsigned long long now;
 
 	if (list_empty(&device->ccw_queue))
 		return;
 	cqr = list_entry(device->ccw_queue.next, struct dasd_ccw_req, list);
 	if (cqr->status == DASD_CQR_IN_IO && cqr->expires != 0) {
-		now = get_clock();
 		if (time_after_eq(jiffies, cqr->expires + cqr->starttime)) {
 			if (device->discipline->term_IO(cqr) != 0)
 				/* Hmpf, try again in 1/100 sec */
@@ -1517,7 +1534,8 @@ dasd_sleep_on_immediatly(struct dasd_ccw_req * cqr)
  * terminated if it is currently in i/o.
  * Returns 1 if the request has been terminated.
  */
-int dasd_cancel_req(struct dasd_ccw_req *cqr)
+int
+dasd_cancel_req(struct dasd_ccw_req *cqr)
 {
 	struct dasd_device *device = cqr->device;
 	unsigned long flags;
@@ -1655,18 +1673,13 @@ dasd_open(struct inode *inp, struct file *filp)
 {
 	struct gendisk *disk = inp->i_bdev->bd_disk;
 	struct dasd_device *device = disk->private_data;
-	int old_count, rc;
+	int rc;
 
-	/*
-	 * We use a negative value in open_count to indicate that
-	 * the device must not be used.
-	 */
-	do {
-		old_count = atomic_read(&device->open_count);
-		if (old_count < 0)
-			return -ENODEV;
-	} while (atomic_compare_and_swap(old_count, old_count + 1,
-					 &device->open_count));
+        atomic_inc(&device->open_count);
+	if (test_bit(DASD_FLAG_OFFLINE, &device->flags)) {
+		rc = -ENODEV;
+		goto unlock;
+	}
 
 	if (!try_module_get(device->discipline->owner)) {
 		rc = -EINVAL;
@@ -1681,7 +1694,6 @@ dasd_open(struct inode *inp, struct file *filp)
 		goto out;
 	}
 
-	rc = -ENODEV;
 	if (device->state < DASD_STATE_BASIC) {
 		DBF_DEV_EVENT(DBF_ERR, device, " %s",
 			      " Cannot open unrecognized device");
@@ -1703,12 +1715,6 @@ dasd_release(struct inode *inp, struct file *filp)
 {
 	struct gendisk *disk = inp->i_bdev->bd_disk;
 	struct dasd_device *device = disk->private_data;
-
-	if (device->state < DASD_STATE_BASIC) {
-		DBF_DEV_EVENT(DBF_ERR, device, " %s",
-			      " Cannot release unrecognized device");
-		return -EINVAL;
-	}
 
 	atomic_dec(&device->open_count);
 	module_put(device->discipline->owner);
@@ -1773,17 +1779,21 @@ dasd_generic_remove (struct ccw_device *cdev)
 
 	dasd_remove_sysfs_files(cdev);
 	device = dasd_device_from_cdev(cdev);
-	if (!IS_ERR(device)) {
-		/*
-		 * This device is removed unconditionally. Set open_count
-		 * to -1 to prevent dasd_open from opening it while it is
-		 * no quite down yet.
-		 */
-		atomic_set(&device->open_count,-1);
-		dasd_set_target_state(device, DASD_STATE_NEW);
-		/* dasd_delete_device destroys the device reference. */
-		dasd_delete_device(device);
+	if (IS_ERR(device))
+		return;
+	if (test_and_set_bit(DASD_FLAG_OFFLINE, &device->flags)) {
+		/* Already doing offline processing */
+		dasd_put_device(device);
+		return;
 	}
+	/*
+	 * This device is removed unconditionally. Set offline
+	 * flag to prevent dasd_open from opening it while it is
+	 * no quite down yet.
+	 */
+	dasd_set_target_state(device, DASD_STATE_NEW);
+	/* dasd_delete_device destroys the device reference. */
+	dasd_delete_device(device);
 }
 
 /* activate a device. This is called from dasd_{eckd,fba}_probe() when either
@@ -1801,7 +1811,7 @@ dasd_generic_set_online (struct ccw_device *cdev,
 	if (IS_ERR(device))
 		return PTR_ERR(device);
 
-	if (device->use_diag_flag) {
+	if (test_bit(DASD_FLAG_USE_DIAG, &device->flags)) {
 	  	if (!dasd_diag_discipline_pointer) {
 		        printk (KERN_WARNING
 				"dasd_generic couldn't online device %s "
@@ -1849,18 +1859,28 @@ int
 dasd_generic_set_offline (struct ccw_device *cdev)
 {
 	struct dasd_device *device;
+	int max_count;
 
 	device = dasd_device_from_cdev(cdev);
+	if (IS_ERR(device))
+		return PTR_ERR(device);
+	if (test_and_set_bit(DASD_FLAG_OFFLINE, &device->flags)) {
+		/* Already doing offline processing */
+		dasd_put_device(device);
+		return 0;
+	}
 	/*
-	 * We must make sure that this device is currently not in use
-	 * (current open_count == 0 ). We set open_count to -1 to indicate
-	 * that from now on set_offline is in progress and the device must
-	 * not be used otherwise.
+	 * We must make sure that this device is currently not in use.
+	 * The open_count is increased for every opener, that includes
+	 * the blkdev_get in dasd_scan_partitions. We are only interested
+	 * in the other openers.
 	 */
-	if (atomic_compare_and_swap(0, -1, &device->open_count)) {
+	max_count = device->bdev ? 1 : 0;
+	if (atomic_read(&device->open_count) > max_count) {
 		printk (KERN_WARNING "Can't offline dasd device with open"
 			" count = %i.\n",
 			atomic_read(&device->open_count));
+		clear_bit(DASD_FLAG_OFFLINE, &device->flags);
 		dasd_put_device(device);
 		return -EBUSY;
 	}
@@ -1890,7 +1910,7 @@ dasd_generic_notify(struct ccw_device *cdev, int event)
 		if (device->state < DASD_STATE_BASIC)
 			break;
 		/* Device is active. We want to keep it. */
-		if (device->disconnect_error_flag) {
+		if (test_bit(DASD_FLAG_DSC_ERROR, &device->flags)) {
 			list_for_each_entry(cqr, &device->ccw_queue, list)
 				if (cqr->status == DASD_CQR_IN_IO)
 					cqr->status = DASD_CQR_FAILED;

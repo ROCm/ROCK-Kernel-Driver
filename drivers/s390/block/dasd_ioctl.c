@@ -303,7 +303,7 @@ dasd_ioctl_format(struct block_device *bdev, int no, long args)
 
 	if (device == NULL)
 		return -ENODEV;
-	if (device->ro_flag)
+	if (test_bit(DASD_FLAG_RO, &device->flags))
 		return -EROFS;
 	if (copy_from_user(&fdata, (void *) args,
 			   sizeof (struct format_data_t)))
@@ -415,8 +415,8 @@ dasd_ioctl_information(struct block_device *bdev, int no, long args)
 	    (dasd_check_blocksize(device->bp_block)))
 		dasd_info->format = DASD_FORMAT_NONE;
 	
-	dasd_info->features |= device->ro_flag ? DASD_FEATURE_READONLY
-					       : DASD_FEATURE_DEFAULT;
+	dasd_info->features |= test_bit(DASD_FLAG_RO, &device->flags) ?
+		DASD_FEATURE_READONLY : DASD_FEATURE_DEFAULT;
 
 	if (device->discipline)
 		memcpy(dasd_info->type, device->discipline->name, 4);
@@ -472,7 +472,10 @@ dasd_ioctl_set_ro(struct block_device *bdev, int no, long args)
 	if (device == NULL)
 		return -ENODEV;
 	set_disk_ro(bdev->bd_disk, intval);
-	device->ro_flag = intval;
+	if (intval)
+		set_bit(DASD_FLAG_RO, &device->flags);
+	else
+		clear_bit(DASD_FLAG_RO, &device->flags);
 	return 0;
 }
 
