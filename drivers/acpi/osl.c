@@ -229,7 +229,7 @@ acpi_os_predefined_override (const struct acpi_predefined_names *init_val,
 
 	*new_val = NULL;
 	if (!memcmp (init_val->name, "_OS_", 4) && strlen(acpi_os_name)) {
-		printk(KERN_INFO PREFIX "Overriding _OS definition %s\n",
+		printk(KERN_INFO PREFIX "Overriding _OS definition to '%s'\n",
 			acpi_os_name);
 		*new_val = acpi_os_name;
 	}
@@ -1005,11 +1005,15 @@ acpi_os_signal (
 		printk(KERN_ERR PREFIX "Fatal opcode executed\n");
 		break;
 	case ACPI_SIGNAL_BREAKPOINT:
-		{
-			char *bp_info = (char*) info;
-
-			printk(KERN_ERR "ACPI breakpoint: %s\n", bp_info);
-		}
+		/*
+		 * AML Breakpoint
+		 * ACPI spec. says to treat it as a NOP unless
+		 * you are debugging.  So if/when we integrate
+		 * AML debugger into the kernel debugger its
+		 * hook will go here.  But until then it is
+		 * not useful to print anything on breakpoints.
+		 */
+		break;
 	default:
 		break;
 	}
