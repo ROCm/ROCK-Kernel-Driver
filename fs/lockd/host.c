@@ -61,7 +61,7 @@ struct nlm_host *
 nlm_lookup_host(int server, struct sockaddr_in *sin,
 					int proto, int version)
 {
-	struct nlm_host	*host, **hp;
+	struct nlm_host	*host, **hp, *host2;
 	u32		addr;
 	int		hash;
 
@@ -129,6 +129,27 @@ nlm_lookup_host(int server, struct sockaddr_in *sin,
 	INIT_LIST_HEAD(&host->h_lockowners);
 	spin_lock_init(&host->h_lock);
 
+#ifdef CONFIG_STATD
+	/* Do the loop again - see if we have an nlm_host for
+	 * this address already.
+	 */
+	for (hp = &nlm_hosts[hash]; (host2 = *hp); hp = &host2->h_next) {
+		if (nlm_cmp_addr(&host2->h_addr, sin)) {
+			struct nsm_handle *nsm;
+
+			nsm = host2->h_nsmhandle;
+			if (nsm) {
+				host->h_nsmhandle = nsm;
+				atomic_inc(&nsm->sm_count);
+				break;
+			}
+		}
+	}
+
+	if (host->h_nsmhandle == NULL)
+		host->h_nsmhandle = nsm_alloc(&host->h_addr);
+#endif
+
 	if (++nrhosts > NLM_HOST_MAX)
 		next_gc = 0;
 
@@ -140,17 +161,17 @@ nohost:
 struct nlm_host *
 nlm_find_client(void)
 {
-	/* find a nlm_host for a client for which h_killed == 0.
-	 * and return it
+	/* Find the next NLM client host and remove it from the
+	 * list. The caller is supposed to release all resources
+	 * held by this client, and release the nlm_host afterwards.
 	 */
 	int hash;
 	down(&nlm_host_sema);
 	for (hash = 0 ; hash < NLM_HOST_NRHASH; hash++) {
 		struct nlm_host *host, **hp;
 		for (hp = &nlm_hosts[hash]; (host = *hp) != 0; hp = &host->h_next) {
-			if (host->h_server &&
-			    host->h_killed == 0) {
-				nlm_get_host(host);
+			if (host->h_server) {
+			    	*hp = host->h_next;
 				up(&nlm_host_sema);
 				return host;
 			}
@@ -256,6 +277,59 @@ void nlm_release_host(struct nlm_host *host)
 }
 
 /*
+ * Given an IP address, initiate recovery and ditch all locks.
+ */
+void
+nlm_host_rebooted(struct sockaddr_in *sin, u32 new_state)
+{
+	struct nlm_host	*host, **hp;
+	int		hash;
+
+	dprintk("lockd: nlm_host_rebooted(%u.%u.%u.%u)\n",
+			NIPQUAD(sin->sin_addr));
+
+	hash = NLM_ADDRHASH(sin->sin_addr.s_addr);
+
+	/* Lock hash table */
+	down(&nlm_host_sema);
+	for (hp = &nlm_hosts[hash]; (host = *hp); hp = &host->h_next) {
+		if (nlm_cmp_addr(&host->h_addr, sin)) {
+			if (host->h_nsmhandle)
+				host->h_nsmhandle->sm_monitored = 0;
+			host->h_rebooted = 1;
+		}
+	}
+
+again:
+	for (hp = &nlm_hosts[hash]; (host = *hp); hp = &host->h_next) {
+		if (nlm_cmp_addr(&host->h_addr, sin) && host->h_rebooted) {
+			host->h_rebooted = 0;
+			atomic_inc(&host->h_count);
+			up(&nlm_host_sema);
+
+			/* If we're server for this guy, just ditch
+			 * all the locks he held.
+			 * If he's the server, initiate lock recovery.
+			 */
+			if (host->h_server) {
+				nlmsvc_free_host_resources(host);
+			} else {
+				nlmclnt_recovery(host, new_state);
+			}
+
+			down(&nlm_host_sema);
+			nlm_release_host(host);
+
+			/* Host table may have changed in the meanwhile,
+			 * start over */
+			goto again;
+		}
+	}
+
+	up(&nlm_host_sema);
+}
+
+/*
  * Shut down the hosts module.
  * Note that this routine is called only at server shutdown time.
  */
@@ -327,9 +401,12 @@ nlm_gc_hosts(void)
 			}
 			dprintk("lockd: delete host %s\n", host->h_name);
 			*q = host->h_next;
-			/* Don't unmonitor hosts that have been invalidated */
-			if (host->h_monitored && !host->h_killed)
-				nsm_unmonitor(host);
+
+			/* Release the NSM handle. Unmonitor unless
+			 * host was invalidated (i.e. lockd restarted)
+			 */
+			nsm_unmonitor(host);
+
 			if ((clnt = host->h_rpcclnt) != NULL) {
 				if (atomic_read(&clnt->cl_users)) {
 					printk(KERN_WARNING

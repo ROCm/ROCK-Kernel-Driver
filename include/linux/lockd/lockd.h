@@ -47,8 +47,7 @@ struct nlm_host {
 	unsigned short		h_reclaiming : 1,
 				h_server     : 1, /* server side, not client side */
 				h_inuse      : 1,
-				h_killed     : 1,
-				h_monitored  : 1;
+				h_rebooted   : 1;
 	wait_queue_head_t	h_gracewait;	/* wait while reclaiming */
 	u32			h_state;	/* pseudo-state counter */
 	u32			h_nsmstate;	/* true remote NSM state */
@@ -59,6 +58,14 @@ struct nlm_host {
 	unsigned long		h_expires;	/* eligible for GC */
 	struct list_head	h_lockowners;	/* Lockowners for the client */
 	spinlock_t		h_lock;
+	struct nsm_handle *	h_nsmhandle;	/* for kernel statd */
+};
+
+struct nsm_handle {
+	atomic_t		sm_count;
+	struct sockaddr_in	sm_addr;
+	unsigned int		sm_monitored : 1,
+				sm_sticky : 1;	/* don't unmonitor */
 };
 
 /*
@@ -136,6 +143,9 @@ extern struct svc_procedure	nlmsvc_procedures[];
 #ifdef CONFIG_LOCKD_V4
 extern struct svc_procedure	nlmsvc_procedures4[];
 #endif
+#ifdef CONFIG_STATD
+extern struct svc_procedure	nsmsvc_procedures[];
+#endif
 extern int			nlmsvc_grace_period;
 extern unsigned long		nlmsvc_timeout;
 
@@ -165,6 +175,7 @@ struct nlm_host * nlm_get_host(struct nlm_host *);
 void		  nlm_release_host(struct nlm_host *);
 void		  nlm_shutdown_hosts(void);
 extern struct nlm_host *nlm_find_client(void);
+extern void	  nlm_host_rebooted(struct sockaddr_in *, u32);
 
 
 /*

@@ -5,6 +5,16 @@
 menu "IPv6: Netfilter Configuration"
 	depends on INET && IPV6 && NETFILTER
 
+config IP6_NF_FTP
+	tristate "FTP protocol support"
+	depends on IP6_NF_CONNTRACK
+	help
+	  Tracking FTP connections is problematic: special helpers are
+	  required for tracking them.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
+
 #tristate 'Connection tracking (required for masq/NAT)' CONFIG_IP6_NF_CONNTRACK
 #if [ "$CONFIG_IP6_NF_CONNTRACK" != "n" ]; then
 #  dep_tristate '  FTP protocol support' CONFIG_IP6_NF_FTP $CONFIG_IP6_NF_CONNTRACK
@@ -168,6 +178,32 @@ config IP6_NF_MATCH_EUI64
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config IP6_NF_CONNTRACK
+	tristate "Connection tracking (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	---help---
+	  Connection tracking keeps a record of what packets have passed
+	  through your machine, in order to figure out how they are related
+	  into connections.
+
+          It can also be used to enhance packet filtering
+	  (see `Connection state match support'
+          below).
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+config IP6_NF_MATCH_STATE
+	tristate "Connection state match support"
+	depends on IP6_NF_CONNTRACK && IP6_NF_IPTABLES
+	help
+	  Connection state matching allows you to match packets based on their
+	  relationship to a tracked connection (ie. previous packets).  This
+	  is a powerful tool for packet classification.
+
+	  If you want to compile it as a module, say M here and read
+	  <file:Documentation/modules.txt>.  If unsure, say `N'.
+
 #  dep_tristate '  Multiple port match support' CONFIG_IP6_NF_MATCH_MULTIPORT $CONFIG_IP6_NF_IPTABLES
 #  dep_tristate '  TOS match support' CONFIG_IP6_NF_MATCH_TOS $CONFIG_IP6_NF_IPTABLES
 #  if [ "$CONFIG_IP6_NF_CONNTRACK" != "n" ]; then
@@ -197,8 +233,17 @@ config IP6_NF_TARGET_LOG
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 
+config IP6_NF_TARGET_REJECT
+	tristate "REJECT target support"
+	depends on IP6_NF_FILTER
+	help
+	 The REJECT target allows a filtering rule to specify that an ICMP
+	 error should be issued in response to an incoming packet, rather
+	 than silently being dropped.
+
+	 To compile it as a module, choose M here.  If unsure, say N.
+
 #  if [ "$CONFIG_IP6_NF_FILTER" != "n" ]; then
-#    dep_tristate '    REJECT target support' CONFIG_IP6_NF_TARGET_REJECT $CONFIG_IP6_NF_FILTER
 #    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
 #      dep_tristate '    MIRROR target support (EXPERIMENTAL)' CONFIG_IP6_NF_TARGET_MIRROR $CONFIG_IP6_NF_FILTER
 #    fi
