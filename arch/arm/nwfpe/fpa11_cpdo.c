@@ -67,13 +67,16 @@ unsigned int EmulateCPDO(const unsigned int opcode)
       default           : nRc = 0;
    }
 
-   /* If the operation succeeded, check to see if the result in the
-      destination register is the correct size.  If not force it
-      to be. */
-   Fd = getFd(opcode);
-   nType = fpa11->fType[Fd];
+   /* The CPDO functions always set the destination type
+      to be the same as their working size. */
+
    if ((0 != nRc) && (nDest != nType))
    {
+     /* If the operation succeeded, check to see if the result in the
+        destination register is the correct size.  If not force it
+        to be. */
+     Fd = getFd(opcode);
+
      switch (nDest)
      {
        case typeSingle:
