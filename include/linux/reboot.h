@@ -48,13 +48,6 @@ extern void machine_restart(char *cmd);
 extern void machine_halt(void);
 extern void machine_power_off(void);
 
-/*
- * Architecture-independent suspend facility
- */
-
-extern void software_suspend(void);
-extern unsigned char software_suspend_enabled;
-
 #endif
 
 #endif /* _LINUX_REBOOT_H */
