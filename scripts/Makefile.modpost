@@ -57,7 +57,7 @@ $(modules:.ko=.mod.c): __modpost ;
 ifeq ($(filter ../% /%,$(SUBDIRS)),)
 modver_file := modversions-$(shell echo $(ARCH)-$(CONFIG_CFGNAME))
 quiet_cmd_modpost = MODPOST
-      cmd_modpost = scripts/modpost $(filter-out FORCE,$^) -o $(modver_file)
+      cmd_modpost = scripts/modpost $(filter-out FORCE,$^) $(if $(CONFIG_MODVERSIONS),-o $(modver_file))
 __modpost: $(wildcard vmlinux) $(modules:.ko=.o) FORCE
 	$(call if_changed,modpost)
 else
