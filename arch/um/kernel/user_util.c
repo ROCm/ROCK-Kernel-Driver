@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <sys/mman.h> 
+#include <setjmp.h>
 #include <sys/stat.h>
 #include <sys/ptrace.h>
 #include <sys/utsname.h>
@@ -167,6 +168,21 @@ void setup_hostinfo(void)
 	uname(&host);
 	sprintf(host_info, "%s %s %s %s %s", host.sysname, host.nodename,
 		host.release, host.version, host.machine);
+}
+
+int setjmp_wrapper(void (*proc)(void *, void *), ...)
+{
+        va_list args;
+	sigjmp_buf buf;
+	int n;
+
+	n = sigsetjmp(buf, 1);
+	if(n == 0){
+		va_start(args, proc);
+		(*proc)(&buf, &args);
+	}
+	va_end(args);
+	return(n);
 }
 
 /*

@@ -183,15 +183,16 @@ void arch_check_bugs(void)
 
 int arch_handle_signal(int sig, union uml_pt_regs *regs)
 {
-	unsigned long ip;
+	unsigned char tmp[2];
 
 	/* This is testing for a cmov (0x0f 0x4x) instruction causing a
 	 * SIGILL in init.
 	 */
 	if((sig != SIGILL) || (TASK_PID(get_current()) != 1)) return(0);
 
-	ip = UPT_IP(regs);
-	if((*((char *) ip) != 0x0f) || ((*((char *) (ip + 1)) & 0xf0) != 0x40))
+	if (copy_from_user_proc(tmp, (void *) UPT_IP(regs), 2))
+		panic("SIGILL in init, could not read instructions!\n");
+	if((tmp[0] != 0x0f) || ((tmp[1] & 0xf0) != 0x40))
 		return(0);
 
 	if(host_has_cmov == 0)
