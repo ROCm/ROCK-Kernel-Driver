@@ -54,7 +54,7 @@
   #define CFQ_38_480           0xB       /* 38 KHz low, 480 KHz high */
 #define CIR_HCFS               0x20
   #define CIR_SET_HS(x)        (((x)&0x1)<<5)
-    
+
 
 /* Receiver Control Register */
 #define CIR_SET_RXDCR(x)       ((x)&0x7)

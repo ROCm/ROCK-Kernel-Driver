@@ -1,5 +1,12 @@
-#ifndef __ASM_MIPS_USER_H
-#define __ASM_MIPS_USER_H
+/*
+ * This file is subject to the terms and conditions of the GNU General Public
+ * License.  See the file "COPYING" in the main directory of this archive
+ * for more details.
+ *
+ * Copyright (C) 1994, 1995, 1996, 1999 by Ralf Baechle
+ */
+#ifndef _ASM_USER_H
+#define _ASM_USER_H
 
 #include <asm/page.h>
 #include <asm/reg.h>
@@ -28,7 +35,8 @@
  *	to write an integer number of pages.
  */
 struct user {
-	unsigned long	regs[EF_SIZE/4+64];	/* integer and fp regs */
+	unsigned long	regs[EF_SIZE /		/* integer and fp regs */
+			sizeof(unsigned long) + 64];
 	size_t		u_tsize;		/* text size (pages) */
 	size_t		u_dsize;		/* data size (pages) */
 	size_t		u_ssize;		/* stack size (pages) */
@@ -47,4 +55,4 @@ struct user {
 #define HOST_DATA_START_ADDR	(u.start_data)
 #define HOST_STACK_END_ADDR	(u.start_stack + u.u_ssize * NBPG)
 
-#endif /* __ASM_MIPS_USER_H */
+#endif /* _ASM_USER_H */

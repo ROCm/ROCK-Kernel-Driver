@@ -5,7 +5,8 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1997, 1998, 2000, 2001 by Ralf Baechle
+ * Copyright (C) 1996, 97, 98, 99, 2000, 01, 03 by Ralf Baechle
+ * Copyright (C) 1999, 2000, 01 Silicon Graphics, Inc.
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -41,6 +42,7 @@ extern long __strnlen_user_nocheck_asm(const char *s);
 extern long __strnlen_user_asm(const char *s);
 
 EXPORT_SYMBOL(mips_machtype);
+
 #ifdef CONFIG_EISA
 EXPORT_SYMBOL(EISA_bus);
 #endif
@@ -91,10 +93,6 @@ EXPORT_SYMBOL(__up);
  */
 #include <asm/branch.h>
 #include <linux/sched.h>
-
-#ifdef CONFIG_VT
-EXPORT_SYMBOL(screen_info);
-#endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 EXPORT_SYMBOL(ide_ops);

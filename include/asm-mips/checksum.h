@@ -3,13 +3,18 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 1997, 1998, 2001 by Ralf Baechle
+ * Copyright (C) 1995, 96, 97, 98, 99, 2001 by Ralf Baechle
+ * Copyright (C) 1999 Silicon Graphics, Inc.
+ * Copyright (C) 2001 Thiemo Seufer.
+ * Copyright (C) 2002 Maciej W. Rozycki
  */
 #ifndef _ASM_CHECKSUM_H
 #define _ASM_CHECKSUM_H
 
-#include <asm/uaccess.h>
+#include <linux/config.h>
 #include <linux/in6.h>
+
+#include <asm/uaccess.h>
 
 /*
  * computes the checksum of a memory block at buff, length len,
@@ -87,19 +92,18 @@ static inline unsigned short int csum_fold(unsigned int sum)
 static inline unsigned short ip_fast_csum(unsigned char *iph,
 					  unsigned int ihl)
 {
-	unsigned int sum;
-	unsigned long dummy;
+	unsigned int dummy, sum;
 
 	/*
-	 * This is for 32-bit MIPS processors.
+	 * This is for 32-bit processors ...  but works just fine for 64-bit
+	 * processors for now ...  XXX
 	 */
 	__asm__ __volatile__(
 	".set\tnoreorder\t\t\t# ip_fast_csum\n\t"
 	".set\tnoat\n\t"
 	"lw\t%0, (%1)\n\t"
 	"subu\t%2, 4\n\t"
-	"#blez\t%2, 2f\n\t"
-	" sll\t%2, 2\n\t"
+	"sll\t%2, 2\n\t"
 	"lw\t%3, 4(%1)\n\t"
 	"addu\t%2, %1\n\t"
 	"addu\t%0, %3\n\t"
@@ -133,14 +137,13 @@ static inline unsigned short ip_fast_csum(unsigned char *iph,
  * computes the checksum of the TCP/UDP pseudo-header
  * returns a 16-bit checksum, already complemented
  */
-static inline unsigned long csum_tcpudp_nofold(unsigned long saddr,
-                                               unsigned long daddr,
-                                               unsigned short len,
-                                               unsigned short proto,
-                                               unsigned int sum)
+static inline unsigned int csum_tcpudp_nofold(unsigned int saddr,
+	unsigned int daddr, unsigned short len, unsigned short proto,
+	unsigned int sum)
 {
 	__asm__(
 	".set\tnoat\t\t\t# csum_tcpudp_nofold\n\t"
+#ifdef CONFIG_MIPS32
 	"addu\t%0, %2\n\t"
 	"sltu\t$1, %0, %2\n\t"
 	"addu\t%0, $1\n\t"
@@ -152,6 +155,15 @@ static inline unsigned long csum_tcpudp_nofold(unsigned long saddr,
 	"addu\t%0, %4\n\t"
 	"sltu\t$1, %0, %4\n\t"
 	"addu\t%0, $1\n\t"
+#endif
+#ifdef CONFIG_MIPS64
+	"daddu\t%0, %2\n\t"
+	"daddu\t%0, %3\n\t"
+	"daddu\t%0, %4\n\t"
+	"dsll32\t$1, %0, 0\n\t"
+	"daddu\t%0, $1\n\t"
+	"dsrl32\t%0, %0, 0\n\t"
+#endif
 	".set\tat"
 	: "=r" (sum)
 	: "0" (daddr), "r"(saddr),

@@ -153,7 +153,7 @@ int get_irq_list(char *buf)
 		if (!action)
 			gotos skip;
 		len += sprintf(buf+len, "%2d: %8d %c %s",
-			i, kstat_cpu(0).irqs[i],
+			i, kstat_this_cpu.irqs[i],
 			(action->flags & SA_INTERRUPT) ? '+' : ' ',
 			action->name);
 		for (action=action->next; action; action = action->next) {
@@ -183,7 +183,7 @@ static void do_IRQ(int irq, struct pt_regs * regs)
 
 	cpu = smp_processor_id();
 	irq_enter();
-	kstat_cpus(cpu)[irq]++;
+	kstat_cpus(cpu).irqs[irq]++;
 
 	mask_irq(irq);
 	action = *(irq + irq_action);

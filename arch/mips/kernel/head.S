@@ -5,12 +5,11 @@
  *
  * Copyright (C) 1994, 1995 Waldorf Electronics
  * Written by Ralf Baechle and Andreas Busse
- * Copyright (C) 1995 - 1999 Ralf Baechle
+ * Copyright (C) 1994, 95, 96, 97, 98, 99, 2003 Ralf Baechle
  * Copyright (C) 1996 Paul M. Antoine
  * Modified for DECStation and hence R3000 support by Paul M. Antoine
  * Further modifications by David S. Miller and Harald Koerfgen
  * Copyright (C) 1999 Silicon Graphics, Inc.
- *
  * Kevin Kissell, kevink@mips.com and Carsten Langgaard, carstenl@mips.com
  * Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
  */
@@ -19,204 +18,161 @@
 #include <linux/threads.h>
 
 #include <asm/asm.h>
-#include <asm/offset.h>
-#include <asm/pgtable-bits.h>
-#include <asm/processor.h>
 #include <asm/regdef.h>
-#include <asm/cachectl.h>
+#include <asm/page.h>
+#include <asm/processor.h>
 #include <asm/mipsregs.h>
 #include <asm/stackframe.h>
+#ifdef CONFIG_SGI_IP27
+#include <asm/sn/addrs.h>
+#include <asm/sn/sn0/hubni.h>
+#include <asm/sn/klkernvars.h>
+#endif
 
-		.text
-		/*
-		 * Reserved space for exception handlers.
-		 * Necessary for machines which link their kernels at KSEG0.
-		 */
-		.fill	0x400
+	.macro	ARC64_TWIDDLE_PC
+#if defined(CONFIG_ARC64) || defined(CONFIG_MAPPED_KERNEL)
+	/* We get launched at a XKPHYS address but the kernel is linked to
+	   run at a KSEG0 address, so jump there.  */
+	PTR_LA	t0, \@f
+	jr	t0
+\@:
+#endif
+	.endm
 
-		/* The following two symbols are used for kernel profiling. */
-		EXPORT(stext)
-		EXPORT(_stext)
+#ifdef CONFIG_SGI_IP27
+	/*
+	 * outputs the local nasid into res.  IP27 stuff.
+	 */
+	.macro GET_NASID_ASM res
+	dli	\res, LOCAL_HUB_ADDR(NI_STATUS_REV_ID)
+	ld	\res, (\res)
+	and	\res, NSRI_NODEID_MASK
+	dsrl	\res, NSRI_NODEID_SHFT
+	.endm
+#endif /* CONFIG_SGI_IP27 */
 
-		__INIT
+	/*
+	 * inputs are the text nasid in t1, data nasid in t2.
+	 */
+	.macro MAPPED_KERNEL_SETUP_TLB
+#ifdef CONFIG_MAPPED_KERNEL
+	/*
+	 * This needs to read the nasid - assume 0 for now.
+	 * Drop in 0xffffffffc0000000 in tlbhi, 0+VG in tlblo_0,
+	 * 0+DVG in tlblo_1.
+	 */
+	dli	t0, 0xffffffffc0000000
+	dmtc0	t0, CP0_ENTRYHI
+	li	t0, 0x1c000		# Offset of text into node memory
+	dsll	t1, NASID_SHFT		# Shift text nasid into place
+	dsll	t2, NASID_SHFT		# Same for data nasid
+	or	t1, t1, t0		# Physical load address of kernel text
+	or	t2, t2, t0		# Physical load address of kernel data
+	dsrl	t1, 12			# 4K pfn
+	dsrl	t2, 12			# 4K pfn
+	dsll	t1, 6			# Get pfn into place
+	dsll	t2, 6			# Get pfn into place
+	li	t0, ((_PAGE_GLOBAL|_PAGE_VALID| _CACHE_CACHABLE_COW) >> 6)
+	or	t0, t0, t1
+	mtc0	t0, CP0_ENTRYLO0	# physaddr, VG, cach exlwr
+	li	t0, ((_PAGE_GLOBAL|_PAGE_VALID| _PAGE_DIRTY|_CACHE_CACHABLE_COW) >> 6)
+	or	t0, t0, t2
+	mtc0	t0, CP0_ENTRYLO1	# physaddr, DVG, cach exlwr
+	li	t0, 0x1ffe000		# MAPPED_KERN_TLBMASK, TLBPGMASK_16M
+	mtc0	t0, CP0_PAGEMASK
+	li	t0, 0			# KMAP_INX
+	mtc0	t0, CP0_INDEX
+	li	t0, 1
+	mtc0	t0, CP0_WIRED
+	tlbwi
+#else
+	mtc0	zero, CP0_WIRED
+#endif
+	.endm
 
-		/* Cache Error */
-		LEAF(except_vec2_generic)
-		.set	noreorder
-		.set	noat
-		.set    mips0
-		/*
-		 * This is a very bad place to be.  Our cache error
-		 * detection has triggered.  If we have write-back data
-		 * in the cache, we may not be able to recover.  As a
-		 * first-order desperate measure, turn off KSEG0 cacheing.
-		 */
-		mfc0	k0,CP0_CONFIG
-		li	k1,~CONF_CM_CMASK
-		and	k0,k0,k1
-		ori	k0,k0,CONF_CM_UNCACHED
-		mtc0	k0,CP0_CONFIG
-		/* Give it a few cycles to sink in... */
-		nop
-		nop
-		nop
+	/*
+	 * Reserved space for exception handlers.
+	 * Necessary for machines which link their kernels at KSEG0.
+	 */
+	.fill	0x400
 
-		j	cache_parity_error
-		nop
-		END(except_vec2_generic)
+EXPORT(stext)					# used for profiling
+EXPORT(_stext)
 
-		.set	at
+	__INIT
 
-		/*
-		 * Special interrupt vector for embedded MIPS.  This is a
-		 * dedicated interrupt vector which reduces interrupt processing
-		 * overhead.  The jump instruction will be inserted here at
-		 * initialization time.  This handler may only be 8 bytes in
-		 * size!
-		 */
-		NESTED(except_vec4, 0, sp)
-1:		j	1b			/* Dummy, will be replaced */
-		 nop
-		END(except_vec4)
+NESTED(kernel_entry, 16, sp)			# kernel entry point
+#ifdef CONFIG_SGI_IP27
+	GET_NASID_ASM	t1
+	move	t2, t1				# text and data are here
+	MAPPED_KERNEL_SETUP_TLB
+#endif /* IP27 */
 
-		/*
-		 * EJTAG debug exception handler.
-		 * The EJTAG debug exception entry point is 0xbfc00480, which
-		 * normally is in the boot PROM, so the boot PROM must do a
-		 * unconditional jump to this vector.
-		 */
-		NESTED(except_vec_ejtag_debug, 0, sp)
-		j	ejtag_debug_handler
-		 nop
-		END(except_vec_ejtag_debug)
+	ARC64_TWIDDLE_PC
 
-		__FINIT
+	CLI					# disable interrupts
 
-		/*
-		 * EJTAG debug exception handler.
-		 */
-		NESTED(ejtag_debug_handler, PT_SIZE, sp)
-		.set	noat
-		.set	noreorder
-		mtc0	k0, CP0_DESAVE
-		mfc0	k0, CP0_DEBUG
+	PTR_LA		$28, init_thread_union
+	PTR_ADDIU	sp, $28, _THREAD_SIZE - 32
+	set_saved_sp	sp, t0, t1
+	PTR_SUBU	sp, 4 * SZREG		# init stack pointer
 
-		sll	k0, k0, 30	# Check for SDBBP.
-		bgez	k0, ejtag_return
-
-		la	k0, ejtag_debug_buffer
-		sw	k1, 0(k0)
-		SAVE_ALL
-		jal	ejtag_exception_handler
-		 move	a0, sp
-		RESTORE_ALL
-		la	k0, ejtag_debug_buffer
-		lw	k1, 0(k0)
-
-ejtag_return:
-		mfc0	k0, CP0_DESAVE
-		.set	mips32
-		deret
-		.set	mips0
-		 nop
-		.set	at
-		END(ejtag_debug_handler)
-
-		__INIT
-
-		/*
-		* NMI debug exception handler for MIPS reference boards.
-		* The NMI debug exception entry point is 0xbfc00000, which
-		* normally is in the boot PROM, so the boot PROM must do a
-		* unconditional jump to this vector.
-		*/
-		NESTED(except_vec_nmi, 0, sp)
-		j       nmi_handler
-		 nop
-		END(except_vec_nmi)
-
-		__FINIT
-
-		NESTED(nmi_handler, PT_SIZE, sp)
-		.set    noat
-		.set    noreorder
-		.set    mips3
-		SAVE_ALL
-		jal     nmi_exception_handler
-		 move   a0, sp
-		RESTORE_ALL
-		eret
-		.set    at
-		.set    mips0
-		END(nmi_handler)
-
-		__INIT
-
-		/*
-		 * Kernel entry point
-		 */
-		NESTED(kernel_entry, 16, sp)
-		.set	noreorder
-
-		/*
-		 * Stack for kernel and init, current variable
-		 */
-		la	$28, init_thread_union
-		addiu	t0, $28, KERNEL_STACK_SIZE-32
-		subu	sp, t0, 4*SZREG
-		sw	t0, kernelsp
-
-		/* The firmware/bootloader passes argc/argp/envp
-		 * to us as arguments.  But clear bss first because
-		 * the romvec and other important info is stored there
-		 * by prom_init().
-		 */
-		la	t0, __bss_start
-		sw	zero, (t0)
-		la	t1, __bss_stop - 4
+	/*
+	 * The firmware/bootloader passes argc/argp/envp
+	 * to us as arguments.  But clear bss first because
+	 * the romvec and other important info is stored there
+	 * by prom_init().
+	 */
+	PTR_LA		t0, __bss_start
+	LONG_S		zero, (t0)
+	PTR_LA		t1, __bss_stop - LONGSIZE
 1:
-		addiu	t0, 4
-		bne	t0, t1, 1b
-		 sw	zero, (t0)
+	PTR_ADDIU	t0, LONGSIZE
+	LONG_S		zero, (t0)
+	bne		t0, t1, 1b
 
-		jal	init_arch
-		 nop
-		END(kernel_entry)
-
+	jal		init_arch
+	END(kernel_entry)
 
 #ifdef CONFIG_SMP
-
 /*
  * SMP slave cpus entry point.  Board specific code for bootstrap calls this
  * function after setting up the stack and gp registers.
  */
-		LEAF(smp_bootstrap)
-		.set push
-		.set noreorder
-		mtc0	zero, CP0_WIRED
-		CLI
-		mfc0	t0, CP0_STATUS
-		li	t1, ~(ST0_CU1|ST0_CU2|ST0_CU3|ST0_KX|ST0_SX)
-		and	t0, t1
-		or	t0, (ST0_CU0);
-		jal	start_secondary
-		mtc0	t0, CP0_STATUS
-		.set pop
-		END(smp_bootstrap)
+NESTED(smp_bootstrap, 16, sp)
+#ifdef CONFIG_SGI_IP27
+	GET_NASID_ASM	t1
+	li	t0, KLDIR_OFFSET + (KLI_KERN_VARS * KLDIR_ENT_SIZE) + \
+		    KLDIR_OFF_POINTER + K0BASE
+	dsll	t1, NASID_SHFT
+	or	t0, t0, t1
+	ld	t0, 0(t0)			# t0 points to kern_vars struct
+	lh	t1, KV_RO_NASID_OFFSET(t0)
+	lh	t2, KV_RW_NASID_OFFSET(t0)
+	MAPPED_KERNEL_SETUP_TLB
+	ARC64_TWIDDLE_PC
+#endif /* CONFIG_SGI_IP27 */
+
+	CLI
+
+#ifdef CONFIG_MIPS64
+	/*
+	 * For the moment set ST0_KU so the CPU will not spit fire when
+	 * executing 64-bit instructions.  The full initialization of the
+	 * CPU's status register is done later in per_cpu_trap_init().
+	 */
+	mfc0	t0, CP0_STATUS
+	or	t0, ST0_KX
+	mtc0	t0, CP0_STATUS
 #endif
+	jal	start_secondary
+	END(smp_bootstrap)
+#endif /* CONFIG_SMP */
 
-		__FINIT
+	__FINIT
 
-		/*
-		 * This buffer is reserved for the use of the EJTAG debug
-		 * handler.
-		 */
-		.data
-		EXPORT(ejtag_debug_buffer)
-		.fill	4
-
-		.comm	kernelsp,    NR_CPUS * 8, 8
-		.comm	pgd_current, NR_CPUS * 8, 8
+	.comm	kernelsp,    NR_CPUS * 8, 8
+	.comm	pgd_current, NR_CPUS * 8, 8
 
 	.macro	page name, order=0
 	.globl	\name
@@ -228,7 +184,27 @@ ejtag_return:
 	.data
 	.align	PAGE_SHIFT
 
+#ifdef CONFIG_MIPS32
+	/*
+	 * Here we only have a two-level pagetable structure ...
+	 */
 	page	swapper_pg_dir, _PGD_ORDER
-	page	empty_bad_page, 0
-	page	empty_bad_page_table, 0
-	page	invalid_pte_table, 0
+	page	invalid_pte_table, _PTE_ORDER
+#endif
+#ifdef CONFIG_MIPS64
+	/*
+	 * ... but on 64-bit we've got three-level pagetables with a
+	 * slightly different layout ...
+	 */
+	page	swapper_pg_dir, _PGD_ORDER
+	page	invalid_pmd_table, _PMD_ORDER
+	page	invalid_pte_table, _PTE_ORDER
+
+	/*
+	 * 64-bit kernel mappings are really screwed up ...
+	 */
+	page	kptbl, _PGD_ORDER
+	.globl	ekptbl
+	page	kpmdtbl, 0
+ekptbl:
+#endif

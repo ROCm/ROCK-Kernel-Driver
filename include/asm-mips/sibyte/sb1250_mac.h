@@ -8,7 +8,7 @@
     *  
     *  SB1250 specification level:  User's manual 1/02/02
     *  
-    *  Author:  Mitch Lichtenberg (mpl@broadcom.com)
+    *  Author:  Mitch Lichtenberg
     *  
     *********************************************************************  
     *
@@ -132,9 +132,9 @@
 #define M_MAC_RX_CH_SEL_MSB	    _SB_MAKEMASK1(44)
 #endif /* 1250 PASS2 || 112x PASS1 */
 
-#if SIBYTE_HDR_FEATURE(112x, PASS1)
+#if SIBYTE_HDR_FEATURE(1250, PASS3) || SIBYTE_HDR_FEATURE(112x, PASS1)
 #define M_MAC_SPLIT_CH_SEL	    _SB_MAKEMASK1(45)
-#endif /* 112x PASS1 */
+#endif /* 1250 PASS3 || 112x PASS1 */
 
 #define S_MAC_BYPASS_IFG            _SB_MAKE64(46)
 #define M_MAC_BYPASS_IFG            _SB_MAKEMASK(8,S_MAC_BYPASS_IFG)
@@ -267,12 +267,12 @@
 #define V_MAC_IFG_RX(x)             _SB_MAKEVALUE(x,S_MAC_IFG_RX)
 #define G_MAC_IFG_RX(x)             _SB_GETVALUE(x,S_MAC_IFG_RX,M_MAC_IFG_RX)
 
-#if SIBYTE_HDR_FEATURE(112x, PASS1)
+#if SIBYTE_HDR_FEATURE(1250, PASS3) || SIBYTE_HDR_FEATURE(112x, PASS1)
 #define S_MAC_PRE_LEN               _SB_MAKE64(0)
 #define M_MAC_PRE_LEN               _SB_MAKEMASK(6,S_MAC_PRE_LEN)
 #define V_MAC_PRE_LEN(x)            _SB_MAKEVALUE(x,S_MAC_PRE_LEN)
 #define G_MAC_PRE_LEN(x)            _SB_GETVALUE(x,S_MAC_PRE_LEN,M_MAC_PRE_LEN)
-#endif /* 112x PASS1 */
+#endif /* 1250 PASS3 || 112x PASS1 */
 
 #define S_MAC_IFG_TX                _SB_MAKE64(6)
 #define M_MAC_IFG_TX                _SB_MAKEMASK(6,S_MAC_IFG_TX)
@@ -368,7 +368,7 @@
 #define V_MAC_VLAN_TAG(x)        _SB_MAKEVALUE(x,S_MAC_VLAN_TAG)
 #define G_MAC_VLAN_TAG(x)        _SB_GETVALUE(x,S_MAC_VLAN_TAG,M_MAC_VLAN_TAG)
 
-#if SIBYTE_HDR_FEATURE(112x, PASS1)
+#if SIBYTE_HDR_FEATURE(1250, PASS3) || SIBYTE_HDR_FEATURE(112x, PASS1)
 #define S_MAC_TX_PKT_OFFSET      _SB_MAKE64(32)
 #define M_MAC_TX_PKT_OFFSET      _SB_MAKEMASK(8,S_MAC_TX_PKT_OFFSET)
 #define V_MAC_TX_PKT_OFFSET(x)   _SB_MAKEVALUE(x,S_MAC_TX_PKT_OFFSET)
@@ -380,7 +380,7 @@
 #define G_MAC_TX_CRC_OFFSET(x)   _SB_GETVALUE(x,S_MAC_TX_CRC_OFFSET,M_MAC_TX_CRC_OFFSET)
 
 #define M_MAC_CH_BASE_FC_EN      _SB_MAKEMASK1(48)
-#endif /* 112x PASS1 */
+#endif /* 1250 PASS3 || 112x PASS1 */
 
 /*
  * MAC Status Registers (Table 9-17)
@@ -458,9 +458,9 @@
 #define V_MAC_COUNTER_ADDR(x)       _SB_MAKEVALUE(x,S_MAC_COUNTER_ADDR)
 #define G_MAC_COUNTER_ADDR(x)       _SB_GETVALUE(x,S_MAC_COUNTER_ADDR,M_MAC_COUNTER_ADDR)
 
-#if SIBYTE_HDR_FEATURE(112x, PASS1)
+#if SIBYTE_HDR_FEATURE(1250, PASS3) || SIBYTE_HDR_FEATURE(112x, PASS1)
 #define M_MAC_TX_PAUSE_ON	    _SB_MAKEMASK1(52)
-#endif /* 112x PASS1 */
+#endif /* 1250 PASS3 || 112x PASS1 */
 
 /*
  * MAC Fifo Pointer Registers (Table 9-19)    [Debug register]
@@ -594,7 +594,7 @@
 #define V_MAC_IPHDR_OFFSET(x)	_SB_MAKEVALUE(x,S_MAC_IPHDR_OFFSET)
 #define G_MAC_IPHDR_OFFSET(x)	_SB_GETVALUE(x,S_MAC_IPHDR_OFFSET,M_MAC_IPHDR_OFFSET)
 
-#if SIBYTE_HDR_FEATURE(112x, PASS1)
+#if SIBYTE_HDR_FEATURE(1250, PASS3) || SIBYTE_HDR_FEATURE(112x, PASS1)
 #define S_MAC_RX_CRC_OFFSET     _SB_MAKE64(16)
 #define M_MAC_RX_CRC_OFFSET     _SB_MAKEMASK(8,S_MAC_RX_CRC_OFFSET)
 #define V_MAC_RX_CRC_OFFSET(x)	_SB_MAKEVALUE(x,S_MAC_RX_CRC_OFFSET)
@@ -612,7 +612,7 @@
 #define M_MAC_RX_CH_MSN_SEL     _SB_MAKEMASK(8,S_MAC_RX_CH_MSN_SEL)
 #define V_MAC_RX_CH_MSN_SEL(x)	_SB_MAKEVALUE(x,S_MAC_RX_CH_MSN_SEL)
 #define G_MAC_RX_CH_MSN_SEL(x)	_SB_GETVALUE(x,S_MAC_RX_CH_MSN_SEL,M_MAC_RX_CH_MSN_SEL)
-#endif /* 112x PASS1 */
+#endif /* 1250 PASS3 || 112x PASS1 */
 
 /*
  * MAC Receive Channel Select Registers (Table 9-25)

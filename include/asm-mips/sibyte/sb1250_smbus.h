@@ -8,7 +8,7 @@
     *  
     *  SB1250 specification level:  01/02/2002
     *  
-    *  Author:  Mitch Lichtenberg (mpl@broadcom.com)
+    *  Author:  Mitch Lichtenberg
     *  
     *********************************************************************  
     *

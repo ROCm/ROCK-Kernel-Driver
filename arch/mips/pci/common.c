@@ -1,6 +1,9 @@
+#include <linux/config.h>
+#include <linux/init.h>
+#include <linux/pci.h>
+
 void __init pcibios_fixup_bus(struct pci_bus *b)
 {
-	Dprintk("pcibios_fixup_bus()\n");
 }
 
 static int pcibios_enable_resources(struct pci_dev *dev, int mask)

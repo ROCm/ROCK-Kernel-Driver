@@ -10,8 +10,8 @@
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
  */
-#ifndef __ASM_MIPS_I8259_H
-#define __ASM_MIPS_I8259_H
+#ifndef _ASM_I8259_H
+#define _ASM_I8259_H
 
 #include <linux/spinlock.h>
 
@@ -20,4 +20,4 @@
 
 extern void init_i8259_irqs(void);
 
-#endif /* __ASM_MIPS_I8259_H */
+#endif /* _ASM_I8259_H */

@@ -3,15 +3,15 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995  Linus Torvalds
- * Copyright (C) 1995  Waldorf Electronics
- * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001  Ralf Baechle
- * Copyright (C) 1996  Stoned Elipot
- * Copyright (C) 2000, 2001, 2002  Maciej W. Rozycki
+ * Copyright (C) 1995 Linus Torvalds
+ * Copyright (C) 1995 Waldorf Electronics
+ * Copyright (C) 1994, 95, 96, 97, 98, 99, 2000, 01, 02, 03  Ralf Baechle
+ * Copyright (C) 1996 Stoned Elipot
+ * Copyright (C) 1999 Silicon Graphics, Inc.
+ * Copyright (C) 2000 2001, 2002  Maciej W. Rozycki
  */
 #include <linux/config.h>
 #include <linux/errno.h>
-#include <linux/hdreg.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>
@@ -28,38 +28,35 @@
 #include <linux/tty.h>
 #include <linux/bootmem.h>
 #include <linux/initrd.h>
-#include <linux/ide.h>
-#include <linux/timex.h>
 #include <linux/major.h>
 #include <linux/kdev_t.h>
 #include <linux/root_dev.h>
 
-#include <asm/asm.h>
+#include <asm/addrspace.h>
 #include <asm/bootinfo.h>
-#include <asm/cachectl.h>
 #include <asm/cpu.h>
-#include <asm/io.h>
-#include <asm/ptrace.h>
 #include <asm/sections.h>
 #include <asm/system.h>
 
 struct cpuinfo_mips cpu_data[NR_CPUS];
 
-/*
- * There are several bus types available for MIPS machines.  "RISC PC"
- * type machines have ISA, EISA, VLB or PCI available, DECstations
- * have Turbochannel or Q-Bus, SGI has GIO, there are lots of VME
- * boxes ...
- * This flag is set if a EISA slots are available.
- */
-#ifdef CONFIG_EISA
-int EISA_bus = 0;
+#ifdef CONFIG_VT
+struct screen_info screen_info;
 #endif
 
-struct screen_info screen_info;
+/*
+ * Set if box has EISA slots.
+ */
+#ifdef CONFIG_EISA
+int EISA_bus;
 
+EXPORT_SYMBOL(EISA_bus);
+#endif
+
+#if defined(CONFIG_BLK_DEV_FD) || defined(CONFIG_BLK_DEV_FD_MODULE)
 extern struct fd_ops no_fd_ops;
 struct fd_ops *fd_ops;
+#endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 extern struct ide_ops no_ide_ops;
@@ -81,8 +78,6 @@ unsigned long mips_machgroup = MACH_GROUP_UNKNOWN;
 
 struct boot_mem_map boot_mem_map;
 
-unsigned char aux_device_present;
-
 static char command_line[CL_SIZE];
        char saved_command_line[CL_SIZE];
 extern char arcs_cmdline[CL_SIZE];
@@ -94,7 +89,6 @@ extern char arcs_cmdline[CL_SIZE];
 const unsigned long mips_io_port_base = -1;
 EXPORT_SYMBOL(mips_io_port_base);
 
-
 /*
  * isa_slot_offset is the address where E(ISA) busaddress 0 is mapped
  * for the processor.
@@ -104,14 +98,14 @@ EXPORT_SYMBOL(isa_slot_offset);
 
 extern void SetUpBootInfo(void);
 extern void load_mmu(void);
-extern asmlinkage void start_kernel(void);
+extern ATTRIB_NORET asmlinkage void start_kernel(void);
 extern void prom_init(int, char **, char **, int *);
 
 static struct resource code_resource = { "Kernel code" };
 static struct resource data_resource = { "Kernel data" };
 
-asmlinkage void __init
-init_arch(int argc, char **argv, char **envp, int *prom_vec)
+asmlinkage void __init init_arch(int argc, char **argv, char **envp,
+	int *prom_vec)
 {
 	/* Determine which MIPS variant we are running on. */
 	cpu_probe();
@@ -121,15 +115,26 @@ init_arch(int argc, char **argv, char **envp, int *prom_vec)
 	cpu_report();
 
 	/*
-	 * Determine the mmu/cache attached to this machine,
-	 * then flush the tlb and caches.  On the r4xx0
-	 * variants this also sets CP0_WIRED to zero.
+	 * Determine the mmu/cache attached to this machine, then flush the
+	 * tlb and caches.  On the r4xx0 variants this also sets CP0_WIRED to
+	 * zero.
 	 */
 	load_mmu();
 
+#ifdef CONFIG_MIPS32
 	/* Disable coprocessors and set FPU for 16/32 FPR register model */
 	clear_c0_status(ST0_CU1|ST0_CU2|ST0_CU3|ST0_KX|ST0_SX|ST0_FR);
 	set_c0_status(ST0_CU0);
+#endif
+#ifdef CONFIG_MIPS64
+	/*
+	 * On IP27, I am seeing the TS bit set when the kernel is loaded.
+	 * Maybe because the kernel is in ckseg0 and not xkphys? Clear it
+	 * anyway ...
+	 */
+	clear_c0_status(ST0_BEV|ST0_TS|ST0_CU1|ST0_CU2|ST0_CU3);
+	set_c0_status(ST0_CU0|ST0_KX|ST0_SX|ST0_FR);
+#endif
 
 	start_kernel();
 }
@@ -155,9 +160,9 @@ static void __init print_memory_map(void)
 	int i;
 
 	for (i = 0; i < boot_mem_map.nr_map; i++) {
-		printk(" memory: %08Lx @ %08Lx ",
-			(u64) boot_mem_map.map[i].size,
-		        (u64) boot_mem_map.map[i].addr);
+		printk(" memory: %0*Lx @ %0*Lx ",
+		       sizeof(long) * 2, (u64) boot_mem_map.map[i].size,
+		       sizeof(long) * 2, (u64) boot_mem_map.map[i].addr);
 
 		switch (boot_mem_map.map[i].type) {
 		case BOOT_MEM_RAM:
@@ -254,15 +259,16 @@ static inline void bootmem_init(void)
 		initrd_start = (unsigned long)&initrd_header[2];
 		initrd_end = initrd_start + initrd_header[1];
 	}
-	start_pfn = PFN_UP(__pa((&_end)+(initrd_end - initrd_start) + PAGE_SIZE));
+	start_pfn = PFN_UP(CPHYSADDR((&_end)+(initrd_end - initrd_start) + PAGE_SIZE));
 #else
 	/*
 	 * Partially used pages are not usable - thus
 	 * we are rounding upwards.
 	 */
-	start_pfn = PFN_UP(__pa(&_end));
+	start_pfn = PFN_UP(CPHYSADDR(&_end));
 #endif	/* CONFIG_BLK_DEV_INITRD */
 
+#ifndef CONFIG_SGI_IP27
 	/* Find the highest page frame number we have available.  */
 	max_pfn = 0;
 	first_usable_pfn = -1UL;
@@ -297,8 +303,8 @@ static inline void bootmem_init(void)
 		max_low_pfn = MAXMEM_PFN;
 #ifndef CONFIG_HIGHMEM
 		/* Maximum memory usable is what is directly addressable */
-		printk(KERN_WARNING "Warning only %dMB will be used.\n",
-		       MAXMEM>>20);
+		printk(KERN_WARNING "Warning only %ldMB will be used.\n",
+		       MAXMEM >> 20);
 		printk(KERN_WARNING "Use a HIGHMEM enabled kernel.\n");
 #endif
 	}
@@ -373,6 +379,7 @@ static inline void bootmem_init(void)
 
 	/* Reserve the bootmap memory.  */
 	reserve_bootmem(PFN_PHYS(first_usable_pfn), bootmap_size);
+#endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* Board specific code should have set up initrd_start and initrd_end */
@@ -387,13 +394,16 @@ static inline void bootmem_init(void)
 		printk("Initial ramdisk at: 0x%p (%lu bytes)\n",
 		       (void *)initrd_start,
 		       initrd_size);
-		if (PHYSADDR(initrd_end) > PFN_PHYS(max_low_pfn)) {
+/* FIXME: is this right? */
+#ifndef CONFIG_SGI_IP27
+		if (CPHYSADDR(initrd_end) > PFN_PHYS(max_low_pfn)) {
 			printk("initrd extends beyond end of memory "
-			       "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
-			       PHYSADDR(initrd_end),
-			       PFN_PHYS(max_low_pfn));
+			       "(0x%0*Lx > 0x%0*Lx)\ndisabling initrd\n",
+			       sizeof(long) * 2, CPHYSADDR(initrd_end),
+			       sizeof(long) * 2, PFN_PHYS(max_low_pfn));
 			initrd_start = initrd_end = 0;
 		}
+#endif /* !CONFIG_SGI_IP27 */
 	}
 #endif /* CONFIG_BLK_DEV_INITRD  */
 }
@@ -455,38 +465,39 @@ static inline void resource_init(void)
 #undef MAXMEM
 #undef MAXMEM_PFN
 
-
 void __init setup_arch(char **cmdline_p)
 {
-	void atlas_setup(void);
-	void baget_setup(void);
-	void cobalt_setup(void);
-	void lasat_setup(void);
-	void ddb_setup(void);
-	void decstation_setup(void);
-	void deskstation_setup(void);
-	void jazz_setup(void);
-	void sni_rm200_pci_setup(void);
-	void ip22_setup(void);
-	void ev96100_setup(void);
-	void malta_setup(void);
-	void sead_setup(void);
-	void ikos_setup(void);
-	void momenco_ocelot_setup(void);
-	void momenco_ocelot_g_setup(void);
-	void momenco_ocelot_c_setup(void);
-	void nec_osprey_setup(void);
-	void nec_eagle_setup(void);
-	void zao_capcella_setup(void);
-	void victor_mpc30x_setup(void);
-	void ibm_workpad_setup(void);
-	void casio_e55_setup(void);
-	void jmr3927_setup(void);
- 	void it8172_setup(void);
-	void swarm_setup(void);
-	void hp_setup(void);
-	void au1x00_setup(void);
-	void frame_info_init(void);
+	extern void atlas_setup(void);
+	extern void baget_setup(void);
+	extern void cobalt_setup(void);
+	extern void lasat_setup(void);
+	extern void ddb_setup(void);
+	extern void decstation_setup(void);
+	extern void deskstation_setup(void);
+	extern void jazz_setup(void);
+	extern void sni_rm200_pci_setup(void);
+	extern void ip22_setup(void);
+	extern void ip27_setup(void);
+	extern void ip32_setup(void);
+	extern void ev96100_setup(void);
+	extern void malta_setup(void);
+	extern void sead_setup(void);
+	extern void ikos_setup(void);
+	extern void momenco_ocelot_setup(void);
+	extern void momenco_ocelot_g_setup(void);
+	extern void momenco_ocelot_c_setup(void);
+	extern void nec_osprey_setup(void);
+	extern void nec_eagle_setup(void);
+	extern void zao_capcella_setup(void);
+	extern void victor_mpc30x_setup(void);
+	extern void ibm_workpad_setup(void);
+	extern void casio_e55_setup(void);
+	extern void jmr3927_setup(void);
+	extern void it8172_setup(void);
+	extern void swarm_setup(void);
+	extern void hp_setup(void);
+	extern void au1x00_setup(void);
+	extern void frame_info_init(void);
 
 	frame_info_init();
 
@@ -500,17 +511,16 @@ void __init setup_arch(char **cmdline_p)
 
 	rtc_ops = &no_rtc_ops;
 
-	switch(mips_machgroup)
-	{
+	switch (mips_machgroup) {
 #ifdef CONFIG_BAGET_MIPS
 	case MACH_GROUP_BAGET:
 		baget_setup();
 		break;
 #endif
 #ifdef CONFIG_MIPS_COBALT
-        case MACH_GROUP_COBALT:
-                cobalt_setup();
-                break;
+	case MACH_GROUP_COBALT:
+		cobalt_setup();
+		break;
 #endif
 #ifdef CONFIG_DECSTATION
 	case MACH_GROUP_DEC:
@@ -556,6 +566,16 @@ void __init setup_arch(char **cmdline_p)
 	/* As of now this is only IP22.  */
 	case MACH_GROUP_SGI:
 		ip22_setup();
+		break;
+#endif
+#ifdef CONFIG_SGI_IP27
+	case MACH_GROUP_SGI:
+		ip27_setup();
+		break;
+#endif
+#ifdef CONFIG_SGI_IP32
+	case MACH_GROUP_SGI:
+		ip32_setup();
 		break;
 #endif
 #ifdef CONFIG_SNI_RM200_PCI
@@ -669,8 +689,9 @@ void __init setup_arch(char **cmdline_p)
 		panic("Unsupported architecture");
 	}
 
-	strlcpy(command_line, arcs_cmdline, sizeof command_line);
-	strlcpy(saved_command_line, command_line, sizeof saved_command_line);
+	strlcpy(command_line, arcs_cmdline, sizeof(command_line));
+	strlcpy(saved_command_line, command_line, sizeof(saved_command_line));
+
 	*cmdline_p = command_line;
 
 	parse_cmdline_early();
@@ -688,4 +709,5 @@ int __init fpu_disable(char *s)
 
 	return 1;
 }
+
 __setup("nofpu", fpu_disable);

@@ -16,8 +16,8 @@
 
 #include <asm/time.h>
 #include <asm/addrspace.h>
+#include <asm/io.h>
 
-#include <asm/sibyte/64bit.h>
 #include <asm/sibyte/sb1250.h>
 #include <asm/sibyte/sb1250_regs.h>
 #include <asm/sibyte/sb1250_smbus.h>
@@ -86,53 +86,53 @@
 
 static int m41t81_read(uint8_t addr)
 {
-	while (in64(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
+	while (__raw_readq(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
 		;
 
-	out64(addr & 0xff, SMB_CSR(R_SMB_CMD));
-	out64((V_SMB_ADDR(M41T81_CCR_ADDRESS) | V_SMB_TT_WR1BYTE), SMB_CSR(R_SMB_START));
+	__raw_writeq(addr & 0xff, SMB_CSR(R_SMB_CMD));
+	__raw_writeq((V_SMB_ADDR(M41T81_CCR_ADDRESS) | V_SMB_TT_WR1BYTE), SMB_CSR(R_SMB_START));
 
-	while (in64(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
+	while (__raw_readq(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
 		;
 
-	out64((V_SMB_ADDR(M41T81_CCR_ADDRESS) | V_SMB_TT_RD1BYTE), SMB_CSR(R_SMB_START));
+	__raw_writeq((V_SMB_ADDR(M41T81_CCR_ADDRESS) | V_SMB_TT_RD1BYTE), SMB_CSR(R_SMB_START));
 
-	while (in64(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
+	while (__raw_readq(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
 		;
 
-	if (in64(SMB_CSR(R_SMB_STATUS)) & M_SMB_ERROR) {
+	if (__raw_readq(SMB_CSR(R_SMB_STATUS)) & M_SMB_ERROR) {
 		/* Clear error bit by writing a 1 */
-		out64(M_SMB_ERROR, SMB_CSR(R_SMB_STATUS));
+		__raw_writeq(M_SMB_ERROR, SMB_CSR(R_SMB_STATUS));
 		return -1;
 	}
 
-	return (in64(SMB_CSR(R_SMB_DATA)) & 0xff);
+	return (__raw_readq(SMB_CSR(R_SMB_DATA)) & 0xff);
 }
 
 static int m41t81_write(uint8_t addr, int b)
 {
-	while (in64(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
+	while (__raw_readq(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
 		;
 
-	out64((addr & 0xFF), SMB_CSR(R_SMB_CMD));
-	out64((b & 0xff), SMB_CSR(R_SMB_DATA));
-	out64(V_SMB_ADDR(M41T81_CCR_ADDRESS) | V_SMB_TT_WR2BYTE,
+	__raw_writeq((addr & 0xFF), SMB_CSR(R_SMB_CMD));
+	__raw_writeq((b & 0xff), SMB_CSR(R_SMB_DATA));
+	__raw_writeq(V_SMB_ADDR(M41T81_CCR_ADDRESS) | V_SMB_TT_WR2BYTE,
 	      SMB_CSR(R_SMB_START));
 
-	while (in64(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
+	while (__raw_readq(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
 		;
 
-	if (in64(SMB_CSR(R_SMB_STATUS)) & M_SMB_ERROR) {
+	if (__raw_readq(SMB_CSR(R_SMB_STATUS)) & M_SMB_ERROR) {
 		/* Clear error bit by writing a 1 */
-		out64(M_SMB_ERROR, SMB_CSR(R_SMB_STATUS));
+		__raw_writeq(M_SMB_ERROR, SMB_CSR(R_SMB_STATUS));
 		return -1;
 	} 
 
 	/* read the same byte again to make sure it is written */
-	out64(V_SMB_ADDR(M41T81_CCR_ADDRESS) | V_SMB_TT_RD1BYTE,
+	__raw_writeq(V_SMB_ADDR(M41T81_CCR_ADDRESS) | V_SMB_TT_RD1BYTE,
 	      SMB_CSR(R_SMB_START));
 
-	while (in64(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
+	while (__raw_readq(SMB_CSR(R_SMB_STATUS)) & M_SMB_BUSY)
 		;
 	
 	return 0;

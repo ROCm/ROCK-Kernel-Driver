@@ -40,6 +40,9 @@
 extern asmlinkage void handle_mod(void);
 extern asmlinkage void handle_tlbl(void);
 extern asmlinkage void handle_tlbs(void);
+extern asmlinkage void __xtlb_mod(void);
+extern asmlinkage void __xtlb_tlbl(void);
+extern asmlinkage void __xtlb_tlbs(void);
 extern asmlinkage void handle_adel(void);
 extern asmlinkage void handle_ades(void);
 extern asmlinkage void handle_ibe(void);
@@ -164,7 +167,7 @@ void show_regs(struct pt_regs *regs)
 	/*
 	 * Saved main processor registers
 	 */
-	for (i = 0; i < 32; i++) {
+	for (i = 0; i < 32; ) {
 		if ((i % 4) == 0)
 			printk("$%2d :", i);
 		if (i == 0)
@@ -489,7 +492,7 @@ asmlinkage void do_fpe(struct pt_regs *regs, unsigned long fcr31)
 		 * We can't allow the emulated instruction to leave any of
 		 * the cause bit set in $fcr31.
 		 */
-		current->thread.fpu.soft.sr &= ~FPU_CSR_ALL_X;
+		current->thread.fpu.soft.fcr31 &= ~FPU_CSR_ALL_X;
 
 		/* Restore the hardware register state */
 		restore_fp(current);
@@ -796,6 +799,9 @@ void *set_except_vector(int n, void *addr)
 	return (void *)old_handler;
 }
 
+/*
+ * This is used by native signal handling
+ */
 asmlinkage int (*save_fp_context)(struct sigcontext *sc);
 asmlinkage int (*restore_fp_context)(struct sigcontext *sc);
 
@@ -805,12 +811,52 @@ extern asmlinkage int _restore_fp_context(struct sigcontext *sc);
 extern asmlinkage int fpu_emulator_save_context(struct sigcontext *sc);
 extern asmlinkage int fpu_emulator_restore_context(struct sigcontext *sc);
 
+static inline void signal_init(void)
+{
+	if (cpu_has_fpu) {
+		save_fp_context = _save_fp_context;
+		restore_fp_context = _restore_fp_context;
+	} else {
+		save_fp_context = fpu_emulator_save_context;
+		restore_fp_context = fpu_emulator_restore_context;
+	}
+}
+
+#ifdef CONFIG_MIPS32_COMPAT
+
+/*
+ * This is used by 32-bit signal stuff on the 64-bit kernel
+ */
+asmlinkage int (*save_fp_context32)(struct sigcontext32 *sc);
+asmlinkage int (*restore_fp_context32)(struct sigcontext32 *sc);
+
+extern asmlinkage int _save_fp_context32(struct sigcontext32 *sc);
+extern asmlinkage int _restore_fp_context32(struct sigcontext32 *sc);
+
+extern asmlinkage int fpu_emulator_save_context32(struct sigcontext32 *sc);
+extern asmlinkage int fpu_emulator_restore_context32(struct sigcontext32 *sc);
+
+static inline void signal32_init(void)
+{
+	if (cpu_has_fpu) {
+		save_fp_context32 = _save_fp_context32;
+		restore_fp_context32 = _restore_fp_context32;
+	} else {
+		save_fp_context32 = fpu_emulator_save_context32;
+		restore_fp_context32 = fpu_emulator_restore_context32;
+	}
+}
+#endif
+
 void __init per_cpu_trap_init(void)
 {
 	unsigned int cpu = smp_processor_id();
 
 	/* Some firmware leaves the BEV flag set, clear it.  */
 	clear_c0_status(ST0_CU1|ST0_CU2|ST0_CU3|ST0_BEV);
+#ifdef CONFIG_MIPS64
+	set_c0_status(ST0_CU0|ST0_FR|ST0_KX|ST0_SX|ST0_UX);
+#endif
 
 	/*
 	 * Some MIPS CPUs have a dedicated interrupt vector which reduces the
@@ -820,11 +866,18 @@ void __init per_cpu_trap_init(void)
 		set_c0_cause(CAUSEF_IV);
 
 	cpu_data[cpu].asid_cache = ASID_FIRST_VERSION;
+#ifdef CONFIG_MIPS32
 	write_c0_context(cpu << 23);
+#endif
+#ifdef CONFIG_MIPS64
+	write_c0_context(((long)(&pgd_current[cpu])) << 23);
+#endif
+	write_c0_wired(0);
 }
 
 void __init trap_init(void)
 {
+	extern char except_vec0_generic;
 	extern char except_vec1_generic;
 	extern char except_vec3_generic, except_vec3_r4000;
 	extern char except_vec_ejtag_debug;
@@ -833,8 +886,14 @@ void __init trap_init(void)
 
 	per_cpu_trap_init();
 
-	/* Copy the generic exception handler code to its final destination. */
-	memcpy((void *)(KSEG0 + 0x80), &except_vec1_generic, 0x80);
+	/*
+	 * Copy the generic exception handlers to their final destination.
+	 * This will be overriden later as suitable for a particular
+	 * configuration.
+	 */
+	memcpy((void *) KSEG0         , &except_vec0_generic, 0x80);
+	memcpy((void *)(KSEG0 + 0x080), &except_vec1_generic, 0x80);
+	memcpy((void *)(KSEG0 + 0x180), &except_vec3_generic, 0x80);
 
 	/*
 	 * Setup default vectors
@@ -877,9 +936,16 @@ void __init trap_init(void)
 	if (board_be_init)
 		board_be_init();
 
+#ifdef CONFIG_MIPS32
 	set_except_vector(1, handle_mod);
 	set_except_vector(2, handle_tlbl);
 	set_except_vector(3, handle_tlbs);
+#endif
+#ifdef CONFIG_MIPS64
+	set_except_vector(1, __xtlb_mod);
+	set_except_vector(2, __xtlb_tlbl);
+	set_except_vector(3, __xtlb_tlbs);
+#endif
 	set_except_vector(4, handle_adel);
 	set_except_vector(5, handle_ades);
 
@@ -921,13 +987,10 @@ void __init trap_init(void)
 		//set_except_vector(15, handle_ndc);
 	}
 
-	if (cpu_has_fpu) {
-	        save_fp_context = _save_fp_context;
-		restore_fp_context = _restore_fp_context;
-	} else {
-		save_fp_context = fpu_emulator_save_context;
-		restore_fp_context = fpu_emulator_restore_context;
-	}
+	signal_init();
+#ifdef CONFIG_MIPS32_COMPAT
+	signal32_init();
+#endif
 
 	flush_icache_range(KSEG0, KSEG0 + 0x400);
 
@@ -936,7 +999,4 @@ void __init trap_init(void)
 
 	atomic_inc(&init_mm.mm_count);	/* XXX UP?  */
 	current->active_mm = &init_mm;
-
-	/* XXX Must be done for all CPUs  */
-	TLBMISS_HANDLER_SETUP();
 }

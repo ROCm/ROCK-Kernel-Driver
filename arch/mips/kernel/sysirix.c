@@ -721,7 +721,7 @@ asmlinkage int irix_statfs(const char *path, struct irix_statfs *buf,
 			   int len, int fs_type)
 {
 	struct nameidata nd;
-	struct statfs kbuf;
+	struct kstatfs kbuf;
 	int error, i;
 
 	/* We don't support this feature yet. */
@@ -761,7 +761,7 @@ out:
 
 asmlinkage int irix_fstatfs(unsigned int fd, struct irix_statfs *buf)
 {
-	struct statfs kbuf;
+	struct kstatfs kbuf;
 	struct file *file;
 	int error, i;
 
@@ -1404,7 +1404,7 @@ struct irix_statvfs {
 asmlinkage int irix_statvfs(char *fname, struct irix_statvfs *buf)
 {
 	struct nameidata nd;
-	struct statfs kbuf;
+	struct kstatfs kbuf;
 	int error, i;
 
 	printk("[%s:%d] Wheee.. irix_statvfs(%s,%p)\n",
@@ -1449,7 +1449,7 @@ out:
 
 asmlinkage int irix_fstatvfs(int fd, struct irix_statvfs *buf)
 {
-	struct statfs kbuf;
+	struct kstatfs kbuf;
 	struct file *file;
 	int error, i;
 
@@ -1665,7 +1665,7 @@ struct irix_statvfs64 {
 asmlinkage int irix_statvfs64(char *fname, struct irix_statvfs64 *buf)
 {
 	struct nameidata nd;
-	struct statfs kbuf;
+	struct kstatfs kbuf;
 	int error, i;
 
 	printk("[%s:%d] Wheee.. irix_statvfs(%s,%p)\n",
@@ -1710,7 +1710,7 @@ out:
 
 asmlinkage int irix_fstatvfs64(int fd, struct irix_statvfs *buf)
 {
-	struct statfs kbuf;
+	struct kstatfs kbuf;
 	struct file *file;
 	int error, i;
 

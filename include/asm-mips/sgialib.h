@@ -41,8 +41,8 @@ extern void prom_printf(char *fmt, ...);
 #define PROM_MAX_PMEMBLOCKS    32
 struct prom_pmemblock {
 	LONG	base;		/* Within KSEG0 or XKPHYS. */
-	ULONG size;		/* In bytes. */
-	ULONG type;		/* free or prom memory */
+	ULONG	size;		/* In bytes. */
+	ULONG	type;		/* free or prom memory */
 };
 
 /* Get next memory descriptor after CURR, returns first descriptor

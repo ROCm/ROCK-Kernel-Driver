@@ -8,7 +8,7 @@
  * Author: MontaVista Software, Inc.
  *         	ppopov@mvista.com or source@mvista.com
  *
- * This file was derived from Carsten Langgaard's 
+ * This file was derived from Carsten Langgaard's
  * arch/mips/mips-boards/xx files.
  *
  * Carsten Langgaard, carstenl@mips.com
@@ -44,7 +44,7 @@
 
 /* #define DEBUG_CMDLINE */
 
-char arcs_cmdline[COMMAND_LINE_SIZE];
+char arcs_cmdline[CL_SIZE];
 extern int prom_argc;
 extern char **prom_argv, **prom_envp;
 
@@ -111,11 +111,6 @@ static inline unsigned char str2hexnum(unsigned char c)
 	return 0; /* foo */
 }
 
-int __init page_is_ram(unsigned long pagenr)
-{
-    return 1;
-}
-
 void prom_free_prom_memory (void)
 {
 }
@@ -128,11 +123,11 @@ unsigned long __init prom_get_memsize(void)
 	memsize_str = prom_getenv("memsize");
 	if (!memsize_str) {
 #ifdef CONFIG_MIPS_ITE8172
-		memsize = 32; 
+		memsize = 32;
 #elif defined(CONFIG_MIPS_IVR)
-		memsize = 64; 
+		memsize = 64;
 #else
-		memsize = 8; 
+		memsize = 8;
 #endif
 		printk("memsize unknown: setting to %dMB\n", memsize);
 	} else {

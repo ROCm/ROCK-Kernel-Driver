@@ -9,7 +9,6 @@
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
  */
-#include <linux/config.h>
 #include <asm/asm.h>
 #include <asm/mipsregs.h>
 #include <asm/addrspace.h>
@@ -26,11 +25,11 @@
 		SAVE_ALL
 		CLI
 		.set	at
-		mfc0	t0, CP0_CAUSE  
+		mfc0	t0, CP0_CAUSE
 		mfc0	t2, CP0_STATUS
 
 		and	t0, t2
-        
+
 		 andi	t1, t0, STATUSF_IP2	/* int0 hardware line */
 		bnez	t1, ll_pri_enet_irq
 		 andi	t1, t0, STATUSF_IP3	/* int1 hardware line */
@@ -45,7 +44,7 @@
 		bnez	t1, ll_cputimer_irq
 
                 /* now look at the extended interrupts */
-		mfc0	t0, CP0_CAUSE  
+		mfc0	t0, CP0_CAUSE
 		cfc0	t1, CP0_S1_INTCONTROL
 
 		/* shift the mask 8 bits left to line up the bits */
@@ -88,7 +87,7 @@ ll_uart1_irq:
 		move	a1, sp
 		jal	do_IRQ
 		j	ret_from_irq
-	
+
 ll_cpci_irq:
 		li	a0, 5
 		move	a1, sp
@@ -106,7 +105,7 @@ ll_cputimer_irq:
 		move	a1, sp
 		jal	do_IRQ
 		j	ret_from_irq
-	
+
 ll_pmc1_irq:
 		li	a0, 8
 		move	a1, sp

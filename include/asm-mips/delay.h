@@ -4,7 +4,8 @@
  * for more details.
  *
  * Copyright (C) 1994 by Waldorf Electronics
- * Copyright (C) 1995 - 1998, 2001 by Ralf Baechle
+ * Copyright (C) 1995 - 2000, 01, 03 by Ralf Baechle
+ * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  */
 #ifndef _ASM_DELAY_H
 #define _ASM_DELAY_H
@@ -14,17 +15,26 @@
 
 extern unsigned long loops_per_jiffy;
 
-extern __inline__ void
-__delay(unsigned long loops)
+static inline void __delay(unsigned long loops)
 {
-	__asm__ __volatile__ (
+	if (sizeof(long) == 4)
+		__asm__ __volatile__ (
 		".set\tnoreorder\n"
 		"1:\tbnez\t%0,1b\n\t"
 		"subu\t%0,1\n\t"
 		".set\treorder"
+		: "=r" (loops)
+		: "0" (loops));
+	else if (sizeof(long) == 8)
+		__asm__ __volatile__ (
+		".set\tnoreorder\n"
+		"1:\tbnez\t%0,1b\n\t"
+		"dsubu\t%0,1\n\t"
+		".set\treorder"
 		:"=r" (loops)
 		:"0" (loops));
 }
+
 
 /*
  * Division by multiplication: you don't have to worry about
@@ -36,18 +46,35 @@ __delay(unsigned long loops)
  * first constant multiplications gets optimized away if the delay is
  * a constant)
  */
-extern __inline__ void __udelay(unsigned long usecs, unsigned long lpj)
+
+static inline void __udelay(unsigned long usecs, unsigned long lpj)
 {
 	unsigned long lo;
 
 	/*
-	 * Excessive precission?  Probably ...
+	 * The common rates of 1000 and 128 are rounded wrongly by the
+	 * catchall case for 64-bit.  Excessive precission?  Probably ...
 	 */
+#if defined(CONFIG_MIPS64) && (HZ == 128)
+	usecs *= 0x0008637bd05af6c7UL;		/* 2**64 / (1000000 / HZ) */
+#elif defined(CONFIG_MIPS64) && (HZ == 1000)
+	usecs *= 0x004189374BC6A7f0UL;		/* 2**64 / (1000000 / HZ) */
+#elif defined(CONFIG_MIPS64)
+	usecs *= (0x8000000000000000UL / (500000 / HZ));
+#else /* 32-bit junk follows here */
 	usecs *= (unsigned long) (((0x8000000000000000ULL / (500000 / HZ)) +
 	                           0x80000000ULL) >> 32);
-	__asm__("multu\t%2,%3"
-		:"=h" (usecs), "=l" (lo)
-		:"r" (usecs),"r" (lpj));
+#endif
+
+	if (sizeof(long) == 4)
+		__asm__("multu\t%2, %3"
+		: "=h" (usecs), "=l" (lo)
+		: "r" (usecs),"r" (lpj));
+	else if (sizeof(long) == 8)
+		__asm__("dmultu\t%2, %3"
+		: "=h" (usecs), "=l" (lo)
+		: "r" (usecs),"r" (lpj));
+
 	__delay(usecs);
 }
 

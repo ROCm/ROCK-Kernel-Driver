@@ -161,7 +161,7 @@
 #define jmr3927_isac_reg_out(d, a)	((*(volatile unsigned char *)(a)) = (d))
 #define jmr3927_isac_reg_in(a)		(*(volatile unsigned char *)(a))
 
-extern inline int jmr3927_have_isac(void)
+static inline int jmr3927_have_isac(void)
 {
 	unsigned char idt;
 	unsigned long flags;

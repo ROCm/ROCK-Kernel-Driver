@@ -242,7 +242,7 @@ irix_sigreturn(struct pt_regs *regs)
 		fregs = (u64 *) &current->thread.fpu;
 		for(i = 0; i < 32; i++)
 			fregs[i] = (u64) context->fpregs[i];
-		__get_user(current->thread.fpu.hard.control, &context->fpcsr);
+		__get_user(current->thread.fpu.hard.fcr31, &context->fpcsr);
 	}
 
 	/* XXX do sigstack crapola here... XXX */

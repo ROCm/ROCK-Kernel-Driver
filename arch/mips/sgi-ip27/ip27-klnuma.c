@@ -10,6 +10,7 @@
 #include <linux/string.h>
 
 #include <asm/page.h>
+#include <asm/sections.h>
 #include <asm/smp.h>
 #include <asm/sn/types.h>
 #include <asm/sn/arch.h>
@@ -82,11 +83,10 @@ static __init void set_ktext_source(nasid_t client_nasid, nasid_t server_nasid)
 /* XXX - When the BTE works, we should use it instead of this. */
 static __init void copy_kernel(nasid_t dest_nasid)
 {
-	extern char _stext, _etext;
 	unsigned long dest_kern_start, source_start, source_end, kern_size;
 
-	source_start = (unsigned long)&_stext;
-	source_end = (unsigned long)&_etext;
+	source_start = (unsigned long) _stext;
+	source_end = (unsigned long) _etext;
 	kern_size = source_end - source_start;
 
 	dest_kern_start = CHANGE_ADDR_NASID(MAPPED_KERN_RO_TO_K0(source_start),

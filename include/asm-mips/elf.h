@@ -3,8 +3,10 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  */
-#ifndef __ASM_ELF_H
-#define __ASM_ELF_H
+#ifndef _ASM_ELF_H
+#define _ASM_ELF_H
+
+#include <linux/config.h>
 
 /* ELF header e_flags defines. */
 /* MIPS architecture level. */
@@ -110,6 +112,7 @@
 
 #define SHF_MIPS_GPREL	0x10000000
 
+#ifndef ELF_ARCH
 /* ELF register definitions */
 #define ELF_NGREG	45
 #define ELF_NFPREG	33
@@ -119,6 +122,32 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 
 typedef double elf_fpreg_t;
 typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
+
+#ifdef CONFIG_MIPS32
+/*
+ * This is used to ensure we don't load something for the wrong architecture.
+ */
+#define elf_check_arch(hdr)						\
+({									\
+	int __res = 1;							\
+	struct elfhdr *__h = (hdr);					\
+									\
+	if (__h->e_machine != EM_MIPS)					\
+		__res = 0;						\
+	if (__h->e_ident[EI_CLASS] != ELFCLASS64) 			\
+		__res = 0;						\
+									\
+	__res;								\
+})
+
+/*
+ * These are used to set parameters in the core dumps.
+ */
+#define ELF_CLASS	ELFCLASS32
+
+#endif /* CONFIG_MIPS32 */
+
+#ifdef CONFIG_MIPS64
 
 /*
  * This is used to ensure we don't load something for the wrong architecture.
@@ -141,19 +170,62 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 	__res;								\
 })
 
-/* This one accepts IRIX binaries.  */
-#define irix_elf_check_arch(hdr)	((hdr)->e_machine == EM_MIPS)
+/*
+ * These are used to set parameters in the core dumps.
+ */
+#define ELF_CLASS	ELFCLASS64
+
+#endif /* CONFIG_MIPS64 */
 
 /*
  * These are used to set parameters in the core dumps.
  */
-#define ELF_CLASS	ELFCLASS32
 #ifdef __MIPSEB__
 #define ELF_DATA	ELFDATA2MSB
 #elif __MIPSEL__
 #define ELF_DATA	ELFDATA2LSB
 #endif
 #define ELF_ARCH	EM_MIPS
+
+#endif /* !defined(ELF_ARCH) */
+
+#ifdef __KERNEL__
+
+#ifdef CONFIG_MIPS32
+
+#define SET_PERSONALITY(ex, ibcs2)			\
+do {							\
+	if (ibcs2)					\
+		set_personality(PER_SVR4);		\
+	set_personality(PER_LINUX);			\
+} while (0)
+
+#endif /* CONFIG_MIPS32 */
+
+#ifdef CONFIG_MIPS64
+
+#define SET_PERSONALITY(ex, ibcs2)				\
+do {	current->thread.mflags &= ~MF_ABI_MASK;			\
+	if ((ex).e_ident[EI_CLASS] == ELFCLASS32) {		\
+		if ((((ex).e_flags & EF_MIPS_ABI2) != 0) &&	\
+		     ((ex).e_flags & EF_MIPS_ABI) == 0)		\
+			current->thread.mflags |= MF_N32;	\
+		else						\
+			current->thread.mflags |= MF_O32;	\
+	} else							\
+		current->thread.mflags |= MF_N64;		\
+	if (ibcs2)						\
+		set_personality(PER_SVR4);			\
+	else if (current->personality != PER_LINUX32)		\
+		set_personality(PER_LINUX);			\
+} while (0)
+
+#endif /* CONFIG_MIPS64 */
+
+#endif /* __KERNEL__ */
+
+/* This one accepts IRIX binaries.  */
+#define irix_elf_check_arch(hdr)	((hdr)->e_machine == EM_MIPS)
 
 #define USE_ELF_CORE_DUMP
 #define ELF_EXEC_PAGESIZE	4096
@@ -197,10 +269,8 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
    the loader.  We need to make sure that it is out of the way of the program
    that it will "exec", and that there is sufficient room for the brk.  */
 
+#ifndef ELF_ET_DYN_BASE
 #define ELF_ET_DYN_BASE         (TASK_SIZE / 3 * 2)
-
-#ifdef __KERNEL__
-#define SET_PERSONALITY(ex, ibcs2) set_personality((ibcs2)?PER_SVR4:PER_LINUX)
 #endif
 
-#endif /* __ASM_ELF_H */
+#endif /* _ASM_ELF_H */

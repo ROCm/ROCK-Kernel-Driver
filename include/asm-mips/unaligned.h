@@ -3,91 +3,13 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1999, 2000 by Ralf Baechle
- * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 1996, 1999, 2000, 2001, 2003 by Ralf Baechle
+ * Copyright (C) 1999, 2000, 2001 Silicon Graphics, Inc.
  */
 #ifndef _ASM_UNALIGNED_H
 #define _ASM_UNALIGNED_H
 
-extern void __get_unaligned_bad_length(void);
-extern void __put_unaligned_bad_length(void);
-
-/*
- * Load double unaligned.
- *
- * This could have been implemented in plain C like IA64 but egcs 1.0.3a
- * inflates this to 23 instructions ...
- */
-static inline unsigned long long __ldq_u(const unsigned long long * __addr)
-{
-	unsigned long long __res;
-
-	__asm__("ulw\t%0, %1\n\t"
-		"ulw\t%D0, 4+%1"
-		: "=&r" (__res)
-		: "m" (*__addr));
-
-	return __res;
-}
-
-/*
- * Load word unaligned.
- */
-static inline unsigned long __ldl_u(const unsigned int * __addr)
-{
-	unsigned long __res;
-
-	__asm__("ulw\t%0,%1"
-		: "=&r" (__res)
-		: "m" (*__addr));
-
-	return __res;
-}
-
-/*
- * Load halfword unaligned.
- */
-static inline unsigned long __ldw_u(const unsigned short * __addr)
-{
-	unsigned long __res;
-
-	__asm__("ulh\t%0,%1"
-		: "=&r" (__res)
-		: "m" (*__addr));
-
-	return __res;
-}
-
-/*
- * Store doubleword ununaligned.
- */
-static inline void __stq_u(unsigned long __val, unsigned long long * __addr)
-{
-	__asm__("usw\t%1, %0\n\t"
-		"usw\t%D1, 4+%0"
-		: "=m" (*__addr)
-		: "r" (__val));
-}
-
-/*
- * Store long ununaligned.
- */
-static inline void __stl_u(unsigned long __val, unsigned int * __addr)
-{
-	__asm__("usw\t%1, %0"
-		: "=m" (*__addr)
-		: "r" (__val));
-}
-
-/*
- * Store word ununaligned.
- */
-static inline void __stw_u(unsigned long __val, unsigned short * __addr)
-{
-	__asm__("ush\t%1, %0"
-		: "=m" (*__addr)
-		: "r" (__val));
-}
+#include <linux/types.h>
 
 /*
  * get_unaligned - get value from possibly mis-aligned location
@@ -99,30 +21,8 @@ static inline void __stw_u(unsigned long __val, unsigned short * __addr)
  *
  * Note that unaligned accesses can be very expensive on some architectures.
  */
-#define get_unaligned(ptr)						\
-({									\
-	__typeof__(*(ptr)) __val;					\
-									\
-	switch (sizeof(*(ptr))) {					\
-	case 1:								\
-		__val = *(const unsigned char *)ptr;			\
-		break;							\
-	case 2:								\
-		__val = __ldw_u((const unsigned short *)ptr);		\
-		break;							\
-	case 4:								\
-		__val = __ldl_u((const unsigned int *)ptr);		\
-		break;							\
-	case 8:								\
-		__val = __ldq_u((const unsigned long long *)ptr);	\
-		break;							\
-	default:							\
-		__get_unaligned_bad_length();				\
-		break;							\
-	}								\
-									\
-	__val;								\
-})
+#define get_unaligned(ptr) \
+	((__typeof__(*(ptr)))__get_unaligned((ptr), sizeof(*(ptr))))
 
 /*
  * put_unaligned - put value to a possibly mis-aligned location
@@ -135,25 +35,110 @@ static inline void __stw_u(unsigned long __val, unsigned short * __addr)
  *
  * Note that unaligned accesses can be very expensive on some architectures.
  */
-#define put_unaligned(val,ptr)						\
-do {									\
-	switch (sizeof(*(ptr))) {					\
-	case 1:								\
-		*(unsigned char *)(ptr) = (val);			\
-		break;							\
-	case 2:								\
-		__stw_u(val, (unsigned short *)(ptr));			\
-		break;							\
-	case 4:								\
-		__stl_u(val, (unsigned int *)(ptr));			\
-		break;							\
-	case 8:								\
-		__stq_u(val, (unsigned long long *)(ptr));		\
-		break;							\
-	default:							\
-		__put_unaligned_bad_length();				\
-		break;							\
-	}								\
-} while(0)
+#define put_unaligned(x,ptr) \
+	__put_unaligned((__u64)(x), (ptr), sizeof(*(ptr)))
+
+/*
+ * This is a silly but good way to make sure that
+ * the get/put functions are indeed always optimized,
+ * and that we use the correct sizes.
+ */
+extern void bad_unaligned_access_length(void);
+
+/*
+ * EGCS 1.1 knows about arbitrary unaligned loads.  Define some
+ * packed structures to talk about such things with.
+ */
+
+struct __una_u64 { __u64 x __attribute__((packed)); };
+struct __una_u32 { __u32 x __attribute__((packed)); };
+struct __una_u16 { __u16 x __attribute__((packed)); };
+
+/*
+ * Elemental unaligned loads 
+ */
+
+extern inline __u64 __uldq(const __u64 * r11)
+{
+	const struct __una_u64 *ptr = (const struct __una_u64 *) r11;
+	return ptr->x;
+}
+
+extern inline __u32 __uldl(const __u32 * r11)
+{
+	const struct __una_u32 *ptr = (const struct __una_u32 *) r11;
+	return ptr->x;
+}
+
+extern inline __u16 __uldw(const __u16 * r11)
+{
+	const struct __una_u16 *ptr = (const struct __una_u16 *) r11;
+	return ptr->x;
+}
+
+/*
+ * Elemental unaligned stores 
+ */
+
+extern inline void __ustq(__u64 r5, __u64 * r11)
+{
+	struct __una_u64 *ptr = (struct __una_u64 *) r11;
+	ptr->x = r5;
+}
+
+extern inline void __ustl(__u32 r5, __u32 * r11)
+{
+	struct __una_u32 *ptr = (struct __una_u32 *) r11;
+	ptr->x = r5;
+}
+
+extern inline void __ustw(__u16 r5, __u16 * r11)
+{
+	struct __una_u16 *ptr = (struct __una_u16 *) r11;
+	ptr->x = r5;
+}
+
+extern inline __u64 __get_unaligned(const void *ptr, size_t size)
+{
+	__u64 val;
+
+	switch (size) {
+	case 1:
+		val = *(const __u8 *)ptr;
+		break;
+	case 2:
+		val = __uldw((const __u16 *)ptr);
+		break;
+	case 4:
+		val = __uldl((const __u32 *)ptr);
+		break;
+	case 8:
+		val = __uldq((const __u64 *)ptr);
+		break;
+	default:
+		bad_unaligned_access_length();
+	}
+	return val;
+}
+
+extern inline void __put_unaligned(__u64 val, void *ptr, size_t size)
+{
+	switch (size) {
+	      case 1:
+		*(__u8 *)ptr = (val);
+	        break;
+	      case 2:
+		__ustw(val, (__u16 *)ptr);
+		break;
+	      case 4:
+		__ustl(val, (__u32 *)ptr);
+		break;
+	      case 8:
+		__ustq(val, (__u64 *)ptr);
+		break;
+	      default:
+	    	bad_unaligned_access_length();
+	}
+}
 
 #endif /* _ASM_UNALIGNED_H */

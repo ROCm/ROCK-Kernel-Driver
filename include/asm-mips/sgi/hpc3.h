@@ -214,10 +214,11 @@ struct hpc3_regs {
 #define HPC3_EEPROM_DATI	0x10	/* Data in */
 
 	volatile u32 istat1;		/* Irq status, only bits <9:5> reliable. */
-	volatile u32 gio_estat;		/* GIO error interrupt status reg. */
-#define HPC3_GIOESTAT_BLMASK	0x000ff	/* Bus lane where bad parity occurred */
-#define HPC3_GIOESTAT_CTYPE	0x00100	/* Bus cycle type, 0=PIO 1=DMA */
-#define HPC3_GIOESTAT_PIDMSK	0x3f700	/* DMA channel parity identifier */
+	volatile u32 bestat;		/* Bus error interrupt status reg. */
+#define HPC3_BESTAT_BLMASK	0x000ff	/* Bus lane where bad parity occurred */
+#define HPC3_BESTAT_CTYPE	0x00100	/* Bus cycle type, 0=PIO 1=DMA */
+#define HPC3_BESTAT_PIDSHIFT	9
+#define HPC3_BESTAT_PIDMASK	0x3f700	/* DMA channel parity identifier */
 
 	u32 _unused1[0x14000/4 - 5];	/* padding */
 	

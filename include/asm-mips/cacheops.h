@@ -23,14 +23,14 @@
 #define Hit_Invalidate_I	0x10
 #define Hit_Invalidate_D	0x11
 #define Hit_Writeback_Inv_D	0x15
-#define Hit_Writeback_I		0x18
-#define Hit_Writeback_D		0x19
 
 /*
  * R4000-specific cacheops
  */
 #define Create_Dirty_Excl_D	0x0d
 #define Fill			0x14
+#define Hit_Writeback_I		0x18
+#define Hit_Writeback_D		0x19
 
 /*
  * R4000SC and R4400SC-specific cacheops

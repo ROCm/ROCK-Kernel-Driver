@@ -15,22 +15,21 @@
 #include <asm/processor.h>
 #include <asm/reboot.h>
 #include <asm/system.h>
+#include <linux/delay.h>
 
 void momenco_ocelot_restart(char *command)
 {
-	*(volatile char *) 0xbc000000 = 0x0f;
+	void *nvram = ioremap_nocache(0x2c807000, 0x1000);
 
-	/*
-	 * Ouch, we're still alive ... This time we take the silver bullet ...
-	 * ... and find that we leave the hardware in a state in which the
-	 * kernel in the flush locks up somewhen during of after the PCI
-	 * detection stuff.
-	 */
-	clear_cp0_status(ST0_BEV | ST0_ERL);
-	change_cp0_config(CONF_CM_CMASK, CONF_CM_UNCACHED);
-	flush_cache_all();
-	write_32bit_cp0_register(CP0_WIRED, 0);
-	__asm__ __volatile__("jr\t%0"::"r"(0xbfc00000));
+	if (!nvram) {
+		printk(KERN_NOTICE "ioremap of reset register failed\n");
+		return;
+	}
+	writeb(0x84, nvram + 0xff7); /* Ask the NVRAM/RTC/watchdog chip to
+					assert reset in 1/16 second */
+	mdelay(10+(1000/16));
+	iounmap(nvram);
+	printk(KERN_NOTICE "Watchdog reset failed\n");
 }
 
 void momenco_ocelot_halt(void)
