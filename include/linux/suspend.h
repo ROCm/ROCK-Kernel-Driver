@@ -11,9 +11,6 @@
 
 extern unsigned char software_suspend_enabled;
 
-#define NORESUME	 1
-#define RESUME_SPECIFIED 2
-
 #ifdef CONFIG_SOFTWARE_SUSPEND
 /* page backup entry */
 typedef struct pbe {
@@ -51,7 +48,6 @@ extern void drain_local_pages(void);
 
 /* kernel/suspend.c */
 extern int software_suspend(void);
-extern void software_resume(void);
 
 extern int register_suspend_notifier(struct notifier_block *);
 extern int unregister_suspend_notifier(struct notifier_block *);
@@ -76,7 +72,6 @@ static inline int software_suspend(void)
 {
 	return -EPERM;
 }
-#define software_resume()		do { } while(0)
 #define register_suspend_notifier(a)	do { } while(0)
 #define unregister_suspend_notifier(a)	do { } while(0)
 #endif	/* CONFIG_SOFTWARE_SUSPEND */

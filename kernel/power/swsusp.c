@@ -67,7 +67,7 @@
 
 extern long sys_sync(void);
 
-unsigned char software_suspend_enabled = 0;
+unsigned char software_suspend_enabled = 1;
 
 #define __ADDRESS(x)  ((unsigned long) phys_to_virt(x))
 #define ADDRESS(x) __ADDRESS((x) << PAGE_SHIFT)
@@ -85,8 +85,7 @@ spinlock_t suspend_pagedir_lock __nosavedata = SPIN_LOCK_UNLOCKED;
 static int pagedir_order_check;
 static int nr_copy_pages_check;
 
-static int resume_status;
-static char resume_file[256] = "";			/* For resume= kernel option */
+static char resume_file[256];			/* For resume= kernel option */
 static dev_t resume_device;
 /* Local variables that should not be affected by save */
 unsigned int nr_copy_pages __nosavedata = 0;
@@ -746,6 +745,11 @@ int software_suspend(void)
 	if(!software_suspend_enabled)
 		return -EINVAL;
 
+	if (num_online_cpus() > 1) {
+		printk(KERN_WARNING "swsusp does not support SMP.\n");	
+		return -EPERM;
+	}
+
 #if defined (CONFIG_HIGHMEM) || defined (COFNIG_DISCONTIGMEM)
 	printk("swsusp is not supported with high- or discontig-mem.\n");
 	return -EPERM;
@@ -899,31 +903,9 @@ static int bdev_read_page(struct block_device *bdev, long pos, void *buf)
 	return 0;
 } 
 
-static int bdev_write_page(struct block_device *bdev, long pos, void *buf)
-{
-#if 0
-	struct buffer_head *bh;
-	BUG_ON (pos%PAGE_SIZE);
-	bh = __bread(bdev, pos/PAGE_SIZE, PAGE_SIZE);
-	if (!bh || (!bh->b_data)) {
-		return -1;
-	}
-	memcpy(bh->b_data, buf, PAGE_SIZE);	/* FIXME: may need kmap() */
-	BUG_ON(!buffer_uptodate(bh));
-	generic_make_request(WRITE, bh);
-	if (!buffer_uptodate(bh))
-		printk(KERN_CRIT "%sWarning %s: Fixing swap signatures unsuccessful...\n", name_resume, resume_file);
-	wait_on_buffer(bh);
-	brelse(bh);
-	return 0;
-#endif
-	printk(KERN_CRIT "%sWarning %s: Fixing swap signatures unimplemented...\n", name_resume, resume_file);
-	return 0;
-}
-
 extern dev_t __init name_to_dev_t(const char *line);
 
-static int __read_suspend_image(struct block_device *bdev, union diskpage *cur, int noresume)
+static int __read_suspend_image(struct block_device *bdev, union diskpage *cur)
 {
 	swp_entry_t next;
 	int i, nr_pgdir_pages;
@@ -948,18 +930,9 @@ static int __read_suspend_image(struct block_device *bdev, union diskpage *cur, 
 	else if (!memcmp("S2",cur->swh.magic.magic,2))
 		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
 	else {
-		if (noresume)
-			return -EINVAL;
-		panic("%sUnable to find suspended-data signature (%.10s - misspelled?\n", 
+		printk("swsusp: %s: Unable to find suspended-data signature (%.10s - misspelled?\n", 
 			name_resume, cur->swh.magic.magic);
-	}
-	if (noresume) {
-		/* We don't do a sanity check here: we want to restore the swap
-		   whatever version of kernel made the suspend image;
-		   We need to write swap, but swap is *not* enabled so
-		   we must write the device directly */
-		printk("%s: Fixing swap signatures %s...\n", name_resume, resume_file);
-		bdev_write_page(bdev, 0, cur);
+		return -EFAULT;
 	}
 
 	printk( "%sSignature found, resuming\n", name_resume );
@@ -1009,7 +982,7 @@ static int __read_suspend_image(struct block_device *bdev, union diskpage *cur, 
 	return 0;
 }
 
-static int read_suspend_image(const char * specialfile, int noresume)
+static int read_suspend_image(const char * specialfile)
 {
 	union diskpage *cur;
 	unsigned long scratch_page = 0;
@@ -1028,7 +1001,7 @@ static int read_suspend_image(const char * specialfile, int noresume)
 			error = PTR_ERR(bdev);
 		} else {
 			set_blocksize(bdev, PAGE_SIZE);
-			error = __read_suspend_image(bdev, cur, noresume);
+			error = __read_suspend_image(bdev, cur);
 			blkdev_put(bdev, BDEV_RAW);
 		}
 	} else error = -ENOMEM;
@@ -1057,64 +1030,47 @@ static int read_suspend_image(const char * specialfile, int noresume)
 	return error;
 }
 
-/*
- * Called from init kernel_thread.
- * We check if we have an image and if so we try to resume
+/**
+ *	software_resume - Check and load saved image from swap.
+ *
+ *	Defined as a late_initcall, so it gets called after all devices
+ *	have been probed and initialized, but before we've mounted anything.
  */
 
-void software_resume(void)
+static int software_resume(void)
 {
-	if (num_online_cpus() > 1) {
-		printk(KERN_WARNING "Software Suspend has malfunctioning SMP support. Disabled :(\n");	
-		return;
-	}
-	/* We enable the possibility of machine suspend */
-	software_suspend_enabled = 1;
-	if (!resume_status)
-		return;
-
-	printk( "%s", name_resume );
-	if (resume_status == NORESUME) {
-		if(resume_file[0])
-			read_suspend_image(resume_file, 1);
-		printk( "disabled\n" );
-		return;
-	}
-	MDELAY(1000);
+	if (!strlen(resume_file))
+		return 0;
 
 	if (pm_prepare_console())
 		printk("swsusp: Can't allocate a console... proceeding\n");
 
-	if (!resume_file[0] && resume_status == RESUME_SPECIFIED) {
-		printk( "suspension device unspecified\n" );
-		return;
-	}
+	printk("swsusp: %s\n", name_resume );
 
-	printk( "resuming from %s\n", resume_file);
-	if (read_suspend_image(resume_file, 0))
+	MDELAY(1000);
+
+	printk("swsusp: resuming from %s\n", resume_file);
+	if (read_suspend_image(resume_file))
 		goto read_failure;
 	do_magic(1);
-	panic("This never returns");
+	printk("swsusp: Resume failed. Continuing.\n");
 
 read_failure:
 	pm_restore_console();
-	return;
+	return -EFAULT;
 }
+
+late_initcall(software_resume);
 
 static int __init resume_setup(char *str)
 {
-	if (resume_status == NORESUME)
-		return 1;
-
 	strncpy( resume_file, str, 255 );
-	resume_status = RESUME_SPECIFIED;
-
 	return 1;
 }
 
 static int __init noresume_setup(char *str)
 {
-	resume_status = NORESUME;
+	resume_file[0] = '\0';
 	return 1;
 }
 
