@@ -499,7 +499,7 @@ isdn_net_dial_timer(unsigned long data)
 		isdn_BUG();
 		return;
 	}
-	printk("%s: %s %#x\n", __FUNCTION__, lp->name, lp->dial_event);
+	printk("%s: %s %#x\n", __FUNCTION__ , lp->name, lp->dial_event);
 	isdn_net_handle_event(lp, lp->dial_event, NULL);
 }
 
