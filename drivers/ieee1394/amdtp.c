@@ -1140,24 +1140,28 @@ static ssize_t amdtp_write(struct file *file, const char __user *buffer, size_t 
 	return count;
 }
 
-static int amdtp_ioctl(struct inode *inode, struct file *file,
-			   unsigned int cmd, unsigned long arg)
+static long amdtp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct stream *s = file->private_data;
 	struct amdtp_ioctl cfg;
-
+	int err;
+	lock_kernel();
 	switch(cmd)
 	{
 	case AMDTP_IOC_PLUG:
 	case AMDTP_IOC_CHANNEL:
 		if (copy_from_user(&cfg, (struct amdtp_ioctl __user *) arg, sizeof cfg))
-			return -EFAULT;
+			err = -EFAULT;
 		else
-			return stream_configure(s, cmd, &cfg);
+			err = stream_configure(s, cmd, &cfg);
+		break;
 
 	default:
-		return -EINVAL;
+		err = -EINVAL;
+		break;
 	}
+	unlock_kernel();
+	return err;
 }
 
 static unsigned int amdtp_poll(struct file *file, poll_table *pt)
@@ -1203,7 +1207,8 @@ static struct file_operations amdtp_fops =
 	.owner =	THIS_MODULE,
 	.write =	amdtp_write,
 	.poll =		amdtp_poll,
-	.ioctl =	amdtp_ioctl,
+	.unlocked_ioctl = amdtp_ioctl,
+	.compat_ioctl = amdtp_ioctl, /* All amdtp ioctls are compatible */
 	.open =		amdtp_open,
 	.release =	amdtp_release
 };
@@ -1276,18 +1281,6 @@ static int __init amdtp_init_module (void)
 
 	hpsb_register_highlevel(&amdtp_highlevel);
 
-#ifdef CONFIG_COMPAT
-	{
-		int ret;
-		ret = register_ioctl32_conversion(AMDTP_IOC_CHANNEL, NULL);
-		ret |= register_ioctl32_conversion(AMDTP_IOC_PLUG, NULL);
-		ret |= register_ioctl32_conversion(AMDTP_IOC_PING, NULL);
-		ret |= register_ioctl32_conversion(AMDTP_IOC_ZAP, NULL);
-		if (ret)
-			HPSB_ERR("amdtp: Error registering ioctl32 translations");
-	}
-#endif
-
 	HPSB_INFO("Loaded AMDTP driver");
 
 	return 0;
@@ -1295,17 +1288,6 @@ static int __init amdtp_init_module (void)
 
 static void __exit amdtp_exit_module (void)
 {
-#ifdef CONFIG_COMPAT
-	int ret;
-
-	ret = unregister_ioctl32_conversion(AMDTP_IOC_CHANNEL);
-	ret |= unregister_ioctl32_conversion(AMDTP_IOC_PLUG);
-	ret |= unregister_ioctl32_conversion(AMDTP_IOC_PING);
-	ret |= unregister_ioctl32_conversion(AMDTP_IOC_ZAP);
-	if (ret)
-		HPSB_ERR("amdtp: Error unregistering ioctl32 translations");
-#endif
-
         hpsb_unregister_highlevel(&amdtp_highlevel);
 	devfs_remove("amdtp");
 	cdev_del(&amdtp_cdev);
