@@ -190,13 +190,8 @@ static inline int page_mapping_inuse(struct page *page)
 	if (!mapping)
 		return 0;
 
-	/* File is mmap'd by somebody. */
-	if (!list_empty(&mapping->i_mmap))
-		return 1;
-	if (!list_empty(&mapping->i_mmap_shared))
-		return 1;
-
-	return 0;
+	/* File is mmap'd by somebody? */
+	return mapping_mapped(mapping);
 }
 
 static inline int is_page_cache_freeable(struct page *page)

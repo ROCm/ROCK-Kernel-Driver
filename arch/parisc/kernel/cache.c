@@ -68,7 +68,7 @@ update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t pte)
 {
 	struct page *page = pte_page(pte);
 
-	if (VALID_PAGE(page) && page->mapping &&
+	if (VALID_PAGE(page) && page_mapping(page) &&
 	    test_bit(PG_dcache_dirty, &page->flags)) {
 
 		flush_kernel_dcache_page(page_address(page));
@@ -234,7 +234,7 @@ void __flush_dcache_page(struct page *page)
 
 	flush_kernel_dcache_page(page_address(page));
 
-	if (!page->mapping)
+	if (!page_mapping(page))
 		return;
 	/* check shared list first if it's not empty...it's usually
 	 * the shortest */

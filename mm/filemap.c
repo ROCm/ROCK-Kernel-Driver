@@ -660,7 +660,7 @@ page_ok:
 		 * virtual addresses, take care about potential aliasing
 		 * before reading the page on the kernel side.
 		 */
-		if (!list_empty(&mapping->i_mmap_shared))
+		if (mapping_writably_mapped(mapping))
 			flush_dcache_page(page);
 
 		/*

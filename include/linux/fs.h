@@ -374,6 +374,26 @@ struct block_device {
 int mapping_tagged(struct address_space *mapping, int tag);
 
 /*
+ * Might pages of this file be mapped into userspace?
+ */
+static inline int mapping_mapped(struct address_space *mapping)
+{
+	return	!list_empty(&mapping->i_mmap) ||
+		!list_empty(&mapping->i_mmap_shared);
+}
+
+/*
+ * Might pages of this file have been modified in userspace?
+ * Note that i_mmap_shared holds all the VM_SHARED vmas: do_mmap_pgoff
+ * marks vma as VM_SHARED if it is shared, and the file was opened for
+ * writing i.e. vma may be mprotected writable even if now readonly.
+ */
+static inline int mapping_writably_mapped(struct address_space *mapping)
+{
+	return	!list_empty(&mapping->i_mmap_shared);
+}
+
+/*
  * Use sequence counter to get consistent i_size on 32-bit processors.
  */
 #if BITS_PER_LONG==32 && defined(CONFIG_SMP)

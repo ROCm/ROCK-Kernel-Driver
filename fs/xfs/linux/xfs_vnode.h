@@ -596,9 +596,7 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 /*
  * Some useful predicates.
  */
-#define VN_MAPPED(vp)	\
-	(!list_empty(&(LINVFS_GET_IP(vp)->i_mapping->i_mmap)) || \
-	(!list_empty(&(LINVFS_GET_IP(vp)->i_mapping->i_mmap_shared))))
+#define VN_MAPPED(vp)	mapping_mapped(LINVFS_GET_IP(vp)->i_mapping)
 #define VN_CACHED(vp)	(LINVFS_GET_IP(vp)->i_mapping->nrpages)
 #define VN_DIRTY(vp)	mapping_tagged(LINVFS_GET_IP(vp)->i_mapping, \
 					PAGECACHE_TAG_DIRTY)
