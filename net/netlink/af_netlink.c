@@ -868,7 +868,10 @@ netlink_kernel_create(int unit, void (*input)(struct sock *sk, int len))
 	if (input)
 		nlk_sk(sk)->data_ready = input;
 
-	netlink_insert(sk, 0);
+	if (netlink_insert(sk, 0)) {
+		sock_release(sock);
+		return NULL;
+	}
 	return sk;
 }
 
