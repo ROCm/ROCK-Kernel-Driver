@@ -666,7 +666,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	regs->u_regs[UREG_I1] = 0;
 
 	if (clone_flags & CLONE_SETTLS)
-		childregs->u_regs[UREG_G7] = regs->u_regs[UREG_I3];
+		t->kregs->u_regs[UREG_G7] = regs->u_regs[UREG_I3];
 
 	return 0;
 }
