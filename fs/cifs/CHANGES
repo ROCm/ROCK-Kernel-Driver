@@ -1,3 +1,9 @@
+Version 1.16
+------------
+Fix incorrect file size in file handle based setattr on big endian hardware.
+Fix oops in build_path_from_dentry when out of memory.  Add checks for invalid
+and closing file structs in writepage/partialpagewrite
+
 Version 1.15
 ------------
 Change to mempools for alloc smb request buffers and multiplex structs
