@@ -237,9 +237,7 @@ acpi_os_table_override (struct acpi_table_header *existing_table,
 static irqreturn_t
 acpi_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
-	(*acpi_irq_handler)(acpi_irq_context);
-	/* FIXME!! We really should check that the irq was really ours! */
-	return IRQ_HANDLED;
+	return (*acpi_irq_handler)(acpi_irq_context);
 }
 
 acpi_status
