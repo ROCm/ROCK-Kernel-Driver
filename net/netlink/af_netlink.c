@@ -1082,7 +1082,7 @@ static void __exit netlink_proto_exit(void)
        remove_proc_entry("net/netlink", NULL);
 }
 
-subsys_initcall(netlink_proto_init);
+core_initcall(netlink_proto_init);
 module_exit(netlink_proto_exit);
 
 MODULE_LICENSE("GPL");
