@@ -275,7 +275,7 @@ check_display(unsigned long mem)
 {
 	phandle node;
 	ihandle ih;
-	int i;
+	int i, j;
 	char type[16], *path;
 	static unsigned char default_colors[] = {
 		0x00, 0x00, 0x00,
@@ -335,26 +335,23 @@ check_display(unsigned long mem)
 			break;
 	}
 
-try_again:
-	/*
-	 * Open the first display and set its colormap.
-	 */
-	if (prom_num_displays > 0) {
-		path = prom_display_paths[0];
+	for (j=0; j<prom_num_displays; j++) {
+		path = prom_display_paths[j];
 		prom_print("opening display ");
 		prom_print(path);
 		ih = call_prom("open", 1, 1, path);
 		if (ih == 0 || ih == (ihandle) -1) {
 			prom_print("... failed\n");
-			for (i=1; i<prom_num_displays; i++) {
+			for (i=j+1; i<prom_num_displays; i++) {
 				prom_display_paths[i-1] = prom_display_paths[i];
 				prom_display_nodes[i-1] = prom_display_nodes[i];
 			}
-			if (--prom_num_displays > 0)
-				prom_disp_node = prom_display_nodes[0];
-			else
+			if (--prom_num_displays > 0) {
+				prom_disp_node = prom_display_nodes[j];
+				j--;
+			} else
 				prom_disp_node = NULL;
-			goto try_again;
+			continue;
 		} else {
 			prom_print("... ok\n");
 			/*
@@ -369,7 +366,7 @@ try_again:
 					break;
 
 #ifdef CONFIG_LOGO_LINUX_CLUT224
-			clut = logo_linux_clut224.clut;
+			clut = PTRRELOC(logo_linux_clut224.clut);
 			for (i = 0; i < logo_linux_clut224.clutsize;
 			     i++, clut += 3)
 				if (prom_set_color(ih, i + 32, clut[0],

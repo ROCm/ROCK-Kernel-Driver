@@ -21,7 +21,7 @@ obj-y				:= entry.o traps.o irq.o idle.o time.o misc.o \
 					process.o signal.o ptrace.o align.o \
 					semaphore.o syscalls.o setup.o \
 					cputable.o ppc_htab.o
-obj-$(CONFIG_6xx)		+= l2cr.o
+obj-$(CONFIG_6xx)		+= l2cr.o cpu_setup_6xx.o
 obj-$(CONFIG_MODULES)		+= module.o ppc_ksyms.o
 obj-$(CONFIG_PCI)		+= pci.o 
 obj-$(CONFIG_PCI)		+= pci-dma.o

@@ -133,8 +133,8 @@ spruce_setup_arch(void)
 #endif
 
 	/* Identify the system */
-	printk("System Identification: IBM Spruce\n");
-	printk("IBM Spruce port (C) 2001 MontaVista Software, Inc. (source@mvista.com)\n");
+	printk(KERN_INFO "System Identification: IBM Spruce\n");
+	printk(KERN_INFO "Port by MontaVista Software, Inc. (source@mvista.com)\n");
 }
 
 static void

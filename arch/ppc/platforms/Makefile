@@ -19,12 +19,14 @@ endif
 obj-$(CONFIG_ALL_PPC)		+= pmac_pic.o pmac_setup.o pmac_time.o \
 					pmac_feature.o pmac_pci.o chrp_setup.o\
 					chrp_time.o chrp_pci.o prep_pci.o \
-					prep_time.o prep_setup.o
+					prep_time.o prep_setup.o pmac_sleep.o
 ifeq ($(CONFIG_ALL_PPC),y)
 obj-$(CONFIG_NVRAM)		+= pmac_nvram.o
 endif
 obj-$(CONFIG_PMAC_BACKLIGHT)	+= pmac_backlight.o
-obj-$(CONFIG_PMAC_PBOOK)	+= sleep.o
+ifeq ($(CONFIG_ALL_PPC),y)
+obj-$(CONFIG_CPU_FREQ_PMAC)	+= pmac_cpufreq.o
+endif
 obj-$(CONFIG_PPC_RTAS)		+= error_log.o proc_rtas.o
 obj-$(CONFIG_PREP_RESIDUAL)	+= residual.o
 obj-$(CONFIG_ADIR)		+= adir_setup.o adir_pic.o adir_pci.o

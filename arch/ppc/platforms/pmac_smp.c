@@ -106,14 +106,16 @@ volatile static long int core99_l2_cache;
 volatile static long int core99_l3_cache;
 
 static void __init
-core99_init_caches(void)
+core99_init_caches(int cpu)
 {
-	int cpu = smp_processor_id();
-
+	/* Check cache presence on cpu 0, we assume all CPUs have
+	 * same features here. We also assume that if we don't have
+	 * L2CR, we don't have L3CR neither
+	 */
 	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR))
 		return;
 
-	if (cpu == 0){
+	if (cpu == 0) {
 		core99_l2_cache = _get_L2CR();
 		printk("CPU0: L2CR is %lx\n", core99_l2_cache);
 	} else {
@@ -134,106 +136,6 @@ core99_init_caches(void)
 		_set_L3CR(0);
 		_set_L3CR(core99_l3_cache);
 		printk("CPU%d: L3CR set to %lx\n", cpu, core99_l3_cache);
-	}
-}
-
-/* Some CPU registers have to be saved from the first CPU and
- * applied to others. Note that we override what is setup by
- * the cputable intentionally.
- */
-
-#define	reg_hid0	0
-#define	reg_hid1	1
-#define	reg_msscr0	2
-#define	reg_msssr0	3
-#define	reg_ictrl	4
-#define	reg_ldstcr	5
-#define	reg_ldstdb	6
-#define	reg_count	7
-
-static unsigned long cpu_regs[reg_count];
-
-static void __pmac
-cpu_setup_grab(void)
-{
-	unsigned int pvers = mfspr(SPRN_PVR)>>16;
-
-	/* Read cache setting of CPU 0 */
-	core99_init_caches();
-
-	/* 7400/7410/7450 */
-	if (pvers == 0x8000 || pvers == 0x000c || pvers == 0x800c) {
-		cpu_regs[reg_hid0] = mfspr(SPRN_HID0);
-		cpu_regs[reg_msscr0] = mfspr(SPRN_MSSCR0);
-		cpu_regs[reg_msssr0] = mfspr(SPRN_MSSSR0);
-	}
-	/* 7450 only */
-	if (pvers == 0x8000) {
-		cpu_regs[reg_hid1] = mfspr(SPRN_HID1);
-		cpu_regs[reg_ictrl] = mfspr(SPRN_ICTRL);
-		cpu_regs[reg_ldstcr] = mfspr(SPRN_LDSTCR);
-		cpu_regs[reg_ldstdb] = mfspr(SPRN_LDSTDB);
-	}
-	flush_dcache_range((unsigned long)cpu_regs, (unsigned long)&cpu_regs[reg_count]);
-}
-
-static void __pmac
-cpu_setup_apply(int cpu_nr)
-{
-	unsigned int pvers = mfspr(SPRN_PVR)>>16;
-
-	/* Apply cache setting from CPU 0 */
-	core99_init_caches();
-
-	/* 7400/7410/7450 */
-	if (pvers == 0x8000 || pvers == 0x000c || pvers == 0x800c) {
-		unsigned long tmp;
-		__asm__ __volatile__ (
-			"lwz	%0,4*"stringify(reg_hid0)"(%1)\n"
-			"sync\n"
-			"mtspr	"stringify(SPRN_HID0)", %0\n"
-			"isync;sync\n"
-			"lwz	%0, 4*"stringify(reg_msscr0)"(%1)\n"
-			"sync\n"
-			"mtspr	"stringify(SPRN_MSSCR0)", %0\n"
-			"isync;sync\n"
-//			"lwz	%0, "stringify(reg_msssr0)"(%1)\n"
-//			"sync\n"
-//			"mtspr	"stringify(SPRN_MSSSR0)", %0\n"
-//			"isync;sync\n"
-		: "=&r" (tmp) : "r" (cpu_regs));			
-	}
-	/* 7410 only */
-	if (pvers == 0x800c) {
-		unsigned long tmp;
-		__asm__ __volatile__ (
-			"li	%0, 0\n"
-			"sync\n"
-			"mtspr	"stringify(SPRN_L2CR2)", %0\n"
-			"isync;sync\n"
-		: "=&r" (tmp));		
-	}
-	/* 7450 only */
-	if (pvers == 0x8000) {
-		unsigned long tmp;
-		__asm__ __volatile__ (
-			"lwz	%0, 4*"stringify(reg_hid1)"(%1)\n"
-			"sync\n"
-			"mtspr	"stringify(SPRN_HID1)", %0\n"
-			"isync;sync\n"
-			"lwz	%0, 4*"stringify(reg_ictrl)"(%1)\n"
-			"sync\n"
-			"mtspr	"stringify(SPRN_ICTRL)", %0\n"
-			"isync;sync\n"
-			"lwz	%0, 4*"stringify(reg_ldstcr)"(%1)\n"
-			"sync\n"
-			"mtspr	"stringify(SPRN_LDSTCR)", %0\n"
-			"isync;sync\n"
-			"lwz	%0, 4*"stringify(reg_ldstdb)"(%1)\n"
-			"sync\n"
-			"mtspr	"stringify(SPRN_LDSTDB)", %0\n"
-			"isync;sync\n"
-		: "=&r" (tmp) : "r" (cpu_regs));		
 	}
 }
 
@@ -501,7 +403,7 @@ smp_psurge_setup_cpu(int cpu_nr)
 		/* reset the entry point so if we get another intr we won't
 		 * try to startup again */
 		out_be32(psurge_start, 0x100);
-		if (request_irq(30, psurge_primary_intr, 0, "primary IPI", 0))
+		if (request_irq(30, psurge_primary_intr, SA_INTERRUPT, "primary IPI", 0))
 			printk(KERN_ERR "Couldn't get primary IPI interrupt");
 	}
 
@@ -526,8 +428,10 @@ smp_core99_probe(void)
 		openpic_request_IPIs();
 		for (i = 1; i < ncpus; ++i)
 			smp_hw_index[i] = i;
+#ifdef CONFIG_6xx
 		powersave_nap = 0;
-		cpu_setup_grab();
+#endif
+		core99_init_caches(0);
 	}
 
 	return ncpus;
@@ -593,7 +497,7 @@ smp_core99_setup_cpu(int cpu_nr)
 {
 	/* Setup some registers */
 	if (cpu_nr != 0)
-		cpu_setup_apply(cpu_nr);
+		core99_init_caches(cpu_nr);
 	
 	/* Setup openpic */
 	do_openpic_setup_cpu();
@@ -605,20 +509,20 @@ smp_core99_setup_cpu(int cpu_nr)
 
 /* PowerSurge-style Macs */
 struct smp_ops_t psurge_smp_ops __pmacdata = {
-	smp_psurge_message_pass,
-	smp_psurge_probe,
-	smp_psurge_kick_cpu,
-	smp_psurge_setup_cpu,
-	.give_timebase = smp_generic_give_timebase,
-	.take_timebase = smp_generic_take_timebase,
+	.message_pass	= smp_psurge_message_pass,
+	.probe		= smp_psurge_probe,
+	.kick_cpu	= smp_psurge_kick_cpu,
+	.setup_cpu	= smp_psurge_setup_cpu,
+	.give_timebase	= smp_generic_give_timebase,
+	.take_timebase	= smp_generic_take_timebase,
 };
 
 /* Core99 Macs (dual G4s) */
 struct smp_ops_t core99_smp_ops __pmacdata = {
-	smp_openpic_message_pass,
-	smp_core99_probe,
-	smp_core99_kick_cpu,
-	smp_core99_setup_cpu,
-	.give_timebase = smp_generic_give_timebase,
-	.take_timebase = smp_generic_take_timebase,
+	.message_pass	= smp_openpic_message_pass,
+	.probe		= smp_core99_probe,
+	.kick_cpu	= smp_core99_kick_cpu,
+	.setup_cpu	= smp_core99_setup_cpu,
+	.give_timebase	= smp_generic_give_timebase,
+	.take_timebase	= smp_generic_take_timebase,
 };

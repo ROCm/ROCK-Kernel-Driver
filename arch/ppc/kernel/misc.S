@@ -201,6 +201,60 @@ _GLOBAL(call_setup_cpu)
 	mr	r4,r24
 	bctr
 
+#ifdef CONFIG_CPU_FREQ_PMAC
+
+/* This gets called by via-pmu.c to switch the PLL selection
+ * on 750fx CPU. This function should really be moved to some
+ * other place (as most of the cpufreq code in via-pmu
+ */
+_GLOBAL(low_choose_750fx_pll)
+	/* Clear MSR:EE */
+	mfmsr	r7
+	rlwinm	r0,r7,0,17,15
+	mtmsr	r0
+
+	/* If switching to PLL1, disable HID0:BTIC */
+	cmpli	cr0,r3,0
+	beq	1f
+	mfspr	r5,HID0
+	rlwinm	r5,r5,0,27,25
+	sync
+	mtspr	HID0,r5
+	isync
+	sync
+	
+1:
+	/* Calc new HID1 value */
+	mfspr	r4,SPRN_HID1	/* Build a HID1:PS bit from parameter */
+	rlwinm	r5,r3,16,15,15	/* Clear out HID1:PS from value read */
+	rlwinm	r4,r4,0,16,14	/* Could have I used rlwimi here ? */
+	or	r4,r4,r5
+	mtspr	SPRN_HID1,r4
+
+	/* Store new HID1 image */
+	rlwinm	r6,r1,0,0,18
+	lwz	r6,TI_CPU(r6)
+	slwi	r6,r6,2
+	addis	r6,r6,nap_save_hid1@ha
+	stw	r4,nap_save_hid1@l(r6)
+
+	/* If switching to PLL0, enable HID0:BTIC */
+	cmpli	cr0,r3,0
+	bne	1f
+	mfspr	r5,HID0
+	ori	r5,r5,HID0_BTIC
+	sync
+	mtspr	HID0,r5
+	isync
+	sync
+	
+1:	
+	/* Return */		
+	mtmsr	r7
+	blr
+
+#endif /* CONFIG_CPU_FREQ_PMAC */
+
 /* void local_save_flags_ptr(unsigned long *flags) */
 _GLOBAL(local_save_flags_ptr)
 	mfmsr	r4
@@ -351,7 +405,16 @@ _GLOBAL(_tlbia)
 	sync			/* Flush to memory before changing mapping */
 	tlbia
 	isync			/* Flush shadow TLB */
-#else /* ! defined(CONFIG_40x) */
+#elif defined(CONFIG_440)
+	lis	r3,0
+	sync
+1:
+	tlbwe	r3,r3,PPC440_TLB_PAGEID
+	addi	r3,r3,1
+	cmpwi	0,r3,61
+	ble	1b
+	isync
+#else /* !(CONFIG_40x || CONFIG_440) */
 #if defined(CONFIG_SMP)
 	rlwinm	r8,r1,0,0,18
 	lwz	r8,TI_CPU(r8)
@@ -392,7 +455,7 @@ _GLOBAL(_tlbia)
  * Flush MMU TLB for a particular address
  */
 _GLOBAL(_tlbie)
-#ifdef CONFIG_40x
+#if defined(CONFIG_40x)
 	tlbsx.	r3, 0, r3
 	bne	10f
 	sync
@@ -402,7 +465,31 @@ _GLOBAL(_tlbie)
 	tlbwe	r3, r3, TLB_TAG
 	isync
 10:
-#else /* ! CONFIG_40x */
+#elif defined(CONFIG_440)
+	mfspr	r4,SPRN_MMUCR			/* Get MMUCR */
+	lis	r5,PPC440_MMUCR_STS@h
+	ori	r5,r5,PPC440_MMUCR_TID@l	/* Create mask */
+	andc	r4,r4,r5			/* Clear out TID/STS bits */
+	mfspr	r5,SPRN_PID			/* Get PID */
+	or	r4,r4,r5			/* Set TID bits */
+	mfmsr	r6				/* Get MSR */
+	andi.	r6,r6,MSR_IS@l			/* TS=1? */
+	beq	11f				/* If not, leave STS=0 */
+	oris	r4,r4,PPC440_MMUCR_STS@h	/* Set STS=1 */
+11:	mtspr	SPRN_MMUCR, r4			/* Put MMUCR */
+
+	tlbsx.	r3, 0, r3
+	bne	10f
+	sync
+	/* There are only 64 TLB entries, so r3 < 64,
+	 * which means bit 22, is clear.  Since 22 is
+	 * the V bit in the TLB_PAGEID, loading this
+	 * value will invalidate the TLB entry.
+	 */
+	tlbwe	r3, r3, PPC440_TLB_PAGEID
+	isync
+10:
+#else /* !(CONFIG_40x || CONFIG_440) */
 #if defined(CONFIG_SMP)
 	rlwinm	r8,r1,0,0,18
 	lwz	r8,TI_CPU(r8)
@@ -569,22 +656,18 @@ _GLOBAL(invalidate_dcache_range)
 	blr
 
 #ifdef CONFIG_NOT_COHERENT_CACHE
-/* This is a bad one....It is used by 'consistent_sync' functions when
- * there isn't any handle on the virtual address needed by the usual
- * cache flush instructions.  On the MPC8xx, we can use the cache line
- * flush command, on others all we can do is read enough data to completely
- * reload the cache, flushing old data out.
+/*
+ * 40x cores have 8K or 16K dcache and 32 byte line size.
+ * 440 has a 32K dcache and 32 byte line size.
+ * 8xx has 1, 2, 4, 8K variants.
+ * For now, cover the worst case of the 440.
+ * Must be called with external interrupts disabled.
  */
-
-/* Cache organization.  The 4xx has a 8K (128 line) cache, and the 8xx
- * has 1, 2, 4, 8K variants.  For now, cover worst case.  When we can
- * deteremine actual size, we will use that later.
- */
-#define CACHE_NWAYS	2
-#define CACHE_NLINES	128
+#define CACHE_NWAYS	64
+#define CACHE_NLINES	16
 
 _GLOBAL(flush_dcache_all)
-	li	r4, (CACHE_NWAYS * CACHE_NLINES)
+	li	r4, (2 * CACHE_NWAYS * CACHE_NLINES)
 	mtctr	r4
 	lis     r5, KERNELBASE@h
 1:	lwz	r3, 0(r5)		/* Load one word from every line */
