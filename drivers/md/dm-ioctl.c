@@ -173,14 +173,18 @@ static void free_cell(struct hash_cell *hc)
  */
 static int register_with_devfs(struct hash_cell *hc)
 {
-	char name[32];
 	struct gendisk *disk = dm_disk(hc->md);
+	char *name = kmalloc(DM_NAME_LEN + strlen(DM_DIR) + 1);
+	if (!name) {
+		return -ENOMEM;
+	}
 
 	sprintf(name, DM_DIR "/%s", hc->name);
 	devfs_register(NULL, name, DEVFS_FL_CURRENT_OWNER,
 		       disk->major, disk->first_minor,
 		       S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
 		       &dm_blk_dops, NULL);
+	kfree(name);
 	return 0;
 }
 
