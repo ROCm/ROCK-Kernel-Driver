@@ -25,14 +25,15 @@
 #include <linux/module.h>
 #include <linux/proc_fs.h>
 #include <linux/init.h>
+#include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
-#include <linux/device.h>
-#include <asm/io.h>
-#include <asm/scatterlist.h>
 #include <linux/dma-mapping.h>
 #include <asm/semaphore.h>
 #include <sound/memalloc.h>
+#ifdef CONFIG_SBUS
+#include <asm/sbus.h>
+#endif
 
 
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>, Jaroslav Kysela <perex@suse.cz>");
@@ -87,6 +88,30 @@ struct snd_mem_list {
 /*
  *  Hacks
  */
+
+static void *snd_dma_alloc_coherent1(struct device *dev, size_t size,
+				     dma_addr_t *dma_handle, int flags)
+{
+	if (dev)
+		return dma_alloc_coherent(dev, size, dma_handle, flags);
+	else /* FIXME: dma_alloc_coherent does't always accept dev=NULL */
+		return pci_alloc_consistent(NULL, size, dma_handle);
+}
+
+static void snd_dma_free_coherent1(struct device *dev, size_t size, void *dma_addr,
+				   dma_addr_t dma_handle)
+{
+	if (dev)
+		return dma_free_coherent(dev, size, dma_addr, dma_handle);
+	else
+		return pci_free_consistent(NULL, size, dma_addr, dma_handle);
+}
+
+#undef dma_alloc_coherent
+#define dma_alloc_coherent snd_dma_alloc_coherent1
+#undef dma_free_coherent
+#define dma_free_coherent snd_dma_free_coherent1
+
 
 #if defined(__i386__) || defined(__ppc__) || defined(__x86_64__)
 
@@ -260,9 +285,8 @@ static void *snd_malloc_dev_pages(struct device *dev, size_t size, dma_addr_t *d
 	return res;
 }
 
-static inline 
-void *snd_malloc_dev_pages_fallback(struct device *dev, size_t size,
-				    dma_addr_t *dma, size_t *res_size)
+static void *snd_malloc_dev_pages_fallback(struct device *dev, size_t size,
+					   dma_addr_t *dma, size_t *res_size)
 {
 	void *res;
 
@@ -277,9 +301,8 @@ void *snd_malloc_dev_pages_fallback(struct device *dev, size_t size,
 	return NULL;
 }
 
-static inline
-void snd_free_dev_pages(struct device *dev, size_t size, void *ptr,
-			dma_addr_t dma)
+static void snd_free_dev_pages(struct device *dev, size_t size, void *ptr,
+			       dma_addr_t dma)
 {
 	int pg;
 
@@ -290,65 +313,12 @@ void snd_free_dev_pages(struct device *dev, size_t size, void *ptr,
 	dma_free_coherent(dev, PAGE_SIZE << pg, ptr, dma);
 }
 
-#if defined(CONFIG_ISA) && ! defined(CONFIG_PCI)
-
-static inline
-void *snd_malloc_isa_pages(size_t size, dma_addr_t *dma_addr)
-{
-	void *dma_area;
-	dma_area = snd_malloc_pages(size, GFP_ATOMIC|GFP_DMA);
-	*dma_addr = dma_area ? isa_virt_to_bus(dma_area) : 0UL;
-	return dma_area;
-}
-
-static inline
-void *snd_malloc_isa_pages_fallback(size_t size,
-				    dma_addr_t *dma_addr,
-				    size_t *res_size)
-{
-	void *dma_area;
-	dma_area = snd_malloc_pages_fallback(size, GFP_ATOMIC|GFP_DMA, res_size);
-	*dma_addr = dma_area ? isa_virt_to_bus(dma_area) : 0UL;
-	return dma_area;
-}
-
-static inline
-void snd_free_isa_pages(size_t size, void *ptr, dma_addr_t addr)
-{
-	return snd_free_pages(ptr, size);
-}
-
-#endif
-
-#if defined(CONFIG_ISA) && defined(CONFIG_PCI)
-
-static inline
-void *snd_malloc_isa_pages(size_t size, dma_addr_t *dma_addr)
-{
-	return snd_malloc_dev_pages(NULL, size, dma_addr);
-}
-
-static inline
-void *snd_malloc_isa_pages_fallback(size_t size,
-				    dma_addr_t *dma_addr,
-				    size_t *res_size)
-{
-	return snd_malloc_dev_pages_fallback(NULL, size, dma_addr, res_size);
-}
-
-static inline
-void snd_free_isa_pages(size_t size, void *ptr, dma_addr_t addr)
-{
-	return snd_free_dev_pages(NULL, size, ptr, addr);
-}
-
-#endif
-
 #ifdef CONFIG_SBUS
 
-static void *snd_malloc_sbus_pages(struct sbus_dev *sdev, size_t size,
+static void *snd_malloc_sbus_pages(struct device *dev, size_t size,
 				   dma_addr_t *dma_addr)
 {
+	struct sbus_dev *sdev = (struct sbus_dev *)dev;
 	int pg;
 	void *res;
 
@@ -362,14 +332,14 @@ static void *snd_malloc_sbus_pages(struct sbus_dev *sdev, size_t size,
 	return res;
 }
 
-static void *snd_malloc_sbus_pages_fallback(struct sbus_dev *sdev, size_t size,
+static void *snd_malloc_sbus_pages_fallback(struct device *dev, size_t size,
 					    dma_addr_t *dma_addr, size_t *res_size)
 {
 	void *res;
 
 	snd_assert(res_size != NULL, return NULL);
 	do {
-		if ((res = snd_malloc_sbus_pages(sdev, size, dma_addr)) != NULL) {
+		if ((res = snd_malloc_sbus_pages(dev, size, dma_addr)) != NULL) {
 			*res_size = size;
 			return res;
 		}
@@ -378,9 +348,10 @@ static void *snd_malloc_sbus_pages_fallback(struct sbus_dev *sdev, size_t size,
 	return NULL;
 }
 
-static void snd_free_sbus_pages(struct sbus_dev *sdev, size_t size,
+static void snd_free_sbus_pages(struct device *dev, size_t size,
 				void *ptr, dma_addr_t dma_addr)
 {
+	struct sbus_dev *sdev = (struct sbus_dev *)dev;
 	int pg;
 
 	if (ptr == NULL)
@@ -411,21 +382,7 @@ static int compare_device(const struct snd_dma_device *a, const struct snd_dma_d
 		if (! allow_unused || (a->id != SNDRV_DMA_DEVICE_UNUSED && b->id != SNDRV_DMA_DEVICE_UNUSED))
 			return 0;
 	}
-	switch (a->type) {
-	case SNDRV_DMA_TYPE_CONTINUOUS:
-#ifdef CONFIG_ISA
-	case SNDRV_DMA_TYPE_ISA:
-#endif
-		return a->dev.flags == b->dev.flags;
-#ifdef CONFIG_SBUS
-	case SNDRV_DMA_TYPE_SBUS:
-		return a->dev.sbus == b->dev.sbus;
-#endif
-	case SNDRV_DMA_TYPE_DEV:
-	case SNDRV_DMA_TYPE_DEV_SG:
-		return a->dev.dev == b->dev.dev;
-	}
-	return 0;
+	return a->dev == b->dev;
 }
 
 /**
@@ -450,28 +407,17 @@ int snd_dma_alloc_pages(const struct snd_dma_device *dev, size_t size,
 	dmab->bytes = 0;
 	switch (dev->type) {
 	case SNDRV_DMA_TYPE_CONTINUOUS:
-		dmab->area = snd_malloc_pages(size, dev->dev.flags);
+		dmab->area = snd_malloc_pages(size, (unsigned long)dev->dev);
 		dmab->addr = 0;
 		break;
-#ifdef CONFIG_ISA
-	case SNDRV_DMA_TYPE_ISA:
-		dmab->area = snd_malloc_isa_pages(size, &dmab->addr);
-		break;
-#endif
 #ifdef CONFIG_SBUS
 	case SNDRV_DMA_TYPE_SBUS:
-		dmab->area = snd_malloc_sbus_pages(dev->dev.sbus, size, &dmab->addr);
-		break;
-#endif
-#ifdef CONFIG_PCI
-	case SNDRV_DMA_TYPE_PCI:
-		dmab->area = snd_malloc_dev_pages(&dev->dev.pci->dev, size, &dmab->addr);
+		dmab->area = snd_malloc_sbus_pages(dev->dev, size, &dmab->addr);
 		break;
 #endif
 	case SNDRV_DMA_TYPE_DEV:
-		dmab->area = snd_malloc_dev_pages(dev->dev.dev, size, &dmab->addr);
+		dmab->area = snd_malloc_dev_pages(dev->dev, size, &dmab->addr);
 		break;
-	case SNDRV_DMA_TYPE_PCI_SG:
 	case SNDRV_DMA_TYPE_DEV_SG:
 		snd_malloc_sgbuf_pages(dev, size, dmab, NULL);
 		break;
@@ -511,28 +457,17 @@ int snd_dma_alloc_pages_fallback(const struct snd_dma_device *dev, size_t size,
 	dmab->bytes = 0;
 	switch (dev->type) {
 	case SNDRV_DMA_TYPE_CONTINUOUS:
-		dmab->area = snd_malloc_pages_fallback(size, dev->dev.flags, &dmab->bytes);
+		dmab->area = snd_malloc_pages_fallback(size, (unsigned long)dev->dev, &dmab->bytes);
 		dmab->addr = 0;
 		break;
-#ifdef CONFIG_ISA
-	case SNDRV_DMA_TYPE_ISA:
-		dmab->area = snd_malloc_isa_pages_fallback(size, &dmab->addr, &dmab->bytes);
-		break;
-#endif
 #ifdef CONFIG_SBUS
 	case SNDRV_DMA_TYPE_SBUS:
-		dmab->area = snd_malloc_sbus_pages_fallback(dev->dev.sbus, size, &dmab->addr, &dmab->bytes);
-		break;
-#endif
-#ifdef CONFIG_PCI
-	case SNDRV_DMA_TYPE_PCI:
-		dmab->area = snd_malloc_dev_pages_fallback(&dev->dev.pci->dev, size, &dmab->addr, &dmab->bytes);
+		dmab->area = snd_malloc_sbus_pages_fallback(dev->dev, size, &dmab->addr, &dmab->bytes);
 		break;
 #endif
 	case SNDRV_DMA_TYPE_DEV:
-		dmab->area = snd_malloc_dev_pages_fallback(dev->dev.dev, size, &dmab->addr, &dmab->bytes);
+		dmab->area = snd_malloc_dev_pages_fallback(dev->dev, size, &dmab->addr, &dmab->bytes);
 		break;
-	case SNDRV_DMA_TYPE_PCI_SG:
 	case SNDRV_DMA_TYPE_DEV_SG:
 		snd_malloc_sgbuf_pages(dev, size, dmab, &dmab->bytes);
 		break;
@@ -561,26 +496,15 @@ void snd_dma_free_pages(const struct snd_dma_device *dev, struct snd_dma_buffer 
 	case SNDRV_DMA_TYPE_CONTINUOUS:
 		snd_free_pages(dmab->area, dmab->bytes);
 		break;
-#ifdef CONFIG_ISA
-	case SNDRV_DMA_TYPE_ISA:
-		snd_free_isa_pages(dmab->bytes, dmab->area, dmab->addr);
-		break;
-#endif
 #ifdef CONFIG_SBUS
 	case SNDRV_DMA_TYPE_SBUS:
-		snd_free_sbus_pages(dev->dev.sbus, dmab->bytes, dmab->area, dmab->addr);
-		break;
-#endif
-#ifdef CONFIG_PCI
-	case SNDRV_DMA_TYPE_PCI:
-		snd_free_dev_pages(&dev->dev.pci->dev, dmab->bytes, dmab->area, dmab->addr);
+		snd_free_sbus_pages(dev->dev, dmab->bytes, dmab->area, dmab->addr);
 		break;
 #endif
 	case SNDRV_DMA_TYPE_DEV:
-		snd_free_dev_pages(dev->dev.dev, dmab->bytes, dmab->area, dmab->addr);
+		snd_free_dev_pages(dev->dev, dmab->bytes, dmab->area, dmab->addr);
 		break;
 	case SNDRV_DMA_TYPE_DEV_SG:
-	case SNDRV_DMA_TYPE_PCI_SG:
 		snd_free_sgbuf_pages(dmab);
 		break;
 	default:
@@ -775,7 +699,7 @@ static inline void snd_dma_device_pci(struct snd_dma_device *dev, struct pci_dev
 {
 	memset(dev, 0, sizeof(*dev));
 	dev->type = SNDRV_DMA_TYPE_DEV;
-	dev->dev.dev = &pci->dev;
+	dev->dev = snd_dma_pci_data(pci);
 	dev->id = id;
 }
 
@@ -860,35 +784,24 @@ static int snd_mem_proc_read(char *page, char **start, off_t off,
 		len += sprintf(page + len, " : type ");
 		switch (mem->dev.type) {
 		case SNDRV_DMA_TYPE_CONTINUOUS:
-			len += sprintf(page + len, "CONT [%x]", mem->dev.dev.flags);
+			len += sprintf(page + len, "CONT [%p]", mem->dev.dev);
 			break;
-#ifdef CONFIG_ISA
-		case SNDRV_DMA_TYPE_ISA:
-			len += sprintf(page + len, "ISA [%x]", mem->dev.dev.flags);
-			break;
-#endif
 #ifdef CONFIG_SBUS
 		case SNDRV_DMA_TYPE_SBUS:
-			len += sprintf(page + len, "SBUS [%x]", mem->dev.dev.sbus->slot);
-			break;
-#endif
-#ifdef CONFIG_PCI
-		case SNDRV_DMA_TYPE_PCI:
-		case SNDRV_DMA_TYPE_PCI_SG:
-			if (mem->dev.dev.dev) {
-				len += sprintf(page + len, "%s [%s]",
-					       mem->dev.type == SNDRV_DMA_TYPE_PCI_SG ? "PCI" : "PCI-SG",
-					       mem->dev.dev.pci->slot_name);
+			{
+				struct sbus_dev *sdev = (struct sbus_dev *)(mem->dev.dev);
+				len += sprintf(page + len, "SBUS [%x]", sbus->slot);
 			}
 			break;
 #endif
 		case SNDRV_DMA_TYPE_DEV:
 		case SNDRV_DMA_TYPE_DEV_SG:
-			if (mem->dev.dev.dev) {
+			if (mem->dev.dev) {
 				len += sprintf(page + len, "%s [%s]",
-					       mem->dev.type == SNDRV_DMA_TYPE_DEV_SG ? "DEV" : "DEV-SG",
-					       mem->dev.dev.dev->bus_id);
-			}
+					       mem->dev.type == SNDRV_DMA_TYPE_DEV_SG ? "DEV-SG" : "DEV",
+					       mem->dev.dev->bus_id);
+			} else
+				len += sprintf(page + len, "ISA");
 			break;
 		default:
 			len += sprintf(page + len, "UNKNOWN");

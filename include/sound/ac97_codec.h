@@ -484,7 +484,8 @@ enum {
 	AC97_TUNE_HP_ONLY,	/* headphone (true line-out) control as master only */
 	AC97_TUNE_SWAP_HP,	/* swap headphone and master controls */
 	AC97_TUNE_SWAP_SURROUND, /* swap master and surround controls */
-	AC97_TUNE_AD_SHARING	/* for AD1985, turn on OMS bit and use headphone */
+	AC97_TUNE_AD_SHARING,	/* for AD1985, turn on OMS bit and use headphone */
+	AC97_TUNE_ALC_JACK,	/* for Realtek, enable JACK detection */
 };
 
 struct ac97_quirk {

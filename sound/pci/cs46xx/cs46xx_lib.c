@@ -66,6 +66,8 @@
 #include "cs46xx_lib.h"
 #include "dsp_spos.h"
 
+static void amp_voyetra(cs46xx_t *chip, int change);
+
 static unsigned short snd_cs46xx_codec_read(cs46xx_t *chip,
 					    unsigned short reg,
 					    int codec_index)
@@ -203,6 +205,13 @@ static unsigned short snd_cs46xx_ac97_read(ac97_t * ac97,
 	chip->active_ctrl(chip, 1);
 	val = snd_cs46xx_codec_read(chip, reg, codec_index);
 	chip->active_ctrl(chip, -1);
+
+	/* HACK: voyetra uses EAPD bit in the reverse way.
+	 * we flip the bit to show the mixer status correctly
+	 */
+	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
+		val ^= 0x8000;
+
 	return val;
 }
 
@@ -283,6 +292,12 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 		codec_index = CS46XX_SECONDARY_CODEC_INDEX;
 	else
 		snd_assert(0,return);
+
+	/* HACK: voyetra uses EAPD bit in the reverse way.
+	 * we flip the bit to show the mixer status correctly
+	 */
+	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
+		val ^= 0x8000;
 
 	chip->active_ctrl(chip, 1);
 	snd_cs46xx_codec_write(chip, reg, val, codec_index);
@@ -1702,8 +1717,8 @@ int __devinit snd_cs46xx_pcm(cs46xx_t *chip, int device, snd_pcm_t ** rpcm)
 	strcpy(pcm->name, "CS46xx");
 	chip->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      chip->pci, 64*1024, 256*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 256*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1734,8 +1749,8 @@ int __devinit snd_cs46xx_pcm_rear(cs46xx_t *chip, int device, snd_pcm_t ** rpcm)
 	strcpy(pcm->name, "CS46xx - Rear");
 	chip->pcm_rear = pcm;
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      pcm, 64*1024, 256*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 256*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1764,8 +1779,8 @@ int __devinit snd_cs46xx_pcm_center_lfe(cs46xx_t *chip, int device, snd_pcm_t **
 	strcpy(pcm->name, "CS46xx - Center LFE");
 	chip->pcm_center_lfe = pcm;
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      chip->pci, 64*1024, 256*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 256*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -1794,8 +1809,8 @@ int __devinit snd_cs46xx_pcm_iec958(cs46xx_t *chip, int device, snd_pcm_t ** rpc
 	strcpy(pcm->name, "CS46xx - IEC958");
 	chip->pcm_rear = pcm;
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      chip->pci, 64*1024, 256*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 256*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
@@ -2550,7 +2565,7 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	/* get EAPD mixer switch (for voyetra hack) */
 	memset(&id, 0, sizeof(id));
 	id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
-	strcpy(id.name, "External Amplifier Power Down");
+	strcpy(id.name, "External Amplifier");
 	chip->eapd_switch = snd_ctl_find_id(chip->card, &id);
     
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
@@ -3916,8 +3931,8 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	region->size = CS46XX_BA1_REG_SIZE;
 
 	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
-	chip->dma_dev.type = SNDRV_DMA_TYPE_PCI;
-	chip->dma_dev.dev.pci = pci;
+	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	chip->dma_dev.dev = snd_dma_pci_data(pci);
 
 	/* set up amp and clkrun hack */
 	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &ss_vendor);

@@ -2329,8 +2329,8 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 #endif
 
 	memset(&korg1212->dma_dev, 0, sizeof(korg1212->dma_dev));
-	korg1212->dma_dev.type = SNDRV_DMA_TYPE_PCI;
-	korg1212->dma_dev.dev.pci = korg1212->pci;
+	korg1212->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	korg1212->dma_dev.dev = snd_dma_pci_data(korg1212->pci);
 
 	if (snd_dma_alloc_pages(&korg1212->dma_dev, sizeof(KorgSharedBuffer), &korg1212->dma_shared) < 0) {
 		snd_printk(KERN_ERR "can not allocate shared buffer memory (%Zd bytes)\n", sizeof(KorgSharedBuffer));

@@ -813,10 +813,11 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 		if (status) {
 			/* ack */
 			iputdword(chip, chip->int_sta_reg, status);
-			status ^= igetdword(chip, chip->int_sta_reg);
+			if (chip->device_type != DEVICE_NFORCE)
+				status ^= igetdword(chip, chip->int_sta_reg);
 		}
 		spin_unlock(&chip->reg_lock);
-		if (status && err_count) {
+		if (chip->device_type != DEVICE_NFORCE && status && err_count) {
 			err_count--;
 			snd_printd("intel8x0: unknown IRQ bits 0x%x (sta_mask=0x%x)\n",
 				   status, chip->int_sta_mask);
@@ -1451,7 +1452,7 @@ static int __devinit snd_intel8x0_pcm1(intel8x0_t *chip, int device, struct ich_
 		strcpy(pcm->name, chip->card->shortname);
 	chip->pcm[device] = pcm;
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI, chip->pci,
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(chip->pci),
 					      rec->prealloc_size, rec->prealloc_max_size);
 
 	return 0;
@@ -1674,6 +1675,12 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
+		.vendor = 0x1014,
+		.device = 0x1f00,
+		.name = "MS-9128",
+		.type = AC97_TUNE_ALC_JACK
+	},
+	{
 		.vendor = 0x1028,
 		.device = 0x00d8,
 		.name = "Dell Precision 530",	/* AD1885 */
@@ -1773,6 +1780,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
 	},
+#if 0 /* FIXME: this seems wrong on most boards */
 	{
 		.vendor = 0x8086,
 		.device = 0xa000,
@@ -1780,6 +1788,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_HP_ONLY
 	},
+#endif
 	{ } /* terminator */
 };
 
@@ -2524,8 +2533,8 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	chip->pcm_pos_shift = (device_type == DEVICE_SIS) ? 0 : 1;
 
 	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
-	chip->dma_dev.type = SNDRV_DMA_TYPE_PCI;
-	chip->dma_dev.dev.pci = pci;
+	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	chip->dma_dev.dev = snd_dma_pci_data(pci);
 
 	/* allocate buffer descriptor lists */
 	/* the start of each lists must be aligned to 8 bytes */

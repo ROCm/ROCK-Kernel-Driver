@@ -311,8 +311,12 @@ static char * snd_opti9xx_names[] = {
 static long snd_legacy_find_free_ioport(long *port_table, long size)
 {
 	while (*port_table != -1) {
-		if (!check_region(*port_table, size))
+		struct resource *res;
+		if ((res = request_region(*port_table, size, "ALSA test")) != NULL) {
+			release_resource(res);
+			kfree_nocheck(res);
 			return *port_table;
+		}
 		port_table++;
 	}
 	return -1;
@@ -1399,8 +1403,8 @@ int snd_opti93x_pcm(opti93x_t *codec, int device, snd_pcm_t **rpcm)
 
 	strcpy(pcm->name, snd_opti93x_chip_id(codec));
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_ISA,
-					      snd_pcm_dma_flags(0),
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_isa_data(),
 					      64*1024, codec->dma1 > 3 || codec->dma2 > 3 ? 128*1024 : 64*1024);
 
 	codec->pcm = pcm;
@@ -1674,13 +1678,18 @@ static int __devinit snd_card_opti9xx_detect(snd_card_t *card, opti9xx_t *chip)
 		if ((err = snd_opti9xx_init(chip, i)) < 0)
 			return err;
 
-		if (check_region(chip->mc_base, chip->mc_base_size))
+		if ((chip->res_mc_base = request_region(chip->mc_base, chip->mc_base_size, "OPTi9xx MC")) == NULL)
 			continue;
 
 		value = snd_opti9xx_read(chip, OPTi9XX_MC_REG(1));
 		if ((value != 0xff) && (value != inb(chip->mc_base + 1)))
 			if (value == snd_opti9xx_read(chip, OPTi9XX_MC_REG(1)))
 				return 1;
+
+		release_resource(chip->res_mc_base);
+		kfree_nocheck(chip->res_mc_base);
+		chip->res_mc_base = NULL;
+
 	}
 #else	/* OPTi93X */
 	for (i = OPTi9XX_HW_82C931; i >= OPTi9XX_HW_82C930; i--) {
@@ -1690,7 +1699,7 @@ static int __devinit snd_card_opti9xx_detect(snd_card_t *card, opti9xx_t *chip)
 		if ((err = snd_opti9xx_init(chip, i)) < 0)
 			return err;
 
-		if (check_region(chip->mc_base, chip->mc_base_size))
+		if ((chip->res_mc_base = request_region(chip->mc_base, chip->mc_base_size, "OPTi9xx MC")) == NULL)
 			continue;
 
 		spin_lock_irqsave(&chip->lock, flags);
@@ -1703,6 +1712,10 @@ static int __devinit snd_card_opti9xx_detect(snd_card_t *card, opti9xx_t *chip)
 		snd_opti9xx_write(chip, OPTi9XX_MC_REG(7), 0xff - value);
 		if (snd_opti9xx_read(chip, OPTi9XX_MC_REG(7)) == 0xff - value)
 			return 1;
+
+		release_resource(chip->res_mc_base);
+		kfree_nocheck(chip->res_mc_base);
+		chip->res_mc_base = NULL;
 	}
 #endif	/* OPTi93X */
 
@@ -1986,7 +1999,8 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 	}
 #endif	/* CONFIG_PNP */
 
-	if ((chip->res_mc_base = request_region(chip->mc_base, chip->mc_base_size, "OPTi9xx MC")) == NULL) {
+	if (! chip->res_mc_base &&
+	    (chip->res_mc_base = request_region(chip->mc_base, chip->mc_base_size, "OPTi9xx MC")) == NULL) {
 		snd_card_free(card);
 		return -ENOMEM;
 	}

@@ -640,8 +640,8 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	emu->irq = pci->irq;
 
 	memset(&emu->dma_dev, 0, sizeof(emu->dma_dev));
-	emu->dma_dev.type = SNDRV_DMA_TYPE_PCI;
-	emu->dma_dev.dev.pci = pci;
+	emu->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	emu->dma_dev.dev = snd_dma_pci_data(pci);
 
 	emu->max_cache_pages = max_cache_bytes >> PAGE_SHIFT;
 	if (snd_dma_alloc_pages(&emu->dma_dev, 32 * 1024, &emu->ptb_pages) < 0) {

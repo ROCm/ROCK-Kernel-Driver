@@ -703,8 +703,9 @@ static int __devinit snd_fm801_pcm(fm801_t *chip, int device, snd_pcm_t ** rpcm)
 	strcpy(pcm->name, "FM801");
 	chip->pcm = pcm;
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      chip->pci, chip->multichannel ? 128*1024 : 64*1024, 128*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci),
+					      chip->multichannel ? 128*1024 : 64*1024, 128*1024);
 
 	if (rpcm)
 		*rpcm = pcm;

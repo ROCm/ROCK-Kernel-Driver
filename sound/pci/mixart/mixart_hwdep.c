@@ -22,6 +22,7 @@
 
 #include <sound/driver.h>
 #include <linux/interrupt.h>
+#include <asm/io.h>
 #include <sound/core.h>
 #include "mixart.h"
 #include "mixart_mixer.h"

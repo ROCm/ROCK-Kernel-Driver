@@ -1892,7 +1892,7 @@ static void init_substream(snd_usb_stream_t *as, int stream, struct audioformat 
 	subs->ops = audio_urb_ops[stream];
 	snd_pcm_lib_preallocate_pages(as->pcm->streams[stream].substream,
 				      SNDRV_DMA_TYPE_CONTINUOUS,
-				      snd_pcm_dma_flags(GFP_ATOMIC),
+				      snd_dma_continuous_data(GFP_KERNEL),
 				      64 * 1024, 128 * 1024);
 	snd_pcm_set_ops(as->pcm, stream,
 			stream == SNDRV_PCM_STREAM_PLAYBACK ?

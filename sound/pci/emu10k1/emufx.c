@@ -26,6 +26,7 @@
  */
 
 #include <sound/driver.h>
+#include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/init.h>
@@ -760,7 +761,7 @@ int snd_emu10k1_fx8010_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
 	strcpy(pcm->name, "EMU10K1 FX8010");
 	emu->pcm_fx8010 = pcm;
 	
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI, emu->pci, 64*1024, 0);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(emu->pci), 64*1024, 0);
 
 	if (rpcm)
 		*rpcm = pcm;

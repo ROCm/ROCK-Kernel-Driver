@@ -191,7 +191,6 @@ snd_trident_alloc_sg_pages(trident_t *trident, snd_pcm_substream_t *substream)
 	int idx, page;
 	struct snd_sg_buf *sgbuf = runtime->dma_private;
 
-	snd_assert(substream->dma_device.type == SNDRV_DMA_TYPE_PCI_SG, return NULL);
 	snd_assert(runtime->dma_bytes > 0 && runtime->dma_bytes <= SNDRV_TRIDENT_MAX_PAGES * SNDRV_TRIDENT_PAGE_SIZE, return NULL);
 	hdr = trident->tlb.memhdr;
 	snd_assert(hdr != NULL, return NULL);
@@ -240,7 +239,6 @@ snd_trident_alloc_cont_pages(trident_t *trident, snd_pcm_substream_t *substream)
 	dma_addr_t addr;
 	unsigned long ptr;
 
-	snd_assert(substream->dma_device.type == SNDRV_DMA_TYPE_PCI, return NULL);
 	snd_assert(runtime->dma_bytes> 0 && runtime->dma_bytes <= SNDRV_TRIDENT_MAX_PAGES * SNDRV_TRIDENT_PAGE_SIZE, return NULL);
 	hdr = trident->tlb.memhdr;
 	snd_assert(hdr != NULL, return NULL);
@@ -276,7 +274,7 @@ snd_trident_alloc_pages(trident_t *trident, snd_pcm_substream_t *substream)
 {
 	snd_assert(trident != NULL, return NULL);
 	snd_assert(substream != NULL, return NULL);
-	if (substream->dma_device.type == SNDRV_DMA_TYPE_PCI_SG)
+	if (substream->dma_device.type == SNDRV_DMA_TYPE_DEV_SG)
 		return snd_trident_alloc_sg_pages(trident, substream);
 	else
 		return snd_trident_alloc_cont_pages(trident, substream);

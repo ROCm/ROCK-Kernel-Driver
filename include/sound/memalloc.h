@@ -24,11 +24,6 @@
 #ifndef __SOUND_MEMALLOC_H
 #define __SOUND_MEMALLOC_H
 
-#include <linux/pci.h>
-#ifdef CONFIG_SBUS
-#include <asm/sbus.h>
-#endif
-
 struct device;
 
 /*
@@ -36,29 +31,26 @@ struct device;
  */
 struct snd_dma_device {
 	int type;			/* SNDRV_MEM_TYPE_XXX */
-	union {
-		void *data;
-		struct device *dev;	/* generic device */
-		struct pci_dev *pci;	/* PCI device */
-		unsigned int flags;	/* GFP_XXX for continous and ISA types */
-#ifdef CONFIG_SBUS
-		struct sbus_dev *sbus;	/* for SBUS type */
-#endif
-	} dev;
+	struct device *dev;		/* generic device */
 	unsigned int id;		/* a unique ID */
 };
+
+#ifndef snd_dma_pci_data
+#define snd_dma_pci_data(pci)	(&(pci)->dev)
+#define snd_dma_isa_data()	NULL
+#define snd_dma_sbus_data(sbus)	((struct device *)(sbus))
+#define snd_dma_continuous_data(x)	((struct device *)(unsigned long)(x))
+#endif
+
 
 /*
  * buffer types
  */
 #define SNDRV_DMA_TYPE_UNKNOWN		0	/* not defined */
 #define SNDRV_DMA_TYPE_CONTINUOUS	1	/* continuous no-DMA memory */
-#define SNDRV_DMA_TYPE_ISA		2	/* ISA continuous */
-#define SNDRV_DMA_TYPE_PCI		3	/* PCI continuous */
-#define SNDRV_DMA_TYPE_PCI_SG		4	/* PCI SG-buffer */
-#define SNDRV_DMA_TYPE_DEV		5	/* generic device continuous */
-#define SNDRV_DMA_TYPE_DEV_SG		6	/* generic device SG-buffer */
-#define SNDRV_DMA_TYPE_SBUS		7	/* SBUS continuous */
+#define SNDRV_DMA_TYPE_DEV		2	/* generic device continuous */
+#define SNDRV_DMA_TYPE_DEV_SG		3	/* generic device SG-buffer */
+#define SNDRV_DMA_TYPE_SBUS		4	/* SBUS continuous */
 
 /*
  * info for buffer allocation

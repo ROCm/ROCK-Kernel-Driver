@@ -178,8 +178,8 @@ static struct snd_dma_buffer *get_dmabuf(struct snd_dma_buffer *buf, unsigned lo
 	if (buf) {
 		struct snd_dma_device dev;
 		memset(&dev, 0, sizeof(dev));
-		dev.type = SNDRV_DMA_TYPE_ISA;
-		dev.dev.flags = GFP_DMA|GFP_ATOMIC;
+		dev.type = SNDRV_DMA_TYPE_DEV;
+		dev.dev = snd_dma_isa_data();
 		if (snd_dma_alloc_pages_fallback(&dev, size, buf) < 0) {
 			snd_printk(KERN_ERR "sscape: Failed to allocate %lu bytes for DMA\n", size);
 			return NULL;
@@ -197,8 +197,8 @@ static void free_dmabuf(struct snd_dma_buffer *buf)
 	if (buf && buf->area) {
 		struct snd_dma_device dev;
 		memset(&dev, 0, sizeof(dev));
-		dev.type = SNDRV_DMA_TYPE_ISA;
-		dev.dev.flags = GFP_DMA|GFP_ATOMIC;
+		dev.type = SNDRV_DMA_TYPE_DEV;
+		dev.dev = snd_dma_isa_data();
 		snd_dma_free_pages(&dev, buf);
 	}
 }

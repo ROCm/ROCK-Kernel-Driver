@@ -24,6 +24,7 @@
 #include <sound/driver.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/pci.h>
 #include <sound/core.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
@@ -910,8 +911,8 @@ static void preallocate_buffers(mixart_t *chip, snd_pcm_t *pcm)
 				subs->stream << 8 | (subs->number + 1) |
 				(chip->chip_idx + 1) << 24;
 	}
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      chip->mgr->pci, 32*1024, 32*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->mgr->pci), 32*1024, 32*1024);
 }
 
 /*
@@ -1390,8 +1391,8 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	mgr->board_type = MIXART_DAUGHTER_TYPE_NONE;
 
 	memset(&mgr->dma_dev, 0, sizeof(mgr->dma_dev));
-	mgr->dma_dev.type = SNDRV_DMA_TYPE_PCI;
-	mgr->dma_dev.dev.pci = mgr->pci;
+	mgr->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	mgr->dma_dev.dev = snd_dma_pci_data(mgr->pci);
 
 	/* create array of streaminfo */
 	size = PAGE_ALIGN( (MIXART_MAX_STREAM_PER_CARD * MIXART_MAX_CARDS * sizeof(mixart_flowinfo_t)) );

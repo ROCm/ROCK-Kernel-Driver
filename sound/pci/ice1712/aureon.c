@@ -409,10 +409,13 @@ static int __devinit aureon_init(ice1712_t *ice)
 	unsigned int tmp;
 	unsigned int i;
 
-	if (ice->eeprom.subvendor == VT1724_SUBDEVICE_AUREON51_SKY)
+	if (ice->eeprom.subvendor == VT1724_SUBDEVICE_AUREON51_SKY) {
 		ice->num_total_dacs = 6;
-	else
+		ice->num_total_adcs = 6;
+	} else {
 		ice->num_total_dacs = 8;
+		ice->num_total_adcs = 8;
+	}
 
 	/* to remeber the register values */
 	ice->akm = snd_kcalloc(sizeof(akm4xxx_t), GFP_KERNEL);

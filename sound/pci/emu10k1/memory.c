@@ -297,7 +297,6 @@ snd_emu10k1_alloc_pages(emu10k1_t *emu, snd_pcm_substream_t *substream)
 	int page, err, idx;
 
 	snd_assert(emu, return NULL);
-	snd_assert(substream->dma_device.type == SNDRV_DMA_TYPE_PCI_SG, return NULL);
 	snd_assert(runtime->dma_bytes > 0 && runtime->dma_bytes < MAXPAGES * EMUPAGESIZE, return NULL);
 	hdr = emu->memhdr;
 	snd_assert(hdr, return NULL);

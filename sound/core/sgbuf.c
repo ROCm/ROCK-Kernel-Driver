@@ -74,10 +74,7 @@ void *snd_malloc_sgbuf_pages(const struct snd_dma_device *dev,
 		return NULL;
 	memset(sgbuf, 0, sizeof(*sgbuf));
 	sgbuf->dev = *dev;
-	if (dev->type == SNDRV_DMA_TYPE_PCI_SG)
-		sgbuf->dev.type = SNDRV_DMA_TYPE_PCI;
-	else
-		sgbuf->dev.type =SNDRV_DMA_TYPE_DEV;
+	sgbuf->dev.type = SNDRV_DMA_TYPE_DEV;
 	pages = snd_sgbuf_aligned_pages(size);
 	sgbuf->tblsize = sgbuf_align_table(pages);
 	sgbuf->table = kmalloc(sizeof(*sgbuf->table) * sgbuf->tblsize, GFP_KERNEL);

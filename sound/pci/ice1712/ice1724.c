@@ -756,8 +756,8 @@ static int __devinit snd_vt1724_pcm_profi(ice1712_t * ice, int device)
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ICE1724");
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      ice->pci, 256*1024, 256*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(ice->pci), 256*1024, 256*1024);
 
 	ice->pcm_pro = pcm;
 
@@ -911,8 +911,8 @@ static int __devinit snd_vt1724_pcm_spdif(ice1712_t * ice, int device)
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ICE1724 IEC958");
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      ice->pci, 64*1024, 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(ice->pci), 64*1024, 64*1024);
 
 	ice->pcm = pcm;
 
@@ -1033,8 +1033,8 @@ static int __devinit snd_vt1724_pcm_indep(ice1712_t * ice, int device)
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ICE1724 Surround PCM");
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      ice->pci, 64*1024, 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(ice->pci), 64*1024, 64*1024);
 
 	ice->pcm_ds = pcm;
 

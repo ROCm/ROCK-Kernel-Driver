@@ -1014,8 +1014,8 @@ static int __devinit snd_es1938_new_pcm(es1938_t *chip, int device, snd_pcm_t **
 	pcm->info_flags = 0;
 	strcpy(pcm->name, "ESS Solo-1");
 
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_PCI,
-					      chip->pci, 64*1024, 64*1024);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(chip->pci), 64*1024, 64*1024);
 
 	if (rpcm)
 		*rpcm = pcm;
