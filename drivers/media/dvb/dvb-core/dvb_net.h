@@ -1,8 +1,7 @@
 /* 
  * dvb_net.h
  *
- * Copyright (C) 2001 Convergence integrated media GmbH
- *                    Ralph Metzler <ralph@convergence.de>
+ * Copyright (C) 2001 Ralph Metzler for convergence integrated media GmbH
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
