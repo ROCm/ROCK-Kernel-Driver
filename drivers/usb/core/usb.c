@@ -931,7 +931,7 @@ static void set_device_description (struct usb_device *dev)
 
 	if (prod && usb_string (dev, prod, prod_str, 256) > 0) {
 #ifdef DEBUG
-		printk (KERN_INFO "Product: %s\n", prod_str);
+		dev_printk (KERN_INFO, dev->dev, "Product: %s\n", prod_str);
 #endif
 	} else {
 		prod_str = 0;
@@ -939,7 +939,7 @@ static void set_device_description (struct usb_device *dev)
 
 	if (mfgr && usb_string (dev, mfgr, mfgr_str, 256) > 0) {
 #ifdef DEBUG
-		printk (KERN_INFO "Manufacturer: %s\n", mfgr_str);
+		dev_printk (KERN_INFO, dev->dev, "Manufacturer: %s\n", mfgr_str);
 #endif
 	} else {
 		mfgr_str = 0;
@@ -1108,7 +1108,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	/* USB device state == configured ... tell the world! */
 
-	dbg("new device strings: Mfr=%d, Product=%d, SerialNumber=%d",
+	dev_dbg(dev->dev, "new device strings: Mfr=%d, Product=%d, SerialNumber=%d\n",
 		dev->descriptor.iManufacturer, dev->descriptor.iProduct, dev->descriptor.iSerialNumber);
 	set_device_description (dev);
 
