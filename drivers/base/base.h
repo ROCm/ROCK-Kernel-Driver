@@ -26,5 +26,14 @@ extern void driver_remove_dir(struct device_driver * drv);
 extern int device_bus_link(struct device * dev);
 extern void device_remove_symlink(struct driver_dir_entry * dir, const char * name);
 
+extern int devclass_make_dir(struct device_class *);
+extern void devclass_remove_dir(struct device_class *);
+
+extern int devclass_drv_link(struct device_driver *);
+extern void devclass_drv_unlink(struct device_driver *);
+
+extern int devclass_dev_link(struct device_class *, struct device *);
+extern void devclass_dev_unlink(struct device_class *, struct device *);
+
 extern int driver_attach(struct device_driver * drv);
 extern void driver_detach(struct device_driver * drv);

@@ -50,6 +50,7 @@ enum {
 
 struct device;
 struct device_driver;
+struct device_class;
 
 struct bus_type {
 	char			* name;
@@ -106,12 +107,14 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
 struct device_driver {
 	char			* name;
 	struct bus_type		* bus;
+	struct device_class	* devclass;
 
 	rwlock_t		lock;
 	atomic_t		refcount;
 
-	list_t			bus_list;
-	list_t			devices;
+	struct list_head	bus_list;
+	struct list_head	class_list;
+	struct list_head	devices;
 
 	struct driver_dir_entry	dir;
 
@@ -160,6 +163,47 @@ struct driver_attribute driver_attr_##_name = { 		\
 extern int driver_create_file(struct device_driver *, struct driver_attribute *);
 extern void driver_remove_file(struct device_driver *, struct driver_attribute *);
 
+
+/*
+ * device classes
+ */
+struct device_class {
+	char			* name;
+	u32			devnum;
+
+	struct list_head	node;
+	struct list_head	drivers;
+
+	struct driver_dir_entry	dir;
+	struct driver_dir_entry	driver_dir;
+	struct driver_dir_entry	device_dir;
+
+	int	(*add_device)(struct device *);
+	void	(*remove_device)(struct device *);
+};
+
+extern int devclass_register(struct device_class *);
+extern void devclass_unregister(struct device_class *);
+
+
+struct devclass_attribute {
+	struct attribute	attr;
+	ssize_t (*show)(struct device_class *, char * buf, size_t count, loff_t off);
+	ssize_t (*store)(struct device_class *, const char * buf, size_t count, loff_t off);
+};
+
+#define DEVCLASS_ATTR(_name,_str,_mode,_show,_store)	\
+struct devclass_attribute devclass_attr_##_name = { 		\
+	.attr = {.name	= _str,	.mode	= _mode },	\
+	.show	= _show,				\
+	.store	= _store,				\
+};
+
+extern int devclass_create_file(struct device_class *, struct devclass_attribute *);
+extern void devclass_remove_file(struct device_class *, struct devclass_attribute *);
+
+
+
 struct device {
 	struct list_head g_list;        /* node in depth-first order list */
 	struct list_head node;		/* node in sibling list */
@@ -183,6 +227,8 @@ struct device {
 	struct device_driver *driver;	/* which driver has allocated this
 					   device */
 	void		*driver_data;	/* data private to the driver */
+
+	u32		class_num;	/* class-enumerated value */
 	void		*platform_data;	/* Platform specific data (e.g. ACPI,
 					   BIOS data relevant to device) */
 

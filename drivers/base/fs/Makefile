@@ -1,5 +1,5 @@
-obj-y		:= device.o bus.o driver.o
+obj-y		:= device.o bus.o driver.o class.o
 
-export-objs	:= device.o bus.o driver.o
+export-objs	:= device.o bus.o driver.o class.o
 
 include $(TOPDIR)/Rules.make
