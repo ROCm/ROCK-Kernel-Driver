@@ -13,7 +13,7 @@
 #error What am I doing here...
 #endif
 
-		.section        ".start", #alloc, #execinstr
+		.section        ".start", "ax"
 
 __L7200_start:
 		mov	r0, #0x00100000		@ FLASH address of initrd

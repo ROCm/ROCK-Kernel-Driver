@@ -28,6 +28,7 @@
 #include <linux/config.h>
 
 /* XXX */
+#include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>

@@ -1091,8 +1091,9 @@ static void __devinit pci_fixup_i450nx(struct pci_dev *d)
 	 */
 	int pxb, reg;
 	u8 busno, suba, subb;
+#ifdef CONFIG_MULTIQUAD
 	int quad = BUS2QUAD(d->bus->number);
-
+#endif
 	printk("PCI: Searching for i450NX host bridges on %s\n", d->slot_name);
 	reg = 0xd0;
 	for(pxb=0; pxb<2; pxb++) {

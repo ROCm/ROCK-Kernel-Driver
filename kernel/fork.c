@@ -665,6 +665,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 
 	copy_flags(clone_flags, p);
 	p->pid = get_pid(clone_flags);
+	p->proc_dentry = NULL;
 
 	INIT_LIST_HEAD(&p->run_list);
 

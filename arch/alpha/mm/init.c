@@ -283,7 +283,7 @@ paging_init(void)
 	unsigned long dma_pfn, high_pfn;
 
 	dma_pfn = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-	high_pfn = max_low_pfn;
+	high_pfn = max_pfn = max_low_pfn;
 
 	if (dma_pfn >= high_pfn)
 		zones_size[ZONE_DMA] = high_pfn;

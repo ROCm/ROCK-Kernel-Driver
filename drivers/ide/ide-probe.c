@@ -168,6 +168,9 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 		}
 		printk (" drive\n");
 		drive->type = type;
+
+		goto init_queue;
+
 		return;
 	}
 
@@ -198,6 +201,7 @@ static inline void do_identify (ide_drive_t *drive, byte cmd)
 	if (drive->channel->quirkproc)
 		drive->quirk_list = drive->channel->quirkproc(drive);
 
+init_queue:
 	/*
 	 * it's an ata drive, build command list
 	 */

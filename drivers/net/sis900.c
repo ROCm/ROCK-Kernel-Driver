@@ -656,7 +656,7 @@ static void sis900_set_capability( struct net_device *net_dev , struct mii_phy *
  *	Note that location is in word (16 bits) unit
  */
 
-static u16 read_eeprom(long ioaddr, int location)
+static u16 __devinit read_eeprom(long ioaddr, int location)
 {
 	int i;
 	u16 retval = 0;

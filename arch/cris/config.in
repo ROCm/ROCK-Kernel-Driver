@@ -185,15 +185,7 @@ source net/ax25/Config.in
 
 source net/irda/Config.in
 
-mainmenu_option next_comment
-comment 'ISDN subsystem'
-if [ "$CONFIG_NET" != "n" ]; then
-   tristate 'ISDN support' CONFIG_ISDN
-   if [ "$CONFIG_ISDN" != "n" ]; then
-      source drivers/isdn/Config.in
-   fi
-fi
-endmenu
+source drivers/isdn/Config.in
 
 mainmenu_option next_comment
 comment 'Old CD-ROM drivers (not SCSI, not IDE)'

@@ -37,9 +37,60 @@
 
 #define fake_ino(pid,ino) (((pid)<<16)|(ino))
 
+enum pid_directory_inos {
+	PROC_PID_INO = 2,
+	PROC_PID_STATUS,
+	PROC_PID_MEM,
+	PROC_PID_CWD,
+	PROC_PID_ROOT,
+	PROC_PID_EXE,
+	PROC_PID_FD,
+	PROC_PID_ENVIRON,
+	PROC_PID_CMDLINE,
+	PROC_PID_STAT,
+	PROC_PID_STATM,
+	PROC_PID_MAPS,
+	PROC_PID_CPU,
+	PROC_PID_MOUNTS,
+	PROC_PID_FD_DIR = 0x8000,	/* 0x8000-0xffff */
+};
+
+struct pid_entry {
+	int type;
+	int len;
+	char *name;
+	mode_t mode;
+};
+
+#define E(type,name,mode) {(type),sizeof(name)-1,(name),(mode)}
+static struct pid_entry base_stuff[] = {
+  E(PROC_PID_FD,	"fd",		S_IFDIR|S_IRUSR|S_IXUSR),
+  E(PROC_PID_ENVIRON,	"environ",	S_IFREG|S_IRUSR),
+  E(PROC_PID_STATUS,	"status",	S_IFREG|S_IRUGO),
+  E(PROC_PID_CMDLINE,	"cmdline",	S_IFREG|S_IRUGO),
+  E(PROC_PID_STAT,	"stat",		S_IFREG|S_IRUGO),
+  E(PROC_PID_STATM,	"statm",	S_IFREG|S_IRUGO),
+#ifdef CONFIG_SMP
+  E(PROC_PID_CPU,	"cpu",		S_IFREG|S_IRUGO),
+#endif
+  E(PROC_PID_MAPS,	"maps",		S_IFREG|S_IRUGO),
+  E(PROC_PID_MEM,	"mem",		S_IFREG|S_IRUSR|S_IWUSR),
+  E(PROC_PID_CWD,	"cwd",		S_IFLNK|S_IRWXUGO),
+  E(PROC_PID_ROOT,	"root",		S_IFLNK|S_IRWXUGO),
+  E(PROC_PID_EXE,	"exe",		S_IFLNK|S_IRWXUGO),
+  E(PROC_PID_MOUNTS,	"mounts",	S_IFREG|S_IRUGO),
+  {0,0,NULL,0}
+};
+#undef E
+
 static inline struct task_struct *proc_task(struct inode *inode)
 {
 	return PROC_I(inode)->task;
+}
+
+static inline int proc_type(struct inode *inode)
+{
+	return PROC_I(inode)->type;
 }
 
 ssize_t proc_pid_read_maps(struct task_struct*,struct file*,char*,size_t,loff_t*);
@@ -50,11 +101,28 @@ int proc_pid_cpu(struct task_struct*,char*);
 
 static int proc_fd_link(struct inode *inode, struct dentry **dentry, struct vfsmount **mnt)
 {
-	struct file *file = PROC_I(inode)->file;
-	if (file) {
-		*mnt = mntget(file->f_vfsmnt);
-		*dentry = dget(file->f_dentry);
-		return 0;
+	struct task_struct *task = proc_task(inode);
+	struct files_struct *files;
+	struct file *file;
+	int fd = proc_type(inode) - PROC_PID_FD_DIR;
+
+	task_lock(task);
+	files = task->files;
+	if (files)
+		atomic_inc(&files->count);
+	task_unlock(task);
+	if (files) {
+		read_lock(&files->file_lock);
+		file = fcheck_files(files, fd);
+		if (file) {
+			*mnt = mntget(file->f_vfsmnt);
+			*dentry = dget(file->f_dentry);
+			read_unlock(&files->file_lock);
+			put_files_struct(files);
+			return 0;
+		}
+		read_unlock(&files->file_lock);
+		put_files_struct(files);
 	}
 	return -ENOENT;
 }
@@ -525,52 +593,6 @@ static struct inode_operations proc_pid_link_inode_operations = {
 	follow_link:	proc_pid_follow_link
 };
 
-struct pid_entry {
-	int type;
-	int len;
-	char *name;
-	mode_t mode;
-};
-
-enum pid_directory_inos {
-	PROC_PID_INO = 2,
-	PROC_PID_STATUS,
-	PROC_PID_MEM,
-	PROC_PID_CWD,
-	PROC_PID_ROOT,
-	PROC_PID_EXE,
-	PROC_PID_FD,
-	PROC_PID_ENVIRON,
-	PROC_PID_CMDLINE,
-	PROC_PID_STAT,
-	PROC_PID_STATM,
-	PROC_PID_MAPS,
-	PROC_PID_CPU,
-	PROC_PID_MOUNTS,
-	PROC_PID_FD_DIR = 0x8000,	/* 0x8000-0xffff */
-};
-
-#define E(type,name,mode) {(type),sizeof(name)-1,(name),(mode)}
-static struct pid_entry base_stuff[] = {
-  E(PROC_PID_FD,	"fd",		S_IFDIR|S_IRUSR|S_IXUSR),
-  E(PROC_PID_ENVIRON,	"environ",	S_IFREG|S_IRUSR),
-  E(PROC_PID_STATUS,	"status",	S_IFREG|S_IRUGO),
-  E(PROC_PID_CMDLINE,	"cmdline",	S_IFREG|S_IRUGO),
-  E(PROC_PID_STAT,	"stat",		S_IFREG|S_IRUGO),
-  E(PROC_PID_STATM,	"statm",	S_IFREG|S_IRUGO),
-#ifdef CONFIG_SMP
-  E(PROC_PID_CPU,	"cpu",		S_IFREG|S_IRUGO),
-#endif
-  E(PROC_PID_MAPS,	"maps",		S_IFREG|S_IRUGO),
-  E(PROC_PID_MEM,	"mem",		S_IFREG|S_IRUSR|S_IWUSR),
-  E(PROC_PID_CWD,	"cwd",		S_IFLNK|S_IRWXUGO),
-  E(PROC_PID_ROOT,	"root",		S_IFLNK|S_IRWXUGO),
-  E(PROC_PID_EXE,	"exe",		S_IFLNK|S_IRWXUGO),
-  E(PROC_PID_MOUNTS,	"mounts",	S_IFREG|S_IRUGO),
-  {0,0,NULL,0}
-};
-#undef E
-
 #define NUMBUF 10
 
 static int proc_readfd(struct file * filp, void * dirent, filldir_t filldir)
@@ -707,7 +729,6 @@ static struct inode *proc_pid_make_inode(struct super_block * sb, struct task_st
 	/* Common stuff */
 	ei = PROC_I(inode);
 	ei->task = NULL;
-	ei->file = NULL;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	inode->i_ino = fake_ino(task->pid, ino);
 
@@ -719,6 +740,7 @@ static struct inode *proc_pid_make_inode(struct super_block * sb, struct task_st
 	 */
 	get_task_struct(task);
 	ei->task = task;
+	ei->type = ino;
 	inode->i_uid = 0;
 	inode->i_gid = 0;
 	if (ino == PROC_PID_INO || task_dumpable(task)) {
@@ -737,17 +759,12 @@ out_unlock:
 
 /* dentry stuff */
 
-static int pid_fd_revalidate(struct dentry * dentry, int flags)
-{
-	return 0;
-}
-
 /*
  *	Exceptional case: normally we are not allowed to unhash a busy
  * directory. In this case, however, we can do it - no aliasing problems
  * due to the way we treat inodes.
  */
-static int pid_base_revalidate(struct dentry * dentry, int flags)
+static int pid_revalidate(struct dentry * dentry, int flags)
 {
 	if (proc_task(dentry->d_inode)->pid)
 		return 1;
@@ -755,9 +772,44 @@ static int pid_base_revalidate(struct dentry * dentry, int flags)
 	return 0;
 }
 
+static int pid_fd_revalidate(struct dentry * dentry, int flags)
+{
+	struct task_struct *task = proc_task(dentry->d_inode);
+	int fd = proc_type(dentry->d_inode) - PROC_PID_FD_DIR;
+	struct files_struct *files;
+
+	task_lock(task);
+	files = task->files;
+	if (files)
+		atomic_inc(&files->count);
+	task_unlock(task);
+	if (files) {
+		read_lock(&files->file_lock);
+		if (fcheck_files(files, fd)) {
+			read_unlock(&files->file_lock);
+			put_files_struct(files);
+			return 1;
+		}
+		read_unlock(&files->file_lock);
+		put_files_struct(files);
+	}
+	d_drop(dentry);
+	return 0;
+}
+
+static void pid_base_iput(struct dentry *dentry, struct inode *inode)
+{
+	struct task_struct *task = proc_task(inode);
+	write_lock_irq(&tasklist_lock);
+	if (task->proc_dentry == dentry)
+		task->proc_dentry = NULL;
+	write_unlock_irq(&tasklist_lock);
+	iput(inode);
+}
+
 static int pid_delete_dentry(struct dentry * dentry)
 {
-	return 1;
+	return proc_task(dentry->d_inode)->pid == 0;
 }
 
 static struct dentry_operations pid_fd_dentry_operations =
@@ -768,44 +820,53 @@ static struct dentry_operations pid_fd_dentry_operations =
 
 static struct dentry_operations pid_dentry_operations =
 {
+	d_revalidate:	pid_revalidate,
 	d_delete:	pid_delete_dentry,
 };
 
 static struct dentry_operations pid_base_dentry_operations =
 {
-	d_revalidate:	pid_base_revalidate,
+	d_revalidate:	pid_revalidate,
+	d_iput:		pid_base_iput,
 	d_delete:	pid_delete_dentry,
 };
 
 /* Lookups */
-#define MAX_MULBY10	((~0U-9)/10)
+
+static unsigned name_to_int(struct dentry *dentry)
+{
+	const char *name = dentry->d_name.name;
+	int len = dentry->d_name.len;
+	unsigned n = 0;
+
+	if (len > 1 && *name == '0')
+		goto out;
+	while (len-- > 0) {
+		unsigned c = *name++ - '0';
+		if (c > 9)
+			goto out;
+		if (n >= (~0U-9)/10)
+			goto out;
+		n *= 10;
+		n += c;
+	}
+	return n;
+out:
+	return ~0U;
+}
 
 /* SMP-safe */
 static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
 {
-	unsigned int fd, c;
 	struct task_struct *task = proc_task(dir);
+	unsigned fd = name_to_int(dentry);
 	struct file * file;
 	struct files_struct * files;
 	struct inode *inode;
 	struct proc_inode *ei;
-	const char *name;
-	int len;
 
-	fd = 0;
-	len = dentry->d_name.len;
-	name = dentry->d_name.name;
-	if (len > 1 && *name == '0') goto out;
-	while (len-- > 0) {
-		c = *name - '0';
-		name++;
-		if (c > 9)
-			goto out;
-		if (fd >= MAX_MULBY10)
-			goto out;
-		fd *= 10;
-		fd += c;
-	}
+	if (fd == ~0U)
+		goto out;
 
 	inode = proc_pid_make_inode(dir->i_sb, task, PROC_PID_FD_DIR+fd);
 	if (!inode)
@@ -818,28 +879,29 @@ static struct dentry *proc_lookupfd(struct inode * dir, struct dentry * dentry)
 	task_unlock(task);
 	if (!files)
 		goto out_unlock;
+	inode->i_mode = S_IFLNK;
 	read_lock(&files->file_lock);
-	file = ei->file = fcheck_files(files, fd);
+	file = fcheck_files(files, fd);
 	if (!file)
 		goto out_unlock2;
-	get_file(file);
-	read_unlock(&files->file_lock);
-	put_files_struct(files);
-	inode->i_op = &proc_pid_link_inode_operations;
-	inode->i_size = 64;
-	inode->i_mode = S_IFLNK;
-	ei->op.proc_get_link = proc_fd_link;
 	if (file->f_mode & 1)
 		inode->i_mode |= S_IRUSR | S_IXUSR;
 	if (file->f_mode & 2)
 		inode->i_mode |= S_IWUSR | S_IXUSR;
+	read_unlock(&files->file_lock);
+	put_files_struct(files);
+	inode->i_op = &proc_pid_link_inode_operations;
+	inode->i_size = 64;
+	ei->op.proc_get_link = proc_fd_link;
 	dentry->d_op = &pid_fd_dentry_operations;
 	d_add(dentry, inode);
+	if (!proc_task(dentry->d_inode)->pid)
+		d_drop(dentry);
 	return NULL;
 
 out_unlock2:
-	put_files_struct(files);
 	read_unlock(&files->file_lock);
+	put_files_struct(files);
 out_unlock:
 	iput(inode);
 out:
@@ -952,6 +1014,8 @@ static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry)
 	}
 	dentry->d_op = &pid_dentry_operations;
 	d_add(dentry, inode);
+	if (!proc_task(dentry->d_inode)->pid)
+		d_drop(dentry);
 	return NULL;
 
 out:
@@ -992,17 +1056,12 @@ static struct inode_operations proc_self_inode_operations = {
 /* SMP-safe */
 struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 {
-	unsigned int pid, c;
 	struct task_struct *task;
-	const char *name;
 	struct inode *inode;
 	struct proc_inode *ei;
-	int len;
+	unsigned pid;
 
-	pid = 0;
-	name = dentry->d_name.name;
-	len = dentry->d_name.len;
-	if (len == 4 && !memcmp(name, "self", 4)) {
+	if (dentry->d_name.len == 4 && !memcmp(dentry->d_name.name,"self",4)) {
 		inode = new_inode(dir->i_sb);
 		if (!inode)
 			return ERR_PTR(-ENOMEM);
@@ -1017,18 +1076,9 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 		d_add(dentry, inode);
 		return NULL;
 	}
-	while (len-- > 0) {
-		c = *name - '0';
-		name++;
-		if (c > 9)
-			goto out;
-		if (pid >= MAX_MULBY10)
-			goto out;
-		pid *= 10;
-		pid += c;
-		if (!pid)
-			goto out;
-	}
+	pid = name_to_int(dentry);
+	if (pid == ~0U)
+		goto out;
 
 	read_lock(&tasklist_lock);
 	task = find_task_by_pid(pid);
@@ -1052,6 +1102,11 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 
 	dentry->d_op = &pid_base_dentry_operations;
 	d_add(dentry, inode);
+	read_lock(&tasklist_lock);
+	proc_task(dentry->d_inode)->proc_dentry = dentry;
+	read_unlock(&tasklist_lock);
+	if (!proc_task(dentry->d_inode)->pid)
+		d_drop(dentry);
 	return NULL;
 out:
 	return ERR_PTR(-ENOENT);
@@ -1059,8 +1114,6 @@ out:
 
 void proc_pid_delete_inode(struct inode *inode)
 {
-	if (PROC_I(inode)->file)
-		fput(PROC_I(inode)->file);
 	if (proc_task(inode))
 		put_task_struct(proc_task(inode));
 }

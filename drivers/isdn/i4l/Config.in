@@ -1,0 +1,46 @@
+#
+# Old ISDN4Linux config
+#
+
+if [ "$CONFIG_INET" != "n" ]; then
+   bool '  Support synchronous PPP' CONFIG_ISDN_PPP
+   if [ "$CONFIG_ISDN_PPP" != "n" ]; then
+      bool         '    Use VJ-compression with synchronous PPP' CONFIG_ISDN_PPP_VJ
+      bool         '    Support generic MP (RFC 1717)' CONFIG_ISDN_MPP
+      dep_tristate '    Support BSD compression' CONFIG_ISDN_PPP_BSDCOMP $CONFIG_ISDN
+   fi
+fi
+bool '  Support audio via ISDN' CONFIG_ISDN_AUDIO
+if [ "$CONFIG_ISDN_AUDIO" != "n" ]; then
+   bool '    Support AT-Fax Class 1 and 2 commands' CONFIG_ISDN_TTY_FAX
+fi
+if [ "$CONFIG_X25" != "n" ]; then
+   bool '  X.25 PLP on top of ISDN' CONFIG_ISDN_X25
+fi
+
+mainmenu_option next_comment
+comment 'ISDN feature submodules'
+   dep_tristate 'isdnloop support' CONFIG_ISDN_DRV_LOOP $CONFIG_ISDN
+   dep_tristate 'Support isdn diversion services' CONFIG_ISDN_DIVERSION $CONFIG_ISDN
+endmenu
+
+comment 'low-level hardware drivers'
+
+source drivers/isdn/hisax/Config.in
+
+### Active ISDN cards
+
+mainmenu_option next_comment
+comment 'Active ISDN cards'
+
+source drivers/isdn/icn/Config.in
+source drivers/isdn/pcbit/Config.in
+source drivers/isdn/sc/Config.in
+source drivers/isdn/act2000/Config.in
+source drivers/isdn/eicon/Config.in
+source drivers/isdn/tpam/Config.in
+source drivers/isdn/avmb1/Config.in
+source drivers/isdn/hysdn/Config.in
+
+endmenu
+

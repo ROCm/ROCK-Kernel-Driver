@@ -292,7 +292,7 @@ sys_ptrace(long request, long pid, long addr, long data,
 		if (request != PTRACE_KILL)
 			goto out;
 	}
-	if (child->p_pptr != current) {
+	if (child->parent != current) {
 		DBG(DBG_MEM, ("child not parent of this process\n"));
 		goto out;
 	}
