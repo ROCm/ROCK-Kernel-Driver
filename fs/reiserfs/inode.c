@@ -20,10 +20,7 @@
 
 static int reiserfs_get_block (struct inode * inode, sector_t block,
 			       struct buffer_head * bh_result, int create);
-//
-// initially this function was derived from minix or ext2's analog and
-// evolved as the prototype did
-//
+
 void reiserfs_delete_inode (struct inode * inode)
 {
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 2; 
@@ -31,7 +28,7 @@ void reiserfs_delete_inode (struct inode * inode)
     struct reiserfs_transaction_handle th ;
 
   
-    lock_kernel() ; 
+    reiserfs_write_lock(inode->i_sb);
 
     /* The = 0 happens when we abort creating a new inode for some reason like lack of space.. */
     if (!(inode->i_state & I_NEW) && INODE_PKEY(inode)->k_objectid != 0) { /* also handles bad_inode case */
@@ -56,7 +53,7 @@ void reiserfs_delete_inode (struct inode * inode)
     }
     clear_inode (inode); /* note this must go after the journal_end to prevent deadlock */
     inode->i_blocks = 0;
-    unlock_kernel() ;
+    reiserfs_write_unlock(inode->i_sb);
 }
 
 static void _make_cpu_key (struct cpu_key * key, int version, __u32 dirid, __u32 objectid, 
@@ -112,8 +109,7 @@ static void add_to_flushlist(struct inode *inode, struct buffer_head *bh) {
 }
 
 //
-// FIXME: we might cache recently accessed indirect item (or at least
-// first 15 pointers just like ext2 does
+// FIXME: we might cache recently accessed indirect item
 
 // Ugh.  Not too eager for that....
 //  I cut the code until such time as I see a convincing argument (benchmark).
@@ -412,10 +408,10 @@ int reiserfs_bmap (struct inode * inode, sector_t block,
     if (!file_capable (inode, block))
 	return -EFBIG;
 
-    lock_kernel() ;
+    reiserfs_write_lock(inode->i_sb);
     /* do not read the direct item */
     _get_block_create_0 (inode, block, bh_result, 0) ;
-    unlock_kernel() ;
+    reiserfs_write_unlock(inode->i_sb);
     return 0;
 }
 
@@ -521,12 +517,7 @@ static inline int _allocate_block(struct reiserfs_transaction_handle *th,
 #endif
     return reiserfs_new_unf_blocknrs (th, allocated_block_nr, tag);
 }
-//
-// initially this function was derived from ext2's analog and evolved
-// as the prototype did.  You'll need to look at the ext2 version to
-// determine which parts are derivative, if any, understanding that
-// there are only so many ways to code to a given interface.
-//
+
 int reiserfs_get_block (struct inode * inode, sector_t block,
 			struct buffer_head * bh_result, int create)
 {
@@ -554,17 +545,17 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
     loff_t new_offset = (((loff_t)block) << inode->i_sb->s_blocksize_bits) + 1 ;
 
 				/* bad.... */
-    lock_kernel() ;
+    reiserfs_write_lock(inode->i_sb);
     th.t_trans_id = 0 ;
     version = get_inode_item_key_version (inode);
 
     if (block < 0) {
-	unlock_kernel();
+	reiserfs_write_unlock(inode->i_sb);
 	return -EIO;
     }
 
     if (!file_capable (inode, block)) {
-	unlock_kernel() ;
+	reiserfs_write_unlock(inode->i_sb);
 	return -EFBIG;
     }
 
@@ -576,7 +567,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	/* find number of block-th logical block of the file */
 	ret = _get_block_create_0 (inode, block, bh_result, 
 	                           create | GET_BLOCK_READ_DIRECT) ;
-	unlock_kernel() ;
+	reiserfs_write_unlock(inode->i_sb);
 	return ret;
     }
 
@@ -667,7 +658,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	if (transaction_started)
 	    journal_end(&th, inode->i_sb, jbegin_count) ;
 
-	unlock_kernel() ;
+	reiserfs_write_unlock(inode->i_sb);
 	 
 	/* the item was found, so new blocks were not added to the file
 	** there is no need to make sure the inode is updated with this 
@@ -866,7 +857,6 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 
 
     retval = 0;
-    reiserfs_check_path(&path) ;
 
  failure:
     if (transaction_started) {
@@ -874,7 +864,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
       journal_end(&th, inode->i_sb, jbegin_count) ;
     }
     pop_journal_writer(windex) ;
-    unlock_kernel() ;
+    reiserfs_write_unlock(inode->i_sb);
     reiserfs_check_path(&path) ;
     return retval;
 }
@@ -1353,10 +1343,6 @@ int reiserfs_encode_fh(struct dentry *dentry, __u32 *data, int *lenp, int need_p
 }
 
 
-//
-// initially this function was derived from minix or ext2's analog and
-// evolved as the prototype did
-//
 /* looks for stat data, then copies fields to it, marks the buffer
    containing stat data as dirty */
 /* reiserfs inodes are never really dirty, since the dirty inode call
@@ -1379,11 +1365,11 @@ void reiserfs_write_inode (struct inode * inode, int do_sync) {
     ** ignored because the altered inode has already been logged.
     */
     if (do_sync && !(current->flags & PF_MEMALLOC)) {
-	lock_kernel() ;
+	reiserfs_write_lock(inode->i_sb);
 	journal_begin(&th, inode->i_sb, jbegin_count) ;
 	reiserfs_update_sd (&th, inode);
 	journal_end_sync(&th, inode->i_sb, jbegin_count) ;
-	unlock_kernel() ;
+	reiserfs_write_unlock(inode->i_sb);
     }
 }
 
@@ -1725,7 +1711,8 @@ static int grab_tail_page(struct inode *p_s_inode,
 	** call prepare_write
 	*/
 	reiserfs_warning("clm-6000: error reading block %lu on dev %s\n",
-	                  bh->b_blocknr, p_s_inode->i_sb->s_id) ;
+			 bh->b_blocknr,
+			 reiserfs_bdevname (p_s_inode->i_sb)) ;
 	error = -EIO ;
 	goto unlock ;
     }
@@ -1750,7 +1737,6 @@ unlock:
 void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     struct reiserfs_transaction_handle th ;
     int windex ;
-
     /* we want the offset for the first byte after the end of the file */
     unsigned long offset = p_s_inode->i_size & (PAGE_CACHE_SIZE - 1) ;
     unsigned blocksize = p_s_inode->i_sb->s_blocksize ;
@@ -1758,6 +1744,8 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
     struct page *page = NULL ;
     int error ;
     struct buffer_head *bh = NULL ;
+
+    reiserfs_write_lock(p_s_inode->i_sb);
 
     if (p_s_inode->i_size > 0) {
         if ((error = grab_tail_page(p_s_inode, &page, &bh))) {
@@ -1812,7 +1800,7 @@ void reiserfs_truncate_file(struct inode *p_s_inode, int update_timestamps) {
 	page_cache_release(page) ;
     }
 
-    return ;
+    reiserfs_write_unlock(p_s_inode->i_sb);
 }
 
 static int map_block_for_writepage(struct inode *inode, 
@@ -1836,7 +1824,7 @@ static int map_block_for_writepage(struct inode *inode,
 
     kmap(bh_result->b_page) ;
 start_over:
-    lock_kernel() ;
+    reiserfs_write_lock(inode->i_sb);
     journal_begin(&th, inode->i_sb, jbegin_count) ;
     reiserfs_update_inode_transaction(inode) ;
 
@@ -1894,7 +1882,7 @@ research:
 	    goto research ;
 	}
     } else {
-        reiserfs_warning("clm-6003: bad item inode %lu, device %s\n", inode->i_ino, inode->i_sb->s_id) ;
+        reiserfs_warning("clm-6003: bad item inode %lu, device %s\n", inode->i_ino, reiserfs_bdevname (inode->i_sb)) ;
         retval = -EIO ;
 	goto out ;
     }
@@ -1903,7 +1891,7 @@ research:
 out:
     pathrelse(&path) ;
     journal_end(&th, inode->i_sb, jbegin_count) ;
-    unlock_kernel() ;
+    reiserfs_write_unlock(inode->i_sb);
 
     /* this is where we fill in holes in the file. */
     if (use_get_block) {
@@ -2033,18 +2021,13 @@ fail:
     return error ;
 }
 
-//
-// this is exactly what 2.3.99-pre9's ext2_readpage is
-//
+
 static int reiserfs_readpage (struct file *f, struct page * page)
 {
     return block_read_full_page (page, reiserfs_get_block);
 }
 
 
-//
-// modified from ext2_writepage is
-//
 static int reiserfs_writepage (struct page * page)
 {
     struct inode *inode = page->mapping->host ;
@@ -2053,9 +2036,6 @@ static int reiserfs_writepage (struct page * page)
 }
 
 
-//
-// from ext2_prepare_write, but modified
-//
 int reiserfs_prepare_write(struct file *f, struct page *page, 
 			   unsigned from, unsigned to) {
     struct inode *inode = page->mapping->host ;
@@ -2065,9 +2045,6 @@ int reiserfs_prepare_write(struct file *f, struct page *page,
 }
 
 
-//
-// this is exactly what 2.3.99-pre9's ext2_bmap is
-//
 static int reiserfs_aop_bmap(struct address_space *as, long block) {
   return generic_block_bmap(as, block, reiserfs_bmap) ;
 }
@@ -2086,13 +2063,13 @@ static int reiserfs_commit_write(struct file *f, struct page *page,
     */
     if (pos > inode->i_size) {
 	struct reiserfs_transaction_handle th ;
-	lock_kernel() ;
+	reiserfs_write_lock(inode->i_sb);
 	journal_begin(&th, inode->i_sb, 1) ;
 	reiserfs_update_inode_transaction(inode) ;
 	inode->i_size = pos ;
 	reiserfs_update_sd(&th, inode) ;
 	journal_end(&th, inode->i_sb, 1) ;
-	unlock_kernel() ;
+	reiserfs_write_unlock(inode->i_sb);
     }
  
     ret = generic_commit_write(f, page, from, to) ;
@@ -2101,9 +2078,9 @@ static int reiserfs_commit_write(struct file *f, struct page *page,
     ** for any packed tails the file might have had
     */
     if (f && (f->f_flags & O_SYNC)) {
-	lock_kernel() ;
+	reiserfs_write_lock(inode->i_sb);
  	reiserfs_commit_for_inode(inode) ;
-	unlock_kernel();
+	reiserfs_write_unlock(inode->i_sb);
     }
     return ret ;
 }

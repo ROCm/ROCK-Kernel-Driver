@@ -36,7 +36,7 @@ static struct super_block *procinfo_prologue( kdev_t dev )
 	/* get super-block by device */
 	result = get_super( dev );
 	if( result != NULL ) {
-		if( !reiserfs_is_super( result ) ) {
+		if( !is_reiserfs_super( result ) ) {
 			printk( KERN_DEBUG "reiserfs: procfs-52: "
 				"non-reiserfs super found\n" );
 			drop_super( result );
@@ -500,7 +500,7 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 			"prepare_retry: \t%12lu\n",
 
                         DJP( jp_journal_1st_block ),
-                        DJP( jp_journal_dev ) == 0 ? "none" : __bdevname(to_kdev_t(DJP( jp_journal_dev ))),
+                        bdevname(SB_JOURNAL(sb)->j_dev_bd),
                         DJP( jp_journal_dev ),
                         DJP( jp_journal_size ),
                         DJP( jp_journal_trans_max ),
@@ -556,13 +556,13 @@ static const char *proc_info_root_name = "fs/reiserfs";
 int reiserfs_proc_info_init( struct super_block *sb )
 {
 	spin_lock_init( & __PINFO( sb ).lock );
-	REISERFS_SB(sb)->procdir = proc_mkdir(sb->s_id, proc_info_root);
+	REISERFS_SB(sb)->procdir = proc_mkdir(reiserfs_bdevname (sb), proc_info_root);
 	if( REISERFS_SB(sb)->procdir ) {
 		REISERFS_SB(sb)->procdir -> owner = THIS_MODULE;
 		return 0;
 	}
 	reiserfs_warning( "reiserfs: cannot create /proc/%s/%s\n",
-			  proc_info_root_name, sb->s_id );
+			  proc_info_root_name, reiserfs_bdevname (sb) );
 	return 1;
 }
 
@@ -573,7 +573,7 @@ int reiserfs_proc_info_done( struct super_block *sb )
 	__PINFO( sb ).exiting = 1;
 	spin_unlock( & __PINFO( sb ).lock );
 	if ( proc_info_root ) {
-		remove_proc_entry( sb->s_id, proc_info_root );
+		remove_proc_entry( reiserfs_bdevname (sb), proc_info_root );
 		REISERFS_SB(sb)->procdir = NULL;
 	}
 	return 0;

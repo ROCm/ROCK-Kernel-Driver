@@ -1715,13 +1715,13 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 	/* Cut or delete file item. */
 	n_deleted = reiserfs_cut_from_item(th, &s_search_path, &s_item_key, p_s_inode,  page, n_new_file_size);
 	if (n_deleted < 0) {
-	    reiserfs_warning ("vs-5665: reiserfs_truncate_file: cut_from_item failed");
+	    reiserfs_warning ("vs-5665: reiserfs_do_truncate: reiserfs_cut_from_item failed");
 	    reiserfs_check_path(&s_search_path) ;
 	    return;
 	}
 
 	RFALSE( n_deleted > n_file_size,
-		"PAP-5670: reiserfs_truncate_file returns too big number: deleted %d, file_size %lu, item_key %K",
+		"PAP-5670: reiserfs_cut_from_item: too many bytes deleted: deleted %d, file_size %lu, item_key %K",
 		n_deleted, n_file_size, &s_item_key);
 
 	/* Change key to search the last file item. */
