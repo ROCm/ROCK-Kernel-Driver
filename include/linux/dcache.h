@@ -117,12 +117,18 @@ d_iput:		no		no		yes
 					 * renamed" and has to be
 					 * deleted on the last dput()
 					 */
-#define	DCACHE_DISCONNECTED 0x0004	/* This dentry is not currently connected to the
-					 * dcache tree. Its parent will either be itself,
-					 * or will have this flag as well.
-					 * If this dentry points to a directory, then
-					 * s_nfsd_free_path semaphore will be down
-					 */
+#define	DCACHE_DISCONNECTED 0x0004
+     /* This dentry is possibly not currently connected to the dcache tree,
+      * in which case its parent will either be itself, or will have this
+      * flag as well.  nfsd will not use a dentry with this bit set, but will
+      * first endeavour to clear the bit either by discovering that it is
+      * connected, or by performing lookup operations.   Any filesystem which
+      * supports nfsd_operations MUST have a lookup function which, if it finds
+      * a directory inode with a DCACHE_DISCONNECTED dentry, will d_move
+      * that dentry into place and return that dentry rather than the passed one,
+      * typically using d_splice_alias.
+      */
+
 #define DCACHE_REFERENCED	0x0008  /* Recently used, don't discard. */
 
 extern spinlock_t dcache_lock;

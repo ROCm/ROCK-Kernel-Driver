@@ -6,6 +6,7 @@
  * Copyright (C) 1995, 1996 Olaf Kirch <okir@monad.swb.de>
  * Portions Copyright (C) 1999 G. Allen Morris III <gam3@acm.org>
  * Extensive rewrite by Neil Brown <neilb@cse.unsw.edu.au> Southern-Spring 1999
+ * ... and again Southern-Winter 2001 to support export_operations
  */
 
 #include <linux/sched.h>
@@ -28,6 +29,11 @@
 
 static int nfsd_nr_verified;
 static int nfsd_nr_put;
+
+extern struct export_operations export_op_default;
+
+#define	CALL(ops,fun) ((ops->fun)?(ops->fun):export_op_default.fun)
+
 
 
 struct nfsd_getdents_callback {
@@ -60,15 +66,6 @@ dprintk("filldir_one: seq=%d, ino=%ld, name=%s\n", buf->sequence, ino, name);
 	return result;
 }
 
-/**
- * nfsd_get_name - default nfsd_operations->get_name function
- * @dentry: the directory in which to find a name
- * @name:   a pointer to a %NAME_MAX+1 char buffer to store the name
- * @child:  the dentry for the child directory.
- *
- * calls readdir on the parent until it finds an entry with
- * the same inode number as the child, and returns that.
- */
 static int nfsd_get_name(struct dentry *dentry, char *name,
 			struct dentry *child)
 {
@@ -120,9 +117,6 @@ out:
 	return error;
 }
 
-/* this should be provided by each filesystem in an nfsd_operations interface as
- * iget isn't really the right interface
- */
 static struct dentry *nfsd_iget(struct super_block *sb, unsigned long ino, __u32 generation)
 {
 
@@ -244,7 +238,6 @@ int d_splice(struct dentry *target, struct dentry *parent, struct qstr *name)
 }
 
 /* this routine finds the dentry of the parent of a given directory
- * it should be in the filesystem accessed by nfsd_operations
  * it assumes lookup("..") works.
  */
 struct dentry *nfsd_findparent(struct dentry *child)
@@ -510,6 +503,46 @@ err_out:
 }
 
 /*
+ * our acceptability function.
+ * if NOSUBTREECHECK, accept anything
+ * if not, require that we can walk up to exp->ex_dentry
+ * doing some checks on the 'x' bits
+ */
+int nfsd_acceptable(void *expv, struct dentry *dentry)
+{
+	struct svc_export *exp = expv;
+	int rv;
+	struct dentry *tdentry;
+
+	if (exp->ex_flags & NFSEXP_NOSUBTREECHECK)
+		return 1;
+
+	dget(dentry);
+	read_lock(&dparent_lock);
+	for (tdentry = dentry;
+	     tdentry != exp->ex_dentry && ! IS_ROOT(tdentry);
+	     (dget(tdentry->d_parent),
+	      dput(tdentry),
+	      tdentry = tdentry->d_parent)
+		) {
+		/* make sure parents give x permission to user */
+		int err;
+		read_unlock(&dparent_lock);
+		err = permission(tdentry->d_parent->d_inode, S_IXOTH);
+		read_lock(&dparent_lock);
+		if (err < 0)
+			break;
+	}
+	read_unlock(&dparent_lock);
+	if (tdentry != exp->ex_dentry)
+		dprintk("nfsd_acceptable failed at %p %s\n", tdentry, tdentry->d_name.name);
+	rv = (tdentry == exp->ex_dentry);
+	dput(tdentry);
+	return rv;
+}
+
+
+/*
  * Perform sanity checks on the dentry in a client's file handle.
  *
  * Note that the file handle dentry may need to be freed even after
@@ -536,6 +569,8 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		kdev_t xdev = NODEV;
 		ino_t xino = 0;
 		__u32 *datap=NULL;
+		__u32 tfh[3];		/* filehandle fragment for oldstyle filehandles */
+		int fileid_type;
 		int data_left = fh->fh_size/4;
 		int nfsdev;
 		int fsid = 0;
@@ -543,8 +578,8 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		error = nfserr_stale;
 		if (rqstp->rq_vers == 3)
 			error = nfserr_badhandle;
+
 		if (fh->fh_version == 1) {
-			
 			datap = fh->fh_auth;
 			if (--data_left<0) goto out;
 			switch (fh->fh_auth_type) {
@@ -585,7 +620,6 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 
 		if (!exp) {
 			/* export entry revoked */
-			nfsdstats.fh_stale++;
 			goto out;
 		}
 
@@ -609,27 +643,35 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		if (rqstp->rq_vers == 3)
 			error = nfserr_badhandle;
 
-		if (fh->fh_version == 1) {
-			/* if fileid_type != 0, and super_operations provide fh_to_dentry lookup,
-			 *  then should use that */
-			switch (fh->fh_fileid_type) {
-			case 0:
-				dentry = dget(exp->ex_dentry);
-				break;
-			default:
-				dentry = find_fh_dentry(exp->ex_dentry->d_sb,
-							datap, data_left, fh->fh_fileid_type,
-							!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
-			}
-		} else {
-			__u32 tfh[3];
+		if (fh->fh_version != 1) {
 			tfh[0] = fh->ofh_ino;
 			tfh[1] = fh->ofh_generation;
 			tfh[2] = fh->ofh_dirino;
-			dentry = find_fh_dentry(exp->ex_dentry->d_sb,
-						tfh, 3, fh->ofh_dirino?2:1,
-						!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
+			datap = tfh;
+			data_left = 3;
+			if (fh->ofh_dirino == 0)
+				fileid_type = 1;
+			else
+				fileid_type = 2;
+		} else
+			fileid_type = fh->fh_fileid_type;
+		
+		if (fileid_type == 0)
+			dentry = dget(exp->ex_dentry);
+		else {
+			struct export_operations *nop = exp->ex_mnt->mnt_sb->s_export_op;
+			if (nop)
+				dentry = CALL(nop,decode_fh)(exp->ex_mnt->mnt_sb,
+							     datap, data_left,
+							     fileid_type,
+							     nfsd_acceptable, exp);
+			else
+				dentry = find_fh_dentry(exp->ex_dentry->d_sb,
+							datap, data_left, fileid_type,
+							!(exp->ex_flags & NFSEXP_NOSUBTREECHECK));
 		}
+		if (dentry == NULL)
+			goto out;
 		if (IS_ERR(dentry)) {
 			if (PTR_ERR(dentry) != -EINVAL)
 				error = nfserrno(PTR_ERR(dentry));
@@ -664,7 +706,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	 * write call).
 	 */
 
-	/* When is type ever negative? */
+	/* Type can be negative when creating hardlinks - not to a dir */
 	if (type > 0 && (inode->i_mode & S_IFMT) != type) {
 		error = (type == S_IFDIR)? nfserr_notdir : nfserr_isdir;
 		goto out;
@@ -676,10 +718,14 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 
 	/*
 	 * Security: Check that the export is valid for dentry <gam3@acm.org>
+	 *  This is only needed with subtree_check, and if export_operations is
+	 *  not being used -  export_operations does the check via  the "acceptable"
+	 *  callback
 	 */
 	error = 0;
 
-	if (!(exp->ex_flags & NFSEXP_NOSUBTREECHECK)) {
+	if (exp->ex_mnt->mnt_sb->s_export_op == NULL &&
+	    !(exp->ex_flags & NFSEXP_NOSUBTREECHECK)) {
 		if (exp->ex_dentry != dentry) {
 			struct dentry *tdentry = dentry;
 
@@ -701,13 +747,11 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 				    && !(tdentry->d_inode->i_mode & S_IXOTH)
 					) {
 					error = nfserr_stale;
-					nfsdstats.fh_stale++;
 					dprintk("fh_verify: no root_squashed access.\n");
 				}
 			} while ((tdentry != tdentry->d_parent));
 			if (exp->ex_dentry != tdentry) {
 				error = nfserr_stale;
-				nfsdstats.fh_stale++;
 				printk("nfsd Security: %s/%s bad export.\n",
 				       dentry->d_parent->d_name.name,
 				       dentry->d_name.name);
@@ -729,8 +773,11 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	}
 #endif
 out:
+	if (error == nfserr_stale)
+		nfsdstats.fh_stale++;
 	return error;
 }
+
 
 /*
  * Compose a file handle for an NFS reply.
@@ -742,12 +789,17 @@ out:
 inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
 		      __u32 *datap, int *maxsize)
 {
+	struct export_operations *nop = exp->ex_mnt->mnt_sb->s_export_op;
 	struct super_block *sb = dentry->d_sb;
 	
 	if (dentry == exp->ex_dentry) {
 		*maxsize = 0;
 		return 0;
 	}
+
+	if (nop)
+		return CALL(nop,encode_fh)(dentry, datap, maxsize,
+			  !(exp->ex_flags&NFSEXP_NOSUBTREECHECK));
 
 	if (sb->s_op->dentry_to_fh) {
 		int need_parent = !S_ISDIR(dentry->d_inode->i_mode) &&
@@ -853,11 +905,11 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 				_fh_update(dentry, exp, datap, &size);
 			fhp->fh_handle.fh_size += size*4;
 		}
+		if (fhp->fh_handle.fh_fileid_type == 255)
+			return nfserr_opnotsupp;
 	}
 
 	nfsd_nr_verified++;
-	if (fhp->fh_handle.fh_fileid_type == 255)
-		return nfserr_opnotsupp;
 	return 0;
 }
 
@@ -889,6 +941,8 @@ fh_update(struct svc_fh *fhp)
 		fhp->fh_handle.fh_fileid_type =
 			_fh_update(dentry, fhp->fh_export, datap, &size);
 		fhp->fh_handle.fh_size += size*4;
+		if (fhp->fh_handle.fh_fileid_type == 255)
+			return nfserr_opnotsupp;
 	}
 out:
 	return 0;
@@ -921,3 +975,4 @@ fh_put(struct svc_fh *fhp)
 	}
 	return;
 }
+

@@ -45,6 +45,7 @@ subdir-$(CONFIG_DEVFS_FS)	+= devfs
 subdir-$(CONFIG_HFS_FS)		+= hfs
 subdir-$(CONFIG_VXFS_FS)	+= freevxfs
 subdir-$(CONFIG_NFS_FS)		+= nfs
+subdir-$(CONFIG_EXPORTFS)	+= exportfs
 subdir-$(CONFIG_NFSD)		+= nfsd
 subdir-$(CONFIG_LOCKD)		+= lockd
 subdir-$(CONFIG_NLS)		+= nls
