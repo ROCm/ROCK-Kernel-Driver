@@ -170,7 +170,6 @@ struct mddev_s
 	void				*private;
 	mdk_personality_t		*pers;
 	int				__minor;
-	mdp_super_t			*sb;
 	struct list_head 		disks;
 	int				sb_dirty;
 	int				ro;
