@@ -30,6 +30,30 @@ static void nfs_free_delegation(struct nfs_delegation *delegation)
 	kfree(delegation);
 }
 
+static void nfs_delegation_claim_opens(struct inode *inode)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct nfs_open_context *ctx;
+	struct nfs4_state *state;
+
+again:
+	spin_lock(&inode->i_lock);
+	list_for_each_entry(ctx, &nfsi->open_files, list) {
+		state = ctx->state;
+		if (state == NULL)
+			continue;
+		if (!test_bit(NFS_DELEGATED_STATE, &state->flags))
+			continue;
+		get_nfs_open_context(ctx);
+		spin_unlock(&inode->i_lock);
+		if (nfs4_open_delegation_recall(ctx->dentry, state) < 0)
+			return;
+		put_nfs_open_context(ctx);
+		goto again;
+	}
+	spin_unlock(&inode->i_lock);
+}
+
 /*
  * Set up a delegation on an inode
  */
@@ -110,6 +134,7 @@ int nfs_inode_return_delegation(struct inode *inode)
 		nfsi->delegation = NULL;
 	}
 	spin_unlock(&clp->cl_lock);
+	nfs_delegation_claim_opens(inode);
 	up_write(&nfsi->rwsem);
 	up_read(&clp->cl_sem);
 	nfs_msync_inode(inode);
@@ -182,6 +207,7 @@ static int recall_thread(void *data)
 	}
 	spin_unlock(&clp->cl_lock);
 	complete(&args->started);
+	nfs_delegation_claim_opens(inode);
 	up_write(&nfsi->rwsem);
 	up_read(&clp->cl_sem);
 	nfs_msync_inode(inode);
