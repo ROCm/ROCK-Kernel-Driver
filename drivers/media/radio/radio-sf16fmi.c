@@ -82,24 +82,15 @@ static inline void fmi_unmute(int port)
 
 static inline int fmi_setfreq(struct fmi_device *dev)
 {
-        int myport = dev->port;
+	int myport = dev->port;
 	unsigned long freq = dev->curfreq;
-	int i;
-	
+
 	down(&lock);
-	
+
 	outbits(16, RSF16_ENCODE(freq), myport);
 	outbits(8, 0xC0, myport);
-	for(i=0; i< 100; i++)
-	{
-		udelay(1400);
-		cond_resched();
-	}
-/* If this becomes allowed use it ... 	
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule_timeout(HZ/7);
-*/	
-
 	up(&lock);
 	if (dev->curvol) fmi_unmute(myport);
 	return 0;
@@ -110,7 +101,7 @@ static inline int fmi_getsigstr(struct fmi_device *dev)
 	int val;
 	int res;
 	int myport = dev->port;
-	int i;
+
 	
 	down(&lock);
 	val = dev->curvol ? 0x08 : 0x00;	/* unmute/mute */
