@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2001 - 2003 Jeff Dike (jdike@addtoit.com)
+ * Licensed under the GPL
+ */
+
 #include "linux/kernel.h"
 #include "linux/smp.h"
 #include "linux/sched.h"
