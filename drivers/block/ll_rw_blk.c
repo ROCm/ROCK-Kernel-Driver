@@ -48,8 +48,14 @@ static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
  */
 static int queue_nr_requests;
 
-unsigned long blk_max_low_pfn, blk_max_pfn;
 static wait_queue_head_t congestion_wqh[2];
+
+/*
+ * Controlling structure to kblockd
+ */
+static struct workqueue_struct *kblockd_workqueue; 
+
+unsigned long blk_max_low_pfn, blk_max_pfn;
 
 static inline int batch_requests(void)
 {
@@ -2308,9 +2314,23 @@ void blk_rq_prep_restart(struct request *rq)
 	rq->current_nr_sectors = rq->hard_cur_sectors;
 }
 
+int kblockd_schedule_work(struct work_struct *work)
+{
+	return queue_work(kblockd_workqueue, work);
+}
+
+void kblockd_flush(void)
+{
+	flush_workqueue(kblockd_workqueue);
+}
+
 int __init blk_dev_init(void)
 {
 	int i;
+
+	kblockd_workqueue = create_workqueue("kblockd");
+	if (!kblockd_workqueue)
+		panic("Failed to create kblockd\n");
 
 	request_cachep = kmem_cache_create("blkdev_requests",
 			sizeof(struct request), 0, 0, NULL, NULL);
@@ -2331,7 +2351,7 @@ int __init blk_dev_init(void)
 	for (i = 0; i < ARRAY_SIZE(congestion_wqh); i++)
 		init_waitqueue_head(&congestion_wqh[i]);
 	return 0;
-};
+}
 
 EXPORT_SYMBOL(process_that_request_first);
 EXPORT_SYMBOL(end_that_request_first);

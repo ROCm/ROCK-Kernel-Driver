@@ -561,6 +561,10 @@ static inline void put_dev_sector(Sector p)
 	page_cache_release(p.v);
 }
 
+struct work_struct;
+int kblockd_schedule_work(struct work_struct *work);
+void kblockd_flush(void);
+
 #ifdef CONFIG_LBD
 # include <asm/div64.h>
 # define sector_div(a, b) do_div(a, b)
