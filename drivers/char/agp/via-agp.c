@@ -319,10 +319,10 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* VT8361 */
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_8361,	// 0x3112
 		.chipset_name	= "Apollo KLE133",
-	}, */
+	},
 
 	/* VT8365 / VT8362 */
 	{
@@ -331,10 +331,10 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* VT8753A */
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_8753_0,	// 0x3128
 		.chipset_name	= "P4X266",
-	},	*/	
+	},
 
 	/* VT8366 */
 	{
@@ -349,16 +349,16 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* KM266 / PM266 */
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_KM266,	// 0x3116
 		.chipset_name	= "KM266/PM266",
-	},	*/
+	},
 
 	/* CLE266 */
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_CLE266,	// 0x3123
 		.chipset_name	= "CLE266",
-	},	*/
+	},
 
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8377_0,
@@ -374,16 +374,16 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* VT8752*/
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_8752,	// 0x3148
 		.chipset_name	= "ProSavage DDR P4M266",
-	},	*/
+	},
 
 	/* KN266/PN266 */
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_KN266,	// 0x3156
 		.chipset_name	= "KN266/PN266",
-	},	*/
+	},
 
 	/* VT8754 */
 	{
@@ -392,28 +392,28 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	},
 
 	/* P4N333 */
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_P4N333,	// 0x3178
 		.chipset_name	= "P4N333",
-	}, */
+	},
 
 	/* P4X600 */
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_P4X600,	// 0x0198
 		.chipset_name	= "P4X600",
-	},	*/
+	},
 
 	/* KM400 */
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_KM400,	// 0x3205
 		.chipset_name	= "KM400",
-	},	*/
+	},
 
 	/* P4M400 */
-/*	{
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_P4M400,	// 0x3209
 		.chipset_name	= "PM400",
-	},	*/
+	},
 
 	{ }, /* dummy final entry, always present */
 };
