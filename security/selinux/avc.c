@@ -31,13 +31,44 @@
 #include <net/ipv6.h>
 #include "avc.h"
 #include "avc_ss.h"
-#ifdef CONFIG_AUDIT
-#include "class_to_string.h"
-#endif
-#include "common_perm_to_string.h"
-#include "av_inherit.h"
+
+static const struct av_perm_to_string
+{
+  u16 tclass;
+  u32 value;
+  const char *name;
+} av_perm_to_string[] = {
+#define S_(c, v, s) { c, v, s },
 #include "av_perm_to_string.h"
-#include "objsec.h"
+#undef S_
+};
+
+#ifdef CONFIG_AUDIT
+static const char *class_to_string[] = {
+#define S_(s) s,
+#include "class_to_string.h"
+#undef S_
+};
+#endif
+
+#define TB_(s) static const char * s [] = {
+#define TE_(s) };
+#define S_(s) s,
+#include "common_perm_to_string.h"
+#undef TB_
+#undef TE_
+#undef S_
+
+static const struct av_inherit
+{
+    u16 tclass;
+    const char **common_pts;
+    u32 common_base;
+} av_inherit[] = {
+#define S_(c, i, b) { c, common_##i##_perm_to_string, b },
+#include "av_inherit.h"
+#undef S_
+};
 
 #define AVC_CACHE_SLOTS			512
 #define AVC_DEF_CACHE_THRESHOLD		512
@@ -110,7 +141,7 @@ static inline int avc_hash(u32 ssid, u32 tsid, u16 tclass)
  */
 void avc_dump_av(struct audit_buffer *ab, u16 tclass, u32 av)
 {
-	char **common_pts = NULL;
+	const char **common_pts = NULL;
 	u32 common_base = 0;
 	int i, i2, perm;
 
