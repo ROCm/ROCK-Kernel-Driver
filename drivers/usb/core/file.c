@@ -160,8 +160,7 @@ int usb_register_dev(struct usb_interface *intf,
 
 	/* handle the devfs registration */
 	snprintf(name, DEVICE_ID_SIZE, class_driver->name, minor - minor_base);
-	devfs_register(NULL, name, 0, USB_MAJOR, minor, class_driver->mode,
-		       class_driver->fops, NULL);
+	devfs_mk_cdev(MKDEV(USB_MAJOR, minor), class_driver->mode, name);
 
 	/* create a usb class device for this usb interface */
 	memset(&intf->class_dev, 0x00, sizeof(struct class_device));
