@@ -212,7 +212,7 @@ extern struct page *mem_map_zero;
 #define page_pte_prot(page, prot)	mk_pte(page, prot)
 #define page_pte(page)			page_pte_prot(page, __pgprot(0))
 
-extern inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
+static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 {
 	pte_t __pte;
 
@@ -291,7 +291,7 @@ struct vm_area_struct;
 extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
 /* Make a non-present pseudo-TTE. */
-extern inline pte_t mk_pte_io(unsigned long page, pgprot_t prot, int space)
+static inline pte_t mk_pte_io(unsigned long page, pgprot_t prot, int space)
 {
 	pte_t pte;
 	pte_val(pte) = ((page) | pgprot_val(prot) | _PAGE_E) & ~(unsigned long)_PAGE_CACHE;
@@ -313,7 +313,7 @@ extern inline pte_t mk_pte_io(unsigned long page, pgprot_t prot, int space)
 
 extern unsigned long prom_virt_to_phys(unsigned long, int *);
 
-extern __inline__ unsigned long
+static __inline__ unsigned long
 sun4u_get_pte (unsigned long addr)
 {
 	pgd_t *pgdp;
@@ -330,13 +330,13 @@ sun4u_get_pte (unsigned long addr)
 	return pte_val(*ptep) & _PAGE_PADDR;
 }
 
-extern __inline__ unsigned long
+static __inline__ unsigned long
 __get_phys (unsigned long addr)
 {
 	return sun4u_get_pte (addr);
 }
 
-extern __inline__ int
+static __inline__ int
 __get_iospace (unsigned long addr)
 {
 	return ((sun4u_get_pte (addr) & 0xf0000000) >> 28);

@@ -52,7 +52,7 @@ do {										\
 #define __access_ok(addr,size) 1
 #define access_ok(type,addr,size) 1
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+static inline int verify_area(int type, const void * addr, unsigned long size)
 {
 	return 0;
 }
@@ -270,7 +270,7 @@ extern __kernel_size_t __copy_in_user(void *to, const void *from,
 	__copy_in_user((void *)(to), \
 	(void *) (from), (__kernel_size_t)(n))
 
-extern __inline__ __kernel_size_t __clear_user(void *addr, __kernel_size_t size)
+static __inline__ __kernel_size_t __clear_user(void *addr, __kernel_size_t size)
 {
 	extern __kernel_size_t __bzero_noasi(void *addr, __kernel_size_t size);
 	

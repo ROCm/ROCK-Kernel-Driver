@@ -89,7 +89,7 @@ static inline int any_online_cpu(unsigned long mask)
  *	General functions that each host system must provide.
  */
 
-extern __inline__ int hard_smp_processor_id(void)
+static __inline__ int hard_smp_processor_id(void)
 {
 	if (tlb_type == cheetah || tlb_type == cheetah_plus) {
 		unsigned long safari_config;
@@ -130,7 +130,7 @@ static __inline__ void smp_send_reschedule(int cpu)
 /* This is a nop as well because we capture all other cpus
  * anyways when making the PROM active.
  */
-extern __inline__ void smp_send_stop(void) { }
+static __inline__ void smp_send_stop(void) { }
 
 #endif /* !(__ASSEMBLY__) */
 
