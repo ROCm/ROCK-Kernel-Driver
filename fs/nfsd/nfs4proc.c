@@ -349,14 +349,18 @@ nfsd4_link(struct svc_rqst *rqstp, struct svc_fh *current_fh,
 static inline int
 nfsd4_lookupp(struct svc_rqst *rqstp, struct svc_fh *current_fh)
 {
-	/*
-	 * XXX: We currently violate the spec in one small respect
-	 * here.  If LOOKUPP is done at the root of the pseudofs,
-	 * the spec requires us to return NFSERR_NOENT.  Personally,
-	 * I think that leaving the filehandle unchanged is more
-	 * logical, but this is an academic question anyway, since
-	 * no clients actually use LOOKUPP.
-	 */
+	struct svc_fh tmp_fh;
+	int ret;
+
+	fh_init(&tmp_fh, NFS4_FHSIZE);
+	if((ret = exp_pseudoroot(rqstp->rq_client, &tmp_fh,
+			      &rqstp->rq_chandle)) != 0)
+		return ret;
+	if (tmp_fh.fh_dentry == current_fh->fh_dentry) {
+		fh_put(&tmp_fh);
+		return nfserr_noent;
+	}
+	fh_put(&tmp_fh);
 	return nfsd_lookup(rqstp, current_fh, "..", 2, current_fh);
 }
 
