@@ -35,9 +35,7 @@ ohci_pci_reset (struct usb_hcd *hcd)
 {
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 
-	ohci->regs = hcd->regs;
-	ohci->next_statechange = jiffies;
-	return hc_reset (ohci);
+	return ohci_init (ohci);
 }
 
 static int __devinit
@@ -45,11 +43,6 @@ ohci_pci_start (struct usb_hcd *hcd)
 {
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 	int		ret;
-
-	ohci->hcca = dma_alloc_coherent (hcd->self.controller,
-			sizeof *ohci->hcca, &ohci->hcca_dma, 0);
-	if (!ohci->hcca)
-		return -ENOMEM;
 
 	if(hcd->self.controller && hcd->self.controller->bus == &pci_bus_type) {
 		struct pci_dev *pdev = to_pci_dev(hcd->self.controller);
@@ -104,31 +97,14 @@ ohci_pci_start (struct usb_hcd *hcd)
 	
 	}
 
-        memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
-	if ((ret = ohci_mem_init (ohci)) < 0) {
+	/* NOTE: there may have already been a first reset, to
+	 * keep bios/smm irqs from making trouble
+	 */
+	if ((ret = ohci_run (ohci)) < 0) {
+		ohci_err (ohci, "can't start\n");
 		ohci_stop (hcd);
 		return ret;
 	}
-
-	/* NOTE: this is a second reset. the first one helps
-	 * keep bios/smm irqs from making trouble, but it was
-	 * probably more than 1msec ago...
-	 */
-	if (hc_reset (ohci) < 0) {
-		ohci_stop (hcd);
-		return -ENODEV;
-	}
-
-	if (hc_start (ohci) < 0) {
-		ohci_err (ohci, "can't start\n");
-		ohci_stop (hcd);
-		return -EBUSY;
-	}
-	create_debug_files (ohci);
-
-#ifdef	DEBUG
-	ohci_dump (ohci, 1);
-#endif
 	return 0;
 }
 

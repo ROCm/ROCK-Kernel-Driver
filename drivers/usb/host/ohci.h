@@ -42,7 +42,6 @@ struct ed {
 
 	/* create --> IDLE --> OPER --> ... --> IDLE --> destroy
 	 * usually:  OPER --> UNLINK --> (IDLE | OPER) --> ...
-	 * some special cases :  OPER --> IDLE ...
 	 */
 	u8			state;		/* ED_{IDLE,UNLINK,OPER} */
 #define ED_IDLE 	0x00		/* NOT linked to HC */
@@ -406,15 +405,14 @@ static inline void disable (struct ohci_hcd *ohci)
 }
 
 #define	FI			0x2edf		/* 12000 bits per frame (-1) */
-#define	FSMP(fi) 		((6 * ((fi) - 210)) / 7)
+#define	FSMP(fi) 		(0x7fff & ((6 * ((fi) - 210)) / 7))
 #define LSTHRESH		0x628		/* lowspeed bit threshold */
 
 static inline void periodic_reinit (struct ohci_hcd *ohci)
 {
 	u32	fi = ohci->fminterval & 0x0ffff;
-	writel (ohci->fminterval, &ohci->regs->fminterval);
+
 	writel (((9 * fi) / 10) & 0x3fff, &ohci->regs->periodicstart);
-	writel (LSTHRESH, &ohci->regs->lsthresh);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -438,6 +436,8 @@ static inline void periodic_reinit (struct ohci_hcd *ohci)
 #	define ohci_vdbg(ohci, fmt, args...) do { } while (0)
 #endif
 
+/*-------------------------------------------------------------------------*/
+
 #ifdef CONFIG_ARCH_LH7A404
 	/* Marc Singer: at the time this code was written, the LH7A404
 	 * had a problem reading the USB host registers.  This
@@ -457,3 +457,25 @@ static inline unsigned int ohci_readl (void* regs)
 	return readl (regs);
 }
 #endif
+
+/* AMD-756 (D2 rev) reports corrupt register contents in some cases.
+ * The erratum (#4) description is incorrect.  AMD's workaround waits
+ * till some bits (mostly reserved) are clear; ok for all revs.
+ */
+#define read_roothub(hc, register, mask) ({ \
+	u32 temp = ohci_readl (&hc->regs->roothub.register); \
+	if (temp == -1) \
+		disable (hc); \
+	else if (hc->flags & OHCI_QUIRK_AMD756) \
+		while (temp & mask) \
+			temp = ohci_readl (&hc->regs->roothub.register); \
+	temp; })
+
+static u32 roothub_a (struct ohci_hcd *hc)
+	{ return read_roothub (hc, a, 0xfc0fe000); }
+static inline u32 roothub_b (struct ohci_hcd *hc)
+	{ return ohci_readl (&hc->regs->roothub.b); }
+static inline u32 roothub_status (struct ohci_hcd *hc)
+	{ return ohci_readl (&hc->regs->roothub.status); }
+static u32 roothub_portstatus (struct ohci_hcd *hc, int i)
+	{ return read_roothub (hc, portstatus [i], 0xffe0fce0); }
