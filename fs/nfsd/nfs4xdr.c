@@ -231,6 +231,7 @@ xdr_error:					\
 	p += XDR_QUADLEN(nbytes);		\
 } while (0)
 
+/* READ_BUF, read_buf(): nbytes must be <= PAGE_SIZE */
 #define READ_BUF(nbytes)  do {			\
 	if (nbytes <= (u32)((char *)argp->end - (char *)argp->p)) {	\
 		p = argp->p;			\
@@ -244,15 +245,15 @@ xdr_error:					\
 u32 *read_buf(struct nfsd4_compoundargs *argp, int nbytes)
 {
 	/* We want more bytes than seem to be available.
-	 * Maybe we need a new page, may wehave just run out
+	 * Maybe we need a new page, maybe we have just run out
 	 */
 	int avail = (char*)argp->end - (char*)argp->p;
 	u32 *p;
 	if (avail + argp->pagelen < nbytes)
 		return NULL;
-	if (avail + PAGE_SIZE > nbytes) /* need more than a page !! */
+	if (avail + PAGE_SIZE < nbytes) /* need more than a page !! */
 		return NULL;
-	/* ok, we can do it with the tail plus the next page */
+	/* ok, we can do it with the current plus the next page */
 	if (nbytes <= sizeof(argp->tmp))
 		p = argp->tmp;
 	else {
