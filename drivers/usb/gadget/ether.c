@@ -1107,7 +1107,7 @@ eth_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	}
 
 	/* respond with data transfer before status phase? */
-	if (value > 0) {
+	if (value >= 0) {
 		req->length = value;
 		value = usb_ep_queue (gadget->ep0, req, GFP_ATOMIC);
 		if (value < 0) {
