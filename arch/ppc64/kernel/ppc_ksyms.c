@@ -78,9 +78,7 @@ EXPORT_SYMBOL(register_ioctl32_conversion);
 EXPORT_SYMBOL(unregister_ioctl32_conversion);
 
 EXPORT_SYMBOL(isa_io_base);
-EXPORT_SYMBOL(isa_mem_base);
 EXPORT_SYMBOL(pci_io_base);
-EXPORT_SYMBOL(pci_dram_offset);
 
 EXPORT_SYMBOL(find_next_zero_bit);
 
@@ -246,5 +244,7 @@ EXPORT_SYMBOL(debugger_fault_handler);
 
 EXPORT_SYMBOL(tb_ticks_per_usec);
 
+#ifdef CONFIG_PROFILING
 EXPORT_SYMBOL_GPL(register_profile_notifier);
 EXPORT_SYMBOL_GPL(unregister_profile_notifier);
+#endif

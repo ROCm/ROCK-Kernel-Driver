@@ -37,6 +37,10 @@ config COMPAT
 	bool
 	default y
 
+config FRAME_POINTER
+	bool
+	default y
+
 source "init/Kconfig"
 
 

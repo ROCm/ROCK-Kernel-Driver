@@ -1988,8 +1988,7 @@ interpret_isa_props(struct device_node *np, unsigned long mem_start,
 		adr = (struct address_range *) mem_start;
 		while ((l -= sizeof(struct reg_property)) >= 0) {
 			adr[i].space = rp[i].space;
-			adr[i].address = rp[i].address
-				+ (adr[i].space? 0: _ISA_MEM_BASE);
+			adr[i].address = rp[i].address;
 			adr[i].size = rp[i].size;
 			++i;
 		}

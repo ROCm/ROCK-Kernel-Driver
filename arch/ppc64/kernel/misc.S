@@ -508,7 +508,7 @@ _GLOBAL(kernel_thread)
 /* Why isn't this a) automatic, b) written in 'C'? */	
 	.balign 8
 _GLOBAL(sys_call_table32)
-	.llong .sys_ni_syscall		/* 0 - old setup syscall */
+	.llong .sys_restart_syscall	/* 0 */
 	.llong .sys_exit
 	.llong .sys_fork
 	.llong .sys_read
@@ -756,7 +756,7 @@ _GLOBAL(sys_call_table32)
 
 	.balign 8
 _GLOBAL(sys_call_table)
-	.llong .sys_ni_syscall		/* 0 - old setup syscall */
+	.llong .sys_restart_syscall	/* 0 */
 	.llong .sys_exit
 	.llong .sys_fork
 	.llong .sys_read

@@ -67,84 +67,6 @@ update_dn_pci_info(struct device_node *dn, void *data)
 	return NULL;
 }
 
-/*
- * Hit all the BARs of all the devices with values from OF.
- * This is unnecessary on most systems, but also harmless.
- */
-static void * __init
-write_OF_bars(struct device_node *dn, void *data)
-{
-	char *name = get_property(dn, "name", 0);
-	char *device_type = get_property(dn, "device_type", 0);
-	char devname[128];
-	sprintf(devname, "%04x:%02x.%x %s (%s)", dn->busno, PCI_SLOT(dn->devfn), PCI_FUNC(dn->devfn), name ? name : "<no name>", device_type ? device_type : "<unknown type>");
-
-	if (device_type && strcmp(device_type, "pci") == 0 &&
-	    get_property(dn, "class-code", 0) == 0)
-		return NULL;	/* This is probably a phb.  Skip it. */
-
-	if (dn->n_addrs == 0)
-		return NULL;	/* This is normal for some adapters or bridges */
-
-	if (dn->addrs == NULL) {
-		/* This shouldn't happen. */
-		printk(KERN_WARNING "write_OF_bars %s: device has %d BARs, but no addrs recorded\n", devname, dn->n_addrs);
-		return NULL;
-	}
-
-#ifndef CONFIG_PPC_ISERIES
-	int i;
-	u32 oldbar, newbar, newbartest;
-	u8 config_offset;
-
-	for (i = 0; i < dn->n_addrs; i++) {
-		newbar = dn->addrs[i].address;
-		config_offset = dn->addrs[i].space & 0xff;
-		if (ppc_md.pcibios_read_config(dn, config_offset, 4, &oldbar) != PCIBIOS_SUCCESSFUL) {
-			printk(KERN_WARNING "write_OF_bars %s: read BAR%d failed\n", devname, i);
-			continue;
-		}
-		/* Need to update this BAR. */
-		if (ppc_md.pcibios_write_config(dn, config_offset, 4, newbar) != PCIBIOS_SUCCESSFUL) {
-			printk(KERN_WARNING "write_OF_bars %s: write BAR%d with 0x%08x failed (old was 0x%08x)\n", devname, i, newbar, oldbar);
-			continue;
-		}
-		/* sanity check */
-		if (ppc_md.pcibios_read_config(dn, config_offset, 4, &newbartest) != PCIBIOS_SUCCESSFUL) {
-			printk(KERN_WARNING "write_OF_bars %s: sanity test read BAR%d failed?\n", devname, i);
-			continue;
-		}
-		if ((newbar & PCI_BASE_ADDRESS_MEM_MASK) != (newbartest & PCI_BASE_ADDRESS_MEM_MASK)) {
-			printk(KERN_WARNING "write_OF_bars %s: oops...BAR%d read back as 0x%08x%s!\n", devname, i, newbartest, (oldbar & PCI_BASE_ADDRESS_MEM_MASK) == (newbartest & PCI_BASE_ADDRESS_MEM_MASK) ? " (original value)" : "");
-			continue;
-		}
-	}
-#endif
-	return NULL; 
-}
-
-#if 0
-/* Traverse_func that starts the BIST (self test) */
-static void * __init
-startBIST(struct device_node *dn, void *data)
-{
-	struct pci_controller *phb = (struct pci_controller *)data;
-	u8 bist;
-
-	char *name = get_property(dn, "name", 0);
-	udbg_printf("startBIST: %s phb=%p, device=%p\n", name ? name : "<unknown>", phb, dn);
-
-	if (ppc_md.pcibios_read_config_byte(dn, PCI_BIST, &bist) == PCIBIOS_SUCCESSFUL) {
-		if (bist & PCI_BIST_CAPABLE) {
-			udbg_printf("  -> is BIST capable!\n", phb, dn);
-			/* Start bist here */
-		}
-	}
-	return NULL;
-}
-#endif
-
-
 /******************************************************************
  * Traverse a device tree stopping each PCI device in the tree.
  * This is done depth first.  As each node is processed, a "pre"
@@ -227,39 +149,6 @@ is_devfn_node(struct device_node *dn, void *data)
 	return (devfn == dn->devfn && busno == dn->busno) ? dn : NULL;
 }
 
-/* Same as is_devfn_node except ignore the "fn" part of the "devfn".
- */
-static void *
-is_devfn_sub_node(struct device_node *dn, void *data)
-{
-	int busno = ((unsigned long)data >> 8) & 0xff;
-	int devfn = ((unsigned long)data) & 0xf8;
-	return (devfn == (dn->devfn & 0xf8) && busno == dn->busno) ? dn : NULL;
-}
-
-/* Given an existing EADs (pci bridge) device node create a fake one
- * that will simulate function zero.  Make it a sibling of other_eads.
- */
-static struct device_node *
-create_eads_node(struct device_node *other_eads)
-{
-	struct device_node *eads = (struct device_node *)kmalloc(sizeof(struct device_node), GFP_KERNEL);
-
-	if (!eads) return NULL;	/* huh? */
-	*eads = *other_eads;
-	eads->devfn &= ~7;	/* make it function zero */
-	eads->tce_table = NULL;
-	/*
-	 * NOTE: share properties.  We could copy but for now this should
-	 * suffice.  The full_name is also incorrect...but seems harmless.
-	 */
-	eads->child = NULL;
-	eads->next = NULL;
-	other_eads->allnext = eads;
-	other_eads->sibling = eads;
-	return eads;
-}
-
 /* This is the "slow" path for looking up a device_node from a
  * pci_dev.  It will hunt for the device under it's parent's
  * phb and then update sysdata for a future fastpath.
@@ -285,43 +174,6 @@ struct device_node *fetch_dev_dn(struct pci_dev *dev)
 	if (dn) {
 		dev->sysdata = dn;
 		/* ToDo: call some device init hook here */
-	} else {
-		/* Now it is very possible that we can't find the device
-		 * because it is not the zero'th device of a mutifunction
-		 * device and we don't have permission to read the zero'th
-		 * device.  If this is the case, Linux would ordinarily skip
-		 * all the other functions.
-		 */
-		if ((searchval & 0x7) == 0) {
-			struct device_node *thisdevdn;
-			/* Ok, we are looking for fn == 0.  Let's check for other functions. */
-			thisdevdn = (struct device_node *)traverse_pci_devices(phb_dn, is_devfn_sub_node, NULL, (void *)searchval);
-			if (thisdevdn) {
-				/* Ah ha!  There does exist a sub function.
-				 * Now this isn't an exact match for
-				 * searchval, but in order to get Linux to
-				 * believe the sub functions exist we will
-				 * need to manufacture a fake device_node for
-				 * this zero'th function.  To keept this
-				 * simple for now we only handle pci bridges
-				 * and we just hand back the found node which
-				 * isn't correct, but Linux won't care.
-				 */
-				char *device_type = (char *)get_property(thisdevdn, "device_type", 0);
-				if (device_type && strcmp(device_type, "pci") == 0) {
-					return create_eads_node(thisdevdn);
-				}
-			}
-		}
-		/* ToDo: device not found...probe for it anyway with a fake dn?
-		struct device_node fake_dn;
-		memset(&fake_dn, 0, sizeof(fake_dn));
-		fake_dn.phb = phb;
-		fake_dn.busno = dev->bus->number;
-		fake_dn.devfn = dev->devfn;
-		... now do ppc_md.pcibios_read_config_dword(&fake_dn.....)
-		 ... if ok, alloc a real device_node and dn = real_dn;
-		 */
 	}
 	return dn;
 }
@@ -336,14 +188,6 @@ pci_devs_phb_init(void)
 {
 	/* This must be done first so the device nodes have valid pci info! */
 	traverse_all_pci_devices(update_dn_pci_info);
-
-	/* Hack for regatta which does not init the bars correctly */
-	traverse_all_pci_devices(write_OF_bars);
-#if 0
-	traverse_all_pci_devices(startBIST);
-	mdelay(5000);
-	traverse_all_pci_devices(checkBIST);
-#endif
 }
 
 

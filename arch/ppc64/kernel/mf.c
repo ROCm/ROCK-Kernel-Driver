@@ -410,7 +410,7 @@ static int shutdown( void )
 		mf_powerOff();
 	}
 	else
-		printk( KERN_ALERT "mf.c: init has been successfully notified to proceed with shutdown\n" );
+		printk( KERN_INFO "mf.c: init has been successfully notified to proceed with shutdown\n" );
 
 	return rc;
 }
@@ -436,7 +436,7 @@ static void intReceived( struct IoMFLpEvent * event )
 		case 0x5B:	/* power control notification */
 			if ( (event->xUnion.xCEMsgData.xCEMsg[5]&0x20) != 0 )
 			{
-				printk( KERN_ALERT "mf.c: Commencing partition shutdown\n" );
+				printk( KERN_INFO "mf.c: Commencing partition shutdown\n" );
 				if ( shutdown() == 0 )
 					signalCEMsg( "\x00\x00\x00\xDB\x00\x00\x00\x00\x00\x00\x00\x00", NULL );
 			}
@@ -479,7 +479,7 @@ static void intReceived( struct IoMFLpEvent * event )
 			signalEvent( NULL );
 		break;
 	case 1:	/* IT sys shutdown */
-		printk( KERN_ALERT "mf.c: Commencing system shutdown\n" );
+		printk( KERN_INFO "mf.c: Commencing system shutdown\n" );
 		shutdown();
 		break;
 	}
@@ -666,7 +666,7 @@ void mf_deallocateLpEvents( HvLpIndex targetLp,
  */
 void mf_powerOff( void )
 {
-	printk( KERN_ALERT "mf.c: Down it goes...\n" );
+	printk( KERN_INFO "mf.c: Down it goes...\n" );
 	signalCEMsg( "\x00\x00\x00\x4D\x00\x00\x00\x00\x00\x00\x00\x00", NULL );
 	for (;;);
 }
@@ -677,7 +677,7 @@ void mf_powerOff( void )
  */
 void mf_reboot( void )
 {
-	printk( KERN_ALERT "mf.c: Preparing to bounce...\n" );
+	printk( KERN_INFO "mf.c: Preparing to bounce...\n" );
 	signalCEMsg( "\x00\x00\x00\x4E\x00\x00\x00\x00\x00\x00\x00\x00", NULL );
 	for (;;);
 }

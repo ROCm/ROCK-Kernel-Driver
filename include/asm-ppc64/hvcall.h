@@ -57,6 +57,7 @@
 #define H_IPI			0x6c
 #define H_IPOLL			0x70
 #define H_XIRR			0x74
+#define H_PERFMON		0x7c
 
 #define HSC			".long 0x44000022\n"
 #define H_ENTER_r3		"li	3, 0x08\n"

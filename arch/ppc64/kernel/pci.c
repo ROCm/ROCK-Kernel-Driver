@@ -1,6 +1,6 @@
 /*
  * Port for PPC64 David Engebretsen, IBM Corp.
- *   Contains common pci routines for ppc64 platform, pSeries and iSeries brands. 
+ * Contains common pci routines for ppc64 platform, pSeries and iSeries brands.
  * 
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -31,7 +31,6 @@
 #include <asm/naca.h>
 #include <asm/pci_dma.h>
 #include <asm/machdep.h>
-#include <asm/eeh.h>
 
 #include "pci.h"
 
@@ -43,49 +42,20 @@
  */
 unsigned long isa_io_base     = 0;	/* NULL if no ISA bus */
 unsigned long pci_io_base     = 0;
-unsigned long isa_mem_base    = 0;
-unsigned long pci_dram_offset = 0;
 
-/******************************************************************
- * Forward declare of prototypes
- ******************************************************************/
 static void pcibios_fixup_resources(struct pci_dev* dev);
 static void fixup_broken_pcnet32(struct pci_dev* dev);
 static void fixup_windbond_82c105(struct pci_dev* dev);
-void        fixup_resources(struct pci_dev* dev);
+void fixup_resources(struct pci_dev* dev);
 
 void   iSeries_pcibios_init(void);
 void   pSeries_pcibios_init(void);
 
-int    pci_assign_all_busses = 0;
 struct pci_controller* hose_head;
 struct pci_controller** hose_tail = &hose_head;
 
-LIST_HEAD(iSeries_Global_Device_List);
-
-/*******************************************************************
- * Counters and control flags. 
- *******************************************************************/
-long   Pci_Io_Read_Count  = 0;
-long   Pci_Io_Write_Count = 0;
-long   Pci_Cfg_Read_Count = 0;
-long   Pci_Cfg_Write_Count= 0;
-long   Pci_Error_Count    = 0;
-
-int    Pci_Retry_Max      = 3;	/* Only retry 3 times  */	
-int    Pci_Error_Flag     = 1;	/* Set Retry Error on. */
-int    Pci_Trace_Flag     = 0;
-
-/******************************************************************
- * 
- ******************************************************************/
 int  global_phb_number    = 0;           /* Global phb counter    */
-int  Pci_Large_Bus_System = 0;
-int  Pci_Set_IOA_Address  = 0;
-int  Pci_Manage_Phb_Space = 0;
 struct pci_controller *phbtab[PCI_MAX_PHB];
-
-static int pci_bus_count;
 
 /* Cached ISA bridge dev. */
 struct pci_dev *ppc64_isabridge_dev = NULL;
@@ -120,6 +90,43 @@ static void fixup_windbond_82c105(struct pci_dev* dev)
 	pci_write_config_dword(dev, 0x40, reg | (1<<11));
 }
 
+
+/* Given an mmio phys address, find a pci device that implements
+ * this address.  This is of course expensive, but only used
+ * for device initialization or error paths.
+ * For io BARs it is assumed the pci_io_base has already been added
+ * into addr.
+ *
+ * Bridges are ignored although they could be used to optimize the search.
+ */
+struct pci_dev *pci_find_dev_by_addr(unsigned long addr)
+{
+	struct pci_dev *dev;
+	int i;
+	unsigned long ioaddr;
+
+	ioaddr = (addr > isa_io_base) ? addr - isa_io_base : 0;
+
+	pci_for_each_dev(dev) {
+		if ((dev->class >> 8) == PCI_BASE_CLASS_BRIDGE)
+			continue;
+		for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
+			unsigned long start = pci_resource_start(dev,i);
+			unsigned long end = pci_resource_end(dev,i);
+			unsigned int flags = pci_resource_flags(dev,i);
+			if (start == 0 || ~start == 0 ||
+			    end == 0 || ~end == 0)
+				continue;
+			if ((flags & IORESOURCE_IO) &&
+			    (ioaddr >= start && ioaddr <= end))
+				return dev;
+			else if ((flags & IORESOURCE_MEM) &&
+				 (addr >= start && addr <= end))
+				return dev;
+		}
+	}
+	return NULL;
+}
 
 void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
 					 struct pbus_set_ranges_data *pranges)
@@ -402,10 +409,9 @@ pcibios_init(void)
 		bus = pci_scan_bus(hose->first_busno, hose->ops, hose->arch_data);
 		hose->bus = bus;
 		hose->last_busno = bus->subordinate;
-		if (pci_assign_all_busses || next_busno <= hose->last_busno)
+		if (next_busno <= hose->last_busno)
 			next_busno = hose->last_busno+1;
 	}
-	pci_bus_count = next_busno;
 
 	/* Call machine dependant fixup */
 	if (ppc_md.pcibios_fixup) {
@@ -419,6 +425,9 @@ pcibios_init(void)
 	pcibios_assign_resources();
 
 #ifndef CONFIG_PPC_ISERIES
+	void chrp_request_regions(void);
+	chrp_request_regions();
+
 	pci_fix_bus_sysdata();
 
 	create_tce_tables();
@@ -438,18 +447,6 @@ pcibios_init(void)
 }
 
 subsys_initcall(pcibios_init);
-
-int __init
-pcibios_assign_all_busses(void)
-{
-	return pci_assign_all_busses;
-}
-
-unsigned long resource_fixup(struct pci_dev * dev, struct resource * res,
-			     unsigned long start, unsigned long size)
-{
-	return start;
-}
 
 void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
@@ -486,21 +483,15 @@ void __init pcibios_fixup_bus(struct pci_bus *bus)
 				/* Transparent resource -- don't try to "fix" it. */
 				continue;
 			}
-			if (is_eeh_implemented()) {
-				if (res->flags & (IORESOURCE_IO|IORESOURCE_MEM)) {
-					res->start = eeh_token(phb->global_number, bus->number, 0, 0);
-					res->end = eeh_token(phb->global_number, bus->number, 0xff, 0xffffffff);
-				}
-			} else {
-				if (res->flags & IORESOURCE_IO) {
-					res->start += (unsigned long)phb->io_base_virt;
-					res->end += (unsigned long)phb->io_base_virt;
-				} else if (phb->pci_mem_offset
-					   && (res->flags & IORESOURCE_MEM)) {
-					if (res->start < phb->pci_mem_offset) {
-						res->start += phb->pci_mem_offset;
-						res->end += phb->pci_mem_offset;
-					}
+			if (res->flags & IORESOURCE_IO) {
+				unsigned long offset = (unsigned long)phb->io_base_virt - pci_io_base;
+				res->start += offset;
+				res->end += offset;
+			} else if (phb->pci_mem_offset
+				   && (res->flags & IORESOURCE_MEM)) {
+				if (res->start < phb->pci_mem_offset) {
+					res->start += phb->pci_mem_offset;
+					res->end += phb->pci_mem_offset;
 				}
 			}
 		}
@@ -549,50 +540,6 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
 	return 0;
-}
-
-struct pci_controller*
-pci_bus_to_hose(int bus)
-{
-	struct pci_controller* hose = hose_head;
-
-	for (; hose; hose = hose->next)
-		if (bus >= hose->first_busno && bus <= hose->last_busno)
-			return hose;
-	return NULL;
-}
-
-void*
-pci_bus_io_base(unsigned int bus)
-{
-	struct pci_controller *hose;
-
-	hose = pci_bus_to_hose(bus);
-	if (!hose)
-		return NULL;
-	return hose->io_base_virt;
-}
-
-unsigned long
-pci_bus_io_base_phys(unsigned int bus)
-{
-	struct pci_controller *hose;
-
-	hose = pci_bus_to_hose(bus);
-	if (!hose)
-		return 0;
-	return hose->io_base_phys;
-}
-
-unsigned long
-pci_bus_mem_base_phys(unsigned int bus)
-{
-	struct pci_controller *hose;
-
-	hose = pci_bus_to_hose(bus);
-	if (!hose)
-		return 0;
-	return hose->pci_mem_offset;
 }
 
 /*
@@ -730,123 +677,6 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 			       vma->vm_end - vma->vm_start, vma->vm_page_prot);
 
 	return ret;
-}
-
-/************************************************************************/
-/* Formats the device information and location for service.             */
-/* - Pass in pci_dev* pointer to the device.                            */
-/* - Pass in buffer to place the data.  Danger here is the buffer must  */
-/*   be as big as the client says it is.   Should be at least 128 bytes.*/
-/* Return will the length of the string data put in the buffer.         */
-/* The brand specific method device_Location is called.                 */
-/* Format:                                                              */
-/* PCI: Bus  0, Device 26, Vendor 0x12AE  Frame  1, Card  C10  Ethernet */
-/* PCI: Bus  0, Device 26, Vendor 0x12AE  Location U0.3-P1-I8  Ethernet */
-/* For pSeries, see the Product Topology in the RS/6000 Architecture.   */
-/* For iSeries, see the Service Manuals.                                */
-/************************************************************************/
-int  format_device_location(struct pci_dev* PciDev,char* BufPtr, int BufferSize)
-{
-	struct device_node* DevNode = (struct device_node*)PciDev->sysdata;
-	int  LineLen = 0;
-	if (DevNode != NULL && BufferSize >= 128) {
-		LineLen += device_Location(PciDev,BufPtr+LineLen);
-		LineLen += sprintf(BufPtr+LineLen," %12s",pci_class_name(PciDev->class >> 8) );
-	}
-	return LineLen;
-}
-/************************************************************************
- * Saves the config registers for a device.                             *
- ************************************************************************
- * Note: This does byte reads so the data may appear byte swapped,      *
- * The data returned in the pci_config_reg_save_area structure can be   *
- * used to the restore of the data.  If the save failed, the data       *
- * will not be restore.  Yes I know, you are most likey toast.          *
- ************************************************************************/
-int pci_save_config_regs(struct pci_dev* PciDev,struct pci_config_reg_save_area* SaveArea)
-{
-	memset(SaveArea,0x00,sizeof(struct pci_config_reg_save_area) );
-	SaveArea->PciDev    = PciDev;
-	SaveArea->RCode     = 0;
-	SaveArea->Register  = 0;
-	/******************************************************************
-	 * Save All the Regs,  NOTE: restore skips the first 16 bytes.    *
-	 ******************************************************************/
-	while (SaveArea->Register < REG_SAVE_SIZE && SaveArea->RCode == 0) {
-		SaveArea->RCode = pci_read_config_byte(PciDev, SaveArea->Register, &SaveArea->Regs[SaveArea->Register]);
-		++SaveArea->Register;
-	}
-	if (SaveArea->RCode != 0) { 	/* Ouch */
-		SaveArea->Flags = 0x80;	
-		printk("PCI: pci_restore_save_regs failed! %p\n 0x%04X",PciDev,SaveArea->RCode);
-	}
-	else {
-		SaveArea->Flags = 0x01;
-	}
-	return  SaveArea->RCode;
-}
-
-/************************************************************************
- * Restores the registers saved via the save function.  See the save    *
- * function for details.                                                *
- ************************************************************************/
-int pci_restore_config_regs(struct pci_dev* PciDev,struct pci_config_reg_save_area* SaveArea)
-{
- 	if (SaveArea->PciDev != PciDev || SaveArea->Flags == 0x80 || SaveArea->RCode != 0) {
-		printk("PCI: pci_restore_config_regs failed! %p\n",PciDev);
-		return -1;
-	}
-	/******************************************************************
-	 * Don't touch the Cmd or BIST regs, user must restore those.     *
-	 * Restore PCI_VENDOR_ID & PCI_DEVICE_ID                          *
-	 * Restore PCI_CACHE_LINE_SIZE & PCI_LATENCY_TIMER                *
-	 * Restore Saved Regs from 0x10 to 0x3F                           * 
-	 ******************************************************************/
-	SaveArea->Register = 0;
-	while(SaveArea->Register < REG_SAVE_SIZE && SaveArea->RCode == 0) {
-		SaveArea->RCode = pci_write_config_byte(PciDev,SaveArea->Register,SaveArea->Regs[SaveArea->Register]);
-		++SaveArea->Register;
-		if (     SaveArea->Register == PCI_COMMAND)     SaveArea->Register = PCI_CACHE_LINE_SIZE;
-		else if (SaveArea->Register == PCI_HEADER_TYPE) SaveArea->Register = PCI_BASE_ADDRESS_0;
-	}
-	if (SaveArea->RCode != 0) {
-		printk("PCI: pci_restore_config_regs failed! %p\n 0x%04X",PciDev,SaveArea->RCode);
-	}
-	return  SaveArea->RCode;
-}
-
-/************************************************************************/
-/* Interface to toggle the reset line                                   */
-/* Time is in .1 seconds, need for seconds.                             */
-/************************************************************************/
-int  pci_reset_device(struct pci_dev* PciDev, int AssertTime, int DelayTime)
-{
-	unsigned long AssertDelay, WaitDelay;
-	int RtnCode;
-	/********************************************************************
-	 * Set defaults, Assert is .5 second, Wait is 3 seconds.
-	 ********************************************************************/
-	if (AssertTime == 0) AssertDelay = ( 5 * HZ)/10;
-	else                 AssertDelay = (AssertTime*HZ)/10;
-	if (WaitDelay == 0)  WaitDelay   = (30 * HZ)/10;
-	else                 WaitDelay   = (DelayTime* HZ)/10;
-
-	/********************************************************************
-	 * Assert reset, wait, de-assert reset, wait for IOA to reset.
-	 * - Don't waste the CPU time on jiffies.
-	 ********************************************************************/
-	RtnCode = pci_set_reset(PciDev,1);
-	if (RtnCode == 0) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(AssertDelay);   /* Sleep for the time     */
-		RtnCode = pci_set_reset(PciDev,0);
-		set_current_state(TASK_UNINTERRUPTIBLE);  
-		schedule_timeout(WaitDelay);
-	}
-	if (RtnCode != 0) {
-		printk("PCI: Bus%3d, Device%3d, Reset Failed:0x%04X\n",PciDev->bus->number,PCI_SLOT(PciDev->devfn),RtnCode );
-	}
-	return RtnCode;
 }
 
 /*****************************************************

@@ -393,7 +393,7 @@ int hash_page(unsigned long ea, unsigned long access, unsigned long trap)
 		mm = &init_mm;
 		vsid = get_kernel_vsid(ea);
 		break;
-	case IO_UNMAPPED_REGION_ID:
+	case EEH_REGION_ID:
 		/*
 		 * Should only be hit if there is an access to MMIO space
 		 * which is protected by EEH.
