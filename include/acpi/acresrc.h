@@ -66,6 +66,12 @@ acpi_rs_get_prs_method_data (
 	struct acpi_buffer              *ret_buffer);
 
 acpi_status
+acpi_rs_get_method_data (
+	acpi_handle                     handle,
+	char                            *path,
+	struct acpi_buffer              *ret_buffer);
+
+acpi_status
 acpi_rs_set_srs_method_data (
 	acpi_handle                     handle,
 	struct acpi_buffer              *ret_buffer);

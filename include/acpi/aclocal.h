@@ -308,25 +308,28 @@ struct acpi_create_field_info
  *
  ****************************************************************************/
 
-/* Information about each GPE register block */
+/* Information about each particular GPE level */
 
-struct acpi_gpe_block_info
+struct acpi_gpe_event_info
 {
-	struct acpi_generic_address     *block_address;
-	u16                             register_count;
-	u8                              block_base_number;
+	struct acpi_namespace_node              *method_node;   /* Method node for this GPE level */
+	acpi_gpe_handler                        handler;        /* Address of handler, if any */
+	void                                    *context;       /* Context to be passed to handler */
+	struct acpi_gpe_register_info           *register_info;
+	u8                                      type;           /* Level or Edge */
+	u8                                      bit_mask;
 };
 
 /* Information about a particular GPE register pair */
 
 struct acpi_gpe_register_info
 {
-	struct acpi_generic_address     status_address; /* Address of status reg */
-	struct acpi_generic_address     enable_address; /* Address of enable reg */
-	u8                              status;         /* Current value of status reg */
-	u8                              enable;         /* Current value of enable reg */
-	u8                              wake_enable;    /* Mask of bits to keep enabled when sleeping */
-	u8                              base_gpe_number; /* Base GPE number for this register */
+	struct acpi_generic_address             status_address; /* Address of status reg */
+	struct acpi_generic_address             enable_address; /* Address of enable reg */
+	u8                                      status;         /* Current value of status reg */
+	u8                                      enable;         /* Current value of enable reg */
+	u8                                      wake_enable;    /* Mask of bits to keep enabled when sleeping */
+	u8                                      base_gpe_number; /* Base GPE number for this register */
 };
 
 
@@ -334,22 +337,20 @@ struct acpi_gpe_register_info
 #define ACPI_GPE_EDGE_TRIGGERED         2
 
 
-/* Information about each particular GPE level */
+/* Information about each GPE register block */
 
-struct acpi_gpe_number_info
+struct acpi_gpe_block_info
 {
-	struct acpi_namespace_node      *method_node;   /* Method node for this GPE level */
-	acpi_gpe_handler                handler;        /* Address of handler, if any */
-	void                            *context;       /* Context to be passed to handler */
-	u8                              type;           /* Level or Edge */
-	u8                              bit_mask;
+	struct acpi_gpe_block_info              *previous;
+	struct acpi_gpe_block_info              *next;
+	struct acpi_gpe_block_info              *next_on_interrupt;
+	struct acpi_gpe_register_info           *register_info;
+	struct acpi_gpe_event_info              *event_info;
+	struct acpi_generic_address             block_address;
+	u32                                     register_count;
+	u8                                      block_base_number;
 };
 
-
-struct acpi_gpe_index_info
-{
-	u8                              number_index;
-};
 
 /* Information about each particular fixed event */
 

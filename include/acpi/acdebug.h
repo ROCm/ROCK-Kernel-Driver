@@ -177,6 +177,9 @@ acpi_db_display_resources (
 	char                            *object_arg);
 
 void
+acpi_db_display_gpes (void);
+
+void
 acpi_db_check_integrity (
 	void);
 

@@ -645,11 +645,11 @@ acpi_ut_copy_simple_object (
 
 		/*
 		 * Allocate and copy the actual buffer if and only if:
-		 * 1) There is a valid buffer (length > 0)
+		 * 1) There is a valid buffer pointer
 		 * 2) The buffer is not static (not in an ACPI table) (in this case,
 		 *    the actual pointer was already copied above)
 		 */
-		if ((source_desc->buffer.length) &&
+		if ((source_desc->buffer.pointer) &&
 			(!(source_desc->common.flags & AOPOBJ_STATIC_POINTER))) {
 			dest_desc->buffer.pointer = ACPI_MEM_ALLOCATE (source_desc->buffer.length);
 			if (!dest_desc->buffer.pointer) {
@@ -665,11 +665,11 @@ acpi_ut_copy_simple_object (
 
 		/*
 		 * Allocate and copy the actual string if and only if:
-		 * 1) There is a valid string (length > 0)
+		 * 1) There is a valid string pointer
 		 * 2) The string is not static (not in an ACPI table) (in this case,
 		 *    the actual pointer was already copied above)
 		 */
-		if ((source_desc->string.length) &&
+		if ((source_desc->string.pointer) &&
 			(!(source_desc->common.flags & AOPOBJ_STATIC_POINTER))) {
 			dest_desc->string.pointer = ACPI_MEM_ALLOCATE ((acpi_size) source_desc->string.length + 1);
 			if (!dest_desc->string.pointer) {
