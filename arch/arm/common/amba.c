@@ -50,7 +50,7 @@ static int amba_hotplug(struct device *dev, char **envp, int nr_env, char *buf, 
 	if (nr_env < 2)
 		return -ENOMEM;
 
-	snprintf(buf, bufsz, "AMBA_ID=%08lx", pcdev->periphid);
+	snprintf(buf, bufsz, "AMBA_ID=%08x", pcdev->periphid);
 	*envp++ = buf;
 	*envp++ = NULL;
 	return 0;

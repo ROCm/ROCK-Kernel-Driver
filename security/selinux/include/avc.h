@@ -11,6 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/kdev_t.h>
 #include <linux/spinlock.h>
+#include <linux/init.h>
 #include <asm/system.h>
 #include "flask.h"
 #include "av_permissions.h"
@@ -121,7 +122,7 @@ void avc_dump_cache(char *tag);
  * AVC operations
  */
 
-void avc_init(void);
+void __init avc_init(void);
 
 int avc_lookup(u32 ssid, u32 tsid, u16 tclass,
                u32 requested, struct avc_entry_ref *aeref);

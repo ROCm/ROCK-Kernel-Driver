@@ -234,7 +234,7 @@ typedef struct {
 /* these common regs are cleared before mode setting so they do not
  * interfere with anything
  */
-reg_val common_regs[] = {
+static reg_val common_regs[] = {
 	{ OVR_CLR, 0 },	
 	{ OVR_WID_LEFT_RIGHT, 0 },
 	{ OVR_WID_TOP_BOTTOM, 0 },
@@ -246,7 +246,7 @@ reg_val common_regs[] = {
 	{ CAP0_TRIG_CNTL, 0 },
 };
 
-reg_val common_regs_m6[] = {
+static reg_val common_regs_m6[] = {
 	{ OVR_CLR,      0 },
 	{ OVR_WID_LEFT_RIGHT,   0 },
 	{ OVR_WID_TOP_BOTTOM,   0 },
@@ -3134,19 +3134,19 @@ static struct pci_driver radeonfb_driver = {
 };
 
 
-int __init radeonfb_init (void)
+int __init radeonfb_old_init (void)
 {
 	return pci_module_init (&radeonfb_driver);
 }
 
 
-void __exit radeonfb_exit (void)
+void __exit radeonfb_old_exit (void)
 {
 	pci_unregister_driver (&radeonfb_driver);
 }
 
 
-int __init radeonfb_setup (char *options)
+int __init radeonfb_old_setup (char *options)
 {
         char *this_opt;
 
@@ -3174,8 +3174,8 @@ int __init radeonfb_setup (char *options)
 }
 
 #ifdef MODULE
-module_init(radeonfb_init);
-module_exit(radeonfb_exit);
+module_init(radeonfb_old_init);
+module_exit(radeonfb_old_exit);
 #endif
 
 

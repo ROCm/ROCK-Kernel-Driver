@@ -346,6 +346,9 @@ void cfb_copyarea(struct fb_info *p, const struct fb_copyarea *area)
 	int dst_idx = 0, src_idx = 0, rev_copy = 0;
 	unsigned long *dst = NULL, *src = NULL;
 
+	if (p->state != FBINFO_STATE_RUNNING)
+		return;
+
 	/* We want rotation but lack hardware to do it for us. */
 	if (!p->fbops->fb_rotate && p->var.rotate) {
 	}	

@@ -413,8 +413,8 @@ static int config_drive_for_dma (ide_drive_t *drive)
 
 	if ((id->capability & 1) && hwif->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (hwif->ide_dma_bad_drive(drive))
-			return hwif->ide_dma_off(drive);
+		if (__ide_dma_bad_drive(drive))
+			return __ide_dma_off(drive);
 
 		/*
 		 * Enable DMA on any drive that has
@@ -432,7 +432,7 @@ static int config_drive_for_dma (ide_drive_t *drive)
 				return hwif->ide_dma_on(drive);
 
 		/* Consult the list of known "good" drives */
-		if (hwif->ide_dma_good_drive(drive))
+		if (__ide_dma_good_drive(drive))
 			return hwif->ide_dma_on(drive);
 	}
 //	if (hwif->tuneproc != NULL) hwif->tuneproc(drive, 255);
@@ -520,13 +520,14 @@ int __ide_dma_off_quietly (ide_drive_t *drive)
 }
 
 EXPORT_SYMBOL(__ide_dma_off_quietly);
+#endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
 
 /**
- *	__ide_dma_host_off	-	Generic DMA kill
- *	@drive: drive to control
+ *	__ide_dma_off	-	disable DMA on a device
+ *	@drive: drive to disable DMA on
  *
- *	Turn off the current DMA on this IDE controller. Inform the
- *	user that DMA has been disabled. 
+ *	Disable IDE DMA for a device on this IDE controller.
+ *	Inform the user that DMA has been disabled.
  */
 
 int __ide_dma_off (ide_drive_t *drive)
@@ -537,6 +538,7 @@ int __ide_dma_off (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_off);
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 /**
  *	__ide_dma_host_on	-	Enable DMA on a host
  *	@drive: drive to enable for DMA
@@ -662,7 +664,7 @@ int __ide_dma_read (ide_drive_t *drive /*, struct request *rq */)
 
 	/* issue cmd to drive */
 	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
-	return HWIF(drive)->ide_dma_count(drive);
+	return hwif->ide_dma_begin(drive);
 }
 
 EXPORT_SYMBOL(__ide_dma_read);
@@ -694,7 +696,7 @@ int __ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 	/* issue cmd to drive */
 	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
 
-	return HWIF(drive)->ide_dma_count(drive);
+	return hwif->ide_dma_begin(drive);
 }
 
 EXPORT_SYMBOL(__ide_dma_write);
@@ -791,17 +793,6 @@ int __ide_dma_good_drive (ide_drive_t *drive)
 EXPORT_SYMBOL(__ide_dma_good_drive);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PCI
-/*
- * Used for HOST FIFO counters for VDMA
- * PIO over DMA, effective ATA-Bridge operator.
- */
-int __ide_dma_count (ide_drive_t *drive)
-{
-	return HWIF(drive)->ide_dma_begin(drive);
-}
-
-EXPORT_SYMBOL(__ide_dma_count);
-
 int __ide_dma_verbose (ide_drive_t *drive)
 {
 	struct hd_driveid *id	= drive->id;
@@ -1060,8 +1051,6 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 	if (!(hwif->dma_prdtable))
 		hwif->dma_prdtable	= (hwif->dma_base + 4);
 
-	if (!hwif->ide_dma_off)
-		hwif->ide_dma_off = &__ide_dma_off;
 	if (!hwif->ide_dma_off_quietly)
 		hwif->ide_dma_off_quietly = &__ide_dma_off_quietly;
 	if (!hwif->ide_dma_host_off)
@@ -1076,18 +1065,12 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->ide_dma_read = &__ide_dma_read;
 	if (!hwif->ide_dma_write)
 		hwif->ide_dma_write = &__ide_dma_write;
-	if (!hwif->ide_dma_count)
-		hwif->ide_dma_count = &__ide_dma_count;
 	if (!hwif->ide_dma_begin)
 		hwif->ide_dma_begin = &__ide_dma_begin;
 	if (!hwif->ide_dma_end)
 		hwif->ide_dma_end = &__ide_dma_end;
 	if (!hwif->ide_dma_test_irq)
 		hwif->ide_dma_test_irq = &__ide_dma_test_irq;
-	if (!hwif->ide_dma_bad_drive)
-		hwif->ide_dma_bad_drive = &__ide_dma_bad_drive;
-	if (!hwif->ide_dma_good_drive)
-		hwif->ide_dma_good_drive = &__ide_dma_good_drive;
 	if (!hwif->ide_dma_verbose)
 		hwif->ide_dma_verbose = &__ide_dma_verbose;
 	if (!hwif->ide_dma_timeout)

@@ -243,7 +243,8 @@ int radeon_probe_i2c_connector(struct radeonfb_info *rinfo, int conn, u8 **out_e
 		return MT_NONE;
 	}
 	if (edid[0x14] & 0x80) {
-		if (rinfo->is_mobility && conn == ddc_dvi &&
+		/* Fix detection using BIOS tables */
+		if (rinfo->is_mobility /*&& conn == ddc_dvi*/ &&
 		    (INREG(LVDS_GEN_CNTL) & LVDS_ON)) {
 			RTRACE("radeonfb: I2C (port %d) ... found LVDS panel\n", conn);
 			return MT_LCD;
