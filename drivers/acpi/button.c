@@ -29,6 +29,7 @@
 #include <linux/types.h>
 #include <linux/compatmac.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -69,6 +70,7 @@ MODULE_LICENSE("GPL");
 
 int acpi_button_add (struct acpi_device *device);
 int acpi_button_remove (struct acpi_device *device, int type);
+static int acpi_button_open_fs(struct inode *inode, struct file *file);
 
 static struct acpi_driver acpi_button_driver = {
 	.name =		ACPI_BUTTON_DRIVER_NAME,
@@ -87,6 +89,12 @@ struct acpi_button {
 	unsigned long		pushed;
 };
 
+static struct file_operations acpi_button_fops = {
+	.open		= acpi_button_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 /* --------------------------------------------------------------------------
                               FS Interface (/proc)
@@ -94,39 +102,26 @@ struct acpi_button {
 
 static struct proc_dir_entry	*acpi_button_dir = NULL;
 
-static int
-acpi_button_read_info (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_button_seq_show(struct seq_file *seq, void *offset)
 {
-	struct acpi_button	*button = (struct acpi_button *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_button	*button = (struct acpi_button *) seq->private;
 
-	ACPI_FUNCTION_TRACE("acpi_button_read_info");
+	ACPI_FUNCTION_TRACE("acpi_button_seq_show");
 
 	if (!button || !button->device)
-		goto end;
+		return 0;
 
-	p += sprintf(p, "type:                    %s\n", 
+	seq_printf(seq, "type:                    %s\n", 
 		acpi_device_name(button->device));
 
-end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-
-	return_VALUE(len);
+	return 0;
 }
 
-
+static int acpi_button_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_button_seq_show, PDE(inode)->data);
+}
+	
 static int
 acpi_button_add_fs (
 	struct acpi_device	*device)
@@ -176,7 +171,7 @@ acpi_button_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_BUTTON_FILE_INFO));
 	else {
-		entry->read_proc = acpi_button_read_info;
+		entry->proc_fops = &acpi_button_fops;
 		entry->data = acpi_driver_data(device);
 	}
 
