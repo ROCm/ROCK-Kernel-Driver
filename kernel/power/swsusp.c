@@ -104,14 +104,14 @@ static int pagedir_order __nosavedata = 0;
 
 #define SWSUSP_SIG	"S1SUSPEND"
 
-struct swsusp_header {
+static struct swsusp_header {
 	char reserved[PAGE_SIZE - 20 - sizeof(swp_entry_t)];
 	swp_entry_t swsusp_info;
 	char	orig_sig[10];
 	char	sig[10];
 } __attribute__((packed, aligned(PAGE_SIZE))) swsusp_header;
 
-struct swsusp_info swsusp_info;
+static struct swsusp_info swsusp_info;
 
 /*
  * XXX: We try to keep some more pages free so that I/O operations succeed
@@ -174,7 +174,7 @@ static int is_resume_device(const struct swap_info_struct *swap_info)
 		resume_device == MKDEV(imajor(inode), iminor(inode));
 }
 
-int swsusp_swap_check(void) /* This is called before saving image */
+static int swsusp_swap_check(void) /* This is called before saving image */
 {
 	int i, len;
 	
