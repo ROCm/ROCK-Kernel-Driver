@@ -704,21 +704,20 @@ static void free_slots (void)
 	debug ("%s -- exit\n", __FUNCTION__);
 }
 
-static int ibm_unconfigure_device (struct pci_func *func)
+static void ibm_unconfigure_device(struct pci_func *func)
 {
 	struct pci_dev *temp;
 	u8 j;
 
-	debug ("inside %s\n", __FUNCTION__);
-	debug ("func->device = %x, func->function = %x\n", func->device, func->function);
-	debug ("func->device << 3 | 0x0  = %x\n", func->device << 3 | 0x0);
+	debug("inside %s\n", __FUNCTION__);
+	debug("func->device = %x, func->function = %x\n", func->device, func->function);
+	debug("func->device << 3 | 0x0  = %x\n", func->device << 3 | 0x0);
 
 	for (j = 0; j < 0x08; j++) {
-		temp = pci_find_slot (func->busno, (func->device << 3) | j);
+		temp = pci_find_slot(func->busno, (func->device << 3) | j);
 		if (temp)
 			pci_remove_bus_device(temp);
 	}
-	return 0;
 }
 
 /*
@@ -1192,12 +1191,7 @@ int ibmphp_do_disable_slot (struct slot *slot_cur)
 		slot_cur->func->device = slot_cur->device;
 	}
 
-	if ((rc = ibm_unconfigure_device (slot_cur->func))) {
-		err ("removing from kernel failed... \n");
-		err ("Please check to see if it was statically linked or is "
-		     "in use otherwise. (perhaps the driver is not 'hot-removable')\n");
-		goto error;
-	}
+	ibm_unconfigure_device(slot_cur->func);
         
 	/* If we got here from latch suddenly opening on operating card or 
 	a power fault, there's no power to the card, so cannot
