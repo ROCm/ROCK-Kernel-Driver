@@ -123,8 +123,8 @@ cifs_open(struct inode *inode, struct file *file)
 				 to problems creating new read-only files */
 				if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
 					CIFSSMBUnixSetPerms(xid, pTcon, full_path, inode->i_mode,
-						0xFFFFFFFFFFFFFFFF,  
-						0xFFFFFFFFFFFFFFFF,
+						(__u64)-1, 
+						(__u64)-1,
 						cifs_sb->local_nls);
 				else {/* BB implement via Windows security descriptors */
 			/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
@@ -351,8 +351,8 @@ cifs_write(struct file * file, const char *write_data,
 	   size_t write_size, loff_t * poffset)
 {
 	int rc = 0;
-	int bytes_written = 0;
-	int total_written;
+	unsigned int bytes_written = 0;
+	unsigned int total_written;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	int xid, long_op;
@@ -633,9 +633,9 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 	  loff_t * poffset)
 {
 	int rc = -EACCES;
-	int bytes_read = 0;
-	int total_read;
-	int current_read_size;
+	unsigned int bytes_read = 0;
+	unsigned int total_read;
+	unsigned int current_read_size;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	int xid;
@@ -742,13 +742,13 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		struct list_head *page_list, unsigned num_pages)
 {
 	int rc = -EACCES;
-	int xid,i;
+	int xid;
 	loff_t offset;
 	struct page * page;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	int bytes_read = 0;
-	unsigned int read_size;
+	unsigned int read_size,i;
 	char * smb_read_data = 0;
 	struct smb_com_read_rsp * pSMBr;
 	struct pagevec lru_pvec;
@@ -1099,10 +1099,10 @@ int
 cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 {
 	int rc = 0;
-	int xid, i;
+	int xid;
 	int Unicode = FALSE;
 	int UnixSearch = FALSE;
-	unsigned int bufsize;
+	unsigned int bufsize, i;
 	__u16 searchHandle;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;

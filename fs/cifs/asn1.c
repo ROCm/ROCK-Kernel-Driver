@@ -432,7 +432,7 @@ static int
 compare_oid(unsigned long *oid1, unsigned int oid1len,
 	    unsigned long *oid2, unsigned int oid2len)
 {
-	int i;
+	unsigned int i;
 
 	if (oid1len != oid2len)
 		return 0;

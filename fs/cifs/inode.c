@@ -395,8 +395,8 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 		direntry->d_inode->i_nlink = 2;
 		if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)                
 			CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
-				0xFFFFFFFFFFFFFFFF,  
-				0xFFFFFFFFFFFFFFFF,
+				(__u64)-1,  
+				(__u64)-1,
 				cifs_sb->local_nls);
 		else { /* BB to be implemented via Windows secrty descriptors*/
 		/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
