@@ -118,7 +118,6 @@ typedef struct dev_link_t {
     dev_node_t		*dev;
     u_int		state, open;
     wait_queue_head_t	pending;
-    struct timer_list	release;
     client_handle_t	handle;
     io_req_t		io;
     irq_req_t		irq;

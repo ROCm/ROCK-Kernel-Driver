@@ -362,7 +362,7 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 	int i, len;
 	extern unsigned long total_forks;
 	u64 jif;
-	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0;
+	unsigned int sum = 0, user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0;
 	struct timeval now; 
 	unsigned long seq;
 
@@ -388,25 +388,31 @@ static int kstat_read_proc(char *page, char **start, off_t off,
 		system += kstat_cpu(i).cpustat.system;
 		idle += kstat_cpu(i).cpustat.idle;
 		iowait += kstat_cpu(i).cpustat.iowait;
+		irq += kstat_cpu(i).cpustat.irq;
+		softirq += kstat_cpu(i).cpustat.softirq;
 		for (j = 0 ; j < NR_IRQS ; j++)
 			sum += kstat_cpu(i).irqs[j];
 	}
 
-	len = sprintf(page, "cpu  %u %u %u %u %u\n",
+	len = sprintf(page, "cpu  %u %u %u %u %u %u %u\n",
 		jiffies_to_clock_t(user),
 		jiffies_to_clock_t(nice),
 		jiffies_to_clock_t(system),
 		jiffies_to_clock_t(idle),
-		jiffies_to_clock_t(iowait));
+		jiffies_to_clock_t(iowait),
+		jiffies_to_clock_t(irq),
+		jiffies_to_clock_t(softirq));
 	for (i = 0 ; i < NR_CPUS; i++){
 		if (!cpu_online(i)) continue;
-		len += sprintf(page + len, "cpu%d %u %u %u %u %u\n",
+		len += sprintf(page + len, "cpu%d %u %u %u %u %u %u %u\n",
 			i,
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.user),
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.nice),
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.system),
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.idle),
-			jiffies_to_clock_t(kstat_cpu(i).cpustat.iowait));
+			jiffies_to_clock_t(kstat_cpu(i).cpustat.iowait),
+			jiffies_to_clock_t(kstat_cpu(i).cpustat.irq),
+			jiffies_to_clock_t(kstat_cpu(i).cpustat.softirq));
 	}
 	len += sprintf(page + len, "intr %u", sum);
 

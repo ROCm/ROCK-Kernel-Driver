@@ -291,7 +291,7 @@ NCR_Q720_probe(struct device *dev)
 	}
 
 	mca_device_set_claim(mca_dev, 1);
-	strlcpy(dev->name, "NCR_Q720", sizeof(dev->name));
+	mca_device_set_name(mca_dev, "NCR_Q720");
 	dev_set_drvdata(dev, p);
 
 	return 0;

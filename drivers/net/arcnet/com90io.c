@@ -158,14 +158,14 @@ static int __init com90io_probe(struct net_device *dev)
 		       "must specify the base address!\n");
 		return -ENODEV;
 	}
-	if (check_region(ioaddr, ARCNET_TOTAL_SIZE)) {
+	if (!request_region(ioaddr, ARCNET_TOTAL_SIZE, "com90io probe")) {
 		BUGMSG(D_INIT_REASONS, "IO check_region %x-%x failed.\n",
 		       ioaddr, ioaddr + ARCNET_TOTAL_SIZE - 1);
 		return -ENXIO;
 	}
 	if (ASTATUS() == 0xFF) {
 		BUGMSG(D_INIT_REASONS, "IO address %x empty\n", ioaddr);
-		return -ENODEV;
+		goto err_out;
 	}
 	inb(_RESET);
 	mdelay(RESETtime);
@@ -174,7 +174,7 @@ static int __init com90io_probe(struct net_device *dev)
 
 	if ((status & 0x9D) != (NORXflag | RECONflag | TXFREEflag | RESETflag)) {
 		BUGMSG(D_INIT_REASONS, "Status invalid (%Xh).\n", status);
-		return -ENODEV;
+		goto err_out;
 	}
 	BUGMSG(D_INIT_REASONS, "Status after reset: %X\n", status);
 
@@ -186,7 +186,7 @@ static int __init com90io_probe(struct net_device *dev)
 
 	if (status & RESETflag) {
 		BUGMSG(D_INIT_REASONS, "Eternal reset (status=%Xh)\n", status);
-		return -ENODEV;
+		goto err_out;
 	}
 	outb((0x16 | IOMAPflag) & ~ENABLE16flag, _CONFIG);
 
@@ -198,7 +198,7 @@ static int __init com90io_probe(struct net_device *dev)
 	if ((status = inb(_MEMDATA)) != 0xd1) {
 		BUGMSG(D_INIT_REASONS, "Signature byte not found"
 		       " (%Xh instead).\n", status);
-		return -ENODEV;
+		goto err_out;
 	}
 	if (!dev->irq) {
 		/*
@@ -215,10 +215,15 @@ static int __init com90io_probe(struct net_device *dev)
 
 		if (dev->irq <= 0) {
 			BUGMSG(D_INIT_REASONS, "Autoprobe IRQ failed\n");
-			return -ENODEV;
+			goto err_out;
 		}
 	}
+	release_region(ioaddr, ARCNET_TOTAL_SIZE); /* end of probing */
 	return com90io_found(dev);
+
+err_out:
+	release_region(ioaddr, ARCNET_TOTAL_SIZE);
+	return -ENODEV;
 }
 
 
