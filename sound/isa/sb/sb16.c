@@ -157,6 +157,8 @@ struct snd_card_sb16 {
 
 static snd_card_t *snd_sb16_legacy[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
+#ifdef CONFIG_PNP
+
 static struct pnp_card_device_id snd_sb16_pnpids[] = {
 #ifndef SNDRV_SBAWE
 	/* Sound Blaster 16 PnP */
@@ -249,6 +251,8 @@ static struct pnp_card_device_id snd_sb16_pnpids[] = {
 };
 
 MODULE_DEVICE_TABLE(pnp_card, snd_sb16_pnpids);
+
+#endif /* CONFIG_PNP */
 
 #ifdef SNDRV_SBAWE_EMU8000
 #define DRIVER_NAME	"snd-card-sbawe"
