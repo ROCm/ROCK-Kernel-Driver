@@ -183,8 +183,7 @@ acpi_parse_lapic_nmi (
 
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
-#ifdef CONFIG_X86_IO_APIC
-
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
 
 static int __init
 acpi_parse_ioapic (
@@ -368,7 +367,6 @@ acpi_boot_init (void)
 
 	result = acpi_table_parse(ACPI_APIC, acpi_parse_madt);
 	if (!result) {
-		printk(KERN_WARNING PREFIX "MADT not present\n");
 		return 0;
 	}
 	else if (result < 0) {
@@ -416,7 +414,7 @@ acpi_boot_init (void)
 
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
-#ifdef CONFIG_X86_IO_APIC
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_ACPI_INTERPRETER)
 
 	/* 
 	 * I/O APIC 
@@ -472,7 +470,8 @@ acpi_boot_init (void)
 	acpi_irq_model = ACPI_IRQ_MODEL_IOAPIC;
 
 	acpi_ioapic = 1;
-#endif /*CONFIG_X86_IO_APIC*/
+
+#endif /* CONFIG_X86_IO_APIC && CONFIG_ACPI_INTERPRETER */
 
 #ifdef CONFIG_X86_LOCAL_APIC
 	if (acpi_lapic && acpi_ioapic) {
@@ -480,6 +479,7 @@ acpi_boot_init (void)
 		clustered_apic_check();
 	}
 #endif
+
 #ifdef CONFIG_HPET_TIMER
 	acpi_table_parse(ACPI_HPET, acpi_parse_hpet);
 #endif
