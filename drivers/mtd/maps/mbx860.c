@@ -1,5 +1,5 @@
 /*
- * $Id: mbx860.c,v 1.5 2003/05/21 12:45:19 dwmw2 Exp $
+ * $Id: mbx860.c,v 1.6 2004/07/12 21:59:44 dwmw2 Exp $
  *
  * Handle mapping of the flash on MBX860 boards
  *
@@ -54,7 +54,7 @@ struct map_info mbx_map = {
 	.name = "MBX flash",
 	.size = WINDOW_SIZE,
 	.phys = WINDOW_ADDR,
-	.buswidth = 4,
+	.bankwidth = 4,
 };
 
 int __init init_mbx(void)

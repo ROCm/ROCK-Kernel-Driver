@@ -5,7 +5,7 @@
  *
  *	(C) Copyright 2002, Greg Ungerer (gerg@snapgear.com)
  *
- * 	$Id: uclinux.c,v 1.5 2003/05/20 20:59:32 dwmw2 Exp $
+ * 	$Id: uclinux.c,v 1.7 2004/07/12 21:59:45 dwmw2 Exp $
  */
 
 /****************************************************************************/
@@ -64,7 +64,7 @@ int __init uclinux_mtd_init(void)
 	mapp = &uclinux_ram_map;
 	mapp->phys = (unsigned long) &_ebss;
 	mapp->size = PAGE_ALIGN(*((unsigned long *)((&_ebss) + 8)));
-	mapp->buswidth = 4;
+	mapp->bankwidth = 4;
 
 	printk("uclinux[mtd]: RAM probe address=0x%x size=0x%x\n",
 	       	(int) mapp->map_priv_2, (int) mapp->size);

@@ -1,7 +1,7 @@
 /*
  *  Copyright © 2001 Flaga hf. Medical Devices, Kári Davíðsson <kd@flaga.is>
  *
- *  $Id: cfi_flagadm.c,v 1.11 2003/05/21 12:45:18 dwmw2 Exp $
+ *  $Id: cfi_flagadm.c,v 1.12 2004/07/12 21:59:43 dwmw2 Exp $
  *  
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -60,7 +60,7 @@
 struct map_info flagadm_map = {
 		.name =		"FlagaDM flash device",
 		.size =		FLASH_SIZE,
-		.buswidth =	2,
+		.bankwidth =	2,
 };
 
 struct mtd_partition flagadm_parts[] = {

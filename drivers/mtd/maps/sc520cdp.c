@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- * $Id: sc520cdp.c,v 1.15 2003/05/21 12:45:20 dwmw2 Exp $
+ * $Id: sc520cdp.c,v 1.16 2004/07/12 21:59:45 dwmw2 Exp $
  *
  *
  * The SC520CDP is an evaluation board for the Elan SC520 processor available
@@ -90,19 +90,19 @@ static struct map_info sc520cdp_map[] = {
 	{
 		.name = "SC520CDP Flash Bank #0",
 		.size = WINDOW_SIZE_0,
-		.buswidth = 4,
+		.bankwidth = 4,
 		.phys = WINDOW_ADDR_0
 	},
 	{
 		.name = "SC520CDP Flash Bank #1",
 		.size = WINDOW_SIZE_1,
-		.buswidth = 4,
+		.bankwidth = 4,
 		.phys = WINDOW_ADDR_1
 	},
 	{
 		.name = "SC520CDP DIL Flash",
 		.size = WINDOW_SIZE_2,
-		.buswidth = 1,
+		.bankwidth = 1,
 		.phys = WINDOW_ADDR_2
 	},
 };

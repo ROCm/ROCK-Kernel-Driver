@@ -2,7 +2,7 @@
  * NV-RAM memory access on autcpu12 
  * (C) 2002 Thomas Gleixner (gleixner@autronix.de)
  *
- * $Id: autcpu12-nvram.c,v 1.5 2003/05/21 12:45:18 dwmw2 Exp $ 
+ * $Id: autcpu12-nvram.c,v 1.6 2004/07/12 21:59:43 dwmw2 Exp $ 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ static struct mtd_info *sram_mtd;
 struct map_info autcpu12_sram_map = {
 	.name = "SRAM",
 	.size = 32768,
-	.buswidth = 4,
+	.bankwidth = 4,
 	.phys = 0x12000000,
 };
 

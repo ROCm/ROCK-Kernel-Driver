@@ -1,5 +1,5 @@
 # drivers/mtd/chips/Kconfig
-# $Id: Kconfig,v 1.3 2003/05/28 15:13:24 dwmw2 Exp $
+# $Id: Kconfig,v 1.8 2004/07/13 22:32:02 dwmw2 Exp $
 
 menu "RAM/ROM/Flash chip drivers"
 	depends on MTD!=n
@@ -85,59 +85,72 @@ config MTD_CFI_GEOMETRY
 	  arrangements of CFI chips. If unsure, say 'N' and all options 
 	  which are supported by the current code will be enabled.
 
-config MTD_CFI_B1
-	bool "Support  8-bit buswidth"
-	depends on MTD_CFI_GEOMETRY
+config MTD_MAP_BANK_WIDTH_1
+	bool "Support  8-bit buswidth" if MTD_CFI_GEOMETRY
+	default y
 	help
 	  If you wish to support CFI devices on a physical bus which is
 	  8 bits wide, say 'Y'.
 
-config MTD_CFI_B2
-	bool "Support 16-bit buswidth"
-	depends on MTD_CFI_GEOMETRY
+config MTD_MAP_BANK_WIDTH_2
+	bool "Support 16-bit buswidth" if MTD_CFI_GEOMETRY
+	default y
 	help
 	  If you wish to support CFI devices on a physical bus which is
 	  16 bits wide, say 'Y'.
 
-config MTD_CFI_B4
-	bool "Support 32-bit buswidth"
-	depends on MTD_CFI_GEOMETRY
+config MTD_MAP_BANK_WIDTH_4
+	bool "Support 32-bit buswidth" if MTD_CFI_GEOMETRY
+	default y
 	help
 	  If you wish to support CFI devices on a physical bus which is
 	  32 bits wide, say 'Y'.
 
-config MTD_CFI_B8
-	bool "Support 64-bit buswidth"
-	depends on MTD_CFI_GEOMETRY
+config MTD_MAP_BANK_WIDTH_8
+	bool "Support 64-bit buswidth" if MTD_CFI_GEOMETRY
+	default n
 	help
 	  If you wish to support CFI devices on a physical bus which is
 	  64 bits wide, say 'Y'.
 
+config MTD_MAP_BANK_WIDTH_16
+	bool "Support 128-bit buswidth" if MTD_CFI_GEOMETRY
+	default n
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  128 bits wide, say 'Y'.
+
+config MTD_MAP_BANK_WIDTH_32
+	bool "Support 256-bit buswidth" if MTD_CFI_GEOMETRY
+	default n
+	help
+	  If you wish to support CFI devices on a physical bus which is
+	  256 bits wide, say 'Y'.
+
 config MTD_CFI_I1
-	bool "Support 1-chip flash interleave" if !MTD_CFI_B1
-	depends on MTD_CFI_GEOMETRY
-	default y if MTD_CFI_B1
+	bool "Support 1-chip flash interleave" if MTD_CFI_GEOMETRY
+	default y
 	help
 	  If your flash chips are not interleaved - i.e. you only have one
 	  flash chip addressed by each bus cycle, then say 'Y'.
 
 config MTD_CFI_I2
-	bool "Support 2-chip flash interleave"
-	depends on MTD_CFI_GEOMETRY
+	bool "Support 2-chip flash interleave" if MTD_CFI_GEOMETRY
+	default y
 	help
 	  If your flash chips are interleaved in pairs - i.e. you have two
 	  flash chips addressed by each bus cycle, then say 'Y'.
 
 config MTD_CFI_I4
-	bool "Support 4-chip flash interleave"
-	depends on MTD_CFI_GEOMETRY
+	bool "Support 4-chip flash interleave" if MTD_CFI_GEOMETRY
+	default n
 	help
 	  If your flash chips are interleaved in fours - i.e. you have four
 	  flash chips addressed by each bus cycle, then say 'Y'.
 
 config MTD_CFI_I8
-	bool "Support 8-chip flash interleave"
-	depends on MTD_CFI_GEOMETRY
+	bool "Support 8-chip flash interleave" if MTD_CFI_GEOMETRY
+	default n
 	help
 	  If your flash chips are interleaved in eights - i.e. you have eight
 	  flash chips addressed by each bus cycle, then say 'Y'.
@@ -160,6 +173,27 @@ config MTD_CFI_AMDSTD
 	  provides support for one of those command sets, used on chips 
 	  including the AMD Am29LV320.
 
+config MTD_CFI_AMDSTD_RETRY
+	int "Retry failed commands (erase/program)"
+	depends on MTD_CFI_AMDSTD
+	default "0"
+	help
+	  Some chips, when attached to a shared bus, don't properly filter
+	  bus traffic that is destined to other devices.  This broken
+	  behavior causes erase and program sequences to be aborted when
+	  the sequences are mixed with traffic for other devices.
+
+	  SST49LF040 (and related) chips are know to be broken.
+
+config MTD_CFI_AMDSTD_RETRY_MAX
+	int "Max retries of failed commands (erase/program)"
+	depends on MTD_CFI_AMDSTD_RETRY
+	default "0"
+	help
+	  If you have an SST49LF040 (or related chip) then this value should
+	  be set to at least 1.  This can also be adjusted at driver load
+	  time with the retry_cmd_max module parameter.
+
 config MTD_CFI_STAA
 	tristate "Support for ST (Advanced Architecture) flash chips"
 	depends on MTD_GEN_PROBE
@@ -167,6 +201,11 @@ config MTD_CFI_STAA
 	  The Common Flash Interface defines a number of different command
 	  sets which a CFI-compliant chip may claim to implement. This code
 	  provides support for one of those command sets.
+
+config MTD_CFI_UTIL
+	tristate
+	default y if MTD_CFI_INTELEXT=y || MTD_CFI_AMDSTD=y || MTD_CFI_STAA=y
+	default m if MTD_CFI_INTELEXT=m || MTD_CFI_AMDSTD=m || MTD_CFI_STAA=m
 
 config MTD_RAM
 	tristate "Support for RAM chips in bus mapping"
