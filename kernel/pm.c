@@ -154,7 +154,7 @@ void pm_unregister_all(pm_callback callback)
 int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data)
 {
 	int status = 0;
-	int prev_state, next_state;
+	unsigned long prev_state, next_state;
 
 	if (in_interrupt())
 		BUG();
@@ -163,7 +163,7 @@ int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data)
 	case PM_SUSPEND:
 	case PM_RESUME:
 		prev_state = dev->state;
-		next_state = (int) data;
+		next_state = (unsigned long) data;
 		if (prev_state != next_state) {
 			if (dev->callback)
 				status = (*dev->callback)(dev, rqst, data);
