@@ -34,6 +34,7 @@
 #include <linux/sysrq.h>
 #include <linux/pm.h>
 #include <linux/device.h>
+#include <linux/suspend.h>
 #include <asm/uaccess.h>
 #include <asm/acpi.h>
 #include "acpi_bus.h"

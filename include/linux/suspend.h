@@ -60,6 +60,8 @@ extern void refrigerator(unsigned long);
 #define register_suspend_notifier(a)	do { } while(0)
 #define unregister_suspend_notifier(a)	do { } while(0)
 #define refrigerator(a)			do { BUG(); } while(0)
+#define freeze_processes()		do { panic("You need CONFIG_SOFTWARE_SUSPEND to do sleeps."); } while(0)
+#define thaw_processes()		do { } while(0)
 #endif
 
 #endif /* _LINUX_SWSUSP_H */
