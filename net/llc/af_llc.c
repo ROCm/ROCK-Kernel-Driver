@@ -22,6 +22,7 @@
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/tcp.h>
 #include <net/llc_sap.h>
 #include <net/llc_pdu.h>
