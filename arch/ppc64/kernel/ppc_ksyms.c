@@ -148,10 +148,6 @@ EXPORT_SYMBOL(iSeries_Write_Byte);
 EXPORT_SYMBOL(iSeries_Write_Word);
 EXPORT_SYMBOL(iSeries_Write_Long);
 #endif /* CONFIG_PPC_ISERIES */
-#ifndef CONFIG_PPC_ISERIES
-EXPORT_SYMBOL(eeh_check_failure);
-EXPORT_SYMBOL(eeh_total_mmio_ffs);
-#endif /* CONFIG_PPC_ISERIES */
 #endif /* CONFIG_PCI */
 
 EXPORT_SYMBOL(start_thread);

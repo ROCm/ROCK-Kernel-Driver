@@ -58,6 +58,13 @@ extern unsigned long pci_io_base;
 #define outb(data,addr)		writeb(data,((unsigned long)(addr)))  
 #define outw(data,addr)		writew(data,((unsigned long)(addr)))  
 #define outl(data,addr)		writel(data,((unsigned long)(addr)))
+/*
+ * The *_ns versions below don't do byte-swapping.
+ * Neither do the standard versions now, these are just here
+ * for older code.
+ */
+#define insw_ns(port, buf, ns)	_insw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
+#define insl_ns(port, buf, nl)	_insl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
 #else
 #define __raw_readb(addr)       (*(volatile unsigned char *)(addr))
 #define __raw_readw(addr)       (*(volatile unsigned short *)(addr))
@@ -90,12 +97,16 @@ extern unsigned long pci_io_base;
  * They are only used in practice for transferring buffers which
  * are arrays of bytes, and byte-swapping is not appropriate in
  * that case.  - paulus */
-#define insb(port, buf, ns)	_insb((u8 *)((port)+pci_io_base), (buf), (ns))
-#define outsb(port, buf, ns)	_outsb((u8 *)((port)+pci_io_base), (buf), (ns))
-#define insw(port, buf, ns)	_insw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
-#define outsw(port, buf, ns)	_outsw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
-#define insl(port, buf, nl)	_insl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
-#define outsl(port, buf, nl)	_outsl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
+#define insb(port, buf, ns)	eeh_insb((port), (buf), (ns))
+#define insw(port, buf, ns)	eeh_insw_ns((port), (buf), (ns))
+#define insl(port, buf, nl)	eeh_insl_ns((port), (buf), (nl))
+#define insw_ns(port, buf, ns)	eeh_insw_ns((port), (buf), (ns))
+#define insl_ns(port, buf, nl)	eeh_insl_ns((port), (buf), (nl))
+
+#define outsb(port, buf, ns)  _outsb((u8 *)((port)+pci_io_base), (buf), (ns))
+#define outsw(port, buf, ns)  _outsw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
+#define outsl(port, buf, nl)  _outsl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
+
 #endif
 
 #define readb_relaxed(addr) readb(addr)
@@ -130,9 +141,7 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
  * Neither do the standard versions now, these are just here
  * for older code.
  */
-#define insw_ns(port, buf, ns)	_insw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
 #define outsw_ns(port, buf, ns)	_outsw_ns((u16 *)((port)+pci_io_base), (buf), (ns))
-#define insl_ns(port, buf, nl)	_insl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
 #define outsl_ns(port, buf, nl)	_outsl_ns((u32 *)((port)+pci_io_base), (buf), (nl))
 
 
@@ -204,6 +213,9 @@ static inline void iosync(void)
 
 /*
  * 8, 16 and 32 bit, big and little endian I/O operations, with barrier.
+ * These routines do not perform EEH-related I/O address translation,
+ * and should not be used directly by device drivers.  Use inb/readb
+ * instead.
  */
 static inline int in_8(volatile unsigned char *addr)
 {
