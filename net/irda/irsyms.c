@@ -204,11 +204,11 @@ static int irda_device_event(struct notifier_block *this, unsigned long event,
 	
         switch (event) {
 	case NETDEV_UP:
-		IRDA_DEBUG(3, __FUNCTION__ "(), NETDEV_UP\n");
+		IRDA_DEBUG(3, "%s(), NETDEV_UP\n", __FUNCTION__);
 		/* irda_dev_device_up(dev); */
 		break;
 	case NETDEV_DOWN:
-		IRDA_DEBUG(3, __FUNCTION__ "(), NETDEV_DOWN\n");
+		IRDA_DEBUG(3, "%s(), NETDEV_DOWN\n", __FUNCTION__);
 		/* irda_kill_by_device(dev); */
 		/* irda_rt_device_down(dev); */
 		/* irda_dev_device_down(dev); */
@@ -253,7 +253,7 @@ void irda_notify_init(notify_t *notify)
  */
 int __init irda_init(void)
 {
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__);
 
 	/* Lower layer of the stack */
  	irlmp_init();

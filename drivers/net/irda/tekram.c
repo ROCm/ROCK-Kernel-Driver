@@ -66,7 +66,7 @@ void __exit tekram_cleanup(void)
 
 static void tekram_open(dongle_t *self, struct qos_info *qos)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	qos->baud_rate.bits &= IR_9600|IR_19200|IR_38400|IR_57600|IR_115200;
 	qos->min_turn_time.bits = 0x01; /* Needs at least 10 ms */	
@@ -77,7 +77,7 @@ static void tekram_open(dongle_t *self, struct qos_info *qos)
 
 static void tekram_close(dongle_t *self)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	/* Power off dongle */
 	self->set_dtr_rts(self->dev, FALSE, FALSE);
@@ -113,12 +113,12 @@ static int tekram_change_speed(struct irda_task *task)
 	__u8 byte;
 	int ret = 0;
 	
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(task != NULL, return -1;);
 
 	if (self->speed_task && self->speed_task != task) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), busy!\n");
+		IRDA_DEBUG(0, "%s(), busy!\n", __FUNCTION__ );
 		return MSECS_TO_JIFFIES(10);
 	} else
 		self->speed_task = task;
@@ -214,12 +214,12 @@ int tekram_reset(struct irda_task *task)
 	dongle_t *self = (dongle_t *) task->instance;
 	int ret = 0;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(task != NULL, return -1;);
 
 	if (self->reset_task && self->reset_task != task) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), busy!\n");
+		IRDA_DEBUG(0, "%s(), busy!\n", __FUNCTION__ );
 		return MSECS_TO_JIFFIES(10);
 	} else
 		self->reset_task = task;

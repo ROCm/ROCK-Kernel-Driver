@@ -126,14 +126,14 @@ static int (*state[])(struct ircomm_tty_cb *self, IRCOMM_TTY_EVENT event,
  */
 int ircomm_tty_attach_cable(struct ircomm_tty_cb *self)
 {
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
        	/* Check if somebody has already connected to us */
 	if (ircomm_is_connected(self->ircomm)) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), already connected!\n");
+		IRDA_DEBUG(0, "%s(), already connected!\n", __FUNCTION__ );
 		return 0;
 	}
 
@@ -144,7 +144,7 @@ int ircomm_tty_attach_cable(struct ircomm_tty_cb *self)
 
 	/* Check if somebody has already connected to us */
 	if (ircomm_is_connected(self->ircomm)) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), already connected!\n");
+		IRDA_DEBUG(0, "%s(), already connected!\n", __FUNCTION__ );
 		return 0;
 	}
 
@@ -161,7 +161,7 @@ int ircomm_tty_attach_cable(struct ircomm_tty_cb *self)
  */
 void ircomm_tty_detach_cable(struct ircomm_tty_cb *self)
 {
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
@@ -203,7 +203,7 @@ static void ircomm_tty_ias_register(struct ircomm_tty_cb *self)
 	__u8 oct_seq[6];
 	__u16 hints;
 
-	IRDA_DEBUG(0, __FUNCTION__ "()\n");
+	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
@@ -258,16 +258,16 @@ int ircomm_tty_send_initial_parameters(struct ircomm_tty_cb *self)
 	 * Set default values, but only if the application for some reason 
 	 * haven't set them already
 	 */
-	IRDA_DEBUG(2, __FUNCTION__ "(), data-rate = %d\n", 
+	IRDA_DEBUG(2, "%s(), data-rate = %d\n", __FUNCTION__ , 
 		   self->settings.data_rate);
 	if (!self->settings.data_rate)
 		self->settings.data_rate = 9600;
-	IRDA_DEBUG(2, __FUNCTION__ "(), data-format = %d\n", 
+	IRDA_DEBUG(2, "%s(), data-format = %d\n", __FUNCTION__ , 
 		   self->settings.data_format);
 	if (!self->settings.data_format)
 		self->settings.data_format = IRCOMM_WSIZE_8;  /* 8N1 */
 
-	IRDA_DEBUG(2, __FUNCTION__ "(), flow-control = %d\n", 
+	IRDA_DEBUG(2, "%s(), flow-control = %d\n", __FUNCTION__ , 
 		   self->settings.flow_control);
 	/*self->settings.flow_control = IRCOMM_RTS_CTS_IN|IRCOMM_RTS_CTS_OUT;*/
 
@@ -312,7 +312,7 @@ static void ircomm_tty_discovery_indication(discovery_t *discovery,
 	struct ircomm_tty_cb *self;
 	struct ircomm_tty_info info;
 
-	IRDA_DEBUG(2, __FUNCTION__"()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	/* Important note :
 	 * We need to drop all passive discoveries.
@@ -356,7 +356,7 @@ void ircomm_tty_disconnect_indication(void *instance, void *sap,
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) instance;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
@@ -386,7 +386,7 @@ static void ircomm_tty_getvalue_confirm(int result, __u16 obj_id,
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) priv;
 
-	IRDA_DEBUG(2, __FUNCTION__"()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
@@ -397,13 +397,13 @@ static void ircomm_tty_getvalue_confirm(int result, __u16 obj_id,
 
 	/* Check if request succeeded */
 	if (result != IAS_SUCCESS) {
-		IRDA_DEBUG(4, __FUNCTION__ "(), got NULL value!\n");
+		IRDA_DEBUG(4, "%s(), got NULL value!\n", __FUNCTION__ );
 		return;
 	}
 
 	switch (value->type) {
  	case IAS_OCT_SEQ:
-		IRDA_DEBUG(2, __FUNCTION__"(), got octet sequence\n");
+		IRDA_DEBUG(2, "%s(), got octet sequence\n", __FUNCTION__ );
 
 		irda_param_extract_all(self, value->t.oct_seq, value->len,
 				       &ircomm_param_info);
@@ -413,21 +413,21 @@ static void ircomm_tty_getvalue_confirm(int result, __u16 obj_id,
 		break;
 	case IAS_INTEGER:
 		/* Got LSAP selector */	
-		IRDA_DEBUG(2, __FUNCTION__"(), got lsapsel = %d\n", 
+		IRDA_DEBUG(2, "%s(), got lsapsel = %d\n", __FUNCTION__ , 
 			   value->t.integer);
 
 		if (value->t.integer == -1) {
-			IRDA_DEBUG(0, __FUNCTION__"(), invalid value!\n");
+			IRDA_DEBUG(0, "%s(), invalid value!\n", __FUNCTION__ );
 		} else
 			self->dlsap_sel = value->t.integer;
 
 		ircomm_tty_do_event(self, IRCOMM_TTY_GOT_LSAPSEL, NULL, NULL);
 		break;
 	case IAS_MISSING:
-		IRDA_DEBUG(0, __FUNCTION__"(), got IAS_MISSING\n");
+		IRDA_DEBUG(0, "%s(), got IAS_MISSING\n", __FUNCTION__ );
 		break;
 	default:
-		IRDA_DEBUG(0, __FUNCTION__"(), got unknown type!\n");
+		IRDA_DEBUG(0, "%s(), got unknown type!\n", __FUNCTION__ );
 		break;
 	}
 	irias_delete_value(value);
@@ -447,7 +447,7 @@ void ircomm_tty_connect_confirm(void *instance, void *sap,
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) instance;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
@@ -478,7 +478,7 @@ void ircomm_tty_connect_indication(void *instance, void *sap,
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) instance;
 	int clen;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
@@ -507,7 +507,7 @@ void ircomm_tty_connect_indication(void *instance, void *sap,
  */
 void ircomm_tty_link_established(struct ircomm_tty_cb *self)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
@@ -524,10 +524,10 @@ void ircomm_tty_link_established(struct ircomm_tty_cb *self)
 	 * line.  
 	 */
 	if ((self->flags & ASYNC_CTS_FLOW) && ((self->settings.dce & IRCOMM_CTS) == 0)) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), waiting for CTS ...\n");
+		IRDA_DEBUG(0, "%s(), waiting for CTS ...\n", __FUNCTION__ );
 		return;
 	} else {
-		IRDA_DEBUG(2, __FUNCTION__ "(), starting hardware!\n");
+		IRDA_DEBUG(2, "%s(), starting hardware!\n", __FUNCTION__ );
 
 		self->tty->hw_stopped = 0;
 	
@@ -565,7 +565,7 @@ void ircomm_tty_watchdog_timer_expired(void *data)
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) data;
 	
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
@@ -586,7 +586,7 @@ static int ircomm_tty_state_idle(struct ircomm_tty_cb *self,
 {
 	int ret = 0;
 
-	IRDA_DEBUG(2, __FUNCTION__": state=%s, event=%s\n",
+	IRDA_DEBUG(2, "%s: state=%s, event=%s\n", __FUNCTION__ ,
 		   ircomm_tty_state[self->state], ircomm_tty_event[event]);
 	switch (event) {
 	case IRCOMM_TTY_ATTACH_CABLE:
@@ -629,7 +629,7 @@ static int ircomm_tty_state_idle(struct ircomm_tty_cb *self,
 		ircomm_tty_next_state(self, IRCOMM_TTY_IDLE);
 		break;
 	default:
-		IRDA_DEBUG(2, __FUNCTION__"(), unknown event: %s\n",
+		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
 		return -EINVAL;
 	}
@@ -649,7 +649,7 @@ static int ircomm_tty_state_search(struct ircomm_tty_cb *self,
 {
 	int ret = 0;
 
-	IRDA_DEBUG(2, __FUNCTION__": state=%s, event=%s\n",
+	IRDA_DEBUG(2, "%s: state=%s, event=%s\n", __FUNCTION__ ,
 		   ircomm_tty_state[self->state], ircomm_tty_event[event]);
 
 	switch (event) {
@@ -700,7 +700,7 @@ static int ircomm_tty_state_search(struct ircomm_tty_cb *self,
 		ircomm_tty_next_state(self, IRCOMM_TTY_IDLE);
 		break;
 	default:
-		IRDA_DEBUG(2, __FUNCTION__"(), unknown event: %s\n",
+		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
 		return -EINVAL;
 	}
@@ -720,7 +720,7 @@ static int ircomm_tty_state_query_parameters(struct ircomm_tty_cb *self,
 {
 	int ret = 0;
 
-	IRDA_DEBUG(2, __FUNCTION__": state=%s, event=%s\n",
+	IRDA_DEBUG(2, "%s: state=%s, event=%s\n", __FUNCTION__ ,
 		   ircomm_tty_state[self->state], ircomm_tty_event[event]);
 
 	switch (event) {
@@ -756,7 +756,7 @@ static int ircomm_tty_state_query_parameters(struct ircomm_tty_cb *self,
 		ircomm_tty_next_state(self, IRCOMM_TTY_IDLE);
 		break;
 	default:
-		IRDA_DEBUG(2, __FUNCTION__"(), unknown event: %s\n",
+		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
 		return -EINVAL;
 	}
@@ -776,7 +776,7 @@ static int ircomm_tty_state_query_lsap_sel(struct ircomm_tty_cb *self,
 {
 	int ret = 0;
 
-	IRDA_DEBUG(2, __FUNCTION__": state=%s, event=%s\n",
+	IRDA_DEBUG(2, "%s: state=%s, event=%s\n", __FUNCTION__ ,
 		   ircomm_tty_state[self->state], ircomm_tty_event[event]);
 
 	switch (event) {
@@ -804,7 +804,7 @@ static int ircomm_tty_state_query_lsap_sel(struct ircomm_tty_cb *self,
 		ircomm_tty_next_state(self, IRCOMM_TTY_IDLE);
 		break;
 	default:
-		IRDA_DEBUG(2, __FUNCTION__"(), unknown event: %s\n",
+		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
 		return -EINVAL;
 	}
@@ -824,7 +824,7 @@ static int ircomm_tty_state_setup(struct ircomm_tty_cb *self,
 {
 	int ret = 0;
 
-	IRDA_DEBUG(2, __FUNCTION__": state=%s, event=%s\n",
+	IRDA_DEBUG(2, "%s: state=%s, event=%s\n", __FUNCTION__ ,
 		   ircomm_tty_state[self->state], ircomm_tty_event[event]);
 
 	switch (event) {
@@ -856,7 +856,7 @@ static int ircomm_tty_state_setup(struct ircomm_tty_cb *self,
 		ircomm_tty_next_state(self, IRCOMM_TTY_IDLE);
 		break;
 	default:
-		IRDA_DEBUG(2, __FUNCTION__"(), unknown event: %s\n",
+		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
 		return -EINVAL;
 	}
@@ -893,13 +893,13 @@ static int ircomm_tty_state_ready(struct ircomm_tty_cb *self,
 			self->settings.dce = IRCOMM_DELTA_CD;
 			ircomm_tty_check_modem_status(self);
 		} else {
-			IRDA_DEBUG(0, __FUNCTION__ "(), hanging up!\n");
+			IRDA_DEBUG(0, "%s(), hanging up!\n", __FUNCTION__ );
 			if (self->tty)
 				tty_hangup(self->tty);
 		}
 		break;
 	default:
-		IRDA_DEBUG(2, __FUNCTION__"(), unknown event: %s\n",
+		IRDA_DEBUG(2, "%s(), unknown event: %s\n", __FUNCTION__ ,
 			   ircomm_tty_event[event]);
 		return -EINVAL;
 	}
@@ -918,7 +918,7 @@ int ircomm_tty_do_event(struct ircomm_tty_cb *self, IRCOMM_TTY_EVENT event,
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
-	IRDA_DEBUG(2, __FUNCTION__": state=%s, event=%s\n",
+	IRDA_DEBUG(2, "%s: state=%s, event=%s\n", __FUNCTION__ ,
 		   ircomm_tty_state[self->state], ircomm_tty_event[event]);
 	
 	return (*state[self->state])(self, event, skb, info);
@@ -937,7 +937,7 @@ void ircomm_tty_next_state(struct ircomm_tty_cb *self, IRCOMM_TTY_STATE state)
 
 	self->state = state;
 	
-	IRDA_DEBUG(2, __FUNCTION__": next state=%s, service type=%d\n", 
+	IRDA_DEBUG(2, "%s: next state=%s, service type=%d\n", __FUNCTION__ , 
 		   ircomm_tty_state[self->state], self->service_type);
 }
 
