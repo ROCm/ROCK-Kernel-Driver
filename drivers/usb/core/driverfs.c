@@ -23,21 +23,43 @@
 #include "usb.h"
 
 /* Active configuration fields */
-#define usb_actconfig_attr(field, format_string)			\
+#define usb_actconfig_show(field, format_string)			\
 static ssize_t								\
 show_##field (struct device *dev, char *buf)				\
 {									\
 	struct usb_device *udev;					\
 									\
 	udev = to_usb_device (dev);					\
+	if (udev->actconfig) \
 	return sprintf (buf, format_string, udev->actconfig->desc.field); \
+	else return 0;							\
 }									\
+
+#define usb_actconfig_attr(field, format_string)			\
+usb_actconfig_show(field,format_string)					\
 static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
 
 usb_actconfig_attr (bNumInterfaces, "%2d\n")
-usb_actconfig_attr (bConfigurationValue, "%2d\n")
 usb_actconfig_attr (bmAttributes, "%2x\n")
 usb_actconfig_attr (bMaxPower, "%3dmA\n")
+
+/* configuration value is always present, and r/w */
+usb_actconfig_show(bConfigurationValue,"%u\n");
+
+static ssize_t
+set_bConfigurationValue (struct device *dev, const char *buf, size_t count)
+{
+	struct usb_device	*udev = udev = to_usb_device (dev);
+	int			config, value;
+
+	if (sscanf (buf, "%u", &config) != 1 || config > 255)
+		return -EINVAL;
+	value = usb_set_configuration (udev, config);
+	return (value < 0) ? value : count;
+}
+
+static DEVICE_ATTR(bConfigurationValue, S_IRUGO | S_IWUSR, 
+		show_bConfigurationValue, set_bConfigurationValue);
 
 /* String fields */
 static ssize_t show_product (struct device *dev, char *buf)

@@ -898,6 +898,7 @@ void usb_disconnect(struct usb_device **pdev)
 	 * this device will fail.
 	 */
 	dev->state = USB_STATE_NOTATTACHED;
+	down(&dev->serialize);
 
 	dev_info (&dev->dev, "USB disconnect, address %d\n", dev->devnum);
 
@@ -908,20 +909,10 @@ void usb_disconnect(struct usb_device **pdev)
 			usb_disconnect(child);
 	}
 
-	/* deallocate hcd/hardware state ... and nuke all pending urbs */
+	/* deallocate hcd/hardware state ... nuking all pending urbs and
+	 * cleaning up all state associated with the current configuration
+	 */
 	usb_disable_device(dev, 0);
-
-	/* disconnect() drivers from interfaces (a key side effect) */
-	dev_dbg (&dev->dev, "unregistering interfaces\n");
-	if (dev->actconfig) {
-		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
-			struct usb_interface	*interface;
-
-			/* remove this interface */
-			interface = dev->actconfig->interface[i];
-			device_unregister(&interface->dev);
-		}
-	}
 
 	dev_dbg (&dev->dev, "unregistering device\n");
 	/* Free the device number and remove the /proc/bus/usb entry */
@@ -929,11 +920,8 @@ void usb_disconnect(struct usb_device **pdev)
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		usbfs_remove_device(dev);
 	}
+	up(&dev->serialize);
 	device_unregister(&dev->dev);
-
-	/* Decrement the reference count, it'll auto free everything when */
-	/* it hits 0 which could very well be now */
-	usb_put_dev(dev);
 }
 
 /**
@@ -1017,7 +1005,6 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	dev->dev.driver = &usb_generic_driver;
 	dev->dev.bus = &usb_bus_type;
 	dev->dev.driver_data = &usb_generic_driver_data;
-	usb_get_dev(dev);
 	if (dev->dev.bus_id[0] == 0)
 		sprintf (&dev->dev.bus_id[0], "%d-%s",
 			 dev->bus->busnum, dev->devpath);
@@ -1090,27 +1077,12 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	err = usb_get_configuration(dev);
 	if (err < 0) {
-		dev_err(&dev->dev, "unable to get device %d configuration (error=%d)\n",
-			dev->devnum, err);
+		dev_err(&dev->dev, "can't read configurations, error %d\n",
+			err);
 		goto fail;
 	}
 
-	/* choose and set the configuration here */
-	if (dev->descriptor.bNumConfigurations != 1) {
-		dev_info(&dev->dev,
-			"configuration #%d chosen from %d choices\n",
-			dev->config[0].desc.bConfigurationValue,
-			dev->descriptor.bNumConfigurations);
-	}
-	err = usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue);
-	if (err) {
-		dev_err(&dev->dev, "failed to set device %d default configuration (error=%d)\n",
-			dev->devnum, err);
-		goto fail;
-	}
-
-	/* USB device state == configured ... tell the world! */
-
+	/* Tell the world! */
 	dev_dbg(&dev->dev, "new device strings: Mfr=%d, Product=%d, SerialNumber=%d\n",
 		dev->descriptor.iManufacturer, dev->descriptor.iProduct, dev->descriptor.iSerialNumber);
 
@@ -1123,30 +1095,32 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		usb_show_string(dev, "SerialNumber", dev->descriptor.iSerialNumber);
 #endif
 
-	/* put into sysfs, with device and config specific files */
+	/* put device-specific files into sysfs */
 	err = device_add (&dev->dev);
-	if (err)
+	if (err) {
+		dev_err(&dev->dev, "can't device_add, error %d\n", err);
 		goto fail;
+	}
 	usb_create_driverfs_dev_files (dev);
 
-	/* Register all of the interfaces for this device with the driver core.
-	 * Remember, interfaces get bound to drivers, not devices. */
-	for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
-		struct usb_interface *interface = dev->actconfig->interface[i];
-		struct usb_interface_descriptor *desc;
-
-		desc = &interface->altsetting [interface->act_altsetting].desc;
-		interface->dev.parent = &dev->dev;
-		interface->dev.driver = NULL;
-		interface->dev.bus = &usb_bus_type;
-		interface->dev.dma_mask = parent->dma_mask;
-		sprintf (&interface->dev.bus_id[0], "%d-%s:%d",
-			 dev->bus->busnum, dev->devpath,
-			 desc->bInterfaceNumber);
-		dev_dbg (&dev->dev, "%s - registering interface %s\n", __FUNCTION__, interface->dev.bus_id);
-		device_add (&interface->dev);
-		usb_create_driverfs_intf_files (interface);
+	/* choose and set the configuration. that registers the interfaces
+	 * with the driver core, and lets usb device drivers bind to them.
+	 */
+	if (dev->descriptor.bNumConfigurations != 1) {
+		dev_info(&dev->dev,
+			"configuration #%d chosen from %d choices\n",
+			dev->config[0].desc.bConfigurationValue,
+			dev->descriptor.bNumConfigurations);
 	}
+	err = usb_set_configuration(dev,
+			dev->config[0].desc.bConfigurationValue);
+	if (err) {
+		dev_err(&dev->dev, "can't set config #%d, error %d\n",
+			dev->config[0].desc.bConfigurationValue, err);
+		goto fail;
+	}
+
+	/* USB device state == configured ... usable */
 
 	/* add a /proc/bus/usb entry */
 	usbfs_add_device(dev);
@@ -1156,7 +1130,6 @@ fail:
 	dev->state = USB_STATE_DEFAULT;
 	clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 	dev->devnum = -1;
-	usb_put_dev(dev);
 	return err;
 }
 
