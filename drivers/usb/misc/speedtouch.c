@@ -892,7 +892,6 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	int ifnum = intf->altsetting->desc.bInterfaceNumber;
 	struct udsl_instance_data *instance;
 	unsigned char mac_str [13];
-	unsigned char mac [6];
 	int i, length;
 	char *buf;
 
@@ -995,13 +994,10 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	instance->atm_dev->link_rate = 128 * 1000 / 424;
 
 	/* set MAC address, it is stored in the serial number */
-	usb_string (instance->usb_dev, instance->usb_dev->descriptor.iSerialNumber, mac_str, 13);
-	for (i = 0; i < 6; i++)
-		mac[i] = (hex2int (mac_str[i * 2]) * 16) + (hex2int (mac_str[i * 2 + 1]));
-
-	dbg ("MAC is %02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-	memcpy (instance->atm_dev->esi, mac, 6);
+	memset (instance->atm_dev->esi, 0, sizeof (instance->atm_dev->esi));
+	if (usb_string (dev, dev->descriptor.iSerialNumber, mac_str, sizeof (mac_str)) == 12)
+		for (i = 0; i < 6; i++)
+			instance->atm_dev->esi[i] = (hex2int (mac_str[i * 2]) * 16) + (hex2int (mac_str[i * 2 + 1]));
 
 	/* device description */
 	buf = instance->description;
