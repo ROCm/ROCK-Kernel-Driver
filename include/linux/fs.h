@@ -653,7 +653,6 @@ struct quota_mount_options
 #include <linux/affs_fs_sb.h>
 #include <linux/ufs_fs_sb.h>
 #include <linux/romfs_fs_sb.h>
-#include <linux/smb_fs_sb.h>
 #include <linux/hfs_fs_sb.h>
 #include <linux/adfs_fs_sb.h>
 #include <linux/qnx4_fs_sb.h>
@@ -705,7 +704,6 @@ struct super_block {
 		struct ufs_sb_info	ufs_sb;
 		struct shmem_sb_info	shmem_sb;
 		struct romfs_sb_info	romfs_sb;
-		struct smb_sb_info	smbfs_sb;
 		struct hfs_sb_info	hfs_sb;
 		struct adfs_sb_info	adfs_sb;
 		struct qnx4_sb_info	qnx4_sb;

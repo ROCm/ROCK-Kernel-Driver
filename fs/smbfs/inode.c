@@ -400,7 +400,7 @@ parse_options(struct smb_mount_data_kernel *mnt, char *options)
 static int
 smb_show_options(struct seq_file *s, struct vfsmount *m)
 {
-	struct smb_mount_data_kernel *mnt = m->mnt_sb->u.smbfs_sb.mnt;
+	struct smb_mount_data_kernel *mnt = SMB_SB(m->mnt_sb)->mnt;
 	int i;
 
 	for (i = 0; opts[i].name != NULL; i++)
@@ -435,7 +435,7 @@ smb_show_options(struct seq_file *s, struct vfsmount *m)
 static void
 smb_put_super(struct super_block *sb)
 {
-	struct smb_sb_info *server = &(sb->u.smbfs_sb);
+	struct smb_sb_info *server = SMB_SB(sb);
 
 	if (server->sock_file) {
 		smb_dont_catch_keepalive(server);
@@ -457,11 +457,13 @@ smb_put_super(struct super_block *sb)
 		unload_nls(server->local_nls);
 		server->local_nls = NULL;
 	}
+	sb->u.generic_sbp = NULL;
+	smb_kfree(server);
 }
 
 int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 {
-	struct smb_sb_info *server = &sb->u.smbfs_sb;
+	struct smb_sb_info *server;
 	struct smb_mount_data_kernel *mnt;
 	struct smb_mount_data *oldmnt;
 	struct inode *root_inode;
@@ -482,6 +484,13 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	sb->s_magic = SMB_SUPER_MAGIC;
 	sb->s_op = &smb_sops;
 
+	server = smb_kmalloc(sizeof(struct smb_sb_info), GFP_KERNEL);
+	if (!server)
+		goto out_no_server;
+	sb->u.generic_sbp = server;
+	memset(server, 0, sizeof(struct smb_sb_info));
+
+	server->super_block = sb;
 	server->mnt = NULL;
 	server->sock_file = NULL;
 	init_MUTEX(&server->sem);
@@ -578,6 +587,8 @@ out_no_temp:
 out_no_mem:
 	if (!server->mnt)
 		printk(KERN_ERR "smb_fill_super: allocation failure\n");
+	sb->u.generic_sbp = NULL;
+	smb_kfree(server);
 	goto out_fail;
 out_wrong_data:
 	printk(KERN_ERR "smbfs: mount_data version %d is not supported\n", ver);
@@ -586,6 +597,9 @@ out_no_data:
 	printk(KERN_ERR "smb_fill_super: missing data argument\n");
 out_fail:
 	return -EINVAL;
+out_no_server:
+	printk(KERN_ERR "smb_fill_super: cannot allocate struct smb_sb_info\n");
+	return -ENOMEM;
 }
 
 static int
