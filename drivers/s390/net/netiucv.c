@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.20 2003/05/27 11:34:24 mschwide Exp $
+ * $Id: netiucv.c,v 1.26 2003/09/23 16:48:17 mschwide Exp $
  *
  * IUCV network driver
  *
@@ -30,11 +30,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.20 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.26 $
  *
  */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -114,23 +113,6 @@ static struct iucv_connection *connections;
 
 /* Keep track of interfaces. */
 static int ifno;
-
-static int
-iucv_bus_match (struct device *dev, struct device_driver *drv)
-{
-	return 0;
-}
-
-/* Hm - move to iucv.c and export? - CH */
-static struct bus_type iucv_bus = {
-	.name = "iucv",
-	.match = iucv_bus_match,
-};	
-
-static struct device iucv_root = {
-	.name   = "IUCV",
-	.bus_id = "iucv",
-};
 
 /**
  * Representation of event-data for the
@@ -1255,6 +1237,16 @@ netiucv_change_mtu (struct net_device * dev, int new_mtu)
 #define CTRL_BUFSIZE 40
 
 static ssize_t
+user_show (struct device *dev, char *buf)
+{
+	struct netiucv_priv *priv = dev->driver_data;
+
+	return sprintf(buf, "%s\n", netiucv_printname(priv->conn->userid));
+}
+
+static DEVICE_ATTR(user, 0444, user_show, NULL);
+
+static ssize_t
 buffer_show (struct device *dev, char *buf)
 {
 	struct netiucv_priv *priv = dev->driver_data;
@@ -1437,6 +1429,7 @@ static DEVICE_ATTR(max_tx_io_time, 0644, txtime_show, txtime_write);
 
 static struct attribute *netiucv_attrs[] = {
 	&dev_attr_buffer.attr,
+	&dev_attr_user.attr,
 	NULL,
 };
 
@@ -1490,7 +1483,6 @@ netiucv_register_device(struct net_device *ndev, int ifno)
 	int ret;
 	char *str = "netiucv";
 
-	snprintf(dev->name, DEVICE_NAME_SIZE, "%s", priv->conn->userid);
 	snprintf(dev->bus_id, BUS_ID_SIZE, "%s%x", str, ifno);
 	dev->bus = &iucv_bus;
 	dev->parent = &iucv_root;
@@ -1739,7 +1731,7 @@ static struct device_driver netiucv_driver = {
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.20 $";
+	char vbuf[] = "$Revision: 1.26 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -1763,7 +1755,6 @@ netiucv_exit(void)
 
 	driver_remove_file(&netiucv_driver, &driver_attr_connection);
 	driver_unregister(&netiucv_driver);
-	bus_unregister(&iucv_bus);
 
 	printk(KERN_INFO "NETIUCV driver unloaded\n");
 	return;
@@ -1774,25 +1765,9 @@ netiucv_init(void)
 {
 	int ret;
 	
-	/* Move the bus stuff to iucv.c? - CH */
-	ret = bus_register(&iucv_bus);
-	if (ret != 0) {
-		printk(KERN_ERR "NETIUCV: failed to register bus.\n");
-		return ret;
-	}
-
 	ret = driver_register(&netiucv_driver);
 	if (ret != 0) {
 		printk(KERN_ERR "NETIUCV: failed to register driver.\n");
-		bus_unregister(&iucv_bus);
-		return ret;
-	}
-
-	ret = device_register(&iucv_root);
-	if (ret != 0) {
-		printk(KERN_ERR "NETIUCV: failed to register iucv root.\n");
-		driver_unregister(&netiucv_driver);
-		bus_unregister(&iucv_bus);
 		return ret;
 	}
 
@@ -1803,9 +1778,7 @@ netiucv_init(void)
 		netiucv_banner();
 	else {
 		printk(KERN_ERR "NETIUCV: failed to add driver attribute.\n");
-		device_unregister(&iucv_root);
 		driver_unregister(&netiucv_driver);
-		bus_unregister(&iucv_bus);
 	}
 	return ret;
 }
