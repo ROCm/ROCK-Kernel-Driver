@@ -1217,7 +1217,7 @@ static int snd_cs46xx_capture_prepare(snd_pcm_substream_t * substream)
 	return 0;
 }
 
-static void snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, dev_id, return);
 	u32 status1;
@@ -1234,7 +1234,7 @@ static void snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	status1 = snd_cs46xx_peekBA0(chip, BA0_HISR);
 	if ((status1 & 0x7fffffff) == 0) {
 		snd_cs46xx_pokeBA0(chip, BA0_HICR, HICR_CHGM | HICR_IEV);
-		return;
+		return IRQ_NONE;
 	}
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
@@ -1305,6 +1305,8 @@ static void snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 *  EOI to the PCI part....reenables interrupts
 	 */
 	snd_cs46xx_pokeBA0(chip, BA0_HICR, HICR_CHGM | HICR_IEV);
+
+	return IRQ_HANDLED;
 }
 
 static snd_pcm_hardware_t snd_cs46xx_playback =

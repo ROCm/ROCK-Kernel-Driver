@@ -30,7 +30,7 @@
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 
-void snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	emu10k1_t *emu = snd_magic_cast(emu10k1_t, dev_id, return);
 	unsigned int status;
@@ -145,4 +145,6 @@ void snd_emu10k1_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			outl(IPR_FXDSP, emu->port + IPR);
 		}
 	}
+
+	return IRQ_HANDLED;
 }

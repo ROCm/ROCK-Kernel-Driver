@@ -249,7 +249,7 @@ struct _snd_es1938 {
 #endif
 };
 
-static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static struct pci_device_id snd_es1938_ids[] __devinitdata = {
         { 0x125d, 0x1969, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* Solo-1 */
@@ -1490,7 +1490,7 @@ static int __devinit snd_es1938_create(snd_card_t * card,
 /* --------------------------------------------------------------------
  * Interrupt handler
  * -------------------------------------------------------------------- */
-static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	es1938_t *chip = snd_magic_cast(es1938_t, dev_id, return);
 	unsigned char status, audiostatus;
@@ -1549,6 +1549,8 @@ static void snd_es1938_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		if (chip->rmidi)
 			snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
 	}
+
+	return IRQ_HANDLED;
 }
 
 #define ES1938_DMA_SIZE 64
