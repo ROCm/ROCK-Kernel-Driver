@@ -52,7 +52,7 @@ static inline int num_online_cpus(void)
 	return nr;
 }
 
-extern volatile unsigned long cpu_callin_map[NR_CPUS];
+extern volatile unsigned int cpu_callin_map[NR_CPUS];
 
 #define smp_processor_id() (get_paca()->xPacaIndex)
 

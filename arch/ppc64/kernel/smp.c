@@ -56,7 +56,7 @@ unsigned long cpu_online_map = 0;
 
 static struct smp_ops_t *smp_ops;
 
-volatile unsigned long cpu_callin_map[NR_CPUS];
+volatile unsigned int cpu_callin_map[NR_CPUS];
 
 extern unsigned char stab_array[];
 
@@ -564,26 +564,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	/* Fixup boot cpu */
 	smp_store_cpu_info(smp_processor_id());
 	cpu_callin_map[smp_processor_id()] = 1;
-
-	for (i = 0; i < NR_CPUS; i++) {
-		paca[i].prof_counter = 1;
-		paca[i].prof_multiplier = 1;
-		if (i != boot_cpuid) {
-			void *tmp;
-		        /*
-			 * the boot cpu segment table is statically 
-			 * initialized to real address 0x5000.  The
-			 * Other processor's tables are created and
-			 * initialized here.
-			 */
-			tmp = &stab_array[PAGE_SIZE * (i-1)];
-			memset(tmp, 0, PAGE_SIZE); 
-			paca[i].xStab_data.virt = (unsigned long)tmp;
-			paca[i].xStab_data.real = (unsigned long)__v2a(tmp);
-			paca[i].default_decr = tb_ticks_per_jiffy /
-				decr_overclock;
-		}
-	}
+	paca[smp_processor_id()].prof_counter = 1;
+	paca[smp_processor_id()].prof_multiplier = 1;
 
 	/*
 	 * XXX very rough. 
@@ -610,6 +592,23 @@ int __devinit __cpu_up(unsigned int cpu)
 	struct pt_regs regs;
 	struct task_struct *p;
 	int c;
+
+	paca[cpu].prof_counter = 1;
+	paca[cpu].prof_multiplier = 1;
+	paca[cpu].default_decr = tb_ticks_per_jiffy / decr_overclock;
+
+	if (!cpu_has_slb()) {
+		void *tmp;
+
+		/* maximum of 48 CPUs on machines with a segment table */
+		if (cpu >= 48)
+			BUG();
+
+		tmp = &stab_array[PAGE_SIZE * cpu];
+		memset(tmp, 0, PAGE_SIZE); 
+		paca[cpu].xStab_data.virt = (unsigned long)tmp;
+		paca[cpu].xStab_data.real = (unsigned long)__v2a(tmp);
+	}
 
 	/* create a process for the processor */
 	/* only regs.msr is actually used, and 0 is OK for it */

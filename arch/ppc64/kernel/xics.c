@@ -437,7 +437,7 @@ void xics_set_affinity(unsigned int virq, unsigned long cpumask)
 	unsigned long flags;
 	long status;
 	unsigned long xics_status[2];
-	u32 newmask;
+	unsigned long newmask;
 
 	virq -= XICS_IRQ_OFFSET;
 	irq = virt_irq_to_real(virq);
@@ -455,12 +455,12 @@ void xics_set_affinity(unsigned int virq, unsigned long cpumask)
 	}
 
 	/* For the moment only implement delivery to all cpus or one cpu */
-	if (cpumask == 0xffffffff) {
+	if (cpumask == -1UL) {
 		newmask = default_distrib_server;
 	} else {
 		if (!(cpumask & cpu_online_map))
 			goto out;
-		newmask = find_first_bit(&cpumask, 32);
+		newmask = find_first_bit(&cpumask, 8*sizeof(unsigned long));
 	}
 
 	status = rtas_call(ibm_set_xive, 3, 1, NULL,

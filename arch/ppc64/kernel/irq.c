@@ -395,7 +395,7 @@ handle_irq_event(int irq, struct pt_regs *regs, struct irqaction *action)
 }
 
 #ifdef CONFIG_SMP
-extern unsigned int irq_affinity [NR_IRQS];
+extern unsigned long irq_affinity [NR_IRQS];
 
 typedef struct {
 	unsigned long cpu;
@@ -409,7 +409,7 @@ static irq_balance_t irq_balance[NR_IRQS] __cacheline_aligned
 		(idle_cpu(cpu) && ((now) - irq_stat[(cpu)].idle_timestamp > 1))
 
 #define IRQ_ALLOWED(cpu,allowed_mask) \
-		((1 << cpu) & (allowed_mask))
+		((1UL << cpu) & (allowed_mask))
 
 #define IRQ_BALANCE_INTERVAL (HZ/50)
 
@@ -461,7 +461,7 @@ static inline void balance_irq(int irq)
 		new_cpu = move(entry->cpu, allowed_mask, now, random_number);
 		if (entry->cpu != new_cpu) {
 			entry->cpu = new_cpu;
-			irq_desc[irq].handler->set_affinity(irq, 1 << new_cpu);
+			irq_desc[irq].handler->set_affinity(irq, 1UL << new_cpu);
 		}
 	}
 }
@@ -649,19 +649,19 @@ static struct proc_dir_entry * irq_dir [NR_IRQS];
 static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 
 #ifdef CONFIG_IRQ_ALL_CPUS
-unsigned int irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = 0xffffffff};
+unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = -1UL};
 #else  /* CONFIG_IRQ_ALL_CPUS */
-unsigned int irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = 0x00000000};
+unsigned long irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = 0x0};
 #endif /* CONFIG_IRQ_ALL_CPUS */
 
-#define HEX_DIGITS 8
+#define HEX_DIGITS 16
 
 static int irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
 	if (count < HEX_DIGITS+1)
 		return -EINVAL;
-	return sprintf (page, "%08x\n", irq_affinity[(int)(long)data]);
+	return sprintf(page, "%16lx\n", irq_affinity[(long)data]);
 }
 
 static unsigned int parse_hex_value (const char *buffer,
@@ -679,7 +679,7 @@ static unsigned int parse_hex_value (const char *buffer,
 		return -EFAULT;
 
 	/*
-	 * Parse the first 8 characters as a hex string, any non-hex char
+	 * Parse the first 16 characters as a hex string, any non-hex char
 	 * is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
 	 */
 	value = 0;
@@ -704,7 +704,7 @@ out:
 static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
-	int irq = (int)(long) data, full_count = count, err;
+	int irq = (long)data, full_count = count, err;
 	unsigned long new_value;
 
 	if (!irq_desc[irq].handler->set_affinity)
@@ -712,8 +712,6 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 
 	err = parse_hex_value(buffer, count, &new_value);
 
-/* Why is this disabled ? --BenH */
-#if 0/*CONFIG_SMP*/
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
 	 * way to make the system unusable accidentally :-) At least
@@ -721,7 +719,6 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	 */
 	if (!(new_value & cpu_online_map))
 		return -EINVAL;
-#endif
 
 	irq_affinity[irq] = new_value;
 	irq_desc[irq].handler->set_affinity(irq, new_value);
