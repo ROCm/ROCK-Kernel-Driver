@@ -908,6 +908,12 @@ static void serial8250_stop_tx(struct uart_port *port, unsigned int tty_stop)
 		up->ier &= ~UART_IER_THRI;
 		serial_out(up, UART_IER, up->ier);
 	}
+
+	/*
+	 * We only do this from uart_stop - if we run out of
+	 * characters to send, we don't want to prevent the
+	 * FIFO from emptying.
+	 */
 	if (up->port.type == PORT_16C950 && tty_stop) {
 		up->acr |= UART_ACR_TXDIS;
 		serial_icr_write(up, UART_ACR, up->acr);
