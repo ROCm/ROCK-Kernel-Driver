@@ -26,6 +26,10 @@ struct fat_mount_options {
 		 nocase:1;	  /* Does this need case conversion? 0=need case conversion*/
 };
 
+#define FAT_HASH_BITS	8
+#define FAT_HASH_SIZE	(1UL << FAT_HASH_BITS)
+#define FAT_HASH_MASK	(FAT_HASH_SIZE-1)
+
 struct msdos_sb_info {
 	unsigned short sec_per_clus; /* sectors/cluster */
 	unsigned short cluster_bits; /* log2(cluster_size) */
@@ -48,6 +52,9 @@ struct msdos_sb_info {
 	void *dir_ops;		     /* Opaque; default directory operations */
 	int dir_per_block;	     /* dir entries per block */
 	int dir_per_block_bits;	     /* log2(dir_per_block) */
+
+	spinlock_t inode_hash_lock;
+	struct hlist_head inode_hashtable[FAT_HASH_SIZE];
 };
 
 #endif

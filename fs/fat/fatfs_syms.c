@@ -31,7 +31,7 @@ void __exit fat_destroy_inodecache(void);
 static int __init init_fat_fs(void)
 {
 	int ret;
-	fat_hash_init();
+
 	ret = fat_cache_init();
 	if (ret < 0)
 		return ret;

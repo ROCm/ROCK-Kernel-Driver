@@ -58,17 +58,14 @@ static void fat_write_inode(struct inode *inode, int wait);
  *			and consider negative result as cache miss.
  */
 
-#define FAT_HASH_BITS	8
-#define FAT_HASH_SIZE	(1UL << FAT_HASH_BITS)
-#define FAT_HASH_MASK	(FAT_HASH_SIZE-1)
-static struct hlist_head fat_inode_hashtable[FAT_HASH_SIZE];
-static spinlock_t fat_inode_lock = SPIN_LOCK_UNLOCKED;
-
-void fat_hash_init(void)
+static void fat_hash_init(struct super_block *sb)
 {
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int i;
+
+	spin_lock_init(&sbi->inode_hash_lock);
 	for (i = 0; i < FAT_HASH_SIZE; i++)
-		INIT_HLIST_HEAD(&fat_inode_hashtable[i]);
+		INIT_HLIST_HEAD(&sbi->inode_hashtable[i]);
 }
 
 static inline unsigned long fat_hash(struct super_block *sb, loff_t i_pos)
@@ -80,39 +77,43 @@ static inline unsigned long fat_hash(struct super_block *sb, loff_t i_pos)
 
 void fat_attach(struct inode *inode, loff_t i_pos)
 {
-	spin_lock(&fat_inode_lock);
+	struct super_block *sb = inode->i_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+
+	spin_lock(&sbi->inode_hash_lock);
 	MSDOS_I(inode)->i_pos = i_pos;
 	hlist_add_head(&MSDOS_I(inode)->i_fat_hash,
-		fat_inode_hashtable + fat_hash(inode->i_sb, i_pos));
-	spin_unlock(&fat_inode_lock);
+			sbi->inode_hashtable + fat_hash(sb, i_pos));
+	spin_unlock(&sbi->inode_hash_lock);
 }
 
 void fat_detach(struct inode *inode)
 {
-	spin_lock(&fat_inode_lock);
+	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
+	spin_lock(&sbi->inode_hash_lock);
 	MSDOS_I(inode)->i_pos = 0;
 	hlist_del_init(&MSDOS_I(inode)->i_fat_hash);
-	spin_unlock(&fat_inode_lock);
+	spin_unlock(&sbi->inode_hash_lock);
 }
 
 struct inode *fat_iget(struct super_block *sb, loff_t i_pos)
 {
-	struct hlist_head *head = fat_inode_hashtable + fat_hash(sb, i_pos);
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	struct hlist_head *head = sbi->inode_hashtable + fat_hash(sb, i_pos);
 	struct hlist_node *_p;
 	struct msdos_inode_info *i;
 	struct inode *inode = NULL;
 
-	spin_lock(&fat_inode_lock);
+	spin_lock(&sbi->inode_hash_lock);
 	hlist_for_each_entry(i, _p, head, i_fat_hash) {
-		if (i->vfs_inode.i_sb != sb)
-			continue;
+		BUG_ON(i->vfs_inode.i_sb != sb);
 		if (i->i_pos != i_pos)
 			continue;
 		inode = igrab(&i->vfs_inode);
 		if (inode)
 			break;
 	}
-	spin_unlock(&fat_inode_lock);
+	spin_unlock(&sbi->inode_hash_lock);
 	return inode;
 }
 
@@ -155,13 +156,15 @@ static void fat_delete_inode(struct inode *inode)
 
 static void fat_clear_inode(struct inode *inode)
 {
+	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
+
 	if (is_bad_inode(inode))
 		return;
 	lock_kernel();
-	spin_lock(&fat_inode_lock);
+	spin_lock(&sbi->inode_hash_lock);
 	fat_cache_inval_inode(inode);
 	hlist_del_init(&MSDOS_I(inode)->i_fat_hash);
-	spin_unlock(&fat_inode_lock);
+	spin_unlock(&sbi->inode_hash_lock);
 	unlock_kernel();
 }
 
@@ -822,6 +825,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		goto out_fail;
 
 	/* set up enough so that it can read an inode */
+	fat_hash_init(sb);
 	init_MUTEX(&sbi->fat_lock);
 
 	error = -EIO;
@@ -1231,6 +1235,7 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 int fat_write_inode(struct inode *inode, int wait)
 {
 	struct super_block *sb = inode->i_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	struct buffer_head *bh;
 	struct msdos_dir_entry *raw_entry;
 	loff_t i_pos;
@@ -1241,22 +1246,22 @@ retry:
 		return 0;
 	}
 	lock_kernel();
-	if (!(bh = sb_bread(sb, i_pos >> MSDOS_SB(sb)->dir_per_block_bits))) {
+	if (!(bh = sb_bread(sb, i_pos >> sbi->dir_per_block_bits))) {
 		printk(KERN_ERR "FAT: unable to read inode block "
 		       "for updating (i_pos %lld)\n", i_pos);
 		unlock_kernel();
 		return -EIO;
 	}
-	spin_lock(&fat_inode_lock);
+	spin_lock(&sbi->inode_hash_lock);
 	if (i_pos != MSDOS_I(inode)->i_pos) {
-		spin_unlock(&fat_inode_lock);
+		spin_unlock(&sbi->inode_hash_lock);
 		brelse(bh);
 		unlock_kernel();
 		goto retry;
 	}
 
 	raw_entry = &((struct msdos_dir_entry *) (bh->b_data))
-	    [i_pos & (MSDOS_SB(sb)->dir_per_block - 1)];
+	    [i_pos & (sbi->dir_per_block - 1)];
 	if (S_ISDIR(inode->i_mode)) {
 		raw_entry->attr = ATTR_DIR;
 		raw_entry->size = 0;
@@ -1270,11 +1275,11 @@ retry:
 	raw_entry->start = CT_LE_W(MSDOS_I(inode)->i_logstart);
 	raw_entry->starthi = CT_LE_W(MSDOS_I(inode)->i_logstart >> 16);
 	fat_date_unix2dos(inode->i_mtime.tv_sec, &raw_entry->time, &raw_entry->date);
-	if (MSDOS_SB(sb)->options.isvfat) {
+	if (sbi->options.isvfat) {
 		fat_date_unix2dos(inode->i_ctime.tv_sec,&raw_entry->ctime,&raw_entry->cdate);
 		raw_entry->ctime_ms = MSDOS_I(inode)->i_ctime_ms; /* use i_ctime.tv_nsec? */
 	}
-	spin_unlock(&fat_inode_lock);
+	spin_unlock(&sbi->inode_hash_lock);
 	mark_buffer_dirty(bh);
 	brelse(bh);
 	unlock_kernel();

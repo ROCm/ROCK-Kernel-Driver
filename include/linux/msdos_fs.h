@@ -259,7 +259,6 @@ extern int fat_get_block(struct inode *inode, sector_t iblock,
 extern void fat_truncate(struct inode *inode);
 
 /* fat/inode.c */
-extern void fat_hash_init(void);
 extern void fat_attach(struct inode *inode, loff_t i_pos);
 extern void fat_detach(struct inode *inode);
 extern struct inode *fat_iget(struct super_block *sb, loff_t i_pos);
