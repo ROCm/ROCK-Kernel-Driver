@@ -482,10 +482,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 	if (port->open_count == 1) {
 		/* only call the device specific open if this 
 		 * is the first time the port is opened */
-		if (serial->type->open)
-			retval = serial->type->open(port, filp);
-		else
-			retval = usb_serial_generic_open(port, filp);
+		retval = serial->type->open(port, filp);
 		if (retval) {
 			port->open_count = 0;
 			module_put(serial->type->owner);
@@ -507,10 +504,7 @@ static void __serial_close(struct usb_serial_port *port, struct file *filp)
 	if (port->open_count <= 0) {
 		/* only call the device specific close if this 
 		 * port is being closed by the last owner */
-		if (port->serial->type->close)
-			port->serial->type->close(port, filp);
-		else
-			usb_serial_generic_close(port, filp);
+		port->serial->type->close(port, filp);
 		port->open_count = 0;
 	}
 
@@ -552,11 +546,8 @@ static int serial_write (struct tty_struct * tty, int from_user, const unsigned 
 		goto exit;
 	}
 
-	/* pass on to the driver specific version of this function if it is available */
-	if (serial->type->write)
-		retval = serial->type->write(port, from_user, buf, count);
-	else
-		retval = usb_serial_generic_write(port, from_user, buf, count);
+	/* pass on to the driver specific version of this function */
+	retval = serial->type->write(port, from_user, buf, count);
 
 exit:
 	return retval;
@@ -578,11 +569,8 @@ static int serial_write_room (struct tty_struct *tty)
 		goto exit;
 	}
 
-	/* pass on to the driver specific version of this function if it is available */
-	if (serial->type->write_room)
-		retval = serial->type->write_room(port);
-	else
-		retval = usb_serial_generic_write_room(port);
+	/* pass on to the driver specific version of this function */
+	retval = serial->type->write_room(port);
 
 exit:
 	return retval;
@@ -604,11 +592,8 @@ static int serial_chars_in_buffer (struct tty_struct *tty)
 		goto exit;
 	}
 
-	/* pass on to the driver specific version of this function if it is available */
-	if (serial->type->chars_in_buffer)
-		retval = serial->type->chars_in_buffer(port);
-	else
-		retval = usb_serial_generic_chars_in_buffer(port);
+	/* pass on to the driver specific version of this function */
+	retval = serial->type->chars_in_buffer(port);
 
 exit:
 	return retval;
@@ -736,10 +721,7 @@ static void serial_shutdown (struct usb_serial *serial)
 {
 	dbg ("%s", __FUNCTION__);
 
-	if (serial->type->shutdown)
-		serial->type->shutdown(serial);
-	else
-		usb_serial_generic_shutdown(serial);
+	serial->type->shutdown(serial);
 }
 
 static int serial_read_proc (char *page, char **start, off_t off, int count, int *eof, void *data)
@@ -1186,9 +1168,7 @@ int usb_serial_probe(struct usb_interface *interface,
 				   usb_rcvbulkpipe (dev,
 					   	    endpoint->bEndpointAddress),
 				   port->bulk_in_buffer, buffer_size,
-				   ((serial->type->read_bulk_callback) ? 
-				     serial->type->read_bulk_callback : 
-				     usb_serial_generic_read_bulk_callback),
+				   serial->type->read_bulk_callback,
 				   port);
 	}
 
@@ -1212,9 +1192,7 @@ int usb_serial_probe(struct usb_interface *interface,
 				   usb_sndbulkpipe (dev,
 						    endpoint->bEndpointAddress),
 				   port->bulk_out_buffer, buffer_size, 
-				   ((serial->type->write_bulk_callback) ? 
-				     serial->type->write_bulk_callback : 
-				     usb_serial_generic_write_bulk_callback),
+				   serial->type->write_bulk_callback,
 				   port);
 	}
 
@@ -1429,10 +1407,32 @@ static void __exit usb_serial_exit(void)
 module_init(usb_serial_init);
 module_exit(usb_serial_exit);
 
+#define set_to_generic_if_null(type, function)				\
+	do {								\
+		if (!type->function) {					\
+			type->function = usb_serial_generic_##function;	\
+			dbg("Had to override the " #function		\
+				 " usb serial operation with the generic one.");\
+			}						\
+	} while (0)
+
+static void fixup_generic(struct usb_serial_device_type *device)
+{
+	set_to_generic_if_null(device, open);
+	set_to_generic_if_null(device, write);
+	set_to_generic_if_null(device, close);
+	set_to_generic_if_null(device, write_room);
+	set_to_generic_if_null(device, chars_in_buffer);
+	set_to_generic_if_null(device, read_bulk_callback);
+	set_to_generic_if_null(device, write_bulk_callback);
+	set_to_generic_if_null(device, shutdown);
+}
 
 int usb_serial_register(struct usb_serial_device_type *new_device)
 {
 	int retval;
+
+	fixup_generic(new_device);
 
 	/* Add this device to our list of devices */
 	list_add(&new_device->driver_list, &usb_serial_driver_list);
