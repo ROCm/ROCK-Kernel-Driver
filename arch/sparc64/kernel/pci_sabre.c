@@ -221,6 +221,7 @@
 	 ((unsigned long)(REG)))
 
 static int hummingbird_p;
+static struct pci_bus *sabre_root_bus;
 
 static void *sabre_pci_config_mkaddr(struct pci_pbm_info *pbm,
 				     unsigned char bus,
@@ -860,6 +861,42 @@ static irqreturn_t sabre_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t sabre_pcierr_intr_other(struct pci_controller_info *p)
+{
+	unsigned long csr_reg, csr, csr_error_bits;
+	irqreturn_t ret = IRQ_NONE;
+	u16 stat;
+
+	csr_reg = p->pbm_A.controller_regs + SABRE_PCICTRL;
+	csr = sabre_read(csr_reg);
+	csr_error_bits =
+		csr & SABRE_PCICTRL_SERR;
+	if (csr_error_bits) {
+		/* Clear the errors.  */
+		sabre_write(csr_reg, csr);
+
+		/* Log 'em.  */
+		if (csr_error_bits & SABRE_PCICTRL_SERR)
+			printk("SABRE%d: PCI SERR signal asserted.\n",
+			       p->index);
+		ret = IRQ_HANDLED;
+	}
+	pci_read_config_word(sabre_root_bus->self,
+			     PCI_STATUS, &stat);
+	if (stat & (PCI_STATUS_PARITY |
+		    PCI_STATUS_SIG_TARGET_ABORT |
+		    PCI_STATUS_REC_TARGET_ABORT |
+		    PCI_STATUS_REC_MASTER_ABORT |
+		    PCI_STATUS_SIG_SYSTEM_ERROR)) {
+		printk("SABRE%d: PCI bus error, PCI_STATUS[%04x]\n",
+		       p->index, stat);
+		pci_write_config_word(sabre_root_bus->self,
+				      PCI_STATUS, 0xffff);
+		ret = IRQ_HANDLED;
+	}
+	return ret;
+}
+
 static irqreturn_t sabre_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct pci_controller_info *p = dev_id;
@@ -881,7 +918,7 @@ static irqreturn_t sabre_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs
 		 SABRE_PIOAFSR_SMA | SABRE_PIOAFSR_STA |
 		 SABRE_PIOAFSR_SRTRY | SABRE_PIOAFSR_SPERR);
 	if (!error_bits)
-		return IRQ_NONE;
+		return sabre_pcierr_intr_other(p);
 	sabre_write(afsr_reg, error_bits);
 
 	/* Log the error. */
@@ -1167,6 +1204,8 @@ static void __init sabre_scan_bus(struct pci_controller_info *p)
 				 &p->pbm_A);
 	pci_fixup_host_bridge_self(sabre_bus);
 	sabre_bus->self->sysdata = cookie;
+
+	sabre_root_bus = sabre_bus;
 
 	apb_init(p, sabre_bus);
 

@@ -72,7 +72,7 @@ sys_call_table32:
 /*250*/	.word sys32_mremap, sys32_sysctl, sys_getsid, sys_fdatasync, sys32_nfsservctl
 	.word sys_ni_syscall, compat_clock_settime, compat_clock_gettime, compat_clock_getres, compat_clock_nanosleep
 /*260*/	.word compat_sys_sched_getaffinity, compat_sys_sched_setaffinity, compat_timer_settime, compat_timer_gettime, sys_timer_getoverrun
-	.word sys_timer_delete, sys_ni_syscall
+	.word sys_timer_delete, sys32_timer_create, sys_ni_syscall
 
 	/* Now the 64-bit native Linux syscall table. */
 
@@ -133,7 +133,7 @@ sys_call_table:
 /*250*/	.word sys64_mremap, sys_sysctl, sys_getsid, sys_fdatasync, sys_nfsservctl
 	.word sys_ni_syscall, sys_clock_settime, sys_clock_gettime, sys_clock_getres, sys_clock_nanosleep
 /*260*/	.word sys_sched_getaffinity, sys_sched_setaffinity, sys_timer_settime, sys_timer_gettime, sys_timer_getoverrun
-	.word sys_timer_delete, sys_ni_syscall
+	.word sys_timer_delete, sys_timer_create, sys_ni_syscall
 
 #if defined(CONFIG_SUNOS_EMUL) || defined(CONFIG_SOLARIS_EMUL) || \
     defined(CONFIG_SOLARIS_EMUL_MODULE)
@@ -228,10 +228,10 @@ sunos_sys_table:
 	.word sunos_nosys, sunos_nosys, sunos_nosys
 	.word sunos_nosys, sunos_nosys
 /*250*/	.word sunos_nosys, sunos_nosys, sunos_nosys
-	.word sunos_nosys, sunos_nosys, sys_ni_syscall
-	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
-	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
-	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
-	.word sys_ni_syscall, sys_ni_syscall
+	.word sunos_nosys, sunos_nosys, sunos_nosys
+	.word sunos_nosys, sunos_nosys, sunos_nosys
+	.word sunos_nosys, sunos_nosys, sunos_nosys
+	.word sunos_nosys, sunos_nosys, sunos_nosys
+	.word sunos_nosys, sunos_nosys, sunos_nosys
 
 #endif
