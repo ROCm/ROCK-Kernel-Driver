@@ -21,6 +21,9 @@
 #include <linux/ptrace.h>
 #include <linux/blkdev.h>
 #include <linux/backing-dev.h>
+#include <linux/mount.h>
+#include <linux/personality.h>
+#include <linux/security.h>
 #include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
@@ -372,30 +375,14 @@ unsigned long do_mmap_pgoff(struct file *file,
 	struct rb_node *rb;
 	unsigned int vm_flags;
 	void *result;
-	int ret, chrdev;
+	int ret, membacked;
 
-	/*
-	 * Get the !CONFIG_MMU specific checks done first
-	 */
-	chrdev = 0;
-	if (file)
-		chrdev = S_ISCHR(file->f_dentry->d_inode->i_mode);
-
-	if ((flags & MAP_SHARED) && (prot & PROT_WRITE) && file && !chrdev) {
-		printk("MAP_SHARED not completely supported (cannot detect page dirtying)\n");
-		return -EINVAL;
-	}
-
+	/* do the simple checks first */
 	if (flags & MAP_FIXED || addr) {
-		/* printk("can't do fixed-address/overlay mmap of RAM\n"); */
+		printk(KERN_DEBUG "%d: Can't do fixed-address/overlay mmap of RAM\n",
+		       current->pid);
 		return -EINVAL;
 	}
-
-	/*
-	 * now all the standard checks
-	 */
-	if (file && (!file->f_op || !file->f_op->mmap))
-		return -ENODEV;
 
 	if (PAGE_ALIGN(len) == 0)
 		return addr;
@@ -407,55 +394,129 @@ unsigned long do_mmap_pgoff(struct file *file,
 	if ((pgoff + (len >> PAGE_SHIFT)) < pgoff)
 		return -EINVAL;
 
-	/* we're going to need to record the mapping if it works */
-	vml = kmalloc(sizeof(struct vm_list_struct), GFP_KERNEL);
-	if (!vml)
-		goto error_getting_vml;
-	memset(vml, 0, sizeof(*vml));
+	/* validate file mapping requests */
+	membacked = 0;
+	if (file) {
+		/* files must support mmap */
+		if (!file->f_op || !file->f_op->mmap)
+			return -ENODEV;
 
-	/* Do simple checking here so the lower-level routines won't have
+		if ((prot & PROT_EXEC) &&
+		    (file->f_vfsmnt->mnt_flags & MNT_NOEXEC))
+			return -EPERM;
+
+		/* work out if what we've got could possibly be shared
+		 * - we support chardevs that provide their own "memory"
+		 * - we support files/blockdevs that are memory backed
+		 */
+		if (S_ISCHR(file->f_dentry->d_inode->i_mode)) {
+			membacked = 1;
+		}
+		else {
+			struct address_space *mapping = file->f_mapping;
+			if (!mapping)
+				mapping = file->f_dentry->d_inode->i_mapping;
+			if (mapping && mapping->backing_dev_info)
+				membacked = mapping->backing_dev_info->memory_backed;
+		}
+
+		if (flags & MAP_SHARED) {
+			/* do checks for writing, appending and locking */
+			if ((prot & PROT_WRITE) && !(file->f_mode & FMODE_WRITE))
+				return -EACCES;
+
+			if (IS_APPEND(file->f_dentry->d_inode) &&
+			    (file->f_mode & FMODE_WRITE))
+				return -EACCES;
+
+			if (locks_verify_locked(file->f_dentry->d_inode))
+				return -EAGAIN;
+
+			if (!membacked) {
+				printk("MAP_SHARED not completely supported on !MMU\n");
+				return -EINVAL;
+			}
+
+			/* we require greater support from the driver or
+			 * filesystem - we ask it to tell us what memory to
+			 * use */
+			if (!file->f_op->get_unmapped_area)
+				return -ENODEV;
+		}
+		else {
+			/* we read private files into memory we allocate */
+			if (!file->f_op->read)
+				return -ENODEV;
+		}
+	}
+
+	/* handle PROT_EXEC implication by PROT_READ */
+	if ((prot & PROT_READ) && (current->personality & READ_IMPLIES_EXEC))
+		if (!(file && (file->f_vfsmnt->mnt_flags & MNT_NOEXEC)))
+			prot |= PROT_EXEC;
+
+	/* do simple checking here so the lower-level routines won't have
 	 * to. we assume access permissions have been handled by the open
 	 * of the memory object, so we don't do any here.
 	 */
 	vm_flags = calc_vm_flags(prot,flags) /* | mm->def_flags */
 		| VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
 
-	if (!chrdev) {
+	if (!membacked) {
 		/* share any file segment that's mapped read-only */
 		if (((flags & MAP_PRIVATE) && !(prot & PROT_WRITE) && file) ||
 		    ((flags & MAP_SHARED) && !(prot & PROT_WRITE) && file))
-			vm_flags |= VM_SHARED | VM_MAYSHARE;
+			vm_flags |= VM_MAYSHARE;
 
 		/* refuse to let anyone share files with this process if it's being traced -
 		 * otherwise breakpoints set in it may interfere with another untraced process
 		 */
-		if (!chrdev && current->ptrace & PT_PTRACED)
+		if (current->ptrace & PT_PTRACED)
 			vm_flags &= ~(VM_SHARED | VM_MAYSHARE);
 	}
 	else {
-		/* permit sharing of character devices at any time */
-		vm_flags |= VM_MAYSHARE;
-		if (flags & MAP_SHARED)
-			vm_flags |= VM_SHARED;
+		/* permit sharing of character devices and ramfs files at any time for
+		 * anything other than a privately writable mapping
+		 */
+		if (!(flags & MAP_PRIVATE) || !(prot & PROT_WRITE)) {
+			vm_flags |= VM_MAYSHARE;
+			if (flags & MAP_SHARED)
+				vm_flags |= VM_SHARED;
+		}
 	}
 
-	/* if we want to share, we need to search for VMAs created by another mmap() call that
-	 * overlap with our proposed mapping
-	 * - we can only share with an exact match on regular files
-	 * - shared mappings on character devices are permitted to overlap inexactly as far as we
-	 *   are concerned, but in that case, sharing is handled in the driver rather than here
-	 */
+	/* allow the security API to have its say */
+	ret = security_file_mmap(file, prot, flags);
+	if (ret)
+		return ret;
+
+	/* we're going to need to record the mapping if it works */
+	vml = kmalloc(sizeof(struct vm_list_struct), GFP_KERNEL);
+	if (!vml)
+		goto error_getting_vml;
+	memset(vml, 0, sizeof(*vml));
+
 	down_write(&nommu_vma_sem);
-	if (!chrdev && vm_flags & VM_SHARED) {
+
+	/* if we want to share, we need to search for VMAs created by another
+	 * mmap() call that overlap with our proposed mapping
+	 * - we can only share with an exact match on most regular files
+	 * - shared mappings on character devices and memory backed files are
+	 *   permitted to overlap inexactly as far as we are concerned for in
+	 *   these cases, sharing is handled in the driver or filesystem rather
+	 *   than here
+	 */
+	if (vm_flags & VM_MAYSHARE) {
 		unsigned long pglen = (len + PAGE_SIZE - 1) >> PAGE_SHIFT;
 		unsigned long vmpglen;
 
 		for (rb = rb_first(&nommu_vma_tree); rb; rb = rb_next(rb)) {
 			vma = rb_entry(rb, struct vm_area_struct, vm_rb);
 
-			if (!(vma->vm_flags & VM_SHARED))
+			if (!(vma->vm_flags & VM_MAYSHARE))
 				continue;
 
+			/* search for overlapping mappings on the same file */
 			if (vma->vm_file->f_dentry->d_inode != file->f_dentry->d_inode)
 				continue;
 
@@ -466,8 +527,9 @@ unsigned long do_mmap_pgoff(struct file *file,
 			if (pgoff >= vma->vm_pgoff + vmpglen)
 				continue;
 
+			/* handle inexact matches between mappings */
 			if (vmpglen != pglen || vma->vm_pgoff != pgoff) {
-				if (flags & MAP_SHARED)
+				if (!membacked)
 					goto sharing_violation;
 				continue;
 			}
@@ -481,11 +543,13 @@ unsigned long do_mmap_pgoff(struct file *file,
 		}
 	}
 
+	vma = NULL;
+
 	/* obtain the address to map to. we verify (or select) it and ensure
 	 * that it represents a valid section of the address space
 	 * - this is the hook for quasi-memory character devices
 	 */
-	if (file && file->f_op && file->f_op->get_unmapped_area)
+	if (file && file->f_op->get_unmapped_area)
 		addr = file->f_op->get_unmapped_area(file, addr, len, pgoff, flags);
 
 	if (IS_ERR((void *) addr)) {
@@ -511,18 +575,12 @@ unsigned long do_mmap_pgoff(struct file *file,
 
 	vml->vma = vma;
 
-	/*
-	 * determine the object being mapped and call the appropriate
-	 * specific mapper.
+	/* determine the object being mapped and call the appropriate specific
+	 * mapper.
 	 */
 	if (file) {
-		ret = -ENODEV;
-		if (!file->f_op)
-			goto error;
-
 #ifdef MAGIC_ROM_PTR
 		/* First, try simpler routine designed to give us a ROM pointer. */
-
 		if (file->f_op->romptr && !(prot & PROT_WRITE)) {
 			ret = file->f_op->romptr(file, vma);
 #ifdef DEBUG
@@ -536,9 +594,9 @@ unsigned long do_mmap_pgoff(struct file *file,
 				goto error;
 		} else
 #endif /* MAGIC_ROM_PTR */
-		/* Then try full mmap routine, which might return a RAM pointer,
-		   or do something truly complicated. */
-
+		/* Then try full mmap routine, which might return a RAM
+		 * pointer, or do something truly complicated
+		 */
 		if (file->f_op->mmap) {
 			ret = file->f_op->mmap(file, vma);
 
@@ -556,11 +614,15 @@ unsigned long do_mmap_pgoff(struct file *file,
 			goto error;
 		}
 
-		/* An ENOSYS error indicates that mmap isn't possible (as opposed to
-		   tried but failed) so we'll fall through to the copy. */
+		/* An ENOSYS error indicates that mmap isn't possible (as
+		 * opposed to tried but failed) so we'll fall through to the
+		 * copy. */
 	}
 
-	/* allocate some memory to hold the mapping */
+	/* allocate some memory to hold the mapping
+	 * - note that this may not return a page-aligned address if the object
+	 *   we're allocating is smaller than a page
+	 */
 	ret = -ENOMEM;
 	result = kmalloc(len, GFP_KERNEL);
 	if (!result) {
@@ -602,8 +664,10 @@ unsigned long do_mmap_pgoff(struct file *file,
 		flush_icache_range((unsigned long) result, (unsigned long) result + len);
 
  done:
-	realalloc += kobjsize(result);
-	askedalloc += len;
+	if (!(vma->vm_flags & VM_SHARED)) {
+		realalloc += kobjsize(result);
+		askedalloc += len;
+	}
 
 	realalloc += kobjsize(vma);
 	askedalloc += sizeof(*vma);
