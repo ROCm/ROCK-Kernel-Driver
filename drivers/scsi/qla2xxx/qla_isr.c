@@ -376,7 +376,14 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 			qla2100_fw_dump(ha, 1);
 		else
 	    		qla2300_fw_dump(ha, 1);
-		set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
+
+		if (mb[1] == 0) {
+			qla_printk(KERN_INFO, ha,
+			    "Unrecoverable Hardware Error: adapter marked "
+			    "OFFLINE!\n");
+			ha->flags.online = 0;
+		} else
+			set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
 		break;
 
 	case MBA_REQ_TRANSFER_ERR:	/* Request Transfer Error */
@@ -583,11 +590,13 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		}
 
 		/*
-		 * If PORT UPDATE is global (received LIP_OCCURRED/LIP_RESET
+		 * If PORT UPDATE is global (recieved LIP_OCCURED/LIP_RESET
 		 * event etc. earlier indicating loop is down) then process
 		 * it.  Otherwise ignore it and Wait for RSCN to come in.
 		 */
-		if (atomic_read(&ha->loop_state) != LOOP_DOWN) {
+		atomic_set(&ha->loop_down_timer, 0);
+		if (atomic_read(&ha->loop_state) != LOOP_DOWN &&
+		    atomic_read(&ha->loop_state) != LOOP_DEAD) {
 			DEBUG2(printk("scsi(%ld): Asynchronous PORT UPDATE "
 			    "ignored.\n", ha->host_no));
 			break;
@@ -604,7 +613,6 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		 */
 		atomic_set(&ha->loop_state, LOOP_UP);
 
-		atomic_set(&ha->loop_down_timer, 0);
 		qla2x00_mark_all_devices_lost(ha);
 
 		ha->flags.rscn_queue_overflow = 1;
