@@ -503,9 +503,10 @@ int sctp_rcv_ootb(struct sk_buff *skb)
 			goto discard;
 
 		if (SCTP_CID_ERROR == ch->type) {
-			err = (sctp_errhdr_t *)(ch + sizeof(sctp_chunkhdr_t));
-			if (SCTP_ERROR_STALE_COOKIE == err->cause)
-				goto discard;
+			sctp_walk_errors(err, ch) {
+				if (SCTP_ERROR_STALE_COOKIE == err->cause)
+					goto discard;
+			}
 		}
 
 		ch = (sctp_chunkhdr_t *) ch_end;

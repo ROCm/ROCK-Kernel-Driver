@@ -1787,24 +1787,17 @@ sctp_disposition_t sctp_sf_cookie_echoed_err(const struct sctp_endpoint *ep,
 	struct sctp_chunk *chunk = arg;
 	sctp_errhdr_t *err;
 
-	err = (sctp_errhdr_t *)(chunk->skb->data);
-
-	/* If we have gotten too many failures, give up.  */
-	if (1 + asoc->counters[SCTP_COUNTER_INIT_ERROR] >
-					 asoc->max_init_attempts) {
-		/* INIT_FAILED will issue an ulpevent.  */
-		sctp_add_cmd_sf(commands, SCTP_CMD_INIT_FAILED,
-				SCTP_U32(err->cause));
-		return SCTP_DISPOSITION_DELETE_TCB;
-	}
-
 	/* Process the error here */
-	switch (err->cause) {
-	case SCTP_ERROR_STALE_COOKIE:
-		return sctp_sf_do_5_2_6_stale(ep, asoc, type, arg, commands);
-	default:
-		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
+	/* FUTURE FIXME:  When PR-SCTP related and other optional
+	 * parms are emitted, this will have to change to handle multiple
+	 * errors.
+	 */
+	sctp_walk_errors(err, chunk->chunk_hdr) {
+		if (SCTP_ERROR_STALE_COOKIE == err->cause)
+			return sctp_sf_do_5_2_6_stale(ep, asoc, type, 
+							arg, commands);
 	}
+	return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 }
 
 /*
