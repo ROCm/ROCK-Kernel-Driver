@@ -8,18 +8,6 @@
 #ifndef _ZCONF_H
 #define _ZCONF_H
 
-#if defined(__GNUC__) || defined(__386__) || defined(i386)
-#  ifndef __32BIT__
-#    define __32BIT__
-#  endif
-#endif
-
-#if defined(__STDC__) || defined(__cplusplus)
-#  ifndef STDC
-#    define STDC
-#  endif
-#endif
-
 /* The memory requirements for deflate are (in bytes):
             (1 << (windowBits+2)) +  (1 << (memLevel+9))
  that is: 128K for windowBits=15  +  128K for memLevel = 8  (default values)
@@ -49,13 +37,7 @@
 
                         /* Type declarations */
 
-#ifndef OF /* function prototypes */
-#  ifdef STDC
 #    define OF(args)  args
-#  else
-#    define OF(args)  ()
-#  endif
-#endif
 
 #ifndef ZEXPORT
 #  define ZEXPORT
