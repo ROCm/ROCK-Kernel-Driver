@@ -598,6 +598,7 @@ struct rtl8139_private {
 MODULE_AUTHOR ("Jeff Garzik <jgarzik@pobox.com>");
 MODULE_DESCRIPTION ("RealTek RTL-8139 Fast Ethernet driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRV_VERSION);
 
 module_param(multicast_filter_limit, int, 0);
 module_param_array(media, int, NULL, 0);

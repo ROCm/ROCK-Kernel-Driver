@@ -362,6 +362,7 @@ MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM(use_dac, "i");
 MODULE_PARM_DESC(use_dac, "Enable PCI DAC. Unsafe on 32 bit PCI slot.");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(RTL8169_VERSION);
 
 static int rtl8169_open(struct net_device *dev);
 static int rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev);
