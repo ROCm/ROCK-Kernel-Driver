@@ -484,6 +484,17 @@ sums:
 # FIXME Should go into a make.lib or something 
 # ---------------------------------------------------------------------------
 
+# read all saved command lines
+
+cmd_files := $(wildcard .*.cmd)
+ifneq ($(cmd_files),)
+  include $(cmd_files)
+endif
+
+# Usage: $(call if_changed_rule,foo)
+# will check if $(cmd_foo) changed, or any of the prequisites changed,
+# and if so will execute $(rule_foo)
+
 if_changed_rule = $(if $(strip $? \
 		               $(filter-out $(cmd_$(1)),$(cmd_$(@F)))\
 			       $(filter-out $(cmd_$(@F)),$(cmd_$(1)))),\
