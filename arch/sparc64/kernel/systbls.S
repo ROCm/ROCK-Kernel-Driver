@@ -13,7 +13,7 @@
 #include <linux/config.h>
 
 	.text
-	.align	1024
+	.align	4
 
 	/* First, the 32-bit Linux native syscall table. */
 
@@ -76,7 +76,7 @@ sys_call_table32:
 
 	/* Now the 64-bit native Linux syscall table. */
 
-	.align	1024
+	.align	4
 	.globl sys_call_table64, sys_call_table
 sys_call_table64:
 sys_call_table:
@@ -139,7 +139,7 @@ sys_call_table:
     defined(CONFIG_SOLARIS_EMUL_MODULE)
 	/* Now the 32-bit SunOS syscall table. */
 
-	.align 1024
+	.align 4
 	.globl sunos_sys_table
 sunos_sys_table:
 /*0*/	.word sunos_indir, sparc_exit, sys_fork
