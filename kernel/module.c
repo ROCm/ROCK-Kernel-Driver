@@ -840,38 +840,11 @@ static int handle_section(const char *name,
 	return ret;
 }
 
-/* Figure out total size desired for the common vars */
-static unsigned long read_commons(void *start, Elf_Shdr *sechdr)
-{
-	unsigned long size, i, max_align;
-	Elf_Sym *sym;
-	
-	size = max_align = 0;
-
-	for (sym = start + sechdr->sh_offset, i = 0;
-	     i < sechdr->sh_size / sizeof(Elf_Sym);
-	     i++) {
-		if (sym[i].st_shndx == SHN_COMMON) {
-			/* Value encodes alignment. */
-			if (sym[i].st_value > max_align)
-				max_align = sym[i].st_value;
-			/* Pad to required alignment */
-			size = ALIGN(size, sym[i].st_value) + sym[i].st_size;
-		}
-	}
-
-	/* Now, add in max alignment requirement (with align
-	   attribute, this could be large), so we know we have space
-	   whatever the start alignment is */
-	return size + max_align;
-}
-
 /* Change all symbols so that sh_value encodes the pointer directly. */
-static void simplify_symbols(Elf_Shdr *sechdrs,
-			     unsigned int symindex,
-			     unsigned int strindex,
-			     void *common,
-			     struct module *mod)
+static int simplify_symbols(Elf_Shdr *sechdrs,
+			    unsigned int symindex,
+			    unsigned int strindex,
+			    struct module *mod)
 {
 	unsigned int i;
 	Elf_Sym *sym;
@@ -884,13 +857,10 @@ static void simplify_symbols(Elf_Shdr *sechdrs,
 	     i++) {
 		switch (sym[i].st_shndx) {
 		case SHN_COMMON:
-			/* Value encodes alignment. */
-			common = (void *)ALIGN((unsigned long)common,
-					       sym[i].st_value);
-			/* Change it to encode pointer */
-			sym[i].st_value = (unsigned long)common;
-			common += sym[i].st_size;
-			break;
+			/* We compiled with -fno-common.  These are not
+			   supposed to happen.  */
+			DEBUGP("Common symbol: %s\n", strtab + sym[i].st_name);
+			return -ENOEXEC;
 
 		case SHN_ABS:
 			/* Don't need to do anything */
@@ -928,15 +898,16 @@ static void simplify_symbols(Elf_Shdr *sechdrs,
 						       &ksg);
 		}
 	}
+
+	return 0;
 }
 
 /* Get the total allocation size of the init and non-init sections */
 static struct sizes get_sizes(const Elf_Ehdr *hdr,
 			      const Elf_Shdr *sechdrs,
-			      const char *secstrings,
-			      unsigned long common_length)
+			      const char *secstrings)
 {
-	struct sizes ret = { 0, common_length };
+	struct sizes ret = { 0, 0 };
 	unsigned i;
 
 	/* Everything marked ALLOC (this includes the exported
@@ -971,7 +942,6 @@ static struct module *load_module(void *umod,
 	unsigned int i, symindex, exportindex, strindex, setupindex, exindex,
 		modindex, obsparmindex;
 	long arglen;
-	unsigned long common_length;
 	struct sizes sizes, used;
 	struct module *mod;
 	long err = 0;
@@ -1089,9 +1059,8 @@ static struct module *load_module(void *umod,
 
 	mod->state = MODULE_STATE_COMING;
 
-	/* How much space will we need?  (Common area in first) */
-	common_length = read_commons(hdr, &sechdrs[symindex]);
-	sizes = get_sizes(hdr, sechdrs, secstrings, common_length);
+	/* How much space will we need? */
+	sizes = get_sizes(hdr, sechdrs, secstrings);
 
 	/* Set these up, and allow archs to manipulate them. */
 	mod->core_size = sizes.core_size;
@@ -1127,7 +1096,7 @@ static struct module *load_module(void *umod,
 
 	/* Transfer each section which requires ALLOC, and set sh_offset
 	   fields to absolute addresses. */
-	used.core_size = common_length;
+	used.core_size = 0;
 	used.init_size = 0;
 	for (i = 1; i < hdr->e_shnum; i++) {
 		if (sechdrs[i].sh_flags & SHF_ALLOC) {
@@ -1151,7 +1120,9 @@ static struct module *load_module(void *umod,
 	module_unload_init(mod);
 
 	/* Fix up syms, so that st_value is a pointer to location. */
-	simplify_symbols(sechdrs, symindex, strindex, mod->module_core, mod);
+	err = simplify_symbols(sechdrs, symindex, strindex, mod);
+	if (err < 0)
+		goto cleanup;
 
 	/* Set up EXPORTed symbols */
 	if (exportindex) {
