@@ -60,3 +60,4 @@ obj-$(CONFIG_EISA)		+= eisa/
 obj-$(CONFIG_CPU_FREQ)		+= cpufreq/
 obj-$(CONFIG_MMC)		+= mmc/
 obj-y				+= firmware/
+obj-$(CONFIG_CRYPTO)		+= crypto/
