@@ -1167,16 +1167,6 @@ static int __init inet_init(void)
 
 	icmp_init(&inet_family_ops);
 
-	/* I wish inet_add_protocol had no constructor hook...
-	   I had to move IPIP from net/ipv4/protocol.c :-( --ANK
-	 */
-#ifdef CONFIG_NET_IPIP
-	ipip_init();
-#endif
-#ifdef CONFIG_NET_IPGRE
-	ipgre_init();
-#endif
-
 	/*
 	 *	Initialise the multicast router
 	 */

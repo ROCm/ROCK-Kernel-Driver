@@ -788,11 +788,6 @@ static int __init inet6_init(void)
 	err = ndisc_init(&inet6_family_ops);
 	if (err)
 		goto ndisc_fail;
-#ifdef CONFIG_IPV6_TUNNEL
-	err = ip6_tunnel_init();
-	if (err)
-		goto ip6_tunnel_fail;
-#endif
 	err = igmp6_init(&inet6_family_ops);
 	if (err)
 		goto igmp_fail;
@@ -846,9 +841,6 @@ proc_raw6_fail:
 	igmp6_cleanup();
 #endif
 igmp_fail:
-#ifdef CONFIG_IPV6_TUNNEL
-	ip6_tunnel_cleanup();
-ip6_tunnel_fail:
 #endif
 	ndisc_cleanup();
 ndisc_fail:
@@ -882,9 +874,6 @@ static void __exit inet6_exit(void)
 	ip6_route_cleanup();
 	ipv6_packet_cleanup();
 	igmp6_cleanup();
-#ifdef CONFIG_IPV6_TUNNEL
-	ip6_tunnel_cleanup();
-#endif
 	ndisc_cleanup();
 	icmpv6_cleanup();
 #ifdef CONFIG_SYSCTL
