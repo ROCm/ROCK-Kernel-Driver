@@ -1886,7 +1886,7 @@ static inline long do_mmap2(
 	if (file)
 		fput(file);
 out:    
-	FSHOOK_END(mmap, !IS_ERR(void *)error) ? 0 : error)
+	FSHOOK_END(mmap, !IS_ERR((void *)error) ? 0 : error)
 
 	return error;
 }

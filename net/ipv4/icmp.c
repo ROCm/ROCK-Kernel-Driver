@@ -228,7 +228,7 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1];
  *
  *	On SMP we have one ICMP socket per-cpu.
  */
-static DEFINE_PER_CPU(struct socket *, __icmp_socket) = NULL;
+DEFINE_PER_CPU(struct socket *, __icmp_socket) = NULL;
 #define icmp_socket	__get_cpu_var(__icmp_socket)
 
 static __inline__ int icmp_xmit_lock(void)
