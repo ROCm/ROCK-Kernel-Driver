@@ -627,7 +627,6 @@ int inet_stream_connect(struct socket *sock, struct sockaddr * uaddr,
 			int addr_len, int flags)
 {
 	struct sock *sk=sock->sk;
-	struct inet_opt *inet = inet_sk(sk);
 	int err;
 	long timeo;
 
