@@ -33,7 +33,7 @@
 #define ZFCP_DEF_H
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.72 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.73 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -64,8 +64,6 @@
 /************************ DEBUG FLAGS *****************************************/
 
 #define	ZFCP_PRINT_FLAGS
-#define	ZFCP_STAT_REQSIZES
-#define	ZFCP_STAT_QUEUES
 
 /********************* GENERAL DEFINES *********************************/
 
@@ -1080,30 +1078,7 @@ struct zfcp_data {
 	char                    init_busid[BUS_ID_SIZE];
 	wwn_t                   init_wwpn;
 	fcp_lun_t               init_fcp_lun;
-#ifdef ZFCP_STAT_REQSIZES                            /* Statistical accounting
-							of processed data */
-	struct list_head	read_req_head;
-	struct list_head	write_req_head;
-	struct list_head	read_sg_head;
-	struct list_head	write_sg_head;
-	struct list_head	read_sguse_head;
-	struct list_head	write_sguse_head;
-	unsigned long		stat_errors;
-	rwlock_t		stat_lock;
-#endif
-#ifdef ZFCP_STAT_QUEUES
-        atomic_t                outbound_queue_full;
-	atomic_t		outbound_total;
-#endif
 };
-
-#ifdef ZFCP_STAT_REQSIZES
-struct zfcp_statistics {
-        struct list_head list;
-        u32 num;
-        u32 occurrence;
-};
-#endif
 
 struct zfcp_sg_list {
 	struct scatterlist *sg;
