@@ -162,9 +162,57 @@ void __init numa_init_array(void)
 	set_bit(0, &node_to_cpumask[cpu_to_node(0)]);
 }
 
+int numa_fake __initdata = 0;
+
+/* Numa emulation */
+static int numa_emulation(unsigned long start_pfn, unsigned long end_pfn)
+{
+ 	int i;
+ 	struct node nodes[MAXNODE];
+ 	unsigned long sz = ((end_pfn - start_pfn)<<PAGE_SHIFT) / numa_fake;
+
+ 	/* Kludge needed for the hash function */
+ 	if (hweight64(sz) > 1) {
+ 		unsigned long x = 1;
+ 		while ((x << 1) < sz)
+ 			x <<= 1;
+ 		if (x < sz/2)
+ 			printk("Numa emulation unbalanced. Complain to maintainer\n");
+ 		sz = x;
+ 	}
+
+ 	memset(&nodes,0,sizeof(nodes));
+ 	for (i = 0; i < numa_fake; i++) {
+ 		nodes[i].start = (start_pfn<<PAGE_SHIFT) + i*sz;
+ 		if (i == numa_fake-1)
+ 			sz = (end_pfn<<PAGE_SHIFT) - nodes[i].start;
+ 		nodes[i].end = nodes[i].start + sz;
+ 		if (i != numa_fake-1)
+ 			nodes[i].end--;
+ 		printk(KERN_INFO "Faking node %d at %016Lx-%016Lx (%LuMB)\n",
+ 		       i,
+ 		       nodes[i].start, nodes[i].end,
+ 		       (nodes[i].end - nodes[i].start) >> 20);
+ 	}
+ 	numnodes = numa_fake;
+ 	memnode_shift = compute_hash_shift(nodes);
+ 	if (memnode_shift < 0) {
+ 		memnode_shift = 0;
+ 		printk(KERN_ERR "No NUMA hash function found. Emulation disabled.\n");
+ 		return -1;
+ 	}
+ 	for (i = 0; i < numa_fake; i++)
+ 		setup_node_bootmem(i, nodes[i].start, nodes[i].end);
+ 	numa_init_array();
+ 	return 0;
+}
+
 void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 { 
 	int i;
+
+	if (numa_fake && !numa_emulation(start_pfn, end_pfn))
+ 		return;
 
 #ifdef CONFIG_K8_NUMA
 	if (!numa_off && !k8_scan_nodes(start_pfn<<PAGE_SHIFT, end_pfn<<PAGE_SHIFT))
@@ -214,8 +262,13 @@ void __init paging_init(void)
 /* [numa=off] */
 __init int numa_setup(char *opt) 
 { 
-	if (!strncmp(opt,"off",3))
+	if (!strcmp(opt,"off"))
 		numa_off = 1;
+	if(!strncmp(opt, "fake=", 5)) {
+		numa_fake = simple_strtoul(opt+5,NULL,0); ;
+		if (numa_fake >= MAX_NUMNODES)
+			numa_fake = MAX_NUMNODES;
+	}
 	return 1;
 } 
 
