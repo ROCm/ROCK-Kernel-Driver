@@ -113,7 +113,7 @@ memset_c:
 	/* expand byte value  */
 	movzbl %sil,%esi
 	movabs $0x0101010101010101,%rax
-	mul    %esi		/* with rax, clobbers rdx */
+	mulq   %rsi		/* with rax, clobbers rdx */
 	rep
 	stosq	
 	movl %r8d,%ecx
