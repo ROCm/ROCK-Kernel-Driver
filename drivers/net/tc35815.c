@@ -488,9 +488,6 @@ tc35815_probe(struct pci_dev *pdev,
 		return -ENODEV;
 	called++;
 
-	if (!pci_present())
-		return -ENODEV;
-
 	if (pdev) {
 		unsigned int pci_memaddr;
 		unsigned int pci_irq_line;
