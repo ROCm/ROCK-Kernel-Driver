@@ -1591,7 +1591,7 @@ static ssize_t auerchar_read (struct file *file, char __user *buf, size_t count,
 	/* Error checking */
 	if (!ccp)
 		return -EIO;
-	if (*ppos)
+	if (ppos != &file->f_pos)
  		return -ESPIPE;
         if (count == 0)
 		return 0;
@@ -1723,8 +1723,8 @@ static ssize_t auerchar_write (struct file *file, const char __user *buf, size_t
 	/* Error checking */
 	if (!ccp)
 		return -EIO;
-        if (*ppos)
-		return -ESPIPE;
+	if (ppos != &file->f_pos)
+ 		return -ESPIPE;
         if (len == 0)
                 return 0;
 

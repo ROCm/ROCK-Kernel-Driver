@@ -276,24 +276,25 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 	size_t elf_buflen;
 	int nphdr;
 	unsigned long start;
+	loff_t pos = *fpos;
 
 	read_lock(&kclist_lock);
 	tsz =  get_kcore_size(&nphdr, &elf_buflen);
 	proc_root_kcore->size = size = tsz + elf_buflen;
-	if (buflen == 0 || *fpos >= size) {
+	if (buflen == 0 || pos < 0 || pos >= size) {
 		read_unlock(&kclist_lock);
 		return 0;
 	}
 
 	/* trim buflen to not go beyond EOF */
-	if (buflen > size - *fpos)
-		buflen = size - *fpos;
+	if (buflen > size - pos)
+		buflen = size - pos;
 
 	/* construct an ELF core header if we'll need some of it */
-	if (*fpos < elf_buflen) {
+	if (pos < elf_buflen) {
 		char * elf_buf;
 
-		tsz = elf_buflen - *fpos;
+		tsz = elf_buflen - pos;
 		if (buflen < tsz)
 			tsz = buflen;
 		elf_buf = kmalloc(elf_buflen, GFP_ATOMIC);
@@ -304,13 +305,14 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 		memset(elf_buf, 0, elf_buflen);
 		elf_kcore_store_hdr(elf_buf, nphdr, elf_buflen);
 		read_unlock(&kclist_lock);
-		if (copy_to_user(buffer, elf_buf + *fpos, tsz)) {
+		if (copy_to_user(buffer, elf_buf + pos, tsz)) {
 			kfree(elf_buf);
 			return -EFAULT;
 		}
 		kfree(elf_buf);
 		buflen -= tsz;
-		*fpos += tsz;
+		pos += tsz;
+		*fpos = pos;
 		buffer += tsz;
 		acc += tsz;
 
@@ -324,7 +326,7 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 	 * Check to see if our file offset matches with any of
 	 * the addresses in the elf_phdr on our list.
 	 */
-	start = kc_offset_to_vaddr(*fpos - elf_buflen);
+	start = kc_offset_to_vaddr(pos - elf_buflen);
 	if ((tsz = (PAGE_SIZE - (start & ~PAGE_MASK))) > buflen)
 		tsz = buflen;
 		
@@ -408,7 +410,8 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 			}
 		}
 		buflen -= tsz;
-		*fpos += tsz;
+		pos += tsz;
+		*fpos = pos;
 		buffer += tsz;
 		acc += tsz;
 		start += tsz;

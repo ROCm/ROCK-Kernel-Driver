@@ -1698,59 +1698,74 @@ int radeonfb_set_par(struct fb_info *info)
 
 static ssize_t radeonfb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
-	unsigned long p = *ppos;
+	unsigned long p;
 	struct inode *inode = file->f_dentry->d_inode;
 	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
 	struct radeonfb_info *rinfo = info->par;
 	
-	if (p >= rinfo->mapped_vram)
-	    return 0;
+	down(&info->mutex);
+	p = *ppos;
+	if (*ppos  >= rinfo->mapped_vram)
+	{
+		up(&info->mutex);
+		return 0;
+	}
 	if (count >= rinfo->mapped_vram)
-	    count = rinfo->mapped_vram;
+		count = rinfo->mapped_vram;
 	if (count + p > rinfo->mapped_vram)
 		count = rinfo->mapped_vram - p;
 	radeonfb_sync(info);
+	
 	if (count) {
-	    char *base_addr;
+		char *base_addr;
 
-	    base_addr = info->screen_base;
-	    count -= copy_to_user(buf, base_addr+p, count);
-	    if (!count)
-		return -EFAULT;
-	    *ppos += count;
+		base_addr = info->screen_base;
+		count -= copy_to_user(buf, base_addr+p, count);
+		if (!count)
+			count = -EFAULT;
+		else
+			*ppos += count;
 	}
+	up(&info->mutex);
 	return count;
 }
 
 static ssize_t radeonfb_write(struct file *file, const char *buf, size_t count,
 			      loff_t *ppos)
 {
-	unsigned long p = *ppos;
+	unsigned long p;
 	struct inode *inode = file->f_dentry->d_inode;
 	int fbidx = iminor(inode);
 	struct fb_info *info = registered_fb[fbidx];
 	struct radeonfb_info *rinfo = info->par;
 	int err;
 
-	if (p > rinfo->mapped_vram)
-	    return -ENOSPC;
+	down(&info->mutex);
+	p = *ppos; /* truncated */
+	if (*ppos > rinfo->mapped_vram)
+	{
+		up(&info->mutex);
+		return -ENOSPC;
+	}
 	if (count >= rinfo->mapped_vram)
-	    count = rinfo->mapped_vram;
+		count = rinfo->mapped_vram;
 	err = 0;
 	if (count + p > rinfo->mapped_vram) {
-	    count = rinfo->mapped_vram - p;
-	    err = -ENOSPC;
+		count = rinfo->mapped_vram - p;
+		err = -ENOSPC;
 	}
 	radeonfb_sync(info);
+	
 	if (count) {
-	    char *base_addr;
+		char *base_addr;
 
-	    base_addr = info->screen_base;
-	    count -= copy_from_user(base_addr+p, buf, count);
-	    *ppos += count;
-	    err = -EFAULT;
+		base_addr = info->screen_base;
+		count -= copy_from_user(base_addr+p, buf, count);
+		*ppos += count;
+		err = -EFAULT;
 	}
+	up(&info->mutex);
 	if (count)
 		return count;
 	return err;

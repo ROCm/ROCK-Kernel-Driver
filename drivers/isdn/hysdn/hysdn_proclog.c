@@ -210,6 +210,7 @@ hysdn_log_read(struct file *file, char *buf, size_t count, loff_t * off)
 	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
 	struct procdata *pd = NULL;
 	hysdn_card *card;
+	loff_t pos = *off;
 
 	if (!*((struct log_data **) file->private_data)) {
 		if (file->f_flags & O_NONBLOCK)
@@ -237,7 +238,7 @@ hysdn_log_read(struct file *file, char *buf, size_t count, loff_t * off)
 	if ((len = strlen(inf->log_start)) <= count) {
 		if (copy_to_user(buf, inf->log_start, len))
 			return -EFAULT;
-		file->f_pos += len;
+		*off = pos + len;
 		return (len);
 	}
 	return (0);

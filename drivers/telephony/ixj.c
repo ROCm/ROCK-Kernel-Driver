@@ -2857,7 +2857,7 @@ static void alaw2ulaw(unsigned char *buff, unsigned long len)
 
 static ssize_t ixj_read(struct file * file_p, char *buf, size_t length, loff_t * ppos)
 {
-	unsigned long i = *ppos;
+	unsigned long i;
 	IXJ * j = get_ixj(NUM(file_p->f_dentry->d_inode));
 
 	DECLARE_WAITQUEUE(wait, current);
@@ -2937,7 +2937,7 @@ static ssize_t ixj_enhanced_read(struct file * file_p, char *buf, size_t length,
 
 static ssize_t ixj_write(struct file *file_p, const char *buf, size_t count, loff_t * ppos)
 {
-	unsigned long i = *ppos;
+	unsigned long i;
 	IXJ *j = file_p->private_data;
 
 	DECLARE_WAITQUEUE(wait, current);
@@ -2983,7 +2983,7 @@ static ssize_t ixj_write(struct file *file_p, const char *buf, size_t count, lof
 		j->flags.inwrite = 0;
 		return -EFAULT;
 	}
-       if(j->play_codec == ALAW)
+        if(j->play_codec == ALAW)
                alaw2ulaw(j->write_buffer_wp, min(count, j->write_buffer_size));
 	j->flags.inwrite = 0;
 	return min(count, j->write_buffer_size);
