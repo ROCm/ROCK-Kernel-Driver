@@ -88,26 +88,18 @@ struct task_struct;
 extern void __switch_to(struct task_struct *, struct task_struct *);
 #define switch_to(prev, next, last) __switch_to((prev), (next))
 
-#define prepare_arch_schedule(prev)		do { } while(0)
-#define finish_arch_schedule(prev)		do { } while(0)
-#define prepare_arch_switch(rq)			do { } while(0)
-#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
-
 struct thread_struct;
 extern void _switch(struct thread_struct *prev, struct thread_struct *next);
 
 struct pt_regs;
 extern void dump_regs(struct pt_regs *);
 
-#ifndef CONFIG_SMP
-
-#define cli()	local_irq_disable()
-#define sti()	local_irq_enable()
-#define save_flags(flags)	local_save_flags(flags)
-#define restore_flags(flags)	local_irq_restore(flags)
-#define save_and_cli(flags)	local_irq_save(flags)
-
-#endif /* !CONFIG_SMP */
+#define irqs_disabled()				\
+({						\
+	unsigned long flags;			\
+	local_save_flags(flags);		\
+	!(flags & MSR_EE);			\
+})
 
 static __inline__ int __is_processor(unsigned long pv)
 {
