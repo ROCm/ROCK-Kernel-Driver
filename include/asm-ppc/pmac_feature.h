@@ -31,7 +31,7 @@
 #ifndef __PPC_ASM_PMAC_FEATURE_H
 #define __PPC_ASM_PMAC_FEATURE_H
 
-#include <asm/macio_asic.h>
+#include <asm/macio.h>
 
 /*
  * Known Mac motherboard models

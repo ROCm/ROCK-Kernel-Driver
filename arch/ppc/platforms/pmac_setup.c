@@ -69,6 +69,7 @@
 #include <asm/btext.h>
 #include <asm/pmac_feature.h>
 #include <asm/time.h>
+#include <asm/of_device.h>
 #include "pmac_pic.h"
 #include "mem_pieces.h"
 
@@ -670,3 +671,29 @@ pmac_progress(char *s, unsigned short hex)
 	}
 }
 #endif /* CONFIG_BOOTX_TEXT */
+
+static int __init
+pmac_declare_of_platform_devices(void)
+{
+	struct device_node *np;
+
+	np = find_devices("uni-n");
+	if (np) {
+		for (np = np->child; np != NULL; np = np->sibling)
+			if (strncmp(np->name, "i2c", 3) == 0) {
+				of_platform_device_create(np, "uni-n-i2c");
+				break;
+			}
+	}
+
+	np = find_devices("valkyrie");
+	if (np)
+		of_platform_device_create(np, "valkyrie");
+	np = find_devices("platinum");
+	if (np)
+		of_platform_device_create(np, "platinum");
+
+	return 0;
+}
+
+device_initcall(pmac_declare_of_platform_devices);
