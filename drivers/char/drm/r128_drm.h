@@ -190,6 +190,7 @@ typedef struct drm_r128_sarea {
 #define DRM_IOCTL_R128_INDIRECT		DRM_IOWR(0x4f, drm_r128_indirect_t)
 #define DRM_IOCTL_R128_FULLSCREEN	DRM_IOW( 0x50, drm_r128_fullscreen_t)
 #define DRM_IOCTL_R128_CLEAR2		DRM_IOW( 0x51, drm_r128_clear2_t)
+#define DRM_IOCTL_R128_GETPARAM		DRM_IOW( 0x52, drm_r128_getparam_t)
 
 typedef struct drm_r128_init {
 	enum {
@@ -304,5 +305,15 @@ typedef struct drm_r128_fullscreen {
 		R128_CLEANUP_FULLSCREEN = 0x02
 	} func;
 } drm_r128_fullscreen_t;
+
+/* 2.3: An ioctl to get parameters that aren't available to the 3d
+ * client any other way.  
+ */
+#define R128_PARAM_IRQ_NR            1
+
+typedef struct drm_r128_getparam {
+	int param;
+	int *value;
+} drm_r128_getparam_t;
 
 #endif
