@@ -146,6 +146,7 @@ static const char udsl_driver_name[] = "Alcatel SpeedTouch USB";
 /* data thread */
 DECLARE_WAIT_QUEUE_HEAD (udsl_wqh);
 static DECLARE_COMPLETION(thread_grave);
+static DECLARE_MUTEX(udsl_usb_ioctl_lock);
 static unsigned int datapid;
 
 #ifdef DEBUG_PACKET
@@ -890,7 +891,7 @@ static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *
 {
 	struct usb_device *dev = interface_to_usbdev (intf);
 	struct udsl_instance_data *instance;
-	int i;
+	int i,retval;
 
 	for (i = 0; i < MAX_UDSL; i++)
 		if (minor_data[i] && (minor_data[i]->usb_dev == dev))
@@ -901,17 +902,20 @@ static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *
 
 	instance = minor_data[i];
 
+	down(&udsl_usb_ioctl_lock);
 	switch (code) {
 	case UDSL_IOCTL_START:
-		return udsl_usb_data_init (instance);
+		retval = udsl_usb_data_init (instance);
 		break;
 	case UDSL_IOCTL_STOP:
-		return udsl_usb_data_exit (instance);
+		retval = udsl_usb_data_exit (instance);
 		break;
 	default:
+		retval = -ENOTTY;
 		break;
 	}
-	return -EINVAL;
+	up(&udsl_usb_ioctl_lock);
+	return retval;
 }
 
 static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_id *id)
