@@ -30,8 +30,7 @@ struct exec
 
 #ifdef __KERNEL__
 
-/* 64-bit user address space is less PGDIR_SIZE due to pgd_index() bug. */
-#define STACK_TOP_USER64 (TASK_SIZE_USER64 - PGDIR_SIZE)
+#define STACK_TOP_USER64 (TASK_SIZE_USER64)
 
 /* Give 32-bit user space a full 4G address space to live in. */
 #define STACK_TOP_USER32 (TASK_SIZE_USER32)

@@ -119,7 +119,6 @@ typedef struct siginfo32 {
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS, SIGEMT */
 		struct {
 			unsigned int _addr; /* faulting insn/memory ref. */
-			int _trapno;
 		} _sigfault;
 
 		/* SIGPOLL */

@@ -3680,7 +3680,7 @@ asmlinkage int ppc64_newuname(struct new_utsname * name)
 
 extern asmlinkage long sys_personality(unsigned long);
 
-asmlinkage int sys32_personality(unsigned long personality)
+asmlinkage int ppc64_personality(unsigned long personality)
 {
 	int ret;
 	if (current->personality == PER_LINUX32 && personality == PER_LINUX)

@@ -641,7 +641,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_fchdir
 	.llong .sys_bdflush
 	.llong .sys32_sysfs		/* 135 */
-	.llong .sys32_personality
+	.llong .ppc64_personality
 	.llong .sys_ni_syscall	        /* for afs_syscall */
 	.llong .sys_setfsuid
 	.llong .sys_setfsgid
@@ -884,7 +884,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_fchdir
 	.llong .sys_bdflush
 	.llong .sys_sysfs		/* 135 */
-	.llong .sys_personality
+	.llong .ppc64_personality
 	.llong .sys_ni_syscall	        /* for afs_syscall */
 	.llong .sys_setfsuid
 	.llong .sys_setfsgid
