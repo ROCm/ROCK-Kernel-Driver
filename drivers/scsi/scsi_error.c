@@ -37,6 +37,7 @@
 
 #define SENSE_TIMEOUT		(10*HZ)
 #define START_UNIT_TIMEOUT	(30*HZ)
+#define TEST_UNIT_READY_TIMEOUT	(30*HZ)
 
 /*
  * These should *probably* be handled by the host itself.
@@ -786,7 +787,7 @@ retry_tur:
 	scmd->underflow = 0;
 	scmd->sc_data_direction = DMA_NONE;
 
-	rtn = scsi_send_eh_cmnd(scmd, SENSE_TIMEOUT);
+	rtn = scsi_send_eh_cmnd(scmd, TEST_UNIT_READY_TIMEOUT);
 
 	/*
 	 * when we eventually call scsi_finish, we really wish to complete

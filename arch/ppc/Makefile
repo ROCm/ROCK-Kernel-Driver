@@ -133,7 +133,7 @@ ifneq ($(AS_ALTIVEC),0)
 endif
 	@true
 
-CLEAN_FILES +=	include/asm-$(ARCH)/offsets.h \
-		arch/$(ARCH)/kernel/asm-offsets.s \
+CLEAN_FILES += arch/$(ARCH)/kernel/asm-offsets.s \
 		$(TOUT)
+MRPROPER_FILES += include/asm-$(ARCH)/offsets.h
 
