@@ -533,7 +533,7 @@ int reiserfs_create (struct inode * dir, struct dentry *dentry, int mode)
     struct reiserfs_transaction_handle th ;
 
 
-    inode = get_empty_inode() ;
+    inode = new_inode(dir->i_sb) ;
     if (!inode) {
 	return -ENOMEM ;
     }
@@ -586,7 +586,7 @@ int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, int rde
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
 
-    inode = get_empty_inode() ;
+    inode = new_inode(dir->i_sb) ;
     if (!inode) {
 	return -ENOMEM ;
     }
@@ -638,7 +638,7 @@ int reiserfs_mkdir (struct inode * dir, struct dentry *dentry, int mode)
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
 
-    inode = get_empty_inode() ;
+    inode = new_inode(dir->i_sb) ;
     if (!inode) {
 	return -ENOMEM ;
     }
@@ -859,7 +859,7 @@ int reiserfs_symlink (struct inode * dir, struct dentry * dentry, const char * s
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
 
 
-    inode = get_empty_inode() ;
+    inode = new_inode(dir->i_sb) ;
     if (!inode) {
 	return -ENOMEM ;
     }

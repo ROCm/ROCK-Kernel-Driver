@@ -408,7 +408,6 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 	unsigned long offset = 0;
 	kdev_t dev = sb->s_dev;
 	int blocksize = BLOCK_SIZE;
-	int hblock;
 	int db_count;
 	int i, j;
 
@@ -429,7 +428,10 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 		return NULL;
 	}
 
-	set_blocksize (dev, blocksize);
+	if (set_blocksize(dev, blocksize) < 0) {
+		printk ("EXT2-fs: unable to set blocksize %d\n", blocksize);
+		return NULL;
+	}
 
 	/*
 	 * If the superblock doesn't start on a sector boundary,
@@ -488,24 +490,19 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 
 	sb->s_maxbytes = ext2_max_size(sb->s_blocksize_bits);
 
-	if (sb->s_blocksize != BLOCK_SIZE &&
-	    (sb->s_blocksize == 1024 || sb->s_blocksize == 2048 ||
-	     sb->s_blocksize == 4096)) {
-		/*
-		 * Make sure the blocksize for the filesystem is larger
-		 * than the hardware sectorsize for the machine.
-		 */
-		hblock = get_hardsect_size(dev);
-		if (sb->s_blocksize < hblock) {
+	/* If the blocksize doesn't match, re-read the thing.. */
+	if (sb->s_blocksize != blocksize) {
+		blocksize = sb->s_blocksize;
+		brelse(bh);
+
+		if (set_blocksize(dev, blocksize) < 0) {
 			printk(KERN_ERR "EXT2-fs: blocksize too small for device.\n");
-			goto failed_mount;
+			return NULL;
 		}
 
-		brelse (bh);
-		set_blocksize (dev, sb->s_blocksize);
-		logic_sb_block = (sb_block*BLOCK_SIZE) / sb->s_blocksize;
-		offset = (sb_block*BLOCK_SIZE) % sb->s_blocksize;
-		bh = bread (dev, logic_sb_block, sb->s_blocksize);
+		logic_sb_block = (sb_block*BLOCK_SIZE) / blocksize;
+		offset = (sb_block*BLOCK_SIZE) % blocksize;
+		bh = bread (dev, logic_sb_block, blocksize);
 		if(!bh) {
 			printk("EXT2-fs: Couldn't read superblock on "
 			       "2nd try.\n");
@@ -518,6 +515,7 @@ struct super_block * ext2_read_super (struct super_block * sb, void * data,
 			goto failed_mount;
 		}
 	}
+
 	if (le32_to_cpu(es->s_rev_level) == EXT2_GOOD_OLD_REV) {
 		sb->u.ext2_sb.s_inode_size = EXT2_GOOD_OLD_INODE_SIZE;
 		sb->u.ext2_sb.s_first_ino = EXT2_GOOD_OLD_FIRST_INO;

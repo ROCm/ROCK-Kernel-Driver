@@ -1482,10 +1482,10 @@ static int __block_write_full_page(struct inode *inode, struct page *page, get_b
 		BUG();
 
 	if (!page->buffers)
-		create_empty_buffers(page, inode->i_dev, inode->i_sb->s_blocksize);
+		create_empty_buffers(page, inode->i_dev, 1 << inode->i_blkbits);
 	head = page->buffers;
 
-	block = page->index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits);
+	block = page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
 
 	bh = head;
 	i = 0;
@@ -1547,12 +1547,12 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 	struct buffer_head *bh, *head, *wait[2], **wait_bh=wait;
 	char *kaddr = kmap(page);
 
-	blocksize = inode->i_sb->s_blocksize;
+	blocksize = 1 << inode->i_blkbits;
 	if (!page->buffers)
 		create_empty_buffers(page, inode->i_dev, blocksize);
 	head = page->buffers;
 
-	bbits = inode->i_sb->s_blocksize_bits;
+	bbits = inode->i_blkbits;
 	block = page->index << (PAGE_CACHE_SHIFT - bbits);
 
 	for(bh = head, block_start = 0; bh != head || !block_start;
@@ -1615,7 +1615,7 @@ static int __block_commit_write(struct inode *inode, struct page *page,
 	unsigned blocksize;
 	struct buffer_head *bh, *head;
 
-	blocksize = inode->i_sb->s_blocksize;
+	blocksize = 1 << inode->i_blkbits;
 
 	for(bh = head = page->buffers, block_start = 0;
 	    bh != head || !block_start;
@@ -1664,14 +1664,14 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 
 	if (!PageLocked(page))
 		PAGE_BUG(page);
-	blocksize = inode->i_sb->s_blocksize;
+	blocksize = 1 << inode->i_blkbits;
 	if (!page->buffers)
 		create_empty_buffers(page, inode->i_dev, blocksize);
 	head = page->buffers;
 
-	blocks = PAGE_CACHE_SIZE >> inode->i_sb->s_blocksize_bits;
-	iblock = page->index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits);
-	lblock = (inode->i_size+blocksize-1) >> inode->i_sb->s_blocksize_bits;
+	blocks = PAGE_CACHE_SIZE >> inode->i_blkbits;
+	iblock = page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
+	lblock = (inode->i_size+blocksize-1) >> inode->i_blkbits;
 	bh = head;
 	nr = 0;
 	i = 0;
@@ -1738,7 +1738,7 @@ int cont_prepare_write(struct page *page, unsigned offset, unsigned to, get_bloc
 	unsigned long pgpos;
 	long status;
 	unsigned zerofrom;
-	unsigned blocksize = inode->i_sb->s_blocksize;
+	unsigned blocksize = 1 << inode->i_blkbits;
 	char *kaddr;
 
 	while(page->index > (pgpos = *bytes>>PAGE_CACHE_SHIFT)) {
@@ -1823,6 +1823,14 @@ int block_prepare_write(struct page *page, unsigned from, unsigned to,
 	return err;
 }
 
+int block_commit_write(struct page *page, unsigned from, unsigned to)
+{
+	struct inode *inode = page->mapping->host;
+	__block_commit_write(inode,page,from,to);
+	kunmap(page);
+	return 0;
+}
+
 int generic_commit_write(struct file *file, struct page *page,
 		unsigned from, unsigned to)
 {
@@ -1847,7 +1855,7 @@ int block_truncate_page(struct address_space *mapping, loff_t from, get_block_t 
 	struct buffer_head *bh;
 	int err;
 
-	blocksize = inode->i_sb->s_blocksize;
+	blocksize = 1 << inode->i_blkbits;
 	length = offset & (blocksize - 1);
 
 	/* Block boundary? Nothing to do */
@@ -1855,7 +1863,7 @@ int block_truncate_page(struct address_space *mapping, loff_t from, get_block_t 
 		return 0;
 
 	length = blocksize - length;
-	iblock = index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits);
+	iblock = index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
 	
 	page = grab_cache_page(mapping, index);
 	err = -ENOMEM;
@@ -2391,6 +2399,10 @@ cleaned_buffers_try_again:
 
 	spin_lock(&unused_list_lock);
 	tmp = bh;
+
+	/* if this buffer was hashed, this page counts as buffermem */
+	if (bh->b_pprev)
+		atomic_dec(&buffermem_pages);
 	do {
 		struct buffer_head * p = tmp;
 		tmp = tmp->b_this_page;

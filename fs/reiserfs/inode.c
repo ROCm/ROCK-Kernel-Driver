@@ -1428,7 +1428,6 @@ struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     }
 
     sb = dir->i_sb;
-    inode->i_sb = sb;
     inode->i_flags = 0;//inode->i_sb->s_flags;
 
     /* item head of new item */

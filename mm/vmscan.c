@@ -407,12 +407,6 @@ static int shrink_cache(int nr_pages, int max_scan, zone_t * classzone, unsigned
 			if (try_to_free_buffers(page, gfp_mask)) {
 				if (!page->mapping) {
 					/*
-					 * Account we successfully freed a page
-					 * of buffer cache.
-					 */
-					atomic_dec(&buffermem_pages);
-
-					/*
 					 * We must not allow an anon page
 					 * with no buffers to be visible on
 					 * the LRU, so we unlock the page after
@@ -536,16 +530,20 @@ static void refill_inactive(int nr_pages)
 static int FASTCALL(shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages));
 static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask, int nr_pages)
 {
-	int max_scan = nr_inactive_pages / priority;
+	int max_scan;
+	int chunk_size = nr_pages;
+	unsigned long ratio;
 
 	nr_pages -= kmem_cache_reap(gfp_mask);
 	if (nr_pages <= 0)
 		return 0;
 
-	/* Do we want to age the active list? */
-	if (nr_inactive_pages < nr_active_pages*2)
-		refill_inactive(nr_pages);
-
+	nr_pages = chunk_size;
+	/* try to keep the active list 2/3 of the size of the cache */
+	ratio = (unsigned long) nr_pages * nr_active_pages / ((nr_inactive_pages + 1) * 2);
+	refill_inactive(ratio);
+  
+	max_scan = nr_inactive_pages / priority;
 	nr_pages = shrink_cache(nr_pages, max_scan, classzone, gfp_mask);
 	if (nr_pages <= 0)
 		return 0;
@@ -558,17 +556,28 @@ static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask
 
 int try_to_free_pages(zone_t * classzone, unsigned int gfp_mask, unsigned int order)
 {
-	int priority = DEF_PRIORITY;
 	int ret = 0;
 
-	do {
+	for (;;) {
+		int priority = DEF_PRIORITY;
 		int nr_pages = SWAP_CLUSTER_MAX;
-		nr_pages = shrink_caches(priority, classzone, gfp_mask, nr_pages);
-		if (nr_pages <= 0)
-			return 1;
 
-		ret |= swap_out(priority, classzone, gfp_mask, SWAP_CLUSTER_MAX << 2);
-	} while (--priority);
+		do {
+			nr_pages = shrink_caches(priority, classzone, gfp_mask, nr_pages);
+			if (nr_pages <= 0)
+				return 1;
+
+			ret |= swap_out(priority, classzone, gfp_mask, SWAP_CLUSTER_MAX << 2);
+		} while (--priority);
+
+		if (likely(ret))
+			break;
+		if (likely(current->pid != 1))
+			break;
+		current->policy |= SCHED_YIELD;
+		__set_current_state(TASK_RUNNING);
+		schedule();
+	}
 
 	return ret;
 }

@@ -816,6 +816,7 @@ struct inode * get_empty_inode(void)
 		list_add(&inode->i_list, &inode_in_use);
 		inode->i_sb = NULL;
 		inode->i_dev = 0;
+		inode->i_blkbits = 0;
 		inode->i_ino = ++last_ino;
 		inode->i_flags = 0;
 		atomic_set(&inode->i_count, 1);
@@ -849,6 +850,7 @@ static struct inode * get_new_inode(struct super_block *sb, unsigned long ino, s
 			list_add(&inode->i_hash, head);
 			inode->i_sb = sb;
 			inode->i_dev = sb->s_dev;
+			inode->i_blkbits = sb->s_blocksize_bits;
 			inode->i_ino = ino;
 			inode->i_flags = 0;
 			atomic_set(&inode->i_count, 1);

@@ -47,7 +47,7 @@ static inline unsigned int block_size(kdev_t dev)
 	return retval;
 }
 
-static unsigned int max_block(kdev_t dev)
+static unsigned long max_block(kdev_t dev)
 {
 	unsigned int retval = ~0U;
 	int major = MAJOR(dev);
@@ -86,302 +86,74 @@ static void kill_bdev(struct block_device *bdev)
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 }	
 
-static inline void kill_buffers(kdev_t dev)
+int set_blocksize(kdev_t dev, int size)
 {
-	struct block_device *bdev = bdget(dev);
-	if (bdev) {
-		kill_bdev(bdev);
-		bdput(bdev);
-	}
-}
-
-void set_blocksize(kdev_t dev, int size)
-{
-	extern int *blksize_size[];
-
-	if (!blksize_size[MAJOR(dev)])
-		return;
+	int oldsize;
+	struct block_device *bdev;
 
 	/* Size must be a power of two, and between 512 and PAGE_SIZE */
 	if (size > PAGE_SIZE || size < 512 || (size & (size-1)))
-		panic("Invalid blocksize passed to set_blocksize");
+		return -EINVAL;
 
-	if (blksize_size[MAJOR(dev)][MINOR(dev)] == 0 && size == BLOCK_SIZE) {
-		blksize_size[MAJOR(dev)][MINOR(dev)] = size;
-		return;
+	/* Size cannot be smaller than the size supported by the device */
+	if (size < get_hardsect_size(dev))
+		return -EINVAL;
+
+	/* No blocksize array? Implies hardcoded BLOCK_SIZE */
+	if (!blksize_size[MAJOR(dev)]) {
+		if (size == BLOCK_SIZE)
+			return 0;
+		return -EINVAL;
 	}
-	if (blksize_size[MAJOR(dev)][MINOR(dev)] == size)
-		return;
 
+	oldsize = blksize_size[MAJOR(dev)][MINOR(dev)];
+	if (oldsize == size)
+		return 0;
+
+	if (!oldsize && size == BLOCK_SIZE) {
+		blksize_size[MAJOR(dev)][MINOR(dev)] = size;
+		return 0;
+	}
+
+	/* Ok, we're actually changing the blocksize.. */
+	bdev = bdget(dev);
 	sync_buffers(dev, 2);
 	blksize_size[MAJOR(dev)][MINOR(dev)] = size;
-	kill_buffers(dev);
+	bdev->bd_inode->i_blkbits = blksize_bits(size);
+	kill_bdev(bdev);
+	bdput(bdev);
+	return 0;
 }
 
-static inline int blkdev_get_block(struct inode * inode, long iblock, struct buffer_head * bh_result)
+static int blkdev_get_block(struct inode * inode, long iblock, struct buffer_head * bh, int create)
 {
-	int err;
-
-	err = -EIO;
 	if (iblock >= max_block(inode->i_rdev))
-		goto out;
+		return -EIO;
 
-	bh_result->b_blocknr = iblock;
-	bh_result->b_state |= 1UL << BH_Mapped;
-	err = 0;
-
- out:
-	return err;
+	bh->b_dev = inode->i_rdev;
+	bh->b_blocknr = iblock;
+	bh->b_state |= 1UL << BH_Mapped;
+	return 0;
 }
 
 static int blkdev_writepage(struct page * page)
 {
-	int err, i;
-	unsigned int blocksize;
-	unsigned long block;
-	struct buffer_head *bh, *head;
-	struct inode *inode = page->mapping->host;
-
-	if (!PageLocked(page))
-		BUG();
-	blocksize = block_size(inode->i_rdev);	
-
-	if (!page->buffers)
-		create_empty_buffers(page, inode->i_rdev, blocksize);
-	head = page->buffers;
-
-	block = page->index << (PAGE_CACHE_SHIFT - blksize_bits(blocksize));
-
-	bh = head;
-	i = 0;
-
-	/* Stage 1: make sure we have all the buffers mapped! */
-	do {
-		/*
-		 * If the buffer isn't up-to-date, we can't be sure
-		 * that the buffer has been initialized with the proper
-		 * block number information etc..
-		 *
-		 * Leave it to the low-level FS to make all those
-		 * decisions (block #0 may actually be a valid block)
-		 */
-		if (!buffer_mapped(bh)) {
-			err = blkdev_get_block(inode, block, bh);
-			if (err)
-				goto out;
-		}
-		bh = bh->b_this_page;
-		block++;
-	} while (bh != head);
-
-	/* Stage 2: lock the buffers, mark them clean */
-	do {
-		lock_buffer(bh);
-		set_buffer_async_io(bh);
-		set_bit(BH_Uptodate, &bh->b_state);
-		clear_bit(BH_Dirty, &bh->b_state);
-		bh = bh->b_this_page;
-	} while (bh != head);
-
-	/* Stage 3: submit the IO */
-	do {
-		submit_bh(WRITE, bh);
-		bh = bh->b_this_page;
-	} while (bh != head);
-
-	/* Done - end_buffer_io_async will unlock */
-	SetPageUptodate(page);
-	return 0;
-
-out:
-	ClearPageUptodate(page);
-	UnlockPage(page);
-	return err;
+	return block_write_full_page(page, blkdev_get_block);
 }
 
 static int blkdev_readpage(struct file * file, struct page * page)
 {
-	struct inode *inode = page->mapping->host;
-	kdev_t dev = inode->i_rdev;
-	unsigned long iblock, lblock;
-	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
-	unsigned int blocks, blocksize, blocksize_bits;
-	int nr, i;
-
-	if (!PageLocked(page))
-		PAGE_BUG(page);
-	blocksize = block_size(dev);
-	blocksize_bits = blksize_bits(blocksize);
-	if (!page->buffers)
-		create_empty_buffers(page, dev, blocksize);
-	head = page->buffers;
-
-	blocks = PAGE_CACHE_SIZE >> blocksize_bits;
-	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
-	lblock = max_block(dev);
-	bh = head;
-	nr = 0;
-	i = 0;
-
-	do {
-		if (buffer_uptodate(bh))
-			continue;
-
-		if (!buffer_mapped(bh)) {
-			if (iblock <= lblock) {
-				if (blkdev_get_block(inode, iblock, bh))
-					continue;
-			}
-			if (!buffer_mapped(bh)) {
-				memset(kmap(page) + i * blocksize, 0, blocksize);
-				flush_dcache_page(page);
-				kunmap(page);
-				set_bit(BH_Uptodate, &bh->b_state);
-				continue;
-			}
-			/* get_block() might have updated the buffer synchronously */
-			if (buffer_uptodate(bh))
-				continue;
-		}
-
-		arr[nr] = bh;
-		nr++;
-	} while (i++, iblock++, (bh = bh->b_this_page) != head);
-
-	if (!nr) {
-		/*
-		 * all buffers are uptodate - we can set the page
-		 * uptodate as well.
-		 */
-		SetPageUptodate(page);
-		UnlockPage(page);
-		return 0;
-	}
-
-	/* Stage two: lock the buffers */
-	for (i = 0; i < nr; i++) {
-		struct buffer_head * bh = arr[i];
-		lock_buffer(bh);
-		set_buffer_async_io(bh);
-	}
-
-	/* Stage 3: start the IO */
-	for (i = 0; i < nr; i++)
-		submit_bh(READ, arr[i]);
-
-	return 0;
-}
-
-static int __blkdev_prepare_write(struct inode *inode, struct page *page,
-				  unsigned from, unsigned to)
-{
-	kdev_t dev = inode->i_rdev;
-	unsigned block_start, block_end;
-	unsigned long block;
-	int err = 0;
-	struct buffer_head *bh, *head, *wait[2], **wait_bh=wait;
-	unsigned int blocksize, blocksize_bits;
-
-	blocksize = block_size(dev);
-	blocksize_bits = blksize_bits(blocksize);
-	if (!page->buffers)
-		create_empty_buffers(page, dev, blocksize);
-	head = page->buffers;
-
-	block = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
-
-	for(bh = head, block_start = 0; bh != head || !block_start;
-	    block++, block_start=block_end, bh = bh->b_this_page) {
-		if (!bh)
-			BUG();
-		block_end = block_start + blocksize;
-		if (block_end <= from)
-			continue;
-		if (block_start >= to)
-			break;
-		if (!buffer_mapped(bh)) {
-			err = blkdev_get_block(inode, block, bh);
-			if (err)
-				goto out;
-		}
-		if (Page_Uptodate(page)) {
-			set_bit(BH_Uptodate, &bh->b_state);
-			continue; 
-		}
-		if (!buffer_uptodate(bh) &&
-		     (block_start < from || block_end > to)) {
-			ll_rw_block(READ, 1, &bh);
-			*wait_bh++=bh;
-		}
-	}
-	/*
-	 * If we issued read requests - let them complete.
-	 */
-	while(wait_bh > wait) {
-		wait_on_buffer(*--wait_bh);
-		err = -EIO;
-		if (!buffer_uptodate(*wait_bh))
-			goto out;
-	}
-	return 0;
-out:
-	return err;
+	return block_read_full_page(page, blkdev_get_block);
 }
 
 static int blkdev_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
 {
-	struct inode *inode = page->mapping->host;
-	int err = __blkdev_prepare_write(inode, page, from, to);
-	if (err) {
-		ClearPageUptodate(page);
-	}
-	return err;
+	return block_prepare_write(page, from, to, blkdev_get_block);
 }
 
-static int __blkdev_commit_write(struct inode *inode, struct page *page,
-				 unsigned from, unsigned to)
+static int blkdev_commit_write(struct file *file, struct page *page, unsigned from, unsigned to)
 {
-	unsigned block_start, block_end;
-	int partial = 0, need_balance_dirty = 0;
-	struct buffer_head *bh, *head;
-	unsigned int blocksize;
-
-	blocksize = block_size(inode->i_rdev);
-	for(bh = head = page->buffers, block_start = 0;
-	    bh != head || !block_start;
-	    block_start=block_end, bh = bh->b_this_page) {
-		block_end = block_start + blocksize;
-		if (block_end <= from || block_start >= to) {
-			if (!buffer_uptodate(bh))
-				partial = 1;
-		} else {
-			set_bit(BH_Uptodate, &bh->b_state);
-			if (!atomic_set_buffer_dirty(bh)) {
-				__mark_dirty(bh);
-				need_balance_dirty = 1;
-			}
-		}
-	}
-
-	if (need_balance_dirty)
-		balance_dirty();
-	/*
-	 * is this a partial write that happened to make all buffers
-	 * uptodate then we can optimize away a bogus readpage() for
-	 * the next read(). Here we 'discover' wether the page went
-	 * uptodate as a result of this (potentially partial) write.
-	 */
-	if (!partial)
-		SetPageUptodate(page);
-	return 0;
-}
-
-static int blkdev_commit_write(struct file *file, struct page *page,
-			       unsigned from, unsigned to)
-{
-	struct inode *inode = page->mapping->host;
-	__blkdev_commit_write(inode,page,from,to);
-	return 0;
+	return block_commit_write(page, from, to);
 }
 
 /*
@@ -565,12 +337,15 @@ struct block_device *bdget(dev_t dev)
 	if (new_bdev) {
 		struct inode *inode = new_inode(bd_mnt->mnt_sb);
 		if (inode) {
+			kdev_t kdev = to_kdev_t(dev);
 			atomic_set(&new_bdev->bd_count,1);
 			new_bdev->bd_dev = dev;
 			new_bdev->bd_op = NULL;
 			new_bdev->bd_inode = inode;
-			inode->i_rdev = to_kdev_t(dev);
+			inode->i_rdev = kdev;
+			inode->i_dev = kdev;
 			inode->i_bdev = new_bdev;
+			inode->i_blkbits = blksize_bits(block_size(kdev));
 			inode->i_data.a_ops = &def_blk_aops;
 			inode->i_data.gfp_mask = GFP_USER;
 			spin_lock(&bdev_lock);

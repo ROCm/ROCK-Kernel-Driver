@@ -278,7 +278,7 @@ void init_buffer(struct buffer_head *, bh_end_io_t *, void *);
 
 extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long offset);
 
-#define touch_buffer(bh)	SetPageReferenced(bh->b_page)
+#define touch_buffer(bh)	mark_page_accessed(bh->b_page)
 
 
 #include <linux/pipe_fs_i.h>
@@ -433,6 +433,7 @@ struct inode {
 	time_t			i_atime;
 	time_t			i_mtime;
 	time_t			i_ctime;
+	unsigned int		i_blkbits;
 	unsigned long		i_blksize;
 	unsigned long		i_blocks;
 	unsigned long		i_version;
@@ -1299,12 +1300,14 @@ static inline struct inode *iget(struct super_block *sb, unsigned long ino)
 
 extern void clear_inode(struct inode *);
 extern struct inode * get_empty_inode(void);
+
 static inline struct inode * new_inode(struct super_block *sb)
 {
 	struct inode *inode = get_empty_inode();
 	if (inode) {
 		inode->i_sb = sb;
 		inode->i_dev = sb->s_dev;
+		inode->i_blkbits = sb->s_blocksize_bits;
 	}
 	return inode;
 }
@@ -1331,7 +1334,7 @@ static inline void bforget(struct buffer_head *buf)
 	if (buf)
 		__bforget(buf);
 }
-extern void set_blocksize(kdev_t, int);
+extern int set_blocksize(kdev_t, int);
 extern struct buffer_head * bread(kdev_t, int, int);
 extern void wakeup_bdflush(void);
 
@@ -1349,6 +1352,7 @@ extern int block_read_full_page(struct page*, get_block_t*);
 extern int block_prepare_write(struct page*, unsigned, unsigned, get_block_t*);
 extern int cont_prepare_write(struct page*, unsigned, unsigned, get_block_t*,
 				unsigned long *);
+extern int block_commit_write(struct page *page, unsigned from, unsigned to);
 extern int block_sync_page(struct page *);
 
 int generic_block_bmap(struct address_space *, long, get_block_t *);

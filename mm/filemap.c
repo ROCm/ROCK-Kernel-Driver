@@ -1245,6 +1245,13 @@ page_ok:
 			flush_dcache_page(page);
 
 		/*
+		 * Mark the page accessed if we read the
+		 * beginning or we just did an lseek.
+		 */
+		if (!offset || !filp->f_reada)
+			mark_page_accessed(page);
+
+		/*
 		 * Ok, we have the page, and it's up-to-date, so
 		 * now we can copy it to user space...
 		 *
@@ -1259,7 +1266,6 @@ page_ok:
 		index += offset >> PAGE_CACHE_SHIFT;
 		offset &= ~PAGE_CACHE_MASK;
 
-		mark_page_accessed(page);
 		page_cache_release(page);
 		if (ret == nr && desc->count)
 			continue;

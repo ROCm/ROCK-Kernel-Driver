@@ -300,7 +300,7 @@ affs_new_inode(struct inode *dir)
 	u32			 block;
 	struct buffer_head	*bh;
 
-	if (!(inode = get_empty_inode()))
+	if (!(inode = new_inode(sb)))
 		goto err_inode;
 
 	if (!(block = affs_alloc_block(dir, dir->i_ino)))
@@ -312,8 +312,6 @@ affs_new_inode(struct inode *dir)
 	mark_buffer_dirty_inode(bh, inode);
 	affs_brelse(bh);
 
-	inode->i_sb      = sb;
-	inode->i_dev     = sb->s_dev;
 	inode->i_uid     = current->fsuid;
 	inode->i_gid     = current->fsgid;
 	inode->i_ino     = block;
