@@ -222,7 +222,7 @@ void compute_shiftstate(void)
 			if (!test_bit(k, key_down))
 				continue;
 
-			sym = U(plain_map[k]);
+			sym = U(key_maps[0][k]);
 			if (KTYP(sym) != KT_SHIFT && KTYP(sym) != KT_SLOCK)
 				continue;
 
