@@ -3306,7 +3306,6 @@ static void do_softint(void *private_)
 		}
 
 	} /* End EPCA_MAGIC */
-	MOD_DEC_USE_COUNT;
 } /* End do_softint */
 
 /* ------------------------------------------------------------
