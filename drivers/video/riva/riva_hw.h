@@ -74,6 +74,8 @@ typedef unsigned int   U032;
 #define NV_ARCH_03  0x03
 #define NV_ARCH_04  0x04
 #define NV_ARCH_10  0x10
+#define NV_ARCH_20  0x20
+
 /***************************************************************************\
 *                                                                           *
 *                             FIFO registers.                               *

@@ -54,7 +54,7 @@
 #include "../fbcon-accel.h"
 
 /* version number of this driver */
-#define RIVAFB_VERSION "0.9.2a"
+#define RIVAFB_VERSION "0.9.3"
 
 /* ------------------------------------------------------------------------- *
  *
@@ -127,6 +127,11 @@ enum riva_chips {
 	CH_GEFORCE2_GTS,
 	CH_GEFORCE2_ULTRA,
 	CH_QUADRO2_PRO,
+	CH_GEFORCE2_GO,
+	CH_GEFORCE3,
+	CH_GEFORCE3_1,
+	CH_GEFORCE3_2,
+	CH_QUADRO_DDC
 };
 
 /* directly indexed by riva_chips enum, above */
@@ -149,6 +154,11 @@ static struct riva_chip_info {
 	{ "GeForce2-GTS", NV_ARCH_10},
 	{ "GeForce2-ULTRA", NV_ARCH_10},
 	{ "Quadro2-PRO", NV_ARCH_10},
+	{ "GeForce2-Go", NV_ARCH_10},
+	{ "GeForce3", NV_ARCH_20},
+	{ "GeForce3 Ti 200", NV_ARCH_20},
+	{ "GeForce3 Ti 500", NV_ARCH_20},
+	{ "Quadro DDC", NV_ARCH_20}
 };
 
 static struct pci_device_id rivafb_pci_tbl[] __devinitdata = {
@@ -186,6 +196,16 @@ static struct pci_device_id rivafb_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE2_ULTRA },
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO2_PRO,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO2_PRO },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE2_GO,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE2_GO },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE3,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE3 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE3_1,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE3_1 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_GEFORCE3_2,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_GEFORCE3_2 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_QUADRO_DDC,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, CH_QUADRO_DDC },
 	{ 0, } /* terminate list */
 };
 MODULE_DEVICE_TABLE(pci, rivafb_pci_tbl);
@@ -1521,6 +1541,7 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 		break;
 	case NV_ARCH_04:
 	case NV_ARCH_10:
+	case NV_ARCH_20:
 		/* riva_hw.c now doesn't distinguish between TNT & TNT2 */
 		default_par->riva.PCRTC = (unsigned *)(default_par->ctrl_base + 0x00600000);
 		default_par->riva.PRAMIN = (unsigned *)(default_par->ctrl_base + 0x00710000);
@@ -1558,7 +1579,7 @@ static int __devinit rivafb_init_one(struct pci_dev *pd,
 	pci_set_drvdata(pd, info);
 
 	printk(KERN_INFO PFX
-		"PCI nVidia NV%d framebuffer ver %s (%s, %dMB @ 0x%lX)\n",
+		"PCI nVidia NV%x framebuffer ver %s (%s, %dMB @ 0x%lX)\n",
 		default_par->riva.Architecture,
 		RIVAFB_VERSION,
 		info->fix.id,
