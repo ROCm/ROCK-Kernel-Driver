@@ -158,8 +158,8 @@ __inline__ void tcp_inherit_port(struct sock *sk, struct sock *child)
 	local_bh_enable();
 }
 
-static inline void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
-				 unsigned short snum)
+void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
+		   unsigned short snum)
 {
 	inet_sk(sk)->num = snum;
 	if ((sk->bind_next = tb->owners) != NULL)
