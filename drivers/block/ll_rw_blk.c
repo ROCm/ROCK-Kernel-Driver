@@ -587,7 +587,7 @@ int blk_queue_resize_tags(request_queue_t *q, int new_depth)
 /**
  * blk_queue_end_tag - end tag operations for a request
  * @q:  the request queue for the device
- * @tag:  the tag that has completed
+ * @rq: the request that has completed
  *
  *  Description:
  *    Typically called when end_that_request_first() returns 0, meaning
@@ -1282,9 +1282,9 @@ request_queue_t *blk_alloc_queue(int gfp_mask)
 
 /**
  * blk_init_queue  - prepare a request queue for use with a block device
- * @q:    The &request_queue_t to be initialised
  * @rfn:  The function to be called to process requests that have been
  *        placed on the queue.
+ * @lock: Request queue spin lock
  *
  * Description:
  *    If a block device wishes to use the standard request handling procedures,
@@ -1303,6 +1303,9 @@ request_queue_t *blk_alloc_queue(int gfp_mask)
  *
  *    The queue spin lock must be held while manipulating the requests on the
  *    request queue.
+ *
+ *    Function returns a pointer to the initialized request queue, or NULL if
+ *    it didn't succeed.
  *
  * Note:
  *    blk_init_queue() must be paired with a blk_cleanup_queue() call
