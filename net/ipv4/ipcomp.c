@@ -231,6 +231,7 @@ out_ok:
 		err = -EHOSTUNREACH;
 		goto error_nolock;
 	}
+	IPCB(skb)->flags |= IPSKB_XFRM_TRANSFORMED;
 	err = NET_XMIT_BYPASS;
 
 out_exit:
@@ -407,6 +408,7 @@ static struct inet_protocol ipcomp4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	ipcomp4_err,
 	.no_policy	=	1,
+	.xfrm_prot	=	1,
 };
 
 static int __init ipcomp4_init(void)

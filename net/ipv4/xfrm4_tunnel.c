@@ -76,6 +76,7 @@ static int ipip_output(struct sk_buff *skb)
 		err = -EHOSTUNREACH;
 		goto error_nolock;
 	}
+	IPCB(skb)->flags |= IPSKB_XFRM_TRANSFORMED;
 	return NET_XMIT_BYPASS;
 
 error_nolock:
@@ -170,6 +171,7 @@ static struct inet_protocol ipip_protocol = {
 	.handler	=	ipip_rcv,
 	.err_handler	=	ipip_err,
 	.no_policy	=	1,
+	.xfrm_prot	=	1,
 };
 
 static int __init ipip_init(void)

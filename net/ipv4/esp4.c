@@ -216,6 +216,7 @@ int esp_output(struct sk_buff *skb)
 		err = -EHOSTUNREACH;
 		goto error_nolock;
 	}
+	IPCB(skb)->flags |= IPSKB_XFRM_TRANSFORMED;
 	return NET_XMIT_BYPASS;
 
 error:
@@ -598,6 +599,7 @@ static struct inet_protocol esp4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	esp4_err,
 	.no_policy	=	1,
+	.xfrm_prot	=	1,
 };
 
 static int __init esp4_init(void)

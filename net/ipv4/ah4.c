@@ -145,6 +145,7 @@ static int ah_output(struct sk_buff *skb)
 		err = -EHOSTUNREACH;
 		goto error_nolock;
 	}
+	IPCB(skb)->flags |= IPSKB_XFRM_TRANSFORMED;
 	return NET_XMIT_BYPASS;
 
 error:
@@ -343,6 +344,7 @@ static struct inet_protocol ah4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	ah4_err,
 	.no_policy	=	1,
+	.xfrm_prot	=	1,
 };
 
 static int __init ah4_init(void)
