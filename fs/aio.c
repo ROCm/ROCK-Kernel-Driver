@@ -837,7 +837,7 @@ void queue_kicked_iocb(struct kiocb *iocb)
 	run = __queue_kicked_iocb(iocb);
 	spin_unlock_irqrestore(&ctx->ctx_lock, flags);
 	if (run) {
-		queue_work(aio_wq, &ctx->wq);
+		queue_delayed_work(aio_wq, &ctx->wq, HZ/10);
 		aio_wakeups++;
 	}
 }
@@ -1073,13 +1073,14 @@ static int read_events(struct kioctx *ctx,
 	struct io_event		ent;
 	struct timeout		to;
 	int 			event_loop = 0; /* testing only */
+	int			retry = 0;
 
 	/* needed to zero any padding within an entry (there shouldn't be 
 	 * any, but C is fun!
 	 */
 	memset(&ent, 0, sizeof(ent));
+retry:
 	ret = 0;
-
 	while (likely(i < nr)) {
 		ret = aio_read_evt(ctx, &ent);
 		if (unlikely(ret <= 0))
@@ -1107,6 +1108,13 @@ static int read_events(struct kioctx *ctx,
 		return ret;
 
 	/* End fast path */
+
+	/* racey check, but it gets redone */
+	if (!retry && unlikely(!list_empty(&ctx->run_list))) {
+		retry = 1;
+		aio_run_iocbs(ctx);
+		goto retry;
+	}
 
 	init_timeout(&to);
 	if (timeout) {
@@ -1265,6 +1273,8 @@ asmlinkage long sys_io_destroy(aio_context_t ctx)
 static ssize_t aio_pread(struct kiocb *iocb)
 {
 	struct file *file = iocb->ki_filp;
+	struct address_space *mapping = file->f_mapping;
+	struct inode *inode = mapping->host;
 	ssize_t ret = 0;
 
 	ret = file->f_op->aio_read(iocb, iocb->ki_buf,
@@ -1277,8 +1287,14 @@ static ssize_t aio_pread(struct kiocb *iocb)
 	if (ret > 0) {
 		iocb->ki_buf += ret;
 		iocb->ki_left -= ret;
-
-		ret = -EIOCBRETRY;
+		/* 
+		 * For pipes and sockets we return once we have
+		 * some data; for regular files we retry till we
+		 * complete the entire read or find that we can't
+		 * read any more data (e.g short reads).
+		 */
+		if (!S_ISFIFO(inode->i_mode) && !S_ISSOCK(inode->i_mode))
+			ret = -EIOCBRETRY;
 	}
 
 	/* This means we must have transferred all that we could */
@@ -1348,7 +1364,7 @@ static ssize_t aio_fsync(struct kiocb *iocb)
  */
 static ssize_t aio_poll(struct kiocb *iocb)
 {
-	unsigned events = (unsigned)(iocb->ki_buf);
+	unsigned long events = (unsigned long)(iocb->ki_buf);
 	return generic_aio_poll(iocb, events);
 }
 
@@ -1507,11 +1523,9 @@ int fastcall io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 		goto out_put_req;
 
 	spin_lock_irq(&ctx->ctx_lock);
-	ret = aio_run_iocb(req);
+	list_add_tail(&req->ki_run_list, &ctx->run_list);
+	__aio_run_iocbs(ctx);
 	spin_unlock_irq(&ctx->ctx_lock);
-
-	if (-EIOCBRETRY == ret)
-		queue_work(aio_wq, &ctx->wq);
 	aio_put_req(req);	/* drop extra ref to req */
 	return 0;
 

@@ -563,7 +563,7 @@ out_fds:
 	return err;
 }
 
-static void aio_poll_freewait(struct aio_poll_table *ap)
+static void aio_poll_freewait(struct aio_poll_table *ap, struct kiocb *iocb)
 {
 	struct poll_table_page * p = ap->wq.table;
 	if (p) {
@@ -573,7 +573,10 @@ static void aio_poll_freewait(struct aio_poll_table *ap)
 			 * there is only one entry for aio polls
 			 */
 			entry = p->entries;
-			wake_up(entry->wait_address);
+			if (iocb)
+				finish_wait(entry->wait_address,&iocb->ki_wait);
+			else
+				wake_up(entry->wait_address);
 			fput(entry->filp);
 		}
 	}
@@ -593,7 +596,7 @@ aio_poll_cancel(struct kiocb *iocb, struct io_event *evt)
 	        evt->res = -EINTR;
 	evt->res2 = 0;
 	if (aio_table->init)
-		aio_poll_freewait(aio_table);
+		aio_poll_freewait(aio_table, NULL);
 	aio_put_req(iocb);
 	return 0;
 }
@@ -604,6 +607,12 @@ ssize_t generic_aio_poll(struct kiocb *iocb, unsigned events)
 	unsigned mask;
 	struct file *file = iocb->ki_filp;
 	aio_table = (struct aio_poll_table *)iocb->private;
+
+	/* fast path */
+	mask = file->f_op->poll(file, NULL);
+	mask &= events | POLLERR | POLLHUP;
+	if (mask)
+		return mask;
 
 	if ((sizeof(*aio_table) + sizeof(struct poll_table_entry)) >
 	    sizeof(iocb->private))
@@ -621,7 +630,7 @@ ssize_t generic_aio_poll(struct kiocb *iocb, unsigned events)
 	mask = file->f_op->poll(file, &aio_table->wq.pt);
 	mask &= events | POLLERR | POLLHUP;
 	if (mask) {
-		aio_poll_freewait(aio_table);
+		aio_poll_freewait(aio_table, iocb);
 		return mask;
 	}
 	return -EIOCBRETRY;
