@@ -622,11 +622,13 @@ static inline int IO_APIC_irq_trigger(int irq)
 	return 0;
 }
 
-int irq_vector[NR_IRQS] = { FIRST_DEVICE_VECTOR , 0 };
+/* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
+u8 irq_vector[NR_IRQ_VECTORS] = { FIRST_DEVICE_VECTOR , 0 };
 
 static int __init assign_irq_vector(int irq)
 {
 	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
+	BUG_ON(irq >= NR_IRQ_VECTORS);
 	if (IO_APIC_VECTOR(irq) > 0)
 		return IO_APIC_VECTOR(irq);
 next:

@@ -263,8 +263,8 @@ struct thread_struct {
 #define DOUBLEFAULT_STACK 2 
 #define NMI_STACK 3 
 #define N_EXCEPTION_STACKS 3  /* hw limit: 7 */
-#define EXCEPTION_STKSZ 1024
-#define EXCEPTION_STK_ORDER 0
+#define EXCEPTION_STKSZ (PAGE_SIZE << EXCEPTION_STACK_ORDER)
+#define EXCEPTION_STACK_ORDER 0 
 
 #define start_thread(regs,new_rip,new_rsp) do { \
 	asm volatile("movl %0,%%fs; movl %0,%%es; movl %0,%%ds": :"r" (0));	 \

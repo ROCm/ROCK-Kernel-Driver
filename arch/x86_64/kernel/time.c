@@ -111,6 +111,14 @@ void do_gettimeofday(struct timeval *tv)
 		sec = xtime.tv_sec;
 		usec = xtime.tv_nsec / 1000;
 
+		/*
+		 * If time_adjust is negative then NTP is slowing the clock
+		 * so make sure not to go into next possible interval.
+		 * Better to lose some accuracy than have time go backwards..
+		 */
+		if (unlikely(time_adjust < 0) && usec > tickadj)
+			usec = tickadj;
+
 		t = (jiffies - wall_jiffies) * (1000000L / HZ) +
 			do_gettimeoffset();
 		usec += t;
@@ -477,22 +485,28 @@ unsigned long get_cmos_time(void)
 static unsigned int  ref_freq = 0;
 static unsigned long loops_per_jiffy_ref = 0;
 
-//static unsigned long fast_gettimeoffset_ref = 0;
 static unsigned long cpu_khz_ref = 0;
 
 static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 				 void *data)
 {
         struct cpufreq_freqs *freq = data;
+	unsigned long *lpj;
+
+#ifdef CONFIG_SMP
+	lpj = &cpu_data[freq->cpu].loops_per_jiffy;
+#else
+	lpj = &boot_cpu_data.loops_per_jiffy;
+#endif
 
 	if (!ref_freq) {
 		ref_freq = freq->old;
-		loops_per_jiffy_ref = cpu_data[freq->cpu].loops_per_jiffy;
+		loops_per_jiffy_ref = *lpj;
 		cpu_khz_ref = cpu_khz;
 	}
         if ((val == CPUFREQ_PRECHANGE  && freq->old < freq->new) ||
             (val == CPUFREQ_POSTCHANGE && freq->old > freq->new)) {
-                cpu_data[freq->cpu].loops_per_jiffy =
+                *lpj =
 		cpufreq_scale(loops_per_jiffy_ref, ref_freq, freq->new);
 
 		cpu_khz = cpufreq_scale(cpu_khz_ref, ref_freq, freq->new);

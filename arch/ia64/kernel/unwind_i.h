@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2000, 2002 Hewlett-Packard Co
+ * Copyright (C) 2000, 2002-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * Kernel unwind support.
@@ -43,12 +43,6 @@ struct unw_info_block {
 	u64 header;
 	u64 desc[0];		/* unwind descriptors */
 	/* personality routine and language-specific data follow behind descriptors */
-};
-
-struct unw_table_entry {
-	u64 start_offset;
-	u64 end_offset;
-	u64 info_offset;
 };
 
 struct unw_table {

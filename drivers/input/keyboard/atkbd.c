@@ -184,11 +184,19 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		atkbd->resend = 0;
 #endif
 
+	switch (code) {
+		case ATKBD_RET_ACK:
+			atkbd->ack = 1;
+			goto out;
+		case ATKBD_RET_NAK:
+			atkbd->ack = -1;
+			goto out;
+	}
+
 	if (atkbd->translated) do {
 
 		if (atkbd->emul != 1) {
-			if (code == ATKBD_RET_EMUL0 || code == ATKBD_RET_EMUL1 ||
-			    code == ATKBD_RET_ACK || code == ATKBD_RET_NAK)
+			if (code == ATKBD_RET_EMUL0 || code == ATKBD_RET_EMUL1)
 				break;
 			if (code == ATKBD_RET_BAT) {
 				if (!atkbd->bat_xl)
@@ -211,15 +219,6 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		atkbd->release = 1;
 
 	} while (0);
-
-	switch (code) {
-		case ATKBD_RET_ACK:
-			atkbd->ack = 1;
-			goto out;
-		case ATKBD_RET_NAK:
-			atkbd->ack = -1;
-			goto out;
-	}
 
 	if (atkbd->cmdcnt) {
 		atkbd->cmdbuf[--atkbd->cmdcnt] = code;

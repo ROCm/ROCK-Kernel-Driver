@@ -9,7 +9,7 @@
 #include <asm/ptrace.h>
 #include <asm/system.h>
 
-#define EMUL_PREFIX_LINUX_IA32 "emul/ia32-linux/"
+#define EMUL_PREFIX_LINUX_IA32 "/emul/ia32-linux/"
 
 static inline char *
 __emul_prefix (void)

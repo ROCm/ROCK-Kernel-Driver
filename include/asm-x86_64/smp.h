@@ -74,15 +74,7 @@ extern __inline int hard_smp_processor_id(void)
 	return GET_APIC_ID(*(unsigned int *)(APIC_BASE+APIC_ID));
 }
 
-extern int slow_smp_processor_id(void);
-
-extern inline int safe_smp_processor_id(void)
-{ 
-	if (disable_apic)
-		return slow_smp_processor_id(); 
-	else
-		return hard_smp_processor_id();
-} 
+#define safe_smp_processor_id() (cpuid_ebx(1) >> 24) 
 
 #define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
 #endif /* !ASSEMBLY */

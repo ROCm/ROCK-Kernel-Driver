@@ -566,8 +566,14 @@ error_kernelspace:
 	incl %ebx
        /* There are two places in the kernel that can potentially fault with
           usergs. Handle them here. The exception handlers after
-	  iret run with kernel gs again, so don't set the user space flag. */
-	cmpq $iret_label,RIP(%rsp) 
+	   iret run with kernel gs again, so don't set the user space flag.
+	   B stepping K8s sometimes report an truncated RIP for IRET 
+	   exceptions returning to compat mode. Check for these here too. */
+	leaq iret_label(%rip),%rbp
+	cmpq %rbp,RIP(%rsp) 
+	je   error_swapgs
+	movl %ebp,%ebp	/* zero extend */
+	cmpq %rbp,RIP(%rsp) 
 	je   error_swapgs
 	cmpq $gs_change,RIP(%rsp)
         je   error_swapgs

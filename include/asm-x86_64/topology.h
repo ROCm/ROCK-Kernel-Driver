@@ -10,13 +10,15 @@
 /* Map the K8 CPU local memory controllers to a simple 1:1 CPU:NODE topology */
 
 extern int fake_node;
+/* This is actually a cpumask_t, but doesn't matter because we don't have
+   >BITS_PER_LONG CPUs */
 extern unsigned long cpu_online_map;
 
 #define cpu_to_node(cpu)		(fake_node ? 0 : (cpu))
 #define memblk_to_node(memblk) 	(fake_node ? 0 : (memblk))
 #define parent_node(node)		(node)
 #define node_to_first_cpu(node) 	(fake_node ? 0 : (node))
-#define node_to_cpu_mask(node)	(fake_node ? cpu_online_map : (1UL << (node)))
+#define node_to_cpumask(node)	(fake_node ? cpu_online_map : (1UL << (node)))
 #define node_to_memblk(node)		(node)
 
 static inline unsigned long pcibus_to_cpumask(int bus)
