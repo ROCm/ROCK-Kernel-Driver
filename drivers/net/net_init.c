@@ -103,116 +103,6 @@ struct net_device *alloc_netdev(int sizeof_priv, const char *mask,
 }
 EXPORT_SYMBOL(alloc_netdev);
 
-static struct net_device *init_alloc_dev(int sizeof_priv)
-{
-	struct net_device *dev;
-	int alloc_size;
-
-	/* ensure 32-byte alignment of the private area */
-	alloc_size = sizeof (*dev) + sizeof_priv + 31;
-
-	dev = (struct net_device *) kmalloc (alloc_size, GFP_KERNEL);
-	if (dev == NULL)
-	{
-		printk(KERN_ERR "alloc_dev: Unable to allocate device memory.\n");
-		return NULL;
-	}
-
-	memset(dev, 0, alloc_size);
-
-	if (sizeof_priv)
-		dev->priv = (void *) (((long)(dev + 1) + 31) & ~31);
-
-	return dev;
-}
-
-/* 
- *	Create and name a device from a prototype, then perform any needed
- *	setup.
- */
-
-static struct net_device *init_netdev(struct net_device *dev, int sizeof_priv,
-				      char *mask, void (*setup)(struct net_device *))
-{
-	int new_device = 0;
-
-	/*
-	 *	Allocate a device if one is not provided.
-	 */
-	 
-	if (dev == NULL) {
-		dev=init_alloc_dev(sizeof_priv);
-		if(dev==NULL)
-			return NULL;
-		new_device = 1;
-	}
-
-	/*
-	 *	Allocate a name
-	 */
-	 
-	if (dev->name[0] == '\0' || dev->name[0] == ' ') {
-		strcpy(dev->name, mask);
-		rtnl_lock();
-		if (dev_alloc_name(dev, mask)<0) {
-			rtnl_unlock();
-			if (new_device)
-				kfree(dev);
-			return NULL;
-		}
-		rtnl_unlock();
-	}
-
-	netdev_boot_setup_check(dev);
-	
-	/*
-	 *	Configure via the caller provided setup function then
-	 *	register if needed.
-	 */
-	
-	setup(dev);
-	
-	if (new_device) {
-		int err;
-
-		rtnl_lock();
-		err = register_netdevice(dev);
-		rtnl_unlock();
-
-		if (err < 0) {
-			kfree(dev);
-			dev = NULL;
-		}
-	}
-	return dev;
-}
-
-/**
- * init_etherdev - Register ethernet device
- * @dev: An ethernet device structure to be filled in, or %NULL if a new
- *	struct should be allocated.
- * @sizeof_priv: Size of additional driver-private structure to be allocated
- *	for this ethernet device
- *
- * Fill in the fields of the device structure with ethernet-generic values.
- *
- * If no device structure is passed, a new one is constructed, complete with
- * a private data area of size @sizeof_priv.  A 32-byte (not bit)
- * alignment is enforced for this private data area.
- *
- * If an empty string area is passed as dev->name, or a new structure is made,
- * a new name string is constructed.
- *
- * Deprecated because of exposed window between device registration 
- * and interfaces pointers that need to be set by driver.
- * Use alloc_etherdev and register_netdev instead.
- */
-
-struct net_device *__init_etherdev(struct net_device *dev, int sizeof_priv)
-{
-	return init_netdev(dev, sizeof_priv, "eth%d", ether_setup);
-}
-
 /**
  * alloc_etherdev - Allocates and sets up an ethernet device
  * @sizeof_priv: Size of additional driver-private structure to be allocated
@@ -231,7 +121,6 @@ struct net_device *alloc_etherdev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "eth%d", ether_setup);
 }
 
-EXPORT_SYMBOL(__init_etherdev);
 EXPORT_SYMBOL(alloc_etherdev);
 
 static int eth_mac_addr(struct net_device *dev, void *p)

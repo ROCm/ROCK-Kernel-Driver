@@ -4,11 +4,12 @@
  * 
  * FCP adapter driver for IBM eServer zSeries 
  * 
- * Copyright 2002 IBM Corporation 
+ * (C) Copyright IBM Corp. 2002, 2004
+ *
  * Author(s): Martin Peschke <mpeschke@de.ibm.com> 
  *            Raimund Schroeder <raimund.schroeder@de.ibm.com> 
- *            Aron Zeh <arzeh@de.ibm.com> 
- *            Wolfgang Taphorn <taphorn@de.ibm.com> 
+ *            Aron Zeh
+ *            Wolfgang Taphorn
  *            Stefan Bader <stefan.bader@de.ibm.com> 
  *            Heiko Carstens <heiko.carstens@de.ibm.com> 
  * 
@@ -30,7 +31,7 @@
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.38 $"
+#define ZFCP_EXT_REVISION "$Revision: 1.45 $"
 
 #include "zfcp_def.h"
 
@@ -46,7 +47,6 @@ extern void zfcp_sysfs_port_remove_files(struct device *, u32);
 extern int  zfcp_sysfs_unit_create_files(struct device *);
 extern void zfcp_sysfs_unit_remove_files(struct device *);
 extern void zfcp_sysfs_port_release(struct device *);
-extern int  zfcp_sysfs_port_shutdown(struct zfcp_port *);
 extern void zfcp_sysfs_unit_release(struct device *);
 
 /**************************** CONFIGURATION  *********************************/
@@ -65,7 +65,6 @@ extern void   zfcp_unit_dequeue(struct zfcp_unit *);
 extern int  zfcp_ccw_register(void);
 extern void zfcp_ccw_unregister(void);
 
-extern int  zfcp_initialize_with_0copy(struct zfcp_adapter *);
 extern void zfcp_qdio_zero_sbals(struct qdio_buffer **, int, int);
 extern int  zfcp_qdio_allocate(struct zfcp_adapter *);
 extern int  zfcp_qdio_allocate_queues(struct zfcp_adapter *);
@@ -73,6 +72,16 @@ extern void zfcp_qdio_free_queues(struct zfcp_adapter *);
 extern int  zfcp_qdio_determine_pci(struct zfcp_qdio_queue *,
 				    struct zfcp_fsf_req *);
 extern int  zfcp_qdio_reqid_check(struct zfcp_adapter *, void *);
+
+extern volatile struct qdio_buffer_element *zfcp_qdio_sbale_req
+	(struct zfcp_fsf_req *, int, int);
+extern volatile struct qdio_buffer_element *zfcp_qdio_sbale_curr
+	(struct zfcp_fsf_req *);
+extern int zfcp_qdio_sbals_from_sg
+	(struct zfcp_fsf_req *, unsigned long, struct scatterlist *, int, int);
+extern int zfcp_qdio_sbals_from_scsicmnd
+	(struct zfcp_fsf_req *, unsigned long, struct scsi_cmnd *);
+
 
 /******************************** FSF ****************************************/
 extern int  zfcp_fsf_open_port(struct zfcp_erp_action *);
@@ -83,17 +92,20 @@ extern int  zfcp_fsf_open_unit(struct zfcp_erp_action *);
 extern int  zfcp_fsf_close_unit(struct zfcp_erp_action *);
 
 extern int  zfcp_fsf_exchange_config_data(struct zfcp_erp_action *);
+extern int  zfcp_fsf_control_file(struct zfcp_adapter *, struct zfcp_fsf_req **,
+				  u32, u32, struct zfcp_sg_list *);
 extern void zfcp_fsf_scsi_er_timeout_handler(unsigned long);
 extern int  zfcp_fsf_req_dismiss_all(struct zfcp_adapter *);
 extern int  zfcp_fsf_status_read(struct zfcp_adapter *, int);
-extern int  zfcp_fsf_req_create(struct zfcp_adapter *,u32, unsigned long *,
-				int, struct zfcp_fsf_req **);
-extern void zfcp_fsf_req_free(struct zfcp_fsf_req *);
-extern int  zfcp_fsf_send_generic(struct zfcp_fsf_req *, unsigned char,
-				  unsigned long *, struct timer_list *);
+extern int zfcp_fsf_req_create(struct zfcp_adapter *, u32, int, mempool_t *,
+			       unsigned long *, struct zfcp_fsf_req **);
+extern int zfcp_fsf_send_ct(struct zfcp_send_ct *, mempool_t *,
+			    struct zfcp_erp_action *);
+extern int zfcp_fsf_send_els(struct zfcp_send_els *);
 extern int  zfcp_fsf_req_wait_and_cleanup(struct zfcp_fsf_req *, int, u32 *);
 extern int  zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *,
-					   struct zfcp_unit *, Scsi_Cmnd *,
+					   struct zfcp_unit *,
+					   struct scsi_cmnd *,
 					   int);
 extern int  zfcp_fsf_req_complete(struct zfcp_fsf_req *);
 extern void zfcp_fsf_incoming_els(struct zfcp_fsf_req *);
@@ -105,15 +117,11 @@ extern struct zfcp_fsf_req *zfcp_fsf_abort_fcp_command(
 
 /******************************** FCP ****************************************/
 extern int  zfcp_nameserver_enqueue(struct zfcp_adapter *);
-extern int  zfcp_nameserver_request(struct zfcp_erp_action *);
-extern void zfcp_fsf_els_processing(struct zfcp_fsf_req *);
+extern int  zfcp_ns_gid_pn_request(struct zfcp_erp_action *);
 
 /******************************* SCSI ****************************************/
 extern int  zfcp_adapter_scsi_register(struct zfcp_adapter *);
 extern void zfcp_adapter_scsi_unregister(struct zfcp_adapter *);
-extern void zfcp_scsi_block_requests(struct Scsi_Host *);
-extern int  zfcp_create_sbals_from_sg(struct zfcp_fsf_req *,
-				     Scsi_Cmnd *, char, int, int);
 extern void zfcp_set_fcp_dl(struct fcp_cmnd_iu *, fcp_dl_t);
 extern char *zfcp_get_fcp_rsp_info_ptr(struct fcp_rsp_iu *);
 extern void set_host_byte(u32 *, char);
@@ -121,6 +129,11 @@ extern void set_driver_byte(u32 *, char);
 extern char *zfcp_get_fcp_sns_info_ptr(struct fcp_rsp_iu *);
 extern void zfcp_fsf_start_scsi_er_timer(struct zfcp_adapter *);
 extern fcp_dl_t zfcp_get_fcp_dl(struct fcp_cmnd_iu *);
+
+extern int zfcp_scsi_command_async(struct zfcp_adapter *,struct zfcp_unit *unit,
+				   struct scsi_cmnd *scsi_cmnd);
+extern int zfcp_scsi_command_sync(struct zfcp_unit *unit,
+				  struct scsi_cmnd *scsi_cmnd);
 
 /******************************** ERP ****************************************/
 extern void zfcp_erp_modify_adapter_status(struct zfcp_adapter *, u32, int);
@@ -147,10 +160,12 @@ extern int  zfcp_erp_thread_kill(struct zfcp_adapter *);
 extern int  zfcp_erp_wait(struct zfcp_adapter *);
 extern void zfcp_erp_fsf_req_handler(struct zfcp_fsf_req *);
 
+extern int  zfcp_test_link(struct zfcp_port *);
+
 /******************************** AUX ****************************************/
 extern void zfcp_cmd_dbf_event_fsf(const char *, struct zfcp_fsf_req *,
 				   void *, int);
-extern void zfcp_cmd_dbf_event_scsi(const char *, Scsi_Cmnd *);
+extern void zfcp_cmd_dbf_event_scsi(const char *, struct scsi_cmnd *);
 extern void zfcp_in_els_dbf_event(struct zfcp_adapter *, const char *,
 				  struct fsf_status_read_buffer *, int);
 #ifdef ZFCP_STAT_REQSIZES

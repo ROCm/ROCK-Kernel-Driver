@@ -286,7 +286,20 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	policy->cur = speed;
 
-	return cpufreq_frequency_table_cpuinfo(policy, &speedstep_freqs[0]);
+	result = cpufreq_frequency_table_cpuinfo(policy, speedstep_freqs);
+	if (result)
+		return (result);
+
+        cpufreq_frequency_table_get_attr(speedstep_freqs, policy->cpu);
+
+	return 0;
+}
+
+
+static int speedstep_cpu_exit(struct cpufreq_policy *policy)
+{
+	cpufreq_frequency_table_put_attr(policy->cpu);
+	return 0;
 }
 
 
@@ -300,14 +313,20 @@ static int speedstep_resume(struct cpufreq_policy *policy)
 	return result;
 }
 
+static struct freq_attr* speedstep_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
 
 static struct cpufreq_driver speedstep_driver = {
 	.name		= "speedstep-smi",
 	.verify 	= speedstep_verify,
 	.target 	= speedstep_target,
 	.init		= speedstep_cpu_init,
+	.exit		= speedstep_cpu_exit,
 	.resume		= speedstep_resume,
 	.owner		= THIS_MODULE,
+	.attr		= speedstep_attr,
 };
 
 /**

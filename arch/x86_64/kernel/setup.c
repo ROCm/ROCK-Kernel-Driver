@@ -380,6 +380,8 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	end_pfn = e820_end_of_ram();
 
+	check_efer();
+
 	init_memory_mapping(); 
 
 #ifdef CONFIG_DISCONTIGMEM
@@ -892,6 +894,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
 	}
 
+	mcheck_init(c);
 }
  
 
@@ -949,7 +952,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 		/* Intel-defined (#2) */
 		"pni", NULL, NULL, "monitor", "ds_cpl", NULL, NULL, "tm2",
-		"est", NULL, "cid", NULL, NULL, NULL, NULL, NULL,
+		"est", NULL, "cid", NULL, NULL, "cmpxchg16b", NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	};

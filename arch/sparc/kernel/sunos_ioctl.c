@@ -21,6 +21,7 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 #include <linux/file.h>
 #include <asm/kbio.h>
 
@@ -31,9 +32,6 @@ extern char sunkbd_layout;
 
 /* NR_OPEN is now larger and dynamic in recent kernels. */
 #define SUNOS_NR_OPEN	256
-
-extern asmlinkage int sys_ioctl(unsigned int, unsigned int, unsigned long);
-extern asmlinkage int sys_setsid(void);
 
 asmlinkage int sunos_ioctl (int fd, unsigned long cmd, unsigned long arg)
 {

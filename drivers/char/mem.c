@@ -67,6 +67,14 @@ static inline int uncached_access(struct file *file, unsigned long addr)
 	 * On ia64, we ignore O_SYNC because we cannot tolerate memory attribute aliases.
 	 */
 	return !(efi_mem_attributes(addr) & EFI_MEMORY_WB);
+#elif defined(CONFIG_PPC64)
+	/* On PPC64, we always do non-cacheable access to the IO hole and
+	 * cacheable elsewhere. Cache paradox can checkstop the CPU and
+	 * the high_memory heuristic below is wrong on machines with memory
+	 * above the IO hole... Ah, and of course, XFree86 doesn't pass
+	 * O_SYNC when mapping us to tap IO space. Surprised ?
+	 */
+	return !page_is_ram(addr);
 #else
 	/*
 	 * Accessing memory above the top the kernel knows about or through a file pointer

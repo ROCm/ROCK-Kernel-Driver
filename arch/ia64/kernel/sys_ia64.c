@@ -15,6 +15,7 @@
 #include <linux/file.h>		/* doh, must come after sched.h... */
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 #include <linux/highuid.h>
 #include <linux/hugetlb.h>
 
@@ -74,7 +75,6 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 asmlinkage long
 ia64_getpriority (int which, int who)
 {
-	extern long sys_getpriority (int, int);
 	long prio;
 
 	prio = sys_getpriority(which, who);

@@ -1011,11 +1011,6 @@ out:
 	return un;
 }
 
-asmlinkage long sys_semop (int semid, struct sembuf __user *tsops, unsigned nsops)
-{
-	return sys_semtimedop(semid, tsops, nsops, NULL);
-}
-
 asmlinkage long sys_semtimedop(int semid, struct sembuf __user *tsops,
 			unsigned nsops, const struct timespec __user *timeout)
 {
@@ -1179,6 +1174,11 @@ out_free:
 	if(sops != fast_sops)
 		kfree(sops);
 	return error;
+}
+
+asmlinkage long sys_semop (int semid, struct sembuf __user *tsops, unsigned nsops)
+{
+	return sys_semtimedop(semid, tsops, nsops, NULL);
 }
 
 /* If CLONE_SYSVSEM is set, establish sharing of SEM_UNDO state between

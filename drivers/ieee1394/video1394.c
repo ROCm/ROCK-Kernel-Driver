@@ -1453,24 +1453,32 @@ static void __exit video1394_exit_module (void)
 
 static int __init video1394_init_module (void)
 {
+	int ret;
+
 	cdev_init(&video1394_cdev, &video1394_fops);
 	video1394_cdev.owner = THIS_MODULE;
 	kobject_set_name(&video1394_cdev.kobj, VIDEO1394_DRIVER_NAME);
+	ret = cdev_add(&video1394_cdev, IEEE1394_VIDEO1394_DEV, 16);
 	if (cdev_add(&video1394_cdev, IEEE1394_VIDEO1394_DEV, 16)) {
 		PRINT_G(KERN_ERR, "video1394: unable to get minor device block");
-		return -EIO;
+		return ret;
         }
 
 	devfs_mk_dir(VIDEO1394_DRIVER_NAME);
 
 	hpsb_register_highlevel(&video1394_highlevel);
 
-	hpsb_register_protocol(&video1394_driver);
+	ret = hpsb_register_protocol(&video1394_driver);
+	if (ret) {
+		PRINT_G(KERN_ERR, "video1394: failed to register protocol");
+		hpsb_unregister_highlevel(&video1394_highlevel);
+		devfs_remove(VIDEO1394_DRIVER_NAME);
+		cdev_del(&video1394_cdev);
+		return ret;
+	}
 
 #ifdef CONFIG_COMPAT
 	{
-		int ret;
-
 		/* First the compatible ones */
 		ret = register_ioctl32_conversion(VIDEO1394_IOC_LISTEN_CHANNEL, NULL);
 		ret |= register_ioctl32_conversion(VIDEO1394_IOC_UNLISTEN_CHANNEL, NULL);

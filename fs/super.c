@@ -329,7 +329,7 @@ restart:
  * flags again, which will cause process A to resync everything.  Fix that with
  * a local mutex.
  *
- * FIXME: If wait==0, we only really need to call ->sync_fs if s_dirt is true.
+ * (Fabian) Avoid sync_fs with clean fs & wait mode 0
  */
 void sync_filesystems(int wait)
 {
@@ -360,7 +360,7 @@ restart:
 		sb->s_count++;
 		spin_unlock(&sb_lock);
 		down_read(&sb->s_umount);
-		if (sb->s_root)
+		if (sb->s_root && (wait || sb->s_dirt))
 			sb->s_op->sync_fs(sb, wait);
 		drop_super(sb);
 		goto restart;
@@ -450,6 +450,14 @@ out:
 	return err;
 }
 
+/**
+ *	mark_files_ro
+ *	@sb: superblock in question
+ *
+ *	All files are marked read/only.  We don't care about pending
+ *	delete files so this should be used in 'force' mode only
+ */
+
 static void mark_files_ro(struct super_block *sb)
 {
 	struct file *f;
@@ -482,7 +490,8 @@ int do_remount_sb(struct super_block *sb, int flags, void *data, int force)
 	shrink_dcache_sb(sb);
 	fsync_super(sb);
 
-	/* If we are remounting RDONLY, make sure there are no rw files open */
+	/* If we are remounting RDONLY and current sb is read/write,
+	   make sure there are no rw files opened */
 	if ((flags & MS_RDONLY) && !(sb->s_flags & MS_RDONLY)) {
 		if (force)
 			mark_files_ro(sb);

@@ -44,6 +44,7 @@
 #include <linux/interrupt.h>
 #include <linux/device.h>
 #include <linux/suspend.h>
+#include <linux/syscalls.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
@@ -2291,8 +2292,6 @@ restore_via_state(void)
 	out_8(&via[IFR], 0x7f);				/* clear IFR */
 	out_8(&via[IER], IER_SET | SR_INT | CB1_INT);
 }
-
-extern long sys_sync(void);
 
 static int __pmac
 pmac_suspend_devices(void)

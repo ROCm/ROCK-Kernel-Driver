@@ -60,7 +60,7 @@ struct vt_struct *vt_cons[MAX_NR_CONSOLES];
 unsigned char keyboard_type = KB_101;
 
 #ifdef CONFIG_X86
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
+#include <linux/syscalls.h>
 #endif
 
 /*

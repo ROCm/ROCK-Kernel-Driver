@@ -16,6 +16,7 @@
 #include <linux/fcntl.h>
 #include <linux/net.h>
 #include <linux/in.h>
+#include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
@@ -24,6 +25,7 @@
 #include <linux/init.h>
 
 #include <linux/nfs.h>
+#include <linux/nfsd_idmap.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
@@ -436,6 +438,9 @@ static int __init init_nfsd(void)
 	nfsd_cache_init();	/* RPC reply cache */
 	nfsd_export_init();	/* Exports table */
 	nfsd_lockd_init();	/* lockd->nfsd callbacks */
+#ifdef CONFIG_NFSD_V4
+	nfsd_idmap_init();      /* Name to ID mapping */
+#endif /* CONFIG_NFSD_V4 */
 	if (proc_mkdir("fs/nfs", 0)) {
 		struct proc_dir_entry *entry;
 		entry = create_proc_entry("fs/nfs/exports", 0, NULL);
@@ -462,6 +467,9 @@ static void __exit exit_nfsd(void)
 	remove_proc_entry("fs/nfs", NULL);
 	nfsd_stat_shutdown();
 	nfsd_lockd_shutdown();
+#ifdef CONFIG_NFSD_V4
+	nfsd_idmap_shutdown();
+#endif /* CONFIG_NFSD_V4 */
 	unregister_filesystem(&nfsd_fs_type);
 }
 

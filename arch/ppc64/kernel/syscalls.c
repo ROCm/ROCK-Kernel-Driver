@@ -22,6 +22,7 @@
 
 #include <linux/errno.h>
 #include <linux/sched.h>
+#include <linux/syscalls.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>

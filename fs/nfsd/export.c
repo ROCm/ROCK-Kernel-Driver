@@ -20,6 +20,7 @@
 #include <linux/stat.h>
 #include <linux/in.h>
 #include <linux/seq_file.h>
+#include <linux/syscalls.h>
 #include <linux/rwsem.h>
 #include <linux/dcache.h>
 #include <linux/namei.h>

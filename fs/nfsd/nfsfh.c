@@ -165,7 +165,11 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 		}
 
 		/* Set user creds for this exportpoint */
-		nfsd_setuser(rqstp, exp);
+		error = nfsd_setuser(rqstp, exp);
+		if (error) {
+			error = nfserrno(error);
+			goto out;
+		}
 
 		/*
 		 * Look up the dentry using the NFS file handle.

@@ -115,7 +115,6 @@ struct au1k_private {
 	struct irlap_cb		*irlap;
 	
 	u8 open;
-	u32 flags;               /* Interface flags */
 	u32 speed;
 	u32 newspeed;
 	

@@ -348,6 +348,9 @@ static inline struct hci_dev *hci_dev_hold(struct hci_dev *d)
 
 struct hci_dev *hci_dev_get(int index);
 struct hci_dev *hci_get_route(bdaddr_t *src, bdaddr_t *dst);
+
+struct hci_dev *hci_alloc_dev(void);
+void hci_free_dev(struct hci_dev *hdev);
 int hci_register_dev(struct hci_dev *hdev);
 int hci_unregister_dev(struct hci_dev *hdev);
 int hci_suspend_dev(struct hci_dev *hdev);

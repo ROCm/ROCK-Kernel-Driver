@@ -36,7 +36,7 @@
 #include <asm/pci-bridge.h>
 #include <asm/ppcdebug.h>
 #include <asm/naca.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 
 #include <asm/iSeries/HvCallPci.h>
 #include <asm/iSeries/HvCallSm.h>
@@ -53,7 +53,7 @@ extern int panic_timeout;
 
 extern unsigned long iSeries_Base_Io_Memory;    
 
-extern struct TceTable *tceTables[256];
+extern struct iommu_table *tceTables[256];
 
 extern void iSeries_MmIoTest(void);
 
@@ -273,10 +273,11 @@ void __init iSeries_pci_final_fixup(void)
 			iSeries_Device_Information(pdev, Buffer,
 					sizeof(Buffer));
 			printk("%d. %s\n", DeviceCount, Buffer);
-			create_pci_bus_tce_table((unsigned long)node);
+			iommu_devnode_init(node);
 		} else
 			printk("PCI: Device Tree not found for 0x%016lX\n",
 					(unsigned long)pdev);
+		pdev->irq = node->Irq;
 	}
 	iSeries_IoMmTable_Status();
 	iSeries_activate_IRQs();
@@ -423,8 +424,6 @@ static int iSeries_Scan_Bridge_Slot(HvBusNumber Bus,
 					      Bus, SubBus, AgentId, HvRc);
 				continue;
 			}
-			printk("connected bus unit at bus %d subbus 0x%x agentid 0x%x (idsel=%d func=%d)\n",
-			       Bus, SubBus, AgentId, IdSel, Function);
 
 			HvRc = HvCallPci_configLoad16(Bus, SubBus, AgentId,
 						      PCI_VENDOR_ID, &VendorId);
@@ -437,8 +436,8 @@ static int iSeries_Scan_Bridge_Slot(HvBusNumber Bus,
 
 			/* FoundDevice: 0x18.28.10 = 0x12AE */
 			PPCDBG(PPCDBG_BUSWALK,
-			       "PCI:- FoundDevice: 0x%02X.%02X.%02X = 0x%04X\n",
-			       Bus, SubBus, AgentId, VendorId);
+			       "PCI:- FoundDevice: 0x%02X.%02X.%02X = 0x%04X, irq %d\n",
+			       Bus, SubBus, AgentId, VendorId, Irq);
 			HvRc = HvCallPci_configStore8(Bus, SubBus, AgentId,
 						      PCI_INTERRUPT_LINE, Irq);  
 			if (HvRc != 0)

@@ -1,28 +1,22 @@
 /*
- * linux/fs/hfs/mdb.c
+ *  linux/fs/hfs/mdb.c
  *
  * Copyright (C) 1995-1997  Paul H. Hargrove
+ * (C) 2003 Ardis Technologies <roman@ardistech.com>
  * This file may be distributed under the terms of the GNU General Public License.
  *
  * This file contains functions for reading/writing the MDB.
- *
- * "XXX" in a comment is a note to myself to consider changing something.
- *
- * In function preconditions the term "valid" applied to a pointer to
- * a structure means that the pointer is non-NULL and the structure it
- * points to has all fields initialized to consistent values.
- *
- * The code in this file initializes some structures which contain
- * pointers by calling memset(&foo, 0, sizeof(foo)).
- * This produces the desired behavior only due to the non-ANSI
- * assumption that the machine representation of NULL is all zeros.
  */
 
-#include "hfs.h"
+#include <linux/cdrom.h>
+#include <linux/genhd.h>
+
+#include "hfs_fs.h"
+#include "btree.h"
 
 /*================ File-local data types ================*/
 
-/* 
+/*
  * The HFS Master Directory Block (MDB).
  *
  * Also known as the Volume Information Block (VIB), this structure is
@@ -32,48 +26,35 @@
  *
  * modified for HFS Extended
  */
-struct raw_mdb {
-	hfs_word_t	drSigWord;	/* Signature word indicating fs type */
-	hfs_lword_t	drCrDate;	/* fs creation date/time */
-	hfs_lword_t	drLsMod;	/* fs modification date/time */
-	hfs_word_t	drAtrb;		/* fs attributes */
-	hfs_word_t	drNmFls;	/* number of files in root directory */
-	hfs_word_t	drVBMSt;	/* location (in 512-byte blocks)
-					   of the volume bitmap */
-	hfs_word_t	drAllocPtr;	/* location (in allocation blocks)
-					   to begin next allocation search */
-	hfs_word_t	drNmAlBlks;	/* number of allocation blocks */
-	hfs_lword_t	drAlBlkSiz;	/* bytes in an allocation block */
-	hfs_lword_t	drClpSiz;	/* clumpsize, the number of bytes to
-					   allocate when extending a file */
-	hfs_word_t	drAlBlSt;	/* location (in 512-byte blocks)
-					   of the first allocation block */
-	hfs_lword_t	drNxtCNID;	/* CNID to assign to the next
-					   file or directory created */
-	hfs_word_t	drFreeBks;	/* number of free allocation blocks */
-	hfs_byte_t	drVN[28];	/* the volume label */
-	hfs_lword_t	drVolBkUp;	/* fs backup date/time */
-	hfs_word_t	drVSeqNum;	/* backup sequence number */
-	hfs_lword_t	drWrCnt;	/* fs write count */
-	hfs_lword_t	drXTClpSiz;	/* clumpsize for the extents B-tree */
-	hfs_lword_t	drCTClpSiz;	/* clumpsize for the catalog B-tree */
-	hfs_word_t	drNmRtDirs;	/* number of directories in
-					   the root directory */
-	hfs_lword_t	drFilCnt;	/* number of files in the fs */
-	hfs_lword_t	drDirCnt;	/* number of directories in the fs */
-	hfs_byte_t	drFndrInfo[32];	/* data used by the Finder */
-	hfs_word_t	drEmbedSigWord;	/* embedded volume signature */
-	hfs_lword_t     drEmbedExtent;  /* starting block number (xdrStABN) 
-					   and number of allocation blocks 
-					   (xdrNumABlks) occupied by embedded
-					   volume */
-	hfs_lword_t	drXTFlSize;	/* bytes in the extents B-tree */
-	hfs_byte_t	drXTExtRec[12];	/* extents B-tree's first 3 extents */
-	hfs_lword_t	drCTFlSize;	/* bytes in the catalog B-tree */
-	hfs_byte_t	drCTExtRec[12];	/* catalog B-tree's first 3 extents */
-} __attribute__((packed));
 
-/*================ Global functions ================*/
+static int hfs_get_last_session(struct super_block *sb,
+				sector_t *start, sector_t *size)
+{
+	struct cdrom_multisession ms_info;
+	struct cdrom_tocentry te;
+	int res;
+
+	/* default values */
+	*start = 0;
+	*size = sb->s_bdev->bd_inode->i_size >> 9;
+
+	if (HFS_SB(sb)->session >= 0) {
+		te.cdte_track = HFS_SB(sb)->session;
+		te.cdte_format = CDROM_LBA;
+		res = ioctl_by_bdev(sb->s_bdev, CDROMREADTOCENTRY, (unsigned long)&te);
+		if (!res && (te.cdte_ctrl & CDROM_DATA_TRACK) == 4) {
+			*start = (sector_t)te.cdte_addr.lba << 2;
+			return 0;
+		}
+		printk(KERN_ERR "HFS: Invalid session number or type of track\n");
+		return -EINVAL;
+	}
+	ms_info.addr_format = CDROM_LBA;
+	res = ioctl_by_bdev(sb->s_bdev, CDROMMULTISESSION, (unsigned long)&ms_info);
+	if (!res && ms_info.xa_flag)
+		*start = (sector_t)ms_info.addr.lba << 2;
+	return 0;
+}
 
 /*
  * hfs_mdb_get()
@@ -81,135 +62,172 @@ struct raw_mdb {
  * Build the in-core MDB for a filesystem, including
  * the B-trees and the volume bitmap.
  */
-struct hfs_mdb *hfs_mdb_get(hfs_sysmdb sys_mdb, int readonly,
-			    hfs_s32 part_start)
+int hfs_mdb_get(struct super_block *sb)
 {
-	struct hfs_mdb *mdb;
-	hfs_buffer buf;
-	struct raw_mdb *raw;
-	unsigned int bs, block;
-	int lcv, limit;
-	hfs_buffer *bmbuf;
+	struct buffer_head *bh;
+	struct hfs_mdb *mdb, *mdb2;
+	unsigned int block;
+	char *ptr;
+	int off2, len, size, sect;
+	sector_t part_start, part_size;
+	loff_t off;
+	u16 attrib;
 
-	if (!HFS_NEW(mdb)) {
-		hfs_warn("hfs_fs: out of memory\n");
-		return NULL;
+	/* set the device driver to 512-byte blocks */
+	size = sb_min_blocksize(sb, HFS_SECTOR_SIZE);
+	if (!size)
+		return -EINVAL;
+
+	if (hfs_get_last_session(sb, &part_start, &part_size))
+		return -EINVAL;
+	while (1) {
+		/* See if this is an HFS filesystem */
+		bh = sb_bread512(sb, part_start + HFS_MDB_BLK, mdb);
+		if (!bh)
+			goto out;
+
+		if (mdb->drSigWord == cpu_to_be16(HFS_SUPER_MAGIC))
+			break;
+		brelse(bh);
+
+		/* check for a partition block
+		 * (should do this only for cdrom/loop though)
+		 */
+		if (hfs_part_find(sb, &part_start, &part_size))
+			goto out;
 	}
 
-	memset(mdb, 0, sizeof(*mdb));
-	mdb->magic = HFS_MDB_MAGIC;
-	mdb->sys_mdb = sys_mdb;
-	INIT_LIST_HEAD(&mdb->entry_dirty);
-	init_MUTEX(&mdb->bitmap_sem);
-
-	/* See if this is an HFS filesystem */
-	buf = hfs_buffer_get(sys_mdb, part_start + HFS_MDB_BLK, 1);
-	if (!hfs_buffer_ok(buf)) {
-		hfs_warn("hfs_fs: Unable to read superblock\n");
-		HFS_DELETE(mdb);
-		goto bail2;
+	HFS_SB(sb)->alloc_blksz = size = be32_to_cpu(mdb->drAlBlkSiz);
+	if (!size || (size & (HFS_SECTOR_SIZE - 1))) {
+		hfs_warn("hfs_fs: bad allocation block size %d\n", size);
+		goto out_bh;
 	}
 
-	raw = (struct raw_mdb *)hfs_buffer_data(buf);
-	if (hfs_get_ns(raw->drSigWord) != htons(HFS_SUPER_MAGIC)) {
-		hfs_buffer_put(buf);
-		HFS_DELETE(mdb);
-		goto bail2;
+	size = min(HFS_SB(sb)->alloc_blksz, (u32)PAGE_SIZE);
+	/* size must be a multiple of 512 */
+	while (size & (size - 1))
+		size -= HFS_SECTOR_SIZE;
+	sect = be16_to_cpu(mdb->drAlBlSt) + part_start;
+	/* align block size to first sector */
+	while (sect & ((size - 1) >> HFS_SECTOR_SIZE_BITS))
+		size >>= 1;
+	/* align block size to weird alloc size */
+	while (HFS_SB(sb)->alloc_blksz & (size - 1))
+		size >>= 1;
+	brelse(bh);
+	if (!sb_set_blocksize(sb, size)) {
+		printk("hfs_fs: unable to set blocksize to %u\n", size);
+		goto out;
 	}
-	mdb->buf = buf;
-	
-	bs = hfs_get_hl(raw->drAlBlkSiz);
-	if (!bs || (bs & (HFS_SECTOR_SIZE-1))) {
-		hfs_warn("hfs_fs: bad allocation block size %d != 512\n", bs);
-		hfs_buffer_put(buf);
-		HFS_DELETE(mdb);
-		goto bail2;
-	}
-	mdb->alloc_blksz = bs >> HFS_SECTOR_SIZE_BITS;
+
+	bh = sb_bread512(sb, part_start + HFS_MDB_BLK, mdb);
+	if (!bh)
+		goto out;
+	if (mdb->drSigWord != cpu_to_be16(HFS_SUPER_MAGIC))
+		goto out_bh;
+
+	HFS_SB(sb)->mdb_bh = bh;
+	HFS_SB(sb)->mdb = mdb;
 
 	/* These parameters are read from the MDB, and never written */
-	mdb->create_date = hfs_get_hl(raw->drCrDate);
-	mdb->fs_ablocks  = hfs_get_hs(raw->drNmAlBlks);
-	mdb->fs_start    = hfs_get_hs(raw->drAlBlSt) + part_start;
-	mdb->backup_date = hfs_get_hl(raw->drVolBkUp);
-	mdb->clumpablks  = (hfs_get_hl(raw->drClpSiz) / mdb->alloc_blksz)
-						 >> HFS_SECTOR_SIZE_BITS;
-	memcpy(mdb->vname, raw->drVN, sizeof(raw->drVN));
+	HFS_SB(sb)->part_start = part_start;
+	HFS_SB(sb)->fs_ablocks = be16_to_cpu(mdb->drNmAlBlks);
+	HFS_SB(sb)->fs_div = HFS_SB(sb)->alloc_blksz >> sb->s_blocksize_bits;
+	HFS_SB(sb)->clumpablks = be32_to_cpu(mdb->drClpSiz) /
+				 HFS_SB(sb)->alloc_blksz;
+	if (!HFS_SB(sb)->clumpablks)
+		HFS_SB(sb)->clumpablks = 1;
+	HFS_SB(sb)->fs_start = (be16_to_cpu(mdb->drAlBlSt) + part_start) >>
+			       (sb->s_blocksize_bits - HFS_SECTOR_SIZE_BITS);
 
 	/* These parameters are read from and written to the MDB */
-	mdb->modify_date  = hfs_get_nl(raw->drLsMod);
-	mdb->attrib       = hfs_get_ns(raw->drAtrb);
-	mdb->free_ablocks = hfs_get_hs(raw->drFreeBks);
-	mdb->next_id      = hfs_get_hl(raw->drNxtCNID);
-	mdb->write_count  = hfs_get_hl(raw->drWrCnt);
-	mdb->root_files   = hfs_get_hs(raw->drNmFls);
-	mdb->root_dirs    = hfs_get_hs(raw->drNmRtDirs);
-	mdb->file_count   = hfs_get_hl(raw->drFilCnt);
-	mdb->dir_count    = hfs_get_hl(raw->drDirCnt);
+	HFS_SB(sb)->free_ablocks = be16_to_cpu(mdb->drFreeBks);
+	HFS_SB(sb)->next_id = be32_to_cpu(mdb->drNxtCNID);
+	HFS_SB(sb)->root_files = be16_to_cpu(mdb->drNmFls);
+	HFS_SB(sb)->root_dirs = be16_to_cpu(mdb->drNmRtDirs);
+	HFS_SB(sb)->file_count = be32_to_cpu(mdb->drFilCnt);
+	HFS_SB(sb)->folder_count = be32_to_cpu(mdb->drDirCnt);
 
 	/* TRY to get the alternate (backup) MDB. */
-	lcv = mdb->fs_start + mdb->fs_ablocks * mdb->alloc_blksz;
-	limit = lcv + mdb->alloc_blksz;
-	for (; lcv < limit; ++lcv) {
-		buf = hfs_buffer_get(sys_mdb, lcv, 1);
-		if (hfs_buffer_ok(buf)) {
-			struct raw_mdb *tmp =
-				(struct raw_mdb *)hfs_buffer_data(buf);
-			
-			if (hfs_get_ns(tmp->drSigWord) ==
-			    htons(HFS_SUPER_MAGIC)) {
-				mdb->alt_buf = buf;
-				break;
-			}
-		}
-		hfs_buffer_put(buf);
+	sect = part_start + part_size - 2;
+	bh = sb_bread512(sb, sect, mdb2);
+	if (bh) {
+		if (mdb2->drSigWord == cpu_to_be16(HFS_SUPER_MAGIC)) {
+			HFS_SB(sb)->alt_mdb_bh = bh;
+			HFS_SB(sb)->alt_mdb = mdb2;
+		} else
+			brelse(bh);
 	}
-	
-	if (mdb->alt_buf == NULL) {
+
+	if (!HFS_SB(sb)->alt_mdb) {
 		hfs_warn("hfs_fs: unable to locate alternate MDB\n");
 		hfs_warn("hfs_fs: continuing without an alternate MDB\n");
 	}
-	
+
+	HFS_SB(sb)->bitmap = (u32 *)__get_free_pages(GFP_KERNEL, PAGE_SIZE < 8192 ? 1 : 0);
+	if (!HFS_SB(sb)->bitmap)
+		goto out;
+
 	/* read in the bitmap */
-	block = hfs_get_hs(raw->drVBMSt) + part_start;
-	bmbuf = mdb->bitmap;
-	lcv = (mdb->fs_ablocks + 4095) / 4096;
-	for ( ; lcv; --lcv, ++bmbuf, ++block) {
-		if (!hfs_buffer_ok(*bmbuf =
-				   hfs_buffer_get(sys_mdb, block, 1))) {
+	block = be16_to_cpu(mdb->drVBMSt) + part_start;
+	off = (loff_t)block << HFS_SECTOR_SIZE_BITS;
+	size = (HFS_SB(sb)->fs_ablocks + 8) / 8;
+	ptr = (u8 *)HFS_SB(sb)->bitmap;
+	while (size) {
+		bh = sb_bread(sb, off >> sb->s_blocksize_bits);
+		if (!bh) {
 			hfs_warn("hfs_fs: unable to read volume bitmap\n");
-			goto bail1;
+			goto out;
 		}
+		off2 = off & (sb->s_blocksize - 1);
+		len = min((int)sb->s_blocksize - off2, size);
+		memcpy(ptr, bh->b_data + off2, len);
+		brelse(bh);
+		ptr += len;
+		off += len;
+		size -= len;
 	}
 
-	if (!(mdb->ext_tree = hfs_btree_init(mdb, htonl(HFS_EXT_CNID),
-					     raw->drXTExtRec,
-					     hfs_get_hl(raw->drXTFlSize),
-					     hfs_get_hl(raw->drXTClpSiz))) ||
-	    !(mdb->cat_tree = hfs_btree_init(mdb, htonl(HFS_CAT_CNID),
-					     raw->drCTExtRec,
-					     hfs_get_hl(raw->drCTFlSize),
-					     hfs_get_hl(raw->drCTClpSiz)))) {
-		hfs_warn("hfs_fs: unable to initialize data structures\n");
-		goto bail1;
+	HFS_SB(sb)->ext_tree = hfs_btree_open(sb, HFS_EXT_CNID, hfs_ext_keycmp);
+	if (!HFS_SB(sb)->ext_tree) {
+		hfs_warn("hfs_fs: unable to open extent tree\n");
+		goto out;
+	}
+	HFS_SB(sb)->cat_tree = hfs_btree_open(sb, HFS_CAT_CNID, hfs_cat_keycmp);
+	if (!HFS_SB(sb)->cat_tree) {
+		hfs_warn("hfs_fs: unable to open catalog tree\n");
+		goto out;
 	}
 
-	if (!(mdb->attrib & htons(HFS_SB_ATTRIB_CLEAN))) {
-		hfs_warn("hfs_fs: WARNING: mounting unclean filesystem.\n");
-	} else if (!readonly) {
+	attrib = mdb->drAtrb;
+	if (!(attrib & cpu_to_be16(HFS_SB_ATTRIB_UNMNT))
+	    || (attrib & cpu_to_be16(HFS_SB_ATTRIB_INCNSTNT))) {
+		hfs_warn("HFS-fs warning: Filesystem was not cleanly unmounted, "
+			 "running fsck.hfs is recommended.  mounting read-only.\n");
+		sb->s_flags |= MS_RDONLY;
+	}
+	if ((attrib & cpu_to_be16(HFS_SB_ATTRIB_SLOCK))) {
+		hfs_warn("HFS-fs: Filesystem is marked locked, mounting read-only.\n");
+		sb->s_flags |= MS_RDONLY;
+	}
+	if (!(sb->s_flags & MS_RDONLY)) {
 		/* Mark the volume uncleanly unmounted in case we crash */
-		hfs_put_ns(mdb->attrib & htons(~HFS_SB_ATTRIB_CLEAN),
-			   raw->drAtrb);
-		hfs_buffer_dirty(mdb->buf);
-		hfs_buffer_sync(mdb->buf);
+		mdb->drAtrb = attrib & cpu_to_be16(~HFS_SB_ATTRIB_UNMNT);
+		mdb->drAtrb = attrib | cpu_to_be16(HFS_SB_ATTRIB_INCNSTNT);
+		mdb->drWrCnt = cpu_to_be32(be32_to_cpu(mdb->drWrCnt) + 1);
+		mdb->drLsMod = hfs_mtime();
+
+		mark_buffer_dirty(HFS_SB(sb)->mdb_bh);
+		hfs_buffer_sync(HFS_SB(sb)->mdb_bh);
 	}
 
-	return mdb;
+	return 0;
 
-bail1:
-	hfs_mdb_put(mdb, readonly);
-bail2:
-	return NULL;
+out_bh:
+	brelse(bh);
+out:
+	hfs_mdb_put(sb);
+	return -EIO;
 }
 
 /*
@@ -236,84 +254,90 @@ bail2:
  *   If 'backup' is non-zero then the alternate MDB is also written
  *   and the function doesn't return until it is actually on disk.
  */
-void hfs_mdb_commit(struct hfs_mdb *mdb, int backup)
+void hfs_mdb_commit(struct super_block *sb)
 {
-	struct raw_mdb *raw = (struct raw_mdb *)hfs_buffer_data(mdb->buf);
+	struct hfs_mdb *mdb = HFS_SB(sb)->mdb;
 
-	/* Commit catalog entries to buffers */
-	hfs_cat_commit(mdb);
+	if (test_and_clear_bit(HFS_FLG_MDB_DIRTY, &HFS_SB(sb)->flags)) {
+		/* These parameters may have been modified, so write them back */
+		mdb->drLsMod = hfs_mtime();
+		mdb->drFreeBks = cpu_to_be16(HFS_SB(sb)->free_ablocks);
+		mdb->drNxtCNID = cpu_to_be32(HFS_SB(sb)->next_id);
+		mdb->drNmFls = cpu_to_be16(HFS_SB(sb)->root_files);
+		mdb->drNmRtDirs = cpu_to_be16(HFS_SB(sb)->root_dirs);
+		mdb->drFilCnt = cpu_to_be32(HFS_SB(sb)->file_count);
+		mdb->drDirCnt = cpu_to_be32(HFS_SB(sb)->folder_count);
 
-	/* Commit B-tree data to buffers */
-	hfs_btree_commit(mdb->cat_tree, raw->drCTExtRec, raw->drCTFlSize);
-	hfs_btree_commit(mdb->ext_tree, raw->drXTExtRec, raw->drXTFlSize);
+		/* write MDB to disk */
+		mark_buffer_dirty(HFS_SB(sb)->mdb_bh);
+	}
 
-	/* Update write_count and modify_date */
-	++mdb->write_count;
-	mdb->modify_date = hfs_time();
+	/* write the backup MDB, not returning until it is written.
+	 * we only do this when either the catalog or extents overflow
+	 * files grow. */
+	if (test_and_clear_bit(HFS_FLG_ALT_MDB_DIRTY, &HFS_SB(sb)->flags) &&
+	    HFS_SB(sb)->alt_mdb) {
+		hfs_inode_write_fork(HFS_SB(sb)->ext_tree->inode, mdb->drXTExtRec,
+				     &mdb->drXTFlSize, NULL);
+		hfs_inode_write_fork(HFS_SB(sb)->cat_tree->inode, mdb->drCTExtRec,
+				     &mdb->drCTFlSize, NULL);
+		memcpy(HFS_SB(sb)->alt_mdb, HFS_SB(sb)->mdb, HFS_SECTOR_SIZE);
+		HFS_SB(sb)->alt_mdb->drAtrb |= cpu_to_be16(HFS_SB_ATTRIB_UNMNT);
+		HFS_SB(sb)->alt_mdb->drAtrb &= cpu_to_be16(~HFS_SB_ATTRIB_INCNSTNT);
+		mark_buffer_dirty(HFS_SB(sb)->alt_mdb_bh);
+		hfs_buffer_sync(HFS_SB(sb)->alt_mdb_bh);
+	}
 
-	/* These parameters may have been modified, so write them back */
-	hfs_put_nl(mdb->modify_date,   raw->drLsMod);
-	hfs_put_hs(mdb->free_ablocks,  raw->drFreeBks);
-	hfs_put_hl(mdb->next_id,       raw->drNxtCNID);
-	hfs_put_hl(mdb->write_count,   raw->drWrCnt);
-	hfs_put_hs(mdb->root_files,    raw->drNmFls);
-	hfs_put_hs(mdb->root_dirs,     raw->drNmRtDirs);
-	hfs_put_hl(mdb->file_count,    raw->drFilCnt);
-	hfs_put_hl(mdb->dir_count,     raw->drDirCnt);
+	if (test_and_clear_bit(HFS_FLG_BITMAP_DIRTY, &HFS_SB(sb)->flags)) {
+		struct buffer_head *bh;
+		sector_t block;
+		char *ptr;
+		int off, size, len;
 
-	/* write MDB to disk */
-	hfs_buffer_dirty(mdb->buf);
-
-       	/* write the backup MDB, not returning until it is written. 
-         * we only do this when either the catalog or extents overflow
-         * files grow. */
-        if (backup && hfs_buffer_ok(mdb->alt_buf)) {
-		struct raw_mdb *tmp = (struct raw_mdb *)
-			hfs_buffer_data(mdb->alt_buf);
-		
-		if ((hfs_get_hl(tmp->drCTFlSize) < 
-		     hfs_get_hl(raw->drCTFlSize)) ||
-		    (hfs_get_hl(tmp->drXTFlSize) <
-		     hfs_get_hl(raw->drXTFlSize))) {
-			memcpy(hfs_buffer_data(mdb->alt_buf), 
-			       hfs_buffer_data(mdb->buf), HFS_SECTOR_SIZE); 
-			hfs_buffer_dirty(mdb->alt_buf);
-			hfs_buffer_sync(mdb->alt_buf);
+		block = be16_to_cpu(HFS_SB(sb)->mdb->drVBMSt) + HFS_SB(sb)->part_start;
+		off = (block << HFS_SECTOR_SIZE_BITS) & (sb->s_blocksize - 1);
+		block >>= sb->s_blocksize_bits - HFS_SECTOR_SIZE_BITS;
+		size = (HFS_SB(sb)->fs_ablocks + 7) / 8;
+		ptr = (u8 *)HFS_SB(sb)->bitmap;
+		while (size) {
+			bh = sb_bread(sb, block);
+			if (!bh) {
+				hfs_warn("hfs_fs: unable to read volume bitmap\n");
+				break;
+			}
+			len = min((int)sb->s_blocksize - off, size);
+			memcpy(bh->b_data + off, ptr, len);
+			mark_buffer_dirty(bh);
+			brelse(bh);
+			block++;
+			off = 0;
+			ptr += len;
+			size -= len;
 		}
-        }
+	}
+}
+
+void hfs_mdb_close(struct super_block *sb)
+{
+	/* update volume attributes */
+	if (sb->s_flags & MS_RDONLY)
+		return;
+	HFS_SB(sb)->mdb->drAtrb |= cpu_to_be16(HFS_SB_ATTRIB_UNMNT);
+	HFS_SB(sb)->mdb->drAtrb &= cpu_to_be16(~HFS_SB_ATTRIB_INCNSTNT);
+	mark_buffer_dirty(HFS_SB(sb)->mdb_bh);
 }
 
 /*
  * hfs_mdb_put()
  *
  * Release the resources associated with the in-core MDB.  */
-void hfs_mdb_put(struct hfs_mdb *mdb, int readonly) {
-	int lcv;
-
-	/* invalidate cached catalog entries */
-	hfs_cat_invalidate(mdb);
-
+void hfs_mdb_put(struct super_block *sb)
+{
 	/* free the B-trees */
-	hfs_btree_free(mdb->ext_tree);
-	hfs_btree_free(mdb->cat_tree);
-
-	/* free the volume bitmap */
-	for (lcv = 0; lcv < HFS_BM_MAXBLOCKS; ++lcv) {
-		hfs_buffer_put(mdb->bitmap[lcv]);
-	}
-
-	/* update volume attributes */
-	if (!readonly) {
-		struct raw_mdb *raw = 
-				(struct raw_mdb *)hfs_buffer_data(mdb->buf);
-		hfs_put_ns(mdb->attrib, raw->drAtrb);
-		hfs_buffer_dirty(mdb->buf);
-	}
+	hfs_btree_close(HFS_SB(sb)->ext_tree);
+	hfs_btree_close(HFS_SB(sb)->cat_tree);
 
 	/* free the buffers holding the primary and alternate MDBs */
-	hfs_buffer_put(mdb->buf);
-	hfs_buffer_put(mdb->alt_buf);
-
-	/* free the MDB */
-	HFS_DELETE(mdb);
+	brelse(HFS_SB(sb)->mdb_bh);
+	brelse(HFS_SB(sb)->alt_mdb_bh);
 }

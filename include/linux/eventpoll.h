@@ -49,13 +49,6 @@ struct epoll_event {
 struct file;
 
 
-/* Kernel space functions implementing the user space "epoll" API */
-asmlinkage long sys_epoll_create(int size);
-asmlinkage long sys_epoll_ctl(int epfd, int op, int fd,
-			      struct epoll_event __user *event);
-asmlinkage long sys_epoll_wait(int epfd, struct epoll_event __user *events,
-			       int maxevents, int timeout);
-
 #ifdef CONFIG_EPOLL
 
 /* Used to initialize the epoll bits inside the "struct file" */

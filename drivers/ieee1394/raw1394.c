@@ -2737,6 +2737,8 @@ static struct file_operations raw1394_fops = {
 
 static int __init init_raw1394(void)
 {
+	int ret;
+
 	hpsb_register_highlevel(&raw1394_highlevel);
 
         devfs_mk_cdev(MKDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_RAW1394 * 16),
@@ -2745,16 +2747,24 @@ static int __init init_raw1394(void)
 	cdev_init(&raw1394_cdev, &raw1394_fops);
 	raw1394_cdev.owner = THIS_MODULE;
 	kobject_set_name(&raw1394_cdev.kobj, RAW1394_DEVICE_NAME);
-	if (cdev_add(&raw1394_cdev, IEEE1394_RAW1394_DEV, 1)) {
+	ret = cdev_add(&raw1394_cdev, IEEE1394_RAW1394_DEV, 1);
+	if (ret) {
                 HPSB_ERR("raw1394 failed to register minor device block");
                 devfs_remove(RAW1394_DEVICE_NAME);
                 hpsb_unregister_highlevel(&raw1394_highlevel);
-                return -EBUSY;
+                return ret;
         }
 
-        printk(KERN_INFO "raw1394: /dev/%s device initialized\n", RAW1394_DEVICE_NAME);
+        HPSB_INFO("raw1394: /dev/%s device initialized", RAW1394_DEVICE_NAME);
 
-	hpsb_register_protocol(&raw1394_driver);
+	ret = hpsb_register_protocol(&raw1394_driver);
+	if (ret) {
+		HPSB_ERR("raw1394: failed to register protocol");
+		cdev_del(&raw1394_cdev);
+		devfs_remove(RAW1394_DEVICE_NAME);
+		hpsb_unregister_highlevel(&raw1394_highlevel);
+		return ret;
+	}
 
         return 0;
 }

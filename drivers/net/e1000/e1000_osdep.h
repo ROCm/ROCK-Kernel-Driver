@@ -47,7 +47,7 @@
 	                	BUG(); \
 			} else { \
 				set_current_state(TASK_UNINTERRUPTIBLE); \
-				schedule_timeout((x * HZ)/1000); \
+				schedule_timeout((x * HZ)/1000 + 2); \
 			} } while(0)
 #endif
 

@@ -4,7 +4,10 @@
 
 obj-$(CONFIG_IA32_EMULATION) := ia32entry.o sys_ia32.o ia32_ioctl.o \
 	ia32_signal.o tls32.o \
-	ia32_binfmt.o fpu32.o ptrace32.o ipc32.o syscall32.o
+	ia32_binfmt.o fpu32.o ptrace32.o syscall32.o
+
+sysv-$(CONFIG_SYSVIPC) := ipc32.o
+obj-$(CONFIG_IA32_EMULATION) += $(sysv-y)
 
 obj-$(CONFIG_IA32_AOUT) += ia32_aout.o
 

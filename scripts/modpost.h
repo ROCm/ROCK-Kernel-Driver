@@ -80,9 +80,19 @@ struct elf_info {
 	Elf_Sym      *symtab_start;
 	Elf_Sym      *symtab_stop;
 	const char   *strtab;
+	char	     *modinfo;
+	unsigned int modinfo_len;
 };
 
 void handle_moddevtable(struct module *mod, struct elf_info *info,
 			Elf_Sym *sym, const char *symname);
 
 void add_moddevtable(struct buffer *buf, struct module *mod);
+
+void maybe_frob_version(const char *modfilename,
+			void *modinfo,
+			unsigned long modinfo_len,
+			unsigned long modinfo_offset);
+
+void *grab_file(const char *filename, unsigned long *size);
+void release_file(void *file, unsigned long size);

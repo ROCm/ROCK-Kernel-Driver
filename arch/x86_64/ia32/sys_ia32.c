@@ -26,6 +26,7 @@
 #include <linux/fs.h> 
 #include <linux/file.h> 
 #include <linux/signal.h>
+#include <linux/syscalls.h>
 #include <linux/resource.h>
 #include <linux/times.h>
 #include <linux/utsname.h>
@@ -109,9 +110,6 @@ int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
 		return -EFAULT;
 	return 0;
 }
-
-extern long sys_truncate(char *, loff_t);
-extern long sys_ftruncate(int, loff_t);
 
 asmlinkage long
 sys32_truncate64(char * filename, unsigned long offset_low, unsigned long offset_high)
@@ -235,8 +233,6 @@ sys32_mmap(struct mmap_arg_struct *arg)
 
 	return retval;
 }
-
-extern asmlinkage long sys_mprotect(unsigned long start,size_t len,unsigned long prot);
 
 asmlinkage long 
 sys32_mprotect(unsigned long start, size_t len, unsigned long prot)
@@ -363,12 +359,9 @@ sys32_sigaction (int sig, struct old_sigaction32 *act, struct old_sigaction32 *o
 	return ret;
 }
 
-extern asmlinkage long sys_rt_sigprocmask(int how, sigset_t *set, sigset_t *oset,
-					  size_t sigsetsize);
-
 asmlinkage long
-sys32_rt_sigprocmask(int how, compat_sigset_t *set, compat_sigset_t *oset,
-		     unsigned int sigsetsize)
+sys32_rt_sigprocmask(int how, compat_sigset_t __user *set,
+			compat_sigset_t __user *oset, unsigned int sigsetsize)
 {
 	sigset_t s;
 	compat_sigset_t s32;
@@ -734,9 +727,6 @@ sys32_old_select(struct sel_arg_struct *arg)
 			    (struct compat_timeval *)A(a.tvp));
 }
 
-asmlinkage ssize_t sys_readv(unsigned long,const struct iovec *,unsigned long);
-asmlinkage ssize_t sys_writev(unsigned long,const struct iovec *,unsigned long);
-
 static struct iovec *
 get_compat_iovec(struct compat_iovec *iov32, struct iovec *iov_buf, u32 *count, int type, int *errp)
 {
@@ -878,17 +868,11 @@ int sys32_ni_syscall(int call)
 
 /* 32-bit timeval and related flotsam.  */
 
-extern asmlinkage long sys_sysfs(int option, unsigned long arg1,
-				unsigned long arg2);
-
 asmlinkage long
 sys32_sysfs(int option, u32 arg1, u32 arg2)
 {
 	return sys_sysfs(option, arg1, arg2);
 }
-
-extern asmlinkage long sys_mount(char * dev_name, char * dir_name, char * type,
-				unsigned long new_flags, void *data);
 
 static char *badfs[] = {
 	"smbfs", "ncpfs", NULL
@@ -940,8 +924,6 @@ struct sysinfo32 {
         char _f[20-2*sizeof(u32)-sizeof(int)];
 };
 
-extern asmlinkage long sys_sysinfo(struct sysinfo *info);
-
 asmlinkage long
 sys32_sysinfo(struct sysinfo32 *info)
 {
@@ -991,9 +973,6 @@ sys32_sysinfo(struct sysinfo32 *info)
 	return 0;
 }
                 
-extern asmlinkage long sys_sched_rr_get_interval(pid_t pid,
-						struct timespec *interval);
-
 asmlinkage long
 sys32_sched_rr_get_interval(compat_pid_t pid, struct compat_timespec *interval)
 {
@@ -1009,10 +988,8 @@ sys32_sched_rr_get_interval(compat_pid_t pid, struct compat_timespec *interval)
 	return ret;
 }
 
-extern asmlinkage long sys_rt_sigpending(sigset_t *set, size_t sigsetsize);
-
 asmlinkage long
-sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
+sys32_rt_sigpending(compat_sigset_t __user *set, compat_size_t sigsetsize)
 {
 	sigset_t s;
 	compat_sigset_t s32;
@@ -1035,9 +1012,6 @@ sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 	return ret;
 }
 
-extern asmlinkage long
-sys_rt_sigtimedwait(const sigset_t *uthese, siginfo_t *uinfo,
-		    const struct timespec *uts, size_t sigsetsize);
 
 asmlinkage long
 sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
@@ -1076,9 +1050,6 @@ sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 	}
 	return ret;
 }
-
-extern asmlinkage long
-sys_rt_sigqueueinfo(int pid, int sig, siginfo_t *uinfo);
 
 asmlinkage long
 sys32_rt_sigqueueinfo(int pid, int sig, siginfo_t32 *uinfo)
@@ -1165,12 +1136,6 @@ sys32_sysctl(struct sysctl_ia32 *args32)
 #endif
 }
 
-extern asmlinkage ssize_t sys_pread64(unsigned int fd, char * buf,
-				    size_t count, loff_t pos);
-
-extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char * buf,
-				     size_t count, loff_t pos);
-
 /* warning: next two assume little endian */ 
 asmlinkage long
 sys32_pread(unsigned int fd, char *ubuf, u32 count, u32 poslo, u32 poshi)
@@ -1187,8 +1152,6 @@ sys32_pwrite(unsigned int fd, char *ubuf, u32 count, u32 poslo, u32 poshi)
 }
 
 
-extern asmlinkage long sys_personality(unsigned long);
-
 asmlinkage long
 sys32_personality(unsigned long personality)
 {
@@ -1201,9 +1164,6 @@ sys32_personality(unsigned long personality)
 		ret = PER_LINUX;
 	return ret;
 }
-
-extern asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset,
-				       size_t count); 
 
 asmlinkage long
 sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)
@@ -1375,9 +1335,7 @@ long sys32_uname(struct old_utsname * name)
 	return err?-EFAULT:0;
 }
 
-extern int sys_ustat(dev_t, struct ustat *);
-
-long sys32_ustat(unsigned dev, struct ustat32 *u32p)
+long sys32_ustat(unsigned dev, struct ustat32 __user *u32p)
 {
 	struct ustat u;
 	mm_segment_t seg;
@@ -1500,14 +1458,10 @@ asmlinkage long sys32_clone(unsigned int clone_flags, unsigned int newsp, struct
  * Some system calls that need sign extended arguments. This could be done by a generic wrapper.
  */ 
 
-extern off_t sys_lseek (unsigned int fd, off_t offset, unsigned int origin);
-
 long sys32_lseek (unsigned int fd, int offset, unsigned int whence)
 {
 	return sys_lseek(fd, offset, whence);
 }
-
-extern int sys_kill(pid_t pid, int sig); 
 
 long sys32_kill(int pid, int sig)
 {
@@ -1736,14 +1690,11 @@ done:
 	return err;
 }
 #else /* !NFSD */
-extern asmlinkage long sys_ni_syscall(void);
 long asmlinkage sys32_nfsservctl(int cmd, void *notused, void *notused2)
 {
 	return sys_ni_syscall();
 }
 #endif
-
-extern long sys_io_setup(unsigned nr_reqs, aio_context_t *ctx);
 
 long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
 { 
@@ -1802,11 +1753,6 @@ asmlinkage long sys32_io_submit(aio_context_t ctx_id, int nr,
 	return i ? i : ret;
 }
 
-extern asmlinkage long sys_io_getevents(aio_context_t ctx_id,
-					  long min_nr,
-					  long nr,
-					  struct io_event *events,
-					  struct timespec *timeout);
 
 asmlinkage long sys32_io_getevents(aio_context_t ctx_id,
 				 unsigned long min_nr,
@@ -1895,8 +1841,6 @@ sys32_timer_create(u32 clock, struct sigevent32 *se32, timer_t *timer_id)
 	return err; 
 } 
 
-extern long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice);
-
 long sys32_fadvise64_64(int fd, __u32 offset_low, __u32 offset_high, 
 			__u32 len_low, __u32 len_high, int advice)
 { 
@@ -1929,6 +1873,8 @@ long sys32_quotactl(void)
 	} 
 	return -ENOSYS;
 } 
+
+cond_syscall(sys32_ipc)
 
 struct exec_domain ia32_exec_domain = { 
 	.name = "linux/x86",

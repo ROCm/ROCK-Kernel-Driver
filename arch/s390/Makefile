@@ -35,6 +35,7 @@ cflags-$(CONFIG_MARCH_Z990) += $(call check_gcc,-march=z990,)
 CFLAGS		+= $(cflags-y)
 CFLAGS		+= $(call check_gcc,-finline-limit=10000,)
 CFLAGS 		+= -pipe -fno-strength-reduce -Wno-sign-compare 
+CFLAGS		+= -mbackchain
 
 OBJCOPYFLAGS	:= -O binary
 LDFLAGS_vmlinux := -e start
@@ -43,7 +44,8 @@ head-$(CONFIG_ARCH_S390_31)	+= arch/$(ARCH)/kernel/head.o
 head-$(CONFIG_ARCH_S390X)	+= arch/$(ARCH)/kernel/head64.o
 head-y				+= arch/$(ARCH)/kernel/init_task.o
 
-core-y		+= arch/$(ARCH)/mm/ arch/$(ARCH)/kernel/
+core-y		+= arch/$(ARCH)/mm/ arch/$(ARCH)/kernel/ \
+		   arch/$(ARCH)/appldata/
 libs-y		+= arch/$(ARCH)/lib/
 drivers-y	+= drivers/s390/
 drivers-$(CONFIG_MATHEMU) += arch/$(ARCH)/math-emu/

@@ -19,8 +19,8 @@
 
 int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
-	unsigned int scan_align = info->pixmap.scan_align - 1;
-	unsigned int buf_align = info->pixmap.buf_align - 1;
+	unsigned int scan_align = info->sprite.scan_align - 1;
+	unsigned int buf_align = info->sprite.buf_align - 1;
 	unsigned int i, size, dsize, s_pitch, d_pitch;
 	u8 *dst, src[64];
 
@@ -56,7 +56,7 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	d_pitch = (s_pitch + scan_align) & ~scan_align;
 	size = d_pitch * info->cursor.image.height + buf_align;
 	size &= ~buf_align;
-	dst = info->pixmap.addr + fb_get_buffer_offset(info, size);
+	dst = fb_get_buffer_offset(info, &info->sprite, size);
 
 	if (info->cursor.enable) {
 		switch (info->cursor.rop) {
@@ -73,7 +73,7 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	} else 
 		memcpy(src, cursor->image.data, dsize);
 	
-	move_buf_aligned(info, dst, src, d_pitch, s_pitch, info->cursor.image.height);
+	fb_move_buf_aligned(info, &info->sprite, dst, d_pitch, src, s_pitch, info->cursor.image.height);
 	info->cursor.image.data = dst;
 	
 	info->fbops->fb_imageblit(info, &info->cursor.image);

@@ -49,6 +49,7 @@
 #include <asm/amigahw.h>
 #include <asm/amigaints.h>
 #include <asm/amipcmcia.h>
+#include <asm/unistd.h>
 
 extern int cia_request_irq(struct ciabase *base,int irq,
                            irqreturn_t (*handler)(int, void *, struct pt_regs *),

@@ -59,6 +59,7 @@
 #include <linux/buffer_head.h>
 #include <linux/swapops.h>
 #include <linux/bootmem.h>
+#include <linux/syscalls.h>
 #include <linux/console.h>
 
 #include <asm/uaccess.h>
@@ -68,11 +69,7 @@
 
 #include "power.h"
 
-extern long sys_sync(void);
-
 unsigned char software_suspend_enabled = 0;
-
-extern void do_magic(int resume);
 
 #define NORESUME		1
 #define RESUME_SPECIFIED	2
@@ -584,7 +581,7 @@ static void suspend_power_down(void)
  * Magic happens here
  */
 
-void do_magic_resume_1(void)
+asmlinkage void do_magic_resume_1(void)
 {
 	barrier();
 	mb();
@@ -597,7 +594,7 @@ void do_magic_resume_1(void)
 			   driver scheduled DMA, we have good chance for DMA to finish ;-). */
 }
 
-void do_magic_resume_2(void)
+asmlinkage void do_magic_resume_2(void)
 {
 	BUG_ON (nr_copy_pages_check != nr_copy_pages);
 	BUG_ON (pagedir_order_check != pagedir_order);
@@ -619,7 +616,9 @@ void do_magic_resume_2(void)
 	PRINTK( "ok\n" );
 
 #ifdef SUSPEND_CONSOLE
+	acquire_console_sem();
 	update_screen(fg_console);	/* Hmm, is this the problem? */
+	release_console_sem();
 #endif
 }
 
@@ -641,7 +640,7 @@ void do_magic_resume_2(void)
 
  */
 
-void do_magic_suspend_1(void)
+asmlinkage void do_magic_suspend_1(void)
 {
 	mb();
 	barrier();
@@ -649,7 +648,7 @@ void do_magic_suspend_1(void)
 	spin_lock_irq(&suspend_pagedir_lock);
 }
 
-void do_magic_suspend_2(void)
+asmlinkage void do_magic_suspend_2(void)
 {
 	int is_problem;
 	read_swapfiles();

@@ -743,7 +743,7 @@ static void exit_notify(struct task_struct *tsk)
 
 }
 
-NORET_TYPE void do_exit(long code)
+asmlinkage NORET_TYPE void do_exit(long code)
 {
 	struct task_struct *tsk = current;
 

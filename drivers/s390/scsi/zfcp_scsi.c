@@ -4,11 +4,12 @@
  * 
  * FCP adapter driver for IBM eServer zSeries 
  * 
- * Copyright 2002 IBM Corporation 
+ * (C) Copyright IBM Corp. 2002, 2004
+ *
  * Author(s): Martin Peschke <mpeschke@de.ibm.com> 
  *            Raimund Schroeder <raimund.schroeder@de.ibm.com> 
- *            Aron Zeh <arzeh@de.ibm.com> 
- *            Wolfgang Taphorn <taphorn@de.ibm.com> 
+ *            Aron Zeh
+ *            Wolfgang Taphorn
  *            Stefan Bader <stefan.bader@de.ibm.com> 
  *            Heiko Carstens <heiko.carstens@de.ibm.com> 
  * 
@@ -28,9 +29,9 @@
  */
 
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_SCSI
-#define ZFCP_LOG_AREA_PREFIX		ZFCP_LOG_AREA_PREFIX_SCSI
+
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_SCSI_REVISION "$Revision: 1.42 $"
+#define ZFCP_SCSI_REVISION "$Revision: 1.52 $"
 
 #include <linux/blkdev.h>
 
@@ -39,24 +40,14 @@
 static void zfcp_scsi_slave_destroy(struct scsi_device *sdp);
 static int zfcp_scsi_slave_alloc(struct scsi_device *sdp);
 static int zfcp_scsi_slave_configure(struct scsi_device *sdp);
-static int zfcp_scsi_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
-static int zfcp_scsi_eh_abort_handler(Scsi_Cmnd *);
-static int zfcp_scsi_eh_device_reset_handler(Scsi_Cmnd *);
-static int zfcp_scsi_eh_bus_reset_handler(Scsi_Cmnd *);
-static int zfcp_scsi_eh_host_reset_handler(Scsi_Cmnd *);
+static int zfcp_scsi_queuecommand(struct scsi_cmnd *,
+				  void (*done) (struct scsi_cmnd *));
+static int zfcp_scsi_eh_abort_handler(struct scsi_cmnd *);
+static int zfcp_scsi_eh_device_reset_handler(struct scsi_cmnd *);
+static int zfcp_scsi_eh_bus_reset_handler(struct scsi_cmnd *);
+static int zfcp_scsi_eh_host_reset_handler(struct scsi_cmnd *);
 static int zfcp_task_management_function(struct zfcp_unit *, u8);
 
-static int zfcp_create_sbales_from_segment(unsigned long, int, int *,
-					   int, int, int *, int *, int,
-					   int, struct qdio_buffer **,
-					   char);
-
-static int zfcp_create_sbale(unsigned long, int, int *, int, int, int *,
-			     int, int, int *, struct qdio_buffer **,
-			     char);
-
-static struct zfcp_unit *zfcp_scsi_determine_unit(struct zfcp_adapter *,
-						  Scsi_Cmnd *);
 static struct zfcp_unit *zfcp_unit_lookup(struct zfcp_adapter *, int, int, int);
 
 static struct device_attribute *zfcp_sysfs_sdev_attrs[];
@@ -225,59 +216,7 @@ zfcp_scsi_slave_destroy(struct scsi_device *sdpnt)
 	}
 }
 
-void
-zfcp_scsi_block_requests(struct Scsi_Host *shpnt)
-{
-	scsi_block_requests(shpnt);
-	/* This is still somewhat racy but the best I could imagine */
-	do {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(ZFCP_SCSI_HOST_FLUSH_TIMEOUT);
-
-	} while (shpnt->host_busy || shpnt->eh_active);
-}
-
 /* 
- * Tries to associate a zfcp unit with the scsi device.
- *
- * returns:       unit pointer   if unit is found
- *                NULL           otherwise
- */
-struct zfcp_unit *
-zfcp_scsi_determine_unit(struct zfcp_adapter *adapter, Scsi_Cmnd * scpnt)
-{
-	struct zfcp_unit *unit;
-
-	/*
-	 * figure out target device
-	 * (stored there by zfcp_scsi_slave_alloc)
-	 * ATTENTION: assumes hostdata initialized to NULL by
-	 * mid layer (see scsi_scan.c)
-	 */
-	unit = (struct zfcp_unit *) scpnt->device->hostdata;
-	if (!unit) {
-		ZFCP_LOG_DEBUG("logical unit (%i %i %i %i) not configured\n",
-			       scpnt->device->host->host_no,
-			       scpnt->device->channel,
-			       scpnt->device->id, scpnt->device->lun);
-		/*
-		 * must fake SCSI command execution and scsi_done
-		 * callback for non-configured logical unit
-		 */
-		/* return this as long as we are unable to process requests */
-		set_host_byte(&scpnt->result, DID_NO_CONNECT);
-		zfcp_cmd_dbf_event_scsi("notconf", scpnt);
-		scpnt->scsi_done(scpnt);
-#ifdef ZFCP_DEBUG_REQUESTS
-		debug_text_event(adapter->req_dbf, 2, "nc_done:");
-		debug_event(adapter->req_dbf, 2, &scpnt,
-			    sizeof (unsigned long));
-#endif				/* ZFCP_DEBUG_REQUESTS */
-	}
-	return unit;
-}
-
-/*
  * called from scsi midlayer to allow finetuning of a device.
  */
 static int
@@ -290,35 +229,111 @@ zfcp_scsi_slave_configure(struct scsi_device *sdp)
 	return 0;
 }
 
-/* Complete a command immediately handing back DID_ERROR */
+/**
+ * zfcp_scsi_command_fail - set result in scsi_cmnd and call scsi_done function
+ * @scpnt: pointer to struct scsi_cmnd where result is set
+ * @result: result to be set in scpnt (e.g. DID_ERROR)
+ */
 static void
-zfcp_scsi_queuecommand_stop(Scsi_Cmnd * scpnt,
-			    struct zfcp_adapter *adapter,
-			    struct zfcp_unit *unit)
+zfcp_scsi_command_fail(struct scsi_cmnd *scpnt, int result)
 {
-	/* Always pass through to upper layer */
-	scpnt->retries = scpnt->allowed - 1;
-	set_host_byte(&scpnt->result, DID_ERROR);
-	zfcp_cmd_dbf_event_scsi("stopping", scpnt);
+	set_host_byte(&scpnt->result, result);
+	zfcp_cmd_dbf_event_scsi("failing", scpnt);
 	/* return directly */
 	scpnt->scsi_done(scpnt);
-	if (adapter && unit) {
-		ZFCP_LOG_INFO("Stopping SCSI IO on the unit with FCP LUN 0x%Lx "
-			      "connected to the port with WWPN 0x%Lx at the "
-			      "adapter %s.\n",
-			      unit->fcp_lun,
-			      unit->port->wwpn,
-			      zfcp_get_busid_by_adapter(adapter));
+}
+
+/**
+ * zfcp_scsi_command_async - worker for zfcp_scsi_queuecommand and
+ *	zfcp_scsi_command_sync
+ * @adapter: adapter for where scsi command is issued
+ * @unit: unit to which scsi command is sent
+ * @scpnt: scsi command to be sent
+ *
+ * Note: In scsi_done function must be set in scpnt.
+ */
+int
+zfcp_scsi_command_async(struct zfcp_adapter *adapter, struct zfcp_unit *unit,
+			struct scsi_cmnd *scpnt)
+{
+	int tmp;
+	int retval;
+
+	retval = 0;
+
+	BUG_ON((adapter == NULL) || (adapter != unit->port->adapter));
+	BUG_ON(scpnt->scsi_done == NULL);
+
+	if (unlikely(NULL == unit)) {
+		zfcp_scsi_command_fail(scpnt, DID_NO_CONNECT);
+		goto out;
+	}
+
+	if (unlikely(
+	      atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &unit->status) ||
+	     !atomic_test_mask(ZFCP_STATUS_COMMON_RUNNING, &unit->status))) {
+		ZFCP_LOG_DEBUG("Stopping SCSI IO on the unit with "
+			       "FCP LUN 0x%Lx connected to the port "
+			       "with WWPN 0x%Lx at the adapter %s.\n",
+			       unit->fcp_lun,
+			       unit->port->wwpn,
+			       zfcp_get_busid_by_adapter(adapter));
+		zfcp_scsi_command_fail(scpnt, DID_ERROR);
+		goto out;
+	}
+
+	if (unlikely(
+	     !atomic_test_mask(ZFCP_STATUS_COMMON_UNBLOCKED, &unit->status))) {
+		ZFCP_LOG_DEBUG("adapter %s not ready or unit with LUN 0x%Lx "
+			       "on the port with WWPN 0x%Lx in recovery.\n",
+			       zfcp_get_busid_by_unit(unit),
+			       unit->fcp_lun, unit->port->wwpn);
+		retval = SCSI_MLQUEUE_DEVICE_BUSY;
+		goto out;
+	}
+
+	tmp = zfcp_fsf_send_fcp_command_task(adapter, unit, scpnt,
+					     ZFCP_REQ_AUTO_CLEANUP);
+
+	if (unlikely(tmp < 0)) {
+		ZFCP_LOG_DEBUG("error: Could not send a Send FCP Command\n");
+		retval = SCSI_MLQUEUE_HOST_BUSY;
+	} else {
+
 #ifdef ZFCP_DEBUG_REQUESTS
-		debug_text_event(adapter->req_dbf, 2, "de_done:");
-		debug_event(adapter->req_dbf, 2, &scpnt,
+		debug_text_event(adapter->req_dbf, 3, "q_scpnt");
+		debug_event(adapter->req_dbf, 3, &scpnt,
 			    sizeof (unsigned long));
 #endif				/* ZFCP_DEBUG_REQUESTS */
-	} else {
-		ZFCP_LOG_INFO("There is no adapter registered in the zfcp "
-			      "module for the SCSI host with hostnumber %d. "
-			      "Stopping IO.\n", scpnt->device->host->host_no);
 	}
+
+out:
+	return retval;
+}
+
+void
+zfcp_scsi_command_sync_handler(struct scsi_cmnd *scpnt)
+{
+	struct completion *wait = (struct completion *) scpnt->SCp.ptr;
+	complete(wait);
+}
+
+
+/**
+ * zfcp_scsi_command_sync - send a SCSI command and wait for completion
+ * returns 0, errors are indicated by scsi_cmnd->result
+ */
+int
+zfcp_scsi_command_sync(struct zfcp_unit *unit, struct scsi_cmnd *scpnt)
+{
+	DECLARE_COMPLETION(wait);
+
+	scpnt->SCp.ptr = (void *) &wait;  /* silent re-use */
+	scpnt->done = zfcp_scsi_command_sync_handler;
+        zfcp_scsi_command_async(unit->port->adapter, unit, scpnt);
+	wait_for_completion(&wait);
+
+	return 0;
 }
 
 /*
@@ -326,86 +341,29 @@ zfcp_scsi_queuecommand_stop(Scsi_Cmnd * scpnt,
  *
  * purpose:	enqueues a SCSI command to the specified target device
  *
- * note:        The scsi_done midlayer function may be called directly from
- *              within queuecommand provided queuecommand returns with
- *              success (0).
- *              If it fails, it is expected that the command could not be sent
- *              and is still available for processing.
- *              As we ensure that queuecommand never fails, we have the choice 
- *              to call done directly wherever we please.
- *              Thus, any kind of send errors other than those indicating
- *              'infinite' retries will be reported directly.
- *              Retry requests are put into a list to be processed under timer 
- *              control once in a while to allow for other operations to
- *              complete in the meantime.
- *
  * returns:	0 - success, SCSI command enqueued
- *		!0 - failure, note that we never allow this to happen as the 
- *              SCSI stack would block indefinitely should a non-zero return
- *              value be reported if there are no outstanding commands
- *              (as in when the queues are down)
+ *		!0 - failure
  */
 int
-zfcp_scsi_queuecommand(Scsi_Cmnd * scpnt, void (*done) (Scsi_Cmnd *))
+zfcp_scsi_queuecommand(struct scsi_cmnd *scpnt,
+		       void (*done) (struct scsi_cmnd *))
 {
-	int retval;
-	int temp_ret;
 	struct zfcp_unit *unit;
 	struct zfcp_adapter *adapter;
 
-	retval = 0;
 	/* reset the status for this request */
 	scpnt->result = 0;
 	/* save address of mid layer call back function */
 	scpnt->scsi_done = done;
+
 	/*
-	 * figure out adapter
-	 * (previously stored there by the driver when
-	 * the adapter was registered)
+	 * figure out adapter and target device
+	 * (stored there by zfcp_scsi_slave_alloc)
 	 */
 	adapter = (struct zfcp_adapter *) scpnt->device->host->hostdata[0];
-	/* NULL when the adapter was removed from the zfcp list */
-	if (unlikely(adapter == NULL)) {
-		zfcp_scsi_queuecommand_stop(scpnt, NULL, NULL);
-		goto out;
-	}
+	unit = (struct zfcp_unit *) scpnt->device->hostdata;
 
-	unit = zfcp_scsi_determine_unit(adapter, scpnt);
-	if (unlikely(unit == NULL))
-		goto out;
-
-	if (unlikely(
-	      atomic_test_mask(ZFCP_STATUS_COMMON_ERP_FAILED, &unit->status) ||
-	     !atomic_test_mask(ZFCP_STATUS_COMMON_RUNNING, &unit->status))) {
-		zfcp_scsi_queuecommand_stop(scpnt, adapter, unit);
-		goto out;
-	}
-	if (unlikely(
-	     !atomic_test_mask(ZFCP_STATUS_COMMON_UNBLOCKED, &unit->status))) {
-		ZFCP_LOG_DEBUG("adapter %s not ready or unit with LUN 0x%Lx "
-			       "on the port with WWPN 0x%Lx in recovery.\n",
-			       zfcp_get_busid_by_adapter(adapter),
-			       unit->fcp_lun, unit->port->wwpn);
-		retval = SCSI_MLQUEUE_DEVICE_BUSY;
-		goto out;
-	}
-
-	temp_ret = zfcp_fsf_send_fcp_command_task(adapter,
-						  unit,
-						  scpnt, ZFCP_REQ_AUTO_CLEANUP);
-
-	if (unlikely(temp_ret < 0)) {
-		ZFCP_LOG_DEBUG("error: Could not send a Send FCP Command\n");
-		retval = SCSI_MLQUEUE_HOST_BUSY;
-	} else {
-#ifdef ZFCP_DEBUG_REQUESTS
-		debug_text_event(adapter->req_dbf, 3, "q_scpnt");
-		debug_event(adapter->req_dbf, 3, &scpnt,
-			    sizeof (unsigned long));
-#endif				/* ZFCP_DEBUG_REQUESTS */
-	}
- out:
-	return retval;
+	return zfcp_scsi_command_async(adapter, unit, scpnt);
 }
 
 /*
@@ -456,22 +414,18 @@ zfcp_unit_lookup(struct zfcp_adapter *adapter, int channel, int id, int lun)
  *		FAILED	- otherwise
  */
 int
-zfcp_scsi_eh_abort_handler(Scsi_Cmnd * scpnt)
+zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 {
 	int retval = SUCCESS;
 	struct zfcp_fsf_req *new_fsf_req, *old_fsf_req;
-	struct zfcp_adapter *adapter;
-	struct zfcp_unit *unit;
-	struct zfcp_port *port;
-	struct Scsi_Host *scsi_host;
+	struct zfcp_adapter *adapter = (struct zfcp_adapter *) scpnt->device->host->hostdata[0];
+	struct zfcp_unit *unit = (struct zfcp_unit *) scpnt->device->hostdata;
+	struct zfcp_port *port = unit->port;
+	struct Scsi_Host *scsi_host = scpnt->device->host;
 	union zfcp_req_data *req_data = NULL;
 	unsigned long flags;
 	u32 status = 0;
 
-	adapter = (struct zfcp_adapter *) scpnt->device->host->hostdata[0];
-	scsi_host = scpnt->device->host;
-	unit = (struct zfcp_unit *) scpnt->device->hostdata;
-	port = unit->port;
 
 #ifdef ZFCP_DEBUG_ABORTS
 	/* the components of a abort_dbf record (fixed size record) */
@@ -657,7 +611,7 @@ zfcp_scsi_eh_abort_handler(Scsi_Cmnd * scpnt)
  * returns:
  */
 int
-zfcp_scsi_eh_device_reset_handler(Scsi_Cmnd * scpnt)
+zfcp_scsi_eh_device_reset_handler(struct scsi_cmnd *scpnt)
 {
 	int retval;
 	struct zfcp_unit *unit = (struct zfcp_unit *) scpnt->device->hostdata;
@@ -764,7 +718,7 @@ zfcp_task_management_function(struct zfcp_unit *unit, u8 tm_flags)
  * returns:
  */
 int
-zfcp_scsi_eh_bus_reset_handler(Scsi_Cmnd * scpnt)
+zfcp_scsi_eh_bus_reset_handler(struct scsi_cmnd *scpnt)
 {
 	int retval = 0;
 	struct zfcp_unit *unit;
@@ -793,7 +747,7 @@ zfcp_scsi_eh_bus_reset_handler(Scsi_Cmnd * scpnt)
  * returns:
  */
 int
-zfcp_scsi_eh_host_reset_handler(Scsi_Cmnd * scpnt)
+zfcp_scsi_eh_host_reset_handler(struct scsi_cmnd *scpnt)
 {
 	int retval = 0;
 	struct zfcp_unit *unit;
@@ -887,332 +841,6 @@ zfcp_adapter_scsi_unregister(struct zfcp_adapter *adapter)
 }
 
 
-/**
- * zfcp_create_sbales_from_segment - creates SBALEs
- * @addr:          begin of this buffer segment
- * @length_seg:	   length of this buffer segment
- * @length_total:  total length of buffer
- * @length_min:    roll back if generated buffer smaller than this
- * @length_max:	   sum of all SBALEs (count) not larger than this
- * @buffer_index:  position of current BUFFER
- * @buffere_index: position of current BUFFERE
- * @buffer_first:  first BUFFER used for this buffer
- * @buffer_last:   last BUFFER in request queue allowed
- * @buffer:        begin of SBAL array of request queue
- * @sbtype:        storage-block type
- */
-static int
-zfcp_create_sbales_from_segment(unsigned long addr, int length_seg,
-				int *length_total, int length_min,
-				int length_max, int *buffer_index,
-				int *buffere_index, int buffer_first,
-				int buffer_last, struct qdio_buffer *buffer[],
-				char sbtype)
-{
-	int retval = 0;
-	int length = 0;
-
-	ZFCP_LOG_TRACE
-	    ("SCSI data buffer segment with %i bytes from 0x%lx to 0x%lx\n",
-	     length_seg, addr, (addr + length_seg) - 1);
-
-	if (!length_seg)
-		goto out;
-
-	if (addr & (PAGE_SIZE - 1)) {
-		length =
-		    min((int) (PAGE_SIZE - (addr & (PAGE_SIZE - 1))),
-			length_seg);
-		ZFCP_LOG_TRACE
-		    ("address 0x%lx not on page boundary, length=0x%x\n",
-		     (unsigned long) addr, length);
-		retval =
-		    zfcp_create_sbale(addr, length, length_total, length_min,
-				      length_max, buffer_index, buffer_first,
-				      buffer_last, buffere_index, buffer,
-				      sbtype);
-		if (retval) {
-			/* no resources */
-			goto out;
-		}
-		addr += length;
-		length = length_seg - length;
-	} else
-		length = length_seg;
-
-	while (length > 0) {
-		retval = zfcp_create_sbale(addr, min((int) PAGE_SIZE, length),
-					   length_total, length_min, length_max,
-					   buffer_index, buffer_first,
-					   buffer_last, buffere_index, buffer,
-					   sbtype);
-		if (*buffere_index > ZFCP_LAST_SBALE_PER_SBAL)
-			ZFCP_LOG_NORMAL("bug: Filling output buffers with SCSI "
-					"data failed. Index ran out of bounds. "
-					"(debug info %d)\n", *buffere_index);
-		if (retval) {
-			/* no resources */
-			goto out;
-		}
-		length -= PAGE_SIZE;
-		addr += PAGE_SIZE;
-	}
- out:
-	return retval;
-}
-
-/**
- * zfcp_create_sbale - creates a single SBALE
- * @addr:          begin of this buffer segment
- * @length:        length of this buffer segment
- * @length_total:  total length of buffer
- * @length_min:    roll back if generated buffer smaller than this
- * @length_max:    sum of all SBALEs (count) not larger than this
- * @buffer_index:  position of current BUFFER
- * @buffer_first:  first BUFFER used for this buffer
- * @buffer_last:   last BUFFER allowed for this buffer
- * @buffere_index: position of current BUFFERE of current BUFFER
- * @buffer:        begin of SBAL array of request queue
- * @sbtype:        storage-block type
- */
-static int
-zfcp_create_sbale(unsigned long addr, int length, int *length_total,
-		  int length_min, int length_max, int *buffer_index,
-		  int buffer_first, int buffer_last, int *buffere_index,
-		  struct qdio_buffer *buffer[], char sbtype)
-{
-	int retval = 0;
-	int length_real, residual;
-	int buffers_used;
-
-	volatile struct qdio_buffer_element *buffere =
-	    &(buffer[*buffer_index]->element[*buffere_index]);
-
-	/* check whether we hit the limit */
-	residual = length_max - *length_total;
-	if (residual == 0) {
-		ZFCP_LOG_TRACE("skip remaining %i bytes since length_max hit\n",
-			       length);
-		goto out;
-	}
-	length_real = min(length, residual);
-
-	/*
-	 * figure out next BUFFERE
-	 * (first BUFFERE of first BUFFER is skipped - 
-	 * this is ok since it is reserved for the QTCB)
-	 */
-	if (*buffere_index == ZFCP_LAST_SBALE_PER_SBAL) {
-		/* last BUFFERE in this BUFFER */
-		buffere->flags |= SBAL_FLAGS_LAST_ENTRY;
-		/* need further BUFFER */
-		if (*buffer_index == buffer_last) {
-			/* queue full or last allowed BUFFER */
-			buffers_used = (buffer_last - buffer_first) + 1;
-			/* avoid modulo operation on negative value */
-			buffers_used += QDIO_MAX_BUFFERS_PER_Q;
-			buffers_used %= QDIO_MAX_BUFFERS_PER_Q;
-			ZFCP_LOG_DEBUG("reached limit of number of BUFFERs "
-				       "allowed for this request\n");
-			/* FIXME (design) - This check is wrong and enforces the
-			 * use of one SBALE less than possible 
-			 */
-			if ((*length_total < length_min)
-			    || (buffers_used < ZFCP_MAX_SBALS_PER_REQ)) {
-				ZFCP_LOG_DEBUG("Rolling back SCSI command as "
-					       "there are insufficient buffers "
-					       "to cover the minimum required "
-					       "amount of data\n");
-				/*
-				 * roll back complete list of BUFFERs generated
-				 * from the scatter-gather list associated
-				 * with this SCSI command
-				 */
-				zfcp_qdio_zero_sbals(buffer,
-						     buffer_first,
-						     buffers_used);
-				*length_total = 0;
-			} else {
-				/* DEBUG */
-				ZFCP_LOG_NORMAL("Not enough buffers available. "
-						"Can only transfer %i bytes of "
-						"data\n",
-						*length_total);
-			}
-			retval = -ENOMEM;
-			goto out;
-		} else {	/* *buffer_index != buffer_last */
-			/* chain BUFFERs */
-			*buffere_index = 0;
-			buffere =
-			    &(buffer[*buffer_index]->element[*buffere_index]);
-			buffere->flags |= SBAL_FLAGS0_MORE_SBALS;
-			(*buffer_index)++;
-			*buffer_index %= QDIO_MAX_BUFFERS_PER_Q;
-			buffere =
-			    &(buffer[*buffer_index]->element[*buffere_index]);
-			buffere->flags |= sbtype;
-			ZFCP_LOG_DEBUG
-			    ("Chaining previous BUFFER %i to BUFFER %i\n",
-			     ((*buffer_index !=
-			       0) ? *buffer_index - 1 : QDIO_MAX_BUFFERS_PER_Q -
-			      1), *buffer_index);
-		}
-	} else { /* *buffere_index != (QDIO_MAX_ELEMENTS_PER_BUFFER - 1) */
-		(*buffere_index)++;
-		buffere = &(buffer[*buffer_index]->element[*buffere_index]);
-	}
-
-	/* ok, found a place for this piece, put it there */
-	buffere->addr = (void *) addr;
-	buffere->length = length_real;
-
-#ifdef ZFCP_STAT_REQSIZES
-	if (sbtype == SBAL_FLAGS0_TYPE_READ)
-		zfcp_statistics_inc(&zfcp_data.read_sg_head, length_real);
-	else
-		zfcp_statistics_inc(&zfcp_data.write_sg_head, length_real);
-#endif
-
-	ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_TRACE, (char *) addr, length_real);
-	ZFCP_LOG_TRACE("BUFFER no %i (0x%lx) BUFFERE no %i (0x%lx): BUFFERE "
-		       "data addr 0x%lx, BUFFERE length %i, BUFFER type %i\n",
-		       *buffer_index,
-		       (unsigned long) &buffer[*buffer_index], *buffere_index,
-		       (unsigned long) buffere, addr, length_real, sbtype);
-	*length_total += length_real;
- out:
-	return retval;
-}
-
-/*
- * function:    zfcp_create_sbals_from_sg
- *
- * purpose:	walks through scatter-gather list of specified SCSI command
- *		and creates a corresponding list of SBALs
- *
- * returns:	size of generated buffer in bytes 
- *
- * context:	
- */
-int
-zfcp_create_sbals_from_sg(struct zfcp_fsf_req *fsf_req, Scsi_Cmnd * scpnt,
-			  char sbtype,	/* storage-block type */
-			  int length_min, /* roll back if generated buffer */
-			  int buffer_max) /* max numbers of BUFFERs */
-{
-	int length_total = 0;
-	int buffer_index = 0;
-	int buffer_last = 0;
-	int buffere_index = 1;	/* elements 0 and 1 are req-id and qtcb */
-	volatile struct qdio_buffer_element *buffere = NULL;
-	struct zfcp_qdio_queue *req_q = NULL;
-	int length_max = scpnt->request_bufflen;
-
-	req_q = &fsf_req->adapter->request_queue;
-
-	buffer_index = req_q->free_index;
-	buffer_last = req_q->free_index +
-	    min(buffer_max, atomic_read(&req_q->free_count)) - 1;
-	buffer_last %= QDIO_MAX_BUFFERS_PER_Q;
-
-	ZFCP_LOG_TRACE
-	    ("total SCSI data buffer size is (scpnt->request_bufflen) %i\n",
-	     scpnt->request_bufflen);
-	ZFCP_LOG_TRACE
-	    ("BUFFERs from (buffer_index)%i to (buffer_last)%i available\n",
-	     buffer_index, buffer_last);
-	ZFCP_LOG_TRACE("buffer_max=%d, req_q->free_count=%d\n", buffer_max,
-		       atomic_read(&req_q->free_count));
-
-	if (scpnt->use_sg) {
-		int sg_index;
-		struct scatterlist *list
-		    = (struct scatterlist *) scpnt->request_buffer;
-
-		ZFCP_LOG_DEBUG("%i (scpnt->use_sg) scatter-gather segments\n",
-			       scpnt->use_sg);
-
-		//                length_max+=0x2100;
-
-#ifdef ZFCP_STAT_REQSIZES
-		if (sbtype == SBAL_FLAGS0_TYPE_READ)
-			zfcp_statistics_inc(&zfcp_data.read_sguse_head,
-					    scpnt->use_sg);
-		else
-			zfcp_statistics_inc(&zfcp_data.write_sguse_head,
-					    scpnt->use_sg);
-#endif
-
-		for (sg_index = 0; sg_index < scpnt->use_sg; sg_index++, list++)
-		{
-			if (zfcp_create_sbales_from_segment(
-				    (page_to_pfn (list->page) << PAGE_SHIFT) +
-				    list->offset,
-				    list->length,
-				    &length_total,
-				    length_min,
-				    length_max,
-				    &buffer_index,
-				    &buffere_index,
-				    req_q->free_index,
-				    buffer_last,
-				    req_q->buffer,
-				    sbtype))
-				break;
-		}
-	} else {
-		ZFCP_LOG_DEBUG("no scatter-gather list\n");
-#ifdef ZFCP_STAT_REQSIZES
-		if (sbtype == SBAL_FLAGS0_TYPE_READ)
-			zfcp_statistics_inc(&zfcp_data.read_sguse_head, 1);
-		else
-			zfcp_statistics_inc(&zfcp_data.write_sguse_head, 1);
-#endif
-		zfcp_create_sbales_from_segment(
-			(unsigned long) scpnt->request_buffer,
-			scpnt->request_bufflen,
-			&length_total,
-			length_min,
-			length_max,
-			&buffer_index,
-			&buffere_index,
-			req_q->free_index,
-			buffer_last,
-			req_q->buffer,
-			sbtype);
-	}
-
-	fsf_req->sbal_index = req_q->free_index;
-
-	if (buffer_index >= fsf_req->sbal_index) {
-		fsf_req->sbal_count = (buffer_index - fsf_req->sbal_index) + 1;
-	} else {
-		fsf_req->sbal_count =
-		    (QDIO_MAX_BUFFERS_PER_Q - fsf_req->sbal_index) +
-		    buffer_index + 1;
-	}
-	/* HACK */
-	if ((scpnt->request_bufflen != 0) && (length_total == 0))
-		goto out;
-
-#ifdef ZFCP_STAT_REQSIZES
-	if (sbtype == SBAL_FLAGS0_TYPE_READ)
-		zfcp_statistics_inc(&zfcp_data.read_req_head, length_total);
-	else
-		zfcp_statistics_inc(&zfcp_data.write_req_head, length_total);
-#endif
-
-	buffere = &(req_q->buffer[buffer_index]->element[buffere_index]);
-	buffere->flags |= SBAL_FLAGS_LAST_ENTRY;
- out:
-	ZFCP_LOG_DEBUG("%i BUFFER(s) from %i to %i needed\n",
-		       fsf_req->sbal_count, fsf_req->sbal_index, buffer_index);
-	ZFCP_LOG_TRACE("total QDIO data buffer size is %i\n", length_total);
-
-	return length_total;
-}
-
 void
 zfcp_fsf_start_scsi_er_timer(struct zfcp_adapter *adapter)
 {
@@ -1293,4 +921,3 @@ static struct device_attribute *zfcp_sysfs_sdev_attrs[] = {
 };
 
 #undef ZFCP_LOG_AREA
-#undef ZFCP_LOG_AREA_PREFIX

@@ -737,12 +737,6 @@ zr36050_unset (struct videocodec *codec)
 		codec->data = NULL;
 
 		zr36050_codecs--;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-		MOD_DEC_USE_COUNT;
-#else
-		module_put(THIS_MODULE);
-#endif
-
 		return 0;
 	}
 
@@ -785,19 +779,6 @@ zr36050_setup (struct videocodec *codec)
 	ptr->num = zr36050_codecs++;
 	ptr->codec = codec;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	MOD_INC_USE_COUNT;
-#else
-	if (!try_module_get(THIS_MODULE)) {
-		dprintk(1,
-			KERN_ERR
-			"zr36050: failed to increase module use count\n");
-		kfree(ptr);
-		zr36050_codecs--;
-		return -ENODEV;
-	}
-#endif
-
 	//testing
 	res = zr36050_basic_test(ptr);
 	if (res < 0) {
@@ -826,6 +807,7 @@ zr36050_setup (struct videocodec *codec)
 }
 
 static const struct videocodec zr36050_codec = {
+	.owner = THIS_MODULE,
 	.name = "zr36050",
 	.magic = 0L,		// magic not used
 	.flags =

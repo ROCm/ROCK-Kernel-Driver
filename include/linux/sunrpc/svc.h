@@ -135,6 +135,7 @@ struct svc_rqst {
 
 	void *			rq_argp;	/* decoded arguments */
 	void *			rq_resp;	/* xdr'd results */
+	void *			rq_auth_data;	/* flavor-specific data */
 
 	int			rq_reserved;	/* space on socket outq
 						 * reserved for this request

@@ -1,10 +1,6 @@
 #ifndef _PPC64_TLBFLUSH_H
 #define _PPC64_TLBFLUSH_H
 
-#include <linux/threads.h>
-#include <linux/mm.h>
-#include <asm/page.h>
-
 /*
  * TLB flushing:
  *
@@ -15,21 +11,38 @@
  *  - flush_tlb_pgtables(mm, start, end) flushes a range of page tables
  */
 
-extern void flush_tlb_mm(struct mm_struct *mm);
-extern void flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
-extern void __flush_tlb_range(struct mm_struct *mm,
-			    unsigned long start, unsigned long end);
-#define flush_tlb_range(vma, start, end) \
-	__flush_tlb_range(vma->vm_mm, start, end)
+#include <linux/percpu.h>
+#include <asm/page.h>
 
-#define flush_tlb_kernel_range(start, end) \
-	__flush_tlb_range(&init_mm, (start), (end))
+#define PPC64_TLB_BATCH_NR 192
 
-static inline void flush_tlb_pgtables(struct mm_struct *mm,
-				      unsigned long start, unsigned long end)
+struct mm_struct;
+struct ppc64_tlb_batch {
+	unsigned long index;
+	unsigned long context;
+	struct mm_struct *mm;
+	pte_t pte[PPC64_TLB_BATCH_NR];
+	unsigned long addr[PPC64_TLB_BATCH_NR];
+	unsigned long vaddr[PPC64_TLB_BATCH_NR];
+};
+DECLARE_PER_CPU(struct ppc64_tlb_batch, ppc64_tlb_batch);
+
+extern void __flush_tlb_pending(struct ppc64_tlb_batch *batch);
+
+static inline void flush_tlb_pending(void)
 {
-	/* PPC has hw page tables. */
+	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
+
+	if (batch->index)
+		__flush_tlb_pending(batch);
 }
+
+#define flush_tlb_mm(mm)			flush_tlb_pending()
+#define flush_tlb_page(vma, addr)		flush_tlb_pending()
+#define flush_tlb_range(vma, start, end) \
+		do { (void)(start); flush_tlb_pending(); } while (0)
+#define flush_tlb_kernel_range(start, end)	flush_tlb_pending()
+#define flush_tlb_pgtables(mm, start, end)	do { } while (0)
 
 extern void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte,
 			    int local);

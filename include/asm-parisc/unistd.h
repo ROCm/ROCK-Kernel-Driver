@@ -840,34 +840,32 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
 #ifdef __KERNEL_SYSCALLS__
 
 #include <asm/current.h>
+#include <linux/compiler.h>
+#include <linux/types.h>
+#include <linux/syscalls.h>
 
 static inline pid_t setsid(void)
 {
-	extern long sys_setsid(void);
 	return sys_setsid();
 }
 
 static inline int write(int fd, const char *buf, off_t count)
 {
-	extern long sys_write(int, const char *, int);
 	return sys_write(fd, buf, count);
 }
 
 static inline int read(int fd, char *buf, off_t count)
 {
-	extern long sys_read(int, char *, int);
 	return sys_read(fd, buf, count);
 }
 
 static inline off_t lseek(int fd, off_t offset, int count)
 {
-	extern off_t sys_lseek(int, off_t, int);
 	return sys_lseek(fd, offset, count);
 }
 
 static inline int dup(int fd)
 {
-	extern long sys_dup(int);
 	return sys_dup(fd);
 }
 
@@ -880,29 +878,43 @@ static inline int execve(char *filename, char * argv [],
 
 static inline int open(const char *file, int flag, int mode)
 {
-	extern long sys_open(const char *, int, int);
 	return sys_open(file, flag, mode);
 }
 
 static inline int close(int fd)
 {
-	extern asmlinkage long sys_close(unsigned int);
 	return sys_close(fd);
 }
 
 static inline int _exit(int exitcode)
 {
-	extern long sys_exit(int) __attribute__((noreturn));
 	return sys_exit(exitcode);
 }
-
-struct rusage;
-extern asmlinkage long sys_wait4(pid_t, unsigned int *, int, struct rusage *);
 
 static inline pid_t waitpid(pid_t pid, int *wait_stat, int options)
 {
 	return sys_wait4(pid, wait_stat, options, NULL);
 }
+
+asmlinkage unsigned long sys_mmap(unsigned long addr, unsigned long len,
+				unsigned long prot, unsigned long flags,
+				unsigned long fd, unsigned long offset);
+asmlinkage unsigned long sys_mmap2(unsigned long addr, unsigned long len,
+				unsigned long prot, unsigned long flags,
+				unsigned long fd, unsigned long pgoff);
+struct pt_regs;
+asmlinkage int sys_execve(struct pt_regs *regs);
+int sys_clone(unsigned long clone_flags, unsigned long usp,
+		struct pt_regs *regs);
+int sys_vfork(struct pt_regs *regs);
+int sys_pipe(int *fildes);
+long sys_ptrace(long request, pid_t pid, long addr, long data);
+asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on);
+struct sigaction;
+asmlinkage long sys_rt_sigaction(int sig,
+				const struct sigaction __user *act,
+				struct sigaction __user *oact,
+				size_t sigsetsize);
 
 #endif	/* __KERNEL_SYSCALLS__ */
 

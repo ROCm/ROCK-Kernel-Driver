@@ -158,6 +158,6 @@ struct scsi_cmnd {
 
 extern struct scsi_cmnd *scsi_get_command(struct scsi_device *, int);
 extern void scsi_put_command(struct scsi_cmnd *);
-extern void scsi_io_completion(struct scsi_cmnd *, int, int);
+extern void scsi_io_completion(struct scsi_cmnd *, unsigned int, unsigned int);
 
 #endif /* _SCSI_SCSI_CMND_H */

@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/linkage.h>
 
 #define preempt_count()	(current_thread_info()->preempt_count)
 
@@ -22,7 +23,7 @@ do { \
 
 #ifdef CONFIG_PREEMPT
 
-extern void preempt_schedule(void);
+asmlinkage void preempt_schedule(void);
 
 #define preempt_disable() \
 do { \

@@ -105,6 +105,7 @@ static void arm_error(struct av7110 *av7110)
 static int arm_thread(void *data)
 {
 	struct av7110 *av7110 = data;
+	unsigned long timeout;
         u16 newloops = 0;
 
 	DEB_EE(("av7110: %p\n",av7110));
@@ -112,8 +113,12 @@ static int arm_thread(void *data)
 	dvb_kernel_thread_setup ("arm_mon");
 	av7110->arm_thread = current;
 
-	while (!av7110->arm_rmmod && !signal_pending(current)) {
-                interruptible_sleep_on_timeout(&av7110->arm_wait, 5*HZ);
+	while (1) {
+		timeout = wait_event_interruptible_timeout(av7110->arm_wait,0 != av7110->arm_rmmod, 5*HZ);
+		if (-ERESTARTSYS == timeout || 0 != av7110->arm_rmmod) {
+			/* got signal or told to quit*/
+			break;
+		}
 
                 if (!av7110->arm_ready)
                         continue;
@@ -1283,7 +1288,7 @@ static int check_firmware(struct av7110* av7110)
 		return -EINVAL;
 	}
 	if( crc != crc32_le(0,ptr,len)) {
-		printk("dvb-ttpci: crc32 of dpram file does not match.\n");
+		printk("dvb-ttpci: crc32 of root file does not match.\n");
 		return -EINVAL;
 	}
 	av7110->bin_root = ptr;
@@ -1426,7 +1431,10 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 
         /* load firmware into AV7110 cards */
 	av7110_bootarm(av7110);
-	av7110_firmversion(av7110);
+	if (av7110_firmversion(av7110)) {
+		ret = -EIO;
+		goto err2;
+	}
 
 	if (FW_VERSION(av7110->arm_app)<0x2501)
 		printk ("av7110: Warning, firmware version 0x%04x is too old. "
@@ -1497,6 +1505,9 @@ static int av7110_attach(struct saa7146_dev* dev, struct saa7146_pci_extension_d
 	av7110_num++;
         return 0;
 
+err2:
+	av7110_ca_exit(av7110);
+	av7110_av_exit(av7110);
 err:
 	if (NULL != av7110 ) {
 		kfree(av7110);

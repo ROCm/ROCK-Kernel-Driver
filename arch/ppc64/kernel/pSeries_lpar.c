@@ -29,7 +29,7 @@
 #include <asm/abs_addr.h>
 #include <asm/mmu_context.h>
 #include <asm/ppcdebug.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <linux/pci.h>
 #include <asm/naca.h>
 #include <asm/tlbflush.h>
@@ -122,51 +122,59 @@ long plpar_put_term_char(unsigned long termno,
 				  lbuf[1]);
 }
 
-static void tce_build_pSeriesLP(struct TceTable *tbl, long tcenum, 
+static void tce_build_pSeriesLP(struct iommu_table *tbl, long tcenum, long npages,
 				unsigned long uaddr, int direction )
 {
-	u64 set_tce_rc;
-	union Tce tce;
-	
-	PPCDBG(PPCDBG_TCE, "build_tce: uaddr = 0x%lx\n", uaddr);
-	PPCDBG(PPCDBG_TCE, "\ttcenum = 0x%lx, tbl = 0x%lx, index=%lx\n", 
-	       tcenum, tbl, tbl->index);
+	u64 rc;
+	union tce_entry tce;
 
-	tce.wholeTce = 0;
-	tce.tceBits.rpn = (virt_to_absolute(uaddr)) >> PAGE_SHIFT;
+	tce.te_word = 0;
+	tce.te_rpn = (virt_to_absolute(uaddr)) >> PAGE_SHIFT;
+	tce.te_rdwr = 1;
+	if (direction != PCI_DMA_TODEVICE)
+		tce.te_pciwr = 1;
 
-	tce.tceBits.readWrite = 1;
-	if ( direction != PCI_DMA_TODEVICE ) tce.tceBits.pciWrite = 1;
-
-	set_tce_rc = plpar_tce_put((u64)tbl->index, 
-				 (u64)tcenum << 12, 
-				 tce.wholeTce );
-
-	if(set_tce_rc) {
-		printk("tce_build_pSeriesLP: plpar_tce_put failed. rc=%ld\n", set_tce_rc);
-		printk("\tindex   = 0x%lx\n", (u64)tbl->index);
-		printk("\ttcenum  = 0x%lx\n", (u64)tcenum);
-		printk("\ttce val = 0x%lx\n", tce.wholeTce );
+	while (npages--) {
+		rc = plpar_tce_put((u64)tbl->it_index, 
+				   (u64)tcenum << 12, 
+				   tce.te_word );
+		
+		if(rc && printk_ratelimit()) {
+			printk("tce_build_pSeriesLP: plpar_tce_put failed. rc=%ld\n", rc);
+			printk("\tindex   = 0x%lx\n", (u64)tbl->it_index);
+			printk("\ttcenum  = 0x%lx\n", (u64)tcenum);
+			printk("\ttce val = 0x%lx\n", tce.te_word );
+			show_stack(current, (unsigned long *)__get_SP());
+		}
+			
+		tcenum++;
+		tce.te_rpn++;
 	}
 }
 
-static void tce_free_one_pSeriesLP(struct TceTable *tbl, long tcenum)
+static void tce_free_pSeriesLP(struct iommu_table *tbl, long tcenum, long npages)
 {
-	u64 set_tce_rc;
-	union Tce tce;
+	u64 rc;
+	union tce_entry tce;
 
-	tce.wholeTce = 0;
-	set_tce_rc = plpar_tce_put((u64)tbl->index, 
-				 (u64)tcenum << 12,
-				 tce.wholeTce );
-	if ( set_tce_rc ) {
-		printk("tce_free_one_pSeriesLP: plpar_tce_put failed\n");
-		printk("\trc      = %ld\n", set_tce_rc);
-		printk("\tindex   = 0x%lx\n", (u64)tbl->index);
-		printk("\ttcenum  = 0x%lx\n", (u64)tcenum);
-		printk("\ttce val = 0x%lx\n", tce.wholeTce );
+	tce.te_word = 0;
+
+	while (npages--) {
+		rc = plpar_tce_put((u64)tbl->it_index, 
+				   (u64)tcenum << 12,
+				   tce.te_word );
+		
+		if (rc && printk_ratelimit()) {
+			printk("tce_free_pSeriesLP: plpar_tce_put failed\n");
+			printk("\trc      = %ld\n", rc);
+			printk("\tindex   = 0x%lx\n", (u64)tbl->it_index);
+			printk("\ttcenum  = 0x%lx\n", (u64)tcenum);
+			printk("\ttce val = 0x%lx\n", tce.te_word );
+			show_stack(current, (unsigned long *)__get_SP());
+		}
+		
+		tcenum++;
 	}
-
 }
 
 int vtermno;	/* virtual terminal# for udbg  */
@@ -298,8 +306,10 @@ void pSeriesLP_init_early(void)
 
 	tce_init_pSeries();
 
-	ppc_md.tce_build	 = tce_build_pSeriesLP;
-	ppc_md.tce_free_one	 = tce_free_one_pSeriesLP;
+	ppc_md.tce_build = tce_build_pSeriesLP;
+	ppc_md.tce_free	 = tce_free_pSeriesLP;
+
+	pci_iommu_init();
 
 #ifdef CONFIG_SMP
 	smp_init_pSeries();
@@ -422,10 +432,8 @@ static long pSeries_lpar_hpte_updatepp(unsigned long slot, unsigned long newpp,
 
 	lpar_rc = plpar_pte_protect(flags, slot, (avpn << 7));
 
-	if (lpar_rc == H_Not_Found) {
-		udbg_printf("updatepp missed\n");
+	if (lpar_rc == H_Not_Found)
 		return -1;
-	}
 
 	if (lpar_rc != H_Success)
 		panic("bad return code from pte protect rc = %lx\n", lpar_rc);
@@ -523,10 +531,8 @@ static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
 	lpar_rc = plpar_pte_remove(H_AVPN, slot, (avpn << 7), &dummy1,
 				   &dummy2);
 
-	if (lpar_rc == H_Not_Found) {
-		udbg_printf("invalidate missed\n");
+	if (lpar_rc == H_Not_Found)
 		return;
-	}
 
 	if (lpar_rc != H_Success)
 		panic("Bad return code from invalidate rc = %lx\n", lpar_rc);
@@ -541,7 +547,7 @@ void pSeries_lpar_flush_hash_range(unsigned long context, unsigned long number,
 {
 	int i;
 	unsigned long flags;
-	struct ppc64_tlb_batch *batch = &ppc64_tlb_batch[smp_processor_id()];
+	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
 
 	spin_lock_irqsave(&pSeries_lpar_tlbie_lock, flags);
 

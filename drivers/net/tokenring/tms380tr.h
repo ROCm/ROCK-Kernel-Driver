@@ -598,7 +598,6 @@ typedef struct {
 				 * in one RPL/TPL. (depending on TI firmware 
 				 * version)
 				 */
-#define MAX_TX_QUEUE	    10	/* Maximal number of skb's queued in driver. */
 
 /*
  * AC (1), FC (1), Dst (6), Src (6), RIF (18), Data (4472) = 4504
@@ -1113,9 +1112,6 @@ typedef struct net_local {
 	
 	unsigned long StartTime;
 	unsigned long LastSendTime;
-
-	struct sk_buff_head SendSkbQueue;
-	unsigned short QueueSkb;
 
 	struct tr_statistics MacStat;	/* MAC statistics structure */
 

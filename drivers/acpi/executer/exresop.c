@@ -154,7 +154,7 @@ acpi_ex_resolve_operands (
 
 	arg_types = op_info->runtime_args;
 	if (arg_types == ARGI_INVALID_OPCODE) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Internal - %X is not a valid AML opcode\n",
+		ACPI_REPORT_ERROR (("resolve_operands: %X is not a valid AML opcode\n",
 			opcode));
 
 		return_ACPI_STATUS (AE_AML_INTERNAL);
@@ -172,7 +172,7 @@ acpi_ex_resolve_operands (
 	 */
 	while (GET_CURRENT_ARG_TYPE (arg_types)) {
 		if (!stack_ptr || !*stack_ptr) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Internal - null stack entry at %p\n",
+			ACPI_REPORT_ERROR (("resolve_operands: Null stack entry at %p\n",
 				stack_ptr));
 
 			return_ACPI_STATUS (AE_AML_INTERNAL);

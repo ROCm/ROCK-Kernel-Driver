@@ -4005,7 +4005,7 @@ static int st_remove(struct device *dev)
 
 static void st_intr(struct scsi_cmnd *SCpnt)
 {
-	scsi_io_completion(SCpnt, (SCpnt->result ? 0: SCpnt->bufflen >> 9), 1);
+	scsi_io_completion(SCpnt, (SCpnt->result ? 0: SCpnt->bufflen), 1);
 }
 
 /*

@@ -132,8 +132,8 @@
 #include <asm/mac_psc.h>
 #include <asm/hwtest.h>
 #include <asm/errno.h>
-
 #include <asm/macints.h>
+#include <asm/unistd.h>
 
 #define DEBUG_SPURIOUS
 #define SHUTUP_SONIC

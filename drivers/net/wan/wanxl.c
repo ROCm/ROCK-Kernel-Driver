@@ -826,10 +826,10 @@ static struct pci_device_id wanxl_pci_tbl[] __devinitdata = {
 
 
 static struct pci_driver wanxl_pci_driver = {
-	name:           "wanXL",
-	id_table:       wanxl_pci_tbl,
-	probe:          wanxl_pci_init_one,
-	remove:         wanxl_pci_remove_one,
+	.name		= "wanXL",
+	.id_table	= wanxl_pci_tbl,
+	.probe		= wanxl_pci_init_one,
+	.remove		= wanxl_pci_remove_one,
 };
 
 

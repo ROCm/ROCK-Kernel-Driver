@@ -545,9 +545,6 @@ static void __init init_hwif_sc1200 (ide_hwif_t *hwif)
         hwif->drives[1].autodma = hwif->autodma;
 }
 
-extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
-
-
 static int __devinit sc1200_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	ide_pci_device_t *d = &sc1200_chipsets[id->driver_data];

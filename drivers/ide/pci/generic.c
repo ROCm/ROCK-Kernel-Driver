@@ -72,12 +72,9 @@ static void __init init_hwif_generic (ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
-extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
-
 #if 0
-
 	/* Logic to add back later on */
-	
+
 	if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE) {
 		ide_pci_device_t *unknown = unknown_chipset;
 //		unknown->vendor = dev->vendor;
