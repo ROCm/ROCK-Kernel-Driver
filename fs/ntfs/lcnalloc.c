@@ -322,10 +322,10 @@ runlist_element *ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 			}
 			/*
 			 * Allocate more memory if needed, including space for
-			 * the not-mapped and terminator elements.
+			 * the terminator element.
 			 * ntfs_malloc_nofs() operates on whole pages only.
 			 */
-			if ((rlpos + 3) * sizeof(*rl) > rlsize) {
+			if ((rlpos + 2) * sizeof(*rl) > rlsize) {
 				runlist_element *rl2;
 
 				ntfs_debug("Reallocating memory.");
