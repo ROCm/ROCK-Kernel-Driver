@@ -190,7 +190,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 
 	current->thread.request.u.thread.proc = fn;
 	current->thread.request.u.thread.arg = arg;
-	p = do_fork(CLONE_VM | flags, 0, NULL, 0, NULL);
+	p = do_fork(CLONE_VM | flags, 0, NULL, 0, NULL, NULL);
 	if(IS_ERR(p)) panic("do_fork failed in kernel_thread");
 	return(p->pid);
 }
