@@ -91,8 +91,8 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
 	if (!urb)
 		return -ENOMEM;
   
-	usb_fill_control_urb(urb, usb_dev, pipe, (unsigned char*)cmd, data, len,
-		   usb_api_blocking_completion, 0);
+	usb_fill_control_urb(urb, usb_dev, pipe, (unsigned char *)cmd, data,
+			     len, usb_api_blocking_completion, NULL);
 
 	retv = usb_start_wait_urb(urb, timeout, &length);
 	if (retv < 0)
@@ -190,7 +190,7 @@ int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 		return -ENOMEM;
 
 	usb_fill_bulk_urb(urb, usb_dev, pipe, data, len,
-		    usb_api_blocking_completion, 0);
+			  usb_api_blocking_completion, NULL);
 
 	return usb_start_wait_urb(urb,timeout,actual_length);
 }
@@ -203,11 +203,11 @@ static void sg_clean (struct usb_sg_request *io)
 		while (io->entries--)
 			usb_free_urb (io->urbs [io->entries]);
 		kfree (io->urbs);
-		io->urbs = 0;
+		io->urbs = NULL;
 	}
 	if (io->dev->dev.dma_mask != 0)
 		usb_buffer_unmap_sg (io->dev, io->pipe, io->sg, io->nents);
-	io->dev = 0;
+	io->dev = NULL;
 }
 
 static void sg_complete (struct urb *urb, struct pt_regs *regs)
@@ -260,7 +260,7 @@ static void sg_complete (struct urb *urb, struct pt_regs *regs)
 				found = 1;
 		}
 	}
-	urb->dev = 0;
+	urb->dev = NULL;
 
 	/* on the last completion, signal usb_sg_wait() */
 	io->bytes += urb->actual_length;
@@ -356,7 +356,7 @@ int usb_sg_init (
 			goto nomem;
 		}
 
-		io->urbs [i]->dev = 0;
+		io->urbs [i]->dev = NULL;
 		io->urbs [i]->pipe = pipe;
 		io->urbs [i]->interval = period;
 		io->urbs [i]->transfer_flags = urb_flags;
@@ -459,7 +459,7 @@ void usb_sg_wait (struct usb_sg_request *io)
 		case -ENXIO:	// hc didn't queue this one
 		case -EAGAIN:
 		case -ENOMEM:
-			io->urbs [i]->dev = 0;
+			io->urbs[i]->dev = NULL;
 			retval = 0;
 			i--;
 			yield ();
@@ -485,7 +485,7 @@ void usb_sg_wait (struct usb_sg_request *io)
 				complete (&io->complete);
 			spin_unlock_irq (&io->lock);
 
-			io->urbs [i]->dev = 0;
+			io->urbs[i]->dev = NULL;
 			io->urbs [i]->status = retval;
 			dev_dbg (&io->dev->dev, "%s, submit --> %d\n",
 				__FUNCTION__, retval);
@@ -838,7 +838,7 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 			put_device (&dev->actconfig->interface[i]->dev);
 			dev->actconfig->interface[i] = NULL;
 		}
-		dev->actconfig = 0;
+		dev->actconfig = NULL;
 		if (dev->state == USB_STATE_CONFIGURED)
 			usb_set_device_state(dev, USB_STATE_ADDRESS);
 	}

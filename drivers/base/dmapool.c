@@ -110,7 +110,7 @@ dma_pool_create (const char *name, struct device *dev,
 	if (align == 0)
 		align = 1;
 	if (size == 0)
-		return 0;
+		return NULL;
 	else if (size < align)
 		size = align;
 	else if ((size % align) != 0) {
@@ -125,7 +125,7 @@ dma_pool_create (const char *name, struct device *dev,
 			allocation = PAGE_SIZE;
 		// FIXME: round up for less fragmentation
 	} else if (allocation < size)
-		return 0;
+		return NULL;
 
 	if (!(retval = kmalloc (sizeof *retval, SLAB_KERNEL)))
 		return retval;
@@ -167,7 +167,7 @@ pool_alloc_page (struct dma_pool *pool, int mem_flags)
 
 	page = (struct dma_page *) kmalloc (mapsize + sizeof *page, mem_flags);
 	if (!page)
-		return 0;
+		return NULL;
 	page->vaddr = dma_alloc_coherent (pool->dev,
 					    pool->allocation,
 					    &page->dma,
@@ -181,7 +181,7 @@ pool_alloc_page (struct dma_pool *pool, int mem_flags)
 		page->in_use = 0;
 	} else {
 		kfree (page);
-		page = 0;
+		page = NULL;
 	}
 	return page;
 }
@@ -302,7 +302,7 @@ restart:
 			remove_wait_queue (&pool->waitq, &wait);
 			goto restart;
 		}
-		retval = 0;
+		retval = NULL;
 		goto done;
 	}
 
@@ -334,7 +334,7 @@ pool_find_page (struct dma_pool *pool, dma_addr_t dma)
 		if (dma < (page->dma + pool->allocation))
 			goto done;
 	}
-	page = 0;
+	page = NULL;
 done:
 	spin_unlock_irqrestore (&pool->lock, flags);
 	return page;

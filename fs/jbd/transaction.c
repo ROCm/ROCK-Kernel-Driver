@@ -1480,7 +1480,7 @@ __blist_del_buffer(struct journal_head **list, struct journal_head *jh)
 	if (*list == jh) {
 		*list = jh->b_tnext;
 		if (*list == jh)
-			*list = 0;
+			*list = NULL;
 	}
 	jh->b_tprev->b_tnext = jh->b_tnext;
 	jh->b_tnext->b_tprev = jh->b_tprev;
@@ -1499,7 +1499,7 @@ __blist_del_buffer(struct journal_head **list, struct journal_head *jh)
  */
 void __journal_unfile_buffer(struct journal_head *jh)
 {
-	struct journal_head **list = 0;
+	struct journal_head **list = NULL;
 	transaction_t *transaction;
 	struct buffer_head *bh = jh2bh(jh);
 
@@ -1930,7 +1930,7 @@ int journal_invalidatepage(journal_t *journal,
 void __journal_file_buffer(struct journal_head *jh,
 			transaction_t *transaction, int jlist)
 {
-	struct journal_head **list = 0;
+	struct journal_head **list = NULL;
 	int was_dirty = 0;
 	struct buffer_head *bh = jh2bh(jh);
 

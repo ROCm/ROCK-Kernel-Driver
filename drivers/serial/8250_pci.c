@@ -497,7 +497,7 @@ static struct timedia_struct {
 	{ 2, timedia_dual_port },
 	{ 4, timedia_quad_port },
 	{ 8, timedia_eight_port },
-	{ 0, 0 }
+	{ 0, NULL }
 };
 
 static int __devinit pci_timedia_init(struct pci_dev *dev)

@@ -197,7 +197,7 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 	}
 
 	spin_lock (&urb->lock);
-	urb->hcpriv = 0;
+	urb->hcpriv = NULL;
 	switch (urb->status) {
 	case -EINPROGRESS:		/* success */
 		urb->status = 0;
@@ -242,7 +242,7 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 static unsigned
 qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 {
-	struct ehci_qtd		*last = 0, *end = qh->dummy;
+	struct ehci_qtd		*last = NULL, *end = qh->dummy;
 	struct list_head	*entry, *tmp;
 	int			stopped;
 	unsigned		count = 0;
@@ -282,7 +282,7 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 				count++;
 			}
 			ehci_qtd_free (ehci, last);
-			last = 0;
+			last = NULL;
 		}
 
 		/* ignore urbs submitted during completions we reported */
@@ -383,7 +383,7 @@ halt:
 					struct ehci_qtd, qtd_list);
 			/* first qtd may already be partially processed */
 			if (cpu_to_le32 (end->qtd_dma) == qh->hw_current)
-				end = 0;
+				end = NULL;
 		}
 		if (end)
 			qh_update (ehci, qh, end);
@@ -440,7 +440,7 @@ qh_urb_transaction (
 	 */
 	qtd = ehci_qtd_alloc (ehci, flags);
 	if (unlikely (!qtd))
-		return 0;
+		return NULL;
 	list_add_tail (&qtd->qtd_list, head);
 	qtd->urb = urb;
 
@@ -555,7 +555,7 @@ qh_urb_transaction (
 
 cleanup:
 	qtd_list_free (ehci, urb, head);
-	return 0;
+	return NULL;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -709,7 +709,7 @@ qh_make (
  		dbg ("bogus dev %p speed %d", urb->dev, urb->dev->speed);
 done:
 		qh_put (qh);
-		return 0;
+		return NULL;
 	}
 
 	/* NOTE:  if (PIPE_INTERRUPT) { scheduler sets s-mask } */
@@ -780,19 +780,19 @@ static struct ehci_qh *qh_append_tds (
 	void			**ptr
 )
 {
-	struct ehci_qh		*qh = 0;
+	struct ehci_qh		*qh = NULL;
 
 	qh = (struct ehci_qh *) *ptr;
-	if (unlikely (qh == 0)) {
+	if (unlikely (qh == NULL)) {
 		/* can't sleep here, we have ehci->lock... */
 		qh = qh_make (ehci, urb, GFP_ATOMIC);
 		*ptr = qh;
 	}
-	if (likely (qh != 0)) {
+	if (likely (qh != NULL)) {
 		struct ehci_qtd	*qtd;
 
 		if (unlikely (list_empty (qtd_list)))
-			qtd = 0;
+			qtd = NULL;
 		else
 			qtd = list_entry (qtd_list->next, struct ehci_qtd,
 					qtd_list);
@@ -900,7 +900,7 @@ submit_async (
 	struct hcd_dev		*dev;
 	int			epnum;
 	unsigned long		flags;
-	struct ehci_qh		*qh = 0;
+	struct ehci_qh		*qh = NULL;
 
 	qtd = list_entry (qtd_list->next, struct ehci_qtd, qtd_list);
 	dev = (struct hcd_dev *)urb->dev->hcpriv;
@@ -950,14 +950,14 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 
 	// qh->hw_next = cpu_to_le32 (qh->qh_dma);
 	qh->qh_state = QH_STATE_IDLE;
-	qh->qh_next.qh = 0;
+	qh->qh_next.qh = NULL;
 	qh_put (qh);			// refcount from reclaim 
 
 	/* other unlink(s) may be pending (in QH_STATE_UNLINK_WAIT) */
 	next = qh->reclaim;
 	ehci->reclaim = next;
 	ehci->reclaim_ready = 0;
-	qh->reclaim = 0;
+	qh->reclaim = NULL;
 
 	qh_completions (ehci, qh, regs);
 
@@ -976,7 +976,7 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 	}
 
 	if (next) {
-		ehci->reclaim = 0;
+		ehci->reclaim = NULL;
 		start_unlink_async (ehci, next);
 	}
 }

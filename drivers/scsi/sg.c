@@ -2404,7 +2404,7 @@ sg_add_sfp(Sg_device * sdp, int dev)
 	Sg_fd *sfp;
 	unsigned long iflags;
 
-	sfp = (Sg_fd *) sg_page_malloc(sizeof (Sg_fd), 0, 0);
+	sfp = (Sg_fd *) sg_page_malloc(sizeof (Sg_fd), 0, NULL);
 	if (!sfp)
 		return NULL;
 	memset(sfp, 0, sizeof (Sg_fd));
@@ -2814,7 +2814,7 @@ sg_proc_write_adio(struct file *filp, const char __user *buffer,
 	if (copy_from_user(buff, buffer, num))
 		return -EFAULT;
 	buff[num] = '\0';
-	sg_allow_dio = simple_strtoul(buff, 0, 10) ? 1 : 0;
+	sg_allow_dio = simple_strtoul(buff, NULL, 10) ? 1 : 0;
 	return count;
 }
 
@@ -2837,7 +2837,7 @@ sg_proc_write_dressz(struct file *filp, const char __user *buffer,
 	if (copy_from_user(buff, buffer, num))
 		return -EFAULT;
 	buff[num] = '\0';
-	k = simple_strtoul(buff, 0, 10);
+	k = simple_strtoul(buff, NULL, 10);
 	if (k <= 1048576) {	/* limit "big buff" to 1 MB */
 		sg_big_buff = k;
 		return count;

@@ -211,7 +211,7 @@ static struct us_unusual_dev us_unusual_dev_list[] = {
 	  .useTransport = US_PR_BULK},
 
 	/* Terminating entry */
-	{ 0 }
+	{ NULL }
 };
 
 struct usb_driver usb_storage_driver = {

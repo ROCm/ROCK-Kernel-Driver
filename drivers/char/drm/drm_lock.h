@@ -95,7 +95,7 @@ int DRM(lock_transfer)(drm_device_t *dev,
 {
 	unsigned int old, new, prev;
 
-	dev->lock.filp = 0;
+	dev->lock.filp = NULL;
 	do {
 		old  = *lock;
 		new  = context | _DRM_LOCK_HELD;
@@ -120,7 +120,7 @@ int DRM(lock_free)(drm_device_t *dev,
 {
 	unsigned int old, new, prev;
 
-	dev->lock.filp = 0;
+	dev->lock.filp = NULL;
 	do {
 		old  = *lock;
 		new  = 0;

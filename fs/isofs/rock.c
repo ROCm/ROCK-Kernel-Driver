@@ -41,7 +41,7 @@
 
 #define CONTINUE_DECLS \
   int cont_extent = 0, cont_offset = 0, cont_size = 0;   \
-  void * buffer = 0
+  void *buffer = NULL
 
 #define CHECK_CE	       			\
       {cont_extent = isonum_733(rr->u.CE.extent); \

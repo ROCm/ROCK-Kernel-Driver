@@ -82,7 +82,7 @@ kclist_del(void *addr)
 		}
 	}
 	write_unlock(&kclist_lock);
-	return 0;
+	return NULL;
 }
 
 static size_t get_kcore_size(int *nphdr, size_t *elf_buflen)

@@ -90,7 +90,7 @@ int register_blkdev(unsigned int major, const char *name)
 
 	p->major = major;
 	strlcpy(p->name, name, sizeof(p->name));
-	p->next = 0;
+	p->next = NULL;
 	index = major_to_index(major);
 
 	spin_lock_irqsave(&major_names_lock, flags);

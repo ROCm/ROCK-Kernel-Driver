@@ -604,7 +604,7 @@ int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 	}
 	hinfo.hash = start_hash;
 	hinfo.minor_hash = 0;
-	frame = dx_probe(0, dir_file->f_dentry->d_inode, &hinfo, frames, &err);
+	frame = dx_probe(NULL, dir_file->f_dentry->d_inode, &hinfo, frames, &err);
 	if (!frame)
 		return err;
 
@@ -930,7 +930,7 @@ static struct buffer_head * ext3_dx_find_entry(struct dentry *dentry,
 	struct inode *dir = dentry->d_parent->d_inode;
 
 	sb = dir->i_sb;
-	if (!(frame = dx_probe (dentry, 0, &hinfo, frames, err)))
+	if (!(frame = dx_probe(dentry, NULL, &hinfo, frames, err)))
 		return NULL;
 	hash = hinfo.hash;
 	do {
@@ -956,7 +956,7 @@ static struct buffer_head * ext3_dx_find_entry(struct dentry *dentry,
 		brelse (bh);
 		/* Check to see if we should continue to search */
 		retval = ext3_htree_next_block(dir, hash, frame,
-					       frames, 0);
+					       frames, NULL);
 		if (retval < 0) {
 			ext3_warning(sb, __FUNCTION__,
 			     "error reading index page in directory #%lu",
@@ -1392,7 +1392,7 @@ static int ext3_add_entry (handle_t *handle, struct dentry *dentry,
 		bh = ext3_bread(handle, dir, block, 0, &retval);
 		if(!bh)
 			return retval;
-		retval = add_dirent_to_buf(handle, dentry, inode, 0, bh);
+		retval = add_dirent_to_buf(handle, dentry, inode, NULL, bh);
 		if (retval != -ENOSPC)
 			return retval;
 
@@ -1429,7 +1429,7 @@ static int ext3_dx_add_entry(handle_t *handle, struct dentry *dentry,
 	struct ext3_dir_entry_2 *de;
 	int err;
 
-	frame = dx_probe(dentry, 0, &hinfo, frames, &err);
+	frame = dx_probe(dentry, NULL, &hinfo, frames, &err);
 	if (!frame)
 		return err;
 	entries = frame->entries;
@@ -1443,9 +1443,9 @@ static int ext3_dx_add_entry(handle_t *handle, struct dentry *dentry,
 	if (err)
 		goto journal_error;
 
-	err = add_dirent_to_buf(handle, dentry, inode, 0, bh);
+	err = add_dirent_to_buf(handle, dentry, inode, NULL, bh);
 	if (err != -ENOSPC) {
-		bh = 0;
+		bh = NULL;
 		goto cleanup;
 	}
 
@@ -1537,7 +1537,7 @@ static int ext3_dx_add_entry(handle_t *handle, struct dentry *dentry,
 	if (!de)
 		goto cleanup;
 	err = add_dirent_to_buf(handle, dentry, inode, de, bh);
-	bh = 0;
+	bh = NULL;
 	goto cleanup;
 
 journal_error:

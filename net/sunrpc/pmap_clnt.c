@@ -58,7 +58,7 @@ rpc_getport(struct rpc_task *task, struct rpc_clnt *clnt)
 
 	spin_lock(&pmap_lock);
 	if (map->pm_binding) {
-		rpc_sleep_on(&map->pm_bindwait, task, NULL, 0);
+		rpc_sleep_on(&map->pm_bindwait, task, NULL, NULL);
 		spin_unlock(&pmap_lock);
 		return;
 	}

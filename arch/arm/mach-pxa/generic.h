@@ -13,6 +13,8 @@ extern void __init pxa_map_io(void);
 extern void __init pxa_init_irq(void);
 extern void __init pxa_init_time(void);
 
+extern unsigned int get_clk_frequency_khz(int info);
+
 #define SET_BANK(__nr,__start,__size) \
 	mi->bank[__nr].start = (__start), \
 	mi->bank[__nr].size = (__size), \

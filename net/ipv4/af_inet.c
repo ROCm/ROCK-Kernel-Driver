@@ -1018,13 +1018,13 @@ static int __init inet_init(void)
 
 	tcp_sk_cachep = kmem_cache_create("tcp_sock",
 					  sizeof(struct tcp_sock), 0,
-					  SLAB_HWCACHE_ALIGN, 0, 0);
+					  SLAB_HWCACHE_ALIGN, NULL, NULL);
 	udp_sk_cachep = kmem_cache_create("udp_sock",
 					  sizeof(struct udp_sock), 0,
-					  SLAB_HWCACHE_ALIGN, 0, 0);
+					  SLAB_HWCACHE_ALIGN, NULL, NULL);
 	raw4_sk_cachep = kmem_cache_create("raw4_sock",
 					   sizeof(struct raw_sock), 0,
-					   SLAB_HWCACHE_ALIGN, 0, 0);
+					   SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (!tcp_sk_cachep || !udp_sk_cachep || !raw4_sk_cachep)
 		printk(KERN_CRIT
 		       "inet_init: Can't create protocol sock SLAB caches!\n");

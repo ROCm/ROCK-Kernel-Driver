@@ -1617,7 +1617,7 @@ static void journal_destroy_journal_head_cache(void)
 {
 	J_ASSERT(journal_head_cache != NULL);
 	kmem_cache_destroy(journal_head_cache);
-	journal_head_cache = 0;
+	journal_head_cache = NULL;
 }
 
 /*

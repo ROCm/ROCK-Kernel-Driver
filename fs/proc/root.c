@@ -52,29 +52,29 @@ void __init proc_root_init(void)
 		return;
 	}
 	proc_misc_init();
-	proc_net = proc_mkdir("net", 0);
+	proc_net = proc_mkdir("net", NULL);
 #ifdef CONFIG_SYSVIPC
-	proc_mkdir("sysvipc", 0);
+	proc_mkdir("sysvipc", NULL);
 #endif
 #ifdef CONFIG_SYSCTL
-	proc_sys_root = proc_mkdir("sys", 0);
+	proc_sys_root = proc_mkdir("sys", NULL);
 #endif
 #if defined(CONFIG_BINFMT_MISC) || defined(CONFIG_BINFMT_MISC_MODULE)
-	proc_mkdir("sys/fs", 0);
-	proc_mkdir("sys/fs/binfmt_misc", 0);
+	proc_mkdir("sys/fs", NULL);
+	proc_mkdir("sys/fs/binfmt_misc", NULL);
 #endif
-	proc_root_fs = proc_mkdir("fs", 0);
-	proc_root_driver = proc_mkdir("driver", 0);
-	proc_mkdir("fs/nfsd", 0); /* somewhere for the nfsd filesystem to be mounted */
+	proc_root_fs = proc_mkdir("fs", NULL);
+	proc_root_driver = proc_mkdir("driver", NULL);
+	proc_mkdir("fs/nfsd", NULL); /* somewhere for the nfsd filesystem to be mounted */
 #if defined(CONFIG_SUN_OPENPROMFS) || defined(CONFIG_SUN_OPENPROMFS_MODULE)
 	/* just give it a mountpoint */
-	proc_mkdir("openprom", 0);
+	proc_mkdir("openprom", NULL);
 #endif
 	proc_tty_init();
 #ifdef CONFIG_PROC_DEVICETREE
 	proc_device_tree_init();
 #endif
-	proc_bus = proc_mkdir("bus", 0);
+	proc_bus = proc_mkdir("bus", NULL);
 }
 
 static struct dentry *proc_root_lookup(struct inode * dir, struct dentry * dentry, struct nameidata *nd)
