@@ -1,0 +1,30 @@
+#ifndef __ASM_MACH_APIC_H
+#define __ASM_MACH_APIC_H
+
+#include <asm/genapic.h>
+
+#define esr_disable (genapic->esr_disable)
+#define NO_BALANCE_IRQ (genapic->no_balance_irq)
+#define APIC_BROADCAST_ID (genapic->apic_broadcast_id)
+#define INT_DELIVERY_MODE (genapic->int_delivery_mode)
+#define INT_DEST_MODE (genapic->int_dest_mode)
+#define TARGET_CPUS	  (genapic->target_cpus())
+#define apic_id_registered (genapic->apic_id_registered)
+#define apic_id_registered (genapic->apic_id_registered)
+#define init_apic_ldr (genapic->init_apic_ldr)
+#define ioapic_phys_id_map (genapic->ioapic_phys_id_map)
+#define clustered_apic_check (genapic->clustered_apic_check) 
+#define multi_timer_check (genapic->multi_timer_check)
+#define apicid_to_node (genapic->apicid_to_node)
+#define cpu_to_logical_apicid (genapic->cpu_to_logical_apicid) 
+#define cpu_present_to_apicid (genapic->cpu_present_to_apicid)
+#define apicid_to_cpu_present (genapic->apicid_to_cpu_present)
+#define mpc_apic_id (genapic->mpc_apic_id) 
+#define setup_portio_remap (genapic->setup_portio_remap)
+#define check_apicid_present (genapic->check_apicid_present)
+#define check_phys_apicid_present (genapic->check_phys_apicid_present)
+#define check_apicid_used (genapic->check_apicid_used)
+#define GET_APIC_ID (genapic->get_apic_id)
+#define APIC_ID_MASK (genapic->apic_id_mask)
+
+#endif /* __ASM_MACH_APIC_H */

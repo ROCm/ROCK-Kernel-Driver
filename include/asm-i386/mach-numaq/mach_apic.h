@@ -1,6 +1,9 @@
 #ifndef __ASM_MACH_APIC_H
 #define __ASM_MACH_APIC_H
 
+#include <asm/io.h>
+#include <linux/mmzone.h>
+
 #define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
 
 #define TARGET_CPUS (0xf)
@@ -102,5 +105,14 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
 	return (1);
 }
+
+#define APIC_ID_MASK (0xF<<24)
+
+static inline unsigned get_apic_id(unsigned long x)
+{
+	        return (((x)>>24)&0x0F);
+}
+
+#define         GET_APIC_ID(x)  get_apic_id(x)
 
 #endif /* __ASM_MACH_APIC_H */
