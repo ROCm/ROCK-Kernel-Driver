@@ -86,7 +86,7 @@ static dpt_sig_S DPTI_sig = {
 #elif defined(__alpha__)
 	PROC_ALPHA ,
 #else
-	(-1),
+	(-1),(-1)
 #endif
 	 FT_HBADRVR, 0, OEM_DPT, OS_LINUX, CAP_OVERLAP, DEV_ALL,
 	ADF_ALL_SC5, 0, 0, DPT_VERSION, DPT_REVISION, DPT_SUBREVISION,
@@ -1135,7 +1135,8 @@ static int adpt_i2o_post_wait(adpt_hba* pHba, u32* msg, int len, int timeout)
        // to support async LCT get
 	wait_data->next = adpt_post_wait_queue;
 	adpt_post_wait_queue = wait_data;
-	adpt_post_wait_id = (++adpt_post_wait_id & 0x7fff);
+	adpt_post_wait_id++;
+	adpt_post_wait_id &= 0x7fff;
 	wait_data->id =  adpt_post_wait_id;
 	spin_unlock_irqrestore(&adpt_post_wait_lock, flags);
 
