@@ -343,8 +343,8 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 	}
 
 	/* Refresh ephemeral port.  */
-	if (!snum)
-		snum = inet_sk(sk)->num;
+	if (!bp->port)
+		bp->port = inet_sk(sk)->num;
 
 	/* Add the address to the bind address list.  */
 	sctp_local_bh_disable();
@@ -354,8 +354,6 @@ SCTP_STATIC int sctp_do_bind(struct sock *sk, union sctp_addr *addr, int len)
 	addr->v4.sin_port = ntohs(addr->v4.sin_port);
 	ret = sctp_add_bind_addr(bp, addr, GFP_ATOMIC);
 	addr->v4.sin_port = htons(addr->v4.sin_port);
-	if (!ret && !bp->port)
-		bp->port = snum;
 	sctp_write_unlock(&ep->base.addr_lock);
 	sctp_local_bh_enable();
 
