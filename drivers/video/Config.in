@@ -372,7 +372,7 @@ if [ "$CONFIG_FB" = "y" ]; then
 	   "$CONFIG_FB_HP300" = "y" -o "$CONFIG_FB_Q40" = "y" -o \
 	   "$CONFIG_FB_ANAKIN" = "y" -o "$CONFIG_FB_G364" = "y" -o \
 	   "$CONFIG_FB_VIRTUAL" = "y" -o "$CONFIG_FB_CLPS711X" = "y" -o \
-	   "$CONFIG_FB_3DFX" = "y" ]; then
+	   "$CONFIG_FB_3DFX" = "y" -o "$CONFIG_FB_APOLLO" = "y" ]; then
 	 define_tristate CONFIG_FBCON_ACCEL y
       else
 	 if [ "$CONFIG_FB_NEOMAGIC" = "m" -o "$CONFIG_FB_HIT" = "m" -o \

@@ -2044,7 +2044,7 @@ int __init neofb_setup(char *options)
 	return 0;
 }
 
-static int __init initialized = 0;
+static int __initdata initialized = 0;
 
 int __init neofb_init(void)
 {
