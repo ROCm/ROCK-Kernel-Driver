@@ -9,7 +9,6 @@
  * as published by the Free Software Foundation.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -75,12 +74,10 @@ int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 
 		hdlc_proto_detach(hdlc);
 		memcpy(&hdlc->state.raw_hdlc.settings, &new_settings, size);
+		memset(&hdlc->proto, 0, sizeof(hdlc->proto));
 
-		hdlc->open = NULL;
-		hdlc->stop = NULL;
-		hdlc->netif_rx = NULL;
-		hdlc->type_trans = raw_type_trans;
-		hdlc->proto = IF_PROTO_HDLC;
+		hdlc->proto.type_trans = raw_type_trans;
+		hdlc->proto.id = IF_PROTO_HDLC;
 		dev->hard_start_xmit = hdlc->xmit;
 		dev->hard_header = NULL;
 		dev->type = ARPHRD_RAWHDLC;

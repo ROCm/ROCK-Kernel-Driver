@@ -39,6 +39,7 @@
 #include <asm/ptrace.h>
 #include <asm/ptrace_offsets.h>
 #include <asm/rse.h>
+#include <asm/sections.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
@@ -2178,7 +2179,7 @@ __initcall(create_gate_table);
 void __init
 unw_init (void)
 {
-	extern int ia64_unw_start, ia64_unw_end, __gp;
+	extern char __gp[];
 	extern void unw_hash_index_t_is_too_narrow (void);
 	long i, off;
 
@@ -2211,8 +2212,8 @@ unw_init (void)
 	unw.lru_head = UNW_CACHE_SIZE - 1;
 	unw.lru_tail = 0;
 
-	init_unwind_table(&unw.kernel_table, "kernel", KERNEL_START, (unsigned long) &__gp,
-			  &ia64_unw_start, &ia64_unw_end);
+	init_unwind_table(&unw.kernel_table, "kernel", KERNEL_START, (unsigned long) __gp,
+			  __start_unwind, __end_unwind);
 }
 
 /*

@@ -1667,23 +1667,25 @@ static int uart_line_info(char *buf, struct uart_driver *drv, int i)
 		return ret + 1;
 	}
 
-	status = port->ops->get_mctrl(port);
+	if(capable(CAP_SYS_ADMIN))
+	{
+		status = port->ops->get_mctrl(port);
 
-	ret += sprintf(buf + ret, " tx:%d rx:%d",
-			port->icount.tx, port->icount.rx);
-	if (port->icount.frame)
-		ret += sprintf(buf + ret, " fe:%d",
-			port->icount.frame);
-	if (port->icount.parity)
-		ret += sprintf(buf + ret, " pe:%d",
-			port->icount.parity);
-	if (port->icount.brk)
-		ret += sprintf(buf + ret, " brk:%d",
-			port->icount.brk);
-	if (port->icount.overrun)
-		ret += sprintf(buf + ret, " oe:%d",
-			port->icount.overrun);
-
+		ret += sprintf(buf + ret, " tx:%d rx:%d",
+				port->icount.tx, port->icount.rx);
+		if (port->icount.frame)
+			ret += sprintf(buf + ret, " fe:%d",
+				port->icount.frame);
+		if (port->icount.parity)
+			ret += sprintf(buf + ret, " pe:%d",
+				port->icount.parity);
+		if (port->icount.brk)
+			ret += sprintf(buf + ret, " brk:%d",
+				port->icount.brk);
+		if (port->icount.overrun)
+			ret += sprintf(buf + ret, " oe:%d",
+				port->icount.overrun);
+	
 #define INFOBIT(bit,str) \
 	if (port->mctrl & (bit)) \
 		strncat(stat_buf, (str), sizeof(stat_buf) - \
@@ -1693,19 +1695,22 @@ static int uart_line_info(char *buf, struct uart_driver *drv, int i)
 		strncat(stat_buf, (str), sizeof(stat_buf) - \
 		       strlen(stat_buf) - 2)
 
-	stat_buf[0] = '\0';
-	stat_buf[1] = '\0';
-	INFOBIT(TIOCM_RTS, "|RTS");
-	STATBIT(TIOCM_CTS, "|CTS");
-	INFOBIT(TIOCM_DTR, "|DTR");
-	STATBIT(TIOCM_DSR, "|DSR");
-	STATBIT(TIOCM_CAR, "|CD");
-	STATBIT(TIOCM_RNG, "|RI");
-	if (stat_buf[0])
-		stat_buf[0] = ' ';
-	strcat(stat_buf, "\n");
-
-	ret += sprintf(buf + ret, stat_buf);
+		stat_buf[0] = '\0';
+		stat_buf[1] = '\0';
+		INFOBIT(TIOCM_RTS, "|RTS");
+		STATBIT(TIOCM_CTS, "|CTS");
+		INFOBIT(TIOCM_DTR, "|DTR");
+		STATBIT(TIOCM_DSR, "|DSR");
+		STATBIT(TIOCM_CAR, "|CD");
+		STATBIT(TIOCM_RNG, "|RI");
+		if (stat_buf[0])
+			stat_buf[0] = ' ';
+		strcat(stat_buf, "\n");
+	
+		ret += sprintf(buf + ret, stat_buf);
+	}
+#undef STATBIT
+#undef INFOBIT
 	return ret;
 }
 

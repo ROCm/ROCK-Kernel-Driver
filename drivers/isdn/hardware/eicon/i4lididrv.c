@@ -1354,8 +1354,6 @@ i4l_idi_init(void)
   status_lock = SPIN_LOCK_UNLOCKED;
   ll_lock = SPIN_LOCK_UNLOCKED;
 
-  MOD_INC_USE_COUNT;
-
   if (strlen(id) < 1)
     strcpy(id, "diva");
 
@@ -1382,7 +1380,6 @@ i4l_idi_init(void)
   create_proc();
 
 out:
-  MOD_DEC_USE_COUNT;
   return(ret);
 }
 

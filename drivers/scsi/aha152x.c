@@ -939,7 +939,8 @@ static irqreturn_t swintr(int irqno, void *dev_id, struct pt_regs *regs)
 	struct Scsi_Host *shpnt = lookup_irq(irqno);
 
 	if (!shpnt) {
-        	printk(KERN_ERR "aha152x%d: catched software interrupt %d for unknown controller.\n", HOSTNO, irqno);
+		/* no point using HOSTNO here! */
+        	printk(KERN_ERR "aha152x: catched software interrupt %d for unknown controller.\n", irqno);
 		return IRQ_NONE;
 	}
 
@@ -1047,6 +1048,10 @@ struct Scsi_Host *aha152x_probe_one(struct aha152x_setup *setup)
 
 	printk(KERN_INFO "aha152x%d: trying software interrupt, ",
 			 shost->host_no);
+
+	/* need to have host registered before triggering any interrupt */
+	aha152x_host[registered_count] = shost;
+	mb();
 	SETPORT(DMACNTRL0, SWINT|INTEN);
 	mdelay(1000);
 	free_irq(shost->irq, shost);
@@ -1062,7 +1067,7 @@ struct Scsi_Host *aha152x_probe_one(struct aha152x_setup *setup)
 
 		printk(KERN_ERR "aha152x%d: IRQ %d possibly wrong.  "
 				"Please verify.\n", shost->host_no, shost->irq);
-		goto out_release_region;
+		goto out_unregister_host;
 	}
 	printk("ok.\n");
 
@@ -1075,12 +1080,12 @@ struct Scsi_Host *aha152x_probe_one(struct aha152x_setup *setup)
 				"aha152x", shost) < 0) {
 		printk(KERN_ERR "aha152x%d: failed to reassign interrupt.\n",
 				shost->host_no);
-		goto out_release_region;
+		goto out_unregister_host;
 	}
-
-	aha152x_host[registered_count] = shost;
 	return shost;	/* the pcmcia stub needs the return value; */
 
+out_unregister_host:
+	aha152x_host[registered_count] = NULL;
 out_release_region:
 	release_region(shost->io_port, IO_RANGE);
 out_unregister:

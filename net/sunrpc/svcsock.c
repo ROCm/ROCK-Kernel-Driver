@@ -1377,7 +1377,8 @@ svc_create_socket(struct svc_serv *serv, int protocol, struct sockaddr_in *sin)
 		return error;
 
 	if (sin != NULL) {
-		sock->sk->sk_reuse = 1; /* allow address reuse */
+		if (type == SOCK_STREAM)
+			sock->sk->sk_reuse = 1; /* allow address reuse */
 		error = sock->ops->bind(sock, (struct sockaddr *) sin,
 						sizeof(*sin));
 		if (error < 0)

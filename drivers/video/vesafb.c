@@ -51,7 +51,7 @@ static struct fb_info fb_info;
 static u32 pseudo_palette[17];
 
 static int             inverse   = 0;
-static int             mtrr      = 0;
+static int             mtrr      = 1;
 
 static int             pmi_setpal = 0;	/* pmi for palette changes ??? */
 static int             ypan       = 0;  /* 0..nothing, 1..ypan, 2..ywrap */
@@ -208,6 +208,8 @@ int __init vesafb_setup(char *options)
 			pmi_setpal=1;
 		else if (! strcmp(this_opt, "mtrr"))
 			mtrr=1;
+		else if (! strcmp(this_opt, "nomtrr"))
+			mtrr=0;
 	}
 	return 0;
 }
@@ -230,6 +232,12 @@ int __init vesafb_init(void)
 	vesafb_fix.smem_len = screen_info.lfb_size * 65536;
 	vesafb_fix.visual   = (vesafb_defined.bits_per_pixel == 8) ?
 		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_TRUECOLOR;
+
+	/* limit framebuffer size to 16 MB.  Otherwise we'll eat tons of
+	 * kernel address space for nothing if the gfx card has alot of
+	 * memory (>= 128 MB isn't uncommon these days ...) */
+	if (vesafb_fix.smem_len > 16 * 1024 * 1024)
+		vesafb_fix.smem_len = 16 * 1024 * 1024;
 
 #ifndef __i386__
 	screen_info.vesapm_seg = 0;

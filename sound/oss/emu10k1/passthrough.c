@@ -109,7 +109,7 @@ static int pt_putblock(struct emu10k1_wavedevice *wave_dev, u16 *block, int nonb
 	return 0;
 }
 
-static int pt_setup(struct emu10k1_wavedevice *wave_dev)
+int emu10k1_pt_setup(struct emu10k1_wavedevice *wave_dev)
 {
 	u32 bits;
 	struct emu10k1_card *card = wave_dev->card;
@@ -155,7 +155,7 @@ ssize_t emu10k1_pt_write(struct file *file, const char *buffer, size_t count)
 		pt->prepend_size = 0;
 		if (pt->buf == NULL)
 			return -ENOMEM;
-		pt_setup(wave_dev);
+		emu10k1_pt_setup(wave_dev);
 	}
 	if (pt->prepend_size) {
 		int needed = PT_BLOCKSIZE - pt->prepend_size;
@@ -208,13 +208,14 @@ void emu10k1_pt_stop(struct emu10k1_card *card)
 
 	if (pt->state != PT_STATE_INACTIVE) {
 		DPF(2, "digital pass-through stopped\n");
-		sblive_writeptr(card, GPR_BASE + pt->enable_gpr, 0, 0);
+		sblive_writeptr(card, (card->is_audigy ? A_GPR_BASE : GPR_BASE) + pt->enable_gpr, 0, 0);
 		for (i = 0; i < 3; i++) {
                         if (pt->spcs_to_use & (1 << i))
 				sblive_writeptr(card, SPCS0 + i, 0, pt->old_spcs[i]);
 		}
 		pt->state = PT_STATE_INACTIVE;
-		kfree(pt->buf);
+		if(pt->buf)
+			kfree(pt->buf);
 	}
 }
 

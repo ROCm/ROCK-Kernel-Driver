@@ -911,10 +911,15 @@ cee_trap:
 	sllx		%g1, 63, %g2;					\
 	or		%g4, %g2, %g4;					\
 	/* Get log entry pointer for this cpu at this trap level. */	\
+	BRANCH_IF_JALAPENO(g2,g3,50f)					\
 	ldxa		[%g0] ASI_SAFARI_CONFIG, %g2;			\
 	srlx		%g2, 17, %g2;					\
-	and		%g2, 0x3ff, %g2;				\
-	sllx		%g2, 9, %g2;					\
+	ba,pt		%xcc, 60f; 					\
+	 and		%g2, 0x3ff, %g2;				\
+50:	ldxa		[%g0] ASI_JBUS_CONFIG, %g2;			\
+	srlx		%g2, 17, %g2;					\
+	and		%g2, 0x1f, %g2;					\
+60:	sllx		%g2, 9, %g2;					\
 	sethi		%hi(cheetah_error_log), %g3;			\
 	ldx		[%g3 + %lo(cheetah_error_log)], %g3;		\
 	brz,pn		%g3, 80f;					\

@@ -81,7 +81,6 @@ unsigned char software_suspend_enabled = 0;
 #define ADDRESS2(x) __ADDRESS(__pa(x))		/* Needed for x86-64 where some pages are in memory twice */
 
 /* References to section boundaries */
-extern char _text, _etext, _edata, __bss_start, _end;
 extern char __nosave_begin, __nosave_end;
 
 extern int is_head_of_free_region(struct page *);

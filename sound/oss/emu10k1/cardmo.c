@@ -72,7 +72,7 @@ int emu10k1_mpuout_close(struct emu10k1_card *card)
 
 	DPF(2, "emu10k1_mpuout_close()\n");
 
-	emu10k1_irq_disable(card, INTE_MIDITXENABLE);
+	emu10k1_irq_disable(card, card->is_audigy ? A_INTE_MIDITXENABLE : INTE_MIDITXENABLE);
 
 	spin_lock_irqsave(&card_mpuout->lock, flags);
 
@@ -142,7 +142,7 @@ int emu10k1_mpuout_add_buffer(struct emu10k1_card *card, struct midi_hdr *midihd
 
 	card_mpuout->intr = 0;
 
-	emu10k1_irq_enable(card, INTE_MIDITXENABLE);
+	emu10k1_irq_enable(card, card->is_audigy ? A_INTE_MIDITXENABLE : INTE_MIDITXENABLE);
 
 	spin_unlock_irqrestore(&card_mpuout->lock, flags);
 
@@ -206,7 +206,7 @@ void emu10k1_mpuout_bh(unsigned long refdata)
 
 	if ((card_mpuout->firstmidiq != NULL) || cByteSent) {
 		card_mpuout->intr = 0;
-		emu10k1_irq_enable(card, INTE_MIDITXENABLE);
+		emu10k1_irq_enable(card, card->is_audigy ? A_INTE_MIDITXENABLE : INTE_MIDITXENABLE);
 	}
 
 	spin_unlock_irqrestore(&card_mpuout->lock, flags);
@@ -221,7 +221,7 @@ int emu10k1_mpuout_irqhandler(struct emu10k1_card *card)
 	DPF(4, "emu10k1_mpuout_irqhandler\n");
 
 	card_mpuout->intr = 1;
-	emu10k1_irq_disable(card, INTE_MIDITXENABLE);
+	emu10k1_irq_disable(card, card->is_audigy ? A_INTE_MIDITXENABLE : INTE_MIDITXENABLE);
 
 	tasklet_hi_schedule(&card_mpuout->tasklet);
 

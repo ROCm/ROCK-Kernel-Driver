@@ -171,7 +171,7 @@ void q40_free_irq(unsigned int irq, void *dev_id)
 	  {
 	  case 1: case 2: case 8: case 9:
 	  case 12: case 13:
-	    printk("%s: ISA IRQ %d from %x illegal\n", __FUNCTION__, irq, (unsigned)dev_id);
+	    printk("%s: ISA IRQ %d from %x invalid\n", __FUNCTION__, irq, (unsigned)dev_id);
 	    return;
 	  case 11: irq=10;
 	  default:

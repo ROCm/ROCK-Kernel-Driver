@@ -17,7 +17,6 @@ check_gcc = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null > /dev
 
 ifdef CONFIG_ARCH_S390_31
 LDFLAGS		:= -m elf_s390
-LDFLAGS_BLOB	:= --format binary --oformat elf32-s390
 CFLAGS		+= -m31
 AFLAGS		+= -m31
 UTS_MACHINE	:= s390
@@ -26,7 +25,6 @@ endif
 ifdef CONFIG_ARCH_S390X
 LDFLAGS		:= -m elf64_s390
 MODFLAGS	+= -fpic -D__PIC__
-LDFLAGS_BLOB	:= --format binary --oformat elf64-s390
 CFLAGS		+= -m64
 AFLAGS		+= -m64
 UTS_MACHINE	:= s390x

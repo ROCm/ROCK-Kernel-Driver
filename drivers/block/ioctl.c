@@ -166,13 +166,11 @@ int blkdev_ioctl(struct inode *inode, struct file *file, unsigned cmd,
 			return -EINVAL;
 		if (get_user(n, (int *) arg))
 			return -EFAULT;
-		if (n > PAGE_SIZE || n < 512 || (n & (n - 1)))
-			return -EINVAL;
 		if (bd_claim(bdev, &holder) < 0)
 			return -EBUSY;
-		set_blocksize(bdev, n);
+		ret = set_blocksize(bdev, n);
 		bd_release(bdev);
-		return 0;
+		return ret;
 	case BLKPG:
 		return blkpg_ioctl(bdev, (struct blkpg_ioctl_arg *) arg);
 	case BLKRRPART:

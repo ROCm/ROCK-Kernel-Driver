@@ -34,6 +34,7 @@ EXPORT_SYMBOL(scsi_register_driver);
 EXPORT_SYMBOL(scsi_register_interface);
 EXPORT_SYMBOL(scsi_host_alloc);
 EXPORT_SYMBOL(scsi_add_host);
+EXPORT_SYMBOL(scsi_scan_host);
 EXPORT_SYMBOL(scsi_remove_host);
 EXPORT_SYMBOL(scsi_host_get);
 EXPORT_SYMBOL(scsi_host_put);

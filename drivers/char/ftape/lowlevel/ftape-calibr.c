@@ -49,6 +49,8 @@
 static unsigned long ps_per_cycle = 0;
 #endif
 
+static spinlock_t calibr_lock;
+
 /*
  * Note: On Intel PCs, the clock ticks at 100 Hz (HZ==100) which is
  * too slow for certain timeouts (and that clock doesn't even tick
@@ -75,13 +77,12 @@ unsigned int ftape_timestamp(void)
 	__u16 lo;
 	__u16 hi;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&calibr_lock, flags);
 	outb_p(0x00, 0x43);	/* latch the count ASAP */
 	lo = inb_p(0x40);	/* read the latched count */
 	lo |= inb(0x40) << 8;
 	hi = jiffies;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&calibr_lock, flags);
 	return ((hi + 1) * (unsigned int) LATCH) - lo;  /* downcounter ! */
 #endif
 }
@@ -94,12 +95,11 @@ static unsigned int short_ftape_timestamp(void)
 	unsigned int count;
  	unsigned long flags;
  
- 	save_flags(flags);
- 	cli();
+	spin_lock_irqsave(&calibr_lock, flags);
  	outb_p(0x00, 0x43);	/* latch the count ASAP */
 	count = inb_p(0x40);	/* read the latched count */
 	count |= inb(0x40) << 8;
- 	restore_flags(flags);
+	spin_unlock_irqrestore(&calibr_lock, flags);
 	return (LATCH - count);	/* normal: downcounter */
 #endif
 }
@@ -150,14 +150,13 @@ static void time_inb(void)
 	int status;
 	TRACE_FUN(ft_t_any);
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&calibr_lock, flags);
 	t0 = short_ftape_timestamp();
 	for (i = 0; i < 1000; ++i) {
 		status = inb(fdc.msr);
 	}
 	t1 = short_ftape_timestamp();
-	restore_flags(flags);
+	spin_unlock_irqrestore(&calibr_lock, flags);
 	TRACE(ft_t_info, "inb() duration: %d nsec", ftape_timediff(t0, t1));
 	TRACE_EXIT;
 }
@@ -241,8 +240,7 @@ void ftape_calibrate(char *name,
 
 		*calibr_count =
 		*calibr_time = count;	/* set TC to 1 */
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&calibr_lock, flags);
 		fun(0);		/* dummy, get code into cache */
 		t0 = short_ftape_timestamp();
 		fun(0);		/* overhead + one test */
@@ -252,7 +250,7 @@ void ftape_calibrate(char *name,
 		fun(count);		/* overhead + count tests */
 		t1 = short_ftape_timestamp();
 		multiple = diff(t0, t1);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&calibr_lock, flags);
 		time = ftape_timediff(0, multiple - once);
 		tc = (1000 * time) / (count - 1);
 		TRACE(ft_t_any, "once:%3d us,%6d times:%6d us, TC:%5d ns",

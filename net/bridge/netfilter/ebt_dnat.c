@@ -19,6 +19,17 @@ static int ebt_target_dnat(struct sk_buff **pskb, unsigned int hooknr,
 {
 	struct ebt_nat_info *info = (struct ebt_nat_info *)data;
 
+	if (skb_shared(*pskb) || skb_cloned(*pskb)) {
+		struct sk_buff *nskb;
+
+		nskb = skb_copy(*pskb, GFP_ATOMIC);
+		if (!nskb)
+			return NF_DROP;
+		if ((*pskb)->sk)
+			skb_set_owner_w(nskb, (*pskb)->sk);
+		kfree_skb(*pskb);
+		*pskb = nskb;
+	}
 	memcpy(((**pskb).mac.ethernet)->h_dest, info->mac,
 	   ETH_ALEN * sizeof(unsigned char));
 	return info->target;
@@ -36,7 +47,7 @@ static int ebt_target_dnat_check(const char *tablename, unsigned int hookmask,
 	   (hookmask & ~((1 << NF_BR_PRE_ROUTING) | (1 << NF_BR_LOCAL_OUT)))) &&
 	   (strcmp(tablename, "broute") || hookmask & ~(1 << NF_BR_BROUTING)) )
 		return -EINVAL;
-	if (datalen != sizeof(struct ebt_nat_info))
+	if (datalen != EBT_ALIGN(sizeof(struct ebt_nat_info)))
 		return -EINVAL;
 	if (INVALID_TARGET)
 		return -EINVAL;

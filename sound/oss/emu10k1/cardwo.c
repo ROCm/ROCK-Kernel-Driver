@@ -85,25 +85,36 @@ static void query_format(struct emu10k1_wavedevice *wave_dev, struct wave_format
 		break;
 	}	
 	if (do_passthrough) {
-		i = emu10k1_find_control_gpr(&card->mgr, card->pt.patch_name, card->pt.intr_gpr_name);
-		j = emu10k1_find_control_gpr(&card->mgr, card->pt.patch_name, card->pt.enable_gpr_name);
 		/* currently only one waveout instance may use pass-through */
-		if (i < 0 || j < 0 || woinst->state != WAVE_STATE_CLOSED || 
+		if (woinst->state != WAVE_STATE_CLOSED || 
 		    card->pt.state != PT_STATE_INACTIVE ||
-		    (wave_fmt->samplingrate != 48000 && !is_ac3) ||
 		    (wave_fmt->samplingrate != 48000 && !is_ac3)) {
 			DPF(2, "unable to set pass-through mode\n");
-		} else {
-			wave_fmt->samplingrate = 48000;
-			wave_fmt->channels = 2;
-			wave_fmt->passthrough = 1;
-			card->pt.intr_gpr = i;
-			card->pt.enable_gpr = j;
-			card->pt.state = PT_STATE_INACTIVE;
-			card->pt.pos_gpr = emu10k1_find_control_gpr(&card->mgr, card->pt.patch_name, card->pt.pos_gpr_name);
-			DPD(2, "is_ac3 is %d\n", is_ac3);
-			card->pt.ac3data = is_ac3;
-	                wave_fmt->bitsperchannel = 16;
+		} else if (USE_PT_METHOD1) {
+			i = emu10k1_find_control_gpr(&card->mgr, card->pt.patch_name, card->pt.intr_gpr_name);
+			j = emu10k1_find_control_gpr(&card->mgr, card->pt.patch_name, card->pt.enable_gpr_name);
+			if (i < 0 || j < 0)
+				DPF(2, "unable to set pass-through mode\n");
+			else {
+				wave_fmt->samplingrate = 48000;
+				wave_fmt->channels = 2;
+				card->pt.pos_gpr = emu10k1_find_control_gpr(&card->mgr, card->pt.patch_name,
+									    card->pt.pos_gpr_name);
+				wave_fmt->passthrough = 1;
+				card->pt.intr_gpr = i;
+				card->pt.enable_gpr = j;
+				card->pt.state = PT_STATE_INACTIVE;
+			
+				DPD(2, "is_ac3 is %d\n", is_ac3);
+				card->pt.ac3data = is_ac3;
+				wave_fmt->bitsperchannel = 16;
+			}
+		}else{
+			DPF(2, "Using Passthrough Method 2\n");
+			card->pt.enable_gpr = emu10k1_find_control_gpr(&card->mgr, card->pt.patch_name,
+								       card->pt.enable_gpr_name);
+			wave_fmt->passthrough = 2;
+			wave_fmt->bitsperchannel = 16;
 		}
 	}
 
@@ -149,33 +160,37 @@ static int get_voice(struct emu10k1_card *card, struct woinst *woinst, unsigned 
 	voice->endloop = voice->startloop + woinst->buffer.size / woinst->format.bytespervoicesample;
 	voice->start = voice->startloop;
 
+	
+	voice->params[0].volume_target = 0xffff;
+	voice->params[0].initial_fc = 0xff;
+	voice->params[0].initial_attn = 0x00;
+	voice->params[0].byampl_env_sustain = 0x7f;
+	voice->params[0].byampl_env_decay = 0x7f;
+
+	
 	if (voice->flags & VOICE_FLAGS_STEREO) {
-		voice->params[0].send_a = card->waveout.send_a[1];
-		voice->params[0].send_b = card->waveout.send_b[1];
-		voice->params[0].send_c = card->waveout.send_c[1];
-		voice->params[0].send_d = card->waveout.send_d[1];
+		if (woinst->format.passthrough == 2) {
+			voice->params[0].send_routing  = voice->params[1].send_routing  = card->waveout.send_routing[ROUTE_PT];
+			voice->params[0].send_routing2 = voice->params[1].send_routing2 = card->waveout.send_routing2[ROUTE_PT];
+			voice->params[0].send_dcba = 0xff;
+			voice->params[1].send_dcba = 0xff00;
+			voice->params[0].send_hgfe = voice->params[1].send_hgfe=0;
+		} else {
+			voice->params[0].send_dcba = card->waveout.send_dcba[SEND_LEFT];
+			voice->params[0].send_hgfe = card->waveout.send_hgfe[SEND_LEFT];
+			voice->params[1].send_dcba = card->waveout.send_dcba[SEND_RIGHT];
+			voice->params[1].send_hgfe = card->waveout.send_hgfe[SEND_RIGHT];
 
-		if (woinst->device)
-			voice->params[0].send_routing = 0x7654;
-		else
-			voice->params[0].send_routing = card->waveout.send_routing[1];
-
-		voice->params[0].volume_target = 0xffff;
-		voice->params[0].initial_fc = 0xff;
-		voice->params[0].initial_attn = 0x00;
-		voice->params[0].byampl_env_sustain = 0x7f;
-		voice->params[0].byampl_env_decay = 0x7f;
-
-		voice->params[1].send_a = card->waveout.send_a[2];
-		voice->params[1].send_b = card->waveout.send_b[2];
-		voice->params[1].send_c = card->waveout.send_c[2];
-		voice->params[1].send_d = card->waveout.send_d[2];
-
-		if (woinst->device)
-			voice->params[1].send_routing = 0x7654;
-		else
-			voice->params[1].send_routing = card->waveout.send_routing[2];
-
+			if (woinst->device) {
+				// /dev/dps1
+				voice->params[0].send_routing  = voice->params[1].send_routing  = card->waveout.send_routing[ROUTE_PCM1];
+				voice->params[0].send_routing2 = voice->params[1].send_routing2 = card->waveout.send_routing2[ROUTE_PCM1];
+			} else {
+				voice->params[0].send_routing  = voice->params[1].send_routing  = card->waveout.send_routing[ROUTE_PCM];
+				voice->params[0].send_routing2 = voice->params[1].send_routing2 = card->waveout.send_routing2[ROUTE_PCM];
+			}
+		}
+		
 		voice->params[1].volume_target = 0xffff;
 		voice->params[1].initial_fc = 0xff;
 		voice->params[1].initial_attn = 0x00;
@@ -183,30 +198,28 @@ static int get_voice(struct emu10k1_card *card, struct woinst *woinst, unsigned 
 		voice->params[1].byampl_env_decay = 0x7f;
 	} else {
 		if (woinst->num_voices > 1) {
-			voice->params[0].send_a = 0xff;
-			voice->params[0].send_b = 0;
-			voice->params[0].send_c = 0;
-			voice->params[0].send_d = 0;
-
-			voice->params[0].send_routing =
-			 0xfff0 + card->mchannel_fx + voicenum;
+			// Multichannel pcm
+			voice->params[0].send_dcba=0xff;
+			voice->params[0].send_hgfe=0;
+			if (card->is_audigy) {
+				voice->params[0].send_routing = 0x3f3f3f00 + card->mchannel_fx + voicenum;
+				voice->params[0].send_routing2 = 0x3f3f3f3f;
+			} else {
+				voice->params[0].send_routing = 0xfff0 + card->mchannel_fx + voicenum;
+			}
+			
 		} else {
-			voice->params[0].send_a = card->waveout.send_a[0];
-			voice->params[0].send_b = card->waveout.send_b[0];
-			voice->params[0].send_c = card->waveout.send_c[0];
-			voice->params[0].send_d = card->waveout.send_d[0];
+			voice->params[0].send_dcba = card->waveout.send_dcba[SEND_MONO];
+			voice->params[0].send_hgfe = card->waveout.send_hgfe[SEND_MONO];
 
-			if (woinst->device)
-				voice->params[0].send_routing = 0x7654;
-			else
-				voice->params[0].send_routing = card->waveout.send_routing[0];
-		}	
-
-		voice->params[0].volume_target = 0xffff;
-		voice->params[0].initial_fc = 0xff;
-		voice->params[0].initial_attn = 0x00;
-		voice->params[0].byampl_env_sustain = 0x7f;
-		voice->params[0].byampl_env_decay = 0x7f;
+			if (woinst->device) {
+				voice->params[0].send_routing = card->waveout.send_routing[ROUTE_PCM1];
+				voice->params[0].send_routing2 = card->waveout.send_routing2[ROUTE_PCM1];
+			} else {
+				voice->params[0].send_routing = card->waveout.send_routing[ROUTE_PCM];
+				voice->params[0].send_routing2 = card->waveout.send_routing2[ROUTE_PCM];
+			}
+		}
 	}
 
 	DPD(2, "voice: startloop=%#x, endloop=%#x\n", voice->startloop, voice->endloop);
@@ -280,8 +293,15 @@ void emu10k1_waveout_start(struct emu10k1_wavedevice *wave_dev)
 {
 	struct emu10k1_card *card = wave_dev->card;
 	struct woinst *woinst = wave_dev->woinst;
+	struct pt_data *pt = &card->pt;
 
 	DPF(2, "emu10k1_waveout_start()\n");
+
+	if (woinst->format.passthrough == 2) {
+		emu10k1_pt_setup(wave_dev);
+		sblive_writeptr(card, (card->is_audigy ? A_GPR_BASE : GPR_BASE) + pt->enable_gpr, 0, 1);
+		pt->state = PT_STATE_PLAYING;
+	}
 
 	/* Actual start */
 	emu10k1_voices_start(woinst->voice, woinst->num_voices, woinst->total_played);

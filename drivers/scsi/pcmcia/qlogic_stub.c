@@ -270,7 +270,8 @@ static void qlogic_config(dev_link_t * link)
 	link->dev = &info->node;
 	info->host = host;
 
-	scsi_add_host(host, NULL);
+	scsi_add_host(host, NULL); /* XXX handle failure */
+	scsi_scan_host(host);
 
 out:
 	link->state &= ~DEV_CONFIG_PENDING;

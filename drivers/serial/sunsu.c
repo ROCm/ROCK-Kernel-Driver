@@ -86,7 +86,7 @@ struct uart_sunsu_port {
 	struct uart_port	port;
 	unsigned char		acr;
 	unsigned char		ier;
-	unsigned char		rev;
+	unsigned short		rev;
 	unsigned char		lcr;
 	unsigned int		lsr_break_flag;
 	unsigned int		cflag;

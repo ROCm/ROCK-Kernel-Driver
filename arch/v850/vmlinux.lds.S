@@ -206,8 +206,8 @@ _jiffies = _jiffies_64 ;
 # include "sim.ld"
 #endif
 
-#ifdef CONFIG_V850E2_SIM85E2C
-# include "sim85e2c.ld"
+#ifdef CONFIG_V850E2_SIM85E2
+# include "sim85e2.ld"
 #endif
 
 #ifdef CONFIG_V850E2_FPGA85E2C
@@ -247,3 +247,8 @@ _jiffies = _jiffies_64 ;
 #  include "rte_nb85e_cb.ld"
 # endif
 #endif
+
+#ifdef CONFIG_RTE_CB_ME2
+#  include "rte_me2_cb.ld"
+#endif
+

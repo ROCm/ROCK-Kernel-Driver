@@ -41,6 +41,7 @@ struct csr_control {
         quadlet_t state;
         quadlet_t node_ids;
         quadlet_t split_timeout_hi, split_timeout_lo;
+	unsigned long expire;	// Calculated from split_timeout
         quadlet_t cycle_time;
         quadlet_t bus_time;
         quadlet_t bus_manager_id;

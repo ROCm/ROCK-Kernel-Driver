@@ -1151,6 +1151,8 @@ static inline void rebalance_tick(runqueue_t *this_rq, int idle)
 
 DEFINE_PER_CPU(struct kernel_stat, kstat) = { { 0 } };
 
+EXPORT_PER_CPU_SYMBOL(kstat);
+
 /*
  * We place interactive tasks back into the active array, if possible.
  *
@@ -2080,7 +2082,7 @@ asmlinkage long sys_sched_get_priority_max(int policy)
 }
 
 /**
- * sys_sched_get_priority_mix - return minimum RT priority.
+ * sys_sched_get_priority_min - return minimum RT priority.
  * @policy: scheduling class.
  *
  * this syscall returns the minimum rt_priority that can be used
@@ -2541,7 +2543,7 @@ void __might_sleep(char *file, int line)
 		if (time_before(jiffies, prev_jiffy + HZ))
 			return;
 		prev_jiffy = jiffies;
-		printk(KERN_ERR "Debug: sleeping function called from illegal"
+		printk(KERN_ERR "Debug: sleeping function called from invalid"
 				" context at %s:%d\n", file, line);
 		dump_stack();
 	}

@@ -689,7 +689,7 @@ void blk_queue_invalidate_tags(request_queue_t *q)
 
 static char *rq_flags[] = {
 	"REQ_RW",
-	"REQ_RW_AHEAD",
+	"REQ_FAILFAST",
 	"REQ_SOFTBARRIER",
 	"REQ_HARDBARRIER",
 	"REQ_CMD",
@@ -706,6 +706,10 @@ static char *rq_flags[] = {
 	"REQ_DRIVE_CMD",
 	"REQ_DRIVE_TASK",
 	"REQ_DRIVE_TASKFILE",
+	"REQ_PREEMPT",
+	"REQ_PM_SUSPEND",
+	"REQ_PM_RESUME",
+	"REQ_PM_SHUTDOWN",
 };
 
 void blk_dump_rq_flags(struct request *rq, char *msg)
@@ -1494,6 +1498,23 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
 
 	return rq;
 }
+/**
+ * blk_requeue_request - put a request back on queue
+ * @q:		request queue where request should be inserted
+ * @rq:		request to be inserted
+ *
+ * Description:
+ *    Drivers often keep queueing requests until the hardware cannot accept
+ *    more, when that condition happens we need to put the request back
+ *    on the queue. Must be called with queue lock held.
+ */
+void blk_requeue_request(request_queue_t *q, struct request *rq)
+{
+	if (blk_rq_tagged(rq))
+		blk_queue_end_tag(q, rq);
+
+	elv_requeue_request(q, rq);
+}
 
 /**
  * blk_insert_request - insert a special request in to a request queue
@@ -1501,6 +1522,7 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
  * @rq:		request to be inserted
  * @at_head:	insert request at head or tail of queue
  * @data:	private data
+ * @reinsert:	true if request it a reinsertion of previously processed one
  *
  * Description:
  *    Many block devices need to execute commands asynchronously, so they don't
@@ -1515,7 +1537,7 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
  *    host that is unable to accept a particular command.
  */
 void blk_insert_request(request_queue_t *q, struct request *rq,
-			int at_head, void *data)
+			int at_head, void *data, int reinsert)
 {
 	unsigned long flags;
 
@@ -1533,11 +1555,15 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	/*
 	 * If command is tagged, release the tag
 	 */
-	if (blk_rq_tagged(rq))
-		blk_queue_end_tag(q, rq);
+	if(reinsert) {
+		blk_requeue_request(q, rq);
+	} else {
+		if (blk_rq_tagged(rq))
+			blk_queue_end_tag(q, rq);
 
-	drive_stat_acct(rq, rq->nr_sectors, 1);
-	__elv_add_request(q, rq, !at_head, 0);
+		drive_stat_acct(rq, rq->nr_sectors, 1);
+		__elv_add_request(q, rq, !at_head, 0);
+	}
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
@@ -1776,7 +1802,7 @@ void __blk_attempt_remerge(request_queue_t *q, struct request *rq)
 static int __make_request(request_queue_t *q, struct bio *bio)
 {
 	struct request *req, *freereq = NULL;
-	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier;
+	int el_ret, rw, nr_sectors, cur_nr_sectors, barrier, ra;
 	struct list_head *insert_here;
 	sector_t sector;
 
@@ -1796,6 +1822,8 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 	spin_lock_prefetch(q->queue_lock);
 
 	barrier = test_bit(BIO_RW_BARRIER, &bio->bi_rw);
+
+	ra = bio_flagged(bio, BIO_RW_AHEAD) || current->flags & PF_READAHEAD;
 
 again:
 	insert_here = NULL;
@@ -1884,7 +1912,7 @@ get_rq:
 			/*
 			 * READA bit set
 			 */
-			if (bio_flagged(bio, BIO_RW_AHEAD))
+			if (ra)
 				goto end_io;
 	
 			freereq = get_request_wait(q, rw);
@@ -1903,6 +1931,12 @@ get_rq:
 	 */
 	if (barrier)
 		req->flags |= (REQ_HARDBARRIER | REQ_NOMERGE);
+
+	/*
+	 * don't stack up retries for read ahead
+	 */
+	if (ra)
+		req->flags |= REQ_FAILFAST;
 
 	req->errors = 0;
 	req->hard_sector = req->sector = sector;
@@ -2730,6 +2764,7 @@ EXPORT_SYMBOL(blk_hw_contig_segment);
 EXPORT_SYMBOL(blk_get_request);
 EXPORT_SYMBOL(blk_put_request);
 EXPORT_SYMBOL(blk_insert_request);
+EXPORT_SYMBOL(blk_requeue_request);
 
 EXPORT_SYMBOL(blk_queue_prep_rq);
 EXPORT_SYMBOL(blk_queue_merge_bvec);

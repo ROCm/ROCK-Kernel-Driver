@@ -580,9 +580,7 @@ int hpsb_send_gasp(struct hpsb_host *host, int channel, unsigned int generation,
 	u16 specifier_id_hi = (specifier_id & 0x00ffff00) >> 8;
 	u8 specifier_id_lo = specifier_id & 0xff;
 
-#ifdef CONFIG_IEEE1394_VERBOSEDEBUG
-	HPSB_DEBUG("Send GASP: channel = %d, length = %d", channel, length);
-#endif
+	HPSB_VERBOSE("Send GASP: channel = %d, length = %d", channel, length);
 
 	length += 8;
 

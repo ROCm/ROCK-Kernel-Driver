@@ -21,7 +21,7 @@
 
 #include <asm/atomic.h>
 #include <asm/page.h>
-#include <asm/nb85e.h>
+#include <asm/v850e.h>
 #include <asm/rte_nb85e_cb.h>
 
 #include "mach.h"
@@ -41,7 +41,7 @@ void __init mach_early_init (void)
 
 	   Unfortunately, the dcache seems to be buggy, so we only use the
 	   icache for now.  */
-	nb85e_cache_enable (0x0040 /* BHC */, 0x0000 /* DCC */);
+	v850e_cache_enable (0x0040 /*BHC*/, 0x0003 /*ICC*/, 0x0000 /*DCC*/);
 
 	rte_cb_early_init ();
 }

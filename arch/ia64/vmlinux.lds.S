@@ -59,7 +59,7 @@ SECTIONS
 	{
 	  __start___vtop_patchlist = .;
 	  *(.data.patch.vtop)
-	  __end____vtop_patchlist = .;
+	  __end___vtop_patchlist = .;
 	}
 
   .data.patch.mckinley_e9 : AT(ADDR(.data.patch.mckinley_e9) - LOAD_OFFSET)
@@ -89,9 +89,9 @@ SECTIONS
 	{ *(.IA_64.unwind_info*) }
   .IA_64.unwind : AT(ADDR(.IA_64.unwind) - LOAD_OFFSET)
 	{
-	  ia64_unw_start = .;
+	  __start_unwind = .;
 	  *(.IA_64.unwind*)
-	  ia64_unw_end = .;
+	  __end_unwind = .;
 	}
 
   RODATA

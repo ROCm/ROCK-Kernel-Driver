@@ -130,7 +130,7 @@ static spinlock_t addrconf_verify_lock = SPIN_LOCK_UNLOCKED;
 
 static int addrconf_ifdown(struct net_device *dev, int how);
 
-static void addrconf_dad_start(struct inet6_ifaddr *ifp);
+static void addrconf_dad_start(struct inet6_ifaddr *ifp, int flags);
 static void addrconf_dad_timer(unsigned long data);
 static void addrconf_dad_completed(struct inet6_ifaddr *ifp);
 static void addrconf_rs_timer(unsigned long data);
@@ -209,15 +209,8 @@ int ipv6_addr_type(const struct in6_addr *addr)
 		};
 		return type;
 	}
-	/* check for reserved anycast addresses */
-	
-	if ((st & htonl(0xE0000000)) &&
-	    ((addr->s6_addr32[2] == htonl(0xFDFFFFFF) &&
-	    (addr->s6_addr32[3] | htonl(0x7F)) == (u32)~0) ||
-	    (addr->s6_addr32[2] == 0 && addr->s6_addr32[3] == 0)))
-		type = IPV6_ADDR_ANYCAST;
-	else
-		type = IPV6_ADDR_UNICAST;
+
+	type = IPV6_ADDR_UNICAST;
 
 	/* Consider all addresses with the first three bits different of
 	   000 and 111 as finished.
@@ -717,7 +710,7 @@ retry:
 	ift->prefered_lft = tmp_prefered_lft;
 	ift->tstamp = ifp->tstamp;
 	spin_unlock_bh(&ift->lock);
-	addrconf_dad_start(ift);
+	addrconf_dad_start(ift, 0);
 	in6_ifa_put(ift);
 	in6_dev_put(idev);
 out:
@@ -1254,7 +1247,7 @@ static void addrconf_add_mroute(struct net_device *dev)
 	rtmsg.rtmsg_dst_len = 8;
 	rtmsg.rtmsg_metric = IP6_RT_PRIO_ADDRCONF;
 	rtmsg.rtmsg_ifindex = dev->ifindex;
-	rtmsg.rtmsg_flags = RTF_UP|RTF_ADDRCONF;
+	rtmsg.rtmsg_flags = RTF_UP;
 	rtmsg.rtmsg_type = RTMSG_NEWROUTE;
 	ip6_route_add(&rtmsg, NULL, NULL);
 }
@@ -1281,7 +1274,7 @@ static void addrconf_add_lroute(struct net_device *dev)
 	struct in6_addr addr;
 
 	ipv6_addr_set(&addr,  htonl(0xFE800000), 0, 0, 0);
-	addrconf_prefix_route(&addr, 64, dev, 0, RTF_ADDRCONF);
+	addrconf_prefix_route(&addr, 64, dev, 0, 0);
 }
 
 static struct inet6_dev *addrconf_add_dev(struct net_device *dev)
@@ -1374,7 +1367,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 			}
 		} else if (valid_lft) {
 			addrconf_prefix_route(&pinfo->prefix, pinfo->prefix_len,
-					      dev, rt_expires, RTF_ADDRCONF|RTF_EXPIRES);
+					      dev, rt_expires, RTF_ADDRCONF|RTF_EXPIRES|RTF_PREFIX_RT);
 		}
 		if (rt)
 			dst_release(&rt->u.dst);
@@ -1420,7 +1413,7 @@ ok:
 			}
 
 			update_lft = create = 1;
-			addrconf_dad_start(ifp);
+			addrconf_dad_start(ifp, RTF_ADDRCONF|RTF_PREFIX_RT);
 		}
 
 		if (ifp) {
@@ -1593,7 +1586,7 @@ static int inet6_addr_add(int ifindex, struct in6_addr *pfx, int plen)
 
 	ifp = ipv6_add_addr(idev, pfx, plen, scope, IFA_F_PERMANENT);
 	if (!IS_ERR(ifp)) {
-		addrconf_dad_start(ifp);
+		addrconf_dad_start(ifp, 0);
 		in6_ifa_put(ifp);
 		return 0;
 	}
@@ -1768,7 +1761,7 @@ static void addrconf_add_linklocal(struct inet6_dev *idev, struct in6_addr *addr
 
 	ifp = ipv6_add_addr(idev, addr, 64, IFA_LINK, IFA_F_PERMANENT);
 	if (!IS_ERR(ifp)) {
-		addrconf_dad_start(ifp);
+		addrconf_dad_start(ifp, 0);
 		in6_ifa_put(ifp);
 	}
 }
@@ -2028,8 +2021,7 @@ static void addrconf_rs_timer(unsigned long data)
 		memset(&rtmsg, 0, sizeof(struct in6_rtmsg));
 		rtmsg.rtmsg_type = RTMSG_NEWROUTE;
 		rtmsg.rtmsg_metric = IP6_RT_PRIO_ADDRCONF;
-		rtmsg.rtmsg_flags = (RTF_ALLONLINK | RTF_ADDRCONF | 
-				     RTF_DEFAULT | RTF_UP);
+		rtmsg.rtmsg_flags = (RTF_ALLONLINK | RTF_DEFAULT | RTF_UP);
 
 		rtmsg.rtmsg_ifindex = ifp->idev->dev->ifindex;
 
@@ -2043,7 +2035,7 @@ out:
 /*
  *	Duplicate Address Detection
  */
-static void addrconf_dad_start(struct inet6_ifaddr *ifp)
+static void addrconf_dad_start(struct inet6_ifaddr *ifp, int flags)
 {
 	struct net_device *dev;
 	unsigned long rand_num;
@@ -2053,7 +2045,8 @@ static void addrconf_dad_start(struct inet6_ifaddr *ifp)
 	addrconf_join_solict(dev, &ifp->addr);
 
 	if (ifp->prefix_len != 128 && (ifp->flags&IFA_F_PERMANENT))
-		addrconf_prefix_route(&ifp->addr, ifp->prefix_len, dev, 0, RTF_ADDRCONF);
+		addrconf_prefix_route(&ifp->addr, ifp->prefix_len, dev, 0,
+					flags);
 
 	net_srandom(ifp->addr.s6_addr32[3]);
 	rand_num = net_random() % (ifp->idev->cnf.rtr_solicit_delay ? : 1);
@@ -2552,7 +2545,7 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 
 	switch (event) {
 	case RTM_NEWADDR:
-		ip6_rt_addr_add(&ifp->addr, ifp->idev->dev);
+		ip6_rt_addr_add(&ifp->addr, ifp->idev->dev, 0);
 		break;
 	case RTM_DELADDR:
 		addrconf_leave_solict(ifp->idev->dev, &ifp->addr);

@@ -22,9 +22,6 @@ typedef struct {
 #define SPIN_LOCK_UNLOCKED			(spinlock_t) { 0 }
 #define spin_lock_init(x)			((x)->lock = 0)
 
-#define NEW_LOCK
-#ifdef NEW_LOCK
-
 /*
  * Try to get the lock.  If we fail to get the lock, make a non-standard call to
  * ia64_spinlock_contention().  We do not use a normal call because that would force all
@@ -86,31 +83,6 @@ _raw_spin_lock (spinlock_t *lock)
 # endif /* CONFIG_MCKINLEY */
 #endif
 }
-
-#else /* !NEW_LOCK */
-
-/*
- * Streamlined test_and_set_bit(0, (x)).  We use test-and-test-and-set
- * rather than a simple xchg to avoid writing the cache-line when
- * there is contention.
- */
-#define _raw_spin_lock(x) __asm__ __volatile__ (		\
-	"mov ar.ccv = r0\n"					\
-	"mov r29 = 1\n"						\
-	";;\n"							\
-	"1:\n"							\
-	"ld4.bias r2 = [%0]\n"					\
-	";;\n"							\
-	"cmp4.eq p0,p7 = r0,r2\n"				\
-	"(p7) br.cond.spnt.few 1b \n"				\
-	"cmpxchg4.acq r2 = [%0], r29, ar.ccv\n"			\
-	";;\n"							\
-	"cmp4.eq p0,p7 = r0, r2\n"				\
-	"(p7) br.cond.spnt.few 1b\n"				\
-	";;\n"							\
-	:: "r"(&(x)->lock) : "ar.ccv", "p7", "r2", "r29", "memory")
-
-#endif /* !NEW_LOCK */
 
 #define spin_is_locked(x)	((x)->lock != 0)
 #define _raw_spin_unlock(x)	do { barrier(); ((spinlock_t *) x)->lock = 0; } while (0)

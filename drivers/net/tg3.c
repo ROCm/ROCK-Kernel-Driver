@@ -32,6 +32,12 @@
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_SPARC64
+#include <asm/idprom.h>
+#include <asm/oplib.h>
+#include <asm/pbm.h>
+#endif
+
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #define TG3_VLAN_TAG_USED 1
 #else
@@ -51,8 +57,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.6"
-#define DRV_MODULE_RELDATE	"June 11, 2003"
+#define DRV_MODULE_VERSION	"1.7"
+#define DRV_MODULE_RELDATE	"July 23, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -147,6 +153,8 @@ static struct pci_device_id tg3_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_SYSKONNECT, 0x4400,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC1000,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC1001,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC9100,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
@@ -6272,10 +6280,43 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	return err;
 }
 
+#ifdef CONFIG_SPARC64
+static int __devinit tg3_get_macaddr_sparc(struct tg3 *tp)
+{
+	struct net_device *dev = tp->dev;
+	struct pci_dev *pdev = tp->pdev;
+	struct pcidev_cookie *pcp = pdev->sysdata;
+
+	if (pcp != NULL) {
+		int node = pcp->prom_node;
+
+		if (prom_getproplen(node, "local-mac-address") == 6) {
+			prom_getproperty(node, "local-mac-address",
+					 dev->dev_addr, 6);
+			return 0;
+		}
+	}
+	return -ENODEV;
+}
+
+static int __devinit tg3_get_default_macaddr_sparc(struct tg3 *tp)
+{
+	struct net_device *dev = tp->dev;
+
+	memcpy(dev->dev_addr, idprom->id_ethaddr, 6);
+	return 0;
+}
+#endif
+
 static int __devinit tg3_get_device_address(struct tg3 *tp)
 {
 	struct net_device *dev = tp->dev;
 	u32 hi, lo, mac_offset;
+
+#ifdef CONFIG_SPARC64
+	if (!tg3_get_macaddr_sparc(tp))
+		return 0;
+#endif
 
 	if (PCI_FUNC(tp->pdev->devfn) == 0)
 		mac_offset = 0x7c;
@@ -6317,9 +6358,13 @@ static int __devinit tg3_get_device_address(struct tg3 *tp)
 		dev->dev_addr[0] = (hi >> 8) & 0xff;
 	}
 
-	if (!is_valid_ether_addr(&dev->dev_addr[0]))
+	if (!is_valid_ether_addr(&dev->dev_addr[0])) {
+#ifdef CONFIG_SPARC64
+		if (!tg3_get_default_macaddr_sparc(tp))
+			return 0;
+#endif
 		return -EINVAL;
-
+	}
 	return 0;
 }
 

@@ -140,6 +140,7 @@
 
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/dma.h>
 
 #include "scsi.h"
 #include "hosts.h"

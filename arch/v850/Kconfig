@@ -48,20 +48,24 @@ menu "Processor type and features"
    choice
 	  prompt "Platform"
 	  default GDB
+      config V850E_SIM
+      	     bool "GDB"
       config RTE_CB_MA1
       	     bool "RTE-V850E/MA1-CB"
       config RTE_CB_NB85E
       	     bool "RTE-V850E/NB85E-CB"
-      config V850E_SIM
-      	     bool "GDB"
+      config RTE_CB_ME2
+      	     bool "RTE-V850E/ME2-CB"
+      config V850E_AS85EP1
+      	     bool "AS85EP1"
       config V850E2_SIM85E2C
       	     bool "sim85e2c"
+      config V850E2_SIM85E2S
+      	     bool "sim85e2s"
       config V850E2_FPGA85E2C
       	     bool "NA85E2C-FPGA"
       config V850E2_ANNA
       	     bool "Anna"
-      config V850E_AS85EP1
-      	     bool "AS85EP1"
    endchoice
 
 
@@ -78,21 +82,24 @@ menu "Processor type and features"
    	  bool
 	  depends RTE_CB_MA1
 	  default y
-   # Similarly for the RTE-V850E/MA1-CB - V850E/TEG
+   # Similarly for the RTE-V850E/NB85E-CB - V850E/TEG
    config V850E_TEG
    	  bool
 	  depends RTE_CB_NB85E
 	  default y
-
-   # NB85E processor core
-   config V850E_NB85E
+   # ... and the RTE-V850E/ME2-CB - V850E/ME2
+   config V850E_ME2
    	  bool
-	  depends V850E_MA1 || V850E_TEG
+	  depends RTE_CB_ME2
 	  default y
 
-   config V850E_MA1_HIGHRES_TIMER
-   	  bool "High resolution timer support"
-  	  depends V850E_MA1
+
+   #### sim85e2-specific config
+
+   config V850E2_SIM85E2
+   	  bool
+	  depends V850E2_SIM85E2C || V850E2_SIM85E2S
+	  default y
 
 
    #### V850E2 processor-specific config
@@ -100,19 +107,7 @@ menu "Processor type and features"
    # V850E2 processors
    config V850E2
    	  bool
-	  depends V850E2_SIM85E2C || V850E2_FPGA85E2C || V850E2_ANNA
-	  default y
-
-   # Processors based on the NA85E2A core
-   config V850E2_NA85E2A
-   	  bool
-	  depends V850E2_ANNA
-	  default y
-
-   # Processors based on the NA85E2C core
-   config V850E2_NA85E2C
-   	  bool
-	  depends V850E2_SIM85E2C || V850E2_FPGA85E2C
+	  depends V850E2_SIM85E2 || V850E2_FPGA85E2C || V850E2_ANNA
 	  default y
 
 
@@ -121,7 +116,7 @@ menu "Processor type and features"
    # Boards in the RTE-x-CB series
    config RTE_CB
    	  bool
-	  depends RTE_CB_MA1 || RTE_CB_NB85E
+	  depends RTE_CB_MA1 || RTE_CB_NB85E || RTE_CB_ME2
 	  default y
 
    config RTE_CB_MULTI
@@ -129,7 +124,7 @@ menu "Processor type and features"
 	  # RTE_CB_NB85E can either have multi ROM support or not, but
 	  # other platforms (currently only RTE_CB_MA1) require it.
 	  prompt "Multi monitor ROM support" if RTE_CB_NB85E
-	  depends RTE_CB
+	  depends RTE_CB_MA1 || RTE_CB_NB85E
 	  default y
 
    config RTE_CB_MULTI_DBTRAP
@@ -156,14 +151,42 @@ menu "Processor type and features"
    # The only PCI bus we support is on the RTE-MOTHER-A board
    config PCI
    	  bool
-	  default y if RTE_MB_A_PCI
+	  default RTE_MB_A_PCI
+
+
+   #### Some feature-specific configs
+
+   # Everything except for the GDB simulator uses the same interrupt controller
+   config V850E_INTC
+   	  bool
+	  default !V850E_SIM
+
+   # Everything except for the various simulators uses the "Timer D" unit
+   config V850E_TIMER_D
+   	  bool
+	  default !V850E_SIM && !V850E2_SIM85E2
+
+   # Cache control used on some v850e1 processors
+   config V850E_CACHE
+          bool
+	  default V850E_TEG || V850E_ME2
+
+   # Cache control used on v850e2 processors; I think this should
+   # actually apply to more, but currently only the SIM85E2S uses it
+   config V850E2_CACHE
+   	  bool
+	  default V850E2_SIM85E2S
+
+   config NO_CACHE
+   	  bool
+	  default !V850E_CACHE && !V850E2_CACHE
 
 
    #### Misc config
 
    config ROM_KERNEL
    	  bool "Kernel in ROM"
-	  depends V850E2_ANNA || (RTE_CB && !RTE_CB_MULTI)
+	  depends V850E2_ANNA || V850E_AS85EP1 || RTE_CB_ME2
 
    # Some platforms pre-zero memory, in which case the kernel doesn't need to
    config ZERO_BSS
@@ -177,9 +200,12 @@ menu "Processor type and features"
    	  int
 	  default 8 if V850E2_SIM85E2C || V850E2_FPGA85E2C
 
+   config V850E_HIGHRES_TIMER
+   	  bool "High resolution timer support"
+	  depends V850E_TIMER_D
    config TIME_BOOTUP
    	  bool "Time bootup"
-	  depends V850E_MA1_HIGHRES_TIMER
+	  depends V850E_HIGHRES_TIMER
 
    config RESET_GUARD
    	  bool "Reset Guard"
@@ -241,6 +267,7 @@ config KCORE_AOUT
 	default y
 
 config KCORE_ELF
+	bool
 	default y
 
 source "fs/Kconfig.binfmt"

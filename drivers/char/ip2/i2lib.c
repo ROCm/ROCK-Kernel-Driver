@@ -1089,7 +1089,7 @@ i2Output(i2ChanStrPtr pCh, const char *pSource, int count, int user )
 
 			// Move the data
 			if ( user ) {
-				COPY_FROM_USER(rc, (char*)(DATA_OF(pInsert)), pSource,
+				rc = copy_from_user((char*)(DATA_OF(pInsert)), pSource,
 						amountToMove );
 			} else {
 				memcpy( (char*)(DATA_OF(pInsert)), pSource, amountToMove );

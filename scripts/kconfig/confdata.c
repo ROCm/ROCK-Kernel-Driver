@@ -115,6 +115,7 @@ int conf_read(const char *name)
 
 	while (fgets(line, sizeof(line), in)) {
 		lineno++;
+		sym = NULL;
 		switch (line[0]) {
 		case '#':
 			if (memcmp(line + 2, "CONFIG_", 7))
@@ -125,11 +126,15 @@ int conf_read(const char *name)
 			*p++ = 0;
 			if (strncmp(p, "is not set", 10))
 				continue;
-			sym = sym_lookup(line + 9, 0);
+			sym = sym_find(line + 9);
+			if (!sym) {
+				fprintf(stderr, "%s:%d: trying to assign nonexistent symbol %s\n", name, lineno, line + 9);
+				break;
+			}
 			switch (sym->type) {
 			case S_BOOLEAN:
 			case S_TRISTATE:
-				sym->user = symbol_no.curr;
+				sym->user.tri = no;
 				sym->flags &= ~SYMBOL_NEW;
 				break;
 			default:
@@ -197,35 +202,36 @@ int conf_read(const char *name)
 			default:
 				;
 			}
-			if (sym_is_choice_value(sym)) {
-				struct symbol *cs = prop_get_symbol(sym_get_choice_prop(sym));
-				switch (sym->user.tri) {
-				case mod:
-					if (cs->user.tri == yes)
-						/* warn? */;
-					break;
-				case yes:
-					if (cs->user.tri != no)
-						/* warn? */;
-					cs->user.val = sym;
-					break;
-				case no:
-					break;
-				}
-				cs->user.tri = sym->user.tri;
-			}
 			break;
 		case '\n':
 			break;
 		default:
 			continue;
 		}
+		if (sym && sym_is_choice_value(sym)) {
+			struct symbol *cs = prop_get_symbol(sym_get_choice_prop(sym));
+			switch (sym->user.tri) {
+			case no:
+				break;
+			case mod:
+				if (cs->user.tri == yes)
+					/* warn? */;
+				break;
+			case yes:
+				if (cs->user.tri != no)
+					/* warn? */;
+				cs->user.val = sym;
+				break;
+			}
+			cs->user.tri = E_OR(cs->user.tri, sym->user.tri);
+			cs->flags &= ~SYMBOL_NEW;
+		}
 	}
 	fclose(in);
 
 	for_all_symbols(i, sym) {
 		sym_calc_value(sym);
-		if (sym_has_value(sym)) {
+		if (sym_has_value(sym) && !sym_is_choice_value(sym)) {
 			if (sym->visible == no)
 				sym->flags |= SYMBOL_NEW;
 			switch (sym->type) {
@@ -241,7 +247,6 @@ int conf_read(const char *name)
 		if (!sym_is_choice(sym))
 			continue;
 		prop = sym_get_choice_prop(sym);
-		sym->flags &= ~SYMBOL_NEW;
 		for (e = prop->expr; e; e = e->left.expr)
 			if (e->right.sym->visible != no)
 				sym->flags |= e->right.sym->flags & SYMBOL_NEW;
@@ -408,6 +413,7 @@ int conf_write(const char *name)
 	if (out_h) {
 		fclose(out_h);
 		rename(".tmpconfig.h", "include/linux/autoconf.h");
+		file_write_dep(NULL);
 	}
 	if (!name || basename != conf_def_filename) {
 		if (!name)

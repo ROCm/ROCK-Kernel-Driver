@@ -34,7 +34,6 @@ CFLAGS += -D__linux__
 CFLAGS += -DUTS_SYSNAME=\"uClinux\" -DTARGET=$(BOARD)
 AFLAGS += -DPLATFORM=$(PLATFORM) -DTARGET=$(BOARD) -DMODEL=$(MODEL) $(cflags-y)
 LDFLAGS += $(ldflags-y)
-LDFLAGS_BLOB :=  --format binary --oformat elf32-h8300
 
 CROSS_COMPILE = h8300-elf-
 #HEAD := arch/$(ARCH)/platform/$(platform-y)/$(board-y)/crt0_$(model-y).o

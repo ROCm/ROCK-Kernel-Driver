@@ -863,7 +863,7 @@ GLOBAL_ENTRY(ia64_spinlock_contention_pre3_4)
 .wait:
 	// exponential backoff, kdb, lockmeter etc. go in here
 	hint @pause
-	ld4.bias r30=[r31]
+	ld4 r30=[r31]		// don't use ld4.bias; if it's contended, we won't write the word
 	nop 0
 	;;
 	cmp4.eq p14,p0=r30,r0
@@ -880,7 +880,7 @@ GLOBAL_ENTRY(ia64_spinlock_contention)
 .wait:
 	// exponential backoff, kdb, lockmeter etc. go in here
 	hint @pause
-	ld4.bias r30=[r31]
+	ld4 r30=[r31]		// don't use ld4.bias; if it's contended, we won't write the word
 	;;
 	cmp4.ne p14,p0=r30,r0
 	mov r30 = 1

@@ -4,10 +4,6 @@
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
  */
 
-#include <linux/config.h>
-
-#ifdef CONFIG_PCI
-
 #include <asm/io.h>
 #include <asm/byteorder.h>
 
@@ -239,4 +235,3 @@ void insl(unsigned long addr, void *dst, unsigned long count)
 	}
 }
 
-#endif /* CONFIG_PCI */

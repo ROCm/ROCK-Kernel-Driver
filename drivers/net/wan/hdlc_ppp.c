@@ -9,7 +9,6 @@
  * as published by the Free Software Foundation.
  */
 
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -99,12 +98,12 @@ int hdlc_ppp_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 			return result;
 
 		hdlc_proto_detach(hdlc);
+		memset(&hdlc->proto, 0, sizeof(hdlc->proto));
 
-		hdlc->open = ppp_open;
-		hdlc->stop = ppp_close;
-		hdlc->netif_rx = NULL;
-		hdlc->type_trans = ppp_type_trans;
-		hdlc->proto = IF_PROTO_PPP;
+		hdlc->proto.open = ppp_open;
+		hdlc->proto.close = ppp_close;
+		hdlc->proto.type_trans = ppp_type_trans;
+		hdlc->proto.id = IF_PROTO_PPP;
 		dev->hard_start_xmit = hdlc->xmit;
 		dev->hard_header = NULL;
 		dev->type = ARPHRD_PPP;

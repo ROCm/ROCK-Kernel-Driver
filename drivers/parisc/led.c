@@ -14,6 +14,10 @@
  * TODO:
  *	- speed-up calculations with inlined assembler
  *	- interface to write to second row of LCD from /proc (if technically possible)
+ *
+ * Changes:
+ *      - Audit copy_from_user in led_proc_write.
+ *                                Daniele Bellucci <bellucda@tiscali.it>
  */
 
 #include <linux/config.h>
@@ -160,7 +164,9 @@ static int led_proc_write(struct file *file, const char *buf,
 
 	memset(lbuf, 0, count);
 
-	copy_from_user(lbuf, buf, count);
+	if (copy_from_user(lbuf, buf, count))
+		return -EFAULT;
+
 	cur = lbuf;
 
 	/* skip initial spaces */

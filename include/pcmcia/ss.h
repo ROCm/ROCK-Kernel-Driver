@@ -51,6 +51,7 @@
 #define SS_3VCARD	0x1000
 #define SS_XVCARD	0x2000
 #define SS_PENDING	0x4000
+#define SS_ZVCARD	0x8000
 
 /* InquireSocket capabilities */
 #define SS_CAP_PAGE_REGS	0x0001
@@ -209,6 +210,10 @@ struct pcmcia_socket {
 	/* socket operations */
 	struct pccard_operations *	ops;
 
+	/* Zoom video behaviour is so chip specific its not worth adding
+	   this to _ops */
+	void 				(*zoom_video)(struct pcmcia_socket *, int);
+                           
 	/* state thread */
 	struct semaphore		skt_sem;	/* protects socket h/w state */
 

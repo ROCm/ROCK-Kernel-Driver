@@ -2,6 +2,10 @@
 #ifndef _PPC_SECTIONS_H
 #define _PPC_SECTIONS_H
 
+#include <asm-generic/sections.h>
+
+extern char _end[];
+
 #define __pmac __attribute__ ((__section__ (".pmac.text")))
 #define __pmacdata __attribute__ ((__section__ (".pmac.data")))
 #define __pmacfunc(__argpmac) \

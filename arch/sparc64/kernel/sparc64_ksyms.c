@@ -176,6 +176,8 @@ EXPORT_SYMBOL(up);
 /* Atomic counter implementation. */
 EXPORT_SYMBOL(__atomic_add);
 EXPORT_SYMBOL(__atomic_sub);
+EXPORT_SYMBOL(__atomic64_add);
+EXPORT_SYMBOL(__atomic64_sub);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(atomic_dec_and_lock);
 #endif
@@ -219,16 +221,16 @@ EXPORT_SYMBOL(sbus_unmap_sg);
 EXPORT_SYMBOL(sbus_dma_sync_single);
 EXPORT_SYMBOL(sbus_dma_sync_sg);
 #endif
-#ifdef CONFIG_PCI
-EXPORT_SYMBOL(ebus_chain);
-EXPORT_SYMBOL(isa_chain);
-EXPORT_SYMBOL(pci_memspace_mask);
 EXPORT_SYMBOL(outsb);
 EXPORT_SYMBOL(outsw);
 EXPORT_SYMBOL(outsl);
 EXPORT_SYMBOL(insb);
 EXPORT_SYMBOL(insw);
 EXPORT_SYMBOL(insl);
+#ifdef CONFIG_PCI
+EXPORT_SYMBOL(ebus_chain);
+EXPORT_SYMBOL(isa_chain);
+EXPORT_SYMBOL(pci_memspace_mask);
 EXPORT_SYMBOL(pci_alloc_consistent);
 EXPORT_SYMBOL(pci_free_consistent);
 EXPORT_SYMBOL(pci_map_single);

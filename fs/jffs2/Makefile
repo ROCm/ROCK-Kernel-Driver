@@ -13,6 +13,7 @@ JFFS2_OBJS	:= dir.o file.o ioctl.o nodelist.o malloc.o \
 
 LINUX_OBJS-24	:= super-v24.o crc32.o
 LINUX_OBJS-25	:= super.o
+LINUX_OBJS-26	:= super.o
 
 NAND_OBJS-$(CONFIG_JFFS2_FS_NAND)	:= wbuf.o
 

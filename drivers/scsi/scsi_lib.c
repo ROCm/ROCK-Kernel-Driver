@@ -69,7 +69,7 @@ int scsi_insert_special_req(struct scsi_request *sreq, int at_head)
 	 */
 	sreq->sr_request->flags &= ~REQ_DONTPREP;
 	blk_insert_request(sreq->sr_device->request_queue, sreq->sr_request,
-		       	   at_head, sreq);
+		       	   at_head, sreq, 0);
 	return 0;
 }
 
@@ -147,7 +147,7 @@ int scsi_queue_insert(struct scsi_cmnd *cmd, int reason)
 	 * function.  The SCSI request function detects the blocked condition
 	 * and plugs the queue appropriately.
 	 */
-	blk_insert_request(device->request_queue, cmd->request, 1, cmd);
+	blk_insert_request(device->request_queue, cmd->request, 1, cmd, 1);
 	return 0;
 }
 
@@ -444,22 +444,8 @@ static void scsi_run_queue(struct request_queue *q)
  */
 static void scsi_requeue_command(struct request_queue *q, struct scsi_cmnd *cmd)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(q->queue_lock, flags);
-	cmd->request->special = cmd;
-	if (blk_rq_tagged(cmd->request))
-		blk_queue_end_tag(q, cmd->request);
-
-	/*
-	 * set REQ_SPECIAL - we have a command
-	 * clear REQ_DONTPREP - we assume the sg table has been 
-	 *	nuked so we need to set it up again.
-	 */
-	cmd->request->flags |= REQ_SPECIAL;
 	cmd->request->flags &= ~REQ_DONTPREP;
-	__elv_add_request(q, cmd->request, 0, 0);
-	spin_unlock_irqrestore(q->queue_lock, flags);
+	blk_insert_request(q, cmd->request, 1, cmd, 1);
 
 	scsi_run_queue(q);
 }
@@ -1213,9 +1199,7 @@ static void scsi_request_fn(struct request_queue *q)
 	 * later time.
 	 */
 	spin_lock_irq(q->queue_lock);
-	if (blk_rq_tagged(req))
-		blk_queue_end_tag(q, req);
-	__elv_add_request(q, req, 0, 0);
+	blk_requeue_request(q, req);
 	sdev->device_busy--;
 	if(sdev->device_busy == 0)
 		blk_plug_device(q);
@@ -1426,17 +1410,17 @@ __scsi_mode_sense(struct scsi_request *sreq, int dbd, int modepage,
 	if(scsi_status_is_good(sreq->sr_result)) {
 		data->header_length = header_length;
 		if(use_10_for_ms) {
-			data->length = buffer[0]*256 + buffer[1];
+			data->length = buffer[0]*256 + buffer[1] + 2;
 			data->medium_type = buffer[2];
 			data->device_specific = buffer[3];
 			data->longlba = buffer[4] & 0x01;
 			data->block_descriptor_length = buffer[6]*256
 				+ buffer[7];
 		} else {
-			data->length = buffer[0];
+			data->length = buffer[0] + 1;
 			data->medium_type = buffer[1];
-			data->device_specific = buffer[3];
-			data->block_descriptor_length = buffer[4];
+			data->device_specific = buffer[2];
+			data->block_descriptor_length = buffer[3];
 		}
 	}
 

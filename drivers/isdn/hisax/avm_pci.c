@@ -530,21 +530,17 @@ inithdlc(struct IsdnCardState *cs)
 	modehdlc(cs->bcs + 1, -1, 1);
 }
 
-static void
+static irqreturn_t
 avm_pcipnp_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val;
 	u8 sval;
 
-	if (!cs) {
-		printk(KERN_WARNING "AVM PCI: Spurious interrupt!\n");
-		return;
-	}
 	sval = inb(cs->hw.avm.cfg_reg + 2);
 	if ((sval & AVM_STATUS0_IRQ_MASK) == AVM_STATUS0_IRQ_MASK)
 		/* possible a shared  IRQ reqest */
-		return;
+		return IRQ_NONE;
 	if (!(sval & AVM_STATUS0_IRQ_ISAC)) {
 		val = ReadISAC(cs, ISAC_ISTA);
 		isac_interrupt(cs, val);
@@ -554,6 +550,7 @@ avm_pcipnp_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	}
 	WriteISAC(cs, ISAC_MASK, 0xFF);
 	WriteISAC(cs, ISAC_MASK, 0x0);
+	return IRQ_HANDLED;
 }
 
 static int

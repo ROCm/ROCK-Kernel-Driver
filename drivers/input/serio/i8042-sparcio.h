@@ -1,8 +1,13 @@
 #ifndef _I8042_SPARCIO_H
 #define _I8042_SPARCIO_H
 
+#include <linux/config.h>
+#include <asm/io.h>
+
+#ifdef CONFIG_PCI
 #include <asm/oplib.h>
 #include <asm/ebus.h>
+#endif
 
 static int i8042_kbd_irq = -1;
 static int i8042_aux_irq = -1;
@@ -45,6 +50,9 @@ static inline void i8042_write_command(int val)
 
 static int i8042_platform_init(void)
 {
+#ifndef CONFIG_PCI
+	return -1;
+#else
 	char prop[128];
 	int len;
 
@@ -95,11 +103,14 @@ static int i8042_platform_init(void)
 	i8042_reset = 1;
 
 	return 0;
+#endif /* CONFIG_PCI */
 }
 
 static inline void i8042_platform_exit(void)
 {
+#ifdef CONFIG_PCI
 	iounmap((void *)kbd_iobase);
+#endif
 }
 
 #endif /* _I8042_SPARCIO_H */

@@ -16,6 +16,7 @@ menu "General setup"
 
 config BBC_I2C
 	tristate "UltraSPARC-III bootbus i2c controller driver"
+	depends on PCI
 	help
 	  The BBC devices on the UltraSPARC III have two I2C controllers.  The
 	  first I2C controller connects mainly to configuration PROMs (NVRAM,
@@ -208,10 +209,6 @@ config HOTPLUG
 	  to use devices as you hotplug them.
 
 # Global things across all Sun machines.
-config HAVE_DEC_LOCK
-	bool
-	default y
-
 config RWSEM_GENERIC_SPINLOCK
 	bool
 
@@ -923,6 +920,14 @@ config DEBUG_SPINLOCK
 	  and certain other kinds of spinlock errors commonly made.  This is
 	  best used in conjunction with the NMI watchdog so that spinlock
 	  deadlocks are also debuggable.
+
+# We have a custom atomic_dec_and_lock() implementation but it's not
+# compatible with spinlock debugging so we need to fall back on
+# the generic version in that case.
+config HAVE_DEC_LOCK
+	bool
+	depends on !DEBUG_SPINLOCK
+	default y
 
 config DEBUG_SPINLOCK_SLEEP
 	bool "Sleep-inside-spinlock checking"
