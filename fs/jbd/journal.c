@@ -585,9 +585,13 @@ int journal_bmap(journal_t *journal, unsigned long blocknr,
  * We play buffer_head aliasing tricks to write data/metadata blocks to
  * the journal without copying their contents, but for journal
  * descriptor blocks we do need to generate bona fide buffers.
+ *
+ * After the caller of journal_get_descriptor_buffer() has finished modifying
+ * the buffer's contents they really should run flush_dcache_page(bh->b_page).
+ * But we don't bother doing that, so there will be coherency problems with
+ * mmaps of blockdevs which hold live JBD-controlled filesystems.
  */
-
-struct journal_head * journal_get_descriptor_buffer(journal_t *journal)
+struct journal_head *journal_get_descriptor_buffer(journal_t *journal)
 {
 	struct buffer_head *bh;
 	unsigned long blocknr;
@@ -599,8 +603,10 @@ struct journal_head * journal_get_descriptor_buffer(journal_t *journal)
 		return NULL;
 
 	bh = __getblk(journal->j_dev, blocknr, journal->j_blocksize);
+	lock_buffer(bh);
 	memset(bh->b_data, 0, journal->j_blocksize);
-	bh->b_state |= (1 << BH_Dirty);
+	set_buffer_uptodate(bh);
+	unlock_buffer(bh);
 	BUFFER_TRACE(bh, "return this buffer");
 	return journal_add_journal_head(bh);
 }

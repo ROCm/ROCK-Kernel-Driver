@@ -396,9 +396,19 @@ restart:
 	sb = sb_entry(super_blocks.prev);
 	for (; sb != sb_entry(&super_blocks); sb = sb_entry(sb->s_list.prev)) {
 		if (!list_empty(&sb->s_dirty) || !list_empty(&sb->s_io)) {
+			/* we're making our own get_super here */
 			sb->s_count++;
 			spin_unlock(&sb_lock);
-			sync_sb_inodes(sb, wbc);
+			/*
+			 * If we can't get the readlock, there's no sense in
+			 * waiting around, most of the time the FS is going to
+			 * be unmounted by the time it is released.
+			 */
+			if (down_read_trylock(&sb->s_umount)) {
+				if (sb->s_root)
+					sync_sb_inodes(sb, wbc);
+				up_read(&sb->s_umount);
+			}
 			spin_lock(&sb_lock);
 			if (__put_super(sb))
 				goto restart;

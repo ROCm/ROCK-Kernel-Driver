@@ -15,7 +15,7 @@
 #include <linux/aio_abi.h>
 #include <linux/module.h>
 
-//#define DEBUG 1
+#define DEBUG 0
 
 #include <linux/sched.h>
 #include <linux/fs.h>
