@@ -27,21 +27,15 @@ mtrr_file_add(unsigned long base, unsigned long size,
 
 	max = num_var_ranges;
 	if (fcount == NULL) {
-		if ((fcount =
-		     kmalloc(max * sizeof *fcount, GFP_KERNEL)) == NULL) {
-			printk("mtrr: could not allocate\n");
+		fcount = kmalloc(max * sizeof *fcount, GFP_KERNEL);
+		if (!fcount)
 			return -ENOMEM;
-		}
 		memset(fcount, 0, max * sizeof *fcount);
 		FILE_FCOUNT(file) = fcount;
 	}
 	if (!page) {
-		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
-			printk
-			    ("mtrr: size and base must be multiples of 4 kiB\n");
-			printk("mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1)))
 			return -EINVAL;
-		}
 		base >>= PAGE_SHIFT;
 		size >>= PAGE_SHIFT;
 	}
@@ -59,12 +53,8 @@ mtrr_file_del(unsigned long base, unsigned long size,
 	unsigned int *fcount = file->private_data;
 
 	if (!page) {
-		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
-			printk
-			    ("mtrr: size and base must be multiples of 4 kiB\n");
-			printk("mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1)))
 			return -EINVAL;
-		}
 		base >>= PAGE_SHIFT;
 		size >>= PAGE_SHIFT;
 	}
@@ -160,8 +150,6 @@ mtrr_ioctl(struct inode *inode, struct file *file,
 	mtrr_type type;
 	struct mtrr_sentry sentry;
 	struct mtrr_gentry gentry;
-
-	printk("mtrr_ioctl %d\n", cmd);
 
 	switch (cmd) {
 	default:
