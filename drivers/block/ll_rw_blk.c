@@ -187,6 +187,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->max_phys_segments = MAX_PHYS_SEGMENTS;
 	q->max_hw_segments = MAX_HW_SEGMENTS;
 	q->make_request_fn = mfn;
+	q->ra_sectors = VM_MAX_READAHEAD << (10 - 9);	/* kbytes->sectors */
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 
@@ -854,7 +855,6 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	q->plug_tq.data		= q;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
 	q->queue_lock		= lock;
-	q->ra_sectors		= 0;		/* Use VM default */
 
 	blk_queue_segment_boundary(q, 0xffffffff);
 
