@@ -90,12 +90,8 @@ static const char *block_name[] __devinitdata = {
  */
 static void __devinit tulip_build_fake_mediatable(struct tulip_private *tp)
 {
-#ifdef __hppa__
-	unsigned char *ee_data = tp->eeprom;
-
-	if (ee_data[0] == 0x3c && ee_data[1] == 0x10 && 
-		(ee_data[2] == 0x63 || ee_data[2] == 0x61) && ee_data[3] == 0x10) {
-
+#ifdef CONFIG_GSC
+	if (tp->flags & NEEDS_FAKE_MEDIA_TABLE) {
 		static unsigned char leafdata[] =
 			{ 0x01,       /* phy number */
 			  0x02,       /* gpr setup sequence length */
@@ -306,12 +302,12 @@ subsequent_board:
 
 /*  EEPROM_Ctrl bits. */
 #define EE_SHIFT_CLK	0x02	/* EEPROM shift clock. */
-#define EE_CS			0x01	/* EEPROM chip select. */
+#define EE_CS		0x01	/* EEPROM chip select. */
 #define EE_DATA_WRITE	0x04	/* Data from the Tulip to EEPROM. */
-#define EE_WRITE_0		0x01
-#define EE_WRITE_1		0x05
+#define EE_WRITE_0	0x01
+#define EE_WRITE_1	0x05
 #define EE_DATA_READ	0x08	/* Data from the EEPROM chip. */
-#define EE_ENB			(0x4800 | EE_CS)
+#define EE_ENB		(0x4800 | EE_CS)
 
 /* Delay between EEPROM clock transitions.
    Even at 33Mhz current PCI implementations don't overrun the EEPROM clock.
@@ -322,11 +318,12 @@ subsequent_board:
 #define EE_READ_CMD		(6)
 
 /* Note: this routine returns extra data bits for size detection. */
-int __devinit tulip_read_eeprom(long ioaddr, int location, int addr_len)
+int __devinit tulip_read_eeprom(struct net_device *dev, int location, int addr_len)
 {
 	int i;
 	unsigned retval = 0;
-	long ee_addr = ioaddr + CSR9;
+	struct tulip_private *tp = dev->priv;
+	long ee_addr = tp->base_addr + CSR9;
 	int read_cmd = location | (EE_READ_CMD << addr_len);
 
 	outl(EE_ENB & ~EE_CS, ee_addr);
@@ -354,6 +351,6 @@ int __devinit tulip_read_eeprom(long ioaddr, int location, int addr_len)
 
 	/* Terminate the EEPROM access. */
 	outl(EE_ENB & ~EE_CS, ee_addr);
-	return retval;
+	return (tp->flags & HAS_SWAPPED_SEEPROM) ? swab16(retval) : retval;
 }
 

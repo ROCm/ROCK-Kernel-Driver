@@ -610,7 +610,6 @@ static void sca_close(struct net_device *dev)
 	card_t* card = port_to_card(port);
 
 	/* reset channel */
-	netif_stop_queue(dev);
 	sca_out(CMD_RESET, get_msci(port) + CMD, port_to_card(port));
 #ifdef __HD64570_H
 	/* disable MSCI interrupts */
@@ -624,6 +623,7 @@ static void sca_close(struct net_device *dev)
 	sca_outl(sca_inl(IER0, card) &
 		 (phy_node(port) ? 0x00FF00FF : 0xFF00FF00), IER0, card);
 #endif
+	netif_stop_queue(dev);
 }
 
 
