@@ -54,10 +54,6 @@ static kmem_cache_t *request_cachep;
  */
 DECLARE_TASK_QUEUE(tq_disk);
 
-/* This specifies how many sectors to read ahead on the disk. */
-
-int read_ahead[MAX_BLKDEV];
-
 /* blk_dev_struct is:
  *	request_queue
  *	*queue
@@ -82,11 +78,6 @@ int * blk_size[MAX_BLKDEV];
  * if (!blksize_size[MAJOR]) then 1024 bytes is assumed.
  */
 int * blksize_size[MAX_BLKDEV];
-
-/*
- * The following tunes the read-ahead algorithm in mm/filemap.c
- */
-int * max_readahead[MAX_BLKDEV];
 
 /*
  * How many reqeusts do we allocate per queue,
@@ -1685,7 +1676,6 @@ int __init blk_dev_init(void)
 		dev->queue = NULL;
 
 	memset(ro_bits,0,sizeof(ro_bits));
-	memset(max_readahead, 0, sizeof(max_readahead));
 
 	total_ram = nr_free_pages() << (PAGE_SHIFT - 10);
 

@@ -613,8 +613,8 @@ void help(void)
 	printf("READ          d      READ RAW     w       READ AUDIO   A\n");
 	printf("MS-INFO       M      TOC          T       START        S\n");
 	printf("SET EJECTSW   X      DEVICE       D       DEBUG        Y\n");
-	printf("AUDIO_BUFSIZ  Z      RESET        R       BLKRASET     B\n");
-	printf("SET VOLUME    v      GET VOLUME   V\n");
+	printf("AUDIO_BUFSIZ  Z      RESET        R       SET VOLUME   v\n");
+	printf("GET VOLUME    V\n");
 }
 
 /*
@@ -881,12 +881,6 @@ main(int argc, char *argv[])
 		case 'R':
 			rc=ioctl(drive,CDROMRESET);
 			if (rc<0) printf("CDROMRESET: rc=%d.\n",rc);
-			break;
-		case 'B': /* set the driver's (?) read ahead value */
-			printf("enter read-ahead size: ? ");
-			scanf("%d",&i);
-			rc=ioctl(drive,BLKRASET,i);
-			if (rc<0) printf("BLKRASET: rc=%d.\n",rc);
 			break;
 #ifdef AZT_PRIVATE_IOCTLS /*not supported by every CDROM driver*/
 		case 'd':

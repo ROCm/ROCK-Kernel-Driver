@@ -101,7 +101,6 @@ tapeblock_init(void) {
     }
     if (tapeblock_major == 0) tapeblock_major = result;   /* accept dynamic major number*/
     INIT_BLK_DEV(tapeblock_major,tape_request_fn,tapeblock_getqueue,NULL);
-    read_ahead[tapeblock_major]=TAPEBLOCK_READAHEAD;
     PRINT_WARN(KERN_ERR " tape gets major %d for block device\n", result);
     blk_size[tapeblock_major] = (int*) kmalloc (256*sizeof(int),GFP_ATOMIC);
     memset(blk_size[tapeblock_major],0,256*sizeof(int));

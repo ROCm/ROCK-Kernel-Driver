@@ -289,7 +289,6 @@ static void __exit ataraid_exit(void)
 	hardsect_size[ATAMAJOR] = NULL;
 	blk_size[ATAMAJOR] = NULL;
 	blksize_size[ATAMAJOR] = NULL;                       
-	max_readahead[ATAMAJOR] = NULL;
 
 	del_gendisk(&ataraid_gendisk);
         

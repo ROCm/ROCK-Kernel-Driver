@@ -785,16 +785,6 @@ void sr_finish()
                                     &sr_bdops, NULL);
 		register_cdrom(&scsi_CDs[i].cdi);
 	}
-
-
-	/* If our host adapter is capable of scatter-gather, then we increase
-	 * the read-ahead to 16 blocks (32 sectors).  If not, we use
-	 * a two block (4 sector) read ahead. */
-	if (scsi_CDs[0].device && scsi_CDs[0].device->host->sg_tablesize)
-		read_ahead[MAJOR_NR] = 32;	/* 32 sector read-ahead.  Always removable. */
-	else
-		read_ahead[MAJOR_NR] = 4;	/* 4 sector read-ahead */
-
 }
 
 static void sr_detach(Scsi_Device * SDp)
@@ -846,7 +836,6 @@ static void __exit exit_sr(void)
 		kfree(sr_blocksizes);
 		sr_blocksizes = NULL;
 	}
-	read_ahead[MAJOR_NR] = 0;
 	blk_clear(MAJOR_NR);
 
 	sr_template.dev_max = 0;

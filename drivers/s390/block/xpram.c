@@ -163,12 +163,11 @@ int xpram_major;   /* must be declared before including blk.h */
 
 static int major    = XPRAM_MAJOR;
 static int devs     = XPRAM_DEVS;
-static int rahead   = XPRAM_RAHEAD;
 static int sizes[XPRAM_MAX_DEVS] = { 0, };
 static int blksize  = XPRAM_BLKSIZE;
 static int hardsect = XPRAM_HARDSECT;
 
-int xpram_devs, xpram_rahead;
+int xpram_devs;
 int xpram_blksize, xpram_hardsect;
 int xpram_mem_avail = 0;
 unsigned long xpram_sizes[XPRAM_MAX_DEVS];
@@ -659,25 +658,8 @@ int xpram_ioctl (struct inode *inode, struct file *filp,
 		if ( capable(CAP_SYS_ADMIN) )invalidate_buffers(inode->i_rdev);
 		return 0;
 
-	case BLKRAGET: /* return the readahead value, 0x1263 */
-		if (!arg)  return -EINVAL;
-		err = 0; /* verify_area_20(VERIFY_WRITE, (long *) arg, sizeof(long));
-		          * if (err) return err;
-                          */
-		put_user(read_ahead[MAJOR(inode->i_rdev)], (long *)arg);
-
-		return 0;
-
-	case BLKRASET: /* set the readahead value, 0x1262 */
-		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-		if (arg > 0xff) return -EINVAL; /* limit it */
-		read_ahead[MAJOR(inode->i_rdev)] = arg;
-                atomic_eieio();
-		return 0;
-
 	case BLKRRPART: /* re-read partition table: can't do it, 0x1259 */
 		return -EINVAL;
-
 
 #if (XPRAM_VERSION == 22)
 		RO_IOCTLS(inode->i_rdev, arg); /* the default RO operations 
@@ -940,7 +922,6 @@ int xpram_init(void)
 				 * snoozing with a debugger.
 				 */
 
-	xpram_rahead   = rahead;
 	xpram_blksize  = blksize;
 	xpram_hardsect = hardsect;
 
@@ -1029,7 +1010,7 @@ int xpram_init(void)
 	PRINT_INFO("  %d kB expanded memory found.\n",xpram_mem_avail );
 
 	/*
-	 * Assign the other needed values: request, rahead, size, blksize,
+	 * Assign the other needed values: request, size, blksize,
 	 * hardsect. All the minor devices feature the same value.
 	 * Note that `xpram' defines all of them to allow testing non-default
 	 * values. A real device could well avoid setting values in global
@@ -1042,7 +1023,6 @@ int xpram_init(void)
 	q = BLK_DEFAULT_QUEUE (major);
 	blk_init_queue (q, xpram_request);
 #endif /* V22/V24 */
-	read_ahead[major] = xpram_rahead;
 
 	/* we want to have XPRAM_UNUSED blocks security buffer between devices */
 	mem_usable=xpram_mem_avail-(XPRAM_UNUSED*(xpram_devs-1));
@@ -1181,7 +1161,6 @@ int xpram_init(void)
 	kfree(xpram_hardsects);
 	hardsect_size[major] = NULL;
  fail_malloc:
-	read_ahead[major] = 0;
 #if (XPRAM_VERSION == 22)
 	blk_dev[major].request_fn = NULL;
 #endif /* V22 */

@@ -1022,7 +1022,6 @@ int __init my_gscd_init(void)
 
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &gscd_lock);
 	blksize_size[MAJOR_NR] = gscd_blocksizes;
-	read_ahead[MAJOR_NR] = 4;
 
 	disk_state = 0;
 	gscdPresent = 1;

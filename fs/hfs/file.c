@@ -164,8 +164,7 @@ static hfs_rwret_t hfs_file_read(struct file * filp, char * buf,
 	if (left <= 0) {
 		return 0;
 	}
-	if ((read = hfs_do_read(inode, HFS_I(inode)->fork, pos,
-				buf, left, filp->f_reada != 0)) > 0) {
+	if ((read = hfs_do_read(inode, HFS_I(inode)->fork, pos, buf, left)) > 0) {
 	        *ppos += read;
 		filp->f_reada = 1;
 	}
@@ -292,7 +291,7 @@ static inline int xlate_from_user(char *data, const char *buf, int count)
  * It has been changed to take into account that HFS files have no holes.
  */
 hfs_s32 hfs_do_read(struct inode *inode, struct hfs_fork * fork, hfs_u32 pos,
-		    char * buf, hfs_u32 count, int reada)
+		    char * buf, hfs_u32 count)
 {
 	kdev_t dev = inode->i_dev;
 	hfs_s32 size, chars, offset, block, blocks, read = 0;
@@ -313,14 +312,6 @@ hfs_s32 hfs_do_read(struct inode *inode, struct hfs_fork * fork, hfs_u32 pos,
 	blocks = (count+offset+HFS_SECTOR_SIZE-1) >> HFS_SECTOR_SIZE_BITS;
 
 	bhb = bhe = buflist;
-	if (reada) {
-		if (blocks < read_ahead[major(dev)] / (HFS_SECTOR_SIZE>>9)) {
-			blocks = read_ahead[major(dev)] / (HFS_SECTOR_SIZE>>9);
-		}
-		if (block + blocks > size) {
-			blocks = size - block;
-		}
-	}
 
 	/* We do this in a two stage process.  We first try and
 	   request as many blocks as we can, then we wait for the

@@ -1503,7 +1503,6 @@ int __init cm206_init(void)
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
 		       &cm206_lock);
 	blksize_size[MAJOR_NR] = cm206_blocksizes;
-	read_ahead[MAJOR_NR] = 16;	/* reads ahead what? */
 	init_bh(CM206_BH, cm206_bh);
 
 	memset(cd, 0, sizeof(*cd));	/* give'm some reasonable value */

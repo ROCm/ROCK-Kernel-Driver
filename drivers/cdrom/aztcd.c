@@ -1927,7 +1927,6 @@ int __init aztcd_init(void)
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, &aztSpin);
 	blksize_size[MAJOR_NR] = aztcd_blocksizes;
-	read_ahead[MAJOR_NR] = 4;
 	register_disk(NULL, mk_kdev(MAJOR_NR, 0), 1, &azt_fops, 0);
 
 	if ((azt_port == 0x1f0) || (azt_port == 0x170))

@@ -481,7 +481,6 @@ int __init cpqarray_init(void)
 		blk_queue_max_phys_segments(q, SG_MAX);
 
 		blksize_size[MAJOR_NR+i] = ida_blocksizes + (i*256);
-		read_ahead[MAJOR_NR+i] = READ_AHEAD;
 
 		ida_gendisk[i].major = MAJOR_NR + i;
 		ida_gendisk[i].major_name = "ida";
@@ -1179,8 +1178,6 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 	case BLKBSZGET:
 	case BLKROSET:
 	case BLKROGET:
-	case BLKRASET:
-	case BLKRAGET:
 	case BLKPG:
 		return blk_ioctl(inode->i_rdev, cmd, arg);
 

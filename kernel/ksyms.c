@@ -323,7 +323,6 @@ EXPORT_SYMBOL(read_dev_sector);
 EXPORT_SYMBOL(tq_disk);
 EXPORT_SYMBOL(init_buffer);
 EXPORT_SYMBOL(refile_buffer);
-EXPORT_SYMBOL(max_readahead);
 EXPORT_SYMBOL(wipe_partitions);
 
 /* tty routines */
@@ -525,7 +524,6 @@ EXPORT_SYMBOL(fsync_buffers_list);
 EXPORT_SYMBOL(clear_inode);
 EXPORT_SYMBOL(___strtok);
 EXPORT_SYMBOL(init_special_inode);
-EXPORT_SYMBOL(read_ahead);
 EXPORT_SYMBOL(__get_hash_table);
 EXPORT_SYMBOL(new_inode);
 EXPORT_SYMBOL(insert_inode_hash);

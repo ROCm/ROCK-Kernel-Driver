@@ -1104,8 +1104,6 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 		case BLKFLSBUF:
 		case BLKROSET:
 		case BLKROGET:
-		case BLKRASET:
-		case BLKRAGET:
 		case BLKPG:
 			return blk_ioctl(inode->i_rdev, cmd, arg);
 			

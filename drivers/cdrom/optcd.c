@@ -2062,7 +2062,6 @@ int __init optcd_init(void)
 	blksize_size[MAJOR_NR] = &blksize;
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST,
 		       &optcd_lock);
-	read_ahead[MAJOR_NR] = 4;
 	request_region(optcd_port, 4, "optcd");
 	register_disk(NULL, mk_kdev(MAJOR_NR,0), 1, &opt_fops, 0);
 

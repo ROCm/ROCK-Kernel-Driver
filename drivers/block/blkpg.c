@@ -29,7 +29,7 @@
  */
 
 #include <linux/errno.h>
-#include <linux/fs.h>			/* for BLKRASET, ... */
+#include <linux/fs.h>			/* for BLKROSET, ... */
 #include <linux/sched.h>		/* for capable() */
 #include <linux/blk.h>			/* for set_device_ro() */
 #include <linux/blkpg.h>
@@ -226,31 +226,6 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 		case BLKROGET:
 			intval = (is_read_only(dev) != 0);
 			return put_user(intval, (int *)(arg));
-
-		case BLKRASET:
-			if(!capable(CAP_SYS_ADMIN))
-				return -EACCES;
-			if(arg > 0xff)
-				return -EINVAL;
-			read_ahead[major(dev)] = arg;
-			return 0;
-		case BLKRAGET:
-			if (!arg)
-				return -EINVAL;
-			return put_user(read_ahead[major(dev)], (long *) arg);
-
-		case BLKFRASET:
-			if (!capable(CAP_SYS_ADMIN))
-				return -EACCES;
-			if (!(iptr = max_readahead[major(dev)]))
-				return -EINVAL;
-			iptr[minor(dev)] = arg;
-			return 0;
-
-		case BLKFRAGET:
-			if (!(iptr = max_readahead[major(dev)]))
-				return -EINVAL;
-			return put_user(iptr[minor(dev)], (long *) arg);
 
 		case BLKSECTGET:
 			if ((q = blk_get_queue(dev)) == NULL)

@@ -1120,7 +1120,7 @@ static void profile_readahead(int async, struct file *filp)
  *
  * Asynchronous read-ahead risks:
  * ------------------------------
- * In order to maximize overlapping, we must start some asynchronous read 
+ * In order to maximize overlapping, we must start some asynchronous read
  * request from the device, as soon as possible.
  * We must be very careful about:
  * - The number of effective pending IO read requests.
@@ -1131,13 +1131,6 @@ static void profile_readahead(int async, struct file *filp)
  *   64k if defined (4K page size assumed).
  */
 
-static inline int get_max_readahead(struct inode * inode)
-{
-	if (kdev_none(inode->i_dev) || !max_readahead[major(inode->i_dev)])
-		return MAX_READAHEAD;
-	return max_readahead[major(inode->i_dev)][minor(inode->i_dev)];
-}
-
 static void generic_file_readahead(int reada_ok,
 	struct file * filp, struct inode * inode,
 	struct page * page)
@@ -1146,7 +1139,6 @@ static void generic_file_readahead(int reada_ok,
 	unsigned long index = page->index;
 	unsigned long max_ahead, ahead;
 	unsigned long raend;
-	int max_readahead = get_max_readahead(inode);
 
 	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
 
@@ -1231,8 +1223,8 @@ static void generic_file_readahead(int reada_ok,
 
 		filp->f_ramax += filp->f_ramax;
 
-		if (filp->f_ramax > max_readahead)
-			filp->f_ramax = max_readahead;
+		if (filp->f_ramax > MAX_READAHEAD)
+			filp->f_ramax = MAX_READAHEAD;
 
 #ifdef PROFILE_READAHEAD
 		profile_readahead((reada_ok == 2), filp);
@@ -1278,7 +1270,6 @@ void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * 
 	struct page *cached_page;
 	int reada_ok;
 	int error;
-	int max_readahead = get_max_readahead(inode);
 
 	cached_page = NULL;
 	index = *ppos >> PAGE_CACHE_SHIFT;
@@ -1318,9 +1309,9 @@ void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * 
 			filp->f_ramax = needed;
 
 		if (reada_ok && filp->f_ramax < MIN_READAHEAD)
-				filp->f_ramax = MIN_READAHEAD;
-		if (filp->f_ramax > max_readahead)
-			filp->f_ramax = max_readahead;
+			filp->f_ramax = MIN_READAHEAD;
+		if (filp->f_ramax > MAX_READAHEAD)
+			filp->f_ramax = MAX_READAHEAD;
 	}
 
 	for (;;) {
@@ -1808,8 +1799,7 @@ static void nopage_sequential_readahead(struct vm_area_struct * vma,
 {
 	unsigned long ra_window;
 
-	ra_window = get_max_readahead(vma->vm_file->f_dentry->d_inode);
-	ra_window = CLUSTER_OFFSET(ra_window + CLUSTER_PAGES - 1);
+	ra_window = CLUSTER_OFFSET(MAX_READAHEAD + CLUSTER_PAGES - 1);
 
 	/* vm_raend is zero if we haven't read ahead in this area yet.  */
 	if (vma->vm_raend == 0)

@@ -3442,7 +3442,6 @@ int __init cdu31a_init(void)
 		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR),
 			       DEVICE_REQUEST,
 			       &cdu31a_lock);
-		read_ahead[MAJOR_NR] = CDU31A_READAHEAD;
 		cdu31a_block_size = 1024;	/* 1kB default block size */
 		/* use 'mount -o block=2048' */
 		blksize_size[MAJOR_NR] = &cdu31a_block_size;

@@ -397,7 +397,6 @@ int pd_init (void)
 	q = BLK_DEFAULT_QUEUE(MAJOR_NR);
 	blk_init_queue(q, DEVICE_REQUEST, &pd_lock);
 	blk_queue_max_sectors(q, cluster);
-        read_ahead[MAJOR_NR] = 8;       /* 8 sector (4kB) read ahead */
         
 	pd_gendisk.major = major;
 	pd_gendisk.major_name = name;
@@ -480,8 +479,6 @@ static int pd_ioctl(struct inode *inode,struct file *file,
 	    case BLKGETSIZE64:
 	    case BLKROSET:
 	    case BLKROGET:
-	    case BLKRASET:
-	    case BLKRAGET:
 	    case BLKFLSBUF:
 	    case BLKPG:
 		return blk_ioctl(inode->i_rdev, cmd, arg);

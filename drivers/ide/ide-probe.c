@@ -788,8 +788,7 @@ static int init_irq (ide_hwif_t *hwif)
 static void init_gendisk (ide_hwif_t *hwif)
 {
 	struct gendisk *gd;
-	unsigned int unit, units, minors;
-	int *bs, *max_ra;
+	unsigned int unit, units, minors, i;
 	extern devfs_handle_t ide_devfs_handle;
 
 #if 1
@@ -802,33 +801,25 @@ static void init_gendisk (ide_hwif_t *hwif)
 	}
 #endif
 
-	minors    = units * (1<<PARTN_BITS);
-	gd        = kmalloc (sizeof(struct gendisk), GFP_KERNEL);
+	minors = units * (1<<PARTN_BITS);
+
+	gd = kmalloc (sizeof(struct gendisk), GFP_KERNEL);
 	if (!gd)
 		goto err_kmalloc_gd;
 	gd->sizes = kmalloc (minors * sizeof(int), GFP_KERNEL);
 	if (!gd->sizes)
 		goto err_kmalloc_gd_sizes;
-	gd->part  = kmalloc (minors * sizeof(struct hd_struct), GFP_KERNEL);
+	gd->part = kmalloc (minors * sizeof(struct hd_struct), GFP_KERNEL);
 	if (!gd->part)
 		goto err_kmalloc_gd_part;
-	bs        = kmalloc (minors*sizeof(int), GFP_KERNEL);
-	if (!bs)
+	blksize_size[hwif->major] = kmalloc (minors*sizeof(int), GFP_KERNEL);
+	if (!blksize_size[hwif->major])
 		goto err_kmalloc_bs;
-	max_ra    = kmalloc (minors*sizeof(int), GFP_KERNEL);
-	if (!max_ra)
-		goto err_kmalloc_max_ra;
 
 	memset(gd->part, 0, minors * sizeof(struct hd_struct));
 
-	/* cdroms and msdos f/s are examples of non-1024 blocksizes */
-	blksize_size[hwif->major] = bs;
-	max_readahead[hwif->major] = max_ra;
-	for (unit = 0; unit < minors; ++unit) {
-		*bs++ = BLOCK_SIZE;
-		*max_ra++ = MAX_READAHEAD;
-	}
-
+	for (i = 0; i < minors; ++i)
+	    blksize_size[hwif->major][i] = BLOCK_SIZE;
 	for (unit = 0; unit < units; ++unit)
 		hwif->drives[unit].part = &gd->part[unit << PARTN_BITS];
 
@@ -875,8 +866,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 	}
 	return;
 
-err_kmalloc_max_ra:
-	kfree(bs);
 err_kmalloc_bs:
 	kfree(gd->part);
 err_kmalloc_gd_part:
@@ -937,7 +926,6 @@ static int hwif_init (ide_hwif_t *hwif)
 	init_gendisk(hwif);
 	blk_dev[hwif->major].data = hwif;
 	blk_dev[hwif->major].queue = ide_get_queue;
-	read_ahead[hwif->major] = 8;	/* (4kB) */
 	hwif->present = 1;	/* success */
 
 	return hwif->present;
