@@ -122,10 +122,8 @@ __pci_device_probe(struct pci_driver *drv, struct pci_dev *pci_dev)
 
 	if (!pci_dev->driver && drv->probe) {
 		error = pci_device_probe_static(drv, pci_dev);
-		if (error >= 0)
-			return error;
-
-		error = pci_device_probe_dynamic(drv, pci_dev);
+		if (error == -ENODEV)
+			error = pci_device_probe_dynamic(drv, pci_dev);
 	}
 	return error;
 }

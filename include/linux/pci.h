@@ -420,7 +420,9 @@ struct pci_dev {
 	unsigned int	transparent:1;	/* Transparent PCI bridge */
 	unsigned int	multifunction:1;/* Part of multi-function device */
 #ifdef CONFIG_PCI_NAMES
-	char		pretty_name[DEVICE_NAME_SIZE];	/* pretty name for users to see */
+#define PCI_NAME_SIZE	50
+#define PCI_NAME_HALF	__stringify(20)	/* less than half to handle slop */
+	char		pretty_name[PCI_NAME_SIZE];	/* pretty name for users to see */
 #endif
 };
 
@@ -524,6 +526,32 @@ struct pci_driver {
 
 #define	to_pci_driver(drv) container_of(drv,struct pci_driver, driver)
 
+/**
+ * PCI_DEVICE - macro used to describe a specific pci device
+ * @vend: the 16 bit PCI Vendor ID
+ * @dev: the 16 bit PCI Device ID
+ *
+ * This macro is used to create a struct pci_device_id that matches a
+ * specific device.  The subvendor and subdevice fields will be set to
+ * PCI_ANY_ID.
+ */
+#define PCI_DEVICE(vend,dev) \
+	.vendor = (vend), .device = (dev), \
+	.subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID
+
+/**
+ * PCI_DEVICE_CLASS - macro used to describe a specific pci device class
+ * @dev_class: the class, subclass, prog-if triple for this device
+ * @dev_class_mask: the class mask for this device
+ *
+ * This macro is used to create a struct pci_device_id that matches a
+ * specific PCI class.  The vendor, device, subvendor, and subdevice 
+ * fields will be set to PCI_ANY_ID.
+ */
+#define PCI_DEVICE_CLASS(dev_class,dev_class_mask) \
+	.class = (dev_class), .class_mask = (dev_class_mask), \
+	.vendor = PCI_ANY_ID, .device = PCI_ANY_ID, \
+	.subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID
 
 /* these external functions are only available when PCI support is enabled */
 #ifdef CONFIG_PCI
@@ -813,6 +841,13 @@ static inline char *pci_name(struct pci_dev *pdev)
 {
 	return pdev->dev.bus_id;
 }
+
+/* Some archs want to see the pretty pci name, so use this macro */
+#ifdef CONFIG_PCI_NAMES
+#define pci_pretty_name(dev) ((dev)->pretty_name)
+#else
+#define pci_pretty_name(dev) ""
+#endif
 
 /*
  *  The world is not perfect and supplies us with broken PCI devices.
