@@ -52,8 +52,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"0.99-NAPI"
-#define DRV_MODULE_RELDATE	"Jun 20, 2002"
+#define DRV_MODULE_VERSION	"1.0"
+#define DRV_MODULE_RELDATE	"Jul 19, 2002"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -1922,8 +1922,11 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 		}
 	}
 
-	if (sblk->idx[0].tx_consumer != tp->tx_cons)
+	if (sblk->idx[0].tx_consumer != tp->tx_cons) {
+		spin_lock(&tp->tx_lock);
 		tg3_tx(tp);
+		spin_unlock(&tp->tx_lock);
+	}
 
 	done = 1;
 	if (sblk->idx[0].rx_producer != tp->rx_rcb_ptr) {
@@ -2014,11 +2017,13 @@ static void tg3_tx_timeout(struct net_device *dev)
 	       dev->name);
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 
 	tg3_halt(tp);
 	tg3_init_rings(tp);
 	tg3_init_hw(tp);
 
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	netif_wake_queue(dev);
@@ -2203,12 +2208,16 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 
 	len = (skb->len - skb->data_len);
 
-	spin_lock_irq(&tp->lock);
+	/* No BH disabling for tx_lock here.  We are running in BH disabled
+	 * context and TX reclaim runs via tp->poll inside of a software
+	 * interrupt.  Rejoice!
+	 */
+	spin_lock(&tp->tx_lock);
 
 	/* This is a hard error, log it. */
 	if (unlikely(TX_BUFFS_AVAIL(tp) <= (skb_shinfo(skb)->nr_frags + 1))) {
 		netif_stop_queue(dev);
-		spin_unlock_irq(&tp->lock);
+		spin_unlock(&tp->tx_lock);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
 		return 1;
@@ -2327,7 +2336,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 		netif_stop_queue(dev);
 
 out_unlock:
-	spin_unlock_irq(&tp->lock);
+	spin_unlock(&tp->tx_lock);
 
 	dev->trans_start = jiffies;
 
@@ -2342,12 +2351,16 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	len = (skb->len - skb->data_len);
 
-	spin_lock_irq(&tp->lock);
+	/* No BH disabling for tx_lock here.  We are running in BH disabled
+	 * context and TX reclaim runs via tp->poll inside of a software
+	 * interrupt.  Rejoice!
+	 */
+	spin_lock(&tp->tx_lock);
 
 	/* This is a hard error, log it. */
 	if (unlikely(TX_BUFFS_AVAIL(tp) <= (skb_shinfo(skb)->nr_frags + 1))) {
 		netif_stop_queue(dev);
-		spin_unlock_irq(&tp->lock);
+		spin_unlock(&tp->tx_lock);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
 		return 1;
@@ -2416,7 +2429,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (TX_BUFFS_AVAIL(tp) <= (MAX_SKB_FRAGS + 1))
 		netif_stop_queue(dev);
 
-	spin_unlock_irq(&tp->lock);
+	spin_unlock(&tp->tx_lock);
 
 	dev->trans_start = jiffies;
 
@@ -2439,6 +2452,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 	}
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 
 	tg3_halt(tp);
 
@@ -2452,6 +2466,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 	tg3_init_rings(tp);
 	tg3_init_hw(tp);
 
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	return 0;
@@ -2461,7 +2476,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
  *
  * The chip has been shut down and the driver detached from
  * the networking, so no interrupts or new tx packets will
- * end up in the driver.  tp->lock is not held and we are not
+ * end up in the driver.  tp->{tx,}lock is not held and we are not
  * in an interrupt context and thus may sleep.
  */
 static void tg3_free_rings(struct tg3 *tp)
@@ -2546,7 +2561,7 @@ static void tg3_free_rings(struct tg3 *tp)
  *
  * The chip has been shut down and the driver detached from
  * the networking, so no interrupts or new tx packets will
- * end up in the driver.  tp->lock is not held and we are not
+ * end up in the driver.  tp->{tx,}lock is not held and we are not
  * in an interrupt context and thus may sleep.
  */
 static void tg3_init_rings(struct tg3 *tp)
@@ -3711,6 +3726,7 @@ static void tg3_timer(unsigned long __opaque)
 	struct tg3 *tp = (struct tg3 *) __opaque;
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 
 	/* All of this garbage is because when using non-tagged
 	 * IRQ status the mailbox/status_block protocol the chip
@@ -3772,6 +3788,7 @@ static void tg3_timer(unsigned long __opaque)
 		tp->timer_counter = tp->timer_multiplier;
 	}
 
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	tp->timer.expires = jiffies + tp->timer_offset;
@@ -3784,10 +3801,12 @@ static int tg3_open(struct net_device *dev)
 	int err;
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 
 	tg3_disable_ints(tp);
 	tp->tg3_flags &= ~TG3_FLAG_INIT_COMPLETE;
 
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	/* If you move this call, make sure TG3_FLAG_HOST_TXDS in
@@ -3806,6 +3825,7 @@ static int tg3_open(struct net_device *dev)
 	}
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 
 	tg3_init_rings(tp);
 
@@ -3823,13 +3843,10 @@ static int tg3_open(struct net_device *dev)
 		tp->timer.function = tg3_timer;
 		add_timer(&tp->timer);
 
-		tp->last_rate_sample = jiffies;
-		tp->last_rx_count = 0;
-		tp->last_tx_count = 0;
-
 		tp->tg3_flags |= TG3_FLAG_INIT_COMPLETE;
 	}
 
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	if (err) {
@@ -3841,9 +3858,11 @@ static int tg3_open(struct net_device *dev)
 	netif_start_queue(dev);
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 
 	tg3_enable_ints(tp);
 
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	return 0;
@@ -4105,6 +4124,7 @@ static int tg3_close(struct net_device *dev)
 	del_timer_sync(&tp->timer);
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 #if 0
 	tg3_dump_state(tp);
 #endif
@@ -4118,6 +4138,7 @@ static int tg3_close(struct net_device *dev)
 		  TG3_FLAG_GOT_SERDES_FLOWCTL);
 	netif_carrier_off(tp->dev);
 
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	free_irq(dev->irq, dev);
@@ -4325,6 +4346,7 @@ static u8 *tg3_get_regs(struct tg3 *tp)
 	memset(orig_p, 0, TG3_REGDUMP_LEN);
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 
 #define __GET_REG32(reg)	(*((u32 *)(p))++ = tr32(reg))
 #define GET_REG32_LOOP(base,len)		\
@@ -4373,6 +4395,7 @@ do {	p = orig_p + (reg);	\
 #undef GET_REG32_LOOP
 #undef GET_REG32_1
 
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	return orig_p;
@@ -4471,6 +4494,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		}
 
 		spin_lock_irq(&tp->lock);
+		spin_lock(&tp->tx_lock);
 
 		tp->link_config.autoneg = cmd.autoneg;
 		if (cmd.autoneg == AUTONEG_ENABLE) {
@@ -4483,6 +4507,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		}
 
 		tg3_setup_phy(tp);
+		spin_unlock(&tp->tx_lock);
 		spin_unlock_irq(&tp->lock);
 
 		return 0;
@@ -4617,6 +4642,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 			return -EINVAL;
 
 		spin_lock_irq(&tp->lock);
+		spin_lock(&tp->tx_lock);
 
 		tp->rx_pending = ering.rx_pending;
 #if TG3_MINI_RING_WORKS
@@ -4629,6 +4655,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		tg3_init_rings(tp);
 		tg3_init_hw(tp);
 		netif_wake_queue(tp->dev);
+		spin_unlock(&tp->tx_lock);
 		spin_unlock_irq(&tp->lock);
 
 		return 0;
@@ -4653,6 +4680,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 			return -EFAULT;
 
 		spin_lock_irq(&tp->lock);
+		spin_lock(&tp->tx_lock);
 		if (epause.autoneg)
 			tp->tg3_flags |= TG3_FLAG_PAUSE_AUTONEG;
 		else
@@ -4668,6 +4696,7 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		tg3_halt(tp);
 		tg3_init_rings(tp);
 		tg3_init_hw(tp);
+		spin_unlock(&tp->tx_lock);
 		spin_unlock_irq(&tp->lock);
 
 		return 0;
@@ -4805,7 +4834,9 @@ static void tg3_vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
 	struct tg3 *tp = dev->priv;
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 	tp->vlgrp = grp;
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 }
 
@@ -4814,8 +4845,10 @@ static void tg3_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 	struct tg3 *tp = dev->priv;
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 	if (tp->vlgrp)
 		tp->vlgrp->vlan_devices[vid] = NULL;
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 }
 #endif
@@ -5926,6 +5959,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	tp->grc_mode |= GRC_MODE_BSWAP_NONFRM_DATA;
 #endif
 	spin_lock_init(&tp->lock);
+	spin_lock_init(&tp->tx_lock);
 	spin_lock_init(&tp->indirect_lock);
 
 	tp->regs = (unsigned long) ioremap(tg3reg_base, tg3reg_len);
@@ -6061,22 +6095,28 @@ static int tg3_suspend(struct pci_dev *pdev, u32 state)
 		return 0;
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 	tg3_disable_ints(tp);
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	netif_device_detach(dev);
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 	tg3_halt(tp);
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	err = tg3_set_power_state(tp, state);
 	if (err) {
 		spin_lock_irq(&tp->lock);
+		spin_lock(&tp->tx_lock);
 
 		tg3_init_rings(tp);
 		tg3_init_hw(tp);
 
+		spin_unlock(&tp->tx_lock);
 		spin_unlock_irq(&tp->lock);
 
 		netif_device_attach(dev);
@@ -6101,11 +6141,13 @@ static int tg3_resume(struct pci_dev *pdev)
 	netif_device_attach(dev);
 
 	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 
 	tg3_init_rings(tp);
 	tg3_init_hw(tp);
 	tg3_enable_ints(tp);
 
+	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 
 	return 0;
