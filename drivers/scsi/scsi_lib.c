@@ -692,6 +692,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 	int this_count = cmd->bufflen;
 	request_queue_t *q = cmd->device->request_queue;
 	struct request *req = cmd->request;
+	int clear_errors = 1;
 	struct scsi_sense_hdr sshdr;
 	int sense_valid = 0;
 	int sense_deferred = 0;
@@ -721,6 +722,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 	if (blk_pc_request(req)) { /* SG_IO ioctl from block level */
 		req->errors = result;
 		if (result) {
+			clear_errors = 0;
 			if (sense_valid) {
 				/*
 				 * SG_IO wants current and deferred errors
@@ -745,11 +747,6 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 	cmd->request_buffer = NULL;
 	cmd->request_bufflen = 0;
 
-	if (blk_pc_request(req)) { /* SG_IO ioctl from block level */
-		scsi_end_request(cmd, 1, good_bytes, 0);
-		return;
-	}
-
 	/*
 	 * Next deal with any sectors which we were able to correctly
 	 * handle.
@@ -759,7 +756,8 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 					      req->nr_sectors, good_bytes));
 		SCSI_LOG_HLCOMPLETE(1, printk("use_sg is %d\n", cmd->use_sg));
 
-		req->errors = 0;
+		if (clear_errors)
+			req->errors = 0;
 		/*
 		 * If multiple sectors are requested in one buffer, then
 		 * they will have been finished off by the first command.
