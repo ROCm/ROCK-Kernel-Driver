@@ -2467,7 +2467,8 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	/* make sure the board interrupts are off */
 	hba[i]->access.set_intr_mask(hba[i], CCISS_INTR_OFF);
 	if( request_irq(hba[i]->intr, do_cciss_intr, 
-		SA_INTERRUPT|SA_SHIRQ, hba[i]->devname, hba[i]))
+		SA_INTERRUPT | SA_SHIRQ | SA_SAMPLE_RANDOM, 
+			hba[i]->devname, hba[i]))
 	{
 		printk(KERN_ERR "ciss: Unable to get irq %d for %s\n",
 			hba[i]->intr, hba[i]->devname);
