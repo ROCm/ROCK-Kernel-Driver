@@ -175,22 +175,21 @@ static int dino_cfg_read(struct pci_bus *bus, unsigned int devfn, int where,
 	struct dino_device *d = DINO_DEV(parisc_walk_tree(bus->bridge));
 	u32 local_bus = (bus->parent == NULL) ? 0 : bus->secondary;
 	u32 v = DINO_CFG_TOK(local_bus, devfn, where & ~3);
-	unsigned long base_addr = d->hba.base_addr;
+	void __iomem *base_addr = d->hba.base_addr;
 	unsigned long flags;
 
 	spin_lock_irqsave(&d->dinosaur_pen, flags);
 
 	/* tell HW which CFG address */
-	gsc_writel(v, base_addr + DINO_PCI_ADDR);
+	__raw_writel(v, base_addr + DINO_PCI_ADDR);
 
 	/* generate cfg read cycle */
 	if (size == 1) {
-		*val = gsc_readb(base_addr + DINO_CONFIG_DATA + (where & 3));
+		*val = readb(base_addr + DINO_CONFIG_DATA + (where & 3));
 	} else if (size == 2) {
-		*val = le16_to_cpu(gsc_readw(base_addr +
-					DINO_CONFIG_DATA + (where & 2)));
+		*val = readw(base_addr + DINO_CONFIG_DATA + (where & 2));
 	} else if (size == 4) {
-		*val = le32_to_cpu(gsc_readl(base_addr + DINO_CONFIG_DATA));
+		*val = readl(base_addr + DINO_CONFIG_DATA);
 	}
 
 	spin_unlock_irqrestore(&d->dinosaur_pen, flags);
@@ -209,25 +208,24 @@ static int dino_cfg_write(struct pci_bus *bus, unsigned int devfn, int where,
 	struct dino_device *d = DINO_DEV(parisc_walk_tree(bus->bridge));
 	u32 local_bus = (bus->parent == NULL) ? 0 : bus->secondary;
 	u32 v = DINO_CFG_TOK(local_bus, devfn, where & ~3);
-	unsigned long base_addr = d->hba.base_addr;
+	void __iomem *base_addr = d->hba.base_addr;
 	unsigned long flags;
 
 	spin_lock_irqsave(&d->dinosaur_pen, flags);
 
 	/* avoid address stepping feature */
-	gsc_writel(v & 0xffffff00, base_addr + DINO_PCI_ADDR);
-	gsc_readl(base_addr + DINO_CONFIG_DATA);
+	__raw_writel(v & 0xffffff00, base_addr + DINO_PCI_ADDR);
+	__raw_readl(base_addr + DINO_CONFIG_DATA);
 
 	/* tell HW which CFG address */
-	gsc_writel(v, base_addr + DINO_PCI_ADDR);
+	__raw_writel(v, base_addr + DINO_PCI_ADDR);
 	/* generate cfg read cycle */
 	if (size == 1) {
-		gsc_writeb(val, base_addr + DINO_CONFIG_DATA + (where & 3));
+		writeb(val, base_addr + DINO_CONFIG_DATA + (where & 3));
 	} else if (size == 2) {
-		gsc_writew(cpu_to_le16(val),
-				base_addr + DINO_CONFIG_DATA + (where & 2));
+		writew(val, base_addr + DINO_CONFIG_DATA + (where & 2));
 	} else if (size == 4) {
-		gsc_writel(cpu_to_le32(val), base_addr + DINO_CONFIG_DATA);
+		writel(val, base_addr + DINO_CONFIG_DATA);
 	}
 
 	spin_unlock_irqrestore(&d->dinosaur_pen, flags);
@@ -249,9 +247,6 @@ static struct pci_ops dino_cfg_ops = {
  * I/O port instead of MMIO.
  */
 
-#define cpu_to_le8(x) (x)
-#define le8_to_cpu(x) (x)
-
 #define DINO_PORT_IN(type, size, mask) \
 static u##size dino_in##size (struct pci_hba_data *d, u16 addr) \
 { \
@@ -259,11 +254,11 @@ static u##size dino_in##size (struct pci_hba_data *d, u16 addr) \
 	unsigned long flags; \
 	spin_lock_irqsave(&(DINO_DEV(d)->dinosaur_pen), flags); \
 	/* tell HW which IO Port address */ \
-	gsc_writel((u32) addr, d->base_addr + DINO_PCI_ADDR); \
+	__raw_writel((u32) addr, d->base_addr + DINO_PCI_ADDR); \
 	/* generate I/O PORT read cycle */ \
-	v = gsc_read##type(d->base_addr+DINO_IO_DATA+(addr&mask)); \
+	v = read##type(d->base_addr+DINO_IO_DATA+(addr&mask)); \
 	spin_unlock_irqrestore(&(DINO_DEV(d)->dinosaur_pen), flags); \
-	return le##size##_to_cpu(v); \
+	return v; \
 }
 
 DINO_PORT_IN(b,  8, 3)
@@ -276,9 +271,9 @@ static void dino_out##size (struct pci_hba_data *d, u16 addr, u##size val) \
 	unsigned long flags; \
 	spin_lock_irqsave(&(DINO_DEV(d)->dinosaur_pen), flags); \
 	/* tell HW which IO port address */ \
-	gsc_writel((u32) addr, d->base_addr + DINO_PCI_ADDR); \
+	__raw_writel((u32) addr, d->base_addr + DINO_PCI_ADDR); \
 	/* generate cfg write cycle */ \
-	gsc_write##type(cpu_to_le##size(val), d->base_addr+DINO_IO_DATA+(addr&mask)); \
+	write##type(val, d->base_addr+DINO_IO_DATA+(addr&mask)); \
 	spin_unlock_irqrestore(&(DINO_DEV(d)->dinosaur_pen), flags); \
 }
 
@@ -451,7 +446,7 @@ dino_bios_init(void)
  */
 #define _8MB 0x00800000UL
 static void __init
-dino_card_setup(struct pci_bus *bus, unsigned long base_addr)
+dino_card_setup(struct pci_bus *bus, void __iomem *base_addr)
 {
 	int i;
 	struct dino_device *dino_dev = DINO_DEV(parisc_walk_tree(bus->bridge));
@@ -461,7 +456,8 @@ dino_card_setup(struct pci_bus *bus, unsigned long base_addr)
 
 	res = &dino_dev->hba.lmmio_space;
 	res->flags = IORESOURCE_MEM;
-	size = scnprintf(name, sizeof(name), "Dino LMMIO (%s)", bus->bridge->bus_id);
+	size = scnprintf(name, sizeof(name), "Dino LMMIO (%s)", 
+			 bus->bridge->bus_id);
 	res->name = kmalloc(size+1, GFP_KERNEL);
 	if(res->name)
 		strcpy((char *)res->name, name);
@@ -496,7 +492,7 @@ dino_card_setup(struct pci_bus *bus, unsigned long base_addr)
 	}
 	DBG("DINO GSC WRITE i=%d, start=%lx, dino addr = %lx\n",
 	    i, res->start, base_addr + DINO_IO_ADDR_EN);
-	gsc_writel(1 << i, base_addr + DINO_IO_ADDR_EN);
+	__raw_writel(1 << i, base_addr + DINO_IO_ADDR_EN);
 }
 
 static void __init
@@ -517,7 +513,8 @@ dino_card_fixup(struct pci_dev *dev)
 	** Set Latency Timer to 0xff (not a shared bus)
 	** Set CACHELINE_SIZE.
 	*/
-	dino_cfg_write(dev->bus, dev->devfn, PCI_CACHE_LINE_SIZE, 2, 0xff00 | L1_CACHE_BYTES/4); 
+	dino_cfg_write(dev->bus, dev->devfn, 
+		       PCI_CACHE_LINE_SIZE, 2, 0xff00 | L1_CACHE_BYTES/4); 
 
 	/*
 	** Program INT_LINE for card-mode devices.
@@ -549,8 +546,9 @@ dino_fixup_bus(struct pci_bus *bus)
         struct dino_device *dino_dev = DINO_DEV(parisc_walk_tree(bus->bridge));
 	int port_base = HBA_PORT_BASE(dino_dev->hba.hba_num);
 
-	DBG(KERN_WARNING "%s(0x%p) bus %d sysdata 0x%p\n",
-			__FUNCTION__, bus, bus->secondary, bus->bridge->platform_data);
+	DBG(KERN_WARNING "%s(0x%p) bus %d platform_data 0x%p\n",
+	    __FUNCTION__, bus, bus->secondary, 
+	    bus->bridge->platform_data);
 
 	/* Firmware doesn't set up card-mode dino, so we have to */
 	if (is_card_dino(&dino_dev->hba.dev->id)) {
@@ -575,7 +573,8 @@ dino_fixup_bus(struct pci_bus *bus)
 
 
 		for(i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
-			if((bus->self->resource[i].flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
+			if((bus->self->resource[i].flags & 
+			    (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
 				continue;
 			
 			if(bus->self->resource[i].flags & IORESOURCE_MEM) {
@@ -686,9 +685,9 @@ dino_card_init(struct dino_device *dino_dev)
 {
 	u32 brdg_feat = 0x00784e05;
 
-	gsc_writel(0x00000000, dino_dev->hba.base_addr+DINO_GMASK);
-	gsc_writel(0x00000001, dino_dev->hba.base_addr+DINO_IO_FBB_EN);
-	gsc_writel(0x00000000, dino_dev->hba.base_addr+DINO_ICR);
+	__raw_writel(0x00000000, dino_dev->hba.base_addr+DINO_GMASK);
+	__raw_writel(0x00000001, dino_dev->hba.base_addr+DINO_IO_FBB_EN);
+	__raw_writel(0x00000000, dino_dev->hba.base_addr+DINO_ICR);
 
 #if 1
 /* REVISIT - should be a runtime check (eg if (CPU_IS_PCX_L) ...) */
@@ -698,34 +697,34 @@ dino_card_init(struct dino_device *dino_dev)
 	*/
 	brdg_feat &= ~0x4;	/* UXQL */
 #endif
-	gsc_writel( brdg_feat, dino_dev->hba.base_addr+DINO_BRDG_FEAT);
+	__raw_writel( brdg_feat, dino_dev->hba.base_addr+DINO_BRDG_FEAT);
 
 	/*
 	** Don't enable address decoding until we know which I/O range
 	** currently is available from the host. Only affects MMIO
 	** and not I/O port space.
 	*/
-	gsc_writel(0x00000000, dino_dev->hba.base_addr+DINO_IO_ADDR_EN);
+	__raw_writel(0x00000000, dino_dev->hba.base_addr+DINO_IO_ADDR_EN);
 
-	gsc_writel(0x00000000, dino_dev->hba.base_addr+DINO_DAMODE);
-	gsc_writel(0x00222222, dino_dev->hba.base_addr+DINO_PCIROR);
-	gsc_writel(0x00222222, dino_dev->hba.base_addr+DINO_PCIWOR);
+	__raw_writel(0x00000000, dino_dev->hba.base_addr+DINO_DAMODE);
+	__raw_writel(0x00222222, dino_dev->hba.base_addr+DINO_PCIROR);
+	__raw_writel(0x00222222, dino_dev->hba.base_addr+DINO_PCIWOR);
 
-	gsc_writel(0x00000040, dino_dev->hba.base_addr+DINO_MLTIM);
-	gsc_writel(0x00000080, dino_dev->hba.base_addr+DINO_IO_CONTROL);
-	gsc_writel(0x0000008c, dino_dev->hba.base_addr+DINO_TLTIM);
+	__raw_writel(0x00000040, dino_dev->hba.base_addr+DINO_MLTIM);
+	__raw_writel(0x00000080, dino_dev->hba.base_addr+DINO_IO_CONTROL);
+	__raw_writel(0x0000008c, dino_dev->hba.base_addr+DINO_TLTIM);
 
 	/* Disable PAMR before writing PAPR */
-	gsc_writel(0x0000007e, dino_dev->hba.base_addr+DINO_PAMR);
-	gsc_writel(0x0000007f, dino_dev->hba.base_addr+DINO_PAPR);
-	gsc_writel(0x00000000, dino_dev->hba.base_addr+DINO_PAMR);
+	__raw_writel(0x0000007e, dino_dev->hba.base_addr+DINO_PAMR);
+	__raw_writel(0x0000007f, dino_dev->hba.base_addr+DINO_PAPR);
+	__raw_writel(0x00000000, dino_dev->hba.base_addr+DINO_PAMR);
 
 	/*
 	** Dino ERS encourages enabling FBB (0x6f).
 	** We can't until we know *all* devices below us can support it.
 	** (Something in device configuration header tells us).
 	*/
-	gsc_writel(0x0000004f, dino_dev->hba.base_addr+DINO_PCICMD);
+	__raw_writel(0x0000004f, dino_dev->hba.base_addr+DINO_PCICMD);
 
 	/* Somewhere, the PCI spec says give devices 1 second
 	** to recover from the #RESET being de-asserted.
@@ -746,7 +745,7 @@ dino_bridge_init(struct dino_device *dino_dev, const char *name)
 	 * since PDC has already initialized this.
 	 */
 
-	io_addr = gsc_readl(dino_dev->hba.base_addr + DINO_IO_ADDR_EN);
+	io_addr = __raw_readl(dino_dev->hba.base_addr + DINO_IO_ADDR_EN);
 	if (io_addr == 0) {
 		printk(KERN_WARNING "%s: No PCI devices enabled.\n", name);
 		return -ENODEV;
@@ -871,8 +870,9 @@ static int __init dino_common_init(struct parisc_device *dev,
 	res->end = res->start + (HBA_PORT_SPACE_SIZE - 1);
 	res->flags = IORESOURCE_IO; /* do not mark it busy ! */
 	if (request_resource(&ioport_resource, res) < 0) {
-		printk(KERN_ERR "%s: request I/O Port region failed 0x%lx/%lx (hpa 0x%lx)\n",
-				name, res->start, res->end, dino_dev->hba.base_addr);
+		printk(KERN_ERR "%s: request I/O Port region failed "
+		       "0x%lx/%lx (hpa 0x%p)\n",
+		       name, res->start, res->end, dino_dev->hba.base_addr);
 		return 1;
 	}
 
@@ -908,20 +908,11 @@ dino_driver_callback(struct parisc_device *dev)
 {
 	struct dino_device *dino_dev;	// Dino specific control struct
 	const char *version = "unknown";
-	const int name_len = 32;
-	char hw_path[64];
 	char *name;
 	int is_cujo = 0;
 	struct pci_bus *bus;
 	
-	name = kmalloc(name_len, GFP_KERNEL);
-	if(name) {
-		print_pa_hwpath(dev, hw_path);
-		snprintf(name, name_len, "Dino [%s]", hw_path);
-	} 
-	else
-		name = "Dino";
-
+	name = "Dino";
 	if (is_card_dino(&dev->id)) {
 		version = "3.x (card mode)";
 	} else {
@@ -980,9 +971,9 @@ dino_driver_callback(struct parisc_device *dev)
 	memset(dino_dev, 0, sizeof(struct dino_device));
 
 	dino_dev->hba.dev = dev;
-	dino_dev->hba.base_addr = dev->hpa;  /* faster access */
+	dino_dev->hba.base_addr = ioremap(dev->hpa, 4096); /* faster access */
 	dino_dev->hba.lmmio_space_offset = 0;	/* CPU addrs == bus addrs */
-	dino_dev->dinosaur_pen = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dino_dev->dinosaur_pen);
 	dino_dev->hba.iommu = ccio_get_iommu(dev);
 
 	if (is_card_dino(&dev->id)) {
