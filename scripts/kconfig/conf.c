@@ -342,6 +342,8 @@ static int conf_choice(struct menu *menu)
 		case ask_new:
 		case ask_silent:
 		case ask_all:
+			if (is_new)
+				sym->flags |= SYMBOL_NEW;
 			conf_askvalue(sym, menu_get_prompt(def_menu));
 			strip(line);
 			break;

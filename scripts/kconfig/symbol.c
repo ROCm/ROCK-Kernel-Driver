@@ -204,7 +204,8 @@ void sym_calc_value(struct symbol *sym)
 					sym_calc_value(prop->def);
 					newval = prop->def->curr;
 				}
-			}
+			} else
+				S_TRI(newval) = S_TRI(sym->def);
 		} else
 			newval = sym->def;
 
