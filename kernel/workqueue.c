@@ -334,6 +334,7 @@ struct workqueue_struct *__create_workqueue(const char *name,
 				destroy = 1;
 		}
 	}
+	unlock_cpu_hotplug();
 
 	/*
 	 * Was there any error during startup? If yes then clean up:
@@ -342,7 +343,6 @@ struct workqueue_struct *__create_workqueue(const char *name,
 		destroy_workqueue(wq);
 		wq = NULL;
 	}
-	unlock_cpu_hotplug();
 	return wq;
 }
 
