@@ -30,6 +30,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/pci.h>
@@ -47,11 +48,7 @@ struct slot {
 
 static LIST_HEAD(slot_list);
 
-#if !defined(CONFIG_HOTPLUG_PCI_SKELETON_MODULE)
-	#define MY_NAME	"pcihp_skeleton"
-#else
-	#define MY_NAME	THIS_MODULE->name
-#endif
+#define MY_NAME	"pcihp_skeleton"
 
 #define dbg(format, arg...)					\
 	do {							\
@@ -76,7 +73,7 @@ static int num_slots;
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug, "i");
+module_param(debug, bool, 644);
 MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
 
 static int enable_slot		(struct hotplug_slot *slot);
