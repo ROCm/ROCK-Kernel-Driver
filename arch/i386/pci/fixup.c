@@ -23,9 +23,9 @@ static void __devinit pci_fixup_i450nx(struct pci_dev *d)
 		pci_read_config_byte(d, reg++, &subb);
 		DBG("i450NX PXB %d: %02x/%02x/%02x\n", pxb, busno, suba, subb);
 		if (busno)
-			pci_scan_bus(busno, pci_root_ops, NULL);	/* Bus A */
+			pci_scan_bus(busno, &pci_root_ops, NULL);	/* Bus A */
 		if (suba < subb)
-			pci_scan_bus(suba+1, pci_root_ops, NULL);	/* Bus B */
+			pci_scan_bus(suba+1, &pci_root_ops, NULL);	/* Bus B */
 	}
 	pcibios_last_bus = -1;
 }
@@ -39,7 +39,7 @@ static void __devinit pci_fixup_i450gx(struct pci_dev *d)
 	u8 busno;
 	pci_read_config_byte(d, 0x4a, &busno);
 	printk(KERN_INFO "PCI: i440KX/GX host bridge %s: secondary bus %02x\n", d->slot_name, busno);
-	pci_scan_bus(busno, pci_root_ops, NULL);
+	pci_scan_bus(busno, &pci_root_ops, NULL);
 	pcibios_last_bus = -1;
 }
 

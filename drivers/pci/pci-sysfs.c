@@ -18,12 +18,6 @@
 
 #include "pci.h"
 
-#if BITS_PER_LONG == 32
-#define LONG_FORMAT "\t%08lx"
-#else
-#define LONG_FORMAT "\t%16lx"
-#endif
-
 /* show configuration fields */
 #define pci_config_attr(field, format_string)				\
 static ssize_t								\
@@ -36,11 +30,11 @@ show_##field (struct device *dev, char *buf)				\
 }									\
 static DEVICE_ATTR(field, S_IRUGO, show_##field, NULL);
 
-pci_config_attr(vendor, "%04x\n");
-pci_config_attr(device, "%04x\n");
-pci_config_attr(subsystem_vendor, "%04x\n");
-pci_config_attr(subsystem_device, "%04x\n");
-pci_config_attr(class, "%06x\n");
+pci_config_attr(vendor, "0x%04x\n");
+pci_config_attr(device, "0x%04x\n");
+pci_config_attr(subsystem_vendor, "0x%04x\n");
+pci_config_attr(subsystem_device, "0x%04x\n");
+pci_config_attr(class, "0x%06x\n");
 pci_config_attr(irq, "%u\n");
 
 /* show resources */
@@ -50,9 +44,13 @@ pci_show_resources(struct device * dev, char * buf)
 	struct pci_dev * pci_dev = to_pci_dev(dev);
 	char * str = buf;
 	int i;
+	int max = 7;
 
-	for (i = 0; i < DEVICE_COUNT_RESOURCE && pci_resource_start(pci_dev,i); i++) {
-		str += sprintf(str,LONG_FORMAT LONG_FORMAT LONG_FORMAT "\n",
+	if (pci_dev->subordinate)
+		max = DEVICE_COUNT_RESOURCE;
+
+	for (i = 0; i < max; i++) {
+		str += sprintf(str,"0x%016lx 0x%016lx 0x%016lx\n",
 			       pci_resource_start(pci_dev,i),
 			       pci_resource_end(pci_dev,i),
 			       pci_resource_flags(pci_dev,i));

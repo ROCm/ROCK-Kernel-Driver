@@ -486,6 +486,13 @@ struct pci_ops {
 	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
 };
 
+struct pci_raw_ops {
+	int (*read)(int dom, int bus, int dev, int func, int reg, int len, u32 *val);
+	int (*write)(int dom, int bus, int dev, int func, int reg, int len, u32 val);
+};
+
+extern struct pci_raw_ops *raw_pci_ops;
+
 struct pci_bus_region {
 	unsigned long start;
 	unsigned long end;
@@ -549,8 +556,8 @@ char *pci_class_name(u32 class);
 void pci_read_bridge_bases(struct pci_bus *child);
 struct resource *pci_find_parent_resource(const struct pci_dev *dev, struct resource *res);
 int pci_get_interrupt_pin(struct pci_dev *dev, struct pci_dev **bridge);
-extern struct pci_dev *pci_get_dev(struct pci_dev *dev);
-extern void pci_put_dev(struct pci_dev *dev);
+extern struct pci_dev *pci_dev_get(struct pci_dev *dev);
+extern void pci_dev_put(struct pci_dev *dev);
 
 extern void pci_remove_bus_device(struct pci_dev *dev);
 
@@ -566,6 +573,10 @@ struct pci_dev *pci_find_slot (unsigned int bus, unsigned int devfn);
 int pci_find_capability (struct pci_dev *dev, int cap);
 struct pci_bus * pci_find_next_bus(const struct pci_bus *from);
 
+struct pci_dev *pci_get_device (unsigned int vendor, unsigned int device, struct pci_dev *from);
+struct pci_dev *pci_get_subsys (unsigned int vendor, unsigned int device,
+				unsigned int ss_vendor, unsigned int ss_device,
+				struct pci_dev *from);
 int pci_bus_read_config_byte (struct pci_bus *bus, unsigned int devfn, int where, u8 *val);
 int pci_bus_read_config_word (struct pci_bus *bus, unsigned int devfn, int where, u16 *val);
 int pci_bus_read_config_dword (struct pci_bus *bus, unsigned int devfn, int where, u32 *val);
@@ -688,6 +699,13 @@ static inline struct pci_dev *pci_find_subsys(unsigned int vendor, unsigned int 
 unsigned int ss_vendor, unsigned int ss_device, const struct pci_dev *from)
 { return NULL; }
 
+static inline struct pci_dev *pci_get_device (unsigned int vendor, unsigned int device, struct pci_dev *from)
+{ return NULL; }
+
+static inline struct pci_dev *pci_get_subsys (unsigned int vendor, unsigned int device,
+unsigned int ss_vendor, unsigned int ss_device, struct pci_dev *from)
+{ return NULL; }
+
 static inline void pci_set_master(struct pci_dev *dev) { }
 static inline int pci_enable_device(struct pci_dev *dev) { return -EIO; }
 static inline void pci_disable_device(struct pci_dev *dev) { }
@@ -742,6 +760,15 @@ static inline int pci_module_init(struct pci_driver *drv)
 	
 	return rc;
 }
+
+/*
+ * PCI domain support.  Sometimes called PCI segment (eg by ACPI),
+ * a PCI domain is defined to be a set of PCI busses which share
+ * configuration space.
+ */
+#ifndef CONFIG_PCI_DOMAINS
+static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+#endif
 
 #endif /* !CONFIG_PCI */
 
@@ -799,16 +826,6 @@ extern int pci_pci_problems;
 #define PCIPCI_VIAETBF		8
 #define PCIPCI_VSFX		16
 #define PCIPCI_ALIMAGIK		32
-
-/*
- * PCI domain support.  Sometimes called PCI segment (eg by ACPI),
- * a PCI domain is defined to be a set of PCI busses which share
- * configuration space.
- */
-
-#ifndef CONFIG_PCI_DOMAINS
-static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
-#endif
 
 #endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */
