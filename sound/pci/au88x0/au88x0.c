@@ -170,9 +170,8 @@ snd_vortex_create(snd_card_t * card, struct pci_dev *pci, vortex_t ** rchip)
 	if ((err = pci_request_regions(pci, CARD_NAME_SHORT)) != 0)
 		goto regions_out;
 
-	chip->mmio =
-	    ioremap_nocache(pci_resource_start(pci, 0),
-			    pci_resource_len(pci, 0));
+	chip->mmio = ioremap_nocache(pci_resource_start(pci, 0),
+	                             pci_resource_len(pci, 0));
 	if (!chip->mmio) {
 		printk(KERN_ERR "MMIO area remap failed.\n");
 		err = -ENOMEM;
@@ -187,10 +186,9 @@ snd_vortex_create(snd_card_t * card, struct pci_dev *pci, vortex_t ** rchip)
 		goto core_out;
 	}
 
-	if ((err =
-	     request_irq(pci->irq, vortex_interrupt,
-			 SA_INTERRUPT | SA_SHIRQ, CARD_NAME_SHORT,
-			 (void *)chip)) != 0) {
+	if ((err = request_irq(pci->irq, vortex_interrupt,
+	                       SA_INTERRUPT | SA_SHIRQ, CARD_NAME_SHORT,
+	                       chip)) != 0) {
 		printk(KERN_ERR "cannot grab irq\n");
 		goto irq_out;
 	}
@@ -214,7 +212,6 @@ snd_vortex_create(snd_card_t * card, struct pci_dev *pci, vortex_t ** rchip)
       irq_out:
 	vortex_core_shutdown(chip);
       core_out:
-	//FIXME: the type of chip->mmio might need to be changed??
 	iounmap(chip->mmio);
       ioremap_out:
 	pci_release_regions(chip->pci_dev);
