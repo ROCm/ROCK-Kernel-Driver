@@ -144,7 +144,7 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 	if (!error) {
 		unsigned long dn_mask = setattr_mask(ia_valid);
 		if (dn_mask)
-			inode_dir_notify(dentry->d_parent->d_inode, dn_mask);
+			dnotify_parent(dentry, dn_mask);
 	}
 	return error;
 }

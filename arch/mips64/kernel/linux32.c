@@ -1000,7 +1000,7 @@ asmlinkage ssize_t sys32_pread(unsigned int fd, char * buf,
 		goto out;
 	ret = read(file, buf, count, &pos);
 	if (ret > 0)
-		inode_dir_notify(file->f_dentry->d_parent->d_inode, DN_ACCESS);
+		dnotify_parent(file->f_dentry, DN_ACCESS);
 out:
 	fput(file);
 bad_file:
@@ -1032,7 +1032,7 @@ asmlinkage ssize_t sys32_pwrite(unsigned int fd, const char * buf,
 
 	ret = write(file, buf, count, &pos);
 	if (ret > 0)
-		inode_dir_notify(file->f_dentry->d_parent->d_inode, DN_MODIFY);
+		dnotify_parent(file->f_dentry, DN_MODIFY);
 out:
 	fput(file);
 bad_file:
