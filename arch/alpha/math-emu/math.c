@@ -171,7 +171,7 @@ alpha_fp_emul (unsigned long pc)
 					_FP_FRAC_SET_1(DB, _FP_ZEROFRAC_1);
 			}
 			FP_CMP_D(res, DA, DB, 3);
-			vc = 0x4000000000000000;
+			vc = 0x4000000000000000UL;
 			/* CMPTEQ, CMPTUN don't trap on QNaN,
 			   while CMPTLT and CMPTLE do */
 			if (res == 3

@@ -152,9 +152,9 @@ switch_to_system_map(void)
 
 	/* Set the vptb.  This is often done by the bootloader, but 
 	   shouldn't be required.  */
-	if (hwrpb->vptb != 0xfffffffe00000000) {
-		wrvptptr(0xfffffffe00000000);
-		hwrpb->vptb = 0xfffffffe00000000;
+	if (hwrpb->vptb != 0xfffffffe00000000UL) {
+		wrvptptr(0xfffffffe00000000UL);
+		hwrpb->vptb = 0xfffffffe00000000UL;
 		hwrpb_update_checksum(hwrpb);
 	}
 
@@ -301,8 +301,8 @@ srm_paging_stop (void)
 	/* Move the vptb back to where the SRM console expects it.  */
 	swapper_pg_dir[1] = swapper_pg_dir[1023];
 	tbia();
-	wrvptptr(0x200000000);
-	hwrpb->vptb = 0x200000000;
+	wrvptptr(0x200000000UL);
+	hwrpb->vptb = 0x200000000UL;
 	hwrpb_update_checksum(hwrpb);
 
 	/* Reload the page tables that the console had in use.  */
