@@ -1,10 +1,44 @@
 IBM ServeRAID driver Change Log
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+        5.00.01  - Sarasota ( 5i ) adapters must always be scanned first  
+                 - Get rid on IOCTL_NEW_COMMAND code  
+                 - Add Extended DCDB Commands for Tape Support in 5I                  
+        
+        4.90.11  - Don't actually RESET unless it's physically required
+                 - Remove unused compile options
+        
+        4.90.08  - Data Corruption if First Scatter Gather Element is > 64K
+        
+        4.90.08  - Increase Delays in Flashing ( Trombone Only - 4H )        
+        
+        4.90.05  - Use New PCI Architecture to facilitate Hot Plug Development
+        
+        4.90.01  - Add ServeRAID Version Checking
+
+        4.80.26  - Clean up potential code problems ( Arjan's recommendations )
+        
+        4.80.21  - Change memcpy() to copy_to_user() in NVRAM Page 5 IOCTL path   
+        
+        4.80.20  - Set max_sectors in Scsi_Host structure ( if >= 2.4.7 kernel )
+                 - 5 second delay needed after resetting an i960 adapter
+        
+        4.80.14  - Take all semaphores off stack                    
+                 - Clean Up New_IOCTL path
+                   
+        4.80.04  - Eliminate calls to strtok() if 2.4.x or greater 
+                 - Adjustments to Device Queue Depth               
+
+        4.80.00  - Make ia64 Safe    
+        
+        4.72.01  - I/O Mapped Memory release ( so "insmod ips" does not Fail )    
+                 - Don't Issue Internal FFDC Command if there are Active Commands 
+                 - Close Window for getting too many IOCTL's active 
+                   
         4.72.00  - Allow for a Scatter-Gather Element to exceed MAX_XFER Size     
         
         4.71.00  - Change all memory allocations to not use GFP_DMA flag 
-                   Code Clean-Up for 2.4.x kernel      
+                 - Code Clean-Up for 2.4.x kernel      
         
         4.70.15  - Fix Breakup for very large ( non-SG ) requests
         
@@ -86,4 +120,3 @@ IBM ServeRAID driver Change Log
                 - Fixed read/write errors when the adapter is using an
                   8K stripe size.
 
-
