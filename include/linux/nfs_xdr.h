@@ -180,6 +180,7 @@ struct nfs_readres {
 
 struct nfs_writeargs {
 	struct nfs_fh *		fh;
+	nfs4_stateid		stateid;
 	__u64			offset;
 	__u32			count;
 	enum nfs3_stable_how	stable;

@@ -837,10 +837,7 @@ encode_write(struct xdr_stream *xdr, struct nfs_writeargs *args)
 
 	RESERVE_SPACE(36);
 	WRITE32(OP_WRITE);
-	WRITE32(0xffffffff);     /* magic stateid -1 */
-	WRITE32(0xffffffff);
-	WRITE32(0xffffffff);
-	WRITE32(0xffffffff);
+	WRITEMEM(args->stateid, sizeof(nfs4_stateid));
 	WRITE64(args->offset);
 	WRITE32(args->stable);
 	WRITE32(args->count);

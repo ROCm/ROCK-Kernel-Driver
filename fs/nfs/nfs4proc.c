@@ -55,7 +55,8 @@ extern u32 *nfs4_decode_dirent(u32 *p, struct nfs_entry *entry, int plus);
 extern struct rpc_procinfo nfs4_procedures[];
 
 static nfs4_stateid zero_stateid =
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
 static spinlock_t renew_lock = SPIN_LOCK_UNLOCKED;
 
 static void
@@ -1067,6 +1068,7 @@ nfs4_proc_write(struct inode *inode, struct rpc_cred *cred,
 		struct page *page, struct nfs_writeverf *verf)
 {
 	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs4_shareowner	*sp;
 	uint64_t offset = page_offset(page) + base;
 	struct nfs_writeargs arg = {
 		.fh		= NFS_FH(inode),
@@ -1090,6 +1092,19 @@ nfs4_proc_write(struct inode *inode, struct rpc_cred *cred,
 	int			rpcflags = (flags & NFS_RW_SWAP) ? NFS_RPC_SWAPFLAGS : 0;
 
 	dprintk("NFS call  write %d @ %Ld\n", count, (long long)offset);
+
+	/*
+	* Try first to use O_WRONLY, then O_RDWR stateid.
+	*/
+	sp = nfs4_get_inode_share(inode, O_WRONLY);
+	if (!sp)
+		sp = nfs4_get_inode_share(inode, O_RDWR);
+
+	if (sp)
+		memcpy(arg.stateid,sp->so_stateid, sizeof(nfs4_stateid));
+	else
+		memcpy(arg.stateid, zero_stateid, sizeof(nfs4_stateid));
+
 	fattr->valid = 0;
 	return rpc_call_sync(server->client, &msg, rpcflags);
 }
@@ -1531,6 +1546,7 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	};
 	struct inode *inode = data->inode;
 	struct nfs_page *req = nfs_list_entry(data->pages.next);
+	struct nfs4_shareowner	*sp;
 	int stable;
 	int flags;
 	
@@ -1552,6 +1568,20 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	data->res.count   = count;
 	data->res.verf    = &data->verf;
 	data->timestamp   = jiffies;
+
+	if(req->wb_file) {
+		unsigned int oflags = req->wb_file->f_flags;
+		sp = nfs4_get_inode_share(inode, oflags);
+	} else {
+		sp = nfs4_get_inode_share(inode, O_WRONLY);
+		if (!sp)
+			sp = nfs4_get_inode_share(inode, O_RDWR);
+	}
+
+	if (sp)
+		memcpy(data->args.stateid,sp->so_stateid, sizeof(nfs4_stateid));
+	else
+		memcpy(data->args.stateid, zero_stateid, sizeof(nfs4_stateid));
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
