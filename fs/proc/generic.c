@@ -319,7 +319,7 @@ int proc_readdir(struct file * filp,
 			/* fall through */
 		case 1:
 			if (filldir(dirent, "..", 2, i,
-				    filp->f_dentry->d_parent->d_inode->i_ino,
+				    parent_ino(filp->f_dentry),
 				    DT_DIR) < 0)
 				return 0;
 			i++;

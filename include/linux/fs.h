@@ -1508,6 +1508,15 @@ extern int generic_osync_inode(struct inode *, int);
 extern int inode_change_ok(struct inode *, struct iattr *);
 extern int inode_setattr(struct inode *, struct iattr *);
 
+static inline ino_t parent_ino(struct dentry *dentry)
+{
+	ino_t res;
+	spin_lock(&dcache_lock);
+	res = dentry->d_parent->d_inode->i_ino;
+	spin_unlock(&dcache_lock);
+	return res;
+}
+
 #endif /* __KERNEL__ */
 
 #endif /* _LINUX_FS_H */

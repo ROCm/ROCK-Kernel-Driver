@@ -531,7 +531,7 @@ ParseLong:
 	if (!memcmp(de->name,MSDOS_DOT,11))
 		inum = inode->i_ino;
 	else if (!memcmp(de->name,MSDOS_DOTDOT,11)) {
-		inum = filp->f_dentry->d_parent->d_inode->i_ino;
+		inum = parent_ino(filp->f_dentry);
 	} else {
 		struct inode *tmp = fat_iget(sb, ino);
 		if (tmp) {

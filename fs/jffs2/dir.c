@@ -157,8 +157,8 @@ static int jffs2_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		offset++;
 	}
 	if (offset == 1) {
-		D1(printk(KERN_DEBUG "Dirent 1: \"..\", ino #%lu\n", filp->f_dentry->d_parent->d_inode->i_ino));
-		if (filldir(dirent, "..", 2, 1, filp->f_dentry->d_parent->d_inode->i_ino, DT_DIR) < 0)
+		D1(printk(KERN_DEBUG "Dirent 1: \"..\", ino #%lu\n", parent_ino(filp->f_dentry)));
+		if (filldir(dirent, "..", 2, 1, parent_ino(filp->f_dentry), DT_DIR) < 0)
 			goto out;
 		offset++;
 	}

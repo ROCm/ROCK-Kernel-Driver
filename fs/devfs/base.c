@@ -2678,7 +2678,7 @@ static int devfs_readdir (struct file *file, void *dirent, filldir_t filldir)
       case 0:
 	scan_dir_for_removable (parent);
 	err = (*filldir) (dirent, "..", 2, file->f_pos,
-			  file->f_dentry->d_parent->d_inode->i_ino, DT_DIR);
+			  parent_ino(file->f_dentry), DT_DIR);
 	if (err == -EINVAL) break;
 	if (err < 0) return err;
 	file->f_pos++;

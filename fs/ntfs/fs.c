@@ -276,10 +276,9 @@ static int ntfs_readdir(struct file* filp, void *dirent, filldir_t filldir)
 			ntfs_debug(DEBUG_OTHER, __FUNCTION__ "(): Calling "
 				    "filldir for .. with len 2, f_pos 0x%Lx, "
 				    "inode %lu, DT_DIR.\n", filp->f_pos,
-				    filp->f_dentry->d_parent->d_inode->i_ino);
+				    parent_ino(filp->f_dentry));
 			cb.ret_code = filldir(dirent, "..", 2, filp->f_pos,
-				    filp->f_dentry->d_parent->d_inode->i_ino,
-				    DT_DIR);
+				    parent_ino(filp->f_dentry), DT_DIR);
 			if (cb.ret_code)
 				goto done;
 			cb.pl++;

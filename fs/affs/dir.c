@@ -79,7 +79,7 @@ affs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		stored++;
 	}
 	if (f_pos == 1) {
-		if (filldir(dirent, "..", 2, f_pos, filp->f_dentry->d_parent->d_inode->i_ino, DT_DIR) < 0)
+		if (filldir(dirent, "..", 2, f_pos, parent_ino(filp->f_dentry), DT_DIR) < 0)
 			return stored;
 		filp->f_pos = f_pos = 2;
 		stored++;
