@@ -57,11 +57,7 @@ void init_new_thread_signals(int altstack)
 {
 	int flags = altstack ? SA_ONSTACK : 0;
 
-	/* NODEFER is set here because SEGV isn't turned back on when the
-	 * handler is ready to receive signals.  This causes any segfault
-	 * during a copy_user to kill the process because the fault is blocked.
-	 */
-	set_handler(SIGSEGV, (__sighandler_t) sig_handler, flags | SA_NODEFER,
+	set_handler(SIGSEGV, (__sighandler_t) sig_handler, flags,
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGTRAP, (__sighandler_t) sig_handler, flags, 
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);

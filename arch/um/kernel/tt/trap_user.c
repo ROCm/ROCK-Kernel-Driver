@@ -23,6 +23,13 @@ void sig_handler_common_tt(int sig, void *sc_ptr)
 
 	unprotect_kernel_mem();
 
+	/* This is done because to allow SIGSEGV to be delivered inside a SEGV
+	 * handler.  This can happen in copy_user, and if SEGV is disabled,
+	 * the process will die.
+	 */
+	if(sig == SIGSEGV)
+		change_sig(SIGSEGV, 1);
+
 	r = &TASK_REGS(get_current())->tt;
 	save_regs = *r;
 	is_user = user_context(SC_SP(sc));
