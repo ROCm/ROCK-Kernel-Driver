@@ -45,9 +45,6 @@
 #ifndef ZEXPORTVA
 #  define ZEXPORTVA
 #endif
-#ifndef ZEXTERN
-#  define ZEXTERN extern
-#endif
 
 typedef unsigned char  Byte;  /* 8 bits */
 typedef unsigned int   uInt;  /* 16 bits or more */

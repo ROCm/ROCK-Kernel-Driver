@@ -1252,7 +1252,7 @@ local block_state deflate_slow(s, flush)
     return flush == Z_FINISH ? finish_done : block_done;
 }
 
-ZEXTERN int ZEXPORT zlib_deflate_workspacesize ()
+extern int ZEXPORT zlib_deflate_workspacesize ()
 {
     return sizeof(deflate_workspace);
 }
