@@ -439,8 +439,6 @@ smp_boot_one_cpu(int cpuid)
 	if (IS_ERR(idle))
 		panic("failed fork for CPU %d", cpuid);
 
-	wake_up_forked_process(idle);
-
 	init_idle(idle, cpuid);
 	unhash_process(idle);
 

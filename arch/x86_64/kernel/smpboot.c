@@ -578,15 +578,12 @@ static void __init do_boot_cpu (int apicid)
 	idle = fork_by_hand();
 	if (IS_ERR(idle))
 		panic("failed fork for CPU %d", cpu);
-	wake_up_forked_process(idle);	
 	x86_cpu_to_apicid[cpu] = apicid;
 
-	/*
-	 * We remove it from the pidhash and the runqueue
-	 * once we got the process:
-	 */
+	/* Make this the idle thread */
 	init_idle(idle,cpu);
 
+	/* Remove it from the pidhash */
 	unhash_process(idle);
 
 	cpu_pda[cpu].pcurrent = idle;

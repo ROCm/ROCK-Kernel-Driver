@@ -574,9 +574,12 @@ static void __init smp_create_idle(unsigned int cpu)
 	if (IS_ERR(p))
 		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
 
-	wake_up_forked_process(p);
+	/* Make this the idle thread */
 	init_idle(p, cpu);
+
+	/* Remove it from the pidhash */
 	unhash_process(p);
+
 	current_set[cpu] = p;
 }
 

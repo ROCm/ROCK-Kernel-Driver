@@ -375,8 +375,6 @@ int __cpu_up(unsigned int cpu)
 	p = copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 	if (IS_ERR(p))
 		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
-	wake_up_forked_process(p);
-
 	init_idle(p, cpu);
 	unhash_process(p);
 

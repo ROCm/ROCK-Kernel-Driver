@@ -106,8 +106,6 @@ int __cpu_up(unsigned int cpu)
 	if (IS_ERR(tsk))
 		panic("Failed forking idle task for cpu %d\n", cpu);
 	
-	wake_up_forked_process(tsk);
-
 	init_idle(tsk, cpu);
 	unhash_process(tsk);
 	

@@ -1121,6 +1121,15 @@ unsigned long nr_iowait(void)
 	return sum;
 }
 
+enum idle_type
+{
+	IDLE,
+	NOT_IDLE,
+	NEWLY_IDLE,
+};
+
+#ifdef CONFIG_SMP
+
 /*
  * double_rq_lock - safely lock two runqueues
  *
@@ -1155,14 +1164,20 @@ static void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
 		spin_unlock(&rq2->lock);
 }
 
-enum idle_type
+/*
+ * double_lock_balance - lock the busiest runqueue, this_rq is locked already.
+ */
+static void double_lock_balance(runqueue_t *this_rq, runqueue_t *busiest)
 {
-	IDLE,
-	NOT_IDLE,
-	NEWLY_IDLE,
-};
-
-#ifdef CONFIG_SMP
+	if (unlikely(!spin_trylock(&busiest->lock))) {
+		if (busiest < this_rq) {
+			spin_unlock(&this_rq->lock);
+			spin_lock(&busiest->lock);
+			spin_lock(&this_rq->lock);
+		} else
+			spin_lock(&busiest->lock);
+	}
+}
 
 /*
  * find_idlest_cpu - find the least busy runqueue.
@@ -1355,21 +1370,6 @@ void sched_balance_exec(void)
 	}
 out:
 	put_cpu();
-}
-
-/*
- * double_lock_balance - lock the busiest runqueue, this_rq is locked already.
- */
-static void double_lock_balance(runqueue_t *this_rq, runqueue_t *busiest)
-{
-	if (unlikely(!spin_trylock(&busiest->lock))) {
-		if (busiest < this_rq) {
-			spin_unlock(&this_rq->lock);
-			spin_lock(&busiest->lock);
-			spin_lock(&this_rq->lock);
-		} else
-			spin_lock(&busiest->lock);
-	}
 }
 
 /*
@@ -2208,6 +2208,15 @@ need_resched:
 	preempt_disable();
 	prev = current;
 	rq = this_rq();
+
+	/*
+	 * The idle thread is not allowed to schedule!
+	 * Remove this check after it has been exercised a bit.
+	 */
+	if (unlikely(current == rq->idle) && current->state != TASK_RUNNING) {
+		printk(KERN_ERR "bad: scheduling from the idle thread!\n");
+		dump_stack();
+	}
 
 	release_kernel_lock(prev);
 	now = sched_clock();
@@ -3268,21 +3277,20 @@ void show_state(void)
 
 void __devinit init_idle(task_t *idle, int cpu)
 {
-	runqueue_t *idle_rq = cpu_rq(cpu), *rq = cpu_rq(task_cpu(idle));
+	runqueue_t *rq = cpu_rq(cpu);
 	unsigned long flags;
 
-	local_irq_save(flags);
-	double_rq_lock(idle_rq, rq);
-
-	idle_rq->curr = idle_rq->idle = idle;
-	deactivate_task(idle, rq);
+	idle->sleep_avg = 0;
+	idle->interactive_credit = 0;
 	idle->array = NULL;
 	idle->prio = MAX_PRIO;
 	idle->state = TASK_RUNNING;
 	set_task_cpu(idle, cpu);
-	double_rq_unlock(idle_rq, rq);
+
+	spin_lock_irqsave(&rq->lock, flags);
+	rq->curr = rq->idle = idle;
 	set_tsk_need_resched(idle);
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&rq->lock, flags);
 
 	/* Set the preempt count _outside_ the spinlocks! */
 #ifdef CONFIG_PREEMPT
@@ -3959,15 +3967,6 @@ void __init sched_init(void)
 			__set_bit(MAX_PRIO, array->bitmap);
 		}
 	}
-	/*
-	 * We have to do a little magic to get the first
-	 * thread right in SMP mode.
-	 */
-	rq = this_rq();
-	rq->curr = current;
-	rq->idle = current;
-	set_task_cpu(current, smp_processor_id());
-	wake_up_forked_process(current);
 
 	/*
 	 * The boot idle thread does lazy MMU switching as well:

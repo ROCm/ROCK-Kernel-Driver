@@ -591,11 +591,12 @@ do_boot_cpu(__u8 cpu)
 	if(IS_ERR(idle))
 		panic("failed fork for CPU%d", cpu);
 
-	wake_up_forked_process(idle);
-
+	/* Make this the idle thread */
 	init_idle(idle, cpu);
 
 	idle->thread.eip = (unsigned long) start_secondary;
+
+	/* Remove it from the pidhash */
 	unhash_process(idle);
 	/* init_tasks (in sched.c) is indexed logically */
 	stack_start.esp = (void *) idle->thread.esp;

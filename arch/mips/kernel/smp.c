@@ -279,14 +279,10 @@ static int __init do_boot_cpu(int cpu)
 	if (IS_ERR(idle))
 		panic("failed fork for CPU %d\n", cpu);
 
-	wake_up_forked_process(idle);
-
-	/*
-	 * We remove it from the pidhash and the runqueue once we've
-	 * got the process:
-	 */
+	/* Make this the idle thread */
 	init_idle(idle, cpu);
 
+	/* Remove it from the pidhash */
 	unhash_process(idle);
 
 	prom_boot_secondary(cpu, idle);
