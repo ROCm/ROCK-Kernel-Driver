@@ -251,8 +251,12 @@ static void handle_write_error(struct address_space *mapping,
 				struct page *page, int error)
 {
 	lock_page(page);
-	if (page->mapping == mapping)
-		mapping->error = error;
+	if (page->mapping == mapping) {
+		if (error == -ENOSPC)
+			set_bit(AS_ENOSPC, &mapping->flags);
+		else
+			set_bit(AS_EIO, &mapping->flags);
+	}
 	unlock_page(page);
 }
 

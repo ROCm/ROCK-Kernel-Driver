@@ -579,7 +579,7 @@ void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 		buffer_io_error(bh);
 		printk(KERN_WARNING "lost page write due to I/O error on %s\n",
 		       bdevname(bh->b_bdev, b));
-		page->mapping->error = -EIO;
+		set_bit(AS_EIO, &page->mapping->flags);
 		clear_buffer_uptodate(bh);
 		SetPageError(page);
 	}
@@ -2815,7 +2815,7 @@ drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 	do {
 		check_ttfb_buffer(page, bh);
 		if (buffer_write_io_error(bh))
-			page->mapping->error = -EIO;
+			set_bit(AS_EIO, &page->mapping->flags);
 		if (buffer_busy(bh))
 			goto failed;
 		if (!buffer_uptodate(bh) && !buffer_req(bh))

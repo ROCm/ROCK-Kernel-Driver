@@ -205,11 +205,10 @@ restart:
 	spin_unlock(&mapping->page_lock);
 
 	/* Check for outstanding write errors */
-	if (mapping->error) {
-		if (!ret)
-			ret = mapping->error;
-		mapping->error = 0;
-	}
+	if (test_and_clear_bit(AS_ENOSPC, &mapping->flags))
+		ret = -ENOSPC;
+	if (test_and_clear_bit(AS_EIO, &mapping->flags))
+		ret = -EIO;
 
 	return ret;
 }
@@ -532,7 +531,7 @@ grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 		page_cache_release(page);
 		return NULL;
 	}
-	gfp_mask = mapping->gfp_mask & ~__GFP_FS;
+	gfp_mask = mapping_gfp_mask(mapping) & ~__GFP_FS;
 	page = alloc_pages(gfp_mask, 0);
 	if (page && add_to_page_cache_lru(page, mapping, index, gfp_mask)) {
 		page_cache_release(page);

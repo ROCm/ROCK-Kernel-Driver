@@ -43,6 +43,7 @@
 
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
+#include <linux/pagemap.h>
 
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
@@ -504,7 +505,7 @@ struct inode *diReadSpecial(struct super_block *sb, ino_t inum, int secondary)
 	}
 
 	ip->i_mapping->a_ops = &jfs_aops;
-	ip->i_mapping->gfp_mask = GFP_NOFS;
+	mapping_set_gfp_mask(ip->i_mapping, GFP_NOFS);
 
 	if ((inum == FILESYSTEM_I) && (JFS_IP(ip)->ipimap == sbi->ipaimap)) {
 		sbi->gengen = le32_to_cpu(dp->di_gengen);

@@ -21,6 +21,7 @@
 #include <linux/vfs.h>
 #include <asm/uaccess.h>
 #include <linux/fs.h>
+#include <linux/pagemap.h>
 
 int vfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
@@ -954,10 +955,10 @@ int filp_close(struct file *filp, fl_owner_t id)
 		retval = err;
 	}
 
-	err = mapping->error;
-	if (!retval)
-		retval = err;
-	mapping->error = 0;
+	if (test_and_clear_bit(AS_ENOSPC, &mapping->flags))
+		retval = -ENOSPC;
+	if (test_and_clear_bit(AS_EIO, &mapping->flags))
+		retval = -EIO;
 
 	if (!file_count(filp)) {
 		printk(KERN_ERR "VFS: Close: file count is 0\n");

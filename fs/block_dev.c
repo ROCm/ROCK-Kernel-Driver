@@ -320,7 +320,7 @@ struct block_device *bdget(dev_t dev)
 			inode->i_rdev = kdev;
 			inode->i_bdev = new_bdev;
 			inode->i_data.a_ops = &def_blk_aops;
-			inode->i_data.gfp_mask = GFP_USER;
+			mapping_set_gfp_mask(&inode->i_data, GFP_USER);
 			inode->i_data.backing_dev_info = &default_backing_dev_info;
 			spin_lock(&bdev_lock);
 			bdev = bdfind(dev, head);

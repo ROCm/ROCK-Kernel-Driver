@@ -566,8 +566,12 @@ confused:
 	/*
 	 * The caller has a ref on the inode, so *mapping is stable
 	 */
-	if (*ret < 0)
-		mapping->error = *ret;
+	if (*ret) {
+		if (*ret == -ENOSPC)
+			set_bit(AS_ENOSPC, &mapping->flags);
+		else
+			set_bit(AS_EIO, &mapping->flags);
+	}
 out:
 	return bio;
 }
@@ -669,8 +673,14 @@ mpage_writepages(struct address_space *mapping,
 					test_clear_page_dirty(page)) {
 			if (writepage) {
 				ret = (*writepage)(page, wbc);
-				if (ret < 0)
-					mapping->error = ret;
+				if (ret) {
+					if (ret == -ENOSPC)
+						set_bit(AS_ENOSPC,
+							&mapping->flags);
+					else
+						set_bit(AS_EIO,
+							&mapping->flags);
+				}
 			} else {
 				bio = mpage_writepage(bio, page, get_block,
 					&last_block_in_bio, &ret, wbc);
