@@ -153,7 +153,7 @@ static ssize_t ali_write(struct file *file, const char *data,
 			 * five months ago... */
 			ali_expect_release = 0;
 
-			/* scan to see wether or not we got the magic character */
+			/* scan to see whether or not we got the magic character */
 			for (i = 0; i != len; i++) {
 				char c;
 				if(get_user(c, data+i))
@@ -402,7 +402,7 @@ static int __init watchdog_init(void)
 
 	spin_lock_init(&ali_lock);
 
-	/* Check wether or not the hardware watchdog is there */
+	/* Check whether or not the hardware watchdog is there */
 	if (ali_find_watchdog() != 0) {
 		return -ENODEV;
 	}
