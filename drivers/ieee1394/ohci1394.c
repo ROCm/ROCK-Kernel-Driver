@@ -501,6 +501,7 @@ static void ohci_initialize(struct ti_ohci *ohci)
 {
 	char irq_buf[16];
 	quadlet_t buf;
+	int num_ports, i;
 
 	spin_lock_init(&ohci->phy_reg_lock);
 	spin_lock_init(&ohci->event_lock);
@@ -526,10 +527,6 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	reg_write(ohci, OHCI1394_LinkControlSet, OHCI1394_LinkControl_CycleTimerEnable |
 		  OHCI1394_LinkControl_CycleMaster);
 	set_phy_reg_mask(ohci, 4, 0xc0);
-
-	/* Clear interrupt registers */
-	reg_write(ohci, OHCI1394_IntMaskClear, 0xffffffff);
-	reg_write(ohci, OHCI1394_IntEventClear, 0xffffffff);
 
 	/* Set up self-id dma buffer */
 	reg_write(ohci, OHCI1394_SelfIDBuffer, ohci->selfid_buf_bus);
@@ -610,6 +607,19 @@ static void ohci_initialize(struct ti_ohci *ohci)
 	      pci_resource_start(ohci->dev, 0),
 	      pci_resource_start(ohci->dev, 0) + OHCI1394_REGISTER_SIZE - 1,
 	      ohci->max_packet_size);
+
+	/* Check all of our ports to make sure that if anything is
+	 * connected, we enable that port. */
+	num_ports = get_phy_reg(ohci, 2) & 0xf;
+	for (i = 0; i < num_ports; i++) {
+		unsigned int status;
+
+		set_phy_reg(ohci, 7, i);
+		status = get_phy_reg(ohci, 8);
+
+		if (status & 0x20)
+			set_phy_reg(ohci, 8, status & ~1);
+	}
 }
 
 /* 
@@ -690,7 +700,12 @@ static void insert_packet(struct ti_ohci *ohci,
                         /* 
                          * Check that the packet data buffer
                          * does not cross a page boundary.
+			 *
+			 * XXX Fix this some day. eth1394 seems to trigger
+			 * it, but ignoring it doesn't seem to cause a
+			 * problem.
                          */
+#if 0
                         if (cross_bound((unsigned long)packet->data, 
                                         packet->data_size)>0) {
                                 /* FIXME: do something about it */
@@ -699,7 +714,7 @@ static void insert_packet(struct ti_ohci *ohci,
                                       "cross page boundary", __FUNCTION__,
                                       packet->data, packet->data_size);
                         }
-
+#endif
                         d->prg_cpu[idx]->end.address = cpu_to_le32(
                                 pci_map_single(ohci->dev, packet->data,
                                                packet->data_size,
@@ -3189,6 +3204,7 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 	} else
 		ohci->selfid_swap = 1;
 #endif
+
 
 #ifndef PCI_DEVICE_ID_NVIDIA_NFORCE2_FW
 #define PCI_DEVICE_ID_NVIDIA_NFORCE2_FW 0x006e
