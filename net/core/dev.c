@@ -3177,6 +3177,8 @@ int unregister_netdevice(struct net_device *dev)
 	/* Finish processing unregister after unlock */
 	net_set_todo(dev);
 
+	synchronize_net();
+
 	dev_put(dev);
 	return 0;
 }
